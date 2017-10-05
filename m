@@ -1,244 +1,335 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Thu, 05 Oct 2017 17:30:00 +1030
-Subject: [PATCH v4 2/5] clk: aspeed: Register core clocks
-In-Reply-To: <20171003065540.11722-3-joel@jms.id.au>
-References: <20171003065540.11722-1-joel@jms.id.au>
- <20171003065540.11722-3-joel@jms.id.au>
-Message-ID: <1507186800.5452.63.camel@aj.id.au>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 5 Oct 2017 09:20:57 +0200
+Subject: [PATCH] mtd: nand: gpio: Convert to use GPIO descriptors
+In-Reply-To: <20170924173912.9199-1-linus.walleij@linaro.org>
+References: <20170924173912.9199-1-linus.walleij@linaro.org>
+Message-ID: <20171005092057.4ebdc62e@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-10-03 at 17:25 +1030, Joel Stanley wrote:
-> This registers the core clocks; those which are required to calculate
-> the rate of the timer peripheral so the system can load a clocksource
-> driver.
->?
-> Signed-off-by: Joel Stanley <joel@jms.id.au>
->?
+On Sun, 24 Sep 2017 19:39:12 +0200
+Linus Walleij <linus.walleij@linaro.org> wrote:
+
+> There is exactly one board in the kernel that defines platform data
+> for the GPIO NAND driver.
+> 
+> Use the feature to provide a lookup table for the GPIOs in the board
+> file so we can convert the driver as a whole to just use GPIO
+> descriptors.
+> 
+> After this we can cut the use of <linux/of_gpio.h> and use the GPIO
+> descriptor management from <linux/gpio/consumer.h> alone to grab and use
+> the GPIOs used in the driver.
+> 
+> I also created a local struct device *dev in the probe() function
+> because I was getting annoyed with all the &pdev->dev dereferencing.
+> 
+> Cc: arm at kernel.org
+> Cc: Mike Rapoport <rppt@linux.vnet.ibm.com>
+> Cc: Frans Klaver <fransklaver@gmail.com>
+> Cc: Gerhard Sittig <gsi@denx.de>
+> Cc: Jamie Iles <jamie.iles@oracle.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+
+Applied.
+
+Thanks,
+
+Boris
+
 > ---
-> v4:
-> ? - Add defines to document the BIT() macros
-> v3:
-> ? - Fix ast2400 ahb calculation
-> ? - Remove incorrect 'this is wrong' comment
-> ? - Separate out clkin calc to be per platform
-> ? - Support 48MHz clkin on ast2400
+> ARM SoC folks: Please ACK this so it can be merged through the MTD
+> subsystem.
+> 
+> Everyone else on CC: can you test and/or ACK this?
+> 
+> I don't have this PXA board, and all device tree users seem to be
+> out-of-tree so I rely on third parties to test this.
 > ---
-> ?drivers/clk/clk-aspeed.c | 177 +++++++++++++++++++++++++++++++++++++++++++++++
-> ?1 file changed, 177 insertions(+)
->?
-> diff --git a/drivers/clk/clk-aspeed.c b/drivers/clk/clk-aspeed.c
-> index a45eb351bb05..d39cf51a5114 100644
-> --- a/drivers/clk/clk-aspeed.c
-> +++ b/drivers/clk/clk-aspeed.c
-> @@ -20,7 +20,23 @@
-> ?
-> ?#include <dt-bindings/clock/aspeed-clock.h>
-> ?
-> +#define ASPEED_RESET_CTRL	0x04
-> +#define ASPEED_CLK_SELECTION	0x08
-> +#define ASPEED_CLK_STOP_CTRL	0x0c
-> +#define ASPEED_MPLL_PARAM	0x20
-> +#define ASPEED_HPLL_PARAM	0x24
-> +#define??AST2500_HPLL_BYPASS_EN	BIT(20)
-> +#define??AST2400_HPLL_STRAPPED	BIT(18)
-> +#define??AST2400_HPLL_BYPASS_EN	BIT(17)
-> +#define ASPEED_MISC_CTRL	0x2c
-> +#define??UART_DIV13_EN		BIT(12)
-> ?#define ASPEED_STRAP		0x70
-> +#define??CLKIN_25MHZ_EN		BIT(23)
-> +#define??AST2400_CLK_SOURCE_SEL	BIT(18)
-> +#define ASPEED_CLK_SELECTION_2	0xd8
+>  arch/arm/mach-pxa/cm-x255.c   |  19 ++++---
+>  drivers/mtd/nand/gpio.c       | 112 +++++++++++++++++++++---------------------
+>  include/linux/mtd/nand-gpio.h |   5 --
+>  3 files changed, 70 insertions(+), 66 deletions(-)
+> 
+> diff --git a/arch/arm/mach-pxa/cm-x255.c b/arch/arm/mach-pxa/cm-x255.c
+> index b592f79a1742..f8d67acb7194 100644
+> --- a/arch/arm/mach-pxa/cm-x255.c
+> +++ b/arch/arm/mach-pxa/cm-x255.c
+> @@ -14,7 +14,7 @@
+>  #include <linux/mtd/partitions.h>
+>  #include <linux/mtd/physmap.h>
+>  #include <linux/mtd/nand-gpio.h>
+> -
+> +#include <linux/gpio/machine.h>
+>  #include <linux/spi/spi.h>
+>  #include <linux/spi/pxa2xx_spi.h>
+>  
+> @@ -176,6 +176,17 @@ static inline void cmx255_init_nor(void) {}
+>  #endif
+>  
+>  #if defined(CONFIG_MTD_NAND_GPIO) || defined(CONFIG_MTD_NAND_GPIO_MODULE)
 > +
-> +/* Globally visible clocks */
-> +static DEFINE_SPINLOCK(aspeed_clk_lock);
-> ?
-> ?/* Keeps track of all clocks */
-> ?static struct clk_hw_onecell_data *aspeed_clk_data;
-> @@ -98,6 +114,160 @@ static const struct aspeed_gate_data aspeed_gates[] __initconst = {
-> ?	[ASPEED_CLK_GATE_LHCCLK] =	{ 28, -1, "lhclk-gate",		"lhclk", 0 }, /* LPC master/LPC+ */
-> ?};
-> ?
-> +static const struct clk_div_table ast2400_div_table[] = {
-> +	{ 0x0, 2 },
-> +	{ 0x1, 4 },
-> +	{ 0x2, 6 },
-> +	{ 0x3, 8 },
-> +	{ 0x4, 10 },
-> +	{ 0x5, 12 },
-> +	{ 0x6, 14 },
-> +	{ 0x7, 16 },
-> +	{ 0 }
+> +static struct gpiod_lookup_table cmx255_nand_gpiod_table = {
+> +	.dev_id         = "cmx255-nand",
+> +	.table          = {
+> +		GPIO_LOOKUP("gpio-pxa", GPIO_NAND_CS, "nce", GPIO_ACTIVE_HIGH),
+> +		GPIO_LOOKUP("gpio-pxa", GPIO_NAND_CLE, "cle", GPIO_ACTIVE_HIGH),
+> +		GPIO_LOOKUP("gpio-pxa", GPIO_NAND_ALE, "ale", GPIO_ACTIVE_HIGH),
+> +		GPIO_LOOKUP("gpio-pxa", GPIO_NAND_RB, "rdy", GPIO_ACTIVE_HIGH),
+> +	},
 > +};
 > +
-> +static const struct clk_div_table ast2500_div_table[] = {
-> +	{ 0x0, 4 },
-> +	{ 0x1, 8 },
-> +	{ 0x2, 12 },
-> +	{ 0x3, 16 },
-> +	{ 0x4, 20 },
-> +	{ 0x5, 24 },
-> +	{ 0x6, 28 },
-> +	{ 0x7, 32 },
-> +	{ 0 }
-> +};
+>  static struct resource cmx255_nand_resource[] = {
+>  	[0] = {
+>  		.start = PXA_CS1_PHYS,
+> @@ -198,11 +209,6 @@ static struct mtd_partition cmx255_nand_parts[] = {
+>  };
+>  
+>  static struct gpio_nand_platdata cmx255_nand_platdata = {
+> -	.gpio_nce = GPIO_NAND_CS,
+> -	.gpio_cle = GPIO_NAND_CLE,
+> -	.gpio_ale = GPIO_NAND_ALE,
+> -	.gpio_rdy = GPIO_NAND_RB,
+> -	.gpio_nwp = -1,
+>  	.parts = cmx255_nand_parts,
+>  	.num_parts = ARRAY_SIZE(cmx255_nand_parts),
+>  	.chip_delay = 25,
+> @@ -220,6 +226,7 @@ static struct platform_device cmx255_nand = {
+>  
+>  static void __init cmx255_init_nand(void)
+>  {
+> +	gpiod_add_lookup_table(&cmx255_nand_gpiod_table);
+>  	platform_device_register(&cmx255_nand);
+>  }
+>  #else
+> diff --git a/drivers/mtd/nand/gpio.c b/drivers/mtd/nand/gpio.c
+> index fd3648952b5a..484f7fbc3f7d 100644
+> --- a/drivers/mtd/nand/gpio.c
+> +++ b/drivers/mtd/nand/gpio.c
+> @@ -23,7 +23,7 @@
+>  #include <linux/slab.h>
+>  #include <linux/module.h>
+>  #include <linux/platform_device.h>
+> -#include <linux/gpio.h>
+> +#include <linux/gpio/consumer.h>
+>  #include <linux/io.h>
+>  #include <linux/mtd/mtd.h>
+>  #include <linux/mtd/rawnand.h>
+> @@ -31,12 +31,16 @@
+>  #include <linux/mtd/nand-gpio.h>
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+> -#include <linux/of_gpio.h>
+>  
+>  struct gpiomtd {
+>  	void __iomem		*io_sync;
+>  	struct nand_chip	nand_chip;
+>  	struct gpio_nand_platdata plat;
+> +	struct gpio_desc *nce; /* Optional chip enable */
+> +	struct gpio_desc *cle;
+> +	struct gpio_desc *ale;
+> +	struct gpio_desc *rdy;
+> +	struct gpio_desc *nwp; /* Optional write protection */
+>  };
+>  
+>  static inline struct gpiomtd *gpio_nand_getpriv(struct mtd_info *mtd)
+> @@ -78,11 +82,10 @@ static void gpio_nand_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
+>  	gpio_nand_dosync(gpiomtd);
+>  
+>  	if (ctrl & NAND_CTRL_CHANGE) {
+> -		if (gpio_is_valid(gpiomtd->plat.gpio_nce))
+> -			gpio_set_value(gpiomtd->plat.gpio_nce,
+> -				       !(ctrl & NAND_NCE));
+> -		gpio_set_value(gpiomtd->plat.gpio_cle, !!(ctrl & NAND_CLE));
+> -		gpio_set_value(gpiomtd->plat.gpio_ale, !!(ctrl & NAND_ALE));
+> +		if (gpiomtd->nce)
+> +			gpiod_set_value(gpiomtd->nce, !(ctrl & NAND_NCE));
+> +		gpiod_set_value(gpiomtd->cle, !!(ctrl & NAND_CLE));
+> +		gpiod_set_value(gpiomtd->ale, !!(ctrl & NAND_ALE));
+>  		gpio_nand_dosync(gpiomtd);
+>  	}
+>  	if (cmd == NAND_CMD_NONE)
+> @@ -96,7 +99,7 @@ static int gpio_nand_devready(struct mtd_info *mtd)
+>  {
+>  	struct gpiomtd *gpiomtd = gpio_nand_getpriv(mtd);
+>  
+> -	return gpio_get_value(gpiomtd->plat.gpio_rdy);
+> +	return gpiod_get_value(gpiomtd->rdy);
+>  }
+>  
+>  #ifdef CONFIG_OF
+> @@ -123,12 +126,6 @@ static int gpio_nand_get_config_of(const struct device *dev,
+>  		}
+>  	}
+>  
+> -	plat->gpio_rdy = of_get_gpio(dev->of_node, 0);
+> -	plat->gpio_nce = of_get_gpio(dev->of_node, 1);
+> -	plat->gpio_ale = of_get_gpio(dev->of_node, 2);
+> -	plat->gpio_cle = of_get_gpio(dev->of_node, 3);
+> -	plat->gpio_nwp = of_get_gpio(dev->of_node, 4);
+> -
+>  	if (!of_property_read_u32(dev->of_node, "chip-delay", &val))
+>  		plat->chip_delay = val;
+>  
+> @@ -201,10 +198,11 @@ static int gpio_nand_remove(struct platform_device *pdev)
+>  
+>  	nand_release(nand_to_mtd(&gpiomtd->nand_chip));
+>  
+> -	if (gpio_is_valid(gpiomtd->plat.gpio_nwp))
+> -		gpio_set_value(gpiomtd->plat.gpio_nwp, 0);
+> -	if (gpio_is_valid(gpiomtd->plat.gpio_nce))
+> -		gpio_set_value(gpiomtd->plat.gpio_nce, 1);
+> +	/* Enable write protection and disable the chip */
+> +	if (gpiomtd->nwp && !IS_ERR(gpiomtd->nwp))
+> +		gpiod_set_value(gpiomtd->nwp, 0);
+> +	if (gpiomtd->nce && !IS_ERR(gpiomtd->nce))
+> +		gpiod_set_value(gpiomtd->nce, 0);
+>  
+>  	return 0;
+>  }
+> @@ -215,66 +213,66 @@ static int gpio_nand_probe(struct platform_device *pdev)
+>  	struct nand_chip *chip;
+>  	struct mtd_info *mtd;
+>  	struct resource *res;
+> +	struct device *dev = &pdev->dev;
+>  	int ret = 0;
+>  
+> -	if (!pdev->dev.of_node && !dev_get_platdata(&pdev->dev))
+> +	if (!dev->of_node && !dev_get_platdata(dev))
+>  		return -EINVAL;
+>  
+> -	gpiomtd = devm_kzalloc(&pdev->dev, sizeof(*gpiomtd), GFP_KERNEL);
+> +	gpiomtd = devm_kzalloc(dev, sizeof(*gpiomtd), GFP_KERNEL);
+>  	if (!gpiomtd)
+>  		return -ENOMEM;
+>  
+>  	chip = &gpiomtd->nand_chip;
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	chip->IO_ADDR_R = devm_ioremap_resource(&pdev->dev, res);
+> +	chip->IO_ADDR_R = devm_ioremap_resource(dev, res);
+>  	if (IS_ERR(chip->IO_ADDR_R))
+>  		return PTR_ERR(chip->IO_ADDR_R);
+>  
+>  	res = gpio_nand_get_io_sync(pdev);
+>  	if (res) {
+> -		gpiomtd->io_sync = devm_ioremap_resource(&pdev->dev, res);
+> +		gpiomtd->io_sync = devm_ioremap_resource(dev, res);
+>  		if (IS_ERR(gpiomtd->io_sync))
+>  			return PTR_ERR(gpiomtd->io_sync);
+>  	}
+>  
+> -	ret = gpio_nand_get_config(&pdev->dev, &gpiomtd->plat);
+> +	ret = gpio_nand_get_config(dev, &gpiomtd->plat);
+>  	if (ret)
+>  		return ret;
+>  
+> -	if (gpio_is_valid(gpiomtd->plat.gpio_nce)) {
+> -		ret = devm_gpio_request(&pdev->dev, gpiomtd->plat.gpio_nce,
+> -					"NAND NCE");
+> -		if (ret)
+> -			return ret;
+> -		gpio_direction_output(gpiomtd->plat.gpio_nce, 1);
+> +	/* Just enable the chip */
+> +	gpiomtd->nce = devm_gpiod_get_optional(dev, "nce", GPIOD_OUT_HIGH);
+> +	if (IS_ERR(gpiomtd->nce))
+> +		return PTR_ERR(gpiomtd->nce);
 > +
-> +static struct clk_hw *aspeed_ast2400_calc_pll(const char *name, u32 val)
-> +{
-> +	unsigned int mult, div;
-> +
-> +	if (val & AST2400_HPLL_BYPASS_EN) {
-> +		/* Pass through mode */
-> +		mult = div = 1;
-> +	} else {
-> +		/* F = 24Mhz * (2-OD) * [(N + 2) / (D + 1)] */
-> +		u32 n = (val >> 5) & 0x3f;
-> +		u32 od = (val >> 4) & 0x1;
-> +		u32 d = val & 0xf;
-> +
-> +		mult = (2 - od) * (n + 2);
-> +		div = d + 1;
+> +	/* We disable write protection once we know probe() will succeed */
+> +	gpiomtd->nwp = devm_gpiod_get_optional(dev, "nwp", GPIOD_OUT_LOW);
+> +	if (IS_ERR(gpiomtd->nwp)) {
+> +		ret = PTR_ERR(gpiomtd->nwp);
+> +		goto out_ce;
+>  	}
+>  
+> -	if (gpio_is_valid(gpiomtd->plat.gpio_nwp)) {
+> -		ret = devm_gpio_request(&pdev->dev, gpiomtd->plat.gpio_nwp,
+> -					"NAND NWP");
+> -		if (ret)
+> -			return ret;
+> +	gpiomtd->nwp = devm_gpiod_get(dev, "ale", GPIOD_OUT_LOW);
+> +	if (IS_ERR(gpiomtd->nwp)) {
+> +		ret = PTR_ERR(gpiomtd->nwp);
+> +		goto out_ce;
+>  	}
+>  
+> -	ret = devm_gpio_request(&pdev->dev, gpiomtd->plat.gpio_ale, "NAND ALE");
+> -	if (ret)
+> -		return ret;
+> -	gpio_direction_output(gpiomtd->plat.gpio_ale, 0);
+> +	gpiomtd->cle = devm_gpiod_get(dev, "cle", GPIOD_OUT_LOW);
+> +	if (IS_ERR(gpiomtd->cle)) {
+> +		ret = PTR_ERR(gpiomtd->cle);
+> +		goto out_ce;
 > +	}
-> +	return clk_hw_register_fixed_factor(NULL, name, "clkin", 0,
-> +			mult, div);
-> +};
-> +
-> +static struct clk_hw *aspeed_ast2500_calc_pll(const char *name, u32 val)
-> +{
-> +	unsigned int mult, div;
-> +
-> +	if (val & AST2500_HPLL_BYPASS_EN) {
-> +		/* Pass through mode */
-> +		mult = div = 1;
-> +	} else {
-> +		/* F = clkin * [(M+1) / (N+1)] / (P + 1) */
-> +		u32 p = (val >> 13) & 0x3f;
-> +		u32 m = (val >> 5) & 0xff;
-> +		u32 n = val & 0x1f;
-> +
-> +		mult = (m + 1) / (n + 1);
-> +		div = p + 1;
-> +	}
-> +
-> +	return clk_hw_register_fixed_factor(NULL, name, "clkin", 0,
-> +			mult, div);
-> +}
-> +
-> +static void __init aspeed_ast2400_cc(struct regmap *map)
-> +{
-> +	struct clk_hw *hw;
-> +	u32 val, freq, div;
-> +
-> +	/*
-> +	?* CLKIN is the crystal oscillator, 24, 48 or 25MHz selected by
-> +	?* strapping
-> +	?*/
-> +	regmap_read(map, ASPEED_STRAP, &val);
-> +	if (val & CLKIN_25MHZ_EN)
-> +		freq = 25000000;
-> +	else if (val & AST2400_CLK_SOURCE_SEL)
-> +		freq = 48000000;
-> +	else
-> +		freq = 24000000;
-> +	hw = clk_hw_register_fixed_rate(NULL, "clkin", NULL, 0, freq);
-> +	pr_debug("clkin @%u MHz\n", freq / 1000000);
-> +
-> +	/*
-> +	?* High-speed PLL clock derived from the crystal. This the CPU clock,
-> +	?* and we assume that it is enabled
-> +	?*/
-> +	regmap_read(map, ASPEED_HPLL_PARAM, &val);
-> +	WARN(val & AST2400_HPLL_STRAPPED, "hpll is strapped not configured");
-> +	aspeed_clk_data->hws[ASPEED_CLK_HPLL] = aspeed_ast2400_calc_pll("hpll", val);
-> +
-> +	/*
-> +	?* Strap bits 11:10 define the CPU/AHB clock frequency ratio (aka HCLK)
-> +	?*???00: Select CPU:AHB = 1:1
-> +	?*???01: Select CPU:AHB = 2:1
-> +	?*???10: Select CPU:AHB = 4:1
-> +	?*???11: Select CPU:AHB = 3:1
-> +	?*/
-> +	regmap_read(map, ASPEED_STRAP, &val);
-> +	val = (val >> 10) & 0x3;
-> +	div = val + 1;
-> +	if (div == 3)
-> +		div = 4;
-> +	else if (div == 4)
-> +		div = 3;
-> +	hw = clk_hw_register_fixed_factor(NULL, "ahb", "hpll", 0, 1, div);
-> +	aspeed_clk_data->hws[ASPEED_CLK_AHB] = hw;
-> +
-> +	/* APB clock clock selection register SCU08 (aka PCLK) */
-> +	hw = clk_hw_register_divider_table(NULL, "apb", "hpll", 0,
-> +			scu_base + ASPEED_CLK_SELECTION, 23, 3, 0,
-> +			ast2400_div_table,
-> +			&aspeed_clk_lock);
-> +	aspeed_clk_data->hws[ASPEED_CLK_APB] = hw;
-> +}
-> +
-> +static void __init aspeed_ast2500_cc(struct regmap *map)
-> +{
-> +	struct clk_hw *hw;
-> +	u32 val, freq, div;
-> +
-> +	/* CLKIN is the crystal oscillator, 24 or 25MHz selected by strapping */
-> +	regmap_read(map, ASPEED_STRAP, &val);
-> +	if (val & CLKIN_25MHZ_EN)
-> +		freq = 25000000;
-> +	else
-> +		freq = 24000000;
-> +	hw = clk_hw_register_fixed_rate(NULL, "clkin", NULL, 0, freq);
-> +	pr_debug("clkin @%u MHz\n", freq / 1000000);
-> +
-> +	/*
-> +	?* High-speed PLL clock derived from the crystal. This the CPU clock,
-> +	?* and we assume that it is enabled
-> +	?*/
-> +	regmap_read(map, ASPEED_HPLL_PARAM, &val);
-> +	aspeed_clk_data->hws[ASPEED_CLK_HPLL] = aspeed_ast2500_calc_pll("hpll", val);
-> +
-> +	/* Strap bits 11:9 define the AXI/AHB clock frequency ratio (aka HCLK)*/
-> +	regmap_read(map, ASPEED_STRAP, &val);
-> +	val = (val >> 9) & 0x7;
-> +	WARN(val == 0, "strapping is zero: cannot determine ahb clock");
-> +	div = 2 * (val + 1);
-> +	hw = clk_hw_register_fixed_factor(NULL, "ahb", "hpll", 0, 1, div);
-> +	aspeed_clk_data->hws[ASPEED_CLK_AHB] = hw;
-> +
-> +	/* APB clock clock selection register SCU08 (aka PCLK) */
-> +	regmap_read(map, ASPEED_CLK_SELECTION, &val);
-> +	val = (val >> 23) & 0x7;
-> +	div = 4 * (val + 1);
-> +	hw = clk_hw_register_fixed_factor(NULL, "apb", "hpll", 0, 1, div);
-> +	aspeed_clk_data->hws[ASPEED_CLK_APB] = hw;
-> +};
-> +
-> ?static void __init aspeed_cc_init(struct device_node *np)
-> ?{
-> ?	struct regmap *map;
-> @@ -139,6 +309,13 @@ static void __init aspeed_cc_init(struct device_node *np)
-> ?		return;
-> ?	}
-> ?
-> +	if (of_device_is_compatible(np, "aspeed,ast2400-scu"))
-> +		aspeed_ast2400_cc(map);
-> +	else if (of_device_is_compatible(np, "aspeed,ast2500-scu"))
-> +		aspeed_ast2500_cc(map);
-> +	else
-> +		pr_err("unknown platform, failed to add clocks\n");
-> +
-
-I'm still unsure about this approach with the scu compatible, but otherwise:
-
-Reviewed-by: Andrew Jeffery <andrew@aj.id.au>
-
-> ?	aspeed_clk_data->num = ASPEED_NUM_CLKS;
-> ?	ret = of_clk_add_hw_provider(np, of_clk_hw_onecell_get, aspeed_clk_data);
-> ?	if (ret)
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171005/300aa628/attachment.sig>
+>  
+> -	ret = devm_gpio_request(&pdev->dev, gpiomtd->plat.gpio_cle, "NAND CLE");
+> -	if (ret)
+> -		return ret;
+> -	gpio_direction_output(gpiomtd->plat.gpio_cle, 0);
+> -
+> -	if (gpio_is_valid(gpiomtd->plat.gpio_rdy)) {
+> -		ret = devm_gpio_request(&pdev->dev, gpiomtd->plat.gpio_rdy,
+> -					"NAND RDY");
+> -		if (ret)
+> -			return ret;
+> -		gpio_direction_input(gpiomtd->plat.gpio_rdy);
+> -		chip->dev_ready = gpio_nand_devready;
+> +	gpiomtd->rdy = devm_gpiod_get_optional(dev, "rdy", GPIOD_IN);
+> +	if (IS_ERR(gpiomtd->rdy)) {
+> +		ret = PTR_ERR(gpiomtd->rdy);
+> +		goto out_ce;
+>  	}
+> +	/* Using RDY pin */
+> +	if (gpiomtd->rdy)
+> +		chip->dev_ready = gpio_nand_devready;
+>  
+>  	nand_set_flash_node(chip, pdev->dev.of_node);
+>  	chip->IO_ADDR_W		= chip->IO_ADDR_R;
+> @@ -285,12 +283,13 @@ static int gpio_nand_probe(struct platform_device *pdev)
+>  	chip->cmd_ctrl		= gpio_nand_cmd_ctrl;
+>  
+>  	mtd			= nand_to_mtd(chip);
+> -	mtd->dev.parent		= &pdev->dev;
+> +	mtd->dev.parent		= dev;
+>  
+>  	platform_set_drvdata(pdev, gpiomtd);
+>  
+> -	if (gpio_is_valid(gpiomtd->plat.gpio_nwp))
+> -		gpio_direction_output(gpiomtd->plat.gpio_nwp, 1);
+> +	/* Disable write protection, if wired up */
+> +	if (gpiomtd->nwp && !IS_ERR(gpiomtd->nwp))
+> +		gpiod_direction_output(gpiomtd->nwp, 1);
+>  
+>  	ret = nand_scan(mtd, 1);
+>  	if (ret)
+> @@ -305,8 +304,11 @@ static int gpio_nand_probe(struct platform_device *pdev)
+>  		return 0;
+>  
+>  err_wp:
+> -	if (gpio_is_valid(gpiomtd->plat.gpio_nwp))
+> -		gpio_set_value(gpiomtd->plat.gpio_nwp, 0);
+> +	if (gpiomtd->nwp && !IS_ERR(gpiomtd->nwp))
+> +		gpiod_set_value(gpiomtd->nwp, 0);
+> +out_ce:
+> +	if (gpiomtd->nce && !IS_ERR(gpiomtd->nce))
+> +		gpiod_set_value(gpiomtd->nce, 0);
+>  
+>  	return ret;
+>  }
+> diff --git a/include/linux/mtd/nand-gpio.h b/include/linux/mtd/nand-gpio.h
+> index be4f45d89be2..98f71908212d 100644
+> --- a/include/linux/mtd/nand-gpio.h
+> +++ b/include/linux/mtd/nand-gpio.h
+> @@ -4,11 +4,6 @@
+>  #include <linux/mtd/rawnand.h>
+>  
+>  struct gpio_nand_platdata {
+> -	int	gpio_nce;
+> -	int	gpio_nwp;
+> -	int	gpio_cle;
+> -	int	gpio_ale;
+> -	int	gpio_rdy;
+>  	void	(*adjust_parts)(struct gpio_nand_platdata *, size_t);
+>  	struct mtd_partition *parts;
+>  	unsigned int num_parts;
