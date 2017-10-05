@@ -1,131 +1,37 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 5 Oct 2017 17:16:46 +0100
-Subject: undefined instruction d5380001 (arm64 mrs emulation)
-In-Reply-To: <fb13bcdf-c97b-40c6-3815-30dce26bca8e@suse.com>
-References: <CAJs94EZqdWJRTF+tLgGU=pcRoU5HvuV959Qq8nFB5yQ-sQyxzg@mail.gmail.com>
- <20171002112433.GM3611@e103592.cambridge.arm.com>
- <59D24906.4060104@arm.com>
- <20171002155638.GA18543@e107814-lin.cambridge.arm.com>
- <CAJs94EbvM6U5qQyAGGY7BEppC=dPo_LPzU4STDNU7muCZvLXmw@mail.gmail.com>
- <fb13bcdf-c97b-40c6-3815-30dce26bca8e@suse.com>
-Message-ID: <20171005161645.7sqjkd25pwdng5dz@armageddon.cambridge.arm.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Fri, 6 Oct 2017 00:23:35 +0800
+Subject: [xlnx:master 841/1043] core.c:undefined reference to
+ `dwc3_set_simple_data'
+Message-ID: <201710060032.malauWKb%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   f1b1e077d641fc83b54c1b8f168cbb58044fbd4e
+commit: a4769f84c50a769e655d4bb9c1a8a45586cdc1f4 [841/1043] dwc3: Add support for removing vbus when suspended
+config: i386-randconfig-s0-10032350 (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        git checkout a4769f84c50a769e655d4bb9c1a8a45586cdc1f4
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-On Thu, Oct 05, 2017 at 04:54:09PM +0200, Matthias Brugger wrote:
-> On 10/04/2017 11:11 AM, Matwey V. Kornilov wrote:
-> > The patch helps to overcome the issue, Probably it should be applied
-> > to all stable releases affected by this behaviour.
-> > modprobe in initrd may load quite required things.
-> > 
-> > 2017-10-02 18:56 GMT+03:00 Suzuki K Poulose <Suzuki.Poulose@arm.com>:
-> > > On Mon, Oct 02, 2017 at 03:11:18PM +0100, James Morse wrote:
-> > > > On 02/10/17 12:24, Dave Martin wrote:
-> > > > > On Fri, Sep 29, 2017 at 10:23:54PM +0300, Matwey V. Kornilov wrote:
-> > > > > > I am running 4.13.3 on rockchip 3328 platform(aarch64) with glibc 2.26
-> > > > > > and see the following at booting:
-> > > > > > 
-> > > > > > [   11.152061] modprobe[93]: undefined instruction: pc=0000ffff8ca48ff4
-> > > > > > [   11.152707] Code: d503201f 8a180320 92750001 365ffc20 (d5380001)
-> > > > > > [   11.154347] modprobe[94]: undefined instruction: pc=0000ffff94243ff4
-> > > > > > [   11.154991] Code: d503201f 8a180320 92750001 365ffc20 (d5380001)
-> > > > > > [   11.157070] modprobe[97]: undefined instruction: pc=0000ffff839a0ff4
-> > > > > > [   11.157715] Code: d503201f 8a180320 92750001 365ffc20 (d5380001)
-> > > > > > [   11.159265] modprobe[98]: undefined instruction: pc=0000ffffb0591ff4
-> > > > > > [   11.159908] Code: d503201f 8a180320 92750001 365ffc20 (d5380001)
-> > > > > > 
-> > > > > > As far as I understand d5380001 should be emulated in cpufeature.c but
-> > > > > > it is not. What could be wrong here?
-> > > > > 
-> > > > > The whole sequence is
-> > > > > 
-> > > > >     0:   d503201f        nop
-> > > > >     4:   8a180320        and     x0, x25, x24
-> > > > >     8:   92750001        and     x1, x0, #0x800
-> > > > >     c:   365ffc20        tbz     w0, #11, 0xffffffffffffff90
-> > > > >    10:*  d5380001        mrs     x1, midr_el1            <-- trapping instruction
-> > > > 
-> > > > This looks the same as:
-> > > > https://bugzilla.redhat.com/show_bug.cgi?id=1496209
-> > > > 
-> > > > [...]
-> > > > 
-> > > > > What should happen here is that the do_undefinstr() in
-> > > > > arch/arm64/kernel/traps.c should call registered undef hooks until it
-> > > > > finds one that accepts the faulting instruction.
-> > > > > 
-> > > > > So, either the cpufeatures undef hook is not getting called, or it is
-> > > > > failing the instruction somewhere, possibly in
-> > > > > cpufeatures.c:emulate_id_reg() or emulate_sys_reg().
-> > > > > 
-> > > > > 
-> > > > > Can you add some trace to those functions to see what's happening?
-> > > > 
-> > > > I couldn't reproduce this with linux-stable's v4.13.3 defconfig on Seattle or Juno.
-> > > > 
-> > > > What distribution are you running? Could you also try [0] to see if this is
-> > > > something specific to your version of modprobe?
-> > > 
-> > > 
-> > > It is worth noting that we register the MRS instruction handler as late_init call.
-> > > Now the question is how late that could be. Given that we are hitting it with
-> > > modprobe, which could be used for requesting modules from initrd. Also which explains
-> > > why it we can't reproduce it by simple testcases, after it was registered.
-> > > 
-> > > Now the question is, how early do we want to push this. Since it doesn't depend really
-> > > on any other subsystem, we could move it as early as "early". Or for keeping it in
-> > > line with other "arch" specific init calls, we could simply make it arch_initcall.
-> > > 
-> > > Matwey,
-> > > 
-> > > Please could you check if the following patch fixes the issue for you:
-> > > 
-> > > Cheers
-> > > Suzuki
-> > > 
-> > > ----8>----
-> > > 
-> > > arm64: Enable MRS emulation early enough in the boot sequence
-> > > 
-> > > Make sure the MRS emulation is enabled early enough that the
-> > > early userspace applications (e.g, those run from initrd) could
-> > > run without any trouble.
-> > > 
-> > > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> > > 
-> > > diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> > > index 9f9e0064c8c1..048f5469531f 100644
-> > > --- a/arch/arm64/kernel/cpufeature.c
-> > > +++ b/arch/arm64/kernel/cpufeature.c
-> > > @@ -1294,4 +1294,4 @@ static int __init enable_mrs_emulation(void)
-> > >          return 0;
-> > >   }
-> > > 
-> > > -late_initcall(enable_mrs_emulation);
-> > > +arch_initcall(enable_mrs_emulation);
-> > > ---
-> 
-> I realized this patch did not land in v4.13.5
-> Did it got forgotten or are there any concerns?
-> 
-> We also hit this bug in openSUSE Tumbleweed:
-> https://bugzilla.suse.com/show_bug.cgi?id=1061188
+All errors (new ones prefixed by >>):
 
-As Mark replied, we are still debating why this happens and whether the
-above fix is sufficient. As we were digging further, we realised there
-is no clear init level after which user space can be invoked, which
-means Suzuki's patch may not always be sufficient.
+   drivers/built-in.o: In function `dwc3_core_init':
+>> core.c:(.text+0x24776d): undefined reference to `dwc3_set_simple_data'
+   core.c:(.text+0x2477a3): undefined reference to `dwc3_enable_hw_coherency'
+   drivers/built-in.o: In function `dwc3_probe':
+   core.c:(.text+0x248cf3): undefined reference to `dwc3_set_phydata'
+   core.c:(.text+0x248d8c): undefined reference to `dwc3_set_phydata'
 
-I proposed something as a way of spotting this issue early [1] but I
-need to post it on the linux-arch to get some consensus.
-
-Can you post the full kernel log somewhere? I'm trying to figure out
-what trigged the modprobe during the kernel boot.
-
-Thanks,
-
-Catalin
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-October/534465.html
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 28152 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171006/3827b313/attachment-0001.gz>
