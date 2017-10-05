@@ -1,74 +1,85 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 5 Oct 2017 15:52:50 +0930
-Subject: [PATCH v2 3/5] clk: aspeed: Add platform driver and register PLLs
-In-Reply-To: <20171004211820.GX457@codeaurora.org>
-References: <20170921042641.7326-1-joel@jms.id.au>
- <20170921042641.7326-4-joel@jms.id.au>
- <20171002212435.GP457@codeaurora.org>
- <CACPK8XeHj2xdw6HgkWRDiJPjurip3wVbkOmY0mGW=dSTVWsYmg@mail.gmail.com>
- <20171004211820.GX457@codeaurora.org>
-Message-ID: <CACPK8XdzDatTXng-YR9qqYNqxzQPSaf87+2B==YEnC+ffGkPTw@mail.gmail.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Thu, 5 Oct 2017 14:33:56 +0800
+Subject: [PATCH] soc: mediatek: turn MTK_PMIC_WRAP into visible symbols
+In-Reply-To: <CAK8P3a3WPPQrLL0r2FSBms-9UxFFQTkBs7kBaCQRkqX5Ohv36g@mail.gmail.com>
+References: <6c1696cf9f860cc8151a906ecbc799121b5aeeab.1505984256.git.sean.wang@mediatek.com>
+ <20170926080022.215f7b7b@endymion>
+ <CAK8P3a3WPPQrLL0r2FSBms-9UxFFQTkBs7kBaCQRkqX5Ohv36g@mail.gmail.com>
+Message-ID: <1507185236.21840.3.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 5, 2017 at 6:48 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 10/03, Joel Stanley wrote:
->> On Tue, Oct 3, 2017 at 6:54 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> > On 09/21, Joel Stanley wrote:
->> >> @@ -160,6 +191,104 @@ static struct clk_hw *aspeed_calc_pll(const char *name, u32 val)
->> >> +     /*
->> >> +      * Memory controller (M-PLL) PLL. This clock is configured by the
->> >> +      * bootloader, and is exposed to Linux as a read-only clock rate.
->> >> +      */
->> >> +     regmap_read(map, ASPEED_MPLL_PARAM, &val);
->> >> +     aspeed_clk_data->hws[ASPEED_CLK_MPLL] = aspeed_calc_pll("mpll", val);
->> >> +
->> >> +     /* SD/SDIO clock divider (TODO: There's a gate too) */
->> >> +     hw = clk_hw_register_divider_table(NULL, "sdio", "hpll", 0,
->> >
->> > Please pass your dev pointer here from the platform device.
->> >
->> >> +                     scu_base + ASPEED_CLK_SELECTION, 12, 3, 0,
->> >> +                     div_table,
->> >> +                     &aspeed_clk_lock);
->> >
->> > And check for errors? Perhaps use devm_clk_hw_regsiter() APIs and
->> > construct the dividers and muxes directly instead of using the
->> > basic type registration APIs.
->>
->> Do you think that devm_ is overkill, given we will never unload this driver?
->
-> Is probe defer going to happen? Even if unload can't happen,
-> probe defer is a concern unless that is also ruled out.
+On Mon, 2017-10-02 at 13:21 +0200, Arnd Bergmann wrote:
+> On Tue, Sep 26, 2017 at 8:00 AM, Jean Delvare <jdelvare@suse.de> wrote:
+> > On Thu, 21 Sep 2017 17:01:05 +0800, sean.wang at mediatek.com wrote:
+> >> From: Sean Wang <sean.wang@mediatek.com>
+> >>
+> >> MTK_PMIC_WRAP is the basic and required configuration for those various
+> >> MediaTek PMICs, so turning MTK_PMIC_WRAP into visible symbols easily
+> >> allows users tending to have the enablement for those PMICs.
+> >
+> > I can't really make sense of the sentence above, sorry, and can't see
+> > how it matches the change below anyway. MTK_PMIC_WRAP is already a
+> > visible symbol before this change. The change is probably good in
+> > itself, but please try to come up with a better description.
+> >
+> >> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> >> ---
+> >>  drivers/soc/mediatek/Kconfig | 2 +-
+> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>
+> >> diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
+> >> index a2fcd7f..d513629 100644
+> >> --- a/drivers/soc/mediatek/Kconfig
+> >> +++ b/drivers/soc/mediatek/Kconfig
+> >> @@ -15,7 +15,7 @@ config MTK_INFRACFG
+> >>  config MTK_PMIC_WRAP
+> >>       tristate "MediaTek PMIC Wrapper Support"
+> >>       depends on ARCH_MEDIATEK
+> >> -     depends on RESET_CONTROLLER
+> >> +     select RESET_CONTROLLER
+> >>       select REGMAP
+> 
+> Your other patch now removes the ARCH_MEDIATEK dependency
+> and allows enabling the driver for COMPILE_TEST on architectures
+> that might not have ARCH_HAS_RESET_CONTROLLER set,
+> so you cannot 'select' the symbol in general.
+> 
+> I think a better solution is to leave the 'depends on
+> RESET_CONTROLLER' present here, but instead add
+> 'select RESET_CONTROLLER' to the ARCH_MEDIATEK
+> definition.
+> 
+> Generally speaking, we don't want to mix 'select' and 'depends on'
+> statements for the same symbol, but if we do, it should be done
+> consistently in a very clear hierarchy. In case of RESET_CONTROLLER,
+> the rule seems to be to 'select' it from architectures and platforms,
+> while using 'depends on' from device drivers that absolutely require it.
+> 
+> Note that for compile-testing, it should be fine to rely on the fallback
+> definitions in include/linux/reset.h, so you might be able to just
+> remove the 'depends on' statement completely.
+> 
+> In any case, please try to be clearer about what the patch
+> actually tries to achieve. Did you run into a build error without
+> it? If so, please copy the exact build error message into the
+> patch description.
+> 
+>       Arnd
 
-As I understand it, I will only get an EPROBE_DEFER if I'm requesting
-something from another driver?
+Thanks for your both suggestions and idea
 
-If that's the case then we can rule that out.
+No any compile error is present prior to the patch.
 
->>
->> Can you explain why you suggest to construct the structures directly
->> instead of using the APIs?
->
-> There aren't devm APIs for some of these basic clk type
-> registration functions.
->
->>
->> I had a read of the basic type registration functions, and the
->> relevant failure paths are memory allocation failures. If we're out of
->> memory that early in boot then things have gone pretty bad.
->>
->> I can add checks for null and bail out; I don't think there's value in
->> freeing the allocated memory: if a system can't load it's clock driver
->> then it's super hosed.
->
-> If we can't proceed without this driver because it's super hosed,
-> then perhaps we need to panic the system on errors here. Should
-> be simple enough to add some error checks and goto panic("Things
-> are super hosed").
+In the initial thought, I simply would like to allow the configuration
+item able to be visible in menuconfig without visiting all dependencies
+for it, especially for those SoC-required drivers when the corresponding
+architecture target is already picked up.
 
-Okay. I added checks in v4. Does that look ok you you?
+I prefer to the better solution leaving 'depends on RESET_CONTROLLER'
+present here, and add additional 'select ARCH_RESET_CONTROLLER' to the
+ARCH_MEDIATEK definition, which could reach the goal initially I'd try
+to. So I will update them in this way in the next version, including a
+better description of the patch.
 
-Cheers,
-
-Joel
+	Sean 
