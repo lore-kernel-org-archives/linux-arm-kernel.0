@@ -1,45 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  5 Oct 2017 17:49:18 +0100
-Subject: [PATCH] iommu/arm-smmu-v3: Ensure we sync STE when only changing
- config field
-Message-ID: <1507222158-4151-1-git-send-email-will.deacon@arm.com>
+From: anup@brainfault.org (Anup Patel)
+Date: Thu,  5 Oct 2017 22:19:58 +0530
+Subject: [PATCH] ARM: multi_v7_defconfig: Select RPMSG_VIRTIO as module
+Message-ID: <1507222198-5052-1-git-send-email-anup@brainfault.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SMMUv3 architecture permits caching of data structures deemed to be
-"reachable" by the SMU, which includes STEs marked as invalid. When
-transitioning an STE to a bypass/fault configuration at init or detach
-time, we mistakenly elide the CMDQ_OP_CFGI_STE operation in some cases,
-therefore potentially leaving the old STE state cached in the SMMU.
+The RPMSG_VIRTIO is now user selectable option so we explicitly
+select it in multi_v7_defconfig. Till now RPMSG_VIRTIO was
+selected by ST_REMOTEPROC=m in multi_v7_defconfig.
 
-This patch fixes the problem by ensuring that we perform the
-CMDQ_OP_CFGI_STE operation irrespective of the validity of the previous
-STE.
-
-Cc: Robin Murphy <robin.murphy@arm.com>
-Reported-by: Eric Auger <eric.auger@redhat.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Anup Patel <anup@brainfault.org>
 ---
- drivers/iommu/arm-smmu-v3.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 47f52b1ab838..91fdabdb4de6 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1085,8 +1085,11 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
- 		dst[1] = cpu_to_le64(STRTAB_STE_1_SHCFG_INCOMING
- 			 << STRTAB_STE_1_SHCFG_SHIFT);
- 		dst[2] = 0; /* Nuke the VMID */
--		if (ste_live)
--			arm_smmu_sync_ste_for_sid(smmu, sid);
-+		/*
-+		 * The SMMU can perform negative caching, so we must sync
-+		 * the STE regardless of whether the old value was live.
-+		 */
-+		arm_smmu_sync_ste_for_sid(smmu, sid);
- 		return;
- 	}
- 
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 0cacdbf..5e689e0 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -849,6 +849,7 @@ CONFIG_TEGRA_IOMMU_GART=y
+ CONFIG_TEGRA_IOMMU_SMMU=y
+ CONFIG_REMOTEPROC=m
+ CONFIG_ST_REMOTEPROC=m
++CONFIG_RPMSG_VIRTIO=m
+ CONFIG_PM_DEVFREQ=y
+ CONFIG_ARM_TEGRA_DEVFREQ=m
+ CONFIG_MEMORY=y
 -- 
-2.1.4
+2.7.4
