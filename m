@@ -1,50 +1,71 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 5 Oct 2017 17:09:27 -0500
-Subject: [PATCH v6 11/11] of: mdio: Prevent of_mdiobus_register from
- scanning mdio-mux nodes
-In-Reply-To: <c8697b60-294f-7cc1-8425-aa5b837fcca0@gmail.com>
-References: <20170927073414.17361-1-clabbe.montjoie@gmail.com>
- <20170927073414.17361-12-clabbe.montjoie@gmail.com>
- <20170927141213.GF13516@lunn.ch>
- <c8697b60-294f-7cc1-8425-aa5b837fcca0@gmail.com>
-Message-ID: <20171005220927.7rabn3ftvow253xj@rob-hp-laptop>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Thu, 5 Oct 2017 17:12:44 -0500
+Subject: [PATCH 0/6] Switch arm64 over to qrwlock
+In-Reply-To: <1507208097-825-1-git-send-email-will.deacon@arm.com>
+References: <1507208097-825-1-git-send-email-will.deacon@arm.com>
+Message-ID: <9e2468c3-894e-1204-4578-3d8266c56d6c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 27, 2017 at 09:50:46PM -0700, Florian Fainelli wrote:
+Hi,
+
+
+On 10/05/2017 07:54 AM, Will Deacon wrote:
+> Hi all,
 > 
+> This patch series reworks bits of the qrwlock code that it can be used
+> to replace the asm rwlocks currently implemented for arm64. The structure
+> of the series is:
 > 
-> On 09/27/2017 07:12 AM, Andrew Lunn wrote:
-> > On Wed, Sep 27, 2017 at 09:34:14AM +0200, Corentin Labbe wrote:
-> >> Each child node of an MDIO node is scanned as a PHY when calling
-> >> of_mdiobus_register() givint the following result:
-> >> [   18.175379] mdio_bus stmmac-0: /soc/ethernet at 1c30000/mdio/mdio-mux has invalid PHY address
-> >> [   18.175408] mdio_bus stmmac-0: scan phy mdio-mux at address 0
-> >> [   18.175450] mdio_bus stmmac-0: scan phy mdio-mux at address 1
-> >> [...]
-> >> [   18.176420] mdio_bus stmmac-0: scan phy mdio-mux at address 30
-> >> [   18.176452] mdio_bus stmmac-0: scan phy mdio-mux at address 31
-> >>
-> >> Since mdio-mux nodes are not PHY, this patch a way to to not scan
-> >> them.
-> > 
-> > Hi Corentin
-> > 
-> > I still don't like this, but ...
+>    Patches 1-3	: Work WFE into qrwlock using atomic_cond_read_acquire so
+> 		  we can avoid busy-waiting.
 > 
-> Me neither, even more so as I don't understand the reasoning behind
-> putting the mux as a child node of the MDIO bus controller in the first
-> place.
+>    Patch 4	: Enable qrwlocks for arm64
+> 
+>    Patch 5-6	: Ensure writer slowpath fairness. This has a potential
+> 		  performance impact on the writer unlock path, so I've
+> 		  kept them at the end.
+> 
+> The patches apply on top of my other locking cleanups:
+> 
+>    http://lkml.kernel.org/r/1507055129-12300-1-git-send-email-will.deacon at arm.com
+> 
+> although the conflict with mainline is trivial to resolve without those.
+> The full stack is also pushed here:
+> 
+>    git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git qrwlock
+> 
+> All comments (particularly related to testing and performance) welcome!
 
-If no one agrees with me, then you shouldn't just accept my answers. I'm 
-not always right.
+I haven't done any perf testing, but the machines continue to boot, and 
+the stress-ng test which causes task lock problems with the normal arm64 
+rwlock now appears to run as expected. So, its a good start!
 
-Looking at this some more, why can't mdio-mux-mmio be used? Then there 
-is nothing to review or discuss. If you want to extend that then make it 
-clear this is just extending/inheriting already defined bindings.
 
-That being said, if we were starting over I would probably do mux 
-designs differently with DT hierarchy reflecting the mux hierarchy, but 
-that ship has sailed.
 
-Rob
+> 
+> Cheers,
+> 
+> Will
+> 
+> --->8
+> 
+> Will Deacon (6):
+>    kernel/locking: Use struct qrwlock instead of struct __qrwlock
+>    locking/atomic: Add atomic_cond_read_acquire
+>    kernel/locking: Use atomic_cond_read_acquire when spinning in qrwlock
+>    arm64: locking: Move rwlock implementation over to qrwlocks
+>    kernel/locking: Prevent slowpath writers getting held up by fastpath
+>    kernel/locking: Remove unused union members from struct qrwlock
+> 
+>   arch/arm64/Kconfig                      |  17 ++++
+>   arch/arm64/include/asm/Kbuild           |   1 +
+>   arch/arm64/include/asm/spinlock.h       | 164 +-------------------------------
+>   arch/arm64/include/asm/spinlock_types.h |   6 +-
+>   include/asm-generic/atomic-long.h       |   3 +
+>   include/asm-generic/qrwlock.h           |  14 +--
+>   include/asm-generic/qrwlock_types.h     |   2 +-
+>   include/linux/atomic.h                  |   4 +
+>   kernel/locking/qrwlock.c                |  83 +++-------------
+>   9 files changed, 43 insertions(+), 251 deletions(-)
+> 
