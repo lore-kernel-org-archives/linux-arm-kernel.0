@@ -1,35 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  5 Oct 2017 14:09:39 +0200
-Subject: [PATCH] drm/rockchip: add PINCTRL dependency for LVDS
-Message-ID: <20171005120957.485433-1-arnd@arndb.de>
+From: allen.pais@oracle.com (Allen Pais)
+Date: Thu,  5 Oct 2017 17:46:55 +0530
+Subject: [PATCH] arm64: use vma_pages helper
+Message-ID: <1507205815-5204-1-git-send-email-allen.pais@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new driver fails to build when CONFIG_PINCTRL is disabled:
+  Use vma_pages function on vma object instead of explicit computation.
+  This is a clean up patch.
 
-drivers/gpu/drm/rockchip/rockchip_lvds.c: In function 'rockchip_lvds_grf_config':
-drivers/gpu/drm/rockchip/rockchip_lvds.c:229:39: error: dereferencing pointer to incomplete type 'struct dev_pin_info'
-   if (lvds->pins && !IS_ERR(lvds->pins->default_state))
-
-This adds the respective Kconfig dependency.
-
-Fixes: 34cc0aa25456 ("drm/rockchip: Add support for Rockchip Soc LVDS")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Allen Pais <allen.pais@oracle.com>
 ---
- drivers/gpu/drm/rockchip/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/mm/dma-mapping.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
-index 0c31f0a27b9c..3c70c6224bd2 100644
---- a/drivers/gpu/drm/rockchip/Kconfig
-+++ b/drivers/gpu/drm/rockchip/Kconfig
-@@ -60,6 +60,7 @@ config ROCKCHIP_INNO_HDMI
- config ROCKCHIP_LVDS
- 	bool "Rockchip LVDS support"
- 	depends on DRM_ROCKCHIP
-+	depends on PINCTRL
- 	help
- 	  Choose this option to enable support for Rockchip LVDS controllers.
- 	  Rockchip rk3288 SoC has LVDS TX Controller can be used, and it
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index 614af88..5f62090 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -303,8 +303,7 @@ static int __swiotlb_mmap_pfn(struct vm_area_struct *vma,
+ 			      unsigned long pfn, size_t size)
+ {
+ 	int ret = -ENXIO;
+-	unsigned long nr_vma_pages = (vma->vm_end - vma->vm_start) >>
+-					PAGE_SHIFT;
++	unsigned long nr_vma_pages = vma_pages(vma);
+ 	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
+ 	unsigned long off = vma->vm_pgoff;
+ 
 -- 
-2.9.0
+1.9.1
