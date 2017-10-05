@@ -1,20 +1,18 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Wed, 4 Oct 2017 17:50:43 -0700
-Subject: [PATCH] ethernet/broadcom: Convert timers to use timer_setup()
-Message-ID: <20171005005043.GA23290@beast>
+Date: Wed, 4 Oct 2017 17:54:02 -0700
+Subject: [PATCH] watchdog: lpc18xx_wdt: Convert timers to use
+Message-ID: <20171005005402.GA23880@beast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 In preparation for unconditionally passing the struct timer_list pointer to
 all timer callbacks, switch to using the new timer_setup() and from_timer()
-helper to pass the timer pointer explicitly.
+to pass the timer pointer explicitly.
 
-Cc: Florian Fainelli <f.fainelli@gmail.com>
-Cc: bcm-kernel-feedback-list at broadcom.com
-Cc: "David S. Miller" <davem@davemloft.net>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Jarod Wilson <jarod@redhat.com>
-Cc: netdev at vger.kernel.org
+Cc: Wim Van Sebroeck <wim@iguana.be>
+Cc: Guenter Roeck <linux@roeck-us.net>
+Cc: Joachim Eastwood <manabian@gmail.com>
+Cc: linux-watchdog at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Kees Cook <keescook@chromium.org>
@@ -23,79 +21,48 @@ This requires commit 686fef928bba ("timer: Prepare to change timer
 callback argument type") in v4.14-rc3, but should be otherwise
 stand-alone.
 ---
- drivers/net/ethernet/broadcom/bcm63xx_enet.c | 27 +++++++++------------------
- 1 file changed, 9 insertions(+), 18 deletions(-)
+ drivers/watchdog/lpc18xx_wdt.c | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/net/ethernet/broadcom/bcm63xx_enet.c b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
-index 4f3845a58126..99c2270d4677 100644
---- a/drivers/net/ethernet/broadcom/bcm63xx_enet.c
-+++ b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
-@@ -295,16 +295,13 @@ static int bcm_enet_refill_rx(struct net_device *dev)
- /*
-  * timer callback to defer refill rx queue in case we're OOM
-  */
--static void bcm_enet_refill_rx_timer(unsigned long data)
-+static void bcm_enet_refill_rx_timer(struct timer_list *t)
- {
--	struct net_device *dev;
--	struct bcm_enet_priv *priv;
--
--	dev = (struct net_device *)data;
--	priv = netdev_priv(dev);
-+	struct bcm_enet_priv *priv = from_timer(priv, t, rx_timeout);
-+	struct net_device *dev = priv->net_dev;
- 
- 	spin_lock(&priv->rx_lock);
--	bcm_enet_refill_rx((struct net_device *)data);
-+	bcm_enet_refill_rx(dev);
- 	spin_unlock(&priv->rx_lock);
+diff --git a/drivers/watchdog/lpc18xx_wdt.c b/drivers/watchdog/lpc18xx_wdt.c
+index 3b8bb59adf02..b4221f43cd94 100644
+--- a/drivers/watchdog/lpc18xx_wdt.c
++++ b/drivers/watchdog/lpc18xx_wdt.c
+@@ -78,10 +78,10 @@ static int lpc18xx_wdt_feed(struct watchdog_device *wdt_dev)
+ 	return 0;
  }
  
-@@ -1857,9 +1854,7 @@ static int bcm_enet_probe(struct platform_device *pdev)
- 	spin_lock_init(&priv->rx_lock);
- 
- 	/* init rx timeout (used for oom) */
--	init_timer(&priv->rx_timeout);
--	priv->rx_timeout.function = bcm_enet_refill_rx_timer;
--	priv->rx_timeout.data = (unsigned long)dev;
-+	timer_setup(&priv->rx_timeout, bcm_enet_refill_rx_timer, 0);
- 
- 	/* init the mib update lock&work */
- 	mutex_init(&priv->mib_update_lock);
-@@ -2021,9 +2016,9 @@ static inline int bcm_enet_port_is_rgmii(int portid)
- /*
-  * enet sw PHY polling
-  */
--static void swphy_poll_timer(unsigned long data)
-+static void swphy_poll_timer(struct timer_list *t)
+-static void lpc18xx_wdt_timer_feed(unsigned long data)
++static void lpc18xx_wdt_timer_feed(struct timer_list *t)
  {
--	struct bcm_enet_priv *priv = (struct bcm_enet_priv *)data;
-+	struct bcm_enet_priv *priv = from_timer(priv, t, swphy_poll);
- 	unsigned int i;
+-	struct watchdog_device *wdt_dev = (struct watchdog_device *)data;
+-	struct lpc18xx_wdt_dev *lpc18xx_wdt = watchdog_get_drvdata(wdt_dev);
++	struct lpc18xx_wdt_dev *lpc18xx_wdt = from_timer(lpc18xx_wdt, t, timer);
++	struct watchdog_device *wdt_dev = &lpc18xx_wdt->wdt_dev;
  
- 	for (i = 0; i < priv->num_ports; i++) {
-@@ -2332,9 +2327,7 @@ static int bcm_enetsw_open(struct net_device *dev)
- 	}
+ 	lpc18xx_wdt_feed(wdt_dev);
  
- 	/* start phy polling timer */
--	init_timer(&priv->swphy_poll);
--	priv->swphy_poll.function = swphy_poll_timer;
--	priv->swphy_poll.data = (unsigned long)priv;
-+	timer_setup(&priv->swphy_poll, swphy_poll_timer, 0);
- 	priv->swphy_poll.expires = jiffies;
- 	add_timer(&priv->swphy_poll);
+@@ -96,7 +96,9 @@ static void lpc18xx_wdt_timer_feed(unsigned long data)
+  */
+ static int lpc18xx_wdt_stop(struct watchdog_device *wdt_dev)
+ {
+-	lpc18xx_wdt_timer_feed((unsigned long)wdt_dev);
++	struct lpc18xx_wdt_dev *lpc18xx_wdt = watchdog_get_drvdata(wdt_dev);
++
++	lpc18xx_wdt_timer_feed(&lpc18xx_wdt->timer);
+ 
  	return 0;
-@@ -2759,9 +2752,7 @@ static int bcm_enetsw_probe(struct platform_device *pdev)
- 	spin_lock_init(&priv->rx_lock);
+ }
+@@ -267,8 +269,7 @@ static int lpc18xx_wdt_probe(struct platform_device *pdev)
  
- 	/* init rx timeout (used for oom) */
--	init_timer(&priv->rx_timeout);
--	priv->rx_timeout.function = bcm_enet_refill_rx_timer;
--	priv->rx_timeout.data = (unsigned long)dev;
-+	timer_setup(&priv->rx_timeout, bcm_enet_refill_rx_timer, 0);
+ 	__lpc18xx_wdt_set_timeout(lpc18xx_wdt);
  
- 	/* register netdevice */
- 	dev->netdev_ops = &bcm_enetsw_ops;
+-	setup_timer(&lpc18xx_wdt->timer, lpc18xx_wdt_timer_feed,
+-		    (unsigned long)&lpc18xx_wdt->wdt_dev);
++	timer_setup(&lpc18xx_wdt->timer, lpc18xx_wdt_timer_feed, 0);
+ 
+ 	watchdog_set_nowayout(&lpc18xx_wdt->wdt_dev, nowayout);
+ 	watchdog_set_restart_priority(&lpc18xx_wdt->wdt_dev, 128);
 -- 
 2.7.4
 
