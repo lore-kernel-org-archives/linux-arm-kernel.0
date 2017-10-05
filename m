@@ -1,43 +1,111 @@
-From: hkallweit1@gmail.com (Heiner Kallweit)
-Date: Thu, 5 Oct 2017 21:06:22 +0200
-Subject: [PATCH 1/2] firmware: arm_scpi: drop unnecessary type cast to
- scpi_shared_mem
-In-Reply-To: <1507201911-27976-1-git-send-email-sudeep.holla@arm.com>
-References: <1507201911-27976-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <54852f4b-78cc-061a-3c82-b753f289fee8@gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu,  5 Oct 2017 20:17:54 +0100
+Subject: [PATCH v3 02/20] arm64: introduce an order for exceptions
+In-Reply-To: <20171005191812.5678-1-james.morse@arm.com>
+References: <20171005191812.5678-1-james.morse@arm.com>
+Message-ID: <20171005191812.5678-3-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 05.10.2017 um 13:11 schrieb Sudeep Holla:
-> This patch drops the only present type cast of the SCPI payload pointer
-> to scpi_shared_mem inorder to align with other occurrences, IOW for
-> consistency.
-> 
-> Cc: Heiner Kallweit <hkallweit1@gmail.com>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  drivers/firmware/arm_scpi.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
-> index c923d1ebfa3e..a888970f1347 100644
-> --- a/drivers/firmware/arm_scpi.c
-> +++ b/drivers/firmware/arm_scpi.c
-> @@ -453,7 +453,7 @@ static void scpi_tx_prepare(struct mbox_client *c, void *msg)
->  	unsigned long flags;
->  	struct scpi_xfer *t = msg;
->  	struct scpi_chan *ch = container_of(c, struct scpi_chan, cl);
-> -	struct scpi_shared_mem *mem = (struct scpi_shared_mem *)ch->tx_payload;
-> +	struct scpi_shared_mem *mem = ch->tx_payload;
->  
-This should work fine, however it might not be 100% clean with regard to __iomem
-annotation. ch->tx_payload is of type "void __iomem *" and I would assume that
-sparse complains about the new statement.
-The old one casts away the __iomem, what isn't much better IMO.
+Currently SError is always masked in the kernel. To support RAS exceptions
+using SError on hardware with the v8.2 RAS Extensions we need to unmask
+SError as much as possible.
 
-By the way, I think this also applies to other places in this driver
-where ch->rx/tx_payload are used.
+Let's define an order for masking and unmasking exceptions. 'dai' is
+memorable and effectively what we have today.
 
->  	if (t->tx_buf) {
->  		if (scpi_info->is_legacy)
-> 
+Disabling debug exceptions should cause all other exceptions to be masked.
+Masking SError should mask irq, but not disable debug exceptions.
+Masking irqs has no side effects for other flags. Keeping to this order
+makes it easier for entry.S to know which exceptions should be unmasked.
+
+FIQ is never expected, but we mask it when we mask debug exceptions, and
+unmask it at all other times.
+
+Given masking debug exceptions masks everything, we don't need macros
+to save/restore that bit independently. Remove them and switch the last
+caller over to {en,dis}able_daif().
+
+Signed-off-by: James Morse <james.morse@arm.com>
+---
+ arch/arm64/include/asm/irqflags.h  | 34 +++++++++++++---------------------
+ arch/arm64/kernel/debug-monitors.c |  5 +++--
+ 2 files changed, 16 insertions(+), 23 deletions(-)
+
+diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
+index 8c581281fa12..9ecdca7011f0 100644
+--- a/arch/arm64/include/asm/irqflags.h
++++ b/arch/arm64/include/asm/irqflags.h
+@@ -21,6 +21,19 @@
+ #include <asm/ptrace.h>
+ 
+ /*
++ * Aarch64 has flags for masking: Debug, Asynchronous (serror), Interrupts and
++ * FIQ exceptions, in the 'daif' register. We mask and unmask them in 'dai'
++ * order:
++ * Masking debug exceptions causes all other exceptions to be masked too/
++ * Masking SError masks irq, but not debug exceptions. Masking irqs has no
++ * side effects for other flags. Keeping to this order makes it easier for
++ * entry.S to know which exceptions should be unmasked.
++ *
++ * FIQ is never expected, but we mask it when we disable debug exceptions, and
++ * unmask it at all other times.
++ */
++
++/*
+  * CPU interrupt mask handling.
+  */
+ static inline unsigned long arch_local_irq_save(void)
+@@ -89,26 +102,5 @@ static inline int arch_irqs_disabled_flags(unsigned long flags)
+ {
+ 	return flags & PSR_I_BIT;
+ }
+-
+-/*
+- * save and restore debug state
+- */
+-#define local_dbg_save(flags)						\
+-	do {								\
+-		typecheck(unsigned long, flags);			\
+-		asm volatile(						\
+-		"mrs    %0, daif		// local_dbg_save\n"	\
+-		"msr    daifset, #8"					\
+-		: "=r" (flags) : : "memory");				\
+-	} while (0)
+-
+-#define local_dbg_restore(flags)					\
+-	do {								\
+-		typecheck(unsigned long, flags);			\
+-		asm volatile(						\
+-		"msr    daif, %0		// local_dbg_restore\n"	\
+-		: : "r" (flags) : "memory");				\
+-	} while (0)
+-
+ #endif
+ #endif
+diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+index c7ef99904934..bbfa4978b657 100644
+--- a/arch/arm64/kernel/debug-monitors.c
++++ b/arch/arm64/kernel/debug-monitors.c
+@@ -30,6 +30,7 @@
+ 
+ #include <asm/cpufeature.h>
+ #include <asm/cputype.h>
++#include <asm/daifflags.h>
+ #include <asm/debug-monitors.h>
+ #include <asm/system_misc.h>
+ 
+@@ -46,9 +47,9 @@ u8 debug_monitors_arch(void)
+ static void mdscr_write(u32 mdscr)
+ {
+ 	unsigned long flags;
+-	local_dbg_save(flags);
++	flags = local_mask_daif();
+ 	write_sysreg(mdscr, mdscr_el1);
+-	local_dbg_restore(flags);
++	local_restore_daif(flags);
+ }
+ NOKPROBE_SYMBOL(mdscr_write);
+ 
+-- 
+2.13.3
