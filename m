@@ -1,37 +1,165 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Fri, 6 Oct 2017 00:23:35 +0800
-Subject: [xlnx:master 841/1043] core.c:undefined reference to
- `dwc3_set_simple_data'
-Message-ID: <201710060032.malauWKb%fengguang.wu@intel.com>
+From: digetx@gmail.com (Dmitry Osipenko)
+Date: Thu, 5 Oct 2017 19:24:58 +0300
+Subject: [PATCH 4/9] ARM: trusted_foundations: enable L2x0 cache via
+ firmware_ops
+In-Reply-To: <1d12ea86cca40749731a594afc165830c0b2463d.1500510157.git.mirq-linux@rere.qmqm.pl>
+References: <cover.1500510157.git.mirq-linux@rere.qmqm.pl>
+ <1d12ea86cca40749731a594afc165830c0b2463d.1500510157.git.mirq-linux@rere.qmqm.pl>
+Message-ID: <6fd1e0cc-3d75-0817-3272-5e896c4a7c50@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/Xilinx/linux-xlnx master
-head:   f1b1e077d641fc83b54c1b8f168cbb58044fbd4e
-commit: a4769f84c50a769e655d4bb9c1a8a45586cdc1f4 [841/1043] dwc3: Add support for removing vbus when suspended
-config: i386-randconfig-s0-10032350 (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        git checkout a4769f84c50a769e655d4bb9c1a8a45586cdc1f4
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+On 20.07.2017 03:29, Micha? Miros?aw wrote:
+> Use firmware_ops to provide hook for cache initialization through
+> Trusted Foundations firmware, as some writes need Secure mode.
+> 
+> Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
+> ---
+>  arch/arm/firmware/trusted_foundations.c    | 46 ++++++++++++++++++++++++++++++
+>  arch/arm/include/asm/hardware/cache-l2x0.h |  1 +
+>  arch/arm/mm/cache-l2x0.c                   | 10 ++++++-
+>  3 files changed, 56 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/firmware/trusted_foundations.c b/arch/arm/firmware/trusted_foundations.c
+> index 3fb1b5a1dce9..81ff71b87438 100644
+> --- a/arch/arm/firmware/trusted_foundations.c
+> +++ b/arch/arm/firmware/trusted_foundations.c
+> @@ -17,11 +17,19 @@
+>  #include <linux/kernel.h>
+>  #include <linux/init.h>
+>  #include <linux/of.h>
+> +#include <asm/io.h>
+>  #include <asm/firmware.h>
+> +#include <asm/outercache.h>
+> +#include <asm/hardware/cache-l2x0.h>
+>  #include <asm/trusted_foundations.h>
+>  
+> +#define TF_CACHE_MAINT           0xfffff100
+>  #define TF_SET_CPU_BOOT_ADDR_SMC 0xfffff200
+>  
+> +#define TF_CACHE_INIT		1
+> +#define TF_CACHE_FLUSH		2
+> +#define TF_CACHE_REENABLE	4
+> +
+>  #define TF_CPU_PM		0xfffffffc
+>  #define TF_CPU_PM_S3		0xffffffe3
+>  #define TF_CPU_PM_S2		0xffffffe6
+> @@ -63,9 +71,47 @@ static int tf_prepare_idle(void)
+>  	return 0;
+>  }
+>  
+> +#ifdef CONFIG_CACHE_L2X0
+> +static void tf_write_sec(unsigned long val, unsigned reg)
+> +{
+> +	unsigned long cur = readl_relaxed(l2x0_base + reg);
+> +
+> +	pr_warn("TF: ignoring write_sec[0x%x]: 0x%08lx -> 0x%08lx\n", reg, cur, val);
+> +}
+> +
+> +static void tf_disable_cache(void)
+> +{
+> +	tf_generic_smc(TF_CACHE_MAINT, TF_CACHE_FLUSH, l2x0_way_mask);
+> +}
+> +
+> +static void tf_resume_cache(void)
+> +{
+> +	unsigned long aux_val = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
+> +	tf_generic_smc(TF_CACHE_MAINT, TF_CACHE_REENABLE, aux_val);
+> +}
+> +
+> +static void tf_configure_cache(const struct l2x0_regs *regs)
+> +{
+> +	outer_cache.disable = tf_disable_cache;
+> +	outer_cache.resume = tf_resume_cache;
+> +}
+> +
+> +static int tf_init_cache(void)
+> +{
+> +	tf_generic_smc(TF_CACHE_MAINT, TF_CACHE_INIT, 0);
+> +
+> +	outer_cache.write_sec = tf_write_sec;
+> +	outer_cache.configure = tf_configure_cache;
+> +	return 0;
+> +}
+> +#endif /* CONFIG_CACHE_L2X0 */
+> +
+>  static const struct firmware_ops trusted_foundations_ops = {
+>  	.set_cpu_boot_addr = tf_set_cpu_boot_addr,
+>  	.prepare_idle = tf_prepare_idle,
+> +#ifdef CONFIG_CACHE_L2X0
+> +	.l2x0_init = tf_init_cache,
+> +#endif
+>  };
+>  
+>  void register_trusted_foundations(struct trusted_foundations_platform_data *pd)
+> diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
+> index 492de655e4f3..665eb0758417 100644
+> --- a/arch/arm/include/asm/hardware/cache-l2x0.h
+> +++ b/arch/arm/include/asm/hardware/cache-l2x0.h
+> @@ -194,6 +194,7 @@ struct l2x0_regs {
+>  };
+>  
+>  extern void __iomem *l2x0_base;
+> +extern u32 l2x0_way_mask;	/* Bitmask of active ways */
+>  extern struct l2x0_regs l2x0_saved_regs;
+>  
+>  #endif /* __ASSEMBLY__ */
+> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> index bbfbc18399f9..f1268e9b35f0 100644
+> --- a/arch/arm/mm/cache-l2x0.c
+> +++ b/arch/arm/mm/cache-l2x0.c
+> @@ -30,6 +30,7 @@
+>  #include <asm/cp15.h>
+>  #include <asm/cputype.h>
+>  #include <asm/hardware/cache-l2x0.h>
+> +#include <asm/firmware.h>
+>  #include "cache-tauros3.h"
+>  #include "cache-aurora-l2.h"
+>  
+> @@ -37,6 +38,7 @@ struct l2c_init_data {
+>  	const char *type;
+>  	unsigned way_size_0;
+>  	unsigned num_lock;
+> +	void (*init)(void __iomem *, u32 *, u32 *);
+>  	void (*of_parse)(const struct device_node *, u32 *, u32 *);
+>  	void (*enable)(void __iomem *, unsigned);
+>  	void (*fixup)(void __iomem *, u32, struct outer_cache_fns *);
+> @@ -50,11 +52,11 @@ struct l2c_init_data {
+>  
+>  static const struct l2c_init_data *l2x0_data;
+>  static DEFINE_RAW_SPINLOCK(l2x0_lock);
+> -static u32 l2x0_way_mask;	/* Bitmask of active ways */
+>  static u32 l2x0_size;
+>  static unsigned long sync_reg_offset = L2X0_CACHE_SYNC;
+>  
+>  void __iomem *l2x0_base;
+> +u32 l2x0_way_mask;	/* Bitmask of active ways */
+>  struct l2x0_regs l2x0_saved_regs;
+>  
+>  static bool l2x0_bresp_disable;
+> @@ -1760,6 +1762,7 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+>  	u32 cache_id;
+>  	u32 cache_level = 2;
+>  	bool nosync = false;
+> +	int err;
+>  
+>  	np = of_find_matching_node(NULL, l2x0_ids);
+>  	if (!np)
+> @@ -1792,6 +1795,11 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+>  
+>  	nosync = of_property_read_bool(np, "arm,outer-sync-disable");
+>  
+> +	/* Call firmware init */
 
-All errors (new ones prefixed by >>):
+What about to make this comment a bit more explanatory? Add couple words about
+what firmware initializes, maybe it enables access from CPU.. of course if you
+have any clue.
 
-   drivers/built-in.o: In function `dwc3_core_init':
->> core.c:(.text+0x24776d): undefined reference to `dwc3_set_simple_data'
-   core.c:(.text+0x2477a3): undefined reference to `dwc3_enable_hw_coherency'
-   drivers/built-in.o: In function `dwc3_probe':
-   core.c:(.text+0x248cf3): undefined reference to `dwc3_set_phydata'
-   core.c:(.text+0x248d8c): undefined reference to `dwc3_set_phydata'
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 28152 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171006/3827b313/attachment-0001.gz>
+> +	err = call_firmware_op(l2x0_init);
+> +	if (err && err != -ENOSYS)
+> +		return err;
+> +
+>  	/* Read back current (default) hardware configuration */
+>  	if (data->save)
+>  		data->save(l2x0_base);
+> 
