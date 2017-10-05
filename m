@@ -1,335 +1,253 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 5 Oct 2017 09:20:57 +0200
-Subject: [PATCH] mtd: nand: gpio: Convert to use GPIO descriptors
-In-Reply-To: <20170924173912.9199-1-linus.walleij@linaro.org>
-References: <20170924173912.9199-1-linus.walleij@linaro.org>
-Message-ID: <20171005092057.4ebdc62e@bbrezillon>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Thu, 05 Oct 2017 17:52:31 +1030
+Subject: [PATCH v4 3/5] clk: aspeed: Add platform driver and register PLLs
+In-Reply-To: <20171003065540.11722-4-joel@jms.id.au>
+References: <20171003065540.11722-1-joel@jms.id.au>
+ <20171003065540.11722-4-joel@jms.id.au>
+Message-ID: <1507188151.5452.65.camel@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 24 Sep 2017 19:39:12 +0200
-Linus Walleij <linus.walleij@linaro.org> wrote:
-
-> There is exactly one board in the kernel that defines platform data
-> for the GPIO NAND driver.
-> 
-> Use the feature to provide a lookup table for the GPIOs in the board
-> file so we can convert the driver as a whole to just use GPIO
-> descriptors.
-> 
-> After this we can cut the use of <linux/of_gpio.h> and use the GPIO
-> descriptor management from <linux/gpio/consumer.h> alone to grab and use
-> the GPIOs used in the driver.
-> 
-> I also created a local struct device *dev in the probe() function
-> because I was getting annoyed with all the &pdev->dev dereferencing.
-> 
-> Cc: arm at kernel.org
-> Cc: Mike Rapoport <rppt@linux.vnet.ibm.com>
-> Cc: Frans Klaver <fransklaver@gmail.com>
-> Cc: Gerhard Sittig <gsi@denx.de>
-> Cc: Jamie Iles <jamie.iles@oracle.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-
-Applied.
-
-Thanks,
-
-Boris
-
+On Tue, 2017-10-03 at 17:25 +1030, Joel Stanley wrote:
+> This registers a platform driver to set up all of the non-core clocks.
+>?
+> The clocks that have configurable rates are now registered.
+>?
+> Signed-off-by: Joel Stanley <joel@jms.id.au>
+>?
+> --
+> v4:
+> ?- Add eclk div table to fix ast2500 calculation
+> ?- Add defines to document the BIT() macros
+> ?- Pass dev where we can when registering clocks
+> ?- Check for errors when registering clk_hws
+> v3:
+> ?- Fix bclk and eclk calculation
+> ?- Seperate out ast2400 and ast25000 for pll calculation
+>?
+> Signed-off-by: Joel Stanley <joel@jms.id.au>
 > ---
-> ARM SoC folks: Please ACK this so it can be merged through the MTD
-> subsystem.
-> 
-> Everyone else on CC: can you test and/or ACK this?
-> 
-> I don't have this PXA board, and all device tree users seem to be
-> out-of-tree so I rely on third parties to test this.
-> ---
->  arch/arm/mach-pxa/cm-x255.c   |  19 ++++---
->  drivers/mtd/nand/gpio.c       | 112 +++++++++++++++++++++---------------------
->  include/linux/mtd/nand-gpio.h |   5 --
->  3 files changed, 70 insertions(+), 66 deletions(-)
-> 
-> diff --git a/arch/arm/mach-pxa/cm-x255.c b/arch/arm/mach-pxa/cm-x255.c
-> index b592f79a1742..f8d67acb7194 100644
-> --- a/arch/arm/mach-pxa/cm-x255.c
-> +++ b/arch/arm/mach-pxa/cm-x255.c
-> @@ -14,7 +14,7 @@
->  #include <linux/mtd/partitions.h>
->  #include <linux/mtd/physmap.h>
->  #include <linux/mtd/nand-gpio.h>
-> -
-> +#include <linux/gpio/machine.h>
->  #include <linux/spi/spi.h>
->  #include <linux/spi/pxa2xx_spi.h>
->  
-> @@ -176,6 +176,17 @@ static inline void cmx255_init_nor(void) {}
->  #endif
->  
->  #if defined(CONFIG_MTD_NAND_GPIO) || defined(CONFIG_MTD_NAND_GPIO_MODULE)
+> ?drivers/clk/clk-aspeed.c | 163 +++++++++++++++++++++++++++++++++++++++++++++++
+> ?1 file changed, 163 insertions(+)
+>?
+> diff --git a/drivers/clk/clk-aspeed.c b/drivers/clk/clk-aspeed.c
+> index d39cf51a5114..adb295292189 100644
+> --- a/drivers/clk/clk-aspeed.c
+> +++ b/drivers/clk/clk-aspeed.c
+> @@ -14,6 +14,8 @@
+> ?#include <linux/clk-provider.h>
+> ?#include <linux/mfd/syscon.h>
+> ?#include <linux/of_address.h>
+> +#include <linux/of_device.h>
+> +#include <linux/platform_device.h>
+> ?#include <linux/regmap.h>
+> ?#include <linux/slab.h>
+> ?#include <linux/spinlock.h>
+> @@ -114,6 +116,32 @@ static const struct aspeed_gate_data aspeed_gates[] __initconst = {
+> ?	[ASPEED_CLK_GATE_LHCCLK] =	{ 28, -1, "lhclk-gate",		"lhclk", 0 }, /* LPC master/LPC+ */
+> ?};
+> ?
+> +static const char * const eclk_parents[] = {"d1pll", "hpll", "mpll"};
+
+Hate to throw a spanner in the works, but I think we need some extra bits here
+for handling the AST2400. ECLK with M-PLL as the parent divides the clock rate
+by 2, there are four cases to handle where the last two cases are inverted, and
+d1pll isn't a valid parent.
+
+Also this table looks to be in reverse order to the field defined in the
+datasheet.
+
 > +
-> +static struct gpiod_lookup_table cmx255_nand_gpiod_table = {
-> +	.dev_id         = "cmx255-nand",
-> +	.table          = {
-> +		GPIO_LOOKUP("gpio-pxa", GPIO_NAND_CS, "nce", GPIO_ACTIVE_HIGH),
-> +		GPIO_LOOKUP("gpio-pxa", GPIO_NAND_CLE, "cle", GPIO_ACTIVE_HIGH),
-> +		GPIO_LOOKUP("gpio-pxa", GPIO_NAND_ALE, "ale", GPIO_ACTIVE_HIGH),
-> +		GPIO_LOOKUP("gpio-pxa", GPIO_NAND_RB, "rdy", GPIO_ACTIVE_HIGH),
-> +	},
+> +static const struct clk_div_table ast2500_eclk_div_table[] = {
+> +	{ 0x0, 2 },
+> +	{ 0x1, 2 },
+> +	{ 0x2, 3 },
+> +	{ 0x3, 4 },
+> +	{ 0x4, 5 },
+> +	{ 0x5, 6 },
+> +	{ 0x6, 7 },
+> +	{ 0x7, 8 },
+> +	{ 0 }
 > +};
 > +
->  static struct resource cmx255_nand_resource[] = {
->  	[0] = {
->  		.start = PXA_CS1_PHYS,
-> @@ -198,11 +209,6 @@ static struct mtd_partition cmx255_nand_parts[] = {
->  };
->  
->  static struct gpio_nand_platdata cmx255_nand_platdata = {
-> -	.gpio_nce = GPIO_NAND_CS,
-> -	.gpio_cle = GPIO_NAND_CLE,
-> -	.gpio_ale = GPIO_NAND_ALE,
-> -	.gpio_rdy = GPIO_NAND_RB,
-> -	.gpio_nwp = -1,
->  	.parts = cmx255_nand_parts,
->  	.num_parts = ARRAY_SIZE(cmx255_nand_parts),
->  	.chip_delay = 25,
-> @@ -220,6 +226,7 @@ static struct platform_device cmx255_nand = {
->  
->  static void __init cmx255_init_nand(void)
->  {
-> +	gpiod_add_lookup_table(&cmx255_nand_gpiod_table);
->  	platform_device_register(&cmx255_nand);
->  }
->  #else
-> diff --git a/drivers/mtd/nand/gpio.c b/drivers/mtd/nand/gpio.c
-> index fd3648952b5a..484f7fbc3f7d 100644
-> --- a/drivers/mtd/nand/gpio.c
-> +++ b/drivers/mtd/nand/gpio.c
-> @@ -23,7 +23,7 @@
->  #include <linux/slab.h>
->  #include <linux/module.h>
->  #include <linux/platform_device.h>
-> -#include <linux/gpio.h>
-> +#include <linux/gpio/consumer.h>
->  #include <linux/io.h>
->  #include <linux/mtd/mtd.h>
->  #include <linux/mtd/rawnand.h>
-> @@ -31,12 +31,16 @@
->  #include <linux/mtd/nand-gpio.h>
->  #include <linux/of.h>
->  #include <linux/of_address.h>
-> -#include <linux/of_gpio.h>
->  
->  struct gpiomtd {
->  	void __iomem		*io_sync;
->  	struct nand_chip	nand_chip;
->  	struct gpio_nand_platdata plat;
-> +	struct gpio_desc *nce; /* Optional chip enable */
-> +	struct gpio_desc *cle;
-> +	struct gpio_desc *ale;
-> +	struct gpio_desc *rdy;
-> +	struct gpio_desc *nwp; /* Optional write protection */
->  };
->  
->  static inline struct gpiomtd *gpio_nand_getpriv(struct mtd_info *mtd)
-> @@ -78,11 +82,10 @@ static void gpio_nand_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
->  	gpio_nand_dosync(gpiomtd);
->  
->  	if (ctrl & NAND_CTRL_CHANGE) {
-> -		if (gpio_is_valid(gpiomtd->plat.gpio_nce))
-> -			gpio_set_value(gpiomtd->plat.gpio_nce,
-> -				       !(ctrl & NAND_NCE));
-> -		gpio_set_value(gpiomtd->plat.gpio_cle, !!(ctrl & NAND_CLE));
-> -		gpio_set_value(gpiomtd->plat.gpio_ale, !!(ctrl & NAND_ALE));
-> +		if (gpiomtd->nce)
-> +			gpiod_set_value(gpiomtd->nce, !(ctrl & NAND_NCE));
-> +		gpiod_set_value(gpiomtd->cle, !!(ctrl & NAND_CLE));
-> +		gpiod_set_value(gpiomtd->ale, !!(ctrl & NAND_ALE));
->  		gpio_nand_dosync(gpiomtd);
->  	}
->  	if (cmd == NAND_CMD_NONE)
-> @@ -96,7 +99,7 @@ static int gpio_nand_devready(struct mtd_info *mtd)
->  {
->  	struct gpiomtd *gpiomtd = gpio_nand_getpriv(mtd);
->  
-> -	return gpio_get_value(gpiomtd->plat.gpio_rdy);
-> +	return gpiod_get_value(gpiomtd->rdy);
->  }
->  
->  #ifdef CONFIG_OF
-> @@ -123,12 +126,6 @@ static int gpio_nand_get_config_of(const struct device *dev,
->  		}
->  	}
->  
-> -	plat->gpio_rdy = of_get_gpio(dev->of_node, 0);
-> -	plat->gpio_nce = of_get_gpio(dev->of_node, 1);
-> -	plat->gpio_ale = of_get_gpio(dev->of_node, 2);
-> -	plat->gpio_cle = of_get_gpio(dev->of_node, 3);
-> -	plat->gpio_nwp = of_get_gpio(dev->of_node, 4);
-> -
->  	if (!of_property_read_u32(dev->of_node, "chip-delay", &val))
->  		plat->chip_delay = val;
->  
-> @@ -201,10 +198,11 @@ static int gpio_nand_remove(struct platform_device *pdev)
->  
->  	nand_release(nand_to_mtd(&gpiomtd->nand_chip));
->  
-> -	if (gpio_is_valid(gpiomtd->plat.gpio_nwp))
-> -		gpio_set_value(gpiomtd->plat.gpio_nwp, 0);
-> -	if (gpio_is_valid(gpiomtd->plat.gpio_nce))
-> -		gpio_set_value(gpiomtd->plat.gpio_nce, 1);
-> +	/* Enable write protection and disable the chip */
-> +	if (gpiomtd->nwp && !IS_ERR(gpiomtd->nwp))
-> +		gpiod_set_value(gpiomtd->nwp, 0);
-> +	if (gpiomtd->nce && !IS_ERR(gpiomtd->nce))
-> +		gpiod_set_value(gpiomtd->nce, 0);
->  
->  	return 0;
->  }
-> @@ -215,66 +213,66 @@ static int gpio_nand_probe(struct platform_device *pdev)
->  	struct nand_chip *chip;
->  	struct mtd_info *mtd;
->  	struct resource *res;
-> +	struct device *dev = &pdev->dev;
->  	int ret = 0;
->  
-> -	if (!pdev->dev.of_node && !dev_get_platdata(&pdev->dev))
-> +	if (!dev->of_node && !dev_get_platdata(dev))
->  		return -EINVAL;
->  
-> -	gpiomtd = devm_kzalloc(&pdev->dev, sizeof(*gpiomtd), GFP_KERNEL);
-> +	gpiomtd = devm_kzalloc(dev, sizeof(*gpiomtd), GFP_KERNEL);
->  	if (!gpiomtd)
->  		return -ENOMEM;
->  
->  	chip = &gpiomtd->nand_chip;
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -	chip->IO_ADDR_R = devm_ioremap_resource(&pdev->dev, res);
-> +	chip->IO_ADDR_R = devm_ioremap_resource(dev, res);
->  	if (IS_ERR(chip->IO_ADDR_R))
->  		return PTR_ERR(chip->IO_ADDR_R);
->  
->  	res = gpio_nand_get_io_sync(pdev);
->  	if (res) {
-> -		gpiomtd->io_sync = devm_ioremap_resource(&pdev->dev, res);
-> +		gpiomtd->io_sync = devm_ioremap_resource(dev, res);
->  		if (IS_ERR(gpiomtd->io_sync))
->  			return PTR_ERR(gpiomtd->io_sync);
->  	}
->  
-> -	ret = gpio_nand_get_config(&pdev->dev, &gpiomtd->plat);
-> +	ret = gpio_nand_get_config(dev, &gpiomtd->plat);
->  	if (ret)
->  		return ret;
->  
-> -	if (gpio_is_valid(gpiomtd->plat.gpio_nce)) {
-> -		ret = devm_gpio_request(&pdev->dev, gpiomtd->plat.gpio_nce,
-> -					"NAND NCE");
-> -		if (ret)
-> -			return ret;
-> -		gpio_direction_output(gpiomtd->plat.gpio_nce, 1);
-> +	/* Just enable the chip */
-> +	gpiomtd->nce = devm_gpiod_get_optional(dev, "nce", GPIOD_OUT_HIGH);
-> +	if (IS_ERR(gpiomtd->nce))
-> +		return PTR_ERR(gpiomtd->nce);
+> +static const struct clk_div_table ast2500_mac_div_table[] = {
+> +	{ 0x0, 4 }, /* Yep, really. Aspeed confirmed this is correct */
+> +	{ 0x1, 4 },
+> +	{ 0x2, 6 },
+> +	{ 0x3, 8 },
+> +	{ 0x4, 10 },
+> +	{ 0x5, 12 },
+> +	{ 0x6, 14 },
+> +	{ 0x7, 16 },
+> +	{ 0 }
+> +};
 > +
-> +	/* We disable write protection once we know probe() will succeed */
-> +	gpiomtd->nwp = devm_gpiod_get_optional(dev, "nwp", GPIOD_OUT_LOW);
-> +	if (IS_ERR(gpiomtd->nwp)) {
-> +		ret = PTR_ERR(gpiomtd->nwp);
-> +		goto out_ce;
->  	}
->  
-> -	if (gpio_is_valid(gpiomtd->plat.gpio_nwp)) {
-> -		ret = devm_gpio_request(&pdev->dev, gpiomtd->plat.gpio_nwp,
-> -					"NAND NWP");
-> -		if (ret)
-> -			return ret;
-> +	gpiomtd->nwp = devm_gpiod_get(dev, "ale", GPIOD_OUT_LOW);
-> +	if (IS_ERR(gpiomtd->nwp)) {
-> +		ret = PTR_ERR(gpiomtd->nwp);
-> +		goto out_ce;
->  	}
->  
-> -	ret = devm_gpio_request(&pdev->dev, gpiomtd->plat.gpio_ale, "NAND ALE");
-> -	if (ret)
-> -		return ret;
-> -	gpio_direction_output(gpiomtd->plat.gpio_ale, 0);
-> +	gpiomtd->cle = devm_gpiod_get(dev, "cle", GPIOD_OUT_LOW);
-> +	if (IS_ERR(gpiomtd->cle)) {
-> +		ret = PTR_ERR(gpiomtd->cle);
-> +		goto out_ce;
+> ?static const struct clk_div_table ast2400_div_table[] = {
+> ?	{ 0x0, 2 },
+> ?	{ 0x1, 4 },
+> @@ -179,6 +207,141 @@ static struct clk_hw *aspeed_ast2500_calc_pll(const char *name, u32 val)
+> ?			mult, div);
+> ?}
+> ?
+> +struct aspeed_clk_soc_data {
+> +	const struct clk_div_table *div_table;
+> +	const struct clk_div_table *mac_div_table;
+> +	const struct clk_div_table *eclk_div_table;
+> +	struct clk_hw *(*calc_pll)(const char *name, u32 val);
+
+As a note, I just discovered the D-PLL (and D2-PLL where applicable) frequency
+function is slightly different to M-PLL and H-PLL on both the AST2400 and
+AST2500. I don't think that is significant yet, but it's something to watch out
+for. The point is this callback isn't a general-purpose "calculate a PLL
+frequency" function, so the name might be inappropriate.
+
+> +};
+> +
+> +static const struct aspeed_clk_soc_data ast2500_data = {
+> +	.div_table = ast2500_div_table,
+> +	.mac_div_table = ast2500_mac_div_table,
+> +	.eclk_div_table = ast2500_eclk_div_table,
+> +	.calc_pll = aspeed_ast2500_calc_pll,
+> +};
+> +
+> +static const struct aspeed_clk_soc_data ast2400_data = {
+> +	.div_table = ast2400_div_table,
+> +	.mac_div_table = ast2400_div_table,
+> +	.eclk_div_table = ast2400_div_table,
+> +	.calc_pll = aspeed_ast2400_calc_pll,
+> +};
+> +
+> +static int aspeed_clk_probe(struct platform_device *pdev)
+> +{
+> +	const struct aspeed_clk_soc_data *soc_data;
+> +	struct device *dev = &pdev->dev;
+> +	struct regmap *map;
+> +	struct clk_hw *hw;
+> +	u32 val, rate;
+> +
+> +	map = syscon_node_to_regmap(dev->of_node);
+> +	if (IS_ERR(map)) {
+> +		dev_err(dev, "no syscon regmap\n");
+> +		return PTR_ERR(map);
 > +	}
->  
-> -	ret = devm_gpio_request(&pdev->dev, gpiomtd->plat.gpio_cle, "NAND CLE");
-> -	if (ret)
-> -		return ret;
-> -	gpio_direction_output(gpiomtd->plat.gpio_cle, 0);
-> -
-> -	if (gpio_is_valid(gpiomtd->plat.gpio_rdy)) {
-> -		ret = devm_gpio_request(&pdev->dev, gpiomtd->plat.gpio_rdy,
-> -					"NAND RDY");
-> -		if (ret)
-> -			return ret;
-> -		gpio_direction_input(gpiomtd->plat.gpio_rdy);
-> -		chip->dev_ready = gpio_nand_devready;
-> +	gpiomtd->rdy = devm_gpiod_get_optional(dev, "rdy", GPIOD_IN);
-> +	if (IS_ERR(gpiomtd->rdy)) {
-> +		ret = PTR_ERR(gpiomtd->rdy);
-> +		goto out_ce;
->  	}
-> +	/* Using RDY pin */
-> +	if (gpiomtd->rdy)
-> +		chip->dev_ready = gpio_nand_devready;
->  
->  	nand_set_flash_node(chip, pdev->dev.of_node);
->  	chip->IO_ADDR_W		= chip->IO_ADDR_R;
-> @@ -285,12 +283,13 @@ static int gpio_nand_probe(struct platform_device *pdev)
->  	chip->cmd_ctrl		= gpio_nand_cmd_ctrl;
->  
->  	mtd			= nand_to_mtd(chip);
-> -	mtd->dev.parent		= &pdev->dev;
-> +	mtd->dev.parent		= dev;
->  
->  	platform_set_drvdata(pdev, gpiomtd);
->  
-> -	if (gpio_is_valid(gpiomtd->plat.gpio_nwp))
-> -		gpio_direction_output(gpiomtd->plat.gpio_nwp, 1);
-> +	/* Disable write protection, if wired up */
-> +	if (gpiomtd->nwp && !IS_ERR(gpiomtd->nwp))
-> +		gpiod_direction_output(gpiomtd->nwp, 1);
->  
->  	ret = nand_scan(mtd, 1);
->  	if (ret)
-> @@ -305,8 +304,11 @@ static int gpio_nand_probe(struct platform_device *pdev)
->  		return 0;
->  
->  err_wp:
-> -	if (gpio_is_valid(gpiomtd->plat.gpio_nwp))
-> -		gpio_set_value(gpiomtd->plat.gpio_nwp, 0);
-> +	if (gpiomtd->nwp && !IS_ERR(gpiomtd->nwp))
-> +		gpiod_set_value(gpiomtd->nwp, 0);
-> +out_ce:
-> +	if (gpiomtd->nce && !IS_ERR(gpiomtd->nce))
-> +		gpiod_set_value(gpiomtd->nce, 0);
->  
->  	return ret;
->  }
-> diff --git a/include/linux/mtd/nand-gpio.h b/include/linux/mtd/nand-gpio.h
-> index be4f45d89be2..98f71908212d 100644
-> --- a/include/linux/mtd/nand-gpio.h
-> +++ b/include/linux/mtd/nand-gpio.h
-> @@ -4,11 +4,6 @@
->  #include <linux/mtd/rawnand.h>
->  
->  struct gpio_nand_platdata {
-> -	int	gpio_nce;
-> -	int	gpio_nwp;
-> -	int	gpio_cle;
-> -	int	gpio_ale;
-> -	int	gpio_rdy;
->  	void	(*adjust_parts)(struct gpio_nand_platdata *, size_t);
->  	struct mtd_partition *parts;
->  	unsigned int num_parts;
+> +
+> +	/* SoC generations share common layouts but have different divisors */
+> +	soc_data = of_device_get_match_data(dev);
+> +	if (!soc_data) {
+> +		dev_err(dev, "no match data for platform\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* UART clock div13 setting */
+> +	regmap_read(map, ASPEED_MISC_CTRL, &val);
+> +	if (val & UART_DIV13_EN)
+> +		rate = 24000000 / 13;
+> +	else
+> +		rate = 24000000;
+> +	/* TODO: Find the parent data for the uart clock */
+> +	hw = clk_hw_register_fixed_rate(dev, "uart", NULL, 0, rate);
+> +	if (IS_ERR(hw))
+> +		return PTR_ERR(hw);
+> +	aspeed_clk_data->hws[ASPEED_CLK_UART] = hw;
+> +
+> +	/*
+> +	?* Memory controller (M-PLL) PLL. This clock is configured by the
+> +	?* bootloader, and is exposed to Linux as a read-only clock rate.
+> +	?*/
+> +	regmap_read(map, ASPEED_MPLL_PARAM, &val);
+> +	hw = soc_data->calc_pll("mpll", val);
+> +	if (IS_ERR(hw))
+> +		return PTR_ERR(hw);
+> +	aspeed_clk_data->hws[ASPEED_CLK_MPLL] =	hw;
+> +
+> +	/* SD/SDIO clock divider (TODO: There's a gate too) */
+
+That sneaky gate bit!
+
+> +	hw = clk_hw_register_divider_table(dev, "sdio", "hpll", 0,
+> +			scu_base + ASPEED_CLK_SELECTION, 12, 3, 0,
+> +			soc_data->div_table,
+> +			&aspeed_clk_lock);
+> +	if (IS_ERR(hw))
+> +		return PTR_ERR(hw);
+> +	aspeed_clk_data->hws[ASPEED_CLK_SDIO] = hw;
+> +
+> +	/* MAC AHB bus clock divider */
+> +	hw = clk_hw_register_divider_table(dev, "mac", "hpll", 0,
+> +			scu_base + ASPEED_CLK_SELECTION, 16, 3, 0,
+> +			soc_data->mac_div_table,
+> +			&aspeed_clk_lock);
+> +	if (IS_ERR(hw))
+> +		return PTR_ERR(hw);
+> +	aspeed_clk_data->hws[ASPEED_CLK_MAC] = hw;
+> +
+> +	/* LPC Host (LHCLK) clock divider */
+> +	hw = clk_hw_register_divider_table(dev, "lhclk", "hpll", 0,
+> +			scu_base + ASPEED_CLK_SELECTION, 20, 3, 0,
+> +			soc_data->div_table,
+> +			&aspeed_clk_lock);
+> +	if (IS_ERR(hw))
+> +		return PTR_ERR(hw);
+> +	aspeed_clk_data->hws[ASPEED_CLK_LHCLK] = hw;
+> +
+> +	/* Video Engine (ECLK) mux and clock divider */
+> +	hw = clk_hw_register_mux(dev, "eclk_mux",
+> +			eclk_parents, ARRAY_SIZE(eclk_parents), 0,
+> +			scu_base + ASPEED_CLK_SELECTION, 2, 2,
+> +			0, &aspeed_clk_lock);
+
+See my comment on the eclk_parents table above.
+
+> +	if (IS_ERR(hw))
+> +		return PTR_ERR(hw);
+> +	aspeed_clk_data->hws[ASPEED_CLK_ECLK_MUX] = hw;
+> +	hw = clk_hw_register_divider_table(dev, "eclk", "eclk_mux", 0,
+> +			scu_base + ASPEED_CLK_SELECTION, 28, 3, 0,
+> +			soc_data->eclk_div_table,
+> +			&aspeed_clk_lock);
+> +	if (IS_ERR(hw))
+> +		return PTR_ERR(hw);
+> +	aspeed_clk_data->hws[ASPEED_CLK_ECLK] = hw;
+> +
+> +	/* P-Bus (BCLK) clock divider */
+> +	hw = clk_hw_register_divider_table(dev, "bclk", "hpll", 0,
+> +			scu_base + ASPEED_CLK_SELECTION_2, 0, 2, 0,
+> +			soc_data->div_table,
+> +			&aspeed_clk_lock);
+> +	if (IS_ERR(hw))
+> +		return PTR_ERR(hw);
+> +	aspeed_clk_data->hws[ASPEED_CLK_BCLK] = hw;
+> +
+> +	return 0;
+> +};
+> +
+> +static const struct of_device_id aspeed_clk_dt_ids[] = {
+> +	{ .compatible = "aspeed,ast2400-scu", .data = &ast2400_data },
+> +	{ .compatible = "aspeed,ast2500-scu", .data = &ast2500_data },
+> +	{ }
+> +};
+> +
+> +static struct platform_driver aspeed_clk_driver = {
+> +	.probe??= aspeed_clk_probe,
+> +	.driver = {
+> +		.name = "aspeed-clk",
+> +		.of_match_table = aspeed_clk_dt_ids,
+> +		.suppress_bind_attrs = true,
+> +	},
+> +};
+> +builtin_platform_driver(aspeed_clk_driver);
+> +
+> ?static void __init aspeed_ast2400_cc(struct regmap *map)
+> ?{
+> ?	struct clk_hw *hw;
+
+Cheers,
+
+Andrew
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171005/82c465d9/attachment.sig>
