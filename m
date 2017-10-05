@@ -1,49 +1,80 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 5 Oct 2017 17:54:50 +0100
-Subject: [PATCH] iommu/arm-smmu-v3: Ensure we sync STE when only changing
- config field
-In-Reply-To: <1507222158-4151-1-git-send-email-will.deacon@arm.com>
-References: <1507222158-4151-1-git-send-email-will.deacon@arm.com>
-Message-ID: <7e9ef711-b1d7-ee70-b740-5d03a4fc61f6@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 5 Oct 2017 18:02:54 +0100
+Subject: [PATCH v2 26/28] arm64/sve: Add documentation
+In-Reply-To: <59D6603C.2040603@arm.com>
+References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
+ <1504198860-12951-27-git-send-email-Dave.Martin@arm.com>
+ <59D6603C.2040603@arm.com>
+Message-ID: <20171005170254.GY3611@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/10/17 17:49, Will Deacon wrote:
-> The SMMUv3 architecture permits caching of data structures deemed to be
-> "reachable" by the SMU, which includes STEs marked as invalid. When
-> transitioning an STE to a bypass/fault configuration at init or detach
-> time, we mistakenly elide the CMDQ_OP_CFGI_STE operation in some cases,
-> therefore potentially leaving the old STE state cached in the SMMU.
-> 
-> This patch fixes the problem by ensuring that we perform the
-> CMDQ_OP_CFGI_STE operation irrespective of the validity of the previous
-> STE.
+On Thu, Oct 05, 2017 at 05:39:24PM +0100, Szabolcs Nagy wrote:
+> On 31/08/17 18:00, Dave Martin wrote:
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+[...]
 
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Reported-by: Eric Auger <eric.auger@redhat.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  drivers/iommu/arm-smmu-v3.c | 7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
+> > +	PR_SVE_SET_VL_ONEXEC
+> > +
+> > +	    Defer the requested vector length change until the next execve().
+> > +	    This allows launching of a new program with a different vector
+> > +	    length, while avoiding runtime side effects in the caller.
+> > +
+> > +	    This also overrides the effect of PR_SVE_SET_VL_INHERIT for the
+> > +	    first execve().
+> > +
+> > +	    Without PR_SVE_SET_VL_ONEXEC, any outstanding deferred vector
+> > +	    length change is cancelled.
+> > +
 > 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 47f52b1ab838..91fdabdb4de6 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -1085,8 +1085,11 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
->  		dst[1] = cpu_to_le64(STRTAB_STE_1_SHCFG_INCOMING
->  			 << STRTAB_STE_1_SHCFG_SHIFT);
->  		dst[2] = 0; /* Nuke the VMID */
-> -		if (ste_live)
-> -			arm_smmu_sync_ste_for_sid(smmu, sid);
-> +		/*
-> +		 * The SMMU can perform negative caching, so we must sync
-> +		 * the STE regardless of whether the old value was live.
-> +		 */
-> +		arm_smmu_sync_ste_for_sid(smmu, sid);
->  		return;
->  	}
->  
+> based on later text it seems this works if exeve is
+> called in the same thread as prctl was called in.
 > 
+> this is a bit weird from user-space pov so it may
+> make sense to state it here explicitly.
+
+True.  Looking at the prctl(2) man page it looks like other per-thread
+properties are inherited across execve() in a similar way, but it's at
+least worth a mention.  PR_SET_SECCOMP seems to work like this, for
+example.
+
+So, the intention is that you do a prctl(...ONEXEC) in the run up to
+execve(), rather than doing it at other random times.  The primary
+reason for ONEXEC is to avoid the side-effects of actually changing
+the VL.
+
+
+Looking at this though...
+I wonder whether PR_SVE_SET_VL(... PR_SVE_SET_VL_ONEXEC) should return
+the VL set for exec, rather than the current VL (which is unchanged by
+definition in this case, thus uninteresting).
+
+This would allow the ONEXEC flag to be used to probe for available VLs
+without the other side-effects of changing VL, something like:
+
+	int old = prctl(PR_SVE_GET_VL);
+	int ret;
+
+	ret = prctl(PR_SVE_SET_VL, 144 | PR_SVE_SET_VL_ONEXEC);
+	if (ret == -1) {
+		perror("PR_SVE_SET_VL");
+		goto error;
+	}
+
+	if ((ret & PR_SVE_VL_LEN_MASK) == 144)
+		have_vl_144 = true;
+
+	if (prctl(PR_SVE_SET_VL, old | PR_SVE_SET_VL_ONEXEC) == -1) {
+		perror("PR_SVE_SET_VL");
+		goto error;
+	}
+
+
+This does _not_ do the expected thing right now, since there's no
+direct way to retrieve thread.sve_vl_onexec directly from the kernel
+(and it didn't really seem justified to add one).
+
+Thoughts?
+
+Cheers
+---Dave
