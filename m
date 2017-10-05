@@ -1,152 +1,116 @@
-From: marco.franchi@nxp.com (Marco Franchi)
-Date: Thu, 5 Oct 2017 11:31:41 -0300
-Subject: [PATCH v3 2/2] ARM: dts: imx51: Fix inconsistent display port names
-In-Reply-To: <1507213901-1349-1-git-send-email-marco.franchi@nxp.com>
-References: <1507213901-1349-1-git-send-email-marco.franchi@nxp.com>
-Message-ID: <1507213901-1349-2-git-send-email-marco.franchi@nxp.com>
+From: longman@redhat.com (Waiman Long)
+Date: Thu, 5 Oct 2017 10:37:26 -0400
+Subject: [PATCH 5/6] kernel/locking: Prevent slowpath writers getting held
+ up by fastpath
+In-Reply-To: <20171005135618.yufhaklq5cefaiyn@hirez.programming.kicks-ass.net>
+References: <1507208097-825-1-git-send-email-will.deacon@arm.com>
+ <1507208097-825-6-git-send-email-will.deacon@arm.com>
+ <20171005135618.yufhaklq5cefaiyn@hirez.programming.kicks-ass.net>
+Message-ID: <791b62c1-a291-3d13-3eb9-8bbadc493a86@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Contrary to later i.MX SoCs, the parallel display interface pad groups on 
-i.MX51 are called DISP1 and DISP2 in the Reference Manual, not DISP0 and 
-DISP1.
+On 10/05/2017 09:56 AM, Peter Zijlstra wrote:
+> On Thu, Oct 05, 2017 at 01:54:56PM +0100, Will Deacon wrote:
+>> When a prospective writer takes the qrwlock locking slowpath due to the
+>> lock being held, it attempts to cmpxchg the wmode field from 0 to
+>> _QW_WAITING so that concurrent lockers also take the slowpath and queue
+>> on the spinlock accordingly, allowing the lockers to drain.
+>>
+>> Unfortunately, this isn't fair, because a fastpath writer that comes in
+>> after the lock is made available but before the _QW_WAITING flag is set
+>> can effectively jump the queue. If there is a steady stream of prospective
+>> writers, then the waiter will be held off indefinitely.
+>>
+>> This patch restores fairness by separating _QW_WAITING and _QW_LOCKED
+>> into two bits in the wmode byte and having the waiter set _QW_WAITING
+>> unconditionally. This then forces the slow-path for concurrent lockers,
+>> but requires that a writer unlock operation performs an
+>> atomic_sub_release instead of a store_release so that the waiting status
+>> is preserved.
+>> diff --git a/include/asm-generic/qrwlock.h b/include/asm-generic/qrwlock.h
+>> index 02c0a768e6b0..8b7edef500e5 100644
+>> --- a/include/asm-generic/qrwlock.h
+>> +++ b/include/asm-generic/qrwlock.h
+>> @@ -41,7 +41,7 @@
+>>   *       +----+----+----+----+
+>>   */
+>>  #define	_QW_WAITING	1		/* A writer is waiting	   */
+>> -#define	_QW_LOCKED	0xff		/* A writer holds the lock */
+>> +#define	_QW_LOCKED	2		/* A writer holds the lock */
+>>  #define	_QW_WMASK	0xff		/* Writer mask		   */
+>>  #define	_QR_SHIFT	8		/* Reader count shift	   */
+>>  #define _QR_BIAS	(1U << _QR_SHIFT)
+>> @@ -134,7 +134,7 @@ static inline void queued_read_unlock(struct qrwlock *lock)
+>>   */
+>>  static inline void queued_write_unlock(struct qrwlock *lock)
+>>  {
+>> -	smp_store_release(&lock->wmode, 0);
+>> +	(void)atomic_sub_return_release(_QW_LOCKED, &lock->cnts);
+>>  }
+> That is a fairly painful hit on x86. Changes a regular store into an
+> "LOCK XADD" +20 cycles right there.
+>
+> Can't we steal one of the reader bits for waiting?
+>
+> diff --git a/include/asm-generic/qrwlock.h b/include/asm-generic/qrwlock.h
+> index 7d026bf27713..5524801a02a5 100644
+> --- a/include/asm-generic/qrwlock.h
+> +++ b/include/asm-generic/qrwlock.h
+> @@ -40,10 +40,10 @@
+>   *       |      rd      | wr |
+>   *       +----+----+----+----+
+>   */
+> -#define	_QW_WAITING	1		/* A writer is waiting	   */
+> -#define	_QW_LOCKED	0xff		/* A writer holds the lock */
+> -#define	_QW_WMASK	0xff		/* Writer mask		   */
+> -#define	_QR_SHIFT	8		/* Reader count shift	   */
+> +#define	_QW_WAITING	0x100		/* A writer is waiting	   */
+> +#define	_QW_LOCKED	0x0ff		/* A writer holds the lock */
+> +#define	_QW_WMASK	0x1ff		/* Writer mask		   */
+> +#define	_QR_SHIFT	9		/* Reader count shift	   */
+>  #define _QR_BIAS	(1U << _QR_SHIFT)
+>  
+>  /*
+> diff --git a/kernel/locking/qrwlock.c b/kernel/locking/qrwlock.c
+> index 2655f26ec882..5f75caea97e0 100644
+> --- a/kernel/locking/qrwlock.c
+> +++ b/kernel/locking/qrwlock.c
+> @@ -54,7 +54,7 @@ struct __qrwlock {
+>  static __always_inline void
+>  rspin_until_writer_unlock(struct qrwlock *lock, u32 cnts)
+>  {
+> -	while ((cnts & _QW_WMASK) == _QW_LOCKED) {
+> +	while ((cnts & _QW_LOCKED)) {
+>  		cpu_relax();
+>  		cnts = atomic_read_acquire(&lock->cnts);
+>  	}
+> @@ -120,21 +120,10 @@ void queued_write_lock_slowpath(struct qrwlock *lock)
+>  	    (atomic_cmpxchg_acquire(&lock->cnts, 0, _QW_LOCKED) == 0))
+>  		goto unlock;
+>  
+> -	/*
+> -	 * Set the waiting flag to notify readers that a writer is pending,
+> -	 * or wait for a previous writer to go away.
+> -	 */
+> -	for (;;) {
+> -		struct __qrwlock *l = (struct __qrwlock *)lock;
+> -
+> -		if (!READ_ONCE(l->wmode) &&
+> -		   (cmpxchg_relaxed(&l->wmode, 0, _QW_WAITING) == 0))
+> -			break;
+> -
+> -		cpu_relax();
+> -	}
+> +	/* Set the waiting flag to notify readers that a writer is pending */
+> +	atomic_add(_QW_WAITING, &lock->cnts);
+>  
+> -	/* When no more readers, set the locked flag */
+> +	/* When no more readers or writers, set the locked flag */
+>  	for (;;) {
+>  		cnts = atomic_read(&lock->cnts);
+>  		if ((cnts == _QW_WAITING) &&
 
-Fix this inconsistence by changing the DISP names in the i.mx51 dts.
+I think this is the better of dealing with the fairness problem.
 
-Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
----
-Changes since v2:
--change message log text
- arch/arm/boot/dts/imx51-apf51dev.dts |  4 ++--
- arch/arm/boot/dts/imx51-babbage.dts  | 12 ++++++------
- arch/arm/boot/dts/imx51-ts4800.dts   |  6 +++---
- arch/arm/boot/dts/imx51.dtsi         |  4 ++--
- 4 files changed, 13 insertions(+), 13 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx51-apf51dev.dts b/arch/arm/boot/dts/imx51-apf51dev.dts
-index f04d0df..2f1a9d2 100644
---- a/arch/arm/boot/dts/imx51-apf51dev.dts
-+++ b/arch/arm/boot/dts/imx51-apf51dev.dts
-@@ -51,7 +51,7 @@
- 
- 		port {
- 			display_in: endpoint {
--				remote-endpoint = <&ipu_di0_disp0>;
-+				remote-endpoint = <&ipu_di0_disp1>;
- 			};
- 		};
- 	};
-@@ -218,6 +218,6 @@
- 	};
- };
- 
--&ipu_di0_disp0 {
-+&ipu_di0_disp1 {
- 	remote-endpoint = <&display_in>;
- };
-diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-index 297953c..668c37b 100644
---- a/arch/arm/boot/dts/imx51-babbage.dts
-+++ b/arch/arm/boot/dts/imx51-babbage.dts
-@@ -39,7 +39,7 @@
- 		};
- 	};
- 
--	display0: disp0 {
-+	display1: disp1 {
- 		compatible = "fsl,imx-parallel-display";
- 		interface-pix-fmt = "rgb24";
- 		pinctrl-names = "default";
-@@ -61,12 +61,12 @@
- 
- 		port {
- 			display0_in: endpoint {
--				remote-endpoint = <&ipu_di0_disp0>;
-+				remote-endpoint = <&ipu_di0_disp1>;
- 			};
- 		};
- 	};
- 
--	display1: disp1 {
-+	display2: disp2 {
- 		compatible = "fsl,imx-parallel-display";
- 		interface-pix-fmt = "rgb565";
- 		pinctrl-names = "default";
-@@ -93,7 +93,7 @@
- 
- 		port {
- 			display1_in: endpoint {
--				remote-endpoint = <&ipu_di1_disp1>;
-+				remote-endpoint = <&ipu_di1_disp2>;
- 			};
- 		};
- 	};
-@@ -348,11 +348,11 @@
- 	};
- };
- 
--&ipu_di0_disp0 {
-+&ipu_di0_disp1 {
- 	remote-endpoint = <&display0_in>;
- };
- 
--&ipu_di1_disp1 {
-+&ipu_di1_disp2 {
- 	remote-endpoint = <&display1_in>;
- };
- 
-diff --git a/arch/arm/boot/dts/imx51-ts4800.dts b/arch/arm/boot/dts/imx51-ts4800.dts
-index e6be869..35a1112 100644
---- a/arch/arm/boot/dts/imx51-ts4800.dts
-+++ b/arch/arm/boot/dts/imx51-ts4800.dts
-@@ -50,7 +50,7 @@
- 		power-supply = <&backlight_reg>;
- 	};
- 
--	display0: disp0 {
-+	display1: disp1 {
- 		compatible = "fsl,imx-parallel-display";
- 		interface-pix-fmt = "rgb24";
- 		pinctrl-names = "default";
-@@ -73,7 +73,7 @@
- 
- 		port at 0 {
- 			display0_in: endpoint {
--				remote-endpoint = <&ipu_di0_disp0>;
-+				remote-endpoint = <&ipu_di0_disp1>;
- 			};
- 		};
- 	};
-@@ -107,7 +107,7 @@
- 	};
- };
- 
--&ipu_di0_disp0 {
-+&ipu_di0_disp1 {
- 	remote-endpoint = <&display0_in>;
- };
- 
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index 1ee1d54..378be72 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -148,14 +148,14 @@
- 			ipu_di0: port at 2 {
- 				reg = <2>;
- 
--				ipu_di0_disp0: endpoint {
-+				ipu_di0_disp1: endpoint {
- 				};
- 			};
- 
- 			ipu_di1: port at 3 {
- 				reg = <3>;
- 
--				ipu_di1_disp1: endpoint {
-+				ipu_di1_disp2: endpoint {
- 				};
- 			};
- 		};
--- 
-2.7.4
+Acked-by: Waiman Long <longman@redhat.com>
