@@ -1,65 +1,37 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 5 Oct 2017 16:04:47 +0100
-Subject: [PATCH v2 2/2] arm64: dts: r8a7796: Add OPPs table for cpu devices
-In-Reply-To: <1507209984-17123-3-git-send-email-horms+renesas@verge.net.au>
-References: <1507209984-17123-1-git-send-email-horms+renesas@verge.net.au>
- <1507209984-17123-3-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <e2e31fd8-b5f8-40a8-df3d-e7726bb8a8e1@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 5 Oct 2017 16:05:17 +0100
+Subject: [PATCH] arm64: mm: Clarify a printk in data_abort_decode()
+In-Reply-To: <20171005130436.GB5235@leverpostej>
+References: <20171005125914.34uc5qq5titpq6zi@mwanda>
+ <20171005130436.GB5235@leverpostej>
+Message-ID: <20171005150517.kshu2ftduw5rpg4d@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Oct 05, 2017 at 02:04:36PM +0100, Mark Rutland wrote:
+> On Thu, Oct 05, 2017 at 03:59:14PM +0300, Dan Carpenter wrote:
+> > The 0x in front of a base 10 number is misleading so I removed it.
+> > 
+> > Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+> > 
+> > diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> > index 89993c4be1be..a5382e90418c 100644
+> > --- a/arch/arm64/mm/fault.c
+> > +++ b/arch/arm64/mm/fault.c
+> > @@ -97,7 +97,7 @@ static void data_abort_decode(unsigned int esr)
+> >  			 (esr & ESR_ELx_SF) >> ESR_ELx_SF_SHIFT,
+> >  			 (esr & ESR_ELx_AR) >> ESR_ELx_AR_SHIFT);
+> >  	} else {
+> > -		pr_alert("  ISV = 0, ISS = 0x%08lu\n", esr & ESR_ELx_ISS_MASK);
+> > +		pr_alert("  ISV = 0, ISS = %08lu\n", esr & ESR_ELx_ISS_MASK);
+> 
+> A fix has already been queued [0,1], ensuring this is printed as hex.
+> 
+> Catalin, I see that hasn't been pushed out to the arm64 fixes/core
+> branch. Is that deliberate?
 
-
-On 05/10/17 14:26, Simon Horman wrote:
-> From: Dien Pham <dien.pham.ry@rvc.renesas.com>
-> 
-> Current, OPP tables are defined temporary,
-> they are being evaluated and adjust in future.
-> 
-
-I assume these OPPs will continue to work in future but just not optimal.
-
-> Based in part on work by Hien Dang.
-> 
-> Signed-off-by: Dien Pham <dien.pham.ry@rvc.renesas.com>
-> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
-> v2 [Simon Horman]
-> - Only provide one operating points node for each operating-points-v2 node
->   as per the binding; other nodes were unused and have been removed
-> 
-> v1 [Simon Horman]
-> - consolidated several patches into one
-> 
-> v0 [Dien Pham]
-> ---
->  arch/arm64/boot/dts/renesas/r8a7796.dtsi | 58 ++++++++++++++++++++++++++++++++
->  1 file changed, 58 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-> index 57ac5ca6ed98..2d9edc61437c 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-> @@ -46,6 +46,8 @@
->  			power-domains = <&sysc R8A7796_PD_CA57_CPU0>;
->  			next-level-cache = <&L2_CA57>;
->  			enable-method = "psci";
-> +			clocks =<&cpg CPG_CORE R8A7796_CLK_Z>;
-> +			operating-points-v2 = <&cluster0_opp>;
->  		};
->  
->  		a57_1: cpu at 1 {
-> @@ -55,6 +57,7 @@
->  			power-domains = <&sysc R8A7796_PD_CA57_CPU1>;
->  			next-level-cache = <&L2_CA57>;
->  			enable-method = "psci";
-
-Just curious why clocks are not specified in secondaries ?
-Does this continue work if I hotplug out CPUs in ascending order and
-then hotplug back in descending order ? Also the current driver or OS
-may deal with that but not a good assumption when write DT
+No. Only that my tests took about a day to complete. I'll push the
+patches out today.
 
 -- 
-Regards,
-Sudeep
+Catalin
