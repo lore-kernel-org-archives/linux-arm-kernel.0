@@ -1,151 +1,195 @@
 From: james.morse@arm.com (James Morse)
-Date: Thu,  5 Oct 2017 20:18:02 +0100
-Subject: [PATCH v3 10/20] arm64: entry.S: move SError handling into a C
- function for future expansion
+Date: Thu,  5 Oct 2017 20:18:04 +0100
+Subject: [PATCH v3 12/20] arm64: kernel: Survive corrected RAS errors notified
+ by SError
 In-Reply-To: <20171005191812.5678-1-james.morse@arm.com>
 References: <20171005191812.5678-1-james.morse@arm.com>
-Message-ID: <20171005191812.5678-11-james.morse@arm.com>
+Message-ID: <20171005191812.5678-13-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Xie XiuQi <xiexiuqi@huawei.com>
+Prior to v8.2, SError is an uncontainable fatal exception. The v8.2 RAS
+extensions use SError to notify software about RAS errors, these can be
+contained by the ESB instruction.
 
-Today SError is taken using the inv_entry macro that ends up in
-bad_mode.
+An ACPI system with firmware-first may use SError as its 'SEI'
+notification. Future patches may add code to 'claim' this SError as a
+notification.
 
-SError can be used by the RAS Extensions to notify either the OS or
-firmware of CPU problems, some of which may have been corrected.
+Other systems can distinguish these RAS errors from the SError ESR and
+use the AET bits and additional data from RAS-Error registers to handle
+the error. Future patches may add this kernel-first handling.
 
-To allow this handling to be added, add a do_serror() C function
-that just panic()s. Add the entry.S boiler plate to save/restore the
-CPU registers and unmask debug exceptions. Future patches may change
-do_serror() to return if the SError Interrupt was notification of a
-corrected error.
+Without support for either of these we will panic(), even if we received
+a corrected error. Add code to decode the severity of RAS errors. We can
+safely ignore contained errors where the CPU can continue to make
+progress. For all other errors we continue to panic().
 
-Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
-Signed-off-by: Wang Xiongfeng <wangxiongfengi2@huawei.com>
-[Split out of a bigger patch, added compat path, renamed, enabled debug
- exceptions]
 Signed-off-by: James Morse <james.morse@arm.com>
----
- arch/arm64/Kconfig        |  2 +-
- arch/arm64/kernel/entry.S | 36 +++++++++++++++++++++++++++++-------
- arch/arm64/kernel/traps.c | 13 +++++++++++++
- 3 files changed, 43 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 0df64a6a56d4..70dfe4e9ccc5 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -98,7 +98,7 @@ config ARM64
- 	select HAVE_IRQ_TIME_ACCOUNTING
- 	select HAVE_MEMBLOCK
- 	select HAVE_MEMBLOCK_NODE_MAP if NUMA
--	select HAVE_NMI if ACPI_APEI_SEA
-+	select HAVE_NMI
- 	select HAVE_PATA_PLATFORM
- 	select HAVE_PERF_EVENTS
- 	select HAVE_PERF_REGS
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index df085ec003b0..e147c1d00b41 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -375,18 +375,18 @@ ENTRY(vectors)
- 	kernel_ventry	el1_sync			// Synchronous EL1h
- 	kernel_ventry	el1_irq				// IRQ EL1h
- 	kernel_ventry	el1_fiq_invalid			// FIQ EL1h
--	kernel_ventry	el1_error_invalid		// Error EL1h
-+	kernel_ventry	el1_error			// Error EL1h
+==
+I couldn't come up with a concise way to capture 'can continue to make
+progress', so opted for 'blocking' instead.
+---
+ arch/arm64/include/asm/esr.h   | 10 ++++++++
+ arch/arm64/include/asm/traps.h | 36 ++++++++++++++++++++++++++
+ arch/arm64/kernel/traps.c      | 58 ++++++++++++++++++++++++++++++++++++++----
+ 3 files changed, 99 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index 66ed8b6b9976..8ea52f15bf1c 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -85,6 +85,15 @@
+ #define ESR_ELx_WNR_SHIFT	(6)
+ #define ESR_ELx_WNR		(UL(1) << ESR_ELx_WNR_SHIFT)
  
- 	kernel_ventry	el0_sync			// Synchronous 64-bit EL0
- 	kernel_ventry	el0_irq				// IRQ 64-bit EL0
- 	kernel_ventry	el0_fiq_invalid			// FIQ 64-bit EL0
--	kernel_ventry	el0_error_invalid		// Error 64-bit EL0
-+	kernel_ventry	el0_error			// Error 64-bit EL0
++/* Asynchronous Error Type */
++#define ESR_ELx_AET		(UL(0x7) << 10)
++
++#define ESR_ELx_AET_UC		(UL(0) << 10)	/* Uncontainable */
++#define ESR_ELx_AET_UEU		(UL(1) << 10)	/* Uncorrected Unrecoverable */
++#define ESR_ELx_AET_UEO		(UL(2) << 10)	/* Uncorrected Restartable */
++#define ESR_ELx_AET_UER		(UL(3) << 10)	/* Uncorrected Recoverable */
++#define ESR_ELx_AET_CE		(UL(6) << 10)	/* Corrected */
++
+ /* Shared ISS field definitions for Data/Instruction aborts */
+ #define ESR_ELx_SET_SHIFT	(11)
+ #define ESR_ELx_SET_MASK	(UL(3) << ESR_ELx_SET_SHIFT)
+@@ -99,6 +108,7 @@
+ #define ESR_ELx_FSC		(0x3F)
+ #define ESR_ELx_FSC_TYPE	(0x3C)
+ #define ESR_ELx_FSC_EXTABT	(0x10)
++#define ESR_ELx_FSC_SERROR	(0x11)
+ #define ESR_ELx_FSC_ACCESS	(0x08)
+ #define ESR_ELx_FSC_FAULT	(0x04)
+ #define ESR_ELx_FSC_PERM	(0x0C)
+diff --git a/arch/arm64/include/asm/traps.h b/arch/arm64/include/asm/traps.h
+index d131501c6222..8d2a1fff5c6b 100644
+--- a/arch/arm64/include/asm/traps.h
++++ b/arch/arm64/include/asm/traps.h
+@@ -19,6 +19,7 @@
+ #define __ASM_TRAP_H
  
- #ifdef CONFIG_COMPAT
- 	kernel_ventry	el0_sync_compat			// Synchronous 32-bit EL0
- 	kernel_ventry	el0_irq_compat			// IRQ 32-bit EL0
- 	kernel_ventry	el0_fiq_invalid_compat		// FIQ 32-bit EL0
--	kernel_ventry	el0_error_invalid_compat	// Error 32-bit EL0
-+	kernel_ventry	el0_error_compat		// Error 32-bit EL0
- #else
- 	kernel_ventry	el0_sync_invalid		// Synchronous 32-bit EL0
- 	kernel_ventry	el0_irq_invalid			// IRQ 32-bit EL0
-@@ -455,10 +455,6 @@ ENDPROC(el0_error_invalid)
- el0_fiq_invalid_compat:
- 	inv_entry 0, BAD_FIQ, 32
- ENDPROC(el0_fiq_invalid_compat)
--
--el0_error_invalid_compat:
--	inv_entry 0, BAD_ERROR, 32
--ENDPROC(el0_error_invalid_compat)
+ #include <linux/list.h>
++#include <asm/esr.h>
+ #include <asm/sections.h>
+ 
+ struct pt_regs;
+@@ -58,4 +59,39 @@ static inline int in_entry_text(unsigned long ptr)
+ 	return ptr >= (unsigned long)&__entry_text_start &&
+ 	       ptr < (unsigned long)&__entry_text_end;
+ }
++
++static inline bool arm64_is_ras_serror(u32 esr)
++{
++	bool impdef = esr & ESR_ELx_ISV; /* aka IDS */
++
++	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN))
++		return !impdef;
++
++	return false;
++}
++
++/* Return the AET bits of an SError ESR, or 0/uncontainable/uncategorized */
++static inline u32 arm64_ras_serror_get_severity(u32 esr)
++{
++	u32 aet = esr & ESR_ELx_AET;
++
++	if (!arm64_is_ras_serror(esr)) {
++		/* Not a RAS error, we can't interpret the ESR */
++		return 0;
++	}
++
++	/*
++	 * AET is RES0 if 'the value returned in the DFSC field is not
++	 * [ESR_ELx_FSC_SERROR]'
++	 */
++	if ((esr & ESR_ELx_FSC) != ESR_ELx_FSC_SERROR) {
++		/* No severity information */
++		return 0;
++	}
++
++	return aet;
++}
++
++bool arm64_blocking_ras_serror(struct pt_regs *regs, unsigned int esr);
++void __noreturn arm64_serror_panic(struct pt_regs *regs, u32 esr);
  #endif
- 
- el1_sync_invalid:
-@@ -663,6 +659,10 @@ el0_svc_compat:
- el0_irq_compat:
- 	kernel_entry 0, 32
- 	b	el0_irq_naked
-+
-+el0_error_compat:
-+	kernel_entry 0, 32
-+	b	el0_error_naked
- #endif
- 
- el0_da:
-@@ -780,6 +780,28 @@ el0_irq_naked:
- 	b	ret_to_user
- ENDPROC(el0_irq)
- 
-+el1_error:
-+	kernel_entry 1
-+	mrs	x1, esr_el1
-+	enable_dbg
-+	mov	x0, sp
-+	bl	do_serror
-+	kernel_exit 1
-+ENDPROC(el1_error)
-+
-+el0_error:
-+	kernel_entry 0
-+el0_error_naked:
-+	mrs	x1, esr_el1
-+	enable_dbg
-+	mov	x0, sp
-+	bl	do_serror
-+	enable_daif
-+	ct_user_exit
-+	b	ret_to_user
-+ENDPROC(el0_error)
-+
-+
- /*
-  * This is the fast syscall return path.  We do as little as possible here,
-  * and this includes saving x0 back into the kernel stack.
 diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index d046495f67eb..210647d33bea 100644
+index 210647d33bea..ab0f61d98fd6 100644
 --- a/arch/arm64/kernel/traps.c
 +++ b/arch/arm64/kernel/traps.c
-@@ -709,6 +709,19 @@ asmlinkage void handle_bad_stack(struct pt_regs *regs)
+@@ -709,17 +709,65 @@ asmlinkage void handle_bad_stack(struct pt_regs *regs)
  }
  #endif
  
+-asmlinkage void do_serror(struct pt_regs *regs, unsigned int esr)
++void __noreturn arm64_serror_panic(struct pt_regs *regs, u32 esr)
+ {
+-	nmi_enter();
+-
+ 	console_verbose();
+ 
+ 	pr_crit("SError Interrupt on CPU%d, code 0x%08x -- %s\n",
+ 		smp_processor_id(), esr, esr_get_class_string(esr));
+-	__show_regs(regs);
++	if (regs)
++		__show_regs(regs);
++
++	/* KVM may call this this from a preemptible context */
++	preempt_disable();
++
++	/*
++	 * panic() unmasks interrupts, which unmasks SError. Use nmi_panic()
++	 * to avoid re-entering panic.
++	 */
++	nmi_panic(regs, "Asynchronous SError Interrupt");
++
++	cpu_park_loop();
++	unreachable();
++}
++
++bool arm64_blocking_ras_serror(struct pt_regs *regs, unsigned int esr)
++{
++	u32 aet = arm64_ras_serror_get_severity(esr);
++
++	switch (aet) {
++	case ESR_ELx_AET_CE:	/* corrected error */
++	case ESR_ELx_AET_UEO:	/* restartable, not yet consumed */
++		/*
++		 * The CPU can make progress. We may take UEO again as
++		 * a more severe error.
++		 */
++		return false;
++
++	case ESR_ELx_AET_UEU:	/* Uncorrected Unrecoverable */
++	case ESR_ELx_AET_UER:	/* Uncorrected Recoverable */
++		/*
++		 * The CPU can't make progress. The exception may have
++		 * been imprecise.
++		 */
++		return true;
++
++	case ESR_ELx_AET_UC:	/* Uncontainable error */
++	default:
++		/* Error has been silently propagated */
++		arm64_serror_panic(regs, esr);
++	}
++}
++
 +asmlinkage void do_serror(struct pt_regs *regs, unsigned int esr)
 +{
 +	nmi_enter();
 +
-+	console_verbose();
-+
-+	pr_crit("SError Interrupt on CPU%d, code 0x%08x -- %s\n",
-+		smp_processor_id(), esr, esr_get_class_string(esr));
-+	__show_regs(regs);
-+
-+	panic("Asynchronous SError Interrupt");
-+}
-+
++	/* non-RAS errors are not containable */
++	if (!arm64_is_ras_serror(esr) || arm64_blocking_ras_serror(regs, esr))
++		arm64_serror_panic(regs, esr);
+ 
+-	panic("Asynchronous SError Interrupt");
++	nmi_exit();
+ }
+ 
  void __pte_error(const char *file, int line, unsigned long val)
- {
- 	pr_err("%s:%d: bad pte %016lx.\n", file, line, val);
 -- 
 2.13.3
