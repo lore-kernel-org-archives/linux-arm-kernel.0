@@ -1,212 +1,173 @@
 From: andrew@aj.id.au (Andrew Jeffery)
-Date: Thu, 05 Oct 2017 18:07:52 +1030
-Subject: [PATCH v4 4/5] clk: aspeed: Register gated clocks
-In-Reply-To: <20171003065540.11722-5-joel@jms.id.au>
+Date: Thu, 05 Oct 2017 18:17:09 +1030
+Subject: [PATCH v4 5/5] clk: aspeed: Add reset controller
+In-Reply-To: <20171003065540.11722-6-joel@jms.id.au>
 References: <20171003065540.11722-1-joel@jms.id.au>
- <20171003065540.11722-5-joel@jms.id.au>
-Message-ID: <1507189072.5452.67.camel@aj.id.au>
+ <20171003065540.11722-6-joel@jms.id.au>
+Message-ID: <1507189629.5452.69.camel@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, 2017-10-03 at 17:25 +1030, Joel Stanley wrote:
-> The majority of the clocks in the system are gates paired with a reset
-> controller that holds the IP in reset.
->?
-> This borrows from clk_hw_register_gate, but registers two 'gates', one
-> to control the clock enable register and the other to control the reset
-> IP. This allows us to enforce the ordering:
->?
-> ?1. Place IP in reset
-> ?2. Enable clock
-> ?3. Delay
-> ?4. Release reset
->?
-> There are some gates that do not have an associated reset; these are
-> handled by using -1 as the index for the reset.
+> There are some resets that are not associated with gates. These are
+> represented by a reset controller.
 >?
 > Signed-off-by: Joel Stanley <joel@jms.id.au>
+
+With respect to the Aspeed hardware reset bits:
+
+Reviewed-by: Andrew Jeffery <andrew@aj.id.au>
+
 >?
 > ---
-> v4:
-> ?- Drop useless 'disable clock' comment
-> ?- Drop CLK_IS_BASIC flag
-> ?- Fix 'there are a number of clocks...' comment
-> ?- Pass device to clk registration functions
-> ?- Check for errors when registering clk_hws
 > v3:
-> ?- Remove gates offset as gates are now at the start of the list
+> ? - Add named initalisers for the reset defines
+> ? - Add define for ADC
 > ---
-> ?drivers/clk/clk-aspeed.c | 130 +++++++++++++++++++++++++++++++++++++++++++++++
-> ?1 file changed, 130 insertions(+)
+> ?drivers/clk/clk-aspeed.c?????????????????| 82 +++++++++++++++++++++++++++++++-
+> ?include/dt-bindings/clock/aspeed-clock.h | 10 ++++
+> ?2 files changed, 91 insertions(+), 1 deletion(-)
 >?
 > diff --git a/drivers/clk/clk-aspeed.c b/drivers/clk/clk-aspeed.c
-> index adb295292189..a424b056e767 100644
+> index a424b056e767..de491dc7f955 100644
 > --- a/drivers/clk/clk-aspeed.c
 > +++ b/drivers/clk/clk-aspeed.c
-> @@ -228,6 +228,107 @@ static const struct aspeed_clk_soc_data ast2400_data = {
-> ?	.calc_pll = aspeed_ast2400_calc_pll,
+> @@ -17,6 +17,7 @@
+> ?#include <linux/of_device.h>
+> ?#include <linux/platform_device.h>
+> ?#include <linux/regmap.h>
+> +#include <linux/reset-controller.h>
+> ?#include <linux/slab.h>
+> ?#include <linux/spinlock.h>
+> ?
+> @@ -292,6 +293,68 @@ static const struct clk_ops aspeed_clk_gate_ops = {
+> ?	.is_enabled = aspeed_clk_is_enabled,
 > ?};
 > ?
-> +static int aspeed_clk_enable(struct clk_hw *hw)
-> +{
-> +	struct aspeed_clk_gate *gate = to_aspeed_clk_gate(hw);
-> +	unsigned long flags;
-> +	u32 clk = BIT(gate->clock_idx);
-> +	u32 rst = BIT(gate->reset_idx);
-> +
-> +	spin_lock_irqsave(gate->lock, flags);
-> +
-> +	if (gate->reset_idx >= 0) {
-> +		/* Put IP in reset */
-> +		regmap_update_bits(gate->map, ASPEED_RESET_CTRL, rst, rst);
-> +
-> +		/* Delay 100us */
-> +		udelay(100);
-> +	}
-> +
-> +	/* Enable clock */
-> +	regmap_update_bits(gate->map, ASPEED_CLK_STOP_CTRL, clk, 0);
-> +
-> +	if (gate->reset_idx >= 0) {
-> +		/* Delay 10ms */
-> +		/* TODO: can we sleep here? */
-> +		msleep(10);
-> +
-> +		/* Take IP out of reset */
-> +		regmap_update_bits(gate->map, ASPEED_RESET_CTRL, rst, 0);
-> +	}
-> +
-> +	spin_unlock_irqrestore(gate->lock, flags);
-> +
-> +	return 0;
-> +}
-> +
-> +static void aspeed_clk_disable(struct clk_hw *hw)
-> +{
-> +	struct aspeed_clk_gate *gate = to_aspeed_clk_gate(hw);
-> +	unsigned long flags;
-> +	u32 clk = BIT(gate->clock_idx);
-> +
-> +	spin_lock_irqsave(gate->lock, flags);
-> +
-> +	regmap_update_bits(gate->map, ASPEED_CLK_STOP_CTRL, clk, clk);
-> +
-> +	spin_unlock_irqrestore(gate->lock, flags);
-> +}
-> +
-> +static int aspeed_clk_is_enabled(struct clk_hw *hw)
-> +{
-> +	struct aspeed_clk_gate *gate = to_aspeed_clk_gate(hw);
-> +	u32 clk = BIT(gate->clock_idx);
-> +	u32 reg;
-> +
-> +	regmap_read(gate->map, ASPEED_CLK_STOP_CTRL, &reg);
-> +
-> +	return (reg & clk) ? 0 : 1;
-
-Kill a branch, save the internet: return !(reg & clk);
-
-But regardless, the patch seems sensible to me modulo the power domain
-discussion. However as it's more clk-y than Aspeed-y I don't feel entirely
-qualified to provide a r-b, so instead:
-
-Acked-by: Andrew Jeffery <andrew@aj.id.au>
-
-> +}
-> +
-> +static const struct clk_ops aspeed_clk_gate_ops = {
-> +	.enable = aspeed_clk_enable,
-> +	.disable = aspeed_clk_disable,
-> +	.is_enabled = aspeed_clk_is_enabled,
+> +/**
+> + * struct aspeed_reset - Aspeed reset controller
+> + * @map: regmap to access the containing system controller
+> + * @rcdev: reset controller device
+> + */
+> +struct aspeed_reset {
+> +	struct regmap			*map;
+> +	struct reset_controller_dev	rcdev;
 > +};
 > +
-> +static struct clk_hw *aspeed_clk_hw_register_gate(struct device *dev,
-> +		const char *name, const char *parent_name, unsigned long flags,
-> +		struct regmap *map, u8 clock_idx, u8 reset_idx,
-> +		u8 clk_gate_flags, spinlock_t *lock)
+> +#define to_aspeed_reset(p) container_of((p), struct aspeed_reset, rcdev)
+> +
+> +static const u8 aspeed_resets[] = {
+> +	[ASPEED_RESET_XDMA]	= 25,
+> +	[ASPEED_RESET_MCTP]	= 24,
+> +	[ASPEED_RESET_ADC]	= 23,
+> +	[ASPEED_RESET_JTAG_MASTER] = 22,
+> +	[ASPEED_RESET_MIC]	= 18,
+> +	[ASPEED_RESET_PWM]	=??9,
+> +	[ASPEED_RESET_PCIVGA]	=??8,
+> +	[ASPEED_RESET_I2C]	=??2,
+> +	[ASPEED_RESET_AHB]	=??1,
+> +};
+> +
+> +static int aspeed_reset_deassert(struct reset_controller_dev *rcdev,
+> +				?unsigned long id)
 > +{
-> +	struct aspeed_clk_gate *gate;
-> +	struct clk_init_data init;
-> +	struct clk_hw *hw;
-> +	int ret;
+> +	struct aspeed_reset *ar = to_aspeed_reset(rcdev);
+> +	u32 rst = BIT(aspeed_resets[id]);
 > +
-> +	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
-> +	if (!gate)
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	init.name = name;
-> +	init.ops = &aspeed_clk_gate_ops;
-> +	init.flags = flags;
-> +	init.parent_names = parent_name ? &parent_name : NULL;
-> +	init.num_parents = parent_name ? 1 : 0;
-> +
-> +	gate->map = map;
-> +	gate->clock_idx = clock_idx;
-> +	gate->reset_idx = reset_idx;
-> +	gate->flags = clk_gate_flags;
-> +	gate->lock = lock;
-> +	gate->hw.init = &init;
-> +
-> +	hw = &gate->hw;
-> +	ret = clk_hw_register(dev, hw);
-> +	if (ret) {
-> +		kfree(gate);
-> +		hw = ERR_PTR(ret);
-> +	}
-> +
-> +	return hw;
+> +	return regmap_update_bits(ar->map, ASPEED_RESET_CTRL, rst, 0);
 > +}
 > +
-> ?static int aspeed_clk_probe(struct platform_device *pdev)
+> +static int aspeed_reset_assert(struct reset_controller_dev *rcdev,
+> +			???????unsigned long id)
+> +{
+> +	struct aspeed_reset *ar = to_aspeed_reset(rcdev);
+> +	u32 rst = BIT(aspeed_resets[id]);
+> +
+> +	return regmap_update_bits(ar->map, ASPEED_RESET_CTRL, rst, rst);
+> +}
+> +
+> +static int aspeed_reset_status(struct reset_controller_dev *rcdev,
+> +			???????unsigned long id)
+> +{
+> +	struct aspeed_reset *ar = to_aspeed_reset(rcdev);
+> +	u32 val, rst = BIT(aspeed_resets[id]);
+> +	int ret;
+> +
+> +	ret = regmap_read(ar->map, ASPEED_RESET_CTRL, &val);
+> +	if (ret)
+> +		return ret;
+> +
+> +	return !!(val & rst);
+> +}
+> +
+> +static const struct reset_control_ops aspeed_reset_ops = {
+> +	.assert = aspeed_reset_assert,
+> +	.deassert = aspeed_reset_deassert,
+> +	.status = aspeed_reset_status,
+> +};
+> +
+> ?static struct clk_hw *aspeed_clk_hw_register_gate(struct device *dev,
+> ?		const char *name, const char *parent_name, unsigned long flags,
+> ?		struct regmap *map, u8 clock_idx, u8 reset_idx,
+> @@ -333,10 +396,11 @@ static int aspeed_clk_probe(struct platform_device *pdev)
 > ?{
 > ?	const struct aspeed_clk_soc_data *soc_data;
-> @@ -235,6 +336,7 @@ static int aspeed_clk_probe(struct platform_device *pdev)
+> ?	struct device *dev = &pdev->dev;
+> +	struct aspeed_reset *ar;
 > ?	struct regmap *map;
 > ?	struct clk_hw *hw;
 > ?	u32 val, rate;
-> +	int i;
+> -	int i;
+> +	int i, ret;
 > ?
 > ?	map = syscon_node_to_regmap(dev->of_node);
 > ?	if (IS_ERR(map)) {
-> @@ -323,6 +425,34 @@ static int aspeed_clk_probe(struct platform_device *pdev)
-> ?		return PTR_ERR(hw);
-> ?	aspeed_clk_data->hws[ASPEED_CLK_BCLK] = hw;
+> @@ -344,6 +408,22 @@ static int aspeed_clk_probe(struct platform_device *pdev)
+> ?		return PTR_ERR(map);
+> ?	}
 > ?
-> +	/*
-> +	?* TODO: There are a number of clocks that not included in this driver
-> +	?* as more information is required:
-> +	?*???D2-PLL
-> +	?*???D-PLL
-> +	?*???YCLK
-> +	?*???RGMII
-> +	?*???RMII
-> +	?*???UART[1..5] clock source mux
-> +	?*/
+> +	ar = devm_kzalloc(dev, sizeof(*ar), GFP_KERNEL);
+> +	if (!ar)
+> +		return -ENOMEM;
 > +
-> +	for (i = 0; i < ARRAY_SIZE(aspeed_gates); i++) {
-> +		const struct aspeed_gate_data *gd = &aspeed_gates[i];
+> +	ar->map = map;
+> +	ar->rcdev.owner = THIS_MODULE;
+> +	ar->rcdev.nr_resets = ARRAY_SIZE(aspeed_resets);
+> +	ar->rcdev.ops = &aspeed_reset_ops;
+> +	ar->rcdev.of_node = dev->of_node;
 > +
-> +		hw = aspeed_clk_hw_register_gate(dev,
-> +				gd->name,
-> +				gd->parent_name,
-> +				gd->flags,
-> +				map,
-> +				gd->clock_idx,
-> +				gd->reset_idx,
-> +				CLK_GATE_SET_TO_DISABLE,
-> +				&aspeed_clk_lock);
-> +		if (IS_ERR(hw))
-> +			return PTR_ERR(hw);
-> +		aspeed_clk_data->hws[i] = hw;
+> +	ret = devm_reset_controller_register(dev, &ar->rcdev);
+> +	if (ret) {
+> +		dev_err(dev, "could not register reset controller\n");
+> +		return ret;
 > +	}
 > +
-> ?	return 0;
-> ?};
+> ?	/* SoC generations share common layouts but have different divisors */
+> ?	soc_data = of_device_get_match_data(dev);
+> ?	if (!soc_data) {
+> diff --git a/include/dt-bindings/clock/aspeed-clock.h b/include/dt-bindings/clock/aspeed-clock.h
+> index 4a99421d77c8..8e19646d8025 100644
+> --- a/include/dt-bindings/clock/aspeed-clock.h
+> +++ b/include/dt-bindings/clock/aspeed-clock.h
+> @@ -39,4 +39,14 @@
 > ?
+> ?#define ASPEED_NUM_CLKS			35
+> ?
+> +#define ASPEED_RESET_XDMA		0
+> +#define ASPEED_RESET_MCTP		1
+> +#define ASPEED_RESET_ADC		2
+> +#define ASPEED_RESET_JTAG_MASTER	3
+> +#define ASPEED_RESET_MIC		4
+> +#define ASPEED_RESET_PWM		5
+> +#define ASPEED_RESET_PCIVGA		6
+> +#define ASPEED_RESET_I2C		7
+> +#define ASPEED_RESET_AHB		8
+> +
+> ?#endif
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171005/716a881a/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171005/75109006/attachment-0001.sig>
