@@ -1,37 +1,68 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 5 Oct 2017 21:25:54 +0200
-Subject: [PATCH v2 7/7] PCI: aardvark: define IRQ related hooks in
- pci_host_bridge
-In-Reply-To: <20171005175547.GT25517@bhelgaas-glaptop.roam.corp.google.com>
+Date: Thu, 5 Oct 2017 21:35:12 +0200
+Subject: [PATCH v2 0/7] PCI: aardvark: improve compatibility with PCI
+ devices
+In-Reply-To: <20171005181615.GU25517@bhelgaas-glaptop.roam.corp.google.com>
 References: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
- <20170928125838.11887-8-thomas.petazzoni@free-electrons.com>
- <20171005175547.GT25517@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20171005212554.31c5b3a1@windsurf.lan>
+ <20171005175310.3c2dde95@windsurf.lan>
+ <20171005181615.GU25517@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20171005213512.5cdcd879@windsurf.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-On Thu, 5 Oct 2017 12:55:47 -0500, Bjorn Helgaas wrote:
+On Thu, 5 Oct 2017 13:16:17 -0500, Bjorn Helgaas wrote:
 
-> On Thu, Sep 28, 2017 at 02:58:38PM +0200, Thomas Petazzoni wrote:
-> > Commit 769b461fc0c0 ("arm64: PCI: Drop DT IRQ allocation from
-> > pcibios_alloc_irq()") was assuming all PCI host controller drivers had
-> > been converted to use ->map_irq(), but that wasn't the case:
-> > pci-aardvark had not been converted. Due to this, it broke the support
-> > for legacy PCI interrupts when using the pci-aardvark driver (used on
-> > Marvell Armada 3720 platforms).  
+> The general rule is that after the merge window, I merge fixes to
+> things we put in during the merge window, as well as important
+> regression fixes.  Most bug fixes will be queued for the next merge
+> window.  I'll need some guidance on classifying these.
 > 
-> Lorenzo is pretty thorough, but maybe pci-aardvark.c got overlooked.
-> Cc'ing him just to make sure there's nothing deeper than that.
+> I think the map_irq/swizzle_irq patch should definitely be in v4.14.
+> (It looks a lot like these:
+> 
+>   1ee4d93d5037 PCI: xilinx-nwl: Move to struct pci_host_bridge IRQ mapping functions
+>   5a3dc3c1f694 PCI: rockchip: Move to struct pci_host_bridge IRQ mapping functions
+>   c62e98bdaa70 PCI: xgene: Move to struct pci_host_bridge IRQ mapping functions
+>   6ab380957838 PCI: altera: Drop pci_fixup_irqs()
+>   cf60374de8f6 PCI: versatile: Drop pci_fixup_irqs()
+>   6982a068aa5f PCI: generic: Drop pci_fixup_irqs()
+>   f7c2e69b65fe PCI: faraday: Drop pci_fixup_irqs()
+>   60eca198b1ea PCI: designware: Drop pci_fixup_irqs()
+>   64bcd00a7ef5 PCI: iproc: Drop pci_fixup_irqs()
+>   29db991902ec PCI: rcar: Drop pci_fixup_irqs()
+>   cc2eaaef63df PCI: xilinx: Drop pci_fixup_irqs()
+>   dd5fcce2a7f9 PCI: tegra: Drop pci_fixup_irqs()
+> 
+> and I'm obsessive enough to use one of those subject lines to tie this
+> patch together with those.)
 
-I talked about this issue with Lorenzo on IRC and then briefly in real
-life at Linux Plumbers, and I'm pretty sure he agreed that it was just
-due to the Aardvark driver having been overlooked.
+Fine, I'll adjust the commit title to be "PCI: aardvark: Move to struct
+pci_host_bridge IRQ mapping functions". I also find it nice when commit
+titles are very consistent, so I can only agree with your obsessiveness
+on this!
 
-But I'll let him confirm.
+> Most of the rest look like they've been there since the driver was
+> first merged, so they would *probably* go in the v4.15 queue.
 
-Thanks!
+I agree that the other patches do not fix regressions but bugs. So it's
+really up to you as to what you consider a "fix". The Aardvark driver
+in its current form leaves a lot of PCIe devices unusable, and we get
+bug reports about this. But admittedly, such PCIe devices have never
+worked with Aardvark.
+
+> Sorry for the delay; mostly just lack of time.  I used to work pretty
+> strictly first-in, first-out, but the native host bridge drivers
+> consume a disproportionate share of my time compared with the generic
+> code that benefits everybody, so I'm trying to figure out how to
+> prioritize generic changes.  Obviously I need a solution that gives
+> *some* time to the native drivers.
+
+No problem. I do understand that reviewing all of those native drivers
+takes a significant amount of time.
+
+Best regards,
 
 Thomas
 -- 
