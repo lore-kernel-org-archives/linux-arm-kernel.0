@@ -1,55 +1,83 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 5 Oct 2017 16:11:10 +0100
-Subject: [PATCH] arm64: Use larger stacks when KASAN is selected
-In-Reply-To: <20171004113908.GD23092@leverpostej>
-References: <1507051546-11677-1-git-send-email-mark.rutland@arm.com>
- <20171004113130.t76oxehchtfcvbo3@armageddon.cambridge.arm.com>
- <20171004113908.GD23092@leverpostej>
-Message-ID: <20171005151110.dvgnpruwyiml2pse@armageddon.cambridge.arm.com>
+From: m.purski@samsung.com (Maciej Purski)
+Date: Thu, 05 Oct 2017 17:15:07 +0200
+Subject: [PATCH 3/4] dt-bindings: hwmon: Add max-expected-current
+ property to ina2xx
+In-Reply-To: <20171001113145.2e839bc1@archlinux>
+References: <1506603015-27202-1-git-send-email-m.purski@samsung.com>
+ <CGME20170928125104eucas1p20a3ead82624005331e36b8ebeca46815@eucas1p2.samsung.com>
+ <1506603015-27202-4-git-send-email-m.purski@samsung.com>
+ <20171001113145.2e839bc1@archlinux>
+Message-ID: <b990ff1b-80d6-4686-eb8f-51f045a92858@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 04, 2017 at 12:39:09PM +0100, Mark Rutland wrote:
-> On Wed, Oct 04, 2017 at 12:31:31PM +0100, Catalin Marinas wrote:
-> > On Tue, Oct 03, 2017 at 06:25:46PM +0100, Mark Rutland wrote:
-> > > AddressSanitizer instrumentation can significantly bloat the stack, and
-> > > with GCC 7 this can result in stack overflows at boot time in some
-> > > configurations.
-> > > 
-> > > We can avoid this by doubling our stack size when KASAN is in use, as is
-> > > already done on x86 (and has been since KASAN was introduced).
-> > > Regardless of other patches to decrease KASAN's stack utilization,
-> > > kernels built with KASAN will always require more stack space than those
-> > > built without, and we should take this into account.
-> > > 
-> > > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > > Cc: Will Deacon <will.deacon@arm.com>
-> > > Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> > > ---
-> > >  arch/arm64/include/asm/memory.h | 9 ++++++---
-> > >  1 file changed, 6 insertions(+), 3 deletions(-)
-> > > 
-> > > In local testing (with KASAN and other options enabled), I've seen a stack
-> > > depth of 23928 bytes while booting to a prompt with an Ubuntu 14.04 filesystem
-> > > mounted over NFS. Without KASAN (but with other debug options enabled), this
-> > > was 7992 bytes.
-> > > 
-> > > I wonder if we want to go for 4x rather than 2x...
-> > 
-> > Let's hope it's fine for now with 32K stacks. We may run into allocation
-> > issues with 64K stacks (and without VMAP_STACKS).
-> > 
-> > Do you want this patch for 4.14?
+On 10/01/2017 12:31 PM, Jonathan Cameron wrote:
+> On Thu, 28 Sep 2017 14:50:14 +0200
+> Maciej Purski <m.purski@samsung.com> wrote:
 > 
-> If you're happy to take it, that would be great, but otherwise it can
-> wait for v4.15.
+>> Add optional max expected current property which allows calibrating
+>> the ina sensor in order to achieve requested precision. Document
+>> the changes in Documentation/hwmon/ina2xx.
+>>
 > 
-> Arguably this fixes the introduction of KASAN to arm64, but I'm not sure
-> how much we care about backporting this to stable.
+> This is introducing new generic devicetree bindings..
+> I'm not totally sure we want to do this rather than having a
+> manufacturer specific binding...  I don't have a good feeling for
+> how common this will be in other devices.
+> 
+> If it's generic, then this isn't necessarily the place to define it.
+> 
+> Jonathan
+>
 
-I queued it for 4.14. If anyone thinks it's really important for older
-kernels, we can send it to stable later (I don't think it is though).
+I agree, this should be manufacturer-specific property. Thanks.
 
--- 
-Catalin
+>> Signed-off-by: Maciej Purski <m.purski@samsung.com>
+>> ---
+>>   Documentation/devicetree/bindings/hwmon/ina2xx.txt | 4 +++-
+>>   Documentation/hwmon/ina2xx                         | 9 +++++----
+>>   2 files changed, 8 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/hwmon/ina2xx.txt b/Documentation/devicetree/bindings/hwmon/ina2xx.txt
+>> index 02af0d9..25ba372 100644
+>> --- a/Documentation/devicetree/bindings/hwmon/ina2xx.txt
+>> +++ b/Documentation/devicetree/bindings/hwmon/ina2xx.txt
+>> @@ -14,11 +14,13 @@ Optional properties:
+>>   
+>>   - shunt-resistor
+>>   	Shunt resistor value in micro-Ohm
+>> -
+>> +- max-expected-current
+>> +	Max expected current value in mA
+>>   Example:
+>>   
+>>   ina220 at 44 {
+>>   	compatible = "ti,ina220";
+>>   	reg = <0x44>;
+>>   	shunt-resistor = <1000>;
+>> +	max-expected-current = <3000>;
+>>   };
+>> diff --git a/Documentation/hwmon/ina2xx b/Documentation/hwmon/ina2xx
+>> index cfd31d9..e9ca838 100644
+>> --- a/Documentation/hwmon/ina2xx
+>> +++ b/Documentation/hwmon/ina2xx
+>> @@ -51,10 +51,11 @@ INA230 and INA231 are high or low side current shunt and power monitors
+>>   with an I2C interface. The chips monitor both a shunt voltage drop and
+>>   bus supply voltage.
+>>   
+>> -The shunt value in micro-ohms can be set via platform data or device tree at
+>> -compile-time or via the shunt_resistor attribute in sysfs at run-time. Please
+>> -refer to the Documentation/devicetree/bindings/i2c/ina2xx.txt for bindings
+>> -if the device tree is used.
+>> +The shunt value in micro-ohms and max expected current in mA can be set
+>> +via platform data or device tree at compile-time or via the shunt_resistor
+>> +and max_expected_current attributes in sysfs at run-time. Please refer to the
+>> +Documentation/devicetree/bindings/i2c/ina2xx.txt for bindings if the
+>> +device tree is used.
+>>   
+>>   Additionally ina226 supports update_interval attribute as described in
+>>   Documentation/hwmon/sysfs-interface. Internally the interval is the sum of
+> 
+> 
+> 
+> 
