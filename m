@@ -1,106 +1,92 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 5 Oct 2017 16:16:50 -0500
-Subject: [PATCH 2/2] PCI: mvebu: Check DRAM window size
-In-Reply-To: <20170925235658.GK15970@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170828152517.24506-1-jlu@pengutronix.de>
- <20170828152517.24506-3-jlu@pengutronix.de>
- <20170925235658.GK15970@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20171005211650.GZ25517@bhelgaas-glaptop.roam.corp.google.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 5 Oct 2017 14:30:35 -0700
+Subject: [PATCH 0/2] [v5] pinctrl: qcom: add support for sparse GPIOs
+In-Reply-To: <f8c20994-230e-0028-c46a-d001e59223ce@codeaurora.org>
+References: <CACRpkdaUV1Mjh7U9bBAgZA5Zq1oqN0HBT=VH5NkvPnY4gHxDVw@mail.gmail.com>
+ <d53e67a2-4f69-752f-ba35-53872d9b9760@codeaurora.org>
+ <CACRpkdYfAcKrgbgybccurUKTyR0E+tHDyzp7sbXxXxKuyMOGhQ@mail.gmail.com>
+ <619f48d2-59c7-c090-4ace-9e8db9f92064@codeaurora.org>
+ <CACRpkdZFunwQ=tiQqsapap7Ozz42hr=df5vqbC0S5xy5Wn+ZWw@mail.gmail.com>
+ <255ad0dc-2d16-ae7f-0b45-500e23cff1a4@codeaurora.org>
+ <20171003220311.GU457@codeaurora.org>
+ <40a0ab68-dc3a-10e2-f78e-9a386b4a72bd@codeaurora.org>
+ <20171004215023.GA457@codeaurora.org>
+ <f8c20994-230e-0028-c46a-d001e59223ce@codeaurora.org>
+Message-ID: <20171005213035.GF457@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 25, 2017 at 06:56:58PM -0500, Bjorn Helgaas wrote:
-> On Mon, Aug 28, 2017 at 05:25:17PM +0200, Jan Luebbe wrote:
-> > The sum of the DRAM windows may exceed 4GB (at least on Armada XP).
-> > Return an error in that case.
-> > 
-> > Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+On 10/04, Timur Tabi wrote:
+> On 10/04/2017 04:50 PM, Stephen Boyd wrote:
 > 
-> Looking for an ack from Thomas or Jason before applying this...
+> Yes.  A recent firmware update enabled the "XPU" block which is
+> being programmed with a select subset of individual GPIOs.  On our
+> silicon, each TLMM GPIO is in a separate 64k page, and so the XPU
+> can block any individual GPIO.  Any attempt to touch those registers
+> causes an XPU violation which takes the whole system down.
 
-Ping, I think I'm stil waiting for an ack for this.  Or did I miss it?
+Yes it's the same sort of design with the hardware I have too.
 
-> > ---
-> >  drivers/pci/host/pci-mvebu.c | 27 ++++++++++++++++++++++-----
-> >  1 file changed, 22 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-> > index f353a6eb2f01..5d74af81d104 100644
-> > --- a/drivers/pci/host/pci-mvebu.c
-> > +++ b/drivers/pci/host/pci-mvebu.c
-> > @@ -206,10 +206,10 @@ static void mvebu_pcie_set_local_dev_nr(struct mvebu_pcie_port *port, int nr)
-> >   * BAR[0,2] -> disabled, BAR[1] -> covers all DRAM banks
-> >   * WIN[0-3] -> DRAM bank[0-3]
-> >   */
-> > -static void mvebu_pcie_setup_wins(struct mvebu_pcie_port *port)
-> > +static int mvebu_pcie_setup_wins(struct mvebu_pcie_port *port)
-> >  {
-> >  	const struct mbus_dram_target_info *dram;
-> > -	u32 size;
-> > +	u64 size;
-> >  	int i;
-> >  
-> >  	dram = mv_mbus_dram_info();
-> > @@ -252,19 +252,32 @@ static void mvebu_pcie_setup_wins(struct mvebu_pcie_port *port)
-> >  	if ((size & (size - 1)) != 0)
-> >  		size = 1 << fls(size);
-> >  
-> > +	if (size > 0x100000000) {
-> > +		dev_err(&port->pcie->pdev->dev,
-> > +			"Could not configure DRAM window (too large): 0x%llx\n",
-> > +			size);
-> > +
-> > +		return -EINVAL;
-> > +	}
-> > +
-> >  	/* Setup BAR[1] to all DRAM banks. */
-> >  	mvebu_writel(port, dram->cs[0].base, PCIE_BAR_LO_OFF(1));
-> >  	mvebu_writel(port, 0, PCIE_BAR_HI_OFF(1));
-> >  	mvebu_writel(port, ((size - 1) & 0xffff0000) | 1,
-> >  		     PCIE_BAR_CTRL_OFF(1));
-> > +
-> > +	return 0;
-> >  }
-> >  
-> > -static void mvebu_pcie_setup_hw(struct mvebu_pcie_port *port)
-> > +static int mvebu_pcie_setup_hw(struct mvebu_pcie_port *port)
-> >  {
-> >  	u32 cmd, mask;
-> > +	int ret;
-> >  
-> >  	/* Point PCIe unit MBUS decode windows to DRAM space. */
-> > -	mvebu_pcie_setup_wins(port);
-> > +	ret = mvebu_pcie_setup_wins(port);
-> > +	if (ret)
-> > +		return ret;
-> >  
-> >  	/* Master + slave enable. */
-> >  	cmd = mvebu_readl(port, PCIE_CMD_OFF);
-> > @@ -277,6 +290,8 @@ static void mvebu_pcie_setup_hw(struct mvebu_pcie_port *port)
-> >  	mask = mvebu_readl(port, PCIE_MASK_OFF);
-> >  	mask |= PCIE_MASK_ENABLE_INTS;
-> >  	mvebu_writel(port, mask, PCIE_MASK_OFF);
-> > +
-> > +	return 0;
-> >  }
-> >  
-> >  static int mvebu_pcie_hw_rd_conf(struct mvebu_pcie_port *port,
-> > @@ -882,7 +897,9 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
-> >  
-> >  		if (!port->base)
-> >  			continue;
-> > -		mvebu_pcie_setup_hw(port);
-> > +		err = mvebu_pcie_setup_hw(port);
-> > +		if (err)
-> > +			return 0;
-> >  	}
-> >  
-> >  	return 1;
-> > -- 
-> > 2.11.0
-> > 
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >
+> >If it's in gpiochip_add_pin_range() would we still read the
+> >hardware when creating the pin ranges?
+> 
+> I presume so.  The idea is that pinctrl-qdf2xxx/pinctrl-msm only
+> submit pin ranges that are present in the ACPI tables.
+
+Ok.
+
+> 
+> > I don't want to have to describe pin ranges of "valid" pins that
+> > won't cause the system
+> > to blow up if we touch them, because those pins are never used by
+> > Linux so reading them is not useful.
+> 
+> Well, that's exactly what I'm trying to do with current patch set
+> :-) It seems the most logical approach to me.  I don't understand
+> the dislike for it.  What else are pin ranges for, other than to
+> specify ranges of pins that can be accessed?
+
+I have no idea. To describe non-contiguous pin ranges? Linus?
+
+> 
+> Another alternative was to enumerate all of the GPIOs starting from
+> 0. So the first GPIO in ACPI would be gpio0, regardless of what gpio
+> number it actually was.  E.g. GPIO 37 would appear as gpio0, GPIO 38
+> would appear as gpio1, and so on.  That also worked, but it meant
+> that customers would need to figure out which GPIO that "gpio0"
+> actually pointed to.  That was not acceptable, so I dropped it.
+
+Agreed.
+
+> 
+> I'm at a loss on how else to do it.  I think a gpio_chip.available
+> callback is far less elegant than define pin ranges.  There is no
+> chance that unavailable GPIOs can be accessed because the physical
+> addresses are not in the msm_pingroup array.  That is,
+> groups[0].ctrl_reg == 0, not 0xFF02010000.
+> 
+
+Yes, thinking more about it I don't want an available callback
+either. It will add burden on DT platforms where we have to
+describe per-firmware pin ranges just because gpiolib is reading
+the direction of gpios we don't use.
+
+Instead, I'd prefer we delay reading the direction until a
+consumer requests the gpio, this way we don't touch the hardware
+unless a consumer wants to. That seems simpler and doesn't
+require anything special from the driver.
+
+Don't get me wrong, I'm willing to describe with DT/ACPI which
+pins are available if we have a need for it, but so far I don't
+see the requirement and I'm a lazy person so I like avoiding more
+work.
+
+Does my patch fail on your platform for some reason? I can only
+guess that somewhere we don't request the gpio before using it
+and then you don't see the proper direction.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
