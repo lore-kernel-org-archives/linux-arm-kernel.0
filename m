@@ -1,229 +1,172 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 5 Oct 2017 15:05:41 +0100
-Subject: [PATCH v8 3/5] iommu/of: Add msi address regions reservation
- helper
-In-Reply-To: <82272c18-717d-bbaf-b8c3-61785af496bd@huawei.com>
-References: <20170927133241.21036-1-shameerali.kolothum.thodi@huawei.com>
- <20170927133241.21036-4-shameerali.kolothum.thodi@huawei.com>
- <f3146f49-6004-7a15-866b-653e3ea54856@arm.com>
- <20171004135007.GA12327@red-moon>
- <5c80f292-dc5d-a1c6-d7a0-df2a84cc77d1@arm.com>
- <d525f112-fb20-d14b-bea0-6547c8b933dd@huawei.com>
- <cd4d3ad0-317e-6b7b-c5f4-f4e6eac3ee10@arm.com>
- <82272c18-717d-bbaf-b8c3-61785af496bd@huawei.com>
-Message-ID: <6f8e27fc-3f16-7f66-5443-2be64ce9e464@arm.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 05 Oct 2017 16:09:13 +0200
+Subject: [PATCH v2 2/2] ARM: dts: imx51: Fix inconsistent display port
+ names
+In-Reply-To: <1507207427-32424-2-git-send-email-marco.franchi@nxp.com>
+References: <1507207427-32424-1-git-send-email-marco.franchi@nxp.com>
+ <1507207427-32424-2-git-send-email-marco.franchi@nxp.com>
+Message-ID: <1507212553.8473.16.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/10/17 14:08, John Garry wrote:
-> On 05/10/2017 13:44, Robin Murphy wrote:
->> On 05/10/17 13:37, John Garry wrote:
->>> On 05/10/2017 12:07, Robin Murphy wrote:
->>>> On 04/10/17 14:50, Lorenzo Pieralisi wrote:
->>>>> On Wed, Oct 04, 2017 at 12:22:04PM +0100, Marc Zyngier wrote:
->>>>>> On 27/09/17 14:32, Shameer Kolothum wrote:
->>>>>>> From: John Garry <john.garry@huawei.com>
->>>>>>>
->>>>>>> On some platforms msi-controller address regions have to be excluded
->>>>>>> from normal IOVA allocation in that they are detected and decoded in
->>>>>>> a HW specific way by system components and so they cannot be
->>>>>>> considered
->>>>>>> normal IOVA address space.
->>>>>>>
->>>>>>> Add a helper function that retrieves msi address regions through
->>>>>>> device
->>>>>>> tree msi mapping, so that these regions will not be translated by
->>>>>>> IOMMU
->>>>>>> and will be excluded from IOVA allocations.
->>>>>>>
->>>>>>> Signed-off-by: John Garry <john.garry@huawei.com>
->>>>>>> [Shameer: Modified msi-parent retrieval logic]
->>>>>>> Signed-off-by: Shameer Kolothum
->>>>>>> <shameerali.kolothum.thodi@huawei.com>
->>>>>>> ---
->>>>>>> ?drivers/iommu/of_iommu.c | 95
->>>>>>> ++++++++++++++++++++++++++++++++++++++++++++++++
->>>>>>> ?include/linux/of_iommu.h | 10 +++++
->>>>>>> ?2 files changed, 105 insertions(+)
->>>>>>>
->>>>>>> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
->>>>>>> index e60e3db..ffd7fb7 100644
->>>>>>> --- a/drivers/iommu/of_iommu.c
->>>>>>> +++ b/drivers/iommu/of_iommu.c
->>>>>>> @@ -21,6 +21,7 @@
->>>>>>> ?#include <linux/iommu.h>
->>>>>>> ?#include <linux/limits.h>
->>>>>>> ?#include <linux/of.h>
->>>>>>> +#include <linux/of_address.h>
->>>>>>> ?#include <linux/of_iommu.h>
->>>>>>> ?#include <linux/of_pci.h>
->>>>>>> ?#include <linux/slab.h>
->>>>>>> @@ -138,6 +139,14 @@ static int of_iommu_xlate(struct device *dev,
->>>>>>> ???? return ops->of_xlate(dev, iommu_spec);
->>>>>>> ?}
->>>>>>>
->>>>>>> +static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void
->>>>>>> *data)
->>>>>>> +{
->>>>>>> +??? u32 *rid = data;
->>>>>>> +
->>>>>>> +??? *rid = alias;
->>>>>>> +??? return 0;
->>>>>>> +}
->>>>>>> +
->>>>>>> ?struct of_pci_iommu_alias_info {
->>>>>>> ???? struct device *dev;
->>>>>>> ???? struct device_node *np;
->>>>>>> @@ -163,6 +172,73 @@ static int of_pci_iommu_init(struct pci_dev
->>>>>>> *pdev, u16 alias, void *data)
->>>>>>> ???? return info->np == pdev->bus->dev.of_node;
->>>>>>> ?}
->>>>>>>
->>>>>>> +static int of_iommu_alloc_resv_region(struct device_node *np,
->>>>>>> +????????????????????? struct list_head *head)
->>>>>>> +{
->>>>>>> +??? int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
->>>>>>> +??? struct iommu_resv_region *region;
->>>>>>> +??? struct resource res;
->>>>>>> +??? int err;
->>>>>>> +
->>>>>>> +??? err = of_address_to_resource(np, 0, &res);
->>>>>>
->>>>>> What is the rational for registering the first region only? Surely
->>>>>> you
->>>>>> can have more than one region in an MSI controller (yes, your
->>>>>> particular
->>>>>> case is the ITS which has only one, but we're trying to do something
->>>>>> generic here).
->>>>>>
->>>>>> Another issue I have with this code is that it inserts all of the ITS
->>>>>> MMIO in the RESV_MSI range. As long as we don't generate any page
->>>>>> tables
->>>>>> for this, we're fine. But if we ever change this, we'll end-up
->>>>>> with the
->>>>>> ITS programming interface being exposed to a device, which
->>>>>> wouldn't be
->>>>>> acceptable.
->>>>>>
->>>>>> Why can't we have some generic property instead, that would describe
->>>>>> the
->>>>>> actual ranges that cannot be translated? That way, no random
->>>>>> insertion
->>>>>> of a random range, and relatively future proof.
->>>>
->>>> Indeed. Furthermore, IORT has the advantage of being limited to a few
->>>> distinct device types and SBSA-compliant system topologies, so the
->>>> ITS-chasing is reasonable there (modulo only reserving
->>>> GITS_TRANSLATER).
->>>> The scope of DT covers more embedded things as well like PCI host
->>>> controllers with internal MSI doorbells, and potentially even
->>>> direct-mapped memory regions for things like bootloader framebuffers to
->>>> prevent display glitches - a generic address/size/flags description
->>>> of a
->>>> region could work for just about everything.
->>>>
->>>>> IORT code has the same issue (ie it reserves all ITS regions) and I do
->>>>> not know where a property can be added to describe those ranges (IORT
->>>>> specs ? I'd rather not) in ACPI other than the IORT tables entries
->>>>> themselves.
->>>>>
->>>>>> I'm not sure where to declare it (PCIe node? IOMMU node?), but it'd
->>>>>> feel
->>>>>> like a much nicer and simpler solution to this problem.
->>>>>
->>>>> It could be but if we throw ACPI into the picture we have to knock
->>>>> together Hisilicon specific namespace bindings to handle this and
->>>>> quickly.
->>>>
->>>> As above I'm happy with the ITS-specific solution for ACPI given the
->>>> limits of IORT. What I had in mind for DT was something tied in with
->>>> the
->>>> generic IOMMU bindings. Something like this is probably easiest to
->>>> handle, but does rather spread the information around:
->>>>
->>>>
->>>> ? pci {
->>>> ????? ...
->>>> ????? iommu-map = <0 0 &iommu1 0x10000>;
->>>> ????? iommu-reserved-ranges = <0x12340000 0x1000 IOMMU_MSI>,
->>>> ????????????????? <0x34560000 0x1000 IOMMU_MSI>;
->>>> ? };
->>>>
->>>> ? display {
->>>> ????? ...
->>>> ????? iommus = <&iommu1 0x20000>;
->>>> ????? /* simplefb region */
->>>> ????? iommu-reserved-ranges = <0x80080000 0x80000 IOMMU_DIRECT>,
->>>> ? };
->>>>
->>>>
->>>> Alternatively, something inspired by reserved-memory might perhaps be
->>>> conceptually neater, at the risk of being more complicated:
->>>>
->>>>
->>>> ? iommu1: iommu at acbd0000 {
->>>> ????? ...
->>>> ????? #iommu-cells = <1>;
->>>>
->>>> ????? iommu-reserved-ranges {
->>>> ????????? #address-cells = <1>;
->>>> ????????? #size-cells = <1>;
->>>>
->>>> ??????? its0_resv: msi at 12340000 {
->>>> ????????????? compatible = "iommu-msi-region";
->>>> ????????????? reg = <0x12340000 0x1000>;
->>>> ????????? };
->>>>
->>>> ??????? its1_resv: msi at 34560000 {
->>>> ????????????? compatible = "iommu-msi-region";
->>>> ????????????? reg = <0x34560000 0x1000>;
->>>> ????????? };
->>>>
->>>> ??????? fb_resv: direct at 12340000 {
->>>> ????????????? compatible = "iommu-direct-region";
->>>> ????????????? reg = <0x80080000 0x80000>;
->>>> ????????? };
->>>> ????? };
->>>> ? };
->>>>
->>>>
->>>
->>> If we did this, wouldn't it be easier to create dangerous reserved
->>> regions, like our ITS region which Marc was concerned by? It's not so
->>> hard to get dts changes into the kernel.
->>
->> Well, yeah. It's also equally easy to add some peripheral register
->> region to the /memory node and watch hilarity ensue. The solution to
->> both is "don't put bogus crap in your DT".
->>
-> 
-> Sure, but people make mistakes and often a lot more subtle than your
-> example.
+Hi Marco,
 
-I wanted to write a response to that but since it was too easy to hit
-the wrong keys on my keyboard, I didn't.
+On Thu, 2017-10-05 at 09:43 -0300, Marco Franchi wrote:
+> The parallel display interface pad groups are called DISP0 and DISP1 in?
+> the reference manuals, but in the i.MX51 dts files they are called DISP1?
+> and DISP2.
 
-I don't see a proposal for some alternate method of describing
-restricted IOVA regions which scales beyond HiSilicon Hip07 and would be
-entirely immune to bugs, so I'm really not sure what your argument is
-here :/
+To me, this sounds like they are called DISP0/1 also in the i.MX51
+reference manual, but if I'm not mistaken, the i.MX51 reference manual
+actually calls them DISP1/2.
+I'd change the comment to say something to the effect of: "Contrary to
+later SoCs, the parallel display interface pad groups on i.MX51 are
+called DISP1 and DISP2, not DISP0 and DISP1."
 
-Robin.
+> Fix this inconsistence by changing the DISP names in the i.mx51 dts.
+> 
+> Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
 
-> Only one person spotted the problem with our approach to the ITS
-> problem. I'm pretty confident it would not have been spotted if it was
-> submitted as a dts change.
+For the patch itself,
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+
+> ---
+> Changes since v1:
+> -newly introduced in this series
+> ?arch/arm/boot/dts/imx51-apf51dev.dts |??4 ++--
+> ?arch/arm/boot/dts/imx51-babbage.dts??| 12 ++++++------
+> ?arch/arm/boot/dts/imx51-ts4800.dts???|??6 +++---
+> ?arch/arm/boot/dts/imx51.dtsi?????????|??4 ++--
+> ?4 files changed, 13 insertions(+), 13 deletions(-)
 > 
-> Much appreciated,
-> John
-> 
->> There's a big difference between wilfully misdescribing your platform
->> requirements vs. having the kernel automatically infer something but
->> leave a hole open in the process.
->>
->> Robin.
->>
->> .
->>
-> 
-> 
+> diff --git a/arch/arm/boot/dts/imx51-apf51dev.dts
+> b/arch/arm/boot/dts/imx51-apf51dev.dts
+> index f04d0df..2f1a9d2 100644
+> --- a/arch/arm/boot/dts/imx51-apf51dev.dts
+> +++ b/arch/arm/boot/dts/imx51-apf51dev.dts
+> @@ -51,7 +51,7 @@
+> ?
+> ?		port {
+> ?			display_in: endpoint {
+> -				remote-endpoint = <&ipu_di0_disp0>;
+> +				remote-endpoint = <&ipu_di0_disp1>;
+> ?			};
+> ?		};
+> ?	};
+> @@ -218,6 +218,6 @@
+> ?	};
+> ?};
+> ?
+> -&ipu_di0_disp0 {
+> +&ipu_di0_disp1 {
+> ?	remote-endpoint = <&display_in>;
+> ?};
+> diff --git a/arch/arm/boot/dts/imx51-babbage.dts
+> b/arch/arm/boot/dts/imx51-babbage.dts
+> index 297953c..668c37b 100644
+> --- a/arch/arm/boot/dts/imx51-babbage.dts
+> +++ b/arch/arm/boot/dts/imx51-babbage.dts
+> @@ -39,7 +39,7 @@
+> ?		};
+> ?	};
+> ?
+> -	display0: disp0 {
+> +	display1: disp1 {
+> ?		compatible = "fsl,imx-parallel-display";
+> ?		interface-pix-fmt = "rgb24";
+> ?		pinctrl-names = "default";
+> @@ -61,12 +61,12 @@
+> ?
+> ?		port {
+> ?			display0_in: endpoint {
+> -				remote-endpoint = <&ipu_di0_disp0>;
+> +				remote-endpoint = <&ipu_di0_disp1>;
+> ?			};
+> ?		};
+> ?	};
+> ?
+> -	display1: disp1 {
+> +	display2: disp2 {
+> ?		compatible = "fsl,imx-parallel-display";
+> ?		interface-pix-fmt = "rgb565";
+> ?		pinctrl-names = "default";
+> @@ -93,7 +93,7 @@
+> ?
+> ?		port {
+> ?			display1_in: endpoint {
+> -				remote-endpoint = <&ipu_di1_disp1>;
+> +				remote-endpoint = <&ipu_di1_disp2>;
+> ?			};
+> ?		};
+> ?	};
+> @@ -348,11 +348,11 @@
+> ?	};
+> ?};
+> ?
+> -&ipu_di0_disp0 {
+> +&ipu_di0_disp1 {
+> ?	remote-endpoint = <&display0_in>;
+> ?};
+> ?
+> -&ipu_di1_disp1 {
+> +&ipu_di1_disp2 {
+> ?	remote-endpoint = <&display1_in>;
+> ?};
+> ?
+> diff --git a/arch/arm/boot/dts/imx51-ts4800.dts
+> b/arch/arm/boot/dts/imx51-ts4800.dts
+> index e6be869..35a1112 100644
+> --- a/arch/arm/boot/dts/imx51-ts4800.dts
+> +++ b/arch/arm/boot/dts/imx51-ts4800.dts
+> @@ -50,7 +50,7 @@
+> ?		power-supply = <&backlight_reg>;
+> ?	};
+> ?
+> -	display0: disp0 {
+> +	display1: disp1 {
+> ?		compatible = "fsl,imx-parallel-display";
+> ?		interface-pix-fmt = "rgb24";
+> ?		pinctrl-names = "default";
+> @@ -73,7 +73,7 @@
+> ?
+> ?		port at 0 {
+> ?			display0_in: endpoint {
+> -				remote-endpoint = <&ipu_di0_disp0>;
+> +				remote-endpoint = <&ipu_di0_disp1>;
+> ?			};
+> ?		};
+> ?	};
+> @@ -107,7 +107,7 @@
+> ?	};
+> ?};
+> ?
+> -&ipu_di0_disp0 {
+> +&ipu_di0_disp1 {
+> ?	remote-endpoint = <&display0_in>;
+> ?};
+> ?
+> diff --git a/arch/arm/boot/dts/imx51.dtsi
+> b/arch/arm/boot/dts/imx51.dtsi
+> index 1ee1d54..378be72 100644
+> --- a/arch/arm/boot/dts/imx51.dtsi
+> +++ b/arch/arm/boot/dts/imx51.dtsi
+> @@ -148,14 +148,14 @@
+> ?			ipu_di0: port at 2 {
+> ?				reg = <2>;
+> ?
+> -				ipu_di0_disp0: endpoint {
+> +				ipu_di0_disp1: endpoint {
+> ?				};
+> ?			};
+> ?
+> ?			ipu_di1: port at 3 {
+> ?				reg = <3>;
+> ?
+> -				ipu_di1_disp1: endpoint {
+> +				ipu_di1_disp2: endpoint {
+> ?				};
+> ?			};
+> ?		};
+
+regards
+Philipp
