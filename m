@@ -1,70 +1,53 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 5 Oct 2017 12:46:07 -0500
-Subject: [PATCH v2 5/7] PCI: aardvark: disable LOS state by default
-In-Reply-To: <20170928125838.11887-6-thomas.petazzoni@free-electrons.com>
-References: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
- <20170928125838.11887-6-thomas.petazzoni@free-electrons.com>
-Message-ID: <20171005174607.GS25517@bhelgaas-glaptop.roam.corp.google.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 5 Oct 2017 17:48:32 +0100
+Subject: [PATCH 3/9] arm: cache-l2x0: share l2x0_base
+In-Reply-To: <eb104cfdf44ef9bf7b4f271555e1496d2bf781bf.1500510157.git.mirq-linux@rere.qmqm.pl>
+References: <cover.1500510157.git.mirq-linux@rere.qmqm.pl>
+ <eb104cfdf44ef9bf7b4f271555e1496d2bf781bf.1500510157.git.mirq-linux@rere.qmqm.pl>
+Message-ID: <20171005164831.GG5235@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I assume you mean "ASPM L0s"?
+On Thu, Jul 20, 2017 at 02:29:23AM +0200, Micha? Miros?aw wrote:
+> Share l2x0_base between cache-l2x0 and pmu drivers.  They are duplicates.
 
-On Thu, Sep 28, 2017 at 02:58:36PM +0200, Thomas Petazzoni wrote:
-> From: Victor Gu <xigu@marvell.com>
-> 
-> Some PCIe devices do not support LOS, and will cause timeouts if the
-> root complex forces the LOS state. This patch disables the LOS state
-> by default.
+This is not quite true, and this change introduces bugs.
 
-Per PCIe r3.1, sec 5.4.1.3, software should not enable L0s in either
-direction unless both ends support L0s.
+The l2x0 pmu driver only sets its copy of the base for an l2x0 variant
+it recognises:
 
-I'm unclear on what the bug is here.  Is the generic ASPM code
-incorrectly enabling L0s when one end doesn't support it?  That seems
-unlikely, but if so, it should be fixed in the generic ASPM code.
+> -void __init l2x0_pmu_register(void __iomem *base, u32 part)
+> +void __init l2x0_pmu_register(u32 part)
+>  {
+>  	/*
+>  	 * Determine whether we support the PMU, and choose the name for sysfs.
+> @@ -503,8 +502,7 @@ void __init l2x0_pmu_register(void __iomem *base, u32 part)
+>  	 * supported by this driver.
+>  	 *
+>  	 * We must defer registering the PMU until the perf subsystem is up and
+> -	 * running, so just stash the name and base, and leave that to another
+> -	 * initcall.
+> +	 * running, so just stash the name, and leave that to another initcall.
+>  	 */
+>  	switch (part & L2X0_CACHE_ID_PART_MASK) {
+>  	case L2X0_CACHE_ID_PART_L220:
+> @@ -516,8 +514,6 @@ void __init l2x0_pmu_register(void __iomem *base, u32 part)
+>  	default:
+>  		return;
+>  	}
+> -
+> -	l2x0_base = base;
 
-Are both ends advertising L0s support, but there's a hardware erratum
-on the Aardvark end that keeps it from working correctly?  If so, we
-should say that explicitly and include a reference to a published
-hardware erratum.
+... note that we may return *before* setting l2x0_base.
 
-Something else?
+This (deliberately) prevents us from erroneously registering a PMU for
+l2x0 variants for which we don't know how to drive any IMPLEMENTATION
+DEFINED PMU functionality.
 
-> This is part of fixing bug
-> https://bugzilla.kernel.org/show_bug.cgi?id=196339, this commit was
-> reported as the user to be important to get a Intel 7260 mini-PCIe
-> WiFi card working.
+This cahnge breaks that, and will result in l2x0_pmu_init() trying to
+register a PMU with a NULL name.
 
-The bugzilla link is a good start, but "reported by the user to be
-important" is meaningless by itself.  What we need here is the details
-of what's broken and how this fixes it.  Unfortunately the bugzilla
-doesn't have those details.
+So NAK to this change.
 
-> Fixes: 8c39d710363c1 ("PCI: aardvark: Add Aardvark PCI host controller driver")
-> Signed-off-by: Victor Gu <xigu@marvell.com>
-> Reviewed-by: Evan Wang <xswang@marvell.com>
-> Reviewed-by: Nadav Haklai <nadavh@marvell.com>
-> [Thomas: tweak commit log.]
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  drivers/pci/host/pci-aardvark.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
-> index 23e243135ebe..a173f31853df 100644
-> --- a/drivers/pci/host/pci-aardvark.c
-> +++ b/drivers/pci/host/pci-aardvark.c
-> @@ -368,8 +368,7 @@ static void advk_pcie_setup_hw(struct advk_pcie *pcie)
->  
->  	advk_pcie_wait_for_link(pcie);
->  
-> -	reg = PCIE_CORE_LINK_L0S_ENTRY |
-> -		(1 << PCIE_CORE_LINK_WIDTH_SHIFT);
-> +	reg = (1 << PCIE_CORE_LINK_WIDTH_SHIFT);
->  	advk_writel(pcie, reg, PCIE_CORE_LINK_CTRL_STAT_REG);
->  
->  	reg = advk_readl(pcie, PCIE_CORE_CMD_STATUS_REG);
-> -- 
-> 2.13.5
-> 
+Thanks,
+Mark.
