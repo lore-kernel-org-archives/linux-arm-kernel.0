@@ -1,37 +1,32 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  5 Oct 2017 18:05:11 +0200
-Subject: [PATCH] arm64: dts: marvell: 7040-db: Document the gpio expander
-Message-ID: <20171005160511.23683-1-gregory.clement@free-electrons.com>
+Date: Thu,  5 Oct 2017 18:05:49 +0200
+Subject: [PATCH] arm64: dts: marvell: 7040-db: Add the carrier detect pin for
+ SD card on CP
+Message-ID: <20171005160549.23741-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document all the GPIO of the expander based on the schematics
+The SD card slot connected to the SD controller of the CP part has a
+carrier detect pin connected the gpio expander. This patch enables it
+allowing supporting the hotplug event for the SD card.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm64/boot/dts/marvell/armada-7040-db.dts | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm64/boot/dts/marvell/armada-7040-db.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm64/boot/dts/marvell/armada-7040-db.dts b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-index 8f3b395c786c..18a75fad1e8d 100644
+index 18a75fad1e8d..d339ad5c8c27 100644
 --- a/arch/arm64/boot/dts/marvell/armada-7040-db.dts
 +++ b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-@@ -143,6 +143,16 @@
- 		gpio-controller;
- 		#gpio-cells = <2>;
- 		reg = <0x21>;
-+		/*
-+		 * IO0_0: USB3_PWR_EN0	IO1_0: USB_3_1_Dev_Detect
-+		 * IO0_1: USB3_PWR_EN1	IO1_1: USB2_1_current_limit
-+		 * IO0_2: DDR3_4_Detect	IO1_2: Hcon_IO_RstN
-+		 * IO0_3: USB2_DEVICE_DETECT
-+		 * IO0_4: GPIO_0	IO1_4: SD_Status
-+		 * IO0_5: GPIO_1	IO1_5: LDO_5V_Enable
-+		 * IO0_6: IHB_5V_Enable	IO1_6: PWR_EN_eMMC
-+		 * IO0_7:		IO1_7: SDIO_Vcntrl
-+		 */
- 	};
+@@ -239,7 +239,7 @@
+ 	status = "okay";
+ 	bus-width = <4>;
+ 	no-1-8-v;
+-	non-removable;
++	cd-gpios = <&expander0 12 GPIO_ACTIVE_LOW>;
  };
  
+ &cpm_mdio {
 -- 
 2.14.2
