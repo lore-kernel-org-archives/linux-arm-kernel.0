@@ -1,109 +1,119 @@
 From: james.morse@arm.com (James Morse)
-Date: Thu,  5 Oct 2017 20:17:55 +0100
-Subject: [PATCH v3 03/20] arm64: Move the async/fiq helpers to explicitly set
- process context flags
+Date: Thu,  5 Oct 2017 20:17:56 +0100
+Subject: [PATCH v3 04/20] arm64: Mask all exceptions during kernel_exit
 In-Reply-To: <20171005191812.5678-1-james.morse@arm.com>
 References: <20171005191812.5678-1-james.morse@arm.com>
-Message-ID: <20171005191812.5678-4-james.morse@arm.com>
+Message-ID: <20171005191812.5678-5-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the local_{async,fiq}_{en,dis}able macros as they don't respect
-our newly defined order and are only used to set the flags for process
-context when we bring CPUs online.
+To take RAS Exceptions as quickly as possible we need to keep SError
+unmasked as much as possible. We need to mask it during kernel_exit
+as taking an error from this code will overwrite the exception-registers.
 
-Add a helper to do this. The IRQ flag varies as we want it masked on
-the boot CPU until we are ready to handle interrupts.
-The boot CPU unmasks SError during early boot once it can print an error
-message. If we can print an error message about SError, we can do the
-same for FIQ. Debug exceptions are already enabled by __cpu_setup(),
-which has also configured MDSCR_EL1 to disable MDE and KDE.
+Adding a naked 'disable_daif' to kernel_exit causes a performance problem
+for micro-benchmarks that do no real work, (e.g. calling getpid() in a
+loop). This is because the ret_to_user loop has already masked IRQs so
+that the TIF_WORK_MASK thread flags can't change underneath it, adding
+disable_daif is an additional self-synchronising operation.
+
+In the future, the RAS APEI code may need to modify the TIF_WORK_MASK
+flags from an SError, in which case the ret_to_user loop must mask SError
+while it examines the flags.
+
+Disable all exceptions for return to EL1. For return to EL0 get the
+ret_to_user loop to leave all exceptions masked once it has done its
+work, this avoids an extra pstate-write.
 
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
- arch/arm64/include/asm/daifflags.h | 4 +++-
- arch/arm64/include/asm/irqflags.h  | 6 ------
- arch/arm64/kernel/setup.c          | 8 +++++---
- arch/arm64/kernel/smp.c            | 3 +--
- 4 files changed, 9 insertions(+), 12 deletions(-)
+ arch/arm64/kernel/entry.S  | 10 +++++-----
+ arch/arm64/kernel/signal.c |  8 ++++++--
+ 2 files changed, 11 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/include/asm/daifflags.h b/arch/arm64/include/asm/daifflags.h
-index fb40da8e1457..72389644c811 100644
---- a/arch/arm64/include/asm/daifflags.h
-+++ b/arch/arm64/include/asm/daifflags.h
-@@ -19,6 +19,9 @@
- #include <asm/irqflags.h>
- #include <linux/irqflags.h>
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index e1c59d4008a8..f7d7bf9d76e7 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -221,6 +221,8 @@ alternative_else_nop_endif
  
-+#define DAIF_PROCCTX		0
-+#define DAIF_PROCCTX_NOIRQ	PSR_I_BIT
+ 	.macro	kernel_exit, el
+ 	.if	\el != 0
++	disable_daif
 +
- /* Mask/unmask/restore all exceptions, including interrupts. */
- static inline unsigned long local_mask_daif(void)
- {
-@@ -55,5 +58,4 @@ static inline void local_restore_daif(unsigned long flags)
- 	if (arch_irqs_disabled_flags(flags))
- 		trace_hardirqs_off();
- }
--
- #endif
-diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
-index 9ecdca7011f0..24692edf1a69 100644
---- a/arch/arm64/include/asm/irqflags.h
-+++ b/arch/arm64/include/asm/irqflags.h
-@@ -66,12 +66,6 @@ static inline void arch_local_irq_disable(void)
- 		: "memory");
- }
+ 	/* Restore the task's original addr_limit. */
+ 	ldr	x20, [sp, #S_ORIG_ADDR_LIMIT]
+ 	str	x20, [tsk, #TSK_TI_ADDR_LIMIT]
+@@ -517,8 +519,6 @@ el1_da:
+ 	mov	x2, sp				// struct pt_regs
+ 	bl	do_mem_abort
  
--#define local_fiq_enable()	asm("msr	daifclr, #1" : : : "memory")
--#define local_fiq_disable()	asm("msr	daifset, #1" : : : "memory")
--
--#define local_async_enable()	asm("msr	daifclr, #4" : : : "memory")
--#define local_async_disable()	asm("msr	daifset, #4" : : : "memory")
--
- /*
-  * Save the current interrupt enable state.
+-	// disable interrupts before pulling preserved data off the stack
+-	disable_irq
+ 	kernel_exit 1
+ el1_sp_pc:
+ 	/*
+@@ -793,7 +793,7 @@ ENDPROC(el0_irq)
+  * and this includes saving x0 back into the kernel stack.
   */
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index d4b740538ad5..3a3f479d8fc8 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -48,6 +48,7 @@
- #include <asm/fixmap.h>
- #include <asm/cpu.h>
- #include <asm/cputype.h>
+ ret_fast_syscall:
+-	disable_irq				// disable interrupts
++	disable_daif
+ 	str	x0, [sp, #S_X0]			// returned x0
+ 	ldr	x1, [tsk, #TSK_TI_FLAGS]	// re-check for syscall tracing
+ 	and	x2, x1, #_TIF_SYSCALL_WORK
+@@ -803,7 +803,7 @@ ret_fast_syscall:
+ 	enable_step_tsk x1, x2
+ 	kernel_exit 0
+ ret_fast_syscall_trace:
+-	enable_irq				// enable interrupts
++	enable_daif
+ 	b	__sys_trace_return_skipped	// we already saved x0
+ 
+ /*
+@@ -821,7 +821,7 @@ work_pending:
+  * "slow" syscall return path.
+  */
+ ret_to_user:
+-	disable_irq				// disable interrupts
++	disable_daif
+ 	ldr	x1, [tsk, #TSK_TI_FLAGS]
+ 	and	x2, x1, #_TIF_WORK_MASK
+ 	cbnz	x2, work_pending
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index 0bdc96c61bc0..b1fd14beb044 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -31,6 +31,7 @@
+ #include <linux/ratelimit.h>
+ #include <linux/syscalls.h>
+ 
 +#include <asm/daifflags.h>
+ #include <asm/debug-monitors.h>
  #include <asm/elf.h>
- #include <asm/cpufeature.h>
- #include <asm/cpu_ops.h>
-@@ -262,10 +263,11 @@ void __init setup_arch(char **cmdline_p)
- 	parse_early_param();
+ #include <asm/cacheflush.h>
+@@ -756,9 +757,12 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
+ 		addr_limit_user_check();
  
- 	/*
--	 *  Unmask asynchronous aborts after bringing up possible earlycon.
--	 * (Report possible System Errors once we can report this occurred)
-+	 * Unmask asynchronous aborts and fiq after bringing up possible
-+	 * earlycon. (Report possible System Errors once we can report this
-+	 * occurred).
- 	 */
--	local_async_enable();
-+	local_restore_daif(DAIF_PROCCTX_NOIRQ);
+ 		if (thread_flags & _TIF_NEED_RESCHED) {
++			/* Unmask Debug and SError for the next task */
++			local_restore_daif(DAIF_PROCCTX_NOIRQ);
++
+ 			schedule();
+ 		} else {
+-			local_irq_enable();
++			local_restore_daif(DAIF_PROCCTX);
  
- 	/*
- 	 * TTBR0 is only used for the identity mapping at this stage. Make it
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index c4116f2af43f..ced874565610 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -272,8 +272,7 @@ asmlinkage void secondary_start_kernel(void)
- 	set_cpu_online(cpu, true);
- 	complete(&cpu_running);
+ 			if (thread_flags & _TIF_UPROBE)
+ 				uprobe_notify_resume(regs);
+@@ -775,7 +779,7 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
+ 				fpsimd_restore_current_state();
+ 		}
  
--	local_irq_enable();
--	local_async_enable();
-+	local_restore_daif(DAIF_PROCCTX);
- 
- 	/*
- 	 * OK, it's off to the idle thread for us
+-		local_irq_disable();
++		local_mask_daif();
+ 		thread_flags = READ_ONCE(current_thread_info()->flags);
+ 	} while (thread_flags & _TIF_WORK_MASK);
+ }
 -- 
 2.13.3
