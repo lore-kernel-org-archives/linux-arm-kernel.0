@@ -1,121 +1,62 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 05 Oct 2017 10:30:01 +0200
-Subject: [PATCH] reset: uniphier: add PXs3 reset data
-In-Reply-To: <1507170657-26432-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1507170657-26432-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1507192201.8473.2.camel@pengutronix.de>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 5 Oct 2017 10:32:08 +0200
+Subject: [PATCH] arm: dts: gr-peach: Reduce extal_clk resolution
+In-Reply-To: <20171005074859.GN4037@w540>
+References: <1507131657-6414-1-git-send-email-jacopo+renesas@jmondi.org>
+ <CAMuHMdXOJ6V_p26ozzwzUh5a9mvH-Aeiz2MavEf22v3iB6GiKQ@mail.gmail.com>
+ <20171005074859.GN4037@w540>
+Message-ID: <CAMuHMdUy1BTv7rCSrJ+REpe9RWqc8A3BNhzD=HmimpyuuFb-ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-10-05 at 11:30 +0900, Masahiro Yamada wrote:
-> Add basic reset data for Socionext's new SoC PXs3.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Hi Jacopo,
 
-Thanks, applied to the reset/next branch.
+On Thu, Oct 5, 2017 at 9:48 AM, jacopo mondi <jacopo@jmondi.org> wrote:
+> On Wed, Oct 04, 2017 at 05:54:46PM +0200, Geert Uytterhoeven wrote:
+>> On Wed, Oct 4, 2017 at 5:40 PM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
+>> > The system clock described by extal_clk is reported to have a frequency
+>> > of 13.333 Mhz and is correctly described by gr-peach device tree.
+>> >
+>> > However, when enabling a RIIC device the following error is reported by
+>> > drivers/i2c/busses/i2c-riic.c
+>> >
+>> > "invalid parent clk (33332500). Must be 33325000Hz"
+>> >
+>> > As RIIC devices have a clock source obtained by dividing by 12 the
+>> > system clock, the resulting value is not accepted by the driver
+>> > (which clearly states not to support any frequency except the reported
+>> > 33325000Hz one).
+>> >
+>> > Hence, reduce the system clock accuracy to a value which makes
+>> > frequencies obtained through division accepted by RIIC driver.
+>> >
+>> > Please note that other r7s72100 boards, such as Genmai, report the same
+>> > "reduced accuracy" frequency, even if their external clock sources are
+>> > effectively 13.333Mhz as gr-peach one.
+>> >
+>> > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+>>
+>> There's no need to do this, Chris already proposed a fix, cfr.
+>> "[PATCH v2] i2c: riic: remove fixed clock restriction"
+>> (https://www.spinics.net/lists/linux-renesas-soc/msg18573.html).
+>
+> Oh that's even better!
+> Do you see any value in augmenting the frequency resolution in Genmai
+> DTS then?
 
-regards
-Philipp
+The Genmai documentation says EXTAL is 13.33 MHz (which matches
+r7s72100-genmai.dts) everywhere, except in the schematics, where it says
+13.3333 MHz. Sigh...
 
-> ---
-> 
-> ?.../devicetree/bindings/reset/uniphier-reset.txt???|??3 +++
-> ?drivers/reset/reset-uniphier.c?????????????????????| 26
-> ++++++++++++++++++++++
-> ?2 files changed, 29 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/reset/uniphier-
-> reset.txt b/Documentation/devicetree/bindings/reset/uniphier-reset.txt
-> index 68a6f48..93efed6 100644
-> --- a/Documentation/devicetree/bindings/reset/uniphier-reset.txt
-> +++ b/Documentation/devicetree/bindings/reset/uniphier-reset.txt
-> @@ -13,6 +13,7 @@ Required properties:
-> ?????"socionext,uniphier-pxs2-reset" - for PXs2/LD6b SoC
-> ?????"socionext,uniphier-ld11-reset" - for LD11 SoC
-> ?????"socionext,uniphier-ld20-reset" - for LD20 SoC
-> +????"socionext,uniphier-pxs3-reset" - for PXs3 SoC
-> ?- #reset-cells: should be 1.
-> ?
-> ?Example:
-> @@ -44,6 +45,7 @@ Required properties:
-> ?????"socionext,uniphier-ld11-mio-reset" - for LD11 SoC (MIO)
-> ?????"socionext,uniphier-ld11-sd-reset"??- for LD11 SoC (SD)
-> ?????"socionext,uniphier-ld20-sd-reset"??- for LD20 SoC
-> +????"socionext,uniphier-pxs3-sd-reset"??- for PXs3 SoC
-> ?- #reset-cells: should be 1.
-> ?
-> ?Example:
-> @@ -74,6 +76,7 @@ Required properties:
-> ?????"socionext,uniphier-pxs2-peri-reset" - for PXs2/LD6b SoC
-> ?????"socionext,uniphier-ld11-peri-reset" - for LD11 SoC
-> ?????"socionext,uniphier-ld20-peri-reset" - for LD20 SoC
-> +????"socionext,uniphier-pxs3-peri-reset" - for PXs3 SoC
-> ?- #reset-cells: should be 1.
-> ?
-> ?Example:
-> diff --git a/drivers/reset/reset-uniphier.c b/drivers/reset/reset-
-> uniphier.c
-> index bda2dd1..6ed808d 100644
-> --- a/drivers/reset/reset-uniphier.c
-> +++ b/drivers/reset/reset-uniphier.c
-> @@ -114,6 +114,20 @@ static const struct uniphier_reset_data
-> uniphier_ld20_sys_reset_data[] = {
-> ?	UNIPHIER_RESET_END,
-> ?};
-> ?
-> +static const struct uniphier_reset_data
-> uniphier_pxs3_sys_reset_data[] = {
-> +	UNIPHIER_RESETX(2, 0x200c, 0),		/* NAND */
-> +	UNIPHIER_RESETX(4, 0x200c, 2),		/* eMMC */
-> +	UNIPHIER_RESETX(8, 0x200c, 12),		/* STDMAC */
-> +	UNIPHIER_RESETX(12, 0x200c, 4),		/* USB30 link
-> (GIO0) */
-> +	UNIPHIER_RESETX(13, 0x200c, 5),		/* USB31 link
-> (GIO1) */
-> +	UNIPHIER_RESETX(16, 0x200c, 16),	/* USB30-PHY0 */
-> +	UNIPHIER_RESETX(17, 0x200c, 18),	/* USB30-PHY1 */
-> +	UNIPHIER_RESETX(18, 0x200c, 20),	/* USB30-PHY2 */
-> +	UNIPHIER_RESETX(20, 0x200c, 17),	/* USB31-PHY0 */
-> +	UNIPHIER_RESETX(21, 0x200c, 19),	/* USB31-PHY1 */
-> +	UNIPHIER_RESET_END,
-> +};
-> +
-> ?/* Media I/O reset data */
-> ?#define UNIPHIER_MIO_RESET_SD(id, ch)			\
-> ?	UNIPHIER_RESETX((id), 0x110 + 0x200 * (ch), 0)
-> @@ -359,6 +373,10 @@ static const struct of_device_id
-> uniphier_reset_match[] = {
-> ?		.compatible = "socionext,uniphier-ld20-reset",
-> ?		.data = uniphier_ld20_sys_reset_data,
-> ?	},
-> +	{
-> +		.compatible = "socionext,uniphier-pxs3-reset",
-> +		.data = uniphier_pxs3_sys_reset_data,
-> +	},
-> ?	/* Media I/O reset, SD reset */
-> ?	{
-> ?		.compatible = "socionext,uniphier-ld4-mio-reset",
-> @@ -392,6 +410,10 @@ static const struct of_device_id
-> uniphier_reset_match[] = {
-> ?		.compatible = "socionext,uniphier-ld20-sd-reset",
-> ?		.data = uniphier_pro5_sd_reset_data,
-> ?	},
-> +	{
-> +		.compatible = "socionext,uniphier-pxs3-sd-reset",
-> +		.data = uniphier_pro5_sd_reset_data,
-> +	},
-> ?	/* Peripheral reset */
-> ?	{
-> ?		.compatible = "socionext,uniphier-ld4-peri-reset",
-> @@ -421,6 +443,10 @@ static const struct of_device_id
-> uniphier_reset_match[] = {
-> ?		.compatible = "socionext,uniphier-ld20-peri-reset",
-> ?		.data = uniphier_pro4_peri_reset_data,
-> ?	},
-> +	{
-> +		.compatible = "socionext,uniphier-pxs3-peri-reset",
-> +		.data = uniphier_pro4_peri_reset_data,
-> +	},
-> ?	/* Analog signal amplifiers reset */
-> ?	{
-> ?		.compatible = "socionext,uniphier-ld11-adamv-reset",
+The difference is slightly larger than 100 ppm, so still insignificant, I think.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
