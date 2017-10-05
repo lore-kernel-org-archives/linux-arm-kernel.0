@@ -1,55 +1,61 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 5 Oct 2017 18:04:47 +0100
-Subject: [PATCH v2 14/28] arm64/sve: Backend logic for setting the vector
- length
-In-Reply-To: <20171005165334.cstx6fszl7shaudg@armageddon.cambridge.arm.com>
-References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
- <1504198860-12951-15-git-send-email-Dave.Martin@arm.com>
- <20170913172911.3ca2h6cpju7etifi@localhost>
- <20170913190611.GC23415@e103592.cambridge.arm.com>
- <20170913221123.y4znytmxtplx24m4@localhost>
- <20171005164229.GX3611@e103592.cambridge.arm.com>
- <20171005165334.cstx6fszl7shaudg@armageddon.cambridge.arm.com>
-Message-ID: <20171005170446.GZ3611@e103592.cambridge.arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 5 Oct 2017 20:18:38 +0300
+Subject: [PATCH v2 8/8] arm64: dts: renesas: eagle: add EtherAVB support
+In-Reply-To: <20171005090500.GC26369@verge.net.au>
+References: <20170915194449.538504992@cogentembedded.com>
+ <CAMuHMdXQXFuVzwW7G-U7XWZUEj8qFRjtfDQF1+TgyzO0Xb+eYg@mail.gmail.com>
+ <c0390fc1-7da4-ac60-afee-97126d1fd372@cogentembedded.com>
+ <CAMuHMdVCTORpfKN+GTka_6pT1VWjOneV2GBhGo7Y8DsZYSxdvw@mail.gmail.com>
+ <20171005090500.GC26369@verge.net.au>
+Message-ID: <dca19642-e511-5cd5-b7b9-9ed339407ed6@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 05, 2017 at 05:53:34PM +0100, Catalin Marinas wrote:
-> On Thu, Oct 05, 2017 at 05:42:29PM +0100, Dave P Martin wrote:
-> > On Wed, Sep 13, 2017 at 03:11:23PM -0700, Catalin Marinas wrote:
-> > > On Wed, Sep 13, 2017 at 08:06:12PM +0100, Dave P Martin wrote:
-> > > > On Wed, Sep 13, 2017 at 10:29:11AM -0700, Catalin Marinas wrote:
+On 10/05/2017 12:05 PM, Simon Horman wrote:
 
-[...]
-
-> > > > > Can this be merged with patch 20? It seems to add the PR_ definitions
-> > > > > which get actually used later when the prctl interface is added.
-> > > > 
-> > > > This patch is used both by patch 19 and by patch 20, which I preferred
-> > > > not to merge with each other: ptrace and prctl are significantly
-> > > > different things.
-> > > > 
-> > > > The prctl bit definitions are added here because they are the canonical
-> > > > definitions used by both interfaces.  The ptrace #defines are based on
-> > > > them.
-> > > > 
-> > > > Does it make sense if I merge patch 20 into this one and apply patch 19
-> > > > on top?  This avoide the appearance of prctl #defines with no prctl
-> > > > implementation.
-> > > 
-> > > That's fine, you can bring patch 20 forward. If there are other
-> > > non-trivial issues, feel free to ignore my comment.
-> > 
-> > I've had a go at this, but I think it's going to be more trouble than
-> > it's worth -- there are other interdependencies between the patches
-> > which make them tricky to reorder.
-> > 
-> > I could add a note in the commit message for this patch explaining why
-> > the prctl flag #defines are being added here.  What do you think?
+>>>>> Define the Eagle board  dependent part of the EtherAVB device node.
+>>>>> Enable DHCP  and NFS root for the kernel booting.
+>>>>>
+>>>>> Based  on the original (and large) patch by Vladimir Barinov.
+>>>>>
+>>>>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+>>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>>>
+>>>>
+>>>>> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
+>>>>> +++ renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
+>>>
+>>> [...]
+>>>>>
+>>>>> @@ -43,3 +44,14 @@
+>>>>>    &scif0 {
+>>>>>           status = "okay";
+>>>>>    };
+>>>>> +
+>>>>> +&avb {
+>>>>> +       renesas,no-ether-link;
+>>>>> +       phy-handle = <&phy0>;
+>>>>> +       status = "okay";
+>>>>> +
+>>>>> +       phy0: ethernet-phy at 0 {
+>>>>> +               rxc-skew-ps = <1500>;
+>>>>> +               reg = <0>;
+>>>>
+>>>>
+>>>> Any specific reason why you don't want to wire up the interrupt?
+>>>>
+>>>>                   interrupt-parent = <&gpio2>;
+>>>
+>>>
+>>>     I thought it's quite obvious -- we don't have GPIOs yet, and GPIOs seem
+>>> to require PFC.
+>>
+>> Of course. And these can be added later.
+>>
+>> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 > 
-> As I said, it's up to you. A line in the commit message would do.
+> Thanks, applied.
 
-OK, I think I'll stick with this then.
+    Still not seeing any devel branch updates/tags -- have you pushed it?
 
-Cheers
----Dave
+MBR, Sergei
