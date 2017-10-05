@@ -1,44 +1,28 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 5 Oct 2017 17:33:25 -0500
-Subject: [PATCH 12/12] dt-bindings: usb: mtu3: remove optional pinctrls
-In-Reply-To: <ec8e65205c6e0a83850e11c030ed440d7b9be2e8.1506509659.git.chunfeng.yun@mediatek.com>
-References: <fe8df8503f602586bcea4b1598eb09678b1525e3.1506509658.git.chunfeng.yun@mediatek.com>
- <ec8e65205c6e0a83850e11c030ed440d7b9be2e8.1506509659.git.chunfeng.yun@mediatek.com>
-Message-ID: <20171005223325.ryvu6ifjgcj5scf4@rob-hp-laptop>
+Date: Thu, 5 Oct 2017 17:34:01 -0500
+Subject: [PATCH v4 11/11] arm: allwinner: Correct unit name in devicetree
+ binding example
+In-Reply-To: <5b7a8fb3-21bb-417c-9471-1330dd379fd9@rwthex-w2-a.rwth-ad.de>
+References: <20170928014928.2272-1-stefan.bruens@rwth-aachen.de>
+ <5b7a8fb3-21bb-417c-9471-1330dd379fd9@rwthex-w2-a.rwth-ad.de>
+Message-ID: <20171005223401.wme5av4hzcc3lzgn@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 28, 2017 at 08:17:20AM +0800, Chunfeng Yun wrote:
-> Remove optional pinctrls due to using FORCE/RG_IDDIG to implement
-> manual switch function.
-
-Another not backwards compatible change. Please explain why that is 
-okay.
-
+On Thu, Sep 28, 2017 at 03:49:28AM +0200, Stefan Br?ns wrote:
+> Unit-names must not start with a leading 0.
 > 
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
+> 
 > ---
->  .../devicetree/bindings/usb/mediatek,mtu3.txt      |    7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/usb/mediatek,mtu3.txt b/Documentation/devicetree/bindings/usb/mediatek,mtu3.txt
-> index 49c982b..b2271d8 100644
-> --- a/Documentation/devicetree/bindings/usb/mediatek,mtu3.txt
-> +++ b/Documentation/devicetree/bindings/usb/mediatek,mtu3.txt
-> @@ -30,9 +30,10 @@ Optional properties:
->  	when supports dual-role mode.
->   - vbus-supply : reference to the VBUS regulator, needed when supports
->  	dual-role mode.
-> - - pinctl-names : a pinctrl state named "default" must be defined,
-> -	"id_float" and "id_ground" are optinal which depends on
-> -	"mediatek,enable-manual-drd"
-> + - pinctrl-names : a pinctrl state named "default" is optional, and need be
-> +	defined if auto drd switch is enabled, that means the property dr_mode
-> +	is set as "otg", and meanwhile the property "mediatek,enable-manual-drd"
-> +	is not set.
->   - pinctrl-0 : pin control group
->  	See: Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
->  
-> -- 
-> 1.7.9.5
+> Changes in v4:
+> - Split minor fix in devicetree example from patch 6/10
 > 
+> Changes in v3: None
+> Changes in v2: None
+> 
+>  Documentation/devicetree/bindings/dma/sun6i-dma.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+
+Acked-by: Rob Herring <robh@kernel.org>
