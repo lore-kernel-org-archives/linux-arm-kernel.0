@@ -1,77 +1,105 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 4 Oct 2017 17:36:49 -0700
-Subject: [GIT PULL] Reset controller fixes for v4.14
-In-Reply-To: <fc2949d7-c038-1ac7-d93d-d2c645f5022d@synopsys.com>
-References: <1506010379.10081.15.camel@pengutronix.de>
- <20171004011003.ae5r55dttjtxrvlj@localhost>
- <fc2949d7-c038-1ac7-d93d-d2c645f5022d@synopsys.com>
-Message-ID: <CAOesGMgCQ+rqkthuX5WxL-bTa+=R7d35JkGq6G2wKyoCAJVRRg@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 4 Oct 2017 17:50:43 -0700
+Subject: [PATCH] ethernet/broadcom: Convert timers to use timer_setup()
+Message-ID: <20171005005043.GA23290@beast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+In preparation for unconditionally passing the struct timer_list pointer to
+all timer callbacks, switch to using the new timer_setup() and from_timer()
+helper to pass the timer pointer explicitly.
 
-On Wed, Oct 4, 2017 at 11:46 AM, Vineet Gupta
-<Vineet.Gupta1@synopsys.com> wrote:
-> Hi Olof,
->
-> On 10/03/2017 06:10 PM, Olof Johansson wrote:
->>
->> On Thu, Sep 21, 2017 at 06:12:59PM +0200, Philipp Zabel wrote:
->>>
->>> Dear arm-soc-maintainers,
->>>
->>> please consider merging this tag for v4.14. It removes the "v1" suffix
->>> from the newly merged HSDK reset driver, fixes its Kconfig dependencies,
->>> and adds back the DT binding documentation that I accidentally dropped
->>> onto the floor when applying the original patch.
->>>
->>> regards
->>> Philipp
->>>
->>> The following changes since commit
->>> 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
->>>
->>>    Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
->>>
->>> are available in the git repository at:
->>>
->>>    git://git.pengutronix.de/git/pza/linux.git tags/reset-fixes-for-4.14
->>>
->>> for you to fetch changes up to 544e3bf4f0e8278400f19ca7918a3cdf2548b4eb:
->>>
->>>    reset: Restrict RESET_HSDK to ARC_SOC_HSDK or COMPILE_TEST (2017-09-21
->>> 12:44:01 +0200)
->>>
->>> ----------------------------------------------------------------
->>> Reset controller fixes for v4.14
->>>
->>> - Remove misleading HSDK v1 suffix, as there is no v2 planned
->>> - Add missing DT binding documentation for HSDK reset driver
->>> - Fix HSDK reset driver dependencies
->>
->>
->> Merged, thanks.
->
->
-> What's the tentative plan for this hitting mainline since I have pending ARC
-> HSDK DT changes to use the new DT binding. If it is not goign to be
-> 4.14-rc4, is it OK for me to pull this branch into ARC tree as well and send
-> to Linus' way before armsoc pull request. Does it matter if Linux gets same
-> changes via 2 tree !
->
-> P.S. Consider this no-ob question since I don't use merge commits in my
-> typical workflow !
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: bcm-kernel-feedback-list at broadcom.com
+Cc: "David S. Miller" <davem@davemloft.net>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Jarod Wilson <jarod@redhat.com>
+Cc: netdev at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+This requires commit 686fef928bba ("timer: Prepare to change timer
+callback argument type") in v4.14-rc3, but should be otherwise
+stand-alone.
+---
+ drivers/net/ethernet/broadcom/bcm63xx_enet.c | 27 +++++++++------------------
+ 1 file changed, 9 insertions(+), 18 deletions(-)
 
-Linus just merged it so it will be part of -rc4. In general, a one-off
-patch being duplicate is not a big deal, but one dealing with renames
-like this can cause conflicts when merged as two patches so it's
-better to use a shared base.
+diff --git a/drivers/net/ethernet/broadcom/bcm63xx_enet.c b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
+index 4f3845a58126..99c2270d4677 100644
+--- a/drivers/net/ethernet/broadcom/bcm63xx_enet.c
++++ b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
+@@ -295,16 +295,13 @@ static int bcm_enet_refill_rx(struct net_device *dev)
+ /*
+  * timer callback to defer refill rx queue in case we're OOM
+  */
+-static void bcm_enet_refill_rx_timer(unsigned long data)
++static void bcm_enet_refill_rx_timer(struct timer_list *t)
+ {
+-	struct net_device *dev;
+-	struct bcm_enet_priv *priv;
+-
+-	dev = (struct net_device *)data;
+-	priv = netdev_priv(dev);
++	struct bcm_enet_priv *priv = from_timer(priv, t, rx_timeout);
++	struct net_device *dev = priv->net_dev;
+ 
+ 	spin_lock(&priv->rx_lock);
+-	bcm_enet_refill_rx((struct net_device *)data);
++	bcm_enet_refill_rx(dev);
+ 	spin_unlock(&priv->rx_lock);
+ }
+ 
+@@ -1857,9 +1854,7 @@ static int bcm_enet_probe(struct platform_device *pdev)
+ 	spin_lock_init(&priv->rx_lock);
+ 
+ 	/* init rx timeout (used for oom) */
+-	init_timer(&priv->rx_timeout);
+-	priv->rx_timeout.function = bcm_enet_refill_rx_timer;
+-	priv->rx_timeout.data = (unsigned long)dev;
++	timer_setup(&priv->rx_timeout, bcm_enet_refill_rx_timer, 0);
+ 
+ 	/* init the mib update lock&work */
+ 	mutex_init(&priv->mib_update_lock);
+@@ -2021,9 +2016,9 @@ static inline int bcm_enet_port_is_rgmii(int portid)
+ /*
+  * enet sw PHY polling
+  */
+-static void swphy_poll_timer(unsigned long data)
++static void swphy_poll_timer(struct timer_list *t)
+ {
+-	struct bcm_enet_priv *priv = (struct bcm_enet_priv *)data;
++	struct bcm_enet_priv *priv = from_timer(priv, t, swphy_poll);
+ 	unsigned int i;
+ 
+ 	for (i = 0; i < priv->num_ports; i++) {
+@@ -2332,9 +2327,7 @@ static int bcm_enetsw_open(struct net_device *dev)
+ 	}
+ 
+ 	/* start phy polling timer */
+-	init_timer(&priv->swphy_poll);
+-	priv->swphy_poll.function = swphy_poll_timer;
+-	priv->swphy_poll.data = (unsigned long)priv;
++	timer_setup(&priv->swphy_poll, swphy_poll_timer, 0);
+ 	priv->swphy_poll.expires = jiffies;
+ 	add_timer(&priv->swphy_poll);
+ 	return 0;
+@@ -2759,9 +2752,7 @@ static int bcm_enetsw_probe(struct platform_device *pdev)
+ 	spin_lock_init(&priv->rx_lock);
+ 
+ 	/* init rx timeout (used for oom) */
+-	init_timer(&priv->rx_timeout);
+-	priv->rx_timeout.function = bcm_enet_refill_rx_timer;
+-	priv->rx_timeout.data = (unsigned long)dev;
++	timer_setup(&priv->rx_timeout, bcm_enet_refill_rx_timer, 0);
+ 
+ 	/* register netdevice */
+ 	dev->netdev_ops = &bcm_enetsw_ops;
+-- 
+2.7.4
 
-In the future, if you anticipate this being needed, you can always
-request the maintainer to apply the fix to a stable branch that you
-can use as a base for your work. That way the specific commit will
-only be in the tree once, even if it comes in via two paths.
 
-
--Olof
+-- 
+Kees Cook
+Pixel Security
