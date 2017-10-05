@@ -1,102 +1,49 @@
-From: digetx@gmail.com (Dmitry Osipenko)
-Date: Thu, 5 Oct 2017 21:16:12 +0300
-Subject: [PATCH 1/9] ARM: enable secure platform-only erratas
-In-Reply-To: <77ce738c15b992a92bee3a18e5468342fb2dc5ab.1500510157.git.mirq-linux@rere.qmqm.pl>
-References: <cover.1500510157.git.mirq-linux@rere.qmqm.pl>
- <77ce738c15b992a92bee3a18e5468342fb2dc5ab.1500510157.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <bdff72b9-8ebd-a426-b27b-fe055d45cfb1@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 5 Oct 2017 14:29:33 -0400 (EDT)
+Subject: [PATCH 2/2] of/fdt: skip unflattening of disabled nodes
+In-Reply-To: <59D40813.4020009@gmail.com>
+References: <20171003161815.25999-1-robh@kernel.org>
+ <20171003161815.25999-2-robh@kernel.org>
+ <nycvar.YSQ.7.76.1710031444060.5407@knanqh.ubzr> <59D40813.4020009@gmail.com>
+Message-ID: <nycvar.YSQ.7.76.1710051427000.1693@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.07.2017 03:29, Micha? Miros?aw wrote:
-> Allow secure-only erratas to be used in multiarch kernel.
+On Tue, 3 Oct 2017, Frank Rowand wrote:
+
+> On 10/03/17 11:46, Nicolas Pitre wrote:
+> > On Tue, 3 Oct 2017, Rob Herring wrote:
+> > 
+> >> For static DT usecases, we don't need the disabled nodes and can skip
+> >> unflattening. This saves a significant amount of RAM in memory constrained
+> >> cases. In one example on STM32F469, the RAM usage goes from 118K to 26K.
+> >>
+> >> There are a few cases in the kernel that modify the status property
+> >> dynamically. These all are changes from enabled to disabled, depend on
+> >> OF_DYNAMIC or are not FDT based (PDT based).
+> >>
+> >> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> >> Cc: Frank Rowand <frowand.list@gmail.com>
+> >> Signed-off-by: Rob Herring <robh@kernel.org>
+> > 
+> > Tested-by: Nicolas Pitre <nico@linaro.org>
+> > 
+> >> ---
+> >> For more background, see this presentation from Nico:
+> >>
+> >> https://connect.linaro.org/resource/sfo17/sfo17-100/
+> > 
+> > Oh my ... this is horrible ...
 > 
-> Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
-> ---
->  arch/arm/Kconfig | 20 ++++++++++++++------
->  1 file changed, 14 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index a208bfe367b5..a1eff866550b 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -696,6 +696,14 @@ config ARCH_MULTI_CPU_AUTO
->  
->  endmenu
->  
-> +config ARCH_ASSUME_SECURE_PLATFORM
-> +	bool "Enable ERRATAs using secure-only registers"
-> +	default !ARCH_MULTIPLATFORM
+> I found the presentation to be quite good and useful.
 
-I think default should always be "Yes" and this option shouldn't affect
-multiplatform kernels. So a multiplatform kernel wouldn't be an option for your
-device.
+Thanks. I think the content is good. I'm just a terrible speaker.
 
-> +	help
-> +	  Allow erratas that need access to secure-only registers.
-> +
-> +	  Beware: Resulting kernel won't boot on a CPU in non-Secure mode.
-> +
+> The Linaro site does not have the slides, could you please send
+> me a copy?
 
-Probably better to say here something like that: Disable this option to avoid
-CPU erratas that require access to secure-only registers. This might be needed
-in a case of running under a secure monitor.
+I've asked for the slides to be uploaded to the site. I've sent you a 
+copy privately in the mean time.
 
->  config ARCH_VIRT
->  	bool "Dummy Virtual Machine"
->  	depends on ARCH_MULTI_V7
-> @@ -984,7 +992,7 @@ config ARM_ERRATA_430973
->  config ARM_ERRATA_458693
->  	bool "ARM errata: Processor deadlock when a false hazard is created"
->  	depends on CPU_V7
-> -	depends on !ARCH_MULTIPLATFORM
-> +	depends on ARCH_ASSUME_SECURE_PLATFORM
->  	help
->  	  This option enables the workaround for the 458693 Cortex-A8 (r2p0)
->  	  erratum. For very specific sequences of memory operations, it is
-> @@ -998,7 +1006,7 @@ config ARM_ERRATA_458693
->  config ARM_ERRATA_460075
->  	bool "ARM errata: Data written to the L2 cache can be overwritten with stale data"
->  	depends on CPU_V7
-> -	depends on !ARCH_MULTIPLATFORM
-> +	depends on ARCH_ASSUME_SECURE_PLATFORM
->  	help
->  	  This option enables the workaround for the 460075 Cortex-A8 (r2p0)
->  	  erratum. Any asynchronous access to the L2 cache may encounter a
-> @@ -1011,7 +1019,7 @@ config ARM_ERRATA_460075
->  config ARM_ERRATA_742230
->  	bool "ARM errata: DMB operation may be faulty"
->  	depends on CPU_V7 && SMP
-> -	depends on !ARCH_MULTIPLATFORM
-> +	depends on ARCH_ASSUME_SECURE_PLATFORM
->  	help
->  	  This option enables the workaround for the 742230 Cortex-A9
->  	  (r1p0..r2p2) erratum. Under rare circumstances, a DMB instruction
-> @@ -1024,7 +1032,7 @@ config ARM_ERRATA_742230
->  config ARM_ERRATA_742231
->  	bool "ARM errata: Incorrect hazard handling in the SCU may lead to data corruption"
->  	depends on CPU_V7 && SMP
-> -	depends on !ARCH_MULTIPLATFORM
-> +	depends on ARCH_ASSUME_SECURE_PLATFORM
->  	help
->  	  This option enables the workaround for the 742231 Cortex-A9
->  	  (r2p0..r2p2) erratum. Under certain conditions, specific to the
-> @@ -1062,7 +1070,7 @@ config ARM_ERRATA_720789
->  config ARM_ERRATA_743622
->  	bool "ARM errata: Faulty hazard checking in the Store Buffer may lead to data corruption"
->  	depends on CPU_V7
-> -	depends on !ARCH_MULTIPLATFORM
-> +	depends on ARCH_ASSUME_SECURE_PLATFORM
->  	help
->  	  This option enables the workaround for the 743622 Cortex-A9
->  	  (r2p*) erratum. Under very rare conditions, a faulty
-> @@ -1076,7 +1084,7 @@ config ARM_ERRATA_743622
->  config ARM_ERRATA_751472
->  	bool "ARM errata: Interrupted ICIALLUIS may prevent completion of broadcasted operation"
->  	depends on CPU_V7
-> -	depends on !ARCH_MULTIPLATFORM
-> +	depends on ARCH_ASSUME_SECURE_PLATFORM
->  	help
->  	  This option enables the workaround for the 751472 Cortex-A9 (prior
->  	  to r3p0) erratum. An interrupted ICIALLUIS operation may prevent the
-> 
+
+Nicolas
