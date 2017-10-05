@@ -1,165 +1,62 @@
-From: digetx@gmail.com (Dmitry Osipenko)
-Date: Thu, 5 Oct 2017 19:24:58 +0300
-Subject: [PATCH 4/9] ARM: trusted_foundations: enable L2x0 cache via
- firmware_ops
-In-Reply-To: <1d12ea86cca40749731a594afc165830c0b2463d.1500510157.git.mirq-linux@rere.qmqm.pl>
-References: <cover.1500510157.git.mirq-linux@rere.qmqm.pl>
- <1d12ea86cca40749731a594afc165830c0b2463d.1500510157.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <6fd1e0cc-3d75-0817-3272-5e896c4a7c50@gmail.com>
+From: szabolcs.nagy@arm.com (Szabolcs Nagy)
+Date: Thu, 05 Oct 2017 17:39:24 +0100
+Subject: [PATCH v2 26/28] arm64/sve: Add documentation
+In-Reply-To: <1504198860-12951-27-git-send-email-Dave.Martin@arm.com>
+References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
+ <1504198860-12951-27-git-send-email-Dave.Martin@arm.com>
+Message-ID: <59D6603C.2040603@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.07.2017 03:29, Micha? Miros?aw wrote:
-> Use firmware_ops to provide hook for cache initialization through
-> Trusted Foundations firmware, as some writes need Secure mode.
-> 
-> Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
-> ---
->  arch/arm/firmware/trusted_foundations.c    | 46 ++++++++++++++++++++++++++++++
->  arch/arm/include/asm/hardware/cache-l2x0.h |  1 +
->  arch/arm/mm/cache-l2x0.c                   | 10 ++++++-
->  3 files changed, 56 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/firmware/trusted_foundations.c b/arch/arm/firmware/trusted_foundations.c
-> index 3fb1b5a1dce9..81ff71b87438 100644
-> --- a/arch/arm/firmware/trusted_foundations.c
-> +++ b/arch/arm/firmware/trusted_foundations.c
-> @@ -17,11 +17,19 @@
->  #include <linux/kernel.h>
->  #include <linux/init.h>
->  #include <linux/of.h>
-> +#include <asm/io.h>
->  #include <asm/firmware.h>
-> +#include <asm/outercache.h>
-> +#include <asm/hardware/cache-l2x0.h>
->  #include <asm/trusted_foundations.h>
->  
-> +#define TF_CACHE_MAINT           0xfffff100
->  #define TF_SET_CPU_BOOT_ADDR_SMC 0xfffff200
->  
-> +#define TF_CACHE_INIT		1
-> +#define TF_CACHE_FLUSH		2
-> +#define TF_CACHE_REENABLE	4
+On 31/08/17 18:00, Dave Martin wrote:
+> +prctl(PR_SVE_SET_VL, unsigned long arg)
 > +
->  #define TF_CPU_PM		0xfffffffc
->  #define TF_CPU_PM_S3		0xffffffe3
->  #define TF_CPU_PM_S2		0xffffffe6
-> @@ -63,9 +71,47 @@ static int tf_prepare_idle(void)
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_CACHE_L2X0
-> +static void tf_write_sec(unsigned long val, unsigned reg)
-> +{
-> +	unsigned long cur = readl_relaxed(l2x0_base + reg);
+> +    Sets the vector length of the calling thread and related flags, where
+> +    arg == vl | flags.
 > +
-> +	pr_warn("TF: ignoring write_sec[0x%x]: 0x%08lx -> 0x%08lx\n", reg, cur, val);
-> +}
+> +    vl is the desired vector length, where sve_vl_valid(vl) must be true.
 > +
-> +static void tf_disable_cache(void)
-> +{
-> +	tf_generic_smc(TF_CACHE_MAINT, TF_CACHE_FLUSH, l2x0_way_mask);
-> +}
+> +    flags:
 > +
-> +static void tf_resume_cache(void)
-> +{
-> +	unsigned long aux_val = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
-> +	tf_generic_smc(TF_CACHE_MAINT, TF_CACHE_REENABLE, aux_val);
-> +}
+> +	PR_SVE_SET_VL_INHERIT
 > +
-> +static void tf_configure_cache(const struct l2x0_regs *regs)
-> +{
-> +	outer_cache.disable = tf_disable_cache;
-> +	outer_cache.resume = tf_resume_cache;
-> +}
+> +	    Inherit the current vector length across execve().  Otherwise, the
+> +	    vector length is reset to the system default at execve().  (See
+> +	    Section 9.)
 > +
-> +static int tf_init_cache(void)
-> +{
-> +	tf_generic_smc(TF_CACHE_MAINT, TF_CACHE_INIT, 0);
+> +	PR_SVE_SET_VL_ONEXEC
 > +
-> +	outer_cache.write_sec = tf_write_sec;
-> +	outer_cache.configure = tf_configure_cache;
-> +	return 0;
-> +}
-> +#endif /* CONFIG_CACHE_L2X0 */
+> +	    Defer the requested vector length change until the next execve().
+> +	    This allows launching of a new program with a different vector
+> +	    length, while avoiding runtime side effects in the caller.
 > +
->  static const struct firmware_ops trusted_foundations_ops = {
->  	.set_cpu_boot_addr = tf_set_cpu_boot_addr,
->  	.prepare_idle = tf_prepare_idle,
-> +#ifdef CONFIG_CACHE_L2X0
-> +	.l2x0_init = tf_init_cache,
-> +#endif
->  };
->  
->  void register_trusted_foundations(struct trusted_foundations_platform_data *pd)
-> diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
-> index 492de655e4f3..665eb0758417 100644
-> --- a/arch/arm/include/asm/hardware/cache-l2x0.h
-> +++ b/arch/arm/include/asm/hardware/cache-l2x0.h
-> @@ -194,6 +194,7 @@ struct l2x0_regs {
->  };
->  
->  extern void __iomem *l2x0_base;
-> +extern u32 l2x0_way_mask;	/* Bitmask of active ways */
->  extern struct l2x0_regs l2x0_saved_regs;
->  
->  #endif /* __ASSEMBLY__ */
-> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> index bbfbc18399f9..f1268e9b35f0 100644
-> --- a/arch/arm/mm/cache-l2x0.c
-> +++ b/arch/arm/mm/cache-l2x0.c
-> @@ -30,6 +30,7 @@
->  #include <asm/cp15.h>
->  #include <asm/cputype.h>
->  #include <asm/hardware/cache-l2x0.h>
-> +#include <asm/firmware.h>
->  #include "cache-tauros3.h"
->  #include "cache-aurora-l2.h"
->  
-> @@ -37,6 +38,7 @@ struct l2c_init_data {
->  	const char *type;
->  	unsigned way_size_0;
->  	unsigned num_lock;
-> +	void (*init)(void __iomem *, u32 *, u32 *);
->  	void (*of_parse)(const struct device_node *, u32 *, u32 *);
->  	void (*enable)(void __iomem *, unsigned);
->  	void (*fixup)(void __iomem *, u32, struct outer_cache_fns *);
-> @@ -50,11 +52,11 @@ struct l2c_init_data {
->  
->  static const struct l2c_init_data *l2x0_data;
->  static DEFINE_RAW_SPINLOCK(l2x0_lock);
-> -static u32 l2x0_way_mask;	/* Bitmask of active ways */
->  static u32 l2x0_size;
->  static unsigned long sync_reg_offset = L2X0_CACHE_SYNC;
->  
->  void __iomem *l2x0_base;
-> +u32 l2x0_way_mask;	/* Bitmask of active ways */
->  struct l2x0_regs l2x0_saved_regs;
->  
->  static bool l2x0_bresp_disable;
-> @@ -1760,6 +1762,7 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
->  	u32 cache_id;
->  	u32 cache_level = 2;
->  	bool nosync = false;
-> +	int err;
->  
->  	np = of_find_matching_node(NULL, l2x0_ids);
->  	if (!np)
-> @@ -1792,6 +1795,11 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
->  
->  	nosync = of_property_read_bool(np, "arm,outer-sync-disable");
->  
-> +	/* Call firmware init */
+> +	    This also overrides the effect of PR_SVE_SET_VL_INHERIT for the
+> +	    first execve().
+> +
+> +	    Without PR_SVE_SET_VL_ONEXEC, any outstanding deferred vector
+> +	    length change is cancelled.
+> +
 
-What about to make this comment a bit more explanatory? Add couple words about
-what firmware initializes, maybe it enables access from CPU.. of course if you
-have any clue.
+based on later text it seems this works if exeve is
+called in the same thread as prctl was called in.
 
-> +	err = call_firmware_op(l2x0_init);
-> +	if (err && err != -ENOSYS)
-> +		return err;
+this is a bit weird from user-space pov so it may
+make sense to state it here explicitly.
+
+> +    Return value: a nonnegative on success, or a negative value on error:
+> +	EINVAL: SVE not supported, invalid vector length requested, or
+> +	    invalid flags.
 > +
->  	/* Read back current (default) hardware configuration */
->  	if (data->save)
->  		data->save(l2x0_base);
-> 
+> +    On success, the calling thread's vector length is changed to the largest
+> +    value supported by the system that is less than or equal to vl.
+> +    If vl == SVE_VL_MAX, the calling thread's vector length is changed to the
+> +    largest value supported by the system.
+> +
+> +    The returned value describes the resulting configuration, encoded as for
+> +    PR_SVE_GET_VL.
+> +
+> +    Changing the vector length causes all of P0..P15, FFR and all bits of
+> +    Z0..V31 except for Z0 bits [127:0] .. Z31 bits [127:0] to become
+> +    unspecified.  Calling PR_SVE_SET_VL with vl equal to the thread's current
+> +    vector length does not constitute a change to the vector length for this
+> +    purpose.
