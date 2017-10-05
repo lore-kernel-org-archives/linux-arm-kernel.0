@@ -1,73 +1,156 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 5 Oct 2017 15:42:57 +0100
-Subject: [PATCH 5/6] kernel/locking: Prevent slowpath writers getting
- held up by fastpath
-In-Reply-To: <20171005135618.yufhaklq5cefaiyn@hirez.programming.kicks-ass.net>
-References: <1507208097-825-1-git-send-email-will.deacon@arm.com>
- <1507208097-825-6-git-send-email-will.deacon@arm.com>
- <20171005135618.yufhaklq5cefaiyn@hirez.programming.kicks-ass.net>
-Message-ID: <20171005144256.GF11088@arm.com>
+From: mbrugger@suse.com (Matthias Brugger)
+Date: Thu, 5 Oct 2017 16:54:09 +0200
+Subject: undefined instruction d5380001 (arm64 mrs emulation)
+In-Reply-To: <CAJs94EbvM6U5qQyAGGY7BEppC=dPo_LPzU4STDNU7muCZvLXmw@mail.gmail.com>
+References: <CAJs94EZqdWJRTF+tLgGU=pcRoU5HvuV959Qq8nFB5yQ-sQyxzg@mail.gmail.com>
+ <20171002112433.GM3611@e103592.cambridge.arm.com> <59D24906.4060104@arm.com>
+ <20171002155638.GA18543@e107814-lin.cambridge.arm.com>
+ <CAJs94EbvM6U5qQyAGGY7BEppC=dPo_LPzU4STDNU7muCZvLXmw@mail.gmail.com>
+Message-ID: <fb13bcdf-c97b-40c6-3815-30dce26bca8e@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI Peter,
-
-Thanks for having a look.
-
-On Thu, Oct 05, 2017 at 03:56:18PM +0200, Peter Zijlstra wrote:
-> On Thu, Oct 05, 2017 at 01:54:56PM +0100, Will Deacon wrote:
-> > When a prospective writer takes the qrwlock locking slowpath due to the
-> > lock being held, it attempts to cmpxchg the wmode field from 0 to
-> > _QW_WAITING so that concurrent lockers also take the slowpath and queue
-> > on the spinlock accordingly, allowing the lockers to drain.
-> > 
-> > Unfortunately, this isn't fair, because a fastpath writer that comes in
-> > after the lock is made available but before the _QW_WAITING flag is set
-> > can effectively jump the queue. If there is a steady stream of prospective
-> > writers, then the waiter will be held off indefinitely.
-> > 
-> > This patch restores fairness by separating _QW_WAITING and _QW_LOCKED
-> > into two bits in the wmode byte and having the waiter set _QW_WAITING
-> > unconditionally. This then forces the slow-path for concurrent lockers,
-> > but requires that a writer unlock operation performs an
-> > atomic_sub_release instead of a store_release so that the waiting status
-> > is preserved.
+Hi all,
+Hi Greg,
+On 10/04/2017 11:11 AM, Matwey V. Kornilov wrote:
+> The patch helps to overcome the issue, Probably it should be applied
+> to all stable releases affected by this behaviour.
+> modprobe in initrd may load quite required things.
 > 
-> > diff --git a/include/asm-generic/qrwlock.h b/include/asm-generic/qrwlock.h
-> > index 02c0a768e6b0..8b7edef500e5 100644
-> > --- a/include/asm-generic/qrwlock.h
-> > +++ b/include/asm-generic/qrwlock.h
-> > @@ -41,7 +41,7 @@
-> >   *       +----+----+----+----+
-> >   */
-> >  #define	_QW_WAITING	1		/* A writer is waiting	   */
-> > -#define	_QW_LOCKED	0xff		/* A writer holds the lock */
-> > +#define	_QW_LOCKED	2		/* A writer holds the lock */
-> >  #define	_QW_WMASK	0xff		/* Writer mask		   */
-> >  #define	_QR_SHIFT	8		/* Reader count shift	   */
-> >  #define _QR_BIAS	(1U << _QR_SHIFT)
-> > @@ -134,7 +134,7 @@ static inline void queued_read_unlock(struct qrwlock *lock)
-> >   */
-> >  static inline void queued_write_unlock(struct qrwlock *lock)
-> >  {
-> > -	smp_store_release(&lock->wmode, 0);
-> > +	(void)atomic_sub_return_release(_QW_LOCKED, &lock->cnts);
-> >  }
 > 
-> That is a fairly painful hit on x86. Changes a regular store into an
-> "LOCK XADD" +20 cycles right there.
+> 2017-10-02 18:56 GMT+03:00 Suzuki K Poulose <Suzuki.Poulose@arm.com>:
+>> On Mon, Oct 02, 2017 at 03:11:18PM +0100, James Morse wrote:
+>>> Hi Matwey,
+>>>
+>>> On 02/10/17 12:24, Dave Martin wrote:
+>>>> On Fri, Sep 29, 2017 at 10:23:54PM +0300, Matwey V. Kornilov wrote:
+>>>>> I am running 4.13.3 on rockchip 3328 platform(aarch64) with glibc 2.26
+>>>>> and see the following at booting:
+>>>>>
+>>>>> [   11.152061] modprobe[93]: undefined instruction: pc=0000ffff8ca48ff4
+>>>>> [   11.152707] Code: d503201f 8a180320 92750001 365ffc20 (d5380001)
+>>>>> [   11.154347] modprobe[94]: undefined instruction: pc=0000ffff94243ff4
+>>>>> [   11.154991] Code: d503201f 8a180320 92750001 365ffc20 (d5380001)
+>>>>> [   11.157070] modprobe[97]: undefined instruction: pc=0000ffff839a0ff4
+>>>>> [   11.157715] Code: d503201f 8a180320 92750001 365ffc20 (d5380001)
+>>>>> [   11.159265] modprobe[98]: undefined instruction: pc=0000ffffb0591ff4
+>>>>> [   11.159908] Code: d503201f 8a180320 92750001 365ffc20 (d5380001)
+>>>>>
+>>>>> As far as I understand d5380001 should be emulated in cpufeature.c but
+>>>>> it is not. What could be wrong here?
+>>>>
+>>>> The whole sequence is
+>>>>
+>>>>     0:   d503201f        nop
+>>>>     4:   8a180320        and     x0, x25, x24
+>>>>     8:   92750001        and     x1, x0, #0x800
+>>>>     c:   365ffc20        tbz     w0, #11, 0xffffffffffffff90
+>>>>    10:*  d5380001        mrs     x1, midr_el1            <-- trapping instruction
+>>>
+>>> This looks the same as:
+>>> https://bugzilla.redhat.com/show_bug.cgi?id=1496209
+>>>
+>>> [...]
+>>>
+>>>> What should happen here is that the do_undefinstr() in
+>>>> arch/arm64/kernel/traps.c should call registered undef hooks until it
+>>>> finds one that accepts the faulting instruction.
+>>>>
+>>>> So, either the cpufeatures undef hook is not getting called, or it is
+>>>> failing the instruction somewhere, possibly in
+>>>> cpufeatures.c:emulate_id_reg() or emulate_sys_reg().
+>>>>
+>>>>
+>>>> Can you add some trace to those functions to see what's happening?
+>>>
+>>> I couldn't reproduce this with linux-stable's v4.13.3 defconfig on Seattle or Juno.
+>>>
+>>> What distribution are you running? Could you also try [0] to see if this is
+>>> something specific to your version of modprobe?
+>>
+>>
+>> It is worth noting that we register the MRS instruction handler as late_init call.
+>> Now the question is how late that could be. Given that we are hitting it with
+>> modprobe, which could be used for requesting modules from initrd. Also which explains
+>> why it we can't reproduce it by simple testcases, after it was registered.
+>>
+>> Now the question is, how early do we want to push this. Since it doesn't depend really
+>> on any other subsystem, we could move it as early as "early". Or for keeping it in
+>> line with other "arch" specific init calls, we could simply make it arch_initcall.
+>>
+>> Matwey,
+>>
+>> Please could you check if the following patch fixes the issue for you:
+>>
+>> Cheers
+>> Suzuki
+>>
+>> ----8>----
+>>
+>> arm64: Enable MRS emulation early enough in the boot sequence
+>>
+>> Make sure the MRS emulation is enabled early enough that the
+>> early userspace applications (e.g, those run from initrd) could
+>> run without any trouble.
+>>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>
+>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+>> index 9f9e0064c8c1..048f5469531f 100644
+>> --- a/arch/arm64/kernel/cpufeature.c
+>> +++ b/arch/arm64/kernel/cpufeature.c
+>> @@ -1294,4 +1294,4 @@ static int __init enable_mrs_emulation(void)
+>>          return 0;
+>>   }
+>>
+>> -late_initcall(enable_mrs_emulation);
+>> +arch_initcall(enable_mrs_emulation);
+>> ---
+>>
+>>
 
-Yeah, I mentioned that in the cover letter which is also why it's at the end
-of the series ;) However, it's worth noting that this is the same as the
-reader unlock path and, as it stands, there's a real risk of writer
-starvation with the current code which isn't great for a queued lock.
+I realized this patch did not land in v4.13.5
+Did it got forgotten or are there any concerns?
 
-> Can't we steal one of the reader bits for waiting?
+We also hit this bug in openSUSE Tumbleweed:
+https://bugzilla.suse.com/show_bug.cgi?id=1061188
 
-I considered this at LPC and somehow convinced myself it didn't work, but
-actually all it's really doing is making the _QW_LOCKED bit a byte, so it
-should work fine.
+Regards,
+Matthias
 
-I'll work that into v2.
-
-Will
+>>>
+>>>
+>>> Thanks,
+>>>
+>>> James
+>>>
+>>> [0] works for me:
+>>> ---------------------%<---------------------
+>>> #include <stdio.h>
+>>> #include <sys/auxv.h>
+>>>
+>>> #ifndef HWCAP_CPUID
+>>> #define HWCAP_CPUID (1 << 11)
+>>> #endif
+>>>
+>>> int main(int argc, char **argv)
+>>> {
+>>>          register unsigned int midr asm ("r1") = 0;
+>>>          unsigned long hwcaps = getauxval(AT_HWCAP);
+>>>
+>>>          if (!(hwcaps & HWCAP_CPUID)) {
+>>>                  fprintf(stderr, "mrs emulation not supported\n");
+>>>                  return 1;
+>>>          }
+>>>
+>>>          asm("mrs %0, midr_el1" : "=r"(midr));
+>>>
+>>>          fprintf(stderr, "mrs x1, midr_el1; x1=0x%x\n", midr);
+>>>
+>>>          return 0;
+>>> }
+>>> ---------------------%<---------------------
+>>>
+> 
+> 
+> 
