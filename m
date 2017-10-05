@@ -1,36 +1,88 @@
-From: hkallweit1@gmail.com (Heiner Kallweit)
-Date: Thu, 5 Oct 2017 22:32:01 +0200
-Subject: Follow-up: How to deal with weird SCPI firmware and invalid DVFS
- frequencies
-Message-ID: <a96ffcce-7399-97c6-10be-88869c77ccef@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 5 Oct 2017 15:50:37 -0500
+Subject: [PATCH v2 01/10] pinctrl: move gpio-axp209 to pinctrl
+In-Reply-To: <e193f8efe9092171ebeffb77ab77422179fd3cab.1506428208.git-series.quentin.schulz@free-electrons.com>
+References: <cover.1c314f4154a6d27354625f03d0a5269eee55a9c5.1506428208.git-series.quentin.schulz@free-electrons.com>
+ <e193f8efe9092171ebeffb77ab77422179fd3cab.1506428208.git-series.quentin.schulz@free-electrons.com>
+Message-ID: <20171005205037.hxtoyeryiolflkda@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Few months ago we discussed how to deal with the Amlogic Meson SCPI
-DVFS cpu frequencies. To recap:
-SCPI DVFS provides some high frequencies which are usable only if
-just one CPU core is used. Else the system will just crash
-(even w/o being thermally loaded).
+On Tue, Sep 26, 2017 at 02:17:11PM +0200, Quentin Schulz wrote:
+> To prepare the driver for the upcoming pinctrl features, move the GPIO
+> driver AXP209 from GPIO to pinctrl subsystem.
+> 
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/gpio/gpio-axp209.txt       |  30 +-
+>  Documentation/devicetree/bindings/pinctrl/pinctrl-axp209.txt |  30 +-
+>  drivers/gpio/Kconfig                                         |   6 +-
+>  drivers/gpio/Makefile                                        |   1 +-
+>  drivers/gpio/gpio-axp209.c                                   | 188 +-------
+>  drivers/pinctrl/Kconfig                                      |   6 +-
+>  drivers/pinctrl/Makefile                                     |   1 +-
+>  drivers/pinctrl/pinctrl-axp209.c                             | 188 +++++++-
+>  8 files changed, 225 insertions(+), 225 deletions(-)
+>  delete mode 100644 Documentation/devicetree/bindings/gpio/gpio-axp209.txt
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-axp209.txt
+>  delete mode 100644 drivers/gpio/gpio-axp209.c
+>  create mode 100644 drivers/pinctrl/pinctrl-axp209.c
+> 
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio-axp209.txt b/Documentation/devicetree/bindings/gpio/gpio-axp209.txt
+> deleted file mode 100644
+> index a661130..0000000
+> --- a/Documentation/devicetree/bindings/gpio/gpio-axp209.txt
+> +++ /dev/null
+> @@ -1,30 +0,0 @@
+> -AXP209 GPIO controller
+> -
+> -This driver follows the usual GPIO bindings found in
+> -Documentation/devicetree/bindings/gpio/gpio.txt
+> -
+> -Required properties:
+> -- compatible: Should be "x-powers,axp209-gpio"
+> -- #gpio-cells: Should be two. The first cell is the pin number and the
+> -  second is the GPIO flags.
+> -- gpio-controller: Marks the device node as a GPIO controller.
+> -
+> -This node must be a subnode of the axp20x PMIC, documented in
+> -Documentation/devicetree/bindings/mfd/axp20x.txt
+> -
+> -Example:
+> -
+> -axp209: pmic at 34 {
+> -	compatible = "x-powers,axp209";
+> -	reg = <0x34>;
+> -	interrupt-parent = <&nmi_intc>;
+> -	interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+> -	interrupt-controller;
+> -	#interrupt-cells = <1>;
+> -
+> -	axp_gpio: gpio {
+> -		compatible = "x-powers,axp209-gpio";
+> -		gpio-controller;
+> -		#gpio-cells = <2>;
+> -	};
+> -};
+> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-axp209.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-axp209.txt
+> new file mode 100644
+> index 0000000..a661130
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-axp209.txt
+> @@ -0,0 +1,30 @@
+> +AXP209 GPIO controller
+> +
+> +This driver follows the usual GPIO bindings found in
+> +Documentation/devicetree/bindings/gpio/gpio.txt
+> +
+> +Required properties:
+> +- compatible: Should be "x-powers,axp209-gpio"
+> +- #gpio-cells: Should be two. The first cell is the pin number and the
+> +  second is the GPIO flags.
+> +- gpio-controller: Marks the device node as a GPIO controller.
 
-See also:
-https://patchwork.kernel.org/patch/9557349/
-https://patchwork.kernel.org/patch/9555761/
+Maybe there's some reason to move the driver, but the binding describes 
+a gpio-controller so it should remain in bindings/gpio/. Binding and 
+driver directories aren't one to one necessarily.
 
-One idea was to introduce a DT param for the CPU nodes to configure
-a max frequency, and all DVFS freq's above this threashold would be
-ignored. However we didn't come to an agreement.
-
-Now, when dealing with SCPI again, another idea came to my mind:
-Still it would be about introducing such a DT parameter, however
-we would not completely ignore higher frequencies but just set
-the "turbo" flag of the opp.
-This way cpufreq would ignore these frequencies, however we still
-had the option to manually enable these frequencies via sysfs and
-use them on systems where just one CPU core is used.
-(or more general: manually enable the boost frequencies if system
-macthes certain criteria)
-
-Does this sound better or would you still consider this to be too
-hacky?
-
-Rgds, Heiner
+Rob
