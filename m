@@ -1,33 +1,19 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 5 Oct 2017 17:53:10 +0200
-Subject: [PATCH v2 0/7] PCI: aardvark: improve compatibility with PCI
- devices
-In-Reply-To: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
-References: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
-Message-ID: <20171005175310.3c2dde95@windsurf.lan>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 5 Oct 2017 23:44:42 +0800
+Subject: [PATCH 10/20] ARM: dts: sun4i: Rename thermal nodes to avoid
+ warnings
+In-Reply-To: <f40eebec4a934ee2a2ef46c375c731daac664dba.1507198895.git-series.maxime.ripard@free-electrons.com>
+References: <cover.f5f905a5434f2a540d6844d23369a04af9f5314c.1507198895.git-series.maxime.ripard@free-electrons.com>
+ <f40eebec4a934ee2a2ef46c375c731daac664dba.1507198895.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v66Fobd6JFqYSnu1LJy4kHQQ7NsXcwgA25jq5crR1yOkeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Bjorn,
+On Thu, Oct 5, 2017 at 6:49 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The thermal-zone subnodes we defined for the A10 have underscores in them
+> that will generate DTC warnings. Change those underscores for hyphens.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-On Thu, 28 Sep 2017 14:58:31 +0200, Thomas Petazzoni wrote:
-
-> This patch series brings a number of fixes to the pci-aardvark driver
-> that allows a much larger number of PCIe devices to be used.
-
-I sent the initial version of this patch series almost a month ago, and
-it consists of fixes that I would like to have in 4.14.
-
-Is there a specific problem with those patches that explains why they
-have been ignored? Or is it just lack of time?
-
-If there is any problem with the patches, please let me know, I am of
-course perfectly fine with reworking them as needed.
-
-Thanks a lot,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Acked-by: Chen-Yu Tsai <wens@csie.org>
