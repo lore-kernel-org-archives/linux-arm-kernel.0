@@ -1,19 +1,29 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 5 Oct 2017 23:51:15 +0800
-Subject: [PATCH 14/20] ARM: dts: sun9i: Remove skeleton to avoid warnings
-In-Reply-To: <3c127ab5cd3ef874a51d9e8b37277fb87e7f774f.1507198895.git-series.maxime.ripard@free-electrons.com>
-References: <cover.f5f905a5434f2a540d6844d23369a04af9f5314c.1507198895.git-series.maxime.ripard@free-electrons.com>
- <3c127ab5cd3ef874a51d9e8b37277fb87e7f774f.1507198895.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v65jFsZ+hn3VJBJ_3y38KTuf20PiQnO+3Z9YdeX4WnLXmg@mail.gmail.com>
+From: digetx@gmail.com (Dmitry Osipenko)
+Date: Thu, 5 Oct 2017 18:52:30 +0300
+Subject: [PATCH 0/9] Bringing Asus TF300T support to mainline
+In-Reply-To: <20171004212534.uosfz6757bbds2c5@qmqm.qmqm.pl>
+References: <cover.1500510157.git.mirq-linux@rere.qmqm.pl>
+ <20171004212534.uosfz6757bbds2c5@qmqm.qmqm.pl>
+Message-ID: <dcbbc541-60c1-8af5-25ea-927629447a55@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 5, 2017 at 6:49 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Using skeleton.dtsi will create a memory node that will generate a warning
-> in DTC. However, that node will be created by the bootloader, so we can
-> just remove it entirely in order to remove that warning.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+On 05.10.2017 00:25, Micha? Miros?aw wrote:
+> On Thu, Jul 20, 2017 at 02:29:22AM +0200, Micha? Miros?aw wrote:
+>> Here is a suprisingly small set of patches that enable Asus TF300T tablet
+>> to boot and have all cores available. TF300T is one of a consumer devices
+>> based on NVidia's Cardhu reference tablet.
+>>
+>> This series is an arch-dependent part. TF parts were extracted from ASUS's
+>> GPL code dump.  The rest being driver code - a work in progress - is
+>> available in branch tf300t at:
+>>
+>>         https://rere.qmqm.pl/git/linux
+> 
+> Just a quick note, that I've rebased the branch on v4.14-rc3 and added
+> some more patches on top. This includes updated defconfig and devicetree
+> with working eMMC and an attempt at making TF300T's dock hot-pluggable.
+> 
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+Just a small note.. I think you should develop on top of linux-next, since your
+patches would be applied to linux-next first.
