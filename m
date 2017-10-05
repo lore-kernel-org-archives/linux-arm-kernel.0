@@ -1,47 +1,60 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 5 Oct 2017 11:03:49 +0200
-Subject: [PATCH v2 7/8] arm64: dts: renesas: initial Eagle board device
- tree
-In-Reply-To: <CAMuHMdUfRr-X_+pZhmWw28SDwa5=7daSefjVaT9y5cFB9VoO6Q@mail.gmail.com>
-References: <20170915194445.950496886@cogentembedded.com>
- <CAMuHMdUX+RW9H-p5n_JB-SkW8k5g_i0bg-i9LD59b5MLvFm3YQ@mail.gmail.com>
- <9ad9bd62-300c-cc78-a8f3-bbdd9eed6bed@cogentembedded.com>
- <CAMuHMdUfRr-X_+pZhmWw28SDwa5=7daSefjVaT9y5cFB9VoO6Q@mail.gmail.com>
-Message-ID: <20171005090348.GB26369@verge.net.au>
+Date: Thu, 5 Oct 2017 11:05:01 +0200
+Subject: [PATCH v2 8/8] arm64: dts: renesas: eagle: add EtherAVB support
+In-Reply-To: <CAMuHMdVCTORpfKN+GTka_6pT1VWjOneV2GBhGo7Y8DsZYSxdvw@mail.gmail.com>
+References: <20170915194449.538504992@cogentembedded.com>
+ <CAMuHMdXQXFuVzwW7G-U7XWZUEj8qFRjtfDQF1+TgyzO0Xb+eYg@mail.gmail.com>
+ <c0390fc1-7da4-ac60-afee-97126d1fd372@cogentembedded.com>
+ <CAMuHMdVCTORpfKN+GTka_6pT1VWjOneV2GBhGo7Y8DsZYSxdvw@mail.gmail.com>
+Message-ID: <20171005090500.GC26369@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 04, 2017 at 01:10:26PM +0200, Geert Uytterhoeven wrote:
+On Thu, Sep 21, 2017 at 06:09:34PM +0200, Geert Uytterhoeven wrote:
 > Hi Sergei,
 > 
-> On Wed, Oct 4, 2017 at 1:03 PM, Sergei Shtylyov
+> On Thu, Sep 21, 2017 at 6:03 PM, Sergei Shtylyov
 > <sergei.shtylyov@cogentembedded.com> wrote:
-> > On 9/21/2017 4:18 PM, Geert Uytterhoeven wrote:
-> >>> Add the initial device  tree for  the R8A77970 SoC based Eagle board.
-> >>> The board has 1 debug serial port (SCIF0); include support for it,
-> >>> so that the serial console can work.
+> > On 9/21/2017 4:08 PM, Geert Uytterhoeven wrote:
+> >>> Define the Eagle board  dependent part of the EtherAVB device node.
+> >>> Enable DHCP  and NFS root for the kernel booting.
 > >>>
-> >>> Based on the original (and large) patch by Vladimir Barinov
-> >>> <vladimir.barinov@cogentembedded.com>.
+> >>> Based  on the original (and large) patch by Vladimir Barinov.
 > >>>
 > >>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 > >>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 > >>
-> >> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 > >>
-> >>> --- /dev/null
+> >>> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
 > >>> +++ renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
-> 
-> >>> +&extal_clk {
-> >>> +       clock-frequency = <16666666>;
-> >>
-> >>
-> >> Nitpicking: the schematics say 16.6666 MHz
-> >> At 100 ppm accuracy that's the same, though.
 > >
-> >    So, you still want me to change this freq?
+> > [...]
+> >>>
+> >>> @@ -43,3 +44,14 @@
+> >>>   &scif0 {
+> >>>          status = "okay";
+> >>>   };
+> >>> +
+> >>> +&avb {
+> >>> +       renesas,no-ether-link;
+> >>> +       phy-handle = <&phy0>;
+> >>> +       status = "okay";
+> >>> +
+> >>> +       phy0: ethernet-phy at 0 {
+> >>> +               rxc-skew-ps = <1500>;
+> >>> +               reg = <0>;
+> >>
+> >>
+> >> Any specific reason why you don't want to wire up the interrupt?
+> >>
+> >>                  interrupt-parent = <&gpio2>;
+> >
+> >
+> >    I thought it's quite obvious -- we don't have GPIOs yet, and GPIOs seem
+> > to require PFC.
 > 
-> I don't think that's really needed, as the difference is smaller than the
-> accuracy anyway.
+> Of course. And these can be added later.
+> 
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Thanks, I have applied this patch for v4.15.
+Thanks, applied.
