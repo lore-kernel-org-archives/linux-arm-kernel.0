@@ -1,62 +1,37 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Thu, 5 Oct 2017 11:17:49 +0800
-Subject: [PATCH v2] soc: mediatek: place Kconfig for all SoC drivers under menu
-Message-ID: <41e81ac2998b171ff4715cb2dc17f15aa10b7518.1507173110.git.sean.wang@mediatek.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Wed,  4 Oct 2017 20:32:53 -0700
+Subject: [PATCH v3 0/5] Qualcomm remote filesystem shared memory driver
+Message-ID: <20171005033258.12825-1-bjorn.andersson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+Some remote processors (in particular the modem) found in Qualcomm platforms
+stores configuration parameters and other data in a file system. As the remotes
+does not have direct storage access it needs to relay block accesses through a
+service running on the application CPU.
 
-Add cleanup for placing all Kconfig for all MediaTek SoC drivers under
-the independent menu as other SoCs vendor usually did. Since the menu
-would be shown depending on "ARCH_MEDIATEK || COMPILE_TEST" selected and
-MTK_PMIC_WRAP is still safe compiling with the case of "COMPILE_TEST"
-only, the superfluous dependency for those items under the menu also is
-also being removed for the sake of simplicity.
+The memory is described in DeviceTree by a new reserved-memory compatible and
+the implementation provides the user space service a read/write interface to
+this chunk of memory.
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
----
- drivers/soc/mediatek/Kconfig | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+Bjorn Andersson (5):
+  of/platform: Generalize /reserved-memory handling
+  of: reserved_mem: Accessor for acquiring reserved_mem
+  dt-binding: soc: qcom: Add binding for rmtfs memory
+  soc: qcom: Remote filesystem memory driver
+  arm64: dts: msm8916: Mark rmtfs node as qcom,rmtfs-mem compatible
 
-diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
-index 609bb34..a7d0667 100644
---- a/drivers/soc/mediatek/Kconfig
-+++ b/drivers/soc/mediatek/Kconfig
-@@ -1,9 +1,11 @@
- #
- # MediaTek SoC drivers
- #
-+menu "MediaTek SoC drivers"
-+	depends on ARCH_MEDIATEK || COMPILE_TEST
-+
- config MTK_INFRACFG
- 	bool "MediaTek INFRACFG Support"
--	depends on ARCH_MEDIATEK || COMPILE_TEST
- 	select REGMAP
- 	help
- 	  Say yes here to add support for the MediaTek INFRACFG controller. The
-@@ -12,7 +14,6 @@ config MTK_INFRACFG
- 
- config MTK_PMIC_WRAP
- 	tristate "MediaTek PMIC Wrapper Support"
--	depends on ARCH_MEDIATEK
- 	depends on RESET_CONTROLLER
- 	select REGMAP
- 	help
-@@ -22,7 +23,6 @@ config MTK_PMIC_WRAP
- 
- config MTK_SCPSYS
- 	bool "MediaTek SCPSYS Support"
--	depends on ARCH_MEDIATEK || COMPILE_TEST
- 	default ARCH_MEDIATEK
- 	select REGMAP
- 	select MTK_INFRACFG
-@@ -30,3 +30,5 @@ config MTK_SCPSYS
- 	help
- 	  Say yes here to add support for the MediaTek SCPSYS power domain
- 	  driver.
-+
-+endmenu
+ .../bindings/reserved-memory/qcom,rmtfs-mem.txt    |  51 ++++
+ arch/arm64/boot/dts/qcom/msm8916.dtsi              |   3 +
+ drivers/of/of_reserved_mem.c                       |  26 ++
+ drivers/of/platform.c                              |  19 +-
+ drivers/soc/qcom/Kconfig                           |  11 +
+ drivers/soc/qcom/Makefile                          |   1 +
+ drivers/soc/qcom/rmtfs_mem.c                       | 272 +++++++++++++++++++++
+ include/linux/of_reserved_mem.h                    |   5 +
+ 8 files changed, 380 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/reserved-memory/qcom,rmtfs-mem.txt
+ create mode 100644 drivers/soc/qcom/rmtfs_mem.c
+
 -- 
-2.7.4
+2.12.0
