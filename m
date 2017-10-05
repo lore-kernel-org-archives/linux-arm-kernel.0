@@ -1,41 +1,82 @@
 From: james.morse@arm.com (James Morse)
-Date: Thu,  5 Oct 2017 20:18:12 +0100
-Subject: [PATCH v3 20/20] KVM: arm64: Take any host SError before entering the
- guest
+Date: Thu,  5 Oct 2017 20:18:01 +0100
+Subject: [PATCH v3 09/20] KVM: arm/arm64: mask/unmask daif around VHE guests
 In-Reply-To: <20171005191812.5678-1-james.morse@arm.com>
 References: <20171005191812.5678-1-james.morse@arm.com>
-Message-ID: <20171005191812.5678-21-james.morse@arm.com>
+Message-ID: <20171005191812.5678-10-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On VHE systems KVM masks SError before switching the VBAR value. Any
-host RAS error that the CPU knew about before world-switch may become
-pending as an SError during world-switch, and only be taken once we enter
-the guest.
+Non-VHE systems take an exception to EL2 in order to world-switch into the
+guest. When returning from the guest KVM implicitly restores the DAIF
+flags when it returns to the kernel at EL1.
 
-Until KVM can take RAS SErrors during world switch, add an ESB to
-force any RAS errors to be synchronised and taken on the host before
-we enter world switch.
+With VHE none of this exception-level jumping happens, so KVMs
+world-switch code is exposed to the host kernel's DAIF values, and KVM
+spills the guest-exit DAIF values back into the host kernel.
+On entry to a guest we have Debug and SError exceptions unmasked, KVM
+has switched VBAR but isn't prepared to handle these. On guest exit
+Debug exceptions are left disabled once we return to the host and will
+stay this way until we enter user space.
 
-RAS errors that become pending during world switch are still taken
-once we enter the guest.
+Add a helper to mask/unmask DAIF around VHE guests. The unmask can only
+happen after the hosts VBAR value has been synchronised by the isb in
+__vhe_hyp_call (via kvm_call_hyp()). Masking could be as late as
+setting KVMs VBAR value, but is kept here for symmetry.
 
 Signed-off-by: James Morse <james.morse@arm.com>
+
 ---
- arch/arm64/include/asm/kvm_host.h | 1 +
- 1 file changed, 1 insertion(+)
+Give me a kick if you want this reworked as a fix (which will then
+conflict with this series), or a backportable version.
+
+ arch/arm64/include/asm/kvm_host.h | 10 ++++++++++
+ virt/kvm/arm/arm.c                |  4 ++++
+ 2 files changed, 14 insertions(+)
 
 diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index b3c53d8b6a60..6a48f9d18c58 100644
+index e923b58606e2..d3eb79a9ed6b 100644
 --- a/arch/arm64/include/asm/kvm_host.h
 +++ b/arch/arm64/include/asm/kvm_host.h
-@@ -392,6 +392,7 @@ static inline void __cpu_init_stage2(void)
- 
- static inline void kvm_arm_vhe_guest_enter(void)
- {
-+	esb();
- 	local_mask_daif();
+@@ -25,6 +25,7 @@
+ #include <linux/types.h>
+ #include <linux/kvm_types.h>
+ #include <asm/cpufeature.h>
++#include <asm/daifflags.h>
+ #include <asm/kvm.h>
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_mmio.h>
+@@ -384,4 +385,13 @@ static inline void __cpu_init_stage2(void)
+ 		  "PARange is %d bits, unsupported configuration!", parange);
  }
  
++static inline void kvm_arm_vhe_guest_enter(void)
++{
++	local_mask_daif();
++}
++
++static inline void kvm_arm_vhe_guest_exit(void)
++{
++	local_restore_daif(DAIF_PROCCTX_NOIRQ);
++}
+ #endif /* __ARM64_KVM_HOST_H__ */
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index b9f68e4add71..665529924b34 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -698,9 +698,13 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		 */
+ 		trace_kvm_entry(*vcpu_pc(vcpu));
+ 		guest_enter_irqoff();
++		if (has_vhe())
++			kvm_arm_vhe_guest_enter();
+ 
+ 		ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);
+ 
++		if (has_vhe())
++			kvm_arm_vhe_guest_exit();
+ 		vcpu->mode = OUTSIDE_GUEST_MODE;
+ 		vcpu->stat.exits++;
+ 		/*
 -- 
 2.13.3
