@@ -1,61 +1,77 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 5 Oct 2017 20:18:38 +0300
-Subject: [PATCH v2 8/8] arm64: dts: renesas: eagle: add EtherAVB support
-In-Reply-To: <20171005090500.GC26369@verge.net.au>
-References: <20170915194449.538504992@cogentembedded.com>
- <CAMuHMdXQXFuVzwW7G-U7XWZUEj8qFRjtfDQF1+TgyzO0Xb+eYg@mail.gmail.com>
- <c0390fc1-7da4-ac60-afee-97126d1fd372@cogentembedded.com>
- <CAMuHMdVCTORpfKN+GTka_6pT1VWjOneV2GBhGo7Y8DsZYSxdvw@mail.gmail.com>
- <20171005090500.GC26369@verge.net.au>
-Message-ID: <dca19642-e511-5cd5-b7b9-9ed339407ed6@cogentembedded.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 5 Oct 2017 12:23:30 -0500
+Subject: [PATCH v2 1/7] PCI: aardvark: fix logic in PCI configuration
+ read/write functions
+In-Reply-To: <20170928125838.11887-2-thomas.petazzoni@free-electrons.com>
+References: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
+ <20170928125838.11887-2-thomas.petazzoni@free-electrons.com>
+Message-ID: <20171005172330.GP25517@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/05/2017 12:05 PM, Simon Horman wrote:
-
->>>>> Define the Eagle board  dependent part of the EtherAVB device node.
->>>>> Enable DHCP  and NFS root for the kernel booting.
->>>>>
->>>>> Based  on the original (and large) patch by Vladimir Barinov.
->>>>>
->>>>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>>>
->>>>
->>>>> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
->>>>> +++ renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
->>>
->>> [...]
->>>>>
->>>>> @@ -43,3 +44,14 @@
->>>>>    &scif0 {
->>>>>           status = "okay";
->>>>>    };
->>>>> +
->>>>> +&avb {
->>>>> +       renesas,no-ether-link;
->>>>> +       phy-handle = <&phy0>;
->>>>> +       status = "okay";
->>>>> +
->>>>> +       phy0: ethernet-phy at 0 {
->>>>> +               rxc-skew-ps = <1500>;
->>>>> +               reg = <0>;
->>>>
->>>>
->>>> Any specific reason why you don't want to wire up the interrupt?
->>>>
->>>>                   interrupt-parent = <&gpio2>;
->>>
->>>
->>>     I thought it's quite obvious -- we don't have GPIOs yet, and GPIOs seem
->>> to require PFC.
->>
->> Of course. And these can be added later.
->>
->> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+On Thu, Sep 28, 2017 at 02:58:32PM +0200, Thomas Petazzoni wrote:
+> From: Victor Gu <xigu@marvell.com>
 > 
-> Thanks, applied.
+> The PCI configuration space read/write functions were special casing
+> the situation where PCI_SLOT(devfn) != 0, and returned
+> PCIBIOS_DEVICE_NOT_FOUND in this case.
+> 
+> However, will this is what is intended for the root bus, it is not
+> intended for the child busses, as it prevents discovering devices with
+> PCI_SLOT(x) != 0. Therefore, we return PCIBIOS_DEVICE_NOT_FOUND only
+> if we're on the root bus.
+> 
+> Fixes: 8c39d710363c1 ("PCI: aardvark: Add Aardvark PCI host controller driver")
+> Cc: <stable@vger.kernel.org>
+> Signed-off-by: Victor Gu <xigu@marvell.com>
+> Reviewed-by: Wilson Ding <dingwei@marvell.com>
+> Reviewed-by: Nadav Haklai <nadavh@marvell.com>
+> [Thomas: tweak commit log.]
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  drivers/pci/host/pci-aardvark.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
+> index 89f4e3d072d7..da2881ba7737 100644
+> --- a/drivers/pci/host/pci-aardvark.c
+> +++ b/drivers/pci/host/pci-aardvark.c
+> @@ -440,7 +440,7 @@ static int advk_pcie_rd_conf(struct pci_bus *bus, u32 devfn,
+>  	u32 reg;
+>  	int ret;
+>  
+> -	if (PCI_SLOT(devfn) != 0) {
+> +	if ((bus->number == pcie->root_bus_nr) && (PCI_SLOT(devfn) != 0)) {
 
-    Still not seeing any devel branch updates/tags -- have you pushed it?
+I'm fine with this, but please take a look at these:
 
-MBR, Sergei
+  8e7ca8ca5fd8 PCI: xilinx: Relax device number checking to allow SR-IOV
+  e18934b5e9c7 PCI: designware: Relax device number checking to allow SR-IOV
+  d99e30b7936a PCI: altera: Relax device number checking to allow SR-IOV
+
+and make sure that reasoning doesn't apply here, too.
+
+http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=8e7ca8ca5fd8
+http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=e18934b5e9c7
+http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=d99e30b7936a
+
+>  		*val = 0xffffffff;
+>  		return PCIBIOS_DEVICE_NOT_FOUND;
+>  	}
+> @@ -494,7 +494,7 @@ static int advk_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
+>  	int offset;
+>  	int ret;
+>  
+> -	if (PCI_SLOT(devfn) != 0)
+> +	if ((bus->number == pcie->root_bus_nr) && (PCI_SLOT(devfn) != 0))
+>  		return PCIBIOS_DEVICE_NOT_FOUND;
+>  
+>  	if (where % size)
+> -- 
+> 2.13.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
