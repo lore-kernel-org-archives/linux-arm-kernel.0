@@ -1,60 +1,66 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  5 Oct 2017 13:54:51 +0100
-Subject: [PATCH 0/6] Switch arm64 over to qrwlock
-Message-ID: <1507208097-825-1-git-send-email-will.deacon@arm.com>
+Date: Thu,  5 Oct 2017 13:54:53 +0100
+Subject: [PATCH 2/6] locking/atomic: Add atomic_cond_read_acquire
+In-Reply-To: <1507208097-825-1-git-send-email-will.deacon@arm.com>
+References: <1507208097-825-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1507208097-825-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+smp_cond_load_acquire provides a way to spin on a variable with acquire
+semantics until some conditional expression involing the variable is
+satisfied. Architectures such as arm64 can potentially enter a low-power
+state, waking up only when the value of the variable changes, which
+reduces the system impact of tight polling loops.
 
-This patch series reworks bits of the qrwlock code that it can be used
-to replace the asm rwlocks currently implemented for arm64. The structure
-of the series is:
+This patch makes the same interface available to users of atomic_t,
+atomic64_t and atomic_long_t, rather than require messy accesses to the
+structure internals.
 
-  Patches 1-3	: Work WFE into qrwlock using atomic_cond_read_acquire so
-		  we can avoid busy-waiting.
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: Waiman Long <longman@redhat.com>
+Cc: Boqun Feng <boqun.feng@gmail.com>
+Cc: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ include/asm-generic/atomic-long.h | 3 +++
+ include/linux/atomic.h            | 4 ++++
+ 2 files changed, 7 insertions(+)
 
-  Patch 4	: Enable qrwlocks for arm64
-
-  Patch 5-6	: Ensure writer slowpath fairness. This has a potential
-		  performance impact on the writer unlock path, so I've
-		  kept them at the end.
-
-The patches apply on top of my other locking cleanups:
-
-  http://lkml.kernel.org/r/1507055129-12300-1-git-send-email-will.deacon at arm.com
-
-although the conflict with mainline is trivial to resolve without those.
-The full stack is also pushed here:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git qrwlock
-
-All comments (particularly related to testing and performance) welcome!
-
-Cheers,
-
-Will
-
---->8
-
-Will Deacon (6):
-  kernel/locking: Use struct qrwlock instead of struct __qrwlock
-  locking/atomic: Add atomic_cond_read_acquire
-  kernel/locking: Use atomic_cond_read_acquire when spinning in qrwlock
-  arm64: locking: Move rwlock implementation over to qrwlocks
-  kernel/locking: Prevent slowpath writers getting held up by fastpath
-  kernel/locking: Remove unused union members from struct qrwlock
-
- arch/arm64/Kconfig                      |  17 ++++
- arch/arm64/include/asm/Kbuild           |   1 +
- arch/arm64/include/asm/spinlock.h       | 164 +-------------------------------
- arch/arm64/include/asm/spinlock_types.h |   6 +-
- include/asm-generic/atomic-long.h       |   3 +
- include/asm-generic/qrwlock.h           |  14 +--
- include/asm-generic/qrwlock_types.h     |   2 +-
- include/linux/atomic.h                  |   4 +
- kernel/locking/qrwlock.c                |  83 +++-------------
- 9 files changed, 43 insertions(+), 251 deletions(-)
-
+diff --git a/include/asm-generic/atomic-long.h b/include/asm-generic/atomic-long.h
+index 288cc9e96395..f2d97b782031 100644
+--- a/include/asm-generic/atomic-long.h
++++ b/include/asm-generic/atomic-long.h
+@@ -243,4 +243,7 @@ static inline long atomic_long_add_unless(atomic_long_t *l, long a, long u)
+ #define atomic_long_inc_not_zero(l) \
+ 	ATOMIC_LONG_PFX(_inc_not_zero)((ATOMIC_LONG_PFX(_t) *)(l))
+ 
++#define atomic_long_cond_read_acquire(v, c) \
++	ATOMIC_LONG_PFX(_cond_read_acquire)((ATOMIC_LONG_PFX(_t) *)(v), (c))
++
+ #endif  /*  _ASM_GENERIC_ATOMIC_LONG_H  */
+diff --git a/include/linux/atomic.h b/include/linux/atomic.h
+index 40d6bfec0e0d..0aeb2b3f4578 100644
+--- a/include/linux/atomic.h
++++ b/include/linux/atomic.h
+@@ -653,6 +653,8 @@ static inline int atomic_dec_if_positive(atomic_t *v)
+ }
+ #endif
+ 
++#define atomic_cond_read_acquire(v, c)	smp_cond_load_acquire(&(v)->counter, (c))
++
+ #ifdef CONFIG_GENERIC_ATOMIC64
+ #include <asm-generic/atomic64.h>
+ #endif
+@@ -1072,6 +1074,8 @@ static inline long long atomic64_fetch_andnot_release(long long i, atomic64_t *v
+ }
+ #endif
+ 
++#define atomic64_cond_read_acquire(v, c)	smp_cond_load_acquire(&(v)->counter, (c))
++
+ #include <asm-generic/atomic-long.h>
+ 
+ #endif /* _LINUX_ATOMIC_H */
 -- 
 2.1.4
