@@ -1,142 +1,178 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 5 Oct 2017 13:30:45 +0100
-Subject: [PATCH] drivers/irqchip: gicv3: add workaround for Synquacer
- pre-ITS
-In-Reply-To: <78b7d2cb-9c72-f8b2-fb3d-0b9331c7c968@arm.com>
-References: <20171005114344.21029-1-ard.biesheuvel@linaro.org>
- <78b7d2cb-9c72-f8b2-fb3d-0b9331c7c968@arm.com>
-Message-ID: <CAKv+Gu9KrpLhbUzHtsdMCXWr4ZeRmdCp-=NKyugMqCH6iVh0Fw@mail.gmail.com>
+From: john.garry@huawei.com (John Garry)
+Date: Thu, 5 Oct 2017 13:37:06 +0100
+Subject: [PATCH v8 3/5] iommu/of: Add msi address regions reservation
+ helper
+In-Reply-To: <5c80f292-dc5d-a1c6-d7a0-df2a84cc77d1@arm.com>
+References: <20170927133241.21036-1-shameerali.kolothum.thodi@huawei.com>
+ <20170927133241.21036-4-shameerali.kolothum.thodi@huawei.com>
+ <f3146f49-6004-7a15-866b-653e3ea54856@arm.com>
+ <20171004135007.GA12327@red-moon>
+ <5c80f292-dc5d-a1c6-d7a0-df2a84cc77d1@arm.com>
+Message-ID: <d525f112-fb20-d14b-bea0-6547c8b933dd@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 October 2017 at 13:19, Robin Murphy <robin.murphy@arm.com> wrote:
-> On 05/10/17 12:43, Ard Biesheuvel wrote:
->> The Socionext Synquacer SoC's implementation of GICv3 has a so-called
->> 'pre-ITS', which maps 32-bit writes targeted at a separate window of
->> size '4 << device_id_bits' onto writes to GITS_TRANSLATER with device
->> ID taken from bits [device_id_bits + 1:2] of the window offset.
->> Writes that target GITS_TRANSLATER directly are reported as originating
->> from device ID #0.
->>
->> So add a workaround for this. Given that this breaks isolation, clear
->> the IRQ_DOMAIN_FLAG_MSI_REMAP flag as well.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt |  4 ++
->>  arch/arm64/Kconfig                                                    |  8 ++++
->>  drivers/irqchip/irq-gic-v3-its.c                                      | 50 ++++++++++++++++++--
->>  3 files changed, 58 insertions(+), 4 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt b/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
->> index 4c29cdab0ea5..112ebb286728 100644
->> --- a/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
->> +++ b/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
->> @@ -75,6 +75,10 @@ These nodes must have the following properties:
->>  - reg: Specifies the base physical address and size of the ITS
->>    registers.
->>
->> +Optional:
->> +- socionext,synquacer-pre-its: (u64, u64) tuple describing the PCI address
->> +  and size of the pre-ITS window.
->> +
->>  The main GIC node must contain the appropriate #address-cells,
->>  #size-cells and ranges properties for the reg property of all ITS
->>  nodes.
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index dfd908630631..081722240936 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -538,6 +538,14 @@ config QCOM_QDF2400_ERRATUM_0065
->>
->>         If unsure, say Y.
->>
->> +config SOCIONEXT_SYNQUACER_PREITS
->> +     bool "Socionext Synquacer: Workaround for GICv3 pre-ITS"
->> +     default y
->> +     help
->> +       Socionext Synquacer SoCs implement a separate h/w block to generate
->> +       MSI doorbell writes with non-zero values for the device ID.
->> +
->> +       If unsure, say Y.
->>  endmenu
->>
->>
->> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
->> index 284738add89b..fb86b15fa10d 100644
->> --- a/drivers/irqchip/irq-gic-v3-its.c
->> +++ b/drivers/irqchip/irq-gic-v3-its.c
->> @@ -45,6 +45,7 @@
->>  #define ITS_FLAGS_CMDQ_NEEDS_FLUSHING                (1ULL << 0)
->>  #define ITS_FLAGS_WORKAROUND_CAVIUM_22375    (1ULL << 1)
->>  #define ITS_FLAGS_WORKAROUND_CAVIUM_23144    (1ULL << 2)
->> +#define ITS_FLAGS_WORKAROUND_SOCIONEXT_PREITS        (1ULL << 3)
->>
->>  #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING  (1 << 0)
->>
->> @@ -85,6 +86,10 @@ struct its_node {
->>       struct its_collection   *collections;
->>       struct list_head        its_device_list;
->>       u64                     flags;
->> +#ifdef CONFIG_SOCIONEXT_SYNQUACER_PREITS
->> +     u64                     pre_its_base;
->> +     u64                     pre_its_size;
->> +#endif
->>       u32                     ite_size;
->>       u32                     device_ids;
->>       int                     numa_node;
->> @@ -654,6 +659,23 @@ static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
->>       return IRQ_SET_MASK_OK_DONE;
->>  }
->>
->> +static u64 its_irq_get_msi_base(struct its_node *its)
->> +{
->> +#ifdef CONFIG_SOCIONEXT_SYNQUACER_PREITS
->> +     if (its->flags & ITS_FLAGS_WORKAROUND_SOCIONEXT_PREITS)
->> +
->> +             /*
->> +              * The Socionext Synquacer SoC has a so-called 'pre-ITS',
->> +              * which maps 32-bit writes targeted at a separate window of
->> +              * size '4 << device_id_bits' onto writes to GITS_TRANSLATER
->> +              * with device ID taken from bits [device_id_bits + 1:2] of
->> +              * the window offset.
->> +              */
->> +             return its->pre_its_base + (its_dev->device_id << 2);
->> +#endif
->> +     return its->phys_base + GITS_TRANSLATER;
->> +}
->> +
->>  static void its_irq_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
->>  {
->>       struct its_device *its_dev = irq_data_get_irq_chip_data(d);
->> @@ -661,12 +683,15 @@ static void its_irq_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
->>       u64 addr;
->>
->>       its = its_dev->its;
->> -     addr = its->phys_base + GITS_TRANSLATER;
->> +     addr = its_irq_get_msi_base(its);
->>
->>       msg->address_lo         = lower_32_bits(addr);
->>       msg->address_hi         = upper_32_bits(addr);
->>       msg->data               = its_get_event_id(d);
->>
->> +     if (its->flags & ITS_FLAGS_WORKAROUND_SOCIONEXT_PREITS)
->> +             return;
+On 05/10/2017 12:07, Robin Murphy wrote:
+> On 04/10/17 14:50, Lorenzo Pieralisi wrote:
+>> On Wed, Oct 04, 2017 at 12:22:04PM +0100, Marc Zyngier wrote:
+>>> On 27/09/17 14:32, Shameer Kolothum wrote:
+>>>> From: John Garry <john.garry@huawei.com>
+>>>>
+>>>> On some platforms msi-controller address regions have to be excluded
+>>>> from normal IOVA allocation in that they are detected and decoded in
+>>>> a HW specific way by system components and so they cannot be considered
+>>>> normal IOVA address space.
+>>>>
+>>>> Add a helper function that retrieves msi address regions through device
+>>>> tree msi mapping, so that these regions will not be translated by IOMMU
+>>>> and will be excluded from IOVA allocations.
+>>>>
+>>>> Signed-off-by: John Garry <john.garry@huawei.com>
+>>>> [Shameer: Modified msi-parent retrieval logic]
+>>>> Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
+>>>> ---
+>>>>  drivers/iommu/of_iommu.c | 95 ++++++++++++++++++++++++++++++++++++++++++++++++
+>>>>  include/linux/of_iommu.h | 10 +++++
+>>>>  2 files changed, 105 insertions(+)
+>>>>
+>>>> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+>>>> index e60e3db..ffd7fb7 100644
+>>>> --- a/drivers/iommu/of_iommu.c
+>>>> +++ b/drivers/iommu/of_iommu.c
+>>>> @@ -21,6 +21,7 @@
+>>>>  #include <linux/iommu.h>
+>>>>  #include <linux/limits.h>
+>>>>  #include <linux/of.h>
+>>>> +#include <linux/of_address.h>
+>>>>  #include <linux/of_iommu.h>
+>>>>  #include <linux/of_pci.h>
+>>>>  #include <linux/slab.h>
+>>>> @@ -138,6 +139,14 @@ static int of_iommu_xlate(struct device *dev,
+>>>>  	return ops->of_xlate(dev, iommu_spec);
+>>>>  }
+>>>>
+>>>> +static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
+>>>> +{
+>>>> +	u32 *rid = data;
+>>>> +
+>>>> +	*rid = alias;
+>>>> +	return 0;
+>>>> +}
+>>>> +
+>>>>  struct of_pci_iommu_alias_info {
+>>>>  	struct device *dev;
+>>>>  	struct device_node *np;
+>>>> @@ -163,6 +172,73 @@ static int of_pci_iommu_init(struct pci_dev *pdev, u16 alias, void *data)
+>>>>  	return info->np == pdev->bus->dev.of_node;
+>>>>  }
+>>>>
+>>>> +static int of_iommu_alloc_resv_region(struct device_node *np,
+>>>> +				      struct list_head *head)
+>>>> +{
+>>>> +	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
+>>>> +	struct iommu_resv_region *region;
+>>>> +	struct resource res;
+>>>> +	int err;
+>>>> +
+>>>> +	err = of_address_to_resource(np, 0, &res);
+>>>
+>>> What is the rational for registering the first region only? Surely you
+>>> can have more than one region in an MSI controller (yes, your particular
+>>> case is the ITS which has only one, but we're trying to do something
+>>> generic here).
+>>>
+>>> Another issue I have with this code is that it inserts all of the ITS
+>>> MMIO in the RESV_MSI range. As long as we don't generate any page tables
+>>> for this, we're fine. But if we ever change this, we'll end-up with the
+>>> ITS programming interface being exposed to a device, which wouldn't be
+>>> acceptable.
+>>>
+>>> Why can't we have some generic property instead, that would describe the
+>>> actual ranges that cannot be translated? That way, no random insertion
+>>> of a random range, and relatively future proof.
 >
-> Oh, goody. If the pre-ITS is in front of SMMU translation as well then
-> we're really going to need that generic IOMMU reserved region binding.
-> Does this thing plan to support ACPI booting as well?
+> Indeed. Furthermore, IORT has the advantage of being limited to a few
+> distinct device types and SBSA-compliant system topologies, so the
+> ITS-chasing is reasonable there (modulo only reserving GITS_TRANSLATER).
+> The scope of DT covers more embedded things as well like PCI host
+> controllers with internal MSI doorbells, and potentially even
+> direct-mapped memory regions for things like bootloader framebuffers to
+> prevent display glitches - a generic address/size/flags description of a
+> region could work for just about everything.
+>
+>> IORT code has the same issue (ie it reserves all ITS regions) and I do
+>> not know where a property can be added to describe those ranges (IORT
+>> specs ? I'd rather not) in ACPI other than the IORT tables entries
+>> themselves.
+>>
+>>> I'm not sure where to declare it (PCIe node? IOMMU node?), but it'd feel
+>>> like a much nicer and simpler solution to this problem.
+>>
+>> It could be but if we throw ACPI into the picture we have to knock
+>> together Hisilicon specific namespace bindings to handle this and
+>> quickly.
+>
+> As above I'm happy with the ITS-specific solution for ACPI given the
+> limits of IORT. What I had in mind for DT was something tied in with the
+> generic IOMMU bindings. Something like this is probably easiest to
+> handle, but does rather spread the information around:
+>
+>
+>   pci {
+>   	...
+>   	iommu-map = <0 0 &iommu1 0x10000>;
+>   	iommu-reserved-ranges = <0x12340000 0x1000 IOMMU_MSI>,
+>   				<0x34560000 0x1000 IOMMU_MSI>;
+>   };
+>
+>   display {
+>   	...
+>   	iommus = <&iommu1 0x20000>;
+>   	/* simplefb region */
+>   	iommu-reserved-ranges = <0x80080000 0x80000 IOMMU_DIRECT>,
+>   };
+>
+>
+> Alternatively, something inspired by reserved-memory might perhaps be
+> conceptually neater, at the risk of being more complicated:
+>
+>
+>   iommu1: iommu at acbd0000 {
+>   	...
+>   	#iommu-cells = <1>;
+>
+>   	iommu-reserved-ranges {
+>   		#address-cells = <1>;
+>   		#size-cells = <1>;
+>
+> 		its0_resv: msi at 12340000 {
+>   			compatible = "iommu-msi-region";
+>   			reg = <0x12340000 0x1000>;
+>   		};
+>
+> 		its1_resv: msi at 34560000 {
+>   			compatible = "iommu-msi-region";
+>   			reg = <0x34560000 0x1000>;
+>   		};
+>
+> 		fb_resv: direct at 12340000 {
+>   			compatible = "iommu-direct-region";
+>   			reg = <0x80080000 0x80000>;
+>   		};
+>   	};
+>   };
+>
 >
 
-Yes. And bring world peace.
+If we did this, wouldn't it be easier to create dangerous reserved 
+regions, like our ITS region which Marc was concerned by? It's not so 
+hard to get dts changes into the kernel.
 
-There are various SMMUs on this board, but they are currently owned by
-the firmware, and it is unclear whether we can expose any of them the
-OS at any point.
+John
 
-Ideally, I would like to specify the host address, and let the SMMU
-take care of the translation (if needed). Also, it would be nice if
-the pre-ITS was accessible to legacy endpoints that only support
-32-bit MSIs, and so it would be much better if the pre-ITS were simple
-mapped 1:1, and then we can just translate it like any other MSI if we
-do end up exposing the SMMU to the OS.
+> DT folks - any opinions?
+>
+> Robin.
+>
+> .
+>
