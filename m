@@ -1,139 +1,72 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 05 Oct 2017 12:52:43 +0200
-Subject: [RESEND][PATCH 5/7] nvmem: imx-ocotp: Add i.MX7D timing write
- clock setup support
-In-Reply-To: <1507155921-824-6-git-send-email-pure.logic@nexus-software.ie>
-References: <1507155921-824-1-git-send-email-pure.logic@nexus-software.ie>
- <1507155921-824-6-git-send-email-pure.logic@nexus-software.ie>
-Message-ID: <1507200763.8473.12.camel@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 5 Oct 2017 13:56:16 +0200
+Subject: [PATCH v3 02/22] dt-bindings: arm: add support for ARM System
+ Control and Management Interface(SCMI) protocol
+In-Reply-To: <86fc9060-e0da-3dde-899d-1c4055f15386@arm.com>
+References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
+ <1506604306-20739-3-git-send-email-sudeep.holla@arm.com>
+ <CAK8P3a2-7NJTukWaf3=oB9dC+b3uuOGiN+Kc95FS_YBGGHz3ug@mail.gmail.com>
+ <c561b2b9-7146-6262-0e9f-fd6511455518@arm.com>
+ <CAK8P3a2Vu1SWjYykyXtzjFVmGjm_pAfA1QuTG_X5CHzmtk+WJw@mail.gmail.com>
+ <69fc9095-6961-b861-d2e0-afb58de11d59@arm.com>
+ <CAK8P3a3C-xyE-mkj8ERDZHtWbpcOx3Z-gPgHrQHxNVi_3AmAZA@mail.gmail.com>
+ <86fc9060-e0da-3dde-899d-1c4055f15386@arm.com>
+Message-ID: <CAK8P3a2+tXNpYxot-OFRNeVhrDA=VN4Ui8KhuRynHgcL+Ch9ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-10-04 at 23:25 +0100, Bryan O'Donoghue wrote:
-> This patch adds logic to correctly setup the write timing parameters
-> when blowing an OTP fuse for the i.MX7S/D.
-> 
-> Fixes: 0642bac7da42 ("nvmem: imx-ocotp: add write support")
-> 
-> Signed-off-by: Bryan O'Donoghue <pure.logic@nexus-software.ie>
-> ---
-> ?drivers/nvmem/imx-ocotp.c | 61
-> ++++++++++++++++++++++++++++++++++++++++++-----
-> ?1 file changed, 55 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/nvmem/imx-ocotp.c b/drivers/nvmem/imx-ocotp.c
-> index 0cd7e03..40a1669 100644
-> --- a/drivers/nvmem/imx-ocotp.c
-> +++ b/drivers/nvmem/imx-ocotp.c
-> @@ -51,6 +51,7 @@
-> ?#define IMX_OCOTP_BM_CTRL_REL_SHADOWS	0x00000400
-> ?
-> ?#define DEF_RELAX			20 /* > 16.5ns */
-> +#define DEF_FSOURCE			1001
-> ?#define IMX_OCOTP_WR_UNLOCK		0x3E770000
-> ?#define IMX_OCOTP_READ_LOCKED_VAL	0xBADABADA
-> ?
-> @@ -60,6 +61,7 @@ struct octp_params {
-> ?	unsigned int nregs;
-> ?	bool banked;
-> ?	unsigned int regs_per_bank;
-> +	bool mx7_timing;
-> ?};
-> ?
-> ?struct ocotp_priv {
-> @@ -194,6 +196,25 @@ static void imx_ocotp_set_imx6_timing(struct
-> ocotp_priv *priv)
-> ?	writel(timing, priv->base + IMX_OCOTP_ADDR_TIMING);
-> ?}
-> ?
-> +static void imx_ocotp_set_imx7_timing(struct ocotp_priv *priv)
-> +{
-> +	unsigned long clk_rate = 0;
-> +	unsigned long fsource, strobe_prog;
-> +	u32 timing = 0;
-> +
-> +	/* i.MX 7Solo Applications Processor Reference Manual, Rev.
-> 0.1
-> +	?* 6.4.3.3
-> +	?*/
-> +	clk_rate = clk_get_rate(priv->clk);
-> +	fsource = DIV_ROUND_UP(((clk_rate / 1000) * DEF_FSOURCE),
-> 1000000) + 1;
-> +	strobe_prog = ((clk_rate * 10) / 1000000) + 1;
-> +
-> +	timing = strobe_prog & 0x00000FFF;
-> +	timing |= (fsource???????<< 12) & 0x000FF000;
-> +
-> +	writel(timing, priv->base + IMX_OCOTP_ADDR_TIMING);
-> +}
-> +
-> ?static int imx_ocotp_write(void *context, unsigned int offset, void
-> *val,
-> ?			???size_t bytes)
-> ?{
-> @@ -220,7 +241,10 @@ static int imx_ocotp_write(void *context,
-> unsigned int offset, void *val,
-> ?	}
-> ?
-> ?	/* Setup the write timing values */
-> -	imx_ocotp_set_imx6_timing(priv);
-> +	if (priv->params->mx7_timing)
-> +		imx_ocotp_set_imx7_timing(priv);
-> +	else
-> +		imx_ocotp_set_imx6_timing(priv);
+On Wed, Oct 4, 2017 at 4:47 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> On 04/10/17 15:17, Arnd Bergmann wrote:
+>> On Wed, Oct 4, 2017 at 3:53 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>> On 04/10/17 13:35, Arnd Bergmann wrote:
+>>>> On Wed, Oct 4, 2017 at 1:07 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
 
-Do we expect this to grow more different cases in the future?
+>> There are probably several ways of doing this better, we should see
+>> what the best is we can come up with.
+>>
+>> I think generally speaking we need a way for a mailbox user to
+>> know what it should use as the mailbox data here, so it is
+>> able to talk to different incompatible mailbox providers.
+>>
+>> One idea I had is to use a nested mailbox driver, that turns
+>> a doorbell or single-register styled mailbox into a variable-length
+>> mailbox by adding a memory region, like
+>>
+>>     mailbox at 1233000 {
+>>         compatible = "vendor-hardware-specifc-id";
+>>         interrupts = <34>;
+>>         reg = <0x1233000 0x100>;
+>>         #mbox-cells = <1>;
+>>     };
+>>
+>>     mailbox {
+>>            compatible = "shmem-mailbox";
+>>            mboxes = <&/mailbox@1233000  25>;
+>>            #mbox-cells = <1>;
+>>            shmem = <&cpu_scp_lpri &cpu_scp_hpri>;
+>>     };
+>>
+>> This would create one mailbox that only takes a register argument,
+>> and another one that can take longer messages based on the first.
+>> In your driver, you then refer to the second one and pass the
+>> variable-length data into that directly.
+>
+> 1. IIUC it was intentional not to include shmem as part of mailbox
+>    controller binding and was pushed to client drivers as it's generally
+>    not part of mailbox IP block. I am not sure if there are any other
+>    specific reasons for that, but I may be missing some facts.
 
-Maybe it would be better to just store a .set_timing function pointer in
-the params.
+Ok, I see.
 
-> ?
-> ?	/* 47.3.1.3.2
-> ?	?* Check that HW_OCOTP_CTRL[BUSY] and HW_OCOTP_CTRL[ERROR]
-> are clear.
-> @@ -373,11 +397,36 @@ static struct nvmem_config
-> imx_ocotp_nvmem_config = {
-> ?};
-> ?
-> ?static const struct octp_params params[] = {
-> -	{ .nregs = 128, .banked = false, .regs_per_bank = 0},
-> -	{ .nregs = 64,??.banked = false, .regs_per_bank = 0},
-> -	{ .nregs = 128, .banked = false, .regs_per_bank = 0},
-> -	{ .nregs = 128, .banked = false, .regs_per_bank = 0},
-> -	{ .nregs = 64,??.banked = true, .regs_per_bank = 4},
-> +	{
-> +		.nregs = 128,
-> +		.banked = false,
-> +		.regs_per_bank = 0,
-> +		.mx7_timing = false
-> +	},
-> +	{
-> +		.nregs = 64,
-> +		.banked = false,
-> +		.regs_per_bank = 0,
-> +		.mx7_timing = false
-> +	},
-> +	{
-> +		.nregs = 128,
-> +		.banked = false,
-> +		.regs_per_bank = 0,
-> +		.mx7_timing = false
-> +	},
-> +	{
-> +		.nregs = 128,
-> +		.banked = false,
-> +		.regs_per_bank = 0,
-> +		.mx7_timing = false
-> +	},
-> +	{
-> +		.nregs = 64,
-> +		.banked = true,
-> +		.regs_per_bank = 4,
-> +		.mx7_timing = true
-> +	},
-> ?};
-> ?
-> ?static const struct of_device_id imx_ocotp_dt_ids[] = {
+> 2. I am not sure if we need nested driver/bindings (at-least to begin
+>    with). On a platform I don't think both/all modes will be used.
+>    I had  proposal for adding doorbell for ARM MHU based on extended
+>    bindings, but it was rejected[1]. But I really preferred that over
+>    the shim layer I had to add in v3.
 
-regards
-Philipp
+Maybe we can come up with a more generic way to do doorbells
+on top of mailboxes instead? This sounds like a problem that
+would come back with other drivers, so the MHU-specific shim
+will not be a permanent solution either.
+
+       Arnd
