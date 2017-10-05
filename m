@@ -1,108 +1,178 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  5 Oct 2017 13:54:56 +0100
-Subject: [PATCH 5/6] kernel/locking: Prevent slowpath writers getting held up
- by fastpath
-In-Reply-To: <1507208097-825-1-git-send-email-will.deacon@arm.com>
-References: <1507208097-825-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1507208097-825-6-git-send-email-will.deacon@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 5 Oct 2017 13:55:10 +0100
+Subject: [PATCH v8 3/5] iommu/of: Add msi address regions reservation
+ helper
+In-Reply-To: <20171005115719.GC11088@arm.com>
+References: <20170927133241.21036-1-shameerali.kolothum.thodi@huawei.com>
+ <20170927133241.21036-4-shameerali.kolothum.thodi@huawei.com>
+ <f3146f49-6004-7a15-866b-653e3ea54856@arm.com>
+ <20171004135007.GA12327@red-moon>
+ <5c80f292-dc5d-a1c6-d7a0-df2a84cc77d1@arm.com>
+ <20171005115719.GC11088@arm.com>
+Message-ID: <e05ff7b7-c2bc-8bf9-88f4-23b8fb6feb2c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a prospective writer takes the qrwlock locking slowpath due to the
-lock being held, it attempts to cmpxchg the wmode field from 0 to
-_QW_WAITING so that concurrent lockers also take the slowpath and queue
-on the spinlock accordingly, allowing the lockers to drain.
+On 05/10/17 12:57, Will Deacon wrote:
+> On Thu, Oct 05, 2017 at 12:07:26PM +0100, Robin Murphy wrote:
+>> On 04/10/17 14:50, Lorenzo Pieralisi wrote:
+>>> On Wed, Oct 04, 2017 at 12:22:04PM +0100, Marc Zyngier wrote:
+>>>> On 27/09/17 14:32, Shameer Kolothum wrote:
+>>>>> From: John Garry <john.garry@huawei.com>
+>>>>>
+>>>>> On some platforms msi-controller address regions have to be excluded
+>>>>> from normal IOVA allocation in that they are detected and decoded in
+>>>>> a HW specific way by system components and so they cannot be considered
+>>>>> normal IOVA address space.
+>>>>>
+>>>>> Add a helper function that retrieves msi address regions through device
+>>>>> tree msi mapping, so that these regions will not be translated by IOMMU
+>>>>> and will be excluded from IOVA allocations.
+>>>>>
+>>>>> Signed-off-by: John Garry <john.garry@huawei.com>
+>>>>> [Shameer: Modified msi-parent retrieval logic]
+>>>>> Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
+>>>>> ---
+>>>>>  drivers/iommu/of_iommu.c | 95 ++++++++++++++++++++++++++++++++++++++++++++++++
+>>>>>  include/linux/of_iommu.h | 10 +++++
+>>>>>  2 files changed, 105 insertions(+)
+>>>>>
+>>>>> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+>>>>> index e60e3db..ffd7fb7 100644
+>>>>> --- a/drivers/iommu/of_iommu.c
+>>>>> +++ b/drivers/iommu/of_iommu.c
+>>>>> @@ -21,6 +21,7 @@
+>>>>>  #include <linux/iommu.h>
+>>>>>  #include <linux/limits.h>
+>>>>>  #include <linux/of.h>
+>>>>> +#include <linux/of_address.h>
+>>>>>  #include <linux/of_iommu.h>
+>>>>>  #include <linux/of_pci.h>
+>>>>>  #include <linux/slab.h>
+>>>>> @@ -138,6 +139,14 @@ static int of_iommu_xlate(struct device *dev,
+>>>>>  	return ops->of_xlate(dev, iommu_spec);
+>>>>>  }
+>>>>>  
+>>>>> +static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
+>>>>> +{
+>>>>> +	u32 *rid = data;
+>>>>> +
+>>>>> +	*rid = alias;
+>>>>> +	return 0;
+>>>>> +}
+>>>>> +
+>>>>>  struct of_pci_iommu_alias_info {
+>>>>>  	struct device *dev;
+>>>>>  	struct device_node *np;
+>>>>> @@ -163,6 +172,73 @@ static int of_pci_iommu_init(struct pci_dev *pdev, u16 alias, void *data)
+>>>>>  	return info->np == pdev->bus->dev.of_node;
+>>>>>  }
+>>>>>  
+>>>>> +static int of_iommu_alloc_resv_region(struct device_node *np,
+>>>>> +				      struct list_head *head)
+>>>>> +{
+>>>>> +	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
+>>>>> +	struct iommu_resv_region *region;
+>>>>> +	struct resource res;
+>>>>> +	int err;
+>>>>> +
+>>>>> +	err = of_address_to_resource(np, 0, &res);
+>>>>
+>>>> What is the rational for registering the first region only? Surely you
+>>>> can have more than one region in an MSI controller (yes, your particular
+>>>> case is the ITS which has only one, but we're trying to do something
+>>>> generic here).
+>>>>
+>>>> Another issue I have with this code is that it inserts all of the ITS
+>>>> MMIO in the RESV_MSI range. As long as we don't generate any page tables
+>>>> for this, we're fine. But if we ever change this, we'll end-up with the
+>>>> ITS programming interface being exposed to a device, which wouldn't be
+>>>> acceptable.
+>>>>
+>>>> Why can't we have some generic property instead, that would describe the
+>>>> actual ranges that cannot be translated? That way, no random insertion
+>>>> of a random range, and relatively future proof.
+>>
+>> Indeed. Furthermore, IORT has the advantage of being limited to a few
+>> distinct device types and SBSA-compliant system topologies, so the
+>> ITS-chasing is reasonable there (modulo only reserving GITS_TRANSLATER).
+>> The scope of DT covers more embedded things as well like PCI host
+>> controllers with internal MSI doorbells, and potentially even
+>> direct-mapped memory regions for things like bootloader framebuffers to
+>> prevent display glitches - a generic address/size/flags description of a
+>> region could work for just about everything.
+>>
+>>> IORT code has the same issue (ie it reserves all ITS regions) and I do
+>>> not know where a property can be added to describe those ranges (IORT
+>>> specs ? I'd rather not) in ACPI other than the IORT tables entries
+>>> themselves.
+>>>
+>>>> I'm not sure where to declare it (PCIe node? IOMMU node?), but it'd feel
+>>>> like a much nicer and simpler solution to this problem.
+>>>
+>>> It could be but if we throw ACPI into the picture we have to knock
+>>> together Hisilicon specific namespace bindings to handle this and
+>>> quickly.
+>>
+>> As above I'm happy with the ITS-specific solution for ACPI given the
+>> limits of IORT. What I had in mind for DT was something tied in with the
+>> generic IOMMU bindings. Something like this is probably easiest to
+>> handle, but does rather spread the information around:
+>>
+>>
+>>   pci {
+>>   	...
+>>   	iommu-map = <0 0 &iommu1 0x10000>;
+>>   	iommu-reserved-ranges = <0x12340000 0x1000 IOMMU_MSI>,
+>>   				<0x34560000 0x1000 IOMMU_MSI>;
+>>   };
+>>
+>>   display {
+>>   	...
+>>   	iommus = <&iommu1 0x20000>;
+>>   	/* simplefb region */
+>>   	iommu-reserved-ranges = <0x80080000 0x80000 IOMMU_DIRECT>,
+>>   };
+>>
+>>
+>> Alternatively, something inspired by reserved-memory might perhaps be
+>> conceptually neater, at the risk of being more complicated:
+>>
+>>
+>>   iommu1: iommu at acbd0000 {
+>>   	...
+>>   	#iommu-cells = <1>;
+>>
+>>   	iommu-reserved-ranges {
+>>   		#address-cells = <1>;
+>>   		#size-cells = <1>;
+>>
+>> 		its0_resv: msi at 12340000 {
+>>   			compatible = "iommu-msi-region";
+>>   			reg = <0x12340000 0x1000>;
+>>   		};
+>>
+>> 		its1_resv: msi at 34560000 {
+>>   			compatible = "iommu-msi-region";
+>>   			reg = <0x34560000 0x1000>;
+>>   		};
+>>
+>> 		fb_resv: direct at 12340000 {
+>>   			compatible = "iommu-direct-region";
+>>   			reg = <0x80080000 0x80000>;
+>>   		};
+>>   	};
+>>   };
+> 
+> I like the locality of this, but is it definitely flexible enough? Do we
+> need to deal with systems where the reserved regions are specific to the
+> master (i.e. TBU) as opposed to the entire SMMU block?
 
-Unfortunately, this isn't fair, because a fastpath writer that comes in
-after the lock is made available but before the _QW_WAITING flag is set
-can effectively jump the queue. If there is a steady stream of prospective
-writers, then the waiter will be held off indefinitely.
+That would certainly be true for most direct-mapping cases, where the
+reservation is tied to the specific stream ID(s) of one master, let
+alone a TBU. I guess we'd have to make a phandle reference from the
+device node(s) to the region node mandatory, such that software need
+only make the actual reservation/mapping upon encountering a device that
+actually needs it.
 
-This patch restores fairness by separating _QW_WAITING and _QW_LOCKED
-into two bits in the wmode byte and having the waiter set _QW_WAITING
-unconditionally. This then forces the slow-path for concurrent lockers,
-but requires that a writer unlock operation performs an
-atomic_sub_release instead of a store_release so that the waiting status
-is preserved.
-
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: Waiman Long <longman@redhat.com>
-Cc: Boqun Feng <boqun.feng@gmail.com>
-Cc: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- include/asm-generic/qrwlock.h |  4 ++--
- kernel/locking/qrwlock.c      | 20 +++++---------------
- 2 files changed, 7 insertions(+), 17 deletions(-)
-
-diff --git a/include/asm-generic/qrwlock.h b/include/asm-generic/qrwlock.h
-index 02c0a768e6b0..8b7edef500e5 100644
---- a/include/asm-generic/qrwlock.h
-+++ b/include/asm-generic/qrwlock.h
-@@ -41,7 +41,7 @@
-  *       +----+----+----+----+
-  */
- #define	_QW_WAITING	1		/* A writer is waiting	   */
--#define	_QW_LOCKED	0xff		/* A writer holds the lock */
-+#define	_QW_LOCKED	2		/* A writer holds the lock */
- #define	_QW_WMASK	0xff		/* Writer mask		   */
- #define	_QR_SHIFT	8		/* Reader count shift	   */
- #define _QR_BIAS	(1U << _QR_SHIFT)
-@@ -134,7 +134,7 @@ static inline void queued_read_unlock(struct qrwlock *lock)
-  */
- static inline void queued_write_unlock(struct qrwlock *lock)
- {
--	smp_store_release(&lock->wmode, 0);
-+	(void)atomic_sub_return_release(_QW_LOCKED, &lock->cnts);
- }
- 
- /*
-diff --git a/kernel/locking/qrwlock.c b/kernel/locking/qrwlock.c
-index b7ea4647c74d..e940f2c2b4f2 100644
---- a/kernel/locking/qrwlock.c
-+++ b/kernel/locking/qrwlock.c
-@@ -40,8 +40,7 @@ void queued_read_lock_slowpath(struct qrwlock *lock, u32 cnts)
- 		 * so spin with ACQUIRE semantics until the lock is available
- 		 * without waiting in the queue.
- 		 */
--		atomic_cond_read_acquire(&lock->cnts, (VAL & _QW_WMASK)
--					 != _QW_LOCKED);
-+		atomic_cond_read_acquire(&lock->cnts, !(VAL & _QW_LOCKED));
- 		return;
- 	}
- 	atomic_sub(_QR_BIAS, &lock->cnts);
-@@ -57,7 +56,7 @@ void queued_read_lock_slowpath(struct qrwlock *lock, u32 cnts)
- 	 * that accesses can't leak upwards out of our subsequent critical
- 	 * section in the case that the lock is currently held for write.
- 	 */
--	atomic_cond_read_acquire(&lock->cnts, (VAL & _QW_WMASK) != _QW_LOCKED);
-+	atomic_cond_read_acquire(&lock->cnts, !(VAL & _QW_LOCKED));
- 
- 	/*
- 	 * Signal the next one in queue to become queue head
-@@ -80,19 +79,10 @@ void queued_write_lock_slowpath(struct qrwlock *lock)
- 	    (atomic_cmpxchg_acquire(&lock->cnts, 0, _QW_LOCKED) == 0))
- 		goto unlock;
- 
--	/*
--	 * Set the waiting flag to notify readers that a writer is pending,
--	 * or wait for a previous writer to go away.
--	 */
--	for (;;) {
--		if (!READ_ONCE(lock->wmode) &&
--		   (cmpxchg_relaxed(&lock->wmode, 0, _QW_WAITING) == 0))
--			break;
--
--		cpu_relax();
--	}
-+	/* Set the waiting flag to notify readers that a writer is pending */
-+	atomic_add(_QW_WAITING, &lock->cnts);
- 
--	/* When no more readers, set the locked flag */
-+	/* When no more readers or writers, set the locked flag */
- 	do {
- 		atomic_cond_read_acquire(&lock->cnts, VAL == _QW_WAITING);
- 	} while (atomic_cmpxchg_relaxed(&lock->cnts, _QW_WAITING,
--- 
-2.1.4
+Robin.
