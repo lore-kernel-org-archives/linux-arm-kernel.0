@@ -1,60 +1,37 @@
-From: jacopo@jmondi.org (jacopo mondi)
-Date: Thu, 5 Oct 2017 09:48:59 +0200
-Subject: [PATCH] arm: dts: gr-peach: Reduce extal_clk resolution
-In-Reply-To: <CAMuHMdXOJ6V_p26ozzwzUh5a9mvH-Aeiz2MavEf22v3iB6GiKQ@mail.gmail.com>
-References: <1507131657-6414-1-git-send-email-jacopo+renesas@jmondi.org>
- <CAMuHMdXOJ6V_p26ozzwzUh5a9mvH-Aeiz2MavEf22v3iB6GiKQ@mail.gmail.com>
-Message-ID: <20171005074859.GN4037@w540>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 5 Oct 2017 16:00:43 +0800
+Subject: [PATCHv2 2/2] phy: exynos5-usbdrd: Calibrate LOS levels for
+ exynos5420/5800
+In-Reply-To: <1507035578-24945-3-git-send-email-andrzej.p@samsung.com>
+Message-ID: <201710051544.yeZytIjV%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert
+Hi Vivek,
 
-On Wed, Oct 04, 2017 at 05:54:46PM +0200, Geert Uytterhoeven wrote:
-> Hi Jacopo,
->
-> On Wed, Oct 4, 2017 at 5:40 PM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
-> > The system clock described by extal_clk is reported to have a frequency
-> > of 13.333 Mhz and is correctly described by gr-peach device tree.
-> >
-> > However, when enabling a RIIC device the following error is reported by
-> > drivers/i2c/busses/i2c-riic.c
-> >
-> > "invalid parent clk (33332500). Must be 33325000Hz"
-> >
-> > As RIIC devices have a clock source obtained by dividing by 12 the
-> > system clock, the resulting value is not accepted by the driver
-> > (which clearly states not to support any frequency except the reported
-> > 33325000Hz one).
-> >
-> > Hence, reduce the system clock accuracy to a value which makes
-> > frequencies obtained through division accepted by RIIC driver.
-> >
-> > Please note that other r7s72100 boards, such as Genmai, report the same
-> > "reduced accuracy" frequency, even if their external clock sources are
-> > effectively 13.333Mhz as gr-peach one.
-> >
-> > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
->
-> There's no need to do this, Chris already proposed a fix, cfr.
-> "[PATCH v2] i2c: riic: remove fixed clock restriction"
-> (https://www.spinics.net/lists/linux-renesas-soc/msg18573.html).
+[auto build test ERROR on phy/next]
+[also build test ERROR on v4.14-rc3 next-20170929]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Oh that's even better!
-Do you see any value in augmenting the frequency resolution in Genmai
-DTS then?
+url:    https://github.com/0day-ci/linux/commits/Andrzej-Pietrasiewicz/drivers-phy-add-calibrate-method/20171005-144320
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/kishon/linux-phy.git next
+config: x86_64-randconfig-b0-10051313 (attached as .config)
+compiler: gcc-4.4 (Debian 4.4.7-8) 4.4.7
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-Thanks
-  j
+All errors (new ones prefixed by >>):
 
->
-> Gr{oetje,eeting}s,
->
->                         Geert
->
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
->
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
+>> ERROR: "phy_calibrate" [drivers/usb/dwc3/dwc3.ko] undefined!
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 27608 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171005/5d554f92/attachment-0001.gz>
