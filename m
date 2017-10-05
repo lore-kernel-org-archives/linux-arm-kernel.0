@@ -1,255 +1,135 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  5 Oct 2017 13:54:55 +0100
-Subject: [PATCH 4/6] arm64: locking: Move rwlock implementation over to
- qrwlocks
+Date: Thu,  5 Oct 2017 13:54:52 +0100
+Subject: [PATCH 1/6] kernel/locking: Use struct qrwlock instead of struct
+ __qrwlock
 In-Reply-To: <1507208097-825-1-git-send-email-will.deacon@arm.com>
 References: <1507208097-825-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1507208097-825-5-git-send-email-will.deacon@arm.com>
+Message-ID: <1507208097-825-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the qrwlock can make use of WFE, remove our homebrew rwlock
-code in favour of the generic queued implementation.
+There's no good reason to keep the internal structure of struct qrwlock
+hidden from qrwlock.h, particularly as it's actually needed for unlock
+and ends up being abstracted independently behind the __qrwlock_write_byte
+function.
 
+Stop pretending we can hide this stuff, and move the __qrwlock definition
+into qrwlock, removing the __qrwlock_write_byte nastiness and using the
+same struct definition everywhere instead.
+
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: Waiman Long <longman@redhat.com>
+Cc: Boqun Feng <boqun.feng@gmail.com>
+Cc: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/Kconfig                      |  17 ++++
- arch/arm64/include/asm/Kbuild           |   1 +
- arch/arm64/include/asm/spinlock.h       | 164 +-------------------------------
- arch/arm64/include/asm/spinlock_types.h |   6 +-
- 4 files changed, 20 insertions(+), 168 deletions(-)
+ include/asm-generic/qrwlock.h       | 12 +-----------
+ include/asm-generic/qrwlock_types.h | 15 +++++++++++++--
+ kernel/locking/qrwlock.c            | 26 ++------------------------
+ 3 files changed, 16 insertions(+), 37 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 0df64a6a56d4..6d32c9b0d4bb 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -22,7 +22,24 @@ config ARM64
- 	select ARCH_HAS_STRICT_MODULE_RWX
- 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
- 	select ARCH_HAVE_NMI_SAFE_CMPXCHG if ACPI_APEI_SEA
-+	select ARCH_INLINE_READ_LOCK if !PREEMPT
-+	select ARCH_INLINE_READ_LOCK_BH if !PREEMPT
-+	select ARCH_INLINE_READ_LOCK_IRQ if !PREEMPT
-+	select ARCH_INLINE_READ_LOCK_IRQSAVE if !PREEMPT
-+	select ARCH_INLINE_READ_UNLOCK if !PREEMPT
-+	select ARCH_INLINE_READ_UNLOCK_BH if !PREEMPT
-+	select ARCH_INLINE_READ_UNLOCK_IRQ if !PREEMPT
-+	select ARCH_INLINE_READ_UNLOCK_IRQSAVE if !PREEMPT
-+	select ARCH_INLINE_WRITE_LOCK if !PREEMPT
-+	select ARCH_INLINE_WRITE_LOCK_BH if !PREEMPT
-+	select ARCH_INLINE_WRITE_LOCK_IRQ if !PREEMPT
-+	select ARCH_INLINE_WRITE_LOCK_IRQSAVE if !PREEMPT
-+	select ARCH_INLINE_WRITE_UNLOCK if !PREEMPT
-+	select ARCH_INLINE_WRITE_UNLOCK_BH if !PREEMPT
-+	select ARCH_INLINE_WRITE_UNLOCK_IRQ if !PREEMPT
-+	select ARCH_INLINE_WRITE_UNLOCK_IRQSAVE if !PREEMPT
- 	select ARCH_USE_CMPXCHG_LOCKREF
-+	select ARCH_USE_QUEUED_RWLOCKS
- 	select ARCH_SUPPORTS_MEMORY_FAILURE
- 	select ARCH_SUPPORTS_ATOMIC_RMW
- 	select ARCH_SUPPORTS_NUMA_BALANCING
-diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
-index 2326e39d5892..e63d0a8312de 100644
---- a/arch/arm64/include/asm/Kbuild
-+++ b/arch/arm64/include/asm/Kbuild
-@@ -16,6 +16,7 @@ generic-y += mcs_spinlock.h
- generic-y += mm-arch-hooks.h
- generic-y += msi.h
- generic-y += preempt.h
-+generic-y += qrwlock.h
- generic-y += rwsem.h
- generic-y += segment.h
- generic-y += serial.h
-diff --git a/arch/arm64/include/asm/spinlock.h b/arch/arm64/include/asm/spinlock.h
-index aa51a38e46e4..fdb827c7832f 100644
---- a/arch/arm64/include/asm/spinlock.h
-+++ b/arch/arm64/include/asm/spinlock.h
-@@ -137,169 +137,7 @@ static inline int arch_spin_is_contended(arch_spinlock_t *lock)
+diff --git a/include/asm-generic/qrwlock.h b/include/asm-generic/qrwlock.h
+index 50925327b0a8..02c0a768e6b0 100644
+--- a/include/asm-generic/qrwlock.h
++++ b/include/asm-generic/qrwlock.h
+@@ -129,22 +129,12 @@ static inline void queued_read_unlock(struct qrwlock *lock)
  }
- #define arch_spin_is_contended	arch_spin_is_contended
+ 
+ /**
+- * __qrwlock_write_byte - retrieve the write byte address of a queue rwlock
+- * @lock : Pointer to queue rwlock structure
+- * Return: the write byte address of a queue rwlock
+- */
+-static inline u8 *__qrwlock_write_byte(struct qrwlock *lock)
+-{
+-	return (u8 *)lock + 3 * IS_BUILTIN(CONFIG_CPU_BIG_ENDIAN);
+-}
+-
+-/**
+  * queued_write_unlock - release write lock of a queue rwlock
+  * @lock : Pointer to queue rwlock structure
+  */
+ static inline void queued_write_unlock(struct qrwlock *lock)
+ {
+-	smp_store_release(__qrwlock_write_byte(lock), 0);
++	smp_store_release(&lock->wmode, 0);
+ }
+ 
+ /*
+diff --git a/include/asm-generic/qrwlock_types.h b/include/asm-generic/qrwlock_types.h
+index 0abc6b6062fb..507f2dc51bba 100644
+--- a/include/asm-generic/qrwlock_types.h
++++ b/include/asm-generic/qrwlock_types.h
+@@ -9,12 +9,23 @@
+  */
+ 
+ typedef struct qrwlock {
+-	atomic_t		cnts;
++	union {
++		atomic_t cnts;
++		struct {
++#ifdef __LITTLE_ENDIAN
++			u8 wmode;	/* Writer mode   */
++			u8 rcnts[3];	/* Reader counts */
++#else
++			u8 rcnts[3];	/* Reader counts */
++			u8 wmode;	/* Writer mode   */
++#endif
++		};
++	};
+ 	arch_spinlock_t		wait_lock;
+ } arch_rwlock_t;
+ 
+ #define	__ARCH_RW_LOCK_UNLOCKED {		\
+-	.cnts = ATOMIC_INIT(0),			\
++	{ .cnts = ATOMIC_INIT(0), },		\
+ 	.wait_lock = __ARCH_SPIN_LOCK_UNLOCKED,	\
+ }
+ 
+diff --git a/kernel/locking/qrwlock.c b/kernel/locking/qrwlock.c
+index 2655f26ec882..1af791e37348 100644
+--- a/kernel/locking/qrwlock.c
++++ b/kernel/locking/qrwlock.c
+@@ -23,26 +23,6 @@
+ #include <linux/spinlock.h>
+ #include <asm/qrwlock.h>
  
 -/*
-- * Write lock implementation.
-- *
-- * Write locks set bit 31. Unlocking, is done by writing 0 since the lock is
-- * exclusively held.
-- *
-- * The memory barriers are implicit with the load-acquire and store-release
-- * instructions.
+- * This internal data structure is used for optimizing access to some of
+- * the subfields within the atomic_t cnts.
 - */
+-struct __qrwlock {
+-	union {
+-		atomic_t cnts;
+-		struct {
+-#ifdef __LITTLE_ENDIAN
+-			u8 wmode;	/* Writer mode   */
+-			u8 rcnts[3];	/* Reader counts */
+-#else
+-			u8 rcnts[3];	/* Reader counts */
+-			u8 wmode;	/* Writer mode   */
+-#endif
+-		};
+-	};
+-	arch_spinlock_t	lock;
+-};
 -
--static inline void arch_write_lock(arch_rwlock_t *rw)
--{
--	unsigned int tmp;
+ /**
+  * rspin_until_writer_unlock - inc reader count & spin until writer is gone
+  * @lock  : Pointer to queue rwlock structure
+@@ -125,10 +105,8 @@ void queued_write_lock_slowpath(struct qrwlock *lock)
+ 	 * or wait for a previous writer to go away.
+ 	 */
+ 	for (;;) {
+-		struct __qrwlock *l = (struct __qrwlock *)lock;
 -
--	asm volatile(ARM64_LSE_ATOMIC_INSN(
--	/* LL/SC */
--	"	sevl\n"
--	"1:	wfe\n"
--	"2:	ldaxr	%w0, %1\n"
--	"	cbnz	%w0, 1b\n"
--	"	stxr	%w0, %w2, %1\n"
--	"	cbnz	%w0, 2b\n"
--	__nops(1),
--	/* LSE atomics */
--	"1:	mov	%w0, wzr\n"
--	"2:	casa	%w0, %w2, %1\n"
--	"	cbz	%w0, 3f\n"
--	"	ldxr	%w0, %1\n"
--	"	cbz	%w0, 2b\n"
--	"	wfe\n"
--	"	b	1b\n"
--	"3:")
--	: "=&r" (tmp), "+Q" (rw->lock)
--	: "r" (0x80000000)
--	: "memory");
--}
--
--static inline int arch_write_trylock(arch_rwlock_t *rw)
--{
--	unsigned int tmp;
--
--	asm volatile(ARM64_LSE_ATOMIC_INSN(
--	/* LL/SC */
--	"1:	ldaxr	%w0, %1\n"
--	"	cbnz	%w0, 2f\n"
--	"	stxr	%w0, %w2, %1\n"
--	"	cbnz	%w0, 1b\n"
--	"2:",
--	/* LSE atomics */
--	"	mov	%w0, wzr\n"
--	"	casa	%w0, %w2, %1\n"
--	__nops(2))
--	: "=&r" (tmp), "+Q" (rw->lock)
--	: "r" (0x80000000)
--	: "memory");
--
--	return !tmp;
--}
--
--static inline void arch_write_unlock(arch_rwlock_t *rw)
--{
--	asm volatile(ARM64_LSE_ATOMIC_INSN(
--	"	stlr	wzr, %0",
--	"	swpl	wzr, wzr, %0")
--	: "=Q" (rw->lock) :: "memory");
--}
--
--/* write_can_lock - would write_trylock() succeed? */
--#define arch_write_can_lock(x)		((x)->lock == 0)
--
--/*
-- * Read lock implementation.
-- *
-- * It exclusively loads the lock value, increments it and stores the new value
-- * back if positive and the CPU still exclusively owns the location. If the
-- * value is negative, the lock is already held.
-- *
-- * During unlocking there may be multiple active read locks but no write lock.
-- *
-- * The memory barriers are implicit with the load-acquire and store-release
-- * instructions.
-- *
-- * Note that in UNDEFINED cases, such as unlocking a lock twice, the LL/SC
-- * and LSE implementations may exhibit different behaviour (although this
-- * will have no effect on lockdep).
-- */
--static inline void arch_read_lock(arch_rwlock_t *rw)
--{
--	unsigned int tmp, tmp2;
--
--	asm volatile(
--	"	sevl\n"
--	ARM64_LSE_ATOMIC_INSN(
--	/* LL/SC */
--	"1:	wfe\n"
--	"2:	ldaxr	%w0, %2\n"
--	"	add	%w0, %w0, #1\n"
--	"	tbnz	%w0, #31, 1b\n"
--	"	stxr	%w1, %w0, %2\n"
--	"	cbnz	%w1, 2b\n"
--	__nops(1),
--	/* LSE atomics */
--	"1:	wfe\n"
--	"2:	ldxr	%w0, %2\n"
--	"	adds	%w1, %w0, #1\n"
--	"	tbnz	%w1, #31, 1b\n"
--	"	casa	%w0, %w1, %2\n"
--	"	sbc	%w0, %w1, %w0\n"
--	"	cbnz	%w0, 2b")
--	: "=&r" (tmp), "=&r" (tmp2), "+Q" (rw->lock)
--	:
--	: "cc", "memory");
--}
--
--static inline void arch_read_unlock(arch_rwlock_t *rw)
--{
--	unsigned int tmp, tmp2;
--
--	asm volatile(ARM64_LSE_ATOMIC_INSN(
--	/* LL/SC */
--	"1:	ldxr	%w0, %2\n"
--	"	sub	%w0, %w0, #1\n"
--	"	stlxr	%w1, %w0, %2\n"
--	"	cbnz	%w1, 1b",
--	/* LSE atomics */
--	"	movn	%w0, #0\n"
--	"	staddl	%w0, %2\n"
--	__nops(2))
--	: "=&r" (tmp), "=&r" (tmp2), "+Q" (rw->lock)
--	:
--	: "memory");
--}
--
--static inline int arch_read_trylock(arch_rwlock_t *rw)
--{
--	unsigned int tmp, tmp2;
--
--	asm volatile(ARM64_LSE_ATOMIC_INSN(
--	/* LL/SC */
--	"	mov	%w1, #1\n"
--	"1:	ldaxr	%w0, %2\n"
--	"	add	%w0, %w0, #1\n"
--	"	tbnz	%w0, #31, 2f\n"
--	"	stxr	%w1, %w0, %2\n"
--	"	cbnz	%w1, 1b\n"
--	"2:",
--	/* LSE atomics */
--	"	ldr	%w0, %2\n"
--	"	adds	%w1, %w0, #1\n"
--	"	tbnz	%w1, #31, 1f\n"
--	"	casa	%w0, %w1, %2\n"
--	"	sbc	%w1, %w1, %w0\n"
--	__nops(1)
--	"1:")
--	: "=&r" (tmp), "=&r" (tmp2), "+Q" (rw->lock)
--	:
--	: "cc", "memory");
--
--	return !tmp2;
--}
--
--/* read_can_lock - would read_trylock() succeed? */
--#define arch_read_can_lock(x)		((x)->lock < 0x80000000)
-+#include <asm/qrwlock.h>
+-		if (!READ_ONCE(l->wmode) &&
+-		   (cmpxchg_relaxed(&l->wmode, 0, _QW_WAITING) == 0))
++		if (!READ_ONCE(lock->wmode) &&
++		   (cmpxchg_relaxed(&lock->wmode, 0, _QW_WAITING) == 0))
+ 			break;
  
- /* See include/linux/spinlock.h */
- #define smp_mb__after_spinlock()	smp_mb()
-diff --git a/arch/arm64/include/asm/spinlock_types.h b/arch/arm64/include/asm/spinlock_types.h
-index 55be59a35e3f..6b856012c51b 100644
---- a/arch/arm64/include/asm/spinlock_types.h
-+++ b/arch/arm64/include/asm/spinlock_types.h
-@@ -36,10 +36,6 @@ typedef struct {
- 
- #define __ARCH_SPIN_LOCK_UNLOCKED	{ 0 , 0 }
- 
--typedef struct {
--	volatile unsigned int lock;
--} arch_rwlock_t;
--
--#define __ARCH_RW_LOCK_UNLOCKED		{ 0 }
-+#include <asm-generic/qrwlock_types.h>
- 
- #endif
+ 		cpu_relax();
 -- 
 2.1.4
