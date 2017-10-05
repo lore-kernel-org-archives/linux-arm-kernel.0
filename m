@@ -1,93 +1,43 @@
 From: hkallweit1@gmail.com (Heiner Kallweit)
-Date: Thu, 5 Oct 2017 21:07:16 +0200
-Subject: [PATCH 2/2] firmware: arm_scpi: remove all single element
- structures
-In-Reply-To: <1507201911-27976-2-git-send-email-sudeep.holla@arm.com>
+Date: Thu, 5 Oct 2017 21:06:22 +0200
+Subject: [PATCH 1/2] firmware: arm_scpi: drop unnecessary type cast to
+ scpi_shared_mem
+In-Reply-To: <1507201911-27976-1-git-send-email-sudeep.holla@arm.com>
 References: <1507201911-27976-1-git-send-email-sudeep.holla@arm.com>
- <1507201911-27976-2-git-send-email-sudeep.holla@arm.com>
-Message-ID: <18e4e7d1-69e8-0176-b823-4de102973ef5@gmail.com>
+Message-ID: <54852f4b-78cc-061a-3c82-b753f289fee8@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Am 05.10.2017 um 13:11 schrieb Sudeep Holla:
-> Both clk_get_value and sensor_value structures contains a single element
-> and hence needs no packing making the whole structure defination
-> unnecessary.
-> 
-> This patch gets rid of both those structures
+> This patch drops the only present type cast of the SCPI payload pointer
+> to scpi_shared_mem inorder to align with other occurrences, IOW for
+> consistency.
 > 
 > Cc: Heiner Kallweit <hkallweit1@gmail.com>
 > Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 > ---
->  drivers/firmware/arm_scpi.c | 22 +++++++---------------
->  1 file changed, 7 insertions(+), 15 deletions(-)
+>  drivers/firmware/arm_scpi.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
 > diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
-> index a888970f1347..f0c37a4ecddf 100644
+> index c923d1ebfa3e..a888970f1347 100644
 > --- a/drivers/firmware/arm_scpi.c
 > +++ b/drivers/firmware/arm_scpi.c
-> @@ -304,10 +304,6 @@ struct clk_get_info {
->  	u8 name[20];
->  } __packed;
+> @@ -453,7 +453,7 @@ static void scpi_tx_prepare(struct mbox_client *c, void *msg)
+>  	unsigned long flags;
+>  	struct scpi_xfer *t = msg;
+>  	struct scpi_chan *ch = container_of(c, struct scpi_chan, cl);
+> -	struct scpi_shared_mem *mem = (struct scpi_shared_mem *)ch->tx_payload;
+> +	struct scpi_shared_mem *mem = ch->tx_payload;
 >  
-> -struct clk_get_value {
-> -	__le32 rate;
-> -} __packed;
-> -
->  struct clk_set_value {
->  	__le16 id;
->  	__le16 reserved;
-> @@ -346,10 +342,6 @@ struct _scpi_sensor_info {
->  	char name[20];
->  };
->  
-> -struct sensor_value {
-> -	__le64 val;
-> -};
-> -
->  struct dev_pstate_set {
->  	__le16 dev_id;
->  	u8 pstate;
-> @@ -577,13 +569,13 @@ scpi_clk_get_range(u16 clk_id, unsigned long *min, unsigned long *max)
->  static unsigned long scpi_clk_get_val(u16 clk_id)
->  {
->  	int ret;
-> -	struct clk_get_value clk;
-> +	__le32 rate;
->  	__le16 le_clk_id = cpu_to_le16(clk_id);
->  
->  	ret = scpi_send_message(CMD_GET_CLOCK_VALUE, &le_clk_id,
-> -				sizeof(le_clk_id), &clk, sizeof(clk));
-> +				sizeof(le_clk_id), &rate, sizeof(rate));
->  
-> -	return ret ? ret : le32_to_cpu(clk.rate);
-> +	return ret ? ret : le32_to_cpu(rate);
->  }
->  
->  static int scpi_clk_set_val(u16 clk_id, unsigned long rate)
-> @@ -775,19 +767,19 @@ static int scpi_sensor_get_info(u16 sensor_id, struct scpi_sensor_info *info)
->  static int scpi_sensor_get_value(u16 sensor, u64 *val)
->  {
->  	__le16 id = cpu_to_le16(sensor);
-> -	struct sensor_value buf;
-> +	__le64 value;
->  	int ret;
->  
->  	ret = scpi_send_message(CMD_SENSOR_VALUE, &id, sizeof(id),
-> -				&buf, sizeof(buf));
-> +				&value, sizeof(value));
->  	if (ret)
->  		return ret;
->  
->  	if (scpi_info->is_legacy)
->  		/* only 32-bits supported, upper 32 bits can be junk */
-> -		*val = le32_to_cpup((__le32 *)&buf.val);
-> +		*val = le32_to_cpup((__le32 *)&value);
->  	else
-> -		*val = le64_to_cpu(buf.val);
-> +		*val = le64_to_cpu(value);
->  
->  	return 0;
->  }
+This should work fine, however it might not be 100% clean with regard to __iomem
+annotation. ch->tx_payload is of type "void __iomem *" and I would assume that
+sparse complains about the new statement.
+The old one casts away the __iomem, what isn't much better IMO.
+
+By the way, I think this also applies to other places in this driver
+where ch->rx/tx_payload are used.
+
+>  	if (t->tx_buf) {
+>  		if (scpi_info->is_legacy)
 > 
-Looks good to me.
