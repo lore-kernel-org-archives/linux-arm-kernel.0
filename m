@@ -1,50 +1,35 @@
-From: andrzej.p@samsung.com (Andrzej Pietrasiewicz)
-Date: Thu, 05 Oct 2017 14:11:49 +0200
-Subject: [PATCHv3 0/2] dwc3 on XU3
-In-Reply-To: <6935498c-9788-14e6-844f-f9e8288026dc@samsung.com>
-References: <6935498c-9788-14e6-844f-f9e8288026dc@samsung.com>
- <CGME20171005121201eucas1p2d8e7c3bf18b24ffaa0bf9593dcffe37e@eucas1p2.samsung.com>
-Message-ID: <1507205511-23048-1-git-send-email-andrzej.p@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu,  5 Oct 2017 14:09:39 +0200
+Subject: [PATCH] drm/rockchip: add PINCTRL dependency for LVDS
+Message-ID: <20171005120957.485433-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+The new driver fails to build when CONFIG_PINCTRL is disabled:
 
-This is the third version of patches in this thread.
+drivers/gpu/drm/rockchip/rockchip_lvds.c: In function 'rockchip_lvds_grf_config':
+drivers/gpu/drm/rockchip/rockchip_lvds.c:229:39: error: dereferencing pointer to incomplete type 'struct dev_pin_info'
+   if (lvds->pins && !IS_ERR(lvds->pins->default_state))
 
-The series fixes problems with enumerating of SuperSpeed devices
-on an Odroid XU3. There was a patch series from Vivek Gautam in
-circulation, but it got lost somehow. Please see:
+This adds the respective Kconfig dependency.
 
-https://lkml.org/lkml/2014/9/2/166
-https://lkml.org/lkml/2015/2/2/257
+Fixes: 34cc0aa25456 ("drm/rockchip: Add support for Rockchip Soc LVDS")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/gpu/drm/rockchip/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-I adapted his patch so that it does not use a hacky solution to force
-additional initialization in order for calibration to happen.
-With this patch enumeration happens correctly and a super speed device
-is recognized as such.
-
-Changes since v2:
-
-- exported the "calibrate_phy" symbol
-
-Changes since v1:
-
-- added calibrate() callback to phy
-- used calibrate() instead of reset() to trigger the calibration
-
-
-Andrzej Pietrasiewicz (1):
-  drivers: phy: add calibrate method
-
-Vivek Gautam (1):
-  phy: exynos5-usbdrd: Calibrate LOS levels for exynos5420/5800
-
- drivers/phy/phy-core.c                   |  15 +++
- drivers/phy/samsung/phy-exynos5-usbdrd.c | 183 +++++++++++++++++++++++++++++++
- drivers/usb/dwc3/core.c                  |   7 +-
- include/linux/phy/phy.h                  |  10 ++
- 4 files changed, 213 insertions(+), 2 deletions(-)
-
+diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
+index 0c31f0a27b9c..3c70c6224bd2 100644
+--- a/drivers/gpu/drm/rockchip/Kconfig
++++ b/drivers/gpu/drm/rockchip/Kconfig
+@@ -60,6 +60,7 @@ config ROCKCHIP_INNO_HDMI
+ config ROCKCHIP_LVDS
+ 	bool "Rockchip LVDS support"
+ 	depends on DRM_ROCKCHIP
++	depends on PINCTRL
+ 	help
+ 	  Choose this option to enable support for Rockchip LVDS controllers.
+ 	  Rockchip rk3288 SoC has LVDS TX Controller can be used, and it
 -- 
-1.9.1
+2.9.0
