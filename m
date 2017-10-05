@@ -1,82 +1,24 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 5 Oct 2017 13:56:28 +0100
-Subject: [PATCH v3 02/22] dt-bindings: arm: add support for ARM System
- Control and Management Interface(SCMI) protocol
-In-Reply-To: <CAK8P3a2+tXNpYxot-OFRNeVhrDA=VN4Ui8KhuRynHgcL+Ch9ug@mail.gmail.com>
-References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
- <1506604306-20739-3-git-send-email-sudeep.holla@arm.com>
- <CAK8P3a2-7NJTukWaf3=oB9dC+b3uuOGiN+Kc95FS_YBGGHz3ug@mail.gmail.com>
- <c561b2b9-7146-6262-0e9f-fd6511455518@arm.com>
- <CAK8P3a2Vu1SWjYykyXtzjFVmGjm_pAfA1QuTG_X5CHzmtk+WJw@mail.gmail.com>
- <69fc9095-6961-b861-d2e0-afb58de11d59@arm.com>
- <CAK8P3a3C-xyE-mkj8ERDZHtWbpcOx3Z-gPgHrQHxNVi_3AmAZA@mail.gmail.com>
- <86fc9060-e0da-3dde-899d-1c4055f15386@arm.com>
- <CAK8P3a2+tXNpYxot-OFRNeVhrDA=VN4Ui8KhuRynHgcL+Ch9ug@mail.gmail.com>
-Message-ID: <19eca9f4-5606-5849-12f1-5480d89b95e7@arm.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Thu, 5 Oct 2017 15:59:14 +0300
+Subject: [PATCH] arm64: mm: Clarify a printk in data_abort_decode()
+Message-ID: <20171005125914.34uc5qq5titpq6zi@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The 0x in front of a base 10 number is misleading so I removed it.
 
+Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
 
-On 05/10/17 12:56, Arnd Bergmann wrote:
-> On Wed, Oct 4, 2017 at 4:47 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> On 04/10/17 15:17, Arnd Bergmann wrote:
->>> On Wed, Oct 4, 2017 at 3:53 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>>> On 04/10/17 13:35, Arnd Bergmann wrote:
->>>>> On Wed, Oct 4, 2017 at 1:07 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> 
->>> There are probably several ways of doing this better, we should see
->>> what the best is we can come up with.
->>>
->>> I think generally speaking we need a way for a mailbox user to
->>> know what it should use as the mailbox data here, so it is
->>> able to talk to different incompatible mailbox providers.
->>>
->>> One idea I had is to use a nested mailbox driver, that turns
->>> a doorbell or single-register styled mailbox into a variable-length
->>> mailbox by adding a memory region, like
->>>
->>>     mailbox at 1233000 {
->>>         compatible = "vendor-hardware-specifc-id";
->>>         interrupts = <34>;
->>>         reg = <0x1233000 0x100>;
->>>         #mbox-cells = <1>;
->>>     };
->>>
->>>     mailbox {
->>>            compatible = "shmem-mailbox";
->>>            mboxes = <&/mailbox@1233000  25>;
->>>            #mbox-cells = <1>;
->>>            shmem = <&cpu_scp_lpri &cpu_scp_hpri>;
->>>     };
->>>
->>> This would create one mailbox that only takes a register argument,
->>> and another one that can take longer messages based on the first.
->>> In your driver, you then refer to the second one and pass the
->>> variable-length data into that directly.
->>
->> 1. IIUC it was intentional not to include shmem as part of mailbox
->>    controller binding and was pushed to client drivers as it's generally
->>    not part of mailbox IP block. I am not sure if there are any other
->>    specific reasons for that, but I may be missing some facts.
-> 
-> Ok, I see.
-> 
->> 2. I am not sure if we need nested driver/bindings (at-least to begin
->>    with). On a platform I don't think both/all modes will be used.
->>    I had  proposal for adding doorbell for ARM MHU based on extended
->>    bindings, but it was rejected[1]. But I really preferred that over
->>    the shim layer I had to add in v3.
-> 
-> Maybe we can come up with a more generic way to do doorbells
-> on top of mailboxes instead? This sounds like a problem that
-> would come back with other drivers, so the MHU-specific shim
-> will not be a permanent solution either.
-> 
-
-I completely agree. I have seen few drivers that just implement
-doorbells in their controller. I will check them in details again.
-
--- 
-Regards,
-Sudeep
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 89993c4be1be..a5382e90418c 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -97,7 +97,7 @@ static void data_abort_decode(unsigned int esr)
+ 			 (esr & ESR_ELx_SF) >> ESR_ELx_SF_SHIFT,
+ 			 (esr & ESR_ELx_AR) >> ESR_ELx_AR_SHIFT);
+ 	} else {
+-		pr_alert("  ISV = 0, ISS = 0x%08lu\n", esr & ESR_ELx_ISS_MASK);
++		pr_alert("  ISV = 0, ISS = %08lu\n", esr & ESR_ELx_ISS_MASK);
+ 	}
+ 
+ 	pr_alert("  CM = %lu, WnR = %lu\n",
