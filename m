@@ -1,59 +1,22 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 5 Oct 2017 23:43:53 +0800
-Subject: [PATCH 07/20] ARM: dts: sun4i: Remove skeleton and memory to
- avoid warnings
-In-Reply-To: <b1acecf3049f3bc96266f2db22149bf0b18e7a30.1507198895.git-series.maxime.ripard@free-electrons.com>
+Date: Thu, 5 Oct 2017 23:44:11 +0800
+Subject: [PATCH 09/20] ARM: dts: sun4i: Remove SoC node unit-name to avoid
+ warnings
+In-Reply-To: <c9f2be09d1e5d69e728e246567b289a278a1cb54.1507198895.git-series.maxime.ripard@free-electrons.com>
 References: <cover.f5f905a5434f2a540d6844d23369a04af9f5314c.1507198895.git-series.maxime.ripard@free-electrons.com>
- <b1acecf3049f3bc96266f2db22149bf0b18e7a30.1507198895.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v66LnQB1jqU5BWNEYjws3YLVBndLf8-ofLE+6JgZ1GtnXA@mail.gmail.com>
+ <c9f2be09d1e5d69e728e246567b289a278a1cb54.1507198895.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v65wbizeO3s3o2W=Cx9_4mqkPJcT=7GmbFUdY9_yfJP_QA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, Oct 5, 2017 at 6:49 PM, Maxime Ripard
 <maxime.ripard@free-electrons.com> wrote:
-> Using skeleton.dtsi will create a memory node that will generate a warning
-> in DTC. However, that node will be created by the bootloader, so we can
-> just remove it entirely in order to remove that warning.
+> Our main node for all the in-SoC controllers used to have a unit name. The
+> unit-name, in addition to being actually false, would not match any reg
+> property, which generates a warning.
+>
+> Remove it in order to remove those warnings.
 >
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  arch/arm/boot/dts/sun4i-a10.dtsi | 8 ++------
->  1 file changed, 2 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-> index 1876abb62ec7..f64544f615ea 100644
-> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
-> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-> @@ -41,14 +41,14 @@
->   *     OTHER DEALINGS IN THE SOFTWARE.
->   */
->
-> -#include "skeleton.dtsi"
-> -
->  #include <dt-bindings/thermal/thermal.h>
->  #include <dt-bindings/dma/sun4i-a10.h>
->  #include <dt-bindings/clock/sun4i-a10-ccu.h>
->  #include <dt-bindings/reset/sun4i-a10-ccu.h>
->
->  / {
-> +       #address-cells = <1>;
-> +       #size-cells = <1>;
->         interrupt-parent = <&intc>;
->
->         aliases {
-> @@ -160,10 +160,6 @@
->                 };
->         };
->
-> -       memory {
-> -               reg = <0x40000000 0x80000000>;
-> -       };
-> -
-
-My only concern (I'm not sure if it's valid or not) is U-boot not being
-able to add nodes or properties due to lack of space within the DT
-blob. It seemed like a possibility in older versions.
-
-Otherwise,
 
 Acked-by: Chen-Yu Tsai <wens@csie.org>
