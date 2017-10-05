@@ -1,65 +1,49 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  5 Oct 2017 12:49:54 +0200
-Subject: [PATCH 19/20] ARM: dts: sun9i: Change node names to remove underscores
+Date: Thu,  5 Oct 2017 12:49:53 +0200
+Subject: [PATCH 18/20] ARM: dts: sun9i: cubieboard4: Remove card detect pull-up
 In-Reply-To: <cover.f5f905a5434f2a540d6844d23369a04af9f5314c.1507198895.git-series.maxime.ripard@free-electrons.com>
 References: <cover.f5f905a5434f2a540d6844d23369a04af9f5314c.1507198895.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <708449b45b1ef546a4c27d99bc68d6cc151e8ad3.1507198895.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <efb84cd6e7d9685042a1dbeb80a5e89ff123cd7e.1507198895.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some node names in the A80 DTSI still have underscores in them. Remove them
-in favour of hyphens to remove DTC warnings.
+The board has an external pull-up on the card-detect signal, so there's no
+need to add another one.
+
+This also removes a DTC warning.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun9i-a80.dtsi | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/sun9i-a80-cubieboard4.dts | 10 +---------
+ 1 file changed, 1 insertion(+), 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
-index f9cb701f29b0..70d79ef711b3 100644
---- a/arch/arm/boot/dts/sun9i-a80.dtsi
-+++ b/arch/arm/boot/dts/sun9i-a80.dtsi
-@@ -139,7 +139,7 @@
- 		 * would also throw all the PLL clock rates off, or just the
- 		 * downstream clocks in the PRCM.
- 		 */
--		osc24M: osc24M_clk {
-+		osc24M: clk-24M {
- 			#clock-cells = <0>;
- 			compatible = "fixed-clock";
- 			clock-frequency = <24000000>;
-@@ -151,7 +151,7 @@
- 		 * AC100 codec/RTC chip. This serves as a placeholder for
- 		 * board dts files to specify the source.
- 		 */
--		osc32k: osc32k_clk {
-+		osc32k: clk-32k {
- 			#clock-cells = <0>;
- 			compatible = "fixed-factor-clock";
- 			clock-div = <1>;
-@@ -169,7 +169,7 @@
- 			clock-output-names = "cpus";
- 		};
+diff --git a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+index 15cc82350360..cb337e08adab 100644
+--- a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
++++ b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+@@ -85,7 +85,7 @@
  
--		ahbs: ahbs_clk {
-+		ahbs: ahbs-clk {
- 			compatible = "fixed-factor-clock";
- 			#clock-cells = <0>;
- 			clock-div = <1>;
-@@ -708,12 +708,12 @@
- 			#interrupt-cells = <3>;
- 			#gpio-cells = <3>;
+ &mmc0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&mmc0_pins>, <&mmc0_cd_pin_cubieboard4>;
++	pinctrl-0 = <&mmc0_pins>;
+ 	vmmc-supply = <&reg_dcdc1>;
+ 	bus-width = <4>;
+ 	cd-gpios = <&pio 7 18 GPIO_ACTIVE_HIGH>; /* PH18 */
+@@ -128,14 +128,6 @@
+ 	clocks = <&ac100_rtc 0>;
+ };
  
--			r_ir_pins: r_ir {
-+			r_ir_pins: r-ir {
- 				pins = "PL6";
- 				function = "s_cir_rx";
- 			};
- 
--			r_rsb_pins: r_rsb {
-+			r_rsb_pins: r-rsb {
- 				pins = "PN0", "PN1";
- 				function = "s_rsb";
- 				drive-strength = <20>;
+-&pio {
+-	mmc0_cd_pin_cubieboard4: mmc0_cd_pin at 0 {
+-		pins = "PH18";
+-		function = "gpio_in";
+-		bias-pull-up;
+-	};
+-};
+-
+ &r_ir {
+ 	status = "okay";
+ };
 -- 
 git-series 0.9.1
