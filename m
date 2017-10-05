@@ -1,37 +1,55 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 5 Oct 2017 16:05:17 +0100
-Subject: [PATCH] arm64: mm: Clarify a printk in data_abort_decode()
-In-Reply-To: <20171005130436.GB5235@leverpostej>
-References: <20171005125914.34uc5qq5titpq6zi@mwanda>
- <20171005130436.GB5235@leverpostej>
-Message-ID: <20171005150517.kshu2ftduw5rpg4d@armageddon.cambridge.arm.com>
+Date: Thu, 5 Oct 2017 16:11:10 +0100
+Subject: [PATCH] arm64: Use larger stacks when KASAN is selected
+In-Reply-To: <20171004113908.GD23092@leverpostej>
+References: <1507051546-11677-1-git-send-email-mark.rutland@arm.com>
+ <20171004113130.t76oxehchtfcvbo3@armageddon.cambridge.arm.com>
+ <20171004113908.GD23092@leverpostej>
+Message-ID: <20171005151110.dvgnpruwyiml2pse@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 05, 2017 at 02:04:36PM +0100, Mark Rutland wrote:
-> On Thu, Oct 05, 2017 at 03:59:14PM +0300, Dan Carpenter wrote:
-> > The 0x in front of a base 10 number is misleading so I removed it.
+On Wed, Oct 04, 2017 at 12:39:09PM +0100, Mark Rutland wrote:
+> On Wed, Oct 04, 2017 at 12:31:31PM +0100, Catalin Marinas wrote:
+> > On Tue, Oct 03, 2017 at 06:25:46PM +0100, Mark Rutland wrote:
+> > > AddressSanitizer instrumentation can significantly bloat the stack, and
+> > > with GCC 7 this can result in stack overflows at boot time in some
+> > > configurations.
+> > > 
+> > > We can avoid this by doubling our stack size when KASAN is in use, as is
+> > > already done on x86 (and has been since KASAN was introduced).
+> > > Regardless of other patches to decrease KASAN's stack utilization,
+> > > kernels built with KASAN will always require more stack space than those
+> > > built without, and we should take this into account.
+> > > 
+> > > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > > Cc: Will Deacon <will.deacon@arm.com>
+> > > Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+> > > ---
+> > >  arch/arm64/include/asm/memory.h | 9 ++++++---
+> > >  1 file changed, 6 insertions(+), 3 deletions(-)
+> > > 
+> > > In local testing (with KASAN and other options enabled), I've seen a stack
+> > > depth of 23928 bytes while booting to a prompt with an Ubuntu 14.04 filesystem
+> > > mounted over NFS. Without KASAN (but with other debug options enabled), this
+> > > was 7992 bytes.
+> > > 
+> > > I wonder if we want to go for 4x rather than 2x...
 > > 
-> > Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+> > Let's hope it's fine for now with 32K stacks. We may run into allocation
+> > issues with 64K stacks (and without VMAP_STACKS).
 > > 
-> > diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> > index 89993c4be1be..a5382e90418c 100644
-> > --- a/arch/arm64/mm/fault.c
-> > +++ b/arch/arm64/mm/fault.c
-> > @@ -97,7 +97,7 @@ static void data_abort_decode(unsigned int esr)
-> >  			 (esr & ESR_ELx_SF) >> ESR_ELx_SF_SHIFT,
-> >  			 (esr & ESR_ELx_AR) >> ESR_ELx_AR_SHIFT);
-> >  	} else {
-> > -		pr_alert("  ISV = 0, ISS = 0x%08lu\n", esr & ESR_ELx_ISS_MASK);
-> > +		pr_alert("  ISV = 0, ISS = %08lu\n", esr & ESR_ELx_ISS_MASK);
+> > Do you want this patch for 4.14?
 > 
-> A fix has already been queued [0,1], ensuring this is printed as hex.
+> If you're happy to take it, that would be great, but otherwise it can
+> wait for v4.15.
 > 
-> Catalin, I see that hasn't been pushed out to the arm64 fixes/core
-> branch. Is that deliberate?
+> Arguably this fixes the introduction of KASAN to arm64, but I'm not sure
+> how much we care about backporting this to stable.
 
-No. Only that my tests took about a day to complete. I'll push the
-patches out today.
+I queued it for 4.14. If anyone thinks it's really important for older
+kernels, we can send it to stable later (I don't think it is though).
 
 -- 
 Catalin
