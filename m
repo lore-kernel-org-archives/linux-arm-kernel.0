@@ -1,58 +1,36 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 5 Oct 2017 14:25:23 +0200
-Subject: [PATCH] ARM: shmobile: rcar-gen2: fix non-SMP build
-In-Reply-To: <20171005120914.465582-1-arnd@arndb.de>
-References: <20171005120914.465582-1-arnd@arndb.de>
-Message-ID: <CAMuHMdXjD-MpW9sqKtdUasizN8YkWuzChNyduyHz7p-cz38VBg@mail.gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 05 Oct 2017 14:28:24 +0200
+Subject: [PATCHv3 2/2] phy: exynos5-usbdrd: Calibrate LOS levels for
+ exynos5420/5800
+In-Reply-To: <1507205511-23048-3-git-send-email-andrzej.p@samsung.com>
+References: <6935498c-9788-14e6-844f-f9e8288026dc@samsung.com>
+ <1507205511-23048-1-git-send-email-andrzej.p@samsung.com>
+ <CGME20171005121202eucas1p249a72bb6d8dde4a61134ffb49216d4c5@eucas1p2.samsung.com>
+ <1507205511-23048-3-git-send-email-andrzej.p@samsung.com>
+Message-ID: <88cf66cc-0bca-3ad9-183b-d55f7f258028@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 10/05/2017 02:11 PM, Andrzej Pietrasiewicz wrote:
+> +static int crport_handshake(struct exynos5_usbdrd_phy *phy_drd,
+> +						u32 val, u32 cmd)
+> +{
+> +	u32 usec = 100;
+> +	unsigned int result;
+> +
+> +	writel(val | cmd, phy_drd->reg_phy + EXYNOS5_DRD_PHYREG0);
+> +
+> +	do {
+> +		result = readl(phy_drd->reg_phy + EXYNOS5_DRD_PHYREG1);
+> +		if (result & PHYREG1_CR_ACK)
+> +			break;
+> +
+> +		udelay(1);
+> +	} while (usec-- > 0);
 
-On Thu, Oct 5, 2017 at 2:09 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> A bugfix for the SMP case broke the build for the UP case:
->
-> arch/arm/mach-shmobile/headsmp-apmu.o: In function `shmobile_boot_apmu':
-> (.text+0x34): undefined reference to `secondary_startup'
->
-> The assembler file mixes code that is used for SMP with code
-> that we also need on a single-CPU build, so I'm leaving it
-> always enabled in the Makefile, but enclose the SMP code
-> in an #ifdef.
+It looks like you could use readl_poll_timeout_atomic() macro 
+instead of these polling loops.
 
-Oops, sorry for that. Looks like 0-day doesn't do UP builds?
-
-> 3fd45a136ff6 ("ARM: shmobile: rcar-gen2: Make sure CNTVOFF is initialized on CA7/15")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be> ;-)
-
-> ---
->  arch/arm/mach-shmobile/headsmp-apmu.S | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm/mach-shmobile/headsmp-apmu.S b/arch/arm/mach-shmobile/headsmp-apmu.S
-> index db4743d2bf91..5672b5849401 100644
-> --- a/arch/arm/mach-shmobile/headsmp-apmu.S
-> +++ b/arch/arm/mach-shmobile/headsmp-apmu.S
-
-As this hasn't been pulled into arm-soc yet (pull request sent though),
-perhaps Simon should squash this fix into the original commit?
-Should we rename headsmp-apmu.S to head-apmu.S?
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Regards,
+Sylwester
