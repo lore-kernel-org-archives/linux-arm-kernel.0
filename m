@@ -1,30 +1,33 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu,  5 Oct 2017 11:32:59 +0900
-Subject: [PATCH] clk: uniphier: fix DAPLL2 clock rate of Pro5
-Message-ID: <1507170779-26688-1-git-send-email-yamada.masahiro@socionext.com>
+From: megous@megous.com (megous at megous.com)
+Date: Thu,  5 Oct 2017 04:33:14 +0200
+Subject: [PATCH] clk: sunxi-ng: a83t: Fix invalid csi-mclk mux offset
+Message-ID: <20171005023314.21663-1-megous@megous.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The parent of DAPLL2 should be DAPLL1.  Fix the clock connection.
+From: Ondrej Jirman <megous@megous.com>
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Datasheet specified that parent MUX settings are at bits [10:8],
+but current implementation specifies incorrect offset at [10:12].
+Fix this.
+
+Signed-off-by: Ondrej Jirman <megous@megous.com>
 ---
-
- drivers/clk/uniphier/clk-uniphier-sys.c | 2 +-
+ drivers/clk/sunxi-ng/ccu-sun8i-a83t.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/uniphier/clk-uniphier-sys.c b/drivers/clk/uniphier/clk-uniphier-sys.c
-index 0e396f3..bffe095 100644
---- a/drivers/clk/uniphier/clk-uniphier-sys.c
-+++ b/drivers/clk/uniphier/clk-uniphier-sys.c
-@@ -123,7 +123,7 @@ const struct uniphier_clk_data uniphier_sld8_sys_clk_data[] = {
- const struct uniphier_clk_data uniphier_pro5_sys_clk_data[] = {
- 	UNIPHIER_CLK_FACTOR("spll", -1, "ref", 120, 1),		/* 2400 MHz */
- 	UNIPHIER_CLK_FACTOR("dapll1", -1, "ref", 128, 1),	/* 2560 MHz */
--	UNIPHIER_CLK_FACTOR("dapll2", -1, "ref", 144, 125),	/* 2949.12 MHz */
-+	UNIPHIER_CLK_FACTOR("dapll2", -1, "dapll1", 144, 125),	/* 2949.12 MHz */
- 	UNIPHIER_CLK_FACTOR("uart", 0, "dapll2", 1, 40),
- 	UNIPHIER_CLK_FACTOR("i2c", 1, "spll", 1, 48),
- 	UNIPHIER_PRO5_SYS_CLK_NAND(2),
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c b/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
+index b0fbdaea76de..d7938ab57429 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
+@@ -534,7 +534,7 @@ static SUNXI_CCU_M_WITH_MUX_TABLE_GATE(csi_mclk_clk, "csi-mclk",
+ 				       csi_mclk_parents, csi_mclk_table,
+ 				       0x134,
+ 				       0, 5,	/* M */
+-				       10, 3,	/* mux */
++				       8, 3,	/* mux */
+ 				       BIT(15),	/* gate */
+ 				       0);
+ 
 -- 
-2.7.4
+2.14.2
