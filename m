@@ -1,10 +1,10 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 5 Oct 2017 13:24:07 +0200
-Subject: [PATCH 2/8] pinctrl: meson: remove offset continued - gxbb
-In-Reply-To: <20170920133927.17390-3-jbrunet@baylibre.com>
+Date: Thu, 5 Oct 2017 13:25:20 +0200
+Subject: [PATCH 3/8] pinctrl: meson: remove offset continued - gxl
+In-Reply-To: <20170920133927.17390-4-jbrunet@baylibre.com>
 References: <20170920133927.17390-1-jbrunet@baylibre.com>
- <20170920133927.17390-3-jbrunet@baylibre.com>
-Message-ID: <CACRpkdb1=-j7omaH3pNn3Rb=_V9A13s08kMrgsi6REXwzCuAJg@mail.gmail.com>
+ <20170920133927.17390-4-jbrunet@baylibre.com>
+Message-ID: <CACRpkdaXWc4cK+71fJuqe7NSR7SQcxzWswHce8briEGaKypLgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
