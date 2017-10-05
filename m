@@ -1,53 +1,50 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 5 Oct 2017 17:48:32 +0100
-Subject: [PATCH 3/9] arm: cache-l2x0: share l2x0_base
-In-Reply-To: <eb104cfdf44ef9bf7b4f271555e1496d2bf781bf.1500510157.git.mirq-linux@rere.qmqm.pl>
-References: <cover.1500510157.git.mirq-linux@rere.qmqm.pl>
- <eb104cfdf44ef9bf7b4f271555e1496d2bf781bf.1500510157.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <20171005164831.GG5235@leverpostej>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 5 Oct 2017 12:55:47 -0500
+Subject: [PATCH v2 7/7] PCI: aardvark: define IRQ related hooks in
+ pci_host_bridge
+In-Reply-To: <20170928125838.11887-8-thomas.petazzoni@free-electrons.com>
+References: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
+ <20170928125838.11887-8-thomas.petazzoni@free-electrons.com>
+Message-ID: <20171005175547.GT25517@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 20, 2017 at 02:29:23AM +0200, Micha? Miros?aw wrote:
-> Share l2x0_base between cache-l2x0 and pmu drivers.  They are duplicates.
+[+cc Lorenzo]
 
-This is not quite true, and this change introduces bugs.
+On Thu, Sep 28, 2017 at 02:58:38PM +0200, Thomas Petazzoni wrote:
+> Commit 769b461fc0c0 ("arm64: PCI: Drop DT IRQ allocation from
+> pcibios_alloc_irq()") was assuming all PCI host controller drivers had
+> been converted to use ->map_irq(), but that wasn't the case:
+> pci-aardvark had not been converted. Due to this, it broke the support
+> for legacy PCI interrupts when using the pci-aardvark driver (used on
+> Marvell Armada 3720 platforms).
 
-The l2x0 pmu driver only sets its copy of the base for an l2x0 variant
-it recognises:
+Lorenzo is pretty thorough, but maybe pci-aardvark.c got overlooked.
+Cc'ing him just to make sure there's nothing deeper than that.
 
-> -void __init l2x0_pmu_register(void __iomem *base, u32 part)
-> +void __init l2x0_pmu_register(u32 part)
->  {
->  	/*
->  	 * Determine whether we support the PMU, and choose the name for sysfs.
-> @@ -503,8 +502,7 @@ void __init l2x0_pmu_register(void __iomem *base, u32 part)
->  	 * supported by this driver.
->  	 *
->  	 * We must defer registering the PMU until the perf subsystem is up and
-> -	 * running, so just stash the name and base, and leave that to another
-> -	 * initcall.
-> +	 * running, so just stash the name, and leave that to another initcall.
->  	 */
->  	switch (part & L2X0_CACHE_ID_PART_MASK) {
->  	case L2X0_CACHE_ID_PART_L220:
-> @@ -516,8 +514,6 @@ void __init l2x0_pmu_register(void __iomem *base, u32 part)
->  	default:
->  		return;
->  	}
-> -
-> -	l2x0_base = base;
-
-... note that we may return *before* setting l2x0_base.
-
-This (deliberately) prevents us from erroneously registering a PMU for
-l2x0 variants for which we don't know how to drive any IMPLEMENTATION
-DEFINED PMU functionality.
-
-This cahnge breaks that, and will result in l2x0_pmu_init() trying to
-register a PMU with a NULL name.
-
-So NAK to this change.
-
-Thanks,
-Mark.
+> In order to fix this, we make sure the ->map_irq and ->swizzle_irq
+> fields of pci_host_bridge are properly filled in.
+> 
+> Fixes: 769b461fc0c0 ("arm64: PCI: Drop DT IRQ allocation from pcibios_alloc_irq()")
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: <stable@vger.kernel.org> # v4.13+
+> ---
+>  drivers/pci/host/pci-aardvark.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
+> index c1093b023e48..249a088b463c 100644
+> --- a/drivers/pci/host/pci-aardvark.c
+> +++ b/drivers/pci/host/pci-aardvark.c
+> @@ -998,6 +998,8 @@ static int advk_pcie_probe(struct platform_device *pdev)
+>  	bridge->sysdata = pcie;
+>  	bridge->busnr = 0;
+>  	bridge->ops = &advk_pcie_ops;
+> +	bridge->map_irq = of_irq_parse_and_map_pci;
+> +	bridge->swizzle_irq = pci_common_swizzle;
+>  
+>  	ret = pci_scan_root_bus_bridge(bridge);
+>  	if (ret < 0) {
+> -- 
+> 2.13.5
+> 
