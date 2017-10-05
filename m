@@ -1,40 +1,68 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Thu, 5 Oct 2017 16:22:42 +0300
-Subject: [PATCH] arm64: mm: Clarify a printk in data_abort_decode()
-In-Reply-To: <20171005130436.GB5235@leverpostej>
-References: <20171005125914.34uc5qq5titpq6zi@mwanda>
- <20171005130436.GB5235@leverpostej>
-Message-ID: <20171005132242.u3c2gy6edpkkt2sr@mwanda>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 5 Oct 2017 15:23:34 +0200
+Subject: [PATCH] ARM64: dts: meson-gxbb-nexbox-a95x: Enable USB Nodes
+In-Reply-To: <20171005132118.2150-1-peter@korsgaard.com>
+References: <20171005132118.2150-1-peter@korsgaard.com>
+Message-ID: <89e9980a-2ca6-4509-b9d5-36aac433b9bd@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 05, 2017 at 02:04:36PM +0100, Mark Rutland wrote:
-> Hi,
+On 05/10/2017 15:21, Peter Korsgaard wrote:
+> Enable both gxbb USB controllers and add a 5V regulator for the OTG port
+> VBUS, similar to p20x.
 > 
-> On Thu, Oct 05, 2017 at 03:59:14PM +0300, Dan Carpenter wrote:
-> > The 0x in front of a base 10 number is misleading so I removed it.
-> > 
-> > Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
-> > 
-> > diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> > index 89993c4be1be..a5382e90418c 100644
-> > --- a/arch/arm64/mm/fault.c
-> > +++ b/arch/arm64/mm/fault.c
-> > @@ -97,7 +97,7 @@ static void data_abort_decode(unsigned int esr)
-> >  			 (esr & ESR_ELx_SF) >> ESR_ELx_SF_SHIFT,
-> >  			 (esr & ESR_ELx_AR) >> ESR_ELx_AR_SHIFT);
-> >  	} else {
-> > -		pr_alert("  ISV = 0, ISS = 0x%08lu\n", esr & ESR_ELx_ISS_MASK);
-> > +		pr_alert("  ISV = 0, ISS = %08lu\n", esr & ESR_ELx_ISS_MASK);
+> Signed-off-by: Peter Korsgaard <peter@korsgaard.com>
+> ---
+>  .../boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts    | 29 ++++++++++++++++++++++
+>  1 file changed, 29 insertions(+)
 > 
-> A fix has already been queued [0,1], ensuring this is printed as hex.
-> 
-> Catalin, I see that hasn't been pushed out to the arm64 fixes/core
-> branch. Is that deliberate?
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
+> index 38dfdde5c147..60cd9c3b11c8 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
+> @@ -88,6 +88,18 @@
+>  		};
+>  	};
+>  
+> +	usb_pwr: regulator-usb-pwrs {
+> +		compatible = "regulator-fixed";
+> +
+> +		regulator-name = "USB_PWR";
+> +
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +
+> +		gpio = <&gpio GPIODV_24 GPIO_ACTIVE_HIGH>;
+> +		enable-active-high;
+> +	};
+> +
+>  	vddio_card: gpio-regulator {
+>  		compatible = "regulator-gpio";
+>  
+> @@ -294,3 +306,20 @@
+>  	pinctrl-0 = <&uart_ao_a_pins>;
+>  	pinctrl-names = "default";
+>  };
+> +
+> +&usb0_phy {
+> +	status = "okay";
+> +	phy-supply = <&usb_pwr>;
+> +};
+> +
+> +&usb1_phy {
+> +	status = "okay";
+> +};
+> +
+> +&usb0 {
+> +	status = "okay";
+> +};
+> +
+> +&usb1 {
+> +	status = "okay";
+> +};
 > 
 
-Stephen is on vacation so there is no linux-next and I'm on ancient code
-anyway.  :/
+Indeed, I forgot to add USB to this board,
+Thanks
 
-regards,
-dan carpenter
+Acked-by: Neil Armstrong <narmstrong@baylibre.com>
