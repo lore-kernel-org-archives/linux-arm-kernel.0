@@ -1,51 +1,63 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  5 Oct 2017 22:54:05 +0200
-Subject: [PATCH 0/3] pinctrl: sunxi: Start to enforce the strict mode
-Message-ID: <cover.7a61d0bb31530def29efd8b4286d8c0afdaab347.1507236823.git-series.maxime.ripard@free-electrons.com>
+Date: Thu,  5 Oct 2017 22:54:06 +0200
+Subject: [PATCH 1/3] pinctrl: sunxi: Introduce the strict flag
+In-Reply-To: <cover.7a61d0bb31530def29efd8b4286d8c0afdaab347.1507236823.git-series.maxime.ripard@free-electrons.com>
+References: <cover.7a61d0bb31530def29efd8b4286d8c0afdaab347.1507236823.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <d05b00e25ec1c466bb5852b0ce06b3e67d93f9a7.1507236823.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Our pinctrl device should have had strict set all along. However, it wasn't
+the case, and most of our old device trees also have a pinctrl group in
+addition to the GPIOs properties, which mean that we can't really turn it
+on now.
 
-Here is an attempt to enable pinctrl's strict mode on our pinctrl drivers.
-Indeed, our controllers should have had that mode enabled since its
-introduction.
+All our new SoCs don't have that group, so we should still enable that mode
+on the newer one though.
 
-However, there's a number of issues with old device trees that prevent from
-just enabling it for all the devices. There's basically two of them:
+In order to enable it by default, add a flag that will allow to disable
+that mode that should be set by pinctrl drivers that cannot be migrated.
 
-  - Most of our old DTs have a pinctrl node for GPIOs, which will result in
-    an error when the driver is going to request the gpio because it would
-    already be requested automatically by pinctrl. We cannot break those.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c | 5 ++++-
+ drivers/pinctrl/sunxi/pinctrl-sunxi.h | 1 +
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
-  - Some of these GPIOs also need to change their pin configuration to add
-    a bias or change the current output, and there isn't a migration path.
-
-Let's just keep the old behaviour for the old SoCs, and enforce it on the
-new one, and enabled it by default so that the situation at least doesn't
-get worse.
-
-This has been tested on an A83t (strict on) and an H3 (strict off) board.
-
-Let me know what you think,
-Maxime
-
-Maxime Ripard (3):
-  pinctrl: sunxi: Introduce the strict flag
-  pinctrl: sunxi: Disable strict mode for old pinctrl drivers
-  pinctrl: sunxi: Enforce the strict mode by default
-
- drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c | 1 +
- drivers/pinctrl/sunxi/pinctrl-sun5i.c     | 1 +
- drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c | 1 +
- drivers/pinctrl/sunxi/pinctrl-sun8i-a23.c | 1 +
- drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c | 1 +
- drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c  | 3 ++-
- drivers/pinctrl/sunxi/pinctrl-sun9i-a80.c | 1 +
- drivers/pinctrl/sunxi/pinctrl-sunxi.c     | 6 +++++-
- drivers/pinctrl/sunxi/pinctrl-sunxi.h     | 1 +
- 9 files changed, 14 insertions(+), 2 deletions(-)
-
-base-commit: c27ad2958485126c3828e59d53013d3b45ec14f2
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+index 52edf3b5988d..1753a5b1573f 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+@@ -690,7 +690,7 @@ sunxi_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
+ 	return 0;
+ }
+ 
+-static const struct pinmux_ops sunxi_pmx_ops = {
++static struct pinmux_ops sunxi_pmx_ops = {
+ 	.get_functions_count	= sunxi_pmx_get_funcs_cnt,
+ 	.get_function_name	= sunxi_pmx_get_func_name,
+ 	.get_function_groups	= sunxi_pmx_get_func_groups,
+@@ -1307,6 +1307,9 @@ int sunxi_pinctrl_init_with_variant(struct platform_device *pdev,
+ 	pctrl_desc->pctlops = &sunxi_pctrl_ops;
+ 	pctrl_desc->pmxops =  &sunxi_pmx_ops;
+ 
++	if (desc->disable_strict_mode)
++		sunxi_pmx_ops.strict = false;
++
+ 	pctl->pctl_dev = devm_pinctrl_register(&pdev->dev, pctrl_desc, pctl);
+ 	if (IS_ERR(pctl->pctl_dev)) {
+ 		dev_err(&pdev->dev, "couldn't register pinctrl driver\n");
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.h b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+index 1bfc0d8a55df..11b128f54ed2 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.h
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+@@ -112,6 +112,7 @@ struct sunxi_pinctrl_desc {
+ 	unsigned			irq_banks;
+ 	unsigned			irq_bank_base;
+ 	bool				irq_read_needs_mux;
++	bool				disable_strict_mode;
+ };
+ 
+ struct sunxi_pinctrl_function {
 -- 
 git-series 0.9.1
