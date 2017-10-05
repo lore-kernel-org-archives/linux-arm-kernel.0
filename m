@@ -1,28 +1,84 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 5 Oct 2017 17:34:01 -0500
-Subject: [PATCH v4 11/11] arm: allwinner: Correct unit name in devicetree
- binding example
-In-Reply-To: <5b7a8fb3-21bb-417c-9471-1330dd379fd9@rwthex-w2-a.rwth-ad.de>
-References: <20170928014928.2272-1-stefan.bruens@rwth-aachen.de>
- <5b7a8fb3-21bb-417c-9471-1330dd379fd9@rwthex-w2-a.rwth-ad.de>
-Message-ID: <20171005223401.wme5av4hzcc3lzgn@rob-hp-laptop>
+Date: Thu, 5 Oct 2017 17:35:33 -0500
+Subject: [PATCH 3/4] dt-bindings: hwmon: Add max-expected-current
+ property to ina2xx
+In-Reply-To: <b990ff1b-80d6-4686-eb8f-51f045a92858@samsung.com>
+References: <1506603015-27202-1-git-send-email-m.purski@samsung.com>
+ <CGME20170928125104eucas1p20a3ead82624005331e36b8ebeca46815@eucas1p2.samsung.com>
+ <1506603015-27202-4-git-send-email-m.purski@samsung.com>
+ <20171001113145.2e839bc1@archlinux>
+ <b990ff1b-80d6-4686-eb8f-51f045a92858@samsung.com>
+Message-ID: <20171005223533.iuzvfqxv57aktwtk@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 28, 2017 at 03:49:28AM +0200, Stefan Br?ns wrote:
-> Unit-names must not start with a leading 0.
+On Thu, Oct 05, 2017 at 05:15:07PM +0200, Maciej Purski wrote:
+> On 10/01/2017 12:31 PM, Jonathan Cameron wrote:
+> > On Thu, 28 Sep 2017 14:50:14 +0200
+> > Maciej Purski <m.purski@samsung.com> wrote:
+> > 
+> > > Add optional max expected current property which allows calibrating
+> > > the ina sensor in order to achieve requested precision. Document
+> > > the changes in Documentation/hwmon/ina2xx.
+> > > 
+> > 
+> > This is introducing new generic devicetree bindings..
+> > I'm not totally sure we want to do this rather than having a
+> > manufacturer specific binding...  I don't have a good feeling for
+> > how common this will be in other devices.
+> > 
+> > If it's generic, then this isn't necessarily the place to define it.
+> > 
+> > Jonathan
+> > 
 > 
-> Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
+> I agree, this should be manufacturer-specific property. Thanks.
 > 
-> ---
-> 
-> Changes in v4:
-> - Split minor fix in devicetree example from patch 6/10
-> 
-> Changes in v3: None
-> Changes in v2: None
-> 
->  Documentation/devicetree/bindings/dma/sun6i-dma.txt | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > Signed-off-by: Maciej Purski <m.purski@samsung.com>
+> > > ---
+> > >   Documentation/devicetree/bindings/hwmon/ina2xx.txt | 4 +++-
+> > >   Documentation/hwmon/ina2xx                         | 9 +++++----
+> > >   2 files changed, 8 insertions(+), 5 deletions(-)
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/hwmon/ina2xx.txt b/Documentation/devicetree/bindings/hwmon/ina2xx.txt
+> > > index 02af0d9..25ba372 100644
+> > > --- a/Documentation/devicetree/bindings/hwmon/ina2xx.txt
+> > > +++ b/Documentation/devicetree/bindings/hwmon/ina2xx.txt
+> > > @@ -14,11 +14,13 @@ Optional properties:
+> > >   - shunt-resistor
+> > >   	Shunt resistor value in micro-Ohm
+> > > -
+> > > +- max-expected-current
+> > > +	Max expected current value in mA
 
-Acked-by: Rob Herring <robh@kernel.org>
+Also needs a unit suffix as defined in property-units.txt.
+
+> > >   Example:
+> > >   ina220 at 44 {
+> > >   	compatible = "ti,ina220";
+> > >   	reg = <0x44>;
+> > >   	shunt-resistor = <1000>;
+> > > +	max-expected-current = <3000>;
+> > >   };
+> > > diff --git a/Documentation/hwmon/ina2xx b/Documentation/hwmon/ina2xx
+> > > index cfd31d9..e9ca838 100644
+> > > --- a/Documentation/hwmon/ina2xx
+> > > +++ b/Documentation/hwmon/ina2xx
+> > > @@ -51,10 +51,11 @@ INA230 and INA231 are high or low side current shunt and power monitors
+> > >   with an I2C interface. The chips monitor both a shunt voltage drop and
+> > >   bus supply voltage.
+> > > -The shunt value in micro-ohms can be set via platform data or device tree at
+> > > -compile-time or via the shunt_resistor attribute in sysfs at run-time. Please
+> > > -refer to the Documentation/devicetree/bindings/i2c/ina2xx.txt for bindings
+> > > -if the device tree is used.
+> > > +The shunt value in micro-ohms and max expected current in mA can be set
+> > > +via platform data or device tree at compile-time or via the shunt_resistor
+> > > +and max_expected_current attributes in sysfs at run-time. Please refer to the
+> > > +Documentation/devicetree/bindings/i2c/ina2xx.txt for bindings if the
+> > > +device tree is used.
+> > >   Additionally ina226 supports update_interval attribute as described in
+> > >   Documentation/hwmon/sysfs-interface. Internally the interval is the sum of
+> > 
+> > 
+> > 
+> > 
