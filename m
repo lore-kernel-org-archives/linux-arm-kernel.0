@@ -1,34 +1,16 @@
-From: jdelvare@suse.de (Jean Delvare)
-Date: Thu, 5 Oct 2017 11:17:43 +0200
-Subject: [PATCH] soc: Allow test-building of MediaTek drivers
-Message-ID: <20171005111743.6367f128@endymion>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 5 Oct 2017 11:25:53 +0200
+Subject: [PATCH 1/3] ARM: dts: gr-peach: Fix 'leds' node name indent
+In-Reply-To: <1507193900-23801-2-git-send-email-jacopo+renesas@jmondi.org>
+References: <1507193900-23801-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1507193900-23801-2-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <20171005092553.GV26369@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The COMPILE_TEST alternative dependency allows test-building the
-drivers but only as long as the build system itself will look into
-the directory where the drivers reside.
+On Thu, Oct 05, 2017 at 10:58:18AM +0200, Jacopo Mondi wrote:
+> Fix 'leds' node name indent as it was wrongly aligned.
+> 
+> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 
-Signed-off-by: Jean Delvare <jdelvare@suse.de>
-Cc: Sean Wang <sean.wang@mediatek.com>
-Cc: Matthias Brugger <matthias.bgg@gmail.com>
----
- drivers/soc/Makefile |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
---- linux-4.14-rc3.orig/drivers/soc/Makefile	2017-09-17 00:47:51.000000000 +0200
-+++ linux-4.14-rc3/drivers/soc/Makefile	2017-10-05 09:44:01.478589469 +0200
-@@ -10,7 +10,7 @@ obj-$(CONFIG_MACH_DOVE)		+= dove/
- obj-y				+= fsl/
- obj-$(CONFIG_ARCH_MXC)		+= imx/
- obj-$(CONFIG_SOC_XWAY)		+= lantiq/
--obj-$(CONFIG_ARCH_MEDIATEK)	+= mediatek/
-+obj-y				+= mediatek/
- obj-$(CONFIG_ARCH_MESON)	+= amlogic/
- obj-$(CONFIG_ARCH_QCOM)		+= qcom/
- obj-y				+= renesas/
-
-
--- 
-Jean Delvare
-SUSE L3 Support
+Thanks, applied.
