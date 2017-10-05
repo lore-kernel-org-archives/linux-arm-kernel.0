@@ -1,62 +1,49 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 5 Oct 2017 17:53:34 +0100
-Subject: [PATCH v2 14/28] arm64/sve: Backend logic for setting the vector
- length
-In-Reply-To: <20171005164229.GX3611@e103592.cambridge.arm.com>
-References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
- <1504198860-12951-15-git-send-email-Dave.Martin@arm.com>
- <20170913172911.3ca2h6cpju7etifi@localhost>
- <20170913190611.GC23415@e103592.cambridge.arm.com>
- <20170913221123.y4znytmxtplx24m4@localhost>
- <20171005164229.GX3611@e103592.cambridge.arm.com>
-Message-ID: <20171005165334.cstx6fszl7shaudg@armageddon.cambridge.arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 5 Oct 2017 17:54:50 +0100
+Subject: [PATCH] iommu/arm-smmu-v3: Ensure we sync STE when only changing
+ config field
+In-Reply-To: <1507222158-4151-1-git-send-email-will.deacon@arm.com>
+References: <1507222158-4151-1-git-send-email-will.deacon@arm.com>
+Message-ID: <7e9ef711-b1d7-ee70-b740-5d03a4fc61f6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 05, 2017 at 05:42:29PM +0100, Dave P Martin wrote:
-> On Wed, Sep 13, 2017 at 03:11:23PM -0700, Catalin Marinas wrote:
-> > On Wed, Sep 13, 2017 at 08:06:12PM +0100, Dave P Martin wrote:
-> > > On Wed, Sep 13, 2017 at 10:29:11AM -0700, Catalin Marinas wrote:
-> > > > On Thu, Aug 31, 2017 at 06:00:46PM +0100, Dave P Martin wrote:
-> > > > > This patch implements the core logic for changing a task's vector
-> > > > > length on request from userspace.  This will be used by the ptrace
-> > > > > and prctl frontends that are implemented in later patches.
-> > > > > 
-> > > > > The SVE architecture permits, but does not require, implementations
-> > > > > to support vector lengths that are not a power of two.  To handle
-> > > > > this, logic is added to check a requested vector length against a
-> > > > > possibly sparse bitmap of available vector lengths at runtime, so
-> > > > > that the best supported value can be chosen.
-> > > > > 
-> > > > > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > > > > Cc: Alex Benn?e <alex.bennee@linaro.org>
-> > > > 
-> > > > Can this be merged with patch 20? It seems to add the PR_ definitions
-> > > > which get actually used later when the prctl interface is added.
-> > > 
-> > > This patch is used both by patch 19 and by patch 20, which I preferred
-> > > not to merge with each other: ptrace and prctl are significantly
-> > > different things.
-> > > 
-> > > The prctl bit definitions are added here because they are the canonical
-> > > definitions used by both interfaces.  The ptrace #defines are based on
-> > > them.
-> > > 
-> > > Does it make sense if I merge patch 20 into this one and apply patch 19
-> > > on top?  This avoide the appearance of prctl #defines with no prctl
-> > > implementation.
-> > 
-> > That's fine, you can bring patch 20 forward. If there are other
-> > non-trivial issues, feel free to ignore my comment.
+On 05/10/17 17:49, Will Deacon wrote:
+> The SMMUv3 architecture permits caching of data structures deemed to be
+> "reachable" by the SMU, which includes STEs marked as invalid. When
+> transitioning an STE to a bypass/fault configuration at init or detach
+> time, we mistakenly elide the CMDQ_OP_CFGI_STE operation in some cases,
+> therefore potentially leaving the old STE state cached in the SMMU.
 > 
-> I've had a go at this, but I think it's going to be more trouble than
-> it's worth -- there are other interdependencies between the patches
-> which make them tricky to reorder.
+> This patch fixes the problem by ensuring that we perform the
+> CMDQ_OP_CFGI_STE operation irrespective of the validity of the previous
+> STE.
+
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Reported-by: Eric Auger <eric.auger@redhat.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  drivers/iommu/arm-smmu-v3.c | 7 +++++--
+>  1 file changed, 5 insertions(+), 2 deletions(-)
 > 
-> I could add a note in the commit message for this patch explaining why
-> the prctl flag #defines are being added here.  What do you think?
-
-As I said, it's up to you. A line in the commit message would do.
-
--- 
-Catalin
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 47f52b1ab838..91fdabdb4de6 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -1085,8 +1085,11 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
+>  		dst[1] = cpu_to_le64(STRTAB_STE_1_SHCFG_INCOMING
+>  			 << STRTAB_STE_1_SHCFG_SHIFT);
+>  		dst[2] = 0; /* Nuke the VMID */
+> -		if (ste_live)
+> -			arm_smmu_sync_ste_for_sid(smmu, sid);
+> +		/*
+> +		 * The SMMU can perform negative caching, so we must sync
+> +		 * the STE regardless of whether the old value was live.
+> +		 */
+> +		arm_smmu_sync_ste_for_sid(smmu, sid);
+>  		return;
+>  	}
+>  
+> 
