@@ -1,219 +1,291 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  5 Oct 2017 12:49:48 +0200
-Subject: [PATCH 13/20] ARM: dts: sun4i: Remove gpio-keys warnings
+Date: Thu,  5 Oct 2017 12:49:47 +0200
+Subject: [PATCH 12/20] ARM: dts: sun4i: Remove underscores from nodes names
 In-Reply-To: <cover.f5f905a5434f2a540d6844d23369a04af9f5314c.1507198895.git-series.maxime.ripard@free-electrons.com>
 References: <cover.f5f905a5434f2a540d6844d23369a04af9f5314c.1507198895.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <247d527cb833713f487b97a2c95e30545273ac92.1507198895.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <2b7de818cec2fcbc75335a2c6eb3816c6718cb26.1507198895.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some gpio-keys definitions in our DTs were having buttons defined with a
-unit-address and that would generate a DTC warning.
+Some GPIO pinctrl nodes cannot be easily removed, because they would also
+change the pin configuration, for example to add a pull resistor or change
+the current delivered by the pin.
 
-Change the buttons node names to remove the warnings.
+Those nodes still have underscores and unit-addresses in their node names
+in our DTs, so adjust their name to remove the warnings.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun4i-a10-inet9f-rev03.dts | 40 ++++++++++-----------
- arch/arm/boot/dts/sun4i-a10-pcduino.dts      |  6 +--
- 2 files changed, 23 insertions(+), 23 deletions(-)
+ arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts  | 4 ++--
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts       | 4 ++--
+ arch/arm/boot/dts/sun4i-a10-dserve-dsrv9703c.dts | 6 +++---
+ arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts     | 4 ++--
+ arch/arm/boot/dts/sun4i-a10-inet1.dts            | 4 ++--
+ arch/arm/boot/dts/sun4i-a10-inet97fv2.dts        | 4 ++--
+ arch/arm/boot/dts/sun4i-a10-inet9f-rev03.dts     | 8 ++++----
+ arch/arm/boot/dts/sun4i-a10-marsboard.dts        | 2 +-
+ arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts   | 6 +++---
+ arch/arm/boot/dts/sun4i-a10-pcduino.dts          | 4 ++--
+ arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts | 6 +++---
+ 11 files changed, 26 insertions(+), 26 deletions(-)
 
+diff --git a/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts b/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
+index b2dbdac19c0f..dfc88aee4fe3 100644
+--- a/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
++++ b/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
+@@ -133,13 +133,13 @@
+ };
+ 
+ &pio {
+-	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
++	usb0_id_detect_pin: usb0-id-detect-pin {
+ 		pins = "PH4";
+ 		function = "gpio_in";
+ 		bias-pull-up;
+ 	};
+ 
+-	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
++	usb0_vbus_detect_pin: usb0-vbus-detect-pin {
+ 		pins = "PH5";
+ 		function = "gpio_in";
+ 		bias-pull-down;
+diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+index b48cc70aa6c2..d5ba5400a975 100644
+--- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
++++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+@@ -155,13 +155,13 @@
+ };
+ 
+ &pio {
+-	led_pins_cubieboard: led_pins at 0 {
++	led_pins_cubieboard: led-pins {
+ 		pins = "PH20", "PH21";
+ 		function = "gpio_out";
+ 		drive-strength = <20>;
+ 	};
+ 
+-	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
++	usb0_id_detect_pin: usb0-id-detect-pin {
+ 		pins = "PH4";
+ 		function = "gpio_in";
+ 		bias-pull-up;
+diff --git a/arch/arm/boot/dts/sun4i-a10-dserve-dsrv9703c.dts b/arch/arm/boot/dts/sun4i-a10-dserve-dsrv9703c.dts
+index acbf692e837f..147cbc5e08ac 100644
+--- a/arch/arm/boot/dts/sun4i-a10-dserve-dsrv9703c.dts
++++ b/arch/arm/boot/dts/sun4i-a10-dserve-dsrv9703c.dts
+@@ -75,7 +75,7 @@
+ 		max-microvolt = <3000000>;
+ 	};
+ 
+-	reg_motor: reg_motor {
++	reg_motor: reg-motor {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "vcc-motor";
+ 		regulator-min-microvolt = <3000000>;
+@@ -160,13 +160,13 @@
+ };
+ 
+ &pio {
+-	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
++	usb0_id_detect_pin: usb0-id-detect-pin {
+ 		pins = "PH4";
+ 		function = "gpio_in";
+ 		bias-pull-up;
+ 	};
+ 
+-	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
++	usb0_vbus_detect_pin: usb0-vbus-detect-pin {
+ 		pins = "PH5";
+ 		function = "gpio_in";
+ 		bias-pull-down;
+diff --git a/arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts b/arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts
+index f5e9b643007e..35c57d065dd8 100644
+--- a/arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts
++++ b/arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts
+@@ -88,13 +88,13 @@
+ };
+ 
+ &pio {
+-	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
++	usb0_id_detect_pin: usb0-id-detect-pin {
+ 		pins = "PH4";
+ 		function = "gpio_in";
+ 		bias-pull-up;
+ 	};
+ 
+-	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
++	usb0_vbus_detect_pin: usb0-vbus-detect-pin {
+ 		pins = "PH5";
+ 		function = "gpio_in";
+ 		bias-pull-down;
+diff --git a/arch/arm/boot/dts/sun4i-a10-inet1.dts b/arch/arm/boot/dts/sun4i-a10-inet1.dts
+index 2374ee7dfc64..9482e831a9a1 100644
+--- a/arch/arm/boot/dts/sun4i-a10-inet1.dts
++++ b/arch/arm/boot/dts/sun4i-a10-inet1.dts
+@@ -166,13 +166,13 @@
+ };
+ 
+ &pio {
+-	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
++	usb0_id_detect_pin: usb0-id-detect-pin {
+ 		pins = "PH4";
+ 		function = "gpio_in";
+ 		bias-pull-up;
+ 	};
+ 
+-	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
++	usb0_vbus_detect_pin: usb0-vbus-detect-pin {
+ 		pins = "PH5";
+ 		function = "gpio_in";
+ 		bias-pull-down;
+diff --git a/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts b/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts
+index c76f2538e3a2..4b5c91c8e85b 100644
+--- a/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts
++++ b/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts
+@@ -152,13 +152,13 @@
+ };
+ 
+ &pio {
+-	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
++	usb0_id_detect_pin: usb0-id-detect-pin {
+ 		pins = "PH4";
+ 		function = "gpio_in";
+ 		bias-pull-up;
+ 	};
+ 
+-	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
++	usb0_vbus_detect_pin: usb0-vbus-detect-pin {
+ 		pins = "PH5";
+ 		function = "gpio_in";
+ 		bias-pull-down;
 diff --git a/arch/arm/boot/dts/sun4i-a10-inet9f-rev03.dts b/arch/arm/boot/dts/sun4i-a10-inet9f-rev03.dts
-index 7c7f12132ea3..13224f5ac166 100644
+index 1ed0d56dd2b4..7c7f12132ea3 100644
 --- a/arch/arm/boot/dts/sun4i-a10-inet9f-rev03.dts
 +++ b/arch/arm/boot/dts/sun4i-a10-inet9f-rev03.dts
-@@ -67,7 +67,7 @@
- 		#size-cells = <0>;
- 		poll-interval = <20>;
+@@ -59,7 +59,7 @@
+ 		stdout-path = "serial0:115200n8";
+ 	};
  
--		button at 0 {
-+		left-joystick-left {
- 			label = "Left Joystick Left";
- 			linux,code = <ABS_X>;
- 			linux,input-type = <EV_ABS>;
-@@ -75,7 +75,7 @@
- 			gpios = <&pio 0 6 GPIO_ACTIVE_LOW>; /* PA6 */
- 		};
+-	gpio_keys {
++	gpio-keys {
+ 		compatible = "gpio-keys-polled";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&key_pins_inet9f>;
+@@ -310,7 +310,7 @@
+ };
  
--		button at 1 {
-+		left-joystick-right {
- 			label = "Left Joystick Right";
- 			linux,code = <ABS_X>;
- 			linux,input-type = <EV_ABS>;
-@@ -83,7 +83,7 @@
- 			gpios = <&pio 0 5 GPIO_ACTIVE_LOW>; /* PA5 */
- 		};
+ &pio {
+-	key_pins_inet9f: key_pins at 0 {
++	key_pins_inet9f: key-pins {
+ 		pins = "PA0", "PA1", "PA3", "PA4",
+ 		       "PA5", "PA6", "PA8", "PA9",
+ 		       "PA11", "PA12", "PA13",
+@@ -320,13 +320,13 @@
+ 		bias-pull-up;
+ 	};
  
--		button at 2 {
-+		left-joystick-up {
- 			label = "Left Joystick Up";
- 			linux,code = <ABS_Y>;
- 			linux,input-type = <EV_ABS>;
-@@ -91,7 +91,7 @@
- 			gpios = <&pio 0 8 GPIO_ACTIVE_LOW>; /* PA8 */
- 		};
+-	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
++	usb0_id_detect_pin: usb0-id-detect-pin {
+ 		pins = "PH4";
+ 		function = "gpio_in";
+ 		bias-pull-up;
+ 	};
  
--		button at 3 {
-+		left-joystick-down {
- 			label = "Left Joystick Down";
- 			linux,code = <ABS_Y>;
- 			linux,input-type = <EV_ABS>;
-@@ -99,7 +99,7 @@
- 			gpios = <&pio 0 9 GPIO_ACTIVE_LOW>; /* PA9 */
- 		};
+-	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
++	usb0_vbus_detect_pin: usb0-vbus-detect-pin {
+ 		pins = "PH5";
+ 		function = "gpio_in";
+ 		bias-pull-down;
+diff --git a/arch/arm/boot/dts/sun4i-a10-marsboard.dts b/arch/arm/boot/dts/sun4i-a10-marsboard.dts
+index 86c7c3fcaf9c..435c551aef0f 100644
+--- a/arch/arm/boot/dts/sun4i-a10-marsboard.dts
++++ b/arch/arm/boot/dts/sun4i-a10-marsboard.dts
+@@ -150,7 +150,7 @@
+ };
  
--		button at 4 {
-+		right-joystick-left {
- 			label = "Right Joystick Left";
- 			linux,code = <ABS_Z>;
- 			linux,input-type = <EV_ABS>;
-@@ -107,7 +107,7 @@
- 			gpios = <&pio 0 1 GPIO_ACTIVE_LOW>; /* PA1 */
- 		};
+ &pio {
+-	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
++	usb0_id_detect_pin: usb0-id-detect-pin {
+ 		pins = "PH4";
+ 		function = "gpio_in";
+ 		bias-pull-up;
+diff --git a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
+index 3689b8c3b7a0..2d1b4329f54a 100644
+--- a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
++++ b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
+@@ -158,19 +158,19 @@
+ };
  
--		button at 5 {
-+		right-joystick-right {
- 			label = "Right Joystick Right";
- 			linux,code = <ABS_Z>;
- 			linux,input-type = <EV_ABS>;
-@@ -115,7 +115,7 @@
- 			gpios = <&pio 0 0 GPIO_ACTIVE_LOW>; /* PA0 */
- 		};
+ &pio {
+-	led_pins_olinuxinolime: led_pins at 0 {
++	led_pins_olinuxinolime: led-pin {
+ 		pins = "PH2";
+ 		function = "gpio_out";
+ 		drive-strength = <20>;
+ 	};
  
--		button at 6 {
-+		right-joystick-up {
- 			label = "Right Joystick Up";
- 			linux,code = <ABS_RZ>;
- 			linux,input-type = <EV_ABS>;
-@@ -123,7 +123,7 @@
- 			gpios = <&pio 0 3 GPIO_ACTIVE_LOW>; /* PA3 */
- 		};
+-	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
++	usb0_id_detect_pin: usb0-id-detect-pin {
+ 		pins = "PH4";
+ 		function = "gpio_in";
+ 		bias-pull-up;
+ 	};
  
--		button at 7 {
-+		right-joystick-down {
- 			label = "Right Joystick Down";
- 			linux,code = <ABS_RZ>;
- 			linux,input-type = <EV_ABS>;
-@@ -131,7 +131,7 @@
- 			gpios = <&pio 0 4 GPIO_ACTIVE_LOW>; /* PA4 */
- 		};
- 
--		button at 8 {
-+		dpad-left {
- 			label = "DPad Left";
- 			linux,code = <ABS_HAT0X>;
- 			linux,input-type = <EV_ABS>;
-@@ -139,7 +139,7 @@
- 			gpios = <&pio 7 23 GPIO_ACTIVE_LOW>; /* PH23 */
- 		};
- 
--		button at 9 {
-+		dpad-right {
- 			label = "DPad Right";
- 			linux,code = <ABS_HAT0X>;
- 			linux,input-type = <EV_ABS>;
-@@ -147,7 +147,7 @@
- 			gpios = <&pio 7 24 GPIO_ACTIVE_LOW>; /* PH24 */
- 		};
- 
--		button at 10 {
-+		dpad-up {
- 			label = "DPad Up";
- 			linux,code = <ABS_HAT0Y>;
- 			linux,input-type = <EV_ABS>;
-@@ -155,7 +155,7 @@
- 			gpios = <&pio 7 25 GPIO_ACTIVE_LOW>; /* PH25 */
- 		};
- 
--		button at 11 {
-+		dpad-down {
- 			label = "DPad Down";
- 			linux,code = <ABS_HAT0Y>;
- 			linux,input-type = <EV_ABS>;
-@@ -163,49 +163,49 @@
- 			gpios = <&pio 7 26 GPIO_ACTIVE_LOW>; /* PH26 */
- 		};
- 
--		button at 12 {
-+		x {
- 			label = "Button X";
- 			linux,code = <BTN_X>;
- 			gpios = <&pio 0 16 GPIO_ACTIVE_LOW>; /* PA16 */
- 		};
- 
--		button at 13 {
-+		y {
- 			label = "Button Y";
- 			linux,code = <BTN_Y>;
- 			gpios = <&pio 0 14 GPIO_ACTIVE_LOW>; /* PA14 */
- 		};
- 
--		button at 14 {
-+		a {
- 			label = "Button A";
- 			linux,code = <BTN_A>;
- 			gpios = <&pio 0 17 GPIO_ACTIVE_LOW>; /* PA17 */
- 		};
- 
--		button at 15 {
-+		b {
- 			label = "Button B";
- 			linux,code = <BTN_B>;
- 			gpios = <&pio 0 15 GPIO_ACTIVE_LOW>; /* PA15 */
- 		};
- 
--		button at 16 {
-+		select {
- 			label = "Select Button";
- 			linux,code = <BTN_SELECT>;
- 			gpios = <&pio 0 11 GPIO_ACTIVE_LOW>; /* PA11 */
- 		};
- 
--		button at 17 {
-+		start {
- 			label = "Start Button";
- 			linux,code = <BTN_START>;
- 			gpios = <&pio 0 12 GPIO_ACTIVE_LOW>; /* PA12 */
- 		};
- 
--		button at 18 {
-+		top-left {
- 			label = "Top Left Button";
- 			linux,code = <BTN_TL>;
- 			gpios = <&pio 7 22 GPIO_ACTIVE_LOW>; /* PH22 */
- 		};
- 
--		button at 19 {
-+		top-right {
- 			label = "Top Right Button";
- 			linux,code = <BTN_TR>;
- 			gpios = <&pio 0 13 GPIO_ACTIVE_LOW>; /* PA13 */
+-	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
++	usb0_vbus_detect_pin: usb0-vbus-detect-pin {
+ 		pins = "PH5";
+ 		function = "gpio_in";
+ 		bias-pull-down;
 diff --git a/arch/arm/boot/dts/sun4i-a10-pcduino.dts b/arch/arm/boot/dts/sun4i-a10-pcduino.dts
-index be7508cecd2e..6e140547b638 100644
+index c62db1e2c115..be7508cecd2e 100644
 --- a/arch/arm/boot/dts/sun4i-a10-pcduino.dts
 +++ b/arch/arm/boot/dts/sun4i-a10-pcduino.dts
-@@ -79,19 +79,19 @@
+@@ -74,7 +74,7 @@
+ 		};
+ 	};
+ 
+-	gpio_keys {
++	gpio-keys {
+ 		compatible = "gpio-keys";
  		#address-cells = <1>;
  		#size-cells = <0>;
+@@ -158,7 +158,7 @@
+ };
  
--		button at 0 {
-+		back {
- 			label = "Key Back";
- 			linux,code = <KEY_BACK>;
- 			gpios = <&pio 7 17 GPIO_ACTIVE_LOW>;
- 		};
+ &pio {
+-	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
++	usb0_id_detect_pin: usb0-id-detect-pin {
+ 		pins = "PH4";
+ 		function = "gpio_in";
+ 		bias-pull-up;
+diff --git a/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts b/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts
+index 46e485ff925b..5081303f79e7 100644
+--- a/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts
++++ b/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts
+@@ -101,7 +101,7 @@
+ &i2c2 {
+ 	status = "okay";
  
--		button at 1 {
-+		home {
- 			label = "Key Home";
- 			linux,code = <KEY_HOME>;
- 			gpios = <&pio 7 18 GPIO_ACTIVE_LOW>;
- 		};
+-	pixcir_ts at 5c {
++	touchscreen at 5c {
+ 		compatible = "pixcir,pixcir_tangoc";
+ 		reg = <0x5c>;
+ 		interrupt-parent = <&pio>;
+@@ -148,13 +148,13 @@
+ };
  
--		button at 2 {
-+		menu {
- 			label = "Key Menu";
- 			linux,code = <KEY_MENU>;
- 			gpios = <&pio 7 19 GPIO_ACTIVE_LOW>;
+ &pio {
+-	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
++	usb0_id_detect_pin: usb0-id-detect-pin {
+ 		pins = "PH4";
+ 		function = "gpio_in";
+ 		bias-pull-up;
+ 	};
+ 
+-	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
++	usb0_vbus_detect_pin: usb0-vbus-detect-pin {
+ 		pins = "PH5";
+ 		function = "gpio_in";
+ 		bias-pull-down;
 -- 
 git-series 0.9.1
