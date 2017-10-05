@@ -1,35 +1,42 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 5 Oct 2017 14:52:46 -0500
-Subject: [PATCH 1/3] dt-bindings: Amlogic: add documentation for the SoC
- info register areas
-In-Reply-To: <20170923141403.20882-2-martin.blumenstingl@googlemail.com>
-References: <20170923141403.20882-1-martin.blumenstingl@googlemail.com>
- <20170923141403.20882-2-martin.blumenstingl@googlemail.com>
-Message-ID: <20171005195246.6nddrovf53zenxxo@rob-hp-laptop>
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Thu, 5 Oct 2017 12:58:32 -0700 (PDT)
+Subject: [PATCH 1/3] arm/xen: don't inclide rwlock.h directly.1~B
+In-Reply-To: <20171005125655.12373-1-bigeasy@linutronix.de>
+References: <20171005125655.12373-1-bigeasy@linutronix.de>
+Message-ID: <alpine.DEB.2.10.1710051256230.3073@sstabellini-ThinkPad-X260>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 23, 2017 at 04:14:01PM +0200, Martin Blumenstingl wrote:
-> There are three register areas which contain information about the SoC
-> version and revision:
-> - the assist registers contain the SoC's "major version" which encodes
->   the SoC generation and part number. this is available on Meson6,
->   Meson8 and Meson8b SoCs.
-> - the bootrom register contains at least the SoCs "misc version". this
->   is avilable on Meson6, Meson8 and Meson8b
-> - the analog top registers contain information about the SoC revision.
->   this is only available on Meson8 and Meson8b
+On Thu, 5 Oct 2017, Sebastian Andrzej Siewior wrote:
+> rwlock.h should not be included directly. Instead linux/splinlock.h
+> should be included. One thing it does is to break the RT build.
 > 
-> Not much else is currently known about these registers.
-> 
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> ---
->  .../devicetree/bindings/arm/amlogic/analog-top.txt   | 20 ++++++++++++++++++++
->  .../devicetree/bindings/arm/amlogic/assist.txt       | 17 +++++++++++++++++
->  .../devicetree/bindings/arm/amlogic/bootrom.txt      | 17 +++++++++++++++++
->  3 files changed, 54 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/amlogic/analog-top.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/amlogic/assist.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/amlogic/bootrom.txt
+> Cc: Stefano Stabellini <sstabellini@kernel.org>
+> Cc: xen-devel at lists.xenproject.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 
-Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Stefano Stabellini <sstabellini@kernel.org>
+
+Let me know if you want this patch to go via the xen tree.
+
+> ---
+>  arch/arm/xen/p2m.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/xen/p2m.c b/arch/arm/xen/p2m.c
+> index e71eefa2e427..0641ba54ab62 100644
+> --- a/arch/arm/xen/p2m.c
+> +++ b/arch/arm/xen/p2m.c
+> @@ -1,7 +1,7 @@
+>  #include <linux/bootmem.h>
+>  #include <linux/gfp.h>
+>  #include <linux/export.h>
+> -#include <linux/rwlock.h>
+> +#include <linux/spinlock.h>
+>  #include <linux/slab.h>
+>  #include <linux/types.h>
+>  #include <linux/dma-mapping.h>
+> -- 
+> 2.14.2
+> 
