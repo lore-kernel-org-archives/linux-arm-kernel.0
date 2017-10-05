@@ -1,55 +1,40 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu,  5 Oct 2017 20:17:57 +0100
-Subject: [PATCH v3 05/20] arm64: entry.S: Remove disable_dbg
-In-Reply-To: <20171005191812.5678-1-james.morse@arm.com>
-References: <20171005191812.5678-1-james.morse@arm.com>
-Message-ID: <20171005191812.5678-6-james.morse@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 5 Oct 2017 21:25:54 +0200
+Subject: [PATCH v2 7/7] PCI: aardvark: define IRQ related hooks in
+ pci_host_bridge
+In-Reply-To: <20171005175547.GT25517@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
+ <20170928125838.11887-8-thomas.petazzoni@free-electrons.com>
+ <20171005175547.GT25517@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20171005212554.31c5b3a1@windsurf.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-enable_step_tsk is the only user of disable_dbg, which doesn't respect
-our 'dai' order for exception masking. enable_step_tsk may enable
-single-step, so previously needed to mask debug exceptions to prevent us
-from single-stepping kernel_exit. enable_step_tsk is called at the end
-of the ret_to_user loop, which has already masked all exceptions so this
-is no longer needed.
+Hello,
 
-Remove disable_dbg, add a comment that enable_step_tsk's caller should
-have masked debug.
+On Thu, 5 Oct 2017 12:55:47 -0500, Bjorn Helgaas wrote:
 
-Signed-off-by: James Morse <james.morse@arm.com>
----
- arch/arm64/include/asm/assembler.h | 9 +--------
- 1 file changed, 1 insertion(+), 8 deletions(-)
+> On Thu, Sep 28, 2017 at 02:58:38PM +0200, Thomas Petazzoni wrote:
+> > Commit 769b461fc0c0 ("arm64: PCI: Drop DT IRQ allocation from
+> > pcibios_alloc_irq()") was assuming all PCI host controller drivers had
+> > been converted to use ->map_irq(), but that wasn't the case:
+> > pci-aardvark had not been converted. Due to this, it broke the support
+> > for legacy PCI interrupts when using the pci-aardvark driver (used on
+> > Marvell Armada 3720 platforms).  
+> 
+> Lorenzo is pretty thorough, but maybe pci-aardvark.c got overlooked.
+> Cc'ing him just to make sure there's nothing deeper than that.
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 114e741ca873..1b0972046a72 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -68,13 +68,6 @@
- 	msr	daif, \flags
- 	.endm
- 
--/*
-- * Enable and disable debug exceptions.
-- */
--	.macro	disable_dbg
--	msr	daifset, #8
--	.endm
--
- 	.macro	enable_dbg
- 	msr	daifclr, #8
- 	.endm
-@@ -88,9 +81,9 @@
- 9990:
- 	.endm
- 
-+	/* call with daif masked */
- 	.macro	enable_step_tsk, flgs, tmp
- 	tbz	\flgs, #TIF_SINGLESTEP, 9990f
--	disable_dbg
- 	mrs	\tmp, mdscr_el1
- 	orr	\tmp, \tmp, #1
- 	msr	mdscr_el1, \tmp
+I talked about this issue with Lorenzo on IRC and then briefly in real
+life at Linux Plumbers, and I'm pretty sure he agreed that it was just
+due to the Aardvark driver having been overlooked.
+
+But I'll let him confirm.
+
+Thanks!
+
+Thomas
 -- 
-2.13.3
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
