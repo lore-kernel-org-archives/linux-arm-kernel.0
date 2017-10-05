@@ -1,68 +1,34 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 5 Oct 2017 15:23:34 +0200
-Subject: [PATCH] ARM64: dts: meson-gxbb-nexbox-a95x: Enable USB Nodes
-In-Reply-To: <20171005132118.2150-1-peter@korsgaard.com>
-References: <20171005132118.2150-1-peter@korsgaard.com>
-Message-ID: <89e9980a-2ca6-4509-b9d5-36aac433b9bd@baylibre.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu,  5 Oct 2017 15:23:54 +0200
+Subject: [PATCH v3 3/6] clk: renesas: r8a7795: Add Z clock
+In-Reply-To: <1507209837-16938-1-git-send-email-horms+renesas@verge.net.au>
+References: <1507209837-16938-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1507209837-16938-4-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/10/2017 15:21, Peter Korsgaard wrote:
-> Enable both gxbb USB controllers and add a 5V regulator for the OTG port
-> VBUS, similar to p20x.
-> 
-> Signed-off-by: Peter Korsgaard <peter@korsgaard.com>
-> ---
->  .../boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts    | 29 ++++++++++++++++++++++
->  1 file changed, 29 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
-> index 38dfdde5c147..60cd9c3b11c8 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
-> @@ -88,6 +88,18 @@
->  		};
->  	};
->  
-> +	usb_pwr: regulator-usb-pwrs {
-> +		compatible = "regulator-fixed";
-> +
-> +		regulator-name = "USB_PWR";
-> +
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +
-> +		gpio = <&gpio GPIODV_24 GPIO_ACTIVE_HIGH>;
-> +		enable-active-high;
-> +	};
-> +
->  	vddio_card: gpio-regulator {
->  		compatible = "regulator-gpio";
->  
-> @@ -294,3 +306,20 @@
->  	pinctrl-0 = <&uart_ao_a_pins>;
->  	pinctrl-names = "default";
->  };
-> +
-> +&usb0_phy {
-> +	status = "okay";
-> +	phy-supply = <&usb_pwr>;
-> +};
-> +
-> +&usb1_phy {
-> +	status = "okay";
-> +};
-> +
-> +&usb0 {
-> +	status = "okay";
-> +};
-> +
-> +&usb1 {
-> +	status = "okay";
-> +};
-> 
+From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 
-Indeed, I forgot to add USB to this board,
-Thanks
+This patch adds Z clock for R8A7795 SoC.
 
-Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ drivers/clk/renesas/r8a7795-cpg-mssr.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/clk/renesas/r8a7795-cpg-mssr.c b/drivers/clk/renesas/r8a7795-cpg-mssr.c
+index 762b2f8824f1..2a0546fd47dc 100644
+--- a/drivers/clk/renesas/r8a7795-cpg-mssr.c
++++ b/drivers/clk/renesas/r8a7795-cpg-mssr.c
+@@ -74,6 +74,7 @@ static struct cpg_core_clk r8a7795_core_clks[] __initdata = {
+ 	DEF_FIXED(".sdsrc",     CLK_SDSRC,         CLK_PLL1_DIV2,  2, 1),
+ 
+ 	/* Core Clock Outputs */
++	DEF_BASE("z",           R8A7795_CLK_Z,     CLK_TYPE_GEN3_Z, CLK_PLL0),
+ 	DEF_FIXED("ztr",        R8A7795_CLK_ZTR,   CLK_PLL1_DIV2,  6, 1),
+ 	DEF_FIXED("ztrd2",      R8A7795_CLK_ZTRD2, CLK_PLL1_DIV2, 12, 1),
+ 	DEF_FIXED("zt",         R8A7795_CLK_ZT,    CLK_PLL1_DIV2,  4, 1),
+-- 
+2.1.4
