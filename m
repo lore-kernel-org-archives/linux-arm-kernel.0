@@ -1,71 +1,40 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Thu, 5 Oct 2017 17:12:44 -0500
-Subject: [PATCH 0/6] Switch arm64 over to qrwlock
-In-Reply-To: <1507208097-825-1-git-send-email-will.deacon@arm.com>
-References: <1507208097-825-1-git-send-email-will.deacon@arm.com>
-Message-ID: <9e2468c3-894e-1204-4578-3d8266c56d6c@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 5 Oct 2017 17:16:50 -0500
+Subject: [PATCH 8/9] dt-bindings: usb: mtk-xhci: add a optional property
+ to disable u3ports
+In-Reply-To: <fd8b6099192ddee3b277f5ca3a699c20fb273ffe.1506503880.git.chunfeng.yun@mediatek.com>
+References: <994382d16d6bdc0f3d7c11b22f1710252e056e34.1506503879.git.chunfeng.yun@mediatek.com>
+ <fd8b6099192ddee3b277f5ca3a699c20fb273ffe.1506503880.git.chunfeng.yun@mediatek.com>
+Message-ID: <20171005221650.yfyh72op6azm2nri@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Sep 27, 2017 at 05:23:04PM +0800, Chunfeng Yun wrote:
+> Add a new optional property to disable u3ports
+> 
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> ---
+>  .../devicetree/bindings/usb/mediatek,mtk-xhci.txt  |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
+> index 5611a2e..2d9b459 100644
+> --- a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
+> +++ b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
+> @@ -38,6 +38,8 @@ Optional properties:
+>  	mode;
+>   - mediatek,syscon-wakeup : phandle to syscon used to access USB wakeup
+>  	control register, it depends on "mediatek,wakeup-src".
+> + - mediatek,u3p-dis-msk : mask to disable u3ports, bit0 for u3port0,
+> +	bit1 for u3port1, ... etc;
 
+I think you should have child nodes for ports and use "status" to 
+disable them (or omit them). IIRC, the common USB bus binding already 
+defines ports.
 
-On 10/05/2017 07:54 AM, Will Deacon wrote:
-> Hi all,
-> 
-> This patch series reworks bits of the qrwlock code that it can be used
-> to replace the asm rwlocks currently implemented for arm64. The structure
-> of the series is:
-> 
->    Patches 1-3	: Work WFE into qrwlock using atomic_cond_read_acquire so
-> 		  we can avoid busy-waiting.
-> 
->    Patch 4	: Enable qrwlocks for arm64
-> 
->    Patch 5-6	: Ensure writer slowpath fairness. This has a potential
-> 		  performance impact on the writer unlock path, so I've
-> 		  kept them at the end.
-> 
-> The patches apply on top of my other locking cleanups:
-> 
->    http://lkml.kernel.org/r/1507055129-12300-1-git-send-email-will.deacon at arm.com
-> 
-> although the conflict with mainline is trivial to resolve without those.
-> The full stack is also pushed here:
-> 
->    git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git qrwlock
-> 
-> All comments (particularly related to testing and performance) welcome!
-
-I haven't done any perf testing, but the machines continue to boot, and 
-the stress-ng test which causes task lock problems with the normal arm64 
-rwlock now appears to run as expected. So, its a good start!
-
-
-
-> 
-> Cheers,
-> 
-> Will
-> 
-> --->8
-> 
-> Will Deacon (6):
->    kernel/locking: Use struct qrwlock instead of struct __qrwlock
->    locking/atomic: Add atomic_cond_read_acquire
->    kernel/locking: Use atomic_cond_read_acquire when spinning in qrwlock
->    arm64: locking: Move rwlock implementation over to qrwlocks
->    kernel/locking: Prevent slowpath writers getting held up by fastpath
->    kernel/locking: Remove unused union members from struct qrwlock
-> 
->   arch/arm64/Kconfig                      |  17 ++++
->   arch/arm64/include/asm/Kbuild           |   1 +
->   arch/arm64/include/asm/spinlock.h       | 164 +-------------------------------
->   arch/arm64/include/asm/spinlock_types.h |   6 +-
->   include/asm-generic/atomic-long.h       |   3 +
->   include/asm-generic/qrwlock.h           |  14 +--
->   include/asm-generic/qrwlock_types.h     |   2 +-
->   include/linux/atomic.h                  |   4 +
->   kernel/locking/qrwlock.c                |  83 +++-------------
->   9 files changed, 43 insertions(+), 251 deletions(-)
+>   - vbus-supply : reference to the VBUS regulator;
+>   - usb3-lpm-capable : supports USB3.0 LPM
+>   - pinctrl-names : a pinctrl state named "default" must be defined
+> -- 
+> 1.7.9.5
 > 
