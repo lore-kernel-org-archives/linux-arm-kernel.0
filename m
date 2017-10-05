@@ -1,22 +1,83 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 5 Oct 2017 12:56:49 -0300
-Subject: [PATCH v3 2/2] ARM: dts: imx51: Fix inconsistent display port
- names
-In-Reply-To: <1507213901-1349-2-git-send-email-marco.franchi@nxp.com>
-References: <1507213901-1349-1-git-send-email-marco.franchi@nxp.com>
- <1507213901-1349-2-git-send-email-marco.franchi@nxp.com>
-Message-ID: <CAOMZO5A8LmN9BW2PrgktJ6A5M_==f=o8NfiVoOguZdtmZdjNog@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 5 Oct 2017 23:56:29 +0800
+Subject: [PATCH 19/20] ARM: dts: sun9i: Change node names to remove
+ underscores
+In-Reply-To: <708449b45b1ef546a4c27d99bc68d6cc151e8ad3.1507198895.git-series.maxime.ripard@free-electrons.com>
+References: <cover.f5f905a5434f2a540d6844d23369a04af9f5314c.1507198895.git-series.maxime.ripard@free-electrons.com>
+ <708449b45b1ef546a4c27d99bc68d6cc151e8ad3.1507198895.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v65UhyGqU4mm0z1V7ioM3e=3UgFkpokAnuRB5U9qTuMjNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 5, 2017 at 11:31 AM, Marco Franchi <marco.franchi@nxp.com> wrote:
-> Contrary to later i.MX SoCs, the parallel display interface pad groups on
-> i.MX51 are called DISP1 and DISP2 in the Reference Manual, not DISP0 and
-> DISP1.
+On Thu, Oct 5, 2017 at 6:49 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Some node names in the A80 DTSI still have underscores in them. Remove them
+> in favour of hyphens to remove DTC warnings.
 >
-> Fix this inconsistence by changing the DISP names in the i.mx51 dts.
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/sun9i-a80.dtsi | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
 >
-> Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
-> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+> diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
+> index f9cb701f29b0..70d79ef711b3 100644
+> --- a/arch/arm/boot/dts/sun9i-a80.dtsi
+> +++ b/arch/arm/boot/dts/sun9i-a80.dtsi
+> @@ -139,7 +139,7 @@
+>                  * would also throw all the PLL clock rates off, or just the
+>                  * downstream clocks in the PRCM.
+>                  */
+> -               osc24M: osc24M_clk {
+> +               osc24M: clk-24M {
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Can we stick with the same style for all clks? Like "X-clk"?
+
+>                         #clock-cells = <0>;
+>                         compatible = "fixed-clock";
+>                         clock-frequency = <24000000>;
+> @@ -151,7 +151,7 @@
+>                  * AC100 codec/RTC chip. This serves as a placeholder for
+>                  * board dts files to specify the source.
+>                  */
+> -               osc32k: osc32k_clk {
+> +               osc32k: clk-32k {
+
+And here.
+
+>                         #clock-cells = <0>;
+>                         compatible = "fixed-factor-clock";
+>                         clock-div = <1>;
+> @@ -169,7 +169,7 @@
+>                         clock-output-names = "cpus";
+>                 };
+>
+> -               ahbs: ahbs_clk {
+> +               ahbs: ahbs-clk {
+>                         compatible = "fixed-factor-clock";
+>                         #clock-cells = <0>;
+>                         clock-div = <1>;
+> @@ -708,12 +708,12 @@
+>                         #interrupt-cells = <3>;
+>                         #gpio-cells = <3>;
+>
+> -                       r_ir_pins: r_ir {
+> +                       r_ir_pins: r-ir {
+
+"r-ir-pins".
+
+>                                 pins = "PL6";
+>                                 function = "s_cir_rx";
+>                         };
+>
+> -                       r_rsb_pins: r_rsb {
+> +                       r_rsb_pins: r-rsb {
+
+"r-rsb-pins".
+
+ChenYu
+
+>                                 pins = "PN0", "PN1";
+>                                 function = "s_rsb";
+>                                 drive-strength = <20>;
+> --
+> git-series 0.9.1
