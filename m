@@ -1,88 +1,34 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 5 Oct 2017 15:50:37 -0500
-Subject: [PATCH v2 01/10] pinctrl: move gpio-axp209 to pinctrl
-In-Reply-To: <e193f8efe9092171ebeffb77ab77422179fd3cab.1506428208.git-series.quentin.schulz@free-electrons.com>
-References: <cover.1c314f4154a6d27354625f03d0a5269eee55a9c5.1506428208.git-series.quentin.schulz@free-electrons.com>
- <e193f8efe9092171ebeffb77ab77422179fd3cab.1506428208.git-series.quentin.schulz@free-electrons.com>
-Message-ID: <20171005205037.hxtoyeryiolflkda@rob-hp-laptop>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu,  5 Oct 2017 22:54:08 +0200
+Subject: [PATCH 3/3] pinctrl: sunxi: Enforce the strict mode by default
+In-Reply-To: <cover.7a61d0bb31530def29efd8b4286d8c0afdaab347.1507236823.git-series.maxime.ripard@free-electrons.com>
+References: <cover.7a61d0bb31530def29efd8b4286d8c0afdaab347.1507236823.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <817a66704d6c8f3caa034a526db11e25a9152a65.1507236823.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 26, 2017 at 02:17:11PM +0200, Quentin Schulz wrote:
-> To prepare the driver for the upcoming pinctrl features, move the GPIO
-> driver AXP209 from GPIO to pinctrl subsystem.
-> 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/gpio/gpio-axp209.txt       |  30 +-
->  Documentation/devicetree/bindings/pinctrl/pinctrl-axp209.txt |  30 +-
->  drivers/gpio/Kconfig                                         |   6 +-
->  drivers/gpio/Makefile                                        |   1 +-
->  drivers/gpio/gpio-axp209.c                                   | 188 +-------
->  drivers/pinctrl/Kconfig                                      |   6 +-
->  drivers/pinctrl/Makefile                                     |   1 +-
->  drivers/pinctrl/pinctrl-axp209.c                             | 188 +++++++-
->  8 files changed, 225 insertions(+), 225 deletions(-)
->  delete mode 100644 Documentation/devicetree/bindings/gpio/gpio-axp209.txt
->  create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-axp209.txt
->  delete mode 100644 drivers/gpio/gpio-axp209.c
->  create mode 100644 drivers/pinctrl/pinctrl-axp209.c
-> 
-> diff --git a/Documentation/devicetree/bindings/gpio/gpio-axp209.txt b/Documentation/devicetree/bindings/gpio/gpio-axp209.txt
-> deleted file mode 100644
-> index a661130..0000000
-> --- a/Documentation/devicetree/bindings/gpio/gpio-axp209.txt
-> +++ /dev/null
-> @@ -1,30 +0,0 @@
-> -AXP209 GPIO controller
-> -
-> -This driver follows the usual GPIO bindings found in
-> -Documentation/devicetree/bindings/gpio/gpio.txt
-> -
-> -Required properties:
-> -- compatible: Should be "x-powers,axp209-gpio"
-> -- #gpio-cells: Should be two. The first cell is the pin number and the
-> -  second is the GPIO flags.
-> -- gpio-controller: Marks the device node as a GPIO controller.
-> -
-> -This node must be a subnode of the axp20x PMIC, documented in
-> -Documentation/devicetree/bindings/mfd/axp20x.txt
-> -
-> -Example:
-> -
-> -axp209: pmic at 34 {
-> -	compatible = "x-powers,axp209";
-> -	reg = <0x34>;
-> -	interrupt-parent = <&nmi_intc>;
-> -	interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-> -	interrupt-controller;
-> -	#interrupt-cells = <1>;
-> -
-> -	axp_gpio: gpio {
-> -		compatible = "x-powers,axp209-gpio";
-> -		gpio-controller;
-> -		#gpio-cells = <2>;
-> -	};
-> -};
-> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-axp209.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-axp209.txt
-> new file mode 100644
-> index 0000000..a661130
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-axp209.txt
-> @@ -0,0 +1,30 @@
-> +AXP209 GPIO controller
-> +
-> +This driver follows the usual GPIO bindings found in
-> +Documentation/devicetree/bindings/gpio/gpio.txt
-> +
-> +Required properties:
-> +- compatible: Should be "x-powers,axp209-gpio"
-> +- #gpio-cells: Should be two. The first cell is the pin number and the
-> +  second is the GPIO flags.
-> +- gpio-controller: Marks the device node as a GPIO controller.
+The strict mode should always have been enabled on our driver, and leaving
+it unchecked just makes it harder to find a migration path as time passes.
 
-Maybe there's some reason to move the driver, but the binding describes 
-a gpio-controller so it should remain in bindings/gpio/. Binding and 
-driver directories aren't one to one necessarily.
+Let's enable it by default now so that hopefully the new SoCs should be
+safe.
 
-Rob
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+index 1753a5b1573f..2313c3b8931a 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+@@ -696,6 +696,7 @@ static struct pinmux_ops sunxi_pmx_ops = {
+ 	.get_function_groups	= sunxi_pmx_get_func_groups,
+ 	.set_mux		= sunxi_pmx_set_mux,
+ 	.gpio_set_direction	= sunxi_pmx_gpio_set_direction,
++	.strict			= true,
+ };
+ 
+ static int sunxi_pinctrl_gpio_direction_input(struct gpio_chip *chip,
+-- 
+git-series 0.9.1
