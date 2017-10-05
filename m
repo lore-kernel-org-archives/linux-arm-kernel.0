@@ -1,26 +1,90 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 5 Oct 2017 15:59:56 -0500
-Subject: [PATCH v6 01/11] dt-bindings: net: Restore sun8i dwmac binding
-In-Reply-To: <20170927073414.17361-2-clabbe.montjoie@gmail.com>
-References: <20170927073414.17361-1-clabbe.montjoie@gmail.com>
- <20170927073414.17361-2-clabbe.montjoie@gmail.com>
-Message-ID: <20171005205956.2wy26t4mugbowucn@rob-hp-laptop>
+From: pasha.tatashin@oracle.com (Pavel Tatashin)
+Date: Thu,  5 Oct 2017 17:11:15 -0400
+Subject: [PATCH v10 01/10] x86/mm: setting fields in deferred pages
+In-Reply-To: <20171005211124.26524-1-pasha.tatashin@oracle.com>
+References: <20171005211124.26524-1-pasha.tatashin@oracle.com>
+Message-ID: <20171005211124.26524-2-pasha.tatashin@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 27, 2017 at 09:34:04AM +0200, Corentin Labbe wrote:
-> This patch restore dt-bindings documentation about dwmac-sun8i
-> This reverts commit 8aa33ec2f481 ("dt-bindings: net: Revert sun8i dwmac binding")
+Without deferred struct page feature (CONFIG_DEFERRED_STRUCT_PAGE_INIT),
+flags and other fields in "struct page"es are never changed prior to first
+initializing struct pages by going through __init_single_page().
 
-What's missing here is why you are reverting?
+With deferred struct page feature enabled, however, we set fields in
+register_page_bootmem_info that are subsequently clobbered right after in
+free_all_bootmem:
 
-> 
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> ---
->  .../devicetree/bindings/net/dwmac-sun8i.txt        | 84 ++++++++++++++++++++++
->  1 file changed, 84 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+        mem_init() {
+                register_page_bootmem_info();
+                free_all_bootmem();
+                ...
+        }
 
-Otherwise,
+When register_page_bootmem_info() is called only non-deferred struct pages
+are initialized. But, this function goes through some reserved pages which
+might be part of the deferred, and thus are not yet initialized.
 
-Acked-by: Rob Herring <robh@kernel.org>
+  mem_init
+   register_page_bootmem_info
+    register_page_bootmem_info_node
+     get_page_bootmem
+      .. setting fields here ..
+      such as: page->freelist = (void *)type;
+
+  free_all_bootmem()
+   free_low_memory_core_early()
+    for_each_reserved_mem_region()
+     reserve_bootmem_region()
+      init_reserved_page() <- Only if this is deferred reserved page
+       __init_single_pfn()
+        __init_single_page()
+            memset(0) <-- Loose the set fields here
+
+We end-up with issue where, currently we do not observe problem as memory
+is explicitly zeroed. But, if flag asserts are changed we can start hitting
+issues.
+
+Also, because in this patch series we will stop zeroing struct page memory
+during allocation, we must make sure that struct pages are properly
+initialized prior to using them.
+
+The deferred-reserved pages are initialized in free_all_bootmem().
+Therefore, the fix is to switch the above calls.
+
+Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
+Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
+Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
+Reviewed-by: Bob Picco <bob.picco@oracle.com>
+Acked-by: Michal Hocko <mhocko@suse.com>
+---
+ arch/x86/mm/init_64.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/arch/x86/mm/init_64.c b/arch/x86/mm/init_64.c
+index 5ea1c3c2636e..8822523fdcd7 100644
+--- a/arch/x86/mm/init_64.c
++++ b/arch/x86/mm/init_64.c
+@@ -1182,12 +1182,18 @@ void __init mem_init(void)
+ 
+ 	/* clear_bss() already clear the empty_zero_page */
+ 
+-	register_page_bootmem_info();
+-
+ 	/* this will put all memory onto the freelists */
+ 	free_all_bootmem();
+ 	after_bootmem = 1;
+ 
++	/*
++	 * Must be done after boot memory is put on freelist, because here we
++	 * might set fields in deferred struct pages that have not yet been
++	 * initialized, and free_all_bootmem() initializes all the reserved
++	 * deferred pages for us.
++	 */
++	register_page_bootmem_info();
++
+ 	/* Register memory areas for /proc/kcore */
+ 	kclist_add(&kcore_vsyscall, (void *)VSYSCALL_ADDR,
+ 			 PAGE_SIZE, KCORE_OTHER);
+-- 
+2.14.2
