@@ -1,44 +1,33 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 5 Oct 2017 14:29:20 +0100
-Subject: [PATCH] arm64: mm: Clarify a printk in data_abort_decode()
-In-Reply-To: <20171005132242.u3c2gy6edpkkt2sr@mwanda>
-References: <20171005125914.34uc5qq5titpq6zi@mwanda>
- <20171005130436.GB5235@leverpostej>
- <20171005132242.u3c2gy6edpkkt2sr@mwanda>
-Message-ID: <20171005132920.GC5235@leverpostej>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Thu,  5 Oct 2017 14:56:53 +0200
+Subject: [PATCH 1/3] arm/xen: don't inclide rwlock.h directly.
+Message-ID: <20171005125655.12373-1-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 05, 2017 at 04:22:42PM +0300, Dan Carpenter wrote:
-> On Thu, Oct 05, 2017 at 02:04:36PM +0100, Mark Rutland wrote:
-> > Hi,
-> > 
-> > On Thu, Oct 05, 2017 at 03:59:14PM +0300, Dan Carpenter wrote:
-> > > The 0x in front of a base 10 number is misleading so I removed it.
-> > > 
-> > > Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
-> > > 
-> > > diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> > > index 89993c4be1be..a5382e90418c 100644
-> > > --- a/arch/arm64/mm/fault.c
-> > > +++ b/arch/arm64/mm/fault.c
-> > > @@ -97,7 +97,7 @@ static void data_abort_decode(unsigned int esr)
-> > >  			 (esr & ESR_ELx_SF) >> ESR_ELx_SF_SHIFT,
-> > >  			 (esr & ESR_ELx_AR) >> ESR_ELx_AR_SHIFT);
-> > >  	} else {
-> > > -		pr_alert("  ISV = 0, ISS = 0x%08lu\n", esr & ESR_ELx_ISS_MASK);
-> > > +		pr_alert("  ISV = 0, ISS = %08lu\n", esr & ESR_ELx_ISS_MASK);
-> > 
-> > A fix has already been queued [0,1], ensuring this is printed as hex.
-> > 
-> > Catalin, I see that hasn't been pushed out to the arm64 fixes/core
-> > branch. Is that deliberate?
-> 
-> Stephen is on vacation so there is no linux-next and I'm on ancient code
-> anyway.  :/
+rwlock.h should not be included directly. Instead linux/splinlock.h
+should be included. One thing it does is to break the RT build.
 
-Sure; it's just easier to peek at fixes/core than to trawl the list when
-it's up-to-date. ;)
+Cc: Stefano Stabellini <sstabellini@kernel.org>
+Cc: xen-devel at lists.xenproject.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ arch/arm/xen/p2m.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks,
-Mark.
+diff --git a/arch/arm/xen/p2m.c b/arch/arm/xen/p2m.c
+index e71eefa2e427..0641ba54ab62 100644
+--- a/arch/arm/xen/p2m.c
++++ b/arch/arm/xen/p2m.c
+@@ -1,7 +1,7 @@
+ #include <linux/bootmem.h>
+ #include <linux/gfp.h>
+ #include <linux/export.h>
+-#include <linux/rwlock.h>
++#include <linux/spinlock.h>
+ #include <linux/slab.h>
+ #include <linux/types.h>
+ #include <linux/dma-mapping.h>
+-- 
+2.14.2
