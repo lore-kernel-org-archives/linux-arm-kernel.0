@@ -1,84 +1,87 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 5 Oct 2017 11:47:17 +0100
-Subject: [PATCH v2 10/28] arm64/sve: Low-level CPU setup
-In-Reply-To: <20170913192110.GE23415@e103592.cambridge.arm.com>
-References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
- <1504198860-12951-11-git-send-email-Dave.Martin@arm.com>
- <20170913133206.rwobtu7ft5nrsh4p@localhost>
- <20170913192110.GE23415@e103592.cambridge.arm.com>
-Message-ID: <20171005104716.GV3611@e103592.cambridge.arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu,  5 Oct 2017 12:49:35 +0200
+Subject: [PATCH 00/20] sunxi: Cleanup DT warnings for the A10 and A80
+Message-ID: <cover.f5f905a5434f2a540d6844d23369a04af9f5314c.1507198895.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 13, 2017 at 08:21:11PM +0100, Dave Martin wrote:
-> On Wed, Sep 13, 2017 at 06:32:06AM -0700, Catalin Marinas wrote:
-> > On Thu, Aug 31, 2017 at 06:00:42PM +0100, Dave P Martin wrote:
-> > > diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> > > index 877d42f..dd22ef2 100644
-> > > --- a/arch/arm64/mm/proc.S
-> > > +++ b/arch/arm64/mm/proc.S
-> > > @@ -27,6 +27,7 @@
-> > >  #include <asm/pgtable-hwdef.h>
-> > >  #include <asm/cpufeature.h>
-> > >  #include <asm/alternative.h>
-> > > +#include <asm/sysreg.h>
-> > >  
-> > >  #ifdef CONFIG_ARM64_64K_PAGES
-> > >  #define TCR_TG_FLAGS	TCR_TG0_64K | TCR_TG1_64K
-> > > @@ -186,8 +187,17 @@ ENTRY(__cpu_setup)
-> > >  	tlbi	vmalle1				// Invalidate local TLB
-> > >  	dsb	nsh
-> > >  
-> > > -	mov	x0, #3 << 20
-> > > -	msr	cpacr_el1, x0			// Enable FP/ASIMD
-> > > +	mov	x0, #3 << 20			// FEN
-> > > +
-> > > +	/* SVE */
-> > > +	mrs	x5, id_aa64pfr0_el1
-> > > +	ubfx	x5, x5, #ID_AA64PFR0_SVE_SHIFT, #4
-> > > +	cbz	x5, 1f
-> > > +
-> > > +	bic	x0, x0, #CPACR_EL1_ZEN
-> > > +	orr	x0, x0, #CPACR_EL1_ZEN_EL1EN	// SVE: trap for EL0, not EL1
-> > > +1:	msr	cpacr_el1, x0			// Enable FP/ASIMD
-> > 
-> > For EL1, I wonder whether we could move this later to cpufeature.c. IIRC
-> > I tried to do the same with FPSIMD but hit an issue with EFI run-time
-> > services (I may be wrong though).
-> 
-> I'll take a look at this -- I believe it should be safe to disable this
-> trap for EL1 relatively late.  This is needed before probing for
-> available vector lengths, but apart from that the kernel shouldn't touch
-> SVE until/unless some user task uses SVE.
-> 
-> This would change if we eventually enable kernel-mode SVE, but I wouldn't
-> expect that to get used in early boot before the cpufeatures code runs.
-> 
-> Ard may have a view on this.
+We've had quite a big number of warnings in our device trees due to some
+convention that was added before any kind of warning was introduced, and
+went on since.
 
-I've had a go at this, but there's a lot of splatter.
+Some of our newest SoC will not generate any warning but the unavoidable
+ones (generic properties with underscores, mostly, like USB OTG dr_mode).
 
-I can add a helper el1_enable_sve() say, and call it before probing
-ZCR_EL1 in the cpufeatures code.
+However, most of them just needed some cleanup. Here is a serie that would
+clean two of these SoCs (plus one SoC-tree wide change).
 
-This makes enabling SVE a side-effect of the cpufeatures code, which
-I'm not that comfortable with -- it feels like something that later
-refactoring could easily break.
+This brings down the number of DTC warnings with W=2 from 10482 to 4504,
+which is a nice stat, but will obviously need some more work.
 
-I can also add an explicit call to el1_enable_sve() in sve_setup(),
-but this only works on the boot cpu.
+Let me know what you think,
+Maxime
 
-For secondaries, I could add something in secondary_start_kernel(),
-but this looks incongruous since there's no other call to do something
-similar yet.
+Maxime Ripard (20):
+  ARM: dts: sunxi: Remove leading zeros from unit-addresses
+  ARM: dts: axp209: Rename usb_power_supply node to avoid warnings
+  ARM: dts: sun4i: Change framebuffer node names to avoid warnings
+  ARM: dts: sun4i: Change clock node names to avoid warnings
+  ARM: dts: sun4i: Change pinctrl nodes to avoid warning
+  ARM: dts: sun4i: Provide default muxing for relevant controllers
+  ARM: dts: sun4i: Remove skeleton and memory to avoid warnings
+  ARM: dts: sun4i: Change LRADC node names to avoid warnings
+  ARM: dts: sun4i: Remove SoC node unit-name to avoid warnings
+  ARM: dts: sun4i: Rename thermal nodes to avoid warnings
+  ARM: dts: sun4i: Remove all useless pinctrl nodes
+  ARM: dts: sun4i: Remove underscores from nodes names
+  ARM: dts: sun4i: Remove gpio-keys warnings
+  ARM: dts: sun9i: Remove skeleton to avoid warnings
+  ARM: dts: sun9i: Rename pinctrl nodes to avoid warnings
+  ARM: dts: sun9i: Remove GPIO pinctrl nodes to avoid warnings
+  ARM: dts: sun9i: optimus: Remove card detect pull-up
+  ARM: dts: sun9i: cubieboard4: Remove card detect pull-up
+  ARM: dts: sun9i: Change node names to remove underscores
+  ARM: dts: sun9i: Change node names to remove underscores
 
+ arch/arm/boot/dts/axp209.dtsi                        |   2 +-
+ arch/arm/boot/dts/sun4i-a10-a1000.dts                |  28 +--
+ arch/arm/boot/dts/sun4i-a10-ba10-tvbox.dts           |  16 +-
+ arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts      |  20 +-
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts           |  20 +-
+ arch/arm/boot/dts/sun4i-a10-dserve-dsrv9703c.dts     |  50 +---
+ arch/arm/boot/dts/sun4i-a10-gemei-g9.dts             |  23 +-
+ arch/arm/boot/dts/sun4i-a10-hackberry.dts            |  24 +-
+ arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts         |  10 +-
+ arch/arm/boot/dts/sun4i-a10-inet1.dts                |  36 +--
+ arch/arm/boot/dts/sun4i-a10-inet97fv2.dts            |  24 +-
+ arch/arm/boot/dts/sun4i-a10-inet9f-rev03.dts         |  68 +---
+ arch/arm/boot/dts/sun4i-a10-itead-iteaduino-plus.dts |  21 +-
+ arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts           |  26 +-
+ arch/arm/boot/dts/sun4i-a10-marsboard.dts            |  25 +-
+ arch/arm/boot/dts/sun4i-a10-mini-xplus.dts           |  10 +-
+ arch/arm/boot/dts/sun4i-a10-mk802.dts                |  24 +-
+ arch/arm/boot/dts/sun4i-a10-mk802ii.dts              |   6 +-
+ arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts       |  22 +-
+ arch/arm/boot/dts/sun4i-a10-pcduino.dts              |  32 +--
+ arch/arm/boot/dts/sun4i-a10-pcduino2.dts             |   9 +-
+ arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts     |  43 +--
+ arch/arm/boot/dts/sun4i-a10.dtsi                     | 210 ++++++------
+ arch/arm/boot/dts/sun5i-a10s.dtsi                    |   6 +-
+ arch/arm/boot/dts/sun5i-a13.dtsi                     |   4 +-
+ arch/arm/boot/dts/sun5i-gr8.dtsi                     |   8 +-
+ arch/arm/boot/dts/sun5i.dtsi                         |  82 ++---
+ arch/arm/boot/dts/sun6i-a31.dtsi                     | 112 +++---
+ arch/arm/boot/dts/sun7i-a20.dtsi                     | 122 +++----
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi                 |  62 ++--
+ arch/arm/boot/dts/sun8i-a23.dtsi                     |   4 +-
+ arch/arm/boot/dts/sun8i-a33.dtsi                     |  18 +-
+ arch/arm/boot/dts/sun8i-v3s.dtsi                     |  32 +-
+ arch/arm/boot/dts/sun9i-a80-cubieboard4.dts          |  36 +--
+ arch/arm/boot/dts/sun9i-a80-optimus.dts              |  56 +---
+ arch/arm/boot/dts/sun9i-a80.dtsi                     | 117 +++----
+ arch/arm/boot/dts/sunxi-itead-core-common.dtsi       |   4 +-
+ 37 files changed, 525 insertions(+), 887 deletions(-)
 
-** Suzuki, do we have any other case where the trap for a CPU feature is
-turned off by the cpufeatures code?  If there's already a template for
-this then I'm happy to follow it.
-
-Otherwise, maybe it's simpler to keep it in __cpu_setup after all
-since that's a common path that all CPUs pass through.
-
-Cheers
----Dave
+base-commit: c27ad2958485126c3828e59d53013d3b45ec14f2
+-- 
+git-series 0.9.1
