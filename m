@@ -1,93 +1,166 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 5 Oct 2017 12:04:12 +0100
-Subject: [PATCH v2 10/28] arm64/sve: Low-level CPU setup
-In-Reply-To: <20171005104716.GV3611@e103592.cambridge.arm.com>
-References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
- <1504198860-12951-11-git-send-email-Dave.Martin@arm.com>
- <20170913133206.rwobtu7ft5nrsh4p@localhost>
- <20170913192110.GE23415@e103592.cambridge.arm.com>
- <20171005104716.GV3611@e103592.cambridge.arm.com>
-Message-ID: <76020d51-a971-e73e-9fba-1e2ec97985dc@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 5 Oct 2017 12:07:26 +0100
+Subject: [PATCH v8 3/5] iommu/of: Add msi address regions reservation
+ helper
+In-Reply-To: <20171004135007.GA12327@red-moon>
+References: <20170927133241.21036-1-shameerali.kolothum.thodi@huawei.com>
+ <20170927133241.21036-4-shameerali.kolothum.thodi@huawei.com>
+ <f3146f49-6004-7a15-866b-653e3ea54856@arm.com>
+ <20171004135007.GA12327@red-moon>
+Message-ID: <5c80f292-dc5d-a1c6-d7a0-df2a84cc77d1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/10/17 11:47, Dave Martin wrote:
-> On Wed, Sep 13, 2017 at 08:21:11PM +0100, Dave Martin wrote:
->> On Wed, Sep 13, 2017 at 06:32:06AM -0700, Catalin Marinas wrote:
->>> On Thu, Aug 31, 2017 at 06:00:42PM +0100, Dave P Martin wrote:
->>>> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
->>>> index 877d42f..dd22ef2 100644
->>>> --- a/arch/arm64/mm/proc.S
->>>> +++ b/arch/arm64/mm/proc.S
->>>> @@ -27,6 +27,7 @@
->>>>   #include <asm/pgtable-hwdef.h>
->>>>   #include <asm/cpufeature.h>
->>>>   #include <asm/alternative.h>
->>>> +#include <asm/sysreg.h>
->>>>   
->>>>   #ifdef CONFIG_ARM64_64K_PAGES
->>>>   #define TCR_TG_FLAGS	TCR_TG0_64K | TCR_TG1_64K
->>>> @@ -186,8 +187,17 @@ ENTRY(__cpu_setup)
->>>>   	tlbi	vmalle1				// Invalidate local TLB
->>>>   	dsb	nsh
->>>>   
->>>> -	mov	x0, #3 << 20
->>>> -	msr	cpacr_el1, x0			// Enable FP/ASIMD
->>>> +	mov	x0, #3 << 20			// FEN
->>>> +
->>>> +	/* SVE */
->>>> +	mrs	x5, id_aa64pfr0_el1
->>>> +	ubfx	x5, x5, #ID_AA64PFR0_SVE_SHIFT, #4
->>>> +	cbz	x5, 1f
->>>> +
->>>> +	bic	x0, x0, #CPACR_EL1_ZEN
->>>> +	orr	x0, x0, #CPACR_EL1_ZEN_EL1EN	// SVE: trap for EL0, not EL1
->>>> +1:	msr	cpacr_el1, x0			// Enable FP/ASIMD
+On 04/10/17 14:50, Lorenzo Pieralisi wrote:
+> On Wed, Oct 04, 2017 at 12:22:04PM +0100, Marc Zyngier wrote:
+>> On 27/09/17 14:32, Shameer Kolothum wrote:
+>>> From: John Garry <john.garry@huawei.com>
 >>>
->>> For EL1, I wonder whether we could move this later to cpufeature.c. IIRC
->>> I tried to do the same with FPSIMD but hit an issue with EFI run-time
->>> services (I may be wrong though).
+>>> On some platforms msi-controller address regions have to be excluded
+>>> from normal IOVA allocation in that they are detected and decoded in
+>>> a HW specific way by system components and so they cannot be considered
+>>> normal IOVA address space.
+>>>
+>>> Add a helper function that retrieves msi address regions through device
+>>> tree msi mapping, so that these regions will not be translated by IOMMU
+>>> and will be excluded from IOVA allocations.
+>>>
+>>> Signed-off-by: John Garry <john.garry@huawei.com>
+>>> [Shameer: Modified msi-parent retrieval logic]
+>>> Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
+>>> ---
+>>>  drivers/iommu/of_iommu.c | 95 ++++++++++++++++++++++++++++++++++++++++++++++++
+>>>  include/linux/of_iommu.h | 10 +++++
+>>>  2 files changed, 105 insertions(+)
+>>>
+>>> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+>>> index e60e3db..ffd7fb7 100644
+>>> --- a/drivers/iommu/of_iommu.c
+>>> +++ b/drivers/iommu/of_iommu.c
+>>> @@ -21,6 +21,7 @@
+>>>  #include <linux/iommu.h>
+>>>  #include <linux/limits.h>
+>>>  #include <linux/of.h>
+>>> +#include <linux/of_address.h>
+>>>  #include <linux/of_iommu.h>
+>>>  #include <linux/of_pci.h>
+>>>  #include <linux/slab.h>
+>>> @@ -138,6 +139,14 @@ static int of_iommu_xlate(struct device *dev,
+>>>  	return ops->of_xlate(dev, iommu_spec);
+>>>  }
+>>>  
+>>> +static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
+>>> +{
+>>> +	u32 *rid = data;
+>>> +
+>>> +	*rid = alias;
+>>> +	return 0;
+>>> +}
+>>> +
+>>>  struct of_pci_iommu_alias_info {
+>>>  	struct device *dev;
+>>>  	struct device_node *np;
+>>> @@ -163,6 +172,73 @@ static int of_pci_iommu_init(struct pci_dev *pdev, u16 alias, void *data)
+>>>  	return info->np == pdev->bus->dev.of_node;
+>>>  }
+>>>  
+>>> +static int of_iommu_alloc_resv_region(struct device_node *np,
+>>> +				      struct list_head *head)
+>>> +{
+>>> +	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
+>>> +	struct iommu_resv_region *region;
+>>> +	struct resource res;
+>>> +	int err;
+>>> +
+>>> +	err = of_address_to_resource(np, 0, &res);
 >>
->> I'll take a look at this -- I believe it should be safe to disable this
->> trap for EL1 relatively late.  This is needed before probing for
->> available vector lengths, but apart from that the kernel shouldn't touch
->> SVE until/unless some user task uses SVE.
+>> What is the rational for registering the first region only? Surely you
+>> can have more than one region in an MSI controller (yes, your particular
+>> case is the ITS which has only one, but we're trying to do something
+>> generic here).
 >>
->> This would change if we eventually enable kernel-mode SVE, but I wouldn't
->> expect that to get used in early boot before the cpufeatures code runs.
+>> Another issue I have with this code is that it inserts all of the ITS
+>> MMIO in the RESV_MSI range. As long as we don't generate any page tables
+>> for this, we're fine. But if we ever change this, we'll end-up with the
+>> ITS programming interface being exposed to a device, which wouldn't be
+>> acceptable.
 >>
->> Ard may have a view on this.
-> 
-> I've had a go at this, but there's a lot of splatter.
-> 
-> I can add a helper el1_enable_sve() say, and call it before probing
-> ZCR_EL1 in the cpufeatures code.
-> 
-> This makes enabling SVE a side-effect of the cpufeatures code, which
-> I'm not that comfortable with -- it feels like something that later
-> refactoring could easily break.
-> 
-> I can also add an explicit call to el1_enable_sve() in sve_setup(),
-> but this only works on the boot cpu.
-> 
-> For secondaries, I could add something in secondary_start_kernel(),
-> but this looks incongruous since there's no other call to do something
-> similar yet.
-> 
-> 
-> ** Suzuki, do we have any other case where the trap for a CPU feature is
-> turned off by the cpufeatures code?  If there's already a template for
-> this then I'm happy to follow it.
+>> Why can't we have some generic property instead, that would describe the
+>> actual ranges that cannot be translated? That way, no random insertion
+>> of a random range, and relatively future proof.
 
-The closest thing you have is an "enable" callback for each "available"
-capability, which gets invoked on all CPUs (boot time active CPUs and the
-ones which are brought up later). This is used by things like, PAN to
-do some CPU specific setups.
+Indeed. Furthermore, IORT has the advantage of being limited to a few
+distinct device types and SBSA-compliant system topologies, so the
+ITS-chasing is reasonable there (modulo only reserving GITS_TRANSLATER).
+The scope of DT covers more embedded things as well like PCI host
+controllers with internal MSI doorbells, and potentially even
+direct-mapped memory regions for things like bootloader framebuffers to
+prevent display glitches - a generic address/size/flags description of a
+region could work for just about everything.
 
-See  :
-    enable_cpu_capabilities()  // For all boot time active CPUs
-    and
-    verify_local_cpu_features()  // For CPUs brought up later
+> IORT code has the same issue (ie it reserves all ITS regions) and I do
+> not know where a property can be added to describe those ranges (IORT
+> specs ? I'd rather not) in ACPI other than the IORT tables entries
+> themselves.
+> 
+>> I'm not sure where to declare it (PCIe node? IOMMU node?), but it'd feel
+>> like a much nicer and simpler solution to this problem.
+> 
+> It could be but if we throw ACPI into the picture we have to knock
+> together Hisilicon specific namespace bindings to handle this and
+> quickly.
 
-Cheers
-Suzuki
+As above I'm happy with the ITS-specific solution for ACPI given the
+limits of IORT. What I had in mind for DT was something tied in with the
+generic IOMMU bindings. Something like this is probably easiest to
+handle, but does rather spread the information around:
+
+
+  pci {
+  	...
+  	iommu-map = <0 0 &iommu1 0x10000>;
+  	iommu-reserved-ranges = <0x12340000 0x1000 IOMMU_MSI>,
+  				<0x34560000 0x1000 IOMMU_MSI>;
+  };
+
+  display {
+  	...
+  	iommus = <&iommu1 0x20000>;
+  	/* simplefb region */
+  	iommu-reserved-ranges = <0x80080000 0x80000 IOMMU_DIRECT>,
+  };
+
+
+Alternatively, something inspired by reserved-memory might perhaps be
+conceptually neater, at the risk of being more complicated:
+
+
+  iommu1: iommu at acbd0000 {
+  	...
+  	#iommu-cells = <1>;
+
+  	iommu-reserved-ranges {
+  		#address-cells = <1>;
+  		#size-cells = <1>;
+
+		its0_resv: msi at 12340000 {
+  			compatible = "iommu-msi-region";
+  			reg = <0x12340000 0x1000>;
+  		};
+
+		its1_resv: msi at 34560000 {
+  			compatible = "iommu-msi-region";
+  			reg = <0x34560000 0x1000>;
+  		};
+
+		fb_resv: direct at 12340000 {
+  			compatible = "iommu-direct-region";
+  			reg = <0x80080000 0x80000>;
+  		};
+  	};
+  };
+
+
+DT folks - any opinions?
+
+Robin.
