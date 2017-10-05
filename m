@@ -1,60 +1,55 @@
 From: james.morse@arm.com (James Morse)
-Date: Thu,  5 Oct 2017 20:18:09 +0100
-Subject: [PATCH v3 17/20] KVM: arm64: Save ESR_EL2 on guest SError
+Date: Thu,  5 Oct 2017 20:17:57 +0100
+Subject: [PATCH v3 05/20] arm64: entry.S: Remove disable_dbg
 In-Reply-To: <20171005191812.5678-1-james.morse@arm.com>
 References: <20171005191812.5678-1-james.morse@arm.com>
-Message-ID: <20171005191812.5678-18-james.morse@arm.com>
+Message-ID: <20171005191812.5678-6-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we exit a guest due to an SError the vcpu fault info isn't updated
-with the ESR. Today this is only done for traps.
+enable_step_tsk is the only user of disable_dbg, which doesn't respect
+our 'dai' order for exception masking. enable_step_tsk may enable
+single-step, so previously needed to mask debug exceptions to prevent us
+from single-stepping kernel_exit. enable_step_tsk is called at the end
+of the ret_to_user loop, which has already masked all exceptions so this
+is no longer needed.
 
-The v8.2 RAS Extensions define ISS values for SError. Update the vcpu's
-fault_info with the ESR on SError so that handle_exit() can determine
-if this was a RAS SError and decode its severity.
+Remove disable_dbg, add a comment that enable_step_tsk's caller should
+have masked debug.
 
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
- arch/arm64/kvm/hyp/switch.c | 15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
+ arch/arm64/include/asm/assembler.h | 9 +--------
+ 1 file changed, 1 insertion(+), 8 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index af37658223a0..cba6d8ac105c 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -230,13 +230,20 @@ static bool __hyp_text __translate_far_to_hpfar(u64 far, u64 *hpfar)
- 	return true;
- }
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index 114e741ca873..1b0972046a72 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -68,13 +68,6 @@
+ 	msr	daif, \flags
+ 	.endm
  
-+static void __hyp_text __populate_fault_info_esr(struct kvm_vcpu *vcpu)
-+{
-+	vcpu->arch.fault.esr_el2 = read_sysreg_el2(esr);
-+}
-+
- static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
- {
--	u64 esr = read_sysreg_el2(esr);
--	u8 ec = ESR_ELx_EC(esr);
-+	u8 ec;
-+	u64 esr;
- 	u64 hpfar, far;
+-/*
+- * Enable and disable debug exceptions.
+- */
+-	.macro	disable_dbg
+-	msr	daifset, #8
+-	.endm
+-
+ 	.macro	enable_dbg
+ 	msr	daifclr, #8
+ 	.endm
+@@ -88,9 +81,9 @@
+ 9990:
+ 	.endm
  
--	vcpu->arch.fault.esr_el2 = esr;
-+	__populate_fault_info_esr(vcpu);
-+	esr = vcpu->arch.fault.esr_el2;
-+	ec = ESR_ELx_EC(esr);
- 
- 	if (ec != ESR_ELx_EC_DABT_LOW && ec != ESR_ELx_EC_IABT_LOW)
- 		return true;
-@@ -325,6 +332,8 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 	 */
- 	if (exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
- 		goto again;
-+	else if (ARM_EXCEPTION_CODE(exit_code) == ARM_EXCEPTION_EL1_SERROR)
-+		__populate_fault_info_esr(vcpu);
- 
- 	if (static_branch_unlikely(&vgic_v2_cpuif_trap) &&
- 	    exit_code == ARM_EXCEPTION_TRAP) {
++	/* call with daif masked */
+ 	.macro	enable_step_tsk, flgs, tmp
+ 	tbz	\flgs, #TIF_SINGLESTEP, 9990f
+-	disable_dbg
+ 	mrs	\tmp, mdscr_el1
+ 	orr	\tmp, \tmp, #1
+ 	msr	mdscr_el1, \tmp
 -- 
 2.13.3
