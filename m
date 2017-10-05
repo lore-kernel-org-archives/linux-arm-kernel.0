@@ -1,21 +1,16 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  5 Oct 2017 13:54:52 +0100
-Subject: [PATCH 1/6] kernel/locking: Use struct qrwlock instead of struct
- __qrwlock
+Date: Thu,  5 Oct 2017 13:54:57 +0100
+Subject: [PATCH 6/6] kernel/locking: Remove unused union members from struct
+ qrwlock
 In-Reply-To: <1507208097-825-1-git-send-email-will.deacon@arm.com>
 References: <1507208097-825-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1507208097-825-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1507208097-825-7-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no good reason to keep the internal structure of struct qrwlock
-hidden from qrwlock.h, particularly as it's actually needed for unlock
-and ends up being abstracted independently behind the __qrwlock_write_byte
-function.
-
-Stop pretending we can hide this stuff, and move the __qrwlock definition
-into qrwlock, removing the __qrwlock_write_byte nastiness and using the
-same struct definition everywhere instead.
+Now that all atomic operations are performed on the full lock word of
+the qrwlock, there's no need to define a union type exposing the reader
+and writer subcomponents. Remove them.
 
 Cc: Peter Zijlstra <peterz@infradead.org>
 Cc: Ingo Molnar <mingo@redhat.com>
@@ -24,82 +19,17 @@ Cc: Boqun Feng <boqun.feng@gmail.com>
 Cc: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- include/asm-generic/qrwlock.h       | 12 +-----------
- include/asm-generic/qrwlock_types.h | 15 +++++++++++++--
- kernel/locking/qrwlock.c            | 26 ++------------------------
- 3 files changed, 16 insertions(+), 37 deletions(-)
+ include/asm-generic/qrwlock_types.h | 15 ++-------------
+ 1 file changed, 2 insertions(+), 13 deletions(-)
 
-diff --git a/include/asm-generic/qrwlock.h b/include/asm-generic/qrwlock.h
-index 50925327b0a8..02c0a768e6b0 100644
---- a/include/asm-generic/qrwlock.h
-+++ b/include/asm-generic/qrwlock.h
-@@ -129,22 +129,12 @@ static inline void queued_read_unlock(struct qrwlock *lock)
- }
- 
- /**
-- * __qrwlock_write_byte - retrieve the write byte address of a queue rwlock
-- * @lock : Pointer to queue rwlock structure
-- * Return: the write byte address of a queue rwlock
-- */
--static inline u8 *__qrwlock_write_byte(struct qrwlock *lock)
--{
--	return (u8 *)lock + 3 * IS_BUILTIN(CONFIG_CPU_BIG_ENDIAN);
--}
--
--/**
-  * queued_write_unlock - release write lock of a queue rwlock
-  * @lock : Pointer to queue rwlock structure
-  */
- static inline void queued_write_unlock(struct qrwlock *lock)
- {
--	smp_store_release(__qrwlock_write_byte(lock), 0);
-+	smp_store_release(&lock->wmode, 0);
- }
- 
- /*
 diff --git a/include/asm-generic/qrwlock_types.h b/include/asm-generic/qrwlock_types.h
-index 0abc6b6062fb..507f2dc51bba 100644
+index 507f2dc51bba..7f53be31359c 100644
 --- a/include/asm-generic/qrwlock_types.h
 +++ b/include/asm-generic/qrwlock_types.h
-@@ -9,12 +9,23 @@
+@@ -9,23 +9,12 @@
   */
  
  typedef struct qrwlock {
--	atomic_t		cnts;
-+	union {
-+		atomic_t cnts;
-+		struct {
-+#ifdef __LITTLE_ENDIAN
-+			u8 wmode;	/* Writer mode   */
-+			u8 rcnts[3];	/* Reader counts */
-+#else
-+			u8 rcnts[3];	/* Reader counts */
-+			u8 wmode;	/* Writer mode   */
-+#endif
-+		};
-+	};
- 	arch_spinlock_t		wait_lock;
- } arch_rwlock_t;
- 
- #define	__ARCH_RW_LOCK_UNLOCKED {		\
--	.cnts = ATOMIC_INIT(0),			\
-+	{ .cnts = ATOMIC_INIT(0), },		\
- 	.wait_lock = __ARCH_SPIN_LOCK_UNLOCKED,	\
- }
- 
-diff --git a/kernel/locking/qrwlock.c b/kernel/locking/qrwlock.c
-index 2655f26ec882..1af791e37348 100644
---- a/kernel/locking/qrwlock.c
-+++ b/kernel/locking/qrwlock.c
-@@ -23,26 +23,6 @@
- #include <linux/spinlock.h>
- #include <asm/qrwlock.h>
- 
--/*
-- * This internal data structure is used for optimizing access to some of
-- * the subfields within the atomic_t cnts.
-- */
--struct __qrwlock {
 -	union {
 -		atomic_t cnts;
 -		struct {
@@ -112,24 +42,15 @@ index 2655f26ec882..1af791e37348 100644
 -#endif
 -		};
 -	};
--	arch_spinlock_t	lock;
--};
--
- /**
-  * rspin_until_writer_unlock - inc reader count & spin until writer is gone
-  * @lock  : Pointer to queue rwlock structure
-@@ -125,10 +105,8 @@ void queued_write_lock_slowpath(struct qrwlock *lock)
- 	 * or wait for a previous writer to go away.
- 	 */
- 	for (;;) {
--		struct __qrwlock *l = (struct __qrwlock *)lock;
--
--		if (!READ_ONCE(l->wmode) &&
--		   (cmpxchg_relaxed(&l->wmode, 0, _QW_WAITING) == 0))
-+		if (!READ_ONCE(lock->wmode) &&
-+		   (cmpxchg_relaxed(&lock->wmode, 0, _QW_WAITING) == 0))
- 			break;
++	atomic_t cnts;
+ 	arch_spinlock_t		wait_lock;
+ } arch_rwlock_t;
  
- 		cpu_relax();
+ #define	__ARCH_RW_LOCK_UNLOCKED {		\
+-	{ .cnts = ATOMIC_INIT(0), },		\
++	.cnts = ATOMIC_INIT(0),			\
+ 	.wait_lock = __ARCH_SPIN_LOCK_UNLOCKED,	\
+ }
+ 
 -- 
 2.1.4
