@@ -1,19 +1,45 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 5 Oct 2017 23:44:42 +0800
-Subject: [PATCH 10/20] ARM: dts: sun4i: Rename thermal nodes to avoid
- warnings
-In-Reply-To: <f40eebec4a934ee2a2ef46c375c731daac664dba.1507198895.git-series.maxime.ripard@free-electrons.com>
-References: <cover.f5f905a5434f2a540d6844d23369a04af9f5314c.1507198895.git-series.maxime.ripard@free-electrons.com>
- <f40eebec4a934ee2a2ef46c375c731daac664dba.1507198895.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v66Fobd6JFqYSnu1LJy4kHQQ7NsXcwgA25jq5crR1yOkeg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu,  5 Oct 2017 17:49:18 +0100
+Subject: [PATCH] iommu/arm-smmu-v3: Ensure we sync STE when only changing
+ config field
+Message-ID: <1507222158-4151-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 5, 2017 at 6:49 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The thermal-zone subnodes we defined for the A10 have underscores in them
-> that will generate DTC warnings. Change those underscores for hyphens.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+The SMMUv3 architecture permits caching of data structures deemed to be
+"reachable" by the SMU, which includes STEs marked as invalid. When
+transitioning an STE to a bypass/fault configuration at init or detach
+time, we mistakenly elide the CMDQ_OP_CFGI_STE operation in some cases,
+therefore potentially leaving the old STE state cached in the SMMU.
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+This patch fixes the problem by ensuring that we perform the
+CMDQ_OP_CFGI_STE operation irrespective of the validity of the previous
+STE.
+
+Cc: Robin Murphy <robin.murphy@arm.com>
+Reported-by: Eric Auger <eric.auger@redhat.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ drivers/iommu/arm-smmu-v3.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 47f52b1ab838..91fdabdb4de6 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1085,8 +1085,11 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
+ 		dst[1] = cpu_to_le64(STRTAB_STE_1_SHCFG_INCOMING
+ 			 << STRTAB_STE_1_SHCFG_SHIFT);
+ 		dst[2] = 0; /* Nuke the VMID */
+-		if (ste_live)
+-			arm_smmu_sync_ste_for_sid(smmu, sid);
++		/*
++		 * The SMMU can perform negative caching, so we must sync
++		 * the STE regardless of whether the old value was live.
++		 */
++		arm_smmu_sync_ste_for_sid(smmu, sid);
+ 		return;
+ 	}
+ 
+-- 
+2.1.4
