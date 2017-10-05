@@ -1,166 +1,44 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 5 Oct 2017 12:07:26 +0100
-Subject: [PATCH v8 3/5] iommu/of: Add msi address regions reservation
- helper
-In-Reply-To: <20171004135007.GA12327@red-moon>
-References: <20170927133241.21036-1-shameerali.kolothum.thodi@huawei.com>
- <20170927133241.21036-4-shameerali.kolothum.thodi@huawei.com>
- <f3146f49-6004-7a15-866b-653e3ea54856@arm.com>
- <20171004135007.GA12327@red-moon>
-Message-ID: <5c80f292-dc5d-a1c6-d7a0-df2a84cc77d1@arm.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 5 Oct 2017 13:08:20 +0200
+Subject: [PATCH v2 2/2] dt-bindings: i2c: Update documentation for
+ "mv78230-a0-i2c"
+In-Reply-To: <87k20dmxw0.fsf@free-electrons.com>
+References: <20170928213605.22874-1-kalyan.kinthada@alliedtelesis.co.nz>
+ <20170928213605.22874-3-kalyan.kinthada@alliedtelesis.co.nz>
+ <87k20dmxw0.fsf@free-electrons.com>
+Message-ID: <20171005110820.phcjh7dmygi43dhq@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/17 14:50, Lorenzo Pieralisi wrote:
-> On Wed, Oct 04, 2017 at 12:22:04PM +0100, Marc Zyngier wrote:
->> On 27/09/17 14:32, Shameer Kolothum wrote:
->>> From: John Garry <john.garry@huawei.com>
->>>
->>> On some platforms msi-controller address regions have to be excluded
->>> from normal IOVA allocation in that they are detected and decoded in
->>> a HW specific way by system components and so they cannot be considered
->>> normal IOVA address space.
->>>
->>> Add a helper function that retrieves msi address regions through device
->>> tree msi mapping, so that these regions will not be translated by IOMMU
->>> and will be excluded from IOVA allocations.
->>>
->>> Signed-off-by: John Garry <john.garry@huawei.com>
->>> [Shameer: Modified msi-parent retrieval logic]
->>> Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
->>> ---
->>>  drivers/iommu/of_iommu.c | 95 ++++++++++++++++++++++++++++++++++++++++++++++++
->>>  include/linux/of_iommu.h | 10 +++++
->>>  2 files changed, 105 insertions(+)
->>>
->>> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
->>> index e60e3db..ffd7fb7 100644
->>> --- a/drivers/iommu/of_iommu.c
->>> +++ b/drivers/iommu/of_iommu.c
->>> @@ -21,6 +21,7 @@
->>>  #include <linux/iommu.h>
->>>  #include <linux/limits.h>
->>>  #include <linux/of.h>
->>> +#include <linux/of_address.h>
->>>  #include <linux/of_iommu.h>
->>>  #include <linux/of_pci.h>
->>>  #include <linux/slab.h>
->>> @@ -138,6 +139,14 @@ static int of_iommu_xlate(struct device *dev,
->>>  	return ops->of_xlate(dev, iommu_spec);
->>>  }
->>>  
->>> +static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
->>> +{
->>> +	u32 *rid = data;
->>> +
->>> +	*rid = alias;
->>> +	return 0;
->>> +}
->>> +
->>>  struct of_pci_iommu_alias_info {
->>>  	struct device *dev;
->>>  	struct device_node *np;
->>> @@ -163,6 +172,73 @@ static int of_pci_iommu_init(struct pci_dev *pdev, u16 alias, void *data)
->>>  	return info->np == pdev->bus->dev.of_node;
->>>  }
->>>  
->>> +static int of_iommu_alloc_resv_region(struct device_node *np,
->>> +				      struct list_head *head)
->>> +{
->>> +	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
->>> +	struct iommu_resv_region *region;
->>> +	struct resource res;
->>> +	int err;
->>> +
->>> +	err = of_address_to_resource(np, 0, &res);
->>
->> What is the rational for registering the first region only? Surely you
->> can have more than one region in an MSI controller (yes, your particular
->> case is the ITS which has only one, but we're trying to do something
->> generic here).
->>
->> Another issue I have with this code is that it inserts all of the ITS
->> MMIO in the RESV_MSI range. As long as we don't generate any page tables
->> for this, we're fine. But if we ever change this, we'll end-up with the
->> ITS programming interface being exposed to a device, which wouldn't be
->> acceptable.
->>
->> Why can't we have some generic property instead, that would describe the
->> actual ranges that cannot be translated? That way, no random insertion
->> of a random range, and relatively future proof.
-
-Indeed. Furthermore, IORT has the advantage of being limited to a few
-distinct device types and SBSA-compliant system topologies, so the
-ITS-chasing is reasonable there (modulo only reserving GITS_TRANSLATER).
-The scope of DT covers more embedded things as well like PCI host
-controllers with internal MSI doorbells, and potentially even
-direct-mapped memory regions for things like bootloader framebuffers to
-prevent display glitches - a generic address/size/flags description of a
-region could work for just about everything.
-
-> IORT code has the same issue (ie it reserves all ITS regions) and I do
-> not know where a property can be added to describe those ranges (IORT
-> specs ? I'd rather not) in ACPI other than the IORT tables entries
-> themselves.
+On Mon, Oct 02, 2017 at 04:23:43PM +0200, Gregory CLEMENT wrote:
+> Hi Wolfram,
+>  
+>  On ven., sept. 29 2017, Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz> wrote:
 > 
->> I'm not sure where to declare it (PCIe node? IOMMU node?), but it'd feel
->> like a much nicer and simpler solution to this problem.
+> > This commit modifies the documentation for
+> > "marvell,mv78230-a0-i2c" compatible string.
+> >
+> > The "marvell,mv78230-a0-i2c" compatible string enables the workaround
+> > for an i2c repeated start timing violation, but unlike
+> > "marvell,mv78230-i2c" it disables the i2c offload support. This is
+> > applicable to a number of SoCs such as early revisions of the Armada XP
+> > and the Armada 38x.
+> >
+> > Signed-off-by: Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz>
 > 
-> It could be but if we throw ACPI into the picture we have to knock
-> together Hisilicon specific namespace bindings to handle this and
-> quickly.
+> 
+> I applied the dt fix on my mvebu/fixes branch. Do you want to apply this
+> one on your branch, or do you prefer I take it. In this case an acked-by
+> would be nice.
 
-As above I'm happy with the ITS-specific solution for ACPI given the
-limits of IORT. What I had in mind for DT was something tied in with the
-generic IOMMU bindings. Something like this is probably easiest to
-handle, but does rather spread the information around:
+I'd prefer to take it. What I'd really like to see here is an ack from
+Rob because of the previous discussion of an earlier revision of this
+patch.
 
-
-  pci {
-  	...
-  	iommu-map = <0 0 &iommu1 0x10000>;
-  	iommu-reserved-ranges = <0x12340000 0x1000 IOMMU_MSI>,
-  				<0x34560000 0x1000 IOMMU_MSI>;
-  };
-
-  display {
-  	...
-  	iommus = <&iommu1 0x20000>;
-  	/* simplefb region */
-  	iommu-reserved-ranges = <0x80080000 0x80000 IOMMU_DIRECT>,
-  };
-
-
-Alternatively, something inspired by reserved-memory might perhaps be
-conceptually neater, at the risk of being more complicated:
-
-
-  iommu1: iommu at acbd0000 {
-  	...
-  	#iommu-cells = <1>;
-
-  	iommu-reserved-ranges {
-  		#address-cells = <1>;
-  		#size-cells = <1>;
-
-		its0_resv: msi at 12340000 {
-  			compatible = "iommu-msi-region";
-  			reg = <0x12340000 0x1000>;
-  		};
-
-		its1_resv: msi at 34560000 {
-  			compatible = "iommu-msi-region";
-  			reg = <0x34560000 0x1000>;
-  		};
-
-		fb_resv: direct at 12340000 {
-  			compatible = "iommu-direct-region";
-  			reg = <0x80080000 0x80000>;
-  		};
-  	};
-  };
-
-
-DT folks - any opinions?
-
-Robin.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171005/f264e77f/attachment.sig>
