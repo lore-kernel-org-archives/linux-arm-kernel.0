@@ -1,261 +1,73 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 06 Oct 2017 15:11:43 +0200
-Subject: [PATCH 10/16] serial: mvebu-uart: dissociate RX and TX interrupts
-In-Reply-To: <20171006101344.15590-11-miquel.raynal@free-electrons.com>
- (Miquel Raynal's message of "Fri, 6 Oct 2017 12:13:38 +0200")
-References: <20171006101344.15590-1-miquel.raynal@free-electrons.com>
- <20171006101344.15590-11-miquel.raynal@free-electrons.com>
-Message-ID: <87bmlke7zk.fsf@free-electrons.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Fri, 6 Oct 2017 14:13:38 +0100
+Subject: [PATCH v1 2/2] kvm: arm64: handle single-step of userspace mmio
+ instructions
+In-Reply-To: <20171006113921.24880-3-alex.bennee@linaro.org>
+References: <20171006113921.24880-1-alex.bennee@linaro.org>
+ <20171006113921.24880-3-alex.bennee@linaro.org>
+Message-ID: <a9f8905e-18e9-267a-2479-f498c248e2f4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Miquel,
- 
- On ven., oct. 06 2017, Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
 
-> While the standard UART port can use a single IRQ that 'sums' both RX
-> and TX interrupts, the extended port cannot and has to use two different
-> ISR, one for each direction. The standard port also has the hability
-                                                              ability
-> to use two separate interrupts (one for each direction).
->
-> The logic is then: either there is only one unnamed interrupt on the
-> standard port and this interrupt must be used for both directions
-> (this is legacy bindings); or all the interrupts must be described and
-> named 'uart-sum' (if available), 'uart-rx', 'uart-tx' and two separate
-> handlers for each direction will be used.
->
-> Suggested-by: Allen Yan <yanwei@marvell.com>
-> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+
+On 06/10/17 12:39, Alex Benn?e wrote:
+> The system state of KVM when using userspace emulation is not complete
+> until we return into KVM_RUN. To handle mmio related updates we wait
+> until they have been committed and then schedule our KVM_EXIT_DEBUG.
+> 
+> I've introduced a new function kvm_arm_maybe_return_debug() to wrap up
+> the differences between arm/arm64 which is currently null for arm.
+> 
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 > ---
->  drivers/tty/serial/mvebu-uart.c | 129 ++++++++++++++++++++++++++++++++++++----
->  1 file changed, 118 insertions(+), 11 deletions(-)
->
-> diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
-> index 46d10209637a..b52cbe8c0558 100644
-> --- a/drivers/tty/serial/mvebu-uart.c
-> +++ b/drivers/tty/serial/mvebu-uart.c
-> @@ -79,7 +79,16 @@
->  #define MVEBU_UART_TYPE		"mvebu-uart"
->  #define DRIVER_NAME		"mvebu_serial"
->  
-> -/* Register offsets, different depending on the UART */
-> +enum {
-> +	/* Either there is only one summed IRQ... */
-> +	UART_IRQ_SUM = 0,
-> +	/* ...or there are two separate IRQ for RX and TX */
-> +	UART_RX_IRQ = 0,
-> +	UART_TX_IRQ,
-> +	UART_IRQ_COUNT
-> +};
-> +
-> +/* Diverging register offsets */
->  struct uart_regs_layout {
->  	unsigned int rbr;
->  	unsigned int tsh;
-> @@ -106,6 +115,8 @@ struct mvebu_uart_driver_data {
->  struct mvebu_uart {
->  	struct uart_port *port;
->  	struct clk *clk;
-> +	int irq[UART_IRQ_COUNT];
-> +	unsigned char __iomem *nb;
->  	struct mvebu_uart_driver_data *data;
->  };
->  
-> @@ -313,9 +324,32 @@ static irqreturn_t mvebu_uart_isr(int irq, void *dev_id)
->  	unsigned int st = readl(port->membase + UART_STAT);
->  
->  	if (st & (STAT_RX_RDY(port) | STAT_OVR_ERR | STAT_FRM_ERR |
-> +		  STAT_BRK_DET))
-> +		mvebu_uart_rx_chars(port, st);
-> +
-> +	if (st & STAT_TX_RDY(port))
-> +		mvebu_uart_tx_chars(port, st);
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static irqreturn_t mvebu_uart_rx_isr(int irq, void *dev_id)
-> +{
-> +	struct uart_port *port = (struct uart_port *)dev_id;
-> +	unsigned int st = readl(port->membase + UART_STAT);
-> +
-> +	if (st & (STAT_RX_RDY(port) | STAT_OVR_ERR | STAT_FRM_ERR |
->  			STAT_BRK_DET))
->  		mvebu_uart_rx_chars(port, st);
->  
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static irqreturn_t mvebu_uart_tx_isr(int irq, void *dev_id)
-> +{
-> +	struct uart_port *port = (struct uart_port *)dev_id;
-> +	unsigned int st = readl(port->membase + UART_STAT);
-> +
->  	if (st & STAT_TX_RDY(port))
->  		mvebu_uart_tx_chars(port, st);
->  
-> @@ -324,6 +358,7 @@ static irqreturn_t mvebu_uart_isr(int irq, void *dev_id)
->  
->  static int mvebu_uart_startup(struct uart_port *port)
->  {
-> +	struct mvebu_uart *mvuart = to_mvuart(port);
->  	unsigned int ctl;
->  	int ret;
->  
-> @@ -342,11 +377,37 @@ static int mvebu_uart_startup(struct uart_port *port)
->  	ctl |= CTRL_RX_RDY_INT(port);
->  	writel(ctl, port->membase + UART_INTR(port));
->  
-> -	ret = request_irq(port->irq, mvebu_uart_isr, port->irqflags,
-> -			  DRIVER_NAME, port);
-> -	if (ret) {
-> -		dev_err(port->dev, "failed to request irq\n");
-> -		return ret;
-> +	if (!mvuart->irq[UART_TX_IRQ]) {
-> +		/* Old bindings with just one interrupt (UART0 only) */
-> +		ret = devm_request_irq(port->dev, mvuart->irq[UART_IRQ_SUM],
-> +				       mvebu_uart_isr, port->irqflags,
-> +				       dev_name(port->dev), port);
-> +		if (ret) {
-> +			dev_err(port->dev, "unable to request IRQ %d\n",
-> +				mvuart->irq[UART_IRQ_SUM]);
-> +			return ret;
-> +		}
-> +	} else {
-> +		/* New bindings with an IRQ for RX and TX (both UART) */
-> +		ret = devm_request_irq(port->dev, mvuart->irq[UART_RX_IRQ],
-> +				       mvebu_uart_rx_isr, port->irqflags,
-> +				       dev_name(port->dev), port);
-> +		if (ret) {
-> +			dev_err(port->dev, "unable to request IRQ %d\n",
-> +				mvuart->irq[UART_RX_IRQ]);
-> +			return ret;
-> +		}
-> +
-> +		ret = devm_request_irq(port->dev, mvuart->irq[UART_TX_IRQ],
-> +				       mvebu_uart_tx_isr, port->irqflags,
-> +				       dev_name(port->dev),
-> +				       port);
-> +		if (ret) {
-> +			dev_err(port->dev, "unable to request IRQ %d\n",
-> +				mvuart->irq[UART_TX_IRQ]);
-> +			free_irq(mvuart->irq[UART_RX_IRQ], port);
+>   arch/arm/include/asm/kvm_host.h   |  2 ++
+>   arch/arm64/include/asm/kvm_host.h |  1 +
+>   arch/arm64/kvm/debug.c            | 21 +++++++++++++++++++++
+>   arch/arm64/kvm/handle_exit.c      |  9 +++------
+>   virt/kvm/arm/arm.c                |  2 +-
+>   virt/kvm/arm/mmio.c               |  3 ++-
+>   6 files changed, 30 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index 4a879f6ff13b..aec943f6d123 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -285,6 +285,8 @@ static inline void kvm_arm_init_debug(void) {}
+>   static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
+>   static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
+>   static inline void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu) {}
+> +static inline int  kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu,
+> +						struct kvm_run *run) {}
+>   
 
-If you register with devm_request_irq then you have to free with
-devm_free_irq().
+This function should return 1.
 
-> +			return ret;
-> +		}
->  	}
->  
->  	return 0;
-> @@ -354,9 +415,16 @@ static int mvebu_uart_startup(struct uart_port *port)
->  
->  static void mvebu_uart_shutdown(struct uart_port *port)
->  {
-> +	struct mvebu_uart *mvuart = to_mvuart(port);
-> +
->  	writel(0, port->membase + UART_INTR(port));
->  
-> -	free_irq(port->irq, port);
-> +	if (!mvuart->irq[UART_TX_IRQ]) {
-> +		free_irq(mvuart->irq[UART_IRQ_SUM], port);
+>   int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
+>   			       struct kvm_device_attr *attr);
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index e923b58606e2..fa67d21662f6 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -369,6 +369,7 @@ void kvm_arm_init_debug(void);
+>   void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
+>   void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
+>   void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu);
+> +int  kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu, struct kvm_run *run);
 
-same here use devm_free_irq().
+I feel the name could be a little bit more explicit:
 
-> +	} else {
-> +		free_irq(mvuart->irq[UART_RX_IRQ], port);
-> +		free_irq(mvuart->irq[UART_TX_IRQ], port);
+kvm_arm_trap_need_step_debug, kvm_arm_trap_step_return_debug, 
+kvm_arm_trap_need_return_debug.
 
-And here again.
+At least, I think it would be nice that the name reflect that this check 
+is meant for emulated instructions.
 
-Gregory
+Otherwise:
 
-> +	}
->  }
->  
->  static int mvebu_uart_baud_rate_set(struct uart_port *port, unsigned int baud)
-> @@ -658,15 +726,15 @@ static const struct of_device_id mvebu_uart_of_match[];
->  static int mvebu_uart_probe(struct platform_device *pdev)
->  {
->  	struct resource *reg = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -	struct resource *irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
->  	const struct of_device_id *match = of_match_device(mvebu_uart_of_match,
->  							   &pdev->dev);
->  	struct uart_port *port;
->  	struct mvebu_uart *mvuart;
-> +	int irq;
->  	int ret;
->  
-> -	if (!reg || !irq) {
-> -		dev_err(&pdev->dev, "no registers/irq defined\n");
-> +	if (!reg) {
-> +		dev_err(&pdev->dev, "no registers defined\n");
->  		return -EINVAL;
->  	}
->  
-> @@ -693,7 +761,12 @@ static int mvebu_uart_probe(struct platform_device *pdev)
->  	port->flags      = UPF_FIXED_PORT;
->  	port->line       = pdev->id;
->  
-> -	port->irq        = irq->start;
-> +	/*
-> +	 * IRQ number is not stored in this structure because we may have two of
-> +	 * them per port (RX and TX). Instead, use the driver UART structure
-> +	 * array so called ->irq[].
-> +	 */
-> +	port->irq        = 0;
->  	port->irqflags   = 0;
->  	port->mapbase    = reg->start;
->  
-> @@ -728,6 +801,40 @@ static int mvebu_uart_probe(struct platform_device *pdev)
->  			port->uartclk = clk_get_rate(mvuart->clk);
->  	}
->  
-> +	/* Manage interrupts */
-> +	memset(mvuart->irq, 0, UART_IRQ_COUNT);
-> +	if (platform_irq_count(pdev) == 1) {
-> +		/* Old bindings: no name on the single unamed UART0 IRQ */
-> +		irq = platform_get_irq(pdev, 0);
-> +		if (irq < 0) {
-> +			dev_err(&pdev->dev, "unable to get UART IRQ\n");
-> +			return irq;
-> +		}
-> +
-> +		mvuart->irq[UART_IRQ_SUM] = irq;
-> +	} else {
-> +		/*
-> +		 * New bindings: named interrupts (RX, TX) for both UARTS,
-> +		 * only make use of uart-rx and uart-tx interrupts, do not use
-> +		 * uart-sum of UART0 port.
-> +		 */
-> +		irq = platform_get_irq_byname(pdev, "uart-rx");
-> +		if (irq < 0) {
-> +			dev_err(&pdev->dev, "unable to get 'uart-rx' IRQ\n");
-> +			return irq;
-> +		}
-> +
-> +		mvuart->irq[UART_RX_IRQ] = irq;
-> +
-> +		irq = platform_get_irq_byname(pdev, "uart-tx");
-> +		if (irq < 0) {
-> +			dev_err(&pdev->dev, "unable to get 'uart-tx' IRQ\n");
-> +			return irq;
-> +		}
-> +
-> +		mvuart->irq[UART_TX_IRQ] = irq;
-> +	}
-> +
->  	/* UART Soft Reset*/
->  	writel(CTRL_SOFT_RST, port->membase + UART_CTRL(port));
->  	udelay(1);
-> -- 
-> 2.11.0
->
+Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+
+Thanks,
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Julien Thierry
