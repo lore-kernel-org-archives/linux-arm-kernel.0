@@ -1,33 +1,48 @@
 From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Fri,  6 Oct 2017 12:13:41 +0200
-Subject: [PATCH 13/16] arm64: dts: marvell: armada-37xx: add UART clock
+Date: Fri,  6 Oct 2017 12:13:37 +0200
+Subject: [PATCH 09/16] serial: mvebu-uart: add TX interrupt trigger for pulse
+ interrupts
 In-Reply-To: <20171006101344.15590-1-miquel.raynal@free-electrons.com>
 References: <20171006101344.15590-1-miquel.raynal@free-electrons.com>
-Message-ID: <20171006101344.15590-14-miquel.raynal@free-electrons.com>
+Message-ID: <20171006101344.15590-10-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the missing clock property to armada-3700 UART node.
+From: Allen Yan <yanwei@marvell.com>
 
-This clock will be used to derive the prescaler value to comply to the
-requested baudrate.
+Pulse interrupts (extended UART only) needs a change of state to trigger
+the TX interrupt. In addition to enabling the TX_READY_INT_EN flag,
+produce a FIFO state change from 'empty' to 'not full'. For this, write
+only one data byte in TX start, making the TX FIFO not empty, and wait
+for the TX interrupt to continue the transfer.
 
+Signed-off-by: Allen Yan <yanwei@marvell.com>
 Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 ---
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/tty/serial/mvebu-uart.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-index b554cdaf5e53..a36d667f770e 100644
---- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-@@ -135,6 +135,7 @@
- 			uart0: serial at 12000 {
- 				compatible = "marvell,armada-3700-uart";
- 				reg = <0x12000 0x200>;
-+				clocks = <&xtalclk>;
- 				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
- 				status = "disabled";
- 			};
+diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
+index 67f302748b78..46d10209637a 100644
+--- a/drivers/tty/serial/mvebu-uart.c
++++ b/drivers/tty/serial/mvebu-uart.c
+@@ -165,8 +165,16 @@ static void mvebu_uart_stop_tx(struct uart_port *port)
+ 
+ static void mvebu_uart_start_tx(struct uart_port *port)
+ {
+-	unsigned int ctl = readl(port->membase + UART_INTR(port));
++	unsigned int ctl;
++	struct circ_buf *xmit = &port->state->xmit;
+ 
++	if (IS_EXTENDED(port) && !uart_circ_empty(xmit)) {
++		writel(xmit->buf[xmit->tail], port->membase + UART_TSH(port));
++		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
++		port->icount.tx++;
++	}
++
++	ctl = readl(port->membase + UART_INTR(port));
+ 	ctl |= CTRL_TX_RDY_INT(port);
+ 	writel(ctl, port->membase + UART_INTR(port));
+ }
 -- 
 2.11.0
