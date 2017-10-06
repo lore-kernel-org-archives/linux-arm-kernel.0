@@ -1,27 +1,67 @@
-From: fabien.dessenne@st.com (Fabien DESSENNE)
-Date: Fri, 6 Oct 2017 09:26:07 +0000
-Subject: [PATCH v3 1/3] crypto: engine - permit to enqueue aead_request
-In-Reply-To: <20171005033925.GA31996@gondor.apana.org.au>
-References: <1503047946-27799-1-git-send-email-fabien.dessenne@st.com>
- <1503047946-27799-2-git-send-email-fabien.dessenne@st.com>
- <20170922090921.GA15677@gondor.apana.org.au>
- <20206811-7075-5ca9-98cd-26a5709751fb@st.com>
- <20171005033925.GA31996@gondor.apana.org.au>
-Message-ID: <9d89727b-f3cb-3322-6513-962e9df63ca8@st.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 6 Oct 2017 11:26:35 +0200
+Subject: [PATCH 08/20] ARM: dts: sun4i: Change LRADC node names to avoid
+ warnings
+In-Reply-To: <CAGb2v65LTUN4a=BzB7hgE7g=4qH6bFLp3WyWJxPrPoVXp0seVw@mail.gmail.com>
+References: <cover.f5f905a5434f2a540d6844d23369a04af9f5314c.1507198895.git-series.maxime.ripard@free-electrons.com>
+ <14fb41e6a5648f99643629b1dc9df9ef04c01fbd.1507198895.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v65LTUN4a=BzB7hgE7g=4qH6bFLp3WyWJxPrPoVXp0seVw@mail.gmail.com>
+Message-ID: <20171006092635.eeynkeoxgbj3c27f@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OK, I will send an initial version without the AEAD part.
+On Thu, Oct 05, 2017 at 03:52:29PM +0000, Chen-Yu Tsai wrote:
+> On Thu, Oct 5, 2017 at 6:49 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > One of the usage of the LRADC is to implement buttons. The bindings define
+> > that we should have one subnode per button, with their associated voltage
+> > as a property.
+> >
+> > However, there was no reg property but we still used the voltage associated
+> > to the button as the unit-address, which eventually generated warnings in
+> > DTC.
+> >
+> > Rename the node names to avoid those warnings.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts  |  6 +++---
+> >  arch/arm/boot/dts/sun4i-a10-dserve-dsrv9703c.dts |  4 ++--
+> >  arch/arm/boot/dts/sun4i-a10-gemei-g9.dts         |  6 +++---
+> >  arch/arm/boot/dts/sun4i-a10-inet1.dts            |  6 +++---
+> >  arch/arm/boot/dts/sun4i-a10-inet97fv2.dts        | 10 +++++-----
+> >  arch/arm/boot/dts/sun4i-a10-inet9f-rev03.dts     | 10 +++++-----
+> >  arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts |  4 ++--
+> >  7 files changed, 23 insertions(+), 23 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts b/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
+> > index 4978e46ca620..b2dbdac19c0f 100644
+> > --- a/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
+> > +++ b/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
+> > @@ -98,21 +98,21 @@
+> >         vref-supply = <&reg_vcc3v0>;
+> >         status = "okay";
+> >
+> > -       button at 800 {
+> > +       button-800 {
+> 
+> I think 800mV-button would be better, i.e. have the "generic"
+> part of the name as a suffix.
 
+It would go against most of the convention that we have everywhere
+else for framebuffers, pin muxings, or even regular node names that
+start with the class, and then have the most specific part.
 
-On 05/10/17 05:39, Herbert Xu wrote:
-> On Tue, Oct 03, 2017 at 07:48:08AM +0000, Fabien DESSENNE wrote:
->> It looks like there is no more activity around this "crypto_engine
->> interface clean up" task.
->> This unfortunately has been blocking the introduction of this new STM32
->> crypto driver for 3 months now.
->> Would it make sense to have this driver reviewed first, and then
->> reworked (I expect minor update here) when the interface update is ready?
-> Hmm, is it possible to disable the AEAD part of the driver first?
->
-> Cheers,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171006/09fef6eb/attachment.sig>
