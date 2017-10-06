@@ -1,119 +1,202 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  6 Oct 2017 16:33:35 +0100
-Subject: [PATCH v4 00/26] KVM/ARM: Add support for GICv4
-Message-ID: <20171006153401.5481-1-marc.zyngier@arm.com>
+Date: Fri,  6 Oct 2017 16:33:37 +0100
+Subject: [PATCH v4 02/26] KVM: arm/arm64: vgic: restructure
+ kvm_vgic_(un)map_phys_irq
+In-Reply-To: <20171006153401.5481-1-marc.zyngier@arm.com>
+References: <20171006153401.5481-1-marc.zyngier@arm.com>
+Message-ID: <20171006153401.5481-3-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series implements full support for GICv4 in KVM, bringing direct
-injection of MSIs to arm and arm64, assuming you have the right
-hardware (which is quite unlikely).
+From: Eric Auger <eric.auger@redhat.com>
 
-To get an idea of the design, I'd recommend you start with commit
-7954907bedaf as well as patch #26, which try to shed some light on the
-approach that I've taken. And before that, please digest some of the
-GICv3/GICv4 architecture documentation[1] (less than 800 pages!). Once
-you feel reasonably insane, you'll be in the right mood to read the
-code (no, I didn't bother changing the above, I already hit LWN/QotW
-once).
+We want to reuse the core of the map/unmap functions for IRQ
+forwarding. Let's move the computation of the hwirq in
+kvm_vgic_map_phys_irq and pass the linux IRQ as parameter.
+the host_irq is added to struct vgic_irq.
 
-Now that the low-level irqchip code has been merged, what we have here
-is only the KVM-specific part. I've lifted two of Eric's patches
-(having slightly changed one of them) as they form the base of this
-series.
+We introduce kvm_vgic_map/unmap_irq which take a struct vgic_irq
+handle as a parameter.
 
-The stack has been *very lightly* tested on an arm64 model, with a PCI
-virtio block device passed from the host to a guest (using kvmtool and
-Jean-Philippe Brucker's excellent VFIO support patches[3]), as well as
-on a Huawei D05 box using an Intel I350 Ethernet card and passing a VF
-into the guest. So far, things are solid enough (although some HW need
-workarounds that I'll address separately).
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
+---
+ include/kvm/arm_vgic.h    |  8 ++++---
+ virt/kvm/arm/arch_timer.c | 24 +------------------
+ virt/kvm/arm/vgic/vgic.c  | 60 +++++++++++++++++++++++++++++++++++------------
+ 3 files changed, 51 insertions(+), 41 deletions(-)
 
-I've pushed out a branch based on 4.14-rc3 containing the dependencies:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/gicv4-kvm
-
-* From v3:
-   - Lots of cleanups following Christoffer's review
-   - Got rid of all of the irqchip code (well, merged it)
-   - Picked the minimal set of patches from Eric to get this working
-   - Prevent VM save if using GICv4
-   - Rebased on top of 4.14-rc3
-
-* From v2:
-  - Lots of fixes all over the map (the doorbell code was amazingly
-    wrong, both at the GICv4 level and in KVM)
-  - KVM GICv4 enablement is now gated by a command-line option and
-    defaults to off
-  - Now properly deals with ordering of vITS creation
-  - Some debugging features
-  - More documentation so that I can forget what this is all about
-  - Huawei D05 quirks
-
-* From v1:
-  - The bulk of the 30-something initial patches have seen countless
-    bugs being fixed, and some key data structures have been subtly
-    tweaked (or killed altogether). They are still quite similar to
-    what I had in v1 though.
-  - The whole KVM code is brand new and as I said above, only lightly
-    tested.
-  - Collected a bunch a R-bs from Thomas and Eric (many thanks, guys).
-
-[1] https://static.docs.arm.com/ihi0069/c/IHI0069C_gic_architecture_specification.pfd
-[2] http://www.spinics.net/lists/kvm/msg151463.html
-[3] http://www.spinics.net/lists/kvm/msg151823.html
-
-Eric Auger (2):
-  KVM: arm/arm64: register irq bypass consumer on ARM/ARM64
-  KVM: arm/arm64: vgic: restructure kvm_vgic_(un)map_phys_irq
-
-Marc Zyngier (24):
-  KVM: arm: Select ARM_GIC_V3 and ARM_GIC_V3_ITS
-  KVM: arm/arm64: vgic: Move kvm_vgic_destroy call around
-  KVM: arm/arm64: vITS: Add MSI translation helpers
-  KVM: arm/arm64: vITS: Add a helper to update the affinity of an LPI
-  KVM: arm/arm64: GICv4: Add property field and per-VM predicate
-  KVM: arm/arm64: GICv4: Add init/teardown of the per-VM vPE irq domain
-  KVM: arm/arm64: GICv4: Wire mapping/unmapping of VLPIs in VFIO irq
-    bypass
-  KVM: arm/arm64: GICv4: Handle INT command applied to a VLPI
-  KVM: arm/arm64: GICv4: Unmap VLPI when freeing an LPI
-  KVM: arm/arm64: GICv4: Propagate affinity changes to the physical ITS
-  KVM: arm/arm64: GICv4: Handle CLEAR applied to a VLPI
-  KVM: arm/arm64: GICv4: Handle MOVALL applied to a vPE
-  KVM: arm/arm64: GICv4: Propagate property updates to VLPIs
-  KVM: arm/arm64: GICv4: Handle INVALL applied to a vPE
-  KVM: arm/arm64: GICv4: Propagate VLPI properties at map time
-  KVM: arm/arm64: GICv4: Use pending_last as a scheduling hint
-  KVM: arm/arm64: GICv4: Add doorbell interrupt handling
-  KVM: arm/arm64: GICv4: Use the doorbell interrupt as an unblocking
-    source
-  KVM: arm/arm64: GICv4: Hook vPE scheduling into vgic flush/sync
-  KVM: arm/arm64: GICv4: Enable virtual cpuif if VLPIs can be delivered
-  KVM: arm/arm64: GICv4: Prevent a VM using GICv4 from being saved
-  KVM: arm/arm64: GICv4: Enable VLPI support
-  KVM: arm/arm64: GICv4: Prevent heterogenous systems from using GICv4
-  KVM: arm/arm64: GICv4: Theory of operations
-
- Documentation/admin-guide/kernel-parameters.txt |   4 +
- arch/arm/kvm/Kconfig                            |   5 +
- arch/arm/kvm/Makefile                           |   1 +
- arch/arm64/kvm/Kconfig                          |   3 +
- arch/arm64/kvm/Makefile                         |   1 +
- include/kvm/arm_vgic.h                          |  41 ++-
- include/linux/irqchip/arm-gic-v3.h              |   2 +
- virt/kvm/arm/arch_timer.c                       |  24 +-
- virt/kvm/arm/arm.c                              |  48 +++-
- virt/kvm/arm/hyp/vgic-v3-sr.c                   |   9 +-
- virt/kvm/arm/vgic/vgic-init.c                   |   9 +
- virt/kvm/arm/vgic/vgic-its.c                    | 195 ++++++++-----
- virt/kvm/arm/vgic/vgic-mmio-v3.c                |   5 +
- virt/kvm/arm/vgic/vgic-v3.c                     |  39 ++-
- virt/kvm/arm/vgic/vgic-v4.c                     | 361 ++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.c                        |  67 ++++-
- virt/kvm/arm/vgic/vgic.h                        |  12 +
- 17 files changed, 713 insertions(+), 113 deletions(-)
- create mode 100644 virt/kvm/arm/vgic/vgic-v4.c
-
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 34dba516ef24..53f631bdec75 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -116,6 +116,7 @@ struct vgic_irq {
+ 	bool hw;			/* Tied to HW IRQ */
+ 	struct kref refcount;		/* Used for LPIs */
+ 	u32 hwintid;			/* HW INTID number */
++	unsigned int host_irq;		/* linux irq corresponding to hwintid */
+ 	union {
+ 		u8 targets;			/* GICv2 target VCPUs mask */
+ 		u32 mpidr;			/* GICv3 target VCPU */
+@@ -307,9 +308,10 @@ void kvm_vgic_init_cpu_hardware(void);
+ 
+ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+ 			bool level, void *owner);
+-int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, u32 virt_irq, u32 phys_irq);
+-int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq);
+-bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
++int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
++			  u32 vintid);
++int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int vintid);
++bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int vintid);
+ 
+ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+ 
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 8e89d63005c7..b24e2f7b363a 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -647,9 +647,6 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
+ {
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+-	struct irq_desc *desc;
+-	struct irq_data *data;
+-	int phys_irq;
+ 	int ret;
+ 
+ 	if (timer->enabled)
+@@ -667,26 +664,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
+ 		return -EINVAL;
+ 	}
+ 
+-	/*
+-	 * Find the physical IRQ number corresponding to the host_vtimer_irq
+-	 */
+-	desc = irq_to_desc(host_vtimer_irq);
+-	if (!desc) {
+-		kvm_err("%s: no interrupt descriptor\n", __func__);
+-		return -EINVAL;
+-	}
+-
+-	data = irq_desc_get_irq_data(desc);
+-	while (data->parent_data)
+-		data = data->parent_data;
+-
+-	phys_irq = data->hwirq;
+-
+-	/*
+-	 * Tell the VGIC that the virtual interrupt is tied to a
+-	 * physical interrupt. We do that once per VCPU.
+-	 */
+-	ret = kvm_vgic_map_phys_irq(vcpu, vtimer->irq.irq, phys_irq);
++	ret = kvm_vgic_map_phys_irq(vcpu, host_vtimer_irq, vtimer->irq.irq);
+ 	if (ret)
+ 		return ret;
+ 
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index fed717e07938..9d557efd1f7d 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -17,6 +17,8 @@
+ #include <linux/kvm.h>
+ #include <linux/kvm_host.h>
+ #include <linux/list_sort.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
+ 
+ #include "vgic.h"
+ 
+@@ -403,38 +405,66 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+ 	return 0;
+ }
+ 
+-int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, u32 virt_irq, u32 phys_irq)
++/* @irq->irq_lock must be held */
++static int kvm_vgic_map_irq(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
++			    unsigned int host_irq)
+ {
+-	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
++	struct irq_desc *desc;
++	struct irq_data *data;
+ 
+-	BUG_ON(!irq);
+-
+-	spin_lock(&irq->irq_lock);
++	/*
++	 * Find the physical IRQ number corresponding to @host_irq
++	 */
++	desc = irq_to_desc(host_irq);
++	if (!desc) {
++		kvm_err("%s: no interrupt descriptor\n", __func__);
++		return -EINVAL;
++	}
++	data = irq_desc_get_irq_data(desc);
++	while (data->parent_data)
++		data = data->parent_data;
+ 
+ 	irq->hw = true;
+-	irq->hwintid = phys_irq;
++	irq->host_irq = host_irq;
++	irq->hwintid = data->hwirq;
++	return 0;
++}
++
++/* @irq->irq_lock must be held */
++static inline void kvm_vgic_unmap_irq(struct vgic_irq *irq)
++{
++	irq->hw = false;
++	irq->hwintid = 0;
++}
++
++int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
++			  u32 vintid)
++{
++	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
++	int ret;
+ 
++	BUG_ON(!irq);
++
++	spin_lock(&irq->irq_lock);
++	ret = kvm_vgic_map_irq(vcpu, irq, host_irq);
+ 	spin_unlock(&irq->irq_lock);
+ 	vgic_put_irq(vcpu->kvm, irq);
+ 
+-	return 0;
++	return ret;
+ }
+ 
+-int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq)
++int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int vintid)
+ {
+ 	struct vgic_irq *irq;
+ 
+ 	if (!vgic_initialized(vcpu->kvm))
+ 		return -EAGAIN;
+ 
+-	irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
++	irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
+ 	BUG_ON(!irq);
+ 
+ 	spin_lock(&irq->irq_lock);
+-
+-	irq->hw = false;
+-	irq->hwintid = 0;
+-
++	kvm_vgic_unmap_irq(irq);
+ 	spin_unlock(&irq->irq_lock);
+ 	vgic_put_irq(vcpu->kvm, irq);
+ 
+@@ -772,9 +802,9 @@ void vgic_kick_vcpus(struct kvm *kvm)
+ 	}
+ }
+ 
+-bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq)
++bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int vintid)
+ {
+-	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
++	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
+ 	bool map_is_active;
+ 
+ 	spin_lock(&irq->irq_lock);
 -- 
 2.14.1
