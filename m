@@ -1,90 +1,48 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Fri, 06 Oct 2017 14:45:35 +0100
-Subject: [PATCH v1 2/2] kvm: arm64: handle single-step of userspace mmio
- instructions
-In-Reply-To: <a9f8905e-18e9-267a-2479-f498c248e2f4@arm.com>
-References: <20171006113921.24880-1-alex.bennee@linaro.org>
- <20171006113921.24880-3-alex.bennee@linaro.org>
- <a9f8905e-18e9-267a-2479-f498c248e2f4@arm.com>
-Message-ID: <878tgoxudc.fsf@linaro.org>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 6 Oct 2017 14:32:00 +0100
+Subject: [PATCH v3 16/22] firmware: arm_scmi: add arm_mhu specific mailbox
+ interface
+In-Reply-To: <CABb+yY1N6hmC6Kd2QteMw_oCf=-mYHf7p6RdhYPQK+QUO7VP4A@mail.gmail.com>
+References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
+ <1506604306-20739-17-git-send-email-sudeep.holla@arm.com>
+ <CAK8P3a0XmiXqZ-z7WV+nk7B86p23Jmf31Q=pVovXVebhA28_0Q@mail.gmail.com>
+ <CABb+yY1N6hmC6Kd2QteMw_oCf=-mYHf7p6RdhYPQK+QUO7VP4A@mail.gmail.com>
+Message-ID: <f142dac2-a27c-4c46-4d22-4df4f2e8cfb1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Julien Thierry <julien.thierry@arm.com> writes:
 
-> On 06/10/17 12:39, Alex Benn?e wrote:
->> The system state of KVM when using userspace emulation is not complete
->> until we return into KVM_RUN. To handle mmio related updates we wait
->> until they have been committed and then schedule our KVM_EXIT_DEBUG.
+On 06/10/17 12:26, Jassi Brar wrote:
+> On Wed, Oct 4, 2017 at 5:06 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Thu, Sep 28, 2017 at 3:11 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>> This patch adds ARM MHU specific mailbox interface for SCMI.
+>>>
+>>> Cc: Arnd Bergmann <arnd@arndb.de>
+>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 >>
->> I've introduced a new function kvm_arm_maybe_return_debug() to wrap up
->> the differences between arm/arm64 which is currently null for arm.
+>> This clearly needs an explanation why we need another driver.
 >>
->> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->> ---
->>   arch/arm/include/asm/kvm_host.h   |  2 ++
->>   arch/arm64/include/asm/kvm_host.h |  1 +
->>   arch/arm64/kvm/debug.c            | 21 +++++++++++++++++++++
->>   arch/arm64/kvm/handle_exit.c      |  9 +++------
->>   virt/kvm/arm/arm.c                |  2 +-
->>   virt/kvm/arm/mmio.c               |  3 ++-
->>   6 files changed, 30 insertions(+), 8 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->> index 4a879f6ff13b..aec943f6d123 100644
->> --- a/arch/arm/include/asm/kvm_host.h
->> +++ b/arch/arm/include/asm/kvm_host.h
->> @@ -285,6 +285,8 @@ static inline void kvm_arm_init_debug(void) {}
->>   static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
->>   static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
->>   static inline void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu) {}
->> +static inline int  kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu,
->> +						struct kvm_run *run) {}
->>
->
-> This function should return 1.
+> Yes the patch needs explanation which is that we need a shim layer to
+> map SCMI requests onto what the underlying controller expects. The
+> alternative was to clone the controller driver (MHU now and others
+> later when their platforms support SCMI) and pretend SCMI is the only
+> client they are ever going to serve.
+> 
 
-So I did ponder making this a bool, returning true if we need to exit
-and testing in v/k/a/arm.c exit leg rather than in the mmio handler.
+Again that's not the point, doorbell is more common feature and that can
+be supported. As SCMI expects doorbell feature in the specification, it
+just need to support that class of controllers.
 
-At the moment it mirrors the existing exit logic which follows -1 err, 0
-return, >0 handled. But as I mentioned in the cover letter this fell
-down a bit when dealing with the mmio case.
+> BTW, I haven't reviewed this patchset yet so I am not sure about this
+> code but I do believe we need a transport layer (this shim driver)
+> between generic SCMI implementation and each controller driver.
+> 
 
->
->>   int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
->>   			       struct kvm_device_attr *attr);
->> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->> index e923b58606e2..fa67d21662f6 100644
->> --- a/arch/arm64/include/asm/kvm_host.h
->> +++ b/arch/arm64/include/asm/kvm_host.h
->> @@ -369,6 +369,7 @@ void kvm_arm_init_debug(void);
->>   void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
->>   void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
->>   void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu);
->> +int  kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu, struct kvm_run *run);
->
-> I feel the name could be a little bit more explicit:
->
-> kvm_arm_trap_need_step_debug, kvm_arm_trap_step_return_debug,
-> kvm_arm_trap_need_return_debug.
+Again Arnd's point was to extend mailbox API instead of adding this
+abstract layer which I think is more elegant. The controllers that
+can provide that feature will support that.
 
-I wanted to keep the debug suffix so that's fine although I'm not so
-sure trap is correct because on the tail end of mmio emulation are we
-still trapping?
-
-Maybe kvm_arm_step_emulated_debug?
-
-> At least, I think it would be nice that the name reflect that this
-> check is meant for emulated instructions.
->
-> Otherwise:
->
-> Reviewed-by: Julien Thierry <julien.thierry@arm.com>
->
-> Thanks,
-
-
---
-Alex Benn?e
+-- 
+Regards,
+Sudeep
