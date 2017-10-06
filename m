@@ -1,176 +1,261 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 6 Oct 2017 14:10:09 +0100
-Subject: [PATCH v2 11/28] arm64/sve: Core task context handling
-In-Reply-To: <20171005112835.2rhaqx23bhe6tnwl@armageddon.cambridge.arm.com>
-References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
- <1504198860-12951-12-git-send-email-Dave.Martin@arm.com>
- <20170913143325.hi4cfcajbts3bbao@localhost>
- <20171003113302.GR3611@e103592.cambridge.arm.com>
- <20171005112835.2rhaqx23bhe6tnwl@armageddon.cambridge.arm.com>
-Message-ID: <20171006131005.GA3611@e103592.cambridge.arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 06 Oct 2017 15:11:43 +0200
+Subject: [PATCH 10/16] serial: mvebu-uart: dissociate RX and TX interrupts
+In-Reply-To: <20171006101344.15590-11-miquel.raynal@free-electrons.com>
+ (Miquel Raynal's message of "Fri, 6 Oct 2017 12:13:38 +0200")
+References: <20171006101344.15590-1-miquel.raynal@free-electrons.com>
+ <20171006101344.15590-11-miquel.raynal@free-electrons.com>
+Message-ID: <87bmlke7zk.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 05, 2017 at 12:28:35PM +0100, Catalin Marinas wrote:
-> On Tue, Oct 03, 2017 at 12:33:03PM +0100, Dave P Martin wrote:
-> > On Wed, Sep 13, 2017 at 07:33:25AM -0700, Catalin Marinas wrote:
-> > > On Thu, Aug 31, 2017 at 06:00:43PM +0100, Dave P Martin wrote:
-> > > > +/*
-> > > > + * Handle SVE state across fork():
-> > > > + *
-> > > > + * dst and src must not end up with aliases of the same sve_state.
-> > > > + * Because a task cannot fork except in a syscall, we can discard SVE
-> > > > + * state for dst here, so long as we take care to retain the FPSIMD
-> > > > + * subset of the state if SVE is in use.  Reallocation of the SVE state
-> > > > + * will be deferred until dst tries to use SVE.
-> > > > + */
-> > > > +void fpsimd_dup_sve(struct task_struct *dst, struct task_struct const *src)
-> > > > +{
-> > > > +	if (test_and_clear_tsk_thread_flag(dst, TIF_SVE)) {
-> > > > +		WARN_ON(dst->mm && !in_syscall(task_pt_regs(dst)));
-> > > > +		sve_to_fpsimd(dst);
-> > > > +	}
-> > > > +
-> > > > +	dst->thread.sve_state = NULL;
-> > > > +}
-> > > 
-> > > I first thought the thread flags are not visible in dst yet since
-> > > dup_task_struct() calls arch_dup_task_struct() before
-> > > setup_thread_stack(). However, at the end of the last year we enabled
-> > > CONFIG_THREAD_INFO_IN_TASK_STRUCT. But I don't particularly like relying
-> > > on this.
-> > > 
-> > > Anyway, IIUC we don't need sve_to_fpsimd() here. The
-> > > arch_dup_task_struct() already called fpsimd_preserve_current_state()
-> > > for src, so the FPSIMD state (which we care about) is transferred during
-> > > the *dst = *src assignment. So you'd only need the last statement,
-> > > possibly with a different function name like fpsimd_erase_sve (and maybe
-> > > make the function static inline in the header).
-> > 
-> > Regarding the intended meanings of the thread flags, does this help?
-> > 
-> > --8<--
-> > 
-> > TIF_FOREIGN_FPSTATE's meaning is expanded to cover SVE, but otherwise
-> > unchanged:
-> > 
-> >  * If a task is running and !TIF_FOREIGN_FPSTATE, then the the CPU
-> >    registers of the CPU the task is running on contain the authoritative
-> >    FPSIMD/SVE state of the task.  The backing memory may be stale.
-> > 
-> >  * Otherwise (i.e., task not running, or task running and
-> >    TIF_FOREIGN_FPSTATE), the task's FPSIMD/SVE backing memory is
-> >    authoritative.  If additionally per_cpu(fpsimd_last_state,
-> >    task->fpsimd_state.cpu) == &task->fpsimd_state.cpu, then
-> >    task->fpsimd_state.cpu's registers are also up to date for task, but
-> >    not authorititive: the current FPSIMD/SVE state may be read from
-> >    them, but they must not be written.
-> >  
-> > The FPSIMD/SVE backing memory is selected by TIF_SVE:
-> > 
-> >  * TIF_SVE set: Zn (incorporating Vn in bits[127:0]), Pn and FFR are
-> >    stored in task->thread.sve_state, formatted appropriately for vector
-> >    length task->thread.sve_vl.  task->thread.sve_state must point to a
-> >    valid buffer at least sve_state_size(task) bytes in size.
-> > 
-> >  * TIF_SVE clear: Vn are stored in task->fpsimd_state; Zn[max : 128] are
-> >    logically zero[*] but not stored anywhere; Pn, FFR are not stored and
-> >    have unspecified values from userspace's point of view.
-> >    task->thread.sve_state does not need to be non-null, valid or any
-> >    particular size: it must not be dereferenced.
-> > 
-> >    In practice I don't exploit the "unspecifiedness" much.  The Zn high
-> >    bits, Pn and FFR are all zeroed when setting TIF_SVE again:
-> >    sve_alloc() is the common path for this.
-> > 
-> >  * FPSR and FPCR are always stored in task->fpsimd_state irrespctive of
-> >    whether TIF_SVE is clear or set, since these are not vector length
-> >    dependent.
-> 
-> This looks fine. I think we need to make sure (with a warning) that
-> task_fpsimd_save() (and probably load) is always called in a
-> non-preemptible context. 
-> 
-> > [*] theoretically unspecified, which is what I've written in sve.txt.
-> > However, on any FPSIMD Vn write the upper bits of the corresponding Zn
-> > must become logically zero in order to conform to the SVE programmer's
-> > model.  It's not feasible to track which Vn have been written
-> > individually because that would involve trapping every FPSIMD insn until
-> > all possible Vn have been written.  So the kernel ensures that the Zn
-> > high bits become zero.
-> > 
-> > Maybe we should just guarantee "zero-or-preserved" behaviour for
-> > userspace.  This may close down some future optimisation opportunities,
-> > but maybe it's better to be simple.
-> 
-> Does it work if we leave it as "unspecified" in the document but just do
-> zero-or-preserved in the kernel code?
+Hi Miquel,
+ 
+ On ven., oct. 06 2017, Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
 
-Sure, that's the behaviour today in effect.
+> While the standard UART port can use a single IRQ that 'sums' both RX
+> and TX interrupts, the extended port cannot and has to use two different
+> ISR, one for each direction. The standard port also has the hability
+                                                              ability
+> to use two separate interrupts (one for each direction).
+>
+> The logic is then: either there is only one unnamed interrupt on the
+> standard port and this interrupt must be used for both directions
+> (this is legacy bindings); or all the interrupts must be described and
+> named 'uart-sum' (if available), 'uart-rx', 'uart-tx' and two separate
+> handlers for each direction will be used.
+>
+> Suggested-by: Allen Yan <yanwei@marvell.com>
+> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+> ---
+>  drivers/tty/serial/mvebu-uart.c | 129 ++++++++++++++++++++++++++++++++++++----
+>  1 file changed, 118 insertions(+), 11 deletions(-)
+>
+> diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
+> index 46d10209637a..b52cbe8c0558 100644
+> --- a/drivers/tty/serial/mvebu-uart.c
+> +++ b/drivers/tty/serial/mvebu-uart.c
+> @@ -79,7 +79,16 @@
+>  #define MVEBU_UART_TYPE		"mvebu-uart"
+>  #define DRIVER_NAME		"mvebu_serial"
+>  
+> -/* Register offsets, different depending on the UART */
+> +enum {
+> +	/* Either there is only one summed IRQ... */
+> +	UART_IRQ_SUM = 0,
+> +	/* ...or there are two separate IRQ for RX and TX */
+> +	UART_RX_IRQ = 0,
+> +	UART_TX_IRQ,
+> +	UART_IRQ_COUNT
+> +};
+> +
+> +/* Diverging register offsets */
+>  struct uart_regs_layout {
+>  	unsigned int rbr;
+>  	unsigned int tsh;
+> @@ -106,6 +115,8 @@ struct mvebu_uart_driver_data {
+>  struct mvebu_uart {
+>  	struct uart_port *port;
+>  	struct clk *clk;
+> +	int irq[UART_IRQ_COUNT];
+> +	unsigned char __iomem *nb;
+>  	struct mvebu_uart_driver_data *data;
+>  };
+>  
+> @@ -313,9 +324,32 @@ static irqreturn_t mvebu_uart_isr(int irq, void *dev_id)
+>  	unsigned int st = readl(port->membase + UART_STAT);
+>  
+>  	if (st & (STAT_RX_RDY(port) | STAT_OVR_ERR | STAT_FRM_ERR |
+> +		  STAT_BRK_DET))
+> +		mvebu_uart_rx_chars(port, st);
+> +
+> +	if (st & STAT_TX_RDY(port))
+> +		mvebu_uart_tx_chars(port, st);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static irqreturn_t mvebu_uart_rx_isr(int irq, void *dev_id)
+> +{
+> +	struct uart_port *port = (struct uart_port *)dev_id;
+> +	unsigned int st = readl(port->membase + UART_STAT);
+> +
+> +	if (st & (STAT_RX_RDY(port) | STAT_OVR_ERR | STAT_FRM_ERR |
+>  			STAT_BRK_DET))
+>  		mvebu_uart_rx_chars(port, st);
+>  
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static irqreturn_t mvebu_uart_tx_isr(int irq, void *dev_id)
+> +{
+> +	struct uart_port *port = (struct uart_port *)dev_id;
+> +	unsigned int st = readl(port->membase + UART_STAT);
+> +
+>  	if (st & STAT_TX_RDY(port))
+>  		mvebu_uart_tx_chars(port, st);
+>  
+> @@ -324,6 +358,7 @@ static irqreturn_t mvebu_uart_isr(int irq, void *dev_id)
+>  
+>  static int mvebu_uart_startup(struct uart_port *port)
+>  {
+> +	struct mvebu_uart *mvuart = to_mvuart(port);
+>  	unsigned int ctl;
+>  	int ret;
+>  
+> @@ -342,11 +377,37 @@ static int mvebu_uart_startup(struct uart_port *port)
+>  	ctl |= CTRL_RX_RDY_INT(port);
+>  	writel(ctl, port->membase + UART_INTR(port));
+>  
+> -	ret = request_irq(port->irq, mvebu_uart_isr, port->irqflags,
+> -			  DRIVER_NAME, port);
+> -	if (ret) {
+> -		dev_err(port->dev, "failed to request irq\n");
+> -		return ret;
+> +	if (!mvuart->irq[UART_TX_IRQ]) {
+> +		/* Old bindings with just one interrupt (UART0 only) */
+> +		ret = devm_request_irq(port->dev, mvuart->irq[UART_IRQ_SUM],
+> +				       mvebu_uart_isr, port->irqflags,
+> +				       dev_name(port->dev), port);
+> +		if (ret) {
+> +			dev_err(port->dev, "unable to request IRQ %d\n",
+> +				mvuart->irq[UART_IRQ_SUM]);
+> +			return ret;
+> +		}
+> +	} else {
+> +		/* New bindings with an IRQ for RX and TX (both UART) */
+> +		ret = devm_request_irq(port->dev, mvuart->irq[UART_RX_IRQ],
+> +				       mvebu_uart_rx_isr, port->irqflags,
+> +				       dev_name(port->dev), port);
+> +		if (ret) {
+> +			dev_err(port->dev, "unable to request IRQ %d\n",
+> +				mvuart->irq[UART_RX_IRQ]);
+> +			return ret;
+> +		}
+> +
+> +		ret = devm_request_irq(port->dev, mvuart->irq[UART_TX_IRQ],
+> +				       mvebu_uart_tx_isr, port->irqflags,
+> +				       dev_name(port->dev),
+> +				       port);
+> +		if (ret) {
+> +			dev_err(port->dev, "unable to request IRQ %d\n",
+> +				mvuart->irq[UART_TX_IRQ]);
+> +			free_irq(mvuart->irq[UART_RX_IRQ], port);
 
-I'll leave the documentation unchanged, then we can take advantage of
-this flexibility later if is proves to be useful.
+If you register with devm_request_irq then you have to free with
+devm_free_irq().
 
-> Just wondering, as an optimisation for do_sve_acc() - instead of
-> sve_alloc() and fpsimd_to_sve(), can we not force the loading of the
-> FPSIMD regs on the return to user via TIF_FOREIGN_FPSTATE? This would
-> ensure the zeroing of the top SVE bits and we only need to allocate the
-> SVE state on the saving path. This means enabling SVE for user and
-> setting TIF_SVE without having the backing storage allocated.
+> +			return ret;
+> +		}
+>  	}
+>  
+>  	return 0;
+> @@ -354,9 +415,16 @@ static int mvebu_uart_startup(struct uart_port *port)
+>  
+>  static void mvebu_uart_shutdown(struct uart_port *port)
+>  {
+> +	struct mvebu_uart *mvuart = to_mvuart(port);
+> +
+>  	writel(0, port->membase + UART_INTR(port));
+>  
+> -	free_irq(port->irq, port);
+> +	if (!mvuart->irq[UART_TX_IRQ]) {
+> +		free_irq(mvuart->irq[UART_IRQ_SUM], port);
 
-Currently the set of places where the "TIF_SVE implies sve_state valid"
-assumption is applied is not very constrained, so while your suggestion
-is reasonable I'd rather not mess with it just now, if possible.
+same here use devm_free_irq().
 
+> +	} else {
+> +		free_irq(mvuart->irq[UART_RX_IRQ], port);
+> +		free_irq(mvuart->irq[UART_TX_IRQ], port);
 
-But we can do this (which is what my current fixup has):
+And here again.
 
-el0_sve_acc:
-	enable_dbg_and_irq
-	// ...
-	bl	do_sve_acc
-	b	ret_to_user
+Gregory
 
-void do_sve_acc(unsigned int esr, struct pt_regs *regs)
-{
-	/* Even if we chose not to use SVE, the hardware could still trap: */
-	if (unlikely(!system_supports_sve()) || WARN_ON(is_compat_task())) {
-		force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
-		return;
-	}
+> +	}
+>  }
+>  
+>  static int mvebu_uart_baud_rate_set(struct uart_port *port, unsigned int baud)
+> @@ -658,15 +726,15 @@ static const struct of_device_id mvebu_uart_of_match[];
+>  static int mvebu_uart_probe(struct platform_device *pdev)
+>  {
+>  	struct resource *reg = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	struct resource *irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+>  	const struct of_device_id *match = of_match_device(mvebu_uart_of_match,
+>  							   &pdev->dev);
+>  	struct uart_port *port;
+>  	struct mvebu_uart *mvuart;
+> +	int irq;
+>  	int ret;
+>  
+> -	if (!reg || !irq) {
+> -		dev_err(&pdev->dev, "no registers/irq defined\n");
+> +	if (!reg) {
+> +		dev_err(&pdev->dev, "no registers defined\n");
+>  		return -EINVAL;
+>  	}
+>  
+> @@ -693,7 +761,12 @@ static int mvebu_uart_probe(struct platform_device *pdev)
+>  	port->flags      = UPF_FIXED_PORT;
+>  	port->line       = pdev->id;
+>  
+> -	port->irq        = irq->start;
+> +	/*
+> +	 * IRQ number is not stored in this structure because we may have two of
+> +	 * them per port (RX and TX). Instead, use the driver UART structure
+> +	 * array so called ->irq[].
+> +	 */
+> +	port->irq        = 0;
+>  	port->irqflags   = 0;
+>  	port->mapbase    = reg->start;
+>  
+> @@ -728,6 +801,40 @@ static int mvebu_uart_probe(struct platform_device *pdev)
+>  			port->uartclk = clk_get_rate(mvuart->clk);
+>  	}
+>  
+> +	/* Manage interrupts */
+> +	memset(mvuart->irq, 0, UART_IRQ_COUNT);
+> +	if (platform_irq_count(pdev) == 1) {
+> +		/* Old bindings: no name on the single unamed UART0 IRQ */
+> +		irq = platform_get_irq(pdev, 0);
+> +		if (irq < 0) {
+> +			dev_err(&pdev->dev, "unable to get UART IRQ\n");
+> +			return irq;
+> +		}
+> +
+> +		mvuart->irq[UART_IRQ_SUM] = irq;
+> +	} else {
+> +		/*
+> +		 * New bindings: named interrupts (RX, TX) for both UARTS,
+> +		 * only make use of uart-rx and uart-tx interrupts, do not use
+> +		 * uart-sum of UART0 port.
+> +		 */
+> +		irq = platform_get_irq_byname(pdev, "uart-rx");
+> +		if (irq < 0) {
+> +			dev_err(&pdev->dev, "unable to get 'uart-rx' IRQ\n");
+> +			return irq;
+> +		}
+> +
+> +		mvuart->irq[UART_RX_IRQ] = irq;
+> +
+> +		irq = platform_get_irq_byname(pdev, "uart-tx");
+> +		if (irq < 0) {
+> +			dev_err(&pdev->dev, "unable to get 'uart-tx' IRQ\n");
+> +			return irq;
+> +		}
+> +
+> +		mvuart->irq[UART_TX_IRQ] = irq;
+> +	}
+> +
+>  	/* UART Soft Reset*/
+>  	writel(CTRL_SOFT_RST, port->membase + UART_CTRL(port));
+>  	udelay(1);
+> -- 
+> 2.11.0
+>
 
-	sve_alloc(current);
-
-	local_bh_disable();
-	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
-		task_fpsimd_load(); /* flushes high Zn bits as a side-effect */
-		sve_flush_pregs();
-	} else {
-		sve_flush_all(); /* flush all the SVE bits in-place */
-	}
-
-	if (test_and_set_thread_flag(TIF_SVE))
-		WARN_ON(1); /* SVE access shouldn't have trapped */
-	local_bh_enable();
-}
-
-where sve_flush_all() zeroes all the high Zn bits via a series of
-MOV Vn, Vn instructions, and also zeroes Pn and FFR.  sve_fplush_pregs()
-just does the latter.
-
-In the common case the sve_alloc() does a memzero, but doesn't
-allocate memory because more often than not, it will already have
-been allocated.
-
-On this path, the memzero is now pointless -- I'll need to double-check
-what else may be impacted by its removal (probably only ptrace, and I'm
-not sure if the zeroing is strictly required there).
-
-
-There is still a bit of room for improvement, but it's still a step up
-from v2.
-
-What do you think?
-
-Cheers
----Dave
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
