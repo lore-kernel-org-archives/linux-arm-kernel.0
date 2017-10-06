@@ -1,48 +1,45 @@
 From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Fri, 6 Oct 2017 15:01:50 +0200
-Subject: [RESEND PATCH v5 4/4] ARM: configs: stm32: Add DMAMUX support in
- STM32 defconfig
-In-Reply-To: <1506065492-31478-5-git-send-email-pierre-yves.mordret@st.com>
-References: <1506065492-31478-1-git-send-email-pierre-yves.mordret@st.com>
- <1506065492-31478-5-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <5dfb2dc4-a286-b810-3707-82d39ab07ae5@st.com>
+Date: Fri, 6 Oct 2017 15:01:10 +0200
+Subject: [PATCH v2 3/3] ARM: dts: stm32: add vrefbuf to stm32h743
+In-Reply-To: <1504108529-31727-4-git-send-email-fabrice.gasnier@st.com>
+References: <1504108529-31727-1-git-send-email-fabrice.gasnier@st.com>
+ <1504108529-31727-4-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <46c381ed-f096-5da5-c352-89a044aea10d@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Fabrice,
 
-On 09/22/2017 09:31 AM, Pierre-Yves MORDRET wrote:
-> This patch adds DMAMUX support in STM32 defconfig file
+On 08/30/2017 05:55 PM, Fabrice Gasnier wrote:
+> Add STM32H743 VREFBUF (Voltage Reference Buffer) definition.
 > 
-> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 > ---
->   Version history:
->      v5:
->      v4:
->      v3:
->      v2:
->          * None
-> ---
-> ---
->   arch/arm/configs/stm32_defconfig | 1 +
->   1 file changed, 1 insertion(+)
+>   arch/arm/boot/dts/stm32h743.dtsi | 9 +++++++++
+>   1 file changed, 9 insertions(+)
 > 
-> diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
-> index 90e5c46..988f395 100644
-> --- a/arch/arm/configs/stm32_defconfig
-> +++ b/arch/arm/configs/stm32_defconfig
-> @@ -67,6 +67,7 @@ CONFIG_RTC_CLASS=y
->   CONFIG_RTC_DRV_STM32=y
->   CONFIG_DMADEVICES=y
->   CONFIG_STM32_DMA=y
-> +CONFIG_STM32_DMAMUX=y
->   CONFIG_IIO=y
->   CONFIG_STM32_ADC_CORE=y
->   CONFIG_STM32_ADC=y
+> diff --git a/arch/arm/boot/dts/stm32h743.dtsi b/arch/arm/boot/dts/stm32h743.dtsi
+> index 36a99db..83ee8fe 100644
+> --- a/arch/arm/boot/dts/stm32h743.dtsi
+> +++ b/arch/arm/boot/dts/stm32h743.dtsi
+> @@ -82,6 +82,15 @@
+>   			interrupts = <50>;
+>   			clocks = <&timer_clk>;
+>   		};
+> +
+> +		vrefbuf: regulator at 58003C00 {
+> +			compatible = "st,stm32-vrefbuf";
+> +			reg = <0x58003C00 0x8>;
+> +			clocks = <&timer_clk>;
+> +			regulator-min-microvolt = <1500000>;
+> +			regulator-max-microvolt = <2500000>;
+> +			status = "disabled";
+> +		};
+>   	};
+>   };
+>   
 > 
-
-Applied on stm32-defconfig-for-v4.15 branch.
+Applied on stm32-dt-for-v4.15 branch.
 
 Thanks
 Alex
