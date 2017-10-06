@@ -1,121 +1,177 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 06 Oct 2017 14:30:05 -0700
-Subject: [PATCH v7 0/6] SMP and CPU hotplug support for Meson8/Meson8b
-In-Reply-To: <CAFBinCCdj8LwXvUSoCPeVfPUTaLVFFyvKZcNceLGvj26Z740DQ@mail.gmail.com>
- (Martin Blumenstingl's message of "Sun, 1 Oct 2017 14:19:11 +0200")
-References: <20170917164523.6970-1-martin.blumenstingl@googlemail.com>
- <CAFBinCCdj8LwXvUSoCPeVfPUTaLVFFyvKZcNceLGvj26Z740DQ@mail.gmail.com>
-Message-ID: <7hpoa07yn6.fsf@baylibre.com>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Fri,  6 Oct 2017 15:30:08 -0600
+Subject: [PATCH 2/2] media: s5p-mfc: fix lock confection - request_firmware()
+ once and keep state
+In-Reply-To: <cover.1507325072.git.shuahkh@osg.samsung.com>
+References: <cover.1507325072.git.shuahkh@osg.samsung.com>
+Message-ID: <fab205fc9ba1bc00e5dda4db6d426fde69116c37.1507325072.git.shuahkh@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
+Driver calls request_firmware() whenever the device is opened for the
+first time. As the device gets opened and closed, dev->num_inst == 1
+is true several times. This is not necessary since the firmware is saved
+in the fw_buf. s5p_mfc_load_firmware() copies the buffer returned by
+the request_firmware() to dev->fw_buf.
 
-> Hello Russel, Hi Kevin,
->
-> On Sun, Sep 17, 2017 at 6:45 PM, Martin Blumenstingl
-> <martin.blumenstingl@googlemail.com> wrote:
->> This patchset adds support for booting the secondary CPU cores (and
->> taking them offline again) on Amlogic Meson8 and Meson8b SoCs.
->> It is based on an earlier version from Carlo Caione - this helped me
->> a lot to get a better understanding of how SMP/CPU hotplug works
->> (compared to the code found in Amlogic's GPL kernel sources from
->> year 2015).
->>
->> Changes since v6 from [6]:
->> - rebased on top of v4.14-rc1 (which only corrected some line
->>   numbers in the SCU patches)
-> it's been two weeks since v6 and since then Linus L?ssing has
-> confirmed that this works fine on his Odroid-C1 as well (many thanks
-> for testing!): [7]
->
->> Changes since v5 from [5]:
->> - dropped dependency on another patch series (for the clock
->>   controller's embedded reset controller, which is needed to boot
->>   the secondary CPUs) from the cover-letter as that series is now
->>   merged
->> - fix incorrect documentation of scu_cpu_power_enable (thanks to
->>   Russell King for spotting these). removed the paragraph about
->>   preemption, cache coherency and interrupts as we're powering on
->>   a CPU core (the text was copied from the original scu_power_mode
->>   but simply not adjusted). also changed "Set the executing CPUs"
->>   to "Set the given (logical) CPU's" as we're not modifying the
->>   current CPU. this affects only patch #2
->> - extended the commit message of patch #3 with a short sentence
->>   about why SCU_CPU_STATUS_MASK was introduced
->>
->> Changes since v4 from [4]:
->> - use __pa_symbol(secondary_startup) instead of
->>   virt_to_phys(secondary_startup) as suggested by Florian Fainelli
->>   (affects patch #4)
->> - (cover-letter) removed dependency on my other patch
->>   "ARM: dts: meson: add a node which describes the SRAM" [2] as that
->>   was merged into Kevin's Amlogic repo today
->> - dropped patch #5 ("clk: meson: meson8b: export the CPU soft reset
->>   lines") again because the reset controller series exposes the
->>   preprocessor macros now directly, see [1]
->> - refreshed the .dts patches so they now include the new header for
->>   the reset line preprocessor macros
->>
->> Changes since v3 from [3]:
->> - added Rob's ACK to patch #1
->> - replaced a msleep(10) with usleep_range(10000, 15000) in patch #4
->> - removed all "pen" code from patch #4 as that code was not needed
->>   at all (it was left-over while trying to fix Meson8 secondary CPU
->>   boot - which turned out to have nothing to do with this "pen" code)
->> - removed all memory barrier operations as they were added based on
->>   the code in the Amlogic GPL kernel tree (while trying to fix the
->>   Meson8 secondary CPU boot - just like the "pen" code). Everything
->>   still works fine with these on my Meson8m2 and Meson8b boards.
->> - added PATCH #5 as we now have to export the reset identifiers
->>   (just like we do it with the clock identifiers / preprocessor
->>   macros) - this is the result of a change in the reset controller
->>   patch in version 2, see [1]
->> - use the reset line preprocessor macros (from patch #5) in patches
->>   #6 and #7
->>
->> Changes since v2 from [0]:
->> - added support for Meson8 (which requires a slightly different
->>   enable-method)
->> - implemented CPU hotplug support which allows taking a CPU core
->>   offline for both, Meson8 and Meson8b
->> - add a function to smp_scu.c which allows enabling a CPU core from
->>   a different CPU (previously only the power mode for the current CPU
->>   could be changed). Without this the CPU cores on Meson8 won't come
->>   up (Amlogic's vendor GPL kernel sources also enable power through
->>   SCU as very first step for Meson8b as well)
->> - add a function to smp_scu.c to get the power status of a CPU core
->>   (which is needed because the code in .cpu_kill needs to wait until
->>   the core is actually powered off)
->> - dropped patch "ARM: DTS: meson8b: Extend L2 cache controller node"
->>   as it is already applied (for both, Meson8 and Meson8b)
->> - dropped the patches which implement the reset controller which is
->>   built into the clock-controller, these are a separate series: [1]
->> - moved the enable-method property to each CPU node
->>
->>
->> [0] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/390355.html
->> [1] http://lists.infradead.org/pipermail/linux-amlogic/2017-July/004456.html
->> [2] http://lists.infradead.org/pipermail/linux-amlogic/2017-July/004282.html
->> [3] http://lists.infradead.org/pipermail/linux-amlogic/2017-July/004297.html
->> [4] http://lists.infradead.org/pipermail/linux-amlogic/2017-July/004354.html
->> [5] http://lists.infradead.org/pipermail/linux-amlogic/2017-July/004460.html
->> [6] http://lists.infradead.org/pipermail/linux-amlogic/2017-August/004588.html
->>
->> Carlo Caione (2):
->>   dt-bindings: Amlogic: Add Meson8 and Meson8b SMP related documentation
->>   ARM: dts: meson8b: add support for booting the secondary CPU cores
->>
->> Martin Blumenstingl (4):
->>   ARM: smp_scu: add a helper for powering on a specific CPU
->>   ARM: smp_scu: allow the platform code to read the SCU CPU status
->>   ARM: meson: Add SMP bringup code for Meson8 and Meson8b
->>   ARM: dts: meson8: add support for booting the secondary CPU cores
-> @Russel: should Kevin take all patches including the two smp_scu ones?
-> or do you want to take them through your own tree?
+fw_buf sticks around until it gets released from s5p_mfc_remove(), hence
+there is no need to keep requesting firmware and copying it to fw_buf.
 
-With Russell's ack, I can take the series via the amlogic tree.  But I'm
-also fine if Russell wants to take the arch/arm/* via his tree, and I
-will just queue up the DT.
+This might have been overlooked when changes are made to free fw_buf from
+the device release interface s5p_mfc_release().
 
-Kevin
+Fix s5p_mfc_load_firmware() to call request_firmware() once and keep state.
+Change _probe() to load firmware once fw_buf has been allocated.
+
+s5p_mfc_open() and it continues to call s5p_mfc_load_firmware() and init
+hardware which is the step where firmware is written to the device.
+
+This addresses the mfc_mutex contention due to repeated request_firmware()
+calls from open() in the following circular locking warning:
+
+[  552.194115] qtdemux0:sink/2710 is trying to acquire lock:
+[  552.199488]  (&dev->mfc_mutex){+.+.}, at: [<bf145544>] s5p_mfc_mmap+0x28/0xd4 [s5p_mfc]
+[  552.207459]
+               but task is already holding lock:
+[  552.213264]  (&mm->mmap_sem){++++}, at: [<c01df2e4>] vm_mmap_pgoff+0x44/0xb8
+[  552.220284]
+               which lock already depends on the new lock.
+
+[  552.228429]
+               the existing dependency chain (in reverse order) is:
+[  552.235881]
+               -> #2 (&mm->mmap_sem){++++}:
+[  552.241259]        __might_fault+0x80/0xb0
+[  552.245331]        filldir64+0xc0/0x2f8
+[  552.249144]        call_filldir+0xb0/0x14c
+[  552.253214]        ext4_readdir+0x768/0x90c
+[  552.257374]        iterate_dir+0x74/0x168
+[  552.261360]        SyS_getdents64+0x7c/0x1a0
+[  552.265608]        ret_fast_syscall+0x0/0x28
+[  552.269850]
+               -> #1 (&type->i_mutex_dir_key#2){++++}:
+[  552.276180]        down_read+0x48/0x90
+[  552.279904]        lookup_slow+0x74/0x178
+[  552.283889]        walk_component+0x1a4/0x2e4
+[  552.288222]        link_path_walk+0x174/0x4a0
+[  552.292555]        path_openat+0x68/0x944
+[  552.296541]        do_filp_open+0x60/0xc4
+[  552.300528]        file_open_name+0xe4/0x114
+[  552.304772]        filp_open+0x28/0x48
+[  552.308499]        kernel_read_file_from_path+0x30/0x78
+[  552.313700]        _request_firmware+0x3ec/0x78c
+[  552.318291]        request_firmware+0x3c/0x54
+[  552.322642]        s5p_mfc_load_firmware+0x54/0x150 [s5p_mfc]
+[  552.328358]        s5p_mfc_open+0x4e4/0x550 [s5p_mfc]
+[  552.333394]        v4l2_open+0xa0/0x104 [videodev]
+[  552.338137]        chrdev_open+0xa4/0x18c
+[  552.342121]        do_dentry_open+0x208/0x310
+[  552.346454]        path_openat+0x28c/0x944
+[  552.350526]        do_filp_open+0x60/0xc4
+[  552.354512]        do_sys_open+0x118/0x1c8
+[  552.358586]        ret_fast_syscall+0x0/0x28
+[  552.362830]
+               -> #0 (&dev->mfc_mutex){+.+.}:
+               -> #0 (&dev->mfc_mutex){+.+.}:
+[  552.368379]        lock_acquire+0x6c/0x88
+[  552.372364]        __mutex_lock+0x68/0xa34
+[  552.376437]        mutex_lock_interruptible_nested+0x1c/0x24
+[  552.382086]        s5p_mfc_mmap+0x28/0xd4 [s5p_mfc]
+[  552.386939]        v4l2_mmap+0x54/0x88 [videodev]
+[  552.391601]        mmap_region+0x3a8/0x638
+[  552.395673]        do_mmap+0x330/0x3a4
+[  552.399400]        vm_mmap_pgoff+0x90/0xb8
+[  552.403472]        SyS_mmap_pgoff+0x90/0xc0
+[  552.407632]        ret_fast_syscall+0x0/0x28
+[  552.411876]
+               other info that might help us debug this:
+
+[  552.419848] Chain exists of:
+                 &dev->mfc_mutex --> &type->i_mutex_dir_key#2 --> &mm->mmap_sem
+
+[  552.431200]  Possible unsafe locking scenario:
+
+[  552.437092]        CPU0                    CPU1
+[  552.441598]        ----                    ----
+[  552.446104]   lock(&mm->mmap_sem);
+[  552.449484]                                lock(&type->i_mutex_dir_key#2);
+[  552.456329]                                lock(&mm->mmap_sem);
+[  552.462222]   lock(&dev->mfc_mutex);
+[  552.465775]
+                *** DEADLOCK ***
+
+Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+---
+ drivers/media/platform/s5p-mfc/s5p_mfc.c        | 4 ++++
+ drivers/media/platform/s5p-mfc/s5p_mfc_common.h | 3 +++
+ drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c   | 5 +++++
+ 3 files changed, 12 insertions(+)
+
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+index 1afde50..4c253fb 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+@@ -1315,6 +1315,10 @@ static int s5p_mfc_probe(struct platform_device *pdev)
+ 		goto err_dma;
+ 	}
+ 
++	ret = s5p_mfc_load_firmware(dev);
++	if (ret)
++		mfc_err("Failed to load FW - try loading from open()\n");
++
+ 	mutex_init(&dev->mfc_mutex);
+ 	init_waitqueue_head(&dev->queue);
+ 	dev->hw_lock = 0;
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+index 4220914..76119a8 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+@@ -290,6 +290,8 @@ struct s5p_mfc_priv_buf {
+  * @mfc_cmds:		cmd structure holding HW commands function pointers
+  * @mfc_regs:		structure holding MFC registers
+  * @fw_ver:		loaded firmware sub-version
++ * @fw_get_done		flag set when request_firmware() is complete and
++ *			copied into fw_buf
+  * risc_on:		flag indicates RISC is on or off
+  *
+  */
+@@ -336,6 +338,7 @@ struct s5p_mfc_dev {
+ 	struct s5p_mfc_hw_cmds *mfc_cmds;
+ 	const struct s5p_mfc_regs *mfc_regs;
+ 	enum s5p_mfc_fw_ver fw_ver;
++	bool fw_get_done;
+ 	bool risc_on; /* indicates if RISC is on or off */
+ };
+ 
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c b/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
+index f064a0d1..ca57936 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
+@@ -55,6 +55,9 @@ int s5p_mfc_load_firmware(struct s5p_mfc_dev *dev)
+ 	 * into kernel. */
+ 	mfc_debug_enter();
+ 
++	if (dev->fw_get_done)
++		return 0;
++
+ 	if (!dev->fw_buf.virt) {
+ 		mfc_err("MFC firmware is not allocated\n");
+ 		return -EINVAL;
+@@ -82,6 +85,7 @@ int s5p_mfc_load_firmware(struct s5p_mfc_dev *dev)
+ 	}
+ 	memcpy(dev->fw_buf.virt, fw_blob->data, fw_blob->size);
+ 	wmb();
++	dev->fw_get_done = true;
+ 	release_firmware(fw_blob);
+ 	mfc_debug_leave();
+ 	return 0;
+@@ -93,6 +97,7 @@ int s5p_mfc_release_firmware(struct s5p_mfc_dev *dev)
+ 	/* Before calling this function one has to make sure
+ 	 * that MFC is no longer processing */
+ 	s5p_mfc_release_priv_buf(dev, &dev->fw_buf);
++	dev->fw_get_done = false;
+ 	return 0;
+ }
+ 
+-- 
+2.7.4
