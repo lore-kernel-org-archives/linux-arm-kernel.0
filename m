@@ -1,327 +1,573 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Fri,  6 Oct 2017 14:31:31 +0100
-Subject: [RFCv2 PATCH 04/36] iommu/process: Track process changes with an
- mmu_notifier
+Date: Fri,  6 Oct 2017 14:31:34 +0100
+Subject: [RFCv2 PATCH 07/36] iommu: Add a fault handler
 In-Reply-To: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
 References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
-Message-ID: <20171006133203.22803-5-jean-philippe.brucker@arm.com>
+Message-ID: <20171006133203.22803-8-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When creating an iommu_process structure, register a notifier to be
-informed of changes to the virtual address space and to know when the
-process exits.
+Some systems allow devices to do paging. For example systems supporting
+PCI's PRI extension or ARM SMMU's stall model. As more IOMMU drivers are
+adding support for page faults, we see a number of patterns that are
+common to all implementations. Let's try to unify some of the generic
+code.
 
-Two new operations are added to the IOMMU driver:
+Add boilerplate code to handle device page requests:
 
-* process_invalidate when a range of addresses is unmapped, to let the
-  IOMMU driver send TLB invalidations.
+* An IOMMU drivers instantiate a fault workqueue if necessary, using
+  iommu_fault_queue_init and iommu_fault_queue_destroy.
 
-* process_exit when the mm is released. It's a bit more involved in this
-  case, as the IOMMU driver has to tell all devices drivers to stop using
-  this PASID, then clear the PASID table and invalidate TLBs.
+* When it receives a fault report, supposedly in an IRQ handler, the IOMMU
+  driver reports the fault using handle_iommu_fault (as opposed to the
+  current report_iommu_fault)
 
-Adding the notifier in the mix complicates process release. In one case
-device drivers free the process explicitly by calling unbind (or detaching
-the device). In the other case the process could crash before unbind, in
-which case the release notifier has to do all the work.
+* Then depending on the domain configuration, we either immediately
+  forward it to a device driver, or submit it to the fault queue, to be
+  handled in a thread.
+
+* When the fault corresponds to a process context, call the mm fault
+  handler on it (in the next patch).
+
+* Once the fault is handled, it is completed. This is either done
+  automatically by the mm wrapper, or manually by a device driver (e.g.
+  VFIO).
+
+A new operation, fault_response, is added to IOMMU drivers. It takes the
+same fault context passed to handle_iommu_fault and a status, allowing the
+driver to complete the fault, for instance by sending a PRG Response in
+PCI PRI.
 
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
- drivers/iommu/iommu-process.c | 165 ++++++++++++++++++++++++++++++++++++++++--
- include/linux/iommu.h         |  12 +++
- 2 files changed, 170 insertions(+), 7 deletions(-)
+ drivers/iommu/Kconfig         |   9 ++
+ drivers/iommu/Makefile        |   1 +
+ drivers/iommu/io-pgfault.c    | 330 ++++++++++++++++++++++++++++++++++++++++++
+ drivers/iommu/iommu-process.c |   3 -
+ include/linux/iommu.h         | 102 ++++++++++++-
+ 5 files changed, 440 insertions(+), 5 deletions(-)
+ create mode 100644 drivers/iommu/io-pgfault.c
 
+diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+index 1ea5c90e37be..a34d268d8ed3 100644
+--- a/drivers/iommu/Kconfig
++++ b/drivers/iommu/Kconfig
+@@ -84,6 +84,15 @@ config IOMMU_PROCESS
+ 
+ 	  If unsure, say N here.
+ 
++config IOMMU_FAULT
++	bool "Fault handler for the IOMMU API"
++	select IOMMU_API
++	help
++	  Enable the generic fault handler for the IOMMU API, that handles
++	  recoverable page faults or inject them into guests.
++
++	  If unsure, say N here.
++
+ config FSL_PAMU
+ 	bool "Freescale IOMMU support"
+ 	depends on PCI
+diff --git a/drivers/iommu/Makefile b/drivers/iommu/Makefile
+index a2832edbfaa2..c34cbea482f0 100644
+--- a/drivers/iommu/Makefile
++++ b/drivers/iommu/Makefile
+@@ -2,6 +2,7 @@ obj-$(CONFIG_IOMMU_API) += iommu.o
+ obj-$(CONFIG_IOMMU_API) += iommu-traces.o
+ obj-$(CONFIG_IOMMU_API) += iommu-sysfs.o
+ obj-$(CONFIG_IOMMU_PROCESS) += iommu-process.o
++obj-$(CONFIG_IOMMU_FAULT) += io-pgfault.o
+ obj-$(CONFIG_IOMMU_DMA) += dma-iommu.o
+ obj-$(CONFIG_IOMMU_IO_PGTABLE) += io-pgtable.o
+ obj-$(CONFIG_IOMMU_IO_PGTABLE_ARMV7S) += io-pgtable-arm-v7s.o
+diff --git a/drivers/iommu/io-pgfault.c b/drivers/iommu/io-pgfault.c
+new file mode 100644
+index 000000000000..f31bc24534b0
+--- /dev/null
++++ b/drivers/iommu/io-pgfault.c
+@@ -0,0 +1,330 @@
++/*
++ * Handle device page faults
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published
++ * by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
++ *
++ * Copyright (C) 2017 ARM Ltd.
++ *
++ * Author: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
++ */
++
++#include <linux/iommu.h>
++#include <linux/list.h>
++#include <linux/slab.h>
++#include <linux/workqueue.h>
++
++static struct workqueue_struct *iommu_fault_queue;
++static DECLARE_RWSEM(iommu_fault_queue_sem);
++static refcount_t iommu_fault_queue_refs = REFCOUNT_INIT(0);
++static BLOCKING_NOTIFIER_HEAD(iommu_fault_queue_flush_notifiers);
++
++/* Used to store incomplete fault groups */
++static LIST_HEAD(iommu_partial_faults);
++static DEFINE_SPINLOCK(iommu_partial_faults_lock);
++
++struct iommu_fault_context {
++	struct iommu_domain	*domain;
++	struct device		*dev;
++	struct iommu_fault	params;
++	struct list_head	head;
++};
++
++struct iommu_fault_group {
++	struct list_head	faults;
++	struct work_struct	work;
++};
++
++/*
++ * iommu_fault_finish - Finish handling a fault
++ *
++ * Send a response if necessary and pass on the sanitized status code
++ */
++static int iommu_fault_finish(struct iommu_domain *domain, struct device *dev,
++			      struct iommu_fault *fault, int status)
++{
++	/*
++	 * There is no "handling" an unrecoverable fault, so the only valid
++	 * return values are 0 or an error.
++	 */
++	if (!(fault->flags & IOMMU_FAULT_RECOVERABLE))
++		return status > 0 ? 0 : status;
++
++	/* Device driver took ownership of the fault and will complete it later */
++	if (status == IOMMU_FAULT_STATUS_IGNORE)
++		return 0;
++
++	/*
++	 * There was an internal error with handling the recoverable fault (e.g.
++	 * OOM or no handler). Try to complete the fault if possible.
++	 */
++	if (status <= 0)
++		status = IOMMU_FAULT_STATUS_INVALID;
++
++	if (WARN_ON(!domain->ops->fault_response))
++		/*
++		 * The IOMMU driver shouldn't have submitted recoverable faults
++		 * if it cannot receive a response.
++		 */
++		return -EINVAL;
++
++	return domain->ops->fault_response(domain, dev, fault, status);
++}
++
++static int iommu_fault_handle_single(struct iommu_fault_context *fault)
++{
++	/* TODO */
++	return -ENODEV;
++}
++
++static void iommu_fault_handle_group(struct work_struct *work)
++{
++	struct iommu_fault_group *group;
++	struct iommu_fault_context *fault, *next;
++	int status = IOMMU_FAULT_STATUS_HANDLED;
++
++	group = container_of(work, struct iommu_fault_group, work);
++
++	list_for_each_entry_safe(fault, next, &group->faults, head) {
++		struct iommu_fault *params = &fault->params;
++		/*
++		 * Errors are sticky: don't handle subsequent faults in the
++		 * group if there is an error.
++		 */
++		if (status == IOMMU_FAULT_STATUS_HANDLED)
++			status = iommu_fault_handle_single(fault);
++
++		if (params->flags & IOMMU_FAULT_LAST ||
++		    !(params->flags & IOMMU_FAULT_GROUP)) {
++			iommu_fault_finish(fault->domain, fault->dev,
++					   &fault->params, status);
++		}
++
++		kfree(fault);
++	}
++
++	kfree(group);
++}
++
++static int iommu_queue_fault(struct iommu_domain *domain, struct device *dev,
++			     struct iommu_fault *params)
++{
++	struct iommu_fault_group *group;
++	struct iommu_fault_context *fault = kzalloc(sizeof(*fault), GFP_KERNEL);
++
++	/*
++	 * FIXME There is a race here, with queue_register. The last IOMMU
++	 * driver has to ensure no fault is reported anymore before
++	 * unregistering, so that doesn't matter. But you could have an IOMMU
++	 * device that didn't register to the fault queue and is still reporting
++	 * faults while the last queue user disappears. It really shouldn't get
++	 * here, but it currently does if there is a blocking handler.
++	 */
++	if (!iommu_fault_queue)
++		return -ENOSYS;
++
++	if (!fault)
++		return -ENOMEM;
++
++	fault->dev = dev;
++	fault->domain = domain;
++	fault->params = *params;
++
++	if ((params->flags & IOMMU_FAULT_LAST) || !(params->flags & IOMMU_FAULT_GROUP)) {
++		group = kzalloc(sizeof(*group), GFP_KERNEL);
++		if (!group) {
++			kfree(fault);
++			return -ENOMEM;
++		}
++
++		INIT_LIST_HEAD(&group->faults);
++		list_add(&fault->head, &group->faults);
++		INIT_WORK(&group->work, iommu_fault_handle_group);
++	} else {
++		/* Non-last request of a group. Postpone until the last one */
++		spin_lock(&iommu_partial_faults_lock);
++		list_add(&fault->head, &iommu_partial_faults);
++		spin_unlock(&iommu_partial_faults_lock);
++
++		return IOMMU_FAULT_STATUS_IGNORE;
++	}
++
++	if (params->flags & IOMMU_FAULT_GROUP) {
++		struct iommu_fault_context *cur, *next;
++
++		/* See if we have pending faults for this group */
++		spin_lock(&iommu_partial_faults_lock);
++		list_for_each_entry_safe(cur, next, &iommu_partial_faults, head) {
++			if (cur->params.id == params->id && cur->dev == dev) {
++				list_del(&cur->head);
++				/* Insert *before* the last fault */
++				list_add(&cur->head, &group->faults);
++			}
++		}
++		spin_unlock(&iommu_partial_faults_lock);
++	}
++
++	queue_work(iommu_fault_queue, &group->work);
++
++	/* Postpone the fault completion */
++	return IOMMU_FAULT_STATUS_IGNORE;
++}
++
++/**
++ * handle_iommu_fault - Handle fault in device driver or mm
++ *
++ * If the device driver expressed interest in handling fault, report it throught
++ * the domain handler. If the fault is recoverable, try to page in the address.
++ */
++int handle_iommu_fault(struct iommu_domain *domain, struct device *dev,
++		       struct iommu_fault *fault)
++{
++	int ret = -ENOSYS;
++
++	/*
++	 * if upper layers showed interest and installed a fault handler,
++	 * invoke it.
++	 */
++	if (domain->ext_handler) {
++		ret = domain->ext_handler(domain, dev, fault,
++					  domain->handler_token);
++
++		if (ret != IOMMU_FAULT_STATUS_NONE)
++			return iommu_fault_finish(domain, dev, fault, ret);
++	} else if (domain->handler && !(fault->flags &
++		   (IOMMU_FAULT_RECOVERABLE | IOMMU_FAULT_PASID))) {
++		/* Fall back to the old method if possible */
++		ret = domain->handler(domain, dev, fault->address,
++				      fault->flags, domain->handler_token);
++		if (ret)
++			return ret;
++	}
++
++	/* If the handler is blocking, handle fault in the workqueue */
++	if (fault->flags & IOMMU_FAULT_RECOVERABLE)
++		ret = iommu_queue_fault(domain, dev, fault);
++
++	return iommu_fault_finish(domain, dev, fault, ret);
++}
++EXPORT_SYMBOL_GPL(handle_iommu_fault);
++
++/**
++ * iommu_fault_response - Complete a recoverable fault
++ * @domain: iommu domain passed to the handler
++ * @dev: device passed to the handler
++ * @fault: fault passed to the handler
++ * @status: action to perform
++ *
++ * An atomic handler that took ownership of the fault (by returning
++ * IOMMU_FAULT_STATUS_IGNORE) must complete the fault by calling this function.
++ */
++int iommu_fault_response(struct iommu_domain *domain, struct device *dev,
++			 struct iommu_fault *fault, enum iommu_fault_status status)
++{
++	/* No response is need for unrecoverable faults... */
++	if (!(fault->flags & IOMMU_FAULT_RECOVERABLE))
++		return -EINVAL;
++
++	/* Ignore is certainly the wrong thing to do at this point */
++	if (WARN_ON(status == IOMMU_FAULT_STATUS_IGNORE ||
++		    status == IOMMU_FAULT_STATUS_NONE))
++		status = IOMMU_FAULT_STATUS_INVALID;
++
++	return iommu_fault_finish(domain, dev, fault, status);
++}
++EXPORT_SYMBOL_GPL(iommu_fault_response);
++
++/**
++ * iommu_fault_queue_register - register an IOMMU driver to the global fault
++ * queue
++ *
++ * @flush_notifier: a notifier block that is called before the fault queue is
++ * flushed. The IOMMU driver should commit all faults that are pending in its
++ * low-level queues at the time of the call, into the fault queue. The notifier
++ * takes a device pointer as argument, hinting what endpoint is causing the
++ * flush. When the device is NULL, all faults should be committed.
++ */
++int iommu_fault_queue_register(struct notifier_block *flush_notifier)
++{
++	/*
++	 * The WQ is unordered because the low-level handler enqueues faults by
++	 * group. PRI requests within a group have to be ordered, but once
++	 * that's dealt with, the high-level function can handle groups out of
++	 * order.
++	 */
++	down_write(&iommu_fault_queue_sem);
++	if (!iommu_fault_queue) {
++		iommu_fault_queue = alloc_workqueue("iommu_fault_queue",
++						    WQ_UNBOUND, 0);
++		if (iommu_fault_queue)
++			refcount_set(&iommu_fault_queue_refs, 1);
++	} else {
++		refcount_inc(&iommu_fault_queue_refs);
++	}
++	up_write(&iommu_fault_queue_sem);
++
++	if (!iommu_fault_queue)
++		return -ENOMEM;
++
++	if (flush_notifier)
++		blocking_notifier_chain_register(&iommu_fault_queue_flush_notifiers,
++						 flush_notifier);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(iommu_fault_queue_register);
++
++/**
++ * iommu_fault_queue_flush - Ensure that all queued faults have been processed.
++ * @dev: the endpoint whose faults need to be flushed. If NULL, flush all
++ *       pending faults.
++ *
++ * Users must call this function when releasing a PASID, to ensure that all
++ * pending faults affecting this PASID have been handled, and won't affect the
++ * address space of a subsequent process that reuses this PASID.
++ */
++void iommu_fault_queue_flush(struct device *dev)
++{
++	blocking_notifier_call_chain(&iommu_fault_queue_flush_notifiers, 0, dev);
++
++	down_read(&iommu_fault_queue_sem);
++	/*
++	 * Don't flush the partial faults list. All PRGs with the PASID are
++	 * complete and have been submitted to the queue.
++	 */
++	if (iommu_fault_queue)
++		flush_workqueue(iommu_fault_queue);
++	up_read(&iommu_fault_queue_sem);
++}
++EXPORT_SYMBOL_GPL(iommu_fault_queue_flush);
++
++/**
++ * iommu_fault_queue_unregister - Unregister an IOMMU driver from the global
++ * fault queue.
++ *
++ * @flush_notifier: same parameter as iommu_fault_queue_register
++ */
++void iommu_fault_queue_unregister(struct notifier_block *flush_notifier)
++{
++	down_write(&iommu_fault_queue_sem);
++	if (refcount_dec_and_test(&iommu_fault_queue_refs)) {
++		destroy_workqueue(iommu_fault_queue);
++		iommu_fault_queue = NULL;
++	}
++	up_write(&iommu_fault_queue_sem);
++
++	if (flush_notifier)
++		blocking_notifier_chain_unregister(&iommu_fault_queue_flush_notifiers,
++						   flush_notifier);
++}
++EXPORT_SYMBOL_GPL(iommu_fault_queue_unregister);
 diff --git a/drivers/iommu/iommu-process.c b/drivers/iommu/iommu-process.c
-index 8f4c98632d58..1ef3f55b962b 100644
+index dee7691e3791..092240708b78 100644
 --- a/drivers/iommu/iommu-process.c
 +++ b/drivers/iommu/iommu-process.c
-@@ -21,9 +21,14 @@
- 
- #include <linux/idr.h>
- #include <linux/iommu.h>
-+#include <linux/mmu_notifier.h>
- #include <linux/slab.h>
-+#include <linux/sched/mm.h>
+@@ -26,9 +26,6 @@
+ #include <linux/sched/mm.h>
  #include <linux/spinlock.h>
  
-+/* FIXME: stub for the fault queue. Remove later. */
-+#define iommu_fault_queue_flush(...)
-+
+-/* FIXME: stub for the fault queue. Remove later. */
+-#define iommu_fault_queue_flush(...)
+-
  /* Link between a domain and a process */
  struct iommu_context {
  	struct iommu_process	*process;
-@@ -50,6 +55,8 @@ static DEFINE_IDR(iommu_process_idr);
-  */
- static DEFINE_SPINLOCK(iommu_process_lock);
- 
-+static struct mmu_notifier_ops iommu_process_mmu_notfier;
-+
- /*
-  * Allocate a iommu_process structure for the given task.
-  *
-@@ -74,15 +81,21 @@ iommu_process_alloc(struct iommu_domain *domain, struct task_struct *task)
- 		return ERR_PTR(-ENOMEM);
- 
- 	process->pid		= get_task_pid(task, PIDTYPE_PID);
-+	process->mm		= get_task_mm(task);
-+	process->notifier.ops	= &iommu_process_mmu_notfier;
- 	process->release	= domain->ops->process_free;
- 	INIT_LIST_HEAD(&process->domains);
--	kref_init(&process->kref);
- 
- 	if (!process->pid) {
- 		err = -EINVAL;
- 		goto err_free_process;
- 	}
- 
-+	if (!process->mm) {
-+		err = -EINVAL;
-+		goto err_put_pid;
-+	}
-+
- 	idr_preload(GFP_KERNEL);
- 	spin_lock(&iommu_process_lock);
- 	pasid = idr_alloc_cyclic(&iommu_process_idr, process, domain->min_pasid,
-@@ -93,11 +106,44 @@ iommu_process_alloc(struct iommu_domain *domain, struct task_struct *task)
- 
- 	if (pasid < 0) {
- 		err = pasid;
--		goto err_put_pid;
-+		goto err_put_mm;
- 	}
- 
-+	err = mmu_notifier_register(&process->notifier, process->mm);
-+	if (err)
-+		goto err_free_pasid;
-+
-+	/*
-+	 * Now that the MMU notifier is valid, we can allow users to grab this
-+	 * process by setting a valid refcount. Before that it was accessible in
-+	 * the IDR but invalid.
-+	 *
-+	 * Users of the process structure obtain it with inc_not_zero, which
-+	 * provides a control dependency to ensure that they don't modify the
-+	 * structure if they didn't acquire the ref. So I think we need a write
-+	 * barrier here to pair with that control dependency (XXX probably
-+	 * nonsense.)
-+	 */
-+	smp_wmb();
-+	kref_init(&process->kref);
-+
-+	/* A mm_count reference is kept by the notifier */
-+	mmput(process->mm);
-+
- 	return process;
- 
-+err_free_pasid:
-+	/*
-+	 * Even if the process is accessible from the IDR at this point, kref is
-+	 * 0 so no user could get a reference to it. Free it manually.
-+	 */
-+	spin_lock(&iommu_process_lock);
-+	idr_remove(&iommu_process_idr, process->pasid);
-+	spin_unlock(&iommu_process_lock);
-+
-+err_put_mm:
-+	mmput(process->mm);
-+
- err_put_pid:
- 	put_pid(process->pid);
- 
-@@ -107,21 +153,46 @@ iommu_process_alloc(struct iommu_domain *domain, struct task_struct *task)
- 	return ERR_PTR(err);
- }
- 
--static void iommu_process_release(struct kref *kref)
-+static void iommu_process_free(struct rcu_head *rcu)
- {
- 	struct iommu_process *process;
- 	void (*release)(struct iommu_process *);
- 
-+	process = container_of(rcu, struct iommu_process, rcu);
-+	release = process->release;
-+
-+	release(process);
-+}
-+
-+static void iommu_process_release(struct kref *kref)
-+{
-+	struct iommu_process *process;
-+
- 	assert_spin_locked(&iommu_process_lock);
- 
- 	process = container_of(kref, struct iommu_process, kref);
--	release = process->release;
--
- 	WARN_ON(!list_empty(&process->domains));
- 
- 	idr_remove(&iommu_process_idr, process->pasid);
- 	put_pid(process->pid);
--	release(process);
-+
-+	/*
-+	 * If we're being released from process exit, the notifier callback
-+	 * ->release has already been called. Otherwise we don't need to go
-+	 * through there, the process isn't attached to anything anymore. Hence
-+	 * no_release.
-+	 */
-+	mmu_notifier_unregister_no_release(&process->notifier, process->mm);
-+
-+	/*
-+	 * We can't free the structure here, because ->release might be
-+	 * attempting to grab it concurrently. And in the other case, if the
-+	 * structure is being released from within ->release, then
-+	 * __mmu_notifier_release expects to still have a valid mn when
-+	 * returning. So free the structure when it's safe, after the RCU grace
-+	 * period elapsed.
-+	 */
-+	mmu_notifier_call_srcu(&process->rcu, iommu_process_free);
- }
- 
- /*
-@@ -187,7 +258,8 @@ static int iommu_process_attach(struct iommu_domain *domain, struct device *dev,
- 	int pasid = process->pasid;
- 	struct iommu_context *context;
- 
--	if (WARN_ON(!domain->ops->process_attach || !domain->ops->process_detach))
-+	if (WARN_ON(!domain->ops->process_attach || !domain->ops->process_detach ||
-+		    !domain->ops->process_exit || !domain->ops->process_invalidate))
- 		return -ENODEV;
- 
- 	if (pasid > domain->max_pasid || pasid < domain->min_pasid)
-@@ -259,6 +331,85 @@ static void iommu_process_detach_locked(struct iommu_context *context,
- 		iommu_context_free(context);
- }
- 
-+/*
-+ * Called when the process exits. Might race with unbind or any other function
-+ * dropping the last reference to the process. As the mmu notifier doesn't hold
-+ * any reference to the process when calling ->release, try to take a reference.
-+ */
-+static void iommu_notifier_release(struct mmu_notifier *mn, struct mm_struct *mm)
-+{
-+	struct iommu_context *context, *next;
-+	struct iommu_process *process = container_of(mn, struct iommu_process, notifier);
-+
-+	/*
-+	 * If the process is exiting then domains are still attached to the
-+	 * process. A few things need to be done before it is safe to release
-+	 *
-+	 * 1) Tell the IOMMU driver to stop using this PASID (and forward the
-+	 *    message to attached device drivers. It can then clear the PASID
-+	 *    table and invalidate relevant TLBs.
-+	 *
-+	 * 2) Drop all references to this process, by freeing the contexts.
-+	 */
-+	spin_lock(&iommu_process_lock);
-+	if (!iommu_process_get_locked(process)) {
-+		/* Someone's already taking care of it. */
-+		spin_unlock(&iommu_process_lock);
-+		return;
-+	}
-+
-+	list_for_each_entry_safe(context, next, &process->domains, process_head) {
-+		context->domain->ops->process_exit(context->domain, process);
-+		iommu_context_free(context);
-+	}
-+	spin_unlock(&iommu_process_lock);
-+
-+	iommu_fault_queue_flush(NULL);
-+
-+	/*
-+	 * We're now reasonably certain that no more fault is being handled for
-+	 * this process, since we just flushed them all out of the fault queue.
-+	 * Release the last reference to free the process.
-+	 */
-+	iommu_process_put(process);
-+}
-+
-+static void iommu_notifier_invalidate_range(struct mmu_notifier *mn, struct mm_struct *mm,
-+					    unsigned long start, unsigned long end)
-+{
-+	struct iommu_context *context;
-+	struct iommu_process *process = container_of(mn, struct iommu_process, notifier);
-+
-+	spin_lock(&iommu_process_lock);
-+	list_for_each_entry(context, &process->domains, process_head) {
-+		context->domain->ops->process_invalidate(context->domain,
-+						 process, start, end - start);
-+	}
-+	spin_unlock(&iommu_process_lock);
-+}
-+
-+static int iommu_notifier_clear_flush_young(struct mmu_notifier *mn,
-+					    struct mm_struct *mm,
-+					    unsigned long start,
-+					    unsigned long end)
-+{
-+	iommu_notifier_invalidate_range(mn, mm, start, end);
-+	return 0;
-+}
-+
-+static void iommu_notifier_change_pte(struct mmu_notifier *mn, struct mm_struct *mm,
-+				      unsigned long address, pte_t pte)
-+{
-+	iommu_notifier_invalidate_range(mn, mm, address, address + PAGE_SIZE);
-+}
-+
-+static struct mmu_notifier_ops iommu_process_mmu_notfier = {
-+	.release		= iommu_notifier_release,
-+	.clear_flush_young	= iommu_notifier_clear_flush_young,
-+	.change_pte		= iommu_notifier_change_pte,
-+	.invalidate_range	= iommu_notifier_invalidate_range,
-+};
-+
- /**
-  * iommu_set_process_exit_handler() - set a callback for stopping the use of
-  * PASID in a device.
 diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index e9528fcacab1..42b818437fa1 100644
+index ea4eaf585eb4..37fafaf07ee2 100644
 --- a/include/linux/iommu.h
 +++ b/include/linux/iommu.h
-@@ -25,6 +25,7 @@
- #include <linux/errno.h>
- #include <linux/err.h>
- #include <linux/of.h>
-+#include <linux/mmu_notifier.h>
+@@ -51,15 +51,69 @@ struct iommu_domain;
+ struct notifier_block;
  
- #define IOMMU_READ	(1 << 0)
- #define IOMMU_WRITE	(1 << 1)
-@@ -111,9 +112,13 @@ struct iommu_process {
- 	int			pasid;
- 	struct list_head	domains;
- 	struct kref		kref;
-+	struct mmu_notifier	notifier;
-+	struct mm_struct	*mm;
+ /* iommu fault flags */
+-#define IOMMU_FAULT_READ	0x0
+-#define IOMMU_FAULT_WRITE	0x1
++#define IOMMU_FAULT_READ		(1 << 0)
++#define IOMMU_FAULT_WRITE		(1 << 1)
++#define IOMMU_FAULT_EXEC		(1 << 2)
++#define IOMMU_FAULT_PRIV		(1 << 3)
++/*
++ * If a fault is recoverable, then it *must* be completed, once handled, with
++ * iommu_fault_response.
++ */
++#define IOMMU_FAULT_RECOVERABLE		(1 << 4)
++/* The PASID field is valid */
++#define IOMMU_FAULT_PASID		(1 << 5)
++/* Fault is part of a group (PCI PRG) */
++#define IOMMU_FAULT_GROUP		(1 << 6)
++/* Fault is last of its group */
++#define IOMMU_FAULT_LAST		(1 << 7)
++
++/**
++ * enum iommu_fault_status - Return status of fault handlers, telling the IOMMU
++ *	driver how to proceed with the fault.
++ *
++ * @IOMMU_FAULT_STATUS_NONE: Fault was not handled. Call the next handler, or
++ *	terminate.
++ * @IOMMU_FAULT_STATUS_FAILURE: General error. Drop all subsequent faults from
++ *	this device if possible. This is "Response Failure" in PCI PRI.
++ * @IOMMU_FAULT_STATUS_INVALID: Could not handle this fault, don't retry the
++ *	access. This is "Invalid Request" in PCI PRI.
++ * @IOMMU_FAULT_STATUS_HANDLED: Fault has been handled and the page tables
++ *	populated, retry the access.
++ * @IOMMU_FAULT_STATUS_IGNORE: Stop processing the fault, and do not send a
++ *	reply to the device.
++ *
++ * For unrecoverable faults, the only valid status is IOMMU_FAULT_STATUS_NONE
++ * For a recoverable fault, if no one handled the fault, treat as
++ * IOMMU_FAULT_STATUS_INVALID.
++ */
++enum iommu_fault_status {
++	IOMMU_FAULT_STATUS_NONE = 0,
++	IOMMU_FAULT_STATUS_FAILURE,
++	IOMMU_FAULT_STATUS_INVALID,
++	IOMMU_FAULT_STATUS_HANDLED,
++	IOMMU_FAULT_STATUS_IGNORE,
++};
  
- 	/* Release callback for this process */
- 	void (*release)(struct iommu_process *process);
-+	/* For postponed release */
-+	struct rcu_head		rcu;
+ typedef int (*iommu_fault_handler_t)(struct iommu_domain *,
+ 			struct device *, unsigned long, int, void *);
+ 
+ struct iommu_fault {
++	/* Faulting address */
+ 	unsigned long		address;
++	/* Fault flags */
+ 	unsigned int		flags;
++	/* Process address space ID (if IOMMU_FAULT_PASID is present) */
++	u32			pasid;
++	/*
++	 * For PCI PRI, 'id' is the PRG. For others, it's a tag identifying a
++	 * single fault.
++	 */
++	unsigned int		id;
++	/*
++	 * IOMMU vendor-specific things. This cannot be a private pointer
++	 * because the fault report might leave the kernel and into a guest.
++	 */
++	u64			iommu_data;
  };
  
- enum iommu_cap {
-@@ -189,6 +194,9 @@ struct iommu_resv_region {
-  * @process_attach: attach iommu process to a domain
-  * @process_detach: detach iommu process from a domain. Remove PASID entry and
-  *                  flush associated TLB entries.
-+ * @process_invalidate: Invalidate a range of mappings for a process.
-+ * @process_exit: A process is exiting. Stop using the PASID, remove PASID entry
-+ *                and flush associated TLB entries.
-  * @map: map a physically contiguous memory region to an iommu domain
-  * @unmap: unmap a physically contiguous memory region from an iommu domain
-  * @map_sg: map a scatter-gather list of physically contiguous memory chunks
-@@ -228,6 +236,10 @@ struct iommu_ops {
- 			      struct iommu_process *process, bool first);
- 	void (*process_detach)(struct iommu_domain *domain, struct device *dev,
- 			       struct iommu_process *process, bool last);
-+	void (*process_invalidate)(struct iommu_domain *domain,
-+				   struct iommu_process *process,
-+				   unsigned long iova, size_t size);
-+	void (*process_exit)(struct iommu_domain *domain, struct iommu_process *process);
- 	int (*map)(struct iommu_domain *domain, unsigned long iova,
- 		   phys_addr_t paddr, size_t size, int prot);
- 	size_t (*unmap)(struct iommu_domain *domain, unsigned long iova,
+ typedef int (*iommu_ext_fault_handler_t)(struct iommu_domain *, struct device *,
+@@ -228,6 +282,7 @@ struct iommu_resv_region {
+  * @domain_set_windows: Set the number of windows for a domain
+  * @domain_get_windows: Return the number of windows for a domain
+  * @of_xlate: add OF master IDs to iommu grouping
++ * @fault_reponse: complete a recoverable fault
+  * @pgsize_bitmap: bitmap of all possible supported page sizes
+  */
+ struct iommu_ops {
+@@ -287,6 +342,10 @@ struct iommu_ops {
+ 	int (*of_xlate)(struct device *dev, struct of_phandle_args *args);
+ 	bool (*is_attach_deferred)(struct iommu_domain *domain, struct device *dev);
+ 
++	int (*fault_response)(struct iommu_domain *domain, struct device *dev,
++			      struct iommu_fault *fault,
++			      enum iommu_fault_status status);
++
+ 	unsigned long pgsize_bitmap;
+ };
+ 
+@@ -824,4 +883,43 @@ static inline void __iommu_process_unbind_dev_all(struct iommu_domain *domain,
+ 
+ #endif /* CONFIG_IOMMU_PROCESS */
+ 
++#ifdef CONFIG_IOMMU_FAULT
++extern int handle_iommu_fault(struct iommu_domain *domain, struct device *dev,
++			      struct iommu_fault *fault);
++extern int iommu_fault_response(struct iommu_domain *domain, struct device *dev,
++				struct iommu_fault *fault,
++				enum iommu_fault_status status);
++extern int iommu_fault_queue_register(struct notifier_block *flush_notifier);
++extern void iommu_fault_queue_flush(struct device *dev);
++extern void iommu_fault_queue_unregister(struct notifier_block *flush_notifier);
++#else /* CONFIG_IOMMU_FAULT */
++static inline int handle_iommu_fault(struct iommu_domain *domain,
++				     struct device *dev,
++				     struct iommu_fault *fault)
++{
++	return -ENODEV;
++}
++
++static inline int iommu_fault_response(struct iommu_domain *domain,
++				       struct device *dev,
++				       struct iommu_fault *fault,
++				       enum iommu_fault_status status)
++{
++	return -ENODEV;
++}
++
++static inline int iommu_fault_queue_register(struct notifier_block *flush_notifier)
++{
++	return -ENODEV;
++}
++
++static inline void iommu_fault_queue_flush(struct device *dev)
++{
++}
++
++static inline void iommu_fault_queue_unregister(struct notifier_block *flush_notifier)
++{
++}
++#endif /* CONFIG_IOMMU_FAULT */
++
+ #endif /* __LINUX_IOMMU_H */
 -- 
 2.13.3
