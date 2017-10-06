@@ -1,57 +1,57 @@
 From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Fri,  6 Oct 2017 12:13:31 +0200
-Subject: [PATCH 03/16] serial: mvebu-uart: use driver name when requesting an
- interrupt
+Date: Fri,  6 Oct 2017 12:13:32 +0200
+Subject: [PATCH 04/16] serial: mvebu-uart: support probe of multiple ports
 In-Reply-To: <20171006101344.15590-1-miquel.raynal@free-electrons.com>
 References: <20171006101344.15590-1-miquel.raynal@free-electrons.com>
-Message-ID: <20171006101344.15590-4-miquel.raynal@free-electrons.com>
+Message-ID: <20171006101344.15590-5-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yehuda Yitschak <yehuday@marvell.com>
+From: Allen Yan <yanwei@marvell.com>
 
-Use the driver name when requesting an interrupt for consistency.
+Until now, the mvebu-uart driver only supported probing a single UART
+port. However, some platforms have multiple instances of this UART
+controller, and therefore the driver should support multiple ports.
 
-Avoids possible confusion with DW8250 driver interrupt names in
-/proc/interrupts.
+In order to achieve this, we make sure to assign port->line properly,
+instead of hardcoding it to zero.
 
-Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
+Signed-off-by: Allen Yan <yanwei@marvell.com>
 Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 ---
- drivers/tty/serial/mvebu-uart.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ drivers/tty/serial/mvebu-uart.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
-index 45b57c294d13..7e0a3e9fee15 100644
+index 7e0a3e9fee15..25b11ede3a97 100644
 --- a/drivers/tty/serial/mvebu-uart.c
 +++ b/drivers/tty/serial/mvebu-uart.c
-@@ -90,6 +90,7 @@
- #define MVEBU_NR_UARTS		1
+@@ -560,7 +560,16 @@ static int mvebu_uart_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
  
- #define MVEBU_UART_TYPE		"mvebu-uart"
-+#define DRIVER_NAME		"mvebu_serial"
+-	port = &mvebu_uart_ports[0];
++	if (pdev->dev.of_node)
++		pdev->id = of_alias_get_id(pdev->dev.of_node, "serial");
++
++	if (pdev->id >= MVEBU_NR_UARTS) {
++		dev_err(&pdev->dev, "cannot have more than %d UART ports\n",
++			MVEBU_NR_UARTS);
++		return -EINVAL;
++	}
++
++	port = &mvebu_uart_ports[pdev->id];
  
- static struct uart_port mvebu_uart_ports[MVEBU_NR_UARTS];
+ 	spin_lock_init(&port->lock);
  
-@@ -287,8 +288,8 @@ static int mvebu_uart_startup(struct uart_port *port)
- 	udelay(1);
- 	writel(CTRL_RX_INT, port->membase + UART_CTRL);
+@@ -572,7 +581,7 @@ static int mvebu_uart_probe(struct platform_device *pdev)
+ 	port->fifosize   = 32;
+ 	port->iotype     = UPIO_MEM32;
+ 	port->flags      = UPF_FIXED_PORT;
+-	port->line       = 0; /* single port: force line number to  0 */
++	port->line       = pdev->id;
  
--	ret = request_irq(port->irq, mvebu_uart_isr, port->irqflags, "serial",
--			  port);
-+	ret = request_irq(port->irq, mvebu_uart_isr, port->irqflags,
-+			  DRIVER_NAME, port);
- 	if (ret) {
- 		dev_err(port->dev, "failed to request irq\n");
- 		return ret;
-@@ -538,7 +539,7 @@ console_initcall(mvebu_uart_console_init);
- 
- static struct uart_driver mvebu_uart_driver = {
- 	.owner			= THIS_MODULE,
--	.driver_name		= "mvebu_serial",
-+	.driver_name		= DRIVER_NAME,
- 	.dev_name		= "ttyMV",
- 	.nr			= MVEBU_NR_UARTS,
- #ifdef CONFIG_SERIAL_MVEBU_CONSOLE
+ 	port->irq        = irq->start;
+ 	port->irqflags   = 0;
 -- 
 2.11.0
