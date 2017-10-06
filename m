@@ -1,30 +1,74 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 6 Oct 2017 10:19:27 +0200
-Subject: [PATCH v3 0/3] Basical device tree parts for Allwinner R40 SoC
-In-Reply-To: <20171006064233.13967-1-icenowy@aosc.io>
-References: <20171006064233.13967-1-icenowy@aosc.io>
-Message-ID: <20171006081927.oiekmlnsewjzz2g7@flea>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 6 Oct 2017 16:32:23 +0800
+Subject: [PATCH 1/3] pinctrl: sunxi: Introduce the strict flag
+In-Reply-To: <d05b00e25ec1c466bb5852b0ce06b3e67d93f9a7.1507236823.git-series.maxime.ripard@free-electrons.com>
+References: <cover.7a61d0bb31530def29efd8b4286d8c0afdaab347.1507236823.git-series.maxime.ripard@free-electrons.com>
+ <d05b00e25ec1c466bb5852b0ce06b3e67d93f9a7.1507236823.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v65xhXKB10r4BhmKra+XLrSq9GjGL+sUbRDqkb2Y=nsE4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Oct 6, 2017 at 4:54 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Our pinctrl device should have had strict set all along. However, it wasn't
+> the case, and most of our old device trees also have a pinctrl group in
+> addition to the GPIOs properties, which mean that we can't really turn it
+> on now.
+>
+> All our new SoCs don't have that group, so we should still enable that mode
+> on the newer one though.
+>
+> In order to enable it by default, add a flag that will allow to disable
+> that mode that should be set by pinctrl drivers that cannot be migrated.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 5 ++++-
+>  drivers/pinctrl/sunxi/pinctrl-sunxi.h | 1 +
+>  2 files changed, 5 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+> index 52edf3b5988d..1753a5b1573f 100644
+> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+> @@ -690,7 +690,7 @@ sunxi_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
+>         return 0;
+>  }
+>
+> -static const struct pinmux_ops sunxi_pmx_ops = {
+> +static struct pinmux_ops sunxi_pmx_ops = {
+>         .get_functions_count    = sunxi_pmx_get_funcs_cnt,
+>         .get_function_name      = sunxi_pmx_get_func_name,
+>         .get_function_groups    = sunxi_pmx_get_func_groups,
+> @@ -1307,6 +1307,9 @@ int sunxi_pinctrl_init_with_variant(struct platform_device *pdev,
+>         pctrl_desc->pctlops = &sunxi_pctrl_ops;
+>         pctrl_desc->pmxops =  &sunxi_pmx_ops;
+>
+> +       if (desc->disable_strict_mode)
+> +               sunxi_pmx_ops.strict = false;
 
-On Fri, Oct 06, 2017 at 06:42:30AM +0000, Icenowy Zheng wrote:
-> This patchset adds basical device tree parts for the Allwinner R40 SoC
-> and two boards feature this SoC -- Banana Pi M2 Ultra and Berry (The
-> BPi M2 Berry board uses V40 SoC, which is just a renamed R40).
+This is a bad idea. We have two pinctrl instances sharing the
+same ops structure for later SoCs (the normal PIO and R_PIO).
+What if they don't match? It would be better to make a copy,
+(preferably) at runtime, or statically.
 
-Applied all three, thanks!
-Maxime
+ChenYu
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171006/c357e076/attachment-0001.sig>
+> +
+>         pctl->pctl_dev = devm_pinctrl_register(&pdev->dev, pctrl_desc, pctl);
+>         if (IS_ERR(pctl->pctl_dev)) {
+>                 dev_err(&pdev->dev, "couldn't register pinctrl driver\n");
+> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.h b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+> index 1bfc0d8a55df..11b128f54ed2 100644
+> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+> @@ -112,6 +112,7 @@ struct sunxi_pinctrl_desc {
+>         unsigned                        irq_banks;
+>         unsigned                        irq_bank_base;
+>         bool                            irq_read_needs_mux;
+> +       bool                            disable_strict_mode;
+>  };
+>
+>  struct sunxi_pinctrl_function {
+> --
+> git-series 0.9.1
