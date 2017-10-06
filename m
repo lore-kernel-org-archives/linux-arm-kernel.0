@@ -1,44 +1,78 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Fri,  6 Oct 2017 14:32:00 +0100
-Subject: [RFCv2 PATCH 33/36] iommu/arm-smmu-v3: Disable tagged pointers
+Date: Fri,  6 Oct 2017 14:31:57 +0100
+Subject: [RFCv2 PATCH 30/36] ACPI/IORT: Check ATS capability in root complex
+ nodes
 In-Reply-To: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
 References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
-Message-ID: <20171006133203.22803-34-jean-philippe.brucker@arm.com>
+Message-ID: <20171006133203.22803-31-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM architecture has a "Top Byte Ignore" (TBI) option that makes the
-MMU mask out bits [63:56] of an address, allowing a userspace application
-to store data in its pointers. This option is incompatible with PCI ATS.
+Root complex node in IORT has a bit telling whether it supports ATS or
+not. Store this bit in the IOMMU fwspec when setting up a device, so it
+can be accessed later by an IOMMU driver.
 
-If TBI is enabled in the SMMU and userspace triggers DMA transactions on
-tagged pointers, the endpoint might create ATC entries for addresses that
-include a tag. Software would then have to send ATC invalidation packets
-for each 255 possible alias of an address, or just wipe the whole address
-space. This is not a viable option, so disable TBI.
-
-The impact of this change is unclear, since there are very few users of
-tagged pointers, much less SVM. But the requirement introduced by this
-patch doesn't seem excessive: a userspace application using both tagged
-pointers and SVM should now sanitize addresses (clear the tag) before
-using them for device DMA.
+Use the negative version at the moment because it's not clear if/how the
+bit needs to be integrated in other firmare descriptions. The SMMU has a
+feature bit telling if it supports ATS, which might be sufficient in most
+systems for deciding whether or not we should enable the ATS capability in
+endpoints.
 
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 1 -
- 1 file changed, 1 deletion(-)
+ drivers/acpi/arm64/iort.c | 11 +++++++++++
+ include/linux/iommu.h     |  4 ++++
+ 2 files changed, 15 insertions(+)
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index f591f1974228..f008b4617cd4 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1332,7 +1332,6 @@ static u64 arm_smmu_cpu_tcr_to_cd(struct arm_smmu_device *smmu, u64 tcr)
- 	val |= ARM_SMMU_TCR2CD(tcr, EPD0);
- 	val |= ARM_SMMU_TCR2CD(tcr, EPD1);
- 	val |= ARM_SMMU_TCR2CD(tcr, IPS);
--	val |= ARM_SMMU_TCR2CD(tcr, TBI0);
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index 9565d572f8dd..b94eac8ed21e 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -768,6 +768,14 @@ void iort_dma_setup(struct device *dev, u64 *dma_addr, u64 *dma_size)
+ 	dev_dbg(dev, "dma_pfn_offset(%#08llx)\n", offset);
+ }
  
- 	if (smmu->features & ARM_SMMU_FEAT_HA)
- 		val |= ARM_SMMU_TCR2CD(tcr, HA);
++static bool iort_pci_rc_supports_ats(struct acpi_iort_node *node)
++{
++	struct acpi_iort_root_complex *pci_rc;
++
++	pci_rc = (struct acpi_iort_root_complex *)node->node_data;
++	return pci_rc->ats_attribute & ACPI_IORT_ATS_SUPPORTED;
++}
++
+ /**
+  * iort_iommu_configure - Set-up IOMMU configuration for a device.
+  *
+@@ -803,6 +811,9 @@ const struct iommu_ops *iort_iommu_configure(struct device *dev)
+ 		info.node = node;
+ 		err = pci_for_each_dma_alias(to_pci_dev(dev),
+ 					     iort_pci_iommu_init, &info);
++
++		if (!err && !iort_pci_rc_supports_ats(node))
++			dev->iommu_fwspec->flags |= IOMMU_FWSPEC_PCI_NO_ATS;
+ 	} else {
+ 		int i = 0;
+ 
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index 2eb65d4724bb..661031aed0c4 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -534,12 +534,16 @@ struct iommu_fwspec {
+ 	const struct iommu_ops	*ops;
+ 	struct fwnode_handle	*iommu_fwnode;
+ 	void			*iommu_priv;
++	u32			flags;
+ 	unsigned int		num_ids;
+ 	unsigned int		num_pasid_bits;
+ 	bool			can_stall;
+ 	u32			ids[1];
+ };
+ 
++/* Firmware disabled ATS in the root complex */
++#define IOMMU_FWSPEC_PCI_NO_ATS			(1 << 0)
++
+ int iommu_fwspec_init(struct device *dev, struct fwnode_handle *iommu_fwnode,
+ 		      const struct iommu_ops *ops);
+ void iommu_fwspec_free(struct device *dev);
 -- 
 2.13.3
