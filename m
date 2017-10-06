@@ -1,33 +1,45 @@
-From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
-Date: Fri, 6 Oct 2017 09:53:23 +0200
-Subject: [PATCH v1] i2c:i2c-stm32f7: fix setup structure
-In-Reply-To: <20171005111444.77qib2ddnz4jmbnr@ninjato>
-References: <1506000609-27409-1-git-send-email-pierre-yves.mordret@st.com>
- <20171005111444.77qib2ddnz4jmbnr@ninjato>
-Message-ID: <3b0e9bd4-298f-3ec9-7560-9758a8198e27@st.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 6 Oct 2017 09:57:11 +0200
+Subject: [PATCH 2/2] ARM: dts: iwg20d-q7-dbcm-ca: Add device trees for
+ camera DB
+In-Reply-To: <1507108713-10686-3-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1507108713-10686-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <1507108713-10686-3-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <CAMuHMdU-zOogwOKS_s8-r_fsUfXxu38WKkaoryuuuGGJzmBkSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Fabrizio,
 
+On Wed, Oct 4, 2017 at 11:18 AM, Fabrizio Castro
+<fabrizio.castro@bp.renesas.com> wrote:
+> This patch adds a .dtsi that describes the camera daughter board
+> and a .dts to describe the HW made of iWave's RZ/G1M SoM, iWave's
+> RZ/G1M/G1N Qseven carrier board, and the camera daughter board.
+> The camera daughter board .dtsi adds support for ttySC[14].
+>
+> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
 
-On 10/05/2017 01:14 PM, Wolfram Sang wrote:
-> On Thu, Sep 21, 2017 at 03:30:09PM +0200, Pierre-Yves MORDRET wrote:
->> I2C drive setup structure is not properly allocated.
->> Make it static instead of pointer to store driver data.
->>
->> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
-> 
-> Ouch! How did it work before?
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Well yes it did. When it has been discovered during internal code review I was
-skeptical but it turned out to be true. I tested on STM32 F7/H7 without any
-trouble : scary !
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/iwg20d-q7-dbcm-ca.dtsi
 
-> 
-> Applied to for-current, thanks! Please provide a Fixes: tag next time,
-> did this for you now.
-> 
-Sorry I wasn't aware about that. I gonna remember for the next time.
-Thanks !
+> +/ {
+> +       aliases {
+> +               serial1 = &scif1;
+> +               serial4 = &hscif1;
 
-Py
+BTW, what's the reason you picked serial4 for the third serial port?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
