@@ -1,124 +1,90 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Fri,  6 Oct 2017 14:31:35 +0100
-Subject: [RFCv2 PATCH 08/36] iommu/fault: Handle mm faults
-In-Reply-To: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
-References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
-Message-ID: <20171006133203.22803-9-jean-philippe.brucker@arm.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Fri, 06 Oct 2017 14:45:35 +0100
+Subject: [PATCH v1 2/2] kvm: arm64: handle single-step of userspace mmio
+ instructions
+In-Reply-To: <a9f8905e-18e9-267a-2479-f498c248e2f4@arm.com>
+References: <20171006113921.24880-1-alex.bennee@linaro.org>
+ <20171006113921.24880-3-alex.bennee@linaro.org>
+ <a9f8905e-18e9-267a-2479-f498c248e2f4@arm.com>
+Message-ID: <878tgoxudc.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a recoverable page fault is handled by the fault workqueue, find the
-associated process and call handle_mm_fault.
 
-In theory, we don't even need to take a reference to the iommu_process,
-because any release of the structure is preceded by a flush of the queue.
-I don't feel comfortable removing the pinning at the moment, though.
+Julien Thierry <julien.thierry@arm.com> writes:
 
-Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
----
- drivers/iommu/io-pgfault.c | 83 ++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 81 insertions(+), 2 deletions(-)
+> On 06/10/17 12:39, Alex Benn?e wrote:
+>> The system state of KVM when using userspace emulation is not complete
+>> until we return into KVM_RUN. To handle mmio related updates we wait
+>> until they have been committed and then schedule our KVM_EXIT_DEBUG.
+>>
+>> I've introduced a new function kvm_arm_maybe_return_debug() to wrap up
+>> the differences between arm/arm64 which is currently null for arm.
+>>
+>> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+>> ---
+>>   arch/arm/include/asm/kvm_host.h   |  2 ++
+>>   arch/arm64/include/asm/kvm_host.h |  1 +
+>>   arch/arm64/kvm/debug.c            | 21 +++++++++++++++++++++
+>>   arch/arm64/kvm/handle_exit.c      |  9 +++------
+>>   virt/kvm/arm/arm.c                |  2 +-
+>>   virt/kvm/arm/mmio.c               |  3 ++-
+>>   6 files changed, 30 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+>> index 4a879f6ff13b..aec943f6d123 100644
+>> --- a/arch/arm/include/asm/kvm_host.h
+>> +++ b/arch/arm/include/asm/kvm_host.h
+>> @@ -285,6 +285,8 @@ static inline void kvm_arm_init_debug(void) {}
+>>   static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
+>>   static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
+>>   static inline void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu) {}
+>> +static inline int  kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu,
+>> +						struct kvm_run *run) {}
+>>
+>
+> This function should return 1.
 
-diff --git a/drivers/iommu/io-pgfault.c b/drivers/iommu/io-pgfault.c
-index f31bc24534b0..532bdb9ce519 100644
---- a/drivers/iommu/io-pgfault.c
-+++ b/drivers/iommu/io-pgfault.c
-@@ -21,6 +21,7 @@
- 
- #include <linux/iommu.h>
- #include <linux/list.h>
-+#include <linux/sched/mm.h>
- #include <linux/slab.h>
- #include <linux/workqueue.h>
- 
-@@ -83,8 +84,86 @@ static int iommu_fault_finish(struct iommu_domain *domain, struct device *dev,
- 
- static int iommu_fault_handle_single(struct iommu_fault_context *fault)
- {
--	/* TODO */
--	return -ENODEV;
-+	struct mm_struct *mm;
-+	struct vm_area_struct *vma;
-+	struct iommu_process *process;
-+	int ret = IOMMU_FAULT_STATUS_INVALID;
-+	unsigned int access_flags = 0;
-+	unsigned int fault_flags = FAULT_FLAG_REMOTE;
-+	struct iommu_fault *params = &fault->params;
-+
-+	if (!(params->flags & IOMMU_FAULT_PASID))
-+		return ret;
-+
-+	process = iommu_process_find(params->pasid);
-+	if (!process)
-+		return ret;
-+
-+	if ((params->flags & (IOMMU_FAULT_LAST | IOMMU_FAULT_READ |
-+			      IOMMU_FAULT_WRITE)) == IOMMU_FAULT_LAST) {
-+		/* Special case: PASID Stop Marker doesn't require a response */
-+		ret = IOMMU_FAULT_STATUS_IGNORE;
-+		goto out_put_process;
-+	}
-+
-+	mm = process->mm;
-+	if (!mmget_not_zero(mm)) {
-+		/* Process is dead */
-+		goto out_put_process;
-+	}
-+
-+	down_read(&mm->mmap_sem);
-+
-+	vma = find_extend_vma(mm, params->address);
-+	if (!vma)
-+		/* Unmapped area */
-+		goto out_put_mm;
-+
-+	if (params->flags & IOMMU_FAULT_READ)
-+		access_flags |= VM_READ;
-+
-+	if (params->flags & IOMMU_FAULT_WRITE) {
-+		access_flags |= VM_WRITE;
-+		fault_flags |= FAULT_FLAG_WRITE;
-+	}
-+
-+	if (params->flags & IOMMU_FAULT_EXEC) {
-+		access_flags |= VM_EXEC;
-+		fault_flags |= FAULT_FLAG_INSTRUCTION;
-+	}
-+
-+	if (!(params->flags & IOMMU_FAULT_PRIV))
-+		fault_flags |= FAULT_FLAG_USER;
-+
-+	if (access_flags & ~vma->vm_flags)
-+		/* Access fault */
-+		goto out_put_mm;
-+
-+	ret = handle_mm_fault(vma, params->address, fault_flags);
-+	ret = ret & VM_FAULT_ERROR ? IOMMU_FAULT_STATUS_INVALID :
-+		IOMMU_FAULT_STATUS_HANDLED;
-+
-+out_put_mm:
-+	up_read(&mm->mmap_sem);
-+
-+	/*
-+	 * Here's a fun scenario: the process exits while we're handling the
-+	 * fault on its mm. Since we're the last mm_user, mmput will call
-+	 * mm_exit immediately. exit_mm releases the mmu notifier, which calls
-+	 * iommu_notifier_release, which has to flush the fault queue that we're
-+	 * executing on... It's actually easy to reproduce with a DMA engine,
-+	 * and I did observe a lockdep splat. Therefore move the release of the
-+	 * mm to another thread, if we're the last user.
-+	 *
-+	 * mmput_async was removed in 4.14, and added back in 4.15(?)
-+	 * https://patchwork.kernel.org/patch/9952257/
-+	 */
-+	mmput_async(mm);
-+
-+out_put_process:
-+	iommu_process_put(process);
-+
-+	return ret;
- }
- 
- static void iommu_fault_handle_group(struct work_struct *work)
--- 
-2.13.3
+So I did ponder making this a bool, returning true if we need to exit
+and testing in v/k/a/arm.c exit leg rather than in the mmio handler.
+
+At the moment it mirrors the existing exit logic which follows -1 err, 0
+return, >0 handled. But as I mentioned in the cover letter this fell
+down a bit when dealing with the mmio case.
+
+>
+>>   int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
+>>   			       struct kvm_device_attr *attr);
+>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>> index e923b58606e2..fa67d21662f6 100644
+>> --- a/arch/arm64/include/asm/kvm_host.h
+>> +++ b/arch/arm64/include/asm/kvm_host.h
+>> @@ -369,6 +369,7 @@ void kvm_arm_init_debug(void);
+>>   void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
+>>   void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
+>>   void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu);
+>> +int  kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu, struct kvm_run *run);
+>
+> I feel the name could be a little bit more explicit:
+>
+> kvm_arm_trap_need_step_debug, kvm_arm_trap_step_return_debug,
+> kvm_arm_trap_need_return_debug.
+
+I wanted to keep the debug suffix so that's fine although I'm not so
+sure trap is correct because on the tail end of mmio emulation are we
+still trapping?
+
+Maybe kvm_arm_step_emulated_debug?
+
+> At least, I think it would be nice that the name reflect that this
+> check is meant for emulated instructions.
+>
+> Otherwise:
+>
+> Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+>
+> Thanks,
+
+
+--
+Alex Benn?e
