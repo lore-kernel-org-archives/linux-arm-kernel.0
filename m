@@ -1,35 +1,76 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 6 Oct 2017 16:35:51 +0100
-Subject: [PATCH 1/2] arm64: Ensure the instruction emulation is ready for
- userspace
-In-Reply-To: <20171006131653.15876-1-suzuki.poulose@arm.com>
-References: <20171006131653.15876-1-suzuki.poulose@arm.com>
-Message-ID: <20171006153550.cng3w5ahxuzlivxa@armageddon.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri,  6 Oct 2017 16:33:59 +0100
+Subject: [PATCH v4 24/26] KVM: arm/arm64: GICv4: Enable VLPI support
+In-Reply-To: <20171006153401.5481-1-marc.zyngier@arm.com>
+References: <20171006153401.5481-1-marc.zyngier@arm.com>
+Message-ID: <20171006153401.5481-25-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 06, 2017 at 02:16:52PM +0100, Suzuki K. Poulose wrote:
-> We trap and emulate some instructions (e.g, mrs, deprecated instructions)
-> for the userspace. However the handlers for these are registered as
-> late_initcalls and the userspace could be up and running from the initramfs
-> by that time (with populate_rootfs, which is a rootfs_initcall()). This
-> could cause problems for the early applications ending up in failure
-> like :
-> 
-> [   11.152061] modprobe[93]: undefined instruction: pc=0000ffff8ca48ff4
-> 
-> This patch promotes the specific calls to core_initcalls, which are
-> guaranteed to be completed before we hit userspace.
-> 
-> Cc: stable at vger.kernel.org
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Dave Martin <dave.martin@arm.com>
-> Cc: Matthias Brugger <mbrugger@suse.com>
-> Cc: James Morse <james.morse@arm.com>
-> Reported-by: Matwey V. Kornilov <matwey.kornilov@gmail.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+All it takes is the has_v4 flag to be set in gic_kvm_info
+as well as "kvm-arm.vgic_v4_enable=1" being passed on the
+command line for GICv4 to be enabled in KVM.
 
-Both patches queued for 4.14. Thanks.
+Acked-by: Christoffer Dall <cdall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ Documentation/admin-guide/kernel-parameters.txt |  4 ++++
+ virt/kvm/arm/vgic/vgic-v3.c                     | 14 ++++++++++++++
+ 2 files changed, 18 insertions(+)
 
+diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+index 05496622b4ef..93c8fff399eb 100644
+--- a/Documentation/admin-guide/kernel-parameters.txt
++++ b/Documentation/admin-guide/kernel-parameters.txt
+@@ -1874,6 +1874,10 @@
+ 			[KVM,ARM] Trap guest accesses to GICv3 common
+ 			system registers
+ 
++	kvm-arm.vgic_v4_enable=
++			[KVM,ARM] Allow use of GICv4 for direct injection of
++			LPIs.
++
+ 	kvm-intel.ept=	[KVM,Intel] Disable extended page tables
+ 			(virtualized MMU) support on capable Intel chips.
+ 			Default is 1 (enabled)
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index 96ea597db0e7..405733678c2f 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -24,6 +24,7 @@
+ static bool group0_trap;
+ static bool group1_trap;
+ static bool common_trap;
++static bool gicv4_enable;
+ 
+ void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
+ {
+@@ -459,6 +460,12 @@ static int __init early_common_trap_cfg(char *buf)
+ }
+ early_param("kvm-arm.vgic_v3_common_trap", early_common_trap_cfg);
+ 
++static int __init early_gicv4_enable(char *buf)
++{
++	return strtobool(buf, &gicv4_enable);
++}
++early_param("kvm-arm.vgic_v4_enable", early_gicv4_enable);
++
+ /**
+  * vgic_v3_probe - probe for a GICv3 compatible interrupt controller in DT
+  * @node:	pointer to the DT node
+@@ -478,6 +485,13 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
+ 	kvm_vgic_global_state.can_emulate_gicv2 = false;
+ 	kvm_vgic_global_state.ich_vtr_el2 = ich_vtr_el2;
+ 
++	/* GICv4 support? */
++	if (info->has_v4) {
++		kvm_vgic_global_state.has_gicv4 = gicv4_enable;
++		kvm_info("GICv4 support %sabled\n",
++			 gicv4_enable ? "en" : "dis");
++	}
++
+ 	if (!info->vcpu.start) {
+ 		kvm_info("GICv3: no GICV resource entry\n");
+ 		kvm_vgic_global_state.vcpu_base = 0;
 -- 
-Catalin
+2.14.1
