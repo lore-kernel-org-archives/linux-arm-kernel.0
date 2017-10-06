@@ -1,82 +1,42 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 06 Oct 2017 14:23:55 +0200
-Subject: [PATCH 04/16] serial: mvebu-uart: support probe of multiple ports
-In-Reply-To: <20171006101344.15590-5-miquel.raynal@free-electrons.com> (Miquel
- Raynal's message of "Fri, 6 Oct 2017 12:13:32 +0200")
-References: <20171006101344.15590-1-miquel.raynal@free-electrons.com>
- <20171006101344.15590-5-miquel.raynal@free-electrons.com>
-Message-ID: <87poa0foro.fsf@free-electrons.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Fri, 6 Oct 2017 14:25:18 +0200
+Subject: [PATCH v10 09/10] mm: stop zeroing memory during allocation in
+ vmemmap
+In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6DD008BB4D@AcuExch.aculab.com>
+References: <20171005211124.26524-1-pasha.tatashin@oracle.com>
+ <20171005211124.26524-10-pasha.tatashin@oracle.com>
+ <063D6719AE5E284EB5DD2968C1650D6DD008BA85@AcuExch.aculab.com>
+ <20171006114729.fexwklupkhyxdpt3@dhcp22.suse.cz>
+ <063D6719AE5E284EB5DD2968C1650D6DD008BB4D@AcuExch.aculab.com>
+Message-ID: <20171006122518.y22rzeq7riyjbrbg@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Miquel,
- 
- On ven., oct. 06 2017, Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
+On Fri 06-10-17 12:11:42, David Laight wrote:
+> From: Michal Hocko
+> > Sent: 06 October 2017 12:47
+> > On Fri 06-10-17 11:10:14, David Laight wrote:
+> > > From: Pavel Tatashin
+> > > > Sent: 05 October 2017 22:11
+> > > > vmemmap_alloc_block() will no longer zero the block, so zero memory
+> > > > at its call sites for everything except struct pages.  Struct page memory
+> > > > is zero'd by struct page initialization.
+> > >
+> > > It seems dangerous to change an allocator to stop zeroing memory.
+> > > It is probably saver to add a new function that doesn't zero
+> > > the memory and use that is the places where you don't want it
+> > > to be zeroed.
+> > 
+> > Not sure what you mean. memblock_virt_alloc_try_nid_raw is a new
+> > function which doesn't zero out...
+> 
+> You should probably leave vmemap_alloc_block() zeroing the memory
+> so that existing alls don't have to be changed - apart from the
+> ones you are explicitly optimising.
 
-> From: Allen Yan <yanwei@marvell.com>
->
-> Until now, the mvebu-uart driver only supported probing a single UART
-> port. However, some platforms have multiple instances of this UART
-> controller, and therefore the driver should support multiple ports.
->
-> In order to achieve this, we make sure to assign port->line properly,
-> instead of hardcoding it to zero.
->
-> Signed-off-by: Allen Yan <yanwei@marvell.com>
-> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
-> ---
->  drivers/tty/serial/mvebu-uart.c | 13 +++++++++++--
->  1 file changed, 11 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
-> index 7e0a3e9fee15..25b11ede3a97 100644
-> --- a/drivers/tty/serial/mvebu-uart.c
-> +++ b/drivers/tty/serial/mvebu-uart.c
-> @@ -560,7 +560,16 @@ static int mvebu_uart_probe(struct platform_device *pdev)
->  		return -EINVAL;
->  	}
->  
-> -	port = &mvebu_uart_ports[0];
-> +	if (pdev->dev.of_node)
-> +		pdev->id = of_alias_get_id(pdev->dev.of_node, "serial");
-
-If the id is retrieved using an of_ function, then I think that the
-driver would depend on OF_CONFIG.
-
-Gregory
-
-
-> +
-> +	if (pdev->id >= MVEBU_NR_UARTS) {
-> +		dev_err(&pdev->dev, "cannot have more than %d UART ports\n",
-> +			MVEBU_NR_UARTS);
-> +		return -EINVAL;
-> +	}
-> +
-> +	port = &mvebu_uart_ports[pdev->id];
->  
->  	spin_lock_init(&port->lock);
->  
-> @@ -572,7 +581,7 @@ static int mvebu_uart_probe(struct platform_device *pdev)
->  	port->fifosize   = 32;
->  	port->iotype     = UPIO_MEM32;
->  	port->flags      = UPF_FIXED_PORT;
-> -	port->line       = 0; /* single port: force line number to  0 */
-> +	port->line       = pdev->id;
->  
->  	port->irq        = irq->start;
->  	port->irqflags   = 0;
-> -- 
-> 2.11.0
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
+But the whole point of vmemmap_alloc_block is to allocate memmaps and
+the point of this change is to cover those. This is not a generic API
+that other users would depend on. 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Michal Hocko
+SUSE Labs
