@@ -1,89 +1,48 @@
 From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Fri,  6 Oct 2017 12:13:40 +0200
-Subject: [PATCH 12/16] serial: mvebu-uart: support extended port registers
- layout
+Date: Fri,  6 Oct 2017 12:13:44 +0200
+Subject: [PATCH 16/16] arm64: dts: marvell: armada-3720-espressobin: fill UART
+ nodes
 In-Reply-To: <20171006101344.15590-1-miquel.raynal@free-electrons.com>
 References: <20171006101344.15590-1-miquel.raynal@free-electrons.com>
-Message-ID: <20171006101344.15590-13-miquel.raynal@free-electrons.com>
+Message-ID: <20171006101344.15590-17-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the missing register offsets and bit fields for the extended
-UART port. Add a second driver data structure filled with its port data,
-selected with the right compatible (marvell,armada-3700-uart-ext).
+Fill ESPRESSObin uart0 node with pinctrl information like in the
+Armada-3720-DB device tree (which uses the same node).
 
+Also explain how to enable the second UART port available on the
+headers. This second port is not enabled by default because both
+headers are dedicated to expose general purpose pins and remapping
+some of them to use the second UART would break existing users.
+
+Suggested-by: L?szl? ?SHIN <laszlo@ashin.hu>
 Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 ---
- drivers/tty/serial/mvebu-uart.c | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
-index 3e46affa09a8..38b067e0ef0c 100644
---- a/drivers/tty/serial/mvebu-uart.c
-+++ b/drivers/tty/serial/mvebu-uart.c
-@@ -39,10 +39,13 @@
+diff --git a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+index 2ce52ba74f73..c05b274ab1a9 100644
+--- a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
++++ b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+@@ -98,9 +98,17 @@
  
- /* Register Map */
- #define UART_STD_RBR		0x00
-+#define UART_EXT_RBR		0x18
- 
- #define UART_STD_TSH		0x04
-+#define UART_EXT_TSH		0x1C
- 
- #define UART_STD_CTRL1		0x08
-+#define UART_EXT_CTRL1		0x04
- #define  CTRL_SOFT_RST		BIT(31)
- #define  CTRL_TXFIFO_RST	BIT(15)
- #define  CTRL_RXFIFO_RST	BIT(14)
-@@ -55,15 +58,20 @@
- 				CTRL_PAR_ERR_INT | CTRL_OVR_ERR_INT)
- 
- #define UART_STD_CTRL2		UART_STD_CTRL1
-+#define UART_EXT_CTRL2		0x20
- #define  CTRL_STD_TX_RDY_INT	BIT(5)
-+#define  CTRL_EXT_TX_RDY_INT	BIT(6)
- #define  CTRL_STD_RX_RDY_INT	BIT(4)
-+#define  CTRL_EXT_RX_RDY_INT	BIT(5)
- 
- #define UART_STAT		0x0C
- #define  STAT_TX_FIFO_EMP	BIT(13)
- #define  STAT_TX_FIFO_FUL	BIT(11)
- #define  STAT_TX_EMP		BIT(6)
- #define  STAT_STD_TX_RDY	BIT(5)
-+#define  STAT_EXT_TX_RDY	BIT(15)
- #define  STAT_STD_RX_RDY	BIT(4)
-+#define  STAT_EXT_RX_RDY	BIT(14)
- #define  STAT_BRK_DET		BIT(3)
- #define  STAT_FRM_ERR		BIT(2)
- #define  STAT_PAR_ERR		BIT(1)
-@@ -858,12 +866,28 @@ static struct mvebu_uart_driver_data uart_std_driver_data = {
- 	.flags.stat_rx_rdy = STAT_STD_RX_RDY,
+ /* Exported on the micro USB connector J5 through an FTDI */
+ &uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart1_pins>;
+ 	status = "okay";
  };
  
-+static struct mvebu_uart_driver_data uart_ext_driver_data = {
-+	.is_ext = true,
-+	.regs.rbr = UART_EXT_RBR,
-+	.regs.tsh = UART_EXT_TSH,
-+	.regs.ctrl = UART_EXT_CTRL1,
-+	.regs.intr = UART_EXT_CTRL2,
-+	.flags.ctrl_tx_rdy_int = CTRL_EXT_TX_RDY_INT,
-+	.flags.ctrl_rx_rdy_int = CTRL_EXT_RX_RDY_INT,
-+	.flags.stat_tx_rdy = STAT_EXT_TX_RDY,
-+	.flags.stat_rx_rdy = STAT_EXT_RX_RDY,
-+};
++/*
++ * Enabling the second UART on J17 (pins 24,26) is just a matter of copying the
++ * uart1 node from armada-3720-db.dts with one difference: it works with 1.8V
++ * TTL levels.
++ */
 +
- /* Match table for of_platform binding */
- static const struct of_device_id mvebu_uart_of_match[] = {
- 	{
- 		.compatible = "marvell,armada-3700-uart",
- 		.data = (void *)&uart_std_driver_data,
- 	},
-+	{
-+		.compatible = "marvell,armada-3700-uart-ext",
-+		.data = (void *)&uart_ext_driver_data,
-+	},
- 	{}
- };
- 
+ /* J7 */
+ &usb3 {
+ 	status = "okay";
 -- 
 2.11.0
