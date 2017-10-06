@@ -1,42 +1,89 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Fri, 6 Oct 2017 14:25:18 +0200
-Subject: [PATCH v10 09/10] mm: stop zeroing memory during allocation in
- vmemmap
-In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6DD008BB4D@AcuExch.aculab.com>
-References: <20171005211124.26524-1-pasha.tatashin@oracle.com>
- <20171005211124.26524-10-pasha.tatashin@oracle.com>
- <063D6719AE5E284EB5DD2968C1650D6DD008BA85@AcuExch.aculab.com>
- <20171006114729.fexwklupkhyxdpt3@dhcp22.suse.cz>
- <063D6719AE5E284EB5DD2968C1650D6DD008BB4D@AcuExch.aculab.com>
-Message-ID: <20171006122518.y22rzeq7riyjbrbg@dhcp22.suse.cz>
+From: jacopo@jmondi.org (jacopo mondi)
+Date: Fri, 6 Oct 2017 14:25:23 +0200
+Subject: [PATCH 3/3] ARM: dts: gr-peach: Add ETHER pin group
+In-Reply-To: <1507193900-23801-4-git-send-email-jacopo+renesas@jmondi.org>
+References: <1507193900-23801-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1507193900-23801-4-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <20171006122523.GD19008@w540>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 06-10-17 12:11:42, David Laight wrote:
-> From: Michal Hocko
-> > Sent: 06 October 2017 12:47
-> > On Fri 06-10-17 11:10:14, David Laight wrote:
-> > > From: Pavel Tatashin
-> > > > Sent: 05 October 2017 22:11
-> > > > vmemmap_alloc_block() will no longer zero the block, so zero memory
-> > > > at its call sites for everything except struct pages.  Struct page memory
-> > > > is zero'd by struct page initialization.
-> > >
-> > > It seems dangerous to change an allocator to stop zeroing memory.
-> > > It is probably saver to add a new function that doesn't zero
-> > > the memory and use that is the places where you don't want it
-> > > to be zeroed.
-> > 
-> > Not sure what you mean. memblock_virt_alloc_try_nid_raw is a new
-> > function which doesn't zero out...
-> 
-> You should probably leave vmemap_alloc_block() zeroing the memory
-> so that existing alls don't have to be changed - apart from the
-> ones you are explicitly optimising.
+Hi Simon,
 
-But the whole point of vmemmap_alloc_block is to allocate memmaps and
-the point of this change is to cover those. This is not a generic API
-that other users would depend on. 
--- 
-Michal Hocko
-SUSE Labs
+On Thu, Oct 05, 2017 at 10:58:20AM +0200, Jacopo Mondi wrote:
+> Add pin configuration subnode for ETHER pin group and enable the interface.
+>
+> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> ---
+>  arch/arm/boot/dts/r7s72100-gr-peach.dts | 38 +++++++++++++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
+>
+
+Can you confirm you have not applied this yet?
+
+I have received indications from netdev people to change location of
+the reset pin properties, as they belong to PHY node, and also to
+change the node layout.
+
+If you have applied the first 2 but not this one, I will re-submit this one only
+
+Thanks
+   j
+
+
+> diff --git a/arch/arm/boot/dts/r7s72100-gr-peach.dts b/arch/arm/boot/dts/r7s72100-gr-peach.dts
+> index ad6a627..8b5a2c5 100644
+> --- a/arch/arm/boot/dts/r7s72100-gr-peach.dts
+> +++ b/arch/arm/boot/dts/r7s72100-gr-peach.dts
+> @@ -68,6 +68,28 @@
+>  		/* P6_2 as RxD2; P6_3 as TxD2 */
+>  		pinmux = <RZA1_PINMUX(6, 2, 7)>, <RZA1_PINMUX(6, 3, 7)>;
+>  	};
+> +
+> +	ether_pins: ether {
+> +		/* Ethernet on Ports 1,3,5,10 */
+> +		pinmux = <RZA1_PINMUX(1, 14, 4)>, /* P1_14 = ET_COL   */
+> +			 <RZA1_PINMUX(3, 0, 2)>,  /* P3_0 = ET_TXCLK  */
+> +			 <RZA1_PINMUX(3, 3, 2)>,  /* P3_3 = ET_MDIO   */
+> +			 <RZA1_PINMUX(3, 4, 2)>,  /* P3_4 = ET_RXCLK  */
+> +			 <RZA1_PINMUX(3, 5, 2)>,  /* P3_5 = ET_RXER   */
+> +			 <RZA1_PINMUX(3, 6, 2)>,  /* P3_6 = ET_RXDV   */
+> +			 <RZA1_PINMUX(5, 9, 2)>,  /* P5_9 = ET_MDC    */
+> +			 <RZA1_PINMUX(10, 1, 4)>, /* P10_1 = ET_TXER  */
+> +			 <RZA1_PINMUX(10, 2, 4)>, /* P10_2 = ET_TXEN  */
+> +			 <RZA1_PINMUX(10, 3, 4)>, /* P10_3 = ET_CRS   */
+> +			 <RZA1_PINMUX(10, 4, 4)>, /* P10_4 = ET_TXD0  */
+> +			 <RZA1_PINMUX(10, 5, 4)>, /* P10_5 = ET_TXD1  */
+> +			 <RZA1_PINMUX(10, 6, 4)>, /* P10_6 = ET_TXD2  */
+> +			 <RZA1_PINMUX(10, 7, 4)>, /* P10_7 = ET_TXD3  */
+> +			 <RZA1_PINMUX(10, 8, 4)>, /* P10_8 = ET_RXD0  */
+> +			 <RZA1_PINMUX(10, 9, 4)>, /* P10_9 = ET_RXD1  */
+> +			 <RZA1_PINMUX(10, 10, 4)>,/* P10_10 = ET_RXD2 */
+> +			 <RZA1_PINMUX(10, 11, 4)>;/* P10_11 = ET_RXD3 */
+> +	};
+>  };
+>
+>  &extal_clk {
+> @@ -88,3 +110,19 @@
+>
+>  	status = "okay";
+>  };
+> +
+> +&ether {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&ether_pins>;
+> +
+> +	status = "okay";
+> +
+> +	reset-gpios = <&port4 2 GPIO_ACTIVE_LOW>;
+> +	reset-delay-us = <5>;
+> +
+> +	renesas,no-ether-link;
+> +	phy-handle = <&phy0>;
+> +	phy0: ethernet-phy at 0 {
+> +		reg = <0>;
+> +	};
+> +};
+> --
+> 2.7.4
+>
