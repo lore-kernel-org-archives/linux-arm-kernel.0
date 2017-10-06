@@ -1,176 +1,113 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Fri,  6 Oct 2017 14:31:49 +0100
-Subject: [RFCv2 PATCH 22/36] iommu/io-pgtable-arm: Factor out ARM LPAE
- register defines
-In-Reply-To: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
-References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
-Message-ID: <20171006133203.22803-23-jean-philippe.brucker@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 6 Oct 2017 14:36:40 +0100
+Subject: [PATCH v2 11/28] arm64/sve: Core task context handling
+In-Reply-To: <20171006131005.GA3611@e103592.cambridge.arm.com>
+References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
+ <1504198860-12951-12-git-send-email-Dave.Martin@arm.com>
+ <20170913143325.hi4cfcajbts3bbao@localhost>
+ <20171003113302.GR3611@e103592.cambridge.arm.com>
+ <20171005112835.2rhaqx23bhe6tnwl@armageddon.cambridge.arm.com>
+ <20171006131005.GA3611@e103592.cambridge.arm.com>
+Message-ID: <20171006133639.ialgglabo7yca5bm@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For SVM, we'll need to extract CPU page table information and mirror it in
-the substream setup. Move relevant defines to a common header.
+On Fri, Oct 06, 2017 at 02:10:09PM +0100, Dave P Martin wrote:
+> On Thu, Oct 05, 2017 at 12:28:35PM +0100, Catalin Marinas wrote:
+> > On Tue, Oct 03, 2017 at 12:33:03PM +0100, Dave P Martin wrote:
+> > > TIF_FOREIGN_FPSTATE's meaning is expanded to cover SVE, but otherwise
+> > > unchanged:
+> > > 
+> > >  * If a task is running and !TIF_FOREIGN_FPSTATE, then the the CPU
+> > >    registers of the CPU the task is running on contain the authoritative
+> > >    FPSIMD/SVE state of the task.  The backing memory may be stale.
+> > > 
+> > >  * Otherwise (i.e., task not running, or task running and
+> > >    TIF_FOREIGN_FPSTATE), the task's FPSIMD/SVE backing memory is
+> > >    authoritative.  If additionally per_cpu(fpsimd_last_state,
+> > >    task->fpsimd_state.cpu) == &task->fpsimd_state.cpu, then
+> > >    task->fpsimd_state.cpu's registers are also up to date for task, but
+> > >    not authorititive: the current FPSIMD/SVE state may be read from
+> > >    them, but they must not be written.
+> > >  
+> > > The FPSIMD/SVE backing memory is selected by TIF_SVE:
+> > > 
+> > >  * TIF_SVE set: Zn (incorporating Vn in bits[127:0]), Pn and FFR are
+> > >    stored in task->thread.sve_state, formatted appropriately for vector
+> > >    length task->thread.sve_vl.  task->thread.sve_state must point to a
+> > >    valid buffer at least sve_state_size(task) bytes in size.
 
-Fix TCR_SZ_MASK while we're at it.
+"Zn [...] stored in  task->thread.sve_state" - is this still true with
+the changes you proposed? I guess even without these changes, you have
+situations where the hardware regs are out of sync with sve_state (see
+more below).
 
-Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
----
- MAINTAINERS                    |  1 +
- drivers/iommu/io-pgtable-arm.c | 48 +-----------------------------
- drivers/iommu/io-pgtable-arm.h | 67 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 69 insertions(+), 47 deletions(-)
- create mode 100644 drivers/iommu/io-pgtable-arm.h
+> > >  * TIF_SVE clear: Vn are stored in task->fpsimd_state; Zn[max : 128] are
+> > >    logically zero[*] but not stored anywhere; Pn, FFR are not stored and
+> > >    have unspecified values from userspace's point of view.
+> > >    task->thread.sve_state does not need to be non-null, valid or any
+> > >    particular size: it must not be dereferenced.
+> > > 
+> > >    In practice I don't exploit the "unspecifiedness" much.  The Zn high
+> > >    bits, Pn and FFR are all zeroed when setting TIF_SVE again:
+> > >    sve_alloc() is the common path for this.
+> > > 
+> > >  * FPSR and FPCR are always stored in task->fpsimd_state irrespctive of
+> > >    whether TIF_SVE is clear or set, since these are not vector length
+> > >    dependent.
+[...]
+> > Just wondering, as an optimisation for do_sve_acc() - instead of
+> > sve_alloc() and fpsimd_to_sve(), can we not force the loading of the
+> > FPSIMD regs on the return to user via TIF_FOREIGN_FPSTATE? This would
+> > ensure the zeroing of the top SVE bits and we only need to allocate the
+> > SVE state on the saving path. This means enabling SVE for user and
+> > setting TIF_SVE without having the backing storage allocated.
+> 
+> Currently the set of places where the "TIF_SVE implies sve_state valid"
+> assumption is applied is not very constrained, so while your suggestion
+> is reasonable I'd rather not mess with it just now, if possible.
+> 
+> 
+> But we can do this (which is what my current fixup has):
+> 
+> el0_sve_acc:
+> 	enable_dbg_and_irq
+> 	// ...
+> 	bl	do_sve_acc
+> 	b	ret_to_user
+> 
+> void do_sve_acc(unsigned int esr, struct pt_regs *regs)
+> {
+> 	/* Even if we chose not to use SVE, the hardware could still trap: */
+> 	if (unlikely(!system_supports_sve()) || WARN_ON(is_compat_task())) {
+> 		force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
+> 		return;
+> 	}
+> 
+> 	sve_alloc(current);
+> 
+> 	local_bh_disable();
+> 	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+> 		task_fpsimd_load(); /* flushes high Zn bits as a side-effect */
+> 		sve_flush_pregs();
+> 	} else {
+> 		sve_flush_all(); /* flush all the SVE bits in-place */
+> 	}
+> 
+> 	if (test_and_set_thread_flag(TIF_SVE))
+> 		WARN_ON(1); /* SVE access shouldn't have trapped */
+> 	local_bh_enable();
+> }
+> 
+> where sve_flush_all() zeroes all the high Zn bits via a series of
+> MOV Vn, Vn instructions, and also zeroes Pn and FFR.  sve_fplush_pregs()
+> just does the latter.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 65b0c88d5ee0..cff90315c2ec 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1089,6 +1089,7 @@ S:	Maintained
- F:	drivers/iommu/arm-smmu.c
- F:	drivers/iommu/arm-smmu-v3.c
- F:	drivers/iommu/io-pgtable-arm.c
-+F:	drivers/iommu/io-pgtable-arm.h
- F:	drivers/iommu/io-pgtable-arm-v7s.c
- 
- ARM SUB-ARCHITECTURES
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index e8018a308868..443234a564a6 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -31,6 +31,7 @@
- #include <asm/barrier.h>
- 
- #include "io-pgtable.h"
-+#include "io-pgtable-arm.h"
- 
- #define ARM_LPAE_MAX_ADDR_BITS		48
- #define ARM_LPAE_S2_MAX_CONCAT_PAGES	16
-@@ -118,53 +119,6 @@
- #define ARM_LPAE_PTE_MEMATTR_DEV	(((arm_lpae_iopte)0x1) << 2)
- 
- /* Register bits */
--#define ARM_32_LPAE_TCR_EAE		(1 << 31)
--#define ARM_64_LPAE_S2_TCR_RES1		(1 << 31)
--
--#define ARM_LPAE_TCR_EPD1		(1 << 23)
--
--#define ARM_LPAE_TCR_TG0_4K		(0 << 14)
--#define ARM_LPAE_TCR_TG0_64K		(1 << 14)
--#define ARM_LPAE_TCR_TG0_16K		(2 << 14)
--
--#define ARM_LPAE_TCR_SH0_SHIFT		12
--#define ARM_LPAE_TCR_SH0_MASK		0x3
--#define ARM_LPAE_TCR_SH_NS		0
--#define ARM_LPAE_TCR_SH_OS		2
--#define ARM_LPAE_TCR_SH_IS		3
--
--#define ARM_LPAE_TCR_ORGN0_SHIFT	10
--#define ARM_LPAE_TCR_IRGN0_SHIFT	8
--#define ARM_LPAE_TCR_RGN_MASK		0x3
--#define ARM_LPAE_TCR_RGN_NC		0
--#define ARM_LPAE_TCR_RGN_WBWA		1
--#define ARM_LPAE_TCR_RGN_WT		2
--#define ARM_LPAE_TCR_RGN_WB		3
--
--#define ARM_LPAE_TCR_SL0_SHIFT		6
--#define ARM_LPAE_TCR_SL0_MASK		0x3
--
--#define ARM_LPAE_TCR_T0SZ_SHIFT		0
--#define ARM_LPAE_TCR_SZ_MASK		0xf
--
--#define ARM_LPAE_TCR_PS_SHIFT		16
--#define ARM_LPAE_TCR_PS_MASK		0x7
--
--#define ARM_LPAE_TCR_IPS_SHIFT		32
--#define ARM_LPAE_TCR_IPS_MASK		0x7
--
--#define ARM_LPAE_TCR_PS_32_BIT		0x0ULL
--#define ARM_LPAE_TCR_PS_36_BIT		0x1ULL
--#define ARM_LPAE_TCR_PS_40_BIT		0x2ULL
--#define ARM_LPAE_TCR_PS_42_BIT		0x3ULL
--#define ARM_LPAE_TCR_PS_44_BIT		0x4ULL
--#define ARM_LPAE_TCR_PS_48_BIT		0x5ULL
--
--#define ARM_LPAE_MAIR_ATTR_SHIFT(n)	((n) << 3)
--#define ARM_LPAE_MAIR_ATTR_MASK		0xff
--#define ARM_LPAE_MAIR_ATTR_DEVICE	0x04
--#define ARM_LPAE_MAIR_ATTR_NC		0x44
--#define ARM_LPAE_MAIR_ATTR_WBRWA	0xff
- #define ARM_LPAE_MAIR_ATTR_IDX_NC	0
- #define ARM_LPAE_MAIR_ATTR_IDX_CACHE	1
- #define ARM_LPAE_MAIR_ATTR_IDX_DEV	2
-diff --git a/drivers/iommu/io-pgtable-arm.h b/drivers/iommu/io-pgtable-arm.h
-new file mode 100644
-index 000000000000..cb31314971ac
---- /dev/null
-+++ b/drivers/iommu/io-pgtable-arm.h
-@@ -0,0 +1,67 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ * Copyright (C) 2017 ARM Limited
-+ */
-+#ifndef __IO_PGTABLE_ARM_H
-+#define __IO_PGTABLE_ARM_H
-+
-+#define ARM_32_LPAE_TCR_EAE		(1 << 31)
-+#define ARM_64_LPAE_S2_TCR_RES1		(1 << 31)
-+
-+#define ARM_LPAE_TCR_EPD1		(1 << 23)
-+
-+#define ARM_LPAE_TCR_TG0_4K		(0 << 14)
-+#define ARM_LPAE_TCR_TG0_64K		(1 << 14)
-+#define ARM_LPAE_TCR_TG0_16K		(2 << 14)
-+
-+#define ARM_LPAE_TCR_SH0_SHIFT		12
-+#define ARM_LPAE_TCR_SH0_MASK		0x3
-+#define ARM_LPAE_TCR_SH_NS		0
-+#define ARM_LPAE_TCR_SH_OS		2
-+#define ARM_LPAE_TCR_SH_IS		3
-+
-+#define ARM_LPAE_TCR_ORGN0_SHIFT	10
-+#define ARM_LPAE_TCR_IRGN0_SHIFT	8
-+#define ARM_LPAE_TCR_RGN_MASK		0x3
-+#define ARM_LPAE_TCR_RGN_NC		0
-+#define ARM_LPAE_TCR_RGN_WBWA		1
-+#define ARM_LPAE_TCR_RGN_WT		2
-+#define ARM_LPAE_TCR_RGN_WB		3
-+
-+#define ARM_LPAE_TCR_SL0_SHIFT		6
-+#define ARM_LPAE_TCR_SL0_MASK		0x3
-+
-+#define ARM_LPAE_TCR_T0SZ_SHIFT		0
-+#define ARM_LPAE_TCR_SZ_MASK		0x3f
-+
-+#define ARM_LPAE_TCR_PS_SHIFT		16
-+#define ARM_LPAE_TCR_PS_MASK		0x7
-+
-+#define ARM_LPAE_TCR_IPS_SHIFT		32
-+#define ARM_LPAE_TCR_IPS_MASK		0x7
-+
-+#define ARM_LPAE_TCR_PS_32_BIT		0x0ULL
-+#define ARM_LPAE_TCR_PS_36_BIT		0x1ULL
-+#define ARM_LPAE_TCR_PS_40_BIT		0x2ULL
-+#define ARM_LPAE_TCR_PS_42_BIT		0x3ULL
-+#define ARM_LPAE_TCR_PS_44_BIT		0x4ULL
-+#define ARM_LPAE_TCR_PS_48_BIT		0x5ULL
-+
-+#define ARM_LPAE_MAIR_ATTR_SHIFT(n)	((n) << 3)
-+#define ARM_LPAE_MAIR_ATTR_MASK		0xff
-+#define ARM_LPAE_MAIR_ATTR_DEVICE	0x04
-+#define ARM_LPAE_MAIR_ATTR_NC		0x44
-+#define ARM_LPAE_MAIR_ATTR_WBRWA	0xff
-+
-+#endif /* __IO_PGTABLE_ARM_H */
+This looks fine to me but I added a comment above. IIUC, we can now have
+TIF_SVE set while sve_state contains stale data. I don't see an issue
+given that every time you enter the kernel from user space you have
+TIF_SVE set and the sve_state storage out of sync. Maybe tweak the
+TIF_SVE description above slightly.
+
 -- 
-2.13.3
+Catalin
