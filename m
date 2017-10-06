@@ -1,48 +1,30 @@
-From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
-Date: Fri,  6 Oct 2017 14:03:00 +0900
-Subject: [PATCH v2 3/3] arm64: dts: uniphier: add efuse node for LD20
-In-Reply-To: <1507266180-11840-1-git-send-email-hayashibara.keiji@socionext.com>
-References: <1507266180-11840-1-git-send-email-hayashibara.keiji@socionext.com>
-Message-ID: <1507266180-11840-4-git-send-email-hayashibara.keiji@socionext.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Fri,  6 Oct 2017 14:33:31 +0800
+Subject: [PATCH 0/2] Add a regmap to Allwinner R40 CCU to export GMAC register
+Message-ID: <20171006063333.12345-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add efuse node for UniPhier LD20 SoC.
-This efuse node is included in soc-glue.
+In the CCU of the Allwinner R40 SoC, there's a GMAC configuration register,
+which is intended to be accessed by the dwmac-sun8i driver. On SoCs already
+supported by the driver the register is placed in the syscon rather than
+the CCU.
 
-Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
----
- arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+As CCU is a critical part of the SoC, so write to it should be strictly
+limited. A regmap with restricted write permission is created by the R40
+CCU driver, and can be get with dev_get_regmap. In order to tie the regmap
+to the CCU device, the R40 CCU is now a platform driver, so a platform
+device is created for it (and then tied with the regmap).
 
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-index a29c279..ddefde6 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-@@ -376,6 +376,24 @@
- 			};
- 		};
- 
-+		soc-glue at 5f900000 {
-+			compatible = "socionext,uniphier-ld20-soc-glue-debug",
-+				     "simple-mfd";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0x0 0x5f900000 0x2000>;
-+
-+			efuse at 100 {
-+				compatible = "socionext,uniphier-efuse";
-+				reg = <0x100 0x28>;
-+			};
-+
-+			efuse at 200 {
-+				compatible = "socionext,uniphier-efuse";
-+				reg = <0x200 0x68>;
-+			};
-+		};
-+
- 		aidet: aidet at 5fc20000 {
- 			compatible = "socionext,uniphier-ld20-aidet";
- 			reg = <0x5fc20000 0x200>;
+The first patch does the conversion of the driver to a platform driver,
+and the second patch adds the regmap.
+
+Icenowy Zheng (2):
+  clk: sunxi-ng: r40: rewrite init code to a platform driver
+  clk: sunxi-ng: r40: export a regmap to access the GMAC register
+
+ drivers/clk/sunxi-ng/ccu-sun8i-r40.c | 69 ++++++++++++++++++++++++++++++------
+ 1 file changed, 59 insertions(+), 10 deletions(-)
+
 -- 
-2.7.4
+2.13.6
