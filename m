@@ -1,46 +1,62 @@
 From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Fri,  6 Oct 2017 12:13:36 +0200
-Subject: [PATCH 08/16] serial: mvebu-uart: clear state register before IRQ
- request
+Date: Fri,  6 Oct 2017 12:13:42 +0200
+Subject: [PATCH 14/16] arm64: dts: marvell: armada-37xx: add second UART port
 In-Reply-To: <20171006101344.15590-1-miquel.raynal@free-electrons.com>
 References: <20171006101344.15590-1-miquel.raynal@free-electrons.com>
-Message-ID: <20171006101344.15590-9-miquel.raynal@free-electrons.com>
+Message-ID: <20171006101344.15590-15-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Allen Yan <yanwei@marvell.com>
+Add a node in Armada 37xx DTSI file for the second UART, with a
+different compatible due to its extended IP which has some
+differences with the first UART already in place.
 
-When receiving data on RX pin before ->uart_startup() is called, some
-error bits in the state register could be set up (like BRK_DET).
+Make use of this commit to also fully describe the first port and
+use the same clear and named interrupt bindings for both ports.
 
-This is harmless when using only the standard UART (error bits are
-read-only), but may procude an endless loop once in the extended UART
-RX interrupt handler (error bits must be cleared).
+The standard UART (UART0) uses level-interrupts while the extended
+UART (UART1) uses edge-triggered interrupts.
 
-Clear the status register in ->uart_startup() to avoid this situation.
-
-Signed-off-by: Allen Yan <yanwei@marvell.com>
 Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 ---
- drivers/tty/serial/mvebu-uart.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
-index 81a3d2714fd3..67f302748b78 100644
---- a/drivers/tty/serial/mvebu-uart.c
-+++ b/drivers/tty/serial/mvebu-uart.c
-@@ -322,6 +322,12 @@ static int mvebu_uart_startup(struct uart_port *port)
- 	writel(CTRL_TXFIFO_RST | CTRL_RXFIFO_RST,
- 	       port->membase + UART_CTRL(port));
- 	udelay(1);
-+
-+	/* Clear the error bits of state register before IRQ request */
-+	ret = readl(port->membase + UART_STAT);
-+	ret |= STAT_BRK_ERR;
-+	writel(ret, port->membase + UART_STAT);
-+
- 	writel(CTRL_BRK_INT, port->membase + UART_CTRL(port));
+diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+index a36d667f770e..72b68f23c001 100644
+--- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+@@ -55,6 +55,7 @@
  
- 	ctl = readl(port->membase + UART_INTR(port));
+ 	aliases {
+ 		serial0 = &uart0;
++		serial1 = &uart1;
+ 	};
+ 
+ 	cpus {
+@@ -136,7 +137,22 @@
+ 				compatible = "marvell,armada-3700-uart";
+ 				reg = <0x12000 0x200>;
+ 				clocks = <&xtalclk>;
+-				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
++				interrupts =
++				<GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
++				interrupt-names = "uart-sum", "uart-tx", "uart-rx";
++				status = "disabled";
++			};
++
++			uart1: serial at 12200 {
++				compatible = "marvell,armada-3700-uart-ext";
++				reg = <0x12200 0x30>;
++				clocks = <&xtalclk>;
++				interrupts =
++				<GIC_SPI 30 IRQ_TYPE_EDGE_RISING>,
++				<GIC_SPI 31 IRQ_TYPE_EDGE_RISING>;
++				interrupt-names = "uart-tx", "uart-rx";
+ 				status = "disabled";
+ 			};
+ 
 -- 
 2.11.0
