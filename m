@@ -1,110 +1,138 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Fri,  6 Oct 2017 14:31:38 +0100
-Subject: [RFCv2 PATCH 11/36] iommu/arm-smmu-v3: Link domains and devices
+Date: Fri,  6 Oct 2017 14:31:47 +0100
+Subject: [RFCv2 PATCH 20/36] iommu/arm-smmu-v3: Track ASID state
 In-Reply-To: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
 References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
-Message-ID: <20171006133203.22803-12-jean-philippe.brucker@arm.com>
+Message-ID: <20171006133203.22803-21-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When removing a mapping from a domain, we need to send an invalidation to
-all devices that might have stored it in their Address Translation Cache
-(ATC). In addition with SVM, we'll need to invalidate context descriptors
-of all devices attached to a live domain.
+At the moment each SMMU has a 8- or 16-bit ASID set and allocates one ASID
+per device via a bitmap. ASIDs are used to differentiate address spaces in
+SMMU TLB entries. With SVM, sharing process address spaces with the SMMU,
+we need to use CPU ASIDs in SMMU contexts, to ensure that broadcast TLB
+invalidations reach the right IOTLB entries.
 
-Maintain a list of devices in each domain, protected by a spinlock. It is
-updated every time we attach or detach devices to and from domains.
+When binding a process address space to a device, we become slaves to the
+arch ASID allocator. We have to use whatever ASID they give us. If a
+domain is currently using it, then we'll either abort or steal that ASID.
 
-It needs to be a spinlock because we'll invalidate ATC entries from
-within hardirq-safe contexts, but it may be possible to relax the read
-side with RCU later.
+To make matters worse, tasks are global, while domains are per-SMMU. SMMU
+ASIDs can be aliased across different SMMUs, but the CPU ASID space is
+unique across the whole system.
+
+Introduce an IDR for SMMU ASID allocation. It allows to keep information
+about an ASID, for instance which domain it is assigned to or how many
+devices are using it.
 
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ drivers/iommu/arm-smmu-v3.c | 53 +++++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 44 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 22a6b08ef014..ecc424b15749 100644
+index 96347aad605f..71fc3a2c8a95 100644
 --- a/drivers/iommu/arm-smmu-v3.c
 +++ b/drivers/iommu/arm-smmu-v3.c
-@@ -644,6 +644,11 @@ struct arm_smmu_device {
- struct arm_smmu_master_data {
- 	struct arm_smmu_device		*smmu;
- 	struct arm_smmu_strtab_ent	ste;
-+
+@@ -640,6 +640,10 @@ struct arm_smmu_strtab_cfg {
+ 	u32				strtab_base_cfg;
+ };
+ 
++struct arm_smmu_asid_state {
 +	struct arm_smmu_domain		*domain;
-+	struct list_head		list; /* domain->devices */
++};
 +
-+	struct device			*dev;
- };
+ /* An SMMUv3 instance */
+ struct arm_smmu_device {
+ 	struct device			*dev;
+@@ -681,7 +685,8 @@ struct arm_smmu_device {
  
- /* SMMU private data for an IOMMU domain */
-@@ -667,6 +672,9 @@ struct arm_smmu_domain {
- 	};
+ #define ARM_SMMU_MAX_ASIDS		(1 << 16)
+ 	unsigned int			asid_bits;
+-	DECLARE_BITMAP(asid_map, ARM_SMMU_MAX_ASIDS);
++	struct idr			asid_idr;
++	spinlock_t			asid_lock;
  
- 	struct iommu_domain		domain;
+ #define ARM_SMMU_MAX_VMIDS		(1 << 16)
+ 	unsigned int			vmid_bits;
+@@ -1828,7 +1833,11 @@ static void arm_smmu_domain_free(struct iommu_domain *domain)
+ 		struct arm_smmu_s1_cfg *cfg = &smmu_domain->s1_cfg;
+ 		if (cfg->num_contexts) {
+ 			arm_smmu_free_cd_tables(smmu_domain);
+-			arm_smmu_bitmap_free(smmu->asid_map, cfg->cd.asid);
 +
-+	struct list_head		devices;
-+	spinlock_t			devices_lock;
- };
++			spin_lock(&smmu->asid_lock);
++			kfree(idr_find(&smmu->asid_idr, cfg->cd.asid));
++			idr_remove(&smmu->asid_idr, cfg->cd.asid);
++			spin_unlock(&smmu->asid_lock);
+ 		}
+ 	} else {
+ 		struct arm_smmu_s2_cfg *cfg = &smmu_domain->s2_cfg;
+@@ -1844,25 +1853,48 @@ static int arm_smmu_domain_finalise_s1(struct arm_smmu_domain *smmu_domain,
+ {
+ 	int ret;
+ 	int asid;
++	struct arm_smmu_asid_state *asid_state;
+ 	struct arm_smmu_device *smmu = smmu_domain->smmu;
+ 	struct arm_smmu_s1_cfg *cfg = &smmu_domain->s1_cfg;
  
- struct arm_smmu_option_prop {
-@@ -1461,6 +1469,9 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
- 	}
- 
- 	mutex_init(&smmu_domain->init_mutex);
-+	INIT_LIST_HEAD(&smmu_domain->devices);
-+	spin_lock_init(&smmu_domain->devices_lock);
+-	asid = arm_smmu_bitmap_alloc(smmu->asid_map, smmu->asid_bits);
+-	if (asid < 0)
+-		return asid;
+-
+ 	ret = arm_smmu_alloc_cd_tables(smmu_domain);
+ 	if (ret)
+-		goto out_free_asid;
++		return ret;
 +
- 	return &smmu_domain->domain;
++	asid_state = kzalloc(sizeof(*asid_state), GFP_KERNEL);
++	if (!asid_state) {
++		ret = -ENOMEM;
++		goto out_free_tables;
++	}
++
++	asid_state->domain = smmu_domain;
++
++	idr_preload(GFP_KERNEL);
++	spin_lock(&smmu->asid_lock);
++	asid = idr_alloc_cyclic(&smmu->asid_idr, asid_state, 0,
++				1 << smmu->asid_bits, GFP_ATOMIC);
+ 
+ 	cfg->cd.asid	= (u16)asid;
+ 	cfg->cd.ttbr	= pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
+ 	cfg->cd.tcr	= pgtbl_cfg->arm_lpae_s1_cfg.tcr;
+ 	cfg->cd.mair	= pgtbl_cfg->arm_lpae_s1_cfg.mair[0];
++
++	spin_unlock(&smmu->asid_lock);
++	idr_preload_end();
++
++	if (asid < 0) {
++		ret = asid;
++		goto out_free_asid_state;
++	}
++
+ 	return 0;
+ 
+-out_free_asid:
+-	arm_smmu_bitmap_free(smmu->asid_map, asid);
++out_free_asid_state:
++	kfree(asid_state);
++
++out_free_tables:
++	arm_smmu_free_cd_tables(smmu_domain);
++
+ 	return ret;
  }
  
-@@ -1666,7 +1677,17 @@ static void arm_smmu_install_ste_for_dev(struct iommu_fwspec *fwspec)
- 
- static void arm_smmu_detach_dev(struct device *dev)
+@@ -2506,6 +2538,9 @@ static int arm_smmu_init_structures(struct arm_smmu_device *smmu)
  {
-+	unsigned long flags;
- 	struct arm_smmu_master_data *master = dev->iommu_fwspec->iommu_priv;
-+	struct arm_smmu_domain *smmu_domain = master->domain;
+ 	int ret;
+ 
++	spin_lock_init(&smmu->asid_lock);
++	idr_init(&smmu->asid_idr);
 +
-+	if (smmu_domain) {
-+		spin_lock_irqsave(&smmu_domain->devices_lock, flags);
-+		list_del(&master->list);
-+		spin_unlock_irqrestore(&smmu_domain->devices_lock, flags);
-+
-+		master->domain = NULL;
-+	}
- 
- 	master->ste.assigned = false;
- 	arm_smmu_install_ste_for_dev(dev->iommu_fwspec);
-@@ -1675,6 +1696,7 @@ static void arm_smmu_detach_dev(struct device *dev)
- static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
- {
- 	int ret = 0;
-+	unsigned long flags;
- 	struct arm_smmu_device *smmu;
- 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
- 	struct arm_smmu_master_data *master;
-@@ -1710,6 +1732,11 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
- 	}
- 
- 	ste->assigned = true;
-+	master->domain = smmu_domain;
-+
-+	spin_lock_irqsave(&smmu_domain->devices_lock, flags);
-+	list_add(&master->list, &smmu_domain->devices);
-+	spin_unlock_irqrestore(&smmu_domain->devices_lock, flags);
- 
- 	if (smmu_domain->stage == ARM_SMMU_DOMAIN_BYPASS) {
- 		ste->s1_cfg = NULL;
-@@ -1820,6 +1847,7 @@ static int arm_smmu_add_device(struct device *dev)
- 			return -ENOMEM;
- 
- 		master->smmu = smmu;
-+		master->dev = dev;
- 		fwspec->iommu_priv = master;
- 	}
- 
+ 	ret = arm_smmu_init_queues(smmu);
+ 	if (ret)
+ 		return ret;
 -- 
 2.13.3
