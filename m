@@ -1,54 +1,97 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 06 Oct 2017 14:45:26 +0200
-Subject: [PATCH 11/16] serial: mvebu-uart: augment the maximum number of
- ports
-In-Reply-To: <20171006101344.15590-12-miquel.raynal@free-electrons.com>
- (Miquel Raynal's message of "Fri, 6 Oct 2017 12:13:39 +0200")
-References: <20171006101344.15590-1-miquel.raynal@free-electrons.com>
- <20171006101344.15590-12-miquel.raynal@free-electrons.com>
-Message-ID: <871smgfnrt.fsf@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 6 Oct 2017 13:46:05 +0100
+Subject: [PATCH v1 1/2] KVM: arm64: handle single-stepping trapped
+ instructions
+In-Reply-To: <49ddad48-d3ce-43e2-7aae-f6cc66ef1fad@arm.com>
+References: <20171006113921.24880-1-alex.bennee@linaro.org>
+ <20171006113921.24880-2-alex.bennee@linaro.org>
+ <d95a7ce1-1996-b0c6-4a2d-64af011c0c79@arm.com>
+ <49ddad48-d3ce-43e2-7aae-f6cc66ef1fad@arm.com>
+Message-ID: <789ebd83-6ece-027d-a623-067187b9d7df@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Miquel,
- 
- On ven., oct. 06 2017, Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
+On 06/10/17 13:34, Julien Thierry wrote:
+> 
+> 
+> On 06/10/17 13:27, Marc Zyngier wrote:
+>> On 06/10/17 12:39, Alex Benn?e wrote:
+>>> If we are using guest debug to single-step the guest we need to ensure
+>>> we exit after emulating the instruction. This only affects
+>>> instructions completely emulated by the kernel. For userspace emulated
+>>> instructions we need to exit and return to complete the emulation.
+>>>
+>>> We fake debug.arch.hsr to contain ESR_ELx_EC_SOFTSTP_LOW so QEMU knows
+>>> it was a single-step event (and without altering the userspace ABI).
+>>>
+>>> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+>>> ---
+>>>   arch/arm64/kvm/handle_exit.c | 48 +++++++++++++++++++++++++++++++-------------
+>>>   1 file changed, 34 insertions(+), 14 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+>>> index 7debb74843a0..c918d291cb58 100644
+>>> --- a/arch/arm64/kvm/handle_exit.c
+>>> +++ b/arch/arm64/kvm/handle_exit.c
+>>> @@ -178,6 +178,39 @@ static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
+>>>   	return arm_exit_handlers[hsr_ec];
+>>>   }
+>>>   
+>>> +/*
+>>> + * When handling traps we need to ensure exit the guest if we
+>>> + * completely emulated the instruction while single-stepping. Stuff to
+>>> + * be emulated in userspace needs to complete that first.
+>>> + */
+>>> +
+>>> +static int handle_trap_exceptions(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>> +{
+>>> +	int handled;
+>>> +
+>>> +	/*
+>>> +	 * See ARM ARM B1.14.1: "Hyp traps on instructions
+>>> +	 * that fail their condition code check"
+>>> +	 */
+>>> +	if (!kvm_condition_valid(vcpu)) {
+>>> +		kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
+>>> +		handled = 1;
+>>> +	} else {
+>>> +		exit_handle_fn exit_handler;
+>>> +
+>>> +		exit_handler = kvm_get_exit_handler(vcpu);
+>>> +		handled = exit_handler(vcpu, run);
+>>> +	}
+>>> +
+>>> +	if (handled && (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP)) {
+>>> +		handled = 0;
+>>> +		run->exit_reason = KVM_EXIT_DEBUG;
+>>> +		run->debug.arch.hsr = ESR_ELx_EC_SOFTSTP_LOW << ESR_ELx_EC_SHIFT;
+>>> +	}
+>>
+>> Doesn't this break an MMIO read? The registers haven't been updated yet,
+>> and the debugger may not see the right thing...
+>>
+>> How about something like:
+>>
+>> 	if (handled && (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP)) {
+>> 		if (run->exit_reason == KVM_EXIT_MMIO)
+>> 			kvm_handle_mmio_return(vcpu, run);
+>> 		[...]
+>> 	}
+>>
+>> Or am I missing something?
+> 
+> If the MMIO was not handled by the kernel, exit_handler will return 0, 
+> so handled will be false and we won't pretend we have a debug exception 
+> (but will still return to userland with KVM_EXIT_MMIO).
+> 
+> I think the second patch takes care of properly handling single step for 
+> userland MMIO.
 
-> A3700 boards may have up to two UART ports. Set the new limit to two
-> maximum UART ports.
->
-> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
-
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Indeed, I was just confused. We do have a kvm_handle_mmio_return in the
+vgic emulation, so it is all taken care off at this stage. Blimey.
 
 Thanks,
 
-Gregory
-
-
-> ---
->  drivers/tty/serial/mvebu-uart.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
-> index b52cbe8c0558..3e46affa09a8 100644
-> --- a/drivers/tty/serial/mvebu-uart.c
-> +++ b/drivers/tty/serial/mvebu-uart.c
-> @@ -74,7 +74,7 @@
->  #define UART_BRDV		0x10
->  #define  BRDV_BAUD_MASK         0x3FF
->  
-> -#define MVEBU_NR_UARTS		1
-> +#define MVEBU_NR_UARTS		2
->  
->  #define MVEBU_UART_TYPE		"mvebu-uart"
->  #define DRIVER_NAME		"mvebu_serial"
-> -- 
-> 2.11.0
->
-
+	M.
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Jazz is not dead. It just smells funny...
