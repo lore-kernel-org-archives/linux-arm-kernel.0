@@ -1,37 +1,26 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri,  6 Oct 2017 23:51:44 +0200
-Subject: [PATCH] ARM: pxa: cm-x255: Fix up GPIO NAND device name in table
-Message-ID: <20171006215144.18039-1-linus.walleij@linaro.org>
+Date: Fri, 6 Oct 2017 23:52:38 +0200
+Subject: [PATCH] mtd: nand: gpio: Convert to use GPIO descriptors
+In-Reply-To: <87fuawf1h8.fsf@belgarion.home>
+References: <20170924173912.9199-1-linus.walleij@linaro.org>
+ <87fuawf1h8.fsf@belgarion.home>
+Message-ID: <CACRpkdZEx8=887BiW786Cfh89yjLx1cVdJ=jdD+tVdqec-k3Fw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-My patch set the device name wrong because I confused the
-device name for a partition name. Sorry.
+On Fri, Oct 6, 2017 at 10:46 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> Linus Walleij <linus.walleij@linaro.org> writes:
+>
+>>  #if defined(CONFIG_MTD_NAND_GPIO) || defined(CONFIG_MTD_NAND_GPIO_MODULE)
+>> +
+>> +static struct gpiod_lookup_table cmx255_nand_gpiod_table = {
+>> +     .dev_id         = "cmx255-nand",
+> Shouldn't the device name be "gpio-nand" instead ?
+> "cmx255-nand" is AFAIR a partition name, not a device name.
 
-Cc: arm at kernel.org
-Fixes: ("mtd: nand: gpio: Convert to use GPIO descriptors")
-Reported-by: Robert Jarzmik <robert.jarzmik@free.fr>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-This can be squashed into the commit or applied on top
-as a fix. The original patch was ACKed by the ARM SoC
-maintainers so I believe this is fine to apply.
----
- arch/arm/mach-pxa/cm-x255.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+My silly mistake. Sent a fixup patch.
 
-diff --git a/arch/arm/mach-pxa/cm-x255.c b/arch/arm/mach-pxa/cm-x255.c
-index f8d67acb7194..fa8e7dd4d898 100644
---- a/arch/arm/mach-pxa/cm-x255.c
-+++ b/arch/arm/mach-pxa/cm-x255.c
-@@ -178,7 +178,7 @@ static inline void cmx255_init_nor(void) {}
- #if defined(CONFIG_MTD_NAND_GPIO) || defined(CONFIG_MTD_NAND_GPIO_MODULE)
- 
- static struct gpiod_lookup_table cmx255_nand_gpiod_table = {
--	.dev_id         = "cmx255-nand",
-+	.dev_id         = "gpio-nand",
- 	.table          = {
- 		GPIO_LOOKUP("gpio-pxa", GPIO_NAND_CS, "nce", GPIO_ACTIVE_HIGH),
- 		GPIO_LOOKUP("gpio-pxa", GPIO_NAND_CLE, "cle", GPIO_ACTIVE_HIGH),
--- 
-2.13.5
+Thanks for spotting this!
+
+Yours,
+Linus Walleij
