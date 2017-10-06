@@ -1,70 +1,106 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri,  6 Oct 2017 17:39:19 +0100
-Subject: [PATCH v4 2/2] dt-bindings: designware: add binding for Designware
- PCIe in ECAM mode
+Date: Fri,  6 Oct 2017 17:39:18 +0100
+Subject: [PATCH v4 1/2] PCI: pci-host-generic: add support for Synopsys
+ DesignWare RC in ECAM mode
 In-Reply-To: <20171006163919.14898-1-ard.biesheuvel@linaro.org>
 References: <20171006163919.14898-1-ard.biesheuvel@linaro.org>
-Message-ID: <20171006163919.14898-3-ard.biesheuvel@linaro.org>
+Message-ID: <20171006163919.14898-2-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe the binding for firmware-configured instances of the Synopsys
-DesignWare PCIe controller in RC mode, that are almost but not quite
-ECAM compliant.
+Some implementations of the Synopsys DesignWare PCIe controller implement
+a so-called ECAM shift mode, which allows a static memory window to be
+configured that covers the configuration space of the entire bus range.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Usually, when the firmware performs all the low level configuration that
+is required to expose this controller in a fully ECAM compatible manner,
+we can simply describe it as "pci-host-ecam-generic" and be done with it.
+However, in some cases (e.g., the Marvell Armada 80x0 as well as the
+Socionext SynQuacer Soc), the IP was synthesized with an ATU window
+granularity that does not allow the first bus to be mapped in a way that
+prevents the device on the downstream port from appearing more than once,
+and so we still need special handling in software to drive this static
+almost-ECAM configuration.
+
+So extend the pci-host-generic driver so it can support these controllers
+as well, by adding special config space accessors that take the above
+quirk into account.
+
+Note that, unlike most drivers for this IP, this driver does not expose
+a fake bridge device at B/D/F 00:00.0. There is no point in doing so,
+given that this is not a true bridge, and does not require any windows
+to be configured in order for the downstream device to operate correctly.
+Omitting it also prevents the PCI resource allocation routines from
+handing out BAR space to it unnecessarily.
+
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- Documentation/devicetree/bindings/pci/designware-pcie-ecam.txt | 42 ++++++++++++++++++++
- 1 file changed, 42 insertions(+)
+ drivers/pci/host/pci-host-generic.c | 46 ++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/pci/designware-pcie-ecam.txt b/Documentation/devicetree/bindings/pci/designware-pcie-ecam.txt
-new file mode 100644
-index 000000000000..515b2f9542e5
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pci/designware-pcie-ecam.txt
-@@ -0,0 +1,42 @@
-+* Synopsys DesignWare PCIe root complex in ECAM shift mode
+diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+index 7d709a7e0aa8..01e81a30e303 100644
+--- a/drivers/pci/host/pci-host-generic.c
++++ b/drivers/pci/host/pci-host-generic.c
+@@ -35,6 +35,43 @@ static struct pci_ecam_ops gen_pci_cfg_cam_bus_ops = {
+ 	}
+ };
+ 
++static int pci_dw_ecam_config_read(struct pci_bus *bus, u32 devfn, int where,
++				   int size, u32 *val)
++{
++	struct pci_config_window *cfg = bus->sysdata;
 +
-+In some cases, firmware may already have configured the Synopsys DesignWare
-+PCIe controller in RC mode with static ATU window mappings that cover all
-+config, MMIO and I/O spaces in a [mostly] ECAM compatible fashion.
-+In this case, there is no need for the OS to perform any low level setup
-+of clocks, PHYs or device registers, nor is there any reason for the driver
-+to reconfigure ATU windows for config and/or IO space accesses at runtime.
++	/*
++	 * The Synopsys DesignWare PCIe controller in ECAM mode will not filter
++	 * type 0 config TLPs sent to devices 1 and up on its downstream port,
++	 * resulting in devices appearing multiple times on bus 0 unless we
++	 * filter out those accesses here.
++	 */
++	if (bus->number == cfg->busr.start && PCI_SLOT(devfn) > 0)
++		return PCIBIOS_DEVICE_NOT_FOUND;
 +
-+In cases where the IP was synthesized with a minimum ATU window size of
-+64 KB, it cannot be supported by the generic ECAM driver, because it
-+requires special config space accessors that filter accesses to device #1
-+and beyond on the first bus.
++	return pci_generic_config_read(bus, devfn, where, size, val);
++}
 +
-+Required properties:
-+- compatible: "marvell,armada8k-pcie-ecam" or
-+              "socionext,synquacer-pcie-ecam" or
-+              "snps,dw-pcie-ecam" (must be preceded by a more specific match)
++static int pci_dw_ecam_config_write(struct pci_bus *bus, u32 devfn, int where,
++				    int size, u32 val)
++{
++	struct pci_config_window *cfg = bus->sysdata;
 +
-+Please refer to the binding document of "pci-host-ecam-generic" in the
-+file host-generic-pci.txt for a description of the remaining required
-+and optional properties.
++	if (bus->number == cfg->busr.start && PCI_SLOT(devfn) > 0)
++		return PCIBIOS_DEVICE_NOT_FOUND;
 +
-+Example:
++	return pci_generic_config_write(bus, devfn, where, size, val);
++}
 +
-+    pcie1: pcie at 7f000000 {
-+        compatible = "socionext,synquacer-pcie-ecam", "snps,dw-pcie-ecam";
-+        device_type = "pci";
-+        reg = <0x0 0x7f000000 0x0 0xf00000>;
-+        bus-range = <0x0 0xe>;
-+        #address-cells = <3>;
-+        #size-cells = <2>;
-+        ranges = <0x1000000 0x00 0x00010000 0x00 0x7ff00000 0x0 0x00010000>,
-+                 <0x2000000 0x00 0x70000000 0x00 0x70000000 0x0 0x0f000000>,
-+                 <0x3000000 0x3f 0x00000000 0x3f 0x00000000 0x1 0x00000000>;
++static struct pci_ecam_ops pci_dw_ecam_bus_ops = {
++	.bus_shift	= 20,
++	.pci_ops	= {
++		.map_bus	= pci_ecam_map_bus,
++		.read		= pci_dw_ecam_config_read,
++		.write		= pci_dw_ecam_config_write,
++	}
++};
 +
-+        #interrupt-cells = <0x1>;
-+        interrupt-map-mask = <0x0 0x0 0x0 0x0>;
-+        interrupt-map = <0x0 0x0 0x0 0x0 &gic 0x0 0x0 0x0 182 0x4>;
-+        msi-map = <0x0 &its 0x0 0x10000>;
-+        dma-coherent;
-+    };
+ static const struct of_device_id gen_pci_of_match[] = {
+ 	{ .compatible = "pci-host-cam-generic",
+ 	  .data = &gen_pci_cfg_cam_bus_ops },
+@@ -42,6 +79,15 @@ static const struct of_device_id gen_pci_of_match[] = {
+ 	{ .compatible = "pci-host-ecam-generic",
+ 	  .data = &pci_generic_ecam_ops },
+ 
++	{ .compatible = "marvell,armada8k-pcie-ecam",
++	  .data = &pci_dw_ecam_bus_ops },
++
++	{ .compatible = "socionext,synquacer-pcie-ecam",
++	  .data = &pci_dw_ecam_bus_ops },
++
++	{ .compatible = "snps,dw-pcie-ecam",
++	  .data = &pci_dw_ecam_bus_ops },
++
+ 	{ },
+ };
+ 
 -- 
 2.11.0
