@@ -1,67 +1,65 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 6 Oct 2017 12:34:27 +0300
-Subject: [PATCH v2 8/8] arm64: dts: renesas: eagle: add EtherAVB support
-In-Reply-To: <20171006093112.GJ7734@verge.net.au>
-References: <20170915194449.538504992@cogentembedded.com>
- <CAMuHMdXQXFuVzwW7G-U7XWZUEj8qFRjtfDQF1+TgyzO0Xb+eYg@mail.gmail.com>
- <c0390fc1-7da4-ac60-afee-97126d1fd372@cogentembedded.com>
- <CAMuHMdVCTORpfKN+GTka_6pT1VWjOneV2GBhGo7Y8DsZYSxdvw@mail.gmail.com>
- <20171005090500.GC26369@verge.net.au>
- <dca19642-e511-5cd5-b7b9-9ed339407ed6@cogentembedded.com>
- <20171006093112.GJ7734@verge.net.au>
-Message-ID: <317baf29-ce3f-38a6-20ca-accd0e34fb25@cogentembedded.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 6 Oct 2017 11:34:48 +0200
+Subject: [PATCH 20/20] ARM: dts: sun9i: Change node names to remove
+ underscores
+In-Reply-To: <CAGb2v65JL5Rcq8-Pmt3C=MuoVXdfa+ZJvFBkCPg4C4O0rO-S3g@mail.gmail.com>
+References: <cover.f5f905a5434f2a540d6844d23369a04af9f5314c.1507198895.git-series.maxime.ripard@free-electrons.com>
+ <5763e28fbe7c8e313f29a1ae2e72ddfe7e483f16.1507198895.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v65JL5Rcq8-Pmt3C=MuoVXdfa+ZJvFBkCPg4C4O0rO-S3g@mail.gmail.com>
+Message-ID: <20171006093448.jzisqq6u6iecsoqk@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/6/2017 12:31 PM, Simon Horman wrote:
-
->>>>>>> Define the Eagle board  dependent part of the EtherAVB device node.
->>>>>>> Enable DHCP  and NFS root for the kernel booting.
->>>>>>>
->>>>>>> Based  on the original (and large) patch by Vladimir Barinov.
->>>>>>>
->>>>>>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->>>>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>>>>>
->>>>>>
->>>>>>> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
->>>>>>> +++ renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
->>>>>
->>>>> [...]
->>>>>>>
->>>>>>> @@ -43,3 +44,14 @@
->>>>>>>    &scif0 {
->>>>>>>           status = "okay";
->>>>>>>    };
->>>>>>> +
->>>>>>> +&avb {
->>>>>>> +       renesas,no-ether-link;
->>>>>>> +       phy-handle = <&phy0>;
->>>>>>> +       status = "okay";
->>>>>>> +
->>>>>>> +       phy0: ethernet-phy at 0 {
->>>>>>> +               rxc-skew-ps = <1500>;
->>>>>>> +               reg = <0>;
->>>>>>
->>>>>>
->>>>>> Any specific reason why you don't want to wire up the interrupt?
->>>>>>
->>>>>>                   interrupt-parent = <&gpio2>;
->>>>>
->>>>>
->>>>>     I thought it's quite obvious -- we don't have GPIOs yet, and GPIOs seem
->>>>> to require PFC.
->>>>
->>>> Of course. And these can be added later.
->>>>
->>>> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
->>>
->>> Thanks, applied.
->>
->>     Still not seeing any devel branch updates/tags -- have you pushed it?
+On Thu, Oct 05, 2017 at 03:59:29PM +0000, Chen-Yu Tsai wrote:
+> On Thu, Oct 5, 2017 at 6:49 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Some boards have had node names with underscores. Remove them in favour of
+> > hyphens in order to reduce the DTC warnings.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  arch/arm/boot/dts/sun9i-a80-cubieboard4.dts | 8 ++++----
+> >  arch/arm/boot/dts/sun9i-a80-optimus.dts     | 8 ++++----
+> >  2 files changed, 8 insertions(+), 8 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+> > index cb337e08adab..fa09186bc6d7 100644
+> > --- a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+> > +++ b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+> > @@ -74,7 +74,7 @@
+> >                 };
+> >         };
+> >
+> > -       wifi_pwrseq: wifi_pwrseq {
+> > +       wifi_pwrseq: wifi-pwrseq {
+> >                 compatible = "mmc-pwrseq-simple";
+> >                 clocks = <&ac100_rtc 1>;
+> >                 clock-names = "ext_clock";
+> > @@ -241,20 +241,20 @@
+> >                                 regulator-name = "vcc-pm-codec-io1";
+> >                         };
+> >
+> > -                       reg_ldo_io0: ldo_io0 {
+> > +                       reg_ldo_io0: ldo-io0 {
 > 
-> Sorry, there was a bit of a delay. But it is there.
+> We can't change these. They are part of the device tree binding.
+> The regulator code matches against the node names.
 
-    Yeah, I saw it later yesterday, thanks!
+Ah, right...
 
-MBR, Sergei
+I'll drop this part then.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171006/df4cec7a/attachment.sig>
