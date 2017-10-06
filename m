@@ -1,72 +1,54 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 6 Oct 2017 18:59:22 +0800
-Subject: [PATCH 07/20] ARM: dts: sun4i: Remove skeleton and memory to
- avoid warnings
-In-Reply-To: <20171006084740.5g7tavojdghn7cma@flea>
-References: <cover.f5f905a5434f2a540d6844d23369a04af9f5314c.1507198895.git-series.maxime.ripard@free-electrons.com>
- <b1acecf3049f3bc96266f2db22149bf0b18e7a30.1507198895.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v66LnQB1jqU5BWNEYjws3YLVBndLf8-ofLE+6JgZ1GtnXA@mail.gmail.com>
- <20171006084740.5g7tavojdghn7cma@flea>
-Message-ID: <CAGb2v67nUCW0eWH60io+X5bkVLuNq0GjGPMkKOcBxnrZvrLE1g@mail.gmail.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Fri, 6 Oct 2017 16:31:55 +0530
+Subject: [PATCH v3 03/22] dt-bindings: arm: scmi: add ARM MHU specific
+ mailbox client bindings
+In-Reply-To: <20171005232031.7373ni5ssln4wlpr@rob-hp-laptop>
+References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
+ <1506604306-20739-4-git-send-email-sudeep.holla@arm.com>
+ <20171005232031.7373ni5ssln4wlpr@rob-hp-laptop>
+Message-ID: <CABb+yY1ra5bgRB1VND+NvCcDFqfggG04a+JPWFZ+HpNg08eR8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 6, 2017 at 4:47 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Thu, Oct 05, 2017 at 03:43:53PM +0000, Chen-Yu Tsai wrote:
->> On Thu, Oct 5, 2017 at 6:49 PM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > Using skeleton.dtsi will create a memory node that will generate a warning
->> > in DTC. However, that node will be created by the bootloader, so we can
->> > just remove it entirely in order to remove that warning.
->> >
->> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> > ---
->> >  arch/arm/boot/dts/sun4i-a10.dtsi | 8 ++------
->> >  1 file changed, 2 insertions(+), 6 deletions(-)
->> >
->> > diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
->> > index 1876abb62ec7..f64544f615ea 100644
->> > --- a/arch/arm/boot/dts/sun4i-a10.dtsi
->> > +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
->> > @@ -41,14 +41,14 @@
->> >   *     OTHER DEALINGS IN THE SOFTWARE.
->> >   */
->> >
->> > -#include "skeleton.dtsi"
->> > -
->> >  #include <dt-bindings/thermal/thermal.h>
->> >  #include <dt-bindings/dma/sun4i-a10.h>
->> >  #include <dt-bindings/clock/sun4i-a10-ccu.h>
->> >  #include <dt-bindings/reset/sun4i-a10-ccu.h>
->> >
->> >  / {
->> > +       #address-cells = <1>;
->> > +       #size-cells = <1>;
->> >         interrupt-parent = <&intc>;
->> >
->> >         aliases {
->> > @@ -160,10 +160,6 @@
->> >                 };
->> >         };
->> >
->> > -       memory {
->> > -               reg = <0x40000000 0x80000000>;
->> > -       };
->> > -
+On Fri, Oct 6, 2017 at 4:50 AM, Rob Herring <robh@kernel.org> wrote:
+> On Thu, Sep 28, 2017 at 02:11:27PM +0100, Sudeep Holla wrote:
+>> This patch adds ARM MHU specific mailbox client bindings to support
+>> SCMI. Since SCMI specification just requires doorbell mechanism from
+>> mailbox controllers, we add mailbox data to specify the doorbell bit(s).
 >>
->> My only concern (I'm not sure if it's valid or not) is U-boot not being
->> able to add nodes or properties due to lack of space within the DT
->> blob. It seemed like a possibility in older versions.
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>> ---
+>>  .../devicetree/bindings/arm/arm,mhu-scmi.txt          | 19 +++++++++++++++++++
+>>  1 file changed, 19 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/arm,mhu-scmi.txt
 >>
->> Otherwise,
->>
->> Acked-by: Chen-Yu Tsai <wens@csie.org>
+>> diff --git a/Documentation/devicetree/bindings/arm/arm,mhu-scmi.txt b/Documentation/devicetree/bindings/arm/arm,mhu-scmi.txt
+>> new file mode 100644
+>> index 000000000000..8c106f1cdeb8
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/arm,mhu-scmi.txt
+>> @@ -0,0 +1,19 @@
+>> +ARM MHU mailbox client bindings for SCMI Message Protocol
+>> +----------------------------------------------------------
+>> +
+>> +This binding is intended to define the ARM MHU specific extensions to
+>> +the generic SCMI bindings[2].
+>> +
+>> +Required properties:
+>> +
+>> +The scmi node with the following properties shall be under the /firmware/ node.
+>> +
+>> +- compatible : shall be "arm,scmi" and "arm,mhu-scmi"
 >
-> I don't think we really have to worry about it. We've had a bunch of
-> nodes (like the PSCI nodes) created in the same way for quite some
-> time already without causing any issues.
-
-Indeed. Ack it is then.
-
-ChenYu
+> Most specific first.
+>
+>> +- mbox-data : For each phandle listed in mboxes property, an unsigned 32-bit
+>> +           data as expected by the mailbox controller
+>
+> Shouldn't that be cells as part of mboxes property?
+>
+A MHU client can send any number of commands (such u32 values) over a channel.
+This client (SCMI) sends just one command over a channel, but other
+clients may/do send two or more.
