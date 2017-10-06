@@ -1,65 +1,35 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 6 Oct 2017 11:34:48 +0200
-Subject: [PATCH 20/20] ARM: dts: sun9i: Change node names to remove
- underscores
-In-Reply-To: <CAGb2v65JL5Rcq8-Pmt3C=MuoVXdfa+ZJvFBkCPg4C4O0rO-S3g@mail.gmail.com>
-References: <cover.f5f905a5434f2a540d6844d23369a04af9f5314c.1507198895.git-series.maxime.ripard@free-electrons.com>
- <5763e28fbe7c8e313f29a1ae2e72ddfe7e483f16.1507198895.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v65JL5Rcq8-Pmt3C=MuoVXdfa+ZJvFBkCPg4C4O0rO-S3g@mail.gmail.com>
-Message-ID: <20171006093448.jzisqq6u6iecsoqk@flea>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 6 Oct 2017 11:39:21 +0200
+Subject: [PATCH] ARM: shmobile: rcar-gen2: fix non-SMP build
+In-Reply-To: <20171006092856.GI7734@verge.net.au>
+References: <20171005120914.465582-1-arnd@arndb.de>
+ <CAMuHMdXjD-MpW9sqKtdUasizN8YkWuzChNyduyHz7p-cz38VBg@mail.gmail.com>
+ <CAK8P3a1BkwquyVgRAsRgt2d5jv7TGoKPhA_gA0p+UQ9Spu_g2w@mail.gmail.com>
+ <20171006092856.GI7734@verge.net.au>
+Message-ID: <20171006093921.GK7734@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 05, 2017 at 03:59:29PM +0000, Chen-Yu Tsai wrote:
-> On Thu, Oct 5, 2017 at 6:49 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Some boards have had node names with underscores. Remove them in favour of
-> > hyphens in order to reduce the DTC warnings.
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  arch/arm/boot/dts/sun9i-a80-cubieboard4.dts | 8 ++++----
-> >  arch/arm/boot/dts/sun9i-a80-optimus.dts     | 8 ++++----
-> >  2 files changed, 8 insertions(+), 8 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
-> > index cb337e08adab..fa09186bc6d7 100644
-> > --- a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
-> > +++ b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
-> > @@ -74,7 +74,7 @@
-> >                 };
-> >         };
-> >
-> > -       wifi_pwrseq: wifi_pwrseq {
-> > +       wifi_pwrseq: wifi-pwrseq {
-> >                 compatible = "mmc-pwrseq-simple";
-> >                 clocks = <&ac100_rtc 1>;
-> >                 clock-names = "ext_clock";
-> > @@ -241,20 +241,20 @@
-> >                                 regulator-name = "vcc-pm-codec-io1";
-> >                         };
-> >
-> > -                       reg_ldo_io0: ldo_io0 {
-> > +                       reg_ldo_io0: ldo-io0 {
+On Fri, Oct 06, 2017 at 11:28:56AM +0200, Simon Horman wrote:
+> On Thu, Oct 05, 2017 at 10:29:47PM +0200, Arnd Bergmann wrote:
+> > On Thu, Oct 5, 2017 at 2:25 PM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> > > On Thu, Oct 5, 2017 at 2:09 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > >>  arch/arm/mach-shmobile/headsmp-apmu.S | 2 ++
+> > >>  1 file changed, 2 insertions(+)
+> > >>
+> > >> diff --git a/arch/arm/mach-shmobile/headsmp-apmu.S b/arch/arm/mach-shmobile/headsmp-apmu.S
+> > >> index db4743d2bf91..5672b5849401 100644
+> > >> --- a/arch/arm/mach-shmobile/headsmp-apmu.S
+> > >> +++ b/arch/arm/mach-shmobile/headsmp-apmu.S
+> > >
+> > > As this hasn't been pulled into arm-soc yet (pull request sent though),
+> > > perhaps Simon should squash this fix into the original commit?
+> > > Should we rename headsmp-apmu.S to head-apmu.S?
+> > 
+> > I'm fine with it either way, just do whatever works best for you here.
 > 
-> We can't change these. They are part of the device tree binding.
-> The regulator code matches against the node names.
+> My preference is to send a second pull request with this patch on top of the
+> previous pull request. Arnd does that work for you?
 
-Ah, right...
-
-I'll drop this part then.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171006/df4cec7a/attachment.sig>
+In the mean time I pushed the patch to the next branch of the renesas
+tree so it should appear in linux-next in the not to distant future.
