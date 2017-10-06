@@ -1,75 +1,55 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 6 Oct 2017 09:47:05 +0100
-Subject: [PATCH v2 0/7] PCI: aardvark: improve compatibility with PCI
- devices
-In-Reply-To: <20171005181615.GU25517@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
- <20171005175310.3c2dde95@windsurf.lan>
- <20171005181615.GU25517@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20171006084705.GA8754@red-moon>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 6 Oct 2017 10:45:27 +0200
+Subject: [PATCH 05/20] ARM: dts: sun4i: Change pinctrl nodes to avoid
+ warning
+In-Reply-To: <CAGb2v65wmkHvibm8pLBkrD3h_TySoiV605=6VW+pJN3xgoEbKw@mail.gmail.com>
+References: <cover.f5f905a5434f2a540d6844d23369a04af9f5314c.1507198895.git-series.maxime.ripard@free-electrons.com>
+ <5ed70f11299554e43f575aaf3b0bbe76991d8373.1507198895.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v65wmkHvibm8pLBkrD3h_TySoiV605=6VW+pJN3xgoEbKw@mail.gmail.com>
+Message-ID: <20171006084526.h2ty25pajknlchue@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 05, 2017 at 01:16:17PM -0500, Bjorn Helgaas wrote:
-> [+cc Lorenzo]
-> 
-> On Thu, Oct 05, 2017 at 05:53:10PM +0200, Thomas Petazzoni wrote:
-> > Hello Bjorn,
-> > 
-> > On Thu, 28 Sep 2017 14:58:31 +0200, Thomas Petazzoni wrote:
-> > 
-> > > This patch series brings a number of fixes to the pci-aardvark driver
-> > > that allows a much larger number of PCIe devices to be used.
-> > 
-> > I sent the initial version of this patch series almost a month ago, and
-> > it consists of fixes that I would like to have in 4.14.
-> 
-> The general rule is that after the merge window, I merge fixes to
-> things we put in during the merge window, as well as important
-> regression fixes.  Most bug fixes will be queued for the next merge
-> window.  I'll need some guidance on classifying these.
-> 
-> I think the map_irq/swizzle_irq patch should definitely be in v4.14.
+Hi,
 
-Yes it is v4.14 (actually v4.13 - Fixes: tag will cover that) material,
-I missed updating this host bridge while patching all ARM host controller
-bridges, apologies.
+On Thu, Oct 05, 2017 at 03:29:56PM +0000, Chen-Yu Tsai wrote:
+> > @@ -531,83 +531,83 @@
+> >                                 bias-pull-up;
+> >                         };
+> >
+> > -                       ps20_pins_a: ps20 at 0 {
+> > -                               pins = "PI20", "PI21";
+> > +                       ps2_ph_pins: ps2-ph-pins {
+> > +                               pins = "PH12", "PH13";
+> >                                 function = "ps2";
+> >                         };
+> >
+> > -                       ps21_pins_a: ps21 at 0 {
+> > -                               pins = "PH12", "PH13";
+> > +                       ps2_pi_pins: ps2-pi-pins {
+> > +                               pins = "PI20", "PI21";
+> >                                 function = "ps2";
+> >                         };
+> 
+> This part is slightly incorrect. The PS/2 block has 2 inputs.
+> The first channel, or ps2-0, has only one muxing option, on
+> pins PI20 and PI21. The second channel has two options, either
+> PH12 + PH13 or PI14 + PI15. The names should encode which channel
+> the muxing option is for.
 
-Thanks,
-Lorenzo
+Would ps2_ch0_pins and ps2_ch1_pi_pins work for you then?
 
-> (It looks a lot like these:
-> 
->   1ee4d93d5037 PCI: xilinx-nwl: Move to struct pci_host_bridge IRQ mapping functions
->   5a3dc3c1f694 PCI: rockchip: Move to struct pci_host_bridge IRQ mapping functions
->   c62e98bdaa70 PCI: xgene: Move to struct pci_host_bridge IRQ mapping functions
->   6ab380957838 PCI: altera: Drop pci_fixup_irqs()
->   cf60374de8f6 PCI: versatile: Drop pci_fixup_irqs()
->   6982a068aa5f PCI: generic: Drop pci_fixup_irqs()
->   f7c2e69b65fe PCI: faraday: Drop pci_fixup_irqs()
->   60eca198b1ea PCI: designware: Drop pci_fixup_irqs()
->   64bcd00a7ef5 PCI: iproc: Drop pci_fixup_irqs()
->   29db991902ec PCI: rcar: Drop pci_fixup_irqs()
->   cc2eaaef63df PCI: xilinx: Drop pci_fixup_irqs()
->   dd5fcce2a7f9 PCI: tegra: Drop pci_fixup_irqs()
-> 
-> and I'm obsessive enough to use one of those subject lines to tie this
-> patch together with those.)
-> 
-> Most of the rest look like they've been there since the driver was
-> first merged, so they would *probably* go in the v4.15 queue.
-> 
-> > Is there a specific problem with those patches that explains why they
-> > have been ignored? Or is it just lack of time?
-> > 
-> > If there is any problem with the patches, please let me know, I am of
-> > course perfectly fine with reworking them as needed.
-> 
-> Sorry for the delay; mostly just lack of time.  I used to work pretty
-> strictly first-in, first-out, but the native host bridge drivers
-> consume a disproportionate share of my time compared with the generic
-> code that benefits everybody, so I'm trying to figure out how to
-> prioritize generic changes.  Obviously I need a solution that gives
-> *some* time to the native drivers.
-> 
-> Bjorn
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171006/2c7b2e2f/attachment.sig>
