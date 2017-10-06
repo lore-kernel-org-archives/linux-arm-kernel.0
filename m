@@ -1,30 +1,50 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 6 Oct 2017 14:15:21 +0100
-Subject: [PATCH v1 1/2] KVM: arm64: handle single-stepping trapped
- instructions
-In-Reply-To: <20171006113921.24880-2-alex.bennee@linaro.org>
-References: <20171006113921.24880-1-alex.bennee@linaro.org>
- <20171006113921.24880-2-alex.bennee@linaro.org>
-Message-ID: <ec903fcc-6e73-40c6-69b0-b37d7d53d431@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 6 Oct 2017 15:15:21 +0200
+Subject: [PATCH 16/16] arm64: dts: marvell: armada-3720-espressobin:
+ fill UART nodes
+In-Reply-To: <87fuawe8gx.fsf@free-electrons.com>
+References: <20171006101344.15590-1-miquel.raynal@free-electrons.com>
+ <20171006101344.15590-17-miquel.raynal@free-electrons.com>
+ <87fuawe8gx.fsf@free-electrons.com>
+Message-ID: <20171006151521.440418a2@windsurf.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
+On Fri, 06 Oct 2017 15:01:18 +0200, Gregory CLEMENT wrote:
 
-On 06/10/17 12:39, Alex Benn?e wrote:
-> If we are using guest debug to single-step the guest we need to ensure
-> we exit after emulating the instruction. This only affects
-> instructions completely emulated by the kernel. For userspace emulated
-> instructions we need to exit and return to complete the emulation.
-> 
-> We fake debug.arch.hsr to contain ESR_ELx_EC_SOFTSTP_LOW so QEMU knows
-> it was a single-step event (and without altering the userspace ABI).
-> 
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+>  /*
+>   * To enable the second UART on J17 (pins 24,26) refer to the uart1
+>   * node from armada-3720-db.dts.
+>   * Note that TX and RX signal are the ones coming directly from the SoC:
+>   * 1.8V TTL.
+>   */
 
-Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+One issue with this comment (and Miqu?l's version as well) is that it
+does not explain why you don't enable this UART by default.
 
-Thanks,
+The real reason is in the commit log from Miqu?l, and should probably
+be part of the comment. Perhaps something like:
 
+/*
+
+ * Connector J17 (pins X, Y, Z) exposes a number of different
+ * features:
+ *  - UART1 (pins 24 = RX, pins 26 = TX), see armada-3720-db.dts for an
+ *    example on how to enable UART1. Beware that the signals are 1.8V
+ *    TTL.
+ *  - SPIxyz
+ *  - I2Cxyz
+ */
+
+Otherwise, it's not clear at all why you don't just enable UART1. Or
+perhaps I misunderstood Miqu?l's commit log ?
+
+Best regards,
+
+Thomas
 -- 
-Julien Thierry
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
