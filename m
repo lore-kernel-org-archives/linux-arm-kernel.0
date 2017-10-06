@@ -1,31 +1,20 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 06 Oct 2017 16:10:43 -0700
-Subject: [PATCH] ARM64: dts: meson-gxbb-nexbox-a95x: Enable USB Nodes
-In-Reply-To: <89e9980a-2ca6-4509-b9d5-36aac433b9bd@baylibre.com> (Neil
- Armstrong's message of "Thu, 5 Oct 2017 15:23:34 +0200")
-References: <20171005132118.2150-1-peter@korsgaard.com>
- <89e9980a-2ca6-4509-b9d5-36aac433b9bd@baylibre.com>
-Message-ID: <7hlgkn7tzg.fsf@baylibre.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 6 Oct 2017 16:19:43 -0700
+Subject: [PATCH 0/2] memory: brcmstb: dpfe: skip downloading firmware
+In-Reply-To: <20171002231347.8671-1-code@mmayer.net>
+References: <20171002231347.8671-1-code@mmayer.net>
+Message-ID: <c53fe52f-024a-1721-b4b1-16beb1405f0d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neil Armstrong <narmstrong@baylibre.com> writes:
+On 10/02/2017 04:13 PM, Markus Mayer wrote:
+> From: Markus Mayer <mmayer@broadcom.com>
+> 
+> This series lets the DPFE driver skip the DPFE firmware download if the
+> DCPU is already running. If it's running by the time Linux comes up, it
+> means the boot loader already downloaded the DPFE firmware.
 
-> On 05/10/2017 15:21, Peter Korsgaard wrote:
->> Enable both gxbb USB controllers and add a 5V regulator for the OTG port
->> VBUS, similar to p20x.
->> 
->> Signed-off-by: Peter Korsgaard <peter@korsgaard.com>
-
-[...]
-
-> Indeed, I forgot to add USB to this board,
-> Thanks
->
-> Acked-by: Neil Armstrong <narmstrong@baylibre.com>
-
-Applied to v4.15/dt64,
-
-Thanks,
-
-Kevin
+Series applied to drivers/next thanks Markus.
+-- 
+-- 
+Florian
