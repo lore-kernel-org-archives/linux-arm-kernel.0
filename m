@@ -1,59 +1,15 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameer Kolothum)
-Date: Fri, 6 Oct 2017 15:04:50 +0100
-Subject: [PATCH v9 4/4] PCI: hisi: blacklist hip06/hip07 controllers behind
- SMMUv3
-In-Reply-To: <20171006140450.89652-1-shameerali.kolothum.thodi@huawei.com>
-References: <20171006140450.89652-1-shameerali.kolothum.thodi@huawei.com>
-Message-ID: <20171006140450.89652-5-shameerali.kolothum.thodi@huawei.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 6 Oct 2017 09:25:54 -0500
+Subject: [PATCH v3] irqchip/gicv3: Add support for Range Selector (RS)
+ feature
+In-Reply-To: <1507247949-21620-1-git-send-email-shankerd@codeaurora.org>
+References: <1507247949-21620-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <CAOZdJXXp6Vm7rZNP4eH8UKpHqqrCQnqt257X3VZPnC7sG4VQGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The HiSilicon erratum 161010801 describes the limitation of
-HiSilicon platforms hip06/hip07 to support the SMMUv3 mappings
-for MSI transactions.
+On Thu, Oct 5, 2017 at 6:59 PM, Shanker Donthineni
+<shankerd@codeaurora.org> wrote:
+> +#define MPIDR_TO_SGI_CLUSTER_ID(mpidr) (mpidr & ~0xFUL)
 
-PCIe controller on these platforms has to differentiate the MSI
-payload against other DMA payload and has to modify the MSI
-payload. This basically makes it difficult for this platforms to
-have a SMMU translation for MSI. In order to workaround this, ARM
-SMMUv3 driver requires a quirk to treat the MSI regions separately.
-Such a quirk is currently missing for DT based systems and therefore
-we need to blacklist the hip06/hip07 PCIe controllers.
-
-Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
----
- drivers/pci/dwc/pcie-hisi.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/drivers/pci/dwc/pcie-hisi.c b/drivers/pci/dwc/pcie-hisi.c
-index a201791..6800747 100644
---- a/drivers/pci/dwc/pcie-hisi.c
-+++ b/drivers/pci/dwc/pcie-hisi.c
-@@ -270,6 +270,12 @@ static int hisi_pcie_probe(struct platform_device *pdev)
- 	struct resource *reg;
- 	int ret;
- 
-+	if ((IS_BUILTIN(CONFIG_ARM_SMMU_V3)) &&
-+			of_property_read_bool(dev->of_node, "iommu-map")) {
-+		dev_warn(dev, "HiSilicon erratum 161010801: blacklisting PCIe controllers behind SMMUv3\n");
-+		return -ENODEV;
-+	}
-+
- 	hisi_pcie = devm_kzalloc(dev, sizeof(*hisi_pcie), GFP_KERNEL);
- 	if (!hisi_pcie)
- 		return -ENOMEM;
-@@ -340,6 +346,12 @@ static int hisi_pcie_almost_ecam_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	struct pci_ecam_ops *ops;
- 
-+	if ((IS_BUILTIN(CONFIG_ARM_SMMU_V3)) &&
-+			of_property_read_bool(dev->of_node, "iommu-map")) {
-+		dev_warn(dev, "HiSilicon erratum 161010801: blacklisting PCIe controllers behind SMMUv3\n");
-+		return -ENODEV;
-+	}
-+
- 	ops = (struct pci_ecam_ops *)of_device_get_match_data(dev);
- 	return pci_host_common_probe(pdev, ops);
- }
--- 
-1.9.1
+This should be "((mpidr) & 0xFUL)", just to be safe.
