@@ -1,91 +1,60 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Fri,  6 Oct 2017 17:51:08 +0200
-Subject: [PATCH] crypto: atmel-aes - properly set IV after {en,de}crypt
-Message-ID: <20171006155108.6581-1-romain.izard.pro@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 6 Oct 2017 10:54:46 -0500
+Subject: [PATCH v3 03/22] dt-bindings: arm: scmi: add ARM MHU specific
+ mailbox client bindings
+In-Reply-To: <CABb+yY1ra5bgRB1VND+NvCcDFqfggG04a+JPWFZ+HpNg08eR8g@mail.gmail.com>
+References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
+ <1506604306-20739-4-git-send-email-sudeep.holla@arm.com>
+ <20171005232031.7373ni5ssln4wlpr@rob-hp-laptop>
+ <CABb+yY1ra5bgRB1VND+NvCcDFqfggG04a+JPWFZ+HpNg08eR8g@mail.gmail.com>
+Message-ID: <CAL_Jsq+0paGePmJVjsyFJiHx0UaDPjQrbe3C030U+fuUkWCJ+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Certain cipher modes like CTS expect the IV (req->info) of
-ablkcipher_request (or equivalently req->iv of skcipher_request) to
-contain the last ciphertext block when the {en,de}crypt operation is done.
+On Fri, Oct 6, 2017 at 6:01 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+> On Fri, Oct 6, 2017 at 4:50 AM, Rob Herring <robh@kernel.org> wrote:
+>> On Thu, Sep 28, 2017 at 02:11:27PM +0100, Sudeep Holla wrote:
+>>> This patch adds ARM MHU specific mailbox client bindings to support
+>>> SCMI. Since SCMI specification just requires doorbell mechanism from
+>>> mailbox controllers, we add mailbox data to specify the doorbell bit(s).
+>>>
+>>> Cc: Rob Herring <robh+dt@kernel.org>
+>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>>> ---
+>>>  .../devicetree/bindings/arm/arm,mhu-scmi.txt          | 19 +++++++++++++++++++
+>>>  1 file changed, 19 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/arm/arm,mhu-scmi.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/arm/arm,mhu-scmi.txt b/Documentation/devicetree/bindings/arm/arm,mhu-scmi.txt
+>>> new file mode 100644
+>>> index 000000000000..8c106f1cdeb8
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/arm/arm,mhu-scmi.txt
+>>> @@ -0,0 +1,19 @@
+>>> +ARM MHU mailbox client bindings for SCMI Message Protocol
+>>> +----------------------------------------------------------
+>>> +
+>>> +This binding is intended to define the ARM MHU specific extensions to
+>>> +the generic SCMI bindings[2].
+>>> +
+>>> +Required properties:
+>>> +
+>>> +The scmi node with the following properties shall be under the /firmware/ node.
+>>> +
+>>> +- compatible : shall be "arm,scmi" and "arm,mhu-scmi"
+>>
+>> Most specific first.
+>>
+>>> +- mbox-data : For each phandle listed in mboxes property, an unsigned 32-bit
+>>> +           data as expected by the mailbox controller
+>>
+>> Shouldn't that be cells as part of mboxes property?
+>>
+> A MHU client can send any number of commands (such u32 values) over a channel.
+> This client (SCMI) sends just one command over a channel, but other
+> clients may/do send two or more.
 
-Fix this issue for the Atmel AES hardware engine. The tcrypt test
-case for cts(cbc(aes)) is now correctly passed.
+Okay, then I guess I don't understand why this is in DT.
 
-To handle the case of in-place decryption, copy the ciphertext in an
-intermediate buffer before decryption.
-
-Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
----
- drivers/crypto/atmel-aes.c | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
-
-diff --git a/drivers/crypto/atmel-aes.c b/drivers/crypto/atmel-aes.c
-index 29e20c37f3a6..f22300babb45 100644
---- a/drivers/crypto/atmel-aes.c
-+++ b/drivers/crypto/atmel-aes.c
-@@ -156,6 +156,7 @@ struct atmel_aes_authenc_ctx {
- 
- struct atmel_aes_reqctx {
- 	unsigned long		mode;
-+	u8			*backup_info;
- };
- 
- #ifdef CONFIG_CRYPTO_DEV_ATMEL_AUTHENC
-@@ -496,6 +497,12 @@ static void atmel_aes_authenc_complete(struct atmel_aes_dev *dd, int err);
- 
- static inline int atmel_aes_complete(struct atmel_aes_dev *dd, int err)
- {
-+	struct ablkcipher_request *req = ablkcipher_request_cast(dd->areq);
-+	struct crypto_ablkcipher *ablkcipher = crypto_ablkcipher_reqtfm(req);
-+	struct atmel_aes_reqctx *rctx = ablkcipher_request_ctx(req);
-+	int ivsize = crypto_ablkcipher_ivsize(ablkcipher);
-+	bool enc = atmel_aes_is_encrypt(dd);
-+
- #ifdef CONFIG_CRYPTO_DEV_ATMEL_AUTHENC
- 	atmel_aes_authenc_complete(dd, err);
- #endif
-@@ -503,6 +510,15 @@ static inline int atmel_aes_complete(struct atmel_aes_dev *dd, int err)
- 	clk_disable(dd->iclk);
- 	dd->flags &= ~AES_FLAGS_BUSY;
- 
-+	if (enc) {
-+		scatterwalk_map_and_copy(req->info, req->dst,
-+					 req->nbytes - ivsize, ivsize, 0);
-+	} else if (rctx->backup_info) {
-+		memcpy(req->info, rctx->backup_info, ivsize);
-+		kfree(rctx->backup_info);
-+		rctx->backup_info = NULL;
-+	}
-+
- 	if (dd->is_async)
- 		dd->areq->complete(dd->areq, err);
- 
-@@ -959,13 +975,25 @@ static int atmel_aes_transfer_complete(struct atmel_aes_dev *dd)
- static int atmel_aes_start(struct atmel_aes_dev *dd)
- {
- 	struct ablkcipher_request *req = ablkcipher_request_cast(dd->areq);
-+	struct crypto_ablkcipher *ablkcipher = crypto_ablkcipher_reqtfm(req);
- 	struct atmel_aes_reqctx *rctx = ablkcipher_request_ctx(req);
-+	int ivsize = crypto_ablkcipher_ivsize(ablkcipher);
-+	bool enc = atmel_aes_is_encrypt(dd);
- 	bool use_dma = (req->nbytes >= ATMEL_AES_DMA_THRESHOLD ||
- 			dd->ctx->block_size != AES_BLOCK_SIZE);
- 	int err;
- 
- 	atmel_aes_set_mode(dd, rctx);
- 
-+	if (!enc) {
-+		rctx->backup_info = kzalloc(ivsize, GFP_KERNEL);
-+		if (rctx->backup_info == NULL)
-+			return atmel_aes_complete(dd, -ENOMEM);
-+
-+		scatterwalk_map_and_copy(rctx->backup_info, req->src,
-+				 (req->nbytes - ivsize), ivsize, 0);
-+	}
-+
- 	err = atmel_aes_hw_init(dd);
- 	if (err)
- 		return atmel_aes_complete(dd, err);
--- 
-2.11.0
+Rob
