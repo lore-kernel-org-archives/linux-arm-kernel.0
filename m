@@ -1,26 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 6 Oct 2017 23:52:38 +0200
-Subject: [PATCH] mtd: nand: gpio: Convert to use GPIO descriptors
-In-Reply-To: <87fuawf1h8.fsf@belgarion.home>
-References: <20170924173912.9199-1-linus.walleij@linaro.org>
- <87fuawf1h8.fsf@belgarion.home>
-Message-ID: <CACRpkdZEx8=887BiW786Cfh89yjLx1cVdJ=jdD+tVdqec-k3Fw@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Fri,  6 Oct 2017 15:05:04 -0700
+Subject: [GIT PULL 2/2] bcm2835-dt-next-2017-10-06
+In-Reply-To: <20171006220504.7776-1-eric@anholt.net>
+References: <20171006220504.7776-1-eric@anholt.net>
+Message-ID: <20171006220504.7776-2-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 6, 2017 at 10:46 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> Linus Walleij <linus.walleij@linaro.org> writes:
->
->>  #if defined(CONFIG_MTD_NAND_GPIO) || defined(CONFIG_MTD_NAND_GPIO_MODULE)
->> +
->> +static struct gpiod_lookup_table cmx255_nand_gpiod_table = {
->> +     .dev_id         = "cmx255-nand",
-> Shouldn't the device name be "gpio-nand" instead ?
-> "cmx255-nand" is AFAIR a partition name, not a device name.
+Hi Florian,
 
-My silly mistake. Sent a fixup patch.
+This -next PR builds on the previous one for -fixes, to get bluetooth
+working by default without userspace hacks.
 
-Thanks for spotting this!
+The following changes since commit f08f58a2bf68900a84e782b8c7ad701c0654173c:
 
-Yours,
-Linus Walleij
+  ARM: dts: bcm283x: Fix console path on RPi3 (2017-10-06 13:04:56 -0700)
+
+are available in the git repository at:
+
+  git://github.com/anholt/linux tags/bcm2835-dt-next-2017-10-06
+
+for you to fetch changes up to fd3372db18d3d44ae4579243a8eacb5247d8c03a:
+
+  ARM: dts: bcm2837-rpi-3-b: Add bcm43438 serial slave (2017-10-06 13:07:21 -0700)
+
+----------------------------------------------------------------
+This pull request adds the Pi 3's built in bluetooth device so that it
+can be probed automatically without userspace hciattach calls.
+
+----------------------------------------------------------------
+Loic Poulain (1):
+      ARM: dts: bcm2837-rpi-3-b: Add bcm43438 serial slave
+
+ arch/arm/boot/dts/bcm2837-rpi-3-b.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
