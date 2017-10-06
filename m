@@ -1,50 +1,54 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 6 Oct 2017 15:15:21 +0200
-Subject: [PATCH 16/16] arm64: dts: marvell: armada-3720-espressobin:
- fill UART nodes
-In-Reply-To: <87fuawe8gx.fsf@free-electrons.com>
-References: <20171006101344.15590-1-miquel.raynal@free-electrons.com>
- <20171006101344.15590-17-miquel.raynal@free-electrons.com>
- <87fuawe8gx.fsf@free-electrons.com>
-Message-ID: <20171006151521.440418a2@windsurf.lan>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Fri,  6 Oct 2017 14:16:52 +0100
+Subject: [PATCH 1/2] arm64: Ensure the instruction emulation is ready for
+ userspace
+Message-ID: <20171006131653.15876-1-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+We trap and emulate some instructions (e.g, mrs, deprecated instructions)
+for the userspace. However the handlers for these are registered as
+late_initcalls and the userspace could be up and running from the initramfs
+by that time (with populate_rootfs, which is a rootfs_initcall()). This
+could cause problems for the early applications ending up in failure
+like :
 
-On Fri, 06 Oct 2017 15:01:18 +0200, Gregory CLEMENT wrote:
+[   11.152061] modprobe[93]: undefined instruction: pc=0000ffff8ca48ff4
 
->  /*
->   * To enable the second UART on J17 (pins 24,26) refer to the uart1
->   * node from armada-3720-db.dts.
->   * Note that TX and RX signal are the ones coming directly from the SoC:
->   * 1.8V TTL.
->   */
+This patch promotes the specific calls to core_initcalls, which are
+guaranteed to be completed before we hit userspace.
 
-One issue with this comment (and Miqu?l's version as well) is that it
-does not explain why you don't enable this UART by default.
+Cc: stable at vger.kernel.org
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Dave Martin <dave.martin@arm.com>
+Cc: Matthias Brugger <mbrugger@suse.com>
+Cc: James Morse <james.morse@arm.com>
+Reported-by: Matwey V. Kornilov <matwey.kornilov@gmail.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/kernel/armv8_deprecated.c | 2 +-
+ arch/arm64/kernel/cpufeature.c       | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-The real reason is in the commit log from Miqu?l, and should probably
-be part of the comment. Perhaps something like:
-
-/*
-
- * Connector J17 (pins X, Y, Z) exposes a number of different
- * features:
- *  - UART1 (pins 24 = RX, pins 26 = TX), see armada-3720-db.dts for an
- *    example on how to enable UART1. Beware that the signals are 1.8V
- *    TTL.
- *  - SPIxyz
- *  - I2Cxyz
- */
-
-Otherwise, it's not clear at all why you don't just enable UART1. Or
-perhaps I misunderstood Miqu?l's commit log ?
-
-Best regards,
-
-Thomas
+diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
+index f0e6d717885b..d06fbe4cd38d 100644
+--- a/arch/arm64/kernel/armv8_deprecated.c
++++ b/arch/arm64/kernel/armv8_deprecated.c
+@@ -649,4 +649,4 @@ static int __init armv8_deprecated_init(void)
+ 	return 0;
+ }
+ 
+-late_initcall(armv8_deprecated_init);
++core_initcall(armv8_deprecated_init);
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index cd52d365d1f0..21e2c95d24e7 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -1307,4 +1307,4 @@ static int __init enable_mrs_emulation(void)
+ 	return 0;
+ }
+ 
+-late_initcall(enable_mrs_emulation);
++core_initcall(enable_mrs_emulation);
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.13.6
