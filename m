@@ -1,20 +1,26 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 6 Oct 2017 10:39:37 -0500
-Subject: [PATCH v2 08/10] dt-bindings: Add Ubiquiti Networks vendor prefix
-In-Reply-To: <20170928231502.27069-9-f.fainelli@gmail.com>
-References: <20170928231502.27069-1-f.fainelli@gmail.com>
- <20170928231502.27069-9-f.fainelli@gmail.com>
-Message-ID: <20171006153937.5vstbj5zp5eemc4r@rob-hp-laptop>
+From: szabolcs.nagy@arm.com (Szabolcs Nagy)
+Date: Fri, 06 Oct 2017 16:43:43 +0100
+Subject: [PATCH v2 26/28] arm64/sve: Add documentation
+In-Reply-To: <1504198860-12951-27-git-send-email-Dave.Martin@arm.com>
+References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
+ <1504198860-12951-27-git-send-email-Dave.Martin@arm.com>
+Message-ID: <59D7A4AF.40408@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 28, 2017 at 04:15:00PM -0700, Florian Fainelli wrote:
-> Use the stock ticker: UBNT as the vendor prefix for Ubiquiti Networks.
-> 
-> Acked-by: Jon Mason <jon.mason@broadcom.com>
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->  1 file changed, 1 insertion(+)
+On 31/08/17 18:00, Dave Martin wrote:
+> +9.  System runtime configuration
+> +--------------------------------
+> +
+> +* To mitigate the ABI impact of expansion of the signal frame, a policy
+> +  mechanism is provided for administrators, distro maintainers and developers
+> +  to set the default vector length for userspace processes:
+> +
+> +/proc/cpu/sve_default_vector_length
 
-Acked-by: Rob Herring <robh@kernel.org>
+
+elsewhere in the patch series i see
+
+/proc/sys/abi/sve_default_vector_length
+
+is this supposed to be the same?
