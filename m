@@ -1,24 +1,65 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Fri, 6 Oct 2017 10:30:10 -0500
-Subject: [PATCH v3] irqchip/gicv3: Add support for Range Selector (RS)
- feature
-In-Reply-To: <CAOZdJXXp6Vm7rZNP4eH8UKpHqqrCQnqt257X3VZPnC7sG4VQGg@mail.gmail.com>
-References: <1507247949-21620-1-git-send-email-shankerd@codeaurora.org>
- <CAOZdJXXp6Vm7rZNP4eH8UKpHqqrCQnqt257X3VZPnC7sG4VQGg@mail.gmail.com>
-Message-ID: <010801d33eb8$00a7ae10$01f70a30$@codeaurora.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 6 Oct 2017 16:33:13 +0100
+Subject: [PATCH v2 11/28] arm64/sve: Core task context handling
+In-Reply-To: <20171006151528.GB3611@e103592.cambridge.arm.com>
+References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
+ <1504198860-12951-12-git-send-email-Dave.Martin@arm.com>
+ <20170913143325.hi4cfcajbts3bbao@localhost>
+ <20171003113302.GR3611@e103592.cambridge.arm.com>
+ <20171005112835.2rhaqx23bhe6tnwl@armageddon.cambridge.arm.com>
+ <20171006131005.GA3611@e103592.cambridge.arm.com>
+ <20171006133639.ialgglabo7yca5bm@armageddon.cambridge.arm.com>
+ <20171006151528.GB3611@e103592.cambridge.arm.com>
+Message-ID: <20171006153312.cushhcb4m2qc4kwd@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I posted v4 patch https://patchwork.kernel.org/patch/9989667/ with parentheses around a macro parameter. 
+On Fri, Oct 06, 2017 at 04:15:28PM +0100, Dave P Martin wrote:
+> On Fri, Oct 06, 2017 at 02:36:40PM +0100, Catalin Marinas wrote:
+> > On Fri, Oct 06, 2017 at 02:10:09PM +0100, Dave P Martin wrote:
+> > > On Thu, Oct 05, 2017 at 12:28:35PM +0100, Catalin Marinas wrote:
+> > > > On Tue, Oct 03, 2017 at 12:33:03PM +0100, Dave P Martin wrote:
+> > > > > TIF_FOREIGN_FPSTATE's meaning is expanded to cover SVE, but otherwise
+> > > > > unchanged:
+> > > > > 
+> > > > >  * If a task is running and !TIF_FOREIGN_FPSTATE, then the the CPU
+> > > > >    registers of the CPU the task is running on contain the authoritative
+> > > > >    FPSIMD/SVE state of the task.  The backing memory may be stale.
+> > > > > 
+> > > > >  * Otherwise (i.e., task not running, or task running and
+> > > > >    TIF_FOREIGN_FPSTATE), the task's FPSIMD/SVE backing memory is
+> > > > >    authoritative.  If additionally per_cpu(fpsimd_last_state,
+> > > > >    task->fpsimd_state.cpu) == &task->fpsimd_state.cpu, then
+> > > > >    task->fpsimd_state.cpu's registers are also up to date for task, but
+> > > > >    not authorititive: the current FPSIMD/SVE state may be read from
+> > > > >    them, but they must not be written.
+> > > > >  
+> > > > > The FPSIMD/SVE backing memory is selected by TIF_SVE:
+> > > > > 
+> > > > >  * TIF_SVE set: Zn (incorporating Vn in bits[127:0]), Pn and FFR are
+> > > > >    stored in task->thread.sve_state, formatted appropriately for vector
+> > > > >    length task->thread.sve_vl.  task->thread.sve_state must point to a
+> > > > >    valid buffer at least sve_state_size(task) bytes in size.
+> > 
+> > "Zn [...] stored in  task->thread.sve_state" - is this still true with
+> > the changes you proposed? I guess even without these changes, you have
+> > situations where the hardware regs are out of sync with sve_state (see
+> > more below).
+> 
+> I guess I need to tweak the wording here.
+> 
+> TIF_SVE says where the vector state should be loaded/stored from,
+> but does not say whether the data is up to date in memory, or when
+> it should be loaded/stored.
+> 
+> The latter is described by a cocktail of different things including
+> which bit of kernel code we are executing if any, whether the task
+> is running/stopped etc., TIF_FOREIGN_FPSTATE,
+> task->thread.fpsimd_state.cpu and per_cpu(fpsimd_last_state).
+> 
+> Does this make any better sense of my code below?
 
------Original Message-----
-From: Timur Tabi [mailto:timur at codeaurora.org] 
-Sent: Friday, October 6, 2017 9:26 AM
-To: Shanker Donthineni <shankerd@codeaurora.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>; linux-kernel <linux-kernel@vger.kernel.org>; linux-arm-kernel <linux-arm-kernel@lists.infradead.org>; Thomas Gleixner <tglx@linutronix.de>; Jason Cooper <jason@lakedaemon.net>; Vikram Sethi <vikrams@codeaurora.org>
-Subject: Re: [PATCH v3] irqchip/gicv3: Add support for Range Selector (RS) feature
+Yes, it looks fine.
 
-On Thu, Oct 5, 2017 at 6:59 PM, Shanker Donthineni <shankerd@codeaurora.org> wrote:
-> +#define MPIDR_TO_SGI_CLUSTER_ID(mpidr) (mpidr & ~0xFUL)
-
-This should be "((mpidr) & 0xFUL)", just to be safe.
+-- 
+Catalin
