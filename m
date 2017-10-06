@@ -1,66 +1,33 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Fri, 6 Oct 2017 09:46:47 +0200
-Subject: [PATCH] iommu/arm-smmu-v3: Ensure we sync STE when only changing
- config field
-In-Reply-To: <7e9ef711-b1d7-ee70-b740-5d03a4fc61f6@arm.com>
-References: <1507222158-4151-1-git-send-email-will.deacon@arm.com>
- <7e9ef711-b1d7-ee70-b740-5d03a4fc61f6@arm.com>
-Message-ID: <59075e5e-56d5-9a93-8c01-c602be996982@redhat.com>
+From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
+Date: Fri, 6 Oct 2017 09:53:23 +0200
+Subject: [PATCH v1] i2c:i2c-stm32f7: fix setup structure
+In-Reply-To: <20171005111444.77qib2ddnz4jmbnr@ninjato>
+References: <1506000609-27409-1-git-send-email-pierre-yves.mordret@st.com>
+ <20171005111444.77qib2ddnz4jmbnr@ninjato>
+Message-ID: <3b0e9bd4-298f-3ec9-7560-9758a8198e27@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
 
-On 05/10/2017 18:54, Robin Murphy wrote:
-> On 05/10/17 17:49, Will Deacon wrote:
->> The SMMUv3 architecture permits caching of data structures deemed to be
->> "reachable" by the SMU, which includes STEs marked as invalid. When
->> transitioning an STE to a bypass/fault configuration at init or detach
->> time, we mistakenly elide the CMDQ_OP_CFGI_STE operation in some cases,
->> therefore potentially leaving the old STE state cached in the SMMU.
+
+On 10/05/2017 01:14 PM, Wolfram Sang wrote:
+> On Thu, Sep 21, 2017 at 03:30:09PM +0200, Pierre-Yves MORDRET wrote:
+>> I2C drive setup structure is not properly allocated.
+>> Make it static instead of pointer to store driver data.
 >>
->> This patch fixes the problem by ensuring that we perform the
->> CMDQ_OP_CFGI_STE operation irrespective of the validity of the previous
->> STE.
+>> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 > 
-> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
+> Ouch! How did it work before?
 
-Thanks
-
-Eric
+Well yes it did. When it has been discovered during internal code review I was
+skeptical but it turned out to be true. I tested on STM32 F7/H7 without any
+trouble : scary !
 
 > 
->> Cc: Robin Murphy <robin.murphy@arm.com>
->> Reported-by: Eric Auger <eric.auger@redhat.com>
->> Signed-off-by: Will Deacon <will.deacon@arm.com>
->> ---
->>  drivers/iommu/arm-smmu-v3.c | 7 +++++--
->>  1 file changed, 5 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index 47f52b1ab838..91fdabdb4de6 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -1085,8 +1085,11 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
->>  		dst[1] = cpu_to_le64(STRTAB_STE_1_SHCFG_INCOMING
->>  			 << STRTAB_STE_1_SHCFG_SHIFT);
->>  		dst[2] = 0; /* Nuke the VMID */
->> -		if (ste_live)
->> -			arm_smmu_sync_ste_for_sid(smmu, sid);
->> +		/*
->> +		 * The SMMU can perform negative caching, so we must sync
->> +		 * the STE regardless of whether the old value was live.
->> +		 */
->> +		arm_smmu_sync_ste_for_sid(smmu, sid);
->>  		return;
->>  	}
->>  
->>
+> Applied to for-current, thanks! Please provide a Fixes: tag next time,
+> did this for you now.
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Sorry I wasn't aware about that. I gonna remember for the next time.
+Thanks !
+
+Py
