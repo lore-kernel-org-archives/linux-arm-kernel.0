@@ -1,134 +1,58 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Fri,  6 Oct 2017 14:31:43 +0100
-Subject: [RFCv2 PATCH 16/36] iommu/arm-smmu-v3: Add support for VHE
+Date: Fri,  6 Oct 2017 14:31:39 +0100
+Subject: [RFCv2 PATCH 12/36] dt-bindings: document stall and PASID properties
+ for IOMMU masters
 In-Reply-To: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
 References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
-Message-ID: <20171006133203.22803-17-jean-philippe.brucker@arm.com>
+Message-ID: <20171006133203.22803-13-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARMv8.1 extensions added Virtualization Host Extensions (VHE), which allow
-to run a host kernel at EL2. When using normal DMA, Device and CPU address
-spaces are orthogonal, and do not need to implement the same capabilities,
-so VHE hasn't been in use on the SMMU side until now.
-
-With shared address spaces however, ASIDs are shared between MMU and SMMU,
-and broadcast TLB invalidations issued by a CPU are taken into account by
-the SMMU. TLB entries on both sides need to have identical exception level
-in order to be shot with a single invalidation.
-
-When the CPU is using VHE, enable VHE in the SMMU and for all streams.
-Normal DMA mappings will need to use TLBI_EL2 commands instead of TLBI_NH,
-but shouldn't be otherwise affected by this change.
+On ARM systems, some platform devices behind an IOMMU may support stall
+and PASID features. Stall is the ability to recover from page faults and
+PASID offers multiple process address spaces to the device. Together they
+allow to do paging with a device. Let the firmware tell us when a device
+supports stall and PASID.
 
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 29 ++++++++++++++++++++++++-----
- 1 file changed, 24 insertions(+), 5 deletions(-)
+ Documentation/devicetree/bindings/iommu/iommu.txt | 24 +++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index c444f9e83b91..27376e1193c1 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -22,6 +22,7 @@
+diff --git a/Documentation/devicetree/bindings/iommu/iommu.txt b/Documentation/devicetree/bindings/iommu/iommu.txt
+index 5a8b4624defc..c589b75f7277 100644
+--- a/Documentation/devicetree/bindings/iommu/iommu.txt
++++ b/Documentation/devicetree/bindings/iommu/iommu.txt
+@@ -86,6 +86,30 @@ have a means to turn off translation. But it is invalid in such cases to
+ disable the IOMMU's device tree node in the first place because it would
+ prevent any driver from properly setting up the translations.
  
- #include <linux/acpi.h>
- #include <linux/acpi_iort.h>
-+#include <linux/cpufeature.h>
- #include <linux/delay.h>
- #include <linux/dma-iommu.h>
- #include <linux/err.h>
-@@ -516,6 +517,8 @@ struct arm_smmu_cmdq_ent {
- 		#define CMDQ_OP_TLBI_NH_ASID	0x11
- 		#define CMDQ_OP_TLBI_NH_VA	0x12
- 		#define CMDQ_OP_TLBI_EL2_ALL	0x20
-+		#define CMDQ_OP_TLBI_EL2_ASID	0x21
-+		#define CMDQ_OP_TLBI_EL2_VA	0x22
- 		#define CMDQ_OP_TLBI_S12_VMALL	0x28
- 		#define CMDQ_OP_TLBI_S2_IPA	0x2a
- 		#define CMDQ_OP_TLBI_NSNH_ALL	0x30
-@@ -655,6 +658,7 @@ struct arm_smmu_device {
- #define ARM_SMMU_FEAT_STALLS		(1 << 11)
- #define ARM_SMMU_FEAT_HYP		(1 << 12)
- #define ARM_SMMU_FEAT_STALL_FORCE	(1 << 13)
-+#define ARM_SMMU_FEAT_E2H		(1 << 14)
- 	u32				features;
- 
- #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
-@@ -912,6 +916,7 @@ static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
- 		cmd[1] |= CMDQ_CFGI_1_RANGE_MASK << CMDQ_CFGI_1_RANGE_SHIFT;
- 		break;
- 	case CMDQ_OP_TLBI_NH_VA:
-+	case CMDQ_OP_TLBI_EL2_VA:
- 		cmd[0] |= (u64)ent->tlbi.asid << CMDQ_TLBI_0_ASID_SHIFT;
- 		cmd[1] |= ent->tlbi.leaf ? CMDQ_TLBI_1_LEAF : 0;
- 		cmd[1] |= ent->tlbi.addr & CMDQ_TLBI_1_VA_MASK;
-@@ -927,6 +932,9 @@ static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
- 	case CMDQ_OP_TLBI_S12_VMALL:
- 		cmd[0] |= (u64)ent->tlbi.vmid << CMDQ_TLBI_0_VMID_SHIFT;
- 		break;
-+	case CMDQ_OP_TLBI_EL2_ASID:
-+		cmd[0] |= (u64)ent->tlbi.asid << CMDQ_TLBI_0_ASID_SHIFT;
-+		break;
- 	case CMDQ_OP_PRI_RESP:
- 		cmd[0] |= ent->substream_valid ? CMDQ_0_SSV : 0;
- 		cmd[0] |= ent->pri.ssid << CMDQ_PRI_0_SSID_SHIFT;
-@@ -1428,7 +1436,9 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
- #ifdef CONFIG_PCI_ATS
- 			 STRTAB_STE_1_EATS_TRANS << STRTAB_STE_1_EATS_SHIFT |
- #endif
--			 STRTAB_STE_1_STRW_NSEL1 << STRTAB_STE_1_STRW_SHIFT);
-+			 (smmu->features & ARM_SMMU_FEAT_E2H ?
-+			  STRTAB_STE_1_STRW_EL2 : STRTAB_STE_1_STRW_NSEL1) <<
-+			 STRTAB_STE_1_STRW_SHIFT);
- 
- 		if (smmu->features & ARM_SMMU_FEAT_STALLS &&
- 		   !(smmu->features & ARM_SMMU_FEAT_STALL_FORCE))
-@@ -1694,7 +1704,8 @@ static void arm_smmu_tlb_inv_context(void *cookie)
- 	struct arm_smmu_cmdq_ent cmd;
- 
- 	if (smmu_domain->stage == ARM_SMMU_DOMAIN_S1) {
--		cmd.opcode	= CMDQ_OP_TLBI_NH_ASID;
-+		cmd.opcode	= smmu->features & ARM_SMMU_FEAT_E2H ?
-+				  CMDQ_OP_TLBI_EL2_ASID : CMDQ_OP_TLBI_NH_ASID;
- 		cmd.tlbi.asid	= smmu_domain->s1_cfg.cd.asid;
- 		cmd.tlbi.vmid	= 0;
- 	} else {
-@@ -1719,7 +1730,8 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
- 	};
- 
- 	if (smmu_domain->stage == ARM_SMMU_DOMAIN_S1) {
--		cmd.opcode	= CMDQ_OP_TLBI_NH_VA;
-+		cmd.opcode	= smmu->features & ARM_SMMU_FEAT_E2H ?
-+				  CMDQ_OP_TLBI_EL2_VA : CMDQ_OP_TLBI_NH_VA;
- 		cmd.tlbi.asid	= smmu_domain->s1_cfg.cd.asid;
- 	} else {
- 		cmd.opcode	= CMDQ_OP_TLBI_S2_IPA;
-@@ -2718,7 +2730,11 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
- 	writel_relaxed(reg, smmu->base + ARM_SMMU_CR1);
- 
- 	/* CR2 (random crap) */
--	reg = CR2_PTM | CR2_RECINVSID | CR2_E2H;
-+	reg = CR2_PTM | CR2_RECINVSID;
++Optional properties:
++--------------------
++- dma-can-stall: When present, the master can wait for a transaction to
++  complete for an indefinite amount of time. Upon translation fault some
++  IOMMUs, instead of aborting the translation immediately, may first
++  notify the driver and keep the transaction in flight. This allows the OS
++  to inspect the fault and, for example, make physical pages resident
++  before updating the mappings and completing the transaction. Such IOMMU
++  accepts a limited number of simultaneous stalled transactions before
++  having to either put back-pressure on the master, or abort new faulting
++  transactions.
 +
-+	if (smmu->features & ARM_SMMU_FEAT_E2H)
-+		reg |= CR2_E2H;
++  Firmware has to opt-in stalling, because most buses and masters don't
++  support it. In particular it isn't compatible with PCI, where
++  transactions have to complete before a time limit. More generally it
++  won't work in systems and masters that haven't been designed for
++  stalling. For example the OS, in order to handle a stalled transaction,
++  may attempt to retrieve pages from secondary storage in a stalled
++  domain, leading to a deadlock.
 +
- 	writel_relaxed(reg, smmu->base + ARM_SMMU_CR2);
++- pasid-bits: Some masters support multiple address spaces for DMA. By
++  tagging DMA transactions with an address space identifier. By default,
++  this is 0, which means that the device only has one address space.
++
  
- 	/* Stream table */
-@@ -2868,8 +2884,11 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
- 	if (reg & IDR0_MSI)
- 		smmu->features |= ARM_SMMU_FEAT_MSI;
- 
--	if (reg & IDR0_HYP)
-+	if (reg & IDR0_HYP) {
- 		smmu->features |= ARM_SMMU_FEAT_HYP;
-+		if (cpus_have_cap(ARM64_HAS_VIRT_HOST_EXTN))
-+			smmu->features |= ARM_SMMU_FEAT_E2H;
-+	}
- 
- 	/*
- 	 * The coherency feature as set by FW is used in preference to the ID
+ Notes:
+ ======
 -- 
 2.13.3
