@@ -1,81 +1,64 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri,  6 Oct 2017 06:20:25 +0200
-Subject: [PATCH] ARM: ux500: Fix regression while init PM domains
-Message-ID: <1507263625-16756-1-git-send-email-ulf.hansson@linaro.org>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Fri,  6 Oct 2017 04:36:34 +0000
+Subject: [RFC 1/2] ARM: dts: exynos: update the usbdrd phy and ref clk
+Message-ID: <1507264595-3565-1-git-send-email-linux.amoon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit afece3ab9a36 ("PM / Domains: Add time accounting to various
-genpd states") causes a boot regression for ux500.
+update the usbdrd link control and phy contol clks.
 
-The problem occurs when the ux500 machine code calls pm_genpd_init(), which
-since the above change triggers a call to ktime_get(). More precisely,
-because ux500 initializes PM domains in the init_IRQ() phase of the boot,
-timekeeping has not yet been initialized.
-
-Fix the problem by moving the initialization of the PM domains to after
-timekeeping has been initialized.
-
-Fixes: afece3ab9a36 ("PM / Domains: Add time accounting to various genpd..")
-Cc: Thara Gopinath <thara.gopinath@linaro.org>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Anand Moon <linux.amoon@gmail.com>
 ---
-
-Note, since the commit afece3ab9a36 ("PM / Domains: Add time accounting to
-various genpd states") potentially could cause similar problems for other SoCs,
-I have walked through the callers of pm_genpd_init(). At this point I couldn't
-find any other SoC having these problems.
-
-Kind regards
-Uffe
-
+Tested on Odroid XU4 and Odroid HC1 develpment board.
+Did not test Odroid XU develpment board.
 ---
- arch/arm/mach-ux500/cpu-db8500.c | 4 ++++
- arch/arm/mach-ux500/pm.c         | 4 ----
+ arch/arm/boot/dts/exynos5410.dtsi | 4 ++--
+ arch/arm/boot/dts/exynos5420.dtsi | 4 ++--
  2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index 71a34e8..57058ac 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -32,6 +32,7 @@
- #include <asm/mach/arch.h>
+diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
+index 7eab4bc..5af9f4b 100644
+--- a/arch/arm/boot/dts/exynos5410.dtsi
++++ b/arch/arm/boot/dts/exynos5410.dtsi
+@@ -385,7 +385,7 @@
+ };
  
- #include "db8500-regs.h"
-+#include "pm_domains.h"
+ &usbdrd_phy0 {
+-	clocks = <&clock CLK_USBD300>, <&clock CLK_SCLK_USBPHY300>;
++	clocks = <&clock CLK_SCLK_USBPHY300>, <&clock CLK_SCLK_USBD300>;
+ 	clock-names = "phy", "ref";
+ 	samsung,pmu-syscon = <&pmu_system_controller>;
+ };
+@@ -400,7 +400,7 @@
+ };
  
- static int __init ux500_l2x0_unlock(void)
- {
-@@ -157,6 +158,9 @@ static const struct of_device_id u8500_local_bus_nodes[] = {
+ &usbdrd_phy1 {
+-	clocks = <&clock CLK_USBD301>, <&clock CLK_SCLK_USBPHY301>;
++	clocks = <&clock CLK_SCLK_USBPHY301>, <&clock CLK_SCLK_USBD301>;
+ 	clock-names = "phy", "ref";
+ 	samsung,pmu-syscon = <&pmu_system_controller>;
+ };
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index 88e5d6d..36d26ab 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -1461,7 +1461,7 @@
+ };
  
- static void __init u8500_init_machine(void)
- {
-+	/* Initialize ux500 power domains */
-+	ux500_pm_domains_init();
-+
- 	/* automatically probe child nodes of dbx5x0 devices */
- 	if (of_machine_is_compatible("st-ericsson,u8540"))
- 		of_platform_populate(NULL, u8500_local_bus_nodes,
-diff --git a/arch/arm/mach-ux500/pm.c b/arch/arm/mach-ux500/pm.c
-index a970e7f..f6c33a0 100644
---- a/arch/arm/mach-ux500/pm.c
-+++ b/arch/arm/mach-ux500/pm.c
-@@ -19,7 +19,6 @@
- #include <linux/of_address.h>
+ &usbdrd_phy0 {
+-	clocks = <&clock CLK_USBD300>, <&clock CLK_SCLK_USBPHY300>;
++	clocks = <&clock CLK_SCLK_USBPHY300>, <&clock CLK_SCLK_USBD300>;
+ 	clock-names = "phy", "ref";
+ 	samsung,pmu-syscon = <&pmu_system_controller>;
+ };
+@@ -1476,7 +1476,7 @@
+ };
  
- #include "db8500-regs.h"
--#include "pm_domains.h"
- 
- /* ARM WFI Standby signal register */
- #define PRCM_ARM_WFI_STANDBY    (prcmu_base + 0x130)
-@@ -203,7 +202,4 @@ void __init ux500_pm_init(u32 phy_base, u32 size)
- 
- 	/* Set up ux500 suspend callbacks. */
- 	suspend_set_ops(UX500_SUSPEND_OPS);
--
--	/* Initialize ux500 power domains */
--	ux500_pm_domains_init();
- }
+ &usbdrd_phy1 {
+-	clocks = <&clock CLK_USBD301>, <&clock CLK_SCLK_USBPHY301>;
++	clocks = <&clock CLK_SCLK_USBPHY301>, <&clock CLK_SCLK_USBD301>;
+ 	clock-names = "phy", "ref";
+ 	samsung,pmu-syscon = <&pmu_system_controller>;
+ };
 -- 
 2.7.4
