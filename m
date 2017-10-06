@@ -1,30 +1,23 @@
 From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 6 Oct 2017 16:56:01 +0530
-Subject: [PATCH v3 16/22] firmware: arm_scmi: add arm_mhu specific mailbox
- interface
-In-Reply-To: <CAK8P3a0XmiXqZ-z7WV+nk7B86p23Jmf31Q=pVovXVebhA28_0Q@mail.gmail.com>
+Date: Fri, 6 Oct 2017 17:04:01 +0530
+Subject: [PATCH v3 15/22] firmware: arm_scmi: abstract mailbox interface
+In-Reply-To: <f316b938-c6d5-3aa9-4f03-6b5c6ad4bfa7@arm.com>
 References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
- <1506604306-20739-17-git-send-email-sudeep.holla@arm.com>
- <CAK8P3a0XmiXqZ-z7WV+nk7B86p23Jmf31Q=pVovXVebhA28_0Q@mail.gmail.com>
-Message-ID: <CABb+yY1N6hmC6Kd2QteMw_oCf=-mYHf7p6RdhYPQK+QUO7VP4A@mail.gmail.com>
+ <1506604306-20739-16-git-send-email-sudeep.holla@arm.com>
+ <CAK8P3a0EUr_aEZdOrjHixzp44yXqsNxTMzBceSBTmk-x8x2MAg@mail.gmail.com>
+ <f316b938-c6d5-3aa9-4f03-6b5c6ad4bfa7@arm.com>
+Message-ID: <CABb+yY0SmQaPgBxan44a_Sx2mFuuiPcMz41J1yjqfO5irPTYig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 4, 2017 at 5:06 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thu, Sep 28, 2017 at 3:11 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> This patch adds ARM MHU specific mailbox interface for SCMI.
->>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->
-> This clearly needs an explanation why we need another driver.
->
-Yes the patch needs explanation which is that we need a shim layer to
-map SCMI requests onto what the underlying controller expects. The
-alternative was to clone the controller driver (MHU now and others
-later when their platforms support SCMI) and pretend SCMI is the only
-client they are ever going to serve.
+On Wed, Oct 4, 2017 at 5:02 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
 
-BTW, I haven't reviewed this patchset yet so I am not sure about this
-code but I do believe we need a transport layer (this shim driver)
-between generic SCMI implementation and each controller driver.
+> Also, I have added shim only for specific controllers that need them.
+> E.g. ARM MHU as Jassi disagreed to add doorbell mechanism to that.
+> mbox_if provides default implementation that just calls direct mailbox
+> APIs.
+>
+Yeah you could hack away the MHU driver to make your life easy at the
+cost of duplicated code and extra DT bindings, but for a moment think
+what if your development platform wasn't MHU but, say, Rockchip
+mailbox controller?
