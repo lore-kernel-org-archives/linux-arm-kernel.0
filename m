@@ -1,80 +1,134 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Fri,  6 Oct 2017 14:31:50 +0100
-Subject: [RFCv2 PATCH 23/36] iommu/arm-smmu-v3: Share process page tables
-In-Reply-To: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
-References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
-Message-ID: <20171006133203.22803-24-jean-philippe.brucker@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri,  6 Oct 2017 14:34:42 +0100
+Subject: [PATCH v2 5/5] kernel/locking: Prevent slowpath writers getting held
+ up by fastpath
+In-Reply-To: <1507296882-18721-1-git-send-email-will.deacon@arm.com>
+References: <1507296882-18721-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1507296882-18721-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Copy the content of TCR, MAIR and TTBR of a given task into a context
-descriptor.
+When a prospective writer takes the qrwlock locking slowpath due to the
+lock being held, it attempts to cmpxchg the wmode field from 0 to
+_QW_WAITING so that concurrent lockers also take the slowpath and queue
+on the spinlock accordingly, allowing the lockers to drain.
 
-Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+Unfortunately, this isn't fair, because a fastpath writer that comes in
+after the lock is made available but before the _QW_WAITING flag is set
+can effectively jump the queue. If there is a steady stream of prospective
+writers, then the waiter will be held off indefinitely.
+
+This patch restores fairness by separating _QW_WAITING and _QW_LOCKED
+into two distinct fields: _QW_LOCKED continues to occupy the bottom byte
+of the lockword so that it can be cleared unconditionally when unlocking,
+but _QW_WAITING now occupies what used to be the bottom bit of the reader
+count. This then forces the slow-path for concurrent lockers.
+
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: Waiman Long <longman@redhat.com>
+Cc: Boqun Feng <boqun.feng@gmail.com>
+Cc: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 38 ++++++++++++++++++++++++++++++++++++--
- 1 file changed, 36 insertions(+), 2 deletions(-)
+ include/asm-generic/qrwlock.h       | 10 +++++-----
+ include/asm-generic/qrwlock_types.h |  8 ++++----
+ kernel/locking/qrwlock.c            | 20 +++++---------------
+ 3 files changed, 14 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index c86a1182c137..293f260782c2 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -43,6 +43,7 @@
- #include <linux/amba/bus.h>
+diff --git a/include/asm-generic/qrwlock.h b/include/asm-generic/qrwlock.h
+index 02c0a768e6b0..63cb7d347b25 100644
+--- a/include/asm-generic/qrwlock.h
++++ b/include/asm-generic/qrwlock.h
+@@ -40,10 +40,10 @@
+  *       |      rd      | wr |
+  *       +----+----+----+----+
+  */
+-#define	_QW_WAITING	1		/* A writer is waiting	   */
+-#define	_QW_LOCKED	0xff		/* A writer holds the lock */
+-#define	_QW_WMASK	0xff		/* Writer mask		   */
+-#define	_QR_SHIFT	8		/* Reader count shift	   */
++#define	_QW_WAITING	0x100		/* A writer is waiting	   */
++#define	_QW_LOCKED	0x0ff		/* A writer holds the lock */
++#define	_QW_WMASK	0x1ff		/* Writer mask		   */
++#define	_QR_SHIFT	9		/* Reader count shift	   */
+ #define _QR_BIAS	(1U << _QR_SHIFT)
  
- #include "io-pgtable.h"
-+#include "io-pgtable-arm.h"
- 
- /* MMIO registers */
- #define ARM_SMMU_IDR0			0x0
-@@ -2170,13 +2171,46 @@ static int arm_smmu_process_init_pgtable(struct arm_smmu_process *smmu_process,
- 					 struct mm_struct *mm)
+ /*
+@@ -134,7 +134,7 @@ static inline void queued_read_unlock(struct qrwlock *lock)
+  */
+ static inline void queued_write_unlock(struct qrwlock *lock)
  {
- 	int asid;
-+	unsigned long tcr;
-+	unsigned long reg, par;
-+	struct arm_smmu_ctx_desc *cfg = &smmu_process->ctx_desc;
- 
- 	asid = mm_context_get(mm);
- 	if (!asid)
- 		return -ENOSPC;
- 
--	smmu_process->ctx_desc.asid = asid;
--	/* TODO: init the rest */
-+	tcr = TCR_T0SZ(VA_BITS) | TCR_IRGN0_WBWA | TCR_ORGN0_WBWA |
-+		TCR_SH0_INNER | ARM_LPAE_TCR_EPD1;
-+
-+	switch (PAGE_SIZE) {
-+		case SZ_4K:
-+			tcr |= TCR_TG0_4K;
-+			break;
-+		case SZ_16K:
-+			tcr |= TCR_TG0_16K;
-+			break;
-+		case SZ_64K:
-+			tcr |= TCR_TG0_64K;
-+			break;
-+		default:
-+			WARN_ON(1);
-+			return -EFAULT;
-+	}
-+
-+	reg = read_sanitised_ftr_reg(SYS_ID_AA64MMFR0_EL1);
-+	par = cpuid_feature_extract_unsigned_field(reg, ID_AA64MMFR0_PARANGE_SHIFT);
-+	tcr |= par << ARM_LPAE_TCR_IPS_SHIFT;
-+
-+	tcr |= TCR_TBI0;
-+
-+	cfg->asid       = asid;
-+	cfg->ttbr       = virt_to_phys(mm->pgd);
-+	/*
-+	 * MAIR value is pretty much constant and global, so we can just get it
-+	 * from the current CPU register
-+	 */
-+	cfg->mair       = read_sysreg(mair_el1);
-+	cfg->tcr        = tcr;
- 
- 	return 0;
+-	smp_store_release(&lock->wmode, 0);
++	smp_store_release(&lock->wlocked, 0);
  }
+ 
+ /*
+diff --git a/include/asm-generic/qrwlock_types.h b/include/asm-generic/qrwlock_types.h
+index 507f2dc51bba..8af752acbdc0 100644
+--- a/include/asm-generic/qrwlock_types.h
++++ b/include/asm-generic/qrwlock_types.h
+@@ -13,11 +13,11 @@ typedef struct qrwlock {
+ 		atomic_t cnts;
+ 		struct {
+ #ifdef __LITTLE_ENDIAN
+-			u8 wmode;	/* Writer mode   */
+-			u8 rcnts[3];	/* Reader counts */
++			u8 wlocked;	/* Locked for write? */
++			u8 __lstate[3];
+ #else
+-			u8 rcnts[3];	/* Reader counts */
+-			u8 wmode;	/* Writer mode   */
++			u8 __lstate[3];
++			u8 wlocked;	/* Locked for write? */
+ #endif
+ 		};
+ 	};
+diff --git a/kernel/locking/qrwlock.c b/kernel/locking/qrwlock.c
+index b7ea4647c74d..e940f2c2b4f2 100644
+--- a/kernel/locking/qrwlock.c
++++ b/kernel/locking/qrwlock.c
+@@ -40,8 +40,7 @@ void queued_read_lock_slowpath(struct qrwlock *lock, u32 cnts)
+ 		 * so spin with ACQUIRE semantics until the lock is available
+ 		 * without waiting in the queue.
+ 		 */
+-		atomic_cond_read_acquire(&lock->cnts, (VAL & _QW_WMASK)
+-					 != _QW_LOCKED);
++		atomic_cond_read_acquire(&lock->cnts, !(VAL & _QW_LOCKED));
+ 		return;
+ 	}
+ 	atomic_sub(_QR_BIAS, &lock->cnts);
+@@ -57,7 +56,7 @@ void queued_read_lock_slowpath(struct qrwlock *lock, u32 cnts)
+ 	 * that accesses can't leak upwards out of our subsequent critical
+ 	 * section in the case that the lock is currently held for write.
+ 	 */
+-	atomic_cond_read_acquire(&lock->cnts, (VAL & _QW_WMASK) != _QW_LOCKED);
++	atomic_cond_read_acquire(&lock->cnts, !(VAL & _QW_LOCKED));
+ 
+ 	/*
+ 	 * Signal the next one in queue to become queue head
+@@ -80,19 +79,10 @@ void queued_write_lock_slowpath(struct qrwlock *lock)
+ 	    (atomic_cmpxchg_acquire(&lock->cnts, 0, _QW_LOCKED) == 0))
+ 		goto unlock;
+ 
+-	/*
+-	 * Set the waiting flag to notify readers that a writer is pending,
+-	 * or wait for a previous writer to go away.
+-	 */
+-	for (;;) {
+-		if (!READ_ONCE(lock->wmode) &&
+-		   (cmpxchg_relaxed(&lock->wmode, 0, _QW_WAITING) == 0))
+-			break;
+-
+-		cpu_relax();
+-	}
++	/* Set the waiting flag to notify readers that a writer is pending */
++	atomic_add(_QW_WAITING, &lock->cnts);
+ 
+-	/* When no more readers, set the locked flag */
++	/* When no more readers or writers, set the locked flag */
+ 	do {
+ 		atomic_cond_read_acquire(&lock->cnts, VAL == _QW_WAITING);
+ 	} while (atomic_cmpxchg_relaxed(&lock->cnts, _QW_WAITING,
 -- 
-2.13.3
+2.1.4
