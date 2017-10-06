@@ -1,108 +1,35 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  6 Oct 2017 16:33:54 +0100
-Subject: [PATCH v4 19/26] KVM: arm/arm64: GICv4: Add doorbell interrupt
- handling
+Date: Fri,  6 Oct 2017 16:33:50 +0100
+Subject: [PATCH v4 15/26] KVM: arm/arm64: GICv4: Propagate property updates to
+ VLPIs
 In-Reply-To: <20171006153401.5481-1-marc.zyngier@arm.com>
 References: <20171006153401.5481-1-marc.zyngier@arm.com>
-Message-ID: <20171006153401.5481-20-marc.zyngier@arm.com>
+Message-ID: <20171006153401.5481-16-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a vPE is not running, a VLPI being made pending results in a
-doorbell interrupt being delivered. Let's handle this interrupt
-and update the pending_last flag that indicates that VLPIs are
-pending. The corresponding vcpu is also kicked into action.
+Upon updating a property, we propagate it all the way to the physical
+ITS, and ask for an INV command to be executed there.
 
-Special care is taken care of not allowing the doorbell to be
-enabled at request time (this is controlled separately), and
-to make the disabling on the interrupt non-lazy.
-
+Acked-by: Christoffer Dall <cdall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-v4.c | 48 +++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
+ virt/kvm/arm/vgic/vgic-its.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
-index b79a0450bb1c..2c250ee37878 100644
---- a/virt/kvm/arm/vgic/vgic-v4.c
-+++ b/virt/kvm/arm/vgic/vgic-v4.c
-@@ -16,11 +16,23 @@
-  */
- 
- #include <linux/interrupt.h>
-+#include <linux/irq.h>
- #include <linux/irqdomain.h>
- #include <linux/kvm_host.h>
- 
- #include "vgic.h"
- 
-+static irqreturn_t vgic_v4_doorbell_handler(int irq, void *info)
-+{
-+	struct kvm_vcpu *vcpu = info;
-+
-+	vcpu->arch.vgic_cpu.vgic_v3.its_vpe.pending_last = true;
-+	kvm_make_request(KVM_REQ_IRQ_PENDING, vcpu);
-+	kvm_vcpu_kick(vcpu);
-+
-+	return IRQ_HANDLED;
-+}
-+
- /**
-  * vgic_v4_init - Initialize the GICv4 data structures
-  * @kvm:	Pointer to the VM being initialized
-@@ -60,6 +72,33 @@ int vgic_v4_init(struct kvm *kvm)
- 		return ret;
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 0b7e648e7a0c..2e77c7c83942 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -296,6 +296,9 @@ static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
+ 		spin_unlock(&irq->irq_lock);
  	}
  
-+	kvm_for_each_vcpu(i, vcpu, kvm) {
-+		int irq = dist->its_vm.vpes[i]->irq;
++	if (irq->hw)
++		return its_prop_update_vlpi(irq->host_irq, prop, true);
 +
-+		/*
-+		 * Don't automatically enable the doorbell, as we're
-+		 * flipping it back and forth when the vcpu gets
-+		 * blocked. Also disable the lazy disabling, as the
-+		 * doorbell could kick us out of the guest too
-+		 * early...
-+		 */
-+		irq_set_status_flags(irq, IRQ_NOAUTOEN | IRQ_DISABLE_UNLAZY);
-+		ret = request_irq(irq, vgic_v4_doorbell_handler,
-+				  0, "vcpu", vcpu);
-+		if (ret) {
-+			kvm_err("failed to allocate vcpu IRQ%d\n", irq);
-+			/*
-+			 * Trick: adjust the number of vpes so we know
-+			 * how many to nuke on teardown...
-+			 */
-+			dist->its_vm.nr_vpes = i;
-+			break;
-+		}
-+	}
-+
-+	if (ret)
-+		vgic_v4_teardown(kvm);
-+
- 	return ret;
+ 	return 0;
  }
  
-@@ -72,10 +111,19 @@ int vgic_v4_init(struct kvm *kvm)
- void vgic_v4_teardown(struct kvm *kvm)
- {
- 	struct its_vm *its_vm = &kvm->arch.vgic.its_vm;
-+	int i;
- 
- 	if (!its_vm->vpes)
- 		return;
- 
-+	for (i = 0; i < its_vm->nr_vpes; i++) {
-+		struct kvm_vcpu *vcpu = kvm_get_vcpu(kvm, i);
-+		int irq = its_vm->vpes[i]->irq;
-+
-+		irq_clear_status_flags(irq, IRQ_NOAUTOEN | IRQ_DISABLE_UNLAZY);
-+		free_irq(irq, vcpu);
-+	}
-+
- 	its_free_vcpu_irqs(its_vm);
- 	kfree(its_vm->vpes);
- 	its_vm->nr_vpes = 0;
 -- 
 2.14.1
