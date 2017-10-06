@@ -1,87 +1,87 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  6 Oct 2017 16:33:51 +0100
-Subject: [PATCH v4 16/26] KVM: arm/arm64: GICv4: Handle INVALL applied to a vPE
+Date: Fri,  6 Oct 2017 16:34:00 +0100
+Subject: [PATCH v4 25/26] KVM: arm/arm64: GICv4: Prevent heterogenous systems
+ from using GICv4
 In-Reply-To: <20171006153401.5481-1-marc.zyngier@arm.com>
 References: <20171006153401.5481-1-marc.zyngier@arm.com>
-Message-ID: <20171006153401.5481-17-marc.zyngier@arm.com>
+Message-ID: <20171006153401.5481-26-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since when updating the properties one LPI at a time, there is no
-need to perform an INV each time we read one. Instead, we rely
-on the final VINVALL that gets sent to the ITS to do the work.
+The GICv4 architecture doesn't prevent CPUs implementing GICv4 to
+cohabit with CPUs limited to GICv3 in the same system.
 
-Acked-by: Christoffer Dall <cdall@linaro.org>
+This is mad (the scheduler would have to be made aware of the v4
+capability), and we're certainly not going to support this any
+time soon. So let's check that all online CPUs are GICv4 capable,
+and disable the functionnality if not.
+
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-its.c | 15 +++++++++------
- 1 file changed, 9 insertions(+), 6 deletions(-)
+ include/linux/irqchip/arm-gic-v3.h |  2 ++
+ virt/kvm/arm/vgic/vgic-v3.c        | 27 +++++++++++++++++++++++++--
+ 2 files changed, 27 insertions(+), 2 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 2e77c7c83942..eb72eb027060 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -38,7 +38,7 @@ static int vgic_its_save_tables_v0(struct vgic_its *its);
- static int vgic_its_restore_tables_v0(struct vgic_its *its);
- static int vgic_its_commit_v0(struct vgic_its *its);
- static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
--			     struct kvm_vcpu *filter_vcpu);
-+			     struct kvm_vcpu *filter_vcpu, bool needs_inv);
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 1ea576c8126f..dfa4a51643d6 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -532,6 +532,8 @@
+ #define ICH_VTR_SEIS_MASK		(1 << ICH_VTR_SEIS_SHIFT)
+ #define ICH_VTR_A3V_SHIFT		21
+ #define ICH_VTR_A3V_MASK		(1 << ICH_VTR_A3V_SHIFT)
++#define ICH_VTR_nV4_SHIFT		20
++#define ICH_VTR_nV4_MASK		(1 << ICH_VTR_nV4_SHIFT)
  
- /*
-  * Creates a new (reference to a) struct vgic_irq for a given LPI.
-@@ -106,7 +106,7 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid,
- 	 * However we only have those structs for mapped IRQs, so we read in
- 	 * the respective config data from memory here upon mapping the LPI.
- 	 */
--	ret = update_lpi_config(kvm, irq, NULL);
-+	ret = update_lpi_config(kvm, irq, NULL, false);
- 	if (ret)
- 		return ERR_PTR(ret);
+ #define ICC_IAR1_EL1_SPURIOUS		0x3ff
  
-@@ -273,7 +273,7 @@ static struct its_collection *find_collection(struct vgic_its *its, int coll_id)
-  * VCPU. Unconditionally applies if filter_vcpu is NULL.
-  */
- static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
--			     struct kvm_vcpu *filter_vcpu)
-+			     struct kvm_vcpu *filter_vcpu, bool needs_inv)
- {
- 	u64 propbase = GICR_PROPBASER_ADDRESS(kvm->arch.vgic.propbaser);
- 	u8 prop;
-@@ -297,7 +297,7 @@ static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
- 	}
- 
- 	if (irq->hw)
--		return its_prop_update_vlpi(irq->host_irq, prop, true);
-+		return its_prop_update_vlpi(irq->host_irq, prop, needs_inv);
- 
- 	return 0;
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index 405733678c2f..da99df50a818 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -466,9 +466,19 @@ static int __init early_gicv4_enable(char *buf)
  }
-@@ -1096,7 +1096,7 @@ static int vgic_its_cmd_handle_inv(struct kvm *kvm, struct vgic_its *its,
- 	if (!ite)
- 		return E_ITS_INV_UNMAPPED_INTERRUPT;
+ early_param("kvm-arm.vgic_v4_enable", early_gicv4_enable);
  
--	return update_lpi_config(kvm, ite->irq, NULL);
-+	return update_lpi_config(kvm, ite->irq, NULL, true);
- }
- 
- /*
-@@ -1131,12 +1131,15 @@ static int vgic_its_cmd_handle_invall(struct kvm *kvm, struct vgic_its *its,
- 		irq = vgic_get_irq(kvm, NULL, intids[i]);
- 		if (!irq)
- 			continue;
--		update_lpi_config(kvm, irq, vcpu);
-+		update_lpi_config(kvm, irq, vcpu, false);
- 		vgic_put_irq(kvm, irq);
- 	}
- 
- 	kfree(intids);
- 
-+	if (vcpu->arch.vgic_cpu.vgic_v3.its_vpe.its_vm)
-+		its_invall_vpe(&vcpu->arch.vgic_cpu.vgic_v3.its_vpe);
++static void vgic_check_v4_cpuif(void *param)
++{
++	u32 ich_vtr_el2 = kvm_call_hyp(__vgic_v3_get_ich_vtr_el2);
++	bool *v4 = param;
 +
- 	return 0;
- }
++	*v4 = !(ich_vtr_el2 & ICH_VTR_nV4_MASK);
++	if (!*v4)
++		kvm_info("CPU%d is not GICv4 capable\n", smp_processor_id());
++}
++
+ /**
+  * vgic_v3_probe - probe for a GICv3 compatible interrupt controller in DT
+- * @node:	pointer to the DT node
++ * @info:	pointer to the firmware-agnostic GIC information
+  *
+  * Returns 0 if a GICv3 has been found, returns an error code otherwise
+  */
+@@ -485,8 +495,21 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
+ 	kvm_vgic_global_state.can_emulate_gicv2 = false;
+ 	kvm_vgic_global_state.ich_vtr_el2 = ich_vtr_el2;
  
+-	/* GICv4 support? */
++	/*
++	 * GICv4 support? We need to check on all CPUs in case of some
++	 * extremely creative form of big-little brain damage...
++	 */
+ 	if (info->has_v4) {
++		int cpu;
++
++		for_each_online_cpu(cpu) {
++			bool enable;
++
++			smp_call_function_single(cpu, vgic_check_v4_cpuif,
++						 &enable, 1);
++			gicv4_enable = gicv4_enable && enable;
++		}
++
+ 		kvm_vgic_global_state.has_gicv4 = gicv4_enable;
+ 		kvm_info("GICv4 support %sabled\n",
+ 			 gicv4_enable ? "en" : "dis");
 -- 
 2.14.1
