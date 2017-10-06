@@ -1,23 +1,30 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Fri, 6 Oct 2017 11:10:14 +0000
-Subject: [PATCH v10 09/10] mm: stop zeroing memory during allocation in
- vmemmap
-In-Reply-To: <20171005211124.26524-10-pasha.tatashin@oracle.com>
-References: <20171005211124.26524-1-pasha.tatashin@oracle.com>
- <20171005211124.26524-10-pasha.tatashin@oracle.com>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6DD008BA85@AcuExch.aculab.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Fri, 6 Oct 2017 16:56:01 +0530
+Subject: [PATCH v3 16/22] firmware: arm_scmi: add arm_mhu specific mailbox
+ interface
+In-Reply-To: <CAK8P3a0XmiXqZ-z7WV+nk7B86p23Jmf31Q=pVovXVebhA28_0Q@mail.gmail.com>
+References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
+ <1506604306-20739-17-git-send-email-sudeep.holla@arm.com>
+ <CAK8P3a0XmiXqZ-z7WV+nk7B86p23Jmf31Q=pVovXVebhA28_0Q@mail.gmail.com>
+Message-ID: <CABb+yY1N6hmC6Kd2QteMw_oCf=-mYHf7p6RdhYPQK+QUO7VP4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pavel Tatashin
-> Sent: 05 October 2017 22:11
-> vmemmap_alloc_block() will no longer zero the block, so zero memory
-> at its call sites for everything except struct pages.  Struct page memory
-> is zero'd by struct page initialization.
+On Wed, Oct 4, 2017 at 5:06 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thu, Sep 28, 2017 at 3:11 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>> This patch adds ARM MHU specific mailbox interface for SCMI.
+>>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>
+> This clearly needs an explanation why we need another driver.
+>
+Yes the patch needs explanation which is that we need a shim layer to
+map SCMI requests onto what the underlying controller expects. The
+alternative was to clone the controller driver (MHU now and others
+later when their platforms support SCMI) and pretend SCMI is the only
+client they are ever going to serve.
 
-It seems dangerous to change an allocator to stop zeroing memory.
-It is probably saver to add a new function that doesn't zero
-the memory and use that is the places where you don't want it
-to be zeroed.
-
-	David
+BTW, I haven't reviewed this patchset yet so I am not sure about this
+code but I do believe we need a transport layer (this shim driver)
+between generic SCMI implementation and each controller driver.
