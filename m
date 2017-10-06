@@ -1,39 +1,74 @@
 From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
-Date: Fri,  6 Oct 2017 14:02:57 +0900
-Subject: [PATCH v2 0/3] add UniPhier efuse support
-Message-ID: <1507266180-11840-1-git-send-email-hayashibara.keiji@socionext.com>
+Date: Fri,  6 Oct 2017 14:02:58 +0900
+Subject: [PATCH v2 1/3] dt-bindings: nvmem: add description for UniPhier eFuse
+In-Reply-To: <1507266180-11840-1-git-send-email-hayashibara.keiji@socionext.com>
+References: <1507266180-11840-1-git-send-email-hayashibara.keiji@socionext.com>
+Message-ID: <1507266180-11840-2-git-send-email-hayashibara.keiji@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for eFuse implemented on UniPhier LD20 SoCs.
-The eFuse device is under soc-glue and this register implements as read only.
+Add uniphier-efuse dt-bindings documentation.
 
-patch V1
-https://lkml.org/lkml/2017/8/31/880
-
-Changes between V2 and V1
-=========================
-1. Fix sparse warnings
-2. Changed to implement without regmap
-3. Convert devm_kzalloc to stack
-4. Divide efuse into two areas in devicetree
-5. Remove .owner settings of struct nvmem_config
-6. Remove enable of CONFIG_UNIPHIER_EFUSE in defconfig
-7. Other minor fixes
-
-Keiji Hayashibara (3):
-  dt-bindings: nvmem: add description for UniPhier eFuse
-  nvmem: uniphier: add UniPhier eFuse driver
-  arm64: dts: uniphier: add efuse node for LD20
-
- .../devicetree/bindings/nvmem/uniphier-efuse.txt   | 49 +++++++++++
- arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi   | 18 ++++
- drivers/nvmem/Kconfig                              | 11 +++
- drivers/nvmem/Makefile                             |  2 +
- drivers/nvmem/uniphier-efuse.c                     | 97 ++++++++++++++++++++++
- 5 files changed, 177 insertions(+)
+Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
+---
+ .../devicetree/bindings/nvmem/uniphier-efuse.txt   | 49 ++++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt
- create mode 100644 drivers/nvmem/uniphier-efuse.c
 
+diff --git a/Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt b/Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt
+new file mode 100644
+index 0000000..1a394e5
+--- /dev/null
++++ b/Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt
+@@ -0,0 +1,49 @@
++= UniPhier eFuse device tree bindings =
++
++This UniPhier eFuse must be under soc-glue.
++
++Required properties:
++- compatible: should be "socionext,uniphier-efuse"
++- reg: should contain the register location and length
++
++= Data cells =
++Are child nodes of efuse, bindings of which as described in
++bindings/nvmem/nvmem.txt
++
++Example:
++
++	soc-glue at 5f900000 {
++		compatible = "socionext,uniphier-ld20-soc-glue-debug",
++			     "simple-mfd";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0x0 0x5f900000 0x2000>;
++
++		efuse at 100 {
++			compatible = "socionext,uniphier-efuse";
++			reg = <0x100 0x28>;
++		};
++
++		efuse at 200 {
++			compatible = "socionext,uniphier-efuse";
++			reg = <0x200 0x68>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			/* Data cells */
++			usb_mon: usb_mon {
++				reg = <0x54 0xc>;
++			};
++		};
++	};
++
++= Data consumers =
++Are device nodes which consume nvmem data cells.
++
++Example:
++
++	usb {
++		...
++		nvmem-cells = <&usb_mon>;
++		nvmem-cell-names = "usb_mon";
++	}
 -- 
 2.7.4
