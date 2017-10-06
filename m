@@ -1,73 +1,45 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 6 Oct 2017 14:13:38 +0100
-Subject: [PATCH v1 2/2] kvm: arm64: handle single-step of userspace mmio
- instructions
-In-Reply-To: <20171006113921.24880-3-alex.bennee@linaro.org>
-References: <20171006113921.24880-1-alex.bennee@linaro.org>
- <20171006113921.24880-3-alex.bennee@linaro.org>
-Message-ID: <a9f8905e-18e9-267a-2479-f498c248e2f4@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 6 Oct 2017 14:13:44 +0100
+Subject: undefined instruction d5380001 (arm64 mrs emulation)
+In-Reply-To: <ffdba697-8ab5-9f66-f160-710308da6390@suse.com>
+References: <CAJs94EZqdWJRTF+tLgGU=pcRoU5HvuV959Qq8nFB5yQ-sQyxzg@mail.gmail.com>
+ <20171002112433.GM3611@e103592.cambridge.arm.com>
+ <59D24906.4060104@arm.com>
+ <20171002155638.GA18543@e107814-lin.cambridge.arm.com>
+ <CAJs94EbvM6U5qQyAGGY7BEppC=dPo_LPzU4STDNU7muCZvLXmw@mail.gmail.com>
+ <fb13bcdf-c97b-40c6-3815-30dce26bca8e@suse.com>
+ <20171005161645.7sqjkd25pwdng5dz@armageddon.cambridge.arm.com>
+ <ffdba697-8ab5-9f66-f160-710308da6390@suse.com>
+Message-ID: <20171006131343.rs7ig4owz4anw3cl@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 06/10/17 12:39, Alex Benn?e wrote:
-> The system state of KVM when using userspace emulation is not complete
-> until we return into KVM_RUN. To handle mmio related updates we wait
-> until they have been committed and then schedule our KVM_EXIT_DEBUG.
+On Fri, Oct 06, 2017 at 02:05:09PM +0200, Matthias Brugger wrote:
+> On 10/05/2017 06:16 PM, Catalin Marinas wrote:
+> > On Thu, Oct 05, 2017 at 04:54:09PM +0200, Matthias Brugger wrote:
+> > > We also hit this bug in openSUSE Tumbleweed:
+> > > https://bugzilla.suse.com/show_bug.cgi?id=1061188
+> > 
+> > As Mark replied, we are still debating why this happens and whether the
+> > above fix is sufficient. As we were digging further, we realised there
+> > is no clear init level after which user space can be invoked, which
+> > means Suzuki's patch may not always be sufficient.
+> > 
+> > I proposed something as a way of spotting this issue early [1] but I
+> > need to post it on the linux-arch to get some consensus.
+> > 
+> > Can you post the full kernel log somewhere? I'm trying to figure out
+> > what trigged the modprobe during the kernel boot.
+> > 
 > 
-> I've introduced a new function kvm_arm_maybe_return_debug() to wrap up
-> the differences between arm/arm64 which is currently null for arm.
-> 
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-> ---
->   arch/arm/include/asm/kvm_host.h   |  2 ++
->   arch/arm64/include/asm/kvm_host.h |  1 +
->   arch/arm64/kvm/debug.c            | 21 +++++++++++++++++++++
->   arch/arm64/kvm/handle_exit.c      |  9 +++------
->   virt/kvm/arm/arm.c                |  2 +-
->   virt/kvm/arm/mmio.c               |  3 ++-
->   6 files changed, 30 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index 4a879f6ff13b..aec943f6d123 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -285,6 +285,8 @@ static inline void kvm_arm_init_debug(void) {}
->   static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
->   static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
->   static inline void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu) {}
-> +static inline int  kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu,
-> +						struct kvm_run *run) {}
->   
+> You can find the kernel log here:
+> https://bugzilla.suse.com/attachment.cgi?id=743311
 
-This function should return 1.
+Thanks, it seems that ipv6 module loading triggered this.
 
->   int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
->   			       struct kvm_device_attr *attr);
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index e923b58606e2..fa67d21662f6 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -369,6 +369,7 @@ void kvm_arm_init_debug(void);
->   void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
->   void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
->   void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu);
-> +int  kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu, struct kvm_run *run);
-
-I feel the name could be a little bit more explicit:
-
-kvm_arm_trap_need_step_debug, kvm_arm_trap_step_return_debug, 
-kvm_arm_trap_need_return_debug.
-
-At least, I think it would be nice that the name reflect that this check 
-is meant for emulated instructions.
-
-Otherwise:
-
-Reviewed-by: Julien Thierry <julien.thierry@arm.com>
-
-Thanks,
+Talking to Suzuki, we came to the conclusion that such thing cannot
+happen before rootfs_initcall, so his original core_initcall change
+should suffice. I'll push a patch out, hopefully for -rc4 and cc stable.
 
 -- 
-Julien Thierry
+Catalin
