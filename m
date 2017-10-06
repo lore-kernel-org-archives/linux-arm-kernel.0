@@ -1,78 +1,44 @@
-From: hkallweit1@gmail.com (Heiner Kallweit)
-Date: Fri, 6 Oct 2017 20:59:05 +0200
-Subject: [PATCH] firmware: arm_scpi: silence sparse warnings
-Message-ID: <05d15d9d-4664-8bbe-ea4b-90e538d2c1b3@gmail.com>
+From: lsun@mellanox.com (Liming Sun)
+Date: Fri,  6 Oct 2017 15:21:23 -0400
+Subject: [PATCH 0/9] Enable dw-mmc multi-card support
+Message-ID: <cover.1507315433.git.lsun@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At several positions in the code sparse complains about incorrect access
-to __iomem annotated memory. Fix this and make sparse happy.
+This series of commits enables the multi-card support for the dw-mmc
+controller. It includes two parts as below.
 
-Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
----
- drivers/firmware/arm_scpi.c | 17 +++++++++--------
- 1 file changed, 9 insertions(+), 8 deletions(-)
+The first part (patches 1-7) reverts the series of recent commits that
+removed the multi-card support with comments saying there was no such
+use case in the real world. Actually this feature is being used in
+Mellanox Bluefield SoC and has been requested by customers.
 
-diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
-index f0c37a4e..dfb373c8 100644
---- a/drivers/firmware/arm_scpi.c
-+++ b/drivers/firmware/arm_scpi.c
-@@ -405,19 +405,20 @@ static void scpi_process_cmd(struct scpi_chan *ch, u32 cmd)
- 		unsigned int len;
- 
- 		if (scpi_info->is_legacy) {
--			struct legacy_scpi_shared_mem *mem = ch->rx_payload;
-+			struct legacy_scpi_shared_mem __iomem *mem =
-+							ch->rx_payload;
- 
- 			/* RX Length is not replied by the legacy Firmware */
- 			len = match->rx_len;
- 
--			match->status = le32_to_cpu(mem->status);
-+			match->status = ioread32(&mem->status);
- 			memcpy_fromio(match->rx_buf, mem->payload, len);
- 		} else {
--			struct scpi_shared_mem *mem = ch->rx_payload;
-+			struct scpi_shared_mem __iomem *mem = ch->rx_payload;
- 
- 			len = min(match->rx_len, CMD_SIZE(cmd));
- 
--			match->status = le32_to_cpu(mem->status);
-+			match->status = ioread32(&mem->status);
- 			memcpy_fromio(match->rx_buf, mem->payload, len);
- 		}
- 
-@@ -431,11 +432,11 @@ static void scpi_process_cmd(struct scpi_chan *ch, u32 cmd)
- static void scpi_handle_remote_msg(struct mbox_client *c, void *msg)
- {
- 	struct scpi_chan *ch = container_of(c, struct scpi_chan, cl);
--	struct scpi_shared_mem *mem = ch->rx_payload;
-+	struct scpi_shared_mem __iomem *mem = ch->rx_payload;
- 	u32 cmd = 0;
- 
- 	if (!scpi_info->is_legacy)
--		cmd = le32_to_cpu(mem->command);
-+		cmd = ioread32(&mem->command);
- 
- 	scpi_process_cmd(ch, cmd);
- }
-@@ -445,7 +446,7 @@ static void scpi_tx_prepare(struct mbox_client *c, void *msg)
- 	unsigned long flags;
- 	struct scpi_xfer *t = msg;
- 	struct scpi_chan *ch = container_of(c, struct scpi_chan, cl);
--	struct scpi_shared_mem *mem = ch->tx_payload;
-+	struct scpi_shared_mem __iomem *mem = ch->tx_payload;
- 
- 	if (t->tx_buf) {
- 		if (scpi_info->is_legacy)
-@@ -464,7 +465,7 @@ static void scpi_tx_prepare(struct mbox_client *c, void *msg)
- 	}
- 
- 	if (!scpi_info->is_legacy)
--		mem->command = cpu_to_le32(t->cmd);
-+		iowrite32(t->cmd, &mem->command);
- }
- 
- static struct scpi_xfer *get_scpi_xfer(struct scpi_chan *ch)
+The second part (patches 8-9) fixes the DesignWare multi-card support
+according to the dw-mmc databook (synnopsys: DesignWare Cores Mobile
+Storage Host Databook, 2.70a). It has changes to set the card number
+into the CMD register to multiplex requests to different cards when
+working in SD_MMC_CEATA mode, set the CTYPE / CLKENA / CDTHRCTL
+registers properly according to the spec, and parse the per-card
+configuration to match the Linux Documentation
+(bindings/mmc/synopsys-dw-mshc.txt).
+
+Liming Sun (9):
+  Revert "Documentation: dw-mshc: deprecate num-slots"
+  Revert "mmc: dw_mmc: remove the unnecessary slot variable"
+  Revert "mmc: dw_mmc: use the 'slot' instead of 'cur_slot'"
+  Revert "mmc: dw_mmc: remove the 'id' arguments about functions
+    relevant to slot"
+  Revert "mmc: dw_mmc: change the array of slots"
+  Revert "mmc: dw_mmc: remove the loop about finding slots"
+  Revert "mmc: dw_mmc: deprecated the "num-slots" property"
+  mmc: dw_mmc: Support two SD_MMC_CE-ATA cards
+  mmc: dw_mmc: Parse slot-specific configuration
+
+ .../devicetree/bindings/mmc/synopsys-dw-mshc.txt   |  16 +-
+ drivers/mmc/host/dw_mmc-exynos.c                   |   4 +-
+ drivers/mmc/host/dw_mmc.c                          | 277 ++++++++++++++++-----
+ drivers/mmc/host/dw_mmc.h                          |  17 +-
+ 4 files changed, 236 insertions(+), 78 deletions(-)
+
 -- 
-2.14.2
+1.8.3.1
