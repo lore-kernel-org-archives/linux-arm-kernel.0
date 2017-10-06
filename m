@@ -1,38 +1,81 @@
-From: ben@decadent.org.uk (Ben Hutchings)
-Date: Fri, 6 Oct 2017 03:00:01 +0100
-Subject: [PATCH] arm64: elf.h: Correct comment about READ_IMPLIES_EXEC
- propagation
-Message-ID: <20171006020001.GD2971@decadent.org.uk>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri,  6 Oct 2017 06:20:25 +0200
+Subject: [PATCH] ARM: ux500: Fix regression while init PM domains
+Message-ID: <1507263625-16756-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Process personality always propagates across a fork(), but can change
-at an execve().
+The commit afece3ab9a36 ("PM / Domains: Add time accounting to various
+genpd states") causes a boot regression for ux500.
 
-Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
+The problem occurs when the ux500 machine code calls pm_genpd_init(), which
+since the above change triggers a call to ktime_get(). More precisely,
+because ux500 initializes PM domains in the init_IRQ() phase of the boot,
+timekeeping has not yet been initialized.
+
+Fix the problem by moving the initialization of the PM domains to after
+timekeeping has been initialized.
+
+Fixes: afece3ab9a36 ("PM / Domains: Add time accounting to various genpd..")
+Cc: Thara Gopinath <thara.gopinath@linaro.org>
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- arch/arm64/include/asm/elf.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index 33be513ef24c..fac1c4de7898 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -188,8 +188,8 @@ typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
+Note, since the commit afece3ab9a36 ("PM / Domains: Add time accounting to
+various genpd states") potentially could cause similar problems for other SoCs,
+I have walked through the callers of pm_genpd_init(). At this point I couldn't
+find any other SoC having these problems.
+
+Kind regards
+Uffe
+
+---
+ arch/arm/mach-ux500/cpu-db8500.c | 4 ++++
+ arch/arm/mach-ux500/pm.c         | 4 ----
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index 71a34e8..57058ac 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -32,6 +32,7 @@
+ #include <asm/mach/arch.h>
  
- #define compat_start_thread		compat_start_thread
- /*
-- * Unlike the native SET_PERSONALITY macro, the compat version inherits
-- * READ_IMPLIES_EXEC across a fork() since this is the behaviour on
-+ * Unlike the native SET_PERSONALITY macro, the compat version maintains
-+ * READ_IMPLIES_EXEC across an execve() since this is the behaviour on
-  * arch/arm/.
-  */
- #define COMPAT_SET_PERSONALITY(ex)					\
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 811 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171006/041ef202/attachment.sig>
+ #include "db8500-regs.h"
++#include "pm_domains.h"
+ 
+ static int __init ux500_l2x0_unlock(void)
+ {
+@@ -157,6 +158,9 @@ static const struct of_device_id u8500_local_bus_nodes[] = {
+ 
+ static void __init u8500_init_machine(void)
+ {
++	/* Initialize ux500 power domains */
++	ux500_pm_domains_init();
++
+ 	/* automatically probe child nodes of dbx5x0 devices */
+ 	if (of_machine_is_compatible("st-ericsson,u8540"))
+ 		of_platform_populate(NULL, u8500_local_bus_nodes,
+diff --git a/arch/arm/mach-ux500/pm.c b/arch/arm/mach-ux500/pm.c
+index a970e7f..f6c33a0 100644
+--- a/arch/arm/mach-ux500/pm.c
++++ b/arch/arm/mach-ux500/pm.c
+@@ -19,7 +19,6 @@
+ #include <linux/of_address.h>
+ 
+ #include "db8500-regs.h"
+-#include "pm_domains.h"
+ 
+ /* ARM WFI Standby signal register */
+ #define PRCM_ARM_WFI_STANDBY    (prcmu_base + 0x130)
+@@ -203,7 +202,4 @@ void __init ux500_pm_init(u32 phy_base, u32 size)
+ 
+ 	/* Set up ux500 suspend callbacks. */
+ 	suspend_set_ops(UX500_SUSPEND_OPS);
+-
+-	/* Initialize ux500 power domains */
+-	ux500_pm_domains_init();
+ }
+-- 
+2.7.4
