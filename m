@@ -1,125 +1,176 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Fri,  6 Oct 2017 14:31:51 +0100
-Subject: [RFCv2 PATCH 24/36] iommu/arm-smmu-v3: Steal private ASID from a
- domain
+Date: Fri,  6 Oct 2017 14:31:49 +0100
+Subject: [RFCv2 PATCH 22/36] iommu/io-pgtable-arm: Factor out ARM LPAE
+ register defines
 In-Reply-To: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
 References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
-Message-ID: <20171006133203.22803-25-jean-philippe.brucker@arm.com>
+Message-ID: <20171006133203.22803-23-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SMMU only has one ASID space, so the process allocator competes with
-the domain allocator for ASIDs. Process ASIDs are allocated by the arch
-allocator and shared with CPUs, whereas domain ASIDs are private to the
-SMMU, and not affected by broadcast TLB invalidations.
+For SVM, we'll need to extract CPU page table information and mirror it in
+the substream setup. Move relevant defines to a common header.
 
-When the process allocator pins an mm_context and gets an ASID that is
-already in use by the SMMU, it belongs to a domain. At the moment we
-simply abort the bind, but we can try one step further. Attempt to assign
-a new private ASID to the domain, and steal the old one for our process.
-
-Use the smmu-wide ASID lock to prevent racing with attach_dev over the
-foreign domain. We now need to also take this lock when modifying entry 0
-of the context table. Concurrent modifications of a given context table
-used to be prevented by group->mutex but in this patch we modify the CD of
-another group.
+Fix TCR_SZ_MASK while we're at it.
 
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 53 +++++++++++++++++++++++++++++++++++++++++----
- 1 file changed, 49 insertions(+), 4 deletions(-)
+ MAINTAINERS                    |  1 +
+ drivers/iommu/io-pgtable-arm.c | 48 +-----------------------------
+ drivers/iommu/io-pgtable-arm.h | 67 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 69 insertions(+), 47 deletions(-)
+ create mode 100644 drivers/iommu/io-pgtable-arm.h
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 293f260782c2..e89e6d1263d9 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1731,7 +1731,7 @@ static void arm_smmu_tlb_inv_context(void *cookie)
- 	if (smmu_domain->stage == ARM_SMMU_DOMAIN_S1) {
- 		cmd.opcode	= smmu->features & ARM_SMMU_FEAT_E2H ?
- 				  CMDQ_OP_TLBI_EL2_ASID : CMDQ_OP_TLBI_NH_ASID;
--		cmd.tlbi.asid	= smmu_domain->s1_cfg.cd.asid;
-+		cmd.tlbi.asid	= READ_ONCE(smmu_domain->s1_cfg.cd.asid);
- 		cmd.tlbi.vmid	= 0;
- 	} else {
- 		cmd.opcode	= CMDQ_OP_TLBI_S12_VMALL;
-@@ -1757,7 +1757,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
- 	if (smmu_domain->stage == ARM_SMMU_DOMAIN_S1) {
- 		cmd.opcode	= smmu->features & ARM_SMMU_FEAT_E2H ?
- 				  CMDQ_OP_TLBI_EL2_VA : CMDQ_OP_TLBI_NH_VA;
--		cmd.tlbi.asid	= smmu_domain->s1_cfg.cd.asid;
-+		cmd.tlbi.asid	= READ_ONCE(smmu_domain->s1_cfg.cd.asid);
- 	} else {
- 		cmd.opcode	= CMDQ_OP_TLBI_S2_IPA;
- 		cmd.tlbi.vmid	= smmu_domain->s2_cfg.vmid;
-@@ -2119,7 +2119,9 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
- 	} else if (smmu_domain->stage == ARM_SMMU_DOMAIN_S1) {
- 		ste->s1_cfg = &smmu_domain->s1_cfg;
- 		ste->s2_cfg = NULL;
-+		spin_lock(&smmu->asid_lock);
- 		arm_smmu_write_ctx_desc(smmu_domain, 0, &ste->s1_cfg->cd);
-+		spin_unlock(&smmu->asid_lock);
- 	} else {
- 		ste->s1_cfg = NULL;
- 		ste->s2_cfg = &smmu_domain->s2_cfg;
-@@ -2253,14 +2255,57 @@ static int arm_smmu_process_share(struct arm_smmu_domain *smmu_domain,
- 				  struct arm_smmu_process *smmu_process)
- {
- 	int asid, ret;
--	struct arm_smmu_asid_state *asid_state;
-+	struct arm_smmu_asid_state *asid_state, *new_state;
- 	struct arm_smmu_device *smmu = smmu_domain->smmu;
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 65b0c88d5ee0..cff90315c2ec 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1089,6 +1089,7 @@ S:	Maintained
+ F:	drivers/iommu/arm-smmu.c
+ F:	drivers/iommu/arm-smmu-v3.c
+ F:	drivers/iommu/io-pgtable-arm.c
++F:	drivers/iommu/io-pgtable-arm.h
+ F:	drivers/iommu/io-pgtable-arm-v7s.c
  
- 	asid = smmu_process->ctx_desc.asid;
+ ARM SUB-ARCHITECTURES
+diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+index e8018a308868..443234a564a6 100644
+--- a/drivers/iommu/io-pgtable-arm.c
++++ b/drivers/iommu/io-pgtable-arm.c
+@@ -31,6 +31,7 @@
+ #include <asm/barrier.h>
  
- 	asid_state = idr_find(&smmu->asid_idr, asid);
- 	if (asid_state && asid_state->domain) {
--		return -EEXIST;
-+		struct arm_smmu_domain *smmu_domain = asid_state->domain;
-+		struct arm_smmu_cmdq_ent cmd = {
-+			.opcode = smmu->features & ARM_SMMU_FEAT_E2H ?
-+				CMDQ_OP_TLBI_EL2_ASID : CMDQ_OP_TLBI_NH_ASID,
-+		};
+ #include "io-pgtable.h"
++#include "io-pgtable-arm.h"
+ 
+ #define ARM_LPAE_MAX_ADDR_BITS		48
+ #define ARM_LPAE_S2_MAX_CONCAT_PAGES	16
+@@ -118,53 +119,6 @@
+ #define ARM_LPAE_PTE_MEMATTR_DEV	(((arm_lpae_iopte)0x1) << 2)
+ 
+ /* Register bits */
+-#define ARM_32_LPAE_TCR_EAE		(1 << 31)
+-#define ARM_64_LPAE_S2_TCR_RES1		(1 << 31)
+-
+-#define ARM_LPAE_TCR_EPD1		(1 << 23)
+-
+-#define ARM_LPAE_TCR_TG0_4K		(0 << 14)
+-#define ARM_LPAE_TCR_TG0_64K		(1 << 14)
+-#define ARM_LPAE_TCR_TG0_16K		(2 << 14)
+-
+-#define ARM_LPAE_TCR_SH0_SHIFT		12
+-#define ARM_LPAE_TCR_SH0_MASK		0x3
+-#define ARM_LPAE_TCR_SH_NS		0
+-#define ARM_LPAE_TCR_SH_OS		2
+-#define ARM_LPAE_TCR_SH_IS		3
+-
+-#define ARM_LPAE_TCR_ORGN0_SHIFT	10
+-#define ARM_LPAE_TCR_IRGN0_SHIFT	8
+-#define ARM_LPAE_TCR_RGN_MASK		0x3
+-#define ARM_LPAE_TCR_RGN_NC		0
+-#define ARM_LPAE_TCR_RGN_WBWA		1
+-#define ARM_LPAE_TCR_RGN_WT		2
+-#define ARM_LPAE_TCR_RGN_WB		3
+-
+-#define ARM_LPAE_TCR_SL0_SHIFT		6
+-#define ARM_LPAE_TCR_SL0_MASK		0x3
+-
+-#define ARM_LPAE_TCR_T0SZ_SHIFT		0
+-#define ARM_LPAE_TCR_SZ_MASK		0xf
+-
+-#define ARM_LPAE_TCR_PS_SHIFT		16
+-#define ARM_LPAE_TCR_PS_MASK		0x7
+-
+-#define ARM_LPAE_TCR_IPS_SHIFT		32
+-#define ARM_LPAE_TCR_IPS_MASK		0x7
+-
+-#define ARM_LPAE_TCR_PS_32_BIT		0x0ULL
+-#define ARM_LPAE_TCR_PS_36_BIT		0x1ULL
+-#define ARM_LPAE_TCR_PS_40_BIT		0x2ULL
+-#define ARM_LPAE_TCR_PS_42_BIT		0x3ULL
+-#define ARM_LPAE_TCR_PS_44_BIT		0x4ULL
+-#define ARM_LPAE_TCR_PS_48_BIT		0x5ULL
+-
+-#define ARM_LPAE_MAIR_ATTR_SHIFT(n)	((n) << 3)
+-#define ARM_LPAE_MAIR_ATTR_MASK		0xff
+-#define ARM_LPAE_MAIR_ATTR_DEVICE	0x04
+-#define ARM_LPAE_MAIR_ATTR_NC		0x44
+-#define ARM_LPAE_MAIR_ATTR_WBRWA	0xff
+ #define ARM_LPAE_MAIR_ATTR_IDX_NC	0
+ #define ARM_LPAE_MAIR_ATTR_IDX_CACHE	1
+ #define ARM_LPAE_MAIR_ATTR_IDX_DEV	2
+diff --git a/drivers/iommu/io-pgtable-arm.h b/drivers/iommu/io-pgtable-arm.h
+new file mode 100644
+index 000000000000..cb31314971ac
+--- /dev/null
++++ b/drivers/iommu/io-pgtable-arm.h
+@@ -0,0 +1,67 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Copyright (C) 2017 ARM Limited
++ */
++#ifndef __IO_PGTABLE_ARM_H
++#define __IO_PGTABLE_ARM_H
 +
-+		new_state = kzalloc(sizeof(*new_state), GFP_ATOMIC);
-+		if (!new_state)
-+			return -ENOMEM;
++#define ARM_32_LPAE_TCR_EAE		(1 << 31)
++#define ARM_64_LPAE_S2_TCR_RES1		(1 << 31)
 +
-+		new_state->domain = smmu_domain;
++#define ARM_LPAE_TCR_EPD1		(1 << 23)
 +
-+		ret = idr_alloc_cyclic(&smmu->asid_idr, new_state, 0,
-+				       1 << smmu->asid_bits, GFP_ATOMIC);
-+		if (ret < 0) {
-+			kfree(new_state);
-+			return ret;
-+		}
++#define ARM_LPAE_TCR_TG0_4K		(0 << 14)
++#define ARM_LPAE_TCR_TG0_64K		(1 << 14)
++#define ARM_LPAE_TCR_TG0_16K		(2 << 14)
 +
-+		/*
-+		 * Race with unmap; TLB invalidations will start targeting the
-+		 * new ASID, which isn't assigned yet. We'll do an
-+		 * invalidate-all on the old ASID later, so it doesn't matter.
-+		 */
-+		WRITE_ONCE(smmu_domain->s1_cfg.cd.asid, ret);
++#define ARM_LPAE_TCR_SH0_SHIFT		12
++#define ARM_LPAE_TCR_SH0_MASK		0x3
++#define ARM_LPAE_TCR_SH_NS		0
++#define ARM_LPAE_TCR_SH_OS		2
++#define ARM_LPAE_TCR_SH_IS		3
 +
-+		/*
-+		 * Update ASID and invalidate CD in all associated masters.
-+		 * There will be some overlapping between use of both ASIDs,
-+		 * until we invalidate the TLB.
-+		 */
-+		arm_smmu_write_ctx_desc(smmu_domain, 0, &smmu_domain->s1_cfg.cd);
++#define ARM_LPAE_TCR_ORGN0_SHIFT	10
++#define ARM_LPAE_TCR_IRGN0_SHIFT	8
++#define ARM_LPAE_TCR_RGN_MASK		0x3
++#define ARM_LPAE_TCR_RGN_NC		0
++#define ARM_LPAE_TCR_RGN_WBWA		1
++#define ARM_LPAE_TCR_RGN_WT		2
++#define ARM_LPAE_TCR_RGN_WB		3
 +
-+		/* Invalidate TLB entries previously associated with that domain */
-+		cmd.tlbi.asid = asid;
-+		arm_smmu_cmdq_issue_cmd(smmu, &cmd);
-+		cmd.opcode = CMDQ_OP_CMD_SYNC;
-+		arm_smmu_cmdq_issue_cmd(smmu, &cmd);
++#define ARM_LPAE_TCR_SL0_SHIFT		6
++#define ARM_LPAE_TCR_SL0_MASK		0x3
 +
-+		asid_state->domain = NULL;
-+		asid_state->refs = 1;
++#define ARM_LPAE_TCR_T0SZ_SHIFT		0
++#define ARM_LPAE_TCR_SZ_MASK		0x3f
 +
-+		return 0;
++#define ARM_LPAE_TCR_PS_SHIFT		16
++#define ARM_LPAE_TCR_PS_MASK		0x7
 +
- 	} else if (asid_state) {
- 		asid_state->refs++;
- 		return 0;
++#define ARM_LPAE_TCR_IPS_SHIFT		32
++#define ARM_LPAE_TCR_IPS_MASK		0x7
++
++#define ARM_LPAE_TCR_PS_32_BIT		0x0ULL
++#define ARM_LPAE_TCR_PS_36_BIT		0x1ULL
++#define ARM_LPAE_TCR_PS_40_BIT		0x2ULL
++#define ARM_LPAE_TCR_PS_42_BIT		0x3ULL
++#define ARM_LPAE_TCR_PS_44_BIT		0x4ULL
++#define ARM_LPAE_TCR_PS_48_BIT		0x5ULL
++
++#define ARM_LPAE_MAIR_ATTR_SHIFT(n)	((n) << 3)
++#define ARM_LPAE_MAIR_ATTR_MASK		0xff
++#define ARM_LPAE_MAIR_ATTR_DEVICE	0x04
++#define ARM_LPAE_MAIR_ATTR_NC		0x44
++#define ARM_LPAE_MAIR_ATTR_WBRWA	0xff
++
++#endif /* __IO_PGTABLE_ARM_H */
 -- 
 2.13.3
