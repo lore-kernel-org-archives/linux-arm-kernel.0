@@ -1,68 +1,79 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri,  6 Oct 2017 14:42:33 +0800
-Subject: [PATCH v3 3/3] ARM: dts: sun8i: Add board dts file for Banana Pi M2
- Berry
+Date: Fri,  6 Oct 2017 14:42:32 +0800
+Subject: [PATCH v3 2/3] ARM: dts: sun8i: Add board dts file for Banana Pi M2
+ Ultra
 In-Reply-To: <20171006064233.13967-1-icenowy@aosc.io>
 References: <20171006064233.13967-1-icenowy@aosc.io>
-Message-ID: <20171006064233.13967-4-icenowy@aosc.io>
+Message-ID: <20171006064233.13967-3-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Banana Pi M2 Ultra is an SBC based on the Allwinner V40 SoC (same as
-the R40 SoC). The form factor is similar to the Raspberry Pi series.
+From: Chen-Yu Tsai <wens@csie.org>
+
+The Banana Pi M2 Ultra is an SBC based on the Allwinner R40 SoC. The
+form factor and position of various connectors, leds and buttons is
+similar to the Banana Pi M1+, Banana Pi M3, and is exactly the same
+as the latest Banana Pi M64.
 
 It features:
 
-- X-Powers AXP221s PMIC connected to i2c0
-- 1GiB DDR3 DRAM
-- microSD slot
-- MicroUSB Type-B port for power and connected to usb0
-- HDMI output
-- MIPI DSI connector
-- 4 USB Type-A ports (connected to the usb1 controller via a hub)
-- gigabit ethernet with Realtek RTL8211E transceiver
-- WiFi/Bluetooth with AP6212 module, with external antenna connector
-- SATA and power connectors for native SATA support
-- camera sensor connector
-- audio out headphone jack
-- red and green LEDs
-- debug UART pins
-- Raspberry Pi B+ compatible GPIO header
-- power and reset buttons
+  - X-Powers AXP221s PMIC connected to i2c0
+  - 2 GB DDR3 DRAM
+  - 8 GB eMMC
+  - micro SD card slot
+  - DC power jack
+  - HDMI output
+  - MIPI DSI connector
+  - 2x USB 2.0 hosts
+  - 1x USB 2.0 OTG
+  - gigabit ethernet with Realtek RTL8211E transceiver
+  - WiFi/Bluetooth with AP6212 chip, with external antenna connector
+  - SATA and power connectors for native SATA support
+  - camera sensor connector
+  - consumer IR receiver
+  - audio out headphone jack
+  - onboard microphone
+  - red, green, and blue LEDs
+  - debug UART pins
+  - Li-Po battery connector
+  - Raspberry Pi B+ compatible GPIO header
+  - power, reset, and boot control buttons
 
 This patch adds a dts file that enables UART, MMC and PMIC support.
 
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
+Changes in v3:
+- Added 3.3V vqmmc regulator for mmc2 (eMMC).
 Changes in v2:
 - Dropped the vcc5v0 regulator, as it's not used yet.
 
- arch/arm/boot/dts/Makefile                        |   3 +-
- arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts | 164 ++++++++++++++++++++++
- 2 files changed, 166 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts
+ arch/arm/boot/dts/Makefile                        |   1 +
+ arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts | 178 ++++++++++++++++++++++
+ 2 files changed, 179 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 93b1e63a52af..da3f87b35059 100644
+index 9cf688d404b8..93b1e63a52af 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -941,7 +941,8 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+@@ -939,6 +939,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+ 	sun8i-h3-orangepi-plus2e.dtb \
+ 	sun8i-r16-bananapi-m2m.dtb \
  	sun8i-r16-parrot.dtb \
- 	sun8i-r40-bananapi-m2-ultra.dtb \
++	sun8i-r40-bananapi-m2-ultra.dtb \
  	sun8i-v3s-licheepi-zero.dtb \
--	sun8i-v3s-licheepi-zero-dock.dtb
-+	sun8i-v3s-licheepi-zero-dock.dtb \
-+	sun8i-v40-bananapi-m2-berry.dtb
+ 	sun8i-v3s-licheepi-zero-dock.dtb
  dtb-$(CONFIG_MACH_SUN9I) += \
- 	sun9i-a80-optimus.dtb \
- 	sun9i-a80-cubieboard4.dtb
-diff --git a/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts b/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts
+diff --git a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
 new file mode 100644
-index 000000000000..8a69be2a0842
+index 000000000000..7b52608cebe6
 --- /dev/null
-+++ b/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts
-@@ -0,0 +1,164 @@
++++ b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
+@@ -0,0 +1,178 @@
 +/*
++ * Copyright (C) 2017 Chen-Yu Tsai <wens@csie.org>
 + * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.io>
 + *
 + * This file is dual-licensed: you can use it either under the terms
@@ -110,8 +121,8 @@ index 000000000000..8a69be2a0842
 +#include <dt-bindings/gpio/gpio.h>
 +
 +/ {
-+	model = "Banana Pi M2 Berry";
-+	compatible = "sinovoip,bpi-m2-berry", "allwinner,sun8i-r40";
++	model = "Banana Pi BPI-M2-Ultra";
++	compatible = "sinovoip,bpi-m2-ultra", "allwinner,sun8i-r40";
 +
 +	aliases {
 +		serial0 = &uart0;
@@ -130,9 +141,14 @@ index 000000000000..8a69be2a0842
 +			default-state = "on";
 +		};
 +
-+		user-led {
++		user-led-green {
 +			label = "bananapi:green:user";
 +			gpios = <&pio 7 21 GPIO_ACTIVE_HIGH>;
++		};
++
++		user-led-blue {
++			label = "bananapi:blue:user";
++			gpios = <&pio 7 22 GPIO_ACTIVE_HIGH>;
 +		};
 +	};
 +
@@ -145,7 +161,7 @@ index 000000000000..8a69be2a0842
 +&i2c0 {
 +	status = "okay";
 +
-+	axp22x: pmic at 68 {
++	axp22x: pmic at 34 {
 +		compatible = "x-powers,axp221";
 +		reg = <0x34>;
 +		interrupt-parent = <&nmi_intc>;
@@ -217,6 +233,14 @@ index 000000000000..8a69be2a0842
 +	vqmmc-supply = <&reg_dldo1>;
 +	mmc-pwrseq = <&wifi_pwrseq>;
 +	bus-width = <4>;
++	non-removable;
++	status = "okay";
++};
++
++&mmc2 {
++	vmmc-supply = <&reg_dcdc1>;
++	vqmmc-supply = <&reg_dcdc1>;
++	bus-width = <8>;
 +	non-removable;
 +	status = "okay";
 +};
