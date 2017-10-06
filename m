@@ -1,87 +1,109 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  6 Oct 2017 16:34:00 +0100
-Subject: [PATCH v4 25/26] KVM: arm/arm64: GICv4: Prevent heterogenous systems
- from using GICv4
+Date: Fri,  6 Oct 2017 16:33:56 +0100
+Subject: [PATCH v4 21/26] KVM: arm/arm64: GICv4: Hook vPE scheduling into vgic
+ flush/sync
 In-Reply-To: <20171006153401.5481-1-marc.zyngier@arm.com>
 References: <20171006153401.5481-1-marc.zyngier@arm.com>
-Message-ID: <20171006153401.5481-26-marc.zyngier@arm.com>
+Message-ID: <20171006153401.5481-22-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GICv4 architecture doesn't prevent CPUs implementing GICv4 to
-cohabit with CPUs limited to GICv3 in the same system.
+The redistributor needs to be told which vPE is about to be run,
+and tells us whether there is any pending VLPI on exit.
 
-This is mad (the scheduler would have to be made aware of the v4
-capability), and we're certainly not going to support this any
-time soon. So let's check that all online CPUs are GICv4 capable,
-and disable the functionnality if not.
+Let's add the scheduling calls to the vgic flush/sync functions,
+allowing the VLPIs to be delivered to the guest.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/linux/irqchip/arm-gic-v3.h |  2 ++
- virt/kvm/arm/vgic/vgic-v3.c        | 27 +++++++++++++++++++++++++--
- 2 files changed, 27 insertions(+), 2 deletions(-)
+ virt/kvm/arm/vgic/vgic-v4.c | 39 +++++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic.c    |  4 ++++
+ virt/kvm/arm/vgic/vgic.h    |  2 ++
+ 3 files changed, 45 insertions(+)
 
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 1ea576c8126f..dfa4a51643d6 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -532,6 +532,8 @@
- #define ICH_VTR_SEIS_MASK		(1 << ICH_VTR_SEIS_SHIFT)
- #define ICH_VTR_A3V_SHIFT		21
- #define ICH_VTR_A3V_MASK		(1 << ICH_VTR_A3V_SHIFT)
-+#define ICH_VTR_nV4_SHIFT		20
-+#define ICH_VTR_nV4_MASK		(1 << ICH_VTR_nV4_SHIFT)
- 
- #define ICC_IAR1_EL1_SPURIOUS		0x3ff
- 
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 405733678c2f..da99df50a818 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -466,9 +466,19 @@ static int __init early_gicv4_enable(char *buf)
+diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
+index 5ee69aec990a..68a2ef6df161 100644
+--- a/virt/kvm/arm/vgic/vgic-v4.c
++++ b/virt/kvm/arm/vgic/vgic-v4.c
+@@ -130,6 +130,45 @@ void vgic_v4_teardown(struct kvm *kvm)
+ 	its_vm->vpes = NULL;
  }
- early_param("kvm-arm.vgic_v4_enable", early_gicv4_enable);
  
-+static void vgic_check_v4_cpuif(void *param)
++int vgic_v4_sync_hwstate(struct kvm_vcpu *vcpu)
 +{
-+	u32 ich_vtr_el2 = kvm_call_hyp(__vgic_v3_get_ich_vtr_el2);
-+	bool *v4 = param;
++	if (!vgic_supports_direct_msis(vcpu->kvm))
++		return 0;
 +
-+	*v4 = !(ich_vtr_el2 & ICH_VTR_nV4_MASK);
-+	if (!*v4)
-+		kvm_info("CPU%d is not GICv4 capable\n", smp_processor_id());
++	return its_schedule_vpe(&vcpu->arch.vgic_cpu.vgic_v3.its_vpe, false);
 +}
 +
- /**
-  * vgic_v3_probe - probe for a GICv3 compatible interrupt controller in DT
-- * @node:	pointer to the DT node
-+ * @info:	pointer to the firmware-agnostic GIC information
-  *
-  * Returns 0 if a GICv3 has been found, returns an error code otherwise
-  */
-@@ -485,8 +495,21 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
- 	kvm_vgic_global_state.can_emulate_gicv2 = false;
- 	kvm_vgic_global_state.ich_vtr_el2 = ich_vtr_el2;
- 
--	/* GICv4 support? */
++int vgic_v4_flush_hwstate(struct kvm_vcpu *vcpu)
++{
++	int irq = vcpu->arch.vgic_cpu.vgic_v3.its_vpe.irq;
++	int err;
++
++	if (!vgic_supports_direct_msis(vcpu->kvm))
++		return 0;
++
 +	/*
-+	 * GICv4 support? We need to check on all CPUs in case of some
-+	 * extremely creative form of big-little brain damage...
++	 * Before making the VPE resident, make sure the redistributor
++	 * corresponding to our current CPU expects us here. See the
++	 * doc in drivers/irqchip/irq-gic-v4.c to understand how this
++	 * turns into a VMOVP command at the ITS level.
 +	 */
- 	if (info->has_v4) {
-+		int cpu;
++	err = irq_set_affinity(irq, cpumask_of(smp_processor_id()));
++	if (err)
++		return err;
 +
-+		for_each_online_cpu(cpu) {
-+			bool enable;
++	err = its_schedule_vpe(&vcpu->arch.vgic_cpu.vgic_v3.its_vpe, true);
++	if (err)
++		return err;
 +
-+			smp_call_function_single(cpu, vgic_check_v4_cpuif,
-+						 &enable, 1);
-+			gicv4_enable = gicv4_enable && enable;
-+		}
++	/*
++	 * Now that the VPE is resident, let's get rid of a potential
++	 * doorbell interrupt that would still be pending.
++	 */
++	err = irq_set_irqchip_state(irq, IRQCHIP_STATE_PENDING, false);
 +
- 		kvm_vgic_global_state.has_gicv4 = gicv4_enable;
- 		kvm_info("GICv4 support %sabled\n",
- 			 gicv4_enable ? "en" : "dis");
++	return err;
++}
++
+ static struct vgic_its *vgic_get_its(struct kvm *kvm,
+ 				     struct kvm_kernel_irq_routing_entry *irq_entry)
+ {
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index 0691a2250949..71ca0ff1b35a 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -709,6 +709,8 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+ {
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+ 
++	WARN_ON(vgic_v4_sync_hwstate(vcpu));
++
+ 	/* An empty ap_list_head implies used_lrs == 0 */
+ 	if (list_empty(&vcpu->arch.vgic_cpu.ap_list_head))
+ 		return;
+@@ -721,6 +723,8 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+ /* Flush our emulation state into the GIC hardware before entering the guest. */
+ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+ {
++	WARN_ON(vgic_v4_flush_hwstate(vcpu));
++
+ 	/*
+ 	 * If there are no virtual interrupts active or pending for this
+ 	 * VCPU, then there is no work to do and we can bail out without
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index 1bd2e28ac097..1c65750892d7 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -245,5 +245,7 @@ int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
+ bool vgic_supports_direct_msis(struct kvm *kvm);
+ int vgic_v4_init(struct kvm *kvm);
+ void vgic_v4_teardown(struct kvm *kvm);
++int vgic_v4_sync_hwstate(struct kvm_vcpu *vcpu);
++int vgic_v4_flush_hwstate(struct kvm_vcpu *vcpu);
+ 
+ #endif
 -- 
 2.14.1
