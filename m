@@ -1,130 +1,25 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 6 Oct 2017 14:51:18 -0500
-Subject: [PATCH v3 0/3] Split default display handling out from VGA arbiter
-In-Reply-To: <87k20kyezs.fsf@linkitivity.dja.id.au>
-References: <20170901072744.2409-1-dja@axtens.net>
- <20170925163948.GD15970@bhelgaas-glaptop.roam.corp.google.com>
- <87k20kyezs.fsf@linkitivity.dja.id.au>
-Message-ID: <20171006195118.GG25517@bhelgaas-glaptop.roam.corp.google.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 6 Oct 2017 13:06:33 -0700
+Subject: [PATCH v2 05/10] clk: bcm: Add Broadcom Hurricane 2 clock support
+In-Reply-To: <20170928231502.27069-6-f.fainelli@gmail.com>
+References: <20170928231502.27069-1-f.fainelli@gmail.com>
+ <20170928231502.27069-6-f.fainelli@gmail.com>
+Message-ID: <20171006200633.GI457@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 27, 2017 at 01:52:55PM +1000, Daniel Axtens wrote:
-> Hi Bjorn,
+On 09/28, Florian Fainelli wrote:
+> Add support for the Broadcom Hurricane 2 SoC clock controller. We can
+> re-use the existing iProc clock library since the SoC's architecture is
+> largely the same as its predecessors. For now, we just initialize the
+> iProc ARM PLL.
 > 
-> Yes, this works:
-> 
-> Tested-by: Daniel Axtens <dja@axtens.net> # arm64, ppc64-qemu-tcg
+> Acked-by: Jon Mason <jon.mason@broadcom.com>
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
 
-I guess I was assuming you'd pick this up, but that doesn't really
-make sense because I didn't give you a signed-off-by or anything.
-I'll post this with a changelog and signed-off-by so it doesn't get
-lost.
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
-I also noticed that I didn't correctly handle the powerpc quirk case
-where it doesn't require the device to be enabled at all.  I'll try to
-fix that up, too.
-
-Bjorn
-
-> > On Fri, Sep 01, 2017 at 05:27:41PM +1000, Daniel Axtens wrote:
-> >> This patch set:
-> >> 
-> >>  - splits the default display handling out from VGA arbiter, into its
-> >>    own file and behind its own Kconfig option (and gives the functions
-> >>    better names).
-> >> 
-> >>  - adds extra detection of default devices. To be nominated, the vga
-> >>    arbiter and platform hooks must not have nominated a default. A
-> >>    card will then only be nominated if it has a driver attached and
-> >>    has IO or memory decoding enabled.
-> >> 
-> >>  - adds relevant documentation.
-> >> 
-> >> The practical impact of this is improved X autoconfiguration on some
-> >> arm64 systems.
-> >
-> > I think I gave you bad advice about trying to separate the "default
-> > device" idea from the VGA arbiter.
-> >
-> > It is true that the "VGA arbiter" per se is related to routing the
-> > legacy VGA resources, and the arbiter currently only selects a default
-> > device if it finds a device to which those resources are routed.
-> >
-> > We have some cases where we want to select a default device that may
-> > not support the legacy VGA resources, or where they might not be
-> > routed to the device:
-> >
-> >   - systems where we match the EFI framebuffer address with a BAR, and
-> >     select that device as default,
-> >
-> >   - powerpc systems where there may be no host bridge window that maps
-> >     to the legacy VGA resources,
-> >
-> >   - your ARM64 systems where the default device may be behind a bridge
-> >     that doesn't support legacy VGA routing (PCI_BRIDGE_CTL_VGA)
-> >
-> > But I think trying to split the "default device" part out from the VGA
-> > arbiter ends up being overkill and making things more complicated
-> > instead of simpler.
-> >
-> > Would something like the following work for you as well as the powerpc
-> > case?  On powerpc, we already use vga_set_default_device() to select a
-> > device that doesn't use legacy VGA resources, so maybe we can just do
-> > the same on ARM64?
-> >
-> > I suppose there might be wrinkles in how the arbiter deals with
-> > multiple graphics devices on those systems, since I don't think it
-> > identifies these devices that don't use the legacy resources, but it
-> > seems like we live with whatever those on are powerpc and probably can
-> > on ARM64 as well.
-> >
-> >
-> > diff --git a/arch/powerpc/kernel/pci-common.c b/arch/powerpc/kernel/pci-common.c
-> > index 02831a396419..0ac7aa346c69 100644
-> > --- a/arch/powerpc/kernel/pci-common.c
-> > +++ b/arch/powerpc/kernel/pci-common.c
-> > @@ -1740,15 +1740,3 @@ static void fixup_hide_host_resource_fsl(struct pci_dev *dev)
-> >  }
-> >  DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MOTOROLA, PCI_ANY_ID, fixup_hide_host_resource_fsl);
-> >  DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_FREESCALE, PCI_ANY_ID, fixup_hide_host_resource_fsl);
-> > -
-> > -static void fixup_vga(struct pci_dev *pdev)
-> > -{
-> > -	u16 cmd;
-> > -
-> > -	pci_read_config_word(pdev, PCI_COMMAND, &cmd);
-> > -	if ((cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY)) || !vga_default_device())
-> > -		vga_set_default_device(pdev);
-> > -
-> > -}
-> > -DECLARE_PCI_FIXUP_CLASS_FINAL(PCI_ANY_ID, PCI_ANY_ID,
-> > -			      PCI_CLASS_DISPLAY_VGA, 8, fixup_vga);
-> > diff --git a/drivers/gpu/vga/vgaarb.c b/drivers/gpu/vga/vgaarb.c
-> > index 76875f6299b8..9df4802c5f04 100644
-> > --- a/drivers/gpu/vga/vgaarb.c
-> > +++ b/drivers/gpu/vga/vgaarb.c
-> > @@ -1468,6 +1468,21 @@ static int __init vga_arb_device_init(void)
-> >  			vgaarb_info(dev, "no bridge control possible\n");
-> >  	}
-> >  
-> > +	if (!vga_default_device()) {
-> > +		list_for_each_entry(vgadev, &vga_list, list) {
-> > +			struct device *dev = &vgadev->pdev->dev;
-> > +			u16 cmd;
-> > +
-> > +			pdev = vgadev->pdev;
-> > +			pci_read_config_word(pdev, PCI_COMMAND, &cmd);
-> > +			if (cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY)) {
-> > +				vgaarb_info(dev, "setting as boot device\n");
-> > +				vga_set_default_device(pdev);
-> > +				break;
-> > +			}
-> > +		}
-> > +	}
-> > +
-> >  	pr_info("loaded\n");
-> >  	return rc;
-> >  }
-> 
-> 
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
