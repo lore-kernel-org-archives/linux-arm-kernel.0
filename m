@@ -1,119 +1,28 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 06 Oct 2017 17:24:35 -0500
-Subject: [PATCH 2/2] vgaarb: Factor out EFI and fallback default device
- selection
-In-Reply-To: <20171006221358.12211.42879.stgit@bhelgaas-glaptop.roam.corp.google.com>
-References: <20171006221358.12211.42879.stgit@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20171006222435.12211.54547.stgit@bhelgaas-glaptop.roam.corp.google.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 06 Oct 2017 15:30:03 -0700
+Subject: [PATCH 0/7] ARM: dts: meson: clean pin offsets
+In-Reply-To: <20170921171450.27407-1-jbrunet@baylibre.com> (Jerome Brunet's
+ message of "Thu, 21 Sep 2017 19:14:43 +0200")
+References: <20170921171450.27407-1-jbrunet@baylibre.com>
+Message-ID: <7ha8139afo.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bjorn Helgaas <bhelgaas@google.com>
+Jerome Brunet <jbrunet@baylibre.com> writes:
 
-The default VGA device is normally set in vga_arbiter_add_pci_device() when
-we call it for the first enabled device that can be accessed with the
-legacy VGA resources ([mem 0xa0000-0xbffff], etc.)
+> The series is the device-tree part of the series sent to pinctrl [0]
+> The present patchset depends on the pinctrl part.
+>
+> The purpose of this series is to:
+> 1) remove the hardcoded gpio offset
+> 2) adjust gpio-ranges with respect to the new pin number of each
+>    controller
+> 3) adjust gpio-line-names accordingly for the boards having this property.
+>
+> [0]: https://lkml.kernel.org/r/20170918134610.17743-1-jbrunet at baylibre.com
 
-That default device can be overridden by an EFI device that owns the boot
-framebuffer.  As a fallback, we can also select a VGA device that can't be
-accessed via legacy VGA resources, or a VGA device that isn't even enabled.
+Seeing the driver part is now merged, applying to v4.15/dt64,
 
-Factor out this EFI and fallback selection from vga_arb_device_init() into
-a separate vga_arb_select_default_device() function.  This doesn't change
-any behavior, but it untangles the "bridge control possible" checking and
-messages from the default device selection.
+Thanks,
 
-Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
----
- drivers/gpu/vga/vgaarb.c |   57 ++++++++++++++++++++++++++++------------------
- 1 file changed, 35 insertions(+), 22 deletions(-)
-
-diff --git a/drivers/gpu/vga/vgaarb.c b/drivers/gpu/vga/vgaarb.c
-index aeb41f793ed4..7803e35a3702 100644
---- a/drivers/gpu/vga/vgaarb.c
-+++ b/drivers/gpu/vga/vgaarb.c
-@@ -1402,29 +1402,14 @@ static struct miscdevice vga_arb_device = {
- 	MISC_DYNAMIC_MINOR, "vga_arbiter", &vga_arb_device_fops
- };
- 
--static int __init vga_arb_device_init(void)
-+static void __init vga_arb_select_default_device(void)
- {
--	int rc;
- 	struct pci_dev *pdev;
- 	struct vga_device *vgadev;
- 
--	rc = misc_register(&vga_arb_device);
--	if (rc < 0)
--		pr_err("error %d registering device\n", rc);
--
--	bus_register_notifier(&pci_bus_type, &pci_notifier);
--
--	/* We add all pci devices satisfying vga class in the arbiter by
--	 * default */
--	pdev = NULL;
--	while ((pdev =
--		pci_get_subsys(PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID,
--			       PCI_ANY_ID, pdev)) != NULL)
--		vga_arbiter_add_pci_device(pdev);
--
-+#if defined(CONFIG_X86) || defined(CONFIG_IA64)
- 	list_for_each_entry(vgadev, &vga_list, list) {
- 		struct device *dev = &vgadev->pdev->dev;
--#if defined(CONFIG_X86) || defined(CONFIG_IA64)
- 		/*
- 		 * Override vga_arbiter_add_pci_device()'s I/O based detection
- 		 * as it may take the wrong device (e.g. on Apple system under
-@@ -1461,12 +1446,8 @@ static int __init vga_arb_device_init(void)
- 				vgaarb_info(dev, "overriding boot device\n");
- 			vga_set_default_device(vgadev->pdev);
- 		}
--#endif
--		if (vgadev->bridge_has_one_vga)
--			vgaarb_info(dev, "bridge control possible\n");
--		else
--			vgaarb_info(dev, "no bridge control possible\n");
- 	}
-+#endif
- 
- 	if (!vga_default_device()) {
- 		list_for_each_entry(vgadev, &vga_list, list) {
-@@ -1492,6 +1473,38 @@ static int __init vga_arb_device_init(void)
- 			vga_set_default_device(pdev);
- 		}
- 	}
-+}
-+
-+static int __init vga_arb_device_init(void)
-+{
-+	int rc;
-+	struct pci_dev *pdev;
-+	struct vga_device *vgadev;
-+
-+	rc = misc_register(&vga_arb_device);
-+	if (rc < 0)
-+		pr_err("error %d registering device\n", rc);
-+
-+	bus_register_notifier(&pci_bus_type, &pci_notifier);
-+
-+	/* We add all PCI devices satisfying VGA class in the arbiter by
-+	 * default */
-+	pdev = NULL;
-+	while ((pdev =
-+		pci_get_subsys(PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID,
-+			       PCI_ANY_ID, pdev)) != NULL)
-+		vga_arbiter_add_pci_device(pdev);
-+
-+	list_for_each_entry(vgadev, &vga_list, list) {
-+		struct device *dev = &vgadev->pdev->dev;
-+
-+		if (vgadev->bridge_has_one_vga)
-+			vgaarb_info(dev, "bridge control possible\n");
-+		else
-+			vgaarb_info(dev, "no bridge control possible\n");
-+	}
-+
-+	vga_arb_select_default_device();
- 
- 	pr_info("loaded\n");
- 	return rc;
+Kevin
