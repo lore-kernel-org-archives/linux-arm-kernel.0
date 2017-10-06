@@ -1,27 +1,43 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 06 Oct 2017 15:30:03 -0700
-Subject: [PATCH 0/7] ARM: dts: meson: clean pin offsets
-In-Reply-To: <20170921171450.27407-1-jbrunet@baylibre.com> (Jerome Brunet's
- message of "Thu, 21 Sep 2017 19:14:43 +0200")
-References: <20170921171450.27407-1-jbrunet@baylibre.com>
-Message-ID: <7ha8139afo.fsf@baylibre.com>
+Date: Fri, 06 Oct 2017 15:38:13 -0700
+Subject: [PATCH 0/3] soc: amlogic: Add Meson6/8/8b SoC Information driver
+In-Reply-To: <20170923141403.20882-1-martin.blumenstingl@googlemail.com>
+ (Martin Blumenstingl's message of "Sat, 23 Sep 2017 16:14:00 +0200")
+References: <20170923141403.20882-1-martin.blumenstingl@googlemail.com>
+Message-ID: <7h60br9a22.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jerome Brunet <jbrunet@baylibre.com> writes:
+Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
 
-> The series is the device-tree part of the series sent to pinctrl [0]
-> The present patchset depends on the pinctrl part.
+> The 32-bit Amlogic SoC have some registers which contain some information
+> the SoC's major and version, as well as a "major version".
+> This patchset adds support for this register decoding and exposing with the
+> SoC bus infrastructure, with dt-bindings and DT node.
 >
-> The purpose of this series is to:
-> 1) remove the hardcoded gpio offset
-> 2) adjust gpio-ranges with respect to the new pin number of each
->    controller
-> 3) adjust gpio-line-names accordingly for the boards having this property.
+> This is inspired by Neil's Meson GX socinfo driver, see [0]
 >
-> [0]: https://lkml.kernel.org/r/20170918134610.17743-1-jbrunet at baylibre.com
+> All information was taken from Amlogic's 3.10 GPL kernel sources because
+> the public S805 datasheet from Hardkernel does not contain any relevant
+> information for these register blocks.
+>
+>
+> [0] http://lists.infradead.org/pipermail/linux-amlogic/2017-June/004187.html
+>
+> Martin Blumenstingl (3):
+>   dt-bindings: Amlogic: add documentation for the SoC info register
+>     areas
 
-Seeing the driver part is now merged, applying to v4.15/dt64,
+Applied to v4.15/dt
+
+>   soc: amlogic: Add Meson6/Meson8/Meson8b/Meson8m2 SoC Information
+>     driver
+
+Applied to v4.15/drivers
+
+>   ARM: dts: meson: add SoC information nodes
+
+Applied to v4.15/dt
 
 Thanks,
 
