@@ -1,84 +1,70 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 6 Oct 2017 09:57:21 +0200
-Subject: [PATCH 1/2] ARM: dts: iwg20d-q7: Rework DT architecture
-In-Reply-To: <1507108713-10686-2-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1507108713-10686-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1507108713-10686-2-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <CAMuHMdW-Y7tK28YAGBRMqdgZK7vVqnUcud1FtzQd6wLrKii_AA@mail.gmail.com>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Fri, 6 Oct 2017 16:09:53 +0800
+Subject: [PATCH v2] arm64: dts: mediatek: Add cpuidle support for MT2712
+Message-ID: <1507277393-30356-1-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabrizio,
+Add CPU idle state nodes to enable C1/C2 idle states.
 
-On Wed, Oct 4, 2017 at 11:18 AM, Fabrizio Castro
-<fabrizio.castro@bp.renesas.com> wrote:
-> Since the same carrier board may host RZ/G1M and RZ/G1N based
-> Systems on Module, the DT architecture for iwg20d-q7 needs
-> better decoupling. This patch provides:
-> * iwg20d-q7-common.dtsi - its purpose is to define the carrier
->   board definitions, and its content is basically the same
->   as the previous version of r8a7743-iwg20d-q7.dts, only it
->   has no reference to the SoM .dtsi, and that's why the
->   filename doesn't mention the SoC name any more.
-> * r8a7743-iwg20d-q7.dts - its new purpose is to put together
->   the SoM .dtsi (r8a7743-iwg20m.dtsi) and the carrier board
->   .dtsi defined by this very patch, along with "model" and
->   "compatible" properties.
-> The final DT architecture to describe the board is now:
-> r8a7743-iwg20d-q7.dts           # Carrier Board + SoM
-> ??? r8a7743-iwg20m.dtsi         # SoM
-> ?   ??? r8a7743.dtsi            # SoC
-> ??? iwg20d-q7-common.dtsi       # Carrier Board
-> and maximizes the reuse of the definitions for the carrier board
-> and for the SoM.
->
-> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
+Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+---
 
-Thanks for your patch!
+changes since v1:
+- Rebase to 4.14-rc1.
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+ arch/arm64/boot/dts/mediatek/mt2712e.dtsi | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
-
-> +&pfc {
-> +       i2c2_pins: i2c2 {
-> +               groups = "i2c2";
-> +               function = "i2c2";
-> +       };
-> +
-> +       scif0_pins: scif0 {
-> +               groups = "scif0_data_d";
-> +               function = "scif0";
-> +       };
-> +
-> +       avb_pins: avb {
-> +               groups = "avb_mdio", "avb_gmii";
-> +               function = "avb";
-> +       };
-
-Perhaps you want to use this opportunity to restore alphabetical sort order?
-
-> +&scif0 {
-
-[...]
-
-> +};
-> +
-> +&avb {
-
-Likewise.
-
-Can be a separate patch, though.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+index 57d0396..5d4e406 100644
+--- a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+@@ -39,6 +39,7 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a35";
+ 			reg = <0x000>;
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 
+ 		cpu1: cpu at 1 {
+@@ -46,6 +47,7 @@
+ 			compatible = "arm,cortex-a35";
+ 			reg = <0x001>;
+ 			enable-method = "psci";
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 
+ 		cpu2: cpu at 200 {
+@@ -53,6 +55,29 @@
+ 			compatible = "arm,cortex-a72";
+ 			reg = <0x200>;
+ 			enable-method = "psci";
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
++		};
++
++		idle-states {
++			entry-method = "arm,psci";
++
++			CPU_SLEEP_0: cpu-sleep-0 {
++				compatible = "arm,idle-state";
++				local-timer-stop;
++				entry-latency-us = <100>;
++				exit-latency-us = <80>;
++				min-residency-us = <2000>;
++				arm,psci-suspend-param = <0x0010000>;
++			};
++
++			CLUSTER_SLEEP_0: cluster-sleep-0 {
++				compatible = "arm,idle-state";
++				local-timer-stop;
++				entry-latency-us = <350>;
++				exit-latency-us = <80>;
++				min-residency-us = <3000>;
++				arm,psci-suspend-param = <0x1010000>;
++			};
+ 		};
+ 	};
+ 
+-- 
+1.9.1
