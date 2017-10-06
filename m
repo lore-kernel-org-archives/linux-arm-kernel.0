@@ -1,45 +1,75 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 6 Oct 2017 09:39:44 +0100
-Subject: [PATCH 0/6] Switch arm64 over to qrwlock
-In-Reply-To: <9e2468c3-894e-1204-4578-3d8266c56d6c@arm.com>
-References: <1507208097-825-1-git-send-email-will.deacon@arm.com>
- <9e2468c3-894e-1204-4578-3d8266c56d6c@arm.com>
-Message-ID: <20171006083944.GA10941@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 6 Oct 2017 09:47:05 +0100
+Subject: [PATCH v2 0/7] PCI: aardvark: improve compatibility with PCI
+ devices
+In-Reply-To: <20171005181615.GU25517@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
+ <20171005175310.3c2dde95@windsurf.lan>
+ <20171005181615.GU25517@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20171006084705.GA8754@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeremy,
-
-On Thu, Oct 05, 2017 at 05:12:44PM -0500, Jeremy Linton wrote:
-> On 10/05/2017 07:54 AM, Will Deacon wrote:
-> >This patch series reworks bits of the qrwlock code that it can be used
-> >to replace the asm rwlocks currently implemented for arm64. The structure
-> >of the series is:
-> >
-> >   Patches 1-3	: Work WFE into qrwlock using atomic_cond_read_acquire so
-> >		  we can avoid busy-waiting.
-> >
-> >   Patch 4	: Enable qrwlocks for arm64
-> >
-> >   Patch 5-6	: Ensure writer slowpath fairness. This has a potential
-> >		  performance impact on the writer unlock path, so I've
-> >		  kept them at the end.
-> >
-> >The patches apply on top of my other locking cleanups:
-> >
-> >   http://lkml.kernel.org/r/1507055129-12300-1-git-send-email-will.deacon at arm.com
-> >
-> >although the conflict with mainline is trivial to resolve without those.
-> >The full stack is also pushed here:
-> >
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git qrwlock
-> >
-> >All comments (particularly related to testing and performance) welcome!
+On Thu, Oct 05, 2017 at 01:16:17PM -0500, Bjorn Helgaas wrote:
+> [+cc Lorenzo]
 > 
-> I haven't done any perf testing, but the machines continue to boot, and the
-> stress-ng test which causes task lock problems with the normal arm64 rwlock
-> now appears to run as expected. So, its a good start!
+> On Thu, Oct 05, 2017 at 05:53:10PM +0200, Thomas Petazzoni wrote:
+> > Hello Bjorn,
+> > 
+> > On Thu, 28 Sep 2017 14:58:31 +0200, Thomas Petazzoni wrote:
+> > 
+> > > This patch series brings a number of fixes to the pci-aardvark driver
+> > > that allows a much larger number of PCIe devices to be used.
+> > 
+> > I sent the initial version of this patch series almost a month ago, and
+> > it consists of fixes that I would like to have in 4.14.
+> 
+> The general rule is that after the merge window, I merge fixes to
+> things we put in during the merge window, as well as important
+> regression fixes.  Most bug fixes will be queued for the next merge
+> window.  I'll need some guidance on classifying these.
+> 
+> I think the map_irq/swizzle_irq patch should definitely be in v4.14.
 
-Excellent! Mind if I add your tested-by?
+Yes it is v4.14 (actually v4.13 - Fixes: tag will cover that) material,
+I missed updating this host bridge while patching all ARM host controller
+bridges, apologies.
 
-Will
+Thanks,
+Lorenzo
+
+> (It looks a lot like these:
+> 
+>   1ee4d93d5037 PCI: xilinx-nwl: Move to struct pci_host_bridge IRQ mapping functions
+>   5a3dc3c1f694 PCI: rockchip: Move to struct pci_host_bridge IRQ mapping functions
+>   c62e98bdaa70 PCI: xgene: Move to struct pci_host_bridge IRQ mapping functions
+>   6ab380957838 PCI: altera: Drop pci_fixup_irqs()
+>   cf60374de8f6 PCI: versatile: Drop pci_fixup_irqs()
+>   6982a068aa5f PCI: generic: Drop pci_fixup_irqs()
+>   f7c2e69b65fe PCI: faraday: Drop pci_fixup_irqs()
+>   60eca198b1ea PCI: designware: Drop pci_fixup_irqs()
+>   64bcd00a7ef5 PCI: iproc: Drop pci_fixup_irqs()
+>   29db991902ec PCI: rcar: Drop pci_fixup_irqs()
+>   cc2eaaef63df PCI: xilinx: Drop pci_fixup_irqs()
+>   dd5fcce2a7f9 PCI: tegra: Drop pci_fixup_irqs()
+> 
+> and I'm obsessive enough to use one of those subject lines to tie this
+> patch together with those.)
+> 
+> Most of the rest look like they've been there since the driver was
+> first merged, so they would *probably* go in the v4.15 queue.
+> 
+> > Is there a specific problem with those patches that explains why they
+> > have been ignored? Or is it just lack of time?
+> > 
+> > If there is any problem with the patches, please let me know, I am of
+> > course perfectly fine with reworking them as needed.
+> 
+> Sorry for the delay; mostly just lack of time.  I used to work pretty
+> strictly first-in, first-out, but the native host bridge drivers
+> consume a disproportionate share of my time compared with the generic
+> code that benefits everybody, so I'm trying to figure out how to
+> prioritize generic changes.  Obviously I need a solution that gives
+> *some* time to the native drivers.
+> 
+> Bjorn
