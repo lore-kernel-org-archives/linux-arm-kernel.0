@@ -1,21 +1,45 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 6 Oct 2017 16:34:26 +0800
-Subject: [PATCH 3/3] pinctrl: sunxi: Enforce the strict mode by default
-In-Reply-To: <817a66704d6c8f3caa034a526db11e25a9152a65.1507236823.git-series.maxime.ripard@free-electrons.com>
-References: <cover.7a61d0bb31530def29efd8b4286d8c0afdaab347.1507236823.git-series.maxime.ripard@free-electrons.com>
- <817a66704d6c8f3caa034a526db11e25a9152a65.1507236823.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v64FwRnthfP=OrxUp92oAtozzo6BEAOFbn8pMg5gXUpWjQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 6 Oct 2017 09:39:44 +0100
+Subject: [PATCH 0/6] Switch arm64 over to qrwlock
+In-Reply-To: <9e2468c3-894e-1204-4578-3d8266c56d6c@arm.com>
+References: <1507208097-825-1-git-send-email-will.deacon@arm.com>
+ <9e2468c3-894e-1204-4578-3d8266c56d6c@arm.com>
+Message-ID: <20171006083944.GA10941@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 6, 2017 at 4:54 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The strict mode should always have been enabled on our driver, and leaving
-> it unchecked just makes it harder to find a migration path as time passes.
->
-> Let's enable it by default now so that hopefully the new SoCs should be
-> safe.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Hi Jeremy,
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+On Thu, Oct 05, 2017 at 05:12:44PM -0500, Jeremy Linton wrote:
+> On 10/05/2017 07:54 AM, Will Deacon wrote:
+> >This patch series reworks bits of the qrwlock code that it can be used
+> >to replace the asm rwlocks currently implemented for arm64. The structure
+> >of the series is:
+> >
+> >   Patches 1-3	: Work WFE into qrwlock using atomic_cond_read_acquire so
+> >		  we can avoid busy-waiting.
+> >
+> >   Patch 4	: Enable qrwlocks for arm64
+> >
+> >   Patch 5-6	: Ensure writer slowpath fairness. This has a potential
+> >		  performance impact on the writer unlock path, so I've
+> >		  kept them at the end.
+> >
+> >The patches apply on top of my other locking cleanups:
+> >
+> >   http://lkml.kernel.org/r/1507055129-12300-1-git-send-email-will.deacon at arm.com
+> >
+> >although the conflict with mainline is trivial to resolve without those.
+> >The full stack is also pushed here:
+> >
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git qrwlock
+> >
+> >All comments (particularly related to testing and performance) welcome!
+> 
+> I haven't done any perf testing, but the machines continue to boot, and the
+> stress-ng test which causes task lock problems with the normal arm64 rwlock
+> now appears to run as expected. So, its a good start!
+
+Excellent! Mind if I add your tested-by?
+
+Will
