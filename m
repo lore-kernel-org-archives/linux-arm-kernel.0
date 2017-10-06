@@ -1,115 +1,132 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 6 Oct 2017 11:02:06 -0500
-Subject: [PATCH v6 3/3] PCI: iproc: Implement PCI hotplug support
-In-Reply-To: <CAK1A=4z6T9MLmCBBCmr5jVkVOySpw6fMTiTPqb=Nr-pjxhuARw@mail.gmail.com>
-References: <1504155029-24729-1-git-send-email-oza.oza@broadcom.com>
- <1504155029-24729-4-git-send-email-oza.oza@broadcom.com>
- <20171006113700.GA25517@bhelgaas-glaptop.roam.corp.google.com>
- <CAK1A=4z6T9MLmCBBCmr5jVkVOySpw6fMTiTPqb=Nr-pjxhuARw@mail.gmail.com>
-Message-ID: <20171006160206.GB25517@bhelgaas-glaptop.roam.corp.google.com>
+From: mdf@kernel.org (Moritz Fischer)
+Date: Fri, 6 Oct 2017 09:18:08 -0700
+Subject: [PATCH 1/2] arm: dts: Add support for National Instruments
+ Project Sulfur SDRs
+In-Reply-To: <58fe4e6c-8765-bd9a-0698-8f8326f95e40@xilinx.com>
+References: <20170911232223.91894-1-mdf@kernel.org>
+ <314acb1f-1f0f-7893-70a8-9379c01112ac@xilinx.com>
+ <20170925161136.GA12943@tyrael.ni.corp.natinst.com>
+ <6b87e902-3201-6710-4921-d465dea19dcd@xilinx.com>
+ <20170926175018.GA14962@tyrael.ni.corp.natinst.com>
+ <dfb517fe-8584-2a1a-22e5-946980cc9644@balister.org>
+ <a606ab17-6fb9-2ce1-3b3b-5a2e72d3fc7c@xilinx.com>
+ <3b41cfc0-08b7-853d-3439-7f9848d04d3c@balister.org>
+ <58fe4e6c-8765-bd9a-0698-8f8326f95e40@xilinx.com>
+Message-ID: <20171006161808.GA14871@tyrael.ni.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 06, 2017 at 08:03:52PM +0530, Oza Pawandeep wrote:
-> On Fri, Oct 6, 2017 at 5:07 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> > On Thu, Aug 31, 2017 at 10:20:29AM +0530, Oza Pawandeep wrote:
-> >> This patch implements PCI hotplug support for iproc family chipsets.
+On Fri, Oct 06, 2017 at 01:49:44PM +0200, Michal Simek wrote:
+> On 26.9.2017 20:15, Philip Balister wrote:
+> > On 09/26/2017 02:06 PM, Michal Simek wrote:
+> >> On 26.9.2017 19:58, Philip Balister wrote:
+> >>> On 09/26/2017 01:50 PM, Moritz Fischer wrote:
+> >>>> Michal,
+> >>>>
+> >>>> On Tue, Sep 26, 2017 at 02:54:48PM +0200, Michal Simek wrote:
+> >>>>> Hi,
+> >>>>>
+> >>>>> On 25.9.2017 18:11, Moritz Fischer wrote:
+> >>>>>> Hi Michal,
+> >>>>>>
+> >>>>>> On Mon, Sep 25, 2017 at 10:19:44AM +0200, Michal Simek wrote:
+> >>>>>>> Hi Moritz
+> >>>>>>>
+> >>>>>>> sorry for delay.
+> >>>>>>
+> >>>>>> No problem.
+> >>>>>>
+> >>>>>>>
+> >>>>>>> On 12.9.2017 01:22, Moritz Fischer wrote:
+> >>>>>>>> Add support for the National Instruments Project Sulfur SDR
+> >>>>>>>> motherboards Rev 2,3 and 4.
+> >>>>>>>>
+> >>>>>>>> Signed-off-by: Moritz Fischer <mdf@kernel.org>
+> >>>>>>>> ---
+> >>>>>>>>  arch/arm/boot/dts/Makefile                |   3 +
+> >>>>>>>>  arch/arm/boot/dts/zynq-ni-sulfur-rev2.dts |  84 +++++++++++++++++++
+> >>>>>>>>  arch/arm/boot/dts/zynq-ni-sulfur-rev3.dts | 118 ++++++++++++++++++++++++++
+> >>>>>>>>  arch/arm/boot/dts/zynq-ni-sulfur-rev4.dts |  26 ++++++
+> >>>>>>>>  arch/arm/boot/dts/zynq-ni-sulfur.dtsi     | 133 ++++++++++++++++++++++++++++++
+> >>>>>>>>  5 files changed, 364 insertions(+)
+> >>>>>>>>  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur-rev2.dts
+> >>>>>>>>  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur-rev3.dts
+> >>>>>>>>  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur-rev4.dts
+> >>>>>>>>  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur.dtsi
+> >>>>>>>
+> >>>>>>> Is this publicly available board?
+> >>>>>>
+> >>>>>> Will be in Q1 2018 was announced at GRCon'17 ([1]).
+> >>>>>> Some of the Rev3s are currently deployed in Norway as part of a radar
+> >>>>>> system.
+> >>>>>>
+> >>>>>>> I am not quite sure we should apply these dts files. There are a lot of
+> >>>>>>> boards with zynq and there must be any strong argument for applying this
+> >>>>>>> to the tree. For arm32 with even flat tree structure.
+> >>>>>>
+> >>>>>> What's the issue with merging them, except for having 3 more files? 
+> >>>>>
+> >>>>> For me this is not a problem because on Linux side it is not increasing
+> >>>>> build time.
+> >>>>> I want to see the value for community. All xilinx platforms are
+> >>>>> evaluation generic purpose boards which are showing how to connect stuff
+> >>>>> together.
+> >>>>> On the other hand this is real product.
+> >>>>
+> >>>> Uh.
+> >>>>
+> >>>>> I would let arm-soc maintainer to decide if this is fine or not. I
+> >>>>> definitely don't want to end up in situation that we will have dts for
+> >>>>> real products which are not bringing any value for others.
+> >>>>
+> >>>> Sure, it's the maintainers call.
+> >>>>
+> >>>> I do intend to have my customers run mainline on it eventually, currently
+> >>>> I'm a handful of patches away from making that happen. So yes, running
+> >>>> mainline is a usecase that matters to me.
+> >>>>
+> >>>> It is one thing to keep bitching about vendor kernels as a community
+> >>>> continuously, but then if someone goes through the effort and actually
+> >>>> tries to run mainline, you give them crap like that above.
+> >>>>
+> >>>> Our products usually come with full schematics [1], firmware, fpga code and all
+> >>>> available, I don't know what makes them less useful to the community as a
+> >>>> platform to experiment and develop on than Xilinx eval boards.
+> >>>>
+> >>>> There's several people that I know of both hobbyists and companies that
+> >>>> build systems around these platforms, so I don't know ...
+> >>>
+> >>> I expect this product to be delivered with full source and a mainline
+> >>> kernel, so lets make it easy for Moritz to do the right thing here. This
+> >>> makes long term support of this product much easier.
+> >>>
+> >>> Acked-by: Philip Balister <philip@opensdr.com>
 > >>
-> >> iproc based SOC (e.g. Stingray) does not have hotplug controller
-> >> integrated.
-> >> Hence, standard PCI hotplug framework hooks can-not be used.
-> >> e.g. controlled power up/down of slot.
-> >>
-> >> The mechanism, for e.g. Stingray has adopted for PCI hotplug is as follows:
-> >> PCI present lines are input to GPIOs depending on the type of
-> >> connector (x2, x4, x8).
-> >>
-> >> GPIO array needs to be present if hotplug is supported.
-> >> HW implementation is SOC/Board specific, and also it depends on how
-> >> add-in card is designed
-> >> (e.g. how many present pins are implemented).
-> >>
-> >> If x8 card is connected, then it might be possible that all the
-> >> 3 present pins could go low, or at least one pin goes low.
-> >> If x4 card is connected, then it might be possible that 2 present
-> >> pins go low, or at least one pin goes low.
-> >>
-> >> The implementation essentially takes care of following:
-> >> > Initializing hotplug irq thread.
-> >> > Detecting the endpoint device based on link state.
-> >> > Handling PERST and detecting the plugged devices.
-> >> > Ordered Hot plug-out, where User is expected
-> >>   to write 1 to /sys/bus/pci/devices/<pci_dev>/remove
-> >> > Handling spurious interrupt
-> >> > Handling multiple interrupts and makes sure that card is
-> >>   enumerated only once.
-> >
-> > I haven't forgotten this, but I am dragging my feet a little bit.
-> > There is a standard way for hardware to support PCIe hotplug, and it's
-> > hard enough to get the software for that right.  I really, really
-> > don't want to see a bunch of one-off implementations that sort of look
-> > like standard hotplug but not really.
-> >
-> > I have a few trivial comments below but haven't really reviewed the
-> > whole thing.
-> ...
-
-> >> -     list_splice_init(res, &host->windows);
-> >> -     host->busnr = 0;
-> >> -     host->dev.parent = dev;
-> >> -     host->ops = &iproc_pcie_ops;
-> >> -     host->sysdata = sysdata;
-> >> -     host->map_irq = pcie->map_irq;
-> >> -     host->swizzle_irq = pci_common_swizzle;
-> >> +     if (!link_not_active) {
-> >
-> > Double negation.  If you pick a better name, e.g., "link_active", this
-> > will read much better.  But I don't understand why you want to check
-> > whether the link is active here anyway.  pci_scan_root_bus_bridge()
-> > should work fine even if there's no device present below the bridge.
-> > Won't the root port be there always, even if there's no downstream
-> > device?
-> ...
+> >> I think this is the right way to go. Get ACK from Arnd or Olof or Kevin
+> >> and I will merge this.
+> >> I am simply just afraid that if a lot of zynq customers will ask for it
+> >> we can will end up with a lot of zynq/zynqmp based dts files in the
+> >> kernel and arm-soc guys will stop this that it is simply too much and
+> >> won't accept +1 case.
+> > 
+> > I share the same concerns. Unfortunately, there doesn't seem like any
+> > other structured way to manage dts files.
+> > 
+> > As an OpenEmbedded guy, I know I can carry them with BSP's, but not
+> > everyone uses OpenEmbedded. I'd love to see a long term scalable
+> > solution for tracking dts files, but that is outside the scope of
+> > Moritz's request.
 > 
-> pci_scan_root_bus_bridge crashes when link is not active. when I last
-> tested, that is what I observed.
+> Are you guys coming to ELCE? There will be Devicetree Workshop which
+> will be good place to talk about this.
 
-I think that would mean a bug in your config accessors.  The PCI core
-enumeration itself doesn't depend on the link being up.  But I don't
-see anything obvious in your accessors that looks like an issue.
+Yeah, it's on Thursday, right?
 
-If you post details about the crash, maybe we can help figure it out.
-
-> because in previous code when we dont support hotplug, we just got to
-> err, and remove root-bus in case link is not active.
-> we dont do scan bus.
-> 
-> if fact so far none of the RC driver implements hotplug so this might
-> not have been exercised.
-
-If the RC implements PCIe hotplug correctly, the RC driver shouldn't
-need to do anything special to support hotplug.  It should just work.
-That's why I'm so reluctant to merge stuff like this.  Your hardware
-folks are making work for themselves by designing a new scheme, and
-that makes work for software folks to support it.  None of that should
-be necessary.
-
-> ...
-> >> @@ -104,6 +108,9 @@ struct iproc_pcie {
-> >>       struct iproc_pcie_ib ib;
-> >>       const struct iproc_pcie_ib_map *ib_map;
-> >>
-> >> +     bool enable_hotplug;
-> >> +     bool ep_is_present;
-> >
-> > Are you suggesting that only an endpoint can be hotplugged?  You can't
-> > hotplug a switch?
-> >
-> 
-> ok, we can change the name, PCI switch also can be hot-plugged.
-
-I'm dubious about the need for such a variable in the first place.
-It's always going to be unreliable because you might test it after a
-device has been hotplugged but before the variable has been updated.
-
-Bjorn
+- Moritz
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171006/78e4bc92/attachment.sig>
