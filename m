@@ -1,62 +1,138 @@
 From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Fri,  6 Oct 2017 12:13:42 +0200
-Subject: [PATCH 14/16] arm64: dts: marvell: armada-37xx: add second UART port
+Date: Fri,  6 Oct 2017 12:13:35 +0200
+Subject: [PATCH 07/16] serial: mvebu-uart: add function to change baudrate
 In-Reply-To: <20171006101344.15590-1-miquel.raynal@free-electrons.com>
 References: <20171006101344.15590-1-miquel.raynal@free-electrons.com>
-Message-ID: <20171006101344.15590-15-miquel.raynal@free-electrons.com>
+Message-ID: <20171006101344.15590-8-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a node in Armada 37xx DTSI file for the second UART, with a
-different compatible due to its extended IP which has some
-differences with the first UART already in place.
+From: Allen Yan <yanwei@marvell.com>
 
-Make use of this commit to also fully describe the first port and
-use the same clear and named interrupt bindings for both ports.
+Until now, the first UART port baudrate was set by the bootloader.
 
-The standard UART (UART0) uses level-interrupts while the extended
-UART (UART1) uses edge-triggered interrupts.
+Add a function allowing to change the baudrate. Changes may be done
+from userspace but also at probe time by the kernel. Use the simplest
+method: baudrate divisor.
 
+Works for all UART ports until 230400 baud. To achieve higher baudrates,
+software should implement the fractional divisor feature that allows
+more accuracy for higher rates.
+
+Signed-off-by: Allen Yan <yanwei@marvell.com>
+[<miquel.raynal@free-electrons.com>: changed termios handling]
 Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 ---
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 18 +++++++++++++++++-
- 1 file changed, 17 insertions(+), 1 deletion(-)
+ drivers/tty/serial/mvebu-uart.c | 69 ++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 65 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-index a36d667f770e..72b68f23c001 100644
---- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-@@ -55,6 +55,7 @@
+diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
+index da756cfec0bb..81a3d2714fd3 100644
+--- a/drivers/tty/serial/mvebu-uart.c
++++ b/drivers/tty/serial/mvebu-uart.c
+@@ -72,6 +72,7 @@
+ 				 | STAT_PAR_ERR | STAT_OVR_ERR)
  
- 	aliases {
- 		serial0 = &uart0;
-+		serial1 = &uart1;
- 	};
+ #define UART_BRDV		0x10
++#define  BRDV_BAUD_MASK         0x3FF
  
- 	cpus {
-@@ -136,7 +137,22 @@
- 				compatible = "marvell,armada-3700-uart";
- 				reg = <0x12000 0x200>;
- 				clocks = <&xtalclk>;
--				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupts =
-+				<GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
-+				<GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
-+				<GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupt-names = "uart-sum", "uart-tx", "uart-rx";
-+				status = "disabled";
-+			};
+ #define MVEBU_NR_UARTS		1
+ 
+@@ -344,6 +345,31 @@ static void mvebu_uart_shutdown(struct uart_port *port)
+ 	free_irq(port->irq, port);
+ }
+ 
++static int mvebu_uart_baud_rate_set(struct uart_port *port, unsigned int baud)
++{
++	struct mvebu_uart *mvuart = to_mvuart(port);
++	unsigned int baud_rate_div;
++	u32 brdv;
 +
-+			uart1: serial at 12200 {
-+				compatible = "marvell,armada-3700-uart-ext";
-+				reg = <0x12200 0x30>;
-+				clocks = <&xtalclk>;
-+				interrupts =
-+				<GIC_SPI 30 IRQ_TYPE_EDGE_RISING>,
-+				<GIC_SPI 31 IRQ_TYPE_EDGE_RISING>;
-+				interrupt-names = "uart-tx", "uart-rx";
- 				status = "disabled";
- 			};
++	if (IS_ERR(mvuart->clk))
++		return -PTR_ERR(mvuart->clk);
++
++	/*
++	 * The UART clock is divided by the value of the divisor to generate
++	 * UCLK_OUT clock, which is 16 times faster than the baudrate.
++	 * This prescaler can achieve all standard baudrates until 230400.
++	 * Higher baudrates could be achieved for the extended UART by using the
++	 * programmable oversampling stack (also called fractional divisor).
++	 */
++	baud_rate_div = DIV_ROUND_UP(port->uartclk, baud * 16);
++	brdv = readl(port->membase + UART_BRDV);
++	brdv &= ~BRDV_BAUD_MASK;
++	brdv |= baud_rate_div;
++	writel(brdv, port->membase + UART_BRDV);
++
++	return 0;
++}
++
+ static void mvebu_uart_set_termios(struct uart_port *port,
+ 				   struct ktermios *termios,
+ 				   struct ktermios *old)
+@@ -367,11 +393,30 @@ static void mvebu_uart_set_termios(struct uart_port *port,
+ 	if ((termios->c_cflag & CREAD) == 0)
+ 		port->ignore_status_mask |= STAT_RX_RDY(port) | STAT_BRK_ERR;
  
+-	if (old)
+-		tty_termios_copy_hw(termios, old);
++	/*
++	 * Maximum achievable frequency with simple baudrate divisor is 230400.
++	 * Since the error per bit frame would be of more than 15%, achieving
++	 * higher frequencies would require to implement the fractional divisor
++	 * feature.
++	 */
++	baud = uart_get_baud_rate(port, termios, old, 0, 230400);
++	if (mvebu_uart_baud_rate_set(port, baud)) {
++		/* No clock available, baudrate cannot be changed */
++		if (old)
++			baud = uart_get_baud_rate(port, old, NULL, 0, 230400);
++	} else {
++		tty_termios_encode_baud_rate(termios, baud, baud);
++		uart_update_timeout(port, termios->c_cflag, baud);
++	}
+ 
+-	baud = uart_get_baud_rate(port, termios, old, 0, 460800);
+-	uart_update_timeout(port, termios->c_cflag, baud);
++	/* Only the following flag changes are supported */
++	if (old) {
++		termios->c_iflag &= INPCK | IGNPAR;
++		termios->c_iflag |= old->c_iflag & ~(INPCK | IGNPAR);
++		termios->c_cflag &= CREAD | CBAUD;
++		termios->c_cflag |= old->c_cflag & ~(CREAD | CBAUD);
++		termios->c_lflag = old->c_lflag;
++	}
+ 
+ 	spin_unlock_irqrestore(&port->lock, flags);
+ }
+@@ -647,12 +692,28 @@ static int mvebu_uart_probe(struct platform_device *pdev)
+ 	if (!mvuart)
+ 		return -ENOMEM;
+ 
++	/* Get controller data depending on the compatible string */
+ 	mvuart->data = (struct mvebu_uart_driver_data *)match->data;
+ 	mvuart->port = port;
+ 
+ 	port->private_data = mvuart;
+ 	platform_set_drvdata(pdev, mvuart);
+ 
++	/* Get fixed clock frequency */
++	mvuart->clk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(mvuart->clk)) {
++		if (PTR_ERR(mvuart->clk) == -EPROBE_DEFER)
++			return PTR_ERR(mvuart->clk);
++
++		if (IS_EXTENDED(port)) {
++			dev_err(&pdev->dev, "unable to get UART clock\n");
++			return PTR_ERR(mvuart->clk);
++		}
++	} else {
++		if (!clk_prepare_enable(mvuart->clk))
++			port->uartclk = clk_get_rate(mvuart->clk);
++	}
++
+ 	/* UART Soft Reset*/
+ 	writel(CTRL_SOFT_RST, port->membase + UART_CTRL(port));
+ 	udelay(1);
 -- 
 2.11.0
