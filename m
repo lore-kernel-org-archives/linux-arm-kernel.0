@@ -1,145 +1,164 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 6 Oct 2017 13:37:53 +0100
-Subject: [PATCH v1 2/2] kvm: arm64: handle single-step of userspace mmio
- instructions
-In-Reply-To: <20171006113921.24880-3-alex.bennee@linaro.org>
-References: <20171006113921.24880-1-alex.bennee@linaro.org>
- <20171006113921.24880-3-alex.bennee@linaro.org>
-Message-ID: <ca10e4b9-08cc-486c-a229-da5ebcdb76cf@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 06 Oct 2017 14:39:35 +0200
+Subject: [PATCH 07/16] serial: mvebu-uart: add function to change baudrate
+In-Reply-To: <20171006101344.15590-8-miquel.raynal@free-electrons.com> (Miquel
+ Raynal's message of "Fri, 6 Oct 2017 12:13:35 +0200")
+References: <20171006101344.15590-1-miquel.raynal@free-electrons.com>
+ <20171006101344.15590-8-miquel.raynal@free-electrons.com>
+Message-ID: <87d160fo1k.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/17 12:39, Alex Benn?e wrote:
-> The system state of KVM when using userspace emulation is not complete
-> until we return into KVM_RUN. To handle mmio related updates we wait
-> until they have been committed and then schedule our KVM_EXIT_DEBUG.
-> 
-> I've introduced a new function kvm_arm_maybe_return_debug() to wrap up
-> the differences between arm/arm64 which is currently null for arm.
-> 
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-> ---
->  arch/arm/include/asm/kvm_host.h   |  2 ++
->  arch/arm64/include/asm/kvm_host.h |  1 +
->  arch/arm64/kvm/debug.c            | 21 +++++++++++++++++++++
->  arch/arm64/kvm/handle_exit.c      |  9 +++------
->  virt/kvm/arm/arm.c                |  2 +-
->  virt/kvm/arm/mmio.c               |  3 ++-
->  6 files changed, 30 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index 4a879f6ff13b..aec943f6d123 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -285,6 +285,8 @@ static inline void kvm_arm_init_debug(void) {}
->  static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
->  static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
->  static inline void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu) {}
-> +static inline int  kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu,
-> +						struct kvm_run *run) {}
->  
->  int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
->  			       struct kvm_device_attr *attr);
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index e923b58606e2..fa67d21662f6 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -369,6 +369,7 @@ void kvm_arm_init_debug(void);
->  void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
->  void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
->  void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu);
-> +int  kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu, struct kvm_run *run);
->  int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
->  			       struct kvm_device_attr *attr);
->  int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
-> diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
-> index dbadfaf850a7..a10a18c55c87 100644
-> --- a/arch/arm64/kvm/debug.c
-> +++ b/arch/arm64/kvm/debug.c
-> @@ -221,3 +221,24 @@ void kvm_arm_clear_debug(struct kvm_vcpu *vcpu)
->  		}
->  	}
->  }
-> +
-> +
-> +/*
-> + * When KVM has successfully emulated the instruction we might want to
-> + * return we a KVM_EXIT_DEBUG. We can only do this once the emulation
-> + * is complete though so for userspace emulations we have to wait
-> + * until we have re-entered KVM.
-> + *
-> + * Return > 0 to return to guest, 0 (and set exit_reason) on proper
-> + * exit to userspace.
-> + */
-> +
-> +int kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> +{
-> +	if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
-> +		run->exit_reason = KVM_EXIT_DEBUG;
-> +		run->debug.arch.hsr = ESR_ELx_EC_SOFTSTP_LOW << ESR_ELx_EC_SHIFT;
-> +		return 0;
-> +	}
-> +	return 1;
-> +}
-> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-> index c918d291cb58..7b04f59217bf 100644
-> --- a/arch/arm64/kvm/handle_exit.c
-> +++ b/arch/arm64/kvm/handle_exit.c
-> @@ -202,13 +202,10 @@ static int handle_trap_exceptions(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  		handled = exit_handler(vcpu, run);
->  	}
->  
-> -	if (handled && (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP)) {
-> -		handled = 0;
-> -		run->exit_reason = KVM_EXIT_DEBUG;
-> -		run->debug.arch.hsr = ESR_ELx_EC_SOFTSTP_LOW << ESR_ELx_EC_SHIFT;
-> -	}
-> +	if (handled)
-> +		return kvm_arm_maybe_return_debug(vcpu, run);
->  
-> -	return handled;
-> +	return 0;
->  }
->  
->  /*
-> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> index b9f68e4add71..3d28fe2daa26 100644
-> --- a/virt/kvm/arm/arm.c
-> +++ b/virt/kvm/arm/arm.c
-> @@ -623,7 +623,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  
->  	if (run->exit_reason == KVM_EXIT_MMIO) {
->  		ret = kvm_handle_mmio_return(vcpu, vcpu->run);
-> -		if (ret)
-> +		if (ret < 1)
->  			return ret;
->  	}
->  
-> diff --git a/virt/kvm/arm/mmio.c b/virt/kvm/arm/mmio.c
-> index b6e715fd3c90..e43e3bd6222f 100644
-> --- a/virt/kvm/arm/mmio.c
-> +++ b/virt/kvm/arm/mmio.c
-> @@ -117,7 +117,8 @@ int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  		vcpu_set_reg(vcpu, vcpu->arch.mmio_decode.rt, data);
->  	}
->  
-> -	return 0;
-> +	/* If debugging in effect we may need to return now */
-> +	return kvm_arm_maybe_return_debug(vcpu, run);
+Hi Miquel,
+ 
+ On ven., oct. 06 2017, Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
 
-Ah, that's how you do it. OK. Then the patch splitting is wrong, because
-everything is broken after patch #1.
+> From: Allen Yan <yanwei@marvell.com>
+>
+> Until now, the first UART port baudrate was set by the bootloader.
+>
+> Add a function allowing to change the baudrate. Changes may be done
+> from userspace but also at probe time by the kernel. Use the simplest
+> method: baudrate divisor.
+>
+> Works for all UART ports until 230400 baud. To achieve higher baudrates,
+> software should implement the fractional divisor feature that allows
+> more accuracy for higher rates.
+>
+> Signed-off-by: Allen Yan <yanwei@marvell.com>
+> [<miquel.raynal@free-electrons.com>: changed termios handling]
+> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 
-I'd prefer something like "kvm_handle_single_step" instead of this
-"kvm_arm_maybe_return_debug", but I'm very bad at naming things anyway.
-
->  }
->  
->  static int decode_hsr(struct kvm_vcpu *vcpu, bool *is_write, int *len)
-> 
+Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
 Thanks,
 
-	M.
+Gregory
+
+
+> ---
+>  drivers/tty/serial/mvebu-uart.c | 69 ++++++++++++++++++++++++++++++++++++++---
+>  1 file changed, 65 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
+> index da756cfec0bb..81a3d2714fd3 100644
+> --- a/drivers/tty/serial/mvebu-uart.c
+> +++ b/drivers/tty/serial/mvebu-uart.c
+> @@ -72,6 +72,7 @@
+>  				 | STAT_PAR_ERR | STAT_OVR_ERR)
+>  
+>  #define UART_BRDV		0x10
+> +#define  BRDV_BAUD_MASK         0x3FF
+>  
+>  #define MVEBU_NR_UARTS		1
+>  
+> @@ -344,6 +345,31 @@ static void mvebu_uart_shutdown(struct uart_port *port)
+>  	free_irq(port->irq, port);
+>  }
+>  
+> +static int mvebu_uart_baud_rate_set(struct uart_port *port, unsigned int baud)
+> +{
+> +	struct mvebu_uart *mvuart = to_mvuart(port);
+> +	unsigned int baud_rate_div;
+> +	u32 brdv;
+> +
+> +	if (IS_ERR(mvuart->clk))
+> +		return -PTR_ERR(mvuart->clk);
+> +
+> +	/*
+> +	 * The UART clock is divided by the value of the divisor to generate
+> +	 * UCLK_OUT clock, which is 16 times faster than the baudrate.
+> +	 * This prescaler can achieve all standard baudrates until 230400.
+> +	 * Higher baudrates could be achieved for the extended UART by using the
+> +	 * programmable oversampling stack (also called fractional divisor).
+> +	 */
+> +	baud_rate_div = DIV_ROUND_UP(port->uartclk, baud * 16);
+> +	brdv = readl(port->membase + UART_BRDV);
+> +	brdv &= ~BRDV_BAUD_MASK;
+> +	brdv |= baud_rate_div;
+> +	writel(brdv, port->membase + UART_BRDV);
+> +
+> +	return 0;
+> +}
+> +
+>  static void mvebu_uart_set_termios(struct uart_port *port,
+>  				   struct ktermios *termios,
+>  				   struct ktermios *old)
+> @@ -367,11 +393,30 @@ static void mvebu_uart_set_termios(struct uart_port *port,
+>  	if ((termios->c_cflag & CREAD) == 0)
+>  		port->ignore_status_mask |= STAT_RX_RDY(port) | STAT_BRK_ERR;
+>  
+> -	if (old)
+> -		tty_termios_copy_hw(termios, old);
+> +	/*
+> +	 * Maximum achievable frequency with simple baudrate divisor is 230400.
+> +	 * Since the error per bit frame would be of more than 15%, achieving
+> +	 * higher frequencies would require to implement the fractional divisor
+> +	 * feature.
+> +	 */
+> +	baud = uart_get_baud_rate(port, termios, old, 0, 230400);
+> +	if (mvebu_uart_baud_rate_set(port, baud)) {
+> +		/* No clock available, baudrate cannot be changed */
+> +		if (old)
+> +			baud = uart_get_baud_rate(port, old, NULL, 0, 230400);
+> +	} else {
+> +		tty_termios_encode_baud_rate(termios, baud, baud);
+> +		uart_update_timeout(port, termios->c_cflag, baud);
+> +	}
+>  
+> -	baud = uart_get_baud_rate(port, termios, old, 0, 460800);
+> -	uart_update_timeout(port, termios->c_cflag, baud);
+> +	/* Only the following flag changes are supported */
+> +	if (old) {
+> +		termios->c_iflag &= INPCK | IGNPAR;
+> +		termios->c_iflag |= old->c_iflag & ~(INPCK | IGNPAR);
+> +		termios->c_cflag &= CREAD | CBAUD;
+> +		termios->c_cflag |= old->c_cflag & ~(CREAD | CBAUD);
+> +		termios->c_lflag = old->c_lflag;
+> +	}
+>  
+>  	spin_unlock_irqrestore(&port->lock, flags);
+>  }
+> @@ -647,12 +692,28 @@ static int mvebu_uart_probe(struct platform_device *pdev)
+>  	if (!mvuart)
+>  		return -ENOMEM;
+>  
+> +	/* Get controller data depending on the compatible string */
+>  	mvuart->data = (struct mvebu_uart_driver_data *)match->data;
+>  	mvuart->port = port;
+>  
+>  	port->private_data = mvuart;
+>  	platform_set_drvdata(pdev, mvuart);
+>  
+> +	/* Get fixed clock frequency */
+> +	mvuart->clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(mvuart->clk)) {
+> +		if (PTR_ERR(mvuart->clk) == -EPROBE_DEFER)
+> +			return PTR_ERR(mvuart->clk);
+> +
+> +		if (IS_EXTENDED(port)) {
+> +			dev_err(&pdev->dev, "unable to get UART clock\n");
+> +			return PTR_ERR(mvuart->clk);
+> +		}
+> +	} else {
+> +		if (!clk_prepare_enable(mvuart->clk))
+> +			port->uartclk = clk_get_rate(mvuart->clk);
+> +	}
+> +
+>  	/* UART Soft Reset*/
+>  	writel(CTRL_SOFT_RST, port->membase + UART_CTRL(port));
+>  	udelay(1);
+> -- 
+> 2.11.0
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
 -- 
-Jazz is not dead. It just smells funny...
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
