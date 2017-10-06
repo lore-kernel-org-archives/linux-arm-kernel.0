@@ -1,202 +1,137 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  6 Oct 2017 16:33:37 +0100
-Subject: [PATCH v4 02/26] KVM: arm/arm64: vgic: restructure
- kvm_vgic_(un)map_phys_irq
+Date: Fri,  6 Oct 2017 16:33:36 +0100
+Subject: [PATCH v4 01/26] KVM: arm/arm64: register irq bypass consumer on
+ ARM/ARM64
 In-Reply-To: <20171006153401.5481-1-marc.zyngier@arm.com>
 References: <20171006153401.5481-1-marc.zyngier@arm.com>
-Message-ID: <20171006153401.5481-3-marc.zyngier@arm.com>
+Message-ID: <20171006153401.5481-2-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Eric Auger <eric.auger@redhat.com>
 
-We want to reuse the core of the map/unmap functions for IRQ
-forwarding. Let's move the computation of the hwirq in
-kvm_vgic_map_phys_irq and pass the linux IRQ as parameter.
-the host_irq is added to struct vgic_irq.
+This patch selects IRQ_BYPASS_MANAGER and HAVE_KVM_IRQ_BYPASS
+configs for ARM/ARM64.
 
-We introduce kvm_vgic_map/unmap_irq which take a struct vgic_irq
-handle as a parameter.
+kvm_arch_has_irq_bypass() now is implemented and returns true.
+As a consequence the irq bypass consumer will be registered for
+ARM/ARM64 with the forwarding callbacks:
+
+- stop/start: halt/resume guest execution
+- add/del_producer: set/unset forwarding at vgic/irqchip level
+
+We don't have any actual support yet, so nothing gets actually
+forwarded.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
+[maz: dropped the DEOI stuff for the time being in order to
+      reduce the dependency chain, amended commit message]
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/kvm/arm_vgic.h    |  8 ++++---
- virt/kvm/arm/arch_timer.c | 24 +------------------
- virt/kvm/arm/vgic/vgic.c  | 60 +++++++++++++++++++++++++++++++++++------------
- 3 files changed, 51 insertions(+), 41 deletions(-)
+ arch/arm/kvm/Kconfig   |  3 +++
+ arch/arm64/kvm/Kconfig |  3 +++
+ virt/kvm/arm/arm.c     | 40 ++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 46 insertions(+)
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 34dba516ef24..53f631bdec75 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -116,6 +116,7 @@ struct vgic_irq {
- 	bool hw;			/* Tied to HW IRQ */
- 	struct kref refcount;		/* Used for LPIs */
- 	u32 hwintid;			/* HW INTID number */
-+	unsigned int host_irq;		/* linux irq corresponding to hwintid */
- 	union {
- 		u8 targets;			/* GICv2 target VCPUs mask */
- 		u32 mpidr;			/* GICv3 target VCPU */
-@@ -307,9 +308,10 @@ void kvm_vgic_init_cpu_hardware(void);
+diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+index 90d0176fb30d..4e2b192a030a 100644
+--- a/arch/arm/kvm/Kconfig
++++ b/arch/arm/kvm/Kconfig
+@@ -3,6 +3,7 @@
+ #
  
- int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
- 			bool level, void *owner);
--int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, u32 virt_irq, u32 phys_irq);
--int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq);
--bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
-+int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
-+			  u32 vintid);
-+int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int vintid);
-+bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int vintid);
+ source "virt/kvm/Kconfig"
++source "virt/lib/Kconfig"
  
- int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+ menuconfig VIRTUALIZATION
+ 	bool "Virtualization"
+@@ -35,6 +36,8 @@ config KVM
+ 	select HAVE_KVM_IRQCHIP
+ 	select HAVE_KVM_IRQ_ROUTING
+ 	select HAVE_KVM_MSI
++	select IRQ_BYPASS_MANAGER
++	select HAVE_KVM_IRQ_BYPASS
+ 	depends on ARM_VIRT_EXT && ARM_LPAE && ARM_ARCH_TIMER
+ 	---help---
+ 	  Support hosting virtualized guest machines.
+diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+index 52cb7ad9b2fd..7e0d6e63cc71 100644
+--- a/arch/arm64/kvm/Kconfig
++++ b/arch/arm64/kvm/Kconfig
+@@ -3,6 +3,7 @@
+ #
  
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 8e89d63005c7..b24e2f7b363a 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -647,9 +647,6 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
--	struct irq_desc *desc;
--	struct irq_data *data;
--	int phys_irq;
- 	int ret;
+ source "virt/kvm/Kconfig"
++source "virt/lib/Kconfig"
  
- 	if (timer->enabled)
-@@ -667,26 +664,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
- 		return -EINVAL;
- 	}
- 
--	/*
--	 * Find the physical IRQ number corresponding to the host_vtimer_irq
--	 */
--	desc = irq_to_desc(host_vtimer_irq);
--	if (!desc) {
--		kvm_err("%s: no interrupt descriptor\n", __func__);
--		return -EINVAL;
--	}
--
--	data = irq_desc_get_irq_data(desc);
--	while (data->parent_data)
--		data = data->parent_data;
--
--	phys_irq = data->hwirq;
--
--	/*
--	 * Tell the VGIC that the virtual interrupt is tied to a
--	 * physical interrupt. We do that once per VCPU.
--	 */
--	ret = kvm_vgic_map_phys_irq(vcpu, vtimer->irq.irq, phys_irq);
-+	ret = kvm_vgic_map_phys_irq(vcpu, host_vtimer_irq, vtimer->irq.irq);
- 	if (ret)
- 		return ret;
- 
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index fed717e07938..9d557efd1f7d 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -17,6 +17,8 @@
+ menuconfig VIRTUALIZATION
+ 	bool "Virtualization"
+@@ -35,6 +36,8 @@ config KVM
+ 	select HAVE_KVM_MSI
+ 	select HAVE_KVM_IRQCHIP
+ 	select HAVE_KVM_IRQ_ROUTING
++	select IRQ_BYPASS_MANAGER
++	select HAVE_KVM_IRQ_BYPASS
+ 	---help---
+ 	  Support hosting virtualized guest machines.
+ 	  We don't support KVM with 16K page tables yet, due to the multiple
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index b9f68e4add71..7ac4ecba9ebd 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -27,6 +27,8 @@
+ #include <linux/mman.h>
+ #include <linux/sched.h>
  #include <linux/kvm.h>
- #include <linux/kvm_host.h>
- #include <linux/list_sort.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
++#include <linux/kvm_irqfd.h>
++#include <linux/irqbypass.h>
+ #include <trace/events/kvm.h>
+ #include <kvm/arm_pmu.h>
  
- #include "vgic.h"
- 
-@@ -403,38 +405,66 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
- 	return 0;
+@@ -1449,6 +1451,44 @@ struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr)
+ 	return NULL;
  }
  
--int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, u32 virt_irq, u32 phys_irq)
-+/* @irq->irq_lock must be held */
-+static int kvm_vgic_map_irq(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
-+			    unsigned int host_irq)
- {
--	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
-+	struct irq_desc *desc;
-+	struct irq_data *data;
- 
--	BUG_ON(!irq);
--
--	spin_lock(&irq->irq_lock);
-+	/*
-+	 * Find the physical IRQ number corresponding to @host_irq
-+	 */
-+	desc = irq_to_desc(host_irq);
-+	if (!desc) {
-+		kvm_err("%s: no interrupt descriptor\n", __func__);
-+		return -EINVAL;
-+	}
-+	data = irq_desc_get_irq_data(desc);
-+	while (data->parent_data)
-+		data = data->parent_data;
- 
- 	irq->hw = true;
--	irq->hwintid = phys_irq;
-+	irq->host_irq = host_irq;
-+	irq->hwintid = data->hwirq;
++bool kvm_arch_has_irq_bypass(void)
++{
++	return true;
++}
++
++int kvm_arch_irq_bypass_add_producer(struct irq_bypass_consumer *cons,
++				      struct irq_bypass_producer *prod)
++{
++	struct kvm_kernel_irqfd *irqfd =
++		container_of(cons, struct kvm_kernel_irqfd, consumer);
++
 +	return 0;
 +}
-+
-+/* @irq->irq_lock must be held */
-+static inline void kvm_vgic_unmap_irq(struct vgic_irq *irq)
++void kvm_arch_irq_bypass_del_producer(struct irq_bypass_consumer *cons,
++				      struct irq_bypass_producer *prod)
 +{
-+	irq->hw = false;
-+	irq->hwintid = 0;
++	struct kvm_kernel_irqfd *irqfd =
++		container_of(cons, struct kvm_kernel_irqfd, consumer);
++
++	return;
 +}
 +
-+int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
-+			  u32 vintid)
++void kvm_arch_irq_bypass_stop(struct irq_bypass_consumer *cons)
 +{
-+	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
-+	int ret;
- 
-+	BUG_ON(!irq);
++	struct kvm_kernel_irqfd *irqfd =
++		container_of(cons, struct kvm_kernel_irqfd, consumer);
 +
-+	spin_lock(&irq->irq_lock);
-+	ret = kvm_vgic_map_irq(vcpu, irq, host_irq);
- 	spin_unlock(&irq->irq_lock);
- 	vgic_put_irq(vcpu->kvm, irq);
- 
--	return 0;
-+	return ret;
- }
- 
--int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq)
-+int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int vintid)
- {
- 	struct vgic_irq *irq;
- 
- 	if (!vgic_initialized(vcpu->kvm))
- 		return -EAGAIN;
- 
--	irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
-+	irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
- 	BUG_ON(!irq);
- 
- 	spin_lock(&irq->irq_lock);
--
--	irq->hw = false;
--	irq->hwintid = 0;
--
-+	kvm_vgic_unmap_irq(irq);
- 	spin_unlock(&irq->irq_lock);
- 	vgic_put_irq(vcpu->kvm, irq);
- 
-@@ -772,9 +802,9 @@ void vgic_kick_vcpus(struct kvm *kvm)
- 	}
- }
- 
--bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq)
-+bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int vintid)
- {
--	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
-+	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
- 	bool map_is_active;
- 
- 	spin_lock(&irq->irq_lock);
++	kvm_arm_halt_guest(irqfd->kvm);
++}
++
++void kvm_arch_irq_bypass_start(struct irq_bypass_consumer *cons)
++{
++	struct kvm_kernel_irqfd *irqfd =
++		container_of(cons, struct kvm_kernel_irqfd, consumer);
++
++	kvm_arm_resume_guest(irqfd->kvm);
++}
++
+ /**
+  * Initialize Hyp-mode and memory mappings on all CPUs.
+  */
 -- 
 2.14.1
