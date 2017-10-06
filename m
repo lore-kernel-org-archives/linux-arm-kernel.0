@@ -1,96 +1,166 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Fri,  6 Oct 2017 14:31:30 +0100
-Subject: [RFCv2 PATCH 03/36] iommu/process: Add public function to search for
- a process
+Date: Fri,  6 Oct 2017 14:31:33 +0100
+Subject: [RFCv2 PATCH 06/36] iommu: Extend fault reporting
 In-Reply-To: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
 References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
-Message-ID: <20171006133203.22803-4-jean-philippe.brucker@arm.com>
+Message-ID: <20171006133203.22803-7-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The fault handler will need to find a process given its PASID. This is
-the reason we have an IDR for storing processes, so hook it up.
+A number of new users will need additional information in the IOMMU fault
+report, such as PASID and/or PRI group. Pass a new iommu_fault structure
+to the driver callbacks.
+
+For the moment add the new API in parallel, with an "ext" prefix, to let
+users move to the new API at their pace. I think it would be nice to use a
+single API though. There are only 4 device drivers using it, and receiving
+an iommu_fault instead of iova/flags wouldn't hurt them much.
+
+For the same reason as the process_exit handler, set_fault_handler is done
+on a device rather than a domain (although for the moment stored in the
+domain). Even when multiple heterogenous devices are in the same IOMMU
+group, each of their driver might want to register a fault handler. At the
+moment they'll race to set the handler, and the winning driver will
+receive fault reports from other devices.
+
+The new registering function also takes flags as arguments, giving future
+users a way to specify at which point of the fault process they want to be
+called.
 
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
- drivers/iommu/iommu-process.c | 35 +++++++++++++++++++++++++++++++++++
- include/linux/iommu.h         | 12 ++++++++++++
- 2 files changed, 47 insertions(+)
+ drivers/iommu/iommu.c | 42 ++++++++++++++++++++++++++++++++++++++++++
+ include/linux/iommu.h | 18 ++++++++++++++++++
+ 2 files changed, 60 insertions(+)
 
-diff --git a/drivers/iommu/iommu-process.c b/drivers/iommu/iommu-process.c
-index 61ca0bd707c0..8f4c98632d58 100644
---- a/drivers/iommu/iommu-process.c
-+++ b/drivers/iommu/iommu-process.c
-@@ -145,6 +145,41 @@ static void iommu_process_put_locked(struct iommu_process *process)
- 	kref_put(&process->kref, iommu_process_release);
+diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+index f9cb89dd28f5..ee956b5fc301 100644
+--- a/drivers/iommu/iommu.c
++++ b/drivers/iommu/iommu.c
+@@ -1234,6 +1234,8 @@ EXPORT_SYMBOL_GPL(iommu_capable);
+  * This function should be used by IOMMU users which want to be notified
+  * whenever an IOMMU fault happens.
+  *
++ * Note that new users should use iommu_set_ext_fault_handler instead.
++ *
+  * The fault handler itself should return 0 on success, and an appropriate
+  * error code otherwise.
+  */
+@@ -1243,11 +1245,44 @@ void iommu_set_fault_handler(struct iommu_domain *domain,
+ {
+ 	BUG_ON(!domain);
+ 
++	if (WARN_ON(domain->ext_handler))
++		return;
++
+ 	domain->handler = handler;
+ 	domain->handler_token = token;
  }
+ EXPORT_SYMBOL_GPL(iommu_set_fault_handler);
  
 +/**
-+ * iommu_process_put - Put reference to process, freeing it if necessary.
-+ */
-+void iommu_process_put(struct iommu_process *process)
-+{
-+	spin_lock(&iommu_process_lock);
-+	iommu_process_put_locked(process);
-+	spin_unlock(&iommu_process_lock);
-+}
-+EXPORT_SYMBOL_GPL(iommu_process_put);
-+
-+/**
-+ * iommu_process_find - Find process associated to the given PASID
++ * iommu_set_ext_fault_handler() - set a fault handler for a device
++ * @dev: the device
++ * @handler: fault handler
++ * @token: user data, will be passed back to the fault handler
++ * @flags: IOMMU_FAULT_HANDLER_* parameters.
 + *
-+ * Returns the IOMMU process corresponding to this PASID, or NULL if not found.
-+ * A reference to the iommu_process is kept, and must be released with
-+ * iommu_process_put.
++ * This function should be used by IOMMU users which want to be notified
++ * whenever an IOMMU fault happens.
++ *
++ * The fault handler itself should return 0 on success, and an appropriate
++ * error code otherwise.
 + */
-+struct iommu_process *iommu_process_find(int pasid)
++void iommu_set_ext_fault_handler(struct device *dev,
++				 iommu_ext_fault_handler_t handler,
++				 void *token, int flags)
 +{
-+	struct iommu_process *process;
++	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
 +
-+	spin_lock(&iommu_process_lock);
-+	process = idr_find(&iommu_process_idr, pasid);
-+	if (process) {
-+		if (!iommu_process_get_locked(process))
-+			/* kref is 0, process is defunct */
-+			process = NULL;
-+	}
-+	spin_unlock(&iommu_process_lock);
++	if (WARN_ON(!domain))
++		return;
 +
-+	return process;
++	if (WARN_ON(domain->handler || domain->ext_handler))
++		return;
++
++	domain->ext_handler = handler;
++	domain->handler_token = token;
 +}
-+EXPORT_SYMBOL_GPL(iommu_process_find);
++EXPORT_SYMBOL_GPL(iommu_set_ext_fault_handler);
 +
- static int iommu_process_attach(struct iommu_domain *domain, struct device *dev,
- 				struct iommu_process *process)
+ static struct iommu_domain *__iommu_domain_alloc(struct bus_type *bus,
+ 						 unsigned type)
  {
+@@ -1787,6 +1822,10 @@ int report_iommu_fault(struct iommu_domain *domain, struct device *dev,
+ 		       unsigned long iova, int flags)
+ {
+ 	int ret = -ENOSYS;
++	struct iommu_fault fault = {
++		.address	= iova,
++		.flags		= flags,
++	};
+ 
+ 	/*
+ 	 * if upper layers showed interest and installed a fault handler,
+@@ -1795,6 +1834,9 @@ int report_iommu_fault(struct iommu_domain *domain, struct device *dev,
+ 	if (domain->handler)
+ 		ret = domain->handler(domain, dev, iova, flags,
+ 						domain->handler_token);
++	else if (domain->ext_handler)
++		ret = domain->ext_handler(domain, dev, &fault,
++					  domain->handler_token);
+ 
+ 	trace_io_page_fault(dev, iova, flags);
+ 	return ret;
 diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index 8d74f9058f30..e9528fcacab1 100644
+index e64c2711ea8d..ea4eaf585eb4 100644
 --- a/include/linux/iommu.h
 +++ b/include/linux/iommu.h
-@@ -733,12 +733,24 @@ const struct iommu_ops *iommu_ops_from_fwnode(struct fwnode_handle *fwnode)
- extern void iommu_set_process_exit_handler(struct device *dev,
- 					   iommu_process_exit_handler_t cb,
- 					   void *token);
-+extern struct iommu_process *iommu_process_find(int pasid);
-+extern void iommu_process_put(struct iommu_process *process);
+@@ -57,6 +57,14 @@ struct notifier_block;
+ typedef int (*iommu_fault_handler_t)(struct iommu_domain *,
+ 			struct device *, unsigned long, int, void *);
+ 
++struct iommu_fault {
++	unsigned long		address;
++	unsigned int		flags;
++};
 +
- #else /* CONFIG_IOMMU_PROCESS */
- static inline void iommu_set_process_exit_handler(struct device *dev,
- 						  iommu_process_exit_handler_t cb,
- 						  void *token)
++typedef int (*iommu_ext_fault_handler_t)(struct iommu_domain *, struct device *,
++					 struct iommu_fault *, void *);
++
+ /* All process are being detached from this device */
+ #define IOMMU_PROCESS_EXIT_ALL			(-1)
+ typedef int (*iommu_process_exit_handler_t)(struct iommu_domain *, struct device *dev,
+@@ -97,6 +105,7 @@ struct iommu_domain {
+ 	const struct iommu_ops *ops;
+ 	unsigned long pgsize_bitmap;	/* Bitmap of page sizes in use */
+ 	iommu_fault_handler_t handler;
++	iommu_ext_fault_handler_t ext_handler;
+ 	void *handler_token;
+ 	iommu_process_exit_handler_t process_exit;
+ 	void *process_exit_token;
+@@ -352,6 +361,9 @@ extern size_t default_iommu_map_sg(struct iommu_domain *domain, unsigned long io
+ extern phys_addr_t iommu_iova_to_phys(struct iommu_domain *domain, dma_addr_t iova);
+ extern void iommu_set_fault_handler(struct iommu_domain *domain,
+ 			iommu_fault_handler_t handler, void *token);
++extern void iommu_set_ext_fault_handler(struct device *dev,
++					iommu_ext_fault_handler_t handler,
++					void *token, int flags);
+ 
+ extern void iommu_get_resv_regions(struct device *dev, struct list_head *list);
+ extern void iommu_put_resv_regions(struct device *dev, struct list_head *list);
+@@ -566,6 +578,12 @@ static inline void iommu_set_fault_handler(struct iommu_domain *domain,
  {
  }
-+
-+static inline struct iommu_process *iommu_process_find(int pasid)
-+{
-+	return NULL;
-+}
-+
-+static inline void iommu_process_put(struct iommu_process *process)
-+{
-+}
- #endif /* CONFIG_IOMMU_PROCESS */
  
- #endif /* __LINUX_IOMMU_H */
++static inline void iommu_set_ext_fault_handler(struct device *dev,
++				 iommu_ext_fault_handler_t handler, void *token,
++				 int flags)
++{
++}
++
+ static inline void iommu_get_resv_regions(struct device *dev,
+ 					struct list_head *list)
+ {
 -- 
 2.13.3
