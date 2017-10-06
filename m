@@ -1,69 +1,32 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Fri,  6 Oct 2017 04:36:35 +0000
-Subject: [RFC 2/2] phy: exynos5-usbdrd: remove disable and enable of phy clk
-In-Reply-To: <1507264595-3565-1-git-send-email-linux.amoon@gmail.com>
-References: <1507264595-3565-1-git-send-email-linux.amoon@gmail.com>
-Message-ID: <1507264595-3565-2-git-send-email-linux.amoon@gmail.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Thu, 5 Oct 2017 23:41:10 -0500
+Subject: [PATCH 2/2] arm64: dts: qcom: Rename SBC to DragonBoard 410c
+In-Reply-To: <3241c0f0-cc40-0262-a771-a0b6fd020b54@suse.de>
+References: <20171003091155.7138-1-linus.walleij@linaro.org>
+ <20171003091155.7138-2-linus.walleij@linaro.org>
+ <b6b065c7-ad6b-d3da-704f-f139f12752d8@linaro.org>
+ <CAF6AEGta20EGJOvLcFWVfUa3kpfq+Udyp1QRNzjY8P290A2tVg@mail.gmail.com>
+ <CAP71Wjy2gEn=sGz5kN++=TdZ4S1cmE-3fdw-5__tdtR-M9RDGQ@mail.gmail.com>
+ <CAF6AEGvRB_SGQ_Xv33FiPZRyp+Wf29aG_Ex6rVk2Czov-Gjj9Q@mail.gmail.com>
+ <CAF6AEGvtfAYx5mgg9mMVeXdO5mStD9gJvi5+Pp46jYj-e8WnOQ@mail.gmail.com>
+ <CAAqcGH=aZSg7Dzv_Y2erUxmCaN7LXYqxgO9wnPKqSVX1fBuCMg@mail.gmail.com>
+ <3241c0f0-cc40-0262-a771-a0b6fd020b54@suse.de>
+Message-ID: <20171006044110.GA3105@hector>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-remove the disable and enable of phy clk.
-phy clk is needed to tune the phy controller.
+On Thu, Oct 05, 2017 at 03:06:34PM +0200, Alexander Graf wrote:
 
-Before:
-    mout_usbd300                          1            1    24000000          0 0
-       dout_usbd300                       0            0    24000000          0 0
-          sclk_usbd300                    0            0    24000000          0 0
-       dout_usbphy300                     1            1    24000000          0 0
-          sclk_usbphy300                  3            3    24000000          0 0
-    mout_usbd301                          1            1    24000000          0 0
-       dout_usbd301                       0            0    24000000          0 0
-          sclk_usbd301                    0            0    24000000          0 0
-       dout_usbphy301                     1            1    24000000          0 0
-          sclk_usbphy301                  2            2    24000000          0 0
-After:
-    mout_usbd300                          2            2    24000000          0 0
-       dout_usbd300                       1            1    24000000          0 0
-          sclk_usbd300                    2            2    24000000          0 0
-       dout_usbphy300                     1            1    24000000          0 0
-          sclk_usbphy300                  3            3    24000000          0 0
-    mout_usbd301                          2            2    24000000          0 0
-       dout_usbd301                       1            1    24000000          0 0
-          sclk_usbd301                    2            2    24000000          0 0
-       dout_usbphy301                     1            1    24000000          0 0
-          sclk_usbphy301                  2            2    24000000          0 0
+<snip>
 
-Signed-off-by: Anand Moon <linux.amoon@gmail.com>
----
- drivers/phy/samsung/phy-exynos5-usbdrd.c | 7 -------
- 1 file changed, 7 deletions(-)
+> You could also simply carry around both, with for example the dragonboard
+> one including sbc and overriding the machine name.
+> 
+> But please don't remove any device tree file names that were there before.
+> It only causes confusion for everyone.
 
-diff --git a/drivers/phy/samsung/phy-exynos5-usbdrd.c b/drivers/phy/samsung/phy-exynos5-usbdrd.c
-index 22c68f5..5e8054c 100644
---- a/drivers/phy/samsung/phy-exynos5-usbdrd.c
-+++ b/drivers/phy/samsung/phy-exynos5-usbdrd.c
-@@ -409,22 +409,15 @@ static int exynos5_usbdrd_phy_init(struct phy *phy)
- 	reg &= ~PHYCLKRST_PORTRESET;
- 	writel(reg, phy_drd->reg_phy + EXYNOS5_DRD_PHYCLKRST);
- 
--	clk_disable_unprepare(phy_drd->clk);
--
- 	return 0;
- }
- 
- static int exynos5_usbdrd_phy_exit(struct phy *phy)
- {
--	int ret;
- 	u32 reg;
- 	struct phy_usb_instance *inst = phy_get_drvdata(phy);
- 	struct exynos5_usbdrd_phy *phy_drd = to_usbdrd_phy(inst);
- 
--	ret = clk_prepare_enable(phy_drd->clk);
--	if (ret)
--		return ret;
--
- 	reg =	PHYUTMI_OTGDISABLE |
- 		PHYUTMI_FORCESUSPEND |
- 		PHYUTMI_FORCESLEEP;
--- 
-2.7.4
+This seems to be a reasonable solution.
+
+
+Regards,
+Andy
