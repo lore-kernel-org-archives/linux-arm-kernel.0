@@ -1,178 +1,110 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Fri,  6 Oct 2017 14:31:36 +0100
-Subject: [RFCv2 PATCH 09/36] iommu/fault: Allow blocking fault handlers
+Date: Fri,  6 Oct 2017 14:31:38 +0100
+Subject: [RFCv2 PATCH 11/36] iommu/arm-smmu-v3: Link domains and devices
 In-Reply-To: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
 References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
-Message-ID: <20171006133203.22803-10-jean-philippe.brucker@arm.com>
+Message-ID: <20171006133203.22803-12-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow device driver to register their fault handler at various stages of
-the handling path, by adding flags to iommu_set_ext_fault_handler. Since
-we now have a fault workqueue, it is quite easy to call their handler from
-thread context instead of IRQ handler.
+When removing a mapping from a domain, we need to send an invalidation to
+all devices that might have stored it in their Address Translation Cache
+(ATC). In addition with SVM, we'll need to invalidate context descriptors
+of all devices attached to a live domain.
 
-A driver can request to be called both in blocking and non-blocking
-context, so it can filter faults early and only execute the blocking code
-for some of them. Add the IOMMU_FAULT_ATOMIC fault flag to tell the driver
-where we're calling it from.
+Maintain a list of devices in each domain, protected by a spinlock. It is
+updated every time we attach or detach devices to and from domains.
+
+It needs to be a spinlock because we'll invalidate ATC entries from
+within hardirq-safe contexts, but it may be possible to relax the read
+side with RCU later.
 
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
+ drivers/iommu/arm-smmu-v3.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-Rob, would this do what you want? The MSM driver can register its handler
-with ATOMIC | BLOCKING flags. When called in IRQ context, it can ignore
-the fault by returning IOMMU_FAULT_STATUS_NONE, or drop it by returning
-IOMMU_FAULT_STATUS_INVALID. When called in thread context, it can sleep
-and then return IOMMU_FAULT_STATUS_INVALID to terminate the fault.
----
- drivers/iommu/io-pgfault.c | 16 ++++++++++++++--
- drivers/iommu/iommu.c      | 12 +++++++++---
- include/linux/iommu.h      | 20 +++++++++++++++++++-
- 3 files changed, 42 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/iommu/io-pgfault.c b/drivers/iommu/io-pgfault.c
-index 532bdb9ce519..3ec8179f58b5 100644
---- a/drivers/iommu/io-pgfault.c
-+++ b/drivers/iommu/io-pgfault.c
-@@ -91,6 +91,14 @@ static int iommu_fault_handle_single(struct iommu_fault_context *fault)
- 	unsigned int access_flags = 0;
- 	unsigned int fault_flags = FAULT_FLAG_REMOTE;
- 	struct iommu_fault *params = &fault->params;
-+	struct iommu_domain *domain = fault->domain;
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 22a6b08ef014..ecc424b15749 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -644,6 +644,11 @@ struct arm_smmu_device {
+ struct arm_smmu_master_data {
+ 	struct arm_smmu_device		*smmu;
+ 	struct arm_smmu_strtab_ent	ste;
 +
-+	if (domain->handler_flags & IOMMU_FAULT_HANDLER_BLOCKING) {
-+		ret = domain->ext_handler(domain, fault->dev, &fault->params,
-+					  domain->handler_token);
-+		if (ret != IOMMU_FAULT_STATUS_NONE)
-+			return ret;
-+	}
- 
- 	if (!(params->flags & IOMMU_FAULT_PASID))
- 		return ret;
-@@ -274,7 +282,8 @@ int handle_iommu_fault(struct iommu_domain *domain, struct device *dev,
- 	 * if upper layers showed interest and installed a fault handler,
- 	 * invoke it.
- 	 */
--	if (domain->ext_handler) {
-+	if (domain->handler_flags & IOMMU_FAULT_HANDLER_ATOMIC) {
-+		fault->flags |= IOMMU_FAULT_ATOMIC;
- 		ret = domain->ext_handler(domain, dev, fault,
- 					  domain->handler_token);
- 
-@@ -290,8 +299,11 @@ int handle_iommu_fault(struct iommu_domain *domain, struct device *dev,
- 	}
- 
- 	/* If the handler is blocking, handle fault in the workqueue */
--	if (fault->flags & IOMMU_FAULT_RECOVERABLE)
-+	if ((fault->flags & IOMMU_FAULT_RECOVERABLE) ||
-+	    (domain->handler_flags & IOMMU_FAULT_HANDLER_BLOCKING)) {
-+		fault->flags &= ~IOMMU_FAULT_ATOMIC;
- 		ret = iommu_queue_fault(domain, dev, fault);
-+	}
- 
- 	return iommu_fault_finish(domain, dev, fault, ret);
- }
-diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index ee956b5fc301..c189648ab7b4 100644
---- a/drivers/iommu/iommu.c
-+++ b/drivers/iommu/iommu.c
-@@ -1258,7 +1258,9 @@ EXPORT_SYMBOL_GPL(iommu_set_fault_handler);
-  * @dev: the device
-  * @handler: fault handler
-  * @token: user data, will be passed back to the fault handler
-- * @flags: IOMMU_FAULT_HANDLER_* parameters.
-+ * @flags: IOMMU_FAULT_HANDLER_* parameters. Allows the driver to tell when it
-+ * wants to be notified. By default the handler will only be called from atomic
-+ * context.
-  *
-  * This function should be used by IOMMU users which want to be notified
-  * whenever an IOMMU fault happens.
-@@ -1275,11 +1277,15 @@ void iommu_set_ext_fault_handler(struct device *dev,
- 	if (WARN_ON(!domain))
- 		return;
- 
-+	if (!flags)
-+		flags |= IOMMU_FAULT_HANDLER_ATOMIC;
++	struct arm_smmu_domain		*domain;
++	struct list_head		list; /* domain->devices */
 +
- 	if (WARN_ON(domain->handler || domain->ext_handler))
- 		return;
++	struct device			*dev;
+ };
  
- 	domain->ext_handler = handler;
- 	domain->handler_token = token;
-+	domain->handler_flags = flags;
- }
- EXPORT_SYMBOL_GPL(iommu_set_ext_fault_handler);
- 
-@@ -1824,7 +1830,7 @@ int report_iommu_fault(struct iommu_domain *domain, struct device *dev,
- 	int ret = -ENOSYS;
- 	struct iommu_fault fault = {
- 		.address	= iova,
--		.flags		= flags,
-+		.flags		= flags | IOMMU_FAULT_ATOMIC,
+ /* SMMU private data for an IOMMU domain */
+@@ -667,6 +672,9 @@ struct arm_smmu_domain {
  	};
  
- 	/*
-@@ -1834,7 +1840,7 @@ int report_iommu_fault(struct iommu_domain *domain, struct device *dev,
- 	if (domain->handler)
- 		ret = domain->handler(domain, dev, iova, flags,
- 						domain->handler_token);
--	else if (domain->ext_handler)
-+	else if (domain->handler_flags & IOMMU_FAULT_HANDLER_ATOMIC)
- 		ret = domain->ext_handler(domain, dev, &fault,
- 					  domain->handler_token);
- 
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index 37fafaf07ee2..a6d417785c7b 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -66,6 +66,8 @@ struct notifier_block;
- #define IOMMU_FAULT_GROUP		(1 << 6)
- /* Fault is last of its group */
- #define IOMMU_FAULT_LAST		(1 << 7)
-+/* The fault handler is being called from atomic context */
-+#define IOMMU_FAULT_ATOMIC		(1 << 8)
- 
- /**
-  * enum iommu_fault_status - Return status of fault handlers, telling the IOMMU
-@@ -97,6 +99,21 @@ enum iommu_fault_status {
- typedef int (*iommu_fault_handler_t)(struct iommu_domain *,
- 			struct device *, unsigned long, int, void *);
- 
-+/*
-+ * IOMMU_FAULT_HANDLER_ATOMIC: Notify device driver from within atomic context
-+ * (IRQ handler). The callback is not allowed to sleep. If the fault is
-+ * recoverable, the driver must either return a fault status telling the IOMMU
-+ * driver how to complete the fault (FAILURE, INVALID, HANDLED) or complete the
-+ * fault later with iommu_fault_response.
-+ */
-+#define IOMMU_FAULT_HANDLER_ATOMIC	(1 << 0)
-+/*
-+ * IOMMU_FAULT_HANDLER_BLOCKING: Notify device driver from a thread. If the fault
-+ * is recoverable, the driver must return a fault status telling the IOMMU
-+ * driver how to complete the fault (FAILURE, INVALID, HANDLED)
-+ */
-+#define IOMMU_FAULT_HANDLER_BLOCKING	(1 << 1)
+ 	struct iommu_domain		domain;
 +
- struct iommu_fault {
- 	/* Faulting address */
- 	unsigned long		address;
-@@ -161,6 +178,7 @@ struct iommu_domain {
- 	iommu_fault_handler_t handler;
- 	iommu_ext_fault_handler_t ext_handler;
- 	void *handler_token;
-+	int handler_flags;
- 	iommu_process_exit_handler_t process_exit;
- 	void *process_exit_token;
- 	struct iommu_domain_geometry geometry;
-@@ -633,7 +651,7 @@ static inline phys_addr_t iommu_iova_to_phys(struct iommu_domain *domain, dma_ad
++	struct list_head		devices;
++	spinlock_t			devices_lock;
+ };
+ 
+ struct arm_smmu_option_prop {
+@@ -1461,6 +1469,9 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
+ 	}
+ 
+ 	mutex_init(&smmu_domain->init_mutex);
++	INIT_LIST_HEAD(&smmu_domain->devices);
++	spin_lock_init(&smmu_domain->devices_lock);
++
+ 	return &smmu_domain->domain;
  }
  
- static inline void iommu_set_fault_handler(struct iommu_domain *domain,
--				iommu_fault_handler_t handler, void *token)
-+				iommu_fault_handler_t handler, void *token, int flags)
+@@ -1666,7 +1677,17 @@ static void arm_smmu_install_ste_for_dev(struct iommu_fwspec *fwspec)
+ 
+ static void arm_smmu_detach_dev(struct device *dev)
  {
- }
++	unsigned long flags;
+ 	struct arm_smmu_master_data *master = dev->iommu_fwspec->iommu_priv;
++	struct arm_smmu_domain *smmu_domain = master->domain;
++
++	if (smmu_domain) {
++		spin_lock_irqsave(&smmu_domain->devices_lock, flags);
++		list_del(&master->list);
++		spin_unlock_irqrestore(&smmu_domain->devices_lock, flags);
++
++		master->domain = NULL;
++	}
+ 
+ 	master->ste.assigned = false;
+ 	arm_smmu_install_ste_for_dev(dev->iommu_fwspec);
+@@ -1675,6 +1696,7 @@ static void arm_smmu_detach_dev(struct device *dev)
+ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+ {
+ 	int ret = 0;
++	unsigned long flags;
+ 	struct arm_smmu_device *smmu;
+ 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+ 	struct arm_smmu_master_data *master;
+@@ -1710,6 +1732,11 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+ 	}
+ 
+ 	ste->assigned = true;
++	master->domain = smmu_domain;
++
++	spin_lock_irqsave(&smmu_domain->devices_lock, flags);
++	list_add(&master->list, &smmu_domain->devices);
++	spin_unlock_irqrestore(&smmu_domain->devices_lock, flags);
+ 
+ 	if (smmu_domain->stage == ARM_SMMU_DOMAIN_BYPASS) {
+ 		ste->s1_cfg = NULL;
+@@ -1820,6 +1847,7 @@ static int arm_smmu_add_device(struct device *dev)
+ 			return -ENOMEM;
+ 
+ 		master->smmu = smmu;
++		master->dev = dev;
+ 		fwspec->iommu_priv = master;
+ 	}
  
 -- 
 2.13.3
