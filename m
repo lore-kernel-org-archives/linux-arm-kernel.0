@@ -1,59 +1,57 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 6 Oct 2017 19:24:28 +0100
-Subject: [GIT PULL] arm64 fixes for 4.14-rc4
-Message-ID: <20171006182426.udiie6pplnklwv5a@armageddon.cambridge.arm.com>
+From: hkallweit1@gmail.com (Heiner Kallweit)
+Date: Fri, 6 Oct 2017 20:47:43 +0200
+Subject: [PATCH 1/2] firmware: arm_scpi: drop unnecessary type cast to
+ scpi_shared_mem
+In-Reply-To: <2f742de8-3742-ef61-8d77-27adfbdce877@arm.com>
+References: <1507201911-27976-1-git-send-email-sudeep.holla@arm.com>
+ <54852f4b-78cc-061a-3c82-b753f289fee8@gmail.com>
+ <2f742de8-3742-ef61-8d77-27adfbdce877@arm.com>
+Message-ID: <17c7e5f2-4497-bc0c-bc6b-b09474bbebbf@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-Please pull the arm64 fixes below. Thanks.
-
-The following changes since commit 9e66317d3c92ddaab330c125dfe9d06eee268aff:
-
-  Linux 4.14-rc3 (2017-10-01 14:54:54 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
-
-for you to fetch changes up to ae2e972dae3cea795e9f8f94eb1601213c2d49f0:
-
-  arm64: Ensure fpsimd support is ready before userspace is active (2017-10-06 16:35:25 +0100)
-
-----------------------------------------------------------------
-arm64 fixes:
-
-- Bring initialisation of user space undefined instruction handling
-  early (core_initcall) since late_initcall() happens after modprobe in
-  initramfs is invoked. Similar fix for fpsimd initialisation
-
-- Increase the kernel stack when KASAN is enabled
-
-- Bring the PCI ACS enabling earlier via the
-  iort_init_platform_devices()
-
-- Fix misleading data abort address printing (decimal vs hex)
-
-----------------------------------------------------------------
-Lorenzo Pieralisi (1):
-      ACPI/IORT: Fix PCI ACS enablement
-
-Mark Rutland (2):
-      arm64: fix misleading data abort decoding
-      arm64: Use larger stacks when KASAN is selected
-
-Suzuki K Poulose (2):
-      arm64: Ensure the instruction emulation is ready for userspace
-      arm64: Ensure fpsimd support is ready before userspace is active
-
- arch/arm64/include/asm/memory.h      |  9 ++++++---
- arch/arm64/kernel/armv8_deprecated.c |  2 +-
- arch/arm64/kernel/cpufeature.c       |  2 +-
- arch/arm64/kernel/fpsimd.c           |  2 +-
- arch/arm64/mm/fault.c                |  2 +-
- drivers/acpi/arm64/iort.c            | 35 +++++++++++++++++++++++++++++++++++
- 6 files changed, 45 insertions(+), 7 deletions(-)
-
--- 
-Catalin
+Am 06.10.2017 um 10:51 schrieb Sudeep Holla:
+> 
+> 
+> On 05/10/17 20:06, Heiner Kallweit wrote:
+>> Am 05.10.2017 um 13:11 schrieb Sudeep Holla:
+>>> This patch drops the only present type cast of the SCPI payload pointer
+>>> to scpi_shared_mem inorder to align with other occurrences, IOW for
+>>> consistency.
+>>>
+>>> Cc: Heiner Kallweit <hkallweit1@gmail.com>
+>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>>> ---
+>>>  drivers/firmware/arm_scpi.c | 2 +-
+>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
+>>> index c923d1ebfa3e..a888970f1347 100644
+>>> --- a/drivers/firmware/arm_scpi.c
+>>> +++ b/drivers/firmware/arm_scpi.c
+>>> @@ -453,7 +453,7 @@ static void scpi_tx_prepare(struct mbox_client *c, void *msg)
+>>>  	unsigned long flags;
+>>>  	struct scpi_xfer *t = msg;
+>>>  	struct scpi_chan *ch = container_of(c, struct scpi_chan, cl);
+>>> -	struct scpi_shared_mem *mem = (struct scpi_shared_mem *)ch->tx_payload;
+>>> +	struct scpi_shared_mem *mem = ch->tx_payload;
+>>>  
+>> This should work fine, however it might not be 100% clean with regard to __iomem
+>> annotation. ch->tx_payload is of type "void __iomem *" and I would assume that
+>> sparse complains about the new statement.
+> 
+> Yes sparse complains for both(with or without typecast)
+> 
+>> The old one casts away the __iomem, what isn't much better IMO.
+>>
+> 
+> Agreed.
+> 
+>> By the way, I think this also applies to other places in this driver
+>> where ch->rx/tx_payload are used.
+>>
+> 
+> Yes, but do you have any alternatives in your mind ? I am happy to hear
+> that.
+> 
+I'll send a patch addressing this issue.
