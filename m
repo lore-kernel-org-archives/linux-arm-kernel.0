@@ -1,161 +1,111 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 6 Oct 2017 15:00:17 +0100
-Subject: [PATCH v1 2/2] kvm: arm64: handle single-step of userspace mmio
- instructions
-In-Reply-To: <877ew8xu9x.fsf@linaro.org>
-References: <20171006113921.24880-1-alex.bennee@linaro.org>
- <20171006113921.24880-3-alex.bennee@linaro.org>
- <ca10e4b9-08cc-486c-a229-da5ebcdb76cf@arm.com>
- <3c2eed4b-fc66-b87c-c61e-106efdfa78df@arm.com> <877ew8xu9x.fsf@linaro.org>
-Message-ID: <3a969f2f-29b5-7847-9633-15ac45812ebb@arm.com>
+From: shameerali.kolothum.thodi@huawei.com (Shameer Kolothum)
+Date: Fri, 6 Oct 2017 15:04:46 +0100
+Subject: [PATCH v9 0/4] iommu/smmu-v3: Workaround for hisilicon 161010801
+ erratum(reserve HW MSI)
+Message-ID: <20171006140450.89652-1-shameerali.kolothum.thodi@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/17 14:47, Alex Benn?e wrote:
-> 
-> Marc Zyngier <marc.zyngier@arm.com> writes:
-> 
->> On 06/10/17 13:37, Marc Zyngier wrote:
->>> On 06/10/17 12:39, Alex Benn?e wrote:
->>>> The system state of KVM when using userspace emulation is not complete
->>>> until we return into KVM_RUN. To handle mmio related updates we wait
->>>> until they have been committed and then schedule our KVM_EXIT_DEBUG.
->>>>
->>>> I've introduced a new function kvm_arm_maybe_return_debug() to wrap up
->>>> the differences between arm/arm64 which is currently null for arm.
->>>>
->>>> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->>>> ---
->>>>  arch/arm/include/asm/kvm_host.h   |  2 ++
->>>>  arch/arm64/include/asm/kvm_host.h |  1 +
->>>>  arch/arm64/kvm/debug.c            | 21 +++++++++++++++++++++
->>>>  arch/arm64/kvm/handle_exit.c      |  9 +++------
->>>>  virt/kvm/arm/arm.c                |  2 +-
->>>>  virt/kvm/arm/mmio.c               |  3 ++-
->>>>  6 files changed, 30 insertions(+), 8 deletions(-)
->>>>
->>>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->>>> index 4a879f6ff13b..aec943f6d123 100644
->>>> --- a/arch/arm/include/asm/kvm_host.h
->>>> +++ b/arch/arm/include/asm/kvm_host.h
->>>> @@ -285,6 +285,8 @@ static inline void kvm_arm_init_debug(void) {}
->>>>  static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
->>>>  static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
->>>>  static inline void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu) {}
->>>> +static inline int  kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu,
->>>> +						struct kvm_run *run) {}
->>>>
->>>>  int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
->>>>  			       struct kvm_device_attr *attr);
->>>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->>>> index e923b58606e2..fa67d21662f6 100644
->>>> --- a/arch/arm64/include/asm/kvm_host.h
->>>> +++ b/arch/arm64/include/asm/kvm_host.h
->>>> @@ -369,6 +369,7 @@ void kvm_arm_init_debug(void);
->>>>  void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
->>>>  void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
->>>>  void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu);
->>>> +int  kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu, struct kvm_run *run);
->>>>  int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
->>>>  			       struct kvm_device_attr *attr);
->>>>  int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
->>>> diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
->>>> index dbadfaf850a7..a10a18c55c87 100644
->>>> --- a/arch/arm64/kvm/debug.c
->>>> +++ b/arch/arm64/kvm/debug.c
->>>> @@ -221,3 +221,24 @@ void kvm_arm_clear_debug(struct kvm_vcpu *vcpu)
->>>>  		}
->>>>  	}
->>>>  }
->>>> +
->>>> +
->>>> +/*
->>>> + * When KVM has successfully emulated the instruction we might want to
->>>> + * return we a KVM_EXIT_DEBUG. We can only do this once the emulation
->>>> + * is complete though so for userspace emulations we have to wait
->>>> + * until we have re-entered KVM.
->>>> + *
->>>> + * Return > 0 to return to guest, 0 (and set exit_reason) on proper
->>>> + * exit to userspace.
->>>> + */
->>>> +
->>>> +int kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>>> +{
->>>> +	if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
->>>> +		run->exit_reason = KVM_EXIT_DEBUG;
->>>> +		run->debug.arch.hsr = ESR_ELx_EC_SOFTSTP_LOW << ESR_ELx_EC_SHIFT;
->>>> +		return 0;
->>>> +	}
->>>> +	return 1;
->>>> +}
->>>> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
->>>> index c918d291cb58..7b04f59217bf 100644
->>>> --- a/arch/arm64/kvm/handle_exit.c
->>>> +++ b/arch/arm64/kvm/handle_exit.c
->>>> @@ -202,13 +202,10 @@ static int handle_trap_exceptions(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>>>  		handled = exit_handler(vcpu, run);
->>>>  	}
->>>>
->>>> -	if (handled && (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP)) {
->>>> -		handled = 0;
->>>> -		run->exit_reason = KVM_EXIT_DEBUG;
->>>> -		run->debug.arch.hsr = ESR_ELx_EC_SOFTSTP_LOW << ESR_ELx_EC_SHIFT;
->>>> -	}
->>>> +	if (handled)
->>>> +		return kvm_arm_maybe_return_debug(vcpu, run);
->>>>
->>>> -	return handled;
->>>> +	return 0;
->>>>  }
->>>>
->>>>  /*
->>>> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
->>>> index b9f68e4add71..3d28fe2daa26 100644
->>>> --- a/virt/kvm/arm/arm.c
->>>> +++ b/virt/kvm/arm/arm.c
->>>> @@ -623,7 +623,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>>>
->>>>  	if (run->exit_reason == KVM_EXIT_MMIO) {
->>>>  		ret = kvm_handle_mmio_return(vcpu, vcpu->run);
->>>> -		if (ret)
->>>> +		if (ret < 1)
->>>>  			return ret;
->>>>  	}
->>>>
->>>> diff --git a/virt/kvm/arm/mmio.c b/virt/kvm/arm/mmio.c
->>>> index b6e715fd3c90..e43e3bd6222f 100644
->>>> --- a/virt/kvm/arm/mmio.c
->>>> +++ b/virt/kvm/arm/mmio.c
->>>> @@ -117,7 +117,8 @@ int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>>>  		vcpu_set_reg(vcpu, vcpu->arch.mmio_decode.rt, data);
->>>>  	}
->>>>
->>>> -	return 0;
->>>> +	/* If debugging in effect we may need to return now */
->>>> +	return kvm_arm_maybe_return_debug(vcpu, run);
->>>
->>> Ah, that's how you do it. OK. Then the patch splitting is wrong, because
->>> everything is broken after patch #1.
->>
->> Actually, it is not broken at all. I'm just confused by the very
->> esoteric flow.
-> 
-> We could just merge the whole patch in one but I wanted to show the
-> difference between in-kernel and out-of-kernel emulation.
-> 
-> I could also move the step handling to the mmio leg in
-> kvm_arch_vcpu_ioctl_run but you mentioned you use the mmio completion
-> elsewhere anyway?
-Yes, look at the end of io_mem_abort(). This is used by the vgic to
-complete a read emulation in the kernel.
+On certain HiSilicon platforms (hip06/hip07) the GIC ITS and PCIe RC
+deviates from the standard implementation and this breaks PCIe MSI
+functionality when SMMU is enabled.
 
-And actually, this means that we shouldn't have to mess with
-handle_exit. Just check for the return value of kvm_handle_mmio_return
-in the call sites (including the one in io_mem_abort), and exit if we
-need to single-step...
+The HiSilicon erratum 161010801 describes this limitation of certain
+HiSilicon platforms to support the SMMU mappings for MSI transactions.
+On these platforms GICv3 ITS translator is presented with the deviceID
+by extending the MSI payload data to 64 bits to include the deviceID.
+Hence, the PCIe controller on this platforms has to differentiate the MSI
+payload against other DMA payload and has to modify the MSI payload.
+This basically makes it difficult for this platforms to have a SMMU
+translation for MSI.
 
-Thoughts?
+This patch implements an ACPI and DT based quirk to reserve the hw msi
+regions in the smmu-v3 driver which means these address regions will
+not be translated and will be excluded from iova allocations.
 
-	M.
+To implement this quirk, the following changes are incorporated:
+1. Added a generic helper function to IORT code to retrieve the
+   associated ITS base address from a device IORT node.
+2. Added a generic helper function to of iommu code to retrieve the
+   associated msi controller base address from for a PCI RC
+   msi-mapping and also platform device msi-parent.
+3. Blacklisted HiSilicon PCIe controllers on DT based hip06/hip07
+   platforms when SMMUv3 is enabled as there is no DT based solution
+   for this as of now.
+
+Changelog:
+
+v8 --> v9
+-Thanks to Marc, fixed IORT helper function to reserve the ITS 
+ translater region only.
+-Removed the DT support for MSI reservation and blacklisted
+ HiSilicon PCIe controllers on DT based systems when SMMUv3 is
+ enabled.
+
+v7 --> v8
+Addressed comments from Rob and Lorenzo:
+ -Modified to use DT compatible string for errata.
+ -Changed logic to retrieve the msi-parent for DT case.
+
+v6 --> v7
+Addressed request from Will to add DT support for the erratum:
+ - added bt binding
+ - add of_iommu_msi_get_resv_regions()
+New arm64 silicon errata entry
+Rename iort_iommu_{its->msi}_get_resv_regions
+
+v5 --> v6
+Addressed comments from Robin and Lorenzo:
+-No change to patch#1 .
+-Reverted v5 patch#2 as this might break the platforms where this quirk
+  is not applicable. Provided a generic function in iommu code and added
+  back the quirk implementation in SMMU v3 driver(patch#3)
+ 
+v4 --> v5
+Addressed comments from Robin and Lorenzo:
+-Added a comment to make it clear that, for now, only straightforward 
+  HW topologies are handled while reserving ITS regions(patch #1).
+
+v3 --> v4
+Rebased on 4.13-rc1.
+Addressed comments from Robin, Will and Lorenzo:
+-As suggested by Robin, moved the ITS msi reservation into 
+  iommu_dma_get_resv_regions().
+-Added its_count != resv region failure case(patch #1).
+
+v2 --> v3
+Addressed comments from Lorenzo and Robin:
+-Removed dev_is_pci() check in smmuV3 driver.
+-Don't treat device not having an ITS mapping as an error in
+  iort helper function.
+
+v1 --> v2
+-patch 2/2: Invoke iort helper fn based on fwnode type(acpi).
+
+RFCv2 -->PATCH
+-Incorporated Lorenzo's review comments.
+
+RFC v1 --> RFC v2
+Based on Robin's review comments,
+-Removed  the generic erratum framework.
+-Using IORT/MADT tables to retrieve the ITS base addr instead  of vendor specific CSRT table.
+
+
+Shameer Kolothum (4):
+  ACPI/IORT: Add msi address regions reservation helper
+  iommu/dma: Add a helper function to reserve HW MSI address regions for
+    IOMMU drivers
+  iommu/arm-smmu-v3:Enable ACPI based HiSilicon erratum 161010801
+  PCI: hisi: blacklist hip06/hip07 controllers behind SMMUv3
+
+ drivers/acpi/arm64/iort.c        | 97 ++++++++++++++++++++++++++++++++++++++--
+ drivers/iommu/arm-smmu-v3.c      | 27 ++++++++---
+ drivers/iommu/dma-iommu.c        | 20 +++++++++
+ drivers/irqchip/irq-gic-v3-its.c |  3 +-
+ drivers/pci/dwc/pcie-hisi.c      | 12 +++++
+ include/linux/acpi_iort.h        |  7 ++-
+ include/linux/dma-iommu.h        |  7 +++
+ 7 files changed, 163 insertions(+), 10 deletions(-)
+
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
