@@ -1,109 +1,44 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  6 Oct 2017 16:33:56 +0100
-Subject: [PATCH v4 21/26] KVM: arm/arm64: GICv4: Hook vPE scheduling into vgic
- flush/sync
+Date: Fri,  6 Oct 2017 16:33:58 +0100
+Subject: [PATCH v4 23/26] KVM: arm/arm64: GICv4: Prevent a VM using GICv4 from
+ being saved
 In-Reply-To: <20171006153401.5481-1-marc.zyngier@arm.com>
 References: <20171006153401.5481-1-marc.zyngier@arm.com>
-Message-ID: <20171006153401.5481-22-marc.zyngier@arm.com>
+Message-ID: <20171006153401.5481-24-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The redistributor needs to be told which vPE is about to be run,
-and tells us whether there is any pending VLPI on exit.
+The GICv4 architecture doesn't make it easy for save/restore to
+work, as it doesn't give any guarantee that the pending state
+is written into the pending table.
 
-Let's add the scheduling calls to the vgic flush/sync functions,
-allowing the VLPIs to be delivered to the guest.
+So let's not take any chance, and let's return an error if
+we encounter any LPI that has the HW bit set.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-v4.c | 39 +++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.c    |  4 ++++
- virt/kvm/arm/vgic/vgic.h    |  2 ++
- 3 files changed, 45 insertions(+)
+ virt/kvm/arm/vgic/vgic-its.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
-index 5ee69aec990a..68a2ef6df161 100644
---- a/virt/kvm/arm/vgic/vgic-v4.c
-+++ b/virt/kvm/arm/vgic/vgic-v4.c
-@@ -130,6 +130,45 @@ void vgic_v4_teardown(struct kvm *kvm)
- 	its_vm->vpes = NULL;
- }
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index f434748439ee..01aa4d9d405e 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -1987,6 +1987,15 @@ static int vgic_its_save_itt(struct vgic_its *its, struct its_device *device)
+ 	list_for_each_entry(ite, &device->itt_head, ite_list) {
+ 		gpa_t gpa = base + ite->event_id * ite_esz;
  
-+int vgic_v4_sync_hwstate(struct kvm_vcpu *vcpu)
-+{
-+	if (!vgic_supports_direct_msis(vcpu->kvm))
-+		return 0;
++		/*
++		 * If an LPI carries the HW bit, this means that this
++		 * interrupt is controlled by GICv4, and we do not
++		 * have direct access to that state. Let's simply fail
++		 * the save operation...
++		 */
++		if (ite->irq->hw)
++			return -EINVAL;
 +
-+	return its_schedule_vpe(&vcpu->arch.vgic_cpu.vgic_v3.its_vpe, false);
-+}
-+
-+int vgic_v4_flush_hwstate(struct kvm_vcpu *vcpu)
-+{
-+	int irq = vcpu->arch.vgic_cpu.vgic_v3.its_vpe.irq;
-+	int err;
-+
-+	if (!vgic_supports_direct_msis(vcpu->kvm))
-+		return 0;
-+
-+	/*
-+	 * Before making the VPE resident, make sure the redistributor
-+	 * corresponding to our current CPU expects us here. See the
-+	 * doc in drivers/irqchip/irq-gic-v4.c to understand how this
-+	 * turns into a VMOVP command at the ITS level.
-+	 */
-+	err = irq_set_affinity(irq, cpumask_of(smp_processor_id()));
-+	if (err)
-+		return err;
-+
-+	err = its_schedule_vpe(&vcpu->arch.vgic_cpu.vgic_v3.its_vpe, true);
-+	if (err)
-+		return err;
-+
-+	/*
-+	 * Now that the VPE is resident, let's get rid of a potential
-+	 * doorbell interrupt that would still be pending.
-+	 */
-+	err = irq_set_irqchip_state(irq, IRQCHIP_STATE_PENDING, false);
-+
-+	return err;
-+}
-+
- static struct vgic_its *vgic_get_its(struct kvm *kvm,
- 				     struct kvm_kernel_irq_routing_entry *irq_entry)
- {
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 0691a2250949..71ca0ff1b35a 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -709,6 +709,8 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
- 
-+	WARN_ON(vgic_v4_sync_hwstate(vcpu));
-+
- 	/* An empty ap_list_head implies used_lrs == 0 */
- 	if (list_empty(&vcpu->arch.vgic_cpu.ap_list_head))
- 		return;
-@@ -721,6 +723,8 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
- /* Flush our emulation state into the GIC hardware before entering the guest. */
- void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
- {
-+	WARN_ON(vgic_v4_flush_hwstate(vcpu));
-+
- 	/*
- 	 * If there are no virtual interrupts active or pending for this
- 	 * VCPU, then there is no work to do and we can bail out without
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 1bd2e28ac097..1c65750892d7 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -245,5 +245,7 @@ int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
- bool vgic_supports_direct_msis(struct kvm *kvm);
- int vgic_v4_init(struct kvm *kvm);
- void vgic_v4_teardown(struct kvm *kvm);
-+int vgic_v4_sync_hwstate(struct kvm_vcpu *vcpu);
-+int vgic_v4_flush_hwstate(struct kvm_vcpu *vcpu);
- 
- #endif
+ 		ret = vgic_its_save_ite(its, device, ite, gpa, ite_esz);
+ 		if (ret)
+ 			return ret;
 -- 
 2.14.1
