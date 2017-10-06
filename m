@@ -1,138 +1,181 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Fri,  6 Oct 2017 14:31:47 +0100
-Subject: [RFCv2 PATCH 20/36] iommu/arm-smmu-v3: Track ASID state
+Date: Fri,  6 Oct 2017 14:31:55 +0100
+Subject: [RFCv2 PATCH 28/36] iommu/arm-smmu-v3: Maintain a SID->device
+ structure
 In-Reply-To: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
 References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
-Message-ID: <20171006133203.22803-21-jean-philippe.brucker@arm.com>
+Message-ID: <20171006133203.22803-29-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At the moment each SMMU has a 8- or 16-bit ASID set and allocates one ASID
-per device via a bitmap. ASIDs are used to differentiate address spaces in
-SMMU TLB entries. With SVM, sharing process address spaces with the SMMU,
-we need to use CPU ASIDs in SMMU contexts, to ensure that broadcast TLB
-invalidations reach the right IOTLB entries.
-
-When binding a process address space to a device, we become slaves to the
-arch ASID allocator. We have to use whatever ASID they give us. If a
-domain is currently using it, then we'll either abort or steal that ASID.
-
-To make matters worse, tasks are global, while domains are per-SMMU. SMMU
-ASIDs can be aliased across different SMMUs, but the CPU ASID space is
-unique across the whole system.
-
-Introduce an IDR for SMMU ASID allocation. It allows to keep information
-about an ASID, for instance which domain it is assigned to or how many
-devices are using it.
+When handling faults from the event or PRI queue, we need to find the
+struct device associated to a SID. Add a rb_tree to keep track of SIDs.
 
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 53 +++++++++++++++++++++++++++++++++++++--------
- 1 file changed, 44 insertions(+), 9 deletions(-)
+ drivers/iommu/arm-smmu-v3.c | 104 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 104 insertions(+)
 
 diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 96347aad605f..71fc3a2c8a95 100644
+index 7d68c6aecb14..4e915e649643 100644
 --- a/drivers/iommu/arm-smmu-v3.c
 +++ b/drivers/iommu/arm-smmu-v3.c
-@@ -640,6 +640,10 @@ struct arm_smmu_strtab_cfg {
- 	u32				strtab_base_cfg;
+@@ -721,10 +721,19 @@ struct arm_smmu_device {
+ 	/* IOMMU core code handle */
+ 	struct iommu_device		iommu;
+ 
++	struct rb_root			streams;
++	struct mutex			streams_mutex;
++
+ 	/* Notifier for the fault queue */
+ 	struct notifier_block		faultq_nb;
  };
  
-+struct arm_smmu_asid_state {
-+	struct arm_smmu_domain		*domain;
++struct arm_smmu_stream {
++	u32				id;
++	struct arm_smmu_master_data	*master;
++	struct rb_node			node;
 +};
 +
- /* An SMMUv3 instance */
- struct arm_smmu_device {
+ /* SMMU private data for each master */
+ struct arm_smmu_master_data {
+ 	struct arm_smmu_device		*smmu;
+@@ -732,6 +741,7 @@ struct arm_smmu_master_data {
+ 
+ 	struct arm_smmu_domain		*domain;
+ 	struct list_head		list; /* domain->devices */
++	struct arm_smmu_stream		*streams;
+ 
  	struct device			*dev;
-@@ -681,7 +685,8 @@ struct arm_smmu_device {
  
- #define ARM_SMMU_MAX_ASIDS		(1 << 16)
- 	unsigned int			asid_bits;
--	DECLARE_BITMAP(asid_map, ARM_SMMU_MAX_ASIDS);
-+	struct idr			asid_idr;
-+	spinlock_t			asid_lock;
- 
- #define ARM_SMMU_MAX_VMIDS		(1 << 16)
- 	unsigned int			vmid_bits;
-@@ -1828,7 +1833,11 @@ static void arm_smmu_domain_free(struct iommu_domain *domain)
- 		struct arm_smmu_s1_cfg *cfg = &smmu_domain->s1_cfg;
- 		if (cfg->num_contexts) {
- 			arm_smmu_free_cd_tables(smmu_domain);
--			arm_smmu_bitmap_free(smmu->asid_map, cfg->cd.asid);
-+
-+			spin_lock(&smmu->asid_lock);
-+			kfree(idr_find(&smmu->asid_idr, cfg->cd.asid));
-+			idr_remove(&smmu->asid_idr, cfg->cd.asid);
-+			spin_unlock(&smmu->asid_lock);
- 		}
- 	} else {
- 		struct arm_smmu_s2_cfg *cfg = &smmu_domain->s2_cfg;
-@@ -1844,25 +1853,48 @@ static int arm_smmu_domain_finalise_s1(struct arm_smmu_domain *smmu_domain,
- {
- 	int ret;
- 	int asid;
-+	struct arm_smmu_asid_state *asid_state;
- 	struct arm_smmu_device *smmu = smmu_domain->smmu;
- 	struct arm_smmu_s1_cfg *cfg = &smmu_domain->s1_cfg;
- 
--	asid = arm_smmu_bitmap_alloc(smmu->asid_map, smmu->asid_bits);
--	if (asid < 0)
--		return asid;
--
- 	ret = arm_smmu_alloc_cd_tables(smmu_domain);
- 	if (ret)
--		goto out_free_asid;
-+		return ret;
-+
-+	asid_state = kzalloc(sizeof(*asid_state), GFP_KERNEL);
-+	if (!asid_state) {
-+		ret = -ENOMEM;
-+		goto out_free_tables;
-+	}
-+
-+	asid_state->domain = smmu_domain;
-+
-+	idr_preload(GFP_KERNEL);
-+	spin_lock(&smmu->asid_lock);
-+	asid = idr_alloc_cyclic(&smmu->asid_idr, asid_state, 0,
-+				1 << smmu->asid_bits, GFP_ATOMIC);
- 
- 	cfg->cd.asid	= (u16)asid;
- 	cfg->cd.ttbr	= pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
- 	cfg->cd.tcr	= pgtbl_cfg->arm_lpae_s1_cfg.tcr;
- 	cfg->cd.mair	= pgtbl_cfg->arm_lpae_s1_cfg.mair[0];
-+
-+	spin_unlock(&smmu->asid_lock);
-+	idr_preload_end();
-+
-+	if (asid < 0) {
-+		ret = asid;
-+		goto out_free_asid_state;
-+	}
-+
+@@ -1571,6 +1581,31 @@ static int arm_smmu_init_l2_strtab(struct arm_smmu_device *smmu, u32 sid)
  	return 0;
- 
--out_free_asid:
--	arm_smmu_bitmap_free(smmu->asid_map, asid);
-+out_free_asid_state:
-+	kfree(asid_state);
-+
-+out_free_tables:
-+	arm_smmu_free_cd_tables(smmu_domain);
-+
- 	return ret;
  }
  
-@@ -2506,6 +2538,9 @@ static int arm_smmu_init_structures(struct arm_smmu_device *smmu)
- {
- 	int ret;
- 
-+	spin_lock_init(&smmu->asid_lock);
-+	idr_init(&smmu->asid_idr);
++static struct arm_smmu_master_data *
++arm_smmu_find_master(struct arm_smmu_device *smmu, u32 sid)
++{
++	struct rb_node *node;
++	struct arm_smmu_stream *stream;
++	struct arm_smmu_master_data *master = NULL;
 +
++	mutex_lock(&smmu->streams_mutex);
++	node = smmu->streams.rb_node;
++	while (node) {
++		stream = rb_entry(node, struct arm_smmu_stream, node);
++		if (stream->id < sid) {
++			node = node->rb_right;
++		} else if (stream->id > sid) {
++			node = node->rb_left;
++		} else {
++			master = stream->master;
++			break;
++		}
++	}
++	mutex_unlock(&smmu->streams_mutex);
++
++	return master;
++}
++
+ /* IRQ and event handlers */
+ static irqreturn_t arm_smmu_evtq_thread(int irq, void *dev)
+ {
+@@ -2555,6 +2590,71 @@ static bool arm_smmu_sid_in_range(struct arm_smmu_device *smmu, u32 sid)
+ 	return sid < limit;
+ }
+ 
++static int arm_smmu_insert_master(struct arm_smmu_device *smmu,
++				  struct arm_smmu_master_data *master)
++{
++	int i;
++	int ret = 0;
++	struct arm_smmu_stream *new_stream, *cur_stream;
++	struct rb_node **new_node, *parent_node = NULL;
++	struct iommu_fwspec *fwspec = master->dev->iommu_fwspec;
++
++	master->streams = kcalloc(fwspec->num_ids,
++				  sizeof(struct arm_smmu_stream), GFP_KERNEL);
++	if (!master->streams)
++		return -ENOMEM;
++
++	mutex_lock(&smmu->streams_mutex);
++	for (i = 0; i < fwspec->num_ids && !ret; i++) {
++		new_stream = &master->streams[i];
++		new_stream->id = fwspec->ids[i];
++		new_stream->master = master;
++
++		new_node = &(smmu->streams.rb_node);
++		while (*new_node) {
++			cur_stream = rb_entry(*new_node, struct arm_smmu_stream,
++					      node);
++			parent_node = *new_node;
++			if (cur_stream->id > new_stream->id) {
++				new_node = &((*new_node)->rb_left);
++			} else if (cur_stream->id < new_stream->id) {
++				new_node = &((*new_node)->rb_right);
++			} else {
++				dev_warn(master->dev,
++					 "stream %u already in tree\n",
++					 cur_stream->id);
++				ret = -EINVAL;
++				break;
++			}
++		}
++
++		if (!ret) {
++			rb_link_node(&new_stream->node, parent_node, new_node);
++			rb_insert_color(&new_stream->node, &smmu->streams);
++		}
++	}
++	mutex_unlock(&smmu->streams_mutex);
++
++	return ret;
++}
++
++static void arm_smmu_remove_master(struct arm_smmu_device *smmu,
++				   struct arm_smmu_master_data *master)
++{
++	int i;
++	struct iommu_fwspec *fwspec = master->dev->iommu_fwspec;
++
++	if (!master->streams)
++		return;
++
++	mutex_lock(&smmu->streams_mutex);
++	for (i = 0; i < fwspec->num_ids; i++)
++		rb_erase(&master->streams[i].node, &smmu->streams);
++	mutex_unlock(&smmu->streams_mutex);
++
++	kfree(master->streams);
++}
++
+ static struct iommu_ops arm_smmu_ops;
+ 
+ static int arm_smmu_add_device(struct device *dev)
+@@ -2609,6 +2709,7 @@ static int arm_smmu_add_device(struct device *dev)
+ 
+ 	group = iommu_group_get_for_dev(dev);
+ 	if (!IS_ERR(group)) {
++		arm_smmu_insert_master(smmu, master);
+ 		iommu_group_put(group);
+ 		iommu_device_link(&smmu->iommu, dev);
+ 	}
+@@ -2629,6 +2730,7 @@ static void arm_smmu_remove_device(struct device *dev)
+ 	smmu = master->smmu;
+ 	if (master && master->ste.assigned)
+ 		arm_smmu_detach_dev(dev);
++	arm_smmu_remove_master(smmu, master);
+ 	iommu_group_remove_device(dev);
+ 	iommu_device_unlink(&smmu->iommu, dev);
+ 	kfree(master);
+@@ -2936,6 +3038,8 @@ static int arm_smmu_init_structures(struct arm_smmu_device *smmu)
+ 
+ 	spin_lock_init(&smmu->asid_lock);
+ 	idr_init(&smmu->asid_idr);
++	mutex_init(&smmu->streams_mutex);
++	smmu->streams = RB_ROOT;
+ 
  	ret = arm_smmu_init_queues(smmu);
  	if (ret)
- 		return ret;
 -- 
 2.13.3
