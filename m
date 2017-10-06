@@ -1,37 +1,48 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri,  6 Oct 2017 14:16:53 +0100
-Subject: [PATCH 2/2] arm64: Ensure fpsimd support is ready before userspace is
- active
-In-Reply-To: <20171006131653.15876-1-suzuki.poulose@arm.com>
-References: <20171006131653.15876-1-suzuki.poulose@arm.com>
-Message-ID: <20171006131653.15876-2-suzuki.poulose@arm.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Fri, 6 Oct 2017 15:01:50 +0200
+Subject: [RESEND PATCH v5 4/4] ARM: configs: stm32: Add DMAMUX support in
+ STM32 defconfig
+In-Reply-To: <1506065492-31478-5-git-send-email-pierre-yves.mordret@st.com>
+References: <1506065492-31478-1-git-send-email-pierre-yves.mordret@st.com>
+ <1506065492-31478-5-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <5dfb2dc4-a286-b810-3707-82d39ab07ae5@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We register the pm/hotplug callbacks for FPSIMD as late_initcall,
-which happens after the userspace is active (from initramfs via
-populate_rootfs, a rootfs_initcall). Make sure we are ready even
-before the userspace could potentially use it, by promoting to
-a core_initcall.
+Hi,
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Dave Martin <dave.martin@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/kernel/fpsimd.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On 09/22/2017 09:31 AM, Pierre-Yves MORDRET wrote:
+> This patch adds DMAMUX support in STM32 defconfig file
+> 
+> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+> ---
+>   Version history:
+>      v5:
+>      v4:
+>      v3:
+>      v2:
+>          * None
+> ---
+> ---
+>   arch/arm/configs/stm32_defconfig | 1 +
+>   1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
+> index 90e5c46..988f395 100644
+> --- a/arch/arm/configs/stm32_defconfig
+> +++ b/arch/arm/configs/stm32_defconfig
+> @@ -67,6 +67,7 @@ CONFIG_RTC_CLASS=y
+>   CONFIG_RTC_DRV_STM32=y
+>   CONFIG_DMADEVICES=y
+>   CONFIG_STM32_DMA=y
+> +CONFIG_STM32_DMAMUX=y
+>   CONFIG_IIO=y
+>   CONFIG_STM32_ADC_CORE=y
+>   CONFIG_STM32_ADC=y
+> 
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index f444f374bd7b..5d547deb6996 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -444,4 +444,4 @@ static int __init fpsimd_init(void)
- 
- 	return 0;
- }
--late_initcall(fpsimd_init);
-+core_initcall(fpsimd_init);
--- 
-2.13.6
+Applied on stm32-defconfig-for-v4.15 branch.
+
+Thanks
+Alex
