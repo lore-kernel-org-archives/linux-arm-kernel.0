@@ -1,130 +1,136 @@
-From: philip@balister.org (Philip Balister)
-Date: Fri, 6 Oct 2017 07:58:40 -0700
-Subject: [PATCH 1/2] arm: dts: Add support for National Instruments
- Project Sulfur SDRs
-In-Reply-To: <58fe4e6c-8765-bd9a-0698-8f8326f95e40@xilinx.com>
-References: <20170911232223.91894-1-mdf@kernel.org>
- <314acb1f-1f0f-7893-70a8-9379c01112ac@xilinx.com>
- <20170925161136.GA12943@tyrael.ni.corp.natinst.com>
- <6b87e902-3201-6710-4921-d465dea19dcd@xilinx.com>
- <20170926175018.GA14962@tyrael.ni.corp.natinst.com>
- <dfb517fe-8584-2a1a-22e5-946980cc9644@balister.org>
- <a606ab17-6fb9-2ce1-3b3b-5a2e72d3fc7c@xilinx.com>
- <3b41cfc0-08b7-853d-3439-7f9848d04d3c@balister.org>
- <58fe4e6c-8765-bd9a-0698-8f8326f95e40@xilinx.com>
-Message-ID: <2ecee25d-bac5-d818-00bc-5361a21c9ac5@balister.org>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 6 Oct 2017 16:15:28 +0100
+Subject: [PATCH v2 11/28] arm64/sve: Core task context handling
+In-Reply-To: <20171006133639.ialgglabo7yca5bm@armageddon.cambridge.arm.com>
+References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
+ <1504198860-12951-12-git-send-email-Dave.Martin@arm.com>
+ <20170913143325.hi4cfcajbts3bbao@localhost>
+ <20171003113302.GR3611@e103592.cambridge.arm.com>
+ <20171005112835.2rhaqx23bhe6tnwl@armageddon.cambridge.arm.com>
+ <20171006131005.GA3611@e103592.cambridge.arm.com>
+ <20171006133639.ialgglabo7yca5bm@armageddon.cambridge.arm.com>
+Message-ID: <20171006151528.GB3611@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/06/2017 04:49 AM, Michal Simek wrote:
-> On 26.9.2017 20:15, Philip Balister wrote:
->> On 09/26/2017 02:06 PM, Michal Simek wrote:
->>> On 26.9.2017 19:58, Philip Balister wrote:
->>>> On 09/26/2017 01:50 PM, Moritz Fischer wrote:
->>>>> Michal,
->>>>>
->>>>> On Tue, Sep 26, 2017 at 02:54:48PM +0200, Michal Simek wrote:
->>>>>> Hi,
->>>>>>
->>>>>> On 25.9.2017 18:11, Moritz Fischer wrote:
->>>>>>> Hi Michal,
->>>>>>>
->>>>>>> On Mon, Sep 25, 2017 at 10:19:44AM +0200, Michal Simek wrote:
->>>>>>>> Hi Moritz
->>>>>>>>
->>>>>>>> sorry for delay.
->>>>>>>
->>>>>>> No problem.
->>>>>>>
->>>>>>>>
->>>>>>>> On 12.9.2017 01:22, Moritz Fischer wrote:
->>>>>>>>> Add support for the National Instruments Project Sulfur SDR
->>>>>>>>> motherboards Rev 2,3 and 4.
->>>>>>>>>
->>>>>>>>> Signed-off-by: Moritz Fischer <mdf@kernel.org>
->>>>>>>>> ---
->>>>>>>>>  arch/arm/boot/dts/Makefile                |   3 +
->>>>>>>>>  arch/arm/boot/dts/zynq-ni-sulfur-rev2.dts |  84 +++++++++++++++++++
->>>>>>>>>  arch/arm/boot/dts/zynq-ni-sulfur-rev3.dts | 118 ++++++++++++++++++++++++++
->>>>>>>>>  arch/arm/boot/dts/zynq-ni-sulfur-rev4.dts |  26 ++++++
->>>>>>>>>  arch/arm/boot/dts/zynq-ni-sulfur.dtsi     | 133 ++++++++++++++++++++++++++++++
->>>>>>>>>  5 files changed, 364 insertions(+)
->>>>>>>>>  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur-rev2.dts
->>>>>>>>>  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur-rev3.dts
->>>>>>>>>  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur-rev4.dts
->>>>>>>>>  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur.dtsi
->>>>>>>>
->>>>>>>> Is this publicly available board?
->>>>>>>
->>>>>>> Will be in Q1 2018 was announced at GRCon'17 ([1]).
->>>>>>> Some of the Rev3s are currently deployed in Norway as part of a radar
->>>>>>> system.
->>>>>>>
->>>>>>>> I am not quite sure we should apply these dts files. There are a lot of
->>>>>>>> boards with zynq and there must be any strong argument for applying this
->>>>>>>> to the tree. For arm32 with even flat tree structure.
->>>>>>>
->>>>>>> What's the issue with merging them, except for having 3 more files? 
->>>>>>
->>>>>> For me this is not a problem because on Linux side it is not increasing
->>>>>> build time.
->>>>>> I want to see the value for community. All xilinx platforms are
->>>>>> evaluation generic purpose boards which are showing how to connect stuff
->>>>>> together.
->>>>>> On the other hand this is real product.
->>>>>
->>>>> Uh.
->>>>>
->>>>>> I would let arm-soc maintainer to decide if this is fine or not. I
->>>>>> definitely don't want to end up in situation that we will have dts for
->>>>>> real products which are not bringing any value for others.
->>>>>
->>>>> Sure, it's the maintainers call.
->>>>>
->>>>> I do intend to have my customers run mainline on it eventually, currently
->>>>> I'm a handful of patches away from making that happen. So yes, running
->>>>> mainline is a usecase that matters to me.
->>>>>
->>>>> It is one thing to keep bitching about vendor kernels as a community
->>>>> continuously, but then if someone goes through the effort and actually
->>>>> tries to run mainline, you give them crap like that above.
->>>>>
->>>>> Our products usually come with full schematics [1], firmware, fpga code and all
->>>>> available, I don't know what makes them less useful to the community as a
->>>>> platform to experiment and develop on than Xilinx eval boards.
->>>>>
->>>>> There's several people that I know of both hobbyists and companies that
->>>>> build systems around these platforms, so I don't know ...
->>>>
->>>> I expect this product to be delivered with full source and a mainline
->>>> kernel, so lets make it easy for Moritz to do the right thing here. This
->>>> makes long term support of this product much easier.
->>>>
->>>> Acked-by: Philip Balister <philip@opensdr.com>
->>>
->>> I think this is the right way to go. Get ACK from Arnd or Olof or Kevin
->>> and I will merge this.
->>> I am simply just afraid that if a lot of zynq customers will ask for it
->>> we can will end up with a lot of zynq/zynqmp based dts files in the
->>> kernel and arm-soc guys will stop this that it is simply too much and
->>> won't accept +1 case.
->>
->> I share the same concerns. Unfortunately, there doesn't seem like any
->> other structured way to manage dts files.
->>
->> As an OpenEmbedded guy, I know I can carry them with BSP's, but not
->> everyone uses OpenEmbedded. I'd love to see a long term scalable
->> solution for tracking dts files, but that is outside the scope of
->> Moritz's request.
+On Fri, Oct 06, 2017 at 02:36:40PM +0100, Catalin Marinas wrote:
+> On Fri, Oct 06, 2017 at 02:10:09PM +0100, Dave P Martin wrote:
+> > On Thu, Oct 05, 2017 at 12:28:35PM +0100, Catalin Marinas wrote:
+> > > On Tue, Oct 03, 2017 at 12:33:03PM +0100, Dave P Martin wrote:
+> > > > TIF_FOREIGN_FPSTATE's meaning is expanded to cover SVE, but otherwise
+> > > > unchanged:
+> > > > 
+> > > >  * If a task is running and !TIF_FOREIGN_FPSTATE, then the the CPU
+> > > >    registers of the CPU the task is running on contain the authoritative
+> > > >    FPSIMD/SVE state of the task.  The backing memory may be stale.
+> > > > 
+> > > >  * Otherwise (i.e., task not running, or task running and
+> > > >    TIF_FOREIGN_FPSTATE), the task's FPSIMD/SVE backing memory is
+> > > >    authoritative.  If additionally per_cpu(fpsimd_last_state,
+> > > >    task->fpsimd_state.cpu) == &task->fpsimd_state.cpu, then
+> > > >    task->fpsimd_state.cpu's registers are also up to date for task, but
+> > > >    not authorititive: the current FPSIMD/SVE state may be read from
+> > > >    them, but they must not be written.
+> > > >  
+> > > > The FPSIMD/SVE backing memory is selected by TIF_SVE:
+> > > > 
+> > > >  * TIF_SVE set: Zn (incorporating Vn in bits[127:0]), Pn and FFR are
+> > > >    stored in task->thread.sve_state, formatted appropriately for vector
+> > > >    length task->thread.sve_vl.  task->thread.sve_state must point to a
+> > > >    valid buffer at least sve_state_size(task) bytes in size.
 > 
-> Are you guys coming to ELCE? There will be Devicetree Workshop which
-> will be good place to talk about this.
+> "Zn [...] stored in  task->thread.sve_state" - is this still true with
+> the changes you proposed? I guess even without these changes, you have
+> situations where the hardware regs are out of sync with sve_state (see
+> more below).
 
-Yes. When is the workshop?
+I guess I need to tweak the wording here.
 
-Philip
+TIF_SVE says where the vector state should be loaded/stored from,
+but does not say whether the data is up to date in memory, or when
+it should be loaded/stored.
+
+The latter is described by a cocktail of different things including
+which bit of kernel code we are executing if any, whether the task
+is running/stopped etc., TIF_FOREIGN_FPSTATE,
+task->thread.fpsimd_state.cpu and per_cpu(fpsimd_last_state).
+
+
+Does this make any better sense of my code below?
 
 > 
-> Thanks,
-> Michal
+> > > >  * TIF_SVE clear: Vn are stored in task->fpsimd_state; Zn[max : 128] are
+> > > >    logically zero[*] but not stored anywhere; Pn, FFR are not stored and
+> > > >    have unspecified values from userspace's point of view.
+> > > >    task->thread.sve_state does not need to be non-null, valid or any
+> > > >    particular size: it must not be dereferenced.
+> > > > 
+> > > >    In practice I don't exploit the "unspecifiedness" much.  The Zn high
+> > > >    bits, Pn and FFR are all zeroed when setting TIF_SVE again:
+> > > >    sve_alloc() is the common path for this.
+> > > > 
+> > > >  * FPSR and FPCR are always stored in task->fpsimd_state irrespctive of
+> > > >    whether TIF_SVE is clear or set, since these are not vector length
+> > > >    dependent.
+> [...]
+> > > Just wondering, as an optimisation for do_sve_acc() - instead of
+> > > sve_alloc() and fpsimd_to_sve(), can we not force the loading of the
+> > > FPSIMD regs on the return to user via TIF_FOREIGN_FPSTATE? This would
+> > > ensure the zeroing of the top SVE bits and we only need to allocate the
+> > > SVE state on the saving path. This means enabling SVE for user and
+> > > setting TIF_SVE without having the backing storage allocated.
+> > 
+> > Currently the set of places where the "TIF_SVE implies sve_state valid"
+> > assumption is applied is not very constrained, so while your suggestion
+> > is reasonable I'd rather not mess with it just now, if possible.
+> > 
+> > 
+> > But we can do this (which is what my current fixup has):
+> > 
+> > el0_sve_acc:
+> > 	enable_dbg_and_irq
+> > 	// ...
+> > 	bl	do_sve_acc
+> > 	b	ret_to_user
+> > 
+> > void do_sve_acc(unsigned int esr, struct pt_regs *regs)
+> > {
+> > 	/* Even if we chose not to use SVE, the hardware could still trap: */
+> > 	if (unlikely(!system_supports_sve()) || WARN_ON(is_compat_task())) {
+> > 		force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
+> > 		return;
+> > 	}
+> > 
+> > 	sve_alloc(current);
+> > 
+> > 	local_bh_disable();
+> > 	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+> > 		task_fpsimd_load(); /* flushes high Zn bits as a side-effect */
+> > 		sve_flush_pregs();
+> > 	} else {
+> > 		sve_flush_all(); /* flush all the SVE bits in-place */
+> > 	}
+> > 
+> > 	if (test_and_set_thread_flag(TIF_SVE))
+> > 		WARN_ON(1); /* SVE access shouldn't have trapped */
+> > 	local_bh_enable();
+> > }
+> > 
+> > where sve_flush_all() zeroes all the high Zn bits via a series of
+> > MOV Vn, Vn instructions, and also zeroes Pn and FFR.  sve_fplush_pregs()
+> > just does the latter.
 > 
+> This looks fine to me but I added a comment above. IIUC, we can now have
+> TIF_SVE set while sve_state contains stale data. I don't see an issue
+> given that every time you enter the kernel from user space you have
+> TIF_SVE set and the sve_state storage out of sync. Maybe tweak the
+> TIF_SVE description above slightly.
+> 
+
+See my comment above ... any better?
+
+If so, I'll paste some of that explanatory text into fpsimd.c (in lieu
+of a better place to put it).
+
+Cheers
+---Dave
