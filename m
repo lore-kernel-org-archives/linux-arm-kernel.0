@@ -1,178 +1,130 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 6 Oct 2017 15:43:20 +0100
-Subject: [PATCH v1 2/2] kvm: arm64: handle single-step of userspace mmio
- instructions
-In-Reply-To: <2c09d93e-e444-1c83-478e-c3d96f0f8893@arm.com>
-References: <20171006113921.24880-1-alex.bennee@linaro.org>
- <20171006113921.24880-3-alex.bennee@linaro.org>
- <ca10e4b9-08cc-486c-a229-da5ebcdb76cf@arm.com>
- <3c2eed4b-fc66-b87c-c61e-106efdfa78df@arm.com> <877ew8xu9x.fsf@linaro.org>
- <3a969f2f-29b5-7847-9633-15ac45812ebb@arm.com>
- <2c09d93e-e444-1c83-478e-c3d96f0f8893@arm.com>
-Message-ID: <76290ca2-96c8-8f13-bedf-485913c2fcd6@arm.com>
+From: philip@balister.org (Philip Balister)
+Date: Fri, 6 Oct 2017 07:58:40 -0700
+Subject: [PATCH 1/2] arm: dts: Add support for National Instruments
+ Project Sulfur SDRs
+In-Reply-To: <58fe4e6c-8765-bd9a-0698-8f8326f95e40@xilinx.com>
+References: <20170911232223.91894-1-mdf@kernel.org>
+ <314acb1f-1f0f-7893-70a8-9379c01112ac@xilinx.com>
+ <20170925161136.GA12943@tyrael.ni.corp.natinst.com>
+ <6b87e902-3201-6710-4921-d465dea19dcd@xilinx.com>
+ <20170926175018.GA14962@tyrael.ni.corp.natinst.com>
+ <dfb517fe-8584-2a1a-22e5-946980cc9644@balister.org>
+ <a606ab17-6fb9-2ce1-3b3b-5a2e72d3fc7c@xilinx.com>
+ <3b41cfc0-08b7-853d-3439-7f9848d04d3c@balister.org>
+ <58fe4e6c-8765-bd9a-0698-8f8326f95e40@xilinx.com>
+Message-ID: <2ecee25d-bac5-d818-00bc-5361a21c9ac5@balister.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/17 15:26, Julien Thierry wrote:
-> 
-> 
-> On 06/10/17 15:00, Marc Zyngier wrote:
->> On 06/10/17 14:47, Alex Benn?e wrote:
->>>
->>> Marc Zyngier <marc.zyngier@arm.com> writes:
->>>
->>>> On 06/10/17 13:37, Marc Zyngier wrote:
->>>>> On 06/10/17 12:39, Alex Benn?e wrote:
->>>>>> The system state of KVM when using userspace emulation is not complete
->>>>>> until we return into KVM_RUN. To handle mmio related updates we wait
->>>>>> until they have been committed and then schedule our KVM_EXIT_DEBUG.
->>>>>>
->>>>>> I've introduced a new function kvm_arm_maybe_return_debug() to wrap up
->>>>>> the differences between arm/arm64 which is currently null for arm.
->>>>>>
->>>>>> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->>>>>> ---
->>>>>>   arch/arm/include/asm/kvm_host.h   |  2 ++
->>>>>>   arch/arm64/include/asm/kvm_host.h |  1 +
->>>>>>   arch/arm64/kvm/debug.c            | 21 +++++++++++++++++++++
->>>>>>   arch/arm64/kvm/handle_exit.c      |  9 +++------
->>>>>>   virt/kvm/arm/arm.c                |  2 +-
->>>>>>   virt/kvm/arm/mmio.c               |  3 ++-
->>>>>>   6 files changed, 30 insertions(+), 8 deletions(-)
->>>>>>
->>>>>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->>>>>> index 4a879f6ff13b..aec943f6d123 100644
->>>>>> --- a/arch/arm/include/asm/kvm_host.h
->>>>>> +++ b/arch/arm/include/asm/kvm_host.h
->>>>>> @@ -285,6 +285,8 @@ static inline void kvm_arm_init_debug(void) {}
->>>>>>   static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
->>>>>>   static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
->>>>>>   static inline void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu) {}
->>>>>> +static inline int  kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu,
->>>>>> +						struct kvm_run *run) {}
->>>>>>
->>>>>>   int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
->>>>>>   			       struct kvm_device_attr *attr);
->>>>>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->>>>>> index e923b58606e2..fa67d21662f6 100644
->>>>>> --- a/arch/arm64/include/asm/kvm_host.h
->>>>>> +++ b/arch/arm64/include/asm/kvm_host.h
->>>>>> @@ -369,6 +369,7 @@ void kvm_arm_init_debug(void);
->>>>>>   void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
->>>>>>   void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
->>>>>>   void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu);
->>>>>> +int  kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu, struct kvm_run *run);
->>>>>>   int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
->>>>>>   			       struct kvm_device_attr *attr);
->>>>>>   int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
->>>>>> diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
->>>>>> index dbadfaf850a7..a10a18c55c87 100644
->>>>>> --- a/arch/arm64/kvm/debug.c
->>>>>> +++ b/arch/arm64/kvm/debug.c
->>>>>> @@ -221,3 +221,24 @@ void kvm_arm_clear_debug(struct kvm_vcpu *vcpu)
->>>>>>   		}
->>>>>>   	}
->>>>>>   }
->>>>>> +
->>>>>> +
->>>>>> +/*
->>>>>> + * When KVM has successfully emulated the instruction we might want to
->>>>>> + * return we a KVM_EXIT_DEBUG. We can only do this once the emulation
->>>>>> + * is complete though so for userspace emulations we have to wait
->>>>>> + * until we have re-entered KVM.
->>>>>> + *
->>>>>> + * Return > 0 to return to guest, 0 (and set exit_reason) on proper
->>>>>> + * exit to userspace.
->>>>>> + */
->>>>>> +
->>>>>> +int kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>>>>> +{
->>>>>> +	if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
->>>>>> +		run->exit_reason = KVM_EXIT_DEBUG;
->>>>>> +		run->debug.arch.hsr = ESR_ELx_EC_SOFTSTP_LOW << ESR_ELx_EC_SHIFT;
->>>>>> +		return 0;
->>>>>> +	}
->>>>>> +	return 1;
->>>>>> +}
->>>>>> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
->>>>>> index c918d291cb58..7b04f59217bf 100644
->>>>>> --- a/arch/arm64/kvm/handle_exit.c
->>>>>> +++ b/arch/arm64/kvm/handle_exit.c
->>>>>> @@ -202,13 +202,10 @@ static int handle_trap_exceptions(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>>>>>   		handled = exit_handler(vcpu, run);
->>>>>>   	}
->>>>>>
->>>>>> -	if (handled && (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP)) {
->>>>>> -		handled = 0;
->>>>>> -		run->exit_reason = KVM_EXIT_DEBUG;
->>>>>> -		run->debug.arch.hsr = ESR_ELx_EC_SOFTSTP_LOW << ESR_ELx_EC_SHIFT;
->>>>>> -	}
->>>>>> +	if (handled)
->>>>>> +		return kvm_arm_maybe_return_debug(vcpu, run);
->>>>>>
->>>>>> -	return handled;
->>>>>> +	return 0;
->>>>>>   }
->>>>>>
->>>>>>   /*
->>>>>> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
->>>>>> index b9f68e4add71..3d28fe2daa26 100644
->>>>>> --- a/virt/kvm/arm/arm.c
->>>>>> +++ b/virt/kvm/arm/arm.c
->>>>>> @@ -623,7 +623,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>>>>>
->>>>>>   	if (run->exit_reason == KVM_EXIT_MMIO) {
->>>>>>   		ret = kvm_handle_mmio_return(vcpu, vcpu->run);
->>>>>> -		if (ret)
->>>>>> +		if (ret < 1)
->>>>>>   			return ret;
->>>>>>   	}
->>>>>>
->>>>>> diff --git a/virt/kvm/arm/mmio.c b/virt/kvm/arm/mmio.c
->>>>>> index b6e715fd3c90..e43e3bd6222f 100644
->>>>>> --- a/virt/kvm/arm/mmio.c
->>>>>> +++ b/virt/kvm/arm/mmio.c
->>>>>> @@ -117,7 +117,8 @@ int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>>>>>   		vcpu_set_reg(vcpu, vcpu->arch.mmio_decode.rt, data);
->>>>>>   	}
->>>>>>
->>>>>> -	return 0;
->>>>>> +	/* If debugging in effect we may need to return now */
->>>>>> +	return kvm_arm_maybe_return_debug(vcpu, run);
+On 10/06/2017 04:49 AM, Michal Simek wrote:
+> On 26.9.2017 20:15, Philip Balister wrote:
+>> On 09/26/2017 02:06 PM, Michal Simek wrote:
+>>> On 26.9.2017 19:58, Philip Balister wrote:
+>>>> On 09/26/2017 01:50 PM, Moritz Fischer wrote:
+>>>>> Michal,
 >>>>>
->>>>> Ah, that's how you do it. OK. Then the patch splitting is wrong, because
->>>>> everything is broken after patch #1.
+>>>>> On Tue, Sep 26, 2017 at 02:54:48PM +0200, Michal Simek wrote:
+>>>>>> Hi,
+>>>>>>
+>>>>>> On 25.9.2017 18:11, Moritz Fischer wrote:
+>>>>>>> Hi Michal,
+>>>>>>>
+>>>>>>> On Mon, Sep 25, 2017 at 10:19:44AM +0200, Michal Simek wrote:
+>>>>>>>> Hi Moritz
+>>>>>>>>
+>>>>>>>> sorry for delay.
+>>>>>>>
+>>>>>>> No problem.
+>>>>>>>
+>>>>>>>>
+>>>>>>>> On 12.9.2017 01:22, Moritz Fischer wrote:
+>>>>>>>>> Add support for the National Instruments Project Sulfur SDR
+>>>>>>>>> motherboards Rev 2,3 and 4.
+>>>>>>>>>
+>>>>>>>>> Signed-off-by: Moritz Fischer <mdf@kernel.org>
+>>>>>>>>> ---
+>>>>>>>>>  arch/arm/boot/dts/Makefile                |   3 +
+>>>>>>>>>  arch/arm/boot/dts/zynq-ni-sulfur-rev2.dts |  84 +++++++++++++++++++
+>>>>>>>>>  arch/arm/boot/dts/zynq-ni-sulfur-rev3.dts | 118 ++++++++++++++++++++++++++
+>>>>>>>>>  arch/arm/boot/dts/zynq-ni-sulfur-rev4.dts |  26 ++++++
+>>>>>>>>>  arch/arm/boot/dts/zynq-ni-sulfur.dtsi     | 133 ++++++++++++++++++++++++++++++
+>>>>>>>>>  5 files changed, 364 insertions(+)
+>>>>>>>>>  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur-rev2.dts
+>>>>>>>>>  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur-rev3.dts
+>>>>>>>>>  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur-rev4.dts
+>>>>>>>>>  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur.dtsi
+>>>>>>>>
+>>>>>>>> Is this publicly available board?
+>>>>>>>
+>>>>>>> Will be in Q1 2018 was announced at GRCon'17 ([1]).
+>>>>>>> Some of the Rev3s are currently deployed in Norway as part of a radar
+>>>>>>> system.
+>>>>>>>
+>>>>>>>> I am not quite sure we should apply these dts files. There are a lot of
+>>>>>>>> boards with zynq and there must be any strong argument for applying this
+>>>>>>>> to the tree. For arm32 with even flat tree structure.
+>>>>>>>
+>>>>>>> What's the issue with merging them, except for having 3 more files? 
+>>>>>>
+>>>>>> For me this is not a problem because on Linux side it is not increasing
+>>>>>> build time.
+>>>>>> I want to see the value for community. All xilinx platforms are
+>>>>>> evaluation generic purpose boards which are showing how to connect stuff
+>>>>>> together.
+>>>>>> On the other hand this is real product.
+>>>>>
+>>>>> Uh.
+>>>>>
+>>>>>> I would let arm-soc maintainer to decide if this is fine or not. I
+>>>>>> definitely don't want to end up in situation that we will have dts for
+>>>>>> real products which are not bringing any value for others.
+>>>>>
+>>>>> Sure, it's the maintainers call.
+>>>>>
+>>>>> I do intend to have my customers run mainline on it eventually, currently
+>>>>> I'm a handful of patches away from making that happen. So yes, running
+>>>>> mainline is a usecase that matters to me.
+>>>>>
+>>>>> It is one thing to keep bitching about vendor kernels as a community
+>>>>> continuously, but then if someone goes through the effort and actually
+>>>>> tries to run mainline, you give them crap like that above.
+>>>>>
+>>>>> Our products usually come with full schematics [1], firmware, fpga code and all
+>>>>> available, I don't know what makes them less useful to the community as a
+>>>>> platform to experiment and develop on than Xilinx eval boards.
+>>>>>
+>>>>> There's several people that I know of both hobbyists and companies that
+>>>>> build systems around these platforms, so I don't know ...
 >>>>
->>>> Actually, it is not broken at all. I'm just confused by the very
->>>> esoteric flow.
+>>>> I expect this product to be delivered with full source and a mainline
+>>>> kernel, so lets make it easy for Moritz to do the right thing here. This
+>>>> makes long term support of this product much easier.
+>>>>
+>>>> Acked-by: Philip Balister <philip@opensdr.com>
 >>>
->>> We could just merge the whole patch in one but I wanted to show the
->>> difference between in-kernel and out-of-kernel emulation.
->>>
->>> I could also move the step handling to the mmio leg in
->>> kvm_arch_vcpu_ioctl_run but you mentioned you use the mmio completion
->>> elsewhere anyway?
->> Yes, look at the end of io_mem_abort(). This is used by the vgic to
->> complete a read emulation in the kernel.
+>>> I think this is the right way to go. Get ACK from Arnd or Olof or Kevin
+>>> and I will merge this.
+>>> I am simply just afraid that if a lot of zynq customers will ask for it
+>>> we can will end up with a lot of zynq/zynqmp based dts files in the
+>>> kernel and arm-soc guys will stop this that it is simply too much and
+>>> won't accept +1 case.
 >>
->> And actually, this means that we shouldn't have to mess with
->> handle_exit. Just check for the return value of kvm_handle_mmio_return
->> in the call sites (including the one in io_mem_abort), and exit if we
->> need to single-step...
+>> I share the same concerns. Unfortunately, there doesn't seem like any
+>> other structured way to manage dts files.
 >>
+>> As an OpenEmbedded guy, I know I can carry them with BSP's, but not
+>> everyone uses OpenEmbedded. I'd love to see a long term scalable
+>> solution for tracking dts files, but that is outside the scope of
+>> Moritz's request.
 > 
-> I think we need to mess with handle_exit (or at least something else 
-> than kvm_handle_mmio call sites) because the patches don't only fix MMIO 
-> single stepping, but also other emulated stuff (system register 
-> accesses, ...).
+> Are you guys coming to ELCE? There will be Devicetree Workshop which
+> will be good place to talk about this.
 
-Ah, true. I was too focussed on the the MMIO problem.
+Yes. When is the workshop?
 
-> But with your suggestion maybe we can at least handle both MMIO cases in 
-> a similar manner. I think we still need the code in handle_exit, or add 
-> more code to deal case by case with other emulated instructions.
-Fair enough.
+Philip
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> 
+> Thanks,
+> Michal
+> 
