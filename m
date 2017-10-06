@@ -1,47 +1,32 @@
-From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Fri,  6 Oct 2017 12:13:43 +0200
-Subject: [PATCH 15/16] arm64: dts: marvell: armada-3720-db: enable second UART
- port
-In-Reply-To: <20171006101344.15590-1-miquel.raynal@free-electrons.com>
-References: <20171006101344.15590-1-miquel.raynal@free-electrons.com>
-Message-ID: <20171006101344.15590-16-miquel.raynal@free-electrons.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Fri,  6 Oct 2017 11:36:05 +0100
+Subject: [PATCH v7 1/6] perf: Export perf_event_update_userpage
+In-Reply-To: <20171006103610.11853-1-suzuki.poulose@arm.com>
+References: <20171006103610.11853-1-suzuki.poulose@arm.com>
+Message-ID: <20171006103610.11853-2-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable Armada-3720-DB second UART port by adding the corresponding
-device tree node in the board DTS and enabling it.
+Export perf_event_update_userpage() so that PMU driver using them,
+can be built as modules.
 
-Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+Cc: Peter Zilstra <peterz@infradead.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/boot/dts/marvell/armada-3720-db.dts | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ kernel/events/core.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-index 9df0f06ce607..15713c19b3d0 100644
---- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-@@ -216,7 +216,7 @@
+diff --git a/kernel/events/core.c b/kernel/events/core.c
+index 6bc21e202ae4..162f5ba756a9 100644
+--- a/kernel/events/core.c
++++ b/kernel/events/core.c
+@@ -4982,6 +4982,7 @@ void perf_event_update_userpage(struct perf_event *event)
+ unlock:
+ 	rcu_read_unlock();
+ }
++EXPORT_SYMBOL_GPL(perf_event_update_userpage);
  
- /*
-  * Exported on the micro USB connector CON30(V2.0)/CON32(V1.4) through
-- * an FTDI
-+ * an FTDI (also on CON24(V2.0)/CON26(V1.4)).
-  */
- &uart0 {
- 	pinctrl-names = "default";
-@@ -224,6 +224,13 @@
- 	status = "okay";
- };
- 
-+/* CON26(V2.0)/CON28(V1.4) */
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart2_pins>;
-+	status = "okay";
-+};
-+
- /* CON27(V2.0)/CON29(V1.4) */
- &usb2 {
- 	status = "okay";
+ static int perf_mmap_fault(struct vm_fault *vmf)
+ {
 -- 
-2.11.0
+2.13.6
