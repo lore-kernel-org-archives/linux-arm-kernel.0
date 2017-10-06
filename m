@@ -1,85 +1,44 @@
 From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Fri, 6 Oct 2017 09:01:55 +0000
-Subject: [PATCH 1/2] ARM: dts: iwg20d-q7: Rework DT architecture
-In-Reply-To: <CAMuHMdW-Y7tK28YAGBRMqdgZK7vVqnUcud1FtzQd6wLrKii_AA@mail.gmail.com>
+Date: Fri, 6 Oct 2017 09:06:14 +0000
+Subject: [PATCH 2/2] ARM: dts: iwg20d-q7-dbcm-ca: Add device trees for
+ camera DB
+In-Reply-To: <CAMuHMdU-zOogwOKS_s8-r_fsUfXxu38WKkaoryuuuGGJzmBkSw@mail.gmail.com>
 References: <1507108713-10686-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1507108713-10686-2-git-send-email-fabrizio.castro@bp.renesas.com>
- <CAMuHMdW-Y7tK28YAGBRMqdgZK7vVqnUcud1FtzQd6wLrKii_AA@mail.gmail.com>
-Message-ID: <TY1PR06MB0895158D1245B1DF150DC9DAC0710@TY1PR06MB0895.apcprd06.prod.outlook.com>
+ <1507108713-10686-3-git-send-email-fabrizio.castro@bp.renesas.com>
+ <CAMuHMdU-zOogwOKS_s8-r_fsUfXxu38WKkaoryuuuGGJzmBkSw@mail.gmail.com>
+Message-ID: <TY1PR06MB0895E77A6CC9BF8B042E9553C0710@TY1PR06MB0895.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Geert,
+Hi Geert,
 
->
 > Hi Fabrizio,
 >
 > On Wed, Oct 4, 2017 at 11:18 AM, Fabrizio Castro
 > <fabrizio.castro@bp.renesas.com> wrote:
-> > Since the same carrier board may host RZ/G1M and RZ/G1N based
-> > Systems on Module, the DT architecture for iwg20d-q7 needs
-> > better decoupling. This patch provides:
-> > * iwg20d-q7-common.dtsi - its purpose is to define the carrier
-> >   board definitions, and its content is basically the same
-> >   as the previous version of r8a7743-iwg20d-q7.dts, only it
-> >   has no reference to the SoM .dtsi, and that's why the
-> >   filename doesn't mention the SoC name any more.
-> > * r8a7743-iwg20d-q7.dts - its new purpose is to put together
-> >   the SoM .dtsi (r8a7743-iwg20m.dtsi) and the carrier board
-> >   .dtsi defined by this very patch, along with "model" and
-> >   "compatible" properties.
-> > The final DT architecture to describe the board is now:
-> > r8a7743-iwg20d-q7.dts           # Carrier Board + SoM
-> > ??? r8a7743-iwg20m.dtsi         # SoM
-> > ?   ??? r8a7743.dtsi            # SoC
-> > ??? iwg20d-q7-common.dtsi       # Carrier Board
-> > and maximizes the reuse of the definitions for the carrier board
-> > and for the SoM.
+> > This patch adds a .dtsi that describes the camera daughter board
+> > and a .dts to describe the HW made of iWave's RZ/G1M SoM, iWave's
+> > RZ/G1M/G1N Qseven carrier board, and the camera daughter board.
+> > The camera daughter board .dtsi adds support for ttySC[14].
 > >
 > > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 > > Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
 >
-> Thanks for your patch!
->
 > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 >
 > > --- /dev/null
-> > +++ b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
+> > +++ b/arch/arm/boot/dts/iwg20d-q7-dbcm-ca.dtsi
 >
-> > +&pfc {
-> > +       i2c2_pins: i2c2 {
-> > +               groups = "i2c2";
-> > +               function = "i2c2";
-> > +       };
-> > +
-> > +       scif0_pins: scif0 {
-> > +               groups = "scif0_data_d";
-> > +               function = "scif0";
-> > +       };
-> > +
-> > +       avb_pins: avb {
-> > +               groups = "avb_mdio", "avb_gmii";
-> > +               function = "avb";
-> > +       };
+> > +/ {
+> > +       aliases {
+> > +               serial1 = &scif1;
+> > +               serial4 = &hscif1;
 >
-> Perhaps you want to use this opportunity to restore alphabetical sort order?
+> BTW, what's the reason you picked serial4 for the third serial port?
 
-good idea
-
->
-> > +&scif0 {
->
-> [...]
->
-> > +};
-> > +
-> > +&avb {
->
-> Likewise.
->
-> Can be a separate patch, though.
-
-I'll send a V2 for this.
+Because it matches the configuration iWave had in their official release based on
+kernel 3.10. We decided to keep the same numbering scheme as a precaution to
+avoid breaking existing code.
 
 Thanks,
 Fab
