@@ -1,65 +1,68 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 6 Oct 2017 16:33:13 +0100
-Subject: [PATCH v2 11/28] arm64/sve: Core task context handling
-In-Reply-To: <20171006151528.GB3611@e103592.cambridge.arm.com>
-References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
- <1504198860-12951-12-git-send-email-Dave.Martin@arm.com>
- <20170913143325.hi4cfcajbts3bbao@localhost>
- <20171003113302.GR3611@e103592.cambridge.arm.com>
- <20171005112835.2rhaqx23bhe6tnwl@armageddon.cambridge.arm.com>
- <20171006131005.GA3611@e103592.cambridge.arm.com>
- <20171006133639.ialgglabo7yca5bm@armageddon.cambridge.arm.com>
- <20171006151528.GB3611@e103592.cambridge.arm.com>
-Message-ID: <20171006153312.cushhcb4m2qc4kwd@armageddon.cambridge.arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 6 Oct 2017 16:33:10 +0100
+Subject: Follow-up: How to deal with weird SCPI firmware and invalid DVFS
+ frequencies
+In-Reply-To: <a96ffcce-7399-97c6-10be-88869c77ccef@gmail.com>
+References: <a96ffcce-7399-97c6-10be-88869c77ccef@gmail.com>
+Message-ID: <98d54730-9756-6c00-64ce-1ec43d8cf770@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 06, 2017 at 04:15:28PM +0100, Dave P Martin wrote:
-> On Fri, Oct 06, 2017 at 02:36:40PM +0100, Catalin Marinas wrote:
-> > On Fri, Oct 06, 2017 at 02:10:09PM +0100, Dave P Martin wrote:
-> > > On Thu, Oct 05, 2017 at 12:28:35PM +0100, Catalin Marinas wrote:
-> > > > On Tue, Oct 03, 2017 at 12:33:03PM +0100, Dave P Martin wrote:
-> > > > > TIF_FOREIGN_FPSTATE's meaning is expanded to cover SVE, but otherwise
-> > > > > unchanged:
-> > > > > 
-> > > > >  * If a task is running and !TIF_FOREIGN_FPSTATE, then the the CPU
-> > > > >    registers of the CPU the task is running on contain the authoritative
-> > > > >    FPSIMD/SVE state of the task.  The backing memory may be stale.
-> > > > > 
-> > > > >  * Otherwise (i.e., task not running, or task running and
-> > > > >    TIF_FOREIGN_FPSTATE), the task's FPSIMD/SVE backing memory is
-> > > > >    authoritative.  If additionally per_cpu(fpsimd_last_state,
-> > > > >    task->fpsimd_state.cpu) == &task->fpsimd_state.cpu, then
-> > > > >    task->fpsimd_state.cpu's registers are also up to date for task, but
-> > > > >    not authorititive: the current FPSIMD/SVE state may be read from
-> > > > >    them, but they must not be written.
-> > > > >  
-> > > > > The FPSIMD/SVE backing memory is selected by TIF_SVE:
-> > > > > 
-> > > > >  * TIF_SVE set: Zn (incorporating Vn in bits[127:0]), Pn and FFR are
-> > > > >    stored in task->thread.sve_state, formatted appropriately for vector
-> > > > >    length task->thread.sve_vl.  task->thread.sve_state must point to a
-> > > > >    valid buffer at least sve_state_size(task) bytes in size.
-> > 
-> > "Zn [...] stored in  task->thread.sve_state" - is this still true with
-> > the changes you proposed? I guess even without these changes, you have
-> > situations where the hardware regs are out of sync with sve_state (see
-> > more below).
-> 
-> I guess I need to tweak the wording here.
-> 
-> TIF_SVE says where the vector state should be loaded/stored from,
-> but does not say whether the data is up to date in memory, or when
-> it should be loaded/stored.
-> 
-> The latter is described by a cocktail of different things including
-> which bit of kernel code we are executing if any, whether the task
-> is running/stopped etc., TIF_FOREIGN_FPSTATE,
-> task->thread.fpsimd_state.cpu and per_cpu(fpsimd_last_state).
-> 
-> Does this make any better sense of my code below?
 
-Yes, it looks fine.
+
+On 05/10/17 21:32, Heiner Kallweit wrote:
+> Few months ago we discussed how to deal with the Amlogic Meson SCPI
+> DVFS cpu frequencies. To recap:
+> SCPI DVFS provides some high frequencies which are usable only if
+> just one CPU core is used. Else the system will just crash
+> (even w/o being thermally loaded).
+>
+
+It simply can't be solved in kernel. The SCP firmware is the only place
+where you can sanely solve the issue.
+
+IIUC this system uses PSCI for CPU ON/OFF/SUSPEND. Even if you manage to
+track CPU state in Linux, you simply can't manage what's happening in
+higher exceptions(EL3 in this case). Some another CPU can brought/woken
+up when Linux has set highest OPP, the system will still crash.
+
+IMO, this can't be solved just in Linux alone that's impossible because
+of the races I mentioned above.It should be solved it in the firmware.
+I know the standard issue there is that you can't change the firmware.
+But that's not a reason to create unusable system ever after adding lots
+of code to deal with that in Linux as Linux is not in full control of this.
+
+SCP is the one bringing/waking up other cores and can workaround this
+issueby dropping the OPP when it's about to bring/wakeup second core.
+
+> See also:
+> https://patchwork.kernel.org/patch/9557349/
+> https://patchwork.kernel.org/patch/9555761/
+> 
+> One idea was to introduce a DT param for the CPU nodes to configure
+> a max frequency, and all DVFS freq's above this threashold would be
+> ignored. However we didn't come to an agreement.
+> 
+
+NAK for that idea for reasons given above.
+
+> Now, when dealing with SCPI again, another idea came to my mind:
+> Still it would be about introducing such a DT parameter, however
+> we would not completely ignore higher frequencies but just set
+> the "turbo" flag of the opp.
+> This way cpufreq would ignore these frequencies, however we still
+> had the option to manually enable these frequencies via sysfs and
+> use them on systems where just one CPU core is used.> (or more > general: manually enable the boost frequencies if system
+> macthes certain criteria)
+> 
+> Does this sound better or would you still consider this to be too
+> hacky?
+> 
+
+Unfortunately still hacky and yet not complete solution as it just
+renders unstable system. System with reduced performance is better
+compared to unstable system :)
 
 -- 
-Catalin
+Regards,
+Sudeep
