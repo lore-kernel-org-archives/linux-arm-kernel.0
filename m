@@ -1,35 +1,110 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Fri, 6 Oct 2017 12:11:42 +0000
-Subject: [PATCH v10 09/10] mm: stop zeroing memory during allocation in
- vmemmap
-In-Reply-To: <20171006114729.fexwklupkhyxdpt3@dhcp22.suse.cz>
-References: <20171005211124.26524-1-pasha.tatashin@oracle.com>
- <20171005211124.26524-10-pasha.tatashin@oracle.com>
- <063D6719AE5E284EB5DD2968C1650D6DD008BA85@AcuExch.aculab.com>
- <20171006114729.fexwklupkhyxdpt3@dhcp22.suse.cz>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6DD008BB4D@AcuExch.aculab.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 06 Oct 2017 14:17:28 +0200
+Subject: [PATCH 01/16] dt-bindings: mvebu-uart: update documentation with
+ extended UART
+In-Reply-To: <20171006101344.15590-2-miquel.raynal@free-electrons.com> (Miquel
+ Raynal's message of "Fri, 6 Oct 2017 12:13:29 +0200")
+References: <20171006101344.15590-1-miquel.raynal@free-electrons.com>
+ <20171006101344.15590-2-miquel.raynal@free-electrons.com>
+Message-ID: <87376wh3mv.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Michal Hocko
-> Sent: 06 October 2017 12:47
-> On Fri 06-10-17 11:10:14, David Laight wrote:
-> > From: Pavel Tatashin
-> > > Sent: 05 October 2017 22:11
-> > > vmemmap_alloc_block() will no longer zero the block, so zero memory
-> > > at its call sites for everything except struct pages.  Struct page memory
-> > > is zero'd by struct page initialization.
-> >
-> > It seems dangerous to change an allocator to stop zeroing memory.
-> > It is probably saver to add a new function that doesn't zero
-> > the memory and use that is the places where you don't want it
-> > to be zeroed.
-> 
-> Not sure what you mean. memblock_virt_alloc_try_nid_raw is a new
-> function which doesn't zero out...
+Hi Miquel,
+ 
+ On ven., oct. 06 2017, Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
 
-You should probably leave vmemap_alloc_block() zeroing the memory
-so that existing alls don't have to be changed - apart from the
-ones you are explicitly optimising.
+> Update the Device Tree binding documentation for the Marvell EBU UART,
+> in order to allow describing the extended UART IP block, in addition to
+> the already supported standard UART IP. This requires adding a new
+> compatible string, the introduction of a clocks property, and extensions
+> to the interrupts property.
+>
+> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 
-	David
+Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+Thanks,
+
+Gregory
+
+> ---
+>  .../devicetree/bindings/serial/mvebu-uart.txt      | 49 +++++++++++++++++++---
+>  1 file changed, 44 insertions(+), 5 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/serial/mvebu-uart.txt b/Documentation/devicetree/bindings/serial/mvebu-uart.txt
+> index d37fabe17bd1..3df3a3fab4bb 100644
+> --- a/Documentation/devicetree/bindings/serial/mvebu-uart.txt
+> +++ b/Documentation/devicetree/bindings/serial/mvebu-uart.txt
+> @@ -1,13 +1,52 @@
+> -* Marvell UART : Non standard UART used in some of Marvell EBU SoCs (e.g., Armada-3700)
+> +* Marvell UART : Non standard UART used in some of Marvell EBU SoCs
+> +                 e.g., Armada-3700.
+>  
+>  Required properties:
+> -- compatible: "marvell,armada-3700-uart"
+> +- compatible:
+> +    - "marvell,armada-3700-uart" for the standard variant of the UART
+> +      (32 bytes FIFO, no DMA, level interrupts, 8-bit access to the
+> +      FIFO, baudrate limited to 230400).
+> +    - "marvell,armada-3700-uart-ext" for the extended variant of the
+> +      UART (128 bytes FIFO, DMA, front interrupts, 8-bit or 32-bit
+> +      accesses to the FIFO, baudrate unlimited by the dividers).
+>  - reg: offset and length of the register set for the device.
+> -- interrupts: device interrupt
+> +- clocks: UART reference clock used to derive the baudrate (only
+> +      mandatory with "marvell,armada-3700-uart-ext" compatible).
+> +- interrupts:
+> +    - Must contain three elements for the standard variant of the IP
+> +      (marvell,armada-3700-uart): "uart-sum", "uart-tx" and "uart-rx",
+> +      respectively the UART sum interrupt, the UART TX interrupt and
+> +      UART RX interrupt. A corresponding interrupt-names property must
+> +      be defined.
+> +    - Must contain two elements for the extended variant of the IP
+> +      (marvell,armada-3700-uart-ext): "uart-tx" and "uart-rx",
+> +      respectively the UART TX interrupt and the UART RX interrupt. A
+> +      corresponding interrupts-names property must be defined.
+> +    - For backward compatibility reasons, a single element interrupts
+> +      property is also supported for the standard variant of the IP,
+> +      containing only the UART sum interrupt. This form is deprecated
+> +      and should no longer be used.
+>  
+>  Example:
+> -	serial at 12000 {
+> +	uart0: serial at 12000 {
+>  		compatible = "marvell,armada-3700-uart";
+>  		reg = <0x12000 0x200>;
+> -		interrupts = <43>;
+> +		clocks = <&xtalclk>;
+> +		interrupts =
+> +		<GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
+> +		<GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
+> +		<GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
+> +		interrupt-names = "uart-sum", "uart-tx", "uart-rx";
+> +		status = "disabled";
+> +	};
+> +
+> +	uart1: serial at 12200 {
+> +		compatible = "marvell,armada-3700-uart-ext";
+> +		reg = <0x12200 0x30>;
+> +		clocks = <&xtalclk>;
+> +		interrupts =
+> +		<GIC_SPI 30 IRQ_TYPE_EDGE_RISING>,
+> +		<GIC_SPI 31 IRQ_TYPE_EDGE_RISING>;
+> +		interrupt-names = "uart-tx", "uart-rx";
+> +		status = "disabled";
+>  	};
+> -- 
+> 2.11.0
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
