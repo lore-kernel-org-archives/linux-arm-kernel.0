@@ -1,181 +1,219 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Fri,  6 Oct 2017 14:31:55 +0100
-Subject: [RFCv2 PATCH 28/36] iommu/arm-smmu-v3: Maintain a SID->device
- structure
+Date: Fri,  6 Oct 2017 14:31:54 +0100
+Subject: [RFCv2 PATCH 27/36] iommu/arm-smmu-v3: Register fault workqueue
 In-Reply-To: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
 References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
-Message-ID: <20171006133203.22803-29-jean-philippe.brucker@arm.com>
+Message-ID: <20171006133203.22803-28-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When handling faults from the event or PRI queue, we need to find the
-struct device associated to a SID. Add a rb_tree to keep track of SIDs.
+When using PRI or Stall, the PRI or event handler enqueues faults into the
+core fault queue. Register it based on the SMMU features.
+
+When the core stops using a PASID, it notifies the SMMU to flush all
+instances of this PASID from the PRI queue. Add a way to flush the PRI and
+event queue. PRI and event thread now take a spinlock while processing the
+queue. The flush handler takes this lock to inspect the queue state.
+We avoid livelock, where the SMMU adds fault to the queue faster than we
+can consume them, by incrementing a 'batch' number on every cycle so the
+flush handler only has to wait a complete cycle (two batch increments.)
 
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 104 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 104 insertions(+)
+ drivers/iommu/arm-smmu-v3.c | 104 +++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 102 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 7d68c6aecb14..4e915e649643 100644
+index 2b2e2be03de7..7d68c6aecb14 100644
 --- a/drivers/iommu/arm-smmu-v3.c
 +++ b/drivers/iommu/arm-smmu-v3.c
-@@ -721,10 +721,19 @@ struct arm_smmu_device {
- 	/* IOMMU core code handle */
- 	struct iommu_device		iommu;
+@@ -570,6 +570,10 @@ struct arm_smmu_queue {
  
-+	struct rb_root			streams;
-+	struct mutex			streams_mutex;
+ 	u32 __iomem			*prod_reg;
+ 	u32 __iomem			*cons_reg;
 +
- 	/* Notifier for the fault queue */
- 	struct notifier_block		faultq_nb;
++	/* Event and PRI */
++	u64				batch;
++	wait_queue_head_t		wq;
  };
  
-+struct arm_smmu_stream {
-+	u32				id;
-+	struct arm_smmu_master_data	*master;
-+	struct rb_node			node;
-+};
+ struct arm_smmu_cmdq {
+@@ -716,6 +720,9 @@ struct arm_smmu_device {
+ 
+ 	/* IOMMU core code handle */
+ 	struct iommu_device		iommu;
 +
++	/* Notifier for the fault queue */
++	struct notifier_block		faultq_nb;
+ };
+ 
  /* SMMU private data for each master */
- struct arm_smmu_master_data {
- 	struct arm_smmu_device		*smmu;
-@@ -732,6 +741,7 @@ struct arm_smmu_master_data {
- 
- 	struct arm_smmu_domain		*domain;
- 	struct list_head		list; /* domain->devices */
-+	struct arm_smmu_stream		*streams;
- 
- 	struct device			*dev;
- 
-@@ -1571,6 +1581,31 @@ static int arm_smmu_init_l2_strtab(struct arm_smmu_device *smmu, u32 sid)
- 	return 0;
- }
- 
-+static struct arm_smmu_master_data *
-+arm_smmu_find_master(struct arm_smmu_device *smmu, u32 sid)
-+{
-+	struct rb_node *node;
-+	struct arm_smmu_stream *stream;
-+	struct arm_smmu_master_data *master = NULL;
-+
-+	mutex_lock(&smmu->streams_mutex);
-+	node = smmu->streams.rb_node;
-+	while (node) {
-+		stream = rb_entry(node, struct arm_smmu_stream, node);
-+		if (stream->id < sid) {
-+			node = node->rb_right;
-+		} else if (stream->id > sid) {
-+			node = node->rb_left;
-+		} else {
-+			master = stream->master;
-+			break;
-+		}
-+	}
-+	mutex_unlock(&smmu->streams_mutex);
-+
-+	return master;
-+}
-+
- /* IRQ and event handlers */
+@@ -1568,19 +1575,27 @@ static int arm_smmu_init_l2_strtab(struct arm_smmu_device *smmu, u32 sid)
  static irqreturn_t arm_smmu_evtq_thread(int irq, void *dev)
  {
-@@ -2555,6 +2590,71 @@ static bool arm_smmu_sid_in_range(struct arm_smmu_device *smmu, u32 sid)
- 	return sid < limit;
+ 	int i;
++	int num_handled = 0;
+ 	struct arm_smmu_device *smmu = dev;
+ 	struct arm_smmu_queue *q = &smmu->evtq.q;
++	size_t queue_size = 1 << q->max_n_shift;
+ 	u64 evt[EVTQ_ENT_DWORDS];
+ 
++	spin_lock(&q->wq.lock);
+ 	do {
+ 		while (!queue_remove_raw(q, evt)) {
+ 			u8 id = evt[0] >> EVTQ_0_ID_SHIFT & EVTQ_0_ID_MASK;
+ 
++			if (++num_handled == queue_size) {
++				q->batch++;
++				wake_up_locked(&q->wq);
++				num_handled = 0;
++			}
++
+ 			dev_info(smmu->dev, "event 0x%02x received:\n", id);
+ 			for (i = 0; i < ARRAY_SIZE(evt); ++i)
+ 				dev_info(smmu->dev, "\t0x%016llx\n",
+ 					 (unsigned long long)evt[i]);
+-
+ 		}
+ 
+ 		/*
+@@ -1593,6 +1608,11 @@ static irqreturn_t arm_smmu_evtq_thread(int irq, void *dev)
+ 
+ 	/* Sync our overflow flag, as we believe we're up to speed */
+ 	q->cons = Q_OVF(q, q->prod) | Q_WRP(q, q->cons) | Q_IDX(q, q->cons);
++
++	q->batch++;
++	wake_up_locked(&q->wq);
++	spin_unlock(&q->wq.lock);
++
+ 	return IRQ_HANDLED;
  }
  
-+static int arm_smmu_insert_master(struct arm_smmu_device *smmu,
-+				  struct arm_smmu_master_data *master)
-+{
-+	int i;
-+	int ret = 0;
-+	struct arm_smmu_stream *new_stream, *cur_stream;
-+	struct rb_node **new_node, *parent_node = NULL;
-+	struct iommu_fwspec *fwspec = master->dev->iommu_fwspec;
-+
-+	master->streams = kcalloc(fwspec->num_ids,
-+				  sizeof(struct arm_smmu_stream), GFP_KERNEL);
-+	if (!master->streams)
-+		return -ENOMEM;
-+
-+	mutex_lock(&smmu->streams_mutex);
-+	for (i = 0; i < fwspec->num_ids && !ret; i++) {
-+		new_stream = &master->streams[i];
-+		new_stream->id = fwspec->ids[i];
-+		new_stream->master = master;
-+
-+		new_node = &(smmu->streams.rb_node);
-+		while (*new_node) {
-+			cur_stream = rb_entry(*new_node, struct arm_smmu_stream,
-+					      node);
-+			parent_node = *new_node;
-+			if (cur_stream->id > new_stream->id) {
-+				new_node = &((*new_node)->rb_left);
-+			} else if (cur_stream->id < new_stream->id) {
-+				new_node = &((*new_node)->rb_right);
-+			} else {
-+				dev_warn(master->dev,
-+					 "stream %u already in tree\n",
-+					 cur_stream->id);
-+				ret = -EINVAL;
-+				break;
+@@ -1636,13 +1656,24 @@ static void arm_smmu_handle_ppr(struct arm_smmu_device *smmu, u64 *evt)
+ 
+ static irqreturn_t arm_smmu_priq_thread(int irq, void *dev)
+ {
++	int num_handled = 0;
+ 	struct arm_smmu_device *smmu = dev;
+ 	struct arm_smmu_queue *q = &smmu->priq.q;
++	size_t queue_size = 1 << q->max_n_shift;
+ 	u64 evt[PRIQ_ENT_DWORDS];
+ 
++	spin_lock(&q->wq.lock);
+ 	do {
+-		while (!queue_remove_raw(q, evt))
++		while (!queue_remove_raw(q, evt)) {
++			spin_unlock(&q->wq.lock);
+ 			arm_smmu_handle_ppr(smmu, evt);
++			spin_lock(&q->wq.lock);
++			if (++num_handled == queue_size) {
++				q->batch++;
++				wake_up_locked(&q->wq);
++				num_handled = 0;
 +			}
 +		}
+ 
+ 		if (queue_sync_prod(q) == -EOVERFLOW)
+ 			dev_err(smmu->dev, "PRIQ overflow detected -- requests lost\n");
+@@ -1650,9 +1681,65 @@ static irqreturn_t arm_smmu_priq_thread(int irq, void *dev)
+ 
+ 	/* Sync our overflow flag, as we believe we're up to speed */
+ 	q->cons = Q_OVF(q, q->prod) | Q_WRP(q, q->cons) | Q_IDX(q, q->cons);
 +
-+		if (!ret) {
-+			rb_link_node(&new_stream->node, parent_node, new_node);
-+			rb_insert_color(&new_stream->node, &smmu->streams);
-+		}
-+	}
-+	mutex_unlock(&smmu->streams_mutex);
++	q->batch++;
++	wake_up_locked(&q->wq);
++	spin_unlock(&q->wq.lock);
++
+ 	return IRQ_HANDLED;
+ }
+ 
++/*
++ * arm_smmu_flush_queue - wait until all events/PRIs currently in the queue have
++ * been consumed.
++ *
++ * Wait until the queue thread finished a batch, or until the queue is empty.
++ * Note that we don't handle overflows on q->batch. If it occurs, just wait for
++ * the queue to be empty.
++ */
++static int arm_smmu_flush_queue(struct arm_smmu_device *smmu,
++				struct arm_smmu_queue *q, const char *name)
++{
++	int ret;
++	u64 batch;
++
++	spin_lock(&q->wq.lock);
++	if (queue_sync_prod(q) == -EOVERFLOW)
++		dev_err(smmu->dev, "%s overflow detected -- requests lost\n", name);
++
++	batch = q->batch;
++	ret = wait_event_interruptible_locked(q->wq, queue_empty(q) ||
++					      q->batch >= batch + 2);
++	spin_unlock(&q->wq.lock);
 +
 +	return ret;
 +}
 +
-+static void arm_smmu_remove_master(struct arm_smmu_device *smmu,
-+				   struct arm_smmu_master_data *master)
++static int arm_smmu_flush_queues(struct notifier_block *nb,
++				 unsigned long action, void *data)
 +{
-+	int i;
-+	struct iommu_fwspec *fwspec = master->dev->iommu_fwspec;
++	struct arm_smmu_device *smmu = container_of(nb, struct arm_smmu_device,
++						    faultq_nb);
++	struct device *dev = data;
++	struct arm_smmu_master_data *master = NULL;
 +
-+	if (!master->streams)
-+		return;
++	if (dev)
++		master = dev->iommu_fwspec->iommu_priv;
 +
-+	mutex_lock(&smmu->streams_mutex);
-+	for (i = 0; i < fwspec->num_ids; i++)
-+		rb_erase(&master->streams[i].node, &smmu->streams);
-+	mutex_unlock(&smmu->streams_mutex);
++	if (master) {
++		/* TODO: add support for PRI and Stall */
++		return 0;
++	}
 +
-+	kfree(master->streams);
++	/* No target device, flush all queues. */
++	if (smmu->features & ARM_SMMU_FEAT_STALLS)
++		arm_smmu_flush_queue(smmu, &smmu->evtq.q, "evtq");
++	if (smmu->features & ARM_SMMU_FEAT_PRI)
++		arm_smmu_flush_queue(smmu, &smmu->priq.q, "priq");
++
++	return 0;
 +}
 +
- static struct iommu_ops arm_smmu_ops;
+ static irqreturn_t arm_smmu_cmdq_sync_handler(int irq, void *dev)
+ {
+ 	/* We don't actually use CMD_SYNC interrupts for anything */
+@@ -2697,6 +2784,10 @@ static int arm_smmu_init_one_queue(struct arm_smmu_device *smmu,
+ 		     << Q_BASE_LOG2SIZE_SHIFT;
  
- static int arm_smmu_add_device(struct device *dev)
-@@ -2609,6 +2709,7 @@ static int arm_smmu_add_device(struct device *dev)
+ 	q->prod = q->cons = 0;
++
++	init_waitqueue_head(&q->wq);
++	q->batch = 0;
++
+ 	return 0;
+ }
  
- 	group = iommu_group_get_for_dev(dev);
- 	if (!IS_ERR(group)) {
-+		arm_smmu_insert_master(smmu, master);
- 		iommu_group_put(group);
- 		iommu_device_link(&smmu->iommu, dev);
- 	}
-@@ -2629,6 +2730,7 @@ static void arm_smmu_remove_device(struct device *dev)
- 	smmu = master->smmu;
- 	if (master && master->ste.assigned)
- 		arm_smmu_detach_dev(dev);
-+	arm_smmu_remove_master(smmu, master);
- 	iommu_group_remove_device(dev);
- 	iommu_device_unlink(&smmu->iommu, dev);
- 	kfree(master);
-@@ -2936,6 +3038,8 @@ static int arm_smmu_init_structures(struct arm_smmu_device *smmu)
- 
- 	spin_lock_init(&smmu->asid_lock);
- 	idr_init(&smmu->asid_idr);
-+	mutex_init(&smmu->streams_mutex);
-+	smmu->streams = RB_ROOT;
- 
- 	ret = arm_smmu_init_queues(smmu);
+@@ -3594,6 +3685,13 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
  	if (ret)
+ 		return ret;
+ 
++	if (smmu->features & (ARM_SMMU_FEAT_STALLS | ARM_SMMU_FEAT_PRI)) {
++		smmu->faultq_nb.notifier_call = arm_smmu_flush_queues;
++		ret = iommu_fault_queue_register(&smmu->faultq_nb);
++		if (ret)
++			return ret;
++	}
++
+ 	/* And we're up. Go go go! */
+ 	ret = iommu_device_sysfs_add(&smmu->iommu, dev, NULL,
+ 				     "smmu3.%pa", &ioaddr);
+@@ -3636,6 +3734,8 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
+ {
+ 	struct arm_smmu_device *smmu = platform_get_drvdata(pdev);
+ 
++	iommu_fault_queue_unregister(&smmu->faultq_nb);
++
+ 	arm_smmu_device_disable(smmu);
+ 
+ 	return 0;
 -- 
 2.13.3
