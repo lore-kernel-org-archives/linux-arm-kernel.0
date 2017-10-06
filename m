@@ -1,178 +1,497 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Fri, 6 Oct 2017 14:30:57 +0200
-Subject: [PATCH v10 05/10] mm: zero reserved and unavailable struct pages
-In-Reply-To: <20171005211124.26524-6-pasha.tatashin@oracle.com>
-References: <20171005211124.26524-1-pasha.tatashin@oracle.com>
- <20171005211124.26524-6-pasha.tatashin@oracle.com>
-Message-ID: <20171006123057.6gu5xnk3usw2hvzb@dhcp22.suse.cz>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 06 Oct 2017 14:32:18 +0200
+Subject: [PATCH 05/16] serial: mvebu-uart: use a generic way to access the
+ registers
+In-Reply-To: <20171006101344.15590-6-miquel.raynal@free-electrons.com> (Miquel
+ Raynal's message of "Fri, 6 Oct 2017 12:13:33 +0200")
+References: <20171006101344.15590-1-miquel.raynal@free-electrons.com>
+ <20171006101344.15590-6-miquel.raynal@free-electrons.com>
+Message-ID: <87lgkofodp.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 05-10-17 17:11:19, Pavel Tatashin wrote:
-> Some memory is reserved but unavailable: not present in memblock.memory
-> (because not backed by physical pages), but present in memblock.reserved.
-> Such memory has backing struct pages, but they are not initialized by going
-> through __init_single_page().
-> 
-> In some cases these struct pages are accessed even if they do not contain
-> any data. One example is page_to_pfn() might access page->flags if this is
-> where section information is stored (CONFIG_SPARSEMEM,
-> SECTION_IN_PAGE_FLAGS).
-> 
-> One example of such memory: trim_low_memory_range() unconditionally
-> reserves from pfn 0, but e820__memblock_setup() might provide the exiting
-> memory from pfn 1 (i.e. KVM).
-> 
-> Since, struct pages are zeroed in __init_single_page(), and not during
-> allocation time, we must zero such struct pages explicitly.
-> 
-> The patch involves adding a new memblock iterator:
-> 	for_each_resv_unavail_range(i, p_start, p_end)
-> 
-> Which iterates through reserved && !memory lists, and we zero struct pages
-> explicitly by calling mm_zero_struct_page().
+Hi Miquel,
+ 
+ On ven., oct. 06 2017, Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
 
-As I've said in other reply this should go in only if the scenario you
-describe is real. I am somehow suspicious to be honest. I simply do not
-see how those weird struct pages would be in a valid pfn range of any
-zone.
+> There are two UART ports on Armada3700. The second UART is based on the
+> first one, plus additional features, but it has a different register
+> layout (some bit fields are also moved inside the registers).
+>
+> Clearly separate register offsets and bit fields that differ between the
+> standard and the extended IP. Access them in a generic way. Rename the
+> defines with the "STD" prefix for future distinction with "EXT" defines.
+> Point to these defines in the main driver data structure.
+>
+> The early console only uses the standard port (not extended).
+>
+> Suggested-by: Wilson Ding <dingwei@marvell.com>
+> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 
-> Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
-> Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
-> Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
-> Reviewed-by: Bob Picco <bob.picco@oracle.com>
+Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+Thanks,
+
+Gregory
+
+
 > ---
->  include/linux/memblock.h | 16 ++++++++++++++++
->  include/linux/mm.h       | 15 +++++++++++++++
->  mm/page_alloc.c          | 38 ++++++++++++++++++++++++++++++++++++++
->  3 files changed, 69 insertions(+)
-> 
-> diff --git a/include/linux/memblock.h b/include/linux/memblock.h
-> index bae11c7e7bf3..ce8bfa5f3e9b 100644
-> --- a/include/linux/memblock.h
-> +++ b/include/linux/memblock.h
-> @@ -237,6 +237,22 @@ unsigned long memblock_next_valid_pfn(unsigned long pfn, unsigned long max_pfn);
->  	for_each_mem_range_rev(i, &memblock.memory, &memblock.reserved,	\
->  			       nid, flags, p_start, p_end, p_nid)
+>  drivers/tty/serial/mvebu-uart.c | 213 ++++++++++++++++++++++++++--------------
+>  1 file changed, 140 insertions(+), 73 deletions(-)
+>
+> diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
+> index 25b11ede3a97..82438884af1e 100644
+> --- a/drivers/tty/serial/mvebu-uart.c
+> +++ b/drivers/tty/serial/mvebu-uart.c
+> @@ -38,46 +38,32 @@
+>  #include <linux/tty_flip.h>
 >  
-> +/**
-> + * for_each_resv_unavail_range - iterate through reserved and unavailable memory
-> + * @i: u64 used as loop variable
-> + * @flags: pick from blocks based on memory attributes
-> + * @p_start: ptr to phys_addr_t for start address of the range, can be %NULL
-> + * @p_end: ptr to phys_addr_t for end address of the range, can be %NULL
-> + *
-> + * Walks over unavailable but reserved (reserved && !memory) areas of memblock.
-> + * Available as soon as memblock is initialized.
-> + * Note: because this memory does not belong to any physical node, flags and
-> + * nid arguments do not make sense and thus not exported as arguments.
-> + */
-> +#define for_each_resv_unavail_range(i, p_start, p_end)			\
-> +	for_each_mem_range(i, &memblock.reserved, &memblock.memory,	\
-> +			   NUMA_NO_NODE, MEMBLOCK_NONE, p_start, p_end, NULL)
+>  /* Register Map */
+> -#define UART_RBR		0x00
+> -#define  RBR_BRK_DET		BIT(15)
+> -#define  RBR_FRM_ERR_DET	BIT(14)
+> -#define  RBR_PAR_ERR_DET	BIT(13)
+> -#define  RBR_OVR_ERR_DET	BIT(12)
+> +#define UART_STD_RBR		0x00
+>  
+> -#define UART_TSH		0x04
+> +#define UART_STD_TSH		0x04
+>  
+> -#define UART_CTRL		0x08
+> +#define UART_STD_CTRL1		0x08
+>  #define  CTRL_SOFT_RST		BIT(31)
+>  #define  CTRL_TXFIFO_RST	BIT(15)
+>  #define  CTRL_RXFIFO_RST	BIT(14)
+> -#define  CTRL_ST_MIRR_EN	BIT(13)
+> -#define  CTRL_LPBK_EN		BIT(12)
+>  #define  CTRL_SND_BRK_SEQ	BIT(11)
+> -#define  CTRL_PAR_EN		BIT(10)
+> -#define  CTRL_TWO_STOP		BIT(9)
+> -#define  CTRL_TX_HFL_INT	BIT(8)
+> -#define  CTRL_RX_HFL_INT	BIT(7)
+> -#define  CTRL_TX_EMP_INT	BIT(6)
+> -#define  CTRL_TX_RDY_INT	BIT(5)
+> -#define  CTRL_RX_RDY_INT	BIT(4)
+>  #define  CTRL_BRK_DET_INT	BIT(3)
+>  #define  CTRL_FRM_ERR_INT	BIT(2)
+>  #define  CTRL_PAR_ERR_INT	BIT(1)
+>  #define  CTRL_OVR_ERR_INT	BIT(0)
+> -#define  CTRL_RX_INT			(CTRL_RX_RDY_INT | CTRL_BRK_DET_INT |\
+> -	CTRL_FRM_ERR_INT | CTRL_PAR_ERR_INT | CTRL_OVR_ERR_INT)
+> +#define  CTRL_BRK_INT		(CTRL_BRK_DET_INT | CTRL_FRM_ERR_INT | \
+> +				CTRL_PAR_ERR_INT | CTRL_OVR_ERR_INT)
+>  
+> -#define UART_STAT		0x0c
+> +#define UART_STD_CTRL2		UART_STD_CTRL1
+> +#define  CTRL_STD_TX_RDY_INT	BIT(5)
+> +#define  CTRL_STD_RX_RDY_INT	BIT(4)
 > +
->  static inline void memblock_set_region_flags(struct memblock_region *r,
->  					     unsigned long flags)
->  {
-> diff --git a/include/linux/mm.h b/include/linux/mm.h
-> index 065d99deb847..04c8b2e5aff4 100644
-> --- a/include/linux/mm.h
-> +++ b/include/linux/mm.h
-> @@ -94,6 +94,15 @@ extern int mmap_rnd_compat_bits __read_mostly;
->  #define mm_forbids_zeropage(X)	(0)
->  #endif
+> +#define UART_STAT		0x0C
+>  #define  STAT_TX_FIFO_EMP	BIT(13)
+> -#define  STAT_RX_FIFO_EMP	BIT(12)
+>  #define  STAT_TX_FIFO_FUL	BIT(11)
+> -#define  STAT_TX_FIFO_HFL	BIT(10)
+> -#define  STAT_RX_TOGL		BIT(9)
+> -#define  STAT_RX_FIFO_FUL	BIT(8)
+> -#define  STAT_RX_FIFO_HFL	BIT(7)
+>  #define  STAT_TX_EMP		BIT(6)
+> -#define  STAT_TX_RDY		BIT(5)
+> -#define  STAT_RX_RDY		BIT(4)
+> +#define  STAT_STD_TX_RDY	BIT(5)
+> +#define  STAT_STD_RX_RDY	BIT(4)
+>  #define  STAT_BRK_DET		BIT(3)
+>  #define  STAT_FRM_ERR		BIT(2)
+>  #define  STAT_PAR_ERR		BIT(1)
+> @@ -92,13 +78,55 @@
+>  #define MVEBU_UART_TYPE		"mvebu-uart"
+>  #define DRIVER_NAME		"mvebu_serial"
 >  
-> +/*
-> + * On some architectures it is expensive to call memset() for small sizes.
-> + * Those architectures should provide their own implementation of "struct page"
-> + * zeroing by defining this macro in <asm/pgtable.h>.
-> + */
-> +#ifndef mm_zero_struct_page
-> +#define mm_zero_struct_page(pp)  ((void)memset((pp), 0, sizeof(struct page)))
-> +#endif
+> -static struct uart_port mvebu_uart_ports[MVEBU_NR_UARTS];
+> +/* Register offsets, different depending on the UART */
+> +struct uart_regs_layout {
+> +	unsigned int rbr;
+> +	unsigned int tsh;
+> +	unsigned int ctrl;
+> +	unsigned int intr;
+> +};
 > +
->  /*
->   * Default maximum number of active map areas, this limits the number of vmas
->   * per mm struct. Users can overwrite this number by sysctl but there is a
-> @@ -2001,6 +2010,12 @@ extern int __meminit __early_pfn_to_nid(unsigned long pfn,
->  					struct mminit_pfnnid_cache *state);
->  #endif
->  
-> +#ifdef CONFIG_HAVE_MEMBLOCK
-> +void zero_resv_unavail(void);
-> +#else
-> +static inline void zero_resv_unavail(void) {}
-> +#endif
+> +/* Diverging flags */
+> +struct uart_flags {
+> +	unsigned int ctrl_tx_rdy_int;
+> +	unsigned int ctrl_rx_rdy_int;
+> +	unsigned int stat_tx_rdy;
+> +	unsigned int stat_rx_rdy;
+> +};
 > +
->  extern void set_dma_reserve(unsigned long new_dma_reserve);
->  extern void memmap_init_zone(unsigned long, int, unsigned long,
->  				unsigned long, enum memmap_context);
-> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-> index 20b0bace2235..5f0013bbbe9d 100644
-> --- a/mm/page_alloc.c
-> +++ b/mm/page_alloc.c
-> @@ -6209,6 +6209,42 @@ void __paginginit free_area_init_node(int nid, unsigned long *zones_size,
->  	free_area_init_core(pgdat);
->  }
+> +/* Driver data, a structure for each UART port */
+> +struct mvebu_uart_driver_data {
+> +	bool is_ext;
+> +	struct uart_regs_layout regs;
+> +	struct uart_flags flags;
+> +};
 >  
-> +#ifdef CONFIG_HAVE_MEMBLOCK
-> +/*
-> + * Only struct pages that are backed by physical memory are zeroed and
-> + * initialized by going through __init_single_page(). But, there are some
-> + * struct pages which are reserved in memblock allocator and their fields
-> + * may be accessed (for example page_to_pfn() on some configuration accesses
-> + * flags). We must explicitly zero those struct pages.
-> + */
-> +void __paginginit zero_resv_unavail(void)
+> -struct mvebu_uart_data {
+> +/* MVEBU UART driver structure */
+> +struct mvebu_uart {
+>  	struct uart_port *port;
+> -	struct clk       *clk;
+> +	struct clk *clk;
+> +	struct mvebu_uart_driver_data *data;
+>  };
+>  
+> +static struct mvebu_uart *to_mvuart(struct uart_port *port)
 > +{
-> +	phys_addr_t start, end;
-> +	unsigned long pfn;
-> +	u64 i, pgcnt;
-> +
-> +	/* Loop through ranges that are reserved, but do not have reported
-> +	 * physical memory backing.
-> +	 */
-> +	pgcnt = 0;
-> +	for_each_resv_unavail_range(i, &start, &end) {
-> +		for (pfn = PFN_DOWN(start); pfn < PFN_UP(end); pfn++) {
-> +			mm_zero_struct_page(pfn_to_page(pfn));
-> +			pgcnt++;
-> +		}
-> +	}
-> +
-> +	/*
-> +	 * Struct pages that do not have backing memory. This could be because
-> +	 * firmware is using some of this memory, or for some other reasons.
-> +	 * Once memblock is changed so such behaviour is not allowed: i.e.
-> +	 * list of "reserved" memory must be a subset of list of "memory", then
-> +	 * this code can be removed.
-> +	 */
-> +	pr_info("Reserved but unavailable: %lld pages", pgcnt);
+> +	return (struct mvebu_uart *)port->private_data;
 > +}
-> +#endif /* CONFIG_HAVE_MEMBLOCK */
 > +
->  #ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
->  
->  #if MAX_NUMNODES > 1
-> @@ -6632,6 +6668,7 @@ void __init free_area_init_nodes(unsigned long *max_zone_pfn)
->  			node_set_state(nid, N_MEMORY);
->  		check_for_memory(pgdat, nid);
->  	}
-> +	zero_resv_unavail();
->  }
->  
->  static int __init cmdline_parse_core(char *p, unsigned long *core)
-> @@ -6795,6 +6832,7 @@ void __init free_area_init(unsigned long *zones_size)
+> +#define IS_EXTENDED(port) (to_mvuart(port)->data->is_ext)
+> +
+> +#define UART_RBR(port) (to_mvuart(port)->data->regs.rbr)
+> +#define UART_TSH(port) (to_mvuart(port)->data->regs.tsh)
+> +#define UART_CTRL(port) (to_mvuart(port)->data->regs.ctrl)
+> +#define UART_INTR(port) (to_mvuart(port)->data->regs.intr)
+> +
+> +#define CTRL_TX_RDY_INT(port) (to_mvuart(port)->data->flags.ctrl_tx_rdy_int)
+> +#define CTRL_RX_RDY_INT(port) (to_mvuart(port)->data->flags.ctrl_rx_rdy_int)
+> +#define STAT_TX_RDY(port) (to_mvuart(port)->data->flags.stat_tx_rdy)
+> +#define STAT_RX_RDY(port) (to_mvuart(port)->data->flags.stat_rx_rdy)
+> +
+> +static struct uart_port mvebu_uart_ports[MVEBU_NR_UARTS];
+> +
+>  /* Core UART Driver Operations */
+>  static unsigned int mvebu_uart_tx_empty(struct uart_port *port)
 >  {
->  	free_area_init_node(0, zones_size,
->  			__pa(PAGE_OFFSET) >> PAGE_SHIFT, NULL);
-> +	zero_resv_unavail();
+> @@ -128,26 +156,31 @@ static void mvebu_uart_set_mctrl(struct uart_port *port,
+>  
+>  static void mvebu_uart_stop_tx(struct uart_port *port)
+>  {
+> -	unsigned int ctl = readl(port->membase + UART_CTRL);
+> +	unsigned int ctl = readl(port->membase + UART_INTR(port));
+>  
+> -	ctl &= ~CTRL_TX_RDY_INT;
+> -	writel(ctl, port->membase + UART_CTRL);
+> +	ctl &= ~CTRL_TX_RDY_INT(port);
+> +	writel(ctl, port->membase + UART_INTR(port));
 >  }
 >  
->  static int page_alloc_cpu_dead(unsigned int cpu)
+>  static void mvebu_uart_start_tx(struct uart_port *port)
+>  {
+> -	unsigned int ctl = readl(port->membase + UART_CTRL);
+> +	unsigned int ctl = readl(port->membase + UART_INTR(port));
+>  
+> -	ctl |= CTRL_TX_RDY_INT;
+> -	writel(ctl, port->membase + UART_CTRL);
+> +	ctl |= CTRL_TX_RDY_INT(port);
+> +	writel(ctl, port->membase + UART_INTR(port));
+>  }
+>  
+>  static void mvebu_uart_stop_rx(struct uart_port *port)
+>  {
+> -	unsigned int ctl = readl(port->membase + UART_CTRL);
+> +	unsigned int ctl;
+>  
+> -	ctl &= ~CTRL_RX_INT;
+> -	writel(ctl, port->membase + UART_CTRL);
+> +	ctl = readl(port->membase + UART_CTRL(port));
+> +	ctl &= ~CTRL_BRK_INT;
+> +	writel(ctl, port->membase + UART_CTRL(port));
+> +
+> +	ctl = readl(port->membase + UART_INTR(port));
+> +	ctl &= ~CTRL_RX_RDY_INT(port);
+> +	writel(ctl, port->membase + UART_INTR(port));
+>  }
+>  
+>  static void mvebu_uart_break_ctl(struct uart_port *port, int brk)
+> @@ -156,12 +189,12 @@ static void mvebu_uart_break_ctl(struct uart_port *port, int brk)
+>  	unsigned long flags;
+>  
+>  	spin_lock_irqsave(&port->lock, flags);
+> -	ctl = readl(port->membase + UART_CTRL);
+> +	ctl = readl(port->membase + UART_CTRL(port));
+>  	if (brk == -1)
+>  		ctl |= CTRL_SND_BRK_SEQ;
+>  	else
+>  		ctl &= ~CTRL_SND_BRK_SEQ;
+> -	writel(ctl, port->membase + UART_CTRL);
+> +	writel(ctl, port->membase + UART_CTRL(port));
+>  	spin_unlock_irqrestore(&port->lock, flags);
+>  }
+>  
+> @@ -172,8 +205,8 @@ static void mvebu_uart_rx_chars(struct uart_port *port, unsigned int status)
+>  	char flag = 0;
+>  
+>  	do {
+> -		if (status & STAT_RX_RDY) {
+> -			ch = readl(port->membase + UART_RBR);
+> +		if (status & STAT_RX_RDY(port)) {
+> +			ch = readl(port->membase + UART_RBR(port));
+>  			ch &= 0xff;
+>  			flag = TTY_NORMAL;
+>  			port->icount.rx++;
+> @@ -199,7 +232,7 @@ static void mvebu_uart_rx_chars(struct uart_port *port, unsigned int status)
+>  			goto ignore_char;
+>  
+>  		if (status & port->ignore_status_mask & STAT_PAR_ERR)
+> -			status &= ~STAT_RX_RDY;
+> +			status &= ~STAT_RX_RDY(port);
+>  
+>  		status &= port->read_status_mask;
+>  
+> @@ -208,7 +241,7 @@ static void mvebu_uart_rx_chars(struct uart_port *port, unsigned int status)
+>  
+>  		status &= ~port->ignore_status_mask;
+>  
+> -		if (status & STAT_RX_RDY)
+> +		if (status & STAT_RX_RDY(port))
+>  			tty_insert_flip_char(tport, ch, flag);
+>  
+>  		if (status & STAT_BRK_DET)
+> @@ -222,7 +255,7 @@ static void mvebu_uart_rx_chars(struct uart_port *port, unsigned int status)
+>  
+>  ignore_char:
+>  		status = readl(port->membase + UART_STAT);
+> -	} while (status & (STAT_RX_RDY | STAT_BRK_DET));
+> +	} while (status & (STAT_RX_RDY(port) | STAT_BRK_DET));
+>  
+>  	tty_flip_buffer_push(tport);
+>  }
+> @@ -234,7 +267,7 @@ static void mvebu_uart_tx_chars(struct uart_port *port, unsigned int status)
+>  	unsigned int st;
+>  
+>  	if (port->x_char) {
+> -		writel(port->x_char, port->membase + UART_TSH);
+> +		writel(port->x_char, port->membase + UART_TSH(port));
+>  		port->icount.tx++;
+>  		port->x_char = 0;
+>  		return;
+> @@ -246,7 +279,7 @@ static void mvebu_uart_tx_chars(struct uart_port *port, unsigned int status)
+>  	}
+>  
+>  	for (count = 0; count < port->fifosize; count++) {
+> -		writel(xmit->buf[xmit->tail], port->membase + UART_TSH);
+> +		writel(xmit->buf[xmit->tail], port->membase + UART_TSH(port));
+>  		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
+>  		port->icount.tx++;
+>  
+> @@ -270,10 +303,11 @@ static irqreturn_t mvebu_uart_isr(int irq, void *dev_id)
+>  	struct uart_port *port = (struct uart_port *)dev_id;
+>  	unsigned int st = readl(port->membase + UART_STAT);
+>  
+> -	if (st & (STAT_RX_RDY | STAT_OVR_ERR | STAT_FRM_ERR | STAT_BRK_DET))
+> +	if (st & (STAT_RX_RDY(port) | STAT_OVR_ERR | STAT_FRM_ERR |
+> +			STAT_BRK_DET))
+>  		mvebu_uart_rx_chars(port, st);
+>  
+> -	if (st & STAT_TX_RDY)
+> +	if (st & STAT_TX_RDY(port))
+>  		mvebu_uart_tx_chars(port, st);
+>  
+>  	return IRQ_HANDLED;
+> @@ -281,12 +315,17 @@ static irqreturn_t mvebu_uart_isr(int irq, void *dev_id)
+>  
+>  static int mvebu_uart_startup(struct uart_port *port)
+>  {
+> +	unsigned int ctl;
+>  	int ret;
+>  
+>  	writel(CTRL_TXFIFO_RST | CTRL_RXFIFO_RST,
+> -	       port->membase + UART_CTRL);
+> +	       port->membase + UART_CTRL(port));
+>  	udelay(1);
+> -	writel(CTRL_RX_INT, port->membase + UART_CTRL);
+> +	writel(CTRL_BRK_INT, port->membase + UART_CTRL(port));
+> +
+> +	ctl = readl(port->membase + UART_INTR(port));
+> +	ctl |= CTRL_RX_RDY_INT(port);
+> +	writel(ctl, port->membase + UART_INTR(port));
+>  
+>  	ret = request_irq(port->irq, mvebu_uart_isr, port->irqflags,
+>  			  DRIVER_NAME, port);
+> @@ -300,7 +339,7 @@ static int mvebu_uart_startup(struct uart_port *port)
+>  
+>  static void mvebu_uart_shutdown(struct uart_port *port)
+>  {
+> -	writel(0, port->membase + UART_CTRL);
+> +	writel(0, port->membase + UART_INTR(port));
+>  
+>  	free_irq(port->irq, port);
+>  }
+> @@ -314,8 +353,8 @@ static void mvebu_uart_set_termios(struct uart_port *port,
+>  
+>  	spin_lock_irqsave(&port->lock, flags);
+>  
+> -	port->read_status_mask = STAT_RX_RDY | STAT_OVR_ERR |
+> -		STAT_TX_RDY | STAT_TX_FIFO_FUL;
+> +	port->read_status_mask = STAT_RX_RDY(port) | STAT_OVR_ERR |
+> +		STAT_TX_RDY(port) | STAT_TX_FIFO_FUL;
+>  
+>  	if (termios->c_iflag & INPCK)
+>  		port->read_status_mask |= STAT_FRM_ERR | STAT_PAR_ERR;
+> @@ -326,7 +365,7 @@ static void mvebu_uart_set_termios(struct uart_port *port,
+>  			STAT_FRM_ERR | STAT_PAR_ERR | STAT_OVR_ERR;
+>  
+>  	if ((termios->c_cflag & CREAD) == 0)
+> -		port->ignore_status_mask |= STAT_RX_RDY | STAT_BRK_ERR;
+> +		port->ignore_status_mask |= STAT_RX_RDY(port) | STAT_BRK_ERR;
+>  
+>  	if (old)
+>  		tty_termios_copy_hw(termios, old);
+> @@ -357,10 +396,10 @@ static int mvebu_uart_get_poll_char(struct uart_port *port)
+>  {
+>  	unsigned int st = readl(port->membase + UART_STAT);
+>  
+> -	if (!(st & STAT_RX_RDY))
+> +	if (!(st & STAT_RX_RDY(port)))
+>  		return NO_POLL_CHAR;
+>  
+> -	return readl(port->membase + UART_RBR);
+> +	return readl(port->membase + UART_RBR(port));
+>  }
+>  
+>  static void mvebu_uart_put_poll_char(struct uart_port *port, unsigned char c)
+> @@ -376,7 +415,7 @@ static void mvebu_uart_put_poll_char(struct uart_port *port, unsigned char c)
+>  		udelay(1);
+>  	}
+>  
+> -	writel(c, port->membase + UART_TSH);
+> +	writel(c, port->membase + UART_TSH(port));
+>  }
+>  #endif
+>  
+> @@ -414,7 +453,8 @@ static void mvebu_uart_putc(struct uart_port *port, int c)
+>  			break;
+>  	}
+>  
+> -	writel(c, port->membase + UART_TSH);
+> +	/* At early stage, DT is not parsed yet, only use UART0 */
+> +	writel(c, port->membase + UART_STD_TSH);
+>  
+>  	for (;;) {
+>  		st = readl(port->membase + UART_STAT);
+> @@ -459,7 +499,7 @@ static void wait_for_xmitr(struct uart_port *port)
+>  static void mvebu_uart_console_putchar(struct uart_port *port, int ch)
+>  {
+>  	wait_for_xmitr(port);
+> -	writel(ch, port->membase + UART_TSH);
+> +	writel(ch, port->membase + UART_TSH(port));
+>  }
+>  
+>  static void mvebu_uart_console_write(struct console *co, const char *s,
+> @@ -467,7 +507,7 @@ static void mvebu_uart_console_write(struct console *co, const char *s,
+>  {
+>  	struct uart_port *port = &mvebu_uart_ports[co->index];
+>  	unsigned long flags;
+> -	unsigned int ier;
+> +	unsigned int ier, intr, ctl;
+>  	int locked = 1;
+>  
+>  	if (oops_in_progress)
+> @@ -475,16 +515,23 @@ static void mvebu_uart_console_write(struct console *co, const char *s,
+>  	else
+>  		spin_lock_irqsave(&port->lock, flags);
+>  
+> -	ier = readl(port->membase + UART_CTRL) &
+> -		(CTRL_RX_INT | CTRL_TX_RDY_INT);
+> -	writel(0, port->membase + UART_CTRL);
+> +	ier = readl(port->membase + UART_CTRL(port)) & CTRL_BRK_INT;
+> +	intr = readl(port->membase + UART_INTR(port)) &
+> +		(CTRL_RX_RDY_INT(port) | CTRL_TX_RDY_INT(port));
+> +	writel(0, port->membase + UART_CTRL(port));
+> +	writel(0, port->membase + UART_INTR(port));
+>  
+>  	uart_console_write(port, s, count, mvebu_uart_console_putchar);
+>  
+>  	wait_for_xmitr(port);
+>  
+>  	if (ier)
+> -		writel(ier, port->membase + UART_CTRL);
+> +		writel(ier, port->membase + UART_CTRL(port));
+> +
+> +	if (intr) {
+> +		ctl = intr | readl(port->membase + UART_INTR(port));
+> +		writel(ctl, port->membase + UART_INTR(port));
+> +	}
+>  
+>  	if (locked)
+>  		spin_unlock_irqrestore(&port->lock, flags);
+> @@ -547,12 +594,16 @@ static struct uart_driver mvebu_uart_driver = {
+>  #endif
+>  };
+>  
+> +static const struct of_device_id mvebu_uart_of_match[];
+> +
+>  static int mvebu_uart_probe(struct platform_device *pdev)
+>  {
+>  	struct resource *reg = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	struct resource *irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+> +	const struct of_device_id *match = of_match_device(mvebu_uart_of_match,
+> +							   &pdev->dev);
+>  	struct uart_port *port;
+> -	struct mvebu_uart_data *data;
+> +	struct mvebu_uart *mvuart;
+>  	int ret;
+>  
+>  	if (!reg || !irq) {
+> @@ -591,15 +642,16 @@ static int mvebu_uart_probe(struct platform_device *pdev)
+>  	if (IS_ERR(port->membase))
+>  		return -PTR_ERR(port->membase);
+>  
+> -	data = devm_kzalloc(&pdev->dev, sizeof(struct mvebu_uart_data),
+> -			    GFP_KERNEL);
+> -	if (!data)
+> +	mvuart = devm_kzalloc(&pdev->dev, sizeof(struct mvebu_uart),
+> +			      GFP_KERNEL);
+> +	if (!mvuart)
+>  		return -ENOMEM;
+>  
+> -	data->port = port;
+> +	mvuart->data = (struct mvebu_uart_driver_data *)match->data;
+> +	mvuart->port = port;
+>  
+> -	port->private_data = data;
+> -	platform_set_drvdata(pdev, data);
+> +	port->private_data = mvuart;
+> +	platform_set_drvdata(pdev, mvuart);
+>  
+>  	ret = uart_add_one_port(&mvebu_uart_driver, port);
+>  	if (ret)
+> @@ -607,9 +659,24 @@ static int mvebu_uart_probe(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> +static struct mvebu_uart_driver_data uart_std_driver_data = {
+> +	.is_ext = false,
+> +	.regs.rbr = UART_STD_RBR,
+> +	.regs.tsh = UART_STD_TSH,
+> +	.regs.ctrl = UART_STD_CTRL1,
+> +	.regs.intr = UART_STD_CTRL2,
+> +	.flags.ctrl_tx_rdy_int = CTRL_STD_TX_RDY_INT,
+> +	.flags.ctrl_rx_rdy_int = CTRL_STD_RX_RDY_INT,
+> +	.flags.stat_tx_rdy = STAT_STD_TX_RDY,
+> +	.flags.stat_rx_rdy = STAT_STD_RX_RDY,
+> +};
+> +
+>  /* Match table for of_platform binding */
+>  static const struct of_device_id mvebu_uart_of_match[] = {
+> -	{ .compatible = "marvell,armada-3700-uart", },
+> +	{
+> +		.compatible = "marvell,armada-3700-uart",
+> +		.data = (void *)&uart_std_driver_data,
+> +	},
+>  	{}
+>  };
+>  
 > -- 
-> 2.14.2
+> 2.11.0
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-Michal Hocko
-SUSE Labs
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
