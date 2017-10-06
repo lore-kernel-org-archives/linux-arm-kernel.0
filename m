@@ -1,60 +1,27 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Fri, 6 Oct 2017 09:06:14 +0000
-Subject: [PATCH 2/2] ARM: dts: iwg20d-q7-dbcm-ca: Add device trees for
- camera DB
-In-Reply-To: <CAMuHMdU-zOogwOKS_s8-r_fsUfXxu38WKkaoryuuuGGJzmBkSw@mail.gmail.com>
-References: <1507108713-10686-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1507108713-10686-3-git-send-email-fabrizio.castro@bp.renesas.com>
- <CAMuHMdU-zOogwOKS_s8-r_fsUfXxu38WKkaoryuuuGGJzmBkSw@mail.gmail.com>
-Message-ID: <TY1PR06MB0895E77A6CC9BF8B042E9553C0710@TY1PR06MB0895.apcprd06.prod.outlook.com>
+From: fabien.dessenne@st.com (Fabien DESSENNE)
+Date: Fri, 6 Oct 2017 09:26:07 +0000
+Subject: [PATCH v3 1/3] crypto: engine - permit to enqueue aead_request
+In-Reply-To: <20171005033925.GA31996@gondor.apana.org.au>
+References: <1503047946-27799-1-git-send-email-fabien.dessenne@st.com>
+ <1503047946-27799-2-git-send-email-fabien.dessenne@st.com>
+ <20170922090921.GA15677@gondor.apana.org.au>
+ <20206811-7075-5ca9-98cd-26a5709751fb@st.com>
+ <20171005033925.GA31996@gondor.apana.org.au>
+Message-ID: <9d89727b-f3cb-3322-6513-962e9df63ca8@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
-
-> Hi Fabrizio,
->
-> On Wed, Oct 4, 2017 at 11:18 AM, Fabrizio Castro
-> <fabrizio.castro@bp.renesas.com> wrote:
-> > This patch adds a .dtsi that describes the camera daughter board
-> > and a .dts to describe the HW made of iWave's RZ/G1M SoM, iWave's
-> > RZ/G1M/G1N Qseven carrier board, and the camera daughter board.
-> > The camera daughter board .dtsi adds support for ttySC[14].
-> >
-> > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> > Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
->
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
->
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/iwg20d-q7-dbcm-ca.dtsi
->
-> > +/ {
-> > +       aliases {
-> > +               serial1 = &scif1;
-> > +               serial4 = &hscif1;
->
-> BTW, what's the reason you picked serial4 for the third serial port?
-
-Because it matches the configuration iWave had in their official release based on
-kernel 3.10. We decided to keep the same numbering scheme as a precaution to
-avoid breaking existing code.
-
-Thanks,
-Fab
-
->
-> Gr{oetje,eeting}s,
->
->                         Geert
->
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
->
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
+OK, I will send an initial version without the AEAD part.
 
 
-
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+On 05/10/17 05:39, Herbert Xu wrote:
+> On Tue, Oct 03, 2017 at 07:48:08AM +0000, Fabien DESSENNE wrote:
+>> It looks like there is no more activity around this "crypto_engine
+>> interface clean up" task.
+>> This unfortunately has been blocking the introduction of this new STM32
+>> crypto driver for 3 months now.
+>> Would it make sense to have this driver reviewed first, and then
+>> reworked (I expect minor update here) when the interface update is ready?
+> Hmm, is it possible to disable the AEAD part of the driver first?
+>
+> Cheers,
