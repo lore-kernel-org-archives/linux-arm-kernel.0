@@ -1,233 +1,132 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Fri,  6 Oct 2017 10:24:00 -0500
-Subject: [PATCH v4] irqchip/gicv3: Add support for Range Selector (RS) feature
-Message-ID: <1507303440-12704-1-git-send-email-shankerd@codeaurora.org>
+From: pasha.tatashin@oracle.com (Pasha Tatashin)
+Date: Fri, 6 Oct 2017 11:25:16 -0400
+Subject: [PATCH v10 05/10] mm: zero reserved and unavailable struct pages
+In-Reply-To: <20171006123057.6gu5xnk3usw2hvzb@dhcp22.suse.cz>
+References: <20171005211124.26524-1-pasha.tatashin@oracle.com>
+ <20171005211124.26524-6-pasha.tatashin@oracle.com>
+ <20171006123057.6gu5xnk3usw2hvzb@dhcp22.suse.cz>
+Message-ID: <bcf24369-ac37-cedd-a264-3396fb5cf39e@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A new feature Range Selector (RS) has been added to GIC specification
-in order to support more than 16 CPUs at affinity level 0. New fields
-are introduced in SGI system registers (ICC_SGI0R_EL1, ICC_SGI1R_EL1
-and ICC_ASGI1R_EL1) to relax an artificial limit of 16 at level 0.
+Hi Michal,
 
-- A new RSS field in ICC_CTLR_EL3, ICC_CTLR_EL1 and ICV_CTLR_EL1:
-  [18] - Range Selector Support (RSS)
-  0b0 = Targeted SGIs with affinity level 0 values of 0-15 are supported.
-  0b1 = Targeted SGIs with affinity level 0 values of 0-255 are supported.
+> 
+> As I've said in other reply this should go in only if the scenario you
+> describe is real. I am somehow suspicious to be honest. I simply do not
+> see how those weird struct pages would be in a valid pfn range of any
+> zone.
+> 
 
-- A new RS field in ICC_SGI0R_EL1, ICC_SGI1R_EL1 and ICC_ASGI1R_EL1:
-  [47:44] - RangeSelector (RS) which group of 16 TargetList[n] field
-            TargetList[n] represents aff0 value ((RS*16)+n)
-            When ICC_CTLR_EL3.RSS==0 or ICC_CTLR_EL1.RSS==0, RS is RES0.
+There are examples of both when unavailable memory is not part of any 
+zone, and where it is part of zones.
 
-- A new RSS field in GICD_TYPER:
-  [26] - Range Selector Support (RSS)
-  0b0 = Targeted SGIs with affinity level 0 values of 0-15 are supported.
-  0b1 = Targeted SGIs with affinity level 0 values of 0-255 are supported.
+I run Linux in kvm with these arguments:
 
-Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
----
-Changes since v3:
-   - Keep parentheses around a macro parameter.
-Changes since v2:
-   - Changed from pr_crit() to pr_crit_once().
-   - Incorporated Marc's simplified RSS validation check.
-Changes since v1:
-   - Addressed Marc's review comments on RSS validation checks.
-   - Apply code changes to gic_compute_target_list() to support RSS feature.
-   - Fix the compilation on ARM32.
+         qemu-system-x86_64
+         -enable-kvm
+         -cpu kvm64
+         -kernel $kernel
+         -initrd $initrd
+         -m 512
+         -smp 2
+         -device e1000,netdev=net0
+         -netdev user,id=net0
+         -boot order=nc
+         -no-reboot
+         -watchdog i6300esb
+         -watchdog-action debug
+         -rtc base=localtime
+         -serial stdio
+         -display none
+         -monitor null
 
- arch/arm/include/asm/arch_gicv3.h   |  5 ++++
- arch/arm64/include/asm/arch_gicv3.h |  5 ++++
- drivers/irqchip/irq-gic-v3.c        | 49 ++++++++++++++++++++++++++++++-------
- include/linux/irqchip/arm-gic-v3.h  |  4 +++
- 4 files changed, 54 insertions(+), 9 deletions(-)
+This patch reports that there are 98 unavailable pages.
 
-diff --git a/arch/arm/include/asm/arch_gicv3.h b/arch/arm/include/asm/arch_gicv3.h
-index eee2693..1070044 100644
---- a/arch/arm/include/asm/arch_gicv3.h
-+++ b/arch/arm/include/asm/arch_gicv3.h
-@@ -196,6 +196,11 @@ static inline void gic_write_ctlr(u32 val)
- 	isb();
- }
- 
-+static inline u32 gic_read_ctlr(void)
-+{
-+	return read_sysreg(ICC_CTLR);
-+}
-+
- static inline void gic_write_grpen1(u32 val)
- {
- 	write_sysreg(val, ICC_IGRPEN1);
-diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
-index b7e3f74..9becba9 100644
---- a/arch/arm64/include/asm/arch_gicv3.h
-+++ b/arch/arm64/include/asm/arch_gicv3.h
-@@ -87,6 +87,11 @@ static inline void gic_write_ctlr(u32 val)
- 	isb();
- }
- 
-+static inline u32 gic_read_ctlr(void)
-+{
-+	return read_sysreg_s(SYS_ICC_CTLR_EL1);
-+}
-+
- static inline void gic_write_grpen1(u32 val)
- {
- 	write_sysreg_s(val, SYS_ICC_IGRPEN1_EL1);
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index b5df99c..a7d255f 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -55,6 +55,7 @@ struct gic_chip_data {
- 	struct irq_domain	*domain;
- 	u64			redist_stride;
- 	u32			nr_redist_regions;
-+	bool			has_rss;
- 	unsigned int		irq_nr;
- 	struct partition_desc	*ppi_descs[16];
- };
-@@ -63,7 +64,9 @@ struct gic_chip_data {
- static struct static_key supports_deactivate = STATIC_KEY_INIT_TRUE;
- 
- static struct gic_kvm_info gic_v3_kvm_info;
-+static DEFINE_PER_CPU(bool, has_rss);
- 
-+#define MPIDR_RS(mpidr)			(((mpidr) & 0xF0UL) >> 4)
- #define gic_data_rdist()		(this_cpu_ptr(gic_data.rdists.rdist))
- #define gic_data_rdist_rd_base()	(gic_data_rdist()->rd_base)
- #define gic_data_rdist_sgi_base()	(gic_data_rdist_rd_base() + SZ_64K)
-@@ -526,6 +529,10 @@ static void gic_update_vlpi_properties(void)
- 
- static void gic_cpu_sys_reg_init(void)
- {
-+	int i, cpu = smp_processor_id();
-+	u64 mpidr = cpu_logical_map(cpu);
-+	u64 need_rss = MPIDR_RS(mpidr);
-+
- 	/*
- 	 * Need to check that the SRE bit has actually been set. If
- 	 * not, it means that SRE is disabled at EL2. We're going to
-@@ -557,6 +564,29 @@ static void gic_cpu_sys_reg_init(void)
- 
- 	/* ... and let's hit the road... */
- 	gic_write_grpen1(1);
-+
-+	/* Keep the RSS capability status in per_cpu variable */
-+	per_cpu(has_rss, cpu) = !!(gic_read_ctlr() & ICC_CTLR_EL1_RSS);
-+
-+	/* Check all the CPUs have capable of sending SGIs to other CPUs */
-+	for_each_online_cpu(i) {
-+		bool have_rss = per_cpu(has_rss, i) && per_cpu(has_rss, cpu);
-+
-+		need_rss |= MPIDR_RS(cpu_logical_map(i));
-+		if (need_rss && (!have_rss))
-+			pr_crit("CPU%d (%llx) can't SGI CPU%d (%llx), no RSS\n",
-+				cpu, mpidr, i, cpu_logical_map(i));
-+	}
-+
-+	/**
-+	 * GIC spec says, when ICC_CTLR_EL1.RSS==1 and GICD_TYPER.RSS==0,
-+	 * writing ICC_ASGI1R_EL1 register with RS != 0 is a CONSTRAINED
-+	 * UNPREDICTABLE choice of :
-+	 *   - The write is ignored.
-+	 *   - The RS field is treated as 0.
-+	 */
-+	if (need_rss && (!gic_data.has_rss))
-+		pr_crit_once("RSS is required but GICD doesn't support it\n");
- }
- 
- static int gic_dist_supports_lpis(void)
-@@ -591,6 +621,9 @@ static void gic_cpu_init(void)
- 
- #ifdef CONFIG_SMP
- 
-+#define MPIDR_TO_SGI_RS(mpidr)	(MPIDR_RS(mpidr) << ICC_SGI1R_RS_SHIFT)
-+#define MPIDR_TO_SGI_CLUSTER_ID(mpidr)	((mpidr) & ~0xFUL)
-+
- static int gic_starting_cpu(unsigned int cpu)
- {
- 	gic_cpu_init();
-@@ -605,13 +638,6 @@ static u16 gic_compute_target_list(int *base_cpu, const struct cpumask *mask,
- 	u16 tlist = 0;
- 
- 	while (cpu < nr_cpu_ids) {
--		/*
--		 * If we ever get a cluster of more than 16 CPUs, just
--		 * scream and skip that CPU.
--		 */
--		if (WARN_ON((mpidr & 0xff) >= 16))
--			goto out;
--
- 		tlist |= 1 << (mpidr & 0xf);
- 
- 		next_cpu = cpumask_next(cpu, mask);
-@@ -621,7 +647,7 @@ static u16 gic_compute_target_list(int *base_cpu, const struct cpumask *mask,
- 
- 		mpidr = cpu_logical_map(cpu);
- 
--		if (cluster_id != (mpidr & ~0xffUL)) {
-+		if (cluster_id != MPIDR_TO_SGI_CLUSTER_ID(mpidr)) {
- 			cpu--;
- 			goto out;
- 		}
-@@ -643,6 +669,7 @@ static void gic_send_sgi(u64 cluster_id, u16 tlist, unsigned int irq)
- 	       MPIDR_TO_SGI_AFFINITY(cluster_id, 2)	|
- 	       irq << ICC_SGI1R_SGI_ID_SHIFT		|
- 	       MPIDR_TO_SGI_AFFINITY(cluster_id, 1)	|
-+	       MPIDR_TO_SGI_RS(cluster_id)		|
- 	       tlist << ICC_SGI1R_TARGET_LIST_SHIFT);
- 
- 	pr_debug("CPU%d: ICC_SGI1R_EL1 %llx\n", smp_processor_id(), val);
-@@ -663,7 +690,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
- 	smp_wmb();
- 
- 	for_each_cpu(cpu, mask) {
--		unsigned long cluster_id = cpu_logical_map(cpu) & ~0xffUL;
-+		u64 cluster_id = MPIDR_TO_SGI_CLUSTER_ID(cpu_logical_map(cpu));
- 		u16 tlist;
- 
- 		tlist = gic_compute_target_list(&cpu, mask, cluster_id);
-@@ -1007,6 +1034,10 @@ static int __init gic_init_bases(void __iomem *dist_base,
- 		goto out_free;
- 	}
- 
-+	gic_data.has_rss = !!(typer & GICD_TYPER_RSS);
-+	pr_info("Distributor has %sRange Selector support\n",
-+		gic_data.has_rss ? "" : "no ");
-+
- 	set_handle_irq(gic_handle_irq);
- 
- 	gic_update_vlpi_properties();
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 1ea576c..b8b5998 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -68,6 +68,7 @@
- #define GICD_CTLR_ENABLE_SS_G1		(1U << 1)
- #define GICD_CTLR_ENABLE_SS_G0		(1U << 0)
- 
-+#define GICD_TYPER_RSS			(1U << 26)
- #define GICD_TYPER_LPIS			(1U << 17)
- #define GICD_TYPER_MBIS			(1U << 16)
- 
-@@ -459,6 +460,7 @@
- #define ICC_CTLR_EL1_SEIS_MASK		(0x1 << ICC_CTLR_EL1_SEIS_SHIFT)
- #define ICC_CTLR_EL1_A3V_SHIFT		15
- #define ICC_CTLR_EL1_A3V_MASK		(0x1 << ICC_CTLR_EL1_A3V_SHIFT)
-+#define ICC_CTLR_EL1_RSS		(0x1 << 18)
- #define ICC_PMR_EL1_SHIFT		0
- #define ICC_PMR_EL1_MASK		(0xff << ICC_PMR_EL1_SHIFT)
- #define ICC_BPR0_EL1_SHIFT		0
-@@ -547,6 +549,8 @@
- #define ICC_SGI1R_AFFINITY_2_SHIFT	32
- #define ICC_SGI1R_AFFINITY_2_MASK	(0xffULL << ICC_SGI1R_AFFINITY_2_SHIFT)
- #define ICC_SGI1R_IRQ_ROUTING_MODE_BIT	40
-+#define ICC_SGI1R_RS_SHIFT		44
-+#define ICC_SGI1R_RS_MASK		(0xfULL << ICC_SGI1R_RS_SHIFT)
- #define ICC_SGI1R_AFFINITY_3_SHIFT	48
- #define ICC_SGI1R_AFFINITY_3_MASK	(0xffULL << ICC_SGI1R_AFFINITY_3_SHIFT)
- 
--- 
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+They are: pfn 0 and pfns in range [159, 255].
+
+Note, trim_low_memory_range() reserves only pfns in range [0, 15], it 
+does not reserve [159, 255] ones.
+
+e820__memblock_setup() reports linux that the following physical ranges 
+are available:
+     [1 , 158]
+[256, 130783]
+
+Notice, that exactly unavailable pfns are missing!
+
+Now, lets check what we have in zone 0: [1, 131039]
+
+pfn 0, is not part of the zone, but pfns [1, 158], are.
+
+However, the bigger problem we have if we do not initialize these struct 
+pages is with memory hotplug. Because, that path operates at 2M 
+boundaries (section_nr). And checks if 2M range of pages is hot 
+removable. It starts with first pfn from zone, rounds it down to 2M 
+boundary (sturct pages are allocated at 2M boundaries when vmemmap is 
+created), and and checks if that section is hot removable. In this case 
+start with pfn 1 and convert it down to pfn 0.
+
+Later pfn is converted to struct page, and some fields are checked. Now, 
+if we do not zero struct pages, we get unpredictable results. In fact 
+when CONFIG_VM_DEBUG is enabled, and we explicitly set all vmemmap 
+memory to ones, I am getting the following panic with kernel test 
+without this patch applied:
+
+[   23.277793] BUG: unable to handle kernel NULL pointer dereference at 
+          (null)
+[   23.278863] IP: is_pageblock_removable_nolock+0x35/0x90
+[   23.279619] PGD 0 P4D 0
+[   23.280031] Oops: 0000 [#1] PREEMPT
+[   23.280527] CPU: 0 PID: 249 Comm: udevd Not tainted 
+4.14.0-rc3_pt_memset10-00335-g5e2c7478bed5-dirty #8
+[   23.281735] task: ffff88001f4e2900 task.stack: ffffc90000314000
+[   23.282532] RIP: 0010:is_pageblock_removable_nolock+0x35/0x90
+[   23.283275] RSP: 0018:ffffc90000317d60 EFLAGS: 00010202
+[   23.283948] RAX: ffffffffffffffff RBX: ffff88001d92b000 RCX: 
+0000000000000000
+[   23.284862] RDX: 0000000000000000 RSI: 0000000000200000 RDI: 
+ffff88001d92b000
+[   23.285771] RBP: ffffc90000317d80 R08: 00000000000010c8 R09: 
+0000000000000000
+[   23.286542] R10: 0000000000000000 R11: 0000000000000000 R12: 
+ffff88001db2b000
+[   23.287264] R13: ffffffff81af6d00 R14: ffff88001f7d5000 R15: 
+ffffffff82a1b6c0
+[   23.287971] FS:  00007f4eb857f7c0(0000) GS:ffffffff81c27000(0000) 
+knlGS:0000000000000000
+[   23.288775] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+[   23.289355] CR2: 0000000000000000 CR3: 000000001f4e6000 CR4: 
+00000000000006b0
+[   23.290066] Call Trace:
+[   23.290323]  ? is_mem_section_removable+0x5a/0xd0
+[   23.290798]  show_mem_removable+0x6b/0xa0
+[   23.291204]  dev_attr_show+0x1b/0x50
+[   23.291565]  sysfs_kf_seq_show+0xa1/0x100
+[   23.291967]  kernfs_seq_show+0x22/0x30
+[   23.292349]  seq_read+0x1ac/0x3a0
+[   23.292687]  kernfs_fop_read+0x36/0x190
+[   23.293074]  ? security_file_permission+0x90/0xb0
+[   23.293547]  __vfs_read+0x16/0x30
+[   23.293884]  vfs_read+0x81/0x130
+[   23.294214]  SyS_read+0x44/0xa0
+[   23.294537]  entry_SYSCALL_64_fastpath+0x1f/0xbd
+[   23.295003] RIP: 0033:0x7f4eb7c660a0
+[   23.295364] RSP: 002b:00007ffda6cffe28 EFLAGS: 00000246 ORIG_RAX: 
+0000000000000000
+[   23.296152] RAX: ffffffffffffffda RBX: 00000000000003de RCX: 
+00007f4eb7c660a0
+[   23.296934] RDX: 0000000000001000 RSI: 00007ffda6cffec8 RDI: 
+0000000000000005
+[   23.297963] RBP: 00007ffda6cffde8 R08: 7379732f73656369 R09: 
+6f6d656d2f6d6574
+[   23.299198] R10: 726f6d656d2f7972 R11: 0000000000000246 R12: 
+0000000000000022
+[   23.300400] R13: 0000561d68ea7710 R14: 0000000000000000 R15: 
+00007ffda6d05c78
+[   23.301591] Code: c1 ea 35 49 c1 e8 2b 48 8b 14 d5 c0 b6 a1 82 41 83 
+e0 03 48 85 d2 74 0c 48 c1 e8 29 25 f0 0f 00 00 48 01 c2 4d 69 c0 98 
+05 00 00 <48> 8b 02 48 89 fa 48 83 e0 f8 49 8b 88 28 b5 d3 81 48 29 c2 49
+[   23.304739] RIP: is_pageblock_removable_nolock+0x35/0x90 RSP: 
+ffffc90000317d60
+[   23.305940] CR2: 0000000000000000
