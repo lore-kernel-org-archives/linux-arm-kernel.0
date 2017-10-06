@@ -1,12 +1,12 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 06 Oct 2017 14:49:55 +0200
-Subject: [PATCH 14/16] arm64: dts: marvell: armada-37xx: add second UART
- port
-In-Reply-To: <20171006101344.15590-15-miquel.raynal@free-electrons.com>
- (Miquel Raynal's message of "Fri, 6 Oct 2017 12:13:42 +0200")
+Date: Fri, 06 Oct 2017 14:51:23 +0200
+Subject: [PATCH 15/16] arm64: dts: marvell: armada-3720-db: enable second
+ UART port
+In-Reply-To: <20171006101344.15590-16-miquel.raynal@free-electrons.com>
+ (Miquel Raynal's message of "Fri, 6 Oct 2017 12:13:43 +0200")
 References: <20171006101344.15590-1-miquel.raynal@free-electrons.com>
- <20171006101344.15590-15-miquel.raynal@free-electrons.com>
-Message-ID: <87o9pke8zw.fsf@free-electrons.com>
+ <20171006101344.15590-16-miquel.raynal@free-electrons.com>
+Message-ID: <87k208e8xg.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,15 +14,8 @@ Hi Miquel,
  
  On ven., oct. 06 2017, Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
 
-> Add a node in Armada 37xx DTSI file for the second UART, with a
-> different compatible due to its extended IP which has some
-> differences with the first UART already in place.
->
-> Make use of this commit to also fully describe the first port and
-> use the same clear and named interrupt bindings for both ports.
->
-> The standard UART (UART0) uses level-interrupts while the extended
-> UART (UART1) uses edge-triggered interrupts.
+> Enable Armada-3720-DB second UART port by adding the corresponding
+> device tree node in the board DTS and enabling it.
 >
 > Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 
@@ -31,47 +24,37 @@ Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Thanks,
 
 Gregory
-
 > ---
->  arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 18 +++++++++++++++++-
->  1 file changed, 17 insertions(+), 1 deletion(-)
+>  arch/arm64/boot/dts/marvell/armada-3720-db.dts | 9 ++++++++-
+>  1 file changed, 8 insertions(+), 1 deletion(-)
 >
-> diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-> index a36d667f770e..72b68f23c001 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-> @@ -55,6 +55,7 @@
+> diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+> index 9df0f06ce607..15713c19b3d0 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+> +++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+> @@ -216,7 +216,7 @@
 >  
->  	aliases {
->  		serial0 = &uart0;
-> +		serial1 = &uart1;
->  	};
+>  /*
+>   * Exported on the micro USB connector CON30(V2.0)/CON32(V1.4) through
+> - * an FTDI
+> + * an FTDI (also on CON24(V2.0)/CON26(V1.4)).
+>   */
+>  &uart0 {
+>  	pinctrl-names = "default";
+> @@ -224,6 +224,13 @@
+>  	status = "okay";
+>  };
 >  
->  	cpus {
-> @@ -136,7 +137,22 @@
->  				compatible = "marvell,armada-3700-uart";
->  				reg = <0x12000 0x200>;
->  				clocks = <&xtalclk>;
-> -				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
-> +				interrupts =
-> +				<GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
-> +				<GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
-> +				<GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
-> +				interrupt-names = "uart-sum", "uart-tx", "uart-rx";
-> +				status = "disabled";
-> +			};
+> +/* CON26(V2.0)/CON28(V1.4) */
+> +&uart1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart2_pins>;
+> +	status = "okay";
+> +};
 > +
-> +			uart1: serial at 12200 {
-> +				compatible = "marvell,armada-3700-uart-ext";
-> +				reg = <0x12200 0x30>;
-> +				clocks = <&xtalclk>;
-> +				interrupts =
-> +				<GIC_SPI 30 IRQ_TYPE_EDGE_RISING>,
-> +				<GIC_SPI 31 IRQ_TYPE_EDGE_RISING>;
-> +				interrupt-names = "uart-tx", "uart-rx";
->  				status = "disabled";
->  			};
->  
+>  /* CON27(V2.0)/CON29(V1.4) */
+>  &usb2 {
+>  	status = "okay";
 > -- 
 > 2.11.0
 >
