@@ -1,43 +1,33 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 06 Oct 2017 15:38:13 -0700
-Subject: [PATCH 0/3] soc: amlogic: Add Meson6/8/8b SoC Information driver
-In-Reply-To: <20170923141403.20882-1-martin.blumenstingl@googlemail.com>
- (Martin Blumenstingl's message of "Sat, 23 Sep 2017 16:14:00 +0200")
-References: <20170923141403.20882-1-martin.blumenstingl@googlemail.com>
-Message-ID: <7h60br9a22.fsf@baylibre.com>
+Date: Fri, 06 Oct 2017 15:59:40 -0700
+Subject: [PATCH] ARM: dts: meson8b: add reserved memory zone to fix silent
+ freezes
+In-Reply-To: <20171002155903.19511-1-linus.luessing@c0d3.blue> ("Linus
+ =?utf-8?Q?L=C3=BCssing=22's?= message of "Mon, 2 Oct 2017 17:59:03 +0200")
+References: <20171002155903.19511-1-linus.luessing@c0d3.blue>
+Message-ID: <7h1smf992b.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
+Linus L?ssing <linus.luessing@c0d3.blue> writes:
 
-> The 32-bit Amlogic SoC have some registers which contain some information
-> the SoC's major and version, as well as a "major version".
-> This patchset adds support for this register decoding and exposing with the
-> SoC bus infrastructure, with dt-bindings and DT node.
+> So far, the stress-ng tool for instance quickly resulted in a silent
+> freeze of the system with no prior notice on a serial console when
+> running its filesystem or memory stressor classes.
 >
-> This is inspired by Neil's Meson GX socinfo driver, see [0]
+> Even with a panic-on-OOM and reboot-on-panic (vm.panic_on_oom=1,
+> kernel.panic=10) configured, the system would neither reboot nor
+> would the OOM killer get any chance to otherwise do its job.
 >
-> All information was taken from Amlogic's 3.10 GPL kernel sources because
-> the public S805 datasheet from Hardkernel does not contain any relevant
-> information for these register blocks.
+> The Amlogic reference source code uses a 2MB PHYS_OFFSET. With these 2MB
+> reserved via DT, stress-ng was able to run on an Odroid C1+ just fine for
+> several hours, the OOM killer was able to kill processes again and if
+> configured would successfully trigger a reboot of the system.
 >
->
-> [0] http://lists.infradead.org/pipermail/linux-amlogic/2017-June/004187.html
->
-> Martin Blumenstingl (3):
->   dt-bindings: Amlogic: add documentation for the SoC info register
->     areas
+> Fixes: 4a69fcd3a108 ("ARM: meson: Add DTS for Odroid-C1 and Tronfy MXQ boards")
+> Signed-off-by: Linus L?ssing <linus.luessing@c0d3.blue>
 
-Applied to v4.15/dt
-
->   soc: amlogic: Add Meson6/Meson8/Meson8b/Meson8m2 SoC Information
->     driver
-
-Applied to v4.15/drivers
-
->   ARM: dts: meson: add SoC information nodes
-
-Applied to v4.15/dt
+Applied to v4.15/dt with Martin's Tested-by,
 
 Thanks,
 
