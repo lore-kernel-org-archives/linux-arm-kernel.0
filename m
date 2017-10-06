@@ -1,112 +1,386 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 6 Oct 2017 15:27:51 +0100
-Subject: [PATCH v1 2/2] kvm: arm64: handle single-step of userspace mmio
- instructions
-In-Reply-To: <878tgoxudc.fsf@linaro.org>
-References: <20171006113921.24880-1-alex.bennee@linaro.org>
- <20171006113921.24880-3-alex.bennee@linaro.org>
- <a9f8905e-18e9-267a-2479-f498c248e2f4@arm.com> <878tgoxudc.fsf@linaro.org>
-Message-ID: <e7dafd0d-80b0-8a53-049e-9d4ecf431359@arm.com>
+From: oza.pawandeep@gmail.com (Oza Pawandeep)
+Date: Fri, 6 Oct 2017 20:03:52 +0530
+Subject: [PATCH v6 3/3] PCI: iproc: Implement PCI hotplug support
+In-Reply-To: <20171006113700.GA25517@bhelgaas-glaptop.roam.corp.google.com>
+References: <1504155029-24729-1-git-send-email-oza.oza@broadcom.com>
+ <1504155029-24729-4-git-send-email-oza.oza@broadcom.com>
+ <20171006113700.GA25517@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <CAK1A=4z6T9MLmCBBCmr5jVkVOySpw6fMTiTPqb=Nr-pjxhuARw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 06/10/17 14:45, Alex Benn?e wrote:
-> 
-> Julien Thierry <julien.thierry@arm.com> writes:
-> 
->> On 06/10/17 12:39, Alex Benn?e wrote:
->>> The system state of KVM when using userspace emulation is not complete
->>> until we return into KVM_RUN. To handle mmio related updates we wait
->>> until they have been committed and then schedule our KVM_EXIT_DEBUG.
->>>
->>> I've introduced a new function kvm_arm_maybe_return_debug() to wrap up
->>> the differences between arm/arm64 which is currently null for arm.
->>>
->>> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->>> ---
->>>    arch/arm/include/asm/kvm_host.h   |  2 ++
->>>    arch/arm64/include/asm/kvm_host.h |  1 +
->>>    arch/arm64/kvm/debug.c            | 21 +++++++++++++++++++++
->>>    arch/arm64/kvm/handle_exit.c      |  9 +++------
->>>    virt/kvm/arm/arm.c                |  2 +-
->>>    virt/kvm/arm/mmio.c               |  3 ++-
->>>    6 files changed, 30 insertions(+), 8 deletions(-)
->>>
->>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->>> index 4a879f6ff13b..aec943f6d123 100644
->>> --- a/arch/arm/include/asm/kvm_host.h
->>> +++ b/arch/arm/include/asm/kvm_host.h
->>> @@ -285,6 +285,8 @@ static inline void kvm_arm_init_debug(void) {}
->>>    static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
->>>    static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
->>>    static inline void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu) {}
->>> +static inline int  kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu,
->>> +						struct kvm_run *run) {}
->>>
+On Fri, Oct 6, 2017 at 5:07 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> On Thu, Aug 31, 2017 at 10:20:29AM +0530, Oza Pawandeep wrote:
+>> This patch implements PCI hotplug support for iproc family chipsets.
 >>
->> This function should return 1.
-> 
-> So I did ponder making this a bool, returning true if we need to exit
-> and testing in v/k/a/arm.c exit leg rather than in the mmio handler.
-> 
-> At the moment it mirrors the existing exit logic which follows -1 err, 0
-> return, >0 handled. But as I mentioned in the cover letter this fell
-> down a bit when dealing with the mmio case.
-> 
-
-Hmmm, my main issue is that this version doesn't have a return 
-statement, which probably triggers a gcc warning with ARCH=arm and also 
-might cause arm (32bit) kvm to exit upon handling mmio return when we 
-don't want to.
-
-Otherwise, I also wondered about using a bool here. But following the 
-pre-existing logic makes sense to me (but I have no strong feeling about 
-it).
-
+>> iproc based SOC (e.g. Stingray) does not have hotplug controller
+>> integrated.
+>> Hence, standard PCI hotplug framework hooks can-not be used.
+>> e.g. controlled power up/down of slot.
 >>
->>>    int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
->>>    			       struct kvm_device_attr *attr);
->>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->>> index e923b58606e2..fa67d21662f6 100644
->>> --- a/arch/arm64/include/asm/kvm_host.h
->>> +++ b/arch/arm64/include/asm/kvm_host.h
->>> @@ -369,6 +369,7 @@ void kvm_arm_init_debug(void);
->>>    void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
->>>    void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
->>>    void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu);
->>> +int  kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu, struct kvm_run *run);
+>> The mechanism, for e.g. Stingray has adopted for PCI hotplug is as follows:
+>> PCI present lines are input to GPIOs depending on the type of
+>> connector (x2, x4, x8).
 >>
->> I feel the name could be a little bit more explicit:
+>> GPIO array needs to be present if hotplug is supported.
+>> HW implementation is SOC/Board specific, and also it depends on how
+>> add-in card is designed
+>> (e.g. how many present pins are implemented).
 >>
->> kvm_arm_trap_need_step_debug, kvm_arm_trap_step_return_debug,
->> kvm_arm_trap_need_return_debug.
-> 
-> I wanted to keep the debug suffix so that's fine although I'm not so
-> sure trap is correct because on the tail end of mmio emulation are we
-> still trapping?
-> 
-> Maybe kvm_arm_step_emulated_debug?
-> 
+>> If x8 card is connected, then it might be possible that all the
+>> 3 present pins could go low, or at least one pin goes low.
+>> If x4 card is connected, then it might be possible that 2 present
+>> pins go low, or at least one pin goes low.
+>>
+>> The implementation essentially takes care of following:
+>> > Initializing hotplug irq thread.
+>> > Detecting the endpoint device based on link state.
+>> > Handling PERST and detecting the plugged devices.
+>> > Ordered Hot plug-out, where User is expected
+>>   to write 1 to /sys/bus/pci/devices/<pci_dev>/remove
+>> > Handling spurious interrupt
+>> > Handling multiple interrupts and makes sure that card is
+>>   enumerated only once.
+>
+> I haven't forgotten this, but I am dragging my feet a little bit.
+> There is a standard way for hardware to support PCIe hotplug, and it's
+> hard enough to get the software for that right.  I really, really
+> don't want to see a bunch of one-off implementations that sort of look
+> like standard hotplug but not really.
+>
+> I have a few trivial comments below but haven't really reviewed the
+> whole thing.
+>
+>> Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
+>> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+>>
+>> diff --git a/drivers/pci/host/pcie-iproc-platform.c b/drivers/pci/host/pcie-iproc-platform.c
+>> index a5073a9..6287a43 100644
+>> --- a/drivers/pci/host/pcie-iproc-platform.c
+>> +++ b/drivers/pci/host/pcie-iproc-platform.c
+>> @@ -92,6 +92,9 @@ static int iproc_pcie_pltfm_probe(struct platform_device *pdev)
+>>               pcie->need_ob_cfg = true;
+>>       }
+>>
+>> +     if (of_property_read_bool(np, "slot-pluggable"))
+>> +             pcie->enable_hotplug = true;
+>> +
+>>       /* PHY use is optional */
+>>       pcie->phy = devm_phy_get(dev, "pcie-phy");
+>>       if (IS_ERR(pcie->phy)) {
+>> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
+>> index 8bd5e54..2b4d830 100644
+>> --- a/drivers/pci/host/pcie-iproc.c
+>> +++ b/drivers/pci/host/pcie-iproc.c
+>> @@ -28,6 +28,7 @@
+>>  #include <linux/of_irq.h>
+>>  #include <linux/of_platform.h>
+>>  #include <linux/phy/phy.h>
+>> +#include <linux/gpio.h>
+>>
+>>  #include "pcie-iproc.h"
+>>
+>> @@ -65,6 +66,17 @@
+>>  #define PCIE_DL_ACTIVE_SHIFT         2
+>>  #define PCIE_DL_ACTIVE               BIT(PCIE_DL_ACTIVE_SHIFT)
+>>
+>> +#define CFG_RC_LTSSM                 0x1cf8
+>> +#define CFG_RC_PHY_CTL               0x1804
+>> +#define CFG_RC_LTSSM_TIMEOUT         1000
+>> +#define CFG_RC_LTSSM_STATE_MASK      0xff
+>> +#define CFG_RC_LTSSM_STATE_L1        0x1
+>> +
+>> +#define CFG_RC_CLR_LTSSM_HIST_SHIFT  29
+>> +#define CFG_RC_CLR_LTSSM_HIST_MASK   BIT(CFG_RC_CLR_LTSSM_HIST_SHIFT)
+>> +#define CFG_RC_CLR_RECOV_HIST_SHIFT  31
+>> +#define CFG_RC_CLR_RECOV_HIST_MASK   BIT(CFG_RC_CLR_RECOV_HIST_SHIFT)
+>> +
+>>  #define APB_ERR_EN_SHIFT             0
+>>  #define APB_ERR_EN                   BIT(APB_ERR_EN_SHIFT)
+>>
+>> @@ -1354,13 +1366,107 @@ static int iproc_pcie_rev_init(struct iproc_pcie *pcie)
+>>       return 0;
+>>  }
+>>
+>> +static bool iproc_pci_hp_check_ltssm(struct iproc_pcie *pcie)
+>
+> *_check_*() is a terrible name for a function because it doesn't give
+> any hint about what a "true" return value means.
+>
+> This looks sort of like dw_pcie_wait_for_link() and
+> advk_pcie_wait_for_link().  Please use a name more like them and
+> structure the code more like them.
+>
+>> +{
+>> +     struct pci_bus *bus = pcie->root_bus;
+>> +     u32 val, timeout = CFG_RC_LTSSM_TIMEOUT;
+>> +
+>> +     /* Clear LTSSM history. */
+>> +     pci_bus_read_config_dword(pcie->root_bus, 0,
+>> +                               CFG_RC_PHY_CTL, &val);
+>> +     pci_bus_write_config_dword(bus, 0, CFG_RC_PHY_CTL,
+>> +                                val | CFG_RC_CLR_RECOV_HIST_MASK |
+>> +                                CFG_RC_CLR_LTSSM_HIST_MASK);
+>> +     /* write back the origional value. */
+>
+> s/origional/original/
+>
+>> +     pci_bus_write_config_dword(bus, 0, CFG_RC_PHY_CTL, val);
+>> +
+>> +     do {
+>> +             pci_bus_read_config_dword(pcie->root_bus, 0,
+>> +                                       CFG_RC_LTSSM, &val);
+>> +             /* check link state to see if link moved to L1 state. */
+>> +             if ((val & CFG_RC_LTSSM_STATE_MASK) ==
+>> +                  CFG_RC_LTSSM_STATE_L1)
+>> +                     return true;
+>> +             timeout--;
+>> +             usleep_range(500, 1000);
+>> +     } while (timeout);
+>> +
+>> +     return false;
+>> +}
+>> +
+>> +static irqreturn_t iproc_pci_hotplug_thread(int irq, void *data)
+>> +{
+>> +     struct iproc_pcie *pcie = data;
+>
+>   struct device *dev = pcie->dev;
+>
+> Then you don't have to repeat "pcie->dev" below.
+>
+>> +     struct pci_bus *bus = pcie->root_bus, *child;
+>> +     bool link_status;
+>> +
+>> +     iproc_pcie_perst_ctrl(pcie, true);
+>> +     iproc_pcie_perst_ctrl(pcie, false);
+>> +
+>> +     link_status = iproc_pci_hp_check_ltssm(pcie);
+>> +
+>> +     if (link_status &&
+>> +         !iproc_pcie_check_link(pcie) &&
+>
+> iproc_pcie_check_link() already exists, but is still a poor name.
+>
+> Please add some preliminary patches to rename and restructure it along
+> the lines of the other *_link_up() functions, e.g.,
+> advk_pcie_link_up(), nwl_pcie_link_up(), spear13xx_pcie_link_up(),
+> etc.
+>
+> iproc_pcie_check_link() does a bunch of other stuff that should be
+> moved to other functions.  Some of it looks similar to the
+> *_establish_link() functions in other drivers.
+>
+>> +         !pcie->ep_is_present) {
+>> +             pci_rescan_bus(bus);
+>> +             list_for_each_entry(child, &bus->children, node)
+>> +                     pcie_bus_configure_settings(child);
+>> +             pcie->ep_is_present = true;
+>> +             dev_info(pcie->dev,
+>> +                      "PCI Hotplug: <device detected and enumerated>\n");
+>> +     } else if (link_status && pcie->ep_is_present)
+>> +             /*
+>> +              * ep_is_present makes sure, enumuration done only once.
+>
+> s/enumuration/enumeration/
+>
+>> +              * So it can handle spurious intrrupts, and also if we
+>
+> s/intrrupts/interrupts/
+>
+>> +              * get multiple interrupts for all the implemented pins,
+>> +              * we handle it only once.
+>> +              */
+>> +             dev_info(pcie->dev,
+>> +                      "PCI Hotplug: <device already present>\n");
+>> +     else {
+>> +             iproc_pcie_perst_ctrl(pcie, true);
+>> +             pcie->ep_is_present = false;
+>> +             dev_info(pcie->dev,
+>> +                      "PCI Hotplug: <device removed>\n");
+>> +     }
+>> +     return IRQ_HANDLED;
+>> +}
+>> +
+>> +static int iproc_pci_hp_gpio_irq_get(struct iproc_pcie *pcie)
+>> +{
+>> +     struct gpio_descs *hp_gpiod;
+>> +     struct device *dev = pcie->dev;
+>> +     int i;
+>> +
+>> +     hp_gpiod = devm_gpiod_get_array(dev, "prsnt", GPIOD_IN);
+>> +     if (PTR_ERR(hp_gpiod) == -EPROBE_DEFER)
+>> +             return -EPROBE_DEFER;
+>> +
+>> +     if (!IS_ERR(hp_gpiod) && (hp_gpiod->ndescs > 0)) {
+>> +             for (i = 0; i < hp_gpiod->ndescs; ++i) {
+>> +                     gpiod_direction_input(hp_gpiod->desc[i]);
+>> +                     if (request_threaded_irq(gpiod_to_irq
+>> +                                              (hp_gpiod->desc[i]),
+>> +                                              NULL, iproc_pci_hotplug_thread,
+>> +                                              IRQF_TRIGGER_FALLING,
+>> +                                              "PCI-hotplug", pcie))
+>> +                             dev_err(dev,
+>> +                                     "PCI hotplug prsnt: request irq failed\n");
+>> +                     }
+>> +     }
+>> +     pcie->ep_is_present = false;
+>> +
+>> +     return 0;
+>> +}
+>> +
+>>  int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
+>>  {
+>>       struct device *dev;
+>>       int ret;
+>>       void *sysdata;
+>> -     struct pci_bus *child;
+>> +     struct pci_bus *bus, *child;
+>>       struct pci_host_bridge *host = pci_host_bridge_from_priv(pcie);
+>> +     bool link_not_active;
+>>
+>>       dev = pcie->dev;
+>>
+>> @@ -1386,6 +1492,12 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
+>>               goto err_exit_phy;
+>>       }
+>>
+>> +     if (pcie->enable_hotplug) {
+>> +             ret = iproc_pci_hp_gpio_irq_get(pcie);
+>> +             if (ret < 0)
+>> +                     return ret;
+>> +     }
+>> +
+>>       iproc_pcie_perst_ctrl(pcie, true);
+>>       iproc_pcie_perst_ctrl(pcie, false);
+>>
+>> @@ -1408,8 +1520,16 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
+>>       sysdata = pcie;
+>>  #endif
+>>
+>> -     ret = iproc_pcie_check_link(pcie);
+>> -     if (ret) {
+>> +     link_not_active = iproc_pcie_check_link(pcie);
+>> +     if (link_not_active && pcie->enable_hotplug) {
+>> +             /*
+>> +              * When link is not active and PCI hotplug
+>> +              * is supported, do not turn off phy, let probe
+>> +              * go ahead.
+>> +              */
+>> +             dev_err(dev, "no PCIe EP device detected\n");
+>> +             iproc_pcie_perst_ctrl(pcie, true);
+>> +     } else if (link_not_active) {
+>>               dev_err(dev, "no PCIe EP device detected\n");
+>>               goto err_power_off_phy;
+>>       }
+>> @@ -1420,24 +1540,34 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
+>>               if (iproc_pcie_msi_enable(pcie))
+>>                       dev_info(dev, "not using iProc MSI\n");
+>>
+>> -     list_splice_init(res, &host->windows);
+>> -     host->busnr = 0;
+>> -     host->dev.parent = dev;
+>> -     host->ops = &iproc_pcie_ops;
+>> -     host->sysdata = sysdata;
+>> -     host->map_irq = pcie->map_irq;
+>> -     host->swizzle_irq = pci_common_swizzle;
+>> +     if (!link_not_active) {
+>
+> Double negation.  If you pick a better name, e.g., "link_active", this
+> will read much better.  But I don't understand why you want to check
+> whether the link is active here anyway.  pci_scan_root_bus_bridge()
+> should work fine even if there's no device present below the bridge.
+> Won't the root port be there always, even if there's no downstream
+> device?
+>
 
-Yes, sounds good.
+will change all the names and spellings as you are suggesting.
 
-Thanks,
+pci_scan_root_bus_bridge crashes when link is not active. when I last
+tested, that is what I observed.
 
->> At least, I think it would be nice that the name reflect that this
->> check is meant for emulated instructions.
->>
->> Otherwise:
->>
->> Reviewed-by: Julien Thierry <julien.thierry@arm.com>
->>
->> Thanks,
-> 
-> 
-> --
-> Alex Benn?e
-> 
+because in previous code when we dont support hotplug, we just got to
+err, and remove root-bus in case link is not active.
+we dont do scan bus.
 
--- 
-Julien Thierry
+if fact so far none of the RC driver implements hotplug so this might
+not have been exercised.
+
+Ray and Vikram: please help to see these comments implemented.
+
+
+>> +             list_splice_init(res, &host->windows);
+>> +             host->busnr = 0;
+>> +             host->dev.parent = dev;
+>> +             host->ops = &iproc_pcie_ops;
+>> +             host->sysdata = sysdata;
+>> +             host->map_irq = pcie->map_irq;
+>> +             host->swizzle_irq = pci_common_swizzle;
+>> +
+>> +             ret = pci_scan_root_bus_bridge(host);
+>> +             if (ret < 0) {
+>> +                     dev_err(dev, "failed to scan host: %d\n", ret);
+>> +                     goto err_power_off_phy;
+>> +             }
+>>
+>> -     ret = pci_scan_root_bus_bridge(host);
+>> -     if (ret < 0) {
+>> -             dev_err(dev, "failed to scan host: %d\n", ret);
+>> -             goto err_power_off_phy;
+>> +             pci_assign_unassigned_bus_resources(host->bus);
+>> +             pcie->root_bus = host->bus;
+>> +     } else {
+>> +             bus = pci_create_root_bus(dev, 0,
+>> +                                       &iproc_pcie_ops, sysdata, res);
+>> +             if (!bus) {
+>> +                     dev_err(dev, "unable to create PCI root bus\n");
+>> +                     ret = -ENOMEM;
+>> +                     goto err_power_off_phy;
+>> +             }
+>> +             pcie->root_bus = bus;
+>>       }
+>>
+>> -     pci_assign_unassigned_bus_resources(host->bus);
+>> -
+>> -     pcie->root_bus = host->bus;
+>> -
+>>       list_for_each_entry(child, &host->bus->children, node)
+>>               pcie_bus_configure_settings(child);
+>>
+>> diff --git a/drivers/pci/host/pcie-iproc.h b/drivers/pci/host/pcie-iproc.h
+>> index a6b55ce..e5d0cd4 100644
+>> --- a/drivers/pci/host/pcie-iproc.h
+>> +++ b/drivers/pci/host/pcie-iproc.h
+>> @@ -77,6 +77,10 @@ struct iproc_pcie_ib {
+>>   * @ib: inbound mapping related parameters
+>>   * @ib_map: outbound mapping region related parameters
+>>   *
+>> + * @enable_hotplug: indicates PCI hotplug feature is enabled
+>> + * @ep_is_present: when PCIe hotplug is enabled, this flag is used to
+>> + * indicate whether or not the endpoint device is present
+>> + *
+>>   * @need_msi_steer: indicates additional configuration of the iProc PCIe
+>>   * controller is required to steer MSI writes to external interrupt controller
+>>   * @msi: MSI data
+>> @@ -104,6 +108,9 @@ struct iproc_pcie {
+>>       struct iproc_pcie_ib ib;
+>>       const struct iproc_pcie_ib_map *ib_map;
+>>
+>> +     bool enable_hotplug;
+>> +     bool ep_is_present;
+>
+> Are you suggesting that only an endpoint can be hotplugged?  You can't
+> hotplug a switch?
+>
+
+ok, we can change the name, PCI switch also can be hot-plugged.
+
+>>       bool need_msi_steer;
+>>       struct iproc_msi *msi;
+>>  };
+>> --
+>> 1.9.1
+>>
+
+Regards,
+Oza.
