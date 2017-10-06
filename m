@@ -1,57 +1,36 @@
 From: hkallweit1@gmail.com (Heiner Kallweit)
-Date: Fri, 6 Oct 2017 20:47:43 +0200
-Subject: [PATCH 1/2] firmware: arm_scpi: drop unnecessary type cast to
- scpi_shared_mem
-In-Reply-To: <2f742de8-3742-ef61-8d77-27adfbdce877@arm.com>
+Date: Fri, 6 Oct 2017 20:51:57 +0200
+Subject: [PATCH 2/2] firmware: arm_scpi: remove all single element
+ structures
+In-Reply-To: <e3fd0668-f23b-6da5-ee0c-0ef146ec4d7b@arm.com>
 References: <1507201911-27976-1-git-send-email-sudeep.holla@arm.com>
- <54852f4b-78cc-061a-3c82-b753f289fee8@gmail.com>
- <2f742de8-3742-ef61-8d77-27adfbdce877@arm.com>
-Message-ID: <17c7e5f2-4497-bc0c-bc6b-b09474bbebbf@gmail.com>
+ <1507201911-27976-2-git-send-email-sudeep.holla@arm.com>
+ <18e4e7d1-69e8-0176-b823-4de102973ef5@gmail.com>
+ <e3fd0668-f23b-6da5-ee0c-0ef146ec4d7b@arm.com>
+Message-ID: <92d71b0d-8cb0-7806-5763-880d2abbecb5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 06.10.2017 um 10:51 schrieb Sudeep Holla:
+Am 06.10.2017 um 10:53 schrieb Sudeep Holla:
 > 
 > 
-> On 05/10/17 20:06, Heiner Kallweit wrote:
+> On 05/10/17 20:07, Heiner Kallweit wrote:
 >> Am 05.10.2017 um 13:11 schrieb Sudeep Holla:
->>> This patch drops the only present type cast of the SCPI payload pointer
->>> to scpi_shared_mem inorder to align with other occurrences, IOW for
->>> consistency.
+>>> Both clk_get_value and sensor_value structures contains a single element
+>>> and hence needs no packing making the whole structure defination
+>>> unnecessary.
+>>>
+>>> This patch gets rid of both those structures
 >>>
 >>> Cc: Heiner Kallweit <hkallweit1@gmail.com>
 >>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->>> ---
->>>  drivers/firmware/arm_scpi.c | 2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> [..]
+> 
 >>>
->>> diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
->>> index c923d1ebfa3e..a888970f1347 100644
->>> --- a/drivers/firmware/arm_scpi.c
->>> +++ b/drivers/firmware/arm_scpi.c
->>> @@ -453,7 +453,7 @@ static void scpi_tx_prepare(struct mbox_client *c, void *msg)
->>>  	unsigned long flags;
->>>  	struct scpi_xfer *t = msg;
->>>  	struct scpi_chan *ch = container_of(c, struct scpi_chan, cl);
->>> -	struct scpi_shared_mem *mem = (struct scpi_shared_mem *)ch->tx_payload;
->>> +	struct scpi_shared_mem *mem = ch->tx_payload;
->>>  
->> This should work fine, however it might not be 100% clean with regard to __iomem
->> annotation. ch->tx_payload is of type "void __iomem *" and I would assume that
->> sparse complains about the new statement.
+>> Looks good to me.
 > 
-> Yes sparse complains for both(with or without typecast)
+> Thanks. Tested-by or Reviewed-by would help ;)
 > 
->> The old one casts away the __iomem, what isn't much better IMO.
->>
 > 
-> Agreed.
-> 
->> By the way, I think this also applies to other places in this driver
->> where ch->rx/tx_payload are used.
->>
-> 
-> Yes, but do you have any alternatives in your mind ? I am happy to hear
-> that.
-> 
-I'll send a patch addressing this issue.
+Reviewed-by: Heiner Kallweit <hkallweit1@gmail.com>
