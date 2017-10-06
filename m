@@ -1,174 +1,84 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 6 Oct 2017 15:26:23 +0100
-Subject: [PATCH v1 2/2] kvm: arm64: handle single-step of userspace mmio
- instructions
-In-Reply-To: <3a969f2f-29b5-7847-9633-15ac45812ebb@arm.com>
-References: <20171006113921.24880-1-alex.bennee@linaro.org>
- <20171006113921.24880-3-alex.bennee@linaro.org>
- <ca10e4b9-08cc-486c-a229-da5ebcdb76cf@arm.com>
- <3c2eed4b-fc66-b87c-c61e-106efdfa78df@arm.com> <877ew8xu9x.fsf@linaro.org>
- <3a969f2f-29b5-7847-9633-15ac45812ebb@arm.com>
-Message-ID: <2c09d93e-e444-1c83-478e-c3d96f0f8893@arm.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Fri, 6 Oct 2017 14:27:13 +0000
+Subject: [PATCH v9 4/4] PCI: hisi: blacklist hip06/hip07 controllers
+ behind SMMUv3
+In-Reply-To: <20171006140450.89652-5-shameerali.kolothum.thodi@huawei.com>
+References: <20171006140450.89652-1-shameerali.kolothum.thodi@huawei.com>
+ <20171006140450.89652-5-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E40C57A73@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Shameer
 
-
-On 06/10/17 15:00, Marc Zyngier wrote:
-> On 06/10/17 14:47, Alex Benn?e wrote:
->>
->> Marc Zyngier <marc.zyngier@arm.com> writes:
->>
->>> On 06/10/17 13:37, Marc Zyngier wrote:
->>>> On 06/10/17 12:39, Alex Benn?e wrote:
->>>>> The system state of KVM when using userspace emulation is not complete
->>>>> until we return into KVM_RUN. To handle mmio related updates we wait
->>>>> until they have been committed and then schedule our KVM_EXIT_DEBUG.
->>>>>
->>>>> I've introduced a new function kvm_arm_maybe_return_debug() to wrap up
->>>>> the differences between arm/arm64 which is currently null for arm.
->>>>>
->>>>> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->>>>> ---
->>>>>   arch/arm/include/asm/kvm_host.h   |  2 ++
->>>>>   arch/arm64/include/asm/kvm_host.h |  1 +
->>>>>   arch/arm64/kvm/debug.c            | 21 +++++++++++++++++++++
->>>>>   arch/arm64/kvm/handle_exit.c      |  9 +++------
->>>>>   virt/kvm/arm/arm.c                |  2 +-
->>>>>   virt/kvm/arm/mmio.c               |  3 ++-
->>>>>   6 files changed, 30 insertions(+), 8 deletions(-)
->>>>>
->>>>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->>>>> index 4a879f6ff13b..aec943f6d123 100644
->>>>> --- a/arch/arm/include/asm/kvm_host.h
->>>>> +++ b/arch/arm/include/asm/kvm_host.h
->>>>> @@ -285,6 +285,8 @@ static inline void kvm_arm_init_debug(void) {}
->>>>>   static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
->>>>>   static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
->>>>>   static inline void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu) {}
->>>>> +static inline int  kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu,
->>>>> +						struct kvm_run *run) {}
->>>>>
->>>>>   int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
->>>>>   			       struct kvm_device_attr *attr);
->>>>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->>>>> index e923b58606e2..fa67d21662f6 100644
->>>>> --- a/arch/arm64/include/asm/kvm_host.h
->>>>> +++ b/arch/arm64/include/asm/kvm_host.h
->>>>> @@ -369,6 +369,7 @@ void kvm_arm_init_debug(void);
->>>>>   void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
->>>>>   void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
->>>>>   void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu);
->>>>> +int  kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu, struct kvm_run *run);
->>>>>   int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
->>>>>   			       struct kvm_device_attr *attr);
->>>>>   int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
->>>>> diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
->>>>> index dbadfaf850a7..a10a18c55c87 100644
->>>>> --- a/arch/arm64/kvm/debug.c
->>>>> +++ b/arch/arm64/kvm/debug.c
->>>>> @@ -221,3 +221,24 @@ void kvm_arm_clear_debug(struct kvm_vcpu *vcpu)
->>>>>   		}
->>>>>   	}
->>>>>   }
->>>>> +
->>>>> +
->>>>> +/*
->>>>> + * When KVM has successfully emulated the instruction we might want to
->>>>> + * return we a KVM_EXIT_DEBUG. We can only do this once the emulation
->>>>> + * is complete though so for userspace emulations we have to wait
->>>>> + * until we have re-entered KVM.
->>>>> + *
->>>>> + * Return > 0 to return to guest, 0 (and set exit_reason) on proper
->>>>> + * exit to userspace.
->>>>> + */
->>>>> +
->>>>> +int kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>>>> +{
->>>>> +	if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
->>>>> +		run->exit_reason = KVM_EXIT_DEBUG;
->>>>> +		run->debug.arch.hsr = ESR_ELx_EC_SOFTSTP_LOW << ESR_ELx_EC_SHIFT;
->>>>> +		return 0;
->>>>> +	}
->>>>> +	return 1;
->>>>> +}
->>>>> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
->>>>> index c918d291cb58..7b04f59217bf 100644
->>>>> --- a/arch/arm64/kvm/handle_exit.c
->>>>> +++ b/arch/arm64/kvm/handle_exit.c
->>>>> @@ -202,13 +202,10 @@ static int handle_trap_exceptions(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>>>>   		handled = exit_handler(vcpu, run);
->>>>>   	}
->>>>>
->>>>> -	if (handled && (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP)) {
->>>>> -		handled = 0;
->>>>> -		run->exit_reason = KVM_EXIT_DEBUG;
->>>>> -		run->debug.arch.hsr = ESR_ELx_EC_SOFTSTP_LOW << ESR_ELx_EC_SHIFT;
->>>>> -	}
->>>>> +	if (handled)
->>>>> +		return kvm_arm_maybe_return_debug(vcpu, run);
->>>>>
->>>>> -	return handled;
->>>>> +	return 0;
->>>>>   }
->>>>>
->>>>>   /*
->>>>> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
->>>>> index b9f68e4add71..3d28fe2daa26 100644
->>>>> --- a/virt/kvm/arm/arm.c
->>>>> +++ b/virt/kvm/arm/arm.c
->>>>> @@ -623,7 +623,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>>>>
->>>>>   	if (run->exit_reason == KVM_EXIT_MMIO) {
->>>>>   		ret = kvm_handle_mmio_return(vcpu, vcpu->run);
->>>>> -		if (ret)
->>>>> +		if (ret < 1)
->>>>>   			return ret;
->>>>>   	}
->>>>>
->>>>> diff --git a/virt/kvm/arm/mmio.c b/virt/kvm/arm/mmio.c
->>>>> index b6e715fd3c90..e43e3bd6222f 100644
->>>>> --- a/virt/kvm/arm/mmio.c
->>>>> +++ b/virt/kvm/arm/mmio.c
->>>>> @@ -117,7 +117,8 @@ int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>>>>   		vcpu_set_reg(vcpu, vcpu->arch.mmio_decode.rt, data);
->>>>>   	}
->>>>>
->>>>> -	return 0;
->>>>> +	/* If debugging in effect we may need to return now */
->>>>> +	return kvm_arm_maybe_return_debug(vcpu, run);
->>>>
->>>> Ah, that's how you do it. OK. Then the patch splitting is wrong, because
->>>> everything is broken after patch #1.
->>>
->>> Actually, it is not broken at all. I'm just confused by the very
->>> esoteric flow.
->>
->> We could just merge the whole patch in one but I wanted to show the
->> difference between in-kernel and out-of-kernel emulation.
->>
->> I could also move the step handling to the mmio leg in
->> kvm_arch_vcpu_ioctl_run but you mentioned you use the mmio completion
->> elsewhere anyway?
-> Yes, look at the end of io_mem_abort(). This is used by the vgic to
-> complete a read emulation in the kernel.
+> -----Original Message-----
+> From: Shameerali Kolothum Thodi
+> Sent: 06 October 2017 15:05
+> To: lorenzo.pieralisi at arm.com; marc.zyngier at arm.com;
+> sudeep.holla at arm.com; will.deacon at arm.com; robin.murphy at arm.com;
+> joro at 8bytes.org; bhelgaas at google.com; Gabriele Paoloni
+> Cc: John Garry; iommu at lists.linux-foundation.org; linux-arm-
+> kernel at lists.infradead.org; linux-acpi at vger.kernel.org; linux-
+> pci at vger.kernel.org; devel at acpica.org; Linuxarm; Wangzhou (B);
+> Guohanjun (Hanjun Guo); Shameerali Kolothum Thodi
+> Subject: [PATCH v9 4/4] PCI: hisi: blacklist hip06/hip07 controllers
+> behind SMMUv3
 > 
-> And actually, this means that we shouldn't have to mess with
-> handle_exit. Just check for the return value of kvm_handle_mmio_return
-> in the call sites (including the one in io_mem_abort), and exit if we
-> need to single-step...
+> The HiSilicon erratum 161010801 describes the limitation of
+> HiSilicon platforms hip06/hip07 to support the SMMUv3 mappings
+> for MSI transactions.
 > 
+> PCIe controller on these platforms has to differentiate the MSI
+> payload against other DMA payload and has to modify the MSI
+> payload. This basically makes it difficult for this platforms to
+> have a SMMU translation for MSI. In order to workaround this, ARM
+> SMMUv3 driver requires a quirk to treat the MSI regions separately.
+> Such a quirk is currently missing for DT based systems and therefore
+> we need to blacklist the hip06/hip07 PCIe controllers.
+> 
+> Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
 
-I think we need to mess with handle_exit (or at least something else 
-than kvm_handle_mmio call sites) because the patches don't only fix MMIO 
-single stepping, but also other emulated stuff (system register 
-accesses, ...).
+For this patch
+Acked-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
 
-But with your suggestion maybe we can at least handle both MMIO cases in 
-a similar manner. I think we still need the code in handle_exit, or add 
-more code to deal case by case with other emulated instructions.
-
-Thanks,
-
--- 
-Julien Thierry
+> ---
+>  drivers/pci/dwc/pcie-hisi.c | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/drivers/pci/dwc/pcie-hisi.c b/drivers/pci/dwc/pcie-hisi.c
+> index a201791..6800747 100644
+> --- a/drivers/pci/dwc/pcie-hisi.c
+> +++ b/drivers/pci/dwc/pcie-hisi.c
+> @@ -270,6 +270,12 @@ static int hisi_pcie_probe(struct platform_device
+> *pdev)
+>  	struct resource *reg;
+>  	int ret;
+> 
+> +	if ((IS_BUILTIN(CONFIG_ARM_SMMU_V3)) &&
+> +			of_property_read_bool(dev->of_node, "iommu-map")) {
+> +		dev_warn(dev, "HiSilicon erratum 161010801: blacklisting
+> PCIe controllers behind SMMUv3\n");
+> +		return -ENODEV;
+> +	}
+> +
+>  	hisi_pcie = devm_kzalloc(dev, sizeof(*hisi_pcie), GFP_KERNEL);
+>  	if (!hisi_pcie)
+>  		return -ENOMEM;
+> @@ -340,6 +346,12 @@ static int hisi_pcie_almost_ecam_probe(struct
+> platform_device *pdev)
+>  	struct device *dev = &pdev->dev;
+>  	struct pci_ecam_ops *ops;
+> 
+> +	if ((IS_BUILTIN(CONFIG_ARM_SMMU_V3)) &&
+> +			of_property_read_bool(dev->of_node, "iommu-map")) {
+> +		dev_warn(dev, "HiSilicon erratum 161010801: blacklisting
+> PCIe controllers behind SMMUv3\n");
+> +		return -ENODEV;
+> +	}
+> +
+>  	ops = (struct pci_ecam_ops *)of_device_get_match_data(dev);
+>  	return pci_host_common_probe(pdev, ops);
+>  }
+> --
+> 1.9.1
+> 
