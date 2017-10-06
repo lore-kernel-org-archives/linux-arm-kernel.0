@@ -1,66 +1,89 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 06 Oct 2017 14:33:03 +0200
-Subject: [PATCH 06/16] serial: mvebu-uart: add soft reset at probe
-In-Reply-To: <20171006101344.15590-7-miquel.raynal@free-electrons.com> (Miquel
- Raynal's message of "Fri, 6 Oct 2017 12:13:34 +0200")
-References: <20171006101344.15590-1-miquel.raynal@free-electrons.com>
- <20171006101344.15590-7-miquel.raynal@free-electrons.com>
-Message-ID: <87h8vcfocg.fsf@free-electrons.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Fri, 6 Oct 2017 13:34:36 +0100
+Subject: [PATCH v1 1/2] KVM: arm64: handle single-stepping trapped
+ instructions
+In-Reply-To: <d95a7ce1-1996-b0c6-4a2d-64af011c0c79@arm.com>
+References: <20171006113921.24880-1-alex.bennee@linaro.org>
+ <20171006113921.24880-2-alex.bennee@linaro.org>
+ <d95a7ce1-1996-b0c6-4a2d-64af011c0c79@arm.com>
+Message-ID: <49ddad48-d3ce-43e2-7aae-f6cc66ef1fad@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Miquel,
- 
- On ven., oct. 06 2017, Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
-
-> From: Allen Yan <yanwei@marvell.com>
->
-> The existing UART driver relies on the bootloader to initialize the
-> port(s). However, the secondary uart port may not be initialized
-> properly in early boot stage. This patch adds the UART soft reset when
-> probing, for all ports.
->
-> Signed-off-by: Allen Yan <yanwei@marvell.com>
-> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
-
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Thanks,
-
-Gregory
 
 
-> ---
->  drivers/tty/serial/mvebu-uart.c | 5 +++++
->  1 file changed, 5 insertions(+)
->
-> diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
-> index 82438884af1e..da756cfec0bb 100644
-> --- a/drivers/tty/serial/mvebu-uart.c
-> +++ b/drivers/tty/serial/mvebu-uart.c
-> @@ -653,6 +653,11 @@ static int mvebu_uart_probe(struct platform_device *pdev)
->  	port->private_data = mvuart;
->  	platform_set_drvdata(pdev, mvuart);
->  
-> +	/* UART Soft Reset*/
-> +	writel(CTRL_SOFT_RST, port->membase + UART_CTRL(port));
-> +	udelay(1);
-> +	writel(0, port->membase + UART_CTRL(port));
-> +
->  	ret = uart_add_one_port(&mvebu_uart_driver, port);
->  	if (ret)
->  		return ret;
-> -- 
-> 2.11.0
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+On 06/10/17 13:27, Marc Zyngier wrote:
+> On 06/10/17 12:39, Alex Benn?e wrote:
+>> If we are using guest debug to single-step the guest we need to ensure
+>> we exit after emulating the instruction. This only affects
+>> instructions completely emulated by the kernel. For userspace emulated
+>> instructions we need to exit and return to complete the emulation.
+>>
+>> We fake debug.arch.hsr to contain ESR_ELx_EC_SOFTSTP_LOW so QEMU knows
+>> it was a single-step event (and without altering the userspace ABI).
+>>
+>> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+>> ---
+>>   arch/arm64/kvm/handle_exit.c | 48 +++++++++++++++++++++++++++++++-------------
+>>   1 file changed, 34 insertions(+), 14 deletions(-)
+>>
+>> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+>> index 7debb74843a0..c918d291cb58 100644
+>> --- a/arch/arm64/kvm/handle_exit.c
+>> +++ b/arch/arm64/kvm/handle_exit.c
+>> @@ -178,6 +178,39 @@ static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
+>>   	return arm_exit_handlers[hsr_ec];
+>>   }
+>>   
+>> +/*
+>> + * When handling traps we need to ensure exit the guest if we
+>> + * completely emulated the instruction while single-stepping. Stuff to
+>> + * be emulated in userspace needs to complete that first.
+>> + */
+>> +
+>> +static int handle_trap_exceptions(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>> +{
+>> +	int handled;
+>> +
+>> +	/*
+>> +	 * See ARM ARM B1.14.1: "Hyp traps on instructions
+>> +	 * that fail their condition code check"
+>> +	 */
+>> +	if (!kvm_condition_valid(vcpu)) {
+>> +		kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
+>> +		handled = 1;
+>> +	} else {
+>> +		exit_handle_fn exit_handler;
+>> +
+>> +		exit_handler = kvm_get_exit_handler(vcpu);
+>> +		handled = exit_handler(vcpu, run);
+>> +	}
+>> +
+>> +	if (handled && (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP)) {
+>> +		handled = 0;
+>> +		run->exit_reason = KVM_EXIT_DEBUG;
+>> +		run->debug.arch.hsr = ESR_ELx_EC_SOFTSTP_LOW << ESR_ELx_EC_SHIFT;
+>> +	}
+> 
+> Doesn't this break an MMIO read? The registers haven't been updated yet,
+> and the debugger may not see the right thing...
+> 
+> How about something like:
+> 
+> 	if (handled && (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP)) {
+> 		if (run->exit_reason == KVM_EXIT_MMIO)
+> 			kvm_handle_mmio_return(vcpu, run);
+> 		[...]
+> 	}
+> 
+> Or am I missing something?
+
+If the MMIO was not handled by the kernel, exit_handler will return 0, 
+so handled will be false and we won't pretend we have a debug exception 
+(but will still return to userland with KVM_EXIT_MMIO).
+
+I think the second patch takes care of properly handling single step for 
+userland MMIO.
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Julien Thierry
