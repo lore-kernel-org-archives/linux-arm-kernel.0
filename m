@@ -1,254 +1,33 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri,  6 Oct 2017 14:42:32 +0800
-Subject: [PATCH v3 2/3] ARM: dts: sun8i: Add board dts file for Banana Pi M2
- Ultra
-In-Reply-To: <20171006064233.13967-1-icenowy@aosc.io>
-References: <20171006064233.13967-1-icenowy@aosc.io>
-Message-ID: <20171006064233.13967-3-icenowy@aosc.io>
+From: khandual@linux.vnet.ibm.com (Anshuman Khandual)
+Date: Fri, 6 Oct 2017 12:18:31 +0530
+Subject: [PATCH] mm: deferred_init_memmap improvements
+In-Reply-To: <20171004152902.17300-1-pasha.tatashin@oracle.com>
+References: <20171004152902.17300-1-pasha.tatashin@oracle.com>
+Message-ID: <071d574f-1d8c-5be9-ec92-6227db01bbd3@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chen-Yu Tsai <wens@csie.org>
+On 10/04/2017 08:59 PM, Pavel Tatashin wrote:
+> This patch fixes another existing issue on systems that have holes in
+> zones i.e CONFIG_HOLES_IN_ZONE is defined.
+> 
+> In for_each_mem_pfn_range() we have code like this:
+> 
+> if (!pfn_valid_within(pfn)
+> 	goto free_range;
+> 
+> Note: 'page' is not set to NULL and is not incremented but 'pfn' advances.
 
-The Banana Pi M2 Ultra is an SBC based on the Allwinner R40 SoC. The
-form factor and position of various connectors, leds and buttons is
-similar to the Banana Pi M1+, Banana Pi M3, and is exactly the same
-as the latest Banana Pi M64.
+page is initialized to NULL at the beginning of the function.
+PFN advances but we dont proceed unless pfn_valid_within(pfn)
+holds true which basically should have checked with arch call
+back if the PFN is valid in presence of memory holes as well.
+Is not this correct ?
 
-It features:
+> Thus means if deferred struct pages are enabled on systems with these kind
+> of holes, linux would get memory corruptions. I have fixed this issue by
+> defining a new macro that performs all the necessary operations when we
+> free the current set of pages.
 
-  - X-Powers AXP221s PMIC connected to i2c0
-  - 2 GB DDR3 DRAM
-  - 8 GB eMMC
-  - micro SD card slot
-  - DC power jack
-  - HDMI output
-  - MIPI DSI connector
-  - 2x USB 2.0 hosts
-  - 1x USB 2.0 OTG
-  - gigabit ethernet with Realtek RTL8211E transceiver
-  - WiFi/Bluetooth with AP6212 chip, with external antenna connector
-  - SATA and power connectors for native SATA support
-  - camera sensor connector
-  - consumer IR receiver
-  - audio out headphone jack
-  - onboard microphone
-  - red, green, and blue LEDs
-  - debug UART pins
-  - Li-Po battery connector
-  - Raspberry Pi B+ compatible GPIO header
-  - power, reset, and boot control buttons
-
-This patch adds a dts file that enables UART, MMC and PMIC support.
-
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
-Changes in v3:
-- Added 3.3V vqmmc regulator for mmc2 (eMMC).
-Changes in v2:
-- Dropped the vcc5v0 regulator, as it's not used yet.
-
- arch/arm/boot/dts/Makefile                        |   1 +
- arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts | 178 ++++++++++++++++++++++
- 2 files changed, 179 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 9cf688d404b8..93b1e63a52af 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -939,6 +939,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- 	sun8i-h3-orangepi-plus2e.dtb \
- 	sun8i-r16-bananapi-m2m.dtb \
- 	sun8i-r16-parrot.dtb \
-+	sun8i-r40-bananapi-m2-ultra.dtb \
- 	sun8i-v3s-licheepi-zero.dtb \
- 	sun8i-v3s-licheepi-zero-dock.dtb
- dtb-$(CONFIG_MACH_SUN9I) += \
-diff --git a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-new file mode 100644
-index 000000000000..7b52608cebe6
---- /dev/null
-+++ b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-@@ -0,0 +1,178 @@
-+/*
-+ * Copyright (C) 2017 Chen-Yu Tsai <wens@csie.org>
-+ * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.io>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun8i-r40.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+
-+/ {
-+	model = "Banana Pi BPI-M2-Ultra";
-+	compatible = "sinovoip,bpi-m2-ultra", "allwinner,sun8i-r40";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		pwr-led {
-+			label = "bananapi:red:pwr";
-+			gpios = <&pio 7 20 GPIO_ACTIVE_HIGH>;
-+			default-state = "on";
-+		};
-+
-+		user-led-green {
-+			label = "bananapi:green:user";
-+			gpios = <&pio 7 21 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		user-led-blue {
-+			label = "bananapi:blue:user";
-+			gpios = <&pio 7 22 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
-+	wifi_pwrseq: wifi_pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		reset-gpios = <&pio 6 10 GPIO_ACTIVE_LOW>; /* PG10 WIFI_EN */
-+	};
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+
-+	axp22x: pmic at 34 {
-+		compatible = "x-powers,axp221";
-+		reg = <0x34>;
-+		interrupt-parent = <&nmi_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+};
-+
-+#include "axp22x.dtsi"
-+
-+&reg_aldo3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <2700000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "avcc";
-+};
-+
-+&reg_dcdc1 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "vcc-3v0";
-+};
-+
-+&reg_dcdc2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1300000>;
-+	regulator-name = "vdd-cpu";
-+};
-+
-+&reg_dcdc3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1300000>;
-+	regulator-name = "vdd-sys";
-+};
-+
-+&reg_dcdc5 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1500000>;
-+	regulator-max-microvolt = <1500000>;
-+	regulator-name = "vcc-dram";
-+};
-+
-+&reg_dldo1 {
-+	regulator-min-microvolt = <1800000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-wifi-io";
-+};
-+
-+&reg_dldo2 {
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-wifi";
-+};
-+
-+&mmc0 {
-+	vmmc-supply = <&reg_dcdc1>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 7 13 GPIO_ACTIVE_HIGH>; /* PH13 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&mmc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pg_pins>;
-+	vmmc-supply = <&reg_dldo2>;
-+	vqmmc-supply = <&reg_dldo1>;
-+	mmc-pwrseq = <&wifi_pwrseq>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+};
-+
-+&mmc2 {
-+	vmmc-supply = <&reg_dcdc1>;
-+	vqmmc-supply = <&reg_dcdc1>;
-+	bus-width = <8>;
-+	non-removable;
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pb_pins>;
-+	status = "okay";
-+};
--- 
-2.13.6
+If we bail out in case PFN is not valid, then how corruption
+can happen ?
