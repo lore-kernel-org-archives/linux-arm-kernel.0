@@ -1,50 +1,38 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  6 Oct 2017 16:33:57 +0100
-Subject: [PATCH v4 22/26] KVM: arm/arm64: GICv4: Enable virtual cpuif if VLPIs
- can be delivered
+Date: Fri,  6 Oct 2017 16:33:38 +0100
+Subject: [PATCH v4 03/26] KVM: arm: Select ARM_GIC_V3 and ARM_GIC_V3_ITS
 In-Reply-To: <20171006153401.5481-1-marc.zyngier@arm.com>
 References: <20171006153401.5481-1-marc.zyngier@arm.com>
-Message-ID: <20171006153401.5481-23-marc.zyngier@arm.com>
+Message-ID: <20171006153401.5481-4-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order for VLPIs to be delivered to the guest, we must make
-sure that the cpuif is always enabled, irrespective of the
-presence of virtual interrupt in the LRs.
+The GICv4 support introduces a hard dependency between the KVM
+core and the ITS infrastructure. arm64 already selects it at
+the architecture level, but 32bit doesn't. In order to avoid
+littering the kernel with #ifdefs, let's just select the whole
+of the GICv3 suport code.
+
+You know you want it.
 
 Acked-by: Christoffer Dall <cdall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/hyp/vgic-v3-sr.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ arch/arm/kvm/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-index 91728faa13fd..f5c3d6d7019e 100644
---- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-@@ -258,7 +258,8 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 			cpu_if->vgic_ap1r[0] = __vgic_v3_read_ap1rn(0);
- 		}
- 	} else {
--		if (static_branch_unlikely(&vgic_v3_cpuif_trap))
-+		if (static_branch_unlikely(&vgic_v3_cpuif_trap) ||
-+		    cpu_if->its_vpe.its_vm)
- 			write_gicreg(0, ICH_HCR_EL2);
- 
- 		cpu_if->vgic_elrsr = 0xffff;
-@@ -337,9 +338,11 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
- 		/*
- 		 * If we need to trap system registers, we must write
- 		 * ICH_HCR_EL2 anyway, even if no interrupts are being
--		 * injected,
-+		 * injected. Same thing if GICv4 is used, as VLPI
-+		 * delivery is gated by ICH_HCR_EL2.En.
- 		 */
--		if (static_branch_unlikely(&vgic_v3_cpuif_trap))
-+		if (static_branch_unlikely(&vgic_v3_cpuif_trap) ||
-+		    cpu_if->its_vpe.its_vm)
- 			write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
- 	}
- 
+diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+index 4e2b192a030a..52b50af04e3b 100644
+--- a/arch/arm/kvm/Kconfig
++++ b/arch/arm/kvm/Kconfig
+@@ -23,6 +23,8 @@ config KVM
+ 	select PREEMPT_NOTIFIERS
+ 	select ANON_INODES
+ 	select ARM_GIC
++	select ARM_GIC_V3
++	select ARM_GIC_V3_ITS
+ 	select HAVE_KVM_CPU_RELAX_INTERCEPT
+ 	select HAVE_KVM_ARCH_TLB_FLUSH_ALL
+ 	select KVM_MMIO
 -- 
 2.14.1
