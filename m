@@ -1,57 +1,49 @@
-From: pasha.tatashin@oracle.com (Pasha Tatashin)
-Date: Fri, 6 Oct 2017 09:55:49 -0400
-Subject: [PATCH] mm: deferred_init_memmap improvements
-In-Reply-To: <071d574f-1d8c-5be9-ec92-6227db01bbd3@linux.vnet.ibm.com>
-References: <20171004152902.17300-1-pasha.tatashin@oracle.com>
- <071d574f-1d8c-5be9-ec92-6227db01bbd3@linux.vnet.ibm.com>
-Message-ID: <0a836d3f-1a0c-8a9e-f4b2-eeb72a08a3e3@oracle.com>
+From: mbrugger@suse.com (Matthias Brugger)
+Date: Fri, 6 Oct 2017 15:57:57 +0200
+Subject: undefined instruction d5380001 (arm64 mrs emulation)
+In-Reply-To: <20171006131343.rs7ig4owz4anw3cl@armageddon.cambridge.arm.com>
+References: <CAJs94EZqdWJRTF+tLgGU=pcRoU5HvuV959Qq8nFB5yQ-sQyxzg@mail.gmail.com>
+ <20171002112433.GM3611@e103592.cambridge.arm.com> <59D24906.4060104@arm.com>
+ <20171002155638.GA18543@e107814-lin.cambridge.arm.com>
+ <CAJs94EbvM6U5qQyAGGY7BEppC=dPo_LPzU4STDNU7muCZvLXmw@mail.gmail.com>
+ <fb13bcdf-c97b-40c6-3815-30dce26bca8e@suse.com>
+ <20171005161645.7sqjkd25pwdng5dz@armageddon.cambridge.arm.com>
+ <ffdba697-8ab5-9f66-f160-710308da6390@suse.com>
+ <20171006131343.rs7ig4owz4anw3cl@armageddon.cambridge.arm.com>
+Message-ID: <27e1bd48-3b6c-5dec-2fb4-cf4625ca5299@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anshuman,
 
-Thank you very much for looking at this. My reply below::
 
-On 10/06/2017 02:48 AM, Anshuman Khandual wrote:
-> On 10/04/2017 08:59 PM, Pavel Tatashin wrote:
->> This patch fixes another existing issue on systems that have holes in
->> zones i.e CONFIG_HOLES_IN_ZONE is defined.
+On 10/06/2017 03:13 PM, Catalin Marinas wrote:
+> On Fri, Oct 06, 2017 at 02:05:09PM +0200, Matthias Brugger wrote:
+>> On 10/05/2017 06:16 PM, Catalin Marinas wrote:
+>>> On Thu, Oct 05, 2017 at 04:54:09PM +0200, Matthias Brugger wrote:
+>>>> We also hit this bug in openSUSE Tumbleweed:
+>>>> https://bugzilla.suse.com/show_bug.cgi?id=1061188
+>>>
+>>> As Mark replied, we are still debating why this happens and whether the
+>>> above fix is sufficient. As we were digging further, we realised there
+>>> is no clear init level after which user space can be invoked, which
+>>> means Suzuki's patch may not always be sufficient.
+>>>
+>>> I proposed something as a way of spotting this issue early [1] but I
+>>> need to post it on the linux-arch to get some consensus.
+>>>
+>>> Can you post the full kernel log somewhere? I'm trying to figure out
+>>> what trigged the modprobe during the kernel boot.
+>>>
 >>
->> In for_each_mem_pfn_range() we have code like this:
->>
->> if (!pfn_valid_within(pfn)
->> 	goto free_range;
->>
->> Note: 'page' is not set to NULL and is not incremented but 'pfn' advances.
+>> You can find the kernel log here:
+>> https://bugzilla.suse.com/attachment.cgi?id=743311
 > 
-> page is initialized to NULL at the beginning of the function.
-
-Yes, it is initialized to NULL but at the beginning of 
-for_each_mem_pfn_range() loop
-
-> PFN advances but we dont proceed unless pfn_valid_within(pfn)
-> holds true which basically should have checked with arch call
-> back if the PFN is valid in presence of memory holes as well.
-> Is not this correct ?
-
-Correct, if pfn_valid_within() is false we jump to the "goto 
-free_range;", which is at the end of for (; pfn < end_pfn; pfn++) loop, 
-so we are not jumping outside of this loop.
-
+> Thanks, it seems that ipv6 module loading triggered this.
 > 
->> Thus means if deferred struct pages are enabled on systems with these kind
->> of holes, linux would get memory corruptions. I have fixed this issue by
->> defining a new macro that performs all the necessary operations when we
->> free the current set of pages.
-> 
-> If we bail out in case PFN is not valid, then how corruption
-> can happen ?
+> Talking to Suzuki, we came to the conclusion that such thing cannot
+> happen before rootfs_initcall, so his original core_initcall change
+> should suffice. I'll push a patch out, hopefully for -rc4 and cc stable.
 > 
 
-We are not bailing out. We continue next iteration with next pfn, but 
-page is not incremented.
-
-Please let me know if I am missing something.
-
-Thank you,
-Pasha
+Thanks for the info.
+Matthias
