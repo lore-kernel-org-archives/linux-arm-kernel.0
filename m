@@ -1,89 +1,142 @@
-From: jacopo@jmondi.org (jacopo mondi)
-Date: Fri, 6 Oct 2017 14:25:23 +0200
-Subject: [PATCH 3/3] ARM: dts: gr-peach: Add ETHER pin group
-In-Reply-To: <1507193900-23801-4-git-send-email-jacopo+renesas@jmondi.org>
-References: <1507193900-23801-1-git-send-email-jacopo+renesas@jmondi.org>
- <1507193900-23801-4-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <20171006122523.GD19008@w540>
+From: mbrugger@suse.com (Matthias Brugger)
+Date: Fri, 6 Oct 2017 14:05:09 +0200
+Subject: undefined instruction d5380001 (arm64 mrs emulation)
+In-Reply-To: <20171005161645.7sqjkd25pwdng5dz@armageddon.cambridge.arm.com>
+References: <CAJs94EZqdWJRTF+tLgGU=pcRoU5HvuV959Qq8nFB5yQ-sQyxzg@mail.gmail.com>
+ <20171002112433.GM3611@e103592.cambridge.arm.com> <59D24906.4060104@arm.com>
+ <20171002155638.GA18543@e107814-lin.cambridge.arm.com>
+ <CAJs94EbvM6U5qQyAGGY7BEppC=dPo_LPzU4STDNU7muCZvLXmw@mail.gmail.com>
+ <fb13bcdf-c97b-40c6-3815-30dce26bca8e@suse.com>
+ <20171005161645.7sqjkd25pwdng5dz@armageddon.cambridge.arm.com>
+Message-ID: <ffdba697-8ab5-9f66-f160-710308da6390@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi Catalin,
 
-On Thu, Oct 05, 2017 at 10:58:20AM +0200, Jacopo Mondi wrote:
-> Add pin configuration subnode for ETHER pin group and enable the interface.
->
-> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-> ---
->  arch/arm/boot/dts/r7s72100-gr-peach.dts | 38 +++++++++++++++++++++++++++++++++
->  1 file changed, 38 insertions(+)
->
+On 10/05/2017 06:16 PM, Catalin Marinas wrote:
+> Hi Matthias,
+> 
+> On Thu, Oct 05, 2017 at 04:54:09PM +0200, Matthias Brugger wrote:
+>> On 10/04/2017 11:11 AM, Matwey V. Kornilov wrote:
+>>> The patch helps to overcome the issue, Probably it should be applied
+>>> to all stable releases affected by this behaviour.
+>>> modprobe in initrd may load quite required things.
+>>>
+>>> 2017-10-02 18:56 GMT+03:00 Suzuki K Poulose <Suzuki.Poulose@arm.com>:
+>>>> On Mon, Oct 02, 2017 at 03:11:18PM +0100, James Morse wrote:
+>>>>> On 02/10/17 12:24, Dave Martin wrote:
+>>>>>> On Fri, Sep 29, 2017 at 10:23:54PM +0300, Matwey V. Kornilov wrote:
+>>>>>>> I am running 4.13.3 on rockchip 3328 platform(aarch64) with glibc 2.26
+>>>>>>> and see the following at booting:
+>>>>>>>
+>>>>>>> [   11.152061] modprobe[93]: undefined instruction: pc=0000ffff8ca48ff4
+>>>>>>> [   11.152707] Code: d503201f 8a180320 92750001 365ffc20 (d5380001)
+>>>>>>> [   11.154347] modprobe[94]: undefined instruction: pc=0000ffff94243ff4
+>>>>>>> [   11.154991] Code: d503201f 8a180320 92750001 365ffc20 (d5380001)
+>>>>>>> [   11.157070] modprobe[97]: undefined instruction: pc=0000ffff839a0ff4
+>>>>>>> [   11.157715] Code: d503201f 8a180320 92750001 365ffc20 (d5380001)
+>>>>>>> [   11.159265] modprobe[98]: undefined instruction: pc=0000ffffb0591ff4
+>>>>>>> [   11.159908] Code: d503201f 8a180320 92750001 365ffc20 (d5380001)
+>>>>>>>
+>>>>>>> As far as I understand d5380001 should be emulated in cpufeature.c but
+>>>>>>> it is not. What could be wrong here?
+>>>>>>
+>>>>>> The whole sequence is
+>>>>>>
+>>>>>>      0:   d503201f        nop
+>>>>>>      4:   8a180320        and     x0, x25, x24
+>>>>>>      8:   92750001        and     x1, x0, #0x800
+>>>>>>      c:   365ffc20        tbz     w0, #11, 0xffffffffffffff90
+>>>>>>     10:*  d5380001        mrs     x1, midr_el1            <-- trapping instruction
+>>>>>
+>>>>> This looks the same as:
+>>>>> https://bugzilla.redhat.com/show_bug.cgi?id=1496209
+>>>>>
+>>>>> [...]
+>>>>>
+>>>>>> What should happen here is that the do_undefinstr() in
+>>>>>> arch/arm64/kernel/traps.c should call registered undef hooks until it
+>>>>>> finds one that accepts the faulting instruction.
+>>>>>>
+>>>>>> So, either the cpufeatures undef hook is not getting called, or it is
+>>>>>> failing the instruction somewhere, possibly in
+>>>>>> cpufeatures.c:emulate_id_reg() or emulate_sys_reg().
+>>>>>>
+>>>>>>
+>>>>>> Can you add some trace to those functions to see what's happening?
+>>>>>
+>>>>> I couldn't reproduce this with linux-stable's v4.13.3 defconfig on Seattle or Juno.
+>>>>>
+>>>>> What distribution are you running? Could you also try [0] to see if this is
+>>>>> something specific to your version of modprobe?
+>>>>
+>>>>
+>>>> It is worth noting that we register the MRS instruction handler as late_init call.
+>>>> Now the question is how late that could be. Given that we are hitting it with
+>>>> modprobe, which could be used for requesting modules from initrd. Also which explains
+>>>> why it we can't reproduce it by simple testcases, after it was registered.
+>>>>
+>>>> Now the question is, how early do we want to push this. Since it doesn't depend really
+>>>> on any other subsystem, we could move it as early as "early". Or for keeping it in
+>>>> line with other "arch" specific init calls, we could simply make it arch_initcall.
+>>>>
+>>>> Matwey,
+>>>>
+>>>> Please could you check if the following patch fixes the issue for you:
+>>>>
+>>>> Cheers
+>>>> Suzuki
+>>>>
+>>>> ----8>----
+>>>>
+>>>> arm64: Enable MRS emulation early enough in the boot sequence
+>>>>
+>>>> Make sure the MRS emulation is enabled early enough that the
+>>>> early userspace applications (e.g, those run from initrd) could
+>>>> run without any trouble.
+>>>>
+>>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>>>
+>>>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+>>>> index 9f9e0064c8c1..048f5469531f 100644
+>>>> --- a/arch/arm64/kernel/cpufeature.c
+>>>> +++ b/arch/arm64/kernel/cpufeature.c
+>>>> @@ -1294,4 +1294,4 @@ static int __init enable_mrs_emulation(void)
+>>>>           return 0;
+>>>>    }
+>>>>
+>>>> -late_initcall(enable_mrs_emulation);
+>>>> +arch_initcall(enable_mrs_emulation);
+>>>> ---
+>>
+>> I realized this patch did not land in v4.13.5
+>> Did it got forgotten or are there any concerns?
+>>
+>> We also hit this bug in openSUSE Tumbleweed:
+>> https://bugzilla.suse.com/show_bug.cgi?id=1061188
+> 
+> As Mark replied, we are still debating why this happens and whether the
+> above fix is sufficient. As we were digging further, we realised there
+> is no clear init level after which user space can be invoked, which
+> means Suzuki's patch may not always be sufficient.
+> 
+> I proposed something as a way of spotting this issue early [1] but I
+> need to post it on the linux-arch to get some consensus.
+> 
+> Can you post the full kernel log somewhere? I'm trying to figure out
+> what trigged the modprobe during the kernel boot.
+> 
 
-Can you confirm you have not applied this yet?
+You can find the kernel log here:
+https://bugzilla.suse.com/attachment.cgi?id=743311
 
-I have received indications from netdev people to change location of
-the reset pin properties, as they belong to PHY node, and also to
-change the node layout.
+Regards,
+Matthias
 
-If you have applied the first 2 but not this one, I will re-submit this one only
-
-Thanks
-   j
-
-
-> diff --git a/arch/arm/boot/dts/r7s72100-gr-peach.dts b/arch/arm/boot/dts/r7s72100-gr-peach.dts
-> index ad6a627..8b5a2c5 100644
-> --- a/arch/arm/boot/dts/r7s72100-gr-peach.dts
-> +++ b/arch/arm/boot/dts/r7s72100-gr-peach.dts
-> @@ -68,6 +68,28 @@
->  		/* P6_2 as RxD2; P6_3 as TxD2 */
->  		pinmux = <RZA1_PINMUX(6, 2, 7)>, <RZA1_PINMUX(6, 3, 7)>;
->  	};
-> +
-> +	ether_pins: ether {
-> +		/* Ethernet on Ports 1,3,5,10 */
-> +		pinmux = <RZA1_PINMUX(1, 14, 4)>, /* P1_14 = ET_COL   */
-> +			 <RZA1_PINMUX(3, 0, 2)>,  /* P3_0 = ET_TXCLK  */
-> +			 <RZA1_PINMUX(3, 3, 2)>,  /* P3_3 = ET_MDIO   */
-> +			 <RZA1_PINMUX(3, 4, 2)>,  /* P3_4 = ET_RXCLK  */
-> +			 <RZA1_PINMUX(3, 5, 2)>,  /* P3_5 = ET_RXER   */
-> +			 <RZA1_PINMUX(3, 6, 2)>,  /* P3_6 = ET_RXDV   */
-> +			 <RZA1_PINMUX(5, 9, 2)>,  /* P5_9 = ET_MDC    */
-> +			 <RZA1_PINMUX(10, 1, 4)>, /* P10_1 = ET_TXER  */
-> +			 <RZA1_PINMUX(10, 2, 4)>, /* P10_2 = ET_TXEN  */
-> +			 <RZA1_PINMUX(10, 3, 4)>, /* P10_3 = ET_CRS   */
-> +			 <RZA1_PINMUX(10, 4, 4)>, /* P10_4 = ET_TXD0  */
-> +			 <RZA1_PINMUX(10, 5, 4)>, /* P10_5 = ET_TXD1  */
-> +			 <RZA1_PINMUX(10, 6, 4)>, /* P10_6 = ET_TXD2  */
-> +			 <RZA1_PINMUX(10, 7, 4)>, /* P10_7 = ET_TXD3  */
-> +			 <RZA1_PINMUX(10, 8, 4)>, /* P10_8 = ET_RXD0  */
-> +			 <RZA1_PINMUX(10, 9, 4)>, /* P10_9 = ET_RXD1  */
-> +			 <RZA1_PINMUX(10, 10, 4)>,/* P10_10 = ET_RXD2 */
-> +			 <RZA1_PINMUX(10, 11, 4)>;/* P10_11 = ET_RXD3 */
-> +	};
->  };
->
->  &extal_clk {
-> @@ -88,3 +110,19 @@
->
->  	status = "okay";
->  };
-> +
-> +&ether {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&ether_pins>;
-> +
-> +	status = "okay";
-> +
-> +	reset-gpios = <&port4 2 GPIO_ACTIVE_LOW>;
-> +	reset-delay-us = <5>;
-> +
-> +	renesas,no-ether-link;
-> +	phy-handle = <&phy0>;
-> +	phy0: ethernet-phy at 0 {
-> +		reg = <0>;
-> +	};
-> +};
-> --
-> 2.7.4
->
+> Thanks,
+> 
+> Catalin
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-October/534465.html
+> 
