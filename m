@@ -1,75 +1,35 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  6 Oct 2017 16:33:52 +0100
-Subject: [PATCH v4 17/26] KVM: arm/arm64: GICv4: Propagate VLPI properties at
- map time
-In-Reply-To: <20171006153401.5481-1-marc.zyngier@arm.com>
-References: <20171006153401.5481-1-marc.zyngier@arm.com>
-Message-ID: <20171006153401.5481-18-marc.zyngier@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 6 Oct 2017 16:35:51 +0100
+Subject: [PATCH 1/2] arm64: Ensure the instruction emulation is ready for
+ userspace
+In-Reply-To: <20171006131653.15876-1-suzuki.poulose@arm.com>
+References: <20171006131653.15876-1-suzuki.poulose@arm.com>
+Message-ID: <20171006153550.cng3w5ahxuzlivxa@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the VLPI gets mapped, it must inherit the configuration of
-the LPI configured at the vITS level. For that purpose, let's make
-update_lpi_config globally available and call it just after
-having performed the VLPI map operation.
+On Fri, Oct 06, 2017 at 02:16:52PM +0100, Suzuki K. Poulose wrote:
+> We trap and emulate some instructions (e.g, mrs, deprecated instructions)
+> for the userspace. However the handlers for these are registered as
+> late_initcalls and the userspace could be up and running from the initramfs
+> by that time (with populate_rootfs, which is a rootfs_initcall()). This
+> could cause problems for the early applications ending up in failure
+> like :
+> 
+> [   11.152061] modprobe[93]: undefined instruction: pc=0000ffff8ca48ff4
+> 
+> This patch promotes the specific calls to core_initcalls, which are
+> guaranteed to be completed before we hit userspace.
+> 
+> Cc: stable at vger.kernel.org
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Dave Martin <dave.martin@arm.com>
+> Cc: Matthias Brugger <mbrugger@suse.com>
+> Cc: James Morse <james.morse@arm.com>
+> Reported-by: Matwey V. Kornilov <matwey.kornilov@gmail.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Acked-by: Christoffer Dall <cdall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- virt/kvm/arm/vgic/vgic-its.c | 6 ++----
- virt/kvm/arm/vgic/vgic-v4.c  | 2 ++
- virt/kvm/arm/vgic/vgic.h     | 2 ++
- 3 files changed, 6 insertions(+), 4 deletions(-)
+Both patches queued for 4.14. Thanks.
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index eb72eb027060..f434748439ee 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -37,8 +37,6 @@
- static int vgic_its_save_tables_v0(struct vgic_its *its);
- static int vgic_its_restore_tables_v0(struct vgic_its *its);
- static int vgic_its_commit_v0(struct vgic_its *its);
--static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
--			     struct kvm_vcpu *filter_vcpu, bool needs_inv);
- 
- /*
-  * Creates a new (reference to a) struct vgic_irq for a given LPI.
-@@ -272,8 +270,8 @@ static struct its_collection *find_collection(struct vgic_its *its, int coll_id)
-  * If filter_vcpu is not NULL, applies only if the IRQ is targeting this
-  * VCPU. Unconditionally applies if filter_vcpu is NULL.
-  */
--static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
--			     struct kvm_vcpu *filter_vcpu, bool needs_inv)
-+int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
-+		      struct kvm_vcpu *filter_vcpu, bool needs_inv)
- {
- 	u64 propbase = GICR_PROPBASER_ADDRESS(kvm->arch.vgic.propbaser);
- 	u8 prop;
-diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
-index ba1dd3162eba..b79a0450bb1c 100644
---- a/virt/kvm/arm/vgic/vgic-v4.c
-+++ b/virt/kvm/arm/vgic/vgic-v4.c
-@@ -147,6 +147,8 @@ int kvm_vgic_v4_set_forwarding(struct kvm *kvm, int virq,
- 	irq->hw		= true;
- 	irq->host_irq	= virq;
- 
-+	/* Force the property update and invalidate */
-+	update_lpi_config(kvm, irq, NULL, true);
- out:
- 	mutex_unlock(&its->its_lock);
- 	return ret;
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index c4105f613f57..1bd2e28ac097 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -239,6 +239,8 @@ static inline int vgic_v3_max_apr_idx(struct kvm_vcpu *vcpu)
- int vgic_its_resolve_lpi(struct kvm *kvm, struct vgic_its *its,
- 			 u32 devid, u32 eventid, struct vgic_irq **irq);
- struct vgic_its *vgic_msi_to_its(struct kvm *kvm, struct kvm_msi *msi);
-+int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
-+		      struct kvm_vcpu *filter_vcpu, bool needs_inv);
- 
- bool vgic_supports_direct_msis(struct kvm *kvm);
- int vgic_v4_init(struct kvm *kvm);
 -- 
-2.14.1
+Catalin
