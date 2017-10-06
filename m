@@ -1,40 +1,57 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 6 Oct 2017 19:17:17 +0530
-Subject: [PATCH v3 16/22] firmware: arm_scmi: add arm_mhu specific mailbox
- interface
-In-Reply-To: <f142dac2-a27c-4c46-4d22-4df4f2e8cfb1@arm.com>
-References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
- <1506604306-20739-17-git-send-email-sudeep.holla@arm.com>
- <CAK8P3a0XmiXqZ-z7WV+nk7B86p23Jmf31Q=pVovXVebhA28_0Q@mail.gmail.com>
- <CABb+yY1N6hmC6Kd2QteMw_oCf=-mYHf7p6RdhYPQK+QUO7VP4A@mail.gmail.com>
- <f142dac2-a27c-4c46-4d22-4df4f2e8cfb1@arm.com>
-Message-ID: <CABb+yY1w358uw2EoeioAvZy06LTuOO0krGFFXoQSNAR5m5ANmQ@mail.gmail.com>
+From: pasha.tatashin@oracle.com (Pasha Tatashin)
+Date: Fri, 6 Oct 2017 09:55:49 -0400
+Subject: [PATCH] mm: deferred_init_memmap improvements
+In-Reply-To: <071d574f-1d8c-5be9-ec92-6227db01bbd3@linux.vnet.ibm.com>
+References: <20171004152902.17300-1-pasha.tatashin@oracle.com>
+ <071d574f-1d8c-5be9-ec92-6227db01bbd3@linux.vnet.ibm.com>
+Message-ID: <0a836d3f-1a0c-8a9e-f4b2-eeb72a08a3e3@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 6, 2017 at 7:02 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->
->
-> On 06/10/17 12:26, Jassi Brar wrote:
->> On Wed, Oct 4, 2017 at 5:06 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->>> On Thu, Sep 28, 2017 at 3:11 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>>> This patch adds ARM MHU specific mailbox interface for SCMI.
->>>>
->>>> Cc: Arnd Bergmann <arnd@arndb.de>
->>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->>>
->>> This clearly needs an explanation why we need another driver.
->>>
->> Yes the patch needs explanation which is that we need a shim layer to
->> map SCMI requests onto what the underlying controller expects. The
->> alternative was to clone the controller driver (MHU now and others
->> later when their platforms support SCMI) and pretend SCMI is the only
->> client they are ever going to serve.
+Hi Anshuman,
+
+Thank you very much for looking at this. My reply below::
+
+On 10/06/2017 02:48 AM, Anshuman Khandual wrote:
+> On 10/04/2017 08:59 PM, Pavel Tatashin wrote:
+>> This patch fixes another existing issue on systems that have holes in
+>> zones i.e CONFIG_HOLES_IN_ZONE is defined.
 >>
->
-> Again that's not the point, doorbell is more common feature and that can
-> be supported. As SCMI expects doorbell feature in the specification, it
-> just need to support that class of controllers.
->
-NO.  All SCMI expects is SHMEM and a signal reaching the other end.
-The signal mechanism need not necessarily be "doorbell".
+>> In for_each_mem_pfn_range() we have code like this:
+>>
+>> if (!pfn_valid_within(pfn)
+>> 	goto free_range;
+>>
+>> Note: 'page' is not set to NULL and is not incremented but 'pfn' advances.
+> 
+> page is initialized to NULL at the beginning of the function.
+
+Yes, it is initialized to NULL but at the beginning of 
+for_each_mem_pfn_range() loop
+
+> PFN advances but we dont proceed unless pfn_valid_within(pfn)
+> holds true which basically should have checked with arch call
+> back if the PFN is valid in presence of memory holes as well.
+> Is not this correct ?
+
+Correct, if pfn_valid_within() is false we jump to the "goto 
+free_range;", which is at the end of for (; pfn < end_pfn; pfn++) loop, 
+so we are not jumping outside of this loop.
+
+> 
+>> Thus means if deferred struct pages are enabled on systems with these kind
+>> of holes, linux would get memory corruptions. I have fixed this issue by
+>> defining a new macro that performs all the necessary operations when we
+>> free the current set of pages.
+> 
+> If we bail out in case PFN is not valid, then how corruption
+> can happen ?
+> 
+
+We are not bailing out. We continue next iteration with next pfn, but 
+page is not incremented.
+
+Please let me know if I am missing something.
+
+Thank you,
+Pasha
