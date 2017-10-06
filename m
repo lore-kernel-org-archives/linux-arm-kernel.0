@@ -1,44 +1,69 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri,  6 Oct 2017 14:42:31 +0800
-Subject: [PATCH v3 1/3] ARM: dts: sun8i: Add basic dtsi file for Allwinner R40
+Date: Fri,  6 Oct 2017 14:42:33 +0800
+Subject: [PATCH v3 3/3] ARM: dts: sun8i: Add board dts file for Banana Pi M2
+ Berry
 In-Reply-To: <20171006064233.13967-1-icenowy@aosc.io>
 References: <20171006064233.13967-1-icenowy@aosc.io>
-Message-ID: <20171006064233.13967-2-icenowy@aosc.io>
+Message-ID: <20171006064233.13967-4-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chen-Yu Tsai <wens@csie.org>
+The Banana Pi M2 Ultra is an SBC based on the Allwinner V40 SoC (same as
+the R40 SoC). The form factor is similar to the Raspberry Pi series.
 
-The Allwinner R40 SoC is marketed as the successor to the A20 SoC.
-The R40 is a smaller chip than the A20, but features the same set
-of programmable pins, with a couple extra pins and some new pin
-functions. The chip features 4 Cortex-A7 cores and a Mali-400 MP2
-GPU. It retains most if not all features from the A20, while adding
-some new features, such as MIPI DSI output, or updating various
-hardware blocks, such as DE 2.0.
+It features:
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+- X-Powers AXP221s PMIC connected to i2c0
+- 1GiB DDR3 DRAM
+- microSD slot
+- MicroUSB Type-B port for power and connected to usb0
+- HDMI output
+- MIPI DSI connector
+- 4 USB Type-A ports (connected to the usb1 controller via a hub)
+- gigabit ethernet with Realtek RTL8211E transceiver
+- WiFi/Bluetooth with AP6212 module, with external antenna connector
+- SATA and power connectors for native SATA support
+- camera sensor connector
+- audio out headphone jack
+- red and green LEDs
+- debug UART pins
+- Raspberry Pi B+ compatible GPIO header
+- power and reset buttons
+
+This patch adds a dts file that enables UART, MMC and PMIC support.
+
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
-Changes in v3:
-- Dropped all max-frequency properties in MMC nodes.
 Changes in v2:
-- Change the MMC frequencies to conservative verified values.
-- Add fallback R40 compatible for MMC.
+- Dropped the vcc5v0 regulator, as it's not used yet.
 
- arch/arm/boot/dts/sun8i-r40.dtsi | 396 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 396 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun8i-r40.dtsi
+ arch/arm/boot/dts/Makefile                        |   3 +-
+ arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts | 164 ++++++++++++++++++++++
+ 2 files changed, 166 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts
 
-diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi b/arch/arm/boot/dts/sun8i-r40.dtsi
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 93b1e63a52af..da3f87b35059 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -941,7 +941,8 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+ 	sun8i-r16-parrot.dtb \
+ 	sun8i-r40-bananapi-m2-ultra.dtb \
+ 	sun8i-v3s-licheepi-zero.dtb \
+-	sun8i-v3s-licheepi-zero-dock.dtb
++	sun8i-v3s-licheepi-zero-dock.dtb \
++	sun8i-v40-bananapi-m2-berry.dtb
+ dtb-$(CONFIG_MACH_SUN9I) += \
+ 	sun9i-a80-optimus.dtb \
+ 	sun9i-a80-cubieboard4.dtb
+diff --git a/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts b/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts
 new file mode 100644
-index 000000000000..d5a6745409ae
+index 000000000000..8a69be2a0842
 --- /dev/null
-+++ b/arch/arm/boot/dts/sun8i-r40.dtsi
-@@ -0,0 +1,396 @@
++++ b/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts
+@@ -0,0 +1,164 @@
 +/*
-+ * Copyright 2017 Chen-Yu Tsai <wens@csie.org>
-+ * Copyright 2017 Icenowy Zheng <icenowy@aosc.io>
++ * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.io>
 + *
 + * This file is dual-licensed: you can use it either under the terms
 + * of the GPL or the X11 license, at your option. Note that this dual
@@ -79,358 +104,127 @@ index 000000000000..d5a6745409ae
 + *     OTHER DEALINGS IN THE SOFTWARE.
 + */
 +
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clock/sun8i-r40-ccu.h>
-+#include <dt-bindings/reset/sun8i-r40-ccu.h>
++/dts-v1/;
++#include "sun8i-r40.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
 +
 +/ {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	interrupt-parent = <&gic>;
++	model = "Banana Pi M2 Berry";
++	compatible = "sinovoip,bpi-m2-berry", "allwinner,sun8i-r40";
 +
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
++	aliases {
++		serial0 = &uart0;
++	};
 +
-+		osc24M: osc24M {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <24000000>;
-+			clock-output-names = "osc24M";
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		pwr-led {
++			label = "bananapi:red:pwr";
++			gpios = <&pio 7 20 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
 +		};
 +
-+		osc32k: osc32k {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <32768>;
-+			clock-output-names = "osc32k";
++		user-led {
++			label = "bananapi:green:user";
++			gpios = <&pio 7 21 GPIO_ACTIVE_HIGH>;
 +		};
 +	};
 +
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			compatible = "arm,cortex-a7";
-+			device_type = "cpu";
-+			reg = <0>;
-+		};
-+
-+		cpu at 1 {
-+			compatible = "arm,cortex-a7";
-+			device_type = "cpu";
-+			reg = <1>;
-+		};
-+
-+		cpu at 2 {
-+			compatible = "arm,cortex-a7";
-+			device_type = "cpu";
-+			reg = <2>;
-+		};
-+
-+		cpu at 3 {
-+			compatible = "arm,cortex-a7";
-+			device_type = "cpu";
-+			reg = <3>;
-+		};
++	wifi_pwrseq: wifi_pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		reset-gpios = <&pio 6 10 GPIO_ACTIVE_LOW>; /* PG10 WIFI_EN */
 +	};
++};
 +
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
++&i2c0 {
++	status = "okay";
 +
-+		nmi_intc: interrupt-controller at 1c00030 {
-+			compatible = "allwinner,sun7i-a20-sc-nmi";
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			reg = <0x01c00030 0x0c>;
-+			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
-+		};
-+
-+		mmc0: mmc at 1c0f000 {
-+			compatible = "allwinner,sun8i-r40-mmc",
-+				     "allwinner,sun50i-a64-mmc";
-+			reg = <0x01c0f000 0x1000>;
-+			clocks = <&ccu CLK_BUS_MMC0>, <&ccu CLK_MMC0>;
-+			clock-names = "ahb", "mmc";
-+			resets = <&ccu RST_BUS_MMC0>;
-+			reset-names = "ahb";
-+			pinctrl-0 = <&mmc0_pins>;
-+			pinctrl-names = "default";
-+			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		mmc1: mmc at 1c10000 {
-+			compatible = "allwinner,sun8i-r40-mmc",
-+				     "allwinner,sun50i-a64-mmc";
-+			reg = <0x01c10000 0x1000>;
-+			clocks = <&ccu CLK_BUS_MMC1>, <&ccu CLK_MMC1>;
-+			clock-names = "ahb", "mmc";
-+			resets = <&ccu RST_BUS_MMC1>;
-+			reset-names = "ahb";
-+			interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		mmc2: mmc at 1c11000 {
-+			compatible = "allwinner,sun8i-r40-emmc",
-+				     "allwinner,sun50i-a64-emmc";
-+			reg = <0x01c11000 0x1000>;
-+			clocks = <&ccu CLK_BUS_MMC2>, <&ccu CLK_MMC2>;
-+			clock-names = "ahb", "mmc";
-+			resets = <&ccu RST_BUS_MMC2>;
-+			reset-names = "ahb";
-+			pinctrl-0 = <&mmc2_pins>;
-+			pinctrl-names = "default";
-+			interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		mmc3: mmc at 1c12000 {
-+			compatible = "allwinner,sun8i-r40-mmc",
-+				     "allwinner,sun50i-a64-mmc";
-+			reg = <0x01c12000 0x1000>;
-+			clocks = <&ccu CLK_BUS_MMC3>, <&ccu CLK_MMC3>;
-+			clock-names = "ahb", "mmc";
-+			resets = <&ccu RST_BUS_MMC3>;
-+			reset-names = "ahb";
-+			interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		ccu: clock at 1c20000 {
-+			compatible = "allwinner,sun8i-r40-ccu";
-+			reg = <0x01c20000 0x400>;
-+			clocks = <&osc24M>, <&osc32k>;
-+			clock-names = "hosc", "losc";
-+			#clock-cells = <1>;
-+			#reset-cells = <1>;
-+		};
-+
-+		pio: pinctrl at 1c20800 {
-+			compatible = "allwinner,sun8i-r40-pinctrl";
-+			reg = <0x01c20800 0x400>;
-+			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_PIO>, <&osc24M>, <&osc32k>;
-+			clock-names = "apb", "hosc", "losc";
-+			gpio-controller;
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+			#gpio-cells = <3>;
-+
-+			i2c0_pins: i2c0-pins {
-+				pins = "PB0", "PB1";
-+				function = "i2c0";
-+			};
-+
-+			mmc0_pins: mmc0-pins {
-+				pins = "PF0", "PF1", "PF2",
-+				       "PF3", "PF4", "PF5";
-+				function = "mmc0";
-+				drive-strength = <30>;
-+				bias-pull-up;
-+			};
-+
-+			mmc1_pg_pins: mmc1-pg-pins {
-+				pins = "PG0", "PG1", "PG2",
-+				       "PG3", "PG4", "PG5";
-+				function = "mmc1";
-+				drive-strength = <30>;
-+				bias-pull-up;
-+			};
-+
-+			mmc2_pins: mmc2-pins {
-+				pins = "PC5", "PC6", "PC7", "PC8", "PC9",
-+				       "PC10", "PC11", "PC12", "PC13", "PC14",
-+				       "PC15", "PC24";
-+				function = "mmc2";
-+				drive-strength = <30>;
-+				bias-pull-up;
-+			};
-+
-+			uart0_pb_pins: uart0-pb-pins {
-+				pins = "PB22", "PB23";
-+				function = "uart0";
-+			};
-+		};
-+
-+		uart0: serial at 1c28000 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x01c28000 0x400>;
-+			interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&ccu CLK_BUS_UART0>;
-+			resets = <&ccu RST_BUS_UART0>;
-+			status = "disabled";
-+		};
-+
-+		uart1: serial at 1c28400 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x01c28400 0x400>;
-+			interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&ccu CLK_BUS_UART1>;
-+			resets = <&ccu RST_BUS_UART1>;
-+			status = "disabled";
-+		};
-+
-+		uart2: serial at 1c28800 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x01c28800 0x400>;
-+			interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&ccu CLK_BUS_UART2>;
-+			resets = <&ccu RST_BUS_UART2>;
-+			status = "disabled";
-+		};
-+
-+		uart3: serial at 1c28c00 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x01c28c00 0x400>;
-+			interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&ccu CLK_BUS_UART3>;
-+			resets = <&ccu RST_BUS_UART3>;
-+			status = "disabled";
-+		};
-+
-+		uart4: serial at 1c29000 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x01c29000 0x400>;
-+			interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&ccu CLK_BUS_UART4>;
-+			resets = <&ccu RST_BUS_UART4>;
-+			status = "disabled";
-+		};
-+
-+		uart5: serial at 1c29400 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x01c29400 0x400>;
-+			interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&ccu CLK_BUS_UART5>;
-+			resets = <&ccu RST_BUS_UART5>;
-+			status = "disabled";
-+		};
-+
-+		uart6: serial at 1c29800 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x01c29800 0x400>;
-+			interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&ccu CLK_BUS_UART6>;
-+			resets = <&ccu RST_BUS_UART6>;
-+			status = "disabled";
-+		};
-+
-+		uart7: serial at 1c29c00 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x01c29c00 0x400>;
-+			interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&ccu CLK_BUS_UART7>;
-+			resets = <&ccu RST_BUS_UART7>;
-+			status = "disabled";
-+		};
-+
-+		i2c0: i2c at 1c2ac00 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x01c2ac00 0x400>;
-+			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_I2C0>;
-+			resets = <&ccu RST_BUS_I2C0>;
-+			pinctrl-0 = <&i2c0_pins>;
-+			pinctrl-names = "default";
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		i2c1: i2c at 1c2b000 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x01c2b000 0x400>;
-+			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_I2C1>;
-+			resets = <&ccu RST_BUS_I2C1>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		i2c2: i2c at 1c2b400 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x01c2b400 0x400>;
-+			interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_I2C2>;
-+			resets = <&ccu RST_BUS_I2C2>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		i2c3: i2c at 1c2b800 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x01c2b800 0x400>;
-+			interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_I2C3>;
-+			resets = <&ccu RST_BUS_I2C3>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		i2c4: i2c at 1c2c000 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x01c2c000 0x400>;
-+			interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_I2C4>;
-+			resets = <&ccu RST_BUS_I2C4>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		gic: interrupt-controller at 1c81000 {
-+			compatible = "arm,gic-400";
-+			reg = <0x01c81000 0x1000>,
-+			      <0x01c82000 0x1000>,
-+			      <0x01c84000 0x2000>,
-+			      <0x01c86000 0x2000>;
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-+		};
++	axp22x: pmic at 68 {
++		compatible = "x-powers,axp221";
++		reg = <0x34>;
++		interrupt-parent = <&nmi_intc>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
 +	};
++};
 +
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+	};
++#include "axp22x.dtsi"
++
++&reg_aldo3 {
++	regulator-always-on;
++	regulator-min-microvolt = <2700000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "avcc";
++};
++
++&reg_dcdc1 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "vcc-3v0";
++};
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1300000>;
++	regulator-name = "vdd-cpu";
++};
++
++&reg_dcdc3 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1300000>;
++	regulator-name = "vdd-sys";
++};
++
++&reg_dcdc5 {
++	regulator-always-on;
++	regulator-min-microvolt = <1500000>;
++	regulator-max-microvolt = <1500000>;
++	regulator-name = "vcc-dram";
++};
++
++&reg_dldo1 {
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-wifi-io";
++};
++
++&reg_dldo2 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-wifi";
++};
++
++&mmc0 {
++	vmmc-supply = <&reg_dcdc1>;
++	bus-width = <4>;
++	cd-gpios = <&pio 7 13 GPIO_ACTIVE_HIGH>; /* PH13 */
++	cd-inverted;
++	status = "okay";
++};
++
++&mmc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc1_pg_pins>;
++	vmmc-supply = <&reg_dldo2>;
++	vqmmc-supply = <&reg_dldo1>;
++	mmc-pwrseq = <&wifi_pwrseq>;
++	bus-width = <4>;
++	non-removable;
++	status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pb_pins>;
++	status = "okay";
 +};
 -- 
 2.13.6
