@@ -1,43 +1,66 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 6 Oct 2017 19:04:13 +0530
-Subject: [PATCH v3 15/22] firmware: arm_scmi: abstract mailbox interface
-In-Reply-To: <4b1ea5ac-1b50-901f-e33a-5af1f04f8a8f@arm.com>
-References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
- <1506604306-20739-16-git-send-email-sudeep.holla@arm.com>
- <CAK8P3a0EUr_aEZdOrjHixzp44yXqsNxTMzBceSBTmk-x8x2MAg@mail.gmail.com>
- <f316b938-c6d5-3aa9-4f03-6b5c6ad4bfa7@arm.com>
- <CABb+yY0SmQaPgBxan44a_Sx2mFuuiPcMz41J1yjqfO5irPTYig@mail.gmail.com>
- <4b1ea5ac-1b50-901f-e33a-5af1f04f8a8f@arm.com>
-Message-ID: <CABb+yY0DiDTKUkVrCDkx8_czfp2p6enzs7w_FRJpy91GDs9wXQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri,  6 Oct 2017 14:34:39 +0100
+Subject: [PATCH v2 2/5] locking/atomic: Add atomic_cond_read_acquire
+In-Reply-To: <1507296882-18721-1-git-send-email-will.deacon@arm.com>
+References: <1507296882-18721-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1507296882-18721-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 6, 2017 at 6:57 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->
->
-> On 06/10/17 12:34, Jassi Brar wrote:
->> On Wed, Oct 4, 2017 at 5:02 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>
->>> Also, I have added shim only for specific controllers that need them.
->>> E.g. ARM MHU as Jassi disagreed to add doorbell mechanism to that.
->>> mbox_if provides default implementation that just calls direct mailbox
->>> APIs.
->>>
->> Yeah you could hack away the MHU driver to make your life easy at the
->> cost of duplicated code and extra DT bindings, but for a moment think
->> what if your development platform wasn't MHU but, say, Rockchip
->> mailbox controller?
->>
->
-> As mentioned before I understand your concern. But the point is this
-> needs to be replicated with each protocol on that controller.
->
-Only generic protocols need to have a platform specific transport
-layer. There's no escaping that.
+smp_cond_load_acquire provides a way to spin on a variable with acquire
+semantics until some conditional expression involing the variable is
+satisfied. Architectures such as arm64 can potentially enter a low-power
+state, waking up only when the value of the variable changes, which
+reduces the system impact of tight polling loops.
 
-> So as Arnd
-> pointed out we can reduce that by generalizing common things like doorbell.
->
-Rockchip, and most other controllers, has no "doorbell". And yet each
-is perfectly capable of supporting SCMI.
-Looking forward to your "generalised doorbell".
+This patch makes the same interface available to users of atomic_t,
+atomic64_t and atomic_long_t, rather than require messy accesses to the
+structure internals.
+
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: Waiman Long <longman@redhat.com>
+Cc: Boqun Feng <boqun.feng@gmail.com>
+Cc: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ include/asm-generic/atomic-long.h | 3 +++
+ include/linux/atomic.h            | 4 ++++
+ 2 files changed, 7 insertions(+)
+
+diff --git a/include/asm-generic/atomic-long.h b/include/asm-generic/atomic-long.h
+index 288cc9e96395..f2d97b782031 100644
+--- a/include/asm-generic/atomic-long.h
++++ b/include/asm-generic/atomic-long.h
+@@ -243,4 +243,7 @@ static inline long atomic_long_add_unless(atomic_long_t *l, long a, long u)
+ #define atomic_long_inc_not_zero(l) \
+ 	ATOMIC_LONG_PFX(_inc_not_zero)((ATOMIC_LONG_PFX(_t) *)(l))
+ 
++#define atomic_long_cond_read_acquire(v, c) \
++	ATOMIC_LONG_PFX(_cond_read_acquire)((ATOMIC_LONG_PFX(_t) *)(v), (c))
++
+ #endif  /*  _ASM_GENERIC_ATOMIC_LONG_H  */
+diff --git a/include/linux/atomic.h b/include/linux/atomic.h
+index 40d6bfec0e0d..0aeb2b3f4578 100644
+--- a/include/linux/atomic.h
++++ b/include/linux/atomic.h
+@@ -653,6 +653,8 @@ static inline int atomic_dec_if_positive(atomic_t *v)
+ }
+ #endif
+ 
++#define atomic_cond_read_acquire(v, c)	smp_cond_load_acquire(&(v)->counter, (c))
++
+ #ifdef CONFIG_GENERIC_ATOMIC64
+ #include <asm-generic/atomic64.h>
+ #endif
+@@ -1072,6 +1074,8 @@ static inline long long atomic64_fetch_andnot_release(long long i, atomic64_t *v
+ }
+ #endif
+ 
++#define atomic64_cond_read_acquire(v, c)	smp_cond_load_acquire(&(v)->counter, (c))
++
+ #include <asm-generic/atomic-long.h>
+ 
+ #endif /* _LINUX_ATOMIC_H */
+-- 
+2.1.4
