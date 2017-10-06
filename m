@@ -1,20 +1,23 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 06 Oct 2017 14:24:36 -0700
-Subject: [PATCH] ARM64: dts: meson-gxl-libretech-cc: enable internal phy
- leds
-In-Reply-To: <20170906122547.11310-1-jbrunet@baylibre.com> (Jerome Brunet's
- message of "Wed, 6 Sep 2017 14:25:47 +0200")
-References: <20170906122547.11310-1-jbrunet@baylibre.com>
-Message-ID: <7hvajs7ywb.fsf@baylibre.com>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Fri,  6 Oct 2017 15:30:06 -0600
+Subject: [PATCH 0/2] Fix s5p-mfc lock contention in request firmware paths
+Message-ID: <cover.1507325072.git.shuahkh@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jerome Brunet <jbrunet@baylibre.com> writes:
+This patch series fixes inefficiencies and lock contention in the request
+firmware paths.
 
-> Enable the internal phy ACT and LINK leds pinmux
->
-> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+Shuah Khan (2):
+  media: s5p-mfc: check for firmware allocation before requesting
+    firmware
+  media: s5p-mfc: fix lock confection - request_firmware() once and keep
+    state
 
-Appled to v4.15/dt64,
+ drivers/media/platform/s5p-mfc/s5p_mfc.c        |  4 ++++
+ drivers/media/platform/s5p-mfc/s5p_mfc_common.h |  3 +++
+ drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c   | 15 ++++++++++-----
+ 3 files changed, 17 insertions(+), 5 deletions(-)
 
-Kevin
+-- 
+2.7.4
