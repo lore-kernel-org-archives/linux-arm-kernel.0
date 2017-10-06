@@ -1,129 +1,59 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 6 Oct 2017 13:11:38 -0500
-Subject: [RFCv2 PATCH 34/36] PCI: Make "PRG Response PASID Required"
- handling common
-In-Reply-To: <20171006133203.22803-35-jean-philippe.brucker@arm.com>
-References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
- <20171006133203.22803-35-jean-philippe.brucker@arm.com>
-Message-ID: <20171006181138.GD25517@bhelgaas-glaptop.roam.corp.google.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 6 Oct 2017 19:24:28 +0100
+Subject: [GIT PULL] arm64 fixes for 4.14-rc4
+Message-ID: <20171006182426.udiie6pplnklwv5a@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 06, 2017 at 02:32:01PM +0100, Jean-Philippe Brucker wrote:
-> The PASID ECN to the PCIe spec added a bit in the PRI status register that
-> allows a Function to declare whether a PRG Response should contain the
-> PASID prefix or not.
-> 
-> Move the helper that accesses it from amd_iommu into the PCI subsystem,
-> renaming it to be consistent with the current spec (PRPR - PRG Response
-> PASID Required).
-> 
-> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+Hi Linus,
 
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+Please pull the arm64 fixes below. Thanks.
 
-I assume this will be merged with the rest of the series, probably via an
-IOMMU tree.
+The following changes since commit 9e66317d3c92ddaab330c125dfe9d06eee268aff:
 
-> ---
->  drivers/iommu/amd_iommu.c     | 19 +------------------
->  drivers/pci/ats.c             | 17 +++++++++++++++++
->  include/linux/pci-ats.h       |  8 ++++++++
->  include/uapi/linux/pci_regs.h |  1 +
->  4 files changed, 27 insertions(+), 18 deletions(-)
-> 
-> diff --git a/drivers/iommu/amd_iommu.c b/drivers/iommu/amd_iommu.c
-> index 51f8215877f5..45036a253d63 100644
-> --- a/drivers/iommu/amd_iommu.c
-> +++ b/drivers/iommu/amd_iommu.c
-> @@ -2039,23 +2039,6 @@ static int pdev_iommuv2_enable(struct pci_dev *pdev)
->  	return ret;
->  }
->  
-> -/* FIXME: Move this to PCI code */
-> -#define PCI_PRI_TLP_OFF		(1 << 15)
-> -
-> -static bool pci_pri_tlp_required(struct pci_dev *pdev)
-> -{
-> -	u16 status;
-> -	int pos;
-> -
-> -	pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_PRI);
-> -	if (!pos)
-> -		return false;
-> -
-> -	pci_read_config_word(pdev, pos + PCI_PRI_STATUS, &status);
-> -
-> -	return (status & PCI_PRI_TLP_OFF) ? true : false;
-> -}
-> -
->  /*
->   * If a device is not yet associated with a domain, this function
->   * assigns it visible for the hardware
-> @@ -2084,7 +2067,7 @@ static int attach_device(struct device *dev,
->  
->  			dev_data->ats.enabled = true;
->  			dev_data->ats.qdep    = pci_ats_queue_depth(pdev);
-> -			dev_data->pri_tlp     = pci_pri_tlp_required(pdev);
-> +			dev_data->pri_tlp     = pci_prg_resp_requires_prefix(pdev);
->  		}
->  	} else if (amd_iommu_iotlb_sup &&
->  		   pci_enable_ats(pdev, PAGE_SHIFT) == 0) {
-> diff --git a/drivers/pci/ats.c b/drivers/pci/ats.c
-> index ad8ddbbbf245..f95e42df728b 100644
-> --- a/drivers/pci/ats.c
-> +++ b/drivers/pci/ats.c
-> @@ -389,3 +389,20 @@ int pci_max_pasids(struct pci_dev *pdev)
->  }
->  EXPORT_SYMBOL_GPL(pci_max_pasids);
->  #endif /* CONFIG_PCI_PASID */
-> +
-> +#if defined(CONFIG_PCI_PASID) && defined(CONFIG_PCI_PRI)
-> +bool pci_prg_resp_requires_prefix(struct pci_dev *pdev)
-> +{
-> +	u16 status;
-> +	int pos;
-> +
-> +	pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_PRI);
-> +	if (!pos)
-> +		return false;
-> +
-> +	pci_read_config_word(pdev, pos + PCI_PRI_STATUS, &status);
-> +
-> +	return !!(status & PCI_PRI_STATUS_PRPR);
-> +}
-> +EXPORT_SYMBOL_GPL(pci_prg_resp_requires_prefix);
-> +#endif /* CONFIG_PCI_PASID && CONFIG_PCI_PRI */
-> diff --git a/include/linux/pci-ats.h b/include/linux/pci-ats.h
-> index 782fb8e0755f..367ea9448441 100644
-> --- a/include/linux/pci-ats.h
-> +++ b/include/linux/pci-ats.h
-> @@ -67,5 +67,13 @@ static inline int pci_max_pasids(struct pci_dev *pdev)
->  
->  #endif /* CONFIG_PCI_PASID */
->  
-> +#if defined(CONFIG_PCI_PASID) && defined(CONFIG_PCI_PRI)
-> +bool pci_prg_resp_requires_prefix(struct pci_dev *pdev);
-> +#else
-> +static inline bool pci_prg_resp_requires_prefix(struct pci_dev *pdev)
-> +{
-> +	return false;
-> +}
-> +#endif /* CONFIG_PCI_PASID && CONFIG_PCI_PRI */
->  
->  #endif /* LINUX_PCI_ATS_H*/
-> diff --git a/include/uapi/linux/pci_regs.h b/include/uapi/linux/pci_regs.h
-> index f8d58045926f..a0eeb16a2bfe 100644
-> --- a/include/uapi/linux/pci_regs.h
-> +++ b/include/uapi/linux/pci_regs.h
-> @@ -862,6 +862,7 @@
->  #define  PCI_PRI_STATUS_RF	0x001	/* Response Failure */
->  #define  PCI_PRI_STATUS_UPRGI	0x002	/* Unexpected PRG index */
->  #define  PCI_PRI_STATUS_STOPPED	0x100	/* PRI Stopped */
-> +#define  PCI_PRI_STATUS_PRPR	0x8000	/* PRG Response requires PASID prefix */
->  #define PCI_PRI_MAX_REQ		0x08	/* PRI max reqs supported */
->  #define PCI_PRI_ALLOC_REQ	0x0c	/* PRI max reqs allowed */
->  #define PCI_EXT_CAP_PRI_SIZEOF	16
-> -- 
-> 2.13.3
-> 
+  Linux 4.14-rc3 (2017-10-01 14:54:54 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
+
+for you to fetch changes up to ae2e972dae3cea795e9f8f94eb1601213c2d49f0:
+
+  arm64: Ensure fpsimd support is ready before userspace is active (2017-10-06 16:35:25 +0100)
+
+----------------------------------------------------------------
+arm64 fixes:
+
+- Bring initialisation of user space undefined instruction handling
+  early (core_initcall) since late_initcall() happens after modprobe in
+  initramfs is invoked. Similar fix for fpsimd initialisation
+
+- Increase the kernel stack when KASAN is enabled
+
+- Bring the PCI ACS enabling earlier via the
+  iort_init_platform_devices()
+
+- Fix misleading data abort address printing (decimal vs hex)
+
+----------------------------------------------------------------
+Lorenzo Pieralisi (1):
+      ACPI/IORT: Fix PCI ACS enablement
+
+Mark Rutland (2):
+      arm64: fix misleading data abort decoding
+      arm64: Use larger stacks when KASAN is selected
+
+Suzuki K Poulose (2):
+      arm64: Ensure the instruction emulation is ready for userspace
+      arm64: Ensure fpsimd support is ready before userspace is active
+
+ arch/arm64/include/asm/memory.h      |  9 ++++++---
+ arch/arm64/kernel/armv8_deprecated.c |  2 +-
+ arch/arm64/kernel/cpufeature.c       |  2 +-
+ arch/arm64/kernel/fpsimd.c           |  2 +-
+ arch/arm64/mm/fault.c                |  2 +-
+ drivers/acpi/arm64/iort.c            | 35 +++++++++++++++++++++++++++++++++++
+ 6 files changed, 45 insertions(+), 7 deletions(-)
+
+-- 
+Catalin
