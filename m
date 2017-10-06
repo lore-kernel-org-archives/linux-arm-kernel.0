@@ -1,111 +1,91 @@
 From: shameerali.kolothum.thodi@huawei.com (Shameer Kolothum)
-Date: Fri, 6 Oct 2017 15:04:46 +0100
-Subject: [PATCH v9 0/4] iommu/smmu-v3: Workaround for hisilicon 161010801
- erratum(reserve HW MSI)
-Message-ID: <20171006140450.89652-1-shameerali.kolothum.thodi@huawei.com>
+Date: Fri, 6 Oct 2017 15:04:48 +0100
+Subject: [PATCH v9 2/4] iommu/dma: Add a helper function to reserve HW MSI
+ address regions for IOMMU drivers
+In-Reply-To: <20171006140450.89652-1-shameerali.kolothum.thodi@huawei.com>
+References: <20171006140450.89652-1-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <20171006140450.89652-3-shameerali.kolothum.thodi@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On certain HiSilicon platforms (hip06/hip07) the GIC ITS and PCIe RC
-deviates from the standard implementation and this breaks PCIe MSI
-functionality when SMMU is enabled.
+IOMMU drivers can use this to implement their .get_resv_regions callback
+for HW MSI specific reservations(e.g. ARM GICv3 ITS MSI region).
 
-The HiSilicon erratum 161010801 describes this limitation of certain
-HiSilicon platforms to support the SMMU mappings for MSI transactions.
-On these platforms GICv3 ITS translator is presented with the deviceID
-by extending the MSI payload data to 64 bits to include the deviceID.
-Hence, the PCIe controller on this platforms has to differentiate the MSI
-payload against other DMA payload and has to modify the MSI payload.
-This basically makes it difficult for this platforms to have a SMMU
-translation for MSI.
+Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
+---
+ drivers/iommu/dma-iommu.c | 20 ++++++++++++++++++++
+ include/linux/dma-iommu.h |  7 +++++++
+ 2 files changed, 27 insertions(+)
 
-This patch implements an ACPI and DT based quirk to reserve the hw msi
-regions in the smmu-v3 driver which means these address regions will
-not be translated and will be excluded from iova allocations.
-
-To implement this quirk, the following changes are incorporated:
-1. Added a generic helper function to IORT code to retrieve the
-   associated ITS base address from a device IORT node.
-2. Added a generic helper function to of iommu code to retrieve the
-   associated msi controller base address from for a PCI RC
-   msi-mapping and also platform device msi-parent.
-3. Blacklisted HiSilicon PCIe controllers on DT based hip06/hip07
-   platforms when SMMUv3 is enabled as there is no DT based solution
-   for this as of now.
-
-Changelog:
-
-v8 --> v9
--Thanks to Marc, fixed IORT helper function to reserve the ITS 
- translater region only.
--Removed the DT support for MSI reservation and blacklisted
- HiSilicon PCIe controllers on DT based systems when SMMUv3 is
- enabled.
-
-v7 --> v8
-Addressed comments from Rob and Lorenzo:
- -Modified to use DT compatible string for errata.
- -Changed logic to retrieve the msi-parent for DT case.
-
-v6 --> v7
-Addressed request from Will to add DT support for the erratum:
- - added bt binding
- - add of_iommu_msi_get_resv_regions()
-New arm64 silicon errata entry
-Rename iort_iommu_{its->msi}_get_resv_regions
-
-v5 --> v6
-Addressed comments from Robin and Lorenzo:
--No change to patch#1 .
--Reverted v5 patch#2 as this might break the platforms where this quirk
-  is not applicable. Provided a generic function in iommu code and added
-  back the quirk implementation in SMMU v3 driver(patch#3)
+diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+index 9d1cebe..bae677e 100644
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -19,6 +19,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
  
-v4 --> v5
-Addressed comments from Robin and Lorenzo:
--Added a comment to make it clear that, for now, only straightforward 
-  HW topologies are handled while reserving ITS regions(patch #1).
-
-v3 --> v4
-Rebased on 4.13-rc1.
-Addressed comments from Robin, Will and Lorenzo:
--As suggested by Robin, moved the ITS msi reservation into 
-  iommu_dma_get_resv_regions().
--Added its_count != resv region failure case(patch #1).
-
-v2 --> v3
-Addressed comments from Lorenzo and Robin:
--Removed dev_is_pci() check in smmuV3 driver.
--Don't treat device not having an ITS mapping as an error in
-  iort helper function.
-
-v1 --> v2
--patch 2/2: Invoke iort helper fn based on fwnode type(acpi).
-
-RFCv2 -->PATCH
--Incorporated Lorenzo's review comments.
-
-RFC v1 --> RFC v2
-Based on Robin's review comments,
--Removed  the generic erratum framework.
--Using IORT/MADT tables to retrieve the ITS base addr instead  of vendor specific CSRT table.
-
-
-Shameer Kolothum (4):
-  ACPI/IORT: Add msi address regions reservation helper
-  iommu/dma: Add a helper function to reserve HW MSI address regions for
-    IOMMU drivers
-  iommu/arm-smmu-v3:Enable ACPI based HiSilicon erratum 161010801
-  PCI: hisi: blacklist hip06/hip07 controllers behind SMMUv3
-
- drivers/acpi/arm64/iort.c        | 97 ++++++++++++++++++++++++++++++++++++++--
- drivers/iommu/arm-smmu-v3.c      | 27 ++++++++---
- drivers/iommu/dma-iommu.c        | 20 +++++++++
- drivers/irqchip/irq-gic-v3-its.c |  3 +-
- drivers/pci/dwc/pcie-hisi.c      | 12 +++++
- include/linux/acpi_iort.h        |  7 ++-
- include/linux/dma-iommu.h        |  7 +++
- 7 files changed, 163 insertions(+), 10 deletions(-)
-
++#include <linux/acpi_iort.h>
+ #include <linux/device.h>
+ #include <linux/dma-iommu.h>
+ #include <linux/gfp.h>
+@@ -27,6 +28,7 @@
+ #include <linux/iova.h>
+ #include <linux/irq.h>
+ #include <linux/mm.h>
++#include <linux/of_iommu.h>
+ #include <linux/pci.h>
+ #include <linux/scatterlist.h>
+ #include <linux/vmalloc.h>
+@@ -198,6 +200,24 @@ void iommu_dma_get_resv_regions(struct device *dev, struct list_head *list)
+ }
+ EXPORT_SYMBOL(iommu_dma_get_resv_regions);
+ 
++/**
++ * iommu_dma_get_msi_resv_regions - Reserved region driver helper
++ * @dev: Device from iommu_get_resv_regions()
++ * @list: Reserved region list from iommu_get_resv_regions()
++ *
++ * IOMMU drivers can use this to implement their .get_resv_regions
++ * callback for HW MSI specific reservations. For now, this only
++ * covers ITS MSI region reservation using ACPI IORT helper function.
++ */
++int iommu_dma_get_msi_resv_regions(struct device *dev, struct list_head *list)
++{
++	if (!is_of_node(dev->iommu_fwspec->iommu_fwnode))
++		return iort_iommu_msi_get_resv_regions(dev, list);
++
++	return -ENODEV;
++}
++EXPORT_SYMBOL(iommu_dma_get_msi_resv_regions);
++
+ static int cookie_init_hw_msi_region(struct iommu_dma_cookie *cookie,
+ 		phys_addr_t start, phys_addr_t end)
+ {
+diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
+index 92f2083..6062ef0 100644
+--- a/include/linux/dma-iommu.h
++++ b/include/linux/dma-iommu.h
+@@ -74,6 +74,8 @@ void iommu_dma_unmap_resource(struct device *dev, dma_addr_t handle,
+ void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg);
+ void iommu_dma_get_resv_regions(struct device *dev, struct list_head *list);
+ 
++int iommu_dma_get_msi_resv_regions(struct device *dev, struct list_head *list);
++
+ #else
+ 
+ struct iommu_domain;
+@@ -107,6 +109,11 @@ static inline void iommu_dma_get_resv_regions(struct device *dev, struct list_he
+ {
+ }
+ 
++static inline int iommu_dma_get_msi_resv_regions(struct device *dev, struct list_head *list)
++{
++	return -ENODEV;
++}
++
+ #endif	/* CONFIG_IOMMU_DMA */
+ #endif	/* __KERNEL__ */
+ #endif	/* __DMA_IOMMU_H */
 -- 
 1.9.1
