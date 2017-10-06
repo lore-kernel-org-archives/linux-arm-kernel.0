@@ -1,66 +1,78 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 06 Oct 2017 14:51:23 +0200
-Subject: [PATCH 15/16] arm64: dts: marvell: armada-3720-db: enable second
- UART port
-In-Reply-To: <20171006101344.15590-16-miquel.raynal@free-electrons.com>
- (Miquel Raynal's message of "Fri, 6 Oct 2017 12:13:43 +0200")
-References: <20171006101344.15590-1-miquel.raynal@free-electrons.com>
- <20171006101344.15590-16-miquel.raynal@free-electrons.com>
-Message-ID: <87k208e8xg.fsf@free-electrons.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Fri, 6 Oct 2017 15:00:25 +0200
+Subject: [PATCH v4 4/5] ARM: dts: stm32: Add I2C1 support for STM32F746 SoC
+In-Reply-To: <1505399319-14782-5-git-send-email-pierre-yves.mordret@st.com>
+References: <1505399319-14782-1-git-send-email-pierre-yves.mordret@st.com>
+ <1505399319-14782-5-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <4b0f5b6c-2755-a7be-ac57-24844ae41f45@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Miquel,
- 
- On ven., oct. 06 2017, Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
+Hi
 
-> Enable Armada-3720-DB second UART port by adding the corresponding
-> device tree node in the board DTS and enabling it.
->
-> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
-
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Thanks,
-
-Gregory
+On 09/14/2017 04:28 PM, Pierre-Yves MORDRET wrote:
+> This patch adds I2C1 support for STM32F746 SoC.
+> 
+> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 > ---
->  arch/arm64/boot/dts/marvell/armada-3720-db.dts | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-> index 9df0f06ce607..15713c19b3d0 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-> +++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-> @@ -216,7 +216,7 @@
->  
->  /*
->   * Exported on the micro USB connector CON30(V2.0)/CON32(V1.4) through
-> - * an FTDI
-> + * an FTDI (also on CON24(V2.0)/CON26(V1.4)).
->   */
->  &uart0 {
->  	pinctrl-names = "default";
-> @@ -224,6 +224,13 @@
->  	status = "okay";
->  };
->  
-> +/* CON26(V2.0)/CON28(V1.4) */
-> +&uart1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart2_pins>;
-> +	status = "okay";
-> +};
-> +
->  /* CON27(V2.0)/CON29(V1.4) */
->  &usb2 {
->  	status = "okay";
-> -- 
-> 2.11.0
->
+>   Version history:
+>      v4:
+>      v3:
+>          * None
+>      v2:
+>          * Update I2C SoC device tree with latest Linux version
+> ---
+> ---
+>   arch/arm/boot/dts/stm32f746.dtsi | 22 ++++++++++++++++++++++
+>   1 file changed, 22 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/stm32f746.dtsi b/arch/arm/boot/dts/stm32f746.dtsi
+> index 4506eb9..ddd8f2c 100644
+> --- a/arch/arm/boot/dts/stm32f746.dtsi
+> +++ b/arch/arm/boot/dts/stm32f746.dtsi
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Applied on stm32-dt-for-v4.15 branch.
+
+Thanks
+Alex
+
+
+
+> @@ -361,6 +361,16 @@
+>   					bias-disable;
+>   				};
+>   			};
+> +
+> +			i2c1_pins_b: i2c1 at 0 {
+> +				pins {
+> +					pinmux = <STM32F746_PB9_FUNC_I2C1_SDA>,
+> +						 <STM32F746_PB8_FUNC_I2C1_SCL>;
+> +					bias-disable;
+> +					drive-open-drain;
+> +					slew-rate = <0>;
+> +				};
+> +			};
+>   		};
+>   
+>   		crc: crc at 40023000 {
+> @@ -380,6 +390,18 @@
+>   			assigned-clocks = <&rcc 1 CLK_HSE_RTC>;
+>   			assigned-clock-rates = <1000000>;
+>   		};
+> +
+> +		i2c1: i2c at 40005400 {
+> +			compatible = "st,stm32f7-i2c";
+> +			reg = <0x40005400 0x400>;
+> +			interrupts = <31>,
+> +				     <32>;
+> +			resets = <&rcc STM32F7_APB1_RESET(I2C1)>;
+> +			clocks = <&rcc 1 CLK_I2C1>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			status = "disabled";
+> +		};
+>   	};
+>   };
+>   
+> 
