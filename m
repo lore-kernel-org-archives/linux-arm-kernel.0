@@ -1,100 +1,66 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 6 Oct 2017 09:29:57 +0200
-Subject: Questions about bluetooth on N900
-In-Reply-To: <20171001145051.7pyzz4bpodkd6i2b@earth>
-References: <87tvzow7jv.fsf@sange.fi>
- <20170927160611.GA10775@xo-6d-61-c0.localdomain>
- <87h8vkpvtu.fsf@sange.fi> <20171001090133.GA16848@amd>
- <20171001145051.7pyzz4bpodkd6i2b@earth>
-Message-ID: <20171006072957.GA18994@amd>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Fri, 6 Oct 2017 09:46:47 +0200
+Subject: [PATCH] iommu/arm-smmu-v3: Ensure we sync STE when only changing
+ config field
+In-Reply-To: <7e9ef711-b1d7-ee70-b740-5d03a4fc61f6@arm.com>
+References: <1507222158-4151-1-git-send-email-will.deacon@arm.com>
+ <7e9ef711-b1d7-ee70-b740-5d03a4fc61f6@arm.com>
+Message-ID: <59075e5e-56d5-9a93-8c01-c602be996982@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Will,
 
-> > >  > There is some interest. I'd like to have working bluetooth, and people from postmarketos
-> > >  > would probably like something, too. Unfortunately my experience is same as yours -- current
-> > >  > mainline does not work well on N900.
-> > > 
-> > > I might try debugging that at some point, but I doubt I can resolve the issue,
-> > > because I have no experience in serial port programming. With latest BlueZ I
-> > > got my braille display working for few seconds, before it stalled.
-> > > 
-> > >  > > I'm considering to rebase the old hci_h4p driver on current mainline, because
-> > >  > > I just need a working BT connection, not code that is of good quality. Some
-> > > 
-> > >  > Ok, I may save you some work. I have rebased version, it should be in
-> > >  > linux-n900 on kernel.org.
-> > > 
-> > > I found a repo from
-> > > https://kernel.googlesource.com/pub/scm/linux/kernel/git/pavel/linux-n900/. I
-> > > assume that's what you meant.
-> > > 
-> > > The latest version is based on 4.13, but it has also some changes which seem
-> > > not to be related to BT. I incorporated them also, but I don't know if they
-> > > are valid.
-> > 
-> > Feel free to take those or not.
-> > 
-> > > I was lucky that you had done rebasing of nokia_h4p, because I wouldn't have
-> > > known what to do with DTS.
-> > > 
-> > > Unfortunately the driver does not work properly. I can access N900 to some
-> > > extent with my braille display, but the connection has random freezes, and
-> > > accessing my GPS receiver (through RFCOMM) causes the whole system to hang.
-> > > 
-> > > I get the following message to syslog something like 100 times per second when
-> > > BRLTTY (the braille display daemon) is communicating with the display:
-> > > Got IIR_RX_TIMEOUT, handling it as IIR_DRI
-> > > 
-> > > Active BT connection also seems to trigger a bug in nokia_h4p related to
-> > > spinlocks. This happens in random intervals between 0.1 s and 30 s.
-> > > 
-> > > The bugs are:
-> > > BUG: scheduling while atomic
-> > > and
-> > > BUG: workqueue leaked lock or atomic
-> > > 
-> > > Stack traces suggest that it is (at least sometimes) caused by h4p_set_clk
-> > > calling clk_prepare_enable and clk_disable_unprepare functions, which should
-> > > only be used in non-atomic context.
-> > > 
-> > > So, I thought it would be good for you to know that BT does not really work. I
-> > > would like to work on this, but I'm afraid my knowledge is too limited to
-> > > track this down. It would be good to know what is causing those IIR RX
-> > > timeouts.
-> > > 
-> > > Also working on an obsolete driver feels like stupid now that there is a
-> > > driver written more properly.
-> > 
-> > Yes, fixing obsolete driver is hard and has drawbacks. The new one
-> > should be fixed.
-> > 
-> > I believe the way forward would be
-> > 
-> > a) add logging to the old driver, to see exact data being exchanged
-> > during initialization.
-> > 
-> > b) add logging to the new driver, and compare old and new driver
-> > 
-> > c) fix the new driver to do the initialization same way the old driver
-> > did
+On 05/10/2017 18:54, Robin Murphy wrote:
+> On 05/10/17 17:49, Will Deacon wrote:
+>> The SMMUv3 architecture permits caching of data structures deemed to be
+>> "reachable" by the SMU, which includes STEs marked as invalid. When
+>> transitioning an STE to a bypass/fault configuration at init or detach
+>> time, we mistakenly elide the CMDQ_OP_CFGI_STE operation in some cases,
+>> therefore potentially leaving the old STE state cached in the SMMU.
+>>
+>> This patch fixes the problem by ensuring that we perform the
+>> CMDQ_OP_CFGI_STE operation irrespective of the validity of the previous
+>> STE.
 > 
-> FWIW I don't think the problem on N900 with hci_nokia ("new") driver is
-> related to incorrect data/packets being sent. I'm pretty sure there is
-> still some problem with the handling of flow control signals (RTS/CTS +
-> the GPIOs) resulting in packets not being sent and/or received properly.
+> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 
-Yes, that's possible. So logging RTS/CTS + gpio transitions along with
-data will be useful.
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171006/83ed2b83/attachment-0001.sig>
+Thanks
+
+Eric
+
+> 
+>> Cc: Robin Murphy <robin.murphy@arm.com>
+>> Reported-by: Eric Auger <eric.auger@redhat.com>
+>> Signed-off-by: Will Deacon <will.deacon@arm.com>
+>> ---
+>>  drivers/iommu/arm-smmu-v3.c | 7 +++++--
+>>  1 file changed, 5 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>> index 47f52b1ab838..91fdabdb4de6 100644
+>> --- a/drivers/iommu/arm-smmu-v3.c
+>> +++ b/drivers/iommu/arm-smmu-v3.c
+>> @@ -1085,8 +1085,11 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
+>>  		dst[1] = cpu_to_le64(STRTAB_STE_1_SHCFG_INCOMING
+>>  			 << STRTAB_STE_1_SHCFG_SHIFT);
+>>  		dst[2] = 0; /* Nuke the VMID */
+>> -		if (ste_live)
+>> -			arm_smmu_sync_ste_for_sid(smmu, sid);
+>> +		/*
+>> +		 * The SMMU can perform negative caching, so we must sync
+>> +		 * the STE regardless of whether the old value was live.
+>> +		 */
+>> +		arm_smmu_sync_ste_for_sid(smmu, sid);
+>>  		return;
+>>  	}
+>>  
+>>
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
