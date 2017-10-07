@@ -1,108 +1,57 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Sat, 07 Oct 2017 21:01:51 +0800
-Subject: [PATCH v3 1/2] dt-bindings: add device tree binding for Allwinner
- XR819 SDIO Wi-Fi
-In-Reply-To: <878tgq5beu.fsf@codeaurora.org>
-References: <20171003165944.13056-1-icenowy@aosc.io>
- <20171003165944.13056-2-icenowy@aosc.io>
- <871smjxp46.fsf@kamboji.qca.qualcomm.com>
- <E46F3A20-294A-497E-AF71-C77A67AFDB8C@aosc.io>
- <59D4B1C8.8020105@broadcom.com> <20171004101145.kgjufpcktodppuy3@flea>
- <C4895259-FCDE-4B21-BB15-8F150FC53BE3@aosc.io>
- <878tgq5beu.fsf@codeaurora.org>
-Message-ID: <46e9b7199a2668842313504273f9f86a@aosc.io>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Sat,  7 Oct 2017 18:29:38 +0200
+Subject: [PATCH 0/2] Enable the Amlogic Meson SDIO MMC controller
+Message-ID: <20171007162940.14595-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-10-05 14:58?Kalle Valo ???
-> Icenowy Zheng <icenowy@aosc.io> writes:
-> 
->> ? 2017?10?4? GMT+08:00 ??6:11:45, Maxime Ripard
->> <maxime.ripard@free-electrons.com> ??:
->>> On Wed, Oct 04, 2017 at 10:02:48AM +0000, Arend van Spriel wrote:
->>>> On 10/4/2017 11:03 AM, Icenowy Zheng wrote:
->>>> >
->>>> >
->>>> > ? 2017?10?4? GMT+08:00 ??5:02:17, Kalle Valo <kvalo@codeaurora.org>
->>> ??:
->>>> > > Icenowy Zheng <icenowy@aosc.io> writes:
->>>> > >
->>>> > > > Allwinner XR819 is a SDIO Wi-Fi chip, which has the
->>> functionality to
->>>> > > use
->>>> > > > an out-of-band interrupt pin instead of SDIO in-band interrupt.
->>>> > > >
->>>> > > > Add the device tree binding of this chip, in order to make it
->>>> > > possible
->>>> > > > to add this interrupt pin to device trees.
->>>> > > >
->>>> > > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->>>> > > > Acked-by: Rob Herring <robh@kernel.org>
->>>> > > > ---
->>>> > > > Changes in v3:
->>>> > > > - Renames the node name.
->>>> > > > - Adds ACK from Rob.
->>>> > > > Changes in v2:
->>>> > > > - Removed status property in example.
->>>> > > > - Added required property reg.
->>>> > > >
->>>> > > >   .../bindings/net/wireless/allwinner,xr819.txt      | 38
->>>> > > ++++++++++++++++++++++
->>>> > > >   1 file changed, 38 insertions(+)
->>>> > > >   create mode 100644
->>>> > >
->>> Documentation/devicetree/bindings/net/wireless/allwinner,xr819.txt
->>>> > >
->>>> > > Like I asked already last time, AFAICS there is no upstream xr819
->>>> > > wireless driver in drivers/net/wireless directory. Do we still
->>> accept
->>>> > > bindings like this for out-of-tree drivers?
->>>> >
->>>> > See esp8089.
->>>> >
->>>> > There's also no in-tree driver for it.
->>>> 
->>>> The question is whether we should. The above might be a precedent,
->>> but it
->>>> may not necessarily be the way to go. The commit message for esp8089
->>> seems
->>>> to hint that there is intent to have an in-tree driver:
->>>> 
->>>> """
->>>>     Note that at this point there only is an out of tree driver for
->>> this
->>>>     hardware, there is no clear timeline / path for merging this.
->>> Still
->>>>     I believe it would be good to specify the binding for this in
->>> tree
->>>>     now, so that any future migration to an in tree driver will not
->>> cause
->>>>     compatiblity issues.
->>>> 
->>>>     Cc: Icenowy Zheng <icenowy@aosc.xyz>
->>>>     Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>>     Signed-off-by: Rob Herring <robh@kernel.org>
->>>> """
->>>> 
->>>> Regardless the bindings are in principle independent of the kernel
->>> and just
->>>> describing hardware. I think there have been discussions to move the
->>>> bindings to their own repository, but apparently it was decided
->>> otherwise.
->>> 
->>> Yeah, I guess especially how it could be merged with the cw1200 
->>> driver
->>> would be very relevant to that commit log.
->> 
->> The cw1200 driver seems to still have some legacy platform
->> data. Maybe they should also be convert to DT.
->> (Or maybe compatible = "allwinner,xr819" is enough, as
->> xr819 is a specified variant of cw1200 family)
-> 
-> Ah, so the upstream cw1200 driver supports xr819? Has anyone tested
-> that? Or does cw1200 more changes than just adding the DT support?
+Now that the SDIO MMC driver is queued for v4.15 we need to prepare
+our platform so boards can actually use this driver.
+This adds the Meson SDIO MMC controller to the .dts files and
+enables the corresponding driver in the multi_v7_defconfig.
 
-By doing some tests, XR819 is in the the CW1x60 family, which is not
-yet well supported by cw1200 driver.
+Below is an example to enable the SD card using "port 1" of
+the SDIO MMC controller.
+cd-gpios, cd-inverted and vmmc-supply need to be configured
+based on the board design (as well as the "reg" property
+if the SD card is not connected to the MMC controller's slot
+called "port 0").
 
-More work should be needed for support xr819 in cw1200 driver.
+&sdio {
+	status = "okay";
+
+	pinctrl-0 = <&sd_b_pins>;
+	pinctrl-names = "default";
+
+	/* SD card */
+	sd_card_slot: slot at 1 {
+		compatible = "mmc-slot";
+		reg = <1>;
+		status = "okay";
+
+		bus-width = <4>;
+		no-sdio;
+		cap-mmc-highspeed;
+		cap-sd-highspeed;
+		disable-wp;
+
+		cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+		cd-inverted;
+
+		vmmc-supply = <&vcc_3v3>;
+	};
+};
+
+
+Martin Blumenstingl (2):
+  ARM: dts: meson: add the SDIO MMC controller
+  ARM: multi_v7_defconfig: enable the Meson MX SDIO/MMC controller
+
+ arch/arm/boot/dts/meson.dtsi        | 9 +++++++++
+ arch/arm/boot/dts/meson8.dtsi       | 6 ++++++
+ arch/arm/boot/dts/meson8b.dtsi      | 6 ++++++
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 4 files changed, 22 insertions(+)
+
+-- 
+2.14.2
