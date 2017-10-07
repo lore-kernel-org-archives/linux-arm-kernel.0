@@ -1,70 +1,108 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sat, 7 Oct 2017 11:22:52 +0200
-Subject: [PATCH] ARM: pxa: cm-x255: Fix up GPIO NAND device name in table
-In-Reply-To: <877ew7fkvj.fsf@belgarion.home>
-References: <20171006215144.18039-1-linus.walleij@linaro.org>
- <20171007074939.516ae693@bbrezillon>
- <877ew7fkvj.fsf@belgarion.home>
-Message-ID: <20171007112252.37db396b@bbrezillon>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 07 Oct 2017 10:58:54 +0100
+Subject: [PATCH] irqchip/gicv3-its: Add missing changes to support 52bit
+ physical address
+In-Reply-To: <1507353204-28808-1-git-send-email-shankerd@codeaurora.org>
+ (Shanker Donthineni's message of "Sat, 7 Oct 2017 00:13:24 -0500")
+References: <1507353204-28808-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <867ew7mg81.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 07 Oct 2017 10:00:16 +0200
-Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+On Sat, Oct 07 2017 at 12:13:24 am BST, Shanker Donthineni <shankerd@codeaurora.org> wrote:
+> The current ITS driver works fine as long as normal memory and GICR
+> regions are located within the lower 48bit (>=0 && <2^48) physical
+> address space. Some of the registers GICR_PEND/PROP, GICR_VPEND/VPROP
+> and GITS_CBASER are handled properly but not all when configuring
+> the hardware with 52bit physical address.
+>
+> This patch does the following changes to support 52bit PA.
+>   -Handle 52bit PA in GITS_BASERn.
+>   -Fix ITT_addr width to 52bits, bits[51:8].
+>   -Fix RDbase width to 52bits, bits[51:16].
+>   -Fix VPT_addr width to 52bits, bits[51:16].
+>
+> Definition of the GITS_BASERn register when ITS PageSize is 64KB:
+>  -Bits[47:16] of the register provide bits[47:16] of the table PA.
+>  -Bits[15:12] of the register provide bits[51:48] of the table PA.
+>  -Bits[15:00] of the base physical address are 0.
+>
+> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+> ---
+>  drivers/irqchip/irq-gic-v3-its.c   | 24 +++++++++++++++++++-----
+>  include/linux/irqchip/arm-gic-v3.h |  3 +++
+>  2 files changed, 22 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index e8d8934..e52c0da 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -308,7 +308,7 @@ static void its_encode_size(struct its_cmd_block *cmd, u8 size)
+>  
+>  static void its_encode_itt(struct its_cmd_block *cmd, u64 itt_addr)
+>  {
+> -	its_mask_encode(&cmd->raw_cmd[2], itt_addr >> 8, 50, 8);
+> +	its_mask_encode(&cmd->raw_cmd[2], itt_addr >> 8, 51, 8);
+>  }
+>  
+>  static void its_encode_valid(struct its_cmd_block *cmd, int valid)
+> @@ -318,7 +318,7 @@ static void its_encode_valid(struct its_cmd_block *cmd, int valid)
+>  
+>  static void its_encode_target(struct its_cmd_block *cmd, u64 target_addr)
+>  {
+> -	its_mask_encode(&cmd->raw_cmd[2], target_addr >> 16, 50, 16);
+> +	its_mask_encode(&cmd->raw_cmd[2], target_addr >> 16, 51, 16);
+>  }
+>  
+>  static void its_encode_collection(struct its_cmd_block *cmd, u16 col)
+> @@ -358,7 +358,7 @@ static void its_encode_its_list(struct its_cmd_block *cmd, u16 its_list)
+>  
+>  static void its_encode_vpt_addr(struct its_cmd_block *cmd, u64 vpt_pa)
+>  {
+> -	its_mask_encode(&cmd->raw_cmd[3], vpt_pa >> 16, 50, 16);
+> +	its_mask_encode(&cmd->raw_cmd[3], vpt_pa >> 16, 51, 16);
+>  }
+>  
+>  static void its_encode_vpt_size(struct its_cmd_block *cmd, u8 vpt_size)
+> @@ -1478,9 +1478,9 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+>  	u64 val = its_read_baser(its, baser);
+>  	u64 esz = GITS_BASER_ENTRY_SIZE(val);
+>  	u64 type = GITS_BASER_TYPE(val);
+> +	u64 baser_phys, tmp;
+>  	u32 alloc_pages;
+>  	void *base;
+> -	u64 tmp;
+>  
+>  retry_alloc_baser:
+>  	alloc_pages = (PAGE_ORDER_TO_SIZE(order) / psz);
+> @@ -1496,8 +1496,22 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+>  	if (!base)
+>  		return -ENOMEM;
+>  
+> +	baser_phys = virt_to_phys(base);
+> +
+> +	/* Check if the physical address of the memory is above 48bits */
+> +	if (baser_phys & (~GITS_BASER_PHYS_MASK)) {
+> +		/* 52bit PA is supported only when PageSize=64K */
+> +		if (psz != SZ_64K) {
+> +			free_pages((unsigned long)base, order);
+> +			return -EFAULT;
+> +		}
+> +
+> +		/* Convert 52bit PA to 48bit field */
+> +		baser_phys = GITS_BASER_64K_PHYS(baser_phys);
+> +	}
 
-> Boris Brezillon <boris.brezillon@free-electrons.com> writes:
-> 
-> > On Fri,  6 Oct 2017 23:51:44 +0200
-> > Linus Walleij <linus.walleij@linaro.org> wrote:
-> >  
-> >> My patch set the device name wrong because I confused the
-> >> device name for a partition name. Sorry.
-> >> 
-> >> Cc: arm at kernel.org
-> >> Fixes: ("mtd: nand: gpio: Convert to use GPIO descriptors")
-> >> Reported-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> >> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> >> ---
-> >> This can be squashed into the commit or applied on top
-> >> as a fix. The original patch was ACKed by the ARM SoC
-> >> maintainers so I believe this is fine to apply.
-> >> ---
-> >>  arch/arm/mach-pxa/cm-x255.c | 2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >> 
-> >> diff --git a/arch/arm/mach-pxa/cm-x255.c b/arch/arm/mach-pxa/cm-x255.c
-> >> index f8d67acb7194..fa8e7dd4d898 100644
-> >> --- a/arch/arm/mach-pxa/cm-x255.c
-> >> +++ b/arch/arm/mach-pxa/cm-x255.c
-> >> @@ -178,7 +178,7 @@ static inline void cmx255_init_nor(void) {}
-> >>  #if defined(CONFIG_MTD_NAND_GPIO) || defined(CONFIG_MTD_NAND_GPIO_MODULE)
-> >>  
-> >>  static struct gpiod_lookup_table cmx255_nand_gpiod_table = {
-> >> -	.dev_id         = "cmx255-nand",
-> >> +	.dev_id         = "gpio-nand",  
-> >
-> > Are you sure it works? AFAIR, you have to set "<driver-name>.<dev-id>"
-> > here, which, assuming there's only one gpio-nand dev, would give
-> >
-> > 	.dev_id		= "gpio-nand.0",  
-> I'm sure Linus is correct this time.
-> This is because :
-> static struct platform_device cmx255_nand = {
-> ...
-> 	.id		= -1,
-> ...
-> 
-> This -1 is the reason it will be "gpio-nand".
+I'm not sure this is completely right. What guarantees that the memory
+you get is 64kB aligned? Your initial masking will do the wrong thing on
+a system with 16kB pages, and everything will break from that point on,
+as you're confusing the ITS page size with the CPU page size.
 
-Right. I thought -1 was PLATFORM_DEVID_AUTO, but it's
-PLATFORM_DEVID_NONE.
-
-I'll squash the change in the initial commit.
+This probably wants to be predicated with a 64kB CPU page size (which is
+the only valid configuration for 52bit PA anyway).
 
 Thanks,
 
-Boris
-
-> 
-> Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> 
+	M.
+-- 
+Jazz is not dead. It just smells funny.
