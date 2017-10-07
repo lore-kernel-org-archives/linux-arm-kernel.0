@@ -1,36 +1,27 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 7 Oct 2017 12:48:31 +0200
-Subject: [PATCH v3 00/12] add pinmuxing support for pins in AXP209 and
- AXP813 PMICs
-In-Reply-To: <20171002120854.5212-1-quentin.schulz@free-electrons.com>
-References: <20171002120854.5212-1-quentin.schulz@free-electrons.com>
-Message-ID: <CACRpkdYBfuyr8hzVTH_RFfM4uYOMbWTHnH9SeF8SMGFe-shEWA@mail.gmail.com>
+Date: Sat, 7 Oct 2017 12:52:47 +0200
+Subject: [PATCH 1/7] gpio: brcmstb: allow all instances to be wakeup
+ sources
+In-Reply-To: <20170930034057.15166-2-opendmb@gmail.com>
+References: <20170930034057.15166-1-opendmb@gmail.com>
+ <20170930034057.15166-2-opendmb@gmail.com>
+Message-ID: <CACRpkdaLBXeSJBMgXM2e5JhZWnLL4rq0Qt97AeRfTZ7V-_NLDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 2, 2017 at 2:08 PM, Quentin Schulz
-<quentin.schulz@free-electrons.com> wrote:
+On Sat, Sep 30, 2017 at 5:40 AM, Doug Berger <opendmb@gmail.com> wrote:
 
-> The AXP209 and AXP813 PMICs have several pins (respectively 3 and 2) that can
-> be used either as GPIOs or for other purposes (ADC or LDO here).
+> This commit allows a wakeup parent interrupt to be shared between
+> instances.
 >
-> We already have a GPIO driver for the GPIO use of those pins on the AXP209.
-> Let's "upgrade" this driver to support all the functions these pins can have.
+> It also removes the redundant can_wake member of the private data
+> structure by using whether the parent_wake_irq has been defined to
+> indicate that the GPIO device can wake.
 >
-> Then we add support to this driver for the AXP813 which is slighlty different
-> (basically a different offset in a register and one less pin).
->
-> I suggest patches 1 to 6 go through Linus's tree and 7 to 12 via Maxime or
-> Chen-Yu's tree.
->
-> This version of the patchset is based on Chen-Yu's patchset for AXP813/818
-> regulators[1].
->
-> v3:
+> Fixes: 19a7b6940b78 ("gpio: brcmstb: Add interrupt and wakeup source support")
+> Signed-off-by: Doug Berger <opendmb@gmail.com>
 
-This is starting to look really good, but I see there are still comments.
-
-Keep the series going, we merge once Maxime and Chen-Yu are happy.
+Patch applied with Gregory's and Florian's ACKs.
 
 Yours,
 Linus Walleij
