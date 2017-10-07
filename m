@@ -1,80 +1,119 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sat,  7 Oct 2017 18:29:39 +0200
-Subject: [PATCH 1/2] ARM: dts: meson: add the SDIO MMC controller
-In-Reply-To: <20171007162940.14595-1-martin.blumenstingl@googlemail.com>
-References: <20171007162940.14595-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20171007162940.14595-2-martin.blumenstingl@googlemail.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Sat,  7 Oct 2017 13:34:04 -0500
+Subject: [PATCH v2] irqchip/gicv3-its: Add missing changes to support 52bit
+ physical address
+Message-ID: <1507401244-12070-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Meson6, Meson8 and Meson8b are using the same MMC controller IP. This
-adds the MMC controller node to meson.dtsi so it can be used by all
-SoCs.
+The current ITS driver works fine as long as normal memory and GICR
+regions are located within the lower 48bit (>=0 && <2^48) physical
+address space. Some of the registers GICR_PEND/PROP, GICR_VPEND/VPROP
+and GITS_CBASER are handled properly but not all when configuring
+the hardware with 52bit physical address.
 
-The controller itself is a bit special, because it has multiple slots.
-Each slot is accessed through a sub-node of the controller. However,
-currently the driver for this hardware only supports one slot.
+This patch does the following changes to support 52bit PA.
+  -Handle 52bit PA in GITS_BASERn.
+  -Fix ITT_addr width to 52bits, bits[51:8].
+  -Fix RDbase width to 52bits, bits[51:16].
+  -Fix VPT_addr width to 52bits, bits[51:16].
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Definition of the GITS_BASERn register when ITS PageSize is 64KB:
+  -Bits[47:16] of the register provide bits[47:16] of the table PA.
+  -Bits[15:12] of the register provide bits[51:48] of the table PA.
+  -Bits[15:00] of the base physical address are 0.
+
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
 ---
- arch/arm/boot/dts/meson.dtsi   | 9 +++++++++
- arch/arm/boot/dts/meson8.dtsi  | 6 ++++++
- arch/arm/boot/dts/meson8b.dtsi | 6 ++++++
- 3 files changed, 21 insertions(+)
+Changes since v1:
+  -Included Marc's suggestion and warn in case of not supporting 52bit PA.
 
-diff --git a/arch/arm/boot/dts/meson.dtsi b/arch/arm/boot/dts/meson.dtsi
-index 7ae30e780506..290a183e87c5 100644
---- a/arch/arm/boot/dts/meson.dtsi
-+++ b/arch/arm/boot/dts/meson.dtsi
-@@ -165,6 +165,15 @@
- 				status = "disabled";
- 			};
+ drivers/irqchip/irq-gic-v3-its.c   | 26 +++++++++++++++++++++-----
+ include/linux/irqchip/arm-gic-v3.h |  3 +++
+ 2 files changed, 24 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index e8d8934..48805f5 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -308,7 +308,7 @@ static void its_encode_size(struct its_cmd_block *cmd, u8 size)
  
-+			sdio: mmc at 8c20 {
-+				compatible = "amlogic,meson-mx-sdio";
-+				reg = <0x8c20 0x20>;
-+				interrupts = <GIC_SPI 28 IRQ_TYPE_EDGE_RISING>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				status = "disabled";
-+			};
-+
- 			spifc: spi at 8c80 {
- 				compatible = "amlogic,meson6-spifc";
- 				reg = <0x8c80 0x80>;
-diff --git a/arch/arm/boot/dts/meson8.dtsi b/arch/arm/boot/dts/meson8.dtsi
-index ada26f8116a8..e6abcc7a1084 100644
---- a/arch/arm/boot/dts/meson8.dtsi
-+++ b/arch/arm/boot/dts/meson8.dtsi
-@@ -299,6 +299,12 @@
- 	clock-names = "clkin", "core", "sana";
- };
+ static void its_encode_itt(struct its_cmd_block *cmd, u64 itt_addr)
+ {
+-	its_mask_encode(&cmd->raw_cmd[2], itt_addr >> 8, 50, 8);
++	its_mask_encode(&cmd->raw_cmd[2], itt_addr >> 8, 51, 8);
+ }
  
-+&sdio {
-+	compatible = "amlogic,meson8-sdio", "amlogic,meson-mx-sdio";
-+	clocks = <&clkc CLKID_SDIO>, <&clkc CLKID_CLK81>;
-+	clock-names = "core", "clkin";
-+};
-+
- &spifc {
- 	clocks = <&clkc CLKID_CLK81>;
- };
-diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
-index bc4d4a237ea5..283c68c6b1f4 100644
---- a/arch/arm/boot/dts/meson8b.dtsi
-+++ b/arch/arm/boot/dts/meson8b.dtsi
-@@ -207,6 +207,12 @@
- 	clock-names = "clkin", "core", "sana";
- };
+ static void its_encode_valid(struct its_cmd_block *cmd, int valid)
+@@ -318,7 +318,7 @@ static void its_encode_valid(struct its_cmd_block *cmd, int valid)
  
-+&sdio {
-+	compatible = "amlogic,meson8b-sdio", "amlogic,meson-mx-sdio";
-+	clocks = <&clkc CLKID_SDIO>, <&clkc CLKID_CLK81>;
-+	clock-names = "core", "clkin";
-+};
+ static void its_encode_target(struct its_cmd_block *cmd, u64 target_addr)
+ {
+-	its_mask_encode(&cmd->raw_cmd[2], target_addr >> 16, 50, 16);
++	its_mask_encode(&cmd->raw_cmd[2], target_addr >> 16, 51, 16);
+ }
+ 
+ static void its_encode_collection(struct its_cmd_block *cmd, u16 col)
+@@ -358,7 +358,7 @@ static void its_encode_its_list(struct its_cmd_block *cmd, u16 its_list)
+ 
+ static void its_encode_vpt_addr(struct its_cmd_block *cmd, u64 vpt_pa)
+ {
+-	its_mask_encode(&cmd->raw_cmd[3], vpt_pa >> 16, 50, 16);
++	its_mask_encode(&cmd->raw_cmd[3], vpt_pa >> 16, 51, 16);
+ }
+ 
+ static void its_encode_vpt_size(struct its_cmd_block *cmd, u8 vpt_size)
+@@ -1478,9 +1478,9 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+ 	u64 val = its_read_baser(its, baser);
+ 	u64 esz = GITS_BASER_ENTRY_SIZE(val);
+ 	u64 type = GITS_BASER_TYPE(val);
++	u64 baser_phys, tmp;
+ 	u32 alloc_pages;
+ 	void *base;
+-	u64 tmp;
+ 
+ retry_alloc_baser:
+ 	alloc_pages = (PAGE_ORDER_TO_SIZE(order) / psz);
+@@ -1496,8 +1496,24 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+ 	if (!base)
+ 		return -ENOMEM;
+ 
++	baser_phys = virt_to_phys(base);
 +
- &uart_AO {
- 	clocks = <&clkc CLKID_CLK81>;
- };
++	/* Check if the physical address of the memory is above 48bits */
++	if (baser_phys & (~GITS_BASER_PHYS_MASK)) {
++
++		/* 52bit PA is supported only when PageSize=64K */
++		if ((!IS_ENABLED(CONFIG_ARM64_64K_PAGES)) || (psz != SZ_64K)) {
++			pr_err("ITS: no 52bit PA support when psz=%d\n", psz);
++			free_pages((unsigned long)base, order);
++			return -EFAULT;
++		}
++
++		/* Convert 52bit PA to 48bit field */
++		baser_phys = GITS_BASER_64K_PHYS(baser_phys);
++	}
++
+ retry_baser:
+-	val = (virt_to_phys(base)				 |
++	val = (baser_phys					 |
+ 		(type << GITS_BASER_TYPE_SHIFT)			 |
+ 		((esz - 1) << GITS_BASER_ENTRY_SIZE_SHIFT)	 |
+ 		((alloc_pages - 1) << GITS_BASER_PAGES_SHIFT)	 |
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index b8b5998..4e82f73 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -373,6 +373,9 @@
+ #define GITS_BASER_ENTRY_SIZE_SHIFT		(48)
+ #define GITS_BASER_ENTRY_SIZE(r)	((((r) >> GITS_BASER_ENTRY_SIZE_SHIFT) & 0x1f) + 1)
+ #define GITS_BASER_ENTRY_SIZE_MASK	GENMASK_ULL(52, 48)
++#define GITS_BASER_PHYS_MASK		GENMASK_ULL(47, 12)
++#define GITS_BASER_64K_PHYS(phys)					\
++	(((phys) | ((((phys) >> 48) & 0xF) << 12)) & GITS_BASER_PHYS_MASK)
+ #define GITS_BASER_SHAREABILITY_SHIFT	(10)
+ #define GITS_BASER_InnerShareable					\
+ 	GIC_BASER_SHAREABILITY(GITS_BASER, InnerShareable)
 -- 
-2.14.2
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
