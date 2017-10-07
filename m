@@ -1,64 +1,62 @@
-From: gilad@benyossef.com (Gilad Ben-Yossef)
-Date: Sat, 7 Oct 2017 10:51:42 +0300
-Subject: [PATCH v8 01/20] crypto: change transient busy return code to
- -EAGAIN
-In-Reply-To: <20171007030541.GA29421@gondor.apana.org.au>
-References: <1504615144-29770-1-git-send-email-gilad@benyossef.com>
- <1504615144-29770-2-git-send-email-gilad@benyossef.com>
- <20171007030541.GA29421@gondor.apana.org.au>
-Message-ID: <CAOtvUMd=vtju=VJkCYFRrvANbRRYj+95cdgDoMMfBvmPaPbsAA@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 07 Oct 2017 10:00:16 +0200
+Subject: [PATCH] ARM: pxa: cm-x255: Fix up GPIO NAND device name in table
+In-Reply-To: <20171007074939.516ae693@bbrezillon> (Boris Brezillon's message
+ of "Sat, 7 Oct 2017 07:49:39 +0200")
+References: <20171006215144.18039-1-linus.walleij@linaro.org>
+ <20171007074939.516ae693@bbrezillon>
+Message-ID: <877ew7fkvj.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 7, 2017 at 6:05 AM, Herbert Xu <herbert@gondor.apana.org.au> wrote:
-> On Tue, Sep 05, 2017 at 03:38:40PM +0300, Gilad Ben-Yossef wrote:
->>
->> diff --git a/crypto/algif_hash.c b/crypto/algif_hash.c
->> index 5e92bd2..3b3c154 100644
->> --- a/crypto/algif_hash.c
->> +++ b/crypto/algif_hash.c
->> @@ -39,6 +39,20 @@ struct algif_hash_tfm {
->>       bool has_key;
->>  };
->>
->> +/* Previous versions of crypto_* ops used to return -EBUSY
->> + * rather than -EAGAIN to indicate being tied up. The in
->> + * kernel API changed but we don't want to break the user
->> + * space API. As only the hash user interface exposed this
->> + * error ever to the user, do the translation here.
->> + */
->> +static inline int crypto_user_err(int err)
->> +{
->> +     if (err == -EAGAIN)
->> +             return -EBUSY;
->> +
->> +     return err;
+Boris Brezillon <boris.brezillon@free-electrons.com> writes:
+
+> On Fri,  6 Oct 2017 23:51:44 +0200
+> Linus Walleij <linus.walleij@linaro.org> wrote:
 >
-> I don't see the need to carry along this baggage.  Does anyone
-> in user-space actually rely on EBUSY?
-
-
-I am not aware of anyone who does. I was just trying to avoid
-changing the user ABI.
-
-Shall I roll a new revision without this patch?
-
-Thanks,
-Gilad
-
+>> My patch set the device name wrong because I confused the
+>> device name for a partition name. Sorry.
+>> 
+>> Cc: arm at kernel.org
+>> Fixes: ("mtd: nand: gpio: Convert to use GPIO descriptors")
+>> Reported-by: Robert Jarzmik <robert.jarzmik@free.fr>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> ---
+>> This can be squashed into the commit or applied on top
+>> as a fix. The original patch was ACKed by the ARM SoC
+>> maintainers so I believe this is fine to apply.
+>> ---
+>>  arch/arm/mach-pxa/cm-x255.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>> 
+>> diff --git a/arch/arm/mach-pxa/cm-x255.c b/arch/arm/mach-pxa/cm-x255.c
+>> index f8d67acb7194..fa8e7dd4d898 100644
+>> --- a/arch/arm/mach-pxa/cm-x255.c
+>> +++ b/arch/arm/mach-pxa/cm-x255.c
+>> @@ -178,7 +178,7 @@ static inline void cmx255_init_nor(void) {}
+>>  #if defined(CONFIG_MTD_NAND_GPIO) || defined(CONFIG_MTD_NAND_GPIO_MODULE)
+>>  
+>>  static struct gpiod_lookup_table cmx255_nand_gpiod_table = {
+>> -	.dev_id         = "cmx255-nand",
+>> +	.dev_id         = "gpio-nand",
 >
-> Cheers,
-> --
-> Email: Herbert Xu <herbert@gondor.apana.org.au>
-> Home Page: http://gondor.apana.org.au/~herbert/
-> PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+> Are you sure it works? AFAIR, you have to set "<driver-name>.<dev-id>"
+> here, which, assuming there's only one gpio-nand dev, would give
+>
+> 	.dev_id		= "gpio-nand.0",
+I'm sure Linus is correct this time.
+This is because :
+static struct platform_device cmx255_nand = {
+...
+	.id		= -1,
+...
 
+This -1 is the reason it will be "gpio-nand".
 
+Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
 -- 
-Gilad Ben-Yossef
-Chief Coffee Drinker
+Robert
 
-"If you take a class in large-scale robotics, can you end up in a
-situation where the homework eats your dog?"
- -- Jean-Baptiste Queru
+PS: For the next time for pxa patches I'd appreciate to be in the "To:" list, as
+my other pxa co-maintainers.
