@@ -1,41 +1,27 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Sat, 7 Oct 2017 11:05:41 +0800
-Subject: [PATCH v8 01/20] crypto: change transient busy return code to
- -EAGAIN
-In-Reply-To: <1504615144-29770-2-git-send-email-gilad@benyossef.com>
-References: <1504615144-29770-1-git-send-email-gilad@benyossef.com>
- <1504615144-29770-2-git-send-email-gilad@benyossef.com>
-Message-ID: <20171007030541.GA29421@gondor.apana.org.au>
+Date: Sat, 7 Oct 2017 12:19:58 +0800
+Subject: [PATCH 1/2] crypto: stm32 - Fix uninitialized data usage
+In-Reply-To: <20170912093553.2580986-1-arnd@arndb.de>
+References: <20170912093553.2580986-1-arnd@arndb.de>
+Message-ID: <20171007041958.GF29803@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 05, 2017 at 03:38:40PM +0300, Gilad Ben-Yossef wrote:
->
-> diff --git a/crypto/algif_hash.c b/crypto/algif_hash.c
-> index 5e92bd2..3b3c154 100644
-> --- a/crypto/algif_hash.c
-> +++ b/crypto/algif_hash.c
-> @@ -39,6 +39,20 @@ struct algif_hash_tfm {
->  	bool has_key;
->  };
->  
-> +/* Previous versions of crypto_* ops used to return -EBUSY
-> + * rather than -EAGAIN to indicate being tied up. The in
-> + * kernel API changed but we don't want to break the user
-> + * space API. As only the hash user interface exposed this
-> + * error ever to the user, do the translation here.
-> + */
-> +static inline int crypto_user_err(int err)
-> +{
-> +	if (err == -EAGAIN)
-> +		return -EBUSY;
-> +
-> +	return err;
+On Tue, Sep 12, 2017 at 11:35:38AM +0200, Arnd Bergmann wrote:
+> The error handling in stm32_hash_irq_thread passes
+> uninitialized data into stm32_hash_finish_req, as gcc
+> points out:
+> 
+> drivers/crypto/stm32/stm32-hash.c: In function 'stm32_hash_irq_thread':
+> drivers/crypto/stm32/stm32-hash.c:1088:2: error: 'err' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> 
+> I could not tell what data should be passed there instead,
+> so this changes the code to always pass zero, making it
+> well-defined, though possibly still wrong. Please check.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-I don't see the need to carry along this baggage.  Does anyone
-in user-space actually rely on EBUSY?
-
-Cheers,
+This is already fixed in cryptodev.
 -- 
 Email: Herbert Xu <herbert@gondor.apana.org.au>
 Home Page: http://gondor.apana.org.au/~herbert/
