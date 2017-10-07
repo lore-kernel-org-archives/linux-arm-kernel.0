@@ -1,51 +1,18 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Sat, 7 Oct 2017 12:20:20 +0800
-Subject: [PATCH 2/2] crypto: stm32 - Try to fix hash padding
-In-Reply-To: <20170912093553.2580986-2-arnd@arndb.de>
-References: <20170912093553.2580986-1-arnd@arndb.de>
- <20170912093553.2580986-2-arnd@arndb.de>
-Message-ID: <20171007042020.GG29803@gondor.apana.org.au>
+Date: Sat, 7 Oct 2017 12:37:38 +0800
+Subject: [PATCH] crypto: stm32: use of_device_get_match_data
+In-Reply-To: <20170920183140.17018-1-clabbe.montjoie@gmail.com>
+References: <20170920183140.17018-1-clabbe.montjoie@gmail.com>
+Message-ID: <20171007043738.GI29803@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 12, 2017 at 11:35:39AM +0200, Arnd Bergmann wrote:
-> gcc warns that the length for the extra unaligned data in the hash
-> function may be used unaligned. In theory this could happen if
-> we pass a zero-length sg_list, or if sg_is_last() was never true:
+On Wed, Sep 20, 2017 at 08:31:40PM +0200, Corentin Labbe wrote:
+> The usage of of_device_get_match_data reduce the code size a bit.
+> Furthermore, it prevents an improbable dereference when
+> of_match_device() return NULL.
 > 
-> In file included from drivers/crypto/stm32/stm32-hash.c:23:
-> drivers/crypto/stm32/stm32-hash.c: In function 'stm32_hash_one_request':
-> include/uapi/linux/kernel.h:12:49: error: 'ncp' may be used uninitialized in this function [-Werror=maybe-uninitialized]
->  #define __KERNEL_DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
-> 
-> Neither of these can happen in practice, so the warning is harmless.
-> 
-> However while trying to suppress the warning, I noticed multiple
-> problems with that code:
-> 
-> - On big-endian kernels, we byte-swap the data like we do for
->   register accesses, however this is a data stream and almost
->   certainly needs to use a single writesl() instead of series
->   of writel() to give the correct hash.
-> 
-> - If the length is not a multiple of four bytes, we skip the
->   last word entirely, since we write the truncated length
->   using stm32_hash_set_nblw().
-> 
-> - If we change the code to round the length up rather than
->   down, the last bytes contain stale data, so it needs some
->   form of padding.
-> 
-> This tries to address all four problems, by correctly
-> initializing the length to zero, using endian-safe copy
-> functions, adding zero-padding and passing the padded length.
-> 
-> I have done no testing on this patch, so please review
-> carefully and if possible test with an unaligned length
-> and big-endian kernel builds.
-> 
-> Fixes: 8a1012d3f2ab ("crypto: stm32 - Support for STM32 HASH module")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 
 Patch applied.  Thanks.
 -- 
