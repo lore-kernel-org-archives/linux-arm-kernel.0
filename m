@@ -1,159 +1,89 @@
 From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Sat, 7 Oct 2017 13:43:58 -0500
-Subject: [PATCH] irqchip/gicv3-its: Add missing changes to support 52bit
- physical address
-In-Reply-To: <1b61de4e-b1df-798a-a973-3275dbc96886@codeaurora.org>
-References: <1507353204-28808-1-git-send-email-shankerd@codeaurora.org>
- <867ew7mg81.fsf@arm.com>
- <1b61de4e-b1df-798a-a973-3275dbc96886@codeaurora.org>
-Message-ID: <d94e0dbb-e369-df08-892b-11e3cd2adca0@codeaurora.org>
+Date: Sat,  7 Oct 2017 15:43:48 -0500
+Subject: [PATCH] irqchip/gicv3-its: Fix the incorrect parsing of VCPU table
+ size
+Message-ID: <1507409028-19778-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+The VCPU table consists of vPE entries, and its size provides the number
+of VPEs supported by GICv4 hardware. Unfortunately the maximum size of
+the VPE table is not discoverable like Device table. All VLPI commands
+limits the number of bits to 16 to hold VPEID, which is index into VCPU
+table. Don't apply DEVID bits for VCPU table instead assume maximum bits
+to 16.
 
-On 10/07/2017 07:59 AM, Shanker Donthineni wrote:
-> Hi Marc, 
-> 
-> Thanks for your quick review comments.
-> 
-> On 10/07/2017 04:58 AM, Marc Zyngier wrote:
->> On Sat, Oct 07 2017 at 12:13:24 am BST, Shanker Donthineni <shankerd@codeaurora.org> wrote:
->>> The current ITS driver works fine as long as normal memory and GICR
->>> regions are located within the lower 48bit (>=0 && <2^48) physical
->>> address space. Some of the registers GICR_PEND/PROP, GICR_VPEND/VPROP
->>> and GITS_CBASER are handled properly but not all when configuring
->>> the hardware with 52bit physical address.
->>>
->>> This patch does the following changes to support 52bit PA.
->>>   -Handle 52bit PA in GITS_BASERn.
->>>   -Fix ITT_addr width to 52bits, bits[51:8].
->>>   -Fix RDbase width to 52bits, bits[51:16].
->>>   -Fix VPT_addr width to 52bits, bits[51:16].
->>>
->>> Definition of the GITS_BASERn register when ITS PageSize is 64KB:
->>>  -Bits[47:16] of the register provide bits[47:16] of the table PA.
->>>  -Bits[15:12] of the register provide bits[51:48] of the table PA.
->>>  -Bits[15:00] of the base physical address are 0.
->>>
->>> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
->>> ---
->>>  drivers/irqchip/irq-gic-v3-its.c   | 24 +++++++++++++++++++-----
->>>  include/linux/irqchip/arm-gic-v3.h |  3 +++
->>>  2 files changed, 22 insertions(+), 5 deletions(-)
->>>
->>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
->>> index e8d8934..e52c0da 100644
->>> --- a/drivers/irqchip/irq-gic-v3-its.c
->>> +++ b/drivers/irqchip/irq-gic-v3-its.c
->>> @@ -308,7 +308,7 @@ static void its_encode_size(struct its_cmd_block *cmd, u8 size)
->>>  
->>>  static void its_encode_itt(struct its_cmd_block *cmd, u64 itt_addr)
->>>  {
->>> -	its_mask_encode(&cmd->raw_cmd[2], itt_addr >> 8, 50, 8);
->>> +	its_mask_encode(&cmd->raw_cmd[2], itt_addr >> 8, 51, 8);
->>>  }
->>>  
->>>  static void its_encode_valid(struct its_cmd_block *cmd, int valid)
->>> @@ -318,7 +318,7 @@ static void its_encode_valid(struct its_cmd_block *cmd, int valid)
->>>  
->>>  static void its_encode_target(struct its_cmd_block *cmd, u64 target_addr)
->>>  {
->>> -	its_mask_encode(&cmd->raw_cmd[2], target_addr >> 16, 50, 16);
->>> +	its_mask_encode(&cmd->raw_cmd[2], target_addr >> 16, 51, 16);
->>>  }
->>>  
->>>  static void its_encode_collection(struct its_cmd_block *cmd, u16 col)
->>> @@ -358,7 +358,7 @@ static void its_encode_its_list(struct its_cmd_block *cmd, u16 its_list)
->>>  
->>>  static void its_encode_vpt_addr(struct its_cmd_block *cmd, u64 vpt_pa)
->>>  {
->>> -	its_mask_encode(&cmd->raw_cmd[3], vpt_pa >> 16, 50, 16);
->>> +	its_mask_encode(&cmd->raw_cmd[3], vpt_pa >> 16, 51, 16);
->>>  }
->>>  
->>>  static void its_encode_vpt_size(struct its_cmd_block *cmd, u8 vpt_size)
->>> @@ -1478,9 +1478,9 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
->>>  	u64 val = its_read_baser(its, baser);
->>>  	u64 esz = GITS_BASER_ENTRY_SIZE(val);
->>>  	u64 type = GITS_BASER_TYPE(val);
->>> +	u64 baser_phys, tmp;
->>>  	u32 alloc_pages;
->>>  	void *base;
->>> -	u64 tmp;
->>>  
->>>  retry_alloc_baser:
->>>  	alloc_pages = (PAGE_ORDER_TO_SIZE(order) / psz);
->>> @@ -1496,8 +1496,22 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
->>>  	if (!base)
->>>  		return -ENOMEM;
->>>  
->>> +	baser_phys = virt_to_phys(base);
->>> +
->>> +	/* Check if the physical address of the memory is above 48bits */
->>> +	if (baser_phys & (~GITS_BASER_PHYS_MASK)) {
->>> +		/* 52bit PA is supported only when PageSize=64K */
->>> +		if (psz != SZ_64K) {
->>> +			free_pages((unsigned long)base, order);
->>> +			return -EFAULT;
->>> +		}
->>> +
->>> +		/* Convert 52bit PA to 48bit field */
->>> +		baser_phys = GITS_BASER_64K_PHYS(baser_phys);
->>> +	}
->>
->> I'm not sure this is completely right. What guarantees that the memory
->> you get is 64kB aligned? Your initial masking will do the wrong thing on
->> a system with 16kB pages, and everything will break from that point on,
->> as you're confusing the ITS page size with the CPU page size.
->>
-> 
-> The first is check right, and the intention was to find out the upper bits
-> of the PA (bits[51:12]) have non-zero value irrespective of PS 64K/16K/4KB.
-> 
-> #define GITS_BASER_PHYS_MASK		GENMASK_ULL(47, 12)    
-> 
-> (baser_phys & (~GITS_BASER_PHYS_MASK)) becomes (baser_phys & 0xFFFF 0000 0000 0000)
-> 
-> We program GITS_BASERn PageSize based on 'psz' value.
-> 
-> However the current code has a hidden bug, we assume memory allocation is aligned
-> on 64K/16K when the ITS PageSize (variable of 'psz') is 64K/16K. We have two options
-> to solve the problem.
-> 
->  -fall-baclk to a lower ITS PageSize if the memory size is lower than 'psz'.
->  -allocate minimum of 64K for all BASERn tables.
-> 
-> 
->  Something like using the second method.
-> 
->   retry_alloc_baser:
->      alloc_pages = (min(PAGE_ORDER_TO_SIZE(order), 64K) / psz);
-> 
->   ....
-> 
->      baser_phys = virt_to_phys(base);
->  
->      /* Check if the physical address of the memory is above 48bits */
->      if (baser_phys & (~GITS_BASER_PHYS_MASK)) {
->          /* 52bit PA is supported only when PageSize=64K */
->          if (psz != SZ_64K) {
->               free_pages((unsigned long)base, order);
->               return -EFAULT;
->          }
->  
->          /* Convert 52bit PA to 48bit field */
->          baser_phys = GITS_BASER_64K_PHYS(baser_phys);
->      }
-> 
->
+ITS log messages on QDF2400 without fix:
+  allocated 524288 Devices (indirect, esz 8, psz 64K, shr 1)
+  allocated 8192 Interrupt Collections (flat, esz 8, psz 64K, shr 1)
+  Virtual CPUs Table too large, reduce ids 32->26
+  Virtual CPUs too large, reduce ITS pages 8192->256
+  allocated 2097152 Virtual CPUs (flat, esz 8, psz 64K, shr 1)
 
-I've included your suggestion in v2 patch https://patchwork.kernel.org/patch/9991405/ even though
-it's not really required. But it helps to understand the code changes better and I also added a
-warning message in case of not supporting 52bit PA. Please comment on v2 patch if any thing I missed.
+ITS log messages on QDF2400 with fix:
+  allocated 524288 Devices (indirect, esz 8, psz 64K, shr 1)
+  allocated 8192 Interrupt Collections (flat, esz 8, psz 64K, shr 1)
+  allocated 65536 Virtual CPUs (flat, esz 8, psz 64K, shr 1)
 
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+---
+ drivers/irqchip/irq-gic-v3-its.c | 15 +++++++++++----
+ 1 file changed, 11 insertions(+), 4 deletions(-)
 
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index cc7c8f6..7b98313 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -108,6 +108,10 @@ struct its_node {
+ 
+ #define ITS_ITT_ALIGN		SZ_256
+ 
++/* The maximum number of VPEID bits supported by VLPI commands */
++#define ITS_MAX_VPEID_BITS	(16)
++#define ITS_MAX_VPEID		(1 << (ITS_MAX_VPEID_BITS))
++
+ /* Convert page order to size in bytes */
+ #define PAGE_ORDER_TO_SIZE(o)	(PAGE_SIZE << (o))
+ 
+@@ -1610,13 +1614,12 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+ 
+ static bool its_parse_indirect_baser(struct its_node *its,
+ 				     struct its_baser *baser,
+-				     u32 psz, u32 *order)
++				     u32 psz, u32 *order, u32 ids)
+ {
+ 	u64 tmp = its_read_baser(its, baser);
+ 	u64 type = GITS_BASER_TYPE(tmp);
+ 	u64 esz = GITS_BASER_ENTRY_SIZE(tmp);
+ 	u64 val = GITS_BASER_InnerShareable | GITS_BASER_RaWaWb;
+-	u32 ids = its->device_ids;
+ 	u32 new_order = *order;
+ 	bool indirect = false;
+ 
+@@ -1708,9 +1711,13 @@ static int its_alloc_tables(struct its_node *its)
+ 			continue;
+ 
+ 		case GITS_BASER_TYPE_DEVICE:
++			indirect = its_parse_indirect_baser(its, baser,
++							    psz, &order,
++							    its->device_ids);
+ 		case GITS_BASER_TYPE_VCPU:
+ 			indirect = its_parse_indirect_baser(its, baser,
+-							    psz, &order);
++							    psz, &order,
++							    ITS_MAX_VPEID_BITS);
+ 			break;
+ 		}
+ 
+@@ -2579,7 +2586,7 @@ static int its_vpe_set_irqchip_state(struct irq_data *d,
+ 
+ static int its_vpe_id_alloc(void)
+ {
+-	return ida_simple_get(&its_vpeid_ida, 0, 1 << 16, GFP_KERNEL);
++	return ida_simple_get(&its_vpeid_ida, 0, ITS_MAX_VPEID, GFP_KERNEL);
+ }
+ 
+ static void its_vpe_id_free(u16 id)
 -- 
-Shanker Donthineni
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
 Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
