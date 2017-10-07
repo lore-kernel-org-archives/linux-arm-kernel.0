@@ -1,78 +1,41 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Fri,  6 Oct 2017 18:46:48 -0700
-Subject: [PATCH 1/1] tty: serial: imx: disable ageing timer interrupt if dma
- in use
-Message-ID: <20171007014648.6989-1-troy.kisky@boundarydevices.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Sat, 7 Oct 2017 07:56:37 +0530
+Subject: [PATCH v3 03/22] dt-bindings: arm: scmi: add ARM MHU specific
+ mailbox client bindings
+In-Reply-To: <CAL_Jsq+0paGePmJVjsyFJiHx0UaDPjQrbe3C030U+fuUkWCJ+A@mail.gmail.com>
+References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
+ <1506604306-20739-4-git-send-email-sudeep.holla@arm.com>
+ <20171005232031.7373ni5ssln4wlpr@rob-hp-laptop>
+ <CABb+yY1ra5bgRB1VND+NvCcDFqfggG04a+JPWFZ+HpNg08eR8g@mail.gmail.com>
+ <CAL_Jsq+0paGePmJVjsyFJiHx0UaDPjQrbe3C030U+fuUkWCJ+A@mail.gmail.com>
+Message-ID: <CABb+yY2v8D9NFVsG9OwSpL8cswKihY6OUru8QA6Jfq5YmVVD7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 4dec2f119e86 ("imx-serial: RX DMA startup latency")
+On Fri, Oct 6, 2017 at 9:24 PM, Rob Herring <robh@kernel.org> wrote:
+> On Fri, Oct 6, 2017 at 6:01 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>> On Fri, Oct 6, 2017 at 4:50 AM, Rob Herring <robh@kernel.org> wrote:
+>>> On Thu, Sep 28, 2017 at 02:11:27PM +0100, Sudeep Holla wrote:
 
-the interrupt routine no longer will start rx dma.
+>>>
+>>>> +- mbox-data : For each phandle listed in mboxes property, an unsigned 32-bit
+>>>> +           data as expected by the mailbox controller
+>>>
+>>> Shouldn't that be cells as part of mboxes property?
+>>>
+>> A MHU client can send any number of commands (such u32 values) over a channel.
+>> This client (SCMI) sends just one command over a channel, but other
+>> clients may/do send two or more.
+>
+> Okay, then I guess I don't understand why this is in DT.
+>
+Yeah the client has to provide code (u32 value) for the commands it
+sends, and that value is going to be platform specific. For example,
+on Juno the ITS_AN_SCMI_COMMAND may be defined as BIT(7) while on my
+platform it may be 0x4567
 
-Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
----
- drivers/tty/serial/imx.c | 34 ++--------------------------------
- 1 file changed, 2 insertions(+), 32 deletions(-)
+For MHU based platforms, it becomes easy if the u32 is passed from DT.
+And that should be ok since that is like a h/w parameter - a value
+chosen/expected by the remote firmware.
 
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index dfeff3951f93..15b0ecb4cf60 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -732,29 +732,6 @@ static void imx_disable_rx_int(struct imx_port *sport)
- }
- 
- static void clear_rx_errors(struct imx_port *sport);
--static int start_rx_dma(struct imx_port *sport);
--/*
-- * If the RXFIFO is filled with some data, and then we
-- * arise a DMA operation to receive them.
-- */
--static void imx_dma_rxint(struct imx_port *sport)
--{
--	unsigned long temp;
--	unsigned long flags;
--
--	spin_lock_irqsave(&sport->port.lock, flags);
--
--	temp = readl(sport->port.membase + USR2);
--	if ((temp & USR2_RDR) && !sport->dma_is_rxing) {
--
--		imx_disable_rx_int(sport);
--
--		/* tell the DMA to receive the data. */
--		start_rx_dma(sport);
--	}
--
--	spin_unlock_irqrestore(&sport->port.lock, flags);
--}
- 
- /*
-  * We have a modem side uart, so the meanings of RTS and CTS are inverted.
-@@ -816,11 +793,8 @@ static irqreturn_t imx_int(int irq, void *dev_id)
- 	sts = readl(sport->port.membase + USR1);
- 	sts2 = readl(sport->port.membase + USR2);
- 
--	if (sts & (USR1_RRDY | USR1_AGTIM)) {
--		if (sport->dma_is_enabled)
--			imx_dma_rxint(sport);
--		else
--			imx_rxint(irq, dev_id);
-+	if (!sport->dma_is_enabled && (sts & (USR1_RRDY | USR1_AGTIM))) {
-+		imx_rxint(irq, dev_id);
- 		ret = IRQ_HANDLED;
- 	}
- 
-@@ -1207,10 +1181,6 @@ static void imx_enable_dma(struct imx_port *sport)
- 	temp |= UCR1_RDMAEN | UCR1_TDMAEN | UCR1_ATDMAEN;
- 	writel(temp, sport->port.membase + UCR1);
- 
--	temp = readl(sport->port.membase + UCR2);
--	temp |= UCR2_ATEN;
--	writel(temp, sport->port.membase + UCR2);
--
- 	imx_setup_ufcr(sport, TXTL_DMA, RXTL_DMA);
- 
- 	sport->dma_is_enabled = 1;
--- 
-2.11.0
+thnx
