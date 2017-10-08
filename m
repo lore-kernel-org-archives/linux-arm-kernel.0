@@ -1,34 +1,114 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun,  8 Oct 2017 12:29:00 +0800
-Subject: [PATCH 0/6] Allwinner R40 USB host support
-Message-ID: <20171008042906.46779-1-icenowy@aosc.io>
+Date: Sun,  8 Oct 2017 12:29:02 +0800
+Subject: [PATCH 2/6] ARM: sun8i: r40: add USB host port nodes for R40
+In-Reply-To: <20171008042906.46779-1-icenowy@aosc.io>
+References: <20171008042906.46779-1-icenowy@aosc.io>
+Message-ID: <20171008042906.46779-3-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds support for the USB host ports on Allwiner R40, and
-enable them on Banana Pi M2 Ultra and Berry boards.
+From: Icenowy Zheng <icenowy@aosc.xyz>
 
-The first patch adds R40 support to the USB PHY driver.
+Allwinner R40 SoC features a USB OTG port and two USB HOST ports.
 
-The second patch adds USB PHY and EHCI/OHCI nodes to the R40 DTSI.
+Add support for the host ports in the DTSI file.
 
-The thrid and fourth patch adds 5V regulator for the two boards, and
-the fifth and sixth patch finally adds USB host ports support.
+The OTG controller still cannot work with existing compatibles, and needs
+more investigation. So it's not added yet.
 
-Icenowy Zheng (6):
-  phy: sun4i-usb: add support for R40 USB PHY
-  ARM: sun8i: r40: add USB host port nodes for R40
-  ARM: sun8i: r40: add 5V regulator for Banana Pi M2 Ultra
-  ARM: sun8i: v40: add 5V regulator for Banana Pi M2 Berry
-  ARM: sun8i: r40: enable USB host for Banana Pi M2 Ultra
-  ARM: sun8i: v40: enable USB host ports for Banana Pi M2 Berry
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+---
+ arch/arm/boot/dts/sun8i-r40.dtsi | 78 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 78 insertions(+)
 
- .../devicetree/bindings/phy/sun4i-usb-phy.txt      |  1 +
- arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts  | 31 +++++++++
- arch/arm/boot/dts/sun8i-r40.dtsi                   | 78 ++++++++++++++++++++++
- arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts  | 22 ++++++
- drivers/phy/allwinner/phy-sun4i-usb.c              | 12 ++++
- 5 files changed, 144 insertions(+)
-
+diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi b/arch/arm/boot/dts/sun8i-r40.dtsi
+index d5a6745409ae..f6c917cbbaac 100644
+--- a/arch/arm/boot/dts/sun8i-r40.dtsi
++++ b/arch/arm/boot/dts/sun8i-r40.dtsi
+@@ -173,6 +173,84 @@
+ 			#size-cells = <0>;
+ 		};
+ 
++		usbphy: phy at 1c13400 {
++			compatible = "allwinner,sun8i-r40-usb-phy";
++			reg = <0x01c13400 0x14>,
++			      <0x01c14800 0x4>,
++			      <0x01c19800 0x4>,
++			      <0x01c1c800 0x4>;
++			reg-names = "phy_ctrl",
++				    "pmu0",
++				    "pmu1",
++				    "pmu2";
++			clocks = <&ccu CLK_USB_PHY0>,
++				 <&ccu CLK_USB_PHY1>,
++				 <&ccu CLK_USB_PHY2>;
++			clock-names = "usb0_phy",
++				      "usb1_phy",
++				      "usb2_phy";
++			resets = <&ccu RST_USB_PHY0>,
++				 <&ccu RST_USB_PHY1>,
++				 <&ccu RST_USB_PHY2>;
++			reset-names = "usb0_reset",
++				      "usb1_reset",
++				      "usb2_reset";
++			status = "disabled";
++			#phy-cells = <1>;
++		};
++
++		ehci1: usb at 1c19000 {
++			compatible = "allwinner,sun8i-r40-ehci", "generic-ehci";
++			reg = <0x01c19000 0x100>;
++			interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_OHCI1>,
++				 <&ccu CLK_BUS_EHCI1>,
++				 <&ccu CLK_USB_OHCI1>;
++			resets = <&ccu RST_BUS_OHCI1>,
++				 <&ccu RST_BUS_EHCI1>;
++			phys = <&usbphy 1>;
++			phy-names = "usb";
++			status = "disabled";
++		};
++
++		ohci1: usb at 1c19400 {
++			compatible = "allwinner,sun8i-r40-ohci", "generic-ohci";
++			reg = <0x01c19400 0x100>;
++			interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_OHCI1>,
++				 <&ccu CLK_USB_OHCI1>;
++			resets = <&ccu RST_BUS_OHCI1>;
++			phys = <&usbphy 1>;
++			phy-names = "usb";
++			status = "disabled";
++		};
++
++		ehci2: usb at 1c1c000 {
++			compatible = "allwinner,sun8i-r40-ehci", "generic-ehci";
++			reg = <0x01c1c000 0x100>;
++			interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_OHCI2>,
++				 <&ccu CLK_BUS_EHCI2>,
++				 <&ccu CLK_USB_OHCI2>;
++			resets = <&ccu RST_BUS_OHCI2>,
++				 <&ccu RST_BUS_EHCI2>;
++			phys = <&usbphy 2>;
++			phy-names = "usb";
++			status = "disabled";
++		};
++
++		ohci2: usb at 1c1c400 {
++			compatible = "allwinner,sun8i-r40-ohci", "generic-ohci";
++			reg = <0x01c1c400 0x100>;
++			interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_OHCI2>,
++				 <&ccu CLK_USB_OHCI2>;
++			resets = <&ccu RST_BUS_OHCI2>;
++			phys = <&usbphy 2>;
++			phy-names = "usb";
++			status = "disabled";
++		};
++
+ 		ccu: clock at 1c20000 {
+ 			compatible = "allwinner,sun8i-r40-ccu";
+ 			reg = <0x01c20000 0x400>;
 -- 
 2.13.6
