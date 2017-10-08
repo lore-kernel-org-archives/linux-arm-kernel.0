@@ -1,57 +1,90 @@
 From: pure.logic@nexus-software.ie (Bryan O'Donoghue)
-Date: Sun,  8 Oct 2017 23:41:15 +0100
-Subject: [PATCH v2 0/7] Fix i.MX7D OCOTP write support
-Message-ID: <1507502482-22518-1-git-send-email-pure.logic@nexus-software.ie>
+Date: Sun,  8 Oct 2017 23:41:17 +0100
+Subject: [PATCH v2 2/7] nvmem: imx-ocotp: Pass parameters via a struct
+In-Reply-To: <1507502482-22518-1-git-send-email-pure.logic@nexus-software.ie>
+References: <1507502482-22518-1-git-send-email-pure.logic@nexus-software.ie>
+Message-ID: <1507502482-22518-3-git-send-email-pure.logic@nexus-software.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-V2:
-- Added Reviewed-by and Acked-by as indicated by Philipp
-- octp_params -> ocotp_params Philipp Zabel
-- Added whitespace to aggregate initaliser - Philipp Zabel
-- Dropped (void*) cast to data - Philipp Zabel
-- Made use of of_device_get_match_data - Philipp Zabel
-- Got rid of params->banked - Philipp Zabel
-- Changed regs_per_bank to bank_address_words
-  makes the intent of the parameter clearer - Bryan O'Donoghue
+It will be useful in later patches to know the register access mode and
+bit-shift to apply to a given input offset.
 
-V1:
-(Resend: I may have missed Philip Zabel on the first send - apologies if
-that is the case Philip.)
+Fixes: 0642bac7da42 ("nvmem: imx-ocotp: add write support")
 
-The current OCOTP driver added support for i.MX7 read access and then added
-support for i.MX6 write access. Between the two commits the fact that the
-added write routine was only appropriate for i.MX6 was missed.
+Signed-off-by: Bryan O'Donoghue <pure.logic@nexus-software.ie>
+---
+ drivers/nvmem/imx-ocotp.c | 32 ++++++++++++++++++++++----------
+ 1 file changed, 22 insertions(+), 10 deletions(-)
 
-As a result its certain that attempting to write i.MX7 OTP fuses on Linux
-would fail as the destination address on i.MX7 is different to i.MX6.
-
-Without the update to the i.MX7 setup and hold timings it's not clear that
-a write operation would actually do any writing which means the bad
-addressing on i.MX7 might not actually destroy the wrong OTP fuses, it
-probably would just fail to do anything, understandably I haven't
-experimented with knowingly bad values for one-time-programmable fuses.
-
-This series fixes the gap by:
-
-1. Switching off OTP writing for i.MX7
-2. Adding in support for the i.MX7 way of doing things
-3. Switching OTP write support back on for i.MX7
-
-There's an additional small fix for the naming of the module then to
-indicate it works for i.MX7 as well as for i.MX6.
-
-Bryan O'Donoghue (7):
-  nvmem: imx-ocotp: Restrict OTP write to IMX6 processors
-  nvmem: imx-ocotp: Pass parameters via a struct
-  nvmem: imx-ocotp: Add support for banked OTP addressing
-  nvmem: imx-ocotp: Move i.MX6 write clock setup to dedicated function
-  nvmem: imx-ocotp: Add i.MX7D timing write clock setup support
-  nvmem: imx-ocotp: Enable i.MX7D OTP write support
-  nvmem: imx-ocotp: Update module description
-
- drivers/nvmem/imx-ocotp.c | 182 +++++++++++++++++++++++++++++++++++++---------
- 1 file changed, 147 insertions(+), 35 deletions(-)
-
+diff --git a/drivers/nvmem/imx-ocotp.c b/drivers/nvmem/imx-ocotp.c
+index 17d160f..7798571 100644
+--- a/drivers/nvmem/imx-ocotp.c
++++ b/drivers/nvmem/imx-ocotp.c
+@@ -53,11 +53,15 @@
+ 
+ static DEFINE_MUTEX(ocotp_mutex);
+ 
++struct ocotp_params {
++	unsigned int nregs;
++};
++
+ struct ocotp_priv {
+ 	struct device *dev;
+ 	struct clk *clk;
+ 	void __iomem *base;
+-	unsigned int nregs;
++	const struct ocotp_params *params;
+ 	struct nvmem_config *config;
+ };
+ 
+@@ -121,8 +125,8 @@ static int imx_ocotp_read(void *context, unsigned int offset,
+ 	index = offset >> 2;
+ 	count = bytes >> 2;
+ 
+-	if (count > (priv->nregs - index))
+-		count = priv->nregs - index;
++	if (count > (priv->params->nregs - index))
++		count = priv->params->nregs - index;
+ 
+ 	mutex_lock(&ocotp_mutex);
+ 
+@@ -308,12 +312,20 @@ static struct nvmem_config imx_ocotp_nvmem_config = {
+ 	.reg_write = imx_ocotp_write,
+ };
+ 
++static const struct ocotp_params params[] = {
++	{ .nregs = 128 },
++	{ .nregs = 64 },
++	{ .nregs = 128 },
++	{ .nregs = 128 },
++	{ .nregs = 64 },
++};
++
+ static const struct of_device_id imx_ocotp_dt_ids[] = {
+-	{ .compatible = "fsl,imx6q-ocotp",  (void *)128 },
+-	{ .compatible = "fsl,imx6sl-ocotp", (void *)64 },
+-	{ .compatible = "fsl,imx6sx-ocotp", (void *)128 },
+-	{ .compatible = "fsl,imx6ul-ocotp", (void *)128 },
+-	{ .compatible = "fsl,imx7d-ocotp", (void *)64 },
++	{ .compatible = "fsl,imx6q-ocotp",  .data = &params[0] },
++	{ .compatible = "fsl,imx6sl-ocotp", .data = &params[1] },
++	{ .compatible = "fsl,imx6sx-ocotp", .data = &params[2] },
++	{ .compatible = "fsl,imx6ul-ocotp", .data = &params[3] },
++	{ .compatible = "fsl,imx7d-ocotp",  .data = &params[4] },
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(of, imx_ocotp_dt_ids);
+@@ -342,8 +354,8 @@ static int imx_ocotp_probe(struct platform_device *pdev)
+ 		return PTR_ERR(priv->clk);
+ 
+ 	of_id = of_match_device(imx_ocotp_dt_ids, dev);
+-	priv->nregs = (unsigned long)of_id->data;
+-	imx_ocotp_nvmem_config.size = 4 * priv->nregs;
++	priv->params = of_device_get_match_data(&pdev->dev);
++	imx_ocotp_nvmem_config.size = 4 * priv->params->nregs;
+ 	imx_ocotp_nvmem_config.dev = dev;
+ 	imx_ocotp_nvmem_config.priv = priv;
+ 	priv->config = &imx_ocotp_nvmem_config;
 -- 
 2.7.4
