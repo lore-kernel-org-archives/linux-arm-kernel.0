@@ -1,196 +1,87 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun,  8 Oct 2017 12:35:41 +0800
-Subject: [PATCH 2/2] ata: ahci_sunxi: add support for R40 SATA controller
-In-Reply-To: <20171008043541.48564-1-icenowy@aosc.io>
-References: <20171008043541.48564-1-icenowy@aosc.io>
-Message-ID: <20171008043541.48564-2-icenowy@aosc.io>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Sun, 8 Oct 2017 10:55:15 +0530
+Subject: [PATCH 3/5] dmaengine: Support for querying maximum trasnfer
+ length (of an SG element)
+In-Reply-To: <11471508-b61c-7842-2080-7f5c2f292c2b@ti.com>
+References: <20170912104424.18495-1-peter.ujfalusi@ti.com>
+ <20170912104424.18495-4-peter.ujfalusi@ti.com>
+ <20170921171451.GG30097@localhost>
+ <02509904-4ae8-c6f8-3514-5f77d665c9a6@ti.com>
+ <20170926165413.GQ30097@localhost>
+ <11471508-b61c-7842-2080-7f5c2f292c2b@ti.com>
+Message-ID: <20171008052514.GG30097@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner R40 SoC has an AHCI SATA controller like the one in A10/A20,
-but with a reset control and two dedicated VDD pins for this controller
-(one 1.2v and one 2.5v).
+On Mon, Oct 02, 2017 at 02:24:12PM +0300, Peter Ujfalusi wrote:
+> 
+> 
+> 
+> Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+> 
+> On 2017-09-26 19:54, Vinod Koul wrote:
+> >>>
+> >>> not another callback :)
+> >>>
+> >>> on a serious note, why shouldn't this be one more capability in
+> >>> dma_slave_caps. looking at next patch it seems static
+> >>
+> >> It is not really static, the size in bytes depends on the dev_width and
+> >> the maxburst:
+> >> dev_width * burst * (SZ_64K - 1);
+> > 
+> > well DMAengines work on FIFOs, in above you are giving length as SZ_64K - 1
+> > 'items' which IIUC in DMAengine terms for bytes would always refer wrt width
+> > used and burst applied.
+> 
+> I think we can live with this and let the user to figure out what to do
+> with this information.
 
-Add support for it.
+Right, plus a macro for conversion :) SO that users dont code buggy
+conversions all over the place
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- drivers/ata/ahci_sunxi.c | 118 +++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 115 insertions(+), 3 deletions(-)
+> But I'm having hard time to figure out a good name for this. It is not
+> the number of SGs we can support, but the number of 'items' within one
+> SG that we have the limit. It could be:
+> u32 max_bursts_per_sg;
 
-diff --git a/drivers/ata/ahci_sunxi.c b/drivers/ata/ahci_sunxi.c
-index b26437430163..a650fd6508be 100644
---- a/drivers/ata/ahci_sunxi.c
-+++ b/drivers/ata/ahci_sunxi.c
-@@ -25,6 +25,7 @@
- #include <linux/of_device.h>
- #include <linux/platform_device.h>
- #include <linux/regulator/consumer.h>
-+#include <linux/reset.h>
- #include "ahci.h"
- 
- #define DRV_NAME "ahci-sunxi"
-@@ -58,6 +59,19 @@ MODULE_PARM_DESC(enable_pmp,
- #define AHCI_P0PHYCR	0x0178
- #define AHCI_P0PHYSR	0x017c
- 
-+struct ahci_sunxi_quirks {
-+	bool has_reset;
-+	bool has_vdd1v2;
-+	bool has_vdd2v5;
-+};
-+
-+struct ahci_sunxi_data {
-+	const struct ahci_sunxi_quirks *quirks;
-+	struct reset_control *reset;
-+	struct regulator *vdd1v2;
-+	struct regulator *vdd2v5;
-+};
-+
- static void sunxi_clrbits(void __iomem *reg, u32 clr_val)
- {
- 	u32 reg_val;
-@@ -179,17 +193,69 @@ static int ahci_sunxi_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
- 	struct ahci_host_priv *hpriv;
-+	struct ahci_sunxi_data *data;
- 	int rc;
- 
-+	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
-+	if (!data)
-+		return -ENOMEM;
-+
-+	data->quirks = of_device_get_match_data(dev);
-+	if (!data->quirks)
-+		return -EINVAL;
-+
-+	if (data->quirks->has_reset) {
-+		data->reset = devm_reset_control_get(dev, NULL);
-+		if (IS_ERR(data->reset)) {
-+			dev_err(dev, "Failed to get reset\n");
-+			return PTR_ERR(data->reset);
-+		}
-+	}
-+
-+	if (data->quirks->has_vdd1v2) {
-+		data->vdd1v2 = devm_regulator_get(dev, "vdd1v2");
-+		if (IS_ERR(data->vdd1v2)) {
-+			dev_err(dev, "Failed to get 1.2v VDD regulator\n");
-+			return PTR_ERR(data->vdd1v2);
-+		}
-+	}
-+
-+	if (data->quirks->has_vdd2v5) {
-+		data->vdd2v5 = devm_regulator_get(dev, "vdd2v5");
-+		if (IS_ERR(data->vdd2v5)) {
-+			dev_err(dev, "Failed to get 2.5v VDD regulator\n");
-+			return PTR_ERR(data->vdd2v5);
-+		}
-+	}
-+
- 	hpriv = ahci_platform_get_resources(pdev);
- 	if (IS_ERR(hpriv))
- 		return PTR_ERR(hpriv);
- 
-+	hpriv->plat_data = data;
- 	hpriv->start_engine = ahci_sunxi_start_engine;
- 
-+	if (data->quirks->has_vdd1v2) {
-+		rc = regulator_enable(data->vdd1v2);
-+		if (rc)
-+			return rc;
-+	}
-+
-+	if (data->quirks->has_vdd2v5) {
-+		rc = regulator_enable(data->vdd2v5);
-+		if (rc)
-+			goto disable_vdd1v2;
-+	}
-+
-+	if (data->quirks->has_reset) {
-+		rc = reset_control_deassert(data->reset);
-+		if (rc)
-+			goto disable_vdd2v5;
-+	}
-+
- 	rc = ahci_platform_enable_resources(hpriv);
- 	if (rc)
--		return rc;
-+		goto assert_reset;
- 
- 	rc = ahci_sunxi_phy_init(dev, hpriv->mmio);
- 	if (rc)
-@@ -215,6 +281,35 @@ static int ahci_sunxi_probe(struct platform_device *pdev)
- 
- disable_resources:
- 	ahci_platform_disable_resources(hpriv);
-+assert_reset:
-+	if (data->quirks->has_reset)
-+		reset_control_assert(data->reset);
-+disable_vdd2v5:
-+	if (data->quirks->has_vdd2v5)
-+		regulator_disable(data->vdd2v5);
-+disable_vdd1v2:
-+	if (data->quirks->has_vdd1v2)
-+		regulator_disable(data->vdd1v2);
-+	return rc;
-+}
-+
-+static int ahci_sunxi_remove(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct ata_host *host = dev_get_drvdata(dev);
-+	struct ahci_host_priv *hpriv = host->private_data;
-+	struct ahci_sunxi_data *data = hpriv->plat_data;
-+	int rc;
-+
-+	rc = ata_platform_remove_one(pdev);
-+
-+	if (data->quirks->has_reset)
-+		reset_control_assert(data->reset);
-+	if (data->quirks->has_vdd2v5)
-+		regulator_disable(data->vdd2v5);
-+	if (data->quirks->has_vdd1v2)
-+		regulator_disable(data->vdd1v2);
-+
- 	return rc;
- }
- 
-@@ -248,15 +343,32 @@ static int ahci_sunxi_resume(struct device *dev)
- static SIMPLE_DEV_PM_OPS(ahci_sunxi_pm_ops, ahci_platform_suspend,
- 			 ahci_sunxi_resume);
- 
-+static const struct ahci_sunxi_quirks sun4i_a10_ahci_quirks = {
-+	/* Nothing special */
-+};
-+
-+static const struct ahci_sunxi_quirks sun8i_r40_ahci_quirks = {
-+	.has_reset = true,
-+	.has_vdd1v2 = true,
-+	.has_vdd2v5 = true,
-+};
-+
- static const struct of_device_id ahci_sunxi_of_match[] = {
--	{ .compatible = "allwinner,sun4i-a10-ahci", },
-+	{
-+		.compatible = "allwinner,sun4i-a10-ahci",
-+		.data = &sun4i_a10_ahci_quirks,
-+	},
-+	{
-+		.compatible = "allwinner,sun8i-r40-ahci",
-+		.data = &sun8i_r40_ahci_quirks,
-+	},
- 	{ },
- };
- MODULE_DEVICE_TABLE(of, ahci_sunxi_of_match);
- 
- static struct platform_driver ahci_sunxi_driver = {
- 	.probe = ahci_sunxi_probe,
--	.remove = ata_platform_remove_one,
-+	.remove = ahci_sunxi_remove,
- 	.driver = {
- 		.name = DRV_NAME,
- 		.of_match_table = ahci_sunxi_of_match,
+this looks fine, another candidate I would use is words_per_sg and while at
+it why tie it to sg? should we make it words_per_txn but then people should not
+confuse with txn represented by a descriptor which can have multiple ....
+
+> 
+> which would also apply to period length (for cyclic) in a similar way.
+> 
+> > Return length in bytes does make sense (from user PoV), but then you need to
+> > "know" the applied  width and burst. How do you decide those?
+> 
+> The number of items works eDMA and sDMA, but we also have the cpp41. It
+> is a packet DMA and it has no understanding of bursts, address widths or
+> any of the 'traditional' things. It only cares about the number of bytes
+> we want to transfer and it has limitation of 4194303 bytes (21bits for
+> length). This is again per SG. How this could report the
+> 'max_bursts_per_sg' ?
+
+hmmm that is intresting case, is this number coming from USB side?
+
+> This was one of the reasons that I have settled with the callback.
+> 
+> What we can also do is to code this within the DMA drivers itself.
+> 
+> When setting up the transfer and we realize that one of the SG will not
+> going to fit, we destroy what we have done so far, pass the sg list
+> along with length/sg limit to create a new sg list where all sg item's
+> length is under the limit. Then using this new sg list we can set up the
+> transfer.
+> 
+> I'm not sure how hard is to do the sg list optimization, I see that
+> sg_split() is not what we want so we might need to code this in
+> dmaengine or in the scatterlist code.
+> 
+> We certainly don't want to verify all slave_sg transfers proactively to
+> avoid adding latency when it is not necessary.
+
+latency would be added at prepare, not when submitting..
+
 -- 
-2.13.6
+~Vinod
