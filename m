@@ -1,121 +1,112 @@
-From: alexander.levin@verizon.com (Levin, Alexander (Sasha Levin))
-Date: Sat, 7 Oct 2017 22:37:44 +0000
-Subject: [PATCH review for 4.4 03/24] ARM: pxa: Don't rely on public mmc
- header to include leds.h
-In-Reply-To: <20171007223738.25013-1-alexander.levin@verizon.com>
-References: <20171007223738.25013-1-alexander.levin@verizon.com>
-Message-ID: <20171007223738.25013-3-alexander.levin@verizon.com>
+From: boqun.feng@gmail.com (Boqun Feng)
+Date: Sun, 8 Oct 2017 09:03:34 +0800
+Subject: [PATCH v2 3/5] kernel/locking: Use atomic_cond_read_acquire when
+ spinning in qrwlock
+In-Reply-To: <1507296882-18721-4-git-send-email-will.deacon@arm.com>
+References: <1507296882-18721-1-git-send-email-will.deacon@arm.com>
+ <1507296882-18721-4-git-send-email-will.deacon@arm.com>
+Message-ID: <20171008005841.gznbomnstzhxwyfm@tardis>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@linaro.org>
+On Fri, Oct 06, 2017 at 01:34:40PM +0000, Will Deacon wrote:
+> The qrwlock slowpaths involve spinning when either a prospective reader
+> is waiting for a concurrent writer to drain, or a prospective writer is
+> waiting for concurrent readers to drain. In both of these situations,
+> atomic_cond_read_acquire can be used to avoid busy-waiting and make use
+> of any backoff functionality provided by the architecture.
+> 
+> This patch replaces the open-code loops and rspin_until_writer_unlock
+> implementation with atomic_cond_read_acquire. The write mode transition
+> zero to _QW_WAITING is left alone, since (a) this doesn't need acquire
+> semantics and (b) should be fast.
+> 
+> Cc: Peter Zijlstra <peterz@infradead.org>
+> Cc: Ingo Molnar <mingo@redhat.com>
+> Cc: Waiman Long <longman@redhat.com>
+> Cc: Boqun Feng <boqun.feng@gmail.com>
+> Cc: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  kernel/locking/qrwlock.c | 47 +++++++++++------------------------------------
+>  1 file changed, 11 insertions(+), 36 deletions(-)
+> 
+> diff --git a/kernel/locking/qrwlock.c b/kernel/locking/qrwlock.c
+> index 1af791e37348..b7ea4647c74d 100644
+> --- a/kernel/locking/qrwlock.c
+> +++ b/kernel/locking/qrwlock.c
+> @@ -24,23 +24,6 @@
+>  #include <asm/qrwlock.h>
+>  
+>  /**
+> - * rspin_until_writer_unlock - inc reader count & spin until writer is gone
+> - * @lock  : Pointer to queue rwlock structure
+> - * @writer: Current queue rwlock writer status byte
+> - *
+> - * In interrupt context or at the head of the queue, the reader will just
+> - * increment the reader count & wait until the writer releases the lock.
+> - */
+> -static __always_inline void
+> -rspin_until_writer_unlock(struct qrwlock *lock, u32 cnts)
+> -{
+> -	while ((cnts & _QW_WMASK) == _QW_LOCKED) {
+> -		cpu_relax();
+> -		cnts = atomic_read_acquire(&lock->cnts);
+> -	}
+> -}
+> -
+> -/**
+>   * queued_read_lock_slowpath - acquire read lock of a queue rwlock
+>   * @lock: Pointer to queue rwlock structure
+>   * @cnts: Current qrwlock lock value
+> @@ -53,13 +36,12 @@ void queued_read_lock_slowpath(struct qrwlock *lock, u32 cnts)
 
-[ Upstream commit 40d727a2defa176b78159d445bcf7afcc2ed9021 ]
+So the second parameter(@cnts) could be removed entirely, right?
+Any reason we still keep it?
 
-Some of the pxa platforms, balloon3, colibri-pxa270-income, corgi,
-trizeps4, vpac270, zeus and zylonite depends on leds.h. Explicitly include
-it instead of relying on the public mmc header host.h.
+Regards,
+Boqun
 
-Cc: Daniel Mack <daniel@zonque.org>
-Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-Cc: Robert Jarzmik <robert.jarzmik@free.fr>
-Cc: <linux-arm-kernel@lists.infradead.org>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
-Signed-off-by: Sasha Levin <alexander.levin@verizon.com>
----
- arch/arm/mach-pxa/balloon3.c              | 1 +
- arch/arm/mach-pxa/colibri-pxa270-income.c | 1 +
- arch/arm/mach-pxa/corgi.c                 | 1 +
- arch/arm/mach-pxa/trizeps4.c              | 1 +
- arch/arm/mach-pxa/vpac270.c               | 1 +
- arch/arm/mach-pxa/zeus.c                  | 1 +
- arch/arm/mach-pxa/zylonite.c              | 1 +
- 7 files changed, 7 insertions(+)
-
-diff --git a/arch/arm/mach-pxa/balloon3.c b/arch/arm/mach-pxa/balloon3.c
-index a727282bfa99..761d7d64d643 100644
---- a/arch/arm/mach-pxa/balloon3.c
-+++ b/arch/arm/mach-pxa/balloon3.c
-@@ -17,6 +17,7 @@
- #include <linux/init.h>
- #include <linux/platform_device.h>
- #include <linux/interrupt.h>
-+#include <linux/leds.h>
- #include <linux/sched.h>
- #include <linux/bitops.h>
- #include <linux/fb.h>
-diff --git a/arch/arm/mach-pxa/colibri-pxa270-income.c b/arch/arm/mach-pxa/colibri-pxa270-income.c
-index db20d25daaab..1b92a4112bd1 100644
---- a/arch/arm/mach-pxa/colibri-pxa270-income.c
-+++ b/arch/arm/mach-pxa/colibri-pxa270-income.c
-@@ -17,6 +17,7 @@
- #include <linux/gpio.h>
- #include <linux/init.h>
- #include <linux/interrupt.h>
-+#include <linux/leds.h>
- #include <linux/ioport.h>
- #include <linux/kernel.h>
- #include <linux/platform_device.h>
-diff --git a/arch/arm/mach-pxa/corgi.c b/arch/arm/mach-pxa/corgi.c
-index 89f790dda93e..d1f12909f740 100644
---- a/arch/arm/mach-pxa/corgi.c
-+++ b/arch/arm/mach-pxa/corgi.c
-@@ -18,6 +18,7 @@
- #include <linux/major.h>
- #include <linux/fs.h>
- #include <linux/interrupt.h>
-+#include <linux/leds.h>
- #include <linux/mmc/host.h>
- #include <linux/mtd/physmap.h>
- #include <linux/pm.h>
-diff --git a/arch/arm/mach-pxa/trizeps4.c b/arch/arm/mach-pxa/trizeps4.c
-index 066e3a250ee0..5e50c53f1f4b 100644
---- a/arch/arm/mach-pxa/trizeps4.c
-+++ b/arch/arm/mach-pxa/trizeps4.c
-@@ -16,6 +16,7 @@
- #include <linux/kernel.h>
- #include <linux/platform_device.h>
- #include <linux/interrupt.h>
-+#include <linux/leds.h>
- #include <linux/export.h>
- #include <linux/sched.h>
- #include <linux/bitops.h>
-diff --git a/arch/arm/mach-pxa/vpac270.c b/arch/arm/mach-pxa/vpac270.c
-index 54122a983ae3..2cce92924068 100644
---- a/arch/arm/mach-pxa/vpac270.c
-+++ b/arch/arm/mach-pxa/vpac270.c
-@@ -15,6 +15,7 @@
- #include <linux/irq.h>
- #include <linux/gpio_keys.h>
- #include <linux/input.h>
-+#include <linux/leds.h>
- #include <linux/gpio.h>
- #include <linux/usb/gpio_vbus.h>
- #include <linux/mtd/mtd.h>
-diff --git a/arch/arm/mach-pxa/zeus.c b/arch/arm/mach-pxa/zeus.c
-index 30e62a3f0701..d757cfb5f8a6 100644
---- a/arch/arm/mach-pxa/zeus.c
-+++ b/arch/arm/mach-pxa/zeus.c
-@@ -13,6 +13,7 @@
- 
- #include <linux/cpufreq.h>
- #include <linux/interrupt.h>
-+#include <linux/leds.h>
- #include <linux/irq.h>
- #include <linux/pm.h>
- #include <linux/gpio.h>
-diff --git a/arch/arm/mach-pxa/zylonite.c b/arch/arm/mach-pxa/zylonite.c
-index e20359a7433c..d7f0a7d87ef2 100644
---- a/arch/arm/mach-pxa/zylonite.c
-+++ b/arch/arm/mach-pxa/zylonite.c
-@@ -16,6 +16,7 @@
- #include <linux/module.h>
- #include <linux/kernel.h>
- #include <linux/interrupt.h>
-+#include <linux/leds.h>
- #include <linux/init.h>
- #include <linux/platform_device.h>
- #include <linux/gpio.h>
--- 
-2.11.0
+>  	if (unlikely(in_interrupt())) {
+>  		/*
+>  		 * Readers in interrupt context will get the lock immediately
+> -		 * if the writer is just waiting (not holding the lock yet).
+> -		 * The rspin_until_writer_unlock() function returns immediately
+> -		 * in this case. Otherwise, they will spin (with ACQUIRE
+> -		 * semantics) until the lock is available without waiting in
+> -		 * the queue.
+> +		 * if the writer is just waiting (not holding the lock yet),
+> +		 * so spin with ACQUIRE semantics until the lock is available
+> +		 * without waiting in the queue.
+>  		 */
+> -		rspin_until_writer_unlock(lock, cnts);
+> +		atomic_cond_read_acquire(&lock->cnts, (VAL & _QW_WMASK)
+> +					 != _QW_LOCKED);
+>  		return;
+>  	}
+>  	atomic_sub(_QR_BIAS, &lock->cnts);
+> @@ -68,14 +50,14 @@ void queued_read_lock_slowpath(struct qrwlock *lock, u32 cnts)
+>  	 * Put the reader into the wait queue
+>  	 */
+>  	arch_spin_lock(&lock->wait_lock);
+> +	atomic_add(_QR_BIAS, &lock->cnts);
+>  
+>  	/*
+>  	 * The ACQUIRE semantics of the following spinning code ensure
+>  	 * that accesses can't leak upwards out of our subsequent critical
+>  	 * section in the case that the lock is currently held for write.
+>  	 */
+> -	cnts = atomic_fetch_add_acquire(_QR_BIAS, &lock->cnts);
+> -	rspin_until_writer_unlock(lock, cnts);
+> +	atomic_cond_read_acquire(&lock->cnts, (VAL & _QW_WMASK) != _QW_LOCKED);
+>  
+>  	/*
+>  	 * Signal the next one in queue to become queue head
+[...]
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171008/ffa9409a/attachment.sig>
