@@ -1,62 +1,34 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sun, 8 Oct 2017 17:50:15 +0200
-Subject: [RFC 2/2] phy: exynos5-usbdrd: remove disable and enable of phy
- clk
-In-Reply-To: <CANAwSgSbHR+e_2wX3i3VoVxPe10mUOoS94uRpvebfUfybaNQ+g@mail.gmail.com>
-References: <1507264595-3565-1-git-send-email-linux.amoon@gmail.com>
- <1507264595-3565-2-git-send-email-linux.amoon@gmail.com>
- <CAJKOXPe9FCKqrvsgdohTAN9tXXwbMOuyaDiHPxZ1Ym1LLPD41w@mail.gmail.com>
- <CANAwSgSbHR+e_2wX3i3VoVxPe10mUOoS94uRpvebfUfybaNQ+g@mail.gmail.com>
-Message-ID: <20171008155015.252gefhsc4tks7k6@kozik-lap>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Sun, 8 Oct 2017 11:45:11 -0500
+Subject: [PATCH v4 00/26] KVM/ARM: Add support for GICv4
+In-Reply-To: <20171006153401.5481-1-marc.zyngier@arm.com>
+References: <20171006153401.5481-1-marc.zyngier@arm.com>
+Message-ID: <0134a6cd-dfbc-6fe5-63a6-958b61d92f36@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 08, 2017 at 06:11:12PM +0530, Anand Moon wrote:
-> Hi Krzysztof,
-> 
-> On 6 October 2017 at 12:12, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> > On Fri, Oct 6, 2017 at 6:36 AM, Anand Moon <linux.amoon@gmail.com> wrote:
-> >> remove the disable and enable of phy clk.
-> >> phy clk is needed to tune the phy controller.
-> >
-> > Drivers should in general enable and disable the clocks they use. Just
-> > like in patch #1 please describe why you are doing this, what kind of
-> > problem are you trying to solve and what exactly are you trying to do
-> > here.
-> >
-> > BR,
-> > Krzysztof
-> >
-> 
-> [snip]
-> 
-> Usually we would disable the clk on error patch and return with failed.
-> but in the current code we disable the clk in init routine and
-> enable the clk in disable routine which seem incorrect.
+Hi Marc,
 
-No. For example for exynos5_usbdrd_phy_exit() the driver enables the
-clock only for the access to PHY block (PHY registers).
+I've tested this patch series on QDF2400 server platform using NVME card, the basic
+functionality works fine and the below log messages shows around 70 interrupts
+are delivered to vCPU directly.
 
-> 
-> [0] https://github.com/torvalds/linux/blob/master/drivers/phy/samsung/phy-exynos5-usbdrd.c#L362-L412
-> [1] https://github.com/torvalds/linux/blob/master/drivers/phy/samsung/phy-exynos5-usbdrd.c#L424-L446
-> 
-> On 3.10.x kernel clk_summary all the clk are enables.
-> 
->     mout_usbdrd300              3           3            24000000
->        dout_usbdrd300           2           2            24000000
->           sclk_usbdrd300        1           1            24000000
->        dout_usbphy300           2           2            24000000
->           sclk_usbphy300        1           1            24000000
->     mout_usbdrd301              3           3            24000000
->        dout_usbdrd301           2           2            24000000
->           sclk_usbdrd301        1           1            24000000
->        dout_usbphy301           2           2            24000000
->           sclk_usbphy301        1           1            24000000
-> 
-> Some more changes in clk driver might be required to stabilize the usb module.
 
-Please describe the issues with stability first.
+Tested-by: Shanker Donthineni <shankerd@codeaurora.org>
 
-Best regards,
-Krzysztof
+
+>From guest kernel:
+ /mnt # cat /proc/interrupts | grep ITS
+ 51:         83   ITS-MSI 32768 Edge      nvme0q0, nvme0q1
+ 52:          0   ITS-MSI 16384 Edge      virtio0-config
+ 53:          0   ITS-MSI 16385 Edge      virtio0-input.0
+ 54:          0   ITS-MSI 16386 Edge      virtio0-output.0
+ 
+>From host kernel:
+ /mnt # cat /proc/interrupts | grep GICv4
+ 388:          9  GICv4-vpe   0 Edge      vcpu
+
+-- 
+Shanker Donthineni
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
