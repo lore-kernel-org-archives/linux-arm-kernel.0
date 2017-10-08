@@ -1,34 +1,30 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Sun, 8 Oct 2017 11:45:11 -0500
-Subject: [PATCH v4 00/26] KVM/ARM: Add support for GICv4
-In-Reply-To: <20171006153401.5481-1-marc.zyngier@arm.com>
-References: <20171006153401.5481-1-marc.zyngier@arm.com>
-Message-ID: <0134a6cd-dfbc-6fe5-63a6-958b61d92f36@codeaurora.org>
+From: chris.gekas@gmail.com (Christos Gkekas)
+Date: Sun,  8 Oct 2017 19:20:30 +0100
+Subject: [PATCH] ASoC: cygnus: Remove unnecessary active_slots check
+Message-ID: <1507486830-21507-1-git-send-email-chris.gekas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Variable active_slots is unsigned so checking whether it is less than
+zero is not necessary.
 
-I've tested this patch series on QDF2400 server platform using NVME card, the basic
-functionality works fine and the below log messages shows around 70 interrupts
-are delivered to vCPU directly.
+Signed-off-by: Christos Gkekas <chris.gekas@gmail.com>
+---
+ sound/soc/bcm/cygnus-ssp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
-Tested-by: Shanker Donthineni <shankerd@codeaurora.org>
-
-
->From guest kernel:
- /mnt # cat /proc/interrupts | grep ITS
- 51:         83   ITS-MSI 32768 Edge      nvme0q0, nvme0q1
- 52:          0   ITS-MSI 16384 Edge      virtio0-config
- 53:          0   ITS-MSI 16385 Edge      virtio0-input.0
- 54:          0   ITS-MSI 16386 Edge      virtio0-output.0
+diff --git a/sound/soc/bcm/cygnus-ssp.c b/sound/soc/bcm/cygnus-ssp.c
+index 15c438f..cb46128 100644
+--- a/sound/soc/bcm/cygnus-ssp.c
++++ b/sound/soc/bcm/cygnus-ssp.c
+@@ -998,7 +998,7 @@ static int cygnus_set_dai_tdm_slot(struct snd_soc_dai *cpu_dai,
  
->From host kernel:
- /mnt # cat /proc/interrupts | grep GICv4
- 388:          9  GICv4-vpe   0 Edge      vcpu
-
+ 	active_slots = hweight32(tx_mask);
+ 
+-	if ((active_slots < 0) || (active_slots > 16))
++	if (active_slots > 16)
+ 		return -EINVAL;
+ 
+ 	/* Slot value must be even */
 -- 
-Shanker Donthineni
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.7.4
