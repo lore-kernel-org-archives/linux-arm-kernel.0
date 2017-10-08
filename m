@@ -1,34 +1,32 @@
 From: pure.logic@nexus-software.ie (Bryan O'Donoghue)
-Date: Sun,  8 Oct 2017 23:41:21 +0100
-Subject: [PATCH v2 6/7] nvmem: imx-ocotp: Enable i.MX7D OTP write support
+Date: Sun,  8 Oct 2017 23:41:22 +0100
+Subject: [PATCH v2 7/7] nvmem: imx-ocotp: Update module description
 In-Reply-To: <1507502482-22518-1-git-send-email-pure.logic@nexus-software.ie>
 References: <1507502482-22518-1-git-send-email-pure.logic@nexus-software.ie>
-Message-ID: <1507502482-22518-7-git-send-email-pure.logic@nexus-software.ie>
+Message-ID: <1507502482-22518-8-git-send-email-pure.logic@nexus-software.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After applying patches for both banked access and write timings we can
-re-enable the OTP write interface on i.MX7D processors.
+This imx-ocotp driver encapsulates support for a subset of both i.MX6 and
+i.MX7 processors. Update the module description to reflect.
 
-Fixes: 0642bac7da42 ("nvmem: imx-ocotp: add write support")
+Fixes: 711d45477931 ("nvmem: octop: Add i.MX7D support")
 
 Signed-off-by: Bryan O'Donoghue <pure.logic@nexus-software.ie>
 ---
- drivers/nvmem/imx-ocotp.c | 2 --
- 1 file changed, 2 deletions(-)
+ drivers/nvmem/imx-ocotp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/nvmem/imx-ocotp.c b/drivers/nvmem/imx-ocotp.c
-index f80aee9..8e8bc20 100644
+index 8e8bc20..60e2617 100644
 --- a/drivers/nvmem/imx-ocotp.c
 +++ b/drivers/nvmem/imx-ocotp.c
-@@ -459,8 +459,6 @@ static int imx_ocotp_probe(struct platform_device *pdev)
- 	imx_ocotp_nvmem_config.dev = dev;
- 	imx_ocotp_nvmem_config.priv = priv;
- 	priv->config = &imx_ocotp_nvmem_config;
--	if (of_device_is_compatible(pdev->dev.of_node, "fsl,imx7d-ocotp"))
--		imx_ocotp_nvmem_config.read_only = true;
- 	nvmem = nvmem_register(&imx_ocotp_nvmem_config);
+@@ -487,5 +487,5 @@ static struct platform_driver imx_ocotp_driver = {
+ module_platform_driver(imx_ocotp_driver);
  
- 	if (IS_ERR(nvmem))
+ MODULE_AUTHOR("Philipp Zabel <p.zabel@pengutronix.de>");
+-MODULE_DESCRIPTION("i.MX6 OCOTP fuse box driver");
++MODULE_DESCRIPTION("i.MX6/i.MX7 OCOTP fuse box driver");
+ MODULE_LICENSE("GPL v2");
 -- 
 2.7.4
