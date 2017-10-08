@@ -1,29 +1,54 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sun,  8 Oct 2017 14:26:28 +0200
-Subject: [PATCH] dt-bindings: samsung: Document binding for new Odroid HC1
- board
-Message-ID: <20171008122628.30973-1-krzk@kernel.org>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Sun, 8 Oct 2017 18:06:19 +0530
+Subject: [RFC 1/2] ARM: dts: exynos: update the usbdrd phy and ref clk
+In-Reply-To: <CAJKOXPe=hd7QdsaqpqPv3cNvL59FBqCfy24mYmGdQvi7Yp8wBQ@mail.gmail.com>
+References: <1507264595-3565-1-git-send-email-linux.amoon@gmail.com>
+ <CAJKOXPe=hd7QdsaqpqPv3cNvL59FBqCfy24mYmGdQvi7Yp8wBQ@mail.gmail.com>
+Message-ID: <CANAwSgRK+F62xKFeFM9ZJ_rgPWj831ca=tX9BSKXUyRBhN4yhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the binding for new Hardkernel Odroid HC1 board.
+Hi Krzysztof,
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
----
- Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt | 1 +
- 1 file changed, 1 insertion(+)
+On 6 October 2017 at 12:08, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> On Fri, Oct 6, 2017 at 6:36 AM, Anand Moon <linux.amoon@gmail.com> wrote:
+>> update the usbdrd link control and phy contol clks.
+>
+> The commit title and especially commit message should explain why you
+> are doing this and what are you doing. "Update" is not enough.
+> Everything could be called update.
+>
+> Therefore I do not understand the reason behind the patch.
+>
+> BR,
+> Krzysztof
 
-diff --git a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
-index 3c551894f621..5e95e3e81140 100644
---- a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
-+++ b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
-@@ -57,6 +57,7 @@ Required root node properties:
- 	- "hardkernel,odroid-xu3-lite" - for Exynos5422-based Hardkernel
- 					 Odroid XU3 Lite board.
- 	- "hardkernel,odroid-xu4" - for Exynos5422-based Hardkernel Odroid XU4.
-+	- "hardkernel,odroid-hc1" - for Exynos5422-based Hardkernel Odroid HC1.
- 
-   * Insignal
- 	- "insignal,arndale"      - for Exynos5250-based Insignal Arndale board.
--- 
-2.11.0
+so as per the driver.
+@clk: phy clock for register access
+@ref_clk: reference clock to PHY block from which PHY's operational
+clocks are derived
+
+Both CLK_SCLK_USBPHY300 and CLK_SCLK_USBD300 belong to FSYS Clock
+and CLK_USBD300 clk is being used by the usbdrd dwc3 module.
+
+[0] https://github.com/torvalds/linux/blob/master/drivers/clk/samsung/clk-exynos5420.c#L1040-L1053
+
+So their is mismatch of the clk used by the usbdrd driver.
+with the above changes the driver work well with camera and disk drives
+connected to usb 3.0 ports and their is improvement in the performance.
+
+root at odroid:~# lsusb -t
+/:  Bus 06.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 5000M
+/:  Bus 05.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 480M
+    |__ Port 1: Dev 3, If 0, Class=Vendor Specific Class, Driver=r8152, 480M
+/:  Bus 04.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 5000M
+    |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/2p, 5000M
+        |__ Port 1: Dev 3, If 0, Class=Mass Storage, Driver=uas, 5000M
+        |__ Port 2: Dev 4, If 0, Class=Mass Storage, Driver=uas, 5000M
+/:  Bus 03.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 480M
+    |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/2p, 480M
+/:  Bus 02.Port 1: Dev 1, Class=root_hub, Driver=exynos-ohci/3p, 12M
+/:  Bus 01.Port 1: Dev 1, Class=root_hub, Driver=exynos-ehci/3p, 480M
+
+Best Regards
+-Anand
