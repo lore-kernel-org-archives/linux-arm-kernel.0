@@ -1,84 +1,71 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Sun, 8 Oct 2017 16:35:40 +0100
-Subject: [PATCH] arm64: kdump: Avoid to power off nonpanic CPUs
-In-Reply-To: <1507471966-15367-1-git-send-email-leo.yan@linaro.org>
-References: <1507471966-15367-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <20171008153540.GB1694@remoulade>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sun, 8 Oct 2017 17:47:59 +0200
+Subject: [RFC 1/2] ARM: dts: exynos: update the usbdrd phy and ref clk
+In-Reply-To: <CANAwSgRK+F62xKFeFM9ZJ_rgPWj831ca=tX9BSKXUyRBhN4yhA@mail.gmail.com>
+References: <1507264595-3565-1-git-send-email-linux.amoon@gmail.com>
+ <CAJKOXPe=hd7QdsaqpqPv3cNvL59FBqCfy24mYmGdQvi7Yp8wBQ@mail.gmail.com>
+ <CANAwSgRK+F62xKFeFM9ZJ_rgPWj831ca=tX9BSKXUyRBhN4yhA@mail.gmail.com>
+Message-ID: <20171008154759.moic645jwrp7nztg@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leo,
-
-On Sun, Oct 08, 2017 at 10:12:46PM +0800, Leo Yan wrote:
-> commit a88ce63b642c ("arm64: kexec: have own crash_smp_send_stop() for
-> crash dump for nonpanic cores") introduces ARM64 architecture function
-> crash_smp_send_stop() to replace the weak function, this results in
-> the nonpanic CPUs to be hot-plugged out and CPUs are placed into low
-> power state on ARM64 platforms with the flow:
+On Sun, Oct 08, 2017 at 06:06:19PM +0530, Anand Moon wrote:
+> Hi Krzysztof,
 > 
->   Panic CPU:
->     machine_crash_shutdown()
->       crash_smp_send_stop()
-> 	smp_cross_call(&mask, IPI_CPU_CRASH_STOP)
+> On 6 October 2017 at 12:08, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> > On Fri, Oct 6, 2017 at 6:36 AM, Anand Moon <linux.amoon@gmail.com> wrote:
+> >> update the usbdrd link control and phy contol clks.
+> >
+> > The commit title and especially commit message should explain why you
+> > are doing this and what are you doing. "Update" is not enough.
+> > Everything could be called update.
+> >
+> > Therefore I do not understand the reason behind the patch.
+> >
+> > BR,
+> > Krzysztof
 > 
->   Nonpanic CPUs:
->     handle_IPI()
->       ipi_cpu_crash_stop()
->         cpu_ops[cpu]->cpu_die()
+> so as per the driver.
+> @clk: phy clock for register access
+> @ref_clk: reference clock to PHY block from which PHY's operational
+> clocks are derived
 > 
-> The upper patch has no issue if enabled crash dump only; but if enabled
-> crash dump and Coresight debug module for panic dumping at the meantime,
-> nonpanic CPUs are powered off in crash dump flow, 
-
-We want to turn secondary CPUs off if at all possible, since we want to prevent
-issues resulting from asynchronous behaviour (e.g. TLB/cache fetches) that
-could result in subsequent problems (e.g. if bad page tables resulted in page
-table walks to MMIO devices).
-
-So we *really* want this behaviour in the general case.
-
-> later this may introduce conflicts with the Coresight debug module because
-> Coresight debug registers dumping requires the CPU must be powered on for
-> some platforms (e.g. Hi6220 on Hikey board). If we cannot keep the CPUs
-> powered on, we can see the hardware lockup issue when access Coresight debug
-> registers.
-
-Just to check I understand, the coresight debug module is being invoked as a
-panic notifier in the current kernel, right?
-
-> To fix this issue, this commit removes CPU hotplug operation in func
-> crash_smp_send_stop() and let CPUs to run into WFE/WFI states so CPUs
-> can still be powered on after crash dump. This finally is more safe
-> for Coresight debug module to dump registers and avoid hardware lockup.
+> Both CLK_SCLK_USBPHY300 and CLK_SCLK_USBD300 belong to FSYS Clock
+> and CLK_USBD300 clk is being used by the usbdrd dwc3 module.
 > 
-> Cc: James Morse <james.morse@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> ---
->  arch/arm64/kernel/smp.c | 6 ------
->  1 file changed, 6 deletions(-)
+> [0] https://github.com/torvalds/linux/blob/master/drivers/clk/samsung/clk-exynos5420.c#L1040-L1053
 > 
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index 9f7195a..a65e68b 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -856,12 +856,6 @@ static void ipi_cpu_crash_stop(unsigned int cpu, struct pt_regs *regs)
->  
->  	local_irq_disable();
->  
-> -#ifdef CONFIG_HOTPLUG_CPU
-> -	if (cpu_ops[cpu]->cpu_die)
-> -		cpu_ops[cpu]->cpu_die(cpu);
-> -#endif
-> -
+> So their is mismatch of the clk used by the usbdrd driver.
 
-If it's really necessary to keep secondary CPUs online, please limit that to
-the case where the coresight debug module is being used.
+Where is the mismatch? I do not understand.
 
-IIRC there were similar interactions with cpuidle, and I don't see why hotplug
-should be any different.
+> with the above changes the driver work well with camera and disk drives
+> connected to usb 3.0 ports and their is improvement in the performance.
 
-Thanks,
-Mark.
+If something is not working now, please describe it exactly so we could
+both reproduce and then observe the end results of fix.
+
+I do not understand how the change of these clocks brings improvement in
+performance... ok, sometimes it might happen if the rate of clock is
+being used on bus. Is this the case?
+
+Best regards,
+Krzysztof
+
+
+> 
+> root at odroid:~# lsusb -t
+> /:  Bus 06.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 5000M
+> /:  Bus 05.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 480M
+>     |__ Port 1: Dev 3, If 0, Class=Vendor Specific Class, Driver=r8152, 480M
+> /:  Bus 04.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 5000M
+>     |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/2p, 5000M
+>         |__ Port 1: Dev 3, If 0, Class=Mass Storage, Driver=uas, 5000M
+>         |__ Port 2: Dev 4, If 0, Class=Mass Storage, Driver=uas, 5000M
+> /:  Bus 03.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 480M
+>     |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/2p, 480M
+> /:  Bus 02.Port 1: Dev 1, Class=root_hub, Driver=exynos-ohci/3p, 12M
+> /:  Bus 01.Port 1: Dev 1, Class=root_hub, Driver=exynos-ehci/3p, 480M
+> 
+> Best Regards
+> -Anand
