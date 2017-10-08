@@ -1,59 +1,65 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun, 8 Oct 2017 22:42:22 +0900
-Subject: [PATCH v7 1/2] dt-bindings: gpio: uniphier: add UniPhier GPIO
- binding
-In-Reply-To: <CACRpkdYJSXH+94QScrpSPdfy8ULa6dV2q0qRjsfKAAWSRuKTKQ@mail.gmail.com>
-References: <1506480343-9597-1-git-send-email-yamada.masahiro@socionext.com>
- <1506480343-9597-2-git-send-email-yamada.masahiro@socionext.com>
- <CACRpkdYJSXH+94QScrpSPdfy8ULa6dV2q0qRjsfKAAWSRuKTKQ@mail.gmail.com>
-Message-ID: <CAK7LNASz+_v=AFJqVchVRZJbXH0Rne0dO9MUCSao0UrFYexGmw@mail.gmail.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Sun,  8 Oct 2017 22:12:46 +0800
+Subject: [PATCH] arm64: kdump: Avoid to power off nonpanic CPUs
+Message-ID: <1507471966-15367-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+commit a88ce63b642c ("arm64: kexec: have own crash_smp_send_stop() for
+crash dump for nonpanic cores") introduces ARM64 architecture function
+crash_smp_send_stop() to replace the weak function, this results in
+the nonpanic CPUs to be hot-plugged out and CPUs are placed into low
+power state on ARM64 platforms with the flow:
 
+  Panic CPU:
+    machine_crash_shutdown()
+      crash_smp_send_stop()
+	smp_cross_call(&mask, IPI_CPU_CRASH_STOP)
 
-2017-09-27 22:42 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
-> On Wed, Sep 27, 2017 at 4:45 AM, Masahiro Yamada
-> <yamada.masahiro@socionext.com> wrote:
->
->> This GPIO controller is used on UniPhier SoC family.
->>
->> The vendor specific property "socionext,interrupt-ranges" is for
->> specifying interrupt mapping to the parent interrupt controller
->> because the mapping is not contiguous.  It works like "ranges",
->> but transforms "interrupts" instead of "reg".
->>
->> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->> Acked-by: Rob Herring <robh@kernel.org>
->
-> I don't think Rob has seen the new interrupt range thing?
-> (It's not a big deal. Things like these are a bit fuzzy.)
->
->> +               socionext,interrupt-ranges = <0 48 16>, <16 154 5>, <21 217 3>;
->
-> If it is as you say, that other SoCs are doing the same, we should
-> think about creating a generic property for this. Like
-> hierarchy-interrupt-ranges or so.
->
-> I kind of liked the old patch where it was just "interrupts" and
-> then you looked it up from the irq subsystem. (tglx even ACKed
-> the patch).
->
-> But I want the DT people to say something here.
->
-> Yours,
-> Linus Walleij
+  Nonpanic CPUs:
+    handle_IPI()
+      ipi_cpu_crash_stop()
+        cpu_ops[cpu]->cpu_die()
 
+The upper patch has no issue if enabled crash dump only; but if enabled
+crash dump and Coresight debug module for panic dumping at the meantime,
+nonpanic CPUs are powered off in crash dump flow, later this may
+introduce conflicts with the Coresight debug module because Coresight
+debug registers dumping requires the CPU must be powered on for some
+platforms (e.g. Hi6220 on Hikey board). If we cannot keep the CPUs
+powered on, we can see the hardware lockup issue when access Coresight
+debug registers.
 
-I explained the technical background of this approach,
-but I have not had any comment.
-(DT people are silent, too)
+To fix this issue, this commit removes CPU hotplug operation in func
+crash_smp_send_stop() and let CPUs to run into WFE/WFI states so CPUs
+can still be powered on after crash dump. This finally is more safe
+for Coresight debug module to dump registers and avoid hardware lockup.
 
-Is this driver applicable?
+Cc: James Morse <james.morse@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ arch/arm64/kernel/smp.c | 6 ------
+ 1 file changed, 6 deletions(-)
 
-
-
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 9f7195a..a65e68b 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -856,12 +856,6 @@ static void ipi_cpu_crash_stop(unsigned int cpu, struct pt_regs *regs)
+ 
+ 	local_irq_disable();
+ 
+-#ifdef CONFIG_HOTPLUG_CPU
+-	if (cpu_ops[cpu]->cpu_die)
+-		cpu_ops[cpu]->cpu_die(cpu);
+-#endif
+-
+-	/* just in case */
+ 	cpu_park_loop();
+ #endif
+ }
 -- 
-Best Regards
-Masahiro Yamada
+2.7.4
