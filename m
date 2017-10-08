@@ -1,71 +1,62 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sun, 8 Oct 2017 17:47:59 +0200
-Subject: [RFC 1/2] ARM: dts: exynos: update the usbdrd phy and ref clk
-In-Reply-To: <CANAwSgRK+F62xKFeFM9ZJ_rgPWj831ca=tX9BSKXUyRBhN4yhA@mail.gmail.com>
+Date: Sun, 8 Oct 2017 17:50:15 +0200
+Subject: [RFC 2/2] phy: exynos5-usbdrd: remove disable and enable of phy
+ clk
+In-Reply-To: <CANAwSgSbHR+e_2wX3i3VoVxPe10mUOoS94uRpvebfUfybaNQ+g@mail.gmail.com>
 References: <1507264595-3565-1-git-send-email-linux.amoon@gmail.com>
- <CAJKOXPe=hd7QdsaqpqPv3cNvL59FBqCfy24mYmGdQvi7Yp8wBQ@mail.gmail.com>
- <CANAwSgRK+F62xKFeFM9ZJ_rgPWj831ca=tX9BSKXUyRBhN4yhA@mail.gmail.com>
-Message-ID: <20171008154759.moic645jwrp7nztg@kozik-lap>
+ <1507264595-3565-2-git-send-email-linux.amoon@gmail.com>
+ <CAJKOXPe9FCKqrvsgdohTAN9tXXwbMOuyaDiHPxZ1Ym1LLPD41w@mail.gmail.com>
+ <CANAwSgSbHR+e_2wX3i3VoVxPe10mUOoS94uRpvebfUfybaNQ+g@mail.gmail.com>
+Message-ID: <20171008155015.252gefhsc4tks7k6@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 08, 2017 at 06:06:19PM +0530, Anand Moon wrote:
+On Sun, Oct 08, 2017 at 06:11:12PM +0530, Anand Moon wrote:
 > Hi Krzysztof,
 > 
-> On 6 October 2017 at 12:08, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> On 6 October 2017 at 12:12, Krzysztof Kozlowski <krzk@kernel.org> wrote:
 > > On Fri, Oct 6, 2017 at 6:36 AM, Anand Moon <linux.amoon@gmail.com> wrote:
-> >> update the usbdrd link control and phy contol clks.
+> >> remove the disable and enable of phy clk.
+> >> phy clk is needed to tune the phy controller.
 > >
-> > The commit title and especially commit message should explain why you
-> > are doing this and what are you doing. "Update" is not enough.
-> > Everything could be called update.
-> >
-> > Therefore I do not understand the reason behind the patch.
+> > Drivers should in general enable and disable the clocks they use. Just
+> > like in patch #1 please describe why you are doing this, what kind of
+> > problem are you trying to solve and what exactly are you trying to do
+> > here.
 > >
 > > BR,
 > > Krzysztof
+> >
 > 
-> so as per the driver.
-> @clk: phy clock for register access
-> @ref_clk: reference clock to PHY block from which PHY's operational
-> clocks are derived
+> [snip]
 > 
-> Both CLK_SCLK_USBPHY300 and CLK_SCLK_USBD300 belong to FSYS Clock
-> and CLK_USBD300 clk is being used by the usbdrd dwc3 module.
+> Usually we would disable the clk on error patch and return with failed.
+> but in the current code we disable the clk in init routine and
+> enable the clk in disable routine which seem incorrect.
+
+No. For example for exynos5_usbdrd_phy_exit() the driver enables the
+clock only for the access to PHY block (PHY registers).
+
 > 
-> [0] https://github.com/torvalds/linux/blob/master/drivers/clk/samsung/clk-exynos5420.c#L1040-L1053
+> [0] https://github.com/torvalds/linux/blob/master/drivers/phy/samsung/phy-exynos5-usbdrd.c#L362-L412
+> [1] https://github.com/torvalds/linux/blob/master/drivers/phy/samsung/phy-exynos5-usbdrd.c#L424-L446
 > 
-> So their is mismatch of the clk used by the usbdrd driver.
+> On 3.10.x kernel clk_summary all the clk are enables.
+> 
+>     mout_usbdrd300              3           3            24000000
+>        dout_usbdrd300           2           2            24000000
+>           sclk_usbdrd300        1           1            24000000
+>        dout_usbphy300           2           2            24000000
+>           sclk_usbphy300        1           1            24000000
+>     mout_usbdrd301              3           3            24000000
+>        dout_usbdrd301           2           2            24000000
+>           sclk_usbdrd301        1           1            24000000
+>        dout_usbphy301           2           2            24000000
+>           sclk_usbphy301        1           1            24000000
+> 
+> Some more changes in clk driver might be required to stabilize the usb module.
 
-Where is the mismatch? I do not understand.
-
-> with the above changes the driver work well with camera and disk drives
-> connected to usb 3.0 ports and their is improvement in the performance.
-
-If something is not working now, please describe it exactly so we could
-both reproduce and then observe the end results of fix.
-
-I do not understand how the change of these clocks brings improvement in
-performance... ok, sometimes it might happen if the rate of clock is
-being used on bus. Is this the case?
+Please describe the issues with stability first.
 
 Best regards,
 Krzysztof
-
-
-> 
-> root at odroid:~# lsusb -t
-> /:  Bus 06.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 5000M
-> /:  Bus 05.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 480M
->     |__ Port 1: Dev 3, If 0, Class=Vendor Specific Class, Driver=r8152, 480M
-> /:  Bus 04.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 5000M
->     |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/2p, 5000M
->         |__ Port 1: Dev 3, If 0, Class=Mass Storage, Driver=uas, 5000M
->         |__ Port 2: Dev 4, If 0, Class=Mass Storage, Driver=uas, 5000M
-> /:  Bus 03.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 480M
->     |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/2p, 480M
-> /:  Bus 02.Port 1: Dev 1, Class=root_hub, Driver=exynos-ohci/3p, 12M
-> /:  Bus 01.Port 1: Dev 1, Class=root_hub, Driver=exynos-ehci/3p, 480M
-> 
-> Best Regards
-> -Anand
