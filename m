@@ -1,50 +1,29 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sun, 8 Oct 2017 12:34:47 +0200
-Subject: [PATCH v5 0/9] mtd: sharpslpart partition parser
-In-Reply-To: <20171008120950.5232a71f@bbrezillon>
-References: <1502743720-28672-1-git-send-email-andrea.adami@gmail.com>
- <20170821221339.70cfcfb7@bbrezillon>
- <87pobmoz8n.fsf@belgarion.home>
- <CAAQYJAv8bNrxJ_ESgC0fOAdry7i5mstzgQ3P74q1D=C-xsJprg@mail.gmail.com>
- <20170824114631.089d2628@bbrezillon>
- <87inh6pw9e.fsf@belgarion.home> <87376uezjs.fsf@belgarion.home>
- <20171008120950.5232a71f@bbrezillon>
-Message-ID: <20171008123447.54a3d0ad@bbrezillon>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sun,  8 Oct 2017 14:26:28 +0200
+Subject: [PATCH] dt-bindings: samsung: Document binding for new Odroid HC1
+ board
+Message-ID: <20171008122628.30973-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 8 Oct 2017 12:09:50 +0200
-Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+Document the binding for new Hardkernel Odroid HC1 board.
 
-> On Sun, 08 Oct 2017 11:53:11 +0200
-> Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> 
-> > Robert Jarzmik <robert.jarzmik@free.fr> writes:
-> >   
-> > > Boris Brezillon <boris.brezillon@free-electrons.com> writes:
-> > >    
-> > >> Hi Robert,
-> > >> Wait a bit before applying. I think patches 6 to 9 have a dependency on
-> > >> patch 1 (it's not a build dependency, but NAND partitioning might be
-> > >> wrong if you apply them), so we need to sync. What release is
-> > >> pxa/for-next targeting? If it's 4.15 I can apply patch 1 just after
-> > >> 4.14-rc1 is out and provide an immutable branch for you to pull in
-> > >> pxa/for-next.    
-> > >
-> > > Hi Boris,
-> > >
-> > > It's targeting 4.15 right now. And we can do as you like, either an immutable
-> > > branch, or I wait to include these patches into my pxa/for-next until you give
-> > > me your go, it's as you like.    
-> > 
-> > Hi Boris,
-> > 
-> > So what's the status about the sync, should I pick the patches, and have the
-> > others make it to your for-next branch ?  
-> 
-> I'm still waiting Brian's final word about this version, and if he's
-> happy with it, Richard will queue it for 4.15.
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+---
+ Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Actually, I'm waiting a feedback on v9 [1], not v5.
-
-[1]http://patchwork.ozlabs.org/patch/808431/
+diff --git a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
+index 3c551894f621..5e95e3e81140 100644
+--- a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
++++ b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
+@@ -57,6 +57,7 @@ Required root node properties:
+ 	- "hardkernel,odroid-xu3-lite" - for Exynos5422-based Hardkernel
+ 					 Odroid XU3 Lite board.
+ 	- "hardkernel,odroid-xu4" - for Exynos5422-based Hardkernel Odroid XU4.
++	- "hardkernel,odroid-hc1" - for Exynos5422-based Hardkernel Odroid HC1.
+ 
+   * Insignal
+ 	- "insignal,arndale"      - for Exynos5250-based Insignal Arndale board.
+-- 
+2.11.0
