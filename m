@@ -1,70 +1,65 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun,  8 Oct 2017 12:29:01 +0800
-Subject: [PATCH 1/6] phy: sun4i-usb: add support for R40 USB PHY
+Date: Sun,  8 Oct 2017 12:29:05 +0800
+Subject: [PATCH 5/6] ARM: sun8i: r40: enable USB host for Banana Pi M2 Ultra
 In-Reply-To: <20171008042906.46779-1-icenowy@aosc.io>
 References: <20171008042906.46779-1-icenowy@aosc.io>
-Message-ID: <20171008042906.46779-2-icenowy@aosc.io>
+Message-ID: <20171008042906.46779-6-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner R40 features a USB PHY like the one in A64, but with 3 PHYs.
+From: Icenowy Zheng <icenowy@aosc.xyz>
 
-Add support for it.
+Banana Pi M2 Ultra board features two USB host ports, connected to the
+two USB host ports on the SoC.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Add support for them.
+
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 ---
- Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt |  1 +
- drivers/phy/allwinner/phy-sun4i-usb.c                   | 12 ++++++++++++
- 2 files changed, 13 insertions(+)
+ arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-index cbc7847dbf6c..0f00abd40a50 100644
---- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-+++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-@@ -11,6 +11,7 @@ Required properties:
-   * allwinner,sun8i-a33-usb-phy
-   * allwinner,sun8i-a83t-usb-phy
-   * allwinner,sun8i-h3-usb-phy
-+  * allwinner,sun8i-r40-usb-phy
-   * allwinner,sun8i-v3s-usb-phy
-   * allwinner,sun50i-a64-usb-phy
- - reg : a list of offset + length pairs
-diff --git a/drivers/phy/allwinner/phy-sun4i-usb.c b/drivers/phy/allwinner/phy-sun4i-usb.c
-index 1161e11fb3cf..9df7a2c9ca75 100644
---- a/drivers/phy/allwinner/phy-sun4i-usb.c
-+++ b/drivers/phy/allwinner/phy-sun4i-usb.c
-@@ -112,6 +112,7 @@ enum sun4i_usb_phy_type {
- 	sun8i_a33_phy,
- 	sun8i_a83t_phy,
- 	sun8i_h3_phy,
-+	sun8i_r40_phy,
- 	sun8i_v3s_phy,
- 	sun50i_a64_phy,
- };
-@@ -919,6 +920,16 @@ static const struct sun4i_usb_phy_cfg sun8i_h3_cfg = {
- 	.phy0_dual_route = true,
+diff --git a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
+index 035599d870b9..8c5efe2a9881 100644
+--- a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
++++ b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
+@@ -93,6 +93,14 @@
+ 	};
  };
  
-+static const struct sun4i_usb_phy_cfg sun8i_r40_cfg = {
-+	.num_phys = 3,
-+	.type = sun8i_r40_phy,
-+	.disc_thresh = 3,
-+	.phyctl_offset = REG_PHYCTL_A33,
-+	.dedicated_clocks = true,
-+	.enable_pmu_unk1 = true,
-+	.phy0_dual_route = true,
++&ehci1 {
++	status = "okay";
 +};
 +
- static const struct sun4i_usb_phy_cfg sun8i_v3s_cfg = {
- 	.num_phys = 1,
- 	.type = sun8i_v3s_phy,
-@@ -947,6 +958,7 @@ static const struct of_device_id sun4i_usb_phy_of_match[] = {
- 	{ .compatible = "allwinner,sun8i-a33-usb-phy", .data = &sun8i_a33_cfg },
- 	{ .compatible = "allwinner,sun8i-a83t-usb-phy", .data = &sun8i_a83t_cfg },
- 	{ .compatible = "allwinner,sun8i-h3-usb-phy", .data = &sun8i_h3_cfg },
-+	{ .compatible = "allwinner,sun8i-r40-usb-phy", .data = &sun8i_r40_cfg },
- 	{ .compatible = "allwinner,sun8i-v3s-usb-phy", .data = &sun8i_v3s_cfg },
- 	{ .compatible = "allwinner,sun50i-a64-usb-phy",
- 	  .data = &sun50i_a64_cfg},
++&ehci2 {
++	status = "okay";
++};
++
+ &i2c0 {
+ 	status = "okay";
+ 
+@@ -180,8 +188,22 @@
+ 	status = "okay";
+ };
+ 
++&ohci1 {
++	status = "okay";
++};
++
++&ohci2 {
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pb_pins>;
+ 	status = "okay";
+ };
++
++&usbphy {
++	usb1_vbus-supply = <&reg_vcc5v0>;
++	usb2_vbus-supply = <&reg_vcc5v0>;
++	status = "okay";
++};
 -- 
 2.13.6
