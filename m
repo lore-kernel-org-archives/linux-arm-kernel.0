@@ -1,29 +1,28 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun,  8 Oct 2017 12:29:05 +0800
-Subject: [PATCH 5/6] ARM: sun8i: r40: enable USB host for Banana Pi M2 Ultra
+Date: Sun,  8 Oct 2017 12:29:06 +0800
+Subject: [PATCH 6/6] ARM: sun8i: v40: enable USB host ports for Banana Pi M2
+ Berry
 In-Reply-To: <20171008042906.46779-1-icenowy@aosc.io>
 References: <20171008042906.46779-1-icenowy@aosc.io>
-Message-ID: <20171008042906.46779-6-icenowy@aosc.io>
+Message-ID: <20171008042906.46779-7-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Icenowy Zheng <icenowy@aosc.xyz>
+Banana Pi M2 Berry has an on-board USB Hub that provides 4 USB Type-A
+ports, and it's connected to the USB1 port of the SoC.
 
-Banana Pi M2 Ultra board features two USB host ports, connected to the
-two USB host ports on the SoC.
+Enable it.
 
-Add support for them.
-
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-index 035599d870b9..8c5efe2a9881 100644
---- a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-+++ b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-@@ -93,6 +93,14 @@
+diff --git a/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts b/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts
+index fe16fc0eb518..45c17c8c5915 100644
+--- a/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts
++++ b/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts
+@@ -87,6 +87,10 @@
  	};
  };
  
@@ -31,34 +30,27 @@ index 035599d870b9..8c5efe2a9881 100644
 +	status = "okay";
 +};
 +
-+&ehci2 {
-+	status = "okay";
-+};
-+
  &i2c0 {
  	status = "okay";
  
-@@ -180,8 +188,22 @@
- 	status = "okay";
+@@ -98,6 +102,10 @@
+ 	};
  };
  
 +&ohci1 {
 +	status = "okay";
 +};
 +
-+&ohci2 {
-+	status = "okay";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
+ #include "axp22x.dtsi"
+ 
+ &reg_aldo3 {
+@@ -171,3 +179,8 @@
  	pinctrl-0 = <&uart0_pb_pins>;
  	status = "okay";
  };
 +
 +&usbphy {
 +	usb1_vbus-supply = <&reg_vcc5v0>;
-+	usb2_vbus-supply = <&reg_vcc5v0>;
 +	status = "okay";
 +};
 -- 
