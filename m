@@ -1,64 +1,61 @@
-From: ben@decadent.org.uk (Ben Hutchings)
-Date: Sun, 08 Oct 2017 22:18:08 +0100
-Subject: [stable:PATCH] arm64: Rework valid_user_regs (v3.16)
-In-Reply-To: <1468844845-6129-4-git-send-email-james.morse@arm.com>
-References: <1468844845-6129-1-git-send-email-james.morse@arm.com>
- <1468844845-6129-4-git-send-email-james.morse@arm.com>
-Message-ID: <1507497488.2677.97.camel@decadent.org.uk>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Mon, 9 Oct 2017 00:30:52 +0300
+Subject: [PATCH v2 0/5] Switch arm64 over to qrwlock
+In-Reply-To: <1507296882-18721-1-git-send-email-will.deacon@arm.com>
+References: <1507296882-18721-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20171008213052.ojyxpr56d2ypscjy@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-07-18 at 13:27 +0100, James Morse wrote:
-> From: Mark Rutland <mark.rutland@arm.com>
+On Fri, Oct 06, 2017 at 02:34:37PM +0100, Will Deacon wrote:
+> Hi all,
 > 
-> commit dbd4d7ca563fd0a8949718d35ce197e5642d5d9d upstream.
+> This is version two of the patches I posted yesterday:
 > 
-> We validate pstate using PSR_MODE32_BIT, which is part of the
-> user-provided pstate (and cannot be trusted). Also, we conflate
-> validation of AArch32 and AArch64 pstate values, making the code
-> difficult to reason about.
+>   http://lists.infradead.org/pipermail/linux-arm-kernel/2017-October/534666.html
 > 
-> Instead, validate the pstate value based on the associated task. The
-> task may or may not be current (e.g. when using ptrace), so this must be
-> passed explicitly by callers. To avoid circular header dependencies via
-> sched.h, is_compat_task is pulled out of asm/ptrace.h.
+> I'd normally leave it longer before posting again, but Peter had a good
+> suggestion to rework the layout of the lock word, so I wanted to post a
+> version that follows that approach.
 > 
-> To make the code possible to reason about, the AArch64 and AArch32
-> validation is split into separate functions. Software must respect the
-> RES0 policy for SPSR bits, and thus the kernel mirrors the hardware
-> policy (RAZ/WI) for bits as-yet unallocated. When these acquire an
-> architected meaning writes may be permitted (potentially with additional
-> validation).
+> I've updated my branch if you're after the full patch stack:
 > 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> [ rebased for v3.16
->   This avoids a user-triggerable Oops() if a task is switched to a mode
->   not supported by the kernel (e.g. switching a 64-bit task to AArch32).
+>   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git qrwlock
 > 
->   v3.16 does not support SETEND, support for this was added by
->   2d888f48e056 ("arm64: Emulate SETEND for AArch32 tasks") in v3.20
->   This backport forces the kernel endianness on userspace.
+> As before, all comments (particularly related to testing and performance)
+> welcome!
 > 
->   Added a DBG_SPSR_SS define hidden by #ifdefs to avoid conflicts with
->   other backports.
-> ]
-> Signed-off-by: James Morse <james.morse@arm.com>
-> Cc: <stable@vger.kernel.org> #3.16.x
-[...]
+> Cheers,
+> 
+> Will
 
-Belatedly queued this up for 3.16.
+Hi Will,
 
-Ben.
+I tested your patches with locktorture and found measurable performance
+regression. I also respin the patch of Jan Glauber [1], and I also
+tried Jan's patch with patch 5 from this series. Numbers differ a lot
+from my previous measurements, but since that I changed working
+station and use qemu with the support of parallel threads.
+                        Spinlock        Read-RW lock    Write-RW lock
+Vanilla:                129804626       12340895        14716138
+This series:            113718002       10982159        13068934
+Jan patch:              117977108       11363462        13615449
+Jan patch + #5:         121483176       11696728        13618967
 
--- 
-Ben Hutchings
-compatible: Gracefully accepts erroneous data from any source
+The bottomline of discussion [1] was that queued locks are more
+effective when SoC has many CPUs. And 4 is not many. My measurement
+was made on the 4-CPU machine, and it seems it confirms that. Does
+it make sense to make queued locks default for many-CPU machines only?
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171008/2cd3880d/attachment.sig>
+There were 2 preparing patches in the series: 
+[PATCH 1/3] kernel/locking: #include <asm/spinlock.h> in qrwlock
+and
+[PATCH 2/3] asm-generic: don't #include <linux/atomic.h> in qspinlock_types.h
+
+1st patch is not needed anymore because Babu Moger submitted similar patch that
+is already in mainline: 9ab6055f95903 ("kernel/locking: Fix compile error with
+qrwlock.c"). Could you revisit second patch?
+
+[1] https://lkml.org/lkml/2017/5/3/330
+
+Yury
