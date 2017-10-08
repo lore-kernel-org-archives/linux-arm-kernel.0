@@ -1,108 +1,33 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Sun, 8 Oct 2017 15:57:51 -0700
-Subject: [PATCH 2/2] of/fdt: skip unflattening of disabled nodes
-In-Reply-To: <20171003161815.25999-2-robh@kernel.org>
-References: <20171003161815.25999-1-robh@kernel.org>
- <20171003161815.25999-2-robh@kernel.org>
-Message-ID: <59DAAD6F.7010907@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 9 Oct 2017 01:31:38 +0200
+Subject: [PATCH] ARM: ux500: Fix regression while init PM domains
+In-Reply-To: <1507263625-16756-1-git-send-email-ulf.hansson@linaro.org>
+References: <1507263625-16756-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <CACRpkdau60y2foj06R7=BTAJ4sob+QNLOadCDajnznZtdohdYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/17 09:18, Rob Herring wrote:
-> For static DT usecases, we don't need the disabled nodes and can skip
-> unflattening. This saves a significant amount of RAM in memory constrained
-> cases. In one example on STM32F469, the RAM usage goes from 118K to 26K.
-> 
-> There are a few cases in the kernel that modify the status property
-> dynamically. These all are changes from enabled to disabled, depend on
-> OF_DYNAMIC or are not FDT based (PDT based).
-> 
-> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Cc: Frank Rowand <frowand.list@gmail.com>
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
-> For more background, see this presentation from Nico:
-> 
-> https://connect.linaro.org/resource/sfo17/sfo17-100/
-> 
->  drivers/of/fdt.c | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-> index f8c39705418b..efe91c6856a0 100644
-> --- a/drivers/of/fdt.c
-> +++ b/drivers/of/fdt.c
-> @@ -396,6 +396,10 @@ static int unflatten_dt_nodes(const void *blob,
->  		if (WARN_ON_ONCE(depth >= FDT_MAX_DEPTH))
->  			continue;
->  
-> +		if (!IS_ENABLED(CONFIG_OF_DYNAMIC) &&
-> +		    !of_fdt_device_is_available(blob, offset))
-> +			continue;
-> +
->  		if (!populate_node(blob, offset, &mem, nps[depth],
->  				   &nps[depth+1], dryrun))
->  			return mem - base;
-> 
+On Fri, Oct 6, 2017 at 6:20 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
 
-Hi Rob,
+> The commit afece3ab9a36 ("PM / Domains: Add time accounting to various
+> genpd states") causes a boot regression for ux500.
+>
+> The problem occurs when the ux500 machine code calls pm_genpd_init(), which
+> since the above change triggers a call to ktime_get(). More precisely,
+> because ux500 initializes PM domains in the init_IRQ() phase of the boot,
+> timekeeping has not yet been initialized.
+>
+> Fix the problem by moving the initialization of the PM domains to after
+> timekeeping has been initialized.
+>
+> Fixes: afece3ab9a36 ("PM / Domains: Add time accounting to various genpd..")
+> Cc: Thara Gopinath <thara.gopinath@linaro.org>
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-I strongly support the idea of this patch, but there may be an
-issue we have to resolve.  I'm pretty sure we had talked about
-the issue a long time ago, and it has been sitting on my todo
-list.
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-We have two sets of node traversal macros and functions.  One
-set honors the status property, and the other ignores it.  If
-I recall our previous discussion properly, we want the normal
-usage to honor the status property and only a tiny (or maybe
-non-existent) set of locations to be allowed to ignore the
-status property.
+ARM SoC folks: please apply this directly for fixes!
 
-A rough sense of how often the status property is honored or
-not is:
-
-   $ git grep for_each_child_of_node | wc -l
-   293
-   $ git grep of_get_next_child | wc -l
-   103
-
-   $ git grep for_each_available_child_of_node | wc -l
-   106
-   $ git grep of_get_next_available_child | wc -l
-   20
-
-Many of the cases where the status flag is ignored will not
-actually encounter a node that is not available, so many of
-the cases where status is not checked could currently be
-checking status.
-
-And just for completeness, there are a number of standalone
-checks for whether a node is available:
-
-   $ git grep of_device_is_available | wc -l
-   128
-
-It will be a pain to manually check all of the sites that
-ignore the status property, but that task should be done.
-
-In the mean time, maybe we could flush out the few cases
-that currently depend on ignoring the status property by
-
-   - making for_each_child_of_node() and of_get_next_child()
-     actually check for valid status
-
-   - provide a temporary (one or two kernel release)
-     CONFIG option to allow the old behavior for
-     for_each_child_of_node() and of_get_next_child()
-     just in case we miss any locations that need to
-     be fixed
-
-   - fix up the few places in core device tree code that
-     actually need to ignore status (if such places exist)
-
-In the end, the *_available_*() interfaces should be
-removed, because the normal behavior of node traversal
-should be to only traverse nodes that are available.
-
--Frank
+Yours,
+Linus Walleij
