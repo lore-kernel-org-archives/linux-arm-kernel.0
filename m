@@ -1,54 +1,59 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Sun, 8 Oct 2017 18:11:12 +0530
-Subject: [RFC 2/2] phy: exynos5-usbdrd: remove disable and enable of phy
- clk
-In-Reply-To: <CAJKOXPe9FCKqrvsgdohTAN9tXXwbMOuyaDiHPxZ1Ym1LLPD41w@mail.gmail.com>
-References: <1507264595-3565-1-git-send-email-linux.amoon@gmail.com>
- <1507264595-3565-2-git-send-email-linux.amoon@gmail.com>
- <CAJKOXPe9FCKqrvsgdohTAN9tXXwbMOuyaDiHPxZ1Ym1LLPD41w@mail.gmail.com>
-Message-ID: <CANAwSgSbHR+e_2wX3i3VoVxPe10mUOoS94uRpvebfUfybaNQ+g@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sun, 8 Oct 2017 22:42:22 +0900
+Subject: [PATCH v7 1/2] dt-bindings: gpio: uniphier: add UniPhier GPIO
+ binding
+In-Reply-To: <CACRpkdYJSXH+94QScrpSPdfy8ULa6dV2q0qRjsfKAAWSRuKTKQ@mail.gmail.com>
+References: <1506480343-9597-1-git-send-email-yamada.masahiro@socionext.com>
+ <1506480343-9597-2-git-send-email-yamada.masahiro@socionext.com>
+ <CACRpkdYJSXH+94QScrpSPdfy8ULa6dV2q0qRjsfKAAWSRuKTKQ@mail.gmail.com>
+Message-ID: <CAK7LNASz+_v=AFJqVchVRZJbXH0Rne0dO9MUCSao0UrFYexGmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+Hi Linus,
 
-On 6 October 2017 at 12:12, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> On Fri, Oct 6, 2017 at 6:36 AM, Anand Moon <linux.amoon@gmail.com> wrote:
->> remove the disable and enable of phy clk.
->> phy clk is needed to tune the phy controller.
+
+2017-09-27 22:42 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
+> On Wed, Sep 27, 2017 at 4:45 AM, Masahiro Yamada
+> <yamada.masahiro@socionext.com> wrote:
 >
-> Drivers should in general enable and disable the clocks they use. Just
-> like in patch #1 please describe why you are doing this, what kind of
-> problem are you trying to solve and what exactly are you trying to do
-> here.
+>> This GPIO controller is used on UniPhier SoC family.
+>>
+>> The vendor specific property "socionext,interrupt-ranges" is for
+>> specifying interrupt mapping to the parent interrupt controller
+>> because the mapping is not contiguous.  It works like "ranges",
+>> but transforms "interrupts" instead of "reg".
+>>
+>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>> Acked-by: Rob Herring <robh@kernel.org>
 >
-> BR,
-> Krzysztof
+> I don't think Rob has seen the new interrupt range thing?
+> (It's not a big deal. Things like these are a bit fuzzy.)
 >
+>> +               socionext,interrupt-ranges = <0 48 16>, <16 154 5>, <21 217 3>;
+>
+> If it is as you say, that other SoCs are doing the same, we should
+> think about creating a generic property for this. Like
+> hierarchy-interrupt-ranges or so.
+>
+> I kind of liked the old patch where it was just "interrupts" and
+> then you looked it up from the irq subsystem. (tglx even ACKed
+> the patch).
+>
+> But I want the DT people to say something here.
+>
+> Yours,
+> Linus Walleij
 
-[snip]
 
-Usually we would disable the clk on error patch and return with failed.
-but in the current code we disable the clk in init routine and
-enable the clk in disable routine which seem incorrect.
+I explained the technical background of this approach,
+but I have not had any comment.
+(DT people are silent, too)
 
-[0] https://github.com/torvalds/linux/blob/master/drivers/phy/samsung/phy-exynos5-usbdrd.c#L362-L412
-[1] https://github.com/torvalds/linux/blob/master/drivers/phy/samsung/phy-exynos5-usbdrd.c#L424-L446
+Is this driver applicable?
 
-On 3.10.x kernel clk_summary all the clk are enables.
 
-    mout_usbdrd300              3           3            24000000
-       dout_usbdrd300           2           2            24000000
-          sclk_usbdrd300        1           1            24000000
-       dout_usbphy300           2           2            24000000
-          sclk_usbphy300        1           1            24000000
-    mout_usbdrd301              3           3            24000000
-       dout_usbdrd301           2           2            24000000
-          sclk_usbdrd301        1           1            24000000
-       dout_usbphy301           2           2            24000000
-          sclk_usbphy301        1           1            24000000
 
-Some more changes in clk driver might be required to stabilize the usb module.
-
+-- 
 Best Regards
--Anand
+Masahiro Yamada
