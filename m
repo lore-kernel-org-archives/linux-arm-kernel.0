@@ -1,41 +1,70 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun,  8 Oct 2017 12:29:04 +0800
-Subject: [PATCH 4/6] ARM: sun8i: v40: add 5V regulator for Banana Pi M2 Berry
+Date: Sun,  8 Oct 2017 12:29:01 +0800
+Subject: [PATCH 1/6] phy: sun4i-usb: add support for R40 USB PHY
 In-Reply-To: <20171008042906.46779-1-icenowy@aosc.io>
 References: <20171008042906.46779-1-icenowy@aosc.io>
-Message-ID: <20171008042906.46779-5-icenowy@aosc.io>
+Message-ID: <20171008042906.46779-2-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the Banana Pi M2 Berry board, the 5V power output (used by HDMI, SATA
-and USB) is controlled via a GPIO.
+Allwinner R40 features a USB PHY like the one in A64, but with 3 PHYs.
 
-Add regulator node for it.
+Add support for it.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt |  1 +
+ drivers/phy/allwinner/phy-sun4i-usb.c                   | 12 ++++++++++++
+ 2 files changed, 13 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts b/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts
-index 8a69be2a0842..fe16fc0eb518 100644
---- a/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts
-+++ b/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts
-@@ -72,6 +72,15 @@
- 		};
- 	};
+diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+index cbc7847dbf6c..0f00abd40a50 100644
+--- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
++++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+@@ -11,6 +11,7 @@ Required properties:
+   * allwinner,sun8i-a33-usb-phy
+   * allwinner,sun8i-a83t-usb-phy
+   * allwinner,sun8i-h3-usb-phy
++  * allwinner,sun8i-r40-usb-phy
+   * allwinner,sun8i-v3s-usb-phy
+   * allwinner,sun50i-a64-usb-phy
+ - reg : a list of offset + length pairs
+diff --git a/drivers/phy/allwinner/phy-sun4i-usb.c b/drivers/phy/allwinner/phy-sun4i-usb.c
+index 1161e11fb3cf..9df7a2c9ca75 100644
+--- a/drivers/phy/allwinner/phy-sun4i-usb.c
++++ b/drivers/phy/allwinner/phy-sun4i-usb.c
+@@ -112,6 +112,7 @@ enum sun4i_usb_phy_type {
+ 	sun8i_a33_phy,
+ 	sun8i_a83t_phy,
+ 	sun8i_h3_phy,
++	sun8i_r40_phy,
+ 	sun8i_v3s_phy,
+ 	sun50i_a64_phy,
+ };
+@@ -919,6 +920,16 @@ static const struct sun4i_usb_phy_cfg sun8i_h3_cfg = {
+ 	.phy0_dual_route = true,
+ };
  
-+	reg_vcc5v0: vcc5v0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc5v0";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&pio 7 23 GPIO_ACTIVE_HIGH>; /* PH23 */
-+		enable-active-high;
-+	};
++static const struct sun4i_usb_phy_cfg sun8i_r40_cfg = {
++	.num_phys = 3,
++	.type = sun8i_r40_phy,
++	.disc_thresh = 3,
++	.phyctl_offset = REG_PHYCTL_A33,
++	.dedicated_clocks = true,
++	.enable_pmu_unk1 = true,
++	.phy0_dual_route = true,
++};
 +
- 	wifi_pwrseq: wifi_pwrseq {
- 		compatible = "mmc-pwrseq-simple";
- 		reset-gpios = <&pio 6 10 GPIO_ACTIVE_LOW>; /* PG10 WIFI_EN */
+ static const struct sun4i_usb_phy_cfg sun8i_v3s_cfg = {
+ 	.num_phys = 1,
+ 	.type = sun8i_v3s_phy,
+@@ -947,6 +958,7 @@ static const struct of_device_id sun4i_usb_phy_of_match[] = {
+ 	{ .compatible = "allwinner,sun8i-a33-usb-phy", .data = &sun8i_a33_cfg },
+ 	{ .compatible = "allwinner,sun8i-a83t-usb-phy", .data = &sun8i_a83t_cfg },
+ 	{ .compatible = "allwinner,sun8i-h3-usb-phy", .data = &sun8i_h3_cfg },
++	{ .compatible = "allwinner,sun8i-r40-usb-phy", .data = &sun8i_r40_cfg },
+ 	{ .compatible = "allwinner,sun8i-v3s-usb-phy", .data = &sun8i_v3s_cfg },
+ 	{ .compatible = "allwinner,sun50i-a64-usb-phy",
+ 	  .data = &sun50i_a64_cfg},
 -- 
 2.13.6
