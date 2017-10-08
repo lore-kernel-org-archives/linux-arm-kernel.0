@@ -1,57 +1,85 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun,  8 Oct 2017 12:29:06 +0800
-Subject: [PATCH 6/6] ARM: sun8i: v40: enable USB host ports for Banana Pi M2
- Berry
-In-Reply-To: <20171008042906.46779-1-icenowy@aosc.io>
-References: <20171008042906.46779-1-icenowy@aosc.io>
-Message-ID: <20171008042906.46779-7-icenowy@aosc.io>
+Date: Sun,  8 Oct 2017 12:35:40 +0800
+Subject: [PATCH 1/2] dt-bindings: add binding for Allwinner R40 SATA AHCI
+ controller
+Message-ID: <20171008043541.48564-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Banana Pi M2 Berry has an on-board USB Hub that provides 4 USB Type-A
-ports, and it's connected to the USB1 port of the SoC.
+The Allwinner R40 SoC contains a SATA AHCI controller like the one in
+A10/A20 SoCs, however a reset control and two power supplies are added
+to it.
 
-Enable it.
+Add a binding document for it.
+
+As a dedicated binding document is needed now for the A10/A20/R40 AHCI
+controller, drop the A10 compatible line from generic platform AHCI
+controller binding document.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ .../devicetree/bindings/ata/ahci-platform.txt      |  1 -
+ .../bindings/ata/allwinner,sun4i-a10-ahci.txt      | 40 ++++++++++++++++++++++
+ 2 files changed, 40 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/ata/allwinner,sun4i-a10-ahci.txt
 
-diff --git a/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts b/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts
-index fe16fc0eb518..45c17c8c5915 100644
---- a/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts
-+++ b/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts
-@@ -87,6 +87,10 @@
- 	};
- };
+diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+index fedc213b5f1a..da6818b2c204 100644
+--- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
++++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+@@ -9,7 +9,6 @@ PHYs.
  
-+&ehci1 {
-+	status = "okay";
-+};
+ Required properties:
+ - compatible        : compatible string, one of:
+-  - "allwinner,sun4i-a10-ahci"
+   - "brcm,iproc-ahci"
+   - "hisilicon,hisi-ahci"
+   - "cavium,octeon-7130-ahci"
+diff --git a/Documentation/devicetree/bindings/ata/allwinner,sun4i-a10-ahci.txt b/Documentation/devicetree/bindings/ata/allwinner,sun4i-a10-ahci.txt
+new file mode 100644
+index 000000000000..0eea78c14ad3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/ata/allwinner,sun4i-a10-ahci.txt
+@@ -0,0 +1,40 @@
++Allwinner A10/A20/R40 SoC SATA AHCI Controller
 +
- &i2c0 {
- 	status = "okay";
- 
-@@ -98,6 +102,10 @@
- 	};
- };
- 
-+&ohci1 {
-+	status = "okay";
-+};
++Required properties:
++- compatible        : compatible string, one of:
++  - "allwinner,sun4i-a10-ahci"
++  - "allwinner,sun8i-r40-ahci"
++- interrupts        : the SATA IRQ
++- reg               : the register mapping
++- clocks            : the clocks needed by SATA controller, usually contains
++		      an AHB clock and a mod clock
 +
- #include "axp22x.dtsi"
- 
- &reg_aldo3 {
-@@ -171,3 +179,8 @@
- 	pinctrl-0 = <&uart0_pb_pins>;
- 	status = "okay";
- };
++Optional properties:
++- target-supply     : regulator for SATA target power
 +
-+&usbphy {
-+	usb1_vbus-supply = <&reg_vcc5v0>;
-+	status = "okay";
-+};
++Required properties for the following compatibles:
++  - "allwinner,sun8i-r40-ahci"
++- resets            : the reset control needed by SATA controller
++- vdd1v2-supply     : regulator for SATA controller's 1.2V VDD
++- vdd2v5-supply     : regulator for SATA controller's 2.5V VDD
++
++
++Examples for A10:
++	ahci: sata at 1c18000 {
++		compatible = "allwinner,sun4i-a10-ahci";
++		reg = <0x01c18000 0x1000>;
++		interrupts = <56>;
++		clocks = <&pll6 0>, <&ahb_gates 25>;
++		target-supply = <&reg_ahci_5v>;
++	};
++
++Examples for R40:
++	ahci: sata at 1c18000 {
++		compatible = "allwinner,sun8i-r40-ahci";
++		reg = <0x01c18000 0x1000>;
++		interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&ccu CLK_SATA>, <&ccu CLK_BUS_SATA>;
++		resets = <&ccu RST_BUS_SATA>;
++		vdd1v2-supply = <&reg_eldo3>;
++		vdd2v5-supply = <&reg_dldo4>;
++	};
 -- 
 2.13.6
