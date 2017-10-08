@@ -1,61 +1,142 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Mon, 9 Oct 2017 00:30:52 +0300
-Subject: [PATCH v2 0/5] Switch arm64 over to qrwlock
-In-Reply-To: <1507296882-18721-1-git-send-email-will.deacon@arm.com>
-References: <1507296882-18721-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20171008213052.ojyxpr56d2ypscjy@yury-thinkpad>
+From: pure.logic@nexus-software.ie (Bryan O'Donoghue)
+Date: Sun,  8 Oct 2017 23:41:18 +0100
+Subject: [PATCH v2 3/7] nvmem: imx-ocotp: Add support for banked OTP addressing
+In-Reply-To: <1507502482-22518-1-git-send-email-pure.logic@nexus-software.ie>
+References: <1507502482-22518-1-git-send-email-pure.logic@nexus-software.ie>
+Message-ID: <1507502482-22518-4-git-send-email-pure.logic@nexus-software.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 06, 2017 at 02:34:37PM +0100, Will Deacon wrote:
-> Hi all,
-> 
-> This is version two of the patches I posted yesterday:
-> 
->   http://lists.infradead.org/pipermail/linux-arm-kernel/2017-October/534666.html
-> 
-> I'd normally leave it longer before posting again, but Peter had a good
-> suggestion to rework the layout of the lock word, so I wanted to post a
-> version that follows that approach.
-> 
-> I've updated my branch if you're after the full patch stack:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git qrwlock
-> 
-> As before, all comments (particularly related to testing and performance)
-> welcome!
-> 
-> Cheers,
-> 
-> Will
+The i.MX7S/D takes the bank address in the CTRLn.ADDR field and the data
+value in one of the DATAx {0, 1, 2, 3} register fields. The current write
+routine is based on writing the CTRLn.ADDR field and writing a single DATA
+register only.
 
-Hi Will,
+Fixes: 0642bac7da42 ("nvmem: imx-ocotp: add write support")
 
-I tested your patches with locktorture and found measurable performance
-regression. I also respin the patch of Jan Glauber [1], and I also
-tried Jan's patch with patch 5 from this series. Numbers differ a lot
-from my previous measurements, but since that I changed working
-station and use qemu with the support of parallel threads.
-                        Spinlock        Read-RW lock    Write-RW lock
-Vanilla:                129804626       12340895        14716138
-This series:            113718002       10982159        13068934
-Jan patch:              117977108       11363462        13615449
-Jan patch + #5:         121483176       11696728        13618967
+Signed-off-by: Bryan O'Donoghue <pure.logic@nexus-software.ie>
+---
+ drivers/nvmem/imx-ocotp.c | 72 ++++++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 62 insertions(+), 10 deletions(-)
 
-The bottomline of discussion [1] was that queued locks are more
-effective when SoC has many CPUs. And 4 is not many. My measurement
-was made on the 4-CPU machine, and it seems it confirms that. Does
-it make sense to make queued locks default for many-CPU machines only?
-
-There were 2 preparing patches in the series: 
-[PATCH 1/3] kernel/locking: #include <asm/spinlock.h> in qrwlock
-and
-[PATCH 2/3] asm-generic: don't #include <linux/atomic.h> in qspinlock_types.h
-
-1st patch is not needed anymore because Babu Moger submitted similar patch that
-is already in mainline: 9ab6055f95903 ("kernel/locking: Fix compile error with
-qrwlock.c"). Could you revisit second patch?
-
-[1] https://lkml.org/lkml/2017/5/3/330
-
-Yury
+diff --git a/drivers/nvmem/imx-ocotp.c b/drivers/nvmem/imx-ocotp.c
+index 7798571..3b18351 100644
+--- a/drivers/nvmem/imx-ocotp.c
++++ b/drivers/nvmem/imx-ocotp.c
+@@ -40,7 +40,10 @@
+ #define IMX_OCOTP_ADDR_CTRL_SET		0x0004
+ #define IMX_OCOTP_ADDR_CTRL_CLR		0x0008
+ #define IMX_OCOTP_ADDR_TIMING		0x0010
+-#define IMX_OCOTP_ADDR_DATA		0x0020
++#define IMX_OCOTP_ADDR_DATA0		0x0020
++#define IMX_OCOTP_ADDR_DATA1		0x0030
++#define IMX_OCOTP_ADDR_DATA2		0x0040
++#define IMX_OCOTP_ADDR_DATA3		0x0050
+ 
+ #define IMX_OCOTP_BM_CTRL_ADDR		0x0000007F
+ #define IMX_OCOTP_BM_CTRL_BUSY		0x00000100
+@@ -55,6 +58,7 @@ static DEFINE_MUTEX(ocotp_mutex);
+ 
+ struct ocotp_params {
+ 	unsigned int nregs;
++	unsigned int bank_address_words;
+ };
+ 
+ struct ocotp_priv {
+@@ -176,6 +180,7 @@ static int imx_ocotp_write(void *context, unsigned int offset, void *val,
+ 	u32 timing = 0;
+ 	u32 ctrl;
+ 	u8 waddr;
++	u8 word = 0;
+ 
+ 	/* allow only writing one complete OTP word at a time */
+ 	if ((bytes != priv->config->word_size) ||
+@@ -228,8 +233,22 @@ static int imx_ocotp_write(void *context, unsigned int offset, void *val,
+ 	 * description. Both the unlock code and address can be written in the
+ 	 * same operation.
+ 	 */
+-	/* OTP write/read address specifies one of 128 word address locations */
+-	waddr = offset / 4;
++	if (priv->params->bank_address_words != 0) {
++		/*
++		 * In banked mode the OTP register bank goes into waddr see
++		 * i.MX 7Solo Applications Processor Reference Manual, Rev. 0.1
++		 * 6.4.3.1
++		 */
++		offset = offset / priv->config->word_size;
++		waddr = offset / priv->params->bank_address_words;
++		word  = offset & (priv->params->bank_address_words - 1);
++	} else {
++		/*
++		 * OTP write/read address specifies one of 128 word address
++		 * locations
++		 */
++		waddr = offset / 4;
++	}
+ 
+ 	ctrl = readl(priv->base + IMX_OCOTP_ADDR_CTRL);
+ 	ctrl &= ~IMX_OCOTP_BM_CTRL_ADDR;
+@@ -255,8 +274,41 @@ static int imx_ocotp_write(void *context, unsigned int offset, void *val,
+ 	 * shift right (with zero fill). This shifting is required to program
+ 	 * the OTP serially. During the write operation, HW_OCOTP_DATA cannot be
+ 	 * modified.
++	 * Note: on i.MX7 there are four data fields to write for banked write
++	 *       with the fuse blowing operation only taking place after data0
++	 *	 has been written. This is why data0 must always be the last
++	 *	 register written.
+ 	 */
+-	writel(*buf, priv->base + IMX_OCOTP_ADDR_DATA);
++	if (priv->params->bank_address_words == 0) {
++		writel(*buf, priv->base + IMX_OCOTP_ADDR_DATA0);
++	} else {
++		switch (word) {
++		case 0:
++			writel(0, priv->base + IMX_OCOTP_ADDR_DATA1);
++			writel(0, priv->base + IMX_OCOTP_ADDR_DATA2);
++			writel(0, priv->base + IMX_OCOTP_ADDR_DATA3);
++			writel(*buf, priv->base + IMX_OCOTP_ADDR_DATA0);
++			break;
++		case 1:
++			writel(*buf, priv->base + IMX_OCOTP_ADDR_DATA1);
++			writel(0, priv->base + IMX_OCOTP_ADDR_DATA2);
++			writel(0, priv->base + IMX_OCOTP_ADDR_DATA3);
++			writel(0, priv->base + IMX_OCOTP_ADDR_DATA0);
++			break;
++		case 2:
++			writel(0, priv->base + IMX_OCOTP_ADDR_DATA1);
++			writel(*buf, priv->base + IMX_OCOTP_ADDR_DATA2);
++			writel(0, priv->base + IMX_OCOTP_ADDR_DATA3);
++			writel(0, priv->base + IMX_OCOTP_ADDR_DATA0);
++			break;
++		case 3:
++			writel(0, priv->base + IMX_OCOTP_ADDR_DATA1);
++			writel(0, priv->base + IMX_OCOTP_ADDR_DATA2);
++			writel(*buf, priv->base + IMX_OCOTP_ADDR_DATA3);
++			writel(0, priv->base + IMX_OCOTP_ADDR_DATA0);
++			break;
++		}
++	}
+ 
+ 	/* 47.4.1.4.5
+ 	 * Once complete, the controller will clear BUSY. A write request to a
+@@ -312,12 +364,12 @@ static struct nvmem_config imx_ocotp_nvmem_config = {
+ 	.reg_write = imx_ocotp_write,
+ };
+ 
+-static const struct ocotp_params params[] = {
+-	{ .nregs = 128 },
+-	{ .nregs = 64 },
+-	{ .nregs = 128 },
+-	{ .nregs = 128 },
+-	{ .nregs = 64 },
++static const struct octop_params params[] = {
++	{ .nregs = 128, .bank_address_words = 0 },
++	{ .nregs = 64,  .bank_address_words = 0 },
++	{ .nregs = 128, .bank_address_words = 0 },
++	{ .nregs = 128, .bank_address_words = 0 },
++	{ .nregs = 64,  .bank_address_words = 4 },
+ };
+ 
+ static const struct of_device_id imx_ocotp_dt_ids[] = {
+-- 
+2.7.4
