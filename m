@@ -1,86 +1,64 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Mon, 9 Oct 2017 02:37:14 +0530
-Subject: [RFC 2/2] phy: exynos5-usbdrd: remove disable and enable of phy
- clk
-In-Reply-To: <20171008155015.252gefhsc4tks7k6@kozik-lap>
-References: <1507264595-3565-1-git-send-email-linux.amoon@gmail.com>
- <1507264595-3565-2-git-send-email-linux.amoon@gmail.com>
- <CAJKOXPe9FCKqrvsgdohTAN9tXXwbMOuyaDiHPxZ1Ym1LLPD41w@mail.gmail.com>
- <CANAwSgSbHR+e_2wX3i3VoVxPe10mUOoS94uRpvebfUfybaNQ+g@mail.gmail.com>
- <20171008155015.252gefhsc4tks7k6@kozik-lap>
-Message-ID: <CANAwSgSMFBS8n48=_OnNNs_=Di9Oqq2tNeiwZM9u1qaLevLP4w@mail.gmail.com>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Sun, 08 Oct 2017 22:18:08 +0100
+Subject: [stable:PATCH] arm64: Rework valid_user_regs (v3.16)
+In-Reply-To: <1468844845-6129-4-git-send-email-james.morse@arm.com>
+References: <1468844845-6129-1-git-send-email-james.morse@arm.com>
+ <1468844845-6129-4-git-send-email-james.morse@arm.com>
+Message-ID: <1507497488.2677.97.camel@decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+On Mon, 2016-07-18 at 13:27 +0100, James Morse wrote:
+> From: Mark Rutland <mark.rutland@arm.com>
+> 
+> commit dbd4d7ca563fd0a8949718d35ce197e5642d5d9d upstream.
+> 
+> We validate pstate using PSR_MODE32_BIT, which is part of the
+> user-provided pstate (and cannot be trusted). Also, we conflate
+> validation of AArch32 and AArch64 pstate values, making the code
+> difficult to reason about.
+> 
+> Instead, validate the pstate value based on the associated task. The
+> task may or may not be current (e.g. when using ptrace), so this must be
+> passed explicitly by callers. To avoid circular header dependencies via
+> sched.h, is_compat_task is pulled out of asm/ptrace.h.
+> 
+> To make the code possible to reason about, the AArch64 and AArch32
+> validation is split into separate functions. Software must respect the
+> RES0 policy for SPSR bits, and thus the kernel mirrors the hardware
+> policy (RAZ/WI) for bits as-yet unallocated. When these acquire an
+> architected meaning writes may be permitted (potentially with additional
+> validation).
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> [ rebased for v3.16
+>   This avoids a user-triggerable Oops() if a task is switched to a mode
+>   not supported by the kernel (e.g. switching a 64-bit task to AArch32).
+> 
+>   v3.16 does not support SETEND, support for this was added by
+>   2d888f48e056 ("arm64: Emulate SETEND for AArch32 tasks") in v3.20
+>   This backport forces the kernel endianness on userspace.
+> 
+>   Added a DBG_SPSR_SS define hidden by #ifdefs to avoid conflicts with
+>   other backports.
+> ]
+> Signed-off-by: James Morse <james.morse@arm.com>
+> Cc: <stable@vger.kernel.org> #3.16.x
+[...]
 
-On 8 October 2017 at 21:20, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> On Sun, Oct 08, 2017 at 06:11:12PM +0530, Anand Moon wrote:
->> Hi Krzysztof,
->>
->> On 6 October 2017 at 12:12, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->> > On Fri, Oct 6, 2017 at 6:36 AM, Anand Moon <linux.amoon@gmail.com> wrote:
->> >> remove the disable and enable of phy clk.
->> >> phy clk is needed to tune the phy controller.
->> >
->> > Drivers should in general enable and disable the clocks they use. Just
->> > like in patch #1 please describe why you are doing this, what kind of
->> > problem are you trying to solve and what exactly are you trying to do
->> > here.
->> >
->> > BR,
->> > Krzysztof
->> >
->>
->> [snip]
->>
->> Usually we would disable the clk on error patch and return with failed.
->> but in the current code we disable the clk in init routine and
->> enable the clk in disable routine which seem incorrect.
->
-> No. For example for exynos5_usbdrd_phy_exit() the driver enables the
-> clock only for the access to PHY block (PHY registers).
->
+Belatedly queued this up for 3.16.
 
-But I dont get it why we disable code phy clk, which could be used in
-future phy tune or link control as it part of CLK_FSYS.
+Ben.
 
->>
->> [0] https://github.com/torvalds/linux/blob/master/drivers/phy/samsung/phy-exynos5-usbdrd.c#L362-L412
->> [1] https://github.com/torvalds/linux/blob/master/drivers/phy/samsung/phy-exynos5-usbdrd.c#L424-L446
->>
->> On 3.10.x kernel clk_summary all the clk are enables.
->>
->>     mout_usbdrd300              3           3            24000000
->>        dout_usbdrd300           2           2            24000000
->>           sclk_usbdrd300        1           1            24000000
->>        dout_usbphy300           2           2            24000000
->>           sclk_usbphy300        1           1            24000000
->>     mout_usbdrd301              3           3            24000000
->>        dout_usbdrd301           2           2            24000000
->>           sclk_usbdrd301        1           1            24000000
->>        dout_usbphy301           2           2            24000000
->>           sclk_usbphy301        1           1            24000000
->>
->> Some more changes in clk driver might be required to stabilize the usb module.
->
-> Please describe the issues with stability first.
->
-> Best regards,
-> Krzysztof
->
-On stability:
+-- 
+Ben Hutchings
+compatible: Gracefully accepts erroneous data from any source
 
-USB 3.0 read / write performance is not up to mark with moderate data
-read / write speed,
-If you give long compilation of kernel or any source code it would
-likely be slow
-It work pretty good with USB 3.0 SSD but generally failed with 2.5' inc HDD.
-
-If needed I will share you some performance test result with and
-without these patches.
-
-I have some more changes related to usbdrd phy change queued along this on.
-
-Best Regards
--Anand
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171008/2cd3880d/attachment.sig>
