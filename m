@@ -1,46 +1,74 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon,  9 Oct 2017 13:55:31 +0100
-Subject: [PATCH 0/3] Support Common Not Private translations
-Message-ID: <1507553734-27854-1-git-send-email-vladimir.murzin@arm.com>
+Date: Mon,  9 Oct 2017 13:55:34 +0100
+Subject: [PATCH 3/3] arm64: Introduce command line parameter to disable CNP
+In-Reply-To: <1507553734-27854-1-git-send-email-vladimir.murzin@arm.com>
+References: <1507553734-27854-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1507553734-27854-4-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Common Not Private (CNP) translations is a feature of ARMv8.2
-extension which allows translation table entries to be shared between
-different PEs in the same inner shareable domain, so the hardware can
-use this fact to optimise the caching of such entries in the TLB.
+There are cases when activating of Common Not Private (CNP) feature
+might not be desirable; this patch allows to forcefully disable CNP
+even it is supported by hardware.
 
-This patch set is an attempt to bring CNP support into Linux. It was
-tested on a v8.2 Fast Model with exploring traces and checking that
-TTBRx_ELy and VTTBR_EL2 have CnP bit set where appropriate.
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+ Documentation/admin-guide/kernel-parameters.txt |  4 ++++
+ arch/arm64/kernel/cpufeature.c                  | 20 +++++++++++++++++++-
+ 2 files changed, 23 insertions(+), 1 deletion(-)
 
-Changelog:
-
-	RFC -> v1
-            - dropped RFC tag
-            - rebased on 4.14-rc4
-
-Thanks!
-
-Vladimir Murzin (3):
-  arm64: mm: Support Common Not Private translations
-  arm64: KVM: Support Common Not Private translations
-  arm64: Introduce command line parameter to disable CNP
-
- Documentation/admin-guide/kernel-parameters.txt |  4 +++
- arch/arm64/Kconfig                              | 13 +++++++++
- arch/arm64/include/asm/asm-uaccess.h            |  2 ++
- arch/arm64/include/asm/cpucaps.h                |  3 +-
- arch/arm64/include/asm/cpufeature.h             |  6 ++++
- arch/arm64/include/asm/memory.h                 |  1 +
- arch/arm64/include/asm/mmu_context.h            | 14 +++++++++
- arch/arm64/include/asm/uaccess.h                | 10 +++++--
- arch/arm64/kernel/cpufeature.c                  | 39 +++++++++++++++++++++++++
- arch/arm64/kernel/hibernate.c                   |  2 +-
- arch/arm64/kvm/hyp-init.S                       |  4 +++
- arch/arm64/kvm/hyp/switch.c                     |  6 +++-
- arch/arm64/mm/proc.S                            |  5 ++++
- 13 files changed, 104 insertions(+), 5 deletions(-)
-
+diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+index 0549662..3c1e45d 100644
+--- a/Documentation/admin-guide/kernel-parameters.txt
++++ b/Documentation/admin-guide/kernel-parameters.txt
+@@ -2560,6 +2560,10 @@
+ 
+ 	noclflush	[BUGS=X86] Don't use the CLFLUSH instruction
+ 
++	nocnp		[ARM64]
++			Disable CNP (Common not Private translations)
++			even if it is supported by processor.
++
+ 	nodelayacct	[KNL] Disable per-task delay accounting
+ 
+ 	nodsp		[SH] Disable hardware DSP at boot time.
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 8d098a1..724fd93 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -771,6 +771,24 @@ static bool has_no_hw_prefetch(const struct arm64_cpu_capabilities *entry, int _
+ 		MIDR_CPU_VAR_REV(1, MIDR_REVISION_MASK));
+ }
+ 
++static bool nocnp;
++
++static int __init early_nocnp(char *p)
++{
++	nocnp = true;
++	return 0;
++}
++early_param("nocnp", early_nocnp);
++
++static bool has_useable_cnp(const struct arm64_cpu_capabilities *entry, int scope)
++{
++	if (!has_cpuid_feature(entry, scope))
++		return false;
++
++	return nocnp ? false : true;
++}
++
++
+ static bool runs_at_el2(const struct arm64_cpu_capabilities *entry, int __unused)
+ {
+ 	return is_kernel_in_hyp_mode();
+@@ -905,7 +923,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 		.desc = "Common not Private translations",
+ 		.capability = ARM64_HAS_CNP,
+ 		.def_scope = SCOPE_SYSTEM,
+-		.matches = has_cpuid_feature,
++		.matches = has_useable_cnp,
+ 		.sys_reg = SYS_ID_AA64MMFR2_EL1,
+ 		.sign = FTR_UNSIGNED,
+ 		.field_pos = ID_AA64MMFR2_CNP_SHIFT,
 -- 
 2.0.0
