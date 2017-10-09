@@ -1,75 +1,31 @@
-From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
-Date: Mon, 9 Oct 2017 09:30:25 +0200
-Subject: [PATCH 16/16] arm64: dts: marvell: armada-3720-espressobin:
- fill UART nodes
-In-Reply-To: <20171006151521.440418a2@windsurf.lan>
-References: <20171006101344.15590-1-miquel.raynal@free-electrons.com>
- <20171006101344.15590-17-miquel.raynal@free-electrons.com>
- <87fuawe8gx.fsf@free-electrons.com>
- <20171006151521.440418a2@windsurf.lan>
-Message-ID: <20171009093025.78d45a9a@xps13>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 9 Oct 2017 09:30:11 +0200
+Subject: [PATCH v2 0/2] ARM: dts: iwg20d-q7: New DT architecture
+In-Reply-To: <1507312793-6877-1-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <CAMuHMdW-Y7tK28YAGBRMqdgZK7vVqnUcud1FtzQd6wLrKii_AA@mail.gmail.com>
+ <1507312793-6877-1-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <20171009073011.GR17360@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas, Gregory,
-
-On Fri, 6 Oct 2017 15:15:21 +0200
-Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
-
-> Hello,
-> 
-> On Fri, 06 Oct 2017 15:01:18 +0200, Gregory CLEMENT wrote:
-> 
-> >  /*
-> >   * To enable the second UART on J17 (pins 24,26) refer to the uart1
-> >   * node from armada-3720-db.dts.
-> >   * Note that TX and RX signal are the ones coming directly from
-> > the SoC:
-> >   * 1.8V TTL.
-> >   */  
-> 
-> One issue with this comment (and Miqu?l's version as well) is that it
-> does not explain why you don't enable this UART by default.
-> 
-> The real reason is in the commit log from Miqu?l, and should probably
-> be part of the comment. Perhaps something like:
-> 
-> /*
-> 
->  * Connector J17 (pins X, Y, Z) exposes a number of different
->  * features:
->  *  - UART1 (pins 24 = RX, pins 26 = TX), see armada-3720-db.dts for
-> an
->  *    example on how to enable UART1. Beware that the signals are 1.8V
->  *    TTL.
->  *  - SPIxyz
->  *  - I2Cxyz
->  */
-
-Thanks for both your comments, there is my version, inspired from both
-comments:
-
-/*
- * Connector J17 exposes a number of different features. Some pins are
- * multiplexed. This is the case for the UART1 feature (pins 24 = RX,
- * pins 26 = TX). See armada-3720-db.dts for an example of how to enable it.
- * Beware that the signals are 1.8V TTL.
- */
-
-Thanks,
-Miqu?l
-
-> 
-> Otherwise, it's not clear at all why you don't just enable UART1. Or
-> perhaps I misunderstood Miqu?l's commit log ?
+On Fri, Oct 06, 2017 at 06:59:51PM +0100, Fabrizio Castro wrote:
+> Some of the serial interfaces are exposed on the camera daughter board.
+> The camera daughter board can be connected to the carrier board
+> by means of expansion connectors 1, 2 and 3. The carrier board may host
+> an RZ/G1M or an RZ/G1N based SoM.
+> While adding support for the serial interfaces on the camera daughter
+> board we faced the dilemma of how to properly describe all of the
+> possible HW configurations and how to maximize code reuse.
+> The best option would be to use device tree overlays, however there is
+> still some work to be done on that front before actually using them,
+> therefore for the time being we decided to provide .dtsi files to
+> describe the carrier board and the camera daughter board, and provide
+> .dts files to describe the HW configurations we need to support.
 > 
 > Best regards,
 > 
-> Thomas
+> Fabrizio Castro (2):
+>   ARM: dts: iwg20d-q7: Rework DT architecture
+>   ARM: dts: iwg20d-q7-dbcm-ca: Add device trees for camera DB
 
-
-
--- 
-Miquel Raynal, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Thanks, applied.
