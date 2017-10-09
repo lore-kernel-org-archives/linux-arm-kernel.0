@@ -1,55 +1,65 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 9 Oct 2017 16:43:53 +0200
-Subject: [PATCH] PCI: exynos: remove redundant code in
- exynos_pcie_establish_link
-In-Reply-To: <1507558478-3218-1-git-send-email-pankaj.dubey@samsung.com>
-References: <CGME20171009141438epcas2p4ead7e2f2d1af7e0950f2c026e3a9943b@epcas2p4.samsung.com>
- <1507558478-3218-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <CAJKOXPeC=cS2cvAXHrKuK5F4tEqH6PppwYkxC+Z8+5D--48CAg@mail.gmail.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Mon, 9 Oct 2017 20:16:20 +0530
+Subject: [PATCH v3 03/22] dt-bindings: arm: scmi: add ARM MHU specific
+ mailbox client bindings
+In-Reply-To: <CAL_JsqKy+WzEiHRS0BrE3_3Md4CGOr0e2ZZ_vBCB-Opgg49s+A@mail.gmail.com>
+References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
+ <1506604306-20739-4-git-send-email-sudeep.holla@arm.com>
+ <20171005232031.7373ni5ssln4wlpr@rob-hp-laptop>
+ <CABb+yY1ra5bgRB1VND+NvCcDFqfggG04a+JPWFZ+HpNg08eR8g@mail.gmail.com>
+ <CAL_Jsq+0paGePmJVjsyFJiHx0UaDPjQrbe3C030U+fuUkWCJ+A@mail.gmail.com>
+ <CABb+yY2v8D9NFVsG9OwSpL8cswKihY6OUru8QA6Jfq5YmVVD7A@mail.gmail.com>
+ <CAL_JsqKy+WzEiHRS0BrE3_3Md4CGOr0e2ZZ_vBCB-Opgg49s+A@mail.gmail.com>
+Message-ID: <CABb+yY0KNafWbD00hBVrNNGnFDcU0v6KXXY2D2K7KNouak1HdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 9, 2017 at 4:14 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
-> From: Anvesh Salveru <anvesh.s@samsung.com>
+On Mon, Oct 9, 2017 at 7:22 PM, Rob Herring <robh@kernel.org> wrote:
+> On Fri, Oct 6, 2017 at 9:26 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>> On Fri, Oct 6, 2017 at 9:24 PM, Rob Herring <robh@kernel.org> wrote:
+>>> On Fri, Oct 6, 2017 at 6:01 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>>>> On Fri, Oct 6, 2017 at 4:50 AM, Rob Herring <robh@kernel.org> wrote:
+>>>>> On Thu, Sep 28, 2017 at 02:11:27PM +0100, Sudeep Holla wrote:
+>>
+>>>>>
+>>>>>> +- mbox-data : For each phandle listed in mboxes property, an unsigned 32-bit
+>>>>>> +           data as expected by the mailbox controller
+>>>>>
+>>>>> Shouldn't that be cells as part of mboxes property?
+>>>>>
+>>>> A MHU client can send any number of commands (such u32 values) over a channel.
+>>>> This client (SCMI) sends just one command over a channel, but other
+>>>> clients may/do send two or more.
 >
-> In exynos_pcie_establish_link if driver is not using generic phy,
-> we are resetting PHY twice, which is redundant, so this patch removes
-
-Hi Pankaj,
-
-This lacks the information why it is redundant.
-
-> repeated lines of code for PHY reset.
+> The above definition doesn't support 2 or more as it is 1-1 with channels.
 >
-> Signed-off-by: Anvesh Salveru <anvesh.s@samsung.com>
+I thought you suggested to make controller driver accept the command
+as another cell in client's mboxes property.
+Which we can't do.
 
-Your Signed-off-by is needed here.
+>>> Okay, then I guess I don't understand why this is in DT.
+>>>
+>> Yeah the client has to provide code (u32 value) for the commands it
+>> sends, and that value is going to be platform specific. For example,
+>> on Juno the ITS_AN_SCMI_COMMAND may be defined as BIT(7) while on my
+>> platform it may be 0x4567
+>>
+>> For MHU based platforms, it becomes easy if the u32 is passed from DT.
+>> And that should be ok since that is like a h/w parameter - a value
+>> chosen/expected by the remote firmware.
+>
+> Could it ever be more than 1 cell?
+>
+SCMI sends sub-commands via SHMEM, so it is always going to be 1cell for _scmi_.
+However many firmwares are unlikely to use just one command over a
+channel - say, the protocol is trivial or the linux and remote have no
+SHMEM.
 
-Best regards,
-Krzysztof
+> I guess being in DT is fine, but I'm still not sure about the naming.
+> The current name suggests it is part of the mbox binding. Do we want
+> that or should it be SCMI specific? Then "data" is vague. Perhaps
+> "scmi-commands"?
+>
+Sure. I have no problem with whatever we wanna call it.
 
-> ---
->  drivers/pci/dwc/pci-exynos.c | 7 -------
->  1 file changed, 7 deletions(-)
->
-> diff --git a/drivers/pci/dwc/pci-exynos.c b/drivers/pci/dwc/pci-exynos.c
-> index 5596fde..85d2f4b 100644
-> --- a/drivers/pci/dwc/pci-exynos.c
-> +++ b/drivers/pci/dwc/pci-exynos.c
-> @@ -423,13 +423,6 @@ static int exynos_pcie_establish_link(struct exynos_pcie *ep)
->                 exynos_pcie_deassert_phy_reset(ep);
->                 exynos_pcie_power_on_phy(ep);
->                 exynos_pcie_init_phy(ep);
-> -
-> -               /* pulse for common reset */
-> -               exynos_pcie_writel(ep->mem_res->block_base, 1,
-> -                                       PCIE_PHY_COMMON_RESET);
-> -               udelay(500);
-> -               exynos_pcie_writel(ep->mem_res->block_base, 0,
-> -                                       PCIE_PHY_COMMON_RESET);
->         }
->
->         /* pulse for common reset */
-> --
-> 2.7.4
->
+thnx
