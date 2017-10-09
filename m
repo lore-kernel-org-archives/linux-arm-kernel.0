@@ -1,65 +1,18 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 09 Oct 2017 17:48:36 +0100
-Subject: [PATCH 1/3] arm64: mm: Support Common Not Private translations
-In-Reply-To: <20171009152300.yrjdhnwna5r2enae@armageddon.cambridge.arm.com>
-References: <1507553734-27854-1-git-send-email-vladimir.murzin@arm.com>
- <1507553734-27854-2-git-send-email-vladimir.murzin@arm.com>
- <20171009152300.yrjdhnwna5r2enae@armageddon.cambridge.arm.com>
-Message-ID: <59DBA864.9030108@arm.com>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Mon, 9 Oct 2017 18:50:57 +0200
+Subject: [PATCH 1/2] ARM: dts: BCM5301X: Add DT for Luxul XBR-4500
+In-Reply-To: <1507563983-7354-1-git-send-email-riproute@gmail.com>
+References: <1507563983-7354-1-git-send-email-riproute@gmail.com>
+Message-ID: <CACna6rxipRP7_oBNJ=5KyB4g66ZBw00g4gwLicc70q5VenJSMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin, Vladimir,
+On 9 October 2017 at 17:46, Dan Haab <riproute@gmail.com> wrote:
+> From: Dan Haab <dhaab@luxul.com>
+>
+> This is BCM47094 (AKA BCM4709C0) based router with ports-on-the-front
+> board design.
+>
+> Signed-off-by: Dan Haab <dhaab@luxul.com>
 
-On 09/10/17 16:23, Catalin Marinas wrote:
-> On Mon, Oct 09, 2017 at 01:55:32PM +0100, Vladimir Murzin wrote:
->> This patch adds support for Common Not Private translations on
->> different exceptions levels:
-
->> (2) For EL1 we postpone setting CNP till all cpus are up and rely on
->>     cpufeature framework to 1) patch the code which is sensitive to
->>     CNP and 2) update TTBR1_EL1 with CNP bit set. The only case where
->>     TTBR1_EL1 can be reprogrammed is hibirnation, so the code there is
->>     changed to save raw TTBR1_EL1 and blindly restore it on resume.
-
-> Even if you do this when all the CPUs are up, that's not always true.
-> Starting with maxcpus=1 allows something like systemd to bring up new
-> CPUs once user space starts.
-
-For secondary CPUs cpu_enable_cnp() will be called to set CNP on TTBR1_EL1. But
-what about cpuidle? This also resets the TTBR1_EL1 value.
-
-
-> The problem we have is that we don't know
-> what the firmware is doing, whether it's setting CnP or not. Maybe we
-> should add some statement in Documentation/arm64/booting.txt that
-> firmware must not use CnP at all.
-
-
->> diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
->> index 095d3c1..1d056f3 100644
->> --- a/arch/arm64/kernel/hibernate.c
->> +++ b/arch/arm64/kernel/hibernate.c
->> @@ -124,7 +124,7 @@ int arch_hibernation_header_save(void *addr, unsigned int max_size)
->>  		return -EOVERFLOW;
->>  
->>  	arch_hdr_invariants(&hdr->invariants);
->> -	hdr->ttbr1_el1		= __pa_symbol(swapper_pg_dir);
->> +	hdr->ttbr1_el1		= read_sysreg(ttbr1_el1);
->>  	hdr->reenter_kernel	= _cpu_resume;
->>  
->>  	/* We can't use __hyp_get_vectors() because kvm may still be loaded */
-
-> Are all the CPUs up when coming out of hibernation and restoring
-> ttbr1_el1?
-
-'nonboot' CPUs are powered off around hibernate, so this only runs on one CPU.
-
-Restoring with the CNP set like this will share all the TTBR1 mappings using the
-reserved ASID out of TTBR0. Hibernate then calls cpu_uninstall_idmap() via
-__cpu_suspend_exit(), which will restore the original ttbr0 value and CNP bit.
-
-
-Thanks,
-
-James
+Acked-by: Rafa? Mi?ecki <rafal@milecki.pl>
