@@ -1,102 +1,55 @@
 From: andrzej.p@samsung.com (Andrzej Pietrasiewicz)
-Date: Mon, 09 Oct 2017 14:00:50 +0200
-Subject: [PATCHv4 1/2] drivers: phy: add calibrate method
-In-Reply-To: <1507550451-21324-1-git-send-email-andrzej.p@samsung.com>
+Date: Mon, 09 Oct 2017 14:00:49 +0200
+Subject: [PATCHv4 0/2] dwc3 on XU3
+In-Reply-To: <6de8a17a-745b-0fa2-c39d-cdeb28fc9489@ti.com>
 References: <6de8a17a-745b-0fa2-c39d-cdeb28fc9489@ti.com>
- <1507550451-21324-1-git-send-email-andrzej.p@samsung.com>
- <CGME20171009120101eucas1p1c79faf4b39df7f9ff622404a15922875@eucas1p1.samsung.com>
-Message-ID: <1507550451-21324-2-git-send-email-andrzej.p@samsung.com>
+ <CGME20171009120100eucas1p2400a1ee4a7c70eed37c653de780b715d@eucas1p2.samsung.com>
+Message-ID: <1507550451-21324-1-git-send-email-andrzej.p@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some quirky UDCs (like dwc3 on Exynos) need to have their phys calibrated e.g.
-for using super speed. This patch adds a new phy_calibrate() method.
-When the calibration should be used is dependent on actual chip.
+Hi all,
 
-In case of dwc3 on Exynos the calibration must happen after usb_add_hcd()
-(while in host mode), because certain phy parameters like Tx LOS levels
-and boost levels need to be calibrated further post initialization of xHCI
-controller, to get SuperSpeed operations working. But an hcd must be
-prepared first in order to pass it to usb_add_hcd(), so, in particular, dwc3
-registers must be available first, and in order for the latter to happen
-the phys must be initialized. This poses a chicken and egg problem if
-the calibration were to be performed in phy_init(). To break the circular
-dependency a separate method is added which can be called at a desired
-moment after phy intialization.
+This is the fourth version of patches in this thread.
 
-Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
----
- drivers/phy/phy-core.c  | 15 +++++++++++++++
- include/linux/phy/phy.h | 10 ++++++++++
- 2 files changed, 25 insertions(+)
+The series fixes problems with enumerating of SuperSpeed devices
+on an Odroid XU3. There was a patch series from Vivek Gautam in
+circulation, but it got lost somehow. Please see:
 
-diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
-index a268f4d..b4964b0 100644
---- a/drivers/phy/phy-core.c
-+++ b/drivers/phy/phy-core.c
-@@ -372,6 +372,21 @@ int phy_reset(struct phy *phy)
- }
- EXPORT_SYMBOL_GPL(phy_reset);
- 
-+int phy_calibrate(struct phy *phy)
-+{
-+	int ret;
-+
-+	if (!phy || !phy->ops->calibrate)
-+		return 0;
-+
-+	mutex_lock(&phy->mutex);
-+	ret = phy->ops->calibrate(phy);
-+	mutex_unlock(&phy->mutex);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(phy_calibrate);
-+
- /**
-  * _of_phy_get() - lookup and obtain a reference to a phy by phandle
-  * @np: device_node for which to get the phy
-diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
-index e694d40..87580c8 100644
---- a/include/linux/phy/phy.h
-+++ b/include/linux/phy/phy.h
-@@ -39,6 +39,7 @@ enum phy_mode {
-  * @power_off: powering off the phy
-  * @set_mode: set the mode of the phy
-  * @reset: resetting the phy
-+ * @calibrate: calibrate the phy
-  * @owner: the module owner containing the ops
-  */
- struct phy_ops {
-@@ -48,6 +49,7 @@ struct phy_ops {
- 	int	(*power_off)(struct phy *phy);
- 	int	(*set_mode)(struct phy *phy, enum phy_mode mode);
- 	int	(*reset)(struct phy *phy);
-+	int	(*calibrate)(struct phy *phy);
- 	struct module *owner;
- };
- 
-@@ -141,6 +143,7 @@ static inline void *phy_get_drvdata(struct phy *phy)
- int phy_power_off(struct phy *phy);
- int phy_set_mode(struct phy *phy, enum phy_mode mode);
- int phy_reset(struct phy *phy);
-+int phy_calibrate(struct phy *phy);
- static inline int phy_get_bus_width(struct phy *phy)
- {
- 	return phy->attrs.bus_width;
-@@ -262,6 +265,13 @@ static inline int phy_reset(struct phy *phy)
- 	return -ENOSYS;
- }
- 
-+static inline int phy_calibrate(struct phy *phy)
-+{
-+	if (!phy)
-+		return 0;
-+	return -ENOSYS;
-+}
-+
- static inline int phy_get_bus_width(struct phy *phy)
- {
- 	return -ENOSYS;
+https://lkml.org/lkml/2014/9/2/166
+https://lkml.org/lkml/2015/2/2/257
+
+I adapted his patch so that it does not use a hacky solution to force
+additional initialization in order for calibration to happen.
+With this patch enumeration happens correctly and a super speed device
+is recognized as such.
+
+Changes since v3:
+
+- improved the commit message in phy_calibrate() commit
+  (as suggested by Kishon)
+- rebased onto v4.14-rc4
+
+Changes since v2:
+
+- exported the "calibrate_phy" symbol
+
+Changes since v1:
+
+- added calibrate() callback to phy
+- used calibrate() instead of reset() to trigger the calibration
+
+Andrzej Pietrasiewicz (1):
+  drivers: phy: add calibrate method
+
+Vivek Gautam (1):
+  phy: exynos5-usbdrd: Calibrate LOS levels for exynos5420/5800
+
+ drivers/phy/phy-core.c                   |  15 +++
+ drivers/phy/samsung/phy-exynos5-usbdrd.c | 183 +++++++++++++++++++++++++++++++
+ drivers/usb/dwc3/core.c                  |   7 +-
+ include/linux/phy/phy.h                  |  10 ++
+ 4 files changed, 213 insertions(+), 2 deletions(-)
+
 -- 
 1.9.1
