@@ -1,70 +1,59 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon,  9 Oct 2017 22:53:37 +0200
-Subject: [PATCH v2 1/3] pinctrl: sunxi: Introduce the strict flag
-In-Reply-To: <cover.3e8ef5cb08d0164375d7644df0548e5f39b0fe66.1507582414.git-series.maxime.ripard@free-electrons.com>
-References: <cover.3e8ef5cb08d0164375d7644df0548e5f39b0fe66.1507582414.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <c764ce12c83daefabaaea6a2df293c68f078c5e2.1507582414.git-series.maxime.ripard@free-electrons.com>
+Date: Mon,  9 Oct 2017 22:53:36 +0200
+Subject: [PATCH v2 0/3] pinctrl: sunxi: Start to enforce the strict mode
+Message-ID: <cover.3e8ef5cb08d0164375d7644df0548e5f39b0fe66.1507582414.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our pinctrl device should have had strict set all along. However, it wasn't
-the case, and most of our old device trees also have a pinctrl group in
-addition to the GPIOs properties, which mean that we can't really turn it
-on now.
+Hi,
 
-All our new SoCs don't have that group, so we should still enable that mode
-on the newer one though.
+Here is an attempt to enable pinctrl's strict mode on our pinctrl drivers.
+Indeed, our controllers should have had that mode enabled since its
+introduction.
 
-In order to enable it by default, add a flag that will allow to disable
-that mode that should be set by pinctrl drivers that cannot be migrated.
+However, there's a number of issues with old device trees that prevent from
+just enabling it for all the devices. There's basically two of them:
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/pinctrl/sunxi/pinctrl-sunxi.c | 12 +++++++++++-
- drivers/pinctrl/sunxi/pinctrl-sunxi.h |  1 +
- 2 files changed, 12 insertions(+), 1 deletion(-)
+  - Most of our old DTs have a pinctrl node for GPIOs, which will result in
+    an error when the driver is going to request the gpio because it would
+    already be requested automatically by pinctrl. We cannot break those.
 
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-index 52edf3b5988d..3bbb34435e0f 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-@@ -1245,6 +1245,7 @@ int sunxi_pinctrl_init_with_variant(struct platform_device *pdev,
- 	struct pinctrl_desc *pctrl_desc;
- 	struct pinctrl_pin_desc *pins;
- 	struct sunxi_pinctrl *pctl;
-+	struct pinmux_ops *pmxops;
- 	struct resource *res;
- 	int i, ret, last_pin, pin_idx;
- 	struct clk *clk;
-@@ -1305,7 +1306,16 @@ int sunxi_pinctrl_init_with_variant(struct platform_device *pdev,
- 	pctrl_desc->npins = pctl->ngroups;
- 	pctrl_desc->confops = &sunxi_pconf_ops;
- 	pctrl_desc->pctlops = &sunxi_pctrl_ops;
--	pctrl_desc->pmxops =  &sunxi_pmx_ops;
-+
-+	pmxops = devm_kmemdup(&pdev->dev, &sunxi_pmx_ops, sizeof(sunxi_pmx_ops),
-+			      GFP_KERNEL);
-+	if (!pmxops)
-+		return -ENOMEM;
-+
-+	if (desc->disable_strict_mode)
-+		pmxops->strict = false;
-+
-+	pctrl_desc->pmxops = pmxops;
- 
- 	pctl->pctl_dev = devm_pinctrl_register(&pdev->dev, pctrl_desc, pctl);
- 	if (IS_ERR(pctl->pctl_dev)) {
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.h b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
-index 1bfc0d8a55df..11b128f54ed2 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sunxi.h
-+++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
-@@ -112,6 +112,7 @@ struct sunxi_pinctrl_desc {
- 	unsigned			irq_banks;
- 	unsigned			irq_bank_base;
- 	bool				irq_read_needs_mux;
-+	bool				disable_strict_mode;
- };
- 
- struct sunxi_pinctrl_function {
+  - Some of these GPIOs also need to change their pin configuration to add
+    a bias or change the current output, and there isn't a migration path.
+
+Let's just keep the old behaviour for the old SoCs, and enforce it on the
+new one, and enabled it by default so that the situation at least doesn't
+get worse.
+
+This has been tested on an A83t (strict on) and an H3 (strict off) board.
+
+Let me know what you think,
+Maxime
+
+Changes from v1:
+  - Duplicate the pmx_ops before modifying them
+  - Disable the strict mode for R_PIO as well
+
+Maxime Ripard (3):
+  pinctrl: sunxi: Introduce the strict flag
+  pinctrl: sunxi: Disable strict mode for old pinctrl drivers
+  pinctrl: sunxi: Enforce the strict mode by default
+
+ drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c   |  1 +
+ drivers/pinctrl/sunxi/pinctrl-sun5i.c       |  1 +
+ drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c |  1 +
+ drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c   |  1 +
+ drivers/pinctrl/sunxi/pinctrl-sun8i-a23-r.c |  1 +
+ drivers/pinctrl/sunxi/pinctrl-sun8i-a23.c   |  1 +
+ drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c   |  1 +
+ drivers/pinctrl/sunxi/pinctrl-sun8i-h3-r.c  |  3 ++-
+ drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c    |  3 ++-
+ drivers/pinctrl/sunxi/pinctrl-sun9i-a80-r.c |  1 +
+ drivers/pinctrl/sunxi/pinctrl-sun9i-a80.c   |  1 +
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c       | 13 ++++++++++++-
+ drivers/pinctrl/sunxi/pinctrl-sunxi.h       |  1 +
+ 13 files changed, 26 insertions(+), 3 deletions(-)
+
+base-commit: bba731ac5505e73c9b0681762ee0cfa52ccfffed
 -- 
 git-series 0.9.1
