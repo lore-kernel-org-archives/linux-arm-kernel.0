@@ -1,99 +1,78 @@
-From: ahs3@redhat.com (Al Stone)
-Date: Mon, 9 Oct 2017 16:46:17 -0600
-Subject: [PATCH 0/3] arm64: cpuinfo: make /proc/cpuinfo more human-readable
-In-Reply-To: <20170927103406.GC32150@leverpostej>
-References: <20170926222324.17409-1-ahs3@redhat.com>
- <20170927103406.GC32150@leverpostej>
-Message-ID: <7e1bd635-8c17-634e-aaae-ac7ec4a1e351@redhat.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 9 Oct 2017 17:57:16 -0500
+Subject: [PATCH v3 03/22] dt-bindings: arm: scmi: add ARM MHU specific
+ mailbox client bindings
+In-Reply-To: <CABb+yY0KNafWbD00hBVrNNGnFDcU0v6KXXY2D2K7KNouak1HdQ@mail.gmail.com>
+References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
+ <1506604306-20739-4-git-send-email-sudeep.holla@arm.com>
+ <20171005232031.7373ni5ssln4wlpr@rob-hp-laptop>
+ <CABb+yY1ra5bgRB1VND+NvCcDFqfggG04a+JPWFZ+HpNg08eR8g@mail.gmail.com>
+ <CAL_Jsq+0paGePmJVjsyFJiHx0UaDPjQrbe3C030U+fuUkWCJ+A@mail.gmail.com>
+ <CABb+yY2v8D9NFVsG9OwSpL8cswKihY6OUru8QA6Jfq5YmVVD7A@mail.gmail.com>
+ <CAL_JsqKy+WzEiHRS0BrE3_3Md4CGOr0e2ZZ_vBCB-Opgg49s+A@mail.gmail.com>
+ <CABb+yY0KNafWbD00hBVrNNGnFDcU0v6KXXY2D2K7KNouak1HdQ@mail.gmail.com>
+Message-ID: <CAL_JsqJTuq4rDu9+T6rcC_q8Gw5nyDScNZy2cNkq+y5_v9pegA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/27/2017 04:34 AM, Mark Rutland wrote:
-> On Tue, Sep 26, 2017 at 04:23:21PM -0600, Al Stone wrote:
->> As ARMv8 servers get deployed, I keep getting the same set of questions
->> from end-users of those systems: what do all the hex numbers mean in 
->> /proc/cpuinfo and could you make them so I don't have to carry a cheat
->> sheet with me all the time?
-> 
-> I appreciate that /proc/cpuinfo can be opaque to end users, but I do not
-> believe that this is the right solution to that problem.
-> 
-> There are a number of issues stemming from the face that /proc/cpuinfo
-> is ill-defined and overused for a number of cases. Changes to it almost
-> certainly violate brittle de-facto ABI details people are relying on,
-> and there's a very long tail on fallout resulting from this. In
-> addition, many niceties come at an excessive maintenance cost, and are
-> simply unreliable as an ABI.
+On Mon, Oct 9, 2017 at 9:46 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+> On Mon, Oct 9, 2017 at 7:22 PM, Rob Herring <robh@kernel.org> wrote:
+>> On Fri, Oct 6, 2017 at 9:26 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>>> On Fri, Oct 6, 2017 at 9:24 PM, Rob Herring <robh@kernel.org> wrote:
+>>>> On Fri, Oct 6, 2017 at 6:01 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>>>>> On Fri, Oct 6, 2017 at 4:50 AM, Rob Herring <robh@kernel.org> wrote:
+>>>>>> On Thu, Sep 28, 2017 at 02:11:27PM +0100, Sudeep Holla wrote:
+>>>
+>>>>>>
+>>>>>>> +- mbox-data : For each phandle listed in mboxes property, an unsigned 32-bit
+>>>>>>> +           data as expected by the mailbox controller
+>>>>>>
+>>>>>> Shouldn't that be cells as part of mboxes property?
+>>>>>>
+>>>>> A MHU client can send any number of commands (such u32 values) over a channel.
+>>>>> This client (SCMI) sends just one command over a channel, but other
+>>>>> clients may/do send two or more.
+>>
+>> The above definition doesn't support 2 or more as it is 1-1 with channels.
+>>
+> I thought you suggested to make controller driver accept the command
+> as another cell in client's mboxes property.
+> Which we can't do.
 
-Instead of dealing with the replies to the specific patches, I'd like to deal
-with the real gist of the matter first -- details can be worked out later.
+Yes, agreed. But I'm wondering since a client may need more than one,
+how would that be expressed?
 
-While I don't disagree -- cpuinfo is enormously fragile -- what _is_ a good
-solution, then?  Right now, things are not terribly useful.  Yes, it is true
-/sys/firmware/dmi has info in it, but again it is all numeric (or in a file
-named 'raw').  Any one who wishes to read the values will need to put some
-interpretation on them somehow.  My personal preference is that the kernel
-control that interpretation instead of random admin tools scattered over a raft
-of different companies.
+>>>> Okay, then I guess I don't understand why this is in DT.
+>>>>
+>>> Yeah the client has to provide code (u32 value) for the commands it
+>>> sends, and that value is going to be platform specific. For example,
+>>> on Juno the ITS_AN_SCMI_COMMAND may be defined as BIT(7) while on my
+>>> platform it may be 0x4567
+>>>
+>>> For MHU based platforms, it becomes easy if the u32 is passed from DT.
+>>> And that should be ok since that is like a h/w parameter - a value
+>>> chosen/expected by the remote firmware.
+>>
+>> Could it ever be more than 1 cell?
+>>
+> SCMI sends sub-commands via SHMEM, so it is always going to be 1cell for _scmi_.
+> However many firmwares are unlikely to use just one command over a
+> channel - say, the protocol is trivial or the linux and remote have no
+> SHMEM.
 
-> So, as with all other patches modifying /proc/cpuinfo, I must NAK this
-> series.
+I'd hope the normal case is not enumerating commands and sub-commands
+in DT and this is special case of a "generic" protocol with platform
+specific aspects. It could be solved with a specific compatible for
+each platform/implementation. We'll probably regret not doing that,
+but I'm going to pretend that this time SoC vendors won't mess it up.
 
-Hrm.  I suggest that policy needs to be rethought.  I understand the reasoning,
-but it puts my end-users in a very difficult position; they now have to justify
-modifying management software that is already in operation in order to purchase
-and integrate ARM servers.  And while I really don't want distro-specific code,
-I'd have to consider it as a possibility.
+>> I guess being in DT is fine, but I'm still not sure about the naming.
+>> The current name suggests it is part of the mbox binding. Do we want
+>> that or should it be SCMI specific? Then "data" is vague. Perhaps
+>> "scmi-commands"?
+>>
+> Sure. I have no problem with whatever we wanna call it.
 
-To be completely fair, though, I'm not completely fixated on cpuinfo as the only
-possible answer.  It has been the most requested, however.
+Okay. That should have an "arm" prefix too BTW.
 
-> For the MPIDR and product info, I think we can expose this in a more
-> structured way (e.g. under sysfs). IIUC the product info is all derived
-> from DMI -- do we not expose that already?
-
-Agreed; the MPIDR I think could just as easily be in /sys/devices/cpu/* as
-a hex value.  It doesn't have the value to end-users that the other info does,
-either -- for debugging, definitely, but not necessarily sysadmin.  I'll put
-something together for this.
-
-The DMI info is in sysfs but it is not in a fashion normally consumed, hence
-the questions from end-users, in a way.  They're not expecting to have to do
-the interpretation, and they are expecting the platform to be able to tell
-them what "Model: 2" means.
-
-> For the human-readable names I must NAK such patches. This is an
-> extremely brittle ABI that cannot be forwards compatible, and comes with
-> hilarious political problems. This should be managed in userspace alone.
-> 
-> I thought tools like lscpu and lshw were intended to gather such
-> information for users. What are these missing today?
-
-All of the above human-readable parts -- lscpu reads model information from
-/proc/cpuinfo, for example, and would require new code to read this info from
-somewhere else, and then figure out how to interpret it.  All I get is a lovely
-'2' for 'model' :).  We could obviously change the userspace tools, but I'm
-guessing it just moves the political hilarity from the kernel to userspace,
-correct?  It also runs the risk of even greater silliness, like perhaps lscpu
-gets a product name right, but lshw calls it something different, and so on.
-
-The other approach that occurs to me is to blend what x86 does and sysfs; i.e.,
-would it be acceptable to modify cputype.h to include comments (as x86 does)
-that are then munged by a script somewhat like arch/x86/kernel/cpu/mkcapflags.sh
-that then produces a header file with proper human-readable content that can
-then be exposed in sysfs?  I don't think we can ever remove the brittleness
-completely, but perhaps this would at least mitigate it.  This would still
-require userspace modifications, too, but they could at least rely on a uniform
-source of data -- and perhaps a single place to focus when hilarity ensues :).
-I'll bodge some patches together and maybe start over as an RFC, if there's a
-chance this would be accepted.
-
--- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Red Hat, Inc.
-ahs3 at redhat.com
------------------------------------
+Rob
