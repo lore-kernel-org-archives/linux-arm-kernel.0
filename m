@@ -1,120 +1,65 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Mon,  9 Oct 2017 11:46:55 -0500
-Subject: [PATCH v3] irqchip/gicv3-its: Add missing changes to support 52bit
- physical address
-Message-ID: <1507567615-4240-1-git-send-email-shankerd@codeaurora.org>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 09 Oct 2017 17:48:36 +0100
+Subject: [PATCH 1/3] arm64: mm: Support Common Not Private translations
+In-Reply-To: <20171009152300.yrjdhnwna5r2enae@armageddon.cambridge.arm.com>
+References: <1507553734-27854-1-git-send-email-vladimir.murzin@arm.com>
+ <1507553734-27854-2-git-send-email-vladimir.murzin@arm.com>
+ <20171009152300.yrjdhnwna5r2enae@armageddon.cambridge.arm.com>
+Message-ID: <59DBA864.9030108@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current ITS driver works fine as long as normal memory and GICR
-regions are located within the lower 48bit (>=0 && <2^48) physical
-address space. Some of the registers GICR_PEND/PROP, GICR_VPEND/VPROP
-and GITS_CBASER are handled properly but not all when configuring
-the hardware with 52bit physical address.
+Hi Catalin, Vladimir,
 
-This patch does the following changes to support 52bit PA.
-  -Handle 52bit PA in GITS_BASERn.
-  -Fix ITT_addr width to 52bits, bits[51:8].
-  -Fix RDbase width to 52bits, bits[51:16].
-  -Fix VPT_addr width to 52bits, bits[51:16].
+On 09/10/17 16:23, Catalin Marinas wrote:
+> On Mon, Oct 09, 2017 at 01:55:32PM +0100, Vladimir Murzin wrote:
+>> This patch adds support for Common Not Private translations on
+>> different exceptions levels:
 
-Definition of the GITS_BASERn register when ITS PageSize is 64KB:
-  -Bits[47:16] of the register provide bits[47:16] of the table PA.
-  -Bits[15:12] of the register provide bits[51:48] of the table PA.
-  -Bits[15:00] of the base physical address are 0.
+>> (2) For EL1 we postpone setting CNP till all cpus are up and rely on
+>>     cpufeature framework to 1) patch the code which is sensitive to
+>>     CNP and 2) update TTBR1_EL1 with CNP bit set. The only case where
+>>     TTBR1_EL1 can be reprogrammed is hibirnation, so the code there is
+>>     changed to save raw TTBR1_EL1 and blindly restore it on resume.
 
-Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
----
-Changes since v2:
-  -Few more changes from Marc's comments in v1 patch.
-Changes since v1:
-  -Included Marc's suggestion and warn in case of not supporting 52bit PA.
+> Even if you do this when all the CPUs are up, that's not always true.
+> Starting with maxcpus=1 allows something like systemd to bring up new
+> CPUs once user space starts.
 
- drivers/irqchip/irq-gic-v3-its.c   | 26 +++++++++++++++++++++-----
- include/linux/irqchip/arm-gic-v3.h |  2 ++
- 2 files changed, 23 insertions(+), 5 deletions(-)
+For secondary CPUs cpu_enable_cnp() will be called to set CNP on TTBR1_EL1. But
+what about cpuidle? This also resets the TTBR1_EL1 value.
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 7b98313..4b598b6 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -315,7 +315,7 @@ static void its_encode_size(struct its_cmd_block *cmd, u8 size)
- 
- static void its_encode_itt(struct its_cmd_block *cmd, u64 itt_addr)
- {
--	its_mask_encode(&cmd->raw_cmd[2], itt_addr >> 8, 50, 8);
-+	its_mask_encode(&cmd->raw_cmd[2], itt_addr >> 8, 51, 8);
- }
- 
- static void its_encode_valid(struct its_cmd_block *cmd, int valid)
-@@ -325,7 +325,7 @@ static void its_encode_valid(struct its_cmd_block *cmd, int valid)
- 
- static void its_encode_target(struct its_cmd_block *cmd, u64 target_addr)
- {
--	its_mask_encode(&cmd->raw_cmd[2], target_addr >> 16, 50, 16);
-+	its_mask_encode(&cmd->raw_cmd[2], target_addr >> 16, 51, 16);
- }
- 
- static void its_encode_collection(struct its_cmd_block *cmd, u16 col)
-@@ -365,7 +365,7 @@ static void its_encode_its_list(struct its_cmd_block *cmd, u16 its_list)
- 
- static void its_encode_vpt_addr(struct its_cmd_block *cmd, u64 vpt_pa)
- {
--	its_mask_encode(&cmd->raw_cmd[3], vpt_pa >> 16, 50, 16);
-+	its_mask_encode(&cmd->raw_cmd[3], vpt_pa >> 16, 51, 16);
- }
- 
- static void its_encode_vpt_size(struct its_cmd_block *cmd, u8 vpt_size)
-@@ -1510,9 +1510,9 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
- 	u64 val = its_read_baser(its, baser);
- 	u64 esz = GITS_BASER_ENTRY_SIZE(val);
- 	u64 type = GITS_BASER_TYPE(val);
-+	u64 baser_phys, tmp;
- 	u32 alloc_pages;
- 	void *base;
--	u64 tmp;
- 
- retry_alloc_baser:
- 	alloc_pages = (PAGE_ORDER_TO_SIZE(order) / psz);
-@@ -1528,8 +1528,24 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
- 	if (!base)
- 		return -ENOMEM;
- 
-+	baser_phys = virt_to_phys(base);
-+
-+	/* Check if the physical address of the memory is above 48bits */
-+	if (IS_ENABLED(CONFIG_ARM64_64K_PAGES) && (baser_phys >> 48)) {
-+
-+		/* 52bit PA is supported only when PageSize=64K */
-+		if (psz != SZ_64K) {
-+			pr_err("ITS: no 52bit PA support when psz=%d\n", psz);
-+			free_pages((unsigned long)base, order);
-+			return -ENXIO;
-+		}
-+
-+		/* Convert 52bit PA to 48bit field */
-+		baser_phys = GITS_BASER_PHYS_52_to_48(baser_phys);
-+	}
-+
- retry_baser:
--	val = (virt_to_phys(base)				 |
-+	val = (baser_phys					 |
- 		(type << GITS_BASER_TYPE_SHIFT)			 |
- 		((esz - 1) << GITS_BASER_ENTRY_SIZE_SHIFT)	 |
- 		((alloc_pages - 1) << GITS_BASER_PAGES_SHIFT)	 |
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index dfa4a51..6412f91 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -372,6 +372,8 @@
- #define GITS_BASER_ENTRY_SIZE_SHIFT		(48)
- #define GITS_BASER_ENTRY_SIZE(r)	((((r) >> GITS_BASER_ENTRY_SIZE_SHIFT) & 0x1f) + 1)
- #define GITS_BASER_ENTRY_SIZE_MASK	GENMASK_ULL(52, 48)
-+#define GITS_BASER_PHYS_52_to_48(phys)					\
-+	(((phys) & GENMASK_ULL(47, 16)) | (((phys) >> 48) & 0xf) << 12)
- #define GITS_BASER_SHAREABILITY_SHIFT	(10)
- #define GITS_BASER_InnerShareable					\
- 	GIC_BASER_SHAREABILITY(GITS_BASER, InnerShareable)
--- 
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+
+> The problem we have is that we don't know
+> what the firmware is doing, whether it's setting CnP or not. Maybe we
+> should add some statement in Documentation/arm64/booting.txt that
+> firmware must not use CnP at all.
+
+
+>> diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
+>> index 095d3c1..1d056f3 100644
+>> --- a/arch/arm64/kernel/hibernate.c
+>> +++ b/arch/arm64/kernel/hibernate.c
+>> @@ -124,7 +124,7 @@ int arch_hibernation_header_save(void *addr, unsigned int max_size)
+>>  		return -EOVERFLOW;
+>>  
+>>  	arch_hdr_invariants(&hdr->invariants);
+>> -	hdr->ttbr1_el1		= __pa_symbol(swapper_pg_dir);
+>> +	hdr->ttbr1_el1		= read_sysreg(ttbr1_el1);
+>>  	hdr->reenter_kernel	= _cpu_resume;
+>>  
+>>  	/* We can't use __hyp_get_vectors() because kvm may still be loaded */
+
+> Are all the CPUs up when coming out of hibernation and restoring
+> ttbr1_el1?
+
+'nonboot' CPUs are powered off around hibernate, so this only runs on one CPU.
+
+Restoring with the CNP set like this will share all the TTBR1 mappings using the
+reserved ASID out of TTBR0. Hibernate then calls cpu_uninstall_idmap() via
+__cpu_suspend_exit(), which will restore the original ttbr0 value and CNP bit.
+
+
+Thanks,
+
+James
