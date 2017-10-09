@@ -1,77 +1,86 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 9 Oct 2017 23:08:31 +0200
-Subject: [PATCH v6 05/11] dt-bindings: net: dwmac-sun8i: update
- documentation about integrated PHY
-In-Reply-To: <20171008183340.GA21531@Red>
-References: <20170927073414.17361-1-clabbe.montjoie@gmail.com>
- <20170927073414.17361-6-clabbe.montjoie@gmail.com>
- <20170927140210.GE13516@lunn.ch> <20170928073708.GB32676@Red>
- <20171008183340.GA21531@Red>
-Message-ID: <20171009210831.qc2cgxr4cx2qz5x7@flea.home>
+From: net147@gmail.com (Jonathan Liu)
+Date: Tue, 10 Oct 2017 08:17:34 +1100
+Subject: [PATCH] usb: musb: sunxi: Explicitly release USB PHY on exit
+In-Reply-To: <20171009142302.GB32614@uda0271908>
+References: <20170926113923.18181-1-net147@gmail.com>
+ <20171009142302.GB32614@uda0271908>
+Message-ID: <CANwerB2kbxnhrgWAnmWB9Uzp+M1MjC7MwWuwLXw==dpdCRLCAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 08, 2017 at 06:33:40PM +0000, Corentin Labbe wrote:
-> On Thu, Sep 28, 2017 at 09:37:08AM +0200, Corentin Labbe wrote:
-> > On Wed, Sep 27, 2017 at 04:02:10PM +0200, Andrew Lunn wrote:
-> > > Hi Corentin
-> > > 
-> > > > +Required properties for the mdio-mux node:
-> > > > +  - compatible = "mdio-mux"
-> > > 
-> > > This is too generic. Please add a more specific compatible for this
-> > > particular mux. You can keep "mdio-mux", since that is what the MDIO
-> > > subsystem will look for.
-> > > 
-> > 
-> > I will add allwinner,sun8i-h3-mdio-mux
-> > 
-> > > > +Required properties of the integrated phy node:
-> > > >  - clocks: a phandle to the reference clock for the EPHY
-> > > >  - resets: a phandle to the reset control for the EPHY
-> > > > +- phy-is-integrated
-> > > 
-> > > So the last thing you said is that the mux is not the problem
-> > > here. Something else is locking up. Did you discover what?
-> > > 
-> > > I really would like phy-is-integrated to go away.
-> > > 
-> > 
-> > I have found the problem: by enabling ephy clk/reset the timeout does not occur anymore.
-> > So we could remove phy-is-integrated by:
-> > Moving internal phy clk/reset handling in mdio_mux_syscon_switch_fn()
-> > But this means:
-> > - getting internalphy node always by manually get internal_mdio/internal_phy (and not by the given phyhandle)
-> > - doing some unnecessary tasks (enable/scan/disable) when external_phy is needed
-> > 
-> > Regards
-> 
-> Hello all
-> 
-> Below is the current patch, as you can read, it does not use anymore the phy-is-integrated property.
-> So now, the mdio-mux must always enable the internal mdio when switch_fn ask for it and so reset MAC and so need to enable ephy clk/reset.
-> But for this I need a reference to thoses clock and reset. (this is done in get_ephy_nodes)
-> The current version set those clock in mdio-mux node, and as you can see it is already ugly (lots of get next node),
-> if the clk/rst nodes were as it should be, in phy nodes, it will be more bad.
-> 
-> So, since the MAC have a dependency on thoses clk/rst nodes for
-> doing reset(), I seek a proper way to get references on it.
+Hi,
+
+On 10 October 2017 at 01:23, Bin Liu <b-liu@ti.com> wrote:
+> Hi,
 >
-> OR do you agree that putting ephy clk/rst in emac is acceptable ?
+> On Tue, Sep 26, 2017 at 09:39:23PM +1000, Jonathan Liu wrote:
+>> This fixes a kernel oops when unloading the driver due to usb_put_phy
+>> being called after usb_phy_generic_unregister when the device is
+>> detached. Calling usb_phy_generic_unregister causes x->dev->driver to
+>> be NULL in usb_put_phy and results in a NULL pointer dereference.
+>>
+>> As we are now explicitly managing the lifetime of usb_phy,
+>> devm_usb_get_phy is changed to usb_get_phy and we call usb_put_phy in
+>> the probe error path.
+>>
+>> Cc: stable at vger.kernel.org # v4.3+
+>> Signed-off-by: Jonathan Liu <net147@gmail.com>
+>> ---
+>>  drivers/usb/musb/sunxi.c | 8 ++++++--
+>>  1 file changed, 6 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
+>> index c9a09b5bb6e5..8eed61042103 100644
+>> --- a/drivers/usb/musb/sunxi.c
+>> +++ b/drivers/usb/musb/sunxi.c
+>> @@ -297,6 +297,8 @@ static int sunxi_musb_exit(struct musb *musb)
+>>       if (test_bit(SUNXI_MUSB_FL_HAS_SRAM, &glue->flags))
+>>               sunxi_sram_release(musb->controller->parent);
+>>
+>> +     usb_put_phy(glue->xceiv);
+>
+> Will devm_usb_put_phy() solve the issue too? Then you don't need the
+> changes in sunxi_musb_probe() below.
+>
 
-Why not just parsing the DT child nodes looking for resets and clocks
-properties? The usual PHY don't have that.
+devm_usb_put_phy does solve the issue without changes in
+sunxi_musb_probe but I think it is clearer that the lifetime is
+explicitly managed if we don't mix implicit and explicit freeing of
+resources.
 
-Maxime
+>> +
+>>       return 0;
+>>  }
+>>
+>> @@ -781,7 +783,7 @@ static int sunxi_musb_probe(struct platform_device *pdev)
+>>               return PTR_ERR(glue->usb_phy);
+>>       }
+>>
+>> -     glue->xceiv = devm_usb_get_phy(&pdev->dev, USB_PHY_TYPE_USB2);
+>> +     glue->xceiv = usb_get_phy(USB_PHY_TYPE_USB2);
+>>       if (IS_ERR(glue->xceiv)) {
+>>               ret = PTR_ERR(glue->xceiv);
+>>               dev_err(&pdev->dev, "Error getting usb-phy %d\n", ret);
+>> @@ -803,11 +805,13 @@ static int sunxi_musb_probe(struct platform_device *pdev)
+>>       if (IS_ERR(glue->musb_pdev)) {
+>>               ret = PTR_ERR(glue->musb_pdev);
+>>               dev_err(&pdev->dev, "Error registering musb dev: %d\n", ret);
+>> -             goto err_unregister_usb_phy;
+>> +             goto err_put_usb_phy;
+>>       }
+>>
+>>       return 0;
+>>
+>> +err_put_usb_phy:
+>> +     usb_put_phy(glue->xceiv);
+>>  err_unregister_usb_phy:
+>>       usb_phy_generic_unregister(glue->usb_phy);
+>>       return ret;
+>> --
+>> 2.13.2
+>
+> Regards,
+> -Bin.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171009/afbdd66c/attachment.sig>
+Regards,
+Jonathan
