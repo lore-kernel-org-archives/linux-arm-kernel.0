@@ -1,78 +1,28 @@
-From: Wenyou.Yang@Microchip.com (Yang, Wenyou)
-Date: Mon, 9 Oct 2017 18:01:05 +0800
-Subject: [PATCH v3 3/5] media: atmel-isc: Enable the clocks during probe
-In-Reply-To: <20171009075804.2qr3pbunqzhdz5go@valkosipuli.retiisi.org.uk>
-References: <20170928081828.20335-1-wenyou.yang@microchip.com>
- <20170928081828.20335-4-wenyou.yang@microchip.com>
- <20170928212543.sltvd4rgswfowtcd@valkosipuli.retiisi.org.uk>
- <7d5bd4ff-f18e-5f0d-9ce1-3f5169be4c14@Microchip.com>
- <20171009075804.2qr3pbunqzhdz5go@valkosipuli.retiisi.org.uk>
-Message-ID: <82829609-5c87-538c-2c5d-e99d6c516c60@Microchip.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 9 Oct 2017 11:02:47 +0100
+Subject: [PATCH v2 0/5] Switch arm64 over to qrwlock
+In-Reply-To: <20171009065243.g4q7l3kf2esa4fkk@hirez.programming.kicks-ass.net>
+References: <1507296882-18721-1-git-send-email-will.deacon@arm.com>
+ <20171008213052.ojyxpr56d2ypscjy@yury-thinkpad>
+ <20171009065243.g4q7l3kf2esa4fkk@hirez.programming.kicks-ass.net>
+Message-ID: <20171009100246.GD5127@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sakari,
+On Mon, Oct 09, 2017 at 08:52:43AM +0200, Peter Zijlstra wrote:
+> On Mon, Oct 09, 2017 at 12:30:52AM +0300, Yury Norov wrote:
+> > The bottomline of discussion [1] was that queued locks are more
+> > effective when SoC has many CPUs. And 4 is not many.
+> 
+> qspinlock, yes. qrwlock not, as it fully depends on arch_spinlock_t for
+> the queueing. qrwlock is just a generic rwlock_t implementation.
 
-On 2017/10/9 15:58, Sakari Ailus wrote:
-> Hi
-> Wenyou,
->
-> On Mon, Oct 09, 2017 at 01:49:44PM +0800, Yang, Wenyou wrote:
->> Hi Sakari,
->>
->> Sorry for late answer, because I was in vacation last week.
->>
->> On 2017/9/29 5:25, Sakari Ailus wrote:
->>> Hi Wenyou,
->>>
->>> On Thu, Sep 28, 2017 at 04:18:26PM +0800, Wenyou Yang wrote:
->>>> To meet the relationship, enable the HCLOCK and ispck during the
->>>> device probe, "isc_pck frequency is less than or equal to isc_ispck,
->>>> and isc_ispck is greater than or equal to HCLOCK."
->>>> Meanwhile, call the pm_runtime_enable() in the right place.
->>>>
->>>> Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
->>>> ---
->>>>
->>>> Changes in v3: None
->>>> Changes in v2: None
->>>>
->>>>    drivers/media/platform/atmel/atmel-isc.c | 31 +++++++++++++++++++++++++------
->>>>    1 file changed, 25 insertions(+), 6 deletions(-)
->>>>
->>>> diff --git a/drivers/media/platform/atmel/atmel-isc.c b/drivers/media/platform/atmel/atmel-isc.c
->>>> index 0b15dc1a3a0b..f092c95587c1 100644
->>>> --- a/drivers/media/platform/atmel/atmel-isc.c
->>>> +++ b/drivers/media/platform/atmel/atmel-isc.c
->>>> @@ -1594,6 +1594,7 @@ static int isc_async_complete(struct v4l2_async_notifier *notifier)
->>>>    	struct isc_subdev_entity *sd_entity;
->>>>    	struct video_device *vdev = &isc->video_dev;
->>>>    	struct vb2_queue *q = &isc->vb2_vidq;
->>>> +	struct device *dev = isc->dev;
->>>>    	int ret;
->>>>    	ret = v4l2_device_register_subdev_nodes(&isc->v4l2_dev);
->>>> @@ -1677,6 +1678,10 @@ static int isc_async_complete(struct v4l2_async_notifier *notifier)
->>>>    		return ret;
->>>>    	}
->>>> +	pm_runtime_set_active(dev);
->>>> +	pm_runtime_enable(dev);
->>>> +	pm_request_idle(dev);
->>> Remember that the driver's async complete function could never get called.
->>>
->>> What would be the reason to move it here?
->> The ISC provides the clock for the sensor, namely, it is the clock provider
->> for the external sensor.
->> So it keeps active to make the sensor probe successfully.
->> Otherwise, the sensor, such as 0v7670 fails to probe due to the failure to
->> clk_enable().
-> You'll still need to balance the get and put calls.
->
-> complete callback is not necessarily called at all or could be called
-> multiple times. Instead, you should probably do pm_runtime_get_sync() when
-> the clock is enabled and put when it's disabled.
-I will send v4 to update it.
+Yup, and once I've knocked qrwlocks on the head I'll go take a look at
+qspinlock. Either way, I'll keep our ticket implementation around because
+(a) it's a tonne simpler (b) I don't have data to suggest that it sucks and
+(c) there's been formal work to show that various parts of it are correct.
 
-Thank you for your advice.
+rwlock on the other hand has been shown to be broken, I know that it sucks
+and there's not been any formal work, so I'll be glad to see the back of it!
 
-Best Regards,
-Wenyou Yang
+Will
