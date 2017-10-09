@@ -1,59 +1,71 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 9 Oct 2017 18:48:33 +0100
-Subject: [PATCH v3 12/20] genirq: Document vcpu_info usage for
- percpu_devid interrupts
-In-Reply-To: <20170923004207.22356-13-cdall@linaro.org>
-References: <20170923004207.22356-1-cdall@linaro.org>
- <20170923004207.22356-13-cdall@linaro.org>
-Message-ID: <1a21ed0e-39eb-a5a3-5cda-3a51d9f9c8da@arm.com>
+From: pasha.tatashin@oracle.com (Pavel Tatashin)
+Date: Mon, 9 Oct 2017 13:51:47 -0400
+Subject: [PATCH v9 09/12] mm/kasan: kasan specific map populate function
+In-Reply-To: <20171009171337.GE30085@arm.com>
+References: <20170920201714.19817-1-pasha.tatashin@oracle.com>
+ <20170920201714.19817-10-pasha.tatashin@oracle.com>
+ <20171003144845.GD4931@leverpostej>
+ <20171009171337.GE30085@arm.com>
+Message-ID: <CAOAebxtHHFvYn4WysMASe1GqvgKYPVyjJ572UM3Sef5sP0hi9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/09/17 01:41, Christoffer Dall wrote:
-> It is currently unclear how to set the VCPU affinity for a percpu_devid
-> interrupt , since the Linux irq_data structure describes the state for
-> multiple interrupts, one for each physical CPU on the system.  Since
-> each such interrupt can be associated with different VCPUs or none at
-> all, associating a single VCPU state with such an interrupt does not
-> capture the necessary semantics.
-> 
-> The implementers of irq_set_affinity are the Intel and AMD IOMMUs, and
-> the ARM GIC irqchip.  The Intel and AMD callers do not appear to use
-> percpu_devid interrupts, and the ARM GIC implementation only checks the
-> pointer against NULL vs. non-NULL.
-> 
-> Therefore, simply update the function documentation to explain the
-> expected use in the context of percpu_devid interrupts, allowing future
-> changes or additions to irqchip implementers to do the right thing.
-> 
-> This allows us to set the VCPU affinity for the virtual timer interrupt
-> in KVM/ARM, which is a percpu_devid (PPI) interrupt.
-> 
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> ---
->  kernel/irq/manage.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-> index 573dc52..2b2c94f 100644
-> --- a/kernel/irq/manage.c
-> +++ b/kernel/irq/manage.c
-> @@ -381,7 +381,8 @@ int irq_select_affinity_usr(unsigned int irq)
->  /**
->   *	irq_set_vcpu_affinity - Set vcpu affinity for the interrupt
->   *	@irq: interrupt number to set affinity
-> - *	@vcpu_info: vCPU specific data
-> + *	@vcpu_info: vCPU specific data or pointer to a percpu array of vCPU
-> + *	            specific data for percpu_devid interrupts
->   *
->   *	This function uses the vCPU specific data to set the vCPU
->   *	affinity for an irq. The vCPU specific data is passed from
-> 
+Hi Will,
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+I can go back to that approach, if Michal OK with it. But, that would
+mean that I would need to touch every single architecture that
+implements vmemmap_populate(), and also pass flags at least through
+these functions on every architectures (some have more than one
+decided by configs).:
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+vmemmap_populate()
+vmemmap_populate_basepages()
+vmemmap_populate_hugepages()
+vmemmap_pte_populate()
+__vmemmap_alloc_block_buf()
+alloc_block_buf()
+vmemmap_alloc_block()
+
+IMO, while I understand that it looks strange that we must walk page
+table after creating it, it is a better approach: more enclosed as it
+effects kasan only, and more universal as it is in common code. We are
+also somewhat late in the review process, means we will need again to
+get ACKs from the maintainers of other arches.
+
+Pavel
+
+On Mon, Oct 9, 2017 at 1:13 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Oct 03, 2017 at 03:48:46PM +0100, Mark Rutland wrote:
+>> On Wed, Sep 20, 2017 at 04:17:11PM -0400, Pavel Tatashin wrote:
+>> > During early boot, kasan uses vmemmap_populate() to establish its shadow
+>> > memory. But, that interface is intended for struct pages use.
+>> >
+>> > Because of the current project, vmemmap won't be zeroed during allocation,
+>> > but kasan expects that memory to be zeroed. We are adding a new
+>> > kasan_map_populate() function to resolve this difference.
+>>
+>> Thanks for putting this together.
+>>
+>> I've given this a spin on arm64, and can confirm that it works.
+>>
+>> Given that this involes redundant walking of page tables, I still think
+>> it'd be preferable to have some common *_populate() helper that took a
+>> gfp argument, but I guess it's not the end of the world.
+>>
+>> I'll leave it to Will and Catalin to say whether they're happy with the
+>> page table walking and the new p{u,m}d_large() helpers added to arm64.
+>
+> To be honest, it just looks completely backwards to me; we're walking the
+> page tables we created earlier on so that we can figure out what needs to
+> be zeroed for KASAN. We already had that information before, hence my
+> preference to allow propagation of GFP_FLAGs to vmemmap_alloc_block when
+> it's needed. I know that's not popular for some reason, but is walking the
+> page tables really better?
+>
+> Will
+>
+> --
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
