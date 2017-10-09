@@ -1,51 +1,35 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 9 Oct 2017 13:57:03 +0200
-Subject: [PATCH v2 2/2] arm64: dts: r8a7796: Add OPPs table for cpu devices
-In-Reply-To: <e2e31fd8-b5f8-40a8-df3d-e7726bb8a8e1@arm.com>
+Date: Mon, 9 Oct 2017 13:58:25 +0200
+Subject: [PATCH v2 1/2] arm64: dts: r8a7795: Add OPPs table for cpu devices
+In-Reply-To: <1507209984-17123-2-git-send-email-horms+renesas@verge.net.au>
 References: <1507209984-17123-1-git-send-email-horms+renesas@verge.net.au>
- <1507209984-17123-3-git-send-email-horms+renesas@verge.net.au>
- <e2e31fd8-b5f8-40a8-df3d-e7726bb8a8e1@arm.com>
-Message-ID: <CAMuHMdVbQMGG92sAnWUDzBisSHEdedoSNLWxokv_BTj4eER64Q@mail.gmail.com>
+ <1507209984-17123-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdX-EGVuyM=ieAw3TBObL04FqH3cGcYRwdGG8wwNmVnwLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep,
+Hi Simon,
 
-On Thu, Oct 5, 2017 at 5:04 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> On 05/10/17 14:26, Simon Horman wrote:
->> From: Dien Pham <dien.pham.ry@rvc.renesas.com>
->>
->> Current, OPP tables are defined temporary,
->> they are being evaluated and adjust in future.
-
->> --- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
->> +++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
->> @@ -46,6 +46,8 @@
->>                       power-domains = <&sysc R8A7796_PD_CA57_CPU0>;
->>                       next-level-cache = <&L2_CA57>;
->>                       enable-method = "psci";
->> +                     clocks =<&cpg CPG_CORE R8A7796_CLK_Z>;
->> +                     operating-points-v2 = <&cluster0_opp>;
->>               };
->>
->>               a57_1: cpu at 1 {
->> @@ -55,6 +57,7 @@
->>                       power-domains = <&sysc R8A7796_PD_CA57_CPU1>;
->>                       next-level-cache = <&L2_CA57>;
->>                       enable-method = "psci";
+On Thu, Oct 5, 2017 at 3:26 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
+> From: Dien Pham <dien.pham.ry@rvc.renesas.com>
 >
-> Just curious why clocks are not specified in secondaries ?
+> Current, OPP tables are defined temporary,
+> they are being evaluated and adjust in future.
+>
+> Based in part on work by Hien Dang.
+>
+> Signed-off-by: Dien Pham <dien.pham.ry@rvc.renesas.com>
+> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+> v2 [Simon Horman]
+> - Only provide one operating points node for each operating-points-v2 node
+>   as per the binding; other nodes were unused and have been removed
 
-Thanks for noticing, it would indeed be good to describe the clock dependency
-for all CPU cores.
+Thanks for the update!
 
-> Does this continue work if I hotplug out CPUs in ascending order and
-> then hotplug back in descending order ? Also the current driver or OS
-> may deal with that but not a good assumption when write DT
-
-Yes that works, as Linux doesn't handle CPU hotplug details.
-CPU hotplug is controlled by PSCI, i.e. out of control of the Linux kernel.
-So it doesn't matter at all what is described here ;-)
+I think all comments for "[PATCH v2 2/2] arm64: dts: r8a7796: Add OPPs table
+for cpu devices" apply here, too.
 
 Gr{oetje,eeting}s,
 
