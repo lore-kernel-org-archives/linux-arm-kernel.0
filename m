@@ -1,58 +1,52 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 9 Oct 2017 08:54:51 +0200
-Subject: [PATCH v2 5/7] PCI: aardvark: disable LOS state by default
-In-Reply-To: <20171005174607.GS25517@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
- <20170928125838.11887-6-thomas.petazzoni@free-electrons.com>
- <20171005174607.GS25517@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20171009085451.5a6cfbcc@windsurf.lan>
+Date: Mon,  9 Oct 2017 09:00:49 +0200
+Subject: [PATCH] PCI: aardvark: Move to struct pci_host_bridge IRQ mapping
+ functions
+Message-ID: <20171009070049.2684-1-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+struct pci_host_bridge gained hooks to map/swizzle IRQs, so that the
+IRQ mapping can be done automatically by PCI core code through the
+pci_assign_irq() function instead of resorting to arch-specific
+implementation callbacks to carry out the same task which force PCI
+host bridge drivers implementation to implement per-arch kludges to
+carry out a task that is inherently architecture agnostic.
 
-On Thu, 5 Oct 2017 12:46:07 -0500, Bjorn Helgaas wrote:
+Commit 769b461fc0c0 ("arm64: PCI: Drop DT IRQ allocation from
+pcibios_alloc_irq()") was assuming all PCI host controller drivers had
+been converted to use ->map_irq(), but that wasn't the case:
+pci-aardvark had not been converted. Due to this, it broke the support
+for legacy PCI interrupts when using the pci-aardvark driver (used on
+Marvell Armada 3720 platforms).
 
-> On Thu, Sep 28, 2017 at 02:58:36PM +0200, Thomas Petazzoni wrote:
-> > From: Victor Gu <xigu@marvell.com>
-> > 
-> > Some PCIe devices do not support LOS, and will cause timeouts if the
-> > root complex forces the LOS state. This patch disables the LOS state
-> > by default.  
-> 
-> Per PCIe r3.1, sec 5.4.1.3, software should not enable L0s in either
-> direction unless both ends support L0s.
-> 
-> I'm unclear on what the bug is here.  Is the generic ASPM code
-> incorrectly enabling L0s when one end doesn't support it?  That seems
-> unlikely, but if so, it should be fixed in the generic ASPM code.
-> 
-> Are both ends advertising L0s support, but there's a hardware erratum
-> on the Aardvark end that keeps it from working correctly?  If so, we
-> should say that explicitly and include a reference to a published
-> hardware erratum.
-> 
-> Something else?
+In order to fix this, we make sure the ->map_irq and ->swizzle_irq
+fields of pci_host_bridge are properly filled in.
 
-I'll do some more research on this and get back to you.
+Fixes: 769b461fc0c0 ("arm64: PCI: Drop DT IRQ allocation from pcibios_alloc_irq()")
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: <stable@vger.kernel.org> # v4.13+
+---
+Changes since v2:
+ - Adjust commit title to match other commits doing the same change in
+   other drivers
+ - Improve commit log.
+---
+ drivers/pci/host/pci-aardvark.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-> > This is part of fixing bug
-> > https://bugzilla.kernel.org/show_bug.cgi?id=196339, this commit was
-> > reported as the user to be important to get a Intel 7260 mini-PCIe
-> > WiFi card working.  
-> 
-> The bugzilla link is a good start, but "reported by the user to be
-> important" is meaningless by itself.  What we need here is the details
-> of what's broken and how this fixes it.  Unfortunately the bugzilla
-> doesn't have those details.
-
-Yes, the issue is that the bug report doesn't have much details, and I
-don't have the specific PCIe card that was used by the bug reporter.
-
-Best regards,
-
-Thomas
+diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
+index 89f4e3d072d7..26ed0c08f209 100644
+--- a/drivers/pci/host/pci-aardvark.c
++++ b/drivers/pci/host/pci-aardvark.c
+@@ -935,6 +935,8 @@ static int advk_pcie_probe(struct platform_device *pdev)
+ 	bridge->sysdata = pcie;
+ 	bridge->busnr = 0;
+ 	bridge->ops = &advk_pcie_ops;
++	bridge->map_irq = of_irq_parse_and_map_pci;
++	bridge->swizzle_irq = pci_common_swizzle;
+ 
+ 	ret = pci_scan_root_bus_bridge(bridge);
+ 	if (ret < 0) {
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.13.6
