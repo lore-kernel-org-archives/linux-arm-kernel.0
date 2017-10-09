@@ -1,19 +1,97 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Mon, 9 Oct 2017 18:51:11 +0200
-Subject: [PATCH 2/2] ARM: dts: BCM5301X: Add DT for Luxul ABR-4500
-In-Reply-To: <1507563983-7354-2-git-send-email-riproute@gmail.com>
-References: <1507563983-7354-1-git-send-email-riproute@gmail.com>
- <1507563983-7354-2-git-send-email-riproute@gmail.com>
-Message-ID: <CACna6rxYF3SDGYWj9363SNoxhXZ6rou9pn9OgFqsRPpDegkN=A@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 9 Oct 2017 18:34:45 +0100
+Subject: [PATCH v3 10/20] KVM: arm/arm64: Move timer/vgic flush/sync under
+ disabled irq
+In-Reply-To: <20170923004207.22356-11-cdall@linaro.org>
+References: <20170923004207.22356-1-cdall@linaro.org>
+ <20170923004207.22356-11-cdall@linaro.org>
+Message-ID: <512939dd-1f04-f653-d069-e468936eeabb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 October 2017 at 17:46, Dan Haab <riproute@gmail.com> wrote:
-> From: Dan Haab <dhaab@luxul.com>
->
-> This is BCM47094 (AKA BCM4709C0) based router with rear-facing ports
-> board design.
->
-> Signed-off-by: Dan Haab <dhaab@luxul.com>
+On 23/09/17 01:41, Christoffer Dall wrote:
+> As we are about to play tricks with the timer to be more lazy in saving
+> and restoring state, we need to move the timer sync and flush functions
+> under a disabled irq section and since we have to flush the vgic state
+> after the timer and PMU state, we do the whole flush/sync sequence with
+> disabled irqs.
+> 
+> The only downside is a slightly longer delay before being able to
+> process hardware interrupts and run softirqs.
+> 
+> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+> ---
+>  virt/kvm/arm/arm.c | 26 +++++++++++++-------------
+>  1 file changed, 13 insertions(+), 13 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index b9f68e4..27db222 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -654,11 +654,11 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  
+>  		kvm_pmu_flush_hwstate(vcpu);
+>  
+> +		local_irq_disable();
+> +
+>  		kvm_timer_flush_hwstate(vcpu);
+>  		kvm_vgic_flush_hwstate(vcpu);
+>  
+> -		local_irq_disable();
+> -
+>  		/*
+>  		 * If we have a singal pending, or need to notify a userspace
+>  		 * irqchip about timer or PMU level changes, then we exit (and
+> @@ -683,10 +683,10 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm) ||
+>  		    kvm_request_pending(vcpu)) {
+>  			vcpu->mode = OUTSIDE_GUEST_MODE;
+> -			local_irq_enable();
+>  			kvm_pmu_sync_hwstate(vcpu);
+>  			kvm_timer_sync_hwstate(vcpu);
+>  			kvm_vgic_sync_hwstate(vcpu);
+> +			local_irq_enable();
+>  			preempt_enable();
+>  			continue;
+>  		}
+> @@ -710,6 +710,16 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  		kvm_arm_clear_debug(vcpu);
+>  
+>  		/*
+> +		 * We must sync the PMU and timer state before the vgic state so
+> +		 * that the vgic can properly sample the updated state of the
+> +		 * interrupt line.
+> +		 */
+> +		kvm_pmu_sync_hwstate(vcpu);
+> +		kvm_timer_sync_hwstate(vcpu);
+> +
+> +		kvm_vgic_sync_hwstate(vcpu);
+> +
+> +		/*
+>  		 * We may have taken a host interrupt in HYP mode (ie
+>  		 * while executing the guest). This interrupt is still
+>  		 * pending, as we haven't serviced it yet!
+> @@ -732,16 +742,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  		guest_exit();
+>  		trace_kvm_exit(ret, kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
+>  
+> -		/*
+> -		 * We must sync the PMU and timer state before the vgic state so
+> -		 * that the vgic can properly sample the updated state of the
+> -		 * interrupt line.
+> -		 */
+> -		kvm_pmu_sync_hwstate(vcpu);
+> -		kvm_timer_sync_hwstate(vcpu);
+> -
+> -		kvm_vgic_sync_hwstate(vcpu);
+> -
+>  		preempt_enable();
+>  
+>  		ret = handle_exit(vcpu, run, ret);
+> 
 
-Acked-by: Rafa? Mi?ecki <rafal@milecki.pl>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
