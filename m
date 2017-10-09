@@ -1,56 +1,96 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue, 10 Oct 2017 07:25:41 +0800
-Subject: [PATCH 3/6] ARM: sun8i: r40: add 5V regulator for Banana Pi M2
- Ultra
-In-Reply-To: <20171009210407.ueharyifho3s6xvu@flea.home>
-References: <20171008042906.46779-1-icenowy@aosc.io>
- <20171008042906.46779-4-icenowy@aosc.io>
- <20171009210407.ueharyifho3s6xvu@flea.home>
-Message-ID: <61E002C8-4046-44E4-8E1A-43C8AF74257C@aosc.io>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 9 Oct 2017 18:54:52 -0500
+Subject: [PATCH v9 4/4] PCI: hisi: blacklist hip06/hip07 controllers
+ behind SMMUv3
+In-Reply-To: <20171006140450.89652-5-shameerali.kolothum.thodi@huawei.com>
+References: <20171006140450.89652-1-shameerali.kolothum.thodi@huawei.com>
+ <20171006140450.89652-5-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <20171009235452.GP25517@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Please change subject line:
 
+-  PCI: hisi: blacklist hip06/hip07 controllers behind SMMUv3
++  PCI: hisi: Blacklist hip06/hip07 controllers behind SMMUv3
 
-? 2017?10?10? GMT+08:00 ??5:04:07, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
->On Sun, Oct 08, 2017 at 04:29:03AM +0000, Icenowy Zheng wrote:
->> On newer revisions of the Banana Pi M2 Ultra boards, the 5V power
->output
->> (used by HDMI, SATA and USB) is controller via a GPIO.
->> 
->> Add the regulator node for it.
->> 
->> Older revisions just have the 5V power output always on, and the GPIO
->is
->> reserved on these boards. So it won't affect the older revisions.
->> 
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> ---
->>  arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts | 9 +++++++++
->>  1 file changed, 9 insertions(+)
->> 
->> diff --git a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
->b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
->> index 7b52608cebe6..035599d870b9 100644
->> --- a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
->> +++ b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
->> @@ -78,6 +78,15 @@
->>  		};
->>  	};
->>  
->> +	reg_vcc5v0: vcc5v0 {
->> +		compatible = "regulator-fixed";
->> +		regulator-name = "vcc5v0";
->> +		regulator-min-microvolt = <5000000>;
->> +		regulator-max-microvolt = <5000000>;
->> +		gpio = <&pio 7 23 GPIO_ACTIVE_HIGH>; /* PH23 */
->> +		enable-active-high;
->
->This is redundant with the GPIO flag
+On Fri, Oct 06, 2017 at 03:04:50PM +0100, Shameer Kolothum wrote:
+> The HiSilicon erratum 161010801 describes the limitation of
+> HiSilicon platforms hip06/hip07 to support the SMMUv3 mappings
+> for MSI transactions.
 
-I remember someone suggested me to add this
-property (maybe wens). It's said that the driver may not
-process the GPIO_ACTIVE_HIGH correctly.
+I don't suppose there's a URL for this erratum, is there?
 
->
->Maxime
+> PCIe controller on these platforms has to differentiate the MSI
+> payload against other DMA payload and has to modify the MSI
+> payload. This basically makes it difficult for this platforms to
+> have a SMMU translation for MSI. In order to workaround this, ARM
+> SMMUv3 driver requires a quirk to treat the MSI regions separately.
+> Such a quirk is currently missing for DT based systems and therefore
+> we need to blacklist the hip06/hip07 PCIe controllers.
+
+I don't understand the DT connection here.  If this is a hardware
+erratum, I assume the a quirk would be required whether the system
+uses DT, ACPI, etc.
+
+> Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
+
+I assume this will go via some non-PCI tree.  If I were applying this,
+I would look for an ack from Zhou or Gabriele in addition to mine.
+
+> ---
+>  drivers/pci/dwc/pcie-hisi.c | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/drivers/pci/dwc/pcie-hisi.c b/drivers/pci/dwc/pcie-hisi.c
+> index a201791..6800747 100644
+> --- a/drivers/pci/dwc/pcie-hisi.c
+> +++ b/drivers/pci/dwc/pcie-hisi.c
+> @@ -270,6 +270,12 @@ static int hisi_pcie_probe(struct platform_device *pdev)
+>  	struct resource *reg;
+>  	int ret;
+>  
+> +	if ((IS_BUILTIN(CONFIG_ARM_SMMU_V3)) &&
+> +			of_property_read_bool(dev->of_node, "iommu-map")) {
+
+Does the presence of "iommu-map" tell you this is an SMMUv3?  Could it
+have a different type of IOMMU?  I can't tell from reading
+Documentation/devicetree/bindings/pci/pci-iommu.txt.
+
+Why do you care whether CONFIG_ARM_SMMU_V3 is set?  Does MSI work
+correctly if SMMUv3 is present but not used?
+
+Is it really necessary to ignore the PCIe controller completely?
+Could you use the devices below it as long as you disable MSI for
+them?  I know there are probably devices that require MSI, so maybe
+it's easier to just ignore everything than to respond to reports of
+"my device doesn't work because it requires MSI."
+
+> +		dev_warn(dev, "HiSilicon erratum 161010801: blacklisting PCIe controllers behind SMMUv3\n");
+> +		return -ENODEV;
+> +	}
+> +
+>  	hisi_pcie = devm_kzalloc(dev, sizeof(*hisi_pcie), GFP_KERNEL);
+>  	if (!hisi_pcie)
+>  		return -ENOMEM;
+> @@ -340,6 +346,12 @@ static int hisi_pcie_almost_ecam_probe(struct platform_device *pdev)
+>  	struct device *dev = &pdev->dev;
+>  	struct pci_ecam_ops *ops;
+>  
+> +	if ((IS_BUILTIN(CONFIG_ARM_SMMU_V3)) &&
+> +			of_property_read_bool(dev->of_node, "iommu-map")) {
+> +		dev_warn(dev, "HiSilicon erratum 161010801: blacklisting PCIe controllers behind SMMUv3\n");
+> +		return -ENODEV;
+> +	}
+> +
+>  	ops = (struct pci_ecam_ops *)of_device_get_match_data(dev);
+>  	return pci_host_common_probe(pdev, ops);
+>  }
+> -- 
+> 1.9.1
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
