@@ -1,101 +1,99 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 9 Oct 2017 15:45:45 +0530
-Subject: [PATCHv3 1/2] drivers: phy: add calibrate method
-In-Reply-To: <1507205511-23048-2-git-send-email-andrzej.p@samsung.com>
-References: <6935498c-9788-14e6-844f-f9e8288026dc@samsung.com>
- <1507205511-23048-1-git-send-email-andrzej.p@samsung.com>
- <CGME20171005121201eucas1p269da2155c4257777b0c3a5b210c651f8@eucas1p2.samsung.com>
- <1507205511-23048-2-git-send-email-andrzej.p@samsung.com>
-Message-ID: <6de8a17a-745b-0fa2-c39d-cdeb28fc9489@ti.com>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Mon, 9 Oct 2017 10:16:10 +0000
+Subject: [PATCH ] phy: rcar-gen2: Add r8a7743/5 support
+In-Reply-To: <535bd74a-ca7d-31bf-e7df-f2bda31be1a6@ti.com>
+References: <1503568773-41410-1-git-send-email-biju.das@bp.renesas.com>
+ <CAMuHMdW8x-7LVGgJr1GQfMJurfW=0Ky71K18zc+x5_XHMC6VxA@mail.gmail.com>
+ <KL1PR06MB17020EBD5992AFA4F6E3F6C7B8740@KL1PR06MB1702.apcprd06.prod.outlook.com>
+ <535bd74a-ca7d-31bf-e7df-f2bda31be1a6@ti.com>
+Message-ID: <KL1PR06MB170203142C33A1733B89D3A5B8740@KL1PR06MB1702.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Thanks. I will resend the patch.
 
-On Thursday 05 October 2017 05:41 PM, Andrzej Pietrasiewicz wrote:
-> Some quirky UDCs (like dwc3 on exynos) need to have heir phys calibrated
+Regards,
+Biju
 
-%s/heir/their
-> e.g. for using super speed.
 
-The commit log should also include when phy calibrate should be used and why
-existing API's is not sufficient for initializing/calibrating the phy.
+> -----Original Message-----
+> From: Kishon Vijay Abraham I [mailto:kishon at ti.com]
+> Sent: 09 October 2017 10:47
+> To: Biju Das <biju.das@bp.renesas.com>; Yoshihiro Shimoda
+> <yoshihiro.shimoda.uh@renesas.com>
+> Cc: Rob Herring <robh+dt@kernel.org>; Mark Rutland
+> <mark.rutland@arm.com>; Simon Horman <horms@verge.net.au>; Magnus
+> Damm <magnus.damm@gmail.com>; Russell King <linux@armlinux.org.uk>;
+> Chris Paterson <Chris.Paterson2@renesas.com>; devicetree at vger.kernel.org;
+> Linux-Renesas <linux-renesas-soc@vger.kernel.org>; linux-arm-
+> kernel at lists.infradead.org; Geert Uytterhoeven <geert@linux-m68k.org>
+> Subject: Re: [PATCH ] phy: rcar-gen2: Add r8a7743/5 support
+>
+> Hi,
+>
+> On Monday 09 October 2017 02:19 PM, Biju Das wrote:
+> > Hi Kishon,
+> >
+> > Looks like the below patch is not merged into linux-next.  Somehow I
+> > missed your mail ID, when I submitted the
+> > patch(scripts/get_maintainer.pl  script  didn't show your mail address
+> > for this patch)
+> >
+> > https://patchwork.kernel.org/patch/9919727/
+>
+> Can you resend the patch with all the Ack's you got?
+>
+> Thanks
+> Kishon
+> >
+> > Regards,
+> > Biju
+> >
+> >
+> >> -----Original Message-----
+> >> From: geert.uytterhoeven at gmail.com
+> >> [mailto:geert.uytterhoeven at gmail.com]
+> >> On Behalf Of Geert Uytterhoeven
+> >> Sent: 19 September 2017 15:58
+> >> To: Biju Das <biju.das@bp.renesas.com>
+> >> Cc: Rob Herring <robh+dt@kernel.org>; Mark Rutland
+> >> <mark.rutland@arm.com>; Simon Horman <horms@verge.net.au>; Magnus
+> >> Damm <magnus.damm@gmail.com>; Russell King <linux@armlinux.org.uk>;
+> >> Chris Paterson <Chris.Paterson2@renesas.com>;
+> >> devicetree at vger.kernel.org; Linux-Renesas
+> >> <linux-renesas-soc@vger.kernel.org>; linux-arm-
+> >> kernel at lists.infradead.org
+> >> Subject: Re: [PATCH ] phy: rcar-gen2: Add r8a7743/5 support
+> >>
+> >> On Thu, Aug 24, 2017 at 11:59 AM, Biju Das <biju.das@bp.renesas.com>
+> >> wrote:
+> >>> Add USB PHY support for r8a7743/5 SoC. Renesas RZ/G1[ME] (R8A7743/5)
+> >>> USB PHY is identical to the R-Car Gen2 family.
+> >>>
+> >>> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> >>
+> >> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >>
+> >> Gr{oetje,eeting}s,
+> >>
+> >>                         Geert
+> >>
+> >> --
+> >> Geert Uytterhoeven -- There's lots of Linux beyond ia32 --
+> >> geert at linux- m68k.org
+> >>
+> >> In personal conversations with technical people, I call myself a
+> >> hacker. But when I'm talking to journalists I just say "programmer" or
+> something like that.
+> >>                                 -- Linus Torvalds
+> >
+> >
+> >
+> > Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End,
+> Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered
+> No. 04586709.
+> >
 
-Thanks
-Kishon
-> 
-> Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
-> ---
->  drivers/phy/phy-core.c  | 15 +++++++++++++++
->  include/linux/phy/phy.h | 10 ++++++++++
->  2 files changed, 25 insertions(+)
-> 
-> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
-> index a268f4d..b4964b0 100644
-> --- a/drivers/phy/phy-core.c
-> +++ b/drivers/phy/phy-core.c
-> @@ -372,6 +372,21 @@ int phy_reset(struct phy *phy)
->  }
->  EXPORT_SYMBOL_GPL(phy_reset);
->  
-> +int phy_calibrate(struct phy *phy)
-> +{
-> +	int ret;
-> +
-> +	if (!phy || !phy->ops->calibrate)
-> +		return 0;
-> +
-> +	mutex_lock(&phy->mutex);
-> +	ret = phy->ops->calibrate(phy);
-> +	mutex_unlock(&phy->mutex);
-> +
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(phy_calibrate);
-> +
->  /**
->   * _of_phy_get() - lookup and obtain a reference to a phy by phandle
->   * @np: device_node for which to get the phy
-> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
-> index e694d40..87580c8 100644
-> --- a/include/linux/phy/phy.h
-> +++ b/include/linux/phy/phy.h
-> @@ -39,6 +39,7 @@ enum phy_mode {
->   * @power_off: powering off the phy
->   * @set_mode: set the mode of the phy
->   * @reset: resetting the phy
-> + * @calibrate: calibrate the phy
->   * @owner: the module owner containing the ops
->   */
->  struct phy_ops {
-> @@ -48,6 +49,7 @@ struct phy_ops {
->  	int	(*power_off)(struct phy *phy);
->  	int	(*set_mode)(struct phy *phy, enum phy_mode mode);
->  	int	(*reset)(struct phy *phy);
-> +	int	(*calibrate)(struct phy *phy);
->  	struct module *owner;
->  };
->  
-> @@ -141,6 +143,7 @@ static inline void *phy_get_drvdata(struct phy *phy)
->  int phy_power_off(struct phy *phy);
->  int phy_set_mode(struct phy *phy, enum phy_mode mode);
->  int phy_reset(struct phy *phy);
-> +int phy_calibrate(struct phy *phy);
->  static inline int phy_get_bus_width(struct phy *phy)
->  {
->  	return phy->attrs.bus_width;
-> @@ -262,6 +265,13 @@ static inline int phy_reset(struct phy *phy)
->  	return -ENOSYS;
->  }
->  
-> +static inline int phy_calibrate(struct phy *phy)
-> +{
-> +	if (!phy)
-> +		return 0;
-> +	return -ENOSYS;
-> +}
-> +
->  static inline int phy_get_bus_width(struct phy *phy)
->  {
->  	return -ENOSYS;
-> 
+
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
