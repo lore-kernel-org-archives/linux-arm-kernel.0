@@ -1,61 +1,38 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 9 Oct 2017 09:14:19 -0300
-Subject: [PATCH 0/3] DWC host without MSI controller
-In-Reply-To: <CAJ+vNU1GZMpptQ2oCE-cOzX+G=cj248bVGXhC_vSqD_4d7D7+Q@mail.gmail.com>
-References: <20170828142307.30061-1-l.stach@pengutronix.de>
- <CAJ+vNU1GZMpptQ2oCE-cOzX+G=cj248bVGXhC_vSqD_4d7D7+Q@mail.gmail.com>
-Message-ID: <CAOMZO5CLqYx-OyxqrqGjGgRNGoGETM=nt5FF_wQ2bye=nXkFPQ@mail.gmail.com>
+Date: Mon, 9 Oct 2017 09:16:36 -0300
+Subject: iMX6 PCIE IRQ not working with ath9k based Wifi
+In-Reply-To: <CAK8P3a0bF7=bbWBS9+7uBYp+yGpDUfS_QCX6K4i3WJv9mbgvEA@mail.gmail.com>
+References: <348346fa-1d70-1d08-9a32-18b660328e4f@tubby.org>
+ <CAK8P3a0bF7=bbWBS9+7uBYp+yGpDUfS_QCX6K4i3WJv9mbgvEA@mail.gmail.com>
+Message-ID: <CAOMZO5AR3GukHSaRvUfW9MR6XPqKxEP+6wQn26zJTPX+Tx7xHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+Hi Mike,
 
-On Mon, Aug 28, 2017 at 1:59 PM, Tim Harvey <tharvey@gateworks.com> wrote:
-> On Mon, Aug 28, 2017 at 7:23 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
->> Hi all,
+On Mon, Oct 9, 2017 at 7:19 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Sat, Oct 7, 2017 at 5:51 PM, Mike Tubby <mike@tubby.org> wrote:
+>> Arnd, Tim
 >>
->> this small series tries to fix/workaround a serious design flaw of the DWC PCIe
->> host controller: it is unable to work with both legacy and MSI IRQs enabled at
->> the same time. As soon as the first MSI is enabled in the DWC MSI controller,
->> the host stops forwarding legacy IRQs.
+>> I have an iMX6 based SMARC module and custom motherboard with an mPCIE slot
+>> into which I have a SparkLAN WPEA-127N Atheros 93xx family based Wifi card
+>> which needs to be an access point and it doesn't work - basically I can get
+>> it all set up and hostapd says it has gone active but it hangs and never
+>> transmits and I think I'm having a problem with IRQ handling from the PCI
+>> bus and as far as I can tell I'm having the issue which you discussed here:
 >>
->> If the MSI controller is present, MSIs will be used for the PCIe port services
->> IRQs, leaving endpoint devices which don't support MSIs unable to raise IRQs.
->> It is only safe to enable the MSI controller if it is validated that all PCIe
->> devices and drivers in the system support working MSIs. As most devices
->> support falling back to using legacy PCIe IRQs if MSI support is missing it is
->> much safer to disable the MSI by default and only enable it on validated
->> systems.
->>
->> Feedback welcome.
->>
->> Regards,
->> Lucas
->>
->> Lucas Stach (3):
->>   PCI: designware: only register MSI controller when MSI irq line is
->>     valid
->>   PCI: imx6: allow MSI irq to be absent
->>   ARM: dts: imx6qdl: remove MSI irq line
->>
->>  .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |  8 ++++----
->>  arch/arm/boot/dts/imx6qdl.dtsi                     |  2 --
->>  drivers/pci/dwc/pci-imx6.c                         | 23 +++++++++++-----------
->>  drivers/pci/dwc/pcie-designware-host.c             |  4 ++--
->>  4 files changed, 17 insertions(+), 20 deletions(-)
->>
+>>     https://patchwork.kernel.org/patch/8687351/
 >
-> Lucas,
+> (adding linux-arm-kernel to Cc, to make sure the discussion is open and
+> gets archived)
 >
-> Thank you for following up on this!
->
-> I tested it with and without the third patch that removes msi from the
-> dt thus with both an ath9k 802.11 device which only supports legacy
-> interrupts and a Marvell sky2 device which supports msi as well as
-> legacy interrupts and it works as expected:
->  - without msi enabled in dts (default): both sky2 and ath9k work
->  - with msi enabled in dt: sky2 works ath9k does not
->
-> Tested-by: Tim Harvey <tharvey@gateworks.com>
+>>
+>> My system:
+>>
+>> root at arm:~# uname -a
+>> Linux arm 4.1.15-224155-g2da0623-dirty #1 SMP PREEMPT Wed Apr 20 03:10:57
+>> CST 2016 armv7l armv7l armv7l GNU/Linux
 
-Any comments about this series?
+Please test a mainline kernel 4.13.x instead and manually apply this
+series from Lucas:
+https://www.spinics.net/lists/arm-kernel/msg603669.html
