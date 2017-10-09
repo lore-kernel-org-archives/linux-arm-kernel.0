@@ -1,47 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 9 Oct 2017 19:22:17 +0100
-Subject: [PATCH v9 09/12] mm/kasan: kasan specific map populate function
-In-Reply-To: <CAOAebxtHHFvYn4WysMASe1GqvgKYPVyjJ572UM3Sef5sP0hi9A@mail.gmail.com>
-References: <20170920201714.19817-1-pasha.tatashin@oracle.com>
- <20170920201714.19817-10-pasha.tatashin@oracle.com>
- <20171003144845.GD4931@leverpostej>
- <20171009171337.GE30085@arm.com>
- <CAOAebxtHHFvYn4WysMASe1GqvgKYPVyjJ572UM3Sef5sP0hi9A@mail.gmail.com>
-Message-ID: <20171009182217.GC30828@arm.com>
+From: kernel@esmil.dk (Emil Renner Berthing)
+Date: Mon,  9 Oct 2017 20:40:28 +0200
+Subject: [PATCH] arm64: dts: rockchip: enable touchpad button for
+ rk3399-gru-kevin
+Message-ID: <20171009184028.11829-1-kernel@esmil.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+Adding the linux,gpio-keymap entry also has
+the side-effect of making the driver register
+the touchpad as a touchpad rather than another
+touchscreen.
 
-On Mon, Oct 09, 2017 at 01:51:47PM -0400, Pavel Tatashin wrote:
-> I can go back to that approach, if Michal OK with it. But, that would
-> mean that I would need to touch every single architecture that
-> implements vmemmap_populate(), and also pass flags at least through
-> these functions on every architectures (some have more than one
-> decided by configs).:
-> 
-> vmemmap_populate()
-> vmemmap_populate_basepages()
-> vmemmap_populate_hugepages()
-> vmemmap_pte_populate()
-> __vmemmap_alloc_block_buf()
-> alloc_block_buf()
-> vmemmap_alloc_block()
+The index for BTN_LEFT was found by trial and error.
 
-As an interim step, why not introduce something like
-vmemmap_alloc_block_flags and make the page-table walking opt-out for
-architectures that don't want it? Then we can just pass __GFP_ZERO from
-our vmemmap_populate where necessary and other architectures can do the
-page-table walking dance if they prefer.
+Signed-off-by: Emil Renner Berthing <kernel@esmil.dk>
+---
+ arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-> IMO, while I understand that it looks strange that we must walk page
-> table after creating it, it is a better approach: more enclosed as it
-> effects kasan only, and more universal as it is in common code.
-
-I don't buy the more universal aspect, but I appreciate it's subjective.
-Frankly, I'd just sooner not have core code walking early page tables if
-it can be avoided, and it doesn't look hard to avoid it in this case.
-The fact that you're having to add pmd_large and pud_large, which are
-otherwise unused in mm/, is an indication that this isn't quite right imo.
-
-Will
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+index 5c8621766908..1c58d12551f5 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+@@ -278,6 +278,10 @@ ap_i2c_dig: &i2c2 {
+ 		pinctrl-0 = <&trackpad_int_l>;
+ 		interrupt-parent = <&gpio1>;
+ 		interrupts = <4 IRQ_TYPE_LEVEL_LOW>;
++		linux,gpio-keymap = <KEY_RESERVED
++				     KEY_RESERVED
++				     KEY_RESERVED
++				     BTN_LEFT>;
+ 		wakeup-source;
+ 	};
+ };
+-- 
+2.14.2
