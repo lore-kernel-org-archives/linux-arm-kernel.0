@@ -1,57 +1,85 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 09 Oct 2017 14:21:38 +0200
-Subject: iMX6 PCIE IRQ not working with ath9k based Wifi
-In-Reply-To: <d20644ba-0e1b-0fb4-41ba-d1d604800382@tubby.org>
-References: <348346fa-1d70-1d08-9a32-18b660328e4f@tubby.org>
- <CAK8P3a0bF7=bbWBS9+7uBYp+yGpDUfS_QCX6K4i3WJv9mbgvEA@mail.gmail.com>
- <d20644ba-0e1b-0fb4-41ba-d1d604800382@tubby.org>
-Message-ID: <1507551698.2745.1.camel@pengutronix.de>
+Date: Mon, 09 Oct 2017 14:22:51 +0200
+Subject: [PATCH 0/3] DWC host without MSI controller
+In-Reply-To: <CAOMZO5CLqYx-OyxqrqGjGgRNGoGETM=nt5FF_wQ2bye=nXkFPQ@mail.gmail.com>
+References: <20170828142307.30061-1-l.stach@pengutronix.de>
+ <CAJ+vNU1GZMpptQ2oCE-cOzX+G=cj248bVGXhC_vSqD_4d7D7+Q@mail.gmail.com>
+ <CAOMZO5CLqYx-OyxqrqGjGgRNGoGETM=nt5FF_wQ2bye=nXkFPQ@mail.gmail.com>
+Message-ID: <1507551771.2745.2.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Hi Fabio,
 
-Am Montag, den 09.10.2017, 12:56 +0100 schrieb Mike Tubby:
+Am Montag, den 09.10.2017, 09:14 -0300 schrieb Fabio Estevam:
+> Hi Bjorn,
+> 
+> On Mon, Aug 28, 2017 at 1:59 PM, Tim Harvey <tharvey@gateworks.com>
+> wrote:
+> > On Mon, Aug 28, 2017 at 7:23 AM, Lucas Stach <l.stach@pengutronix.d
+> > e> wrote:
+> > > Hi all,
+> > > 
+> > > this small series tries to fix/workaround a serious design flaw
+> > > of the DWC PCIe
+> > > host controller: it is unable to work with both legacy and MSI
+> > > IRQs enabled at
+> > > the same time. As soon as the first MSI is enabled in the DWC MSI
+> > > controller,
+> > > the host stops forwarding legacy IRQs.
+> > > 
+> > > If the MSI controller is present, MSIs will be used for the PCIe
+> > > port services
+> > > IRQs, leaving endpoint devices which don't support MSIs unable to
+> > > raise IRQs.
+> > > It is only safe to enable the MSI controller if it is validated
+> > > that all PCIe
+> > > devices and drivers in the system support working MSIs. As most
+> > > devices
+> > > support falling back to using legacy PCIe IRQs if MSI support is
+> > > missing it is
+> > > much safer to disable the MSI by default and only enable it on
+> > > validated
+> > > systems.
+> > > 
+> > > Feedback welcome.
+> > > 
+> > > Regards,
+> > > Lucas
+> > > 
+> > > Lucas Stach (3):
+> > > ? PCI: designware: only register MSI controller when MSI irq line
+> > > is
+> > > ????valid
+> > > ? PCI: imx6: allow MSI irq to be absent
+> > > ? ARM: dts: imx6qdl: remove MSI irq line
+> > > 
+> > > ?.../devicetree/bindings/pci/fsl,imx6q-pcie.txt?????|??8 ++++----
+> > > ?arch/arm/boot/dts/imx6qdl.dtsi?????????????????????|??2 --
+> > > ?drivers/pci/dwc/pci-imx6.c?????????????????????????| 23
+> > > +++++++++++-----------
+> > > ?drivers/pci/dwc/pcie-designware-host.c?????????????|??4 ++--
+> > > ?4 files changed, 17 insertions(+), 20 deletions(-)
+> > > 
+> > 
+> > Lucas,
+> > 
+> > Thank you for following up on this!
+> > 
+> > I tested it with and without the third patch that removes msi from
+> > the
+> > dt thus with both an ath9k 802.11 device which only supports legacy
+> > interrupts and a Marvell sky2 device which supports msi as well as
+> > legacy interrupts and it works as expected:
+> > ?- without msi enabled in dts (default): both sky2 and ath9k work
+> > ?- with msi enabled in dt: sky2 works ath9k does not
+> > 
+> > Tested-by: Tim Harvey <tharvey@gateworks.com>
+> 
+> Any comments about this series?
 
-[...]
-
-> If I understand correctly the ath9k driver in kernel 4.1.15 we're
-> using?
-> doesn't enable MSI - so I assume that there is some backwards?
-> compatibility mode that then is not working because MSI is enabled
-> at?
-> the CPU end, and hence the patch you referred to is used to turn this
-> off.
-> 
-> At the same time on the mailing list:
-> 
-> https://www.mail-archive.com/ath9k-devel at lists.ath9k.org/msg14332.htm
-> l
-> 
-> which is part of:
-> 
-> ???? https://wireless.wiki.kernel.org/en/users/Drivers/ath9k
-> 
-> there is talk of a patch to the ath9k driver to properly implement
-> MSI?
-> in the updated driver in kernel 4.6
-> 
-> So, for us the question is which way to head:
-> 
-> ???? a) disable MSI at the CPU and try to use legacy; or
-> 
-> ???? b) update the ath9k driver to try and enable MSI ?
-> 
-> 
-> We will also check the DTS/DTB in case something is mis-assigned.
-
-Due to a design flaw of the DWC host controller, legacy IRQs (like the
-ones used by ath9k) won't work if any MSIs are enabled on the
-controller.
-
-You can take a look at my series "[PATCH 0/3] DWC host without MSI
-controller", which works around this, but still needs some rework for
-mainline.
+Bjorn already commented on the series and I'm trying free up a slot to
+address the feedback.
 
 Regards,
 Lucas
