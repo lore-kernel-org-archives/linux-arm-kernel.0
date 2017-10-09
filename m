@@ -1,54 +1,56 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Mon,  9 Oct 2017 10:06:21 +0100
-Subject: [PATCH] ARM: dts: iwg20d-q7: Add support for ttySC3
-Message-ID: <1507539981-4193-1-git-send-email-fabrizio.castro@bp.renesas.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 9 Oct 2017 10:49:32 +0100
+Subject: [PATCH v2 26/28] arm64/sve: Add documentation
+In-Reply-To: <878tgkbr6m.fsf@linaro.org>
+References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
+ <1504198860-12951-27-git-send-email-Dave.Martin@arm.com>
+ <59D7A4AF.40408@arm.com>
+ <20171006173715.GC3611@e103592.cambridge.arm.com>
+ <878tgkbr6m.fsf@linaro.org>
+Message-ID: <20171009094930.GD3611@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
----
- arch/arm/boot/dts/iwg20d-q7-common.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+On Mon, Oct 09, 2017 at 10:34:25AM +0100, Alex Benn?e wrote:
+> 
+> Dave Martin <Dave.Martin@arm.com> writes:
+> 
+> > On Fri, Oct 06, 2017 at 04:43:43PM +0100, Szabolcs Nagy wrote:
+> >> On 31/08/17 18:00, Dave Martin wrote:
+> >> > +9.  System runtime configuration
+> >> > +--------------------------------
+> >> > +
+> >> > +* To mitigate the ABI impact of expansion of the signal frame, a policy
+> >> > +  mechanism is provided for administrators, distro maintainers and developers
+> >> > +  to set the default vector length for userspace processes:
+> >> > +
+> >> > +/proc/cpu/sve_default_vector_length
+> >>
+> >>
+> >> elsewhere in the patch series i see
+> >>
+> >> /proc/sys/abi/sve_default_vector_length
+> >>
+> >> is this supposed to be the same?
+> >
+> > Good spot, thanks!
+> >
+> > /proc/cpu/ was the old location: they should both say /proc/abi/.
+> > I'll fix it.
+> 
+> Isn't /sys (or rather sysfs) the preferred location for modern control
+> knobs that mirror the kernels object model or is SVE a special case for
+> extending /proc?
 
-diff --git a/arch/arm/boot/dts/iwg20d-q7-common.dtsi b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
-index 1c072c0..8c852d1 100644
---- a/arch/arm/boot/dts/iwg20d-q7-common.dtsi
-+++ b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
-@@ -11,6 +11,7 @@
- / {
- 	aliases {
- 		serial0 = &scif0;
-+		serial3 = &scifb1;
- 		ethernet0 = &avb;
- 	};
- 
-@@ -99,6 +100,11 @@
- 		function = "scif0";
- 	};
- 
-+	scifb1_pins: scifb1 {
-+		groups = "scifb1_data_d", "scifb1_ctrl";
-+		function = "scifb1";
-+	};
-+
- 	sdhi1_pins: sd1 {
- 		groups = "sdhi1_data4", "sdhi1_ctrl";
- 		function = "sdhi1";
-@@ -129,6 +135,14 @@
- 	status = "okay";
- };
- 
-+&scifb1 {
-+	pinctrl-0 = <&scifb1_pins>;
-+	pinctrl-names = "default";
-+
-+	uart-has-rtscts;
-+	status = "okay";
-+};
-+
- &sdhi1 {
- 	pinctrl-0 = <&sdhi1_pins>;
- 	pinctrl-1 = <&sdhi1_pins_uhs>;
--- 
-2.7.4
+I couldn't figure out which kernel object this maps to.  There's no
+device, no driver.  This isn't even per-cpu.
+
+sysctl is already used for similar knobs to this one, so I followed that
+precedent -- though if someone argues strongly enough it could be
+changed.
+
+Are there already examples of arch controls like this in sysfs?  I
+wasn't aware of any, but I didn't look all that hard...
+
+Cheers
+---Dave
