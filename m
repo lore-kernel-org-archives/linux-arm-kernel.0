@@ -1,88 +1,68 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 9 Oct 2017 17:22:07 +0800
-Subject: [PATCH v2 3/7] nvmem: imx-ocotp: Add support for banked OTP
- addressing
-In-Reply-To: <1507502482-22518-4-git-send-email-pure.logic@nexus-software.ie>
-Message-ID: <201710091711.BaoLcxo3%fengguang.wu@intel.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Mon, 9 Oct 2017 11:23:01 +0200
+Subject: [PATCH v4 0/4] stm32 clocksource driver rework
+In-Reply-To: <1506959513-16851-1-git-send-email-benjamin.gaignard@linaro.org>
+References: <1506959513-16851-1-git-send-email-benjamin.gaignard@linaro.org>
+Message-ID: <CA+M3ks551+w1wtg9O_bYRiTjx00M8qOBsB92og2-EL0Wnrf2rw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bryan,
+2017-10-02 17:51 GMT+02:00 Benjamin Gaignard <benjamin.gaignard@linaro.org>:
+> version 4:
+> - split patch in 3 parts
+>   - convert code to timer_of
+>   - only use 32 bits timers
+>   - add clocksource support
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.14-rc4 next-20170929]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Hello Daniel,
 
-url:    https://github.com/0day-ci/linux/commits/Bryan-O-Donoghue/Fix-i-MX7D-OCOTP-write-support/20171009-155445
-config: xtensa-allyesconfig (attached as .config)
-compiler: xtensa-linux-gcc (GCC) 4.9.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=xtensa 
+Does the patches split sound good for you ?
 
-Note: the linux-review/Bryan-O-Donoghue/Fix-i-MX7D-OCOTP-write-support/20171009-155445 HEAD 5cdf7fb933d7043592aa21e657d9ffa0ef4eb764 builds fine.
-      It only hurts bisectibility.
+Regards,
+Benjamin
 
-All errors (new ones prefixed by >>):
+>
+> version 3:
+> - fix comments done by Daniel
+> - use timer_of helper functions
+>
+> version 2:
+> - fix uninitialized variable
+>
+> These patches implements clocksource and clockevent by using only one hardware block.
+> Getting both clock source and events on the same hardware lead to change quite
+> a lot driver code.
+> It also limits usage of clocksource to 32 bits timers because 16 bits ones
+> aren't enough accurate.
+> Thanks to timer_fo helpers this series includes minor clean up in structures,
+> function prototypes and driver name.
+>
+> Since 16 bits timers become useless it also removes them from stm32f4 and
+> stm32f7 devicetree.
+>
+> Benjamin Gaignard (4):
+>   clocksource: stm32: convert driver to timer_of
+>   clocksource: stm32: only use 32 bits timers
+>   clocksource: stm32: add clocksource support
+>   arm: dts: stm32: remove useless clocksource nodes
+>
+>  arch/arm/boot/dts/stm32f429.dtsi  |  32 ------
+>  arch/arm/boot/dts/stm32f746.dtsi  |  32 ------
+>  drivers/clocksource/Kconfig       |   1 +
+>  drivers/clocksource/timer-stm32.c | 229 ++++++++++++++++++--------------------
+>  4 files changed, 112 insertions(+), 182 deletions(-)
+>
+> --
+> 2.7.4
+>
 
->> drivers/nvmem/imx-ocotp.c:367:34: error: array type has incomplete element type
-    static const struct octop_params params[] = {
-                                     ^
->> drivers/nvmem/imx-ocotp.c:368:2: error: field name not in record or union initializer
-     { .nregs = 128, .bank_address_words = 0 },
-     ^
-   drivers/nvmem/imx-ocotp.c:368:2: error: (near initialization for 'params')
->> drivers/nvmem/imx-ocotp.c:368:2: error: field name not in record or union initializer
-   drivers/nvmem/imx-ocotp.c:368:2: error: (near initialization for 'params')
-   drivers/nvmem/imx-ocotp.c:369:2: error: field name not in record or union initializer
-     { .nregs = 64,  .bank_address_words = 0 },
-     ^
-   drivers/nvmem/imx-ocotp.c:369:2: error: (near initialization for 'params')
-   drivers/nvmem/imx-ocotp.c:369:2: error: field name not in record or union initializer
-   drivers/nvmem/imx-ocotp.c:369:2: error: (near initialization for 'params')
-   drivers/nvmem/imx-ocotp.c:370:2: error: field name not in record or union initializer
-     { .nregs = 128, .bank_address_words = 0 },
-     ^
-   drivers/nvmem/imx-ocotp.c:370:2: error: (near initialization for 'params')
-   drivers/nvmem/imx-ocotp.c:370:2: error: field name not in record or union initializer
-   drivers/nvmem/imx-ocotp.c:370:2: error: (near initialization for 'params')
-   drivers/nvmem/imx-ocotp.c:371:2: error: field name not in record or union initializer
-     { .nregs = 128, .bank_address_words = 0 },
-     ^
-   drivers/nvmem/imx-ocotp.c:371:2: error: (near initialization for 'params')
-   drivers/nvmem/imx-ocotp.c:371:2: error: field name not in record or union initializer
-   drivers/nvmem/imx-ocotp.c:371:2: error: (near initialization for 'params')
-   drivers/nvmem/imx-ocotp.c:372:2: error: field name not in record or union initializer
-     { .nregs = 64,  .bank_address_words = 4 },
-     ^
-   drivers/nvmem/imx-ocotp.c:372:2: error: (near initialization for 'params')
-   drivers/nvmem/imx-ocotp.c:372:2: error: field name not in record or union initializer
-   drivers/nvmem/imx-ocotp.c:372:2: error: (near initialization for 'params')
-   drivers/nvmem/imx-ocotp.c:367:34: warning: 'params' defined but not used [-Wunused-variable]
-    static const struct octop_params params[] = {
-                                     ^
 
-vim +367 drivers/nvmem/imx-ocotp.c
 
-   366	
- > 367	static const struct octop_params params[] = {
- > 368		{ .nregs = 128, .bank_address_words = 0 },
-   369		{ .nregs = 64,  .bank_address_words = 0 },
-   370		{ .nregs = 128, .bank_address_words = 0 },
-   371		{ .nregs = 128, .bank_address_words = 0 },
-   372		{ .nregs = 64,  .bank_address_words = 4 },
-   373	};
-   374	
+-- 
+Benjamin Gaignard
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 51614 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171009/5776f43e/attachment-0001.gz>
+Graphic Study Group
+
+Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro: Facebook | Twitter | Blog
