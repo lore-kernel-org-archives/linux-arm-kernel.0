@@ -1,53 +1,29 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 9 Oct 2017 18:52:16 +0100
-Subject: [PATCH v3 13/20] KVM: arm/arm64: Set VCPU affinity for virt timer
- irq
-In-Reply-To: <20170923004207.22356-14-cdall@linaro.org>
-References: <20170923004207.22356-1-cdall@linaro.org>
- <20170923004207.22356-14-cdall@linaro.org>
-Message-ID: <916c971f-861e-092e-3b3a-325eb558e599@arm.com>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Mon, 9 Oct 2017 13:52:39 -0400
+Subject: [PATCH v4 00/26] KVM/ARM: Add support for GICv4
+In-Reply-To: <20171006153401.5481-1-marc.zyngier@arm.com>
+References: <20171006153401.5481-1-marc.zyngier@arm.com>
+Message-ID: <20171009175239.GE23730@char.us.oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/09/17 01:42, Christoffer Dall wrote:
-> As we are about to take physical interrupts for the virtual timer on the
-> host but want to leave those active while running the VM (and let the VM
-> deactivate them), we need to set the vtimer PPI affinity accordingly.
+On Fri, Oct 06, 2017 at 04:33:35PM +0100, Marc Zyngier wrote:
+> This series implements full support for GICv4 in KVM, bringing direct
+> injection of MSIs to arm and arm64, assuming you have the right
+> hardware (which is quite unlikely).
 > 
-> Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> ---
->  virt/kvm/arm/arch_timer.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> index 4254f88..4275f8f 100644
-> --- a/virt/kvm/arm/arch_timer.c
-> +++ b/virt/kvm/arm/arch_timer.c
-> @@ -650,11 +650,20 @@ int kvm_timer_hyp_init(void)
->  		return err;
->  	}
->  
-> +	err = irq_set_vcpu_affinity(host_vtimer_irq, kvm_get_running_vcpus());
-> +	if (err) {
-> +		kvm_err("kvm_arch_timer: error setting vcpu affinity\n");
-> +		goto out_free_irq;
-> +	}
-> +
->  	kvm_info("virtual timer IRQ%d\n", host_vtimer_irq);
->  
->  	cpuhp_setup_state(CPUHP_AP_KVM_ARM_TIMER_STARTING,
->  			  "kvm/arm/timer:starting", kvm_timer_starting_cpu,
->  			  kvm_timer_dying_cpu);
-> +	return 0;
-> +out_free_irq:
-> +	free_percpu_irq(host_vtimer_irq, kvm_get_running_vcpus());
->  	return err;
->  }
->  
-> 
+> To get an idea of the design, I'd recommend you start with commit
+> 7954907bedaf as well as patch #26, which try to shed some light on the
+> approach that I've taken. And before that, please digest some of the
+> GICv3/GICv4 architecture documentation[1] (less than 800 pages!). Once
+> you feel reasonably insane, you'll be in the right mood to read the
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+You may want to update the link:
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+s/pfd/pdf/
+
+(Does that mean you typed this by hand, my gosh, you really are breathing
+this everyday) :-)
+
+> code (no, I didn't bother changing the above, I already hit LWN/QotW
+> once).
