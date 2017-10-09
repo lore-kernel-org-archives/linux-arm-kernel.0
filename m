@@ -1,61 +1,34 @@
 From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Mon, 9 Oct 2017 19:35:18 +0800
-Subject: [PATCH v2 05/13] mmc: mediatek: make hs400_tune_response only for
- mt8173
+Date: Mon, 9 Oct 2017 19:35:16 +0800
+Subject: [PATCH v2 03/13] mmc: dt-bindings: make compatible explicit
 In-Reply-To: <1507548926-9555-1-git-send-email-chaotian.jing@mediatek.com>
 References: <1507548926-9555-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <1507548926-9555-6-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <1507548926-9555-4-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-the origin design of hs400_tune_response is for mt8173 because of
-mt8173 has a special design. for doing that, we add a new member
-"compatible", by now it's only for mt8173.
+the driver has updated to have an explicit compatible, so update
+binding file according to the driver change.
 
 Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
 ---
- drivers/mmc/host/mtk-sd.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/mmc/mtk-sd.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-index 643c795..e8f8ad9 100644
---- a/drivers/mmc/host/mtk-sd.c
-+++ b/drivers/mmc/host/mtk-sd.c
-@@ -317,6 +317,7 @@ struct msdc_delay_phase {
- struct msdc_host {
- 	struct device *dev;
- 	const struct mtk_mmc_compatible *dev_comp;
-+	const char *compatible;
- 	struct mmc_host *mmc;	/* mmc structure */
- 	int cmd_rsp;
+diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+index 3e0a97c..2bb585b 100644
+--- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
++++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+@@ -8,8 +8,8 @@ and the properties used by the msdc driver.
  
-@@ -666,7 +667,8 @@ static void msdc_set_mclk(struct msdc_host *host, unsigned char timing, u32 hz)
- 		       host->base + PAD_CMD_TUNE);
- 	}
- 
--	if (timing == MMC_TIMING_MMC_HS400)
-+	if (timing == MMC_TIMING_MMC_HS400 &&
-+	    !strcmp(host->compatible, "mediatek,mt8173-mmc"))
- 		sdr_set_field(host->base + PAD_CMD_TUNE,
- 			      MSDC_PAD_TUNE_CMDRRDLY,
- 			      host->hs400_cmd_int_delay);
-@@ -1594,7 +1596,8 @@ static int msdc_execute_tuning(struct mmc_host *mmc, u32 opcode)
- 	struct msdc_host *host = mmc_priv(mmc);
- 	int ret;
- 
--	if (host->hs400_mode)
-+	if (host->hs400_mode &&
-+	    !strcmp(host->compatible, "mediatek,mt8173-mmc"))
- 		ret = hs400_tune_response(mmc, opcode);
- 	else
- 		ret = msdc_tune_response(mmc, opcode);
-@@ -1745,6 +1748,7 @@ static int msdc_drv_probe(struct platform_device *pdev)
- 
- 	host->dev = &pdev->dev;
- 	host->dev_comp = of_id->data;
-+	host->compatible = of_id->compatible;
- 	host->mmc = mmc;
- 	host->src_clk_freq = clk_get_rate(host->src_clk);
- 	/* Set host parameters to mmc */
+ Required properties:
+ - compatible: value should be either of the following.
+-	"mediatek,mt8173-mmc","mediatek,mt8135-mmc": for mmc host ip compatible with mt8135
+-	"mediatek,mt8173-mmc","mediatek,mt8135-mmc": for mmc host ip compatible with mt8173
++	"mediatek,mt8135-mmc": for mmc host ip compatible with mt8135
++	"mediatek,mt8173-mmc": for mmc host ip compatible with mt8173
+ 	"mediatek,mt2701-mmc": for mmc host ip compatible with mt2701
+ 	"mediatek,mt2712-mmc": for mmc host ip compatible with mt2712
+ - reg: physical base address of the controller and length
 -- 
 1.8.1.1.dirty
