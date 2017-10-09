@@ -1,31 +1,73 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 9 Oct 2017 09:30:11 +0200
-Subject: [PATCH v2 0/2] ARM: dts: iwg20d-q7: New DT architecture
-In-Reply-To: <1507312793-6877-1-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <CAMuHMdW-Y7tK28YAGBRMqdgZK7vVqnUcud1FtzQd6wLrKii_AA@mail.gmail.com>
- <1507312793-6877-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <20171009073011.GR17360@verge.net.au>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Mon, 9 Oct 2017 10:58:05 +0300
+Subject: [PATCH v3 3/5] media: atmel-isc: Enable the clocks during probe
+In-Reply-To: <7d5bd4ff-f18e-5f0d-9ce1-3f5169be4c14@Microchip.com>
+References: <20170928081828.20335-1-wenyou.yang@microchip.com>
+ <20170928081828.20335-4-wenyou.yang@microchip.com>
+ <20170928212543.sltvd4rgswfowtcd@valkosipuli.retiisi.org.uk>
+ <7d5bd4ff-f18e-5f0d-9ce1-3f5169be4c14@Microchip.com>
+Message-ID: <20171009075804.2qr3pbunqzhdz5go@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 06, 2017 at 06:59:51PM +0100, Fabrizio Castro wrote:
-> Some of the serial interfaces are exposed on the camera daughter board.
-> The camera daughter board can be connected to the carrier board
-> by means of expansion connectors 1, 2 and 3. The carrier board may host
-> an RZ/G1M or an RZ/G1N based SoM.
-> While adding support for the serial interfaces on the camera daughter
-> board we faced the dilemma of how to properly describe all of the
-> possible HW configurations and how to maximize code reuse.
-> The best option would be to use device tree overlays, however there is
-> still some work to be done on that front before actually using them,
-> therefore for the time being we decided to provide .dtsi files to
-> describe the carrier board and the camera daughter board, and provide
-> .dts files to describe the HW configurations we need to support.
-> 
-> Best regards,
-> 
-> Fabrizio Castro (2):
->   ARM: dts: iwg20d-q7: Rework DT architecture
->   ARM: dts: iwg20d-q7-dbcm-ca: Add device trees for camera DB
+Hi
+Wenyou,
 
-Thanks, applied.
+On Mon, Oct 09, 2017 at 01:49:44PM +0800, Yang, Wenyou wrote:
+> Hi Sakari,
+> 
+> Sorry for late answer, because I was in vacation last week.
+> 
+> On 2017/9/29 5:25, Sakari Ailus wrote:
+> > Hi Wenyou,
+> > 
+> > On Thu, Sep 28, 2017 at 04:18:26PM +0800, Wenyou Yang wrote:
+> > > To meet the relationship, enable the HCLOCK and ispck during the
+> > > device probe, "isc_pck frequency is less than or equal to isc_ispck,
+> > > and isc_ispck is greater than or equal to HCLOCK."
+> > > Meanwhile, call the pm_runtime_enable() in the right place.
+> > > 
+> > > Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
+> > > ---
+> > > 
+> > > Changes in v3: None
+> > > Changes in v2: None
+> > > 
+> > >   drivers/media/platform/atmel/atmel-isc.c | 31 +++++++++++++++++++++++++------
+> > >   1 file changed, 25 insertions(+), 6 deletions(-)
+> > > 
+> > > diff --git a/drivers/media/platform/atmel/atmel-isc.c b/drivers/media/platform/atmel/atmel-isc.c
+> > > index 0b15dc1a3a0b..f092c95587c1 100644
+> > > --- a/drivers/media/platform/atmel/atmel-isc.c
+> > > +++ b/drivers/media/platform/atmel/atmel-isc.c
+> > > @@ -1594,6 +1594,7 @@ static int isc_async_complete(struct v4l2_async_notifier *notifier)
+> > >   	struct isc_subdev_entity *sd_entity;
+> > >   	struct video_device *vdev = &isc->video_dev;
+> > >   	struct vb2_queue *q = &isc->vb2_vidq;
+> > > +	struct device *dev = isc->dev;
+> > >   	int ret;
+> > >   	ret = v4l2_device_register_subdev_nodes(&isc->v4l2_dev);
+> > > @@ -1677,6 +1678,10 @@ static int isc_async_complete(struct v4l2_async_notifier *notifier)
+> > >   		return ret;
+> > >   	}
+> > > +	pm_runtime_set_active(dev);
+> > > +	pm_runtime_enable(dev);
+> > > +	pm_request_idle(dev);
+> > Remember that the driver's async complete function could never get called.
+> > 
+> > What would be the reason to move it here?
+> The ISC provides the clock for the sensor, namely, it is the clock provider
+> for the external sensor.
+> So it keeps active to make the sensor probe successfully.
+> Otherwise, the sensor, such as 0v7670 fails to probe due to the failure to
+> clk_enable().
+
+You'll still need to balance the get and put calls.
+
+complete callback is not necessarily called at all or could be called
+multiple times. Instead, you should probably do pm_runtime_get_sync() when
+the clock is enabled and put when it's disabled.
+
+-- 
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi
