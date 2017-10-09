@@ -1,66 +1,46 @@
-From: mike@tubby.org (Mike Tubby)
-Date: Mon, 9 Oct 2017 13:08:35 +0100
-Subject: iMX6 PCIE IRQ not working with ath9k based Wifi
-In-Reply-To: <CAK8P3a0kXf2FFGM+yF=mGEqvQUDf+djK5pW5hDGTSbaXN2w0vA@mail.gmail.com>
-References: <348346fa-1d70-1d08-9a32-18b660328e4f@tubby.org>
- <CAK8P3a0bF7=bbWBS9+7uBYp+yGpDUfS_QCX6K4i3WJv9mbgvEA@mail.gmail.com>
- <d20644ba-0e1b-0fb4-41ba-d1d604800382@tubby.org>
- <CAK8P3a0kXf2FFGM+yF=mGEqvQUDf+djK5pW5hDGTSbaXN2w0vA@mail.gmail.com>
-Message-ID: <38fb3688-e980-28a8-f004-3d29396ec7ca@tubby.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 9 Oct 2017 14:08:51 +0200
+Subject: [PATCH] ARM: dts: iwg20d-q7: Add support for ttySC3
+In-Reply-To: <1507539981-4193-1-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1507539981-4193-1-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <CAMuHMdUprE7QuXF_sX47JyrvuZXhXnQFufy4OHeJ5ExwwoogKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Fabrizio, Chris,
 
+On Mon, Oct 9, 2017 at 11:06 AM, Fabrizio Castro
+<fabrizio.castro@bp.renesas.com> wrote:
+> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
 
-On 10/9/2017 1:03 PM, Arnd Bergmann wrote:
-> On Mon, Oct 9, 2017 at 1:56 PM, Mike Tubby <mike@tubby.org> wrote:
->> On 10/9/2017 11:19 AM, Arnd Bergmann wrote:
->> Thanks for your reply.
->>
->> Here is the output of 'lspic -tv' and 'lspic -v':
->>
->> root at arm:/boot/uboot# lspci -tv
->> -[0000:00]---00.0-[01]----00.0  Qualcomm Atheros AR93xx Wireless Network
->> Adapter
->> root at arm:/boot/uboot#
-> Ok, so no bridge, right?
+Thanks for your patch!
 
-Correct - its a mPCIE socket connected directly in to an Embedian FiMX6 
-SMARC module.
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
->
->> If I look at the 'Capabilities [50]' on the PCI bridge I see 'Enable+' and
->> on the Atheros kernel driver (ath9k) I see 'Enable-' -- this appears to
->> suggest a mis-match.
-> This just means that the host supports MSI in principle, that's not
-> a problem.
->
->> If I understand correctly the ath9k driver in kernel 4.1.15 we're using
->> doesn't enable MSI - so I assume that there is some backwards compatibility
->> mode that then is not working because MSI is enabled at the CPU end, and
->> hence the patch you referred to is used to turn this off.
->> At the same time on the mailing list:
->>
->> https://www.mail-archive.com/ath9k-devel at lists.ath9k.org/msg14332.html
->>
->> which is part of:
->>
->>      https://wireless.wiki.kernel.org/en/users/Drivers/ath9k
->>
->> there is talk of a patch to the ath9k driver to properly implement MSI in
->> the updated driver in kernel 4.6
->>
->> So, for us the question is which way to head:
->>
->>      a) disable MSI at the CPU and try to use legacy; or
->>
->>      b) update the ath9k driver to try and enable MSI ?
->>
->>
->> We will also check the DTS/DTB in case something is mis-assigned.
-> You can try enabling MSI for debugging, but it shouldn't
-> be necessary. There is no reason for the driver to enable
-> MSI here, it would only add more latency to the interrupt
-> path on this hardware AFAICT.
->
->       Arnd
+> --- a/arch/arm/boot/dts/iwg20d-q7-common.dtsi
+> +++ b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
+> @@ -11,6 +11,7 @@
+>  / {
+>         aliases {
+>                 serial0 = &scif0;
+> +               serial3 = &scifb1;
+
+Given this port is not labeled "serial3", but called "data uart", you may want
+to add a comment to avoid confusion:
+
+    serial3 = &scifb1; /* data uart */
+
+>                 ethernet0 = &avb;
+>         };
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
