@@ -1,78 +1,54 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 09 Oct 2017 14:52:06 +0200
-Subject: [PATCH v11 1/4] rockchip/rga: v4l2 m2m support
-In-Reply-To: <39318451-a078-3451-47f8-9205a31cadb5@xs4all.nl>
-References: <20171009090424.15292-1-jacob-chen@iotwrt.com>
- <20171009090424.15292-2-jacob-chen@iotwrt.com>
- <39318451-a078-3451-47f8-9205a31cadb5@xs4all.nl>
-Message-ID: <1723232.PDSGHSTtIa@diego>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon,  9 Oct 2017 13:55:33 +0100
+Subject: [PATCH 2/3] arm64: KVM: Support Common Not Private translations
+In-Reply-To: <1507553734-27854-1-git-send-email-vladimir.murzin@arm.com>
+References: <1507553734-27854-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1507553734-27854-3-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+We rely on cpufeature framework to detect and enable CNP so for KVM we
+need to patch hyp to set CNP bit just before TTBR0_EL2 gets written.
+For the guest it is enough to update VTTBR_EL2 with CNP bit just
+before it gets scheduled.
 
-Am Montag, 9. Oktober 2017, 14:48:13 CEST schrieb Hans Verkuil:
-> On 09/10/17 11:04, Jacob Chen wrote:
-> > Rockchip RGA is a separate 2D raster graphic acceleration unit. It
-> > accelerates 2D graphics operations, such as point/line drawing, image
-> > scaling, rotation, BitBLT, alpha blending and image blur/sharpness
-> > 
-> > The driver supports various operations from the rendering pipeline.
-> > 
-> >  - copy
-> >  - fast solid color fill
-> >  - rotation
-> >  - flip
-> >  - alpha blending
-> > 
-> > The code in rga-hw.c is used to configure regs according to operations
-> > The code in rga-buf.c is used to create private mmu table for RGA.
-> > 
-> > Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
-> 
-> I ran checkpatch --strict on this patch and I found a few small issues:
-> 
-> WARNING: Avoid crashing the kernel - try using WARN_ON & recovery code
-> rather than BUG() or BUG_ON() #1222: FILE:
-> drivers/media/platform/rockchip/rga/rga.c:89:
-> +               BUG_ON(!ctx);
-> 
-> WARNING: Avoid crashing the kernel - try using WARN_ON & recovery code
-> rather than BUG() or BUG_ON() #1229: FILE:
-> drivers/media/platform/rockchip/rga/rga.c:96:
-> +               BUG_ON(!src);
-> 
-> WARNING: Avoid crashing the kernel - try using WARN_ON & recovery code
-> rather than BUG() or BUG_ON() #1230: FILE:
-> drivers/media/platform/rockchip/rga/rga.c:97:
-> +               BUG_ON(!dst);
-> 
-> I think you can use WARN_ON here and just return.
-> 
-> CHECK: struct mutex definition without comment
-> #2235: FILE: drivers/media/platform/rockchip/rga/rga.h:84:
-> +       struct mutex mutex;
-> 
-> CHECK: spinlock_t definition without comment
-> #2236: FILE: drivers/media/platform/rockchip/rga/rga.h:85:
-> +       spinlock_t ctrl_lock;
-> 
-> These two fields need a comment describing what the locks protect.
-> 
-> Also move patch 4/4 to the beginning of the patch series. The bindings
-> patch should come before the driver.
-> 
-> If I have a v12 with these issues fixed and a MAINTAINERS patch, then
-> I'll take it on Friday.
-> 
-> Do you want me to take the dts patches or will they go through another tree?
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+ arch/arm64/kvm/hyp-init.S   | 4 ++++
+ arch/arm64/kvm/hyp/switch.c | 6 +++++-
+ 2 files changed, 9 insertions(+), 1 deletion(-)
 
-I'd prefer for me to pick up the dts patches ("ARM: dts" and "arm64: dts:"), 
-as otherwise we always get conflicts and confusion :-)
-
-I'm monitoring this series, so after you pick the binding + driver, I can
-just pick the other two.
-
-
-Thanks
-Heiko
+diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+index 3f96155..4fd31b3 100644
+--- a/arch/arm64/kvm/hyp-init.S
++++ b/arch/arm64/kvm/hyp-init.S
+@@ -63,6 +63,10 @@ __do_hyp_init:
+ 	cmp	x0, #HVC_STUB_HCALL_NR
+ 	b.lo	__kvm_handle_stub_hvc
+ 
++alternative_if ARM64_HAS_CNP
++	orr	x0, x0, #TTBR_CNP_BIT
++alternative_else_nop_endif
++
+ 	msr	ttbr0_el2, x0
+ 
+ 	mrs	x4, tcr_el1
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 945e79c..a1f3bf2 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -150,7 +150,11 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
+ static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
+ {
+ 	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+-	write_sysreg(kvm->arch.vttbr, vttbr_el2);
++	u64 val = kvm->arch.vttbr;
++
++	if (system_supports_cnp())
++		val |= TTBR_CNP_BIT;
++	write_sysreg(val, vttbr_el2);
+ }
+ 
+ static void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
+-- 
+2.0.0
