@@ -1,52 +1,49 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon,  9 Oct 2017 09:00:49 +0200
-Subject: [PATCH] PCI: aardvark: Move to struct pci_host_bridge IRQ mapping
- functions
-Message-ID: <20171009070049.2684-1-thomas.petazzoni@free-electrons.com>
+From: caoj.fnst@cn.fujitsu.com (Cao jin)
+Date: Mon, 9 Oct 2017 15:11:45 +0800
+Subject: [PATCH 1/3] arm/kbuild: replace {C, LD}FLAGS_MODULE with KBUILD_{C,
+ LD}FLAGS_MODULE
+Message-ID: <1507533107-2069-1-git-send-email-caoj.fnst@cn.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-struct pci_host_bridge gained hooks to map/swizzle IRQs, so that the
-IRQ mapping can be done automatically by PCI core code through the
-pci_assign_irq() function instead of resorting to arch-specific
-implementation callbacks to carry out the same task which force PCI
-host bridge drivers implementation to implement per-arch kludges to
-carry out a task that is inherently architecture agnostic.
+As kbuild document & commit 6588169d51 says: KBUILD_{C,LD}FLAGS_MODULE are
+used to add arch-specific options for $(CC) and $(LD). From commandline,
+{C,LD}FLAGS_MODULE shall be used.
+Doesn't have any functional change, but just follow kbuild rules.
 
-Commit 769b461fc0c0 ("arm64: PCI: Drop DT IRQ allocation from
-pcibios_alloc_irq()") was assuming all PCI host controller drivers had
-been converted to use ->map_irq(), but that wasn't the case:
-pci-aardvark had not been converted. Due to this, it broke the support
-for legacy PCI interrupts when using the pci-aardvark driver (used on
-Marvell Armada 3720 platforms).
-
-In order to fix this, we make sure the ->map_irq and ->swizzle_irq
-fields of pci_host_bridge are properly filled in.
-
-Fixes: 769b461fc0c0 ("arm64: PCI: Drop DT IRQ allocation from pcibios_alloc_irq()")
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: <stable@vger.kernel.org> # v4.13+
+Signed-off-by: Cao jin <caoj.fnst@cn.fujitsu.com>
+CC: Russell King <linux@armlinux.org.uk>
+CC: linux-arm-kernel at lists.infradead.org
 ---
-Changes since v2:
- - Adjust commit title to match other commits doing the same change in
-   other drivers
- - Improve commit log.
----
- drivers/pci/host/pci-aardvark.c | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/Makefile | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
-index 89f4e3d072d7..26ed0c08f209 100644
---- a/drivers/pci/host/pci-aardvark.c
-+++ b/drivers/pci/host/pci-aardvark.c
-@@ -935,6 +935,8 @@ static int advk_pcie_probe(struct platform_device *pdev)
- 	bridge->sysdata = pcie;
- 	bridge->busnr = 0;
- 	bridge->ops = &advk_pcie_ops;
-+	bridge->map_irq = of_irq_parse_and_map_pci;
-+	bridge->swizzle_irq = pci_common_swizzle;
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 47d3a1a..a945b1f 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -16,11 +16,11 @@ LDFLAGS		:=
+ LDFLAGS_vmlinux	:=-p --no-undefined -X --pic-veneer
+ ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
+ LDFLAGS_vmlinux	+= --be8
+-LDFLAGS_MODULE	+= --be8
++KBUILD_LDFLAGS_MODULE	+= --be8
+ endif
  
- 	ret = pci_scan_root_bus_bridge(bridge);
- 	if (ret < 0) {
+ ifeq ($(CONFIG_ARM_MODULE_PLTS),y)
+-LDFLAGS_MODULE	+= -T $(srctree)/arch/arm/kernel/module.lds
++KBUILD_LDFLAGS_MODULE	+= -T $(srctree)/arch/arm/kernel/module.lds
+ endif
+ 
+ GZFLAGS		:=-9
+@@ -120,7 +120,7 @@ CFLAGS_ISA	:=-mthumb $(AFLAGS_AUTOIT) $(AFLAGS_NOWARN)
+ AFLAGS_ISA	:=$(CFLAGS_ISA) -Wa$(comma)-mthumb
+ # Work around buggy relocation from gas if requested:
+ ifeq ($(CONFIG_THUMB2_AVOID_R_ARM_THM_JUMP11),y)
+-CFLAGS_MODULE	+=-fno-optimize-sibling-calls
++KBUILD_CFLAGS_MODULE	+=-fno-optimize-sibling-calls
+ endif
+ else
+ CFLAGS_ISA	:=$(call cc-option,-marm,)
 -- 
-2.13.6
+2.1.0
