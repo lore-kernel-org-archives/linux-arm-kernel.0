@@ -1,44 +1,26 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 9 Oct 2017 11:23:11 +0530
-Subject: [PATCH 1/2] ARM: dts: dra7: Increase max-voltage of pbias regulator
-In-Reply-To: <20171009055312.24165-1-kishon@ti.com>
-References: <20171009055312.24165-1-kishon@ti.com>
-Message-ID: <20171009055312.24165-2-kishon@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 9 Oct 2017 07:57:49 +0200
+Subject: [PATCH 3/3] ARM: dts: gr-peach: Add ETHER pin group
+In-Reply-To: <20171006122523.GD19008@w540>
+References: <1507193900-23801-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1507193900-23801-4-git-send-email-jacopo+renesas@jmondi.org>
+ <20171006122523.GD19008@w540>
+Message-ID: <20171009055749.GD31804@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ravikumar Kattekola <rk@ti.com>
+On Fri, Oct 06, 2017 at 02:25:23PM +0200, jacopo mondi wrote:
+> Hi Simon,
+> 
+> On Thu, Oct 05, 2017 at 10:58:20AM +0200, Jacopo Mondi wrote:
+> > Add pin configuration subnode for ETHER pin group and enable the interface.
+> >
+> > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> > ---
+> >  arch/arm/boot/dts/r7s72100-gr-peach.dts | 38 +++++++++++++++++++++++++++++++++
+> >  1 file changed, 38 insertions(+)
+> >
+> 
+> Can you confirm you have not applied this yet?
 
-As per recent TRM, PBIAS cell on dra7 devices supports
-3.3v and not 3.0v as documented earlier.
-
-Update PBIAS regulator max voltage to match this.
-
-Document reference:
-SPRUI30C ? DRA75x, DRA74x Technical reference manual- November 2016
-
-Tested on:
-DRA75x PG 2.0 REV H EVM
-
-Signed-off-by: Ravikumar Kattekola <rk@ti.com>
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- arch/arm/boot/dts/dra7.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 02a136a4661a..14d75c589369 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -170,7 +170,7 @@
- 						pbias_mmc_reg: pbias_mmc_omap5 {
- 							regulator-name = "pbias_mmc_omap5";
- 							regulator-min-microvolt = <1800000>;
--							regulator-max-microvolt = <3000000>;
-+							regulator-max-microvolt = <3300000>;
- 						};
- 					};
- 
--- 
-2.11.0
+Confirmed.
