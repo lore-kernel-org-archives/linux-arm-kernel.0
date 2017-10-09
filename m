@@ -1,56 +1,21 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 9 Oct 2017 10:24:09 +0100
-Subject: arm64: 4.14 of_match_node() issues
-In-Reply-To: <5d2ff063-1f7e-0200-cc02-99804f7d9219@suse.de>
-References: <5d2ff063-1f7e-0200-cc02-99804f7d9219@suse.de>
-Message-ID: <20171009092409.GB5127@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 9 Oct 2017 10:25:56 +0100
+Subject: [PATCH] firmware: arm_scpi: silence sparse warnings
+In-Reply-To: <05d15d9d-4664-8bbe-ea4b-90e538d2c1b3@gmail.com>
+References: <05d15d9d-4664-8bbe-ea4b-90e538d2c1b3@gmail.com>
+Message-ID: <f134eee1-6106-e459-57c3-7530a7e6072f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andreas,
 
-On Sat, Oct 07, 2017 at 02:42:13AM +0200, Andreas F?rber wrote:
-> Since 4.14-rc1 I am seeing frequent oopses during module loading (e.g.,
-> MMC, USB) from initrd on aarch64. Symptoms are similar to this in -rc3:
+
+On 06/10/17 19:59, Heiner Kallweit wrote:
+> At several positions in the code sparse complains about incorrect access
+> to __iomem annotated memory. Fix this and make sparse happy.
 > 
-> [  OK  ] Started udev Coldplug all Devices.
-> [   10.117775] usbcore: registered new interface driver usbfs
-> [   10.118235] Unable to handle kernel paging request at virtual address
-> ffff000008e5abc0
-> [   10.118238] Mem abort info:
-> [   10.118245]   Exception class = DABT (current EL), IL = 32 bits
-> [   10.118249]   SET = 0, FnV = 0
-> [   10.118253]   EA = 0, S1PTW = 0
-> [   10.118256] Data abort info:
-> [   10.118261]   ISV = 0, ISS = 0x00000006
-> [   10.118264]   CM = 0, WnR = 0
-> [   10.118274] swapper pgtable: 4k pages, 48-bit VAs, pgd = ffff0000094a5000
-> [   10.118279] [ffff000008e5abc0] *pgd=00000000bfffe003,
-> *pud=00000000bfffd003, *pmd=0000000000000000
-> [   10.118299] Internal error: Oops: 96000006 [#1] SMP
-> [   10.118305] Modules linked in: fixed usbcore(+) sunxi_mmc mmc_core
-> phy_sun4i_usb sg
-> [   10.118341] CPU: 3 PID: 49 Comm: kworker/3:1 Not tainted
-> 4.14.0-rc3-2.gf27997b-default #1
-> [   10.118345] Hardware name: sunxi sunxi/sunxi, BIOS 2017.05-rc1 04/13/2017
-> [   10.118369] Workqueue: events deferred_probe_work_func
-> [   10.118378] task: ffff80007c8f4000 task.stack: ffff0000099d8000
-> [   10.118394] PC is at __of_match_node.part.1+0x48/0x88
-> [   10.118403] LR is at of_match_node+0x40/0x70
-> [   10.118411] pc : [<ffff00000879aed0>] lr : [<ffff00000879af50>]
+I just cooked exact same patch ready in my local tree last Friday :).
+I will apply this. Thanks.
 
-[...]
-
-> This has been observed on Pine64 (>60%; also by Stefan) and Odroid-C2;
-> my other arm64 boards such as Raspberry Pi 3 have not run into this so
-> far. No such problems on 32-bit boards.
-> 
-> This is using the openSUSE config:
-> https://kernel.opensuse.org/cgit/kernel-source/plain/config/arm64/default
-
-Hmm, hard to know what to suggest without a concrete reproducer. Do you know
-which driver is being probed in the log above? Also, does this still break
-if you pass "keepinitrd" on the cmdline? Finally, can you dump the kernel
-virtual memory layout, please?
-
-Will
+-- 
+Regards,
+Sudeep
