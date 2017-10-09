@@ -1,103 +1,85 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  9 Oct 2017 16:20:24 +0100
-Subject: [PATCH 02/10] arm64: KVM: Add invalidate_icache_range helper
-In-Reply-To: <20171009152032.27804-1-marc.zyngier@arm.com>
-References: <20171009152032.27804-1-marc.zyngier@arm.com>
-Message-ID: <20171009152032.27804-3-marc.zyngier@arm.com>
+Date: Mon,  9 Oct 2017 16:20:22 +0100
+Subject: [PATCH 00/10] arm/arm64: KVM: limit icache invalidation to prefetch
+ aborts
+Message-ID: <20171009152032.27804-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently tightly couple dcache clean with icache invalidation,
-but KVM could do without the initial flush to PoU, as we've
-already flushed things to PoC.
+It was recently reported that on a VM restore, we seem to spend a
+disproportionate amount of time invalidation the icache. This is
+partially due to some HW behaviour, but also because we're being a bit
+dumb and are invalidating the icache for every page we map at S2, even
+if that on a data access.
 
-Let's introduce invalidate_icache_range which is limited to
-invalidating the icache from the linear mapping (and thus
-has none of the userspace fault handling complexity), and
-wire it in KVM instead of flush_icache_range.
+The slightly better way of doing this is to mark the pages XN at S2,
+and wait for the the guest to execute something in that page, at which
+point we perform the invalidation. As it is likely that there is a lot
+less instruction than data, we win (or so we hope).
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/include/asm/cacheflush.h |  8 ++++++++
- arch/arm64/include/asm/kvm_mmu.h    |  4 ++--
- arch/arm64/mm/cache.S               | 24 ++++++++++++++++++++++++
- 3 files changed, 34 insertions(+), 2 deletions(-)
+We also take this opportunity to drop the extra dcache clean to the
+PoU which is pretty useless, as we already clean all the way to the
+PoC...
 
-diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
-index 76d1cc85d5b1..ad56406944c6 100644
---- a/arch/arm64/include/asm/cacheflush.h
-+++ b/arch/arm64/include/asm/cacheflush.h
-@@ -52,6 +52,13 @@
-  *		- start  - virtual start address
-  *		- end    - virtual end address
-  *
-+ *	invalidate_icache_range(start, end)
-+ *
-+ *		Invalidate the I-cache in the region described by start, end.
-+ *		Linear mapping only!
-+ *		- start  - virtual start address
-+ *		- end    - virtual end address
-+ *
-  *	__flush_cache_user_range(start, end)
-  *
-  *		Ensure coherency between the I-cache and the D-cache in the
-@@ -66,6 +73,7 @@
-  *		- size   - region size
-  */
- extern void flush_icache_range(unsigned long start, unsigned long end);
-+extern void invalidate_icache_range(unsigned long start, unsigned long end);
- extern void __flush_dcache_area(void *addr, size_t len);
- extern void __inval_dcache_area(void *addr, size_t len);
- extern void __clean_dcache_area_poc(void *addr, size_t len);
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 4c4cb4f0e34f..48d31ca2ce9c 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -250,8 +250,8 @@ static inline void __coherent_icache_guest_page(struct kvm_vcpu *vcpu,
- 		/* PIPT or VPIPT at EL2 (see comment in __kvm_tlb_flush_vmid_ipa) */
- 		void *va = page_address(pfn_to_page(pfn));
- 
--		flush_icache_range((unsigned long)va,
--				   (unsigned long)va + size);
-+		invalidate_icache_range((unsigned long)va,
-+					(unsigned long)va + size);
- 	}
- }
- 
-diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-index 7f1dbe962cf5..0c330666a8c9 100644
---- a/arch/arm64/mm/cache.S
-+++ b/arch/arm64/mm/cache.S
-@@ -80,6 +80,30 @@ USER(9f, ic	ivau, x4	)		// invalidate I line PoU
- ENDPROC(flush_icache_range)
- ENDPROC(__flush_cache_user_range)
- 
-+/*
-+ *	invalidate_icache_range(start,end)
-+ *
-+ *	Ensure that the I cache is invalid within specified region. This
-+ *	assumes that this is done on the linear mapping. Do not use it
-+ *	on a userspace range, as this may fault horribly.
-+ *
-+ *	- start   - virtual start address of region
-+ *	- end     - virtual end address of region
-+ */
-+ENTRY(invalidate_icache_range)
-+	icache_line_size x2, x3
-+	sub	x3, x2, #1
-+	bic	x4, x0, x3
-+1:
-+	ic	ivau, x4			// invalidate I line PoU
-+	add	x4, x4, x2
-+	cmp	x4, x1
-+	b.lo	1b
-+	dsb	ish
-+	isb
-+	ret
-+ENDPROC(invalidate_icache_range)
-+
- /*
-  *	__flush_dcache_area(kaddr, size)
-  *
+Running a bare metal test that touches 1GB of memory (using a 4kB
+stride) leads to the following results on Seattle:
+
+4.13:
+do_fault_read.bin:       0.565885992 seconds time elapsed
+do_fault_write.bin:       0.738296337 seconds time elapsed
+do_fault_read_write.bin:       1.241812231 seconds time elapsed
+
+4.14-rc3+patches:
+do_fault_read.bin:       0.244961803 seconds time elapsed
+do_fault_write.bin:       0.422740092 seconds time elapsed
+do_fault_read_write.bin:       0.643402470 seconds time elapsed
+
+We're almost halving the time of something that more or less looks
+like a restore operation. Some larger systems will show much bigger
+benefits as they become less impacted by the icache invalidation
+(which is broadcast in the inner shareable domain).
+
+I've also given it a test run on both Cubietruck and Jetson-TK1.
+
+Tests are archived here:
+https://git.kernel.org/pub/scm/linux/kernel/git/maz/kvm-ws-tests.git/
+
+I'd value some additional test results on HW I don't have access to.
+
+Thanks,
+
+	M.
+
+Marc Zyngier (10):
+  KVM: arm/arm64: Split dcache/icache flushing
+  arm64: KVM: Add invalidate_icache_range helper
+  arm: KVM: Add optimized PIPT icache flushing
+  arm64: KVM: PTE/PMD S2 XN bit definition
+  KVM: arm/arm64: Limit icache invalidation to prefetch aborts
+  KVM: arm/arm64: Only clean the dcache on translation fault
+  KVM: arm/arm64: Preserve Exec permission across R/W permission faults
+  KVM: arm/arm64: Drop vcpu parameter from
+    coherent_{d,i}cache_guest_page
+  KVM: arm/arm64: Detangle kvm_mmu.h from kvm_hyp.h
+  arm: KVM: Use common implementation for all flushes to PoC
+
+ arch/arm/include/asm/kvm_hyp.h         |   3 +-
+ arch/arm/include/asm/kvm_mmu.h         | 110 +++++++++++++++++++++++----------
+ arch/arm/include/asm/pgtable.h         |   4 +-
+ arch/arm/kvm/hyp/switch.c              |   1 +
+ arch/arm/kvm/hyp/tlb.c                 |   1 +
+ arch/arm64/include/asm/cacheflush.h    |   8 +++
+ arch/arm64/include/asm/kvm_hyp.h       |   1 -
+ arch/arm64/include/asm/kvm_mmu.h       |  37 +++++++++--
+ arch/arm64/include/asm/pgtable-hwdef.h |   2 +
+ arch/arm64/include/asm/pgtable-prot.h  |   4 +-
+ arch/arm64/kvm/hyp/debug-sr.c          |   1 +
+ arch/arm64/kvm/hyp/switch.c            |   1 +
+ arch/arm64/kvm/hyp/tlb.c               |   1 +
+ arch/arm64/mm/cache.S                  |  24 +++++++
+ virt/kvm/arm/hyp/vgic-v2-sr.c          |   1 +
+ virt/kvm/arm/mmu.c                     |  68 +++++++++++++++++---
+ 16 files changed, 213 insertions(+), 54 deletions(-)
+
 -- 
 2.14.1
