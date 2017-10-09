@@ -1,85 +1,64 @@
 From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 9 Oct 2017 14:43:23 +0200
-Subject: [PATCH v11 0/4] Add Rockchip RGA V4l2 support
-In-Reply-To: <20171009090424.15292-1-jacob-chen@iotwrt.com>
+Date: Mon, 9 Oct 2017 14:48:13 +0200
+Subject: [PATCH v11 1/4] rockchip/rga: v4l2 m2m support
+In-Reply-To: <20171009090424.15292-2-jacob-chen@iotwrt.com>
 References: <20171009090424.15292-1-jacob-chen@iotwrt.com>
-Message-ID: <2b5c0479-0836-9e03-dfd7-75ed77f39512@xs4all.nl>
+ <20171009090424.15292-2-jacob-chen@iotwrt.com>
+Message-ID: <39318451-a078-3451-47f8-9205a31cadb5@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jacob,
+On 09/10/17 11:04, Jacob Chen wrote:
+> Rockchip RGA is a separate 2D raster graphic acceleration unit. It
+> accelerates 2D graphics operations, such as point/line drawing, image
+> scaling, rotation, BitBLT, alpha blending and image blur/sharpness
+> 
+> The driver supports various operations from the rendering pipeline.
+>  - copy
+>  - fast solid color fill
+>  - rotation
+>  - flip
+>  - alpha blending
+> 
+> The code in rga-hw.c is used to configure regs according to operations
+> The code in rga-buf.c is used to create private mmu table for RGA.
+> 
+> Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
 
-A patch adding an entry to MAINTAINERS is still missing.
+I ran checkpatch --strict on this patch and I found a few small issues:
 
-Just post a separate patch for that.
+WARNING: Avoid crashing the kernel - try using WARN_ON & recovery code rather than BUG() or BUG_ON()
+#1222: FILE: drivers/media/platform/rockchip/rga/rga.c:89:
++               BUG_ON(!ctx);
+
+WARNING: Avoid crashing the kernel - try using WARN_ON & recovery code rather than BUG() or BUG_ON()
+#1229: FILE: drivers/media/platform/rockchip/rga/rga.c:96:
++               BUG_ON(!src);
+
+WARNING: Avoid crashing the kernel - try using WARN_ON & recovery code rather than BUG() or BUG_ON()
+#1230: FILE: drivers/media/platform/rockchip/rga/rga.c:97:
++               BUG_ON(!dst);
+
+I think you can use WARN_ON here and just return.
+
+CHECK: struct mutex definition without comment
+#2235: FILE: drivers/media/platform/rockchip/rga/rga.h:84:
++       struct mutex mutex;
+
+CHECK: spinlock_t definition without comment
+#2236: FILE: drivers/media/platform/rockchip/rga/rga.h:85:
++       spinlock_t ctrl_lock;
+
+These two fields need a comment describing what the locks protect.
+
+Also move patch 4/4 to the beginning of the patch series. The bindings
+patch should come before the driver.
+
+If I have a v12 with these issues fixed and a MAINTAINERS patch, then
+I'll take it on Friday.
+
+Do you want me to take the dts patches or will they go through another tree?
 
 Regards,
 
 	Hans
-
-On 09/10/17 11:04, Jacob Chen wrote:
-> change in V11:
-> - fix compile warning
-> 
-> change in V10:
-> - move to rockchip/rga
-> - changes according to comments
-> - some style changes
-> 
-> change in V9:
-> - remove protduff things
-> - test with the latest v4l2-compliance
-> 
-> change in V8:
-> - remove protduff things
-> 
-> change in V6,V7:
-> - correct warning in checkpatch.pl
-> 
-> change in V5:
-> - v4l2-compliance: handle invalid pxielformat
-> - v4l2-compliance: add subscribe_event
-> - add colorspace support
-> 
-> change in V4:
-> - document the controls.
-> - change according to Hans's comments
-> 
-> change in V3:
-> - rename the controls.
-> - add pm_runtime support.
-> - enable node by default.
-> - correct spelling in documents.
-> 
-> change in V2:
-> - generalize the controls.
-> - map buffers (10-50 us) in every cmd-run rather than in buffer-import to avoid get_free_pages failed on
-> actively used systems.
-> - remove status in dt-bindings examples.
-> 
-> Jacob Chen (4):
->   rockchip/rga: v4l2 m2m support
->   ARM: dts: rockchip: add RGA device node for RK3288
->   arm64: dts: rockchip: add RGA device node for RK3399
->   dt-bindings: Document the Rockchip RGA bindings
-> 
->  .../devicetree/bindings/media/rockchip-rga.txt     |   33 +
->  arch/arm/boot/dts/rk3288.dtsi                      |   11 +
->  arch/arm64/boot/dts/rockchip/rk3399.dtsi           |   11 +
->  drivers/media/platform/Kconfig                     |   15 +
->  drivers/media/platform/Makefile                    |    2 +
->  drivers/media/platform/rockchip/rga/Makefile       |    3 +
->  drivers/media/platform/rockchip/rga/rga-buf.c      |  154 +++
->  drivers/media/platform/rockchip/rga/rga-hw.c       |  421 ++++++++
->  drivers/media/platform/rockchip/rga/rga-hw.h       |  437 +++++++++
->  drivers/media/platform/rockchip/rga/rga.c          | 1012 ++++++++++++++++++++
->  drivers/media/platform/rockchip/rga/rga.h          |  123 +++
->  11 files changed, 2222 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/rockchip-rga.txt
->  create mode 100644 drivers/media/platform/rockchip/rga/Makefile
->  create mode 100644 drivers/media/platform/rockchip/rga/rga-buf.c
->  create mode 100644 drivers/media/platform/rockchip/rga/rga-hw.c
->  create mode 100644 drivers/media/platform/rockchip/rga/rga-hw.h
->  create mode 100644 drivers/media/platform/rockchip/rga/rga.c
->  create mode 100644 drivers/media/platform/rockchip/rga/rga.h
-> 
