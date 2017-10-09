@@ -1,45 +1,74 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 9 Oct 2017 10:00:11 +0100
-Subject: [PATCH] arm64: elf.h: Correct comment about READ_IMPLIES_EXEC
- propagation
-In-Reply-To: <20171006020001.GD2971@decadent.org.uk>
-References: <20171006020001.GD2971@decadent.org.uk>
-Message-ID: <20171009090010.GA5127@arm.com>
+From: jacob-chen@iotwrt.com (Jacob Chen)
+Date: Mon,  9 Oct 2017 17:04:20 +0800
+Subject: [PATCH v11 0/4] Add Rockchip RGA V4l2 support
+Message-ID: <20171009090424.15292-1-jacob-chen@iotwrt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 06, 2017 at 03:00:01AM +0100, Ben Hutchings wrote:
-> Process personality always propagates across a fork(), but can change
-> at an execve().
-> 
-> Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
-> ---
->  arch/arm64/include/asm/elf.h | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+change in V11:
+- fix compile warning
 
-You're right, the comment is sloppy. I'll pick this up for 4.15.
+change in V10:
+- move to rockchip/rga
+- changes according to comments
+- some style changes
 
-Will
+change in V9:
+- remove protduff things
+- test with the latest v4l2-compliance
 
-> diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-> index 33be513ef24c..fac1c4de7898 100644
-> --- a/arch/arm64/include/asm/elf.h
-> +++ b/arch/arm64/include/asm/elf.h
-> @@ -188,8 +188,8 @@ typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
->  
->  #define compat_start_thread		compat_start_thread
->  /*
-> - * Unlike the native SET_PERSONALITY macro, the compat version inherits
-> - * READ_IMPLIES_EXEC across a fork() since this is the behaviour on
-> + * Unlike the native SET_PERSONALITY macro, the compat version maintains
-> + * READ_IMPLIES_EXEC across an execve() since this is the behaviour on
->   * arch/arm/.
->   */
->  #define COMPAT_SET_PERSONALITY(ex)					\
+change in V8:
+- remove protduff things
 
+change in V6,V7:
+- correct warning in checkpatch.pl
 
+change in V5:
+- v4l2-compliance: handle invalid pxielformat
+- v4l2-compliance: add subscribe_event
+- add colorspace support
 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+change in V4:
+- document the controls.
+- change according to Hans's comments
+
+change in V3:
+- rename the controls.
+- add pm_runtime support.
+- enable node by default.
+- correct spelling in documents.
+
+change in V2:
+- generalize the controls.
+- map buffers (10-50 us) in every cmd-run rather than in buffer-import to avoid get_free_pages failed on
+actively used systems.
+- remove status in dt-bindings examples.
+
+Jacob Chen (4):
+  rockchip/rga: v4l2 m2m support
+  ARM: dts: rockchip: add RGA device node for RK3288
+  arm64: dts: rockchip: add RGA device node for RK3399
+  dt-bindings: Document the Rockchip RGA bindings
+
+ .../devicetree/bindings/media/rockchip-rga.txt     |   33 +
+ arch/arm/boot/dts/rk3288.dtsi                      |   11 +
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi           |   11 +
+ drivers/media/platform/Kconfig                     |   15 +
+ drivers/media/platform/Makefile                    |    2 +
+ drivers/media/platform/rockchip/rga/Makefile       |    3 +
+ drivers/media/platform/rockchip/rga/rga-buf.c      |  154 +++
+ drivers/media/platform/rockchip/rga/rga-hw.c       |  421 ++++++++
+ drivers/media/platform/rockchip/rga/rga-hw.h       |  437 +++++++++
+ drivers/media/platform/rockchip/rga/rga.c          | 1012 ++++++++++++++++++++
+ drivers/media/platform/rockchip/rga/rga.h          |  123 +++
+ 11 files changed, 2222 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/rockchip-rga.txt
+ create mode 100644 drivers/media/platform/rockchip/rga/Makefile
+ create mode 100644 drivers/media/platform/rockchip/rga/rga-buf.c
+ create mode 100644 drivers/media/platform/rockchip/rga/rga-hw.c
+ create mode 100644 drivers/media/platform/rockchip/rga/rga-hw.h
+ create mode 100644 drivers/media/platform/rockchip/rga/rga.c
+ create mode 100644 drivers/media/platform/rockchip/rga/rga.h
+
+-- 
+2.14.1
