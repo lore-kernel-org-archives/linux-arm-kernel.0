@@ -1,51 +1,59 @@
-From: pasha.tatashin@oracle.com (Pavel Tatashin)
-Date: Mon, 9 Oct 2017 14:42:32 -0400
-Subject: [PATCH v9 09/12] mm/kasan: kasan specific map populate function
-In-Reply-To: <20171009182217.GC30828@arm.com>
-References: <20170920201714.19817-1-pasha.tatashin@oracle.com>
- <20170920201714.19817-10-pasha.tatashin@oracle.com>
- <20171003144845.GD4931@leverpostej>
- <20171009171337.GE30085@arm.com>
- <CAOAebxtHHFvYn4WysMASe1GqvgKYPVyjJ572UM3Sef5sP0hi9A@mail.gmail.com>
- <20171009182217.GC30828@arm.com>
-Message-ID: <CAOAebxu1310eCrk88EC=Oaw3n90-9RuHZ1KBhPvLu_DyXBNZFQ@mail.gmail.com>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Mon,  9 Oct 2017 11:43:44 -0700
+Subject: [PATCH] ARM: dts: imx7d: Invert legacy PCI irq mapping
+Message-ID: <20171009184344.5839-1-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+According to i.MX7D reference manual (Rev. 0.1, table 7-1, page 1221)
+legacy PCI interrupt mapping is as follows:
 
-In addition to what Michal wrote:
+ - PCIE INT A is IRQ 122
+ - PCIE INT B is IRQ 123
+ - PCIE INT C is IRQ 124
+ - PCIE INT D is IRQ 125
 
-> As an interim step, why not introduce something like
-> vmemmap_alloc_block_flags and make the page-table walking opt-out for
-> architectures that don't want it? Then we can just pass __GFP_ZERO from
-> our vmemmap_populate where necessary and other architectures can do the
-> page-table walking dance if they prefer.
+Invert the mapping information in corresponding DT node to reflect
+that.
 
-I do not see the benefit, implementing this approach means that we
-would need to implement two table walks instead of one: one for x86,
-another for ARM, as these two architectures support kasan. Also, this
-would become a requirement for any future architecture that want to
-add kasan support to add this page table walk implementation.
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: yurovsky at gmail.com
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: devicetree at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+---
 
->> IMO, while I understand that it looks strange that we must walk page
->> table after creating it, it is a better approach: more enclosed as it
->> effects kasan only, and more universal as it is in common code.
->
-> I don't buy the more universal aspect, but I appreciate it's subjective.
-> Frankly, I'd just sooner not have core code walking early page tables if
-> it can be avoided, and it doesn't look hard to avoid it in this case.
-> The fact that you're having to add pmd_large and pud_large, which are
-> otherwise unused in mm/, is an indication that this isn't quite right imo.
+Discovered by using custom build of QEMU[1] when using together with
+"usb-ehci" which is, AFAIU, ICH4. A bit of a convoluted use-case, but
+I thought it would still be worht fixing.
 
- 28 +#define pmd_large(pmd)         pmd_sect(pmd)
- 29 +#define pud_large(pud)         pud_sect(pud)
+[1] https://github.com/ndreys/qemu/tree/imx7-support-upstreaming 
 
-it is just naming difference, ARM64 calls them pmd_sect, common mm and
-other arches call them
-pmd_large/pud_large. Even the ARM has these defines in
+ arch/arm/boot/dts/imx7d.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-arm/include/asm/pgtable-3level.h
-arm/include/asm/pgtable-2level.h
-
-Pavel
+diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+index f46814a7ea44..4d308d17f040 100644
+--- a/arch/arm/boot/dts/imx7d.dtsi
++++ b/arch/arm/boot/dts/imx7d.dtsi
+@@ -144,10 +144,10 @@
+ 		interrupt-names = "msi";
+ 		#interrupt-cells = <1>;
+ 		interrupt-map-mask = <0 0 0 0x7>;
+-		interrupt-map = <0 0 0 1 &intc GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0 0 2 &intc GIC_SPI 124 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0 0 3 &intc GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0 0 4 &intc GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-map = <0 0 0 1 &intc GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 0 2 &intc GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 0 3 &intc GIC_SPI 124 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 0 4 &intc GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&clks IMX7D_PCIE_CTRL_ROOT_CLK>,
+ 			 <&clks IMX7D_PLL_ENET_MAIN_100M_CLK>,
+ 			 <&clks IMX7D_PCIE_PHY_ROOT_CLK>;
+-- 
+2.13.5
