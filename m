@@ -1,40 +1,44 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 9 Oct 2017 19:02:50 +0100
-Subject: [PATCH v4 00/26] KVM/ARM: Add support for GICv4
-In-Reply-To: <20171009175239.GE23730@char.us.oracle.com>
-References: <20171006153401.5481-1-marc.zyngier@arm.com>
- <20171009175239.GE23730@char.us.oracle.com>
-Message-ID: <63365b61-5a2e-220c-a543-d2245bd7f8a5@arm.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Mon, 9 Oct 2017 20:14:33 +0200
+Subject: [PATCH v9 09/12] mm/kasan: kasan specific map populate function
+In-Reply-To: <CAOAebxtHHFvYn4WysMASe1GqvgKYPVyjJ572UM3Sef5sP0hi9A@mail.gmail.com>
+References: <20170920201714.19817-1-pasha.tatashin@oracle.com>
+ <20170920201714.19817-10-pasha.tatashin@oracle.com>
+ <20171003144845.GD4931@leverpostej>
+ <20171009171337.GE30085@arm.com>
+ <CAOAebxtHHFvYn4WysMASe1GqvgKYPVyjJ572UM3Sef5sP0hi9A@mail.gmail.com>
+Message-ID: <20171009181433.wevxa447d4g6kdsj@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/17 18:52, Konrad Rzeszutek Wilk wrote:
-> On Fri, Oct 06, 2017 at 04:33:35PM +0100, Marc Zyngier wrote:
->> This series implements full support for GICv4 in KVM, bringing direct
->> injection of MSIs to arm and arm64, assuming you have the right
->> hardware (which is quite unlikely).
->>
->> To get an idea of the design, I'd recommend you start with commit
->> 7954907bedaf as well as patch #26, which try to shed some light on the
->> approach that I've taken. And before that, please digest some of the
->> GICv3/GICv4 architecture documentation[1] (less than 800 pages!). Once
->> you feel reasonably insane, you'll be in the right mood to read the
+On Mon 09-10-17 13:51:47, Pavel Tatashin wrote:
+> Hi Will,
 > 
-> You may want to update the link:
+> I can go back to that approach, if Michal OK with it. But, that would
+> mean that I would need to touch every single architecture that
+> implements vmemmap_populate(), and also pass flags at least through
+> these functions on every architectures (some have more than one
+> decided by configs).:
 > 
-> s/pfd/pdf/
+> vmemmap_populate()
+> vmemmap_populate_basepages()
+> vmemmap_populate_hugepages()
+> vmemmap_pte_populate()
+> __vmemmap_alloc_block_buf()
+> alloc_block_buf()
+> vmemmap_alloc_block()
 > 
-> (Does that mean you typed this by hand, my gosh, you really are breathing
-> this everyday) :-)
-I am, and I'm feeling pretty dizzy. You can't imagine the kind of fumes
-this thing generates... ;-)
+> IMO, while I understand that it looks strange that we must walk page
+> table after creating it, it is a better approach: more enclosed as it
+> effects kasan only, and more universal as it is in common code.
 
-I probably copy/pasted the URL, edited something, messed up the URL,
-fixed it (sort of), and ended posting the crap (twice!) without even
-realizing. Oh well. I'll blame the spec, as always.
-
-Thanks for the heads up!
-
-	M.
+While I understand that gfp mask approach might look better at first
+sight this is by no means a general purpose API so I would rather be
+pragmatic and have a smaller code footprint than a more general
+interface. Kasan is pretty much a special case and doing a one time
+initialization 2 pass thing is imho acceptable. If this turns out to be
+impractical in future then let's fix it up but right now I would rather
+go a simpler path.
 -- 
-Jazz is not dead. It just smells funny...
+Michal Hocko
+SUSE Labs
