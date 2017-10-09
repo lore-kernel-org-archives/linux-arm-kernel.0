@@ -1,12 +1,12 @@
 From: jingoohan1@gmail.com (Jingoo Han)
-Date: Mon, 9 Oct 2017 12:16:33 -0400
+Date: Mon, 9 Oct 2017 12:20:23 -0400
 Subject: [PATCH] PCI: exynos: remove redundant code in
  exynos_pcie_establish_link
 In-Reply-To: <CAJKOXPeC=cS2cvAXHrKuK5F4tEqH6PppwYkxC+Z8+5D--48CAg@mail.gmail.com>
 References: <CGME20171009141438epcas2p4ead7e2f2d1af7e0950f2c026e3a9943b@epcas2p4.samsung.com>
  <1507558478-3218-1-git-send-email-pankaj.dubey@samsung.com>
  <CAJKOXPeC=cS2cvAXHrKuK5F4tEqH6PppwYkxC+Z8+5D--48CAg@mail.gmail.com>
-Message-ID: <000101d34119$f9e18290$eda487b0$@gmail.com>
+Message-ID: <000a01d3411a$82eea770$88cbf650$@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -22,6 +22,8 @@ On Monday, October 9, 2017 10:44 AM, Krzysztof Kozlowski wrote:
 > Hi Pankaj,
 > 
 > This lacks the information why it is redundant.
+
+(I resend this mail, because email address of pci list was corrupted.)
 
 I think so, too.
 
