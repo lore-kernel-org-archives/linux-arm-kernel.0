@@ -1,103 +1,45 @@
-From: mike@tubby.org (Mike Tubby)
-Date: Mon, 9 Oct 2017 17:20:39 +0100
-Subject: iMX6 PCIE IRQ not working with ath9k based Wifi
-In-Reply-To: <CAJ+vNU0=+H9ED7TXwJv4VjymFD7ArnUq9NhMQVJdPtSdAe=xKw@mail.gmail.com>
-References: <348346fa-1d70-1d08-9a32-18b660328e4f@tubby.org>
- <CAK8P3a0bF7=bbWBS9+7uBYp+yGpDUfS_QCX6K4i3WJv9mbgvEA@mail.gmail.com>
- <d20644ba-0e1b-0fb4-41ba-d1d604800382@tubby.org>
- <1507551698.2745.1.camel@pengutronix.de>
- <CAJ+vNU0=+H9ED7TXwJv4VjymFD7ArnUq9NhMQVJdPtSdAe=xKw@mail.gmail.com>
-Message-ID: <625870fe-37b7-161b-216f-b1e8c60331d1@tubby.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 9 Oct 2017 17:22:13 +0100
+Subject: [PATCH v3 04/20] KVM: arm/arm64: Guard kvm_vgic_map_is_active
+ against !vgic_initialized
+In-Reply-To: <20170923004207.22356-5-cdall@linaro.org>
+References: <20170923004207.22356-1-cdall@linaro.org>
+ <20170923004207.22356-5-cdall@linaro.org>
+Message-ID: <2fb75502-ee42-9178-835f-637179d47937@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 23/09/17 01:41, Christoffer Dall wrote:
+> If the vgic is not initialized, don't try to grab its spinlocks or
+> traverse its data structures.
+> 
+> This is important because we soon have to start considering the active
+> state of a virtual interrupts when doing vcpu_load, which may happen
+> early on before the vgic is initialized.
+> 
+> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+> ---
+>  virt/kvm/arm/vgic/vgic.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+> index fed717e..e1f7dbc 100644
+> --- a/virt/kvm/arm/vgic/vgic.c
+> +++ b/virt/kvm/arm/vgic/vgic.c
+> @@ -777,6 +777,9 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq)
+>  	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
+>  	bool map_is_active;
+>  
+> +	if (!vgic_initialized(vcpu->kvm))
+> +		return false;
+> +
+>  	spin_lock(&irq->irq_lock);
+>  	map_is_active = irq->hw && irq->active;
+>  	spin_unlock(&irq->irq_lock);
+> 
 
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-On 10/9/2017 3:53 PM, Tim Harvey wrote:
-> On Mon, Oct 9, 2017 at 5:21 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
->> Hi Mike,
->>
->> Am Montag, den 09.10.2017, 12:56 +0100 schrieb Mike Tubby:
->>
->> [...]
->>
->>> If I understand correctly the ath9k driver in kernel 4.1.15 we're
->>> using
->>> doesn't enable MSI - so I assume that there is some backwards
->>> compatibility mode that then is not working because MSI is enabled
->>> at
->>> the CPU end, and hence the patch you referred to is used to turn this
->>> off.
->>>
->>> At the same time on the mailing list:
->>>
->>> https://www.mail-archive.com/ath9k-devel at lists.ath9k.org/msg14332.htm
->>> l
->>>
->>> which is part of:
->>>
->>>       https://wireless.wiki.kernel.org/en/users/Drivers/ath9k
->>>
->>> there is talk of a patch to the ath9k driver to properly implement
->>> MSI
->>> in the updated driver in kernel 4.6
->>>
->>> So, for us the question is which way to head:
->>>
->>>       a) disable MSI at the CPU and try to use legacy; or
->>>
->>>       b) update the ath9k driver to try and enable MSI ?
->>>
->>>
->>> We will also check the DTS/DTB in case something is mis-assigned.
->> Due to a design flaw of the DWC host controller, legacy IRQs (like the
->> ones used by ath9k) won't work if any MSIs are enabled on the
->> controller.
->>
->> You can take a look at my series "[PATCH 0/3] DWC host without MSI
->> controller", which works around this, but still needs some rework for
->> mainline.
->>
->> Regards,
->> Lucas
-> Mike,
->
-> Yes, this is exactly the scenario I keep pointing out. The ath9k
-> card/drivers requires legacy interrupts which won't work when MSI is
-> used on the DWC host controller used on the IMX6. I don't know what
-> other cards/drivers require legacy interrupts... perhaps they are not
-> that popular as this issue has lingered for a while.
->
-> The patch series Lucas created disables MSI via the device-tree for
-> IMX6 and is what you need: https://patchwork.ozlabs.org/cover/806603/.
-> The patch series is not accepted yet and will be tweaked a bit (to do
-> the same for the other SoC's that use the DWC controller, not just
-> IMX6) but for IMX6 it works fine on top of a 4.13 kernel.
->
-> I see from your original post you are using a 4.1 kernel. For Linux
-> 4.6 and prior you can disable MSI at kernel build time but from 4.7
-> onward it takes a bit more hacking.
->
-> Tim
-
-Hi Tim,
-
-Thanks for the reply.
-
-We're using the 4.1.15 kernel because its what we were given in the 
-BSP.? I note that NXP/Freescale now have a 4.9.11 kernel officially 
-supported - I'm just downloading it to have a look at.
-
-I've also found a Qualcom provided update to the ath9k driver to add MSI 
-support:
-
- ??? https://patchwork.kernel.org/patch/9971077/
-
-which is only 2 weeks old - so perhaps they've finally got round to 
-fixing it as well and perhaps we can use MSI with the ath9k and not go 
-around disabling it all over the place ;-)
-
-I would be interested if you can get a 4.9.11 or later kernel going with 
-the updated ath9k driver and using MSI ...
-
-Mike
+	M.
+-- 
+Jazz is not dead. It just smells funny...
