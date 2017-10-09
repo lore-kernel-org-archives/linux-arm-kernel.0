@@ -1,34 +1,40 @@
-From: pure.logic@nexus-software.ie (Bryan O'Donoghue)
-Date: Mon,  9 Oct 2017 15:11:51 +0100
-Subject: [PATCH v3 6/7] nvmem: imx-ocotp: Enable i.MX7D OTP write support
-In-Reply-To: <1507558312-20580-1-git-send-email-pure.logic@nexus-software.ie>
-References: <1507558312-20580-1-git-send-email-pure.logic@nexus-software.ie>
-Message-ID: <1507558312-20580-7-git-send-email-pure.logic@nexus-software.ie>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Mon, 09 Oct 2017 19:44:38 +0530
+Subject: [PATCH] PCI: exynos: remove redundant code in
+ exynos_pcie_establish_link
+References: <CGME20171009141438epcas2p4ead7e2f2d1af7e0950f2c026e3a9943b@epcas2p4.samsung.com>
+Message-ID: <1507558478-3218-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After applying patches for both banked access and write timings we can
-re-enable the OTP write interface on i.MX7D processors.
+From: Anvesh Salveru <anvesh.s@samsung.com>
 
-Fixes: 0642bac7da42 ("nvmem: imx-ocotp: add write support")
+In exynos_pcie_establish_link if driver is not using generic phy,
+we are resetting PHY twice, which is redundant, so this patch removes
+repeated lines of code for PHY reset.
 
-Signed-off-by: Bryan O'Donoghue <pure.logic@nexus-software.ie>
+Signed-off-by: Anvesh Salveru <anvesh.s@samsung.com>
 ---
- drivers/nvmem/imx-ocotp.c | 2 --
- 1 file changed, 2 deletions(-)
+ drivers/pci/dwc/pci-exynos.c | 7 -------
+ 1 file changed, 7 deletions(-)
 
-diff --git a/drivers/nvmem/imx-ocotp.c b/drivers/nvmem/imx-ocotp.c
-index f80aee9..8e8bc20 100644
---- a/drivers/nvmem/imx-ocotp.c
-+++ b/drivers/nvmem/imx-ocotp.c
-@@ -459,8 +459,6 @@ static int imx_ocotp_probe(struct platform_device *pdev)
- 	imx_ocotp_nvmem_config.dev = dev;
- 	imx_ocotp_nvmem_config.priv = priv;
- 	priv->config = &imx_ocotp_nvmem_config;
--	if (of_device_is_compatible(pdev->dev.of_node, "fsl,imx7d-ocotp"))
--		imx_ocotp_nvmem_config.read_only = true;
- 	nvmem = nvmem_register(&imx_ocotp_nvmem_config);
+diff --git a/drivers/pci/dwc/pci-exynos.c b/drivers/pci/dwc/pci-exynos.c
+index 5596fde..85d2f4b 100644
+--- a/drivers/pci/dwc/pci-exynos.c
++++ b/drivers/pci/dwc/pci-exynos.c
+@@ -423,13 +423,6 @@ static int exynos_pcie_establish_link(struct exynos_pcie *ep)
+ 		exynos_pcie_deassert_phy_reset(ep);
+ 		exynos_pcie_power_on_phy(ep);
+ 		exynos_pcie_init_phy(ep);
+-
+-		/* pulse for common reset */
+-		exynos_pcie_writel(ep->mem_res->block_base, 1,
+-					PCIE_PHY_COMMON_RESET);
+-		udelay(500);
+-		exynos_pcie_writel(ep->mem_res->block_base, 0,
+-					PCIE_PHY_COMMON_RESET);
+ 	}
  
- 	if (IS_ERR(nvmem))
+ 	/* pulse for common reset */
 -- 
 2.7.4
