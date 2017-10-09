@@ -1,105 +1,98 @@
-From: xieyisheng1@huawei.com (Yisheng Xie)
-Date: Mon, 9 Oct 2017 17:49:52 +0800
-Subject: [RFCv2 PATCH 00/36] Process management for IOMMU + SVM for SMMUv3
-In-Reply-To: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
-References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
-Message-ID: <0c6778d8-741f-0db7-fe3c-df88a75ebbb2@huawei.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 9 Oct 2017 10:59:36 +0100
+Subject: [PATCH v2 0/5] Switch arm64 over to qrwlock
+In-Reply-To: <20171008213052.ojyxpr56d2ypscjy@yury-thinkpad>
+References: <1507296882-18721-1-git-send-email-will.deacon@arm.com>
+ <20171008213052.ojyxpr56d2ypscjy@yury-thinkpad>
+Message-ID: <20171009095935.GC5127@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean,
+Hi Yury,
 
-On 2017/10/6 21:31, Jean-Philippe Brucker wrote:
-> Following discussions at plumbers and elsewhere, it seems like we need to
-> unify some of the Shared Virtual Memory (SVM) code, in order to define
-> clear semantics for the SVM API.
+On Mon, Oct 09, 2017 at 12:30:52AM +0300, Yury Norov wrote:
+> On Fri, Oct 06, 2017 at 02:34:37PM +0100, Will Deacon wrote:
+> > This is version two of the patches I posted yesterday:
+> > 
+> >   http://lists.infradead.org/pipermail/linux-arm-kernel/2017-October/534666.html
+> > 
+> > I'd normally leave it longer before posting again, but Peter had a good
+> > suggestion to rework the layout of the lock word, so I wanted to post a
+> > version that follows that approach.
+> > 
+> > I've updated my branch if you're after the full patch stack:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git qrwlock
+> > 
+> > As before, all comments (particularly related to testing and performance)
+> > welcome!
+> > 
+> I tested your patches with locktorture and found measurable performance
+> regression. I also respin the patch of Jan Glauber [1], and I also
+> tried Jan's patch with patch 5 from this series. Numbers differ a lot
+> from my previous measurements, but since that I changed working
+> station and use qemu with the support of parallel threads.
+>                         Spinlock        Read-RW lock    Write-RW lock
+> Vanilla:                129804626       12340895        14716138
+> This series:            113718002       10982159        13068934
+> Jan patch:              117977108       11363462        13615449
+> Jan patch + #5:         121483176       11696728        13618967
 > 
-> My previous RFC [1] was centered on the SMMUv3, but some of this code will
-> need to be reused by the SMMUv2 and virtio-iommu drivers. This second
-> proposal focuses on abstracting a little more into the core IOMMU API, and
-> also trying to find common ground for all SVM-capable IOMMUs.
-> 
-> SVM is, in the context of the IOMMU, sharing page tables between a process
-> and a device. Traditionally it requires IO Page Fault and Process Address
-> Space ID capabilities in device and IOMMU.
-> 
-> * A device driver can bind a process to a device, with iommu_process_bind.
->   Internally we hold on to the mm and get notified of its activity with an
->   mmu_notifier. The bond is removed by exit_mm, by a call to
->   iommu_process_unbind or iommu_detach_device.
-> 
-> * iommu_process_bind returns a 20-bit PASID (PCI terminology) to the
->   device driver, which programs it into the device to access the process
->   address space.
-> 
-> * The device and the IOMMU support recoverable page faults. This can be
->   either ATS+PRI for PCI, or platform-specific mechanisms such as Stall
->   for SMMU.
-> 
-> Ideally systems wanting to use SVM have to support these three features,
-> but in practice we'll see implementations supporting just a subset of
-> them, especially in validation environments. So even if this particular
-> patchset assumes all three capabilities, it should also be possible to
-> support PASID without IOPF (by pinning everything, see non-system SVM in
-> OpenCL)
-How to pin everything? If user malloc anything we should pin it. It should
-from user or driver?
+> The bottomline of discussion [1] was that queued locks are more
+> effective when SoC has many CPUs. And 4 is not many. My measurement
+> was made on the 4-CPU machine, and it seems it confirms that. Does
+> it make sense to make queued locks default for many-CPU machines only?
 
-> , or IOPF without PASID (sharing the single device address space
-> with a process, could be useful for DPDK+VFIO).
-> 
-> Implementing both these cases would enable PT sharing alone. Some people
-> would also like IOPF alone without SVM (covered by this series) or process
-> management without shared PT (not covered). Using these features
-> individually is also important for testing, as SVM is in its infancy and
-> providing easy ways to test is essential to reduce the number of quirks
-> down the line.
-> 
->   Process management
->   ==================
-> 
-> The first part of this series introduces boilerplate code for managing
-> PASIDs and processes bound to devices. It's something any IOMMU driver
-> that wants to support bind/unbind will have to do, and it is difficult to
-> get right.
-> 
-> Patches
-> 1: iommu_process and PASID allocation, attach and release
-> 2: process_exit callback for device drivers
-> 3: iommu_process search by PASID
-> 4: track process changes with an MMU notifiers
-> 5: bind and unbind operations
-> 
-> My proposal uses the following model:
-> 
-> * The PASID space is system-wide. This means that a Linux process will
->   have a single PASID. I introduce the iommu_process structure and a
->   global IDR to manage this.
-> 
-> * An iommu_process can be bound to multiple domains, and a domain can have
->   multiple iommu_process.
-when bind a task to device, can we create a single domain for it? I am thinking
-about process management without shared PT(for some device only support PASID
-without pri ability), it seems hard to expand if a domain have multiple iommu_process?
-Do you have any idea about this?
+Just to confirm, you're running this under qemu on an x86 host, using full
+AArch64 system emulation? If so, I really don't think we should base the
+merits of qrwlocks on arm64 around this type of configuration. Given that
+you work for a silicon vendor, could you try running on real arm64 hardware
+instead, please? My measurements on 6-core and 8-core systems look a lot
+better with qrwlock than what we currently have in mainline, and they
+also fix a real starvation issue reported by Jeremy [1].
 
-> 
-> * IOMMU groups share same PASID table. IOMMU groups are a convenient way
->   to cover various hardware weaknesses that prevent a group of device to
->   be isolated by the IOMMU (untrusted bridge, for instance). It's foolish
->   to assume that all PASID implementations will perfectly isolate devices
->   within a bus and functions within a device, so let's assume all devices
->   within an IOMMU group have to share PASID traffic as well. In general
->   there will be a single device per group.
-> 
-> * It's up to the driver implementation to decide where to implement the
->   PASID tables. For SMMU it's more convenient to have a single PASID table
->   per domain. And I think the model fits better with the existing IOMMU
->   API: IOVA traffic is shared by all devices in a domain, so should PASID
->   traffic.
-What's the meaning of "share PASID traffic"? PASID space is system-wide,
-and a domain can have multiple iommu_process , so a domain can have multiple
-PASIDs , one PASID for a iommu_process, right?
+I'd also add that lock fairness comes at a cost, so I'd expect a small drop
+in total throughput for some workloads. I encourage you to try passing
+different arguments to locktorture to see this in action. For example, on
+an 8-core machine:
 
-Yisheng Xie
-Thanks
+# insmod ./locktorture.ko nwriters_stress=2 nreaders_stress=8 torture_type="rw_lock_irq" stat_interval=2
+
+-rc3:
+
+  Writes:  Total: 6612  Max/Min: 0/0   Fail: 0
+  Reads :  Total: 1265230  Max/Min: 0/0   Fail: 0
+  Writes:  Total: 6709  Max/Min: 0/0   Fail: 0
+  Reads :  Total: 1916418  Max/Min: 0/0   Fail: 0
+  Writes:  Total: 6725  Max/Min: 0/0   Fail: 0
+  Reads :  Total: 5103727  Max/Min: 0/0   Fail: 0
+
+notice how the writers are really struggling here (you only have to tweak a
+bit more and you get RCU stalls, lose interrupts etc).
+
+With the qrwlock:
+
+  Writes:  Total: 47962  Max/Min: 0/0   Fail: 0
+  Reads :  Total: 277903  Max/Min: 0/0   Fail: 0
+  Writes:  Total: 100151  Max/Min: 0/0   Fail: 0
+  Reads :  Total: 525781  Max/Min: 0/0   Fail: 0
+  Writes:  Total: 155284  Max/Min: 0/0   Fail: 0
+  Reads :  Total: 767703  Max/Min: 0/0   Fail: 0
+
+which is an awful lot better for maximum latency and fairness, despite the
+much lower reader count.
+
+> There were 2 preparing patches in the series: 
+> [PATCH 1/3] kernel/locking: #include <asm/spinlock.h> in qrwlock
+> and
+> [PATCH 2/3] asm-generic: don't #include <linux/atomic.h> in qspinlock_types.h
+> 
+> 1st patch is not needed anymore because Babu Moger submitted similar patch that
+> is already in mainline: 9ab6055f95903 ("kernel/locking: Fix compile error with
+> qrwlock.c"). Could you revisit second patch?
+
+Sorry, not sure what you're asking me to do here.
+
+Will
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-October/534299.html
