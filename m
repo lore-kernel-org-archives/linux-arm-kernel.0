@@ -1,30 +1,35 @@
-From: pasha.tatashin@oracle.com (Pavel Tatashin)
-Date: Mon, 9 Oct 2017 15:57:38 -0400
-Subject: [PATCH v9 09/12] mm/kasan: kasan specific map populate function
-In-Reply-To: <CAOAebxvcg9r00bCWDJS4V_mmKk_dELVs_SfxqrxemDg7=uZx_g@mail.gmail.com>
-References: <20170920201714.19817-1-pasha.tatashin@oracle.com>
- <20170920201714.19817-10-pasha.tatashin@oracle.com>
- <20171003144845.GD4931@leverpostej>
- <20171009171337.GE30085@arm.com>
- <CAOAebxtHHFvYn4WysMASe1GqvgKYPVyjJ572UM3Sef5sP0hi9A@mail.gmail.com>
- <20171009182217.GC30828@arm.com>
- <CAOAebxu1310eCrk88EC=Oaw3n90-9RuHZ1KBhPvLu_DyXBNZFQ@mail.gmail.com>
- <20171009184834.GE30828@arm.com>
- <CAOAebxs5s3DKV8f+Zw+LFVB98PE6cs=RwcOH8qEiU_MPLM9RvQ@mail.gmail.com>
- <20171009190213.GF30828@arm.com>
- <CAOAebxvcg9r00bCWDJS4V_mmKk_dELVs_SfxqrxemDg7=uZx_g@mail.gmail.com>
-Message-ID: <CAOAebxvJDG0MasKMD-UovUgQyb+FP_4uXk5jV8Tsm9gopM_bUA@mail.gmail.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Tue, 10 Oct 2017 04:00:33 +0800
+Subject: [keystone:for_4.15/keystone-dts 5/9] Error:
+ arch/arm/boot/dts/keystone-k2g-evm.dts:134.1-15 syntax error
+Message-ID: <201710100431.nX0RlePi%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> I guess we could implement that on arm64 using our current vmemmap_populate
->> logic and an explicit memset.
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git for_4.15/keystone-dts
+head:   81df40a33d11ae90ba4d5f01a8d9caf25af71768
+commit: feaca04c4e0bede3d2156f01b8c79fb407a4bcb8 [5/9] ARM: dts: k2g-evm: Enable USB 0 and 1
+config: arm-u8500_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout feaca04c4e0bede3d2156f01b8c79fb407a4bcb8
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Hi Will,
+All errors (new ones prefixed by >>):
 
-I will send out a new patch series with x86/arm64  versions of
-kasan_map_populate(), so you could take a look if this is something
-that is acceptable.
+>> Error: arch/arm/boot/dts/keystone-k2g-evm.dts:134.1-15 syntax error
+   FATAL ERROR: Unable to parse input tree
 
-Thank you,
-Pavel
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 22754 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171010/9c748a8e/attachment-0001.gz>
