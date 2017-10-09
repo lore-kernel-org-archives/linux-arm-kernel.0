@@ -1,37 +1,51 @@
-From: kernel@esmil.dk (Emil Renner Berthing)
-Date: Mon,  9 Oct 2017 20:40:28 +0200
-Subject: [PATCH] arm64: dts: rockchip: enable touchpad button for
- rk3399-gru-kevin
-Message-ID: <20171009184028.11829-1-kernel@esmil.dk>
+From: pasha.tatashin@oracle.com (Pavel Tatashin)
+Date: Mon, 9 Oct 2017 14:42:32 -0400
+Subject: [PATCH v9 09/12] mm/kasan: kasan specific map populate function
+In-Reply-To: <20171009182217.GC30828@arm.com>
+References: <20170920201714.19817-1-pasha.tatashin@oracle.com>
+ <20170920201714.19817-10-pasha.tatashin@oracle.com>
+ <20171003144845.GD4931@leverpostej>
+ <20171009171337.GE30085@arm.com>
+ <CAOAebxtHHFvYn4WysMASe1GqvgKYPVyjJ572UM3Sef5sP0hi9A@mail.gmail.com>
+ <20171009182217.GC30828@arm.com>
+Message-ID: <CAOAebxu1310eCrk88EC=Oaw3n90-9RuHZ1KBhPvLu_DyXBNZFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding the linux,gpio-keymap entry also has
-the side-effect of making the driver register
-the touchpad as a touchpad rather than another
-touchscreen.
+Hi Will,
 
-The index for BTN_LEFT was found by trial and error.
+In addition to what Michal wrote:
 
-Signed-off-by: Emil Renner Berthing <kernel@esmil.dk>
----
- arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+> As an interim step, why not introduce something like
+> vmemmap_alloc_block_flags and make the page-table walking opt-out for
+> architectures that don't want it? Then we can just pass __GFP_ZERO from
+> our vmemmap_populate where necessary and other architectures can do the
+> page-table walking dance if they prefer.
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-index 5c8621766908..1c58d12551f5 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-@@ -278,6 +278,10 @@ ap_i2c_dig: &i2c2 {
- 		pinctrl-0 = <&trackpad_int_l>;
- 		interrupt-parent = <&gpio1>;
- 		interrupts = <4 IRQ_TYPE_LEVEL_LOW>;
-+		linux,gpio-keymap = <KEY_RESERVED
-+				     KEY_RESERVED
-+				     KEY_RESERVED
-+				     BTN_LEFT>;
- 		wakeup-source;
- 	};
- };
--- 
-2.14.2
+I do not see the benefit, implementing this approach means that we
+would need to implement two table walks instead of one: one for x86,
+another for ARM, as these two architectures support kasan. Also, this
+would become a requirement for any future architecture that want to
+add kasan support to add this page table walk implementation.
+
+>> IMO, while I understand that it looks strange that we must walk page
+>> table after creating it, it is a better approach: more enclosed as it
+>> effects kasan only, and more universal as it is in common code.
+>
+> I don't buy the more universal aspect, but I appreciate it's subjective.
+> Frankly, I'd just sooner not have core code walking early page tables if
+> it can be avoided, and it doesn't look hard to avoid it in this case.
+> The fact that you're having to add pmd_large and pud_large, which are
+> otherwise unused in mm/, is an indication that this isn't quite right imo.
+
+ 28 +#define pmd_large(pmd)         pmd_sect(pmd)
+ 29 +#define pud_large(pud)         pud_sect(pud)
+
+it is just naming difference, ARM64 calls them pmd_sect, common mm and
+other arches call them
+pmd_large/pud_large. Even the ARM has these defines in
+
+arm/include/asm/pgtable-3level.h
+arm/include/asm/pgtable-2level.h
+
+Pavel
