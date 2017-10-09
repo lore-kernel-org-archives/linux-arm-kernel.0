@@ -1,46 +1,61 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 9 Oct 2017 14:08:51 +0200
-Subject: [PATCH] ARM: dts: iwg20d-q7: Add support for ttySC3
-In-Reply-To: <1507539981-4193-1-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1507539981-4193-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <CAMuHMdUprE7QuXF_sX47JyrvuZXhXnQFufy4OHeJ5ExwwoogKw@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 9 Oct 2017 09:14:19 -0300
+Subject: [PATCH 0/3] DWC host without MSI controller
+In-Reply-To: <CAJ+vNU1GZMpptQ2oCE-cOzX+G=cj248bVGXhC_vSqD_4d7D7+Q@mail.gmail.com>
+References: <20170828142307.30061-1-l.stach@pengutronix.de>
+ <CAJ+vNU1GZMpptQ2oCE-cOzX+G=cj248bVGXhC_vSqD_4d7D7+Q@mail.gmail.com>
+Message-ID: <CAOMZO5CLqYx-OyxqrqGjGgRNGoGETM=nt5FF_wQ2bye=nXkFPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabrizio, Chris,
+Hi Bjorn,
 
-On Mon, Oct 9, 2017 at 11:06 AM, Fabrizio Castro
-<fabrizio.castro@bp.renesas.com> wrote:
-> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
+On Mon, Aug 28, 2017 at 1:59 PM, Tim Harvey <tharvey@gateworks.com> wrote:
+> On Mon, Aug 28, 2017 at 7:23 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
+>> Hi all,
+>>
+>> this small series tries to fix/workaround a serious design flaw of the DWC PCIe
+>> host controller: it is unable to work with both legacy and MSI IRQs enabled at
+>> the same time. As soon as the first MSI is enabled in the DWC MSI controller,
+>> the host stops forwarding legacy IRQs.
+>>
+>> If the MSI controller is present, MSIs will be used for the PCIe port services
+>> IRQs, leaving endpoint devices which don't support MSIs unable to raise IRQs.
+>> It is only safe to enable the MSI controller if it is validated that all PCIe
+>> devices and drivers in the system support working MSIs. As most devices
+>> support falling back to using legacy PCIe IRQs if MSI support is missing it is
+>> much safer to disable the MSI by default and only enable it on validated
+>> systems.
+>>
+>> Feedback welcome.
+>>
+>> Regards,
+>> Lucas
+>>
+>> Lucas Stach (3):
+>>   PCI: designware: only register MSI controller when MSI irq line is
+>>     valid
+>>   PCI: imx6: allow MSI irq to be absent
+>>   ARM: dts: imx6qdl: remove MSI irq line
+>>
+>>  .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |  8 ++++----
+>>  arch/arm/boot/dts/imx6qdl.dtsi                     |  2 --
+>>  drivers/pci/dwc/pci-imx6.c                         | 23 +++++++++++-----------
+>>  drivers/pci/dwc/pcie-designware-host.c             |  4 ++--
+>>  4 files changed, 17 insertions(+), 20 deletions(-)
+>>
+>
+> Lucas,
+>
+> Thank you for following up on this!
+>
+> I tested it with and without the third patch that removes msi from the
+> dt thus with both an ath9k 802.11 device which only supports legacy
+> interrupts and a Marvell sky2 device which supports msi as well as
+> legacy interrupts and it works as expected:
+>  - without msi enabled in dts (default): both sky2 and ath9k work
+>  - with msi enabled in dt: sky2 works ath9k does not
+>
+> Tested-by: Tim Harvey <tharvey@gateworks.com>
 
-Thanks for your patch!
-
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-> --- a/arch/arm/boot/dts/iwg20d-q7-common.dtsi
-> +++ b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
-> @@ -11,6 +11,7 @@
->  / {
->         aliases {
->                 serial0 = &scif0;
-> +               serial3 = &scifb1;
-
-Given this port is not labeled "serial3", but called "data uart", you may want
-to add a comment to avoid confusion:
-
-    serial3 = &scifb1; /* data uart */
-
->                 ethernet0 = &avb;
->         };
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Any comments about this series?
