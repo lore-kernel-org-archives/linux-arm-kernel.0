@@ -1,176 +1,32 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 9 Oct 2017 16:23:00 +0100
-Subject: [PATCH 1/3] arm64: mm: Support Common Not Private translations
-In-Reply-To: <1507553734-27854-2-git-send-email-vladimir.murzin@arm.com>
-References: <1507553734-27854-1-git-send-email-vladimir.murzin@arm.com>
- <1507553734-27854-2-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <20171009152300.yrjdhnwna5r2enae@armageddon.cambridge.arm.com>
+From: b-liu@ti.com (Bin Liu)
+Date: Mon, 9 Oct 2017 11:03:43 -0500
+Subject: [PATCH] usb: musb: Check for host-mode using is_host_active() on
+ reset interrupt
+In-Reply-To: <20170927103522.30202-1-net147@gmail.com>
+References: <20170927103522.30202-1-net147@gmail.com>
+Message-ID: <20171009160343.GC32614@uda0271908>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
+Hi,
 
-On Mon, Oct 09, 2017 at 01:55:32PM +0100, Vladimir Murzin wrote:
-> Common Not Private (CNP) is a feature of ARMv8.2 extension which
-> allows translation table entries to be shared between different PEs in
-> the same inner shareable domain, so the hardware can use this fact to
-> optimise the caching of such entries in the TLB.
+On Wed, Sep 27, 2017 at 08:35:22PM +1000, Jonathan Liu wrote:
+> The sunxi musb has a bug where sometimes it will generate a babble
+> error on device disconnect instead of a disconnect IRQ. When this
+> happens the musb controller switches from host mode to device mode
+> (it clears MUSB_DEVCTL_HM/MUSB_DEVCTL_SESSION and sets
+> MUSB_DEVCTL_BDEVICE) and gets stuck in this state.
 > 
-> CNP occupies one bit in TTBRx_ELy and VTTBR_EL2, which advertises to
-> the hardware that the translation table entries pointed to by this
-> TTBR are the same as every PE in the same inner shareable domain for
-> which the equivalent TTBR also has CNP bit set. In case CNP bit is set
-> but TTBR does not point at the same translation table entries,
-
-I would add something like "for a given ASID and VMID".
-
-> then
-> the system is mis-configured, so the results of translations are
-> UNPREDICTABLE.
+> The babble error is misdetected as a bus reset because MUSB_DEVCTL_HM
+> was cleared.
 > 
-> This patch adds support for Common Not Private translations on
-> different exceptions levels:
+> To fix this, use is_host_active() rather than (devctl & MUSB_DEVCTL_HM)
+> to detect babble error so that sunxi musb babble recovery can handle it
+> by restoring the mode. This information is provided by the driver logic
+> and does not rely on register contents.
 > 
-> (1) For EL0 there are a few cases we need to care of changes in
->     TTBR0_EL1:
->     - a switch to idmap
->     - software emulated PAN
->     in these cases we make sure that CNP is set for non-zero ASIDs
->     only.
-> 
-> (2) For EL1 we postpone setting CNP till all cpus are up and rely on
->     cpufeature framework to 1) patch the code which is sensitive to
->     CNP and 2) update TTBR1_EL1 with CNP bit set. The only case where
->     TTBR1_EL1 can be reprogrammed is hibirnation, so the code there is
->     changed to save raw TTBR1_EL1 and blindly restore it on resume.
+> Cc: stable at vger.kernel.org # v4.1+
+> Signed-off-by: Jonathan Liu <net147@gmail.com>
 
-Even if you do this when all the CPUs are up, that's not always true.
-Starting with maxcpus=1 allows something like systemd to bring up new
-CPUs once user space starts. The problem we have is that we don't know
-what the firmware is doing, whether it's setting CnP or not. Maybe we
-should add some statement in Documentation/arm64/booting.txt that
-firmware must not use CnP at all.
-
-> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-> index f7c4d21..9640abc 100644
-> --- a/arch/arm64/include/asm/memory.h
-> +++ b/arch/arm64/include/asm/memory.h
-> @@ -78,6 +78,7 @@
->  #define PCI_IO_START		(PCI_IO_END - PCI_IO_SIZE)
->  #define FIXADDR_TOP		(PCI_IO_START - SZ_2M)
->  #define TASK_SIZE_64		(UL(1) << VA_BITS)
-> +#define TTBR_CNP_BIT		(UL(1) << 0)
-
-Please move this to arch/arm64/include/asm/pgtable-hwdef.h. That's where
-we keep the TCR_* bits as well.
-
-> diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-> index 3257895a..c8adce2 100644
-> --- a/arch/arm64/include/asm/mmu_context.h
-> +++ b/arch/arm64/include/asm/mmu_context.h
-> @@ -135,6 +135,17 @@ static inline void cpu_replace_ttbr1(pgd_t *pgd)
->  
->  	phys_addr_t pgd_phys = virt_to_phys(pgd);
->  
-> +	if (system_supports_cnp()) {
-> +		/*
-> +		 * cpu_replace_ttbr1() is used when there's a boot CPU up
-> +		 * (i.e. cpufeture framework is not up yet) and latter only
-
-s/cpufeture/cpufeature/
-
-> +		 * when we enable CNP via cpufeature's enable() callback.
-> +		 */
-> +		BUG_ON(pgd != swapper_pg_dir);
-> +
-> +		pgd_phys |= TTBR_CNP_BIT;
-> +	}
-
-Rather than BUG_ON, can we have:
-
-	if (system_supports_cnp() && pgd == swapper_pg_dir)
-
-or, if you want to keep the warning:
-
-	if (system_supports_cnp() && !WARN_ON(pgd != swapper_pg_dir))
-
-We also seem to rely on the cpu_hwcap bit being set before calling the
-enable() function. We need to be careful not to change this, otherwise
-the above will break.
-
-> @@ -178,6 +189,9 @@ static inline void update_saved_ttbr0(struct task_struct *tsk,
->  		BUG_ON(mm->pgd == swapper_pg_dir);
->  		task_thread_info(tsk)->ttbr0 =
->  			virt_to_phys(mm->pgd) | ASID(mm) << 48;
-> +
-> +		if (system_supports_cnp() && ASID(mm))
-> +			task_thread_info(tsk)->ttbr0 |= TTBR_CNP_BIT;
->  	}
->  }
->  #else
-> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-> index fc0f9eb..14b1799 100644
-> --- a/arch/arm64/include/asm/uaccess.h
-> +++ b/arch/arm64/include/asm/uaccess.h
-> @@ -107,8 +107,14 @@ static inline void __uaccess_ttbr0_disable(void)
->  {
->  	unsigned long ttbr;
->  
-> -	/* reserved_ttbr0 placed at the end of swapper_pg_dir */
-> -	ttbr = read_sysreg(ttbr1_el1) + SWAPPER_DIR_SIZE;
-> +	/*
-> +	 * reserved_ttbr0 is placed at the end of swapper_pg_dir.
-> +	 * When CNP is in use, TTBR1 may have the CNP bit set, but the
-> +	 * reserved_ttbr should only be used without CNP.
-> +	 */
-> +	ttbr = read_sysreg(ttbr1_el1);
-> +	ttbr &= ~TTBR_CNP_BIT;
-> +	ttbr += SWAPPER_DIR_SIZE;
->  	write_sysreg(ttbr, ttbr0_el1);
->  	isb();
->  }
-
-As for the asm __uaccess_ttbr0_disable, we probably don't care as hw PAN
-is available since ARMv8.1 and CnP is an ARMv8.2 feature. Sow we always
-end up with unnecessary code for sw PAN that's only executed where it
-doesn't matter. We could check for this at feature detection time (with
-a .matches function) or just add a Kconfig line:
-
-	depends on ARM64_PAN || !ARM64_SW_TTBR0_PAN
-
-> diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
-> index 095d3c1..1d056f3 100644
-> --- a/arch/arm64/kernel/hibernate.c
-> +++ b/arch/arm64/kernel/hibernate.c
-> @@ -124,7 +124,7 @@ int arch_hibernation_header_save(void *addr, unsigned int max_size)
->  		return -EOVERFLOW;
->  
->  	arch_hdr_invariants(&hdr->invariants);
-> -	hdr->ttbr1_el1		= __pa_symbol(swapper_pg_dir);
-> +	hdr->ttbr1_el1		= read_sysreg(ttbr1_el1);
->  	hdr->reenter_kernel	= _cpu_resume;
->  
->  	/* We can't use __hyp_get_vectors() because kvm may still be loaded */
-
-Are all the CPUs up when coming out of hibernation and restoring
-ttbr1_el1?
-
-> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> index 877d42f..1c94030 100644
-> --- a/arch/arm64/mm/proc.S
-> +++ b/arch/arm64/mm/proc.S
-> @@ -141,6 +141,11 @@ ENTRY(cpu_do_switch_mm)
->  	pre_ttbr0_update_workaround x0, x2, x3
->  	mmid	x1, x1				// get mm->context.id
->  	bfi	x0, x1, #48, #16		// set the ASID
-> +alternative_if ARM64_HAS_CNP
-> +	cbz	x1, 1f
-> +	orr	x0, x0, #TTBR_CNP_BIT
-> +1:
-> +alternative_else_nop_endif
-
-Some comments here would be useful for future readers (e.g. "do not set
-the CnP bit if ASID == 0).
-
--- 
-Catalin
+Applied. Thanks.
+-Bin.
