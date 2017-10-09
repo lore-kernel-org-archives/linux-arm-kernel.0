@@ -1,167 +1,94 @@
-From: pasha.tatashin@oracle.com (Pavel Tatashin)
-Date: Mon,  9 Oct 2017 18:19:27 -0400
-Subject: [PATCH v11 5/9] mm: zero reserved and unavailable struct pages
-In-Reply-To: <20171009221931.1481-1-pasha.tatashin@oracle.com>
-References: <20171009221931.1481-1-pasha.tatashin@oracle.com>
-Message-ID: <20171009221931.1481-6-pasha.tatashin@oracle.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Mon, 9 Oct 2017 17:31:27 -0500
+Subject: [PATCH v2 0/5] Switch arm64 over to qrwlock
+In-Reply-To: <1507296882-18721-1-git-send-email-will.deacon@arm.com>
+References: <1507296882-18721-1-git-send-email-will.deacon@arm.com>
+Message-ID: <8f3a78b0-2eb5-98a8-f7f4-95bc700d9167@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some memory is reserved but unavailable: not present in memblock.memory
-(because not backed by physical pages), but present in memblock.reserved.
-Such memory has backing struct pages, but they are not initialized by going
-through __init_single_page().
+Hi,
 
-In some cases these struct pages are accessed even if they do not contain
-any data. One example is page_to_pfn() might access page->flags if this is
-where section information is stored (CONFIG_SPARSEMEM,
-SECTION_IN_PAGE_FLAGS).
+On 10/06/2017 08:34 AM, Will Deacon wrote:
+> Hi all,
+> 
+> This is version two of the patches I posted yesterday:
+> 
+>    http://lists.infradead.org/pipermail/linux-arm-kernel/2017-October/534666.html
+> 
+> I'd normally leave it longer before posting again, but Peter had a good
+> suggestion to rework the layout of the lock word, so I wanted to post a
+> version that follows that approach.
+> 
+> I've updated my branch if you're after the full patch stack:
+> 
+>    git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git qrwlock
+> 
+> As before, all comments (particularly related to testing and performance)
+> welcome!
 
-One example of such memory: trim_low_memory_range() unconditionally
-reserves from pfn 0, but e820__memblock_setup() might provide the exiting
-memory from pfn 1 (i.e. KVM).
+I've been doing perf comparisons with the rwlock fairness patch I posted 
+last week on a single socket thunderx and the baseline rwlock. For most 
+cases where the ratio of read/writers is similar (uncontended 
+readers/writers, single writer/lots readers, etc) the absolute number of 
+lock acquisitions is very similar (within a few percent one way or the 
+other).
 
-Since, struct pages are zeroed in __init_single_page(), and not during
-allocation time, we must zero such struct pages explicitly.
+In this regard both patches are light years ahead of the current arm64 
+rwlock. The unfairness of the current rwlock allows significantly higher 
+lock acquisition counts (say 4x at 30Readers:1Writer) at the expense of 
+complete writer starvation (or a ~43k:1 ratio at a 30R:1W per 
+locktorture). This is untenable.
 
-The patch involves adding a new memblock iterator:
-	for_each_resv_unavail_range(i, p_start, p_end)
+The qrwlock does an excellent job of maintaining the ratio of 
+reader/writer acquisitions proportional to the number of readers/writers 
+until the total lockers exceeds the number of cores where the ratios 
+start to far exceed the reader/writer ratios (440:1 acquisitions @ 96R:1W)
 
-Which iterates through reserved && !memory lists, and we zero struct pages
-explicitly by calling mm_zero_struct_page().
+In comparison the other patch tends to favor the writers more, so at a 
+ratio of 48R/1W, the readers are only grabbing the lock at a ratio of 
+15:1. This flatter curve continues past the number of cores with the 
+readers having a 48:1 advantage with 96R/1W. That said the total lock 
+acquisition counts remain very similar (with maybe a slight advantage to 
+the non queued patch with 1 writer and 12-30 readers) despite the writer 
+acquiring the lock at a higher frequency. OTOH, if the number of writers 
+is closer to the number of readers (24R:24W) then the writers have about 
+a 1.5X bias over the readers independent of the number of 
+reader/writers. This bias seems to be the common multiplier given a 
+reader/writer ratio with those patches and doesn't account for possible 
+single thread starvation.
 
-Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
-Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
-Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
-Reviewed-by: Bob Picco <bob.picco@oracle.com>
----
- include/linux/memblock.h | 16 ++++++++++++++++
- include/linux/mm.h       | 15 +++++++++++++++
- mm/page_alloc.c          | 38 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 69 insertions(+)
+Of course, I've been running other tests as well and the system seems to 
+be behaving as expected (likely better than the rwlock patches under 
+stress). I will continue to test this on a couple other platforms.
 
-diff --git a/include/linux/memblock.h b/include/linux/memblock.h
-index bae11c7e7bf3..ce8bfa5f3e9b 100644
---- a/include/linux/memblock.h
-+++ b/include/linux/memblock.h
-@@ -237,6 +237,22 @@ unsigned long memblock_next_valid_pfn(unsigned long pfn, unsigned long max_pfn);
- 	for_each_mem_range_rev(i, &memblock.memory, &memblock.reserved,	\
- 			       nid, flags, p_start, p_end, p_nid)
- 
-+/**
-+ * for_each_resv_unavail_range - iterate through reserved and unavailable memory
-+ * @i: u64 used as loop variable
-+ * @flags: pick from blocks based on memory attributes
-+ * @p_start: ptr to phys_addr_t for start address of the range, can be %NULL
-+ * @p_end: ptr to phys_addr_t for end address of the range, can be %NULL
-+ *
-+ * Walks over unavailable but reserved (reserved && !memory) areas of memblock.
-+ * Available as soon as memblock is initialized.
-+ * Note: because this memory does not belong to any physical node, flags and
-+ * nid arguments do not make sense and thus not exported as arguments.
-+ */
-+#define for_each_resv_unavail_range(i, p_start, p_end)			\
-+	for_each_mem_range(i, &memblock.reserved, &memblock.memory,	\
-+			   NUMA_NO_NODE, MEMBLOCK_NONE, p_start, p_end, NULL)
-+
- static inline void memblock_set_region_flags(struct memblock_region *r,
- 					     unsigned long flags)
- {
-diff --git a/include/linux/mm.h b/include/linux/mm.h
-index 065d99deb847..04c8b2e5aff4 100644
---- a/include/linux/mm.h
-+++ b/include/linux/mm.h
-@@ -94,6 +94,15 @@ extern int mmap_rnd_compat_bits __read_mostly;
- #define mm_forbids_zeropage(X)	(0)
- #endif
- 
-+/*
-+ * On some architectures it is expensive to call memset() for small sizes.
-+ * Those architectures should provide their own implementation of "struct page"
-+ * zeroing by defining this macro in <asm/pgtable.h>.
-+ */
-+#ifndef mm_zero_struct_page
-+#define mm_zero_struct_page(pp)  ((void)memset((pp), 0, sizeof(struct page)))
-+#endif
-+
- /*
-  * Default maximum number of active map areas, this limits the number of vmas
-  * per mm struct. Users can overwrite this number by sysctl but there is a
-@@ -2001,6 +2010,12 @@ extern int __meminit __early_pfn_to_nid(unsigned long pfn,
- 					struct mminit_pfnnid_cache *state);
- #endif
- 
-+#ifdef CONFIG_HAVE_MEMBLOCK
-+void zero_resv_unavail(void);
-+#else
-+static inline void zero_resv_unavail(void) {}
-+#endif
-+
- extern void set_dma_reserve(unsigned long new_dma_reserve);
- extern void memmap_init_zone(unsigned long, int, unsigned long,
- 				unsigned long, enum memmap_context);
-diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index 20b0bace2235..5f0013bbbe9d 100644
---- a/mm/page_alloc.c
-+++ b/mm/page_alloc.c
-@@ -6209,6 +6209,42 @@ void __paginginit free_area_init_node(int nid, unsigned long *zones_size,
- 	free_area_init_core(pgdat);
- }
- 
-+#ifdef CONFIG_HAVE_MEMBLOCK
-+/*
-+ * Only struct pages that are backed by physical memory are zeroed and
-+ * initialized by going through __init_single_page(). But, there are some
-+ * struct pages which are reserved in memblock allocator and their fields
-+ * may be accessed (for example page_to_pfn() on some configuration accesses
-+ * flags). We must explicitly zero those struct pages.
-+ */
-+void __paginginit zero_resv_unavail(void)
-+{
-+	phys_addr_t start, end;
-+	unsigned long pfn;
-+	u64 i, pgcnt;
-+
-+	/* Loop through ranges that are reserved, but do not have reported
-+	 * physical memory backing.
-+	 */
-+	pgcnt = 0;
-+	for_each_resv_unavail_range(i, &start, &end) {
-+		for (pfn = PFN_DOWN(start); pfn < PFN_UP(end); pfn++) {
-+			mm_zero_struct_page(pfn_to_page(pfn));
-+			pgcnt++;
-+		}
-+	}
-+
-+	/*
-+	 * Struct pages that do not have backing memory. This could be because
-+	 * firmware is using some of this memory, or for some other reasons.
-+	 * Once memblock is changed so such behaviour is not allowed: i.e.
-+	 * list of "reserved" memory must be a subset of list of "memory", then
-+	 * this code can be removed.
-+	 */
-+	pr_info("Reserved but unavailable: %lld pages", pgcnt);
-+}
-+#endif /* CONFIG_HAVE_MEMBLOCK */
-+
- #ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
- 
- #if MAX_NUMNODES > 1
-@@ -6632,6 +6668,7 @@ void __init free_area_init_nodes(unsigned long *max_zone_pfn)
- 			node_set_state(nid, N_MEMORY);
- 		check_for_memory(pgdat, nid);
- 	}
-+	zero_resv_unavail();
- }
- 
- static int __init cmdline_parse_core(char *p, unsigned long *core)
-@@ -6795,6 +6832,7 @@ void __init free_area_init(unsigned long *zones_size)
- {
- 	free_area_init_node(0, zones_size,
- 			__pa(PAGE_OFFSET) >> PAGE_SHIFT, NULL);
-+	zero_resv_unavail();
- }
- 
- static int page_alloc_cpu_dead(unsigned int cpu)
--- 
-2.14.2
+In the meantime:
+
+Tested-by: Jeremy Linton <jeremy.linton@arm.com>
+
+
+> 
+> Cheers,
+> 
+> Will
+> 
+> --->8
+> 
+> Will Deacon (5):
+>    kernel/locking: Use struct qrwlock instead of struct __qrwlock
+>    locking/atomic: Add atomic_cond_read_acquire
+>    kernel/locking: Use atomic_cond_read_acquire when spinning in qrwlock
+>    arm64: locking: Move rwlock implementation over to qrwlocks
+>    kernel/locking: Prevent slowpath writers getting held up by fastpath
+> 
+>   arch/arm64/Kconfig                      |  17 ++++
+>   arch/arm64/include/asm/Kbuild           |   1 +
+>   arch/arm64/include/asm/spinlock.h       | 164 +-------------------------------
+>   arch/arm64/include/asm/spinlock_types.h |   6 +-
+>   include/asm-generic/atomic-long.h       |   3 +
+>   include/asm-generic/qrwlock.h           |  20 +---
+>   include/asm-generic/qrwlock_types.h     |  15 ++-
+>   include/linux/atomic.h                  |   4 +
+>   kernel/locking/qrwlock.c                |  83 +++-------------
+>   9 files changed, 58 insertions(+), 255 deletions(-)
+> 
