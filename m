@@ -1,37 +1,57 @@
-From: gustavo@embeddedor.com (Gustavo A. R. Silva)
-Date: Mon, 9 Oct 2017 11:44:53 -0500
-Subject: [PATCH] net: thunderx: mark expected switch fall-throughs in
- nicvf_main()
-Message-ID: <20171009164453.GA4889@embeddedor.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 9 Oct 2017 17:46:07 +0100
+Subject: [PATCH v4 1/2] PCI: pci-host-generic: add support for Synopsys
+ DesignWare RC in ECAM mode
+In-Reply-To: <20171006232158.GI25517@bhelgaas-glaptop.roam.corp.google.com>
+References: <20171006163919.14898-1-ard.biesheuvel@linaro.org>
+ <20171006163919.14898-2-ard.biesheuvel@linaro.org>
+ <20171006232158.GI25517@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20171009164607.GD30085@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation to enabling -Wimplicit-fallthrough, mark switch cases
-where we are expecting to fall through.
+On Fri, Oct 06, 2017 at 06:21:59PM -0500, Bjorn Helgaas wrote:
+> On Fri, Oct 06, 2017 at 05:39:18PM +0100, Ard Biesheuvel wrote:
+> > diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+> > index 7d709a7e0aa8..01e81a30e303 100644
+> > --- a/drivers/pci/host/pci-host-generic.c
+> > +++ b/drivers/pci/host/pci-host-generic.c
+> > @@ -35,6 +35,43 @@ static struct pci_ecam_ops gen_pci_cfg_cam_bus_ops = {
+> >  	}
+> >  };
+> >  
+> > +static int pci_dw_ecam_config_read(struct pci_bus *bus, u32 devfn, int where,
+> > +				   int size, u32 *val)
+> > +{
+> > +	struct pci_config_window *cfg = bus->sysdata;
+> > +
+> > +	/*
+> > +	 * The Synopsys DesignWare PCIe controller in ECAM mode will not filter
+> > +	 * type 0 config TLPs sent to devices 1 and up on its downstream port,
+> > +	 * resulting in devices appearing multiple times on bus 0 unless we
+> > +	 * filter out those accesses here.
+> > +	 */
+> > +	if (bus->number == cfg->busr.start && PCI_SLOT(devfn) > 0)
+> > +		return PCIBIOS_DEVICE_NOT_FOUND;
+> 
+> I think we should return 0xffffffff data here, as we do in other
+> similar accessors (dw_pcie_rd_conf(), altera_pcie_cfg_read(),
+> rockchip_pcie_rd_conf()).
+> 
+> Actually, xilinx-nwl has a nice trick: it implements
+> nwl_pcie_map_bus(), which returns NULL for invalid devices.  Then it
+> can use the generic accessors, and pci_generic_config_read() already
+> fills in ~0 for this case. 
+> 
+> What do you think of the following?  I put it on my pci/host-generic
+> branch for now (pending your response and an ack from Will).
 
-Cc: Sunil Goutham <sgoutham@cavium.com>
-Cc: Robert Richter <rric@kernel.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: netdev at vger.kernel.org
-Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
----
- drivers/net/ethernet/cavium/thunder/nicvf_main.c | 2 ++
- 1 file changed, 2 insertions(+)
+I'd probably just inline the device check in pci_dw_ecam_map_bus directly,
+but either way:
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-index d68478a..71989e1 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-@@ -566,8 +566,10 @@ static inline bool nicvf_xdp_rx(struct nicvf *nic, struct bpf_prog *prog,
- 		return true;
- 	default:
- 		bpf_warn_invalid_xdp_action(action);
-+		/* fall through */
- 	case XDP_ABORTED:
- 		trace_xdp_exception(nic->netdev, prog, action);
-+		/* fall through */
- 	case XDP_DROP:
- 		/* Check if it's a recycled page, if not
- 		 * unmap the DMA mapping.
--- 
-2.7.4
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+I'm assuming this is so small that there's no point in having a Kconfig
+option for these guys that depends on the generic host driver?
+
+Will
