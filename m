@@ -1,62 +1,71 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 9 Oct 2017 11:58:16 +0100
-Subject: arm64: 4.14 of_match_node() issues
-In-Reply-To: <20171009092409.GB5127@arm.com>
-References: <5d2ff063-1f7e-0200-cc02-99804f7d9219@suse.de>
- <20171009092409.GB5127@arm.com>
-Message-ID: <66956548-fa7a-332a-8045-8202ae0aa564@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 9 Oct 2017 12:30:44 +0100
+Subject: [PATCH v2 3/5] kernel/locking: Use atomic_cond_read_acquire when
+ spinning in qrwlock
+In-Reply-To: <20171008005841.gznbomnstzhxwyfm@tardis>
+References: <1507296882-18721-1-git-send-email-will.deacon@arm.com>
+ <1507296882-18721-4-git-send-email-will.deacon@arm.com>
+ <20171008005841.gznbomnstzhxwyfm@tardis>
+Message-ID: <20171009113044.GB7128@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/17 10:24, Will Deacon wrote:
-> Hi Andreas,
+On Sun, Oct 08, 2017 at 09:03:34AM +0800, Boqun Feng wrote:
+> On Fri, Oct 06, 2017 at 01:34:40PM +0000, Will Deacon wrote:
+> > The qrwlock slowpaths involve spinning when either a prospective reader
+> > is waiting for a concurrent writer to drain, or a prospective writer is
+> > waiting for concurrent readers to drain. In both of these situations,
+> > atomic_cond_read_acquire can be used to avoid busy-waiting and make use
+> > of any backoff functionality provided by the architecture.
+> > 
+> > This patch replaces the open-code loops and rspin_until_writer_unlock
+> > implementation with atomic_cond_read_acquire. The write mode transition
+> > zero to _QW_WAITING is left alone, since (a) this doesn't need acquire
+> > semantics and (b) should be fast.
+> > 
+> > Cc: Peter Zijlstra <peterz@infradead.org>
+> > Cc: Ingo Molnar <mingo@redhat.com>
+> > Cc: Waiman Long <longman@redhat.com>
+> > Cc: Boqun Feng <boqun.feng@gmail.com>
+> > Cc: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  kernel/locking/qrwlock.c | 47 +++++++++++------------------------------------
+> >  1 file changed, 11 insertions(+), 36 deletions(-)
+> > 
+> > diff --git a/kernel/locking/qrwlock.c b/kernel/locking/qrwlock.c
+> > index 1af791e37348..b7ea4647c74d 100644
+> > --- a/kernel/locking/qrwlock.c
+> > +++ b/kernel/locking/qrwlock.c
+> > @@ -24,23 +24,6 @@
+> >  #include <asm/qrwlock.h>
+> >  
+> >  /**
+> > - * rspin_until_writer_unlock - inc reader count & spin until writer is gone
+> > - * @lock  : Pointer to queue rwlock structure
+> > - * @writer: Current queue rwlock writer status byte
+> > - *
+> > - * In interrupt context or at the head of the queue, the reader will just
+> > - * increment the reader count & wait until the writer releases the lock.
+> > - */
+> > -static __always_inline void
+> > -rspin_until_writer_unlock(struct qrwlock *lock, u32 cnts)
+> > -{
+> > -	while ((cnts & _QW_WMASK) == _QW_LOCKED) {
+> > -		cpu_relax();
+> > -		cnts = atomic_read_acquire(&lock->cnts);
+> > -	}
+> > -}
+> > -
+> > -/**
+> >   * queued_read_lock_slowpath - acquire read lock of a queue rwlock
+> >   * @lock: Pointer to queue rwlock structure
+> >   * @cnts: Current qrwlock lock value
+> > @@ -53,13 +36,12 @@ void queued_read_lock_slowpath(struct qrwlock *lock, u32 cnts)
 > 
-> On Sat, Oct 07, 2017 at 02:42:13AM +0200, Andreas F?rber wrote:
->> Since 4.14-rc1 I am seeing frequent oopses during module loading (e.g.,
->> MMC, USB) from initrd on aarch64. Symptoms are similar to this in -rc3:
->>
->> [  OK  ] Started udev Coldplug all Devices.
->> [   10.117775] usbcore: registered new interface driver usbfs
->> [   10.118235] Unable to handle kernel paging request at virtual address
->> ffff000008e5abc0
->> [   10.118238] Mem abort info:
->> [   10.118245]   Exception class = DABT (current EL), IL = 32 bits
->> [   10.118249]   SET = 0, FnV = 0
->> [   10.118253]   EA = 0, S1PTW = 0
->> [   10.118256] Data abort info:
->> [   10.118261]   ISV = 0, ISS = 0x00000006
->> [   10.118264]   CM = 0, WnR = 0
->> [   10.118274] swapper pgtable: 4k pages, 48-bit VAs, pgd = ffff0000094a5000
->> [   10.118279] [ffff000008e5abc0] *pgd=00000000bfffe003,
->> *pud=00000000bfffd003, *pmd=0000000000000000
->> [   10.118299] Internal error: Oops: 96000006 [#1] SMP
->> [   10.118305] Modules linked in: fixed usbcore(+) sunxi_mmc mmc_core
->> phy_sun4i_usb sg
->> [   10.118341] CPU: 3 PID: 49 Comm: kworker/3:1 Not tainted
->> 4.14.0-rc3-2.gf27997b-default #1
->> [   10.118345] Hardware name: sunxi sunxi/sunxi, BIOS 2017.05-rc1 04/13/2017
->> [   10.118369] Workqueue: events deferred_probe_work_func
->> [   10.118378] task: ffff80007c8f4000 task.stack: ffff0000099d8000
->> [   10.118394] PC is at __of_match_node.part.1+0x48/0x88
->> [   10.118403] LR is at of_match_node+0x40/0x70
->> [   10.118411] pc : [<ffff00000879aed0>] lr : [<ffff00000879af50>]
-> 
-> [...]
-> 
->> This has been observed on Pine64 (>60%; also by Stefan) and Odroid-C2;
->> my other arm64 boards such as Raspberry Pi 3 have not run into this so
->> far. No such problems on 32-bit boards.
->>
->> This is using the openSUSE config:
->> https://kernel.opensuse.org/cgit/kernel-source/plain/config/arm64/default
-> 
-> Hmm, hard to know what to suggest without a concrete reproducer. Do you know
-> which driver is being probed in the log above? Also, does this still break
-> if you pass "keepinitrd" on the cmdline? Finally, can you dump the kernel
-> virtual memory layout, please?
+> So the second parameter(@cnts) could be removed entirely, right?
+> Any reason we still keep it?
 
-FWIW, this looks a lot like what happens when a built-in driver's
-of_match_table is marked __init, but for whatever reason (deferred probe
-etc.) winds up getting poked by a module load after it no longer exists.
+Well spotted! I'll remove it.
 
-Robin.
+Will
