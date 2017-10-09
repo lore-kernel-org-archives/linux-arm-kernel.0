@@ -1,54 +1,46 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon,  9 Oct 2017 13:55:33 +0100
-Subject: [PATCH 2/3] arm64: KVM: Support Common Not Private translations
-In-Reply-To: <1507553734-27854-1-git-send-email-vladimir.murzin@arm.com>
-References: <1507553734-27854-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1507553734-27854-3-git-send-email-vladimir.murzin@arm.com>
+Date: Mon,  9 Oct 2017 13:55:31 +0100
+Subject: [PATCH 0/3] Support Common Not Private translations
+Message-ID: <1507553734-27854-1-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We rely on cpufeature framework to detect and enable CNP so for KVM we
-need to patch hyp to set CNP bit just before TTBR0_EL2 gets written.
-For the guest it is enough to update VTTBR_EL2 with CNP bit just
-before it gets scheduled.
+Common Not Private (CNP) translations is a feature of ARMv8.2
+extension which allows translation table entries to be shared between
+different PEs in the same inner shareable domain, so the hardware can
+use this fact to optimise the caching of such entries in the TLB.
 
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
- arch/arm64/kvm/hyp-init.S   | 4 ++++
- arch/arm64/kvm/hyp/switch.c | 6 +++++-
- 2 files changed, 9 insertions(+), 1 deletion(-)
+This patch set is an attempt to bring CNP support into Linux. It was
+tested on a v8.2 Fast Model with exploring traces and checking that
+TTBRx_ELy and VTTBR_EL2 have CnP bit set where appropriate.
 
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-index 3f96155..4fd31b3 100644
---- a/arch/arm64/kvm/hyp-init.S
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -63,6 +63,10 @@ __do_hyp_init:
- 	cmp	x0, #HVC_STUB_HCALL_NR
- 	b.lo	__kvm_handle_stub_hvc
- 
-+alternative_if ARM64_HAS_CNP
-+	orr	x0, x0, #TTBR_CNP_BIT
-+alternative_else_nop_endif
-+
- 	msr	ttbr0_el2, x0
- 
- 	mrs	x4, tcr_el1
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 945e79c..a1f3bf2 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -150,7 +150,11 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
- static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
- {
- 	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
--	write_sysreg(kvm->arch.vttbr, vttbr_el2);
-+	u64 val = kvm->arch.vttbr;
-+
-+	if (system_supports_cnp())
-+		val |= TTBR_CNP_BIT;
-+	write_sysreg(val, vttbr_el2);
- }
- 
- static void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
+Changelog:
+
+	RFC -> v1
+            - dropped RFC tag
+            - rebased on 4.14-rc4
+
+Thanks!
+
+Vladimir Murzin (3):
+  arm64: mm: Support Common Not Private translations
+  arm64: KVM: Support Common Not Private translations
+  arm64: Introduce command line parameter to disable CNP
+
+ Documentation/admin-guide/kernel-parameters.txt |  4 +++
+ arch/arm64/Kconfig                              | 13 +++++++++
+ arch/arm64/include/asm/asm-uaccess.h            |  2 ++
+ arch/arm64/include/asm/cpucaps.h                |  3 +-
+ arch/arm64/include/asm/cpufeature.h             |  6 ++++
+ arch/arm64/include/asm/memory.h                 |  1 +
+ arch/arm64/include/asm/mmu_context.h            | 14 +++++++++
+ arch/arm64/include/asm/uaccess.h                | 10 +++++--
+ arch/arm64/kernel/cpufeature.c                  | 39 +++++++++++++++++++++++++
+ arch/arm64/kernel/hibernate.c                   |  2 +-
+ arch/arm64/kvm/hyp-init.S                       |  4 +++
+ arch/arm64/kvm/hyp/switch.c                     |  6 +++-
+ arch/arm64/mm/proc.S                            |  5 ++++
+ 13 files changed, 104 insertions(+), 5 deletions(-)
+
 -- 
 2.0.0
