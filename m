@@ -1,75 +1,62 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 9 Oct 2017 11:36:23 +0100
-Subject: [PATCH 3/4] nvmem: add a driver for the Amlogic
- Meson6/Meson8/Meson8b SoCs
-In-Reply-To: <cd1e7f9c-5aff-8f4c-82b0-c58c2de4c253@free.fr>
-References: <20171001125700.1520-1-martin.blumenstingl@googlemail.com>
- <20171001125700.1520-4-martin.blumenstingl@googlemail.com>
- <cd1e7f9c-5aff-8f4c-82b0-c58c2de4c253@free.fr>
-Message-ID: <dc3200f3-34cd-f531-0a0b-9b856a84cd52@linaro.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 9 Oct 2017 11:58:16 +0100
+Subject: arm64: 4.14 of_match_node() issues
+In-Reply-To: <20171009092409.GB5127@arm.com>
+References: <5d2ff063-1f7e-0200-cc02-99804f7d9219@suse.de>
+ <20171009092409.GB5127@arm.com>
+Message-ID: <66956548-fa7a-332a-8045-8202ae0aa564@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 09/10/17 10:24, Will Deacon wrote:
+> Hi Andreas,
+> 
+> On Sat, Oct 07, 2017 at 02:42:13AM +0200, Andreas F?rber wrote:
+>> Since 4.14-rc1 I am seeing frequent oopses during module loading (e.g.,
+>> MMC, USB) from initrd on aarch64. Symptoms are similar to this in -rc3:
+>>
+>> [  OK  ] Started udev Coldplug all Devices.
+>> [   10.117775] usbcore: registered new interface driver usbfs
+>> [   10.118235] Unable to handle kernel paging request at virtual address
+>> ffff000008e5abc0
+>> [   10.118238] Mem abort info:
+>> [   10.118245]   Exception class = DABT (current EL), IL = 32 bits
+>> [   10.118249]   SET = 0, FnV = 0
+>> [   10.118253]   EA = 0, S1PTW = 0
+>> [   10.118256] Data abort info:
+>> [   10.118261]   ISV = 0, ISS = 0x00000006
+>> [   10.118264]   CM = 0, WnR = 0
+>> [   10.118274] swapper pgtable: 4k pages, 48-bit VAs, pgd = ffff0000094a5000
+>> [   10.118279] [ffff000008e5abc0] *pgd=00000000bfffe003,
+>> *pud=00000000bfffd003, *pmd=0000000000000000
+>> [   10.118299] Internal error: Oops: 96000006 [#1] SMP
+>> [   10.118305] Modules linked in: fixed usbcore(+) sunxi_mmc mmc_core
+>> phy_sun4i_usb sg
+>> [   10.118341] CPU: 3 PID: 49 Comm: kworker/3:1 Not tainted
+>> 4.14.0-rc3-2.gf27997b-default #1
+>> [   10.118345] Hardware name: sunxi sunxi/sunxi, BIOS 2017.05-rc1 04/13/2017
+>> [   10.118369] Workqueue: events deferred_probe_work_func
+>> [   10.118378] task: ffff80007c8f4000 task.stack: ffff0000099d8000
+>> [   10.118394] PC is at __of_match_node.part.1+0x48/0x88
+>> [   10.118403] LR is at of_match_node+0x40/0x70
+>> [   10.118411] pc : [<ffff00000879aed0>] lr : [<ffff00000879af50>]
+> 
+> [...]
+> 
+>> This has been observed on Pine64 (>60%; also by Stefan) and Odroid-C2;
+>> my other arm64 boards such as Raspberry Pi 3 have not run into this so
+>> far. No such problems on 32-bit boards.
+>>
+>> This is using the openSUSE config:
+>> https://kernel.opensuse.org/cgit/kernel-source/plain/config/arm64/default
+> 
+> Hmm, hard to know what to suggest without a concrete reproducer. Do you know
+> which driver is being probed in the log above? Also, does this still break
+> if you pass "keepinitrd" on the cmdline? Finally, can you dump the kernel
+> virtual memory layout, please?
 
+FWIW, this looks a lot like what happens when a built-in driver's
+of_match_table is marked __init, but for whatever reason (deferred probe
+etc.) winds up getting poked by a module load after it no longer exists.
 
-On 03/10/17 05:48, Chris Moore wrote:
-> Hi,
-> 
-> Sorry in advance if I am being extremely stupid here.
-> 
-> Le 01/10/2017 ? 14:56, Martin Blumenstingl a ?crit :
-> 
-> [snip]
-> 
->> +static int meson_mx_efuse_read(void *context, unsigned int offset,
->> +                   void *buf, size_t bytes)
->> +{
->> +    struct meson_mx_efuse *efuse = context;
->> +    u32 tmp;
->> +    int err, i, addr;
->> +
->> +    err = meson_mx_efuse_hw_enable(efuse);
->> +    if (err)
->> +        return err;
->> +
->> +    meson_mx_efuse_mask_bits(efuse, MESON_MX_EFUSE_CNTL1,
->> +                 MESON_MX_EFUSE_CNTL1_AUTO_RD_ENABLE,
->> +                 MESON_MX_EFUSE_CNTL1_AUTO_RD_ENABLE);
->> +
->> +    for (i = offset; i < offset + bytes; i += efuse->config.word_size) {
->> +        addr = i / efuse->config.word_size;
->> +
->> +        err = meson_mx_efuse_read_addr(efuse, addr, &tmp);
->> +        if (err)
->> +            break;
->> +
->> +        memcpy(buf + i, &tmp, efuse->config.word_size);
->> +    }
-> 
-> This will not give the expected result if offset is not a multiple of 
-> efuse->config.word_size.
-
-Offset should be always multiple of stride which is enforced in nvmem core.
-
-nvmem_cell would return an -EINVAL if that is not the case.
-
-
---srini
-
-> This will cause buffer overflow if bytes is not a multiple of 
-> efuse->config.word_size.
-> Shouldn't there at least be some sort of test on offset and bytes?
-> 
-> Also this doesn't look endian-safe, but maybe it is.
-> 
-> Old-timer remarks:
-> - I try to avoid divisions where possible but I suppose they are very 
-> low-cost on recent hardware.
-> - I don't like arithmetic on void pointers but I know it is supported by 
-> gcc (and possibly by recent C standards too).
-> 
-> Sorry again for the noise if I am being stupid.
-> 
-> Cheers,
-> Chris
-> 
+Robin.
