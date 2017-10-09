@@ -1,94 +1,99 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Mon, 9 Oct 2017 17:31:27 -0500
-Subject: [PATCH v2 0/5] Switch arm64 over to qrwlock
-In-Reply-To: <1507296882-18721-1-git-send-email-will.deacon@arm.com>
-References: <1507296882-18721-1-git-send-email-will.deacon@arm.com>
-Message-ID: <8f3a78b0-2eb5-98a8-f7f4-95bc700d9167@arm.com>
+From: ahs3@redhat.com (Al Stone)
+Date: Mon, 9 Oct 2017 16:46:17 -0600
+Subject: [PATCH 0/3] arm64: cpuinfo: make /proc/cpuinfo more human-readable
+In-Reply-To: <20170927103406.GC32150@leverpostej>
+References: <20170926222324.17409-1-ahs3@redhat.com>
+ <20170927103406.GC32150@leverpostej>
+Message-ID: <7e1bd635-8c17-634e-aaae-ac7ec4a1e351@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 09/27/2017 04:34 AM, Mark Rutland wrote:
+> On Tue, Sep 26, 2017 at 04:23:21PM -0600, Al Stone wrote:
+>> As ARMv8 servers get deployed, I keep getting the same set of questions
+>> from end-users of those systems: what do all the hex numbers mean in 
+>> /proc/cpuinfo and could you make them so I don't have to carry a cheat
+>> sheet with me all the time?
+> 
+> I appreciate that /proc/cpuinfo can be opaque to end users, but I do not
+> believe that this is the right solution to that problem.
+> 
+> There are a number of issues stemming from the face that /proc/cpuinfo
+> is ill-defined and overused for a number of cases. Changes to it almost
+> certainly violate brittle de-facto ABI details people are relying on,
+> and there's a very long tail on fallout resulting from this. In
+> addition, many niceties come at an excessive maintenance cost, and are
+> simply unreliable as an ABI.
 
-On 10/06/2017 08:34 AM, Will Deacon wrote:
-> Hi all,
-> 
-> This is version two of the patches I posted yesterday:
-> 
->    http://lists.infradead.org/pipermail/linux-arm-kernel/2017-October/534666.html
-> 
-> I'd normally leave it longer before posting again, but Peter had a good
-> suggestion to rework the layout of the lock word, so I wanted to post a
-> version that follows that approach.
-> 
-> I've updated my branch if you're after the full patch stack:
-> 
->    git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git qrwlock
-> 
-> As before, all comments (particularly related to testing and performance)
-> welcome!
+Instead of dealing with the replies to the specific patches, I'd like to deal
+with the real gist of the matter first -- details can be worked out later.
 
-I've been doing perf comparisons with the rwlock fairness patch I posted 
-last week on a single socket thunderx and the baseline rwlock. For most 
-cases where the ratio of read/writers is similar (uncontended 
-readers/writers, single writer/lots readers, etc) the absolute number of 
-lock acquisitions is very similar (within a few percent one way or the 
-other).
+While I don't disagree -- cpuinfo is enormously fragile -- what _is_ a good
+solution, then?  Right now, things are not terribly useful.  Yes, it is true
+/sys/firmware/dmi has info in it, but again it is all numeric (or in a file
+named 'raw').  Any one who wishes to read the values will need to put some
+interpretation on them somehow.  My personal preference is that the kernel
+control that interpretation instead of random admin tools scattered over a raft
+of different companies.
 
-In this regard both patches are light years ahead of the current arm64 
-rwlock. The unfairness of the current rwlock allows significantly higher 
-lock acquisition counts (say 4x at 30Readers:1Writer) at the expense of 
-complete writer starvation (or a ~43k:1 ratio at a 30R:1W per 
-locktorture). This is untenable.
+> So, as with all other patches modifying /proc/cpuinfo, I must NAK this
+> series.
 
-The qrwlock does an excellent job of maintaining the ratio of 
-reader/writer acquisitions proportional to the number of readers/writers 
-until the total lockers exceeds the number of cores where the ratios 
-start to far exceed the reader/writer ratios (440:1 acquisitions @ 96R:1W)
+Hrm.  I suggest that policy needs to be rethought.  I understand the reasoning,
+but it puts my end-users in a very difficult position; they now have to justify
+modifying management software that is already in operation in order to purchase
+and integrate ARM servers.  And while I really don't want distro-specific code,
+I'd have to consider it as a possibility.
 
-In comparison the other patch tends to favor the writers more, so at a 
-ratio of 48R/1W, the readers are only grabbing the lock at a ratio of 
-15:1. This flatter curve continues past the number of cores with the 
-readers having a 48:1 advantage with 96R/1W. That said the total lock 
-acquisition counts remain very similar (with maybe a slight advantage to 
-the non queued patch with 1 writer and 12-30 readers) despite the writer 
-acquiring the lock at a higher frequency. OTOH, if the number of writers 
-is closer to the number of readers (24R:24W) then the writers have about 
-a 1.5X bias over the readers independent of the number of 
-reader/writers. This bias seems to be the common multiplier given a 
-reader/writer ratio with those patches and doesn't account for possible 
-single thread starvation.
+To be completely fair, though, I'm not completely fixated on cpuinfo as the only
+possible answer.  It has been the most requested, however.
 
-Of course, I've been running other tests as well and the system seems to 
-be behaving as expected (likely better than the rwlock patches under 
-stress). I will continue to test this on a couple other platforms.
+> For the MPIDR and product info, I think we can expose this in a more
+> structured way (e.g. under sysfs). IIUC the product info is all derived
+> from DMI -- do we not expose that already?
 
-In the meantime:
+Agreed; the MPIDR I think could just as easily be in /sys/devices/cpu/* as
+a hex value.  It doesn't have the value to end-users that the other info does,
+either -- for debugging, definitely, but not necessarily sysadmin.  I'll put
+something together for this.
 
-Tested-by: Jeremy Linton <jeremy.linton@arm.com>
+The DMI info is in sysfs but it is not in a fashion normally consumed, hence
+the questions from end-users, in a way.  They're not expecting to have to do
+the interpretation, and they are expecting the platform to be able to tell
+them what "Model: 2" means.
 
-
+> For the human-readable names I must NAK such patches. This is an
+> extremely brittle ABI that cannot be forwards compatible, and comes with
+> hilarious political problems. This should be managed in userspace alone.
 > 
-> Cheers,
-> 
-> Will
-> 
-> --->8
-> 
-> Will Deacon (5):
->    kernel/locking: Use struct qrwlock instead of struct __qrwlock
->    locking/atomic: Add atomic_cond_read_acquire
->    kernel/locking: Use atomic_cond_read_acquire when spinning in qrwlock
->    arm64: locking: Move rwlock implementation over to qrwlocks
->    kernel/locking: Prevent slowpath writers getting held up by fastpath
-> 
->   arch/arm64/Kconfig                      |  17 ++++
->   arch/arm64/include/asm/Kbuild           |   1 +
->   arch/arm64/include/asm/spinlock.h       | 164 +-------------------------------
->   arch/arm64/include/asm/spinlock_types.h |   6 +-
->   include/asm-generic/atomic-long.h       |   3 +
->   include/asm-generic/qrwlock.h           |  20 +---
->   include/asm-generic/qrwlock_types.h     |  15 ++-
->   include/linux/atomic.h                  |   4 +
->   kernel/locking/qrwlock.c                |  83 +++-------------
->   9 files changed, 58 insertions(+), 255 deletions(-)
-> 
+> I thought tools like lscpu and lshw were intended to gather such
+> information for users. What are these missing today?
+
+All of the above human-readable parts -- lscpu reads model information from
+/proc/cpuinfo, for example, and would require new code to read this info from
+somewhere else, and then figure out how to interpret it.  All I get is a lovely
+'2' for 'model' :).  We could obviously change the userspace tools, but I'm
+guessing it just moves the political hilarity from the kernel to userspace,
+correct?  It also runs the risk of even greater silliness, like perhaps lscpu
+gets a product name right, but lshw calls it something different, and so on.
+
+The other approach that occurs to me is to blend what x86 does and sysfs; i.e.,
+would it be acceptable to modify cputype.h to include comments (as x86 does)
+that are then munged by a script somewhat like arch/x86/kernel/cpu/mkcapflags.sh
+that then produces a header file with proper human-readable content that can
+then be exposed in sysfs?  I don't think we can ever remove the brittleness
+completely, but perhaps this would at least mitigate it.  This would still
+require userspace modifications, too, but they could at least rely on a uniform
+source of data -- and perhaps a single place to focus when hilarity ensues :).
+I'll bodge some patches together and maybe start over as an RFC, if there's a
+chance this would be accepted.
+
+-- 
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Red Hat, Inc.
+ahs3 at redhat.com
+-----------------------------------
