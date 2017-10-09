@@ -1,71 +1,144 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 9 Oct 2017 12:30:44 +0100
-Subject: [PATCH v2 3/5] kernel/locking: Use atomic_cond_read_acquire when
- spinning in qrwlock
-In-Reply-To: <20171008005841.gznbomnstzhxwyfm@tardis>
-References: <1507296882-18721-1-git-send-email-will.deacon@arm.com>
- <1507296882-18721-4-git-send-email-will.deacon@arm.com>
- <20171008005841.gznbomnstzhxwyfm@tardis>
-Message-ID: <20171009113044.GB7128@arm.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Mon, 9 Oct 2017 12:36:22 +0100
+Subject: [RFCv2 PATCH 00/36] Process management for IOMMU + SVM for SMMUv3
+In-Reply-To: <0c6778d8-741f-0db7-fe3c-df88a75ebbb2@huawei.com>
+References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
+ <0c6778d8-741f-0db7-fe3c-df88a75ebbb2@huawei.com>
+Message-ID: <0fecd29e-eaf7-9503-b087-7bfbc251da88@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 08, 2017 at 09:03:34AM +0800, Boqun Feng wrote:
-> On Fri, Oct 06, 2017 at 01:34:40PM +0000, Will Deacon wrote:
-> > The qrwlock slowpaths involve spinning when either a prospective reader
-> > is waiting for a concurrent writer to drain, or a prospective writer is
-> > waiting for concurrent readers to drain. In both of these situations,
-> > atomic_cond_read_acquire can be used to avoid busy-waiting and make use
-> > of any backoff functionality provided by the architecture.
-> > 
-> > This patch replaces the open-code loops and rspin_until_writer_unlock
-> > implementation with atomic_cond_read_acquire. The write mode transition
-> > zero to _QW_WAITING is left alone, since (a) this doesn't need acquire
-> > semantics and (b) should be fast.
-> > 
-> > Cc: Peter Zijlstra <peterz@infradead.org>
-> > Cc: Ingo Molnar <mingo@redhat.com>
-> > Cc: Waiman Long <longman@redhat.com>
-> > Cc: Boqun Feng <boqun.feng@gmail.com>
-> > Cc: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  kernel/locking/qrwlock.c | 47 +++++++++++------------------------------------
-> >  1 file changed, 11 insertions(+), 36 deletions(-)
-> > 
-> > diff --git a/kernel/locking/qrwlock.c b/kernel/locking/qrwlock.c
-> > index 1af791e37348..b7ea4647c74d 100644
-> > --- a/kernel/locking/qrwlock.c
-> > +++ b/kernel/locking/qrwlock.c
-> > @@ -24,23 +24,6 @@
-> >  #include <asm/qrwlock.h>
-> >  
-> >  /**
-> > - * rspin_until_writer_unlock - inc reader count & spin until writer is gone
-> > - * @lock  : Pointer to queue rwlock structure
-> > - * @writer: Current queue rwlock writer status byte
-> > - *
-> > - * In interrupt context or at the head of the queue, the reader will just
-> > - * increment the reader count & wait until the writer releases the lock.
-> > - */
-> > -static __always_inline void
-> > -rspin_until_writer_unlock(struct qrwlock *lock, u32 cnts)
-> > -{
-> > -	while ((cnts & _QW_WMASK) == _QW_LOCKED) {
-> > -		cpu_relax();
-> > -		cnts = atomic_read_acquire(&lock->cnts);
-> > -	}
-> > -}
-> > -
-> > -/**
-> >   * queued_read_lock_slowpath - acquire read lock of a queue rwlock
-> >   * @lock: Pointer to queue rwlock structure
-> >   * @cnts: Current qrwlock lock value
-> > @@ -53,13 +36,12 @@ void queued_read_lock_slowpath(struct qrwlock *lock, u32 cnts)
+Hi,
+
+On 09/10/17 10:49, Yisheng Xie wrote:
+> Hi Jean,
 > 
-> So the second parameter(@cnts) could be removed entirely, right?
-> Any reason we still keep it?
+> On 2017/10/6 21:31, Jean-Philippe Brucker wrote:
+>> Following discussions at plumbers and elsewhere, it seems like we need to
+>> unify some of the Shared Virtual Memory (SVM) code, in order to define
+>> clear semantics for the SVM API.
+>>
+>> My previous RFC [1] was centered on the SMMUv3, but some of this code will
+>> need to be reused by the SMMUv2 and virtio-iommu drivers. This second
+>> proposal focuses on abstracting a little more into the core IOMMU API, and
+>> also trying to find common ground for all SVM-capable IOMMUs.
+>>
+>> SVM is, in the context of the IOMMU, sharing page tables between a process
+>> and a device. Traditionally it requires IO Page Fault and Process Address
+>> Space ID capabilities in device and IOMMU.
+>>
+>> * A device driver can bind a process to a device, with iommu_process_bind.
+>>   Internally we hold on to the mm and get notified of its activity with an
+>>   mmu_notifier. The bond is removed by exit_mm, by a call to
+>>   iommu_process_unbind or iommu_detach_device.
+>>
+>> * iommu_process_bind returns a 20-bit PASID (PCI terminology) to the
+>>   device driver, which programs it into the device to access the process
+>>   address space.
+>>
+>> * The device and the IOMMU support recoverable page faults. This can be
+>>   either ATS+PRI for PCI, or platform-specific mechanisms such as Stall
+>>   for SMMU.
+>>
+>> Ideally systems wanting to use SVM have to support these three features,
+>> but in practice we'll see implementations supporting just a subset of
+>> them, especially in validation environments. So even if this particular
+>> patchset assumes all three capabilities, it should also be possible to
+>> support PASID without IOPF (by pinning everything, see non-system SVM in
+>> OpenCL)
+> How to pin everything? If user malloc anything we should pin it. It should
+> from user or driver?
 
-Well spotted! I'll remove it.
+For userspace drivers, I guess it would be via a VFIO ioctl, that does the
+same preparatory work as VFIO_IOMMU_MAP_DMA, but doesn't call iommu_map.
+For things like OpenCL SVM buffers, it's the kernel driver that does the
+pinning, just like VFIO does it, before launching the work on a SVM buffer.
 
-Will
+>> , or IOPF without PASID (sharing the single device address space
+>> with a process, could be useful for DPDK+VFIO).
+>>
+>> Implementing both these cases would enable PT sharing alone. Some people
+>> would also like IOPF alone without SVM (covered by this series) or process
+>> management without shared PT (not covered). Using these features
+>> individually is also important for testing, as SVM is in its infancy and
+>> providing easy ways to test is essential to reduce the number of quirks
+>> down the line.
+>>
+>>   Process management
+>>   ==================
+>>
+>> The first part of this series introduces boilerplate code for managing
+>> PASIDs and processes bound to devices. It's something any IOMMU driver
+>> that wants to support bind/unbind will have to do, and it is difficult to
+>> get right.
+>>
+>> Patches
+>> 1: iommu_process and PASID allocation, attach and release
+>> 2: process_exit callback for device drivers
+>> 3: iommu_process search by PASID
+>> 4: track process changes with an MMU notifiers
+>> 5: bind and unbind operations
+>>
+>> My proposal uses the following model:
+>>
+>> * The PASID space is system-wide. This means that a Linux process will
+>>   have a single PASID. I introduce the iommu_process structure and a
+>>   global IDR to manage this.
+>>
+>> * An iommu_process can be bound to multiple domains, and a domain can have
+>>   multiple iommu_process.
+> when bind a task to device, can we create a single domain for it? I am thinking
+> about process management without shared PT(for some device only support PASID
+> without pri ability), it seems hard to expand if a domain have multiple iommu_process?
+> Do you have any idea about this?
+
+A device always has to be in a domain, as far as I know. Not supporting
+PRI forces you to pin down all user mappings (or just the ones you use for
+DMA) but you should sill be able to share PT. Now if you don't support
+shared PT either, but only PASID, then you'll have to use io-pgtable and a
+new map/unmap API on an iommu_process. I don't understand your concern
+though, how would the link between process and domains prevent this use-case?
+
+>> * IOMMU groups share same PASID table. IOMMU groups are a convenient way
+>>   to cover various hardware weaknesses that prevent a group of device to
+>>   be isolated by the IOMMU (untrusted bridge, for instance). It's foolish
+>>   to assume that all PASID implementations will perfectly isolate devices
+>>   within a bus and functions within a device, so let's assume all devices
+>>   within an IOMMU group have to share PASID traffic as well. In general
+>>   there will be a single device per group.
+>>
+>> * It's up to the driver implementation to decide where to implement the
+>>   PASID tables. For SMMU it's more convenient to have a single PASID table
+>>   per domain. And I think the model fits better with the existing IOMMU
+>>   API: IOVA traffic is shared by all devices in a domain, so should PASID
+>>   traffic.
+> What's the meaning of "share PASID traffic"? PASID space is system-wide,
+> and a domain can have multiple iommu_process , so a domain can have multiple
+> PASIDs , one PASID for a iommu_process, right?
+
+Yes, I meant that if a device can access mappings for a specific PASID,
+then other devices in that same domain are also able to access them.
+
+A few reasons for this choice in the SMMU:
+* As all devices in an IOMMU group will be in the same domain and share
+the same PASID traffic, it encompasses that case. Groups are the smallest
+isolation granularity, then users are free to choose to put different
+IOMMU groups in different domains.
+* For architectures that can have both non-PASID and PASID traffic
+simultaneously, like the SMMU, it is simpler to reason about PASID tables
+being a domain, rather than sharing PASID0 within the domain and handling
+all others per device.
+* It's the same principle as non-PASID mappings (iommu_map/unmap is on a
+domain).
+* It implement the classic example of IOMMU architectures where multiple
+device descriptors point to the same PASID tables.
+* It may be desirable for drivers to share PASIDs within a domain, if they
+are actually using domains for conveniently sharing address spaces between
+devices. I'm not sure how much this is used as a feature. It does model a
+shared bus where each device can snoop DMA, so it may be useful.
+
+bind/unbind operations are done on devices and not domains, though,
+because it allows users to know which device supports PASID, PRI, etc.
+
+Thanks,
+Jean
