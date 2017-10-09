@@ -1,61 +1,32 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 9 Oct 2017 19:48:34 +0100
-Subject: [PATCH v9 09/12] mm/kasan: kasan specific map populate function
-In-Reply-To: <CAOAebxu1310eCrk88EC=Oaw3n90-9RuHZ1KBhPvLu_DyXBNZFQ@mail.gmail.com>
-References: <20170920201714.19817-1-pasha.tatashin@oracle.com>
- <20170920201714.19817-10-pasha.tatashin@oracle.com>
- <20171003144845.GD4931@leverpostej>
- <20171009171337.GE30085@arm.com>
- <CAOAebxtHHFvYn4WysMASe1GqvgKYPVyjJ572UM3Sef5sP0hi9A@mail.gmail.com>
- <20171009182217.GC30828@arm.com>
- <CAOAebxu1310eCrk88EC=Oaw3n90-9RuHZ1KBhPvLu_DyXBNZFQ@mail.gmail.com>
-Message-ID: <20171009184834.GE30828@arm.com>
+From: hkallweit1@gmail.com (Heiner Kallweit)
+Date: Mon, 9 Oct 2017 20:49:44 +0200
+Subject: [PATCH 1/3] firmware: arm_scpi: remove default for get_scpi_ops if
+ not reachable
+Message-ID: <8afb173f-1480-baf8-e15b-5c01ed033671@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 09, 2017 at 02:42:32PM -0400, Pavel Tatashin wrote:
-> Hi Will,
-> 
-> In addition to what Michal wrote:
-> 
-> > As an interim step, why not introduce something like
-> > vmemmap_alloc_block_flags and make the page-table walking opt-out for
-> > architectures that don't want it? Then we can just pass __GFP_ZERO from
-> > our vmemmap_populate where necessary and other architectures can do the
-> > page-table walking dance if they prefer.
-> 
-> I do not see the benefit, implementing this approach means that we
-> would need to implement two table walks instead of one: one for x86,
-> another for ARM, as these two architectures support kasan. Also, this
-> would become a requirement for any future architecture that want to
-> add kasan support to add this page table walk implementation.
+All callers of get_scpi_ops() depend on the result and therefore have
+a Kconfig dependency on ARM_SCPI_PROTOCOL. Means that ARM_SCPI_PROTOCOL
+being a module and caller being built-in can't occur.
 
-We have two table walks even with your patch series applied afaict: one in
-our definition of vmemmap_populate (arch/arm64/mm/mmu.c) and this one
-in the core code.
+Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
+---
+ include/linux/scpi_protocol.h | 4 ----
+ 1 file changed, 4 deletions(-)
 
-> >> IMO, while I understand that it looks strange that we must walk page
-> >> table after creating it, it is a better approach: more enclosed as it
-> >> effects kasan only, and more universal as it is in common code.
-> >
-> > I don't buy the more universal aspect, but I appreciate it's subjective.
-> > Frankly, I'd just sooner not have core code walking early page tables if
-> > it can be avoided, and it doesn't look hard to avoid it in this case.
-> > The fact that you're having to add pmd_large and pud_large, which are
-> > otherwise unused in mm/, is an indication that this isn't quite right imo.
-> 
->  28 +#define pmd_large(pmd)         pmd_sect(pmd)
->  29 +#define pud_large(pud)         pud_sect(pud)
-> 
-> it is just naming difference, ARM64 calls them pmd_sect, common mm and
-> other arches call them
-> pmd_large/pud_large. Even the ARM has these defines in
-> 
-> arm/include/asm/pgtable-3level.h
-> arm/include/asm/pgtable-2level.h
-
-My worry is that these are actually highly arch-specific, but will likely
-grow more users in mm/ that assume things for all architectures that aren't
-necessarily valid.
-
-Will
+diff --git a/include/linux/scpi_protocol.h b/include/linux/scpi_protocol.h
+index 327d6566..d5eba00d 100644
+--- a/include/linux/scpi_protocol.h
++++ b/include/linux/scpi_protocol.h
+@@ -77,8 +77,4 @@ struct scpi_ops {
+ 	int (*device_set_power_state)(u16, u8);
+ };
+ 
+-#if IS_REACHABLE(CONFIG_ARM_SCPI_PROTOCOL)
+ struct scpi_ops *get_scpi_ops(void);
+-#else
+-static inline struct scpi_ops *get_scpi_ops(void) { return NULL; }
+-#endif
+-- 
+2.14.2
