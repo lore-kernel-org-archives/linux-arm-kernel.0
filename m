@@ -1,68 +1,56 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Mon, 9 Oct 2017 11:23:01 +0200
-Subject: [PATCH v4 0/4] stm32 clocksource driver rework
-In-Reply-To: <1506959513-16851-1-git-send-email-benjamin.gaignard@linaro.org>
-References: <1506959513-16851-1-git-send-email-benjamin.gaignard@linaro.org>
-Message-ID: <CA+M3ks551+w1wtg9O_bYRiTjx00M8qOBsB92og2-EL0Wnrf2rw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 9 Oct 2017 10:24:09 +0100
+Subject: arm64: 4.14 of_match_node() issues
+In-Reply-To: <5d2ff063-1f7e-0200-cc02-99804f7d9219@suse.de>
+References: <5d2ff063-1f7e-0200-cc02-99804f7d9219@suse.de>
+Message-ID: <20171009092409.GB5127@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-10-02 17:51 GMT+02:00 Benjamin Gaignard <benjamin.gaignard@linaro.org>:
-> version 4:
-> - split patch in 3 parts
->   - convert code to timer_of
->   - only use 32 bits timers
->   - add clocksource support
+Hi Andreas,
 
-Hello Daniel,
+On Sat, Oct 07, 2017 at 02:42:13AM +0200, Andreas F?rber wrote:
+> Since 4.14-rc1 I am seeing frequent oopses during module loading (e.g.,
+> MMC, USB) from initrd on aarch64. Symptoms are similar to this in -rc3:
+> 
+> [  OK  ] Started udev Coldplug all Devices.
+> [   10.117775] usbcore: registered new interface driver usbfs
+> [   10.118235] Unable to handle kernel paging request at virtual address
+> ffff000008e5abc0
+> [   10.118238] Mem abort info:
+> [   10.118245]   Exception class = DABT (current EL), IL = 32 bits
+> [   10.118249]   SET = 0, FnV = 0
+> [   10.118253]   EA = 0, S1PTW = 0
+> [   10.118256] Data abort info:
+> [   10.118261]   ISV = 0, ISS = 0x00000006
+> [   10.118264]   CM = 0, WnR = 0
+> [   10.118274] swapper pgtable: 4k pages, 48-bit VAs, pgd = ffff0000094a5000
+> [   10.118279] [ffff000008e5abc0] *pgd=00000000bfffe003,
+> *pud=00000000bfffd003, *pmd=0000000000000000
+> [   10.118299] Internal error: Oops: 96000006 [#1] SMP
+> [   10.118305] Modules linked in: fixed usbcore(+) sunxi_mmc mmc_core
+> phy_sun4i_usb sg
+> [   10.118341] CPU: 3 PID: 49 Comm: kworker/3:1 Not tainted
+> 4.14.0-rc3-2.gf27997b-default #1
+> [   10.118345] Hardware name: sunxi sunxi/sunxi, BIOS 2017.05-rc1 04/13/2017
+> [   10.118369] Workqueue: events deferred_probe_work_func
+> [   10.118378] task: ffff80007c8f4000 task.stack: ffff0000099d8000
+> [   10.118394] PC is at __of_match_node.part.1+0x48/0x88
+> [   10.118403] LR is at of_match_node+0x40/0x70
+> [   10.118411] pc : [<ffff00000879aed0>] lr : [<ffff00000879af50>]
 
-Does the patches split sound good for you ?
+[...]
 
-Regards,
-Benjamin
+> This has been observed on Pine64 (>60%; also by Stefan) and Odroid-C2;
+> my other arm64 boards such as Raspberry Pi 3 have not run into this so
+> far. No such problems on 32-bit boards.
+> 
+> This is using the openSUSE config:
+> https://kernel.opensuse.org/cgit/kernel-source/plain/config/arm64/default
 
->
-> version 3:
-> - fix comments done by Daniel
-> - use timer_of helper functions
->
-> version 2:
-> - fix uninitialized variable
->
-> These patches implements clocksource and clockevent by using only one hardware block.
-> Getting both clock source and events on the same hardware lead to change quite
-> a lot driver code.
-> It also limits usage of clocksource to 32 bits timers because 16 bits ones
-> aren't enough accurate.
-> Thanks to timer_fo helpers this series includes minor clean up in structures,
-> function prototypes and driver name.
->
-> Since 16 bits timers become useless it also removes them from stm32f4 and
-> stm32f7 devicetree.
->
-> Benjamin Gaignard (4):
->   clocksource: stm32: convert driver to timer_of
->   clocksource: stm32: only use 32 bits timers
->   clocksource: stm32: add clocksource support
->   arm: dts: stm32: remove useless clocksource nodes
->
->  arch/arm/boot/dts/stm32f429.dtsi  |  32 ------
->  arch/arm/boot/dts/stm32f746.dtsi  |  32 ------
->  drivers/clocksource/Kconfig       |   1 +
->  drivers/clocksource/timer-stm32.c | 229 ++++++++++++++++++--------------------
->  4 files changed, 112 insertions(+), 182 deletions(-)
->
-> --
-> 2.7.4
->
+Hmm, hard to know what to suggest without a concrete reproducer. Do you know
+which driver is being probed in the log above? Also, does this still break
+if you pass "keepinitrd" on the cmdline? Finally, can you dump the kernel
+virtual memory layout, please?
 
-
-
--- 
-Benjamin Gaignard
-
-Graphic Study Group
-
-Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro: Facebook | Twitter | Blog
+Will
