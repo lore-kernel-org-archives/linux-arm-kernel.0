@@ -1,81 +1,90 @@
-From: longman@redhat.com (Waiman Long)
-Date: Mon, 9 Oct 2017 17:19:46 -0400
-Subject: [PATCH v2 0/5] Switch arm64 over to qrwlock
-In-Reply-To: <1507296882-18721-1-git-send-email-will.deacon@arm.com>
-References: <1507296882-18721-1-git-send-email-will.deacon@arm.com>
-Message-ID: <955771a8-3c72-e816-c080-f9ffec18f049@redhat.com>
+From: pasha.tatashin@oracle.com (Pavel Tatashin)
+Date: Mon,  9 Oct 2017 18:19:23 -0400
+Subject: [PATCH v11 1/9] x86/mm: setting fields in deferred pages
+In-Reply-To: <20171009221931.1481-1-pasha.tatashin@oracle.com>
+References: <20171009221931.1481-1-pasha.tatashin@oracle.com>
+Message-ID: <20171009221931.1481-2-pasha.tatashin@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/06/2017 09:34 AM, Will Deacon wrote:
-> Hi all,
->
-> This is version two of the patches I posted yesterday:
->
->   http://lists.infradead.org/pipermail/linux-arm-kernel/2017-October/534666.html
->
-> I'd normally leave it longer before posting again, but Peter had a good
-> suggestion to rework the layout of the lock word, so I wanted to post a
-> version that follows that approach.
->
-> I've updated my branch if you're after the full patch stack:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git qrwlock
->
-> As before, all comments (particularly related to testing and performance)
-> welcome!
->
-> Cheers,
->
-> Will
->
-> --->8
->
-> Will Deacon (5):
->   kernel/locking: Use struct qrwlock instead of struct __qrwlock
->   locking/atomic: Add atomic_cond_read_acquire
->   kernel/locking: Use atomic_cond_read_acquire when spinning in qrwlock
->   arm64: locking: Move rwlock implementation over to qrwlocks
->   kernel/locking: Prevent slowpath writers getting held up by fastpath
->
->  arch/arm64/Kconfig                      |  17 ++++
->  arch/arm64/include/asm/Kbuild           |   1 +
->  arch/arm64/include/asm/spinlock.h       | 164 +-------------------------------
->  arch/arm64/include/asm/spinlock_types.h |   6 +-
->  include/asm-generic/atomic-long.h       |   3 +
->  include/asm-generic/qrwlock.h           |  20 +---
->  include/asm-generic/qrwlock_types.h     |  15 ++-
->  include/linux/atomic.h                  |   4 +
->  kernel/locking/qrwlock.c                |  83 +++-------------
->  9 files changed, 58 insertions(+), 255 deletions(-)
->
-I had done some performance test of your patch on a 1 socket Cavium
-CN8880 system with 32 cores. I used my locking stress test which
-produced the following results with 16 locking threads at various mixes
-of reader & writer threads on 4.14-rc4 based kernels. The numbers are
-the minimum/average/maximum locking operations done per locking threads
-in a 10 seconds period. A minimum number of 1 means there is at least 1
-thread that cannot acquire the lock during the test period.
+Without deferred struct page feature (CONFIG_DEFERRED_STRUCT_PAGE_INIT),
+flags and other fields in "struct page"es are never changed prior to first
+initializing struct pages by going through __init_single_page().
 
-                w/o qrwlock patch               with qrwlock patch
-                -----------------               ------------------
-16 readers   793,024/1,169,763/1,684,751  1,060,127/1,198,583/1,331,003
-        
-12 readers 1,162,760/1,641,714/2,162,939  1,685,334/2,099,088/2,338,461
- 4 writers         1/        1/        1     25,540/  195,975/  392,232
+With deferred struct page feature enabled, however, we set fields in
+register_page_bootmem_info that are subsequently clobbered right after in
+free_all_bootmem:
+
+        mem_init() {
+                register_page_bootmem_info();
+                free_all_bootmem();
+                ...
+        }
+
+When register_page_bootmem_info() is called only non-deferred struct pages
+are initialized. But, this function goes through some reserved pages which
+might be part of the deferred, and thus are not yet initialized.
+
+  mem_init
+   register_page_bootmem_info
+    register_page_bootmem_info_node
+     get_page_bootmem
+      .. setting fields here ..
+      such as: page->freelist = (void *)type;
+
+  free_all_bootmem()
+   free_low_memory_core_early()
+    for_each_reserved_mem_region()
+     reserve_bootmem_region()
+      init_reserved_page() <- Only if this is deferred reserved page
+       __init_single_pfn()
+        __init_single_page()
+            memset(0) <-- Loose the set fields here
+
+We end-up with issue where, currently we do not observe problem as memory
+is explicitly zeroed. But, if flag asserts are changed we can start hitting
+issues.
+
+Also, because in this patch series we will stop zeroing struct page memory
+during allocation, we must make sure that struct pages are properly
+initialized prior to using them.
+
+The deferred-reserved pages are initialized in free_all_bootmem().
+Therefore, the fix is to switch the above calls.
+
+Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
+Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
+Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
+Reviewed-by: Bob Picco <bob.picco@oracle.com>
+Acked-by: Michal Hocko <mhocko@suse.com>
+---
+ arch/x86/mm/init_64.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/arch/x86/mm/init_64.c b/arch/x86/mm/init_64.c
+index 5ea1c3c2636e..8822523fdcd7 100644
+--- a/arch/x86/mm/init_64.c
++++ b/arch/x86/mm/init_64.c
+@@ -1182,12 +1182,18 @@ void __init mem_init(void)
  
- 8 readers 2,135,670/2,391,612/2,737,564  2,985,686/3,359,048/3,870,423
- 8 writers         1/   19,867/   88,173    119,078/  559,604/1,112,769
+ 	/* clear_bss() already clear the empty_zero_page */
  
- 4 readers 1,194,917/1,250,876/1,299,304  3,611,059/4,653,775/6,268,370
-12 writers   176,156/1,088,513/2,594,534      7,664/  795,393/1,841,961
-
-16 writers    35,007/1,094,608/1,954,457  1,618,915/1,633,077/1,645,637
-
-It can be seen that qrwlock performed much better than the original rwlock
-implementation.
-
-Tested-by: Waiman Long <longman@redhat.com>
-
-Cheers,
-Longman
+-	register_page_bootmem_info();
+-
+ 	/* this will put all memory onto the freelists */
+ 	free_all_bootmem();
+ 	after_bootmem = 1;
+ 
++	/*
++	 * Must be done after boot memory is put on freelist, because here we
++	 * might set fields in deferred struct pages that have not yet been
++	 * initialized, and free_all_bootmem() initializes all the reserved
++	 * deferred pages for us.
++	 */
++	register_page_bootmem_info();
++
+ 	/* Register memory areas for /proc/kcore */
+ 	kclist_add(&kcore_vsyscall, (void *)VSYSCALL_ADDR,
+ 			 PAGE_SIZE, KCORE_OTHER);
+-- 
+2.14.2
