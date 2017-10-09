@@ -1,123 +1,102 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  9 Oct 2017 16:20:30 +0100
-Subject: [PATCH 08/10] KVM: arm/arm64: Drop vcpu parameter from coherent_{d,
- i}cache_guest_page
-In-Reply-To: <20171009152032.27804-1-marc.zyngier@arm.com>
-References: <20171009152032.27804-1-marc.zyngier@arm.com>
-Message-ID: <20171009152032.27804-9-marc.zyngier@arm.com>
+From: riproute@gmail.com (Dan Haab)
+Date: Mon,  9 Oct 2017 09:46:22 -0600
+Subject: [PATCH 1/2] ARM: dts: BCM5301X: Add DT for Luxul XBR-4500
+Message-ID: <1507563983-7354-1-git-send-email-riproute@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The vcpu parameter isn't used for anything, and gets in the way of
-further cleanups. Let's get rid of it.
+From: Dan Haab <dhaab@luxul.com>
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+This is BCM47094 (AKA BCM4709C0) based router with ports-on-the-front
+board design.
+
+Signed-off-by: Dan Haab <dhaab@luxul.com>
 ---
- arch/arm/include/asm/kvm_mmu.h   |  6 ++----
- arch/arm64/include/asm/kvm_mmu.h |  6 ++----
- virt/kvm/arm/mmu.c               | 18 ++++++++----------
- 3 files changed, 12 insertions(+), 18 deletions(-)
+ arch/arm/boot/dts/Makefile                    |  1 +
+ arch/arm/boot/dts/bcm47094-luxul-xbr-4500.dts | 63 +++++++++++++++++++++++++++
+ 2 files changed, 64 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm47094-luxul-xbr-4500.dts
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index ad442d86c23e..5f1ac88a5951 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -150,8 +150,7 @@ static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
- 	return (vcpu_cp15(vcpu, c1_SCTLR) & 0b101) == 0b101;
- }
- 
--static inline void __coherent_dcache_guest_page(struct kvm_vcpu *vcpu,
--						kvm_pfn_t pfn,
-+static inline void __coherent_dcache_guest_page(kvm_pfn_t pfn,
- 						unsigned long size)
- {
- 	/*
-@@ -177,8 +176,7 @@ static inline void __coherent_dcache_guest_page(struct kvm_vcpu *vcpu,
- 	}
- }
- 
--static inline void __coherent_icache_guest_page(struct kvm_vcpu *vcpu,
--						kvm_pfn_t pfn,
-+static inline void __coherent_icache_guest_page(kvm_pfn_t pfn,
- 						unsigned long size)
- {
- 	u32 iclsz;
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index e7af74b8b51a..33dcc3c79574 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -252,8 +252,7 @@ static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
- 	return (vcpu_sys_reg(vcpu, SCTLR_EL1) & 0b101) == 0b101;
- }
- 
--static inline void __coherent_dcache_guest_page(struct kvm_vcpu *vcpu,
--						kvm_pfn_t pfn,
-+static inline void __coherent_dcache_guest_page(kvm_pfn_t pfn,
- 						unsigned long size)
- {
- 	void *va = page_address(pfn_to_page(pfn));
-@@ -261,8 +260,7 @@ static inline void __coherent_dcache_guest_page(struct kvm_vcpu *vcpu,
- 	kvm_flush_dcache_to_poc(va, size);
- }
- 
--static inline void __coherent_icache_guest_page(struct kvm_vcpu *vcpu,
--						kvm_pfn_t pfn,
-+static inline void __coherent_icache_guest_page(kvm_pfn_t pfn,
- 						unsigned long size)
- {
- 	if (icache_is_aliasing()) {
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index ccc6106764a6..5b495450e92f 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -1268,16 +1268,14 @@ void kvm_arch_mmu_enable_log_dirty_pt_masked(struct kvm *kvm,
- 	kvm_mmu_write_protect_pt_masked(kvm, slot, gfn_offset, mask);
- }
- 
--static void coherent_dcache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
--				       unsigned long size)
-+static void coherent_dcache_guest_page(kvm_pfn_t pfn, unsigned long size)
- {
--	__coherent_dcache_guest_page(vcpu, pfn, size);
-+	__coherent_dcache_guest_page(pfn, size);
- }
- 
--static void coherent_icache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
--				       unsigned long size)
-+static void coherent_icache_guest_page(kvm_pfn_t pfn, unsigned long size)
- {
--	__coherent_icache_guest_page(vcpu, pfn, size);
-+	__coherent_icache_guest_page(pfn, size);
- }
- 
- static void kvm_send_hwpoison_signal(unsigned long address,
-@@ -1413,11 +1411,11 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		}
- 
- 		if (fault_status != FSC_PERM)
--			coherent_dcache_guest_page(vcpu, pfn, PMD_SIZE);
-+			coherent_dcache_guest_page(pfn, PMD_SIZE);
- 
- 		if (exec_fault) {
- 			new_pmd = kvm_s2pmd_mkexec(new_pmd);
--			coherent_icache_guest_page(vcpu, pfn, PMD_SIZE);
-+			coherent_icache_guest_page(pfn, PMD_SIZE);
- 		} else if (fault_status == FSC_PERM) {
- 			/* Preserve execute if XN was already cleared */
- 			pmd_t *old_pmdp = stage2_get_pmd(kvm, NULL, fault_ipa);
-@@ -1438,11 +1436,11 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		}
- 
- 		if (fault_status != FSC_PERM)
--			coherent_dcache_guest_page(vcpu, pfn, PAGE_SIZE);
-+			coherent_dcache_guest_page(pfn, PAGE_SIZE);
- 
- 		if (exec_fault) {
- 			new_pte = kvm_s2pte_mkexec(new_pte);
--			coherent_icache_guest_page(vcpu, pfn, PAGE_SIZE);
-+			coherent_icache_guest_page(pfn, PAGE_SIZE);
- 		} else if (fault_status == FSC_PERM) {
- 			/* Preserve execute if XN was already cleared */
- 			pte_t *old_ptep = stage2_get_pte(kvm, fault_ipa);
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index faf46ab..563f8a4 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -100,6 +100,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+ 	bcm4709-tplink-archer-c9-v1.dtb \
+ 	bcm47094-dlink-dir-885l.dtb \
+ 	bcm47094-linksys-panamera.dtb \
++	bcm47094-luxul-xbr-4500.dtb \
+ 	bcm47094-luxul-xwr-3100.dtb \
+ 	bcm47094-netgear-r8500.dtb \
+ 	bcm94708.dtb \
+diff --git a/arch/arm/boot/dts/bcm47094-luxul-xbr-4500.dts b/arch/arm/boot/dts/bcm47094-luxul-xbr-4500.dts
+new file mode 100644
+index 0000000..15ffb1a
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm47094-luxul-xbr-4500.dts
+@@ -0,0 +1,63 @@
++/*
++ * Copyright (C) 2017 Luxul Inc.
++ *
++ * Licensed under the ISC license.
++ */
++
++/dts-v1/;
++
++#include "bcm4708.dtsi"
++#include "bcm5301x-nand-cs0-bch8.dtsi"
++
++/ {
++	compatible = "luxul,xbr-4500-v1", "brcm,bcm47094", "brcm,bcm4708";
++	model = "Luxul XBR-4500 V1";
++
++	chosen {
++		bootargs = "earlycon";
++	};
++
++	memory {
++		reg = <0x00000000 0x08000000
++		       0x88000000 0x18000000>;
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		status {
++			label = "bcm53xx:green:status";
++			gpios = <&chipcommon 20 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "timer";
++		};
++
++		usb3 {
++			label = "bcm53xx:green:usb3";
++			gpios = <&chipcommon 19 GPIO_ACTIVE_HIGH>;
++			trigger-sources = <&ohci_port1>, <&ehci_port1>,
++				<&xhci_port1>;
++			linux,default-trigger = "usbport";
++		};
++
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		restart {
++			label = "Reset";
++			linux,code = <KEY_RESTART>;
++			gpios = <&chipcommon 17 GPIO_ACTIVE_LOW>;
++		};
++	};
++};
++
++&usb3 {
++	vcc-gpio = <&chipcommon 18 GPIO_ACTIVE_HIGH>;
++};
++
++&spi_nor {
++	status = "okay";
++};
 -- 
-2.14.1
+1.9.1
