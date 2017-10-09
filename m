@@ -1,93 +1,189 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Mon, 9 Oct 2017 20:46:48 +0530
-Subject: [RFC 2/2] phy: exynos5-usbdrd: remove disable and enable of phy
- clk
-In-Reply-To: <CANAwSgSMFBS8n48=_OnNNs_=Di9Oqq2tNeiwZM9u1qaLevLP4w@mail.gmail.com>
-References: <1507264595-3565-1-git-send-email-linux.amoon@gmail.com>
- <1507264595-3565-2-git-send-email-linux.amoon@gmail.com>
- <CAJKOXPe9FCKqrvsgdohTAN9tXXwbMOuyaDiHPxZ1Ym1LLPD41w@mail.gmail.com>
- <CANAwSgSbHR+e_2wX3i3VoVxPe10mUOoS94uRpvebfUfybaNQ+g@mail.gmail.com>
- <20171008155015.252gefhsc4tks7k6@kozik-lap>
- <CANAwSgSMFBS8n48=_OnNNs_=Di9Oqq2tNeiwZM9u1qaLevLP4w@mail.gmail.com>
-Message-ID: <CANAwSgRmyEqTbw1ZfZhenC8Cs4ffgeYB4vyDNsGeX-zvg92aPw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon,  9 Oct 2017 16:20:23 +0100
+Subject: [PATCH 01/10] KVM: arm/arm64: Split dcache/icache flushing
+In-Reply-To: <20171009152032.27804-1-marc.zyngier@arm.com>
+References: <20171009152032.27804-1-marc.zyngier@arm.com>
+Message-ID: <20171009152032.27804-2-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Krzysztof,
+As we're about to introduce opportunistic invalidation of the icache,
+let's split dcache and icache flushing.
 
-On 9 October 2017 at 02:37, Anand Moon <linux.amoon@gmail.com> wrote:
-> Hi Krzysztof,
->
-> On 8 October 2017 at 21:20, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->> On Sun, Oct 08, 2017 at 06:11:12PM +0530, Anand Moon wrote:
->>> Hi Krzysztof,
->>>
->>> On 6 October 2017 at 12:12, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->>> > On Fri, Oct 6, 2017 at 6:36 AM, Anand Moon <linux.amoon@gmail.com> wrote:
->>> >> remove the disable and enable of phy clk.
->>> >> phy clk is needed to tune the phy controller.
->>> >
->>> > Drivers should in general enable and disable the clocks they use. Just
->>> > like in patch #1 please describe why you are doing this, what kind of
->>> > problem are you trying to solve and what exactly are you trying to do
->>> > here.
->>> >
->>> > BR,
->>> > Krzysztof
->>> >
->>>
->>> [snip]
->>>
->>> Usually we would disable the clk on error patch and return with failed.
->>> but in the current code we disable the clk in init routine and
->>> enable the clk in disable routine which seem incorrect.
->>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/include/asm/kvm_mmu.h   | 60 ++++++++++++++++++++++++++++------------
+ arch/arm64/include/asm/kvm_mmu.h | 13 +++++++--
+ virt/kvm/arm/mmu.c               | 20 ++++++++++----
+ 3 files changed, 67 insertions(+), 26 deletions(-)
 
-disable of clk could affect the PMU used to control the phy driver.
-
->> No. For example for exynos5_usbdrd_phy_exit() the driver enables the
->> clock only for the access to PHY block (PHY registers).
->>
->
-> But I dont get it why we disable code phy clk, which could be used in
-> future phy tune or link control as it part of CLK_FSYS.
->
->>>
->>> [0] https://github.com/torvalds/linux/blob/master/drivers/phy/samsung/phy-exynos5-usbdrd.c#L362-L412
->>> [1] https://github.com/torvalds/linux/blob/master/drivers/phy/samsung/phy-exynos5-usbdrd.c#L424-L446
->>>
->>> On 3.10.x kernel clk_summary all the clk are enables.
->>>
->>>     mout_usbdrd300              3           3            24000000
->>>        dout_usbdrd300           2           2            24000000
->>>           sclk_usbdrd300        1           1            24000000
->>>        dout_usbphy300           2           2            24000000
->>>           sclk_usbphy300        1           1            24000000
->>>     mout_usbdrd301              3           3            24000000
->>>        dout_usbdrd301           2           2            24000000
->>>           sclk_usbdrd301        1           1            24000000
->>>        dout_usbphy301           2           2            24000000
->>>           sclk_usbphy301        1           1            24000000
->>>
->>> Some more changes in clk driver might be required to stabilize the usb module.
->>
->> Please describe the issues with stability first.
->>
->> Best regards,
->> Krzysztof
->>
-> On stability:
->
-> USB 3.0 read / write performance is not up to mark with moderate data
-> read / write speed,
-> If you give long compilation of kernel or any source code it would
-> likely be slow
-> It work pretty good with USB 3.0 SSD but generally failed with 2.5' inc HDD.
->
-> If needed I will share you some performance test result with and
-> without these patches.
->
-> I have some more changes related to usbdrd phy change queued along this on.
->
-> Best Regards
-> -Anand
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index fa6f2174276b..f553aa62d0c3 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -126,21 +126,12 @@ static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
+ 	return (vcpu_cp15(vcpu, c1_SCTLR) & 0b101) == 0b101;
+ }
+ 
+-static inline void __coherent_cache_guest_page(struct kvm_vcpu *vcpu,
+-					       kvm_pfn_t pfn,
+-					       unsigned long size)
++static inline void __coherent_dcache_guest_page(struct kvm_vcpu *vcpu,
++						kvm_pfn_t pfn,
++						unsigned long size)
+ {
+ 	/*
+-	 * If we are going to insert an instruction page and the icache is
+-	 * either VIPT or PIPT, there is a potential problem where the host
+-	 * (or another VM) may have used the same page as this guest, and we
+-	 * read incorrect data from the icache.  If we're using a PIPT cache,
+-	 * we can invalidate just that page, but if we are using a VIPT cache
+-	 * we need to invalidate the entire icache - damn shame - as written
+-	 * in the ARM ARM (DDI 0406C.b - Page B3-1393).
+-	 *
+-	 * VIVT caches are tagged using both the ASID and the VMID and doesn't
+-	 * need any kind of flushing (DDI 0406C.b - Page B3-1392).
++	 * Clean the dcache to the Point of Coherency.
+ 	 *
+ 	 * We need to do this through a kernel mapping (using the
+ 	 * user-space mapping has proved to be the wrong
+@@ -155,19 +146,52 @@ static inline void __coherent_cache_guest_page(struct kvm_vcpu *vcpu,
+ 
+ 		kvm_flush_dcache_to_poc(va, PAGE_SIZE);
+ 
+-		if (icache_is_pipt())
+-			__cpuc_coherent_user_range((unsigned long)va,
+-						   (unsigned long)va + PAGE_SIZE);
+-
+ 		size -= PAGE_SIZE;
+ 		pfn++;
+ 
+ 		kunmap_atomic(va);
+ 	}
++}
+ 
+-	if (!icache_is_pipt() && !icache_is_vivt_asid_tagged()) {
++static inline void __coherent_icache_guest_page(struct kvm_vcpu *vcpu,
++						kvm_pfn_t pfn,
++						unsigned long size)
++{
++	/*
++	 * If we are going to insert an instruction page and the icache is
++	 * either VIPT or PIPT, there is a potential problem where the host
++	 * (or another VM) may have used the same page as this guest, and we
++	 * read incorrect data from the icache.  If we're using a PIPT cache,
++	 * we can invalidate just that page, but if we are using a VIPT cache
++	 * we need to invalidate the entire icache - damn shame - as written
++	 * in the ARM ARM (DDI 0406C.b - Page B3-1393).
++	 *
++	 * VIVT caches are tagged using both the ASID and the VMID and doesn't
++	 * need any kind of flushing (DDI 0406C.b - Page B3-1392).
++	 */
++
++	VM_BUG_ON(size & ~PAGE_MASK);
++
++	if (icache_is_vivt_asid_tagged())
++		return;
++
++	if (!icache_is_pipt()) {
+ 		/* any kind of VIPT cache */
+ 		__flush_icache_all();
++		return;
++	}
++
++	/* PIPT cache. As for the d-side, use a temporary kernel mapping. */
++	while (size) {
++		void *va = kmap_atomic_pfn(pfn);
++
++		__cpuc_coherent_user_range((unsigned long)va,
++					   (unsigned long)va + PAGE_SIZE);
++
++		size -= PAGE_SIZE;
++		pfn++;
++
++		kunmap_atomic(va);
+ 	}
+ }
+ 
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 672c8684d5c2..4c4cb4f0e34f 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -230,19 +230,26 @@ static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
+ 	return (vcpu_sys_reg(vcpu, SCTLR_EL1) & 0b101) == 0b101;
+ }
+ 
+-static inline void __coherent_cache_guest_page(struct kvm_vcpu *vcpu,
+-					       kvm_pfn_t pfn,
+-					       unsigned long size)
++static inline void __coherent_dcache_guest_page(struct kvm_vcpu *vcpu,
++						kvm_pfn_t pfn,
++						unsigned long size)
+ {
+ 	void *va = page_address(pfn_to_page(pfn));
+ 
+ 	kvm_flush_dcache_to_poc(va, size);
++}
+ 
++static inline void __coherent_icache_guest_page(struct kvm_vcpu *vcpu,
++						kvm_pfn_t pfn,
++						unsigned long size)
++{
+ 	if (icache_is_aliasing()) {
+ 		/* any kind of VIPT cache */
+ 		__flush_icache_all();
+ 	} else if (is_kernel_in_hyp_mode() || !icache_is_vpipt()) {
+ 		/* PIPT or VPIPT at EL2 (see comment in __kvm_tlb_flush_vmid_ipa) */
++		void *va = page_address(pfn_to_page(pfn));
++
+ 		flush_icache_range((unsigned long)va,
+ 				   (unsigned long)va + size);
+ 	}
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index b36945d49986..9e5628388af8 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1257,10 +1257,16 @@ void kvm_arch_mmu_enable_log_dirty_pt_masked(struct kvm *kvm,
+ 	kvm_mmu_write_protect_pt_masked(kvm, slot, gfn_offset, mask);
+ }
+ 
+-static void coherent_cache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
+-				      unsigned long size)
++static void coherent_dcache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
++				       unsigned long size)
+ {
+-	__coherent_cache_guest_page(vcpu, pfn, size);
++	__coherent_dcache_guest_page(vcpu, pfn, size);
++}
++
++static void coherent_icache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
++				       unsigned long size)
++{
++	__coherent_icache_guest_page(vcpu, pfn, size);
+ }
+ 
+ static void kvm_send_hwpoison_signal(unsigned long address,
+@@ -1391,7 +1397,9 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 			new_pmd = kvm_s2pmd_mkwrite(new_pmd);
+ 			kvm_set_pfn_dirty(pfn);
+ 		}
+-		coherent_cache_guest_page(vcpu, pfn, PMD_SIZE);
++		coherent_dcache_guest_page(vcpu, pfn, PMD_SIZE);
++		coherent_icache_guest_page(vcpu, pfn, PMD_SIZE);
++
+ 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
+ 	} else {
+ 		pte_t new_pte = pfn_pte(pfn, mem_type);
+@@ -1401,7 +1409,9 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 			kvm_set_pfn_dirty(pfn);
+ 			mark_page_dirty(kvm, gfn);
+ 		}
+-		coherent_cache_guest_page(vcpu, pfn, PAGE_SIZE);
++		coherent_dcache_guest_page(vcpu, pfn, PAGE_SIZE);
++		coherent_icache_guest_page(vcpu, pfn, PAGE_SIZE);
++
+ 		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, flags);
+ 	}
+ 
+-- 
+2.14.1
