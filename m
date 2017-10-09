@@ -1,55 +1,71 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 9 Oct 2017 15:55:59 +0100
-Subject: [PATCH] kbuild: fix dependency of dtbs targets
-In-Reply-To: <1507091240-12756-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1507091240-12756-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20171009145558.GC28164@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 9 Oct 2017 16:58:54 +0200
+Subject: [PATCH v2 05/13] mmc: mediatek: make hs400_tune_response only for
+ mt8173
+In-Reply-To: <1507548926-9555-6-git-send-email-chaotian.jing@mediatek.com>
+References: <1507548926-9555-1-git-send-email-chaotian.jing@mediatek.com>
+ <1507548926-9555-6-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <a01a245c-1e5b-74c7-9185-548cb0d8f183@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 04, 2017 at 01:27:20PM +0900, Masahiro Yamada wrote:
-> The target "dtbs" should depend on "scripts" because it needs to
-> build dtc.  The "prepare" target is unneeded here.
+
+
+On 10/09/2017 01:35 PM, Chaotian Jing wrote:
+> the origin design of hs400_tune_response is for mt8173 because of
+> mt8173 has a special design. for doing that, we add a new member
+> "compatible", by now it's only for mt8173.
 > 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
 > ---
+>   drivers/mmc/host/mtk-sd.c | 8 ++++++--
+>   1 file changed, 6 insertions(+), 2 deletions(-)
 > 
->  arch/arm/Makefile   | 2 +-
->  arch/arm64/Makefile | 2 +-
->  arch/nios2/Makefile | 2 +-
->  3 files changed, 3 insertions(+), 3 deletions(-)
+> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+> index 643c795..e8f8ad9 100644
+> --- a/drivers/mmc/host/mtk-sd.c
+> +++ b/drivers/mmc/host/mtk-sd.c
+> @@ -317,6 +317,7 @@ struct msdc_delay_phase {
+>   struct msdc_host {
+>   	struct device *dev;
+>   	const struct mtk_mmc_compatible *dev_comp;
+> +	const char *compatible;
+>   	struct mmc_host *mmc;	/* mmc structure */
+>   	int cmd_rsp;
+>   
+> @@ -666,7 +667,8 @@ static void msdc_set_mclk(struct msdc_host *host, unsigned char timing, u32 hz)
+>   		       host->base + PAD_CMD_TUNE);
+>   	}
+>   
+> -	if (timing == MMC_TIMING_MMC_HS400)
+> +	if (timing == MMC_TIMING_MMC_HS400 &&
+> +	    !strcmp(host->compatible, "mediatek,mt8173-mmc"))
+
+You can add another value to mtk_mmc_compatible as you did in all the following 
+patches.
+
+Regards,
+Matthias
+
+>   		sdr_set_field(host->base + PAD_CMD_TUNE,
+>   			      MSDC_PAD_TUNE_CMDRRDLY,
+>   			      host->hs400_cmd_int_delay);
+> @@ -1594,7 +1596,8 @@ static int msdc_execute_tuning(struct mmc_host *mmc, u32 opcode)
+>   	struct msdc_host *host = mmc_priv(mmc);
+>   	int ret;
+>   
+> -	if (host->hs400_mode)
+> +	if (host->hs400_mode &&
+> +	    !strcmp(host->compatible, "mediatek,mt8173-mmc"))
+>   		ret = hs400_tune_response(mmc, opcode);
+>   	else
+>   		ret = msdc_tune_response(mmc, opcode);
+> @@ -1745,6 +1748,7 @@ static int msdc_drv_probe(struct platform_device *pdev)
+>   
+>   	host->dev = &pdev->dev;
+>   	host->dev_comp = of_id->data;
+> +	host->compatible = of_id->compatible;
+>   	host->mmc = mmc;
+>   	host->src_clk_freq = clk_get_rate(host->src_clk);
+>   	/* Set host parameters to mmc */
 > 
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index 47d3a1a..cdb5b55 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -342,7 +342,7 @@ $(INSTALL_TARGETS):
->  
->  PHONY += dtbs dtbs_install
->  
-> -dtbs: prepare scripts
-> +dtbs: scripts
->  	$(Q)$(MAKE) $(build)=$(boot)/dts
->  
->  dtbs_install:
-> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-> index 939b310..fd56fbc 100644
-> --- a/arch/arm64/Makefile
-> +++ b/arch/arm64/Makefile
-> @@ -133,7 +133,7 @@ zinstall install:
->  
->  PHONY += dtbs dtbs_install
->  
-> -dtbs: prepare scripts
-> +dtbs: scripts
->  	$(Q)$(MAKE) $(build)=$(boot)/dts
->  
->  dtbs_install:
-
-I think this is ok, although I was initially nervous about the possibility
-of the archprepare step having interactions with the dt-bindings headers.
-That doesn't appear to be the case, so for arm64:
-
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-Will
