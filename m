@@ -1,62 +1,40 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 9 Oct 2017 20:57:42 +0300
-Subject: [PATCH v2 8/8] arm64: dts: renesas: eagle: add EtherAVB support
-In-Reply-To: <20171005090500.GC26369@verge.net.au>
-References: <20170915194449.538504992@cogentembedded.com>
- <CAMuHMdXQXFuVzwW7G-U7XWZUEj8qFRjtfDQF1+TgyzO0Xb+eYg@mail.gmail.com>
- <c0390fc1-7da4-ac60-afee-97126d1fd372@cogentembedded.com>
- <CAMuHMdVCTORpfKN+GTka_6pT1VWjOneV2GBhGo7Y8DsZYSxdvw@mail.gmail.com>
- <20171005090500.GC26369@verge.net.au>
-Message-ID: <d5940a12-3823-eebb-50d9-c0fd0fcf0fd1@cogentembedded.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 9 Oct 2017 19:02:50 +0100
+Subject: [PATCH v4 00/26] KVM/ARM: Add support for GICv4
+In-Reply-To: <20171009175239.GE23730@char.us.oracle.com>
+References: <20171006153401.5481-1-marc.zyngier@arm.com>
+ <20171009175239.GE23730@char.us.oracle.com>
+Message-ID: <63365b61-5a2e-220c-a543-d2245bd7f8a5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/05/2017 12:05 PM, Simon Horman wrote:
-
->>> On 9/21/2017 4:08 PM, Geert Uytterhoeven wrote:
->>>>> Define the Eagle board  dependent part of the EtherAVB device node.
->>>>> Enable DHCP  and NFS root for the kernel booting.
->>>>>
->>>>> Based  on the original (and large) patch by Vladimir Barinov.
->>>>>
->>>>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>>>
->>>>
->>>>> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
->>>>> +++ renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
->>>
->>> [...]
->>>>>
->>>>> @@ -43,3 +44,14 @@
->>>>>    &scif0 {
->>>>>           status = "okay";
->>>>>    };
->>>>> +
->>>>> +&avb {
->>>>> +       renesas,no-ether-link;
->>>>> +       phy-handle = <&phy0>;
->>>>> +       status = "okay";
->>>>> +
->>>>> +       phy0: ethernet-phy at 0 {
->>>>> +               rxc-skew-ps = <1500>;
->>>>> +               reg = <0>;
->>>>
->>>>
->>>> Any specific reason why you don't want to wire up the interrupt?
->>>>
->>>>                   interrupt-parent = <&gpio2>;
->>>
->>>
->>>     I thought it's quite obvious -- we don't have GPIOs yet, and GPIOs seem
->>> to require PFC.
+On 09/10/17 18:52, Konrad Rzeszutek Wilk wrote:
+> On Fri, Oct 06, 2017 at 04:33:35PM +0100, Marc Zyngier wrote:
+>> This series implements full support for GICv4 in KVM, bringing direct
+>> injection of MSIs to arm and arm64, assuming you have the right
+>> hardware (which is quite unlikely).
 >>
->> Of course. And these can be added later.
->>
->> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> To get an idea of the design, I'd recommend you start with commit
+>> 7954907bedaf as well as patch #26, which try to shed some light on the
+>> approach that I've taken. And before that, please digest some of the
+>> GICv3/GICv4 architecture documentation[1] (less than 800 pages!). Once
+>> you feel reasonably insane, you'll be in the right mood to read the
 > 
-> Thanks, applied.
+> You may want to update the link:
+> 
+> s/pfd/pdf/
+> 
+> (Does that mean you typed this by hand, my gosh, you really are breathing
+> this everyday) :-)
+I am, and I'm feeling pretty dizzy. You can't imagine the kind of fumes
+this thing generates... ;-)
 
-    Unfortunately, you applied an outdated version of this patch. :-(
+I probably copy/pasted the URL, edited something, messed up the URL,
+fixed it (sort of), and ended posting the crap (twice!) without even
+realizing. Oh well. I'll blame the spec, as always.
 
-MBR, Sergei
+Thanks for the heads up!
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
