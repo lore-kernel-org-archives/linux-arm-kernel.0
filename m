@@ -1,44 +1,36 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 9 Oct 2017 08:05:44 -0500
-Subject: [PATCH v2 1/3] dt-bindings: Add document for rockchip RGB output
- interface
-In-Reply-To: <2d502a9d-e952-8afb-d2d7-45c21c36da7e@rock-chips.com>
-References: <1506049221-117283-1-git-send-email-hjc@rock-chips.com>
- <1506049229-117376-1-git-send-email-hjc@rock-chips.com>
- <20171003215631.rc2jsf2m3qgoltsb@rob-hp-laptop>
- <2d502a9d-e952-8afb-d2d7-45c21c36da7e@rock-chips.com>
-Message-ID: <CAL_JsqJcO6VtgYBzby+gjerODT9n6fE0aMNJXNejvvhF1nqM-Q@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 9 Oct 2017 14:13:14 +0100
+Subject: [PATCH v2 0/5] Switch arm64 over to qrwlock
+In-Reply-To: <20171009124921.wtbzvqagges44brq@yury-thinkpad>
+References: <1507296882-18721-1-git-send-email-will.deacon@arm.com>
+ <20171008213052.ojyxpr56d2ypscjy@yury-thinkpad>
+ <20171009095935.GC5127@arm.com>
+ <20171009124921.wtbzvqagges44brq@yury-thinkpad>
+Message-ID: <20171009131314.GA28164@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 9, 2017 at 3:06 AM, Sandy Huang <hjc@rock-chips.com> wrote:
-> Hi rob,
->     Thanks for your reply.
->
-> ? 2017/10/4 5:56, Rob Herring ??:
->>
->> On Fri, Sep 22, 2017 at 11:00:26AM +0800, Sandy Huang wrote:
->>>
->>> This path add support rv1108 rgb output interface driver.
->>>
->>> Signed-off-by: Sandy Huang <hjc@rock-chips.com>
->>> ---
->>> Changes in v2:
->>>   1. rename rockchip,rgb-mode to rgb-mode;
->>
->>
->> You can't just drop the vendor. This needs to be documented in a common
->> place that others will find and use. See panel-common.txt or
->> panel-dpi.txt.
->>
->> Alternatively, you could just drop it and let the panel compatible imply
->> what the mode is.
->>
->>
-> ok, get it, i will move the rgb-mode to panel and describe it at
-> panel-rgb.txt. the patches will be send soon later.
+On Mon, Oct 09, 2017 at 03:49:21PM +0300, Yury Norov wrote:
+> On Mon, Oct 09, 2017 at 10:59:36AM +0100, Will Deacon wrote:
+> > On Mon, Oct 09, 2017 at 12:30:52AM +0300, Yury Norov wrote:
+> > > There were 2 preparing patches in the series: 
+> > > [PATCH 1/3] kernel/locking: #include <asm/spinlock.h> in qrwlock
+> > > and
+> > > [PATCH 2/3] asm-generic: don't #include <linux/atomic.h> in qspinlock_types.h
+> > > 
+> > > 1st patch is not needed anymore because Babu Moger submitted similar patch that
+> > > is already in mainline: 9ab6055f95903 ("kernel/locking: Fix compile error with
+> > > qrwlock.c"). Could you revisit second patch?
+> > 
+> > Sorry, not sure what you're asking me to do here.
+> 
+> It removes unneeded #include <linux/atomic.h> in
+> include/asm-generic/qspinlock_types.h. Could you or someone else take
+> it upstream?
 
-Don't create yet another common panel file. We already have
-panel-dpi.txt which is for digital parallel interface.
+My patch implements qrwlocks, not qspinlocks, so it's a bit weird to take
+this random patch in the same series. Given that Arnd acked it, I'd suggest
+either sending it through him, or leaving it until I get round to looking at
+qspinlock for arm64 (see my reply to Peter).
 
-Rob
+Will
