@@ -1,92 +1,56 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue, 10 Oct 2017 07:24:28 +0800
-Subject: [PATCH 2/6] ARM: sun8i: r40: add USB host port nodes for R40
-In-Reply-To: <20171009210340.ak6wo3vqnwj4gom4@flea.home>
+Date: Tue, 10 Oct 2017 07:25:41 +0800
+Subject: [PATCH 3/6] ARM: sun8i: r40: add 5V regulator for Banana Pi M2
+ Ultra
+In-Reply-To: <20171009210407.ueharyifho3s6xvu@flea.home>
 References: <20171008042906.46779-1-icenowy@aosc.io>
- <20171008042906.46779-3-icenowy@aosc.io>
- <20171009210340.ak6wo3vqnwj4gom4@flea.home>
-Message-ID: <55B35500-67FC-40AA-9A07-98C843DE55B3@aosc.io>
+ <20171008042906.46779-4-icenowy@aosc.io>
+ <20171009210407.ueharyifho3s6xvu@flea.home>
+Message-ID: <61E002C8-4046-44E4-8E1A-43C8AF74257C@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-? 2017?10?10? GMT+08:00 ??5:03:40, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
->On Sun, Oct 08, 2017 at 04:29:02AM +0000, Icenowy Zheng wrote:
->> From: Icenowy Zheng <icenowy@aosc.xyz>
+? 2017?10?10? GMT+08:00 ??5:04:07, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
+>On Sun, Oct 08, 2017 at 04:29:03AM +0000, Icenowy Zheng wrote:
+>> On newer revisions of the Banana Pi M2 Ultra boards, the 5V power
+>output
+>> (used by HDMI, SATA and USB) is controller via a GPIO.
 >> 
->> Allwinner R40 SoC features a USB OTG port and two USB HOST ports.
+>> Add the regulator node for it.
 >> 
->> Add support for the host ports in the DTSI file.
+>> Older revisions just have the 5V power output always on, and the GPIO
+>is
+>> reserved on these boards. So it won't affect the older revisions.
 >> 
->> The OTG controller still cannot work with existing compatibles, and
->needs
->> more investigation. So it's not added yet.
->> 
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 >> ---
->>  arch/arm/boot/dts/sun8i-r40.dtsi | 78
->++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 78 insertions(+)
+>>  arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts | 9 +++++++++
+>>  1 file changed, 9 insertions(+)
 >> 
->> diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi
->b/arch/arm/boot/dts/sun8i-r40.dtsi
->> index d5a6745409ae..f6c917cbbaac 100644
->> --- a/arch/arm/boot/dts/sun8i-r40.dtsi
->> +++ b/arch/arm/boot/dts/sun8i-r40.dtsi
->> @@ -173,6 +173,84 @@
->>  			#size-cells = <0>;
+>> diff --git a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
+>b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
+>> index 7b52608cebe6..035599d870b9 100644
+>> --- a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
+>> +++ b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
+>> @@ -78,6 +78,15 @@
 >>  		};
+>>  	};
 >>  
->> +		usbphy: phy at 1c13400 {
->> +			compatible = "allwinner,sun8i-r40-usb-phy";
->> +			reg = <0x01c13400 0x14>,
->> +			      <0x01c14800 0x4>,
->> +			      <0x01c19800 0x4>,
->> +			      <0x01c1c800 0x4>;
->> +			reg-names = "phy_ctrl",
->> +				    "pmu0",
->> +				    "pmu1",
->> +				    "pmu2";
->> +			clocks = <&ccu CLK_USB_PHY0>,
->> +				 <&ccu CLK_USB_PHY1>,
->> +				 <&ccu CLK_USB_PHY2>;
->> +			clock-names = "usb0_phy",
->> +				      "usb1_phy",
->> +				      "usb2_phy";
->> +			resets = <&ccu RST_USB_PHY0>,
->> +				 <&ccu RST_USB_PHY1>,
->> +				 <&ccu RST_USB_PHY2>;
->> +			reset-names = "usb0_reset",
->> +				      "usb1_reset",
->> +				      "usb2_reset";
->> +			status = "disabled";
->> +			#phy-cells = <1>;
->> +		};
->> +
->> +		ehci1: usb at 1c19000 {
->> +			compatible = "allwinner,sun8i-r40-ehci", "generic-ehci";
->> +			reg = <0x01c19000 0x100>;
+>> +	reg_vcc5v0: vcc5v0 {
+>> +		compatible = "regulator-fixed";
+>> +		regulator-name = "vcc5v0";
+>> +		regulator-min-microvolt = <5000000>;
+>> +		regulator-max-microvolt = <5000000>;
+>> +		gpio = <&pio 7 23 GPIO_ACTIVE_HIGH>; /* PH23 */
+>> +		enable-active-high;
 >
->What is the actual size here?
+>This is redundant with the GPIO flag
 
-The OHCI/EHCI/PHY-PHY three parts are listed in the user manual
-as one MMIO zone.
-
-The size can be at most 0x400, as the OHCI is at offset 0x400.
-
->
->> +			interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
->> +			clocks = <&ccu CLK_BUS_OHCI1>,
->> +				 <&ccu CLK_BUS_EHCI1>,
->> +				 <&ccu CLK_USB_OHCI1>;
->> +			resets = <&ccu RST_BUS_OHCI1>,
->> +				 <&ccu RST_BUS_EHCI1>;
->
->Why do you need to take the OHCI resources too?
-
-AW's strange design -- without OHCI resources taken EHCI
-won't work.
+I remember someone suggested me to add this
+property (maybe wens). It's said that the driver may not
+process the GPIO_ACTIVE_HIGH correctly.
 
 >
 >Maxime
