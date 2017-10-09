@@ -1,40 +1,73 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 09 Oct 2017 19:44:38 +0530
-Subject: [PATCH] PCI: exynos: remove redundant code in
- exynos_pcie_establish_link
-References: <CGME20171009141438epcas2p4ead7e2f2d1af7e0950f2c026e3a9943b@epcas2p4.samsung.com>
-Message-ID: <1507558478-3218-1-git-send-email-pankaj.dubey@samsung.com>
+From: b-liu@ti.com (Bin Liu)
+Date: Mon, 9 Oct 2017 09:23:02 -0500
+Subject: [PATCH] usb: musb: sunxi: Explicitly release USB PHY on exit
+In-Reply-To: <20170926113923.18181-1-net147@gmail.com>
+References: <20170926113923.18181-1-net147@gmail.com>
+Message-ID: <20171009142302.GB32614@uda0271908>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Anvesh Salveru <anvesh.s@samsung.com>
+Hi,
 
-In exynos_pcie_establish_link if driver is not using generic phy,
-we are resetting PHY twice, which is redundant, so this patch removes
-repeated lines of code for PHY reset.
+On Tue, Sep 26, 2017 at 09:39:23PM +1000, Jonathan Liu wrote:
+> This fixes a kernel oops when unloading the driver due to usb_put_phy
+> being called after usb_phy_generic_unregister when the device is
+> detached. Calling usb_phy_generic_unregister causes x->dev->driver to
+> be NULL in usb_put_phy and results in a NULL pointer dereference.
+> 
+> As we are now explicitly managing the lifetime of usb_phy,
+> devm_usb_get_phy is changed to usb_get_phy and we call usb_put_phy in
+> the probe error path.
+> 
+> Cc: stable at vger.kernel.org # v4.3+
+> Signed-off-by: Jonathan Liu <net147@gmail.com>
+> ---
+>  drivers/usb/musb/sunxi.c | 8 ++++++--
+>  1 file changed, 6 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
+> index c9a09b5bb6e5..8eed61042103 100644
+> --- a/drivers/usb/musb/sunxi.c
+> +++ b/drivers/usb/musb/sunxi.c
+> @@ -297,6 +297,8 @@ static int sunxi_musb_exit(struct musb *musb)
+>  	if (test_bit(SUNXI_MUSB_FL_HAS_SRAM, &glue->flags))
+>  		sunxi_sram_release(musb->controller->parent);
+>  
+> +	usb_put_phy(glue->xceiv);
 
-Signed-off-by: Anvesh Salveru <anvesh.s@samsung.com>
----
- drivers/pci/dwc/pci-exynos.c | 7 -------
- 1 file changed, 7 deletions(-)
+Will devm_usb_put_phy() solve the issue too? Then you don't need the
+changes in sunxi_musb_probe() below.
 
-diff --git a/drivers/pci/dwc/pci-exynos.c b/drivers/pci/dwc/pci-exynos.c
-index 5596fde..85d2f4b 100644
---- a/drivers/pci/dwc/pci-exynos.c
-+++ b/drivers/pci/dwc/pci-exynos.c
-@@ -423,13 +423,6 @@ static int exynos_pcie_establish_link(struct exynos_pcie *ep)
- 		exynos_pcie_deassert_phy_reset(ep);
- 		exynos_pcie_power_on_phy(ep);
- 		exynos_pcie_init_phy(ep);
--
--		/* pulse for common reset */
--		exynos_pcie_writel(ep->mem_res->block_base, 1,
--					PCIE_PHY_COMMON_RESET);
--		udelay(500);
--		exynos_pcie_writel(ep->mem_res->block_base, 0,
--					PCIE_PHY_COMMON_RESET);
- 	}
- 
- 	/* pulse for common reset */
--- 
-2.7.4
+> +
+>  	return 0;
+>  }
+>  
+> @@ -781,7 +783,7 @@ static int sunxi_musb_probe(struct platform_device *pdev)
+>  		return PTR_ERR(glue->usb_phy);
+>  	}
+>  
+> -	glue->xceiv = devm_usb_get_phy(&pdev->dev, USB_PHY_TYPE_USB2);
+> +	glue->xceiv = usb_get_phy(USB_PHY_TYPE_USB2);
+>  	if (IS_ERR(glue->xceiv)) {
+>  		ret = PTR_ERR(glue->xceiv);
+>  		dev_err(&pdev->dev, "Error getting usb-phy %d\n", ret);
+> @@ -803,11 +805,13 @@ static int sunxi_musb_probe(struct platform_device *pdev)
+>  	if (IS_ERR(glue->musb_pdev)) {
+>  		ret = PTR_ERR(glue->musb_pdev);
+>  		dev_err(&pdev->dev, "Error registering musb dev: %d\n", ret);
+> -		goto err_unregister_usb_phy;
+> +		goto err_put_usb_phy;
+>  	}
+>  
+>  	return 0;
+>  
+> +err_put_usb_phy:
+> +	usb_put_phy(glue->xceiv);
+>  err_unregister_usb_phy:
+>  	usb_phy_generic_unregister(glue->usb_phy);
+>  	return ret;
+> -- 
+> 2.13.2
+
+Regards,
+-Bin.
