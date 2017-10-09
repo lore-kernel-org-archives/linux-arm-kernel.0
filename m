@@ -1,72 +1,56 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Mon, 9 Oct 2017 10:58:42 +0800
-Subject: [PATCH v7 3/6] coresight: of: Use of_cpu_node_to_id helper
-In-Reply-To: <20171006103610.11853-4-suzuki.poulose@arm.com>
-References: <20171006103610.11853-1-suzuki.poulose@arm.com>
- <20171006103610.11853-4-suzuki.poulose@arm.com>
-Message-ID: <20171009025842.GA3146@leoy-linaro>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Mon, 9 Oct 2017 11:25:54 +0800
+Subject: [PATCH 12/12] dt-bindings: usb: mtu3: remove optional pinctrls
+In-Reply-To: <20171005223325.ryvu6ifjgcj5scf4@rob-hp-laptop>
+References: <fe8df8503f602586bcea4b1598eb09678b1525e3.1506509658.git.chunfeng.yun@mediatek.com>
+ <ec8e65205c6e0a83850e11c030ed440d7b9be2e8.1506509659.git.chunfeng.yun@mediatek.com>
+ <20171005223325.ryvu6ifjgcj5scf4@rob-hp-laptop>
+Message-ID: <1507519554.17567.65.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
-
-On Fri, Oct 06, 2017 at 11:36:07AM +0100, Suzuki K Poulose wrote:
-> Reuse the new generic helper, of_cpu_node_to_id() to map a
-> given CPU phandle to a logical CPU number.
+On Thu, 2017-10-05 at 17:33 -0500, Rob Herring wrote:
+> On Thu, Sep 28, 2017 at 08:17:20AM +0800, Chunfeng Yun wrote:
+> > Remove optional pinctrls due to using FORCE/RG_IDDIG to implement
+> > manual switch function.
 > 
-> Cc: Leo Yan <leo.yan@linaro.org>
-> Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-
-Tested-by: Leo Yan <leo.yan@linaro.org>
-
-BTW, I think the function get_cpu_for_node() in the file
-arch/arm64/kernel/topology.c we also can refactor with the same
-function, just reminding for this.
-
-> ---
-> Changes since V4:
->  - Fix a regression introduced in v4, reported by bugrobot
-> Changes since V3:
->  - Reflect the renaming of the helper and return value changes
-> ---
->  drivers/hwtracing/coresight/of_coresight.c | 15 +++------------
->  1 file changed, 3 insertions(+), 12 deletions(-)
+> Another not backwards compatible change. Please explain why that is 
+> okay.
+The old way of manual switch function uses the IDDIG pin (IDPIN) to
+switch mode between device and host indirectly by pulling up or pulling
+down it by driver. But there is a limitation, when the IDDIG pin is
+connected to the ground, the driver can't pull it up anymore, so it will
+fail when the receptacle is micro type.
+And there is no such limitation through FORCE/RG_IDDIG, because when the
+FORCE_IDDIG is set, the staus of RG_IDDIG is given higher priority than
+IDDIG pin. So it is okay no matter whether id_float and id_ground pins
+are provided or not.
+ 
 > 
-> diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
-> index a18794128bf8..7c375443ede6 100644
-> --- a/drivers/hwtracing/coresight/of_coresight.c
-> +++ b/drivers/hwtracing/coresight/of_coresight.c
-> @@ -104,26 +104,17 @@ static int of_coresight_alloc_memory(struct device *dev,
->  int of_coresight_get_cpu(const struct device_node *node)
->  {
->  	int cpu;
-> -	bool found;
-> -	struct device_node *dn, *np;
-> +	struct device_node *dn;
->  
->  	dn = of_parse_phandle(node, "cpu", 0);
-> -
->  	/* Affinity defaults to CPU0 */
->  	if (!dn)
->  		return 0;
-> -
-> -	for_each_possible_cpu(cpu) {
-> -		np = of_cpu_device_node_get(cpu);
-> -		found = (dn == np);
-> -		of_node_put(np);
-> -		if (found)
-> -			break;
-> -	}
-> +	cpu = of_cpu_node_to_id(dn);
->  	of_node_put(dn);
->  
->  	/* Affinity to CPU0 if no cpu nodes are found */
-> -	return found ? cpu : 0;
-> +	return (cpu < 0) ? 0 : cpu;
->  }
->  EXPORT_SYMBOL_GPL(of_coresight_get_cpu);
->  
-> -- 
-> 2.13.6
-> 
+> > 
+> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> > ---
+> >  .../devicetree/bindings/usb/mediatek,mtu3.txt      |    7 ++++---
+> >  1 file changed, 4 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/usb/mediatek,mtu3.txt b/Documentation/devicetree/bindings/usb/mediatek,mtu3.txt
+> > index 49c982b..b2271d8 100644
+> > --- a/Documentation/devicetree/bindings/usb/mediatek,mtu3.txt
+> > +++ b/Documentation/devicetree/bindings/usb/mediatek,mtu3.txt
+> > @@ -30,9 +30,10 @@ Optional properties:
+> >  	when supports dual-role mode.
+> >   - vbus-supply : reference to the VBUS regulator, needed when supports
+> >  	dual-role mode.
+> > - - pinctl-names : a pinctrl state named "default" must be defined,
+> > -	"id_float" and "id_ground" are optinal which depends on
+> > -	"mediatek,enable-manual-drd"
+> > + - pinctrl-names : a pinctrl state named "default" is optional, and need be
+> > +	defined if auto drd switch is enabled, that means the property dr_mode
+> > +	is set as "otg", and meanwhile the property "mediatek,enable-manual-drd"
+> > +	is not set.
+> >   - pinctrl-0 : pin control group
+> >  	See: Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+> >  
+> > -- 
+> > 1.7.9.5
+> > 
