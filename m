@@ -1,70 +1,57 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 9 Oct 2017 13:20:37 +0100
-Subject: [PATCH] nvmem: sunxi-sid: add support for A64/H5's SID controller
-In-Reply-To: <20170919082019.6bopwauso4mbslqo@flea.lan>
-References: <20170918154204.54427-1-icenowy@aosc.io>
- <20170919082019.6bopwauso4mbslqo@flea.lan>
-Message-ID: <6c9c7797-8b6a-39fd-267c-82d89f71cb67@linaro.org>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 09 Oct 2017 14:21:38 +0200
+Subject: iMX6 PCIE IRQ not working with ath9k based Wifi
+In-Reply-To: <d20644ba-0e1b-0fb4-41ba-d1d604800382@tubby.org>
+References: <348346fa-1d70-1d08-9a32-18b660328e4f@tubby.org>
+ <CAK8P3a0bF7=bbWBS9+7uBYp+yGpDUfS_QCX6K4i3WJv9mbgvEA@mail.gmail.com>
+ <d20644ba-0e1b-0fb4-41ba-d1d604800382@tubby.org>
+Message-ID: <1507551698.2745.1.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Mike,
 
+Am Montag, den 09.10.2017, 12:56 +0100 schrieb Mike Tubby:
 
-On 19/09/17 09:20, Maxime Ripard wrote:
-> On Mon, Sep 18, 2017 at 11:42:04PM +0800, Icenowy Zheng wrote:
->> Allwinner A64/H5 SoCs come with a SID controller like the one in H3, but
->> without the silicon bug that makes the initial value at 0x200 wrong, so
->> the value at 0x200 can be directly read.
->>
->> Add support for this kind of SID controller.
->>
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> ---
->>   Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt | 1 +
->>   drivers/nvmem/sunxi_sid.c                                       | 6 ++++++
->>   2 files changed, 7 insertions(+)
+[...]
 
-
-TBH, I don't fully understand the soc specifics here, but if you want me 
-to queue this patch, I would need an ack from Maxime.
-
-
-thanks,
-srini
-
-
-
->>
->> diff --git a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
->> index ef06d061913c..6ea0836939ee 100644
->> --- a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
->> +++ b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
->> @@ -5,6 +5,7 @@ Required properties:
->>     "allwinner,sun4i-a10-sid"
->>     "allwinner,sun7i-a20-sid"
->>     "allwinner,sun8i-h3-sid"
->> +  "allwinner,sun50i-a64-sid"
->>   
->>   - reg: Should contain registers location and length
->>   
->> diff --git a/drivers/nvmem/sunxi_sid.c b/drivers/nvmem/sunxi_sid.c
->> index 0d6648be93b8..3c9fd4fb9207 100644
->> --- a/drivers/nvmem/sunxi_sid.c
->> +++ b/drivers/nvmem/sunxi_sid.c
->> @@ -199,10 +199,16 @@ static const struct sunxi_sid_cfg sun8i_h3_cfg = {
->>   	.need_register_readout = true,
->>   };
->>   
->> +static const struct sunxi_sid_cfg sun50i_a64_cfg = {
->> +	.value_offset = 0x200,
->> +	.size = 0x100,
->> +};
->> +
+> If I understand correctly the ath9k driver in kernel 4.1.15 we're
+> using?
+> doesn't enable MSI - so I assume that there is some backwards?
+> compatibility mode that then is not working because MSI is enabled
+> at?
+> the CPU end, and hence the patch you referred to is used to turn this
+> off.
 > 
-> How did you get those values?
+> At the same time on the mailing list:
 > 
-> Also, it's reported that the SID can only be accessed in secure mode,
-> did you test it?
+> https://www.mail-archive.com/ath9k-devel at lists.ath9k.org/msg14332.htm
+> l
 > 
-> Maxime
+> which is part of:
 > 
+> ???? https://wireless.wiki.kernel.org/en/users/Drivers/ath9k
+> 
+> there is talk of a patch to the ath9k driver to properly implement
+> MSI?
+> in the updated driver in kernel 4.6
+> 
+> So, for us the question is which way to head:
+> 
+> ???? a) disable MSI at the CPU and try to use legacy; or
+> 
+> ???? b) update the ath9k driver to try and enable MSI ?
+> 
+> 
+> We will also check the DTS/DTB in case something is mis-assigned.
+
+Due to a design flaw of the DWC host controller, legacy IRQs (like the
+ones used by ath9k) won't work if any MSIs are enabled on the
+controller.
+
+You can take a look at my series "[PATCH 0/3] DWC host without MSI
+controller", which works around this, but still needs some rework for
+mainline.
+
+Regards,
+Lucas
