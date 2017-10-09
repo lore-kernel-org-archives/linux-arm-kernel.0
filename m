@@ -1,56 +1,120 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 9 Oct 2017 17:47:18 +0100
-Subject: [PATCH v3 06/20] KVM: arm/arm64: Check that system supports split
- eoi/deactivate
-In-Reply-To: <20170923004207.22356-7-cdall@linaro.org>
-References: <20170923004207.22356-1-cdall@linaro.org>
- <20170923004207.22356-7-cdall@linaro.org>
-Message-ID: <edc875ee-335c-56c1-0cbc-9e45f7915529@arm.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Mon,  9 Oct 2017 11:46:55 -0500
+Subject: [PATCH v3] irqchip/gicv3-its: Add missing changes to support 52bit
+ physical address
+Message-ID: <1507567615-4240-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/09/17 01:41, Christoffer Dall wrote:
-> Some systems without proper firmware and/or hardware description data
-> don't support the split EOI and deactivate operation.
-> 
-> On such systems, we cannot leave the physical interrupt active after the
-> timer handler on the host has run, so we cannot support KVM with an
-> in-kernel GIC with the timer changes we are about to introduce.
-> 
-> This patch makes sure that trying to initialize the KVM GIC code will
-> fail on such systems.
-> 
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> ---
->  drivers/irqchip/irq-gic.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index f641e8e..ab12bf4 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -1420,7 +1420,8 @@ static void __init gic_of_setup_kvm_info(struct device_node *node)
->  	if (ret)
->  		return;
->  
-> -	gic_set_kvm_info(&gic_v2_kvm_info);
-> +	if (static_key_true(&supports_deactivate))
-> +		gic_set_kvm_info(&gic_v2_kvm_info);
->  }
->  
->  int __init
-> 
+The current ITS driver works fine as long as normal memory and GICR
+regions are located within the lower 48bit (>=0 && <2^48) physical
+address space. Some of the registers GICR_PEND/PROP, GICR_VPEND/VPROP
+and GITS_CBASER are handled properly but not all when configuring
+the hardware with 52bit physical address.
 
-Should we add the same level of checking on the ACPI path, just for the
-sake symmetry?
+This patch does the following changes to support 52bit PA.
+  -Handle 52bit PA in GITS_BASERn.
+  -Fix ITT_addr width to 52bits, bits[51:8].
+  -Fix RDbase width to 52bits, bits[51:16].
+  -Fix VPT_addr width to 52bits, bits[51:16].
 
-Also, do we need to add the same thing for GICv3?
+Definition of the GITS_BASERn register when ITS PageSize is 64KB:
+  -Bits[47:16] of the register provide bits[47:16] of the table PA.
+  -Bits[15:12] of the register provide bits[51:48] of the table PA.
+  -Bits[15:00] of the base physical address are 0.
 
-Otherwise looks OK to me.
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+---
+Changes since v2:
+  -Few more changes from Marc's comments in v1 patch.
+Changes since v1:
+  -Included Marc's suggestion and warn in case of not supporting 52bit PA.
 
-Thanks,
+ drivers/irqchip/irq-gic-v3-its.c   | 26 +++++++++++++++++++++-----
+ include/linux/irqchip/arm-gic-v3.h |  2 ++
+ 2 files changed, 23 insertions(+), 5 deletions(-)
 
-	M.
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 7b98313..4b598b6 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -315,7 +315,7 @@ static void its_encode_size(struct its_cmd_block *cmd, u8 size)
+ 
+ static void its_encode_itt(struct its_cmd_block *cmd, u64 itt_addr)
+ {
+-	its_mask_encode(&cmd->raw_cmd[2], itt_addr >> 8, 50, 8);
++	its_mask_encode(&cmd->raw_cmd[2], itt_addr >> 8, 51, 8);
+ }
+ 
+ static void its_encode_valid(struct its_cmd_block *cmd, int valid)
+@@ -325,7 +325,7 @@ static void its_encode_valid(struct its_cmd_block *cmd, int valid)
+ 
+ static void its_encode_target(struct its_cmd_block *cmd, u64 target_addr)
+ {
+-	its_mask_encode(&cmd->raw_cmd[2], target_addr >> 16, 50, 16);
++	its_mask_encode(&cmd->raw_cmd[2], target_addr >> 16, 51, 16);
+ }
+ 
+ static void its_encode_collection(struct its_cmd_block *cmd, u16 col)
+@@ -365,7 +365,7 @@ static void its_encode_its_list(struct its_cmd_block *cmd, u16 its_list)
+ 
+ static void its_encode_vpt_addr(struct its_cmd_block *cmd, u64 vpt_pa)
+ {
+-	its_mask_encode(&cmd->raw_cmd[3], vpt_pa >> 16, 50, 16);
++	its_mask_encode(&cmd->raw_cmd[3], vpt_pa >> 16, 51, 16);
+ }
+ 
+ static void its_encode_vpt_size(struct its_cmd_block *cmd, u8 vpt_size)
+@@ -1510,9 +1510,9 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+ 	u64 val = its_read_baser(its, baser);
+ 	u64 esz = GITS_BASER_ENTRY_SIZE(val);
+ 	u64 type = GITS_BASER_TYPE(val);
++	u64 baser_phys, tmp;
+ 	u32 alloc_pages;
+ 	void *base;
+-	u64 tmp;
+ 
+ retry_alloc_baser:
+ 	alloc_pages = (PAGE_ORDER_TO_SIZE(order) / psz);
+@@ -1528,8 +1528,24 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+ 	if (!base)
+ 		return -ENOMEM;
+ 
++	baser_phys = virt_to_phys(base);
++
++	/* Check if the physical address of the memory is above 48bits */
++	if (IS_ENABLED(CONFIG_ARM64_64K_PAGES) && (baser_phys >> 48)) {
++
++		/* 52bit PA is supported only when PageSize=64K */
++		if (psz != SZ_64K) {
++			pr_err("ITS: no 52bit PA support when psz=%d\n", psz);
++			free_pages((unsigned long)base, order);
++			return -ENXIO;
++		}
++
++		/* Convert 52bit PA to 48bit field */
++		baser_phys = GITS_BASER_PHYS_52_to_48(baser_phys);
++	}
++
+ retry_baser:
+-	val = (virt_to_phys(base)				 |
++	val = (baser_phys					 |
+ 		(type << GITS_BASER_TYPE_SHIFT)			 |
+ 		((esz - 1) << GITS_BASER_ENTRY_SIZE_SHIFT)	 |
+ 		((alloc_pages - 1) << GITS_BASER_PAGES_SHIFT)	 |
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index dfa4a51..6412f91 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -372,6 +372,8 @@
+ #define GITS_BASER_ENTRY_SIZE_SHIFT		(48)
+ #define GITS_BASER_ENTRY_SIZE(r)	((((r) >> GITS_BASER_ENTRY_SIZE_SHIFT) & 0x1f) + 1)
+ #define GITS_BASER_ENTRY_SIZE_MASK	GENMASK_ULL(52, 48)
++#define GITS_BASER_PHYS_52_to_48(phys)					\
++	(((phys) & GENMASK_ULL(47, 16)) | (((phys) >> 48) & 0xf) << 12)
+ #define GITS_BASER_SHAREABILITY_SHIFT	(10)
+ #define GITS_BASER_InnerShareable					\
+ 	GIC_BASER_SHAREABILITY(GITS_BASER, InnerShareable)
 -- 
-Jazz is not dead. It just smells funny...
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
