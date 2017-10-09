@@ -1,52 +1,69 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 9 Oct 2017 08:52:35 -0500
-Subject: [PATCH v3 03/22] dt-bindings: arm: scmi: add ARM MHU specific
- mailbox client bindings
-In-Reply-To: <CABb+yY2v8D9NFVsG9OwSpL8cswKihY6OUru8QA6Jfq5YmVVD7A@mail.gmail.com>
-References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
- <1506604306-20739-4-git-send-email-sudeep.holla@arm.com>
- <20171005232031.7373ni5ssln4wlpr@rob-hp-laptop>
- <CABb+yY1ra5bgRB1VND+NvCcDFqfggG04a+JPWFZ+HpNg08eR8g@mail.gmail.com>
- <CAL_Jsq+0paGePmJVjsyFJiHx0UaDPjQrbe3C030U+fuUkWCJ+A@mail.gmail.com>
- <CABb+yY2v8D9NFVsG9OwSpL8cswKihY6OUru8QA6Jfq5YmVVD7A@mail.gmail.com>
-Message-ID: <CAL_JsqKy+WzEiHRS0BrE3_3Md4CGOr0e2ZZ_vBCB-Opgg49s+A@mail.gmail.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Mon, 09 Oct 2017 15:07:23 +0100
+Subject: [PATCH v2 26/28] arm64/sve: Add documentation
+In-Reply-To: <20171009094930.GD3611@e103592.cambridge.arm.com>
+References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
+ <1504198860-12951-27-git-send-email-Dave.Martin@arm.com>
+ <59D7A4AF.40408@arm.com> <20171006173715.GC3611@e103592.cambridge.arm.com>
+ <878tgkbr6m.fsf@linaro.org> <20171009094930.GD3611@e103592.cambridge.arm.com>
+Message-ID: <87376sbejo.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 6, 2017 at 9:26 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
-> On Fri, Oct 6, 2017 at 9:24 PM, Rob Herring <robh@kernel.org> wrote:
->> On Fri, Oct 6, 2017 at 6:01 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->>> On Fri, Oct 6, 2017 at 4:50 AM, Rob Herring <robh@kernel.org> wrote:
->>>> On Thu, Sep 28, 2017 at 02:11:27PM +0100, Sudeep Holla wrote:
->
->>>>
->>>>> +- mbox-data : For each phandle listed in mboxes property, an unsigned 32-bit
->>>>> +           data as expected by the mailbox controller
->>>>
->>>> Shouldn't that be cells as part of mboxes property?
->>>>
->>> A MHU client can send any number of commands (such u32 values) over a channel.
->>> This client (SCMI) sends just one command over a channel, but other
->>> clients may/do send two or more.
 
-The above definition doesn't support 2 or more as it is 1-1 with channels.
+Dave Martin <Dave.Martin@arm.com> writes:
 
->> Okay, then I guess I don't understand why this is in DT.
+> On Mon, Oct 09, 2017 at 10:34:25AM +0100, Alex Benn?e wrote:
 >>
-> Yeah the client has to provide code (u32 value) for the commands it
-> sends, and that value is going to be platform specific. For example,
-> on Juno the ITS_AN_SCMI_COMMAND may be defined as BIT(7) while on my
-> platform it may be 0x4567
+>> Dave Martin <Dave.Martin@arm.com> writes:
+>>
+>> > On Fri, Oct 06, 2017 at 04:43:43PM +0100, Szabolcs Nagy wrote:
+>> >> On 31/08/17 18:00, Dave Martin wrote:
+>> >> > +9.  System runtime configuration
+>> >> > +--------------------------------
+>> >> > +
+>> >> > +* To mitigate the ABI impact of expansion of the signal frame, a policy
+>> >> > +  mechanism is provided for administrators, distro maintainers and developers
+>> >> > +  to set the default vector length for userspace processes:
+>> >> > +
+>> >> > +/proc/cpu/sve_default_vector_length
+>> >>
+>> >>
+>> >> elsewhere in the patch series i see
+>> >>
+>> >> /proc/sys/abi/sve_default_vector_length
+>> >>
+>> >> is this supposed to be the same?
+>> >
+>> > Good spot, thanks!
+>> >
+>> > /proc/cpu/ was the old location: they should both say /proc/abi/.
+>> > I'll fix it.
+>>
+>> Isn't /sys (or rather sysfs) the preferred location for modern control
+>> knobs that mirror the kernels object model or is SVE a special case for
+>> extending /proc?
 >
-> For MHU based platforms, it becomes easy if the u32 is passed from DT.
-> And that should be ok since that is like a h/w parameter - a value
-> chosen/expected by the remote firmware.
+> I couldn't figure out which kernel object this maps to.  There's no
+> device, no driver.  This isn't even per-cpu.
 
-Could it ever be more than 1 cell?
+Hmm I can see:
 
-I guess being in DT is fine, but I'm still not sure about the naming.
-The current name suggests it is part of the mbox binding. Do we want
-that or should it be SCMI specific? Then "data" is vague. Perhaps
-"scmi-commands"?
+  /sys/devices/system/cpu
 
-Rob
+On both my x86 and arm64 systems - but I guess this is more ABIish than
+CPU feature related.
+
+> sysctl is already used for similar knobs to this one, so I followed that
+> precedent -- though if someone argues strongly enough it could be
+> changed.
+>
+> Are there already examples of arch controls like this in sysfs?  I
+> wasn't aware of any, but I didn't look all that hard...
+
+Given the paucity of the /proc/sys/abi on both systems I guess this sort
+of knob is rare enough that people haven't expressed a strong preference
+for sysfs here. I have no objection to staying with /proc/sys/abi/.
+
+--
+Alex Benn?e
