@@ -1,72 +1,103 @@
-From: jingoohan1@gmail.com (Jingoo Han)
-Date: Mon, 9 Oct 2017 12:20:23 -0400
-Subject: [PATCH] PCI: exynos: remove redundant code in
- exynos_pcie_establish_link
-In-Reply-To: <CAJKOXPeC=cS2cvAXHrKuK5F4tEqH6PppwYkxC+Z8+5D--48CAg@mail.gmail.com>
-References: <CGME20171009141438epcas2p4ead7e2f2d1af7e0950f2c026e3a9943b@epcas2p4.samsung.com>
- <1507558478-3218-1-git-send-email-pankaj.dubey@samsung.com>
- <CAJKOXPeC=cS2cvAXHrKuK5F4tEqH6PppwYkxC+Z8+5D--48CAg@mail.gmail.com>
-Message-ID: <000a01d3411a$82eea770$88cbf650$@gmail.com>
+From: mike@tubby.org (Mike Tubby)
+Date: Mon, 9 Oct 2017 17:20:39 +0100
+Subject: iMX6 PCIE IRQ not working with ath9k based Wifi
+In-Reply-To: <CAJ+vNU0=+H9ED7TXwJv4VjymFD7ArnUq9NhMQVJdPtSdAe=xKw@mail.gmail.com>
+References: <348346fa-1d70-1d08-9a32-18b660328e4f@tubby.org>
+ <CAK8P3a0bF7=bbWBS9+7uBYp+yGpDUfS_QCX6K4i3WJv9mbgvEA@mail.gmail.com>
+ <d20644ba-0e1b-0fb4-41ba-d1d604800382@tubby.org>
+ <1507551698.2745.1.camel@pengutronix.de>
+ <CAJ+vNU0=+H9ED7TXwJv4VjymFD7ArnUq9NhMQVJdPtSdAe=xKw@mail.gmail.com>
+Message-ID: <625870fe-37b7-161b-216f-b1e8c60331d1@tubby.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, October 9, 2017 10:44 AM, Krzysztof Kozlowski wrote:
-> 
-> On Mon, Oct 9, 2017 at 4:14 PM, Pankaj Dubey <pankaj.dubey@samsung.com>
-> wrote:
-> > From: Anvesh Salveru <anvesh.s@samsung.com>
-> >
-> > In exynos_pcie_establish_link if driver is not using generic phy,
-> > we are resetting PHY twice, which is redundant, so this patch removes
-> 
-> Hi Pankaj,
-> 
-> This lacks the information why it is redundant.
 
-(I resend this mail, because email address of pci list was corrupted.)
 
-I think so, too.
+On 10/9/2017 3:53 PM, Tim Harvey wrote:
+> On Mon, Oct 9, 2017 at 5:21 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
+>> Hi Mike,
+>>
+>> Am Montag, den 09.10.2017, 12:56 +0100 schrieb Mike Tubby:
+>>
+>> [...]
+>>
+>>> If I understand correctly the ath9k driver in kernel 4.1.15 we're
+>>> using
+>>> doesn't enable MSI - so I assume that there is some backwards
+>>> compatibility mode that then is not working because MSI is enabled
+>>> at
+>>> the CPU end, and hence the patch you referred to is used to turn this
+>>> off.
+>>>
+>>> At the same time on the mailing list:
+>>>
+>>> https://www.mail-archive.com/ath9k-devel at lists.ath9k.org/msg14332.htm
+>>> l
+>>>
+>>> which is part of:
+>>>
+>>>       https://wireless.wiki.kernel.org/en/users/Drivers/ath9k
+>>>
+>>> there is talk of a patch to the ath9k driver to properly implement
+>>> MSI
+>>> in the updated driver in kernel 4.6
+>>>
+>>> So, for us the question is which way to head:
+>>>
+>>>       a) disable MSI at the CPU and try to use legacy; or
+>>>
+>>>       b) update the ath9k driver to try and enable MSI ?
+>>>
+>>>
+>>> We will also check the DTS/DTB in case something is mis-assigned.
+>> Due to a design flaw of the DWC host controller, legacy IRQs (like the
+>> ones used by ath9k) won't work if any MSIs are enabled on the
+>> controller.
+>>
+>> You can take a look at my series "[PATCH 0/3] DWC host without MSI
+>> controller", which works around this, but still needs some rework for
+>> mainline.
+>>
+>> Regards,
+>> Lucas
+> Mike,
+>
+> Yes, this is exactly the scenario I keep pointing out. The ath9k
+> card/drivers requires legacy interrupts which won't work when MSI is
+> used on the DWC host controller used on the IMX6. I don't know what
+> other cards/drivers require legacy interrupts... perhaps they are not
+> that popular as this issue has lingered for a while.
+>
+> The patch series Lucas created disables MSI via the device-tree for
+> IMX6 and is what you need: https://patchwork.ozlabs.org/cover/806603/.
+> The patch series is not accepted yet and will be tweaked a bit (to do
+> the same for the other SoC's that use the DWC controller, not just
+> IMX6) but for IMX6 it works fine on top of a 4.13 kernel.
+>
+> I see from your original post you are using a 4.1 kernel. For Linux
+> 4.6 and prior you can disable MSI at kernel build time but from 4.7
+> onward it takes a bit more hacking.
+>
+> Tim
 
-Did you test this code on some boards with Exynos PCIe?
-Or did hardware engineers confirm this?
-Please add more information on this patch.
+Hi Tim,
 
-Best regards,
-Jingoo Han
+Thanks for the reply.
 
-> 
-> > repeated lines of code for PHY reset.
-> >
-> > Signed-off-by: Anvesh Salveru <anvesh.s@samsung.com>
-> 
-> Your Signed-off-by is needed here.
-> 
-> Best regards,
-> Krzysztof
-> 
-> > ---
-> >  drivers/pci/dwc/pci-exynos.c | 7 -------
-> >  1 file changed, 7 deletions(-)
-> >
-> > diff --git a/drivers/pci/dwc/pci-exynos.c b/drivers/pci/dwc/pci-exynos.c
-> > index 5596fde..85d2f4b 100644
-> > --- a/drivers/pci/dwc/pci-exynos.c
-> > +++ b/drivers/pci/dwc/pci-exynos.c
-> > @@ -423,13 +423,6 @@ static int exynos_pcie_establish_link(struct
-> exynos_pcie *ep)
-> >                 exynos_pcie_deassert_phy_reset(ep);
-> >                 exynos_pcie_power_on_phy(ep);
-> >                 exynos_pcie_init_phy(ep);
-> > -
-> > -               /* pulse for common reset */
-> > -               exynos_pcie_writel(ep->mem_res->block_base, 1,
-> > -                                       PCIE_PHY_COMMON_RESET);
-> > -               udelay(500);
-> > -               exynos_pcie_writel(ep->mem_res->block_base, 0,
-> > -                                       PCIE_PHY_COMMON_RESET);
-> >         }
-> >
-> >         /* pulse for common reset */
-> > --
-> > 2.7.4
-> >
+We're using the 4.1.15 kernel because its what we were given in the 
+BSP.? I note that NXP/Freescale now have a 4.9.11 kernel officially 
+supported - I'm just downloading it to have a look at.
+
+I've also found a Qualcom provided update to the ath9k driver to add MSI 
+support:
+
+ ??? https://patchwork.kernel.org/patch/9971077/
+
+which is only 2 weeks old - so perhaps they've finally got round to 
+fixing it as well and perhaps we can use MSI with the ath9k and not go 
+around disabling it all over the place ;-)
+
+I would be interested if you can get a 4.9.11 or later kernel going with 
+the updated ath9k driver and using MSI ...
+
+Mike
