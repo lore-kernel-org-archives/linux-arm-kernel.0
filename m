@@ -1,97 +1,138 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 9 Oct 2017 18:34:45 +0100
-Subject: [PATCH v3 10/20] KVM: arm/arm64: Move timer/vgic flush/sync under
- disabled irq
-In-Reply-To: <20170923004207.22356-11-cdall@linaro.org>
-References: <20170923004207.22356-1-cdall@linaro.org>
- <20170923004207.22356-11-cdall@linaro.org>
-Message-ID: <512939dd-1f04-f653-d069-e468936eeabb@arm.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Mon,  9 Oct 2017 18:41:32 +0100
+Subject: [PATCH v2] arm64: Expose support for optional ARMv8-A features
+Message-ID: <20171009174132.24501-1-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/09/17 01:41, Christoffer Dall wrote:
-> As we are about to play tricks with the timer to be more lazy in saving
-> and restoring state, we need to move the timer sync and flush functions
-> under a disabled irq section and since we have to flush the vgic state
-> after the timer and PMU state, we do the whole flush/sync sequence with
-> disabled irqs.
-> 
-> The only downside is a slightly longer delay before being able to
-> process hardware interrupts and run softirqs.
-> 
-> Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> ---
->  virt/kvm/arm/arm.c | 26 +++++++++++++-------------
->  1 file changed, 13 insertions(+), 13 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> index b9f68e4..27db222 100644
-> --- a/virt/kvm/arm/arm.c
-> +++ b/virt/kvm/arm/arm.c
-> @@ -654,11 +654,11 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  
->  		kvm_pmu_flush_hwstate(vcpu);
->  
-> +		local_irq_disable();
-> +
->  		kvm_timer_flush_hwstate(vcpu);
->  		kvm_vgic_flush_hwstate(vcpu);
->  
-> -		local_irq_disable();
-> -
->  		/*
->  		 * If we have a singal pending, or need to notify a userspace
->  		 * irqchip about timer or PMU level changes, then we exit (and
-> @@ -683,10 +683,10 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm) ||
->  		    kvm_request_pending(vcpu)) {
->  			vcpu->mode = OUTSIDE_GUEST_MODE;
-> -			local_irq_enable();
->  			kvm_pmu_sync_hwstate(vcpu);
->  			kvm_timer_sync_hwstate(vcpu);
->  			kvm_vgic_sync_hwstate(vcpu);
-> +			local_irq_enable();
->  			preempt_enable();
->  			continue;
->  		}
-> @@ -710,6 +710,16 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  		kvm_arm_clear_debug(vcpu);
->  
->  		/*
-> +		 * We must sync the PMU and timer state before the vgic state so
-> +		 * that the vgic can properly sample the updated state of the
-> +		 * interrupt line.
-> +		 */
-> +		kvm_pmu_sync_hwstate(vcpu);
-> +		kvm_timer_sync_hwstate(vcpu);
-> +
-> +		kvm_vgic_sync_hwstate(vcpu);
-> +
-> +		/*
->  		 * We may have taken a host interrupt in HYP mode (ie
->  		 * while executing the guest). This interrupt is still
->  		 * pending, as we haven't serviced it yet!
-> @@ -732,16 +742,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  		guest_exit();
->  		trace_kvm_exit(ret, kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
->  
-> -		/*
-> -		 * We must sync the PMU and timer state before the vgic state so
-> -		 * that the vgic can properly sample the updated state of the
-> -		 * interrupt line.
-> -		 */
-> -		kvm_pmu_sync_hwstate(vcpu);
-> -		kvm_timer_sync_hwstate(vcpu);
-> -
-> -		kvm_vgic_sync_hwstate(vcpu);
-> -
->  		preempt_enable();
->  
->  		ret = handle_exit(vcpu, run, ret);
-> 
+ARMv8-A adds a few optional features for ARMv8.2 and ARMv8.3.
+Expose them to the userspace via HWCAPs and mrs emulation.
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+SHA2-512  - Instruction support for SHA512 Has algorithm (e.g SHA512H,
+	    SHA512H2, SHA512U0, SHA512SU1)
+SHA3 	  - SHA3 crypto instructions (EOR3, RAX1, XAR, BCAX).
+SM3	  - Instruction support for Chinese cryptography algorithm SM3
+SM4 	  - Instruction support for Chinese cryptography algorithm SM4
+DP	  - Dot Product instructions (UDOT, SDOT).
 
-	M.
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Dave Martin <dave.martin@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+
+---
+Changes since V1
+ - Expose SHA512, SHA3, SM3 and SM4
+---
+ Documentation/arm64/cpu-feature-registers.txt | 12 +++++++++++-
+ arch/arm64/include/asm/sysreg.h               |  4 ++++
+ arch/arm64/include/uapi/asm/hwcap.h           |  5 +++++
+ arch/arm64/kernel/cpufeature.c                |  9 +++++++++
+ arch/arm64/kernel/cpuinfo.c                   |  5 +++++
+ 5 files changed, 34 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/arm64/cpu-feature-registers.txt b/Documentation/arm64/cpu-feature-registers.txt
+index dad411d635d8..011ddfc1e570 100644
+--- a/Documentation/arm64/cpu-feature-registers.txt
++++ b/Documentation/arm64/cpu-feature-registers.txt
+@@ -110,10 +110,20 @@ infrastructure:
+      x--------------------------------------------------x
+      | Name                         |  bits   | visible |
+      |--------------------------------------------------|
+-     | RES0                         | [63-32] |    n    |
++     | RES0                         | [63-48] |    n    |
++     |--------------------------------------------------|
++     | DP                           | [47-44] |    y    |
++     |--------------------------------------------------|
++     | SM4                          | [43-40] |    y    |
++     |--------------------------------------------------|
++     | SM3                          | [39-36] |    y    |
++     |--------------------------------------------------|
++     | SHA3                         | [35-32] |    y    |
+      |--------------------------------------------------|
+      | RDM                          | [31-28] |    y    |
+      |--------------------------------------------------|
++     | RES0                         | [27-24] |    n    |
++     |--------------------------------------------------|
+      | ATOMICS                      | [23-20] |    y    |
+      |--------------------------------------------------|
+      | CRC32                        | [19-16] |    y    |
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index f707fed5886f..32f489ba952f 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -318,6 +318,10 @@
+ #define SCTLR_EL1_CP15BEN	(1 << 5)
+ 
+ /* id_aa64isar0 */
++#define ID_AA64ISAR0_DP_SHIFT		44
++#define ID_AA64ISAR0_SM4_SHIFT		40
++#define ID_AA64ISAR0_SM3_SHIFT		36
++#define ID_AA64ISAR0_SHA3_SHIFT		32
+ #define ID_AA64ISAR0_RDM_SHIFT		28
+ #define ID_AA64ISAR0_ATOMICS_SHIFT	20
+ #define ID_AA64ISAR0_CRC32_SHIFT	16
+diff --git a/arch/arm64/include/uapi/asm/hwcap.h b/arch/arm64/include/uapi/asm/hwcap.h
+index 4b9344cba83a..a4bad90a3fa3 100644
+--- a/arch/arm64/include/uapi/asm/hwcap.h
++++ b/arch/arm64/include/uapi/asm/hwcap.h
+@@ -36,5 +36,10 @@
+ #define HWCAP_FCMA		(1 << 14)
+ #define HWCAP_LRCPC		(1 << 15)
+ #define HWCAP_DCPOP		(1 << 16)
++#define HWCAP_SHA3		(1 << 17)
++#define HWCAP_SM3		(1 << 18)
++#define HWCAP_SM4		(1 << 19)
++#define HWCAP_ASIMDDP		(1 << 20)
++#define HWCAP_SHA512		(1 << 21)
+ 
+ #endif /* _UAPI__ASM_HWCAP_H */
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 21e2c95d24e7..8f0ec2b62cf1 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -107,6 +107,10 @@ cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry, int __unused)
+  * sync with the documentation of the CPU feature register ABI.
+  */
+ static const struct arm64_ftr_bits ftr_id_aa64isar0[] = {
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_DP_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_SM4_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_SM3_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_SHA3_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_ATOMICS_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_CRC32_SHIFT, 4, 0),
+@@ -921,9 +925,14 @@ static const struct arm64_cpu_capabilities arm64_elf_hwcaps[] = {
+ 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_AES_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_AES),
+ 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SHA1_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_SHA1),
+ 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SHA2_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_SHA2),
++	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SHA2_SHIFT, FTR_UNSIGNED, 2, CAP_HWCAP, HWCAP_SHA512),
+ 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_CRC32_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_CRC32),
+ 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_ATOMICS_SHIFT, FTR_UNSIGNED, 2, CAP_HWCAP, HWCAP_ATOMICS),
+ 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_RDM_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_ASIMDRDM),
++	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SHA3_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_SHA3),
++	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SM3_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_SM3),
++	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SM4_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_SM4),
++	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_DP_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_ASIMDDP),
+ 	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_FP_SHIFT, FTR_SIGNED, 0, CAP_HWCAP, HWCAP_FP),
+ 	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_FP_SHIFT, FTR_SIGNED, 1, CAP_HWCAP, HWCAP_FPHP),
+ 	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_ASIMD_SHIFT, FTR_SIGNED, 0, CAP_HWCAP, HWCAP_ASIMD),
+diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+index 311885962830..1ff1c5a67081 100644
+--- a/arch/arm64/kernel/cpuinfo.c
++++ b/arch/arm64/kernel/cpuinfo.c
+@@ -69,6 +69,11 @@ static const char *const hwcap_str[] = {
+ 	"fcma",
+ 	"lrcpc",
+ 	"dcpop",
++	"sha3",
++	"sm3",
++	"sm4",
++	"asimddp",
++	"sha512",
+ 	NULL
+ };
+ 
 -- 
-Jazz is not dead. It just smells funny...
+2.13.6
