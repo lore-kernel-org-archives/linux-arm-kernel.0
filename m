@@ -1,33 +1,70 @@
-From: claudiu.beznea@microchip.com (Claudiu Beznea)
-Date: Mon, 9 Oct 2017 19:09:37 +0300
-Subject: [PATCH 15/15] ARM: dts: at91: at91sam9x5ek: use DMA for USART0
-In-Reply-To: <1507565377-1545-1-git-send-email-claudiu.beznea@microchip.com>
-References: <1507565377-1545-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <1507565377-1545-16-git-send-email-claudiu.beznea@microchip.com>
+From: jingoohan1@gmail.com (Jingoo Han)
+Date: Mon, 9 Oct 2017 12:16:33 -0400
+Subject: [PATCH] PCI: exynos: remove redundant code in
+ exynos_pcie_establish_link
+In-Reply-To: <CAJKOXPeC=cS2cvAXHrKuK5F4tEqH6PppwYkxC+Z8+5D--48CAg@mail.gmail.com>
+References: <CGME20171009141438epcas2p4ead7e2f2d1af7e0950f2c026e3a9943b@epcas2p4.samsung.com>
+ <1507558478-3218-1-git-send-email-pankaj.dubey@samsung.com>
+ <CAJKOXPeC=cS2cvAXHrKuK5F4tEqH6PppwYkxC+Z8+5D--48CAg@mail.gmail.com>
+Message-ID: <000101d34119$f9e18290$eda487b0$@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use DMA for USART0 (which is used as ttyS1) as we have enough channels and to
-show how to specify DMA use with serial nodes.
+On Monday, October 9, 2017 10:44 AM, Krzysztof Kozlowski wrote:
+> 
+> On Mon, Oct 9, 2017 at 4:14 PM, Pankaj Dubey <pankaj.dubey@samsung.com>
+> wrote:
+> > From: Anvesh Salveru <anvesh.s@samsung.com>
+> >
+> > In exynos_pcie_establish_link if driver is not using generic phy,
+> > we are resetting PHY twice, which is redundant, so this patch removes
+> 
+> Hi Pankaj,
+> 
+> This lacks the information why it is redundant.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
----
- arch/arm/boot/dts/at91sam9x5ek.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+I think so, too.
 
-diff --git a/arch/arm/boot/dts/at91sam9x5ek.dtsi b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-index 9d2bbc41a7b0..a85eb51e6aa8 100644
---- a/arch/arm/boot/dts/at91sam9x5ek.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-@@ -50,6 +50,8 @@
- 			};
- 
- 			usart0: serial at f801c000 {
-+				atmel,use-dma-rx;
-+				atmel,use-dma-tx;
- 				status = "okay";
- 			};
- 
--- 
-2.7.4
+Did you test this code on some boards with Exynos PCIe?
+Or did hardware engineers confirm this?
+Please add more information on this patch.
+
+Best regards,
+Jingoo Han
+
+> 
+> > repeated lines of code for PHY reset.
+> >
+> > Signed-off-by: Anvesh Salveru <anvesh.s@samsung.com>
+> 
+> Your Signed-off-by is needed here.
+> 
+> Best regards,
+> Krzysztof
+> 
+> > ---
+> >  drivers/pci/dwc/pci-exynos.c | 7 -------
+> >  1 file changed, 7 deletions(-)
+> >
+> > diff --git a/drivers/pci/dwc/pci-exynos.c b/drivers/pci/dwc/pci-exynos.c
+> > index 5596fde..85d2f4b 100644
+> > --- a/drivers/pci/dwc/pci-exynos.c
+> > +++ b/drivers/pci/dwc/pci-exynos.c
+> > @@ -423,13 +423,6 @@ static int exynos_pcie_establish_link(struct
+> exynos_pcie *ep)
+> >                 exynos_pcie_deassert_phy_reset(ep);
+> >                 exynos_pcie_power_on_phy(ep);
+> >                 exynos_pcie_init_phy(ep);
+> > -
+> > -               /* pulse for common reset */
+> > -               exynos_pcie_writel(ep->mem_res->block_base, 1,
+> > -                                       PCIE_PHY_COMMON_RESET);
+> > -               udelay(500);
+> > -               exynos_pcie_writel(ep->mem_res->block_base, 0,
+> > -                                       PCIE_PHY_COMMON_RESET);
+> >         }
+> >
+> >         /* pulse for common reset */
+> > --
+> > 2.7.4
+> >
