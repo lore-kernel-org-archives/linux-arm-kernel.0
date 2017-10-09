@@ -1,45 +1,97 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Mon, 9 Oct 2017 10:15:49 +0800
-Subject: [PATCH 8/9] dt-bindings: usb: mtk-xhci: add a optional property
- to disable u3ports
-In-Reply-To: <20171005221650.yfyh72op6azm2nri@rob-hp-laptop>
-References: <994382d16d6bdc0f3d7c11b22f1710252e056e34.1506503879.git.chunfeng.yun@mediatek.com>
- <fd8b6099192ddee3b277f5ca3a699c20fb273ffe.1506503880.git.chunfeng.yun@mediatek.com>
- <20171005221650.yfyh72op6azm2nri@rob-hp-laptop>
-Message-ID: <1507515349.17567.32.camel@mhfsdcap03>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Mon, 9 Oct 2017 10:16:29 +0800
+Subject: [PATCH 01/12] mmc: dt-bindings: update Mediatek MMC bindings
+In-Reply-To: <CAPDyKFoiJJ=NM8EZ7mh+91Nj=EBYcAJmvZ3Z+xskeU3qB40HEw@mail.gmail.com>
+References: <1505207272-16983-1-git-send-email-chaotian.jing@mediatek.com>
+ <1505207272-16983-2-git-send-email-chaotian.jing@mediatek.com>
+ <20170913141026.43oh4n4foipmahsk@rob-hp-laptop>
+ <1505355021.8308.4.camel@mhfsdcap03>
+ <CAPDyKFrUe-0hEsxVRQSZvujcXY8WrR6m-0DMW=VwDDLvz7Lexw@mail.gmail.com>
+ <1506475100.19851.9.camel@mhfsdcap03>
+ <1506650162.19851.12.camel@mhfsdcap03>
+ <CAPDyKFoiJJ=NM8EZ7mh+91Nj=EBYcAJmvZ3Z+xskeU3qB40HEw@mail.gmail.com>
+Message-ID: <1507515389.19789.0.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-10-05 at 17:16 -0500, Rob Herring wrote:
-> On Wed, Sep 27, 2017 at 05:23:04PM +0800, Chunfeng Yun wrote:
-> > Add a new optional property to disable u3ports
-> > 
-> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> > ---
-> >  .../devicetree/bindings/usb/mediatek,mtk-xhci.txt  |    2 ++
-> >  1 file changed, 2 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
-> > index 5611a2e..2d9b459 100644
-> > --- a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
-> > +++ b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
-> > @@ -38,6 +38,8 @@ Optional properties:
-> >  	mode;
-> >   - mediatek,syscon-wakeup : phandle to syscon used to access USB wakeup
-> >  	control register, it depends on "mediatek,wakeup-src".
-> > + - mediatek,u3p-dis-msk : mask to disable u3ports, bit0 for u3port0,
-> > +	bit1 for u3port1, ... etc;
+On Mon, 2017-10-02 at 08:53 +0200, Ulf Hansson wrote:
+> [...]
 > 
-> I think you should have child nodes for ports and use "status" to 
-> disable them (or omit them). IIRC, the common USB bus binding already 
-> defines ports.
-I survey it to see whether it can replace the current way
+> >> > >> >  Required properties:
+> >> > >> > -- compatible: Should be "mediatek,mt8173-mmc","mediatek,mt8135-mmc"
+> >> > >> > +- compatible: value should be either of the following.
+> >> > >> > +   "mediatek,mt8135-mmc": for mmc host ip compatible with mt8135
+> >> > >> > +   "mediatek,mt8173-mmc": for mmc host ip compatible with mt8173
+> >> > >> > +   "mediatek,mt2701-mmc": for mmc host ip compatible with mt2701
+> >> > >> > +   "mediatek,mt2712-mmc": for mmc host ip compatible with mt2712
+> >> > >> > +- reg: physical base address of the controller and length
+> >> > >> >  - interrupts: Should contain MSDC interrupt number
+> >> > >> > -- clocks: MSDC source clock, HCLK
+> >> > >> > -- clock-names: "source", "hclk"
+> >> > >> > +- clocks: MSDC source clock, HCLK, source_cg
+> >> > >> > +- clock-names: "source", "hclk", "source_cg"
+> >> > >>
+> >> > >> All chips support source_cg? That's not backwards compatible for
+> >> > >> existing compatible strings if the driver requires it.
+> >> > > Not all chips support source_cg, for chips which do not support
+> >> > > source_cg, no need source_cg here, and the driver will parse it
+> >> > > to know if current chip support it.
+> >> >
+> >> > In such case you must not add add a required binding for it. I think
+> >> > that is what Rob is trying to point out for you.
+> >> >
+> >> > [...]
+> >> >
+> >> > Kind regards
+> >> > Uffe
+> >> The source_cg is required(MUST) at MT2712 and future SoCs, but not
+> >> required(do not have it) at previous SoCs, so that put it at required
+> >> properties, let the driver to handle it.
+> 
+> Then you must explain that in the binding...
+> 
+> On 29 September 2017 at 03:56, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> > On Wed, 2017-09-27 at 09:18 +0800, Chaotian Jing wrote:
+> >> On Wed, 2017-09-27 at 00:33 +0200, Ulf Hansson wrote:
+> >> > On 14 September 2017 at 04:10, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> >> > > On Wed, 2017-09-13 at 09:10 -0500, Rob Herring wrote:
+> >> > >> On Tue, Sep 12, 2017 at 05:07:41PM +0800, Chaotian Jing wrote:
+> >> > >> > Change the comptiable for support of multi-platform
+> >> > >> > Add description for reg
+> >> > >> > Add description for source_cg
+> >> > >> > Add description for mediatek,latch-ck
+> >> > >>
+> >> > >> This is at least the 3rd patch with exactly the same vague subject.
+> >> > >> Please make the subject somewhat unique.
+> >> > >>
+> >> > > Thx, will change the subject at next version
+> >> > >> >
+> >> > >> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> >> > >> > ---
+> >> > >> >  Documentation/devicetree/bindings/mmc/mtk-sd.txt | 13 ++++++++++---
+> >> > >> >  1 file changed, 10 insertions(+), 3 deletions(-)
+> >> > >> >
+> >> > >> > diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+> >> > >> > index 4182ea3..405cd06 100644
+> >> > >> > --- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+> >> > >> > +++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+> >> > >> > @@ -7,10 +7,15 @@ This file documents differences between the core properties in mmc.txt
+> >> > >> >  and the properties used by the msdc driver.
+> >> > >> >
+> >
+> > Any other comments about it ? still must not add a required binding for
+> > it ? if add a optional binding for it, how to add it ? as cannot
+> > duplicate "clocks" & "clock-names" in one node.
+> >
+> >
+> 
+> I suggest you keep the description of the new clock name part of the
+> "Required properties:" header. However, after each clock name,
+> explicit state when the clock is required/optional. Something along
+> the lines as sdhci-msm does it.
+> Documentation/devicetree/bindings/mmc/sdhci-msm.txt
+> 
+> Kind regards
+> Uffe
 
-thanks
-> 
-> >   - vbus-supply : reference to the VBUS regulator;
-> >   - usb3-lpm-capable : supports USB3.0 LPM
-> >   - pinctrl-names : a pinctrl state named "default" must be defined
-> > -- 
-> > 1.7.9.5
-> > 
+Thx, I will send a new series of patch v2 to review.
