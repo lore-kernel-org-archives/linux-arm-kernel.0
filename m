@@ -1,32 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 10 Oct 2017 22:09:52 +0200
-Subject: [PATCH 11/11] ARM: dts: Add PCLK to the Aspeed watchdogs
-In-Reply-To: <20170812184318.10144-12-linus.walleij@linaro.org>
-References: <20170812184318.10144-1-linus.walleij@linaro.org>
- <20170812184318.10144-12-linus.walleij@linaro.org>
-Message-ID: <CACRpkdbJhTmSZDudJCb_8nOfk6802Z8Op2+gjY9vdDT9Cg+6eQ@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 10 Oct 2017 14:32:11 -0600
+Subject: [PATCH 0/2] coresight: next v4.14-rc4 
+Message-ID: <1507667533-21707-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 12, 2017 at 8:43 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+Hey Greg,
 
-> This adds the PCLK clock to the Aspeed watchdog blocks.
-> I am not directly familiar with the Aspeed clocking, but
-> since the IP is derived from Faraday FTWDT010 it probably
-> has the ability to run the watchdog on the PCLK if
-> desired so to obtain the frequency from it, it needs to
-> be present in the device tree, and for completeness the
-> PCLK should also be referenced and enabled anyways.
->
-> Take this opportunity to add the "faraday,ftwdt010"
-> compatible as fallback to the watchdog IP blocks.
->
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Just a couple of patches for this cycle (to counterweight the barrage 
+of the last cycle).
 
-Joel could you merge this through the Aspeed tree? I think
-the compatible string is completely uncontroversial
-(binding ACKed) to add and all should just work fine so we
-can slap in "EXTCLK" later as well.
+Please consider for the v4.15 cycle - applies on your char-misc-next
+(c2e5df616e1a)
 
-Yours,
-Linus Walleij
+Regards,
+Mathieu
+
+Leo Yan (1):
+  doc: coresight: correct usage for disabling idle states
+
+Suzuki K Poulose (1):
+  coresight: Extend the PIDR mask to cover relevant bits in PIDR2
+
+ Documentation/trace/coresight-cpu-debug.txt        | 22 +++++++++++++++-----
+ .../coresight/coresight-dynamic-replicator.c       |  4 ++--
+ drivers/hwtracing/coresight/coresight-etb10.c      |  4 ++--
+ drivers/hwtracing/coresight/coresight-etm3x.c      | 24 +++++++++++-----------
+ drivers/hwtracing/coresight/coresight-funnel.c     |  4 ++--
+ drivers/hwtracing/coresight/coresight-stm.c        |  8 ++++----
+ drivers/hwtracing/coresight/coresight-tmc.c        |  4 ++--
+ drivers/hwtracing/coresight/coresight-tpiu.c       |  4 ++--
+ 8 files changed, 43 insertions(+), 31 deletions(-)
+
+-- 
+2.7.4
