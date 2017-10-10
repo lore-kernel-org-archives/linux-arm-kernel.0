@@ -1,85 +1,101 @@
 From: wenyou.yang@microchip.com (Wenyou Yang)
-Date: Tue, 10 Oct 2017 10:46:36 +0800
-Subject: [PATCH v4 1/5] media: atmel-isc: Add spin lock for clock enable ops
+Date: Tue, 10 Oct 2017 10:46:37 +0800
+Subject: [PATCH v4 2/5] media: atmel-isc: Add prepare and unprepare ops
 In-Reply-To: <20171010024640.5733-1-wenyou.yang@microchip.com>
 References: <20171010024640.5733-1-wenyou.yang@microchip.com>
-Message-ID: <20171010024640.5733-2-wenyou.yang@microchip.com>
+Message-ID: <20171010024640.5733-3-wenyou.yang@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the spin lock for the clock enable and disable operations.
+A software write operation to the ISC_CLKEN or ISC_CLKDIS register
+requires double clock domain synchronization and is not permitted
+when the ISC_SR.SIP is asserted. So add the .prepare and .unprepare
+ops to make sure the ISC_CLKSR.SIP is unasserted before the write
+operation to the ISC_CLKEN or ISC_CLKDIS register.
 
 Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
 ---
 
-Changes in v4: None
-Changes in v3:
- - Fix the wrong used spinlock.
- - s/_/- on the subject.
+Changes in v4:
+ - Call pm_runtime_get_sync() and pm_runtime_put_sync() in ->prepare
+   and ->unprepare callback.
 
+Changes in v3: None
 Changes in v2: None
 
- drivers/media/platform/atmel/atmel-isc.c | 15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
+ drivers/media/platform/atmel/atmel-isc-regs.h |  1 +
+ drivers/media/platform/atmel/atmel-isc.c      | 40 +++++++++++++++++++++++++++
+ 2 files changed, 41 insertions(+)
 
+diff --git a/drivers/media/platform/atmel/atmel-isc-regs.h b/drivers/media/platform/atmel/atmel-isc-regs.h
+index 6936ac467609..93e58fcf1d5f 100644
+--- a/drivers/media/platform/atmel/atmel-isc-regs.h
++++ b/drivers/media/platform/atmel/atmel-isc-regs.h
+@@ -42,6 +42,7 @@
+ 
+ /* ISC Clock Status Register */
+ #define ISC_CLKSR               0x00000020
++#define ISC_CLKSR_SIP		BIT(31)
+ 
+ #define ISC_CLK(n)		BIT(n)
+ 
 diff --git a/drivers/media/platform/atmel/atmel-isc.c b/drivers/media/platform/atmel/atmel-isc.c
-index 2f8e345d297e..991f962b7023 100644
+index 991f962b7023..5f8228fc9c8d 100644
 --- a/drivers/media/platform/atmel/atmel-isc.c
 +++ b/drivers/media/platform/atmel/atmel-isc.c
-@@ -65,6 +65,7 @@ struct isc_clk {
- 	struct clk_hw   hw;
- 	struct clk      *clk;
- 	struct regmap   *regmap;
-+	spinlock_t	lock;
- 	u8		id;
- 	u8		parent_id;
- 	u32		div;
-@@ -312,26 +313,37 @@ static int isc_clk_enable(struct clk_hw *hw)
- 	struct isc_clk *isc_clk = to_isc_clk(hw);
- 	u32 id = isc_clk->id;
- 	struct regmap *regmap = isc_clk->regmap;
-+	unsigned long flags;
+@@ -308,6 +308,44 @@ module_param(sensor_preferred, uint, 0644);
+ MODULE_PARM_DESC(sensor_preferred,
+ 		 "Sensor is preferred to output the specified format (1-on 0-off), default 1");
+ 
++static int isc_wait_clk_stable(struct clk_hw *hw)
++{
++	struct isc_clk *isc_clk = to_isc_clk(hw);
++	struct regmap *regmap = isc_clk->regmap;
++	unsigned long timeout = jiffies + usecs_to_jiffies(1000);
 +	unsigned int status;
- 
- 	dev_dbg(isc_clk->dev, "ISC CLK: %s, div = %d, parent id = %d\n",
- 		__func__, isc_clk->div, isc_clk->parent_id);
- 
-+	spin_lock_irqsave(&isc_clk->lock, flags);
- 	regmap_update_bits(regmap, ISC_CLKCFG,
- 			   ISC_CLKCFG_DIV_MASK(id) | ISC_CLKCFG_SEL_MASK(id),
- 			   (isc_clk->div << ISC_CLKCFG_DIV_SHIFT(id)) |
- 			   (isc_clk->parent_id << ISC_CLKCFG_SEL_SHIFT(id)));
- 
- 	regmap_write(regmap, ISC_CLKEN, ISC_CLK(id));
-+	spin_unlock_irqrestore(&isc_clk->lock, flags);
- 
--	return 0;
-+	regmap_read(regmap, ISC_CLKSR, &status);
-+	if (status & ISC_CLK(id))
-+		return 0;
-+	else
-+		return -EINVAL;
- }
- 
- static void isc_clk_disable(struct clk_hw *hw)
++
++	while (time_before(jiffies, timeout)) {
++		regmap_read(regmap, ISC_CLKSR, &status);
++		if (!(status & ISC_CLKSR_SIP))
++			return 0;
++
++		usleep_range(10, 250);
++	}
++
++	return -ETIMEDOUT;
++}
++
++static int isc_clk_prepare(struct clk_hw *hw)
++{
++	struct isc_clk *isc_clk = to_isc_clk(hw);
++
++	if (isc_clk->id == ISC_MCK)
++		pm_runtime_get_sync(isc_clk->dev);
++
++	return isc_wait_clk_stable(hw);
++}
++
++static void isc_clk_unprepare(struct clk_hw *hw)
++{
++	struct isc_clk *isc_clk = to_isc_clk(hw);
++
++	isc_wait_clk_stable(hw);
++
++	if (isc_clk->id == ISC_MCK)
++		pm_runtime_put_sync(isc_clk->dev);
++}
++
+ static int isc_clk_enable(struct clk_hw *hw)
  {
  	struct isc_clk *isc_clk = to_isc_clk(hw);
- 	u32 id = isc_clk->id;
-+	unsigned long flags;
- 
-+	spin_lock_irqsave(&isc_clk->lock, flags);
- 	regmap_write(isc_clk->regmap, ISC_CLKDIS, ISC_CLK(id));
-+	spin_unlock_irqrestore(&isc_clk->lock, flags);
+@@ -459,6 +497,8 @@ static int isc_clk_set_rate(struct clk_hw *hw,
  }
  
- static int isc_clk_is_enabled(struct clk_hw *hw)
-@@ -492,6 +504,7 @@ static int isc_clk_register(struct isc_device *isc, unsigned int id)
- 	isc_clk->regmap		= regmap;
- 	isc_clk->id		= id;
- 	isc_clk->dev		= isc->dev;
-+	spin_lock_init(&isc_clk->lock);
- 
- 	isc_clk->clk = clk_register(isc->dev, &isc_clk->hw);
- 	if (IS_ERR(isc_clk->clk)) {
+ static const struct clk_ops isc_clk_ops = {
++	.prepare	= isc_clk_prepare,
++	.unprepare	= isc_clk_unprepare,
+ 	.enable		= isc_clk_enable,
+ 	.disable	= isc_clk_disable,
+ 	.is_enabled	= isc_clk_is_enabled,
 -- 
 2.13.0
