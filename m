@@ -1,96 +1,65 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 10 Oct 2017 10:39:24 +0200
-Subject: [PATCH] ARM: dts: qcom: add MSM8660 GSBI6 and GSBI7
-Message-ID: <20171010083924.19244-1-linus.walleij@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 Oct 2017 10:45:51 +0200
+Subject: [PATCH] ARM: dts: r8a779x: add '#reset-cells' in cpg-mssr
+Message-ID: <20171010084611.968735-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the GSBI6 and GSBI7 IO blocks to the MSM8660 DTSI file.
-On the APQ8060 DragonBoard, GSBI6 DM is used for Bluetooth UART,
-and GSBI7 I2C is used for FM radio I2C.
+With the latest dtc, we get many warnings about the missing
+'#reset-cells' property in these controllers, e.g.:
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+arch/arm/boot/dts/r8a7790-lager.dtb: Warning (resets_property): Missing property '#reset-cells' in node /clock-controller at e6150000 or bad phandle (referred from /can at e6e80000:resets[0])
+arch/arm/boot/dts/r8a7792-blanche.dtb: Warning (resets_property): Missing property '#reset-cells' in node /soc/clock-controller at e6150000 or bad phandle (referred from /soc/dma-controller at e6700000:resets[0])
+arch/arm/boot/dts/r8a7792-wheat.dtb: Warning (resets_property): Missing property '#reset-cells' in node /soc/clock-controller at e6150000 or bad phandle (referred from /soc/ethernet at e6800000:resets[0])
+arch/arm/boot/dts/r8a7793-gose.dtb: Warning (resets_property): Missing property '#reset-cells' in node /clock-controller at e6150000 or bad phandle (referred from /gpio at e6050000:resets[0])
+arch/arm/boot/dts/r8a7794-alt.dtb: Warning (resets_property): Missing property '#reset-cells' in node /clock-controller at e6150000 or bad phandle (referred from /i2c at e6500000:resets[0])
+arch/arm/boot/dts/r8a7794-silk.dtb: Warning (resets_property): Missing property '#reset-cells' in node /clock-controller at e6150000 or bad phandle (referred from /interrupt-controller at e61c0000:resets[0])
+
+This adds it for the three r8a779x chips that were lacking it. The
+binding mandates this as <1>, so this is the value I use.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/boot/dts/qcom-msm8660.dtsi | 67 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 67 insertions(+)
+ arch/arm/boot/dts/r8a7790.dtsi | 1 +
+ arch/arm/boot/dts/r8a7792.dtsi | 1 +
+ arch/arm/boot/dts/r8a7794.dtsi | 1 +
+ 3 files changed, 3 insertions(+)
 
-diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
-index 1b5d31b33b5e..4f02489bcb2e 100644
---- a/arch/arm/boot/dts/qcom-msm8660.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
-@@ -123,6 +123,73 @@
- 			reg = <0x900000 0x4000>;
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 17a48199b7a9..8215a971cf17 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -1186,6 +1186,7 @@
+ 		clock-names = "extal", "usb_extal";
+ 		#clock-cells = <2>;
+ 		#power-domain-cells = <0>;
++		#reset-cells = <1>;
+ 	};
+ 
+ 	prr: chipid at ff000044 {
+diff --git a/arch/arm/boot/dts/r8a7792.dtsi b/arch/arm/boot/dts/r8a7792.dtsi
+index 549eafe8ff12..cde709e3a916 100644
+--- a/arch/arm/boot/dts/r8a7792.dtsi
++++ b/arch/arm/boot/dts/r8a7792.dtsi
+@@ -828,6 +828,7 @@
+ 			clock-names = "extal";
+ 			#clock-cells = <2>;
+ 			#power-domain-cells = <0>;
++			#reset-cells = <1>;
  		};
+ 	};
  
-+		gsbi6: gsbi at 16500000 {
-+			compatible = "qcom,gsbi-v1.0.0";
-+			cell-index = <12>;
-+			reg = <0x16500000 0x100>;
-+			clocks = <&gcc GSBI6_H_CLK>;
-+			clock-names = "iface";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+			syscon-tcsr = <&tcsr>;
-+
-+			gsbi6_serial: serial at 16540000 {
-+				compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
-+				reg = <0x16540000 0x1000>,
-+				      <0x16500000 0x1000>;
-+				interrupts = <GIC_SPI 156 IRQ_TYPE_NONE>;
-+				clocks = <&gcc GSBI6_UART_CLK>, <&gcc GSBI6_H_CLK>;
-+				clock-names = "core", "iface";
-+				status = "disabled";
-+			};
-+
-+			gsbi6_i2c: i2c at 16580000 {
-+				compatible = "qcom,i2c-qup-v1.1.1";
-+				reg = <0x16580000 0x1000>;
-+				interrupts = <GIC_SPI 157 IRQ_TYPE_NONE>;
-+				clocks = <&gcc GSBI6_QUP_CLK>, <&gcc GSBI6_H_CLK>;
-+				clock-names = "core", "iface";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				status = "disabled";
-+			};
-+		};
-+
-+		gsbi7: gsbi at 16600000 {
-+			compatible = "qcom,gsbi-v1.0.0";
-+			cell-index = <12>;
-+			reg = <0x16600000 0x100>;
-+			clocks = <&gcc GSBI7_H_CLK>;
-+			clock-names = "iface";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+			syscon-tcsr = <&tcsr>;
-+
-+			gsbi7_serial: serial at 16640000 {
-+				compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
-+				reg = <0x16640000 0x1000>,
-+				      <0x16600000 0x1000>;
-+				interrupts = <GIC_SPI 158 IRQ_TYPE_NONE>;
-+				clocks = <&gcc GSBI7_UART_CLK>, <&gcc GSBI7_H_CLK>;
-+				clock-names = "core", "iface";
-+				status = "disabled";
-+			};
-+
-+			gsbi7_i2c: i2c at 16680000 {
-+				compatible = "qcom,i2c-qup-v1.1.1";
-+				reg = <0x16680000 0x1000>;
-+				interrupts = <GIC_SPI 159 IRQ_TYPE_NONE>;
-+				clocks = <&gcc GSBI7_QUP_CLK>, <&gcc GSBI7_H_CLK>;
-+				clock-names = "core", "iface";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				status = "disabled";
-+			};
-+		};
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 19cff0dd90cf..a406d56234ba 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -1098,6 +1098,7 @@
+ 		clock-names = "extal", "usb_extal";
+ 		#clock-cells = <2>;
+ 		#power-domain-cells = <0>;
++		#reset-cells = <1>;
+ 	};
  
- 		gsbi8: gsbi at 19800000 {
- 			compatible = "qcom,gsbi-v1.0.0";
+ 	rst: reset-controller at e6160000 {
 -- 
-2.13.5
+2.9.0
