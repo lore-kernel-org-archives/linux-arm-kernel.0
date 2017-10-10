@@ -1,46 +1,51 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Tue, 10 Oct 2017 10:19:51 +0000
-Subject: [PATCH v9 4/4] PCI: hisi: blacklist hip06/hip07 controllers
- behind SMMUv3
-In-Reply-To: <20171010100630.GA764@red-moon>
-References: <20171006140450.89652-1-shameerali.kolothum.thodi@huawei.com>
- <20171006140450.89652-5-shameerali.kolothum.thodi@huawei.com>
- <20171009235452.GP25517@bhelgaas-glaptop.roam.corp.google.com>
- <5FC3163CFD30C246ABAA99954A238FA838421875@FRAEML521-MBX.china.huawei.com>
- <20171010100630.GA764@red-moon>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E40C5DC1F@FRAEML521-MBX.china.huawei.com>
+From: balbi@kernel.org (Felipe Balbi)
+Date: Tue, 10 Oct 2017 13:26:44 +0300
+Subject: [PATCH v2] extcon: Split out extcon header file for consumer and
+ provider device
+In-Reply-To: <1507630671-23536-1-git-send-email-cw00.choi@samsung.com>
+References: <CGME20171010101758epcas2p3b3f379076f5be5e81edee2bd00354c28@epcas2p3.samsung.com>
+ <1507630671-23536-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <87efqbmh7f.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo
 
-[...]
+Hi,
 
-> > > Does the presence of "iommu-map" tell you this is an SMMUv3?  Could
-> it
-> > > have a different type of IOMMU?  I can't tell from reading
-> > > Documentation/devicetree/bindings/pci/pci-iommu.txt.
-> >
-> > Only if the SMMUv3 driver is loaded and iommu-map binding property
-> present,
-> > the pcie devices will use SMMU translated iova for MSI doorbell
-> addresses.
-> 
-> And the iommu-map property _actually_ points at an OF node with an
-> SMMUv3 compatible string - the sheer fact that the SMMUv3 driver
-> is compiled in is not sufficient IIUC.
+Chanwoo Choi <cw00.choi@samsung.com> writes:
+> The extcon has two type of extcon devices as following.
+> - 'extcon provider deivce' adds new extcon device and detect the
+>    state/properties of external connector. Also, it notifies the
+>    state/properties to the extcon consumer device.
+> - 'extcon consumer device' gets the change state/properties
+>    from extcon provider device.
+> Prior to that, include/linux/extcon.h contains all exported API for
+> both provider and consumer device driver. To clarify the meaning of
+> header file and to remove the wrong use-case on consumer device,
+> this patch separates into extcon.h and extcon-provider.h.
+>
+> [Description for include/linux/{extcon.h|extcon-provider.h}]
+> - extcon.h includes the extcon API and data structure for extcon consumer
+>   device driver. This header file contains the following APIs:
+>   : Register/unregister the notifier to catch the change of extcon device
+>   : Get the extcon device instance
+>   : Get the extcon device name
+>   : Get the state of each external connector
+>   : Get the property value of each external connector
+>   : Get the property capability of each external connector
+>
+> - extcon-provider.h includes the extcon API and data structure for extcon
+>   provider device driver. This header file contains the following APIs:
+>   : Include 'include/linux/extcon.h'
+>   : Allocate the memory for extcon device instance
+>   : Register/unregister extcon device
+>   : Set the state of each external connector
+>   : Set the property value of each external connector
+>   : Set the property capability of each external connector
+>
+> Cc: Felipe Balbi <balbi@kernel.org>
 
-The blacklisted controller can only be present in an SoC that supports
-SMMUv3 only.
+Acked-by: Felipe Balbi <felipe.balbi@linux.intel.com>
 
->From our view checking that SMMUv3 is compiled in and also checking that
-the DT contains iommu-map is sufficient to decide to blacklist the controller.
-
-Thanks
-Gab 
-
-> 
-> Lorenzo
-> 
-
-[...]
+-- 
+balbi
