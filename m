@@ -1,47 +1,58 @@
-From: Claudiu.Beznea@microchip.com (m18063)
-Date: Tue, 10 Oct 2017 12:30:06 +0300
-Subject: [PATCH 00/14] at91 fixes and enhancements
-In-Reply-To: <1507565377-1545-1-git-send-email-claudiu.beznea@microchip.com>
-References: <1507565377-1545-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <45089013-3ffa-010f-ef4b-0be693abc2e3@microchip.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 10 Oct 2017 11:30:19 +0200
+Subject: [PATCH] clk: samsung: exynos5433: mark PM functions as
+ __maybe_unused
+In-Reply-To: <20171010091522.2286344-1-arnd@arndb.de>
+References: <CGME20171010091530epcas3p2e03b0e52f91e7dc2ab0dd9fea687d891@epcas3p2.samsung.com>
+ <20171010091522.2286344-1-arnd@arndb.de>
+Message-ID: <66c87919-60a7-b1de-a880-90b007c7efe4@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please ignore this series since I did some mistakes.
-I will send version 2.
+Hi Arnd,
 
-Thank you,
-Claudiu
+On 2017-10-10 11:15, Arnd Bergmann wrote:
+> The suspend/resume functions are referenced conditionally, causing
+> a harmless warning when CONFIG_PM is disabled:
+>
+> drivers/clk/samsung/clk-exynos5433.c:5476:12: error: 'exynos5433_cmu_resume' defined but not used [-Werror=unused-function]
+> drivers/clk/samsung/clk-exynos5433.c:5453:12: error: 'exynos5433_cmu_suspend' defined but not used [-Werror=unused-function]
+>
+> This marks both as __maybe_unused to shut up the warning.
+>
+> Fixes: 523d3de41f02 ("clk: samsung: exynos5433: Add support for runtime PM")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-On 09.10.2017 19:09, Claudiu Beznea wrote:
-> Hi,
-> 
-> This series contains fixes and enhancements for Atmel/Microchip boards,
-> mainly for SoM1-EK board, SAMA5D2 Xplained board and SAM9x5 boards.
-> Please accept them for 4.15.
-> 
-> Thank you,
-> Claudiu Beznea
-> 
-> Claudiu Beznea (14):
->   ARM: dts: at91: sama5d27_som1_ek: add disabled/okay status
->   ARM: dts: at91: sama5d27_som1_ek: update serial aliases
->   ARM: dts: at91: sama5d27_som1_ek: set USER button as a wakeup source
->   ARM: dts: at91: sama5d27_som1_ek: add aliases for i2c
->   ARM: dts: at91: sama5d27_som1_ek: add pinmuxing for pwm0
->   ARM: dts: at91: sama5d27_som1_ek: remove not connected CAN0
->   ARM: dts: at91: sama5d27_som1_ek: remove pull-up on SD/MMC lines
->   ARM: dts: at91: sama5d2_xplained: Add charger node of pmic.
->   ARM: dts: at91: sama5d2_xplained: set PB_USER as wakeup source
->   ARM: dts: at91: sama5d2_xplained: add pinmuxing for pwm0
->   ARM: dts: at91: sama5d2_xplained: remove pull-up on SD/MMC lines
->   ARM: dts: at91: at91sam9x25ek: add CAN1 interface
->   ARM: dts: at91: at91sam9x25ek: add pwm0
->   ARM: dts: at91: at91sam9x5ek: use DMA for USART0
-> 
->  arch/arm/boot/dts/at91-sama5d27_som1_ek.dts | 46 ++++++++++++++---------------
->  arch/arm/boot/dts/at91-sama5d2_xplained.dts | 39 ++++++++++++++++--------
->  arch/arm/boot/dts/at91sam9x25ek.dts         | 10 +++++++
->  arch/arm/boot/dts/at91sam9x5ek.dtsi         |  2 ++
->  4 files changed, 62 insertions(+), 35 deletions(-)
-> 
+Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+
+> ---
+>   drivers/clk/samsung/clk-exynos5433.c | 4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/clk/samsung/clk-exynos5433.c b/drivers/clk/samsung/clk-exynos5433.c
+> index cd9337613dd8..db270908037a 100644
+> --- a/drivers/clk/samsung/clk-exynos5433.c
+> +++ b/drivers/clk/samsung/clk-exynos5433.c
+> @@ -5450,7 +5450,7 @@ struct exynos5433_cmu_data {
+>   	struct samsung_clk_provider ctx;
+>   };
+>   
+> -static int exynos5433_cmu_suspend(struct device *dev)
+> +static int __maybe_unused exynos5433_cmu_suspend(struct device *dev)
+>   {
+>   	struct exynos5433_cmu_data *data = dev_get_drvdata(dev);
+>   	int i;
+> @@ -5473,7 +5473,7 @@ static int exynos5433_cmu_suspend(struct device *dev)
+>   	return 0;
+>   }
+>   
+> -static int exynos5433_cmu_resume(struct device *dev)
+> +static int __maybe_unused exynos5433_cmu_resume(struct device *dev)
+>   {
+>   	struct exynos5433_cmu_data *data = dev_get_drvdata(dev);
+>   	int i;
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
