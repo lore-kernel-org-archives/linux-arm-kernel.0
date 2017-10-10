@@ -1,31 +1,60 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Tue, 10 Oct 2017 17:00:05 +0200
-Subject: [PATCH] crypto: atmel-aes - properly set IV after {en,de}crypt
-In-Reply-To: <20171010161659.4117677c@bbrezillon>
-References: <20171006155108.6581-1-romain.izard.pro@gmail.com>
- <20171010161659.4117677c@bbrezillon>
-Message-ID: <CAGkQfmPTC60A3W0YNJKU61NweSxmfC0xaR7BoT6CG6t7BEEDrw@mail.gmail.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Tue, 10 Oct 2017 17:18:46 +0200
+Subject: regression introduced by commit 70d435ba1cd6 ("ASoC:
+ imx-pcm-dma: simplify pcm_config")
+In-Reply-To: <1507646944.2398.1.camel@pengutronix.de>
+References: <20171004103657.1c6a433d@karo-electronics.de>
+ <1507646944.2398.1.camel@pengutronix.de>
+Message-ID: <20171010171846.509f399e@karo-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-10-10 16:16 GMT+02:00 Boris Brezillon <boris.brezillon@free-electrons.com>:
-> Hi Romain,
->
-> May I ask why you're sending this patch to the MTD ML?
->
-This is related to an issue reported by Nicolas Feignon with UBIFS and
-fscrypt, which was reported on both mtd and fscrypt mailing lists.
+Hi,
 
-The file names are encrypted with cts(cbc(aes)), and this patch tried to
-fix a SAMA5D2 issue where the file names are not correctly encrypted
-when hardware acceleration is enabled.
+On Tue, 10 Oct 2017 16:49:04 +0200 Lucas Stach wrote:
+> Hi Lothar,
+> 
+> Am Mittwoch, den 04.10.2017, 10:36 +0200 schrieb Lothar Wa?mann:
+> > Hi,
+> > 
+> > the commit 70d435ba1cd6 ("ASoC: imx-pcm-dma: simplify pcm_config")
+> > introduced a regression on the Ka-Ro TX series modules (and possibly
+> > other hardware as well).
+> > 
+> > The problem is, that this commit restricts the supported sound
+> > formats
+> > to S24_LE only rather than S16_LE, S24_LE, S20_3LE without the
+> > patch. Therefore aplay fails with the following error messages, when
+> > trying to play a sound file with S16_LE format:
+> > > ALSA lib alsa-lib-
+> > > 1.1.2/src/pcm/pcm_params.c:2162:(snd1_pcm_hw_refine_slave) Slave
+> > > PCM not usable
+> > > aplay: set_params:1204: Broken configuration for this PCM: no
+> > > configurations available
+> > 
+> > This is with the simple-sound-card driver as well as the imx-sgtl5000
+> > driver.
+> > 
+> > Can someone tell me on what hardware and with what software has this
+> > patch been tested?
+> 
+> My primary test hardware was the zii-rdu2 board, the DTS for this board
+> can be found in recent mainline kernels.
+> 
+> Userspace is based on pulseaudio, which may mask the regression by
+> resampling to the supported format. Sorry about that.
+> 
+> From my understanding of the code, it should be possible to fix the
+> regression without reverting this patch by setting
+> SND_DMAENGINE_PCM_DAI_FLAG_PACK in the flags field of the DMA params in
+> fsl_ssi.
+> 
+I tried that, but then I get DMA timeouts.
 
-> While I'm here, can you have a look at this patch [1] and add you
-> Reviewed-by/Tested-by?
->
-> [1]http://patchwork.ozlabs.org/patch/821959/
+I circumvented the problem by changing my /etc/asound.conf to use the
+only supported sample format. So, if nobody else has a problem, there
+is no need to revert the patch or apply additional modifications to the
+driver.
 
-I'll try it.
 
--- 
-Romain Izard
+Lothar Wa?mann
