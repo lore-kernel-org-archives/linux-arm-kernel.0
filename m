@@ -1,77 +1,137 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Tue, 10 Oct 2017 15:39:06 +0200
-Subject: [PATCH v10 05/10] mm: zero reserved and unavailable struct pages
-In-Reply-To: <bcf24369-ac37-cedd-a264-3396fb5cf39e@oracle.com>
-References: <20171005211124.26524-1-pasha.tatashin@oracle.com>
- <20171005211124.26524-6-pasha.tatashin@oracle.com>
- <20171006123057.6gu5xnk3usw2hvzb@dhcp22.suse.cz>
- <bcf24369-ac37-cedd-a264-3396fb5cf39e@oracle.com>
-Message-ID: <20171010133906.l2anyahcvgn6mg7o@dhcp22.suse.cz>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Tue, 10 Oct 2017 19:11:00 +0530
+Subject: [PATCH] PCI: exynos: remove redundant code in
+ exynos_pcie_establish_link
+In-Reply-To: <CAJKOXPeC=cS2cvAXHrKuK5F4tEqH6PppwYkxC+Z8+5D--48CAg@mail.gmail.com>
+References: <CGME20171009141438epcas2p4ead7e2f2d1af7e0950f2c026e3a9943b@epcas2p4.samsung.com>
+ <1507558478-3218-1-git-send-email-pankaj.dubey@samsung.com>
+ <CAJKOXPeC=cS2cvAXHrKuK5F4tEqH6PppwYkxC+Z8+5D--48CAg@mail.gmail.com>
+Message-ID: <fce4fba6-62ad-c718-2496-b7efe27dec80@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 06-10-17 11:25:16, Pasha Tatashin wrote:
-> Hi Michal,
-> 
-> > 
-> > As I've said in other reply this should go in only if the scenario you
-> > describe is real. I am somehow suspicious to be honest. I simply do not
-> > see how those weird struct pages would be in a valid pfn range of any
-> > zone.
-> > 
-> 
-> There are examples of both when unavailable memory is not part of any zone,
-> and where it is part of zones.
-> 
-> I run Linux in kvm with these arguments:
-> 
->         qemu-system-x86_64
->         -enable-kvm
->         -cpu kvm64
->         -kernel $kernel
->         -initrd $initrd
->         -m 512
->         -smp 2
->         -device e1000,netdev=net0
->         -netdev user,id=net0
->         -boot order=nc
->         -no-reboot
->         -watchdog i6300esb
->         -watchdog-action debug
->         -rtc base=localtime
->         -serial stdio
->         -display none
->         -monitor null
-> 
-> This patch reports that there are 98 unavailable pages.
-> 
-> They are: pfn 0 and pfns in range [159, 255].
-> 
-> Note, trim_low_memory_range() reserves only pfns in range [0, 15], it does
-> not reserve [159, 255] ones.
-> 
-> e820__memblock_setup() reports linux that the following physical ranges are
-> available:
->     [1 , 158]
-> [256, 130783]
-> 
-> Notice, that exactly unavailable pfns are missing!
-> 
-> Now, lets check what we have in zone 0: [1, 131039]
-> 
-> pfn 0, is not part of the zone, but pfns [1, 158], are.
-> 
-> However, the bigger problem we have if we do not initialize these struct
-> pages is with memory hotplug. Because, that path operates at 2M boundaries
-> (section_nr). And checks if 2M range of pages is hot removable. It starts
-> with first pfn from zone, rounds it down to 2M boundary (sturct pages are
-> allocated at 2M boundaries when vmemmap is created), and and checks if that
-> section is hot removable. In this case start with pfn 1 and convert it down
-> to pfn 0.
 
-Hmm, this is really interesting! I thought each memblock is guaranteed
-to be section size aligned. But I suspect this is more of a wishful
-thinking. But now I see what is the problem.
--- 
-Michal Hocko
-SUSE Labs
+
+On 10/09/2017 08:13 PM, Krzysztof Kozlowski wrote:
+> On Mon, Oct 9, 2017 at 4:14 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
+>> From: Anvesh Salveru <anvesh.s@samsung.com>
+>>
+>> In exynos_pcie_establish_link if driver is not using generic phy,
+>> we are resetting PHY twice, which is redundant, so this patch removes
+> Hi Pankaj,
+>
+> This lacks the information why it is redundant.
+Sure. Ok probably commit message should have been covered more information.
+
+I can see this patch tries to fix redundancy added by patch [1]:
+
+[1] e7cd7ef58e1f "PCI: exynos: Support the PHY generic framework"
+
+Before adding support for the generic PHY, exynos5440 was doing PHY 
+reset via
+
+/* pulse for common reset */
+exynos_pcie_writel(ep->mem_res->block_base, 1, PCIE_PHY_COMMON_RESET);
+udelay(500);
+exynos_pcie_writel(ep->mem_res->block_base, 0, PCIE_PHY_COMMON_RESET);
+
+But when Jaehoon introduced generic PHY support, above two lines have been
+copied in else part (else case covers: if platform does not uses generic 
+PHY),
+so eventually we will end-up doing PHY reset twice.
+
+For more clarity copy pasting part of above patch:
+
+------------------------------------
+ ???? exynos_pcie_assert_core_reset(ep);
+-??? exynos_pcie_assert_phy_reset(ep);
+-??? exynos_pcie_deassert_phy_reset(ep);
+-??? exynos_pcie_power_on_phy(ep);
+-??? exynos_pcie_init_phy(ep);
++
++??? if (ep->using_phy) {
++??? ??? phy_reset(ep->phy);
++
++??? ??? exynos_pcie_writel(ep->mem_res->elbi_base, 1,
++??? ??? ??? ??? PCIE_PWR_RESET);
++
++??? ??? phy_power_on(ep->phy);
++??? ??? phy_init(ep->phy);
++??? } else {
++??? ??? exynos_pcie_assert_phy_reset(ep);
++??? ??? exynos_pcie_deassert_phy_reset(ep);
++??? ??? exynos_pcie_power_on_phy(ep);
++??? ??? exynos_pcie_init_phy(ep);
++
++??? ??? /* pulse for common reset */
++??? ??? exynos_pcie_writel(ep->mem_res->block_base, 1,
++??? ??? ??? ??? ??? PCIE_PHY_COMMON_RESET);
++??? ??? udelay(500);
++??? ??? exynos_pcie_writel(ep->mem_res->block_base, 0,
++??? ??? ??? ??? ??? PCIE_PHY_COMMON_RESET);
++??? }
+
+ ???? /* pulse for common reset */
+ ???? exynos_pcie_writel(ep->mem_res->block_base, 1, 
+PCIE_PHY_COMMON_RESET);
+ ???? udelay(500);
+ ???? exynos_pcie_writel(ep->mem_res->block_base, 0, PCIE_PHY_COMMON_RESET);
+ ?-----------------------------------------------
+
+So if you see, eventually now we will end up doing common reset twice in 
+case
+platform not using generic PHY (once in else part and immediately after 
+else).
+
+We have submitted this patch without verifying on actual Exynos5440 board,
+as currently we do not have access to this board.
+
+But I feel in the original patch this flow has been changed, that too 
+probably without verifying
+on Exynos5440 board (Probably as I came across Exynos5433 PCIe patch of 
+Jaehoon where
+he mentioned he also do not have access to Exynos5440 board).
+
+So this patch removes that double reset of PHY and makes the code flow 
+as it was originally,
+before introduction of generic PHY.
+
+
+Thanks,
+Pankaj Dubey
+>> repeated lines of code for PHY reset.
+>>
+>> Signed-off-by: Anvesh Salveru <anvesh.s@samsung.com>
+> Your Signed-off-by is needed here.
+I missed it, will add in v2.
+>
+> Best regards,
+> Krzysztof
+>
+>> ---
+>>   drivers/pci/dwc/pci-exynos.c | 7 -------
+>>   1 file changed, 7 deletions(-)
+>>
+>> diff --git a/drivers/pci/dwc/pci-exynos.c b/drivers/pci/dwc/pci-exynos.c
+>> index 5596fde..85d2f4b 100644
+>> --- a/drivers/pci/dwc/pci-exynos.c
+>> +++ b/drivers/pci/dwc/pci-exynos.c
+>> @@ -423,13 +423,6 @@ static int exynos_pcie_establish_link(struct exynos_pcie *ep)
+>>                  exynos_pcie_deassert_phy_reset(ep);
+>>                  exynos_pcie_power_on_phy(ep);
+>>                  exynos_pcie_init_phy(ep);
+>> -
+>> -               /* pulse for common reset */
+>> -               exynos_pcie_writel(ep->mem_res->block_base, 1,
+>> -                                       PCIE_PHY_COMMON_RESET);
+>> -               udelay(500);
+>> -               exynos_pcie_writel(ep->mem_res->block_base, 0,
+>> -                                       PCIE_PHY_COMMON_RESET);
+>>          }
+>>
+>>          /* pulse for common reset */
+>> --
+>> 2.7.4
+>>
+>
+>
