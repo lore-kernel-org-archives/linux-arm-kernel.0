@@ -1,49 +1,47 @@
 From: claudiu.beznea@microchip.com (Claudiu Beznea)
-Date: Tue, 10 Oct 2017 13:09:35 +0300
-Subject: [PATCH v2 00/14] at91 fixes and enhancements
-Message-ID: <1507630189-15504-1-git-send-email-claudiu.beznea@microchip.com>
+Date: Tue, 10 Oct 2017 13:09:43 +0300
+Subject: [PATCH v2 08/14] ARM: dts: at91: sama5d27_som1_ek: remove pull-up on
+ SD/MMC lines
+In-Reply-To: <1507630189-15504-1-git-send-email-claudiu.beznea@microchip.com>
+References: <1507630189-15504-1-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <1507630189-15504-9-git-send-email-claudiu.beznea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Nicolas Ferre <nicolas.ferre@microchip.com>
 
-This series contains fixes and enhancements for Atmel/Microchip boards,
-mainly for SoM1-EK board, SAMA5D2 Xplained board and SAM9x5 boards.
-Please accept them for 4.15.
+As the board have the proper pull-ups soldered on the data
+and CMD lines we don't need them specified in the PADs. So remove
+the "bias-pull-up" property and set "bias-disable".
 
-Thank you,
-Claudiu Beznea
+Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+[claudiu.beznea at microchip.com: change subject to match the desired prefix]
+Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+---
+ arch/arm/boot/dts/at91-sama5d27_som1_ek.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Changes since v1:
-- correct author for some patches; these were developed first on internal
-branch and then were manualy ported by me to Linux public tree (since the device
-tree files are different) but then I forgot to keep the real author
-- removed patch "ARM: dts: at91: sama5d2_xplained: Add charger node of pmic."
-from this series since it was already applied on at91-dt branch (see [1])
-
-[1] https://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git/commit/?h=at91-dt&id=4b6ad41f267b8ddabf5dd1b02a318bc74f0b95e9
-
-Claudiu Beznea (14):
-  ARM: dts: at91: sama5d27_som1_ek: add disabled/okay status
-  ARM: dts: at91: sama5d27_som1_ek: update serial aliases
-  ARM: dts: at91: sama5d27_som1_ek: set USER button as a wakeup source
-  ARM: dts: at91: sama5d27_som1_ek: add aliases for i2c
-  ARM: dts: at91: sama5d27_som1_ek: add pinmuxing for pwm0
-  ARM: dts: at91: sama5d27_som1_ek: remove not connected CAN0
-  ARM: dts: at91: sama5d27_som1_ek: remove pull-up on SD/MMC lines
-  ARM: dts: at91: sama5d2_xplained: Add charger node of pmic.
-  ARM: dts: at91: sama5d2_xplained: set PB_USER as wakeup source
-  ARM: dts: at91: sama5d2_xplained: add pinmuxing for pwm0
-  ARM: dts: at91: sama5d2_xplained: remove pull-up on SD/MMC lines
-  ARM: dts: at91: at91sam9x25ek: add CAN1 interface
-  ARM: dts: at91: at91sam9x25ek: add pwm0
-  ARM: dts: at91: at91sam9x5ek: use DMA for USART0
-
- arch/arm/boot/dts/at91-sama5d27_som1_ek.dts | 46 ++++++++++++++---------------
- arch/arm/boot/dts/at91-sama5d2_xplained.dts | 39 ++++++++++++++++--------
- arch/arm/boot/dts/at91sam9x25ek.dts         | 10 +++++++
- arch/arm/boot/dts/at91sam9x5ek.dtsi         |  2 ++
- 4 files changed, 62 insertions(+), 35 deletions(-)
-
+diff --git a/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts b/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
+index 651ed5d4defc..e72036fa8ddb 100644
+--- a/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
++++ b/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
+@@ -349,7 +349,7 @@
+ 							 <PIN_PA7__SDMMC0_DAT5>,
+ 							 <PIN_PA8__SDMMC0_DAT6>,
+ 							 <PIN_PA9__SDMMC0_DAT7>;
+-						bias-pull-up;
++						bias-disable;
+ 					};
+ 
+ 					ck_cd_vddsel {
+@@ -367,7 +367,7 @@
+ 							 <PIN_PA19__SDMMC1_DAT1>,
+ 							 <PIN_PA20__SDMMC1_DAT2>,
+ 							 <PIN_PA21__SDMMC1_DAT3>;
+-						bias-pull-up;
++						bias-disable;
+ 					};
+ 
+ 					conf-ck_cd {
 -- 
 2.7.4
