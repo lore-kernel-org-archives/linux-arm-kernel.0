@@ -1,97 +1,67 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 10 Oct 2017 13:51:33 -0600
-Subject: [PATCH] arm64: kdump: Avoid to power off nonpanic CPUs
-In-Reply-To: <20171008153540.GB1694@remoulade>
-References: <1507471966-15367-1-git-send-email-leo.yan@linaro.org>
- <20171008153540.GB1694@remoulade>
-Message-ID: <CANLsYkzwKM3tKFy8kaAKsifZjB9L4Jop2TCbC_iXL-EK2R2tSw@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 10 Oct 2017 16:57:05 -0300
+Subject: [PATCH v2] dts: display5: Device tree description of LWN's
+ DISPLAY5 board
+In-Reply-To: <1506353849-21912-1-git-send-email-lukma@denx.de>
+References: <1506353849-21912-1-git-send-email-lukma@denx.de>
+Message-ID: <CAOMZO5D+uQMoVX4gzGa==6qkuUX=kH9g2=w_B73jwK=jxd_xHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 October 2017 at 09:35, Mark Rutland <mark.rutland@arm.com> wrote:
-> Hi Leo,
->
-> On Sun, Oct 08, 2017 at 10:12:46PM +0800, Leo Yan wrote:
->> commit a88ce63b642c ("arm64: kexec: have own crash_smp_send_stop() for
->> crash dump for nonpanic cores") introduces ARM64 architecture function
->> crash_smp_send_stop() to replace the weak function, this results in
->> the nonpanic CPUs to be hot-plugged out and CPUs are placed into low
->> power state on ARM64 platforms with the flow:
->>
->>   Panic CPU:
->>     machine_crash_shutdown()
->>       crash_smp_send_stop()
->>       smp_cross_call(&mask, IPI_CPU_CRASH_STOP)
->>
->>   Nonpanic CPUs:
->>     handle_IPI()
->>       ipi_cpu_crash_stop()
->>         cpu_ops[cpu]->cpu_die()
->>
->> The upper patch has no issue if enabled crash dump only; but if enabled
->> crash dump and Coresight debug module for panic dumping at the meantime,
->> nonpanic CPUs are powered off in crash dump flow,
->
-> We want to turn secondary CPUs off if at all possible, since we want to prevent
-> issues resulting from asynchronous behaviour (e.g. TLB/cache fetches) that
-> could result in subsequent problems (e.g. if bad page tables resulted in page
-> table walks to MMIO devices).
->
-> So we *really* want this behaviour in the general case.
->
->> later this may introduce conflicts with the Coresight debug module because
->> Coresight debug registers dumping requires the CPU must be powered on for
->> some platforms (e.g. Hi6220 on Hikey board). If we cannot keep the CPUs
->> powered on, we can see the hardware lockup issue when access Coresight debug
->> registers.
->
-> Just to check I understand, the coresight debug module is being invoked as a
-> panic notifier in the current kernel, right?
->
->> To fix this issue, this commit removes CPU hotplug operation in func
->> crash_smp_send_stop() and let CPUs to run into WFE/WFI states so CPUs
->> can still be powered on after crash dump. This finally is more safe
->> for Coresight debug module to dump registers and avoid hardware lockup.
->>
->> Cc: James Morse <james.morse@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
->> Signed-off-by: Leo Yan <leo.yan@linaro.org>
->> ---
->>  arch/arm64/kernel/smp.c | 6 ------
->>  1 file changed, 6 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
->> index 9f7195a..a65e68b 100644
->> --- a/arch/arm64/kernel/smp.c
->> +++ b/arch/arm64/kernel/smp.c
->> @@ -856,12 +856,6 @@ static void ipi_cpu_crash_stop(unsigned int cpu, struct pt_regs *regs)
->>
->>       local_irq_disable();
->>
->> -#ifdef CONFIG_HOTPLUG_CPU
->> -     if (cpu_ops[cpu]->cpu_die)
->> -             cpu_ops[cpu]->cpu_die(cpu);
->> -#endif
->> -
->
-> If it's really necessary to keep secondary CPUs online, please limit that to
-> the case where the coresight debug module is being used.
->
-> IIRC there were similar interactions with cpuidle, and I don't see why hotplug
-> should be any different.
+Hi Lukasz,
 
-Can you point to where it was fixed for CPUidle?  We should try to do
-the same for coresight_debug so that things are done the same way.
-I'm also thinking that we could call ->cpu_die(cpu) in a #ifdef
-CONFIG_HOTPLUG_CPU clause in debug_notifier_call().  That way the
-behaviour remains the same, just enacted a little later - please
-advise on what option you prefer.
+Usually the Subject should have the ARM prefix: ARM: dts: ....
 
-Regards,
-Mathieu
+On Mon, Sep 25, 2017 at 12:37 PM, Lukasz Majewski <lukma@denx.de> wrote:
 
->
-> Thanks,
-> Mark.
+> +       backlight_lvds: backlight {
+> +               compatible = "pwm-backlight";
+> +               pinctrl-names = "default";
+> +               pinctrl-0 = <&pinctrl_backlight>;
+> +               pwms = <&pwm2 0 5000000 0>;
+> +               brightness-levels = <  0   1   2   3   4   5   6   7   8   9
+> +                                     10  11  12  13  14  15  16  17  18  19
+> +                                     20  21  22  23  24  25  26  27  28  29
+> +                                     30  31  32  33  34  35  36  37  38  39
+> +                                     40  41  42  43  44  45  46  47  48  49
+> +                                     50  51  52  53  54  55  56  57  58  59
+> +                                     60  61  62  63  64  65  66  67  68  69
+> +                                     70  71  72  73  74  75  76  77  78  79
+> +                                     80  81  82  83  84  85  86  87  88  89
+> +                                     90  91  92  93  94  95  96  97  98  99
+> +                                    100 101 102 103 104 105 106 107 108 109
+> +                                    110 111 112 113 114 115 116 117 118 119
+> +                                    120 121 122 123 124 125 126 127 128 129
+> +                                    130 131 132 133 134 135 136 137 138 139
+> +                                    140 141 142 143 144 145 146 147 148 149
+> +                                    150 151 152 153 154 155 156 157 158 159
+> +                                    160 161 162 163 164 165 166 167 168 169
+> +                                    170 171 172 173 174 175 176 177 178 179
+> +                                    180 181 182 183 184 185 186 187 188 189
+> +                                    190 191 192 193 194 195 196 197 198 199
+> +                                    200 201 202 203 204 205 206 207 208 209
+> +                                    210 211 212 213 214 215 216 217 218 219
+> +                                    220 221 222 223 224 225 226 227 228 229
+> +                                    230 231 232 233 234 235 236 237 238 239
+> +                                    240 241 242 243 244 245 246 247 248 249
+> +                                    250 251 252 253 254 255>;
+
+Do you need such fine grained brightness levels? ;-)
+
+> +&i2c1 {
+> +       clock-frequency = <400000>;
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&pinctrl_i2c1>;
+> +       status = "okay";
+> +
+> +       codec: tfa9879 at 6C {
+> +               #sound-dai-cells = <0>;
+> +               compatible = "tfa9879";
+
+compatible = "nxp,tfa9879" , please.
+
+
+> +&iomuxc {
+> +       pinctrl-names = "default";
+
+This line can be removed.
