@@ -1,58 +1,37 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Tue, 10 Oct 2017 11:12:42 +0300
-Subject: [PATCH v4 0/5] media: atmel-isc: Rework the format list and
- clock provider
-In-Reply-To: <20171010024640.5733-1-wenyou.yang@microchip.com>
-References: <20171010024640.5733-1-wenyou.yang@microchip.com>
-Message-ID: <20171010081242.jxoyb3i5hr5q6zkg@valkosipuli.retiisi.org.uk>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 10 Oct 2017 10:09:49 +0200
+Subject: [PATCH v3 01/12] mmc: mediatek: add support of mt2701/mt2712
+In-Reply-To: <1507620951.19789.7.camel@mhfsdcap03>
+References: <1507604480-23246-1-git-send-email-chaotian.jing@mediatek.com>
+ <1507604480-23246-2-git-send-email-chaotian.jing@mediatek.com>
+ <CAPDyKFrqv5tt8Exq1msUBbMEROam2c+YnStazsf5SPj-NLrGSg@mail.gmail.com>
+ <1507620951.19789.7.camel@mhfsdcap03>
+Message-ID: <CAPDyKFppTCdaMizSGTjrfgsbMuHCsNi+knHVf9ibxgrAQ0GD2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 10, 2017 at 10:46:35AM +0800, Wenyou Yang wrote:
-> To improve the readability of code, rework the format list table,
-> split the format array into two. Meanwhile, fix the issue of the
-> clock provider operation and the pm runtime support.
-> 
-> Changes in v4:
->  - Call pm_runtime_get_sync() and pm_runtime_put_sync() in ->prepare
->    and ->unprepare callback.
->  - Move pm_runtime_enable() call from the complete callback to the
->    end of probe.
->  - Call pm_runtime_get_sync() and pm_runtime_put_sync() in
->    ->is_enabled() callbacks.
->  - Call clk_disable_unprepare() in ->remove callback.
-> 
-> Changes in v3:
->  - Fix the wrong used spinlock.
->  - s/_/- on the subject.
->  - Add a new flag for Raw Bayer format to remove MAX_RAW_FMT_INDEX define.
->  - Add the comments for define of the format flag.
->  - Rebase media_tree/master.
-> 
-> Changes in v2:
->  - Add the new patch to remove the unnecessary member from
->    isc_subdev_entity struct.
->  - Rebase on the patch set,
->         [PATCH 0/6] [media] Atmel: Adjustments for seven function implementations
->         https://www.mail-archive.com/linux-media at vger.kernel.org/msg118342.html
-> 
-> Wenyou Yang (5):
->   media: atmel-isc: Add spin lock for clock enable ops
->   media: atmel-isc: Add prepare and unprepare ops
->   media: atmel-isc: Enable the clocks during probe
->   media: atmel-isc: Remove unnecessary member
->   media: atmel-isc: Rework the format list
-> 
->  drivers/media/platform/atmel/atmel-isc-regs.h |   1 +
->  drivers/media/platform/atmel/atmel-isc.c      | 629 ++++++++++++++++++++------
->  2 files changed, 498 insertions(+), 132 deletions(-)
+On 10 October 2017 at 09:35, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> On Tue, 2017-10-10 at 09:26 +0200, Ulf Hansson wrote:
+>> [...]
+>>
+>> > +
+>> > +static const struct of_device_id msdc_of_ids[] = {
+>> > +       { .compatible = "mediatek,mt8135-mmc", .data = &mt8135_compat},
+>> > +       { .compatible = "mediatek,mt8173-mmc", .data = &mt8173_compat},
+>> > +       { .compatible = "mediatek,mt2701-mmc", .data = &mt2701_compat},
+>> > +       { .compatible = "mediatek,mt2712-mmc", .data = &mt2712_compat},
+>> > +       {}
+>> > +};
+>> > +MODULE_DEVICE_TABLE(of, msdc_of_ids);
+>>
+>> As already stated in the other reply. These new compatible changes
+>> needs to be discussed and acked before the driver starts using them.
+>>
+>> In other words, make patch3 to precede this one.
+> but, then there will have a probe issue as mentioned in previous mail
+> list. that's why I separate the binding file changes to 2 patches.
 
-Thanks for the update!!
+That sounds seriously wrong. Aren't the bindings backwards compatible?
 
-For patches 0--4:
-
-Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
-
--- 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi
+Kind regards
+Uffe
