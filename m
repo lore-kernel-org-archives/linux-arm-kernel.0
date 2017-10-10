@@ -1,61 +1,46 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 10 Oct 2017 10:25:35 +0800
-Subject: [linux-sunxi] Re: [PATCH 3/6] ARM: sun8i: r40: add 5V regulator
- for Banana Pi M2 Ultra
-In-Reply-To: <61E002C8-4046-44E4-8E1A-43C8AF74257C@aosc.io>
-References: <20171008042906.46779-1-icenowy@aosc.io>
- <20171008042906.46779-4-icenowy@aosc.io>
- <20171009210407.ueharyifho3s6xvu@flea.home>
- <61E002C8-4046-44E4-8E1A-43C8AF74257C@aosc.io>
-Message-ID: <CAGb2v66r2UyR1NWrtjdoKLEi_2NdXkhr_c5D6or9_9amNnh6PQ@mail.gmail.com>
+Date: Tue, 10 Oct 2017 10:36:36 +0800
+Subject: [PATCH v2 0/3] pinctrl: sunxi: Start to enforce the strict mode
+In-Reply-To: <cover.3e8ef5cb08d0164375d7644df0548e5f39b0fe66.1507582414.git-series.maxime.ripard@free-electrons.com>
+References: <cover.3e8ef5cb08d0164375d7644df0548e5f39b0fe66.1507582414.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v64PgArRi3gqq6mcT4f7bwY5-BHkaLOSrAQkCpBWHOXXMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 10, 2017 at 7:25 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
+On Tue, Oct 10, 2017 at 4:53 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
 >
+> Here is an attempt to enable pinctrl's strict mode on our pinctrl drivers.
+> Indeed, our controllers should have had that mode enabled since its
+> introduction.
 >
-> ? 2017?10?10? GMT+08:00 ??5:04:07, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
->>On Sun, Oct 08, 2017 at 04:29:03AM +0000, Icenowy Zheng wrote:
->>> On newer revisions of the Banana Pi M2 Ultra boards, the 5V power
->>output
->>> (used by HDMI, SATA and USB) is controller via a GPIO.
->>>
->>> Add the regulator node for it.
->>>
->>> Older revisions just have the 5V power output always on, and the GPIO
->>is
->>> reserved on these boards. So it won't affect the older revisions.
->>>
->>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->>> ---
->>>  arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts | 9 +++++++++
->>>  1 file changed, 9 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
->>b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
->>> index 7b52608cebe6..035599d870b9 100644
->>> --- a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
->>> +++ b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
->>> @@ -78,6 +78,15 @@
->>>              };
->>>      };
->>>
->>> +    reg_vcc5v0: vcc5v0 {
->>> +            compatible = "regulator-fixed";
->>> +            regulator-name = "vcc5v0";
->>> +            regulator-min-microvolt = <5000000>;
->>> +            regulator-max-microvolt = <5000000>;
->>> +            gpio = <&pio 7 23 GPIO_ACTIVE_HIGH>; /* PH23 */
->>> +            enable-active-high;
->>
->>This is redundant with the GPIO flag
+> However, there's a number of issues with old device trees that prevent from
+> just enabling it for all the devices. There's basically two of them:
 >
-> I remember someone suggested me to add this
-> property (maybe wens). It's said that the driver may not
-> process the GPIO_ACTIVE_HIGH correctly.
+>   - Most of our old DTs have a pinctrl node for GPIOs, which will result in
+>     an error when the driver is going to request the gpio because it would
+>     already be requested automatically by pinctrl. We cannot break those.
+>
+>   - Some of these GPIOs also need to change their pin configuration to add
+>     a bias or change the current output, and there isn't a migration path.
+>
+> Let's just keep the old behaviour for the old SoCs, and enforce it on the
+> new one, and enabled it by default so that the situation at least doesn't
+> get worse.
+>
+> This has been tested on an A83t (strict on) and an H3 (strict off) board.
+>
+> Let me know what you think,
+> Maxime
+>
+> Changes from v1:
+>   - Duplicate the pmx_ops before modifying them
+>   - Disable the strict mode for R_PIO as well
+>
+> Maxime Ripard (3):
+>   pinctrl: sunxi: Introduce the strict flag
+>   pinctrl: sunxi: Disable strict mode for old pinctrl drivers
+>   pinctrl: sunxi: Enforce the strict mode by default
 
-I believe it was me. The fixed regulator driver has not migrated to
-the GPIO descriptor API, and it doesn't look like it cares about the
-GPIO flags.
-
-ChenYu
+Acked-by: Chen-Yu Tsai <wens@csie.org>
