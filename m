@@ -1,58 +1,38 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 10 Oct 2017 18:34:32 +0900
-Subject: [PATCH] clk: samsung: exynos5433: mark PM functions as
- __maybe_unused
-In-Reply-To: <20171010091522.2286344-1-arnd@arndb.de>
-References: <CGME20171010091531epcas3p352520667820f068219330b307df69df2@epcas3p3.samsung.com>
- <20171010091522.2286344-1-arnd@arndb.de>
-Message-ID: <59DC9428.4090203@samsung.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 10 Oct 2017 10:38:11 +0100
+Subject: [PATCH v7 3/6] coresight: of: Use of_cpu_node_to_id helper
+In-Reply-To: <20171009025842.GA3146@leoy-linaro>
+References: <20171006103610.11853-1-suzuki.poulose@arm.com>
+ <20171006103610.11853-4-suzuki.poulose@arm.com>
+ <20171009025842.GA3146@leoy-linaro>
+Message-ID: <4518662b-01ce-30fd-a9ea-c517b2d1c5ff@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On 2017? 10? 10? 18:15, Arnd Bergmann wrote:
-> The suspend/resume functions are referenced conditionally, causing
-> a harmless warning when CONFIG_PM is disabled:
+On 09/10/17 03:58, Leo Yan wrote:
+> Hi Suzuki,
 > 
-> drivers/clk/samsung/clk-exynos5433.c:5476:12: error: 'exynos5433_cmu_resume' defined but not used [-Werror=unused-function]
-> drivers/clk/samsung/clk-exynos5433.c:5453:12: error: 'exynos5433_cmu_suspend' defined but not used [-Werror=unused-function]
+> On Fri, Oct 06, 2017 at 11:36:07AM +0100, Suzuki K Poulose wrote:
+>> Reuse the new generic helper, of_cpu_node_to_id() to map a
+>> given CPU phandle to a logical CPU number.
+>>
+>> Cc: Leo Yan <leo.yan@linaro.org>
+>> Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 > 
-> This marks both as __maybe_unused to shut up the warning.
+> Tested-by: Leo Yan <leo.yan@linaro.org>
 > 
-> Fixes: 523d3de41f02 ("clk: samsung: exynos5433: Add support for runtime PM")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/clk/samsung/clk-exynos5433.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/clk/samsung/clk-exynos5433.c b/drivers/clk/samsung/clk-exynos5433.c
-> index cd9337613dd8..db270908037a 100644
-> --- a/drivers/clk/samsung/clk-exynos5433.c
-> +++ b/drivers/clk/samsung/clk-exynos5433.c
-> @@ -5450,7 +5450,7 @@ struct exynos5433_cmu_data {
->  	struct samsung_clk_provider ctx;
->  };
->  
-> -static int exynos5433_cmu_suspend(struct device *dev)
-> +static int __maybe_unused exynos5433_cmu_suspend(struct device *dev)
->  {
->  	struct exynos5433_cmu_data *data = dev_get_drvdata(dev);
->  	int i;
-> @@ -5473,7 +5473,7 @@ static int exynos5433_cmu_suspend(struct device *dev)
->  	return 0;
->  }
->  
-> -static int exynos5433_cmu_resume(struct device *dev)
-> +static int __maybe_unused exynos5433_cmu_resume(struct device *dev)
->  {
->  	struct exynos5433_cmu_data *data = dev_get_drvdata(dev);
->  	int i;
+> BTW, I think the function get_cpu_for_node() in the file
+> arch/arm64/kernel/topology.c we also can refactor with the same
+> function, just reminding for this.
 > 
 
-Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
+Leo,
 
--- 
-Best Regards,
-Chanwoo Choi
-Samsung Electronics
+Thanks for the testing and the pointer. Yes we can move that to
+use the new helper. On another take, I found that the arm_pmu
+can also use it for pmu_parse_irq_affinity(). I will add
+them to the series.
+
+Cheers
+Suzuki
