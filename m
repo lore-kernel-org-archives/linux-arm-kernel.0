@@ -1,31 +1,26 @@
-From: stephen@networkplumber.org (Stephen Hemminger)
-Date: Tue, 10 Oct 2017 10:19:21 -0700
-Subject: [PATCH v2] xdp: Sample xdp program implementing ip forward
-In-Reply-To: <1507620532-25804-2-git-send-email-Christina.Jacob@cavium.com>
-References: <1507620532-25804-1-git-send-email-Christina.Jacob@cavium.com>
- <1507620532-25804-2-git-send-email-Christina.Jacob@cavium.com>
-Message-ID: <20171010101921.30136d48@shemminger-XPS-13-9360>
+From: pasha.tatashin@oracle.com (Pavel Tatashin)
+Date: Tue, 10 Oct 2017 13:19:19 -0400
+Subject: [PATCH v11 0/9] complete deferred page initialization
+In-Reply-To: <20171010141547.zpdptsccsblyw634@dhcp22.suse.cz>
+References: <20171009221931.1481-1-pasha.tatashin@oracle.com>
+ <20171010141547.zpdptsccsblyw634@dhcp22.suse.cz>
+Message-ID: <bd333387-fefc-c48a-2258-1d8c36f2db41@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 10 Oct 2017 12:58:52 +0530
-Christina Jacob <christina.jacob.koikara@gmail.com> wrote:
+I wanted to thank you Michal for spending time and doing the in-depth 
+reviews of every incremental change. Overall the series is in much 
+better shape now because of your feedback.
 
-> +/* Get the mac address of the interface given interface name */
-> +static long *getmac(char *iface)
-> +{
-> +	int fd;
-> +	struct ifreq ifr;
-> +	long *mac = NULL;
-> +
-> +	fd = socket(AF_INET, SOCK_DGRAM, 0);
-> +	ifr.ifr_addr.sa_family = AF_INET;
-> +	strncpy(ifr.ifr_name, iface, IFNAMSIZ - 1);
-> +	ioctl(fd, SIOCGIFHWADDR, &ifr);
-> +	mac = (long *)ifr.ifr_hwaddr.sa_data;
-> +	close(fd);
-> +	return mac;
+Pavel
 
-Always check return value of ioctl.
-You are assuming sizeof(long) > 6 bytes.
-Also the byte order.
+On 10/10/2017 10:15 AM, Michal Hocko wrote:
+> Btw. thanks for your persistance and willingness to go over all the
+> suggestions which might not have been consistent btween different
+> versions. I believe this is a general improvement in the early
+> initialization code. We do not rely on an implicit zeroing which just
+> happens to work by a chance. The perfomance improvements are a bonus on
+> top.
+> 
+> Thanks, good work!
+> 
