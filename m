@@ -1,92 +1,73 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Tue, 10 Oct 2017 11:09:34 -0700
-Subject: [PATCH] PCI: iproc: Allow allocation of multiple MSIs
-In-Reply-To: <20171007120851.20230-1-sbodomerle@gmail.com>
-References: <20171007120851.20230-1-sbodomerle@gmail.com>
-Message-ID: <d0467282-a44a-bd1e-e449-0bba953c4cfd@broadcom.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 10 Oct 2017 13:15:22 -0500
+Subject: [PATCH v3 02/12] pinctrl: axp209: add pinctrl features
+In-Reply-To: <20171002120854.5212-3-quentin.schulz@free-electrons.com>
+References: <20171002120854.5212-1-quentin.schulz@free-electrons.com>
+ <20171002120854.5212-3-quentin.schulz@free-electrons.com>
+Message-ID: <20171010181522.y7moibamlghiw3lf@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bodo,
-
-On 10/7/2017 5:08 AM, Bodo-Merle Sandor wrote:
-> From: Sandor Bodo-Merle <sbodomerle@gmail.com>
+On Mon, Oct 02, 2017 at 02:08:44PM +0200, Quentin Schulz wrote:
+> The X-Powers AXP209 has 3 GPIOs. GPIO0/1 can each act either as a GPIO,
+> an ADC or a LDO regulator. GPIO2 can only act as a GPIO.
 > 
-> Add support for allocating multiple MSIs at the same time, so that the
-> MSI_FLAG_MULTI_PCI_MSI flag can be added to the msi_domain_info
-> structure.
+> This adds the pinctrl features to the driver so GPIO0/1 can be used as
+> ADC or LDO regulator.
 > 
-> Avoid storing the hwirq in the low 5 bits of the message data, as it is
-> used by the device. Also fix an endianness problem by using readl().
-> 
-> Signed-off-by: Sandor Bodo-Merle <sbodomerle@gmail.com>
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 > ---
->   drivers/pci/host/pcie-iproc-msi.c | 19 ++++++++++++-------
->   1 file changed, 12 insertions(+), 7 deletions(-)
+>  .../devicetree/bindings/pinctrl/pinctrl-axp209.txt |  28 +-
+
+In the future, please split bindings to separate patch.
+
+>  drivers/pinctrl/pinctrl-axp209.c                   | 293 +++++++++++++++++++--
+>  2 files changed, 300 insertions(+), 21 deletions(-)
 > 
-> diff --git a/drivers/pci/host/pcie-iproc-msi.c b/drivers/pci/host/pcie-iproc-msi.c
-> index 2d0f535a2f69..990fc906d73d 100644
-> --- a/drivers/pci/host/pcie-iproc-msi.c
-> +++ b/drivers/pci/host/pcie-iproc-msi.c
-> @@ -179,7 +179,7 @@ static struct irq_chip iproc_msi_irq_chip = {
->   
->   static struct msi_domain_info iproc_msi_domain_info = {
->   	.flags = MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
-> -		MSI_FLAG_PCI_MSIX,
-> +		MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX,
->   	.chip = &iproc_msi_irq_chip,
->   };
->   
-> @@ -237,7 +237,7 @@ static void iproc_msi_irq_compose_msi_msg(struct irq_data *data,
->   	addr = msi->msi_addr + iproc_msi_addr_offset(msi, data->hwirq);
->   	msg->address_lo = lower_32_bits(addr);
->   	msg->address_hi = upper_32_bits(addr);
-> -	msg->data = data->hwirq;
-> +	msg->data = data->hwirq << 5; >   }
->   
->   static struct irq_chip iproc_msi_bottom_irq_chip = {
-> @@ -251,7 +251,7 @@ static int iproc_msi_irq_domain_alloc(struct irq_domain *domain,
->   				      void *args)
->   {
->   	struct iproc_msi *msi = domain->host_data;
-> -	int hwirq;
-> +	int hwirq, i;
->   
->   	mutex_lock(&msi->bitmap_lock);
->   
-> @@ -267,10 +267,14 @@ static int iproc_msi_irq_domain_alloc(struct irq_domain *domain,
->   
->   	mutex_unlock(&msi->bitmap_lock);
->   
-> -	irq_domain_set_info(domain, virq, hwirq, &iproc_msi_bottom_irq_chip,
-> -			    domain->host_data, handle_simple_irq, NULL, NULL);
-> +	for (i = 0; i < nr_irqs; i++) {
-> +		irq_domain_set_info(domain, virq + i, hwirq + i,
-> +				    &iproc_msi_bottom_irq_chip,
-> +				    domain->host_data, handle_simple_irq,
-> +				    NULL, NULL);
-> +	}
->   
-> -	return 0;
-> +	return hwirq;
->   }
->   
->   static void iproc_msi_irq_domain_free(struct irq_domain *domain,
-> @@ -302,7 +306,8 @@ static inline u32 decode_msi_hwirq(struct iproc_msi *msi, u32 eq, u32 head)
->   
->   	offs = iproc_msi_eq_offset(msi, eq) + head * sizeof(u32);
->   	msg = (u32 *)(msi->eq_cpu + offs);
-> -	hwirq = *msg & IPROC_MSI_EQ_MASK;
-> +	hwirq = readl(msg);
-> +	hwirq = (hwirq >> 5) + (hwirq & 0x1f);
->   
->   	/*
->   	 * Since we have multiple hwirq mapped to a single MSI vector,nnn
-> 
+> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-axp209.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-axp209.txt
+> index a6611304dd3c..388c04492afd 100644
+> --- a/Documentation/devicetree/bindings/pinctrl/pinctrl-axp209.txt
+> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-axp209.txt
+> @@ -1,4 +1,4 @@
+> -AXP209 GPIO controller
+> +AXP209 GPIO & pinctrl controller
+>  
+>  This driver follows the usual GPIO bindings found in
+>  Documentation/devicetree/bindings/gpio/gpio.txt
+> @@ -28,3 +28,29 @@ axp209: pmic at 34 {
+>  		#gpio-cells = <2>;
+>  	};
+>  };
+> +
+> +The GPIOs can be muxed to other functions and therefore, must be a subnode of
+> +axp_gpio.
+> +
+> +Example:
+> +
+> +&axp_gpio {
+> +	gpio0_adc: gpio0_adc {
 
-Change looks okay to me in general. May I know which platform you tested 
-this patch on and was SMP affinity configuration tested?
+Use '-' rather than '_' for node names.
 
-Thanks,
+With that,
 
-Ray
+Acked-by: Rob Herring <robh@kernel.org>
+
+> +		pins = "GPIO0";
+> +		function = "adc";
+> +	};
+> +};
+> +
+> +&example_node {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&gpio0_adc>;
+> +};
+> +
+> +GPIOs and their functions
+> +-------------------------
+> +
+> +GPIO	|	Functions
+> +------------------------
+> +GPIO0	|	gpio_in, gpio_out, ldo, adc
+> +GPIO1	|	gpio_in, gpio_out, ldo, adc
+> +GPIO2	|	gpio_in, gpio_out
