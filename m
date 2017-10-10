@@ -1,49 +1,58 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 10 Oct 2017 11:33:49 +0200
-Subject: [PATCH] arm64: dts: rockchip: enable touchpad button for
- rk3399-gru-kevin
-In-Reply-To: <20171009184028.11829-1-kernel@esmil.dk>
-References: <20171009184028.11829-1-kernel@esmil.dk>
-Message-ID: <4174027.Z5MyPRUDcj@phil>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 10 Oct 2017 18:34:32 +0900
+Subject: [PATCH] clk: samsung: exynos5433: mark PM functions as
+ __maybe_unused
+In-Reply-To: <20171010091522.2286344-1-arnd@arndb.de>
+References: <CGME20171010091531epcas3p352520667820f068219330b307df69df2@epcas3p3.samsung.com>
+ <20171010091522.2286344-1-arnd@arndb.de>
+Message-ID: <59DC9428.4090203@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Emil,
+Hi Arnd,
 
-Am Montag, 9. Oktober 2017, 20:40:28 CEST schrieb Emil Renner Berthing:
-> Adding the linux,gpio-keymap entry also has
-> the side-effect of making the driver register
-> the touchpad as a touchpad rather than another
-> touchscreen.
+On 2017? 10? 10? 18:15, Arnd Bergmann wrote:
+> The suspend/resume functions are referenced conditionally, causing
+> a harmless warning when CONFIG_PM is disabled:
 > 
-> The index for BTN_LEFT was found by trial and error.
+> drivers/clk/samsung/clk-exynos5433.c:5476:12: error: 'exynos5433_cmu_resume' defined but not used [-Werror=unused-function]
+> drivers/clk/samsung/clk-exynos5433.c:5453:12: error: 'exynos5433_cmu_suspend' defined but not used [-Werror=unused-function]
 > 
-> Signed-off-by: Emil Renner Berthing <kernel@esmil.dk>
-
-looks good to me. I'll just give the ChromeOS people a chance to
-respond before applying [maybe they can even tell what the other
-keys are :-) ]
-
-
-Heiko
-
+> This marks both as __maybe_unused to shut up the warning.
+> 
+> Fixes: 523d3de41f02 ("clk: samsung: exynos5433: Add support for runtime PM")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->  arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 4 ++++
->  1 file changed, 4 insertions(+)
+>  drivers/clk/samsung/clk-exynos5433.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-> index 5c8621766908..1c58d12551f5 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-> @@ -278,6 +278,10 @@ ap_i2c_dig: &i2c2 {
->  		pinctrl-0 = <&trackpad_int_l>;
->  		interrupt-parent = <&gpio1>;
->  		interrupts = <4 IRQ_TYPE_LEVEL_LOW>;
-> +		linux,gpio-keymap = <KEY_RESERVED
-> +				     KEY_RESERVED
-> +				     KEY_RESERVED
-> +				     BTN_LEFT>;
->  		wakeup-source;
->  	};
+> diff --git a/drivers/clk/samsung/clk-exynos5433.c b/drivers/clk/samsung/clk-exynos5433.c
+> index cd9337613dd8..db270908037a 100644
+> --- a/drivers/clk/samsung/clk-exynos5433.c
+> +++ b/drivers/clk/samsung/clk-exynos5433.c
+> @@ -5450,7 +5450,7 @@ struct exynos5433_cmu_data {
+>  	struct samsung_clk_provider ctx;
 >  };
+>  
+> -static int exynos5433_cmu_suspend(struct device *dev)
+> +static int __maybe_unused exynos5433_cmu_suspend(struct device *dev)
+>  {
+>  	struct exynos5433_cmu_data *data = dev_get_drvdata(dev);
+>  	int i;
+> @@ -5473,7 +5473,7 @@ static int exynos5433_cmu_suspend(struct device *dev)
+>  	return 0;
+>  }
+>  
+> -static int exynos5433_cmu_resume(struct device *dev)
+> +static int __maybe_unused exynos5433_cmu_resume(struct device *dev)
+>  {
+>  	struct exynos5433_cmu_data *data = dev_get_drvdata(dev);
+>  	int i;
 > 
+
+Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
+
+-- 
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
