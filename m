@@ -1,77 +1,97 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 10 Oct 2017 11:39:29 +0200
-Subject: [linux-sunxi] Re: [PATCH 3/6] ARM: sun8i: r40: add 5V regulator
- for Banana Pi M2 Ultra
-In-Reply-To: <CAGb2v66r2UyR1NWrtjdoKLEi_2NdXkhr_c5D6or9_9amNnh6PQ@mail.gmail.com>
-References: <20171008042906.46779-1-icenowy@aosc.io>
- <20171008042906.46779-4-icenowy@aosc.io>
- <20171009210407.ueharyifho3s6xvu@flea.home>
- <61E002C8-4046-44E4-8E1A-43C8AF74257C@aosc.io>
- <CAGb2v66r2UyR1NWrtjdoKLEi_2NdXkhr_c5D6or9_9amNnh6PQ@mail.gmail.com>
-Message-ID: <20171010093929.owvrowlpvicw663e@flea.home>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 10 Oct 2017 12:16:46 +0100
+Subject: [PATCH 2/3] ACPI/IORT: Improve functions return type/storage
+ class specifier indentation
+In-Reply-To: <59DC7ED6.50204@huawei.com>
+References: <1507038811-23382-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1507038811-23382-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <59DC7ED6.50204@huawei.com>
+Message-ID: <20171010111636.GA28096@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 10, 2017 at 02:25:35AM +0000, Chen-Yu Tsai wrote:
-> On Tue, Oct 10, 2017 at 7:25 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
+On Tue, Oct 10, 2017 at 04:03:34PM +0800, Hanjun Guo wrote:
+> On 2017/10/3 21:53, Lorenzo Pieralisi wrote:
+> > Some functions definition indentations are using a style that is frowned
+> > upon with return value type/storage class specifier in a separate line.
 > >
-> >
-> > ? 2017?10?10? GMT+08:00 ??5:04:07, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
-> >>On Sun, Oct 08, 2017 at 04:29:03AM +0000, Icenowy Zheng wrote:
-> >>> On newer revisions of the Banana Pi M2 Ultra boards, the 5V power
-> >>output
-> >>> (used by HDMI, SATA and USB) is controller via a GPIO.
-> >>>
-> >>> Add the regulator node for it.
-> >>>
-> >>> Older revisions just have the 5V power output always on, and the GPIO
-> >>is
-> >>> reserved on these boards. So it won't affect the older revisions.
-> >>>
-> >>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> >>> ---
-> >>>  arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts | 9 +++++++++
-> >>>  1 file changed, 9 insertions(+)
-> >>>
-> >>> diff --git a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-> >>b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-> >>> index 7b52608cebe6..035599d870b9 100644
-> >>> --- a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-> >>> +++ b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-> >>> @@ -78,6 +78,15 @@
-> >>>              };
-> >>>      };
-> >>>
-> >>> +    reg_vcc5v0: vcc5v0 {
-> >>> +            compatible = "regulator-fixed";
-> >>> +            regulator-name = "vcc5v0";
-> >>> +            regulator-min-microvolt = <5000000>;
-> >>> +            regulator-max-microvolt = <5000000>;
-> >>> +            gpio = <&pio 7 23 GPIO_ACTIVE_HIGH>; /* PH23 */
-> >>> +            enable-active-high;
-> >>
-> >>This is redundant with the GPIO flag
-> >
-> > I remember someone suggested me to add this
-> > property (maybe wens). It's said that the driver may not
-> > process the GPIO_ACTIVE_HIGH correctly.
+> > Reindent the function definitions to fix them.
 > 
-> I believe it was me. The fixed regulator driver has not migrated to
-> the GPIO descriptor API, and it doesn't look like it cares about the
-> GPIO flags.
+> Shall we fix the functions which guarded with #ifdef CONFIG_IOMMU_API
+> as well?
 
-Maybe we should just migrate it then?
+Yes I have a patch for that, I shall see if I can manage to squeeze it
+in for 4.15.
 
-Maxime
+Thanks,
+Lorenzo
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171010/89c1835c/attachment-0001.sig>
+> Thanks
+> Hanjun
+> 
+> >
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> > Cc: Sudeep Holla <sudeep.holla@arm.com>
+> > ---
+> >  drivers/acpi/arm64/iort.c | 20 +++++++++-----------
+> >  1 file changed, 9 insertions(+), 11 deletions(-)
+> >
+> > diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> > index 69f21f3..f4775e7 100644
+> > --- a/drivers/acpi/arm64/iort.c
+> > +++ b/drivers/acpi/arm64/iort.c
+> > @@ -88,8 +88,8 @@ static inline int iort_set_fwnode(struct acpi_iort_node *iort_node,
+> >   *
+> >   * Returns: fwnode_handle pointer on success, NULL on failure
+> >   */
+> > -static inline
+> > -struct fwnode_handle *iort_get_fwnode(struct acpi_iort_node *node)
+> > +static inline struct fwnode_handle *iort_get_fwnode(
+> > +			struct acpi_iort_node *node)
+> >  {
+> >  	struct iort_fwnode *curr;
+> >  	struct fwnode_handle *fwnode = NULL;
+> > @@ -306,9 +306,8 @@ static int iort_id_map(struct acpi_iort_id_mapping *map, u8 type, u32 rid_in,
+> >  	return 0;
+> >  }
+> >  
+> > -static
+> > -struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
+> > -					u32 *id_out, int index)
+> > +static struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
+> > +					       u32 *id_out, int index)
+> >  {
+> >  	struct acpi_iort_node *parent;
+> >  	struct acpi_iort_id_mapping *map;
+> > @@ -392,10 +391,9 @@ static struct acpi_iort_node *iort_node_map_id(struct acpi_iort_node *node,
+> >  	return NULL;
+> >  }
+> >  
+> > -static
+> > -struct acpi_iort_node *iort_node_map_platform_id(struct acpi_iort_node *node,
+> > -						 u32 *id_out, u8 type_mask,
+> > -						 int index)
+> > +static struct acpi_iort_node *iort_node_map_platform_id(
+> > +		struct acpi_iort_node *node, u32 *id_out, u8 type_mask,
+> > +		int index)
+> >  {
+> >  	struct acpi_iort_node *parent;
+> >  	u32 id;
+> > @@ -1077,8 +1075,8 @@ static const struct iort_iommu_config iort_arm_smmu_cfg __initconst = {
+> >  	.iommu_init_resources = arm_smmu_init_resources
+> >  };
+> >  
+> > -static __init
+> > -const struct iort_iommu_config *iort_get_iommu_cfg(struct acpi_iort_node *node)
+> > +static __init const struct iort_dev_config *iort_get_dev_cfg(
+> > +			struct acpi_iort_node *node)
+> >  {
+> >  	switch (node->type) {
+> >  	case ACPI_IORT_NODE_SMMU_V3:
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
