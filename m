@@ -1,128 +1,233 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 10 Oct 2017 19:38:38 +0100
-Subject: [PATCH v3 21/28] arm64/sve: Add sysctl to set the default vector
- length for new processes
+Date: Tue, 10 Oct 2017 19:38:37 +0100
+Subject: [PATCH v3 20/28] arm64/sve: Add prctl controls for userspace vector
+ length management
 In-Reply-To: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
 References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1507660725-7986-22-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1507660725-7986-21-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because of the effect of SVE on the size of the signal frame, the
-default vector length used for new processes involves a tradeoff
-between performance of SVE-enabled software on the one hand, and
-reliability of non-SVE-aware software on the other hand.
+This patch adds two arm64-specific prctls, to permit userspace to
+control its vector length:
 
-For this reason, the best choice depends on the repertoire of
-userspace software in use and is thus best left up to distro
-maintainers, sysadmins and developers.
+ * PR_SVE_SET_VL: set the thread's SVE vector length and vector
+   length inheritance mode.
 
-If CONFIG_SYSCTL is enabled, this patch exposes the default vector
-length in /proc/sys/abi/sve_default_vector_length, where boot
-scripts or the adventurous can poke it.
+ * PR_SVE_GET_VL: get the same information.
 
-In common with other arm64 ABI sysctls, this control is currently
-global: setting it requires CAP_SYS_ADMIN in the root user
-namespace, but the value set is effective for subsequent execs in
-all namespaces.  The control only affects _new_ processes, however:
-changing it does not affect the vector length of any existing
-process.
-
-The intended usage model is that if userspace is known to be fully
-SVE-tolerant (or a developer is curious to find out) then init
-scripts can crank this up during startup.
+Although these calls shadow instruction set features in the SVE
+architecture, these prctls provide additional control: the vector
+length inheritance mode is Linux-specific and nothing to do with
+the architecture, and the architecture does not permit EL0 to set
+its own vector length directly.  Both can be used in portable tools
+without requiring the use of SVE instructions.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
----
- arch/arm64/kernel/fpsimd.c | 62 +++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 61 insertions(+), 1 deletion(-)
+Cc: Alex Benn?e <alex.bennee@linaro.org>
 
+---
+
+Dropped Alex Benn?e's Reviewed-by, since there are non-trivial changes
+since v2.
+
+Changes since v2
+----------------
+
+Bug fixes:
+
+ * Remove preempt_disable() from sve_set_current_vl(), since it's
+   (a) wrong, and (b) moved to sve_set_vector_length().
+
+   This was a legacy from before migration to allowing kernel_neon_begin()
+   in softirq.
+
+ABI changes:
+
+ * Changed return value of PR_SVE_SET_VL to encode the vector length
+   deferred for the next exec, when PR_SVE_SET_VL_ONEXEC is passed.
+
+   This allows a caller to probe for supported VLs without
+   changing the current VL.
+
+   Without this change, the return value is not very informative
+   in this case, since the current VL doesn't change.
+
+   Without PR_SVE_SET_VL_ONEXEC, the new current VL is returned,
+   as in v2.
+---
+ arch/arm64/include/asm/fpsimd.h    | 14 +++++++++++
+ arch/arm64/include/asm/processor.h |  4 +++
+ arch/arm64/kernel/fpsimd.c         | 50 ++++++++++++++++++++++++++++++++++++++
+ include/uapi/linux/prctl.h         |  4 +++
+ kernel/sys.c                       | 12 +++++++++
+ 5 files changed, 84 insertions(+)
+
+diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+index ee6db38..3cfdfbe 100644
+--- a/arch/arm64/include/asm/fpsimd.h
++++ b/arch/arm64/include/asm/fpsimd.h
+@@ -17,6 +17,7 @@
+ #define __ASM_FP_H
+ 
+ #include <asm/ptrace.h>
++#include <asm/errno.h>
+ 
+ #ifndef __ASSEMBLY__
+ 
+@@ -99,6 +100,9 @@ extern void sve_sync_from_fpsimd_zeropad(struct task_struct *task);
+ extern int sve_set_vector_length(struct task_struct *task,
+ 				 unsigned long vl, unsigned long flags);
+ 
++extern int sve_set_current_vl(unsigned long arg);
++extern int sve_get_current_vl(void);
++
+ /*
+  * Probing and setup functions.
+  * Calls to these functions must be serialised with one another.
+@@ -116,6 +120,16 @@ static void __maybe_unused sve_sync_to_fpsimd(struct task_struct *task) { }
+ static void __maybe_unused sve_sync_from_fpsimd_zeropad(
+ 	struct task_struct *task) { }
+ 
++static int __maybe_unused sve_set_current_vl(unsigned long arg)
++{
++	return -EINVAL;
++}
++
++static int __maybe_unused sve_get_current_vl(void)
++{
++	return -EINVAL;
++}
++
+ static void __maybe_unused sve_init_vq_map(void) { }
+ static void __maybe_unused sve_update_vq_map(void) { }
+ static int __maybe_unused sve_verify_vq_map(void) { return 0; }
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index 3faceac..df66452 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -197,4 +197,8 @@ static inline void spin_lock_prefetch(const void *ptr)
+ int cpu_enable_pan(void *__unused);
+ int cpu_enable_cache_maint_trap(void *__unused);
+ 
++/* Userspace interface for PR_SVE_{SET,GET}_VL prctl()s: */
++#define SVE_SET_VL(arg)	sve_set_current_vl(arg)
++#define SVE_GET_VL()	sve_get_current_vl()
++
+ #endif /* __ASM_PROCESSOR_H */
 diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 2c23e4a..a9cb794 100644
+index 6db9f30..2c23e4a 100644
 --- a/arch/arm64/kernel/fpsimd.c
 +++ b/arch/arm64/kernel/fpsimd.c
-@@ -35,6 +35,7 @@
- #include <linux/sched/signal.h>
- #include <linux/signal.h>
- #include <linux/slab.h>
-+#include <linux/sysctl.h>
- 
- #include <asm/fpsimd.h>
- #include <asm/cputype.h>
-@@ -345,6 +346,65 @@ static unsigned int find_supported_vector_length(unsigned int vl)
- 	return sve_vl_from_vq(bit_to_vq(bit));
+@@ -28,6 +28,7 @@
+ #include <linux/irqflags.h>
+ #include <linux/init.h>
+ #include <linux/percpu.h>
++#include <linux/prctl.h>
+ #include <linux/preempt.h>
+ #include <linux/prctl.h>
+ #include <linux/ptrace.h>
+@@ -569,6 +570,55 @@ int sve_set_vector_length(struct task_struct *task,
  }
  
-+#ifdef CONFIG_SYSCTL
-+
-+static int sve_proc_do_default_vl(struct ctl_table *table, int write,
-+				  void __user *buffer, size_t *lenp,
-+				  loff_t *ppos)
+ /*
++ * Encode the current vector length and flags for return.
++ * This is only required for prctl(): ptrace has separate fields
++ *
++ * flags are as for sve_set_vector_length().
++ */
++static int sve_prctl_status(unsigned long flags)
 +{
 +	int ret;
-+	int vl = sve_default_vl;
-+	struct ctl_table tmp_table = {
-+		.data = &vl,
-+		.maxlen = sizeof(vl),
-+	};
 +
-+	ret = proc_dointvec(&tmp_table, write, buffer, lenp, ppos);
-+	if (ret || !write)
-+		return ret;
++	if (flags & PR_SVE_SET_VL_ONEXEC)
++		ret = current->thread.sve_vl_onexec;
++	else
++		ret = current->thread.sve_vl;
 +
-+	/* Writing -1 has the special meaning "set to max": */
-+	if (vl == -1) {
-+		/* Fail safe if sve_max_vl wasn't initialised */
-+		if (WARN_ON(!sve_vl_valid(sve_max_vl)))
-+			vl = SVE_VL_MIN;
-+		else
-+			vl = sve_max_vl;
++	if (test_thread_flag(TIF_SVE_VL_INHERIT))
++		ret |= PR_SVE_VL_INHERIT;
 +
-+		goto chosen;
-+	}
++	return ret;
++}
 +
-+	if (!sve_vl_valid(vl))
++/* PR_SVE_SET_VL */
++int sve_set_current_vl(unsigned long arg)
++{
++	unsigned long vl, flags;
++	int ret;
++
++	vl = arg & PR_SVE_VL_LEN_MASK;
++	flags = arg & ~vl;
++
++	if (!system_supports_sve())
 +		return -EINVAL;
 +
-+	vl = find_supported_vector_length(vl);
-+chosen:
-+	sve_default_vl = vl;
-+	return 0;
++	ret = sve_set_vector_length(current, vl, flags);
++	if (ret)
++		return ret;
++
++	return sve_prctl_status(flags);
 +}
 +
-+static struct ctl_table sve_default_vl_table[] = {
-+	{
-+		.procname	= "sve_default_vector_length",
-+		.mode		= 0644,
-+		.proc_handler	= sve_proc_do_default_vl,
-+	},
-+	{ }
-+};
-+
-+static int __init sve_sysctl_init(void)
++/* PR_SVE_GET_VL */
++int sve_get_current_vl(void)
 +{
-+	if (system_supports_sve())
-+		if (!register_sysctl("abi", sve_default_vl_table))
-+			return -EINVAL;
++	if (!system_supports_sve())
++		return -EINVAL;
 +
-+	return 0;
++	return sve_prctl_status(0);
 +}
 +
-+#else /* ! CONFIG_SYSCTL */
-+static int __init sve_sysctl_init(void) { return 0; }
-+#endif /* ! CONFIG_SYSCTL */
-+
- #define ZREG(sve_state, vq, n) ((char *)(sve_state) +		\
- 	(SVE_SIG_ZREG_OFFSET(vq, n) - SVE_SIG_REGS_OFFSET))
++/*
+  * Bitmap for temporary storage of the per-CPU set of supported vector lengths
+  * during secondary boot.
+  */
+diff --git a/include/uapi/linux/prctl.h b/include/uapi/linux/prctl.h
+index 1b64901..1ef9370 100644
+--- a/include/uapi/linux/prctl.h
++++ b/include/uapi/linux/prctl.h
+@@ -198,7 +198,11 @@ struct prctl_mm_map {
+ # define PR_CAP_AMBIENT_CLEAR_ALL	4
  
-@@ -1232,6 +1292,6 @@ static int __init fpsimd_init(void)
- 	if (!(elf_hwcap & HWCAP_ASIMD))
- 		pr_notice("Advanced SIMD is not implemented\n");
+ /* arm64 Scalable Vector Extension controls */
++/* Flag values must be kept in sync with ptrace NT_ARM_SVE interface */
++#define PR_SVE_SET_VL			48	/* set task vector length */
+ # define PR_SVE_SET_VL_ONEXEC		(1 << 18) /* defer effect until exec */
++#define PR_SVE_GET_VL			49	/* get task vector length */
++/* Bits common to PR_SVE_SET_VL and PR_SVE_GET_VL */
+ # define PR_SVE_VL_LEN_MASK		0xffff
+ # define PR_SVE_VL_INHERIT		(1 << 17) /* inherit across exec */
  
--	return 0;
-+	return sve_sysctl_init();
- }
- core_initcall(fpsimd_init);
+diff --git a/kernel/sys.c b/kernel/sys.c
+index 9aebc29..c541916 100644
+--- a/kernel/sys.c
++++ b/kernel/sys.c
+@@ -110,6 +110,12 @@
+ #ifndef SET_FP_MODE
+ # define SET_FP_MODE(a,b)	(-EINVAL)
+ #endif
++#ifndef SVE_SET_VL
++# define SVE_SET_VL(a)		(-EINVAL)
++#endif
++#ifndef SVE_GET_VL
++# define SVE_GET_VL()		(-EINVAL)
++#endif
+ 
+ /*
+  * this is where the system-wide overflow UID and GID are defined, for
+@@ -2385,6 +2391,12 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
+ 	case PR_GET_FP_MODE:
+ 		error = GET_FP_MODE(me);
+ 		break;
++	case PR_SVE_SET_VL:
++		error = SVE_SET_VL(arg2);
++		break;
++	case PR_SVE_GET_VL:
++		error = SVE_GET_VL();
++		break;
+ 	default:
+ 		error = -EINVAL;
+ 		break;
 -- 
 2.1.4
