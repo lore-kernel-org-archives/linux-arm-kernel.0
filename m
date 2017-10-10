@@ -1,71 +1,79 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 10 Oct 2017 11:06:30 +0100
-Subject: [PATCH v9 4/4] PCI: hisi: blacklist hip06/hip07 controllers
- behind SMMUv3
-In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA838421875@FRAEML521-MBX.china.huawei.com>
-References: <20171006140450.89652-1-shameerali.kolothum.thodi@huawei.com>
- <20171006140450.89652-5-shameerali.kolothum.thodi@huawei.com>
- <20171009235452.GP25517@bhelgaas-glaptop.roam.corp.google.com>
- <5FC3163CFD30C246ABAA99954A238FA838421875@FRAEML521-MBX.china.huawei.com>
-Message-ID: <20171010100630.GA764@red-moon>
+From: Claudiu.Beznea@microchip.com (m18063)
+Date: Tue, 10 Oct 2017 13:09:32 +0300
+Subject: [PATCH 09/15] ARM: dts: at91: sama5d2_xplained: Add charger node
+ of pmic.
+In-Reply-To: <d42b60fb-7eac-229c-5e71-303e271c01a0@Microchip.com>
+References: <1507565377-1545-1-git-send-email-claudiu.beznea@microchip.com>
+ <1507565377-1545-10-git-send-email-claudiu.beznea@microchip.com>
+ <d42b60fb-7eac-229c-5e71-303e271c01a0@Microchip.com>
+Message-ID: <5714eb53-d777-130e-b8bd-f80eda7c96b0@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 10, 2017 at 09:42:30AM +0000, Shameerali Kolothum Thodi wrote:
+Hi Wenyou,
 
-[...]
+On 10.10.2017 03:39, Yang, Wenyou wrote:
+> Hi Claudiu,
+> 
+> 
+> On 2017/10/10 0:09, Claudiu Beznea wrote:
+>> Add charger device node as a sub-device node of act8945a mfd, move
+>> the charger's properties to this node, and use the "interrupts"
+>> property to replace "active-semi,irq_gpios" to denote the act8945a
+>> charger's irq.
+>>
+>> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+>> [claudiu.beznea at microchip.com: replace numbers with pin macros]
+>> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+> This patch has already applied on at91-dt branch.
+> https://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git/commit/?h=at91-dt&id=4b6ad41f267b8ddabf5dd1b02a318bc74f0b95e9
+> 
+Thanks, I will remove it from v2.
 
-> > > diff --git a/drivers/pci/dwc/pcie-hisi.c b/drivers/pci/dwc/pcie-hisi.c
-> > > index a201791..6800747 100644
-> > > --- a/drivers/pci/dwc/pcie-hisi.c
-> > > +++ b/drivers/pci/dwc/pcie-hisi.c
-> > > @@ -270,6 +270,12 @@ static int hisi_pcie_probe(struct platform_device
-> > *pdev)
-> > >  	struct resource *reg;
-> > >  	int ret;
-> > >
-> > > +	if ((IS_BUILTIN(CONFIG_ARM_SMMU_V3)) &&
-> > > +			of_property_read_bool(dev->of_node, "iommu-
-> > map")) {
-> > 
-> > Does the presence of "iommu-map" tell you this is an SMMUv3?  Could it
-> > have a different type of IOMMU?  I can't tell from reading
-> > Documentation/devicetree/bindings/pci/pci-iommu.txt.
+>> ---
+>> ? arch/arm/boot/dts/at91-sama5d2_xplained.dts | 23 +++++++++++++++--------
+>> ? 1 file changed, 15 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+>> index c7e9ccf2bc87..848ca1b025be 100644
+>> --- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+>> +++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+>> @@ -160,14 +160,6 @@
+>> ????????????????????? compatible = "active-semi,act8945a";
+>> ????????????????????? reg = <0x5b>;
+>> ????????????????????? active-semi,vsel-high;
+>> -??????????????????? active-semi,chglev-gpios = <&pioA PIN_PA12 GPIO_ACTIVE_HIGH>;
+>> -??????????????????? active-semi,lbo-gpios = <&pioA PIN_PC8 GPIO_ACTIVE_LOW>;
+>> -??????????????????? active-semi,irq_gpios = <&pioA PIN_PB13 GPIO_ACTIVE_LOW>;
+>> -??????????????????? active-semi,input-voltage-threshold-microvolt = <6600>;
+>> -??????????????????? active-semi,precondition-timeout = <40>;
+>> -??????????????????? active-semi,total-timeout = <3>;
+>> -??????????????????? pinctrl-names = "default";
+>> -??????????????????? pinctrl-0 = <&pinctrl_charger_chglev &pinctrl_charger_lbo &pinctrl_charger_irq>;
+>> ????????????????????? status = "okay";
+>> ? ????????????????????? regulators {
+>> @@ -220,6 +212,21 @@
+>> ????????????????????????????? regulator-always-on;
+>> ????????????????????????? };
+>> ????????????????????? };
+>> +
+>> +??????????????????? charger {
+>> +??????????????????????? compatible = "active-semi,act8945a-charger";
+>> +??????????????????????? pinctrl-names = "default";
+>> +??????????????????????? pinctrl-0 = <&pinctrl_charger_chglev &pinctrl_charger_lbo &pinctrl_charger_irq>;
+>> +??????????????????????? interrupt-parent = <&pioA>;
+>> +??????????????????????? interrupts = <PIN_PB13 GPIO_ACTIVE_LOW>;
+>> +
+>> +??????????????????????? active-semi,chglev-gpios = <&pioA PIN_PA12 GPIO_ACTIVE_HIGH>;
+>> +??????????????????????? active-semi,lbo-gpios = <&pioA PIN_PC8 GPIO_ACTIVE_LOW>;
+>> +??????????????????????? active-semi,input-voltage-threshold-microvolt = <6600>;
+>> +??????????????????????? active-semi,precondition-timeout = <40>;
+>> +??????????????????????? active-semi,total-timeout = <3>;
+>> +??????????????????????? status = "okay";
+>> +??????????????????? };
+>> ????????????????? };
+>> ????????????? };
+>> ? 
 > 
-> Only if the SMMUv3 driver is loaded and iommu-map binding property present,
-> the pcie devices will use SMMU translated iova for MSI doorbell addresses.
-
-And the iommu-map property _actually_ points at an OF node with an
-SMMUv3 compatible string - the sheer fact that the SMMUv3 driver
-is compiled in is not sufficient IIUC.
-
-Lorenzo
-
-> > Why do you care whether CONFIG_ARM_SMMU_V3 is set?  Does MSI work
-> > correctly if SMMUv3 is present but not used?
-> 
-> Yes. MSI will work if no SMMUv3 is used.
-> 
-> > Is it really necessary to ignore the PCIe controller completely?
-> > Could you use the devices below it as long as you disable MSI for them?  I
-> > know there are probably devices that require MSI, so maybe it's easier to
-> > just ignore everything than to respond to reports of "my device doesn't work
-> > because it requires MSI."
-> 
-> We are blacklisting MSI for PCIe only if the kernel is using DT and is configured
-> to use SMMUv3. Otherwise it is fine. And as I said above DT is not officially
-> supported on these platforms.
-> 
-> Thanks,
-> Shameer
-> 
-> 1. [PATCH v6 3/3] iommu/arm-smmu-v3:Enable ACPI based HiSilicon erratum 161010801
-> https://www.spinics.net/lists/arm-kernel/msg602873.html
-> 2. [PATCH v8 3/5] iommu/of: Add msi address regions reservation helper
-> https://www.spinics.net/lists/arm-kernel/msg609431.html
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Best Regards,
+> Wenyou Yang
