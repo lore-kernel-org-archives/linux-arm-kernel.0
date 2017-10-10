@@ -1,26 +1,91 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 10 Oct 2017 13:56:56 -0500
-Subject: [PATCH v2 1/4] dt-bindings: nvmem: Describe the Amlogic
- Meson6/Meson8/Meson8b efuse
-In-Reply-To: <20171002232804.20042-2-martin.blumenstingl@googlemail.com>
-References: <20171002232804.20042-1-martin.blumenstingl@googlemail.com>
- <20171002232804.20042-2-martin.blumenstingl@googlemail.com>
-Message-ID: <20171010185656.pf4jybiohcywp7wj@rob-hp-laptop>
+From: brouer@redhat.com (Jesper Dangaard Brouer)
+Date: Tue, 10 Oct 2017 21:06:07 +0200
+Subject: [PATCH v2] xdp: Sample xdp program implementing ip forward
+In-Reply-To: <1507620532-25804-2-git-send-email-Christina.Jacob@cavium.com>
+References: <1507620532-25804-1-git-send-email-Christina.Jacob@cavium.com>
+ <1507620532-25804-2-git-send-email-Christina.Jacob@cavium.com>
+Message-ID: <20171010210607.2af452e2@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 03, 2017 at 01:28:01AM +0200, Martin Blumenstingl wrote:
-> Amlogic Meson6, Meson8 and Meson8b SoCs have an efuse which contains
-> calibration data from the factory (for the internal temperature sensor
-> and some CVBS connector settings). Some manufacturers also store the MAC
-> address or serial number in the efuse.
-> 
-> This documents the devicetree bindings for the efuse on these SoCs.
-> 
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> ---
->  .../bindings/nvmem/amlogic-meson-mx-efuse.txt      | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/nvmem/amlogic-meson-mx-efuse.txt
+On Tue, 10 Oct 2017 12:58:52 +0530
+Christina Jacob <christina.jacob.koikara@gmail.com> wrote:
 
-Acked-by: Rob Herring <robh@kernel.org>
+> +SEC("xdp3")
+> +int xdp_prog3(struct xdp_md *ctx)
+> +{
+> +	void *data_end = (void *)(long)ctx->data_end;
+> +	void *data = (void *)(long)ctx->data;
+> +	struct ethhdr *eth = data;
+> +	int rc = XDP_DROP, forward_to;
+> +	long *value;
+> +	struct trie_value *prefix_value;
+> +	long *dest_mac = NULL, *src_mac = NULL;
+> +	u16 h_proto;
+> +	u64 nh_off;
+> +	u32 ipproto;
+> +	union key_4 key4;
+
+Reverse-xmas tree rule: Prefer ordering declarations longest to shortest.
+
+
+[...]
+> +	if (h_proto == htons(ETH_P_ARP)) {
+> +		return XDP_PASS;
+> +	} else if (h_proto == htons(ETH_P_IP)) {
+> +		int src_ip = 0, dest_ip = 0;
+> +		struct direct_map *direct_entry;
+> +
+> +		ipproto = parse_ipv4(data, nh_off, data_end, &src_ip, &dest_ip);
+> +		direct_entry = (struct direct_map *)bpf_map_lookup_elem
+> +			(&exact_match, &dest_ip);
+> +		/*check for exact match, this would give a faster lookup*/
+> +		if (direct_entry && direct_entry->mac && direct_entry->arp.mac) {
+> +			src_mac = &direct_entry->mac;
+> +			dest_mac = &direct_entry->arp.mac;
+> +			forward_to = direct_entry->ifindex;
+> +		} else {
+> +			/*Look up in the trie for lpm*/
+> +			key4.b32[0] = 32;
+> +			key4.b8[4] = dest_ip % 0x100;
+> +			key4.b8[5] = (dest_ip >> 8) % 0x100;
+> +			key4.b8[6] = (dest_ip >> 16) % 0x100;
+> +			key4.b8[7] = (dest_ip >> 24) % 0x100;
+> +			prefix_value = ((struct trie_value *)bpf_map_lookup_elem
+> +					(&lpm_map, &key4));
+> +			if (!prefix_value) {
+> +				return XDP_DROP;
+> +			} else {
+> +				src_mac = &prefix_value->value;
+> +				if (src_mac) {
+> +					dest_mac = (long *)bpf_map_lookup_elem
+> +						(&arp_table, &dest_ip);
+> +					if (!dest_mac) {
+> +						if (prefix_value->gw) {
+> +							dest_ip = *(__be32 *)&prefix_value->gw;
+> +							dest_mac = (long *)bpf_map_lookup_elem(&arp_table, &dest_ip);
+> +						} else {
+> +							return XDP_DROP;
+> +						}
+> +					}
+> +					forward_to = prefix_value->ifindex;
+> +				} else {
+> +					return XDP_DROP;
+> +				}
+> +			}
+> +		}
+> +	} else {
+> +		ipproto = 0;
+> +	}
+
+The nesting in this function is getting annoying to read.
+Kernel code often use "early return" style coding to solve this.
+
+A quick search turns up this guide, look at section "Early return"
+ https://en.wikibooks.org/wiki/Computer_Programming/Coding_Style/Minimize_nesting
+
+-- 
+Best regards,
+  Jesper Dangaard Brouer
+  MSc.CS, Principal Kernel Engineer at Red Hat
+  LinkedIn: http://www.linkedin.com/in/brouer
