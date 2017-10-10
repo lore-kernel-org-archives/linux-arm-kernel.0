@@ -1,65 +1,44 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 9 Oct 2017 19:13:51 -0500
-Subject: [PATCH v4 1/2] PCI: pci-host-generic: add support for Synopsys
- DesignWare RC in ECAM mode
-In-Reply-To: <20171009164607.GD30085@arm.com>
-References: <20171006163919.14898-1-ard.biesheuvel@linaro.org>
- <20171006163919.14898-2-ard.biesheuvel@linaro.org>
- <20171006232158.GI25517@bhelgaas-glaptop.roam.corp.google.com>
- <20171009164607.GD30085@arm.com>
-Message-ID: <20171010001351.GQ25517@bhelgaas-glaptop.roam.corp.google.com>
+Date: Mon, 9 Oct 2017 19:15:42 -0500
+Subject: [PATCH v9 4/4] PCI: hisi: blacklist hip06/hip07 controllers
+ behind SMMUv3
+In-Reply-To: <20171009235452.GP25517@bhelgaas-glaptop.roam.corp.google.com>
+References: <20171006140450.89652-1-shameerali.kolothum.thodi@huawei.com>
+ <20171006140450.89652-5-shameerali.kolothum.thodi@huawei.com>
+ <20171009235452.GP25517@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20171010001542.GR25517@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 09, 2017 at 05:46:07PM +0100, Will Deacon wrote:
-> On Fri, Oct 06, 2017 at 06:21:59PM -0500, Bjorn Helgaas wrote:
-> > On Fri, Oct 06, 2017 at 05:39:18PM +0100, Ard Biesheuvel wrote:
-> > > diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-> > > index 7d709a7e0aa8..01e81a30e303 100644
-> > > --- a/drivers/pci/host/pci-host-generic.c
-> > > +++ b/drivers/pci/host/pci-host-generic.c
-> > > @@ -35,6 +35,43 @@ static struct pci_ecam_ops gen_pci_cfg_cam_bus_ops = {
-> > >  	}
-> > >  };
-> > >  
-> > > +static int pci_dw_ecam_config_read(struct pci_bus *bus, u32 devfn, int where,
-> > > +				   int size, u32 *val)
-> > > +{
-> > > +	struct pci_config_window *cfg = bus->sysdata;
-> > > +
-> > > +	/*
-> > > +	 * The Synopsys DesignWare PCIe controller in ECAM mode will not filter
-> > > +	 * type 0 config TLPs sent to devices 1 and up on its downstream port,
-> > > +	 * resulting in devices appearing multiple times on bus 0 unless we
-> > > +	 * filter out those accesses here.
-> > > +	 */
-> > > +	if (bus->number == cfg->busr.start && PCI_SLOT(devfn) > 0)
-> > > +		return PCIBIOS_DEVICE_NOT_FOUND;
-> > 
-> > I think we should return 0xffffffff data here, as we do in other
-> > similar accessors (dw_pcie_rd_conf(), altera_pcie_cfg_read(),
-> > rockchip_pcie_rd_conf()).
-> > 
-> > Actually, xilinx-nwl has a nice trick: it implements
-> > nwl_pcie_map_bus(), which returns NULL for invalid devices.  Then it
-> > can use the generic accessors, and pci_generic_config_read() already
-> > fills in ~0 for this case. 
-> > 
-> > What do you think of the following?  I put it on my pci/host-generic
-> > branch for now (pending your response and an ack from Will).
+On Mon, Oct 09, 2017 at 06:54:52PM -0500, Bjorn Helgaas wrote:
+> Please change subject line:
 > 
-> I'd probably just inline the device check in pci_dw_ecam_map_bus directly,
-> but either way:
+> -  PCI: hisi: blacklist hip06/hip07 controllers behind SMMUv3
+> +  PCI: hisi: Blacklist hip06/hip07 controllers behind SMMUv3
 > 
-> Acked-by: Will Deacon <will.deacon@arm.com>
+> On Fri, Oct 06, 2017 at 03:04:50PM +0100, Shameer Kolothum wrote:
+> > The HiSilicon erratum 161010801 describes the limitation of
+> > HiSilicon platforms hip06/hip07 to support the SMMUv3 mappings
+> > for MSI transactions.
+> 
+> I don't suppose there's a URL for this erratum, is there?
+> 
+> > PCIe controller on these platforms has to differentiate the MSI
+> > payload against other DMA payload and has to modify the MSI
+> > payload. This basically makes it difficult for this platforms to
+> > have a SMMU translation for MSI. In order to workaround this, ARM
+> > SMMUv3 driver requires a quirk to treat the MSI regions separately.
+> > Such a quirk is currently missing for DT based systems and therefore
+> > we need to blacklist the hip06/hip07 PCIe controllers.
+> 
+> I don't understand the DT connection here.  If this is a hardware
+> erratum, I assume the a quirk would be required whether the system
+> uses DT, ACPI, etc.
+> 
+> > Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
+> 
+> I assume this will go via some non-PCI tree.  If I were applying this,
+> I would look for an ack from Zhou or Gabriele in addition to mine.
 
-Thanks.  The reason I split out pci_dw_valid_device() is because there are
-several other *_valid_device() functions in other drivers that do basically
-the same thing, and I think it's useful to be able to see that they're all
-similar, as opposed to being buried in the config accessor or map
-functions, which vary a little more.
-
-> I'm assuming this is so small that there's no point in having a Kconfig
-> option for these guys that depends on the generic host driver?
-
-Good question; I don't care either way.
+Never mind about this part; I see they already have acked it.  I really
+need to learn to read the whole thread before responding :)
