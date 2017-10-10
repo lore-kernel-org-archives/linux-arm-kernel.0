@@ -1,23 +1,34 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Tue, 10 Oct 2017 17:03:40 +0800
-Subject: [PATCH 2/3] ACPI/IORT: Improve functions return type/storage
- class specifier indentation
-In-Reply-To: <59DC7ED6.50204@huawei.com>
-References: <1507038811-23382-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1507038811-23382-3-git-send-email-lorenzo.pieralisi@arm.com>
- <59DC7ED6.50204@huawei.com>
-Message-ID: <59DC8CEC.5070005@huawei.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 Oct 2017 11:07:14 +0200
+Subject: [PATCH] ARM: dts: r8a779x: add '#reset-cells' in cpg-mssr
+In-Reply-To: <20171010084611.968735-1-arnd@arndb.de>
+References: <20171010084611.968735-1-arnd@arndb.de>
+Message-ID: <CAK8P3a0h0xGb3r=SdmyzNVGu5LmTG6GzvvxEsqmubBWJDFbG3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/10/10 16:03, Hanjun Guo wrote:
-...
+On Tue, Oct 10, 2017 at 10:45 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> With the latest dtc, we get many warnings about the missing
+> '#reset-cells' property in these controllers, e.g.:
+>
+> arch/arm/boot/dts/r8a7790-lager.dtb: Warning (resets_property): Missing property '#reset-cells' in node /clock-controller at e6150000 or bad phandle (referred from /can at e6e80000:resets[0])
+> arch/arm/boot/dts/r8a7792-blanche.dtb: Warning (resets_property): Missing property '#reset-cells' in node /soc/clock-controller at e6150000 or bad phandle (referred from /soc/dma-controller at e6700000:resets[0])
+> arch/arm/boot/dts/r8a7792-wheat.dtb: Warning (resets_property): Missing property '#reset-cells' in node /soc/clock-controller at e6150000 or bad phandle (referred from /soc/ethernet at e6800000:resets[0])
+> arch/arm/boot/dts/r8a7793-gose.dtb: Warning (resets_property): Missing property '#reset-cells' in node /clock-controller at e6150000 or bad phandle (referred from /gpio at e6050000:resets[0])
+> arch/arm/boot/dts/r8a7794-alt.dtb: Warning (resets_property): Missing property '#reset-cells' in node /clock-controller at e6150000 or bad phandle (referred from /i2c at e6500000:resets[0])
+> arch/arm/boot/dts/r8a7794-silk.dtb: Warning (resets_property): Missing property '#reset-cells' in node /clock-controller at e6150000 or bad phandle (referred from /interrupt-controller at e61c0000:resets[0])
+>
+> This adds it for the three r8a779x chips that were lacking it. The
+> binding mandates this as <1>, so this is the value I use.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/boot/dts/r8a7790.dtsi | 1 +
+>  arch/arm/boot/dts/r8a7792.dtsi | 1 +
+>  arch/arm/boot/dts/r8a7794.dtsi | 1 +
 
->> -static __init
->> -const struct iort_iommu_config *iort_get_iommu_cfg(struct acpi_iort_node *node)
->> +static __init const struct iort_dev_config *iort_get_dev_cfg(
+It seems I missed the same problem in r8a7793. I'll do some more tests to
+see if there is more of the same, and will send an updated patch once
+I'm more confident I have the right version.
 
-Seems patch rebase issue, this part should be in patch 3/3 :)
-
-Thanks
-Hanjun
+       Arnd
