@@ -1,107 +1,28 @@
-From: jesper.nilsson@axis.com (Jesper Nilsson)
-Date: Tue, 10 Oct 2017 09:57:42 +0200
-Subject: [PATCH 07/34] cpufreq: cris: remove calls to
- cpufreq_notify_transition()
-In-Reply-To: <d8b7b00908f0fa16feca841b1bf7fb1a49c62df1.1376619363.git.viresh.kumar@linaro.org>
-References: <cover.1376619363.git.viresh.kumar@linaro.org>
- <d8b7b00908f0fa16feca841b1bf7fb1a49c62df1.1376619363.git.viresh.kumar@linaro.org>
-Message-ID: <20171010075742.GL17578@axis.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Tue, 10 Oct 2017 15:59:32 +0800
+Subject: [PATCH 1/3] ACPI/IORT: Remove leftover
+ ACPI_IORT_SMMU_V3_PXM_VALID guard
+In-Reply-To: <1507038811-23382-2-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1507038811-23382-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1507038811-23382-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <59DC7DE4.90409@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 16, 2013 at 04:25:04AM +0200, Viresh Kumar wrote:
-> Most of the drivers do following in their ->target_index() routines:
-> 
-> 	struct cpufreq_freqs freqs;
-> 	freqs.old = old freq...
-> 	freqs.new = new freq...
-> 
-> 	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
-> 
-> 	/* Change rate here */
-> 
-> 	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
-> 
-> This is replicated over all cpufreq drivers today and there doesn't exists a
-> good enough reason why this shouldn't be moved to cpufreq core instead.
-> 
-> Earlier patches have added support in cpufreq core to do cpufreq notification on
-> frequency change, this one removes it from this driver.
-> 
-> Some related minor cleanups are also done along with it.
-> 
+On 2017/10/3 21:53, Lorenzo Pieralisi wrote:
+> The conditional ACPI_IORT_SMMU_V3_PXM_VALID guard around
+> arm_smmu_v3_set_proximity() was added to manage a cross tree
+> ACPICA merge dependency; with ACPICA changes merged in:
+>
+> commit c944230064eb ("ACPICA: iasl: Update to IORT SMMUv3
+> disassembling")
+>
+> the guard has become useless. Remove it.
+>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+>
 
-Acked-by: Jesper Nilsson <jesper.nilsson@axis.com>
-
-> Cc: Mikael Starvik <starvik@axis.com>
-> Cc: linux-cris-kernel at axis.com
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  drivers/cpufreq/cris-artpec3-cpufreq.c | 8 --------
->  drivers/cpufreq/cris-etraxfs-cpufreq.c | 8 --------
->  2 files changed, 16 deletions(-)
-> 
-> diff --git a/drivers/cpufreq/cris-artpec3-cpufreq.c b/drivers/cpufreq/cris-artpec3-cpufreq.c
-> index dace19d..e31e1e5 100644
-> --- a/drivers/cpufreq/cris-artpec3-cpufreq.c
-> +++ b/drivers/cpufreq/cris-artpec3-cpufreq.c
-> @@ -29,15 +29,9 @@ static unsigned int cris_freq_get_cpu_frequency(unsigned int cpu)
->  
->  static int cris_freq_target(struct cpufreq_policy *policy, unsigned int state)
->  {
-> -	struct cpufreq_freqs freqs;
->  	reg_clkgen_rw_clk_ctrl clk_ctrl;
->  	clk_ctrl = REG_RD(clkgen, regi_clkgen, rw_clk_ctrl);
->  
-> -	freqs.old = cris_freq_get_cpu_frequency(policy->cpu);
-> -	freqs.new = cris_freq_table[state].frequency;
-> -
-> -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
-> -
->  	local_irq_disable();
->  
->  	/* Even though we may be SMP they will share the same clock
-> @@ -50,8 +44,6 @@ static int cris_freq_target(struct cpufreq_policy *policy, unsigned int state)
->  
->  	local_irq_enable();
->  
-> -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
-> -
->  	return 0;
->  }
->  
-> diff --git a/drivers/cpufreq/cris-etraxfs-cpufreq.c b/drivers/cpufreq/cris-etraxfs-cpufreq.c
-> index 4d40d9df..9d577d0 100644
-> --- a/drivers/cpufreq/cris-etraxfs-cpufreq.c
-> +++ b/drivers/cpufreq/cris-etraxfs-cpufreq.c
-> @@ -29,15 +29,9 @@ static unsigned int cris_freq_get_cpu_frequency(unsigned int cpu)
->  
->  static int cris_freq_target(struct cpufreq_policy *policy, unsigned int state)
->  {
-> -	struct cpufreq_freqs freqs;
->  	reg_config_rw_clk_ctrl clk_ctrl;
->  	clk_ctrl = REG_RD(config, regi_config, rw_clk_ctrl);
->  
-> -	freqs.old = cris_freq_get_cpu_frequency(policy->cpu);
-> -	freqs.new = cris_freq_table[state].frequency;
-> -
-> -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
-> -
->  	local_irq_disable();
->  
->  	/* Even though we may be SMP they will share the same clock
-> @@ -50,8 +44,6 @@ static int cris_freq_target(struct cpufreq_policy *policy, unsigned int state)
->  
->  	local_irq_enable();
->  
-> -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
-> -
->  	return 0;
->  }
->  
-> -- 
-> 1.7.12.rc2.18.g61b472e
-
-/^JN - Jesper Nilsson
--- 
-               Jesper Nilsson -- jesper.nilsson at axis.com
+Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
