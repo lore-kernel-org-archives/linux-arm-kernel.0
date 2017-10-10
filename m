@@ -1,72 +1,47 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 10 Oct 2017 14:32:13 -0600
-Subject: [PATCH 2/2] doc: coresight: correct usage for disabling idle states
-In-Reply-To: <1507667533-21707-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1507667533-21707-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1507667533-21707-3-git-send-email-mathieu.poirier@linaro.org>
+From: tpiepho@impinj.com (Trent Piepho)
+Date: Tue, 10 Oct 2017 20:38:37 +0000
+Subject: [2/2] spi: imx: fix use of native chip-selects with devicetree
+In-Reply-To: <1489726983-17706-3-git-send-email-gerg@linux-m68k.org>
+References: <1489726983-17706-3-git-send-email-gerg@linux-m68k.org>
+Message-ID: <1507667916.74283.19.camel@impinj.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Leo Yan <leo.yan@linaro.org>
+On Fri, 2017-03-17 at 15:03 +1000, Greg Ungerer wrote:
+> You can successfully specify native chip-selects if using a platform
+> setup by specifying the cs-gpio as negative offset by 32. And that
+> works correctly. You cannot use the same method in devicetree.
 
-In the coresight CPU debug document it suggests to use 'echo' command
-to set latency request to /dev/cpu_dma_latency so can disable all CPU
-idle states, but in fact this doesn't work.
+I came across some spi-imx bugs in an older kernel and in checking the
+latest kernel, found this patch.  It fixed the issue with dt not
+working for older spi imx devices (the imx51+ config function never
+used the platform data 32 offset thing), but fails to address non-dt
+platform data based users of the spi imx driver.
 
-This is because when the command 'echo' exits, it releases the device
-node's file descriptor and the kernel release function removes the QoS
-constraint; finally when the command 'echo' finished there have no
-constraint imposed on cpu_dma_latency.
+For instance, include/linux/platform_data/spi-imx.h still refers to the
+offset by 32 for native cs:
 
-This patch changes to use 'exec' to access '/dev/cpu_dma_latency', the
-command 'exec' can avoid the file descriptor to be closed so we can
-keep the constraint on cpu_dma_latency.
+ * @chipselect: Array of chipselects for this master. Numbers >= 0 mean gpio
+ *              pins, numbers < 0 mean internal CSPI chipselects according
+ *              to MXC_SPI_CS(). Normally you want to use gpio based chip
 
-This patch also adds the info for reference docs for PM QoS and cpuidle
-sysfs.
+#define MXC_SPI_CS(no)  ((no) - 32)
 
-Cc: Jonathan Corbet <corbet@lwn.net>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Reported-by: Kim Phillips <kim.phillips@arm.com>
-Suggested-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- Documentation/trace/coresight-cpu-debug.txt | 22 +++++++++++++++++-----
- 1 file changed, 17 insertions(+), 5 deletions(-)
+After this patch, for no-DT users, any negative (or rather not a valid
+gpio) value in chipselect will cause the native chipselect
+corresponding to the spi slave's chipselect.  It's no longer possible
+to specify which native cs to use in the spi-imx platform data.  So in
+something like:
 
-diff --git a/Documentation/trace/coresight-cpu-debug.txt b/Documentation/trace/coresight-cpu-debug.txt
-index b3da1f90b861..2b9b51cd501e 100644
---- a/Documentation/trace/coresight-cpu-debug.txt
-+++ b/Documentation/trace/coresight-cpu-debug.txt
-@@ -149,11 +149,23 @@ If you want to limit idle states at boot time, you can use "nohlt" or
- 
- At the runtime you can disable idle states with below methods:
- 
--Set latency request to /dev/cpu_dma_latency to disable all CPUs specific idle
--states (if latency = 0uS then disable all idle states):
--# echo "what_ever_latency_you_need_in_uS" > /dev/cpu_dma_latency
--
--Disable specific CPU's specific idle state:
-+It is possible to disable CPU idle states by way of the PM QoS
-+subsystem, more specifically by using the "/dev/cpu_dma_latency"
-+interface (see Documentation/power/pm_qos_interface.txt for more
-+details).  As specified in the PM QoS documentation the requested
-+parameter will stay in effect until the file descriptor is released.
-+For example:
-+
-+# exec 3<> /dev/cpu_dma_latency; echo 0 >&3
-+...
-+Do some work...
-+...
-+# exec 3<>-
-+
-+The same can also be done from an application program.
-+
-+Disable specific CPU's specific idle state from cpuidle sysfs (see
-+Documentation/cpuidle/sysfs.txt):
- # echo 1 > /sys/devices/system/cpu/cpu$cpu/cpuidle/state$state/disable
- 
- 
--- 
-2.7.4
+arch/arm/mach-imx/mach-mx31moboard.c-static int moboard_spi1_cs[] = {
+arch/arm/mach-imx/mach-mx31moboard.c:   MXC_SPI_CS(0),
+arch/arm/mach-imx/mach-mx31moboard.c:   MXC_SPI_CS(2),
+arch/arm/mach-imx/mach-mx31moboard.c-};
+
+The spi device configured to use chip select 1 will no longer use
+native chip select line 2.
+
+Looking@all in-tree users of spi imx platform data, it appears that
+this board is the only one in which the cs selected does not match the
+array index.  Though there are still several which still use
+MSC_SPI_CS() even though it doesn't really work anymore.
