@@ -1,102 +1,104 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 10 Oct 2017 11:20:07 +0800
-Subject: [PATCH v4 10/11] ARM: dts: sun6i: Add device node for HDMI controller
+Date: Tue, 10 Oct 2017 11:20:02 +0800
+Subject: [PATCH v4 05/11] drm/sun4i: hdmi: Allow using second PLL as TMDS clk
+ parent
 In-Reply-To: <20171010032008.682-1-wens@csie.org>
 References: <20171010032008.682-1-wens@csie.org>
-Message-ID: <20171010032008.682-11-wens@csie.org>
+Message-ID: <20171010032008.682-6-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we support the HDMI controller on the A31 SoC, we can add it
-to the device tree.
+On SoCs with two display pipelines, it is possible that the two
+pipelines are active at the same time, with potentially incompatible
+dot clocks.
 
-This adds a device node for the HDMI controller, and the of_graph nodes
-connecting it to the 2 TCONs.
+Let the HDMI encoder's TMDS clock go through all of its parents when
+calculating possible clock rates. This allows usage of the second video
+PLL as its parent.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun6i-a31.dtsi | 55 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c | 53 ++++++++++++++++-------------
+ 1 file changed, 29 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index 93209cda28db..48b2382a18a9 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -289,6 +289,12 @@
- 					#address-cells = <1>;
- 					#size-cells = <0>;
- 					reg = <1>;
-+
-+					tcon0_out_hdmi: endpoint at 1 {
-+						reg = <1>;
-+						remote-endpoint = <&hdmi_in_tcon0>;
-+						allwinner,tcon-channel = <1>;
-+					};
- 				};
- 			};
- 		};
-@@ -331,6 +337,12 @@
- 					#address-cells = <1>;
- 					#size-cells = <0>;
- 					reg = <1>;
-+
-+					tcon1_out_hdmi: endpoint at 1 {
-+						reg = <1>;
-+						remote-endpoint = <&hdmi_in_tcon1>;
-+						allwinner,tcon-channel = <1>;
-+					};
- 				};
- 			};
- 		};
-@@ -411,6 +423,49 @@
- 			#size-cells = <0>;
- 		};
+diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
+index 5cf2527bffc8..e8d4c311b80d 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
++++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
+@@ -67,11 +67,11 @@ static unsigned long sun4i_tmds_calc_divider(unsigned long rate,
+ static int sun4i_tmds_determine_rate(struct clk_hw *hw,
+ 				     struct clk_rate_request *req)
+ {
+-	struct clk_hw *parent;
++	struct clk_hw *parent = NULL;
+ 	unsigned long best_parent = 0;
+ 	unsigned long rate = req->rate;
+ 	int best_div = 1, best_half = 1;
+-	int i, j;
++	int i, j, p;
  
-+		hdmi: hdmi at 01c16000 {
-+			compatible = "allwinner,sun6i-a31-hdmi";
-+			reg = <0x01c16000 0x1000>;
-+			interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_AHB1_HDMI>, <&ccu CLK_HDMI>,
-+				 <&ccu CLK_HDMI_DDC>,
-+				 <&ccu CLK_PLL_VIDEO0_2X>,
-+				 <&ccu CLK_PLL_VIDEO1_2X>;
-+			clock-names = "ahb", "mod", "ddc", "pll-0", "pll-1";
-+			resets = <&ccu RST_AHB1_HDMI>;
-+			reset-names = "ahb";
-+			dma-names = "ddc-tx", "ddc-rx", "audio-tx";
-+			dmas = <&dma 13>, <&dma 13>, <&dma 14>;
-+			status = "disabled";
+ 	/*
+ 	 * We only consider PLL3, since the TCON is very likely to be
+@@ -79,32 +79,37 @@ static int sun4i_tmds_determine_rate(struct clk_hw *hw,
+ 	 * clock, so we should not need to do anything.
+ 	 */
+ 
+-	parent = clk_hw_get_parent_by_index(hw, 0);
+-	if (!parent)
+-		return -EINVAL;
+-
+-	for (i = 1; i < 3; i++) {
+-		for (j = 1; j < 16; j++) {
+-			unsigned long ideal = rate * i * j;
+-			unsigned long rounded;
+-
+-			rounded = clk_hw_round_rate(parent, ideal);
+-
+-			if (rounded == ideal) {
+-				best_parent = rounded;
+-				best_half = i;
+-				best_div = j;
+-				goto out;
+-			}
+-
+-			if (abs(rate - rounded / i) <
+-			    abs(rate - best_parent / best_div)) {
+-				best_parent = rounded;
+-				best_div = i;
++	for (p = 0; p < clk_hw_get_num_parents(hw); p++) {
++		parent = clk_hw_get_parent_by_index(hw, p);
++		if (!parent)
++			continue;
 +
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
++		for (i = 1; i < 3; i++) {
++			for (j = 1; j < 16; j++) {
++				unsigned long ideal = rate * i * j;
++				unsigned long rounded;
 +
-+				hdmi_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
++				rounded = clk_hw_round_rate(parent, ideal);
 +
-+					hdmi_in_tcon0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&tcon0_out_hdmi>;
-+					};
++				if (rounded == ideal) {
++					best_parent = rounded;
++					best_half = i;
++					best_div = j;
++					goto out;
++				}
 +
-+					hdmi_in_tcon1: endpoint at 1 {
-+						reg = <1>;
-+						remote-endpoint = <&tcon1_out_hdmi>;
-+					};
-+				};
++				if (abs(rate - rounded / i) <
++				    abs(rate - best_parent / best_div)) {
++					best_parent = rounded;
++					best_div = i;
++				}
+ 			}
+ 		}
+ 	}
+ 
++	if (!parent)
++		return -EINVAL;
 +
-+				hdmi_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+				};
-+			};
-+		};
-+
- 		usb_otg: usb at 01c19000 {
- 			compatible = "allwinner,sun6i-a31-musb";
- 			reg = <0x01c19000 0x0400>;
+ out:
+ 	req->rate = best_parent / best_half / best_div;
+ 	req->best_parent_rate = best_parent;
 -- 
 2.14.2
