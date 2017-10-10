@@ -1,79 +1,96 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 10 Oct 2017 11:20:01 +0800
-Subject: [PATCH v4 04/11] drm/sun4i: hdmi: create a regmap for later use
+Date: Tue, 10 Oct 2017 11:20:00 +0800
+Subject: [PATCH v4 03/11] drm/sun4i: hdmi: Disable clks in bind function error
+ path and unbind function
 In-Reply-To: <20171010032008.682-1-wens@csie.org>
 References: <20171010032008.682-1-wens@csie.org>
-Message-ID: <20171010032008.682-5-wens@csie.org>
+Message-ID: <20171010032008.682-4-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The HDMI driver is written with readl/writel I/O to the registers.
-However, to support the A31 variant, which has a different layout
-for the DDC registers, it was recommended to use regfields to have
-a cleaner implementation. To use regfields, we need to create an
-underlying regmap.
+The HDMI driver enables the bus and mod clocks in the bind function, but
+does not disable them if it then bails our due to any errors. Neither
+does it disable the clocks in the unbind function.
 
-This patch only adds the regmap. It does not convert the existing
-driver accesses to use regmap.
+Fix this by adding a proper error path to the bind function, and
+clk_disable_unprepare calls to the unbind function.
 
+Also rename the err_cleanup_connector label to err_cleanup_encoder,
+since it is the encoder that gets cleaned up.
+
+Fixes: 9c5681011a0c ("drm/sun4i: Add HDMI support")
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_hdmi.h     |  1 +
- drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c | 15 +++++++++++++++
- 2 files changed, 16 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c | 19 ++++++++++++++-----
+ 1 file changed, 14 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi.h b/drivers/gpu/drm/sun4i/sun4i_hdmi.h
-index a1f8cba251a2..aef157d3b659 100644
---- a/drivers/gpu/drm/sun4i/sun4i_hdmi.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_hdmi.h
-@@ -163,6 +163,7 @@ struct sun4i_hdmi {
- 	struct device		*dev;
- 
- 	void __iomem		*base;
-+	struct regmap		*regmap;
- 
- 	/* Parent clocks */
- 	struct clk		*bus_clk;
 diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
-index 3cf1a6932fac..5ab811cda00e 100644
+index 9ea6cd5a1370..3cf1a6932fac 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
-@@ -22,6 +22,7 @@
- #include <linux/iopoll.h>
- #include <linux/platform_device.h>
- #include <linux/pm_runtime.h>
-+#include <linux/regmap.h>
+@@ -302,26 +302,29 @@ static int sun4i_hdmi_bind(struct device *dev, struct device *master,
+ 	hdmi->mod_clk = devm_clk_get(dev, "mod");
+ 	if (IS_ERR(hdmi->mod_clk)) {
+ 		dev_err(dev, "Couldn't get the HDMI mod clock\n");
+-		return PTR_ERR(hdmi->mod_clk);
++		ret = PTR_ERR(hdmi->mod_clk);
++		goto err_disable_bus_clk;
+ 	}
+ 	clk_prepare_enable(hdmi->mod_clk);
  
- #include "sun4i_backend.h"
- #include "sun4i_crtc.h"
-@@ -267,6 +268,13 @@ static const struct cec_pin_ops sun4i_hdmi_cec_pin_ops = {
- };
- #endif
- 
-+static const struct regmap_config sun4i_hdmi_regmap_config = {
-+	.reg_bits	= 32,
-+	.val_bits	= 32,
-+	.reg_stride	= 4,
-+	.max_register	= 0x580,
-+};
-+
- static int sun4i_hdmi_bind(struct device *dev, struct device *master,
- 			   void *data)
- {
-@@ -321,6 +329,13 @@ static int sun4i_hdmi_bind(struct device *dev, struct device *master,
- 		goto err_disable_mod_clk;
+ 	hdmi->pll0_clk = devm_clk_get(dev, "pll-0");
+ 	if (IS_ERR(hdmi->pll0_clk)) {
+ 		dev_err(dev, "Couldn't get the HDMI PLL 0 clock\n");
+-		return PTR_ERR(hdmi->pll0_clk);
++		ret = PTR_ERR(hdmi->pll0_clk);
++		goto err_disable_mod_clk;
  	}
  
-+	hdmi->regmap = devm_regmap_init_mmio(dev, hdmi->base,
-+					     &sun4i_hdmi_regmap_config);
-+	if (IS_ERR(hdmi->regmap)) {
-+		dev_err(dev, "Couldn't create HDMI encoder regmap\n");
-+		return PTR_ERR(hdmi->regmap);
-+	}
-+
+ 	hdmi->pll1_clk = devm_clk_get(dev, "pll-1");
+ 	if (IS_ERR(hdmi->pll1_clk)) {
+ 		dev_err(dev, "Couldn't get the HDMI PLL 1 clock\n");
+-		return PTR_ERR(hdmi->pll1_clk);
++		ret = PTR_ERR(hdmi->pll1_clk);
++		goto err_disable_mod_clk;
+ 	}
+ 
  	ret = sun4i_tmds_create(hdmi);
  	if (ret) {
  		dev_err(dev, "Couldn't create the TMDS clock\n");
+-		return ret;
++		goto err_disable_mod_clk;
+ 	}
+ 
+ 	writel(SUN4I_HDMI_CTRL_ENABLE, hdmi->base + SUN4I_HDMI_CTRL_REG);
+@@ -362,7 +365,7 @@ static int sun4i_hdmi_bind(struct device *dev, struct device *master,
+ 	ret = sun4i_hdmi_i2c_create(dev, hdmi);
+ 	if (ret) {
+ 		dev_err(dev, "Couldn't create the HDMI I2C adapter\n");
+-		return ret;
++		goto err_disable_mod_clk;
+ 	}
+ 
+ 	drm_encoder_helper_add(&hdmi->encoder,
+@@ -422,6 +425,10 @@ static int sun4i_hdmi_bind(struct device *dev, struct device *master,
+ 	drm_encoder_cleanup(&hdmi->encoder);
+ err_del_i2c_adapter:
+ 	i2c_del_adapter(hdmi->i2c);
++err_disable_mod_clk:
++	clk_disable_unprepare(hdmi->mod_clk);
++err_disable_bus_clk:
++	clk_disable_unprepare(hdmi->bus_clk);
+ 	return ret;
+ }
+ 
+@@ -434,6 +441,8 @@ static void sun4i_hdmi_unbind(struct device *dev, struct device *master,
+ 	drm_connector_cleanup(&hdmi->connector);
+ 	drm_encoder_cleanup(&hdmi->encoder);
+ 	i2c_del_adapter(hdmi->i2c);
++	clk_disable_unprepare(hdmi->mod_clk);
++	clk_disable_unprepare(hdmi->bus_clk);
+ }
+ 
+ static const struct component_ops sun4i_hdmi_ops = {
 -- 
 2.14.2
