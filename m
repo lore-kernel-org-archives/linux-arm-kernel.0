@@ -1,41 +1,48 @@
 From: claudiu.beznea@microchip.com (Claudiu Beznea)
-Date: Tue, 10 Oct 2017 13:09:48 +0300
-Subject: [PATCH v2 13/14] ARM: dts: at91: at91sam9x25ek: add pwm0
+Date: Tue, 10 Oct 2017 13:09:46 +0300
+Subject: [PATCH v2 11/14] ARM: dts: at91: sama5d2_xplained: remove pull-up on
+ SD/MMC lines
 In-Reply-To: <1507630189-15504-1-git-send-email-claudiu.beznea@microchip.com>
 References: <1507630189-15504-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <1507630189-15504-14-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <1507630189-15504-12-git-send-email-claudiu.beznea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nicolas Ferre <nicolas.ferre@microchip.com>
 
-Add the PWM0 interface and one output of channel 0 (on PC10) on this headless
-board. The output conflicts with LCD and ISI, so only enable it for this
-particular board of the series (ISI is enabled on at91sam9g25ek, as an example
-but we can do the other way around).
+As the board have the proper pull-ups soldered on the data and CMD
+lines we don't need them specified in the PADs. So remove the
+"bias-pull-up" property and set "bias-disable".
+This will also save some power.
 
 Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+[claudiu.beznea at microchip.com: change subject to match the desired prefix]
 Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
 ---
- arch/arm/boot/dts/at91sam9x25ek.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/at91sam9x25ek.dts b/arch/arm/boot/dts/at91sam9x25ek.dts
-index f8360fb23107..f705a3165656 100644
---- a/arch/arm/boot/dts/at91sam9x25ek.dts
-+++ b/arch/arm/boot/dts/at91sam9x25ek.dts
-@@ -29,6 +29,12 @@
- 				phy-mode = "rmii";
- 				status = "okay";
- 			};
-+
-+			pwm0: pwm at f8034000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_pwm0_pwm0_1>;
-+				status = "okay";
-+			};
- 		};
- 	};
- };
+diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+index 851a095fd51d..62328310ef42 100644
+--- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
++++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+@@ -437,7 +437,7 @@
+ 							 <PIN_PA7__SDMMC0_DAT5>,
+ 							 <PIN_PA8__SDMMC0_DAT6>,
+ 							 <PIN_PA9__SDMMC0_DAT7>;
+-						bias-pull-up;
++						bias-disable;
+ 					};
+ 
+ 					ck_cd_rstn_vddsel {
+@@ -456,7 +456,7 @@
+ 							 <PIN_PA19__SDMMC1_DAT1>,
+ 							 <PIN_PA20__SDMMC1_DAT2>,
+ 							 <PIN_PA21__SDMMC1_DAT3>;
+-						bias-pull-up;
++						bias-disable;
+ 					};
+ 
+ 					conf-ck_cd {
 -- 
 2.7.4
