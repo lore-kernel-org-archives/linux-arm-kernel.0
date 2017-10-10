@@ -1,187 +1,75 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Tue, 10 Oct 2017 09:39:57 +0800
-Subject: [PATCH v2 09/13] mmc: mediatek: add stop_clk fix and enhance_rx
- support
-In-Reply-To: <f3bea03b-9fc3-ba60-da2d-63438df96e27@gmail.com>
-References: <1507548926-9555-1-git-send-email-chaotian.jing@mediatek.com>
- <1507548926-9555-10-git-send-email-chaotian.jing@mediatek.com>
- <f3bea03b-9fc3-ba60-da2d-63438df96e27@gmail.com>
-Message-ID: <1507599597.19789.4.camel@mhfsdcap03>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Tue, 10 Oct 2017 07:22:46 +0530
+Subject: [PATCH v3 03/22] dt-bindings: arm: scmi: add ARM MHU specific
+ mailbox client bindings
+In-Reply-To: <CAL_JsqJTuq4rDu9+T6rcC_q8Gw5nyDScNZy2cNkq+y5_v9pegA@mail.gmail.com>
+References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
+ <1506604306-20739-4-git-send-email-sudeep.holla@arm.com>
+ <20171005232031.7373ni5ssln4wlpr@rob-hp-laptop>
+ <CABb+yY1ra5bgRB1VND+NvCcDFqfggG04a+JPWFZ+HpNg08eR8g@mail.gmail.com>
+ <CAL_Jsq+0paGePmJVjsyFJiHx0UaDPjQrbe3C030U+fuUkWCJ+A@mail.gmail.com>
+ <CABb+yY2v8D9NFVsG9OwSpL8cswKihY6OUru8QA6Jfq5YmVVD7A@mail.gmail.com>
+ <CAL_JsqKy+WzEiHRS0BrE3_3Md4CGOr0e2ZZ_vBCB-Opgg49s+A@mail.gmail.com>
+ <CABb+yY0KNafWbD00hBVrNNGnFDcU0v6KXXY2D2K7KNouak1HdQ@mail.gmail.com>
+ <CAL_JsqJTuq4rDu9+T6rcC_q8Gw5nyDScNZy2cNkq+y5_v9pegA@mail.gmail.com>
+Message-ID: <CABb+yY09DZz3o++Y5dwYRPG5cp2V5icJgccT5B7uFvm9+v_GOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-10-09 at 17:00 +0200, Matthias Brugger wrote:
-> 
-> On 10/09/2017 01:35 PM, Chaotian Jing wrote:
-> > mt2712 supports stop_clk fix and enhance_rx, which can improve
-> > host stability.
-> > 
-> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> > ---
-> >   drivers/mmc/host/mtk-sd.c | 47 +++++++++++++++++++++++++++++++++++++++++++----
-> >   1 file changed, 43 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-> > index 555824d..5d99e05 100644
-> > --- a/drivers/mmc/host/mtk-sd.c
-> > +++ b/drivers/mmc/host/mtk-sd.c
-> > @@ -67,6 +67,7 @@
-> >   #define SDC_RESP2        0x48
-> >   #define SDC_RESP3        0x4c
-> >   #define SDC_BLK_NUM      0x50
-> > +#define SDC_ADV_CFG0     0x64
-> >   #define EMMC_IOCON       0x7c
-> >   #define SDC_ACMD_RESP    0x80
-> >   #define MSDC_DMA_SA      0x90
-> > @@ -80,6 +81,7 @@
-> >   #define PAD_DS_TUNE      0x188
-> >   #define PAD_CMD_TUNE     0x18c
-> >   #define EMMC50_CFG0      0x208
-> > +#define SDC_FIFO_CFG     0x228
-> >   
-> >   /*--------------------------------------------------------------------------*/
-> >   /* Register Mask                                                            */
-> > @@ -188,6 +190,9 @@
-> >   #define SDC_STS_CMDBUSY         (0x1 << 1)	/* RW */
-> >   #define SDC_STS_SWR_COMPL       (0x1 << 31)	/* RW */
-> >   
-> > +/* SDC_ADV_CFG0 mask */
-> > +#define SDC_RX_ENHANCE_EN	(0x1 << 20)	/* RW */
-> > +
-> >   /* MSDC_DMA_CTRL mask */
-> >   #define MSDC_DMA_CTRL_START     (0x1 << 0)	/* W */
-> >   #define MSDC_DMA_CTRL_STOP      (0x1 << 1)	/* W */
-> > @@ -217,6 +222,8 @@
-> >   #define MSDC_PATCH_BIT_SPCPUSH    (0x1 << 29)	/* RW */
-> >   #define MSDC_PATCH_BIT_DECRCTMO   (0x1 << 30)	/* RW */
-> >   
-> > +#define MSDC_PATCH_BIT1_STOP_DLY  (0xf << 8)    /* RW */
-> > +
-> >   #define MSDC_PATCH_BIT2_CFGRESP   (0x1 << 15)   /* RW */
-> >   #define MSDC_PATCH_BIT2_CFGCRCSTS (0x1 << 28)   /* RW */
-> >   #define MSDC_PB2_RESPWAIT         (0x3 << 2)    /* RW */
-> > @@ -242,6 +249,9 @@
-> >   #define EMMC50_CFG_CRCSTS_EDGE    (0x1 << 3)   /* RW */
-> >   #define EMMC50_CFG_CFCSTS_SEL     (0x1 << 4)   /* RW */
-> >   
-> > +#define SDC_FIFO_CFG_WRVALIDSEL   (0x1 << 24)  /* RW */
-> > +#define SDC_FIFO_CFG_RDVALIDSEL   (0x1 << 25)  /* RW */
-> > +
-> >   #define REQ_CMD_EIO  (0x1 << 0)
-> >   #define REQ_CMD_TMO  (0x1 << 1)
-> >   #define REQ_DAT_ERR  (0x1 << 2)
-> > @@ -308,6 +318,7 @@ struct msdc_save_para {
-> >   	u32 pad_ds_tune;
-> >   	u32 pad_cmd_tune;
-> >   	u32 emmc50_cfg0;
-> > +	u32 sdc_fifo_cfg;
-> >   };
-> >   
-> >   struct mtk_mmc_compatible {
-> > @@ -316,6 +327,8 @@ struct mtk_mmc_compatible {
-> >   	bool async_fifo;
-> >   	bool data_tune;
-> >   	bool busy_check;
-> > +	bool stop_clk_fix;
-> > +	bool enhance_rx;
-> >   };
-> >   
-> >   struct msdc_tune_para {
-> > @@ -381,6 +394,8 @@ struct msdc_host {
-> >   	.async_fifo = false,
-> >   	.data_tune = false,
-> >   	.busy_check = false,
-> > +	.stop_clk_fix = false,
-> > +	.enhance_rx = false,
-> >   };
-> >   
-> >   static const struct mtk_mmc_compatible mt8173_compat = {
-> > @@ -389,6 +404,8 @@ struct msdc_host {
-> >   	.async_fifo = false,
-> >   	.data_tune = false,
-> >   	.busy_check = false,
-> > +	.stop_clk_fix = false,
-> > +	.enhance_rx = false,
-> >   };
-> >   
-> 
-> If you add a flag for hs400_tune then mt8173_compat and mt8135_compat will be 
-> actually different and therefore it will make sense that they exist both in the 
-> driver code.
-> 
-Sure, it's okay.
-> Regards,
-> Matthias
-> 
-> >   static const struct mtk_mmc_compatible mt2701_compat = {
-> > @@ -397,6 +414,8 @@ struct msdc_host {
-> >   	.async_fifo = true,
-> >   	.data_tune = true,
-> >   	.busy_check = false,
-> > +	.stop_clk_fix = false,
-> > +	.enhance_rx = false,
-> >   };
-> >   
-> >   static const struct mtk_mmc_compatible mt2712_compat = {
-> > @@ -405,6 +424,8 @@ struct msdc_host {
-> >   	.async_fifo = true,
-> >   	.data_tune = true,
-> >   	.busy_check = true,
-> > +	.stop_clk_fix = true,
-> > +	.enhance_rx = true,
-> >   };
-> >   
-> >   static const struct of_device_id msdc_of_ids[] = {
-> > @@ -1281,15 +1302,31 @@ static void msdc_init_hw(struct msdc_host *host)
-> >   	sdr_set_field(host->base + MSDC_PATCH_BIT, MSDC_CKGEN_MSDC_DLY_SEL, 1);
-> >   	writel(0xffff4089, host->base + MSDC_PATCH_BIT1);
-> >   	sdr_set_bits(host->base + EMMC50_CFG0, EMMC50_CFG_CFCSTS_SEL);
-> > +
-> > +	if (host->dev_comp->stop_clk_fix) {
-> > +		sdr_set_field(host->base + MSDC_PATCH_BIT1,
-> > +			      MSDC_PATCH_BIT1_STOP_DLY, 3);
-> > +		sdr_clr_bits(host->base + SDC_FIFO_CFG,
-> > +			     SDC_FIFO_CFG_WRVALIDSEL);
-> > +		sdr_clr_bits(host->base + SDC_FIFO_CFG,
-> > +			     SDC_FIFO_CFG_RDVALIDSEL);
-> > +	}
-> > +
-> >   	if (host->dev_comp->busy_check)
-> >   		sdr_clr_bits(host->base + MSDC_PATCH_BIT1, (1 << 7));
-> > +
-> >   	if (host->dev_comp->async_fifo) {
-> >   		sdr_set_field(host->base + MSDC_PATCH_BIT2,
-> >   			      MSDC_PB2_RESPWAIT, 3);
-> > -		sdr_set_field(host->base + MSDC_PATCH_BIT2,
-> > -			      MSDC_PB2_RESPSTSENSEL, 2);
-> > -		sdr_set_field(host->base + MSDC_PATCH_BIT2,
-> > -			      MSDC_PB2_CRCSTSENSEL, 2);
-> > +		if (host->dev_comp->enhance_rx) {
-> > +			sdr_set_bits(host->base + SDC_ADV_CFG0,
-> > +				     SDC_RX_ENHANCE_EN);
-> > +		} else {
-> > +			sdr_set_field(host->base + MSDC_PATCH_BIT2,
-> > +				      MSDC_PB2_RESPSTSENSEL, 2);
-> > +			sdr_set_field(host->base + MSDC_PATCH_BIT2,
-> > +				      MSDC_PB2_CRCSTSENSEL, 2);
-> > +		}
-> >   		/* use async fifo, then no need tune internal delay */
-> >   		sdr_clr_bits(host->base + MSDC_PATCH_BIT2,
-> >   			     MSDC_PATCH_BIT2_CFGRESP);
-> > @@ -1946,6 +1983,7 @@ static void msdc_save_reg(struct msdc_host *host)
-> >   	host->save_para.pad_ds_tune = readl(host->base + PAD_DS_TUNE);
-> >   	host->save_para.pad_cmd_tune = readl(host->base + PAD_CMD_TUNE);
-> >   	host->save_para.emmc50_cfg0 = readl(host->base + EMMC50_CFG0);
-> > +	host->save_para.sdc_fifo_cfg = readl(host->base + SDC_FIFO_CFG);
-> >   }
-> >   
-> >   static void msdc_restore_reg(struct msdc_host *host)
-> > @@ -1964,6 +2002,7 @@ static void msdc_restore_reg(struct msdc_host *host)
-> >   	writel(host->save_para.pad_ds_tune, host->base + PAD_DS_TUNE);
-> >   	writel(host->save_para.pad_cmd_tune, host->base + PAD_CMD_TUNE);
-> >   	writel(host->save_para.emmc50_cfg0, host->base + EMMC50_CFG0);
-> > +	writel(host->save_para.sdc_fifo_cfg, host->base + SDC_FIFO_CFG);
-> >   }
-> >   
-> >   static int msdc_runtime_suspend(struct device *dev)
-> > 
+On Tue, Oct 10, 2017 at 4:27 AM, Rob Herring <robh@kernel.org> wrote:
+> On Mon, Oct 9, 2017 at 9:46 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>> On Mon, Oct 9, 2017 at 7:22 PM, Rob Herring <robh@kernel.org> wrote:
+>>> On Fri, Oct 6, 2017 at 9:26 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>>>> On Fri, Oct 6, 2017 at 9:24 PM, Rob Herring <robh@kernel.org> wrote:
+>>>>> On Fri, Oct 6, 2017 at 6:01 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>>>>>> On Fri, Oct 6, 2017 at 4:50 AM, Rob Herring <robh@kernel.org> wrote:
+>>>>>>> On Thu, Sep 28, 2017 at 02:11:27PM +0100, Sudeep Holla wrote:
+>>>>
+>>>>>>>
+>>>>>>>> +- mbox-data : For each phandle listed in mboxes property, an unsigned 32-bit
+>>>>>>>> +           data as expected by the mailbox controller
+>>>>>>>
+>>>>>>> Shouldn't that be cells as part of mboxes property?
+>>>>>>>
+>>>>>> A MHU client can send any number of commands (such u32 values) over a channel.
+>>>>>> This client (SCMI) sends just one command over a channel, but other
+>>>>>> clients may/do send two or more.
+>>>
+>>> The above definition doesn't support 2 or more as it is 1-1 with channels.
+>>>
+>> I thought you suggested to make controller driver accept the command
+>> as another cell in client's mboxes property.
+>> Which we can't do.
+>
+> Yes, agreed. But I'm wondering since a client may need more than one,
+> how would that be expressed?
+>
+Most (except SCMI) protocols are proprietary and can not be used
+generically, so the command codes get hardcoded in the client driver.
+SCMI+MHU is going to be rare case when we have a chance to get the code via DT.
+
+>>>>> Okay, then I guess I don't understand why this is in DT.
+>>>>>
+>>>> Yeah the client has to provide code (u32 value) for the commands it
+>>>> sends, and that value is going to be platform specific. For example,
+>>>> on Juno the ITS_AN_SCMI_COMMAND may be defined as BIT(7) while on my
+>>>> platform it may be 0x4567
+>>>>
+>>>> For MHU based platforms, it becomes easy if the u32 is passed from DT.
+>>>> And that should be ok since that is like a h/w parameter - a value
+>>>> chosen/expected by the remote firmware.
+>>>
+>>> Could it ever be more than 1 cell?
+>>>
+>> SCMI sends sub-commands via SHMEM, so it is always going to be 1cell for _scmi_.
+>> However many firmwares are unlikely to use just one command over a
+>> channel - say, the protocol is trivial or the linux and remote have no
+>> SHMEM.
+>
+> I'd hope the normal case is not enumerating commands and sub-commands
+> in DT and this is special case of a "generic" protocol with platform
+> specific aspects.
+>
+Yes. It is only for SCMI protocol running over the variations of MHU controller.
+
+Cheers
