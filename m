@@ -1,44 +1,37 @@
-From: claudiu.beznea@microchip.com (Claudiu Beznea)
-Date: Tue, 10 Oct 2017 13:09:41 +0300
-Subject: [PATCH v2 06/14] ARM: dts: at91: sama5d27_som1_ek: add pinmuxing for
- pwm0
-In-Reply-To: <1507630189-15504-1-git-send-email-claudiu.beznea@microchip.com>
-References: <1507630189-15504-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <1507630189-15504-7-git-send-email-claudiu.beznea@microchip.com>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Tue, 10 Oct 2017 14:57:35 +0300
+Subject: [PATCH] ARM: imx: Enable cpuidle for i.MX6DL starting at 1.1
+In-Reply-To: <1507635857.2745.12.camel@pengutronix.de>
+References: <bbd72503f0e79cc6df4ba12db41b980d50415caf.1507634288.git.leonard.crestez@nxp.com>
+ <1507635857.2745.12.camel@pengutronix.de>
+Message-ID: <1507636655.20816.8.camel@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pin muxing for pwm0 and set it as disabled since it is in conflict
-with the pins for leds.
+On Tue, 2017-10-10 at 13:44 +0200, Lucas Stach wrote:
+> Am Dienstag, den 10.10.2017, 14:20 +0300 schrieb Leonard Crestez:
 
-Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
----
- arch/arm/boot/dts/at91-sama5d27_som1_ek.dts | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+> > Enable cpuidle support on i.MX6DL starting from
+> > IMX_CHIP_REVISION_1_1.
 
-diff --git a/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts b/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
-index 6c4c976a99d1..339f4e71cf40 100644
---- a/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
-+++ b/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
-@@ -136,7 +136,9 @@
- 			};
- 
- 			pwm0: pwm at f802c000 {
--				status = "okay";
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_mikrobus1_pwm &pinctrl_mikrobus2_pwm>;
-+				status = "disabled"; /* Conflict with leds. */
- 			};
- 
- 			flx1: flexcom at f8038000 {
-@@ -529,7 +531,7 @@
- 		compatible = "gpio-leds";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_led_gpio_default>;
--		status = "okay";
-+		status = "okay"; /* Conflict with pwm0. */
- 
- 		red {
- 			label = "red";
--- 
-2.7.4
+> Did you mean 1.0 here and in the subject? This would make sense AFAICS,
+> ?and is also in line with what the code change does.
+
+No, I do mean "1.1" for 6dl. It's a bit confusing because the code uses
+> instead of >= for comparison.
+
+This patch results in imx6q_cpuidle_init getting called if
+(cpu_is_imx6dl() &&?imx_get_soc_revision() == IMX_CHIP_REVISION_1_1);
+without this patch it was skipped.
+
+> > --- a/arch/arm/mach-imx/mach-imx6q.c
+> > +++ b/arch/arm/mach-imx/mach-imx6q.c
+> > @@ -374,7 +374,8 @@ static void __init imx6q_init_late(void)
+> > > 
+> > > ?	?* WAIT mode is broken on TO 1.0 and 1.1, so there is no point
+> > > ?	?* to run cpuidle on them.
+> > > ?	?*/
+> > > -	if (imx_get_soc_revision() > IMX_CHIP_REVISION_1_1)
+> > > +	if ((cpu_is_imx6q() && imx_get_soc_revision() > IMX_CHIP_REVISION_1_1) ||
+> > > +	????(cpu_is_imx6dl() && imx_get_soc_revision() > IMX_CHIP_REVISION_1_0))
+> > > ?		imx6q_cpuidle_init();
