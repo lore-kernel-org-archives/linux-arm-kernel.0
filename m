@@ -1,43 +1,79 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 10 Oct 2017 14:43:01 +0530
-Subject: [PATCH 07/34] cpufreq: cris: remove calls to
- cpufreq_notify_transition()
-In-Reply-To: <20171010075742.GL17578@axis.com>
-References: <cover.1376619363.git.viresh.kumar@linaro.org>
- <d8b7b00908f0fa16feca841b1bf7fb1a49c62df1.1376619363.git.viresh.kumar@linaro.org>
- <20171010075742.GL17578@axis.com>
-Message-ID: <20171010091301.GH4031@vireshk-i7>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 10 Oct 2017 10:14:20 +0100
+Subject: [PATCH v4 1/2] PCI: pci-host-generic: add support for Synopsys
+ DesignWare RC in ECAM mode
+In-Reply-To: <CAKv+Gu_Sqkiz8kZC0ab09kS9+ifBYK9gJObTVC81ts8k+JuNKQ@mail.gmail.com>
+References: <20171006163919.14898-1-ard.biesheuvel@linaro.org>
+ <20171006163919.14898-2-ard.biesheuvel@linaro.org>
+ <20171006232158.GI25517@bhelgaas-glaptop.roam.corp.google.com>
+ <20171009164607.GD30085@arm.com>
+ <20171010001351.GQ25517@bhelgaas-glaptop.roam.corp.google.com>
+ <CAKv+Gu_Sqkiz8kZC0ab09kS9+ifBYK9gJObTVC81ts8k+JuNKQ@mail.gmail.com>
+Message-ID: <20171010091419.GA5693@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10-10-17, 09:57, Jesper Nilsson wrote:
-> On Fri, Aug 16, 2013 at 04:25:04AM +0200, Viresh Kumar wrote:
-> > Most of the drivers do following in their ->target_index() routines:
-> > 
-> > 	struct cpufreq_freqs freqs;
-> > 	freqs.old = old freq...
-> > 	freqs.new = new freq...
-> > 
-> > 	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
-> > 
-> > 	/* Change rate here */
-> > 
-> > 	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
-> > 
-> > This is replicated over all cpufreq drivers today and there doesn't exists a
-> > good enough reason why this shouldn't be moved to cpufreq core instead.
-> > 
-> > Earlier patches have added support in cpufreq core to do cpufreq notification on
-> > frequency change, this one removes it from this driver.
-> > 
-> > Some related minor cleanups are also done along with it.
-> > 
+On Tue, Oct 10, 2017 at 10:04:03AM +0100, Ard Biesheuvel wrote:
+> On 10 October 2017 at 01:13, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> > On Mon, Oct 09, 2017 at 05:46:07PM +0100, Will Deacon wrote:
+> >> On Fri, Oct 06, 2017 at 06:21:59PM -0500, Bjorn Helgaas wrote:
+> >> > On Fri, Oct 06, 2017 at 05:39:18PM +0100, Ard Biesheuvel wrote:
+> >> > > diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+> >> > > index 7d709a7e0aa8..01e81a30e303 100644
+> >> > > --- a/drivers/pci/host/pci-host-generic.c
+> >> > > +++ b/drivers/pci/host/pci-host-generic.c
+> >> > > @@ -35,6 +35,43 @@ static struct pci_ecam_ops gen_pci_cfg_cam_bus_ops = {
+> >> > >   }
+> >> > >  };
+> >> > >
+> >> > > +static int pci_dw_ecam_config_read(struct pci_bus *bus, u32 devfn, int where,
+> >> > > +                            int size, u32 *val)
+> >> > > +{
+> >> > > + struct pci_config_window *cfg = bus->sysdata;
+> >> > > +
+> >> > > + /*
+> >> > > +  * The Synopsys DesignWare PCIe controller in ECAM mode will not filter
+> >> > > +  * type 0 config TLPs sent to devices 1 and up on its downstream port,
+> >> > > +  * resulting in devices appearing multiple times on bus 0 unless we
+> >> > > +  * filter out those accesses here.
+> >> > > +  */
+> >> > > + if (bus->number == cfg->busr.start && PCI_SLOT(devfn) > 0)
+> >> > > +         return PCIBIOS_DEVICE_NOT_FOUND;
+> >> >
+> >> > I think we should return 0xffffffff data here, as we do in other
+> >> > similar accessors (dw_pcie_rd_conf(), altera_pcie_cfg_read(),
+> >> > rockchip_pcie_rd_conf()).
+> >> >
+> >> > Actually, xilinx-nwl has a nice trick: it implements
+> >> > nwl_pcie_map_bus(), which returns NULL for invalid devices.  Then it
+> >> > can use the generic accessors, and pci_generic_config_read() already
+> >> > fills in ~0 for this case.
+> >> >
+> >> > What do you think of the following?  I put it on my pci/host-generic
+> >> > branch for now (pending your response and an ack from Will).
+> >>
+> >> I'd probably just inline the device check in pci_dw_ecam_map_bus directly,
+> >> but either way:
+> >>
+> >> Acked-by: Will Deacon <will.deacon@arm.com>
+> >
+> > Thanks.  The reason I split out pci_dw_valid_device() is because there are
+> > several other *_valid_device() functions in other drivers that do basically
+> > the same thing, and I think it's useful to be able to see that they're all
+> > similar, as opposed to being buried in the config accessor or map
+> > functions, which vary a little more.
+> >
+> >> I'm assuming this is so small that there's no point in having a Kconfig
+> >> option for these guys that depends on the generic host driver?
+> >
+> > Good question; I don't care either way.
 > 
-> Acked-by: Jesper Nilsson <jesper.nilsson@axis.com>
+> In this case, may I suggest we leave the patch as is? Neither of you
+> seem to mind, and it will make /my/ life much easier, given that I
+> don't have to chase distros to get this driver enabled in their kernel
+> configs (unless we make if 'def_bool y', in which case it makes even
+> less sense to add the Kconfig option in the first place).
 
-Wow..
+Yup, I acked it as-is, just thought it was worth asking the question.
 
-You just Acked a 4 years old patch :)
-
--- 
-viresh
+Will
