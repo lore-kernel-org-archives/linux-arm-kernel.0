@@ -1,88 +1,32 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 10 Oct 2017 12:04:06 +0100
-Subject: [PATCH v3 03/22] dt-bindings: arm: scmi: add ARM MHU specific
- mailbox client bindings
-In-Reply-To: <CAL_JsqJTuq4rDu9+T6rcC_q8Gw5nyDScNZy2cNkq+y5_v9pegA@mail.gmail.com>
-References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
- <1506604306-20739-4-git-send-email-sudeep.holla@arm.com>
- <20171005232031.7373ni5ssln4wlpr@rob-hp-laptop>
- <CABb+yY1ra5bgRB1VND+NvCcDFqfggG04a+JPWFZ+HpNg08eR8g@mail.gmail.com>
- <CAL_Jsq+0paGePmJVjsyFJiHx0UaDPjQrbe3C030U+fuUkWCJ+A@mail.gmail.com>
- <CABb+yY2v8D9NFVsG9OwSpL8cswKihY6OUru8QA6Jfq5YmVVD7A@mail.gmail.com>
- <CAL_JsqKy+WzEiHRS0BrE3_3Md4CGOr0e2ZZ_vBCB-Opgg49s+A@mail.gmail.com>
- <CABb+yY0KNafWbD00hBVrNNGnFDcU0v6KXXY2D2K7KNouak1HdQ@mail.gmail.com>
- <CAL_JsqJTuq4rDu9+T6rcC_q8Gw5nyDScNZy2cNkq+y5_v9pegA@mail.gmail.com>
-Message-ID: <d8ce2158-f0fc-9bac-713a-ed131bd479bd@arm.com>
+From: kernel@esmil.dk (Emil Renner Berthing)
+Date: Tue, 10 Oct 2017 13:04:20 +0200
+Subject: [PATCH] arm64: dts: rockchip: enable touchpad button for
+ rk3399-gru-kevin
+In-Reply-To: <4174027.Z5MyPRUDcj@phil>
+References: <20171009184028.11829-1-kernel@esmil.dk> <4174027.Z5MyPRUDcj@phil>
+Message-ID: <CANBLGcx187QrX3pgUAjvBmPbyJsX7ZiYdWXhamM-atEe+Mqe3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10 October 2017 at 11:33, Heiko Stuebner <heiko@sntech.de> wrote:
+> Am Montag, 9. Oktober 2017, 20:40:28 CEST schrieb Emil Renner Berthing:
+>> Adding the linux,gpio-keymap entry also has
+>> the side-effect of making the driver register
+>> the touchpad as a touchpad rather than another
+>> touchscreen.
+>>
+>> The index for BTN_LEFT was found by trial and error.
+>>
+>> Signed-off-by: Emil Renner Berthing <kernel@esmil.dk>
+>
+> looks good to me. I'll just give the ChromeOS people a chance to
+> respond before applying [maybe they can even tell what the other
+> keys are :-) ]
 
+Good plan. As far as I can tell their kernel doesn't send anything but
+BTN_LEFT either. It's just that the controller supports multiple
+buttons, but not all are necessarily connected to any button.
+Their version of the driver has logic to detect the proper keymap
+whereas the mainline driver gets it from this devicetree entry.
 
-On 09/10/17 23:57, Rob Herring wrote:
-> On Mon, Oct 9, 2017 at 9:46 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->> On Mon, Oct 9, 2017 at 7:22 PM, Rob Herring <robh@kernel.org> wrote:
->>> On Fri, Oct 6, 2017 at 9:26 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->>>> On Fri, Oct 6, 2017 at 9:24 PM, Rob Herring <robh@kernel.org> wrote:
->>>>> On Fri, Oct 6, 2017 at 6:01 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->>>>>> On Fri, Oct 6, 2017 at 4:50 AM, Rob Herring <robh@kernel.org> wrote:
->>>>>>> On Thu, Sep 28, 2017 at 02:11:27PM +0100, Sudeep Holla wrote:
->>>>
->>>>>>>
->>>>>>>> +- mbox-data : For each phandle listed in mboxes property, an unsigned 32-bit
->>>>>>>> +           data as expected by the mailbox controller
->>>>>>>
->>>>>>> Shouldn't that be cells as part of mboxes property?
->>>>>>>
->>>>>> A MHU client can send any number of commands (such u32 values) over a channel.
->>>>>> This client (SCMI) sends just one command over a channel, but other
->>>>>> clients may/do send two or more.
->>>
->>> The above definition doesn't support 2 or more as it is 1-1 with channels.
->>>
->> I thought you suggested to make controller driver accept the command
->> as another cell in client's mboxes property.
->> Which we can't do.
-> 
-> Yes, agreed. But I'm wondering since a client may need more than one,
-> how would that be expressed?
-> 
->>>>> Okay, then I guess I don't understand why this is in DT.
->>>>>
->>>> Yeah the client has to provide code (u32 value) for the commands it
->>>> sends, and that value is going to be platform specific. For example,
->>>> on Juno the ITS_AN_SCMI_COMMAND may be defined as BIT(7) while on my
->>>> platform it may be 0x4567
->>>>
->>>> For MHU based platforms, it becomes easy if the u32 is passed from DT.
->>>> And that should be ok since that is like a h/w parameter - a value
->>>> chosen/expected by the remote firmware.
->>>
->>> Could it ever be more than 1 cell?
->>>
->> SCMI sends sub-commands via SHMEM, so it is always going to be 1cell for _scmi_.
->> However many firmwares are unlikely to use just one command over a
->> channel - say, the protocol is trivial or the linux and remote have no
->> SHMEM.
-> 
-> I'd hope the normal case is not enumerating commands and sub-commands
-> in DT and this is special case of a "generic" protocol with platform
-> specific aspects. It could be solved with a specific compatible for
-> each platform/implementation. We'll probably regret not doing that,
-> but I'm going to pretend that this time SoC vendors won't mess it up.
-> 
-
-Just to align on the same page, I would like to define the terms used
-above in context of SCMI:
-1. commands : this is platform specific "command" to trigger/signal the
-	      firmware that SCMI packet is sent. This is always platform
-	      or controller specific and is not part of the
-	      specification. It's just like doorbell but since MHU can
-	      send 32-bit data, we need a way to specify the exact bit
-	      as 32-bit data with just one bit set.
-
-2. sub-commands : It is SCMI packet that includes the actual command
-		defined in the SCMI specification. There are sent in
-		SHMEM as Jassi mentioned above.
--- 
-Regards,
-Sudeep
+/Emil
