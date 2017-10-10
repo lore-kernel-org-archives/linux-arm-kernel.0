@@ -1,28 +1,61 @@
-From: zumeng.chen@gmail.com (Zumeng Chen)
-Date: Tue, 10 Oct 2017 21:27:20 +0800
-Subject: [PATCH 1/1] cpufreq: ti-cpufreq: add missing of_node_put()
-Message-ID: <1507642040-13646-1-git-send-email-zumeng.chen@gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 10 Oct 2017 15:27:21 +0200
+Subject: [PATCH v2 00/14] at91 fixes and enhancements
+In-Reply-To: <1507630189-15504-1-git-send-email-claudiu.beznea@microchip.com>
+References: <1507630189-15504-1-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <20171010132721.xbblbwuzfeyy6xva@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-call of_node_put to release the refcount of np.
+On 10/10/2017 at 13:09:35 +0300, Claudiu Beznea wrote:
+> Hi,
+> 
+> This series contains fixes and enhancements for Atmel/Microchip boards,
+> mainly for SoM1-EK board, SAMA5D2 Xplained board and SAM9x5 boards.
+> Please accept them for 4.15.
+> 
+> Thank you,
+> Claudiu Beznea
+> 
+> Changes since v1:
+> - correct author for some patches; these were developed first on internal
+> branch and then were manualy ported by me to Linux public tree (since the device
+> tree files are different) but then I forgot to keep the real author
+> - removed patch "ARM: dts: at91: sama5d2_xplained: Add charger node of pmic."
+> from this series since it was already applied on at91-dt branch (see [1])
+> 
+> [1] https://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git/commit/?h=at91-dt&id=4b6ad41f267b8ddabf5dd1b02a318bc74f0b95e9
+> 
+> Claudiu Beznea (14):
+>   ARM: dts: at91: sama5d27_som1_ek: add disabled/okay status
+>   ARM: dts: at91: sama5d27_som1_ek: update serial aliases
+>   ARM: dts: at91: sama5d27_som1_ek: set USER button as a wakeup source
+>   ARM: dts: at91: sama5d27_som1_ek: add aliases for i2c
+>   ARM: dts: at91: sama5d27_som1_ek: add pinmuxing for pwm0
+>   ARM: dts: at91: sama5d27_som1_ek: remove not connected CAN0
+>   ARM: dts: at91: sama5d27_som1_ek: remove pull-up on SD/MMC lines
+>   ARM: dts: at91: sama5d2_xplained: Add charger node of pmic.
+>   ARM: dts: at91: sama5d2_xplained: set PB_USER as wakeup source
+>   ARM: dts: at91: sama5d2_xplained: add pinmuxing for pwm0
+>   ARM: dts: at91: sama5d2_xplained: remove pull-up on SD/MMC lines
+>   ARM: dts: at91: at91sam9x25ek: add CAN1 interface
+>   ARM: dts: at91: at91sam9x25ek: add pwm0
+>   ARM: dts: at91: at91sam9x5ek: use DMA for USART0
+> 
+>  arch/arm/boot/dts/at91-sama5d27_som1_ek.dts | 46 ++++++++++++++---------------
+>  arch/arm/boot/dts/at91-sama5d2_xplained.dts | 39 ++++++++++++++++--------
+>  arch/arm/boot/dts/at91sam9x25ek.dts         | 10 +++++++
+>  arch/arm/boot/dts/at91sam9x5ek.dtsi         |  2 ++
+>  4 files changed, 62 insertions(+), 35 deletions(-)
+> 
 
-Signed-off-by: Zumeng Chen <zumeng.chen@gmail.com>
----
- drivers/cpufreq/ti-cpufreq.c | 1 +
- 1 file changed, 1 insertion(+)
+All applied
 
-diff --git a/drivers/cpufreq/ti-cpufreq.c b/drivers/cpufreq/ti-cpufreq.c
-index ffcddcd..923317f 100644
---- a/drivers/cpufreq/ti-cpufreq.c
-+++ b/drivers/cpufreq/ti-cpufreq.c
-@@ -205,6 +205,7 @@ static int ti_cpufreq_init(void)
- 
- 	np = of_find_node_by_path("/");
- 	match = of_match_node(ti_cpufreq_of_match, np);
-+	of_node_put(np);
- 	if (!match)
- 		return -ENODEV;
- 
+> -- 
+> 2.7.4
+> 
+
 -- 
-2.7.5
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
