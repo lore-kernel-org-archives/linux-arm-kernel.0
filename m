@@ -1,56 +1,96 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 10 Oct 2017 10:35:48 +0200
-Subject: [PATCH v2 03/13] mmc: dt-bindings: make compatible explicit
-In-Reply-To: <CAPDyKFpzuctUJ7FB9thMi0h602iJZc=kbs7iaVb+0oNCC4K4ng@mail.gmail.com>
-References: <1507548926-9555-1-git-send-email-chaotian.jing@mediatek.com>
- <1507548926-9555-4-git-send-email-chaotian.jing@mediatek.com>
- <e4e5fa8b-b6a5-dc70-fbfc-6328493cd073@gmail.com>
- <1507599473.19789.1.camel@mhfsdcap03>
- <CAPDyKFpzuctUJ7FB9thMi0h602iJZc=kbs7iaVb+0oNCC4K4ng@mail.gmail.com>
-Message-ID: <d6118956-6fb4-cf7c-010b-b53f1c76b0c3@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 10 Oct 2017 10:39:24 +0200
+Subject: [PATCH] ARM: dts: qcom: add MSM8660 GSBI6 and GSBI7
+Message-ID: <20171010083924.19244-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This adds the GSBI6 and GSBI7 IO blocks to the MSM8660 DTSI file.
+On the APQ8060 DragonBoard, GSBI6 DM is used for Bluetooth UART,
+and GSBI7 I2C is used for FM radio I2C.
 
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/boot/dts/qcom-msm8660.dtsi | 67 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 67 insertions(+)
 
-On 10/10/2017 09:19 AM, Ulf Hansson wrote:
-> On 10 October 2017 at 03:37, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
->> On Mon, 2017-10-09 at 16:54 +0200, Matthias Brugger wrote:
->>>
->>> On 10/09/2017 01:35 PM, Chaotian Jing wrote:
->>>> the driver has updated to have an explicit compatible, so update
->>>> binding file according to the driver change.
->>>>
->>>> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
->>>> ---
->>>>    Documentation/devicetree/bindings/mmc/mtk-sd.txt | 4 ++--
->>>>    1 file changed, 2 insertions(+), 2 deletions(-)
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
->>>> index 3e0a97c..2bb585b 100644
->>>> --- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
->>>> +++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
->>>> @@ -8,8 +8,8 @@ and the properties used by the msdc driver.
->>>>
->>>>    Required properties:
->>>>    - compatible: value should be either of the following.
->>>> -   "mediatek,mt8173-mmc","mediatek,mt8135-mmc": for mmc host ip compatible with mt8135
->>>> -   "mediatek,mt8173-mmc","mediatek,mt8135-mmc": for mmc host ip compatible with mt8173
->>>> +   "mediatek,mt8135-mmc": for mmc host ip compatible with mt8135
->>>> +   "mediatek,mt8173-mmc": for mmc host ip compatible with mt8173
->>>
->>> You can merge this with patch 1.
->>
->> OK, will merge it in next patch.
-> 
-> No, please don't!
-> 
-> I would like DT documentation changes to be posted in separate
-> patches. Moreover, those should be before driver changes, when you
-> order the changes in your series.
-> 
-> In this way, the bindings can be reviewed and acked separately, which
-> makes it more convenient.
-> 
-
-Sounds reasonable, sorry for the confusion.
+diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
+index 1b5d31b33b5e..4f02489bcb2e 100644
+--- a/arch/arm/boot/dts/qcom-msm8660.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
+@@ -123,6 +123,73 @@
+ 			reg = <0x900000 0x4000>;
+ 		};
+ 
++		gsbi6: gsbi at 16500000 {
++			compatible = "qcom,gsbi-v1.0.0";
++			cell-index = <12>;
++			reg = <0x16500000 0x100>;
++			clocks = <&gcc GSBI6_H_CLK>;
++			clock-names = "iface";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++
++			syscon-tcsr = <&tcsr>;
++
++			gsbi6_serial: serial at 16540000 {
++				compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
++				reg = <0x16540000 0x1000>,
++				      <0x16500000 0x1000>;
++				interrupts = <GIC_SPI 156 IRQ_TYPE_NONE>;
++				clocks = <&gcc GSBI6_UART_CLK>, <&gcc GSBI6_H_CLK>;
++				clock-names = "core", "iface";
++				status = "disabled";
++			};
++
++			gsbi6_i2c: i2c at 16580000 {
++				compatible = "qcom,i2c-qup-v1.1.1";
++				reg = <0x16580000 0x1000>;
++				interrupts = <GIC_SPI 157 IRQ_TYPE_NONE>;
++				clocks = <&gcc GSBI6_QUP_CLK>, <&gcc GSBI6_H_CLK>;
++				clock-names = "core", "iface";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				status = "disabled";
++			};
++		};
++
++		gsbi7: gsbi at 16600000 {
++			compatible = "qcom,gsbi-v1.0.0";
++			cell-index = <12>;
++			reg = <0x16600000 0x100>;
++			clocks = <&gcc GSBI7_H_CLK>;
++			clock-names = "iface";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++
++			syscon-tcsr = <&tcsr>;
++
++			gsbi7_serial: serial at 16640000 {
++				compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
++				reg = <0x16640000 0x1000>,
++				      <0x16600000 0x1000>;
++				interrupts = <GIC_SPI 158 IRQ_TYPE_NONE>;
++				clocks = <&gcc GSBI7_UART_CLK>, <&gcc GSBI7_H_CLK>;
++				clock-names = "core", "iface";
++				status = "disabled";
++			};
++
++			gsbi7_i2c: i2c at 16680000 {
++				compatible = "qcom,i2c-qup-v1.1.1";
++				reg = <0x16680000 0x1000>;
++				interrupts = <GIC_SPI 159 IRQ_TYPE_NONE>;
++				clocks = <&gcc GSBI7_QUP_CLK>, <&gcc GSBI7_H_CLK>;
++				clock-names = "core", "iface";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				status = "disabled";
++			};
++		};
+ 
+ 		gsbi8: gsbi at 19800000 {
+ 			compatible = "qcom,gsbi-v1.0.0";
+-- 
+2.13.5
