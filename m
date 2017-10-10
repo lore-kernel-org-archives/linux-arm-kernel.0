@@ -1,51 +1,74 @@
 From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Tue, 10 Oct 2017 17:30:29 +0800
-Subject: [PATCH v4 10/12] mmc: mediatek: add latch-ck support
+Date: Tue, 10 Oct 2017 17:30:30 +0800
+Subject: [PATCH v4 11/12] mmc: mediatek: improve eMMC hs400 mode read
+ performance
 In-Reply-To: <1507627831-29323-1-git-send-email-chaotian.jing@mediatek.com>
 References: <1507627831-29323-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <1507627831-29323-11-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <1507627831-29323-12-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-some platform(eg.mt2701) does not support "stop clk fix", in
-this case, need set correct latch-ck to avoid crc error caused
-by stop clock block-internally.
+enlarge outstanding value to improve read performance
 
 Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
 ---
- drivers/mmc/host/mtk-sd.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/mmc/host/mtk-sd.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
 diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-index d3833f3..3a1756a 100644
+index 3a1756a..4cffc04 100644
 --- a/drivers/mmc/host/mtk-sd.c
 +++ b/drivers/mmc/host/mtk-sd.c
-@@ -378,6 +378,7 @@ struct msdc_host {
- 	u32 sclk;		/* SD/MS bus clock frequency */
- 	unsigned char timing;
- 	bool vqmmc_enabled;
-+	u32 latch_ck;
- 	u32 hs400_ds_delay;
- 	u32 hs200_cmd_int_delay; /* cmd internal delay for HS200/SDR104 */
- 	u32 hs400_cmd_int_delay; /* cmd internal delay for HS400 */
-@@ -1672,6 +1673,8 @@ static int msdc_tune_data(struct mmc_host *mmc, u32 opcode)
- 	if (host->dev_comp->pad_tune0)
- 		tune_reg = MSDC_PAD_TUNE0;
+@@ -81,6 +81,7 @@
+ #define PAD_DS_TUNE      0x188
+ #define PAD_CMD_TUNE     0x18c
+ #define EMMC50_CFG0      0x208
++#define EMMC50_CFG3      0x220
+ #define SDC_FIFO_CFG     0x228
  
-+	sdr_set_field(host->base + MSDC_PATCH_BIT, MSDC_INT_DAT_LATCH_CK_SEL,
-+		      host->latch_ck);
- 	sdr_clr_bits(host->base + MSDC_IOCON, MSDC_IOCON_DSPL);
- 	sdr_clr_bits(host->base + MSDC_IOCON, MSDC_IOCON_W_DSPL);
- 	for (i = 0 ; i < PAD_DELAY_MAX; i++) {
-@@ -1787,6 +1790,9 @@ static void msdc_hw_reset(struct mmc_host *mmc)
- static void msdc_of_property_parse(struct platform_device *pdev,
- 				   struct msdc_host *host)
- {
-+	of_property_read_u32(pdev->dev.of_node, "mediatek,latch-ck",
-+			     &host->latch_ck);
+ /*--------------------------------------------------------------------------*/
+@@ -249,6 +250,8 @@
+ #define EMMC50_CFG_CRCSTS_EDGE    (0x1 << 3)   /* RW */
+ #define EMMC50_CFG_CFCSTS_SEL     (0x1 << 4)   /* RW */
+ 
++#define EMMC50_CFG3_OUTS_WR       (0x1f << 0)  /* RW */
 +
- 	of_property_read_u32(pdev->dev.of_node, "hs400-ds-delay",
- 			     &host->hs400_ds_delay);
+ #define SDC_FIFO_CFG_WRVALIDSEL   (0x1 << 24)  /* RW */
+ #define SDC_FIFO_CFG_RDVALIDSEL   (0x1 << 25)  /* RW */
+ 
+@@ -318,6 +321,7 @@ struct msdc_save_para {
+ 	u32 pad_ds_tune;
+ 	u32 pad_cmd_tune;
+ 	u32 emmc50_cfg0;
++	u32 emmc50_cfg3;
+ 	u32 sdc_fifo_cfg;
+ };
+ 
+@@ -1761,6 +1765,9 @@ static int msdc_prepare_hs400_tuning(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	writel(host->hs400_ds_delay, host->base + PAD_DS_TUNE);
+ 	/* hs400 mode must set it to 0 */
+ 	sdr_clr_bits(host->base + MSDC_PATCH_BIT2, MSDC_PATCH_BIT2_CFGCRCSTS);
++	/* to improve read performance, set outstanding to 2 */
++	sdr_set_field(host->base + EMMC50_CFG3, EMMC50_CFG3_OUTS_WR, 2);
++
+ 	return 0;
+ }
+ 
+@@ -2013,6 +2020,7 @@ static void msdc_save_reg(struct msdc_host *host)
+ 	host->save_para.pad_ds_tune = readl(host->base + PAD_DS_TUNE);
+ 	host->save_para.pad_cmd_tune = readl(host->base + PAD_CMD_TUNE);
+ 	host->save_para.emmc50_cfg0 = readl(host->base + EMMC50_CFG0);
++	host->save_para.emmc50_cfg3 = readl(host->base + EMMC50_CFG3);
+ 	host->save_para.sdc_fifo_cfg = readl(host->base + SDC_FIFO_CFG);
+ }
+ 
+@@ -2032,6 +2040,7 @@ static void msdc_restore_reg(struct msdc_host *host)
+ 	writel(host->save_para.pad_ds_tune, host->base + PAD_DS_TUNE);
+ 	writel(host->save_para.pad_cmd_tune, host->base + PAD_CMD_TUNE);
+ 	writel(host->save_para.emmc50_cfg0, host->base + EMMC50_CFG0);
++	writel(host->save_para.emmc50_cfg3, host->base + EMMC50_CFG3);
+ 	writel(host->save_para.sdc_fifo_cfg, host->base + SDC_FIFO_CFG);
+ }
  
 -- 
 1.8.1.1.dirty
