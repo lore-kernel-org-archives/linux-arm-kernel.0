@@ -1,102 +1,60 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 10 Oct 2017 11:32:57 +0100
-Subject: [PATCH v8 2/8] of: Add helper for mapping device node to logical CPU
- number
+Date: Tue, 10 Oct 2017 11:32:58 +0100
+Subject: [PATCH v8 3/8] coresight: of: Use of_cpu_node_to_id helper
 In-Reply-To: <20171010103303.32436-1-suzuki.poulose@arm.com>
 References: <20171010103303.32436-1-suzuki.poulose@arm.com>
-Message-ID: <20171010103303.32436-3-suzuki.poulose@arm.com>
+Message-ID: <20171010103303.32436-4-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a helper to map a device node to a logical CPU number to avoid
-duplication. Currently this is open coded in different places (e.g
-gic-v3, coresight). The helper tries to map device node to a "possible"
-logical CPU id, which may not be online yet. It is the responsibility
-of the user to make sure that the CPU is online. The helper uses
-of_cpu_device_node_get() to retrieve the device node for a given CPU
-(which uses per_cpu data if available else falls back to slower
-of_get_cpu_node()).
+Reuse the new generic helper, of_cpu_node_to_id() to map a
+given CPU phandle to a logical CPU number.
 
-Cc: devicetree at vger.kernel.org
-Cc: Frank Rowand <frowand.list@gmail.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
+Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Tested-by: Leo Yan <leo.yan@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
-Changes since V6:
- - Use faster of_cpu_device_node_get instead of of_get_cpu_node(),
-   which now falls back to latter if called in early.
+Changes since V4:
+ - Fix a regression introduced in v4, reported by bugrobot
 Changes since V3:
- - Renamed the helper to of_cpu_node_to_id(), suggested by Rob
- - Return -ENODEV on failure than nr_cpus_id
+ - Reflect the renaming of the helper and return value changes
 ---
- drivers/of/base.c  | 26 ++++++++++++++++++++++++++
- include/linux/of.h |  7 +++++++
- 2 files changed, 33 insertions(+)
+ drivers/hwtracing/coresight/of_coresight.c | 15 +++------------
+ 1 file changed, 3 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index 260d33c0f26c..e3f46daeee07 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -418,6 +418,32 @@ struct device_node *of_get_cpu_node(int cpu, unsigned int *thread)
- EXPORT_SYMBOL(of_get_cpu_node);
- 
- /**
-+ * of_cpu_node_to_id: Get the logical CPU number for a given device_node
-+ *
-+ * @cpu_node: Pointer to the device_node for CPU.
-+ *
-+ * Returns the logical CPU number of the given CPU device_node.
-+ * Returns -ENODEV if the CPU is not found.
-+ */
-+int of_cpu_node_to_id(struct device_node *cpu_node)
-+{
-+	int cpu;
-+	bool found = false;
-+	struct device_node *np;
-+
-+	for_each_possible_cpu(cpu) {
-+		np = of_cpu_device_node_get(cpu);
-+		found = (cpu_node == np);
-+		of_node_put(np);
-+		if (found)
-+			return cpu;
-+	}
-+
-+	return -ENODEV;
-+}
-+EXPORT_SYMBOL(of_cpu_node_to_id);
-+
-+/**
-  * __of_device_is_compatible() - Check if the node matches given constraints
-  * @device: pointer to node
-  * @compat: required compatible string, NULL or "" for any match
-diff --git a/include/linux/of.h b/include/linux/of.h
-index cfc34117fc92..27b54bcc420a 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -538,6 +538,8 @@ const char *of_prop_next_string(struct property *prop, const char *cur);
- 
- bool of_console_check(struct device_node *dn, char *name, int index);
- 
-+extern int of_cpu_node_to_id(struct device_node *np);
-+
- #else /* CONFIG_OF */
- 
- static inline void of_core_init(void)
-@@ -862,6 +864,11 @@ static inline void of_property_clear_flag(struct property *p, unsigned long flag
+diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
+index a18794128bf8..7c375443ede6 100644
+--- a/drivers/hwtracing/coresight/of_coresight.c
++++ b/drivers/hwtracing/coresight/of_coresight.c
+@@ -104,26 +104,17 @@ static int of_coresight_alloc_memory(struct device *dev,
+ int of_coresight_get_cpu(const struct device_node *node)
  {
- }
+ 	int cpu;
+-	bool found;
+-	struct device_node *dn, *np;
++	struct device_node *dn;
  
-+static inline int of_cpu_node_to_id(struct device_node *np)
-+{
-+	return -ENODEV;
-+}
-+
- #define of_match_ptr(_ptr)	NULL
- #define of_match_node(_matches, _node)	NULL
- #endif /* CONFIG_OF */
+ 	dn = of_parse_phandle(node, "cpu", 0);
+-
+ 	/* Affinity defaults to CPU0 */
+ 	if (!dn)
+ 		return 0;
+-
+-	for_each_possible_cpu(cpu) {
+-		np = of_cpu_device_node_get(cpu);
+-		found = (dn == np);
+-		of_node_put(np);
+-		if (found)
+-			break;
+-	}
++	cpu = of_cpu_node_to_id(dn);
+ 	of_node_put(dn);
+ 
+ 	/* Affinity to CPU0 if no cpu nodes are found */
+-	return found ? cpu : 0;
++	return (cpu < 0) ? 0 : cpu;
+ }
+ EXPORT_SYMBOL_GPL(of_coresight_get_cpu);
+ 
 -- 
 2.13.6
