@@ -1,91 +1,95 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Tue, 10 Oct 2017 15:36:13 +0100
-Subject: [PATCH 3/3] arm64: Introduce command line parameter to disable CNP
-In-Reply-To: <1507553734-27854-4-git-send-email-vladimir.murzin@arm.com>
-References: <1507553734-27854-1-git-send-email-vladimir.murzin@arm.com>
- <1507553734-27854-4-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <6671190b-0d76-2e57-d105-444bbbc13fa0@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 10 Oct 2017 16:44:41 +0200
+Subject: [PATCH v2 2/2] arm64: dts: r8a7796: Add OPPs table for cpu devices
+In-Reply-To: <381aa5b0-16c4-e826-6556-85ce9a9155e5@arm.com>
+References: <1507209984-17123-1-git-send-email-horms+renesas@verge.net.au>
+ <1507209984-17123-3-git-send-email-horms+renesas@verge.net.au>
+ <e2e31fd8-b5f8-40a8-df3d-e7726bb8a8e1@arm.com>
+ <CAMuHMdVbQMGG92sAnWUDzBisSHEdedoSNLWxokv_BTj4eER64Q@mail.gmail.com>
+ <381aa5b0-16c4-e826-6556-85ce9a9155e5@arm.com>
+Message-ID: <CAMuHMdV6s+ue=3F2q2RO7m_YGwBiNyBGCz8FQh7_i1Jboeij2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
+Hi Sudeep,
 
-On 09/10/17 13:55, Vladimir Murzin wrote:
-> There are cases when activating of Common Not Private (CNP) feature
-> might not be desirable; this patch allows to forcefully disable CNP
-> even it is supported by hardware.
-> 
-> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> ---
->   Documentation/admin-guide/kernel-parameters.txt |  4 ++++
->   arch/arm64/kernel/cpufeature.c                  | 20 +++++++++++++++++++-
->   2 files changed, 23 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-> index 0549662..3c1e45d 100644
-> --- a/Documentation/admin-guide/kernel-parameters.txt
-> +++ b/Documentation/admin-guide/kernel-parameters.txt
-> @@ -2560,6 +2560,10 @@
->   
->   	noclflush	[BUGS=X86] Don't use the CLFLUSH instruction
->   
-> +	nocnp		[ARM64]
-> +			Disable CNP (Common not Private translations)
-> +			even if it is supported by processor.
-> +
->   	nodelayacct	[KNL] Disable per-task delay accounting
->   
->   	nodsp		[SH] Disable hardware DSP at boot time.
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 8d098a1..724fd93 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -771,6 +771,24 @@ static bool has_no_hw_prefetch(const struct arm64_cpu_capabilities *entry, int _
->   		MIDR_CPU_VAR_REV(1, MIDR_REVISION_MASK));
->   }
->   
-> +static bool nocnp;
-> +
-> +static int __init early_nocnp(char *p)
-> +{
-> +	nocnp = true;
-> +	return 0;
-> +}
-> +early_param("nocnp", early_nocnp);
-> +
-> +static bool has_useable_cnp(const struct arm64_cpu_capabilities *entry, int scope)
-> +{
-> +	if (!has_cpuid_feature(entry, scope))
-> +		return false;
-> +
-> +	return nocnp ? false : true;
+On Tue, Oct 10, 2017 at 4:33 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> On 09/10/17 12:57, Geert Uytterhoeven wrote:
+>> On Thu, Oct 5, 2017 at 5:04 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>> On 05/10/17 14:26, Simon Horman wrote:
+>>>> From: Dien Pham <dien.pham.ry@rvc.renesas.com>
+>>>>
+>>>> Current, OPP tables are defined temporary,
+>>>> they are being evaluated and adjust in future.
+>>
+>>>> --- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+>>>> +++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+>>>> @@ -46,6 +46,8 @@
+>>>>                       power-domains = <&sysc R8A7796_PD_CA57_CPU0>;
+>>>>                       next-level-cache = <&L2_CA57>;
+>>>>                       enable-method = "psci";
+>>>> +                     clocks =<&cpg CPG_CORE R8A7796_CLK_Z>;
+>>>> +                     operating-points-v2 = <&cluster0_opp>;
+>>>>               };
+>>>>
+>>>>               a57_1: cpu at 1 {
+>>>> @@ -55,6 +57,7 @@
+>>>>                       power-domains = <&sysc R8A7796_PD_CA57_CPU1>;
+>>>>                       next-level-cache = <&L2_CA57>;
+>>>>                       enable-method = "psci";
+>>>
+>>> Just curious why clocks are not specified in secondaries ?
+>>
+>> Thanks for noticing, it would indeed be good to describe the clock dependency
+>> for all CPU cores.
+>>
+>>> Does this continue work if I hotplug out CPUs in ascending order and
+>>> then hotplug back in descending order ? Also the current driver or OS
+>>> may deal with that but not a good assumption when write DT
+>>
+>> Yes that works, as Linux doesn't handle CPU hotplug details.
+>> CPU hotplug is controlled by PSCI, i.e. out of control of the Linux kernel.
+>> So it doesn't matter at all what is described here ;-)
+>>
+>
+> Ah no, sorry for not being clear earlier. I was referring to below code
+> snippet in drivers/cpufreq/cpufreq-dt.c
+>
+> 162         cpu_clk = clk_get(cpu_dev, NULL);
+>
+> 163         if (IS_ERR(cpu_clk)) {
+>
+> 164                 ret = PTR_ERR(cpu_clk);
+>
+> 165                 dev_err(cpu_dev, "%s: failed to get clk: %d\n",
+> __func__, ret);
+> 166                 return ret;
+>
+> 167         }
+>
+> Now on systems using r8a7796.dtsi, if you hotplug out all A53s and
+> hotplug back in A53_3 first, that should trigger cpufreq_driver->init
+> from cpufreq_online which should result in execution above code.
+>
+> If that takes patch of__of_clk_get_by_name, then that may be problem.
+> I was originally point at this when I referred hotplug and was not PSCI
+> related.
 
-This feels a bit odd.
+IC.
 
-Wouldn't the following be better?
-return !nocnp;
+That's something we cannot try, as the secure firmware doesn't enable the A53
+cores, only the A57 cores.
 
-Or simply the whole function as:
-return has_cpuid_feature(entry, scope) && !nocnp;
+And disabling all A57 cores is also not possible, as at least one of them
+has to be kept running.
 
-Thanks,
+Gr{oetje,eeting}s,
 
-> +}
-> +
-> +
->   static bool runs_at_el2(const struct arm64_cpu_capabilities *entry, int __unused)
->   {
->   	return is_kernel_in_hyp_mode();
-> @@ -905,7 +923,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
->   		.desc = "Common not Private translations",
->   		.capability = ARM64_HAS_CNP,
->   		.def_scope = SCOPE_SYSTEM,
-> -		.matches = has_cpuid_feature,
-> +		.matches = has_useable_cnp,
->   		.sys_reg = SYS_ID_AA64MMFR2_EL1,
->   		.sign = FTR_UNSIGNED,
->   		.field_pos = ID_AA64MMFR2_CNP_SHIFT,
-> 
+                        Geert
 
--- 
-Julien Thierry
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
