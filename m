@@ -1,71 +1,41 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 10 Oct 2017 20:00:41 +0200
-Subject: [PATCH v4 4/7] soc: mediatek: pwrap: update pwrap_init without
- slave programming
-In-Reply-To: <604078485ca9ab04cea5bc531425d6035b27bc88.1505980364.git.sean.wang@mediatek.com>
-References: <cover.1505980364.git.sean.wang@mediatek.com>
- <604078485ca9ab04cea5bc531425d6035b27bc88.1505980364.git.sean.wang@mediatek.com>
-Message-ID: <f3a04159-8491-6ca6-d2ad-7df1dfd64331@gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 10 Oct 2017 20:02:50 +0200
+Subject: [PATCH 25/25] arm64: dts: Register Hi3660's thermal sensor
+In-Reply-To: <1507658570-32675-1-git-send-email-daniel.lezcano@linaro.org>
+References: <79a5f10c-0fb7-3e4f-caac-c1625904b137@linaro.org>
+ <1507658570-32675-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1507658570-32675-25-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Kevin Wangtao <kevin.wangtao@linaro.org>
 
+Add binding for tsensor on H3660, this tsensor is used for
+SoC thermal control, it supports alarm interrupt.
 
-On 09/21/2017 10:26 AM, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
-> 
-> pwrap initialization is highly associated with the base SoC, so
-> update here for allowing pwrap_init without slave program which would be
-> used to those PMICs without extra encryption on bus such as MT6380.
-> 
-> Signed-off-by: Chenglin Xu <chenglin.xu@mediatek.com>
-> Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> ---
->   drivers/soc/mediatek/mtk-pmic-wrap.c | 91 +++++++++++++++++++++---------------
->   1 file changed, 54 insertions(+), 37 deletions(-)
-> 
-> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> index 27d7ccc..9c6d855 100644
-> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> @@ -531,6 +531,7 @@ struct pmic_wrapper_type {
->   	u32 spi_w;
->   	u32 wdt_src;
->   	int has_bridge:1;
-> +	int slv_program:1;
->   	int (*init_reg_clock)(struct pmic_wrapper *wrp);
->   	int (*init_soc_specific)(struct pmic_wrapper *wrp);
->   };
-> @@ -999,9 +1000,12 @@ static int pwrap_init(struct pmic_wrapper *wrp)
->   	}
->   
->   	/* Reset SPI slave */
-> -	ret = pwrap_reset_spislave(wrp);
-> -	if (ret)
-> -		return ret;
-> +
-> +	if (wrp->master->slv_program) {
-> +		ret = pwrap_reset_spislave(wrp);
-> +		if (ret)
-> +			return ret;
-> +	}
->   
->   	pwrap_writel(wrp, 1, PWRAP_WRAP_EN);
->   
-> @@ -1013,45 +1017,52 @@ static int pwrap_init(struct pmic_wrapper *wrp)
->   	if (ret)
->   		return ret;
->   
-> -	/* Setup serial input delay */
-> -	ret = pwrap_init_sidly(wrp);
-> -	if (ret)
-> -		return ret;
-> +	if (wrp->master->slv_program) {
+Signed-off-by: Kevin Wangtao <kevin.wangtao@linaro.org>
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-This if branch is really long and complex enough to put it into function apart.
-
-Thanks,
-Matthias
-
-PD please take into account the comments I made on v3 of the series.
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+index c6a1961..d9c0cf3 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+@@ -848,5 +848,13 @@
+ 				     &sdio_cfg_func>;
+ 			status = "disabled";
+ 		};
++
++		tsensor: tsensor at fff30000 {
++			compatible = "hisilicon,hi3660-tsensor";
++			reg = <0x0 0xfff30000 0x0 0x1000>;
++			interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
++			#thermal-sensor-cells = <1>;
++		};
++
+ 	};
+ };
+-- 
+2.7.4
