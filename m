@@ -1,99 +1,90 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Tue, 10 Oct 2017 17:57:26 +0100
-Subject: [PATCH v4 05/12] mmc: mediatek: add pad_tune0 support
-In-Reply-To: <1507627831-29323-6-git-send-email-chaotian.jing@mediatek.com>
-References: <1507627831-29323-1-git-send-email-chaotian.jing@mediatek.com>
- <1507627831-29323-6-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <afac6efe-d721-acae-6c07-adf4cfff962d@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 10 Oct 2017 10:01:28 -0700
+Subject: [PATCH 7/7] ARM: dts: Use ti-sysc module driver for omap4 musb
+In-Reply-To: <20170929223411.9691-8-tony@atomide.com>
+References: <20170929223411.9691-1-tony@atomide.com>
+ <20170929223411.9691-8-tony@atomide.com>
+Message-ID: <20171010170128.GW4394@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+* Tony Lindgren <tony@atomide.com> [170929 15:35]:
+> Let's make use of the generic ti-sysc module for musb to have
+> a child device with working runtime PM.
+...
+> +		target-module at 4a0ab000 {
+> +			compatible = "ti,sysc-omap4";
+>  			ti,hwmods = "usb_otg_hs";
 
-On 10/10/17 10:30, Chaotian Jing wrote:
-> from mt2701, the register of PAD_TUNE has been phased out,
-> while there is a new register of PAD_TUNE0
-> 
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> ---
->   drivers/mmc/host/mtk-sd.c | 69 ++++++++++++++++++++++++++++++++++-------------
->   1 file changed, 51 insertions(+), 18 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-> index ab2fbbb..0dc45b3 100644
-> --- a/drivers/mmc/host/mtk-sd.c
-> +++ b/drivers/mmc/host/mtk-sd.c
-> @@ -75,6 +75,7 @@
->   #define MSDC_PATCH_BIT   0xb0
->   #define MSDC_PATCH_BIT1  0xb4
->   #define MSDC_PAD_TUNE    0xec
-> +#define MSDC_PAD_TUNE0   0xf0
->   #define PAD_DS_TUNE      0x188
->   #define PAD_CMD_TUNE     0x18c
->   #define EMMC50_CFG0      0x208
-> @@ -301,6 +302,7 @@ struct msdc_save_para {
->   struct mtk_mmc_compatible {
->   	u8 clk_div_bits;
->   	bool hs400_tune; /* only used for MT8173 */
-> +	bool pad_tune0;
+And this should be compatible with "ti,sysc-omap2", I messed it up while
+changing from type1 and 2 to omap2 and omap4. Will apply the updated
+version below.
 
-You only use this to decide whether to use MDSC_PAD_TUNE or 
-MSDC_PAD_TUNE0 as tune regs.
+Regards,
 
-Couldn't this field directly be a 'u32' that is either MDSC_PAD_TUNE or 
-MDSC_PAD_TUNE0 rather than a bool?
+Tony
 
->   };
->   
->   struct msdc_tune_para {
-> @@ -362,21 +364,25 @@ struct msdc_host {
->   static const struct mtk_mmc_compatible mt8135_compat = {
->   	.clk_div_bits = 8,
->   	.hs400_tune = false,
-> +	.pad_tune0 = false,
+8< ---------------------
+>From tony Mon Sep 17 00:00:00 2001
+From: Tony Lindgren <tony@atomide.com>
+Date: Fri, 29 Sep 2017 08:20:50 -0700
+Subject: [PATCH] ARM: dts: Use ti-sysc module driver for omap4 musb
 
-and here we could have (field could be renamed accordingly of course):
+Let's make use of the generic ti-sysc module for musb to have
+a child device with working runtime PM.
 
-	.pad_tune0 = MDSC_PAD_TUNE,
+Cc: Bin Liu <b-liu@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/boot/dts/omap4.dtsi | 36 ++++++++++++++++++++++++------------
+ 1 file changed, 24 insertions(+), 12 deletions(-)
 
->   };
->   
->   static const struct mtk_mmc_compatible mt8173_compat = {
->   	.clk_div_bits = 8,
->   	.hs400_tune = true,
-> +	.pad_tune0 = false,
->   };
->   
->   static const struct mtk_mmc_compatible mt2701_compat = {
->   	.clk_div_bits = 12,
->   	.hs400_tune = false,
-> +	.pad_tune0 = true,
-
-here:
-	.pad_tune0 = MDSC_PAD_TUNE0,
-
->   };
->   
->   static const struct mtk_mmc_compatible mt2712_compat = {
->   	.clk_div_bits = 12,
->   	.hs400_tune = false,
-> +	.pad_tune0 = true,
->   };
->   
->   static const struct of_device_id msdc_of_ids[] = {
-> @@ -581,6 +587,10 @@ static void msdc_set_mclk(struct msdc_host *host, unsigned char timing, u32 hz)
->   	u32 flags;
->   	u32 div;
->   	u32 sclk;
-> +	u32 tune_reg = MSDC_PAD_TUNE;
-> +
-> +	if (host->dev_comp->pad_tune0)
-> +		tune_reg = MSDC_PAD_TUNE0;
-
-And this would not be needed here nor in the other functions, it could 
-just be replaced by host->dev_comp->pad_tune0.
-
-Thanks,
-
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -1117,19 +1117,31 @@
+ 			reg-names = "otghs_control";
+ 		};
+ 
+-		usb_otg_hs: usb_otg_hs at 4a0ab000 {
+-			compatible = "ti,omap4-musb";
+-			reg = <0x4a0ab000 0x7ff>;
+-			interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>, <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
+-			interrupt-names = "mc", "dma";
++		target-module at 4a0ab000 {
++			compatible = "ti,sysc-omap2";
+ 			ti,hwmods = "usb_otg_hs";
+-			usb-phy = <&usb2_phy>;
+-			phys = <&usb2_phy>;
+-			phy-names = "usb2-phy";
+-			multipoint = <1>;
+-			num-eps = <16>;
+-			ram-bits = <12>;
+-			ctrl-module = <&omap_control_usbotg>;
++			reg = <0x4a0ab000 0x4>,
++			      <0x4a0ab004 0x4>,
++			      <0x4a0ab008 0x4>;
++			reg-names = "rev", "sysc", "syss";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 0x4a0ab000 0x1000>;
++
++			usb_otg_hs: otg at 0 {
++				compatible = "ti,omap2-musb";
++				reg = <0x0 0x7ff>;
++				interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
++				interrupt-names = "mc", "dma";
++				usb-phy = <&usb2_phy>;
++				phys = <&usb2_phy>;
++				phy-names = "usb2-phy";
++				multipoint = <1>;
++				num-eps = <16>;
++				ram-bits = <12>;
++				ctrl-module = <&omap_control_usbotg>;
++			};
+ 		};
+ 
+ 		aes1: aes at 4b501000 {
 -- 
-Julien Thierry
+2.14.2
