@@ -1,172 +1,128 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 10 Oct 2017 19:38:35 +0100
-Subject: [PATCH v3 18/28] arm64/sve: Preserve SVE registers around EFI runtime
- service calls
+Date: Tue, 10 Oct 2017 19:38:38 +0100
+Subject: [PATCH v3 21/28] arm64/sve: Add sysctl to set the default vector
+ length for new processes
 In-Reply-To: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
 References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1507660725-7986-19-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1507660725-7986-22-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The EFI runtime services ABI allows EFI to make free use of the
-FPSIMD registers during EFI runtime service calls, subject to the
-callee-save requirements of the AArch64 procedure call standard.
+Because of the effect of SVE on the size of the signal frame, the
+default vector length used for new processes involves a tradeoff
+between performance of SVE-enabled software on the one hand, and
+reliability of non-SVE-aware software on the other hand.
 
-However, the SVE architecture allows upper bits of the SVE vector
-registers to be zeroed as a side-effect of FPSIMD V-register
-writes.  This means that the SVE vector registers must be saved in
-their entirety in order to avoid data loss: non-SVE-aware EFI
-implementations cannot restore them correctly.
+For this reason, the best choice depends on the repertoire of
+userspace software in use and is thus best left up to distro
+maintainers, sysadmins and developers.
 
-The non-IRQ case is already handled gracefully by
-kernel_neon_begin().  For the IRQ case, this patch allocates a
-suitable per-CPU stash buffer for the full SVE register state and
-uses it to preserve the affected registers around EFI calls.  It is
-currently unclear how the EFI runtime services ABI will be
-clarified with respect to SVE, so it safest to assume that the
-predicate registers and FFR must be saved and restored too.
+If CONFIG_SYSCTL is enabled, this patch exposes the default vector
+length in /proc/sys/abi/sve_default_vector_length, where boot
+scripts or the adventurous can poke it.
 
-No attempt is made to restore the restore the vector length after
-a call, for now.  It is deemed rather insane for EFI to change it,
-and contemporary EFI implementations certainly won't.
+In common with other arm64 ABI sysctls, this control is currently
+global: setting it requires CAP_SYS_ADMIN in the root user
+namespace, but the value set is effective for subsequent execs in
+all namespaces.  The control only affects _new_ processes, however:
+changing it does not affect the vector length of any existing
+process.
+
+The intended usage model is that if userspace is known to be fully
+SVE-tolerant (or a developer is curious to find out) then init
+scripts can crank this up during startup.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
 ---
-
-Changes since v2
-----------------
-
-Miscellaneous:
-
- * Applied a BUG_ON removal that was split into the wrong patch in v2.
-
- * Fixed overindentation of panic() call in sve_efi_setup().
----
- arch/arm64/kernel/fpsimd.c | 67 +++++++++++++++++++++++++++++++++++++++++-----
- 1 file changed, 61 insertions(+), 6 deletions(-)
+ arch/arm64/kernel/fpsimd.c | 62 +++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 61 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index b1d383a..c194627 100644
+index 2c23e4a..a9cb794 100644
 --- a/arch/arm64/kernel/fpsimd.c
 +++ b/arch/arm64/kernel/fpsimd.c
-@@ -121,11 +121,13 @@ static int sve_default_vl = -1;
- int __ro_after_init sve_max_vl = -1;
- /* Set of available vector lengths, as vq_to_bit(vq): */
- static __ro_after_init DECLARE_BITMAP(sve_vq_map, SVE_VQ_MAX);
-+static void __percpu *efi_sve_state;
+@@ -35,6 +35,7 @@
+ #include <linux/sched/signal.h>
+ #include <linux/signal.h>
+ #include <linux/slab.h>
++#include <linux/sysctl.h>
  
- #else /* ! CONFIG_ARM64_SVE */
- 
- /* Dummy declaration for code that will be optimised out: */
- extern __ro_after_init DECLARE_BITMAP(sve_vq_map, SVE_VQ_MAX);
-+extern void __percpu *efi_sve_state;
- 
- #endif /* ! CONFIG_ARM64_SVE */
- 
-@@ -562,6 +564,30 @@ int sve_verify_vq_map(void)
- 	return ret;
+ #include <asm/fpsimd.h>
+ #include <asm/cputype.h>
+@@ -345,6 +346,65 @@ static unsigned int find_supported_vector_length(unsigned int vl)
+ 	return sve_vl_from_vq(bit_to_vq(bit));
  }
  
-+static void __init sve_efi_setup(void)
++#ifdef CONFIG_SYSCTL
++
++static int sve_proc_do_default_vl(struct ctl_table *table, int write,
++				  void __user *buffer, size_t *lenp,
++				  loff_t *ppos)
 +{
-+	if (!IS_ENABLED(CONFIG_EFI))
-+		return;
++	int ret;
++	int vl = sve_default_vl;
++	struct ctl_table tmp_table = {
++		.data = &vl,
++		.maxlen = sizeof(vl),
++	};
 +
-+	/*
-+	 * alloc_percpu() warns and prints a backtrace if this goes wrong.
-+	 * This is evidence of a crippled system and we are returning void,
-+	 * so no attempt is made to handle this situation here.
-+	 */
-+	if (!sve_vl_valid(sve_max_vl))
-+		goto fail;
++	ret = proc_dointvec(&tmp_table, write, buffer, lenp, ppos);
++	if (ret || !write)
++		return ret;
 +
-+	efi_sve_state = __alloc_percpu(
-+		SVE_SIG_REGS_SIZE(sve_vq_from_vl(sve_max_vl)), SVE_VQ_BYTES);
-+	if (!efi_sve_state)
-+		goto fail;
++	/* Writing -1 has the special meaning "set to max": */
++	if (vl == -1) {
++		/* Fail safe if sve_max_vl wasn't initialised */
++		if (WARN_ON(!sve_vl_valid(sve_max_vl)))
++			vl = SVE_VL_MIN;
++		else
++			vl = sve_max_vl;
 +
-+	return;
++		goto chosen;
++	}
 +
-+fail:
-+	panic("Cannot allocate percpu memory for EFI SVE save/restore");
++	if (!sve_vl_valid(vl))
++		return -EINVAL;
++
++	vl = find_supported_vector_length(vl);
++chosen:
++	sve_default_vl = vl;
++	return 0;
 +}
 +
- /*
-  * Enable SVE for EL1.
-  * Intended for use by the cpufeatures code during CPU boot.
-@@ -609,6 +635,8 @@ void __init sve_setup(void)
- 		sve_max_vl);
- 	pr_info("SVE: default vector length %u bytes per vector\n",
- 		sve_default_vl);
++static struct ctl_table sve_default_vl_table[] = {
++	{
++		.procname	= "sve_default_vector_length",
++		.mode		= 0644,
++		.proc_handler	= sve_proc_do_default_vl,
++	},
++	{ }
++};
 +
-+	sve_efi_setup();
++static int __init sve_sysctl_init(void)
++{
++	if (system_supports_sve())
++		if (!register_sysctl("abi", sve_default_vl_table))
++			return -EINVAL;
++
++	return 0;
++}
++
++#else /* ! CONFIG_SYSCTL */
++static int __init sve_sysctl_init(void) { return 0; }
++#endif /* ! CONFIG_SYSCTL */
++
+ #define ZREG(sve_state, vq, n) ((char *)(sve_state) +		\
+ 	(SVE_SIG_ZREG_OFFSET(vq, n) - SVE_SIG_REGS_OFFSET))
+ 
+@@ -1232,6 +1292,6 @@ static int __init fpsimd_init(void)
+ 	if (!(elf_hwcap & HWCAP_ASIMD))
+ 		pr_notice("Advanced SIMD is not implemented\n");
+ 
+-	return 0;
++	return sve_sysctl_init();
  }
- 
- void fpsimd_release_thread(struct task_struct *dead_task)
-@@ -950,6 +978,7 @@ EXPORT_SYMBOL(kernel_neon_end);
- 
- static DEFINE_PER_CPU(struct fpsimd_state, efi_fpsimd_state);
- static DEFINE_PER_CPU(bool, efi_fpsimd_state_used);
-+static DEFINE_PER_CPU(bool, efi_sve_state_used);
- 
- /*
-  * EFI runtime services support functions
-@@ -975,10 +1004,24 @@ void __efi_fpsimd_begin(void)
- 
- 	WARN_ON(preemptible());
- 
--	if (may_use_simd())
-+	if (may_use_simd()) {
- 		kernel_neon_begin();
--	else {
--		fpsimd_save_state(this_cpu_ptr(&efi_fpsimd_state));
-+	} else {
-+		/*
-+		 * If !efi_sve_state, SVE can't be in use yet and doesn't need
-+		 * preserving:
-+		 */
-+		if (system_supports_sve() && likely(efi_sve_state)) {
-+			char *sve_state = this_cpu_ptr(efi_sve_state);
-+
-+			__this_cpu_write(efi_sve_state_used, true);
-+
-+			sve_save_state(sve_state + sve_ffr_offset(sve_max_vl),
-+				       &this_cpu_ptr(&efi_fpsimd_state)->fpsr);
-+		} else {
-+			fpsimd_save_state(this_cpu_ptr(&efi_fpsimd_state));
-+		}
-+
- 		__this_cpu_write(efi_fpsimd_state_used, true);
- 	}
- }
-@@ -991,10 +1034,22 @@ void __efi_fpsimd_end(void)
- 	if (!system_supports_fpsimd())
- 		return;
- 
--	if (__this_cpu_xchg(efi_fpsimd_state_used, false))
--		fpsimd_load_state(this_cpu_ptr(&efi_fpsimd_state));
--	else
-+	if (!__this_cpu_xchg(efi_fpsimd_state_used, false)) {
- 		kernel_neon_end();
-+	} else {
-+		if (system_supports_sve() &&
-+		    likely(__this_cpu_read(efi_sve_state_used))) {
-+			char const *sve_state = this_cpu_ptr(efi_sve_state);
-+
-+			sve_load_state(sve_state + sve_ffr_offset(sve_max_vl),
-+				       &this_cpu_ptr(&efi_fpsimd_state)->fpsr,
-+				       sve_vq_from_vl(sve_get_vl()) - 1);
-+
-+			__this_cpu_write(efi_sve_state_used, false);
-+		} else {
-+			fpsimd_load_state(this_cpu_ptr(&efi_fpsimd_state));
-+		}
-+	}
- }
- 
- #endif /* CONFIG_EFI */
+ core_initcall(fpsimd_init);
 -- 
 2.1.4
