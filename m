@@ -1,98 +1,71 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 10 Oct 2017 10:46:58 +0100
-Subject: [PATCH v3 19/20] KVM: arm/arm64: Get rid of
- kvm_timer_flush_hwstate
-In-Reply-To: <20170923004207.22356-20-cdall@linaro.org> (Christoffer Dall's
- message of "Sat, 23 Sep 2017 02:42:06 +0200")
-References: <20170923004207.22356-1-cdall@linaro.org>
- <20170923004207.22356-20-cdall@linaro.org>
-Message-ID: <871smbwd0t.fsf@on-the-bus.cambridge.arm.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 10 Oct 2017 11:48:25 +0200
+Subject: [PATCH] arm64: dts: rockchip: fix typo in iommu nodes
+In-Reply-To: <20171010085648.1339605-1-arnd@arndb.de>
+References: <20171010085648.1339605-1-arnd@arndb.de>
+Message-ID: <4123717.0VmPnCpUOn@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 23 2017 at  2:42:06 am BST, Christoffer Dall <cdall@linaro.org> wrote:
-> Now when both the vtimer and the ptimer when using both the in-kernel
-> vgic emulation and a userspace IRQ chip are driven by the timer signals
-> and at the vcpu load/put boundaries, instead of recomputing the timer
-> state at every entry/exit to/from the guest, we can get entirely rid of
-> the flush hwstate function.
->
-> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+Hi Arnd,
+
+Am Dienstag, 10. Oktober 2017, 10:56:01 CEST schrieb Arnd Bergmann:
+> The latest dtc warns about an extraneous cell in the interrupt
+> property of two of the iommu device nodes:
+> 
+> Warning (interrupts_property): interrupts size is (16), expected multiple of
+> 12 in /iommu at ff373f00 Warning (interrupts_property): interrupts size is
+> (16), expected multiple of 12 in /iommu at ff900800
+> 
+> This removes the typo.
+> 
+> Fixes: cede4c79de28 ("arm64: dts: rockchip: add rk3368 iommu nodes")
+> Fixes: 49c82f2b7c5d ("arm64: dts: rockchip: add rk3328 iommu nodes")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+looks like that got copy-pasted from rk3399 where we have 4 elements per irq.
+In any case the change looks good, so if you want to apply it directly to 
+armsoc-fixes here is a
+
+Acked-by: Heiko Stuebner <heiko@sntech.de>
+
+Depending on how you want to handle it I can also merge it, but
+Olof already picked up my 2 fixes for 4.14, so you applying it might
+save us the round-trip for a further 1-patch pull request :-)
+
+
+Heiko
+
 > ---
->  include/kvm/arm_arch_timer.h |  1 -
->  virt/kvm/arm/arch_timer.c    | 24 ------------------------
->  virt/kvm/arm/arm.c           |  1 -
->  3 files changed, 26 deletions(-)
->
-> diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-> index 8e5ed54..af29563 100644
-> --- a/include/kvm/arm_arch_timer.h
-> +++ b/include/kvm/arm_arch_timer.h
-> @@ -61,7 +61,6 @@ int kvm_timer_hyp_init(void);
->  int kvm_timer_enable(struct kvm_vcpu *vcpu);
->  int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu);
->  void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
-> -void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu);
->  void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu);
->  bool kvm_timer_should_notify_user(struct kvm_vcpu *vcpu);
->  void kvm_timer_update_run(struct kvm_vcpu *vcpu);
-> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> index aa18a5d..f92459a 100644
-> --- a/virt/kvm/arm/arch_timer.c
-> +++ b/virt/kvm/arm/arch_timer.c
-> @@ -302,12 +302,6 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
->  	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
->  	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
->  
-> -	/*
-> -	 * If userspace modified the timer registers via SET_ONE_REG before
-> -	 * the vgic was initialized, we mustn't set the vtimer->irq.level value
-> -	 * because the guest would never see the interrupt.  Instead wait
-> -	 * until we call this function from kvm_timer_flush_hwstate.
-> -	 */
->  	if (unlikely(!timer->enabled))
->  		return;
->  
-> @@ -493,24 +487,6 @@ bool kvm_timer_should_notify_user(struct kvm_vcpu *vcpu)
->  	       ptimer->irq.level != plevel;
->  }
->  
-> -/**
-> - * kvm_timer_flush_hwstate - prepare timers before running the vcpu
-> - * @vcpu: The vcpu pointer
-> - *
-> - * Check if the virtual timer has expired while we were running in the host,
-> - * and inject an interrupt if that was the case, making sure the timer is
-> - * masked or disabled on the host so that we keep executing.  Also schedule a
-> - * software timer for the physical timer if it is enabled.
-> - */
-> -void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
-> -{
-> -	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-> -	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
-> -
-> -	if (unlikely(!timer->enabled))
-> -		return;
-> -}
-> -
->  void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
->  {
->  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> index 132d39a..14c50d1 100644
-> --- a/virt/kvm/arm/arm.c
-> +++ b/virt/kvm/arm/arm.c
-> @@ -656,7 +656,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  
->  		local_irq_disable();
->  
-> -		kvm_timer_flush_hwstate(vcpu);
->  		kvm_vgic_flush_hwstate(vcpu);
->  
->  		/*
-
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
--- 
-Jazz is not dead, it just smell funny.
+>  arch/arm64/boot/dts/rockchip/rk3328.dtsi | 2 +-
+>  arch/arm64/boot/dts/rockchip/rk3368.dtsi | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+> b/arch/arm64/boot/dts/rockchip/rk3328.dtsi index 6d615cb6e64d..41d61840fb99
+> 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+> @@ -582,7 +582,7 @@
+>  	vop_mmu: iommu at ff373f00 {
+>  		compatible = "rockchip,iommu";
+>  		reg = <0x0 0xff373f00 0x0 0x100>;
+> -		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH 0>;
+> +		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-names = "vop_mmu";
+>  		#iommu-cells = <0>;
+>  		status = "disabled";
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+> b/arch/arm64/boot/dts/rockchip/rk3368.dtsi index 19fbaa5e7bdd..1070c8264c13
+> 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+> @@ -740,7 +740,7 @@
+>  	iep_mmu: iommu at ff900800 {
+>  		compatible = "rockchip,iommu";
+>  		reg = <0x0 0xff900800 0x0 0x100>;
+> -		interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH 0>;
+> +		interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-names = "iep_mmu";
+>  		#iommu-cells = <0>;
+>  		status = "disabled";
