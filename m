@@ -1,43 +1,33 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 10 Oct 2017 14:26:05 +0200
-Subject: [PATCH] ARM: imx: Enable cpuidle for i.MX6DL starting at 1.1
-In-Reply-To: <1507636655.20816.8.camel@nxp.com>
-References: <bbd72503f0e79cc6df4ba12db41b980d50415caf.1507634288.git.leonard.crestez@nxp.com>
- <1507635857.2745.12.camel@pengutronix.de>
- <1507636655.20816.8.camel@nxp.com>
-Message-ID: <1507638365.2745.15.camel@pengutronix.de>
+From: vigneshr@ti.com (Vignesh R)
+Date: Tue, 10 Oct 2017 18:11:31 +0530
+Subject: [RESEND PATCH 0/3] K2G: Add support for PWM ECAP
+In-Reply-To: <20170919061551.11981-1-vigneshr@ti.com>
+References: <20170919061551.11981-1-vigneshr@ti.com>
+Message-ID: <d8a7bec5-27df-d713-bff5-d70d946f19f7@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 10.10.2017, 14:57 +0300 schrieb Leonard Crestez:
-> On Tue, 2017-10-10 at 13:44 +0200, Lucas Stach wrote:
-> > Am Dienstag, den 10.10.2017, 14:20 +0300 schrieb Leonard Crestez:
-> > > Enable cpuidle support on i.MX6DL starting from
-> > > IMX_CHIP_REVISION_1_1.
-> > Did you mean 1.0 here and in the subject? This would make sense AFAICS,
-> > ?and is also in line with what the code change does.
+
+
+On Tuesday 19 September 2017 11:45 AM, Vignesh R wrote:
 > 
-> No, I do mean "1.1" for 6dl. It's a bit confusing because the code uses
-> > instead of >= for comparison.
-
-Uh, right. Given that I totally misread this on a quick glance, I would
- prefer this to be >= ,but that's more a matter of personal taste.
-
-> This patch results in imx6q_cpuidle_init getting called if
-> (cpu_is_imx6dl() &&?imx_get_soc_revision() == IMX_CHIP_REVISION_1_1);
-> without this patch it was skipped.
+> This series adds support for TI ECAP PWM IP present in 66AK2G SoC.
+> Resending based on today's linux-next.
 > 
-> > > --- a/arch/arm/mach-imx/mach-imx6q.c
-> > > +++ b/arch/arm/mach-imx/mach-imx6q.c
-> > > @@ -374,7 +374,8 @@ static void __init imx6q_init_late(void)
-> > > > 
-> > > > ?	?* WAIT mode is broken on TO 1.0 and 1.1, so there is no point
-> > > > ?	?* to run cpuidle on them.
-> > > > ?	?*/
+> 
+> Vignesh R (3):
+>   ARM: dts: keystone-k2g: Add ECAP PWM DT nodes
+>   ARM: dts: keystone-k2g-evm: Enable PWM ECAP0
+>   ARM: configs: keystone: Enable TIECAP PWM driver
+> 
+>  arch/arm/boot/dts/keystone-k2g-evm.dts | 12 ++++++++++++
+>  arch/arm/boot/dts/keystone-k2g.dtsi    | 20 ++++++++++++++++++++
+>  arch/arm/configs/keystone_defconfig    |  2 ++
+>  3 files changed, 34 insertions(+)
+> 
 
-This comment is now out of sync with the code below.
+Gentle ping on the series...
 
-> > > > -	if (imx_get_soc_revision() > IMX_CHIP_REVISION_1_1)
-> > > > +	if ((cpu_is_imx6q() && imx_get_soc_revision() > IMX_CHIP_REVISION_1_1) ||
-> > > > +	????(cpu_is_imx6dl() && imx_get_soc_revision() > IMX_CHIP_REVISION_1_0))
-> > > > ?		imx6q_cpuidle_init();
+-- 
+Regards
+Vignesh
