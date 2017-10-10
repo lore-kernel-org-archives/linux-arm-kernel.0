@@ -1,43 +1,93 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 10 Oct 2017 19:38:34 +0100
-Subject: [PATCH v3 17/28] arm64/sve: Preserve SVE registers around kernel-mode
- NEON use
+Date: Tue, 10 Oct 2017 19:38:29 +0100
+Subject: [PATCH v3 12/28] arm64/sve: Support vector length resetting for new
+ processes
 In-Reply-To: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
 References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1507660725-7986-18-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1507660725-7986-13-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kernel-mode NEON will corrupt the SVE vector registers, due to the
-way they alias the FPSIMD vector registers in the hardware.
+It's desirable to be able to reset the vector length to some sane
+default for new processes, since the new binary and its libraries
+processes may or may not be SVE-aware.
 
-This patch ensures that any live SVE register content for the task
-is saved by kernel_neon_begin().  The data will be restored in the
-usual way on return to userspace.
+This patch tracks the desired post-exec vector length (if any) in a
+new thread member sve_vl_onexec, and adds a new thread flag
+TIF_SVE_VL_INHERIT to control whether to inherit or reset the
+vector length.  Currently these are inactive.  Subsequent patches
+will provide the capability to configure them.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
 ---
- arch/arm64/kernel/fpsimd.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/processor.h   |  1 +
+ arch/arm64/include/asm/thread_info.h |  1 +
+ arch/arm64/kernel/fpsimd.c           | 16 ++++++++++++----
+ 3 files changed, 14 insertions(+), 4 deletions(-)
 
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index 4831d28..3faceac 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -87,6 +87,7 @@ struct thread_struct {
+ 	struct fpsimd_state	fpsimd_state;
+ 	void			*sve_state;	/* SVE registers, if any */
+ 	unsigned int		sve_vl;		/* SVE vector length */
++	unsigned int		sve_vl_onexec;	/* SVE vl after next exec */
+ 	unsigned long		fault_address;	/* fault info */
+ 	unsigned long		fault_code;	/* ESR_EL1 value */
+ 	struct debug_info	debug;		/* debugging */
+diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+index 04dbf50..c6400fc 100644
+--- a/arch/arm64/include/asm/thread_info.h
++++ b/arch/arm64/include/asm/thread_info.h
+@@ -93,6 +93,7 @@ void arch_setup_new_exec(void);
+ #define TIF_SINGLESTEP		21
+ #define TIF_32BIT		22	/* 32bit process */
+ #define TIF_SVE			23	/* Scalable Vector Extension in use */
++#define TIF_SVE_VL_INHERIT	24	/* Inherit sve_vl_onexec across exec */
+ 
+ #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
+ #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
 diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 5673f50..b1d383a 100644
+index e60d451..aabeaee 100644
 --- a/arch/arm64/kernel/fpsimd.c
 +++ b/arch/arm64/kernel/fpsimd.c
-@@ -909,8 +909,10 @@ void kernel_neon_begin(void)
- 	__this_cpu_write(kernel_neon_busy, true);
+@@ -109,6 +109,9 @@
+  */
+ static DEFINE_PER_CPU(struct fpsimd_state *, fpsimd_last_state);
  
- 	/* Save unsaved task fpsimd state, if any: */
--	if (current->mm && !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
--		fpsimd_save_state(&current->thread.fpsimd_state);
-+	if (current->mm) {
-+		task_fpsimd_save();
-+		set_thread_flag(TIF_FOREIGN_FPSTATE);
-+	}
++/* Default VL for tasks that don't set it explicitly: */
++static int sve_default_vl = SVE_VL_MIN;
++
+ static void sve_free(struct task_struct *task)
+ {
+ 	kfree(task->thread.sve_state);
+@@ -480,15 +483,20 @@ void fpsimd_flush_thread(void)
+ 		 * If a bug causes this to go wrong, we make some noise and
+ 		 * try to fudge thread.sve_vl to a safe value here.
+ 		 */
+-		vl = current->thread.sve_vl;
+-
+-		if (vl == 0)
+-			vl = SVE_VL_MIN;
++		vl = current->thread.sve_vl_onexec ?
++			current->thread.sve_vl_onexec : sve_default_vl;
  
- 	/* Invalidate any task state remaining in the fpsimd regs: */
- 	__this_cpu_write(fpsimd_last_state, NULL);
+ 		if (WARN_ON(!sve_vl_valid(vl)))
+ 			vl = SVE_VL_MIN;
+ 
+ 		current->thread.sve_vl = vl;
++
++		/*
++		 * If the task is not set to inherit, ensure that the vector
++		 * length will be reset by a subsequent exec:
++		 */
++		if (!test_thread_flag(TIF_SVE_VL_INHERIT))
++			current->thread.sve_vl_onexec = 0;
+ 	}
+ 
+ 	set_thread_flag(TIF_FOREIGN_FPSTATE);
 -- 
 2.1.4
