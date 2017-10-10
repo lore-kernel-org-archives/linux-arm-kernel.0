@@ -1,92 +1,97 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 10 Oct 2017 21:51:26 +0200
-Subject: [PATCH 04/11] watchdog: ftwdt010: Add clock support
-In-Reply-To: <20170827170641.GF22819@roeck-us.net>
-References: <20170812184318.10144-1-linus.walleij@linaro.org>
- <20170812184318.10144-5-linus.walleij@linaro.org>
- <20170814160536.GC7025@roeck-us.net>
- <CACRpkdYcEbWkHdgxA-3=6JiZTxecQcTYgqx4xDH23=NxF8zg_Q@mail.gmail.com>
- <20170827170641.GF22819@roeck-us.net>
-Message-ID: <CACRpkdbg3KdVvSMvzTv-rr4mAg_TPs6JLo3N_==G9BBS17B3Rg@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 10 Oct 2017 13:51:33 -0600
+Subject: [PATCH] arm64: kdump: Avoid to power off nonpanic CPUs
+In-Reply-To: <20171008153540.GB1694@remoulade>
+References: <1507471966-15367-1-git-send-email-leo.yan@linaro.org>
+ <20171008153540.GB1694@remoulade>
+Message-ID: <CANLsYkzwKM3tKFy8kaAKsifZjB9L4Jop2TCbC_iXL-EK2R2tSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 27, 2017 at 7:06 PM, Guenter Roeck <linux@roeck-us.net> wrote:
-> On Thu, Aug 24, 2017 at 10:32:22PM +0200, Linus Walleij wrote:
->> On Mon, Aug 14, 2017 at 6:05 PM, Guenter Roeck <linux@roeck-us.net> wrote:
->>
->> >> +     gwdt->pclk = devm_clk_get(dev, "PCLK");
->> >> +     if (!IS_ERR(gwdt->pclk)) {
->> >
->> > devm_clk_get() can return NULL (if the clock subsystem is not enabled).
->>
->> That is fine I think? Because if the clock subsysten is not enabled
->> all the clk_prepare() etc becomes stubs as well and the driver
->> is happy. I think this is intended.
+On 8 October 2017 at 09:35, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi Leo,
 >
-> If I understand your comment below correctly, the driver won't work
-> without clock subsystem because the clock frequency would in that case
-> be 0. Why not catch that situation here, or even better make the driver
-> depends on the clock subsystem ?
-
-OK fair enough I can do that.
-
-I think Aspeed is merging its clock driver this kernel cycle
-so all variant SoCs actually have clocks.
-
->> The driver strictly needs this frequency
->> so we cannot really work without it and it needs to fail
->> over here.
+> On Sun, Oct 08, 2017 at 10:12:46PM +0800, Leo Yan wrote:
+>> commit a88ce63b642c ("arm64: kexec: have own crash_smp_send_stop() for
+>> crash dump for nonpanic cores") introduces ARM64 architecture function
+>> crash_smp_send_stop() to replace the weak function, this results in
+>> the nonpanic CPUs to be hot-plugged out and CPUs are placed into low
+>> power state on ARM64 platforms with the flow:
 >>
-> Repeating from above, doesn't that mean that the driver depends
-> on the clock subsystem ? Or am I missong some context ?
-
-Usually in the kernel, it is acceptable to let stub clocks
-kick in when compiling out the clock subsystem.
-
-I think people assume that in this state, all clocks are simply
-turned on and at nominal speed, all over the place. So it
-usually doesn't matter that it gets compiled out.
-
-But in a sense that is simplistic and as this driver shows
-we really do depend on the clocks to run some business
-like timers, so in practice it is a bad idea. Clocksources
-definately cannot live without their clocks for example.
-So I think strictly requireing it is OK.
-
->> > Note that I would
->> > resist replacing all the devm_ functions with non-devm equivalents just
->> > because the clock subsystem doesn't provide the necessary API functions.
+>>   Panic CPU:
+>>     machine_crash_shutdown()
+>>       crash_smp_send_stop()
+>>       smp_cross_call(&mask, IPI_CPU_CRASH_STOP)
 >>
->> I've seen people do this for this reason though :/
+>>   Nonpanic CPUs:
+>>     handle_IPI()
+>>       ipi_cpu_crash_stop()
+>>         cpu_ops[cpu]->cpu_die()
 >>
-> Yes, but that doesn't make it better.
+>> The upper patch has no issue if enabled crash dump only; but if enabled
+>> crash dump and Coresight debug module for panic dumping at the meantime,
+>> nonpanic CPUs are powered off in crash dump flow,
+>
+> We want to turn secondary CPUs off if at all possible, since we want to prevent
+> issues resulting from asynchronous behaviour (e.g. TLB/cache fetches) that
+> could result in subsequent problems (e.g. if bad page tables resulted in page
+> table walks to MMIO devices).
+>
+> So we *really* want this behaviour in the general case.
+>
+>> later this may introduce conflicts with the Coresight debug module because
+>> Coresight debug registers dumping requires the CPU must be powered on for
+>> some platforms (e.g. Hi6220 on Hikey board). If we cannot keep the CPUs
+>> powered on, we can see the hardware lockup issue when access Coresight debug
+>> registers.
+>
+> Just to check I understand, the coresight debug module is being invoked as a
+> panic notifier in the current kernel, right?
+>
+>> To fix this issue, this commit removes CPU hotplug operation in func
+>> crash_smp_send_stop() and let CPUs to run into WFE/WFI states so CPUs
+>> can still be powered on after crash dump. This finally is more safe
+>> for Coresight debug module to dump registers and avoid hardware lockup.
+>>
+>> Cc: James Morse <james.morse@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+>> ---
+>>  arch/arm64/kernel/smp.c | 6 ------
+>>  1 file changed, 6 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+>> index 9f7195a..a65e68b 100644
+>> --- a/arch/arm64/kernel/smp.c
+>> +++ b/arch/arm64/kernel/smp.c
+>> @@ -856,12 +856,6 @@ static void ipi_cpu_crash_stop(unsigned int cpu, struct pt_regs *regs)
+>>
+>>       local_irq_disable();
+>>
+>> -#ifdef CONFIG_HOTPLUG_CPU
+>> -     if (cpu_ops[cpu]->cpu_die)
+>> -             cpu_ops[cpu]->cpu_die(cpu);
+>> -#endif
+>> -
+>
+> If it's really necessary to keep secondary CPUs online, please limit that to
+> the case where the coresight debug module is being used.
+>
+> IIRC there were similar interactions with cpuidle, and I don't see why hotplug
+> should be any different.
 
-Stephen Boyd <sboyd@codeaurora.org> wrote:
+Can you point to where it was fixed for CPUidle?  We should try to do
+the same for coresight_debug so that things are done the same way.
+I'm also thinking that we could call ->cpu_die(cpu) in a #ifdef
+CONFIG_HOTPLUG_CPU clause in debug_notifier_call().  That way the
+behaviour remains the same, just enacted a little later - please
+advise on what option you prefer.
 
-> I'd still prefer we just disable clks on clk_put(),
+Regards,
+Mathieu
 
-Which means that devm_clk_get() will do the job
-implicitly already.
-
-> but Russell
-> said we needed to fix all non-common clk implementations of the
-> clk API to do that and then I forgot about the topic (so
-> anti-climatic). I'm pretty much OK with us merging the temporary
-> solution.
-
-I guess that means the watchdog-local hack that
-Guenther suggested.
-
-But I'm not in any hurry. Instead of solving the simple problem,
-why not solve the supercomplicated problem.
-
-So the task is to look over all non generic clock implementations
-and make them conform to disabling the clocks on clk_put().
-No big deal. (Famous last words.)
-
-How many local clock implementations can there be?
-I will look into it.
-
-Yours,
-Linus Walleij
+>
+> Thanks,
+> Mark.
