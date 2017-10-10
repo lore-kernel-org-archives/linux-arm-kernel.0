@@ -1,46 +1,73 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 10 Oct 2017 10:36:36 +0800
-Subject: [PATCH v2 0/3] pinctrl: sunxi: Start to enforce the strict mode
-In-Reply-To: <cover.3e8ef5cb08d0164375d7644df0548e5f39b0fe66.1507582414.git-series.maxime.ripard@free-electrons.com>
-References: <cover.3e8ef5cb08d0164375d7644df0548e5f39b0fe66.1507582414.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v64PgArRi3gqq6mcT4f7bwY5-BHkaLOSrAQkCpBWHOXXMQ@mail.gmail.com>
+From: net147@gmail.com (Jonathan Liu)
+Date: Tue, 10 Oct 2017 13:43:51 +1100
+Subject: [PATCH] usb: musb: sunxi: Explicitly release USB PHY on exit
+In-Reply-To: <20171010021439.GH12182@LTA0271908.dhcp.ti.com>
+References: <20170926113923.18181-1-net147@gmail.com>
+ <20171009142302.GB32614@uda0271908>
+ <CANwerB2kbxnhrgWAnmWB9Uzp+M1MjC7MwWuwLXw==dpdCRLCAA@mail.gmail.com>
+ <20171010021439.GH12182@LTA0271908.dhcp.ti.com>
+Message-ID: <CANwerB26bBmP2gyr3JcsvLH6SDyfM4t9i1j9W7YFMtx81r4HyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 10, 2017 at 4:53 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> Here is an attempt to enable pinctrl's strict mode on our pinctrl drivers.
-> Indeed, our controllers should have had that mode enabled since its
-> introduction.
->
-> However, there's a number of issues with old device trees that prevent from
-> just enabling it for all the devices. There's basically two of them:
->
->   - Most of our old DTs have a pinctrl node for GPIOs, which will result in
->     an error when the driver is going to request the gpio because it would
->     already be requested automatically by pinctrl. We cannot break those.
->
->   - Some of these GPIOs also need to change their pin configuration to add
->     a bias or change the current output, and there isn't a migration path.
->
-> Let's just keep the old behaviour for the old SoCs, and enforce it on the
-> new one, and enabled it by default so that the situation at least doesn't
-> get worse.
->
-> This has been tested on an A83t (strict on) and an H3 (strict off) board.
->
-> Let me know what you think,
-> Maxime
->
-> Changes from v1:
->   - Duplicate the pmx_ops before modifying them
->   - Disable the strict mode for R_PIO as well
->
-> Maxime Ripard (3):
->   pinctrl: sunxi: Introduce the strict flag
->   pinctrl: sunxi: Disable strict mode for old pinctrl drivers
->   pinctrl: sunxi: Enforce the strict mode by default
+Hi,
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+On 10 October 2017 at 13:14, Bin Liu <b-liu@ti.com> wrote:
+> On Tue, Oct 10, 2017 at 08:17:34AM +1100, Jonathan Liu wrote:
+>> Hi,
+>>
+>> On 10 October 2017 at 01:23, Bin Liu <b-liu@ti.com> wrote:
+>> > Hi,
+>> >
+>> > On Tue, Sep 26, 2017 at 09:39:23PM +1000, Jonathan Liu wrote:
+>> >> This fixes a kernel oops when unloading the driver due to usb_put_phy
+>> >> being called after usb_phy_generic_unregister when the device is
+>> >> detached. Calling usb_phy_generic_unregister causes x->dev->driver to
+>> >> be NULL in usb_put_phy and results in a NULL pointer dereference.
+>> >>
+>> >> As we are now explicitly managing the lifetime of usb_phy,
+>> >> devm_usb_get_phy is changed to usb_get_phy and we call usb_put_phy in
+>> >> the probe error path.
+>> >>
+>> >> Cc: stable at vger.kernel.org # v4.3+
+>> >> Signed-off-by: Jonathan Liu <net147@gmail.com>
+>> >> ---
+>> >>  drivers/usb/musb/sunxi.c | 8 ++++++--
+>> >>  1 file changed, 6 insertions(+), 2 deletions(-)
+>> >>
+>> >> diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
+>> >> index c9a09b5bb6e5..8eed61042103 100644
+>> >> --- a/drivers/usb/musb/sunxi.c
+>> >> +++ b/drivers/usb/musb/sunxi.c
+>> >> @@ -297,6 +297,8 @@ static int sunxi_musb_exit(struct musb *musb)
+>> >>       if (test_bit(SUNXI_MUSB_FL_HAS_SRAM, &glue->flags))
+>> >>               sunxi_sram_release(musb->controller->parent);
+>> >>
+>> >> +     usb_put_phy(glue->xceiv);
+>> >
+>> > Will devm_usb_put_phy() solve the issue too? Then you don't need the
+>> > changes in sunxi_musb_probe() below.
+>> >
+>>
+>> devm_usb_put_phy does solve the issue without changes in
+>> sunxi_musb_probe but I think it is clearer that the lifetime is
+>> explicitly managed if we don't mix implicit and explicit freeing of
+>> resources.
+>
+> Then what is the purpose of the devm_* API?
+>
+> The original bug was that devm_usb_get_phy() is called in _probe, but
+> devm_usb_put_phy() was never called, which caused the device ref count
+> unbalanced. It is not related to implicit/explicit resource management.
+>
+> devm_* is recommended whenever applicable.
+>
+
+Ok. Will use devm_usb_put_phy in v2 patch.
+
+> Regards,
+> -Bin.
+>
+
+Regards,
+Jonathan
