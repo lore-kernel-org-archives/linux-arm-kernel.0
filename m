@@ -1,282 +1,88 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Tue, 10 Oct 2017 12:02:01 +0100
-Subject: [PATCH v5 03/10] kexec_file: factor out arch_kexec_kernel_*()
- from x86, powerpc
-In-Reply-To: <20171010063619.6303-4-takahiro.akashi@linaro.org>
-References: <20171010063619.6303-1-takahiro.akashi@linaro.org>
- <20171010063619.6303-4-takahiro.akashi@linaro.org>
-Message-ID: <a8a0f36b-e797-289b-04e3-aa87b4088cdd@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 10 Oct 2017 12:04:06 +0100
+Subject: [PATCH v3 03/22] dt-bindings: arm: scmi: add ARM MHU specific
+ mailbox client bindings
+In-Reply-To: <CAL_JsqJTuq4rDu9+T6rcC_q8Gw5nyDScNZy2cNkq+y5_v9pegA@mail.gmail.com>
+References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
+ <1506604306-20739-4-git-send-email-sudeep.holla@arm.com>
+ <20171005232031.7373ni5ssln4wlpr@rob-hp-laptop>
+ <CABb+yY1ra5bgRB1VND+NvCcDFqfggG04a+JPWFZ+HpNg08eR8g@mail.gmail.com>
+ <CAL_Jsq+0paGePmJVjsyFJiHx0UaDPjQrbe3C030U+fuUkWCJ+A@mail.gmail.com>
+ <CABb+yY2v8D9NFVsG9OwSpL8cswKihY6OUru8QA6Jfq5YmVVD7A@mail.gmail.com>
+ <CAL_JsqKy+WzEiHRS0BrE3_3Md4CGOr0e2ZZ_vBCB-Opgg49s+A@mail.gmail.com>
+ <CABb+yY0KNafWbD00hBVrNNGnFDcU0v6KXXY2D2K7KNouak1HdQ@mail.gmail.com>
+ <CAL_JsqJTuq4rDu9+T6rcC_q8Gw5nyDScNZy2cNkq+y5_v9pegA@mail.gmail.com>
+Message-ID: <d8ce2158-f0fc-9bac-713a-ed131bd479bd@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Takahiro,
 
-On 10/10/17 07:36, AKASHI Takahiro wrote:
-> arch_kexec_kernel_*() and arch_kimage_file_post_load_cleanup can now be
-> duplicated among some architectures, so let's factor them out.
->
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Cc: Dave Young <dyoung@redhat.com>
-> Cc: Vivek Goyal <vgoyal@redhat.com>
-> Cc: Baoquan He <bhe@redhat.com>
-> Cc: Michael Ellerman <mpe@ellerman.id.au>
-> Cc: Thiago Jung Bauermann <bauerman@linux.vnet.ibm.com>
-> ---
->   arch/powerpc/include/asm/kexec.h            |  2 +-
->   arch/powerpc/kernel/kexec_elf_64.c          |  2 +-
->   arch/powerpc/kernel/machine_kexec_file_64.c | 36 ++----------------
->   arch/x86/include/asm/kexec-bzimage64.h      |  2 +-
->   arch/x86/kernel/kexec-bzimage64.c           |  2 +-
->   arch/x86/kernel/machine_kexec_64.c          | 45 +----------------------
->   include/linux/kexec.h                       | 15 ++++----
->   kernel/kexec_file.c                         | 57 +++++++++++++++++++++++++++--
->   8 files changed, 70 insertions(+), 91 deletions(-)
->
-> diff --git a/arch/powerpc/include/asm/kexec.h b/arch/powerpc/include/asm/kexec.h
-> index 25668bc8cb2a..23588952d8bd 100644
-> --- a/arch/powerpc/include/asm/kexec.h
-> +++ b/arch/powerpc/include/asm/kexec.h
-> @@ -92,7 +92,7 @@ static inline bool kdump_in_progress(void)
->   }
->
->   #ifdef CONFIG_KEXEC_FILE
-> -extern struct kexec_file_ops kexec_elf64_ops;
-> +extern const struct kexec_file_ops kexec_elf64_ops;
->
->   #ifdef CONFIG_IMA_KEXEC
->   #define ARCH_HAS_KIMAGE_ARCH
-> diff --git a/arch/powerpc/kernel/kexec_elf_64.c b/arch/powerpc/kernel/kexec_elf_64.c
-> index 9a42309b091a..6c78c11c7faf 100644
-> --- a/arch/powerpc/kernel/kexec_elf_64.c
-> +++ b/arch/powerpc/kernel/kexec_elf_64.c
-> @@ -657,7 +657,7 @@ static void *elf64_load(struct kimage *image, char *kernel_buf,
->       return ret ? ERR_PTR(ret) : fdt;
->   }
->
-> -struct kexec_file_ops kexec_elf64_ops = {
-> +const struct kexec_file_ops kexec_elf64_ops = {
->       .probe = elf64_probe,
->       .load = elf64_load,
->   };
-> diff --git a/arch/powerpc/kernel/machine_kexec_file_64.c b/arch/powerpc/kernel/machine_kexec_file_64.c
-> index 992c0d258e5d..e7ce78857f0b 100644
-> --- a/arch/powerpc/kernel/machine_kexec_file_64.c
-> +++ b/arch/powerpc/kernel/machine_kexec_file_64.c
-> @@ -31,8 +31,9 @@
->
->   #define SLAVE_CODE_SIZE             256
->
-> -static struct kexec_file_ops *kexec_file_loaders[] = {
-> +const struct kexec_file_ops * const kexec_file_loaders[] = {
->       &kexec_elf64_ops,
-> +     NULL
->   };
->
->   int arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
-> @@ -45,38 +46,7 @@ int arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
->       if (image->type == KEXEC_TYPE_CRASH)
->               return -ENOTSUPP;
->
-> -     for (i = 0; i < ARRAY_SIZE(kexec_file_loaders); i++) {
-> -             fops = kexec_file_loaders[i];
-> -             if (!fops || !fops->probe)
-> -                     continue;
-> -
-> -             ret = fops->probe(buf, buf_len);
-> -             if (!ret) {
-> -                     image->fops = fops;
-> -                     return ret;
-> -             }
-> -     }
-> -
-> -     return ret;
-> -}
-> -
-> -void *arch_kexec_kernel_image_load(struct kimage *image)
-> -{
-> -     if (!image->fops || !image->fops->load)
-> -             return ERR_PTR(-ENOEXEC);
-> -
-> -     return image->fops->load(image, image->kernel_buf,
-> -                              image->kernel_buf_len, image->initrd_buf,
-> -                              image->initrd_buf_len, image->cmdline_buf,
-> -                              image->cmdline_buf_len);
-> -}
-> -
-> -int arch_kimage_file_post_load_cleanup(struct kimage *image)
-> -{
-> -     if (!image->fops || !image->fops->cleanup)
-> -             return 0;
-> -
-> -     return image->fops->cleanup(image->image_loader_data);
-> +     return _kexec_kernel_image_probe(image, buf, buf_len);
->   }
->
->   /**
-> diff --git a/arch/x86/include/asm/kexec-bzimage64.h b/arch/x86/include/asm/kexec-bzimage64.h
-> index d1b5d194e31d..284fd23d133b 100644
-> --- a/arch/x86/include/asm/kexec-bzimage64.h
-> +++ b/arch/x86/include/asm/kexec-bzimage64.h
-> @@ -1,6 +1,6 @@
->   #ifndef _ASM_KEXEC_BZIMAGE64_H
->   #define _ASM_KEXEC_BZIMAGE64_H
->
-> -extern struct kexec_file_ops kexec_bzImage64_ops;
-> +extern const struct kexec_file_ops kexec_bzImage64_ops;
->
->   #endif  /* _ASM_KEXE_BZIMAGE64_H */
-> diff --git a/arch/x86/kernel/kexec-bzimage64.c b/arch/x86/kernel/kexec-bzimage64.c
-> index fb095ba0c02f..705654776c0c 100644
-> --- a/arch/x86/kernel/kexec-bzimage64.c
-> +++ b/arch/x86/kernel/kexec-bzimage64.c
-> @@ -538,7 +538,7 @@ static int bzImage64_verify_sig(const char *kernel, unsigned long kernel_len)
->   }
->   #endif
->
-> -struct kexec_file_ops kexec_bzImage64_ops = {
-> +const struct kexec_file_ops kexec_bzImage64_ops = {
->       .probe = bzImage64_probe,
->       .load = bzImage64_load,
->       .cleanup = bzImage64_cleanup,
-> diff --git a/arch/x86/kernel/machine_kexec_64.c b/arch/x86/kernel/machine_kexec_64.c
-> index 1f790cf9d38f..2cdd29d64181 100644
-> --- a/arch/x86/kernel/machine_kexec_64.c
-> +++ b/arch/x86/kernel/machine_kexec_64.c
-> @@ -30,8 +30,9 @@
->   #include <asm/set_memory.h>
->
->   #ifdef CONFIG_KEXEC_FILE
-> -static struct kexec_file_ops *kexec_file_loaders[] = {
-> +const struct kexec_file_ops * const kexec_file_loaders[] = {
->               &kexec_bzImage64_ops,
-> +             NULL
->   };
->   #endif
->
-> @@ -363,27 +364,6 @@ void arch_crash_save_vmcoreinfo(void)
->   /* arch-dependent functionality related to kexec file-based syscall */
->
->   #ifdef CONFIG_KEXEC_FILE
-> -int arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
-> -                               unsigned long buf_len)
-> -{
-> -     int i, ret = -ENOEXEC;
-> -     struct kexec_file_ops *fops;
-> -
-> -     for (i = 0; i < ARRAY_SIZE(kexec_file_loaders); i++) {
-> -             fops = kexec_file_loaders[i];
-> -             if (!fops || !fops->probe)
-> -                     continue;
-> -
-> -             ret = fops->probe(buf, buf_len);
-> -             if (!ret) {
-> -                     image->fops = fops;
-> -                     return ret;
-> -             }
-> -     }
-> -
-> -     return ret;
-> -}
-> -
->   void *arch_kexec_kernel_image_load(struct kimage *image)
->   {
->       vfree(image->arch.elf_headers);
-> @@ -398,27 +378,6 @@ void *arch_kexec_kernel_image_load(struct kimage *image)
->                                image->cmdline_buf_len);
->   }
->
-> -int arch_kimage_file_post_load_cleanup(struct kimage *image)
-> -{
-> -     if (!image->fops || !image->fops->cleanup)
-> -             return 0;
-> -
-> -     return image->fops->cleanup(image->image_loader_data);
-> -}
-> -
-> -#ifdef CONFIG_KEXEC_VERIFY_SIG
-> -int arch_kexec_kernel_verify_sig(struct kimage *image, void *kernel,
-> -                              unsigned long kernel_len)
-> -{
-> -     if (!image->fops || !image->fops->verify_sig) {
-> -             pr_debug("kernel loader does not support signature verification.");
-> -             return -EKEYREJECTED;
-> -     }
-> -
-> -     return image->fops->verify_sig(kernel, kernel_len);
-> -}
-> -#endif
-> -
->   /*
->    * Apply purgatory relocations.
->    *
-> diff --git a/include/linux/kexec.h b/include/linux/kexec.h
-> index 2b7590f5483a..bfb37665a77f 100644
-> --- a/include/linux/kexec.h
-> +++ b/include/linux/kexec.h
-> @@ -208,7 +208,7 @@ struct kimage {
->       unsigned long cmdline_buf_len;
->
->       /* File operations provided by image loader */
-> -     struct kexec_file_ops *fops;
-> +     const struct kexec_file_ops *fops;
->
->       /* Image loader handling the kernel can store a pointer here */
->       void *image_loader_data;
-> @@ -276,12 +276,13 @@ int crash_shrink_memory(unsigned long new_size);
->   size_t crash_get_memory_size(void);
->   void crash_free_reserved_phys_range(unsigned long begin, unsigned long end);
->
-> -int __weak arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
-> -                                      unsigned long buf_len);
-> -void * __weak arch_kexec_kernel_image_load(struct kimage *image);
-> -int __weak arch_kimage_file_post_load_cleanup(struct kimage *image);
-> -int __weak arch_kexec_kernel_verify_sig(struct kimage *image, void *buf,
-> -                                     unsigned long buf_len);
-> +int _kexec_kernel_image_probe(struct kimage *image, void *buf,
-> +                           unsigned long buf_len);
-> +void *_kexec_kernel_image_load(struct kimage *image);
-> +int _kimage_file_post_load_cleanup(struct kimage *image);
-> +int _kexec_kernel_verify_sig(struct kimage *image, void *buf,
-> +                          unsigned long buf_len);
-> +
->   int __weak arch_kexec_apply_relocations_add(const Elf_Ehdr *ehdr,
->                                       Elf_Shdr *sechdrs, unsigned int relsec);
->   int __weak arch_kexec_apply_relocations(const Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
-> diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
-> index 9f48f4412297..bbb0177e20ab 100644
-> --- a/kernel/kexec_file.c
-> +++ b/kernel/kexec_file.c
-> @@ -26,30 +26,79 @@
->   #include <linux/vmalloc.h>
->   #include "kexec_internal.h"
->
-> +const __weak struct kexec_file_ops * const kexec_file_loaders[] = {NULL};
-> +
->   static int kexec_calculate_store_digests(struct kimage *image);
->
-> +int _kexec_kernel_image_probe(struct kimage *image, void *buf,
-> +                          unsigned long buf_len)
-> +{
-> +     const struct kexec_file_ops *fops;
-> +     int ret = -ENOEXEC;
-> +
-> +     for (fops = kexec_file_loaders[0]; fops && fops->probe; ++fops) {
 
-Hmm, that's not gonna work (and I see that what I said in the previous
-patch was not 100% correct either).
+On 09/10/17 23:57, Rob Herring wrote:
+> On Mon, Oct 9, 2017 at 9:46 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>> On Mon, Oct 9, 2017 at 7:22 PM, Rob Herring <robh@kernel.org> wrote:
+>>> On Fri, Oct 6, 2017 at 9:26 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>>>> On Fri, Oct 6, 2017 at 9:24 PM, Rob Herring <robh@kernel.org> wrote:
+>>>>> On Fri, Oct 6, 2017 at 6:01 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>>>>>> On Fri, Oct 6, 2017 at 4:50 AM, Rob Herring <robh@kernel.org> wrote:
+>>>>>>> On Thu, Sep 28, 2017 at 02:11:27PM +0100, Sudeep Holla wrote:
+>>>>
+>>>>>>>
+>>>>>>>> +- mbox-data : For each phandle listed in mboxes property, an unsigned 32-bit
+>>>>>>>> +           data as expected by the mailbox controller
+>>>>>>>
+>>>>>>> Shouldn't that be cells as part of mboxes property?
+>>>>>>>
+>>>>>> A MHU client can send any number of commands (such u32 values) over a channel.
+>>>>>> This client (SCMI) sends just one command over a channel, but other
+>>>>>> clients may/do send two or more.
+>>>
+>>> The above definition doesn't support 2 or more as it is 1-1 with channels.
+>>>
+>> I thought you suggested to make controller driver accept the command
+>> as another cell in client's mboxes property.
+>> Which we can't do.
+> 
+> Yes, agreed. But I'm wondering since a client may need more than one,
+> how would that be expressed?
+> 
+>>>>> Okay, then I guess I don't understand why this is in DT.
+>>>>>
+>>>> Yeah the client has to provide code (u32 value) for the commands it
+>>>> sends, and that value is going to be platform specific. For example,
+>>>> on Juno the ITS_AN_SCMI_COMMAND may be defined as BIT(7) while on my
+>>>> platform it may be 0x4567
+>>>>
+>>>> For MHU based platforms, it becomes easy if the u32 is passed from DT.
+>>>> And that should be ok since that is like a h/w parameter - a value
+>>>> chosen/expected by the remote firmware.
+>>>
+>>> Could it ever be more than 1 cell?
+>>>
+>> SCMI sends sub-commands via SHMEM, so it is always going to be 1cell for _scmi_.
+>> However many firmwares are unlikely to use just one command over a
+>> channel - say, the protocol is trivial or the linux and remote have no
+>> SHMEM.
+> 
+> I'd hope the normal case is not enumerating commands and sub-commands
+> in DT and this is special case of a "generic" protocol with platform
+> specific aspects. It could be solved with a specific compatible for
+> each platform/implementation. We'll probably regret not doing that,
+> but I'm going to pretend that this time SoC vendors won't mess it up.
+> 
 
-'fops' should be of type 'const struct kexec_file_ops **', and the loop
-should be:
+Just to align on the same page, I would like to define the terms used
+above in context of SCMI:
+1. commands : this is platform specific "command" to trigger/signal the
+	      firmware that SCMI packet is sent. This is always platform
+	      or controller specific and is not part of the
+	      specification. It's just like doorbell but since MHU can
+	      send 32-bit data, we need a way to specify the exact bit
+	      as 32-bit data with just one bit set.
 
-for (fops = &kexec_file_loaders[0]; *fops && (*fops)->probe; ++fops)
-
-With some additional dereferences in the body of the loop.
-
-Unless you prefer the previous state of the loop (with i and the break
-inside), but I still think this looks better.
-
-Cheers,
-
---
-Julien Thierry
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+2. sub-commands : It is SCMI packet that includes the actual command
+		defined in the SCMI specification. There are sent in
+		SHMEM as Jassi mentioned above.
+-- 
+Regards,
+Sudeep
