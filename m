@@ -1,83 +1,53 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Tue, 10 Oct 2017 16:03:34 +0800
-Subject: [PATCH 2/3] ACPI/IORT: Improve functions return type/storage
- class specifier indentation
-In-Reply-To: <1507038811-23382-3-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1507038811-23382-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1507038811-23382-3-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <59DC7ED6.50204@huawei.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue, 10 Oct 2017 10:12:07 +0200
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v4.15
+Message-ID: <cover.1507623048.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/10/3 21:53, Lorenzo Pieralisi wrote:
-> Some functions definition indentations are using a style that is frowned
-> upon with return value type/storage class specifier in a separate line.
->
-> Reindent the function definitions to fix them.
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Shall we fix the functions which guarded with #ifdef CONFIG_IOMMU_API
-as well?
+Please consider these second round of Renesas ARM based SoC updates for v4.15.
 
-Thanks
-Hanjun
+This pull request is based on the previous round of
+such requests, tagged as renesas-soc-for-v4.15,
+which I have already sent a pull-request for.
 
->
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  drivers/acpi/arm64/iort.c | 20 +++++++++-----------
->  1 file changed, 9 insertions(+), 11 deletions(-)
->
-> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> index 69f21f3..f4775e7 100644
-> --- a/drivers/acpi/arm64/iort.c
-> +++ b/drivers/acpi/arm64/iort.c
-> @@ -88,8 +88,8 @@ static inline int iort_set_fwnode(struct acpi_iort_node *iort_node,
->   *
->   * Returns: fwnode_handle pointer on success, NULL on failure
->   */
-> -static inline
-> -struct fwnode_handle *iort_get_fwnode(struct acpi_iort_node *node)
-> +static inline struct fwnode_handle *iort_get_fwnode(
-> +			struct acpi_iort_node *node)
->  {
->  	struct iort_fwnode *curr;
->  	struct fwnode_handle *fwnode = NULL;
-> @@ -306,9 +306,8 @@ static int iort_id_map(struct acpi_iort_id_mapping *map, u8 type, u32 rid_in,
->  	return 0;
->  }
->  
-> -static
-> -struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
-> -					u32 *id_out, int index)
-> +static struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
-> +					       u32 *id_out, int index)
->  {
->  	struct acpi_iort_node *parent;
->  	struct acpi_iort_id_mapping *map;
-> @@ -392,10 +391,9 @@ static struct acpi_iort_node *iort_node_map_id(struct acpi_iort_node *node,
->  	return NULL;
->  }
->  
-> -static
-> -struct acpi_iort_node *iort_node_map_platform_id(struct acpi_iort_node *node,
-> -						 u32 *id_out, u8 type_mask,
-> -						 int index)
-> +static struct acpi_iort_node *iort_node_map_platform_id(
-> +		struct acpi_iort_node *node, u32 *id_out, u8 type_mask,
-> +		int index)
->  {
->  	struct acpi_iort_node *parent;
->  	u32 id;
-> @@ -1077,8 +1075,8 @@ static const struct iort_iommu_config iort_arm_smmu_cfg __initconst = {
->  	.iommu_init_resources = arm_smmu_init_resources
->  };
->  
-> -static __init
-> -const struct iort_iommu_config *iort_get_iommu_cfg(struct acpi_iort_node *node)
-> +static __init const struct iort_dev_config *iort_get_dev_cfg(
-> +			struct acpi_iort_node *node)
->  {
->  	switch (node->type) {
->  	case ACPI_IORT_NODE_SMMU_V3:
+This pull request fixes a bug introduced in renesas-soc-for-v4.15.
+
+
+The following changes since commit 3fd45a136ff61bb54deab70fb2d534a85e40481f:
+
+  ARM: shmobile: rcar-gen2: Make sure CNTVOFF is initialized on CA7/15 (2017-09-18 08:10:44 +0200)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v4.15
+
+for you to fetch changes up to dc15ca962757ca72a4492b2e13be2eecc6dcd716:
+
+  ARM: shmobile: rcar-gen2: fix non-SMP build (2017-10-06 11:35:34 +0200)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC Updates for v4.15
+
+Fix to allow UP build of shmobile.
+
+Arnd Bergmann says:
+
+  A bugfix for the SMP case broke the build for the UP case:
+
+  arch/arm/mach-shmobile/headsmp-apmu.o: In function `shmobile_boot_apmu':
+  (.text+0x34): undefined reference to `secondary_startup'
+
+  The assembler file mixes code that is used for SMP with code
+  that we also need on a single-CPU build, so I'm leaving it
+  always enabled in the Makefile, but enclose the SMP code
+  in an #ifdef.
+
+----------------------------------------------------------------
+Arnd Bergmann (1):
+      ARM: shmobile: rcar-gen2: fix non-SMP build
+
+ arch/arm/mach-shmobile/headsmp-apmu.S | 2 ++
+ 1 file changed, 2 insertions(+)
