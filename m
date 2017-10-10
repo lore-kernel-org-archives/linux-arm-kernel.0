@@ -1,72 +1,41 @@
-From: yoshihiro.shimoda.uh@renesas.com (Yoshihiro Shimoda)
-Date: Tue, 10 Oct 2017 10:36:42 +0000
-Subject: [PATCH v2] extcon: Split out extcon header file for consumer and
- provider device
-In-Reply-To: <1507630671-23536-1-git-send-email-cw00.choi@samsung.com>
-References: <CGME20171010101758epcas2p3b3f379076f5be5e81edee2bd00354c28@epcas2p3.samsung.com>
- <1507630671-23536-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <TY1PR06MB09928903CD7F333B35C2C17DD8750@TY1PR06MB0992.apcprd06.prod.outlook.com>
+From: claudiu.beznea@microchip.com (Claudiu Beznea)
+Date: Tue, 10 Oct 2017 13:09:48 +0300
+Subject: [PATCH v2 13/14] ARM: dts: at91: at91sam9x25ek: add pwm0
+In-Reply-To: <1507630189-15504-1-git-send-email-claudiu.beznea@microchip.com>
+References: <1507630189-15504-1-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <1507630189-15504-14-git-send-email-claudiu.beznea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Nicolas Ferre <nicolas.ferre@microchip.com>
 
-> From: Chanwoo Choi, Sent: Tuesday, October 10, 2017 7:18 PM
-> 
-> The extcon has two type of extcon devices as following.
-> - 'extcon provider deivce' adds new extcon device and detect the
->    state/properties of external connector. Also, it notifies the
->    state/properties to the extcon consumer device.
-> - 'extcon consumer device' gets the change state/properties
->    from extcon provider device.
-> Prior to that, include/linux/extcon.h contains all exported API for
-> both provider and consumer device driver. To clarify the meaning of
-> header file and to remove the wrong use-case on consumer device,
-> this patch separates into extcon.h and extcon-provider.h.
-> 
-> [Description for include/linux/{extcon.h|extcon-provider.h}]
-> - extcon.h includes the extcon API and data structure for extcon consumer
->   device driver. This header file contains the following APIs:
->   : Register/unregister the notifier to catch the change of extcon device
->   : Get the extcon device instance
->   : Get the extcon device name
->   : Get the state of each external connector
->   : Get the property value of each external connector
->   : Get the property capability of each external connector
-> 
-> - extcon-provider.h includes the extcon API and data structure for extcon
->   provider device driver. This header file contains the following APIs:
->   : Include 'include/linux/extcon.h'
->   : Allocate the memory for extcon device instance
->   : Register/unregister extcon device
->   : Set the state of each external connector
->   : Set the property value of each external connector
->   : Set the property capability of each external connector
-> 
-> Cc: Felipe Balbi <balbi@kernel.org>
-> Cc: Kishon Vijay Abraham I <kishon@ti.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Acked-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
-> Acked-by: Charles Keepax <ckeepax@opensource.cirrus.com>
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> ---
-> Changes from v1:
-> - Don't touch drivers/usb/renesas_usbhs/common.h.
-> - Add acked-by from Sebastian Reichel (for drivers/power/supply/)
-> - Add acked-by from Chen-Yu Tsai (for phy-sun4i-usb.c & extcon-axp288.c)
-> - Add acked-by from Charles Keepax (for drivers/extcon/extcon-arizona.c)
-> - Add acked-by from Lee Jones (fo include/linux/mfd/palmas.h)
-< snip >
->  drivers/phy/renesas/phy-rcar-gen3-usb2.c      |   2 +-
+Add the PWM0 interface and one output of channel 0 (on PC10) on this headless
+board. The output conflicts with LCD and ISI, so only enable it for this
+particular board of the series (ISI is enabled on at91sam9g25ek, as an example
+but we can do the other way around).
 
-and
+Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+---
+ arch/arm/boot/dts/at91sam9x25ek.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-< snip >
->  drivers/usb/gadget/udc/renesas_usb3.c         |   2 +-
-
-Acked-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-
-Best regards,
-Yoshihiro Shimoda
+diff --git a/arch/arm/boot/dts/at91sam9x25ek.dts b/arch/arm/boot/dts/at91sam9x25ek.dts
+index f8360fb23107..f705a3165656 100644
+--- a/arch/arm/boot/dts/at91sam9x25ek.dts
++++ b/arch/arm/boot/dts/at91sam9x25ek.dts
+@@ -29,6 +29,12 @@
+ 				phy-mode = "rmii";
+ 				status = "okay";
+ 			};
++
++			pwm0: pwm at f8034000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_pwm0_pwm0_1>;
++				status = "okay";
++			};
+ 		};
+ 	};
+ };
+-- 
+2.7.4
