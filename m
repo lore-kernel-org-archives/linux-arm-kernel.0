@@ -1,94 +1,25 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Tue, 10 Oct 2017 19:16:23 +0530
-Subject: [PATCH] PCI: exynos: remove redundant code in
- exynos_pcie_establish_link
-In-Reply-To: <000a01d3411a$82eea770$88cbf650$@gmail.com>
-References: <CGME20171009141438epcas2p4ead7e2f2d1af7e0950f2c026e3a9943b@epcas2p4.samsung.com>
- <1507558478-3218-1-git-send-email-pankaj.dubey@samsung.com>
- <CAJKOXPeC=cS2cvAXHrKuK5F4tEqH6PppwYkxC+Z8+5D--48CAg@mail.gmail.com>
- <000a01d3411a$82eea770$88cbf650$@gmail.com>
-Message-ID: <b81a09be-1873-ab81-dcb2-c3b29ff7e430@samsung.com>
+From: brouer@redhat.com (Jesper Dangaard Brouer)
+Date: Tue, 10 Oct 2017 16:00:57 +0200
+Subject: [PATCH v2] XDP Program for Ip forward
+In-Reply-To: <20171010151231.69fde82f@redhat.com>
+References: <1507620532-25804-1-git-send-email-Christina.Jacob@cavium.com>
+ <20171010151231.69fde82f@redhat.com>
+Message-ID: <20171010160057.32678367@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jingoo,
+On Tue, 10 Oct 2017 15:12:31 +0200
+Jesper Dangaard Brouer <brouer@redhat.com> wrote:
 
+> I'll try to test/benchmark your program...
 
-On 10/09/2017 09:50 PM, Jingoo Han wrote:
-> On Monday, October 9, 2017 10:44 AM, Krzysztof Kozlowski wrote:
->> On Mon, Oct 9, 2017 at 4:14 PM, Pankaj Dubey <pankaj.dubey@samsung.com>
->> wrote:
->>> From: Anvesh Salveru <anvesh.s@samsung.com>
->>>
->>> In exynos_pcie_establish_link if driver is not using generic phy,
->>> we are resetting PHY twice, which is redundant, so this patch removes
->> Hi Pankaj,
->>
->> This lacks the information why it is redundant.
-> (I resend this mail, because email address of pci list was corrupted.)
-Thanks, somehow I typed wrong email id.
-> I think so, too.
->
-> Did you test this code on some boards with Exynos PCIe?
-> Or did hardware engineers confirm this?
-> Please add more information on this patch.
-I have replied reason behind this patch in reply to Krzysztof, hope I am 
-able to
-explain logic behind this change.
+In my initial testing, I cannot get this to work...
 
-I do not have access to Exynos5440 PCIe, and this PHY_COMMON_RESET is not
-applicable to other Exynos SoC which I have with me, so I can't test 
-this change,
-but if you see the change it is an obvious change, before introducing 
-generic phy
-support to this driver PHY_COMMON_RESET was programmed only once, then
-in case platform is not using PHY it suppose to be done only once during 
-linkup.
-I am not sure when Jaehoon introduced this patch, he verified this on 
-Exynos5440 or
-not. We are just trying to make the logic as it was before without 
-affecting anything.
+You do seem to XDP_REDIRECT out the right interface, but you have an
+error with setting the correct MAC address.
 
-Thanks,
-Pankaj Dubey
-> Best regards,
-> Jingoo Han
->
->>> repeated lines of code for PHY reset.
->>>
->>> Signed-off-by: Anvesh Salveru <anvesh.s@samsung.com>
->> Your Signed-off-by is needed here.
->>
->> Best regards,
->> Krzysztof
->>
->>> ---
->>>   drivers/pci/dwc/pci-exynos.c | 7 -------
->>>   1 file changed, 7 deletions(-)
->>>
->>> diff --git a/drivers/pci/dwc/pci-exynos.c b/drivers/pci/dwc/pci-exynos.c
->>> index 5596fde..85d2f4b 100644
->>> --- a/drivers/pci/dwc/pci-exynos.c
->>> +++ b/drivers/pci/dwc/pci-exynos.c
->>> @@ -423,13 +423,6 @@ static int exynos_pcie_establish_link(struct
->> exynos_pcie *ep)
->>>                  exynos_pcie_deassert_phy_reset(ep);
->>>                  exynos_pcie_power_on_phy(ep);
->>>                  exynos_pcie_init_phy(ep);
->>> -
->>> -               /* pulse for common reset */
->>> -               exynos_pcie_writel(ep->mem_res->block_base, 1,
->>> -                                       PCIE_PHY_COMMON_RESET);
->>> -               udelay(500);
->>> -               exynos_pcie_writel(ep->mem_res->block_base, 0,
->>> -                                       PCIE_PHY_COMMON_RESET);
->>>          }
->>>
->>>          /* pulse for common reset */
->>> --
->>> 2.7.4
->>>
->
->
->
->
+-- 
+Best regards,
+  Jesper Dangaard Brouer
+  MSc.CS, Principal Kernel Engineer at Red Hat
+  LinkedIn: http://www.linkedin.com/in/brouer
