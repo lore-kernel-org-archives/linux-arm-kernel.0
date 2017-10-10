@@ -1,53 +1,45 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 10 Oct 2017 10:12:07 +0200
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v4.15
-Message-ID: <cover.1507623048.git.horms+renesas@verge.net.au>
+Date: Tue, 10 Oct 2017 10:12:15 +0200
+Subject: [PATCH] ARM: shmobile: rcar-gen2: fix non-SMP build
+In-Reply-To: <cover.1507623048.git.horms+renesas@verge.net.au>
+References: <cover.1507623048.git.horms+renesas@verge.net.au>
+Message-ID: <dc15ca962757ca72a4492b2e13be2eecc6dcd716.1507623048.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Arnd Bergmann <arnd@arndb.de>
 
-Please consider these second round of Renesas ARM based SoC updates for v4.15.
+A bugfix for the SMP case broke the build for the UP case:
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-soc-for-v4.15,
-which I have already sent a pull-request for.
+arch/arm/mach-shmobile/headsmp-apmu.o: In function `shmobile_boot_apmu':
+(.text+0x34): undefined reference to `secondary_startup'
 
-This pull request fixes a bug introduced in renesas-soc-for-v4.15.
+The assembler file mixes code that is used for SMP with code
+that we also need on a single-CPU build, so I'm leaving it
+always enabled in the Makefile, but enclose the SMP code
+in an #ifdef.
 
-
-The following changes since commit 3fd45a136ff61bb54deab70fb2d534a85e40481f:
-
-  ARM: shmobile: rcar-gen2: Make sure CNTVOFF is initialized on CA7/15 (2017-09-18 08:10:44 +0200)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v4.15
-
-for you to fetch changes up to dc15ca962757ca72a4492b2e13be2eecc6dcd716:
-
-  ARM: shmobile: rcar-gen2: fix non-SMP build (2017-10-06 11:35:34 +0200)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM Based SoC Updates for v4.15
-
-Fix to allow UP build of shmobile.
-
-Arnd Bergmann says:
-
-  A bugfix for the SMP case broke the build for the UP case:
-
-  arch/arm/mach-shmobile/headsmp-apmu.o: In function `shmobile_boot_apmu':
-  (.text+0x34): undefined reference to `secondary_startup'
-
-  The assembler file mixes code that is used for SMP with code
-  that we also need on a single-CPU build, so I'm leaving it
-  always enabled in the Makefile, but enclose the SMP code
-  in an #ifdef.
-
-----------------------------------------------------------------
-Arnd Bergmann (1):
-      ARM: shmobile: rcar-gen2: fix non-SMP build
-
+3fd45a136ff6 ("ARM: shmobile: rcar-gen2: Make sure CNTVOFF is initialized on CA7/15")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/mach-shmobile/headsmp-apmu.S | 2 ++
  1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/mach-shmobile/headsmp-apmu.S b/arch/arm/mach-shmobile/headsmp-apmu.S
+index db4743d2bf91..5672b5849401 100644
+--- a/arch/arm/mach-shmobile/headsmp-apmu.S
++++ b/arch/arm/mach-shmobile/headsmp-apmu.S
+@@ -31,7 +31,9 @@ ENTRY(shmobile_init_cntvoff)
+ 	ret	lr
+ ENDPROC(shmobile_init_cntvoff)
+ 
++#ifdef CONFIG_SMP
+ ENTRY(shmobile_boot_apmu)
+ 	bl	shmobile_init_cntvoff
+ 	b	secondary_startup
+ ENDPROC(shmobile_boot_apmu)
++#endif
+-- 
+2.1.4
