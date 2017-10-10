@@ -1,75 +1,83 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 10 Oct 2017 10:03:37 +0200
-Subject: [PATCH v2 8/8] arm64: dts: renesas: eagle: add EtherAVB support
-In-Reply-To: <20171010074842.GN2518@verge.net.au>
-References: <20170915194449.538504992@cogentembedded.com>
- <CAMuHMdXQXFuVzwW7G-U7XWZUEj8qFRjtfDQF1+TgyzO0Xb+eYg@mail.gmail.com>
- <c0390fc1-7da4-ac60-afee-97126d1fd372@cogentembedded.com>
- <CAMuHMdVCTORpfKN+GTka_6pT1VWjOneV2GBhGo7Y8DsZYSxdvw@mail.gmail.com>
- <20171005090500.GC26369@verge.net.au>
- <d5940a12-3823-eebb-50d9-c0fd0fcf0fd1@cogentembedded.com>
- <20171010073346.GL2518@verge.net.au>
- <20171010074842.GN2518@verge.net.au>
-Message-ID: <20171010080337.GO2518@verge.net.au>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Tue, 10 Oct 2017 16:03:34 +0800
+Subject: [PATCH 2/3] ACPI/IORT: Improve functions return type/storage
+ class specifier indentation
+In-Reply-To: <1507038811-23382-3-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1507038811-23382-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1507038811-23382-3-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <59DC7ED6.50204@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 10, 2017 at 09:48:42AM +0200, Simon Horman wrote:
-> On Tue, Oct 10, 2017 at 09:33:46AM +0200, Simon Horman wrote:
-> > On Mon, Oct 09, 2017 at 08:57:42PM +0300, Sergei Shtylyov wrote:
-> > > On 10/05/2017 12:05 PM, Simon Horman wrote:
-> > > 
-> > > >>>On 9/21/2017 4:08 PM, Geert Uytterhoeven wrote:
-> > > >>>>>Define the Eagle board  dependent part of the EtherAVB device node.
-> > > >>>>>Enable DHCP  and NFS root for the kernel booting.
-> > > >>>>>
-> > > >>>>>Based  on the original (and large) patch by Vladimir Barinov.
-> > > >>>>>
-> > > >>>>>Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> > > >>>>>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> > > >>>>
-> > > >>>>
-> > > >>>>>--- renesas.orig/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
-> > > >>>>>+++ renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
-> > > >>>
-> > > >>>[...]
-> > > >>>>>
-> > > >>>>>@@ -43,3 +44,14 @@
-> > > >>>>>   &scif0 {
-> > > >>>>>          status = "okay";
-> > > >>>>>   };
-> > > >>>>>+
-> > > >>>>>+&avb {
-> > > >>>>>+       renesas,no-ether-link;
-> > > >>>>>+       phy-handle = <&phy0>;
-> > > >>>>>+       status = "okay";
-> > > >>>>>+
-> > > >>>>>+       phy0: ethernet-phy at 0 {
-> > > >>>>>+               rxc-skew-ps = <1500>;
-> > > >>>>>+               reg = <0>;
-> > > >>>>
-> > > >>>>
-> > > >>>>Any specific reason why you don't want to wire up the interrupt?
-> > > >>>>
-> > > >>>>                  interrupt-parent = <&gpio2>;
-> > > >>>
-> > > >>>
-> > > >>>    I thought it's quite obvious -- we don't have GPIOs yet, and GPIOs seem
-> > > >>>to require PFC.
-> > > >>
-> > > >>Of course. And these can be added later.
-> > > >>
-> > > >>Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > > >
-> > > >Thanks, applied.
-> > > 
-> > >    Unfortunately, you applied an outdated version of this patch. :-(
-> > 
-> > Sorry, I think patchwork has been playing up of late - or my use of it!
-> > 
-> > Could you repost the correct patch so I am sure to get the right one
-> > the second time around?
-> 
-> Please ignore that request. I'll go ahead and apply v2.
+On 2017/10/3 21:53, Lorenzo Pieralisi wrote:
+> Some functions definition indentations are using a style that is frowned
+> upon with return value type/storage class specifier in a separate line.
+>
+> Reindent the function definitions to fix them.
 
-Done, please check renesas-next-20171010-v4.14-rc1
+Shall we fix the functions which guarded with #ifdef CONFIG_IOMMU_API
+as well?
+
+Thanks
+Hanjun
+
+>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  drivers/acpi/arm64/iort.c | 20 +++++++++-----------
+>  1 file changed, 9 insertions(+), 11 deletions(-)
+>
+> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> index 69f21f3..f4775e7 100644
+> --- a/drivers/acpi/arm64/iort.c
+> +++ b/drivers/acpi/arm64/iort.c
+> @@ -88,8 +88,8 @@ static inline int iort_set_fwnode(struct acpi_iort_node *iort_node,
+>   *
+>   * Returns: fwnode_handle pointer on success, NULL on failure
+>   */
+> -static inline
+> -struct fwnode_handle *iort_get_fwnode(struct acpi_iort_node *node)
+> +static inline struct fwnode_handle *iort_get_fwnode(
+> +			struct acpi_iort_node *node)
+>  {
+>  	struct iort_fwnode *curr;
+>  	struct fwnode_handle *fwnode = NULL;
+> @@ -306,9 +306,8 @@ static int iort_id_map(struct acpi_iort_id_mapping *map, u8 type, u32 rid_in,
+>  	return 0;
+>  }
+>  
+> -static
+> -struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
+> -					u32 *id_out, int index)
+> +static struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
+> +					       u32 *id_out, int index)
+>  {
+>  	struct acpi_iort_node *parent;
+>  	struct acpi_iort_id_mapping *map;
+> @@ -392,10 +391,9 @@ static struct acpi_iort_node *iort_node_map_id(struct acpi_iort_node *node,
+>  	return NULL;
+>  }
+>  
+> -static
+> -struct acpi_iort_node *iort_node_map_platform_id(struct acpi_iort_node *node,
+> -						 u32 *id_out, u8 type_mask,
+> -						 int index)
+> +static struct acpi_iort_node *iort_node_map_platform_id(
+> +		struct acpi_iort_node *node, u32 *id_out, u8 type_mask,
+> +		int index)
+>  {
+>  	struct acpi_iort_node *parent;
+>  	u32 id;
+> @@ -1077,8 +1075,8 @@ static const struct iort_iommu_config iort_arm_smmu_cfg __initconst = {
+>  	.iommu_init_resources = arm_smmu_init_resources
+>  };
+>  
+> -static __init
+> -const struct iort_iommu_config *iort_get_iommu_cfg(struct acpi_iort_node *node)
+> +static __init const struct iort_dev_config *iort_get_dev_cfg(
+> +			struct acpi_iort_node *node)
+>  {
+>  	switch (node->type) {
+>  	case ACPI_IORT_NODE_SMMU_V3:
