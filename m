@@ -1,27 +1,31 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 10 Oct 2017 18:10:47 +0100
-Subject: [PATCH v11 7/9] arm64/kasan: add and use kasan_map_populate()
-In-Reply-To: <CAOAebxv21+KtXPAk-xWz=+2fqWQDgp9SAFZz-N=XsuBxev=zcg@mail.gmail.com>
-References: <20171009221931.1481-1-pasha.tatashin@oracle.com>
- <20171009221931.1481-8-pasha.tatashin@oracle.com>
- <20171010155619.GA2517@arm.com>
- <CAOAebxv21+KtXPAk-xWz=+2fqWQDgp9SAFZz-N=XsuBxev=zcg@mail.gmail.com>
-Message-ID: <20171010171047.GC2517@arm.com>
+From: stephen@networkplumber.org (Stephen Hemminger)
+Date: Tue, 10 Oct 2017 10:19:21 -0700
+Subject: [PATCH v2] xdp: Sample xdp program implementing ip forward
+In-Reply-To: <1507620532-25804-2-git-send-email-Christina.Jacob@cavium.com>
+References: <1507620532-25804-1-git-send-email-Christina.Jacob@cavium.com>
+ <1507620532-25804-2-git-send-email-Christina.Jacob@cavium.com>
+Message-ID: <20171010101921.30136d48@shemminger-XPS-13-9360>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+On Tue, 10 Oct 2017 12:58:52 +0530
+Christina Jacob <christina.jacob.koikara@gmail.com> wrote:
 
-On Tue, Oct 10, 2017 at 01:07:35PM -0400, Pavel Tatashin wrote:
-> Thank you for doing this work. How would you like to proceed?
-> 
-> - If you OK for my series to be accepted as-is, so your patch can be
-> added later on top, I think, I need an ack from you for kasan changes.
-> - Otherwise, I can replace: 4267aaf1d279 arm64/kasan: add and use
-> kasan_map_populate() in my series with code from your patch.
+> +/* Get the mac address of the interface given interface name */
+> +static long *getmac(char *iface)
+> +{
+> +	int fd;
+> +	struct ifreq ifr;
+> +	long *mac = NULL;
+> +
+> +	fd = socket(AF_INET, SOCK_DGRAM, 0);
+> +	ifr.ifr_addr.sa_family = AF_INET;
+> +	strncpy(ifr.ifr_name, iface, IFNAMSIZ - 1);
+> +	ioctl(fd, SIOCGIFHWADDR, &ifr);
+> +	mac = (long *)ifr.ifr_hwaddr.sa_data;
+> +	close(fd);
+> +	return mac;
 
-I was thinking that you could just add my patch to the end of your series
-and have the whole lot go up like that. If you want to merge it with your
-patch, I'm fine with that too.
-
-Will
+Always check return value of ioctl.
+You are assuming sizeof(long) > 6 bytes.
+Also the byte order.
