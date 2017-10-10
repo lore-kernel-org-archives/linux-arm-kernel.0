@@ -1,61 +1,77 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 10 Oct 2017 15:27:21 +0200
-Subject: [PATCH v2 00/14] at91 fixes and enhancements
-In-Reply-To: <1507630189-15504-1-git-send-email-claudiu.beznea@microchip.com>
-References: <1507630189-15504-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <20171010132721.xbblbwuzfeyy6xva@piout.net>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Tue, 10 Oct 2017 15:39:06 +0200
+Subject: [PATCH v10 05/10] mm: zero reserved and unavailable struct pages
+In-Reply-To: <bcf24369-ac37-cedd-a264-3396fb5cf39e@oracle.com>
+References: <20171005211124.26524-1-pasha.tatashin@oracle.com>
+ <20171005211124.26524-6-pasha.tatashin@oracle.com>
+ <20171006123057.6gu5xnk3usw2hvzb@dhcp22.suse.cz>
+ <bcf24369-ac37-cedd-a264-3396fb5cf39e@oracle.com>
+Message-ID: <20171010133906.l2anyahcvgn6mg7o@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/10/2017 at 13:09:35 +0300, Claudiu Beznea wrote:
-> Hi,
+On Fri 06-10-17 11:25:16, Pasha Tatashin wrote:
+> Hi Michal,
 > 
-> This series contains fixes and enhancements for Atmel/Microchip boards,
-> mainly for SoM1-EK board, SAMA5D2 Xplained board and SAM9x5 boards.
-> Please accept them for 4.15.
+> > 
+> > As I've said in other reply this should go in only if the scenario you
+> > describe is real. I am somehow suspicious to be honest. I simply do not
+> > see how those weird struct pages would be in a valid pfn range of any
+> > zone.
+> > 
 > 
-> Thank you,
-> Claudiu Beznea
+> There are examples of both when unavailable memory is not part of any zone,
+> and where it is part of zones.
 > 
-> Changes since v1:
-> - correct author for some patches; these were developed first on internal
-> branch and then were manualy ported by me to Linux public tree (since the device
-> tree files are different) but then I forgot to keep the real author
-> - removed patch "ARM: dts: at91: sama5d2_xplained: Add charger node of pmic."
-> from this series since it was already applied on at91-dt branch (see [1])
+> I run Linux in kvm with these arguments:
 > 
-> [1] https://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git/commit/?h=at91-dt&id=4b6ad41f267b8ddabf5dd1b02a318bc74f0b95e9
+>         qemu-system-x86_64
+>         -enable-kvm
+>         -cpu kvm64
+>         -kernel $kernel
+>         -initrd $initrd
+>         -m 512
+>         -smp 2
+>         -device e1000,netdev=net0
+>         -netdev user,id=net0
+>         -boot order=nc
+>         -no-reboot
+>         -watchdog i6300esb
+>         -watchdog-action debug
+>         -rtc base=localtime
+>         -serial stdio
+>         -display none
+>         -monitor null
 > 
-> Claudiu Beznea (14):
->   ARM: dts: at91: sama5d27_som1_ek: add disabled/okay status
->   ARM: dts: at91: sama5d27_som1_ek: update serial aliases
->   ARM: dts: at91: sama5d27_som1_ek: set USER button as a wakeup source
->   ARM: dts: at91: sama5d27_som1_ek: add aliases for i2c
->   ARM: dts: at91: sama5d27_som1_ek: add pinmuxing for pwm0
->   ARM: dts: at91: sama5d27_som1_ek: remove not connected CAN0
->   ARM: dts: at91: sama5d27_som1_ek: remove pull-up on SD/MMC lines
->   ARM: dts: at91: sama5d2_xplained: Add charger node of pmic.
->   ARM: dts: at91: sama5d2_xplained: set PB_USER as wakeup source
->   ARM: dts: at91: sama5d2_xplained: add pinmuxing for pwm0
->   ARM: dts: at91: sama5d2_xplained: remove pull-up on SD/MMC lines
->   ARM: dts: at91: at91sam9x25ek: add CAN1 interface
->   ARM: dts: at91: at91sam9x25ek: add pwm0
->   ARM: dts: at91: at91sam9x5ek: use DMA for USART0
+> This patch reports that there are 98 unavailable pages.
 > 
->  arch/arm/boot/dts/at91-sama5d27_som1_ek.dts | 46 ++++++++++++++---------------
->  arch/arm/boot/dts/at91-sama5d2_xplained.dts | 39 ++++++++++++++++--------
->  arch/arm/boot/dts/at91sam9x25ek.dts         | 10 +++++++
->  arch/arm/boot/dts/at91sam9x5ek.dtsi         |  2 ++
->  4 files changed, 62 insertions(+), 35 deletions(-)
+> They are: pfn 0 and pfns in range [159, 255].
 > 
+> Note, trim_low_memory_range() reserves only pfns in range [0, 15], it does
+> not reserve [159, 255] ones.
+> 
+> e820__memblock_setup() reports linux that the following physical ranges are
+> available:
+>     [1 , 158]
+> [256, 130783]
+> 
+> Notice, that exactly unavailable pfns are missing!
+> 
+> Now, lets check what we have in zone 0: [1, 131039]
+> 
+> pfn 0, is not part of the zone, but pfns [1, 158], are.
+> 
+> However, the bigger problem we have if we do not initialize these struct
+> pages is with memory hotplug. Because, that path operates at 2M boundaries
+> (section_nr). And checks if 2M range of pages is hot removable. It starts
+> with first pfn from zone, rounds it down to 2M boundary (sturct pages are
+> allocated at 2M boundaries when vmemmap is created), and and checks if that
+> section is hot removable. In this case start with pfn 1 and convert it down
+> to pfn 0.
 
-All applied
-
-> -- 
-> 2.7.4
-> 
-
+Hmm, this is really interesting! I thought each memblock is guaranteed
+to be section size aligned. But I suspect this is more of a wishful
+thinking. But now I see what is the problem.
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Michal Hocko
+SUSE Labs
