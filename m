@@ -1,83 +1,26 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 10 Oct 2017 10:33:25 +0200
-Subject: [PATCH v3 04/12] mmc: mediatek: make hs400_tune_response only for
- mt8173
-In-Reply-To: <1507604480-23246-5-git-send-email-chaotian.jing@mediatek.com>
-References: <1507604480-23246-1-git-send-email-chaotian.jing@mediatek.com>
- <1507604480-23246-5-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <1b26ec7a-9e78-d001-a21a-4c27588c0fa7@gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 10 Oct 2017 10:35:32 +0200
+Subject: ARM: s3c2410: Fix a typo in a comment line
+In-Reply-To: <0f6ea076-2d41-103a-b1a1-40edc38e2daf@users.sourceforge.net>
+References: <d2ae00c8-da57-9ffc-3692-67ed6daa95e0@users.sourceforge.net>
+ <b93ca267-88d2-b68a-1570-dc8fc71f3888@users.sourceforge.net>
+ <20171004181420.lctwaocrvg6rxokk@kozik-lap>
+ <0f6ea076-2d41-103a-b1a1-40edc38e2daf@users.sourceforge.net>
+Message-ID: <CAJKOXPeujGfUt6Sw-N9kBGSyZKvpqdGu8=zoT0pSzi64ioVqOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Oct 10, 2017 at 10:29 AM, SF Markus Elfring
+<elfring@users.sourceforge.net> wrote:
+>> Thanks, applied, squashed and changed commit msg.
+>
+> Would it be more appropriate to use a commit subject like
+> ?ARM: s3c241x: Fix typos in two comments? (instead of
+> ?ARM: s3c2410: Fix typos in a comments?)?
+> https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/?id=6c7a7db2e4c25acf8bd8086797d39a51728139e0
 
+Yes, it would but patch is already applied and I prefer to avoid
+rebasing unless really necessary.
 
-On 10/10/2017 05:01 AM, Chaotian Jing wrote:
-> the origin design of hs400_tune_response is for mt8173 because of
-> mt8173 has a special design. for doing that, we add a new member
-> "compatible", by now it's only for mt8173.
-> 
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> ---
-
-Looks good now:
-Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
-
->   drivers/mmc/host/mtk-sd.c | 11 +++++++++--
->   1 file changed, 9 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-> index 643c795..ab2fbbb 100644
-> --- a/drivers/mmc/host/mtk-sd.c
-> +++ b/drivers/mmc/host/mtk-sd.c
-> @@ -300,6 +300,7 @@ struct msdc_save_para {
->   
->   struct mtk_mmc_compatible {
->   	u8 clk_div_bits;
-> +	bool hs400_tune; /* only used for MT8173 */
->   };
->   
->   struct msdc_tune_para {
-> @@ -360,18 +361,22 @@ struct msdc_host {
->   
->   static const struct mtk_mmc_compatible mt8135_compat = {
->   	.clk_div_bits = 8,
-> +	.hs400_tune = false,
->   };
->   
->   static const struct mtk_mmc_compatible mt8173_compat = {
->   	.clk_div_bits = 8,
-> +	.hs400_tune = true,
->   };
->   
->   static const struct mtk_mmc_compatible mt2701_compat = {
->   	.clk_div_bits = 12,
-> +	.hs400_tune = false,
->   };
->   
->   static const struct mtk_mmc_compatible mt2712_compat = {
->   	.clk_div_bits = 12,
-> +	.hs400_tune = false,
->   };
->   
->   static const struct of_device_id msdc_of_ids[] = {
-> @@ -666,7 +671,8 @@ static void msdc_set_mclk(struct msdc_host *host, unsigned char timing, u32 hz)
->   		       host->base + PAD_CMD_TUNE);
->   	}
->   
-> -	if (timing == MMC_TIMING_MMC_HS400)
-> +	if (timing == MMC_TIMING_MMC_HS400 &&
-> +	    host->dev_comp->hs400_tune)
->   		sdr_set_field(host->base + PAD_CMD_TUNE,
->   			      MSDC_PAD_TUNE_CMDRRDLY,
->   			      host->hs400_cmd_int_delay);
-> @@ -1594,7 +1600,8 @@ static int msdc_execute_tuning(struct mmc_host *mmc, u32 opcode)
->   	struct msdc_host *host = mmc_priv(mmc);
->   	int ret;
->   
-> -	if (host->hs400_mode)
-> +	if (host->hs400_mode &&
-> +	    host->dev_comp->hs400_tune)
->   		ret = hs400_tune_response(mmc, opcode);
->   	else
->   		ret = msdc_tune_response(mmc, opcode);
-> 
+Best regards,
+Krzysztof
