@@ -1,182 +1,229 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 10 Oct 2017 19:38:26 +0100
-Subject: [PATCH v3 09/28] arm64/sve: Signal frame and context structure
- definition
+Date: Tue, 10 Oct 2017 19:38:24 +0100
+Subject: [PATCH v3 07/28] arm64/sve: Low-level SVE architectural state
+ manipulation functions
 In-Reply-To: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
 References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1507660725-7986-10-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1507660725-7986-8-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch defines the representation that will be used for the SVE
-register state in the signal frame, and implements support for
-saving and restoring the SVE registers around signals.
+Manipulating the SVE architectural state, including the vector and
+predicate registers, first-fault register and the vector length,
+requires the use of dedicated instructions added by SVE.
 
-The same layout will also be used for the in-kernel task state.
+This patch adds suitable assembly functions for saving and
+restoring the SVE registers and querying the vector length.
+Setting of the vector length is done as part of register restore.
 
-Due to the variability of the SVE vector length, it is not possible
-to define a fixed C struct to describe all the registers.  Instead,
-Macros are defined in sigcontext.h to facilitate access to the
-parts of the structure.
+Since people building kernels may not all get an SVE-enabled
+toolchain for a while, this patch uses macros that generate
+explicit opcodes in place of assembler mnemonics.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Cc: Alex Benn?e <alex.bennee@linaro.org>
-
+Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
 ---
+ arch/arm64/include/asm/fpsimd.h       |   5 ++
+ arch/arm64/include/asm/fpsimdmacros.h | 148 ++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/entry-fpsimd.S      |  17 ++++
+ 3 files changed, 170 insertions(+)
 
-Changes since v2
-----------------
-
-Requested by Catalin Marinas:
-
- * Rewrite the SVE_VQ_BYTES and SVE_VQ_MAX definitions in decimal, to
-   avoid any resemblance to masks or bitfields.
----
- arch/arm64/include/uapi/asm/sigcontext.h | 117 ++++++++++++++++++++++++++++++-
- 1 file changed, 116 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/include/uapi/asm/sigcontext.h b/arch/arm64/include/uapi/asm/sigcontext.h
-index f0a76b9..7654a81 100644
---- a/arch/arm64/include/uapi/asm/sigcontext.h
-+++ b/arch/arm64/include/uapi/asm/sigcontext.h
-@@ -16,6 +16,8 @@
- #ifndef _UAPI__ASM_SIGCONTEXT_H
- #define _UAPI__ASM_SIGCONTEXT_H
+diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+index 410c481..026a7c7 100644
+--- a/arch/arm64/include/asm/fpsimd.h
++++ b/arch/arm64/include/asm/fpsimd.h
+@@ -67,6 +67,11 @@ extern void fpsimd_update_current_state(struct fpsimd_state *state);
  
-+#ifndef __ASSEMBLY__
-+
- #include <linux/types.h>
+ extern void fpsimd_flush_task_state(struct task_struct *target);
  
- /*
-@@ -41,10 +43,11 @@ struct sigcontext {
-  *
-  *	0x210		fpsimd_context
-  *	 0x10		esr_context
-+ *	0x8a0		sve_context (vl <= 64) (optional)
-  *	 0x20		extra_context (optional)
-  *	 0x10		terminator (null _aarch64_ctx)
-  *
-- *	0xdb0		(reserved for future allocation)
-+ *	0x510		(reserved for future allocation)
-  *
-  * New records that can exceed this space need to be opt-in for userspace, so
-  * that an expanded signal frame is not generated unexpectedly.  The mechanism
-@@ -116,4 +119,116 @@ struct extra_context {
- 	__u32 __reserved[3];
- };
- 
-+#define SVE_MAGIC	0x53564501
++extern void sve_save_state(void *state, u32 *pfpsr);
++extern void sve_load_state(void const *state, u32 const *pfpsr,
++			   unsigned long vq_minus_1);
++extern unsigned int sve_get_vl(void);
 +
-+struct sve_context {
-+	struct _aarch64_ctx head;
-+	__u16 vl;
-+	__u16 __reserved[3];
-+};
+ /* For use by EFI runtime services calls only */
+ extern void __efi_fpsimd_begin(void);
+ extern void __efi_fpsimd_end(void);
+diff --git a/arch/arm64/include/asm/fpsimdmacros.h b/arch/arm64/include/asm/fpsimdmacros.h
+index 0f5fdd3..e050d76 100644
+--- a/arch/arm64/include/asm/fpsimdmacros.h
++++ b/arch/arm64/include/asm/fpsimdmacros.h
+@@ -75,3 +75,151 @@
+ 	ldr	w\tmpnr, [\state, #16 * 2 + 4]
+ 	fpsimd_restore_fpcr x\tmpnr, \state
+ .endm
 +
-+#endif /* !__ASSEMBLY__ */
++/* Sanity-check macros to help avoid encoding garbage instructions */
 +
-+/*
-+ * The SVE architecture leaves space for future expansion of the
-+ * vector length beyond its initial architectural limit of 2048 bits
-+ * (16 quadwords).
-+ */
-+#define SVE_VQ_BYTES		16	/* number of bytes per quadword */
++.macro _check_general_reg nr
++	.if (\nr) < 0 || (\nr) > 30
++		.error "Bad register number \nr."
++	.endif
++.endm
 +
-+#define SVE_VQ_MIN		1
-+#define SVE_VQ_MAX		512
++.macro _sve_check_zreg znr
++	.if (\znr) < 0 || (\znr) > 31
++		.error "Bad Scalable Vector Extension vector register number \znr."
++	.endif
++.endm
 +
-+#define SVE_VL_MIN		(SVE_VQ_MIN * SVE_VQ_BYTES)
-+#define SVE_VL_MAX		(SVE_VQ_MAX * SVE_VQ_BYTES)
++.macro _sve_check_preg pnr
++	.if (\pnr) < 0 || (\pnr) > 15
++		.error "Bad Scalable Vector Extension predicate register number \pnr."
++	.endif
++.endm
 +
-+#define SVE_NUM_ZREGS		32
-+#define SVE_NUM_PREGS		16
++.macro _check_num n, min, max
++	.if (\n) < (\min) || (\n) > (\max)
++		.error "Number \n out of range [\min,\max]"
++	.endif
++.endm
 +
-+#define sve_vl_valid(vl) \
-+	((vl) % SVE_VQ_BYTES == 0 && (vl) >= SVE_VL_MIN && (vl) <= SVE_VL_MAX)
-+#define sve_vq_from_vl(vl)	((vl) / SVE_VQ_BYTES)
-+#define sve_vl_from_vq(vq)	((vq) * SVE_VQ_BYTES)
++/* SVE instruction encodings for non-SVE-capable assemblers */
 +
-+/*
-+ * If the SVE registers are currently live for the thread@signal delivery,
-+ * sve_context.head.size >=
-+ *	SVE_SIG_CONTEXT_SIZE(sve_vq_from_vl(sve_context.vl))
-+ * and the register data may be accessed using the SVE_SIG_*() macros.
-+ *
-+ * If sve_context.head.size <
-+ *	SVE_SIG_CONTEXT_SIZE(sve_vq_from_vl(sve_context.vl)),
-+ * the SVE registers were not live for the thread and no register data
-+ * is included: in this case, the SVE_SIG_*() macros should not be
-+ * used except for this check.
-+ *
-+ * The same convention applies when returning from a signal: a caller
-+ * will need to remove or resize the sve_context block if it wants to
-+ * make the SVE registers live when they were previously non-live or
-+ * vice-versa.  This may require the the caller to allocate fresh
-+ * memory and/or move other context blocks in the signal frame.
-+ *
-+ * Changing the vector length during signal return is not permitted:
-+ * sve_context.vl must equal the thread's current vector length when
-+ * doing a sigreturn.
-+ *
-+ *
-+ * Note: for all these macros, the "vq" argument denotes the SVE
-+ * vector length in quadwords (i.e., units of 128 bits).
-+ *
-+ * The correct way to obtain vq is to use sve_vq_from_vl(vl).  The
-+ * result is valid if and only if sve_vl_valid(vl) is true.  This is
-+ * guaranteed for a struct sve_context written by the kernel.
-+ *
-+ *
-+ * Additional macros describe the contents and layout of the payload.
-+ * For each, SVE_SIG_x_OFFSET(args) is the start offset relative to
-+ * the start of struct sve_context, and SVE_SIG_x_SIZE(args) is the
-+ * size in bytes:
-+ *
-+ *	x	type				description
-+ *	-	----				-----------
-+ *	REGS					the entire SVE context
-+ *
-+ *	ZREGS	__uint128_t[SVE_NUM_ZREGS][vq]	all Z-registers
-+ *	ZREG	__uint128_t[vq]			individual Z-register Zn
-+ *
-+ *	PREGS	uint16_t[SVE_NUM_PREGS][vq]	all P-registers
-+ *	PREG	uint16_t[vq]			individual P-register Pn
-+ *
-+ *	FFR	uint16_t[vq]			first-fault status register
-+ *
-+ * Additional data might be appended in the future.
-+ */
++/* STR (vector): STR Z\nz, [X\nxbase, #\offset, MUL VL] */
++.macro _sve_str_v nz, nxbase, offset=0
++	_sve_check_zreg \nz
++	_check_general_reg \nxbase
++	_check_num (\offset), -0x100, 0xff
++	.inst	0xe5804000			\
++		| (\nz)				\
++		| ((\nxbase) << 5)		\
++		| (((\offset) & 7) << 10)	\
++		| (((\offset) & 0x1f8) << 13)
++.endm
 +
-+#define SVE_SIG_ZREG_SIZE(vq)	((__u32)(vq) * SVE_VQ_BYTES)
-+#define SVE_SIG_PREG_SIZE(vq)	((__u32)(vq) * (SVE_VQ_BYTES / 8))
-+#define SVE_SIG_FFR_SIZE(vq)	SVE_SIG_PREG_SIZE(vq)
++/* LDR (vector): LDR Z\nz, [X\nxbase, #\offset, MUL VL] */
++.macro _sve_ldr_v nz, nxbase, offset=0
++	_sve_check_zreg \nz
++	_check_general_reg \nxbase
++	_check_num (\offset), -0x100, 0xff
++	.inst	0x85804000			\
++		| (\nz)				\
++		| ((\nxbase) << 5)		\
++		| (((\offset) & 7) << 10)	\
++		| (((\offset) & 0x1f8) << 13)
++.endm
 +
-+#define SVE_SIG_REGS_OFFSET					\
-+	((sizeof(struct sve_context) + (SVE_VQ_BYTES - 1))	\
-+		/ SVE_VQ_BYTES * SVE_VQ_BYTES)
++/* STR (predicate): STR P\np, [X\nxbase, #\offset, MUL VL] */
++.macro _sve_str_p np, nxbase, offset=0
++	_sve_check_preg \np
++	_check_general_reg \nxbase
++	_check_num (\offset), -0x100, 0xff
++	.inst	0xe5800000			\
++		| (\np)				\
++		| ((\nxbase) << 5)		\
++		| (((\offset) & 7) << 10)	\
++		| (((\offset) & 0x1f8) << 13)
++.endm
 +
-+#define SVE_SIG_ZREGS_OFFSET	SVE_SIG_REGS_OFFSET
-+#define SVE_SIG_ZREG_OFFSET(vq, n) \
-+	(SVE_SIG_ZREGS_OFFSET + SVE_SIG_ZREG_SIZE(vq) * (n))
-+#define SVE_SIG_ZREGS_SIZE(vq) \
-+	(SVE_SIG_ZREG_OFFSET(vq, SVE_NUM_ZREGS) - SVE_SIG_ZREGS_OFFSET)
++/* LDR (predicate): LDR P\np, [X\nxbase, #\offset, MUL VL] */
++.macro _sve_ldr_p np, nxbase, offset=0
++	_sve_check_preg \np
++	_check_general_reg \nxbase
++	_check_num (\offset), -0x100, 0xff
++	.inst	0x85800000			\
++		| (\np)				\
++		| ((\nxbase) << 5)		\
++		| (((\offset) & 7) << 10)	\
++		| (((\offset) & 0x1f8) << 13)
++.endm
 +
-+#define SVE_SIG_PREGS_OFFSET(vq) \
-+	(SVE_SIG_ZREGS_OFFSET + SVE_SIG_ZREGS_SIZE(vq))
-+#define SVE_SIG_PREG_OFFSET(vq, n) \
-+	(SVE_SIG_PREGS_OFFSET(vq) + SVE_SIG_PREG_SIZE(vq) * (n))
-+#define SVE_SIG_PREGS_SIZE(vq) \
-+	(SVE_SIG_PREG_OFFSET(vq, SVE_NUM_PREGS) - SVE_SIG_PREGS_OFFSET(vq))
++/* RDVL X\nx, #\imm */
++.macro _sve_rdvl nx, imm
++	_check_general_reg \nx
++	_check_num (\imm), -0x20, 0x1f
++	.inst	0x04bf5000			\
++		| (\nx)				\
++		| (((\imm) & 0x3f) << 5)
++.endm
 +
-+#define SVE_SIG_FFR_OFFSET(vq) \
-+	(SVE_SIG_PREGS_OFFSET(vq) + SVE_SIG_PREGS_SIZE(vq))
++/* RDFFR (unpredicated): RDFFR P\np.B */
++.macro _sve_rdffr np
++	_sve_check_preg \np
++	.inst	0x2519f000			\
++		| (\np)
++.endm
 +
-+#define SVE_SIG_REGS_SIZE(vq) \
-+	(SVE_SIG_FFR_OFFSET(vq) + SVE_SIG_FFR_SIZE(vq) - SVE_SIG_REGS_OFFSET)
++/* WRFFR P\np.B */
++.macro _sve_wrffr np
++	_sve_check_preg \np
++	.inst	0x25289000			\
++		| ((\np) << 5)
++.endm
 +
-+#define SVE_SIG_CONTEXT_SIZE(vq) (SVE_SIG_REGS_OFFSET + SVE_SIG_REGS_SIZE(vq))
++.macro __for from:req, to:req
++	.if (\from) == (\to)
++		_for__body \from
++	.else
++		__for \from, (\from) + ((\to) - (\from)) / 2
++		__for (\from) + ((\to) - (\from)) / 2 + 1, \to
++	.endif
++.endm
 +
++.macro _for var:req, from:req, to:req, insn:vararg
++	.macro _for__body \var:req
++		\insn
++	.endm
 +
- #endif /* _UAPI__ASM_SIGCONTEXT_H */
++	__for \from, \to
++
++	.purgem _for__body
++.endm
++
++.macro sve_save nxbase, xpfpsr, nxtmp
++ _for n, 0, 31,	_sve_str_v	\n, \nxbase, \n - 34
++ _for n, 0, 15,	_sve_str_p	\n, \nxbase, \n - 16
++		_sve_rdffr	0
++		_sve_str_p	0, \nxbase
++		_sve_ldr_p	0, \nxbase, -16
++
++		mrs		x\nxtmp, fpsr
++		str		w\nxtmp, [\xpfpsr]
++		mrs		x\nxtmp, fpcr
++		str		w\nxtmp, [\xpfpsr, #4]
++.endm
++
++.macro sve_load nxbase, xpfpsr, xvqminus1, nxtmp
++		mrs_s		x\nxtmp, SYS_ZCR_EL1
++		bic		x\nxtmp, x\nxtmp, ZCR_ELx_LEN_MASK
++		orr		x\nxtmp, x\nxtmp, \xvqminus1
++		msr_s		SYS_ZCR_EL1, x\nxtmp	// self-synchronising
++
++ _for n, 0, 31,	_sve_ldr_v	\n, \nxbase, \n - 34
++		_sve_ldr_p	0, \nxbase
++		_sve_wrffr	0
++ _for n, 0, 15,	_sve_ldr_p	\n, \nxbase, \n - 16
++
++		ldr		w\nxtmp, [\xpfpsr]
++		msr		fpsr, x\nxtmp
++		ldr		w\nxtmp, [\xpfpsr, #4]
++		msr		fpcr, x\nxtmp
++.endm
+diff --git a/arch/arm64/kernel/entry-fpsimd.S b/arch/arm64/kernel/entry-fpsimd.S
+index 6a27cd6..73f17bf 100644
+--- a/arch/arm64/kernel/entry-fpsimd.S
++++ b/arch/arm64/kernel/entry-fpsimd.S
+@@ -41,3 +41,20 @@ ENTRY(fpsimd_load_state)
+ 	fpsimd_restore x0, 8
+ 	ret
+ ENDPROC(fpsimd_load_state)
++
++#ifdef CONFIG_ARM64_SVE
++ENTRY(sve_save_state)
++	sve_save 0, x1, 2
++	ret
++ENDPROC(sve_save_state)
++
++ENTRY(sve_load_state)
++	sve_load 0, x1, x2, 3
++	ret
++ENDPROC(sve_load_state)
++
++ENTRY(sve_get_vl)
++	_sve_rdvl	0, 1
++	ret
++ENDPROC(sve_get_vl)
++#endif /* CONFIG_ARM64_SVE */
 -- 
 2.1.4
