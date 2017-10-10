@@ -1,39 +1,54 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 10 Oct 2017 13:44:17 +0200
-Subject: [PATCH] ARM: imx: Enable cpuidle for i.MX6DL starting at 1.1
-In-Reply-To: <bbd72503f0e79cc6df4ba12db41b980d50415caf.1507634288.git.leonard.crestez@nxp.com>
-References: <bbd72503f0e79cc6df4ba12db41b980d50415caf.1507634288.git.leonard.crestez@nxp.com>
-Message-ID: <1507635857.2745.12.camel@pengutronix.de>
+From: claudiu.beznea@microchip.com (Claudiu Beznea)
+Date: Tue, 10 Oct 2017 13:09:42 +0300
+Subject: [PATCH v2 07/14] ARM: dts: at91: sama5d27_som1_ek: remove not
+ connected CAN0
+In-Reply-To: <1507630189-15504-1-git-send-email-claudiu.beznea@microchip.com>
+References: <1507630189-15504-1-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <1507630189-15504-8-git-send-email-claudiu.beznea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 10.10.2017, 14:20 +0300 schrieb Leonard Crestez:
-> Enable cpuidle support on i.MX6DL starting from
-> IMX_CHIP_REVISION_1_1.
+From: Nicolas Ferre <nicolas.ferre@microchip.com>
 
-Did you mean 1.0 here and in the subject? This would make sense AFAICS,
- and is also in line with what the code change does.
+CAN0 is not connected on the sama5d27_som1_ek board, so remove
+it from DT.
 
-> This also makes the code cleaner because 6q and 6dl actually have
-> different revision histories.
-> 
-> > Signed-off-by: Bai Ping <ping.bai@nxp.com>
-> > Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
-> ---
-> ?arch/arm/mach-imx/mach-imx6q.c | 3 ++-
-> ?1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-> index 45801b2..ef0c949 100644
-> --- a/arch/arm/mach-imx/mach-imx6q.c
-> +++ b/arch/arm/mach-imx/mach-imx6q.c
-> @@ -374,7 +374,8 @@ static void __init imx6q_init_late(void)
-> > ?	?* WAIT mode is broken on TO 1.0 and 1.1, so there is no point
-> > ?	?* to run cpuidle on them.
-> > ?	?*/
-> > -	if (imx_get_soc_revision() > IMX_CHIP_REVISION_1_1)
-> > +	if ((cpu_is_imx6q() && imx_get_soc_revision() > IMX_CHIP_REVISION_1_1) ||
-> > +	????(cpu_is_imx6dl() && imx_get_soc_revision() > IMX_CHIP_REVISION_1_0))
-> > ?		imx6q_cpuidle_init();
-> ?
-> > ?	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ)) {
+Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+[claudiu.beznea at microchip.com: change subject to match the desired prefix]
+Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+---
+ arch/arm/boot/dts/at91-sama5d27_som1_ek.dts | 12 ------------
+ 1 file changed, 12 deletions(-)
+
+diff --git a/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts b/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
+index 339f4e71cf40..651ed5d4defc 100644
+--- a/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
++++ b/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
+@@ -175,12 +175,6 @@
+ 				status = "okay";
+ 			};
+ 
+-			can0: can at f8054000 {
+-				pinctrl-names = "default";
+-				pinctrl-0 = <&pinctrl_can0_default>;
+-				status = "disabled"; /* Conflict with isc. */
+-			};
+-
+ 			uart3: serial at fc008000 {
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
+@@ -279,12 +273,6 @@
+ 
+ 			pinctrl at fc038000 {
+ 
+-				pinctrl_can0_default: can0_default {
+-					pinmux = <PIN_PC10__CANTX0>,
+-						 <PIN_PC11__CANRX0>;
+-					bias-disable;
+-				};
+-
+ 				pinctrl_can1_default: can1_default {
+ 					pinmux = <PIN_PC26__CANTX1>,
+ 						 <PIN_PC27__CANRX1>;
+-- 
+2.7.4
