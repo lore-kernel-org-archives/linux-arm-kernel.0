@@ -1,104 +1,164 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 10 Oct 2017 11:20:02 +0800
-Subject: [PATCH v4 05/11] drm/sun4i: hdmi: Allow using second PLL as TMDS clk
- parent
+Date: Tue, 10 Oct 2017 11:20:08 +0800
+Subject: [PATCH v4 11/11] ARM: dts: sun6i: Enable HDMI support on some
+ A31/A31s devices
 In-Reply-To: <20171010032008.682-1-wens@csie.org>
 References: <20171010032008.682-1-wens@csie.org>
-Message-ID: <20171010032008.682-6-wens@csie.org>
+Message-ID: <20171010032008.682-12-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On SoCs with two display pipelines, it is possible that the two
-pipelines are active at the same time, with potentially incompatible
-dot clocks.
+All the A31/A31s devices I own have some kind of HDMI connector wired
+to the dedicated HDMI pins on the SoC:
 
-Let the HDMI encoder's TMDS clock go through all of its parents when
-calculating possible clock rates. This allows usage of the second video
-PLL as its parent.
+  - A31 Hummingbird (standard HDMI connector, display already enabled)
+  - Sinlinx SinA31s (standard HDMI connector)
+  - MSI Primo81 tablet (micro HDMI connector)
+
+Enable the display pipeline (if needed) and HDMI output for them.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c | 53 ++++++++++++++++-------------
- 1 file changed, 29 insertions(+), 24 deletions(-)
+ arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 21 +++++++++++++++++++++
+ arch/arm/boot/dts/sun6i-a31s-primo81.dts    | 25 +++++++++++++++++++++++++
+ arch/arm/boot/dts/sun6i-a31s-sina31s.dts    | 25 +++++++++++++++++++++++++
+ 3 files changed, 71 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
-index 5cf2527bffc8..e8d4c311b80d 100644
---- a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
-@@ -67,11 +67,11 @@ static unsigned long sun4i_tmds_calc_divider(unsigned long rate,
- static int sun4i_tmds_determine_rate(struct clk_hw *hw,
- 				     struct clk_rate_request *req)
- {
--	struct clk_hw *parent;
-+	struct clk_hw *parent = NULL;
- 	unsigned long best_parent = 0;
- 	unsigned long rate = req->rate;
- 	int best_div = 1, best_half = 1;
--	int i, j;
-+	int i, j, p;
+diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+index 9ecb5f0b3f83..19e382a11297 100644
+--- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
++++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+@@ -62,6 +62,17 @@
+ 		stdout-path = "serial0:115200n8";
+ 	};
  
- 	/*
- 	 * We only consider PLL3, since the TCON is very likely to be
-@@ -79,32 +79,37 @@ static int sun4i_tmds_determine_rate(struct clk_hw *hw,
- 	 * clock, so we should not need to do anything.
- 	 */
++	hdmi-connector {
++		compatible = "hdmi-connector";
++		type = "a";
++
++		port {
++			hdmi_con_in: endpoint {
++				remote-endpoint = <&hdmi_out_con>;
++			};
++		};
++	};
++
+ 	vga-connector {
+ 		compatible = "vga-connector";
  
--	parent = clk_hw_get_parent_by_index(hw, 0);
--	if (!parent)
--		return -EINVAL;
--
--	for (i = 1; i < 3; i++) {
--		for (j = 1; j < 16; j++) {
--			unsigned long ideal = rate * i * j;
--			unsigned long rounded;
--
--			rounded = clk_hw_round_rate(parent, ideal);
--
--			if (rounded == ideal) {
--				best_parent = rounded;
--				best_half = i;
--				best_div = j;
--				goto out;
--			}
--
--			if (abs(rate - rounded / i) <
--			    abs(rate - best_parent / best_div)) {
--				best_parent = rounded;
--				best_div = i;
-+	for (p = 0; p < clk_hw_get_num_parents(hw); p++) {
-+		parent = clk_hw_get_parent_by_index(hw, p);
-+		if (!parent)
-+			continue;
-+
-+		for (i = 1; i < 3; i++) {
-+			for (j = 1; j < 16; j++) {
-+				unsigned long ideal = rate * i * j;
-+				unsigned long rounded;
-+
-+				rounded = clk_hw_round_rate(parent, ideal);
-+
-+				if (rounded == ideal) {
-+					best_parent = rounded;
-+					best_half = i;
-+					best_div = j;
-+					goto out;
-+				}
-+
-+				if (abs(rate - rounded / i) <
-+				    abs(rate - best_parent / best_div)) {
-+					best_parent = rounded;
-+					best_div = i;
-+				}
- 			}
- 		}
- 	}
+@@ -162,6 +173,16 @@
+ 	};
+ };
  
-+	if (!parent)
-+		return -EINVAL;
++&hdmi {
++	status = "okay";
++};
 +
- out:
- 	req->rate = best_parent / best_half / best_div;
- 	req->best_parent_rate = best_parent;
++&hdmi_out {
++	hdmi_out_con: endpoint {
++		remote-endpoint = <&hdmi_con_in>;
++	};
++};
++
+ &i2c0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c0_pins_a>;
+diff --git a/arch/arm/boot/dts/sun6i-a31s-primo81.dts b/arch/arm/boot/dts/sun6i-a31s-primo81.dts
+index 4c10123509c4..0cdb38ab3377 100644
+--- a/arch/arm/boot/dts/sun6i-a31s-primo81.dts
++++ b/arch/arm/boot/dts/sun6i-a31s-primo81.dts
+@@ -52,17 +52,42 @@
+ / {
+ 	model = "MSI Primo81 tablet";
+ 	compatible = "msi,primo81", "allwinner,sun6i-a31s";
++
++	hdmi-connector {
++		compatible = "hdmi-connector";
++		type = "c";
++
++		port {
++			hdmi_con_in: endpoint {
++				remote-endpoint = <&hdmi_out_con>;
++			};
++		};
++	};
+ };
+ 
+ &cpu0 {
+ 	cpu-supply = <&reg_dcdc3>;
+ };
+ 
++&de {
++	status = "okay";
++};
++
+ &ehci0 {
+ 	/* rtl8188etv wifi is connected here */
+ 	status = "okay";
+ };
+ 
++&hdmi {
++	status = "okay";
++};
++
++&hdmi_out {
++	hdmi_out_con: endpoint {
++		remote-endpoint = <&hdmi_con_in>;
++	};
++};
++
+ &i2c0 {
+ 	/* pull-ups and device VDDIO use AXP221 DLDO3 */
+ 	pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/sun6i-a31s-sina31s.dts b/arch/arm/boot/dts/sun6i-a31s-sina31s.dts
+index b3d98222bd81..298476485bb4 100644
+--- a/arch/arm/boot/dts/sun6i-a31s-sina31s.dts
++++ b/arch/arm/boot/dts/sun6i-a31s-sina31s.dts
+@@ -53,6 +53,17 @@
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
++	hdmi-connector {
++		compatible = "hdmi-connector";
++		type = "a";
++
++		port {
++			hdmi_con_in: endpoint {
++				remote-endpoint = <&hdmi_out_con>;
++			};
++		};
++	};
++
+ 	leds {
+ 		compatible = "gpio-leds";
+ 		pinctrl-names = "default";
+@@ -90,6 +101,10 @@
+ 	status = "okay";
+ };
+ 
++&de {
++	status = "okay";
++};
++
+ &ehci0 {
+ 	/* USB 2.0 4 port hub IC */
+ 	status = "okay";
+@@ -112,6 +127,16 @@
+ 	};
+ };
+ 
++&hdmi {
++	status = "okay";
++};
++
++&hdmi_out {
++	hdmi_out_con: endpoint {
++		remote-endpoint = <&hdmi_con_in>;
++	};
++};
++
+ &ir {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&ir_pins_a>;
 -- 
 2.14.2
