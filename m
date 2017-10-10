@@ -1,107 +1,92 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 10 Oct 2017 11:07:48 -0700
-Subject: [PATCH] ARM: dts: qcom: add MSM8660 GSBI6 and GSBI7
-In-Reply-To: <20171010083924.19244-1-linus.walleij@linaro.org>
-References: <20171010083924.19244-1-linus.walleij@linaro.org>
-Message-ID: <20171010180748.GC1165@minitux>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Tue, 10 Oct 2017 11:09:34 -0700
+Subject: [PATCH] PCI: iproc: Allow allocation of multiple MSIs
+In-Reply-To: <20171007120851.20230-1-sbodomerle@gmail.com>
+References: <20171007120851.20230-1-sbodomerle@gmail.com>
+Message-ID: <d0467282-a44a-bd1e-e449-0bba953c4cfd@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 10 Oct 01:39 PDT 2017, Linus Walleij wrote:
+Hi Bodo,
 
-> This adds the GSBI6 and GSBI7 IO blocks to the MSM8660 DTSI file.
-> On the APQ8060 DragonBoard, GSBI6 DM is used for Bluetooth UART,
-> and GSBI7 I2C is used for FM radio I2C.
+On 10/7/2017 5:08 AM, Bodo-Merle Sandor wrote:
+> From: Sandor Bodo-Merle <sbodomerle@gmail.com>
 > 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-
-Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-
-Regards,
-Bjorn
-
+> Add support for allocating multiple MSIs at the same time, so that the
+> MSI_FLAG_MULTI_PCI_MSI flag can be added to the msi_domain_info
+> structure.
+> 
+> Avoid storing the hwirq in the low 5 bits of the message data, as it is
+> used by the device. Also fix an endianness problem by using readl().
+> 
+> Signed-off-by: Sandor Bodo-Merle <sbodomerle@gmail.com>
 > ---
->  arch/arm/boot/dts/qcom-msm8660.dtsi | 67 +++++++++++++++++++++++++++++++++++++
->  1 file changed, 67 insertions(+)
+>   drivers/pci/host/pcie-iproc-msi.c | 19 ++++++++++++-------
+>   1 file changed, 12 insertions(+), 7 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
-> index 1b5d31b33b5e..4f02489bcb2e 100644
-> --- a/arch/arm/boot/dts/qcom-msm8660.dtsi
-> +++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
-> @@ -123,6 +123,73 @@
->  			reg = <0x900000 0x4000>;
->  		};
->  
-> +		gsbi6: gsbi at 16500000 {
-> +			compatible = "qcom,gsbi-v1.0.0";
-> +			cell-index = <12>;
-> +			reg = <0x16500000 0x100>;
-> +			clocks = <&gcc GSBI6_H_CLK>;
-> +			clock-names = "iface";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
-> +
-> +			syscon-tcsr = <&tcsr>;
-> +
-> +			gsbi6_serial: serial at 16540000 {
-> +				compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
-> +				reg = <0x16540000 0x1000>,
-> +				      <0x16500000 0x1000>;
-> +				interrupts = <GIC_SPI 156 IRQ_TYPE_NONE>;
-> +				clocks = <&gcc GSBI6_UART_CLK>, <&gcc GSBI6_H_CLK>;
-> +				clock-names = "core", "iface";
-> +				status = "disabled";
-> +			};
-> +
-> +			gsbi6_i2c: i2c at 16580000 {
-> +				compatible = "qcom,i2c-qup-v1.1.1";
-> +				reg = <0x16580000 0x1000>;
-> +				interrupts = <GIC_SPI 157 IRQ_TYPE_NONE>;
-> +				clocks = <&gcc GSBI6_QUP_CLK>, <&gcc GSBI6_H_CLK>;
-> +				clock-names = "core", "iface";
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				status = "disabled";
-> +			};
-> +		};
-> +
-> +		gsbi7: gsbi at 16600000 {
-> +			compatible = "qcom,gsbi-v1.0.0";
-> +			cell-index = <12>;
-> +			reg = <0x16600000 0x100>;
-> +			clocks = <&gcc GSBI7_H_CLK>;
-> +			clock-names = "iface";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
-> +
-> +			syscon-tcsr = <&tcsr>;
-> +
-> +			gsbi7_serial: serial at 16640000 {
-> +				compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
-> +				reg = <0x16640000 0x1000>,
-> +				      <0x16600000 0x1000>;
-> +				interrupts = <GIC_SPI 158 IRQ_TYPE_NONE>;
-> +				clocks = <&gcc GSBI7_UART_CLK>, <&gcc GSBI7_H_CLK>;
-> +				clock-names = "core", "iface";
-> +				status = "disabled";
-> +			};
-> +
-> +			gsbi7_i2c: i2c at 16680000 {
-> +				compatible = "qcom,i2c-qup-v1.1.1";
-> +				reg = <0x16680000 0x1000>;
-> +				interrupts = <GIC_SPI 159 IRQ_TYPE_NONE>;
-> +				clocks = <&gcc GSBI7_QUP_CLK>, <&gcc GSBI7_H_CLK>;
-> +				clock-names = "core", "iface";
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				status = "disabled";
-> +			};
-> +		};
->  
->  		gsbi8: gsbi at 19800000 {
->  			compatible = "qcom,gsbi-v1.0.0";
-> -- 
-> 2.13.5
+> diff --git a/drivers/pci/host/pcie-iproc-msi.c b/drivers/pci/host/pcie-iproc-msi.c
+> index 2d0f535a2f69..990fc906d73d 100644
+> --- a/drivers/pci/host/pcie-iproc-msi.c
+> +++ b/drivers/pci/host/pcie-iproc-msi.c
+> @@ -179,7 +179,7 @@ static struct irq_chip iproc_msi_irq_chip = {
+>   
+>   static struct msi_domain_info iproc_msi_domain_info = {
+>   	.flags = MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
+> -		MSI_FLAG_PCI_MSIX,
+> +		MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX,
+>   	.chip = &iproc_msi_irq_chip,
+>   };
+>   
+> @@ -237,7 +237,7 @@ static void iproc_msi_irq_compose_msi_msg(struct irq_data *data,
+>   	addr = msi->msi_addr + iproc_msi_addr_offset(msi, data->hwirq);
+>   	msg->address_lo = lower_32_bits(addr);
+>   	msg->address_hi = upper_32_bits(addr);
+> -	msg->data = data->hwirq;
+> +	msg->data = data->hwirq << 5; >   }
+>   
+>   static struct irq_chip iproc_msi_bottom_irq_chip = {
+> @@ -251,7 +251,7 @@ static int iproc_msi_irq_domain_alloc(struct irq_domain *domain,
+>   				      void *args)
+>   {
+>   	struct iproc_msi *msi = domain->host_data;
+> -	int hwirq;
+> +	int hwirq, i;
+>   
+>   	mutex_lock(&msi->bitmap_lock);
+>   
+> @@ -267,10 +267,14 @@ static int iproc_msi_irq_domain_alloc(struct irq_domain *domain,
+>   
+>   	mutex_unlock(&msi->bitmap_lock);
+>   
+> -	irq_domain_set_info(domain, virq, hwirq, &iproc_msi_bottom_irq_chip,
+> -			    domain->host_data, handle_simple_irq, NULL, NULL);
+> +	for (i = 0; i < nr_irqs; i++) {
+> +		irq_domain_set_info(domain, virq + i, hwirq + i,
+> +				    &iproc_msi_bottom_irq_chip,
+> +				    domain->host_data, handle_simple_irq,
+> +				    NULL, NULL);
+> +	}
+>   
+> -	return 0;
+> +	return hwirq;
+>   }
+>   
+>   static void iproc_msi_irq_domain_free(struct irq_domain *domain,
+> @@ -302,7 +306,8 @@ static inline u32 decode_msi_hwirq(struct iproc_msi *msi, u32 eq, u32 head)
+>   
+>   	offs = iproc_msi_eq_offset(msi, eq) + head * sizeof(u32);
+>   	msg = (u32 *)(msi->eq_cpu + offs);
+> -	hwirq = *msg & IPROC_MSI_EQ_MASK;
+> +	hwirq = readl(msg);
+> +	hwirq = (hwirq >> 5) + (hwirq & 0x1f);
+>   
+>   	/*
+>   	 * Since we have multiple hwirq mapped to a single MSI vector,nnn
 > 
+
+Change looks okay to me in general. May I know which platform you tested 
+this patch on and was SMP affinity configuration tested?
+
+Thanks,
+
+Ray
