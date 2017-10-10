@@ -1,45 +1,58 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 10 Oct 2017 10:12:15 +0200
-Subject: [PATCH] ARM: shmobile: rcar-gen2: fix non-SMP build
-In-Reply-To: <cover.1507623048.git.horms+renesas@verge.net.au>
-References: <cover.1507623048.git.horms+renesas@verge.net.au>
-Message-ID: <dc15ca962757ca72a4492b2e13be2eecc6dcd716.1507623048.git.horms+renesas@verge.net.au>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Tue, 10 Oct 2017 11:12:42 +0300
+Subject: [PATCH v4 0/5] media: atmel-isc: Rework the format list and
+ clock provider
+In-Reply-To: <20171010024640.5733-1-wenyou.yang@microchip.com>
+References: <20171010024640.5733-1-wenyou.yang@microchip.com>
+Message-ID: <20171010081242.jxoyb3i5hr5q6zkg@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
+On Tue, Oct 10, 2017 at 10:46:35AM +0800, Wenyou Yang wrote:
+> To improve the readability of code, rework the format list table,
+> split the format array into two. Meanwhile, fix the issue of the
+> clock provider operation and the pm runtime support.
+> 
+> Changes in v4:
+>  - Call pm_runtime_get_sync() and pm_runtime_put_sync() in ->prepare
+>    and ->unprepare callback.
+>  - Move pm_runtime_enable() call from the complete callback to the
+>    end of probe.
+>  - Call pm_runtime_get_sync() and pm_runtime_put_sync() in
+>    ->is_enabled() callbacks.
+>  - Call clk_disable_unprepare() in ->remove callback.
+> 
+> Changes in v3:
+>  - Fix the wrong used spinlock.
+>  - s/_/- on the subject.
+>  - Add a new flag for Raw Bayer format to remove MAX_RAW_FMT_INDEX define.
+>  - Add the comments for define of the format flag.
+>  - Rebase media_tree/master.
+> 
+> Changes in v2:
+>  - Add the new patch to remove the unnecessary member from
+>    isc_subdev_entity struct.
+>  - Rebase on the patch set,
+>         [PATCH 0/6] [media] Atmel: Adjustments for seven function implementations
+>         https://www.mail-archive.com/linux-media at vger.kernel.org/msg118342.html
+> 
+> Wenyou Yang (5):
+>   media: atmel-isc: Add spin lock for clock enable ops
+>   media: atmel-isc: Add prepare and unprepare ops
+>   media: atmel-isc: Enable the clocks during probe
+>   media: atmel-isc: Remove unnecessary member
+>   media: atmel-isc: Rework the format list
+> 
+>  drivers/media/platform/atmel/atmel-isc-regs.h |   1 +
+>  drivers/media/platform/atmel/atmel-isc.c      | 629 ++++++++++++++++++++------
+>  2 files changed, 498 insertions(+), 132 deletions(-)
 
-A bugfix for the SMP case broke the build for the UP case:
+Thanks for the update!!
 
-arch/arm/mach-shmobile/headsmp-apmu.o: In function `shmobile_boot_apmu':
-(.text+0x34): undefined reference to `secondary_startup'
+For patches 0--4:
 
-The assembler file mixes code that is used for SMP with code
-that we also need on a single-CPU build, so I'm leaving it
-always enabled in the Makefile, but enclose the SMP code
-in an #ifdef.
+Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
 
-3fd45a136ff6 ("ARM: shmobile: rcar-gen2: Make sure CNTVOFF is initialized on CA7/15")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/headsmp-apmu.S | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/mach-shmobile/headsmp-apmu.S b/arch/arm/mach-shmobile/headsmp-apmu.S
-index db4743d2bf91..5672b5849401 100644
---- a/arch/arm/mach-shmobile/headsmp-apmu.S
-+++ b/arch/arm/mach-shmobile/headsmp-apmu.S
-@@ -31,7 +31,9 @@ ENTRY(shmobile_init_cntvoff)
- 	ret	lr
- ENDPROC(shmobile_init_cntvoff)
- 
-+#ifdef CONFIG_SMP
- ENTRY(shmobile_boot_apmu)
- 	bl	shmobile_init_cntvoff
- 	b	secondary_startup
- ENDPROC(shmobile_boot_apmu)
-+#endif
 -- 
-2.1.4
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi
