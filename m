@@ -1,52 +1,36 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 10 Oct 2017 13:11:55 +0200
-Subject: [PATCH v4 03/12] arm64: dts: mt8173: remove "mediatek, mt8135-mmc"
- from mmc nodes
-In-Reply-To: <CAPDyKFoGhq_+iiRS4dZscpBw+ttCOY1EzA_okXgpWwOdWUMKNw@mail.gmail.com>
-References: <1507627831-29323-1-git-send-email-chaotian.jing@mediatek.com>
- <1507627831-29323-4-git-send-email-chaotian.jing@mediatek.com>
- <CAPDyKFrtBr_f2HxsNsLQ1s+-9Toni8pC82gFdVcHY+oQSPqOBA@mail.gmail.com>
- <bbbe8b1e-4ac8-95cf-5e47-24a9cac8cffc@gmail.com>
- <CAPDyKFoGhq_+iiRS4dZscpBw+ttCOY1EzA_okXgpWwOdWUMKNw@mail.gmail.com>
-Message-ID: <7802f18f-99fd-d36c-3a99-7d897060eecb@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 10 Oct 2017 11:58:50 +0200
+Subject: [PATCH 1/2] dt-bindings: add binding for Allwinner R40 SATA AHCI
+ controller
+In-Reply-To: <20171008043541.48564-1-icenowy@aosc.io>
+References: <20171008043541.48564-1-icenowy@aosc.io>
+Message-ID: <20171010095850.nyu3oljrz6frpeom@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 10/10/2017 01:10 PM, Ulf Hansson wrote:
-> On 10 October 2017 at 13:06, Matthias Brugger <matthias.bgg@gmail.com> wrote:
->>
->>
->> On 10/10/2017 12:49 PM, Ulf Hansson wrote:
->>>
->>> On 10 October 2017 at 11:30, Chaotian Jing <chaotian.jing@mediatek.com>
->>> wrote:
->>>>
->>>> devicetree bindings has been updated to support multi-platforms,
->>>> so that each platform has its owns compatible name.
->>>> And, this compatible name may used in driver to distinguish with
->>>> other platform.
->>>>
->>>> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
->>>
->>>
->>> I assume there is no dependency to the rest or the series on this, so
->>> this can go via arm soc?
->>>
->>
->>
->> Not in the sense of a merge conflict or something, but mt8173-mmc won't work
->> until patch 2/12 is merged as well. If we want to be conservative, we should
->> wait for this patch until the next kernel release. In the end it's just a
->> cleanup of the dtsi.
+On Sun, Oct 08, 2017 at 04:35:40AM +0000, Icenowy Zheng wrote:
+> The Allwinner R40 SoC contains a SATA AHCI controller like the one in
+> A10/A20 SoCs, however a reset control and two power supplies are added
+> to it.
 > 
-> In such case I can pick it part of this series, just need your ack.
+> Add a binding document for it.
 > 
+> As a dedicated binding document is needed now for the A10/A20/R40 AHCI
+> controller, drop the A10 compatible line from generic platform AHCI
+> controller binding document.
 
-Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
+Why is it needed?
 
-Having a look on the patch, I don't expect it to create any merge conflicts.
+Maxime
 
-Thanks,
-Matthias
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171010/8bd79095/attachment-0001.sig>
