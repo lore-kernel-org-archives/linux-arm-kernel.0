@@ -1,53 +1,20 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Tue, 10 Oct 2017 16:22:28 +0800
-Subject: [PATCH v3 01/12] mmc: mediatek: add support of mt2701/mt2712
-In-Reply-To: <CAPDyKFppTCdaMizSGTjrfgsbMuHCsNi+knHVf9ibxgrAQ0GD2w@mail.gmail.com>
-References: <1507604480-23246-1-git-send-email-chaotian.jing@mediatek.com>
- <1507604480-23246-2-git-send-email-chaotian.jing@mediatek.com>
- <CAPDyKFrqv5tt8Exq1msUBbMEROam2c+YnStazsf5SPj-NLrGSg@mail.gmail.com>
- <1507620951.19789.7.camel@mhfsdcap03>
- <CAPDyKFppTCdaMizSGTjrfgsbMuHCsNi+knHVf9ibxgrAQ0GD2w@mail.gmail.com>
-Message-ID: <1507623748.19789.10.camel@mhfsdcap03>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Tue, 10 Oct 2017 10:29:05 +0200
+Subject: ARM: s3c2410: Fix a typo in a comment line
+In-Reply-To: <20171004181420.lctwaocrvg6rxokk@kozik-lap>
+References: <d2ae00c8-da57-9ffc-3692-67ed6daa95e0@users.sourceforge.net>
+ <b93ca267-88d2-b68a-1570-dc8fc71f3888@users.sourceforge.net>
+ <20171004181420.lctwaocrvg6rxokk@kozik-lap>
+Message-ID: <0f6ea076-2d41-103a-b1a1-40edc38e2daf@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-10-10 at 10:09 +0200, Ulf Hansson wrote:
-> On 10 October 2017 at 09:35, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> > On Tue, 2017-10-10 at 09:26 +0200, Ulf Hansson wrote:
-> >> [...]
-> >>
-> >> > +
-> >> > +static const struct of_device_id msdc_of_ids[] = {
-> >> > +       { .compatible = "mediatek,mt8135-mmc", .data = &mt8135_compat},
-> >> > +       { .compatible = "mediatek,mt8173-mmc", .data = &mt8173_compat},
-> >> > +       { .compatible = "mediatek,mt2701-mmc", .data = &mt2701_compat},
-> >> > +       { .compatible = "mediatek,mt2712-mmc", .data = &mt2712_compat},
-> >> > +       {}
-> >> > +};
-> >> > +MODULE_DEVICE_TABLE(of, msdc_of_ids);
-> >>
-> >> As already stated in the other reply. These new compatible changes
-> >> needs to be discussed and acked before the driver starts using them.
-> >>
-> >> In other words, make patch3 to precede this one.
-> > but, then there will have a probe issue as mentioned in previous mail
-> > list. that's why I separate the binding file changes to 2 patches.
-> 
-> That sounds seriously wrong. Aren't the bindings backwards compatible?
-> 
-> Kind regards
-> Uffe
+> Thanks, applied, squashed and changed commit msg.
 
-As Matthias mentioned before:
-"
->> NAK, this has to be:
->> You have to add the fallback compatible ("mediatek,mt8135-mmc") to
-the binding
->> description as otherwise the driver does not get probed.
->>
->> Regards,
->> Matthias
-"
-the original compatible in driver is "mediatek,mt8135-mmc", so that if
-drop "mediatek,mt8135-mmc" in bindings file(User may refer it and drop
-"mediatek,mt8135-mmc" in their DTS), the driver will not get probed.
+Would it be more appropriate to use a commit subject like
+?ARM: s3c241x: Fix typos in two comments? (instead of
+?ARM: s3c2410: Fix typos in a comments?)?
+https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/?id=6c7a7db2e4c25acf8bd8086797d39a51728139e0
+
+Regards,
+Markus
