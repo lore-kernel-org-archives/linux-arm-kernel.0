@@ -1,74 +1,49 @@
 From: james.morse@arm.com (James Morse)
-Date: Tue, 10 Oct 2017 16:19:23 +0100
+Date: Tue, 10 Oct 2017 16:19:46 +0100
 Subject: [PATCH 1/3] arm64: mm: Support Common Not Private translations
-In-Reply-To: <ace7be76-c6fa-e217-f3c0-5e6dd42f5255@arm.com>
+In-Reply-To: <1507553734-27854-2-git-send-email-vladimir.murzin@arm.com>
 References: <1507553734-27854-1-git-send-email-vladimir.murzin@arm.com>
  <1507553734-27854-2-git-send-email-vladimir.murzin@arm.com>
- <20171009152300.yrjdhnwna5r2enae@armageddon.cambridge.arm.com>
- <59DBA864.9030108@arm.com> <ace7be76-c6fa-e217-f3c0-5e6dd42f5255@arm.com>
-Message-ID: <59DCE4FB.6070106@arm.com>
+Message-ID: <59DCE512.8010106@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Vladimir,
 
-On 10/10/17 13:50, Vladimir Murzin wrote:
-> On 09/10/17 17:48, James Morse wrote:
->> On 09/10/17 16:23, Catalin Marinas wrote:
->>> On Mon, Oct 09, 2017 at 01:55:32PM +0100, Vladimir Murzin wrote:
->>>> This patch adds support for Common Not Private translations on
->>>> different exceptions levels:
->>
->>>> (2) For EL1 we postpone setting CNP till all cpus are up and rely on
->>>>     cpufeature framework to 1) patch the code which is sensitive to
->>>>     CNP and 2) update TTBR1_EL1 with CNP bit set. The only case where
->>>>     TTBR1_EL1 can be reprogrammed is hibirnation, so the code there is
->>>>     changed to save raw TTBR1_EL1 and blindly restore it on resume.
->>
->>> Even if you do this when all the CPUs are up, that's not always true.
->>> Starting with maxcpus=1 allows something like systemd to bring up new
->>> CPUs once user space starts.
->>
->> For secondary CPUs cpu_enable_cnp() will be called to set CNP on TTBR1_EL1. But
->> what about cpuidle? This also resets the TTBR1_EL1 value.
-> 
-> Good point! I've missed it because reset happens via __enable_mmu, which has 
-> no idea about CnP.
-> 
-> Would something like below be sufficient?
-> 
-> 
-> diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
-> index 1e3be90..03a02c4 100644
-> --- a/arch/arm64/kernel/suspend.c
-> +++ b/arch/arm64/kernel/suspend.c
-> @@ -46,6 +46,10 @@ void notrace __cpu_suspend_exit(void)
->  	 */
->  	cpu_uninstall_idmap();
+On 09/10/17 13:55, Vladimir Murzin wrote:
+> Common Not Private (CNP) is a feature of ARMv8.2 extension which
+> allows translation table entries to be shared between different PEs in
+> the same inner shareable domain, so the hardware can use this fact to
+> optimise the caching of such entries in the TLB.
+
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index 21e2c95..8d098a1 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -1211,6 +1224,14 @@ cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry, int __unused)
+>  	return (cpus_have_const_cap(ARM64_HAS_PAN) && !cpus_have_const_cap(ARM64_HAS_UAO));
+>  }
 >  
 > +#ifdef CONFIG_ARM64_CNP
-> +	/* Restore CnP bit in TTBR1_EL1 */
+> +static int cpu_enable_cnp(void *__unused)
+> +{
 > +	cpu_replace_ttbr1(swapper_pg_dir);
-> +#endif
->  	/*
->  	 * PSTATE was not saved over suspend/resume, re-enable any detected
->  	 * features that might not have been set correctly.
-> 
 
-This re-install -> uninstalls the idmap, and if we don't actually have CNP
-support, it wouldn't have changed anything. How about:
+All the other callers of cpu_replace_ttbr1() wrap swapper_pg_dir in lm_alias().
+I'm pretty sure this is so that virt_to_phys() works when swapper_pg_dir's
+address is in the vmalloc range.
 
-> if (cpus_have_const_cap(ARM64_HAS_CNP)
-> 	cpu_replace_ttbr1(lm_alias(swapper_pg_dir));
-
-We could look at having a combined helper that is called with the idmap
-installed and does the uninstall.
+CONFIG_DEBUG_VIRTUAL should catch problems like this.
 
 
-hibernate uses these cpu_suspend helpers to save/restore the CPU registers, so
-if we fix cpu-idle, you don't need the hibernate hunk anymore.
+(Nit: you shouldn't need the #ifdeffery, the only caller of this function is in
+the same file, so the compiler should do the right thing)
 
 
-Thanks,
-
-James
+> +	return 0;
+> +}
+> +#endif /* CONFIG_ARM64_CNP */
+> +
+>  /*
+>   * We emulate only the following system register space.
+>   * Op0 = 0x3, CRn = 0x0, Op1 = 0x0, CRm = [0, 4 - 7]
