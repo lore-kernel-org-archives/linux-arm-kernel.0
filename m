@@ -1,73 +1,132 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 10 Oct 2017 19:38:27 +0100
-Subject: [PATCH v3 10/28] arm64/sve: Low-level CPU setup
+Date: Tue, 10 Oct 2017 19:38:23 +0100
+Subject: [PATCH v3 06/28] arm64/sve: System register and exception syndrome
+ definitions
 In-Reply-To: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
 References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1507660725-7986-11-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1507660725-7986-7-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To enable the kernel to use SVE, SVE traps from EL1 to EL2 must be
-disabled.  To take maximum advantage of the hardware, the full
-available vector length also needs to be enabled for EL1 by
-programming ZCR_EL2.LEN.  (The kernel will program ZCR_EL1.LEN as
-required, but this cannot override the limit set by ZCR_EL2.)
+The SVE architecture adds some system registers, ID register fields
+and a dedicated ESR exception class.
 
-Traps from EL0 to EL1 are also left enabled by virtue of setting
-the relevant CPACR bit at its default (RES0) value.
-
-This patch makes the appropriate changes to the primary and
-secondary CPU initialisation code.
+This patch adds the appropriate definitions that will be needed by
+the kernel.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Alex Benn?e <alex.bennee@linaro.org>
-
+Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
 ---
+ arch/arm64/include/asm/esr.h     |  3 ++-
+ arch/arm64/include/asm/kvm_arm.h |  1 +
+ arch/arm64/include/asm/sysreg.h  | 21 +++++++++++++++++++++
+ arch/arm64/kernel/traps.c        |  1 +
+ 4 files changed, 25 insertions(+), 1 deletion(-)
 
-Dropped Alex Benn?e's Reviewed-by, since there is a non-trivial change
-to the logic here.
-
-Changes since v2
-----------------
-
-Requested by Catalin Marinas:
-
- * Removed the asm logic to enable SVE for EL1 from __cpu_setup, since
-   the kernel doesn't need SVE so early.
-
-   Instead, this logic is moved to C code called via cpufeatures in
-   "arm64/sve: Probe SVE capabilities and usable vector lengths"
-   and wired up for the arm64_cpu_capabilities enable() method in
-   "arm64/sve: Detect SVE and activate runtime support".
----
- arch/arm64/kernel/head.S | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 0b243ec..bb6e3f2 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -517,8 +517,19 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
- 	mov	x0, #0x33ff
- 	msr	cptr_el2, x0			// Disable copro. traps to EL2
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index 66ed8b6..014d7d8 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -43,7 +43,8 @@
+ #define ESR_ELx_EC_HVC64	(0x16)
+ #define ESR_ELx_EC_SMC64	(0x17)
+ #define ESR_ELx_EC_SYS64	(0x18)
+-/* Unallocated EC: 0x19 - 0x1E */
++#define ESR_ELx_EC_SVE		(0x19)
++/* Unallocated EC: 0x1A - 0x1E */
+ #define ESR_ELx_EC_IMP_DEF	(0x1f)
+ #define ESR_ELx_EC_IABT_LOW	(0x20)
+ #define ESR_ELx_EC_IABT_CUR	(0x21)
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index 61d694c..dbf0537 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -185,6 +185,7 @@
+ #define CPTR_EL2_TCPAC	(1 << 31)
+ #define CPTR_EL2_TTA	(1 << 20)
+ #define CPTR_EL2_TFP	(1 << CPTR_EL2_TFP_SHIFT)
++#define CPTR_EL2_TZ	(1 << 8)
+ #define CPTR_EL2_DEFAULT	0x000033ff
  
-+	/* SVE register access */
-+	mrs	x1, id_aa64pfr0_el1
-+	ubfx	x1, x1, #ID_AA64PFR0_SVE_SHIFT, #4
-+	cbz	x1, 7f
-+
-+	bic	x0, x0, #CPTR_EL2_TZ		// Also disable SVE traps
-+	msr	cptr_el2, x0			// Disable copro. traps to EL2
-+	isb
-+	mov	x1, #ZCR_ELx_LEN_MASK		// SVE: Enable full vector
-+	msr_s	SYS_ZCR_EL2, x1			// length for EL1.
-+
- 	/* Hypervisor stub */
--	adr_l	x0, __hyp_stub_vectors
-+7:	adr_l	x0, __hyp_stub_vectors
- 	msr	vbar_el2, x0
+ /* Hyp Debug Configuration Register bits */
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 480ecd6..36fe2ae 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -145,6 +145,7 @@
  
- 	/* spsr */
+ #define SYS_ID_AA64PFR0_EL1		sys_reg(3, 0, 0, 4, 0)
+ #define SYS_ID_AA64PFR1_EL1		sys_reg(3, 0, 0, 4, 1)
++#define SYS_ID_AA64ZFR0_EL1		sys_reg(3, 0, 0, 4, 4)
+ 
+ #define SYS_ID_AA64DFR0_EL1		sys_reg(3, 0, 0, 5, 0)
+ #define SYS_ID_AA64DFR1_EL1		sys_reg(3, 0, 0, 5, 1)
+@@ -163,6 +164,8 @@
+ #define SYS_ACTLR_EL1			sys_reg(3, 0, 1, 0, 1)
+ #define SYS_CPACR_EL1			sys_reg(3, 0, 1, 0, 2)
+ 
++#define SYS_ZCR_EL1			sys_reg(3, 0, 1, 2, 0)
++
+ #define SYS_TTBR0_EL1			sys_reg(3, 0, 2, 0, 0)
+ #define SYS_TTBR1_EL1			sys_reg(3, 0, 2, 0, 1)
+ #define SYS_TCR_EL1			sys_reg(3, 0, 2, 0, 2)
+@@ -253,6 +256,8 @@
+ 
+ #define SYS_PMCCFILTR_EL0		sys_reg (3, 3, 14, 15, 7)
+ 
++#define SYS_ZCR_EL2			sys_reg(3, 4, 1, 2, 0)
++
+ #define SYS_DACR32_EL2			sys_reg(3, 4, 3, 0, 0)
+ #define SYS_IFSR32_EL2			sys_reg(3, 4, 5, 0, 1)
+ #define SYS_FPEXC32_EL2			sys_reg(3, 4, 5, 3, 0)
+@@ -335,6 +340,7 @@
+ #define ID_AA64ISAR1_DPB_SHIFT		0
+ 
+ /* id_aa64pfr0 */
++#define ID_AA64PFR0_SVE_SHIFT		32
+ #define ID_AA64PFR0_GIC_SHIFT		24
+ #define ID_AA64PFR0_ASIMD_SHIFT		20
+ #define ID_AA64PFR0_FP_SHIFT		16
+@@ -343,6 +349,7 @@
+ #define ID_AA64PFR0_EL1_SHIFT		4
+ #define ID_AA64PFR0_EL0_SHIFT		0
+ 
++#define ID_AA64PFR0_SVE			0x1
+ #define ID_AA64PFR0_FP_NI		0xf
+ #define ID_AA64PFR0_FP_SUPPORTED	0x0
+ #define ID_AA64PFR0_ASIMD_NI		0xf
+@@ -444,6 +451,20 @@
+ #endif
+ 
+ 
++/*
++ * The ZCR_ELx_LEN_* definitions intentionally include bits [8:4] which
++ * are reserved by the SVE architecture for future expansion of the LEN
++ * field, with compatible semantics.
++ */
++#define ZCR_ELx_LEN_SHIFT	0
++#define ZCR_ELx_LEN_SIZE	9
++#define ZCR_ELx_LEN_MASK	0x1ff
++
++#define CPACR_EL1_ZEN_EL1EN	(1 << 16) /* enable EL1 access */
++#define CPACR_EL1_ZEN_EL0EN	(1 << 17) /* enable EL0 access, if EL1EN set */
++#define CPACR_EL1_ZEN		(CPACR_EL1_ZEN_EL1EN | CPACR_EL1_ZEN_EL0EN)
++
++
+ /* Safe value for MPIDR_EL1: Bit31:RES1, Bit30:U:0, Bit24:MT:0 */
+ #define SYS_MPIDR_SAFE_VAL		(1UL << 31)
+ 
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 5ea4b85..f202932 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -603,6 +603,7 @@ static const char *esr_class_str[] = {
+ 	[ESR_ELx_EC_HVC64]		= "HVC (AArch64)",
+ 	[ESR_ELx_EC_SMC64]		= "SMC (AArch64)",
+ 	[ESR_ELx_EC_SYS64]		= "MSR/MRS (AArch64)",
++	[ESR_ELx_EC_SVE]		= "SVE",
+ 	[ESR_ELx_EC_IMP_DEF]		= "EL3 IMP DEF",
+ 	[ESR_ELx_EC_IABT_LOW]		= "IABT (lower EL)",
+ 	[ESR_ELx_EC_IABT_CUR]		= "IABT (current EL)",
 -- 
 2.1.4
