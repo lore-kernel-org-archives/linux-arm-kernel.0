@@ -1,34 +1,76 @@
 From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Tue, 10 Oct 2017 17:30:31 +0800
-Subject: [PATCH v4 12/12] mmc: mediatek: perfer to use rise edge latching for
- cmd line
+Date: Tue, 10 Oct 2017 17:30:23 +0800
+Subject: [PATCH v4 04/12] mmc: mediatek: make hs400_tune_response only for
+ mt8173
 In-Reply-To: <1507627831-29323-1-git-send-email-chaotian.jing@mediatek.com>
 References: <1507627831-29323-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <1507627831-29323-13-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <1507627831-29323-5-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-data lines have applied to perfer to use rise edge, also need
-apply it to cmd line.
+the origin design of hs400_tune_response is for mt8173 because of
+mt8173 has a special design. for doing that, we add a new member
+"compatible", by now it's only for mt8173.
 
 Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
 ---
- drivers/mmc/host/mtk-sd.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/mmc/host/mtk-sd.c | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-index 4cffc04..731574e 100644
+index 643c795..ab2fbbb 100644
 --- a/drivers/mmc/host/mtk-sd.c
 +++ b/drivers/mmc/host/mtk-sd.c
-@@ -1558,7 +1558,8 @@ static int msdc_tune_response(struct mmc_host *mmc, u32 opcode)
- 	}
- 	final_rise_delay = get_best_delay(host, rise_delay);
- 	/* if rising edge has enough margin, then do not scan falling edge */
--	if (final_rise_delay.maxlen >= 12 && final_rise_delay.start < 4)
-+	if (final_rise_delay.maxlen >= 12 ||
-+	    (final_rise_delay.start == 0 && final_rise_delay.maxlen >= 4))
- 		goto skip_fall;
+@@ -300,6 +300,7 @@ struct msdc_save_para {
  
- 	sdr_set_bits(host->base + MSDC_IOCON, MSDC_IOCON_RSPL);
+ struct mtk_mmc_compatible {
+ 	u8 clk_div_bits;
++	bool hs400_tune; /* only used for MT8173 */
+ };
+ 
+ struct msdc_tune_para {
+@@ -360,18 +361,22 @@ struct msdc_host {
+ 
+ static const struct mtk_mmc_compatible mt8135_compat = {
+ 	.clk_div_bits = 8,
++	.hs400_tune = false,
+ };
+ 
+ static const struct mtk_mmc_compatible mt8173_compat = {
+ 	.clk_div_bits = 8,
++	.hs400_tune = true,
+ };
+ 
+ static const struct mtk_mmc_compatible mt2701_compat = {
+ 	.clk_div_bits = 12,
++	.hs400_tune = false,
+ };
+ 
+ static const struct mtk_mmc_compatible mt2712_compat = {
+ 	.clk_div_bits = 12,
++	.hs400_tune = false,
+ };
+ 
+ static const struct of_device_id msdc_of_ids[] = {
+@@ -666,7 +671,8 @@ static void msdc_set_mclk(struct msdc_host *host, unsigned char timing, u32 hz)
+ 		       host->base + PAD_CMD_TUNE);
+ 	}
+ 
+-	if (timing == MMC_TIMING_MMC_HS400)
++	if (timing == MMC_TIMING_MMC_HS400 &&
++	    host->dev_comp->hs400_tune)
+ 		sdr_set_field(host->base + PAD_CMD_TUNE,
+ 			      MSDC_PAD_TUNE_CMDRRDLY,
+ 			      host->hs400_cmd_int_delay);
+@@ -1594,7 +1600,8 @@ static int msdc_execute_tuning(struct mmc_host *mmc, u32 opcode)
+ 	struct msdc_host *host = mmc_priv(mmc);
+ 	int ret;
+ 
+-	if (host->hs400_mode)
++	if (host->hs400_mode &&
++	    host->dev_comp->hs400_tune)
+ 		ret = hs400_tune_response(mmc, opcode);
+ 	else
+ 		ret = msdc_tune_response(mmc, opcode);
 -- 
 1.8.1.1.dirty
