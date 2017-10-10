@@ -1,41 +1,107 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 10 Oct 2017 20:02:50 +0200
-Subject: [PATCH 25/25] arm64: dts: Register Hi3660's thermal sensor
-In-Reply-To: <1507658570-32675-1-git-send-email-daniel.lezcano@linaro.org>
-References: <79a5f10c-0fb7-3e4f-caac-c1625904b137@linaro.org>
- <1507658570-32675-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1507658570-32675-25-git-send-email-daniel.lezcano@linaro.org>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Tue, 10 Oct 2017 11:07:48 -0700
+Subject: [PATCH] ARM: dts: qcom: add MSM8660 GSBI6 and GSBI7
+In-Reply-To: <20171010083924.19244-1-linus.walleij@linaro.org>
+References: <20171010083924.19244-1-linus.walleij@linaro.org>
+Message-ID: <20171010180748.GC1165@minitux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kevin Wangtao <kevin.wangtao@linaro.org>
+On Tue 10 Oct 01:39 PDT 2017, Linus Walleij wrote:
 
-Add binding for tsensor on H3660, this tsensor is used for
-SoC thermal control, it supports alarm interrupt.
+> This adds the GSBI6 and GSBI7 IO blocks to the MSM8660 DTSI file.
+> On the APQ8060 DragonBoard, GSBI6 DM is used for Bluetooth UART,
+> and GSBI7 I2C is used for FM radio I2C.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Signed-off-by: Kevin Wangtao <kevin.wangtao@linaro.org>
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-index c6a1961..d9c0cf3 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-@@ -848,5 +848,13 @@
- 				     &sdio_cfg_func>;
- 			status = "disabled";
- 		};
-+
-+		tsensor: tsensor at fff30000 {
-+			compatible = "hisilicon,hi3660-tsensor";
-+			reg = <0x0 0xfff30000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
-+			#thermal-sensor-cells = <1>;
-+		};
-+
- 	};
- };
--- 
-2.7.4
+Regards,
+Bjorn
+
+> ---
+>  arch/arm/boot/dts/qcom-msm8660.dtsi | 67 +++++++++++++++++++++++++++++++++++++
+>  1 file changed, 67 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
+> index 1b5d31b33b5e..4f02489bcb2e 100644
+> --- a/arch/arm/boot/dts/qcom-msm8660.dtsi
+> +++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
+> @@ -123,6 +123,73 @@
+>  			reg = <0x900000 0x4000>;
+>  		};
+>  
+> +		gsbi6: gsbi at 16500000 {
+> +			compatible = "qcom,gsbi-v1.0.0";
+> +			cell-index = <12>;
+> +			reg = <0x16500000 0x100>;
+> +			clocks = <&gcc GSBI6_H_CLK>;
+> +			clock-names = "iface";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges;
+> +
+> +			syscon-tcsr = <&tcsr>;
+> +
+> +			gsbi6_serial: serial at 16540000 {
+> +				compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
+> +				reg = <0x16540000 0x1000>,
+> +				      <0x16500000 0x1000>;
+> +				interrupts = <GIC_SPI 156 IRQ_TYPE_NONE>;
+> +				clocks = <&gcc GSBI6_UART_CLK>, <&gcc GSBI6_H_CLK>;
+> +				clock-names = "core", "iface";
+> +				status = "disabled";
+> +			};
+> +
+> +			gsbi6_i2c: i2c at 16580000 {
+> +				compatible = "qcom,i2c-qup-v1.1.1";
+> +				reg = <0x16580000 0x1000>;
+> +				interrupts = <GIC_SPI 157 IRQ_TYPE_NONE>;
+> +				clocks = <&gcc GSBI6_QUP_CLK>, <&gcc GSBI6_H_CLK>;
+> +				clock-names = "core", "iface";
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				status = "disabled";
+> +			};
+> +		};
+> +
+> +		gsbi7: gsbi at 16600000 {
+> +			compatible = "qcom,gsbi-v1.0.0";
+> +			cell-index = <12>;
+> +			reg = <0x16600000 0x100>;
+> +			clocks = <&gcc GSBI7_H_CLK>;
+> +			clock-names = "iface";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges;
+> +
+> +			syscon-tcsr = <&tcsr>;
+> +
+> +			gsbi7_serial: serial at 16640000 {
+> +				compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
+> +				reg = <0x16640000 0x1000>,
+> +				      <0x16600000 0x1000>;
+> +				interrupts = <GIC_SPI 158 IRQ_TYPE_NONE>;
+> +				clocks = <&gcc GSBI7_UART_CLK>, <&gcc GSBI7_H_CLK>;
+> +				clock-names = "core", "iface";
+> +				status = "disabled";
+> +			};
+> +
+> +			gsbi7_i2c: i2c at 16680000 {
+> +				compatible = "qcom,i2c-qup-v1.1.1";
+> +				reg = <0x16680000 0x1000>;
+> +				interrupts = <GIC_SPI 159 IRQ_TYPE_NONE>;
+> +				clocks = <&gcc GSBI7_QUP_CLK>, <&gcc GSBI7_H_CLK>;
+> +				clock-names = "core", "iface";
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				status = "disabled";
+> +			};
+> +		};
+>  
+>  		gsbi8: gsbi at 19800000 {
+>  			compatible = "qcom,gsbi-v1.0.0";
+> -- 
+> 2.13.5
+> 
