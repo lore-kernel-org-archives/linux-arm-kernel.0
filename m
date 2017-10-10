@@ -1,64 +1,102 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 10 Oct 2017 11:20:05 +0800
-Subject: [PATCH v4 08/11] drm/sun4i: hdmi: Add A31 specific DDC register
- definitions
+Date: Tue, 10 Oct 2017 11:20:07 +0800
+Subject: [PATCH v4 10/11] ARM: dts: sun6i: Add device node for HDMI controller
 In-Reply-To: <20171010032008.682-1-wens@csie.org>
 References: <20171010032008.682-1-wens@csie.org>
-Message-ID: <20171010032008.682-9-wens@csie.org>
+Message-ID: <20171010032008.682-11-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DDC block for the HDMI controller is different on the A31.
+Now that we support the HDMI controller on the A31 SoC, we can add it
+to the device tree.
 
-This patch adds the register definitions.
+This adds a device node for the HDMI controller, and the of_graph nodes
+connecting it to the 2 TCONs.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_hdmi.h | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ arch/arm/boot/dts/sun6i-a31.dtsi | 55 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi.h b/drivers/gpu/drm/sun4i/sun4i_hdmi.h
-index 3057e31219f6..ee42ae7e5a21 100644
---- a/drivers/gpu/drm/sun4i/sun4i_hdmi.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_hdmi.h
-@@ -153,6 +153,37 @@
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index 93209cda28db..48b2382a18a9 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -289,6 +289,12 @@
+ 					#address-cells = <1>;
+ 					#size-cells = <0>;
+ 					reg = <1>;
++
++					tcon0_out_hdmi: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&hdmi_in_tcon0>;
++						allwinner,tcon-channel = <1>;
++					};
+ 				};
+ 			};
+ 		};
+@@ -331,6 +337,12 @@
+ 					#address-cells = <1>;
+ 					#size-cells = <0>;
+ 					reg = <1>;
++
++					tcon1_out_hdmi: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&hdmi_in_tcon1>;
++						allwinner,tcon-channel = <1>;
++					};
+ 				};
+ 			};
+ 		};
+@@ -411,6 +423,49 @@
+ 			#size-cells = <0>;
+ 		};
  
- #define SUN4I_HDMI_DDC_FIFO_SIZE	16
- 
-+/* A31 specific */
-+#define SUN6I_HDMI_DDC_CTRL_REG		0x500
-+#define SUN6I_HDMI_DDC_CTRL_RESET		BIT(31)
-+#define SUN6I_HDMI_DDC_CTRL_START_CMD		BIT(27)
-+#define SUN6I_HDMI_DDC_CTRL_SDA_ENABLE		BIT(6)
-+#define SUN6I_HDMI_DDC_CTRL_SCL_ENABLE		BIT(4)
-+#define SUN6I_HDMI_DDC_CTRL_ENABLE		BIT(0)
++		hdmi: hdmi at 01c16000 {
++			compatible = "allwinner,sun6i-a31-hdmi";
++			reg = <0x01c16000 0x1000>;
++			interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_AHB1_HDMI>, <&ccu CLK_HDMI>,
++				 <&ccu CLK_HDMI_DDC>,
++				 <&ccu CLK_PLL_VIDEO0_2X>,
++				 <&ccu CLK_PLL_VIDEO1_2X>;
++			clock-names = "ahb", "mod", "ddc", "pll-0", "pll-1";
++			resets = <&ccu RST_AHB1_HDMI>;
++			reset-names = "ahb";
++			dma-names = "ddc-tx", "ddc-rx", "audio-tx";
++			dmas = <&dma 13>, <&dma 13>, <&dma 14>;
++			status = "disabled";
 +
-+#define SUN6I_HDMI_DDC_CMD_REG		0x508
-+#define SUN6I_HDMI_DDC_CMD_BYTE_COUNT(count)	((count) << 16)
-+/* command types in lower 3 bits are the same as sun4i */
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
 +
-+#define SUN6I_HDMI_DDC_ADDR_REG		0x50c
-+#define SUN6I_HDMI_DDC_ADDR_SEGMENT(seg)	(((seg) & 0xff) << 24)
-+#define SUN6I_HDMI_DDC_ADDR_EDDC(addr)		(((addr) & 0xff) << 16)
-+#define SUN6I_HDMI_DDC_ADDR_OFFSET(off)		(((off) & 0xff) << 8)
-+#define SUN6I_HDMI_DDC_ADDR_SLAVE(addr)		(((addr) & 0xff) << 1)
++				hdmi_in: port at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
 +
-+#define SUN6I_HDMI_DDC_INT_STATUS_REG	0x514
-+#define SUN6I_HDMI_DDC_INT_STATUS_TIMEOUT	BIT(8)
-+/* lower 8 bits are the same as sun4i */
++					hdmi_in_tcon0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&tcon0_out_hdmi>;
++					};
 +
-+#define SUN6I_HDMI_DDC_FIFO_CTRL_REG	0x518
-+#define SUN6I_HDMI_DDC_FIFO_CTRL_CLEAR		BIT(15)
-+/* lower 9 bits are the same as sun4i */
++					hdmi_in_tcon1: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&tcon1_out_hdmi>;
++					};
++				};
 +
-+#define SUN6I_HDMI_DDC_CLK_REG		0x520
-+/* DDC CLK bit fields are the same, but the formula is not */
++				hdmi_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++				};
++			};
++		};
 +
-+#define SUN6I_HDMI_DDC_FIFO_DATA_REG	0x580
-+
- enum sun4i_hdmi_pkt_type {
- 	SUN4I_HDMI_PKT_AVI = 2,
- 	SUN4I_HDMI_PKT_END = 15,
+ 		usb_otg: usb at 01c19000 {
+ 			compatible = "allwinner,sun6i-a31-musb";
+ 			reg = <0x01c19000 0x0400>;
 -- 
 2.14.2
