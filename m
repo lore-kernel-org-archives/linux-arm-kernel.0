@@ -1,216 +1,286 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 10 Oct 2017 13:05:16 +0200
-Subject: [PATCH v3 17/22][UPDATE] firmware: arm_scmi: add device power
- domain support genpd
-In-Reply-To: <1506692575-7743-1-git-send-email-sudeep.holla@arm.com>
-References: <1506604306-20739-18-git-send-email-sudeep.holla@arm.com>
- <1506692575-7743-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <CAPDyKFpCxJXgT9F7_xq3eL13hnuhOy1sW8ipv0YeitfFhmOcNA@mail.gmail.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Tue, 10 Oct 2017 12:06:23 +0100
+Subject: [PATCH v5 03/10] kexec_file: factor out arch_kexec_kernel_*()
+ from x86, powerpc
+In-Reply-To: <20171010063619.6303-4-takahiro.akashi@linaro.org>
+References: <20171010063619.6303-1-takahiro.akashi@linaro.org>
+ <20171010063619.6303-4-takahiro.akashi@linaro.org>
+Message-ID: <e2ec250b-f5c1-aae8-6291-f1bddb3d59ab@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 September 2017 at 15:42, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> This patch hooks up the support for device power domain provided by
-> SCMI using the Linux generic power domain infrastructure.
->
-> Cc: Kevin Hilman <khilman@baylibre.com>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Hi Takahiro,
+
+Sorry about the previous message, confidential disclaimer shouldn't have 
+been there.
+
+Resending comments without disclaimer to avoid confusion.
+
+On 10/10/17 07:36, AKASHI Takahiro wrote:
+> arch_kexec_kernel_*() and arch_kimage_file_post_load_cleanup can now be
+> duplicated among some architectures, so let's factor them out.
+> 
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> Cc: Dave Young <dyoung@redhat.com>
+> Cc: Vivek Goyal <vgoyal@redhat.com>
+> Cc: Baoquan He <bhe@redhat.com>
+> Cc: Michael Ellerman <mpe@ellerman.id.au>
+> Cc: Thiago Jung Bauermann <bauerman@linux.vnet.ibm.com>
 > ---
->  drivers/firmware/Kconfig                   |  13 +++
->  drivers/firmware/arm_scmi/Makefile         |   1 +
->  drivers/firmware/arm_scmi/scmi_pm_domain.c | 136 +++++++++++++++++++++++++++++
->  3 files changed, 150 insertions(+)
->  create mode 100644 drivers/firmware/arm_scmi/scmi_pm_domain.c
->
-> - updated to read the initial state instead of assuming off as
->   suggested by Ulf
->
-> diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
-> index c3d1a12763ce..a4462bc661c8 100644
-> --- a/drivers/firmware/Kconfig
-> +++ b/drivers/firmware/Kconfig
-> @@ -40,6 +40,19 @@ config ARM_SCMI_PROTOCOL
->           This protocol library provides interface for all the client drivers
->           making use of the features offered by the SCMI.
->
-> +config ARM_SCMI_POWER_DOMAIN
-> +       tristate "SCMI power domain driver"
-> +       depends on ARM_SCMI_PROTOCOL || (COMPILE_TEST && OF)
-> +       default y
-> +       select PM_GENERIC_DOMAINS if PM
-> +       help
-> +         This enables support for the SCMI power domains which can be
-> +         enabled or disabled via the SCP firmware
+>   arch/powerpc/include/asm/kexec.h            |  2 +-
+>   arch/powerpc/kernel/kexec_elf_64.c          |  2 +-
+>   arch/powerpc/kernel/machine_kexec_file_64.c | 36 ++----------------
+>   arch/x86/include/asm/kexec-bzimage64.h      |  2 +-
+>   arch/x86/kernel/kexec-bzimage64.c           |  2 +-
+>   arch/x86/kernel/machine_kexec_64.c          | 45 +----------------------
+>   include/linux/kexec.h                       | 15 ++++----
+>   kernel/kexec_file.c                         | 57 +++++++++++++++++++++++++++--
+>   8 files changed, 70 insertions(+), 91 deletions(-)
+> 
+> diff --git a/arch/powerpc/include/asm/kexec.h b/arch/powerpc/include/asm/kexec.h
+> index 25668bc8cb2a..23588952d8bd 100644
+> --- a/arch/powerpc/include/asm/kexec.h
+> +++ b/arch/powerpc/include/asm/kexec.h
+> @@ -92,7 +92,7 @@ static inline bool kdump_in_progress(void)
+>   }
+>   
+>   #ifdef CONFIG_KEXEC_FILE
+> -extern struct kexec_file_ops kexec_elf64_ops;
+> +extern const struct kexec_file_ops kexec_elf64_ops;
+>   
+>   #ifdef CONFIG_IMA_KEXEC
+>   #define ARCH_HAS_KIMAGE_ARCH
+> diff --git a/arch/powerpc/kernel/kexec_elf_64.c b/arch/powerpc/kernel/kexec_elf_64.c
+> index 9a42309b091a..6c78c11c7faf 100644
+> --- a/arch/powerpc/kernel/kexec_elf_64.c
+> +++ b/arch/powerpc/kernel/kexec_elf_64.c
+> @@ -657,7 +657,7 @@ static void *elf64_load(struct kimage *image, char *kernel_buf,
+>   	return ret ? ERR_PTR(ret) : fdt;
+>   }
+>   
+> -struct kexec_file_ops kexec_elf64_ops = {
+> +const struct kexec_file_ops kexec_elf64_ops = {
+>   	.probe = elf64_probe,
+>   	.load = elf64_load,
+>   };
+> diff --git a/arch/powerpc/kernel/machine_kexec_file_64.c b/arch/powerpc/kernel/machine_kexec_file_64.c
+> index 992c0d258e5d..e7ce78857f0b 100644
+> --- a/arch/powerpc/kernel/machine_kexec_file_64.c
+> +++ b/arch/powerpc/kernel/machine_kexec_file_64.c
+> @@ -31,8 +31,9 @@
+>   
+>   #define SLAVE_CODE_SIZE		256
+>   
+> -static struct kexec_file_ops *kexec_file_loaders[] = {
+> +const struct kexec_file_ops * const kexec_file_loaders[] = {
+>   	&kexec_elf64_ops,
+> +	NULL
+>   };
+>   
+>   int arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
+> @@ -45,38 +46,7 @@ int arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
+>   	if (image->type == KEXEC_TYPE_CRASH)
+>   		return -ENOTSUPP;
+>   
+> -	for (i = 0; i < ARRAY_SIZE(kexec_file_loaders); i++) {
+> -		fops = kexec_file_loaders[i];
+> -		if (!fops || !fops->probe)
+> -			continue;
+> -
+> -		ret = fops->probe(buf, buf_len);
+> -		if (!ret) {
+> -			image->fops = fops;
+> -			return ret;
+> -		}
+> -	}
+> -
+> -	return ret;
+> -}
+> -
+> -void *arch_kexec_kernel_image_load(struct kimage *image)
+> -{
+> -	if (!image->fops || !image->fops->load)
+> -		return ERR_PTR(-ENOEXEC);
+> -
+> -	return image->fops->load(image, image->kernel_buf,
+> -				 image->kernel_buf_len, image->initrd_buf,
+> -				 image->initrd_buf_len, image->cmdline_buf,
+> -				 image->cmdline_buf_len);
+> -}
+> -
+> -int arch_kimage_file_post_load_cleanup(struct kimage *image)
+> -{
+> -	if (!image->fops || !image->fops->cleanup)
+> -		return 0;
+> -
+> -	return image->fops->cleanup(image->image_loader_data);
+> +	return _kexec_kernel_image_probe(image, buf, buf_len);
+>   }
+>   
+>   /**
+> diff --git a/arch/x86/include/asm/kexec-bzimage64.h b/arch/x86/include/asm/kexec-bzimage64.h
+> index d1b5d194e31d..284fd23d133b 100644
+> --- a/arch/x86/include/asm/kexec-bzimage64.h
+> +++ b/arch/x86/include/asm/kexec-bzimage64.h
+> @@ -1,6 +1,6 @@
+>   #ifndef _ASM_KEXEC_BZIMAGE64_H
+>   #define _ASM_KEXEC_BZIMAGE64_H
+>   
+> -extern struct kexec_file_ops kexec_bzImage64_ops;
+> +extern const struct kexec_file_ops kexec_bzImage64_ops;
+>   
+>   #endif  /* _ASM_KEXE_BZIMAGE64_H */
+> diff --git a/arch/x86/kernel/kexec-bzimage64.c b/arch/x86/kernel/kexec-bzimage64.c
+> index fb095ba0c02f..705654776c0c 100644
+> --- a/arch/x86/kernel/kexec-bzimage64.c
+> +++ b/arch/x86/kernel/kexec-bzimage64.c
+> @@ -538,7 +538,7 @@ static int bzImage64_verify_sig(const char *kernel, unsigned long kernel_len)
+>   }
+>   #endif
+>   
+> -struct kexec_file_ops kexec_bzImage64_ops = {
+> +const struct kexec_file_ops kexec_bzImage64_ops = {
+>   	.probe = bzImage64_probe,
+>   	.load = bzImage64_load,
+>   	.cleanup = bzImage64_cleanup,
+> diff --git a/arch/x86/kernel/machine_kexec_64.c b/arch/x86/kernel/machine_kexec_64.c
+> index 1f790cf9d38f..2cdd29d64181 100644
+> --- a/arch/x86/kernel/machine_kexec_64.c
+> +++ b/arch/x86/kernel/machine_kexec_64.c
+> @@ -30,8 +30,9 @@
+>   #include <asm/set_memory.h>
+>   
+>   #ifdef CONFIG_KEXEC_FILE
+> -static struct kexec_file_ops *kexec_file_loaders[] = {
+> +const struct kexec_file_ops * const kexec_file_loaders[] = {
+>   		&kexec_bzImage64_ops,
+> +		NULL
+>   };
+>   #endif
+>   
+> @@ -363,27 +364,6 @@ void arch_crash_save_vmcoreinfo(void)
+>   /* arch-dependent functionality related to kexec file-based syscall */
+>   
+>   #ifdef CONFIG_KEXEC_FILE
+> -int arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
+> -				  unsigned long buf_len)
+> -{
+> -	int i, ret = -ENOEXEC;
+> -	struct kexec_file_ops *fops;
+> -
+> -	for (i = 0; i < ARRAY_SIZE(kexec_file_loaders); i++) {
+> -		fops = kexec_file_loaders[i];
+> -		if (!fops || !fops->probe)
+> -			continue;
+> -
+> -		ret = fops->probe(buf, buf_len);
+> -		if (!ret) {
+> -			image->fops = fops;
+> -			return ret;
+> -		}
+> -	}
+> -
+> -	return ret;
+> -}
+> -
+>   void *arch_kexec_kernel_image_load(struct kimage *image)
+>   {
+>   	vfree(image->arch.elf_headers);
+> @@ -398,27 +378,6 @@ void *arch_kexec_kernel_image_load(struct kimage *image)
+>   				 image->cmdline_buf_len);
+>   }
+>   
+> -int arch_kimage_file_post_load_cleanup(struct kimage *image)
+> -{
+> -	if (!image->fops || !image->fops->cleanup)
+> -		return 0;
+> -
+> -	return image->fops->cleanup(image->image_loader_data);
+> -}
+> -
+> -#ifdef CONFIG_KEXEC_VERIFY_SIG
+> -int arch_kexec_kernel_verify_sig(struct kimage *image, void *kernel,
+> -				 unsigned long kernel_len)
+> -{
+> -	if (!image->fops || !image->fops->verify_sig) {
+> -		pr_debug("kernel loader does not support signature verification.");
+> -		return -EKEYREJECTED;
+> -	}
+> -
+> -	return image->fops->verify_sig(kernel, kernel_len);
+> -}
+> -#endif
+> -
+>   /*
+>    * Apply purgatory relocations.
+>    *
+> diff --git a/include/linux/kexec.h b/include/linux/kexec.h
+> index 2b7590f5483a..bfb37665a77f 100644
+> --- a/include/linux/kexec.h
+> +++ b/include/linux/kexec.h
+> @@ -208,7 +208,7 @@ struct kimage {
+>   	unsigned long cmdline_buf_len;
+>   
+>   	/* File operations provided by image loader */
+> -	struct kexec_file_ops *fops;
+> +	const struct kexec_file_ops *fops;
+>   
+>   	/* Image loader handling the kernel can store a pointer here */
+>   	void *image_loader_data;
+> @@ -276,12 +276,13 @@ int crash_shrink_memory(unsigned long new_size);
+>   size_t crash_get_memory_size(void);
+>   void crash_free_reserved_phys_range(unsigned long begin, unsigned long end);
+>   
+> -int __weak arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
+> -					 unsigned long buf_len);
+> -void * __weak arch_kexec_kernel_image_load(struct kimage *image);
+> -int __weak arch_kimage_file_post_load_cleanup(struct kimage *image);
+> -int __weak arch_kexec_kernel_verify_sig(struct kimage *image, void *buf,
+> -					unsigned long buf_len);
+> +int _kexec_kernel_image_probe(struct kimage *image, void *buf,
+> +			      unsigned long buf_len);
+> +void *_kexec_kernel_image_load(struct kimage *image);
+> +int _kimage_file_post_load_cleanup(struct kimage *image);
+> +int _kexec_kernel_verify_sig(struct kimage *image, void *buf,
+> +			     unsigned long buf_len);
 > +
-> +         This driver can also be built as a module.  If so, the module
-> +         will be called scmi_pm_domain. Note this may needed early in boot
-> +         before rootfs may be available.
+>   int __weak arch_kexec_apply_relocations_add(const Elf_Ehdr *ehdr,
+>   					Elf_Shdr *sechdrs, unsigned int relsec);
+>   int __weak arch_kexec_apply_relocations(const Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
+> diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
+> index 9f48f4412297..bbb0177e20ab 100644
+> --- a/kernel/kexec_file.c
+> +++ b/kernel/kexec_file.c
+> @@ -26,30 +26,79 @@
+>   #include <linux/vmalloc.h>
+>   #include "kexec_internal.h"
+>   
+> +const __weak struct kexec_file_ops * const kexec_file_loaders[] = {NULL};
 > +
->  config ARM_SCPI_PROTOCOL
->         tristate "ARM System Control and Power Interface (SCPI) Message Protocol"
->         depends on ARM || ARM64 || COMPILE_TEST
-> diff --git a/drivers/firmware/arm_scmi/Makefile b/drivers/firmware/arm_scmi/Makefile
-> index 7fb026c71833..289e9e5a4764 100644
-> --- a/drivers/firmware/arm_scmi/Makefile
-> +++ b/drivers/firmware/arm_scmi/Makefile
-> @@ -1,3 +1,4 @@
->  obj-$(CONFIG_ARM_SCMI_PROTOCOL)        = arm_scmi.o
->  arm_scmi-y = base.o clock.o driver.o mbox_if.o perf.o power.o sensors.o
->  arm_scmi-$(CONFIG_ARM_MHU) += arm_mhu_if.o
-> +obj-$(CONFIG_ARM_SCMI_POWER_DOMAIN) += scmi_pm_domain.o
-> diff --git a/drivers/firmware/arm_scmi/scmi_pm_domain.c b/drivers/firmware/arm_scmi/scmi_pm_domain.c
-> new file mode 100644
-> index 000000000000..f105f7d5c660
-> --- /dev/null
-> +++ b/drivers/firmware/arm_scmi/scmi_pm_domain.c
-> @@ -0,0 +1,136 @@
-> +/*
-> + * SCMI Generic power domain support.
-> + *
-> + * Copyright (C) 2017 ARM Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along
-> + * with this program. If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/pm_domain.h>
-> +#include <linux/scmi_protocol.h>
-> +
-> +struct scmi_pm_domain {
-> +       struct generic_pm_domain genpd;
-> +       const struct scmi_handle *handle;
-> +       const char *name;
-> +       u32 domain;
-> +};
-> +
-> +#define to_scmi_pd(gpd) container_of(gpd, struct scmi_pm_domain, genpd)
-> +
-> +static int scmi_pd_power(struct generic_pm_domain *domain, bool power_on)
+>   static int kexec_calculate_store_digests(struct kimage *image);
+>   
+> +int _kexec_kernel_image_probe(struct kimage *image, void *buf,
+> +			     unsigned long buf_len)
 > +{
-> +       int ret;
-> +       u32 state, ret_state;
-> +       struct scmi_pm_domain *pd = to_scmi_pd(domain);
-> +       const struct scmi_power_ops *ops = pd->handle->power_ops;
+> +	const struct kexec_file_ops *fops;
+> +	int ret = -ENOEXEC;
 > +
-> +       if (power_on)
-> +               state = SCMI_POWER_STATE_GENERIC_ON;
-> +       else
-> +               state = SCMI_POWER_STATE_GENERIC_OFF;
-> +
-> +       ret = ops->state_set(pd->handle, pd->domain, state);
-> +       if (!ret)
-> +               ret = ops->state_get(pd->handle, pd->domain, &ret_state);
-> +       if (!ret && state != ret_state)
-> +               return -EIO;
-> +
-> +       return ret;
-> +}
-> +
-> +static int scmi_pd_power_on(struct generic_pm_domain *domain)
-> +{
-> +       return scmi_pd_power(domain, true);
-> +}
-> +
-> +static int scmi_pd_power_off(struct generic_pm_domain *domain)
-> +{
-> +       return scmi_pd_power(domain, false);
-> +}
-> +
-> +static int scmi_pm_domain_probe(struct platform_device *pdev)
-> +{
-> +       int num_domains, i;
-> +       struct device *dev = &pdev->dev;
-> +       struct device_node *np = dev->of_node;
-> +       struct scmi_pm_domain *scmi_pd;
-> +       struct genpd_onecell_data *scmi_pd_data;
-> +       struct generic_pm_domain **domains;
-> +       const struct scmi_handle *handle = devm_scmi_handle_get(dev);
-> +
-> +       if (IS_ERR_OR_NULL(handle) || !handle->power_ops)
-> +               return -EPROBE_DEFER;
-> +
-> +       num_domains = handle->power_ops->num_domains_get(handle);
-> +       if (num_domains < 0) {
-> +               dev_err(dev, "number of domains not found\n");
-> +               return num_domains;
-> +       }
-> +
-> +       scmi_pd = devm_kcalloc(dev, num_domains, sizeof(*scmi_pd), GFP_KERNEL);
-> +       if (!scmi_pd)
-> +               return -ENOMEM;
-> +
-> +       scmi_pd_data = devm_kzalloc(dev, sizeof(*scmi_pd_data), GFP_KERNEL);
-> +       if (!scmi_pd_data)
-> +               return -ENOMEM;
-> +
-> +       domains = devm_kcalloc(dev, num_domains, sizeof(*domains), GFP_KERNEL);
-> +       if (!domains)
-> +               return -ENOMEM;
-> +
-> +       for (i = 0; i < num_domains; i++, scmi_pd++) {
-> +               u32 state;
-> +
-> +               domains[i] = &scmi_pd->genpd;
-> +
-> +               scmi_pd->domain = i;
-> +               scmi_pd->handle = handle;
-> +               scmi_pd->name = handle->power_ops->name_get(handle, i);
-> +               scmi_pd->genpd.name = scmi_pd->name;
-> +               scmi_pd->genpd.power_off = scmi_pd_power_off;
-> +               scmi_pd->genpd.power_on = scmi_pd_power_on;
-> +
-> +               if (handle->power_ops->state_get(handle, i, &state)) {
-> +                       dev_dbg(dev, "failed to get state for domain %d\n", i);
+> +	for (fops = kexec_file_loaders[0]; fops && fops->probe; ++fops) {
 
-Perhaps dev_warn() instead?
+Hmm, that's not gonna work (and I see that what I said in the previous 
+patch was not 100% correct either).
 
-> +                       continue;
-> +               }
-> +
-> +               pm_genpd_init(&scmi_pd->genpd, NULL,
-> +                             state == SCMI_POWER_STATE_GENERIC_OFF);
-> +       }
-> +
-> +       scmi_pd_data->domains = domains;
-> +       scmi_pd_data->num_domains = num_domains;
-> +
-> +       of_genpd_add_provider_onecell(np, scmi_pd_data);
-> +
-> +       return 0;
-> +}
-> +
-> +static struct platform_driver scmi_power_domain_driver = {
-> +       .driver = {
-> +               .name = "scmi-power-domain",
-> +       },
-> +       .probe = scmi_pm_domain_probe,
-> +};
-> +module_platform_driver(scmi_power_domain_driver);
-> +
-> +MODULE_AUTHOR("Sudeep Holla <sudeep.holla@arm.com>");
-> +MODULE_DESCRIPTION("ARM SCMI power domain driver");
-> +MODULE_LICENSE("GPL v2");
-> --
-> 2.7.4
->
+'fops' should be of type 'const struct kexec_file_ops **', and the loop 
+should be:
 
-Besides the nitpick above, feel free to add:
+for (fops = &kexec_file_loaders[0]; *fops && (*fops)->probe; ++fops)
 
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+With some additional dereferences in the body of the loop.
 
-Kind regards
-Uffe
+Unless you prefer the previous state of the loop (with i and the break 
+inside), but I still think this looks better.
+
+Cheers,
+
+-- 
+Julien Thierry
