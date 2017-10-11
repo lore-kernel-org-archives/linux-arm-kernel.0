@@ -1,102 +1,46 @@
 From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 10 Oct 2017 22:08:54 -0700
-Subject: [PATCH v4 2/5] of: reserved_mem: Accessor for acquiring reserved_mem
+Date: Tue, 10 Oct 2017 22:08:57 -0700
+Subject: [PATCH v4 5/5] arm64: dts: msm8916: Mark rmtfs node as qcom,
+ rmtfs-mem compatible
 In-Reply-To: <20171011050857.7588-1-bjorn.andersson@linaro.org>
 References: <20171011050857.7588-1-bjorn.andersson@linaro.org>
-Message-ID: <20171011050857.7588-3-bjorn.andersson@linaro.org>
+Message-ID: <20171011050857.7588-6-bjorn.andersson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some cases drivers referencing a reserved-memory region might want to
-remap the entire region, but when defining the reserved-memory by "size"
-the client driver has no means to know the associated base address of
-the reserved memory region.
+Now that we have a binding defined for the shared file system memory use
+this to describe the rmtfs memory region.
 
-This patch adds an accessor for such drivers to acquire a handle to
-their associated reserved-memory for this purpose.
-
-A complicating factor for the implementation is that the reserved_mem
-objects are created from the flattened DeviceTree, as such we can't
-use the device_node address for comparison. Fortunately the name of the
-node will be used as "name" of the reserved_mem and will be used when
-building the full_name, so we can compare the "name" with the basename
-of the full_name to find the match.
-
-Reviewed-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 ---
 
 Changes since v3:
-- Renamed function from _get() to _lookup()
-- Picked up Rob's R-b
-
-Changes since v2:
 - None
 
+Changes since v2:
+- Update compatible
+
 Changes since v1:
-- Previous patch provided interface to resolve memory-region reference, instead
-  of direct lookup by device_node
+- New patch
 
- drivers/of/of_reserved_mem.c    | 26 ++++++++++++++++++++++++++
- include/linux/of_reserved_mem.h |  5 +++++
- 2 files changed, 31 insertions(+)
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
-index d507c3569a88..b108c7a1f74c 100644
---- a/drivers/of/of_reserved_mem.c
-+++ b/drivers/of/of_reserved_mem.c
-@@ -397,3 +397,29 @@ void of_reserved_mem_device_release(struct device *dev)
- 	rmem->ops->device_release(rmem, dev);
- }
- EXPORT_SYMBOL_GPL(of_reserved_mem_device_release);
-+
-+/**
-+ * of_reserved_mem_lookup() - acquire reserved_mem from a device node
-+ * @np:		node pointer of the desired reserved-memory region
-+ *
-+ * This function allows drivers to acquire a reference to the reserved_mem
-+ * struct based on a device node handle.
-+ *
-+ * Returns a reserved_mem reference, or NULL on error.
-+ */
-+struct reserved_mem *of_reserved_mem_lookup(struct device_node *np)
-+{
-+	const char *name;
-+	int i;
-+
-+	if (!np->full_name)
-+		return NULL;
-+
-+	name = kbasename(np->full_name);
-+	for (i = 0; i < reserved_mem_count; i++)
-+		if (!strcmp(reserved_mem[i].name, name))
-+			return &reserved_mem[i];
-+
-+	return NULL;
-+}
-+EXPORT_SYMBOL_GPL(of_reserved_mem_lookup);
-diff --git a/include/linux/of_reserved_mem.h b/include/linux/of_reserved_mem.h
-index f8e1992d6423..c58f780104f9 100644
---- a/include/linux/of_reserved_mem.h
-+++ b/include/linux/of_reserved_mem.h
-@@ -44,6 +44,7 @@ int early_init_dt_alloc_reserved_memory_arch(phys_addr_t size,
- void fdt_init_reserved_mem(void);
- void fdt_reserved_mem_save_node(unsigned long node, const char *uname,
- 			       phys_addr_t base, phys_addr_t size);
-+struct reserved_mem *of_reserved_mem_lookup(struct device_node *np);
- #else
- static inline int of_reserved_mem_device_init_by_idx(struct device *dev,
- 					struct device_node *np, int idx)
-@@ -55,6 +56,10 @@ static inline void of_reserved_mem_device_release(struct device *pdev) { }
- static inline void fdt_init_reserved_mem(void) { }
- static inline void fdt_reserved_mem_save_node(unsigned long node,
- 		const char *uname, phys_addr_t base, phys_addr_t size) { }
-+static inline struct reserved_mem *of_reserved_mem_lookup(struct device_node *np)
-+{
-+	return NULL;
-+}
- #endif
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index 039991f80831..f6ae6f9b27e1 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -69,8 +69,11 @@
+ 		};
  
- /**
+ 		rmtfs at 86700000 {
++			compatible = "qcom,rmtfs-mem";
+ 			reg = <0x0 0x86700000 0x0 0xe0000>;
+ 			no-map;
++
++			qcom,client-id = <1>;
+ 		};
+ 
+ 		rfsa at 867e00000 {
 -- 
 2.12.0
