@@ -1,98 +1,36 @@
-From: szabolcs.nagy@arm.com (Szabolcs Nagy)
-Date: Wed, 11 Oct 2017 10:50:16 +0100
-Subject: [PATCH v3 26/28] arm64/sve: Add documentation
-In-Reply-To: <1507660725-7986-27-git-send-email-Dave.Martin@arm.com>
-References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
- <1507660725-7986-27-git-send-email-Dave.Martin@arm.com>
-Message-ID: <59DDE958.4080605@arm.com>
+From: sagi@grimberg.me (Sagi Grimberg)
+Date: Wed, 11 Oct 2017 13:00:18 +0300
+Subject: [PATCH v2] nvme-pci: Use PCI bus address for data/queues in CMB
+In-Reply-To: <20171001074203.GA11115@lst.de>
+References: <1506763722-10687-1-git-send-email-abhishek.shah@broadcom.com>
+ <20171001074203.GA11115@lst.de>
+Message-ID: <d2d574a7-3639-0917-3051-3ea4669de892@grimberg.me>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/10/17 19:38, Dave Martin wrote:
-> This patch adds basic documentation of the user/kernel interface
-> provided by the for SVE.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Cc: Alex Benn?e <alex.bennee@linaro.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Alan Hayward <alan.hayward@arm.com>
-> 
 > ---
+>  From b78f4164881125c4fecfdb87878d0120b2177c53 Mon Sep 17 00:00:00 2001
+> From: Christoph Hellwig <hch@lst.de>
+> Date: Sun, 1 Oct 2017 09:37:35 +0200
+> Subject: nvme-pci: Use PCI bus address for data/queues in CMB
 > 
-> Changes since v2
-> ----------------
+> Currently, NVMe PCI host driver is programming CMB dma address as
+> I/O SQs addresses. This results in failures on systems where 1:1
+> outbound mapping is not used (example Broadcom iProc SOCs) because
+> CMB BAR will be progammed with PCI bus address but NVMe PCI EP will
+> try to access CMB using dma address.
 > 
-> Changes requested by Alan Hayward:
+> To have CMB working on systems without 1:1 outbound mapping, we
+> program PCI bus address for I/O SQs instead of dma address. This
+> approach will work on systems with/without 1:1 outbound mapping.
 > 
->  * Added a note that the caller of PTRACE_SETREGSET will need to do a
->    GETREGSET if complete certainty about the resulting VL is desired.
+> Based on a report and previous patch from Abhishek Shah.
 > 
-> ABI changes:
-> 
->  * Documented the changed return value value semantics for PR_SET_SET_VL
->    when the PR_SVE_SET_VL_ONEXEC flag is passed.
-> ---
-...
-> +prctl(PR_SVE_SET_VL, unsigned long arg)
-> +
-> +    Sets the vector length of the calling thread and related flags, where
-> +    arg == vl | flags.
-> +
-> +    vl is the desired vector length, where sve_vl_valid(vl) must be true.
-> +
-> +    flags:
-> +
-> +	PR_SVE_SET_VL_INHERIT
-> +
-> +	    Inherit the current vector length across execve().  Otherwise, the
-> +	    vector length is reset to the system default at execve().  (See
-> +	    Section 9.)
-> +
-> +	PR_SVE_SET_VL_ONEXEC
-> +
-> +	    Defer the requested vector length change until the next execve().
-> +	    This allows launching of a new program with a different vector
-> +	    length, while avoiding runtime side effects in the caller.
-> +
-> +	    This also overrides the effect of PR_SVE_SET_VL_INHERIT for the
-> +	    first execve().
-> +
-> +	    Without PR_SVE_SET_VL_ONEXEC, any outstanding deferred vector
-> +	    length change is cancelled.
-> +
+> Fixes: 8ffaadf7 ("NVMe: Use CMB for the IO SQes if available")
+> Cc: stable at vger.kernel.org
+> Reported-by: Abhishek Shah <abhishek.shah@broadcom.com>
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
 
-"next execve" is still ambiguous. (execve has process
-global effect so it may plausibly mean next in the
-process or next in the calling thread)
+This looks good,
 
-"any outstanding deferred vector length change" is
-ambiguous. (it may be for all threads in a process or
-in the calling thread only)
-
-> +    Return value: a nonnegative on success, or a negative value on error:
-> +	EINVAL: SVE not supported, invalid vector length requested, or
-> +	    invalid flags.
-> +
-> +    On success, the calling thread's vector length is changed to the largest
-> +    value supported by the system that is less than or equal to vl.
-> +    If vl == SVE_VL_MAX, the calling thread's vector length is changed to the
-> +    largest value supported by the system.
-> +
-> +    The returned value describes the resulting configuration, encoded as for
-> +    PR_SVE_GET_VL.  The vector length reported in this value is the new current
-> +    vector length for this thread if PR_SVE_SET_VL_ONEXEC was not passed in the
-> +    input arg; otherwise, the reported vector length is the deferred vector
-> +    length that will be applied at the next exec.
-> +
-...
-> +9.  System runtime configuration
-> +--------------------------------
-> +
-> +* To mitigate the ABI impact of expansion of the signal frame, a policy
-> +  mechanism is provided for administrators, distro maintainers and developers
-> +  to set the default vector length for userspace processes:
-> +
-> +/proc/cpu/sve_default_vector_length
-> +
-
-still wrong.
+Reviewed-by: Sagi Grimberg <sagi@grimberg.me>
