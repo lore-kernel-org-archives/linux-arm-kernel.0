@@ -1,23 +1,26 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 11 Oct 2017 12:15:44 -0700
-Subject: [PATCH 03/11] arm: Kconfig: enable KASan
-In-Reply-To: <20171011082227.20546-4-liuwenliang@huawei.com>
+Date: Wed, 11 Oct 2017 12:16:50 -0700
+Subject: [PATCH 05/11] Disable kasan's instrumentation
+In-Reply-To: <20171011082227.20546-6-liuwenliang@huawei.com>
 References: <20171011082227.20546-1-liuwenliang@huawei.com>
- <20171011082227.20546-4-liuwenliang@huawei.com>
-Message-ID: <a3902e32-0141-9616-ba3e-9cbbd396b99a@gmail.com>
+ <20171011082227.20546-6-liuwenliang@huawei.com>
+Message-ID: <cf3776c0-b6e0-7a6e-9d43-d77ddd83749b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 10/11/2017 01:22 AM, Abbott Liu wrote:
 > From: Andrey Ryabinin <a.ryabinin@samsung.com>
 > 
-> This patch enable kernel address sanitizer for arm.
+>  To avoid some build and runtime errors, compiler's instrumentation must
+>  be disabled for code not linked with kernel image.
 > 
 > Cc: Andrey Ryabinin <a.ryabinin@samsung.com>
 > Signed-off-by: Abbott Liu <liuwenliang@huawei.com>
 
-This needs to be the last patch in the series, otherwise you allow
-people between patch 3 and 11 to have varying degrees of experience with
-this patch series depending on their system type (LPAE or not, etc.)
+Same as patch 3, this needs to be moved before you allow KAsan to be
+enabled/selected. This has little to no dependencies on other patches so
+this could be moved as the first patch in the series.
+
+Thanks!
 -- 
 Florian
