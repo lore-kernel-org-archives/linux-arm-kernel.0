@@ -1,49 +1,123 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 11 Oct 2017 17:23:12 +0200
-Subject: [PATCH] ARM64: dts: meson-gxl: Add alternate ARM Trusted Firmware
- reserved memory zone
-Message-ID: <1507735392-20005-1-git-send-email-narmstrong@baylibre.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 11 Oct 2017 17:28:13 +0200
+Subject: [PATCH v3 2/7] nvmem: imx-ocotp: Pass parameters via a struct
+In-Reply-To: <1507558312-20580-3-git-send-email-pure.logic@nexus-software.ie>
+References: <1507558312-20580-1-git-send-email-pure.logic@nexus-software.ie>
+ <1507558312-20580-3-git-send-email-pure.logic@nexus-software.ie>
+Message-ID: <1507735693.22082.8.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This year, Amlogic updated the ARM Trusted Firmware reserved memory mapping
-for Meson GXL SoCs and products sold since May 2017 uses this alternate
-reserved memory mapping.
-But products had been sold using the previous mapping.
+Hi Bryan,
 
-This issue has been explained in [1] and a dynamic solution is yet to be
-found to avoid loosing another 3Mbytes of reservable memory.
+On Mon, 2017-10-09 at 15:11 +0100, Bryan O'Donoghue wrote:
+> It will be useful in later patches to know the register access mode and
+> bit-shift to apply to a given input offset.
+> 
+> Fixes: 0642bac7da42 ("nvmem: imx-ocotp: add write support")
+> 
+> Signed-off-by: Bryan O'Donoghue <pure.logic@nexus-software.ie>
+> ---
+>  drivers/nvmem/imx-ocotp.c | 32 ++++++++++++++++++++++----------
+>  1 file changed, 22 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/nvmem/imx-ocotp.c b/drivers/nvmem/imx-ocotp.c
+> index 17d160f..7798571 100644
+> --- a/drivers/nvmem/imx-ocotp.c
+> +++ b/drivers/nvmem/imx-ocotp.c
+> @@ -53,11 +53,15 @@
+>  
+>  static DEFINE_MUTEX(ocotp_mutex);
+>  
+> +struct ocotp_params {
+> +	unsigned int nregs;
+> +};
+> +
+>  struct ocotp_priv {
+>  	struct device *dev;
+>  	struct clk *clk;
+>  	void __iomem *base;
+> -	unsigned int nregs;
+> +	const struct ocotp_params *params;
+>  	struct nvmem_config *config;
+>  };
+>  
+> @@ -121,8 +125,8 @@ static int imx_ocotp_read(void *context, unsigned int offset,
+>  	index = offset >> 2;
+>  	count = bytes >> 2;
+>  
+> -	if (count > (priv->nregs - index))
+> -		count = priv->nregs - index;
+> +	if (count > (priv->params->nregs - index))
+> +		count = priv->params->nregs - index;
+>  
+>  	mutex_lock(&ocotp_mutex);
+>  
+> @@ -308,12 +312,20 @@ static struct nvmem_config imx_ocotp_nvmem_config = {
+>  	.reg_write = imx_ocotp_write,
+>  };
+>  
+> +static const struct ocotp_params params[] = {
+> +	{ .nregs = 128 },
+> +	{ .nregs = 64 },
+> +	{ .nregs = 128 },
+> +	{ .nregs = 128 },
+> +	{ .nregs = 64 },
+> +};
 
-In the meantime, this patch adds this alternate memory zone only for
-the GXL and GXM SoCs since GXBB based new products stopped earlier.
+Could you either add an enum for the indices into this array or split
+the array into separate named structs?
 
-[1] http://lists.infradead.org/pipermail/linux-amlogic/2017-October/004860.html
+I find it already hard to see which parameter belongs to which
+compatible, and this will grow worse with increasing number of entries
+in the parameter set.
 
-Fixes: bba8e3f42736 ("ARM64: dts: meson-gx: Add firmware reserved memory zones")
-Reported-by: Jerome Brunet <jbrunet@baylibre.com>
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+For example,
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-index d8dd329..fb8d76a 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-@@ -49,6 +49,14 @@
- 
- / {
- 	compatible = "amlogic,meson-gxl";
-+
-+	reserved-memory {
-+		/* Alternate 3 MiB reserved for ARM Trusted Firmware (BL31) */
-+		secmon_reserved_alt: secmon at 05000000 {
-+			reg = <0x0 0x05000000 0x0 0x300000>;
-+			no-map;
-+		};
-+	};
- };
- 
- &ethmac {
--- 
-2.7.4
+static const struct ocotp_params imx6q_params = {
+	.nregs = 128,
+};
+
+static const struct ocotp_params imx6sl_params = {
+	.nregs = 64,
+};
+
+...
+
+>  static const struct of_device_id imx_ocotp_dt_ids[] = {
+> -	{ .compatible = "fsl,imx6q-ocotp",  (void *)128 },
+> -	{ .compatible = "fsl,imx6sl-ocotp", (void *)64 },
+> -	{ .compatible = "fsl,imx6sx-ocotp", (void *)128 },
+> -	{ .compatible = "fsl,imx6ul-ocotp", (void *)128 },
+> -	{ .compatible = "fsl,imx7d-ocotp", (void *)64 },
+> +	{ .compatible = "fsl,imx6q-ocotp",  .data = &params[0] },
+> +	{ .compatible = "fsl,imx6sl-ocotp", .data = &params[1] },
+> +	{ .compatible = "fsl,imx6sx-ocotp", .data = &params[2] },
+> +	{ .compatible = "fsl,imx6ul-ocotp", .data = &params[3] },
+> +	{ .compatible = "fsl,imx7d-ocotp",  .data = &params[4] },
+
+	{ .compatible = "fsl,imx6q-ocotp",  .data = &imx6q_params },
+	{ .compatible = "fsl,imx6sl-ocotp",  .data = &imx6sl_params },
+...
+
+Apart from that,
+
+Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
+
+>  	{ },
+>  };
+>  MODULE_DEVICE_TABLE(of, imx_ocotp_dt_ids);
+> @@ -342,8 +354,8 @@ static int imx_ocotp_probe(struct platform_device *pdev)
+>  		return PTR_ERR(priv->clk);
+>  
+>  	of_id = of_match_device(imx_ocotp_dt_ids, dev);
+> -	priv->nregs = (unsigned long)of_id->data;
+> -	imx_ocotp_nvmem_config.size = 4 * priv->nregs;
+> +	priv->params = of_device_get_match_data(&pdev->dev);
+> +	imx_ocotp_nvmem_config.size = 4 * priv->params->nregs;
+>  	imx_ocotp_nvmem_config.dev = dev;
+>  	imx_ocotp_nvmem_config.priv = priv;
+>  	priv->config = &imx_ocotp_nvmem_config;
+
+regards
+Philipp
