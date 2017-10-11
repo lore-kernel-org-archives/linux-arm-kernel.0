@@ -1,57 +1,80 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Wed, 11 Oct 2017 17:44:54 +1030
-Subject: [PATCH 11/11] ARM: dts: Add PCLK to the Aspeed watchdogs
-In-Reply-To: <CACRpkdYQ8WE_-nVza=GnNBvfXV=WpcEipoJhVVn=atcqyQZbpw@mail.gmail.com>
-References: <20170812184318.10144-1-linus.walleij@linaro.org>
- <20170812184318.10144-12-linus.walleij@linaro.org>
- <1507693686.5452.174.camel@aj.id.au>
- <CACRpkdYQ8WE_-nVza=GnNBvfXV=WpcEipoJhVVn=atcqyQZbpw@mail.gmail.com>
-Message-ID: <1507706094.5452.181.camel@aj.id.au>
+From: jacob-chen@iotwrt.com (Jacob Chen)
+Date: Wed, 11 Oct 2017 15:29:33 +0800
+Subject: [PATCH v12 0/5] Add Rockchip RGA V4l2 support
+Message-ID: <20171011072938.383-1-jacob-chen@iotwrt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-10-11 at 08:32 +0200, Linus Walleij wrote:
-> > On Wed, Oct 11, 2017 at 5:48 AM, Andrew Jeffery <andrew@aj.id.au> wrote:
-> > On Sat, 2017-08-12 at 20:43 +0200, Linus Walleij wrote:
-> > > This adds the PCLK clock to the Aspeed watchdog blocks.
-> > > I am not directly familiar with the Aspeed clocking, but
-> > > since the IP is derived from Faraday FTWDT010 it probably
-> > > has the ability to run the watchdog on the PCLK if
-> > > desired
-> > 
-> > This is true for the AST2400, but not the AST2500 where the only option
-> > is EXTCLK (1MHz).
-> 
-> The IP block/cell certainly has a PCLK even if it cannot be used
-> to drive the watchdog timer. It is necessary to interface the
-> SoC interconnect.
+change in V12:
+- adding an entry to MAINTAINERS 
+- fix checkpatch
 
-Hah, yep, brain-fade.
+change in V11:
+- fix compile warning
 
-Cheers,
+change in V10:
+- move to rockchip/rga
+- changes according to comments
+- some style changes
 
-Andrew
+change in V9:
+- remove protduff things
+- test with the latest v4l2-compliance
 
-> 
-> > > > +???????????????????????????clocks = <&clk_apb>;
-> > > 
-> > > +?????????????????????????????clock-names = "PCLK";
-> > 
-> > Given the comment above, shouldn't we be doing something like the
-> > following instead for each of the watchdogs?
-> > 
-> > +???????????????????????????????faraday,use-extclk;
-> > +???????????????????????????????clock-names = "EXTCLK";
-> 
-> So that will be added too, later, when there is a 1MHz clock
-> to reference in the device tree. I guess after Joel's patches.
-> 
-> Yours,
-> Linus Walleij
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171011/d867a068/attachment-0001.sig>
+change in V8:
+- remove protduff things
+
+change in V6,V7:
+- correct warning in checkpatch.pl
+
+change in V5:
+- v4l2-compliance: handle invalid pxielformat
+- v4l2-compliance: add subscribe_event
+- add colorspace support
+
+change in V4:
+- document the controls.
+- change according to Hans's comments
+
+change in V3:
+- rename the controls.
+- add pm_runtime support.
+- enable node by default.
+- correct spelling in documents.
+
+change in V2:
+- generalize the controls.
+- map buffers (10-50 us) in every cmd-run rather than in buffer-import to avoid get_free_pages failed on
+actively used systems.
+- remove status in dt-bindings examples.
+
+Jacob Chen (5):
+  dt-bindings: Document the Rockchip RGA bindings
+  rockchip/rga: v4l2 m2m support
+  MAINTAINERS: add entry for Rockchip RGA driver
+  ARM: dts: rockchip: add RGA device node for RK3288
+  arm64: dts: rockchip: add RGA device node for RK3399
+
+ .../devicetree/bindings/media/rockchip-rga.txt     |   33 +
+ MAINTAINERS                                        |    7 +
+ arch/arm/boot/dts/rk3288.dtsi                      |   11 +
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi           |   11 +
+ drivers/media/platform/Kconfig                     |   15 +
+ drivers/media/platform/Makefile                    |    2 +
+ drivers/media/platform/rockchip/rga/Makefile       |    3 +
+ drivers/media/platform/rockchip/rga/rga-buf.c      |  154 +++
+ drivers/media/platform/rockchip/rga/rga-hw.c       |  421 ++++++++
+ drivers/media/platform/rockchip/rga/rga-hw.h       |  437 +++++++++
+ drivers/media/platform/rockchip/rga/rga.c          | 1012 ++++++++++++++++++++
+ drivers/media/platform/rockchip/rga/rga.h          |  125 +++
+ 12 files changed, 2231 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/rockchip-rga.txt
+ create mode 100644 drivers/media/platform/rockchip/rga/Makefile
+ create mode 100644 drivers/media/platform/rockchip/rga/rga-buf.c
+ create mode 100644 drivers/media/platform/rockchip/rga/rga-hw.c
+ create mode 100644 drivers/media/platform/rockchip/rga/rga-hw.h
+ create mode 100644 drivers/media/platform/rockchip/rga/rga.c
+ create mode 100644 drivers/media/platform/rockchip/rga/rga.h
+
+-- 
+2.14.1
