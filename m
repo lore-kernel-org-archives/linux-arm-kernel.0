@@ -1,41 +1,57 @@
-From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Wed, 11 Oct 2017 08:57:24 +0200
-Subject: [RESEND PATCH] clk: stm32h7: fix test of clock config
-Message-ID: <1507705044-30458-1-git-send-email-gabriel.fernandez@st.com>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Wed, 11 Oct 2017 17:44:54 +1030
+Subject: [PATCH 11/11] ARM: dts: Add PCLK to the Aspeed watchdogs
+In-Reply-To: <CACRpkdYQ8WE_-nVza=GnNBvfXV=WpcEipoJhVVn=atcqyQZbpw@mail.gmail.com>
+References: <20170812184318.10144-1-linus.walleij@linaro.org>
+ <20170812184318.10144-12-linus.walleij@linaro.org>
+ <1507693686.5452.174.camel@aj.id.au>
+ <CACRpkdYQ8WE_-nVza=GnNBvfXV=WpcEipoJhVVn=atcqyQZbpw@mail.gmail.com>
+Message-ID: <1507706094.5452.181.camel@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gabriel Fernandez <gabriel.fernandez@st.com>
+On Wed, 2017-10-11 at 08:32 +0200, Linus Walleij wrote:
+> > On Wed, Oct 11, 2017 at 5:48 AM, Andrew Jeffery <andrew@aj.id.au> wrote:
+> > On Sat, 2017-08-12 at 20:43 +0200, Linus Walleij wrote:
+> > > This adds the PCLK clock to the Aspeed watchdog blocks.
+> > > I am not directly familiar with the Aspeed clocking, but
+> > > since the IP is derived from Faraday FTWDT010 it probably
+> > > has the ability to run the watchdog on the PCLK if
+> > > desired
+> > 
+> > This is true for the AST2400, but not the AST2500 where the only option
+> > is EXTCLK (1MHz).
+> 
+> The IP block/cell certainly has a PCLK even if it cannot be used
+> to drive the watchdog timer. It is necessary to interface the
+> SoC interconnect.
 
-fix test of composite clock config (bad copy / past)
+Hah, yep, brain-fade.
 
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
-Fixes: 3e4d618b0722 ("clk: stm32h7: Add stm32h743 clock driver")
----
- drivers/clk/clk-stm32h7.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Cheers,
 
-diff --git a/drivers/clk/clk-stm32h7.c b/drivers/clk/clk-stm32h7.c
-index a94c3f5..61c3e40 100644
---- a/drivers/clk/clk-stm32h7.c
-+++ b/drivers/clk/clk-stm32h7.c
-@@ -384,7 +384,7 @@ static void get_cfg_composite_div(const struct composite_clk_gcfg *gcfg,
- 	mux_ops = div_ops = gate_ops = NULL;
- 	mux_hw = div_hw = gate_hw = NULL;
- 
--	if (gcfg->mux && gcfg->mux) {
-+	if (gcfg->mux && cfg->mux) {
- 		mux = _get_cmux(base + cfg->mux->offset,
- 				cfg->mux->shift,
- 				cfg->mux->width,
-@@ -410,7 +410,7 @@ static void get_cfg_composite_div(const struct composite_clk_gcfg *gcfg,
- 		}
- 	}
- 
--	if (gcfg->gate && gcfg->gate) {
-+	if (gcfg->gate && cfg->gate) {
- 		gate = _get_cgate(base + cfg->gate->offset,
- 				cfg->gate->bit_idx,
- 				gcfg->gate->flags, lock);
--- 
-1.9.1
+Andrew
+
+> 
+> > > > +???????????????????????????clocks = <&clk_apb>;
+> > > 
+> > > +?????????????????????????????clock-names = "PCLK";
+> > 
+> > Given the comment above, shouldn't we be doing something like the
+> > following instead for each of the watchdogs?
+> > 
+> > +???????????????????????????????faraday,use-extclk;
+> > +???????????????????????????????clock-names = "EXTCLK";
+> 
+> So that will be added too, later, when there is a 1MHz clock
+> to reference in the device tree. I guess after Joel's patches.
+> 
+> Yours,
+> Linus Walleij
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171011/d867a068/attachment-0001.sig>
