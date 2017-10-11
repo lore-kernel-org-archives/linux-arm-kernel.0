@@ -1,37 +1,68 @@
 From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 10 Oct 2017 22:08:52 -0700
-Subject: [PATCH v4 0/5] Qualcomm remote filesystem shared memory driver
-Message-ID: <20171011050857.7588-1-bjorn.andersson@linaro.org>
+Date: Tue, 10 Oct 2017 22:08:53 -0700
+Subject: [PATCH v4 1/5] of/platform: Generalize /reserved-memory handling
+In-Reply-To: <20171011050857.7588-1-bjorn.andersson@linaro.org>
+References: <20171011050857.7588-1-bjorn.andersson@linaro.org>
+Message-ID: <20171011050857.7588-2-bjorn.andersson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some remote processors (in particular the modem) found in Qualcomm platforms
-stores configuration parameters and other data in a file system. As the remotes
-does not have direct storage access it needs to relay block accesses through a
-service running on the application CPU.
+By iterating over all /reserved-memory child nodes and match each one to
+a list of compatibles that we want to treat specially, we can easily
+extend the list of compatibles to handle - without having to resort to
+of_platform_populate() that would create unnecessary platform_devices.
 
-The memory is described in DeviceTree by a new reserved-memory compatible and
-the implementation provides the user space service a read/write interface to
-this chunk of memory.
+Reviewed-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+---
 
-Bjorn Andersson (5):
-  of/platform: Generalize /reserved-memory handling
-  of: reserved_mem: Accessor for acquiring reserved_mem
-  dt-binding: soc: qcom: Add binding for rmtfs memory
-  soc: qcom: Remote filesystem memory driver
-  arm64: dts: msm8916: Mark rmtfs node as qcom,rmtfs-mem compatible
+Changes since v3:
+- Picked up Rob's R-b
 
- .../bindings/reserved-memory/qcom,rmtfs-mem.txt    |  51 ++++
- arch/arm64/boot/dts/qcom/msm8916.dtsi              |   3 +
- drivers/of/of_reserved_mem.c                       |  26 ++
- drivers/of/platform.c                              |  19 +-
- drivers/soc/qcom/Kconfig                           |  11 +
- drivers/soc/qcom/Makefile                          |   1 +
- drivers/soc/qcom/rmtfs_mem.c                       | 271 +++++++++++++++++++++
- include/linux/of_reserved_mem.h                    |   5 +
- 8 files changed, 379 insertions(+), 8 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/reserved-memory/qcom,rmtfs-mem.txt
- create mode 100644 drivers/soc/qcom/rmtfs_mem.c
+Changes since v2:
+- Simplify logic per Rob's suggestion.
 
+Changes since v1:
+- New patch
+ drivers/of/platform.c | 18 ++++++++++--------
+ 1 file changed, 10 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index b19524623498..ee89f096f0f3 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -497,6 +497,11 @@ int of_platform_default_populate(struct device_node *root,
+ EXPORT_SYMBOL_GPL(of_platform_default_populate);
+ 
+ #ifndef CONFIG_PPC
++static const struct of_device_id reserved_mem_matches[] = {
++	{ .compatible = "ramoops" },
++	{}
++};
++
+ static int __init of_platform_default_populate_init(void)
+ {
+ 	struct device_node *node;
+@@ -505,15 +510,12 @@ static int __init of_platform_default_populate_init(void)
+ 		return -ENODEV;
+ 
+ 	/*
+-	 * Handle ramoops explicitly, since it is inside /reserved-memory,
+-	 * which lacks a "compatible" property.
++	 * Handle certain compatibles explicitly, since we don't want to create
++	 * platform_devices for every node in /reserved-memory with a
++	 * "compatible",
+ 	 */
+-	node = of_find_node_by_path("/reserved-memory");
+-	if (node) {
+-		node = of_find_compatible_node(node, NULL, "ramoops");
+-		if (node)
+-			of_platform_device_create(node, NULL, NULL);
+-	}
++	for_each_matching_node(node, reserved_mem_matches)
++		of_platform_device_create(node, NULL, NULL);
+ 
+ 	/* Populate everything else. */
+ 	of_platform_default_populate(NULL, NULL, NULL);
 -- 
 2.12.0
