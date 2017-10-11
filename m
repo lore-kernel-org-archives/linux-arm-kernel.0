@@ -1,49 +1,159 @@
 From: itaru.kitayama@riken.jp (Itaru Kitayama)
-Date: Wed, 11 Oct 2017 08:13:59 +0900
-Subject: defconfig'ed v4.13 does not boot on ThunderX
-In-Reply-To: <20171004134414.GF23092@leverpostej>
-References: <135495b6-e13e-5c90-6130-addb60d0fa5c@riken.jp>
- <dfecaf11-d133-91c2-c630-0b08356cebd9@arm.com>
- <20171004134414.GF23092@leverpostej>
-Message-ID: <c59970ab-b3e4-8ff1-3de8-ce13613acdde@riken.jp>
+Date: Wed, 11 Oct 2017 10:03:33 +0900
+Subject: kernel BUG at drivers/net/phy/mdio_bus.c:451!
+In-Reply-To: <9bb49cd2-cc4e-8aac-aba3-30048276b726@riken.jp>
+References: <9bb49cd2-cc4e-8aac-aba3-30048276b726@riken.jp>
+Message-ID: <e3065292-7b36-afff-a7c3-41514b070bd7@riken.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rebuilding v4.13 kernel using the config-4.5.0-25.el7.aarch64 gets me to 
-the prompt
-at least.
+This doesn't happen if operated on the kernel booted with ACPI enabled.
 
-I'll be happy to test the updated defconfig once ThunderX changes 
-accepted upstream.
-
-On 10/4/17 10:44 PM, Mark Rutland wrote:
-> On Wed, Oct 04, 2017 at 02:38:58PM +0100, Robin Murphy wrote:
->> On 04/10/17 08:25, Itaru Kitayama wrote:
->>> Hi,
->>>
->>> defconfig'ed kernel v4.13 does not boot on ThunderX, leaving only
->>> messages below:
->>>
->>> EFI stub: Booting Linux Kernel...
->>> EFI stub: Using DTB from configuration table
->>> EFI stub: Exiting boot services and installing virtual address map...
->>>
->>> Our HW is by GIGABYTE, the model is R150 T62 rev 100:
->>>
->>> http://b2b.gigabyte.com/ARM-Server/R150-T62-rev-100#ov
->>>
->>> The BIOS we're on is T43. Has anyone testing upstream kernels seen a
->>> similar issue like this?
->> FWIW defconfig does *not* enable most of the ThunderX drivers (most
->> importantly, PCI and networking will be missing).
-> .... it's a bit worrying if earlycon doesn't work without those, though.
-> It shouldn't be dependendent on either. :/
+On 10/11/17 7:40 AM, Itaru Kitayama wrote:
+> Hi,
+> Upon invocation of modprobe -r mdio_thunder on our ThunderX platform 
+> (v4.13 backed),
+> I observed a kernel BUG.
 >
->> I've just built the v4.13 tag with the appropriate drivers added and
->> booted it on a different ThunderX box - the net core throws some
->> warnings from __dev_xdp_attached() but it gets to userspace OK for me.
-> Given these seem to exist out in the field, we should probably enable
-> those drivers in defconfig.
->
-> Thanks,
-> Mark.
+> # modprobe -r mdio_thunder
+> [31764.217839] ------------[ cut here ]------------
+> [31764.226645] kernel BUG at drivers/net/phy/mdio_bus.c:451!
+> [31764.236205] Internal error: Oops - BUG: 0 [#1] SMP
+> [31764.245120] Modules linked in: nicpf thunder_bgx thunder_xcv 
+> xt_CHECKSUM iptable_mangle ipt_MASQUERADE nf_nat_masquerade_ipv4 
+> iptable_nat nf_nat_ipv4 nf_nat nf_conntrack_ipv4 nf_defrag_ipv4 
+> xt_conntrack nf_conntrack ipt_REJECT nf_reject_ipv4 tun bridge stp llc 
+> ebtable_filter ebtables ip6table_filter ip6_tables iptable_filter vfat 
+> fat nicvf mdio_thunder(-) mdio_cavium sg ipmi_ssif aes_ce_blk 
+> crypto_simd cryptd ipmi_msghandler aes_ce_cipher ghash_ce 
+> uio_pdrv_genirq sha2_ce sha1_ce uio nfsd ip_tables xfs libcrc32c ast 
+> i2c_algo_bit drm_kms_helper syscopyarea sysfillrect sysimgblt 
+> fb_sys_fops ttm drm i2c_core dm_mirror dm_region_hash dm_log dm_mod 
+> dax [last unloaded: thunder_xcv]
+> [31764.323084] CPU: 52 PID: 6959 Comm: modprobe Tainted: G W 
+> 4.13.0-dev #3
+> [31764.335511] Hardware name: GIGABYTE R150-T62-00/MT60-SC3-00, BIOS 
+> T43 05/18/2017
+> [31764.347587] task: ffffff07f029ff80 task.stack: ffffff07d9154000
+> [31764.358177] PC is at mdiobus_free+0x54/0x58
+> [31764.366993] LR is at _devm_mdiobus_free+0x20/0x28
+> [31764.376291] pc : [<fffffc00085cc618>] lr : [<fffffc00085cc63c>] 
+> pstate: 20000145
+> [31764.388308] sp : ffffff07d9157c80
+> [31764.396183] x29: ffffff07d9157c80 x28: 0000000000000000
+> [31764.406036] x27: fffffc0008552664 x26: ffffff07f91a5330
+> [31764.415860] x25: fffffc000855267c x24: 0000000000000005
+> [31764.425633] x23: ffffff07f91a50a0 x22: ffffff07d9157d30
+> [31764.435364] x21: ffffff07f91a5330 x20: ffffff0016989900
+> [31764.445070] x19: ffffff07f4f30800 x18: 000003ffde5b6bb0
+> [31764.454745] x17: 0000000000000000 x16: ffffff07f029ff80
+> [31764.464380] x15: 0000000000005788 x14: 0000000000000000
+> [31764.473960] x13: 0000000000000040 x12: 0000000000000220
+> [31764.483515] x11: 0000000000000000 x10: 0000000000000000
+> [31764.493013] x9 : ffffff07d901e000 x8 : ffffff000141fc00
+> [31764.502485] x7 : fffffdffc005a600 x6 : 000000000000240e
+> [31764.511911] x5 : ffffff0016989900 x4 : ffffff0016989900
+> [31764.521287] x3 : ffffff07d9157d30 x2 : fffffc00085cc61c
+> [31764.530627] x1 : ffffff0016989d18 x0 : 0000000000000004
+> [31764.539917] Process modprobe (pid: 6959, stack limit = 
+> 0xffffff07d9154000)
+> [31764.550777] Stack: (0xffffff07d9157c80 to 0xffffff07d9158000)
+> [31764.560501] 7c80: ffffff07d9157ca0 fffffc00085cc63c 
+> ffffff0016989d00 fffffc0008553770
+> [31764.572335] 7ca0: ffffff07d9157cc0 fffffc000855379c 
+> ffffff07d9157cc0 ffffff0016989d18
+> [31764.584118] 7cc0: ffffff07d9157d40 fffffc00085539c0 
+> ffffff07f91a50a0 ffffff07f91a5100
+> [31764.595866] 7ce0: ffffff07f915d0a0 fffffc00039b0068 
+> ffffff07f915d100 0000000000000015
+> [31764.607576] 7d00: 0000000000000124 000000000000006a 
+> fffffc0008841000 ffffff07f029ff80
+> [31764.619267] 7d20: ffffff0016989900 0000000000000140 
+> ffffff0016987700 ffffff0016989d00
+> [31764.630937] 7d40: ffffff07d9157d60 fffffc000854ed3c 
+> ffffff07f91a50a0 ffffff07f91a5100
+> [31764.642575] 7d60: ffffff07d9157da0 fffffc000854ee28 
+> ffffff07f91a50a0 fffffc00039b0068
+> [31764.654154] 7d80: fffffc0008e3ab28 fffffc00039b0000 
+> 0000000080000000 dead000000000100
+> [31764.665725] 7da0: ffffff07d9157dc0 fffffc000854da58 
+> fffffc00039b0068 fffffc0008e3a000
+> [31764.677270] 7dc0: ffffff07d9157df0 fffffc000854f7f8 
+> fffffc00039b0068 fffffc000946a000
+> [31764.688747] 7de0: fffffc0008d9f000 000003ff9ab4b9f8 
+> ffffff07d9157e10 fffffc000846539c
+> [31764.700210] 7e00: fffffc00039b0100 fffffc000946a000 
+> ffffff07d9157e40 fffffc0003990350
+> [31764.711635] 7e20: fffffc00039b0100 fffffc000946a000 
+> fffffc0008d9f000 000003ff9ab4b9f8
+> [31764.723010] 7e40: ffffff07d9157e50 fffffc000814d668 
+> 0000000000000000 fffffc000808344c
+> [31764.734375] 7e60: 0000000000000200 00000307f19f0000 
+> ffffffffffffffff 0000000000418710
+> [31764.745733] 7e80: 0000000000000800 7568745f6f69646d 
+> 000000007265646e fffffc000808341c
+> [31764.757066] 7ea0: 0000000000000200 00000307f19f0000 
+> ffffffffffffffff 000003ff9ab3d738
+> [31764.768394] 7ec0: 0000000020e604d8 0000000000000800 
+> 0000000000418710 0000000000002002
+> [31764.779697] 7ee0: 000003ff9abf0e48 000003ffde5b5db9 
+> 000003ff9aab9c78 000000000000001f
+> [31764.790964] 7f00: 000000000000006a 607c4a80bc7d3400 
+> 00000000ffffffff 0000000000000000
+> [31764.802220] 7f20: 0000000000000005 ffffffffffffffff 
+> 0000000020e61699 0000000000005788
+> [31764.813441] 7f40: 000003ff9ab4b9f0 0000000000440320 
+> 000003ffde5b6bb0 0000000020e60470
+> [31764.824712] 7f60: 0000000020e604d8 0000000000000001 
+> 0000000000000000 0000000020e604d8
+> [31764.836016] 7f80: 0000000020e60470 0000000020e60010 
+> 0000000000440000 000003ffde5b8278
+> [31764.847281] 7fa0: 0000000000000000 000003ffde5b6de0 
+> 00000000004114f4 000003ffde5b6de0
+> [31764.858528] 7fc0: 000003ff9ab4b9f8 0000000080000000 
+> 0000000020e604d8 000000000000006a
+> [31764.869774] 7fe0: 0000000000000000 0000000000000000 
+> 0000000000000000 0000000000000000
+> [31764.880873] Call trace:
+> [31764.886418] Exception stack(0xffffff07d9157ab0 to 0xffffff07d9157be0)
+> [31764.895881] 7aa0: ffffff07f4f30800 0000040000000000
+> [31764.906635] 7ac0: ffffff07d9157c80 fffffc00085cc618 
+> ffffff07d9157bd0 fffffc00082512c8
+> [31764.917303] 7ae0: ffffff0016989a00 ffffff0016989a00 
+> fffffc0008547cec fffffc0008afdf40
+> [31764.927936] 7b00: ffffff000141f600 fffffc0009560ce0 
+> ffffff07d9157c10 fffffc00082512c8
+> [31764.938533] 7b20: ffffff000141fa80 ffffff07f4f30800 
+> ffffff000141fc00 fffffc00082512c8
+> [31764.949100] 7b40: ffffff07d9157c40 fffffc00082512c8 
+> 0000000000000004 ffffff0016989d18
+> [31764.959680] 7b60: fffffc00085cc61c ffffff07d9157d30 
+> ffffff0016989900 ffffff0016989900
+> [31764.970233] 7b80: 000000000000240e fffffdffc005a600 
+> ffffff000141fc00 ffffff07d901e000
+> [31764.980763] 7ba0: 0000000000000000 0000000000000000 
+> 0000000000000220 0000000000000040
+> [31764.991315] 7bc0: 0000000000000000 0000000000005788 
+> ffffff07f029ff80 0000000000000000
+> [31765.001861] [<fffffc00085cc618>] mdiobus_free+0x54/0x58
+> [31765.009824] [<fffffc00085cc63c>] _devm_mdiobus_free+0x20/0x28
+> [31765.018321] [<fffffc000855379c>] release_nodes+0x188/0x298
+> [31765.026567] [<fffffc00085539c0>] devres_release_all+0x3c/0x54
+> [31765.035081] [<fffffc000854ed3c>] 
+> device_release_driver_internal+0x164/0x1cc
+> [31765.044830] [<fffffc000854ee28>] driver_detach+0x50/0x94
+> [31765.052932] [<fffffc000854da58>] bus_remove_driver+0x74/0xe8
+> [31765.061410] [<fffffc000854f7f8>] driver_unregister+0x34/0x54
+> [31765.069911] [<fffffc000846539c>] pci_unregister_driver+0x24/0xbc
+> [31765.078771] [<fffffc0003990350>] 
+> thunder_mdiobus_driver_exit+0x10/0xfcc0 [mdio_thunder]
+> [31765.089693] [<fffffc000814d668>] SyS_delete_module+0x1b0/0x20c
+> [31765.098446] [<fffffc000808344c>] __sys_trace_return+0x0/0x4
+> [31765.106949] Code: d65f03c0 aa1303e0 97f212d3 17fffffb (d4210000)
+> [31765.116043] ---[ end trace 3849ffa22d300da4 ]---
+> [31765.123597] Kernel panic - not syncing: Fatal exception
+> [31765.131764] SMP: stopping secondary CPUs
+> [31765.138610] Kernel Offset: disabled
+> [31765.144972] CPU features: 0x101108
+> [31765.151246] Memory Limit: none
+> [31765.157173] ---[ end Kernel panic - not syncing: Fatal exception
