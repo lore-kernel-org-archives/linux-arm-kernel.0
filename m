@@ -1,137 +1,110 @@
-From: guochun.mao@mediatek.com (Guochun Mao)
-Date: Wed, 11 Oct 2017 11:16:19 +0800
-Subject: [PATCH v1 2/2] mtd: mtk-nor: add suspend/resume support
-In-Reply-To: <1505997906-30921-3-git-send-email-guochun.mao@mediatek.com>
-References: <1505997906-30921-1-git-send-email-guochun.mao@mediatek.com>
- <1505997906-30921-3-git-send-email-guochun.mao@mediatek.com>
-Message-ID: <1507691779.14979.3.camel@mhfsdcap03>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Wed, 11 Oct 2017 14:18:06 +1030
+Subject: [PATCH 11/11] ARM: dts: Add PCLK to the Aspeed watchdogs
+In-Reply-To: <20170812184318.10144-12-linus.walleij@linaro.org>
+References: <20170812184318.10144-1-linus.walleij@linaro.org>
+ <20170812184318.10144-12-linus.walleij@linaro.org>
+Message-ID: <1507693686.5452.174.camel@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gentle ping...
+On Sat, 2017-08-12 at 20:43 +0200, Linus Walleij wrote:
+> This adds the PCLK clock to the Aspeed watchdog blocks.
+> I am not directly familiar with the Aspeed clocking, but
+> since the IP is derived from Faraday FTWDT010 it probably
+> has the ability to run the watchdog on the PCLK if
+> desired
 
-On Thu, 2017-09-21 at 20:45 +0800, Guochun Mao wrote:
-> Abstract functions of clock setting, to avoid duplicated code,
-> these functions been used in new feature.
-> Implement suspend/resume functions.
+This is true for the AST2400, but not the AST2500 where the only option
+is EXTCLK (1MHz).
+
+>  so to obtain the frequency from it, it needs to
+> be present in the device tree, and for completeness the
+> PCLK should also be referenced and enabled anyways.
 > 
-> Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
+> Take this opportunity to add the "faraday,ftwdt010"
+> compatible as fallback to the watchdog IP blocks.
+> 
+> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  drivers/mtd/spi-nor/mtk-quadspi.c |   70 ++++++++++++++++++++++++++++++-------
->  1 file changed, 58 insertions(+), 12 deletions(-)
+> ?arch/arm/boot/dts/aspeed-g4.dtsi |??7 +++++--
+> ?arch/arm/boot/dts/aspeed-g5.dtsi | 12 +++++++++---
+> ?2 files changed, 14 insertions(+), 5 deletions(-)
 > 
-> diff --git a/drivers/mtd/spi-nor/mtk-quadspi.c b/drivers/mtd/spi-nor/mtk-quadspi.c
-> index c258c7a..abe455c 100644
-> --- a/drivers/mtd/spi-nor/mtk-quadspi.c
-> +++ b/drivers/mtd/spi-nor/mtk-quadspi.c
-> @@ -404,6 +404,29 @@ static int mt8173_nor_write_reg(struct spi_nor *nor, u8 opcode, u8 *buf,
->  	return ret;
->  }
->  
-> +static void mt8173_nor_disable_clk(struct mt8173_nor *mt8173_nor)
-> +{
-> +	clk_disable_unprepare(mt8173_nor->spi_clk);
-> +	clk_disable_unprepare(mt8173_nor->nor_clk);
-> +}
-> +
-> +static int mt8173_nor_enable_clk(struct mt8173_nor *mt8173_nor)
-> +{
-> +	int ret;
-> +
-> +	ret = clk_prepare_enable(mt8173_nor->spi_clk);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = clk_prepare_enable(mt8173_nor->nor_clk);
-> +	if (ret) {
-> +		clk_disable_unprepare(mt8173_nor->spi_clk);
-> +		return ret;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->  static int mtk_nor_init(struct mt8173_nor *mt8173_nor,
->  			struct device_node *flash_node)
->  {
-> @@ -468,15 +491,11 @@ static int mtk_nor_drv_probe(struct platform_device *pdev)
->  		return PTR_ERR(mt8173_nor->nor_clk);
->  
->  	mt8173_nor->dev = &pdev->dev;
-> -	ret = clk_prepare_enable(mt8173_nor->spi_clk);
-> +
-> +	ret = mt8173_nor_enable_clk(mt8173_nor);
->  	if (ret)
->  		return ret;
->  
-> -	ret = clk_prepare_enable(mt8173_nor->nor_clk);
-> -	if (ret) {
-> -		clk_disable_unprepare(mt8173_nor->spi_clk);
-> -		return ret;
-> -	}
->  	/* only support one attached flash */
->  	flash_np = of_get_next_available_child(pdev->dev.of_node, NULL);
->  	if (!flash_np) {
-> @@ -487,10 +506,9 @@ static int mtk_nor_drv_probe(struct platform_device *pdev)
->  	ret = mtk_nor_init(mt8173_nor, flash_np);
->  
->  nor_free:
-> -	if (ret) {
-> -		clk_disable_unprepare(mt8173_nor->spi_clk);
-> -		clk_disable_unprepare(mt8173_nor->nor_clk);
-> -	}
-> +	if (ret)
-> +		mt8173_nor_disable_clk(mt8173_nor);
-> +
->  	return ret;
->  }
->  
-> @@ -498,11 +516,38 @@ static int mtk_nor_drv_remove(struct platform_device *pdev)
->  {
->  	struct mt8173_nor *mt8173_nor = platform_get_drvdata(pdev);
->  
-> -	clk_disable_unprepare(mt8173_nor->spi_clk);
-> -	clk_disable_unprepare(mt8173_nor->nor_clk);
-> +	mt8173_nor_disable_clk(mt8173_nor);
-> +
-> +	return 0;
-> +}
-> +
-> +#ifdef CONFIG_PM_SLEEP
-> +static int mtk_nor_suspend(struct device *dev)
-> +{
-> +	struct mt8173_nor *mt8173_nor = dev_get_drvdata(dev);
-> +
-> +	mt8173_nor_disable_clk(mt8173_nor);
-> +
->  	return 0;
->  }
->  
-> +static int mtk_nor_resume(struct device *dev)
-> +{
-> +	struct mt8173_nor *mt8173_nor = dev_get_drvdata(dev);
-> +
-> +	return mt8173_nor_enable_clk(mt8173_nor);
-> +}
-> +
-> +static const struct dev_pm_ops mtk_nor_dev_pm_ops = {
-> +	.suspend = mtk_nor_suspend,
-> +	.resume = mtk_nor_resume,
-> +};
-> +
-> +#define MTK_NOR_DEV_PM_OPS	(&mtk_nor_dev_pm_ops)
-> +#else
-> +#define MTK_NOR_DEV_PM_OPS	NULL
-> +#endif
-> +
->  static const struct of_device_id mtk_nor_of_ids[] = {
->  	{ .compatible = "mediatek,mt8173-nor"},
->  	{ /* sentinel */ }
-> @@ -514,6 +559,7 @@ static int mtk_nor_drv_remove(struct platform_device *pdev)
->  	.remove = mtk_nor_drv_remove,
->  	.driver = {
->  		.name = "mtk-nor",
-> +		.pm = MTK_NOR_DEV_PM_OPS,
->  		.of_match_table = mtk_nor_of_ids,
->  	},
->  };
+> diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
+> index 8a04c7e2d818..23b100383c15 100644
+> --- a/arch/arm/boot/dts/aspeed-g4.dtsi
+> +++ b/arch/arm/boot/dts/aspeed-g4.dtsi
+> @@ -895,16 +895,19 @@
+> > ?			};
+> ?
+> > > ?			wdt1: wdt at 1e785000 {
+> > -				compatible = "aspeed,ast2400-wdt";
+> > +				compatible = "aspeed,ast2400-wdt", "faraday,ftwdt010";
+> > ?				reg = <0x1e785000 0x1c>;
+> > ?				interrupts = <27>;
+> > +				clocks = <&clk_apb>;
+> > +				clock-names = "PCLK";
+> > ?			};
+> ?
+> > > ?			wdt2: wdt at 1e785020 {
+> > -				compatible = "aspeed,ast2400-wdt";
+> > +				compatible = "aspeed,ast2400-wdt", "faraday,ftwdt010";
+> > ?				reg = <0x1e785020 0x1c>;
+> > ?				interrupts = <27>;
+> > ?				clocks = <&clk_apb>;
+> > +				clock-names = "PCLK";
+> > ?				status = "disabled";
+> > ?			};
+> ?
+> diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
+> index 9cffe347b828..2322d72cd8a9 100644
+> --- a/arch/arm/boot/dts/aspeed-g5.dtsi
+> +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+> @@ -1003,21 +1003,27 @@
+> ?
+> ?
+> > > ?			wdt1: wdt at 1e785000 {
+> > -				compatible = "aspeed,ast2500-wdt";
+> > +				compatible = "aspeed,ast2500-wdt", "faraday,ftwdt010";
+> > ?				reg = <0x1e785000 0x20>;
+> > ?				interrupts = <27>;
+> > +				clocks = <&clk_apb>;
+> +				clock-names = "PCLK";
+
+Given the comment above, shouldn't we be doing something like the
+following instead for each of the watchdogs?
+
++				faraday,use-extclk;
++				clock-names = "EXTCLK";
+
+Andrew
+
+> ?			};
+> ?
+> > > ?			wdt2: wdt at 1e785020 {
+> > -				compatible = "aspeed,ast2500-wdt";
+> > +				compatible = "aspeed,ast2500-wdt", "faraday,ftwdt010";
+> > ?				reg = <0x1e785020 0x20>;
+> > ?				interrupts = <27>;
+> > +				clocks = <&clk_apb>;
+> > +				clock-names = "PCLK";
+> > ?				status = "disabled";
+> > ?			};
+> ?
+> > > ?			wdt3: wdt at 1e785040 {
+> > -				compatible = "aspeed,ast2500-wdt";
+> > +				compatible = "aspeed,ast2500-wdt", "faraday,ftwdt010";
+> > ?				reg = <0x1e785040 0x20>;
+> > +				clocks = <&clk_apb>;
+> > +				clock-names = "PCLK";
+> > ?				status = "disabled";
+> > ?			};
+> ?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171011/7cd46879/attachment.sig>
