@@ -1,40 +1,85 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 11 Oct 2017 09:51:08 +0200
-Subject: [PATCH 0/2] [v5] pinctrl: qcom: add support for sparse GPIOs
-In-Reply-To: <20171003220311.GU457@codeaurora.org>
-References: <1504798409-32041-1-git-send-email-timur@codeaurora.org>
- <20170919070422.GI3349@codeaurora.org>
- <CACRpkdZcdLac_wYW+XqtZ=-APo8VmvYL4B1oL-wZyLy8KEs9AA@mail.gmail.com>
- <1ecdf6ee-5098-15d3-f85e-66b39a6c25f9@codeaurora.org>
- <CACRpkdaUV1Mjh7U9bBAgZA5Zq1oqN0HBT=VH5NkvPnY4gHxDVw@mail.gmail.com>
- <d53e67a2-4f69-752f-ba35-53872d9b9760@codeaurora.org>
- <CACRpkdYfAcKrgbgybccurUKTyR0E+tHDyzp7sbXxXxKuyMOGhQ@mail.gmail.com>
- <619f48d2-59c7-c090-4ace-9e8db9f92064@codeaurora.org>
- <CACRpkdZFunwQ=tiQqsapap7Ozz42hr=df5vqbC0S5xy5Wn+ZWw@mail.gmail.com>
- <255ad0dc-2d16-ae7f-0b45-500e23cff1a4@codeaurora.org>
- <20171003220311.GU457@codeaurora.org>
-Message-ID: <CACRpkdYXsY5eixYkEeuZTHJn7q6_6BdTxZ-2yneUyEKUjKF3Gw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 11 Oct 2017 10:00:56 +0200
+Subject: [PATCH v4 00/11] drm/sun4i: hdmi: Support HDMI controller on A31
+In-Reply-To: <20171010032008.682-1-wens@csie.org>
+References: <20171010032008.682-1-wens@csie.org>
+Message-ID: <20171011080056.i2eodfsujdhcvxpi@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 4, 2017 at 12:03 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+On Tue, Oct 10, 2017 at 03:19:57AM +0000, Chen-Yu Tsai wrote:
+> Hi everyone,
+> 
+> This is v4 of my A31 HDMI support series. The DTS patches depend on
+> the patch "clk: sunxi-ng: sun6i: Export video PLLs" alreay merged.
+> The DRM patches depend on "regmap: add iopoll-like polling macro for
+> regmap_field" already merged on a topic branch in the regmap repository.
+> 
+> Changes since v3:
+> 
+>     - Renamed sun4i_get_first_tcon() to sun4i_get_tcon0()
+> 
+>     - Made sun4i_get_tcon0() return NULL when it fails, and
+>       sun6i_tcon_set_mux() will error out if that happens.
+> 
+>     - Removed has_unknown_mux field in tcon_quirks structure,
+>       as its function is replaced by the per-soc muxing function
+>       pointer.
+> 
+>     - Dropped clk and regmap patches that were merged.
+> 
+> Changes since v2:
+> 
+>     - TCON muxing moved into functions for each platform, with pointers
+>       to them in the TCON quirks structure.
+> 
+>     - CCU "hdmi-ddc" clock renamed to "ddc".
+> 
+>     - Added Maxime's acks.
+> 
+> Changes since v1:
+> 
+>     - Core changes to sun4i-drm to support two display pipelines
+>       have been merged into drm-misc and thus dropped from this
+>       version
+> 
+>     - Reworked DDC variant support onto new exposed I2C interface bits.
+> 
+>     - Reworked DDC variant support to use regmap_fields.
+> 
+>     - Patches to add variant support to various (TMDS, DDC, HDMI
+>       controller) sub-blocks have been merged into one patch.
+> 
+> This series adds support for the HDMI controller found on Allwinner
+> A31/A31s SoCs. It builds upon Maxime's work that added support for
+> the HDMI controller on the Allwinner A10s SoC.
+> 
+> The HDMI controllers in the older generation Allwinner SoCs is very
+> similar. The A10/A10s/A20 all have the same hardware block, with the
+> A10 having slightly different initial configuration values. The A31's
+> variant splits out the DDC parent clock, has different formulas for
+> the DDC and TMDS clocks, and a different register layout for the DDC
+> block.
 
-> Could we remove the pin direction finding part here in
-> gpiochip_add_pin_range() and lazily resolve the pin direction
-> when a pin is requested? We would need a similar check in the msm
-> specific debugfs code where we skip pins that aren't requested.
-> This is basically a revert of commit 72d320006177 ("gpio: set up
-> initial state from .get_direction()").
+Applied everything, thanks!
 
-It seems reasonable for the gpiolib to be able to call this
-function immediately after registering the new GPIO chip
-with its vtable.
+> Also, it does not expose the CEC pins outside of the SoC, which is
+> unfortunate.
 
-I think it is more up to the driver to numb the reply with
-some dummy return value (i.e. input mode) or refactor the
-callback so that it is acceptable for gpiolib to get an -EINVAL
-or so from the driver (again it will assume input mode) if the
-driver can't return the direction at this time.
+Maybe we shouldn't register the CEC adapter in that case then? Can you
+send an additional patch for that?
 
-Yours,
-Linus Walleij
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171011/455d43d2/attachment-0001.sig>
