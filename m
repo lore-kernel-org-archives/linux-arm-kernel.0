@@ -1,178 +1,59 @@
-From: pure.logic@nexus-software.ie (Bryan O'Donoghue)
-Date: Wed, 11 Oct 2017 16:54:07 +0100
-Subject: [PATCH v3 3/7] nvmem: imx-ocotp: Add support for banked OTP
- addressing
-In-Reply-To: <1507735954.22082.9.camel@pengutronix.de>
-References: <1507558312-20580-1-git-send-email-pure.logic@nexus-software.ie>
- <1507558312-20580-4-git-send-email-pure.logic@nexus-software.ie>
- <1507735954.22082.9.camel@pengutronix.de>
-Message-ID: <4492bd4e-ce32-402c-c52a-a24682f07940@nexus-software.ie>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 11 Oct 2017 18:54:04 +0300
+Subject: [PATCH 5/7] ARM: dts: Add nodes for missing omap4 interconnect
+ target modules
+In-Reply-To: <20170929223411.9691-6-tony@atomide.com>
+References: <20170929223411.9691-1-tony@atomide.com>
+ <20170929223411.9691-6-tony@atomide.com>
+Message-ID: <f5c57f0b-1423-c362-0fda-4069b77a2e38@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/17 16:32, Philipp Zabel wrote:
-> On Mon, 2017-10-09 at 15:11 +0100, Bryan O'Donoghue wrote:
->> The i.MX7S/D takes the bank address in the CTRLn.ADDR field and the data
->> value in one of the DATAx {0, 1, 2, 3} register fields. The current write
->> routine is based on writing the CTRLn.ADDR field and writing a single DATA
->> register only.
->>
->> Fixes: 0642bac7da42 ("nvmem: imx-ocotp: add write support")
->>
->> Signed-off-by: Bryan O'Donoghue <pure.logic@nexus-software.ie>
->> ---
->>   drivers/nvmem/imx-ocotp.c | 70 +++++++++++++++++++++++++++++++++++++++++------
->>   1 file changed, 61 insertions(+), 9 deletions(-)
->>
->> diff --git a/drivers/nvmem/imx-ocotp.c b/drivers/nvmem/imx-ocotp.c
->> index 7798571..927d525 100644
->> --- a/drivers/nvmem/imx-ocotp.c
->> +++ b/drivers/nvmem/imx-ocotp.c
->> @@ -40,7 +40,10 @@
->>   #define IMX_OCOTP_ADDR_CTRL_SET		0x0004
->>   #define IMX_OCOTP_ADDR_CTRL_CLR		0x0008
->>   #define IMX_OCOTP_ADDR_TIMING		0x0010
->> -#define IMX_OCOTP_ADDR_DATA		0x0020
->> +#define IMX_OCOTP_ADDR_DATA0		0x0020
->> +#define IMX_OCOTP_ADDR_DATA1		0x0030
->> +#define IMX_OCOTP_ADDR_DATA2		0x0040
->> +#define IMX_OCOTP_ADDR_DATA3		0x0050
->>   
->>   #define IMX_OCOTP_BM_CTRL_ADDR		0x0000007F
->>   #define IMX_OCOTP_BM_CTRL_BUSY		0x00000100
->> @@ -55,6 +58,7 @@ static DEFINE_MUTEX(ocotp_mutex);
->>   
->>   struct ocotp_params {
->>   	unsigned int nregs;
->> +	unsigned int bank_address_words;
->>   };
->>   
->>   struct ocotp_priv {
->> @@ -176,6 +180,7 @@ static int imx_ocotp_write(void *context, unsigned int offset, void *val,
->>   	u32 timing = 0;
->>   	u32 ctrl;
->>   	u8 waddr;
->> +	u8 word = 0;
->>   
->>   	/* allow only writing one complete OTP word at a time */
->>   	if ((bytes != priv->config->word_size) ||
->> @@ -228,8 +233,22 @@ static int imx_ocotp_write(void *context, unsigned int offset, void *val,
->>   	 * description. Both the unlock code and address can be written in the
->>   	 * same operation.
->>   	 */
->> -	/* OTP write/read address specifies one of 128 word address locations */
->> -	waddr = offset / 4;
->> +	if (priv->params->bank_address_words != 0) {
->> +		/*
->> +		 * In banked mode the OTP register bank goes into waddr see
->> +		 * i.MX 7Solo Applications Processor Reference Manual, Rev. 0.1
->> +		 * 6.4.3.1
->> +		 */
->> +		offset = offset / priv->config->word_size;
->> +		waddr = offset / priv->params->bank_address_words;
->> +		word  = offset & (priv->params->bank_address_words - 1);
->> +	} else {
->> +		/*
->> +		 * OTP write/read address specifies one of 128 word address
->> +		 * locations
->> +		 */
->> +		waddr = offset / 4;
->> +	}
-> 
-> Smallest of nitpicks, here the order is:
-> 
-> 	if (bank_address_words != 0) {
-> 		/* MX7 */
-> 	} else {
-> 		/* MX6 */
-> 	}
-> 
->>   
->>   	ctrl = readl(priv->base + IMX_OCOTP_ADDR_CTRL);
->>   	ctrl &= ~IMX_OCOTP_BM_CTRL_ADDR;
->> @@ -255,8 +274,41 @@ static int imx_ocotp_write(void *context, unsigned int offset, void *val,
->>   	 * shift right (with zero fill). This shifting is required to program
->>   	 * the OTP serially. During the write operation, HW_OCOTP_DATA cannot be
->>   	 * modified.
->> +	 * Note: on i.MX7 there are four data fields to write for banked write
->> +	 *       with the fuse blowing operation only taking place after data0
->> +	 *	 has been written. This is why data0 must always be the last
->> +	 *	 register written.
->>   	 */
->> -	writel(*buf, priv->base + IMX_OCOTP_ADDR_DATA);
->> +	if (priv->params->bank_address_words == 0) {
->> +		writel(*buf, priv->base + IMX_OCOTP_ADDR_DATA0);
->> +	} else {
->> +		switch (word) {
->> +		case 0:
->> +			writel(0, priv->base + IMX_OCOTP_ADDR_DATA1);
->> +			writel(0, priv->base + IMX_OCOTP_ADDR_DATA2);
->> +			writel(0, priv->base + IMX_OCOTP_ADDR_DATA3);
->> +			writel(*buf, priv->base + IMX_OCOTP_ADDR_DATA0);
->> +			break;
->> +		case 1:
->> +			writel(*buf, priv->base + IMX_OCOTP_ADDR_DATA1);
->> +			writel(0, priv->base + IMX_OCOTP_ADDR_DATA2);
->> +			writel(0, priv->base + IMX_OCOTP_ADDR_DATA3);
->> +			writel(0, priv->base + IMX_OCOTP_ADDR_DATA0);
->> +			break;
->> +		case 2:
->> +			writel(0, priv->base + IMX_OCOTP_ADDR_DATA1);
->> +			writel(*buf, priv->base + IMX_OCOTP_ADDR_DATA2);
->> +			writel(0, priv->base + IMX_OCOTP_ADDR_DATA3);
->> +			writel(0, priv->base + IMX_OCOTP_ADDR_DATA0);
->> +			break;
->> +		case 3:
->> +			writel(0, priv->base + IMX_OCOTP_ADDR_DATA1);
->> +			writel(0, priv->base + IMX_OCOTP_ADDR_DATA2);
->> +			writel(*buf, priv->base + IMX_OCOTP_ADDR_DATA3);
->> +			writel(0, priv->base + IMX_OCOTP_ADDR_DATA0);
->> +			break;
->> +		}
->> +	}
-> 
-> But here the order is
-> 	if (bank_address_words == 0) {
-> 		/* MX6 */
-> 	} else {
-> 		/* MX7 */
-> 	}
-> 
-> Reordering this for consistency would also move the MX7 code closer to
-> the comment.
-> 
->>   
->>   	/* 47.4.1.4.5
->>   	 * Once complete, the controller will clear BUSY. A write request to a
->> @@ -313,11 +365,11 @@ static struct nvmem_config imx_ocotp_nvmem_config = {
->>   };
->>   
->>   static const struct ocotp_params params[] = {
->> -	{ .nregs = 128 },
->> -	{ .nregs = 64 },
->> -	{ .nregs = 128 },
->> -	{ .nregs = 128 },
->> -	{ .nregs = 64 },
->> +	{ .nregs = 128, .bank_address_words = 0 },
->> +	{ .nregs = 64,  .bank_address_words = 0 },
->> +	{ .nregs = 128, .bank_address_words = 0 },
->> +	{ .nregs = 128, .bank_address_words = 0 },
->> +	{ .nregs = 64,  .bank_address_words = 4 },
-> 
-> See my comment on the last patch, I'd like to be able see which entry
-> corresponds to which SoC in this patch.
-> 
-> Otherwise,
-> 
-> Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
-> 
-> regards
-> Philipp
-> 
+?
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
 
-ACK those changes Philipp.
+On 09/30/2017 01:34 AM, Tony Lindgren wrote:
+> On omap4 we are missing dts nodes for several interconnect target
+> modules that we are idling on init. This currently works with the
+> legacy platform data still around.
+> 
+> To fix this, let's add the interconnect target modules so we can
+> idle the unused interconnect target module on init.
+> 
+> Also note that adding the interconnect target module node does not
+> necessarily mean that there is a driver available for the child IP
+> block, or that the child IP block is even functional.
+> 
+> In the SGX case, the PowerVR driver is closed source. And McASP on
+> omap4 has at least the TX path disabled and is not supported by the
+> davinci-mcasp driver.
 
-Thanks for your suggestions/time
+RX path is disabled, TX is supposed to work.
 
----
-bod
+...
+
+> +		target-module at 40128000 {
+> +			compatible = "ti,sysc-mcasp";
+> +			ti,hwmods = "mcasp";
+> +			reg = <0x40128004 0x4>;
+> +			reg-names = "sysc";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges = <0x00000000 0x40128000 0x1000>, /* MPU */
+> +				 <0x49028000 0x49028000 0x1000>; /* L3 */
+> +
+> +			/*
+> +			 * Child device unsupported by davinci-mcasp. At least
+> +			 * TX path is disabled for omap4, and only DIT mode
+
+s/TX/RX
+
+> +			 * works with no I2S. See also old Android kernel
+> +			 * omap-mcasp driver for more information.
+
+I'll look at the schema of PandaBoard to see if I can route out the McASP
+lines to somewhere then I can add support for this revision to davinci-mcasp
+driver.
+
+-- 
+P?ter
