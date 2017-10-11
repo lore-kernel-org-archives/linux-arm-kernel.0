@@ -1,158 +1,119 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 11 Oct 2017 18:03:25 +0200
-Subject: [PATCH v3 5/7] nvmem: imx-ocotp: Add i.MX7D timing write clock
- setup support
-In-Reply-To: <1507558312-20580-6-git-send-email-pure.logic@nexus-software.ie>
-References: <1507558312-20580-1-git-send-email-pure.logic@nexus-software.ie>
- <1507558312-20580-6-git-send-email-pure.logic@nexus-software.ie>
-Message-ID: <1507737805.22082.11.camel@pengutronix.de>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Wed, 11 Oct 2017 09:09:34 -0700
+Subject: [PATCH 1/1] tty: serial: imx: disable ageing timer interrupt if
+ dma in use
+In-Reply-To: <AM3P101MB01800FAA2029393C5A859629E64A0@AM3P101MB0180.NAMP101.PROD.OUTLOOK.COM>
+References: <20171007014648.6989-1-troy.kisky@boundarydevices.com>
+ <AM3P101MB01800FAA2029393C5A859629E64A0@AM3P101MB0180.NAMP101.PROD.OUTLOOK.COM>
+Message-ID: <7c5a3ef3-6da7-815e-04a3-a1f18344032e@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-10-09 at 15:11 +0100, Bryan O'Donoghue wrote:
-> This patch adds logic to correctly setup the write timing parameters
-> when blowing an OTP fuse for the i.MX7S/D.
+On 10/10/2017 11:22 PM, Han, Nandor (GE Healthcare) wrote:
 > 
-> Fixes: 0642bac7da42 ("nvmem: imx-ocotp: add write support")
 > 
-> Signed-off-by: Bryan O'Donoghue <pure.logic@nexus-software.ie>
-> ---
->  drivers/nvmem/imx-ocotp.c | 63 ++++++++++++++++++++++++++++++++++++++---------
->  1 file changed, 52 insertions(+), 11 deletions(-)
+>> -----Original Message-----
+>> From: linux-serial-owner at vger.kernel.org [mailto:linux-serial-
+>> owner at vger.kernel.org] On Behalf Of Troy Kisky
+>> Sent: 07 October 2017 04:47
+>> To: gregkh at linuxfoundation.org
+>> Cc: fabio.estevam at nxp.com; l.stach at pengutronix.de; u.kleine-
+>> koenig at pengutronix.de; linux-serial at vger.kernel.org; linux-arm-
+>> kernel at lists.infradead.org; Troy Kisky <troy.kisky@boundarydevices.com>
+>> Subject: EXT: [PATCH 1/1] tty: serial: imx: disable ageing timer interrupt if
+>> dma in use
+>>
+>> Since commit 4dec2f119e86 ("imx-serial: RX DMA startup latency")
+>>
+>> the interrupt routine no longer will start rx dma.
 > 
-> diff --git a/drivers/nvmem/imx-ocotp.c b/drivers/nvmem/imx-ocotp.c
-> index 2645ee3..f80aee9 100644
-> --- a/drivers/nvmem/imx-ocotp.c
-> +++ b/drivers/nvmem/imx-ocotp.c
-> @@ -51,16 +51,12 @@
->  #define IMX_OCOTP_BM_CTRL_REL_SHADOWS	0x00000400
->  
->  #define DEF_RELAX			20 /* > 16.5ns */
-> +#define DEF_FSOURCE			1001
+> I think you have 2 commits here: 
+> - one that disables ageing timer when DMA is in use
+> - one that cleans the leftovers after 4dec2f119e86.
+> 
 
-Maybe add a comment /* > 1000ns */ ?
+I could kill 3 lines, in the 1st patch, and the other 27 in the next.
+But the 2 patches would not be independent. You should not apply the
+second without the 1st. I think the change is simple enough not to
+warrant a series.
 
-Also, I get why there is no DEF_STROBE_PROG, but this is a bit
-inconsistent. You could switch to 64-bit calculations and add a
 
-#define DEF_STROBE_PROG			10000
+>>
+>> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+>> ---
+>>  drivers/tty/serial/imx.c | 34 ++--------------------------------
+>>  1 file changed, 2 insertions(+), 32 deletions(-)
+>>
+>> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c index
+>> dfeff3951f93..15b0ecb4cf60 100644
+>> --- a/drivers/tty/serial/imx.c
+>> +++ b/drivers/tty/serial/imx.c
+>> @@ -732,29 +732,6 @@ static void imx_disable_rx_int(struct imx_port
+>> *sport)  }
+>>
+>>  static void clear_rx_errors(struct imx_port *sport); -static int
+>> start_rx_dma(struct imx_port *sport);
+>> -/*
+>> - * If the RXFIFO is filled with some data, and then we
+>> - * arise a DMA operation to receive them.
+>> - */
+>> -static void imx_dma_rxint(struct imx_port *sport) -{
+>> -	unsigned long temp;
+>> -	unsigned long flags;
+>> -
+>> -	spin_lock_irqsave(&sport->port.lock, flags);
+>> -
+>> -	temp = readl(sport->port.membase + USR2);
+>> -	if ((temp & USR2_RDR) && !sport->dma_is_rxing) {
+>> -
+>> -		imx_disable_rx_int(sport);
+>> -
+>> -		/* tell the DMA to receive the data. */
+>> -		start_rx_dma(sport);
+>> -	}
+>> -
+>> -	spin_unlock_irqrestore(&sport->port.lock, flags);
+>> -}
+>>
+>>  /*
+>>   * We have a modem side uart, so the meanings of RTS and CTS are inverted.
+>> @@ -816,11 +793,8 @@ static irqreturn_t imx_int(int irq, void *dev_id)
+>>  	sts = readl(sport->port.membase + USR1);
+>>  	sts2 = readl(sport->port.membase + USR2);
+>>
+>> -	if (sts & (USR1_RRDY | USR1_AGTIM)) {
+>> -		if (sport->dma_is_enabled)
+>> -			imx_dma_rxint(sport);
+>> -		else
+>> -			imx_rxint(irq, dev_id);
+>> +	if (!sport->dma_is_enabled && (sts & (USR1_RRDY |
+>> USR1_AGTIM))) {
+>> +		imx_rxint(irq, dev_id);
+> 
+> I don't think we need the check `!sport->dma_is_enabled ` since RRDY and AGTIM interrupts should be disable when DMA is enabled.
 
-here.
+If I AND the status with its corresponding interrupt enable. But that is just as complicated, and
+more different from the original.
 
->  #define IMX_OCOTP_WR_UNLOCK		0x3E770000
->  #define IMX_OCOTP_READ_LOCKED_VAL	0xBADABADA
->  
->  static DEFINE_MUTEX(ocotp_mutex);
->  
-> -struct ocotp_params {
-> -	unsigned int nregs;
-> -	unsigned int bank_address_words;
-> -};
-> -
->  struct ocotp_priv {
->  	struct device *dev;
->  	struct clk *clk;
-> @@ -69,6 +65,12 @@ struct ocotp_priv {
->  	struct nvmem_config *config;
->  };
->  
-> +struct ocotp_params {
-> +	unsigned int nregs;
-> +	unsigned int bank_address_words;
-> +	void (*set_timing)(struct ocotp_priv *priv);
-> +};
-> +
->  static int imx_ocotp_wait_for_busy(void __iomem *base, u32 flags)
->  {
->  	int count;
-> @@ -193,6 +195,25 @@ static void imx_ocotp_set_imx6_timing(struct ocotp_priv *priv)
->  	writel(timing, priv->base + IMX_OCOTP_ADDR_TIMING);
->  }
->  
-> +static void imx_ocotp_set_imx7_timing(struct ocotp_priv *priv)
-> +{
-> +	unsigned long clk_rate = 0;
-> +	unsigned long fsource, strobe_prog;
-> +	u32 timing = 0;
-> +
-> +	/* i.MX 7Solo Applications Processor Reference Manual, Rev. 0.1
-> +	 * 6.4.3.3
-> +	 */
-> +	clk_rate = clk_get_rate(priv->clk);
-> +	fsource = DIV_ROUND_UP(((clk_rate / 1000) * DEF_FSOURCE), 1000000) + 1;
-> +	strobe_prog = ((clk_rate * 10) / 1000000) + 1;
 
-Would
+> 
+>>  		ret = IRQ_HANDLED;
+>>  	}
+>>
+>> @@ -1207,10 +1181,6 @@ static void imx_enable_dma(struct imx_port
+>> *sport)
+>>  	temp |= UCR1_RDMAEN | UCR1_TDMAEN | UCR1_ATDMAEN;
+>>  	writel(temp, sport->port.membase + UCR1);
+>>
+>> -	temp = readl(sport->port.membase + UCR2);
+>> -	temp |= UCR2_ATEN;
+>> -	writel(temp, sport->port.membase + UCR2);
+>> -
+> 
+> I think this should be moved to imx_startup. At least RRDY is configured there. 
+> 
 
-	fsource = DIV_ROUND_UP_ULL((u64)clk_rate * DEF_FSOURCE,
-				   NSEC_PER_SEC) + 1;
-	strobe_prog = DIV_ROUND_CLOSEST_ULL((u64)clk_rate * DEF_STROBE_PROG,
-					    NSEC_PER_SEC) + 1;
 
-work instead?
-
-> +
-> +	timing = strobe_prog & 0x00000FFF;
-> +	timing |= (fsource       << 12) & 0x000FF000;
-
-Unnecessary whitespace.
-
-> +
-> +	writel(timing, priv->base + IMX_OCOTP_ADDR_TIMING);
-> +}
-> +
->  static int imx_ocotp_write(void *context, unsigned int offset, void *val,
->  			   size_t bytes)
->  {
-> @@ -219,7 +240,7 @@ static int imx_ocotp_write(void *context, unsigned int offset, void *val,
->  	}
->  
->  	/* Setup the write timing values */
-> -	imx_ocotp_set_imx6_timing(priv);
-> +	priv->params->set_timing(priv);
->  
->  	/* 47.3.1.3.2
->  	 * Check that HW_OCOTP_CTRL[BUSY] and HW_OCOTP_CTRL[ERROR] are clear.
-> @@ -372,11 +393,31 @@ static struct nvmem_config imx_ocotp_nvmem_config = {
->  };
->  
->  static const struct ocotp_params params[] = {
-> -	{ .nregs = 128, .bank_address_words = 0 },
-> -	{ .nregs = 64,  .bank_address_words = 0 },
-> -	{ .nregs = 128, .bank_address_words = 0 },
-> -	{ .nregs = 128, .bank_address_words = 0 },
-> -	{ .nregs = 64,  .bank_address_words = 4 },
-> +	{
-> +		.nregs = 128,
-> +		.bank_address_words = 0,
-> +		.set_timing = imx_ocotp_set_imx6_timing,
-> +	},
-> +	{
-> +		.nregs = 64,
-> +		.bank_address_words = 0,
-> +		.set_timing = imx_ocotp_set_imx6_timing,
-> +	},
-> +	{
-> +		.nregs = 128,
-> +		.bank_address_words = 0,
-> +		.set_timing = imx_ocotp_set_imx6_timing,
-> +	},
-> +	{
-> +		.nregs = 128,
-> +		.bank_address_words = 0,
-> +		.set_timing = imx_ocotp_set_imx6_timing,
-> +	},
-> +	{
-> +		.nregs = 64,
-> +		.bank_address_words = 4,
-> +		.set_timing = imx_ocotp_set_imx7_timing,
-> +	},
-
-See previous patches.
-
->  };
->  
->  static const struct of_device_id imx_ocotp_dt_ids[] = {
-
-regards
-Philipp
+Currently, non-dma mode does not use the ageing timer. You get an interrupt immediately when
+1 character is in the fifo. So, enabling the ageing timer and changing fifo level, should really be
+a separate patch. But it would be a nice patch.
