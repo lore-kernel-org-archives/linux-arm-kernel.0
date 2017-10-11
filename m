@@ -1,94 +1,143 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Wed, 11 Oct 2017 14:00:55 +0100
-Subject: [RFC 0/7] arm64: provide pseudo NMI with GICv3
-Message-ID: <1507726862-11944-1-git-send-email-julien.thierry@arm.com>
+Date: Wed, 11 Oct 2017 14:00:58 +0100
+Subject: [RFC 3/7] arm64: alternative: Apply alternatives early in boot process
+In-Reply-To: <1507726862-11944-1-git-send-email-julien.thierry@arm.com>
+References: <1507726862-11944-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <1507726862-11944-4-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Daniel Thompson <daniel.thompson@linaro.org>
 
-This series is a continuation of the work started by Daniel [1]. The goal is
-to use GICv3 interrupt priorities to simulate an NMI.
+Currently alternatives are applied very late in the boot process (and
+a long time after we enable scheduling). Some alternative sequences,
+such as those that alter the way CPU context is stored, must be applied
+much earlier in the boot sequence.
 
-To achieve this, set two priorities, one for standard interrupts and
-another, higher priority, for NMIs. Whenever we want to disable interrupts,
-we mask the standard priority instead so NMIs can still be raised. Some
-corner cases though still require to actually mask all interrupts
-effectively disabling the NMI.
+Introduce apply_alternatives_early() to allow some alternatives to be
+applied immediately after we detect the CPU features of the boot CPU.
 
-Of course, using priority masking instead of PSR.I comes at some cost. On
-hackbench, I notice a ~6% drop of performance. However, on a kernel build,
-I do not see significant differences.
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/alternative.h |  1 +
+ arch/arm64/kernel/alternative.c      | 39 +++++++++++++++++++++++++++++++++---
+ arch/arm64/kernel/smp.c              |  6 ++++++
+ 3 files changed, 43 insertions(+), 3 deletions(-)
 
-Currently, only PPIs and SPIs can be set as NMIs. IPIs being currently
-hardcoded IRQ numbers, there isn't a generic interface to set SGIs as NMI
-for now. I don't think there is any reason LPIs should be allowed to be set
-as NMI as they do not have an active state.
-When an NMI is active on a CPU, no other NMI can be triggered on the CPU.
+diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
+index 6e1cb8c..01792d5 100644
+--- a/arch/arm64/include/asm/alternative.h
++++ b/arch/arm64/include/asm/alternative.h
+@@ -19,6 +19,7 @@ struct alt_instr {
+ 	u8  alt_len;		/* size of new instruction(s), <= orig_len */
+ };
 
-Requirements to use this:
-- Have GICv3
-- SCR_EL3.FIQ is set to 1 when linux runs
-- Select Kernel Feature -> Use ICC system registers for IRQ masking
++void __init apply_alternatives_early(void);
+ void __init apply_alternatives_all(void);
+ void apply_alternatives(void *start, size_t length);
 
->From my testing with the perf interrupt, there doesn't seem to be any major
-issue left (but if you find some, do tell!).
+diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
+index 6dd0a3a3..78051d4 100644
+--- a/arch/arm64/kernel/alternative.c
++++ b/arch/arm64/kernel/alternative.c
+@@ -28,6 +28,18 @@
+ #include <asm/sections.h>
+ #include <linux/stop_machine.h>
 
-* Patches 1 and 5 are minor utility changes.
-* Patches 2 and 3 allows to detect and enable the use of GICv3 system
-  registers during boot time.
-* Patch 4 introduces the masking of IRQs using priorities replacing irq
-  disabling.
-* Patch 6 add detection of the view linux has on GICv3 priorities, without
-  this we cannot easily mask specific priorities in an accurate manner
-* Patch 7 adds the support for NMIs
++/*
++ * early-apply features are detected using only the boot CPU and checked on
++ * secondary CPUs startup, even then,
++ * These early-apply features should only include features where we must
++ * patch the kernel very early in the boot process.
++ *
++ * Note that the cpufeature logic *must* be made aware of early-apply
++ * features to ensure they are reported as enabled without waiting
++ * for other CPUs to boot.
++ */
++#define EARLY_APPLY_FEATURE_MASK BIT(ARM64_HAS_SYSREG_GIC_CPUIF)
++
+ #define __ALT_PTR(a,f)		((void *)&(a)->f + (a)->f)
+ #define ALT_ORIG_PTR(a)		__ALT_PTR(a, orig_offset)
+ #define ALT_REPL_PTR(a)		__ALT_PTR(a, alt_offset)
+@@ -105,7 +117,8 @@ static u32 get_alt_insn(struct alt_instr *alt, __le32 *insnptr, __le32 *altinsnp
+ 	return insn;
+ }
 
+-static void __apply_alternatives(void *alt_region, bool use_linear_alias)
++static void __apply_alternatives(void *alt_region,  bool use_linear_alias,
++				 unsigned long feature_mask)
+ {
+ 	struct alt_instr *alt;
+ 	struct alt_region *region = alt_region;
+@@ -115,6 +128,9 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
+ 		u32 insn;
+ 		int i, nr_inst;
 
-[1] http://www.spinics.net/lists/arm-kernel/msg525077.html
++		if ((BIT(alt->cpufeature) & feature_mask) == 0)
++			continue;
++
+ 		if (!cpus_have_cap(alt->cpufeature))
+ 			continue;
 
-Thanks,
+@@ -138,6 +154,21 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
+ }
 
-Julien Thierry
+ /*
++ * This is called very early in the boot process (directly after we run
++ * a feature detect on the boot CPU). No need to worry about other CPUs
++ * here.
++ */
++void apply_alternatives_early(void)
++{
++	struct alt_region region = {
++		.begin	= (struct alt_instr *)__alt_instructions,
++		.end	= (struct alt_instr *)__alt_instructions_end,
++	};
++
++	__apply_alternatives(&region, true, EARLY_APPLY_FEATURE_MASK);
++}
++
++/*
+  * We might be patching the stop_machine state machine, so implement a
+  * really simple polling protocol here.
+  */
+@@ -156,7 +187,9 @@ static int __apply_alternatives_multi_stop(void *unused)
+ 		isb();
+ 	} else {
+ 		BUG_ON(patched);
+-		__apply_alternatives(&region, true);
++
++		__apply_alternatives(&region, true, ~EARLY_APPLY_FEATURE_MASK);
++
+ 		/* Barriers provided by the cache flushing */
+ 		WRITE_ONCE(patched, 1);
+ 	}
+@@ -177,5 +210,5 @@ void apply_alternatives(void *start, size_t length)
+ 		.end	= start + length,
+ 	};
 
+-	__apply_alternatives(&region, false);
++	__apply_alternatives(&region, false, -1);
+ }
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 9f7195a..84c6983 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -455,6 +455,12 @@ void __init smp_prepare_boot_cpu(void)
+ 	 * cpuinfo_store_boot_cpu() above.
+ 	 */
+ 	update_cpu_errata_workarounds();
++	/*
++	 * We now know enough about the boot CPU to apply the
++	 * alternatives that cannot wait until interrupt handling
++	 * and/or scheduling is enabled.
++	 */
++	apply_alternatives_early();
+ }
 
-Daniel Thompson (4):
-  arm64: irqflags: Reorder the fiq & async macros
-  arm64: cpufeature: Allow early detect of specific features
-  arm64: alternative: Apply alternatives early in boot process
-  arm64: irqflags: Use ICC sysregs to implement IRQ masking
-
-Julien Thierry (3):
-  irqchip/gic: Add functions to access irq priorities
-  arm64: Detect current view of GIC priorities
-  arm64: Add support for pseudo-NMIs
-
- Documentation/arm64/booting.txt        |   5 +
- arch/arm64/Kconfig                     |  15 ++
- arch/arm64/include/asm/alternative.h   |   1 +
- arch/arm64/include/asm/arch_gicv3.h    |  24 +++
- arch/arm64/include/asm/assembler.h     |  33 +++-
- arch/arm64/include/asm/efi.h           |   5 +
- arch/arm64/include/asm/irqflags.h      | 143 +++++++++++++++-
- arch/arm64/include/asm/kvm_host.h      |  40 +++++
- arch/arm64/include/asm/processor.h     |   4 +
- arch/arm64/include/asm/ptrace.h        |  14 +-
- arch/arm64/include/asm/sysreg.h        |   1 +
- arch/arm64/kernel/alternative.c        |  39 ++++-
- arch/arm64/kernel/asm-offsets.c        |   1 +
- arch/arm64/kernel/cpufeature.c         |  67 +++++---
- arch/arm64/kernel/entry.S              | 132 ++++++++++++--
- arch/arm64/kernel/head.S               |  38 +++++
- arch/arm64/kernel/process.c            |   6 +
- arch/arm64/kernel/smp.c                |  14 ++
- arch/arm64/mm/proc.S                   |  23 +++
- drivers/irqchip/irq-gic-common.c       |  10 ++
- drivers/irqchip/irq-gic-common.h       |   2 +
- drivers/irqchip/irq-gic-v3-its.c       |   2 +-
- drivers/irqchip/irq-gic-v3.c           | 304 +++++++++++++++++++++++++++++----
- include/linux/interrupt.h              |   1 +
- include/linux/irqchip/arm-gic-common.h |   6 +
- include/linux/irqchip/arm-gic.h        |   5 -
- 26 files changed, 845 insertions(+), 90 deletions(-)
-
+ static u64 __init of_get_cpu_mpidr(struct device_node *dn)
 --
 1.9.1
