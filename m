@@ -1,91 +1,84 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 11 Oct 2017 10:53:52 +0800
-Subject: [RESEND PATCH] phy: phy-mtk-tphy: add set_mode callback
-Message-ID: <88ca8e98f1f08e38ac20ece1b7f40189301be74f.1507690355.git.chunfeng.yun@mediatek.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 11 Oct 2017 12:09:24 +0900
+Subject: [PATCH v3 8/8] PM / devfreq: exynos-bus: Register cooling device
+In-Reply-To: <1507691364-3899-1-git-send-email-cw00.choi@samsung.com>
+References: <1507691364-3899-1-git-send-email-cw00.choi@samsung.com>
+ <CGME20171011030947epcas1p475944e5d83cf28deaa3cdef731315d63@epcas1p4.samsung.com>
+Message-ID: <1507691364-3899-9-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is used to force PHY with USB OTG function to enter a specific
-mode, and override OTG IDPIN(or IDDIG) signal.
+This patch registers the Exynos Bus-Frequency scaling device
+as a cooling device of thermal management.
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Krzysztof Kozlowski <krzk@kernel.org>
+Cc: linux-samsung-soc at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
 ---
- drivers/phy/mediatek/phy-mtk-tphy.c |   39 +++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+ drivers/devfreq/exynos-bus.c | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/drivers/phy/mediatek/phy-mtk-tphy.c b/drivers/phy/mediatek/phy-mtk-tphy.c
-index 721a2a1..402385f 100644
---- a/drivers/phy/mediatek/phy-mtk-tphy.c
-+++ b/drivers/phy/mediatek/phy-mtk-tphy.c
-@@ -96,9 +96,11 @@
+diff --git a/drivers/devfreq/exynos-bus.c b/drivers/devfreq/exynos-bus.c
+index c25658b26598..fe9ef6a3238b 100644
+--- a/drivers/devfreq/exynos-bus.c
++++ b/drivers/devfreq/exynos-bus.c
+@@ -15,6 +15,7 @@
+ #include <linux/clk.h>
+ #include <linux/devfreq.h>
+ #include <linux/devfreq-event.h>
++#include <linux/devfreq_cooling.h>
+ #include <linux/device.h>
+ #include <linux/export.h>
+ #include <linux/module.h>
+@@ -41,6 +42,8 @@ struct exynos_bus {
+ 	struct clk *clk;
+ 	unsigned int voltage_tolerance;
+ 	unsigned int ratio;
++
++	struct thermal_cooling_device *cdev;
+ };
  
- #define U3P_U2PHYDTM1		0x06C
- #define P2C_RG_UART_EN			BIT(16)
-+#define P2C_FORCE_IDDIG		BIT(9)
- #define P2C_RG_VBUSVALID		BIT(5)
- #define P2C_RG_SESSEND			BIT(4)
- #define P2C_RG_AVALID			BIT(2)
-+#define P2C_RG_IDDIG			BIT(1)
- 
- #define U3P_U3_CHIP_GPIO_CTLD		0x0c
- #define P3C_REG_IP_SW_RST		BIT(31)
-@@ -585,6 +587,31 @@ static void u2_phy_instance_exit(struct mtk_tphy *tphy,
+ /*
+@@ -468,6 +471,13 @@ static int exynos_bus_probe(struct platform_device *pdev)
+ 		goto err;
  	}
- }
  
-+static void u2_phy_instance_set_mode(struct mtk_tphy *tphy,
-+				     struct mtk_phy_instance *instance,
-+				     enum phy_mode mode)
-+{
-+	struct u2phy_banks *u2_banks = &instance->u2_banks;
-+	u32 tmp;
-+
-+	tmp = readl(u2_banks->com + U3P_U2PHYDTM1);
-+	switch (mode) {
-+	case PHY_MODE_USB_DEVICE:
-+		tmp |= P2C_FORCE_IDDIG | P2C_RG_IDDIG;
-+		break;
-+	case PHY_MODE_USB_HOST:
-+		tmp |= P2C_FORCE_IDDIG;
-+		tmp &= ~P2C_RG_IDDIG;
-+		break;
-+	case PHY_MODE_USB_OTG:
-+		tmp &= ~(P2C_FORCE_IDDIG | P2C_RG_IDDIG);
-+		break;
-+	default:
-+		return;
++	/* Register devfreq cooling device */
++	bus->cdev = of_devfreq_cooling_register(np, bus->devfreq);
++	if (IS_ERR(bus->cdev)) {
++		dev_err(dev, "running exynos-bus without cooling device\n");
++		bus->cdev = NULL;
 +	}
-+	writel(tmp, u2_banks->com + U3P_U2PHYDTM1);
-+}
 +
- static void pcie_phy_instance_init(struct mtk_tphy *tphy,
- 	struct mtk_phy_instance *instance)
- {
-@@ -881,6 +908,17 @@ static int mtk_phy_exit(struct phy *phy)
- 	return 0;
+ 	goto out;
+ passive:
+ 	/* Initialize the struct profile and governor data for passive device */
+@@ -514,6 +524,15 @@ static int exynos_bus_probe(struct platform_device *pdev)
+ 	return ret;
  }
  
-+static int mtk_phy_set_mode(struct phy *phy, enum phy_mode mode)
++static int exynos_bus_remove(struct platform_device *pdev)
 +{
-+	struct mtk_phy_instance *instance = phy_get_drvdata(phy);
-+	struct mtk_tphy *tphy = dev_get_drvdata(phy->dev.parent);
++	struct exynos_bus *bus = platform_get_drvdata(pdev);
 +
-+	if (instance->type == PHY_TYPE_USB2)
-+		u2_phy_instance_set_mode(tphy, instance, mode);
++	devfreq_cooling_unregister(bus->cdev);
 +
 +	return 0;
 +}
 +
- static struct phy *mtk_phy_xlate(struct device *dev,
- 					struct of_phandle_args *args)
+ #ifdef CONFIG_PM_SLEEP
+ static int exynos_bus_resume(struct device *dev)
  {
-@@ -931,6 +969,7 @@ static struct phy *mtk_phy_xlate(struct device *dev,
- 	.exit		= mtk_phy_exit,
- 	.power_on	= mtk_phy_power_on,
- 	.power_off	= mtk_phy_power_off,
-+	.set_mode	= mtk_phy_set_mode,
- 	.owner		= THIS_MODULE,
- };
+@@ -556,6 +575,7 @@ static int exynos_bus_suspend(struct device *dev)
  
+ static struct platform_driver exynos_bus_platdrv = {
+ 	.probe		= exynos_bus_probe,
++	.remove		= exynos_bus_remove,
+ 	.driver = {
+ 		.name	= "exynos-bus",
+ 		.pm	= &exynos_bus_pm,
 -- 
-1.7.9.5
+1.9.1
