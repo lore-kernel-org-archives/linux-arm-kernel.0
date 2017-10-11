@@ -1,48 +1,32 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 11 Oct 2017 14:37:34 +0800
-Subject: [PATCH 8/9] dt-bindings: usb: mtk-xhci: add a optional property
- to disable u3ports
-In-Reply-To: <20171005221650.yfyh72op6azm2nri@rob-hp-laptop>
-References: <994382d16d6bdc0f3d7c11b22f1710252e056e34.1506503879.git.chunfeng.yun@mediatek.com>
- <fd8b6099192ddee3b277f5ca3a699c20fb273ffe.1506503880.git.chunfeng.yun@mediatek.com>
- <20171005221650.yfyh72op6azm2nri@rob-hp-laptop>
-Message-ID: <1507703854.17567.77.camel@mhfsdcap03>
+From: eugen.hristev@microchip.com (Eugen Hristev)
+Date: Wed, 11 Oct 2017 09:35:29 +0300
+Subject: [PATCH v2 2/5] ARM: dts: at91: sama5d2: added dma property for ADC
+ device
+In-Reply-To: <1507703732-29175-1-git-send-email-eugen.hristev@microchip.com>
+References: <1507703732-29175-1-git-send-email-eugen.hristev@microchip.com>
+Message-ID: <1507703732-29175-3-git-send-email-eugen.hristev@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-10-05 at 17:16 -0500, Rob Herring wrote:
-Hi,
-> On Wed, Sep 27, 2017 at 05:23:04PM +0800, Chunfeng Yun wrote:
-> > Add a new optional property to disable u3ports
-> > 
-> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> > ---
-> >  .../devicetree/bindings/usb/mediatek,mtk-xhci.txt  |    2 ++
-> >  1 file changed, 2 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
-> > index 5611a2e..2d9b459 100644
-> > --- a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
-> > +++ b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
-> > @@ -38,6 +38,8 @@ Optional properties:
-> >  	mode;
-> >   - mediatek,syscon-wakeup : phandle to syscon used to access USB wakeup
-> >  	control register, it depends on "mediatek,wakeup-src".
-> > + - mediatek,u3p-dis-msk : mask to disable u3ports, bit0 for u3port0,
-> > +	bit1 for u3port1, ... etc;
-> 
-> I think you should have child nodes for ports and use "status" to 
-> disable them (or omit them). IIRC, the common USB bus binding already 
-> defines ports.
-I find only one common binding document about USB bus, that is
-bindings/usb/usb-device.txt, but it can't be used to disable some ports,
-because in hub_probe() function, hub driver enables all downstream
-ports, but doesn't get any property info from DTS.
+Added DMA property for ADC device
 
-> 
-> >   - vbus-supply : reference to the VBUS regulator;
-> >   - usb3-lpm-capable : supports USB3.0 LPM
-> >   - pinctrl-names : a pinctrl state named "default" must be defined
-> > -- 
-> > 1.7.9.5
-> > 
+Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+---
+ arch/arm/boot/dts/sama5d2.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+index cc06da3..8b4c60c 100644
+--- a/arch/arm/boot/dts/sama5d2.dtsi
++++ b/arch/arm/boot/dts/sama5d2.dtsi
+@@ -1368,6 +1368,8 @@
+ 				atmel,min-sample-rate-hz = <200000>;
+ 				atmel,max-sample-rate-hz = <20000000>;
+ 				atmel,startup-time-ms = <4>;
++				dmas = <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) | AT91_XDMAC_DT_PERID(25))>;
++				dma-names = "rx";
+ 				status = "disabled";
+ 			};
+ 
+-- 
+2.7.4
