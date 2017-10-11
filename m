@@ -1,102 +1,35 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 11 Oct 2017 10:41:48 +0100
-Subject: [PATCH 3/3] irqchip/gic-v3: Bounds check redistributor accesses
-In-Reply-To: <20171011094148.15674-1-punit.agrawal@arm.com>
-References: <20171011094148.15674-1-punit.agrawal@arm.com>
-Message-ID: <20171011094148.15674-4-punit.agrawal@arm.com>
+From: felipe.balbi@linux.intel.com (Felipe Balbi)
+Date: Wed, 11 Oct 2017 13:04:45 +0300
+Subject: [PATCHv2 0/7] Add support for USB OTG on STM32F7
+In-Reply-To: <1503930018-536-1-git-send-email-amelie.delaunay@st.com>
+References: <1503930018-536-1-git-send-email-amelie.delaunay@st.com>
+Message-ID: <878tgim24i.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kernel crashes while iterating over a redistributor that is
-in-correctly sized by the platform firmware or doesn't contain the last
-record.
 
-Prevent the crash by checking accesses against the size of the region
-provided by the firmware. While we are at it, warn the user about
-incorrect region size.
+Hi,
 
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/irqchip/irq-gic-v3.c | 48 ++++++++++++++++++++++++++++++++++++--------
- 1 file changed, 40 insertions(+), 8 deletions(-)
+Amelie Delaunay <amelie.delaunay@st.com> writes:
+> The STM32F7 MCU family embeds two DWC2 USB OTG cores. One core is USB
+> OTG FS and the other is USB OTG HS. The USB FS core only works with its
+> internal phy whilst the USB HS core can work in HS with external ULPI phy
+> or in FS/LS with the on-chip FS phy.
+>
+> Amelie Delaunay (7):
+>   dt-bindings: usb: Document the STM32F7 DWC2 USB OTG HS core binding
+>   usb: dwc2: add support for STM32F7 USB OTG HS
+>   ARM: dts: stm32: Add USB HS support for STM32F746 MCU
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 881d327c53fa..754d936c95e5 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -429,11 +429,21 @@ static int gic_iterate_rdists(int (*fn)(struct redist_region *, void __iomem *))
- 	int i;
- 
- 	for (i = 0; i < gic_data.nr_redist_regions; i++) {
--		void __iomem *ptr = gic_data.redist_regions[i].redist_base;
- 		struct resource *res = &gic_data.redist_regions[i].res;
--		u64 typer;
-+		void __iomem *ptr, *base;
-+		u64 typer, size, stride;
- 		u32 reg;
- 
-+		ptr = base = gic_data.redist_regions[i].redist_base;
-+		size = resource_size(res);
-+
-+		stride = gic_data.redist_stride ?: SZ_64K * 2;
-+		if (ptr + stride > base + size) {
-+			pr_warn("Insufficient size for redistributor region @%llx. Skipping\n",
-+				res->start);
-+			continue;
-+		}
-+
- 		reg = readl_relaxed(ptr + GICR_PIDR2) & GIC_PIDR2_ARCH_MASK;
- 		if (reg != GIC_PIDR2_ARCH_GICv3 &&
- 		    reg != GIC_PIDR2_ARCH_GICv4) { /* We're in trouble... */
-@@ -442,7 +452,28 @@ static int gic_iterate_rdists(int (*fn)(struct redist_region *, void __iomem *))
- 		}
- 
- 		do {
-+			/*
-+			 * We can access GICR_TYPER as we have already
-+			 * checked that we have atleast 128kB or
-+			 * redist_stride
-+			 */
- 			typer = gic_read_typer(ptr + GICR_TYPER);
-+			if (!gic_data.redist_stride &&
-+			    (typer & GICR_TYPER_VLPIS)) {
-+				/* VLPI_base + reserved page */
-+				stride += SZ_64K * 2;
-+
-+				/*
-+				 * We are larger than we thought, do
-+				 * we still fit?
-+				 */
-+				if (ptr + stride > base + size) {
-+					pr_warn("No last record found in redistributor region @%llx\n",
-+						gic_data.redist_regions[i].res.start);
-+					break;
-+				}
-+			}
-+
- 			ret = fn(gic_data.redist_regions + i, ptr);
- 			if (!ret)
- 				return 0;
-@@ -450,12 +481,13 @@ static int gic_iterate_rdists(int (*fn)(struct redist_region *, void __iomem *))
- 			if (gic_data.redist_regions[i].single_redist)
- 				break;
- 
--			if (gic_data.redist_stride) {
--				ptr += gic_data.redist_stride;
--			} else {
--				ptr += SZ_64K * 2; /* Skip RD_base + SGI_base */
--				if (typer & GICR_TYPER_VLPIS)
--					ptr += SZ_64K * 2; /* Skip VLPI_base + reserved page */
-+			ptr += stride;
-+
-+			stride = gic_data.redist_stride ?: SZ_64K * 2;
-+			if (ptr + stride > base + size) {
-+				pr_warn("No last record found in redistributor region @%llx\n",
-+					gic_data.redist_regions[i].res.start);
-+				break;
- 			}
- 		} while (!(typer & GICR_TYPER_LAST));
- 	}
+I have applied these three patches. Should I take the rest? They seems
+like they could go upstream through the ARM maintainers.
+
 -- 
-2.14.1
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171011/13185691/attachment.sig>
