@@ -1,36 +1,102 @@
-From: sagi@grimberg.me (Sagi Grimberg)
-Date: Wed, 11 Oct 2017 13:00:18 +0300
-Subject: [PATCH v2] nvme-pci: Use PCI bus address for data/queues in CMB
-In-Reply-To: <20171001074203.GA11115@lst.de>
-References: <1506763722-10687-1-git-send-email-abhishek.shah@broadcom.com>
- <20171001074203.GA11115@lst.de>
-Message-ID: <d2d574a7-3639-0917-3051-3ea4669de892@grimberg.me>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Wed, 11 Oct 2017 10:41:48 +0100
+Subject: [PATCH 3/3] irqchip/gic-v3: Bounds check redistributor accesses
+In-Reply-To: <20171011094148.15674-1-punit.agrawal@arm.com>
+References: <20171011094148.15674-1-punit.agrawal@arm.com>
+Message-ID: <20171011094148.15674-4-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> ---
->  From b78f4164881125c4fecfdb87878d0120b2177c53 Mon Sep 17 00:00:00 2001
-> From: Christoph Hellwig <hch@lst.de>
-> Date: Sun, 1 Oct 2017 09:37:35 +0200
-> Subject: nvme-pci: Use PCI bus address for data/queues in CMB
-> 
-> Currently, NVMe PCI host driver is programming CMB dma address as
-> I/O SQs addresses. This results in failures on systems where 1:1
-> outbound mapping is not used (example Broadcom iProc SOCs) because
-> CMB BAR will be progammed with PCI bus address but NVMe PCI EP will
-> try to access CMB using dma address.
-> 
-> To have CMB working on systems without 1:1 outbound mapping, we
-> program PCI bus address for I/O SQs instead of dma address. This
-> approach will work on systems with/without 1:1 outbound mapping.
-> 
-> Based on a report and previous patch from Abhishek Shah.
-> 
-> Fixes: 8ffaadf7 ("NVMe: Use CMB for the IO SQes if available")
-> Cc: stable at vger.kernel.org
-> Reported-by: Abhishek Shah <abhishek.shah@broadcom.com>
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
+The kernel crashes while iterating over a redistributor that is
+in-correctly sized by the platform firmware or doesn't contain the last
+record.
 
-This looks good,
+Prevent the crash by checking accesses against the size of the region
+provided by the firmware. While we are at it, warn the user about
+incorrect region size.
 
-Reviewed-by: Sagi Grimberg <sagi@grimberg.me>
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/irqchip/irq-gic-v3.c | 48 ++++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 40 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index 881d327c53fa..754d936c95e5 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -429,11 +429,21 @@ static int gic_iterate_rdists(int (*fn)(struct redist_region *, void __iomem *))
+ 	int i;
+ 
+ 	for (i = 0; i < gic_data.nr_redist_regions; i++) {
+-		void __iomem *ptr = gic_data.redist_regions[i].redist_base;
+ 		struct resource *res = &gic_data.redist_regions[i].res;
+-		u64 typer;
++		void __iomem *ptr, *base;
++		u64 typer, size, stride;
+ 		u32 reg;
+ 
++		ptr = base = gic_data.redist_regions[i].redist_base;
++		size = resource_size(res);
++
++		stride = gic_data.redist_stride ?: SZ_64K * 2;
++		if (ptr + stride > base + size) {
++			pr_warn("Insufficient size for redistributor region @%llx. Skipping\n",
++				res->start);
++			continue;
++		}
++
+ 		reg = readl_relaxed(ptr + GICR_PIDR2) & GIC_PIDR2_ARCH_MASK;
+ 		if (reg != GIC_PIDR2_ARCH_GICv3 &&
+ 		    reg != GIC_PIDR2_ARCH_GICv4) { /* We're in trouble... */
+@@ -442,7 +452,28 @@ static int gic_iterate_rdists(int (*fn)(struct redist_region *, void __iomem *))
+ 		}
+ 
+ 		do {
++			/*
++			 * We can access GICR_TYPER as we have already
++			 * checked that we have atleast 128kB or
++			 * redist_stride
++			 */
+ 			typer = gic_read_typer(ptr + GICR_TYPER);
++			if (!gic_data.redist_stride &&
++			    (typer & GICR_TYPER_VLPIS)) {
++				/* VLPI_base + reserved page */
++				stride += SZ_64K * 2;
++
++				/*
++				 * We are larger than we thought, do
++				 * we still fit?
++				 */
++				if (ptr + stride > base + size) {
++					pr_warn("No last record found in redistributor region @%llx\n",
++						gic_data.redist_regions[i].res.start);
++					break;
++				}
++			}
++
+ 			ret = fn(gic_data.redist_regions + i, ptr);
+ 			if (!ret)
+ 				return 0;
+@@ -450,12 +481,13 @@ static int gic_iterate_rdists(int (*fn)(struct redist_region *, void __iomem *))
+ 			if (gic_data.redist_regions[i].single_redist)
+ 				break;
+ 
+-			if (gic_data.redist_stride) {
+-				ptr += gic_data.redist_stride;
+-			} else {
+-				ptr += SZ_64K * 2; /* Skip RD_base + SGI_base */
+-				if (typer & GICR_TYPER_VLPIS)
+-					ptr += SZ_64K * 2; /* Skip VLPI_base + reserved page */
++			ptr += stride;
++
++			stride = gic_data.redist_stride ?: SZ_64K * 2;
++			if (ptr + stride > base + size) {
++				pr_warn("No last record found in redistributor region @%llx\n",
++					gic_data.redist_regions[i].res.start);
++				break;
+ 			}
+ 		} while (!(typer & GICR_TYPER_LAST));
+ 	}
+-- 
+2.14.1
