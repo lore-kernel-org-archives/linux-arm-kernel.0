@@ -1,75 +1,118 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Wed, 11 Oct 2017 17:10:11 +0100
-Subject: [RFC 0/7] arm64: provide pseudo NMI with GICv3
-In-Reply-To: <CAMTL27FYM=oiNjh1JoXPMx6eTLJZXYm8QPb4QcQe-wgWpeEaBA@mail.gmail.com>
-References: <1507726862-11944-1-git-send-email-julien.thierry@arm.com>
- <CAMTL27FYM=oiNjh1JoXPMx6eTLJZXYm8QPb4QcQe-wgWpeEaBA@mail.gmail.com>
-Message-ID: <9dde96d6-a430-8d63-4f99-e9453ab2e12c@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 11 Oct 2017 17:15:58 +0100
+Subject: [PATCH v3 11/28] arm64/sve: Core task context handling
+In-Reply-To: <1507660725-7986-12-git-send-email-Dave.Martin@arm.com>
+References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
+ <1507660725-7986-12-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20171011161558.ts7adaryabttg47z@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Tue, Oct 10, 2017 at 07:38:28PM +0100, Dave P Martin wrote:
+> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+> index 026a7c7..b1409de 100644
+> --- a/arch/arm64/include/asm/fpsimd.h
+> +++ b/arch/arm64/include/asm/fpsimd.h
+> @@ -72,6 +75,20 @@ extern void sve_load_state(void const *state, u32 const *pfpsr,
+>  			   unsigned long vq_minus_1);
+>  extern unsigned int sve_get_vl(void);
+>  
+> +#ifdef CONFIG_ARM64_SVE
+> +
+> +extern size_t sve_state_size(struct task_struct const *task);
+> +
+> +extern void sve_alloc(struct task_struct *task);
+> +extern void fpsimd_release_thread(struct task_struct *task);
+> +
+> +#else /* ! CONFIG_ARM64_SVE */
+> +
+> +static void __maybe_unused sve_alloc(struct task_struct *task) { }
+> +static void __maybe_unused fpsimd_release_thread(struct task_struct *task) { }
 
-On 11/10/17 16:55, Daniel Thompson wrote:
-> On 11 October 2017 at 14:00, Julien Thierry <julien.thierry@arm.com> wrote:
->> Hi,
->>
->> This series is a continuation of the work started by Daniel [1]. The goal is
->> to use GICv3 interrupt priorities to simulate an NMI.
-> 
-> Cool. By coincidence, and after ignoring the code for three kernel
-> releases, I'm halfway through rebasing this to v4.14... and *very*
-> happy to be able to grab yours instead. There's a machine I want to
-> play with it on!
-> 
+Nitpick: usually we just add static inline functions here rather than
+__maybe_unused.
 
-Good to know someone will be testing this then ;) , thanks.
+> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+> index 29adab8..4831d28 100644
+> --- a/arch/arm64/include/asm/processor.h
+> +++ b/arch/arm64/include/asm/processor.h
+> @@ -39,6 +47,8 @@
+>  #define FPEXC_IDF	(1 << 7)
+>  
+>  /*
+> + * (Note: in this discussion, statements about FPSIMD apply equally to SVE.)
+> + *
+>   * In order to reduce the number of times the FPSIMD state is needlessly saved
+>   * and restored, we need to keep track of two things:
+>   * (a) for each task, we need to remember which CPU was the last one to have
+> @@ -99,6 +109,287 @@
+>   */
+>  static DEFINE_PER_CPU(struct fpsimd_state *, fpsimd_last_state);
+>  
+> +static void sve_free(struct task_struct *task)
+> +{
+> +	kfree(task->thread.sve_state);
+> +	task->thread.sve_state = NULL;
+> +}
 
-> Have you just brought it up to date or have you acted on Marc Z.'s
-> pending feedback from the last circulation?
-> 
+I think we need a WARN_ON if TIF_SVE is still set here (and the callers
+making sure it is cleared). I haven't checked the code paths via
+fpsimd_release_thread() but wondering what happens if we get an
+interrupt between freeing the state and making the pointer NULL, with
+some context switching in a preemptible kernel.
 
-First 3 patches should be pretty much identical. I've done a bit of 
-rework on patch 4, acting on some of Marc's comments, fixing some issues 
-I found along the road, some refactoring.
+Alternatively, always clear TIF_SVE here before freeing (also wondering
+whether we should make sve_state NULL before the actual freeing but I
+think TIF_SVE clearing should suffice).
 
-Then I added code to the GICv3 irqchip so you can turn an irq as NMI 
-like so:
-irq_set_irqchip_state(virq, IRQCHIP_STATE_NMI, true);
+> +/*
+> + * TIF_SVE controls whether a task can use SVE without trapping while
+> + * in userspace, and also the way a task's FPSIMD/SVE state is stored
+> + * in thread_struct.
+> + *
+> + * The kernel uses this flag to track whether a user task is actively
+> + * using SVE, and therefore whether full SVE register state needs to
+> + * be tracked.  If not, the cheaper FPSIMD context handling code can
+> + * be used instead of the more costly SVE equivalents.
+> + *
+> + *  * TIF_SVE set:
+> + *
+> + *    The task can execute SVE instructions while in userspace without
+> + *    trapping to the kernel.
+> + *
+> + *    When stored, Z0-Z31 (incorporating Vn in bits[127:0] or the
+> + *    corresponding Zn), P0-P15 and FFR are encoded in in
+> + *    task->thread.sve_state, formatted appropriately for vector
+> + *    length task->thread.sve_vl.
+> + *
+> + *    task->thread.sve_state must point to a valid buffer at least
+> + *    sve_state_size(task) bytes in size.
+> + *
+> + *    During any syscall, the kernel may optionally clear TIF_SVE and
+> + *    discard the vector state except for the FPSIMD subset.
+> + *
+> + *  * TIF_SVE clear:
+> + *
+> + *    An attempt by the user task to execute an SVE instruction causes
+> + *    do_sve_acc() to be called, which does some preparation and then
+> + *    sets TIF_SVE.
+> + *
+> + *    When stored, FPSIMD registers V0-V31 are encoded in
+> + *    task->fpsimd_state; bits [max : 128] for each of Z0-Z31 are
+> + *    logically zero but not stored anywhere; P0-P15 and FFR are not
+> + *    stored and have unspecified values from userspace's point of
+> + *    view.  For hygiene purposes, the kernel zeroes them on next use,
+> + *    but userspace is discouraged from relying on this.
+> + *
+> + *    task->thread.sve_state does not need to be non-NULL, valid or any
+> + *    particular size: it must not be dereferenced.
+> + *
+> + *  * FPSR and FPCR are always stored in task->fpsimd_state irrespctive of
+> + *    whether TIF_SVE is clear or set, since these are not vector length
+> + *    dependent.
+> + */
 
-So this means you need to do it through a virtual irq number (e.g. no 
-IPI). I started working on some patches to make it work with IPI as 
-well, but I wanted to get some feeback on this first before finalizing them.
-
-> 
->> To achieve this, set two priorities, one for standard interrupts and
->> another, higher priority, for NMIs. Whenever we want to disable interrupts,
->> we mask the standard priority instead so NMIs can still be raised. Some
->> corner cases though still require to actually mask all interrupts
->> effectively disabling the NMI.
->>
->> Of course, using priority masking instead of PSR.I comes at some cost. On
->> hackbench, I notice a ~6% drop of performance. However, on a kernel build,
->> I do not see significant differences.
-> 
-> Which micro-architecture?
-> 
-
-8 cores A57.
-
-> In micro-benchmarks (with hot caches) I've seen the lock sequence
-> speed up on some designs, slow down a bit on some and slow down a
-> *lot* others. In the worst cases the code impacts Android macro
-> benchmarks like scrolling... on the other hand the code was stable
-> enough to run the whole Android stack reliably.
-> 
-
-So far I only tested with classic Linux distros, so if you find issues 
-with Android (or other) do let me know.
-
-Same if you have any question about the changes.
-
-Thanks,
+This looks fine, thanks for adding the description.
 
 -- 
-Julien Thierry
+Catalin
