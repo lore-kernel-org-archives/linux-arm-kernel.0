@@ -1,67 +1,64 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Wed, 11 Oct 2017 16:51:35 -0500
-Subject: [PATCH 1/5] ARM: dts: dra7-evm-common: Enable relevant IPU and
- DSP MMU nodes
-In-Reply-To: <20171011182246.GE4394@atomide.com>
-References: <20170821235158.4968-1-s-anna@ti.com>
- <20170821235158.4968-2-s-anna@ti.com> <20171011182246.GE4394@atomide.com>
-Message-ID: <11194594-f510-bbcd-831e-a9765b88bb1a@ti.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 11 Oct 2017 17:06:25 -0500
+Subject: [PATCH 4/5] PCI: wait device ready after pci_pm_reset()
+In-Reply-To: <1506212218-29103-4-git-send-email-okaya@codeaurora.org>
+References: <1506212218-29103-1-git-send-email-okaya@codeaurora.org>
+ <1506212218-29103-4-git-send-email-okaya@codeaurora.org>
+Message-ID: <20171011220625.GV25517@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On 10/11/2017 01:22 PM, Tony Lindgren wrote:
-> * Suman Anna <s-anna@ti.com> [170821 16:52]:
->> The MMU nodes for the remote processors IPU1, IPU2, DSP1 and
->> DSP2 have all been enabled. All these nodes are relevant and
->> valid for both the DRA7 EVM and DRA76 EVM boards, so are added
->> in the dra7 common evm dtsi file.
->>
->> Signed-off-by: Suman Anna <s-anna@ti.com>
->> ---
->>  arch/arm/boot/dts/dra7-evm-common.dtsi | 24 ++++++++++++++++++++++++
->>  1 file changed, 24 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/dra7-evm-common.dtsi b/arch/arm/boot/dts/dra7-evm-common.dtsi
->> index 343e95f9a001..01a5d4e0b044 100644
->> --- a/arch/arm/boot/dts/dra7-evm-common.dtsi
->> +++ b/arch/arm/boot/dts/dra7-evm-common.dtsi
->> @@ -256,3 +256,27 @@
->>  		status = "okay";
->>  	};
->>  };
->> +
->> +&mmu0_dsp1 {
->> +	status = "okay";
->> +};
->> +
->> +&mmu1_dsp1 {
->> +	status = "okay";
->> +};
->> +
->> +&mmu0_dsp2 {
->> +	status = "okay";
->> +};
->> +
->> +&mmu1_dsp2 {
->> +	status = "okay";
->> +};
->> +
->> +&mmu_ipu1 {
->> +	status = "okay";
->> +};
->> +
->> +&mmu_ipu2 {
->> +	status = "okay";
->> +};
+On Sat, Sep 23, 2017 at 08:16:57PM -0400, Sinan Kaya wrote:
+> Rev 3.1 Sec 2.3.1 Request Handling Rules says a device can issue CRS
+> following a D3hot->D0 transition. Add pci_dev_wait() call with 1 second
+> timeout to see if device is available before returning.
 > 
-> This is getting quite silly.. The default is "okay" so just remove the useless
-> "disabled" from the common file and all these patches are no longer needed.
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/pci/pci.c | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> index fd4a3b6..074adf9 100644
+> --- a/drivers/pci/pci.c
+> +++ b/drivers/pci/pci.c
+> @@ -3963,6 +3963,7 @@ static int pci_af_flr(struct pci_dev *dev, int probe)
+>   */
+>  static int pci_pm_reset(struct pci_dev *dev, int probe)
+>  {
+> +	unsigned int delay = dev->d3_delay;
+>  	u16 csr;
+>  
+>  	if (!dev->pm_cap || dev->dev_flags & PCI_DEV_FLAGS_NO_PM_RESET)
+> @@ -3988,7 +3989,10 @@ static int pci_pm_reset(struct pci_dev *dev, int probe)
+>  	pci_write_config_word(dev, dev->pm_cap + PCI_PM_CTRL, csr);
+>  	pci_dev_d3_sleep(dev);
+>  
+> -	return 0;
+> +	if (delay < pci_pm_d3_delay)
+> +		delay = pci_pm_d3_delay;
+> +
+> +	return pci_dev_wait(dev, "PM D3->D0", delay, 1000);
 
-Yeah, agreed. Original intention was that some of the other remoteproc
-related nodes can be customized per board, but there's nothing of that
-sort on iommu nodes. Will post a new series. Thanks for the review.
+1) Why do we wait up to 1 second here, when we wait up to 60 seconds
+for the other methods?  Can they all be the same?  Maybe a #define for
+it?
 
-regards
-Suman
+2) I don't really like the fact that we do the initial sleep one place
+and then pass the length of that sleep here.  It's hard to verify
+they're the same and keep them in sync.  I think the only thing you
+use initial_wait for is to include that time in the dmesg messages.
+Maybe we should just omit that time from the message and drop the
+parameter?
+
+>  }
+>  
+>  void pci_reset_secondary_bus(struct pci_dev *dev)
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
