@@ -1,64 +1,37 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 11 Oct 2017 14:07:35 +0900
-Subject: [PATCH v5 03/10] kexec_file: factor out arch_kexec_kernel_*()
- from x86, powerpc
-In-Reply-To: <a8a0f36b-e797-289b-04e3-aa87b4088cdd@arm.com>
-References: <20171010063619.6303-1-takahiro.akashi@linaro.org>
- <20171010063619.6303-4-takahiro.akashi@linaro.org>
- <a8a0f36b-e797-289b-04e3-aa87b4088cdd@arm.com>
-Message-ID: <20171011050734.GE6756@linaro.org>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Tue, 10 Oct 2017 22:08:52 -0700
+Subject: [PATCH v4 0/5] Qualcomm remote filesystem shared memory driver
+Message-ID: <20171011050857.7588-1-bjorn.andersson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 10, 2017 at 12:02:01PM +0100, Julien Thierry wrote:
+Some remote processors (in particular the modem) found in Qualcomm platforms
+stores configuration parameters and other data in a file system. As the remotes
+does not have direct storage access it needs to relay block accesses through a
+service running on the application CPU.
 
-[snip]
+The memory is described in DeviceTree by a new reserved-memory compatible and
+the implementation provides the user space service a read/write interface to
+this chunk of memory.
 
-> >--- a/kernel/kexec_file.c
-> >+++ b/kernel/kexec_file.c
-> >@@ -26,30 +26,79 @@
-> >  #include <linux/vmalloc.h>
-> >  #include "kexec_internal.h"
-> >
-> >+const __weak struct kexec_file_ops * const kexec_file_loaders[] = {NULL};
-> >+
-> >  static int kexec_calculate_store_digests(struct kimage *image);
-> >
-> >+int _kexec_kernel_image_probe(struct kimage *image, void *buf,
-> >+                          unsigned long buf_len)
-> >+{
-> >+     const struct kexec_file_ops *fops;
-> >+     int ret = -ENOEXEC;
-> >+
-> >+     for (fops = kexec_file_loaders[0]; fops && fops->probe; ++fops) {
-> 
-> Hmm, that's not gonna work (and I see that what I said in the previous
-> patch was not 100% correct either).
+Bjorn Andersson (5):
+  of/platform: Generalize /reserved-memory handling
+  of: reserved_mem: Accessor for acquiring reserved_mem
+  dt-binding: soc: qcom: Add binding for rmtfs memory
+  soc: qcom: Remote filesystem memory driver
+  arm64: dts: msm8916: Mark rmtfs node as qcom,rmtfs-mem compatible
 
-Can you elaborate this a bit more?
+ .../bindings/reserved-memory/qcom,rmtfs-mem.txt    |  51 ++++
+ arch/arm64/boot/dts/qcom/msm8916.dtsi              |   3 +
+ drivers/of/of_reserved_mem.c                       |  26 ++
+ drivers/of/platform.c                              |  19 +-
+ drivers/soc/qcom/Kconfig                           |  11 +
+ drivers/soc/qcom/Makefile                          |   1 +
+ drivers/soc/qcom/rmtfs_mem.c                       | 271 +++++++++++++++++++++
+ include/linux/of_reserved_mem.h                    |   5 +
+ 8 files changed, 379 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/reserved-memory/qcom,rmtfs-mem.txt
+ create mode 100644 drivers/soc/qcom/rmtfs_mem.c
 
-I'm sure that, with my code, any member of fops, cannot be changed;
-"const struct kexec_file_ops *fops" means that fops is a pointer to
-"constant sturct kexec_file_ops," while "struct kexec_file_ops *
-const kexec_file_loaders[]" means that kexec_file_loaders is a "constant
-array" of pointers to "constant struct kexec_file_ops."
-
-Thanks,
--Takahiro AKASHI
-
-
-> 'fops' should be of type 'const struct kexec_file_ops **', and the loop
-> should be:
-> 
-> for (fops = &kexec_file_loaders[0]; *fops && (*fops)->probe; ++fops)
-> 
-> With some additional dereferences in the body of the loop.
-> 
-> Unless you prefer the previous state of the loop (with i and the break
-> inside), but I still think this looks better.
-> 
-> Cheers,
-> 
-> --
-> Julien Thierry
-> IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+-- 
+2.12.0
