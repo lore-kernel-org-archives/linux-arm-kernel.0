@@ -1,122 +1,80 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 11 Oct 2017 18:47:18 +0300
-Subject: [PATCH 3/5] dmaengine: Support for querying maximum trasnfer
- length (of an SG element)
-In-Reply-To: <20171008052514.GG30097@localhost>
-References: <20170912104424.18495-1-peter.ujfalusi@ti.com>
- <20170912104424.18495-4-peter.ujfalusi@ti.com>
- <20170921171451.GG30097@localhost>
- <02509904-4ae8-c6f8-3514-5f77d665c9a6@ti.com>
- <20170926165413.GQ30097@localhost>
- <11471508-b61c-7842-2080-7f5c2f292c2b@ti.com>
- <20171008052514.GG30097@localhost>
-Message-ID: <faec0874-7321-c6ce-8201-f919aaeaf248@ti.com>
+From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
+Date: Wed, 11 Oct 2017 17:53:28 +0200
+Subject: [PATCH] dmaengine: stm32-mdma: avoid 64-bit division
+In-Reply-To: <CAK8P3a3j5Awh9V6+PHZf-79TM_7wdQ0GkZZv75a3ztewrw6CmQ@mail.gmail.com>
+References: <20171011140144.3746128-1-arnd@arndb.de>
+ <CA+M3ks74eOSOEwadsjjMcQme_6ivzmYGRdc9jvw4RHYa6dxRTA@mail.gmail.com>
+ <CAK8P3a2RsCXq7L6w5K+KmhP1Q2b1=SjnG2Xws2w232vmyj=yEA@mail.gmail.com>
+ <CA+M3ks4cKxYy15-6ewbMaJOLF0e2NdhwrZUCq-U2s4Y8n212fw@mail.gmail.com>
+ <CAK8P3a3j5Awh9V6+PHZf-79TM_7wdQ0GkZZv75a3ztewrw6CmQ@mail.gmail.com>
+Message-ID: <6e0215da-40f7-128e-5781-00b7d2acbd94@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
 
-On 10/08/2017 08:25 AM, Vinod Koul wrote:
->>>> It is not really static, the size in bytes depends on the dev_width and
->>>> the maxburst:
->>>> dev_width * burst * (SZ_64K - 1);
+
+On 10/11/2017 05:13 PM, Arnd Bergmann wrote:
+> On Wed, Oct 11, 2017 at 4:46 PM, Benjamin Gaignard
+> <benjamin.gaignard@linaro.org> wrote:
+>> 2017-10-11 16:39 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
+>>> On Wed, Oct 11, 2017 at 4:27 PM, Benjamin Gaignard
+>>> <benjamin.gaignard@linaro.org> wrote:
+>>>> 2017-10-11 16:01 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
+>>>>
+>>>>> @@ -398,6 +400,9 @@ static enum dma_slave_buswidth stm32_mdma_get_max_width(u32 buf_len, u32 tlen)
+>>>>>                         break;
+>>>>>         }
+>>>>>
+>>>>> +       if (addr % max_width)
+>>>>> +               max_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+>>>>> +
+>>>>
+>>>> I'm only half-convince by the implicite 32 bits cast done into
+>>>> function prototype.
+>>>> If we keep using dma_addr_t and use do_div() instead of %
+>>>> does compiler can still optimize the code ?
+>>>>
 >>>
->>> well DMAengines work on FIFOs, in above you are giving length as SZ_64K - 1
->>> 'items' which IIUC in DMAengine terms for bytes would always refer wrt width
->>> used and burst applied.
+>>> I wouldn't want to add a do_div() here, since it's guaranteed
+>>> not to be needed. Would you prefer an explicit cast here
+>>> and leave the argument as dma_addr_t?
+>>>
+>>> We could also use a bit mask here like
+>>>
+>>>   if (addr & (max_width-1))
 >>
->> I think we can live with this and let the user to figure out what to do
->> with this information.
+>> That sound better for me since it doesn't limit the code to 32 bits architecture
 > 
-> Right, plus a macro for conversion :) SO that users dont code buggy
-> conversions all over the place
-
-OK, but still the naming... ;)
-
->> But I'm having hard time to figure out a good name for this. It is not
->> the number of SGs we can support, but the number of 'items' within one
->> SG that we have the limit. It could be:
->> u32 max_bursts_per_sg;
+> FWIW, I used the u32 type here because that's the limit of the
+> dma driver, the dma_addr_t gets converted to that anyway
+> later.
 > 
-> this looks fine, another candidate I would use is words_per_sg and while at
-> it why tie it to sg? should we make it words_per_txn but then people should not
-> confuse with txn represented by a descriptor which can have multiple ....
-
-Yes, this limit is not only per SG as the same limit actually applies to
-cyclic's period_len in a same way.
-
-words_per_txn does not sound right as for me the words would refer to
-dev_width number of bytes and I'm seeking on limit on the number of (dev_width
-* bursts) sub-chunks.
-
-bursts_per_chunk? With a long comment?
-
-Which would apply to sg_dma_len in slave_sg(), period_len in cyclic() and len
-in slave_single().
-
+>>>
+>>> or we could combined it with the check above:
+>>>
+>>>                 if ((((buf_len | addr) & (max_width - 1)) == 0) &&
+>>>                    (tlen >= max_width))
 >>
->> which would also apply to period length (for cyclic) in a similar way.
->>
->>> Return length in bytes does make sense (from user PoV), but then you need to
->>> "know" the applied  width and burst. How do you decide those?
->>
->> The number of items works eDMA and sDMA, but we also have the cpp41. It
->> is a packet DMA and it has no understanding of bursts, address widths or
->> any of the 'traditional' things. It only cares about the number of bytes
->> we want to transfer and it has limitation of 4194303 bytes (21bits for
->> length). This is again per SG. How this could report the
->> 'max_bursts_per_sg' ?
+>> No it is more simple to read with two checks
 > 
-> hmmm that is intresting case, is this number coming from USB side?
+> I should have mentioned that this variant would also change
+> behavior: the current code falls back to byte access when
+> the address alignment is less than the length alignment.
+> The change I suggested here would change that to use
+> the maximum possible address width that fits the alignment
+> of either size or address.
 
-No, it is coming from cppi4.1's descriptor. The maximum length of a packet is
-stored in 21bits.
-
-But this is a bit more complicated ;) The whole packet have 21bits size limit,
-but at the same time the whole sg_dma_len() also have this as we can link a
-several host buffer descriptors to one host packet descriptor. Each have
-21bits for length, but at the same time the sum of the hpd and the linked hbd
-length can not be more than what we can store in 21bits...
+Both alignment are required on address and length.
+The main advantage result is maximized in term of width. As for now I don't see
+any drawback except a short explanation.
+Nonetheless I need to think a little bit more about this change.
 
 > 
->> This was one of the reasons that I have settled with the callback.
->>
->> What we can also do is to code this within the DMA drivers itself.
->>
->> When setting up the transfer and we realize that one of the SG will not
->> going to fit, we destroy what we have done so far, pass the sg list
->> along with length/sg limit to create a new sg list where all sg item's
->> length is under the limit. Then using this new sg list we can set up the
->> transfer.
->>
->> I'm not sure how hard is to do the sg list optimization, I see that
->> sg_split() is not what we want so we might need to code this in
->> dmaengine or in the scatterlist code.
->>
->> We certainly don't want to verify all slave_sg transfers proactively to
->> avoid adding latency when it is not necessary.
+> I don't know what behavior we actually want though, or
+> if that change would be correct.
 > 
-> latency would be added at prepare, not when submitting..
+>       Arnd
+> 
 
-Yes, but you submit transfers all the time, and added latency would be crucial.
-
-But this could be done with a DMAengine internal helper, I think.
-If a DMA driver figures out that one of the SG length is over the supported
-limit, then it could clean up everything and call something like:
-
-struct dma_async_tx_descriptor *dmaengine_fixup_and_prep_slave_sg(
-	struct dma_chan *chan, struct scatterlist *sgl,
-	unsigned int sg_len, enum dma_transfer_direction dir,
-	unsigned long flags, size_t max_sg_dma_len)
-
-and this would split up the original SG list to a temp one meeting the
-max_sg_dma_len and call chan->device->device_prep_slave_sg()
-
-In this round the setup would succeed and the caller and I would be happy.
-
-But if the caller already aware of the sg_dma_len limit it can prepare the SG
-list correctly and we save time to recreate the list.
-
--- 
-P?ter
+Regards
+Py
