@@ -1,60 +1,34 @@
 From: jacob-chen@iotwrt.com (Jacob Chen)
-Date: Wed, 11 Oct 2017 15:29:34 +0800
-Subject: [PATCH v12 1/5] dt-bindings: Document the Rockchip RGA bindings
+Date: Wed, 11 Oct 2017 15:29:36 +0800
+Subject: [PATCH v12 3/5] MAINTAINERS: add entry for Rockchip RGA driver
 In-Reply-To: <20171011072938.383-1-jacob-chen@iotwrt.com>
 References: <20171011072938.383-1-jacob-chen@iotwrt.com>
-Message-ID: <20171011072938.383-2-jacob-chen@iotwrt.com>
+Message-ID: <20171011072938.383-4-jacob-chen@iotwrt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT bindings documentation for Rockchip RGA
-
 Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/media/rockchip-rga.txt     | 33 ++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/media/rockchip-rga.txt
+ MAINTAINERS | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/media/rockchip-rga.txt b/Documentation/devicetree/bindings/media/rockchip-rga.txt
-new file mode 100644
-index 000000000000..fd5276abfad6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/media/rockchip-rga.txt
-@@ -0,0 +1,33 @@
-+device-tree bindings for rockchip 2D raster graphic acceleration controller (RGA)
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 6671f375f7fc..335497bbc3f3 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -11509,6 +11509,13 @@ F:	drivers/hid/hid-roccat*
+ F:	include/linux/hid-roccat*
+ F:	Documentation/ABI/*/sysfs-driver-hid-roccat*
+ 
++ROCKCHIP RASTER 2D GRAPHIC ACCELERATION UNIT DRIVER
++M:	Jacob chen <jacob-chen@iotwrt.com>
++L:	linux-media at vger.kernel.org
++S:	Maintained
++F:	drivers/media/platform/rockchip/rga/
++F:	Documentation/devicetree/bindings/media/rockchip-rga.txt
 +
-+RGA is a standalone 2D raster graphic acceleration unit. It accelerates 2D
-+graphics operations, such as point/line drawing, image scaling, rotation,
-+BitBLT, alpha blending and image blur/sharpness.
-+
-+Required properties:
-+- compatible: value should be one of the following
-+		"rockchip,rk3288-rga";
-+		"rockchip,rk3399-rga";
-+
-+- interrupts: RGA interrupt specifier.
-+
-+- clocks: phandle to RGA sclk/hclk/aclk clocks
-+
-+- clock-names: should be "aclk", "hclk" and "sclk"
-+
-+- resets: Must contain an entry for each entry in reset-names.
-+  See ../reset/reset.txt for details.
-+- reset-names: should be "core", "axi" and "ahb"
-+
-+Example:
-+SoC-specific DT entry:
-+	rga: rga at ff680000 {
-+		compatible = "rockchip,rk3399-rga";
-+		reg = <0xff680000 0x10000>;
-+		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru ACLK_RGA>, <&cru HCLK_RGA>, <&cru SCLK_RGA_CORE>;
-+		clock-names = "aclk", "hclk", "sclk";
-+
-+		resets = <&cru SRST_RGA_CORE>, <&cru SRST_A_RGA>, <&cru SRST_H_RGA>;
-+		reset-names = "core, "axi", "ahb";
-+	};
+ ROCKER DRIVER
+ M:	Jiri Pirko <jiri@resnulli.us>
+ L:	netdev at vger.kernel.org
 -- 
 2.14.1
