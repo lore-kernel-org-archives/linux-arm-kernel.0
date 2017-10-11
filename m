@@ -1,58 +1,50 @@
 From: liuwenliang@huawei.com (Abbott Liu)
-Date: Wed, 11 Oct 2017 16:22:22 +0800
-Subject: [PATCH 06/11] change memory_is_poisoned_16 for aligned error
+Date: Wed, 11 Oct 2017 16:22:26 +0800
+Subject: [PATCH 10/11] Change mapping of kasan_zero_page int readonly
 In-Reply-To: <20171011082227.20546-1-liuwenliang@huawei.com>
 References: <20171011082227.20546-1-liuwenliang@huawei.com>
-Message-ID: <20171011082227.20546-7-liuwenliang@huawei.com>
+Message-ID: <20171011082227.20546-11-liuwenliang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Because arm instruction set don't support access the address which is
- not aligned, so must change memory_is_poisoned_16 for arm.
+ Because the kasan_zero_page(which is used as the shadow
+ region for some memory that KASan doesn't need to track.) won't be writen
+ after kasan_init, so change the mapping of kasan_zero_page into readonly.
 
-Cc:  Andrey Ryabinin <a.ryabinin@samsung.com>
-Signed-off-by: Abbott Liu <liuwenliang@huawei.com>
+Cc: Andrey Ryabinin <a.ryabinin@samsung.com>
 ---
- mm/kasan/kasan.c | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/mm/kasan_init.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/mm/kasan/kasan.c b/mm/kasan/kasan.c
-index 12749da..e0e152b 100644
---- a/mm/kasan/kasan.c
-+++ b/mm/kasan/kasan.c
-@@ -149,6 +149,25 @@ static __always_inline bool memory_is_poisoned_2_4_8(unsigned long addr,
- 	return memory_is_poisoned_1(addr + size - 1);
- }
- 
-+#ifdef CONFIG_ARM
-+static __always_inline bool memory_is_poisoned_16(unsigned long addr)
-+{
-+	u8 *shadow_addr = (u8 *)kasan_mem_to_shadow((void *)addr);
-+
-+	if (unlikely(shadow_addr[0] || shadow_addr[1])) return true;
-+	else {
-+		/*
-+		 * If two shadow bytes covers 16-byte access, we don't
-+		 * need to do anything more. Otherwise, test the last
-+		 * shadow byte.
-+		 */
-+		if (likely(IS_ALIGNED(addr, KASAN_SHADOW_SCALE_SIZE)))
-+			return false;
-+		return memory_is_poisoned_1(addr + 15);
-+	}
-+}
-+
-+#else
- static __always_inline bool memory_is_poisoned_16(unsigned long addr)
+diff --git a/arch/arm/mm/kasan_init.c b/arch/arm/mm/kasan_init.c
+index 7cfdc39..c11826a 100644
+--- a/arch/arm/mm/kasan_init.c
++++ b/arch/arm/mm/kasan_init.c
+@@ -200,6 +200,7 @@ void __init kasan_init(void)
  {
- 	u16 *shadow_addr = (u16 *)kasan_mem_to_shadow((void *)addr);
-@@ -159,6 +178,7 @@ static __always_inline bool memory_is_poisoned_16(unsigned long addr)
+ 	struct memblock_region *reg;
+ 	u64 orig_ttbr0;
++	int i;
  
- 	return *shadow_addr;
- }
-+#endif
+ 	orig_ttbr0 = cpu_get_ttbr(0);
  
- static __always_inline unsigned long bytes_is_nonzero(const u8 *start,
- 					size_t size)
+@@ -243,6 +244,17 @@ void __init kasan_init(void)
+ 	create_mapping((unsigned long)kasan_mem_to_shadow((void *)MODULES_VADDR),
+ 		(unsigned long)kasan_mem_to_shadow((void *)(PKMAP_BASE+PMD_SIZE)),
+ 		NUMA_NO_NODE);
++
++	/*
++	 * KAsan may reuse the contents of kasan_zero_pte directly, so we
++	 * should make sure that it maps the zero page read-only.
++	 */
++	for (i = 0; i < PTRS_PER_PTE; i++)
++                set_pte_at(&init_mm, KASAN_SHADOW_START + i*PAGE_SIZE,
++                        &kasan_zero_pte[i], pfn_pte(
++                                virt_to_pfn(kasan_zero_page),
++                                __pgprot(_L_PTE_DEFAULT | L_PTE_DIRTY | L_PTE_XN | L_PTE_RDONLY)));
++	memset(kasan_zero_page, 0, PAGE_SIZE);
+ 	cpu_set_ttbr0(orig_ttbr0);
+ 	flush_cache_all();
+ 	local_flush_bp_all();
 -- 
 2.9.0
