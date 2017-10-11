@@ -1,31 +1,104 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 10 Oct 2017 23:17:26 -0700
-Subject: [PATCH 1/3] arm64: dts: qcom: msm8996: add support to pcie
-In-Reply-To: <20170814113420.30866-1-srinivas.kandagatla@linaro.org>
-References: <20170814113420.30866-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20171011061726.GO1165@minitux>
+From: nandor.han@ge.com (Han, Nandor (GE Healthcare))
+Date: Wed, 11 Oct 2017 06:22:53 +0000
+Subject: [PATCH 1/1] tty: serial: imx: disable ageing timer interrupt if
+ dma in use
+In-Reply-To: <20171007014648.6989-1-troy.kisky@boundarydevices.com>
+References: <20171007014648.6989-1-troy.kisky@boundarydevices.com>
+Message-ID: <AM3P101MB01800FAA2029393C5A859629E64A0@AM3P101MB0180.NAMP101.PROD.OUTLOOK.COM>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 14 Aug 04:34 PDT 2017, srinivas.kandagatla at linaro.org wrote:
 
-> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> 
-> This patch adds support to 3 pcie root complexes found on MSM8996.
-> 
-[..]
-> diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-[..]
-> +		agnoc at 0 {
-> +			power-domains = <&gcc AGGRE0_NOC_GDSC>;
-> +			compatible = "simple-pm-bus";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
 
-I also need to enable GCC_AGGRE0_SNOC_AXI_CLK, GCC_AGGRE0_CNOC_AHB_CLK
-and GCC_SMMU_AGGRE0_AXI_CLK for pcie to actually work. It find the
-atl1c, but the board restarts as the interface is brought up.
+> -----Original Message-----
+> From: linux-serial-owner at vger.kernel.org [mailto:linux-serial-
+> owner at vger.kernel.org] On Behalf Of Troy Kisky
+> Sent: 07 October 2017 04:47
+> To: gregkh at linuxfoundation.org
+> Cc: fabio.estevam at nxp.com; l.stach at pengutronix.de; u.kleine-
+> koenig at pengutronix.de; linux-serial at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; Troy Kisky <troy.kisky@boundarydevices.com>
+> Subject: EXT: [PATCH 1/1] tty: serial: imx: disable ageing timer interrupt if
+> dma in use
+> 
+> Since commit 4dec2f119e86 ("imx-serial: RX DMA startup latency")
+> 
+> the interrupt routine no longer will start rx dma.
+
+I think you have 2 commits here: 
+- one that disables ageing timer when DMA is in use
+- one that cleans the leftovers after 4dec2f119e86.
+
+> 
+> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> ---
+>  drivers/tty/serial/imx.c | 34 ++--------------------------------
+>  1 file changed, 2 insertions(+), 32 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c index
+> dfeff3951f93..15b0ecb4cf60 100644
+> --- a/drivers/tty/serial/imx.c
+> +++ b/drivers/tty/serial/imx.c
+> @@ -732,29 +732,6 @@ static void imx_disable_rx_int(struct imx_port
+> *sport)  }
+> 
+>  static void clear_rx_errors(struct imx_port *sport); -static int
+> start_rx_dma(struct imx_port *sport);
+> -/*
+> - * If the RXFIFO is filled with some data, and then we
+> - * arise a DMA operation to receive them.
+> - */
+> -static void imx_dma_rxint(struct imx_port *sport) -{
+> -	unsigned long temp;
+> -	unsigned long flags;
+> -
+> -	spin_lock_irqsave(&sport->port.lock, flags);
+> -
+> -	temp = readl(sport->port.membase + USR2);
+> -	if ((temp & USR2_RDR) && !sport->dma_is_rxing) {
+> -
+> -		imx_disable_rx_int(sport);
+> -
+> -		/* tell the DMA to receive the data. */
+> -		start_rx_dma(sport);
+> -	}
+> -
+> -	spin_unlock_irqrestore(&sport->port.lock, flags);
+> -}
+> 
+>  /*
+>   * We have a modem side uart, so the meanings of RTS and CTS are inverted.
+> @@ -816,11 +793,8 @@ static irqreturn_t imx_int(int irq, void *dev_id)
+>  	sts = readl(sport->port.membase + USR1);
+>  	sts2 = readl(sport->port.membase + USR2);
+> 
+> -	if (sts & (USR1_RRDY | USR1_AGTIM)) {
+> -		if (sport->dma_is_enabled)
+> -			imx_dma_rxint(sport);
+> -		else
+> -			imx_rxint(irq, dev_id);
+> +	if (!sport->dma_is_enabled && (sts & (USR1_RRDY |
+> USR1_AGTIM))) {
+> +		imx_rxint(irq, dev_id);
+
+I don't think we need the check `!sport->dma_is_enabled ` since RRDY and AGTIM interrupts should be disable when DMA is enabled.
+
+>  		ret = IRQ_HANDLED;
+>  	}
+> 
+> @@ -1207,10 +1181,6 @@ static void imx_enable_dma(struct imx_port
+> *sport)
+>  	temp |= UCR1_RDMAEN | UCR1_TDMAEN | UCR1_ATDMAEN;
+>  	writel(temp, sport->port.membase + UCR1);
+> 
+> -	temp = readl(sport->port.membase + UCR2);
+> -	temp |= UCR2_ATEN;
+> -	writel(temp, sport->port.membase + UCR2);
+> -
+
+I think this should be moved to imx_startup. At least RRDY is configured there. 
+
+<snip>
 
 Regards,
-Bjorn
+Nandor
