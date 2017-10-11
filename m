@@ -1,52 +1,120 @@
-From: christina.jacob.koikara@gmail.com (Christina Jacob)
-Date: Wed, 11 Oct 2017 22:36:48 +0530
-Subject: [PATCH v2] XDP Program for Ip forward
-In-Reply-To: <20171010160057.32678367@redhat.com>
-References: <1507620532-25804-1-git-send-email-Christina.Jacob@cavium.com>
- <20171010151231.69fde82f@redhat.com> <20171010160057.32678367@redhat.com>
-Message-ID: <CAGSfdShhRGe97-EtgYGFdYhEtGfFPU_OmeCX3UkxkCZ5XGCt4A@mail.gmail.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Wed, 11 Oct 2017 18:11:19 +0100
+Subject: [PATCH v3 02/20] arm64: introduce an order for exceptions
+In-Reply-To: <20171005191812.5678-3-james.morse@arm.com>
+References: <20171005191812.5678-1-james.morse@arm.com>
+ <20171005191812.5678-3-james.morse@arm.com>
+Message-ID: <b4c4fe24-435f-6582-dd77-e00479875437@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 10, 2017 at 7:30 PM, Jesper Dangaard Brouer
-<brouer@redhat.com> wrote:
->
-> On Tue, 10 Oct 2017 15:12:31 +0200
-> Jesper Dangaard Brouer <brouer@redhat.com> wrote:
->
-> > I'll try to test/benchmark your program...
->
-> In my initial testing, I cannot get this to work...
->
 
-What is the test setup you are using? So that I can also test
-I verified the program in this minimal test setup, I did not see any
-issue with the mac addresses being set.
 
-Below is the test setup.
+On 05/10/17 20:17, James Morse wrote:
+> Currently SError is always masked in the kernel. To support RAS exceptions
+> using SError on hardware with the v8.2 RAS Extensions we need to unmask
+> SError as much as possible.
+> 
+> Let's define an order for masking and unmasking exceptions. 'dai' is
+> memorable and effectively what we have today.
+> 
+> Disabling debug exceptions should cause all other exceptions to be masked.
+> Masking SError should mask irq, but not disable debug exceptions.
+> Masking irqs has no side effects for other flags. Keeping to this order
+> makes it easier for entry.S to know which exceptions should be unmasked.
+> 
+> FIQ is never expected, but we mask it when we mask debug exceptions, and
+> unmask it at all other times.
+> 
+> Given masking debug exceptions masks everything, we don't need macros
+> to save/restore that bit independently. Remove them and switch the last
+> caller over to {en,dis}able_daif().
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
 
-machine 1                                             machine 2
-(90.0.0.2)port 1 ===============>port3(90.0.0.1)
-                                                               ||
-(80.0.0.2)port 2<================port4(80.0.0.1)
-traffic gen                                             xdp program
+Reviewed-by: Julien Thierry <julien.thierry@arm.com>
 
-Below are the steps followed to run the program.
+> ---
+>   arch/arm64/include/asm/irqflags.h  | 34 +++++++++++++---------------------
+>   arch/arm64/kernel/debug-monitors.c |  5 +++--
+>   2 files changed, 16 insertions(+), 23 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
+> index 8c581281fa12..9ecdca7011f0 100644
+> --- a/arch/arm64/include/asm/irqflags.h
+> +++ b/arch/arm64/include/asm/irqflags.h
+> @@ -21,6 +21,19 @@
+>   #include <asm/ptrace.h>
+>   
+>   /*
+> + * Aarch64 has flags for masking: Debug, Asynchronous (serror), Interrupts and
+> + * FIQ exceptions, in the 'daif' register. We mask and unmask them in 'dai'
+> + * order:
+> + * Masking debug exceptions causes all other exceptions to be masked too/
+> + * Masking SError masks irq, but not debug exceptions. Masking irqs has no
+> + * side effects for other flags. Keeping to this order makes it easier for
+> + * entry.S to know which exceptions should be unmasked.
+> + *
+> + * FIQ is never expected, but we mask it when we disable debug exceptions, and
+> + * unmask it at all other times.
+> + */
+> +
+> +/*
+>    * CPU interrupt mask handling.
+>    */
+>   static inline unsigned long arch_local_irq_save(void)
+> @@ -89,26 +102,5 @@ static inline int arch_irqs_disabled_flags(unsigned long flags)
+>   {
+>   	return flags & PSR_I_BIT;
+>   }
+> -
+> -/*
+> - * save and restore debug state
+> - */
+> -#define local_dbg_save(flags)						\
+> -	do {								\
+> -		typecheck(unsigned long, flags);			\
+> -		asm volatile(						\
+> -		"mrs    %0, daif		// local_dbg_save\n"	\
+> -		"msr    daifset, #8"					\
+> -		: "=r" (flags) : : "memory");				\
+> -	} while (0)
+> -
+> -#define local_dbg_restore(flags)					\
+> -	do {								\
+> -		typecheck(unsigned long, flags);			\
+> -		asm volatile(						\
+> -		"msr    daif, %0		// local_dbg_restore\n"	\
+> -		: : "r" (flags) : "memory");				\
+> -	} while (0)
+> -
+>   #endif
+>   #endif
+> diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+> index c7ef99904934..bbfa4978b657 100644
+> --- a/arch/arm64/kernel/debug-monitors.c
+> +++ b/arch/arm64/kernel/debug-monitors.c
+> @@ -30,6 +30,7 @@
+>   
+>   #include <asm/cpufeature.h>
+>   #include <asm/cputype.h>
+> +#include <asm/daifflags.h>
+>   #include <asm/debug-monitors.h>
+>   #include <asm/system_misc.h>
+>   
+> @@ -46,9 +47,9 @@ u8 debug_monitors_arch(void)
+>   static void mdscr_write(u32 mdscr)
+>   {
+>   	unsigned long flags;
+> -	local_dbg_save(flags);
+> +	flags = local_mask_daif();
+>   	write_sysreg(mdscr, mdscr_el1);
+> -	local_dbg_restore(flags);
+> +	local_restore_daif(flags);
+>   }
+>   NOKPROBE_SYMBOL(mdscr_write);
+>   
+> 
 
- Assigned ips in different subnets to interfaces 3 and 4
-Ip of port 1 is in the same subnet as port 3
-Ip of port 2 is in the same subnet as port 4
-sysctl -w net.core.bpf_jit_enable=1
-./xdp_router_ipv4 eth0 eth1
-
-Note: The program will not generate arp requests. Proper arp entries
-need to be added to get the packets forwarded correctly.
-
-> You do seem to XDP_REDIRECT out the right interface, but you have an
-> error with setting the correct MAC address.
->
-> --
-> Best regards,
->   Jesper Dangaard Brouer
->   MSc.CS, Principal Kernel Engineer at Red Hat
->   LinkedIn: http://www.linkedin.com/in/brouer
+-- 
+Julien Thierry
