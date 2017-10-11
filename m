@@ -1,54 +1,37 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 11 Oct 2017 13:19:54 +0100
-Subject: [PATCH v2 2/3] arm64: KVM: Support Common Not Private translations
-In-Reply-To: <1507724395-13735-1-git-send-email-vladimir.murzin@arm.com>
-References: <1507724395-13735-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1507724395-13735-3-git-send-email-vladimir.murzin@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 11 Oct 2017 13:37:05 +0100
+Subject: [PATCH v2] arm64: Expose support for optional ARMv8-A features
+In-Reply-To: <20171010143530.fiomo7pqvtojflnn@localhost>
+References: <20171010095310.30115-1-suzuki.poulose@arm.com>
+ <20171010143530.fiomo7pqvtojflnn@localhost>
+Message-ID: <20171011123705.GE11106@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We rely on cpufeature framework to detect and enable CNP so for KVM we
-need to patch hyp to set CNP bit just before TTBR0_EL2 gets written.
-For the guest it is enough to update VTTBR_EL2 with CNP bit just
-before it gets scheduled.
+On Tue, Oct 10, 2017 at 03:35:30PM +0100, Catalin Marinas wrote:
+> On Tue, Oct 10, 2017 at 10:53:10AM +0100, Suzuki K. Poulose wrote:
+> > diff --git a/arch/arm64/include/uapi/asm/hwcap.h b/arch/arm64/include/uapi/asm/hwcap.h
+> > index 4b9344cba83a..a4bad90a3fa3 100644
+> > --- a/arch/arm64/include/uapi/asm/hwcap.h
+> > +++ b/arch/arm64/include/uapi/asm/hwcap.h
+> > @@ -36,5 +36,10 @@
+> >  #define HWCAP_FCMA		(1 << 14)
+> >  #define HWCAP_LRCPC		(1 << 15)
+> >  #define HWCAP_DCPOP		(1 << 16)
+> > +#define HWCAP_SHA3		(1 << 17)
+> > +#define HWCAP_SM3		(1 << 18)
+> > +#define HWCAP_SM4		(1 << 19)
+> > +#define HWCAP_ASIMDDP		(1 << 20)
+> > +#define HWCAP_SHA512		(1 << 21)
+> 
+> We may be getting some conflicts around these with additional patches
+> coming in but not hard to solve. Anyway, whether we are getting pointer
+> authentication in or not (probably the latter), I would really like to
+> get the first patch in that series merged:
+> 
+> http://lkml.kernel.org/r/1500480092-28480-2-git-send-email-mark.rutland at arm.com
 
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
- arch/arm64/kvm/hyp-init.S   | 4 ++++
- arch/arm64/kvm/hyp/switch.c | 6 +++++-
- 2 files changed, 9 insertions(+), 1 deletion(-)
+Suzuki -- can you take Mark's patch above and update the documentation to
+include the new hwcaps you've added, please?
 
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-index 3f96155..4fd31b3 100644
---- a/arch/arm64/kvm/hyp-init.S
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -63,6 +63,10 @@ __do_hyp_init:
- 	cmp	x0, #HVC_STUB_HCALL_NR
- 	b.lo	__kvm_handle_stub_hvc
- 
-+alternative_if ARM64_HAS_CNP
-+	orr	x0, x0, #TTBR_CNP_BIT
-+alternative_else_nop_endif
-+
- 	msr	ttbr0_el2, x0
- 
- 	mrs	x4, tcr_el1
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 945e79c..a1f3bf2 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -150,7 +150,11 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
- static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
- {
- 	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
--	write_sysreg(kvm->arch.vttbr, vttbr_el2);
-+	u64 val = kvm->arch.vttbr;
-+
-+	if (system_supports_cnp())
-+		val |= TTBR_CNP_BIT;
-+	write_sysreg(val, vttbr_el2);
- }
- 
- static void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
--- 
-2.0.0
+Will
