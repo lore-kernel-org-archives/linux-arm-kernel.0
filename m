@@ -1,424 +1,158 @@
-From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
-Date: Wed, 11 Oct 2017 16:59:41 +0100
-Subject: [PATCH 1/4] iio: adc: ina2xx: Make max expected current
- configurable
-In-Reply-To: <3a64c5a7-6acb-41dd-a18d-6b92b2bef560@samsung.com>
-References: <1506603015-27202-1-git-send-email-m.purski@samsung.com>
- <CGME20170928125053eucas1p19e757ac5c3774f54c7cd0ee4525decbe@eucas1p1.samsung.com>
- <1506603015-27202-2-git-send-email-m.purski@samsung.com>
- <20171001112934.360c840b@archlinux>
- <f04fb517-9866-39fe-310d-b65a915375ca@samsung.com>
- <20171008104756.6eaa62c5@archlinux>
- <662441b9-1b04-3e8b-baac-5852ba873ca5@samsung.com>
- <20171009143539.00002222@huawei.com>
- <3a64c5a7-6acb-41dd-a18d-6b92b2bef560@samsung.com>
-Message-ID: <20171011165941.00006914@huawei.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 11 Oct 2017 18:03:25 +0200
+Subject: [PATCH v3 5/7] nvmem: imx-ocotp: Add i.MX7D timing write clock
+ setup support
+In-Reply-To: <1507558312-20580-6-git-send-email-pure.logic@nexus-software.ie>
+References: <1507558312-20580-1-git-send-email-pure.logic@nexus-software.ie>
+ <1507558312-20580-6-git-send-email-pure.logic@nexus-software.ie>
+Message-ID: <1507737805.22082.11.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 11 Oct 2017 16:42:53 +0200
-Maciej Purski <m.purski@samsung.com> wrote:
-
-> On 10/09/2017 03:35 PM, Jonathan Cameron wrote:
-> > On Mon, 9 Oct 2017 10:08:42 +0200
-> > Maciej Purski <m.purski@samsung.com> wrote:
-> >   
-> >> On 10/08/2017 11:47 AM, Jonathan Cameron wrote:  
-> >>> On Wed, 04 Oct 2017 09:11:31 +0200
-> >>> Maciej Purski <m.purski@samsung.com> wrote:
-> >>>      
-> >>>> On 10/01/2017 12:29 PM, Jonathan Cameron wrote:  
-> >>>>> On Thu, 28 Sep 2017 14:50:12 +0200
-> >>>>> Maciej Purski <m.purski@samsung.com> wrote:
-> >>>>>         
-> >>>>>> Max expected current is used for calculating calibration register value,
-> >>>>>> Current LSB and Power LSB according to equations found in ina datasheet.
-> >>>>>> Max expected current is now implicitly set to default value,
-> >>>>>> which is 2^15, thanks to which Current LSB is equal to 1 mA and
-> >>>>>> Power LSB is equal to 20000 uW or 25000 uW depending on ina model.
-> >>>>>>
-> >>>>>> Make max expected current configurable, just like it's already done
-> >>>>>> with shunt resistance: from device tree, platform_data or later
-> >>>>>> from sysfs. On each max_expected_current change, calculate new values
-> >>>>>> for Current LSB and Power LSB. According to datasheet Current LSB should
-> >>>>>> be calculated by dividing max expected current by 2^15, as values read
-> >>>>>> from device registers are in this case 16-bit integers. Power LSB
-> >>>>>> is calculated by multiplying Current LSB by a factor, which is defined
-> >>>>>> in ina documentation.  
-> >>>>>
-> >>>>> One odd bit of casting inline.  Also this is new userspace ABI.
-> >>>>> It needs documenting in
-> >>>>>
-> >>>>> Documentation/ABI/testing/sysfs-bus-iio* as appropriate.
-> >>>>> I'm also unclear on one element about this - is it a value used only
-> >>>>> for calibration or are we talking about the actual 'range' of the device?
-> >>>>>         
-> >>>>
-> >>>> This is used for calibration. The device measures directly only voltage.
-> >>>> However, it has also current and power registers. Their values are
-> >>>> calculated by the device using the calibration register which is calculated
-> >>>> using max expected current. So I guess that it's not what you mean
-> >>>> by the actual 'range' of the device.
-> >>>>     
-> >>>>> The interpretation of this value isn't clear against the more general
-> >>>>> ABI.
-> >>>>>
-> >>>>> In particular it is it in raw units (adc counts) or mA?  Docs say
-> >>>>> that but the naming of the attribute doesn't make this clear.
-> >>>>>         
-> >>>>
-> >>>> It's in mA. I can make it clear in the attribute name.
-> >>>>     
-> >>>>> Also I'm unconvinced this isn't better represented using the
-> >>>>> range specifications available for any IIO attribute on the raw
-> >>>>> value in combination with adjusting the scale value.
-> >>>>> Note not many drivers yet provide ranges on their raw outputs
-> >>>>> but we do have core support for it.  I've been meaning to start
-> >>>>> pushing this out into drivers, but been busy since we introduced
-> >>>>> the core support.  The dpot-dac driver does use it for examplel
-> >>>>>        
-> >>>>
-> >>>>
-> >>>> I'm not sure if what I'm about to add is similar to what is done
-> >>>> in the mentioned dpot-dac driver. It seems that the callback read_avail
-> >>>> returns information on raw values which can be obtained from the device.
-> >>>> What I need is an adjustable value, which is then used by the device internally
-> >>>> in order to calculate current with the requested precision. Max expected current
-> >>>> is also used for calculating the scale value.
-> >>>> Tell me if I'm wrong. Maybe I misunderstood the 'range' concept in IIO and
-> >>>> your solution fits in here.
-> >>>>     
-> >>>
-> >>> I think I answered this in the other branch of the thread.
-> >>> _calibscale is what you want here as it's internal to the device.
-> >>>
-> >>> It's not one often used for ADCs but quite a few other types of
-> >>> device provide some front end analog adjustment (whilst it is digital
-> >>> here, it is applied within the device - so we don't need to care).
-> >>>
-> >>> Jonathan  
-> >>
-> >> Thank you for your explanation. Calibscale seems suitable for me in this case,
-> >> but what do you think I should do then with SCALE attribute? Should I get rid of
-> >> it for current and use only calibscale? Or should I use both calibscale and
-> >> scale attributes and for current they will be the same value?  
-> > 
-> > You'll have to leave it as it is existing ABI.  It won't have the same value
-> > as calibscale.  Calibscale is for internal changes that don't effect the raw
-> > value.  scale is to be applied by userspace to the raw value. As I understand it
-> > here the calibscale value should have no effect on scale.  
+On Mon, 2017-10-09 at 15:11 +0100, Bryan O'Donoghue wrote:
+> This patch adds logic to correctly setup the write timing parameters
+> when blowing an OTP fuse for the i.MX7S/D.
 > 
+> Fixes: 0642bac7da42 ("nvmem: imx-ocotp: add write support")
 > 
-> Sorry, but now I'm a little bit confused. Which value would you
-> like me to substitute with calibscale - max_expected_current or current_lsb?
-
-As it is an internal scale it actually doesn't matter which one you use.  Both
-are valid.
-
-> Both values do have effect on the scale, as scale is basically
-> current_lsb / 1000 and on the raw value, as current register is calculated
-> internally using current_lsb.
-
-Hmm The terminology in the datasheet is confusing.  I read it as these were
-intended to 'calibrate' the system.  They aren't - they are intended to apply
-a scaling to make the output use the full range. 
-
-So they will effect the scale which is nasty.
-The annoying bit about this is that means the key value you should be modifying
-is scale and you should not use calibscale at all.  It isn't appropriate because
-that is not meant to effect the scale of the exposed value.  It's for calibration
-to correct device inaccuracies. That isn't true here.
-
-Anyhow, so scale is all you should need.  A bit ugly but there we are.
-
-
+> Signed-off-by: Bryan O'Donoghue <pure.logic@nexus-software.ie>
+> ---
+>  drivers/nvmem/imx-ocotp.c | 63 ++++++++++++++++++++++++++++++++++++++---------
+>  1 file changed, 52 insertions(+), 11 deletions(-)
 > 
-> The content of current register is always RAW unless we set current_lsb to 1. 
-> See the documentation:
-> http://www.ti.com/lit/ds/symlink/ina231.pdf
-> page 15
-> 
-> Thanks,
-> 
-> Maciej
-> 
-> >>
-> >> I should mention that currenst_lsb value is also used for calculating power_lsb
-> >> as they have a fixed ratio (20 or 25) given in the documentation.  
-> > 
-> > Then expose it for power as well (appropriately adjusted).
-> > In IIO ABI it is fine to have two elements addressing the same underlying hardware
-> > value - rule is you change something, you check everything else hasn't changed.
-> > 
-> > Jonathan >>  
-> >> Thanks,
-> >>
-> >> Maciej
-> >>  
-> >>>      
-> >>>> Best regards,
-> >>>>
-> >>>> 	Maciej  
-> >>>>> This moves the burden of calculating the 1lsb value to userspace,
-> >>>>> but importantly it would give us a consistent ABI where this fits
-> >>>>> in with existing elements (largely buy not introducing any new
-> >>>>> ones :).
-> >>>>>
-> >>>>> Thanks,
-> >>>>>
-> >>>>> Jonathan  
-> >>>>>>
-> >>>>>> Signed-off-by: Maciej Purski <m.purski@samsung.com>
-> >>>>>> ---
-> >>>>>>     drivers/iio/adc/ina2xx-adc.c         | 110 ++++++++++++++++++++++++++++++-----
-> >>>>>>     include/linux/platform_data/ina2xx.h |   2 +
-> >>>>>>     2 files changed, 98 insertions(+), 14 deletions(-)
-> >>>>>>
-> >>>>>> diff --git a/drivers/iio/adc/ina2xx-adc.c b/drivers/iio/adc/ina2xx-adc.c
-> >>>>>> index f387b97..883fede 100644
-> >>>>>> --- a/drivers/iio/adc/ina2xx-adc.c
-> >>>>>> +++ b/drivers/iio/adc/ina2xx-adc.c
-> >>>>>> @@ -56,6 +56,7 @@
-> >>>>>>     #define INA226_DEFAULT_IT		1110
-> >>>>>>     
-> >>>>>>     #define INA2XX_RSHUNT_DEFAULT           10000
-> >>>>>> +#define INA2XX_MAX_EXPECTED_A_DEFAULT	(1 << 15)	/* current_lsb = 1 mA */
-> >>>>>>     
-> >>>>>>     /*
-> >>>>>>      * bit masks for reading the settings in the configuration register
-> >>>>>> @@ -114,7 +115,7 @@ struct ina2xx_config {
-> >>>>>>     	int shunt_div;
-> >>>>>>     	int bus_voltage_shift;
-> >>>>>>     	int bus_voltage_lsb;	/* uV */
-> >>>>>> -	int power_lsb;		/* uW */
-> >>>>>> +	int power_lsb_factor;
-> >>>>>>     	enum ina2xx_ids chip_id;
-> >>>>>>     };
-> >>>>>>     
-> >>>>>> @@ -123,7 +124,10 @@ struct ina2xx_chip_info {
-> >>>>>>     	struct task_struct *task;
-> >>>>>>     	const struct ina2xx_config *config;
-> >>>>>>     	struct mutex state_lock;
-> >>>>>> -	unsigned int shunt_resistor;
-> >>>>>> +	unsigned int shunt_resistor;		/* uOhms */
-> >>>>>> +	unsigned int max_expected_current;	/* mA */
-> >>>>>> +	int current_lsb;			/* uA */
-> >>>>>> +	int power_lsb;				/* uW */
-> >>>>>>     	int avg;
-> >>>>>>     	int int_time_vbus; /* Bus voltage integration time uS */
-> >>>>>>     	int int_time_vshunt; /* Shunt voltage integration time uS */
-> >>>>>> @@ -137,7 +141,7 @@ static const struct ina2xx_config ina2xx_config[] = {
-> >>>>>>     		.shunt_div = 100,
-> >>>>>>     		.bus_voltage_shift = 3,
-> >>>>>>     		.bus_voltage_lsb = 4000,
-> >>>>>> -		.power_lsb = 20000,
-> >>>>>> +		.power_lsb_factor = 20,
-> >>>>>>     		.chip_id = ina219,
-> >>>>>>     	},
-> >>>>>>     	[ina226] = {
-> >>>>>> @@ -146,7 +150,7 @@ static const struct ina2xx_config ina2xx_config[] = {
-> >>>>>>     		.shunt_div = 400,
-> >>>>>>     		.bus_voltage_shift = 0,
-> >>>>>>     		.bus_voltage_lsb = 1250,
-> >>>>>> -		.power_lsb = 25000,
-> >>>>>> +		.power_lsb_factor = 25,
-> >>>>>>     		.chip_id = ina226,
-> >>>>>>     	},
-> >>>>>>     };
-> >>>>>> @@ -210,14 +214,15 @@ static int ina2xx_read_raw(struct iio_dev *indio_dev,
-> >>>>>>     
-> >>>>>>     		case INA2XX_POWER:
-> >>>>>>     			/* processed (mW) = raw*lsb (uW) / 1000 */
-> >>>>>> -			*val = chip->config->power_lsb;
-> >>>>>> +			*val = chip->power_lsb;
-> >>>>>>     			*val2 = 1000;
-> >>>>>>     			return IIO_VAL_FRACTIONAL;
-> >>>>>>     
-> >>>>>>     		case INA2XX_CURRENT:
-> >>>>>> -			/* processed (mA) = raw (mA) */
-> >>>>>> -			*val = 1;
-> >>>>>> -			return IIO_VAL_INT;
-> >>>>>> +			/* processed (mA) = raw*lsb (uA) / 1000 */
-> >>>>>> +			*val = chip->current_lsb;
-> >>>>>> +			*val2 = 1000;
-> >>>>>> +			return IIO_VAL_FRACTIONAL;
-> >>>>>>     		}
-> >>>>>>     	}
-> >>>>>>     
-> >>>>>> @@ -434,24 +439,47 @@ static ssize_t ina2xx_allow_async_readout_store(struct device *dev,
-> >>>>>>     }
-> >>>>>>     
-> >>>>>>     /*
-> >>>>>> - * Set current LSB to 1mA, shunt is in uOhms
-> >>>>>> - * (equation 13 in datasheet). We hardcode a Current_LSB
-> >>>>>> - * of 1.0 x10-6. The only remaining parameter is RShunt.
-> >>>>>> + * Calculate calibration value according to equation 1 in ina226 datasheet
-> >>>>>> + * http://www.ti.com/lit/ds/symlink/ina226.pdf.
-> >>>>>> + * Current LSB is in uA and RShunt is in uOhms, so RShunt should be
-> >>>>>> + * converted to mOhms in order to keep the scale.
-> >>>>>>      * There is no need to expose the CALIBRATION register
-> >>>>>>      * to the user for now. But we need to reset this register
-> >>>>>> - * if the user updates RShunt after driver init, e.g upon
-> >>>>>> - * reading an EEPROM/Probe-type value.
-> >>>>>> + * if the user updates RShunt or max expected current after driver
-> >>>>>> + * init, e.g upon reading an EEPROM/Probe-type value.
-> >>>>>>      */
-> >>>>>>     static int ina2xx_set_calibration(struct ina2xx_chip_info *chip)
-> >>>>>>     {
-> >>>>>> +	unsigned int rshunt = DIV_ROUND_CLOSEST(chip->shunt_resistor, 1000);
-> >>>>>>     	u16 regval = DIV_ROUND_CLOSEST(chip->config->calibration_factor,
-> >>>>>> -				   chip->shunt_resistor);
-> >>>>>> +				     chip->current_lsb * rshunt);
-> >>>>>>     
-> >>>>>>     	return regmap_write(chip->regmap, INA2XX_CALIBRATION, regval);
-> >>>>>>     }
-> >>>>>>     
-> >>>>>> +/*
-> >>>>>> + * Set max_expected_current (mA) and calculate current_lsb (uA),
-> >>>>>> + * according to equation 2 in ina226 datasheet. Power LSB is calculated
-> >>>>>> + * by multiplying Current LSB by a given factor, which may vary depending
-> >>>>>> + * on ina version.
-> >>>>>> + */
-> >>>>>> +static int set_max_expected_current(struct ina2xx_chip_info *chip,
-> >>>>>> +				    unsigned int val)
-> >>>>>> +{
-> >>>>>> +	if (val <= 0 || val > chip->config->calibration_factor)
-> >>>>>> +		return -EINVAL;
-> >>>>>> +
-> >>>>>> +	chip->max_expected_current = val;
-> >>>>>> +	chip->current_lsb = DIV_ROUND_CLOSEST(chip->max_expected_current * 1000,
-> >>>>>> +					      1 << 15);
-> >>>>>> +	chip->power_lsb = chip->current_lsb * chip->config->power_lsb_factor;
-> >>>>>> +
-> >>>>>> +	return 0;
-> >>>>>> +}
-> >>>>>> +
-> >>>>>>     static int set_shunt_resistor(struct ina2xx_chip_info *chip, unsigned int val)
-> >>>>>>     {
-> >>>>>> +
-> >>>>>>     	if (val <= 0 || val > chip->config->calibration_factor)
-> >>>>>>     		return -EINVAL;
-> >>>>>>     
-> >>>>>> @@ -493,6 +521,39 @@ static ssize_t ina2xx_shunt_resistor_store(struct device *dev,
-> >>>>>>     	return len;
-> >>>>>>     }
-> >>>>>>     
-> >>>>>> +static ssize_t ina2xx_max_expected_current_show(struct device *dev,
-> >>>>>> +					  struct device_attribute *attr,
-> >>>>>> +					  char *buf)
-> >>>>>> +{
-> >>>>>> +	struct ina2xx_chip_info *chip = iio_priv(dev_to_iio_dev(dev));
-> >>>>>> +
-> >>>>>> +	return sprintf(buf, "%d\n", chip->max_expected_current);
-> >>>>>> +}
-> >>>>>> +
-> >>>>>> +static ssize_t ina2xx_max_expected_current_store(struct device *dev,
-> >>>>>> +					   struct device_attribute *attr,
-> >>>>>> +					   const char *buf, size_t len)
-> >>>>>> +{
-> >>>>>> +	struct ina2xx_chip_info *chip = iio_priv(dev_to_iio_dev(dev));
-> >>>>>> +	unsigned long val;
-> >>>>>> +	int ret;
-> >>>>>> +
-> >>>>>> +	ret = kstrtoul((const char *) buf, 10, &val);  
-> >>>>>
-> >>>>> Odd bit of casting given that's what it already is...
-> >>>>>         
-> >>>>>> +	if (ret)
-> >>>>>> +		return ret;
-> >>>>>> +
-> >>>>>> +	ret = set_max_expected_current(chip, val);
-> >>>>>> +	if (ret)
-> >>>>>> +		return ret;
-> >>>>>> +
-> >>>>>> +	/* Update the Calibration register */
-> >>>>>> +	ret = ina2xx_set_calibration(chip);
-> >>>>>> +	if (ret)
-> >>>>>> +		return ret;
-> >>>>>> +
-> >>>>>> +	return len;
-> >>>>>> +}
-> >>>>>> +
-> >>>>>>     #define INA219_CHAN(_type, _index, _address) { \
-> >>>>>>     	.type = (_type), \
-> >>>>>>     	.address = (_address), \
-> >>>>>> @@ -755,10 +816,15 @@ static IIO_DEVICE_ATTR(in_shunt_resistor, S_IRUGO | S_IWUSR,
-> >>>>>>     		       ina2xx_shunt_resistor_show,
-> >>>>>>     		       ina2xx_shunt_resistor_store, 0);
-> >>>>>>     
-> >>>>>> +static IIO_DEVICE_ATTR(in_max_expected_current, S_IRUGO | S_IWUSR,
-> >>>>>> +		       ina2xx_max_expected_current_show,
-> >>>>>> +		       ina2xx_max_expected_current_store, 0);
-> >>>>>> +
-> >>>>>>     static struct attribute *ina219_attributes[] = {
-> >>>>>>     	&iio_dev_attr_in_allow_async_readout.dev_attr.attr,
-> >>>>>>     	&iio_const_attr_ina219_integration_time_available.dev_attr.attr,
-> >>>>>>     	&iio_dev_attr_in_shunt_resistor.dev_attr.attr,
-> >>>>>> +	&iio_dev_attr_in_max_expected_current.dev_attr.attr,
-> >>>>>>     	NULL,
-> >>>>>>     };
-> >>>>>>     
-> >>>>>> @@ -766,6 +832,7 @@ static struct attribute *ina226_attributes[] = {
-> >>>>>>     	&iio_dev_attr_in_allow_async_readout.dev_attr.attr,
-> >>>>>>     	&iio_const_attr_ina226_integration_time_available.dev_attr.attr,
-> >>>>>>     	&iio_dev_attr_in_shunt_resistor.dev_attr.attr,
-> >>>>>> +	&iio_dev_attr_in_max_expected_current.dev_attr.attr,
-> >>>>>>     	NULL,
-> >>>>>>     };
-> >>>>>>     
-> >>>>>> @@ -851,6 +918,21 @@ static int ina2xx_probe(struct i2c_client *client,
-> >>>>>>     	if (ret)
-> >>>>>>     		return ret;
-> >>>>>>     
-> >>>>>> +	if (of_property_read_u32(client->dev.of_node,
-> >>>>>> +				  "max-expected-current", &val) < 0) {
-> >>>>>> +		struct ina2xx_platform_data *pdata =
-> >>>>>> +		    dev_get_platdata(&client->dev);
-> >>>>>> +
-> >>>>>> +		if (pdata && pdata->max_mA != 0)
-> >>>>>> +			val = pdata->max_mA;
-> >>>>>> +		else
-> >>>>>> +			val = INA2XX_MAX_EXPECTED_A_DEFAULT;
-> >>>>>> +	}
-> >>>>>> +
-> >>>>>> +	ret = set_max_expected_current(chip, val);
-> >>>>>> +	if (ret)
-> >>>>>> +		return ret;
-> >>>>>> +
-> >>>>>>     	/* Patch the current config register with default. */
-> >>>>>>     	val = chip->config->config_default;
-> >>>>>>     
-> >>>>>> diff --git a/include/linux/platform_data/ina2xx.h b/include/linux/platform_data/ina2xx.h
-> >>>>>> index 9abc0ca..f02b1d8 100644
-> >>>>>> --- a/include/linux/platform_data/ina2xx.h
-> >>>>>> +++ b/include/linux/platform_data/ina2xx.h
-> >>>>>> @@ -13,7 +13,9 @@
-> >>>>>>     /**
-> >>>>>>      * struct ina2xx_platform_data - ina2xx info
-> >>>>>>      * @shunt_uohms		shunt resistance in microohms
-> >>>>>> + * @max_mA		max expected current in mA
-> >>>>>>      */
-> >>>>>>     struct ina2xx_platform_data {
-> >>>>>>     	long shunt_uohms;
-> >>>>>> +	int max_mA;
-> >>>>>>     };  
-> >>>>>
-> >>>>>
-> >>>>>
-> >>>>>         
-> >>>
-> >>>
-> >>>
-> >>>      
-> >> --
-> >> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> >> the body of a message to majordomo at vger.kernel.org
-> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html  
-> > 
-> > 
-> > 
-> >   
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> diff --git a/drivers/nvmem/imx-ocotp.c b/drivers/nvmem/imx-ocotp.c
+> index 2645ee3..f80aee9 100644
+> --- a/drivers/nvmem/imx-ocotp.c
+> +++ b/drivers/nvmem/imx-ocotp.c
+> @@ -51,16 +51,12 @@
+>  #define IMX_OCOTP_BM_CTRL_REL_SHADOWS	0x00000400
+>  
+>  #define DEF_RELAX			20 /* > 16.5ns */
+> +#define DEF_FSOURCE			1001
+
+Maybe add a comment /* > 1000ns */ ?
+
+Also, I get why there is no DEF_STROBE_PROG, but this is a bit
+inconsistent. You could switch to 64-bit calculations and add a
+
+#define DEF_STROBE_PROG			10000
+
+here.
+
+>  #define IMX_OCOTP_WR_UNLOCK		0x3E770000
+>  #define IMX_OCOTP_READ_LOCKED_VAL	0xBADABADA
+>  
+>  static DEFINE_MUTEX(ocotp_mutex);
+>  
+> -struct ocotp_params {
+> -	unsigned int nregs;
+> -	unsigned int bank_address_words;
+> -};
+> -
+>  struct ocotp_priv {
+>  	struct device *dev;
+>  	struct clk *clk;
+> @@ -69,6 +65,12 @@ struct ocotp_priv {
+>  	struct nvmem_config *config;
+>  };
+>  
+> +struct ocotp_params {
+> +	unsigned int nregs;
+> +	unsigned int bank_address_words;
+> +	void (*set_timing)(struct ocotp_priv *priv);
+> +};
+> +
+>  static int imx_ocotp_wait_for_busy(void __iomem *base, u32 flags)
+>  {
+>  	int count;
+> @@ -193,6 +195,25 @@ static void imx_ocotp_set_imx6_timing(struct ocotp_priv *priv)
+>  	writel(timing, priv->base + IMX_OCOTP_ADDR_TIMING);
+>  }
+>  
+> +static void imx_ocotp_set_imx7_timing(struct ocotp_priv *priv)
+> +{
+> +	unsigned long clk_rate = 0;
+> +	unsigned long fsource, strobe_prog;
+> +	u32 timing = 0;
+> +
+> +	/* i.MX 7Solo Applications Processor Reference Manual, Rev. 0.1
+> +	 * 6.4.3.3
+> +	 */
+> +	clk_rate = clk_get_rate(priv->clk);
+> +	fsource = DIV_ROUND_UP(((clk_rate / 1000) * DEF_FSOURCE), 1000000) + 1;
+> +	strobe_prog = ((clk_rate * 10) / 1000000) + 1;
+
+Would
+
+	fsource = DIV_ROUND_UP_ULL((u64)clk_rate * DEF_FSOURCE,
+				   NSEC_PER_SEC) + 1;
+	strobe_prog = DIV_ROUND_CLOSEST_ULL((u64)clk_rate * DEF_STROBE_PROG,
+					    NSEC_PER_SEC) + 1;
+
+work instead?
+
+> +
+> +	timing = strobe_prog & 0x00000FFF;
+> +	timing |= (fsource       << 12) & 0x000FF000;
+
+Unnecessary whitespace.
+
+> +
+> +	writel(timing, priv->base + IMX_OCOTP_ADDR_TIMING);
+> +}
+> +
+>  static int imx_ocotp_write(void *context, unsigned int offset, void *val,
+>  			   size_t bytes)
+>  {
+> @@ -219,7 +240,7 @@ static int imx_ocotp_write(void *context, unsigned int offset, void *val,
+>  	}
+>  
+>  	/* Setup the write timing values */
+> -	imx_ocotp_set_imx6_timing(priv);
+> +	priv->params->set_timing(priv);
+>  
+>  	/* 47.3.1.3.2
+>  	 * Check that HW_OCOTP_CTRL[BUSY] and HW_OCOTP_CTRL[ERROR] are clear.
+> @@ -372,11 +393,31 @@ static struct nvmem_config imx_ocotp_nvmem_config = {
+>  };
+>  
+>  static const struct ocotp_params params[] = {
+> -	{ .nregs = 128, .bank_address_words = 0 },
+> -	{ .nregs = 64,  .bank_address_words = 0 },
+> -	{ .nregs = 128, .bank_address_words = 0 },
+> -	{ .nregs = 128, .bank_address_words = 0 },
+> -	{ .nregs = 64,  .bank_address_words = 4 },
+> +	{
+> +		.nregs = 128,
+> +		.bank_address_words = 0,
+> +		.set_timing = imx_ocotp_set_imx6_timing,
+> +	},
+> +	{
+> +		.nregs = 64,
+> +		.bank_address_words = 0,
+> +		.set_timing = imx_ocotp_set_imx6_timing,
+> +	},
+> +	{
+> +		.nregs = 128,
+> +		.bank_address_words = 0,
+> +		.set_timing = imx_ocotp_set_imx6_timing,
+> +	},
+> +	{
+> +		.nregs = 128,
+> +		.bank_address_words = 0,
+> +		.set_timing = imx_ocotp_set_imx6_timing,
+> +	},
+> +	{
+> +		.nregs = 64,
+> +		.bank_address_words = 4,
+> +		.set_timing = imx_ocotp_set_imx7_timing,
+> +	},
+
+See previous patches.
+
+>  };
+>  
+>  static const struct of_device_id imx_ocotp_dt_ids[] = {
+
+regards
+Philipp
