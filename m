@@ -1,61 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 11 Oct 2017 11:22:46 -0700
-Subject: [PATCH 1/5] ARM: dts: dra7-evm-common: Enable relevant IPU and
- DSP MMU nodes
-In-Reply-To: <20170821235158.4968-2-s-anna@ti.com>
-References: <20170821235158.4968-1-s-anna@ti.com>
- <20170821235158.4968-2-s-anna@ti.com>
-Message-ID: <20171011182246.GE4394@atomide.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 11 Oct 2017 13:32:01 -0500
+Subject: [PATCH v4 0/3] Workaround for bus/slot reset on Cavium cn8xxx
+ root ports
+In-Reply-To: <20170908081033.3025-1-jglauber@cavium.com>
+References: <20170908081033.3025-1-jglauber@cavium.com>
+Message-ID: <20171011183201.GK25517@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Suman Anna <s-anna@ti.com> [170821 16:52]:
-> The MMU nodes for the remote processors IPU1, IPU2, DSP1 and
-> DSP2 have all been enabled. All these nodes are relevant and
-> valid for both the DRA7 EVM and DRA76 EVM boards, so are added
-> in the dra7 common evm dtsi file.
+On Fri, Sep 08, 2017 at 10:10:30AM +0200, Jan Glauber wrote:
+> Using vfio-pci on a combination of cn8xxx and some PCI devices results in
+> a kernel panic. This is triggered by issuing a bus or a slot reset
+> on the PCI device.
 > 
-> Signed-off-by: Suman Anna <s-anna@ti.com>
-> ---
->  arch/arm/boot/dts/dra7-evm-common.dtsi | 24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
+> With this series both checks indicate that the reset is not possible
+> preventing the kernel panic.
 > 
-> diff --git a/arch/arm/boot/dts/dra7-evm-common.dtsi b/arch/arm/boot/dts/dra7-evm-common.dtsi
-> index 343e95f9a001..01a5d4e0b044 100644
-> --- a/arch/arm/boot/dts/dra7-evm-common.dtsi
-> +++ b/arch/arm/boot/dts/dra7-evm-common.dtsi
-> @@ -256,3 +256,27 @@
->  		status = "okay";
->  	};
->  };
-> +
-> +&mmu0_dsp1 {
-> +	status = "okay";
-> +};
-> +
-> +&mmu1_dsp1 {
-> +	status = "okay";
-> +};
-> +
-> +&mmu0_dsp2 {
-> +	status = "okay";
-> +};
-> +
-> +&mmu1_dsp2 {
-> +	status = "okay";
-> +};
-> +
-> +&mmu_ipu1 {
-> +	status = "okay";
-> +};
-> +
-> +&mmu_ipu2 {
-> +	status = "okay";
-> +};
+> David Daney (2):
+>   PCI: Allow PCI_DEV_FLAGS_NO_BUS_RESET to be used on bus device
+>   PCI: Avoid bus reset for Cavium cn8xxx root ports
+> 
+> Jan Glauber (1):
+>   PCI: Avoid slot reset if bus reset is not possible
+> 
+>  drivers/pci/pci.c    | 8 ++++++++
+>  drivers/pci/quirks.c | 8 ++++++++
+>  2 files changed, 16 insertions(+)
 
-This is getting quite silly.. The default is "okay" so just remove the useless
-"disabled" from the common file and all these patches are no longer needed.
+Applied to pci/host-thunder for v4.15, thanks.
 
-Regards,
+I reordered and renamed them like this:
 
-Tony
+  PCI: Mark Cavium CN8xxx to avoid bus reset
+  PCI: Avoid bus reset if bridge itself is broken
+  PCI: Avoid slot reset if bridge itself is broken
