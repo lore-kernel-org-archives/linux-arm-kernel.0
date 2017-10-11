@@ -1,87 +1,104 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Wed, 11 Oct 2017 09:24:16 +0100
-Subject: [PATCH v5 03/10] kexec_file: factor out arch_kexec_kernel_*()
- from x86, powerpc
-In-Reply-To: <20171011050734.GE6756@linaro.org>
-References: <20171010063619.6303-1-takahiro.akashi@linaro.org>
- <20171010063619.6303-4-takahiro.akashi@linaro.org>
- <a8a0f36b-e797-289b-04e3-aa87b4088cdd@arm.com>
- <20171011050734.GE6756@linaro.org>
-Message-ID: <cbeb01e5-8758-1205-1e79-de01de899ef6@arm.com>
+From: sbodomerle@gmail.com (Sandor Bodo-Merle)
+Date: Wed, 11 Oct 2017 10:26:39 +0200
+Subject: [PATCH] PCI: iproc: Allow allocation of multiple MSIs
+In-Reply-To: <d0467282-a44a-bd1e-e449-0bba953c4cfd@broadcom.com>
+References: <20171007120851.20230-1-sbodomerle@gmail.com>
+ <d0467282-a44a-bd1e-e449-0bba953c4cfd@broadcom.com>
+Message-ID: <CABLWAfR+Nk85wurWnPArpmFPXVhxn0jZ+7H13WnKEPCMJVU0XA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Ray,
 
+we tested on a custom board based on BCM56260. SMP affinity was not
+tested as our board runs on a single core.
 
-On 11/10/17 06:07, AKASHI Takahiro wrote:
-> On Tue, Oct 10, 2017 at 12:02:01PM +0100, Julien Thierry wrote:
-> 
-> [snip]
-> 
->>> --- a/kernel/kexec_file.c
->>> +++ b/kernel/kexec_file.c
->>> @@ -26,30 +26,79 @@
->>>   #include <linux/vmalloc.h>
->>>   #include "kexec_internal.h"
->>>
->>> +const __weak struct kexec_file_ops * const kexec_file_loaders[] = {NULL};
->>> +
->>>   static int kexec_calculate_store_digests(struct kimage *image);
->>>
->>> +int _kexec_kernel_image_probe(struct kimage *image, void *buf,
->>> +                          unsigned long buf_len)
->>> +{
->>> +     const struct kexec_file_ops *fops;
->>> +     int ret = -ENOEXEC;
->>> +
->>> +     for (fops = kexec_file_loaders[0]; fops && fops->probe; ++fops) {
->>
->> Hmm, that's not gonna work (and I see that what I said in the previous
->> patch was not 100% correct either).
-> 
-> Can you elaborate this a bit more?
+br,
+
+Sandor
+
+ps - sorry for the duplicate, but by default gmail sent out html
+formatted mail :(
+
+On Tue, Oct 10, 2017 at 8:09 PM, Ray Jui <ray.jui@broadcom.com> wrote:
+> Hi Bodo,
 >
-
-Yes. With the current state of the loop, you are going to check the 
-first element of kexec_file_loaders[0], and what will get incremented is 
-the pointer contained in kexec_file_loaders rather than a pointer 
-pointer pointing at an element of kexec_file_loaders.
-
-
-> I'm sure that, with my code, any member of fops, cannot be changed;
-> "const struct kexec_file_ops *fops" means that fops is a pointer to
-> "constant sturct kexec_file_ops," while "struct kexec_file_ops *
-> const kexec_file_loaders[]" means that kexec_file_loaders is a "constant
-> array" of pointers to "constant struct kexec_file_ops."
-> 
-
-Hmm, right, my suggestion below doesn't have the right constness, fops 
-should be declared as:
-const struct kexec_file_ops * const * fops;
-
-This can point at elements of kexec_file_loaders.
-
-Hope this makes more sense.
-
-Cheers,
-
+>
+> On 10/7/2017 5:08 AM, Bodo-Merle Sandor wrote:
+>>
+>> From: Sandor Bodo-Merle <sbodomerle@gmail.com>
+>>
+>> Add support for allocating multiple MSIs at the same time, so that the
+>> MSI_FLAG_MULTI_PCI_MSI flag can be added to the msi_domain_info
+>> structure.
+>>
+>> Avoid storing the hwirq in the low 5 bits of the message data, as it is
+>> used by the device. Also fix an endianness problem by using readl().
+>>
+>> Signed-off-by: Sandor Bodo-Merle <sbodomerle@gmail.com>
+>> ---
+>>   drivers/pci/host/pcie-iproc-msi.c | 19 ++++++++++++-------
+>>   1 file changed, 12 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/drivers/pci/host/pcie-iproc-msi.c
+>> b/drivers/pci/host/pcie-iproc-msi.c
+>> index 2d0f535a2f69..990fc906d73d 100644
+>> --- a/drivers/pci/host/pcie-iproc-msi.c
+>> +++ b/drivers/pci/host/pcie-iproc-msi.c
+>> @@ -179,7 +179,7 @@ static struct irq_chip iproc_msi_irq_chip = {
+>>     static struct msi_domain_info iproc_msi_domain_info = {
+>>         .flags = MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
+>> -               MSI_FLAG_PCI_MSIX,
+>> +               MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX,
+>>         .chip = &iproc_msi_irq_chip,
+>>   };
+>>   @@ -237,7 +237,7 @@ static void iproc_msi_irq_compose_msi_msg(struct
+>> irq_data *data,
+>>         addr = msi->msi_addr + iproc_msi_addr_offset(msi, data->hwirq);
+>>         msg->address_lo = lower_32_bits(addr);
+>>         msg->address_hi = upper_32_bits(addr);
+>> -       msg->data = data->hwirq;
+>> +       msg->data = data->hwirq << 5; >   }
+>>     static struct irq_chip iproc_msi_bottom_irq_chip = {
+>> @@ -251,7 +251,7 @@ static int iproc_msi_irq_domain_alloc(struct
+>> irq_domain *domain,
+>>                                       void *args)
+>>   {
+>>         struct iproc_msi *msi = domain->host_data;
+>> -       int hwirq;
+>> +       int hwirq, i;
+>>         mutex_lock(&msi->bitmap_lock);
+>>   @@ -267,10 +267,14 @@ static int iproc_msi_irq_domain_alloc(struct
+>> irq_domain *domain,
+>>         mutex_unlock(&msi->bitmap_lock);
+>>   -     irq_domain_set_info(domain, virq, hwirq,
+>> &iproc_msi_bottom_irq_chip,
+>> -                           domain->host_data, handle_simple_irq, NULL,
+>> NULL);
+>> +       for (i = 0; i < nr_irqs; i++) {
+>> +               irq_domain_set_info(domain, virq + i, hwirq + i,
+>> +                                   &iproc_msi_bottom_irq_chip,
+>> +                                   domain->host_data, handle_simple_irq,
+>> +                                   NULL, NULL);
+>> +       }
+>>   -     return 0;
+>> +       return hwirq;
+>>   }
+>>     static void iproc_msi_irq_domain_free(struct irq_domain *domain,
+>> @@ -302,7 +306,8 @@ static inline u32 decode_msi_hwirq(struct iproc_msi
+>> *msi, u32 eq, u32 head)
+>>         offs = iproc_msi_eq_offset(msi, eq) + head * sizeof(u32);
+>>         msg = (u32 *)(msi->eq_cpu + offs);
+>> -       hwirq = *msg & IPROC_MSI_EQ_MASK;
+>> +       hwirq = readl(msg);
+>> +       hwirq = (hwirq >> 5) + (hwirq & 0x1f);
+>>         /*
+>>          * Since we have multiple hwirq mapped to a single MSI vector,nnn
+>>
+>
+> Change looks okay to me in general. May I know which platform you tested
+> this patch on and was SMP affinity configuration tested?
+>
 > Thanks,
-> -Takahiro AKASHI
-> 
-> 
->> 'fops' should be of type 'const struct kexec_file_ops **', and the loop
->> should be:
->>
->> for (fops = &kexec_file_loaders[0]; *fops && (*fops)->probe; ++fops)
->>
->> With some additional dereferences in the body of the loop.
->>
->> Unless you prefer the previous state of the loop (with i and the break
->> inside), but I still think this looks better.
->>
->> Cheers,
->>
-
-
--- 
-Julien Thierry
+>
+> Ray
