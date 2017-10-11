@@ -1,63 +1,103 @@
 From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Wed, 11 Oct 2017 13:50:24 +0200
-Subject: [PATCH 01/12] ARM: dts: imx6-tx6: update model property to match
- current module HW revision
+Date: Wed, 11 Oct 2017 13:50:30 +0200
+Subject: [PATCH 07/12] ARM: dts: imx6-tx6: convert to using simple-audio-card
 In-Reply-To: <1507722635-30801-1-git-send-email-LW@KARO-electronics.de>
 References: <1507722635-30801-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <1507722635-30801-2-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1507722635-30801-8-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current TX6Q module HW revision is 3 reflected in the module name
-suffix '-1030' (-1130 for LVDS).
-Change the model string to prevent confusion about what DTS file to
-use for these modules.
+Convert the DTS sound setup to use the simple-audio-card driver.
 
 Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 ---
- arch/arm/boot/dts/imx6q-tx6q-1010.dts | 4 ++--
- arch/arm/boot/dts/imx6q-tx6q-1110.dts | 4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/imx6qdl-tx6.dtsi | 50 ++++++++++++++++++++++++++++++++------
+ 1 file changed, 42 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6q-tx6q-1010.dts b/arch/arm/boot/dts/imx6q-tx6q-1010.dts
-index f9cd21a..54bc442 100644
---- a/arch/arm/boot/dts/imx6q-tx6q-1010.dts
-+++ b/arch/arm/boot/dts/imx6q-tx6q-1010.dts
-@@ -1,5 +1,5 @@
- /*
-- * Copyright 2014-2016 Lothar Wa?mann <LW@KARO-electronics.de>
-+ * Copyright 2014-2017 Lothar Wa?mann <LW@KARO-electronics.de>
-  *
-  * This file is dual-licensed: you can use it either under the terms
-  * of the GPL or the X11 license, at your option. Note that this dual
-@@ -44,7 +44,7 @@
- #include "imx6qdl-tx6.dtsi"
+diff --git a/arch/arm/boot/dts/imx6qdl-tx6.dtsi b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
+index c6b2d63..e0dbf8b 100644
+--- a/arch/arm/boot/dts/imx6qdl-tx6.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
+@@ -43,6 +43,7 @@
+ #include <dt-bindings/input/input.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/pwm/pwm.h>
++#include <dt-bindings/sound/fsl-imx-audmux.h>
  
  / {
--	model = "Ka-Ro electronics TX6Q-1010 Module";
-+	model = "Ka-Ro electronics TX6Q-1010/-1030 Module";
- 	compatible = "karo,imx6q-tx6q", "fsl,imx6q";
- 
  	aliases {
-diff --git a/arch/arm/boot/dts/imx6q-tx6q-1110.dts b/arch/arm/boot/dts/imx6q-tx6q-1110.dts
-index 0433e22..0f5e638 100644
---- a/arch/arm/boot/dts/imx6q-tx6q-1110.dts
-+++ b/arch/arm/boot/dts/imx6q-tx6q-1110.dts
-@@ -1,5 +1,5 @@
- /*
-- * Copyright 2014-2016 Lothar Wa?mann <LW@KARO-electronics.de>
-+ * Copyright 2014-2017 Lothar Wa?mann <LW@KARO-electronics.de>
-  *
-  * This file is dual-licensed: you can use it either under the terms
-  * of the GPL or the X11 license, at your option. Note that this dual
-@@ -44,7 +44,7 @@
- #include "imx6qdl-tx6.dtsi"
+@@ -183,24 +184,56 @@
+ 	};
  
- / {
--	model = "Ka-Ro electronics TX6Q-1110 Module";
-+	model = "Ka-Ro electronics TX6Q-1110/-1130 Module";
- 	compatible = "karo,imx6q-tx6q", "fsl,imx6q";
+ 	sound {
+-		compatible = "karo,imx6qdl-tx6qdl-sgtl5000",
+-			     "fsl,imx-audio-sgtl5000";
+-		model = "sgtl5000-audio";
++		compatible = "karo,imx6qdl-tx6-sgtl5000",
++			     "simple-audio-card";
++		simple-audio-card,name = "imx6qdl-tx6-sgtl5000-audio";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_audmux>;
+-		ssi-controller = <&ssi1>;
+-		audio-codec = <&sgtl5000>;
+-		audio-routing =
++		simple-audio-card,format = "i2s";
++		simple-audio-card,bitclock-master = <&codec_dai>;
++		simple-audio-card,frame-master = <&codec_dai>;
++		simple-audio-card,widgets =
++			"Microphone", "Mic Jack",
++			"Line", "Line In",
++			"Line", "Line Out",
++			"Headphone", "Headphone Jack";
++		simple-audio-card,routing =
+ 			"MIC_IN", "Mic Jack",
+ 			"Mic Jack", "Mic Bias",
+ 			"Headphone Jack", "HP_OUT";
+-		mux-int-port = <1>;
+-		mux-ext-port = <5>;
++
++		cpu_dai: simple-audio-card,cpu {
++			sound-dai = <&ssi1>;
++		};
++
++		codec_dai: simple-audio-card,codec {
++			sound-dai = <&sgtl5000>;
++		};
+ 	};
+ };
  
- 	aliases {
+ &audmux {
+ 	status = "okay";
++
++	ssi1 {
++		fsl,audmux-port = <0>;
++		fsl,port-config = <
++			(IMX_AUDMUX_V2_PTCR_SYN |
++			IMX_AUDMUX_V2_PTCR_TFSEL(4) |
++			IMX_AUDMUX_V2_PTCR_TCSEL(4) |
++			IMX_AUDMUX_V2_PTCR_TFSDIR |
++			IMX_AUDMUX_V2_PTCR_TCLKDIR)
++			IMX_AUDMUX_V2_PDCR_RXDSEL(4)
++		>;
++	};
++
++	pins5 {
++		fsl,audmux-port = <4>;
++		fsl,port-config = <
++			IMX_AUDMUX_V2_PTCR_SYN
++			IMX_AUDMUX_V2_PDCR_RXDSEL(0)
++		>;
++	};
+ };
+ 
+ &can1 {
+@@ -298,6 +331,7 @@
+ 
+ 	sgtl5000: sgtl5000 at 0a {
+ 		compatible = "fsl,sgtl5000";
++		#sound-dai-cells = <0>;
+ 		reg = <0x0a>;
+ 		VDDA-supply = <&reg_2v5>;
+ 		VDDIO-supply = <&reg_3v3>;
 -- 
 2.1.4
