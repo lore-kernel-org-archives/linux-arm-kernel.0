@@ -1,42 +1,98 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 11 Oct 2017 10:41:47 +0100
-Subject: [PATCH 2/3] irqchip/gic-v3: Report firmwware provided address in case
- of error
-In-Reply-To: <20171011094148.15674-1-punit.agrawal@arm.com>
-References: <20171011094148.15674-1-punit.agrawal@arm.com>
-Message-ID: <20171011094148.15674-3-punit.agrawal@arm.com>
+From: szabolcs.nagy@arm.com (Szabolcs Nagy)
+Date: Wed, 11 Oct 2017 10:50:16 +0100
+Subject: [PATCH v3 26/28] arm64/sve: Add documentation
+In-Reply-To: <1507660725-7986-27-git-send-email-Dave.Martin@arm.com>
+References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
+ <1507660725-7986-27-git-send-email-Dave.Martin@arm.com>
+Message-ID: <59DDE958.4080605@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a redistributor is not found at the address provided by the
-firmware, report the firmware provided address to help user identify the
-offending firmware data.
+On 10/10/17 19:38, Dave Martin wrote:
+> This patch adds basic documentation of the user/kernel interface
+> provided by the for SVE.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Cc: Alex Benn?e <alex.bennee@linaro.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Alan Hayward <alan.hayward@arm.com>
+> 
+> ---
+> 
+> Changes since v2
+> ----------------
+> 
+> Changes requested by Alan Hayward:
+> 
+>  * Added a note that the caller of PTRACE_SETREGSET will need to do a
+>    GETREGSET if complete certainty about the resulting VL is desired.
+> 
+> ABI changes:
+> 
+>  * Documented the changed return value value semantics for PR_SET_SET_VL
+>    when the PR_SVE_SET_VL_ONEXEC flag is passed.
+> ---
+...
+> +prctl(PR_SVE_SET_VL, unsigned long arg)
+> +
+> +    Sets the vector length of the calling thread and related flags, where
+> +    arg == vl | flags.
+> +
+> +    vl is the desired vector length, where sve_vl_valid(vl) must be true.
+> +
+> +    flags:
+> +
+> +	PR_SVE_SET_VL_INHERIT
+> +
+> +	    Inherit the current vector length across execve().  Otherwise, the
+> +	    vector length is reset to the system default at execve().  (See
+> +	    Section 9.)
+> +
+> +	PR_SVE_SET_VL_ONEXEC
+> +
+> +	    Defer the requested vector length change until the next execve().
+> +	    This allows launching of a new program with a different vector
+> +	    length, while avoiding runtime side effects in the caller.
+> +
+> +	    This also overrides the effect of PR_SVE_SET_VL_INHERIT for the
+> +	    first execve().
+> +
+> +	    Without PR_SVE_SET_VL_ONEXEC, any outstanding deferred vector
+> +	    length change is cancelled.
+> +
 
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/irqchip/irq-gic-v3.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+"next execve" is still ambiguous. (execve has process
+global effect so it may plausibly mean next in the
+process or next in the calling thread)
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 8cb383b6e605..881d327c53fa 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -430,13 +430,14 @@ static int gic_iterate_rdists(int (*fn)(struct redist_region *, void __iomem *))
- 
- 	for (i = 0; i < gic_data.nr_redist_regions; i++) {
- 		void __iomem *ptr = gic_data.redist_regions[i].redist_base;
-+		struct resource *res = &gic_data.redist_regions[i].res;
- 		u64 typer;
- 		u32 reg;
- 
- 		reg = readl_relaxed(ptr + GICR_PIDR2) & GIC_PIDR2_ARCH_MASK;
- 		if (reg != GIC_PIDR2_ARCH_GICv3 &&
- 		    reg != GIC_PIDR2_ARCH_GICv4) { /* We're in trouble... */
--			pr_warn("No redistributor present @%p\n", ptr);
-+			pr_warn("No redistributor present @%llx\n", res->start);
- 			break;
- 		}
- 
--- 
-2.14.1
+"any outstanding deferred vector length change" is
+ambiguous. (it may be for all threads in a process or
+in the calling thread only)
+
+> +    Return value: a nonnegative on success, or a negative value on error:
+> +	EINVAL: SVE not supported, invalid vector length requested, or
+> +	    invalid flags.
+> +
+> +    On success, the calling thread's vector length is changed to the largest
+> +    value supported by the system that is less than or equal to vl.
+> +    If vl == SVE_VL_MAX, the calling thread's vector length is changed to the
+> +    largest value supported by the system.
+> +
+> +    The returned value describes the resulting configuration, encoded as for
+> +    PR_SVE_GET_VL.  The vector length reported in this value is the new current
+> +    vector length for this thread if PR_SVE_SET_VL_ONEXEC was not passed in the
+> +    input arg; otherwise, the reported vector length is the deferred vector
+> +    length that will be applied at the next exec.
+> +
+...
+> +9.  System runtime configuration
+> +--------------------------------
+> +
+> +* To mitigate the ABI impact of expansion of the signal frame, a policy
+> +  mechanism is provided for administrators, distro maintainers and developers
+> +  to set the default vector length for userspace processes:
+> +
+> +/proc/cpu/sve_default_vector_length
+> +
+
+still wrong.
