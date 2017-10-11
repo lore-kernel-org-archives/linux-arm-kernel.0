@@ -1,46 +1,30 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 11 Oct 2017 13:34:30 +0530
-Subject: [PATCH] ARM: dts: dra7-evm: Move pcie RC node to common file
-Message-ID: <20171011080430.13160-1-kishon@ti.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Wed, 11 Oct 2017 03:18:54 -0500
+Subject: [PATCH 2/2] arm64: dts: stratix10: enable gpio and leds
+In-Reply-To: <20171010212538.3331-2-atull@kernel.org>
+References: <20171010212538.3331-1-atull@kernel.org>
+ <20171010212538.3331-2-atull@kernel.org>
+Message-ID: <e180a731-c7b3-5900-36c1-5943a7b11386@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ravikumar Kattekola <rk@ti.com>
 
-Move the pcie_rc node to common file so that it can be
-used by dra76-evm as well.
 
-Signed-off-by: Ravikumar Kattekola <rk@ti.com>
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- arch/arm/boot/dts/dra7-evm-common.dtsi | 4 ++++
- arch/arm/boot/dts/dra7-evm.dts         | 4 ----
- 2 files changed, 4 insertions(+), 4 deletions(-)
+On 10/10/2017 04:25 PM, Alan Tull wrote:
+> Enable gpio and leds for socdk OOBE daughtercard.
+> 
+> pushbutton PB_SW0 = gpio1.io4
+> pushbutton PB_SW1 = gpio1.io5
+> LED HPS_LED0      = gpio1.io20
+> LED HPS_LED1      = gpio1.io19
+> LED HPS_LED2      = gpio1.io21
+> 
+> Signed-off-by: Alan Tull <atull@kernel.org>
+> ---
+>  .../boot/dts/altera/socfpga_stratix10_socdk.dts    | 22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
+> 
 
-diff --git a/arch/arm/boot/dts/dra7-evm-common.dtsi b/arch/arm/boot/dts/dra7-evm-common.dtsi
-index 343e95f9a001..e088bb93636a 100644
---- a/arch/arm/boot/dts/dra7-evm-common.dtsi
-+++ b/arch/arm/boot/dts/dra7-evm-common.dtsi
-@@ -256,3 +256,7 @@
- 		status = "okay";
- 	};
- };
-+
-+&pcie1_rc {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
-index aa426dabb6c3..ef9c90daa74b 100644
---- a/arch/arm/boot/dts/dra7-evm.dts
-+++ b/arch/arm/boot/dts/dra7-evm.dts
-@@ -497,7 +497,3 @@
- 	pinctrl-1 = <&dcan1_pins_sleep>;
- 	pinctrl-2 = <&dcan1_pins_default>;
- };
--
--&pcie1_rc {
--	status = "okay";
--};
--- 
-2.11.0
+Both patches applied, thanks Alan!
+
+Dinh
