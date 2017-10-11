@@ -1,199 +1,87 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 11 Oct 2017 08:06:13 -0500
-Subject: [PATCH 2/2] of: configure DMA for host1x devices
-In-Reply-To: <dd8e9524-1d91-2c8b-a753-086d3ad9f9c9@arm.com>
-References: <20170924090454.28116-1-mperttunen@nvidia.com>
- <20170924090454.28116-2-mperttunen@nvidia.com>
- <20170925074448.GB12494@ulmo.fritz.box>
- <dd8e9524-1d91-2c8b-a753-086d3ad9f9c9@arm.com>
-Message-ID: <CAL_Jsq+eOypWgvqrTmTPm5NSgPGum1BpTp8B=4SUUX3bs7kn9g@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 11 Oct 2017 22:03:28 +0900
+Subject: [PATCH] arm64: remove unneeded copy to init_utsname()->machine
+In-Reply-To: <1505389204-17231-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1505389204-17231-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAK7LNASYmFf1NqVReq-mXhn8OsAkkxF0NXARDZ7L7oOC5zfpjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 25, 2017 at 7:26 AM, Robin Murphy <robin.murphy@arm.com> wrote:
-> On 25/09/17 08:44, Thierry Reding wrote:
->> On Sun, Sep 24, 2017 at 12:04:54PM +0300, Mikko Perttunen wrote:
->>> Devices in the host1x bus rely on the old behavior of of_dma_configure
->>> to set up DMA ops. Add a check for them into of_dma_configure.
->>>
->>> We must do the check using a string comparison instead of using
->>> pointers since the host1x bus can be compiled into a module.
->>>
->>> Fixes: 723288836628 ("of: restrict DMA configuration")
->>> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
->>> ---
->>>  drivers/of/device.c | 3 +++
->>>  1 file changed, 3 insertions(+)
->>>
->>> diff --git a/drivers/of/device.c b/drivers/of/device.c
->>> index 64b710265d39..12368418cd33 100644
->>> --- a/drivers/of/device.c
->>> +++ b/drivers/of/device.c
->>> @@ -104,6 +104,9 @@ int of_dma_configure(struct device *dev, struct device_node *np)
->>>              if (!dev_is_pci(dev) &&
->>>  #ifdef CONFIG_ARM_AMBA
->>>                  dev->bus != &amba_bustype &&
->>> +#endif
->>> +#if IS_ENABLED(CONFIG_TEGRA_HOST1X)
->>> +                !(dev->bus && !strcmp("host1x", dev->bus->name)) &&
->>>  #endif
->>>                  dev->bus != &platform_bus_type)
->>>                      return ret == -ENODEV ? 0 : ret;
->>
->> Maybe a slightly better solution would be to add a dev_is_host1x()
->> function that returns dev->bus == &host1x_bus_type if TEGRA_HOST1X is
->> enabled and returns false otherwise. That way we can have a "proper"
->> check for the bus type and avoid the #if in this file.
->>
->> It's slightly more complicated because of the dependencies between the
->> DT and Tegra DRM trees, but I'm sure we can get Rob to either give his
->> Acked-by on the drivers/of/device.c change or carry the Tegra DRM patch
->> in the DT tree.
->
-> Alternatively (and modulo Greg's opinion, obviously) it would arguably be
-> neatest to handle this at a slightly lower level as below - I only really
-> considered this idea after writing the existing fix, but now that I have
-> actually written it up I do rather like it.
->
-> Robin.
->
-> ----->8-----
-> From: Robin Murphy <robin.murphy@arm.com>
-> Date: Mon, 25 Sep 2017 12:45:58 +0100
-> Subject: [PATCH] drivers: Flag buses which demand DMA configuration
->
-> We do not want the common dma_configure() pathway to apply
-> indiscriminately to all devices, since there are plenty of buses which
-> do not have DMA capability, and if their child devices were used for
-> DMA API calls it would only be indicative of a driver bug. However,
-> there are a number of buses for which DMA is implicitly expected even
-> when not described by firmware, so we currently whitelist those to
-> automatically opt in to dma_configure(), assuming a 1:1 mapping between
-> the DMA address space and the physical address space.
->
-> Commit 723288836628 ("of: restrict DMA configuration") introduced a
-> short-term fix by comparing explicit bus types, but this approach is far
-> from pretty, doesn't scale well, and fails to cope at all with bus
-> drivers which may be built as modules. Let's refine things by making
-> that opt-in a property of the bus type, which neatly addresses those
-> problems and lets the decision of whether firmware description of DMA
-> capability should be optional or mandatory stay internal to the bus
-> drivers themselves.
->
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Hi arm64 maintainers,
 
-Acked-by: Rob Herring <robh@kernel.org>
+Could you check this please?
 
-Are you going to send out as a proper patch? We've now got another
-case with pci_epf_bus_type...
 
-Rob
-
+2017-09-14 20:40 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> As you see in init/version.c, init_uts_ns.name.machine is initially
+> set to UTS_MACHINE.  There is no point to copy the same string.
+>
+> I dug the git history to figure out why this line is here.  My best
+> guess is like this:
+>
+>  - This line has been around here since the initial support of arm64
+>    by commit 9703d9d7f77c ("arm64: Kernel booting and initialisation").
+>    If ARCH (=arm64) and UTS_MACHINE (=aarch64) do not match,
+>    arch/$(ARCH)/Makefile is supposed to override UTS_MACHINE, but the
+>    initial version of arch/arm64/Makefile missed to do that.  Instead,
+>    the boot code copied "aarch64" to init_utsname()->machine.
+>
+>  - Commit 94ed1f2cb5d4 ("arm64: setup: report ELF_PLATFORM as the
+>    machine for utsname") replaced "aarch64" with ELF_PLATFORM to
+>    make "uname" to reflect the endianness.
+>
+>  - ELF_PLATFORM does not help to provide the UTS machine name to rpm
+>    target, so commit cfa88c79462d ("arm64: Set UTS_MACHINE in the
+>    Makefile") fixed it.  The commit simply replaced ELF_PLATFORM with
+>    UTS_MACHINE, but missed the fact the string copy itself is no longer
+>    needed.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 > ---
->  drivers/amba/bus.c       | 1 +
->  drivers/base/platform.c  | 1 +
->  drivers/gpu/host1x/bus.c | 1 +
->  drivers/of/device.c      | 8 +-------
->  drivers/pci/pci-driver.c | 1 +
->  include/linux/device.h   | 4 ++++
->  6 files changed, 9 insertions(+), 7 deletions(-)
 >
-> diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-> index e0f74ddc22b7..594c228d2f02 100644
-> --- a/drivers/amba/bus.c
-> +++ b/drivers/amba/bus.c
-> @@ -195,6 +195,7 @@ struct bus_type amba_bustype = {
->         .match          = amba_match,
->         .uevent         = amba_uevent,
->         .pm             = &amba_pm,
-> +       .force_dma      = true,
->  };
+>  arch/arm64/kernel/Makefile | 2 --
+>  arch/arm64/kernel/setup.c  | 2 --
+>  2 files changed, 4 deletions(-)
 >
->  static int __init amba_init(void)
-> diff --git a/drivers/base/platform.c b/drivers/base/platform.c
-> index d1bd99271066..9c95c8db00f8 100644
-> --- a/drivers/base/platform.c
-> +++ b/drivers/base/platform.c
-> @@ -1142,6 +1142,7 @@ struct bus_type platform_bus_type = {
->         .match          = platform_match,
->         .uevent         = platform_uevent,
->         .pm             = &platform_dev_pm_ops,
-> +       .force_dma      = true,
->  };
->  EXPORT_SYMBOL_GPL(platform_bus_type);
+> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+> index f2b4e81..29764d7 100644
+> --- a/arch/arm64/kernel/Makefile
+> +++ b/arch/arm64/kernel/Makefile
+> @@ -10,8 +10,6 @@ CFLAGS_REMOVE_ftrace.o = -pg
+>  CFLAGS_REMOVE_insn.o = -pg
+>  CFLAGS_REMOVE_return_address.o = -pg
 >
-> diff --git a/drivers/gpu/host1x/bus.c b/drivers/gpu/host1x/bus.c
-> index f9cde03030fd..ed03b3243195 100644
-> --- a/drivers/gpu/host1x/bus.c
-> +++ b/drivers/gpu/host1x/bus.c
-> @@ -320,6 +320,7 @@ struct bus_type host1x_bus_type = {
->         .name = "host1x",
->         .match = host1x_device_match,
->         .pm = &host1x_device_pm_ops,
-> +       .force_dma = true,
->  };
+> -CFLAGS_setup.o = -DUTS_MACHINE='"$(UTS_MACHINE)"'
+> -
+>  # Object file lists.
+>  arm64-obj-y            := debug-monitors.o entry.o irq.o fpsimd.o              \
+>                            entry-fpsimd.o process.o ptrace.o setup.o signal.o   \
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index d4b7405..b2fdb59 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -23,7 +23,6 @@
+>  #include <linux/stddef.h>
+>  #include <linux/ioport.h>
+>  #include <linux/delay.h>
+> -#include <linux/utsname.h>
+>  #include <linux/initrd.h>
+>  #include <linux/console.h>
+>  #include <linux/cache.h>
+> @@ -246,7 +245,6 @@ void __init setup_arch(char **cmdline_p)
+>  {
+>         pr_info("Boot CPU: AArch64 Processor [%08x]\n", read_cpuid_id());
 >
->  static void __host1x_device_del(struct host1x_device *device)
-> diff --git a/drivers/of/device.c b/drivers/of/device.c
-> index 64b710265d39..25bddf9c9fe1 100644
-> --- a/drivers/of/device.c
-> +++ b/drivers/of/device.c
-> @@ -9,9 +9,7 @@
->  #include <linux/module.h>
->  #include <linux/mod_devicetable.h>
->  #include <linux/slab.h>
-> -#include <linux/pci.h>
->  #include <linux/platform_device.h>
-> -#include <linux/amba/bus.h>
->
->  #include <asm/errno.h>
->  #include "of_private.h"
-> @@ -101,11 +99,7 @@ int of_dma_configure(struct device *dev, struct device_node *np)
->                  * DMA configuration regardless of whether "dma-ranges" is
->                  * correctly specified or not.
->                  */
-> -               if (!dev_is_pci(dev) &&
-> -#ifdef CONFIG_ARM_AMBA
-> -                   dev->bus != &amba_bustype &&
-> -#endif
-> -                   dev->bus != &platform_bus_type)
-> +               if (!dev->bus->force_dma)
->                         return ret == -ENODEV ? 0 : ret;
->
->                 dma_addr = offset = 0;
-> diff --git a/drivers/pci/pci-driver.c b/drivers/pci/pci-driver.c
-> index 11bd267fc137..38bdb97b6dc6 100644
-> --- a/drivers/pci/pci-driver.c
-> +++ b/drivers/pci/pci-driver.c
-> @@ -1466,6 +1466,7 @@ struct bus_type pci_bus_type = {
->         .drv_groups     = pci_drv_groups,
->         .pm             = PCI_PM_OPS_PTR,
->         .num_vf         = pci_bus_num_vf,
-> +       .force_dma      = true,
->  };
->  EXPORT_SYMBOL(pci_bus_type);
->
-> diff --git a/include/linux/device.h b/include/linux/device.h
-> index c6f27207dbe8..3a1efa56e7c4 100644
-> --- a/include/linux/device.h
-> +++ b/include/linux/device.h
-> @@ -97,6 +97,8 @@ extern void bus_remove_file(struct bus_type *, struct bus_attribute *);
->   * @p:         The private data of the driver core, only the driver core can
->   *             touch this.
->   * @lock_key:  Lock class key for use by the lock validator
-> + * @force_dma: Assume devices on this bus should be set up by dma_configure()
-> + *             even if DMA capability is not explicitly described by firmware.
->   *
->   * A bus is a channel between the processor and one or more devices. For the
->   * purposes of the device model, all devices are connected via a bus, even if
-> @@ -135,6 +137,8 @@ struct bus_type {
->
->         struct subsys_private *p;
->         struct lock_class_key lock_key;
-> +
-> +       bool force_dma;
->  };
->
->  extern int __must_check bus_register(struct bus_type *bus);
+> -       sprintf(init_utsname()->machine, UTS_MACHINE);
+>         init_mm.start_code = (unsigned long) _text;
+>         init_mm.end_code   = (unsigned long) _etext;
+>         init_mm.end_data   = (unsigned long) _edata;
 > --
-> 2.13.4.dirty
+> 2.7.4
+>
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
