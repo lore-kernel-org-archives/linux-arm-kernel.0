@@ -1,80 +1,178 @@
-From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
-Date: Wed, 11 Oct 2017 17:53:28 +0200
-Subject: [PATCH] dmaengine: stm32-mdma: avoid 64-bit division
-In-Reply-To: <CAK8P3a3j5Awh9V6+PHZf-79TM_7wdQ0GkZZv75a3ztewrw6CmQ@mail.gmail.com>
-References: <20171011140144.3746128-1-arnd@arndb.de>
- <CA+M3ks74eOSOEwadsjjMcQme_6ivzmYGRdc9jvw4RHYa6dxRTA@mail.gmail.com>
- <CAK8P3a2RsCXq7L6w5K+KmhP1Q2b1=SjnG2Xws2w232vmyj=yEA@mail.gmail.com>
- <CA+M3ks4cKxYy15-6ewbMaJOLF0e2NdhwrZUCq-U2s4Y8n212fw@mail.gmail.com>
- <CAK8P3a3j5Awh9V6+PHZf-79TM_7wdQ0GkZZv75a3ztewrw6CmQ@mail.gmail.com>
-Message-ID: <6e0215da-40f7-128e-5781-00b7d2acbd94@st.com>
+From: pure.logic@nexus-software.ie (Bryan O'Donoghue)
+Date: Wed, 11 Oct 2017 16:54:07 +0100
+Subject: [PATCH v3 3/7] nvmem: imx-ocotp: Add support for banked OTP
+ addressing
+In-Reply-To: <1507735954.22082.9.camel@pengutronix.de>
+References: <1507558312-20580-1-git-send-email-pure.logic@nexus-software.ie>
+ <1507558312-20580-4-git-send-email-pure.logic@nexus-software.ie>
+ <1507735954.22082.9.camel@pengutronix.de>
+Message-ID: <4492bd4e-ce32-402c-c52a-a24682f07940@nexus-software.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 10/11/2017 05:13 PM, Arnd Bergmann wrote:
-> On Wed, Oct 11, 2017 at 4:46 PM, Benjamin Gaignard
-> <benjamin.gaignard@linaro.org> wrote:
->> 2017-10-11 16:39 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
->>> On Wed, Oct 11, 2017 at 4:27 PM, Benjamin Gaignard
->>> <benjamin.gaignard@linaro.org> wrote:
->>>> 2017-10-11 16:01 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
->>>>
->>>>> @@ -398,6 +400,9 @@ static enum dma_slave_buswidth stm32_mdma_get_max_width(u32 buf_len, u32 tlen)
->>>>>                         break;
->>>>>         }
->>>>>
->>>>> +       if (addr % max_width)
->>>>> +               max_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
->>>>> +
->>>>
->>>> I'm only half-convince by the implicite 32 bits cast done into
->>>> function prototype.
->>>> If we keep using dma_addr_t and use do_div() instead of %
->>>> does compiler can still optimize the code ?
->>>>
->>>
->>> I wouldn't want to add a do_div() here, since it's guaranteed
->>> not to be needed. Would you prefer an explicit cast here
->>> and leave the argument as dma_addr_t?
->>>
->>> We could also use a bit mask here like
->>>
->>>   if (addr & (max_width-1))
+On 11/10/17 16:32, Philipp Zabel wrote:
+> On Mon, 2017-10-09 at 15:11 +0100, Bryan O'Donoghue wrote:
+>> The i.MX7S/D takes the bank address in the CTRLn.ADDR field and the data
+>> value in one of the DATAx {0, 1, 2, 3} register fields. The current write
+>> routine is based on writing the CTRLn.ADDR field and writing a single DATA
+>> register only.
 >>
->> That sound better for me since it doesn't limit the code to 32 bits architecture
-> 
-> FWIW, I used the u32 type here because that's the limit of the
-> dma driver, the dma_addr_t gets converted to that anyway
-> later.
-> 
->>>
->>> or we could combined it with the check above:
->>>
->>>                 if ((((buf_len | addr) & (max_width - 1)) == 0) &&
->>>                    (tlen >= max_width))
+>> Fixes: 0642bac7da42 ("nvmem: imx-ocotp: add write support")
 >>
->> No it is more simple to read with two checks
+>> Signed-off-by: Bryan O'Donoghue <pure.logic@nexus-software.ie>
+>> ---
+>>   drivers/nvmem/imx-ocotp.c | 70 +++++++++++++++++++++++++++++++++++++++++------
+>>   1 file changed, 61 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/drivers/nvmem/imx-ocotp.c b/drivers/nvmem/imx-ocotp.c
+>> index 7798571..927d525 100644
+>> --- a/drivers/nvmem/imx-ocotp.c
+>> +++ b/drivers/nvmem/imx-ocotp.c
+>> @@ -40,7 +40,10 @@
+>>   #define IMX_OCOTP_ADDR_CTRL_SET		0x0004
+>>   #define IMX_OCOTP_ADDR_CTRL_CLR		0x0008
+>>   #define IMX_OCOTP_ADDR_TIMING		0x0010
+>> -#define IMX_OCOTP_ADDR_DATA		0x0020
+>> +#define IMX_OCOTP_ADDR_DATA0		0x0020
+>> +#define IMX_OCOTP_ADDR_DATA1		0x0030
+>> +#define IMX_OCOTP_ADDR_DATA2		0x0040
+>> +#define IMX_OCOTP_ADDR_DATA3		0x0050
+>>   
+>>   #define IMX_OCOTP_BM_CTRL_ADDR		0x0000007F
+>>   #define IMX_OCOTP_BM_CTRL_BUSY		0x00000100
+>> @@ -55,6 +58,7 @@ static DEFINE_MUTEX(ocotp_mutex);
+>>   
+>>   struct ocotp_params {
+>>   	unsigned int nregs;
+>> +	unsigned int bank_address_words;
+>>   };
+>>   
+>>   struct ocotp_priv {
+>> @@ -176,6 +180,7 @@ static int imx_ocotp_write(void *context, unsigned int offset, void *val,
+>>   	u32 timing = 0;
+>>   	u32 ctrl;
+>>   	u8 waddr;
+>> +	u8 word = 0;
+>>   
+>>   	/* allow only writing one complete OTP word at a time */
+>>   	if ((bytes != priv->config->word_size) ||
+>> @@ -228,8 +233,22 @@ static int imx_ocotp_write(void *context, unsigned int offset, void *val,
+>>   	 * description. Both the unlock code and address can be written in the
+>>   	 * same operation.
+>>   	 */
+>> -	/* OTP write/read address specifies one of 128 word address locations */
+>> -	waddr = offset / 4;
+>> +	if (priv->params->bank_address_words != 0) {
+>> +		/*
+>> +		 * In banked mode the OTP register bank goes into waddr see
+>> +		 * i.MX 7Solo Applications Processor Reference Manual, Rev. 0.1
+>> +		 * 6.4.3.1
+>> +		 */
+>> +		offset = offset / priv->config->word_size;
+>> +		waddr = offset / priv->params->bank_address_words;
+>> +		word  = offset & (priv->params->bank_address_words - 1);
+>> +	} else {
+>> +		/*
+>> +		 * OTP write/read address specifies one of 128 word address
+>> +		 * locations
+>> +		 */
+>> +		waddr = offset / 4;
+>> +	}
 > 
-> I should have mentioned that this variant would also change
-> behavior: the current code falls back to byte access when
-> the address alignment is less than the length alignment.
-> The change I suggested here would change that to use
-> the maximum possible address width that fits the alignment
-> of either size or address.
+> Smallest of nitpicks, here the order is:
+> 
+> 	if (bank_address_words != 0) {
+> 		/* MX7 */
+> 	} else {
+> 		/* MX6 */
+> 	}
+> 
+>>   
+>>   	ctrl = readl(priv->base + IMX_OCOTP_ADDR_CTRL);
+>>   	ctrl &= ~IMX_OCOTP_BM_CTRL_ADDR;
+>> @@ -255,8 +274,41 @@ static int imx_ocotp_write(void *context, unsigned int offset, void *val,
+>>   	 * shift right (with zero fill). This shifting is required to program
+>>   	 * the OTP serially. During the write operation, HW_OCOTP_DATA cannot be
+>>   	 * modified.
+>> +	 * Note: on i.MX7 there are four data fields to write for banked write
+>> +	 *       with the fuse blowing operation only taking place after data0
+>> +	 *	 has been written. This is why data0 must always be the last
+>> +	 *	 register written.
+>>   	 */
+>> -	writel(*buf, priv->base + IMX_OCOTP_ADDR_DATA);
+>> +	if (priv->params->bank_address_words == 0) {
+>> +		writel(*buf, priv->base + IMX_OCOTP_ADDR_DATA0);
+>> +	} else {
+>> +		switch (word) {
+>> +		case 0:
+>> +			writel(0, priv->base + IMX_OCOTP_ADDR_DATA1);
+>> +			writel(0, priv->base + IMX_OCOTP_ADDR_DATA2);
+>> +			writel(0, priv->base + IMX_OCOTP_ADDR_DATA3);
+>> +			writel(*buf, priv->base + IMX_OCOTP_ADDR_DATA0);
+>> +			break;
+>> +		case 1:
+>> +			writel(*buf, priv->base + IMX_OCOTP_ADDR_DATA1);
+>> +			writel(0, priv->base + IMX_OCOTP_ADDR_DATA2);
+>> +			writel(0, priv->base + IMX_OCOTP_ADDR_DATA3);
+>> +			writel(0, priv->base + IMX_OCOTP_ADDR_DATA0);
+>> +			break;
+>> +		case 2:
+>> +			writel(0, priv->base + IMX_OCOTP_ADDR_DATA1);
+>> +			writel(*buf, priv->base + IMX_OCOTP_ADDR_DATA2);
+>> +			writel(0, priv->base + IMX_OCOTP_ADDR_DATA3);
+>> +			writel(0, priv->base + IMX_OCOTP_ADDR_DATA0);
+>> +			break;
+>> +		case 3:
+>> +			writel(0, priv->base + IMX_OCOTP_ADDR_DATA1);
+>> +			writel(0, priv->base + IMX_OCOTP_ADDR_DATA2);
+>> +			writel(*buf, priv->base + IMX_OCOTP_ADDR_DATA3);
+>> +			writel(0, priv->base + IMX_OCOTP_ADDR_DATA0);
+>> +			break;
+>> +		}
+>> +	}
+> 
+> But here the order is
+> 	if (bank_address_words == 0) {
+> 		/* MX6 */
+> 	} else {
+> 		/* MX7 */
+> 	}
+> 
+> Reordering this for consistency would also move the MX7 code closer to
+> the comment.
+> 
+>>   
+>>   	/* 47.4.1.4.5
+>>   	 * Once complete, the controller will clear BUSY. A write request to a
+>> @@ -313,11 +365,11 @@ static struct nvmem_config imx_ocotp_nvmem_config = {
+>>   };
+>>   
+>>   static const struct ocotp_params params[] = {
+>> -	{ .nregs = 128 },
+>> -	{ .nregs = 64 },
+>> -	{ .nregs = 128 },
+>> -	{ .nregs = 128 },
+>> -	{ .nregs = 64 },
+>> +	{ .nregs = 128, .bank_address_words = 0 },
+>> +	{ .nregs = 64,  .bank_address_words = 0 },
+>> +	{ .nregs = 128, .bank_address_words = 0 },
+>> +	{ .nregs = 128, .bank_address_words = 0 },
+>> +	{ .nregs = 64,  .bank_address_words = 4 },
+> 
+> See my comment on the last patch, I'd like to be able see which entry
+> corresponds to which SoC in this patch.
+> 
+> Otherwise,
+> 
+> Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
+> 
+> regards
+> Philipp
+> 
 
-Both alignment are required on address and length.
-The main advantage result is maximized in term of width. As for now I don't see
-any drawback except a short explanation.
-Nonetheless I need to think a little bit more about this change.
+ACK those changes Philipp.
 
-> 
-> I don't know what behavior we actually want though, or
-> if that change would be correct.
-> 
->       Arnd
-> 
+Thanks for your suggestions/time
 
-Regards
-Py
+---
+bod
