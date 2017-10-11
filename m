@@ -1,63 +1,40 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 11 Oct 2017 17:08:19 -0500
-Subject: [PATCH 1/5] PCI: protect restore with device lock to be consistent
-In-Reply-To: <1506212218-29103-1-git-send-email-okaya@codeaurora.org>
-References: <1506212218-29103-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <20171011220819.GW25517@bhelgaas-glaptop.roam.corp.google.com>
+From: fkan@apm.com (Feng Kan)
+Date: Wed, 11 Oct 2017 15:08:39 -0700
+Subject: [PATCH] iommu: enable bypass transaction caching for ARM SMMU 500
+Message-ID: <1507759719-16675-1-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I think this series makes a lot of sense overall; thanks for doing
-this work!  I had a few comments on the individual patches.
+The ARM SMMU identity mapping performance was poor compared with the
+DMA mode. It was found that enable caching would restore the performance
+back to normal. The S2CRB_TLBEN bit in the ACR register would allow for
+caching of the stream to context register bypass transaction information.
 
-(This response would ordinarily be to the cover letter, but there
-isn't one, so I'm just responding to the first patch.)
+Signed-off-by: Feng Kan <fkan@apm.com>
+---
+ drivers/iommu/arm-smmu.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-On Sat, Sep 23, 2017 at 08:16:54PM -0400, Sinan Kaya wrote:
-> Commit b014e96d1abb ("PCI: Protect pci_error_handlers->reset_notify() usage
-> with device_lock()") added protection around pci_dev_restore() function so
-> that device specific remove callback does not cause a race condition
-> against hotplug.
-> 
-> pci_dev_lock() usage has been forgotten in two different places in the
-> code. Adding locks for pci_slot_restore() and moving pci_dev_restore()
-> inside the locks for pci_try_reset_function().
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/pci/pci.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index 6078dfc..23681f4 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -4344,9 +4344,9 @@ int pci_try_reset_function(struct pci_dev *dev)
->  
->  	pci_dev_save_and_disable(dev);
->  	rc = __pci_reset_function_locked(dev);
-> +	pci_dev_restore(dev);
->  	pci_dev_unlock(dev);
->  
-> -	pci_dev_restore(dev);
->  	return rc;
->  }
->  EXPORT_SYMBOL_GPL(pci_try_reset_function);
-> @@ -4546,7 +4546,9 @@ static void pci_slot_restore(struct pci_slot *slot)
->  	list_for_each_entry(dev, &slot->bus->devices, bus_list) {
->  		if (!dev->slot || dev->slot != slot)
->  			continue;
-> +		pci_dev_lock(dev);
->  		pci_dev_restore(dev);
-> +		pci_dev_unlock(dev);
->  		if (dev->subordinate)
->  			pci_bus_restore(dev->subordinate);
->  	}
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 3bdb799..b5676a8 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -59,6 +59,7 @@
+ #define ARM_MMU500_ACTLR_CPRE		(1 << 1)
+ 
+ #define ARM_MMU500_ACR_CACHE_LOCK	(1 << 26)
++#define ARM_MMU500_ACR_S2CRB_TLBEN	(1 << 10)
+ #define ARM_MMU500_ACR_SMTNMB_TLBEN	(1 << 8)
+ 
+ #define TLB_LOOP_TIMEOUT		1000000	/* 1s! */
+@@ -1606,7 +1607,7 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+ 		 * Allow unmatched Stream IDs to allocate bypass
+ 		 * TLB entries for reduced latency.
+ 		 */
+-		reg |= ARM_MMU500_ACR_SMTNMB_TLBEN;
++		reg |= ARM_MMU500_ACR_SMTNMB_TLBEN | ARM_MMU500_ACR_S2CRB_TLBEN;
+ 		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_sACR);
+ 	}
+ 
+-- 
+2.7.4
