@@ -1,167 +1,94 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Wed, 11 Oct 2017 14:00:57 +0100
-Subject: [RFC 2/7] arm64: cpufeature: Allow early detect of specific features
-In-Reply-To: <1507726862-11944-1-git-send-email-julien.thierry@arm.com>
-References: <1507726862-11944-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1507726862-11944-3-git-send-email-julien.thierry@arm.com>
+Date: Wed, 11 Oct 2017 14:00:55 +0100
+Subject: [RFC 0/7] arm64: provide pseudo NMI with GICv3
+Message-ID: <1507726862-11944-1-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Daniel Thompson <daniel.thompson@linaro.org>
+Hi,
 
-Currently it is not possible to detect features of the boot CPU
-until the other CPUs have been brought up.
+This series is a continuation of the work started by Daniel [1]. The goal is
+to use GICv3 interrupt priorities to simulate an NMI.
 
-This prevents us from reacting to features of the boot CPU until
-fairly late in the boot process. To solve this we allow a subset
-of features (that are likely to be common to all clusters) to be
-detected based on the boot CPU alone.
+To achieve this, set two priorities, one for standard interrupts and
+another, higher priority, for NMIs. Whenever we want to disable interrupts,
+we mask the standard priority instead so NMIs can still be raised. Some
+corner cases though still require to actually mask all interrupts
+effectively disabling the NMI.
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-[julien.thierry at arm.com: check non-boot cpu missing early features, avoid
-			 duplicates between early features and normal
-			 features, do not move init_cpu_features]
-Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/kernel/cpufeature.c | 67 ++++++++++++++++++++++++++++--------------
- 1 file changed, 45 insertions(+), 22 deletions(-)
+Of course, using priority masking instead of PSR.I comes at some cost. On
+hackbench, I notice a ~6% drop of performance. However, on a kernel build,
+I do not see significant differences.
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 21e2c95..0e58cdd 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -51,6 +51,8 @@
- DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
- EXPORT_SYMBOL(cpu_hwcaps);
+Currently, only PPIs and SPIs can be set as NMIs. IPIs being currently
+hardcoded IRQ numbers, there isn't a generic interface to set SGIs as NMI
+for now. I don't think there is any reason LPIs should be allowed to be set
+as NMI as they do not have an active state.
+When an NMI is active on a CPU, no other NMI can be triggered on the CPU.
 
-+static void __init setup_early_feature_capabilities(void);
-+
- static int dump_cpu_hwcaps(struct notifier_block *self, unsigned long v, void *p)
- {
- 	/* file-wide pr_fmt adds "CPU features: " prefix */
-@@ -505,6 +507,7 @@ void __init init_cpu_features(struct cpuinfo_arm64 *info)
- 		init_cpu_ftr_reg(SYS_MVFR2_EL1, info->reg_mvfr2);
- 	}
+Requirements to use this:
+- Have GICv3
+- SCR_EL3.FIQ is set to 1 when linux runs
+- Select Kernel Feature -> Use ICC system registers for IRQ masking
 
-+	setup_early_feature_capabilities();
- }
+>From my testing with the perf interrupt, there doesn't seem to be any major
+issue left (but if you find some, do tell!).
 
- static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
-@@ -796,7 +799,7 @@ static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unus
- 					ID_AA64PFR0_FP_SHIFT) < 0;
- }
+* Patches 1 and 5 are minor utility changes.
+* Patches 2 and 3 allows to detect and enable the use of GICv3 system
+  registers during boot time.
+* Patch 4 introduces the masking of IRQs using priorities replacing irq
+  disabling.
+* Patch 6 add detection of the view linux has on GICv3 priorities, without
+  this we cannot easily mask specific priorities in an accurate manner
+* Patch 7 adds the support for NMIs
 
--static const struct arm64_cpu_capabilities arm64_features[] = {
-+static const struct arm64_cpu_capabilities arm64_early_features[] = {
- 	{
- 		.desc = "GIC system register CPU interface",
- 		.capability = ARM64_HAS_SYSREG_GIC_CPUIF,
-@@ -807,6 +810,10 @@ static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unus
- 		.sign = FTR_UNSIGNED,
- 		.min_field_value = 1,
- 	},
-+	{}
-+};
-+
-+static const struct arm64_cpu_capabilities arm64_features[] = {
- #ifdef CONFIG_ARM64_PAN
- 	{
- 		.desc = "Privileged Access Never",
-@@ -1055,6 +1062,29 @@ static inline void set_sys_caps_initialised(void)
- 	sys_caps_initialised = true;
- }
 
-+/* Returns false on a capability mismatch */
-+static bool
-+verify_local_cpu_features(const struct arm64_cpu_capabilities *caps)
-+{
-+	for (; caps->matches; caps++) {
-+		if (!cpus_have_cap(caps->capability))
-+			continue;
-+		/*
-+		 * If the new CPU misses an advertised feature, we cannot
-+		 * proceed further, park the cpu.
-+		 */
-+		if (!caps->matches(caps, SCOPE_LOCAL_CPU)) {
-+			pr_crit("CPU%d: missing feature: %s\n",
-+					smp_processor_id(), caps->desc);
-+			return false;
-+		}
-+		if (caps->enable)
-+			caps->enable(NULL);
-+	}
-+
-+	return true;
-+}
-+
- /*
-  * Check for CPU features that are used in early boot
-  * based on the Boot CPU value.
-@@ -1063,6 +1093,9 @@ static void check_early_cpu_features(void)
- {
- 	verify_cpu_run_el();
- 	verify_cpu_asid_bits();
-+
-+	if (!verify_local_cpu_features(arm64_early_features))
-+		cpu_panic_kernel();
- }
+[1] http://www.spinics.net/lists/arm-kernel/msg525077.html
 
- static void
-@@ -1077,26 +1110,6 @@ static void check_early_cpu_features(void)
- 		}
- }
+Thanks,
 
--static void
--verify_local_cpu_features(const struct arm64_cpu_capabilities *caps)
--{
--	for (; caps->matches; caps++) {
--		if (!cpus_have_cap(caps->capability))
--			continue;
--		/*
--		 * If the new CPU misses an advertised feature, we cannot proceed
--		 * further, park the cpu.
--		 */
--		if (!caps->matches(caps, SCOPE_LOCAL_CPU)) {
--			pr_crit("CPU%d: missing feature: %s\n",
--					smp_processor_id(), caps->desc);
--			cpu_die_early();
--		}
--		if (caps->enable)
--			caps->enable(NULL);
--	}
--}
--
- /*
-  * Run through the enabled system capabilities and enable() it on this CPU.
-  * The capabilities were decided based on the available CPUs at the boot time.
-@@ -1108,7 +1121,10 @@ static void check_early_cpu_features(void)
- static void verify_local_cpu_capabilities(void)
- {
- 	verify_local_cpu_errata_workarounds();
--	verify_local_cpu_features(arm64_features);
-+
-+	if (!verify_local_cpu_features(arm64_features))
-+		cpu_die_early();
-+
- 	verify_local_elf_hwcaps(arm64_elf_hwcaps);
- 	if (system_supports_32bit_el0())
- 		verify_local_elf_hwcaps(compat_elf_hwcaps);
-@@ -1134,6 +1150,13 @@ void check_local_cpu_capabilities(void)
- 		verify_local_cpu_capabilities();
- }
+Julien Thierry
 
-+static void __init setup_early_feature_capabilities(void)
-+{
-+	update_cpu_capabilities(arm64_early_features,
-+				"early detected feature:");
-+	enable_cpu_capabilities(arm64_early_features);
-+}
-+
- static void __init setup_feature_capabilities(void)
- {
- 	update_cpu_capabilities(arm64_features, "detected feature:");
+
+Daniel Thompson (4):
+  arm64: irqflags: Reorder the fiq & async macros
+  arm64: cpufeature: Allow early detect of specific features
+  arm64: alternative: Apply alternatives early in boot process
+  arm64: irqflags: Use ICC sysregs to implement IRQ masking
+
+Julien Thierry (3):
+  irqchip/gic: Add functions to access irq priorities
+  arm64: Detect current view of GIC priorities
+  arm64: Add support for pseudo-NMIs
+
+ Documentation/arm64/booting.txt        |   5 +
+ arch/arm64/Kconfig                     |  15 ++
+ arch/arm64/include/asm/alternative.h   |   1 +
+ arch/arm64/include/asm/arch_gicv3.h    |  24 +++
+ arch/arm64/include/asm/assembler.h     |  33 +++-
+ arch/arm64/include/asm/efi.h           |   5 +
+ arch/arm64/include/asm/irqflags.h      | 143 +++++++++++++++-
+ arch/arm64/include/asm/kvm_host.h      |  40 +++++
+ arch/arm64/include/asm/processor.h     |   4 +
+ arch/arm64/include/asm/ptrace.h        |  14 +-
+ arch/arm64/include/asm/sysreg.h        |   1 +
+ arch/arm64/kernel/alternative.c        |  39 ++++-
+ arch/arm64/kernel/asm-offsets.c        |   1 +
+ arch/arm64/kernel/cpufeature.c         |  67 +++++---
+ arch/arm64/kernel/entry.S              | 132 ++++++++++++--
+ arch/arm64/kernel/head.S               |  38 +++++
+ arch/arm64/kernel/process.c            |   6 +
+ arch/arm64/kernel/smp.c                |  14 ++
+ arch/arm64/mm/proc.S                   |  23 +++
+ drivers/irqchip/irq-gic-common.c       |  10 ++
+ drivers/irqchip/irq-gic-common.h       |   2 +
+ drivers/irqchip/irq-gic-v3-its.c       |   2 +-
+ drivers/irqchip/irq-gic-v3.c           | 304 +++++++++++++++++++++++++++++----
+ include/linux/interrupt.h              |   1 +
+ include/linux/irqchip/arm-gic-common.h |   6 +
+ include/linux/irqchip/arm-gic.h        |   5 -
+ 26 files changed, 845 insertions(+), 90 deletions(-)
+
 --
 1.9.1
