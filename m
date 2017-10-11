@@ -1,73 +1,145 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Wed, 11 Oct 2017 13:33:48 +0200
-Subject: [RFCv2 PATCH 05/36] iommu/process: Bind and unbind process to
- and from devices
-In-Reply-To: <20171006133203.22803-6-jean-philippe.brucker@arm.com>
-References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
- <20171006133203.22803-6-jean-philippe.brucker@arm.com>
-Message-ID: <20171011113348.GE30803@8bytes.org>
+From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
+Date: Wed, 11 Oct 2017 11:34:18 +0000
+Subject: [PATCH v9 0/4] iommu/smmu-v3: Workaround for hisilicon
+ 161010801 erratum(reserve HW MSI)
+In-Reply-To: <20171006140450.89652-1-shameerali.kolothum.thodi@huawei.com>
+References: <20171006140450.89652-1-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <5FC3163CFD30C246ABAA99954A238FA8384228BC@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Philipe,
+Hi Will,
 
-Thanks for your patches, this is definitly a step in the right direction
-to get generic support for IO virtual memory into the IOMMU core code.
+Any further comments on this series, please? 
 
-But I see an issue with the design around task_struct, please see
-below.
+We do have the ack from all relevant people for the "[PATCH v9 4/4] PCI: hisi: blacklist
+hip06/hip07 controllers behind SMMUv3" now. 
 
-On Fri, Oct 06, 2017 at 02:31:32PM +0100, Jean-Philippe Brucker wrote:
-> +int iommu_process_bind_device(struct device *dev, struct task_struct *task,
-> +			      int *pasid, int flags)
+Really appreciate if you can take a look and let us know.
 
-I just took this patch as an example, it is in the other patches as
-well. The code is designed around 'struct task_struct' while it should
-really be designed around 'struct mm_struct'. You are not attaching a
-specific process to a device, but the address-space of one or more
-processes. And that should be reflected in the design.
+Many thanks,
+Shameer
 
-There are several bad implications of building it around task_struct,
-one is the life-time of the binding. If the address space is detached
-from the device when the process exits, only the thread that did the
-setup can can safely make use of the device, because if the device is
-accessed from another thread it will crash when the setup-thread exits.
-
-There are other benefits of using mm_struct, for example that you can
-use mmu_notifiers to exit-handling.
-
-Here is how I think the base API should look like:
-
-	* iommu_iovm_device_init(struct device *dev);
-	  iommu_iovm_device_shutdown(struct device *dev);
-
-	  These two functions do the device specific setup/shutdown. For
-	  PCI this would include enabling the PRI, PASID, and ATS
-	  capabilities and setting up a PASID table for the device.
-
-	* iommu_iovm_bind_mm(struct device *dev, struct mm_struct *mm,
-			     iovm_shutdown_cb *cb);
-	  iommu_iovm_unbind_mm(struct device *dev, struct mm_struct *mm);
-
-	  These functions add and delete the entries in the PASID table
-	  for the device and setup mmu_notifiers for the mm_struct to
-	  keep IOMMU TLBs in sync with the CPU TLBs.
-
-	  The shutdown_cb is invoked by the IOMMU core code when the
-	  mm_struct goes away, for example because the process
-	  segfaults.
-
-	The PASID handling is best done these functions as well, unless
-	there is a strong reason to allow device drivers to do the
-	handling themselves.
-
-The context data can be stored directly in mm_struct, including the
-PASID for that mm.
-
-There is of course more functionality needed, the above only outlines
-the very basic needs.
-
-
-Regards,
-
-	Joerg
+> -----Original Message-----
+> From: Shameerali Kolothum Thodi
+> Sent: Friday, October 06, 2017 3:05 PM
+> To: lorenzo.pieralisi at arm.com; marc.zyngier at arm.com;
+> sudeep.holla at arm.com; will.deacon at arm.com; robin.murphy at arm.com;
+> joro at 8bytes.org; bhelgaas at google.com; Gabriele Paoloni
+> <gabriele.paoloni@huawei.com>
+> Cc: John Garry <john.garry@huawei.com>; iommu at lists.linux-
+> foundation.org; linux-arm-kernel at lists.infradead.org; linux-
+> acpi at vger.kernel.org; linux-pci at vger.kernel.org; devel at acpica.org;
+> Linuxarm <linuxarm@huawei.com>; Wangzhou (B)
+> <wangzhou1@hisilicon.com>; Guohanjun (Hanjun Guo)
+> <guohanjun@huawei.com>; Shameerali Kolothum Thodi
+> <shameerali.kolothum.thodi@huawei.com>
+> Subject: [PATCH v9 0/4] iommu/smmu-v3: Workaround for hisilicon
+> 161010801 erratum(reserve HW MSI)
+> 
+> On certain HiSilicon platforms (hip06/hip07) the GIC ITS and PCIe RC
+> deviates from the standard implementation and this breaks PCIe MSI
+> functionality when SMMU is enabled.
+> 
+> The HiSilicon erratum 161010801 describes this limitation of certain
+> HiSilicon platforms to support the SMMU mappings for MSI transactions.
+> On these platforms GICv3 ITS translator is presented with the deviceID
+> by extending the MSI payload data to 64 bits to include the deviceID.
+> Hence, the PCIe controller on this platforms has to differentiate the MSI
+> payload against other DMA payload and has to modify the MSI payload.
+> This basically makes it difficult for this platforms to have a SMMU
+> translation for MSI.
+> 
+> This patch implements an ACPI and DT based quirk to reserve the hw msi
+> regions in the smmu-v3 driver which means these address regions will
+> not be translated and will be excluded from iova allocations.
+> 
+> To implement this quirk, the following changes are incorporated:
+> 1. Added a generic helper function to IORT code to retrieve the
+>    associated ITS base address from a device IORT node.
+> 2. Added a generic helper function to of iommu code to retrieve the
+>    associated msi controller base address from for a PCI RC
+>    msi-mapping and also platform device msi-parent.
+> 3. Blacklisted HiSilicon PCIe controllers on DT based hip06/hip07
+>    platforms when SMMUv3 is enabled as there is no DT based solution
+>    for this as of now.
+> 
+> Changelog:
+> 
+> v8 --> v9
+> -Thanks to Marc, fixed IORT helper function to reserve the ITS
+>  translater region only.
+> -Removed the DT support for MSI reservation and blacklisted
+>  HiSilicon PCIe controllers on DT based systems when SMMUv3 is
+>  enabled.
+> 
+> v7 --> v8
+> Addressed comments from Rob and Lorenzo:
+>  -Modified to use DT compatible string for errata.
+>  -Changed logic to retrieve the msi-parent for DT case.
+> 
+> v6 --> v7
+> Addressed request from Will to add DT support for the erratum:
+>  - added bt binding
+>  - add of_iommu_msi_get_resv_regions()
+> New arm64 silicon errata entry
+> Rename iort_iommu_{its->msi}_get_resv_regions
+> 
+> v5 --> v6
+> Addressed comments from Robin and Lorenzo:
+> -No change to patch#1 .
+> -Reverted v5 patch#2 as this might break the platforms where this quirk
+>   is not applicable. Provided a generic function in iommu code and added
+>   back the quirk implementation in SMMU v3 driver(patch#3)
+> 
+> v4 --> v5
+> Addressed comments from Robin and Lorenzo:
+> -Added a comment to make it clear that, for now, only straightforward
+>   HW topologies are handled while reserving ITS regions(patch #1).
+> 
+> v3 --> v4
+> Rebased on 4.13-rc1.
+> Addressed comments from Robin, Will and Lorenzo:
+> -As suggested by Robin, moved the ITS msi reservation into
+>   iommu_dma_get_resv_regions().
+> -Added its_count != resv region failure case(patch #1).
+> 
+> v2 --> v3
+> Addressed comments from Lorenzo and Robin:
+> -Removed dev_is_pci() check in smmuV3 driver.
+> -Don't treat device not having an ITS mapping as an error in
+>   iort helper function.
+> 
+> v1 --> v2
+> -patch 2/2: Invoke iort helper fn based on fwnode type(acpi).
+> 
+> RFCv2 -->PATCH
+> -Incorporated Lorenzo's review comments.
+> 
+> RFC v1 --> RFC v2
+> Based on Robin's review comments,
+> -Removed  the generic erratum framework.
+> -Using IORT/MADT tables to retrieve the ITS base addr instead  of vendor
+> specific CSRT table.
+> 
+> 
+> Shameer Kolothum (4):
+>   ACPI/IORT: Add msi address regions reservation helper
+>   iommu/dma: Add a helper function to reserve HW MSI address regions for
+>     IOMMU drivers
+>   iommu/arm-smmu-v3:Enable ACPI based HiSilicon erratum 161010801
+>   PCI: hisi: blacklist hip06/hip07 controllers behind SMMUv3
+> 
+>  drivers/acpi/arm64/iort.c        | 97
+> ++++++++++++++++++++++++++++++++++++++--
+>  drivers/iommu/arm-smmu-v3.c      | 27 ++++++++---
+>  drivers/iommu/dma-iommu.c        | 20 +++++++++
+>  drivers/irqchip/irq-gic-v3-its.c |  3 +-
+>  drivers/pci/dwc/pcie-hisi.c      | 12 +++++
+>  include/linux/acpi_iort.h        |  7 ++-
+>  include/linux/dma-iommu.h        |  7 +++
+>  7 files changed, 163 insertions(+), 10 deletions(-)
+> 
+> --
+> 1.9.1
+> 
