@@ -1,102 +1,49 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 11 Oct 2017 13:13:32 +0100
-Subject: [PATCH v6 2/4] perf tools arm64: Add support for get_cpuid_str
- function.
-In-Reply-To: <20170824120349.2323-3-ganapatrao.kulkarni@cavium.com>
-References: <20170824120349.2323-1-ganapatrao.kulkarni@cavium.com>
- <20170824120349.2323-3-ganapatrao.kulkarni@cavium.com>
-Message-ID: <20171011121332.GA11106@arm.com>
+From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
+Date: Wed, 11 Oct 2017 14:16:28 +0200
+Subject: [PATCH][dma-next] dmaengine: stm32: remove redundant
+ initialization of hwdesc
+In-Reply-To: <20171011102822.19166-1-colin.king@canonical.com>
+References: <20171011102822.19166-1-colin.king@canonical.com>
+Message-ID: <c7a5f1e9-1a70-dfd8-025e-7889b170de93@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 24, 2017 at 05:33:47PM +0530, Ganapatrao Kulkarni wrote:
-> function get_cpuid_str returns MIDR string of the first online
-> cpu from the range of cpus associated with the pmu core device.
+
+On 10/11/2017 12:28 PM, Colin King wrote:
+> From: Colin Ian King <colin.king@canonical.com>
 > 
-> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> hwdesc is being initialized to desc->hwdesc but this is never read
+> as hwdesc is overwritten in a for-loop.  Remove the redundant
+> initialization and move the declaration of hwdesc into the for-loop.
+> 
+> Cleans up clang warning:
+> Value stored to 'hwdesc' during its initialization is never read
+> 
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
 > ---
->  tools/perf/arch/arm64/util/Build    |  1 +
->  tools/perf/arch/arm64/util/header.c | 60 +++++++++++++++++++++++++++++++++++++
->  2 files changed, 61 insertions(+)
->  create mode 100644 tools/perf/arch/arm64/util/header.c
+>  drivers/dma/stm32-mdma.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/tools/perf/arch/arm64/util/Build b/tools/perf/arch/arm64/util/Build
-> index cef6fb3..b1ab72d 100644
-> --- a/tools/perf/arch/arm64/util/Build
-> +++ b/tools/perf/arch/arm64/util/Build
-> @@ -1,3 +1,4 @@
-> +libperf-y += header.o
->  libperf-$(CONFIG_DWARF)     += dwarf-regs.o
->  libperf-$(CONFIG_LOCAL_LIBUNWIND) += unwind-libunwind.o
+> diff --git a/drivers/dma/stm32-mdma.c b/drivers/dma/stm32-mdma.c
+> index 0db59a7e80e0..d3be6bffdf12 100644
+> --- a/drivers/dma/stm32-mdma.c
+> +++ b/drivers/dma/stm32-mdma.c
+> @@ -1252,13 +1252,13 @@ static size_t stm32_mdma_desc_residue(struct stm32_mdma_chan *chan,
+>  				      u32 curr_hwdesc)
+>  {
+>  	struct stm32_mdma_device *dmadev = stm32_mdma_get_dev(chan);
+> -	struct stm32_mdma_hwdesc *hwdesc = desc->hwdesc;
+>  	u32 cbndtr, residue, modulo, burst_size;
+>  	int i;
 >  
-> diff --git a/tools/perf/arch/arm64/util/header.c b/tools/perf/arch/arm64/util/header.c
-> new file mode 100644
-> index 0000000..f02a32e
-> --- /dev/null
-> +++ b/tools/perf/arch/arm64/util/header.c
-> @@ -0,0 +1,60 @@
-> +#include <stdio.h>
-> +#include <stdlib.h>
-> +#include <api/fs/fs.h>
-> +#include "header.h"
+>  	residue = 0;
+>  	for (i = curr_hwdesc + 1; i < desc->count; i++) {
+> -		hwdesc = &desc->hwdesc[i];
+> +		struct stm32_mdma_hwdesc *hwdesc = &desc->hwdesc[i];
 > +
-> +#define MIDR "/regs/identification/midr_el1"
-> +#define MIDR_SIZE 19
-> +
-> +char *get_cpuid_str(struct perf_pmu *pmu)
-> +{
-> +	char *buf = NULL;
-> +	char path[PATH_MAX];
-> +	const char *sysfs = sysfs__mountpoint();
-> +	int cpu;
-> +	u64 midr = 0;
-> +	struct cpu_map *cpus;
-> +	FILE *file;
-> +
-> +	if (!sysfs || !pmu->cpus)
-> +		return NULL;
-> +
-> +	buf = malloc(MIDR_SIZE);
-> +	if (!buf)
-> +		return NULL;
-> +
-> +	/* read midr from list of cpus mapped to this pmu */
-> +	cpus = cpu_map__get(pmu->cpus);
-> +	for (cpu = 0; cpu < cpus->nr; cpu++) {
-> +		scnprintf(path, PATH_MAX, "%s/devices/system/cpu/cpu%d"MIDR,
-> +				sysfs, cpus->map[cpu]);
-> +
-> +		file = fopen(path, "r");
-> +		if (!file) {
-> +			pr_debug("fopen failed for file %s\n", path);
-> +			continue;
-> +		}
-> +
-> +		if (!fgets(buf, MIDR_SIZE, file))
-> +			continue;
-> +		fclose(file);
+>  		residue += STM32_MDMA_CBNDTR_BNDT(hwdesc->cbndtr);
+>  	}
+>  	cbndtr = stm32_mdma_read(dmadev, STM32_MDMA_CBNDTR(chan->id));
+> 
 
-Don't you want to fclose the file if the fgets fails?
-
-> +
-> +		/* Ignore/clear Variant[23:20] and
-> +		 * Revision[3:0] of MIDR
-> +		 */
-> +		midr = strtoul(buf, NULL, 16);
-> +		midr &= (~(0xf << 20 | 0xf));
-
-It would be cleaner if you had #defines for the MIDR fields that you're
-masking.
-
-> +		scnprintf(buf, MIDR_SIZE, "0x%016lx", midr);
-> +		/* got midr break loop */
-> +		break;
-> +	}
-> +
-> +	if (!midr) {
-> +		pr_err("failed to get cpuid string\n");
-
-Might be helpful to print the PMU name and the CPU map if there's a way 
-to do that.
-
-Will
+Acked-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
