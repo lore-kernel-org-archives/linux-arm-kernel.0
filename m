@@ -1,74 +1,298 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Wed, 11 Oct 2017 18:13:01 +0100
-Subject: [PATCH v3 08/20] arm64: entry.S: convert elX_irq
-In-Reply-To: <20171005191812.5678-9-james.morse@arm.com>
-References: <20171005191812.5678-1-james.morse@arm.com>
- <20171005191812.5678-9-james.morse@arm.com>
-Message-ID: <ae8a4e66-0a07-3e1a-9ac9-adf8b6b60b06@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 11 Oct 2017 18:35:42 +0100
+Subject: [PATCH v2 2/3] irqchip: Add Realtek RTD1295 mux driver
+In-Reply-To: <20170828105344.8338-3-afaerber@suse.de>
+References: <20170828105344.8338-1-afaerber@suse.de>
+ <20170828105344.8338-3-afaerber@suse.de>
+Message-ID: <daf9b232-69dc-7701-6a0d-b28479d1f7d4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 05/10/17 20:18, James Morse wrote:
-> Following our 'dai' order, irqs should be processed with debug and
-> serror exceptions unmasked.
->  > Add a helper to unmask these two, (and fiq for good measure).
+On 28/08/17 11:53, Andreas F?rber wrote:
+> This irq mux driver is derived from the RTD1295 vendor DT and assumes a
+> linear mapping between intr_en and intr_status registers.
+> Code for RTD119x indicates this may not always be the case (i2c_3).
 > 
-> Signed-off-by: James Morse <james.morse@arm.com>
+> Based in part on QNAP's arch/arm/mach-rtk119x/rtk_irq_mux.c code.
+> 
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
 > ---
->   arch/arm64/include/asm/assembler.h | 4 ++++
->   arch/arm64/kernel/entry.S          | 4 ++--
->   2 files changed, 6 insertions(+), 2 deletions(-)
+>  v1 -> v2:
+>  * Renamed struct fields to avoid ambiguity (Marc)
+>  * Refactored offset lookup to avoid per-compatible init functions
+>  * Inserted white lines to clarify balanced locking (Marc)
+>  * Dropped forwarding of set_affinity to GIC (Marc)
+>  * Added spinlocks for consistency (Marc)
+>  * Limited initialization quirk to iso mux
+>  * Fixed spinlock initialization (Andrew)
+>  
+>  drivers/irqchip/Makefile          |   1 +
+>  drivers/irqchip/irq-rtd119x-mux.c | 204 ++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 205 insertions(+)
+>  create mode 100644 drivers/irqchip/irq-rtd119x-mux.c
 > 
-> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-> index c2a37e2f733c..7ffb2a629dc9 100644
-> --- a/arch/arm64/include/asm/assembler.h
-> +++ b/arch/arm64/include/asm/assembler.h
-> @@ -54,6 +54,10 @@
->   	msr	daif, \tmp
->   	.endm
->   
-> +	.macro enable_da_f
-> +	msr	daifclr, #(8 | 4 | 1)
-> +	.endm
+> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+> index e88d856cc09c..46202a0b7d96 100644
+> --- a/drivers/irqchip/Makefile
+> +++ b/drivers/irqchip/Makefile
+> @@ -78,3 +78,4 @@ obj-$(CONFIG_EZNPS_GIC)			+= irq-eznps.o
+>  obj-$(CONFIG_ARCH_ASPEED)		+= irq-aspeed-vic.o irq-aspeed-i2c-ic.o
+>  obj-$(CONFIG_STM32_EXTI) 		+= irq-stm32-exti.o
+>  obj-$(CONFIG_QCOM_IRQ_COMBINER)		+= qcom-irq-combiner.o
+> +obj-$(CONFIG_ARCH_REALTEK)		+= irq-rtd119x-mux.o
+> diff --git a/drivers/irqchip/irq-rtd119x-mux.c b/drivers/irqchip/irq-rtd119x-mux.c
+> new file mode 100644
+> index 000000000000..65d22e163bef
+> --- /dev/null
+> +++ b/drivers/irqchip/irq-rtd119x-mux.c
+> @@ -0,0 +1,204 @@
+> +/*
+> + * Realtek RTD129x IRQ mux
+> + *
+> + * Copyright (c) 2017 Andreas F?rber
+> + *
+> + * SPDX-License-Identifier: GPL-2.0+
+> + */
+> +
+> +#include <linux/io.h>
+> +#include <linux/irqchip.h>
+> +#include <linux/irqchip/chained_irq.h>
+> +#include <linux/irqdomain.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/slab.h>
+> +
+> +struct rtd119x_irq_mux_info {
+> +	unsigned intr_status_offset;
+> +	unsigned intr_en_offset;
+> +};
+> +
+> +struct rtd119x_irq_mux_data {
+> +	void __iomem *intr_status;
+> +	void __iomem *intr_en;
+> +	int irq;
+> +	struct irq_domain *domain;
+> +	spinlock_t lock;
+> +};
+> +
+> +static void rtd119x_mux_irq_handle(struct irq_desc *desc)
+> +{
+> +	struct rtd119x_irq_mux_data *data = irq_desc_get_handler_data(desc);
+> +	struct irq_chip *chip = irq_desc_get_chip(desc);
+> +	u32 intr_en, intr_status, status;
+> +	int ret;
+> +
+> +	chained_irq_enter(chip, desc);
+> +
+> +	spin_lock(&data->lock);
+> +	intr_en     = readl(data->intr_en);
+
+I think that all the MMIO accessors in this file can advantageously
+turned into their _relaxed version (none of them require any barrier).
+
+> +	intr_status = readl(data->intr_status);
+> +	spin_unlock(&data->lock);
+> +
+> +	status = intr_status & intr_en;
+> +	if (status != 0) {
+> +		unsigned irq = __ffs(status);
+> +		ret = generic_handle_irq(irq_find_mapping(data->domain, irq));
+> +		if (ret == 0) {
+> +			spin_lock(&data->lock);
+> +
+> +			intr_status = readl(data->intr_status);
+> +			intr_status |= BIT(irq - 1);
+> +			writel(intr_status, data->intr_status);
+
+This sequence feels a bit wrong: It seems to imply that writing to the
+status register is a way to EOI the interrupt. But what happens to the
+other bits that you've read? I fear that you are inadvertently
+signalling an EOI for interrupts that you may not have handled yet.
+
+I'd rather see something like this:
+
+	while (status) {
+		irq = __ffs(status) - 1;
+		writel_relaxed(BIT(irq), data->intr_status);
+		generic_handle_irq(irq_find_mapping(data->domain, irq));
+		status &= ~irq;
+	}
+
+assuming I've understood how the HW works. No need for additional locking.
+
+> +
+> +			spin_unlock(&data->lock);
+> +		}
+> +	}
+> +
+> +	chained_irq_exit(chip, desc);
+> +}
+> +
+> +static void rtd119x_mux_mask_irq(struct irq_data *data)
+> +{
+> +	struct rtd119x_irq_mux_data *mux_data = irq_data_get_irq_chip_data(data);
+> +	u32 intr_status;
+> +
+> +	spin_lock(&mux_data->lock);
+
+Bang, you're dead. If you get the chained interrupt firing here on the
+same CPU, it will take the lock in the above function, and everything
+will grind to a halt. Use the irqsave version.
+
+> +
+> +	intr_status = readl(mux_data->intr_status);
+> +	intr_status |= BIT(data->hwirq);
+> +	writel(intr_status, mux_data->intr_status);
+
+Or maybe I haven't understood how this works at all. Can you please
+explain? I'd expect masking to be the opposite of unmasking, but that's
+not the case...
+
+> +
+> +	spin_unlock(&mux_data->lock);
+> +}
+> +
+> +static void rtd119x_mux_unmask_irq(struct irq_data *data)
+> +{
+> +	struct rtd119x_irq_mux_data *mux_data = irq_data_get_irq_chip_data(data);
+> +	u32 intr_en;
+> +
+> +	spin_lock(&mux_data->lock);
 > +
 
-We use this in irq entries because we are inheriting daif + we want to 
-disable irqs while we process irqs right?
+Same here.
 
-I don't know if it's worth adding a comment but I find it easier to 
-think about it like this.
+> +	intr_en = readl(mux_data->intr_en);
+> +	intr_en |= BIT(data->hwirq);
+> +	writel(intr_en, mux_data->intr_en);
+> +
+> +	spin_unlock(&mux_data->lock);
+> +}
+> +
+> +static int rtd119x_mux_set_affinity(struct irq_data *d,
+> +			const struct cpumask *mask_val, bool force)
+> +{
+> +	/* Forwarding the affinity to the parent would affect all 32 interrupts. */
+> +	return -EINVAL;
+> +}
+> +
+> +static struct irq_chip rtd119x_mux_irq_chip = {
+> +	.name			= "rtd119x-mux",
+> +	.irq_mask		= rtd119x_mux_mask_irq,
+> +	.irq_unmask		= rtd119x_mux_unmask_irq,
+> +	.irq_set_affinity	= rtd119x_mux_set_affinity,
+> +};
+> +
+> +static int rtd119x_mux_irq_domain_map(struct irq_domain *d,
+> +		unsigned int irq, irq_hw_number_t hw)
+> +{
+> +	struct rtd119x_irq_mux_data *data = d->host_data;
+> +
+> +	irq_set_chip_and_handler(irq, &rtd119x_mux_irq_chip, handle_level_irq);
+> +	irq_set_chip_data(irq, data);
+> +	irq_set_probe(irq);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct irq_domain_ops rtd119x_mux_irq_domain_ops = {
+> +	.xlate	= irq_domain_xlate_onecell,
+> +	.map	= rtd119x_mux_irq_domain_map,
+> +};
+> +
+> +static const struct rtd119x_irq_mux_info rtd1295_iso_irq_mux_info = {
+> +	.intr_status_offset	= 0x0,
+> +	.intr_en_offset		= 0x40,
+> +};
+> +
+> +static const struct rtd119x_irq_mux_info rtd1295_irq_mux_info = {
+> +	.intr_status_offset	= 0xc,
+> +	.intr_en_offset		= 0x80,
+> +};
+> +
+> +static const struct of_device_id rtd1295_irq_mux_dt_matches[] = {
+> +	{
+> +		.compatible = "realtek,rtd1295-iso-irq-mux",
+> +		.data = &rtd1295_iso_irq_mux_info,
+> +	}, {
+> +		.compatible = "realtek,rtd1295-irq-mux",
+> +		.data = &rtd1295_irq_mux_info,
+> +	}, {
+> +	}
+> +};
+> +
+> +static int __init rtd119x_irq_mux_init(struct device_node *node,
+> +				       struct device_node *parent)
+> +{
+> +	struct rtd119x_irq_mux_data *data;
+> +	const struct of_device_id *match;
+> +	const struct rtd119x_irq_mux_info *info;
+> +	void __iomem *base;
+> +	u32 val;
+> +
+> +	match = of_match_node(rtd1295_irq_mux_dt_matches, node);
+> +	if (!match)
+> +		return -EINVAL;
+> +
+> +	info = match->data;
+> +	if (!info)
+> +		return -EINVAL;
+> +
+> +	base = of_iomap(node, 0);
+> +	if (IS_ERR(base))
+> +		return PTR_ERR(base);
+> +
+> +	data = kzalloc(sizeof(*data), GFP_KERNEL);
+> +	if (!data)
+> +		return -ENOMEM;
+> +
+> +	data->intr_status = base + info->intr_status_offset;
+> +	data->intr_en     = base + info->intr_en_offset;
+> +
+> +	data->irq = irq_of_parse_and_map(node, 0);
+> +	if (data->irq <= 0) {
+> +		kfree(data);
+> +		return -EINVAL;
+> +	}
+> +
+> +	spin_lock_init(&data->lock);
+> +
+> +	data->domain = irq_domain_add_linear(node, 32,
+> +				&rtd119x_mux_irq_domain_ops, data);
+> +	if (!data->domain) {
+> +		kfree(data);
+> +		return -ENOMEM;
+> +	}
+> +
+> +	if (of_device_is_compatible(node, "realtek,rtd1295-iso-irq-mux")) {
+> +		const int uart0_irq = 2;
+> +
+> +		spin_lock(&data->lock);
+> +
+> +		val = readl(data->intr_en);
+> +		val &= ~BIT(uart0_irq);
+> +		writel(val, data->intr_en);
+> +
+> +		writel(BIT(uart0_irq), data->intr_status);
 
-Otherwise, for patches 3 to 8 (I don't have any comment on 3 to 7):
-Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+Same here. Can you please explain what you're trying to do? The locking
+seems a bit pointless (nobody can request the interrupt yet), and this
+uart0 needs at least a comment, and maybe a description in the device-tree.
 
->   /*
->    * Enable and disable interrupts.
->    */
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index f7dfe5d2b1fb..df085ec003b0 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -557,7 +557,7 @@ ENDPROC(el1_sync)
->   	.align	6
->   el1_irq:
->   	kernel_entry 1
-> -	enable_dbg
-> +	enable_da_f
->   #ifdef CONFIG_TRACE_IRQFLAGS
->   	bl	trace_hardirqs_off
->   #endif
-> @@ -766,7 +766,7 @@ ENDPROC(el0_sync)
->   el0_irq:
->   	kernel_entry 0
->   el0_irq_naked:
-> -	enable_dbg
-> +	enable_da_f
->   #ifdef CONFIG_TRACE_IRQFLAGS
->   	bl	trace_hardirqs_off
->   #endif
+> +
+> +		spin_unlock(&data->lock);
+> +	}
+> +
+> +	irq_set_chained_handler_and_data(data->irq, rtd119x_mux_irq_handle, data);
+> +
+> +	return 0;
+> +}
+> +IRQCHIP_DECLARE(rtd1295_iso_mux, "realtek,rtd1295-iso-irq-mux", rtd119x_irq_mux_init);
+> +IRQCHIP_DECLARE(rtd1295_mux, "realtek,rtd1295-irq-mux", rtd119x_irq_mux_init);
 > 
 
+Thanks,
+
+	M.
 -- 
-Julien Thierry
+Jazz is not dead. It just smells funny...
