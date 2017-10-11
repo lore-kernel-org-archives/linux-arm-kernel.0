@@ -1,26 +1,61 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 11 Oct 2017 12:16:50 -0700
-Subject: [PATCH 05/11] Disable kasan's instrumentation
-In-Reply-To: <20171011082227.20546-6-liuwenliang@huawei.com>
+Date: Wed, 11 Oct 2017 12:19:13 -0700
+Subject: [PATCH 10/11] Change mapping of kasan_zero_page int readonly
+In-Reply-To: <20171011082227.20546-11-liuwenliang@huawei.com>
 References: <20171011082227.20546-1-liuwenliang@huawei.com>
- <20171011082227.20546-6-liuwenliang@huawei.com>
-Message-ID: <cf3776c0-b6e0-7a6e-9d43-d77ddd83749b@gmail.com>
+ <20171011082227.20546-11-liuwenliang@huawei.com>
+Message-ID: <c59a7a5a-8168-8409-228a-0e4f841ced98@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 10/11/2017 01:22 AM, Abbott Liu wrote:
-> From: Andrey Ryabinin <a.ryabinin@samsung.com>
-> 
->  To avoid some build and runtime errors, compiler's instrumentation must
->  be disabled for code not linked with kernel image.
+>  Because the kasan_zero_page(which is used as the shadow
+>  region for some memory that KASan doesn't need to track.) won't be writen
+>  after kasan_init, so change the mapping of kasan_zero_page into readonly.
 > 
 > Cc: Andrey Ryabinin <a.ryabinin@samsung.com>
-> Signed-off-by: Abbott Liu <liuwenliang@huawei.com>
+> ---
+>  arch/arm/mm/kasan_init.c | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/arch/arm/mm/kasan_init.c b/arch/arm/mm/kasan_init.c
+> index 7cfdc39..c11826a 100644
+> --- a/arch/arm/mm/kasan_init.c
+> +++ b/arch/arm/mm/kasan_init.c
+> @@ -200,6 +200,7 @@ void __init kasan_init(void)
+>  {
+>  	struct memblock_region *reg;
+>  	u64 orig_ttbr0;
+> +	int i;
 
-Same as patch 3, this needs to be moved before you allow KAsan to be
-enabled/selected. This has little to no dependencies on other patches so
-this could be moved as the first patch in the series.
+Nit: unsigned int i.
 
-Thanks!
+>  
+>  	orig_ttbr0 = cpu_get_ttbr(0);
+>  
+> @@ -243,6 +244,17 @@ void __init kasan_init(void)
+>  	create_mapping((unsigned long)kasan_mem_to_shadow((void *)MODULES_VADDR),
+>  		(unsigned long)kasan_mem_to_shadow((void *)(PKMAP_BASE+PMD_SIZE)),
+>  		NUMA_NO_NODE);
+> +
+> +	/*
+> +	 * KAsan may reuse the contents of kasan_zero_pte directly, so we
+> +	 * should make sure that it maps the zero page read-only.
+> +	 */
+> +	for (i = 0; i < PTRS_PER_PTE; i++)
+> +                set_pte_at(&init_mm, KASAN_SHADOW_START + i*PAGE_SIZE,
+> +                        &kasan_zero_pte[i], pfn_pte(
+> +                                virt_to_pfn(kasan_zero_page),
+> +                                __pgprot(_L_PTE_DEFAULT | L_PTE_DIRTY | L_PTE_XN | L_PTE_RDONLY)));
+> +	memset(kasan_zero_page, 0, PAGE_SIZE);
+
+
+
+>  	cpu_set_ttbr0(orig_ttbr0);
+>  	flush_cache_all();
+>  	local_flush_bp_all();
+> 
+
+
 -- 
 Florian
