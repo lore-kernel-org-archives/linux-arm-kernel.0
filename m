@@ -1,34 +1,64 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 11 Oct 2017 09:40:30 +0530
-Subject: [PATCH 1/1] cpufreq: ti-cpufreq: add missing of_node_put()
-In-Reply-To: <1507642040-13646-1-git-send-email-zumeng.chen@gmail.com>
-References: <1507642040-13646-1-git-send-email-zumeng.chen@gmail.com>
-Message-ID: <20171011041030.GJ4031@vireshk-i7>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 11 Oct 2017 14:07:35 +0900
+Subject: [PATCH v5 03/10] kexec_file: factor out arch_kexec_kernel_*()
+ from x86, powerpc
+In-Reply-To: <a8a0f36b-e797-289b-04e3-aa87b4088cdd@arm.com>
+References: <20171010063619.6303-1-takahiro.akashi@linaro.org>
+ <20171010063619.6303-4-takahiro.akashi@linaro.org>
+ <a8a0f36b-e797-289b-04e3-aa87b4088cdd@arm.com>
+Message-ID: <20171011050734.GE6756@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10-10-17, 21:27, Zumeng Chen wrote:
-> call of_node_put to release the refcount of np.
-> 
-> Signed-off-by: Zumeng Chen <zumeng.chen@gmail.com>
-> ---
->  drivers/cpufreq/ti-cpufreq.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/cpufreq/ti-cpufreq.c b/drivers/cpufreq/ti-cpufreq.c
-> index ffcddcd..923317f 100644
-> --- a/drivers/cpufreq/ti-cpufreq.c
-> +++ b/drivers/cpufreq/ti-cpufreq.c
-> @@ -205,6 +205,7 @@ static int ti_cpufreq_init(void)
->  
->  	np = of_find_node_by_path("/");
->  	match = of_match_node(ti_cpufreq_of_match, np);
-> +	of_node_put(np);
->  	if (!match)
->  		return -ENODEV;
->  
+On Tue, Oct 10, 2017 at 12:02:01PM +0100, Julien Thierry wrote:
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+[snip]
 
--- 
-viresh
+> >--- a/kernel/kexec_file.c
+> >+++ b/kernel/kexec_file.c
+> >@@ -26,30 +26,79 @@
+> >  #include <linux/vmalloc.h>
+> >  #include "kexec_internal.h"
+> >
+> >+const __weak struct kexec_file_ops * const kexec_file_loaders[] = {NULL};
+> >+
+> >  static int kexec_calculate_store_digests(struct kimage *image);
+> >
+> >+int _kexec_kernel_image_probe(struct kimage *image, void *buf,
+> >+                          unsigned long buf_len)
+> >+{
+> >+     const struct kexec_file_ops *fops;
+> >+     int ret = -ENOEXEC;
+> >+
+> >+     for (fops = kexec_file_loaders[0]; fops && fops->probe; ++fops) {
+> 
+> Hmm, that's not gonna work (and I see that what I said in the previous
+> patch was not 100% correct either).
+
+Can you elaborate this a bit more?
+
+I'm sure that, with my code, any member of fops, cannot be changed;
+"const struct kexec_file_ops *fops" means that fops is a pointer to
+"constant sturct kexec_file_ops," while "struct kexec_file_ops *
+const kexec_file_loaders[]" means that kexec_file_loaders is a "constant
+array" of pointers to "constant struct kexec_file_ops."
+
+Thanks,
+-Takahiro AKASHI
+
+
+> 'fops' should be of type 'const struct kexec_file_ops **', and the loop
+> should be:
+> 
+> for (fops = &kexec_file_loaders[0]; *fops && (*fops)->probe; ++fops)
+> 
+> With some additional dereferences in the body of the loop.
+> 
+> Unless you prefer the previous state of the loop (with i and the break
+> inside), but I still think this looks better.
+> 
+> Cheers,
+> 
+> --
+> Julien Thierry
+> IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
