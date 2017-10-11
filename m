@@ -1,83 +1,218 @@
-From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Wed, 11 Oct 2017 13:07:40 +0200
-Subject: [PATCH 6/7] ARM: dts: imx53-tx53: add support for I2C bus recovery
-In-Reply-To: <1507720061-27666-1-git-send-email-LW@KARO-electronics.de>
-References: <1507720061-27666-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <1507720061-27666-7-git-send-email-LW@KARO-electronics.de>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 11 Oct 2017 12:08:11 +0100
+Subject: [PATCH v3 26/28] arm64/sve: Add documentation
+In-Reply-To: <59DDE958.4080605@arm.com>
+References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
+ <1507660725-7986-27-git-send-email-Dave.Martin@arm.com>
+ <59DDE958.4080605@arm.com>
+Message-ID: <20171011110811.GB19485@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The imx-i2c driver supports automatic bus recovery via the GPIO
-function of the I2C pins. Enable this functionality for the Ka-Ro
-electronics TX53 modules.
+On Wed, Oct 11, 2017 at 10:50:16AM +0100, Szabolcs Nagy wrote:
+> On 10/10/17 19:38, Dave Martin wrote:
+> > This patch adds basic documentation of the user/kernel interface
+> > provided by the for SVE.
+> > 
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > Cc: Alex Benn?e <alex.bennee@linaro.org>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Alan Hayward <alan.hayward@arm.com>
+> > 
+> > ---
+> > 
+> > Changes since v2
+> > ----------------
+> > 
+> > Changes requested by Alan Hayward:
+> > 
+> >  * Added a note that the caller of PTRACE_SETREGSET will need to do a
+> >    GETREGSET if complete certainty about the resulting VL is desired.
+> > 
+> > ABI changes:
+> > 
+> >  * Documented the changed return value value semantics for PR_SET_SET_VL
+> >    when the PR_SVE_SET_VL_ONEXEC flag is passed.
+> > ---
+> ...
+> > +prctl(PR_SVE_SET_VL, unsigned long arg)
+> > +
+> > +    Sets the vector length of the calling thread and related flags, where
+> > +    arg == vl | flags.
+> > +
+> > +    vl is the desired vector length, where sve_vl_valid(vl) must be true.
+> > +
+> > +    flags:
+> > +
+> > +	PR_SVE_SET_VL_INHERIT
+> > +
+> > +	    Inherit the current vector length across execve().  Otherwise, the
+> > +	    vector length is reset to the system default at execve().  (See
+> > +	    Section 9.)
+> > +
+> > +	PR_SVE_SET_VL_ONEXEC
+> > +
+> > +	    Defer the requested vector length change until the next execve().
+> > +	    This allows launching of a new program with a different vector
+> > +	    length, while avoiding runtime side effects in the caller.
+> > +
+> > +	    This also overrides the effect of PR_SVE_SET_VL_INHERIT for the
+> > +	    first execve().
+> > +
+> > +	    Without PR_SVE_SET_VL_ONEXEC, any outstanding deferred vector
+> > +	    length change is cancelled.
+> > +
+> 
+> "next execve" is still ambiguous. (execve has process
+> global effect so it may plausibly mean next in the
+> process or next in the calling thread)
+> 
+> "any outstanding deferred vector length change" is
+> ambiguous. (it may be for all threads in a process or
+> in the calling thread only)
+> 
+> > +    Return value: a nonnegative on success, or a negative value on error:
+> > +	EINVAL: SVE not supported, invalid vector length requested, or
+> > +	    invalid flags.
+> > +
+> > +    On success, the calling thread's vector length is changed to the largest
+> > +    value supported by the system that is less than or equal to vl.
+> > +    If vl == SVE_VL_MAX, the calling thread's vector length is changed to the
+> > +    largest value supported by the system.
+> > +
+> > +    The returned value describes the resulting configuration, encoded as for
+> > +    PR_SVE_GET_VL.  The vector length reported in this value is the new current
+> > +    vector length for this thread if PR_SVE_SET_VL_ONEXEC was not passed in the
+> > +    input arg; otherwise, the reported vector length is the deferred vector
+> > +    length that will be applied at the next exec.
+> > +
+> ...
+> > +9.  System runtime configuration
+> > +--------------------------------
+> > +
+> > +* To mitigate the ABI impact of expansion of the signal frame, a policy
+> > +  mechanism is provided for administrators, distro maintainers and developers
+> > +  to set the default vector length for userspace processes:
+> > +
+> > +/proc/cpu/sve_default_vector_length
+> > +
+> 
+> still wrong.
 
-Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
----
- arch/arm/boot/dts/imx53-tx53-x13x.dts |  5 ++++-
- arch/arm/boot/dts/imx53-tx53.dtsi     | 19 ++++++++++++++++++-
- 2 files changed, 22 insertions(+), 2 deletions(-)
+Dang, sorry, I was focusing on the code and completely missed these
+documentation changes.
 
-diff --git a/arch/arm/boot/dts/imx53-tx53-x13x.dts b/arch/arm/boot/dts/imx53-tx53-x13x.dts
-index e21bc91..a87a10b 100644
---- a/arch/arm/boot/dts/imx53-tx53-x13x.dts
-+++ b/arch/arm/boot/dts/imx53-tx53-x13x.dts
-@@ -121,8 +121,11 @@
- };
+The text actually leaves a fair amount to be desired in some places,
+now I look again at it.
+
+How does this look:
+
+diff --git a/Documentation/arm64/sve.txt b/Documentation/arm64/sve.txt
+index 2e8f009..27b8833 100644
+--- a/Documentation/arm64/sve.txt
++++ b/Documentation/arm64/sve.txt
+@@ -75,6 +75,15 @@ the SVE instruction set architecture.
+   assumptions about this.  The kernel behaviour may vary on a case-by-case
+   basis.
  
- &i2c3 {
--	pinctrl-names = "default";
-+	pinctrl-names = "default", "gpio";
- 	pinctrl-0 = <&pinctrl_i2c3>;
-+	pinctrl-1 = <&pinctrl_i2c3_gpio>;
-+	scl-gpios = <&gpio3 21 GPIO_ACTIVE_HIGH>;
-+	sda-gpios = <&gpio3 28 GPIO_ACTIVE_HIGH>;
- 	status = "okay";
- 
- 	sgtl5000: codec at 0a {
-diff --git a/arch/arm/boot/dts/imx53-tx53.dtsi b/arch/arm/boot/dts/imx53-tx53.dtsi
-index 33934e5..8e10c47 100644
---- a/arch/arm/boot/dts/imx53-tx53.dtsi
-+++ b/arch/arm/boot/dts/imx53-tx53.dtsi
-@@ -233,8 +233,11 @@
- };
- 
- &i2c1 {
--	pinctrl-names = "default";
-+	pinctrl-names = "default", "gpio";
- 	pinctrl-0 = <&pinctrl_i2c1>;
-+	pinctrl-0 = <&pinctrl_i2c1_gpio>;
-+	scl-gpios = <&gpio3 21 GPIO_ACTIVE_HIGH>;
-+	sda-gpios = <&gpio3 28 GPIO_ACTIVE_HIGH>;
- 	clock-frequency = <400000>;
- 	status = "okay";
- 
-@@ -394,6 +397,13 @@
- 			>;
- 		};
- 
-+		pinctrl_i2c1_gpio: i2c1-gpiogrp {
-+			fsl,pins = <
-+				MX53_PAD_EIM_D21__GPIO3_21		0x400001e6
-+				MX53_PAD_EIM_D28__GPIO3_28		0x400001e6
-+			>;
-+		};
++* All other SVE state of a thread, including the currently configured vector
++  length, the state of the PR_SVE_VL_INHERIT flag, and the deferred vector
++  length (if any), is preserved across all syscalls, subject to the specific
++  exceptions for execve() described in section 6.
 +
- 		pinctrl_i2c3: i2c3grp {
- 			fsl,pins = <
- 				MX53_PAD_GPIO_3__I2C3_SCL		0x400001e4
-@@ -401,6 +411,13 @@
- 			>;
- 		};
- 
-+		pinctrl_i2c3_gpio: i2c3-gpiogrp {
-+			fsl,pins = <
-+				MX53_PAD_GPIO_3__GPIO1_3		0x400001e6
-+				MX53_PAD_GPIO_6__GPIO1_6		0x400001e6
-+			>;
-+		};
++  In particular, on return from a fork() or clone(), the parent and new child
++  process or thread share identical SVE configuration, matching that of the
++  parent before the call.
 +
- 		pinctrl_nand: nandgrp {
- 			fsl,pins = <
- 				MX53_PAD_NANDF_WE_B__EMI_NANDF_WE_B	0x4
--- 
-2.1.4
+ 
+ 4.  Signal handling
+ -------------------
+@@ -136,7 +145,7 @@ length:
+ prctl(PR_SVE_SET_VL, unsigned long arg)
+ 
+     Sets the vector length of the calling thread and related flags, where
+-    arg == vl | flags.
++    arg == vl | flags.  Other threads of the calling process are unaffected.
+ 
+     vl is the desired vector length, where sve_vl_valid(vl) must be true.
+ 
+@@ -150,36 +159,51 @@ prctl(PR_SVE_SET_VL, unsigned long arg)
+ 
+ 	PR_SVE_SET_VL_ONEXEC
+ 
+-	    Defer the requested vector length change until the next execve().
++	    Defer the requested vector length change until the next execve()
++	    performed by this thread.
++
++	    The effect is equivalent to implicit exceution of the following
++	    call immediately after the next execve() (if any) by the thread:
++
++		prctl(PR_SVE_SET_VL, arg & ~PR_SVE_SET_VL_ONEXEC)
++
+ 	    This allows launching of a new program with a different vector
+ 	    length, while avoiding runtime side effects in the caller.
+ 
+-	    This also overrides the effect of PR_SVE_SET_VL_INHERIT for the
+-	    first execve().
+ 
+-	    Without PR_SVE_SET_VL_ONEXEC, any outstanding deferred vector
+-	    length change is cancelled.
++	    Without PR_SVE_SET_VL_ONEXEC, the requested change takes effect
++	    immediately.
++
+ 
+     Return value: a nonnegative on success, or a negative value on error:
+ 	EINVAL: SVE not supported, invalid vector length requested, or
+ 	    invalid flags.
+ 
+-    On success, the calling thread's vector length is changed to the largest
+-    value supported by the system that is less than or equal to vl.
+-    If vl == SVE_VL_MAX, the calling thread's vector length is changed to the
+-    largest value supported by the system.
+ 
+-    The returned value describes the resulting configuration, encoded as for
+-    PR_SVE_GET_VL.  The vector length reported in this value is the new current
+-    vector length for this thread if PR_SVE_SET_VL_ONEXEC was not passed in the
+-    input arg; otherwise, the reported vector length is the deferred vector
+-    length that will be applied at the next exec.
++    On success:
++
++    * Either the calling thread's vector length or the deferred vector length
++      to be applied at the next execve() by the thread (dependent on whether
++      PR_SVE_SET_VL_ONEXEC is present in arg), is set to the largest value
++      supported by the system that is less than or equal to vl.  If vl ==
++      SVE_VL_MAX, the value set will be the largest value supported by the
++      system.
++
++    * Any previously outstanding deferred vector length change in the calling
++      thread is cancelled.
++
++    * The returned value describes the resulting configuration, encoded as for
++      PR_SVE_GET_VL.  The vector length reported in this value is the new
++      current vector length for this thread if PR_SVE_SET_VL_ONEXEC was not
++      present in arg; otherwise, the reported vector length is the deferred
++      vector length that will be applied at the next execve() by the calling
++      thread.
+ 
+-    Changing the vector length causes all of P0..P15, FFR and all bits of
+-    Z0..V31 except for Z0 bits [127:0] .. Z31 bits [127:0] to become
+-    unspecified.  Calling PR_SVE_SET_VL with vl equal to the thread's current
+-    vector length does not constitute a change to the vector length for this
+-    purpose.
++    * Changing the vector length causes all of P0..P15, FFR and all bits of
++      Z0..V31 except for Z0 bits [127:0] .. Z31 bits [127:0] to become
++      unspecified.  Calling PR_SVE_SET_VL with vl equal to the thread's current
++      vector length, or calling PR_SVE_SET_VL with the PR_SVE_SET_VL_ONEXEC
++      flag, does not constitute a change to the vector length for this purpose.
+ 
+ 
+ prctl(PR_SVE_GET_VL)
+@@ -315,7 +339,7 @@ The regset data starts with struct user_sve_header, containing:
+   mechanism is provided for administrators, distro maintainers and developers
+   to set the default vector length for userspace processes:
+ 
+-/proc/cpu/sve_default_vector_length
++/proc/sys/abi/sve_default_vector_length
+ 
+     Writing the text representation of an integer to this file sets the system
+     default vector length to the specified value, unless the value is greater
