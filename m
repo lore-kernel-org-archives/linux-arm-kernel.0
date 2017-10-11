@@ -1,37 +1,81 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 11 Oct 2017 17:55:08 +0100
-Subject: [PATCH v3 16/28] arm64/sve: Probe SVE capabilities and usable
- vector lengths
-In-Reply-To: <1507660725-7986-17-git-send-email-Dave.Martin@arm.com>
-References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
- <1507660725-7986-17-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20171011165508.runtc4rkipdg2kdw@armageddon.cambridge.arm.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Wed, 11 Oct 2017 18:58:51 +0200
+Subject: [PATCH 5/7] ARM: dts: Add nodes for missing omap4 interconnect
+ target modules
+In-Reply-To: <f5c57f0b-1423-c362-0fda-4069b77a2e38@ti.com>
+References: <20170929223411.9691-1-tony@atomide.com>
+ <20170929223411.9691-6-tony@atomide.com>
+ <f5c57f0b-1423-c362-0fda-4069b77a2e38@ti.com>
+Message-ID: <20171011165850.jnaievrgcszcawh3@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 10, 2017 at 07:38:33PM +0100, Dave P Martin wrote:
-> This patch uses the cpufeatures framework to determine common SVE
-> capabilities and vector lengths, and configures the runtime SVE
-> support code appropriately.
-> 
-> ZCR_ELx is not really a feature register, but it is convenient to
-> use it as a template for recording the maximum vector length
-> supported by a CPU, using the LEN field.  This field is similar to
-> a feature field in that it is a contiguous bitfield for which we
-> want to determine the minimum system-wide value.  This patch adds
-> ZCR as a pseudo-register in cpuinfo/cpufeatures, with appropriate
-> custom code to populate it.  Finding the minimum supported value of
-> the LEN field is left to the cpufeatures framework in the usual
-> way.
-> 
-> The meaning of ID_AA64ZFR0_EL1 is not architecturally defined yet,
-> so for now we just require it to be zero.
-> 
-> Note that much of this code is dormant and SVE still won't be used
-> yet, since system_supports_sve() remains hardwired to false.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Cc: Alex Benn?e <alex.bennee@linaro.org>
-> Cc: Suzuki K Poulose <Suzuki.Poulose@arm.com>
+Hi Peter,
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+On Wed, Oct 11, 2017 at 06:54:04PM +0300, Peter Ujfalusi wrote:
+> Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+> Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+> 
+> On 09/30/2017 01:34 AM, Tony Lindgren wrote:
+> > On omap4 we are missing dts nodes for several interconnect target
+> > modules that we are idling on init. This currently works with the
+> > legacy platform data still around.
+> > 
+> > To fix this, let's add the interconnect target modules so we can
+> > idle the unused interconnect target module on init.
+> > 
+> > Also note that adding the interconnect target module node does not
+> > necessarily mean that there is a driver available for the child IP
+> > block, or that the child IP block is even functional.
+> > 
+> > In the SGX case, the PowerVR driver is closed source. And McASP on
+> > omap4 has at least the TX path disabled and is not supported by the
+> > davinci-mcasp driver.
+> 
+> RX path is disabled, TX is supposed to work.
+> 
+> ...
+> 
+> > +		target-module at 40128000 {
+> > +			compatible = "ti,sysc-mcasp";
+> > +			ti,hwmods = "mcasp";
+> > +			reg = <0x40128004 0x4>;
+> > +			reg-names = "sysc";
+> > +			#address-cells = <1>;
+> > +			#size-cells = <1>;
+> > +			ranges = <0x00000000 0x40128000 0x1000>, /* MPU */
+> > +				 <0x49028000 0x49028000 0x1000>; /* L3 */
+> > +
+> > +			/*
+> > +			 * Child device unsupported by davinci-mcasp. At least
+> > +			 * TX path is disabled for omap4, and only DIT mode
+> 
+> s/TX/RX
+> 
+> > +			 * works with no I2S. See also old Android kernel
+> > +			 * omap-mcasp driver for more information.
+> 
+> I'll look at the schema of PandaBoard to see if I can route out the McASP
+> lines to somewhere then I can add support for this revision to davinci-mcasp
+> driver.
+
+Not sure if this is helpful information:
+
+Motorola Droid 4 is OMAP4430 based and has McASP lines routed
+to the audio codec (either McASP or McBSP can be used). Codec
+is a custom one, which is not yet supported mainline, but
+patches are WIP (*):
+
+https://lkml.org/lkml/2017/7/12/368
+
+(*) My patches use McBSP instead of McASP, since McASP looked
+mostly unsupported. Motorola's kernel uses McASP.
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171011/6db17987/attachment.sig>
