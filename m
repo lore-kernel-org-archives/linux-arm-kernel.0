@@ -1,145 +1,42 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
-Date: Wed, 11 Oct 2017 11:34:18 +0000
-Subject: [PATCH v9 0/4] iommu/smmu-v3: Workaround for hisilicon
- 161010801 erratum(reserve HW MSI)
-In-Reply-To: <20171006140450.89652-1-shameerali.kolothum.thodi@huawei.com>
-References: <20171006140450.89652-1-shameerali.kolothum.thodi@huawei.com>
-Message-ID: <5FC3163CFD30C246ABAA99954A238FA8384228BC@FRAEML521-MBX.china.huawei.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Wed, 11 Oct 2017 13:36:51 +0200
+Subject: [PATCHv2 0/7] Add support for USB OTG on STM32F7
+In-Reply-To: <878tgim24i.fsf@linux.intel.com>
+References: <1503930018-536-1-git-send-email-amelie.delaunay@st.com>
+ <878tgim24i.fsf@linux.intel.com>
+Message-ID: <04a49088-b615-d7b8-0387-e7bfa32ee19f@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hi Felip
 
-Any further comments on this series, please? 
+On 10/11/2017 12:04 PM, Felipe Balbi wrote:
+> 
+> Hi,
+> 
+> Amelie Delaunay <amelie.delaunay@st.com> writes:
+>> The STM32F7 MCU family embeds two DWC2 USB OTG cores. One core is USB
+>> OTG FS and the other is USB OTG HS. The USB FS core only works with its
+>> internal phy whilst the USB HS core can work in HS with external ULPI phy
+>> or in FS/LS with the on-chip FS phy.
+>>
+>> Amelie Delaunay (7):
+>>    dt-bindings: usb: Document the STM32F7 DWC2 USB OTG HS core binding
+>>    usb: dwc2: add support for STM32F7 USB OTG HS
+>>    ARM: dts: stm32: Add USB HS support for STM32F746 MCU
+> 
+> I have applied these three patches. Should I take the rest? They seems
+> like they could go upstream through the ARM maintainers.
+> 
 
-We do have the ack from all relevant people for the "[PATCH v9 4/4] PCI: hisi: blacklist
-hip06/hip07 controllers behind SMMUv3" now. 
+I will take other DT patches in my PR.
 
-Really appreciate if you can take a look and let us know.
+Concerning "ARM: dts: stm32: Add USB HS support for STM32F746 MCU" patch 
+I prefer also to take it. This patch adds some pinctrl groups but stm32 
+pinctrl bindings will change in my next PR (we will use a macro to 
+define pins instead of using defined values). So if you push the DT 
+patch through your pull request there will be a merge issue.
+It is possible that I take also this one ?
 
-Many thanks,
-Shameer
-
-> -----Original Message-----
-> From: Shameerali Kolothum Thodi
-> Sent: Friday, October 06, 2017 3:05 PM
-> To: lorenzo.pieralisi at arm.com; marc.zyngier at arm.com;
-> sudeep.holla at arm.com; will.deacon at arm.com; robin.murphy at arm.com;
-> joro at 8bytes.org; bhelgaas at google.com; Gabriele Paoloni
-> <gabriele.paoloni@huawei.com>
-> Cc: John Garry <john.garry@huawei.com>; iommu at lists.linux-
-> foundation.org; linux-arm-kernel at lists.infradead.org; linux-
-> acpi at vger.kernel.org; linux-pci at vger.kernel.org; devel at acpica.org;
-> Linuxarm <linuxarm@huawei.com>; Wangzhou (B)
-> <wangzhou1@hisilicon.com>; Guohanjun (Hanjun Guo)
-> <guohanjun@huawei.com>; Shameerali Kolothum Thodi
-> <shameerali.kolothum.thodi@huawei.com>
-> Subject: [PATCH v9 0/4] iommu/smmu-v3: Workaround for hisilicon
-> 161010801 erratum(reserve HW MSI)
-> 
-> On certain HiSilicon platforms (hip06/hip07) the GIC ITS and PCIe RC
-> deviates from the standard implementation and this breaks PCIe MSI
-> functionality when SMMU is enabled.
-> 
-> The HiSilicon erratum 161010801 describes this limitation of certain
-> HiSilicon platforms to support the SMMU mappings for MSI transactions.
-> On these platforms GICv3 ITS translator is presented with the deviceID
-> by extending the MSI payload data to 64 bits to include the deviceID.
-> Hence, the PCIe controller on this platforms has to differentiate the MSI
-> payload against other DMA payload and has to modify the MSI payload.
-> This basically makes it difficult for this platforms to have a SMMU
-> translation for MSI.
-> 
-> This patch implements an ACPI and DT based quirk to reserve the hw msi
-> regions in the smmu-v3 driver which means these address regions will
-> not be translated and will be excluded from iova allocations.
-> 
-> To implement this quirk, the following changes are incorporated:
-> 1. Added a generic helper function to IORT code to retrieve the
->    associated ITS base address from a device IORT node.
-> 2. Added a generic helper function to of iommu code to retrieve the
->    associated msi controller base address from for a PCI RC
->    msi-mapping and also platform device msi-parent.
-> 3. Blacklisted HiSilicon PCIe controllers on DT based hip06/hip07
->    platforms when SMMUv3 is enabled as there is no DT based solution
->    for this as of now.
-> 
-> Changelog:
-> 
-> v8 --> v9
-> -Thanks to Marc, fixed IORT helper function to reserve the ITS
->  translater region only.
-> -Removed the DT support for MSI reservation and blacklisted
->  HiSilicon PCIe controllers on DT based systems when SMMUv3 is
->  enabled.
-> 
-> v7 --> v8
-> Addressed comments from Rob and Lorenzo:
->  -Modified to use DT compatible string for errata.
->  -Changed logic to retrieve the msi-parent for DT case.
-> 
-> v6 --> v7
-> Addressed request from Will to add DT support for the erratum:
->  - added bt binding
->  - add of_iommu_msi_get_resv_regions()
-> New arm64 silicon errata entry
-> Rename iort_iommu_{its->msi}_get_resv_regions
-> 
-> v5 --> v6
-> Addressed comments from Robin and Lorenzo:
-> -No change to patch#1 .
-> -Reverted v5 patch#2 as this might break the platforms where this quirk
->   is not applicable. Provided a generic function in iommu code and added
->   back the quirk implementation in SMMU v3 driver(patch#3)
-> 
-> v4 --> v5
-> Addressed comments from Robin and Lorenzo:
-> -Added a comment to make it clear that, for now, only straightforward
->   HW topologies are handled while reserving ITS regions(patch #1).
-> 
-> v3 --> v4
-> Rebased on 4.13-rc1.
-> Addressed comments from Robin, Will and Lorenzo:
-> -As suggested by Robin, moved the ITS msi reservation into
->   iommu_dma_get_resv_regions().
-> -Added its_count != resv region failure case(patch #1).
-> 
-> v2 --> v3
-> Addressed comments from Lorenzo and Robin:
-> -Removed dev_is_pci() check in smmuV3 driver.
-> -Don't treat device not having an ITS mapping as an error in
->   iort helper function.
-> 
-> v1 --> v2
-> -patch 2/2: Invoke iort helper fn based on fwnode type(acpi).
-> 
-> RFCv2 -->PATCH
-> -Incorporated Lorenzo's review comments.
-> 
-> RFC v1 --> RFC v2
-> Based on Robin's review comments,
-> -Removed  the generic erratum framework.
-> -Using IORT/MADT tables to retrieve the ITS base addr instead  of vendor
-> specific CSRT table.
-> 
-> 
-> Shameer Kolothum (4):
->   ACPI/IORT: Add msi address regions reservation helper
->   iommu/dma: Add a helper function to reserve HW MSI address regions for
->     IOMMU drivers
->   iommu/arm-smmu-v3:Enable ACPI based HiSilicon erratum 161010801
->   PCI: hisi: blacklist hip06/hip07 controllers behind SMMUv3
-> 
->  drivers/acpi/arm64/iort.c        | 97
-> ++++++++++++++++++++++++++++++++++++++--
->  drivers/iommu/arm-smmu-v3.c      | 27 ++++++++---
->  drivers/iommu/dma-iommu.c        | 20 +++++++++
->  drivers/irqchip/irq-gic-v3-its.c |  3 +-
->  drivers/pci/dwc/pcie-hisi.c      | 12 +++++
->  include/linux/acpi_iort.h        |  7 ++-
->  include/linux/dma-iommu.h        |  7 +++
->  7 files changed, 163 insertions(+), 10 deletions(-)
-> 
-> --
-> 1.9.1
-> 
+Regards
+Alex
