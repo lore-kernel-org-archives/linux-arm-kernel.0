@@ -1,95 +1,171 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Wed, 11 Oct 2017 13:26:10 +0800
-Subject: [PATCH 3/4] ACPI: IORT: Skip SMMUv3 device ID map for two steps
- mappings
-In-Reply-To: <20171010092036.GA8507@red-moon>
-References: <1506475215-2731-1-git-send-email-hanjun.guo@linaro.org>
- <1506475215-2731-4-git-send-email-hanjun.guo@linaro.org>
- <20170927135449.GA11347@red-moon>
- <CAGHbJ3DbuGeKH16zr+PdZYjoaZrHJrTmV5tmMxZ5CDPObErUCQ@mail.gmail.com>
- <20171010092036.GA8507@red-moon>
-Message-ID: <59DDAB72.7070605@huawei.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Wed, 11 Oct 2017 11:16:22 +0530
+Subject: [RFC 1/2] ARM: dts: exynos: update the usbdrd phy and ref clk
+In-Reply-To: <368b8301-3b7e-ecf7-ff8d-8f94728749df@codeaurora.org>
+References: <1507264595-3565-1-git-send-email-linux.amoon@gmail.com>
+ <CAJKOXPe=hd7QdsaqpqPv3cNvL59FBqCfy24mYmGdQvi7Yp8wBQ@mail.gmail.com>
+ <CANAwSgRK+F62xKFeFM9ZJ_rgPWj831ca=tX9BSKXUyRBhN4yhA@mail.gmail.com>
+ <368b8301-3b7e-ecf7-ff8d-8f94728749df@codeaurora.org>
+Message-ID: <CANAwSgSmw1=b_57Zt7D_ijg-OaqqpuBqDMZKACT_7Wn16WAUdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/10/10 17:20, Lorenzo Pieralisi wrote:
-> On Tue, Oct 10, 2017 at 02:47:53PM +0800, Hanjun Guo wrote:
->> Hi Lorenzo,
+Hi Vivek,
+
+On 10 October 2017 at 11:57, Vivek Gautam <vivek.gautam@codeaurora.org> wrote:
+>
+>
+> On 10/08/2017 06:06 PM, Anand Moon wrote:
 >>
->> Sorry for the late reply, holidays in China for the past week.
+>> Hi Krzysztof,
 >>
->> At 2017/9/27 21:54, Lorenzo Pieralisi wrote:
->>> Hi Hanjun,
+>> On 6 October 2017 at 12:08, Krzysztof Kozlowski <krzk@kernel.org> wrote:
 >>>
->>> On Wed, Sep 27, 2017 at 09:20:14AM +0800, Hanjun Guo wrote:
->>>> IORT revision C introduced SMMUv3 MSI support which adding a
->>>> device ID mapping index in SMMUv3 sub table, to get the SMMUv3
->>>> device ID mapping for the output ID (dev ID for ITS) and the
->>>> link to which ITS.
+>>> On Fri, Oct 6, 2017 at 6:36 AM, Anand Moon <linux.amoon@gmail.com> wrote:
 >>>>
->>>> So if a platform supports SMMUv3 MSI for control interrupt,
->>>> there will be a additional single map entry under SMMU, this
->>>> will not introduce any difference for devices just use one
->>>> step map to get its output ID and parent (ITS or SMMU), such
->>>> as PCI/NC/PMCG ---> ITS or PCI/NC ---> SMMU, but we need to
->>>> do the special handling for two steps map case such as
->>>> PCI/NC--->SMMUv3--->ITS.
->>>>
->>>> Take a PCI hostbridge for example,
->>>>
->>>> |----------------------|
->>>> |  Root Complex Node   |
->>>> |----------------------|
->>>> |    map entry[x]      |
->>>> |----------------------|
->>>> |       id value       |
->>>> | output_reference     |
->>>> |---|------------------|
->>>>      |
->>>>      |   |----------------------|
->>>>      |-->|        SMMUv3        |
->>>>          |----------------------|
->>>>          |     SMMU dev ID      |
->>>>          |     mapping index 0  |
->>>>          |----------------------|
->>>>          |      map entry[0]    |
->>>>          |----------------------|
->>>>          |       id value       |
->>>>          | output_reference-----------> ITS 1 (SMMU MSI domain)
->>>>          |----------------------|
->>>>          |      map entry[1]    |
->>>>          |----------------------|
->>>>          |       id value       |
->>>>          | output_reference-----------> ITS 2 (PCI MSI domain)
->>>>          |----------------------|
->>>>
->>>> When the SMMU dev ID mapping index is 0, there is entry[0]
->>>> to map to a ITS, we need to skip that map entry for PCI
->>>> or NC (named component), or we may get the wrong ITS parent.
->>> Is this actually true ? I think that currently we would simply skip
->>> the entry and print an error log but we can't get a wrong ITS parent.
->> So the only valid single mapping under type SMMUv3 is SMMUv3's dev id
->> mapping, we need to fix the IORT spec as well.
+>>>> update the usbdrd link control and phy contol clks.
+>>>
+>>> The commit title and especially commit message should explain why you
+>>> are doing this and what are you doing. "Update" is not enough.
+>>> Everything could be called update.
+>>>
+>>> Therefore I do not understand the reason behind the patch.
+>>>
+>>> BR,
+>>> Krzysztof
 >>
->>> I am rewriting this commit (I will probably split it), it is doing the
->>> right thing but the commit log is stale (probably caused by code
->>> reshuffling).
->> Do I need to resend another version, or you can help to update it?
->> please let me know.
-> I reworked the patches, you can repost/retest them I made them available
-> in the branch below, we will have to add a guard around ACPICA smmu
-> struct (unfortunately I think we will have to use the ACPICA version as
-> a guard) or I can ask Rafael to pull the series if ACPICA goes via ACPI
-> tree (and your patch made it into the release - I will check ACPICA
-> upstream).
+>> so as per the driver.
+>> @clk: phy clock for register access
+>> @ref_clk: reference clock to PHY block from which PHY's operational
+>> clocks are derived
+>>
+>> Both CLK_SCLK_USBPHY300 and CLK_SCLK_USBD300 belong to FSYS Clock
+>> and CLK_USBD300 clk is being used by the usbdrd dwc3 module.
+>
+>
+> From what i vaguely remember, the CLK_SCLK* are the parent clocks going to
+> the
+> FSYS block. In this FSYS block the two clocks - CLK_USBD300, and
+> CLK_SCLK_USBPHY300
+> are coming.
+>
+> "phy" - represents the AHB clock used only for the register writes, and is
+> required only
+> during register access. Since we don't need this clock for phy operation,
+> your next change
+> that removes the clk_disable() sounds incorrect to me.
+> Just to double check, this AHB clock should be 200MHz (from what i remember)
+> "ref_clk" - the phy reference that clocks the phy PLL. This is a 24MHz
+> clock.
+>
+> Clubbing the changes in two patches:
+> - You change the "phy" clock from CLK_USBD300 to CLK_SCLK_USBPHY300, and
+> then
+>   you _had_ to remove the clk_disable().
+>   I think you needed the second patch just because you introduced this
+> change in the clocks.
+>
+> - Like Krzysztof mentioned in the thread, if there's a performance
+> improvement you may
+> want to double check the clock rates.
+>
 
-Bob already merged my pull request yesterday, I think it will be ready for
-acpica release for this month.
+Yes their is slight improvement with these changes
+I will share my test result once I add few more changes to this drive.
 
 >
-> git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git iort/smmu-msi-for-4.15
+> Best regards
+> Vivek
 >
 
-Thanks! I will retest then repost.
+Thank for your explanation on the clk internals.
+I have read few detail on the initial mainline list.
 
-Hanjun
+[0] https://lkml.org/lkml/2014/4/8/247
+
+CLK_GATE_TOP_SCLK_FSYS
+
+SCLK_USBDRD301       Gating SUSPEND_CLK for USBDRD30_1
+SCLK_USBDRD300       Gating SUSPEND_CLK for USBDRD30_0
+SCLK_USBPHY300        Gating USB30_SCLK_100M for USBDRD30_PHY_0
+                                            Gating USB20_PICO_CLKCORE
+for PICO PHY
+SCLK_USBPHY300        Gating USB30_SCLK_100M for USBDRD30_PHY_1
+
+So we did not considered the SUSPEN_CLK for phy.
+
+Below is the clk structure diagram for usb drd phy.
+
+[1] https://lkml.org/lkml/2014/4/10/240
+
+Here is how it shown in manual.
+
+                                   ___________________
+                                   |                                          |
+SUSPEND_CLK     |      ____________        |
+ ------------------------- |      | PHY                 |        |
+                                   |      | controller
+|------|--------------------------------------------------------
+                                   |      |___________|        |
+                                                                   |
+                                   |
+       |
+           |
+                                   |
+       |
+          |
+                                   |         USB 3.0
+|      USB30_SCLK_100M------------- |-------------------------------|
+                                   |           DRD
+ |                                                               |
+                                    |---->vbus
+                                   ---------------------------------
+                                                            |
+                               |
+                                   |        Controller
+|                                                               |
+ |---------------------|    |
+                                   |
+       |            Pipe interface                          |       |
+USB 3.0 DRD  |    |
+                                   |      ----------------
+  |-----------------------------------------------|
+|____________|    |
+                                   |     |       PHY       |
+  |            UTMI+ Interface                       |
+                        |
+                                   |     | Link cont.    |
+|-----------------------------------------------|
+                   |
+                                   |     |-----------------|
+ |
+|__________________|
+                                   |
+       |
+                                   |__________________|
+
+
+So how can we support SUSPEND_CLK ?
+Do we need to keep this SUSPEND_CLK enable ?
+
+As of now my dts change are wrong
+How about below changes.
+
+ &usbdrd_phy0 {
+-       clocks = <&clock CLK_USBD300>, <&clock CLK_SCLK_USBPHY300>;
++       clocks = <&clock CLK_SCLK_USBD300>, <&clock CLK_SCLK_USBPHY300>;
+        clock-names = "phy", "ref";
+        samsung,pmu-syscon = <&pmu_system_controller>;
+ };
+@@ -1476,7 +1476,7 @@
+ };
+
+ &usbdrd_phy1 {
+-       clocks = <&clock CLK_USBD301>, <&clock CLK_SCLK_USBPHY301>;
++       clocks = <&clock CLK_SCLK_USBD301>, <&clock CLK_SCLK_USBPHY301>;
+        clock-names = "phy", "ref";
+        samsung,pmu-syscon = <&pmu_system_controller>;
+ };
+
+Best Regards
+-Anand
