@@ -1,104 +1,55 @@
-From: nandor.han@ge.com (Han, Nandor (GE Healthcare))
-Date: Wed, 11 Oct 2017 06:22:53 +0000
-Subject: [PATCH 1/1] tty: serial: imx: disable ageing timer interrupt if
- dma in use
-In-Reply-To: <20171007014648.6989-1-troy.kisky@boundarydevices.com>
-References: <20171007014648.6989-1-troy.kisky@boundarydevices.com>
-Message-ID: <AM3P101MB01800FAA2029393C5A859629E64A0@AM3P101MB0180.NAMP101.PROD.OUTLOOK.COM>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Wed, 11 Oct 2017 14:26:51 +0800
+Subject: [PATCH v8 01/20] crypto: change transient busy return code to
+ -EAGAIN
+In-Reply-To: <CAOtvUMd=vtju=VJkCYFRrvANbRRYj+95cdgDoMMfBvmPaPbsAA@mail.gmail.com>
+References: <1504615144-29770-1-git-send-email-gilad@benyossef.com>
+ <1504615144-29770-2-git-send-email-gilad@benyossef.com>
+ <20171007030541.GA29421@gondor.apana.org.au>
+ <CAOtvUMd=vtju=VJkCYFRrvANbRRYj+95cdgDoMMfBvmPaPbsAA@mail.gmail.com>
+Message-ID: <20171011062651.GA18664@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: linux-serial-owner at vger.kernel.org [mailto:linux-serial-
-> owner at vger.kernel.org] On Behalf Of Troy Kisky
-> Sent: 07 October 2017 04:47
-> To: gregkh at linuxfoundation.org
-> Cc: fabio.estevam at nxp.com; l.stach at pengutronix.de; u.kleine-
-> koenig at pengutronix.de; linux-serial at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; Troy Kisky <troy.kisky@boundarydevices.com>
-> Subject: EXT: [PATCH 1/1] tty: serial: imx: disable ageing timer interrupt if
-> dma in use
+On Sat, Oct 07, 2017 at 10:51:42AM +0300, Gilad Ben-Yossef wrote:
+> On Sat, Oct 7, 2017 at 6:05 AM, Herbert Xu <herbert@gondor.apana.org.au> wrote:
+> > On Tue, Sep 05, 2017 at 03:38:40PM +0300, Gilad Ben-Yossef wrote:
+> >>
+> >> diff --git a/crypto/algif_hash.c b/crypto/algif_hash.c
+> >> index 5e92bd2..3b3c154 100644
+> >> --- a/crypto/algif_hash.c
+> >> +++ b/crypto/algif_hash.c
+> >> @@ -39,6 +39,20 @@ struct algif_hash_tfm {
+> >>       bool has_key;
+> >>  };
+> >>
+> >> +/* Previous versions of crypto_* ops used to return -EBUSY
+> >> + * rather than -EAGAIN to indicate being tied up. The in
+> >> + * kernel API changed but we don't want to break the user
+> >> + * space API. As only the hash user interface exposed this
+> >> + * error ever to the user, do the translation here.
+> >> + */
+> >> +static inline int crypto_user_err(int err)
+> >> +{
+> >> +     if (err == -EAGAIN)
+> >> +             return -EBUSY;
+> >> +
+> >> +     return err;
+> >
+> > I don't see the need to carry along this baggage.  Does anyone
+> > in user-space actually rely on EBUSY?
 > 
-> Since commit 4dec2f119e86 ("imx-serial: RX DMA startup latency")
 > 
-> the interrupt routine no longer will start rx dma.
+> I am not aware of anyone who does. I was just trying to avoid
+> changing the user ABI.
+> 
+> Shall I roll a new revision without this patch?
 
-I think you have 2 commits here: 
-- one that disables ageing timer when DMA is in use
-- one that cleans the leftovers after 4dec2f119e86.
+Yes please.  I'd rather not carry this around for eternity unless
+it was actually required.
 
-> 
-> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
-> ---
->  drivers/tty/serial/imx.c | 34 ++--------------------------------
->  1 file changed, 2 insertions(+), 32 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c index
-> dfeff3951f93..15b0ecb4cf60 100644
-> --- a/drivers/tty/serial/imx.c
-> +++ b/drivers/tty/serial/imx.c
-> @@ -732,29 +732,6 @@ static void imx_disable_rx_int(struct imx_port
-> *sport)  }
-> 
->  static void clear_rx_errors(struct imx_port *sport); -static int
-> start_rx_dma(struct imx_port *sport);
-> -/*
-> - * If the RXFIFO is filled with some data, and then we
-> - * arise a DMA operation to receive them.
-> - */
-> -static void imx_dma_rxint(struct imx_port *sport) -{
-> -	unsigned long temp;
-> -	unsigned long flags;
-> -
-> -	spin_lock_irqsave(&sport->port.lock, flags);
-> -
-> -	temp = readl(sport->port.membase + USR2);
-> -	if ((temp & USR2_RDR) && !sport->dma_is_rxing) {
-> -
-> -		imx_disable_rx_int(sport);
-> -
-> -		/* tell the DMA to receive the data. */
-> -		start_rx_dma(sport);
-> -	}
-> -
-> -	spin_unlock_irqrestore(&sport->port.lock, flags);
-> -}
-> 
->  /*
->   * We have a modem side uart, so the meanings of RTS and CTS are inverted.
-> @@ -816,11 +793,8 @@ static irqreturn_t imx_int(int irq, void *dev_id)
->  	sts = readl(sport->port.membase + USR1);
->  	sts2 = readl(sport->port.membase + USR2);
-> 
-> -	if (sts & (USR1_RRDY | USR1_AGTIM)) {
-> -		if (sport->dma_is_enabled)
-> -			imx_dma_rxint(sport);
-> -		else
-> -			imx_rxint(irq, dev_id);
-> +	if (!sport->dma_is_enabled && (sts & (USR1_RRDY |
-> USR1_AGTIM))) {
-> +		imx_rxint(irq, dev_id);
-
-I don't think we need the check `!sport->dma_is_enabled ` since RRDY and AGTIM interrupts should be disable when DMA is enabled.
-
->  		ret = IRQ_HANDLED;
->  	}
-> 
-> @@ -1207,10 +1181,6 @@ static void imx_enable_dma(struct imx_port
-> *sport)
->  	temp |= UCR1_RDMAEN | UCR1_TDMAEN | UCR1_ATDMAEN;
->  	writel(temp, sport->port.membase + UCR1);
-> 
-> -	temp = readl(sport->port.membase + UCR2);
-> -	temp |= UCR2_ATEN;
-> -	writel(temp, sport->port.membase + UCR2);
-> -
-
-I think this should be moved to imx_startup. At least RRDY is configured there. 
-
-<snip>
-
-Regards,
-Nandor
+Thanks,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
