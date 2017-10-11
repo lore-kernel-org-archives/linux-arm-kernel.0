@@ -1,74 +1,91 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Wed, 11 Oct 2017 10:41:35 +0800
-Subject: [PATCH v5 11/12] mmc: mediatek: improve eMMC hs400 mode read
- performance
-In-Reply-To: <1507689696-25928-1-git-send-email-chaotian.jing@mediatek.com>
-References: <1507689696-25928-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <1507689696-25928-12-git-send-email-chaotian.jing@mediatek.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Wed, 11 Oct 2017 10:53:52 +0800
+Subject: [RESEND PATCH] phy: phy-mtk-tphy: add set_mode callback
+Message-ID: <88ca8e98f1f08e38ac20ece1b7f40189301be74f.1507690355.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-enlarge outstanding value to improve read performance
+This is used to force PHY with USB OTG function to enter a specific
+mode, and override OTG IDPIN(or IDDIG) signal.
 
-Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- drivers/mmc/host/mtk-sd.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/phy/mediatek/phy-mtk-tphy.c |   39 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-index d75a93d..95759bb 100644
---- a/drivers/mmc/host/mtk-sd.c
-+++ b/drivers/mmc/host/mtk-sd.c
-@@ -81,6 +81,7 @@
- #define PAD_DS_TUNE      0x188
- #define PAD_CMD_TUNE     0x18c
- #define EMMC50_CFG0      0x208
-+#define EMMC50_CFG3      0x220
- #define SDC_FIFO_CFG     0x228
+diff --git a/drivers/phy/mediatek/phy-mtk-tphy.c b/drivers/phy/mediatek/phy-mtk-tphy.c
+index 721a2a1..402385f 100644
+--- a/drivers/phy/mediatek/phy-mtk-tphy.c
++++ b/drivers/phy/mediatek/phy-mtk-tphy.c
+@@ -96,9 +96,11 @@
  
- /*--------------------------------------------------------------------------*/
-@@ -249,6 +250,8 @@
- #define EMMC50_CFG_CRCSTS_EDGE    (0x1 << 3)   /* RW */
- #define EMMC50_CFG_CFCSTS_SEL     (0x1 << 4)   /* RW */
+ #define U3P_U2PHYDTM1		0x06C
+ #define P2C_RG_UART_EN			BIT(16)
++#define P2C_FORCE_IDDIG		BIT(9)
+ #define P2C_RG_VBUSVALID		BIT(5)
+ #define P2C_RG_SESSEND			BIT(4)
+ #define P2C_RG_AVALID			BIT(2)
++#define P2C_RG_IDDIG			BIT(1)
  
-+#define EMMC50_CFG3_OUTS_WR       (0x1f << 0)  /* RW */
+ #define U3P_U3_CHIP_GPIO_CTLD		0x0c
+ #define P3C_REG_IP_SW_RST		BIT(31)
+@@ -585,6 +587,31 @@ static void u2_phy_instance_exit(struct mtk_tphy *tphy,
+ 	}
+ }
+ 
++static void u2_phy_instance_set_mode(struct mtk_tphy *tphy,
++				     struct mtk_phy_instance *instance,
++				     enum phy_mode mode)
++{
++	struct u2phy_banks *u2_banks = &instance->u2_banks;
++	u32 tmp;
 +
- #define SDC_FIFO_CFG_WRVALIDSEL   (0x1 << 24)  /* RW */
- #define SDC_FIFO_CFG_RDVALIDSEL   (0x1 << 25)  /* RW */
- 
-@@ -318,6 +321,7 @@ struct msdc_save_para {
- 	u32 pad_ds_tune;
- 	u32 pad_cmd_tune;
- 	u32 emmc50_cfg0;
-+	u32 emmc50_cfg3;
- 	u32 sdc_fifo_cfg;
- };
- 
-@@ -1747,6 +1751,9 @@ static int msdc_prepare_hs400_tuning(struct mmc_host *mmc, struct mmc_ios *ios)
- 	writel(host->hs400_ds_delay, host->base + PAD_DS_TUNE);
- 	/* hs400 mode must set it to 0 */
- 	sdr_clr_bits(host->base + MSDC_PATCH_BIT2, MSDC_PATCH_BIT2_CFGCRCSTS);
-+	/* to improve read performance, set outstanding to 2 */
-+	sdr_set_field(host->base + EMMC50_CFG3, EMMC50_CFG3_OUTS_WR, 2);
++	tmp = readl(u2_banks->com + U3P_U2PHYDTM1);
++	switch (mode) {
++	case PHY_MODE_USB_DEVICE:
++		tmp |= P2C_FORCE_IDDIG | P2C_RG_IDDIG;
++		break;
++	case PHY_MODE_USB_HOST:
++		tmp |= P2C_FORCE_IDDIG;
++		tmp &= ~P2C_RG_IDDIG;
++		break;
++	case PHY_MODE_USB_OTG:
++		tmp &= ~(P2C_FORCE_IDDIG | P2C_RG_IDDIG);
++		break;
++	default:
++		return;
++	}
++	writel(tmp, u2_banks->com + U3P_U2PHYDTM1);
++}
 +
+ static void pcie_phy_instance_init(struct mtk_tphy *tphy,
+ 	struct mtk_phy_instance *instance)
+ {
+@@ -881,6 +908,17 @@ static int mtk_phy_exit(struct phy *phy)
  	return 0;
  }
  
-@@ -1997,6 +2004,7 @@ static void msdc_save_reg(struct msdc_host *host)
- 	host->save_para.pad_ds_tune = readl(host->base + PAD_DS_TUNE);
- 	host->save_para.pad_cmd_tune = readl(host->base + PAD_CMD_TUNE);
- 	host->save_para.emmc50_cfg0 = readl(host->base + EMMC50_CFG0);
-+	host->save_para.emmc50_cfg3 = readl(host->base + EMMC50_CFG3);
- 	host->save_para.sdc_fifo_cfg = readl(host->base + SDC_FIFO_CFG);
- }
- 
-@@ -2014,6 +2022,7 @@ static void msdc_restore_reg(struct msdc_host *host)
- 	writel(host->save_para.pad_ds_tune, host->base + PAD_DS_TUNE);
- 	writel(host->save_para.pad_cmd_tune, host->base + PAD_CMD_TUNE);
- 	writel(host->save_para.emmc50_cfg0, host->base + EMMC50_CFG0);
-+	writel(host->save_para.emmc50_cfg3, host->base + EMMC50_CFG3);
- 	writel(host->save_para.sdc_fifo_cfg, host->base + SDC_FIFO_CFG);
- }
++static int mtk_phy_set_mode(struct phy *phy, enum phy_mode mode)
++{
++	struct mtk_phy_instance *instance = phy_get_drvdata(phy);
++	struct mtk_tphy *tphy = dev_get_drvdata(phy->dev.parent);
++
++	if (instance->type == PHY_TYPE_USB2)
++		u2_phy_instance_set_mode(tphy, instance, mode);
++
++	return 0;
++}
++
+ static struct phy *mtk_phy_xlate(struct device *dev,
+ 					struct of_phandle_args *args)
+ {
+@@ -931,6 +969,7 @@ static struct phy *mtk_phy_xlate(struct device *dev,
+ 	.exit		= mtk_phy_exit,
+ 	.power_on	= mtk_phy_power_on,
+ 	.power_off	= mtk_phy_power_off,
++	.set_mode	= mtk_phy_set_mode,
+ 	.owner		= THIS_MODULE,
+ };
  
 -- 
-1.8.1.1.dirty
+1.7.9.5
