@@ -1,36 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 11 Oct 2017 15:48:55 +0200
-Subject: [PATCH] ARM: don't discard memblock for kexec
-Message-ID: <20171011134925.3251410-1-arnd@arndb.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 11 Oct 2017 14:55:17 +0100
+Subject: [PATCH v6 4/4] perf vendor events arm64: Add ThunderX2
+ implementation defined pmu core events
+In-Reply-To: <20171011132431.GL17961@rric.localdomain>
+References: <20170824120349.2323-1-ganapatrao.kulkarni@cavium.com>
+ <20170824120349.2323-5-ganapatrao.kulkarni@cavium.com>
+ <43dcc107-263a-5429-73d4-a5290c6610d6@hisilicon.com>
+ <20170829124730.GH17961@rric.localdomain>
+ <20171011121926.GC11106@arm.com>
+ <20171011132431.GL17961@rric.localdomain>
+Message-ID: <20171011135517.GF11106@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Discarding the memblock arrays usually works, but causes problems
-with kexec, as pointed out by this kbuild warning:
+On Wed, Oct 11, 2017 at 03:24:31PM +0200, Robert Richter wrote:
+> On 11.10.17 13:19:27, Will Deacon wrote:
+> > On Tue, Aug 29, 2017 at 02:47:30PM +0200, Robert Richter wrote:
+> > > Shaokun,
+> > > 
+> > > On 29.08.17 17:26:00, Zhangshaokun wrote:
+> > > > On 2017/8/24 20:03, Ganapatrao Kulkarni wrote:
+> > > > > This is not a full event list, but a short list of useful events.
+> > > > > 
+> > > > > Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> > > > > ---
+> > > > >  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
+> > > > >  .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
+> > > > >  2 files changed, 77 insertions(+)
+> > > > >  create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
+> > > > >  create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
+> > > > > 
+> > > > 
+> > > > I saw you also used thunderx2 in tools/perf/pmu-events/arch/arm64/, how about John's suggestion
+> > > > that would use vendor sub-folder?
+> > > > Of course, appreciate maintainer's comments.
+> > > 
+> > > this would just add another level of subdirectories. I rather would
+> > > prefer to have a per platform dir comparable to what is listed in
+> > > 
+> > >  arch/arm64/Kconfig.platforms
+> > > 
+> > > This is the same as Ganapat has implemented it.
+> > 
+> > FWIW, I agree with Zhangshaokun here that a silicon vendor subdirectory
+> > would organise things better. It also matches what we do for
+> > arch/arm64/boot/dts/
+> 
+> A file structure like:
+> 
+>  tools/perf/pmu-events/arch/arm64/cavium/thunderx2/implementation-defined.json
+> 
+> looks quite horible. In contrast to dts dir we will need another
+> subdir for each platform and will then have two levels of subdirs.
 
-WARNING: vmlinux.o(.text+0x7c60): Section mismatch in reference from the function machine_kexec_prepare() to the function .meminit.text:memblock_is_region_memory()
+In which case, call the file thunderx2-imp-def.json or something. The
+advantage then is that the SoC names are namespaced by vendor, which is
+the best way to avoid confusion imo.
 
-This lets us keep the memblock structures around whenever kexec
-is enabled, but otherwise still drops them.
-
-Fixes: cf1b09908a23 ("ARM: 8693/1: discard memblock arrays when possible")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 75b8c7e79ebc..90922a090501 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -2,7 +2,7 @@ config ARM
- 	bool
- 	default y
- 	select ARCH_CLOCKSOURCE_DATA
--	select ARCH_DISCARD_MEMBLOCK if !HAVE_ARCH_PFN_VALID
-+	select ARCH_DISCARD_MEMBLOCK if !HAVE_ARCH_PFN_VALID && !KEXEC
- 	select ARCH_HAS_DEBUG_VIRTUAL
- 	select ARCH_HAS_DEVMEM_IS_ALLOWED
- 	select ARCH_HAS_ELF_RANDOMIZE
--- 
-2.9.0
+Will
