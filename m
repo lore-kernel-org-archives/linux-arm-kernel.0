@@ -1,129 +1,96 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 11 Oct 2017 12:39:39 -0700
-Subject: [PATCH 01/11] Initialize the mapping of KASan shadow memory
-In-Reply-To: <20171011082227.20546-2-liuwenliang@huawei.com>
-References: <20171011082227.20546-1-liuwenliang@huawei.com>
- <20171011082227.20546-2-liuwenliang@huawei.com>
-Message-ID: <b53b3281-5eef-7cbd-c7d3-5417d764667b@gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 11 Oct 2017 14:41:29 -0500
+Subject: [PATCH 2/2] pci/layerscape: change the default error response
+ behavior
+In-Reply-To: <20170922072522.36306-3-Zhiqiang.Hou@nxp.com>
+References: <20170922072522.36306-1-Zhiqiang.Hou@nxp.com>
+ <20170922072522.36306-3-Zhiqiang.Hou@nxp.com>
+Message-ID: <20171011194129.GQ25517@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/2017 01:22 AM, Abbott Liu wrote:
-> From: Andrey Ryabinin <a.ryabinin@samsung.com>
+On Fri, Sep 22, 2017 at 03:25:22PM +0800, Zhiqiang Hou wrote:
+> From: Minghuan Lian <Minghuan.Lian@nxp.com>
 > 
-> This patch initializes KASan shadow region's page table and memory.
-> There are two stage for KASan initializing:
-> 1. At early boot stage the whole shadow region is mapped to just
->    one physical page (kasan_zero_page). It's finished by the function
->    kasan_early_init which is called by __mmap_switched(arch/arm/kernel/
->    head-common.S)
+> By default, when the PCIe controller experiences an erroneous
+> completion from an external completer for its outbound non-posted
+> request, it always sends an OKAY response to the device's internal
+> AXI slave system interface. However, such default system error
+> response behavior cannot be used for other types of outbound
+> non-posted requests. For example, the outbound memory read
+> transaction requires an actual ERROR response, like UR completion
+> or completion timeout. The patch is to fix it by forwarding
+> the error response of the non-posted request.
 > 
-> 2. After the calling of paging_init, we use kasan_zero_page as zero
->    shadow for some memory that KASan don't need to track, and we alloc
->    new shadow space for the other memory that KASan need to track. These
->    issues are finished by the function kasan_init which is call by setup_arch.
-> 
-> Cc: Andrey Ryabinin <a.ryabinin@samsung.com>
-> Signed-off-by: Abbott Liu <liuwenliang@huawei.com>
+> Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+> Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 > ---
-
-[snip]
-
-				\
-> @@ -140,6 +149,30 @@ extern void cpu_resume(void);
->  		pg &= ~0x3fff;				\
->  		(pgd_t *)phys_to_virt(pg);		\
->  	})
-> +
-> +#define cpu_set_ttbr(nr, val)					\
-> +	do {							\
-> +		u64 ttbr = val;					\
-> +		__asm__("mcr	p15, 0, %0, c2, c0, 0"		\
-> +			: : "r" (ttbr));			\
-> +	} while (0)
-
-nr seems to be unused here?
-
-> +
-> +#define cpu_get_ttbr(nr)					\
-> +	({							\
-> +		unsigned long ttbr;				\
-> +		__asm__("mrc	p15, 0, %0, c2, c0, 0"		\
-> +			: "=r" (ttbr));				\
-> +		ttbr;						\
-> +	})
-> +
-> +#define cpu_set_ttbr0(val)					\
-> +	do {							\
-> +		u64 ttbr = val;					\
-> +		__asm__("mcr	p15, 0, %0, c2, c0, 0"		\
-> +			: : "r" (ttbr));			\
-> +	} while (0)
-> +
-
-Why is not cpu_set_ttbr0() not using cpu_set_ttbr()?
-
-> +
->  #endif
+>  drivers/pci/dwc/pci-layerscape.c | 25 +++++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
+> 
+> diff --git a/drivers/pci/dwc/pci-layerscape.c b/drivers/pci/dwc/pci-layerscape.c
+> index 3b01e309a55e..a647090c140e 100644
+> --- a/drivers/pci/dwc/pci-layerscape.c
+> +++ b/drivers/pci/dwc/pci-layerscape.c
+> @@ -33,6 +33,8 @@
 >  
->  #else	/*!CONFIG_MMU */
-> diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
-> index 1d468b5..52c4858 100644
-> --- a/arch/arm/include/asm/thread_info.h
-> +++ b/arch/arm/include/asm/thread_info.h
-> @@ -16,7 +16,11 @@
->  #include <asm/fpstate.h>
->  #include <asm/page.h>
+>  /* PEX Internal Configuration Registers */
+>  #define PCIE_STRFMR1		0x71c /* Symbol Timer & Filter Mask Register1 */
+> +#define PCIE_ABSERR		0x8d0 /* Bridge Slave Error Response Register */
+> +#define PCIE_ABSERR_SETTING	0x9401 /* Forward error of non-posted request */
 >  
-> +#ifdef CONFIG_KASAN
-> +#define THREAD_SIZE_ORDER       2
-> +#else
->  #define THREAD_SIZE_ORDER	1
-> +#endif
->  #define THREAD_SIZE		(PAGE_SIZE << THREAD_SIZE_ORDER)
->  #define THREAD_START_SP		(THREAD_SIZE - 8)
+>  #define PCIE_IATU_NUM		6
 >  
-> diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
-> index 8733012..c17f4a2 100644
-> --- a/arch/arm/kernel/head-common.S
-> +++ b/arch/arm/kernel/head-common.S
-> @@ -101,7 +101,11 @@ __mmap_switched:
->  	str	r2, [r6]			@ Save atags pointer
->  	cmp	r7, #0
->  	strne	r0, [r7]			@ Save control register values
-> +#ifdef CONFIG_KASAN
-> +	b	kasan_early_init
-> +#else
->  	b	start_kernel
-> +#endif
-
-Please don't make this "exclusive" just conditionally call
-kasan_early_init(), remove the call to start_kernel from
-kasan_early_init and keep the call to start_kernel here.
-
->  ENDPROC(__mmap_switched)
+> @@ -54,6 +56,19 @@ struct ls_pcie {
 >  
->  	.align	2
-
-[snip]
-
-> +void __init kasan_early_init(void)
+>  #define to_ls_pcie(x)	dev_get_drvdata((x)->dev)
+>  
+> +static int err_response_flag = 1;
+> +
+> +static int __init ls_pcie_param(char *p)
 > +{
-> +	struct proc_info_list *list;
+> +	if (p && strncmp(p, "no-err-response", 15) == 0)
+> +		err_response_flag = 0;
+> +	else
+> +		err_response_flag = 1;
 > +
-> +	/*
-> +	 * locate processor in the list of supported processor
-> +	 * types.  The linker builds this table for us from the
-> +	 * entries in arch/arm/mm/proc-*.S
-> +	 */
-> +	list = lookup_processor_type(read_cpuid_id());
-> +	if (list) {
-> +#ifdef MULTI_CPU
-> +		processor = *list->proc;
-> +#endif
-> +	}
+> +	return 0;
+> +}
+> +early_param("ls_pcie", ls_pcie_param);
 
-I could not quite spot in your patch series when do you need this
-information?
--- 
-Florian
+What's the point of this parameter?  If it's for debugging, it's not
+clear that we need it upstream.  If it's for debugging and we *do*
+need it upstream, there should be some sort of comment to that effect.
+
+I assume you never expect an end user to need this parameter.
+
+>  static bool ls_pcie_is_bridge(struct ls_pcie *pcie)
+>  {
+>  	struct dw_pcie *pci = pcie->pci;
+> @@ -124,6 +139,14 @@ static int ls_pcie_link_up(struct dw_pcie *pci)
+>  	return 1;
+>  }
+>  
+> +/* Forward error response of outbound non-posted requests */
+> +static void ls_pcie_fix_error_response(struct ls_pcie *pcie)
+> +{
+> +	struct dw_pcie *pci = pcie->pci;
+> +
+> +	iowrite32(PCIE_ABSERR_SETTING, pci->dbi_base + PCIE_ABSERR);
+> +}
+> +
+>  static int ls_pcie_host_init(struct pcie_port *pp)
+>  {
+>  	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+> @@ -135,6 +158,8 @@ static int ls_pcie_host_init(struct pcie_port *pp)
+>  	 * dw_pcie_setup_rc() will reconfigure the outbound windows.
+>  	 */
+>  	ls_pcie_disable_outbound_atus(pcie);
+> +	if (err_response_flag)
+> +		ls_pcie_fix_error_response(pcie);
+>  
+>  	dw_pcie_dbi_ro_wr_en(pci);
+>  	ls_pcie_clear_multifunction(pcie);
+> -- 
+> 2.14.1
+> 
