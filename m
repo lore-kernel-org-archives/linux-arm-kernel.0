@@ -1,100 +1,64 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Wed, 11 Oct 2017 09:26:57 +0800
-Subject: [PATCH v4 05/12] mmc: mediatek: add pad_tune0 support
-In-Reply-To: <afac6efe-d721-acae-6c07-adf4cfff962d@arm.com>
-References: <1507627831-29323-1-git-send-email-chaotian.jing@mediatek.com>
- <1507627831-29323-6-git-send-email-chaotian.jing@mediatek.com>
- <afac6efe-d721-acae-6c07-adf4cfff962d@arm.com>
-Message-ID: <1507685217.19789.14.camel@mhfsdcap03>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 10 Oct 2017 21:18:15 -0500
+Subject: [PATCH] PCI: aardvark: Move to struct pci_host_bridge IRQ
+ mapping functions
+In-Reply-To: <20171009070049.2684-1-thomas.petazzoni@free-electrons.com>
+References: <20171009070049.2684-1-thomas.petazzoni@free-electrons.com>
+Message-ID: <20171011021815.GC25517@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-10-10 at 17:57 +0100, Julien Thierry wrote:
-> Hi,
+On Mon, Oct 09, 2017 at 09:00:49AM +0200, Thomas Petazzoni wrote:
+> struct pci_host_bridge gained hooks to map/swizzle IRQs, so that the
+> IRQ mapping can be done automatically by PCI core code through the
+> pci_assign_irq() function instead of resorting to arch-specific
+> implementation callbacks to carry out the same task which force PCI
+> host bridge drivers implementation to implement per-arch kludges to
+> carry out a task that is inherently architecture agnostic.
 > 
-> On 10/10/17 10:30, Chaotian Jing wrote:
-> > from mt2701, the register of PAD_TUNE has been phased out,
-> > while there is a new register of PAD_TUNE0
-> > 
-> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> > ---
-> >   drivers/mmc/host/mtk-sd.c | 69 ++++++++++++++++++++++++++++++++++-------------
-> >   1 file changed, 51 insertions(+), 18 deletions(-)
-> > 
-> > diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-> > index ab2fbbb..0dc45b3 100644
-> > --- a/drivers/mmc/host/mtk-sd.c
-> > +++ b/drivers/mmc/host/mtk-sd.c
-> > @@ -75,6 +75,7 @@
-> >   #define MSDC_PATCH_BIT   0xb0
-> >   #define MSDC_PATCH_BIT1  0xb4
-> >   #define MSDC_PAD_TUNE    0xec
-> > +#define MSDC_PAD_TUNE0   0xf0
-> >   #define PAD_DS_TUNE      0x188
-> >   #define PAD_CMD_TUNE     0x18c
-> >   #define EMMC50_CFG0      0x208
-> > @@ -301,6 +302,7 @@ struct msdc_save_para {
-> >   struct mtk_mmc_compatible {
-> >   	u8 clk_div_bits;
-> >   	bool hs400_tune; /* only used for MT8173 */
-> > +	bool pad_tune0;
+> Commit 769b461fc0c0 ("arm64: PCI: Drop DT IRQ allocation from
+> pcibios_alloc_irq()") was assuming all PCI host controller drivers had
+> been converted to use ->map_irq(), but that wasn't the case:
+> pci-aardvark had not been converted. Due to this, it broke the support
+> for legacy PCI interrupts when using the pci-aardvark driver (used on
+> Marvell Armada 3720 platforms).
 > 
-> You only use this to decide whether to use MDSC_PAD_TUNE or 
-> MSDC_PAD_TUNE0 as tune regs.
+> In order to fix this, we make sure the ->map_irq and ->swizzle_irq
+> fields of pci_host_bridge are properly filled in.
 > 
-> Couldn't this field directly be a 'u32' that is either MDSC_PAD_TUNE or 
-> MDSC_PAD_TUNE0 rather than a bool?
+> Fixes: 769b461fc0c0 ("arm64: PCI: Drop DT IRQ allocation from pcibios_alloc_irq()")
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: <stable@vger.kernel.org> # v4.13+
+
+Applied to for-linus for v4.14, thanks!
+
+> ---
+> Changes since v2:
+>  - Adjust commit title to match other commits doing the same change in
+>    other drivers
+>  - Improve commit log.
+> ---
+>  drivers/pci/host/pci-aardvark.c | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-Thx, will change to "u32 pad_tune_reg;" at next version.
-> >   };
-> >   
-> >   struct msdc_tune_para {
-> > @@ -362,21 +364,25 @@ struct msdc_host {
-> >   static const struct mtk_mmc_compatible mt8135_compat = {
-> >   	.clk_div_bits = 8,
-> >   	.hs400_tune = false,
-> > +	.pad_tune0 = false,
+> diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
+> index 89f4e3d072d7..26ed0c08f209 100644
+> --- a/drivers/pci/host/pci-aardvark.c
+> +++ b/drivers/pci/host/pci-aardvark.c
+> @@ -935,6 +935,8 @@ static int advk_pcie_probe(struct platform_device *pdev)
+>  	bridge->sysdata = pcie;
+>  	bridge->busnr = 0;
+>  	bridge->ops = &advk_pcie_ops;
+> +	bridge->map_irq = of_irq_parse_and_map_pci;
+> +	bridge->swizzle_irq = pci_common_swizzle;
+>  
+>  	ret = pci_scan_root_bus_bridge(bridge);
+>  	if (ret < 0) {
+> -- 
+> 2.13.6
 > 
-> and here we could have (field could be renamed accordingly of course):
 > 
-> 	.pad_tune0 = MDSC_PAD_TUNE,
-> 
-> >   };
-> >   
-> >   static const struct mtk_mmc_compatible mt8173_compat = {
-> >   	.clk_div_bits = 8,
-> >   	.hs400_tune = true,
-> > +	.pad_tune0 = false,
-> >   };
-> >   
-> >   static const struct mtk_mmc_compatible mt2701_compat = {
-> >   	.clk_div_bits = 12,
-> >   	.hs400_tune = false,
-> > +	.pad_tune0 = true,
-> 
-> here:
-> 	.pad_tune0 = MDSC_PAD_TUNE0,
-> 
-> >   };
-> >   
-> >   static const struct mtk_mmc_compatible mt2712_compat = {
-> >   	.clk_div_bits = 12,
-> >   	.hs400_tune = false,
-> > +	.pad_tune0 = true,
-> >   };
-> >   
-> >   static const struct of_device_id msdc_of_ids[] = {
-> > @@ -581,6 +587,10 @@ static void msdc_set_mclk(struct msdc_host *host, unsigned char timing, u32 hz)
-> >   	u32 flags;
-> >   	u32 div;
-> >   	u32 sclk;
-> > +	u32 tune_reg = MSDC_PAD_TUNE;
-> > +
-> > +	if (host->dev_comp->pad_tune0)
-> > +		tune_reg = MSDC_PAD_TUNE0;
-> 
-> And this would not be needed here nor in the other functions, it could 
-> just be replaced by host->dev_comp->pad_tune0.
-> 
-> Thanks,
-> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
