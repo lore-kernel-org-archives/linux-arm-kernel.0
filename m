@@ -1,30 +1,49 @@
-From: nicolas.dechesne@linaro.org (Nicolas Dechesne)
-Date: Wed, 11 Oct 2017 17:19:25 +0200
-Subject: [PATCH] arm64: defconfig: Enable QCOM_IOMMU
-Message-ID: <20171011151925.30909-1-nicolas.dechesne@linaro.org>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Wed, 11 Oct 2017 17:23:12 +0200
+Subject: [PATCH] ARM64: dts: meson-gxl: Add alternate ARM Trusted Firmware
+ reserved memory zone
+Message-ID: <1507735392-20005-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable QCOM IOMMU driver for 'B' family devices, such as APQ8016 found on the
-Dragonboard 410c. With this change, graphics console and GPU are working
-fine (using mesa/freedreno for GPU driver).
+This year, Amlogic updated the ARM Trusted Firmware reserved memory mapping
+for Meson GXL SoCs and products sold since May 2017 uses this alternate
+reserved memory mapping.
+But products had been sold using the previous mapping.
 
-Signed-off-by: Nicolas Dechesne <nicolas.dechesne@linaro.org>
+This issue has been explained in [1] and a dynamic solution is yet to be
+found to avoid loosing another 3Mbytes of reservable memory.
+
+In the meantime, this patch adds this alternate memory zone only for
+the GXL and GXM SoCs since GXBB based new products stopped earlier.
+
+[1] http://lists.infradead.org/pipermail/linux-amlogic/2017-October/004860.html
+
+Fixes: bba8e3f42736 ("ARM64: dts: meson-gx: Add firmware reserved memory zones")
+Reported-by: Jerome Brunet <jbrunet@baylibre.com>
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 34480e9af2e7..653f7149179a 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -510,6 +510,7 @@ CONFIG_HI6220_MBOX=y
- CONFIG_ROCKCHIP_IOMMU=y
- CONFIG_ARM_SMMU=y
- CONFIG_ARM_SMMU_V3=y
-+CONFIG_QCOM_IOMMU=y
- CONFIG_RPMSG_QCOM_SMD=y
- CONFIG_RASPBERRYPI_POWER=y
- CONFIG_QCOM_SMEM=y
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+index d8dd329..fb8d76a 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+@@ -49,6 +49,14 @@
+ 
+ / {
+ 	compatible = "amlogic,meson-gxl";
++
++	reserved-memory {
++		/* Alternate 3 MiB reserved for ARM Trusted Firmware (BL31) */
++		secmon_reserved_alt: secmon at 05000000 {
++			reg = <0x0 0x05000000 0x0 0x300000>;
++			no-map;
++		};
++	};
+ };
+ 
+ &ethmac {
 -- 
-2.14.2
+2.7.4
