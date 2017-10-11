@@ -1,96 +1,43 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 11 Oct 2017 14:41:29 -0500
-Subject: [PATCH 2/2] pci/layerscape: change the default error response
- behavior
-In-Reply-To: <20170922072522.36306-3-Zhiqiang.Hou@nxp.com>
-References: <20170922072522.36306-1-Zhiqiang.Hou@nxp.com>
- <20170922072522.36306-3-Zhiqiang.Hou@nxp.com>
-Message-ID: <20171011194129.GQ25517@bhelgaas-glaptop.roam.corp.google.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed, 11 Oct 2017 22:43:55 +0300
+Subject: next: arm64: LTP sendto01 test causes system crash in ilp32 mode
+In-Reply-To: <1507747717.31614.28.camel@edumazet-glaptop3.roam.corp.google.com>
+References: <20171011183522.tm2xxgzbdspjtsax@yury-thinkpad>
+ <1507747313.31614.27.camel@edumazet-glaptop3.roam.corp.google.com>
+ <1507747717.31614.28.camel@edumazet-glaptop3.roam.corp.google.com>
+Message-ID: <20171011194355.n6mb4oe7qt76d6wh@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 22, 2017 at 03:25:22PM +0800, Zhiqiang Hou wrote:
-> From: Minghuan Lian <Minghuan.Lian@nxp.com>
-> 
-> By default, when the PCIe controller experiences an erroneous
-> completion from an external completer for its outbound non-posted
-> request, it always sends an OKAY response to the device's internal
-> AXI slave system interface. However, such default system error
-> response behavior cannot be used for other types of outbound
-> non-posted requests. For example, the outbound memory read
-> transaction requires an actual ERROR response, like UR completion
-> or completion timeout. The patch is to fix it by forwarding
-> the error response of the non-posted request.
-> 
-> Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
-> Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> ---
->  drivers/pci/dwc/pci-layerscape.c | 25 +++++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
-> 
-> diff --git a/drivers/pci/dwc/pci-layerscape.c b/drivers/pci/dwc/pci-layerscape.c
-> index 3b01e309a55e..a647090c140e 100644
-> --- a/drivers/pci/dwc/pci-layerscape.c
-> +++ b/drivers/pci/dwc/pci-layerscape.c
-> @@ -33,6 +33,8 @@
->  
->  /* PEX Internal Configuration Registers */
->  #define PCIE_STRFMR1		0x71c /* Symbol Timer & Filter Mask Register1 */
-> +#define PCIE_ABSERR		0x8d0 /* Bridge Slave Error Response Register */
-> +#define PCIE_ABSERR_SETTING	0x9401 /* Forward error of non-posted request */
->  
->  #define PCIE_IATU_NUM		6
->  
-> @@ -54,6 +56,19 @@ struct ls_pcie {
->  
->  #define to_ls_pcie(x)	dev_get_drvdata((x)->dev)
->  
-> +static int err_response_flag = 1;
-> +
-> +static int __init ls_pcie_param(char *p)
-> +{
-> +	if (p && strncmp(p, "no-err-response", 15) == 0)
-> +		err_response_flag = 0;
-> +	else
-> +		err_response_flag = 1;
-> +
-> +	return 0;
-> +}
-> +early_param("ls_pcie", ls_pcie_param);
+Hi Eric,
 
-What's the point of this parameter?  If it's for debugging, it's not
-clear that we need it upstream.  If it's for debugging and we *do*
-need it upstream, there should be some sort of comment to that effect.
-
-I assume you never expect an end user to need this parameter.
-
->  static bool ls_pcie_is_bridge(struct ls_pcie *pcie)
+On Wed, Oct 11, 2017 at 11:48:37AM -0700, Eric Dumazet wrote:
+> On Wed, 2017-10-11 at 11:41 -0700, Eric Dumazet wrote:
+> > On Wed, 2017-10-11 at 21:35 +0300, Yury Norov wrote:
+> > > Hi all, 
+> > > 
+> > > It seems like next-20171009 with ilp32 patches crashes on LTP sendto01 test
+> > > in sys_sendto() path, like this:
+> > 
+> > Thanks for the report.
+> > Probably caused by one of my recent patches, so I am taking a look.
+> 
+> Yes, this was silly.
+> 
+> Please test this fix :
+> 
+> diff --git a/include/net/tcp.h b/include/net/tcp.h
+> index 5a95e5886b55e03e4a8bfeac3506c657a4f97dde..15163454174babdcb465904f725b919268dd1bc7 100644
+> --- a/include/net/tcp.h
+> +++ b/include/net/tcp.h
+> @@ -1712,6 +1712,7 @@ static inline void tcp_insert_write_queue_before(struct sk_buff *new,
+>  
+>  static inline void tcp_unlink_write_queue(struct sk_buff *skb, struct sock *sk)
 >  {
->  	struct dw_pcie *pci = pcie->pci;
-> @@ -124,6 +139,14 @@ static int ls_pcie_link_up(struct dw_pcie *pci)
->  	return 1;
+> +	tcp_skb_tsorted_anchor_cleanup(skb);
+>  	__skb_unlink(skb, &sk->sk_write_queue);
 >  }
->  
-> +/* Forward error response of outbound non-posted requests */
-> +static void ls_pcie_fix_error_response(struct ls_pcie *pcie)
-> +{
-> +	struct dw_pcie *pci = pcie->pci;
-> +
-> +	iowrite32(PCIE_ABSERR_SETTING, pci->dbi_base + PCIE_ABSERR);
-> +}
-> +
->  static int ls_pcie_host_init(struct pcie_port *pp)
->  {
->  	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
-> @@ -135,6 +158,8 @@ static int ls_pcie_host_init(struct pcie_port *pp)
->  	 * dw_pcie_setup_rc() will reconfigure the outbound windows.
->  	 */
->  	ls_pcie_disable_outbound_atus(pcie);
-> +	if (err_response_flag)
-> +		ls_pcie_fix_error_response(pcie);
->  
->  	dw_pcie_dbi_ro_wr_en(pci);
->  	ls_pcie_clear_multifunction(pcie);
-> -- 
-> 2.14.1
-> 
+
+The fix works for me, thanks.
+
+Tested-by: Yury Norov <ynorov@caviumnetworks.com>
