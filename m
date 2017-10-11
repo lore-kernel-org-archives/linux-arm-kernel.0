@@ -1,39 +1,99 @@
-From: szabolcs.nagy@arm.com (Szabolcs Nagy)
-Date: Wed, 11 Oct 2017 11:19:03 +0100
-Subject: [RFC PATCH v3 27/28] arm64: signal: Report signal frame size
- to userspace via auxv
-In-Reply-To: <1507660725-7986-28-git-send-email-Dave.Martin@arm.com>
-References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
- <1507660725-7986-28-git-send-email-Dave.Martin@arm.com>
-Message-ID: <59DDF017.7090203@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 11 Oct 2017 11:24:24 +0100
+Subject: [PATCH 3/4] ACPI: IORT: Skip SMMUv3 device ID map for two steps
+ mappings
+In-Reply-To: <59DDAB72.7070605@huawei.com>
+References: <1506475215-2731-1-git-send-email-hanjun.guo@linaro.org>
+ <1506475215-2731-4-git-send-email-hanjun.guo@linaro.org>
+ <20170927135449.GA11347@red-moon>
+ <CAGHbJ3DbuGeKH16zr+PdZYjoaZrHJrTmV5tmMxZ5CDPObErUCQ@mail.gmail.com>
+ <20171010092036.GA8507@red-moon> <59DDAB72.7070605@huawei.com>
+Message-ID: <20171011102424.GA10795@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/10/17 19:38, Dave Martin wrote:
-> Stateful CPU architecture extensions may require the signal frame
-> to grow to a size that exceeds the arch's MINSIGSTKSZ #define.
-> However, changing this #define is an ABI break.
+On Wed, Oct 11, 2017 at 01:26:10PM +0800, Hanjun Guo wrote:
+> On 2017/10/10 17:20, Lorenzo Pieralisi wrote:
+> > On Tue, Oct 10, 2017 at 02:47:53PM +0800, Hanjun Guo wrote:
+> >> Hi Lorenzo,
+> >>
+> >> Sorry for the late reply, holidays in China for the past week.
+> >>
+> >> At 2017/9/27 21:54, Lorenzo Pieralisi wrote:
+> >>> Hi Hanjun,
+> >>>
+> >>> On Wed, Sep 27, 2017 at 09:20:14AM +0800, Hanjun Guo wrote:
+> >>>> IORT revision C introduced SMMUv3 MSI support which adding a
+> >>>> device ID mapping index in SMMUv3 sub table, to get the SMMUv3
+> >>>> device ID mapping for the output ID (dev ID for ITS) and the
+> >>>> link to which ITS.
+> >>>>
+> >>>> So if a platform supports SMMUv3 MSI for control interrupt,
+> >>>> there will be a additional single map entry under SMMU, this
+> >>>> will not introduce any difference for devices just use one
+> >>>> step map to get its output ID and parent (ITS or SMMU), such
+> >>>> as PCI/NC/PMCG ---> ITS or PCI/NC ---> SMMU, but we need to
+> >>>> do the special handling for two steps map case such as
+> >>>> PCI/NC--->SMMUv3--->ITS.
+> >>>>
+> >>>> Take a PCI hostbridge for example,
+> >>>>
+> >>>> |----------------------|
+> >>>> |  Root Complex Node   |
+> >>>> |----------------------|
+> >>>> |    map entry[x]      |
+> >>>> |----------------------|
+> >>>> |       id value       |
+> >>>> | output_reference     |
+> >>>> |---|------------------|
+> >>>>      |
+> >>>>      |   |----------------------|
+> >>>>      |-->|        SMMUv3        |
+> >>>>          |----------------------|
+> >>>>          |     SMMU dev ID      |
+> >>>>          |     mapping index 0  |
+> >>>>          |----------------------|
+> >>>>          |      map entry[0]    |
+> >>>>          |----------------------|
+> >>>>          |       id value       |
+> >>>>          | output_reference-----------> ITS 1 (SMMU MSI domain)
+> >>>>          |----------------------|
+> >>>>          |      map entry[1]    |
+> >>>>          |----------------------|
+> >>>>          |       id value       |
+> >>>>          | output_reference-----------> ITS 2 (PCI MSI domain)
+> >>>>          |----------------------|
+> >>>>
+> >>>> When the SMMU dev ID mapping index is 0, there is entry[0]
+> >>>> to map to a ITS, we need to skip that map entry for PCI
+> >>>> or NC (named component), or we may get the wrong ITS parent.
+> >>> Is this actually true ? I think that currently we would simply skip
+> >>> the entry and print an error log but we can't get a wrong ITS parent.
+> >> So the only valid single mapping under type SMMUv3 is SMMUv3's dev id
+> >> mapping, we need to fix the IORT spec as well.
+> >>
+> >>> I am rewriting this commit (I will probably split it), it is doing the
+> >>> right thing but the commit log is stale (probably caused by code
+> >>> reshuffling).
+> >> Do I need to resend another version, or you can help to update it?
+> >> please let me know.
+> > I reworked the patches, you can repost/retest them I made them available
+> > in the branch below, we will have to add a guard around ACPICA smmu
+> > struct (unfortunately I think we will have to use the ACPICA version as
+> > a guard) or I can ask Rafael to pull the series if ACPICA goes via ACPI
+> > tree (and your patch made it into the release - I will check ACPICA
+> > upstream).
 > 
-> To allow userspace the option of determining the signal frame size
-> in a more forwards-compatible way, this patch adds a new auxv entry
-> tagged with AT_MINSIGSTKSZ, which provides the maximum signal frame
-> size that the process can observe during its lifetime.
+> Bob already merged my pull request yesterday, I think it will be ready for
+> acpica release for this month.
+
+That's good, mind updating the patch series with an ACPICA guard in IORT
+code in preparation for the pull request ?
+
+> > git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git iort/smmu-msi-for-4.15
+> >
 > 
-> If AT_MINSIGSTKSZ is absent from the aux vector, the caller can
-> assume that the MINSIGSTKSZ #define is sufficient.  This allows for
-> a consistent interface with older kernels that do not provide
-> AT_MINSIGSTKSZ.
-> 
+> Thanks! I will retest then repost.
 
-the posix sigaltstack api shall fail with ENOMEM
-if smaller than MINSIGSTKSZ stack size is used.
-
-so it is important to note somewhere if AT_MINSIGSTKSZ
-is intended to be always >= MINSIGSTKSZ define (which
-is rounded up to 5k) or it may be smaller as it provides
-the precise value of the largest signal frame.
-
-(i think it makes sense for it to be a precise value,
-but then users should do the >= check before calling
-the sigaltstack api, so they should be aware of this
-issue)
+Thank you,
+Lorenzo
