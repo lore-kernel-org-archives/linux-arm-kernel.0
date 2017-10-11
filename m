@@ -1,74 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 11 Oct 2017 12:49:05 +0100
-Subject: [PATCH v2 4/5] arm64: locking: Move rwlock implementation over
- to qrwlocks
-In-Reply-To: <909c3e84-745c-20db-a071-f9e0f2cbe63a@redhat.com>
-References: <1507296882-18721-1-git-send-email-will.deacon@arm.com>
- <1507296882-18721-5-git-send-email-will.deacon@arm.com>
- <909c3e84-745c-20db-a071-f9e0f2cbe63a@redhat.com>
-Message-ID: <20171011114905.GA27426@arm.com>
+From: felipe.balbi@linux.intel.com (Felipe Balbi)
+Date: Wed, 11 Oct 2017 14:50:10 +0300
+Subject: [PATCHv2 0/7] Add support for USB OTG on STM32F7
+In-Reply-To: <04a49088-b615-d7b8-0387-e7bfa32ee19f@st.com>
+References: <1503930018-536-1-git-send-email-amelie.delaunay@st.com>
+ <878tgim24i.fsf@linux.intel.com>
+ <04a49088-b615-d7b8-0387-e7bfa32ee19f@st.com>
+Message-ID: <87vajllx8t.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Waiman,
 
-On Mon, Oct 09, 2017 at 09:34:08PM -0400, Waiman Long wrote:
-> On 10/06/2017 09:34 AM, Will Deacon wrote:
-> > Now that the qrwlock can make use of WFE, remove our homebrew rwlock
-> > code in favour of the generic queued implementation.
-> >
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm64/Kconfig                      |  17 ++++
-> >  arch/arm64/include/asm/Kbuild           |   1 +
-> >  arch/arm64/include/asm/spinlock.h       | 164 +-------------------------------
-> >  arch/arm64/include/asm/spinlock_types.h |   6 +-
-> >  4 files changed, 20 insertions(+), 168 deletions(-)
-> >
-> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> > index 0df64a6a56d4..6d32c9b0d4bb 100644
-> > --- a/arch/arm64/Kconfig
-> > +++ b/arch/arm64/Kconfig
-> > @@ -22,7 +22,24 @@ config ARM64
-> >  	select ARCH_HAS_STRICT_MODULE_RWX
-> >  	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
-> >  	select ARCH_HAVE_NMI_SAFE_CMPXCHG if ACPI_APEI_SEA
-> > +	select ARCH_INLINE_READ_LOCK if !PREEMPT
-> > +	select ARCH_INLINE_READ_LOCK_BH if !PREEMPT
-> > +	select ARCH_INLINE_READ_LOCK_IRQ if !PREEMPT
-> > +	select ARCH_INLINE_READ_LOCK_IRQSAVE if !PREEMPT
-> > +	select ARCH_INLINE_READ_UNLOCK if !PREEMPT
-> > +	select ARCH_INLINE_READ_UNLOCK_BH if !PREEMPT
-> > +	select ARCH_INLINE_READ_UNLOCK_IRQ if !PREEMPT
-> > +	select ARCH_INLINE_READ_UNLOCK_IRQSAVE if !PREEMPT
-> > +	select ARCH_INLINE_WRITE_LOCK if !PREEMPT
-> > +	select ARCH_INLINE_WRITE_LOCK_BH if !PREEMPT
-> > +	select ARCH_INLINE_WRITE_LOCK_IRQ if !PREEMPT
-> > +	select ARCH_INLINE_WRITE_LOCK_IRQSAVE if !PREEMPT
-> > +	select ARCH_INLINE_WRITE_UNLOCK if !PREEMPT
-> > +	select ARCH_INLINE_WRITE_UNLOCK_BH if !PREEMPT
-> > +	select ARCH_INLINE_WRITE_UNLOCK_IRQ if !PREEMPT
-> > +	select ARCH_INLINE_WRITE_UNLOCK_IRQSAVE if !PREEMPT
-> >  	select ARCH_USE_CMPXCHG_LOCKREF
-> > +	select ARCH_USE_QUEUED_RWLOCKS
-> >  	select ARCH_SUPPORTS_MEMORY_FAILURE
-> >  	select ARCH_SUPPORTS_ATOMIC_RMW
-> >  	select ARCH_SUPPORTS_NUMA_BALANCING
-> 
-> Inlining is good for performance, but it may come with an increase in
-> kernel text size. Inlining unlock and unlock_irq are OK, but the other
-> inlines will increase the text size of the kernel. Have you measured how
-> much size increase will that be? Is there any concern about the
-> increased text size?
+Hi,
 
-Yes, I did look at the disassembly and bloat-o-meter results. Inlining
-these functions means that the fastpath sits entirely within a 64-byte
-cacheline and bloat-o-meter shows a relatively small increase in vmlinux
-size for a defconfig build with CONFIG_PREEMPT disabled:
+Alexandre Torgue <alexandre.torgue@st.com> writes:
+> Hi Felip
+>
+> On 10/11/2017 12:04 PM, Felipe Balbi wrote:
+>> 
+>> Hi,
+>> 
+>> Amelie Delaunay <amelie.delaunay@st.com> writes:
+>>> The STM32F7 MCU family embeds two DWC2 USB OTG cores. One core is USB
+>>> OTG FS and the other is USB OTG HS. The USB FS core only works with its
+>>> internal phy whilst the USB HS core can work in HS with external ULPI phy
+>>> or in FS/LS with the on-chip FS phy.
+>>>
+>>> Amelie Delaunay (7):
+>>>    dt-bindings: usb: Document the STM32F7 DWC2 USB OTG HS core binding
+>>>    usb: dwc2: add support for STM32F7 USB OTG HS
+>>>    ARM: dts: stm32: Add USB HS support for STM32F746 MCU
+>> 
+>> I have applied these three patches. Should I take the rest? They seems
+>> like they could go upstream through the ARM maintainers.
+>> 
+>
+> I will take other DT patches in my PR.
+>
+> Concerning "ARM: dts: stm32: Add USB HS support for STM32F746 MCU" patch 
+> I prefer also to take it. This patch adds some pinctrl groups but stm32 
+> pinctrl bindings will change in my next PR (we will use a macro to 
+> define pins instead of using defined values). So if you push the DT 
+> patch through your pull request there will be a merge issue.
+> It is possible that I take also this one ?
 
-Total: Before=13800924, After=13812904, chg +0.09%
+In that case, it's best if you take them all :-) Here's my Ack:
 
-(I also just noticed my typos in ARCH_INLINE_{READ.WRITE}_UNLOCK_IRQSAVE
-so I regenerated the numbers!)
+Acked-by: Felipe Balbi <felipe.balbi@linux.intel.com>
 
-Will
+I'll drop them from my tree now
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171011/8722cedb/attachment.sig>
