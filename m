@@ -1,31 +1,32 @@
 From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Wed, 11 Oct 2017 13:50:26 +0200
-Subject: [PATCH 03/12] ARM: dts: imx6-tx6: remove obsolete ipu1 alias
+Date: Wed, 11 Oct 2017 13:50:27 +0200
+Subject: [PATCH 04/12] ARM: dts: imx6-tx6: add trickle-charge config for DS1339
 In-Reply-To: <1507722635-30801-1-git-send-email-LW@KARO-electronics.de>
 References: <1507722635-30801-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <1507722635-30801-4-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1507722635-30801-5-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 'ipu1' alias is already defined in imx6q.dtsi. There is no need to
-redefine it here.
+As the DS1339 driver now supports enabling the trickle charge feature
+via DTB, add the appropriate properties to utilize this feature.
 
 Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 ---
- arch/arm/boot/dts/imx6q-tx6q-11x0-mb7.dts | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/boot/dts/imx6qdl-tx6.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6q-tx6q-11x0-mb7.dts b/arch/arm/boot/dts/imx6q-tx6q-11x0-mb7.dts
-index 6b42c44..be9233d 100644
---- a/arch/arm/boot/dts/imx6q-tx6q-11x0-mb7.dts
-+++ b/arch/arm/boot/dts/imx6q-tx6q-11x0-mb7.dts
-@@ -49,7 +49,6 @@
- 
- 	aliases {
- 		display = &lvds0;
--		ipu1 = &ipu2;
- 		lvds0 = &lvds0;
- 		lvds1 = &lvds1;
+diff --git a/arch/arm/boot/dts/imx6qdl-tx6.dtsi b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
+index c6bec97..a50bf71 100644
+--- a/arch/arm/boot/dts/imx6qdl-tx6.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
+@@ -284,6 +284,8 @@
+ 	ds1339: rtc at 68 {
+ 		compatible = "dallas,ds1339";
+ 		reg = <0x68>;
++		trickle-resistor-ohms = <250>;
++		trickle-diode-disable;
  	};
+ };
+ 
 -- 
 2.1.4
