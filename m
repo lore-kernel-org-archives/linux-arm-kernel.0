@@ -1,64 +1,37 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 11 Oct 2017 17:52:46 +0100
-Subject: [PATCH v2 1/2] arm64: Use existing defines for mdscr
-In-Reply-To: <1507729721-53978-2-git-send-email-julien.thierry@arm.com>
-References: <1507729721-53978-1-git-send-email-julien.thierry@arm.com>
- <1507729721-53978-2-git-send-email-julien.thierry@arm.com>
-Message-ID: <20171011165245.GA26449@leverpostej>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 11 Oct 2017 17:55:08 +0100
+Subject: [PATCH v3 16/28] arm64/sve: Probe SVE capabilities and usable
+ vector lengths
+In-Reply-To: <1507660725-7986-17-git-send-email-Dave.Martin@arm.com>
+References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
+ <1507660725-7986-17-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20171011165508.runtc4rkipdg2kdw@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Oct 11, 2017 at 02:48:40PM +0100, Julien Thierry wrote:
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> ---
->  arch/arm64/include/asm/assembler.h | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
+On Tue, Oct 10, 2017 at 07:38:33PM +0100, Dave P Martin wrote:
+> This patch uses the cpufeatures framework to determine common SVE
+> capabilities and vector lengths, and configures the runtime SVE
+> support code appropriately.
 > 
-> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-> index d58a625..00a4526 100644
-> --- a/arch/arm64/include/asm/assembler.h
-> +++ b/arch/arm64/include/asm/assembler.h
-> @@ -30,6 +30,7 @@
->  #include <asm/pgtable-hwdef.h>
->  #include <asm/ptrace.h>
->  #include <asm/thread_info.h>
-> +#include <asm/debug-monitors.h>
-
-Nit: please keep these ordered alphabetically.
-
-Otherwise, this is much nicer! FWIW:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
-
+> ZCR_ELx is not really a feature register, but it is convenient to
+> use it as a template for recording the maximum vector length
+> supported by a CPU, using the LEN field.  This field is similar to
+> a feature field in that it is a contiguous bitfield for which we
+> want to determine the minimum system-wide value.  This patch adds
+> ZCR as a pseudo-register in cpuinfo/cpufeatures, with appropriate
+> custom code to populate it.  Finding the minimum supported value of
+> the LEN field is left to the cpufeatures framework in the usual
+> way.
 > 
->  /*
->   * Enable and disable interrupts.
-> @@ -65,7 +66,7 @@
->  	.macro	disable_step_tsk, flgs, tmp
->  	tbz	\flgs, #TIF_SINGLESTEP, 9990f
->  	mrs	\tmp, mdscr_el1
-> -	bic	\tmp, \tmp, #1
-> +	bic	\tmp, \tmp, #DBG_MDSCR_SS
->  	msr	mdscr_el1, \tmp
->  	isb	// Synchronise with enable_dbg
->  9990:
-> @@ -75,7 +76,7 @@
->  	tbz	\flgs, #TIF_SINGLESTEP, 9990f
->  	disable_dbg
->  	mrs	\tmp, mdscr_el1
-> -	orr	\tmp, \tmp, #1
-> +	orr	\tmp, \tmp, #DBG_MDSCR_SS
->  	msr	mdscr_el1, \tmp
->  9990:
->  	.endm
-> --
-> 1.9.1
+> The meaning of ID_AA64ZFR0_EL1 is not architecturally defined yet,
+> so for now we just require it to be zero.
+> 
+> Note that much of this code is dormant and SVE still won't be used
+> yet, since system_supports_sve() remains hardwired to false.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Cc: Alex Benn?e <alex.bennee@linaro.org>
+> Cc: Suzuki K Poulose <Suzuki.Poulose@arm.com>
+
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
