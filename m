@@ -1,34 +1,40 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 11 Oct 2017 08:30:20 +0200
-Subject: [PATCH v2] arm64: qcom: sbc: Name GPIO lines
-In-Reply-To: <20171011055405.GI1165@minitux>
-References: <20171009092844.11451-1-linus.walleij@linaro.org>
- <20171011055405.GI1165@minitux>
-Message-ID: <CACRpkdaBuWnimtaQBsT=OGt+2r0UiQzyNymDV_9PLBDDe0ASJw@mail.gmail.com>
+Date: Wed, 11 Oct 2017 08:32:49 +0200
+Subject: [PATCH 11/11] ARM: dts: Add PCLK to the Aspeed watchdogs
+In-Reply-To: <1507693686.5452.174.camel@aj.id.au>
+References: <20170812184318.10144-1-linus.walleij@linaro.org>
+ <20170812184318.10144-12-linus.walleij@linaro.org>
+ <1507693686.5452.174.camel@aj.id.au>
+Message-ID: <CACRpkdYQ8WE_-nVza=GnNBvfXV=WpcEipoJhVVn=atcqyQZbpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 11, 2017 at 7:54 AM, Bjorn Andersson
-<bjorn.andersson@linaro.org> wrote:
-> On Mon 09 Oct 02:28 PDT 2017, Linus Walleij wrote:
-
->> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-> [..]
->> +                             "NC", /* GPIO 70 */
->> +                             "NC",
->> +                             "NC",
->> +                             "NC",
->> +                             "NC", /* GPIO 74 */
+On Wed, Oct 11, 2017 at 5:48 AM, Andrew Jeffery <andrew@aj.id.au> wrote:
+> On Sat, 2017-08-12 at 20:43 +0200, Linus Walleij wrote:
+>> This adds the PCLK clock to the Aspeed watchdog blocks.
+>> I am not directly familiar with the Aspeed clocking, but
+>> since the IP is derived from Faraday FTWDT010 it probably
+>> has the ability to run the watchdog on the PCLK if
+>> desired
 >
-> Convenient to know where index 74 is ;P
+> This is true for the AST2400, but not the AST2500 where the only option
+> is EXTCLK (1MHz).
 
-There is actually a reason for that. 74 begins the next sheet on the schematic
-so engineers working with checking the line table against the schematic are
-helped by this.
+The IP block/cell certainly has a PCLK even if it cannot be used
+to drive the watchdog timer. It is necessary to interface the
+SoC interconnect.
 
-> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+>> > +                           clocks = <&clk_apb>;
+>> +                             clock-names = "PCLK";
+>
+> Given the comment above, shouldn't we be doing something like the
+> following instead for each of the watchdogs?
+>
+> +                               faraday,use-extclk;
+> +                               clock-names = "EXTCLK";
 
-Thanks man!
+So that will be added too, later, when there is a 1MHz clock
+to reference in the device tree. I guess after Joel's patches.
 
 Yours,
 Linus Walleij
