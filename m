@@ -1,104 +1,41 @@
-From: sbodomerle@gmail.com (Sandor Bodo-Merle)
-Date: Wed, 11 Oct 2017 10:26:39 +0200
-Subject: [PATCH] PCI: iproc: Allow allocation of multiple MSIs
-In-Reply-To: <d0467282-a44a-bd1e-e449-0bba953c4cfd@broadcom.com>
-References: <20171007120851.20230-1-sbodomerle@gmail.com>
- <d0467282-a44a-bd1e-e449-0bba953c4cfd@broadcom.com>
-Message-ID: <CABLWAfR+Nk85wurWnPArpmFPXVhxn0jZ+7H13WnKEPCMJVU0XA@mail.gmail.com>
+From: liuwenliang@huawei.com (Abbott Liu)
+Date: Wed, 11 Oct 2017 16:22:23 +0800
+Subject: [PATCH 07/11] Avoid cleaning the KASan shadow area's mapping table
+In-Reply-To: <20171011082227.20546-1-liuwenliang@huawei.com>
+References: <20171011082227.20546-1-liuwenliang@huawei.com>
+Message-ID: <20171011082227.20546-8-liuwenliang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ray,
+From: Andrey Ryabinin <a.ryabinin@samsung.com>
 
-we tested on a custom board based on BCM56260. SMP affinity was not
-tested as our board runs on a single core.
+ Avoid cleaning the mapping table(page table) of KASAN shadow area.
 
-br,
+Cc: Andrey Ryabinin <a.ryabinin@samsung.com>
+Signed-off-by: Abbott Liu <liuwenliang@huawei.com>
+---
+ arch/arm/mm/mmu.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-Sandor
-
-ps - sorry for the duplicate, but by default gmail sent out html
-formatted mail :(
-
-On Tue, Oct 10, 2017 at 8:09 PM, Ray Jui <ray.jui@broadcom.com> wrote:
-> Hi Bodo,
->
->
-> On 10/7/2017 5:08 AM, Bodo-Merle Sandor wrote:
->>
->> From: Sandor Bodo-Merle <sbodomerle@gmail.com>
->>
->> Add support for allocating multiple MSIs at the same time, so that the
->> MSI_FLAG_MULTI_PCI_MSI flag can be added to the msi_domain_info
->> structure.
->>
->> Avoid storing the hwirq in the low 5 bits of the message data, as it is
->> used by the device. Also fix an endianness problem by using readl().
->>
->> Signed-off-by: Sandor Bodo-Merle <sbodomerle@gmail.com>
->> ---
->>   drivers/pci/host/pcie-iproc-msi.c | 19 ++++++++++++-------
->>   1 file changed, 12 insertions(+), 7 deletions(-)
->>
->> diff --git a/drivers/pci/host/pcie-iproc-msi.c
->> b/drivers/pci/host/pcie-iproc-msi.c
->> index 2d0f535a2f69..990fc906d73d 100644
->> --- a/drivers/pci/host/pcie-iproc-msi.c
->> +++ b/drivers/pci/host/pcie-iproc-msi.c
->> @@ -179,7 +179,7 @@ static struct irq_chip iproc_msi_irq_chip = {
->>     static struct msi_domain_info iproc_msi_domain_info = {
->>         .flags = MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
->> -               MSI_FLAG_PCI_MSIX,
->> +               MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX,
->>         .chip = &iproc_msi_irq_chip,
->>   };
->>   @@ -237,7 +237,7 @@ static void iproc_msi_irq_compose_msi_msg(struct
->> irq_data *data,
->>         addr = msi->msi_addr + iproc_msi_addr_offset(msi, data->hwirq);
->>         msg->address_lo = lower_32_bits(addr);
->>         msg->address_hi = upper_32_bits(addr);
->> -       msg->data = data->hwirq;
->> +       msg->data = data->hwirq << 5; >   }
->>     static struct irq_chip iproc_msi_bottom_irq_chip = {
->> @@ -251,7 +251,7 @@ static int iproc_msi_irq_domain_alloc(struct
->> irq_domain *domain,
->>                                       void *args)
->>   {
->>         struct iproc_msi *msi = domain->host_data;
->> -       int hwirq;
->> +       int hwirq, i;
->>         mutex_lock(&msi->bitmap_lock);
->>   @@ -267,10 +267,14 @@ static int iproc_msi_irq_domain_alloc(struct
->> irq_domain *domain,
->>         mutex_unlock(&msi->bitmap_lock);
->>   -     irq_domain_set_info(domain, virq, hwirq,
->> &iproc_msi_bottom_irq_chip,
->> -                           domain->host_data, handle_simple_irq, NULL,
->> NULL);
->> +       for (i = 0; i < nr_irqs; i++) {
->> +               irq_domain_set_info(domain, virq + i, hwirq + i,
->> +                                   &iproc_msi_bottom_irq_chip,
->> +                                   domain->host_data, handle_simple_irq,
->> +                                   NULL, NULL);
->> +       }
->>   -     return 0;
->> +       return hwirq;
->>   }
->>     static void iproc_msi_irq_domain_free(struct irq_domain *domain,
->> @@ -302,7 +306,8 @@ static inline u32 decode_msi_hwirq(struct iproc_msi
->> *msi, u32 eq, u32 head)
->>         offs = iproc_msi_eq_offset(msi, eq) + head * sizeof(u32);
->>         msg = (u32 *)(msi->eq_cpu + offs);
->> -       hwirq = *msg & IPROC_MSI_EQ_MASK;
->> +       hwirq = readl(msg);
->> +       hwirq = (hwirq >> 5) + (hwirq & 0x1f);
->>         /*
->>          * Since we have multiple hwirq mapped to a single MSI vector,nnn
->>
->
-> Change looks okay to me in general. May I know which platform you tested
-> this patch on and was SMP affinity configuration tested?
->
-> Thanks,
->
-> Ray
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index e46a6a4..f5aa1de 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1251,9 +1251,14 @@ static inline void prepare_page_table(void)
+ 	/*
+ 	 * Clear out all the mappings below the kernel image.
+ 	 */
+-	for (addr = 0; addr < MODULES_VADDR; addr += PMD_SIZE)
++	for (addr = 0; addr < TASK_SIZE; addr += PMD_SIZE)
+ 		pmd_clear(pmd_off_k(addr));
+ 
++#ifdef CONFIG_KASAN
++	/*TASK_SIZE ~ MODULES_VADDR is the KASAN's shadow area -- skip over it*/
++	addr = MODULES_VADDR;
++#endif
++
+ #ifdef CONFIG_XIP_KERNEL
+ 	/* The XIP kernel is mapped in the module area -- skip over it */
+ 	addr = ((unsigned long)_exiprom + PMD_SIZE - 1) & PMD_MASK;
+-- 
+2.9.0
