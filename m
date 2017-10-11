@@ -1,61 +1,67 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Wed, 11 Oct 2017 15:24:31 +0200
-Subject: [PATCH v6 4/4] perf vendor events arm64: Add ThunderX2
- implementation defined pmu core events
-In-Reply-To: <20171011121926.GC11106@arm.com>
-References: <20170824120349.2323-1-ganapatrao.kulkarni@cavium.com>
- <20170824120349.2323-5-ganapatrao.kulkarni@cavium.com>
- <43dcc107-263a-5429-73d4-a5290c6610d6@hisilicon.com>
- <20170829124730.GH17961@rric.localdomain>
- <20171011121926.GC11106@arm.com>
-Message-ID: <20171011132431.GL17961@rric.localdomain>
+From: felipe.balbi@linux.intel.com (Felipe Balbi)
+Date: Wed, 11 Oct 2017 16:26:53 +0300
+Subject: [PATCHv2 0/7] Add support for USB OTG on STM32F7
+In-Reply-To: <1c4180ef-2da6-b420-7c6e-41769608384a@st.com>
+References: <1503930018-536-1-git-send-email-amelie.delaunay@st.com>
+ <878tgim24i.fsf@linux.intel.com>
+ <04a49088-b615-d7b8-0387-e7bfa32ee19f@st.com>
+ <87vajllx8t.fsf@linux.intel.com>
+ <1c4180ef-2da6-b420-7c6e-41769608384a@st.com>
+Message-ID: <87sheplsrm.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11.10.17 13:19:27, Will Deacon wrote:
-> On Tue, Aug 29, 2017 at 02:47:30PM +0200, Robert Richter wrote:
-> > Shaokun,
-> > 
-> > On 29.08.17 17:26:00, Zhangshaokun wrote:
-> > > On 2017/8/24 20:03, Ganapatrao Kulkarni wrote:
-> > > > This is not a full event list, but a short list of useful events.
-> > > > 
-> > > > Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> > > > ---
-> > > >  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
-> > > >  .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
-> > > >  2 files changed, 77 insertions(+)
-> > > >  create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
-> > > >  create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
-> > > > 
-> > > 
-> > > I saw you also used thunderx2 in tools/perf/pmu-events/arch/arm64/, how about John's suggestion
-> > > that would use vendor sub-folder?
-> > > Of course, appreciate maintainer's comments.
-> > 
-> > this would just add another level of subdirectories. I rather would
-> > prefer to have a per platform dir comparable to what is listed in
-> > 
-> >  arch/arm64/Kconfig.platforms
-> > 
-> > This is the same as Ganapat has implemented it.
-> 
-> FWIW, I agree with Zhangshaokun here that a silicon vendor subdirectory
-> would organise things better. It also matches what we do for
-> arch/arm64/boot/dts/
 
-A file structure like:
+Hi,
 
- tools/perf/pmu-events/arch/arm64/cavium/thunderx2/implementation-defined.json
+Alexandre Torgue <alexandre.torgue@st.com> writes:
+> Hi
+>
+> On 10/11/2017 01:50 PM, Felipe Balbi wrote:
+>> 
+>> Hi,
+>> 
+>> Alexandre Torgue <alexandre.torgue@st.com> writes:
+>>> Hi Felip
+>>>
+>>> On 10/11/2017 12:04 PM, Felipe Balbi wrote:
+>>>>
+>>>> Hi,
+>>>>
+>>>> Amelie Delaunay <amelie.delaunay@st.com> writes:
+>>>>> The STM32F7 MCU family embeds two DWC2 USB OTG cores. One core is USB
+>>>>> OTG FS and the other is USB OTG HS. The USB FS core only works with its
+>>>>> internal phy whilst the USB HS core can work in HS with external ULPI phy
+>>>>> or in FS/LS with the on-chip FS phy.
+>>>>>
+>>>>> Amelie Delaunay (7):
+>>>>>     dt-bindings: usb: Document the STM32F7 DWC2 USB OTG HS core binding
+>>>>>     usb: dwc2: add support for STM32F7 USB OTG HS
+>>>>>     ARM: dts: stm32: Add USB HS support for STM32F746 MCU
+>>>>
+>>>> I have applied these three patches. Should I take the rest? They seems
+>>>> like they could go upstream through the ARM maintainers.
+>>>>
+>>>
+>>> I will take other DT patches in my PR.
+>>>
+>>> Concerning "ARM: dts: stm32: Add USB HS support for STM32F746 MCU" patch
+>>> I prefer also to take it. This patch adds some pinctrl groups but stm32
+>>> pinctrl bindings will change in my next PR (we will use a macro to
+>>> define pins instead of using defined values). So if you push the DT
+>>> patch through your pull request there will be a merge issue.
+>>> It is possible that I take also this one ?
+>> 
+>> In that case, it's best if you take them all :-) Here's my Ack:
+>> 
+>> Acked-by: Felipe Balbi <felipe.balbi@linux.intel.com>
+>> 
+>> I'll drop them from my tree now
+>
+> Ok perfect, I will take DT patches (3 to 7) and I let you take patch 1&2 
+> in your tree.
 
-looks quite horible. In contrast to dts dir we will need another
-subdir for each platform and will then have two levels of subdirs.
-This is also different to other archs where there is no extra vendor
-dir.
+Well, I have dropped them from my tree. Please two 1-7 through yours.
 
-I haven't checked if implementation allows json files to reside deeper
-in the subdir level.
-
-Anyway, it is bike-shedding.
-
--Robert
+-- 
+balbi
