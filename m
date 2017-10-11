@@ -1,142 +1,82 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 11 Oct 2017 14:01:02 +0100
-Subject: [PATCH v3 1/2] arm64: Expose support for optional ARMv8-A features
-Message-ID: <20171011130103.18362-1-suzuki.poulose@arm.com>
+From: Dave.Martin@arm.com (Dave P Martin)
+Date: Wed, 11 Oct 2017 14:14:13 +0100
+Subject: [RFC PATCH v3 27/28] arm64: signal: Report signal frame size to
+ userspace via auxv
+In-Reply-To: <59DDF017.7090203@arm.com>
+References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
+ <1507660725-7986-28-git-send-email-Dave.Martin@arm.com>
+ <59DDF017.7090203@arm.com>
+Message-ID: <20171011131411.GU3602@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARMv8-A adds a few optional features for ARMv8.2 and ARMv8.3.
-Expose them to the userspace via HWCAPs and mrs emulation.
+On Wed, Oct 11, 2017 at 11:19:03AM +0100, Szabolcs Nagy wrote:
+> On 10/10/17 19:38, Dave Martin wrote:
+> > Stateful CPU architecture extensions may require the signal frame
+> > to grow to a size that exceeds the arch's MINSIGSTKSZ #define.
+> > However, changing this #define is an ABI break.
+> > 
+> > To allow userspace the option of determining the signal frame size
+> > in a more forwards-compatible way, this patch adds a new auxv entry
+> > tagged with AT_MINSIGSTKSZ, which provides the maximum signal frame
+> > size that the process can observe during its lifetime.
+> > 
+> > If AT_MINSIGSTKSZ is absent from the aux vector, the caller can
+> > assume that the MINSIGSTKSZ #define is sufficient.  This allows for
+> > a consistent interface with older kernels that do not provide
+> > AT_MINSIGSTKSZ.
+> > 
+> 
+> the posix sigaltstack api shall fail with ENOMEM
+> if smaller than MINSIGSTKSZ stack size is used.
+> 
+> so it is important to note somewhere if AT_MINSIGSTKSZ
+> is intended to be always >= MINSIGSTKSZ define (which
+> is rounded up to 5k) or it may be smaller as it provides
+> the precise value of the largest signal frame.
+> 
+> (i think it makes sense for it to be a precise value,
+> but then users should do the >= check before calling
+> the sigaltstack api, so they should be aware of this
+> issue)
 
-SHA2-512  - Instruction support for SHA512 Hash algorithm (e.g SHA512H,
-	    SHA512H2, SHA512U0, SHA512SU1)
-SHA3 	  - SHA3 crypto instructions (EOR3, RAX1, XAR, BCAX).
-SM3	  - Instruction support for Chinese cryptography algorithm SM3
-SM4 	  - Instruction support for Chinese cryptography algorithm SM4
-DP	  - Dot Product instructions (UDOT, SDOT).
+This is a good point, and one that I don't have an answer for yet.
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Dave Martin <dave.martin@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+POSIX[1] says that sigaltstack() _shall_ return EPERM if ss_size
+< MINSIGSTKSZ.
 
----
-Changes since V2
- - Fixed a typo in the commit message spotted by Marc Zyngier
- - Added Reviewed-by tags from Catalin
-Changes since V1
- - Expose SHA512, SHA3, SM3 and SM4
----
- Documentation/arm64/cpu-feature-registers.txt | 12 +++++++++++-
- arch/arm64/include/asm/sysreg.h               |  4 ++++
- arch/arm64/include/uapi/asm/hwcap.h           |  5 +++++
- arch/arm64/kernel/cpufeature.c                |  9 +++++++++
- arch/arm64/kernel/cpuinfo.c                   |  5 +++++
- 5 files changed, 34 insertions(+), 1 deletion(-)
+I don't know the full rationale behind this.
 
-diff --git a/Documentation/arm64/cpu-feature-registers.txt b/Documentation/arm64/cpu-feature-registers.txt
-index dad411d635d8..011ddfc1e570 100644
---- a/Documentation/arm64/cpu-feature-registers.txt
-+++ b/Documentation/arm64/cpu-feature-registers.txt
-@@ -110,10 +110,20 @@ infrastructure:
-      x--------------------------------------------------x
-      | Name                         |  bits   | visible |
-      |--------------------------------------------------|
--     | RES0                         | [63-32] |    n    |
-+     | RES0                         | [63-48] |    n    |
-+     |--------------------------------------------------|
-+     | DP                           | [47-44] |    y    |
-+     |--------------------------------------------------|
-+     | SM4                          | [43-40] |    y    |
-+     |--------------------------------------------------|
-+     | SM3                          | [39-36] |    y    |
-+     |--------------------------------------------------|
-+     | SHA3                         | [35-32] |    y    |
-      |--------------------------------------------------|
-      | RDM                          | [31-28] |    y    |
-      |--------------------------------------------------|
-+     | RES0                         | [27-24] |    n    |
-+     |--------------------------------------------------|
-      | ATOMICS                      | [23-20] |    y    |
-      |--------------------------------------------------|
-      | CRC32                        | [19-16] |    y    |
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index f707fed5886f..32f489ba952f 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -318,6 +318,10 @@
- #define SCTLR_EL1_CP15BEN	(1 << 5)
- 
- /* id_aa64isar0 */
-+#define ID_AA64ISAR0_DP_SHIFT		44
-+#define ID_AA64ISAR0_SM4_SHIFT		40
-+#define ID_AA64ISAR0_SM3_SHIFT		36
-+#define ID_AA64ISAR0_SHA3_SHIFT		32
- #define ID_AA64ISAR0_RDM_SHIFT		28
- #define ID_AA64ISAR0_ATOMICS_SHIFT	20
- #define ID_AA64ISAR0_CRC32_SHIFT	16
-diff --git a/arch/arm64/include/uapi/asm/hwcap.h b/arch/arm64/include/uapi/asm/hwcap.h
-index 4b9344cba83a..a4bad90a3fa3 100644
---- a/arch/arm64/include/uapi/asm/hwcap.h
-+++ b/arch/arm64/include/uapi/asm/hwcap.h
-@@ -36,5 +36,10 @@
- #define HWCAP_FCMA		(1 << 14)
- #define HWCAP_LRCPC		(1 << 15)
- #define HWCAP_DCPOP		(1 << 16)
-+#define HWCAP_SHA3		(1 << 17)
-+#define HWCAP_SM3		(1 << 18)
-+#define HWCAP_SM4		(1 << 19)
-+#define HWCAP_ASIMDDP		(1 << 20)
-+#define HWCAP_SHA512		(1 << 21)
- 
- #endif /* _UAPI__ASM_HWCAP_H */
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 21e2c95d24e7..8f0ec2b62cf1 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -107,6 +107,10 @@ cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry, int __unused)
-  * sync with the documentation of the CPU feature register ABI.
-  */
- static const struct arm64_ftr_bits ftr_id_aa64isar0[] = {
-+	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_DP_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_SM4_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_SM3_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_SHA3_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_ATOMICS_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_CRC32_SHIFT, 4, 0),
-@@ -921,9 +925,14 @@ static const struct arm64_cpu_capabilities arm64_elf_hwcaps[] = {
- 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_AES_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_AES),
- 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SHA1_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_SHA1),
- 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SHA2_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_SHA2),
-+	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SHA2_SHIFT, FTR_UNSIGNED, 2, CAP_HWCAP, HWCAP_SHA512),
- 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_CRC32_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_CRC32),
- 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_ATOMICS_SHIFT, FTR_UNSIGNED, 2, CAP_HWCAP, HWCAP_ATOMICS),
- 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_RDM_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_ASIMDRDM),
-+	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SHA3_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_SHA3),
-+	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SM3_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_SM3),
-+	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SM4_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_SM4),
-+	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_DP_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_ASIMDDP),
- 	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_FP_SHIFT, FTR_SIGNED, 0, CAP_HWCAP, HWCAP_FP),
- 	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_FP_SHIFT, FTR_SIGNED, 1, CAP_HWCAP, HWCAP_FPHP),
- 	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_ASIMD_SHIFT, FTR_SIGNED, 0, CAP_HWCAP, HWCAP_ASIMD),
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index 311885962830..1ff1c5a67081 100644
---- a/arch/arm64/kernel/cpuinfo.c
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -69,6 +69,11 @@ static const char *const hwcap_str[] = {
- 	"fcma",
- 	"lrcpc",
- 	"dcpop",
-+	"sha3",
-+	"sm3",
-+	"sm4",
-+	"asimddp",
-+	"sha512",
- 	NULL
- };
- 
--- 
-2.13.6
+The ENOMEM return here doesn't guarantee that signal delivery will
+definitely fail or compromise safety when ss_size or less of stack is
+available.
+
+A 0 return doesn't guarantee that signal delivery on the registered
+alternate stack will succeed or be safe.
+
+So while the ENOMEM return has some sanity-check value, it's very
+limited in its usefulness.
+
+
+I currently saw no good reason to misrepresent the true signal frame
+size in AT_MINSIGSTKSZ, so it is currently a precise value that can be
+< MINSIGSTKSZ (and is, in the default case).
+
+In an ideal world, my preference would be to relax the check in
+sigaltstack() to check >= AT_MINSIGSTKSZ, but it is technically an ABI
+break...
+
+
+We _could_ paper over this by rounding up the AT_MINSIGSTKSZ value
+reported by the kernel to be always >= MINSIGSTKSZ.  This seems ugly,
+but may be the most pragmatic option.
+
+
+Thoughts?
+
+Cheers
+---Dave
+
+
+[1] SUSv7 / IEEE Std 1003.1-2008 (2016): sigaltstack
+http://pubs.opengroup.org/onlinepubs/9699919799/functions/sigaltstack.html
