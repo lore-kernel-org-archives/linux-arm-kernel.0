@@ -1,22 +1,140 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 11 Oct 2017 15:20:20 +0100
-Subject: [PATCH v3 06/28] arm64/sve: System register and exception
- syndrome definitions
-In-Reply-To: <1507660725-7986-7-git-send-email-Dave.Martin@arm.com>
-References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
- <1507660725-7986-7-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20171011142020.ncrsol5lptqdwajz@armageddon.cambridge.arm.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Wed, 11 Oct 2017 16:27:51 +0200
+Subject: [PATCH] dmaengine: stm32-mdma: avoid 64-bit division
+In-Reply-To: <20171011140144.3746128-1-arnd@arndb.de>
+References: <20171011140144.3746128-1-arnd@arndb.de>
+Message-ID: <CA+M3ks74eOSOEwadsjjMcQme_6ivzmYGRdc9jvw4RHYa6dxRTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 10, 2017 at 07:38:23PM +0100, Dave P Martin wrote:
-> The SVE architecture adds some system registers, ID register fields
-> and a dedicated ESR exception class.
-> 
-> This patch adds the appropriate definitions that will be needed by
-> the kernel.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+2017-10-11 16:01 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
+> When building with a 64-bit dma_addr_t, we run into a link
+> error:
+>
+> drivers/dma/stm32-mdma.o: In function `stm32_mdma_prep_dma_memcpy':
+> stm32-mdma.c:(.text+0x16a3): undefined reference to `__umoddi3'
+>
+> Using a 64-bit division here is way too expensive, since the
+> divisor is a known power-of-two value in reality. This moves
+> the modulo operation into stm32_mdma_get_max_width(), where
+> the compiler can optimize out that code, and we can use a 32-bit
+> division to be on the safe side.
+>
+> Fixes: a4ffb13c8946 ("dmaengine: Add STM32 MDMA driver")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/dma/stm32-mdma.c | 27 ++++++++++++---------------
+>  1 file changed, 12 insertions(+), 15 deletions(-)
+>
+> diff --git a/drivers/dma/stm32-mdma.c b/drivers/dma/stm32-mdma.c
+> index 0db59a7e80e0..55151c2c9fae 100644
+> --- a/drivers/dma/stm32-mdma.c
+> +++ b/drivers/dma/stm32-mdma.c
+> @@ -387,7 +387,9 @@ static int stm32_mdma_get_width(struct stm32_mdma_chan *chan,
+>         }
+>  }
+>
+> -static enum dma_slave_buswidth stm32_mdma_get_max_width(u32 buf_len, u32 tlen)
+> +static enum dma_slave_buswidth stm32_mdma_get_max_width(u32 buf_len,
+> +                                                       u32 addr,
+> +                                                       u32 tlen)
+>  {
+>         enum dma_slave_buswidth max_width = DMA_SLAVE_BUSWIDTH_8_BYTES;
+>
+> @@ -398,6 +400,9 @@ static enum dma_slave_buswidth stm32_mdma_get_max_width(u32 buf_len, u32 tlen)
+>                         break;
+>         }
+>
+> +       if (addr % max_width)
+> +               max_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+> +
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+I'm only half-convince by the implicite 32 bits cast done into
+function prototype.
+If we keep using dma_addr_t and use do_div() instead of %
+does compiler can still optimize the code ?
+
+>         return max_width;
+>  }
+>
+> @@ -567,7 +572,7 @@ static int stm32_mdma_set_xfer_param(struct stm32_mdma_chan *chan,
+>                 ctcr |= STM32_MDMA_CTCR_DBURST((ilog2(dst_best_burst)));
+>
+>                 /* Set memory data size */
+> -               src_addr_width = stm32_mdma_get_max_width(buf_len, tlen);
+> +               src_addr_width = stm32_mdma_get_max_width(buf_len, 0, tlen);
+>                 chan->mem_width = src_addr_width;
+>                 src_bus_width = stm32_mdma_get_width(chan, src_addr_width);
+>                 if (src_bus_width < 0)
+> @@ -611,7 +616,7 @@ static int stm32_mdma_set_xfer_param(struct stm32_mdma_chan *chan,
+>                 ctcr |= STM32_MDMA_CTCR_SBURST((ilog2(src_best_burst)));
+>
+>                 /* Set memory data size */
+> -               dst_addr_width = stm32_mdma_get_max_width(buf_len, tlen);
+> +               dst_addr_width = stm32_mdma_get_max_width(buf_len, 0, tlen);
+>                 chan->mem_width = dst_addr_width;
+>                 dst_bus_width = stm32_mdma_get_width(chan, dst_addr_width);
+>                 if (dst_bus_width < 0)
+> @@ -956,9 +961,7 @@ stm32_mdma_prep_dma_memcpy(struct dma_chan *c, dma_addr_t dest, dma_addr_t src,
+>                 ctcr |= STM32_MDMA_CTCR_TLEN((tlen - 1));
+>
+>                 /* Set source best burst size */
+> -               max_width = stm32_mdma_get_max_width(len, tlen);
+> -               if (src % max_width)
+> -                       max_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+> +               max_width = stm32_mdma_get_max_width(len, src, tlen);
+>                 src_bus_width = stm32_mdma_get_width(chan, max_width);
+>
+>                 max_burst = tlen / max_width;
+> @@ -971,9 +974,7 @@ stm32_mdma_prep_dma_memcpy(struct dma_chan *c, dma_addr_t dest, dma_addr_t src,
+>                         STM32_MDMA_CTCR_SINCOS(src_bus_width);
+>
+>                 /* Set destination best burst size */
+> -               max_width = stm32_mdma_get_max_width(len, tlen);
+> -               if (dest % max_width)
+> -                       max_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+> +               max_width = stm32_mdma_get_max_width(len, dest, tlen);
+>                 dst_bus_width = stm32_mdma_get_width(chan, max_width);
+>
+>                 max_burst = tlen / max_width;
+> @@ -1014,9 +1015,7 @@ stm32_mdma_prep_dma_memcpy(struct dma_chan *c, dma_addr_t dest, dma_addr_t src,
+>                                            STM32_MDMA_MAX_BLOCK_LEN);
+>
+>                         /* Set source best burst size */
+> -                       max_width = stm32_mdma_get_max_width(len, tlen);
+> -                       if (src % max_width)
+> -                               max_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+> +                       max_width = stm32_mdma_get_max_width(len, src, tlen);
+>                         src_bus_width = stm32_mdma_get_width(chan, max_width);
+>
+>                         max_burst = tlen / max_width;
+> @@ -1030,9 +1029,7 @@ stm32_mdma_prep_dma_memcpy(struct dma_chan *c, dma_addr_t dest, dma_addr_t src,
+>                                 STM32_MDMA_CTCR_SINCOS(src_bus_width);
+>
+>                         /* Set destination best burst size */
+> -                       max_width = stm32_mdma_get_max_width(len, tlen);
+> -                       if (dest % max_width)
+> -                               max_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+> +                       max_width = stm32_mdma_get_max_width(len, dest, tlen);
+>                         dst_bus_width = stm32_mdma_get_width(chan, max_width);
+>
+>                         max_burst = tlen / max_width;
+> --
+> 2.9.0
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+
+-- 
+Benjamin Gaignard
+
+Graphic Study Group
+
+Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro: Facebook | Twitter | Blog
