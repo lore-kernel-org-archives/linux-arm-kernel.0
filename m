@@ -1,41 +1,37 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 11 Oct 2017 13:37:25 +0100
-Subject: [PATCH v2] arm64: Expose support for optional ARMv8-A features
-In-Reply-To: <20171011123705.GE11106@arm.com>
-References: <20171010095310.30115-1-suzuki.poulose@arm.com>
- <20171010143530.fiomo7pqvtojflnn@localhost> <20171011123705.GE11106@arm.com>
-Message-ID: <ab74bf7a-9ffd-ed5c-f8d9-6dbc89ca1791@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 11 Oct 2017 14:45:16 +0200
+Subject: [PATCH 2/2] ARM: dts: gr-peach: Enable ostm0 and ostm1 timers
+In-Reply-To: <1507538915-16566-3-git-send-email-jacopo+renesas@jmondi.org>
+References: <1507538915-16566-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1507538915-16566-3-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <CAMuHMdXPiO1iZMABAZRfKv0HwYcVtZ_BkEa=dKFczx-3s84_Gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/17 13:37, Will Deacon wrote:
-> On Tue, Oct 10, 2017 at 03:35:30PM +0100, Catalin Marinas wrote:
->> On Tue, Oct 10, 2017 at 10:53:10AM +0100, Suzuki K. Poulose wrote:
->>> diff --git a/arch/arm64/include/uapi/asm/hwcap.h b/arch/arm64/include/uapi/asm/hwcap.h
->>> index 4b9344cba83a..a4bad90a3fa3 100644
->>> --- a/arch/arm64/include/uapi/asm/hwcap.h
->>> +++ b/arch/arm64/include/uapi/asm/hwcap.h
->>> @@ -36,5 +36,10 @@
->>>   #define HWCAP_FCMA		(1 << 14)
->>>   #define HWCAP_LRCPC		(1 << 15)
->>>   #define HWCAP_DCPOP		(1 << 16)
->>> +#define HWCAP_SHA3		(1 << 17)
->>> +#define HWCAP_SM3		(1 << 18)
->>> +#define HWCAP_SM4		(1 << 19)
->>> +#define HWCAP_ASIMDDP		(1 << 20)
->>> +#define HWCAP_SHA512		(1 << 21)
->>
->> We may be getting some conflicts around these with additional patches
->> coming in but not hard to solve. Anyway, whether we are getting pointer
->> authentication in or not (probably the latter), I would really like to
->> get the first patch in that series merged:
->>
->> http://lkml.kernel.org/r/1500480092-28480-2-git-send-email-mark.rutland at arm.com
-> 
-> Suzuki -- can you take Mark's patch above and update the documentation to
-> include the new hwcaps you've added, please?
+On Mon, Oct 9, 2017 at 10:48 AM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
+> Enable ostm0 and ostm1 timers to be used as clock source and clockevent
+> source. The timers provides greater accuracy than the already enabled
+> mtu2 one.
+>
+> With these enabled:
+>
+> clocksource: ostm: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 57352151442 ns
+> sched_clock: 32 bits at 33MHz, resolution 30ns, wraps every 64440619504ns
+> ostm: used for clocksource
+> ostm: used for clock events
+>
+> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> Suggested-by: Chris Brandt <chris.brandt@renesas.com>
 
-Sure, will do that.
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Cheers
-Suzuki
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
