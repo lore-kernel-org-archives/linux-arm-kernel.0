@@ -1,27 +1,45 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 11 Oct 2017 13:17:01 +0100
-Subject: [PATCH v6 3/4] perf utils: Add helper function is_pmu_core to
- detect PMU CORE devices
-In-Reply-To: <20170824120349.2323-4-ganapatrao.kulkarni@cavium.com>
+Date: Wed, 11 Oct 2017 13:19:27 +0100
+Subject: [PATCH v6 4/4] perf vendor events arm64: Add ThunderX2
+ implementation defined pmu core events
+In-Reply-To: <20170829124730.GH17961@rric.localdomain>
 References: <20170824120349.2323-1-ganapatrao.kulkarni@cavium.com>
- <20170824120349.2323-4-ganapatrao.kulkarni@cavium.com>
-Message-ID: <20171011121700.GB11106@arm.com>
+ <20170824120349.2323-5-ganapatrao.kulkarni@cavium.com>
+ <43dcc107-263a-5429-73d4-a5290c6610d6@hisilicon.com>
+ <20170829124730.GH17961@rric.localdomain>
+Message-ID: <20171011121926.GC11106@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 24, 2017 at 05:33:48PM +0530, Ganapatrao Kulkarni wrote:
-> On some platforms, PMU core devices sysfs name is not cpu.
-> Adding function is_pmu_core to detect PMU core devices using
-> core device specific hints in sysfs.
+On Tue, Aug 29, 2017 at 02:47:30PM +0200, Robert Richter wrote:
+> Shaokun,
 > 
-> For arm64 platforms, all core devices have file "cpus" in sysfs.
+> On 29.08.17 17:26:00, Zhangshaokun wrote:
+> > On 2017/8/24 20:03, Ganapatrao Kulkarni wrote:
+> > > This is not a full event list, but a short list of useful events.
+> > > 
+> > > Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> > > ---
+> > >  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
+> > >  .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
+> > >  2 files changed, 77 insertions(+)
+> > >  create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
+> > >  create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
+> > > 
+> > 
+> > I saw you also used thunderx2 in tools/perf/pmu-events/arch/arm64/, how about John's suggestion
+> > that would use vendor sub-folder?
+> > Of course, appreciate maintainer's comments.
 > 
-> Tested-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
-> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> ---
->  tools/perf/util/pmu.c | 39 +++++++++++++++++++++++++++++++++++----
->  1 file changed, 35 insertions(+), 4 deletions(-)
+> this would just add another level of subdirectories. I rather would
+> prefer to have a per platform dir comparable to what is listed in
+> 
+>  arch/arm64/Kconfig.platforms
+> 
+> This is the same as Ganapat has implemented it.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+FWIW, I agree with Zhangshaokun here that a silicon vendor subdirectory
+would organise things better. It also matches what we do for
+arch/arm64/boot/dts/
 
 Will
