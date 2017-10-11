@@ -1,202 +1,196 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Wed, 11 Oct 2017 14:01:01 +0100
-Subject: [RFC 6/7] arm64: Detect current view of GIC priorities
-In-Reply-To: <1507726862-11944-1-git-send-email-julien.thierry@arm.com>
-References: <1507726862-11944-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1507726862-11944-7-git-send-email-julien.thierry@arm.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 11 Oct 2017 14:01:03 +0100
+Subject: [PATCH v3 2/2] arm64: docs: describe ELF hwcaps
+In-Reply-To: <20171011130103.18362-1-suzuki.poulose@arm.com>
+References: <20171011130103.18362-1-suzuki.poulose@arm.com>
+Message-ID: <20171011130103.18362-2-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The values non secure EL1 needs to use for priority registers depends on
-the value of SCR_EL3.FIQ.
+From: Mark Rutland <mark.rutland@arm.com>
 
-Since we don't have access to SCR_EL3, we fake an interrupt and compare the
-GIC priority with the one present in the [re]distributor.
+We don't document our ELF hwcaps, leaving developers to interpret them
+according to hearsay, guesswork, or (in exceptional cases) inspection of
+the current kernel code.
 
-Also, add firmware requirements related to SCR_EL3.
+This is less than optimal, and it would be far better if we had some
+definitive description of each of the ELF hwcaps that developers could
+refer to.
 
-Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+This patch adds a document describing the (native) arm64 ELF hwcaps.
+
 Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Dave Martin <Dave.Martin@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+[ Updated new hwcap entries in the document ]
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- Documentation/arm64/booting.txt     |  5 +++
- arch/arm64/include/asm/arch_gicv3.h |  5 +++
- arch/arm64/include/asm/irqflags.h   |  6 +++
- arch/arm64/include/asm/sysreg.h     |  1 +
- drivers/irqchip/irq-gic-v3.c        | 83 +++++++++++++++++++++++++++++++++++++
- 5 files changed, 100 insertions(+)
+ Documentation/arm64/elf_hwcaps.txt | 156 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 156 insertions(+)
+ create mode 100644 Documentation/arm64/elf_hwcaps.txt
 
-diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
-index 8d0df62..e387938 100644
---- a/Documentation/arm64/booting.txt
-+++ b/Documentation/arm64/booting.txt
-@@ -188,6 +188,11 @@ Before jumping into the kernel, the following conditions must be met:
-   the kernel image will be entered must be initialised by software at a
-   higher exception level to prevent execution in an UNKNOWN state.
-
-+  - SCR_EL3.FIQ must have the same value across all CPUs the kernel is
-+    executing on.
-+  - The value of SCR_EL3.FIQ must be the same as the one present at boot
-+    time whenever the kernel is executing.
+diff --git a/Documentation/arm64/elf_hwcaps.txt b/Documentation/arm64/elf_hwcaps.txt
+new file mode 100644
+index 000000000000..0ba180522e3c
+--- /dev/null
++++ b/Documentation/arm64/elf_hwcaps.txt
+@@ -0,0 +1,156 @@
++ARM64 ELF hwcaps
++================
 +
-   For systems with a GICv3 interrupt controller to be used in v3 mode:
-   - If EL3 is present:
-     ICC_SRE_EL3.Enable (bit 3) must be initialiased to 0b1.
-diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
-index b6b430c..90a3dc3 100644
---- a/arch/arm64/include/asm/arch_gicv3.h
-+++ b/arch/arm64/include/asm/arch_gicv3.h
-@@ -114,6 +114,11 @@ static inline void gic_write_bpr1(u32 val)
- 	write_sysreg_s(val, SYS_ICC_BPR1_EL1);
- }
-
-+static inline u32 gic_read_rpr(void)
++This document describes the usage and semantics of the arm64 ELF hwcaps.
++
++
++1. Introduction
++---------------
++
++Some hardware or software features are only available on some CPU
++implementations, and/or with certain kernel configurations, but have no
++architected discovery mechanism available to userspace code at EL0. The
++kernel exposes the presence of these features to userspace through a set
++of flags called hwcaps, exposed in the auxilliary vector.
++
++Userspace software can test for features by acquiring the AT_HWCAP entry
++of the auxilliary vector, and testing whether the relevant flags are
++set, e.g.
++
++bool floating_point_is_present(void)
 +{
-+	return read_sysreg_s(SYS_ICC_RPR_EL1);
++	unsigned long hwcaps = getauxval(AT_HWCAP);
++	if (hwcaps & HWCAP_FP)
++		return true;
++
++	return false;
 +}
 +
- #define gic_read_typer(c)		readq_relaxed(c)
- #define gic_write_irouter(v, c)		writeq_relaxed(v, c)
- #define gic_read_lpir(c)		readq_relaxed(c)
-diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
-index 1c69ebb..4718ca3f 100644
---- a/arch/arm64/include/asm/irqflags.h
-+++ b/arch/arm64/include/asm/irqflags.h
-@@ -205,6 +205,12 @@ static inline int arch_irqs_disabled_flags(unsigned long flags)
- 		!(ARCH_FLAGS_GET_PMR(flags) & ICC_PMR_EL1_EN_BIT);
- }
-
-+/* Mask IRQs at CPU level instead of GIC level */
-+static inline void arch_irqs_daif_disable(void)
-+{
-+	asm volatile ("msr daifset, #2" : : : "memory");
-+}
++Where software relies on a feature described by a hwcap, it should check
++the relevant hwcap flag to verify that the feature is present before
++attempting to make use of the feature.
 +
- void maybe_switch_to_sysreg_gic_cpuif(void);
-
- #endif /* CONFIG_IRQFLAGS_GIC_MASKING */
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index f707fed..e71bc81 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -205,6 +205,7 @@
- #define SYS_ICC_SRE_EL1			sys_reg(3, 0, 12, 12, 5)
- #define SYS_ICC_IGRPEN0_EL1		sys_reg(3, 0, 12, 12, 6)
- #define SYS_ICC_IGRPEN1_EL1		sys_reg(3, 0, 12, 12, 7)
-+#define SYS_ICC_RPR_EL1			sys_reg(3, 0, 12, 11, 3)
-
- #define SYS_CONTEXTIDR_EL1		sys_reg(3, 0, 13, 0, 1)
- #define SYS_TPIDR_EL1			sys_reg(3, 0, 13, 0, 4)
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 1cdf495..e0b235f 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -62,6 +62,10 @@ struct gic_chip_data {
- static struct gic_chip_data gic_data __read_mostly;
- static struct static_key supports_deactivate = STATIC_KEY_INIT_TRUE;
-
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+DEFINE_STATIC_KEY_FALSE(have_non_secure_prio_view);
-+#endif
++Features cannot be probed reliably through other means. When a feature
++is not available, attempting to use it may result in unpredictable
++behaviour, and is not guaranteed to result in any reliable indication
++that the feature is unavailable, such as a SIGILL.
 +
- static struct gic_kvm_info gic_v3_kvm_info;
-
- #define gic_data_rdist()		(this_cpu_ptr(gic_data.rdists.rdist))
-@@ -969,6 +973,81 @@ static int partition_domain_translate(struct irq_domain *d,
- 	.select = gic_irq_domain_select,
- };
-
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+/*
-+ * The behaviours of RPR and PMR registers differ depending on the value of
-+ * SCR_EL3.FIQ, while the behaviour of priority registers of the distributor
-+ * and redistributors is always the same.
-+ *
-+ * If SCR_EL3.FIQ == 1, the values used for RPR and PMR are the same as the ones
-+ * programmed in the distributor and redistributors registers.
-+ *
-+ * Otherwise, the value presented by RPR as well as the value which will be
-+ * compared against PMR is: (GIC_(R)DIST_PRI[irq] >> 1) | 0x80;
-+ *
-+ * see GICv3/GICv4 Architecture Specification (IHI0069D):
-+ * - section 4.8.1 Non-secure accesses to register fields for Secure interrupt
-+ *   priorities.
-+ * - Figure 4-7 Secure read of the priority field for a Non-secure Group 1
-+ *   interrupt.
-+ */
-+static void __init gic_detect_prio_view(void)
-+{
-+	/*
-+	 * Randomly picked SGI, must be <= 8 as other SGIs might be
-+	 * used by the firmware.
-+	 */
-+	const u32 fake_irqnr = 7;
-+	const u32 fake_irqmask = BIT(fake_irqnr);
-+	void __iomem * const rdist_base = gic_data_rdist_sgi_base();
-+	unsigned long irq_flags;
-+	u32 acked_irqnr;
-+	bool was_enabled;
 +
-+	irq_flags = arch_local_save_flags();
++2. Interpretation of hwcaps
++---------------------------
 +
-+	arch_irqs_daif_disable();
++The majority of hwcaps are intended to indicate the presence of features
++which are described by architected ID registers inaccessible to
++userspace code at EL0. These hwcaps are defined in terms of ID register
++fields, and should be interpreted with reference to the definition of
++these fields in the ARM Architecture Reference Manual (ARM ARM).
 +
-+	was_enabled = !!(readl_relaxed(rdist_base + GICD_ISENABLER) &
-+			 fake_irqmask);
++Such hwcaps are described below in the form:
 +
-+	if (!was_enabled)
-+		writel_relaxed(fake_irqmask, rdist_base + GICD_ISENABLER);
++    Functionality implied by idreg.field == val.
 +
-+	/* Need to unmask to acknowledge the IRQ */
-+	gic_write_pmr(ICC_PMR_EL1_UNMASKED);
-+	dsb(sy);
++Such hwcaps indicate the availability of functionality that the ARM ARM
++defines as being present when idreg.field has value val, but do not
++indicate that idreg.field is precisely equal to val, nor do they
++indicate the absence of functionality implied by other values of
++idreg.field.
 +
-+	/* Fake a pending SGI */
-+	writel_relaxed(fake_irqmask, rdist_base + GICD_ISPENDR);
-+	dsb(sy);
++Other hwcaps may indicate the presence of features which cannot be
++described by ID registers alone. These may be described without
++reference to ID registers, and may refer to other documentation.
 +
-+	acked_irqnr = gic_read_iar();
 +
-+	if (acked_irqnr == fake_irqnr) {
-+		if (gic_read_rpr() == gic_get_irq_prio(acked_irqnr, rdist_base))
-+			static_branch_enable(&have_non_secure_prio_view);
-+	} else {
-+		pr_warn("Unexpected IRQ for priority detection: %u\n",
-+			acked_irqnr);
-+	}
++3. The hwcaps exposed in AT_HWCAP
++---------------------------------
 +
-+	if (acked_irqnr < 1020) {
-+		gic_write_eoir(acked_irqnr);
-+		if (static_key_true(&supports_deactivate))
-+			gic_write_dir(acked_irqnr);
-+	}
++HWCAP_FP
 +
-+	/* Restore enabled state */
-+	if (!was_enabled) {
-+		writel_relaxed(fake_irqmask, rdist_base + GICD_ICENABLER);
-+		gic_redist_wait_for_rwp();
-+	}
++    Functionality implied by ID_AA64PFR0_EL1.FP == 0b0000.
 +
-+	arch_local_irq_restore(irq_flags);
-+}
-+#endif
++HWCAP_ASIMD
 +
- static int __init gic_init_bases(void __iomem *dist_base,
- 				 struct redist_region *rdist_regs,
- 				 u32 nr_redist_regions,
-@@ -1025,6 +1104,10 @@ static int __init gic_init_bases(void __iomem *dist_base,
- 	gic_cpu_init();
- 	gic_cpu_pm_init();
-
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+	gic_detect_prio_view();
-+#endif
++    Functionality implied by ID_AA64PFR0_EL1.AdvSIMD == 0b0000.
 +
- 	return 0;
-
- out_free:
---
-1.9.1
++HWCAP_EVTSTRM
++
++    The generic timer is configured to generate events at a frequency of
++    approximately 100KHz.
++
++HWCAP_AES
++
++    Functionality implied by ID_AA64ISAR1_EL1.AES == 0b0001.
++
++HWCAP_PMULL
++
++    Functionality implied by ID_AA64ISAR1_EL1.AES == 0b0010.
++
++HWCAP_SHA1
++
++    Functionality implied by ID_AA64ISAR0_EL1.SHA1 == 0b0001.
++
++HWCAP_SHA2
++
++    Functionality implied by ID_AA64ISAR0_EL1.SHA2 == 0b0001.
++
++HWCAP_CRC32
++
++    Functionality implied by ID_AA64ISAR0_EL1.CRC32 == 0b0001.
++
++HWCAP_ATOMICS
++
++    Functionality implied by ID_AA64ISAR0_EL1.Atomic == 0b0010.
++
++HWCAP_FPHP
++
++    Functionality implied by ID_AA64PFR0_EL1.FP == 0b0001.
++
++HWCAP_ASIMDHP
++
++    Functionality implied by ID_AA64PFR0_EL1.AdvSIMD == 0b0001.
++
++HWCAP_CPUID
++
++    EL0 access to certain ID registers is available, to the extent
++    described by Documentation/arm64/cpu-feature-registers.txt.
++
++    These ID registers may imply the availability of features.
++
++HWCAP_ASIMDRDM
++
++    Functionality implied by ID_AA64ISAR0_EL1.RDM == 0b0001.
++
++HWCAP_JSCVT
++
++    Functionality implied by ID_AA64ISAR1_EL1.JSCVT == 0b0001.
++
++HWCAP_FCMA
++
++    Functionality implied by ID_AA64ISAR1_EL1.FCMA == 0b0001.
++
++HWCAP_LRCPC
++
++    Functionality implied by ID_AA64ISAR1_EL1.LRCPC == 0b0001.
++
++HWCAP_DCPOP
++
++    Functionality implied by ID_AA64ISAR1_EL1.DPB == 0b0001.
++
++HWCAP_SHA3
++
++    Functionality implied by ID_AA64ISAR0_EL1.SHA3 == 0b0001.
++
++HWCAP_SM3
++
++    Functionality implied by ID_AA64ISAR0_EL1.SM3 == 0b0001.
++
++HWCAP_SM4
++
++    Functionality implied by ID_AA64ISAR0_EL1.SM4 == 0b0001.
++
++HWCAP_ASIMDDP
++
++    Functionality implied by ID_AA64ISAR0_EL1.DP == 0b0001.
++
++HWCAP_SHA512
++
++    Functionality implied by ID_AA64ISAR0_EL1.SHA2 == 0b0002.
+-- 
+2.13.6
