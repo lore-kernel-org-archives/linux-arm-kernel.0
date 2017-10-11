@@ -1,41 +1,52 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed, 11 Oct 2017 10:00:06 -0700
-Subject: [PATCH] arm64: defconfig: Enable QCOM_IOMMU
-In-Reply-To: <20171011151925.30909-1-nicolas.dechesne@linaro.org>
-References: <20171011151925.30909-1-nicolas.dechesne@linaro.org>
-Message-ID: <20171011170006.GQ1165@minitux>
+From: christina.jacob.koikara@gmail.com (Christina Jacob)
+Date: Wed, 11 Oct 2017 22:36:48 +0530
+Subject: [PATCH v2] XDP Program for Ip forward
+In-Reply-To: <20171010160057.32678367@redhat.com>
+References: <1507620532-25804-1-git-send-email-Christina.Jacob@cavium.com>
+ <20171010151231.69fde82f@redhat.com> <20171010160057.32678367@redhat.com>
+Message-ID: <CAGSfdShhRGe97-EtgYGFdYhEtGfFPU_OmeCX3UkxkCZ5XGCt4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 11 Oct 08:19 PDT 2017, Nicolas Dechesne wrote:
+On Tue, Oct 10, 2017 at 7:30 PM, Jesper Dangaard Brouer
+<brouer@redhat.com> wrote:
+>
+> On Tue, 10 Oct 2017 15:12:31 +0200
+> Jesper Dangaard Brouer <brouer@redhat.com> wrote:
+>
+> > I'll try to test/benchmark your program...
+>
+> In my initial testing, I cannot get this to work...
+>
 
-> Enable QCOM IOMMU driver for 'B' family devices, such as APQ8016 found on the
-> Dragonboard 410c. With this change, graphics console and GPU are working
-> fine (using mesa/freedreno for GPU driver).
-> 
-> Signed-off-by: Nicolas Dechesne <nicolas.dechesne@linaro.org>
+What is the test setup you are using? So that I can also test
+I verified the program in this minimal test setup, I did not see any
+issue with the mac addresses being set.
 
-Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Below is the test setup.
 
-Regards,
-Bjorn
+machine 1                                             machine 2
+(90.0.0.2)port 1 ===============>port3(90.0.0.1)
+                                                               ||
+(80.0.0.2)port 2<================port4(80.0.0.1)
+traffic gen                                             xdp program
 
-> ---
->  arch/arm64/configs/defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index 34480e9af2e7..653f7149179a 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -510,6 +510,7 @@ CONFIG_HI6220_MBOX=y
->  CONFIG_ROCKCHIP_IOMMU=y
->  CONFIG_ARM_SMMU=y
->  CONFIG_ARM_SMMU_V3=y
-> +CONFIG_QCOM_IOMMU=y
->  CONFIG_RPMSG_QCOM_SMD=y
->  CONFIG_RASPBERRYPI_POWER=y
->  CONFIG_QCOM_SMEM=y
-> -- 
-> 2.14.2
-> 
+Below are the steps followed to run the program.
+
+ Assigned ips in different subnets to interfaces 3 and 4
+Ip of port 1 is in the same subnet as port 3
+Ip of port 2 is in the same subnet as port 4
+sysctl -w net.core.bpf_jit_enable=1
+./xdp_router_ipv4 eth0 eth1
+
+Note: The program will not generate arp requests. Proper arp entries
+need to be added to get the packets forwarded correctly.
+
+> You do seem to XDP_REDIRECT out the right interface, but you have an
+> error with setting the correct MAC address.
+>
+> --
+> Best regards,
+>   Jesper Dangaard Brouer
+>   MSc.CS, Principal Kernel Engineer at Red Hat
+>   LinkedIn: http://www.linkedin.com/in/brouer
