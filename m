@@ -1,55 +1,34 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 11 Oct 2017 14:26:51 +0800
-Subject: [PATCH v8 01/20] crypto: change transient busy return code to
- -EAGAIN
-In-Reply-To: <CAOtvUMd=vtju=VJkCYFRrvANbRRYj+95cdgDoMMfBvmPaPbsAA@mail.gmail.com>
-References: <1504615144-29770-1-git-send-email-gilad@benyossef.com>
- <1504615144-29770-2-git-send-email-gilad@benyossef.com>
- <20171007030541.GA29421@gondor.apana.org.au>
- <CAOtvUMd=vtju=VJkCYFRrvANbRRYj+95cdgDoMMfBvmPaPbsAA@mail.gmail.com>
-Message-ID: <20171011062651.GA18664@gondor.apana.org.au>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 11 Oct 2017 08:30:20 +0200
+Subject: [PATCH v2] arm64: qcom: sbc: Name GPIO lines
+In-Reply-To: <20171011055405.GI1165@minitux>
+References: <20171009092844.11451-1-linus.walleij@linaro.org>
+ <20171011055405.GI1165@minitux>
+Message-ID: <CACRpkdaBuWnimtaQBsT=OGt+2r0UiQzyNymDV_9PLBDDe0ASJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 07, 2017 at 10:51:42AM +0300, Gilad Ben-Yossef wrote:
-> On Sat, Oct 7, 2017 at 6:05 AM, Herbert Xu <herbert@gondor.apana.org.au> wrote:
-> > On Tue, Sep 05, 2017 at 03:38:40PM +0300, Gilad Ben-Yossef wrote:
-> >>
-> >> diff --git a/crypto/algif_hash.c b/crypto/algif_hash.c
-> >> index 5e92bd2..3b3c154 100644
-> >> --- a/crypto/algif_hash.c
-> >> +++ b/crypto/algif_hash.c
-> >> @@ -39,6 +39,20 @@ struct algif_hash_tfm {
-> >>       bool has_key;
-> >>  };
-> >>
-> >> +/* Previous versions of crypto_* ops used to return -EBUSY
-> >> + * rather than -EAGAIN to indicate being tied up. The in
-> >> + * kernel API changed but we don't want to break the user
-> >> + * space API. As only the hash user interface exposed this
-> >> + * error ever to the user, do the translation here.
-> >> + */
-> >> +static inline int crypto_user_err(int err)
-> >> +{
-> >> +     if (err == -EAGAIN)
-> >> +             return -EBUSY;
-> >> +
-> >> +     return err;
-> >
-> > I don't see the need to carry along this baggage.  Does anyone
-> > in user-space actually rely on EBUSY?
-> 
-> 
-> I am not aware of anyone who does. I was just trying to avoid
-> changing the user ABI.
-> 
-> Shall I roll a new revision without this patch?
+On Wed, Oct 11, 2017 at 7:54 AM, Bjorn Andersson
+<bjorn.andersson@linaro.org> wrote:
+> On Mon 09 Oct 02:28 PDT 2017, Linus Walleij wrote:
 
-Yes please.  I'd rather not carry this around for eternity unless
-it was actually required.
+>> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+> [..]
+>> +                             "NC", /* GPIO 70 */
+>> +                             "NC",
+>> +                             "NC",
+>> +                             "NC",
+>> +                             "NC", /* GPIO 74 */
+>
+> Convenient to know where index 74 is ;P
 
-Thanks,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+There is actually a reason for that. 74 begins the next sheet on the schematic
+so engineers working with checking the line table against the schematic are
+helped by this.
+
+> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+
+Thanks man!
+
+Yours,
+Linus Walleij
