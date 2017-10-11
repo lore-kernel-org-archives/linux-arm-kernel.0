@@ -1,51 +1,64 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Wed, 11 Oct 2017 16:46:00 +0200
-Subject: [PATCH] dmaengine: stm32-mdma: avoid 64-bit division
-In-Reply-To: <CAK8P3a2RsCXq7L6w5K+KmhP1Q2b1=SjnG2Xws2w232vmyj=yEA@mail.gmail.com>
-References: <20171011140144.3746128-1-arnd@arndb.de>
- <CA+M3ks74eOSOEwadsjjMcQme_6ivzmYGRdc9jvw4RHYa6dxRTA@mail.gmail.com>
- <CAK8P3a2RsCXq7L6w5K+KmhP1Q2b1=SjnG2Xws2w232vmyj=yEA@mail.gmail.com>
-Message-ID: <CA+M3ks4cKxYy15-6ewbMaJOLF0e2NdhwrZUCq-U2s4Y8n212fw@mail.gmail.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Wed, 11 Oct 2017 16:06:14 +0100
+Subject: [PATCH v2 2/2] arm64: Fix single stepping in kernel traps
+In-Reply-To: <20171011143715.GH11106@arm.com>
+References: <1507729721-53978-1-git-send-email-julien.thierry@arm.com>
+ <1507729721-53978-3-git-send-email-julien.thierry@arm.com>
+ <20171011143715.GH11106@arm.com>
+Message-ID: <9e9adb8e-b0d5-49bb-1f20-de534fe0e74b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-10-11 16:39 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
-> On Wed, Oct 11, 2017 at 4:27 PM, Benjamin Gaignard
-> <benjamin.gaignard@linaro.org> wrote:
->> 2017-10-11 16:01 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
+
+
+On 11/10/17 15:37, Will Deacon wrote:
+> On Wed, Oct 11, 2017 at 02:48:41PM +0100, Julien Thierry wrote:
+>> Software Step exception is missing after stepping a trapped instruction.
 >>
->>> @@ -398,6 +400,9 @@ static enum dma_slave_buswidth stm32_mdma_get_max_width(u32 buf_len, u32 tlen)
->>>                         break;
->>>         }
->>>
->>> +       if (addr % max_width)
->>> +               max_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
->>> +
+>> Ensure SPSR.SS gets set to 0 after emulating/skipping a trapped instruction
+>> before doing ERET.
 >>
->> I'm only half-convince by the implicite 32 bits cast done into
->> function prototype.
->> If we keep using dma_addr_t and use do_div() instead of %
->> does compiler can still optimize the code ?
+>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+>> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
 >>
->
-> I wouldn't want to add a do_div() here, since it's guaranteed
-> not to be needed. Would you prefer an explicit cast here
-> and leave the argument as dma_addr_t?
->
-> We could also use a bit mask here like
->
->   if (addr & (max_width-1))
+>> ---
+>>   arch/arm64/include/asm/insn.h        |  5 +++++
+>>   arch/arm64/include/asm/traps.h       |  6 ++++++
+>>   arch/arm64/kernel/armv8_deprecated.c |  8 ++++----
+>>   arch/arm64/kernel/cpufeature.c       |  2 +-
+>>   arch/arm64/kernel/traps.c            | 21 ++++++++++++++++-----
+>>   5 files changed, 32 insertions(+), 10 deletions(-)
+> 
+> [...]
+> 
+>> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+>> index 5ea4b85..aaf9a523 100644
+>> --- a/arch/arm64/kernel/traps.c
+>> +++ b/arch/arm64/kernel/traps.c
+>> @@ -293,6 +293,17 @@ void arm64_notify_die(const char *str, struct pt_regs *regs,
+>>   	}
+>>   }
+>>
+>> +void arm64_setup_next_instr(struct pt_regs *regs, unsigned long size)
+>> +{
+>> +	regs->pc += size;
+>> +
+>> +	/*
+>> +	 * If we were single stepping, we want to get the step exception after
+>> +	 * we return from the trap.
+>> +	 */
+>> +	regs->pstate &= ~DBG_SPSR_SS;
+> 
+> Can you use user_fastforward_single_step instead, like we do for the signal
+> handling path?
 
-That sound better for me since it doesn't limit the code to 32 bits architecture
+I guess we are always fast forwarding on the current task. So yes, I can 
+use that.
 
->
-> or we could combined it with the check above:
->
->                 if ((((buf_len | addr) & (max_width - 1)) == 0) &&
->                    (tlen >= max_width))
+Thanks,
 
-No it is more simple to read with two checks
-
-Benjamin
->
->        Arnd
+-- 
+Julien Thierry
