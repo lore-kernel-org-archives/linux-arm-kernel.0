@@ -1,76 +1,66 @@
 From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Wed, 11 Oct 2017 10:41:28 +0800
-Subject: [PATCH v5 04/12] mmc: mediatek: make hs400_tune_response only for
- mt8173
+Date: Wed, 11 Oct 2017 10:41:27 +0800
+Subject: [PATCH v5 03/12] arm64: dts: mt8173: remove "mediatek,
+ mt8135-mmc" from mmc nodes
 In-Reply-To: <1507689696-25928-1-git-send-email-chaotian.jing@mediatek.com>
 References: <1507689696-25928-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <1507689696-25928-5-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <1507689696-25928-4-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-the origin design of hs400_tune_response is for mt8173 because of
-mt8173 has a special design. for doing that, we add a new member
-"compatible", by now it's only for mt8173.
+devicetree bindings has been updated to support multi-platforms,
+so that each platform has its owns compatible name.
+And, this compatible name may used in driver to distinguish with
+other platform.
 
 Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
 ---
- drivers/mmc/host/mtk-sd.c | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi | 12 ++++--------
+ 1 file changed, 4 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-index 643c795..ab2fbbb 100644
---- a/drivers/mmc/host/mtk-sd.c
-+++ b/drivers/mmc/host/mtk-sd.c
-@@ -300,6 +300,7 @@ struct msdc_save_para {
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index b99a273..26396ef 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -682,8 +682,7 @@
+ 		};
  
- struct mtk_mmc_compatible {
- 	u8 clk_div_bits;
-+	bool hs400_tune; /* only used for MT8173 */
- };
+ 		mmc0: mmc at 11230000 {
+-			compatible = "mediatek,mt8173-mmc",
+-				     "mediatek,mt8135-mmc";
++			compatible = "mediatek,mt8173-mmc";
+ 			reg = <0 0x11230000 0 0x1000>;
+ 			interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_LOW>;
+ 			clocks = <&pericfg CLK_PERI_MSDC30_0>,
+@@ -693,8 +692,7 @@
+ 		};
  
- struct msdc_tune_para {
-@@ -360,18 +361,22 @@ struct msdc_host {
+ 		mmc1: mmc at 11240000 {
+-			compatible = "mediatek,mt8173-mmc",
+-				     "mediatek,mt8135-mmc";
++			compatible = "mediatek,mt8173-mmc";
+ 			reg = <0 0x11240000 0 0x1000>;
+ 			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_LOW>;
+ 			clocks = <&pericfg CLK_PERI_MSDC30_1>,
+@@ -704,8 +702,7 @@
+ 		};
  
- static const struct mtk_mmc_compatible mt8135_compat = {
- 	.clk_div_bits = 8,
-+	.hs400_tune = false,
- };
+ 		mmc2: mmc at 11250000 {
+-			compatible = "mediatek,mt8173-mmc",
+-				     "mediatek,mt8135-mmc";
++			compatible = "mediatek,mt8173-mmc";
+ 			reg = <0 0x11250000 0 0x1000>;
+ 			interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_LOW>;
+ 			clocks = <&pericfg CLK_PERI_MSDC30_2>,
+@@ -715,8 +712,7 @@
+ 		};
  
- static const struct mtk_mmc_compatible mt8173_compat = {
- 	.clk_div_bits = 8,
-+	.hs400_tune = true,
- };
- 
- static const struct mtk_mmc_compatible mt2701_compat = {
- 	.clk_div_bits = 12,
-+	.hs400_tune = false,
- };
- 
- static const struct mtk_mmc_compatible mt2712_compat = {
- 	.clk_div_bits = 12,
-+	.hs400_tune = false,
- };
- 
- static const struct of_device_id msdc_of_ids[] = {
-@@ -666,7 +671,8 @@ static void msdc_set_mclk(struct msdc_host *host, unsigned char timing, u32 hz)
- 		       host->base + PAD_CMD_TUNE);
- 	}
- 
--	if (timing == MMC_TIMING_MMC_HS400)
-+	if (timing == MMC_TIMING_MMC_HS400 &&
-+	    host->dev_comp->hs400_tune)
- 		sdr_set_field(host->base + PAD_CMD_TUNE,
- 			      MSDC_PAD_TUNE_CMDRRDLY,
- 			      host->hs400_cmd_int_delay);
-@@ -1594,7 +1600,8 @@ static int msdc_execute_tuning(struct mmc_host *mmc, u32 opcode)
- 	struct msdc_host *host = mmc_priv(mmc);
- 	int ret;
- 
--	if (host->hs400_mode)
-+	if (host->hs400_mode &&
-+	    host->dev_comp->hs400_tune)
- 		ret = hs400_tune_response(mmc, opcode);
- 	else
- 		ret = msdc_tune_response(mmc, opcode);
+ 		mmc3: mmc at 11260000 {
+-			compatible = "mediatek,mt8173-mmc",
+-				     "mediatek,mt8135-mmc";
++			compatible = "mediatek,mt8173-mmc";
+ 			reg = <0 0x11260000 0 0x1000>;
+ 			interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_LOW>;
+ 			clocks = <&pericfg CLK_PERI_MSDC30_3>,
 -- 
 1.8.1.1.dirty
