@@ -1,58 +1,102 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 11 Oct 2017 14:09:57 +0200
-Subject: [PATCH v2] ARM: imx: Enable cpuidle for i.MX6DL starting at 1.1
-In-Reply-To: <800ef25ed868f303bb2aece5dba59d395340f25d.1507722933.git.leonard.crestez@nxp.com>
-References: <800ef25ed868f303bb2aece5dba59d395340f25d.1507722933.git.leonard.crestez@nxp.com>
-Message-ID: <1507723797.2398.8.camel@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 11 Oct 2017 13:13:32 +0100
+Subject: [PATCH v6 2/4] perf tools arm64: Add support for get_cpuid_str
+ function.
+In-Reply-To: <20170824120349.2323-3-ganapatrao.kulkarni@cavium.com>
+References: <20170824120349.2323-1-ganapatrao.kulkarni@cavium.com>
+ <20170824120349.2323-3-ganapatrao.kulkarni@cavium.com>
+Message-ID: <20171011121332.GA11106@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 11.10.2017, 15:08 +0300 schrieb Leonard Crestez:
-> Enable cpuidle support on i.MX6DL starting from
-> IMX_CHIP_REVISION_1_1.
+On Thu, Aug 24, 2017 at 05:33:47PM +0530, Ganapatrao Kulkarni wrote:
+> function get_cpuid_str returns MIDR string of the first online
+> cpu from the range of cpus associated with the pmu core device.
 > 
-> This also makes the code cleaner because 6q and 6dl actually have
-> different revision histories.
-> 
-> Signed-off-by: Bai Ping <ping.bai@nxp.com>
-> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
-
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
-
+> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
 > ---
+>  tools/perf/arch/arm64/util/Build    |  1 +
+>  tools/perf/arch/arm64/util/header.c | 60 +++++++++++++++++++++++++++++++++++++
+>  2 files changed, 61 insertions(+)
+>  create mode 100644 tools/perf/arch/arm64/util/header.c
 > 
-> Changes since v1: https://www.spinics.net/lists/arm-kernel/msg610461.
-> html
-> * Clarified comment but kept > instead of >= because that's what the
-> old code used. Would be OK to change with further feedback.
-> 
-> ?arch/arm/mach-imx/mach-imx6q.c | 9 ++++++---
-> ?1 file changed, 6 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-
-> imx6q.c
-> index 45801b2..5707113 100644
-> --- a/arch/arm/mach-imx/mach-imx6q.c
-> +++ b/arch/arm/mach-imx/mach-imx6q.c
-> @@ -371,10 +371,13 @@ static struct platform_device
-> imx6q_cpufreq_pdev = {
-> ?static void __init imx6q_init_late(void)
-> ?{
-> ?	/*
-> -	?* WAIT mode is broken on TO 1.0 and 1.1, so there is no
-> point
-> -	?* to run cpuidle on them.
-> +	?* WAIT mode is broken on imx6 Dual/Quad revision 1.0 and
-> 1.1 so
-> +	?* there is no point to run cpuidle on them.
-> +	?*
-> +	?* It does work on imx6 Solo/DualLite starting from 1.1
-> ?	?*/
-> -	if (imx_get_soc_revision() > IMX_CHIP_REVISION_1_1)
-> +	if ((cpu_is_imx6q() && imx_get_soc_revision() >
-> IMX_CHIP_REVISION_1_1) ||
-> +	????(cpu_is_imx6dl() && imx_get_soc_revision() >
-> IMX_CHIP_REVISION_1_0))
-> ?		imx6q_cpuidle_init();
-> ?
-> ?	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ)) {
+> diff --git a/tools/perf/arch/arm64/util/Build b/tools/perf/arch/arm64/util/Build
+> index cef6fb3..b1ab72d 100644
+> --- a/tools/perf/arch/arm64/util/Build
+> +++ b/tools/perf/arch/arm64/util/Build
+> @@ -1,3 +1,4 @@
+> +libperf-y += header.o
+>  libperf-$(CONFIG_DWARF)     += dwarf-regs.o
+>  libperf-$(CONFIG_LOCAL_LIBUNWIND) += unwind-libunwind.o
+>  
+> diff --git a/tools/perf/arch/arm64/util/header.c b/tools/perf/arch/arm64/util/header.c
+> new file mode 100644
+> index 0000000..f02a32e
+> --- /dev/null
+> +++ b/tools/perf/arch/arm64/util/header.c
+> @@ -0,0 +1,60 @@
+> +#include <stdio.h>
+> +#include <stdlib.h>
+> +#include <api/fs/fs.h>
+> +#include "header.h"
+> +
+> +#define MIDR "/regs/identification/midr_el1"
+> +#define MIDR_SIZE 19
+> +
+> +char *get_cpuid_str(struct perf_pmu *pmu)
+> +{
+> +	char *buf = NULL;
+> +	char path[PATH_MAX];
+> +	const char *sysfs = sysfs__mountpoint();
+> +	int cpu;
+> +	u64 midr = 0;
+> +	struct cpu_map *cpus;
+> +	FILE *file;
+> +
+> +	if (!sysfs || !pmu->cpus)
+> +		return NULL;
+> +
+> +	buf = malloc(MIDR_SIZE);
+> +	if (!buf)
+> +		return NULL;
+> +
+> +	/* read midr from list of cpus mapped to this pmu */
+> +	cpus = cpu_map__get(pmu->cpus);
+> +	for (cpu = 0; cpu < cpus->nr; cpu++) {
+> +		scnprintf(path, PATH_MAX, "%s/devices/system/cpu/cpu%d"MIDR,
+> +				sysfs, cpus->map[cpu]);
+> +
+> +		file = fopen(path, "r");
+> +		if (!file) {
+> +			pr_debug("fopen failed for file %s\n", path);
+> +			continue;
+> +		}
+> +
+> +		if (!fgets(buf, MIDR_SIZE, file))
+> +			continue;
+> +		fclose(file);
+
+Don't you want to fclose the file if the fgets fails?
+
+> +
+> +		/* Ignore/clear Variant[23:20] and
+> +		 * Revision[3:0] of MIDR
+> +		 */
+> +		midr = strtoul(buf, NULL, 16);
+> +		midr &= (~(0xf << 20 | 0xf));
+
+It would be cleaner if you had #defines for the MIDR fields that you're
+masking.
+
+> +		scnprintf(buf, MIDR_SIZE, "0x%016lx", midr);
+> +		/* got midr break loop */
+> +		break;
+> +	}
+> +
+> +	if (!midr) {
+> +		pr_err("failed to get cpuid string\n");
+
+Might be helpful to print the PMU name and the CPU map if there's a way 
+to do that.
+
+Will
