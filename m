@@ -1,37 +1,45 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 11 Oct 2017 15:39:28 +0100
-Subject: [PATCH v3 07/28] arm64/sve: Low-level SVE architectural state
- manipulation functions
-In-Reply-To: <20171011142819.jheh4jwb347demj6@armageddon.cambridge.arm.com>
-References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
- <1507660725-7986-8-git-send-email-Dave.Martin@arm.com>
- <20171011142819.jheh4jwb347demj6@armageddon.cambridge.arm.com>
-Message-ID: <20171011143928.GD19485@e103592.cambridge.arm.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 11 Oct 2017 10:41:31 -0400 (EDT)
+Subject: [PATCH] ARM: don't discard memblock for kexec
+In-Reply-To: <20171011134925.3251410-1-arnd@arndb.de>
+References: <20171011134925.3251410-1-arnd@arndb.de>
+Message-ID: <nycvar.YSQ.7.76.1710111041070.6870@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 11, 2017 at 03:28:19PM +0100, Catalin Marinas wrote:
-> On Tue, Oct 10, 2017 at 07:38:24PM +0100, Dave P Martin wrote:
-> > Manipulating the SVE architectural state, including the vector and
-> > predicate registers, first-fault register and the vector length,
-> > requires the use of dedicated instructions added by SVE.
-> > 
-> > This patch adds suitable assembly functions for saving and
-> > restoring the SVE registers and querying the vector length.
-> > Setting of the vector length is done as part of register restore.
-> > 
-> > Since people building kernels may not all get an SVE-enabled
-> > toolchain for a while, this patch uses macros that generate
-> > explicit opcodes in place of assembler mnemonics.
-> > 
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-> 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> 
-> (not adding reviewed-by as I haven't checked the instruction encodings,
-> I just trust you to be correct ;))
+On Wed, 11 Oct 2017, Arnd Bergmann wrote:
 
-Agreed, I am sometimes correct.
+> Discarding the memblock arrays usually works, but causes problems
+> with kexec, as pointed out by this kbuild warning:
+> 
+> WARNING: vmlinux.o(.text+0x7c60): Section mismatch in reference from the function machine_kexec_prepare() to the function .meminit.text:memblock_is_region_memory()
+> 
+> This lets us keep the memblock structures around whenever kexec
+> is enabled, but otherwise still drops them.
+> 
+> Fixes: cf1b09908a23 ("ARM: 8693/1: discard memblock arrays when possible")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Better, Alex _did_ check the encodings against binutils :)
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
+> ---
+>  arch/arm/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 75b8c7e79ebc..90922a090501 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -2,7 +2,7 @@ config ARM
+>  	bool
+>  	default y
+>  	select ARCH_CLOCKSOURCE_DATA
+> -	select ARCH_DISCARD_MEMBLOCK if !HAVE_ARCH_PFN_VALID
+> +	select ARCH_DISCARD_MEMBLOCK if !HAVE_ARCH_PFN_VALID && !KEXEC
+>  	select ARCH_HAS_DEBUG_VIRTUAL
+>  	select ARCH_HAS_DEVMEM_IS_ALLOWED
+>  	select ARCH_HAS_ELF_RANDOMIZE
+> -- 
+> 2.9.0
+> 
+> 
