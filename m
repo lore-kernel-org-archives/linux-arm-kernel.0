@@ -1,87 +1,61 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 11 Oct 2017 22:03:28 +0900
-Subject: [PATCH] arm64: remove unneeded copy to init_utsname()->machine
-In-Reply-To: <1505389204-17231-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1505389204-17231-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAK7LNASYmFf1NqVReq-mXhn8OsAkkxF0NXARDZ7L7oOC5zfpjQ@mail.gmail.com>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Wed, 11 Oct 2017 15:24:31 +0200
+Subject: [PATCH v6 4/4] perf vendor events arm64: Add ThunderX2
+ implementation defined pmu core events
+In-Reply-To: <20171011121926.GC11106@arm.com>
+References: <20170824120349.2323-1-ganapatrao.kulkarni@cavium.com>
+ <20170824120349.2323-5-ganapatrao.kulkarni@cavium.com>
+ <43dcc107-263a-5429-73d4-a5290c6610d6@hisilicon.com>
+ <20170829124730.GH17961@rric.localdomain>
+ <20171011121926.GC11106@arm.com>
+Message-ID: <20171011132431.GL17961@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi arm64 maintainers,
+On 11.10.17 13:19:27, Will Deacon wrote:
+> On Tue, Aug 29, 2017 at 02:47:30PM +0200, Robert Richter wrote:
+> > Shaokun,
+> > 
+> > On 29.08.17 17:26:00, Zhangshaokun wrote:
+> > > On 2017/8/24 20:03, Ganapatrao Kulkarni wrote:
+> > > > This is not a full event list, but a short list of useful events.
+> > > > 
+> > > > Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> > > > ---
+> > > >  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
+> > > >  .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
+> > > >  2 files changed, 77 insertions(+)
+> > > >  create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
+> > > >  create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
+> > > > 
+> > > 
+> > > I saw you also used thunderx2 in tools/perf/pmu-events/arch/arm64/, how about John's suggestion
+> > > that would use vendor sub-folder?
+> > > Of course, appreciate maintainer's comments.
+> > 
+> > this would just add another level of subdirectories. I rather would
+> > prefer to have a per platform dir comparable to what is listed in
+> > 
+> >  arch/arm64/Kconfig.platforms
+> > 
+> > This is the same as Ganapat has implemented it.
+> 
+> FWIW, I agree with Zhangshaokun here that a silicon vendor subdirectory
+> would organise things better. It also matches what we do for
+> arch/arm64/boot/dts/
 
-Could you check this please?
+A file structure like:
 
+ tools/perf/pmu-events/arch/arm64/cavium/thunderx2/implementation-defined.json
 
-2017-09-14 20:40 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> As you see in init/version.c, init_uts_ns.name.machine is initially
-> set to UTS_MACHINE.  There is no point to copy the same string.
->
-> I dug the git history to figure out why this line is here.  My best
-> guess is like this:
->
->  - This line has been around here since the initial support of arm64
->    by commit 9703d9d7f77c ("arm64: Kernel booting and initialisation").
->    If ARCH (=arm64) and UTS_MACHINE (=aarch64) do not match,
->    arch/$(ARCH)/Makefile is supposed to override UTS_MACHINE, but the
->    initial version of arch/arm64/Makefile missed to do that.  Instead,
->    the boot code copied "aarch64" to init_utsname()->machine.
->
->  - Commit 94ed1f2cb5d4 ("arm64: setup: report ELF_PLATFORM as the
->    machine for utsname") replaced "aarch64" with ELF_PLATFORM to
->    make "uname" to reflect the endianness.
->
->  - ELF_PLATFORM does not help to provide the UTS machine name to rpm
->    target, so commit cfa88c79462d ("arm64: Set UTS_MACHINE in the
->    Makefile") fixed it.  The commit simply replaced ELF_PLATFORM with
->    UTS_MACHINE, but missed the fact the string copy itself is no longer
->    needed.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
->
->  arch/arm64/kernel/Makefile | 2 --
->  arch/arm64/kernel/setup.c  | 2 --
->  2 files changed, 4 deletions(-)
->
-> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-> index f2b4e81..29764d7 100644
-> --- a/arch/arm64/kernel/Makefile
-> +++ b/arch/arm64/kernel/Makefile
-> @@ -10,8 +10,6 @@ CFLAGS_REMOVE_ftrace.o = -pg
->  CFLAGS_REMOVE_insn.o = -pg
->  CFLAGS_REMOVE_return_address.o = -pg
->
-> -CFLAGS_setup.o = -DUTS_MACHINE='"$(UTS_MACHINE)"'
-> -
->  # Object file lists.
->  arm64-obj-y            := debug-monitors.o entry.o irq.o fpsimd.o              \
->                            entry-fpsimd.o process.o ptrace.o setup.o signal.o   \
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index d4b7405..b2fdb59 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -23,7 +23,6 @@
->  #include <linux/stddef.h>
->  #include <linux/ioport.h>
->  #include <linux/delay.h>
-> -#include <linux/utsname.h>
->  #include <linux/initrd.h>
->  #include <linux/console.h>
->  #include <linux/cache.h>
-> @@ -246,7 +245,6 @@ void __init setup_arch(char **cmdline_p)
->  {
->         pr_info("Boot CPU: AArch64 Processor [%08x]\n", read_cpuid_id());
->
-> -       sprintf(init_utsname()->machine, UTS_MACHINE);
->         init_mm.start_code = (unsigned long) _text;
->         init_mm.end_code   = (unsigned long) _etext;
->         init_mm.end_data   = (unsigned long) _edata;
-> --
-> 2.7.4
->
+looks quite horible. In contrast to dts dir we will need another
+subdir for each platform and will then have two levels of subdirs.
+This is also different to other archs where there is no extra vendor
+dir.
 
+I haven't checked if implementation allows json files to reside deeper
+in the subdir level.
 
+Anyway, it is bike-shedding.
 
--- 
-Best Regards
-Masahiro Yamada
+-Robert
