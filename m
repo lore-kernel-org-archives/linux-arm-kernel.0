@@ -1,54 +1,95 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 11 Oct 2017 10:43:06 +0200
-Subject: [PATCH v6 1/2] dt-bindings: gpio: uniphier: add UniPhier GPIO
- binding
-In-Reply-To: <CACRpkdaJE_-tfZ+Mr3UowY9W0EdEwWEMdfhCfkj7VVOzje7MrA@mail.gmail.com>
-References: <1506480022-8995-1-git-send-email-yamada.masahiro@socionext.com>
- <1506480022-8995-2-git-send-email-yamada.masahiro@socionext.com>
- <CACRpkdaJE_-tfZ+Mr3UowY9W0EdEwWEMdfhCfkj7VVOzje7MrA@mail.gmail.com>
-Message-ID: <CACRpkdaNhzM=p971eW+wNhkaOLyNgszx3qwJp1C5RUgVQc9s6Q@mail.gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed, 11 Oct 2017 09:47:30 +0100
+Subject: [PATCH 3/3] arm64: Introduce command line parameter to disable CNP
+In-Reply-To: <6671190b-0d76-2e57-d105-444bbbc13fa0@arm.com>
+References: <1507553734-27854-1-git-send-email-vladimir.murzin@arm.com>
+ <1507553734-27854-4-git-send-email-vladimir.murzin@arm.com>
+ <6671190b-0d76-2e57-d105-444bbbc13fa0@arm.com>
+Message-ID: <baff1ecc-3a69-6e06-f0b5-2f117e163e7c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 11, 2017 at 10:35 AM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
-> On Wed, Sep 27, 2017 at 4:40 AM, Masahiro Yamada
-> <yamada.masahiro@socionext.com> wrote:
->
->> This GPIO controller is used on UniPhier SoC family.
+Hi Julien,
+
+On 10/10/17 15:36, Julien Thierry wrote:
+> Hi Vladimir,
+> 
+> On 09/10/17 13:55, Vladimir Murzin wrote:
+>> There are cases when activating of Common Not Private (CNP) feature
+>> might not be desirable; this patch allows to forcefully disable CNP
+>> even it is supported by hardware.
 >>
->> The vendor specific property "socionext,interrupt-ranges" is for
->> specifying interrupt mapping to the parent interrupt controller
->> because the mapping is not contiguous.  It works like "ranges",
->> but transforms "interrupts" instead of "reg".
+>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+>> ---
+>>   Documentation/admin-guide/kernel-parameters.txt |  4 ++++
+>>   arch/arm64/kernel/cpufeature.c                  | 20 +++++++++++++++++++-
+>>   2 files changed, 23 insertions(+), 1 deletion(-)
 >>
->> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->> Acked-by: Rob Herring <robh@kernel.org>
->
-> Patch applied.
->
->> +- socionext,interrupt-ranges: Specifies an interrupt number mapping between
->> +  this GPIO controller and its interrupt parent, in the form of arbitrary
->> +  number of <child-interrupt-base parent-interrupt-base length> triplets.
-> (...)
->> +               socionext,interrupt-ranges = <0 48 16>, <16 154 5>, <21 217 3>;
->
-> Still uncertain about that thing.
->
-> But as it is, you need running code, and we have rough consensus.
->
-> So merging.
->
-> If it turns out to be a bad binding we may need to patch in an alternative
-> later.
+>> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+>> index 0549662..3c1e45d 100644
+>> --- a/Documentation/admin-guide/kernel-parameters.txt
+>> +++ b/Documentation/admin-guide/kernel-parameters.txt
+>> @@ -2560,6 +2560,10 @@
+>>         noclflush    [BUGS=X86] Don't use the CLFLUSH instruction
+>>   +    nocnp        [ARM64]
+>> +            Disable CNP (Common not Private translations)
+>> +            even if it is supported by processor.
+>> +
+>>       nodelayacct    [KNL] Disable per-task delay accounting
+>>         nodsp        [SH] Disable hardware DSP at boot time.
+>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+>> index 8d098a1..724fd93 100644
+>> --- a/arch/arm64/kernel/cpufeature.c
+>> +++ b/arch/arm64/kernel/cpufeature.c
+>> @@ -771,6 +771,24 @@ static bool has_no_hw_prefetch(const struct arm64_cpu_capabilities *entry, int _
+>>           MIDR_CPU_VAR_REV(1, MIDR_REVISION_MASK));
+>>   }
+>>   +static bool nocnp;
+>> +
+>> +static int __init early_nocnp(char *p)
+>> +{
+>> +    nocnp = true;
+>> +    return 0;
+>> +}
+>> +early_param("nocnp", early_nocnp);
+>> +
+>> +static bool has_useable_cnp(const struct arm64_cpu_capabilities *entry, int scope)
+>> +{
+>> +    if (!has_cpuid_feature(entry, scope))
+>> +        return false;
+>> +
+>> +    return nocnp ? false : true;
+> 
+> This feels a bit odd.
+> 
+> Wouldn't the following be better?
+> return !nocnp;
+> 
+> Or simply the whole function as:
+> return has_cpuid_feature(entry, scope) && !nocnp;
+> 
 
-Sorry I had to take it back out, because the <dt-bindings/*> stuff in the
-other patch should also be in this patch rather than in the driver.
+I have no strong opinion on that, so I'll change per your suggestion.
 
-Please move that over here, and if you insist on those macros, also
-use them in the example so we understand how this is supposed to
-be used, i.e. also add a consumer node to the bindings example
-if it is gonna use magic macros.
+Cheers
+Vladimir
 
-Yours,
-Linus Walleij
+> Thanks,
+> 
+>> +}
+>> +
+>> +
+>>   static bool runs_at_el2(const struct arm64_cpu_capabilities *entry, int __unused)
+>>   {
+>>       return is_kernel_in_hyp_mode();
+>> @@ -905,7 +923,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+>>           .desc = "Common not Private translations",
+>>           .capability = ARM64_HAS_CNP,
+>>           .def_scope = SCOPE_SYSTEM,
+>> -        .matches = has_cpuid_feature,
+>> +        .matches = has_useable_cnp,
+>>           .sys_reg = SYS_ID_AA64MMFR2_EL1,
+>>           .sign = FTR_UNSIGNED,
+>>           .field_pos = ID_AA64MMFR2_CNP_SHIFT,
+>>
+> 
