@@ -1,119 +1,75 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Wed, 11 Oct 2017 09:09:34 -0700
-Subject: [PATCH 1/1] tty: serial: imx: disable ageing timer interrupt if
- dma in use
-In-Reply-To: <AM3P101MB01800FAA2029393C5A859629E64A0@AM3P101MB0180.NAMP101.PROD.OUTLOOK.COM>
-References: <20171007014648.6989-1-troy.kisky@boundarydevices.com>
- <AM3P101MB01800FAA2029393C5A859629E64A0@AM3P101MB0180.NAMP101.PROD.OUTLOOK.COM>
-Message-ID: <7c5a3ef3-6da7-815e-04a3-a1f18344032e@boundarydevices.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Wed, 11 Oct 2017 17:10:11 +0100
+Subject: [RFC 0/7] arm64: provide pseudo NMI with GICv3
+In-Reply-To: <CAMTL27FYM=oiNjh1JoXPMx6eTLJZXYm8QPb4QcQe-wgWpeEaBA@mail.gmail.com>
+References: <1507726862-11944-1-git-send-email-julien.thierry@arm.com>
+ <CAMTL27FYM=oiNjh1JoXPMx6eTLJZXYm8QPb4QcQe-wgWpeEaBA@mail.gmail.com>
+Message-ID: <9dde96d6-a430-8d63-4f99-e9453ab2e12c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/10/2017 11:22 PM, Han, Nandor (GE Healthcare) wrote:
-> 
-> 
->> -----Original Message-----
->> From: linux-serial-owner at vger.kernel.org [mailto:linux-serial-
->> owner at vger.kernel.org] On Behalf Of Troy Kisky
->> Sent: 07 October 2017 04:47
->> To: gregkh at linuxfoundation.org
->> Cc: fabio.estevam at nxp.com; l.stach at pengutronix.de; u.kleine-
->> koenig at pengutronix.de; linux-serial at vger.kernel.org; linux-arm-
->> kernel at lists.infradead.org; Troy Kisky <troy.kisky@boundarydevices.com>
->> Subject: EXT: [PATCH 1/1] tty: serial: imx: disable ageing timer interrupt if
->> dma in use
+Hi Daniel,
+
+On 11/10/17 16:55, Daniel Thompson wrote:
+> On 11 October 2017 at 14:00, Julien Thierry <julien.thierry@arm.com> wrote:
+>> Hi,
 >>
->> Since commit 4dec2f119e86 ("imx-serial: RX DMA startup latency")
->>
->> the interrupt routine no longer will start rx dma.
+>> This series is a continuation of the work started by Daniel [1]. The goal is
+>> to use GICv3 interrupt priorities to simulate an NMI.
 > 
-> I think you have 2 commits here: 
-> - one that disables ageing timer when DMA is in use
-> - one that cleans the leftovers after 4dec2f119e86.
+> Cool. By coincidence, and after ignoring the code for three kernel
+> releases, I'm halfway through rebasing this to v4.14... and *very*
+> happy to be able to grab yours instead. There's a machine I want to
+> play with it on!
 > 
 
-I could kill 3 lines, in the 1st patch, and the other 27 in the next.
-But the 2 patches would not be independent. You should not apply the
-second without the 1st. I think the change is simple enough not to
-warrant a series.
+Good to know someone will be testing this then ;) , thanks.
 
-
->>
->> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
->> ---
->>  drivers/tty/serial/imx.c | 34 ++--------------------------------
->>  1 file changed, 2 insertions(+), 32 deletions(-)
->>
->> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c index
->> dfeff3951f93..15b0ecb4cf60 100644
->> --- a/drivers/tty/serial/imx.c
->> +++ b/drivers/tty/serial/imx.c
->> @@ -732,29 +732,6 @@ static void imx_disable_rx_int(struct imx_port
->> *sport)  }
->>
->>  static void clear_rx_errors(struct imx_port *sport); -static int
->> start_rx_dma(struct imx_port *sport);
->> -/*
->> - * If the RXFIFO is filled with some data, and then we
->> - * arise a DMA operation to receive them.
->> - */
->> -static void imx_dma_rxint(struct imx_port *sport) -{
->> -	unsigned long temp;
->> -	unsigned long flags;
->> -
->> -	spin_lock_irqsave(&sport->port.lock, flags);
->> -
->> -	temp = readl(sport->port.membase + USR2);
->> -	if ((temp & USR2_RDR) && !sport->dma_is_rxing) {
->> -
->> -		imx_disable_rx_int(sport);
->> -
->> -		/* tell the DMA to receive the data. */
->> -		start_rx_dma(sport);
->> -	}
->> -
->> -	spin_unlock_irqrestore(&sport->port.lock, flags);
->> -}
->>
->>  /*
->>   * We have a modem side uart, so the meanings of RTS and CTS are inverted.
->> @@ -816,11 +793,8 @@ static irqreturn_t imx_int(int irq, void *dev_id)
->>  	sts = readl(sport->port.membase + USR1);
->>  	sts2 = readl(sport->port.membase + USR2);
->>
->> -	if (sts & (USR1_RRDY | USR1_AGTIM)) {
->> -		if (sport->dma_is_enabled)
->> -			imx_dma_rxint(sport);
->> -		else
->> -			imx_rxint(irq, dev_id);
->> +	if (!sport->dma_is_enabled && (sts & (USR1_RRDY |
->> USR1_AGTIM))) {
->> +		imx_rxint(irq, dev_id);
-> 
-> I don't think we need the check `!sport->dma_is_enabled ` since RRDY and AGTIM interrupts should be disable when DMA is enabled.
-
-If I AND the status with its corresponding interrupt enable. But that is just as complicated, and
-more different from the original.
-
-
-> 
->>  		ret = IRQ_HANDLED;
->>  	}
->>
->> @@ -1207,10 +1181,6 @@ static void imx_enable_dma(struct imx_port
->> *sport)
->>  	temp |= UCR1_RDMAEN | UCR1_TDMAEN | UCR1_ATDMAEN;
->>  	writel(temp, sport->port.membase + UCR1);
->>
->> -	temp = readl(sport->port.membase + UCR2);
->> -	temp |= UCR2_ATEN;
->> -	writel(temp, sport->port.membase + UCR2);
->> -
-> 
-> I think this should be moved to imx_startup. At least RRDY is configured there. 
+> Have you just brought it up to date or have you acted on Marc Z.'s
+> pending feedback from the last circulation?
 > 
 
+First 3 patches should be pretty much identical. I've done a bit of 
+rework on patch 4, acting on some of Marc's comments, fixing some issues 
+I found along the road, some refactoring.
 
-Currently, non-dma mode does not use the ageing timer. You get an interrupt immediately when
-1 character is in the fifo. So, enabling the ageing timer and changing fifo level, should really be
-a separate patch. But it would be a nice patch.
+Then I added code to the GICv3 irqchip so you can turn an irq as NMI 
+like so:
+irq_set_irqchip_state(virq, IRQCHIP_STATE_NMI, true);
+
+So this means you need to do it through a virtual irq number (e.g. no 
+IPI). I started working on some patches to make it work with IPI as 
+well, but I wanted to get some feeback on this first before finalizing them.
+
+> 
+>> To achieve this, set two priorities, one for standard interrupts and
+>> another, higher priority, for NMIs. Whenever we want to disable interrupts,
+>> we mask the standard priority instead so NMIs can still be raised. Some
+>> corner cases though still require to actually mask all interrupts
+>> effectively disabling the NMI.
+>>
+>> Of course, using priority masking instead of PSR.I comes at some cost. On
+>> hackbench, I notice a ~6% drop of performance. However, on a kernel build,
+>> I do not see significant differences.
+> 
+> Which micro-architecture?
+> 
+
+8 cores A57.
+
+> In micro-benchmarks (with hot caches) I've seen the lock sequence
+> speed up on some designs, slow down a bit on some and slow down a
+> *lot* others. In the worst cases the code impacts Android macro
+> benchmarks like scrolling... on the other hand the code was stable
+> enough to run the whole Android stack reliably.
+> 
+
+So far I only tested with classic Linux distros, so if you find issues 
+with Android (or other) do let me know.
+
+Same if you have any question about the changes.
+
+Thanks,
+
+-- 
+Julien Thierry
