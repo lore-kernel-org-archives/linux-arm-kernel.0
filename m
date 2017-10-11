@@ -1,66 +1,17 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 11 Oct 2017 11:41:12 -0700
-Subject: [PATCH 6/8] ARM: OMAP5: hwmod_data: Add data for IPU & DSP
- processors
-In-Reply-To: <20170821234818.4755-7-s-anna@ti.com>
-References: <20170821234818.4755-1-s-anna@ti.com>
- <20170821234818.4755-7-s-anna@ti.com>
-Message-ID: <20171011184112.GF4394@atomide.com>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Wed, 11 Oct 2017 11:41:53 -0700
+Subject: next: arm64: LTP sendto01 test causes system crash in ilp32 mode
+In-Reply-To: <20171011183522.tm2xxgzbdspjtsax@yury-thinkpad>
+References: <20171011183522.tm2xxgzbdspjtsax@yury-thinkpad>
+Message-ID: <1507747313.31614.27.camel@edumazet-glaptop3.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Suman Anna <s-anna@ti.com> [170821 16:48]:
-> OMAP5, like OMAP4, also has an IPU and a DSP processor subsystems.
-> The relevant hwmod classes and data structures are added for these
-> devices.
+On Wed, 2017-10-11 at 21:35 +0300, Yury Norov wrote:
+> Hi all, 
 > 
-> Do note that these hwmod data strucutures do not have a .modulemode
-> field as the devices are managed together with their corresponding
-> MMUs. Each of the processor subsystem and its MMU are present within
-> the same clock domain and requires the domain be clocked and enabled
-> until the last entity is disabled. The module is disabled properly
-> during the omap_device_idle processing of the MMU hwmod while
-> disabling the MMU.
+> It seems like next-20171009 with ilp32 patches crashes on LTP sendto01 test
+> in sys_sendto() path, like this:
 
-I think we can make that issue go away, see below.
-
-> --- a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-> @@ -335,6 +335,36 @@ static struct omap_hwmod omap54xx_dmic_hwmod = {
-> +/* dsp */
-> +static struct omap_hwmod omap54xx_dsp_hwmod = {
-> +	.name		= "dsp",
-> +	.class		= &omap54xx_dsp_hwmod_class,
-> +	.clkdm_name	= "dsp_clkdm",
-> +	.rst_lines	= omap54xx_dsp_resets,
-> +	.rst_lines_cnt	= ARRAY_SIZE(omap54xx_dsp_resets),
-> +	.main_clk	= "dpll_iva_h11x2_ck",
-> +	.prcm = {
-> +		.omap4 = {
-> +			.clkctrl_offs = OMAP54XX_CM_DSP_DSP_CLKCTRL_OFFSET,
-> +			.rstctrl_offs = OMAP54XX_RM_DSP_RSTCTRL_OFFSET,
-> +			.context_offs = OMAP54XX_RM_DSP_DSP_CONTEXT_OFFSET,
-> +		},
-> +	},
-> +};
-> +
-> +/*
-
-I don't think we should add a second instance for the DSP_CLKCTRL.
-
-We already have mmu_dsp instance and I'm pretty sure this should be
-just one parent "ti,sysc-omap4" interconnect target module instance.
-Then the MMU and DSP can be children of that node. I think it's set
-the same way for all omap4 and later SoCs. So let's wait on
-this series until we have this verified.
-
-Tehn for resets, in the long run we can add reset controller support
-to the ti-sysc driver and then the MMU driver can do the reset with
-device_reset(dev->parent). Also a separate resetctrl driver is needed
-that the ti-sysc driver can request.
-
-But yeah sorry no immediate solution available for the reset part.
-
-Regards,
-
-Tony
+Thanks for the report.
+Probably caused by one of my recent patches, so I am taking a look.
