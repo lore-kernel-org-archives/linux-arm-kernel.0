@@ -1,196 +1,142 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 11 Oct 2017 14:01:03 +0100
-Subject: [PATCH v3 2/2] arm64: docs: describe ELF hwcaps
-In-Reply-To: <20171011130103.18362-1-suzuki.poulose@arm.com>
-References: <20171011130103.18362-1-suzuki.poulose@arm.com>
-Message-ID: <20171011130103.18362-2-suzuki.poulose@arm.com>
+Date: Wed, 11 Oct 2017 14:01:02 +0100
+Subject: [PATCH v3 1/2] arm64: Expose support for optional ARMv8-A features
+Message-ID: <20171011130103.18362-1-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Rutland <mark.rutland@arm.com>
+ARMv8-A adds a few optional features for ARMv8.2 and ARMv8.3.
+Expose them to the userspace via HWCAPs and mrs emulation.
 
-We don't document our ELF hwcaps, leaving developers to interpret them
-according to hearsay, guesswork, or (in exceptional cases) inspection of
-the current kernel code.
+SHA2-512  - Instruction support for SHA512 Hash algorithm (e.g SHA512H,
+	    SHA512H2, SHA512U0, SHA512SU1)
+SHA3 	  - SHA3 crypto instructions (EOR3, RAX1, XAR, BCAX).
+SM3	  - Instruction support for Chinese cryptography algorithm SM3
+SM4 	  - Instruction support for Chinese cryptography algorithm SM4
+DP	  - Dot Product instructions (UDOT, SDOT).
 
-This is less than optimal, and it would be far better if we had some
-definitive description of each of the ELF hwcaps that developers could
-refer to.
-
-This patch adds a document describing the (native) arm64 ELF hwcaps.
-
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Dave Martin <Dave.Martin@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-[ Updated new hwcap entries in the document ]
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Dave Martin <dave.martin@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- Documentation/arm64/elf_hwcaps.txt | 156 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 156 insertions(+)
- create mode 100644 Documentation/arm64/elf_hwcaps.txt
 
-diff --git a/Documentation/arm64/elf_hwcaps.txt b/Documentation/arm64/elf_hwcaps.txt
-new file mode 100644
-index 000000000000..0ba180522e3c
---- /dev/null
-+++ b/Documentation/arm64/elf_hwcaps.txt
-@@ -0,0 +1,156 @@
-+ARM64 ELF hwcaps
-+================
-+
-+This document describes the usage and semantics of the arm64 ELF hwcaps.
-+
-+
-+1. Introduction
-+---------------
-+
-+Some hardware or software features are only available on some CPU
-+implementations, and/or with certain kernel configurations, but have no
-+architected discovery mechanism available to userspace code at EL0. The
-+kernel exposes the presence of these features to userspace through a set
-+of flags called hwcaps, exposed in the auxilliary vector.
-+
-+Userspace software can test for features by acquiring the AT_HWCAP entry
-+of the auxilliary vector, and testing whether the relevant flags are
-+set, e.g.
-+
-+bool floating_point_is_present(void)
-+{
-+	unsigned long hwcaps = getauxval(AT_HWCAP);
-+	if (hwcaps & HWCAP_FP)
-+		return true;
-+
-+	return false;
-+}
-+
-+Where software relies on a feature described by a hwcap, it should check
-+the relevant hwcap flag to verify that the feature is present before
-+attempting to make use of the feature.
-+
-+Features cannot be probed reliably through other means. When a feature
-+is not available, attempting to use it may result in unpredictable
-+behaviour, and is not guaranteed to result in any reliable indication
-+that the feature is unavailable, such as a SIGILL.
-+
-+
-+2. Interpretation of hwcaps
-+---------------------------
-+
-+The majority of hwcaps are intended to indicate the presence of features
-+which are described by architected ID registers inaccessible to
-+userspace code at EL0. These hwcaps are defined in terms of ID register
-+fields, and should be interpreted with reference to the definition of
-+these fields in the ARM Architecture Reference Manual (ARM ARM).
-+
-+Such hwcaps are described below in the form:
-+
-+    Functionality implied by idreg.field == val.
-+
-+Such hwcaps indicate the availability of functionality that the ARM ARM
-+defines as being present when idreg.field has value val, but do not
-+indicate that idreg.field is precisely equal to val, nor do they
-+indicate the absence of functionality implied by other values of
-+idreg.field.
-+
-+Other hwcaps may indicate the presence of features which cannot be
-+described by ID registers alone. These may be described without
-+reference to ID registers, and may refer to other documentation.
-+
-+
-+3. The hwcaps exposed in AT_HWCAP
-+---------------------------------
-+
-+HWCAP_FP
-+
-+    Functionality implied by ID_AA64PFR0_EL1.FP == 0b0000.
-+
-+HWCAP_ASIMD
-+
-+    Functionality implied by ID_AA64PFR0_EL1.AdvSIMD == 0b0000.
-+
-+HWCAP_EVTSTRM
-+
-+    The generic timer is configured to generate events at a frequency of
-+    approximately 100KHz.
-+
-+HWCAP_AES
-+
-+    Functionality implied by ID_AA64ISAR1_EL1.AES == 0b0001.
-+
-+HWCAP_PMULL
-+
-+    Functionality implied by ID_AA64ISAR1_EL1.AES == 0b0010.
-+
-+HWCAP_SHA1
-+
-+    Functionality implied by ID_AA64ISAR0_EL1.SHA1 == 0b0001.
-+
-+HWCAP_SHA2
-+
-+    Functionality implied by ID_AA64ISAR0_EL1.SHA2 == 0b0001.
-+
-+HWCAP_CRC32
-+
-+    Functionality implied by ID_AA64ISAR0_EL1.CRC32 == 0b0001.
-+
-+HWCAP_ATOMICS
-+
-+    Functionality implied by ID_AA64ISAR0_EL1.Atomic == 0b0010.
-+
-+HWCAP_FPHP
-+
-+    Functionality implied by ID_AA64PFR0_EL1.FP == 0b0001.
-+
-+HWCAP_ASIMDHP
-+
-+    Functionality implied by ID_AA64PFR0_EL1.AdvSIMD == 0b0001.
-+
-+HWCAP_CPUID
-+
-+    EL0 access to certain ID registers is available, to the extent
-+    described by Documentation/arm64/cpu-feature-registers.txt.
-+
-+    These ID registers may imply the availability of features.
-+
-+HWCAP_ASIMDRDM
-+
-+    Functionality implied by ID_AA64ISAR0_EL1.RDM == 0b0001.
-+
-+HWCAP_JSCVT
-+
-+    Functionality implied by ID_AA64ISAR1_EL1.JSCVT == 0b0001.
-+
-+HWCAP_FCMA
-+
-+    Functionality implied by ID_AA64ISAR1_EL1.FCMA == 0b0001.
-+
-+HWCAP_LRCPC
-+
-+    Functionality implied by ID_AA64ISAR1_EL1.LRCPC == 0b0001.
-+
-+HWCAP_DCPOP
-+
-+    Functionality implied by ID_AA64ISAR1_EL1.DPB == 0b0001.
-+
-+HWCAP_SHA3
-+
-+    Functionality implied by ID_AA64ISAR0_EL1.SHA3 == 0b0001.
-+
-+HWCAP_SM3
-+
-+    Functionality implied by ID_AA64ISAR0_EL1.SM3 == 0b0001.
-+
-+HWCAP_SM4
-+
-+    Functionality implied by ID_AA64ISAR0_EL1.SM4 == 0b0001.
-+
-+HWCAP_ASIMDDP
-+
-+    Functionality implied by ID_AA64ISAR0_EL1.DP == 0b0001.
-+
-+HWCAP_SHA512
-+
-+    Functionality implied by ID_AA64ISAR0_EL1.SHA2 == 0b0002.
+---
+Changes since V2
+ - Fixed a typo in the commit message spotted by Marc Zyngier
+ - Added Reviewed-by tags from Catalin
+Changes since V1
+ - Expose SHA512, SHA3, SM3 and SM4
+---
+ Documentation/arm64/cpu-feature-registers.txt | 12 +++++++++++-
+ arch/arm64/include/asm/sysreg.h               |  4 ++++
+ arch/arm64/include/uapi/asm/hwcap.h           |  5 +++++
+ arch/arm64/kernel/cpufeature.c                |  9 +++++++++
+ arch/arm64/kernel/cpuinfo.c                   |  5 +++++
+ 5 files changed, 34 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/arm64/cpu-feature-registers.txt b/Documentation/arm64/cpu-feature-registers.txt
+index dad411d635d8..011ddfc1e570 100644
+--- a/Documentation/arm64/cpu-feature-registers.txt
++++ b/Documentation/arm64/cpu-feature-registers.txt
+@@ -110,10 +110,20 @@ infrastructure:
+      x--------------------------------------------------x
+      | Name                         |  bits   | visible |
+      |--------------------------------------------------|
+-     | RES0                         | [63-32] |    n    |
++     | RES0                         | [63-48] |    n    |
++     |--------------------------------------------------|
++     | DP                           | [47-44] |    y    |
++     |--------------------------------------------------|
++     | SM4                          | [43-40] |    y    |
++     |--------------------------------------------------|
++     | SM3                          | [39-36] |    y    |
++     |--------------------------------------------------|
++     | SHA3                         | [35-32] |    y    |
+      |--------------------------------------------------|
+      | RDM                          | [31-28] |    y    |
+      |--------------------------------------------------|
++     | RES0                         | [27-24] |    n    |
++     |--------------------------------------------------|
+      | ATOMICS                      | [23-20] |    y    |
+      |--------------------------------------------------|
+      | CRC32                        | [19-16] |    y    |
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index f707fed5886f..32f489ba952f 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -318,6 +318,10 @@
+ #define SCTLR_EL1_CP15BEN	(1 << 5)
+ 
+ /* id_aa64isar0 */
++#define ID_AA64ISAR0_DP_SHIFT		44
++#define ID_AA64ISAR0_SM4_SHIFT		40
++#define ID_AA64ISAR0_SM3_SHIFT		36
++#define ID_AA64ISAR0_SHA3_SHIFT		32
+ #define ID_AA64ISAR0_RDM_SHIFT		28
+ #define ID_AA64ISAR0_ATOMICS_SHIFT	20
+ #define ID_AA64ISAR0_CRC32_SHIFT	16
+diff --git a/arch/arm64/include/uapi/asm/hwcap.h b/arch/arm64/include/uapi/asm/hwcap.h
+index 4b9344cba83a..a4bad90a3fa3 100644
+--- a/arch/arm64/include/uapi/asm/hwcap.h
++++ b/arch/arm64/include/uapi/asm/hwcap.h
+@@ -36,5 +36,10 @@
+ #define HWCAP_FCMA		(1 << 14)
+ #define HWCAP_LRCPC		(1 << 15)
+ #define HWCAP_DCPOP		(1 << 16)
++#define HWCAP_SHA3		(1 << 17)
++#define HWCAP_SM3		(1 << 18)
++#define HWCAP_SM4		(1 << 19)
++#define HWCAP_ASIMDDP		(1 << 20)
++#define HWCAP_SHA512		(1 << 21)
+ 
+ #endif /* _UAPI__ASM_HWCAP_H */
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 21e2c95d24e7..8f0ec2b62cf1 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -107,6 +107,10 @@ cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry, int __unused)
+  * sync with the documentation of the CPU feature register ABI.
+  */
+ static const struct arm64_ftr_bits ftr_id_aa64isar0[] = {
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_DP_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_SM4_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_SM3_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_SHA3_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_ATOMICS_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_CRC32_SHIFT, 4, 0),
+@@ -921,9 +925,14 @@ static const struct arm64_cpu_capabilities arm64_elf_hwcaps[] = {
+ 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_AES_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_AES),
+ 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SHA1_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_SHA1),
+ 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SHA2_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_SHA2),
++	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SHA2_SHIFT, FTR_UNSIGNED, 2, CAP_HWCAP, HWCAP_SHA512),
+ 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_CRC32_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_CRC32),
+ 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_ATOMICS_SHIFT, FTR_UNSIGNED, 2, CAP_HWCAP, HWCAP_ATOMICS),
+ 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_RDM_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_ASIMDRDM),
++	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SHA3_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_SHA3),
++	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SM3_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_SM3),
++	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SM4_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_SM4),
++	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_DP_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_ASIMDDP),
+ 	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_FP_SHIFT, FTR_SIGNED, 0, CAP_HWCAP, HWCAP_FP),
+ 	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_FP_SHIFT, FTR_SIGNED, 1, CAP_HWCAP, HWCAP_FPHP),
+ 	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_ASIMD_SHIFT, FTR_SIGNED, 0, CAP_HWCAP, HWCAP_ASIMD),
+diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+index 311885962830..1ff1c5a67081 100644
+--- a/arch/arm64/kernel/cpuinfo.c
++++ b/arch/arm64/kernel/cpuinfo.c
+@@ -69,6 +69,11 @@ static const char *const hwcap_str[] = {
+ 	"fcma",
+ 	"lrcpc",
+ 	"dcpop",
++	"sha3",
++	"sm3",
++	"sm4",
++	"asimddp",
++	"sha512",
+ 	NULL
+ };
+ 
 -- 
 2.13.6
