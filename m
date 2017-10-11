@@ -1,133 +1,260 @@
 From: jim2101024@gmail.com (Jim Quinlan)
-Date: Wed, 11 Oct 2017 18:34:22 -0400
-Subject: [PATCH 2/9] PCI: host: brcmstb: add DT docs for Brcmstb PCIe device
+Date: Wed, 11 Oct 2017 18:34:21 -0400
+Subject: [PATCH 1/9] SOC: brcmstb: add memory API
 In-Reply-To: <1507761269-7017-1-git-send-email-jim2101024@gmail.com>
 References: <1507761269-7017-1-git-send-email-jim2101024@gmail.com>
-Message-ID: <1507761269-7017-3-git-send-email-jim2101024@gmail.com>
+Message-ID: <1507761269-7017-2-git-send-email-jim2101024@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DT bindings description of the Brcmstb PCIe device is described.  This
-node can be used by almost all Broadcom settop box chips, using
-ARM, ARM64, or MIPS CPU architectures.
+From: Florian Fainelli <f.fainelli@gmail.com>
+
+This commit adds a memory API suitable for ascertaining the sizes of
+each of the N memory controllers in a Broadcom STB chip.  Its first
+user will be the Broadcom STB PCIe root complex driver, which needs
+to know these sizes to properly set up DMA mappings for inbound
+regions.
+
+We cannot use memblock here or anything like what Linux provides
+because it collapses adjacent regions within a larger block, and here
+we actually need per-memory controller addresses and sizes, which is
+why we resort to manual DT parsing.
 
 Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
 ---
- .../devicetree/bindings/pci/brcmstb-pci.txt        | 106 +++++++++++++++++++++
- 1 file changed, 106 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pci/brcmstb-pci.txt
+ drivers/soc/bcm/brcmstb/Makefile |   2 +-
+ drivers/soc/bcm/brcmstb/memory.c | 183 +++++++++++++++++++++++++++++++++++++++
+ include/soc/brcmstb/memory_api.h |  25 ++++++
+ 3 files changed, 209 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/soc/bcm/brcmstb/memory.c
+ create mode 100644 include/soc/brcmstb/memory_api.h
 
-diff --git a/Documentation/devicetree/bindings/pci/brcmstb-pci.txt b/Documentation/devicetree/bindings/pci/brcmstb-pci.txt
+diff --git a/drivers/soc/bcm/brcmstb/Makefile b/drivers/soc/bcm/brcmstb/Makefile
+index 9120b27..4cea7b6 100644
+--- a/drivers/soc/bcm/brcmstb/Makefile
++++ b/drivers/soc/bcm/brcmstb/Makefile
+@@ -1 +1 @@
+-obj-y				+= common.o biuctrl.o
++obj-y				+= common.o biuctrl.o memory.o
+diff --git a/drivers/soc/bcm/brcmstb/memory.c b/drivers/soc/bcm/brcmstb/memory.c
 new file mode 100644
-index 0000000..2f699da
+index 0000000..cb6bf73
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/pci/brcmstb-pci.txt
-@@ -0,0 +1,106 @@
-+Brcmstb PCIe Host Controller Device Tree Bindings
++++ b/drivers/soc/bcm/brcmstb/memory.c
+@@ -0,0 +1,183 @@
++/*
++ * Copyright ? 2015-2017 Broadcom
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * A copy of the GPL is available at
++ * http://www.broadcom.com/licenses/GPLv2.php or from the Free Software
++ * Foundation at https://www.gnu.org/licenses/ .
++ */
 +
-+Introduction:
-+  The brcmstb host controller closely follows the example set in
++#include <linux/device.h>
++#include <linux/io.h>
++#include <linux/libfdt.h>
++#include <linux/of_address.h>
++#include <linux/of_fdt.h>
++#include <linux/sizes.h>
++#include <soc/brcmstb/memory_api.h>
 +
-+	[1] http://devicetree.org/Device_Tree_Usage#PCI_Host_Bridge
++/* -------------------- Constants -------------------- */
 +
-+  The rest of this document explains some added customizations and
-+  offers an example Brcmstb PCIe host controller DT node.
++/* Macros to help extract property data */
++#define U8TOU32(b, offs) \
++	((((u32)b[0 + offs] << 0)  & 0x000000ff) | \
++	 (((u32)b[1 + offs] << 8)  & 0x0000ff00) | \
++	 (((u32)b[2 + offs] << 16) & 0x00ff0000) | \
++	 (((u32)b[3 + offs] << 24) & 0xff000000))
 +
-+Required Properties:
-+  reg -- the register start address and length for the PCIe block.
-+      Additional start,length pairs may be specified for clock addresses.
-+  interrupts -- two interrupts are specified; the first interrupt is for
-+      the PCI host controller and the second is for MSI if the built-in
-+      MSI controller is to be used.
-+  interrupt-names -- names of the interrupts (above): "pcie" and "msi".
-+  compatible -- must be one of: "brcm,bcm7425-pcie", "brcm,bcm7435-pcie",
-+      or "brcm,bcm7278-pcie".
-+  #address-cells -- the number of address cells for PCI-space.
-+  #size-cells -- the number of size cells for PCI-space.
-+  ranges -- See [1]; a specification of the outbound windows for the host
-+      controller.  Each outbound window is described by a n-tuple:
-+          (3 cells) -- PCIe space start address; one cell for attributes
-+                       and two cells for the 64-bit PCIe address.
-+          (x cells) -- CPU/System start address, number of cells is determined
-+                       by the parent node's #address-cells.
-+          (y cells) -- Size of region, number of cells determined by the
-+                       parent node's #size-cells.
-+      Due to hardware limitations, there may be a maximum of four
-+      non-contiguous ranges specified.
-+  #interrupt-cells -- number of cells used to describe the interrupt.
-+  interrupt-map-mask -- see [1]; four cells, the first three are zero
-+      for our uses and the fourth cell is the mask (val = 0x7) for
-+      the legacy interrupt number [1..4].
-+  interrupt-map -- See [1]; there are four interrupts (INTA, INTB,
-+      INTC, and INTD) to be mapped; each interrupt requires 5 cells
-+      plus the size of the interrupt specifier.
-+  linux,pci-domain -- the domain of the host controller.
++#define DT_PROP_DATA_TO_U32(b, offs) (fdt32_to_cpu(U8TOU32(b, offs)))
 +
-+Optional Properties:
-+  clocks -- list of clock phandles.  If specified, this should list one
-+      clock.
-+  clock-names -- the "local" names of the clocks specified in 'clocks'.  Note
-+      that if the 'clocks' property is given, 'clock-names' is mandatory,
-+      and the name of the clock is expected to be "sw_pcie".
-+  dma-ranges -- Similar in structure to ranges, each dma region is
-+      specified with a n-tuple.  Dma-regions describe the inbound
-+      accesses from EP to RC; it translates the pci address that the
-+      EP "sees" to the CPU address in memory.  This property is needed
-+      because the design of the Brcmstb memory subsystem often precludes
-+      idenity-mapping between CPU address space and PCIe address space.
-+      Each range is described by a n-tuple:
-+          (3 cells) -- PCIe space start address; one cell for attributes
-+                       and two cells for the 64-bit PCIe address.
-+          (x cells) -- CPU/System start address, number of cells is determined
-+                       by the parent node's #address-cells.
-+          (y cells) -- Size of region, number of cells determined by the
-+                       parent node's #size-cells.
-+  msi-parent -- if MSI is to be used, this must be a phandle to the
-+      msi-parent.  If this prop is set to the phandle of the PCIe
-+      node, or if the msi-parent prop is missing, the PCIE controller
-+      will attempt to use its built in MSI controller.
-+  msi-controller -- this property should only be specified if the
-+      PCIe controller is using its internal MSI controller.
-+  brcm,ssc -- (boolean) indicates usage of spread-spectrum clocking.
-+  brcm,gen --  (integer) indicates desired generation of link:
-+      1 => 2.5 Gbps, 2 => 5.0 Gbps, 3 => 8.0 Gbps.
-+  supply-names -- the names of voltage regulators that the root
-+      complex should turn off/on/on on suspend/resume/boot.  This
-+      is a string list.
-+  supplies -- A collection of phandles to a regulator nodes, see
-+      Documentation/devicetree/bindings/regulator/ for specific
-+      bindings. The number and order of phandles must match
-+      exactly the number of strings in the "supply-names" property.
++/* Constants used when retrieving memc info */
++#define NUM_BUS_RANGES 10
++#define BUS_RANGE_ULIMIT_SHIFT 4
++#define BUS_RANGE_LLIMIT_SHIFT 4
++#define BUS_RANGE_PA_SHIFT 12
 +
-+Example Node:
++enum {
++	BUSNUM_MCP0 = 0x4,
++	BUSNUM_MCP1 = 0x5,
++	BUSNUM_MCP2 = 0x6,
++};
 +
-+pcie0:	pcie at f0460000 {
-+		reg = <0x0 0xf0460000 0x0 0x9310>;
-+		interrupts = <0x0 0x0 0x4>;
-+		compatible = "brcm,pci-plat-dev";
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		ranges = <0x02000000 0x00000000 0x00000000 0x00000000 0xc0000000 0x00000000 0x08000000
-+			  0x02000000 0x00000000 0x08000000 0x00000000 0xc8000000 0x00000000 0x08000000>;
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 0 0 7>;
-+		interrupt-map = <0 0 0 1 &intc 0 47 3
-+				 0 0 0 2 &intc 0 48 3
-+				 0 0 0 3 &intc 0 49 3
-+				 0 0 0 4 &intc 0 50 3>;
-+		interrupt-names = "pcie_0_inta",
-+				  "pcie_0_intb",
-+				  "pcie_0_intc",
-+				  "pcie_0_intd";
-+		clocks = <&sw_pcie0>;
-+		clock-names = "sw_pcie";
-+		msi-parent = <&pcie0>;  /* use PCIe's internal MSI controller */
-+		msi-controller;         /* use PCIe's internal MSI controller */
-+		brcm,ssc;
-+		brcm,gen = <1>;
-+		supply-names = "vreg-wifi-pwr";
-+		supplies = <&vreg-wifi-pwr>;
-+		linux,pci-domain = <0>;
-+	};
++/* -------------------- Functions -------------------- */
++
++/*
++ * If the DT nodes are handy, determine which MEMC holds the specified
++ * physical address.
++ */
++#ifdef CONFIG_ARCH_BRCMSTB
++int __brcmstb_memory_phys_addr_to_memc(phys_addr_t pa, void __iomem *base)
++{
++	int memc = -1;
++	int i;
++
++	for (i = 0; i < NUM_BUS_RANGES; i++, base += 8) {
++		const u64 ulimit_raw = readl(base);
++		const u64 llimit_raw = readl(base + 4);
++		const u64 ulimit =
++			((ulimit_raw >> BUS_RANGE_ULIMIT_SHIFT)
++			 << BUS_RANGE_PA_SHIFT) | 0xfff;
++		const u64 llimit = (llimit_raw >> BUS_RANGE_LLIMIT_SHIFT)
++				   << BUS_RANGE_PA_SHIFT;
++		const u32 busnum = (u32)(ulimit_raw & 0xf);
++
++		if (pa >= llimit && pa <= ulimit) {
++			if (busnum >= BUSNUM_MCP0 && busnum <= BUSNUM_MCP2) {
++				memc = busnum - BUSNUM_MCP0;
++				break;
++			}
++		}
++	}
++
++	return memc;
++}
++
++int brcmstb_memory_phys_addr_to_memc(phys_addr_t pa)
++{
++	int memc = -1;
++	struct device_node *np;
++	void __iomem *cpubiuctrl;
++
++	np = of_find_compatible_node(NULL, NULL, "brcm,brcmstb-cpu-biu-ctrl");
++	if (!np)
++		return memc;
++
++	cpubiuctrl = of_iomap(np, 0);
++	if (!cpubiuctrl)
++		goto cleanup;
++
++	memc = __brcmstb_memory_phys_addr_to_memc(pa, cpubiuctrl);
++	iounmap(cpubiuctrl);
++
++cleanup:
++	of_node_put(np);
++
++	return memc;
++}
++
++#elif defined(CONFIG_MIPS)
++int brcmstb_memory_phys_addr_to_memc(phys_addr_t pa)
++{
++	/* The logic here is fairly simple and hardcoded: if pa <= 0x5000_0000,
++	 * then this is MEMC0, else MEMC1.
++	 *
++	 * For systems with 2GB on MEMC0, MEMC1 starts at 9000_0000, with 1GB
++	 * on MEMC0, MEMC1 starts@6000_0000.
++	 */
++	if (pa >= 0x50000000ULL)
++		return 1;
++	else
++		return 0;
++}
++#endif
++EXPORT_SYMBOL(brcmstb_memory_phys_addr_to_memc);
++
++u64 brcmstb_memory_memc_size(int memc)
++{
++	const void *fdt = initial_boot_params;
++	const int mem_offset = fdt_path_offset(fdt, "/memory");
++	int addr_cells = 1, size_cells = 1;
++	const struct fdt_property *prop;
++	int proplen, cellslen;
++	u64 memc_size = 0;
++	int i;
++
++	/* Get root size and address cells if specified */
++	prop = fdt_get_property(fdt, 0, "#size-cells", &proplen);
++	if (prop)
++		size_cells = DT_PROP_DATA_TO_U32(prop->data, 0);
++
++	prop = fdt_get_property(fdt, 0, "#address-cells", &proplen);
++	if (prop)
++		addr_cells = DT_PROP_DATA_TO_U32(prop->data, 0);
++
++	if (mem_offset < 0)
++		return -1;
++
++	prop = fdt_get_property(fdt, mem_offset, "reg", &proplen);
++	cellslen = (int)sizeof(u32) * (addr_cells + size_cells);
++	if ((proplen % cellslen) != 0)
++		return -1;
++
++	for (i = 0; i < proplen / cellslen; ++i) {
++		u64 addr = 0;
++		u64 size = 0;
++		int memc_idx;
++		int j;
++
++		for (j = 0; j < addr_cells; ++j) {
++			int offset = (cellslen * i) + (sizeof(u32) * j);
++
++			addr |= (u64)DT_PROP_DATA_TO_U32(prop->data, offset) <<
++				((addr_cells - j - 1) * 32);
++		}
++		for (j = 0; j < size_cells; ++j) {
++			int offset = (cellslen * i) +
++				(sizeof(u32) * (j + addr_cells));
++
++			size |= (u64)DT_PROP_DATA_TO_U32(prop->data, offset) <<
++				((size_cells - j - 1) * 32);
++		}
++
++		if ((phys_addr_t)addr != addr) {
++			pr_err("phys_addr_t is smaller than provided address 0x%llx!\n",
++			       addr);
++			return -1;
++		}
++
++		memc_idx = brcmstb_memory_phys_addr_to_memc((phys_addr_t)addr);
++		if (memc_idx == memc)
++			memc_size += size;
++	}
++
++	return memc_size;
++}
++EXPORT_SYMBOL(brcmstb_memory_memc_size);
++
+diff --git a/include/soc/brcmstb/memory_api.h b/include/soc/brcmstb/memory_api.h
+new file mode 100644
+index 0000000..d922906
+--- /dev/null
++++ b/include/soc/brcmstb/memory_api.h
+@@ -0,0 +1,25 @@
++#ifndef __MEMORY_API_H
++#define __MEMORY_API_H
++
++/*
++ * Bus Interface Unit control register setup, must happen early during boot,
++ * before SMP is brought up, called by machine entry point.
++ */
++void brcmstb_biuctrl_init(void);
++
++#ifdef CONFIG_SOC_BRCMSTB
++int brcmstb_memory_phys_addr_to_memc(phys_addr_t pa);
++u64 brcmstb_memory_memc_size(int memc);
++#else
++static inline int brcmstb_memory_phys_addr_to_memc(phys_addr_t pa)
++{
++	return -EINVAL;
++}
++
++static inline u64 brcmstb_memory_memc_size(int memc)
++{
++	return -1;
++}
++#endif
++
++#endif /* __MEMORY_API_H */
 -- 
 1.9.0.138.g2de3478
