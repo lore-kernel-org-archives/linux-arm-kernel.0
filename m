@@ -1,24 +1,32 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Wed, 11 Oct 2017 10:08:21 +0000
-Subject: [PATCH v2] xdp: Sample xdp program implementing ip forward
-In-Reply-To: <20171010210607.2af452e2@redhat.com>
-References: <1507620532-25804-1-git-send-email-Christina.Jacob@cavium.com>
- <1507620532-25804-2-git-send-email-Christina.Jacob@cavium.com>
- <20171010210607.2af452e2@redhat.com>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6DD0090EEE@AcuExch.aculab.com>
+From: julian.calaby@gmail.com (Julian Calaby)
+Date: Wed, 11 Oct 2017 21:09:36 +1100
+Subject: [linux-sunxi] [PATCH v4 02/11] drm/sun4i: tcon: Add support for
+ demuxing TCON output on A31
+In-Reply-To: <20171010032008.682-3-wens@csie.org>
+References: <20171010032008.682-1-wens@csie.org>
+ <20171010032008.682-3-wens@csie.org>
+Message-ID: <CAGRGNgXPt=E-8SBKuA6=CSSf1zee0HVMgZAdjBtTb9WqnXxh2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jesper Dangaard Brouer
-> Sent: 10 October 2017 20:06
-...
-> > +		int src_ip = 0, dest_ip = 0;
-...
-> > +			key4.b8[4] = dest_ip % 0x100;
-> > +			key4.b8[5] = (dest_ip >> 8) % 0x100;
-> > +			key4.b8[6] = (dest_ip >> 16) % 0x100;
-> > +			key4.b8[7] = (dest_ip >> 24) % 0x100;
+Hi Chen-Yu,
 
-Do you really want signed remainders done here?
+On Tue, Oct 10, 2017 at 2:19 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> On systems with 2 TCONs such as the A31, it is possible to demux the
+> output of the TCONs to one encoder.
+>
+> Add support for this for the A31.
+>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-	David
+Thanks!
+
+FWIW this is:
+
+Reviewed-by: Julian Calaby <julian.calaby@gmail.com>
+
+-- 
+Julian Calaby
+
+Email: julian.calaby at gmail.com
+Profile: http://www.google.com/profiles/julian.calaby/
