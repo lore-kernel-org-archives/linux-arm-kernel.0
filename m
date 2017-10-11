@@ -1,98 +1,54 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 11 Oct 2017 10:01:47 +0100
-Subject: [PATCH v3 09/20] KVM: arm/arm64: mask/unmask daif around VHE
- guests
-In-Reply-To: <20171005191812.5678-10-james.morse@arm.com> (James Morse's
- message of "Thu, 5 Oct 2017 20:18:01 +0100")
-References: <20171005191812.5678-1-james.morse@arm.com>
- <20171005191812.5678-10-james.morse@arm.com>
-Message-ID: <87lgkijbwk.fsf@on-the-bus.cambridge.arm.com>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Wed, 11 Oct 2017 17:02:31 +0800
+Subject: [PATCH v3 00/10] update MT7623 and MT2701 dts
+In-Reply-To: <cover.1506908511.git.ryder.lee@mediatek.com>
+References: <cover.1506908511.git.ryder.lee@mediatek.com>
+Message-ID: <1507712551.13764.7.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+Hi Matthias,
 
-On Thu, Oct 05 2017 at  8:18:01 pm BST, James Morse <james.morse@arm.com> wrote:
-> Non-VHE systems take an exception to EL2 in order to world-switch into the
-> guest. When returning from the guest KVM implicitly restores the DAIF
-> flags when it returns to the kernel at EL1.
->
-> With VHE none of this exception-level jumping happens, so KVMs
-> world-switch code is exposed to the host kernel's DAIF values, and KVM
-> spills the guest-exit DAIF values back into the host kernel.
-> On entry to a guest we have Debug and SError exceptions unmasked, KVM
-> has switched VBAR but isn't prepared to handle these. On guest exit
-> Debug exceptions are left disabled once we return to the host and will
-> stay this way until we enter user space.
->
-> Add a helper to mask/unmask DAIF around VHE guests. The unmask can only
-> happen after the hosts VBAR value has been synchronised by the isb in
-> __vhe_hyp_call (via kvm_call_hyp()). Masking could be as late as
-> setting KVMs VBAR value, but is kept here for symmetry.
->
-> Signed-off-by: James Morse <james.morse@arm.com>
->
-> ---
-> Give me a kick if you want this reworked as a fix (which will then
-> conflict with this series), or a backportable version.
->
->  arch/arm64/include/asm/kvm_host.h | 10 ++++++++++
->  virt/kvm/arm/arm.c                |  4 ++++
->  2 files changed, 14 insertions(+)
->
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index e923b58606e2..d3eb79a9ed6b 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -25,6 +25,7 @@
->  #include <linux/types.h>
->  #include <linux/kvm_types.h>
->  #include <asm/cpufeature.h>
-> +#include <asm/daifflags.h>
->  #include <asm/kvm.h>
->  #include <asm/kvm_asm.h>
->  #include <asm/kvm_mmio.h>
-> @@ -384,4 +385,13 @@ static inline void __cpu_init_stage2(void)
->  		  "PARange is %d bits, unsupported configuration!", parange);
->  }
->  
-> +static inline void kvm_arm_vhe_guest_enter(void)
-> +{
-> +	local_mask_daif();
-> +}
-> +
-> +static inline void kvm_arm_vhe_guest_exit(void)
-> +{
-> +	local_restore_daif(DAIF_PROCCTX_NOIRQ);
-> +}
->  #endif /* __ARM64_KVM_HOST_H__ */
-> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> index b9f68e4add71..665529924b34 100644
-> --- a/virt/kvm/arm/arm.c
-> +++ b/virt/kvm/arm/arm.c
-> @@ -698,9 +698,13 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  		 */
->  		trace_kvm_entry(*vcpu_pc(vcpu));
->  		guest_enter_irqoff();
-> +		if (has_vhe())
-> +			kvm_arm_vhe_guest_enter();
->  
->  		ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);
->  
-> +		if (has_vhe())
-> +			kvm_arm_vhe_guest_exit();
->  		vcpu->mode = OUTSIDE_GUEST_MODE;
->  		vcpu->stat.exits++;
->  		/*
+How does this series look to you?
 
-Why is that masking limited to entering/exiting the guest? I would have
-though that it would have been put in the kvm_call_hyp helper, in order
-to cover all "HYP" accesses. Or is it that you've worked out that only
-the guest run actually requires this because none of the other HYP
-helpers are changing the flags?
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead, it just smell funny.
+On Mon, 2017-10-02 at 09:54 +0800, Ryder Lee wrote:
+> Hi Matthias,
+> 
+> This patch series adds/corrects some device nodes for both MT7623 and MT2701.
+> 
+> changes since v3:
+> - revert PIO register space.
+> 
+> changes since v2:
+> - move non-common part and non-display related nodes to different patches.
+> - remove unused wdma node.
+> - add display related nodes for MT2701.
+> 
+> changes since v1:
+> - rebase to v4.14.
+> - sort nodes in alphabetical order
+> 
+> Ryder Lee (7):
+>   arm: dts: mediatek: update audio node for mt2701 and mt7623
+>   arm: dts: mt7623: update pio, usb and crypto nodes
+>   arm: dts: mt7623: add subsystem clock controller nodes
+>   arm: dts: mt7623: add iommu and jpecdec nodes
+>   arm: dts: mt7623: add display subsystem related nodes
+>   arm: dts: mt7623: enable bananapi-r2 display function
+>   arm: dts: mt7623: add PCIe related nodes
+> 
+> Weiqing Kong (2):
+>   arm: dts: mt2701: add pwm backlight device node
+>   arm: dts: mt2701: enable display pwm backlight
+> 
+> YT Shen (1):
+>   arm: dts: mt2701: add display subsystem related nodes
+> 
+>  arch/arm/boot/dts/mt2701-evb.dts              |  23 ++
+>  arch/arm/boot/dts/mt2701.dtsi                 |  88 ++++++-
+>  arch/arm/boot/dts/mt7623.dtsi                 | 338 +++++++++++++++++++++++++-
+>  arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts |  71 +++++-
+>  include/dt-bindings/pinctrl/mt7623-pinfunc.h  |  12 +
+>  5 files changed, 516 insertions(+), 16 deletions(-)
+> 
