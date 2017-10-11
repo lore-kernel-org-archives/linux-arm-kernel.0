@@ -1,100 +1,78 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Wed, 11 Oct 2017 17:30:08 +0100
-Subject: [PATCH v3 01/20] arm64: explicitly mask all exceptions
-In-Reply-To: <20171005191812.5678-2-james.morse@arm.com>
-References: <20171005191812.5678-1-james.morse@arm.com>
- <20171005191812.5678-2-james.morse@arm.com>
-Message-ID: <25eb4c59-a09e-5b0a-66fb-6c650ab8e057@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 11 Oct 2017 17:31:17 +0100
+Subject: [PATCH v3 24/28] arm64/sve: KVM: Hide SVE from CPU features
+ exposed to guests
+In-Reply-To: <1507660725-7986-25-git-send-email-Dave.Martin@arm.com>
+References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
+ <1507660725-7986-25-git-send-email-Dave.Martin@arm.com>
+Message-ID: <ed1f4430-fb52-a6dc-9dc0-1201bc3cd06e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+[+ Christoffer]
 
-On 05/10/17 20:17, James Morse wrote:
-> There are a few places where we want to mask all exceptions. Today we
-> do this in a piecemeal fashion, typically we expect the caller to
-> have masked irqs and the arch code masks debug exceptions, ignoring
-> SError which is probably masked.
+On 10/10/17 19:38, Dave Martin wrote:
+> KVM guests cannot currently use SVE, because SVE is always
+> configured to trap to EL2.
 > 
-> Make it clear that 'mask all exceptions' is the intention by adding
-> helpers to do exactly that.
+> However, a guest that sees SVE reported as present in
+> ID_AA64PFR0_EL1 may legitimately expect that SVE works and try to
+> use it.  Instead of working, the guest will receive an injected
+> undef exception, which may cause the guest to oops or go into a
+> spin.
 > 
-> This will let us unmask SError without having to add 'oh and SError'
-> to these paths.
+> To avoid misleading the guest into believing that SVE will work,
+> this patch masks out the SVE field from ID_AA64PFR0_EL1 when a
+> guest attempts to read this register.  No support is explicitly
+> added for ID_AA64ZFR0_EL1 either, so that is still emulated as
+> reading as zero, which is consistent with SVE not being
+> implemented.
 > 
-> Signed-off-by: James Morse <james.morse@arm.com>
+> This is a temporary measure, and will be removed in a later series
+> when full KVM support for SVE is implemented.
 > 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
 > ---
-> Remove the disable IRQs comment above cpu_die(): we return from idle via
-> cpu_resume. This comment is confusing once the local_irq_disable() call
-> is changed.
+>  arch/arm64/kvm/sys_regs.c | 12 +++++++++++-
+>  1 file changed, 11 insertions(+), 1 deletion(-)
 > 
->   arch/arm64/include/asm/assembler.h | 17 +++++++++++
->   arch/arm64/include/asm/daifflags.h | 59 ++++++++++++++++++++++++++++++++++++++
->   arch/arm64/kernel/hibernate.c      |  5 ++--
->   arch/arm64/kernel/machine_kexec.c  |  4 +--
->   arch/arm64/kernel/smp.c            |  9 ++----
->   arch/arm64/kernel/suspend.c        |  7 +++--
->   arch/arm64/kernel/traps.c          |  3 +-
->   arch/arm64/mm/proc.S               |  9 +++---
->   8 files changed, 94 insertions(+), 19 deletions(-)
->   create mode 100644 arch/arm64/include/asm/daifflags.h
-
-[...]
-
-> diff --git a/arch/arm64/include/asm/daifflags.h b/arch/arm64/include/asm/daifflags.h
-> new file mode 100644
-> index 000000000000..fb40da8e1457
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/daifflags.h
-> @@ -0,0 +1,59 @@
-> +/*
-> + * Copyright (C) 2017 ARM Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +#ifndef __ASM_DAIFFLAGS_H
-> +#define __ASM_DAIFFLAGS_H
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index b1f7552..a0ee9b0 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -23,6 +23,7 @@
+>  #include <linux/bsearch.h>
+>  #include <linux/kvm_host.h>
+>  #include <linux/mm.h>
+> +#include <linux/printk.h>
+>  #include <linux/uaccess.h>
+>  
+>  #include <asm/cacheflush.h>
+> @@ -897,8 +898,17 @@ static u64 read_id_reg(struct sys_reg_desc const *r, bool raz)
+>  {
+>  	u32 id = sys_reg((u32)r->Op0, (u32)r->Op1,
+>  			 (u32)r->CRn, (u32)r->CRm, (u32)r->Op2);
+> +	u64 val = raz ? 0 : read_sanitised_ftr_reg(id);
+>  
+> -	return raz ? 0 : read_sanitised_ftr_reg(id);
+> +	if (id == SYS_ID_AA64PFR0_EL1) {
+> +		if (val & (0xfUL << ID_AA64PFR0_SVE_SHIFT))
+> +			pr_err_once("kvm [%i]: SVE unsupported for guests, suppressing\n",
+> +				    task_pid_nr(current));
 > +
-> +#include <asm/irqflags.h>
-> +#include <linux/irqflags.h>
+> +		val &= ~(0xfUL << ID_AA64PFR0_SVE_SHIFT);
+> +	}
 > +
-> +/* Mask/unmask/restore all exceptions, including interrupts. */
-> +static inline unsigned long local_mask_daif(void)
-> +{
-> +	unsigned long flags;
-> +	asm volatile(
-> +		"mrs	%0, daif		// local_mask_daif\n"
-> +		"msr	daifset, #0xf"
-> +		: "=r" (flags)
-> +		:
-> +		: "memory");
-> +	trace_hardirqs_off();
-> +	return flags;
-> +}
-> +
-nit:
-Can we call this local_daif_save? (and maybe a version that only 
-disables without saving?)
+> +	return val;
+>  }
+>  
+>  /* cpufeature ID register access trap handlers */
+> 
 
-Also, I was wondering why use 'local' as prefix? Is there gonna be a 
-similar set of function for arm that could be called by common code? 
-(e.g. drivers?)
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Otherwise:
-Reviewed-by: Julien Thierry <julien.thierry@arm.com>
-
-Cheers,
-
+	M.
 -- 
-Julien Thierry
+Jazz is not dead. It just smells funny...
