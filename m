@@ -1,29 +1,21 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 11 Oct 2017 08:46:02 -0700
-Subject: [PATCH] ARM: dts: dra7-evm: Move pcie RC node to common file
-In-Reply-To: <20171011154447.GY4394@atomide.com>
-References: <20171011080430.13160-1-kishon@ti.com>
- <20171011154447.GY4394@atomide.com>
-Message-ID: <20171011154601.GZ4394@atomide.com>
+Date: Wed, 11 Oct 2017 08:46:10 -0700
+Subject: [PATCH 0/2] dra7/omap5: Increase max-voltage of pbias to 3.3v
+In-Reply-To: <20171009055312.24165-1-kishon@ti.com>
+References: <20171009055312.24165-1-kishon@ti.com>
+Message-ID: <20171011154610.GA4394@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [171011 08:44]:
-> * Kishon Vijay Abraham I <kishon@ti.com> [171011 01:06]:
-> > From: Ravikumar Kattekola <rk@ti.com>
-> > 
-> > Move the pcie_rc node to common file so that it can be
-> > used by dra76-evm as well.
-> > 
-> > Signed-off-by: Ravikumar Kattekola <rk@ti.com>
-> > Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> > Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+* Kishon Vijay Abraham I <kishon@ti.com> [171008 22:54]:
+> Max voltage of pbias was set to 3.0v because of an error in TRM in
+> omap5/dra7 SoCs. It's now corrected to be 3.3v.
 > 
-> Can you please resend this with your Signed-off-by also
-> since you're the one sending it out?
+> Corresponding change in pbias regulator driver is already merged in
+> ulf -next
+> commit 27eae9d4b9d4cd9c204ef81f46078d91362ed41c
 
-Oops, sorry I misread, never mind. Applying into
-omap-for-v4.15/dt thanks.
+Thanks applying both into omap-for-v4.15/dt.
 
 Regards,
 
