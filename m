@@ -1,36 +1,42 @@
 From: eugen.hristev@microchip.com (Eugen Hristev)
-Date: Wed, 11 Oct 2017 09:35:31 +0300
-Subject: [PATCH v2 4/5] iio: adc: at91-sama5d2_adc: ack DRDY irq in direct mode
+Date: Wed, 11 Oct 2017 09:35:28 +0300
+Subject: [PATCH v2 1/5] dt-bindings: iio: at91-sama5d2_adc: add optional dma
+ property
 In-Reply-To: <1507703732-29175-1-git-send-email-eugen.hristev@microchip.com>
 References: <1507703732-29175-1-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <1507703732-29175-5-git-send-email-eugen.hristev@microchip.com>
+Message-ID: <1507703732-29175-2-git-send-email-eugen.hristev@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Need to acknowledge DRDY irq in direct mode/ software
-triggered mode. Otherwise, on the next conversion, overrun
-flag will be raised, which is not a correct state.
-This doesn't affect the functionality, but will generate
-possible incorrect overrun reports.
+Added property for DMA configuration of the device.
 
 Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
 ---
- drivers/iio/adc/at91-sama5d2_adc.c | 3 +++
- 1 file changed, 3 insertions(+)
+ Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/drivers/iio/adc/at91-sama5d2_adc.c b/drivers/iio/adc/at91-sama5d2_adc.c
-index 7a9305a..7e51ecb 100644
---- a/drivers/iio/adc/at91-sama5d2_adc.c
-+++ b/drivers/iio/adc/at91-sama5d2_adc.c
-@@ -773,6 +773,9 @@ static int at91_adc_read_raw(struct iio_dev *indio_dev,
- 		at91_adc_writel(st, AT91_SAMA5D2_IDR, BIT(chan->channel));
- 		at91_adc_writel(st, AT91_SAMA5D2_CHDR, BIT(chan->channel));
+diff --git a/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt b/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
+index 552e7a8..5f94d479 100644
+--- a/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
++++ b/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
+@@ -17,6 +17,11 @@ Required properties:
+   This property uses the IRQ edge types values: IRQ_TYPE_EDGE_RISING ,
+   IRQ_TYPE_EDGE_FALLING or IRQ_TYPE_EDGE_BOTH
  
-+		/* Needed to ACK the DRDY interruption */
-+		at91_adc_readl(st, AT91_SAMA5D2_LCDR);
++Optional properties:
++  - dmas: Phandle to dma channel for the ADC.
++  See ../../dma/dma.txt for details.
++  - dma-names: Must be "rx" when dmas property is being used.
 +
- 		mutex_unlock(&st->lock);
+ Example:
  
- 		iio_device_release_direct_mode(indio_dev);
+ adc: adc at fc030000 {
+@@ -31,4 +36,6 @@ adc: adc at fc030000 {
+ 	vddana-supply = <&vdd_3v3_lp_reg>;
+ 	vref-supply = <&vdd_3v3_lp_reg>;
+ 	atmel,trigger-edge-type = <IRQ_TYPE_EDGE_BOTH>;
++	dmas = <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) | AT91_XDMAC_DT_PERID(25))>;
++	dma-names = "rx";
+ }
 -- 
 2.7.4
