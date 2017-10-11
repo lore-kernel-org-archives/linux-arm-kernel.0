@@ -1,33 +1,50 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 11 Oct 2017 13:50:38 +0200
-Subject: [PATCH 1/2] ARM: dts: gr-peach: Add ETHER pin group
-In-Reply-To: <1507538915-16566-2-git-send-email-jacopo+renesas@jmondi.org>
-References: <1507538915-16566-1-git-send-email-jacopo+renesas@jmondi.org>
- <1507538915-16566-2-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <CAMuHMdXZia=upoOF3kprnrKfv2W_yrPXf018Woir9qQRRjUyUA@mail.gmail.com>
+From: radoslaw.pietrzyk@gmail.com (Radoslaw Pietrzyk)
+Date: Wed, 11 Oct 2017 13:53:08 +0200
+Subject: [PATCH] i2c: stm32: Fixes multibyte transfer for STM32F4 I2C
+ controller
+Message-ID: <1507722788-31224-1-git-send-email-radoslaw.pietrzyk@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jacopo,
+	Do not read data on RXNE but on BTF only due to HW
+	synchronisation problems and NACKing read data too early.
+	It was found during testing of stmpe811 touchscreen driver.
 
-On Mon, Oct 9, 2017 at 10:48 AM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
-> Add pin configuration subnode for ETHER pin group.
+Signed-off-by: Radoslaw Pietrzyk <radoslaw.pietrzyk@gmail.com>
+---
+ drivers/i2c/busses/i2c-stm32f4.c | 11 +----------
+ 1 file changed, 1 insertion(+), 10 deletions(-)
 
-Thanks for the update!
-BTW, it would be good to have version numbers in the email subjects
-("git format-patch -v2").
-
-> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/i2c/busses/i2c-stm32f4.c b/drivers/i2c/busses/i2c-stm32f4.c
+index 4ec1084..86bcf4c 100644
+--- a/drivers/i2c/busses/i2c-stm32f4.c
++++ b/drivers/i2c/busses/i2c-stm32f4.c
+@@ -409,16 +409,9 @@ static void stm32f4_i2c_handle_read(struct stm32f4_i2c_dev *i2c_dev)
+ 	 * So, here we just disable buffer interrupt in order to avoid another
+ 	 * system preemption due to RX not empty event.
+ 	 */
+-	case 2:
+-	case 3:
++	default:
+ 		stm32f4_i2c_clr_bits(reg, STM32F4_I2C_CR2_ITBUFEN);
+ 		break;
+-	/*
+-	 * For N byte reception with N > 3 we directly read data register
+-	 * until N-2 data.
+-	 */
+-	default:
+-		stm32f4_i2c_read_msg(i2c_dev);
+ 	}
+ }
+ 
+@@ -470,8 +463,6 @@ static void stm32f4_i2c_handle_rx_done(struct stm32f4_i2c_dev *i2c_dev)
+ 		 */
+ 		reg = i2c_dev->base + STM32F4_I2C_CR1;
+ 		stm32f4_i2c_clr_bits(reg, STM32F4_I2C_CR1_ACK);
+-		stm32f4_i2c_read_msg(i2c_dev);
+-		break;
+ 	default:
+ 		stm32f4_i2c_read_msg(i2c_dev);
+ 	}
+-- 
+1.9.1
