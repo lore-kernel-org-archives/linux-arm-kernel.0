@@ -1,81 +1,41 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Wed, 11 Oct 2017 18:58:51 +0200
-Subject: [PATCH 5/7] ARM: dts: Add nodes for missing omap4 interconnect
- target modules
-In-Reply-To: <f5c57f0b-1423-c362-0fda-4069b77a2e38@ti.com>
-References: <20170929223411.9691-1-tony@atomide.com>
- <20170929223411.9691-6-tony@atomide.com>
- <f5c57f0b-1423-c362-0fda-4069b77a2e38@ti.com>
-Message-ID: <20171011165850.jnaievrgcszcawh3@earth>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Wed, 11 Oct 2017 10:00:06 -0700
+Subject: [PATCH] arm64: defconfig: Enable QCOM_IOMMU
+In-Reply-To: <20171011151925.30909-1-nicolas.dechesne@linaro.org>
+References: <20171011151925.30909-1-nicolas.dechesne@linaro.org>
+Message-ID: <20171011170006.GQ1165@minitux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On Wed 11 Oct 08:19 PDT 2017, Nicolas Dechesne wrote:
 
-On Wed, Oct 11, 2017 at 06:54:04PM +0300, Peter Ujfalusi wrote:
-> Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
-> Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+> Enable QCOM IOMMU driver for 'B' family devices, such as APQ8016 found on the
+> Dragonboard 410c. With this change, graphics console and GPU are working
+> fine (using mesa/freedreno for GPU driver).
 > 
-> On 09/30/2017 01:34 AM, Tony Lindgren wrote:
-> > On omap4 we are missing dts nodes for several interconnect target
-> > modules that we are idling on init. This currently works with the
-> > legacy platform data still around.
-> > 
-> > To fix this, let's add the interconnect target modules so we can
-> > idle the unused interconnect target module on init.
-> > 
-> > Also note that adding the interconnect target module node does not
-> > necessarily mean that there is a driver available for the child IP
-> > block, or that the child IP block is even functional.
-> > 
-> > In the SGX case, the PowerVR driver is closed source. And McASP on
-> > omap4 has at least the TX path disabled and is not supported by the
-> > davinci-mcasp driver.
-> 
-> RX path is disabled, TX is supposed to work.
-> 
-> ...
-> 
-> > +		target-module at 40128000 {
-> > +			compatible = "ti,sysc-mcasp";
-> > +			ti,hwmods = "mcasp";
-> > +			reg = <0x40128004 0x4>;
-> > +			reg-names = "sysc";
-> > +			#address-cells = <1>;
-> > +			#size-cells = <1>;
-> > +			ranges = <0x00000000 0x40128000 0x1000>, /* MPU */
-> > +				 <0x49028000 0x49028000 0x1000>; /* L3 */
-> > +
-> > +			/*
-> > +			 * Child device unsupported by davinci-mcasp. At least
-> > +			 * TX path is disabled for omap4, and only DIT mode
-> 
-> s/TX/RX
-> 
-> > +			 * works with no I2S. See also old Android kernel
-> > +			 * omap-mcasp driver for more information.
-> 
-> I'll look at the schema of PandaBoard to see if I can route out the McASP
-> lines to somewhere then I can add support for this revision to davinci-mcasp
-> driver.
+> Signed-off-by: Nicolas Dechesne <nicolas.dechesne@linaro.org>
 
-Not sure if this is helpful information:
+Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 
-Motorola Droid 4 is OMAP4430 based and has McASP lines routed
-to the audio codec (either McASP or McBSP can be used). Codec
-is a custom one, which is not yet supported mainline, but
-patches are WIP (*):
+Regards,
+Bjorn
 
-https://lkml.org/lkml/2017/7/12/368
-
-(*) My patches use McBSP instead of McASP, since McASP looked
-mostly unsupported. Motorola's kernel uses McASP.
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171011/6db17987/attachment.sig>
+> ---
+>  arch/arm64/configs/defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index 34480e9af2e7..653f7149179a 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -510,6 +510,7 @@ CONFIG_HI6220_MBOX=y
+>  CONFIG_ROCKCHIP_IOMMU=y
+>  CONFIG_ARM_SMMU=y
+>  CONFIG_ARM_SMMU_V3=y
+> +CONFIG_QCOM_IOMMU=y
+>  CONFIG_RPMSG_QCOM_SMD=y
+>  CONFIG_RASPBERRYPI_POWER=y
+>  CONFIG_QCOM_SMEM=y
+> -- 
+> 2.14.2
+> 
