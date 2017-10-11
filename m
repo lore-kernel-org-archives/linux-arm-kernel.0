@@ -1,36 +1,36 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Wed, 11 Oct 2017 17:33:02 +0200
-Subject: [PATCH v4 0/3] Workaround for bus/slot reset on Cavium cn8xxx
- root ports
-In-Reply-To: <20170908081033.3025-1-jglauber@cavium.com>
-References: <20170908081033.3025-1-jglauber@cavium.com>
-Message-ID: <20171011153302.GN17961@rric.localdomain>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 11 Oct 2017 16:34:45 +0100
+Subject: [PATCH 1/3] arm: vdso: Rewrite gettimeofday to more closely match
+ arm64 variant
+In-Reply-To: <20170911161827.112786-1-salyzyn@android.com>
+References: <20170911161827.112786-1-salyzyn@android.com>
+Message-ID: <59DE3A15.90800@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bjorn,
+Hi Mark,
 
-On 08.09.17 10:10:30, Jan Glauber wrote:
-> Using vfio-pci on a combination of cn8xxx and some PCI devices results in
-> a kernel panic. This is triggered by issuing a bus or a slot reset
-> on the PCI device.
+On 11/09/17 17:18, Mark Salyzyn wrote:
+> Take an effort to recode the arm64 vdso code from assembler to C
+> previously submitted by Andrew Pinski <apinski@cavium.com>, rework
+> it for use in both arm and arm64, overlapping any optimizations
+> for each architecture.
 > 
-> With this series both checks indicate that the reset is not possible
-> preventing the kernel panic.
-> 
-> David Daney (2):
->   PCI: Allow PCI_DEV_FLAGS_NO_BUS_RESET to be used on bus device
->   PCI: Avoid bus reset for Cavium cn8xxx root ports
-> 
-> Jan Glauber (1):
->   PCI: Avoid slot reset if bus reset is not possible
-> 
->  drivers/pci/pci.c    | 8 ++++++++
->  drivers/pci/quirks.c | 8 ++++++++
->  2 files changed, 16 insertions(+)
+> Side effects include renaming some vdso_datapage.h variables, adding
+> a few more to enhance features and functionality to match.
 
-if you don't have any objections, please apply this series.
+There are quite a lot of different things going on here, all of which are
+interleaved in this patch. Could you split them out into smaller simpler changes?
+
+The bits I count are:
+* Pulling 32bit specific eabi and fallback macro out into compiler.h,
+* Adding support for __vdso_clock_getres,
+* Flipping tk_is_cntvct's logic to become use_syscall,
+* Variable renames to align 32/64 bit,
+
+...are those 'coarse' versions of the timer calls being added, or just moved around?
+
 
 Thanks,
 
--Robert
+James
