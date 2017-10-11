@@ -1,32 +1,63 @@
 From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Wed, 11 Oct 2017 13:50:29 +0200
-Subject: [PATCH 06/12] ARM: dts: imx6-tx6: specify ethernet phy reset duration
+Date: Wed, 11 Oct 2017 13:50:24 +0200
+Subject: [PATCH 01/12] ARM: dts: imx6-tx6: update model property to match
+ current module HW revision
 In-Reply-To: <1507722635-30801-1-git-send-email-LW@KARO-electronics.de>
 References: <1507722635-30801-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <1507722635-30801-7-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1507722635-30801-2-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Under certain circumstances the ethernet PHY cannot be detected on
-Ka-Ro electronics TX6 modules. Using a phy-reset-duration of at least
-2ms alleviates this problem.
+The current TX6Q module HW revision is 3 reflected in the module name
+suffix '-1030' (-1130 for LVDS).
+Change the model string to prevent confusion about what DTS file to
+use for these modules.
 
 Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 ---
- arch/arm/boot/dts/imx6qdl-tx6.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/imx6q-tx6q-1010.dts | 4 ++--
+ arch/arm/boot/dts/imx6q-tx6q-1110.dts | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-tx6.dtsi b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-index aa32956..c6b2d63 100644
---- a/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-@@ -249,6 +249,7 @@
- 	clock-names = "ipg", "ahb", "ptp", "enet_out";
- 	phy-mode = "rmii";
- 	phy-reset-gpios = <&gpio7 6 GPIO_ACTIVE_LOW>;
-+	phy-reset-post-delay = <10>;
- 	phy-handle = <&etnphy>;
- 	phy-supply = <&reg_3v3_etn>;
- 	status = "okay";
+diff --git a/arch/arm/boot/dts/imx6q-tx6q-1010.dts b/arch/arm/boot/dts/imx6q-tx6q-1010.dts
+index f9cd21a..54bc442 100644
+--- a/arch/arm/boot/dts/imx6q-tx6q-1010.dts
++++ b/arch/arm/boot/dts/imx6q-tx6q-1010.dts
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright 2014-2016 Lothar Wa?mann <LW@KARO-electronics.de>
++ * Copyright 2014-2017 Lothar Wa?mann <LW@KARO-electronics.de>
+  *
+  * This file is dual-licensed: you can use it either under the terms
+  * of the GPL or the X11 license, at your option. Note that this dual
+@@ -44,7 +44,7 @@
+ #include "imx6qdl-tx6.dtsi"
+ 
+ / {
+-	model = "Ka-Ro electronics TX6Q-1010 Module";
++	model = "Ka-Ro electronics TX6Q-1010/-1030 Module";
+ 	compatible = "karo,imx6q-tx6q", "fsl,imx6q";
+ 
+ 	aliases {
+diff --git a/arch/arm/boot/dts/imx6q-tx6q-1110.dts b/arch/arm/boot/dts/imx6q-tx6q-1110.dts
+index 0433e22..0f5e638 100644
+--- a/arch/arm/boot/dts/imx6q-tx6q-1110.dts
++++ b/arch/arm/boot/dts/imx6q-tx6q-1110.dts
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright 2014-2016 Lothar Wa?mann <LW@KARO-electronics.de>
++ * Copyright 2014-2017 Lothar Wa?mann <LW@KARO-electronics.de>
+  *
+  * This file is dual-licensed: you can use it either under the terms
+  * of the GPL or the X11 license, at your option. Note that this dual
+@@ -44,7 +44,7 @@
+ #include "imx6qdl-tx6.dtsi"
+ 
+ / {
+-	model = "Ka-Ro electronics TX6Q-1110 Module";
++	model = "Ka-Ro electronics TX6Q-1110/-1130 Module";
+ 	compatible = "karo,imx6q-tx6q", "fsl,imx6q";
+ 
+ 	aliases {
 -- 
 2.1.4
