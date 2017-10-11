@@ -1,148 +1,156 @@
 From: liuwenliang@huawei.com (Abbott Liu)
-Date: Wed, 11 Oct 2017 16:22:18 +0800
-Subject: [PATCH 02/11] replace memory function
+Date: Wed, 11 Oct 2017 16:22:20 +0800
+Subject: [PATCH 04/11] Define the virtual space of KASan's shadow region
 In-Reply-To: <20171011082227.20546-1-liuwenliang@huawei.com>
 References: <20171011082227.20546-1-liuwenliang@huawei.com>
-Message-ID: <20171011082227.20546-3-liuwenliang@huawei.com>
+Message-ID: <20171011082227.20546-5-liuwenliang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrey Ryabinin <a.ryabinin@samsung.com>
+Define KASAN_SHADOW_OFFSET,KASAN_SHADOW_START and KASAN_SHADOW_END for arm
+kernel address sanitizer.
 
-Functions like memset/memmove/memcpy do a lot of memory accesses.
-If bad pointer passed to one of these function it is important
-to catch this. Compiler's instrumentation cannot do this since
-these functions are written in assembly.
+     +----+ 0xffffffff
+     |    |
+     |    |
+     |    |
+     +----+ CONFIG_PAGE_OFFSET
+     |    |\
+     |    | |->  module virtual address space area.
+     |    |/
+     +----+ MODULE_VADDR = KASAN_SHADOW_END
+     |    |\
+     |    | |-> the shadow area of kernel virtual address.
+     |    |/
+     +----+ TASK_SIZE(start of kernel space) = KASAN_SHADOW_START  the shadow address of MODULE_VADDR
+     |    |\
+     |    | ---------------------+
+     |    |                      |
+     +    + KASAN_SHADOW_OFFSET  |-> the user space area. Kernel address sanitizer do not use this space.
+     |    |                      |
+     |    | ---------------------+
+     |    |/
+     ------ 0
 
-KASan replaces memory functions with manually instrumented variants.
-Original functions declared as weak symbols so strong definitions
-in mm/kasan/kasan.c could replace them. Original functions have aliases
-with '__' prefix in name, so we could call non-instrumented variant
-if needed.
+1)KASAN_SHADOW_OFFSET:
+  This value is used to map an address to the corresponding shadow address by the
+following formula:
+  shadow_addr = (address >> 3) + KASAN_SHADOW_OFFSET;
+
+2)KASAN_SHADOW_START
+  This value is the MODULE_VADDR's shadow address. It is the start of kernel virtual
+space.
+
+3) KASAN_SHADOW_END
+  This value is the 0x100000000's shadow address. It is the end of kernel address
+sanitizer's shadow area. It is also the start of the module area.
 
 Cc: Andrey Ryabinin <a.ryabinin@samsung.com>
-Signed-off-by: Abbott Liu <liuwenliang@huawei.com>
 ---
- arch/arm/include/asm/string.h | 18 +++++++++++++++++-
- arch/arm/lib/memcpy.S         |  3 +++
- arch/arm/lib/memmove.S        |  5 ++++-
- arch/arm/lib/memset.S         |  3 +++
- 4 files changed, 27 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/kasan_def.h | 51 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/include/asm/memory.h    |  5 ++++
+ arch/arm/kernel/entry-armv.S     |  7 +++++-
+ 3 files changed, 62 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/include/asm/kasan_def.h
 
-diff --git a/arch/arm/include/asm/string.h b/arch/arm/include/asm/string.h
-index fe1c6af..43325f8 100644
---- a/arch/arm/include/asm/string.h
-+++ b/arch/arm/include/asm/string.h
-@@ -14,15 +14,18 @@ extern char * strchr(const char * s, int c);
- 
- #define __HAVE_ARCH_MEMCPY
- extern void * memcpy(void *, const void *, __kernel_size_t);
-+extern void * __memcpy(void *, const void *, __kernel_size_t);
- 
- #define __HAVE_ARCH_MEMMOVE
- extern void * memmove(void *, const void *, __kernel_size_t);
-+extern void * __memmove(void *, const void *, __kernel_size_t);
- 
- #define __HAVE_ARCH_MEMCHR
- extern void * memchr(const void *, int, __kernel_size_t);
- 
- #define __HAVE_ARCH_MEMSET
- extern void * memset(void *, int, __kernel_size_t);
-+extern void * __memset(void *, int, __kernel_size_t);
- 
- #define __HAVE_ARCH_MEMSET32
- extern void *__memset32(uint32_t *, uint32_t v, __kernel_size_t);
-@@ -39,7 +42,7 @@ static inline void *memset64(uint64_t *p, uint64_t v, __kernel_size_t n)
- }
- 
- extern void __memzero(void *ptr, __kernel_size_t n);
--
-+#ifndef CONFIG_KASAN
- #define memset(p,v,n)							\
- 	({								\
- 	 	void *__p = (p); size_t __n = n;			\
-@@ -51,5 +54,18 @@ extern void __memzero(void *ptr, __kernel_size_t n);
- 		}							\
- 		(__p);							\
- 	})
-+#endif
+diff --git a/arch/arm/include/asm/kasan_def.h b/arch/arm/include/asm/kasan_def.h
+new file mode 100644
+index 0000000..7746908
+--- /dev/null
++++ b/arch/arm/include/asm/kasan_def.h
+@@ -0,0 +1,51 @@
++#ifndef __ASM_KASAN_DEF_H
++#define __ASM_KASAN_DEF_H
 +
-+#if defined(CONFIG_KASAN) && !defined(__SANITIZE_ADDRESS__)
++#ifdef CONFIG_KASAN
 +
 +/*
-+ * For files that not instrumented (e.g. mm/slub.c) we
-+ * should use not instrumented version of mem* functions.
++ *    +----+ 0xffffffff
++ *    |    |
++ *    |    |
++ *    |    |
++ *    +----+ CONFIG_PAGE_OFFSET
++ *    |    |\
++ *    |    | |->  module virtual address space area.
++ *    |    |/
++ *    +----+ MODULE_VADDR = KASAN_SHADOW_END
++ *    |    |\
++ *    |    | |-> the shadow area of kernel virtual address.
++ *    |    |/
++ *    +----+ TASK_SIZE(start of kernel space) = KASAN_SHADOW_START  the shadow address of MODULE_VADDR
++ *    |    |\
++ *    |    | ---------------------+
++ *    |    |                      |
++ *    +    + KASAN_SHADOW_OFFSET  |-> the user space area. Kernel address sanitizer do not use this space.
++ *    |    |                      |
++ *    |    | ---------------------+
++ *    |    |/
++ *    ------ 0
++ *
++ *1)KASAN_SHADOW_OFFSET:
++ *    This value is used to map an address to the corresponding shadow address by the
++ * following formula:
++ * shadow_addr = (address >> 3) + KASAN_SHADOW_OFFSET;
++ *
++ * 2)KASAN_SHADOW_START
++ *     This value is the MODULE_VADDR's shadow address. It is the start of kernel virtual
++ * space.
++ *
++ * 3) KASAN_SHADOW_END
++ *   This value is the 0x100000000's shadow address. It is the end of kernel address
++ * sanitizer's shadow area. It is also the start of the module area.
++ *
 + */
 +
-+#define memcpy(dst, src, len) __memcpy(dst, src, len)
-+#define memmove(dst, src, len) __memmove(dst, src, len)
-+#define memset(s, c, n) __memset(s, c, n)
++#define KASAN_SHADOW_OFFSET     (KASAN_SHADOW_END - (1<<29))
++
++#define KASAN_SHADOW_START      ((KASAN_SHADOW_END >> 3) + KASAN_SHADOW_OFFSET)
++
++#define KASAN_SHADOW_END        (UL(CONFIG_PAGE_OFFSET) - UL(SZ_16M))
++
 +#endif
- 
++#endif
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 1f54e4e..069710d 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -21,6 +21,7 @@
+ #ifdef CONFIG_NEED_MACH_MEMORY_H
+ #include <mach/memory.h>
  #endif
-diff --git a/arch/arm/lib/memcpy.S b/arch/arm/lib/memcpy.S
-index 64111bd..79a83f8 100644
---- a/arch/arm/lib/memcpy.S
-+++ b/arch/arm/lib/memcpy.S
-@@ -61,6 +61,8 @@
++#include <asm/kasan_def.h>
  
- /* Prototype: void *memcpy(void *dest, const void *src, size_t n); */
- 
-+.weak memcpy
-+ENTRY(__memcpy)
- ENTRY(mmiocpy)
- ENTRY(memcpy)
- 
-@@ -68,3 +70,4 @@ ENTRY(memcpy)
- 
- ENDPROC(memcpy)
- ENDPROC(mmiocpy)
-+ENDPROC(__memcpy)
-diff --git a/arch/arm/lib/memmove.S b/arch/arm/lib/memmove.S
-index 69a9d47..313db6c 100644
---- a/arch/arm/lib/memmove.S
-+++ b/arch/arm/lib/memmove.S
-@@ -27,12 +27,14 @@
-  * occurring in the opposite direction.
+ /*
+  * Allow for constants defined here to be used from assembly code
+@@ -37,7 +38,11 @@
+  * TASK_SIZE - the maximum size of a user space task.
+  * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area
   */
++#ifndef CONFIG_KASAN
+ #define TASK_SIZE		(UL(CONFIG_PAGE_OFFSET) - UL(SZ_16M))
++#else
++#define TASK_SIZE               (KASAN_SHADOW_START)
++#endif
+ #define TASK_UNMAPPED_BASE	ALIGN(TASK_SIZE / 3, SZ_16M)
  
-+.weak memmove
-+ENTRY(__memmove)
- ENTRY(memmove)
- 	UNWIND(	.fnstart			)
+ /*
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index fbc7076..f9efea3 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -187,7 +187,12 @@ ENDPROC(__und_invalid)
  
- 		subs	ip, r0, r1
- 		cmphi	r2, ip
--		bls	memcpy
-+		bls	__memcpy
+ 	get_thread_info tsk
+ 	ldr	r0, [tsk, #TI_ADDR_LIMIT]
+-	mov	r1, #TASK_SIZE
++#ifdef CONFIG_KASAN
++	movw r1, #:lower16:TASK_SIZE
++	movt r1, #:upper16:TASK_SIZE
++#else
++	mov r1, #TASK_SIZE
++#endif
+ 	str	r1, [tsk, #TI_ADDR_LIMIT]
+ 	str	r0, [sp, #SVC_ADDR_LIMIT]
  
- 		stmfd	sp!, {r0, r4, lr}
- 	UNWIND(	.fnend				)
-@@ -225,3 +227,4 @@ ENTRY(memmove)
- 18:		backward_copy_shift	push=24	pull=8
- 
- ENDPROC(memmove)
-+ENDPROC(__memmove)
-diff --git a/arch/arm/lib/memset.S b/arch/arm/lib/memset.S
-index ed6d35d..64aa06a 100644
---- a/arch/arm/lib/memset.S
-+++ b/arch/arm/lib/memset.S
-@@ -16,6 +16,8 @@
- 	.text
- 	.align	5
- 
-+.weak memset
-+ENTRY(__memset)
- ENTRY(mmioset)
- ENTRY(memset)
- UNWIND( .fnstart         )
-@@ -135,6 +137,7 @@ UNWIND( .fnstart            )
- UNWIND( .fnend   )
- ENDPROC(memset)
- ENDPROC(mmioset)
-+ENDPROC(__memset)
- 
- ENTRY(__memset32)
- UNWIND( .fnstart         )
 -- 
 2.9.0
