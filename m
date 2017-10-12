@@ -1,80 +1,106 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 12 Oct 2017 12:48:54 -0400
-Subject: [PATCH 4/5] PCI: wait device ready after pci_pm_reset()
-In-Reply-To: <20171011220625.GV25517@bhelgaas-glaptop.roam.corp.google.com>
-References: <1506212218-29103-1-git-send-email-okaya@codeaurora.org>
- <1506212218-29103-4-git-send-email-okaya@codeaurora.org>
- <20171011220625.GV25517@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <2702792d-e076-45a9-5b8a-82e1499cb624@codeaurora.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 12 Oct 2017 09:53:36 -0700
+Subject: [PATCH 1/9] SOC: brcmstb: add memory API
+In-Reply-To: <b6be2073-7a90-f83f-4e25-79ef04827bd7@arm.com>
+References: <1507761269-7017-1-git-send-email-jim2101024@gmail.com>
+ <1507761269-7017-2-git-send-email-jim2101024@gmail.com>
+ <b6be2073-7a90-f83f-4e25-79ef04827bd7@arm.com>
+Message-ID: <425b3363-1977-87e1-644e-68a28f648fb0@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/2017 6:06 PM, Bjorn Helgaas wrote:
->> static int pci_pm_reset(struct pci_dev *dev, int probe)
->>  {
->> +	unsigned int delay = dev->d3_delay;
->>  	u16 csr;
->>  
->>  	if (!dev->pm_cap || dev->dev_flags & PCI_DEV_FLAGS_NO_PM_RESET)
->> @@ -3988,7 +3989,10 @@ static int pci_pm_reset(struct pci_dev *dev, int probe)
->>  	pci_write_config_word(dev, dev->pm_cap + PCI_PM_CTRL, csr);
->>  	pci_dev_d3_sleep(dev);
->>  
->> -	return 0;
->> +	if (delay < pci_pm_d3_delay)
->> +		delay = pci_pm_d3_delay;
+On 10/12/2017 07:41 AM, Julien Thierry wrote:
+> Hi Jim,
+> 
+> On 11/10/17 23:34, Jim Quinlan wrote:
+>> From: Florian Fainelli <f.fainelli@gmail.com>
+>>
+>> This commit adds a memory API suitable for ascertaining the sizes of
+>> each of the N memory controllers in a Broadcom STB chip.  Its first
+>> user will be the Broadcom STB PCIe root complex driver, which needs
+>> to know these sizes to properly set up DMA mappings for inbound
+>> regions.
+>>
+>> We cannot use memblock here or anything like what Linux provides
+>> because it collapses adjacent regions within a larger block, and here
+>> we actually need per-memory controller addresses and sizes, which is
+>> why we resort to manual DT parsing.
+>>
+>> Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
+>> ---
+>>   drivers/soc/bcm/brcmstb/Makefile |   2 +-
+>>   drivers/soc/bcm/brcmstb/memory.c | 183
+>> +++++++++++++++++++++++++++++++++++++++
+>>   include/soc/brcmstb/memory_api.h |  25 ++++++
+>>   3 files changed, 209 insertions(+), 1 deletion(-)
+>>   create mode 100644 drivers/soc/bcm/brcmstb/memory.c
+>>   create mode 100644 include/soc/brcmstb/memory_api.h
+>>
+>> diff --git a/drivers/soc/bcm/brcmstb/Makefile
+>> b/drivers/soc/bcm/brcmstb/Makefile
+>> index 9120b27..4cea7b6 100644
+>> --- a/drivers/soc/bcm/brcmstb/Makefile
+>> +++ b/drivers/soc/bcm/brcmstb/Makefile
+>> @@ -1 +1 @@
+>> -obj-y                += common.o biuctrl.o
+>> +obj-y                += common.o biuctrl.o memory.o
+>> diff --git a/drivers/soc/bcm/brcmstb/memory.c
+>> b/drivers/soc/bcm/brcmstb/memory.c
+>> new file mode 100644
+>> index 0000000..cb6bf73
+>> --- /dev/null
+>> +++ b/drivers/soc/bcm/brcmstb/memory.c
+>> @@ -0,0 +1,183 @@
+>> +/*
+>> + * Copyright ? 2015-2017 Broadcom
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * A copy of the GPL is available at
+>> + * http://www.broadcom.com/licenses/GPLv2.php or from the Free Software
+>> + * Foundation at https://www.gnu.org/licenses/ .
+>> + */
 >> +
->> +	return pci_dev_wait(dev, "PM D3->D0", delay, 1000);
-> 1) Why do we wait up to 1 second here, when we wait up to 60 seconds
-> for the other methods?  Can they all be the same?  Maybe a #define for
-> it?
-
-I know you want to have similar behavior for systems that do and do not support
-CRS. That was the reason why I converted flr wait function to into dev_wait function.
-
-However, here is the problem:
-
-For systems that do not support CRS, there is no way of knowing whether we
-are reading 0xFFFFFFFF because the endpoint is not reachable due to an error
-like "it doesn't support this reset type" or if it is actually emitting a CRS.
-
-If one system has a problem with pm_reset, this code would add an unnecessary
-1 second delay into the reset path. If I make it 60 it would be something like:
-
-1. try reset method A
-2. wait 60 seconds
-3. try reset method B
-4. wait 60 seconds. 
-5. try reset method C
-6. wait 60 seconds
-
-This might end up being a regression on some system. 
-
-I'm still leaning towards a wait only if we are observing a CRS. What's your
-thought on this?
-
-then the sequence would be.
-
-1. try reset method A
-2. if CRS pending, wait 60 seconds
-3. try reset method B
-4. if CRS pending, wait 60 seconds. 
-5. try reset method C
-6. if CRS pending, wait 60 seconds
-
+>> +#include <linux/device.h>
+>> +#include <linux/io.h>
+>> +#include <linux/libfdt.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/of_fdt.h>
+>> +#include <linux/sizes.h>
+>> +#include <soc/brcmstb/memory_api.h>
+>> +
+>> +/* -------------------- Constants -------------------- */
+>> +
+>> +/* Macros to help extract property data */
+>> +#define U8TOU32(b, offs) \
+>> +    ((((u32)b[0 + offs] << 0)  & 0x000000ff) | \
+>> +     (((u32)b[1 + offs] << 8)  & 0x0000ff00) | \
+>> +     (((u32)b[2 + offs] << 16) & 0x00ff0000) | \
+>> +     (((u32)b[3 + offs] << 24) & 0xff000000))
+>> +
+>> +#define DT_PROP_DATA_TO_U32(b, offs) (fdt32_to_cpu(U8TOU32(b, offs)))
+>> +
 > 
-> 2) I don't really like the fact that we do the initial sleep one place
-> and then pass the length of that sleep here.  It's hard to verify
-> they're the same and keep them in sync.  I think the only thing you
-> use initial_wait for is to include that time in the dmesg messages.
-> Maybe we should just omit that time from the message and drop the
-> parameter?
+> I fail to understand why this is not:
 > 
+> #define DT_PROP_DATA_TO_U32(b, offs) (fdt32_to_cpu(*(u32*)(b + offs)))
+> 
+> 
+> If I understand correctly, fdt data is in big endian, the macro U8TOU32
+> reads it as little endian. My guess is that this won't work on big
+> endian kernels but should work on little endian since fdt32_to_cpu will
+> revert the bytes again.
+> 
+> Am I missing something?
 
-This was for printing reasons like you spotted, I can certainly get rid of
-the initial_wait.
-
+No, your point is valid, there is no reason why this cannot be
+fdt32_to_cpu() here.
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Florian
