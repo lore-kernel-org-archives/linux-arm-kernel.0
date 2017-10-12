@@ -1,37 +1,82 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 12 Oct 2017 12:41:28 +0200
-Subject: [PATCH 24/37] KVM: arm64: Prepare to handle traps on deferred EL0
- sysregs
+Date: Thu, 12 Oct 2017 12:41:25 +0200
+Subject: [PATCH 21/37] KVM: arm64: Don't save the host ELR_EL2 and SPSR_EL2 on
+ VHE systems
 In-Reply-To: <20171012104141.26902-1-christoffer.dall@linaro.org>
 References: <20171012104141.26902-1-christoffer.dall@linaro.org>
-Message-ID: <20171012104141.26902-25-christoffer.dall@linaro.org>
+Message-ID: <20171012104141.26902-22-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can trap access to ACTLR_EL1 which we can later defer to only
-save/restore during vcpu_load and vcpu_put, so let's read the value
-directly from the CPU when necessary.
+On non-VHE systems we need to save the ELR_EL2 and SPSR_EL2 so that we
+can return to the host in EL1 in the same state and location where we
+issued a hypercall to EL2, but these registers don't contain anything
+important on VHE, because all of the host runs in EL2.  Therefore,
+exclude them when saving/restoring the host state.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kvm/sys_regs_generic_v8.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ arch/arm64/kvm/hyp/sysreg-sr.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
-index 969ade1..348f227 100644
---- a/arch/arm64/kvm/sys_regs_generic_v8.c
-+++ b/arch/arm64/kvm/sys_regs_generic_v8.c
-@@ -38,7 +38,10 @@ static bool access_actlr(struct kvm_vcpu *vcpu,
- 	if (p->is_write)
- 		return ignore_write(vcpu, p);
- 
--	p->regval = vcpu_sys_reg(vcpu, ACTLR_EL1);
-+	if (vcpu->arch.sysregs_loaded_on_cpu)
-+		read_sysreg(actlr_el1);
-+	else
-+		p->regval = vcpu_sys_reg(vcpu, ACTLR_EL1);
- 	return true;
+diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+index f5c1b44..354ca02 100644
+--- a/arch/arm64/kvm/hyp/sysreg-sr.c
++++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+@@ -66,6 +66,10 @@ static void __hyp_text __sysreg_save_el1_state(struct kvm_cpu_context *ctxt)
+ 	ctxt->gp_regs.sp_el1		= read_sysreg(sp_el1);
+ 	ctxt->gp_regs.elr_el1		= read_sysreg_el1(elr);
+ 	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg_el1(spsr);
++}
++
++static void __hyp_text __sysreg_save_el2_return_state(struct kvm_cpu_context *ctxt)
++{
+ 	ctxt->gp_regs.regs.pc		= read_sysreg_el2(elr);
+ 	ctxt->gp_regs.regs.pstate	= read_sysreg_el2(spsr);
+ }
+@@ -75,6 +79,7 @@ void __hyp_text __sysreg_save_state_nvhe(struct kvm_cpu_context *ctxt)
+ 	__sysreg_save_el1_state(ctxt);
+ 	__sysreg_save_common_state(ctxt);
+ 	__sysreg_save_user_state(ctxt);
++	__sysreg_save_el2_return_state(ctxt);
  }
  
+ void sysreg_save_host_state_vhe(struct kvm_cpu_context *ctxt)
+@@ -88,6 +93,7 @@ void sysreg_save_guest_state_vhe(struct kvm_cpu_context *ctxt)
+ 	__sysreg_save_el1_state(ctxt);
+ 	__sysreg_save_common_state(ctxt);
+ 	__sysreg_save_user_state(ctxt);
++	__sysreg_save_el2_return_state(ctxt);
+ }
+ 
+ static void __hyp_text __sysreg_restore_common_state(struct kvm_cpu_context *ctxt)
+@@ -127,6 +133,11 @@ static void __hyp_text __sysreg_restore_el1_state(struct kvm_cpu_context *ctxt)
+ 	write_sysreg(ctxt->gp_regs.sp_el1,		sp_el1);
+ 	write_sysreg_el1(ctxt->gp_regs.elr_el1,		elr);
+ 	write_sysreg_el1(ctxt->gp_regs.spsr[KVM_SPSR_EL1],spsr);
++}
++
++static void __hyp_text
++__sysreg_restore_el2_return_state(struct kvm_cpu_context *ctxt)
++{
+ 	write_sysreg_el2(ctxt->gp_regs.regs.pc,		elr);
+ 	write_sysreg_el2(ctxt->gp_regs.regs.pstate,	spsr);
+ }
+@@ -136,6 +147,7 @@ void __hyp_text __sysreg_restore_state_nvhe(struct kvm_cpu_context *ctxt)
+ 	__sysreg_restore_el1_state(ctxt);
+ 	__sysreg_restore_common_state(ctxt);
+ 	__sysreg_restore_user_state(ctxt);
++	__sysreg_restore_el2_return_state(ctxt);
+ }
+ 
+ void sysreg_restore_host_state_vhe(struct kvm_cpu_context *ctxt)
+@@ -149,6 +161,7 @@ void sysreg_restore_guest_state_vhe(struct kvm_cpu_context *ctxt)
+ 	__sysreg_restore_el1_state(ctxt);
+ 	__sysreg_restore_common_state(ctxt);
+ 	__sysreg_restore_user_state(ctxt);
++	__sysreg_restore_el2_return_state(ctxt);
+ }
+ 
+ static void __hyp_text __fpsimd32_save_state(struct kvm_cpu_context *ctxt)
 -- 
 2.9.0
