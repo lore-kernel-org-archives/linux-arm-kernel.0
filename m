@@ -1,49 +1,51 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 12 Oct 2017 15:47:51 +0200
-Subject: [PATCH] arm64: defconfig: enable RTC on Armada 7K/8K SoCs
-In-Reply-To: <20171002154416.585-1-gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Mon, 2 Oct 2017 17:44:16 +0200")
-References: <20171002154416.585-1-gregory.clement@free-electrons.com>
-Message-ID: <87k200bhq0.fsf@free-electrons.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 12 Oct 2017 13:39:39 +0100
+Subject: [PATCH] iommu: enable bypass transaction caching for ARM SMMU 500
+In-Reply-To: <1507759719-16675-1-git-send-email-fkan@apm.com>
+References: <1507759719-16675-1-git-send-email-fkan@apm.com>
+Message-ID: <d0482cb9-7af4-2a52-dde2-8d9113a4721d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, 
- 
- On lun., oct. 02 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+On 11/10/17 23:08, Feng Kan wrote:
+> The ARM SMMU identity mapping performance was poor compared with the
+> DMA mode. It was found that enable caching would restore the performance
+> back to normal. The S2CRB_TLBEN bit in the ACR register would allow for
+> caching of the stream to context register bypass transaction information.
 
-> The Armada 38x RTC driver supports also the RTC controller found on the
-> Armada 7K/8K SoCs, so enable it.
+I know the hardware design and reasoning behind this feature, but I'm
+still a little surprised that bypass can show a measurably higher
+overhead than the full DMA mapping path in practice. MMU-500 is great :D
 
-Applied on mvebu/arm64
-
-Gregory
-
-
->
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Signed-off-by: Feng Kan <fkan@apm.com>
 > ---
->  arch/arm64/configs/defconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index 34480e9af2e7..7f6a3aee647d 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -470,6 +470,7 @@ CONFIG_RTC_DRV_EFI=y
->  CONFIG_RTC_DRV_S3C=y
->  CONFIG_RTC_DRV_PL031=y
->  CONFIG_RTC_DRV_SUN6I=y
-> +CONFIG_RTC_DRV_ARMADA38X=y
->  CONFIG_RTC_DRV_TEGRA=y
->  CONFIG_RTC_DRV_XGENE=y
->  CONFIG_DMADEVICES=y
-> -- 
-> 2.14.1
->
+>  drivers/iommu/arm-smmu.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 3bdb799..b5676a8 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -59,6 +59,7 @@
+>  #define ARM_MMU500_ACTLR_CPRE		(1 << 1)
+>  
+>  #define ARM_MMU500_ACR_CACHE_LOCK	(1 << 26)
+> +#define ARM_MMU500_ACR_S2CRB_TLBEN	(1 << 10)
+>  #define ARM_MMU500_ACR_SMTNMB_TLBEN	(1 << 8)
+>  
+>  #define TLB_LOOP_TIMEOUT		1000000	/* 1s! */
+> @@ -1606,7 +1607,7 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+>  		 * Allow unmatched Stream IDs to allocate bypass
+>  		 * TLB entries for reduced latency.
+>  		 */
+> -		reg |= ARM_MMU500_ACR_SMTNMB_TLBEN;
+> +		reg |= ARM_MMU500_ACR_SMTNMB_TLBEN | ARM_MMU500_ACR_S2CRB_TLBEN;
+>  		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_sACR);
+>  	}
+>  
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Looks correct to me, and TLB usage by bypass domains should still be
+equivalent to that of translation domains, so I don't think we should
+see any deleterious effects overall:
+
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
