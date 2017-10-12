@@ -1,34 +1,22 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 12 Oct 2017 18:13:01 +0100
-Subject: [PATCH v3 22/28] arm64/sve: KVM: Prevent guests from using SVE
-In-Reply-To: <1507660725-7986-23-git-send-email-Dave.Martin@arm.com>
+Date: Thu, 12 Oct 2017 18:13:16 +0100
+Subject: [PATCH v3 23/28] arm64/sve: KVM: Treat guest SVE use as
+ undefined instruction execution
+In-Reply-To: <1507660725-7986-24-git-send-email-Dave.Martin@arm.com>
 References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
- <1507660725-7986-23-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20171012171301.whfdkfkzvkvxtgz7@armageddon.cambridge.arm.com>
+ <1507660725-7986-24-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20171012171315.47d3bd5sq76eoqmd@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 10, 2017 at 07:38:39PM +0100, Dave P Martin wrote:
-> Until KVM has full SVE support, guests must not be allowed to
-> execute SVE instructions.
+On Tue, Oct 10, 2017 at 07:38:40PM +0100, Dave P Martin wrote:
+> When trapping forbidden attempts by a guest to use SVE, we want the
+> guest to see a trap consistent with SVE not being implemented.
 > 
-> This patch enables the necessary traps, and also ensures that the
-> traps are disabled again on exit from the guest so that the host
-> can still use SVE if it wants to.
-> 
-> This patch introduces another instance of
-> __this_cpu_write(fpsimd_last_state, NULL), so this flush operation
-> is abstracted out as a separate helper fpsimd_flush_cpu_state().
-> Other instances are ported appropriately.
-> 
-> As a side effect of this refactoring, a this_cpu_write() in
-> fpsimd_cpu_pm_notifier() is changed to __this_cpu_write().  This
-> should be fine, since cpu_pm_enter() is supposed to be called only
-> with interrupts disabled.
+> This patch injects an undefined instruction exception into the
+> guest in response to such an exception.
 > 
 > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 > Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
