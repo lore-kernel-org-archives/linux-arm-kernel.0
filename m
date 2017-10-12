@@ -1,21 +1,21 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 12 Oct 2017 13:20:47 +0100
-Subject: [PATCH v3 1/5] kernel/locking: Use struct qrwlock instead of struct
- __qrwlock
+Date: Thu, 12 Oct 2017 13:20:48 +0100
+Subject: [PATCH v3 2/5] locking/atomic: Add atomic_cond_read_acquire
 In-Reply-To: <1507810851-306-1-git-send-email-will.deacon@arm.com>
 References: <1507810851-306-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1507810851-306-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1507810851-306-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no good reason to keep the internal structure of struct qrwlock
-hidden from qrwlock.h, particularly as it's actually needed for unlock
-and ends up being abstracted independently behind the __qrwlock_write_byte
-function.
+smp_cond_load_acquire provides a way to spin on a variable with acquire
+semantics until some conditional expression involing the variable is
+satisfied. Architectures such as arm64 can potentially enter a low-power
+state, waking up only when the value of the variable changes, which
+reduces the system impact of tight polling loops.
 
-Stop pretending we can hide this stuff, and move the __qrwlock definition
-into qrwlock, removing the __qrwlock_write_byte nastiness and using the
-same struct definition everywhere instead.
+This patch makes the same interface available to users of atomic_t,
+atomic64_t and atomic_long_t, rather than require messy accesses to the
+structure internals.
 
 Cc: Peter Zijlstra <peterz@infradead.org>
 Cc: Ingo Molnar <mingo@redhat.com>
@@ -24,112 +24,43 @@ Cc: Boqun Feng <boqun.feng@gmail.com>
 Cc: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- include/asm-generic/qrwlock.h       | 12 +-----------
- include/asm-generic/qrwlock_types.h | 15 +++++++++++++--
- kernel/locking/qrwlock.c            | 26 ++------------------------
- 3 files changed, 16 insertions(+), 37 deletions(-)
+ include/asm-generic/atomic-long.h | 3 +++
+ include/linux/atomic.h            | 4 ++++
+ 2 files changed, 7 insertions(+)
 
-diff --git a/include/asm-generic/qrwlock.h b/include/asm-generic/qrwlock.h
-index 50925327b0a8..02c0a768e6b0 100644
---- a/include/asm-generic/qrwlock.h
-+++ b/include/asm-generic/qrwlock.h
-@@ -129,22 +129,12 @@ static inline void queued_read_unlock(struct qrwlock *lock)
+diff --git a/include/asm-generic/atomic-long.h b/include/asm-generic/atomic-long.h
+index 288cc9e96395..f2d97b782031 100644
+--- a/include/asm-generic/atomic-long.h
++++ b/include/asm-generic/atomic-long.h
+@@ -243,4 +243,7 @@ static inline long atomic_long_add_unless(atomic_long_t *l, long a, long u)
+ #define atomic_long_inc_not_zero(l) \
+ 	ATOMIC_LONG_PFX(_inc_not_zero)((ATOMIC_LONG_PFX(_t) *)(l))
+ 
++#define atomic_long_cond_read_acquire(v, c) \
++	ATOMIC_LONG_PFX(_cond_read_acquire)((ATOMIC_LONG_PFX(_t) *)(v), (c))
++
+ #endif  /*  _ASM_GENERIC_ATOMIC_LONG_H  */
+diff --git a/include/linux/atomic.h b/include/linux/atomic.h
+index 40d6bfec0e0d..0aeb2b3f4578 100644
+--- a/include/linux/atomic.h
++++ b/include/linux/atomic.h
+@@ -653,6 +653,8 @@ static inline int atomic_dec_if_positive(atomic_t *v)
  }
+ #endif
  
- /**
-- * __qrwlock_write_byte - retrieve the write byte address of a queue rwlock
-- * @lock : Pointer to queue rwlock structure
-- * Return: the write byte address of a queue rwlock
-- */
--static inline u8 *__qrwlock_write_byte(struct qrwlock *lock)
--{
--	return (u8 *)lock + 3 * IS_BUILTIN(CONFIG_CPU_BIG_ENDIAN);
--}
--
--/**
-  * queued_write_unlock - release write lock of a queue rwlock
-  * @lock : Pointer to queue rwlock structure
-  */
- static inline void queued_write_unlock(struct qrwlock *lock)
- {
--	smp_store_release(__qrwlock_write_byte(lock), 0);
-+	smp_store_release(&lock->wmode, 0);
++#define atomic_cond_read_acquire(v, c)	smp_cond_load_acquire(&(v)->counter, (c))
++
+ #ifdef CONFIG_GENERIC_ATOMIC64
+ #include <asm-generic/atomic64.h>
+ #endif
+@@ -1072,6 +1074,8 @@ static inline long long atomic64_fetch_andnot_release(long long i, atomic64_t *v
  }
+ #endif
  
- /*
-diff --git a/include/asm-generic/qrwlock_types.h b/include/asm-generic/qrwlock_types.h
-index 0abc6b6062fb..507f2dc51bba 100644
---- a/include/asm-generic/qrwlock_types.h
-+++ b/include/asm-generic/qrwlock_types.h
-@@ -9,12 +9,23 @@
-  */
++#define atomic64_cond_read_acquire(v, c)	smp_cond_load_acquire(&(v)->counter, (c))
++
+ #include <asm-generic/atomic-long.h>
  
- typedef struct qrwlock {
--	atomic_t		cnts;
-+	union {
-+		atomic_t cnts;
-+		struct {
-+#ifdef __LITTLE_ENDIAN
-+			u8 wmode;	/* Writer mode   */
-+			u8 rcnts[3];	/* Reader counts */
-+#else
-+			u8 rcnts[3];	/* Reader counts */
-+			u8 wmode;	/* Writer mode   */
-+#endif
-+		};
-+	};
- 	arch_spinlock_t		wait_lock;
- } arch_rwlock_t;
- 
- #define	__ARCH_RW_LOCK_UNLOCKED {		\
--	.cnts = ATOMIC_INIT(0),			\
-+	{ .cnts = ATOMIC_INIT(0), },		\
- 	.wait_lock = __ARCH_SPIN_LOCK_UNLOCKED,	\
- }
- 
-diff --git a/kernel/locking/qrwlock.c b/kernel/locking/qrwlock.c
-index 2655f26ec882..1af791e37348 100644
---- a/kernel/locking/qrwlock.c
-+++ b/kernel/locking/qrwlock.c
-@@ -23,26 +23,6 @@
- #include <linux/spinlock.h>
- #include <asm/qrwlock.h>
- 
--/*
-- * This internal data structure is used for optimizing access to some of
-- * the subfields within the atomic_t cnts.
-- */
--struct __qrwlock {
--	union {
--		atomic_t cnts;
--		struct {
--#ifdef __LITTLE_ENDIAN
--			u8 wmode;	/* Writer mode   */
--			u8 rcnts[3];	/* Reader counts */
--#else
--			u8 rcnts[3];	/* Reader counts */
--			u8 wmode;	/* Writer mode   */
--#endif
--		};
--	};
--	arch_spinlock_t	lock;
--};
--
- /**
-  * rspin_until_writer_unlock - inc reader count & spin until writer is gone
-  * @lock  : Pointer to queue rwlock structure
-@@ -125,10 +105,8 @@ void queued_write_lock_slowpath(struct qrwlock *lock)
- 	 * or wait for a previous writer to go away.
- 	 */
- 	for (;;) {
--		struct __qrwlock *l = (struct __qrwlock *)lock;
--
--		if (!READ_ONCE(l->wmode) &&
--		   (cmpxchg_relaxed(&l->wmode, 0, _QW_WAITING) == 0))
-+		if (!READ_ONCE(lock->wmode) &&
-+		   (cmpxchg_relaxed(&lock->wmode, 0, _QW_WAITING) == 0))
- 			break;
- 
- 		cpu_relax();
+ #endif /* _LINUX_ATOMIC_H */
 -- 
 2.1.4
