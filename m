@@ -1,84 +1,39 @@
 From: briannorris@chromium.org (Brian Norris)
-Date: Thu, 12 Oct 2017 13:52:19 -0700
-Subject: [PATCH 2/3] of/pci: Add of_pci_get_pcie_reset_suspend() to parse
- pcie-reset-suspend
+Date: Thu, 12 Oct 2017 13:52:18 -0700
+Subject: [PATCH 1/3] Documentation/devicetree: Add pcie-reset-suspend property
 In-Reply-To: <20171012205220.130048-1-briannorris@chromium.org>
 References: <20171012205220.130048-1-briannorris@chromium.org>
-Message-ID: <20171012205220.130048-3-briannorris@chromium.org>
+Message-ID: <20171012205220.130048-2-briannorris@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This helper can be used by drivers to determine the expected PERST#
-behavior when in low-power system suspend (e.g., S3). I've found the
-expected behavior to vary across a few different endpoint
-implementations.
+The patch is self-descriptive. I've found that we may need
+platform-specific behavior for the PERST# signal in system suspend,
+depending on the type of PCIe endpoints are attached.
 
 Signed-off-by: Brian Norris <briannorris@chromium.org>
 ---
- drivers/of/of_pci.c    | 25 +++++++++++++++++++++++++
- include/linux/of_pci.h |  7 +++++++
- 2 files changed, 32 insertions(+)
+ Documentation/devicetree/bindings/pci/pci.txt | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-index e9ec931f5b9a..ab2586f86094 100644
---- a/drivers/of/of_pci.c
-+++ b/drivers/of/of_pci.c
-@@ -137,6 +137,31 @@ int of_pci_get_max_link_speed(struct device_node *node)
- }
- EXPORT_SYMBOL_GPL(of_pci_get_max_link_speed);
- 
-+/**
-+ * This function returns true if the PCIe controller should assert PCIe Reset
-+ * (PERST#) when entering system suspend (e.g., S3).
-+ *
-+ * @node: device tree node with the reset property
-+ *
-+ * Returns 1 (meaning "assert reset") or 0 ("don't assert reset"), if the DT
-+ * defined a valid behavior. Otherwise, returns a negative error code.
-+ */
-+int of_pci_get_pcie_reset_suspend(struct device_node *node)
-+{
-+	int ret;
-+	u32 val;
-+
-+	ret = of_property_read_u32(node, "pcie-reset-suspend", &val);
-+	if (ret)
-+		return ret;
-+
-+	if (val > 1)
-+		return -EINVAL;
-+
-+	return val;
-+}
-+EXPORT_SYMBOL_GPL(of_pci_get_pcie_reset_suspend);
-+
- /**
-  * of_pci_check_probe_only - Setup probe only mode if linux,pci-probe-only
-  *                           is present and valid
-diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-index 518c8d20647a..df453893080b 100644
---- a/include/linux/of_pci.h
-+++ b/include/linux/of_pci.h
-@@ -17,6 +17,7 @@ int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin);
- int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
- int of_get_pci_domain_nr(struct device_node *node);
- int of_pci_get_max_link_speed(struct device_node *node);
-+int of_pci_get_pcie_reset_suspend(struct device_node *node);
- void of_pci_check_probe_only(void);
- int of_pci_map_rid(struct device_node *np, u32 rid,
- 		   const char *map_name, const char *map_mask_name,
-@@ -69,6 +70,12 @@ of_pci_get_max_link_speed(struct device_node *node)
- 	return -EINVAL;
- }
- 
-+static inline int
-+of_pci_get_pcie_reset_suspend(struct device_node *node)
-+{
-+	return -EINVAL;
-+}
-+
- static inline void of_pci_check_probe_only(void) { }
- #endif
- 
+diff --git a/Documentation/devicetree/bindings/pci/pci.txt b/Documentation/devicetree/bindings/pci/pci.txt
+index c77981c5dd18..91339b6d0652 100644
+--- a/Documentation/devicetree/bindings/pci/pci.txt
++++ b/Documentation/devicetree/bindings/pci/pci.txt
+@@ -24,3 +24,14 @@ driver implementation may support the following properties:
+    unsupported link speed, for instance, trying to do training for
+    unsupported link speed, etc.  Must be '4' for gen4, '3' for gen3, '2'
+    for gen2, and '1' for gen1. Any other values are invalid.
++- pcie-reset-suspend:
++   If present this property defines whether the PCIe Reset signal (referred to
++   as PERST#) should be asserted when the system enters low-power suspend modes
++   (e.g., S3). Depending on the form factor, the associated PCIe
++   electromechanical specification may specify a particular behavior (e.g.,
++   "PERST# is asserted in advance of the power being switched off in a
++   power-managed state like S3") or it may be less clear. The net result is
++   that some endpoints perform better (e.g., lower power consumption) with
++   PERST# asserted, and others prefer PERST# deasserted. The value must be '0'
++   or '1', where '0' means do not assert PERST# and '1' means assert PERST#.
++   When absent, behavior may be platform-specific.
 -- 
 2.15.0.rc0.271.g36b669edcc-goog
