@@ -1,86 +1,119 @@
-From: dvyukov@google.com (Dmitry Vyukov)
-Date: Thu, 12 Oct 2017 09:16:39 +0200
-Subject: [PATCH 06/11] change memory_is_poisoned_16 for aligned error
-In-Reply-To: <20171011162345.f601c29d12c81af85bf38565@linux-foundation.org>
-References: <20171011082227.20546-1-liuwenliang@huawei.com>
- <20171011082227.20546-7-liuwenliang@huawei.com>
- <20171011162345.f601c29d12c81af85bf38565@linux-foundation.org>
-Message-ID: <CACT4Y+Ym3kq5RZ-4F=f97bvT2pNpzDf0kerf6tebzLOY_crR8Q@mail.gmail.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Thu, 12 Oct 2017 15:30:10 +0800
+Subject: [PATCH 3/4] ACPI: IORT: Skip SMMUv3 device ID map for two steps
+ mappings
+In-Reply-To: <20171011102424.GA10795@red-moon>
+References: <1506475215-2731-1-git-send-email-hanjun.guo@linaro.org>
+ <1506475215-2731-4-git-send-email-hanjun.guo@linaro.org>
+ <20170927135449.GA11347@red-moon>
+ <CAGHbJ3DbuGeKH16zr+PdZYjoaZrHJrTmV5tmMxZ5CDPObErUCQ@mail.gmail.com>
+ <20171010092036.GA8507@red-moon> <59DDAB72.7070605@huawei.com>
+ <20171011102424.GA10795@red-moon>
+Message-ID: <59DF1A02.9040008@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 12, 2017 at 1:23 AM, Andrew Morton
-<akpm@linux-foundation.org> wrote:
-> On Wed, 11 Oct 2017 16:22:22 +0800 Abbott Liu <liuwenliang@huawei.com> wrote:
->
->>  Because arm instruction set don't support access the address which is
->>  not aligned, so must change memory_is_poisoned_16 for arm.
->>
->> ...
->>
->> --- a/mm/kasan/kasan.c
->> +++ b/mm/kasan/kasan.c
->> @@ -149,6 +149,25 @@ static __always_inline bool memory_is_poisoned_2_4_8(unsigned long addr,
->>       return memory_is_poisoned_1(addr + size - 1);
->>  }
->>
->> +#ifdef CONFIG_ARM
->> +static __always_inline bool memory_is_poisoned_16(unsigned long addr)
->> +{
->> +     u8 *shadow_addr = (u8 *)kasan_mem_to_shadow((void *)addr);
->> +
->> +     if (unlikely(shadow_addr[0] || shadow_addr[1])) return true;
->
-> Coding-style is messed up.  Please use scripts/checkpatch.pl.
->
->> +     else {
->> +             /*
->> +              * If two shadow bytes covers 16-byte access, we don't
->> +              * need to do anything more. Otherwise, test the last
->> +              * shadow byte.
->> +              */
->> +             if (likely(IS_ALIGNED(addr, KASAN_SHADOW_SCALE_SIZE)))
->> +                     return false;
->> +             return memory_is_poisoned_1(addr + 15);
->> +     }
->> +}
->> +
->> +#else
->>  static __always_inline bool memory_is_poisoned_16(unsigned long addr)
->>  {
->>       u16 *shadow_addr = (u16 *)kasan_mem_to_shadow((void *)addr);
->> @@ -159,6 +178,7 @@ static __always_inline bool memory_is_poisoned_16(unsigned long addr)
->>
->>       return *shadow_addr;
->>  }
->> +#endif
->
-> - I don't understand why this is necessary.  memory_is_poisoned_16()
->   already handles unaligned addresses?
->
-> - If it's needed on ARM then presumably it will be needed on other
->   architectures, so CONFIG_ARM is insufficiently general.
->
-> - If the present memory_is_poisoned_16() indeed doesn't work on ARM,
->   it would be better to generalize/fix it in some fashion rather than
->   creating a new variant of the function.
+On 2017/10/11 18:24, Lorenzo Pieralisi wrote:
+> On Wed, Oct 11, 2017 at 01:26:10PM +0800, Hanjun Guo wrote:
+>> On 2017/10/10 17:20, Lorenzo Pieralisi wrote:
+>>> On Tue, Oct 10, 2017 at 02:47:53PM +0800, Hanjun Guo wrote:
+>>>> Hi Lorenzo,
+>>>>
+>>>> Sorry for the late reply, holidays in China for the past week.
+>>>>
+>>>> At 2017/9/27 21:54, Lorenzo Pieralisi wrote:
+>>>>> Hi Hanjun,
+>>>>>
+>>>>> On Wed, Sep 27, 2017 at 09:20:14AM +0800, Hanjun Guo wrote:
+>>>>>> IORT revision C introduced SMMUv3 MSI support which adding a
+>>>>>> device ID mapping index in SMMUv3 sub table, to get the SMMUv3
+>>>>>> device ID mapping for the output ID (dev ID for ITS) and the
+>>>>>> link to which ITS.
+>>>>>>
+>>>>>> So if a platform supports SMMUv3 MSI for control interrupt,
+>>>>>> there will be a additional single map entry under SMMU, this
+>>>>>> will not introduce any difference for devices just use one
+>>>>>> step map to get its output ID and parent (ITS or SMMU), such
+>>>>>> as PCI/NC/PMCG ---> ITS or PCI/NC ---> SMMU, but we need to
+>>>>>> do the special handling for two steps map case such as
+>>>>>> PCI/NC--->SMMUv3--->ITS.
+>>>>>>
+>>>>>> Take a PCI hostbridge for example,
+>>>>>>
+>>>>>> |----------------------|
+>>>>>> |  Root Complex Node   |
+>>>>>> |----------------------|
+>>>>>> |    map entry[x]      |
+>>>>>> |----------------------|
+>>>>>> |       id value       |
+>>>>>> | output_reference     |
+>>>>>> |---|------------------|
+>>>>>>      |
+>>>>>>      |   |----------------------|
+>>>>>>      |-->|        SMMUv3        |
+>>>>>>          |----------------------|
+>>>>>>          |     SMMU dev ID      |
+>>>>>>          |     mapping index 0  |
+>>>>>>          |----------------------|
+>>>>>>          |      map entry[0]    |
+>>>>>>          |----------------------|
+>>>>>>          |       id value       |
+>>>>>>          | output_reference-----------> ITS 1 (SMMU MSI domain)
+>>>>>>          |----------------------|
+>>>>>>          |      map entry[1]    |
+>>>>>>          |----------------------|
+>>>>>>          |       id value       |
+>>>>>>          | output_reference-----------> ITS 2 (PCI MSI domain)
+>>>>>>          |----------------------|
+>>>>>>
+>>>>>> When the SMMU dev ID mapping index is 0, there is entry[0]
+>>>>>> to map to a ITS, we need to skip that map entry for PCI
+>>>>>> or NC (named component), or we may get the wrong ITS parent.
+>>>>> Is this actually true ? I think that currently we would simply skip
+>>>>> the entry and print an error log but we can't get a wrong ITS parent.
+>>>> So the only valid single mapping under type SMMUv3 is SMMUv3's dev id
+>>>> mapping, we need to fix the IORT spec as well.
+>>>>
+>>>>> I am rewriting this commit (I will probably split it), it is doing the
+>>>>> right thing but the commit log is stale (probably caused by code
+>>>>> reshuffling).
+>>>> Do I need to resend another version, or you can help to update it?
+>>>> please let me know.
+>>> I reworked the patches, you can repost/retest them I made them available
+>>> in the branch below, we will have to add a guard around ACPICA smmu
+>>> struct (unfortunately I think we will have to use the ACPICA version as
+>>> a guard) or I can ask Rafael to pull the series if ACPICA goes via ACPI
+>>> tree (and your patch made it into the release - I will check ACPICA
+>>> upstream).
+>> Bob already merged my pull request yesterday, I think it will be ready for
+>> acpica release for this month.
+> That's good, mind updating the patch series with an ACPICA guard in IORT
+> code in preparation for the pull request ?
 
+Do you mean drop the acpica patch in this patch set and adding the code below?
 
-Yes, I think it will be better to fix the current function rather then
-have 2 slightly different copies with ifdef's.
-Will something along these lines work for arm? 16-byte accesses are
-not too common, so it should not be a performance problem. And
-probably modern compilers can turn 2 1-byte checks into a 2-byte check
-where safe (x86).
-
-static __always_inline bool memory_is_poisoned_16(unsigned long addr)
-{
-        u8 *shadow_addr = (u8 *)kasan_mem_to_shadow((void *)addr);
-
-        if (shadow_addr[0] || shadow_addr[1])
-                return true;
-        /* Unaligned 16-bytes access maps into 3 shadow bytes. */
-        if (unlikely(!IS_ALIGNED(addr, KASAN_SHADOW_SCALE_SIZE)))
-                return memory_is_poisoned_1(addr + 15);
-        return false;
-}
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index 37a1b9f..a883bec 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -366,6 +366,7 @@ static struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
+        return NULL;
+ }
+ 
++#if (ACPI_CA_VERSION > 0x20170929)
+ static int iort_get_id_mapping_index(struct acpi_iort_node *node)
+ {
+        struct acpi_iort_smmu_v3 *smmu;
+@@ -399,6 +400,12 @@ static int iort_get_id_mapping_index(struct acpi_iort_node *node)
+                return -EINVAL;
+        }
+ }
++#else
++static int iort_get_id_mapping_index(struct acpi_iort_node *node)
++{
++ return -EINVAL;
++}
++#endif
+ 
+Thanks
+Hanjun
