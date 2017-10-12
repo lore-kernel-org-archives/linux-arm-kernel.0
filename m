@@ -1,60 +1,58 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Thu, 12 Oct 2017 13:52:20 -0700
-Subject: [PATCH 3/3] PCI: rockchip: Support configuring PERST# state via DT
-In-Reply-To: <20171012205220.130048-1-briannorris@chromium.org>
-References: <20171012205220.130048-1-briannorris@chromium.org>
-Message-ID: <20171012205220.130048-4-briannorris@chromium.org>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Thu, 12 Oct 2017 14:03:56 -0700
+Subject: [PATCH v3 16/22] firmware: arm_scmi: add arm_mhu specific mailbox
+ interface
+In-Reply-To: <25023d1a-a221-b131-5a1e-7d909b006d1b@arm.com>
+References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
+ <1506604306-20739-17-git-send-email-sudeep.holla@arm.com>
+ <CAK8P3a0XmiXqZ-z7WV+nk7B86p23Jmf31Q=pVovXVebhA28_0Q@mail.gmail.com>
+ <CABb+yY1N6hmC6Kd2QteMw_oCf=-mYHf7p6RdhYPQK+QUO7VP4A@mail.gmail.com>
+ <f142dac2-a27c-4c46-4d22-4df4f2e8cfb1@arm.com>
+ <CABb+yY1w358uw2EoeioAvZy06LTuOO0krGFFXoQSNAR5m5ANmQ@mail.gmail.com>
+ <25023d1a-a221-b131-5a1e-7d909b006d1b@arm.com>
+Message-ID: <CAOCOHw54mQUVxVyLRWbV5Ty7trK99MM6zgXsuuxQEHnD3qvKVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've found that different endpoints and board configurations have
-required different behavior from the PCIe Reset (PERST#) signal when in
-low-power system suspend (e.g., S3). Use the new of_pci helper to
-request this state and assert (active low) PERST# before suspending.
+On Fri, Oct 6, 2017 at 6:51 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>
+>
+> On 06/10/17 14:47, Jassi Brar wrote:
+>> On Fri, Oct 6, 2017 at 7:02 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+[..]
+>>> Again that's not the point, doorbell is more common feature and that can
+>>> be supported. As SCMI expects doorbell feature in the specification, it
+>>> just need to support that class of controllers.
+>>>
+>> NO.  All SCMI expects is SHMEM and a signal reaching the other end.
+>> The signal mechanism need not necessarily be "doorbell".
+>>
+>
+> Agreed, but creating an abstraction ro do something as generic as
+> doorbell and writing shim layer for each controller to use SCMI also
+> sounds bad.
+>
 
-Note that we reinitialize the link (including reconfiguring PERST#) at
-resume time.
+In the Qualcomm platform we have a single register that exposes 32
+doorbells, wired to interrupts on the various processors/co-processors
+in the SoC.
 
-This requires that the board and system firmware supports driving this
-signal low when the system is suspended, since PERST# may be pulled up
-by the endpoint, and some GPIO banks are not active in S3.
+There is a handful of different clients each using these doorbells to
+inform the other side that something has happened (often that some
+piece of shared memory has been filled with data). Over the years
+(platforms) this register has moved around as such multiple
+implementations exists.
 
-Signed-off-by: Brian Norris <briannorris@chromium.org>
----
- drivers/pci/host/pcie-rockchip.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+You can see an example of this in
+drivers/mailbox/qcom-apcs-ipc-mailbox.c and e.g.
+drivers/rpmsg/qcom_glink_native.c (qcom_glink_rpm.c prior to v4.14).
 
-diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
-index 9051c6c8fea4..1ab58c1abb34 100644
---- a/drivers/pci/host/pcie-rockchip.c
-+++ b/drivers/pci/host/pcie-rockchip.c
-@@ -233,6 +233,7 @@ struct rockchip_pcie {
- 	struct	regulator *vpcie1v8; /* 1.8V power supply */
- 	struct	regulator *vpcie0v9; /* 0.9V power supply */
- 	struct	gpio_desc *ep_gpio;
-+	bool	suspend_reset;
- 	u32	lanes;
- 	u8      lanes_map;
- 	u8	root_bus_nr;
-@@ -1155,6 +1156,9 @@ static int rockchip_pcie_parse_dt(struct rockchip_pcie *rockchip)
- 		dev_info(dev, "no vpcie0v9 regulator found\n");
- 	}
- 
-+	/* Default not-asserted, to retain backward compatibility. */
-+	rockchip->suspend_reset = of_pci_get_pcie_reset_suspend(node) > 0;
-+
- 	return 0;
- }
- 
-@@ -1463,6 +1467,9 @@ static int __maybe_unused rockchip_pcie_suspend_noirq(struct device *dev)
- 		return ret;
- 	}
- 
-+	if (rockchip->suspend_reset)
-+		gpiod_set_value(rockchip->ep_gpio, 0);
-+
- 	rockchip_pcie_deinit_phys(rockchip);
- 
- 	rockchip_pcie_disable_clocks(rockchip);
--- 
-2.15.0.rc0.271.g36b669edcc-goog
+
+
+I'm struggling to figure out exactly how your case looks like, but if
+your doorbell exists in only one instance and there is only one client
+then I would suggest that it's overkill to create another driver for
+it.
+
+Regards,
+Bjorn
