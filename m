@@ -1,40 +1,107 @@
-From: matthijsvanduin@gmail.com (Matthijs van Duin)
-Date: Thu, 12 Oct 2017 10:40:30 +0200
-Subject: [PATCH 5/7] ARM: dts: Add nodes for missing omap4 interconnect
- target modules
-In-Reply-To: <da8d1d7f-f16d-8d71-cf49-acff79614610@ti.com>
-References: <20170929223411.9691-1-tony@atomide.com>
- <20170929223411.9691-6-tony@atomide.com>
- <f5c57f0b-1423-c362-0fda-4069b77a2e38@ti.com>
- <20171011165850.jnaievrgcszcawh3@earth>
- <da8d1d7f-f16d-8d71-cf49-acff79614610@ti.com>
-Message-ID: <20171012084030.lshobr3ewu3t5goc@squirrel.local>
+From: felipe.balbi@linux.intel.com (Felipe Balbi)
+Date: Thu, 12 Oct 2017 11:43:36 +0300
+Subject: [PATCHv2 0/7] Add support for USB OTG on STM32F7
+In-Reply-To: <21df4d0c-075c-0c5a-c39b-b1dd94fe819d@st.com>
+References: <1503930018-536-1-git-send-email-amelie.delaunay@st.com>
+ <878tgim24i.fsf@linux.intel.com>
+ <04a49088-b615-d7b8-0387-e7bfa32ee19f@st.com>
+ <87vajllx8t.fsf@linux.intel.com>
+ <1c4180ef-2da6-b420-7c6e-41769608384a@st.com>
+ <87sheplsrm.fsf@linux.intel.com>
+ <3c36db6d-75fd-1be6-e946-b75a04e3760e@st.com>
+ <21df4d0c-075c-0c5a-c39b-b1dd94fe819d@st.com>
+Message-ID: <87efq821tz.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 12, 2017 at 09:07:55AM +0300, Peter Ujfalusi wrote:
-> I don't see much benefit of using McASP on OMAP4, only drawbacks... It
-> lacks AFIFO so it is prone to underrun and if it underruns you need to
-> reset McASP. Been there with the Samsung Galaxy Nexus.
 
-AESS/ATC isn't able to consistently respond to a DMA request within 20
-us ?  Strange.. I would have expected it to have no trouble with that.
-(And presumably so did TI, or they would have included AFIFO?)
+Hi,
 
-> I wonder how Motorola is using the McASP as the OMAP4 version
-> (officially) does not support I2S.
+Amelie DELAUNAY <amelie.delaunay@st.com> writes:
+> Hi Felipe, Alex,
+>
+> On 10/11/2017 04:38 PM, Alexandre Torgue wrote:
+>> 
+>> 
+>> On 10/11/2017 03:26 PM, Felipe Balbi wrote:
+>>>
+>>> Hi,
+>>>
+>>> Alexandre Torgue <alexandre.torgue@st.com> writes:
+>>>> Hi
+>>>>
+>>>> On 10/11/2017 01:50 PM, Felipe Balbi wrote:
+>>>>>
+>>>>> Hi,
+>>>>>
+>>>>> Alexandre Torgue <alexandre.torgue@st.com> writes:
+>>>>>> Hi Felip
+>>>>>>
+>>>>>> On 10/11/2017 12:04 PM, Felipe Balbi wrote:
+>>>>>>>
+>>>>>>> Hi,
+>>>>>>>
+>>>>>>> Amelie Delaunay <amelie.delaunay@st.com> writes:
+>>>>>>>> The STM32F7 MCU family embeds two DWC2 USB OTG cores. One core is 
+>>>>>>>> USB
+>>>>>>>> OTG FS and the other is USB OTG HS. The USB FS core only works 
+>>>>>>>> with its
+>>>>>>>> internal phy whilst the USB HS core can work in HS with external 
+>>>>>>>> ULPI phy
+>>>>>>>> or in FS/LS with the on-chip FS phy.
+>>>>>>>>
+>>>>>>>> Amelie Delaunay (7):
+>>>>>>>> ???? dt-bindings: usb: Document the STM32F7 DWC2 USB OTG HS core 
+>>>>>>>> binding
+>>>>>>>> ???? usb: dwc2: add support for STM32F7 USB OTG HS
+>>>>>>>> ???? ARM: dts: stm32: Add USB HS support for STM32F746 MCU
+>>>>>>>
+>>>>>>> I have applied these three patches. Should I take the rest? They 
+>>>>>>> seems
+>>>>>>> like they could go upstream through the ARM maintainers.
+>>>>>>>
+>>>>>>
+>>>>>> I will take other DT patches in my PR.
+>>>>>>
+>>>>>> Concerning "ARM: dts: stm32: Add USB HS support for STM32F746 MCU" 
+>>>>>> patch
+>>>>>> I prefer also to take it. This patch adds some pinctrl groups but 
+>>>>>> stm32
+>>>>>> pinctrl bindings will change in my next PR (we will use a macro to
+>>>>>> define pins instead of using defined values). So if you push the DT
+>>>>>> patch through your pull request there will be a merge issue.
+>>>>>> It is possible that I take also this one ?
+>>>>>
+>>>>> In that case, it's best if you take them all :-) Here's my Ack:
+>>>>>
+>>>>> Acked-by: Felipe Balbi <felipe.balbi@linux.intel.com>
+>>>>>
+>>>>> I'll drop them from my tree now
+>>>>
+>>>> Ok perfect, I will take DT patches (3 to 7) and I let you take patch 1&2
+>>>> in your tree.
+>>>
+>>> Well, I have dropped them from my tree. Please two 1-7 through yours.
+>> 
+>> Hum, ok for this patchset but IMO it is better (next time) that you take 
+>> driver pacthes in your tree and I take only DT patches in mine.
+>> No ?
+>> 
+>> Regards
+>> Alex
+>> 
+>>>
+>
+> I thought that patches 1 and 2, as they are "driver" patches, had to be 
+> applied on USB tree (so Felipe's one), and the others (3 to 7) had to be 
+> applied on STM32-DT tree (Alex's one). Did I miss something?
 
-Hmm? I checked the omap4430 TRM and I don't see that mentioned. It seems
-to have pins for i2s transmit:
+patch 1 is documentation, right? Without the documentation patch,
+checkpatch will cringe :-) So either way works.
 
-	abe_mcasp_axr              O     Audio transmit data
-	abe_mcasp_aclkx            O     Transmit bit clock
-	abe_mcasp_ahclkx           O     Transmit high-frequency master clock
-	abe_mcasp_afsx             O     Transmit frame synchronization
-	abe_mcasp_amute            O     Mute out to external
-	abe_mcasp_amutein          I     Mute in from external
+If you insist, I can take 1-2 through my tree. No worries.
 
-If it supported s/pdif tx only, then all of these except axr would be
-useless.
+let me know
 
-Matthijs
+-- 
+balbi
