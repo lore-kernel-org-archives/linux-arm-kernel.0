@@ -1,24 +1,48 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 12 Oct 2017 11:15:48 +0100
-Subject: [PATCH v3 17/28] arm64/sve: Preserve SVE registers around
- kernel-mode NEON use
-In-Reply-To: <1507660725-7986-18-git-send-email-Dave.Martin@arm.com>
-References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
- <1507660725-7986-18-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20171012101548.of4cn7re76xsot6k@armageddon.cambridge.arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 12 Oct 2017 11:23:41 +0100
+Subject: [PATCH] ARM: head-common.S: Clear lr before jumping to
+ start_kernel()
+In-Reply-To: <20171010203324.GX4394@atomide.com>
+References: <1507044184-27152-1-git-send-email-geert+renesas@glider.be>
+ <nycvar.YSQ.7.76.1710031134140.5407@knanqh.ubzr>
+ <CAMuHMdWJKQb5JY+diH=7dqNuypkPUqBeOEPSLOrfrnbfh2siRQ@mail.gmail.com>
+ <CAMuHMdXpPfipmEdW0Dap6Pjwhz3QxLcrcbtU0RhCu721k-sBpA@mail.gmail.com>
+ <CAMuHMdWH_pebSYAp04gmVceu3qqPczGaXS36R8CtzAYHo-CNog@mail.gmail.com>
+ <20171010203324.GX4394@atomide.com>
+Message-ID: <20171012102341.GF23750@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 10, 2017 at 07:38:34PM +0100, Dave P Martin wrote:
-> Kernel-mode NEON will corrupt the SVE vector registers, due to the
-> way they alias the FPSIMD vector registers in the hardware.
+On Tue, Oct 10, 2017 at 01:33:25PM -0700, Tony Lindgren wrote:
+> * Geert Uytterhoeven <geert@linux-m68k.org> [171003 11:32]:
+> > On Tue, Oct 3, 2017 at 8:15 PM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> > > On Tue, Oct 3, 2017 at 8:11 PM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> > >> On Tue, Oct 3, 2017 at 5:37 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > >>> On Tue, 3 Oct 2017, Geert Uytterhoeven wrote:
+> > >>> Please send it to RMK's patch system.
+> > >>
+> > >> Done (I hope so ;-)
+> > >
+> > > Failed. Retrying.
+> > 
+> > Yiha ;-)
+> > 
+> > http://www.armlinux.org.uk/developer/patches/viewpatch.php?id=8702/1
 > 
-> This patch ensures that any live SVE register content for the task
-> is saved by kernel_neon_begin().  The data will be restored in the
-> usual way on return to userspace.
+> This also fixes the spamming I started seeing with next-20171009:
 > 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+> Tested-by: Tony Lindgren <tony@atomide.com>
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+It's all nice and good that people are testing this patch, but I can't
+apply it to -rc1, nor my "misc" branch.  It appears that this is due
+to patches going through other trees.
+
+Sorry, I can't take this patch.
+
+(This is the falicy about any one particular tree having rights to
+exclusively own a sub-tree in the kernel...)
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
