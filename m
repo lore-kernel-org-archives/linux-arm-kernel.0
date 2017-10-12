@@ -1,75 +1,59 @@
-From: m.purski@samsung.com (Maciej Purski)
-Date: Thu, 12 Oct 2017 15:00:19 +0200
-Subject: [PATCH v2 3/4] dt-bindings: hwmon: Add
- ti-max-expected-current-microamp property to ina2xx
-In-Reply-To: <CAJKOXPc1B1uqravtmHrh4eUK5JiQRiZLeoveSMk5qVyF-mK7Kw@mail.gmail.com>
-References: <CGME20171012123635eucas1p1ff9a982db9d541cd0475d44d114ff92a@eucas1p1.samsung.com>
- <1507811765-31005-1-git-send-email-m.purski@samsung.com>
- <1507811765-31005-4-git-send-email-m.purski@samsung.com>
- <CAJKOXPc1B1uqravtmHrh4eUK5JiQRiZLeoveSMk5qVyF-mK7Kw@mail.gmail.com>
-Message-ID: <4597b058-ecb1-59ef-8693-1a23f374eae0@samsung.com>
+From: awallis@codeaurora.org (Adam Wallis)
+Date: Thu, 12 Oct 2017 09:16:33 -0400
+Subject: [PATCH v3 0/5] Switch arm64 over to qrwlock
+In-Reply-To: <1507810851-306-1-git-send-email-will.deacon@arm.com>
+References: <1507810851-306-1-git-send-email-will.deacon@arm.com>
+Message-ID: <53399b22-8062-aa06-8569-e3fb0ae70ff0@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10/12/2017 8:20 AM, Will Deacon wrote:
+> Hello,
+> 
+> This is version three of the patches previously posted here:
+> 
+> v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2017-October/534666.html
+> v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2017-October/534981.html
+> 
+> Changes since v2 include:
+> 
+>   * Drop unused cnt argument
+>   * Fix typo in UNLOCK Kconfig inlining options
+>   * Added Tested-by tags
+> 
+> Thanks to all of those who provided review and testing feedback!
+> 
+> Will
+> 
+> --->8
+> 
+> Will Deacon (5):
+>   kernel/locking: Use struct qrwlock instead of struct __qrwlock
+>   locking/atomic: Add atomic_cond_read_acquire
+>   kernel/locking: Use atomic_cond_read_acquire when spinning in qrwlock
+>   arm64: locking: Move rwlock implementation over to qrwlocks
+>   kernel/locking: Prevent slowpath writers getting held up by fastpath
+> 
+>  arch/arm64/Kconfig                      |  17 ++++
+>  arch/arm64/include/asm/Kbuild           |   1 +
+>  arch/arm64/include/asm/spinlock.h       | 164 +-------------------------------
+>  arch/arm64/include/asm/spinlock_types.h |   6 +-
+>  include/asm-generic/atomic-long.h       |   3 +
+>  include/asm-generic/qrwlock.h           |  37 ++-----
+>  include/asm-generic/qrwlock_types.h     |  15 ++-
+>  include/linux/atomic.h                  |   4 +
+>  kernel/locking/qrwlock.c                |  86 +++--------------
+>  9 files changed, 61 insertions(+), 272 deletions(-)
+> 
 
+Will, I see the same performance improvements that I was getting in v2 of the
+patch. I will continue to run these patches on multiple systems over the next
+few weeks, months for stability/functionality testing as well.
 
-On 10/12/2017 02:39 PM, Krzysztof Kozlowski wrote:
-> On Thu, Oct 12, 2017 at 2:36 PM, Maciej Purski <m.purski@samsung.com> wrote:
->> Add optional max expected current property which allows calibrating
->> the ina sensor in order to achieve requested measure scale. Document
->> the changes in Documentation/hwmon/ina2xx.
->>
->> Signed-off-by: Maciej Purski <m.purski@samsung.com>
->> ---
->>   Documentation/devicetree/bindings/hwmon/ina2xx.txt | 4 +++-
->>   Documentation/hwmon/ina2xx                         | 3 +++
->>   2 files changed, 6 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/hwmon/ina2xx.txt b/Documentation/devicetree/bindings/hwmon/ina2xx.txt
->> index 02af0d9..49ef0be 100644
->> --- a/Documentation/devicetree/bindings/hwmon/ina2xx.txt
->> +++ b/Documentation/devicetree/bindings/hwmon/ina2xx.txt
->> @@ -14,11 +14,13 @@ Optional properties:
->>
->>   - shunt-resistor
->>          Shunt resistor value in micro-Ohm
->> -
->> +- ti-max-expected-current-microamp
->> +       Max expected current value in mA
->>   Example:
->>
->>   ina220 at 44 {
->>          compatible = "ti,ina220";
->>          reg = <0x44>;
->>          shunt-resistor = <1000>;
->> +       ti-max-expected-current-microamp = <3000>;
->>   };
->> diff --git a/Documentation/hwmon/ina2xx b/Documentation/hwmon/ina2xx
->> index cfd31d9..30620e8 100644
->> --- a/Documentation/hwmon/ina2xx
->> +++ b/Documentation/hwmon/ina2xx
->> @@ -55,6 +55,9 @@ The shunt value in micro-ohms can be set via platform data or device tree at
->>   compile-time or via the shunt_resistor attribute in sysfs at run-time. Please
->>   refer to the Documentation/devicetree/bindings/i2c/ina2xx.txt for bindings
->>   if the device tree is used.
->> +The max expected current value in miliamp can be set via platform data
-> 
-> mili or micro?
-> 
-> BR,
-> Krzysztof
+Tested-by: Adam Wallis <awallis@codeaurora.org>
 
-Sorry, these should be mili everywhere. I'll fix this.
-
-> 
->> +or device tree at compile-time or via currX_max attribute in sysfs
->> +at run-time.
->>
->>   Additionally ina226 supports update_interval attribute as described in
->>   Documentation/hwmon/sysfs-interface. Internally the interval is the sum of
->> --
->> 2.7.4
->>
-> 
-> 
-> 
+-- 
+Adam Wallis
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
