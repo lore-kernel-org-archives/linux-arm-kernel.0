@@ -1,74 +1,117 @@
 From: zhiqiang.hou@nxp.com (Z.q. Hou)
-Date: Thu, 12 Oct 2017 03:17:57 +0000
-Subject: [PATCH 1/2] PCI: Disable MSI for Freescale PCIe RC mode
-In-Reply-To: <20171011193737.GP25517@bhelgaas-glaptop.roam.corp.google.com>
+Date: Thu, 12 Oct 2017 03:33:15 +0000
+Subject: [PATCH 2/2] pci/layerscape: change the default error response
+ behavior
+In-Reply-To: <20171011194129.GQ25517@bhelgaas-glaptop.roam.corp.google.com>
 References: <20170922072522.36306-1-Zhiqiang.Hou@nxp.com>
- <20170922072522.36306-2-Zhiqiang.Hou@nxp.com>
- <20171011193737.GP25517@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <AM5PR0402MB2771384AB34878A38DD9ABD2844B0@AM5PR0402MB2771.eurprd04.prod.outlook.com>
+ <20170922072522.36306-3-Zhiqiang.Hou@nxp.com>
+ <20171011194129.GQ25517@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <AM5PR0402MB27711353F4479D83E41359D8844B0@AM5PR0402MB2771.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Bjorn,
 
-Thanks a lot for your comments!
+Thanks a lot for your review!
 
 > -----Original Message-----
 > From: Bjorn Helgaas [mailto:helgaas at kernel.org]
-> Sent: 2017?10?12? 3:38
+> Sent: 2017?10?12? 3:41
 > To: Z.q. Hou <zhiqiang.hou@nxp.com>
 > Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
 > linux-pci at vger.kernel.org; bhelgaas at google.com; Roy Zang
 > <roy.zang@nxp.com>; Mingkai Hu <mingkai.hu@nxp.com>; M.h. Lian
 > <minghuan.lian@nxp.com>
-> Subject: Re: [PATCH 1/2] PCI: Disable MSI for Freescale PCIe RC mode
+> Subject: Re: [PATCH 2/2] pci/layerscape: change the default error response
+> behavior
 > 
-> On Fri, Sep 22, 2017 at 03:25:21PM +0800, Zhiqiang Hou wrote:
-> > From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> On Fri, Sep 22, 2017 at 03:25:22PM +0800, Zhiqiang Hou wrote:
+> > From: Minghuan Lian <Minghuan.Lian@nxp.com>
 > >
-> > The Freescale PCIe controller advertises the MSI/MSI-X capability in
-> > both RC and Endpoint mode, but in RC mode it doesn't support MSI/MSI-X
-> > by it self, it can only transfer MSI/MSI-X from downstream
-> 
-> s/it self,/itself;/
-
-I'll fix this typo in next version.
-
-> > devices. So add this quirk to prevent use of MSI/MSI-X in RC mode.
+> > By default, when the PCIe controller experiences an erroneous
+> > completion from an external completer for its outbound non-posted
+> > request, it always sends an OKAY response to the device's internal AXI
+> > slave system interface. However, such default system error response
+> > behavior cannot be used for other types of outbound non-posted
+> > requests. For example, the outbound memory read transaction requires
+> > an actual ERROR response, like UR completion or completion timeout.
+> > The patch is to fix it by forwarding the error response of the
+> > non-posted request.
 > >
+> > Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
 > > Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 > > ---
-> >  drivers/pci/quirks.c | 8 ++++++++
-> >  1 file changed, 8 insertions(+)
+> >  drivers/pci/dwc/pci-layerscape.c | 25 +++++++++++++++++++++++++
+> >  1 file changed, 25 insertions(+)
 > >
-> > diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c index
-> > a4d33619a7bb..c1063a420f0c 100644
-> > --- a/drivers/pci/quirks.c
-> > +++ b/drivers/pci/quirks.c
-> > @@ -4799,3 +4799,11 @@ static void quirk_no_ats(struct pci_dev *pdev)
-> >  /* AMD Stoney platform GPU */
-> >  DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_ATI, 0x98e4, quirk_no_ats);
-> > #endif /* CONFIG_PCI_ATS */
+> > diff --git a/drivers/pci/dwc/pci-layerscape.c
+> > b/drivers/pci/dwc/pci-layerscape.c
+> > index 3b01e309a55e..a647090c140e 100644
+> > --- a/drivers/pci/dwc/pci-layerscape.c
+> > +++ b/drivers/pci/dwc/pci-layerscape.c
+> > @@ -33,6 +33,8 @@
+> >
+> >  /* PEX Internal Configuration Registers */
+> >  #define PCIE_STRFMR1		0x71c /* Symbol Timer & Filter Mask
+> Register1 */
+> > +#define PCIE_ABSERR		0x8d0 /* Bridge Slave Error Response
+> Register */
+> > +#define PCIE_ABSERR_SETTING	0x9401 /* Forward error of non-posted
+> request */
+> >
+> >  #define PCIE_IATU_NUM		6
+> >
+> > @@ -54,6 +56,19 @@ struct ls_pcie {
+> >
+> >  #define to_ls_pcie(x)	dev_get_drvdata((x)->dev)
+> >
+> > +static int err_response_flag = 1;
 > > +
-> > +/* Freescale PCIe doesn't support MSI in RC mode */ static void
-> > +quirk_fsl_no_msi(struct pci_dev *pdev) {
-> > +	if (pci_pcie_type(pdev) == PCI_EXP_TYPE_ROOT_PORT)
-> > +		pdev->no_msi = 1;
+> > +static int __init ls_pcie_param(char *p) {
+> > +	if (p && strncmp(p, "no-err-response", 15) == 0)
+> > +		err_response_flag = 0;
+> > +	else
+> > +		err_response_flag = 1;
+> > +
+> > +	return 0;
 > > +}
-> > +DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_FREESCALE, PCI_ANY_ID,
-> > +quirk_fsl_no_msi);
+> > +early_param("ls_pcie", ls_pcie_param);
 > 
-> This disables MSI for all Freescale root ports, past, present, and future.  Is
-> that really what you want?  This is a bug (the root port shouldn't advertise
-> MSI if it doesn't support it), and presumably it might be fixed in some future
-> device?
+> What's the point of this parameter?  If it's for debugging, it's not clear that
+> we need it upstream.  If it's for debugging and we *do* need it upstream,
+> there should be some sort of comment to that effect.
+> 
+> I assume you never expect an end user to need this parameter.
 
-For the past and present, there isn't Freescale root ports supporting MSI. If the future Freescale root port support MSI, I'll add a patch for it checking the PCI device ID to determine if apply the quirk.
-And it should be ok for the root ports without this bug.
+It is for debugging, will drop this parameter next version.
 
 > 
-> This needs an ack from Minghuan or Mingkai (based on MAINTAINERS).
-> 
+> >  static bool ls_pcie_is_bridge(struct ls_pcie *pcie)  {
+> >  	struct dw_pcie *pci = pcie->pci;
+> > @@ -124,6 +139,14 @@ static int ls_pcie_link_up(struct dw_pcie *pci)
+> >  	return 1;
+> >  }
+> >
+> > +/* Forward error response of outbound non-posted requests */ static
+> > +void ls_pcie_fix_error_response(struct ls_pcie *pcie) {
+> > +	struct dw_pcie *pci = pcie->pci;
+> > +
+> > +	iowrite32(PCIE_ABSERR_SETTING, pci->dbi_base + PCIE_ABSERR); }
+> > +
+> >  static int ls_pcie_host_init(struct pcie_port *pp)  {
+> >  	struct dw_pcie *pci = to_dw_pcie_from_pp(pp); @@ -135,6 +158,8 @@
+> > static int ls_pcie_host_init(struct pcie_port *pp)
+> >  	 * dw_pcie_setup_rc() will reconfigure the outbound windows.
+> >  	 */
+> >  	ls_pcie_disable_outbound_atus(pcie);
+> > +	if (err_response_flag)
+> > +		ls_pcie_fix_error_response(pcie);
+> >
+> >  	dw_pcie_dbi_ro_wr_en(pci);
+> >  	ls_pcie_clear_multifunction(pcie);
+> > --
+> > 2.14.1
+> >
 
 Thanks,
 Zhiqiang
