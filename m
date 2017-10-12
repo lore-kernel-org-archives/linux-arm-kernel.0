@@ -1,60 +1,123 @@
-From: liuwenliang@huawei.com (Liuwenliang (Lamb))
-Date: Thu, 12 Oct 2017 11:27:40 +0000
-Subject: [PATCH 06/11] change memory_is_poisoned_16 for aligned error
-In-Reply-To: <CACT4Y+Ym3kq5RZ-4F=f97bvT2pNpzDf0kerf6tebzLOY_crR8Q@mail.gmail.com>
-References: <20171011082227.20546-1-liuwenliang@huawei.com>
- <20171011082227.20546-7-liuwenliang@huawei.com>
- <20171011162345.f601c29d12c81af85bf38565@linux-foundation.org>
- <CACT4Y+Ym3kq5RZ-4F=f97bvT2pNpzDf0kerf6tebzLOY_crR8Q@mail.gmail.com>
-Message-ID: <B8AC3E80E903784988AB3003E3E97330B2528234@dggemm510-mbs.china.huawei.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 12 Oct 2017 20:36:15 +0900
+Subject: [PATCH v8 1/2] dt-bindings: gpio: uniphier: add UniPhier GPIO binding
+In-Reply-To: <1507808176-5223-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1507808176-5223-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1507808176-5223-2-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> - I don't understand why this is necessary.  memory_is_poisoned_16()
->>   already handles unaligned addresses?
->>
->> - If it's needed on ARM then presumably it will be needed on other
->>   architectures, so CONFIG_ARM is insufficiently general.
->>
->> - If the present memory_is_poisoned_16() indeed doesn't work on ARM,
->>   it would be better to generalize/fix it in some fashion rather than
->>   creating a new variant of the function.
+This GPIO controller is used on UniPhier SoC family.
 
+The vendor specific property "socionext,interrupt-ranges" is for
+specifying interrupt mapping to the parent interrupt controller
+because the mapping is not contiguous.  It works like "ranges",
+but transforms "interrupts" instead of "reg".
 
->Yes, I think it will be better to fix the current function rather then
->have 2 slightly different copies with ifdef's.
->Will something along these lines work for arm? 16-byte accesses are
->not too common, so it should not be a performance problem. And
->probably modern compilers can turn 2 1-byte checks into a 2-byte check
->where safe (x86).
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
 
->static __always_inline bool memory_is_poisoned_16(unsigned long addr)
->{
->        u8 *shadow_addr = (u8 *)kasan_mem_to_shadow((void *)addr);
->
->        if (shadow_addr[0] || shadow_addr[1])
->                return true;
->        /* Unaligned 16-bytes access maps into 3 shadow bytes. */
->        if (unlikely(!IS_ALIGNED(addr, KASAN_SHADOW_SCALE_SIZE)))
->                return memory_is_poisoned_1(addr + 15);
->        return false;
->}
+ .../devicetree/bindings/gpio/gpio-uniphier.txt     | 52 ++++++++++++++++++++++
+ MAINTAINERS                                        |  1 +
+ include/dt-bindings/gpio/uniphier-gpio.h           | 18 ++++++++
+ 3 files changed, 71 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-uniphier.txt
+ create mode 100644 include/dt-bindings/gpio/uniphier-gpio.h
 
-Thanks for Andrew Morton and Dmitry Vyukov's review. 
-If the parameter addr=0xc0000008, now in function:
-static __always_inline bool memory_is_poisoned_16(unsigned long addr)
-{
- ---     //shadow_addr = (u16 *)(KASAN_OFFSET+0x18000001(=0xc0000008>>3)) is not 
- ---     // unsigned by 2 bytes.
-        u16 *shadow_addr = (u16 *)kasan_mem_to_shadow((void *)addr); 
-
-        /* Unaligned 16-bytes access maps into 3 shadow bytes. */
-        if (unlikely(!IS_ALIGNED(addr, KASAN_SHADOW_SCALE_SIZE)))
-                return *shadow_addr || memory_is_poisoned_1(addr + 15);
-----      //here is going to be error on arm, specially when kernel has not finished yet.
-----      //Because the unsigned accessing cause DataAbort Exception which is not
-----      //initialized when kernel is starting. 
-        return *shadow_addr;
-}
-
-I also think it is better to fix this problem. 
+diff --git a/Documentation/devicetree/bindings/gpio/gpio-uniphier.txt b/Documentation/devicetree/bindings/gpio/gpio-uniphier.txt
+new file mode 100644
+index 0000000..fed9158
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpio/gpio-uniphier.txt
+@@ -0,0 +1,52 @@
++UniPhier GPIO controller
++
++Required properties:
++- compatible: Should be "socionext,uniphier-gpio".
++- reg: Specifies offset and length of the register set for the device.
++- gpio-controller: Marks the device node as a GPIO controller.
++- #gpio-cells: Should be 2.  The first cell is the pin number and the second
++  cell is used to specify optional parameters.
++- interrupt-parent: Specifies the parent interrupt controller.
++- interrupt-controller: Marks the device node as an interrupt controller.
++- #interrupt-cells: Should be 2.  The first cell defines the interrupt number.
++  The second cell bits[3:0] is used to specify trigger type as follows:
++    1 = low-to-high edge triggered
++    2 = high-to-low edge triggered
++    4 = active high level-sensitive
++    8 = active low level-sensitive
++  Valid combinations are 1, 2, 3, 4, 8.
++- ngpios: Specifies the number of GPIO lines.
++- gpio-ranges: Mapping to pin controller pins (as described in gpio.txt)
++- socionext,interrupt-ranges: Specifies an interrupt number mapping between
++  this GPIO controller and its interrupt parent, in the form of arbitrary
++  number of <child-interrupt-base parent-interrupt-base length> triplets.
++
++Optional properties:
++- gpio-ranges-group-names: Used for named gpio ranges (as described in gpio.txt)
++
++Example:
++	gpio: gpio at 55000000 {
++		compatible = "socionext,uniphier-gpio";
++		reg = <0x55000000 0x200>;
++		interrupt-parent = <&aidet>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++		gpio-controller;
++		#gpio-cells = <2>;
++		gpio-ranges = <&pinctrl 0 0 0>;
++		gpio-ranges-group-names = "gpio_range";
++		ngpios = <248>;
++		socionext,interrupt-ranges = <0 48 16>, <16 154 5>, <21 217 3>;
++	};
++
++Consumer Example:
++
++	sdhci0_pwrseq {
++		compatible = "mmc-pwrseq-emmc";
++		reset-gpios = <&gpio UNIPHIER_GPIO_PORT(29, 4) GPIO_ACTIVE_LOW>;
++	};
++
++Please note UNIPHIER_GPIO_PORT(29, 4) represents PORT294 in the SoC document.
++Unfortunately, only the one's place is octal in the port numbering.  (That is,
++PORT 8, 9, 18, 19, 28, 29, ... are missing.)  UNIPHIER_GPIO_PORT() is a helper
++macro to calculate 29 * 8 + 4.
+diff --git a/MAINTAINERS b/MAINTAINERS
+index caacc88..2474032 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2029,6 +2029,7 @@ M:	Masahiro Yamada <yamada.masahiro@socionext.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
+ S:	Maintained
++F:	Documentation/devicetree/bindings/gpio/gpio-uniphier.txt
+ F:	arch/arm/boot/dts/uniphier*
+ F:	arch/arm/include/asm/hardware/cache-uniphier.h
+ F:	arch/arm/mach-uniphier/
+diff --git a/include/dt-bindings/gpio/uniphier-gpio.h b/include/dt-bindings/gpio/uniphier-gpio.h
+new file mode 100644
+index 0000000..9f0ad17
+--- /dev/null
++++ b/include/dt-bindings/gpio/uniphier-gpio.h
+@@ -0,0 +1,18 @@
++/*
++ * Copyright (C) 2017 Socionext Inc.
++ *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
++ */
++
++#ifndef _DT_BINDINGS_GPIO_UNIPHIER_H
++#define _DT_BINDINGS_GPIO_UNIPHIER_H
++
++#define UNIPHIER_GPIO_LINES_PER_BANK	8
++
++#define UNIPHIER_GPIO_IRQ_OFFSET	((UNIPHIER_GPIO_LINES_PER_BANK) * 15)
++
++#define UNIPHIER_GPIO_PORT(bank, line)	\
++			((UNIPHIER_GPIO_LINES_PER_BANK) * (bank) + (line))
++
++#define UNIPHIER_GPIO_IRQ(n)		((UNIPHIER_GPIO_IRQ_OFFSET) + (n))
++
++#endif /* _DT_BINDINGS_GPIO_UNIPHIER_H */
+-- 
+2.7.4
