@@ -1,25 +1,43 @@
 From: Zhiqiang.Hou@nxp.com (Zhiqiang Hou)
-Date: Thu, 12 Oct 2017 17:44:46 +0800
-Subject: [PATCHv2 0/2] PCI: layerscape: add fixes for layerscape-pcie errata
-Message-ID: <20171012094448.31217-1-Zhiqiang.Hou@nxp.com>
+Date: Thu, 12 Oct 2017 17:44:47 +0800
+Subject: [PATCHv2 1/2] PCI: Disable MSI for Freescale PCIe RC mode
+In-Reply-To: <20171012094448.31217-1-Zhiqiang.Hou@nxp.com>
+References: <20171012094448.31217-1-Zhiqiang.Hou@nxp.com>
+Message-ID: <20171012094448.31217-2-Zhiqiang.Hou@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 
-The [1/2] is to fix layerscape PCIe MSI/MSI-X capability errata.
-The [2/2] is to change the default AXI system error response behavior
-for PCI Express outbound non-posted requests.
+The Freescale PCIe controller advertises the MSI/MSI-X capability
+in both RC and Endpoint mode, but in RC mode it doesn't support
+MSI/MSI-X by itself, it can only transfer MSI/MSI-X from downstream
+devices. So add this quirk to prevent use of MSI/MSI-X in RC mode.
 
-Hou Zhiqiang (1):
-  PCI: Disable MSI for Freescale PCIe RC mode
+Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+Acked-by: Minghuan Lian <minghuan.Lian@nxp.com>
+---
+V2:
+ - Fixed a typo in the commit message.
 
-Minghuan Lian (1):
-  pci/layerscape: change the default error response behavior
+ drivers/pci/quirks.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
- drivers/pci/dwc/pci-layerscape.c | 11 +++++++++++
- drivers/pci/quirks.c             |  8 ++++++++
- 2 files changed, 19 insertions(+)
-
+diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
+index a4d33619a7bb..c1063a420f0c 100644
+--- a/drivers/pci/quirks.c
++++ b/drivers/pci/quirks.c
+@@ -4799,3 +4799,11 @@ static void quirk_no_ats(struct pci_dev *pdev)
+ /* AMD Stoney platform GPU */
+ DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_ATI, 0x98e4, quirk_no_ats);
+ #endif /* CONFIG_PCI_ATS */
++
++/* Freescale PCIe doesn't support MSI in RC mode */
++static void quirk_fsl_no_msi(struct pci_dev *pdev)
++{
++	if (pci_pcie_type(pdev) == PCI_EXP_TYPE_ROOT_PORT)
++		pdev->no_msi = 1;
++}
++DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_FREESCALE, PCI_ANY_ID, quirk_fsl_no_msi);
 -- 
 2.14.1
