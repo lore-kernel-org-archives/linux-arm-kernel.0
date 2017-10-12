@@ -1,29 +1,100 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 12 Oct 2017 13:51:09 +0200
-Subject: [PATCH 1/2] ARM: dts: gr-peach: Add ETHER pin group
-In-Reply-To: <CAMuHMdXZia=upoOF3kprnrKfv2W_yrPXf018Woir9qQRRjUyUA@mail.gmail.com>
-References: <1507538915-16566-1-git-send-email-jacopo+renesas@jmondi.org>
- <1507538915-16566-2-git-send-email-jacopo+renesas@jmondi.org>
- <CAMuHMdXZia=upoOF3kprnrKfv2W_yrPXf018Woir9qQRRjUyUA@mail.gmail.com>
-Message-ID: <20171012115108.qx7vphaki42sb7mj@verge.net.au>
+From: felipe.balbi@linux.intel.com (Felipe Balbi)
+Date: Thu, 12 Oct 2017 14:51:13 +0300
+Subject: [PATCHv2 0/7] Add support for USB OTG on STM32F7
+In-Reply-To: <d6e8be43-cbb9-89cd-eb3f-b34ac23ad99f@st.com>
+References: <1503930018-536-1-git-send-email-amelie.delaunay@st.com>
+ <878tgim24i.fsf@linux.intel.com>
+ <04a49088-b615-d7b8-0387-e7bfa32ee19f@st.com>
+ <87vajllx8t.fsf@linux.intel.com>
+ <1c4180ef-2da6-b420-7c6e-41769608384a@st.com>
+ <87sheplsrm.fsf@linux.intel.com>
+ <3c36db6d-75fd-1be6-e946-b75a04e3760e@st.com>
+ <21df4d0c-075c-0c5a-c39b-b1dd94fe819d@st.com>
+ <87efq821tz.fsf@linux.intel.com>
+ <d6e8be43-cbb9-89cd-eb3f-b34ac23ad99f@st.com>
+Message-ID: <878tgg1t5a.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 11, 2017 at 01:50:38PM +0200, Geert Uytterhoeven wrote:
-> Hi Jacopo,
-> 
-> On Mon, Oct 9, 2017 at 10:48 AM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
-> > Add pin configuration subnode for ETHER pin group.
-> 
-> Thanks for the update!
-> BTW, it would be good to have version numbers in the email subjects
-> ("git format-patch -v2").
 
-Nice, I did not know about the -v option.
-Instead I've been using --subject all this time.
+Hi,
 
-> > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-> 
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Alexandre Torgue <alexandre.torgue@st.com> writes:
+> Hi Felipe
+>
+> On 10/12/2017 10:43 AM, Felipe Balbi wrote:
+>> 
+>> Hi,
+>> 
+>>>>>>>>
+>>>>>>>> On 10/11/2017 12:04 PM, Felipe Balbi wrote:
+>>>>>>>>>
+>>>>>>>>> Hi,
+>>>>>>>>>
+>>>>>>>>> Amelie Delaunay <amelie.delaunay@st.com> writes:
+>>>>>>>>>> The STM32F7 MCU family embeds two DWC2 USB OTG cores. One core is
+>>>>>>>>>> USB
+>>>>>>>>>> OTG FS and the other is USB OTG HS. The USB FS core only works
+>>>>>>>>>> with its
+>>>>>>>>>> internal phy whilst the USB HS core can work in HS with external
+>>>>>>>>>> ULPI phy
+>>>>>>>>>> or in FS/LS with the on-chip FS phy.
+>>>>>>>>>>
+>>>>>>>>>> Amelie Delaunay (7):
+>>>>>>>>>>  ???? dt-bindings: usb: Document the STM32F7 DWC2 USB OTG HS core
+>>>>>>>>>> binding
+>>>>>>>>>>  ???? usb: dwc2: add support for STM32F7 USB OTG HS
+>>>>>>>>>>  ???? ARM: dts: stm32: Add USB HS support for STM32F746 MCU
+>>>>>>>>>
+>>>>>>>>> I have applied these three patches. Should I take the rest? They
+>>>>>>>>> seems
+>>>>>>>>> like they could go upstream through the ARM maintainers.
+>>>>>>>>>
+>>>>>>>>
+>>>>>>>> I will take other DT patches in my PR.
+>>>>>>>>
+>>>>>>>> Concerning "ARM: dts: stm32: Add USB HS support for STM32F746 MCU"
+>>>>>>>> patch
+>>>>>>>> I prefer also to take it. This patch adds some pinctrl groups but
+>>>>>>>> stm32
+>>>>>>>> pinctrl bindings will change in my next PR (we will use a macro to
+>>>>>>>> define pins instead of using defined values). So if you push the DT
+>>>>>>>> patch through your pull request there will be a merge issue.
+>>>>>>>> It is possible that I take also this one ?
+>>>>>>>
+>>>>>>> In that case, it's best if you take them all :-) Here's my Ack:
+>>>>>>>
+>>>>>>> Acked-by: Felipe Balbi <felipe.balbi@linux.intel.com>
+>>>>>>>
+>>>>>>> I'll drop them from my tree now
+>>>>>>
+>>>>>> Ok perfect, I will take DT patches (3 to 7) and I let you take patch 1&2
+>>>>>> in your tree.
+>>>>>
+>>>>> Well, I have dropped them from my tree. Please two 1-7 through yours.
+>>>>
+>>>> Hum, ok for this patchset but IMO it is better (next time) that you take
+>>>> driver pacthes in your tree and I take only DT patches in mine.
+>>>> No ?
+>>>>
+>>>> Regards
+>>>> Alex
+>>>>
+>>>>>
+>>>
+>>> I thought that patches 1 and 2, as they are "driver" patches, had to be
+>>> applied on USB tree (so Felipe's one), and the others (3 to 7) had to be
+>>> applied on STM32-DT tree (Alex's one). Did I miss something?
+>> 
+>> patch 1 is documentation, right? Without the documentation patch,
+>> checkpatch will cringe :-) So either way works.
+>> 
+>> If you insist, I can take 1-2 through my tree. No worries.
+>
+> I don't want to insist :) but for me it is better (and more safe) if you 
+> take patch 1&2 in your tree, and will take others in mine.
 
-Thanks, applied.
+Okay, I'll apply 1&2
+
+-- 
+balbi
