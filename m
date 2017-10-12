@@ -1,111 +1,59 @@
-From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
-Date: Thu, 12 Oct 2017 16:04:19 +0530
-Subject: [PATCH v7 4/4] perf vendor events arm64: Add ThunderX2 implementation
- defined pmu core events
-In-Reply-To: <20171012103419.29824-1-ganapatrao.kulkarni@cavium.com>
-References: <20171012103419.29824-1-ganapatrao.kulkarni@cavium.com>
-Message-ID: <20171012103419.29824-5-ganapatrao.kulkarni@cavium.com>
+From: wangzhou.bry@gmail.com (Sherlock Wang)
+Date: Thu, 12 Oct 2017 18:35:29 +0800
+Subject: [PATCH 0/2] vgaarb: Select fallback default VGA device
+In-Reply-To: <20171006221358.12211.42879.stgit@bhelgaas-glaptop.roam.corp.google.com>
+References: <20171006221358.12211.42879.stgit@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20171012103529.GA5378@T440>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is not a full event list, but a short list of useful events.
+On Fri, Oct 06, 2017 at 05:24:20PM -0500, Bjorn Helgaas wrote:
+> These patches are supposed to fix a problem Daniel Axtens found on the
+> HiSilicon D05 board.  The VGA device there is behind a bridge that doesn't
+> support PCI_BRIDGE_CTL_VGA, so the arbiter never selects the device as the
+> default.
+> 
+> The first patch extends the arbiter so that if it can't find an enabled VGA
+> device with legacy resources, it selects the first enabled device *without*
+> legacy resources (this is what fixes the D05).  If that fails, it selects
+> the first device that isn't enabled.  The combination of both changes
+> should make the current powerpc fixup_vga() quirk unnecessary.
+> 
+> N.B. It changes the powerpc behavior: if there are several enabled VGA
+> devices, the current quirk selects the last one, while this patch selects
+> the first one.  If this is a problem, I can drop that part of the patch and
+> keep the quirk.
+> 
+> The second patch pulls out this fallback device detection (and the EFI
+> override) from vga_arb_device_init() to make it easier to read.
 
-Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
----
- tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
- .../arch/arm64/thunderx2/thunderx2-imp-def.json    | 62 ++++++++++++++++++++++
- 2 files changed, 77 insertions(+)
- create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
- create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/thunderx2-imp-def.json
+Hi Bjorn,
 
-diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
-new file mode 100644
-index 0000000..7167086
---- /dev/null
-+++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
-@@ -0,0 +1,15 @@
-+# Format:
-+#	MIDR,Version,JSON/file/pathname,Type
-+#
-+# where
-+#	MIDR	Processor version
-+#		Variant[23:20] and Revision [3:0] should be zero.
-+#	Version could be used to track version of of JSON file
-+#		but currently unused.
-+#	JSON/file/pathname is the path to JSON file, relative
-+#		to tools/perf/pmu-events/arch/arm64/.
-+#	Type is core, uncore etc
-+#
-+#
-+#Family-model,Version,Filename,EventType
-+0x00000000420f5160,v1,thunderx2,core
-diff --git a/tools/perf/pmu-events/arch/arm64/thunderx2/thunderx2-imp-def.json b/tools/perf/pmu-events/arch/arm64/thunderx2/thunderx2-imp-def.json
-new file mode 100644
-index 0000000..2db45c4
---- /dev/null
-+++ b/tools/perf/pmu-events/arch/arm64/thunderx2/thunderx2-imp-def.json
-@@ -0,0 +1,62 @@
-+[
-+    {
-+        "PublicDescription": "Attributable Level 1 data cache access, read",
-+        "EventCode": "0x40",
-+        "EventName": "l1d_cache_rd",
-+        "BriefDescription": "L1D cache read",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data cache access, write ",
-+        "EventCode": "0x41",
-+        "EventName": "l1d_cache_wr",
-+        "BriefDescription": "L1D cache write",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data cache refill, read",
-+        "EventCode": "0x42",
-+        "EventName": "l1d_cache_refill_rd",
-+        "BriefDescription": "L1D cache refill read",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data cache refill, write",
-+        "EventCode": "0x43",
-+        "EventName": "l1d_cache_refill_wr",
-+        "BriefDescription": "L1D refill write",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data TLB refill, read",
-+        "EventCode": "0x4C",
-+        "EventName": "l1d_tlb_refill_rd",
-+        "BriefDescription": "L1D tlb refill read",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data TLB refill, write",
-+        "EventCode": "0x4D",
-+        "EventName": "l1d_tlb_refill_wr",
-+        "BriefDescription": "L1D tlb refill write",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data or unified TLB access, read",
-+        "EventCode": "0x4E",
-+        "EventName": "l1d_tlb_rd",
-+        "BriefDescription": "L1D tlb read",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data or unified TLB access, write",
-+        "EventCode": "0x4F",
-+        "EventName": "l1d_tlb_wr",
-+        "BriefDescription": "L1D tlb write",
-+    },
-+    {
-+        "PublicDescription": "Bus access read",
-+        "EventCode": "0x60",
-+        "EventName": "bus_access_rd",
-+        "BriefDescription": "Bus access read",
-+   },
-+   {
-+        "PublicDescription": "Bus access write",
-+        "EventCode": "0x61",
-+        "EventName": "bus_access_wr",
-+        "BriefDescription": "Bus access write",
-+   }
-+]
--- 
-2.9.4
+I tested this series in:
+
+        D05 board based on HiSilicon SoC Hip07.
+        And HiSilicon SoC Hip08 based board.
+
+Both of these two SoCs' PCIe host bridge don't support PCI_BRIDGE_CTL_VGA. One
+VGA device which does not support legacy resources has been connected to these
+two PCIe host bridges to test. Default VGA device can be selected in above two
+systems.
+
+Tested-by: Zhou Wang <wangzhou1@hisilicon.com>
+(sorry for my HiSilicon E-mail box miss this serias, so here I have to use my
+gmail box)
+
+Thanks,
+Zhou
+
+> 
+> ---
+> 
+> Bjorn Helgaas (2):
+>       vgaarb: Select a default VGA device even if there's no legacy VGA
+>       vgaarb: Factor out EFI and fallback default device selection
+> 
+> 
+>  arch/powerpc/kernel/pci-common.c |   12 ------
+>  drivers/gpu/vga/vgaarb.c         |   72 +++++++++++++++++++++++++++++---------
+>  2 files changed, 55 insertions(+), 29 deletions(-)
