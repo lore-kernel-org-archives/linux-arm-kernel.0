@@ -1,36 +1,48 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 12 Oct 2017 12:41:18 +0200
-Subject: [PATCH 14/37] KVM: arm64: Remove kern_hyp_va() use in VHE switch
- function
+Date: Thu, 12 Oct 2017 12:41:19 +0200
+Subject: [PATCH 15/37] KVM: arm64: Don't deactivate VM on VHE systems
 In-Reply-To: <20171012104141.26902-1-christoffer.dall@linaro.org>
 References: <20171012104141.26902-1-christoffer.dall@linaro.org>
-Message-ID: <20171012104141.26902-15-christoffer.dall@linaro.org>
+Message-ID: <20171012104141.26902-16-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-VHE kernels run completely in EL2 and therefore don't have a notion of
-kernel and hyp addresses, they are all just kernel addresses.  Therefore
-don't call kern_hyp_va() in the VHE switch function.
+There is no need to reset the VTTBR to zero when exiting the guest on
+VHE systems.  VHE systems don't use stage 2 translations for the EL2&0
+translation regime used by the host.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kvm/hyp/switch.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ arch/arm64/kvm/hyp/switch.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 8a0f38f..b72dc66 100644
+index b72dc66..2cedf12 100644
 --- a/arch/arm64/kvm/hyp/switch.c
 +++ b/arch/arm64/kvm/hyp/switch.c
-@@ -326,9 +326,7 @@ int kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 	struct kvm_cpu_context *guest_ctxt;
- 	u64 exit_code;
+@@ -136,13 +136,13 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
+ 	write_sysreg(0, pmuserenr_el0);
+ }
  
--	vcpu = kern_hyp_va(vcpu);
--
--	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
-+	host_ctxt = vcpu->arch.host_cpu_context;
- 	host_ctxt->__hyp_running_vcpu = vcpu;
- 	guest_ctxt = &vcpu->arch.ctxt;
+-static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
++static inline void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
+ {
+ 	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+ 	write_sysreg(kvm->arch.vttbr, vttbr_el2);
+ }
+ 
+-static void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
++static inline void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
+ {
+ 	write_sysreg(0, vttbr_el2);
+ }
+@@ -360,7 +360,6 @@ int kvm_vcpu_run(struct kvm_vcpu *vcpu)
+ 	__vgic_save_state(vcpu);
+ 
+ 	__deactivate_traps(vcpu);
+-	__deactivate_vm(vcpu);
+ 
+ 	__sysreg_restore_host_state(host_ctxt);
  
 -- 
 2.9.0
