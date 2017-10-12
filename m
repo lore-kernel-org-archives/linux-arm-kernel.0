@@ -1,61 +1,76 @@
-From: gerg@linux-m68k.org (Greg Ungerer)
-Date: Thu, 12 Oct 2017 16:26:10 +1000
-Subject: [2/2] spi: imx: fix use of native chip-selects with devicetree
-In-Reply-To: <1507667916.74283.19.camel@impinj.com>
-References: <1489726983-17706-3-git-send-email-gerg@linux-m68k.org>
- <1507667916.74283.19.camel@impinj.com>
-Message-ID: <209bb901-875e-8007-06f8-3ae9698a0e41@linux-m68k.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 12 Oct 2017 08:58:42 +0200
+Subject: [PATCH 1/2] drivers: firmware: psci: Add psci_is_available()
+In-Reply-To: <20171012105801.0bb643eb@xhacker.debian>
+References: <1507708982-12336-1-git-send-email-geert+renesas@glider.be>
+ <1507708982-12336-2-git-send-email-geert+renesas@glider.be>
+ <20171012105801.0bb643eb@xhacker.debian>
+Message-ID: <CAMuHMdVuEtXYGL5FL4e-_GMNSmRNyodfFvhdNi6ZHaAVcDEUEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Trent,
+Hi Jisheng,
 
-On 11/10/17 06:38, Trent Piepho wrote:
-> On Fri, 2017-03-17 at 15:03 +1000, Greg Ungerer wrote:
->> You can successfully specify native chip-selects if using a platform
->> setup by specifying the cs-gpio as negative offset by 32. And that
->> works correctly. You cannot use the same method in devicetree.
-> 
-> I came across some spi-imx bugs in an older kernel and in checking the
-> latest kernel, found this patch.  It fixed the issue with dt not
-> working for older spi imx devices (the imx51+ config function never
-> used the platform data 32 offset thing), but fails to address non-dt
-> platform data based users of the spi imx driver.
-> 
-> For instance, include/linux/platform_data/spi-imx.h still refers to the
-> offset by 32 for native cs:
-> 
->  * @chipselect: Array of chipselects for this master. Numbers >= 0 mean gpio
->  *              pins, numbers < 0 mean internal CSPI chipselects according
->  *              to MXC_SPI_CS(). Normally you want to use gpio based chip
-> 
-> #define MXC_SPI_CS(no)  ((no) - 32)
-> 
-> After this patch, for no-DT users, any negative (or rather not a valid
-> gpio) value in chipselect will cause the native chipselect
-> corresponding to the spi slave's chipselect.  It's no longer possible
-> to specify which native cs to use in the spi-imx platform data.  So in
-> something like:
-> 
-> arch/arm/mach-imx/mach-mx31moboard.c-static int moboard_spi1_cs[] = {
-> arch/arm/mach-imx/mach-mx31moboard.c:   MXC_SPI_CS(0),
-> arch/arm/mach-imx/mach-mx31moboard.c:   MXC_SPI_CS(2),
-> arch/arm/mach-imx/mach-mx31moboard.c-};
-> 
-> The spi device configured to use chip select 1 will no longer use
-> native chip select line 2.
-> 
-> Looking at all in-tree users of spi imx platform data, it appears that
-> this board is the only one in which the cs selected does not match the
-> array index.  Though there are still several which still use
-> MSC_SPI_CS() even though it doesn't really work anymore.
+On Thu, Oct 12, 2017 at 4:58 AM, Jisheng Zhang
+<Jisheng.Zhang@synaptics.com> wrote:
+> On Wed, 11 Oct 2017 10:03:01 +0200 Geert Uytterhoeven wrote:
+>
+>> PSCI support may be disabled at build time (by configuration) or at
+>> run-time (PSCI firmware not present).  While CONFIG_ARM_PSCI_FW can be
+>> used to check for build time enablement, there is currently no simple
+>> way to check if PSCI is actually available and used.
+>>
+>> Hence add a helper function to check if PSCI is available.
+>>
+>> This is useful for e.g. drivers that are used on platforms with and
+>> without PSCI.  Such drivers may need to take provisions for proper
+>> operation when PSCI is used, and/or to implement functionality that is
+>> usually provided by PSCI.
+>
+> the psci_ops is a global var, why not check psci_ops.mmnn members
+> individually in each drivers? check IS_ENABLED(CONFIG_ARM_PSCI_FW) for
+> building time ennoblement.
 
-Commit 901f26bce64a ("ARM: imx: set correct chip_select in platform setup") 
-fixes this issue. It specifically makes sure that the board setup chip
-select is set correctly (so that spi-imx can then use it). It also pads
-out the chipselect arrays so that the chip select and indexes match.
+While psci_ops is a global var, it only exists if CONFIG_ARM_PSCI_FW=y,
+so typical code like
 
-Is this not working for you?
+    if (IS_ENABLED(CONFIG_ARM_PSCI_FW) && psci_ops.cpu_suspend) {
+            ...
+    }
 
-Regards
-Greg
+won't link. So having a helper is useful.
+The alternative is #ifdef.
+
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> ---
+>>  drivers/firmware/psci.c | 5 +++++
+>>  include/linux/psci.h    | 2 ++
+>>  2 files changed, 7 insertions(+)
+>>
+>> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+>> index da469c972b503f83..a3a11e2d8ffffaaa 100644
+>> --- a/drivers/firmware/psci.c
+>> +++ b/drivers/firmware/psci.c
+>> @@ -670,6 +670,11 @@ int __init psci_dt_init(void)
+>>       return init_fn(np);
+>>  }
+>>
+>> +bool psci_is_available(void)
+>> +{
+>> +     return psci_ops.cpu_off && psci_ops.cpu_on && psci_ops.cpu_suspend;
+>
+> IIRC, for PSCI 0.1, cpu_suspend is optional, we can't say the PSCI isn't
+> available if cpu_suspend is missing.
+
+Hmm...
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
