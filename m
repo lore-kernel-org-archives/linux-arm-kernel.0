@@ -1,76 +1,56 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 12 Oct 2017 14:34:39 +0200
-Subject: [PATCH] ARM: head-common.S: Clear lr before jumping to
- start_kernel()
-In-Reply-To: <20171012102341.GF23750@n2100.armlinux.org.uk>
-References: <1507044184-27152-1-git-send-email-geert+renesas@glider.be>
- <nycvar.YSQ.7.76.1710031134140.5407@knanqh.ubzr>
- <CAMuHMdWJKQb5JY+diH=7dqNuypkPUqBeOEPSLOrfrnbfh2siRQ@mail.gmail.com>
- <CAMuHMdXpPfipmEdW0Dap6Pjwhz3QxLcrcbtU0RhCu721k-sBpA@mail.gmail.com>
- <CAMuHMdWH_pebSYAp04gmVceu3qqPczGaXS36R8CtzAYHo-CNog@mail.gmail.com>
- <20171010203324.GX4394@atomide.com>
- <20171012102341.GF23750@n2100.armlinux.org.uk>
-Message-ID: <CAMuHMdUtOHAb=dfy1ufGyHMERk=frhSH-BTmWgeb9zUyZvHANw@mail.gmail.com>
+From: m.purski@samsung.com (Maciej Purski)
+Date: Thu, 12 Oct 2017 14:36:01 +0200
+Subject: [PATCH v2 0/4] Make max expected current configurable for ina2xx
+ drivers
+References: <CGME20171012123623eucas1p18dd41d52069240a3172c0bcec8f63553@eucas1p1.samsung.com>
+Message-ID: <1507811765-31005-1-git-send-email-m.purski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell, Nicolas,
+Hi all,
 
-On Thu, Oct 12, 2017 at 12:23 PM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Tue, Oct 10, 2017 at 01:33:25PM -0700, Tony Lindgren wrote:
->> * Geert Uytterhoeven <geert@linux-m68k.org> [171003 11:32]:
->> > On Tue, Oct 3, 2017 at 8:15 PM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
->> > > On Tue, Oct 3, 2017 at 8:11 PM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
->> > >> On Tue, Oct 3, 2017 at 5:37 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
->> > >>> On Tue, 3 Oct 2017, Geert Uytterhoeven wrote:
->> > >>> Please send it to RMK's patch system.
->> > >>
->> > >> Done (I hope so ;-)
->> > >
->> > > Failed. Retrying.
->> >
->> > Yiha ;-)
->> >
->> > http://www.armlinux.org.uk/developer/patches/viewpatch.php?id=8702/1
->>
->> This also fixes the spamming I started seeing with next-20171009:
->>
->> Tested-by: Tony Lindgren <tony@atomide.com>
->
-> It's all nice and good that people are testing this patch, but I can't
-> apply it to -rc1, nor my "misc" branch.  It appears that this is due
-> to patches going through other trees.
->
-> Sorry, I can't take this patch.
->
-> (This is the falicy about any one particular tree having rights to
-> exclusively own a sub-tree in the kernel...)
+this patchset makes it possible to calibrate ina2xx drivers with different
+calibration values, which are calculated using max expected current value.
+It can be read from device tree, platform data or changed during run-time
+using sysfs. If it isn't specified in device tree or platform data, the
+driver uses default value, thanks to which the behaviour of the driver
+doesn't change in this case.
 
-So through which tree did this end up in -next?
+There are two drivers for ina2xx: hwmon and iio. Changes are made
+for both of them and their bindings as well.
 
-Apparently Nicolas committed 9520b1a1b5f7a348 ("ARM: head-common.S: speed up
-startup code") himself, and then asked me to send the fix for that commit to
-Russell anyway?
-The commit above is actually in Russell's
-git://git.armlinux.org.uk/~rmk/linux-arm.git#for-next.
+These changes allow setting sensor's precision to the required by the board.
+It is useful in Odroid XU3. Therefore this patchset also sets
+max-expected-current in OdroidXU3 device tree to values from documentation.
 
-Russell, you did merge it yourself into for-next in commit 476242482bdee72b
-("Merge branch 'xip_zdata' of http://git.linaro.org/people/nicolas.pitre/linux
-into devel-testing").
+Best Regards,
 
-My patch applies fine against your for-next branch. So I fail to see why
-you can't take this patch?
+	Maciej Purski
 
-Thanks!
+---
+Changes in v2:
+- make scale attribute for current iio channel writable as instead of
+  adding new attribute max_expected_current
+- use currX_max standard attribute in hwmon instead of adding new
+  attribute
+- fix max expected current property name
+- update commit messages
 
-Gr{oetje,eeting}s,
+Maciej Purski (4):
+  iio: adc: ina2xx: Make max expected current configurable
+  hwmon: (ina2xx) Make max expected current configurable
+  dt-bindings: hwmon: Add ti-max-expected-current-microamp property to
+    ina2xx
+  ARM: dts: Add ti-max-expected-current-microamp properties for ina231
+    in Odroid XU3
 
-                        Geert
+ Documentation/devicetree/bindings/hwmon/ina2xx.txt |   4 +-
+ Documentation/hwmon/ina2xx                         |   3 +
+ arch/arm/boot/dts/exynos5422-odroidxu3.dts         |   4 +
+ drivers/hwmon/ina2xx.c                             | 106 ++++++++++++++++++---
+ drivers/iio/adc/ina2xx-adc.c                       |  97 ++++++++++++++-----
+ include/linux/platform_data/ina2xx.h               |   2 +
+ 6 files changed, 178 insertions(+), 38 deletions(-)
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+2.7.4
