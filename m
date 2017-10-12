@@ -1,210 +1,146 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 12 Oct 2017 12:41:23 +0200
-Subject: [PATCH 19/37] KVM: arm64: Introduce separate VHE/non-VHE sysreg
- save/restore functions
+Date: Thu, 12 Oct 2017 12:41:33 +0200
+Subject: [PATCH 29/37] KVM: arm64: Configure FPSIMD traps on vcpu load/put for
+ VHE
 In-Reply-To: <20171012104141.26902-1-christoffer.dall@linaro.org>
 References: <20171012104141.26902-1-christoffer.dall@linaro.org>
-Message-ID: <20171012104141.26902-20-christoffer.dall@linaro.org>
+Message-ID: <20171012104141.26902-30-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we are about to handle system registers quite differently between VHE
-and non-VHE systems.  In preparation for that, we need to split some of
-the handling functions between VHE and non-VHE functionality.
-
-For now, we simply copy the non-VHE functions, but we do change the use
-of static keys for VHE and non-VHE functionality now that we have
-separate functions.
+There is no need to enable/disable traps to FP registers on every switch
+to/from the VM, because the host kernel does not use this resource
+without calling vcpu_put.  We can therefore move things around enough
+that we still always write FPEXC32_EL2 before programming CPTR_EL2 but
+only program these during vcpu load/put.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/include/asm/kvm_hyp.h | 12 ++++++++----
- arch/arm64/kvm/hyp/switch.c      | 20 ++++++++++----------
- arch/arm64/kvm/hyp/sysreg-sr.c   | 40 ++++++++++++++++++++++++++++++++--------
- 3 files changed, 50 insertions(+), 22 deletions(-)
+ arch/arm64/include/asm/kvm_hyp.h |  3 +++
+ arch/arm64/kvm/hyp/switch.c      | 34 ++++++++++++++++++++++++----------
+ arch/arm64/kvm/hyp/sysreg-sr.c   |  4 ++++
+ 3 files changed, 31 insertions(+), 10 deletions(-)
 
 diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
-index a0e5a70..998152d 100644
+index 3f54c55..28d5f3c 100644
 --- a/arch/arm64/include/asm/kvm_hyp.h
 +++ b/arch/arm64/include/asm/kvm_hyp.h
-@@ -132,10 +132,14 @@ int __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu);
- void __timer_enable_traps(struct kvm_vcpu *vcpu);
- void __timer_disable_traps(struct kvm_vcpu *vcpu);
+@@ -148,6 +148,9 @@ void __fpsimd_save_state(struct user_fpsimd_state *fp_regs);
+ void __fpsimd_restore_state(struct user_fpsimd_state *fp_regs);
+ bool __fpsimd_enabled(void);
  
--void __sysreg_save_host_state(struct kvm_cpu_context *ctxt);
--void __sysreg_restore_host_state(struct kvm_cpu_context *ctxt);
--void __sysreg_save_guest_state(struct kvm_cpu_context *ctxt);
--void __sysreg_restore_guest_state(struct kvm_cpu_context *ctxt);
-+void __sysreg_save_host_state_nvhe(struct kvm_cpu_context *ctxt);
-+void __sysreg_restore_host_state_nvhe(struct kvm_cpu_context *ctxt);
-+void __sysreg_save_guest_state_nvhe(struct kvm_cpu_context *ctxt);
-+void __sysreg_restore_guest_state_nvhe(struct kvm_cpu_context *ctxt);
-+void sysreg_save_host_state_vhe(struct kvm_cpu_context *ctxt);
-+void sysreg_restore_host_state_vhe(struct kvm_cpu_context *ctxt);
-+void sysreg_save_guest_state_vhe(struct kvm_cpu_context *ctxt);
-+void sysreg_restore_guest_state_vhe(struct kvm_cpu_context *ctxt);
- void __sysreg32_save_state(struct kvm_vcpu *vcpu);
- void __sysreg32_restore_state(struct kvm_vcpu *vcpu);
++void activate_traps_vhe_load(struct kvm_vcpu *vcpu);
++void deactivate_traps_vhe_put(void);
++
+ u64 __guest_enter(struct kvm_vcpu *vcpu, struct kvm_cpu_context *host_ctxt);
+ void __noreturn __hyp_do_panic(unsigned long, ...);
  
 diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index b98b73b..7c4d430 100644
+index c587416..09be10f 100644
 --- a/arch/arm64/kvm/hyp/switch.c
 +++ b/arch/arm64/kvm/hyp/switch.c
-@@ -330,7 +330,7 @@ int kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 	host_ctxt->__hyp_running_vcpu = vcpu;
- 	guest_ctxt = &vcpu->arch.ctxt;
+@@ -23,22 +23,25 @@
+ #include <asm/kvm_hyp.h>
+ #include <asm/fpsimd.h>
  
--	__sysreg_save_host_state(host_ctxt);
-+	sysreg_save_host_state_vhe(host_ctxt);
- 
- 	__activate_traps(vcpu);
- 	__activate_vm(vcpu);
-@@ -342,7 +342,7 @@ int kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 	 * to erratum #852523 (Cortex-A57) or #853709 (Cortex-A72).
- 	 */
- 	__sysreg32_restore_state(vcpu);
--	__sysreg_restore_guest_state(guest_ctxt);
-+	sysreg_restore_guest_state_vhe(guest_ctxt);
- 	__debug_switch_to_guest(vcpu);
- 
- 	/* Jump in the fire! */
-@@ -353,13 +353,13 @@ int kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 	if (fixup_guest_exit(vcpu, &exit_code))
- 		goto again;
- 
--	__sysreg_save_guest_state(guest_ctxt);
-+	sysreg_save_guest_state_vhe(guest_ctxt);
- 	__sysreg32_save_state(vcpu);
- 	__vgic_save_state(vcpu);
- 
- 	__deactivate_traps(vcpu);
- 
--	__sysreg_restore_host_state(host_ctxt);
-+	sysreg_restore_host_state_vhe(host_ctxt);
- 
+-static void __hyp_text __activate_traps_common(struct kvm_vcpu *vcpu)
++static void __hyp_text __activate_traps_fpsimd32(struct kvm_vcpu *vcpu)
+ {
  	/*
- 	 * This must come after restoring the host sysregs, since a non-VHE
-@@ -383,7 +383,7 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 	host_ctxt->__hyp_running_vcpu = vcpu;
- 	guest_ctxt = &vcpu->arch.ctxt;
- 
--	__sysreg_save_host_state(host_ctxt);
-+	__sysreg_save_host_state_nvhe(host_ctxt);
- 
- 	__activate_traps(vcpu);
- 	__activate_vm(vcpu);
-@@ -396,7 +396,7 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 	 * to erratum #852523 (Cortex-A57) or #853709 (Cortex-A72).
+-	 * We are about to set CPTR_EL2.TFP to trap all floating point
+-	 * register accesses to EL2, however, the ARM ARM clearly states that
+-	 * traps are only taken to EL2 if the operation would not otherwise
+-	 * trap to EL1.  Therefore, always make sure that for 32-bit guests,
+-	 * we set FPEXC.EN to prevent traps to EL1, when setting the TFP bit.
+-	 * If FP/ASIMD is not implemented, FPEXC is UNDEFINED and any access to
+-	 * it will cause an exception.
++	 * We are about to trap all floating point register accesses to EL2,
++	 * however, traps are only taken to EL2 if the operation would not
++	 * otherwise trap to EL1.  Therefore, always make sure that for 32-bit
++	 * guests, we set FPEXC.EN to prevent traps to EL1, when setting the
++	 * TFP bit.  If FP/ASIMD is not implemented, FPEXC is UNDEFINED and
++	 * any access to it will cause an exception.
  	 */
- 	__sysreg32_restore_state(vcpu);
--	__sysreg_restore_guest_state(guest_ctxt);
-+	__sysreg_restore_guest_state_nvhe(guest_ctxt);
- 	__debug_switch_to_guest(vcpu);
- 
- 	/* Jump in the fire! */
-@@ -407,7 +407,7 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 	if (fixup_guest_exit(vcpu, &exit_code))
- 		goto again;
- 
--	__sysreg_save_guest_state(guest_ctxt);
-+	__sysreg_save_guest_state_nvhe(guest_ctxt);
- 	__sysreg32_save_state(vcpu);
- 	__timer_disable_traps(vcpu);
- 	__vgic_save_state(vcpu);
-@@ -415,7 +415,7 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 	__deactivate_traps(vcpu);
- 	__deactivate_vm(vcpu);
- 
--	__sysreg_restore_host_state(host_ctxt);
-+	__sysreg_restore_host_state_nvhe(host_ctxt);
- 
- 	/*
- 	 * This must come after restoring the host sysregs, since a non-VHE
-@@ -440,7 +440,7 @@ static void __hyp_text __hyp_call_panic_nvhe(u64 spsr, u64 elr, u64 par,
- 		__timer_disable_traps(vcpu);
- 		__deactivate_traps(vcpu);
- 		__deactivate_vm(vcpu);
--		__sysreg_restore_host_state(__host_ctxt);
-+		__sysreg_restore_host_state_nvhe(__host_ctxt);
+ 	if (vcpu_el1_is_32bit(vcpu) && system_supports_fpsimd() &&
+ 	    !vcpu->arch.guest_vfp_loaded) {
+ 		write_sysreg(1 << 30, fpexc32_el2);
+ 		isb();
  	}
++}
++
++static void __hyp_text __activate_traps_common(struct kvm_vcpu *vcpu)
++{
+ 	write_sysreg(vcpu->arch.hcr_el2, hcr_el2);
  
- 	/*
-@@ -463,7 +463,7 @@ static void __hyp_call_panic_vhe(u64 spsr, u64 elr, u64 par,
- 	vcpu = host_ctxt->__hyp_running_vcpu;
+ 	/* Trap on AArch32 cp15 c15 (impdef sysregs) accesses (EL1 or EL0) */
+@@ -60,10 +63,12 @@ static void __hyp_text __deactivate_traps_common(void)
+ 	write_sysreg(0, pmuserenr_el0);
+ }
  
- 	__deactivate_traps_vhe();
--	__sysreg_restore_host_state(host_ctxt);
-+	sysreg_restore_host_state_vhe(host_ctxt);
+-static void __hyp_text __activate_traps_vhe(struct kvm_vcpu *vcpu)
++void activate_traps_vhe_load(struct kvm_vcpu *vcpu)
+ {
+ 	u64 val;
  
- 	panic(__hyp_panic_string,
- 	      spsr,  elr,
++	__activate_traps_fpsimd32(vcpu);
++
+ 	val = read_sysreg(cpacr_el1);
+ 	val |= CPACR_EL1_TTA;
+ 	if (vcpu->arch.guest_vfp_loaded)
+@@ -71,7 +76,15 @@ static void __hyp_text __activate_traps_vhe(struct kvm_vcpu *vcpu)
+ 	else
+ 		val &= ~CPACR_EL1_FPEN;
+ 	write_sysreg(val, cpacr_el1);
++}
+ 
++void deactivate_traps_vhe_put(void)
++{
++	write_sysreg(CPACR_EL1_FPEN, cpacr_el1);
++}
++
++static void __hyp_text __activate_traps_vhe(struct kvm_vcpu *vcpu)
++{
+ 	write_sysreg(__kvm_hyp_vector, vbar_el1);
+ }
+ 
+@@ -79,6 +92,8 @@ static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
+ {
+ 	u64 val;
+ 
++	__activate_traps_fpsimd32(vcpu);
++
+ 	val = CPTR_EL2_DEFAULT;
+ 	val |= CPTR_EL2_TTA;
+ 	if (vcpu->arch.guest_vfp_loaded)
+@@ -109,7 +124,6 @@ static void __hyp_text __deactivate_traps_vhe(void)
+ 
+ 	write_sysreg(mdcr_el2, mdcr_el2);
+ 	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
+-	write_sysreg(CPACR_EL1_FPEN, cpacr_el1);
+ 	write_sysreg(vectors, vbar_el1);
+ }
+ 
 diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-index b55c4ad..d8c42de 100644
+index 6ff1ce5..54a4f55 100644
 --- a/arch/arm64/kvm/hyp/sysreg-sr.c
 +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-@@ -70,15 +70,27 @@ static void __hyp_text __sysreg_save_el1_state(struct kvm_cpu_context *ctxt)
- 	ctxt->gp_regs.regs.pstate	= read_sysreg_el2(spsr);
+@@ -242,6 +242,8 @@ void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu)
+ 	__sysreg_restore_el1_state(guest_ctxt);
+ 
+ 	vcpu->arch.sysregs_loaded_on_cpu = true;
++
++	activate_traps_vhe_load(vcpu);
  }
  
--void __hyp_text __sysreg_save_host_state(struct kvm_cpu_context *ctxt)
-+void __hyp_text __sysreg_save_host_state_nvhe(struct kvm_cpu_context *ctxt)
-+{
-+	__sysreg_save_el1_state(ctxt);
-+	__sysreg_save_common_state(ctxt);
-+	__sysreg_save_user_state(ctxt);
-+}
-+
-+void __hyp_text __sysreg_save_guest_state_nvhe(struct kvm_cpu_context *ctxt)
-+{
-+	__sysreg_save_el1_state(ctxt);
-+	__sysreg_save_common_state(ctxt);
-+	__sysreg_save_user_state(ctxt);
-+}
-+
-+void sysreg_save_host_state_vhe(struct kvm_cpu_context *ctxt)
- {
--	if (!has_vhe())
--		__sysreg_save_el1_state(ctxt);
- 	__sysreg_save_common_state(ctxt);
- 	__sysreg_save_user_state(ctxt);
- }
+ /**
+@@ -272,6 +274,8 @@ void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu)
+ 	if (!has_vhe())
+ 		return;
  
--void __hyp_text __sysreg_save_guest_state(struct kvm_cpu_context *ctxt)
-+void sysreg_save_guest_state_vhe(struct kvm_cpu_context *ctxt)
- {
- 	__sysreg_save_el1_state(ctxt);
- 	__sysreg_save_common_state(ctxt);
-@@ -126,15 +138,27 @@ static void __hyp_text __sysreg_restore_el1_state(struct kvm_cpu_context *ctxt)
- 	write_sysreg_el2(ctxt->gp_regs.regs.pstate,	spsr);
- }
- 
--void __hyp_text __sysreg_restore_host_state(struct kvm_cpu_context *ctxt)
-+void __hyp_text __sysreg_restore_host_state_nvhe(struct kvm_cpu_context *ctxt)
-+{
-+	__sysreg_restore_el1_state(ctxt);
-+	__sysreg_restore_common_state(ctxt);
-+	__sysreg_restore_user_state(ctxt);
-+}
++	deactivate_traps_vhe_put();
 +
-+void __hyp_text __sysreg_restore_guest_state_nvhe(struct kvm_cpu_context *ctxt)
-+{
-+	__sysreg_restore_el1_state(ctxt);
-+	__sysreg_restore_common_state(ctxt);
-+	__sysreg_restore_user_state(ctxt);
-+}
-+
-+void sysreg_restore_host_state_vhe(struct kvm_cpu_context *ctxt)
- {
--	if (!has_vhe())
--		__sysreg_restore_el1_state(ctxt);
- 	__sysreg_restore_common_state(ctxt);
- 	__sysreg_restore_user_state(ctxt);
- }
- 
--void __hyp_text __sysreg_restore_guest_state(struct kvm_cpu_context *ctxt)
-+void sysreg_restore_guest_state_vhe(struct kvm_cpu_context *ctxt)
- {
- 	__sysreg_restore_el1_state(ctxt);
- 	__sysreg_restore_common_state(ctxt);
+ 	__sysreg_save_el1_state(guest_ctxt);
+ 	__sysreg_save_user_state(guest_ctxt);
+ 	__sysreg32_save_state(vcpu);
 -- 
 2.9.0
