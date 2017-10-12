@@ -1,106 +1,247 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 12 Oct 2017 09:53:36 -0700
-Subject: [PATCH 1/9] SOC: brcmstb: add memory API
-In-Reply-To: <b6be2073-7a90-f83f-4e25-79ef04827bd7@arm.com>
-References: <1507761269-7017-1-git-send-email-jim2101024@gmail.com>
- <1507761269-7017-2-git-send-email-jim2101024@gmail.com>
- <b6be2073-7a90-f83f-4e25-79ef04827bd7@arm.com>
-Message-ID: <425b3363-1977-87e1-644e-68a28f648fb0@gmail.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Thu, 12 Oct 2017 19:02:16 +0200
+Subject: [PATCH 01/37] KVM: arm64: Avoid storing the vcpu pointer on the
+ stack
+In-Reply-To: <ef4bffe5-b3c5-5fdd-cb8b-1840d2243ae1@arm.com>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+ <20171012104141.26902-2-christoffer.dall@linaro.org>
+ <ef4bffe5-b3c5-5fdd-cb8b-1840d2243ae1@arm.com>
+Message-ID: <20171012170216.GA26425@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/12/2017 07:41 AM, Julien Thierry wrote:
-> Hi Jim,
+On Thu, Oct 12, 2017 at 04:49:44PM +0100, Marc Zyngier wrote:
+> On 12/10/17 11:41, Christoffer Dall wrote:
+> > We already have the percpu area for the host cpu state, which points to
+> > the VCPU, so there's no need to store the VCPU pointer on the stack on
+> > every context switch.  We can be a little more clever and just use
+> > tpidr_el2 for the percpu offset and load the VCPU pointer from the host
+> > context.
+> > 
+> > This requires us to have a scratch register though, so we take the
+> > chance to rearrange some of the el1_sync code to only look at the
+> > vttbr_el2 to determine if this is a trap from the guest or an HVC from
+> > the host.  We do add an extra check to call the panic code if the kernel
+> > is configured with debugging enabled and we saw a trap from the host
+> > which wasn't an HVC, indicating that we left some EL2 trap configured by
+> > mistake.
+> > 
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > ---
+> >  arch/arm64/include/asm/kvm_asm.h | 20 ++++++++++++++++++++
+> >  arch/arm64/kernel/asm-offsets.c  |  1 +
+> >  arch/arm64/kvm/hyp/entry.S       |  5 +----
+> >  arch/arm64/kvm/hyp/hyp-entry.S   | 39 ++++++++++++++++++---------------------
+> >  arch/arm64/kvm/hyp/switch.c      |  2 +-
+> >  5 files changed, 41 insertions(+), 26 deletions(-)
+> > 
+> > diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+> > index ab4d0a9..7e48a39 100644
+> > --- a/arch/arm64/include/asm/kvm_asm.h
+> > +++ b/arch/arm64/include/asm/kvm_asm.h
+> > @@ -70,4 +70,24 @@ extern u32 __init_stage2_translation(void);
+> >  
+> >  #endif
+> >  
+> > +#ifdef __ASSEMBLY__
+> > +.macro get_host_ctxt reg, tmp
+> > +	/*
+> > +	 * '=kvm_host_cpu_state' is a host VA from the constant pool, it may
+> > +	 * not be accessible by this address from EL2, hyp_panic() converts
+> > +	 * it with kern_hyp_va() before use.
+> > +	 */
 > 
-> On 11/10/17 23:34, Jim Quinlan wrote:
->> From: Florian Fainelli <f.fainelli@gmail.com>
->>
->> This commit adds a memory API suitable for ascertaining the sizes of
->> each of the N memory controllers in a Broadcom STB chip.  Its first
->> user will be the Broadcom STB PCIe root complex driver, which needs
->> to know these sizes to properly set up DMA mappings for inbound
->> regions.
->>
->> We cannot use memblock here or anything like what Linux provides
->> because it collapses adjacent regions within a larger block, and here
->> we actually need per-memory controller addresses and sizes, which is
->> why we resort to manual DT parsing.
->>
->> Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
->> ---
->>   drivers/soc/bcm/brcmstb/Makefile |   2 +-
->>   drivers/soc/bcm/brcmstb/memory.c | 183
->> +++++++++++++++++++++++++++++++++++++++
->>   include/soc/brcmstb/memory_api.h |  25 ++++++
->>   3 files changed, 209 insertions(+), 1 deletion(-)
->>   create mode 100644 drivers/soc/bcm/brcmstb/memory.c
->>   create mode 100644 include/soc/brcmstb/memory_api.h
->>
->> diff --git a/drivers/soc/bcm/brcmstb/Makefile
->> b/drivers/soc/bcm/brcmstb/Makefile
->> index 9120b27..4cea7b6 100644
->> --- a/drivers/soc/bcm/brcmstb/Makefile
->> +++ b/drivers/soc/bcm/brcmstb/Makefile
->> @@ -1 +1 @@
->> -obj-y                += common.o biuctrl.o
->> +obj-y                += common.o biuctrl.o memory.o
->> diff --git a/drivers/soc/bcm/brcmstb/memory.c
->> b/drivers/soc/bcm/brcmstb/memory.c
->> new file mode 100644
->> index 0000000..cb6bf73
->> --- /dev/null
->> +++ b/drivers/soc/bcm/brcmstb/memory.c
->> @@ -0,0 +1,183 @@
->> +/*
->> + * Copyright ? 2015-2017 Broadcom
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
->> + * GNU General Public License for more details.
->> + *
->> + * A copy of the GPL is available at
->> + * http://www.broadcom.com/licenses/GPLv2.php or from the Free Software
->> + * Foundation at https://www.gnu.org/licenses/ .
->> + */
->> +
->> +#include <linux/device.h>
->> +#include <linux/io.h>
->> +#include <linux/libfdt.h>
->> +#include <linux/of_address.h>
->> +#include <linux/of_fdt.h>
->> +#include <linux/sizes.h>
->> +#include <soc/brcmstb/memory_api.h>
->> +
->> +/* -------------------- Constants -------------------- */
->> +
->> +/* Macros to help extract property data */
->> +#define U8TOU32(b, offs) \
->> +    ((((u32)b[0 + offs] << 0)  & 0x000000ff) | \
->> +     (((u32)b[1 + offs] << 8)  & 0x0000ff00) | \
->> +     (((u32)b[2 + offs] << 16) & 0x00ff0000) | \
->> +     (((u32)b[3 + offs] << 24) & 0xff000000))
->> +
->> +#define DT_PROP_DATA_TO_U32(b, offs) (fdt32_to_cpu(U8TOU32(b, offs)))
->> +
+> This really looks like a stale comment, as there is no hyp_panic
+> involved here anymore (thankfully!).
 > 
-> I fail to understand why this is not:
-> 
-> #define DT_PROP_DATA_TO_U32(b, offs) (fdt32_to_cpu(*(u32*)(b + offs)))
-> 
-> 
-> If I understand correctly, fdt data is in big endian, the macro U8TOU32
-> reads it as little endian. My guess is that this won't work on big
-> endian kernels but should work on little endian since fdt32_to_cpu will
-> revert the bytes again.
-> 
-> Am I missing something?
 
-No, your point is valid, there is no reason why this cannot be
-fdt32_to_cpu() here.
--- 
-Florian
+yeah, I suppose.
+
+> > +	ldr	\reg, =kvm_host_cpu_state
+> > +	mrs	\tmp, tpidr_el2
+> > +	add	\reg, \reg, \tmp
+> > +	kern_hyp_va \reg
+> 
+> Here, we're trading a load from the stack for a load from the constant
+> pool. Can't we do something like:
+> 
+> 	adr_l	\reg, kvm_host_cpu_state
+> 	msr	\tmp, tpidr_el2
+> 	add	\reg, \reg, \tmp
+> 
+> and that's it? 
+
+That's definitely what the compiler generates from C code...
+
+> This relies on the property that the kernel/hyp offset is
+> constant, and that it doesn't matter if we add the offset to a kernel VA
+> or a HYP VA... Completely untested of course!
+> 
+
+You're the hyp VA expert.  Is it valid to rely on that assumption?
+
+> > +.endm
+> > +
+> > +.macro get_vcpu vcpu, ctxt
+> > +	ldr	\vcpu, [\ctxt, #HOST_CONTEXT_VCPU]
+> > +	kern_hyp_va	\vcpu
+> > +.endm
+> > +
+> > +#endif
+> > +
+> >  #endif /* __ARM_KVM_ASM_H__ */
+> > diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+> > index 71bf088..612021d 100644
+> > --- a/arch/arm64/kernel/asm-offsets.c
+> > +++ b/arch/arm64/kernel/asm-offsets.c
+> > @@ -135,6 +135,7 @@ int main(void)
+> >    DEFINE(CPU_FP_REGS,		offsetof(struct kvm_regs, fp_regs));
+> >    DEFINE(VCPU_FPEXC32_EL2,	offsetof(struct kvm_vcpu, arch.ctxt.sys_regs[FPEXC32_EL2]));
+> >    DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
+> > +  DEFINE(HOST_CONTEXT_VCPU,	offsetof(struct kvm_cpu_context, __hyp_running_vcpu));
+> >  #endif
+> >  #ifdef CONFIG_CPU_PM
+> >    DEFINE(CPU_SUSPEND_SZ,	sizeof(struct cpu_suspend_ctx));
+> > diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
+> > index 9a8ab5d..76cd48f 100644
+> > --- a/arch/arm64/kvm/hyp/entry.S
+> > +++ b/arch/arm64/kvm/hyp/entry.S
+> > @@ -62,9 +62,6 @@ ENTRY(__guest_enter)
+> >  	// Store the host regs
+> >  	save_callee_saved_regs x1
+> >  
+> > -	// Store host_ctxt and vcpu for use at exit time
+> > -	stp	x1, x0, [sp, #-16]!
+> > -
+> >  	add	x18, x0, #VCPU_CONTEXT
+> >  
+> >  	// Restore guest regs x0-x17
+> > @@ -119,7 +116,7 @@ ENTRY(__guest_exit)
+> >  	save_callee_saved_regs x1
+> >  
+> >  	// Restore the host_ctxt from the stack
+> 
+> Stale comment again.
+> 
+
+yeah...
+
+> > -	ldr	x2, [sp], #16
+> > +	get_host_ctxt	x2, x3
+> >  
+> >  	// Now restore the host regs
+> >  	restore_callee_saved_regs x2
+> > diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+> > index e4f37b9..2950f26 100644
+> > --- a/arch/arm64/kvm/hyp/hyp-entry.S
+> > +++ b/arch/arm64/kvm/hyp/hyp-entry.S
+> > @@ -56,19 +56,16 @@ ENDPROC(__vhe_hyp_call)
+> >  el1_sync:				// Guest trapped into EL2
+> >  	stp	x0, x1, [sp, #-16]!
+> >  
+> > -alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
+> > -	mrs	x1, esr_el2
+> > -alternative_else
+> > -	mrs	x1, esr_el1
+> > -alternative_endif
+> > -	lsr	x0, x1, #ESR_ELx_EC_SHIFT
+> > -
+> > -	cmp	x0, #ESR_ELx_EC_HVC64
+> > -	b.ne	el1_trap
+> > -
+> >  	mrs	x1, vttbr_el2		// If vttbr is valid, the 64bit guest
+> >  	cbnz	x1, el1_trap		// called HVC
+> 
+> Comment is outdated. Any guest trap will take this path.
+> 
+
+yeah...
+
+> >  
+> > +#ifdef CONFIG_DEBUG
+> > +	mrs	x0, esr_el2
+> > +	lsr	x0, x0, #ESR_ELx_EC_SHIFT
+> > +	cmp     x0, #ESR_ELx_EC_HVC64
+> > +	b.ne    __hyp_panic
+> > +#endif
+> > +
+> >  	/* Here, we're pretty sure the host called HVC. */
+> >  	ldp	x0, x1, [sp], #16
+> >  
+> > @@ -101,10 +98,15 @@ alternative_endif
+> >  	eret
+> >  
+> >  el1_trap:
+> > +	get_host_ctxt	x0, x1
+> > +	get_vcpu	x1, x0
+> > +
+> > +	mrs		x0, esr_el2
+> > +	lsr		x0, x0, #ESR_ELx_EC_SHIFT
+> >  	/*
+> >  	 * x0: ESR_EC
+> > +	 * x1: vcpu pointer
+> >  	 */
+> > -	ldr	x1, [sp, #16 + 8]	// vcpu stored by __guest_enter
+> >  
+> >  	/*
+> >  	 * We trap the first access to the FP/SIMD to save the host context
+> > @@ -122,13 +124,15 @@ alternative_else_nop_endif
+> >  
+> >  el1_irq:
+> >  	stp     x0, x1, [sp, #-16]!
+> > -	ldr	x1, [sp, #16 + 8]
+> > +	get_host_ctxt	x0, x1
+> > +	get_vcpu	x1, x0
+> >  	mov	x0, #ARM_EXCEPTION_IRQ
+> >  	b	__guest_exit
+> >  
+> >  el1_error:
+> >  	stp     x0, x1, [sp, #-16]!
+> > -	ldr	x1, [sp, #16 + 8]
+> > +	get_host_ctxt	x0, x1
+> > +	get_vcpu	x1, x0
+> >  	mov	x0, #ARM_EXCEPTION_EL1_SERROR
+> >  	b	__guest_exit
+> >  
+> > @@ -164,14 +168,7 @@ ENTRY(__hyp_do_panic)
+> >  ENDPROC(__hyp_do_panic)
+> >  
+> >  ENTRY(__hyp_panic)
+> > -	/*
+> > -	 * '=kvm_host_cpu_state' is a host VA from the constant pool, it may
+> > -	 * not be accessible by this address from EL2, hyp_panic() converts
+> > -	 * it with kern_hyp_va() before use.
+> > -	 */
+> > -	ldr	x0, =kvm_host_cpu_state
+> > -	mrs	x1, tpidr_el2
+> > -	add	x0, x0, x1
+> > +	get_host_ctxt x0, x1
+> >  	b	hyp_panic
+> >  ENDPROC(__hyp_panic)
+> >  
+> > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> > index 69ef24a..a0123ad 100644
+> > --- a/arch/arm64/kvm/hyp/switch.c
+> > +++ b/arch/arm64/kvm/hyp/switch.c
+> > @@ -435,7 +435,7 @@ void __hyp_text __noreturn hyp_panic(struct kvm_cpu_context *__host_ctxt)
+> >  	if (read_sysreg(vttbr_el2)) {
+> >  		struct kvm_cpu_context *host_ctxt;
+> >  
+> > -		host_ctxt = kern_hyp_va(__host_ctxt);
+> > +		host_ctxt = __host_ctxt;
+> 
+> Can't we just rename __host_ctxt to host_ctxt and drop the local definition?
+> 
+
+yes, patch splitting snafu.  Will fix.
+
+By the way, what I'm going for is anything in the hyp address space has
+leading __, and otherwise ot.
+
+> >  		vcpu = host_ctxt->__hyp_running_vcpu;
+> >  		__timer_disable_traps(vcpu);
+> >  		__deactivate_traps(vcpu);
+> > 
+> 
+Thanks,
+-Christoffer
