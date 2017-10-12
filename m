@@ -1,34 +1,76 @@
-From: garsilva@embeddedor.com (Gustavo A. R. Silva)
-Date: Thu, 12 Oct 2017 11:16:48 -0500
-Subject: [PATCH 08/20] staging: vc04_services: vchiq_core: mark expected
- switch fall-through
-In-Reply-To: <cover.1507781178.git.garsilva@embeddedor.com>
-References: <cover.1507781178.git.garsilva@embeddedor.com>
-Message-ID: <f7666b46f3a50ba58eac5454680bbba4d84fe6c2.1507781178.git.garsilva@embeddedor.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 12 Oct 2017 17:20:49 +0100
+Subject: [PATCH 03/37] KVM: arm64: Move HCR_INT_OVERRIDE to default
+ HCR_EL2 guest flag
+In-Reply-To: <20171012104141.26902-4-christoffer.dall@linaro.org>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+ <20171012104141.26902-4-christoffer.dall@linaro.org>
+Message-ID: <6ca35bb9-cb64-1d0b-6aa5-bf007ad5ccc7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation to enabling -Wimplicit-fallthrough, mark switch cases
-where we are expecting to fall through.
+On 12/10/17 11:41, Christoffer Dall wrote:
+> From: Shih-Wei Li <shihwei@cs.columbia.edu>
+> 
+> We always set the IMO and FMO bits in the HCR_EL2 when running the
+> guest, regardless if we use the vgic or not.  By moving these flags to
+> HCR_GUEST_FLAGS we can avoid one of the extra save/restore operations of
+> HCR_EL2 in the world switch code, and we can also soon get rid of the
+> other one.
+> 
+> Signed-off-by: Shih-Wei Li <shihwei@cs.columbia.edu>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/arm64/include/asm/kvm_arm.h | 4 ++--
+>  arch/arm64/kvm/hyp/switch.c      | 3 ---
+>  2 files changed, 2 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> index 61d694c..e67e279 100644
+> --- a/arch/arm64/include/asm/kvm_arm.h
+> +++ b/arch/arm64/include/asm/kvm_arm.h
+> @@ -79,9 +79,9 @@
+>   */
+>  #define HCR_GUEST_FLAGS (HCR_TSC | HCR_TSW | HCR_TWE | HCR_TWI | HCR_VM | \
+>  			 HCR_TVM | HCR_BSU_IS | HCR_FB | HCR_TAC | \
+> -			 HCR_AMO | HCR_SWIO | HCR_TIDCP | HCR_RW)
+> +			 HCR_AMO | HCR_SWIO | HCR_TIDCP | HCR_RW | \
+> +			 HCR_FMO | HCR_IMO)
+>  #define HCR_VIRT_EXCP_MASK (HCR_VSE | HCR_VI | HCR_VF)
+> -#define HCR_INT_OVERRIDE   (HCR_FMO | HCR_IMO)
+>  #define HCR_HOST_VHE_FLAGS (HCR_RW | HCR_TGE | HCR_E2H)
+>  
+>  /* TCR_EL2 Registers bits */
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index a50ddf3..bcf1a79 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -164,8 +164,6 @@ static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
+>  		__vgic_v3_save_state(vcpu);
+>  	else
+>  		__vgic_v2_save_state(vcpu);
+> -
+> -	write_sysreg(read_sysreg(hcr_el2) & ~HCR_INT_OVERRIDE, hcr_el2);
+>  }
+>  
+>  static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
+> @@ -173,7 +171,6 @@ static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
+>  	u64 val;
+>  
+>  	val = read_sysreg(hcr_el2);
+> -	val |= 	HCR_INT_OVERRIDE;
+>  	val |= vcpu->arch.irq_lines;
+>  	write_sysreg(val, hcr_el2);
+>  
+> 
 
-Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
----
- drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+To expand on why this is actually safe: IMO/FMO control both taking the
+interrupts to EL2 and remapping ICC_*_EL1 to ICV_*_EL1 executed at EL1.
+As long as we ensure that these bits are clear when returning to the EL1
+host, we're OK.
 
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-index c3bb8e0..ecff92b 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-@@ -2951,8 +2951,7 @@ vchiq_close_service_internal(VCHIQ_SERVICE_T *service, int close_recvd)
- 
- 	case VCHIQ_SRVSTATE_OPENSYNC:
- 		mutex_lock(&state->sync_mutex);
--		/* Drop through */
--
-+		/* fall through */
- 	case VCHIQ_SRVSTATE_OPEN:
- 		if (state->is_master || close_recvd) {
- 			if (!do_abort_bulks(service))
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
 -- 
-2.7.4
+Jazz is not dead. It just smells funny...
