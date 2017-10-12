@@ -1,60 +1,39 @@
-From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Thu, 12 Oct 2017 20:12:36 +0000
-Subject: [PATCH 3/3] ARM: mvebu: dts: connect interrupt for WD on
- armada-38x
-References: <20171011022958.31268-1-chris.packham@alliedtelesis.co.nz>
- <20171011022958.31268-4-chris.packham@alliedtelesis.co.nz>
- <874lr4bgdh.fsf@free-electrons.com>
-Message-ID: <69ab72d5008744df9455712c2c821730@svr-chch-ex1.atlnz.lc>
+From: tpiepho@impinj.com (Trent Piepho)
+Date: Thu, 12 Oct 2017 20:41:07 +0000
+Subject: [2/2] spi: imx: fix use of native chip-selects with devicetree
+In-Reply-To: <209bb901-875e-8007-06f8-3ae9698a0e41@linux-m68k.org>
+References: <1489726983-17706-3-git-send-email-gerg@linux-m68k.org>
+ <1507667916.74283.19.camel@impinj.com>
+ <209bb901-875e-8007-06f8-3ae9698a0e41@linux-m68k.org>
+Message-ID: <1507840866.3880.4.camel@impinj.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/10/17 03:17, Gregory CLEMENT wrote:
-> Hi Chris,
->   
->   On mer., oct. 11 2017, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
+On Thu, 2017-10-12 at 16:26 +1000, Greg Ungerer wrote:
+> On 11/10/17 06:38, Trent Piepho wrote:
+> > 
+> > arch/arm/mach-imx/mach-mx31moboard.c-static int moboard_spi1_cs[] = {
+> > arch/arm/mach-imx/mach-mx31moboard.c:   MXC_SPI_CS(0),
+> > arch/arm/mach-imx/mach-mx31moboard.c:   MXC_SPI_CS(2),
+> > arch/arm/mach-imx/mach-mx31moboard.c-};
+> > 
+> > The spi device configured to use chip select 1 will no longer use
+> > native chip select line 2.
+> > 
+> > Looking at all in-tree users of spi imx platform data, it appears that
+> > this board is the only one in which the cs selected does not match the
+> > array index.  Though there are still several which still use
+> > MSC_SPI_CS() even though it doesn't really work anymore.
 > 
->> The watchdog timer interrupt is available internally on the Armada-38x
->> SoCs. Connect it so that we can have the orion_wdt_irq generate debug
->> information when a watchdog timeout occurs.
+> Commit 901f26bce64a ("ARM: imx: set correct chip_select in platform setup") 
+> fixes this issue. It specifically makes sure that the board setup chip
+> select is set correctly (so that spi-imx can then use it). It also pads
+> out the chipselect arrays so that the chip select and indexes match.
 > 
-> Given the patch 2, when an interrupt is provided by the dt, then the
-> behavior of the watchdog changes. So we can't do it for all the
-> platform.
-> 
-> As you propose on your cover letter it is better to set it at board
-> level.
-> 
-> So instead of this patch you should update the binding documentation
-> with this new resources. Thanks to this each board developer will be
-> able to decide to use this feature or not.
+> Is this not working for you?
 
-Agreed. I'll drop this patch in favor of a documentation update in v2.
+It looks like that patch missed one spi bus in mx31moboard.c, quoted
+above.
 
-> 
-> Thanks,
-> 
-> Gregory
-> 
->>
->> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
->> ---
->>   arch/arm/boot/dts/armada-38x.dtsi | 1 +
->>   1 file changed, 1 insertion(+)
->>
->> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
->> index 7ff0811e61db..9ac76c54c9e5 100644
->> --- a/arch/arm/boot/dts/armada-38x.dtsi
->> +++ b/arch/arm/boot/dts/armada-38x.dtsi
->> @@ -408,6 +408,7 @@
->>   				reg = <0x20300 0x34>, <0x20704 0x4>, <0x18260 0x4>;
->>   				clocks = <&coreclk 2>, <&refclk>;
->>   				clock-names = "nbclk", "fixed";
->> +				interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_HIGH>;
->>   			};
->>   
->>   			cpurst: cpurst at 20800 {
->> -- 
->> 2.14.2
->>
-> 
+I have a patch series that should fix that and also the documentation. 
+Need to test it a bit more.
