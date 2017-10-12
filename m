@@ -1,59 +1,26 @@
-From: wangzhou.bry@gmail.com (Sherlock Wang)
-Date: Thu, 12 Oct 2017 18:35:29 +0800
-Subject: [PATCH 0/2] vgaarb: Select fallback default VGA device
-In-Reply-To: <20171006221358.12211.42879.stgit@bhelgaas-glaptop.roam.corp.google.com>
-References: <20171006221358.12211.42879.stgit@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20171012103529.GA5378@T440>
+From: rric@kernel.org (Robert Richter)
+Date: Thu, 12 Oct 2017 12:38:20 +0200
+Subject: [PATCH v7 0/4] Add support for ThunderX2 pmu events using json
+ files
+In-Reply-To: <20171012103419.29824-1-ganapatrao.kulkarni@cavium.com>
+References: <20171012103419.29824-1-ganapatrao.kulkarni@cavium.com>
+Message-ID: <20171012103820.GC17924@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 06, 2017 at 05:24:20PM -0500, Bjorn Helgaas wrote:
-> These patches are supposed to fix a problem Daniel Axtens found on the
-> HiSilicon D05 board.  The VGA device there is behind a bridge that doesn't
-> support PCI_BRIDGE_CTL_VGA, so the arbiter never selects the device as the
-> default.
-> 
-> The first patch extends the arbiter so that if it can't find an enabled VGA
-> device with legacy resources, it selects the first enabled device *without*
-> legacy resources (this is what fixes the D05).  If that fails, it selects
-> the first device that isn't enabled.  The combination of both changes
-> should make the current powerpc fixup_vga() quirk unnecessary.
-> 
-> N.B. It changes the powerpc behavior: if there are several enabled VGA
-> devices, the current quirk selects the last one, while this patch selects
-> the first one.  If this is a problem, I can drop that part of the patch and
-> keep the quirk.
-> 
-> The second patch pulls out this fallback device detection (and the EFI
-> override) from vga_arb_device_init() to make it easier to read.
+On 12.10.17 16:04:15, Ganapatrao Kulkarni wrote:
 
-Hi Bjorn,
+>  tools/perf/arch/arm64/util/Build                   |  1 +
+>  tools/perf/arch/arm64/util/header.c                | 65 ++++++++++++++++++++++
+>  tools/perf/arch/powerpc/util/header.c              |  2 +-
+>  tools/perf/arch/x86/util/header.c                  |  2 +-
+>  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 +++++
+>  .../arch/arm64/thunderx2/thunderx2-imp-def.json    | 62 +++++++++++++++++++++
 
-I tested this series in:
+I guess the dir needs to be named 'cavium'.
 
-        D05 board based on HiSilicon SoC Hip07.
-        And HiSilicon SoC Hip08 based board.
+-Robert
 
-Both of these two SoCs' PCIe host bridge don't support PCI_BRIDGE_CTL_VGA. One
-VGA device which does not support legacy resources has been connected to these
-two PCIe host bridges to test. Default VGA device can be selected in above two
-systems.
-
-Tested-by: Zhou Wang <wangzhou1@hisilicon.com>
-(sorry for my HiSilicon E-mail box miss this serias, so here I have to use my
-gmail box)
-
-Thanks,
-Zhou
-
-> 
-> ---
-> 
-> Bjorn Helgaas (2):
->       vgaarb: Select a default VGA device even if there's no legacy VGA
->       vgaarb: Factor out EFI and fallback default device selection
-> 
-> 
->  arch/powerpc/kernel/pci-common.c |   12 ------
->  drivers/gpu/vga/vgaarb.c         |   72 +++++++++++++++++++++++++++++---------
->  2 files changed, 55 insertions(+), 29 deletions(-)
+>  tools/perf/util/header.h                           |  3 +-
+>  tools/perf/util/pmu.c                              | 52 +++++++++++++----
+>  8 files changed, 189 insertions(+), 13 deletions(-)
