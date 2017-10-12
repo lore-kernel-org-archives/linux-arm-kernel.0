@@ -1,92 +1,105 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 12 Oct 2017 13:24:42 +0200
-Subject: [PATCH 16/16] arm64: dts: marvell: armada-3720-espressobin: fill
- UART nodes
-In-Reply-To: <20171009093025.78d45a9a@xps13> (Miquel RAYNAL's message of "Mon,
- 9 Oct 2017 09:30:25 +0200")
-References: <20171006101344.15590-1-miquel.raynal@free-electrons.com>
- <20171006101344.15590-17-miquel.raynal@free-electrons.com>
- <87fuawe8gx.fsf@free-electrons.com>
- <20171006151521.440418a2@windsurf.lan> <20171009093025.78d45a9a@xps13>
-Message-ID: <87zi8wbocl.fsf@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 12 Oct 2017 12:28:32 +0100
+Subject: [PATCH v3 22/28] arm64/sve: KVM: Prevent guests from using SVE
+In-Reply-To: <20171012110409.GG19485@e103592.cambridge.arm.com>
+References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
+ <1507660725-7986-23-git-send-email-Dave.Martin@arm.com>
+ <c28b3f0d-7beb-cca3-46db-3fce964f4725@arm.com>
+ <20171012110409.GG19485@e103592.cambridge.arm.com>
+Message-ID: <d8a50bf1-bfe0-2423-c56b-adac3925309e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Miquel,
- 
- On lun., oct. 09 2017, Miquel RAYNAL <miquel.raynal@free-electrons.com> wrote:
+On 12/10/17 12:04, Dave Martin wrote:
+> On Wed, Oct 11, 2017 at 05:28:06PM +0100, Marc Zyngier wrote:
+>> [+ Christoffer]
+>>
+>> On 10/10/17 19:38, Dave Martin wrote:
+>>> Until KVM has full SVE support, guests must not be allowed to
+>>> execute SVE instructions.
+>>>
+>>> This patch enables the necessary traps, and also ensures that the
+>>> traps are disabled again on exit from the guest so that the host
+>>> can still use SVE if it wants to.
+>>>
+>>> This patch introduces another instance of
+>>> __this_cpu_write(fpsimd_last_state, NULL), so this flush operation
+>>> is abstracted out as a separate helper fpsimd_flush_cpu_state().
+>>> Other instances are ported appropriately.
+>>>
+>>> As a side effect of this refactoring, a this_cpu_write() in
+>>> fpsimd_cpu_pm_notifier() is changed to __this_cpu_write().  This
+>>> should be fine, since cpu_pm_enter() is supposed to be called only
+>>> with interrupts disabled.
+>>>
+>>> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+>>> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>> ---
+> 
+> [...]
+> 
+>>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>>> index e923b58..674912d 100644
+>>> --- a/arch/arm64/include/asm/kvm_host.h
+>>> +++ b/arch/arm64/include/asm/kvm_host.h
+> 
+> [...]
+> 
+>>> @@ -384,4 +385,14 @@ static inline void __cpu_init_stage2(void)
+> 
+> [...]
+> 
+>>> +static inline void kvm_fpsimd_flush_cpu_state(void)
+>>> +{
+>>> +	if (system_supports_sve())
+>>> +		sve_flush_cpu_state();
+>>
+>> Hmmm. How does this work if...
+> 
+> !IS_ENABLED(CONFIG_ARM64_SVE) implies !system_supports_sve(), so
+> if CONFIG_ARM64_SVE is not set, the call is optimised away.
+> 
+> [...]
+> 
+>>> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+>>> index a9cb794..6ae3703 100644
+>>> --- a/arch/arm64/kernel/fpsimd.c
+>>> +++ b/arch/arm64/kernel/fpsimd.c
+>>> @@ -1073,6 +1073,33 @@ void fpsimd_flush_task_state(struct task_struct *t)
+> 
+> [...]
+> 
+>>> +#ifdef CONFIG_ARM64_SVE
+>>> +void sve_flush_cpu_state(void)
+>>> +{
+>>> +	struct fpsimd_state *const fpstate = __this_cpu_read(fpsimd_last_state);
+>>> +	struct task_struct *tsk;
+>>> +
+>>> +	if (!fpstate)
+>>> +		return;
+>>> +
+>>> +	tsk = container_of(fpstate, struct task_struct, thread.fpsimd_state);
+>>> +	if (test_tsk_thread_flag(tsk, TIF_SVE))
+>>> +		fpsimd_flush_cpu_state();
+>>> +}
+>>> +#endif /* CONFIG_ARM64_SVE */
+>>
+>> ... CONFIG_ARM64_SVE is not set? Fixing this should just be a matter of
+>> moving the #ifdef/#endif inside the function...
+> 
+> Because sve_flush_cpu_state() is not in the same compilation unit it
+> can't be static, and that means the compiler won't remove it
+> automatically if it's unused -- hence the #ifdef.
+> 
+> Because the call site is optimised away, there is no link failure.
+> 
+> Don't we rely on this sort of thing all over the place?
+Dunno. It just feels weird. But if you are sure that it won't break,
+fine by me. I guess we'll find out pretty quickly how this fares,
+specially with older toolchains.
 
-> Hi Thomas, Gregory,
->
-> On Fri, 6 Oct 2017 15:15:21 +0200
-> Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
->
->> Hello,
->> 
->> On Fri, 06 Oct 2017 15:01:18 +0200, Gregory CLEMENT wrote:
->> 
->> >  /*
->> >   * To enable the second UART on J17 (pins 24,26) refer to the uart1
->> >   * node from armada-3720-db.dts.
->> >   * Note that TX and RX signal are the ones coming directly from
->> > the SoC:
->> >   * 1.8V TTL.
->> >   */  
->> 
->> One issue with this comment (and Miqu?l's version as well) is that it
->> does not explain why you don't enable this UART by default.
->> 
->> The real reason is in the commit log from Miqu?l, and should probably
->> be part of the comment. Perhaps something like:
->> 
->> /*
->> 
->>  * Connector J17 (pins X, Y, Z) exposes a number of different
->>  * features:
->>  *  - UART1 (pins 24 = RX, pins 26 = TX), see armada-3720-db.dts for
->> an
->>  *    example on how to enable UART1. Beware that the signals are 1.8V
->>  *    TTL.
->>  *  - SPIxyz
->>  *  - I2Cxyz
->>  */
->
-> Thanks for both your comments, there is my version, inspired from both
-> comments:
->
-> /*
->  * Connector J17 exposes a number of different features. Some pins are
->  * multiplexed. This is the case for the UART1 feature (pins 24 = RX,
->  * pins 26 = TX). See armada-3720-db.dts for an example of how to enable it.
->  * Beware that the signals are 1.8V TTL.
->  */
-
-Seems good for me however I prefer Thomas version, easier to read and to
-extend latter with the description of other pins if needed.
-
-Gregory
-
->
-> Thanks,
-> Miqu?l
->
->> 
->> Otherwise, it's not clear at all why you don't just enable UART1. Or
->> perhaps I misunderstood Miqu?l's commit log ?
->> 
->> Best regards,
->> 
->> Thomas
->
->
->
-> -- 
-> Miquel Raynal, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
-
+	M.
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Jazz is not dead. It just smells funny...
