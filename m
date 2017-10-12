@@ -1,123 +1,96 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 12 Oct 2017 20:36:15 +0900
-Subject: [PATCH v8 1/2] dt-bindings: gpio: uniphier: add UniPhier GPIO binding
-In-Reply-To: <1507808176-5223-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1507808176-5223-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1507808176-5223-2-git-send-email-yamada.masahiro@socionext.com>
+Date: Thu, 12 Oct 2017 20:36:14 +0900
+Subject: [PATCH v8 0/2] gpio: uniphier: UniPhier GPIO driver
+Message-ID: <1507808176-5223-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This GPIO controller is used on UniPhier SoC family.
+This series adds UniPhier GPIO driver.
 
-The vendor specific property "socionext,interrupt-ranges" is for
-specifying interrupt mapping to the parent interrupt controller
-because the mapping is not contiguous.  It works like "ranges",
-but transforms "interrupts" instead of "reg".
+The interrupt controller part is implemented by using hierarchy irqdomain.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
+IMHO, the problem of the hierarchy irqdomain is that drivers must hard-code
+the fwspec of the interrupt parent.  We will never know the DT binding of
+the parent unless we parse #interrupt-cell, etc.
 
- .../devicetree/bindings/gpio/gpio-uniphier.txt     | 52 ++++++++++++++++++++++
- MAINTAINERS                                        |  1 +
- include/dt-bindings/gpio/uniphier-gpio.h           | 18 ++++++++
- 3 files changed, 71 insertions(+)
+I asked about this:
+https://lkml.org/lkml/2017/7/6/758
+
+Apparently, the current kernel does not provide a systematic way to
+describe it.
+
+In v1-v3, I hard-coded the parent hwirq numbers in the driver because
+irqchip drivers are forced to hard-code more or less about the parent.
+This was not accepted by Linus Walleij.
+
+In v4, I tried to use the new API irq_domain_push_irq().  I needed to
+change the irqdomain framework to make it work for DT, but seemed
+controversial in the irqdomain subsystem review.
+
+In v5, I tried another solution.  At first I thought it worked, but
+I found a dead-lock if an irq is disposed from the .alloc hook.
+
+After I considered more, I thought "interrupts" property does not
+make much sense here because the last cell (which usually specifies
+the trigger type) is useless for the hierarchy irqdomain.
+
+I decided to use a vendor-specific property.  This is what some drivers
+actually do.
+
+
+Changes in v8:
+  - Move dt-binding header to binding commit
+  - Add MAINTAINERS entry for the binding doc
+  - Add a consumer example to the binding doc
+
+Changes in v7:
+  - Rename uniphier_gpio_irq_get_hwirq()
+    (I just missed to "git commit" before "git send-email")
+
+Changes in v6:
+  - Add "socionext,interrupt-ranges"
+
+Changes in v5:
+  - Split into a separate patch for DT binding
+  - Add a new patch to export of_phandle_args_to_fwspec
+  - Split DT binding into a separate file
+  - v4 depends on some patches that change irq_domain_push_irq(), but
+    they got negative feedback in the irqdomain subsystem review.
+    Yet another approach here.  Parse "interrupts" property in
+    .alloc() hook.  If the parent IRQ is already mapped, dispose it
+    and re-alloc in irqdomain manner.
+
+Changes in v4:
+  - Add COMPILE_TEST and select IRQ_DOMAIN_HIERARCHY
+  - Reimplement irqchip part by using irq_domain_push_irq()
+
+Changes in v3:
+  - Add .irq_set_affinity() hook
+  - Use irq_domain_create_hierarchy() instead of legacy
+    irq_domain_add_hierarchy()
+
+Changes in v2:
+  - Remove +32 offset for parent interrupts to follow the GIC
+    binding convention
+  - Let uniphier_gpio_irq_alloc() fail if nr_irqs != 1
+  - Allocate gpio_chip statically because just one instance is
+    supported
+  - Fix suspend and resume hooks
+
+Masahiro Yamada (2):
+  dt-bindings: gpio: uniphier: add UniPhier GPIO binding
+  gpio: uniphier: add UniPhier GPIO controller driver
+
+ .../devicetree/bindings/gpio/gpio-uniphier.txt     |  52 +++
+ MAINTAINERS                                        |   2 +
+ drivers/gpio/Kconfig                               |   8 +
+ drivers/gpio/Makefile                              |   1 +
+ drivers/gpio/gpio-uniphier.c                       | 507 +++++++++++++++++++++
+ include/dt-bindings/gpio/uniphier-gpio.h           |  18 +
+ 6 files changed, 588 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-uniphier.txt
+ create mode 100644 drivers/gpio/gpio-uniphier.c
  create mode 100644 include/dt-bindings/gpio/uniphier-gpio.h
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-uniphier.txt b/Documentation/devicetree/bindings/gpio/gpio-uniphier.txt
-new file mode 100644
-index 0000000..fed9158
---- /dev/null
-+++ b/Documentation/devicetree/bindings/gpio/gpio-uniphier.txt
-@@ -0,0 +1,52 @@
-+UniPhier GPIO controller
-+
-+Required properties:
-+- compatible: Should be "socionext,uniphier-gpio".
-+- reg: Specifies offset and length of the register set for the device.
-+- gpio-controller: Marks the device node as a GPIO controller.
-+- #gpio-cells: Should be 2.  The first cell is the pin number and the second
-+  cell is used to specify optional parameters.
-+- interrupt-parent: Specifies the parent interrupt controller.
-+- interrupt-controller: Marks the device node as an interrupt controller.
-+- #interrupt-cells: Should be 2.  The first cell defines the interrupt number.
-+  The second cell bits[3:0] is used to specify trigger type as follows:
-+    1 = low-to-high edge triggered
-+    2 = high-to-low edge triggered
-+    4 = active high level-sensitive
-+    8 = active low level-sensitive
-+  Valid combinations are 1, 2, 3, 4, 8.
-+- ngpios: Specifies the number of GPIO lines.
-+- gpio-ranges: Mapping to pin controller pins (as described in gpio.txt)
-+- socionext,interrupt-ranges: Specifies an interrupt number mapping between
-+  this GPIO controller and its interrupt parent, in the form of arbitrary
-+  number of <child-interrupt-base parent-interrupt-base length> triplets.
-+
-+Optional properties:
-+- gpio-ranges-group-names: Used for named gpio ranges (as described in gpio.txt)
-+
-+Example:
-+	gpio: gpio at 55000000 {
-+		compatible = "socionext,uniphier-gpio";
-+		reg = <0x55000000 0x200>;
-+		interrupt-parent = <&aidet>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		gpio-ranges = <&pinctrl 0 0 0>;
-+		gpio-ranges-group-names = "gpio_range";
-+		ngpios = <248>;
-+		socionext,interrupt-ranges = <0 48 16>, <16 154 5>, <21 217 3>;
-+	};
-+
-+Consumer Example:
-+
-+	sdhci0_pwrseq {
-+		compatible = "mmc-pwrseq-emmc";
-+		reset-gpios = <&gpio UNIPHIER_GPIO_PORT(29, 4) GPIO_ACTIVE_LOW>;
-+	};
-+
-+Please note UNIPHIER_GPIO_PORT(29, 4) represents PORT294 in the SoC document.
-+Unfortunately, only the one's place is octal in the port numbering.  (That is,
-+PORT 8, 9, 18, 19, 28, 29, ... are missing.)  UNIPHIER_GPIO_PORT() is a helper
-+macro to calculate 29 * 8 + 4.
-diff --git a/MAINTAINERS b/MAINTAINERS
-index caacc88..2474032 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2029,6 +2029,7 @@ M:	Masahiro Yamada <yamada.masahiro@socionext.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
- S:	Maintained
-+F:	Documentation/devicetree/bindings/gpio/gpio-uniphier.txt
- F:	arch/arm/boot/dts/uniphier*
- F:	arch/arm/include/asm/hardware/cache-uniphier.h
- F:	arch/arm/mach-uniphier/
-diff --git a/include/dt-bindings/gpio/uniphier-gpio.h b/include/dt-bindings/gpio/uniphier-gpio.h
-new file mode 100644
-index 0000000..9f0ad17
---- /dev/null
-+++ b/include/dt-bindings/gpio/uniphier-gpio.h
-@@ -0,0 +1,18 @@
-+/*
-+ * Copyright (C) 2017 Socionext Inc.
-+ *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
-+ */
-+
-+#ifndef _DT_BINDINGS_GPIO_UNIPHIER_H
-+#define _DT_BINDINGS_GPIO_UNIPHIER_H
-+
-+#define UNIPHIER_GPIO_LINES_PER_BANK	8
-+
-+#define UNIPHIER_GPIO_IRQ_OFFSET	((UNIPHIER_GPIO_LINES_PER_BANK) * 15)
-+
-+#define UNIPHIER_GPIO_PORT(bank, line)	\
-+			((UNIPHIER_GPIO_LINES_PER_BANK) * (bank) + (line))
-+
-+#define UNIPHIER_GPIO_IRQ(n)		((UNIPHIER_GPIO_IRQ_OFFSET) + (n))
-+
-+#endif /* _DT_BINDINGS_GPIO_UNIPHIER_H */
 -- 
 2.7.4
