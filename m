@@ -1,39 +1,35 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 12 Oct 2017 11:57:05 +0100
-Subject: [PATCH v3 18/28] arm64/sve: Preserve SVE registers around EFI
- runtime service calls
-In-Reply-To: <1507660725-7986-19-git-send-email-Dave.Martin@arm.com>
-References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
- <1507660725-7986-19-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20171012105705.zbs3wokxhky36k4k@armageddon.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 12 Oct 2017 11:58:52 +0100
+Subject: [PATCH v7 0/4] Add support for ThunderX2 pmu events using json
+ files
+In-Reply-To: <CAKTKpr5=msG9b-f2Mj+1SibUvMXefg9DAcNA7M3hgHCX=hpQ6g@mail.gmail.com>
+References: <20171012103419.29824-1-ganapatrao.kulkarni@cavium.com>
+ <20171012103820.GC17924@rric.localdomain>
+ <CAKTKpr5=msG9b-f2Mj+1SibUvMXefg9DAcNA7M3hgHCX=hpQ6g@mail.gmail.com>
+Message-ID: <20171012105851.GC7395@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 10, 2017 at 07:38:35PM +0100, Dave P Martin wrote:
-> The EFI runtime services ABI allows EFI to make free use of the
-> FPSIMD registers during EFI runtime service calls, subject to the
-> callee-save requirements of the AArch64 procedure call standard.
+On Thu, Oct 12, 2017 at 04:20:06PM +0530, Ganapatrao Kulkarni wrote:
+> Hi Robert,
 > 
-> However, the SVE architecture allows upper bits of the SVE vector
-> registers to be zeroed as a side-effect of FPSIMD V-register
-> writes.  This means that the SVE vector registers must be saved in
-> their entirety in order to avoid data loss: non-SVE-aware EFI
-> implementations cannot restore them correctly.
+> On Thu, Oct 12, 2017 at 4:08 PM, Robert Richter <rric@kernel.org> wrote:
+> > On 12.10.17 16:04:15, Ganapatrao Kulkarni wrote:
+> >
+> >>  tools/perf/arch/arm64/util/Build                   |  1 +
+> >>  tools/perf/arch/arm64/util/header.c                | 65 ++++++++++++++++++++++
+> >>  tools/perf/arch/powerpc/util/header.c              |  2 +-
+> >>  tools/perf/arch/x86/util/header.c                  |  2 +-
+> >>  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 +++++
+> >>  .../arch/arm64/thunderx2/thunderx2-imp-def.json    | 62 +++++++++++++++++++++
+> >
+> > I guess the dir needs to be named 'cavium'.
 > 
-> The non-IRQ case is already handled gracefully by
-> kernel_neon_begin().  For the IRQ case, this patch allocates a
-> suitable per-CPU stash buffer for the full SVE register state and
-> uses it to preserve the affected registers around EFI calls.  It is
-> currently unclear how the EFI runtime services ABI will be
-> clarified with respect to SVE, so it safest to assume that the
-> predicate registers and FFR must be saved and restored too.
-> 
-> No attempt is made to restore the restore the vector length after
-> a call, for now.  It is deemed rather insane for EFI to change it,
-> and contemporary EFI implementations certainly won't.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> i dont think so ,  while compilation arch type is detected, it has to be arm64
+> refer SRCARCH in pmu-events/Build
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+The full name should be:
+
+.../arch/arm64/cavium/thunderx2-imp-def.json
+
+Will
