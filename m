@@ -1,100 +1,75 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 12 Oct 2017 13:56:51 +0100
-Subject: [PATCH v3 16/28] arm64/sve: Probe SVE capabilities and usable
- vector lengths
-In-Reply-To: <1507660725-7986-17-git-send-email-Dave.Martin@arm.com>
-References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
- <1507660725-7986-17-git-send-email-Dave.Martin@arm.com>
-Message-ID: <a39354fb-9f21-47ff-2ad9-b5bcb04e9990@arm.com>
+From: m.purski@samsung.com (Maciej Purski)
+Date: Thu, 12 Oct 2017 15:00:19 +0200
+Subject: [PATCH v2 3/4] dt-bindings: hwmon: Add
+ ti-max-expected-current-microamp property to ina2xx
+In-Reply-To: <CAJKOXPc1B1uqravtmHrh4eUK5JiQRiZLeoveSMk5qVyF-mK7Kw@mail.gmail.com>
+References: <CGME20171012123635eucas1p1ff9a982db9d541cd0475d44d114ff92a@eucas1p1.samsung.com>
+ <1507811765-31005-1-git-send-email-m.purski@samsung.com>
+ <1507811765-31005-4-git-send-email-m.purski@samsung.com>
+ <CAJKOXPc1B1uqravtmHrh4eUK5JiQRiZLeoveSMk5qVyF-mK7Kw@mail.gmail.com>
+Message-ID: <4597b058-ecb1-59ef-8693-1a23f374eae0@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/10/17 19:38, Dave Martin wrote:
-> This patch uses the cpufeatures framework to determine common SVE
-> capabilities and vector lengths, and configures the runtime SVE
-> support code appropriately.
-> 
-> ZCR_ELx is not really a feature register, but it is convenient to
-> use it as a template for recording the maximum vector length
-> supported by a CPU, using the LEN field.  This field is similar to
-> a feature field in that it is a contiguous bitfield for which we
-> want to determine the minimum system-wide value.  This patch adds
-> ZCR as a pseudo-register in cpuinfo/cpufeatures, with appropriate
-> custom code to populate it.  Finding the minimum supported value of
-> the LEN field is left to the cpufeatures framework in the usual
-> way.
-> 
-> The meaning of ID_AA64ZFR0_EL1 is not architecturally defined yet,
-> so for now we just require it to be zero.
-> 
-> Note that much of this code is dormant and SVE still won't be used
-> yet, since system_supports_sve() remains hardwired to false.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Cc: Alex Benn?e <alex.bennee@linaro.org>
-> Cc: Suzuki K Poulose <Suzuki.Poulose@arm.com>
-> 
-> ---
-> 
-> Dropped Alex Benn?e's Reviewed-by, since there is new logic in this
-> patch.
-> 
-> Changes since v2
-> ----------------
-> 
-> Bug fixes:
-> 
->   * Got rid of dynamic allocation of the shadow vector length map during
->     secondary boot.  Secondary CPU boot takes place in atomic context,
->     and relying on GFP_ATOMIC here doesn't seem justified.
-> 
->     Instead, the needed additional bitmap is allocated statically.  Only
->     one shadow map is needed, because CPUs don't boot concurrently.
-> 
-> Requested by Alex Benn?e:
-> 
->   * Reflowed untidy comment above read_zcr_features()
-> 
->   * Added comments to read_zcr_features() to explain what it's trying to do
->     (which is otherwise not readily apparent).
-> 
-> Requested by Catalin Marinas:
-> 
->   * Moved disabling of the EL1 SVE trap to the cpufeatures C code.
->     This allows addition of new assembler in __cpu_setup to be
->     avoided.
-> 
-> Miscellaneous:
-> 
->   * Added comments explaining the intent, purpose and basic constraints
->     for fpsimd.c helpers.
 
-...
 
-   
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 92a9502..c5acf38 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
+On 10/12/2017 02:39 PM, Krzysztof Kozlowski wrote:
+> On Thu, Oct 12, 2017 at 2:36 PM, Maciej Purski <m.purski@samsung.com> wrote:
+>> Add optional max expected current property which allows calibrating
+>> the ina sensor in order to achieve requested measure scale. Document
+>> the changes in Documentation/hwmon/ina2xx.
+>>
+>> Signed-off-by: Maciej Purski <m.purski@samsung.com>
+>> ---
+>>   Documentation/devicetree/bindings/hwmon/ina2xx.txt | 4 +++-
+>>   Documentation/hwmon/ina2xx                         | 3 +++
+>>   2 files changed, 6 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/hwmon/ina2xx.txt b/Documentation/devicetree/bindings/hwmon/ina2xx.txt
+>> index 02af0d9..49ef0be 100644
+>> --- a/Documentation/devicetree/bindings/hwmon/ina2xx.txt
+>> +++ b/Documentation/devicetree/bindings/hwmon/ina2xx.txt
+>> @@ -14,11 +14,13 @@ Optional properties:
+>>
+>>   - shunt-resistor
+>>          Shunt resistor value in micro-Ohm
+>> -
+>> +- ti-max-expected-current-microamp
+>> +       Max expected current value in mA
+>>   Example:
+>>
+>>   ina220 at 44 {
+>>          compatible = "ti,ina220";
+>>          reg = <0x44>;
+>>          shunt-resistor = <1000>;
+>> +       ti-max-expected-current-microamp = <3000>;
+>>   };
+>> diff --git a/Documentation/hwmon/ina2xx b/Documentation/hwmon/ina2xx
+>> index cfd31d9..30620e8 100644
+>> --- a/Documentation/hwmon/ina2xx
+>> +++ b/Documentation/hwmon/ina2xx
+>> @@ -55,6 +55,9 @@ The shunt value in micro-ohms can be set via platform data or device tree at
+>>   compile-time or via the shunt_resistor attribute in sysfs at run-time. Please
+>>   refer to the Documentation/devicetree/bindings/i2c/ina2xx.txt for bindings
+>>   if the device tree is used.
+>> +The max expected current value in miliamp can be set via platform data
+> 
+> mili or micro?
+> 
+> BR,
+> Krzysztof
 
-...
+Sorry, these should be mili everywhere. I'll fix this.
 
-> @@ -670,6 +689,14 @@ void update_cpu_features(int cpu,
->   					info->reg_mvfr2, boot->reg_mvfr2);
->   	}
->   
-> +	if (id_aa64pfr0_sve(info->reg_id_aa64pfr0)) {
-> +		taint |= check_update_ftr_reg(SYS_ZCR_EL1, cpu,
-> +					info->reg_zcr, boot->reg_zcr);
-> +
-> +		if (!sys_caps_initialised)
-> +			sve_update_vq_map();
-> +	}
-
-nit: I am not sure if we should also check if the "current" sanitised value
-of the id_aa64pfr0 also supports sve and skip the update if it isn't. The code
-is as such fine without the check, its just that we can avoid computing the
-map. It is in the CPU boot up path and hence is not performance critical.
-So, either way we are fine.
-
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> 
+>> +or device tree at compile-time or via currX_max attribute in sysfs
+>> +at run-time.
+>>
+>>   Additionally ina226 supports update_interval attribute as described in
+>>   Documentation/hwmon/sysfs-interface. Internally the interval is the sum of
+>> --
+>> 2.7.4
+>>
+> 
+> 
+> 
