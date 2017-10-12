@@ -1,130 +1,102 @@
 From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
-Date: Thu, 12 Oct 2017 19:41:13 +0530
-Subject: [PATCH v8 1/4] perf utils: passing pmu as a parameter to function
- get_cpuid_str
+Date: Thu, 12 Oct 2017 19:41:14 +0530
+Subject: [PATCH v8 2/4] perf tools arm64: Add support for get_cpuid_str
+ function.
 In-Reply-To: <20171012141116.32475-1-ganapatrao.kulkarni@cavium.com>
 References: <20171012141116.32475-1-ganapatrao.kulkarni@cavium.com>
-Message-ID: <20171012141116.32475-2-ganapatrao.kulkarni@cavium.com>
+Message-ID: <20171012141116.32475-3-ganapatrao.kulkarni@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cpuid string will not be same on all CPUs on heterogeneous
-platforms like ARM's big.LITTLE, adding provision(using pmu->cpus)
-to find cpuid string from associated CPUs of PMU CORE device.
-
-also optimise arguments to function pmu_add_cpu_aliases.
+function get_cpuid_str returns MIDR string of the first online
+cpu from the range of cpus associated with the pmu core device.
 
 Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
 ---
- tools/perf/arch/powerpc/util/header.c |  2 +-
- tools/perf/arch/x86/util/header.c     |  2 +-
- tools/perf/util/header.h              |  3 ++-
- tools/perf/util/pmu.c                 | 13 +++++++------
- 4 files changed, 11 insertions(+), 9 deletions(-)
+ tools/perf/arch/arm64/util/Build    |  1 +
+ tools/perf/arch/arm64/util/header.c | 65 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 66 insertions(+)
+ create mode 100644 tools/perf/arch/arm64/util/header.c
 
-diff --git a/tools/perf/arch/powerpc/util/header.c b/tools/perf/arch/powerpc/util/header.c
-index 9aaa6f5..2953681 100644
---- a/tools/perf/arch/powerpc/util/header.c
-+++ b/tools/perf/arch/powerpc/util/header.c
-@@ -34,7 +34,7 @@ get_cpuid(char *buffer, size_t sz)
- }
+diff --git a/tools/perf/arch/arm64/util/Build b/tools/perf/arch/arm64/util/Build
+index cef6fb3..b1ab72d 100644
+--- a/tools/perf/arch/arm64/util/Build
++++ b/tools/perf/arch/arm64/util/Build
+@@ -1,3 +1,4 @@
++libperf-y += header.o
+ libperf-$(CONFIG_DWARF)     += dwarf-regs.o
+ libperf-$(CONFIG_LOCAL_LIBUNWIND) += unwind-libunwind.o
  
- char *
--get_cpuid_str(void)
-+get_cpuid_str(struct perf_pmu *pmu __maybe_unused)
- {
- 	char *bufp;
- 
-diff --git a/tools/perf/arch/x86/util/header.c b/tools/perf/arch/x86/util/header.c
-index a74a48d..d52bc27 100644
---- a/tools/perf/arch/x86/util/header.c
-+++ b/tools/perf/arch/x86/util/header.c
-@@ -65,7 +65,7 @@ get_cpuid(char *buffer, size_t sz)
- }
- 
- char *
--get_cpuid_str(void)
-+get_cpuid_str(struct perf_pmu *pmu __maybe_unused)
- {
- 	char *buf = malloc(128);
- 
-diff --git a/tools/perf/util/header.h b/tools/perf/util/header.h
-index f7a16ee..3de4be9 100644
---- a/tools/perf/util/header.h
-+++ b/tools/perf/util/header.h
-@@ -8,6 +8,7 @@
- #include <linux/types.h>
- #include "event.h"
- #include "env.h"
-+#include "pmu.h"
- 
- enum {
- 	HEADER_RESERVED		= 0,	/* always cleared */
-@@ -165,5 +166,5 @@ int write_padded(struct feat_fd *fd, const void *bf,
-  */
- int get_cpuid(char *buffer, size_t sz);
- 
--char *get_cpuid_str(void);
-+char *get_cpuid_str(struct perf_pmu *pmu __maybe_unused);
- #endif /* __PERF_HEADER_H */
-diff --git a/tools/perf/util/pmu.c b/tools/perf/util/pmu.c
-index ac16a9d..18edf86 100644
---- a/tools/perf/util/pmu.c
-+++ b/tools/perf/util/pmu.c
-@@ -511,7 +511,7 @@ static struct cpu_map *pmu_cpumask(const char *name)
-  * Each architecture should provide a more precise id string that
-  * can be use to match the architecture's "mapfile".
-  */
--char * __weak get_cpuid_str(void)
-+char * __weak get_cpuid_str(struct perf_pmu *pmu __maybe_unused)
- {
- 	return NULL;
- }
-@@ -521,19 +521,20 @@ char * __weak get_cpuid_str(void)
-  * to the current running CPU. Then, add all PMU events from that table
-  * as aliases.
-  */
--static void pmu_add_cpu_aliases(struct list_head *head, const char *name)
-+static void pmu_add_cpu_aliases(struct list_head *head, struct perf_pmu *pmu)
- {
- 	int i;
- 	struct pmu_events_map *map;
- 	struct pmu_event *pe;
- 	char *cpuid;
- 	static bool printed;
-+	const char *name = pmu->name;
- 
- 	cpuid = getenv("PERF_CPUID");
- 	if (cpuid)
- 		cpuid = strdup(cpuid);
- 	if (!cpuid)
--		cpuid = get_cpuid_str();
-+		cpuid = get_cpuid_str(pmu);
- 	if (!cpuid)
- 		return;
- 
-@@ -610,19 +611,19 @@ static struct perf_pmu *pmu_lookup(const char *name)
- 	if (pmu_aliases(name, &aliases))
- 		return NULL;
- 
--	pmu_add_cpu_aliases(&aliases, name);
- 	pmu = zalloc(sizeof(*pmu));
- 	if (!pmu)
- 		return NULL;
- 
- 	pmu->cpus = pmu_cpumask(name);
-+	pmu->name = strdup(name);
-+	pmu->type = type;
-+	pmu_add_cpu_aliases(&aliases, pmu);
- 
- 	INIT_LIST_HEAD(&pmu->format);
- 	INIT_LIST_HEAD(&pmu->aliases);
- 	list_splice(&format, &pmu->format);
- 	list_splice(&aliases, &pmu->aliases);
--	pmu->name = strdup(name);
--	pmu->type = type;
- 	list_add_tail(&pmu->list, &pmus);
- 
- 	pmu->default_config = perf_pmu__get_default_config(pmu);
+diff --git a/tools/perf/arch/arm64/util/header.c b/tools/perf/arch/arm64/util/header.c
+new file mode 100644
+index 0000000..74567d7
+--- /dev/null
++++ b/tools/perf/arch/arm64/util/header.c
+@@ -0,0 +1,65 @@
++#include <stdio.h>
++#include <stdlib.h>
++#include <api/fs/fs.h>
++#include "header.h"
++
++#define MIDR "/regs/identification/midr_el1"
++#define MIDR_SIZE 19
++#define MIDR_REVISION_MASK      0xf
++#define MIDR_VARIANT_SHIFT      20
++#define MIDR_VARIANT_MASK       (0xf << MIDR_VARIANT_SHIFT)
++
++char *get_cpuid_str(struct perf_pmu *pmu)
++{
++	char *buf = NULL;
++	char path[PATH_MAX];
++	const char *sysfs = sysfs__mountpoint();
++	int cpu;
++	u64 midr = 0;
++	struct cpu_map *cpus;
++	FILE *file;
++
++	if (!sysfs || !pmu->cpus)
++		return NULL;
++
++	buf = malloc(MIDR_SIZE);
++	if (!buf)
++		return NULL;
++
++	/* read midr from list of cpus mapped to this pmu */
++	cpus = cpu_map__get(pmu->cpus);
++	for (cpu = 0; cpu < cpus->nr; cpu++) {
++		scnprintf(path, PATH_MAX, "%s/devices/system/cpu/cpu%d"MIDR,
++				sysfs, cpus->map[cpu]);
++
++		file = fopen(path, "r");
++		if (!file) {
++			pr_debug("fopen failed for file %s\n", path);
++			continue;
++		}
++
++		if (!fgets(buf, MIDR_SIZE, file)) {
++			fclose(file);
++			continue;
++		}
++		fclose(file);
++
++		/* Ignore/clear Variant[23:20] and
++		 * Revision[3:0] of MIDR
++		 */
++		midr = strtoul(buf, NULL, 16);
++		midr &= (~(MIDR_VARIANT_MASK | MIDR_REVISION_MASK));
++		scnprintf(buf, MIDR_SIZE, "0x%016lx", midr);
++		/* got midr break loop */
++		break;
++	}
++
++	if (!midr) {
++		pr_err("failed to get cpuid string for PMU %s\n", pmu->name);
++		free(buf);
++		buf = NULL;
++	}
++
++	cpu_map__put(cpus);
++	return buf;
++}
 -- 
 2.9.4
