@@ -1,116 +1,71 @@
-From: gklkml16@gmail.com (Ganapatrao Kulkarni)
-Date: Thu, 12 Oct 2017 10:45:08 +0530
-Subject: [PATCH v6 2/4] perf tools arm64: Add support for get_cpuid_str
- function.
-In-Reply-To: <20171011121332.GA11106@arm.com>
-References: <20170824120349.2323-1-ganapatrao.kulkarni@cavium.com>
- <20170824120349.2323-3-ganapatrao.kulkarni@cavium.com>
- <20171011121332.GA11106@arm.com>
-Message-ID: <CAKTKpr5SVfCTzveQaNmWaVmgYmcVs7L35AJSb_d4-6TTQ3z=kA@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 12 Oct 2017 08:50:39 +0300
+Subject: [PATCH 0/8] Add hwmod data for IPU & DSP processors/MMUs
+In-Reply-To: <20170922211919.GD4394@atomide.com>
+References: <20170821234818.4755-1-s-anna@ti.com>
+ <d4715d1e-8113-050b-9a0f-77f4a4486081@ti.com>
+ <20170922175110.GC4394@atomide.com>
+ <de9b14a1-250e-c73d-d999-468a50e6b1a3@ti.com>
+ <20170922211919.GD4394@atomide.com>
+Message-ID: <58ebe05c-b2d1-aefd-c15d-5c92fb93ebab@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 11, 2017 at 5:43 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Thu, Aug 24, 2017 at 05:33:47PM +0530, Ganapatrao Kulkarni wrote:
->> function get_cpuid_str returns MIDR string of the first online
->> cpu from the range of cpus associated with the pmu core device.
+?
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+
+On 23/09/17 00:19, Tony Lindgren wrote:
+> * Suman Anna <s-anna@ti.com> [170922 14:08]:
+>> On 09/22/2017 12:51 PM, Tony Lindgren wrote:
+>>> * Suman Anna <s-anna@ti.com> [170922 10:19]:
+>>>> Ping on this series. Tero's clkctrl series changes are orthogonal to
+>>>> these changes.
+>>>
+>>> With patch 5/8 you said earlier "It will still be a shared set
+>>> between the MMU and remoteproc drivers, but let me look into
+>>> how these get integrated." So was there any conclusion there?
+>>>
+>>> Also, what's the deal with these omap4 changes that I commented
+>>> on in 5/8?
 >>
->> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
->> ---
->>  tools/perf/arch/arm64/util/Build    |  1 +
->>  tools/perf/arch/arm64/util/header.c | 60 +++++++++++++++++++++++++++++++++++++
->>  2 files changed, 61 insertions(+)
->>  create mode 100644 tools/perf/arch/arm64/util/header.c
->>
->> diff --git a/tools/perf/arch/arm64/util/Build b/tools/perf/arch/arm64/util/Build
->> index cef6fb3..b1ab72d 100644
->> --- a/tools/perf/arch/arm64/util/Build
->> +++ b/tools/perf/arch/arm64/util/Build
->> @@ -1,3 +1,4 @@
->> +libperf-y += header.o
->>  libperf-$(CONFIG_DWARF)     += dwarf-regs.o
->>  libperf-$(CONFIG_LOCAL_LIBUNWIND) += unwind-libunwind.o
->>
->> diff --git a/tools/perf/arch/arm64/util/header.c b/tools/perf/arch/arm64/util/header.c
->> new file mode 100644
->> index 0000000..f02a32e
->> --- /dev/null
->> +++ b/tools/perf/arch/arm64/util/header.c
->> @@ -0,0 +1,60 @@
->> +#include <stdio.h>
->> +#include <stdlib.h>
->> +#include <api/fs/fs.h>
->> +#include "header.h"
->> +
->> +#define MIDR "/regs/identification/midr_el1"
->> +#define MIDR_SIZE 19
->> +
->> +char *get_cpuid_str(struct perf_pmu *pmu)
->> +{
->> +     char *buf = NULL;
->> +     char path[PATH_MAX];
->> +     const char *sysfs = sysfs__mountpoint();
->> +     int cpu;
->> +     u64 midr = 0;
->> +     struct cpu_map *cpus;
->> +     FILE *file;
->> +
->> +     if (!sysfs || !pmu->cpus)
->> +             return NULL;
->> +
->> +     buf = malloc(MIDR_SIZE);
->> +     if (!buf)
->> +             return NULL;
->> +
->> +     /* read midr from list of cpus mapped to this pmu */
->> +     cpus = cpu_map__get(pmu->cpus);
->> +     for (cpu = 0; cpu < cpus->nr; cpu++) {
->> +             scnprintf(path, PATH_MAX, "%s/devices/system/cpu/cpu%d"MIDR,
->> +                             sysfs, cpus->map[cpu]);
->> +
->> +             file = fopen(path, "r");
->> +             if (!file) {
->> +                     pr_debug("fopen failed for file %s\n", path);
->> +                     continue;
->> +             }
->> +
->> +             if (!fgets(buf, MIDR_SIZE, file))
->> +                     continue;
->> +             fclose(file);
->
-> Don't you want to fclose the file if the fgets fails?
+>> Tony,
+>> So, looking at code, removing modulemode on hwmod does change the
+>> semantics as that will not plug in the clkctrl clk (_omap4_xlate_clkctrl
+>> will return 0) into the hwmod and will fall back. So, this should make
+>> it compatible to the existing code before adding the clkctrl dt nodes,
+>> and Patch 5 will be good to avoid the crash when disabling the processor
+>> nodes. That said, now that the modulemode is controlled by the
+>> ti-clkctrl code, I would expect to get the refcounting for free due to
+>> clk_enable() semantics if the same clkctrl clk is plugged under two
+>> nodes (MMU and processor) and I may not need to remove the modulemode.
+>> One of the main reasons for removing the modulemode is the lack of
+>> refcounting on modulemode in the original code.
+> 
+> OK. Sounds like you can get the refcounting for free just by modifying
+> the dts as done for example for musb on omap4 in "[PATCH 10/10] ARM:
+> dts: Use ti-sysc module driver for omap4 musb" in that series. You
+> will need also the rest of the patches from that series naturally :)
+> 
+> That is as long as MMU and processor are both child devices in the
+> same interconnect target module.
+> 
+>> In anycase, I need to retest this with all of required patches from Tero
+>> (current mainline does not yet have the clkctrl dt nodes).
+> 
+> OK
+> 
+>> Tero,
+>> Do you have these patches rebased onto 4.14-rc1 (preferable if it is
+>> rebased onto Tony's omap-for-v4.15/soc branch. I tried cherry-picking
+>> from your github test branch (based on 4.13-rc3), but am running into
+>> some L3Noc errors once I add the clkctrl dts node patch on Panda4 using NFS.
+> 
+> Yeah I noticed that and emailed Tero about it. It seems to trigger
+> with built-in musb and DEBUG_KERNEL disabled, not sure what triggers
+> it. Only happens after the clkctrl nodes are added.
 
-thanks.
->
->> +
->> +             /* Ignore/clear Variant[23:20] and
->> +              * Revision[3:0] of MIDR
->> +              */
->> +             midr = strtoul(buf, NULL, 16);
->> +             midr &= (~(0xf << 20 | 0xf));
->
-> It would be cleaner if you had #defines for the MIDR fields that you're
-> masking.
+In my tree, you can find 4.14-rc1-clkctrl-cleanup branch. It can still 
+be considered WIP, as I haven't posted it publicly and am working with 
+some late quirks on it.
 
-ok, i can add it.
-I felt, it is not to required, since it is not used anywhere else and
-for better code readability.
-
->
->> +             scnprintf(buf, MIDR_SIZE, "0x%016lx", midr);
->> +             /* got midr break loop */
->> +             break;
->> +     }
->> +
->> +     if (!midr) {
->> +             pr_err("failed to get cpuid string\n");
->
-> Might be helpful to print the PMU name and the CPU map if there's a way
-> to do that.
-
-ok, i can print name,  need to check for cpu map.
->
-> Will
-
-thanks
-Ganapat
+-Tero
