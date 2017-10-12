@@ -1,97 +1,174 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Thu, 12 Oct 2017 13:46:14 +0200
-Subject: [PATCHv2 0/7] Add support for USB OTG on STM32F7
-In-Reply-To: <87efq821tz.fsf@linux.intel.com>
-References: <1503930018-536-1-git-send-email-amelie.delaunay@st.com>
- <878tgim24i.fsf@linux.intel.com>
- <04a49088-b615-d7b8-0387-e7bfa32ee19f@st.com>
- <87vajllx8t.fsf@linux.intel.com>
- <1c4180ef-2da6-b420-7c6e-41769608384a@st.com>
- <87sheplsrm.fsf@linux.intel.com>
- <3c36db6d-75fd-1be6-e946-b75a04e3760e@st.com>
- <21df4d0c-075c-0c5a-c39b-b1dd94fe819d@st.com>
- <87efq821tz.fsf@linux.intel.com>
-Message-ID: <d6e8be43-cbb9-89cd-eb3f-b34ac23ad99f@st.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 12 Oct 2017 12:41:35 +0200
+Subject: [PATCH 31/37] KVM: arm64: Separate activate_traps and deactive_traps
+ for VHE and non-VHE
+In-Reply-To: <20171012104141.26902-1-christoffer.dall@linaro.org>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+Message-ID: <20171012104141.26902-32-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe
+To make the code more readable and to avoid the overhead of a function
+call, let's get rid of a pair of the alternative function selectors and
+explicitly call the VHE and non-VHE functions instead, telling the
+compiler to try to inline the static function if it can.
 
-On 10/12/2017 10:43 AM, Felipe Balbi wrote:
-> 
-> Hi,
-> 
->>>>>>>
->>>>>>> On 10/11/2017 12:04 PM, Felipe Balbi wrote:
->>>>>>>>
->>>>>>>> Hi,
->>>>>>>>
->>>>>>>> Amelie Delaunay <amelie.delaunay@st.com> writes:
->>>>>>>>> The STM32F7 MCU family embeds two DWC2 USB OTG cores. One core is
->>>>>>>>> USB
->>>>>>>>> OTG FS and the other is USB OTG HS. The USB FS core only works
->>>>>>>>> with its
->>>>>>>>> internal phy whilst the USB HS core can work in HS with external
->>>>>>>>> ULPI phy
->>>>>>>>> or in FS/LS with the on-chip FS phy.
->>>>>>>>>
->>>>>>>>> Amelie Delaunay (7):
->>>>>>>>>  ???? dt-bindings: usb: Document the STM32F7 DWC2 USB OTG HS core
->>>>>>>>> binding
->>>>>>>>>  ???? usb: dwc2: add support for STM32F7 USB OTG HS
->>>>>>>>>  ???? ARM: dts: stm32: Add USB HS support for STM32F746 MCU
->>>>>>>>
->>>>>>>> I have applied these three patches. Should I take the rest? They
->>>>>>>> seems
->>>>>>>> like they could go upstream through the ARM maintainers.
->>>>>>>>
->>>>>>>
->>>>>>> I will take other DT patches in my PR.
->>>>>>>
->>>>>>> Concerning "ARM: dts: stm32: Add USB HS support for STM32F746 MCU"
->>>>>>> patch
->>>>>>> I prefer also to take it. This patch adds some pinctrl groups but
->>>>>>> stm32
->>>>>>> pinctrl bindings will change in my next PR (we will use a macro to
->>>>>>> define pins instead of using defined values). So if you push the DT
->>>>>>> patch through your pull request there will be a merge issue.
->>>>>>> It is possible that I take also this one ?
->>>>>>
->>>>>> In that case, it's best if you take them all :-) Here's my Ack:
->>>>>>
->>>>>> Acked-by: Felipe Balbi <felipe.balbi@linux.intel.com>
->>>>>>
->>>>>> I'll drop them from my tree now
->>>>>
->>>>> Ok perfect, I will take DT patches (3 to 7) and I let you take patch 1&2
->>>>> in your tree.
->>>>
->>>> Well, I have dropped them from my tree. Please two 1-7 through yours.
->>>
->>> Hum, ok for this patchset but IMO it is better (next time) that you take
->>> driver pacthes in your tree and I take only DT patches in mine.
->>> No ?
->>>
->>> Regards
->>> Alex
->>>
->>>>
->>
->> I thought that patches 1 and 2, as they are "driver" patches, had to be
->> applied on USB tree (so Felipe's one), and the others (3 to 7) had to be
->> applied on STM32-DT tree (Alex's one). Did I miss something?
-> 
-> patch 1 is documentation, right? Without the documentation patch,
-> checkpatch will cringe :-) So either way works.
-> 
-> If you insist, I can take 1-2 through my tree. No worries.
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ arch/arm64/kvm/hyp/switch.c | 78 +++++++++++++++++++++------------------------
+ 1 file changed, 37 insertions(+), 41 deletions(-)
 
-I don't want to insist :) but for me it is better (and more safe) if you 
-take patch 1&2 in your tree, and will take others in mine.
-
-Thanks in advance.
-Alex
-
-> 
-> let me know
-> 
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 13e137e..5692aa0 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -101,9 +101,27 @@ void deactivate_traps_vhe_put(void)
+ 	write_sysreg(mdcr_el2, mdcr_el2);
+ }
+ 
+-static void __hyp_text __activate_traps_vhe(struct kvm_vcpu *vcpu)
++static inline void activate_traps_vhe(struct kvm_vcpu *vcpu)
+ {
+-	write_sysreg(__kvm_hyp_vector, vbar_el1);
++	write_sysreg(vcpu->arch.hcr_el2, hcr_el2);
++	write_sysreg_el2(__kvm_hyp_vector, vbar);
++}
++
++static inline void deactivate_traps_vhe(struct kvm_vcpu *vcpu)
++{
++	extern char vectors[];	/* kernel exception vectors */
++
++	/*
++	 * If we pended a virtual abort, preserve it until it gets
++	 * cleared. See D1.14.3 (Virtual Interrupts) for details, but
++	 * the crucial bit is "On taking a vSError interrupt,
++	 * HCR_EL2.VSE is cleared to 0."
++	 */
++	if (vcpu->arch.hcr_el2 & HCR_VSE)
++		vcpu->arch.hcr_el2 = read_sysreg(hcr_el2);
++
++	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
++	write_sysreg(vectors, vbar_el1);
+ }
+ 
+ static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
+@@ -124,44 +142,15 @@ static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
+ 	else
+ 		val |= CPTR_EL2_TFP;
+ 	write_sysreg(val, cptr_el2);
+-}
+ 
+-static hyp_alternate_select(__activate_traps_arch,
+-			    __activate_traps_nvhe, __activate_traps_vhe,
+-			    ARM64_HAS_VIRT_HOST_EXTN);
+-
+-static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+-{
+-	__activate_traps_arch()(vcpu);
++	/* Configure all other hypervisor traps and features */
+ 	write_sysreg(vcpu->arch.hcr_el2, hcr_el2);
+ }
+ 
+-static void __hyp_text __deactivate_traps_vhe(void)
+-{
+-	extern char vectors[];	/* kernel exception vectors */
+-
+-	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
+-	write_sysreg(vectors, vbar_el1);
+-}
+-
+-static void __hyp_text __deactivate_traps_nvhe(void)
++static void __hyp_text __deactivate_traps_nvhe(struct kvm_vcpu *vcpu)
+ {
+-	u64 mdcr_el2 = read_sysreg(mdcr_el2);
+-
+-	mdcr_el2 &= MDCR_EL2_HPMN_MASK;
+-	mdcr_el2 |= MDCR_EL2_E2PB_MASK << MDCR_EL2_E2PB_SHIFT;
+-
+-	write_sysreg(mdcr_el2, mdcr_el2);
+-	write_sysreg(HCR_RW, hcr_el2);
+-	write_sysreg(CPTR_EL2_DEFAULT, cptr_el2);
+-}
+-
+-static hyp_alternate_select(__deactivate_traps_arch,
+-			    __deactivate_traps_nvhe, __deactivate_traps_vhe,
+-			    ARM64_HAS_VIRT_HOST_EXTN);
++	u64 mdcr_el2;
+ 
+-static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
+-{
+ 	/*
+ 	 * If we pended a virtual abort, preserve it until it gets
+ 	 * cleared. See D1.14.3 (Virtual Interrupts) for details, but
+@@ -172,7 +161,14 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
+ 		vcpu->arch.hcr_el2 = read_sysreg(hcr_el2);
+ 
+ 	__deactivate_traps_common();
+-	__deactivate_traps_arch()();
++
++	mdcr_el2 = read_sysreg(mdcr_el2);
++	mdcr_el2 &= MDCR_EL2_HPMN_MASK;
++	mdcr_el2 |= MDCR_EL2_E2PB_MASK << MDCR_EL2_E2PB_SHIFT;
++
++	write_sysreg(mdcr_el2, mdcr_el2);
++	write_sysreg(HCR_RW, hcr_el2);
++	write_sysreg(CPTR_EL2_DEFAULT, cptr_el2);
+ }
+ 
+ static inline void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
+@@ -371,7 +367,7 @@ int kvm_vcpu_run(struct kvm_vcpu *vcpu)
+ 
+ 	sysreg_save_host_state_vhe(host_ctxt);
+ 
+-	__activate_traps(vcpu);
++	activate_traps_vhe(vcpu);
+ 	__activate_vm(vcpu);
+ 
+ 	__vgic_restore_state(vcpu);
+@@ -390,7 +386,7 @@ int kvm_vcpu_run(struct kvm_vcpu *vcpu)
+ 	sysreg_save_guest_state_vhe(guest_ctxt);
+ 	__vgic_save_state(vcpu);
+ 
+-	__deactivate_traps(vcpu);
++	deactivate_traps_vhe(vcpu);
+ 
+ 	sysreg_restore_host_state_vhe(host_ctxt);
+ 
+@@ -418,7 +414,7 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+ 
+ 	__sysreg_save_state_nvhe(host_ctxt);
+ 
+-	__activate_traps(vcpu);
++	__activate_traps_nvhe(vcpu);
+ 	__activate_vm(vcpu);
+ 
+ 	__vgic_restore_state(vcpu);
+@@ -445,7 +441,7 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+ 	__timer_disable_traps(vcpu);
+ 	__vgic_save_state(vcpu);
+ 
+-	__deactivate_traps(vcpu);
++	__deactivate_traps_nvhe(vcpu);
+ 	__deactivate_vm(vcpu);
+ 
+ 	__sysreg_restore_state_nvhe(host_ctxt);
+@@ -471,7 +467,7 @@ static void __hyp_text __hyp_call_panic_nvhe(u64 spsr, u64 elr, u64 par,
+ 
+ 	if (read_sysreg(vttbr_el2)) {
+ 		__timer_disable_traps(vcpu);
+-		__deactivate_traps(vcpu);
++		__deactivate_traps_nvhe(vcpu);
+ 		__deactivate_vm(vcpu);
+ 		__sysreg_restore_state_nvhe(__host_ctxt);
+ 	}
+@@ -495,7 +491,7 @@ static void __hyp_call_panic_vhe(u64 spsr, u64 elr, u64 par,
+ 	struct kvm_vcpu *vcpu;
+ 	vcpu = host_ctxt->__hyp_running_vcpu;
+ 
+-	__deactivate_traps_vhe();
++	deactivate_traps_vhe(vcpu);
+ 	sysreg_restore_host_state_vhe(host_ctxt);
+ 
+ 	panic(__hyp_panic_string,
+-- 
+2.9.0
