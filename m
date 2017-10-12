@@ -1,173 +1,244 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 12 Oct 2017 12:41:16 +0200
-Subject: [PATCH 12/37] KVM: arm64: Factor out fault info population and gic
- workarounds
+Date: Thu, 12 Oct 2017 12:41:12 +0200
+Subject: [PATCH 08/37] KVM: arm64: Defer restoring host VFP state to vcpu_put
 In-Reply-To: <20171012104141.26902-1-christoffer.dall@linaro.org>
 References: <20171012104141.26902-1-christoffer.dall@linaro.org>
-Message-ID: <20171012104141.26902-13-christoffer.dall@linaro.org>
+Message-ID: <20171012104141.26902-9-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current world-switch function has functionality to detect a number
-of cases where we need to fixup some part of the exit condition and
-possibly run the guest again, before having restored the host state.
+Avoid saving the guest VFP registers and restoring the host VFP
+registers on every exit from the VM.  Only when we're about to run
+userspace or other threads in the kernel do we really have to switch the
+state back to the host state.
 
-This includes populating missing fault info, emulating GICv2 CPU
-interface accesses when mapped at unaligned addresses, and emulating
-the GICv3 CPU interfaceon systems that need that.
-
-As we are about to have an alternative switch function for VHE systems,
-but VHE systems still need the same early fixup logic, factor out this
-logic into a separate function that can be shared by both switch
-functions.
-
-No functional change.
+We still initially configure the VFP registers to trap when entering the
+VM, but the difference is that we now leave the guest state in the
+hardware registers while running the VM.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kvm/hyp/switch.c | 91 ++++++++++++++++++++++++++-------------------
- 1 file changed, 52 insertions(+), 39 deletions(-)
+ arch/arm64/include/asm/kvm_emulate.h |  5 ++++
+ arch/arm64/include/asm/kvm_host.h    |  3 +++
+ arch/arm64/kernel/asm-offsets.c      |  1 +
+ arch/arm64/kvm/hyp/entry.S           |  3 +++
+ arch/arm64/kvm/hyp/switch.c          | 47 +++++++++++-------------------------
+ arch/arm64/kvm/hyp/sysreg-sr.c       | 21 +++++++++++++---
+ 6 files changed, 44 insertions(+), 36 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index e270cba..ed30af5 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -258,50 +258,24 @@ static void __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
- 	write_sysreg_el2(*vcpu_pc(vcpu), elr);
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index 1fbfe96..630dd60 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -56,6 +56,11 @@ static inline unsigned long *vcpu_hcr(struct kvm_vcpu *vcpu)
+ 	return (unsigned long *)&vcpu->arch.hcr_el2;
  }
  
--int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
-+/*
-+ * Return true when we were able to fixup the guest exit and should return to
-+ * the guest, false when we should restore the host state and return to the
-+ * main run loop.
-+ */
-+static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
++static inline bool vcpu_el1_is_32bit(struct kvm_vcpu *vcpu)
++{
++	return (!(vcpu->arch.hcr_el2 & HCR_RW));
++}
++
+ static inline unsigned long *vcpu_pc(const struct kvm_vcpu *vcpu)
  {
--	struct kvm_cpu_context *host_ctxt;
--	struct kvm_cpu_context *guest_ctxt;
--	u64 exit_code;
--
--	vcpu = kern_hyp_va(vcpu);
--
--	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
--	host_ctxt->__hyp_running_vcpu = vcpu;
--	guest_ctxt = &vcpu->arch.ctxt;
--
--	__sysreg_save_host_state(host_ctxt);
--
--	__activate_traps(vcpu);
--	__activate_vm(vcpu);
--
--	__vgic_restore_state(vcpu);
--	__timer_enable_traps(vcpu);
--
--	/*
--	 * We must restore the 32-bit state before the sysregs, thanks
--	 * to erratum #852523 (Cortex-A57) or #853709 (Cortex-A72).
--	 */
--	__sysreg32_restore_state(vcpu);
--	__sysreg_restore_guest_state(guest_ctxt);
--	__debug_switch_to_guest(vcpu);
--
--	/* Jump in the fire! */
--again:
--	exit_code = __guest_enter(vcpu, host_ctxt);
--	/* And we're baaack! */
--
+ 	return (unsigned long *)&vcpu_gp_regs(vcpu)->regs.pc;
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 7d3bfa7..5e09eb9 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -210,6 +210,9 @@ struct kvm_vcpu_arch {
+ 	/* Guest debug state */
+ 	u64 debug_flags;
+ 
++	/* 1 if the guest VFP state is loaded into the hardware */
++	u64 guest_vfp_loaded;
++
  	/*
- 	 * We're using the raw exception code in order to only process
- 	 * the trap if no SError is pending. We will come back to the
- 	 * same PC once the SError has been injected, and replay the
- 	 * trapping instruction.
+ 	 * We maintain more than a single set of debug registers to support
+ 	 * debugging the guest from the host and to maintain separate host and
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 612021d..9946732 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -133,6 +133,7 @@ int main(void)
+   DEFINE(CPU_GP_REGS,		offsetof(struct kvm_cpu_context, gp_regs));
+   DEFINE(CPU_USER_PT_REGS,	offsetof(struct kvm_regs, regs));
+   DEFINE(CPU_FP_REGS,		offsetof(struct kvm_regs, fp_regs));
++  DEFINE(VCPU_GUEST_VFP_LOADED,	offsetof(struct kvm_vcpu, arch.guest_vfp_loaded));
+   DEFINE(VCPU_FPEXC32_EL2,	offsetof(struct kvm_vcpu, arch.ctxt.sys_regs[FPEXC32_EL2]));
+   DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
+   DEFINE(HOST_CONTEXT_VCPU,	offsetof(struct kvm_cpu_context, __hyp_running_vcpu));
+diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
+index 76cd48f..b3e7191 100644
+--- a/arch/arm64/kvm/hyp/entry.S
++++ b/arch/arm64/kvm/hyp/entry.S
+@@ -185,6 +185,9 @@ alternative_endif
+ 	add	x0, x2, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
+ 	bl	__fpsimd_restore_state
+ 
++	mov	x0, #1
++	str	x0, [x3, #VCPU_GUEST_VFP_LOADED]
++
+ 	// Skip restoring fpexc32 for AArch64 guests
+ 	mrs	x1, hcr_el2
+ 	tbnz	x1, #HCR_RW_SHIFT, 1f
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 7703d63..ef05c59 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -23,43 +23,31 @@
+ #include <asm/kvm_hyp.h>
+ #include <asm/fpsimd.h>
+ 
+-static bool __hyp_text __fpsimd_enabled_nvhe(void)
+-{
+-	return !(read_sysreg(cptr_el2) & CPTR_EL2_TFP);
+-}
+-
+-static bool __hyp_text __fpsimd_enabled_vhe(void)
+-{
+-	return !!(read_sysreg(cpacr_el1) & CPACR_EL1_FPEN);
+-}
+-
+-static hyp_alternate_select(__fpsimd_is_enabled,
+-			    __fpsimd_enabled_nvhe, __fpsimd_enabled_vhe,
+-			    ARM64_HAS_VIRT_HOST_EXTN);
+-
+-bool __hyp_text __fpsimd_enabled(void)
+-{
+-	return __fpsimd_is_enabled()();
+-}
+-
+-static void __hyp_text __activate_traps_vhe(void)
++static void __hyp_text __activate_traps_vhe(struct kvm_vcpu *vcpu)
+ {
+ 	u64 val;
+ 
+ 	val = read_sysreg(cpacr_el1);
+ 	val |= CPACR_EL1_TTA;
+-	val &= ~CPACR_EL1_FPEN;
++	if (vcpu->arch.guest_vfp_loaded)
++		val |= CPACR_EL1_FPEN;
++	else
++		val &= ~CPACR_EL1_FPEN;
+ 	write_sysreg(val, cpacr_el1);
+ 
+ 	write_sysreg(__kvm_hyp_vector, vbar_el1);
+ }
+ 
+-static void __hyp_text __activate_traps_nvhe(void)
++static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
+ {
+ 	u64 val;
+ 
+ 	val = CPTR_EL2_DEFAULT;
+-	val |= CPTR_EL2_TTA | CPTR_EL2_TFP;
++	val |= CPTR_EL2_TTA;
++	if (vcpu->arch.guest_vfp_loaded)
++		val &= ~CPTR_EL2_TFP;
++	else
++		val |= CPTR_EL2_TFP;
+ 	write_sysreg(val, cptr_el2);
+ }
+ 
+@@ -81,7 +69,8 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+ 	 * it will cause an exception.
  	 */
--	if (exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
--		goto again;
-+	if (*exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
-+		return true;
- 
- 	if (static_branch_unlikely(&vgic_v2_cpuif_trap) &&
--	    exit_code == ARM_EXCEPTION_TRAP) {
-+	    *exit_code == ARM_EXCEPTION_TRAP) {
- 		bool valid;
- 
- 		valid = kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_DABT_LOW &&
-@@ -315,13 +289,13 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 
- 			if (ret == 1) {
- 				__skip_instr(vcpu);
--				goto again;
-+				return true;
- 			}
- 
- 			if (ret == -1) {
- 				/* Promote an illegal access to an SError */
- 				__skip_instr(vcpu);
--				exit_code = ARM_EXCEPTION_EL1_SERROR;
-+				*exit_code = ARM_EXCEPTION_EL1_SERROR;
- 			}
- 
- 			/* 0 falls through to be handler out of EL2 */
-@@ -329,19 +303,58 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+ 	val = vcpu->arch.hcr_el2;
+-	if (!(val & HCR_RW) && system_supports_fpsimd()) {
++	if (vcpu_el1_is_32bit(vcpu) && system_supports_fpsimd() &&
++	    !vcpu->arch.guest_vfp_loaded) {
+ 		write_sysreg(1 << 30, fpexc32_el2);
+ 		isb();
  	}
+@@ -97,7 +86,7 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+ 	write_sysreg(0, pmselr_el0);
+ 	write_sysreg(ARMV8_PMU_USERENR_MASK, pmuserenr_el0);
+ 	write_sysreg(vcpu->arch.mdcr_el2, mdcr_el2);
+-	__activate_traps_arch()();
++	__activate_traps_arch()(vcpu);
+ }
  
- 	if (static_branch_unlikely(&vgic_v3_cpuif_trap) &&
--	    exit_code == ARM_EXCEPTION_TRAP &&
-+	    *exit_code == ARM_EXCEPTION_TRAP &&
- 	    (kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_SYS64 ||
- 	     kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_CP15_32)) {
- 		int ret = __vgic_v3_perform_cpuif_access(vcpu);
+ static void __hyp_text __deactivate_traps_vhe(void)
+@@ -273,7 +262,6 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+ {
+ 	struct kvm_cpu_context *host_ctxt;
+ 	struct kvm_cpu_context *guest_ctxt;
+-	bool fp_enabled;
+ 	u64 exit_code;
  
- 		if (ret == 1) {
- 			__skip_instr(vcpu);
--			goto again;
-+			return true;
- 		}
- 
+ 	vcpu = kern_hyp_va(vcpu);
+@@ -355,8 +343,6 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
  		/* 0 falls through to be handled out of EL2 */
  	}
  
-+	return false;
-+}
-+
-+int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
-+{
-+	struct kvm_cpu_context *host_ctxt;
-+	struct kvm_cpu_context *guest_ctxt;
-+	u64 exit_code;
-+
-+	vcpu = kern_hyp_va(vcpu);
-+
-+	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
-+	host_ctxt->__hyp_running_vcpu = vcpu;
-+	guest_ctxt = &vcpu->arch.ctxt;
-+
-+	__sysreg_save_host_state(host_ctxt);
-+
-+	__activate_traps(vcpu);
-+	__activate_vm(vcpu);
-+
-+	__vgic_restore_state(vcpu);
-+	__timer_enable_traps(vcpu);
-+
-+	/*
-+	 * We must restore the 32-bit state before the sysregs, thanks
-+	 * to erratum #852523 (Cortex-A57) or #853709 (Cortex-A72).
-+	 */
-+	__sysreg32_restore_state(vcpu);
-+	__sysreg_restore_guest_state(guest_ctxt);
-+	__debug_switch_to_guest(vcpu);
-+
-+	/* Jump in the fire! */
-+again:
-+	exit_code = __guest_enter(vcpu, host_ctxt);
-+	/* And we're baaack! */
-+
-+	if (fixup_guest_exit(vcpu, &exit_code))
-+		goto again;
-+
+-	fp_enabled = __fpsimd_enabled();
+-
  	__sysreg_save_guest_state(guest_ctxt);
  	__sysreg32_save_state(vcpu);
  	__timer_disable_traps(vcpu);
+@@ -367,11 +353,6 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+ 
+ 	__sysreg_restore_host_state(host_ctxt);
+ 
+-	if (fp_enabled) {
+-		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
+-		__fpsimd_restore_state(&host_ctxt->gp_regs.fp_regs);
+-	}
+-
+ 	__debug_save_state(vcpu, kern_hyp_va(vcpu->arch.debug_ptr), guest_ctxt);
+ 	/*
+ 	 * This must come after restoring the host sysregs, since a non-VHE
+diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+index b7438c8..c4a3714 100644
+--- a/arch/arm64/kvm/hyp/sysreg-sr.c
++++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+@@ -19,6 +19,7 @@
+ #include <linux/kvm_host.h>
+ 
+ #include <asm/kvm_asm.h>
++#include <asm/kvm_emulate.h>
+ #include <asm/kvm_hyp.h>
+ 
+ /* Yes, this does nothing, on purpose */
+@@ -137,6 +138,11 @@ void __hyp_text __sysreg_restore_guest_state(struct kvm_cpu_context *ctxt)
+ 	__sysreg_restore_common_state(ctxt);
+ }
+ 
++static void __hyp_text __fpsimd32_save_state(struct kvm_cpu_context *ctxt)
++{
++	ctxt->sys_regs[FPEXC32_EL2] = read_sysreg(fpexc32_el2);
++}
++
+ void __hyp_text __sysreg32_save_state(struct kvm_vcpu *vcpu)
+ {
+ 	u64 *spsr, *sysreg;
+@@ -155,9 +161,6 @@ void __hyp_text __sysreg32_save_state(struct kvm_vcpu *vcpu)
+ 	sysreg[DACR32_EL2] = read_sysreg(dacr32_el2);
+ 	sysreg[IFSR32_EL2] = read_sysreg(ifsr32_el2);
+ 
+-	if (__fpsimd_enabled())
+-		sysreg[FPEXC32_EL2] = read_sysreg(fpexc32_el2);
+-
+ 	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
+ 		sysreg[DBGVCR32_EL2] = read_sysreg(dbgvcr32_el2);
+ }
+@@ -209,4 +212,16 @@ void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu)
+  */
+ void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu)
+ {
++	struct kvm_cpu_context *host_ctxt = vcpu->arch.host_cpu_context;
++	struct kvm_cpu_context *guest_ctxt = &vcpu->arch.ctxt;
++
++	/* Restore host FP/SIMD state */
++	if (vcpu->arch.guest_vfp_loaded) {
++		if (vcpu_el1_is_32bit(vcpu))
++			kvm_call_hyp(__fpsimd32_save_state,
++				     kern_hyp_va(guest_ctxt));
++		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
++		__fpsimd_restore_state(&host_ctxt->gp_regs.fp_regs);
++		vcpu->arch.guest_vfp_loaded = 0;
++	}
+ }
 -- 
 2.9.0
