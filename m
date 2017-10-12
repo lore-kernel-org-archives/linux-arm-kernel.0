@@ -1,42 +1,50 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Thu, 12 Oct 2017 14:43:01 +0100
-Subject: [PATCH v3 0/2] Fix single step for traps
-Message-ID: <1507815783-39929-1-git-send-email-julien.thierry@arm.com>
+Date: Thu, 12 Oct 2017 14:43:02 +0100
+Subject: [PATCH v3 1/2] arm64: Use existing defines for mdscr
+In-Reply-To: <1507815783-39929-1-git-send-email-julien.thierry@arm.com>
+References: <1507815783-39929-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <1507815783-39929-2-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When single stepping a trapped/emulated instruction, the instruction not
-being actually executed, the PE ends up single stepping the instruction we
-return to after ERET-ing from the trap.
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/assembler.h | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-First patch is just to avoid raw values when using single stepping
-registers/bits.
-Patches 2 fixes the issue for the kernel.
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index d58a625..3128a9c 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -25,6 +25,7 @@
 
-Changes since v1:
-* Rename arm64_skip_trapped_instr to arm64_setup_next_instr
-* Add defines for AARCH32 and Thumb instruction sizes
-* Drop previous KVM patch, Alex Benn?e has a better approach
-
-Changes since v2:
-* Move include in assembler.h to the right place
-* Use user_fastforward_single_step to update single step state
-
-Cheers,
-
-Julien Thierry
-
-Julien Thierry (2):
-  arm64: Use existing defines for mdscr
-  arm64: Fix single stepping in kernel traps
-
- arch/arm64/include/asm/assembler.h   |  5 +++--
- arch/arm64/include/asm/insn.h        |  5 +++++
- arch/arm64/include/asm/traps.h       |  6 ++++++
- arch/arm64/kernel/armv8_deprecated.c |  8 ++++----
- arch/arm64/kernel/cpufeature.c       |  2 +-
- arch/arm64/kernel/traps.c            | 21 ++++++++++++++++-----
- 6 files changed, 35 insertions(+), 12 deletions(-)
-
+ #include <asm/asm-offsets.h>
+ #include <asm/cpufeature.h>
++#include <asm/debug-monitors.h>
+ #include <asm/mmu_context.h>
+ #include <asm/page.h>
+ #include <asm/pgtable-hwdef.h>
+@@ -65,7 +66,7 @@
+ 	.macro	disable_step_tsk, flgs, tmp
+ 	tbz	\flgs, #TIF_SINGLESTEP, 9990f
+ 	mrs	\tmp, mdscr_el1
+-	bic	\tmp, \tmp, #1
++	bic	\tmp, \tmp, #DBG_MDSCR_SS
+ 	msr	mdscr_el1, \tmp
+ 	isb	// Synchronise with enable_dbg
+ 9990:
+@@ -75,7 +76,7 @@
+ 	tbz	\flgs, #TIF_SINGLESTEP, 9990f
+ 	disable_dbg
+ 	mrs	\tmp, mdscr_el1
+-	orr	\tmp, \tmp, #1
++	orr	\tmp, \tmp, #DBG_MDSCR_SS
+ 	msr	mdscr_el1, \tmp
+ 9990:
+ 	.endm
 --
 1.9.1
