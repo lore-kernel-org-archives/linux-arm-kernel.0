@@ -1,51 +1,139 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 12 Oct 2017 13:39:39 +0100
-Subject: [PATCH] iommu: enable bypass transaction caching for ARM SMMU 500
-In-Reply-To: <1507759719-16675-1-git-send-email-fkan@apm.com>
-References: <1507759719-16675-1-git-send-email-fkan@apm.com>
-Message-ID: <d0482cb9-7af4-2a52-dde2-8d9113a4721d@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 12 Oct 2017 14:22:18 +0200
+Subject: [PATCH 04/16] serial: mvebu-uart: support probe of multiple ports
+In-Reply-To: <20171009091711.528adddd@xps13> (Miquel RAYNAL's message of "Mon,
+ 9 Oct 2017 09:17:11 +0200")
+References: <20171006101344.15590-1-miquel.raynal@free-electrons.com>
+ <20171006101344.15590-5-miquel.raynal@free-electrons.com>
+ <87poa0foro.fsf@free-electrons.com> <20171009091711.528adddd@xps13>
+Message-ID: <87vajkblol.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/17 23:08, Feng Kan wrote:
-> The ARM SMMU identity mapping performance was poor compared with the
-> DMA mode. It was found that enable caching would restore the performance
-> back to normal. The S2CRB_TLBEN bit in the ACR register would allow for
-> caching of the stream to context register bypass transaction information.
+Hi Miquel,
+ 
+ On lun., oct. 09 2017, Miquel RAYNAL <miquel.raynal@free-electrons.com> wrote:
 
-I know the hardware design and reasoning behind this feature, but I'm
-still a little surprised that bypass can show a measurably higher
-overhead than the full DMA mapping path in practice. MMU-500 is great :D
+> On Fri, 06 Oct 2017 14:23:55 +0200
+> Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+>
+>> Hi Miquel,
+>>  
+>>  On ven., oct. 06 2017, Miquel Raynal
+>> <miquel.raynal@free-electrons.com> wrote:
+>> 
+>> > From: Allen Yan <yanwei@marvell.com>
+>> >
+>> > Until now, the mvebu-uart driver only supported probing a single
+>> > UART port. However, some platforms have multiple instances of this
+>> > UART controller, and therefore the driver should support multiple
+>> > ports.
+>> >
+>> > In order to achieve this, we make sure to assign port->line
+>> > properly, instead of hardcoding it to zero.
+>> >
+>> > Signed-off-by: Allen Yan <yanwei@marvell.com>
+>> > Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+>> > ---
+>> >  drivers/tty/serial/mvebu-uart.c | 13 +++++++++++--
+>> >  1 file changed, 11 insertions(+), 2 deletions(-)
+>> >
+>> > diff --git a/drivers/tty/serial/mvebu-uart.c
+>> > b/drivers/tty/serial/mvebu-uart.c index 7e0a3e9fee15..25b11ede3a97
+>> > 100644 --- a/drivers/tty/serial/mvebu-uart.c
+>> > +++ b/drivers/tty/serial/mvebu-uart.c
+>> > @@ -560,7 +560,16 @@ static int mvebu_uart_probe(struct
+>> > platform_device *pdev) return -EINVAL;
+>> >  	}
+>> >  
+>> > -	port = &mvebu_uart_ports[0];
+>> > +	if (pdev->dev.of_node)
+>> > +		pdev->id = of_alias_get_id(pdev->dev.of_node,
+>> > "serial");  
+>> 
+>> If the id is retrieved using an of_ function, then I think that the
+>> driver would depend on OF_CONFIG.
+>
+> Is this okay?
+>
+> if (pdev->dev.of_node && IS_ENABLED(CONFIG_OF))
+>         pdev->id = of_alias_get_id(pdev->dev.of_node, "serial");
 
-> Signed-off-by: Feng Kan <fkan@apm.com>
-> ---
->  drivers/iommu/arm-smmu.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 3bdb799..b5676a8 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -59,6 +59,7 @@
->  #define ARM_MMU500_ACTLR_CPRE		(1 << 1)
->  
->  #define ARM_MMU500_ACR_CACHE_LOCK	(1 << 26)
-> +#define ARM_MMU500_ACR_S2CRB_TLBEN	(1 << 10)
->  #define ARM_MMU500_ACR_SMTNMB_TLBEN	(1 << 8)
->  
->  #define TLB_LOOP_TIMEOUT		1000000	/* 1s! */
-> @@ -1606,7 +1607,7 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
->  		 * Allow unmatched Stream IDs to allocate bypass
->  		 * TLB entries for reduced latency.
->  		 */
-> -		reg |= ARM_MMU500_ACR_SMTNMB_TLBEN;
-> +		reg |= ARM_MMU500_ACR_SMTNMB_TLBEN | ARM_MMU500_ACR_S2CRB_TLBEN;
->  		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_sACR);
->  	}
->  
+Actually if CONFIG_OF is not enabled, then dev->dev.of_node. So you can
+keep the test but just remove the test on IS_ENABLED(CONFIG_OF).
 
-Looks correct to me, and TLB usage by bypass domains should still be
-equivalent to that of translation domains, so I don't think we should
-see any deleterious effects overall:
+But my remark about CONFIG_OF, was more to point that if there is no
+device tree support then this part of code won't work well if you have
+several ports using the same driver.
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+So either you keep your driver as is but make it depends on CONFIG_OF to
+make it clear that it won't work with ACPI. Or you add the case for
+ACPI, but I think you don't have a board with ACPI support so you won't
+be able to test it.
+
+A third solution would be to have a fallback when of_alias_get_id failed
+(either because there is no alias in the device tree or there is no
+device tree at all). In this case you can just increment the id for each
+new port.
+
+Gregory
+
+
+> else
+>         pdev->id = 0;
+>
+> BTW, I could not test without CONFIG_OF as it is defined by default in
+> our case: Selected by: ARM64 [=y]
+> I don't think there will be a 32-bit SoC with this UART IP?
+>
+> Thanks,
+> Miqu?l
+>
+>> 
+>> Gregory
+>> 
+>> 
+>> > +
+>> > +	if (pdev->id >= MVEBU_NR_UARTS) {
+>> > +		dev_err(&pdev->dev, "cannot have more than %d UART
+>> > ports\n",
+>> > +			MVEBU_NR_UARTS);
+>> > +		return -EINVAL;
+>> > +	}
+>> > +
+>> > +	port = &mvebu_uart_ports[pdev->id];
+>> >  
+>> >  	spin_lock_init(&port->lock);
+>> >  
+>> > @@ -572,7 +581,7 @@ static int mvebu_uart_probe(struct
+>> > platform_device *pdev) port->fifosize   = 32;
+>> >  	port->iotype     = UPIO_MEM32;
+>> >  	port->flags      = UPF_FIXED_PORT;
+>> > -	port->line       = 0; /* single port: force line number
+>> > to  0 */
+>> > +	port->line       = pdev->id;
+>> >  
+>> >  	port->irq        = irq->start;
+>> >  	port->irqflags   = 0;
+>> > -- 
+>> > 2.11.0
+>> >
+>> >
+>> > _______________________________________________
+>> > linux-arm-kernel mailing list
+>> > linux-arm-kernel at lists.infradead.org
+>> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel  
+>> 
+>
+>
+>
+> -- 
+> Miquel Raynal, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
