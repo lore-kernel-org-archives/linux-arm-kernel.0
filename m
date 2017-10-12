@@ -1,119 +1,50 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Thu, 12 Oct 2017 15:30:10 +0800
-Subject: [PATCH 3/4] ACPI: IORT: Skip SMMUv3 device ID map for two steps
- mappings
-In-Reply-To: <20171011102424.GA10795@red-moon>
-References: <1506475215-2731-1-git-send-email-hanjun.guo@linaro.org>
- <1506475215-2731-4-git-send-email-hanjun.guo@linaro.org>
- <20170927135449.GA11347@red-moon>
- <CAGHbJ3DbuGeKH16zr+PdZYjoaZrHJrTmV5tmMxZ5CDPObErUCQ@mail.gmail.com>
- <20171010092036.GA8507@red-moon> <59DDAB72.7070605@huawei.com>
- <20171011102424.GA10795@red-moon>
-Message-ID: <59DF1A02.9040008@huawei.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 12 Oct 2017 09:35:42 +0200
+Subject: [PATCH 11/11] ARM: dts: Add PCLK to the Aspeed watchdogs
+In-Reply-To: <CACPK8XeQDdisecoHo7+_7LQNxYWh7yDj99O=NxWSoHyuk7LRxg@mail.gmail.com>
+References: <20170812184318.10144-1-linus.walleij@linaro.org>
+ <20170812184318.10144-12-linus.walleij@linaro.org>
+ <CACRpkdbJhTmSZDudJCb_8nOfk6802Z8Op2+gjY9vdDT9Cg+6eQ@mail.gmail.com>
+ <CACPK8XeQDdisecoHo7+_7LQNxYWh7yDj99O=NxWSoHyuk7LRxg@mail.gmail.com>
+Message-ID: <CACRpkdazjg3C7Dt2KbTuYbMnmkeUXT7KyE=AZWSko4=ZWSb2_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/10/11 18:24, Lorenzo Pieralisi wrote:
-> On Wed, Oct 11, 2017 at 01:26:10PM +0800, Hanjun Guo wrote:
->> On 2017/10/10 17:20, Lorenzo Pieralisi wrote:
->>> On Tue, Oct 10, 2017 at 02:47:53PM +0800, Hanjun Guo wrote:
->>>> Hi Lorenzo,
->>>>
->>>> Sorry for the late reply, holidays in China for the past week.
->>>>
->>>> At 2017/9/27 21:54, Lorenzo Pieralisi wrote:
->>>>> Hi Hanjun,
->>>>>
->>>>> On Wed, Sep 27, 2017 at 09:20:14AM +0800, Hanjun Guo wrote:
->>>>>> IORT revision C introduced SMMUv3 MSI support which adding a
->>>>>> device ID mapping index in SMMUv3 sub table, to get the SMMUv3
->>>>>> device ID mapping for the output ID (dev ID for ITS) and the
->>>>>> link to which ITS.
->>>>>>
->>>>>> So if a platform supports SMMUv3 MSI for control interrupt,
->>>>>> there will be a additional single map entry under SMMU, this
->>>>>> will not introduce any difference for devices just use one
->>>>>> step map to get its output ID and parent (ITS or SMMU), such
->>>>>> as PCI/NC/PMCG ---> ITS or PCI/NC ---> SMMU, but we need to
->>>>>> do the special handling for two steps map case such as
->>>>>> PCI/NC--->SMMUv3--->ITS.
->>>>>>
->>>>>> Take a PCI hostbridge for example,
->>>>>>
->>>>>> |----------------------|
->>>>>> |  Root Complex Node   |
->>>>>> |----------------------|
->>>>>> |    map entry[x]      |
->>>>>> |----------------------|
->>>>>> |       id value       |
->>>>>> | output_reference     |
->>>>>> |---|------------------|
->>>>>>      |
->>>>>>      |   |----------------------|
->>>>>>      |-->|        SMMUv3        |
->>>>>>          |----------------------|
->>>>>>          |     SMMU dev ID      |
->>>>>>          |     mapping index 0  |
->>>>>>          |----------------------|
->>>>>>          |      map entry[0]    |
->>>>>>          |----------------------|
->>>>>>          |       id value       |
->>>>>>          | output_reference-----------> ITS 1 (SMMU MSI domain)
->>>>>>          |----------------------|
->>>>>>          |      map entry[1]    |
->>>>>>          |----------------------|
->>>>>>          |       id value       |
->>>>>>          | output_reference-----------> ITS 2 (PCI MSI domain)
->>>>>>          |----------------------|
->>>>>>
->>>>>> When the SMMU dev ID mapping index is 0, there is entry[0]
->>>>>> to map to a ITS, we need to skip that map entry for PCI
->>>>>> or NC (named component), or we may get the wrong ITS parent.
->>>>> Is this actually true ? I think that currently we would simply skip
->>>>> the entry and print an error log but we can't get a wrong ITS parent.
->>>> So the only valid single mapping under type SMMUv3 is SMMUv3's dev id
->>>> mapping, we need to fix the IORT spec as well.
->>>>
->>>>> I am rewriting this commit (I will probably split it), it is doing the
->>>>> right thing but the commit log is stale (probably caused by code
->>>>> reshuffling).
->>>> Do I need to resend another version, or you can help to update it?
->>>> please let me know.
->>> I reworked the patches, you can repost/retest them I made them available
->>> in the branch below, we will have to add a guard around ACPICA smmu
->>> struct (unfortunately I think we will have to use the ACPICA version as
->>> a guard) or I can ask Rafael to pull the series if ACPICA goes via ACPI
->>> tree (and your patch made it into the release - I will check ACPICA
->>> upstream).
->> Bob already merged my pull request yesterday, I think it will be ready for
->> acpica release for this month.
-> That's good, mind updating the patch series with an ACPICA guard in IORT
-> code in preparation for the pull request ?
+On Thu, Oct 12, 2017 at 5:37 AM, Joel Stanley <joel@jms.id.au> wrote:
+> On Wed, Oct 11, 2017 at 4:09 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-Do you mean drop the acpica patch in this patch set and adding the code below?
+>> Joel could you merge this through the Aspeed tree? I think
+>> the compatible string is completely uncontroversial
+>> (binding ACKed) to add and all should just work fine so we
+>> can slap in "EXTCLK" later as well.
+>
+> How do the clock-names work? I have been writing the aspeed clk driver
+> and updating the bindings without clock names, and instead using a
+> identifier in phandle to reference which clock the device wants.
+>
+> eg:
+>
+>  clocks = <&syscon 10>;
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 37a1b9f..a883bec 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -366,6 +366,7 @@ static struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
-        return NULL;
- }
- 
-+#if (ACPI_CA_VERSION > 0x20170929)
- static int iort_get_id_mapping_index(struct acpi_iort_node *node)
- {
-        struct acpi_iort_smmu_v3 *smmu;
-@@ -399,6 +400,12 @@ static int iort_get_id_mapping_index(struct acpi_iort_node *node)
-                return -EINVAL;
-        }
- }
-+#else
-+static int iort_get_id_mapping_index(struct acpi_iort_node *node)
-+{
-+ return -EINVAL;
-+}
-+#endif
- 
-Thanks
-Hanjun
+This works fine as long as there is just one clock.
+
+clocks = <&syscon 10>, <&syscon 11>, <&syscon 12>;
+
+becomes a problem, right?
+
+clk_get() has this signature:
+struct clk *clk_get(struct device *dev, const char *id);
+
+So clk_get(dev, NULL); will return <&syscon 10>;
+
+How to get the rest?
+
+clocks = <&syscon 10>, <&syscon 11>, <&syscon 12>;
+clock-names = "FOO", "BAR", "BAZ";
+
+clk_get(dev, "BAR");
+
+gets the second clock.
+
+Yours,
+Linus Walleij
