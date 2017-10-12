@@ -1,80 +1,120 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 12 Oct 2017 12:41:25 +0200
-Subject: [PATCH 21/37] KVM: arm64: Don't save the host ELR_EL2 and SPSR_EL2 on
- VHE systems
+Date: Thu, 12 Oct 2017 12:41:21 +0200
+Subject: [PATCH 17/37] KVM: arm64: Move userspace system registers into
+ separate function
 In-Reply-To: <20171012104141.26902-1-christoffer.dall@linaro.org>
 References: <20171012104141.26902-1-christoffer.dall@linaro.org>
-Message-ID: <20171012104141.26902-22-christoffer.dall@linaro.org>
+Message-ID: <20171012104141.26902-18-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On non-VHE systems we need to save the ELR_EL2 and SPSR_EL2 so that we
-can return to the host in EL1 in the same state and location where we
-issued a hypercall to EL2, but these registers don't contain anything
-important on VHE, because all of the host runs in EL2.  Therefore,
-exclude them when saving/restoring the host state.
+There's a semantic difference between the EL1 registers that control
+operation of a kernel running in EL1 and EL1 registers that only control
+userspace execution in EL0.  Since we can defer saving/restoring the
+latter, move them into their own function.
+
+We also take this chance to rename the function saving/restoring the
+remaining system register to make it clear this function deals with
+the EL1 system registers.
+
+No functional change.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kvm/hyp/sysreg-sr.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm64/kvm/hyp/sysreg-sr.c | 34 +++++++++++++++++++++++-----------
+ 1 file changed, 23 insertions(+), 11 deletions(-)
 
 diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-index f5c1b44..354ca02 100644
+index c4a3714..193c2b0 100644
 --- a/arch/arm64/kvm/hyp/sysreg-sr.c
 +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-@@ -66,6 +66,10 @@ static void __hyp_text __sysreg_save_el1_state(struct kvm_cpu_context *ctxt)
- 	ctxt->gp_regs.sp_el1		= read_sysreg(sp_el1);
- 	ctxt->gp_regs.elr_el1		= read_sysreg_el1(elr);
- 	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg_el1(spsr);
+@@ -34,14 +34,18 @@ static void __hyp_text __sysreg_do_nothing(struct kvm_cpu_context *ctxt) { }
+ 
+ static void __hyp_text __sysreg_save_common_state(struct kvm_cpu_context *ctxt)
+ {
++	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
++	ctxt->gp_regs.regs.sp		= read_sysreg(sp_el0);
 +}
 +
-+static void __hyp_text __sysreg_save_el2_return_state(struct kvm_cpu_context *ctxt)
++static void __hyp_text __sysreg_save_user_state(struct kvm_cpu_context *ctxt)
 +{
- 	ctxt->gp_regs.regs.pc		= read_sysreg_el2(elr);
- 	ctxt->gp_regs.regs.pstate	= read_sysreg_el2(spsr);
- }
-@@ -75,6 +79,7 @@ void __hyp_text __sysreg_save_state_nvhe(struct kvm_cpu_context *ctxt)
- 	__sysreg_save_el1_state(ctxt);
- 	__sysreg_save_common_state(ctxt);
- 	__sysreg_save_user_state(ctxt);
-+	__sysreg_save_el2_return_state(ctxt);
+ 	ctxt->sys_regs[ACTLR_EL1]	= read_sysreg(actlr_el1);
+ 	ctxt->sys_regs[TPIDR_EL0]	= read_sysreg(tpidr_el0);
+ 	ctxt->sys_regs[TPIDRRO_EL0]	= read_sysreg(tpidrro_el0);
+-	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
+-	ctxt->gp_regs.regs.sp		= read_sysreg(sp_el0);
  }
  
- void sysreg_save_host_state_vhe(struct kvm_cpu_context *ctxt)
-@@ -88,6 +93,7 @@ void sysreg_save_guest_state_vhe(struct kvm_cpu_context *ctxt)
- 	__sysreg_save_el1_state(ctxt);
+-static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
++static void __hyp_text __sysreg_save_el1_state(struct kvm_cpu_context *ctxt)
+ {
+ 	ctxt->sys_regs[MPIDR_EL1]	= read_sysreg(vmpidr_el2);
+ 	ctxt->sys_regs[CSSELR_EL1]	= read_sysreg(csselr_el1);
+@@ -70,31 +74,37 @@ static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
+ }
+ 
+ static hyp_alternate_select(__sysreg_call_save_host_state,
+-			    __sysreg_save_state, __sysreg_do_nothing,
++			    __sysreg_save_el1_state, __sysreg_do_nothing,
+ 			    ARM64_HAS_VIRT_HOST_EXTN);
+ 
+ void __hyp_text __sysreg_save_host_state(struct kvm_cpu_context *ctxt)
+ {
+ 	__sysreg_call_save_host_state()(ctxt);
  	__sysreg_save_common_state(ctxt);
- 	__sysreg_save_user_state(ctxt);
-+	__sysreg_save_el2_return_state(ctxt);
++	__sysreg_save_user_state(ctxt);
+ }
+ 
+ void __hyp_text __sysreg_save_guest_state(struct kvm_cpu_context *ctxt)
+ {
+-	__sysreg_save_state(ctxt);
++	__sysreg_save_el1_state(ctxt);
+ 	__sysreg_save_common_state(ctxt);
++	__sysreg_save_user_state(ctxt);
  }
  
  static void __hyp_text __sysreg_restore_common_state(struct kvm_cpu_context *ctxt)
-@@ -127,6 +133,11 @@ static void __hyp_text __sysreg_restore_el1_state(struct kvm_cpu_context *ctxt)
- 	write_sysreg(ctxt->gp_regs.sp_el1,		sp_el1);
- 	write_sysreg_el1(ctxt->gp_regs.elr_el1,		elr);
- 	write_sysreg_el1(ctxt->gp_regs.spsr[KVM_SPSR_EL1],spsr);
-+}
-+
-+static void __hyp_text
-+__sysreg_restore_el2_return_state(struct kvm_cpu_context *ctxt)
-+{
- 	write_sysreg_el2(ctxt->gp_regs.regs.pc,		elr);
- 	write_sysreg_el2(ctxt->gp_regs.regs.pstate,	spsr);
- }
-@@ -136,6 +147,7 @@ void __hyp_text __sysreg_restore_state_nvhe(struct kvm_cpu_context *ctxt)
- 	__sysreg_restore_el1_state(ctxt);
- 	__sysreg_restore_common_state(ctxt);
- 	__sysreg_restore_user_state(ctxt);
-+	__sysreg_restore_el2_return_state(ctxt);
+ {
+-	write_sysreg(ctxt->sys_regs[ACTLR_EL1],	  actlr_el1);
+-	write_sysreg(ctxt->sys_regs[TPIDR_EL0],	  tpidr_el0);
+-	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], tpidrro_el0);
+ 	write_sysreg(ctxt->sys_regs[MDSCR_EL1],	  mdscr_el1);
+ 	write_sysreg(ctxt->gp_regs.regs.sp,	  sp_el0);
  }
  
- void sysreg_restore_host_state_vhe(struct kvm_cpu_context *ctxt)
-@@ -149,6 +161,7 @@ void sysreg_restore_guest_state_vhe(struct kvm_cpu_context *ctxt)
- 	__sysreg_restore_el1_state(ctxt);
+-static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
++static void __hyp_text __sysreg_restore_user_state(struct kvm_cpu_context *ctxt)
++{
++	write_sysreg(ctxt->sys_regs[ACTLR_EL1],	  	actlr_el1);
++	write_sysreg(ctxt->sys_regs[TPIDR_EL0],	  	tpidr_el0);
++	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], 	tpidrro_el0);
++}
++
++static void __hyp_text __sysreg_restore_el1_state(struct kvm_cpu_context *ctxt)
+ {
+ 	write_sysreg(ctxt->sys_regs[MPIDR_EL1],		vmpidr_el2);
+ 	write_sysreg(ctxt->sys_regs[CSSELR_EL1],	csselr_el1);
+@@ -123,19 +133,21 @@ static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
+ }
+ 
+ static hyp_alternate_select(__sysreg_call_restore_host_state,
+-			    __sysreg_restore_state, __sysreg_do_nothing,
++			    __sysreg_restore_el1_state, __sysreg_do_nothing,
+ 			    ARM64_HAS_VIRT_HOST_EXTN);
+ 
+ void __hyp_text __sysreg_restore_host_state(struct kvm_cpu_context *ctxt)
+ {
+ 	__sysreg_call_restore_host_state()(ctxt);
  	__sysreg_restore_common_state(ctxt);
- 	__sysreg_restore_user_state(ctxt);
-+	__sysreg_restore_el2_return_state(ctxt);
++	__sysreg_restore_user_state(ctxt);
+ }
+ 
+ void __hyp_text __sysreg_restore_guest_state(struct kvm_cpu_context *ctxt)
+ {
+-	__sysreg_restore_state(ctxt);
++	__sysreg_restore_el1_state(ctxt);
+ 	__sysreg_restore_common_state(ctxt);
++	__sysreg_restore_user_state(ctxt);
  }
  
  static void __hyp_text __fpsimd32_save_state(struct kvm_cpu_context *ctxt)
