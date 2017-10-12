@@ -1,150 +1,100 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Thu, 12 Oct 2017 13:56:32 +0100
-Subject: [PATCH 1/2] vgaarb: Select a default VGA device even if there's
- no legacy VGA
-In-Reply-To: <20171012140548.10754506@karo-electronics.de>
-References: <20171006221358.12211.42879.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <20171006222428.12211.3635.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <b5373cbb-7d0d-a626-159b-dee0b82d32d0@arm.com>
- <20171012140548.10754506@karo-electronics.de>
-Message-ID: <4a93e8f1-8b87-ae58-17c8-06b36849dfaf@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 12 Oct 2017 13:56:51 +0100
+Subject: [PATCH v3 16/28] arm64/sve: Probe SVE capabilities and usable
+ vector lengths
+In-Reply-To: <1507660725-7986-17-git-send-email-Dave.Martin@arm.com>
+References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
+ <1507660725-7986-17-git-send-email-Dave.Martin@arm.com>
+Message-ID: <a39354fb-9f21-47ff-2ad9-b5bcb04e9990@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 12/10/17 13:05, Lothar Wa?mann wrote:
-> Hi,
+On 10/10/17 19:38, Dave Martin wrote:
+> This patch uses the cpufeatures framework to determine common SVE
+> capabilities and vector lengths, and configures the runtime SVE
+> support code appropriately.
 > 
-> On Thu, 12 Oct 2017 12:24:10 +0100 Julien Thierry wrote:
->> Hi Bjorn,
->>
->> On 06/10/17 23:24, Bjorn Helgaas wrote:
->>> From: Bjorn Helgaas <bhelgaas@google.com>
->>>
->>> Daniel Axtens reported that on the HiSilicon D05 board, the VGA device is
->>> behind a bridge that doesn't support PCI_BRIDGE_CTL_VGA, so the VGA arbiter
->>> never selects it as the default, which means Xorg auto-detection doesn't
->>> work.
->>>
->>> VGA is a legacy PCI feature: a VGA device can respond to addresses, e.g.,
->>> [mem 0xa0000-0xbffff], [io 0x3b0-0x3bb], [io 0x3c0-0x3df], etc., that are
->>> not configurable by BARs.  Consequently, multiple VGA devices can conflict
->>> with each other.  The VGA arbiter avoids conflicts by ensuring that those
->>> legacy resources are only routed to one VGA device at a time.
->>>
->>> The arbiter identifies the "default VGA" device, i.e., a legacy VGA device
->>> that was used by boot firmware.  It selects the first device that:
->>>
->>>     - is of PCI_CLASS_DISPLAY_VGA,
->>>     - has both PCI_COMMAND_IO and PCI_COMMAND_MEMORY enabled, and
->>>     - has PCI_BRIDGE_CTL_VGA set in all upstream bridges.
->>>
->>> Some systems don't have such a device.  For example, if a host bridge
->>> doesn't support I/O space, PCI_COMMAND_IO probably won't be enabled for any
->>> devices below it.  Or, as on the HiSilicon D05, the VGA device may be
->>> behind a bridge that doesn't support PCI_BRIDGE_CTL_VGA, so accesses to the
->>> legacy VGA resources will never reach the device.
->>>
->>> This patch extends the arbiter so that if it doesn't find a device that
->>> meets all the above criteria, it selects the first device that:
->>>
->>>     - is of PCI_CLASS_DISPLAY_VGA and
->>>     - has PCI_COMMAND_IO or PCI_COMMAND_MEMORY enabled
->>>
->>> If it doesn't find even that, it selects the first device that:
->>>
->>>     - is of class PCI_CLASS_DISPLAY_VGA.
->>>
->>> Such a device may not be able to use the legacy VGA resources, but most
->>> drivers can operate the device without those.  Setting it as the default
->>> device means its "boot_vga" sysfs file will contain "1", which Xorg (via
->>> libpciaccess) uses to help select its default output device.
->>>
->>> This fixes Xorg auto-detection on some arm64 systems (HiSilicon D05 in
->>> particular; see the link below).
->>>
->>> It also replaces the powerpc fixup_vga() quirk, albeit with slightly
->>> different semantics: the quirk selected the first VGA device we found, and
->>> overrode that selection with any enabled VGA device we found.  If there
->>> were several enabled VGA devices, the *last* one we found would become the
->>> default.
->>>
->>> The code here instead selects the *first* enabled VGA device we find, and
->>> if none are enabled, the first VGA device we find.
->>>
->>> Link: http://lkml.kernel.org/r/20170901072744.2409-1-dja at axtens.net
->>> Tested-by: Daniel Axtens <dja@axtens.net>    # arm64, ppc64-qemu-tcg
->>> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
->>> ---
->>>    arch/powerpc/kernel/pci-common.c |   12 ------------
->>>    drivers/gpu/vga/vgaarb.c         |   25 +++++++++++++++++++++++++
->>>    2 files changed, 25 insertions(+), 12 deletions(-)
->>>
->>> diff --git a/arch/powerpc/kernel/pci-common.c b/arch/powerpc/kernel/pci-common.c
->>> index 02831a396419..0ac7aa346c69 100644
->>> --- a/arch/powerpc/kernel/pci-common.c
->>> +++ b/arch/powerpc/kernel/pci-common.c
->>> @@ -1740,15 +1740,3 @@ static void fixup_hide_host_resource_fsl(struct pci_dev *dev)
->>>    }
->>>    DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MOTOROLA, PCI_ANY_ID, fixup_hide_host_resource_fsl);
->>>    DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_FREESCALE, PCI_ANY_ID, fixup_hide_host_resource_fsl);
->>> -
->>> -static void fixup_vga(struct pci_dev *pdev)
->>> -{
->>> -	u16 cmd;
->>> -
->>> -	pci_read_config_word(pdev, PCI_COMMAND, &cmd);
->>> -	if ((cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY)) || !vga_default_device())
->>> -		vga_set_default_device(pdev);
->>> -
->>> -}
->>> -DECLARE_PCI_FIXUP_CLASS_FINAL(PCI_ANY_ID, PCI_ANY_ID,
->>> -			      PCI_CLASS_DISPLAY_VGA, 8, fixup_vga);
->>> diff --git a/drivers/gpu/vga/vgaarb.c b/drivers/gpu/vga/vgaarb.c
->>> index 76875f6299b8..aeb41f793ed4 100644
->>> --- a/drivers/gpu/vga/vgaarb.c
->>> +++ b/drivers/gpu/vga/vgaarb.c
->>> @@ -1468,6 +1468,31 @@ static int __init vga_arb_device_init(void)
->>>    			vgaarb_info(dev, "no bridge control possible\n");
->>>    	}
->>>    
->>> +	if (!vga_default_device()) {
->>> +		list_for_each_entry(vgadev, &vga_list, list) {
->>> +			struct device *dev = &vgadev->pdev->dev;
->>> +			u16 cmd;
->>> +
->>> +			pdev = vgadev->pdev;
->>> +			pci_read_config_word(pdev, PCI_COMMAND, &cmd);
->>> +			if (cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY)) {
->>> +				vgaarb_info(dev, "setting as boot device (VGA legacy resources not available)\n");
->>> +				vga_set_default_device(pdev);
->>> +				break;
->>> +			}
->>> +		}
->>> +	}
->>> +
->>> +	if (!vga_default_device()) {
->>> +		vgadev = list_first_entry_or_null(&vga_list,
->>> +						  struct vga_device, list);
->>> +		if (vgadev) {
->>> +			struct device *dev = &vgadev->pdev->dev;
->>> +			vgaarb_info(dev, "setting as boot device (VGA legacy resources not available)\n");
->>> +			vga_set_default_device(pdev);
->>
->> Isn't 'pdev' NULL here? shouldn't it be vgadev->pdev instead?
->>
-> That cannot not happen, though it isn't quite obvious.
-> 'vgadev' will only be non-NULL, when the vga_list isn't empty and in
-> that case pdev has been set up in the list_for_each_entry() loop above.
+> ZCR_ELx is not really a feature register, but it is convenient to
+> use it as a template for recording the maximum vector length
+> supported by a CPU, using the LEN field.  This field is similar to
+> a feature field in that it is a contiguous bitfield for which we
+> want to determine the minimum system-wide value.  This patch adds
+> ZCR as a pseudo-register in cpuinfo/cpufeatures, with appropriate
+> custom code to populate it.  Finding the minimum supported value of
+> the LEN field is left to the cpufeatures framework in the usual
+> way.
 > 
+> The meaning of ID_AA64ZFR0_EL1 is not architecturally defined yet,
+> so for now we just require it to be zero.
+> 
+> Note that much of this code is dormant and SVE still won't be used
+> yet, since system_supports_sve() remains hardwired to false.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Cc: Alex Benn?e <alex.bennee@linaro.org>
+> Cc: Suzuki K Poulose <Suzuki.Poulose@arm.com>
+> 
+> ---
+> 
+> Dropped Alex Benn?e's Reviewed-by, since there is new logic in this
+> patch.
+> 
+> Changes since v2
+> ----------------
+> 
+> Bug fixes:
+> 
+>   * Got rid of dynamic allocation of the shadow vector length map during
+>     secondary boot.  Secondary CPU boot takes place in atomic context,
+>     and relying on GFP_ATOMIC here doesn't seem justified.
+> 
+>     Instead, the needed additional bitmap is allocated statically.  Only
+>     one shadow map is needed, because CPUs don't boot concurrently.
+> 
+> Requested by Alex Benn?e:
+> 
+>   * Reflowed untidy comment above read_zcr_features()
+> 
+>   * Added comments to read_zcr_features() to explain what it's trying to do
+>     (which is otherwise not readily apparent).
+> 
+> Requested by Catalin Marinas:
+> 
+>   * Moved disabling of the EL1 SVE trap to the cpufeatures C code.
+>     This allows addition of new assembler in __cpu_setup to be
+>     avoided.
+> 
+> Miscellaneous:
+> 
+>   * Added comments explaining the intent, purpose and basic constraints
+>     for fpsimd.c helpers.
 
-Indeed, it can't be NULL. However, in that case we would be using the 
-pdev from the last vgadev in the list whereas this last case suggest we 
-are picking the first vgadev in the list. So I don't understand why 
-'pdev' is being used rather than 'vgadev-pdev'.
+...
 
-Thanks,
+   
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index 92a9502..c5acf38 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
 
--- 
-Julien Thierry
+...
+
+> @@ -670,6 +689,14 @@ void update_cpu_features(int cpu,
+>   					info->reg_mvfr2, boot->reg_mvfr2);
+>   	}
+>   
+> +	if (id_aa64pfr0_sve(info->reg_id_aa64pfr0)) {
+> +		taint |= check_update_ftr_reg(SYS_ZCR_EL1, cpu,
+> +					info->reg_zcr, boot->reg_zcr);
+> +
+> +		if (!sys_caps_initialised)
+> +			sve_update_vq_map();
+> +	}
+
+nit: I am not sure if we should also check if the "current" sanitised value
+of the id_aa64pfr0 also supports sve and skip the update if it isn't. The code
+is as such fine without the check, its just that we can avoid computing the
+map. It is in the CPU boot up path and hence is not performance critical.
+So, either way we are fine.
+
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
