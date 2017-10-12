@@ -1,55 +1,61 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 12 Oct 2017 09:07:55 +0300
-Subject: [PATCH 5/7] ARM: dts: Add nodes for missing omap4 interconnect
- target modules
-In-Reply-To: <20171011165850.jnaievrgcszcawh3@earth>
-References: <20170929223411.9691-1-tony@atomide.com>
- <20170929223411.9691-6-tony@atomide.com>
- <f5c57f0b-1423-c362-0fda-4069b77a2e38@ti.com>
- <20171011165850.jnaievrgcszcawh3@earth>
-Message-ID: <da8d1d7f-f16d-8d71-cf49-acff79614610@ti.com>
+From: gerg@linux-m68k.org (Greg Ungerer)
+Date: Thu, 12 Oct 2017 16:26:10 +1000
+Subject: [2/2] spi: imx: fix use of native chip-selects with devicetree
+In-Reply-To: <1507667916.74283.19.camel@impinj.com>
+References: <1489726983-17706-3-git-send-email-gerg@linux-m68k.org>
+ <1507667916.74283.19.camel@impinj.com>
+Message-ID: <209bb901-875e-8007-06f8-3ae9698a0e41@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?Hi Sebastian,
+Hi Trent,
 
-
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
-
-On 2017-10-11 19:58, Sebastian Reichel wrote:
->> I'll look at the schema of PandaBoard to see if I can route out the McASP
->> lines to somewhere then I can add support for this revision to davinci-mcasp
->> driver.
+On 11/10/17 06:38, Trent Piepho wrote:
+> On Fri, 2017-03-17 at 15:03 +1000, Greg Ungerer wrote:
+>> You can successfully specify native chip-selects if using a platform
+>> setup by specifying the cs-gpio as negative offset by 32. And that
+>> works correctly. You cannot use the same method in devicetree.
 > 
-> Not sure if this is helpful information:
+> I came across some spi-imx bugs in an older kernel and in checking the
+> latest kernel, found this patch.  It fixed the issue with dt not
+> working for older spi imx devices (the imx51+ config function never
+> used the platform data 32 offset thing), but fails to address non-dt
+> platform data based users of the spi imx driver.
 > 
-> Motorola Droid 4 is OMAP4430 based and has McASP lines routed
-> to the audio codec (either McASP or McBSP can be used). Codec
-> is a custom one, which is not yet supported mainline, but
-> patches are WIP (*):
+> For instance, include/linux/platform_data/spi-imx.h still refers to the
+> offset by 32 for native cs:
 > 
-> https://lkml.org/lkml/2017/7/12/368
-
-Really cool!
-I don't see much benefit of using McASP on OMAP4, only drawbacks... It
-lacks AFIFO so it is prone to underrun and if it underruns you need to
-reset McASP. Been there with the Samsung Galaxy Nexus.
-
-I wonder how Motorola is using the McASP as the OMAP4 version
-(officially) does not support I2S. It might work, I have not tried it.
-
-I do have one Galaxy Nexus, but there the McASP is used for the S/PIDIF
-on the dock (the three pins on the side). Yes, I do not have the dock
-and my Galaxy Nexus is still in active use -> not rooted, and never run
-mainline Linux.
-
-> (*) My patches use McBSP instead of McASP, since McASP looked
-> mostly unsupported. Motorola's kernel uses McASP.
-
-If I have something I might ask you for testing, if it is OK.
-
+>  * @chipselect: Array of chipselects for this master. Numbers >= 0 mean gpio
+>  *              pins, numbers < 0 mean internal CSPI chipselects according
+>  *              to MXC_SPI_CS(). Normally you want to use gpio based chip
 > 
-> -- Sebastian
+> #define MXC_SPI_CS(no)  ((no) - 32)
 > 
+> After this patch, for no-DT users, any negative (or rather not a valid
+> gpio) value in chipselect will cause the native chipselect
+> corresponding to the spi slave's chipselect.  It's no longer possible
+> to specify which native cs to use in the spi-imx platform data.  So in
+> something like:
+> 
+> arch/arm/mach-imx/mach-mx31moboard.c-static int moboard_spi1_cs[] = {
+> arch/arm/mach-imx/mach-mx31moboard.c:   MXC_SPI_CS(0),
+> arch/arm/mach-imx/mach-mx31moboard.c:   MXC_SPI_CS(2),
+> arch/arm/mach-imx/mach-mx31moboard.c-};
+> 
+> The spi device configured to use chip select 1 will no longer use
+> native chip select line 2.
+> 
+> Looking at all in-tree users of spi imx platform data, it appears that
+> this board is the only one in which the cs selected does not match the
+> array index.  Though there are still several which still use
+> MSC_SPI_CS() even though it doesn't really work anymore.
 
-- P?ter
+Commit 901f26bce64a ("ARM: imx: set correct chip_select in platform setup") 
+fixes this issue. It specifically makes sure that the board setup chip
+select is set correctly (so that spi-imx can then use it). It also pads
+out the chipselect arrays so that the chip select and indexes match.
+
+Is this not working for you?
+
+Regards
+Greg
