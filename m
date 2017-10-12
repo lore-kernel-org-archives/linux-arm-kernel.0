@@ -1,147 +1,58 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Thu, 12 Oct 2017 09:58:20 +0100
-Subject: [PATCH v3 1/2] arm_arch_timer: Expose event stream status
-In-Reply-To: <20171011151409.GB14341@arm.com>
-References: <1506682350-9023-1-git-send-email-julien.thierry@arm.com>
- <1506682350-9023-2-git-send-email-julien.thierry@arm.com>
- <20171011151409.GB14341@arm.com>
-Message-ID: <f29e7584-4f15-32e5-932c-a688b75fd4d0@arm.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 12 Oct 2017 12:10:01 +0300
+Subject: [PATCH 5/7] ARM: dts: Add nodes for missing omap4 interconnect
+ target modules
+In-Reply-To: <20171012084030.lshobr3ewu3t5goc@squirrel.local>
+References: <20170929223411.9691-1-tony@atomide.com>
+ <20170929223411.9691-6-tony@atomide.com>
+ <f5c57f0b-1423-c362-0fda-4069b77a2e38@ti.com>
+ <20171011165850.jnaievrgcszcawh3@earth>
+ <da8d1d7f-f16d-8d71-cf49-acff79614610@ti.com>
+ <20171012084030.lshobr3ewu3t5goc@squirrel.local>
+Message-ID: <78eff2f9-1fe5-66f8-e754-344cb1ea0d97@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[resending as I don't see it on the ml]
+?
 
-Hi Will,
 
-On 11/10/17 16:14, Will Deacon wrote:
-> Hi Julien,
-> 
-> On Fri, Sep 29, 2017 at 11:52:29AM +0100, Julien Thierry wrote:
->> The arch timer configuration for a CPU might get reset after suspending
->> said CPU.
->>
->> In order to reliably use the event stream in the kernel (e.g. for delays),
->> we keep track of the state where we can safely concider the event stream as
->> properly configured.
->>
->> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Russell King <linux@armlinux.org.uk>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> ---
->>   arch/arm/include/asm/arch_timer.h    |  1 +
->>   arch/arm64/include/asm/arch_timer.h  |  1 +
->>   drivers/clocksource/arm_arch_timer.c | 20 ++++++++++++++++++--
->>   include/clocksource/arm_arch_timer.h |  6 ++++++
->>   4 files changed, 26 insertions(+), 2 deletions(-)
-> 
-> The arch-timer bits needs an ack from Marc or Mark.
-> 
->> diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
->> index d4ebf56..0b6e104 100644
->> --- a/arch/arm/include/asm/arch_timer.h
->> +++ b/arch/arm/include/asm/arch_timer.h
->> @@ -106,6 +106,7 @@ static inline u32 arch_timer_get_cntkctl(void)
->>   static inline void arch_timer_set_cntkctl(u32 cntkctl)
->>   {
->>   	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
->> +	isb();
->>   }
->>
->>   #endif
->> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
->> index a652ce0..bdedd8f 100644
->> --- a/arch/arm64/include/asm/arch_timer.h
->> +++ b/arch/arm64/include/asm/arch_timer.h
->> @@ -144,6 +144,7 @@ static inline u32 arch_timer_get_cntkctl(void)
->>   static inline void arch_timer_set_cntkctl(u32 cntkctl)
->>   {
->>   	write_sysreg(cntkctl, cntkctl_el1);
->> +	isb();
->>   }
->>
->>   static inline u64 arch_counter_get_cntpct(void)
->> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
->> index fd4b7f6..47cf15e 100644
->> --- a/drivers/clocksource/arm_arch_timer.c
->> +++ b/drivers/clocksource/arm_arch_timer.c
->> @@ -77,6 +77,7 @@ struct arch_timer {
->>   static bool arch_counter_suspend_stop;
->>   static bool vdso_default = true;
->>
->> +static cpumask_t evtstrm_available;
->>   static bool evtstrm_enable = IS_ENABLED(CONFIG_ARM_ARCH_TIMER_EVTSTREAM);
->>
->>   static int __init early_evtstrm_cfg(char *buf)
->> @@ -740,6 +741,7 @@ static void arch_timer_evtstrm_enable(int divider)
->>   #ifdef CONFIG_COMPAT
->>   	compat_elf_hwcap |= COMPAT_HWCAP_EVTSTRM;
->>   #endif
->> +	cpumask_set_cpu(smp_processor_id(), &evtstrm_available);
->>   }
->>
->>   static void arch_timer_configure_evtstream(void)
->> @@ -864,6 +866,11 @@ u32 arch_timer_get_rate(void)
->>   	return arch_timer_rate;
->>   }
->>
->> +bool arch_timer_evtstrm_available(void)
->> +{
->> +	return !!cpumask_test_cpu(smp_processor_id(), &evtstrm_available);
->> +}
-> 
-> I don't think you need the '!!' prefix here.
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
 
-True, I'll remove that.
+On 2017-10-12 11:40, Matthijs van Duin wrote:
+> On Thu, Oct 12, 2017 at 09:07:55AM +0300, Peter Ujfalusi wrote:
+>> I don't see much benefit of using McASP on OMAP4, only drawbacks... It
+>> lacks AFIFO so it is prone to underrun and if it underruns you need to
+>> reset McASP. Been there with the Samsung Galaxy Nexus.
+> 
+> AESS/ATC isn't able to consistently respond to a DMA request within 20
+> us ?  Strange.. I would have expected it to have no trouble with that.
+> (And presumably so did TI, or they would have included AFIFO?)
+> 
+>> I wonder how Motorola is using the McASP as the OMAP4 version
+>> (officially) does not support I2S.
+> 
+> Hmm? I checked the omap4430 TRM and I don't see that mentioned. It seems
+> to have pins for i2s transmit:
+> 
+> 	abe_mcasp_axr              O     Audio transmit data
+> 	abe_mcasp_aclkx            O     Transmit bit clock
+> 	abe_mcasp_ahclkx           O     Transmit high-frequency master clock
+> 	abe_mcasp_afsx             O     Transmit frame synchronization
+> 	abe_mcasp_amute            O     Mute out to external
+> 	abe_mcasp_amutein          I     Mute in from external
+> 
+> If it supported s/pdif tx only, then all of these except axr would be
+> useless.
+
+The McASP transmit section uses the S/PDIF industry format, which is
+supported by the DIT transfer mode of the module.
+
+And look for Transfer Modes chapter of McSSP in the OMAP4 TRM.
+
+It is DIT only.
 
 > 
->> +
->>   static u64 arch_counter_get_cntvct_mem(void)
->>   {
->>   	u32 vct_lo, vct_hi, tmp_hi;
->> @@ -929,6 +936,8 @@ static int arch_timer_dying_cpu(unsigned int cpu)
->>   {
->>   	struct clock_event_device *clk = this_cpu_ptr(arch_timer_evt);
->>
->> +	cpumask_clear_cpu(smp_processor_id(), &evtstrm_available);
->> +
->>   	arch_timer_stop(clk);
->>   	return 0;
->>   }
->> @@ -938,10 +947,16 @@ static int arch_timer_dying_cpu(unsigned int cpu)
->>   static int arch_timer_cpu_pm_notify(struct notifier_block *self,
->>   				    unsigned long action, void *hcpu)
->>   {
->> -	if (action == CPU_PM_ENTER)
->> +	if (action == CPU_PM_ENTER) {
->>   		__this_cpu_write(saved_cntkctl, arch_timer_get_cntkctl());
->> -	else if (action == CPU_PM_ENTER_FAILED || action == CPU_PM_EXIT)
->> +
->> +		cpumask_clear_cpu(smp_processor_id(), &evtstrm_available);
->> +	} else if (action == CPU_PM_ENTER_FAILED || action == CPU_PM_EXIT) {
->>   		arch_timer_set_cntkctl(__this_cpu_read(saved_cntkctl));
->> +
->> +		if (elf_hwcap & HWCAP_EVTSTRM)
->> +			cpumask_set_cpu(smp_processor_id(), &evtstrm_available);
->> +	}
->>   	return NOTIFY_OK;
->>   }
->>
->> @@ -1017,6 +1032,7 @@ static int __init arch_timer_register(void)
->>   	if (err)
->>   		goto out_unreg_notify;
->>
->> +	cpumask_clear(&evtstrm_available);
+> Matthijs
 > 
-> This should already be ok by virtue of the mask being static, no?
-> Alternatively, you could use the CPU_MASK_NONE static initialiser.
 
-Yes, I just prefer explicit initialisations. But you're right, I'll use 
-CPU_MASK_NONE unless it is encouraged to rely on implicit intilisation.
-
-Thanks,
-
--- 
-Julien Thierry
+- P?ter
