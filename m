@@ -1,46 +1,86 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 12 Oct 2017 13:20:46 +0100
-Subject: [PATCH v3 0/5] Switch arm64 over to qrwlock
-Message-ID: <1507810851-306-1-git-send-email-will.deacon@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 12 Oct 2017 13:26:17 +0100
+Subject: [PATCH v3 01/20] arm64: explicitly mask all exceptions
+In-Reply-To: <25eb4c59-a09e-5b0a-66fb-6c650ab8e057@arm.com>
+References: <20171005191812.5678-1-james.morse@arm.com>
+ <20171005191812.5678-2-james.morse@arm.com>
+ <25eb4c59-a09e-5b0a-66fb-6c650ab8e057@arm.com>
+Message-ID: <59DF5F69.4080009@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Julien,
 
-This is version three of the patches previously posted here:
+On 11/10/17 17:30, Julien Thierry wrote:
+> On 05/10/17 20:17, James Morse wrote:
+>> There are a few places where we want to mask all exceptions. Today we
+>> do this in a piecemeal fashion, typically we expect the caller to
+>> have masked irqs and the arch code masks debug exceptions, ignoring
+>> SError which is probably masked.
+>>
+>> Make it clear that 'mask all exceptions' is the intention by adding
+>> helpers to do exactly that.
+>>
+>> This will let us unmask SError without having to add 'oh and SError'
+>> to these paths.
 
-v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2017-October/534666.html
-v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2017-October/534981.html
+>> diff --git a/arch/arm64/include/asm/daifflags.h
+>> b/arch/arm64/include/asm/daifflags.h
+>> new file mode 100644
+>> index 000000000000..fb40da8e1457
+>> --- /dev/null
+>> +++ b/arch/arm64/include/asm/daifflags.h
 
-Changes since v2 include:
+>> +#ifndef __ASM_DAIFFLAGS_H
+>> +#define __ASM_DAIFFLAGS_H
+>> +
+>> +#include <asm/irqflags.h>
+>> +#include <linux/irqflags.h>
+>> +
+>> +/* Mask/unmask/restore all exceptions, including interrupts. */
+>> +static inline unsigned long local_mask_daif(void)
+>> +{
+>> +    unsigned long flags;
+>> +    asm volatile(
+>> +        "mrs    %0, daif        // local_mask_daif\n"
+>> +        "msr    daifset, #0xf"
+>> +        : "=r" (flags)
+>> +        :
+>> +        : "memory");
+>> +    trace_hardirqs_off();
+>> +    return flags;
+>> +}
+>> +
+> nit:
+> Can we call this local_daif_save? 
 
-  * Drop unused cnt argument
-  * Fix typo in UNLOCK Kconfig inlining options
-  * Added Tested-by tags
+Sure, having a save version fits better with the C irqflags versions.
 
-Thanks to all of those who provided review and testing feedback!
+mask/unmask is just being pedantic, irqs and SError aren't disabled by these
+flags, (but curiously debug is...).
 
-Will
 
---->8
+> (and maybe a version that only disables without saving?)
 
-Will Deacon (5):
-  kernel/locking: Use struct qrwlock instead of struct __qrwlock
-  locking/atomic: Add atomic_cond_read_acquire
-  kernel/locking: Use atomic_cond_read_acquire when spinning in qrwlock
-  arm64: locking: Move rwlock implementation over to qrwlocks
-  kernel/locking: Prevent slowpath writers getting held up by fastpath
+irqflags.h has one, so yes, why not.
 
- arch/arm64/Kconfig                      |  17 ++++
- arch/arm64/include/asm/Kbuild           |   1 +
- arch/arm64/include/asm/spinlock.h       | 164 +-------------------------------
- arch/arm64/include/asm/spinlock_types.h |   6 +-
- include/asm-generic/atomic-long.h       |   3 +
- include/asm-generic/qrwlock.h           |  37 ++-----
- include/asm-generic/qrwlock_types.h     |  15 ++-
- include/linux/atomic.h                  |   4 +
- kernel/locking/qrwlock.c                |  86 +++--------------
- 9 files changed, 61 insertions(+), 272 deletions(-)
 
--- 
-2.1.4
+> Also, I was wondering why use 'local' as prefix? Is there gonna be a similar set
+> of function for arm that could be called by common code? (e.g. drivers?)
+
+Its a hangover from the C irqflags calls like arch_local_save_flags() etc. I
+dropped the 'arch' as these should only be called by arch code and 'daif' should
+prevent any name collisions.
+
+Drivers should never touch this stuff, if they do its likely to be because they
+want to defer bursting-into-flames until we get to userspace, where its harder
+to work out which driver to blame.
+
+
+> Otherwise:
+> Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+
+Thanks!
+
+
+James
