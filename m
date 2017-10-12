@@ -1,127 +1,67 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Thu, 12 Oct 2017 13:28:04 +0100
-Subject: [PATCH v3 1/2] arm_arch_timer: Expose event stream status
-In-Reply-To: <20171012102612.GB7395@arm.com>
-References: <1506682350-9023-1-git-send-email-julien.thierry@arm.com>
- <1506682350-9023-2-git-send-email-julien.thierry@arm.com>
- <88b96039-f0a5-879f-6f68-d30b09ab0cc7@arm.com>
- <20171012093010.GA7395@arm.com>
- <e94ecbdc-47ae-7351-e422-1fa426e35fad@arm.com>
- <20171012102612.GB7395@arm.com>
-Message-ID: <1cfb312b-11be-6e44-306c-7752a4819dcd@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 12 Oct 2017 13:26:29 +0100
+Subject: [PATCH v3 08/20] arm64: entry.S: convert elX_irq
+In-Reply-To: <ae8a4e66-0a07-3e1a-9ac9-adf8b6b60b06@arm.com>
+References: <20171005191812.5678-1-james.morse@arm.com>
+ <20171005191812.5678-9-james.morse@arm.com>
+ <ae8a4e66-0a07-3e1a-9ac9-adf8b6b60b06@arm.com>
+Message-ID: <59DF5F75.1050009@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Julien,
 
-
-On 12/10/17 11:26, Will Deacon wrote:
-> On Thu, Oct 12, 2017 at 10:40:57AM +0100, Julien Thierry wrote:
+On 11/10/17 18:13, Julien Thierry wrote:
+> On 05/10/17 20:18, James Morse wrote:
+>> Following our 'dai' order, irqs should be processed with debug and
+>> serror exceptions unmasked.
+>>  > Add a helper to unmask these two, (and fiq for good measure).
 >>
+>> Signed-off-by: James Morse <james.morse@arm.com>
+>> ---
+>>   arch/arm64/include/asm/assembler.h | 4 ++++
+>>   arch/arm64/kernel/entry.S          | 4 ++--
+>>   2 files changed, 6 insertions(+), 2 deletions(-)
 >>
->> On 12/10/17 10:30, Will Deacon wrote:
->>> On Thu, Oct 12, 2017 at 10:27:06AM +0100, Suzuki K Poulose wrote:
->>>> On 29/09/17 11:52, Julien Thierry wrote:
->>>>> The arch timer configuration for a CPU might get reset after suspending
->>>>> said CPU.
->>>>>
->>>>> In order to reliably use the event stream in the kernel (e.g. for delays),
->>>>> we keep track of the state where we can safely concider the event stream as
->>>>
->>>> nit: consider
->>>>
->>>>> properly configured.
->>>>>
->>>>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
->>>>> Cc: Mark Rutland <mark.rutland@arm.com>
->>>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>>>> Cc: Russell King <linux@armlinux.org.uk>
->>>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>>>> Cc: Will Deacon <will.deacon@arm.com>
->>>>> ---
->>>>>   arch/arm/include/asm/arch_timer.h    |  1 +
->>>>>   arch/arm64/include/asm/arch_timer.h  |  1 +
->>>>>   drivers/clocksource/arm_arch_timer.c | 20 ++++++++++++++++++--
->>>>>   include/clocksource/arm_arch_timer.h |  6 ++++++
->>>>>   4 files changed, 26 insertions(+), 2 deletions(-)
->>>>>
->>>>> diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
->>>>> index d4ebf56..0b6e104 100644
->>>>> --- a/arch/arm/include/asm/arch_timer.h
->>>>> +++ b/arch/arm/include/asm/arch_timer.h
->>>>> @@ -106,6 +106,7 @@ static inline u32 arch_timer_get_cntkctl(void)
->>>>>   static inline void arch_timer_set_cntkctl(u32 cntkctl)
->>>>>   {
->>>>>   	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
->>>>> +	isb();
->>>>>   }
->>>>>
->>>>>   #endif
->>>>> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
->>>>> index a652ce0..bdedd8f 100644
->>>>> --- a/arch/arm64/include/asm/arch_timer.h
->>>>> +++ b/arch/arm64/include/asm/arch_timer.h
->>>>> @@ -144,6 +144,7 @@ static inline u32 arch_timer_get_cntkctl(void)
->>>>>   static inline void arch_timer_set_cntkctl(u32 cntkctl)
->>>>>   {
->>>>>   	write_sysreg(cntkctl, cntkctl_el1);
->>>>> +	isb();
->>>>>   }
->>>>>
->>>>>   static inline u64 arch_counter_get_cntpct(void)
->>>>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
->>>>> index fd4b7f6..47cf15e 100644
->>>>> --- a/drivers/clocksource/arm_arch_timer.c
->>>>> +++ b/drivers/clocksource/arm_arch_timer.c
->>>>> @@ -77,6 +77,7 @@ struct arch_timer {
->>>>>   static bool arch_counter_suspend_stop;
->>>>>   static bool vdso_default = true;
->>>>>
->>>>> +static cpumask_t evtstrm_available;
->>>>>   static bool evtstrm_enable = IS_ENABLED(CONFIG_ARM_ARCH_TIMER_EVTSTREAM);
->>>>>
->>>>>   static int __init early_evtstrm_cfg(char *buf)
->>>>> @@ -740,6 +741,7 @@ static void arch_timer_evtstrm_enable(int divider)
->>>>>   #ifdef CONFIG_COMPAT
->>>>>   	compat_elf_hwcap |= COMPAT_HWCAP_EVTSTRM;
->>>>>   #endif
->>>>> +	cpumask_set_cpu(smp_processor_id(), &evtstrm_available);
->>>>>   }
->>>>>
->>>>>   static void arch_timer_configure_evtstream(void)
->>>>> @@ -864,6 +866,11 @@ u32 arch_timer_get_rate(void)
->>>>>   	return arch_timer_rate;
->>>>>   }
->>>>>
->>>>> +bool arch_timer_evtstrm_available(void)
->>>>> +{
->>>>> +	return !!cpumask_test_cpu(smp_processor_id(), &evtstrm_available);
->>>>> +}
->>>>> +
->>>>
->>>> This could live in the header file as static inlin, if the evtstrm_available
->>>> is made global and could avoid a function call where it is used.
->>>
->>> You might need an EXPORT_SYMBOl as well if you go down that route.
->>
->> Hmmm, I'm not fond of making the cpu mask global. I understand you can avoid
->> the branch + ret of the function, but generally you want to check if the
->> event stream is present to know if you can use wfe and wake up, so I don't
->> think it might be used in a performance critical path.
->>
->> So I'm wondering, is it really worth it?
+>> diff --git a/arch/arm64/include/asm/assembler.h
+>> b/arch/arm64/include/asm/assembler.h
+>> index c2a37e2f733c..7ffb2a629dc9 100644
+>> --- a/arch/arm64/include/asm/assembler.h
+>> +++ b/arch/arm64/include/asm/assembler.h
+>> @@ -54,6 +54,10 @@
+>>       msr    daif, \tmp
+>>       .endm
+>>   +    .macro enable_da_f
+>> +    msr    daifclr, #(8 | 4 | 1)
+>> +    .endm
+>> +
 > 
-> I have no strong preference, but I think you'll need o EXPORT something
-> either way so that delay and friends can be used from modules.
-> 
+> We use this in irq entries because we are inheriting daif + we want to disable
+> irqs while we process irqs right?
 
-Turns out this is not the case. arch_timer_evtstrm_available is called 
-by __delay which is itself exported and available for module.
+In this case not inheriting, we only do that for synchronous exceptions because
+we can't mask them, keeping the flags 'the same' lets us ignore them.
 
-So unless a module needs to check availability of the event stream there 
-is no need to export it. I'll leave it like this for now unless there is 
-a strong case to be able to inline or export arch_timer_evtstrm_available.
+Here we are unconditionally unmasking things for handling interrupts. If we
+stick with this dai order we know its safe to unmask SError and enable Debug.
 
-Thanks,
 
--- 
-Julien Thierry
+> I don't know if it's worth adding a comment but I find it easier to think about
+> it like this.
+
+If its not-obvious, there should be a comment:
+/* IRQ is the lowest priority flag, unconditionally unmask the rest. */
+
+
+(I was expecting flames for the hangman style naming!)
+
+> Otherwise, for patches 3 to 8 (I don't have any comment on 3 to 7):
+> Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+
+Thanks!
+
+I'll post a v4 ~tomorrow with this and the renaming changes.
+
+
+
+James
