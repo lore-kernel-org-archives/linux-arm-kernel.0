@@ -1,51 +1,32 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Thu, 12 Oct 2017 22:50:01 +0200
-Subject: [PATCH 0/2] Enable the Amlogic Meson SDIO MMC controller
-In-Reply-To: <7ho9pdfc8p.fsf@baylibre.com>
-References: <20171007162940.14595-1-martin.blumenstingl@googlemail.com>
- <7ho9pdfc8p.fsf@baylibre.com>
-Message-ID: <CAFBinCAPsrw89nhWevO6=BG=POa5caepgCNg0xHx=iWD7H6jWg@mail.gmail.com>
+From: briannorris@chromium.org (Brian Norris)
+Date: Thu, 12 Oct 2017 13:52:17 -0700
+Subject: [PATCH 0/3] PCI: rockchip: assert PERST# in S3
+Message-ID: <20171012205220.130048-1-briannorris@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Hi,
 
-On Thu, Oct 12, 2017 at 2:20 AM, Kevin Hilman <khilman@baylibre.com> wrote:
-> Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
->
->> Now that the SDIO MMC driver is queued for v4.15 we need to prepare
->> our platform so boards can actually use this driver.
->> This adds the Meson SDIO MMC controller to the .dts files and
->> enables the corresponding driver in the multi_v7_defconfig.
->
-> Just curious... were you able to test this on any meson8 platform?
-I have two 32-bit Meson boards:
-- Meson8m2 (S812) based Akaso M8S
-- Meson8b based Endless Mini EC-100
+This patch series should mostly be self-descriptive, but it's motivated by the
+fact that I've found differing requirements from PCIe endpoint makers regarding
+the state of PERST# when in system suspend (S3). Additionally, some existing
+boards are not especially well suited for holding PERST# low in S3 (e.g., the
+pin is driven by a non-PMU GPIO, so it's hard or impossible to keep it
+asserted). So the solution is...give it a device tree property!
 
-I do not have any Meson8 (S805) based board, however I believe that
-there aren't many differences between Meson8 and Meson8m2 in terms of
-"peripherals" (they share the same mach-meson8 directory in Amlogic's
-kernel sources).
+Brian
 
-most of my tests were done my Meson8m2 board, however I also did a
-quick test on the EC-100 some time ago.
+Brian Norris (3):
+  Documentation/devicetree: Add pcie-reset-suspend property
+  of/pci: Add of_pci_get_pcie_reset_suspend() to parse
+    pcie-reset-suspend
+  PCI: rockchip: Support configuring PERST# state via DT
 
-> [...]
->
->> Martin Blumenstingl (2):
->>   ARM: dts: meson: add the SDIO MMC controller
->
-> Applied to v4.15/dt
->
->>   ARM: multi_v7_defconfig: enable the Meson MX SDIO/MMC controller
->
-> Applied to v4.15/defconfig
-Thank you!
+ Documentation/devicetree/bindings/pci/pci.txt | 11 +++++++++++
+ drivers/of/of_pci.c                           | 25 +++++++++++++++++++++++++
+ drivers/pci/host/pcie-rockchip.c              |  7 +++++++
+ include/linux/of_pci.h                        |  7 +++++++
+ 4 files changed, 50 insertions(+)
 
-> Thanks!
->
-> Kevin
-
-
-Martin
+-- 
+2.15.0.rc0.271.g36b669edcc-goog
