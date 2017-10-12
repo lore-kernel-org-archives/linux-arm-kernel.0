@@ -1,430 +1,235 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 12 Oct 2017 12:41:36 +0200
-Subject: [PATCH 32/37] KVM: arm/arm64: Handle VGICv2 save/restore from the
- main VGIC code
+Date: Thu, 12 Oct 2017 12:41:29 +0200
+Subject: [PATCH 25/37] KVM: arm64: Prepare to handle traps on remaining
+ deferred EL1 sysregs
 In-Reply-To: <20171012104141.26902-1-christoffer.dall@linaro.org>
 References: <20171012104141.26902-1-christoffer.dall@linaro.org>
-Message-ID: <20171012104141.26902-33-christoffer.dall@linaro.org>
+Message-ID: <20171012104141.26902-26-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can program the GICv2 hypervisor control interface logic directly
-from the core vgic code and can instead do the save/restore directly
-from the flush/sync functions, which can lead to a number of future
-optimizations.
+Handle accesses during traps to any remaining EL1 registers which can be
+deferred to vcpu_load and vcpu_put, by either accessing them directly on
+the physical CPU when the latest version is stored there, or by
+synchronizing the memory representation with the CPU state.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/hyp/switch.c        |  4 --
- arch/arm64/include/asm/kvm_hyp.h |  2 -
- arch/arm64/kvm/hyp/switch.c      |  4 --
- virt/kvm/arm/hyp/vgic-v2-sr.c    | 83 ------------------------------------
- virt/kvm/arm/vgic/vgic-init.c    | 22 ++++++----
- virt/kvm/arm/vgic/vgic-v2.c      | 92 ++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.c         | 21 ++++++++-
- virt/kvm/arm/vgic/vgic.h         |  5 +++
- 8 files changed, 130 insertions(+), 103 deletions(-)
+ arch/arm64/include/asm/kvm_emulate.h | 14 -------
+ arch/arm64/kvm/inject_fault.c        | 79 ++++++++++++++++++++++++++++++++----
+ arch/arm64/kvm/sys_regs.c            |  6 ++-
+ 3 files changed, 76 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
-index c3b9799..0d834f8 100644
---- a/arch/arm/kvm/hyp/switch.c
-+++ b/arch/arm/kvm/hyp/switch.c
-@@ -91,16 +91,12 @@ static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
- {
- 	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
- 		__vgic_v3_save_state(vcpu);
--	else
--		__vgic_v2_save_state(vcpu);
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index 630dd60..69bb40d 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -66,11 +66,6 @@ static inline unsigned long *vcpu_pc(const struct kvm_vcpu *vcpu)
+ 	return (unsigned long *)&vcpu_gp_regs(vcpu)->regs.pc;
  }
  
- static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
- {
- 	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
- 		__vgic_v3_restore_state(vcpu);
--	else
--		__vgic_v2_restore_state(vcpu);
- }
- 
- static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
-diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
-index 28d5f3c..bd3fe64 100644
---- a/arch/arm64/include/asm/kvm_hyp.h
-+++ b/arch/arm64/include/asm/kvm_hyp.h
-@@ -121,8 +121,6 @@ typeof(orig) * __hyp_text fname(void)					\
- 	return val;							\
- }
- 
--void __vgic_v2_save_state(struct kvm_vcpu *vcpu);
--void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
- int __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu);
- 
- void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 5692aa0..90da506 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -186,16 +186,12 @@ static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
- {
- 	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
- 		__vgic_v3_save_state(vcpu);
--	else
--		__vgic_v2_save_state(vcpu);
- }
- 
- static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
- {
- 	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
- 		__vgic_v3_restore_state(vcpu);
--	else
--		__vgic_v2_restore_state(vcpu);
- }
- 
- static bool __hyp_text __true_value(void)
-diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
-index a3f18d3..b433257 100644
---- a/virt/kvm/arm/hyp/vgic-v2-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
-@@ -22,89 +22,6 @@
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_hyp.h>
- 
--static void __hyp_text save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
+-static inline unsigned long *vcpu_elr_el1(const struct kvm_vcpu *vcpu)
 -{
--	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
--	int nr_lr = (kern_hyp_va(&kvm_vgic_global_state))->nr_lr;
--	u32 elrsr0, elrsr1;
--
--	elrsr0 = readl_relaxed(base + GICH_ELRSR0);
--	if (unlikely(nr_lr > 32))
--		elrsr1 = readl_relaxed(base + GICH_ELRSR1);
--	else
--		elrsr1 = 0;
--
--#ifdef CONFIG_CPU_BIG_ENDIAN
--	cpu_if->vgic_elrsr = ((u64)elrsr0 << 32) | elrsr1;
--#else
--	cpu_if->vgic_elrsr = ((u64)elrsr1 << 32) | elrsr0;
--#endif
+-	return (unsigned long *)&vcpu_gp_regs(vcpu)->elr_el1;
 -}
 -
--static void __hyp_text save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
+ static inline unsigned long *vcpu_cpsr(const struct kvm_vcpu *vcpu)
+ {
+ 	return (unsigned long *)&vcpu_gp_regs(vcpu)->regs.pstate;
+@@ -120,15 +115,6 @@ static inline void vcpu_set_reg(struct kvm_vcpu *vcpu, u8 reg_num,
+ 		vcpu_gp_regs(vcpu)->regs.regs[reg_num] = val;
+ }
+ 
+-/* Get vcpu SPSR for current mode */
+-static inline unsigned long *vcpu_spsr(const struct kvm_vcpu *vcpu)
 -{
--	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
--	int i;
--	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
+-	if (vcpu_mode_is_32bit(vcpu))
+-		return vcpu_spsr32(vcpu);
 -
--	for (i = 0; i < used_lrs; i++) {
--		if (cpu_if->vgic_elrsr & (1UL << i))
--			cpu_if->vgic_lr[i] &= ~GICH_LR_STATE;
--		else
--			cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
--
--		writel_relaxed(0, base + GICH_LR0 + (i * 4));
--	}
+-	return (unsigned long *)&vcpu_gp_regs(vcpu)->spsr[KVM_SPSR_EL1];
 -}
 -
--/* vcpu is already in the HYP VA space */
--void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
--{
--	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
--	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
--	struct vgic_dist *vgic = &kvm->arch.vgic;
--	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
--	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
--
--	if (!base)
--		return;
--
--	if (used_lrs) {
--		cpu_if->vgic_apr = readl_relaxed(base + GICH_APR);
--
--		save_elrsr(vcpu, base);
--		save_lrs(vcpu, base);
--
--		writel_relaxed(0, base + GICH_HCR);
--	} else {
--		cpu_if->vgic_elrsr = ~0UL;
--		cpu_if->vgic_apr = 0;
--	}
--}
--
--/* vcpu is already in the HYP VA space */
--void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
--{
--	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
--	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
--	struct vgic_dist *vgic = &kvm->arch.vgic;
--	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
--	int i;
--	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
--
--	if (!base)
--		return;
--
--	if (used_lrs) {
--		writel_relaxed(cpu_if->vgic_hcr, base + GICH_HCR);
--		writel_relaxed(cpu_if->vgic_apr, base + GICH_APR);
--		for (i = 0; i < used_lrs; i++) {
--			writel_relaxed(cpu_if->vgic_lr[i],
--				       base + GICH_LR0 + (i * 4));
--		}
--	}
--}
--
- #ifdef CONFIG_ARM64
- /*
-  * __vgic_v2_perform_cpuif_access -- perform a GICV access on behalf of the
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index 5801261f..fa2b565 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -425,14 +425,16 @@ static int vgic_init_cpu_dying(unsigned int cpu)
- 	return 0;
- }
- 
--static irqreturn_t vgic_maintenance_handler(int irq, void *data)
-+static irqreturn_t vgic_v3_maintenance_handler(int irq, void *data)
+ static inline bool vcpu_mode_priv(const struct kvm_vcpu *vcpu)
  {
--	/*
--	 * We cannot rely on the vgic maintenance interrupt to be
--	 * delivered synchronously. This means we can only use it to
--	 * exit the VM, and we perform the handling of EOIed
--	 * interrupts on the exit path (see vgic_process_maintenance).
--	 */
-+	BUG(); /* Not implemented lazy save/restore on GICv3 */
-+	return IRQ_HANDLED;
-+}
-+
-+static irqreturn_t vgic_v2_maintenance_handler(int irq, void *data)
-+{
-+	struct kvm_vcpu *vcpu = (struct kvm_vcpu *)data;
-+	vgic_v2_handle_maintenance(vcpu);
- 	return IRQ_HANDLED;
- }
+ 	u32 mode;
+diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
+index 45c7026..f4513fc 100644
+--- a/arch/arm64/kvm/inject_fault.c
++++ b/arch/arm64/kvm/inject_fault.c
+@@ -23,6 +23,7 @@
  
-@@ -464,6 +466,7 @@ void kvm_vgic_init_cpu_hardware(void)
- int kvm_vgic_hyp_init(void)
- {
- 	const struct gic_kvm_info *gic_kvm_info;
-+	irqreturn_t (*handler)(int irq, void *data);
- 	int ret;
- 
- 	gic_kvm_info = gic_get_kvm_info();
-@@ -478,6 +481,7 @@ int kvm_vgic_hyp_init(void)
- 	switch (gic_kvm_info->type) {
- 	case GIC_V2:
- 		ret = vgic_v2_probe(gic_kvm_info);
-+		handler = vgic_v2_maintenance_handler;
- 		break;
- 	case GIC_V3:
- 		ret = vgic_v3_probe(gic_kvm_info);
-@@ -485,6 +489,7 @@ int kvm_vgic_hyp_init(void)
- 			static_branch_enable(&kvm_vgic_global_state.gicv3_cpuif);
- 			kvm_info("GIC system register CPU interface enabled\n");
- 		}
-+		handler = vgic_v3_maintenance_handler;
- 		break;
- 	default:
- 		ret = -ENODEV;
-@@ -494,8 +499,7 @@ int kvm_vgic_hyp_init(void)
- 		return ret;
- 
- 	kvm_vgic_global_state.maint_irq = gic_kvm_info->maint_irq;
--	ret = request_percpu_irq(kvm_vgic_global_state.maint_irq,
--				 vgic_maintenance_handler,
-+	ret = request_percpu_irq(kvm_vgic_global_state.maint_irq, handler,
- 				 "vgic", kvm_get_running_vcpus());
- 	if (ret) {
- 		kvm_err("Cannot register interrupt %d\n",
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index 8089710..259079b 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -37,6 +37,17 @@ void vgic_v2_init_lrs(void)
- 		vgic_v2_write_lr(i, 0);
- }
- 
-+void vgic_v2_handle_maintenance(struct kvm_vcpu *vcpu)
-+{
-+	void __iomem *base = kvm_vgic_global_state.vctrl_base;
-+
-+	/*
-+	 * Disable maintenance interrupt as we only use it to generate an exit
-+	 * from the VM.
-+	 */
-+	writel_relaxed(0, base + GICH_HCR);
-+}
-+
- void vgic_v2_set_underflow(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_v2_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v2;
-@@ -393,6 +404,87 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
- 	return ret;
- }
- 
-+static void save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
-+{
-+	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
-+	int nr_lr = kvm_vgic_global_state.nr_lr;
-+	u32 elrsr0, elrsr1;
-+
-+	elrsr0 = readl_relaxed(base + GICH_ELRSR0);
-+	if (unlikely(nr_lr > 32))
-+		elrsr1 = readl_relaxed(base + GICH_ELRSR1);
-+	else
-+		elrsr1 = 0;
-+
-+#ifdef CONFIG_CPU_BIG_ENDIAN
-+	cpu_if->vgic_elrsr = ((u64)elrsr0 << 32) | elrsr1;
-+#else
-+	cpu_if->vgic_elrsr = ((u64)elrsr1 << 32) | elrsr0;
-+#endif
-+}
-+
-+static void save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
-+{
-+	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
-+	int i;
-+	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
-+
-+	for (i = 0; i < used_lrs; i++) {
-+		if (cpu_if->vgic_elrsr & (1UL << i))
-+			cpu_if->vgic_lr[i] &= ~GICH_LR_STATE;
-+		else
-+			cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
-+
-+		writel_relaxed(0, base + GICH_LR0 + (i * 4));
-+	}
-+}
-+
-+void vgic_v2_save_state(struct kvm_vcpu *vcpu)
-+{
-+	struct kvm *kvm = vcpu->kvm;
-+	struct vgic_dist *vgic = &kvm->arch.vgic;
-+	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
-+	void __iomem *base = vgic->vctrl_base;
-+	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
-+
-+	if (!base)
-+		return;
-+
-+	if (used_lrs) {
-+		cpu_if->vgic_apr = readl_relaxed(base + GICH_APR);
-+
-+		save_elrsr(vcpu, base);
-+		save_lrs(vcpu, base);
-+
-+		writel_relaxed(0, base + GICH_HCR);
-+	} else {
-+		cpu_if->vgic_elrsr = ~0UL;
-+		cpu_if->vgic_apr = 0;
-+	}
-+}
-+
-+void vgic_v2_restore_state(struct kvm_vcpu *vcpu)
-+{
-+	struct kvm *kvm = vcpu->kvm;
-+	struct vgic_dist *vgic = &kvm->arch.vgic;
-+	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
-+	void __iomem *base = vgic->vctrl_base;
-+	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
-+	int i;
-+
-+	if (!base)
-+		return;
-+
-+	if (used_lrs) {
-+		writel_relaxed(cpu_if->vgic_hcr, base + GICH_HCR);
-+		writel_relaxed(cpu_if->vgic_apr, base + GICH_APR);
-+		for (i = 0; i < used_lrs; i++) {
-+			writel_relaxed(cpu_if->vgic_lr[i],
-+				       base + GICH_LR0 + (i * 4));
-+		}
-+	}
-+}
-+
- void vgic_v2_load(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index b1bd238..790fd66 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -18,6 +18,8 @@
  #include <linux/kvm_host.h>
- #include <linux/list_sort.h>
- 
+ #include <asm/kvm_emulate.h>
 +#include <asm/kvm_hyp.h>
-+
- #include "vgic.h"
+ #include <asm/esr.h>
  
- #define CREATE_TRACE_POINTS
-@@ -683,11 +685,19 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
- 		vgic_clear_lr(vcpu, count);
- }
+ #define PSTATE_FAULT_BITS_64 	(PSR_MODE_EL1h | PSR_A_BIT | PSR_F_BIT | \
+@@ -33,13 +34,55 @@
+ #define LOWER_EL_AArch64_VECTOR		0x400
+ #define LOWER_EL_AArch32_VECTOR		0x600
  
-+static inline void vgic_save_state(struct kvm_vcpu *vcpu)
++static u64 vcpu_get_vbar_el1(struct kvm_vcpu *vcpu)
 +{
-+	if (!static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
-+		vgic_v2_save_state(vcpu);
++	unsigned long vbar;
++
++	if (vcpu->arch.sysregs_loaded_on_cpu)
++		vbar = read_sysreg_el1(vbar);
++	else
++		vbar = vcpu_sys_reg(vcpu, VBAR_EL1);
++
++	if (vcpu_el1_is_32bit(vcpu))
++		return lower_32_bits(vbar);
++	return vbar;
 +}
 +
- /* Sync back the hardware VGIC state into our emulation after a guest's run. */
- void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
- 
-+	vgic_save_state(vcpu);
-+
- 	/* An empty ap_list_head implies used_lrs == 0 */
- 	if (list_empty(&vcpu->arch.vgic_cpu.ap_list_head))
- 		return;
-@@ -697,6 +707,12 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
- 	vgic_prune_ap_list(vcpu);
- }
- 
-+static inline void vgic_restore_state(struct kvm_vcpu *vcpu)
++static void vcpu_set_elr_el1(struct kvm_vcpu *vcpu, u64 val)
 +{
-+	if (!static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
-+		vgic_v2_restore_state(vcpu);
++	if (vcpu->arch.sysregs_loaded_on_cpu)
++		write_sysreg_el1(val, elr);
++	else
++		vcpu_gp_regs(vcpu)->elr_el1 = val;
 +}
 +
- /* Flush our emulation state into the GIC hardware before entering the guest. */
- void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
- {
-@@ -710,13 +726,16 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
- 	 * this.
- 	 */
- 	if (list_empty(&vcpu->arch.vgic_cpu.ap_list_head))
--		return;
-+		goto out;
- 
- 	DEBUG_SPINLOCK_BUG_ON(!irqs_disabled());
- 
- 	spin_lock(&vcpu->arch.vgic_cpu.ap_list_lock);
- 	vgic_flush_lr_state(vcpu);
- 	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
++/* Set the SPSR for the current mode */
++static void vcpu_set_spsr(struct kvm_vcpu *vcpu, u64 val)
++{
++	if (vcpu_mode_is_32bit(vcpu))
++		*vcpu_spsr32(vcpu) = val;
 +
-+out:
-+	vgic_restore_state(vcpu);
++	if (vcpu->arch.sysregs_loaded_on_cpu)
++		write_sysreg_el1(val, spsr);
++	else
++		vcpu_gp_regs(vcpu)->spsr[KVM_SPSR_EL1] = val;
++}
++
++static u32 vcpu_get_c1_sctlr(struct kvm_vcpu *vcpu)
++{
++	if (vcpu->arch.sysregs_loaded_on_cpu)
++		return lower_32_bits(read_sysreg_el1(sctlr));
++	else
++		return vcpu_cp15(vcpu, c1_SCTLR);
++}
++
+ static void prepare_fault32(struct kvm_vcpu *vcpu, u32 mode, u32 vect_offset)
+ {
+ 	unsigned long cpsr;
+ 	unsigned long new_spsr_value = *vcpu_cpsr(vcpu);
+ 	bool is_thumb = (new_spsr_value & COMPAT_PSR_T_BIT);
+ 	u32 return_offset = (is_thumb) ? 4 : 0;
+-	u32 sctlr = vcpu_cp15(vcpu, c1_SCTLR);
++	u32 sctlr = vcpu_get_c1_sctlr(vcpu);
+ 
+ 	cpsr = mode | COMPAT_PSR_I_BIT;
+ 
+@@ -51,14 +94,14 @@ static void prepare_fault32(struct kvm_vcpu *vcpu, u32 mode, u32 vect_offset)
+ 	*vcpu_cpsr(vcpu) = cpsr;
+ 
+ 	/* Note: These now point to the banked copies */
+-	*vcpu_spsr(vcpu) = new_spsr_value;
++	vcpu_set_spsr(vcpu, new_spsr_value);
+ 	*vcpu_reg32(vcpu, 14) = *vcpu_pc(vcpu) + return_offset;
+ 
+ 	/* Branch to exception vector */
+ 	if (sctlr & (1 << 13))
+ 		vect_offset += 0xffff0000;
+ 	else /* always have security exceptions */
+-		vect_offset += vcpu_cp15(vcpu, c12_VBAR);
++		vect_offset += vcpu_get_vbar_el1(vcpu);
+ 
+ 	*vcpu_pc(vcpu) = vect_offset;
+ }
+@@ -79,6 +122,20 @@ static void inject_abt32(struct kvm_vcpu *vcpu, bool is_pabt,
+ 	u32 *far, *fsr;
+ 	bool is_lpae;
+ 
++	/*
++	 * We are going to need the latest values of the following system
++	 * regiters:
++	 *   DFAR:  mapped to FAR_EL1
++	 *   IFAR:  mapped to FAR_EL1
++	 *   DFSR:  mapped to ESR_EL1
++	 *   TTBCR: mapped to TCR_EL1
++	 */
++	if (vcpu->arch.sysregs_loaded_on_cpu) {
++		vcpu->arch.ctxt.sys_regs[FAR_EL1] = read_sysreg_el1(far);
++		vcpu->arch.ctxt.sys_regs[ESR_EL1] = read_sysreg_el1(esr);
++		vcpu->arch.ctxt.sys_regs[TCR_EL1] = read_sysreg_el1(tcr);
++	}
++
+ 	if (is_pabt) {
+ 		vect_offset = 12;
+ 		far = &vcpu_cp15(vcpu, c6_IFAR);
+@@ -99,6 +156,12 @@ static void inject_abt32(struct kvm_vcpu *vcpu, bool is_pabt,
+ 		*fsr = 1 << 9 | 0x34;
+ 	else
+ 		*fsr = 0x14;
++
++	/* Sync back any registers we may have changed */
++	if (vcpu->arch.sysregs_loaded_on_cpu) {
++		write_sysreg_el1(vcpu->arch.ctxt.sys_regs[FAR_EL1], far);
++		write_sysreg_el1(vcpu->arch.ctxt.sys_regs[ESR_EL1], esr);
++	}
  }
  
- void kvm_vgic_load(struct kvm_vcpu *vcpu)
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 4f8aecb..9895396 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -167,6 +167,11 @@ int vgic_register_dist_iodev(struct kvm *kvm, gpa_t dist_base_address,
- void vgic_v2_init_lrs(void);
- void vgic_v2_load(struct kvm_vcpu *vcpu);
- void vgic_v2_put(struct kvm_vcpu *vcpu);
-+void vgic_v2_handle_maintenance(struct kvm_vcpu *vcpu);
-+
-+void vgic_v2_save_state(struct kvm_vcpu *vcpu);
-+void vgic_v2_restore_state(struct kvm_vcpu *vcpu);
-+
+ enum exception_type {
+@@ -126,7 +189,7 @@ static u64 get_except_vector(struct kvm_vcpu *vcpu, enum exception_type type)
+ 		exc_offset = LOWER_EL_AArch32_VECTOR;
+ 	}
  
- static inline void vgic_get_irq_kref(struct vgic_irq *irq)
+-	return vcpu_sys_reg(vcpu, VBAR_EL1) + exc_offset + type;
++	return vcpu_get_vbar_el1(vcpu) + exc_offset + type;
+ }
+ 
+ static void inject_abt64(struct kvm_vcpu *vcpu, bool is_iabt, unsigned long addr)
+@@ -135,11 +198,11 @@ static void inject_abt64(struct kvm_vcpu *vcpu, bool is_iabt, unsigned long addr
+ 	bool is_aarch32 = vcpu_mode_is_32bit(vcpu);
+ 	u32 esr = 0;
+ 
+-	*vcpu_elr_el1(vcpu) = *vcpu_pc(vcpu);
++	vcpu_set_elr_el1(vcpu, *vcpu_pc(vcpu));
+ 	*vcpu_pc(vcpu) = get_except_vector(vcpu, except_type_sync);
+ 
+ 	*vcpu_cpsr(vcpu) = PSTATE_FAULT_BITS_64;
+-	*vcpu_spsr(vcpu) = cpsr;
++	vcpu_set_spsr(vcpu, cpsr);
+ 
+ 	vcpu_sys_reg(vcpu, FAR_EL1) = addr;
+ 
+@@ -170,11 +233,11 @@ static void inject_undef64(struct kvm_vcpu *vcpu)
+ 	unsigned long cpsr = *vcpu_cpsr(vcpu);
+ 	u32 esr = (ESR_ELx_EC_UNKNOWN << ESR_ELx_EC_SHIFT);
+ 
+-	*vcpu_elr_el1(vcpu) = *vcpu_pc(vcpu);
++	vcpu_set_elr_el1(vcpu, *vcpu_pc(vcpu));
+ 	*vcpu_pc(vcpu) = get_except_vector(vcpu, except_type_sync);
+ 
+ 	*vcpu_cpsr(vcpu) = PSTATE_FAULT_BITS_64;
+-	*vcpu_spsr(vcpu) = cpsr;
++	vcpu_set_spsr(vcpu, cpsr);
+ 
+ 	/*
+ 	 * Build an unknown exception, depending on the instruction
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index f7887dd..60d1660 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -86,12 +86,16 @@ static u32 cache_levels;
+ static u32 get_ccsidr(u32 csselr)
  {
+ 	u32 ccsidr;
++	u32 csselr_preserve;
+ 
+-	/* Make sure noone else changes CSSELR during this! */
++	/* Make sure noone else changes CSSELR during this and preserve any
++	 * existing value in the CSSELR! */
+ 	local_irq_disable();
++	csselr_preserve = read_sysreg(csselr_el1);
+ 	write_sysreg(csselr, csselr_el1);
+ 	isb();
+ 	ccsidr = read_sysreg(ccsidr_el1);
++	write_sysreg(csselr_preserve, csselr_el1);
+ 	local_irq_enable();
+ 
+ 	return ccsidr;
 -- 
 2.9.0
