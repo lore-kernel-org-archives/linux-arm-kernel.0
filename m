@@ -1,49 +1,58 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 12 Oct 2017 11:25:50 -0400 (EDT)
-Subject: [PATCH] ARM: head-common.S: Clear lr before jumping to
- start_kernel()
-In-Reply-To: <20171012102341.GF23750@n2100.armlinux.org.uk>
-References: <1507044184-27152-1-git-send-email-geert+renesas@glider.be>
- <nycvar.YSQ.7.76.1710031134140.5407@knanqh.ubzr>
- <CAMuHMdWJKQb5JY+diH=7dqNuypkPUqBeOEPSLOrfrnbfh2siRQ@mail.gmail.com>
- <CAMuHMdXpPfipmEdW0Dap6Pjwhz3QxLcrcbtU0RhCu721k-sBpA@mail.gmail.com>
- <CAMuHMdWH_pebSYAp04gmVceu3qqPczGaXS36R8CtzAYHo-CNog@mail.gmail.com>
- <20171010203324.GX4394@atomide.com>
- <20171012102341.GF23750@n2100.armlinux.org.uk>
-Message-ID: <nycvar.YSQ.7.76.1710121123530.1718@knanqh.ubzr>
+From: jcrouse@codeaurora.org (Jordan Crouse)
+Date: Thu, 12 Oct 2017 09:28:03 -0600
+Subject: [RFCv2 PATCH 00/36] Process management for IOMMU + SVM for SMMUv3
+In-Reply-To: <8a1e090d-22e8-0295-a53f-bc3b5b7d7971@arm.com>
+References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
+ <0c6778d8-741f-0db7-fe3c-df88a75ebbb2@huawei.com>
+ <0fecd29e-eaf7-9503-b087-7bfbc251da88@arm.com>
+ <c6b7fb4b-4f2b-0d81-8bb5-8fa6b62aca3a@huawei.com>
+ <8a1e090d-22e8-0295-a53f-bc3b5b7d7971@arm.com>
+Message-ID: <20171012152803.GA3027@jcrouse-lnx.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 12 Oct 2017, Russell King - ARM Linux wrote:
-
-> On Tue, Oct 10, 2017 at 01:33:25PM -0700, Tony Lindgren wrote:
-> > * Geert Uytterhoeven <geert@linux-m68k.org> [171003 11:32]:
-> > > On Tue, Oct 3, 2017 at 8:15 PM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> > > > On Tue, Oct 3, 2017 at 8:11 PM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> > > >> On Tue, Oct 3, 2017 at 5:37 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > > >>> On Tue, 3 Oct 2017, Geert Uytterhoeven wrote:
-> > > >>> Please send it to RMK's patch system.
-> > > >>
-> > > >> Done (I hope so ;-)
-> > > >
-> > > > Failed. Retrying.
-> > > 
-> > > Yiha ;-)
-> > > 
-> > > http://www.armlinux.org.uk/developer/patches/viewpatch.php?id=8702/1
-> > 
-> > This also fixes the spamming I started seeing with next-20171009:
-> > 
-> > Tested-by: Tony Lindgren <tony@atomide.com>
+On Thu, Oct 12, 2017 at 01:55:32PM +0100, Jean-Philippe Brucker wrote:
+> On 12/10/17 13:05, Yisheng Xie wrote:
+> [...]
+> >>>> * An iommu_process can be bound to multiple domains, and a domain can have
+> >>>>   multiple iommu_process.
+> >>> when bind a task to device, can we create a single domain for it? I am thinking
+> >>> about process management without shared PT(for some device only support PASID
+> >>> without pri ability), it seems hard to expand if a domain have multiple iommu_process?
+> >>> Do you have any idea about this?
+> >>
+> >> A device always has to be in a domain, as far as I know. Not supporting
+> >> PRI forces you to pin down all user mappings (or just the ones you use for
+> >> DMA) but you should sill be able to share PT. Now if you don't support
+> >> shared PT either, but only PASID, then you'll have to use io-pgtable and a
+> >> new map/unmap API on an iommu_process. I don't understand your concern
+> >> though, how would the link between process and domains prevent this use-case?
+> >>
+> > So you mean that if an iommu_process bind to multiple devices it should create
+> > multiple io-pgtables? or just share the same io-pgtable?
 > 
-> It's all nice and good that people are testing this patch, but I can't
-> apply it to -rc1, nor my "misc" branch.  It appears that this is due
-> to patches going through other trees.
+> I don't know to be honest, I haven't thought much about the io-pgtable
+> case, I'm all about sharing the mm :)
 > 
-> Sorry, I can't take this patch.
+> It really depends on what the user (GPU driver I assume) wants. I think
+> that if you're not sharing an mm with the device, then you're trying to
+> hide parts of the process to the device, so you'd also want the
+> flexibility of having different io-pgtables between devices. Different
+> devices accessing isolated parts of the process requires separate io-pgtables.
 
-It should go into your devel-testing branch as this must be applied on 
-top of my xip_zdata branch that you merged there.
+In our specific Snapdragon use case the GPU is the only entity that cares about
+process specific io-pgtables.  Everything else (display, video, camera) is happy
+using a global io-ptgable.  The reasoning is that the GPU is programmable from
+user space and can be easily used to copy data whereas the other use cases have
+mostly fixed functions.
 
+Even if different devices did want to have a process specific io-pgtable I doubt
+we would share them.  Every device uses the IOMMU differently and the magic
+needed to share a io-pgtable between (for example) a GPU and a DSP would be
+prohibitively complicated.
 
-Nicolas
+Jordan
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
