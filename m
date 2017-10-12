@@ -1,67 +1,88 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 12 Oct 2017 12:41:30 +0200
-Subject: [PATCH 26/37] KVM: arm64: Prepare to handle traps on deferred AArch32
- sysregs
+Date: Thu, 12 Oct 2017 12:41:26 +0200
+Subject: [PATCH 22/37] KVM: arm64: Change 32-bit handling of VM system
+ registers
 In-Reply-To: <20171012104141.26902-1-christoffer.dall@linaro.org>
 References: <20171012104141.26902-1-christoffer.dall@linaro.org>
-Message-ID: <20171012104141.26902-27-christoffer.dall@linaro.org>
+Message-ID: <20171012104141.26902-23-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Handle accesses to any AArch32 EL1 system registers where we can defer
-saving and restoring them to vcpu_load and vcpu_put, and which are
-stored in special EL2 registers only used support 32-bit guests.
+We currently handle 32-bit accesses to trapped VM system registers using
+the 32-bit index into the coproc array on the vcpu structure, which is a
+union of the coprog array and the sysreg array.
+
+Since all the 32-bit coproc indicies are created to correspond to the
+architectural mapping between 64-bit system registers and 32-bit
+coprocessor registers, and because the AArch64 system registers are the
+double in size of the AArch32 coprocessor registers, we can always find
+the system register entry that we must update by dividing the 32-bit
+coproc index by 2.
+
+This is going to make our lives much easier when we have to start
+accessing system registers that uses deferred save/restore and might
+have to be read directly from the physical CPU.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kvm/inject_fault.c | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/kvm_host.h |  8 --------
+ arch/arm64/kvm/sys_regs.c         | 20 +++++++++++++++-----
+ 2 files changed, 15 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
-index f4513fc..02990f5 100644
---- a/arch/arm64/kvm/inject_fault.c
-+++ b/arch/arm64/kvm/inject_fault.c
-@@ -59,9 +59,18 @@ static void vcpu_set_elr_el1(struct kvm_vcpu *vcpu, u64 val)
- /* Set the SPSR for the current mode */
- static void vcpu_set_spsr(struct kvm_vcpu *vcpu, u64 val)
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 5e09eb9..9f5761f 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -289,14 +289,6 @@ struct kvm_vcpu_arch {
+ #define vcpu_cp14(v,r)		((v)->arch.ctxt.copro[(r)])
+ #define vcpu_cp15(v,r)		((v)->arch.ctxt.copro[(r)])
+ 
+-#ifdef CONFIG_CPU_BIG_ENDIAN
+-#define vcpu_cp15_64_high(v,r)	vcpu_cp15((v),(r))
+-#define vcpu_cp15_64_low(v,r)	vcpu_cp15((v),(r) + 1)
+-#else
+-#define vcpu_cp15_64_high(v,r)	vcpu_cp15((v),(r) + 1)
+-#define vcpu_cp15_64_low(v,r)	vcpu_cp15((v),(r))
+-#endif
+-
+ struct kvm_vm_stat {
+ 	ulong remote_tlb_flush;
+ };
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index bb0e41b..dbe35fd 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -120,16 +120,26 @@ static bool access_vm_reg(struct kvm_vcpu *vcpu,
+ 			  const struct sys_reg_desc *r)
  {
--	if (vcpu_mode_is_32bit(vcpu))
-+	if (vcpu_mode_is_32bit(vcpu)) {
-+		if (vcpu->arch.sysregs_loaded_on_cpu)
-+			__sysreg32_save_state(vcpu);
-+
- 		*vcpu_spsr32(vcpu) = val;
+ 	bool was_enabled = vcpu_has_cache_enabled(vcpu);
++	u64 val;
++	int reg = r->reg;
  
-+		if (vcpu->arch.sysregs_loaded_on_cpu)
-+			__sysreg32_restore_state(vcpu);
+ 	BUG_ON(!p->is_write);
+ 
+-	if (!p->is_aarch32) {
+-		vcpu_sys_reg(vcpu, r->reg) = p->regval;
++	/* See the 32bit mapping in kvm_host.h */
++	if (p->is_aarch32)
++		reg = r->reg / 2;
 +
-+		return;
-+	}
-+
- 	if (vcpu->arch.sysregs_loaded_on_cpu)
- 		write_sysreg_el1(val, spsr);
- 	else
-@@ -129,11 +138,13 @@ static void inject_abt32(struct kvm_vcpu *vcpu, bool is_pabt,
- 	 *   IFAR:  mapped to FAR_EL1
- 	 *   DFSR:  mapped to ESR_EL1
- 	 *   TTBCR: mapped to TCR_EL1
-+	 *   IFSR:  stored in IFSR32_EL2
- 	 */
- 	if (vcpu->arch.sysregs_loaded_on_cpu) {
- 		vcpu->arch.ctxt.sys_regs[FAR_EL1] = read_sysreg_el1(far);
- 		vcpu->arch.ctxt.sys_regs[ESR_EL1] = read_sysreg_el1(esr);
- 		vcpu->arch.ctxt.sys_regs[TCR_EL1] = read_sysreg_el1(tcr);
-+		vcpu->arch.ctxt.sys_regs[IFSR32_EL2] = read_sysreg(ifsr32_el2);
++	if (!p->is_aarch32 || !p->is_32bit) {
++		val = p->regval;
+ 	} else {
+-		if (!p->is_32bit)
+-			vcpu_cp15_64_high(vcpu, r->reg) = upper_32_bits(p->regval);
+-		vcpu_cp15_64_low(vcpu, r->reg) = lower_32_bits(p->regval);
++		val = vcpu_sys_reg(vcpu, reg);
++		if (r->reg % 2)
++			val = (p->regval << 32) | (u64)lower_32_bits(val);
++		else
++			val = ((u64)upper_32_bits(val) << 32) |
++				(u64)lower_32_bits(p->regval);
  	}
++	vcpu_sys_reg(vcpu, reg) = val;
  
- 	if (is_pabt) {
-@@ -161,6 +172,7 @@ static void inject_abt32(struct kvm_vcpu *vcpu, bool is_pabt,
- 	if (vcpu->arch.sysregs_loaded_on_cpu) {
- 		write_sysreg_el1(vcpu->arch.ctxt.sys_regs[FAR_EL1], far);
- 		write_sysreg_el1(vcpu->arch.ctxt.sys_regs[ESR_EL1], esr);
-+		write_sysreg(vcpu->arch.ctxt.sys_regs[IFSR32_EL2], ifsr32_el2);
- 	}
- }
- 
+ 	kvm_toggle_cache(vcpu, was_enabled);
+ 	return true;
 -- 
 2.9.0
