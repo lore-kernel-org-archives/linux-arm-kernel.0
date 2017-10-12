@@ -1,71 +1,55 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 12 Oct 2017 08:50:39 +0300
-Subject: [PATCH 0/8] Add hwmod data for IPU & DSP processors/MMUs
-In-Reply-To: <20170922211919.GD4394@atomide.com>
-References: <20170821234818.4755-1-s-anna@ti.com>
- <d4715d1e-8113-050b-9a0f-77f4a4486081@ti.com>
- <20170922175110.GC4394@atomide.com>
- <de9b14a1-250e-c73d-d999-468a50e6b1a3@ti.com>
- <20170922211919.GD4394@atomide.com>
-Message-ID: <58ebe05c-b2d1-aefd-c15d-5c92fb93ebab@ti.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 12 Oct 2017 09:07:55 +0300
+Subject: [PATCH 5/7] ARM: dts: Add nodes for missing omap4 interconnect
+ target modules
+In-Reply-To: <20171011165850.jnaievrgcszcawh3@earth>
+References: <20170929223411.9691-1-tony@atomide.com>
+ <20170929223411.9691-6-tony@atomide.com>
+ <f5c57f0b-1423-c362-0fda-4069b77a2e38@ti.com>
+ <20171011165850.jnaievrgcszcawh3@earth>
+Message-ID: <da8d1d7f-f16d-8d71-cf49-acff79614610@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?
+?Hi Sebastian,
+
+
 Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
 
-On 23/09/17 00:19, Tony Lindgren wrote:
-> * Suman Anna <s-anna@ti.com> [170922 14:08]:
->> On 09/22/2017 12:51 PM, Tony Lindgren wrote:
->>> * Suman Anna <s-anna@ti.com> [170922 10:19]:
->>>> Ping on this series. Tero's clkctrl series changes are orthogonal to
->>>> these changes.
->>>
->>> With patch 5/8 you said earlier "It will still be a shared set
->>> between the MMU and remoteproc drivers, but let me look into
->>> how these get integrated." So was there any conclusion there?
->>>
->>> Also, what's the deal with these omap4 changes that I commented
->>> on in 5/8?
->>
->> Tony,
->> So, looking at code, removing modulemode on hwmod does change the
->> semantics as that will not plug in the clkctrl clk (_omap4_xlate_clkctrl
->> will return 0) into the hwmod and will fall back. So, this should make
->> it compatible to the existing code before adding the clkctrl dt nodes,
->> and Patch 5 will be good to avoid the crash when disabling the processor
->> nodes. That said, now that the modulemode is controlled by the
->> ti-clkctrl code, I would expect to get the refcounting for free due to
->> clk_enable() semantics if the same clkctrl clk is plugged under two
->> nodes (MMU and processor) and I may not need to remove the modulemode.
->> One of the main reasons for removing the modulemode is the lack of
->> refcounting on modulemode in the original code.
+On 2017-10-11 19:58, Sebastian Reichel wrote:
+>> I'll look at the schema of PandaBoard to see if I can route out the McASP
+>> lines to somewhere then I can add support for this revision to davinci-mcasp
+>> driver.
 > 
-> OK. Sounds like you can get the refcounting for free just by modifying
-> the dts as done for example for musb on omap4 in "[PATCH 10/10] ARM:
-> dts: Use ti-sysc module driver for omap4 musb" in that series. You
-> will need also the rest of the patches from that series naturally :)
+> Not sure if this is helpful information:
 > 
-> That is as long as MMU and processor are both child devices in the
-> same interconnect target module.
+> Motorola Droid 4 is OMAP4430 based and has McASP lines routed
+> to the audio codec (either McASP or McBSP can be used). Codec
+> is a custom one, which is not yet supported mainline, but
+> patches are WIP (*):
 > 
->> In anycase, I need to retest this with all of required patches from Tero
->> (current mainline does not yet have the clkctrl dt nodes).
-> 
-> OK
-> 
->> Tero,
->> Do you have these patches rebased onto 4.14-rc1 (preferable if it is
->> rebased onto Tony's omap-for-v4.15/soc branch. I tried cherry-picking
->> from your github test branch (based on 4.13-rc3), but am running into
->> some L3Noc errors once I add the clkctrl dts node patch on Panda4 using NFS.
-> 
-> Yeah I noticed that and emailed Tero about it. It seems to trigger
-> with built-in musb and DEBUG_KERNEL disabled, not sure what triggers
-> it. Only happens after the clkctrl nodes are added.
+> https://lkml.org/lkml/2017/7/12/368
 
-In my tree, you can find 4.14-rc1-clkctrl-cleanup branch. It can still 
-be considered WIP, as I haven't posted it publicly and am working with 
-some late quirks on it.
+Really cool!
+I don't see much benefit of using McASP on OMAP4, only drawbacks... It
+lacks AFIFO so it is prone to underrun and if it underruns you need to
+reset McASP. Been there with the Samsung Galaxy Nexus.
 
--Tero
+I wonder how Motorola is using the McASP as the OMAP4 version
+(officially) does not support I2S. It might work, I have not tried it.
+
+I do have one Galaxy Nexus, but there the McASP is used for the S/PIDIF
+on the dock (the three pins on the side). Yes, I do not have the dock
+and my Galaxy Nexus is still in active use -> not rooted, and never run
+mainline Linux.
+
+> (*) My patches use McBSP instead of McASP, since McASP looked
+> mostly unsupported. Motorola's kernel uses McASP.
+
+If I have something I might ask you for testing, if it is OK.
+
+> 
+> -- Sebastian
+> 
+
+- P?ter
