@@ -1,70 +1,39 @@
-From: tnowicki@caviumnetworks.com (Tomasz Nowicki)
-Date: Thu, 12 Oct 2017 11:41:20 +0200
-Subject: [PATCH V2 0/1] Optimise IOVA allocations for PCI devices
-In-Reply-To: <1505897522-9237-1-git-send-email-tomasz.nowicki@caviumnetworks.com>
-References: <1505897522-9237-1-git-send-email-tomasz.nowicki@caviumnetworks.com>
-Message-ID: <604a93b9-1af4-a961-6c78-cb755d0caa1e@caviumnetworks.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 12 Oct 2017 10:45:17 +0100
+Subject: [PATCH] ARM: compressed: discard ksym/kcrctab input section
+In-Reply-To: <874lr4d8gm.fsf@free-electrons.com>
+References: <20170908153143.27279-1-ard.biesheuvel@linaro.org>
+ <87d163kt0m.fsf@free-electrons.com>
+ <CAKv+Gu_pGeDxK_vD9iGUO486VgLsntMQwVs9wGKa79pkx7paMQ@mail.gmail.com>
+ <20171004124320.GP20805@n2100.armlinux.org.uk>
+ <CAKv+Gu_t+oLJKGzy3LxgLZqqYsd9eQiwZRr6dgPbqpsHnQUUxw@mail.gmail.com>
+ <874lr4d8gm.fsf@free-electrons.com>
+Message-ID: <20171012094517.GB20805@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+On Thu, Oct 12, 2017 at 11:24:57AM +0200, Gregory CLEMENT wrote:
+> Hi Ard,
+> 
+> Can we move forward to fix the booting problem ?
+> 
+> What about amending your commit log with this new information and then
+> submit it to Russell patch system?
 
-Can you please have a look and see if you are fine with this patch?
+Well, I think there's a choice that needs to be made between this
+approach and Arnd's approach.
 
-Thanks in advance,
-Tomasz
+I'm not all that thrilled with the need to add explicit alignment to
+data that is inherently a byte stream, and that invariably results in
+unaligned data words even if you do align the start of it.  That
+sounds to me very much like a hack rather than a proper solution.
+So, right now I'm leaning more towards Arnd's solution than Ard's
+from what's been said in this thread.
 
-On 20.09.2017 10:52, Tomasz Nowicki wrote:
-> Here is my test setup where I have stareted performance measurements.
-> 
->   ------------  PCIe  -------------   TX   -------------  PCIe  -----
-> | ThunderX2  |------| Intel XL710 | ---> | Intel XL710 |------| X86 |
-> | (128 cpus) |      |   40GbE     |      |    40GbE    |       -----
->   ------------        -------------        -------------
-> 
-> As the reference lets take v4.13 host, SMMUv3 off and 1-thread iperf
-> taskset to one CPU. The performance results I got:
-> 
-> SMMU off -> 100%
-> SMMU on -> 0,02%
-> 
-> I followed down the DMA mapping path and found out IOVA 32-bit space
-> full so that kernel was flushing rcaches for all CPUs in (1).
-> For 128 CPUs, this kills the performance. Furthermore, for my case, rcaches
-> contained PFNs > 32-bit mostly so the second round of IOVA allocation failed
-> as well. As the consequence IOVA had to be allocated outside of 32-bit (2)
-> from scratch since all rcaches have been flushed in (1).
-> 
->      if (dma_limit > DMA_BIT_MASK(32) && dev_is_pci(dev))
-> (1)-->  iova = alloc_iova_fast(iovad, iova_len, DMA_BIT_MASK(32) >> shift);
-> 
->      if (!iova)
-> (2)-->  iova = alloc_iova_fast(iovad, iova_len, dma_limit >> shift);
-> 
-> My fix simply introduces parameter for alloc_iova_fast() to decide whether
-> rcache flush has to be done or not. All users follow mentioned scenario
-> so they should let flush as the last chance to avoid time costly iteration
-> over all CPUs.
-> 
-> This bring my iperf performance back to 100% with SMMU on.
-> 
-> My bad feelings regarding this solution is that machines with relatively
-> small numbers of CPUs may get DAC addresses more frequently for PCI
-> devices. Please let me know your thoughts.
-> 
-> Changelog:
-> 
-> v1 --> v2
-> - add missing documentation
-> - fix typo
-> 
-> Tomasz Nowicki (1):
->    iommu/iova: Make rcache flush optional on IOVA allocation failure
-> 
->   drivers/iommu/amd_iommu.c   |  5 +++--
->   drivers/iommu/dma-iommu.c   |  6 ++++--
->   drivers/iommu/intel-iommu.c |  5 +++--
->   drivers/iommu/iova.c        | 11 ++++++-----
->   include/linux/iova.h        |  5 +++--
->   5 files changed, 19 insertions(+), 13 deletions(-)
-> 
+However, I don't recall Arnd's patch, it's probably buried deep in
+my mailbox.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
