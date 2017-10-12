@@ -1,174 +1,87 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 12 Oct 2017 12:41:35 +0200
-Subject: [PATCH 31/37] KVM: arm64: Separate activate_traps and deactive_traps
- for VHE and non-VHE
-In-Reply-To: <20171012104141.26902-1-christoffer.dall@linaro.org>
-References: <20171012104141.26902-1-christoffer.dall@linaro.org>
-Message-ID: <20171012104141.26902-32-christoffer.dall@linaro.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 12 Oct 2017 11:51:37 +0100
+Subject: [PATCH] arm:fix negation of -2147483648 warning with UBSASN
+In-Reply-To: <1507804858-10205-1-git-send-email-manjeet.p@samsung.com>
+References: <CGME20171012104401epcas5p3c707a85cc3a6b35bf34a710f435736cd@epcas5p3.samsung.com>
+ <1507804858-10205-1-git-send-email-manjeet.p@samsung.com>
+Message-ID: <20171012105137.GE20805@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To make the code more readable and to avoid the overhead of a function
-call, let's get rid of a pair of the alternative function selectors and
-explicitly call the VHE and non-VHE functions instead, telling the
-compiler to try to inline the static function if it can.
+On Thu, Oct 12, 2017 at 04:10:58PM +0530, Manjeet Pawar wrote:
+> From: Rohit Thapliyal <r.thapliyal@samsung.com>
+> 
+> Using gcc-6 and UBSAN enabled, we get the following warning:
+> 
+> =========================================================
+> [1-1.4604] UBSAN: Undefined behaviour in ./arch/arm/include/asm/bitops.h:296:17
+> [1-1.4604] negation of -2147483648 cannot be represented in type 'int':
+> [1-1.4605] CPU: 1 PID: 189 Comm: sync Tainted: GO 4.1.10 #1 PPID: 166 PComm: init
+> [1-1.4605] SCHED_NORMAL (p:120, static_p:120, normal_p:120, rt_p:0)
+> [1-1.4605] Backtrace:
+> [1-1.4605] [<c0016050>] (dump_backtrace) from [<c0016fac>] (show_stack+0x18/0x20)
+> [1-1.4605]  r7:c098196c r6:00000000 r5:60040093 r4:c0a177f4
+> [1-1.4605] [<c0016f94>] (show_stack) from [<c06f36d8>] (dump_stack+0xf4/0x148)
+> [1-1.4605] [<c06f35e4>] (dump_stack) from [<c03b8b94>] (ubsan_epilogue+0x14/0x54)
+> [1-1.4605]  r10:00000101 r9:00000120 r8:00000100 r7:00001000 r6:80000000 r5:c0a18b00
+> [1-1.4605]  r4:d8099c00
+> [1-1.4605] [<c03b8b80>] (ubsan_epilogue) from [<c03b941c>] (__ubsan_handle_negate_overflow+0x88/0x90)
+> [1-1.4605]  r5:c0a18b00 r4:c098148c
+> [1-1.4605] [<c03b9394>] (__ubsan_handle_negate_overflow) from [<c03823c4>] (radix_tree_next_chunk+0x380/0x470)
+> [1-1.4605]  r6:e1b88d20 r5:00000006 r4:00000020
+> [1-1.4606] [<c0382044>] (radix_tree_next_chunk) from [<c0158f10>] (find_get_pages_tag+0x158/0x1e8)
+> [1-1.4606]  r10:00000004 r9:0000000e r8:00000101 r7:ffffffff r6:00000000 r5:e1b91cb4
+> [1-1.4606]  r4:00000001
+> [1-1.4606] [<c0158db8>] (find_get_pages_tag) from [<c016e160>] (pagevec_lookup_tag+0x30/0x3c)
+> [1-1.4606]  r10:0000000e r9:27f662e4 r8:00000000 r7:ffffffff r6:e50da320 r5:d8099d60
+> =========================================================
+> 
+> In order to remove these warnings, it seems harmless to modify
+> the signed ints with unsigned long as a fix of negation of -2147483648 in signed int.
+> 
+> Signed-off-by: Rohit Thapliyal <r.thapliyal@samsung.com>
+> Signed-off-by: Manjeet Pawar <manjeet.p@samsung.com>
+> ---
+>  arch/arm/include/asm/bitops.h | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/bitops.h b/arch/arm/include/asm/bitops.h
+> index 5638099..95028db 100644
+> --- a/arch/arm/include/asm/bitops.h
+> +++ b/arch/arm/include/asm/bitops.h
+> @@ -222,7 +222,7 @@ extern int _find_next_bit_be(const unsigned long *p, int size, int offset);
+>  
+>  #else
+>  
+> -static inline int constant_fls(int x)
+> +static inline int constant_fls(unsigned long x)
+>  {
+>  	int r = 32;
+>  
+> @@ -270,7 +270,7 @@ static inline unsigned int __clz(unsigned int x)
+>   * fls() returns zero if the input is zero, otherwise returns the bit
+>   * position of the last set bit, where the LSB is 1 and MSB is 32.
+>   */
+> -static inline int fls(int x)
+> +static inline int fls(unsigned long x)
+>  {
+>  	if (__builtin_constant_p(x))
+>  	       return constant_fls(x);
+> @@ -291,7 +291,7 @@ static inline unsigned long __fls(unsigned long x)
+>   * ffs() returns zero if the input was zero, otherwise returns the bit
+>   * position of the first set bit, where the LSB is 1 and MSB is 32.
+>   */
+> -static inline int ffs(int x)
+> +static inline int ffs(unsigned long x)
+>  {
+>  	return fls(x & -x);
+>  }
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm64/kvm/hyp/switch.c | 78 +++++++++++++++++++++------------------------
- 1 file changed, 37 insertions(+), 41 deletions(-)
+Every other architecture, including asm-generic, uses 'int' for fls()
+and ffs().  If we're going to change the prototype, it needs to be
+changed everwhere, not just one implementation.
 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 13e137e..5692aa0 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -101,9 +101,27 @@ void deactivate_traps_vhe_put(void)
- 	write_sysreg(mdcr_el2, mdcr_el2);
- }
- 
--static void __hyp_text __activate_traps_vhe(struct kvm_vcpu *vcpu)
-+static inline void activate_traps_vhe(struct kvm_vcpu *vcpu)
- {
--	write_sysreg(__kvm_hyp_vector, vbar_el1);
-+	write_sysreg(vcpu->arch.hcr_el2, hcr_el2);
-+	write_sysreg_el2(__kvm_hyp_vector, vbar);
-+}
-+
-+static inline void deactivate_traps_vhe(struct kvm_vcpu *vcpu)
-+{
-+	extern char vectors[];	/* kernel exception vectors */
-+
-+	/*
-+	 * If we pended a virtual abort, preserve it until it gets
-+	 * cleared. See D1.14.3 (Virtual Interrupts) for details, but
-+	 * the crucial bit is "On taking a vSError interrupt,
-+	 * HCR_EL2.VSE is cleared to 0."
-+	 */
-+	if (vcpu->arch.hcr_el2 & HCR_VSE)
-+		vcpu->arch.hcr_el2 = read_sysreg(hcr_el2);
-+
-+	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
-+	write_sysreg(vectors, vbar_el1);
- }
- 
- static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
-@@ -124,44 +142,15 @@ static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
- 	else
- 		val |= CPTR_EL2_TFP;
- 	write_sysreg(val, cptr_el2);
--}
- 
--static hyp_alternate_select(__activate_traps_arch,
--			    __activate_traps_nvhe, __activate_traps_vhe,
--			    ARM64_HAS_VIRT_HOST_EXTN);
--
--static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
--{
--	__activate_traps_arch()(vcpu);
-+	/* Configure all other hypervisor traps and features */
- 	write_sysreg(vcpu->arch.hcr_el2, hcr_el2);
- }
- 
--static void __hyp_text __deactivate_traps_vhe(void)
--{
--	extern char vectors[];	/* kernel exception vectors */
--
--	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
--	write_sysreg(vectors, vbar_el1);
--}
--
--static void __hyp_text __deactivate_traps_nvhe(void)
-+static void __hyp_text __deactivate_traps_nvhe(struct kvm_vcpu *vcpu)
- {
--	u64 mdcr_el2 = read_sysreg(mdcr_el2);
--
--	mdcr_el2 &= MDCR_EL2_HPMN_MASK;
--	mdcr_el2 |= MDCR_EL2_E2PB_MASK << MDCR_EL2_E2PB_SHIFT;
--
--	write_sysreg(mdcr_el2, mdcr_el2);
--	write_sysreg(HCR_RW, hcr_el2);
--	write_sysreg(CPTR_EL2_DEFAULT, cptr_el2);
--}
--
--static hyp_alternate_select(__deactivate_traps_arch,
--			    __deactivate_traps_nvhe, __deactivate_traps_vhe,
--			    ARM64_HAS_VIRT_HOST_EXTN);
-+	u64 mdcr_el2;
- 
--static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
--{
- 	/*
- 	 * If we pended a virtual abort, preserve it until it gets
- 	 * cleared. See D1.14.3 (Virtual Interrupts) for details, but
-@@ -172,7 +161,14 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
- 		vcpu->arch.hcr_el2 = read_sysreg(hcr_el2);
- 
- 	__deactivate_traps_common();
--	__deactivate_traps_arch()();
-+
-+	mdcr_el2 = read_sysreg(mdcr_el2);
-+	mdcr_el2 &= MDCR_EL2_HPMN_MASK;
-+	mdcr_el2 |= MDCR_EL2_E2PB_MASK << MDCR_EL2_E2PB_SHIFT;
-+
-+	write_sysreg(mdcr_el2, mdcr_el2);
-+	write_sysreg(HCR_RW, hcr_el2);
-+	write_sysreg(CPTR_EL2_DEFAULT, cptr_el2);
- }
- 
- static inline void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
-@@ -371,7 +367,7 @@ int kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 
- 	sysreg_save_host_state_vhe(host_ctxt);
- 
--	__activate_traps(vcpu);
-+	activate_traps_vhe(vcpu);
- 	__activate_vm(vcpu);
- 
- 	__vgic_restore_state(vcpu);
-@@ -390,7 +386,7 @@ int kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 	sysreg_save_guest_state_vhe(guest_ctxt);
- 	__vgic_save_state(vcpu);
- 
--	__deactivate_traps(vcpu);
-+	deactivate_traps_vhe(vcpu);
- 
- 	sysreg_restore_host_state_vhe(host_ctxt);
- 
-@@ -418,7 +414,7 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 
- 	__sysreg_save_state_nvhe(host_ctxt);
- 
--	__activate_traps(vcpu);
-+	__activate_traps_nvhe(vcpu);
- 	__activate_vm(vcpu);
- 
- 	__vgic_restore_state(vcpu);
-@@ -445,7 +441,7 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 	__timer_disable_traps(vcpu);
- 	__vgic_save_state(vcpu);
- 
--	__deactivate_traps(vcpu);
-+	__deactivate_traps_nvhe(vcpu);
- 	__deactivate_vm(vcpu);
- 
- 	__sysreg_restore_state_nvhe(host_ctxt);
-@@ -471,7 +467,7 @@ static void __hyp_text __hyp_call_panic_nvhe(u64 spsr, u64 elr, u64 par,
- 
- 	if (read_sysreg(vttbr_el2)) {
- 		__timer_disable_traps(vcpu);
--		__deactivate_traps(vcpu);
-+		__deactivate_traps_nvhe(vcpu);
- 		__deactivate_vm(vcpu);
- 		__sysreg_restore_state_nvhe(__host_ctxt);
- 	}
-@@ -495,7 +491,7 @@ static void __hyp_call_panic_vhe(u64 spsr, u64 elr, u64 par,
- 	struct kvm_vcpu *vcpu;
- 	vcpu = host_ctxt->__hyp_running_vcpu;
- 
--	__deactivate_traps_vhe();
-+	deactivate_traps_vhe(vcpu);
- 	sysreg_restore_host_state_vhe(host_ctxt);
- 
- 	panic(__hyp_panic_string,
 -- 
-2.9.0
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
