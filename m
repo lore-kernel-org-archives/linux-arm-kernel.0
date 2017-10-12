@@ -1,25 +1,26 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 12 Oct 2017 12:39:50 -0400
-Subject: [PATCH 1/5] PCI: protect restore with device lock to be consistent
-In-Reply-To: <20171011220819.GW25517@bhelgaas-glaptop.roam.corp.google.com>
-References: <1506212218-29103-1-git-send-email-okaya@codeaurora.org>
- <20171011220819.GW25517@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <8696d4cf-144d-dbc0-1950-93d42529971a@codeaurora.org>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 12 Oct 2017 22:14:59 +0530
+Subject: [PATCH v2 0/2] dmaengine: edma/omap-dma: max_burst validity
+ checking
+In-Reply-To: <20171003083538.11044-1-peter.ujfalusi@ti.com>
+References: <20171003083538.11044-1-peter.ujfalusi@ti.com>
+Message-ID: <20171012164459.GS30097@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/2017 6:08 PM, Bjorn Helgaas wrote:
-> I think this series makes a lot of sense overall; thanks for doing
-> this work!  I had a few comments on the individual patches.
+On Tue, Oct 03, 2017 at 11:35:36AM +0300, Peter Ujfalusi wrote:
+> Hi,
 > 
-> (This response would ordinarily be to the cover letter, but there
-> isn't one, so I'm just responding to the first patch.)
+> Changes since v1:
+> - Fixed typo in commit message
+> - Separated from the 'dmaengine: core/edma/omap-dma: maximum SG len reporting'
+>   series
+> 
+> Both eDMA and sDMA have limit on the maximum burst size. The two patch
+> implements protection against too big burst size for both driver.
 
-Thanks, I was too lazy to type it up. I'll do it on the next one.
-Since this was an RFC even though the subject doesn't say so, I didn't
-want to invest too much time on documentation.
+I have applied these, but had to hand fix the patches. I guess you should
+use gmail or someother server to send patches
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+~Vinod
