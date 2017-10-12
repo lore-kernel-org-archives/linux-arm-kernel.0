@@ -1,39 +1,50 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 12 Oct 2017 12:14:08 +0100
-Subject: [PATCH V2 0/1] Optimise IOVA allocations for PCI devices
-In-Reply-To: <f7210a76-399c-3767-74d0-24a98cbf7d78@caviumnetworks.com>
-References: <1505897522-9237-1-git-send-email-tomasz.nowicki@caviumnetworks.com>
- <cda4f03f-acf5-9b74-d8f1-774065bfc94e@semihalf.com>
- <20171012100444.GI30803@8bytes.org>
- <f7210a76-399c-3767-74d0-24a98cbf7d78@caviumnetworks.com>
-Message-ID: <c0be8925-a78d-7f9b-99c5-8a812564ce89@arm.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Thu, 12 Oct 2017 19:11:59 +0800
+Subject: [PATCH 0/2] arm64 SMMUv3 PMU driver with IORT support
+In-Reply-To: <20171012110538.GA8509@red-moon>
+References: <1501876754-1064-1-git-send-email-nleeder@codeaurora.org>
+ <394bd3b8-2583-01fa-02d3-6a49c2a6a6c0@linaro.org>
+ <3eac1295-dba2-ad79-d868-b538b13de91a@codeaurora.org>
+ <f1d864be-8ce4-f2d2-9c71-8fff202a76d1@linaro.org>
+ <67a696ad-98e9-d505-1d73-7246d2efc398@codeaurora.org>
+ <59DF4AD9.2060903@huawei.com> <20171012110538.GA8509@red-moon>
+Message-ID: <59DF4DFF.9070609@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/17 11:08, Tomasz Nowicki wrote:
-> Hi Joerg,
-> 
-> On 12.10.2017 12:04, Joerg Roedel wrote:
->> Hi Tomasz,
+On 2017/10/12 19:05, Lorenzo Pieralisi wrote:
+> On Thu, Oct 12, 2017 at 06:58:33PM +0800, Hanjun Guo wrote:
+>> On 2017/8/11 11:28, Leeder, Neil wrote:
+>>> On 8/9/2017 9:26 PM, Hanjun Guo wrote:
+>>>>> On 2017/8/9 23:48, Leeder, Neil wrote:
+>>>>>>>>>>>    drivers/perf/Kconfig          |   9 +
+>>>>>>>>>>>    drivers/perf/Makefile         |   1 +
+>>>>>>>>>>>    drivers/perf/arm_smmuv3_pmu.c | 823 ++++++++++++++++++++++++++++++++++++++++++
+>>>>>>>>>>>    include/acpi/actbl2.h         |   9 +-
+>>>>>>>>> Do you have the acpica support code? I'm currently
+>>>>>>>>> working on SMMUv3 MSI support and I would like to test
+>>>>>>>>> it with MSI support for PMCG as well.
+>>>>>>> I don't have any code other than what was posted here.
+>>>>>>> What additional ACPICA support code is needed?
+>>>>> Sorry for not clear, I mean the acpica code for iASL and
+>>>>> other tool: github.com/acpica/acpica.git
+>>>>>
+>>>>> With that code, I can compile my IORT table with PMCG node.
+>>> Unfortunately it looks like I'm the first person from Qualcomm Datacenter
+>>> Technologies to try to add something to ACPICA, which means I'll have to
+>>> kick off an internal legal process which may take some time. Unless someone
+>>> else wants to take a crack at it - and really, there's nothing more than is
+>>> in the ARM IORT spec - it could be a while before I can do that.
+>> Just a update, I sent a pull request to Bob for ACPICA changes,
+>> please take a look:
 >>
->> On Thu, Oct 12, 2017 at 11:40:27AM +0200, Tomasz Nowicki wrote:
->>> Can you please have a look and see if you are fine with this patch?
->>
->> How do these changes relate to Robin's IOVA optimizations already in the
->> iommu-tree?
->>
-> 
-> This is another optimization patch which does not conflict with Robin's
-> patches.
-> 
-> Robin, please correct me if I am wrong.
+>> https://github.com/acpica/acpica/pull/327
+> You should not have done that. We need to update IORT specifications
+> for IORT PMCG before merging ACPICA PMCG support.
+>
+> Ask Robert to drop it straight away or I will.
 
-Yup, I've had Tomasz' patch included in my iommu/iova branch for a
-while, and the "Misc. IOVA tweaks" patches were actually written on top
-of it.
+Sorry, I will do that, thanks for the reminder.
 
-This should be the final piece of the puzzle for several arm64 server
-platforms, which exacerbate the problem by using 64K pages and having
-host bridge windows consume most of the 32-bit mem space.
-
-Robin.
+Thanks
+Hanjun
