@@ -1,44 +1,83 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 12 Oct 2017 16:36:57 +0800
-Subject: [PATCH 1/9] clk: sunxi-ng: sun5i: Fix bit offset of audio PLL
- post-divider
-In-Reply-To: <20171012083705.24409-1-wens@csie.org>
-References: <20171012083705.24409-1-wens@csie.org>
-Message-ID: <20171012083705.24409-2-wens@csie.org>
+Date: Thu, 12 Oct 2017 16:36:56 +0800
+Subject: [PATCH 0/9] clk: sunxi-ng: Use sigma-delta modulation for audio PLL
+Message-ID: <20171012083705.24409-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The post-divider for the audio PLL is in bits [29:26], as specified
-in the user manual, not [19:16] as currently programmed in the code.
-The post-divider has a default register value of 2, i.e. a divider
-of 3. This means the clock rate fed to the audio codec would be off.
+Hi everyone,
 
-This was discovered when porting sigma-delta modulation for the PLL
-to sun5i, which needs the post-divider to be 1.
+This series adds support for fractional-N synthesis using sigma-delta
+modulation in the audio PLL to get the exact required clock rate.
+This fixes the speed and pitch change when audio is played back on
+sunxi platforms, due to the slightly inaccurate audio clock.
 
-Fix the bit offset, so we do actually force the post-divider to a
-certain value.
+I've done this for all platforms I can test at the moment. A83T is left
+out for now as the the clock unit's design is slightly different. I
+was unable to work on the A33, as my board is very unstable, plus A33
+audio playback seems to be broken at the moment. There might be some
+issue with the DAPM routes.
 
-Fixes: 5e73761786d6 ("clk: sunxi-ng: Add sun5i CCU driver")
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- drivers/clk/sunxi-ng/ccu-sun5i.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Patch 1 fixes an error with the audio PLL's post-divider bit field
+offset.
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun5i.c b/drivers/clk/sunxi-ng/ccu-sun5i.c
-index ab9e850b3707..2f385a57cd91 100644
---- a/drivers/clk/sunxi-ng/ccu-sun5i.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun5i.c
-@@ -982,8 +982,8 @@ static void __init sun5i_ccu_init(struct device_node *node,
- 
- 	/* Force the PLL-Audio-1x divider to 4 */
- 	val = readl(reg + SUN5I_PLL_AUDIO_REG);
--	val &= ~GENMASK(19, 16);
--	writel(val | (3 << 16), reg + SUN5I_PLL_AUDIO_REG);
-+	val &= ~GENMASK(29, 26);
-+	writel(val | (3 << 26), reg + SUN5I_PLL_AUDIO_REG);
- 
- 	/*
- 	 * Use the peripheral PLL as the AHB parent, instead of CPU /
+Patch 2 adds a check for fractional mode clock rates in the N-M clock's
+round_rate callback. This is mostly for aesthetics to have both
+round_rate and set_rate code paths look the same. In practice the N-M
+factors can also generate the fractional mode clock rates directly.
+
+Patch 3 adds a table based sigma-delta modulation clock type. This is
+implemented much like the fractional mode clocks, as a helper library
+to be integrated into the various factor clocks where needed. As there
+is no explanation on how to calculate the parameters for SDM, the table
+based approach allows us to copy existing parameters from the vendor
+kernel.
+
+Patch 4 hooks the SDM clock type helpers into the N-M factors clock
+type. The audio PLLs on most of our are of this type.
+
+Patches 5 ~ 9 convert the audio PLL to using SDM on various SoCs. The
+changes are the same, accounting for minor variances between SoCs:
+
+    - audio PLL post-divider now forced to 1.
+
+    - pll-audio-1x fixed-factor-clock divider now set to 1, matching
+      the hardware setting from above.
+
+    - SDM parameter table added.
+
+    - SDM parameters added to pll-audio-base clock.
+
+Please have a look.
+
+ChenYu
+
+Chen-Yu Tsai (9):
+  clk: sunxi-ng: sun5i: Fix bit offset of audio PLL post-divider
+  clk: sunxi-ng: nm: Check if requested rate is supported by fractional
+    clock
+  clk: sunxi-ng: Add sigma-delta modulation support
+  clk: sunxi-ng: nm: Add support for sigma-delta modulation
+  clk: sunxi-ng: sun8i: h3: Use sigma-delta modulation for audio PLL
+  clk: sunxi-ng: sun4i: Use sigma-delta modulation for audio PLL
+  clk: sunxi-ng: sun5i: Use sigma-delta modulation for audio PLL
+  clk: sunxi-ng: sun6i: Use sigma-delta modulation for audio PLL
+  clk: sunxi-ng: sun8i: a23: Use sigma-delta modulation for audio PLL
+
+ drivers/clk/sunxi-ng/Makefile        |   1 +
+ drivers/clk/sunxi-ng/ccu-sun4i-a10.c |  26 ++++--
+ drivers/clk/sunxi-ng/ccu-sun5i.c     |  27 ++++--
+ drivers/clk/sunxi-ng/ccu-sun6i-a31.c |  38 ++++++---
+ drivers/clk/sunxi-ng/ccu-sun8i-a23.c |  38 ++++++---
+ drivers/clk/sunxi-ng/ccu-sun8i-h3.c  |  38 ++++++---
+ drivers/clk/sunxi-ng/ccu_common.h    |   1 +
+ drivers/clk/sunxi-ng/ccu_nm.c        |  25 +++++-
+ drivers/clk/sunxi-ng/ccu_nm.h        |  25 ++++++
+ drivers/clk/sunxi-ng/ccu_sdm.c       | 158 +++++++++++++++++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu_sdm.h       |  80 ++++++++++++++++++
+ 11 files changed, 404 insertions(+), 53 deletions(-)
+ create mode 100644 drivers/clk/sunxi-ng/ccu_sdm.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu_sdm.h
+
 -- 
 2.14.2
