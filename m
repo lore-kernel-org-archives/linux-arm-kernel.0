@@ -1,102 +1,129 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 12 Oct 2017 12:41:11 +0200
-Subject: [PATCH 07/37] KVM: arm/arm64: Add kvm_vcpu_load_sysregs and
- kvm_vcpu_put_sysregs
+Date: Thu, 12 Oct 2017 12:41:27 +0200
+Subject: [PATCH 23/37] KVM: arm64: Prepare to handle traps on deferred VM
+ sysregs
 In-Reply-To: <20171012104141.26902-1-christoffer.dall@linaro.org>
 References: <20171012104141.26902-1-christoffer.dall@linaro.org>
-Message-ID: <20171012104141.26902-8-christoffer.dall@linaro.org>
+Message-ID: <20171012104141.26902-24-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we are about to move a buch of save/restore logic for VHE kernels to
-the load and put functions, we need some infrastructure to do this.
+When we defer the save/restore of system registers to vcpu_load and
+vcpu_put, we need to take care of the emulation code that handles traps
+to these registers, since simply reading the memory array will return
+stale data.
+
+Therefore, introduce two functions to directly read/write the registers
+from the physical CPU when we're on a VHE system that has loaded the
+system registers onto the physical CPU.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/asm/kvm_host.h   |  3 +++
- arch/arm64/include/asm/kvm_host.h |  3 +++
- arch/arm64/kvm/hyp/sysreg-sr.c    | 27 +++++++++++++++++++++++++++
- virt/kvm/arm/arm.c                |  2 ++
- 4 files changed, 35 insertions(+)
+ arch/arm64/include/asm/kvm_host.h |  4 +++
+ arch/arm64/kvm/sys_regs.c         | 54 +++++++++++++++++++++++++++++++++++++--
+ 2 files changed, 56 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 1100170..13f8165 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -290,4 +290,7 @@ int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
- int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
- 			       struct kvm_device_attr *attr);
- 
-+static inline void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu) {}
-+static inline void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu) {}
-+
- #endif /* __ARM_KVM_HOST_H__ */
 diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 27305e7..7d3bfa7 100644
+index 9f5761f..dcded44 100644
 --- a/arch/arm64/include/asm/kvm_host.h
 +++ b/arch/arm64/include/asm/kvm_host.h
-@@ -383,4 +383,7 @@ static inline void __cpu_init_stage2(void)
- 		  "PARange is %d bits, unsupported configuration!", parange);
+@@ -278,6 +278,10 @@ struct kvm_vcpu_arch {
+ 
+ 	/* Detect first run of a vcpu */
+ 	bool has_run_once;
++
++	/* True when deferrable sysregs are loaded on the physical CPU,
++	 * see kvm_vcpu_load_sysregs and kvm_vcpu_put_sysregs. */
++	bool sysregs_loaded_on_cpu;
+ };
+ 
+ #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index dbe35fd..f7887dd 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -34,6 +34,7 @@
+ #include <asm/kvm_coproc.h>
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_host.h>
++#include <asm/kvm_hyp.h>
+ #include <asm/kvm_mmu.h>
+ #include <asm/perf_event.h>
+ #include <asm/sysreg.h>
+@@ -110,8 +111,57 @@ static bool access_dcsw(struct kvm_vcpu *vcpu,
+ 	return true;
  }
  
-+void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu);
-+void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu);
-+
- #endif /* __ARM64_KVM_HOST_H__ */
-diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-index c54cc2a..b7438c8 100644
---- a/arch/arm64/kvm/hyp/sysreg-sr.c
-+++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-@@ -183,3 +183,30 @@ void __hyp_text __sysreg32_restore_state(struct kvm_vcpu *vcpu)
- 	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
- 		write_sysreg(sysreg[DBGVCR32_EL2], dbgvcr32_el2);
- }
-+
-+/**
-+ * kvm_vcpu_load_sysregs - Load guest system register to physical CPU
-+ *
-+ * @vcpu: The VCPU pointer
-+ *
-+ * If the kernel runs in EL2 then load the system register state for the VCPU
-+ * for EL1 onto the physical CPU so that we can go back and foward between the
-+ * VM and the hypervisor without switching all this state around.
-+ */
-+void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu)
++static u64 read_deferrable_vm_reg(struct kvm_vcpu *vcpu, int reg)
 +{
++	if (vcpu->arch.sysregs_loaded_on_cpu) {
++		switch (reg) {
++		case SCTLR_EL1:		return read_sysreg_el1(sctlr);
++		case TTBR0_EL1:		return read_sysreg_el1(ttbr0);
++		case TTBR1_EL1:		return read_sysreg_el1(ttbr1);
++		case TCR_EL1:		return read_sysreg_el1(tcr);
++		case ESR_EL1:		return read_sysreg_el1(esr);
++		case FAR_EL1:		return read_sysreg_el1(far);
++		case AFSR0_EL1:		return read_sysreg_el1(afsr0);
++		case AFSR1_EL1:		return read_sysreg_el1(afsr1);
++		case MAIR_EL1:		return read_sysreg_el1(mair);
++		case AMAIR_EL1:		return read_sysreg_el1(amair);
++		case CONTEXTIDR_EL1:	return read_sysreg_el1(contextidr);
++		case DACR32_EL2:	return read_sysreg(dacr32_el2);
++		case IFSR32_EL2:	return read_sysreg(ifsr32_el2);
++		default:		BUG();
++		}
++	}
++
++	return vcpu_sys_reg(vcpu, reg);
 +}
 +
-+/**
-+ * kvm_vcpu_put_sysregs - Restore host system register state to physical CPU
-+ *
-+ * @vcpu: The VCPU pointer
-+ *
-+ * If the kernel runs in EL2 and the physical register state belongs to the
-+ * VCPU, then restore the system register state for the host for EL1 onto the
-+ * physical CPU so that we can run userspace and other threads on this
-+ * physical CPU.
-+ */
-+void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu)
++static void write_deferrable_vm_reg(struct kvm_vcpu *vcpu, int reg, u64 val)
 +{
++	if (vcpu->arch.sysregs_loaded_on_cpu) {
++		switch (reg) {
++		case SCTLR_EL1:		write_sysreg_el1(val, sctlr);	return;
++		case TTBR0_EL1:		write_sysreg_el1(val, ttbr0);	return;
++		case TTBR1_EL1:		write_sysreg_el1(val, ttbr1);	return;
++		case TCR_EL1:		write_sysreg_el1(val, tcr);	return;
++		case ESR_EL1:		write_sysreg_el1(val, esr);	return;
++		case FAR_EL1:		write_sysreg_el1(val, far);	return;
++		case AFSR0_EL1:		write_sysreg_el1(val, afsr0);	return;
++		case AFSR1_EL1:		write_sysreg_el1(val, afsr1);	return;
++		case MAIR_EL1:		write_sysreg_el1(val, mair);	return;
++		case AMAIR_EL1:		write_sysreg_el1(val, amair);	return;
++		case CONTEXTIDR_EL1:	write_sysreg_el1(val, contextidr); return;
++		case DACR32_EL2:	write_sysreg(val, dacr32_el2); return;
++		case IFSR32_EL2:	write_sysreg(val, ifsr32_el2); return;
++		default:		BUG();
++		}
++	}
++
++	vcpu_sys_reg(vcpu, reg) = val;
 +}
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index d495453..cf121b2 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -358,6 +358,7 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
- 	kvm_arm_set_running_vcpu(vcpu);
- 	kvm_vgic_load(vcpu);
- 	kvm_timer_vcpu_load(vcpu);
-+	kvm_vcpu_load_sysregs(vcpu);
- }
++
+ /*
+  * Generic accessor for VM registers. Only called as long as HCR_TVM
++ *
+  * is set. If the guest enables the MMU, we stop trapping the VM
+  * sys_regs and leave it in complete control of the caches.
+  */
+@@ -132,14 +182,14 @@ static bool access_vm_reg(struct kvm_vcpu *vcpu,
+ 	if (!p->is_aarch32 || !p->is_32bit) {
+ 		val = p->regval;
+ 	} else {
+-		val = vcpu_sys_reg(vcpu, reg);
++		val = read_deferrable_vm_reg(vcpu, reg);
+ 		if (r->reg % 2)
+ 			val = (p->regval << 32) | (u64)lower_32_bits(val);
+ 		else
+ 			val = ((u64)upper_32_bits(val) << 32) |
+ 				(u64)lower_32_bits(p->regval);
+ 	}
+-	vcpu_sys_reg(vcpu, reg) = val;
++	write_deferrable_vm_reg(vcpu, reg, val);
  
- void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
-@@ -365,6 +366,7 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
- 	if (vcpu->ioctl != KVM_RUN)
- 		return;
- 
-+	kvm_vcpu_put_sysregs(vcpu);
- 	kvm_timer_vcpu_put(vcpu);
- 	kvm_vgic_put(vcpu);
- 
+ 	kvm_toggle_cache(vcpu, was_enabled);
+ 	return true;
 -- 
 2.9.0
