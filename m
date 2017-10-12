@@ -1,51 +1,68 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Thu, 12 Oct 2017 10:58:01 +0800
-Subject: [PATCH 1/2] drivers: firmware: psci: Add psci_is_available()
-In-Reply-To: <1507708982-12336-2-git-send-email-geert+renesas@glider.be>
-References: <1507708982-12336-1-git-send-email-geert+renesas@glider.be>
- <1507708982-12336-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <20171012105801.0bb643eb@xhacker.debian>
+From: minghuan.lian@nxp.com (M.h. Lian)
+Date: Thu, 12 Oct 2017 03:01:19 +0000
+Subject: [PATCH 1/2] PCI: Disable MSI for Freescale PCIe RC mode
+In-Reply-To: <20171011193737.GP25517@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170922072522.36306-1-Zhiqiang.Hou@nxp.com>
+ <20170922072522.36306-2-Zhiqiang.Hou@nxp.com>
+ <20171011193737.GP25517@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <VI1PR04MB161585379E4D3D7CB4794F35E84B0@VI1PR04MB1615.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 11 Oct 2017 10:03:01 +0200 Geert Uytterhoeven wrote:
+Hi Bjorn,
 
-> PSCI support may be disabled at build time (by configuration) or at
-> run-time (PSCI firmware not present).  While CONFIG_ARM_PSCI_FW can be
-> used to check for build time enablement, there is currently no simple
-> way to check if PSCI is actually available and used.
+Thanks for your review.
+Yes. All the freescale's PCIe controllers do not support to generate MSI interrupt.
+The PCIe controllers developed for the next generation SoC do not support it either.
+
+Acked-by: Minghuan Lian <minghuan.Lian@nxp.com>
+
+> -----Original Message-----
+> From: Bjorn Helgaas [mailto:helgaas at kernel.org]
+> Sent: Thursday, October 12, 2017 3:38 AM
+> To: Z.q. Hou <zhiqiang.hou@nxp.com>
+> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> pci at vger.kernel.org; bhelgaas at google.com; Roy Zang <roy.zang@nxp.com>;
+> Mingkai Hu <mingkai.hu@nxp.com>; M.h. Lian <minghuan.lian@nxp.com>
+> Subject: Re: [PATCH 1/2] PCI: Disable MSI for Freescale PCIe RC mode
 > 
-> Hence add a helper function to check if PSCI is available.
+> On Fri, Sep 22, 2017 at 03:25:21PM +0800, Zhiqiang Hou wrote:
+> > From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> >
+> > The Freescale PCIe controller advertises the MSI/MSI-X capability in
+> > both RC and Endpoint mode, but in RC mode it doesn't support MSI/MSI-X
+> > by it self, it can only transfer MSI/MSI-X from downstream
 > 
-> This is useful for e.g. drivers that are used on platforms with and
-> without PSCI.  Such drivers may need to take provisions for proper
-> operation when PSCI is used, and/or to implement functionality that is
-> usually provided by PSCI.
-
-the psci_ops is a global var, why not check psci_ops.mmnn members
-individually in each drivers? check IS_ENABLED(CONFIG_ARM_PSCI_FW) for
-building time ennoblement.
-
+> s/it self,/itself;/
 > 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
->  drivers/firmware/psci.c | 5 +++++
->  include/linux/psci.h    | 2 ++
->  2 files changed, 7 insertions(+)
+> > devices. So add this quirk to prevent use of MSI/MSI-X in RC mode.
+> >
+> > Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> > ---
+> >  drivers/pci/quirks.c | 8 ++++++++
+> >  1 file changed, 8 insertions(+)
+> >
+> > diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c index
+> > a4d33619a7bb..c1063a420f0c 100644
+> > --- a/drivers/pci/quirks.c
+> > +++ b/drivers/pci/quirks.c
+> > @@ -4799,3 +4799,11 @@ static void quirk_no_ats(struct pci_dev *pdev)
+> >  /* AMD Stoney platform GPU */
+> >  DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_ATI, 0x98e4, quirk_no_ats);
+> > #endif /* CONFIG_PCI_ATS */
+> > +
+> > +/* Freescale PCIe doesn't support MSI in RC mode */ static void
+> > +quirk_fsl_no_msi(struct pci_dev *pdev) {
+> > +	if (pci_pcie_type(pdev) == PCI_EXP_TYPE_ROOT_PORT)
+> > +		pdev->no_msi = 1;
+> > +}
+> > +DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_FREESCALE, PCI_ANY_ID,
+> > +quirk_fsl_no_msi);
 > 
-> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-> index da469c972b503f83..a3a11e2d8ffffaaa 100644
-> --- a/drivers/firmware/psci.c
-> +++ b/drivers/firmware/psci.c
-> @@ -670,6 +670,11 @@ int __init psci_dt_init(void)
->  	return init_fn(np);
->  }
->  
-> +bool psci_is_available(void)
-> +{
-> +	return psci_ops.cpu_off && psci_ops.cpu_on && psci_ops.cpu_suspend;
-
-IIRC, for PSCI 0.1, cpu_suspend is optional, we can't say the PSCI isn't
-available if cpu_suspend is missing.
-
-Thanks
+> This disables MSI for all Freescale root ports, past, present, and future.  Is that
+> really what you want?  This is a bug (the root port shouldn't advertise MSI if it
+> doesn't support it), and presumably it might be fixed in some future device?
+> 
+> This needs an ack from Minghuan or Mingkai (based on MAINTAINERS).
+> 
+> Bjorn
