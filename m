@@ -1,86 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 12 Oct 2017 09:52:13 +0100
-Subject: [PATCH v3 2/2] arm64: use WFE for long delays
-In-Reply-To: <e4206f9a-4ba6-550c-fa2a-92d89b5fbc8b@arm.com>
-References: <1506682350-9023-1-git-send-email-julien.thierry@arm.com>
- <1506682350-9023-3-git-send-email-julien.thierry@arm.com>
- <20171011151335.GA14341@arm.com>
- <e4206f9a-4ba6-550c-fa2a-92d89b5fbc8b@arm.com>
-Message-ID: <20171012085213.GC6171@arm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 12 Oct 2017 10:41:18 +0200 (CEST)
+Subject: [PATCH 0/5] arm64: add ls1012a and ls1046a pcie support
+In-Reply-To: <20171011185719.GL25517@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170919092658.22482-1-Zhiqiang.Hou@nxp.com>
+ <20171011185719.GL25517@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <alpine.DEB.2.20.1710121040550.1930@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 12, 2017 at 09:47:26AM +0100, Julien Thierry wrote:
-> Hi Will,
+On Wed, 11 Oct 2017, Bjorn Helgaas wrote:
+> On Tue, Sep 19, 2017 at 05:26:53PM +0800, Zhiqiang Hou wrote:
+> > From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> > 
+> > This patch set adds ls1012a MSI and PCIe support, including driver
+> > and device tree nodes. The ls1046a's MSI support patch and PCIe
+> > driver patch has been applied, so only adds the PCIe device tree
+> > nodes.
+> > 
+> > Hou Zhiqiang (5):
+> >   irqchip/ls-scfg-msi: add LS1012a MSI support
+> >   arm64: dts: ls1012a: Add MSI controller DT node
+> >   PCI: layerscape: Add support for ls1012a
+> >   arm64: dts: ls1012a: Add PCIe controller DT node
+> >   arm64: dts: ls1046a: add PCIe controller DT nodes
+> > 
+> >  .../interrupt-controller/fsl,ls-scfg-msi.txt       |  1 +
+> >  .../devicetree/bindings/pci/layerscape-pci.txt     |  1 +
+> >  arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi     | 31 +++++++++
+> >  arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi     | 75 ++++++++++++++++++++++
+> >  drivers/irqchip/irq-ls-scfg-msi.c                  |  1 +
+> >  drivers/pci/dwc/pci-layerscape.c                   |  1 +
+> >  6 files changed, 110 insertions(+)
 > 
-> On 11/10/17 16:13, Will Deacon wrote:
-> >Hi Julien,
-> >
-> >On Fri, Sep 29, 2017 at 11:52:30AM +0100, Julien Thierry wrote:
-> >>The current delay implementation uses the yield instruction, which is a
-> >>hint that it is beneficial to schedule another thread. As this is a hint,
-> >>it may be implemented as a NOP, causing all delays to be busy loops. This
-> >>is the case for many existing CPUs.
-> >>
-> >>Taking advantage of the generic timer sending periodic events to all
-> >>cores, we can use WFE during delays to reduce power consumption. This is
-> >>beneficial only for delays longer than the period of the timer event
-> >>stream.
-> >>
-> >>If timer event stream is not enabled, delays will behave as yield/busy
-> >>loops.
-> >>
-> >>Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> >>Cc: Catalin Marinas <catalin.marinas@arm.com>
-> >>Cc: Will Deacon <will.deacon@arm.com>
-> >>Cc: Mark Rutland <mark.rutland@arm.com>
-> >>---
-> >>  arch/arm64/lib/delay.c               | 23 +++++++++++++++++++----
-> >>  include/clocksource/arm_arch_timer.h |  4 +++-
-> >>  2 files changed, 22 insertions(+), 5 deletions(-)
-> >>
-> >>diff --git a/arch/arm64/lib/delay.c b/arch/arm64/lib/delay.c
-> >>index dad4ec9..4dc27f3 100644
-> >>--- a/arch/arm64/lib/delay.c
-> >>+++ b/arch/arm64/lib/delay.c
-> >>@@ -24,10 +24,28 @@
-> >>  #include <linux/module.h>
-> >>  #include <linux/timex.h>
-> >>
-> >>+#include <clocksource/arm_arch_timer.h>
-> >>+
-> >>+#define USECS_TO_CYCLES(TIME_USECS)			\
-> >>+	xloops_to_cycles((TIME_USECS) * 0x10C7UL)
-> >
-> >The macro parameter can be lower-case here.
-> >
+> I'm not 100% sure who should take these.  They trivially touch PCI and
+> I haven't seen anybody else respond, so I put them on
+> pci/host-layerscape with Rob's acks.
 > 
-> Noted, I'll change it.
+> If somebody else wants to take them, just let me know and I'll drop
+> them.
 > 
-> >>+static inline unsigned long xloops_to_cycles(unsigned long xloops)
-> >>+{
-> >>+	return (xloops * loops_per_jiffy * HZ) >> 32;
-> >>+}
-> >>+
-> >>  void __delay(unsigned long cycles)
-> >>  {
-> >>  	cycles_t start = get_cycles();
-> >>
-> >>+	if (arch_timer_evtstrm_available()) {
-> >
-> >Hmm, is this never called in a context where preemption is enabled?
-> >Maybe arch_timer_evtstrm_available should be using raw_smp_processor_id()
-> >under the hood.
-> >
+> They really should be acked by Minghuan or Mingkai, who are listed as
+> the maintainers of drivers/pci/dwc/pci-layerscape.c and are presumably
+> responsible for the related dtsi files, too.
 > 
-> This can be called from a preemptible context. But when it is, the event
-> stream is either enabled both on the preemptible context and on the context
-> where a preempted context can be resumed, or the event stream is just
-> disabled in the whole system.
-> 
-> Does using raw_smp_processor_id solve an issue here?
+> Thomas, Jason, and Marc are listed as maintainers of
+> drivers/irqchip/irq-ls-scfg-msi.c.  It's a trivial change, but I added
+> them to the cc list.
 
-I thought that DEBUG_PREEMPT would splat if you called smp_processor_id()
-from preemptible context?
+Feel free to pick them up.
 
-Will
+Acked-by: Thomas Gleixner <tglx@linutronix.de>
