@@ -1,58 +1,226 @@
-From: jcrouse@codeaurora.org (Jordan Crouse)
-Date: Thu, 12 Oct 2017 09:28:03 -0600
-Subject: [RFCv2 PATCH 00/36] Process management for IOMMU + SVM for SMMUv3
-In-Reply-To: <8a1e090d-22e8-0295-a53f-bc3b5b7d7971@arm.com>
-References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
- <0c6778d8-741f-0db7-fe3c-df88a75ebbb2@huawei.com>
- <0fecd29e-eaf7-9503-b087-7bfbc251da88@arm.com>
- <c6b7fb4b-4f2b-0d81-8bb5-8fa6b62aca3a@huawei.com>
- <8a1e090d-22e8-0295-a53f-bc3b5b7d7971@arm.com>
-Message-ID: <20171012152803.GA3027@jcrouse-lnx.qualcomm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 12 Oct 2017 16:49:44 +0100
+Subject: [PATCH 01/37] KVM: arm64: Avoid storing the vcpu pointer on the
+ stack
+In-Reply-To: <20171012104141.26902-2-christoffer.dall@linaro.org>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+ <20171012104141.26902-2-christoffer.dall@linaro.org>
+Message-ID: <ef4bffe5-b3c5-5fdd-cb8b-1840d2243ae1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 12, 2017 at 01:55:32PM +0100, Jean-Philippe Brucker wrote:
-> On 12/10/17 13:05, Yisheng Xie wrote:
-> [...]
-> >>>> * An iommu_process can be bound to multiple domains, and a domain can have
-> >>>>   multiple iommu_process.
-> >>> when bind a task to device, can we create a single domain for it? I am thinking
-> >>> about process management without shared PT(for some device only support PASID
-> >>> without pri ability), it seems hard to expand if a domain have multiple iommu_process?
-> >>> Do you have any idea about this?
-> >>
-> >> A device always has to be in a domain, as far as I know. Not supporting
-> >> PRI forces you to pin down all user mappings (or just the ones you use for
-> >> DMA) but you should sill be able to share PT. Now if you don't support
-> >> shared PT either, but only PASID, then you'll have to use io-pgtable and a
-> >> new map/unmap API on an iommu_process. I don't understand your concern
-> >> though, how would the link between process and domains prevent this use-case?
-> >>
-> > So you mean that if an iommu_process bind to multiple devices it should create
-> > multiple io-pgtables? or just share the same io-pgtable?
+On 12/10/17 11:41, Christoffer Dall wrote:
+> We already have the percpu area for the host cpu state, which points to
+> the VCPU, so there's no need to store the VCPU pointer on the stack on
+> every context switch.  We can be a little more clever and just use
+> tpidr_el2 for the percpu offset and load the VCPU pointer from the host
+> context.
 > 
-> I don't know to be honest, I haven't thought much about the io-pgtable
-> case, I'm all about sharing the mm :)
+> This requires us to have a scratch register though, so we take the
+> chance to rearrange some of the el1_sync code to only look at the
+> vttbr_el2 to determine if this is a trap from the guest or an HVC from
+> the host.  We do add an extra check to call the panic code if the kernel
+> is configured with debugging enabled and we saw a trap from the host
+> which wasn't an HVC, indicating that we left some EL2 trap configured by
+> mistake.
 > 
-> It really depends on what the user (GPU driver I assume) wants. I think
-> that if you're not sharing an mm with the device, then you're trying to
-> hide parts of the process to the device, so you'd also want the
-> flexibility of having different io-pgtables between devices. Different
-> devices accessing isolated parts of the process requires separate io-pgtables.
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/arm64/include/asm/kvm_asm.h | 20 ++++++++++++++++++++
+>  arch/arm64/kernel/asm-offsets.c  |  1 +
+>  arch/arm64/kvm/hyp/entry.S       |  5 +----
+>  arch/arm64/kvm/hyp/hyp-entry.S   | 39 ++++++++++++++++++---------------------
+>  arch/arm64/kvm/hyp/switch.c      |  2 +-
+>  5 files changed, 41 insertions(+), 26 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+> index ab4d0a9..7e48a39 100644
+> --- a/arch/arm64/include/asm/kvm_asm.h
+> +++ b/arch/arm64/include/asm/kvm_asm.h
+> @@ -70,4 +70,24 @@ extern u32 __init_stage2_translation(void);
+>  
+>  #endif
+>  
+> +#ifdef __ASSEMBLY__
+> +.macro get_host_ctxt reg, tmp
+> +	/*
+> +	 * '=kvm_host_cpu_state' is a host VA from the constant pool, it may
+> +	 * not be accessible by this address from EL2, hyp_panic() converts
+> +	 * it with kern_hyp_va() before use.
+> +	 */
 
-In our specific Snapdragon use case the GPU is the only entity that cares about
-process specific io-pgtables.  Everything else (display, video, camera) is happy
-using a global io-ptgable.  The reasoning is that the GPU is programmable from
-user space and can be easily used to copy data whereas the other use cases have
-mostly fixed functions.
+This really looks like a stale comment, as there is no hyp_panic
+involved here anymore (thankfully!).
 
-Even if different devices did want to have a process specific io-pgtable I doubt
-we would share them.  Every device uses the IOMMU differently and the magic
-needed to share a io-pgtable between (for example) a GPU and a DSP would be
-prohibitively complicated.
+> +	ldr	\reg, =kvm_host_cpu_state
+> +	mrs	\tmp, tpidr_el2
+> +	add	\reg, \reg, \tmp
+> +	kern_hyp_va \reg
 
-Jordan
+Here, we're trading a load from the stack for a load from the constant
+pool. Can't we do something like:
 
+	adr_l	\reg, kvm_host_cpu_state
+	msr	\tmp, tpidr_el2
+	add	\reg, \reg, \tmp
+
+and that's it? This relies on the property that the kernel/hyp offset is
+constant, and that it doesn't matter if we add the offset to a kernel VA
+or a HYP VA... Completely untested of course!
+
+> +.endm
+> +
+> +.macro get_vcpu vcpu, ctxt
+> +	ldr	\vcpu, [\ctxt, #HOST_CONTEXT_VCPU]
+> +	kern_hyp_va	\vcpu
+> +.endm
+> +
+> +#endif
+> +
+>  #endif /* __ARM_KVM_ASM_H__ */
+> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+> index 71bf088..612021d 100644
+> --- a/arch/arm64/kernel/asm-offsets.c
+> +++ b/arch/arm64/kernel/asm-offsets.c
+> @@ -135,6 +135,7 @@ int main(void)
+>    DEFINE(CPU_FP_REGS,		offsetof(struct kvm_regs, fp_regs));
+>    DEFINE(VCPU_FPEXC32_EL2,	offsetof(struct kvm_vcpu, arch.ctxt.sys_regs[FPEXC32_EL2]));
+>    DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
+> +  DEFINE(HOST_CONTEXT_VCPU,	offsetof(struct kvm_cpu_context, __hyp_running_vcpu));
+>  #endif
+>  #ifdef CONFIG_CPU_PM
+>    DEFINE(CPU_SUSPEND_SZ,	sizeof(struct cpu_suspend_ctx));
+> diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
+> index 9a8ab5d..76cd48f 100644
+> --- a/arch/arm64/kvm/hyp/entry.S
+> +++ b/arch/arm64/kvm/hyp/entry.S
+> @@ -62,9 +62,6 @@ ENTRY(__guest_enter)
+>  	// Store the host regs
+>  	save_callee_saved_regs x1
+>  
+> -	// Store host_ctxt and vcpu for use at exit time
+> -	stp	x1, x0, [sp, #-16]!
+> -
+>  	add	x18, x0, #VCPU_CONTEXT
+>  
+>  	// Restore guest regs x0-x17
+> @@ -119,7 +116,7 @@ ENTRY(__guest_exit)
+>  	save_callee_saved_regs x1
+>  
+>  	// Restore the host_ctxt from the stack
+
+Stale comment again.
+
+> -	ldr	x2, [sp], #16
+> +	get_host_ctxt	x2, x3
+>  
+>  	// Now restore the host regs
+>  	restore_callee_saved_regs x2
+> diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+> index e4f37b9..2950f26 100644
+> --- a/arch/arm64/kvm/hyp/hyp-entry.S
+> +++ b/arch/arm64/kvm/hyp/hyp-entry.S
+> @@ -56,19 +56,16 @@ ENDPROC(__vhe_hyp_call)
+>  el1_sync:				// Guest trapped into EL2
+>  	stp	x0, x1, [sp, #-16]!
+>  
+> -alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
+> -	mrs	x1, esr_el2
+> -alternative_else
+> -	mrs	x1, esr_el1
+> -alternative_endif
+> -	lsr	x0, x1, #ESR_ELx_EC_SHIFT
+> -
+> -	cmp	x0, #ESR_ELx_EC_HVC64
+> -	b.ne	el1_trap
+> -
+>  	mrs	x1, vttbr_el2		// If vttbr is valid, the 64bit guest
+>  	cbnz	x1, el1_trap		// called HVC
+
+Comment is outdated. Any guest trap will take this path.
+
+>  
+> +#ifdef CONFIG_DEBUG
+> +	mrs	x0, esr_el2
+> +	lsr	x0, x0, #ESR_ELx_EC_SHIFT
+> +	cmp     x0, #ESR_ELx_EC_HVC64
+> +	b.ne    __hyp_panic
+> +#endif
+> +
+>  	/* Here, we're pretty sure the host called HVC. */
+>  	ldp	x0, x1, [sp], #16
+>  
+> @@ -101,10 +98,15 @@ alternative_endif
+>  	eret
+>  
+>  el1_trap:
+> +	get_host_ctxt	x0, x1
+> +	get_vcpu	x1, x0
+> +
+> +	mrs		x0, esr_el2
+> +	lsr		x0, x0, #ESR_ELx_EC_SHIFT
+>  	/*
+>  	 * x0: ESR_EC
+> +	 * x1: vcpu pointer
+>  	 */
+> -	ldr	x1, [sp, #16 + 8]	// vcpu stored by __guest_enter
+>  
+>  	/*
+>  	 * We trap the first access to the FP/SIMD to save the host context
+> @@ -122,13 +124,15 @@ alternative_else_nop_endif
+>  
+>  el1_irq:
+>  	stp     x0, x1, [sp, #-16]!
+> -	ldr	x1, [sp, #16 + 8]
+> +	get_host_ctxt	x0, x1
+> +	get_vcpu	x1, x0
+>  	mov	x0, #ARM_EXCEPTION_IRQ
+>  	b	__guest_exit
+>  
+>  el1_error:
+>  	stp     x0, x1, [sp, #-16]!
+> -	ldr	x1, [sp, #16 + 8]
+> +	get_host_ctxt	x0, x1
+> +	get_vcpu	x1, x0
+>  	mov	x0, #ARM_EXCEPTION_EL1_SERROR
+>  	b	__guest_exit
+>  
+> @@ -164,14 +168,7 @@ ENTRY(__hyp_do_panic)
+>  ENDPROC(__hyp_do_panic)
+>  
+>  ENTRY(__hyp_panic)
+> -	/*
+> -	 * '=kvm_host_cpu_state' is a host VA from the constant pool, it may
+> -	 * not be accessible by this address from EL2, hyp_panic() converts
+> -	 * it with kern_hyp_va() before use.
+> -	 */
+> -	ldr	x0, =kvm_host_cpu_state
+> -	mrs	x1, tpidr_el2
+> -	add	x0, x0, x1
+> +	get_host_ctxt x0, x1
+>  	b	hyp_panic
+>  ENDPROC(__hyp_panic)
+>  
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 69ef24a..a0123ad 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -435,7 +435,7 @@ void __hyp_text __noreturn hyp_panic(struct kvm_cpu_context *__host_ctxt)
+>  	if (read_sysreg(vttbr_el2)) {
+>  		struct kvm_cpu_context *host_ctxt;
+>  
+> -		host_ctxt = kern_hyp_va(__host_ctxt);
+> +		host_ctxt = __host_ctxt;
+
+Can't we just rename __host_ctxt to host_ctxt and drop the local definition?
+
+>  		vcpu = host_ctxt->__hyp_running_vcpu;
+>  		__timer_disable_traps(vcpu);
+>  		__deactivate_traps(vcpu);
+> 
+
+Thanks,
+
+	M.
 -- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Jazz is not dead. It just smells funny...
