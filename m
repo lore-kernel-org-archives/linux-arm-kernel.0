@@ -1,54 +1,49 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu, 12 Oct 2017 17:24:50 +0200
-Subject: [PATCH] nvmem: meson: use generic compatible
-Message-ID: <20171012152450.12454-1-jbrunet@baylibre.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 12 Oct 2017 11:25:50 -0400 (EDT)
+Subject: [PATCH] ARM: head-common.S: Clear lr before jumping to
+ start_kernel()
+In-Reply-To: <20171012102341.GF23750@n2100.armlinux.org.uk>
+References: <1507044184-27152-1-git-send-email-geert+renesas@glider.be>
+ <nycvar.YSQ.7.76.1710031134140.5407@knanqh.ubzr>
+ <CAMuHMdWJKQb5JY+diH=7dqNuypkPUqBeOEPSLOrfrnbfh2siRQ@mail.gmail.com>
+ <CAMuHMdXpPfipmEdW0Dap6Pjwhz3QxLcrcbtU0RhCu721k-sBpA@mail.gmail.com>
+ <CAMuHMdWH_pebSYAp04gmVceu3qqPczGaXS36R8CtzAYHo-CNog@mail.gmail.com>
+ <20171010203324.GX4394@atomide.com>
+ <20171012102341.GF23750@n2100.armlinux.org.uk>
+Message-ID: <nycvar.YSQ.7.76.1710121123530.1718@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The meson efuse driver seems to be compatible with more SoCs than
-initially thought. Let's use the most generic compatible he have in
-DT instead of the gxbb specific one
+On Thu, 12 Oct 2017, Russell King - ARM Linux wrote:
 
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
- Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt | 4 ++--
- drivers/nvmem/meson-efuse.c                               | 2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
+> On Tue, Oct 10, 2017 at 01:33:25PM -0700, Tony Lindgren wrote:
+> > * Geert Uytterhoeven <geert@linux-m68k.org> [171003 11:32]:
+> > > On Tue, Oct 3, 2017 at 8:15 PM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> > > > On Tue, Oct 3, 2017 at 8:11 PM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> > > >> On Tue, Oct 3, 2017 at 5:37 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > > >>> On Tue, 3 Oct 2017, Geert Uytterhoeven wrote:
+> > > >>> Please send it to RMK's patch system.
+> > > >>
+> > > >> Done (I hope so ;-)
+> > > >
+> > > > Failed. Retrying.
+> > > 
+> > > Yiha ;-)
+> > > 
+> > > http://www.armlinux.org.uk/developer/patches/viewpatch.php?id=8702/1
+> > 
+> > This also fixes the spamming I started seeing with next-20171009:
+> > 
+> > Tested-by: Tony Lindgren <tony@atomide.com>
+> 
+> It's all nice and good that people are testing this patch, but I can't
+> apply it to -rc1, nor my "misc" branch.  It appears that this is due
+> to patches going through other trees.
+> 
+> Sorry, I can't take this patch.
 
-diff --git a/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt b/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
-index fafd85bd67a6..0260524292fe 100644
---- a/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
-+++ b/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
-@@ -1,7 +1,7 @@
- = Amlogic eFuse device tree bindings =
- 
- Required properties:
--- compatible: should be "amlogic,meson-gxbb-efuse"
-+- compatible: should be "amlogic,meson-gx-efuse"
- 
- = Data cells =
- Are child nodes of eFuse, bindings of which as described in
-@@ -10,7 +10,7 @@ bindings/nvmem/nvmem.txt
- Example:
- 
- 	efuse: efuse {
--		compatible = "amlogic,meson-gxbb-efuse";
-+		compatible = "amlogic,meson-gx-efuse";
- 		#address-cells = <1>;
- 		#size-cells = <1>;
- 
-diff --git a/drivers/nvmem/meson-efuse.c b/drivers/nvmem/meson-efuse.c
-index 70bfc9839bb2..e90c6d68a263 100644
---- a/drivers/nvmem/meson-efuse.c
-+++ b/drivers/nvmem/meson-efuse.c
-@@ -44,7 +44,7 @@ static struct nvmem_config econfig = {
- };
- 
- static const struct of_device_id meson_efuse_match[] = {
--	{ .compatible = "amlogic,meson-gxbb-efuse", },
-+	{ .compatible = "amlogic,meson-gx-efuse", },
- 	{ /* sentinel */ },
- };
- MODULE_DEVICE_TABLE(of, meson_efuse_match);
--- 
-2.13.6
+It should go into your devel-testing branch as this must be applied on 
+top of my xip_zdata branch that you merged there.
+
+
+Nicolas
