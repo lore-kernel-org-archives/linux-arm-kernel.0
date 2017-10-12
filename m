@@ -1,152 +1,46 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 12 Oct 2017 13:20:51 +0100
-Subject: [PATCH v3 5/5] kernel/locking: Prevent slowpath writers getting held
- up by fastpath
-In-Reply-To: <1507810851-306-1-git-send-email-will.deacon@arm.com>
-References: <1507810851-306-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1507810851-306-6-git-send-email-will.deacon@arm.com>
+Date: Thu, 12 Oct 2017 13:20:46 +0100
+Subject: [PATCH v3 0/5] Switch arm64 over to qrwlock
+Message-ID: <1507810851-306-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a prospective writer takes the qrwlock locking slowpath due to the
-lock being held, it attempts to cmpxchg the wmode field from 0 to
-_QW_WAITING so that concurrent lockers also take the slowpath and queue
-on the spinlock accordingly, allowing the lockers to drain.
+Hello,
 
-Unfortunately, this isn't fair, because a fastpath writer that comes in
-after the lock is made available but before the _QW_WAITING flag is set
-can effectively jump the queue. If there is a steady stream of prospective
-writers, then the waiter will be held off indefinitely.
+This is version three of the patches previously posted here:
 
-This patch restores fairness by separating _QW_WAITING and _QW_LOCKED
-into two distinct fields: _QW_LOCKED continues to occupy the bottom byte
-of the lockword so that it can be cleared unconditionally when unlocking,
-but _QW_WAITING now occupies what used to be the bottom bit of the reader
-count. This then forces the slow-path for concurrent lockers.
+v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2017-October/534666.html
+v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2017-October/534981.html
 
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: Waiman Long <longman@redhat.com>
-Cc: Boqun Feng <boqun.feng@gmail.com>
-Cc: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
-Tested-by: Waiman Long <longman@redhat.com>
-Tested-by: Jeremy Linton <jeremy.linton@arm.com>
-Tested-by: Adam Wallis <awallis@codeaurora.org>
-Tested-by: Jan Glauber <jglauber@cavium.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- include/asm-generic/qrwlock.h       | 23 +++++------------------
- include/asm-generic/qrwlock_types.h |  8 ++++----
- kernel/locking/qrwlock.c            | 20 +++++---------------
- 3 files changed, 14 insertions(+), 37 deletions(-)
+Changes since v2 include:
 
-diff --git a/include/asm-generic/qrwlock.h b/include/asm-generic/qrwlock.h
-index c716b02e8fd7..0f7062bd55e5 100644
---- a/include/asm-generic/qrwlock.h
-+++ b/include/asm-generic/qrwlock.h
-@@ -26,24 +26,11 @@
- 
- /*
-  * Writer states & reader shift and bias.
-- *
-- *       | +0 | +1 | +2 | +3 |
-- *   ----+----+----+----+----+
-- *    LE | 78 | 56 | 34 | 12 | 0x12345678
-- *   ----+----+----+----+----+
-- *       | wr |      rd      |
-- *       +----+----+----+----+
-- *
-- *   ----+----+----+----+----+
-- *    BE | 12 | 34 | 56 | 78 | 0x12345678
-- *   ----+----+----+----+----+
-- *       |      rd      | wr |
-- *       +----+----+----+----+
-  */
--#define	_QW_WAITING	1		/* A writer is waiting	   */
--#define	_QW_LOCKED	0xff		/* A writer holds the lock */
--#define	_QW_WMASK	0xff		/* Writer mask		   */
--#define	_QR_SHIFT	8		/* Reader count shift	   */
-+#define	_QW_WAITING	0x100		/* A writer is waiting	   */
-+#define	_QW_LOCKED	0x0ff		/* A writer holds the lock */
-+#define	_QW_WMASK	0x1ff		/* Writer mask		   */
-+#define	_QR_SHIFT	9		/* Reader count shift	   */
- #define _QR_BIAS	(1U << _QR_SHIFT)
- 
- /*
-@@ -134,7 +121,7 @@ static inline void queued_read_unlock(struct qrwlock *lock)
-  */
- static inline void queued_write_unlock(struct qrwlock *lock)
- {
--	smp_store_release(&lock->wmode, 0);
-+	smp_store_release(&lock->wlocked, 0);
- }
- 
- /*
-diff --git a/include/asm-generic/qrwlock_types.h b/include/asm-generic/qrwlock_types.h
-index 507f2dc51bba..8af752acbdc0 100644
---- a/include/asm-generic/qrwlock_types.h
-+++ b/include/asm-generic/qrwlock_types.h
-@@ -13,11 +13,11 @@ typedef struct qrwlock {
- 		atomic_t cnts;
- 		struct {
- #ifdef __LITTLE_ENDIAN
--			u8 wmode;	/* Writer mode   */
--			u8 rcnts[3];	/* Reader counts */
-+			u8 wlocked;	/* Locked for write? */
-+			u8 __lstate[3];
- #else
--			u8 rcnts[3];	/* Reader counts */
--			u8 wmode;	/* Writer mode   */
-+			u8 __lstate[3];
-+			u8 wlocked;	/* Locked for write? */
- #endif
- 		};
- 	};
-diff --git a/kernel/locking/qrwlock.c b/kernel/locking/qrwlock.c
-index 5825e0fc1a8e..c7471c3fb798 100644
---- a/kernel/locking/qrwlock.c
-+++ b/kernel/locking/qrwlock.c
-@@ -39,8 +39,7 @@ void queued_read_lock_slowpath(struct qrwlock *lock)
- 		 * so spin with ACQUIRE semantics until the lock is available
- 		 * without waiting in the queue.
- 		 */
--		atomic_cond_read_acquire(&lock->cnts, (VAL & _QW_WMASK)
--					 != _QW_LOCKED);
-+		atomic_cond_read_acquire(&lock->cnts, !(VAL & _QW_LOCKED));
- 		return;
- 	}
- 	atomic_sub(_QR_BIAS, &lock->cnts);
-@@ -56,7 +55,7 @@ void queued_read_lock_slowpath(struct qrwlock *lock)
- 	 * that accesses can't leak upwards out of our subsequent critical
- 	 * section in the case that the lock is currently held for write.
- 	 */
--	atomic_cond_read_acquire(&lock->cnts, (VAL & _QW_WMASK) != _QW_LOCKED);
-+	atomic_cond_read_acquire(&lock->cnts, !(VAL & _QW_LOCKED));
- 
- 	/*
- 	 * Signal the next one in queue to become queue head
-@@ -79,19 +78,10 @@ void queued_write_lock_slowpath(struct qrwlock *lock)
- 	    (atomic_cmpxchg_acquire(&lock->cnts, 0, _QW_LOCKED) == 0))
- 		goto unlock;
- 
--	/*
--	 * Set the waiting flag to notify readers that a writer is pending,
--	 * or wait for a previous writer to go away.
--	 */
--	for (;;) {
--		if (!READ_ONCE(lock->wmode) &&
--		   (cmpxchg_relaxed(&lock->wmode, 0, _QW_WAITING) == 0))
--			break;
--
--		cpu_relax();
--	}
-+	/* Set the waiting flag to notify readers that a writer is pending */
-+	atomic_add(_QW_WAITING, &lock->cnts);
- 
--	/* When no more readers, set the locked flag */
-+	/* When no more readers or writers, set the locked flag */
- 	do {
- 		atomic_cond_read_acquire(&lock->cnts, VAL == _QW_WAITING);
- 	} while (atomic_cmpxchg_relaxed(&lock->cnts, _QW_WAITING,
+  * Drop unused cnt argument
+  * Fix typo in UNLOCK Kconfig inlining options
+  * Added Tested-by tags
+
+Thanks to all of those who provided review and testing feedback!
+
+Will
+
+--->8
+
+Will Deacon (5):
+  kernel/locking: Use struct qrwlock instead of struct __qrwlock
+  locking/atomic: Add atomic_cond_read_acquire
+  kernel/locking: Use atomic_cond_read_acquire when spinning in qrwlock
+  arm64: locking: Move rwlock implementation over to qrwlocks
+  kernel/locking: Prevent slowpath writers getting held up by fastpath
+
+ arch/arm64/Kconfig                      |  17 ++++
+ arch/arm64/include/asm/Kbuild           |   1 +
+ arch/arm64/include/asm/spinlock.h       | 164 +-------------------------------
+ arch/arm64/include/asm/spinlock_types.h |   6 +-
+ include/asm-generic/atomic-long.h       |   3 +
+ include/asm-generic/qrwlock.h           |  37 ++-----
+ include/asm-generic/qrwlock_types.h     |  15 ++-
+ include/linux/atomic.h                  |   4 +
+ kernel/locking/qrwlock.c                |  86 +++--------------
+ 9 files changed, 61 insertions(+), 272 deletions(-)
+
 -- 
 2.1.4
