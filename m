@@ -1,67 +1,48 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 12 Oct 2017 12:40:35 +0100
-Subject: kdump: need help with kexec -p
-In-Reply-To: <HE1PR04MB12416F54193B1A61BC0652ED974A0@HE1PR04MB1241.eurprd04.prod.outlook.com>
-References: <HE1PR04MB12416F54193B1A61BC0652ED974A0@HE1PR04MB1241.eurprd04.prod.outlook.com>
-Message-ID: <59DF54B3.1050404@arm.com>
+From: zhangshaokun@hisilicon.com (Zhangshaokun)
+Date: Thu, 12 Oct 2017 19:45:24 +0800
+Subject: [PATCH v7 0/4] Add support for ThunderX2 pmu events using json
+ files
+In-Reply-To: <20171012105851.GC7395@arm.com>
+References: <20171012103419.29824-1-ganapatrao.kulkarni@cavium.com>
+ <20171012103820.GC17924@rric.localdomain>
+ <CAKTKpr5=msG9b-f2Mj+1SibUvMXefg9DAcNA7M3hgHCX=hpQ6g@mail.gmail.com>
+ <20171012105851.GC7395@arm.com>
+Message-ID: <e1a2913c-f56f-44c5-19e7-0c061cf21639@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Prabhakar,
+Hi Will,
 
-(+CC: Akashi Takahiro, who wrote the arm64 kdump support)
+On 2017/10/12 18:58, Will Deacon wrote:
+> On Thu, Oct 12, 2017 at 04:20:06PM +0530, Ganapatrao Kulkarni wrote:
+>> Hi Robert,
+>>
+>> On Thu, Oct 12, 2017 at 4:08 PM, Robert Richter <rric@kernel.org> wrote:
+>>> On 12.10.17 16:04:15, Ganapatrao Kulkarni wrote:
+>>>
+>>>>  tools/perf/arch/arm64/util/Build                   |  1 +
+>>>>  tools/perf/arch/arm64/util/header.c                | 65 ++++++++++++++++++++++
+>>>>  tools/perf/arch/powerpc/util/header.c              |  2 +-
+>>>>  tools/perf/arch/x86/util/header.c                  |  2 +-
+>>>>  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 +++++
+>>>>  .../arch/arm64/thunderx2/thunderx2-imp-def.json    | 62 +++++++++++++++++++++
+>>>
+>>> I guess the dir needs to be named 'cavium'.
+>>
+>> i dont think so ,  while compilation arch type is detected, it has to be arm64
+>> refer SRCARCH in pmu-events/Build
+> 
+> The full name should be:
+> 
+> .../arch/arm64/cavium/thunderx2-imp-def.json
+> 
 
-On 11/10/17 10:11, Prabhakar Kushwaha wrote:
-> We are facing some issues while using  kexec -p on ARM64 NXP platforms. 
->
-> 1) After calling kexec -p, if immediately "panic" is triggered the crash kernel
-> does not boot. If we run few commands and wait for atleast (20-30 secs), before
-> triggering the panic, the crash kernel boots.
-
-What kernel version do you see this on? Can you log the kernel output in each
-case, (do you get a 'bye' message even when the new kernel doesn't boot).
-
-Does 'kexec -p' report success in both cases? ($? == 0)
-
-
-kdump can take many seconds in purgatory, it checksums the kdump image to check
-it didn't get corrupted between 'kexec -p' and crash time, but it doesn't sound
-like this is what you're seeing.
-
-
-> 2) We do not see the issue ("1" ), when we do umount -a, before calling the panic
-> after kexec-p.
-
-What filesystems (ext4, nfs etc) do you have mounted, and which ones does
-'umount -a' get rid of?
-Where are these filesystems stored?
-
-How many CPUs does your platform have?
-
-(...does crashing on a different CPU change the behaviour?)
-> taskset -c 1 bash -c "echo c > /proc/sysrq-trigger"
-
-
-> The issue does not seem to pertain to the NXP software it seems.   (because this
-> observation has been observed on very simple kernel, where most of the
-> controllers have been removed from device tree).
-
-> Also found some info related to this on  internet where it is mentioned that
-> without un-mounting the mounted filesystems, the boot of next kernel is not
-> recommended. (this is in context of kexec -e though)
-> https://www.linux.com/news/reboot-racecar-kexec.
-
-This is because the filesystem is marked as mounted on-disk, and there may be
-vital data you've written but hasn't made it to the disk yet.
-
-For 'kexec -e' I think it tries to shutdown and reboot, then jumps to the new
-kernel instead of calling the firmware. This means all filesystems should be
-sync()d, umounted or at least remounted read-only.
-
-For kdump, we've already crashed, so you've already lost data. Its a best effort
-can we get to a point where you can debug the original crash.
-
+It works for us (HiSilicon) as .../arch/arm64/hisilicon/hip08-imp-def.json.
 
 Thanks,
+Shaokun
 
-James
+> Will
+> 
+> .
+> 
