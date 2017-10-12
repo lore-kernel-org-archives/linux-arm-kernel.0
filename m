@@ -1,117 +1,45 @@
-From: zhiqiang.hou@nxp.com (Z.q. Hou)
-Date: Thu, 12 Oct 2017 03:33:15 +0000
-Subject: [PATCH 2/2] pci/layerscape: change the default error response
- behavior
-In-Reply-To: <20171011194129.GQ25517@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170922072522.36306-1-Zhiqiang.Hou@nxp.com>
- <20170922072522.36306-3-Zhiqiang.Hou@nxp.com>
- <20171011194129.GQ25517@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <AM5PR0402MB27711353F4479D83E41359D8844B0@AM5PR0402MB2771.eurprd04.prod.outlook.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Thu, 12 Oct 2017 11:37:30 +0800
+Subject: [PATCH 11/11] ARM: dts: Add PCLK to the Aspeed watchdogs
+In-Reply-To: <CACRpkdbJhTmSZDudJCb_8nOfk6802Z8Op2+gjY9vdDT9Cg+6eQ@mail.gmail.com>
+References: <20170812184318.10144-1-linus.walleij@linaro.org>
+ <20170812184318.10144-12-linus.walleij@linaro.org>
+ <CACRpkdbJhTmSZDudJCb_8nOfk6802Z8Op2+gjY9vdDT9Cg+6eQ@mail.gmail.com>
+Message-ID: <CACPK8XeQDdisecoHo7+_7LQNxYWh7yDj99O=NxWSoHyuk7LRxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+On Wed, Oct 11, 2017 at 4:09 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Sat, Aug 12, 2017 at 8:43 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>
+>> This adds the PCLK clock to the Aspeed watchdog blocks.
+>> I am not directly familiar with the Aspeed clocking, but
+>> since the IP is derived from Faraday FTWDT010 it probably
+>> has the ability to run the watchdog on the PCLK if
+>> desired so to obtain the frequency from it, it needs to
+>> be present in the device tree, and for completeness the
+>> PCLK should also be referenced and enabled anyways.
+>>
+>> Take this opportunity to add the "faraday,ftwdt010"
+>> compatible as fallback to the watchdog IP blocks.
+>>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> Joel could you merge this through the Aspeed tree? I think
+> the compatible string is completely uncontroversial
+> (binding ACKed) to add and all should just work fine so we
+> can slap in "EXTCLK" later as well.
 
-Thanks a lot for your review!
+How do the clock-names work? I have been writing the aspeed clk driver
+and updating the bindings without clock names, and instead using a
+identifier in phandle to reference which clock the device wants.
 
-> -----Original Message-----
-> From: Bjorn Helgaas [mailto:helgaas at kernel.org]
-> Sent: 2017?10?12? 3:41
-> To: Z.q. Hou <zhiqiang.hou@nxp.com>
-> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> linux-pci at vger.kernel.org; bhelgaas at google.com; Roy Zang
-> <roy.zang@nxp.com>; Mingkai Hu <mingkai.hu@nxp.com>; M.h. Lian
-> <minghuan.lian@nxp.com>
-> Subject: Re: [PATCH 2/2] pci/layerscape: change the default error response
-> behavior
-> 
-> On Fri, Sep 22, 2017 at 03:25:22PM +0800, Zhiqiang Hou wrote:
-> > From: Minghuan Lian <Minghuan.Lian@nxp.com>
-> >
-> > By default, when the PCIe controller experiences an erroneous
-> > completion from an external completer for its outbound non-posted
-> > request, it always sends an OKAY response to the device's internal AXI
-> > slave system interface. However, such default system error response
-> > behavior cannot be used for other types of outbound non-posted
-> > requests. For example, the outbound memory read transaction requires
-> > an actual ERROR response, like UR completion or completion timeout.
-> > The patch is to fix it by forwarding the error response of the
-> > non-posted request.
-> >
-> > Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
-> > Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> > ---
-> >  drivers/pci/dwc/pci-layerscape.c | 25 +++++++++++++++++++++++++
-> >  1 file changed, 25 insertions(+)
-> >
-> > diff --git a/drivers/pci/dwc/pci-layerscape.c
-> > b/drivers/pci/dwc/pci-layerscape.c
-> > index 3b01e309a55e..a647090c140e 100644
-> > --- a/drivers/pci/dwc/pci-layerscape.c
-> > +++ b/drivers/pci/dwc/pci-layerscape.c
-> > @@ -33,6 +33,8 @@
-> >
-> >  /* PEX Internal Configuration Registers */
-> >  #define PCIE_STRFMR1		0x71c /* Symbol Timer & Filter Mask
-> Register1 */
-> > +#define PCIE_ABSERR		0x8d0 /* Bridge Slave Error Response
-> Register */
-> > +#define PCIE_ABSERR_SETTING	0x9401 /* Forward error of non-posted
-> request */
-> >
-> >  #define PCIE_IATU_NUM		6
-> >
-> > @@ -54,6 +56,19 @@ struct ls_pcie {
-> >
-> >  #define to_ls_pcie(x)	dev_get_drvdata((x)->dev)
-> >
-> > +static int err_response_flag = 1;
-> > +
-> > +static int __init ls_pcie_param(char *p) {
-> > +	if (p && strncmp(p, "no-err-response", 15) == 0)
-> > +		err_response_flag = 0;
-> > +	else
-> > +		err_response_flag = 1;
-> > +
-> > +	return 0;
-> > +}
-> > +early_param("ls_pcie", ls_pcie_param);
-> 
-> What's the point of this parameter?  If it's for debugging, it's not clear that
-> we need it upstream.  If it's for debugging and we *do* need it upstream,
-> there should be some sort of comment to that effect.
-> 
-> I assume you never expect an end user to need this parameter.
+eg:
 
-It is for debugging, will drop this parameter next version.
+ clocks = <&syscon 10>;
 
-> 
-> >  static bool ls_pcie_is_bridge(struct ls_pcie *pcie)  {
-> >  	struct dw_pcie *pci = pcie->pci;
-> > @@ -124,6 +139,14 @@ static int ls_pcie_link_up(struct dw_pcie *pci)
-> >  	return 1;
-> >  }
-> >
-> > +/* Forward error response of outbound non-posted requests */ static
-> > +void ls_pcie_fix_error_response(struct ls_pcie *pcie) {
-> > +	struct dw_pcie *pci = pcie->pci;
-> > +
-> > +	iowrite32(PCIE_ABSERR_SETTING, pci->dbi_base + PCIE_ABSERR); }
-> > +
-> >  static int ls_pcie_host_init(struct pcie_port *pp)  {
-> >  	struct dw_pcie *pci = to_dw_pcie_from_pp(pp); @@ -135,6 +158,8 @@
-> > static int ls_pcie_host_init(struct pcie_port *pp)
-> >  	 * dw_pcie_setup_rc() will reconfigure the outbound windows.
-> >  	 */
-> >  	ls_pcie_disable_outbound_atus(pcie);
-> > +	if (err_response_flag)
-> > +		ls_pcie_fix_error_response(pcie);
-> >
-> >  	dw_pcie_dbi_ro_wr_en(pci);
-> >  	ls_pcie_clear_multifunction(pcie);
-> > --
-> > 2.14.1
-> >
+(I'm travelling over the next few weeks so my replies might be delayed)
 
-Thanks,
-Zhiqiang
+Cheers,
+
+Joel
