@@ -1,58 +1,49 @@
-From: gklkml16@gmail.com (Ganapatrao Kulkarni)
-Date: Thu, 12 Oct 2017 19:17:53 +0530
-Subject: [PATCH v7 0/4] Add support for ThunderX2 pmu events using json
- files
-In-Reply-To: <e1a2913c-f56f-44c5-19e7-0c061cf21639@hisilicon.com>
-References: <20171012103419.29824-1-ganapatrao.kulkarni@cavium.com>
- <20171012103820.GC17924@rric.localdomain>
- <CAKTKpr5=msG9b-f2Mj+1SibUvMXefg9DAcNA7M3hgHCX=hpQ6g@mail.gmail.com>
- <20171012105851.GC7395@arm.com>
- <e1a2913c-f56f-44c5-19e7-0c061cf21639@hisilicon.com>
-Message-ID: <CAKTKpr4zqOUJraeCsHH2BFtf3C9a6brTbt94cikOvQe7Y3V0zw@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 12 Oct 2017 15:47:51 +0200
+Subject: [PATCH] arm64: defconfig: enable RTC on Armada 7K/8K SoCs
+In-Reply-To: <20171002154416.585-1-gregory.clement@free-electrons.com>
+ (Gregory CLEMENT's message of "Mon, 2 Oct 2017 17:44:16 +0200")
+References: <20171002154416.585-1-gregory.clement@free-electrons.com>
+Message-ID: <87k200bhq0.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 12, 2017 at 5:15 PM, Zhangshaokun
-<zhangshaokun@hisilicon.com> wrote:
-> Hi Will,
->
-> On 2017/10/12 18:58, Will Deacon wrote:
->> On Thu, Oct 12, 2017 at 04:20:06PM +0530, Ganapatrao Kulkarni wrote:
->>> Hi Robert,
->>>
->>> On Thu, Oct 12, 2017 at 4:08 PM, Robert Richter <rric@kernel.org> wrote:
->>>> On 12.10.17 16:04:15, Ganapatrao Kulkarni wrote:
->>>>
->>>>>  tools/perf/arch/arm64/util/Build                   |  1 +
->>>>>  tools/perf/arch/arm64/util/header.c                | 65 ++++++++++++++++++++++
->>>>>  tools/perf/arch/powerpc/util/header.c              |  2 +-
->>>>>  tools/perf/arch/x86/util/header.c                  |  2 +-
->>>>>  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 +++++
->>>>>  .../arch/arm64/thunderx2/thunderx2-imp-def.json    | 62 +++++++++++++++++++++
->>>>
->>>> I guess the dir needs to be named 'cavium'.
->>>
->>> i dont think so ,  while compilation arch type is detected, it has to be arm64
->>> refer SRCARCH in pmu-events/Build
->>
->> The full name should be:
->>
->> .../arch/arm64/cavium/thunderx2-imp-def.json
+Hi, 
+ 
+ On lun., oct. 02 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
-ok,  i am sending patch with renaming directory to cavium.
+> The Armada 38x RTC driver supports also the RTC controller found on the
+> Armada 7K/8K SoCs, so enable it.
 
->>
+Applied on mvebu/arm64
+
+Gregory
+
+
 >
-> It works for us (HiSilicon) as .../arch/arm64/hisilicon/hip08-imp-def.json.
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  arch/arm64/configs/defconfig | 1 +
+>  1 file changed, 1 insertion(+)
 >
-> Thanks,
-> Shaokun
->
->> Will
->>
->> .
->>
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index 34480e9af2e7..7f6a3aee647d 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -470,6 +470,7 @@ CONFIG_RTC_DRV_EFI=y
+>  CONFIG_RTC_DRV_S3C=y
+>  CONFIG_RTC_DRV_PL031=y
+>  CONFIG_RTC_DRV_SUN6I=y
+> +CONFIG_RTC_DRV_ARMADA38X=y
+>  CONFIG_RTC_DRV_TEGRA=y
+>  CONFIG_RTC_DRV_XGENE=y
+>  CONFIG_DMADEVICES=y
+> -- 
+> 2.14.1
 >
 
-thanks
-Ganapat
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
