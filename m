@@ -1,189 +1,221 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 12 Oct 2017 23:58:26 +0100
-Subject: [PATCH v2] drivers/irqchip: gicv3: add workaround for Synquacer
- pre-ITS
-In-Reply-To: <d7b465b0-9eee-ee01-e690-e4ec3295c04b@arm.com>
-References: <20171012065835.646-1-ard.biesheuvel@linaro.org>
- <d7b465b0-9eee-ee01-e690-e4ec3295c04b@arm.com>
-Message-ID: <CAKv+Gu82e6A4gcq05UA-H9DdsPapgDrNb7X1TL2c_+FqyOLexw@mail.gmail.com>
+From: salyzyn@android.com (Mark Salyzyn)
+Date: Thu, 12 Oct 2017 15:58:46 -0700
+Subject: [PATCH v2 1/10] arm: vdso: rename vdso_datapage variables
+Message-ID: <20171012225853.86413-1-salyzyn@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 October 2017 at 08:49, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> Hi Ard,
->
-> On 12/10/17 07:58, Ard Biesheuvel wrote:
->> The Socionext Synquacer SoC's implementation of GICv3 has a so-called
->> 'pre-ITS', which maps 32-bit writes targeted at a separate window of
->> size '4 << device_id_bits' onto writes to GITS_TRANSLATER with device
->> ID taken from bits [device_id_bits + 1:2] of the window offset.
->> Writes that target GITS_TRANSLATER directly are reported as originating
->> from device ID #0.
->>
->> So add a workaround for this. Given that this breaks isolation, clear
->> the IRQ_DOMAIN_FLAG_MSI_REMAP flag as well.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->> v2: - use a 32-bit host address/size rather than a PCI address, to factor
->>       out the involvement of an SMMU (which the platform does have, but it
->>       is unclear atm if it can be exposed to the OS)
->>     - add msi_domain_flags member to move the quirk flag checks out of the
->>       common code path
->>
->>  Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt |  4 ++
->>  arch/arm64/Kconfig                                                    |  8 +++
->>  drivers/irqchip/irq-gic-v3-its.c                                      | 53 +++++++++++++++++---
->>  3 files changed, 59 insertions(+), 6 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt b/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
->> index 4c29cdab0ea5..3d8b3f910aef 100644
->> --- a/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
->> +++ b/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
->> @@ -75,6 +75,10 @@ These nodes must have the following properties:
->>  - reg: Specifies the base physical address and size of the ITS
->>    registers.
->>
->> +Optional:
->> +- socionext,synquacer-pre-its: (u32, u32) tuple describing the host address
->> +  and size of the pre-ITS window.
->> +
->>  The main GIC node must contain the appropriate #address-cells,
->>  #size-cells and ranges properties for the reg property of all ITS
->>  nodes.
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 0df64a6a56d4..c4361dff2b74 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -539,6 +539,14 @@ config QCOM_QDF2400_ERRATUM_0065
->>
->>         If unsure, say Y.
->>
->> +config SOCIONEXT_SYNQUACER_PREITS
->> +     bool "Socionext Synquacer: Workaround for GICv3 pre-ITS"
->> +     default y
->> +     help
->> +       Socionext Synquacer SoCs implement a separate h/w block to generate
->> +       MSI doorbell writes with non-zero values for the device ID.
->> +
->> +       If unsure, say Y.
->>  endmenu
->>
->>
->> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
->> index e8d89343d613..7a4536ce8e72 100644
->> --- a/drivers/irqchip/irq-gic-v3-its.c
->> +++ b/drivers/irqchip/irq-gic-v3-its.c
->> @@ -46,6 +46,7 @@
->>  #define ITS_FLAGS_CMDQ_NEEDS_FLUSHING                (1ULL << 0)
->>  #define ITS_FLAGS_WORKAROUND_CAVIUM_22375    (1ULL << 1)
->>  #define ITS_FLAGS_WORKAROUND_CAVIUM_23144    (1ULL << 2)
->> +#define ITS_FLAGS_WORKAROUND_SOCIONEXT_PREITS        (1ULL << 3)
->>
->>  #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING  (1 << 0)
->>
->> @@ -102,6 +103,11 @@ struct its_node {
->>       u32                     ite_size;
->>       u32                     device_ids;
->>       int                     numa_node;
->> +     unsigned int            msi_domain_flags;
->> +#ifdef CONFIG_SOCIONEXT_SYNQUACER_PREITS
->> +     u32                     pre_its_base;
->> +     u32                     pre_its_size;
->> +#endif
->>       bool                    is_v4;
->>  };
->>
->> @@ -1095,14 +1101,31 @@ static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
->>       return IRQ_SET_MASK_OK_DONE;
->>  }
->>
->> +static u64 its_irq_get_msi_base(struct its_device *its_dev)
->> +{
->> +     struct its_node *its = its_dev->its;
->> +
->> +#ifdef CONFIG_SOCIONEXT_SYNQUACER_PREITS
->> +     if (its->flags & ITS_FLAGS_WORKAROUND_SOCIONEXT_PREITS)
->> +
->> +             /*
->> +              * The Socionext Synquacer SoC has a so-called 'pre-ITS',
->> +              * which maps 32-bit writes targeted at a separate window of
->> +              * size '4 << device_id_bits' onto writes to GITS_TRANSLATER
->> +              * with device ID taken from bits [device_id_bits + 1:2] of
->> +              * the window offset.
->> +              */
->> +             return its->pre_its_base + (its_dev->device_id << 2);
->> +#endif
->> +     return its->phys_base + GITS_TRANSLATER;
->> +}
->> +
->>  static void its_irq_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
->>  {
->>       struct its_device *its_dev = irq_data_get_irq_chip_data(d);
->> -     struct its_node *its;
->>       u64 addr;
->>
->> -     its = its_dev->its;
->> -     addr = its->phys_base + GITS_TRANSLATER;
->> +     addr = its_irq_get_msi_base(its_dev);
->>
->>       msg->address_lo         = lower_32_bits(addr);
->>       msg->address_hi         = upper_32_bits(addr);
->> @@ -1666,6 +1689,11 @@ static int its_alloc_tables(struct its_node *its)
->>               ids     = 0x14;                 /* 20 bits, 8MB */
->>       }
->>
->> +#ifdef CONFIG_SOCIONEXT_SYNQUACER_PREITS
->> +     if (its->flags & ITS_FLAGS_WORKAROUND_SOCIONEXT_PREITS)
->> +             ids = ilog2(its->pre_its_size) - 2;
->
-> You probably want to check that this is smaller or equal to the ITS's
-> own view of the DevID space.
->
->> +#endif
->> +
->>       its->device_ids = ids;
->>
->>       for (i = 0; i < GITS_BASER_NR_REGS; i++) {
->> @@ -2788,11 +2816,22 @@ static const struct gic_quirk its_quirks[] = {
->>       }
->>  };
->>
->> -static void its_enable_quirks(struct its_node *its)
->> +static void its_enable_quirks(struct its_node *its,
->> +                           struct fwnode_handle *handle)
->>  {
->>       u32 iidr = readl_relaxed(its->base + GITS_IIDR);
->>
->>       gic_enable_quirks(iidr, its_quirks, its);
->> +
->> +#ifdef CONFIG_SOCIONEXT_SYNQUACER_PREITS
->> +     if (!fwnode_property_read_u32_array(handle,
->> +                                         "socionext,synquacer-pre-its",
->> +                                         &its->pre_its_base, 2)) {
->
-> Erm. Populating these two fields with a single read is pretty horrible...
->
->> +             its->flags |= ITS_FLAGS_WORKAROUND_SOCIONEXT_PREITS;
->> +             its->msi_domain_flags &= ~IRQ_DOMAIN_FLAG_MSI_REMAP;
->> +             pr_info("ITS: enabling workaround for Socionext Synquacer pre-ITS\n");
->> +     }
->> +#endif
->
-> I must say I'm not fond of adding a quirk outside of the quirk
-> infrastructure. Could you try this slightly different approach?
->
-> - Add the handle to the struct its_node
-> - Add a quirk structure to the its_quirks array, with a match on
-> whatever version of the GIC this platform is using (I suppose some
-> revision of GIC-500)
+Rename seq_count to tb_seq_count. Rename tk_is_cntvct to use_syscall.
+Rename cs_mult to cs_mono_mult. All to align with the variables in the
+arm64 vdso datapage. Rework vdso_read_begin() and vdso_read_retry()
+functions to reflect modern access patterns for tb_seq_count field.
 
-After spinning v3 with this change, I realised that this will result in the
+Update copyright message to reflect the start of the contributions in
+this series.
 
-GIC: enabling workaround for xxx
+Signed-off-by: Mark Salyzyn <salyzyn@android.com>
 
-message to be printed for all GIC-500s, given that this is triggered
-by the IIDR match itself.
+v2: split first CL into 1 of 7 pieces
+---
+ arch/arm/include/asm/vdso_datapage.h |  6 ++--
+ arch/arm/kernel/vdso.c               | 17 +++++-----
+ arch/arm/vdso/vgettimeofday.c        | 61 +++++++++++++++++++-----------------
+ 3 files changed, 45 insertions(+), 39 deletions(-)
 
-I will add a patch to the series to change the quirk->init() prototype
-to return a bool indicating whether it matched or not.
+diff --git a/arch/arm/include/asm/vdso_datapage.h b/arch/arm/include/asm/vdso_datapage.h
+index 9be259442fca..fa3e1856244d 100644
+--- a/arch/arm/include/asm/vdso_datapage.h
++++ b/arch/arm/include/asm/vdso_datapage.h
+@@ -29,8 +29,8 @@
+  * 32 bytes.
+  */
+ struct vdso_data {
+-	u32 seq_count;		/* sequence count - odd during updates */
+-	u16 tk_is_cntvct;	/* fall back to syscall if false */
++	u32 tb_seq_count;	/* sequence count - odd during updates */
++	u16 use_syscall;	/* fall back to syscall if true */
+ 	u16 cs_shift;		/* clocksource shift */
+ 	u32 xtime_coarse_sec;	/* coarse time */
+ 	u32 xtime_coarse_nsec;
+@@ -38,7 +38,7 @@ struct vdso_data {
+ 	u32 wtm_clock_sec;	/* wall to monotonic offset */
+ 	u32 wtm_clock_nsec;
+ 	u32 xtime_clock_sec;	/* CLOCK_REALTIME - seconds */
+-	u32 cs_mult;		/* clocksource multiplier */
++	u32 cs_mono_mult;	/* clocksource multiplier */
+ 
+ 	u64 cs_cycle_last;	/* last cycle value */
+ 	u64 cs_mask;		/* clocksource mask */
+diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
+index a4d6dc0f2427..aed84b659cc5 100644
+--- a/arch/arm/kernel/vdso.c
++++ b/arch/arm/kernel/vdso.c
+@@ -274,14 +274,14 @@ void arm_install_vdso(struct mm_struct *mm, unsigned long addr)
+ 
+ static void vdso_write_begin(struct vdso_data *vdata)
+ {
+-	++vdso_data->seq_count;
++	++vdso_data->tb_seq_count;
+ 	smp_wmb(); /* Pairs with smp_rmb in vdso_read_retry */
+ }
+ 
+ static void vdso_write_end(struct vdso_data *vdata)
+ {
+ 	smp_wmb(); /* Pairs with smp_rmb in vdso_read_begin */
+-	++vdso_data->seq_count;
++	++vdso_data->tb_seq_count;
+ }
+ 
+ static bool tk_is_cntvct(const struct timekeeper *tk)
+@@ -305,10 +305,10 @@ static bool tk_is_cntvct(const struct timekeeper *tk)
+  * counter again, making it even, indicating to userspace that the
+  * update is finished.
+  *
+- * Userspace is expected to sample seq_count before reading any other
+- * fields from the data page.  If seq_count is odd, userspace is
++ * Userspace is expected to sample tb_seq_count before reading any other
++ * fields from the data page.  If tb_seq_count is odd, userspace is
+  * expected to wait until it becomes even.  After copying data from
+- * the page, userspace must sample seq_count again; if it has changed
++ * the page, userspace must sample tb_seq_count again; if it has changed
+  * from its previous value, userspace must retry the whole sequence.
+  *
+  * Calls to update_vsyscall are serialized by the timekeeping core.
+@@ -326,18 +326,19 @@ void update_vsyscall(struct timekeeper *tk)
+ 
+ 	vdso_write_begin(vdso_data);
+ 
+-	vdso_data->tk_is_cntvct			= tk_is_cntvct(tk);
++	vdso_data->use_syscall			= !tk_is_cntvct(tk);
+ 	vdso_data->xtime_coarse_sec		= tk->xtime_sec;
+ 	vdso_data->xtime_coarse_nsec		= (u32)(tk->tkr_mono.xtime_nsec >>
+ 							tk->tkr_mono.shift);
+ 	vdso_data->wtm_clock_sec		= wtm->tv_sec;
+ 	vdso_data->wtm_clock_nsec		= wtm->tv_nsec;
+ 
+-	if (vdso_data->tk_is_cntvct) {
++	if (!vdso_data->use_syscall) {
+ 		vdso_data->cs_cycle_last	= tk->tkr_mono.cycle_last;
+ 		vdso_data->xtime_clock_sec	= tk->xtime_sec;
+ 		vdso_data->xtime_clock_snsec	= tk->tkr_mono.xtime_nsec;
+-		vdso_data->cs_mult		= tk->tkr_mono.mult;
++		vdso_data->cs_mono_mult		= tk->tkr_mono.mult;
++		/* tkr_mono.shift == tkr_raw.shift */
+ 		vdso_data->cs_shift		= tk->tkr_mono.shift;
+ 		vdso_data->cs_mask		= tk->tkr_mono.mask;
+ 	}
+diff --git a/arch/arm/vdso/vgettimeofday.c b/arch/arm/vdso/vgettimeofday.c
+index 79214d5ff097..8cf13af1323c 100644
+--- a/arch/arm/vdso/vgettimeofday.c
++++ b/arch/arm/vdso/vgettimeofday.c
+@@ -1,18 +1,25 @@
+ /*
+- * Copyright 2015 Mentor Graphics Corporation.
++ * Userspace implementations of gettimeofday() and friends.
+  *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; version 2 of the
+- * License.
++ * Copyright (C) 2017 Cavium, Inc.
++ * Copyright (C) 2015 Mentor Graphics Corporation
++ * Copyright (C) 2012 ARM Limited
+  *
+- * This program is distributed in the hope that it will be useful, but
+- * WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+- * General Public License for more details.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
+  *
+  * You should have received a copy of the GNU General Public License
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Author: Will Deacon <will.deacon@arm.com>
++ * Rewriten from arch64 version into C by: Andrew Pinski <apinski@cavium.com>
++ * Reworked and rebased over arm version by: Mark Salyzyn <salyzyn@android.com>
+  */
+ 
+ #include <linux/compiler.h>
+@@ -31,32 +38,30 @@
+ 
+ extern struct vdso_data *__get_datapage(void);
+ 
+-static notrace u32 __vdso_read_begin(const struct vdso_data *vdata)
+-{
+-	u32 seq;
+-repeat:
+-	seq = ACCESS_ONCE(vdata->seq_count);
+-	if (seq & 1) {
+-		cpu_relax();
+-		goto repeat;
+-	}
+-	return seq;
+-}
+-
+ static notrace u32 vdso_read_begin(const struct vdso_data *vdata)
+ {
+ 	u32 seq;
+ 
+-	seq = __vdso_read_begin(vdata);
++	do {
++		seq = READ_ONCE(vdata->tb_seq_count);
++
++		if ((seq & 1) == 0)
++			break;
+ 
+-	smp_rmb(); /* Pairs with smp_wmb in vdso_write_end */
++		cpu_relax();
++	} while (true);
++
++	smp_rmb(); /* Pairs with second smp_wmb in update_vsyscall */
+ 	return seq;
+ }
+ 
+ static notrace int vdso_read_retry(const struct vdso_data *vdata, u32 start)
+ {
+-	smp_rmb(); /* Pairs with smp_wmb in vdso_write_begin */
+-	return vdata->seq_count != start;
++	u32 seq;
++
++	smp_rmb(); /* Pairs with first smp_wmb in update_vsyscall */
++	seq = READ_ONCE(vdata->tb_seq_count);
++	return seq != start;
+ }
+ 
+ static notrace long clock_gettime_fallback(clockid_t _clkid,
+@@ -127,7 +132,7 @@ static notrace u64 get_ns(struct vdso_data *vdata)
+ 
+ 	cycle_delta = (cycle_now - vdata->cs_cycle_last) & vdata->cs_mask;
+ 
+-	nsec = (cycle_delta * vdata->cs_mult) + vdata->xtime_clock_snsec;
++	nsec = (cycle_delta * vdata->cs_mono_mult) + vdata->xtime_clock_snsec;
+ 	nsec >>= vdata->cs_shift;
+ 
+ 	return nsec;
+@@ -141,7 +146,7 @@ static notrace int do_realtime(struct timespec *ts, struct vdso_data *vdata)
+ 	do {
+ 		seq = vdso_read_begin(vdata);
+ 
+-		if (!vdata->tk_is_cntvct)
++		if (vdata->use_syscall)
+ 			return -1;
+ 
+ 		ts->tv_sec = vdata->xtime_clock_sec;
+@@ -164,7 +169,7 @@ static notrace int do_monotonic(struct timespec *ts, struct vdso_data *vdata)
+ 	do {
+ 		seq = vdso_read_begin(vdata);
+ 
+-		if (!vdata->tk_is_cntvct)
++		if (vdata->use_syscall)
+ 			return -1;
+ 
+ 		ts->tv_sec = vdata->xtime_clock_sec;
+-- 
+2.15.0.rc0.271.g36b669edcc-goog
