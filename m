@@ -1,38 +1,24 @@
-From: gklkml16@gmail.com (Ganapatrao Kulkarni)
-Date: Thu, 12 Oct 2017 22:54:50 +0530
-Subject: [PATCH v8 0/4] Add support for ThunderX2 pmu events using json
- files
-In-Reply-To: <20171012152402.GC5614@arm.com>
-References: <20171012141116.32475-1-ganapatrao.kulkarni@cavium.com>
- <20171012152402.GC5614@arm.com>
-Message-ID: <CAKTKpr6RCzq3QhgptZECZG=YoEmTWCEhM2QaHpzx-ZEtactbHQ@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 12 Oct 2017 19:29:02 +0200 (CEST)
+Subject: [PATCH 08/20] staging: vc04_services: vchiq_core: mark expected
+ switch fall-through
+In-Reply-To: <f7666b46f3a50ba58eac5454680bbba4d84fe6c2.1507781178.git.garsilva@embeddedor.com>
+References: <cover.1507781178.git.garsilva@embeddedor.com>
+ <f7666b46f3a50ba58eac5454680bbba4d84fe6c2.1507781178.git.garsilva@embeddedor.com>
+Message-ID: <9079364.189932.1507829342222@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 12, 2017 at 8:54 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Thu, Oct 12, 2017 at 07:41:12PM +0530, Ganapatrao Kulkarni wrote:
->> Extending json/jevent framework for parsing arm64 event files.
->> Adding jevents for ThunderX2 implementation defined PMU events.
->>
->> v8:
->>    - Rename thunderx2 directory to cavium
->
-> For the series:
->
-> Acked-by: Will Deacon <will.deacon@arm.com>
 
-thanks.
->
-> Although note that this conflicts against a queued fix from Mark[1], so
-> you'll need to rebase on top of that.
+> "Gustavo A. R. Silva" <garsilva@embeddedor.com> hat am 12. Oktober 2017 um 18:16 geschrieben:
+> 
+> 
+> In preparation to enabling -Wimplicit-fallthrough, mark switch cases
+> where we are expecting to fall through.
+> 
+> Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
+> ---
+>  drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
 
-sure, will do.
-may i know the branch/repo which i can rebase to?
-
->
-> Will
->
-> [1] https://patchwork.kernel.org/patch/9990237/
-
-thanks
-Ganapat
+Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
