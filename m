@@ -1,127 +1,92 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 12 Oct 2017 11:24:57 +0200
-Subject: [PATCH] ARM: compressed: discard ksym/kcrctab input section
-In-Reply-To: <CAKv+Gu_t+oLJKGzy3LxgLZqqYsd9eQiwZRr6dgPbqpsHnQUUxw@mail.gmail.com>
- (Ard Biesheuvel's message of "Mon, 9 Oct 2017 13:39:34 +0100")
-References: <20170908153143.27279-1-ard.biesheuvel@linaro.org>
- <87d163kt0m.fsf@free-electrons.com>
- <CAKv+Gu_pGeDxK_vD9iGUO486VgLsntMQwVs9wGKa79pkx7paMQ@mail.gmail.com>
- <20171004124320.GP20805@n2100.armlinux.org.uk>
- <CAKv+Gu_t+oLJKGzy3LxgLZqqYsd9eQiwZRr6dgPbqpsHnQUUxw@mail.gmail.com>
-Message-ID: <874lr4d8gm.fsf@free-electrons.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 12 Oct 2017 10:27:06 +0100
+Subject: [PATCH v3 1/2] arm_arch_timer: Expose event stream status
+In-Reply-To: <1506682350-9023-2-git-send-email-julien.thierry@arm.com>
+References: <1506682350-9023-1-git-send-email-julien.thierry@arm.com>
+ <1506682350-9023-2-git-send-email-julien.thierry@arm.com>
+Message-ID: <88b96039-f0a5-879f-6f68-d30b09ab0cc7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
- 
- On lun., oct. 09 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+On 29/09/17 11:52, Julien Thierry wrote:
+> The arch timer configuration for a CPU might get reset after suspending
+> said CPU.
+> 
+> In order to reliably use the event stream in the kernel (e.g. for delays),
+> we keep track of the state where we can safely concider the event stream as
 
-> On 4 October 2017 at 13:43, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
->> On Wed, Oct 04, 2017 at 01:20:26PM +0100, Ard Biesheuvel wrote:
->>> On 4 October 2017 at 13:16, Gregory CLEMENT
->>> <gregory.clement@free-electrons.com> wrote:
->>> > Hi Ard,
->>> >
->>> >  On ven., sept. 08 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>> >
->>> >> As it turns out, building the ARM kernel with EFI support pulls in
->>> >> a couple of sections that we don't really need in the decompressor.
->>> >> This is due to the fact the the UEFI stub uses sort() to sort the UEFI
->>> >> memory map, which is an exported symbol pulled in from lib/sort.c.
->>> >>
->>> >> Before commit e4bae4d0b5f3 ("arm/efi: Split zImage code and data into
->>> >> separate PE/COFF sections"), this resulted in the following layout
->>> >> for the decompressor ELF binary.
->>> >>
->>> >>   [Nr] Name              Type     Addr     Off    Size   ES Flg Lk Inf Al
->>> >>   [ 0]                   NULL     00000000 000000 000000 00      0   0  0
->>> >>   [ 1] .text             PROGBITS 00000000 010000 009b3c 00  AX  0   0 512
->>> >>   [ 2] .rodata           PROGBITS 00009b3c 019b3c 001684 00   A  0   0  4
->>> >>   [ 3] __ksymtab_strings PROGBITS 0000b1c0 01b1c0 000005 00   A  0   0  1
->>> >>   [ 4] .data             PROGBITS 0000b1c8 01b1c8 000020 00  WA  0   0  8
->>> >>   [ 5] ___ksymtab+sort   PROGBITS 0000b1e8 01b1e8 000008 00  WA  0   0  4
->>> >>   [ 6] .piggydata        PROGBITS 0000b1f0 01b1f0 77ac38 00   A  0   0  1
->>> >>   [ 7] .got.plt          PROGBITS 00785e28 795e28 00000c 04  WA  0   0  4
->>> >>   [ 8] .got              PROGBITS 00785e34 795e34 000028 00  WA  0   0  4
->>> >>   [ 9] .pad              PROGBITS 00785e5c 795e5c 000004 00  WA  0   0  1
->>> >>   [10] .bss              NOBITS   00785e60 795e60 00001c 00  WA  0   0  4
->>> >>   [11] .stack            NOBITS   00785e80 795e60 001000 00  WA  0   0  1
->>> >>
->>> >> Commit e4bae4d0b5f3 made some changes to the linker script to allow the
->>> >> UEFI firmware to map the decompressor with strict R-X/RW- permissions
->>> >> before invoking it. Unfortunately, this turns out to break the boot on
->>> >> some systems, because the linker now also moves the ksymtab/kcrctab
->>> >> sections around, resulting in .piggydata to appear misaligned.
->>> >>
->>> >>   [Nr] Name              Type     Addr     Off    Size   ES Flg Lk Inf Al
->>> >>   [ 0]                   NULL     00000000 000000 000000 00      0   0  0
->>> >>   [ 1] .text             PROGBITS 00000000 010000 00a93c 00  AX  0   0 4096
->>> >>   [ 2] .rodata           PROGBITS 0000a93c 01a93c 001684 00   A  0   0  4
->>> >>   [ 3] __ksymtab_strings PROGBITS 0000bfc0 01bfc0 000005 00   A  0   0  1
->>> >>   [ 4] .piggydata        PROGBITS 0000bfc5 01bfc5 77ac47 00   A  0   0  1
->>> >>   [ 5] .got.plt          PROGBITS 00786c0c 796c0c 00000c 04  WA  0   0  4
->>> >>   [ 6] .got              PROGBITS 00786c18 796c18 000028 00  WA  0   0  4
->>> >>   [ 7] .pad              PROGBITS 00786c40 796c40 000008 00  WA  0   0  1
->>> >>   [ 8] .data             PROGBITS 00787000 797000 000200 00  WA  0   0 4096
->>> >>   [ 9] ___ksymtab+sort   PROGBITS 00787200 797200 000008 00  WA  0   0  4
->>> >>   [10] .bss              NOBITS   00787208 797208 00001c 00  WA  0   0  4
->>> >>   [11] .stack            NOBITS   00787228 797208 001000 00  WA  0   0  1
->>> >>
->>> >> So let's align piggydata explicitly, and discard these sections from the
->>> >> binary.
->>> >>
->>> >> Cc: Russell King <linux@armlinux.org.uk>
->>> >> Fixes: e4bae4d0b5f3 ("arm/efi: Split zImage code and data into separate ...")
->>> >> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->>> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>> >
->>> > Any new for this patch?
->>> >
->>> > It is not yet in v4.14-rc whereas "arm/efi: Split zImage code and data
->>> > into separate ..." was already merged. So currently I have many boards
->>> > which still does not boot in v4.14-rc3.
->>> >
->>>
->>> Russell, any objections?
->>
->> It would be nice if there was something in the commit log that described
->> why we need to align data that is basically a byte stream, and which
->> decompressor methods it affects.  Maybe the decompressors should cope
->> with a misaligned byte stream - what if (for example) someone supplies
->> the kernel with a compressed initramfs image that is not word aligned?
->
-> The decompressor copes with a misaligned byte stream by using
-> get_unaligned et al. Only, on v7, these are simply converted to word
-> wide unaligned accesses, which the compiler may merge into ldm/stm if
-> they occur adjacently. In the kernel proper, this is caught and fixed
-> up by the alignment fixup code, but in the decompressor you hit the
-> fault.
->
+nit: consider
 
-Can we move forward to fix the booting problem ?
+> properly configured.
+> 
+> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>   arch/arm/include/asm/arch_timer.h    |  1 +
+>   arch/arm64/include/asm/arch_timer.h  |  1 +
+>   drivers/clocksource/arm_arch_timer.c | 20 ++++++++++++++++++--
+>   include/clocksource/arm_arch_timer.h |  6 ++++++
+>   4 files changed, 26 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+> index d4ebf56..0b6e104 100644
+> --- a/arch/arm/include/asm/arch_timer.h
+> +++ b/arch/arm/include/asm/arch_timer.h
+> @@ -106,6 +106,7 @@ static inline u32 arch_timer_get_cntkctl(void)
+>   static inline void arch_timer_set_cntkctl(u32 cntkctl)
+>   {
+>   	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
+> +	isb();
+>   }
+> 
+>   #endif
+> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+> index a652ce0..bdedd8f 100644
+> --- a/arch/arm64/include/asm/arch_timer.h
+> +++ b/arch/arm64/include/asm/arch_timer.h
+> @@ -144,6 +144,7 @@ static inline u32 arch_timer_get_cntkctl(void)
+>   static inline void arch_timer_set_cntkctl(u32 cntkctl)
+>   {
+>   	write_sysreg(cntkctl, cntkctl_el1);
+> +	isb();
+>   }
+> 
+>   static inline u64 arch_counter_get_cntpct(void)
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index fd4b7f6..47cf15e 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -77,6 +77,7 @@ struct arch_timer {
+>   static bool arch_counter_suspend_stop;
+>   static bool vdso_default = true;
+> 
+> +static cpumask_t evtstrm_available;
+>   static bool evtstrm_enable = IS_ENABLED(CONFIG_ARM_ARCH_TIMER_EVTSTREAM);
+> 
+>   static int __init early_evtstrm_cfg(char *buf)
+> @@ -740,6 +741,7 @@ static void arch_timer_evtstrm_enable(int divider)
+>   #ifdef CONFIG_COMPAT
+>   	compat_elf_hwcap |= COMPAT_HWCAP_EVTSTRM;
+>   #endif
+> +	cpumask_set_cpu(smp_processor_id(), &evtstrm_available);
+>   }
+> 
+>   static void arch_timer_configure_evtstream(void)
+> @@ -864,6 +866,11 @@ u32 arch_timer_get_rate(void)
+>   	return arch_timer_rate;
+>   }
+> 
+> +bool arch_timer_evtstrm_available(void)
+> +{
+> +	return !!cpumask_test_cpu(smp_processor_id(), &evtstrm_available);
+> +}
+> +
 
-What about amending your commit log with this new information and then
-submit it to Russell patch system?
+This could live in the header file as static inlin, if the evtstrm_available
+is made global and could avoid a function call where it is used.
 
-Thanks,
-
-Gregory
-
->> We already have people using non-page aligned compressed initramfs
->> images.
->>
->
-> Yes, but initramfs accesses are fixed up by the alignment fixup code as well.
->
-> So I suppose Arnd's patch to switch to the struct type unaligned
-> accessor would deal with this issue as well.
-
-
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Suzuki
