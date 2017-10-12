@@ -1,39 +1,60 @@
 From: briannorris@chromium.org (Brian Norris)
-Date: Thu, 12 Oct 2017 13:52:18 -0700
-Subject: [PATCH 1/3] Documentation/devicetree: Add pcie-reset-suspend property
+Date: Thu, 12 Oct 2017 13:52:20 -0700
+Subject: [PATCH 3/3] PCI: rockchip: Support configuring PERST# state via DT
 In-Reply-To: <20171012205220.130048-1-briannorris@chromium.org>
 References: <20171012205220.130048-1-briannorris@chromium.org>
-Message-ID: <20171012205220.130048-2-briannorris@chromium.org>
+Message-ID: <20171012205220.130048-4-briannorris@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch is self-descriptive. I've found that we may need
-platform-specific behavior for the PERST# signal in system suspend,
-depending on the type of PCIe endpoints are attached.
+I've found that different endpoints and board configurations have
+required different behavior from the PCIe Reset (PERST#) signal when in
+low-power system suspend (e.g., S3). Use the new of_pci helper to
+request this state and assert (active low) PERST# before suspending.
+
+Note that we reinitialize the link (including reconfiguring PERST#) at
+resume time.
+
+This requires that the board and system firmware supports driving this
+signal low when the system is suspended, since PERST# may be pulled up
+by the endpoint, and some GPIO banks are not active in S3.
 
 Signed-off-by: Brian Norris <briannorris@chromium.org>
 ---
- Documentation/devicetree/bindings/pci/pci.txt | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/pci/host/pcie-rockchip.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/pci/pci.txt b/Documentation/devicetree/bindings/pci/pci.txt
-index c77981c5dd18..91339b6d0652 100644
---- a/Documentation/devicetree/bindings/pci/pci.txt
-+++ b/Documentation/devicetree/bindings/pci/pci.txt
-@@ -24,3 +24,14 @@ driver implementation may support the following properties:
-    unsupported link speed, for instance, trying to do training for
-    unsupported link speed, etc.  Must be '4' for gen4, '3' for gen3, '2'
-    for gen2, and '1' for gen1. Any other values are invalid.
-+- pcie-reset-suspend:
-+   If present this property defines whether the PCIe Reset signal (referred to
-+   as PERST#) should be asserted when the system enters low-power suspend modes
-+   (e.g., S3). Depending on the form factor, the associated PCIe
-+   electromechanical specification may specify a particular behavior (e.g.,
-+   "PERST# is asserted in advance of the power being switched off in a
-+   power-managed state like S3") or it may be less clear. The net result is
-+   that some endpoints perform better (e.g., lower power consumption) with
-+   PERST# asserted, and others prefer PERST# deasserted. The value must be '0'
-+   or '1', where '0' means do not assert PERST# and '1' means assert PERST#.
-+   When absent, behavior may be platform-specific.
+diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
+index 9051c6c8fea4..1ab58c1abb34 100644
+--- a/drivers/pci/host/pcie-rockchip.c
++++ b/drivers/pci/host/pcie-rockchip.c
+@@ -233,6 +233,7 @@ struct rockchip_pcie {
+ 	struct	regulator *vpcie1v8; /* 1.8V power supply */
+ 	struct	regulator *vpcie0v9; /* 0.9V power supply */
+ 	struct	gpio_desc *ep_gpio;
++	bool	suspend_reset;
+ 	u32	lanes;
+ 	u8      lanes_map;
+ 	u8	root_bus_nr;
+@@ -1155,6 +1156,9 @@ static int rockchip_pcie_parse_dt(struct rockchip_pcie *rockchip)
+ 		dev_info(dev, "no vpcie0v9 regulator found\n");
+ 	}
+ 
++	/* Default not-asserted, to retain backward compatibility. */
++	rockchip->suspend_reset = of_pci_get_pcie_reset_suspend(node) > 0;
++
+ 	return 0;
+ }
+ 
+@@ -1463,6 +1467,9 @@ static int __maybe_unused rockchip_pcie_suspend_noirq(struct device *dev)
+ 		return ret;
+ 	}
+ 
++	if (rockchip->suspend_reset)
++		gpiod_set_value(rockchip->ep_gpio, 0);
++
+ 	rockchip_pcie_deinit_phys(rockchip);
+ 
+ 	rockchip_pcie_disable_clocks(rockchip);
 -- 
 2.15.0.rc0.271.g36b669edcc-goog
