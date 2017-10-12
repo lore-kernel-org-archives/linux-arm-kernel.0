@@ -1,59 +1,52 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 12 Oct 2017 13:30:33 +0100
-Subject: [PATCH v6 2/7] perf/core: Export AUX buffer helpers to modules
+Date: Thu, 12 Oct 2017 13:30:36 +0100
+Subject: [PATCH v6 5/7] arm64: head: Init PMSCR_EL2.{PA,
+ PCT} when entered at EL2 without VHE
 In-Reply-To: <1507811438-2267-1-git-send-email-will.deacon@arm.com>
 References: <1507811438-2267-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1507811438-2267-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1507811438-2267-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Perf PMU drivers using AUX buffers cannot be built as modules unless
-the AUX helpers are exported.
+When booting at EL2, ensure that we permit the EL1 host to sample
+physical addresses and physical counter values using SPE.
 
-This patch exports perf_aux_output_{begin,end,skip} and perf_get_aux to
-modules.
-
-Cc: Peter Zijlstra <peterz@infradead.org>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- kernel/events/ring_buffer.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm64/kernel/head.S | 17 ++++++++++++-----
+ 1 file changed, 12 insertions(+), 5 deletions(-)
 
-diff --git a/kernel/events/ring_buffer.c b/kernel/events/ring_buffer.c
-index f684d8e5fa2b..6d9bffe4d6cc 100644
---- a/kernel/events/ring_buffer.c
-+++ b/kernel/events/ring_buffer.c
-@@ -411,6 +411,7 @@ void *perf_aux_output_begin(struct perf_output_handle *handle,
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 0b243ecaf7ac..cfa90a43fbe7 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -480,14 +480,21 @@ set_hcr:
  
- 	return NULL;
- }
-+EXPORT_SYMBOL_GPL(perf_aux_output_begin);
+ 	/* Statistical profiling */
+ 	ubfx	x0, x1, #32, #4			// Check ID_AA64DFR0_EL1 PMSVer
+-	cbz	x0, 6f				// Skip if SPE not present
+-	cbnz	x2, 5f				// VHE?
++	cbz	x0, 7f				// Skip if SPE not present
++	cbnz	x2, 6f				// VHE?
++	mrs_s	x4, SYS_PMBIDR_EL1		// If SPE available at EL2,
++	and	x4, x4, #(1 << SYS_PMBIDR_EL1_P_SHIFT)
++	cbnz	x4, 5f				// then permit sampling of physical
++	mov	x4, #(1 << SYS_PMSCR_EL2_PCT_SHIFT | \
++		      1 << SYS_PMSCR_EL2_PA_SHIFT)
++	msr_s	SYS_PMSCR_EL2, x4		// addresses and physical counter
++5:
+ 	mov	x1, #(MDCR_EL2_E2PB_MASK << MDCR_EL2_E2PB_SHIFT)
+ 	orr	x3, x3, x1			// If we don't have VHE, then
+-	b	6f				// use EL1&0 translation.
+-5:						// For VHE, use EL2 translation
++	b	7f				// use EL1&0 translation.
++6:						// For VHE, use EL2 translation
+ 	orr	x3, x3, #MDCR_EL2_TPMS		// and disable access from EL1
+-6:
++7:
+ 	msr	mdcr_el2, x3			// Configure debug traps
  
- static bool __always_inline rb_need_aux_wakeup(struct ring_buffer *rb)
- {
-@@ -480,6 +481,7 @@ void perf_aux_output_end(struct perf_output_handle *handle, unsigned long size)
- 	rb_free_aux(rb);
- 	ring_buffer_put(rb);
- }
-+EXPORT_SYMBOL_GPL(perf_aux_output_end);
- 
- /*
-  * Skip over a given number of bytes in the AUX buffer, due to, for example,
-@@ -505,6 +507,7 @@ int perf_aux_output_skip(struct perf_output_handle *handle, unsigned long size)
- 
- 	return 0;
- }
-+EXPORT_SYMBOL_GPL(perf_aux_output_skip);
- 
- void *perf_get_aux(struct perf_output_handle *handle)
- {
-@@ -514,6 +517,7 @@ void *perf_get_aux(struct perf_output_handle *handle)
- 
- 	return handle->rb->aux_priv;
- }
-+EXPORT_SYMBOL_GPL(perf_get_aux);
- 
- #define PERF_AUX_GFP	(GFP_KERNEL | __GFP_ZERO | __GFP_NOWARN | __GFP_NORETRY)
- 
+ 	/* Stage-2 translation */
 -- 
 2.1.4
