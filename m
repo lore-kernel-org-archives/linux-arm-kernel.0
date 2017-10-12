@@ -1,107 +1,124 @@
-From: felipe.balbi@linux.intel.com (Felipe Balbi)
-Date: Thu, 12 Oct 2017 11:43:36 +0300
-Subject: [PATCHv2 0/7] Add support for USB OTG on STM32F7
-In-Reply-To: <21df4d0c-075c-0c5a-c39b-b1dd94fe819d@st.com>
-References: <1503930018-536-1-git-send-email-amelie.delaunay@st.com>
- <878tgim24i.fsf@linux.intel.com>
- <04a49088-b615-d7b8-0387-e7bfa32ee19f@st.com>
- <87vajllx8t.fsf@linux.intel.com>
- <1c4180ef-2da6-b420-7c6e-41769608384a@st.com>
- <87sheplsrm.fsf@linux.intel.com>
- <3c36db6d-75fd-1be6-e946-b75a04e3760e@st.com>
- <21df4d0c-075c-0c5a-c39b-b1dd94fe819d@st.com>
-Message-ID: <87efq821tz.fsf@linux.intel.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Thu, 12 Oct 2017 09:47:26 +0100
+Subject: [PATCH v3 2/2] arm64: use WFE for long delays
+In-Reply-To: <20171011151335.GA14341@arm.com>
+References: <1506682350-9023-1-git-send-email-julien.thierry@arm.com>
+ <1506682350-9023-3-git-send-email-julien.thierry@arm.com>
+ <20171011151335.GA14341@arm.com>
+Message-ID: <e4206f9a-4ba6-550c-fa2a-92d89b5fbc8b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Will,
 
-Hi,
+On 11/10/17 16:13, Will Deacon wrote:
+> Hi Julien,
+> 
+> On Fri, Sep 29, 2017 at 11:52:30AM +0100, Julien Thierry wrote:
+>> The current delay implementation uses the yield instruction, which is a
+>> hint that it is beneficial to schedule another thread. As this is a hint,
+>> it may be implemented as a NOP, causing all delays to be busy loops. This
+>> is the case for many existing CPUs.
+>>
+>> Taking advantage of the generic timer sending periodic events to all
+>> cores, we can use WFE during delays to reduce power consumption. This is
+>> beneficial only for delays longer than the period of the timer event
+>> stream.
+>>
+>> If timer event stream is not enabled, delays will behave as yield/busy
+>> loops.
+>>
+>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> ---
+>>   arch/arm64/lib/delay.c               | 23 +++++++++++++++++++----
+>>   include/clocksource/arm_arch_timer.h |  4 +++-
+>>   2 files changed, 22 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/arch/arm64/lib/delay.c b/arch/arm64/lib/delay.c
+>> index dad4ec9..4dc27f3 100644
+>> --- a/arch/arm64/lib/delay.c
+>> +++ b/arch/arm64/lib/delay.c
+>> @@ -24,10 +24,28 @@
+>>   #include <linux/module.h>
+>>   #include <linux/timex.h>
+>>
+>> +#include <clocksource/arm_arch_timer.h>
+>> +
+>> +#define USECS_TO_CYCLES(TIME_USECS)			\
+>> +	xloops_to_cycles((TIME_USECS) * 0x10C7UL)
+> 
+> The macro parameter can be lower-case here.
+> 
 
-Amelie DELAUNAY <amelie.delaunay@st.com> writes:
-> Hi Felipe, Alex,
->
-> On 10/11/2017 04:38 PM, Alexandre Torgue wrote:
->> 
->> 
->> On 10/11/2017 03:26 PM, Felipe Balbi wrote:
->>>
->>> Hi,
->>>
->>> Alexandre Torgue <alexandre.torgue@st.com> writes:
->>>> Hi
->>>>
->>>> On 10/11/2017 01:50 PM, Felipe Balbi wrote:
->>>>>
->>>>> Hi,
->>>>>
->>>>> Alexandre Torgue <alexandre.torgue@st.com> writes:
->>>>>> Hi Felip
->>>>>>
->>>>>> On 10/11/2017 12:04 PM, Felipe Balbi wrote:
->>>>>>>
->>>>>>> Hi,
->>>>>>>
->>>>>>> Amelie Delaunay <amelie.delaunay@st.com> writes:
->>>>>>>> The STM32F7 MCU family embeds two DWC2 USB OTG cores. One core is 
->>>>>>>> USB
->>>>>>>> OTG FS and the other is USB OTG HS. The USB FS core only works 
->>>>>>>> with its
->>>>>>>> internal phy whilst the USB HS core can work in HS with external 
->>>>>>>> ULPI phy
->>>>>>>> or in FS/LS with the on-chip FS phy.
->>>>>>>>
->>>>>>>> Amelie Delaunay (7):
->>>>>>>> ???? dt-bindings: usb: Document the STM32F7 DWC2 USB OTG HS core 
->>>>>>>> binding
->>>>>>>> ???? usb: dwc2: add support for STM32F7 USB OTG HS
->>>>>>>> ???? ARM: dts: stm32: Add USB HS support for STM32F746 MCU
->>>>>>>
->>>>>>> I have applied these three patches. Should I take the rest? They 
->>>>>>> seems
->>>>>>> like they could go upstream through the ARM maintainers.
->>>>>>>
->>>>>>
->>>>>> I will take other DT patches in my PR.
->>>>>>
->>>>>> Concerning "ARM: dts: stm32: Add USB HS support for STM32F746 MCU" 
->>>>>> patch
->>>>>> I prefer also to take it. This patch adds some pinctrl groups but 
->>>>>> stm32
->>>>>> pinctrl bindings will change in my next PR (we will use a macro to
->>>>>> define pins instead of using defined values). So if you push the DT
->>>>>> patch through your pull request there will be a merge issue.
->>>>>> It is possible that I take also this one ?
->>>>>
->>>>> In that case, it's best if you take them all :-) Here's my Ack:
->>>>>
->>>>> Acked-by: Felipe Balbi <felipe.balbi@linux.intel.com>
->>>>>
->>>>> I'll drop them from my tree now
->>>>
->>>> Ok perfect, I will take DT patches (3 to 7) and I let you take patch 1&2
->>>> in your tree.
->>>
->>> Well, I have dropped them from my tree. Please two 1-7 through yours.
->> 
->> Hum, ok for this patchset but IMO it is better (next time) that you take 
->> driver pacthes in your tree and I take only DT patches in mine.
->> No ?
->> 
->> Regards
->> Alex
->> 
->>>
->
-> I thought that patches 1 and 2, as they are "driver" patches, had to be 
-> applied on USB tree (so Felipe's one), and the others (3 to 7) had to be 
-> applied on STM32-DT tree (Alex's one). Did I miss something?
+Noted, I'll change it.
 
-patch 1 is documentation, right? Without the documentation patch,
-checkpatch will cringe :-) So either way works.
+>> +static inline unsigned long xloops_to_cycles(unsigned long xloops)
+>> +{
+>> +	return (xloops * loops_per_jiffy * HZ) >> 32;
+>> +}
+>> +
+>>   void __delay(unsigned long cycles)
+>>   {
+>>   	cycles_t start = get_cycles();
+>>
+>> +	if (arch_timer_evtstrm_available()) {
+> 
+> Hmm, is this never called in a context where preemption is enabled?
+> Maybe arch_timer_evtstrm_available should be using raw_smp_processor_id()
+> under the hood.
+> 
 
-If you insist, I can take 1-2 through my tree. No worries.
+This can be called from a preemptible context. But when it is, the event 
+stream is either enabled both on the preemptible context and on the 
+context where a preempted context can be resumed, or the event stream is 
+just disabled in the whole system.
 
-let me know
+Does using raw_smp_processor_id solve an issue here?
+
+Thanks,
+
+>> +		const cycles_t timer_evt_period =
+>> +			USECS_TO_CYCLES(ARCH_TIMER_EVT_STREAM_PERIOD_US);
+>> +
+>> +		while ((get_cycles() - start + timer_evt_period) < cycles)
+>> +			wfe();
+>> +	}
+>> +
+>>   	while ((get_cycles() - start) < cycles)
+>>   		cpu_relax();
+>>   }
+>> @@ -35,10 +53,7 @@ void __delay(unsigned long cycles)
+>>
+>>   inline void __const_udelay(unsigned long xloops)
+>>   {
+>> -	unsigned long loops;
+>> -
+>> -	loops = xloops * loops_per_jiffy * HZ;
+>> -	__delay(loops >> 32);
+>> +	__delay(xloops_to_cycles(xloops));
+>>   }
+>>   EXPORT_SYMBOL(__const_udelay);
+>>
+>> diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
+>> index 4e28283..349e595 100644
+>> --- a/include/clocksource/arm_arch_timer.h
+>> +++ b/include/clocksource/arm_arch_timer.h
+>> @@ -67,7 +67,9 @@ enum arch_timer_spi_nr {
+>>   #define ARCH_TIMER_USR_VT_ACCESS_EN	(1 << 8) /* virtual timer registers */
+>>   #define ARCH_TIMER_USR_PT_ACCESS_EN	(1 << 9) /* physical timer registers */
+>>
+>> -#define ARCH_TIMER_EVT_STREAM_FREQ	10000	/* 100us */
+>> +#define ARCH_TIMER_EVT_STREAM_PERIOD_US	100
+>> +#define ARCH_TIMER_EVT_STREAM_FREQ				\
+>> +	(USEC_PER_SEC / ARCH_TIMER_EVT_STREAM_PERIOD_US)
+> 
+> This needs an ack from Marc or Mark.
+> 
+> Will
+> 
 
 -- 
-balbi
+Julien Thierry
