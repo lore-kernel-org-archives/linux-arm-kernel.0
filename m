@@ -1,10 +1,10 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 12 Oct 2017 16:37:01 +0800
-Subject: [PATCH 5/9] clk: sunxi-ng: sun8i: h3: Use sigma-delta modulation for
+Date: Thu, 12 Oct 2017 16:37:04 +0800
+Subject: [PATCH 8/9] clk: sunxi-ng: sun6i: Use sigma-delta modulation for
  audio PLL
 In-Reply-To: <20171012083705.24409-1-wens@csie.org>
 References: <20171012083705.24409-1-wens@csie.org>
-Message-ID: <20171012083705.24409-6-wens@csie.org>
+Message-ID: <20171012083705.24409-9-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,27 +13,28 @@ the closest clock rate possible with integer N-M factors. This resulted
 in audio playback being slightly slower than it should be.
 
 The vendor kernel gets around this (for newer SoCs) by using sigma-delta
-modulation to generate a fractional-N factor. This patch copies the
-parameters for the H3.
+modulation to generate a fractional-N factor. As the PLL hardware is
+identical in most chips, we can back port the settings from the newer
+SoC, in this case the H3, onto the A31.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/clk/sunxi-ng/ccu-sun8i-h3.c | 38 ++++++++++++++++++++++++-------------
+ drivers/clk/sunxi-ng/ccu-sun6i-a31.c | 38 ++++++++++++++++++++++++------------
  1 file changed, 25 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-index 543c46d0e045..29bc0566b776 100644
---- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-@@ -26,6 +26,7 @@
+diff --git a/drivers/clk/sunxi-ng/ccu-sun6i-a31.c b/drivers/clk/sunxi-ng/ccu-sun6i-a31.c
+index 241fb13f1c06..72b16ed1012b 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun6i-a31.c
++++ b/drivers/clk/sunxi-ng/ccu-sun6i-a31.c
+@@ -31,6 +31,7 @@
  #include "ccu_nkmp.h"
  #include "ccu_nm.h"
  #include "ccu_phase.h"
 +#include "ccu_sdm.h"
  
- #include "ccu-sun8i-h3.h"
+ #include "ccu-sun6i-a31.h"
  
-@@ -44,18 +45,29 @@ static SUNXI_CCU_NKMP_WITH_GATE_LOCK(pll_cpux_clk, "pll-cpux",
+@@ -48,18 +49,29 @@ static SUNXI_CCU_NKM_WITH_GATE_LOCK(pll_cpu_clk, "pll-cpu",
   * the base (2x, 4x and 8x), and one variable divider (the one true
   * pll audio).
   *
@@ -46,7 +47,7 @@ index 543c46d0e045..29bc0566b776 100644
 + * variable divider to 1. This means the clock rates will no longer
 + * match the clock names.
   */
- #define SUN8I_H3_PLL_AUDIO_REG	0x008
+ #define SUN6I_A31_PLL_AUDIO_REG	0x008
  
 -static SUNXI_CCU_NM_WITH_GATE_LOCK(pll_audio_base_clk, "pll-audio-base",
 -				   "osc24M", 0x008,
@@ -70,10 +71,10 @@ index 543c46d0e045..29bc0566b776 100644
 +				       BIT(28),	/* lock */
 +				       CLK_SET_RATE_UNGATE);
  
- static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_video_clk, "pll-video",
- 					"osc24M", 0x0010,
-@@ -707,9 +719,9 @@ static struct ccu_common *sun50i_h5_ccu_clks[] = {
- 	&gpu_clk.common,
+ static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_video0_clk, "pll-video0",
+ 					"osc24M", 0x010,
+@@ -950,9 +962,9 @@ static struct ccu_common *sun6i_a31_ccu_clks[] = {
+ 	&out_c_clk.common,
  };
  
 -/* We hardcode the divider to 4 for now */
@@ -84,18 +85,18 @@ index 543c46d0e045..29bc0566b776 100644
  static CLK_FIXED_FACTOR(pll_audio_2x_clk, "pll-audio-2x",
  			"pll-audio-base", 2, 1, CLK_SET_RATE_PARENT);
  static CLK_FIXED_FACTOR(pll_audio_4x_clk, "pll-audio-4x",
-@@ -1129,10 +1141,10 @@ static void __init sunxi_h3_h5_ccu_init(struct device_node *node,
+@@ -1221,10 +1233,10 @@ static void __init sun6i_a31_ccu_setup(struct device_node *node)
  		return;
  	}
  
 -	/* Force the PLL-Audio-1x divider to 4 */
 +	/* Force the PLL-Audio-1x divider to 1 */
- 	val = readl(reg + SUN8I_H3_PLL_AUDIO_REG);
+ 	val = readl(reg + SUN6I_A31_PLL_AUDIO_REG);
  	val &= ~GENMASK(19, 16);
--	writel(val | (3 << 16), reg + SUN8I_H3_PLL_AUDIO_REG);
-+	writel(val | (0 << 16), reg + SUN8I_H3_PLL_AUDIO_REG);
+-	writel(val | (3 << 16), reg + SUN6I_A31_PLL_AUDIO_REG);
++	writel(val | (0 << 16), reg + SUN6I_A31_PLL_AUDIO_REG);
  
- 	sunxi_ccu_probe(node, reg, desc);
- 
+ 	/* Force PLL-MIPI to MIPI mode */
+ 	val = readl(reg + SUN6I_A31_PLL_MIPI_REG);
 -- 
 2.14.2
