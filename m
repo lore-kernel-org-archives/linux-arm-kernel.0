@@ -1,27 +1,130 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 12 Oct 2017 16:51:31 +0100
-Subject: regression introduced by commit 70d435ba1cd6 ("ASoC:
- imx-pcm-dma: simplify pcm_config")
-In-Reply-To: <20171010171846.509f399e@karo-electronics.de>
-References: <20171004103657.1c6a433d@karo-electronics.de>
- <1507646944.2398.1.camel@pengutronix.de>
- <20171010171846.509f399e@karo-electronics.de>
-Message-ID: <20171012155131.zn6r47eaombcqdlk@sirena.co.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 12 Oct 2017 16:55:16 +0100
+Subject: [PATCH 02/37] KVM: arm64: Rework hyp_panic for VHE and non-VHE
+In-Reply-To: <20171012104141.26902-3-christoffer.dall@linaro.org>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+ <20171012104141.26902-3-christoffer.dall@linaro.org>
+Message-ID: <313239e5-d755-95b6-4db7-6dafe2027155@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 10, 2017 at 05:18:46PM +0200, Lothar Wa?mann wrote:
+On 12/10/17 11:41, Christoffer Dall wrote:
+> VHE actually doesn't rely on clearing the VTTBR when returning to the
+> hsot kernel, and that is the current key mechanism of hyp_panic to
 
-> I circumvented the problem by changing my /etc/asound.conf to use the
-> only supported sample format. So, if nobody else has a problem, there
-> is no need to revert the patch or apply additional modifications to the
-> driver.
+host
 
-I've not seen any other reports.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171012/5441e7eb/attachment.sig>
+> figure out how to attempt to return to a state good enough to print a
+> panic statement.
+> 
+> Therefore, we split the hyp_panic function into two functions, a VHE and
+> a non-VHE, keeping the non-VHE version intact, but changing the VHE
+> behavior.
+> 
+> The vttbr_el2 check on VHE doesn't really make that much sense, because
+> the only situation where we can get here on VHE is when the hypervisor
+> assembly code actually caleld into hyp_panic, which only happens when
+
+called
+
+> VBAR_EL2 has been set to the KVM exception vectors.  On VHE, we can
+> always safely disable the traps and restore the host registers at this
+> point, so we simply do that unconditionally and call into the panic
+> function directly.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/arm64/kvm/hyp/switch.c | 45 +++++++++++++++++++++++----------------------
+>  1 file changed, 23 insertions(+), 22 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index a0123ad..a50ddf3 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -394,10 +394,20 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+>  static const char __hyp_panic_string[] = "HYP panic:\nPS:%08llx PC:%016llx ESR:%08llx\nFAR:%016llx HPFAR:%016llx PAR:%016llx\nVCPU:%p\n";
+>  
+>  static void __hyp_text __hyp_call_panic_nvhe(u64 spsr, u64 elr, u64 par,
+> -					     struct kvm_vcpu *vcpu)
+> +					     struct kvm_cpu_context *__host_ctxt)
+>  {
+> +	struct kvm_vcpu *vcpu;
+>  	unsigned long str_va;
+>  
+> +	vcpu = __host_ctxt->__hyp_running_vcpu;
+> +
+> +	if (read_sysreg(vttbr_el2)) {
+> +		__timer_disable_traps(vcpu);
+> +		__deactivate_traps(vcpu);
+> +		__deactivate_vm(vcpu);
+> +		__sysreg_restore_host_state(__host_ctxt);
+> +	}
+> +
+>  	/*
+>  	 * Force the panic string to be loaded from the literal pool,
+>  	 * making sure it is a kernel address and not a PC-relative
+> @@ -411,40 +421,31 @@ static void __hyp_text __hyp_call_panic_nvhe(u64 spsr, u64 elr, u64 par,
+>  		       read_sysreg(hpfar_el2), par, vcpu);
+>  }
+>  
+> -static void __hyp_text __hyp_call_panic_vhe(u64 spsr, u64 elr, u64 par,
+> -					    struct kvm_vcpu *vcpu)
+> +static void __hyp_call_panic_vhe(u64 spsr, u64 elr, u64 par,
+> +				 struct kvm_cpu_context *host_ctxt)
+>  {
+> +	struct kvm_vcpu *vcpu;
+> +	vcpu = host_ctxt->__hyp_running_vcpu;
+> +
+> +	__deactivate_traps_vhe();
+
+Is there a reason why we can't just call __deactivate_traps(), rather
+than the VHE-specific subset? It doesn't really matter, as we're about
+to panic, but still...
+
+> +	__sysreg_restore_host_state(host_ctxt);
+> +
+>  	panic(__hyp_panic_string,
+>  	      spsr,  elr,
+>  	      read_sysreg_el2(esr),   read_sysreg_el2(far),
+>  	      read_sysreg(hpfar_el2), par, vcpu);
+>  }
+>  
+> -static hyp_alternate_select(__hyp_call_panic,
+> -			    __hyp_call_panic_nvhe, __hyp_call_panic_vhe,
+> -			    ARM64_HAS_VIRT_HOST_EXTN);
+> -
+>  void __hyp_text __noreturn hyp_panic(struct kvm_cpu_context *__host_ctxt)
+>  {
+> -	struct kvm_vcpu *vcpu = NULL;
+> -
+>  	u64 spsr = read_sysreg_el2(spsr);
+>  	u64 elr = read_sysreg_el2(elr);
+>  	u64 par = read_sysreg(par_el1);
+>  
+> -	if (read_sysreg(vttbr_el2)) {
+> -		struct kvm_cpu_context *host_ctxt;
+> -
+> -		host_ctxt = __host_ctxt;
+> -		vcpu = host_ctxt->__hyp_running_vcpu;
+> -		__timer_disable_traps(vcpu);
+> -		__deactivate_traps(vcpu);
+> -		__deactivate_vm(vcpu);
+> -		__sysreg_restore_host_state(host_ctxt);
+> -	}
+> -
+> -	/* Call panic for real */
+> -	__hyp_call_panic()(spsr, elr, par, vcpu);
+> +	if (!has_vhe())
+> +		__hyp_call_panic_nvhe(spsr, elr, par, __host_ctxt);
+> +	else
+> +		__hyp_call_panic_vhe(spsr, elr, par, __host_ctxt);
+>  
+>  	unreachable();
+>  }
+> 
+
+Otherwise looks good.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
