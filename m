@@ -1,95 +1,41 @@
-From: amelie.delaunay@st.com (Amelie DELAUNAY)
-Date: Thu, 12 Oct 2017 08:32:49 +0000
-Subject: [PATCHv2 0/7] Add support for USB OTG on STM32F7
-In-Reply-To: <3c36db6d-75fd-1be6-e946-b75a04e3760e@st.com>
-References: <1503930018-536-1-git-send-email-amelie.delaunay@st.com>
- <878tgim24i.fsf@linux.intel.com>
- <04a49088-b615-d7b8-0387-e7bfa32ee19f@st.com>
- <87vajllx8t.fsf@linux.intel.com>
- <1c4180ef-2da6-b420-7c6e-41769608384a@st.com>
- <87sheplsrm.fsf@linux.intel.com>
- <3c36db6d-75fd-1be6-e946-b75a04e3760e@st.com>
-Message-ID: <21df4d0c-075c-0c5a-c39b-b1dd94fe819d@st.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 12 Oct 2017 16:36:35 +0800
+Subject: [PATCH v2 0/5] sunxi: Cleanup DT warnings for the A10 and A80
+In-Reply-To: <cover.e7363fd7884334063590603c0b0de566f66e0c18.1507580565.git-series.maxime.ripard@free-electrons.com>
+References: <cover.e7363fd7884334063590603c0b0de566f66e0c18.1507580565.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v65EGBBoqyVo+_FuEJQoATyYKGhf-J-hA6DQgGuCkQf=3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe, Alex,
+On Tue, Oct 10, 2017 at 4:22 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> We've had quite a big number of warnings in our device trees due to some
+> convention that was added before any kind of warning was introduced, and
+> went on since.
+>
+> Some of our newest SoC will not generate any warning but the unavoidable
+> ones (generic properties with underscores, mostly, like USB OTG dr_mode).
+>
+> However, most of them just needed some cleanup. Here is a serie that would
+> clean two of these SoCs (plus one SoC-tree wide change).
+>
+> This brings down the number of DTC warnings with W=2 from 10482 to 4504,
+> which is a nice stat, but will obviously need some more work.
+>
+> Let me know what you think,
+> Maxime
+>
+> Changes from v1:
+>   - Dropped the patches merged
+>   - Reworked a bit the commit logs
+>   - Removed the changes to the LDO node names
+>   - Renamed the PS2 pins names
+>
+> Maxime Ripard (5):
+>   ARM: dts: sun4i: Change pinctrl nodes to avoid warning
+>   ARM: dts: sun4i: Provide default muxing for relevant controllers
+>   ARM: dts: sun4i: Remove underscores from nodes names
+>   ARM: dts: sun9i: Change node names to remove underscores
+>   ARM: dts: sun9i: Change node names to remove underscores
 
-On 10/11/2017 04:38 PM, Alexandre Torgue wrote:
-> 
-> 
-> On 10/11/2017 03:26 PM, Felipe Balbi wrote:
->>
->> Hi,
->>
->> Alexandre Torgue <alexandre.torgue@st.com> writes:
->>> Hi
->>>
->>> On 10/11/2017 01:50 PM, Felipe Balbi wrote:
->>>>
->>>> Hi,
->>>>
->>>> Alexandre Torgue <alexandre.torgue@st.com> writes:
->>>>> Hi Felip
->>>>>
->>>>> On 10/11/2017 12:04 PM, Felipe Balbi wrote:
->>>>>>
->>>>>> Hi,
->>>>>>
->>>>>> Amelie Delaunay <amelie.delaunay@st.com> writes:
->>>>>>> The STM32F7 MCU family embeds two DWC2 USB OTG cores. One core is 
->>>>>>> USB
->>>>>>> OTG FS and the other is USB OTG HS. The USB FS core only works 
->>>>>>> with its
->>>>>>> internal phy whilst the USB HS core can work in HS with external 
->>>>>>> ULPI phy
->>>>>>> or in FS/LS with the on-chip FS phy.
->>>>>>>
->>>>>>> Amelie Delaunay (7):
->>>>>>> ???? dt-bindings: usb: Document the STM32F7 DWC2 USB OTG HS core 
->>>>>>> binding
->>>>>>> ???? usb: dwc2: add support for STM32F7 USB OTG HS
->>>>>>> ???? ARM: dts: stm32: Add USB HS support for STM32F746 MCU
->>>>>>
->>>>>> I have applied these three patches. Should I take the rest? They 
->>>>>> seems
->>>>>> like they could go upstream through the ARM maintainers.
->>>>>>
->>>>>
->>>>> I will take other DT patches in my PR.
->>>>>
->>>>> Concerning "ARM: dts: stm32: Add USB HS support for STM32F746 MCU" 
->>>>> patch
->>>>> I prefer also to take it. This patch adds some pinctrl groups but 
->>>>> stm32
->>>>> pinctrl bindings will change in my next PR (we will use a macro to
->>>>> define pins instead of using defined values). So if you push the DT
->>>>> patch through your pull request there will be a merge issue.
->>>>> It is possible that I take also this one ?
->>>>
->>>> In that case, it's best if you take them all :-) Here's my Ack:
->>>>
->>>> Acked-by: Felipe Balbi <felipe.balbi@linux.intel.com>
->>>>
->>>> I'll drop them from my tree now
->>>
->>> Ok perfect, I will take DT patches (3 to 7) and I let you take patch 1&2
->>> in your tree.
->>
->> Well, I have dropped them from my tree. Please two 1-7 through yours.
-> 
-> Hum, ok for this patchset but IMO it is better (next time) that you take 
-> driver pacthes in your tree and I take only DT patches in mine.
-> No ?
-> 
-> Regards
-> Alex
-> 
->>
-
-I thought that patches 1 and 2, as they are "driver" patches, had to be 
-applied on USB tree (so Felipe's one), and the others (3 to 7) had to be 
-applied on STM32-DT tree (Alex's one). Did I miss something?
-
-Regards,
-Amelie
+Acked-by: Chen-Yu Tsai <wens@csie.org>
