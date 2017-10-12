@@ -1,112 +1,531 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 12 Oct 2017 11:26:12 +0100
-Subject: [PATCH v3 1/2] arm_arch_timer: Expose event stream status
-In-Reply-To: <e94ecbdc-47ae-7351-e422-1fa426e35fad@arm.com>
-References: <1506682350-9023-1-git-send-email-julien.thierry@arm.com>
- <1506682350-9023-2-git-send-email-julien.thierry@arm.com>
- <88b96039-f0a5-879f-6f68-d30b09ab0cc7@arm.com>
- <20171012093010.GA7395@arm.com>
- <e94ecbdc-47ae-7351-e422-1fa426e35fad@arm.com>
-Message-ID: <20171012102612.GB7395@arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 12 Oct 2017 11:51:10 +0200
+Subject: [PATCH v3] drm: exynos: Add driver for HDMI audio interface
+In-Reply-To: <1506435469-10591-1-git-send-email-s.nawrocki@samsung.com>
+References: <CGME20170926141814epcas1p1923ab779847932395bf2c2899291dfcd@epcas1p1.samsung.com>
+ <1506435469-10591-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <dce1bc56-ecb1-e029-6d2b-ddf3b560d894@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 12, 2017 at 10:40:57AM +0100, Julien Thierry wrote:
+On 09/26/2017 04:17 PM, Sylwester Nawrocki wrote:
+> The hdmi-codec interface added in this patch is required to properly
+> support HDMI audio. Currently the audio part of the SoC internal
+> HDMI transmitter is configured with fixed values, which makes HDMI
+> audio working by chance, only on boards having an external audio
+> codec connected in parallel with the HDMI audio transmitter's input
+> I2S interface.
 > 
-> 
-> On 12/10/17 10:30, Will Deacon wrote:
-> >On Thu, Oct 12, 2017 at 10:27:06AM +0100, Suzuki K Poulose wrote:
-> >>On 29/09/17 11:52, Julien Thierry wrote:
-> >>>The arch timer configuration for a CPU might get reset after suspending
-> >>>said CPU.
-> >>>
-> >>>In order to reliably use the event stream in the kernel (e.g. for delays),
-> >>>we keep track of the state where we can safely concider the event stream as
-> >>
-> >>nit: consider
-> >>
-> >>>properly configured.
-> >>>
-> >>>Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> >>>Cc: Mark Rutland <mark.rutland@arm.com>
-> >>>Cc: Marc Zyngier <marc.zyngier@arm.com>
-> >>>Cc: Russell King <linux@armlinux.org.uk>
-> >>>Cc: Catalin Marinas <catalin.marinas@arm.com>
-> >>>Cc: Will Deacon <will.deacon@arm.com>
-> >>>---
-> >>>  arch/arm/include/asm/arch_timer.h    |  1 +
-> >>>  arch/arm64/include/asm/arch_timer.h  |  1 +
-> >>>  drivers/clocksource/arm_arch_timer.c | 20 ++++++++++++++++++--
-> >>>  include/clocksource/arm_arch_timer.h |  6 ++++++
-> >>>  4 files changed, 26 insertions(+), 2 deletions(-)
-> >>>
-> >>>diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-> >>>index d4ebf56..0b6e104 100644
-> >>>--- a/arch/arm/include/asm/arch_timer.h
-> >>>+++ b/arch/arm/include/asm/arch_timer.h
-> >>>@@ -106,6 +106,7 @@ static inline u32 arch_timer_get_cntkctl(void)
-> >>>  static inline void arch_timer_set_cntkctl(u32 cntkctl)
-> >>>  {
-> >>>  	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
-> >>>+	isb();
-> >>>  }
-> >>>
-> >>>  #endif
-> >>>diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-> >>>index a652ce0..bdedd8f 100644
-> >>>--- a/arch/arm64/include/asm/arch_timer.h
-> >>>+++ b/arch/arm64/include/asm/arch_timer.h
-> >>>@@ -144,6 +144,7 @@ static inline u32 arch_timer_get_cntkctl(void)
-> >>>  static inline void arch_timer_set_cntkctl(u32 cntkctl)
-> >>>  {
-> >>>  	write_sysreg(cntkctl, cntkctl_el1);
-> >>>+	isb();
-> >>>  }
-> >>>
-> >>>  static inline u64 arch_counter_get_cntpct(void)
-> >>>diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> >>>index fd4b7f6..47cf15e 100644
-> >>>--- a/drivers/clocksource/arm_arch_timer.c
-> >>>+++ b/drivers/clocksource/arm_arch_timer.c
-> >>>@@ -77,6 +77,7 @@ struct arch_timer {
-> >>>  static bool arch_counter_suspend_stop;
-> >>>  static bool vdso_default = true;
-> >>>
-> >>>+static cpumask_t evtstrm_available;
-> >>>  static bool evtstrm_enable = IS_ENABLED(CONFIG_ARM_ARCH_TIMER_EVTSTREAM);
-> >>>
-> >>>  static int __init early_evtstrm_cfg(char *buf)
-> >>>@@ -740,6 +741,7 @@ static void arch_timer_evtstrm_enable(int divider)
-> >>>  #ifdef CONFIG_COMPAT
-> >>>  	compat_elf_hwcap |= COMPAT_HWCAP_EVTSTRM;
-> >>>  #endif
-> >>>+	cpumask_set_cpu(smp_processor_id(), &evtstrm_available);
-> >>>  }
-> >>>
-> >>>  static void arch_timer_configure_evtstream(void)
-> >>>@@ -864,6 +866,11 @@ u32 arch_timer_get_rate(void)
-> >>>  	return arch_timer_rate;
-> >>>  }
-> >>>
-> >>>+bool arch_timer_evtstrm_available(void)
-> >>>+{
-> >>>+	return !!cpumask_test_cpu(smp_processor_id(), &evtstrm_available);
-> >>>+}
-> >>>+
-> >>
-> >>This could live in the header file as static inlin, if the evtstrm_available
-> >>is made global and could avoid a function call where it is used.
-> >
-> >You might need an EXPORT_SYMBOl as well if you go down that route.
-> 
-> Hmmm, I'm not fond of making the cpu mask global. I understand you can avoid
-> the branch + ret of the function, but generally you want to check if the
-> event stream is present to know if you can use wfe and wake up, so I don't
-> think it might be used in a performance critical path.
-> 
-> So I'm wondering, is it really worth it?
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 
-I have no strong preference, but I think you'll need o EXPORT something
-either way so that delay and friends can be used from modules.
+Any comments on this patch?
 
-Will
+Thanks,
+Sylwester
+
+> ---
+> Tested on Odroid XU3 and Odroid XU4 with Ubuntu 14.04.
+> 
+> Changes since v2:
+>  - u8 replaced with bool type,
+>  - the  HDMI codec iec.status data used directly for setting up
+>    the HDMI controller registers rather than using hard coded
+>    constants,
+>  - constants used for configuring the HDMI_AUI_CON register
+>    instead of plain numbers,
+>  - if/IS_ERR/return replaced with PTR_ERR_OR_ZERO().
+> 
+> Changes since v1:
+>  - rebased onto v4.14-rc1 and adapted locking
+> 
+> Changes since RFC version:
+>  - fixed hdmi-codec locking issue
+>  - added a comment documenting struct hdmi_contex::mutex
+> ---
+>  drivers/gpu/drm/exynos/Kconfig       |   1 +
+>  drivers/gpu/drm/exynos/exynos_hdmi.c | 253 ++++++++++++++++++++++++++---------
+>  drivers/gpu/drm/exynos/regs-hdmi.h   |   8 +-
+>  3 files changed, 197 insertions(+), 65 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/exynos/Kconfig b/drivers/gpu/drm/exynos/Kconfig
+> index 305dc3d..5a7c9d8 100644
+> --- a/drivers/gpu/drm/exynos/Kconfig
+> +++ b/drivers/gpu/drm/exynos/Kconfig
+> @@ -3,6 +3,7 @@ config DRM_EXYNOS
+>  	depends on OF && DRM && (ARCH_S3C64XX || ARCH_EXYNOS || ARCH_MULTIPLATFORM)
+>  	select DRM_KMS_HELPER
+>  	select VIDEOMODE_HELPERS
+> +	select SND_SOC_HDMI_CODEC if SND_SOC
+>  	help
+>  	  Choose this option if you have a Samsung SoC EXYNOS chipset.
+>  	  If M is selected the module will be called exynosdrm.
+> diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
+> index 214fa5e..d2b389a 100644
+> --- a/drivers/gpu/drm/exynos/exynos_hdmi.c
+> +++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
+> @@ -40,7 +40,7 @@
+>  #include <linux/component.h>
+>  #include <linux/mfd/syscon.h>
+>  #include <linux/regmap.h>
+> -
+> +#include <sound/hdmi-codec.h>
+>  #include <drm/exynos_drm.h>
+> 
+>  #include <media/cec-notifier.h>
+> @@ -111,12 +111,18 @@ struct hdmi_driver_data {
+>  	struct string_array_spec clk_muxes;
+>  };
+> 
+> +struct hdmi_audio {
+> +	struct platform_device		*pdev;
+> +	struct hdmi_audio_infoframe	infoframe;
+> +	struct hdmi_codec_params	params;
+> +	bool				enable;
+> +};
+> +
+>  struct hdmi_context {
+>  	struct drm_encoder		encoder;
+>  	struct device			*dev;
+>  	struct drm_device		*drm_dev;
+>  	struct drm_connector		connector;
+> -	bool				powered;
+>  	bool				dvi_mode;
+>  	struct delayed_work		hotplug_work;
+>  	struct drm_display_mode		current_mode;
+> @@ -137,6 +143,11 @@ struct hdmi_context {
+>  	struct regulator		*reg_hdmi_en;
+>  	struct exynos_drm_clk		phy_clk;
+>  	struct drm_bridge		*bridge;
+> +
+> +	/* mutex protecting subsequent fields below */
+> +	struct mutex			mutex;
+> +	struct hdmi_audio		audio;
+> +	bool				powered;
+>  };
+> 
+>  static inline struct hdmi_context *encoder_to_hdmi(struct drm_encoder *e)
+> @@ -768,6 +779,22 @@ static int hdmi_clk_set_parents(struct hdmi_context *hdata, bool to_phy)
+>  	return ret;
+>  }
+> 
+> +static int hdmi_audio_infoframe_apply(struct hdmi_context *hdata)
+> +{
+> +	struct hdmi_audio_infoframe *infoframe = &hdata->audio.infoframe;
+> +	u8 buf[HDMI_INFOFRAME_SIZE(AUDIO)];
+> +	int len;
+> +
+> +	len = hdmi_audio_infoframe_pack(infoframe, buf, sizeof(buf));
+> +	if (len < 0)
+> +		return len;
+> +
+> +	hdmi_reg_writeb(hdata, HDMI_AUI_CON, HDMI_AUI_CON_EVERY_VSYNC);
+> +	hdmi_reg_write_buf(hdata, HDMI_AUI_HEADER0, buf, len);
+> +
+> +	return 0;
+> +}
+> +
+>  static void hdmi_reg_infoframes(struct hdmi_context *hdata)
+>  {
+>  	union hdmi_infoframe frm;
+> @@ -805,15 +832,7 @@ static void hdmi_reg_infoframes(struct hdmi_context *hdata)
+>  		hdmi_reg_write_buf(hdata, HDMI_VSI_DATA(0), buf + 3, ret - 3);
+>  	}
+> 
+> -	ret = hdmi_audio_infoframe_init(&frm.audio);
+> -	if (!ret) {
+> -		frm.audio.channels = 2;
+> -		ret = hdmi_audio_infoframe_pack(&frm.audio, buf, sizeof(buf));
+> -	}
+> -	if (ret > 0) {
+> -		hdmi_reg_writeb(hdata, HDMI_AUI_CON, HDMI_AUI_CON_EVERY_VSYNC);
+> -		hdmi_reg_write_buf(hdata, HDMI_AUI_HEADER0, buf, ret);
+> -	}
+> +	hdmi_audio_infoframe_apply(hdata);
+>  }
+> 
+>  static enum drm_connector_status hdmi_detect(struct drm_connector *connector,
+> @@ -995,23 +1014,18 @@ static void hdmi_reg_acr(struct hdmi_context *hdata, u32 freq)
+>  	hdmi_reg_writeb(hdata, HDMI_ACR_CON, 4);
+>  }
+> 
+> -static void hdmi_audio_init(struct hdmi_context *hdata)
+> +static void hdmi_audio_config(struct hdmi_context *hdata)
+>  {
+> -	u32 sample_rate, bits_per_sample;
+> -	u32 data_num, bit_ch, sample_frq;
+> -	u32 val;
+> -
+> -	sample_rate = 44100;
+> -	bits_per_sample = 16;
+> +	u32 bit_ch = 1;
+> +	u32 data_num, val;
+> +	int i;
+> 
+> -	switch (bits_per_sample) {
+> +	switch (hdata->audio.params.sample_width) {
+>  	case 20:
+>  		data_num = 2;
+> -		bit_ch = 1;
+>  		break;
+>  	case 24:
+>  		data_num = 3;
+> -		bit_ch = 1;
+>  		break;
+>  	default:
+>  		data_num = 1;
+> @@ -1019,7 +1033,7 @@ static void hdmi_audio_init(struct hdmi_context *hdata)
+>  		break;
+>  	}
+> 
+> -	hdmi_reg_acr(hdata, sample_rate);
+> +	hdmi_reg_acr(hdata, hdata->audio.params.sample_rate);
+> 
+>  	hdmi_reg_writeb(hdata, HDMI_I2S_MUX_CON, HDMI_I2S_IN_DISABLE
+>  				| HDMI_I2S_AUD_I2S | HDMI_I2S_CUV_I2S_ENABLE
+> @@ -1029,12 +1043,6 @@ static void hdmi_audio_init(struct hdmi_context *hdata)
+>  			| HDMI_I2S_CH1_EN | HDMI_I2S_CH2_EN);
+> 
+>  	hdmi_reg_writeb(hdata, HDMI_I2S_MUX_CUV, HDMI_I2S_CUV_RL_EN);
+> -
+> -	sample_frq = (sample_rate == 44100) ? 0 :
+> -			(sample_rate == 48000) ? 2 :
+> -			(sample_rate == 32000) ? 3 :
+> -			(sample_rate == 96000) ? 0xa : 0x0;
+> -
+>  	hdmi_reg_writeb(hdata, HDMI_I2S_CLK_CON, HDMI_I2S_CLK_DIS);
+>  	hdmi_reg_writeb(hdata, HDMI_I2S_CLK_CON, HDMI_I2S_CLK_EN);
+> 
+> @@ -1058,31 +1066,24 @@ static void hdmi_audio_init(struct hdmi_context *hdata)
+>  			| HDMI_I2S_SET_SDATA_BIT(data_num)
+>  			| HDMI_I2S_BASIC_FORMAT);
+> 
+> -	/* Configure register related to CUV information */
+> -	hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST_0, HDMI_I2S_CH_STATUS_MODE_0
+> -			| HDMI_I2S_2AUD_CH_WITHOUT_PREEMPH
+> -			| HDMI_I2S_COPYRIGHT
+> -			| HDMI_I2S_LINEAR_PCM
+> -			| HDMI_I2S_CONSUMER_FORMAT);
+> -	hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST_1, HDMI_I2S_CD_PLAYER);
+> -	hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST_2, HDMI_I2S_SET_SOURCE_NUM(0));
+> -	hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST_3, HDMI_I2S_CLK_ACCUR_LEVEL_2
+> -			| HDMI_I2S_SET_SMP_FREQ(sample_frq));
+> -	hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST_4,
+> -			HDMI_I2S_ORG_SMP_FREQ_44_1
+> -			| HDMI_I2S_WORD_LEN_MAX24_24BITS
+> -			| HDMI_I2S_WORD_LEN_MAX_24BITS);
+> +	/* Configure registers related to CUV information */
+> +	for (i = 0; i < HDMI_I2S_CH_ST_MAXNUM; i++)
+> +		hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST(i),
+> +				hdata->audio.params.iec.status[i]);
+> 
+>  	hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST_CON, HDMI_I2S_CH_STATUS_RELOAD);
+>  }
+> 
+> -static void hdmi_audio_control(struct hdmi_context *hdata, bool onoff)
+> +static void hdmi_audio_control(struct hdmi_context *hdata)
+>  {
+> +	bool enable = hdata->audio.enable;
+> +
+>  	if (hdata->dvi_mode)
+>  		return;
+> 
+> -	hdmi_reg_writeb(hdata, HDMI_AUI_CON, onoff ? 2 : 0);
+> -	hdmi_reg_writemask(hdata, HDMI_CON_0, onoff ?
+> +	hdmi_reg_writeb(hdata, HDMI_AUI_CON, enable ?
+> +			HDMI_AVI_CON_EVERY_VSYNC : HDMI_AUI_CON_NO_TRAN);
+> +	hdmi_reg_writemask(hdata, HDMI_CON_0, enable ?
+>  			HDMI_ASP_EN : HDMI_ASP_DIS, HDMI_ASP_MASK);
+>  }
+> 
+> @@ -1398,13 +1399,14 @@ static void hdmiphy_conf_apply(struct hdmi_context *hdata)
+>  	hdmiphy_wait_for_pll(hdata);
+>  }
+> 
+> +/* Should be called with hdata->mutex mutex held */
+>  static void hdmi_conf_apply(struct hdmi_context *hdata)
+>  {
+>  	hdmi_start(hdata, false);
+>  	hdmi_conf_init(hdata);
+> -	hdmi_audio_init(hdata);
+> +	hdmi_audio_config(hdata);
+>  	hdmi_mode_apply(hdata);
+> -	hdmi_audio_control(hdata, true);
+> +	hdmi_audio_control(hdata);
+>  }
+> 
+>  static void hdmi_mode_set(struct drm_encoder *encoder,
+> @@ -1431,6 +1433,7 @@ static void hdmi_set_refclk(struct hdmi_context *hdata, bool on)
+>  			   SYSREG_HDMI_REFCLK_INT_CLK, on ? ~0 : 0);
+>  }
+> 
+> +/* Should be called with hdata->mutex mutex held. */
+>  static void hdmiphy_enable(struct hdmi_context *hdata)
+>  {
+>  	if (hdata->powered)
+> @@ -1453,6 +1456,7 @@ static void hdmiphy_enable(struct hdmi_context *hdata)
+>  	hdata->powered = true;
+>  }
+> 
+> +/* Should be called with hdata->mutex mutex held. */
+>  static void hdmiphy_disable(struct hdmi_context *hdata)
+>  {
+>  	if (!hdata->powered)
+> @@ -1478,28 +1482,38 @@ static void hdmi_enable(struct drm_encoder *encoder)
+>  {
+>  	struct hdmi_context *hdata = encoder_to_hdmi(encoder);
+> 
+> +	mutex_lock(&hdata->mutex);
+> +
+>  	hdmiphy_enable(hdata);
+>  	hdmi_conf_apply(hdata);
+> +
+> +	mutex_unlock(&hdata->mutex);
+>  }
+> 
+>  static void hdmi_disable(struct drm_encoder *encoder)
+>  {
+>  	struct hdmi_context *hdata = encoder_to_hdmi(encoder);
+> 
+> -	if (!hdata->powered)
+> +	mutex_lock(&hdata->mutex);
+> +
+> +	if (hdata->powered) {
+> +		/*
+> +		 * The SFRs of VP and Mixer are updated by Vertical Sync of
+> +		 * Timing generator which is a part of HDMI so the sequence
+> +		 * to disable TV Subsystem should be as following,
+> +		 *	VP -> Mixer -> HDMI
+> +		 *
+> +		 * To achieve such sequence HDMI is disabled together with
+> +		 * HDMI PHY, via pipe clock callback.
+> +		 */
+> +		mutex_unlock(&hdata->mutex);
+> +		cancel_delayed_work(&hdata->hotplug_work);
+> +		cec_notifier_set_phys_addr(hdata->notifier,
+> +					   CEC_PHYS_ADDR_INVALID);
+>  		return;
+> +	}
+> 
+> -	/*
+> -	 * The SFRs of VP and Mixer are updated by Vertical Sync of
+> -	 * Timing generator which is a part of HDMI so the sequence
+> -	 * to disable TV Subsystem should be as following,
+> -	 *	VP -> Mixer -> HDMI
+> -	 *
+> -	 * To achieve such sequence HDMI is disabled together with HDMI PHY, via
+> -	 * pipe clock callback.
+> -	 */
+> -	cancel_delayed_work(&hdata->hotplug_work);
+> -	cec_notifier_set_phys_addr(hdata->notifier, CEC_PHYS_ADDR_INVALID);
+> +	mutex_unlock(&hdata->mutex);
+>  }
+> 
+>  static const struct drm_encoder_helper_funcs exynos_hdmi_encoder_helper_funcs = {
+> @@ -1513,6 +1527,104 @@ static void hdmi_disable(struct drm_encoder *encoder)
+>  	.destroy = drm_encoder_cleanup,
+>  };
+> 
+> +static void hdmi_audio_shutdown(struct device *dev, void *data)
+> +{
+> +	struct hdmi_context *hdata = dev_get_drvdata(dev);
+> +
+> +	mutex_lock(&hdata->mutex);
+> +
+> +	hdata->audio.enable = false;
+> +
+> +	if (hdata->powered)
+> +		hdmi_audio_control(hdata);
+> +
+> +	mutex_unlock(&hdata->mutex);
+> +}
+> +
+> +static int hdmi_audio_hw_params(struct device *dev, void *data,
+> +				struct hdmi_codec_daifmt *daifmt,
+> +				struct hdmi_codec_params *params)
+> +{
+> +	struct hdmi_context *hdata = dev_get_drvdata(dev);
+> +
+> +	if (daifmt->fmt != HDMI_I2S || daifmt->bit_clk_inv ||
+> +	    daifmt->frame_clk_inv || daifmt->bit_clk_master ||
+> +	    daifmt->frame_clk_master) {
+> +		dev_err(dev, "%s: Bad flags %d %d %d %d\n", __func__,
+> +			daifmt->bit_clk_inv, daifmt->frame_clk_inv,
+> +			daifmt->bit_clk_master,
+> +			daifmt->frame_clk_master);
+> +		return -EINVAL;
+> +	}
+> +
+> +	mutex_lock(&hdata->mutex);
+> +
+> +	hdata->audio.params = *params;
+> +
+> +	if (hdata->powered) {
+> +		hdmi_audio_config(hdata);
+> +		hdmi_audio_infoframe_apply(hdata);
+> +	}
+> +
+> +	mutex_unlock(&hdata->mutex);
+> +
+> +	return 0;
+> +}
+> +
+> +static int hdmi_audio_digital_mute(struct device *dev, void *data, bool mute)
+> +{
+> +	struct hdmi_context *hdata = dev_get_drvdata(dev);
+> +
+> +	mutex_lock(&hdata->mutex);
+> +
+> +	hdata->audio.enable = !mute;
+> +
+> +	if (hdata->powered)
+> +		hdmi_audio_control(hdata);
+> +
+> +	mutex_unlock(&hdata->mutex);
+> +
+> +	return 0;
+> +}
+> +
+> +static int hdmi_audio_get_eld(struct device *dev, void *data, uint8_t *buf,
+> +			      size_t len)
+> +{
+> +	struct hdmi_context *hdata = dev_get_drvdata(dev);
+> +	struct drm_connector *connector = &hdata->connector;
+> +
+> +	memcpy(buf, connector->eld, min(sizeof(connector->eld), len));
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct hdmi_codec_ops audio_codec_ops = {
+> +	.hw_params = hdmi_audio_hw_params,
+> +	.audio_shutdown = hdmi_audio_shutdown,
+> +	.digital_mute = hdmi_audio_digital_mute,
+> +	.get_eld = hdmi_audio_get_eld,
+> +};
+> +
+> +static int hdmi_register_audio_device(struct hdmi_context *hdata)
+> +{
+> +	struct hdmi_codec_pdata codec_data = {
+> +		.ops = &audio_codec_ops,
+> +		.max_i2s_channels = 6,
+> +		.i2s = 1,
+> +	};
+> +
+> +	hdata->audio.pdev = platform_device_register_data(
+> +		hdata->dev, HDMI_CODEC_DRV_NAME, PLATFORM_DEVID_AUTO,
+> +		&codec_data, sizeof(codec_data));
+> +
+> +	return PTR_ERR_OR_ZERO(hdata->audio.pdev);
+> +}
+> +
+> +static void hdmi_unregister_audio_device(struct hdmi_context *hdata)
+> +{
+> +	platform_device_unregister(hdata->audio.pdev);
+> +}
+> +
+>  static void hdmi_hotplug_work_func(struct work_struct *work)
+>  {
+>  	struct hdmi_context *hdata;
+> @@ -1588,11 +1700,14 @@ static void hdmiphy_clk_enable(struct exynos_drm_clk *clk, bool enable)
+>  {
+>  	struct hdmi_context *hdata = container_of(clk, struct hdmi_context,
+>  						  phy_clk);
+> +	mutex_lock(&hdata->mutex);
+> 
+>  	if (enable)
+>  		hdmiphy_enable(hdata);
+>  	else
+>  		hdmiphy_disable(hdata);
+> +
+> +	mutex_unlock(&hdata->mutex);
+>  }
+> 
+>  static int hdmi_bridge_init(struct hdmi_context *hdata)
+> @@ -1697,6 +1812,7 @@ static int hdmi_bind(struct device *dev, struct device *master, void *data)
+>  	struct drm_device *drm_dev = data;
+>  	struct hdmi_context *hdata = dev_get_drvdata(dev);
+>  	struct drm_encoder *encoder = &hdata->encoder;
+> +	struct hdmi_audio_infoframe *audio_infoframe = &hdata->audio.infoframe;
+>  	struct exynos_drm_crtc *crtc;
+>  	int ret;
+> 
+> @@ -1704,6 +1820,12 @@ static int hdmi_bind(struct device *dev, struct device *master, void *data)
+> 
+>  	hdata->phy_clk.enable = hdmiphy_clk_enable;
+> 
+> +	hdmi_audio_infoframe_init(audio_infoframe);
+> +	audio_infoframe->coding_type = HDMI_AUDIO_CODING_TYPE_STREAM;
+> +	audio_infoframe->sample_size = HDMI_AUDIO_SAMPLE_SIZE_STREAM;
+> +	audio_infoframe->sample_frequency = HDMI_AUDIO_SAMPLE_FREQUENCY_STREAM;
+> +	audio_infoframe->channels = 2;
+> +
+>  	drm_encoder_init(drm_dev, encoder, &exynos_hdmi_encoder_funcs,
+>  			 DRM_MODE_ENCODER_TMDS, NULL);
+> 
+> @@ -1818,6 +1940,8 @@ static int hdmi_probe(struct platform_device *pdev)
+> 
+>  	hdata->dev = dev;
+> 
+> +	mutex_init(&hdata->mutex);
+> +
+>  	ret = hdmi_resources_init(hdata);
+>  	if (ret) {
+>  		if (ret != -EPROBE_DEFER)
+> @@ -1877,12 +2001,19 @@ static int hdmi_probe(struct platform_device *pdev)
+> 
+>  	pm_runtime_enable(dev);
+> 
+> -	ret = component_add(&pdev->dev, &hdmi_component_ops);
+> +	ret = hdmi_register_audio_device(hdata);
+>  	if (ret)
+>  		goto err_notifier_put;
+> 
+> +	ret = component_add(&pdev->dev, &hdmi_component_ops);
+> +	if (ret)
+> +		goto err_unregister_audio;
+> +
+>  	return ret;
+> 
+> +err_unregister_audio:
+> +	hdmi_unregister_audio_device(hdata);
+> +
+>  err_notifier_put:
+>  	cec_notifier_put(hdata->notifier);
+>  	pm_runtime_disable(dev);
+> @@ -1921,6 +2052,8 @@ static int hdmi_remove(struct platform_device *pdev)
+> 
+>  	put_device(&hdata->ddc_adpt->dev);
+> 
+> +	mutex_destroy(&hdata->mutex);
+> +
+>  	return 0;
+>  }
+> 
+> diff --git a/drivers/gpu/drm/exynos/regs-hdmi.h b/drivers/gpu/drm/exynos/regs-hdmi.h
+> index a0507dc..d843b1f 100644
+> --- a/drivers/gpu/drm/exynos/regs-hdmi.h
+> +++ b/drivers/gpu/drm/exynos/regs-hdmi.h
+> @@ -419,11 +419,9 @@
+>  #define HDMI_I2S_DSD_CON		HDMI_I2S_BASE(0x01c)
+>  #define HDMI_I2S_MUX_CON		HDMI_I2S_BASE(0x020)
+>  #define HDMI_I2S_CH_ST_CON		HDMI_I2S_BASE(0x024)
+> -#define HDMI_I2S_CH_ST_0		HDMI_I2S_BASE(0x028)
+> -#define HDMI_I2S_CH_ST_1		HDMI_I2S_BASE(0x02c)
+> -#define HDMI_I2S_CH_ST_2		HDMI_I2S_BASE(0x030)
+> -#define HDMI_I2S_CH_ST_3		HDMI_I2S_BASE(0x034)
+> -#define HDMI_I2S_CH_ST_4		HDMI_I2S_BASE(0x038)
+> +/* n must be withing range 0...(HDMI_I2S_CH_ST_MAXNUM - 1) */
+> +#define HDMI_I2S_CH_ST_MAXNUM		5
+> +#define HDMI_I2S_CH_ST(n)		HDMI_I2S_BASE(0x028 + 4 * (n))
+>  #define HDMI_I2S_CH_ST_SH_0		HDMI_I2S_BASE(0x03c)
+>  #define HDMI_I2S_CH_ST_SH_1		HDMI_I2S_BASE(0x040)
+>  #define HDMI_I2S_CH_ST_SH_2		HDMI_I2S_BASE(0x044)
+> --
+> 1.9.1
+
+
+
+-- 
+Sylwester Nawrocki
+Samsung R&D Institute Poland
