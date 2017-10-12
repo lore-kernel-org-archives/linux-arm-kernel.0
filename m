@@ -1,49 +1,98 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 12 Oct 2017 12:05:38 +0100
-Subject: [PATCH 0/2] arm64 SMMUv3 PMU driver with IORT support
-In-Reply-To: <59DF4AD9.2060903@huawei.com>
-References: <1501876754-1064-1-git-send-email-nleeder@codeaurora.org>
- <394bd3b8-2583-01fa-02d3-6a49c2a6a6c0@linaro.org>
- <3eac1295-dba2-ad79-d868-b538b13de91a@codeaurora.org>
- <f1d864be-8ce4-f2d2-9c71-8fff202a76d1@linaro.org>
- <67a696ad-98e9-d505-1d73-7246d2efc398@codeaurora.org>
- <59DF4AD9.2060903@huawei.com>
-Message-ID: <20171012110538.GA8509@red-moon>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Thu, 12 Oct 2017 12:13:20 +0100
+Subject: [RFCv2 PATCH 05/36] iommu/process: Bind and unbind process to and
+ from devices
+In-Reply-To: <20171011113348.GE30803@8bytes.org>
+References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
+ <20171006133203.22803-6-jean-philippe.brucker@arm.com>
+ <20171011113348.GE30803@8bytes.org>
+Message-ID: <ee7f80e3-ca30-0ee7-53f3-3e57b2b58df6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 12, 2017 at 06:58:33PM +0800, Hanjun Guo wrote:
-> On 2017/8/11 11:28, Leeder, Neil wrote:
-> > On 8/9/2017 9:26 PM, Hanjun Guo wrote:
-> >> > On 2017/8/9 23:48, Leeder, Neil wrote:
-> >>>>> >>>>    drivers/perf/Kconfig          |   9 +
-> >>>>> >>>>    drivers/perf/Makefile         |   1 +
-> >>>>> >>>>    drivers/perf/arm_smmuv3_pmu.c | 823 ++++++++++++++++++++++++++++++++++++++++++
-> >>>>> >>>>    include/acpi/actbl2.h         |   9 +-
-> >>>> >>> Do you have the acpica support code? I'm currently
-> >>>> >>> working on SMMUv3 MSI support and I would like to test
-> >>>> >>> it with MSI support for PMCG as well.
-> >>> >> I don't have any code other than what was posted here.
-> >>> >> What additional ACPICA support code is needed?
-> >> > 
-> >> > Sorry for not clear, I mean the acpica code for iASL and
-> >> > other tool: github.com/acpica/acpica.git
-> >> > 
-> >> > With that code, I can compile my IORT table with PMCG node.
-> > Unfortunately it looks like I'm the first person from Qualcomm Datacenter
-> > Technologies to try to add something to ACPICA, which means I'll have to
-> > kick off an internal legal process which may take some time. Unless someone
-> > else wants to take a crack at it - and really, there's nothing more than is
-> > in the ARM IORT spec - it could be a while before I can do that.
+Hi Joerg,
+
+On 11/10/17 12:33, Joerg Roedel wrote:
+> Hi Jean-Philipe,
 > 
-> Just a update, I sent a pull request to Bob for ACPICA changes,
-> please take a look:
+> Thanks for your patches, this is definitly a step in the right direction
+> to get generic support for IO virtual memory into the IOMMU core code.
 > 
-> https://github.com/acpica/acpica/pull/327
+> But I see an issue with the design around task_struct, please see
+> below.
+> 
+> On Fri, Oct 06, 2017 at 02:31:32PM +0100, Jean-Philippe Brucker wrote:
+>> +int iommu_process_bind_device(struct device *dev, struct task_struct *task,
+>> +			      int *pasid, int flags)
+> 
+> I just took this patch as an example, it is in the other patches as
+> well. The code is designed around 'struct task_struct' while it should
+> really be designed around 'struct mm_struct'. You are not attaching a
+> specific process to a device, but the address-space of one or more
+> processes. And that should be reflected in the design.
 
-You should not have done that. We need to update IORT specifications
-for IORT PMCG before merging ACPICA PMCG support.
+Agreed. The task struct is only really needed for obtaining the mm in my
+code. It also keeps hold of a pid, but that's wrong and easy to remove.
 
-Ask Robert to drop it straight away or I will.
+> There are several bad implications of building it around task_struct,
+> one is the life-time of the binding. If the address space is detached
+> from the device when the process exits, only the thread that did the
+> setup can can safely make use of the device, because if the device is
+> accessed from another thread it will crash when the setup-thread exits.
+> 
+> There are other benefits of using mm_struct, for example that you can
+> use mmu_notifiers to exit-handling.
+> 
+> Here is how I think the base API should look like:
+> 
+> 	* iommu_iovm_device_init(struct device *dev);
+> 	  iommu_iovm_device_shutdown(struct device *dev);
+> 
+> 	  These two functions do the device specific setup/shutdown. For
+> 	  PCI this would include enabling the PRI, PASID, and ATS
+> 	  capabilities and setting up a PASID table for the device.
 
-Lorenzo
+Ok. On SMMU the PASID table also hosts the non-PASID page table pointer,
+so the table and capability cannot be setup later than attach_device (and
+we'll probably have to enable PASID in add_device). But I suppose it's an
+implementation detail.
+
+Some device drivers will want to use ATS alone, for accelerating IOVA
+traffic. Should we enable it automatically, or provide device drivers with
+a way to enable it manually? According to the PCI spec, PASID has to be
+enabled before ATS, so device_init would have to first disable ATS in that
+case.
+
+> 	* iommu_iovm_bind_mm(struct device *dev, struct mm_struct *mm,
+> 			     iovm_shutdown_cb *cb);
+> 	  iommu_iovm_unbind_mm(struct device *dev, struct mm_struct *mm);
+> 
+> 	  These functions add and delete the entries in the PASID table
+> 	  for the device and setup mmu_notifiers for the mm_struct to
+> 	  keep IOMMU TLBs in sync with the CPU TLBs.
+> 
+> 	  The shutdown_cb is invoked by the IOMMU core code when the
+> 	  mm_struct goes away, for example because the process
+> 	  segfaults.
+> 
+> 	The PASID handling is best done these functions as well, unless
+> 	there is a strong reason to allow device drivers to do the
+> 	handling themselves.
+> 
+> The context data can be stored directly in mm_struct, including the
+> PASID for that mm.
+
+Changing mm_struct probably isn't required at the moment, since the mm
+subsystem won't use the context data or the PASID. Outside of
+drivers/iommu/, only the caller of bind_mm needs the PASID in order to
+program it into the device. The only advantage I see would be slightly
+faster bind(), when finding out if a mm is already bound to devices. But
+we don't really need fast bind(), so I don't think we'd have enough
+material to argue for a change in mm_struct.
+
+We do need to allocate a separate "iommu_mm_struct" wrapper to store the
+mmu_notifier. Maybe bind() could return this structure (that contains the
+PASID), and unbind() would take this iommu_mm_struct as argument?
+
+Thanks
+Jean
