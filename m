@@ -1,60 +1,58 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu, 12 Oct 2017 15:47:43 +0200
-Subject: [PATCH] firmware: meson-sm: use generic compatible
-Message-ID: <20171012134743.10625-1-jbrunet@baylibre.com>
+From: gklkml16@gmail.com (Ganapatrao Kulkarni)
+Date: Thu, 12 Oct 2017 19:17:53 +0530
+Subject: [PATCH v7 0/4] Add support for ThunderX2 pmu events using json
+ files
+In-Reply-To: <e1a2913c-f56f-44c5-19e7-0c061cf21639@hisilicon.com>
+References: <20171012103419.29824-1-ganapatrao.kulkarni@cavium.com>
+ <20171012103820.GC17924@rric.localdomain>
+ <CAKTKpr5=msG9b-f2Mj+1SibUvMXefg9DAcNA7M3hgHCX=hpQ6g@mail.gmail.com>
+ <20171012105851.GC7395@arm.com>
+ <e1a2913c-f56f-44c5-19e7-0c061cf21639@hisilicon.com>
+Message-ID: <CAKTKpr4zqOUJraeCsHH2BFtf3C9a6brTbt94cikOvQe7Y3V0zw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The meson secure monitor seems to be compatible with more SoCs than
-initially thought. Let's use the most generic compatible he have in
-DT instead of the gxbb specific one
+On Thu, Oct 12, 2017 at 5:15 PM, Zhangshaokun
+<zhangshaokun@hisilicon.com> wrote:
+> Hi Will,
+>
+> On 2017/10/12 18:58, Will Deacon wrote:
+>> On Thu, Oct 12, 2017 at 04:20:06PM +0530, Ganapatrao Kulkarni wrote:
+>>> Hi Robert,
+>>>
+>>> On Thu, Oct 12, 2017 at 4:08 PM, Robert Richter <rric@kernel.org> wrote:
+>>>> On 12.10.17 16:04:15, Ganapatrao Kulkarni wrote:
+>>>>
+>>>>>  tools/perf/arch/arm64/util/Build                   |  1 +
+>>>>>  tools/perf/arch/arm64/util/header.c                | 65 ++++++++++++++++++++++
+>>>>>  tools/perf/arch/powerpc/util/header.c              |  2 +-
+>>>>>  tools/perf/arch/x86/util/header.c                  |  2 +-
+>>>>>  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 +++++
+>>>>>  .../arch/arm64/thunderx2/thunderx2-imp-def.json    | 62 +++++++++++++++++++++
+>>>>
+>>>> I guess the dir needs to be named 'cavium'.
+>>>
+>>> i dont think so ,  while compilation arch type is detected, it has to be arm64
+>>> refer SRCARCH in pmu-events/Build
+>>
+>> The full name should be:
+>>
+>> .../arch/arm64/cavium/thunderx2-imp-def.json
 
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
- Documentation/devicetree/bindings/firmware/meson/meson_sm.txt | 4 ++--
- drivers/firmware/meson/meson_sm.c                             | 4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ok,  i am sending patch with renaming directory to cavium.
 
-diff --git a/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt b/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
-index c248cd44f727..13a7815ac2b9 100644
---- a/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
-+++ b/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
-@@ -4,12 +4,12 @@ In the Amlogic SoCs the Secure Monitor code is used to provide access to the
- NVMEM, enable JTAG, set USB boot, etc...
- 
- Required properties for the secure monitor node:
--- compatible: Should be "amlogic,meson-gxbb-sm"
-+- compatible: Should be "amlogic,meson-gx-sm"
- 
- Example:
- 
- 	firmware {
- 		sm: secure-monitor {
--			compatible = "amlogic,meson-gxbb-sm";
-+			compatible = "amlogic,meson-gx-sm";
- 		};
- 	};
-diff --git a/drivers/firmware/meson/meson_sm.c b/drivers/firmware/meson/meson_sm.c
-index ff204421117b..c83f7be2b1f4 100644
---- a/drivers/firmware/meson/meson_sm.c
-+++ b/drivers/firmware/meson/meson_sm.c
-@@ -38,7 +38,7 @@ struct meson_sm_chip {
- 	struct meson_sm_cmd cmd[];
- };
- 
--struct meson_sm_chip gxbb_chip = {
-+struct meson_sm_chip gx_chip = {
- 	.shmem_size		= SZ_4K,
- 	.cmd_shmem_in_base	= 0x82000020,
- 	.cmd_shmem_out_base	= 0x82000021,
-@@ -213,7 +213,7 @@ int meson_sm_call_write(void *buffer, unsigned int size, unsigned int cmd_index,
- EXPORT_SYMBOL(meson_sm_call_write);
- 
- static const struct of_device_id meson_sm_ids[] = {
--	{ .compatible = "amlogic,meson-gxbb-sm", .data = &gxbb_chip },
-+	{ .compatible = "amlogic,meson-gx-sm", .data = &gx_chip },
- 	{ /* sentinel */ },
- };
- 
--- 
-2.13.6
+>>
+>
+> It works for us (HiSilicon) as .../arch/arm64/hisilicon/hip08-imp-def.json.
+>
+> Thanks,
+> Shaokun
+>
+>> Will
+>>
+>> .
+>>
+>
+
+thanks
+Ganapat
