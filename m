@@ -1,303 +1,33 @@
-From: digetx@gmail.com (Dmitry Osipenko)
-Date: Thu, 12 Oct 2017 02:42:49 +0300
-Subject: [PATCH 01/11] Initialize the mapping of KASan shadow memory
-In-Reply-To: <20171011082227.20546-2-liuwenliang@huawei.com>
-References: <20171011082227.20546-1-liuwenliang@huawei.com>
- <20171011082227.20546-2-liuwenliang@huawei.com>
-Message-ID: <31b16c9d-48c7-bc0a-51d1-cc6cf892329b@gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 11 Oct 2017 17:20:22 -0700
+Subject: [PATCH 0/2] Enable the Amlogic Meson SDIO MMC controller
+In-Reply-To: <20171007162940.14595-1-martin.blumenstingl@googlemail.com>
+ (Martin Blumenstingl's message of "Sat, 7 Oct 2017 18:29:38 +0200")
+References: <20171007162940.14595-1-martin.blumenstingl@googlemail.com>
+Message-ID: <7ho9pdfc8p.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11.10.2017 11:22, Abbott Liu wrote:
-> From: Andrey Ryabinin <a.ryabinin@samsung.com>
-> 
-> This patch initializes KASan shadow region's page table and memory.
-> There are two stage for KASan initializing:
-> 1. At early boot stage the whole shadow region is mapped to just
->    one physical page (kasan_zero_page). It's finished by the function
->    kasan_early_init which is called by __mmap_switched(arch/arm/kernel/
->    head-common.S)
-> 
-> 2. After the calling of paging_init, we use kasan_zero_page as zero
->    shadow for some memory that KASan don't need to track, and we alloc
->    new shadow space for the other memory that KASan need to track. These
->    issues are finished by the function kasan_init which is call by setup_arch.
-> 
-> Cc: Andrey Ryabinin <a.ryabinin@samsung.com>
-> Signed-off-by: Abbott Liu <liuwenliang@huawei.com>
-> ---
->  arch/arm/include/asm/kasan.h       |  20 +++
->  arch/arm/include/asm/pgalloc.h     |   5 +-
->  arch/arm/include/asm/pgtable.h     |   1 +
->  arch/arm/include/asm/proc-fns.h    |  33 +++++
->  arch/arm/include/asm/thread_info.h |   4 +
->  arch/arm/kernel/head-common.S      |   4 +
->  arch/arm/kernel/setup.c            |   2 +
->  arch/arm/mm/Makefile               |   5 +
->  arch/arm/mm/kasan_init.c           | 257 +++++++++++++++++++++++++++++++++++++
->  mm/kasan/kasan.c                   |   2 +-
->  10 files changed, 331 insertions(+), 2 deletions(-)
->  create mode 100644 arch/arm/include/asm/kasan.h
->  create mode 100644 arch/arm/mm/kasan_init.c
-> 
-> diff --git a/arch/arm/include/asm/kasan.h b/arch/arm/include/asm/kasan.h
-> new file mode 100644
-> index 0000000..90ee60c
-> --- /dev/null
-> +++ b/arch/arm/include/asm/kasan.h
-> @@ -0,0 +1,20 @@
-> +#ifndef __ASM_KASAN_H
-> +#define __ASM_KASAN_H
-> +
-> +#ifdef CONFIG_KASAN
-> +
-> +#include <asm/kasan_def.h>
-> +/*
-> + * Compiler uses shadow offset assuming that addresses start
-> + * from 0. Kernel addresses don't start from 0, so shadow
-> + * for kernel really starts from 'compiler's shadow offset' +
-> + * ('kernel address space start' >> KASAN_SHADOW_SCALE_SHIFT)
-> + */
-> +
-> +extern void kasan_init(void);
-> +
-> +#else
-> +static inline void kasan_init(void) { }
-> +#endif
-> +
-> +#endif
-> diff --git a/arch/arm/include/asm/pgalloc.h b/arch/arm/include/asm/pgalloc.h
-> index b2902a5..10cee6a 100644
-> --- a/arch/arm/include/asm/pgalloc.h
-> +++ b/arch/arm/include/asm/pgalloc.h
-> @@ -50,8 +50,11 @@ static inline void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
->   */
->  #define pmd_alloc_one(mm,addr)		({ BUG(); ((pmd_t *)2); })
->  #define pmd_free(mm, pmd)		do { } while (0)
-> +#ifndef CONFIG_KASAN
->  #define pud_populate(mm,pmd,pte)	BUG()
-> -
-> +#else
-> +#define pud_populate(mm,pmd,pte)	do { } while (0)
-> +#endif
->  #endif	/* CONFIG_ARM_LPAE */
->  
->  extern pgd_t *pgd_alloc(struct mm_struct *mm);
-> diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-> index 1c46238..fdf343f 100644
-> --- a/arch/arm/include/asm/pgtable.h
-> +++ b/arch/arm/include/asm/pgtable.h
-> @@ -97,6 +97,7 @@ extern pgprot_t		pgprot_s2_device;
->  #define PAGE_READONLY		_MOD_PROT(pgprot_user, L_PTE_USER | L_PTE_RDONLY | L_PTE_XN)
->  #define PAGE_READONLY_EXEC	_MOD_PROT(pgprot_user, L_PTE_USER | L_PTE_RDONLY)
->  #define PAGE_KERNEL		_MOD_PROT(pgprot_kernel, L_PTE_XN)
-> +#define PAGE_KERNEL_RO		_MOD_PROT(pgprot_kernel, L_PTE_XN | L_PTE_RDONLY)
->  #define PAGE_KERNEL_EXEC	pgprot_kernel
->  #define PAGE_HYP		_MOD_PROT(pgprot_kernel, L_PTE_HYP | L_PTE_XN)
->  #define PAGE_HYP_EXEC		_MOD_PROT(pgprot_kernel, L_PTE_HYP | L_PTE_RDONLY)
-> diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
-> index f2e1af4..6e26714 100644
-> --- a/arch/arm/include/asm/proc-fns.h
-> +++ b/arch/arm/include/asm/proc-fns.h
-> @@ -131,6 +131,15 @@ extern void cpu_resume(void);
->  		pg &= ~(PTRS_PER_PGD*sizeof(pgd_t)-1);	\
->  		(pgd_t *)phys_to_virt(pg);		\
->  	})
-> +
-> +#define cpu_set_ttbr0(val)					\
-> +	do {							\
-> +		u64 ttbr = val;					\
-> +		__asm__("mcrr	p15, 0, %Q0, %R0, c2"		\
-> +			: : "r" (ttbr));	\
-> +	} while (0)
-> +
-> +
->  #else
->  #define cpu_get_pgd()	\
->  	({						\
-> @@ -140,6 +149,30 @@ extern void cpu_resume(void);
->  		pg &= ~0x3fff;				\
->  		(pgd_t *)phys_to_virt(pg);		\
->  	})
-> +
-> +#define cpu_set_ttbr(nr, val)					\
-> +	do {							\
-> +		u64 ttbr = val;					\
-> +		__asm__("mcr	p15, 0, %0, c2, c0, 0"		\
-> +			: : "r" (ttbr));			\
-> +	} while (0)
-> +
-> +#define cpu_get_ttbr(nr)					\
-> +	({							\
-> +		unsigned long ttbr;				\
-> +		__asm__("mrc	p15, 0, %0, c2, c0, 0"		\
-> +			: "=r" (ttbr));				\
-> +		ttbr;						\
-> +	})
-> +
-> +#define cpu_set_ttbr0(val)					\
-> +	do {							\
-> +		u64 ttbr = val;					\
-> +		__asm__("mcr	p15, 0, %0, c2, c0, 0"		\
-> +			: : "r" (ttbr));			\
-> +	} while (0)
-> +
-> +
->  #endif
->  
->  #else	/*!CONFIG_MMU */
-> diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
-> index 1d468b5..52c4858 100644
-> --- a/arch/arm/include/asm/thread_info.h
-> +++ b/arch/arm/include/asm/thread_info.h
-> @@ -16,7 +16,11 @@
->  #include <asm/fpstate.h>
->  #include <asm/page.h>
->  
-> +#ifdef CONFIG_KASAN
-> +#define THREAD_SIZE_ORDER       2
-> +#else
->  #define THREAD_SIZE_ORDER	1
-> +#endif
->  #define THREAD_SIZE		(PAGE_SIZE << THREAD_SIZE_ORDER)
->  #define THREAD_START_SP		(THREAD_SIZE - 8)
->  
-> diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
-> index 8733012..c17f4a2 100644
-> --- a/arch/arm/kernel/head-common.S
-> +++ b/arch/arm/kernel/head-common.S
-> @@ -101,7 +101,11 @@ __mmap_switched:
->  	str	r2, [r6]			@ Save atags pointer
->  	cmp	r7, #0
->  	strne	r0, [r7]			@ Save control register values
-> +#ifdef CONFIG_KASAN
-> +	b	kasan_early_init
-> +#else
->  	b	start_kernel
-> +#endif
->  ENDPROC(__mmap_switched)
->  
->  	.align	2
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 8e9a3e4..985d9a3 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -62,6 +62,7 @@
->  #include <asm/unwind.h>
->  #include <asm/memblock.h>
->  #include <asm/virt.h>
-> +#include <asm/kasan.h>
->  
->  #include "atags.h"
->  
-> @@ -1108,6 +1109,7 @@ void __init setup_arch(char **cmdline_p)
->  	early_ioremap_reset();
->  
->  	paging_init(mdesc);
-> +	kasan_init();
->  	request_standard_resources(mdesc);
->  
->  	if (mdesc->restart)
-> diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
-> index 950d19b..498c316 100644
-> --- a/arch/arm/mm/Makefile
-> +++ b/arch/arm/mm/Makefile
-> @@ -106,4 +106,9 @@ obj-$(CONFIG_CACHE_L2X0)	+= cache-l2x0.o l2c-l2x0-resume.o
->  obj-$(CONFIG_CACHE_L2X0_PMU)	+= cache-l2x0-pmu.o
->  obj-$(CONFIG_CACHE_XSC3L2)	+= cache-xsc3l2.o
->  obj-$(CONFIG_CACHE_TAUROS2)	+= cache-tauros2.o
-> +
-> +KASAN_SANITIZE_kasan_init.o    := n
-> +obj-$(CONFIG_KASAN)            += kasan_init.o
-> +
-> +
->  obj-$(CONFIG_CACHE_UNIPHIER)	+= cache-uniphier.o
-> diff --git a/arch/arm/mm/kasan_init.c b/arch/arm/mm/kasan_init.c
-> new file mode 100644
-> index 0000000..2bf0782
-> --- /dev/null
-> +++ b/arch/arm/mm/kasan_init.c
-> @@ -0,0 +1,257 @@
-> +#include <linux/bootmem.h>
-> +#include <linux/kasan.h>
-> +#include <linux/kernel.h>
-> +#include <linux/memblock.h>
-> +#include <linux/start_kernel.h>
-> +
-> +#include <asm/cputype.h>
-> +#include <asm/highmem.h>
-> +#include <asm/mach/map.h>
-> +#include <asm/memory.h>
-> +#include <asm/page.h>
-> +#include <asm/pgalloc.h>
-> +#include <asm/pgtable.h>
-> +#include <asm/procinfo.h>
-> +#include <asm/proc-fns.h>
-> +#include <asm/tlbflush.h>
-> +#include <asm/cp15.h>
-> +#include <linux/sched/task.h>
-> +
-> +#include "mm.h"
-> +
-> +static pgd_t tmp_page_table[PTRS_PER_PGD] __initdata __aligned(1ULL << 14);
-> +
-> +pmd_t tmp_pmd_table[PTRS_PER_PMD] __page_aligned_bss;
-> +
-> +static __init void *kasan_alloc_block(size_t size, int node)
-> +{
-> +	return memblock_virt_alloc_try_nid(size, size, __pa(MAX_DMA_ADDRESS),
-> +					BOOTMEM_ALLOC_ACCESSIBLE, node);
-> +}
-> +
-> +static void __init kasan_early_pmd_populate(unsigned long start, unsigned long end, pud_t *pud)
-> +{
-> +	unsigned long addr;
-> +	unsigned long next;
-> +	pmd_t *pmd;
-> +
-> +	pmd = pmd_offset(pud, start);
-> +	for (addr = start; addr < end;) {
-> +		pmd_populate_kernel(&init_mm, pmd, kasan_zero_pte);
-> +		next = pmd_addr_end(addr, end);
-> +		addr = next;
-> +		flush_pmd_entry(pmd);
-> +		pmd++;
-> +	}
-> +}
-> +
-> +static void __init kasan_early_pud_populate(unsigned long start, unsigned long end, pgd_t *pgd)
-> +{
-> +	unsigned long addr;
-> +	unsigned long next;
-> +	pud_t *pud;
-> +
-> +	pud = pud_offset(pgd, start);
-> +	for (addr = start; addr < end;) {
-> +		next = pud_addr_end(addr, end);
-> +		kasan_early_pmd_populate(addr, next, pud);
-> +		addr = next;
-> +		pud++;
-> +	}
-> +}
-> +
-> +void __init kasan_map_early_shadow(pgd_t *pgdp)
-> +{
-> +	int i;
-> +	unsigned long start = KASAN_SHADOW_START;
-> +	unsigned long end = KASAN_SHADOW_END;
-> +	unsigned long addr;
-> +	unsigned long next;
-> +	pgd_t *pgd;
-> +
-> +	for (i = 0; i < PTRS_PER_PTE; i++)
-> +		set_pte_at(&init_mm, KASAN_SHADOW_START + i*PAGE_SIZE,
-> +			&kasan_zero_pte[i], pfn_pte(
-> +				virt_to_pfn(kasan_zero_page),
-> +				__pgprot(_L_PTE_DEFAULT | L_PTE_DIRTY | L_PTE_XN)));
+Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
 
-Shouldn't all __pgprot's contain L_PTE_MT_WRITETHROUGH ?
+> Now that the SDIO MMC driver is queued for v4.15 we need to prepare
+> our platform so boards can actually use this driver.
+> This adds the Meson SDIO MMC controller to the .dts files and
+> enables the corresponding driver in the multi_v7_defconfig.
+
+Just curious... were you able to test this on any meson8 platform?
 
 [...]
 
--- 
-Dmitry
+> Martin Blumenstingl (2):
+>   ARM: dts: meson: add the SDIO MMC controller
+
+Applied to v4.15/dt
+
+>   ARM: multi_v7_defconfig: enable the Meson MX SDIO/MMC controller
+
+Applied to v4.15/defconfig
+
+Thanks!
+
+Kevin
