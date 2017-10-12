@@ -1,156 +1,222 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 12 Oct 2017 12:41:04 +0200
-Subject: [PATCH 00/37] Optimize KVM/ARM for VHE systems
-Message-ID: <20171012104141.26902-1-christoffer.dall@linaro.org>
+Date: Thu, 12 Oct 2017 12:41:08 +0200
+Subject: [PATCH 04/37] KVM: arm/arm64: Get rid of vcpu->arch.irq_lines
+In-Reply-To: <20171012104141.26902-1-christoffer.dall@linaro.org>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+Message-ID: <20171012104141.26902-5-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series redesigns parts of KVM/ARM to optimize the performance on
-VHE systems.  The general approach is to try to do as little work as
-possible when transitioning betwen the VM and the hypervisor.  This has
-the benefit of lower latency when waiting for interrupts and delivering
-virtual interrupts, and reduces the overhead of emulating behavior and
-I/O in the host kernel.
+We currently have a separate read-modify-write of the HCR_EL2 on entry
+to the guest for the sole purpose of setting the VF and VI bits, if set.
+Since this is most rarely the case (only when using userspace IRQ chip
+and interrupts are in flight), let's get rid of this operation and
+instead modify the bits in the vcpu->arch.hcr[_el2] directly when
+needed.
 
-Patches 01 through 04 are not VHE specific, but rework parts of KVM/ARM
-that can be generally improved.  We then add infrastructure to move more
-logic into vcpu_load and vcpu_put, we improve handling of VFP and debug
-registers.
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ arch/arm/include/asm/kvm_emulate.h   |  9 ++-------
+ arch/arm/include/asm/kvm_host.h      |  3 ---
+ arch/arm/kvm/emulate.c               |  2 +-
+ arch/arm/kvm/hyp/switch.c            |  2 +-
+ arch/arm64/include/asm/kvm_emulate.h |  9 ++-------
+ arch/arm64/include/asm/kvm_host.h    |  3 ---
+ arch/arm64/kvm/hyp/switch.c          |  6 ------
+ arch/arm64/kvm/inject_fault.c        |  2 +-
+ virt/kvm/arm/arm.c                   | 11 ++++++-----
+ virt/kvm/arm/mmu.c                   |  6 +++---
+ 10 files changed, 16 insertions(+), 37 deletions(-)
 
-We then introduce a new world-switch function for VHE systems, which we
-can tweak and optimize for VHE systems.  To do that, we rework a lot of
-the sytem register save/restore handling and emulation code that may
-need access to system registers, so that we can defer as many system
-register save/restore operations to vcpu_load and vcpu_put, and move
-this logic out of the VHE world switch function.
-
-We then optimize the configuration of traps.  On non-VHE systems, both
-the host and VM kernels run in EL1, but because the host kernel should
-have full access to the underlying hardware, but the VM kernel should
-not, we essentially make the host kernel more privieleged than the VM
-kernel despite them both running at the same privilege level by enabling
-VE traps when entering the VM and disabling those traps when exiting the
-VM.  On VHE systems, the host kernel runs in EL2 and has full access to
-the hardware (as much as allowed by secure side software), and is
-unaffected by the trap configuration.  That means we can configure the
-traps for VMs running in EL1 once, and don't have to switch them on and
-off for every entry/exit to/from the VM.
-
-Finally, we improve our VGIC handling by moving all save/restore logic
-out of the VHE world-switch, and we make it possible to truly only
-evaluate if the AP list is empty and not do *any* VGIC work if that is
-the case, and only do the minimal amount of work required in the course
-of the VGIC processing when we have virtual interrupts in flight.
-
-The patches are based on v4.14-rc2 plus the timer optimization series
-[1] and the patches that use the TPIDR_EL2 for per-cpu offsets in the
-host kernel and stops storing the VCPU pointer in TPIDR_EL2 from the
-SDEI series [2].
-
-I've given the patches a fair amount of testing on Thunder-X, Mustang,
-Seattle, and TC2 (32-bit) for non-VHE testing, and tested VHE
-functionality on the Foundation model, running both 64-bit VMs and
-32-bit VMs side-by-side and using both GICv3-on-GICv3 and
-GICv2-on-GICv3.
-
-The paches are also available in the vhe-optimize branch on my
-kernel.org repository [3].
-
-Thanks,
--Christoffer
-
-[1]: https://lists.cs.columbia.edu/pipermail/kvmarm/2017-September/027245.html
-[2]: https://lists.cs.columbia.edu/pipermail/kvmarm/2017-September/027230.html
-[3]: git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git vhe-optimize
-
-Christoffer Dall (36):
-  KVM: arm64: Avoid storing the vcpu pointer on the stack
-  KVM: arm64: Rework hyp_panic for VHE and non-VHE
-  KVM: arm/arm64: Get rid of vcpu->arch.irq_lines
-  KVM: Record the executing ioctl number on the vcpu struct
-  KVM: arm/arm64: Only load/put VCPU state for KVM_RUN
-  KVM: arm/arm64: Add kvm_vcpu_load_sysregs and kvm_vcpu_put_sysregs
-  KVM: arm64: Defer restoring host VFP state to vcpu_put
-  KVM: arm64: Move debug dirty flag calculation out of world switch
-  KVM: arm64: Slightly improve debug save/restore functions
-  KVM: arm64: Improve debug register save/restore flow
-  KVM: arm64: Factor out fault info population and gic workarounds
-  KVM: arm64: Introduce VHE-specific kvm_vcpu_run
-  KVM: arm64: Remove kern_hyp_va() use in VHE switch function
-  KVM: arm64: Don't deactivate VM on VHE systems
-  KVM: arm64: Remove noop calls to timer save/restore from VHE switch
-  KVM: arm64: Move userspace system registers into separate function
-  KVM: arm64: Rewrite sysreg alternatives to static keys
-  KVM: arm64: Introduce separate VHE/non-VHE sysreg save/restore
-    functions
-  KVM: arm64: Unify non-VHE host/guest sysreg save and restore functions
-  KVM: arm64: Don't save the host ELR_EL2 and SPSR_EL2 on VHE systems
-  KVM: arm64: Change 32-bit handling of VM system registers
-  KVM: arm64: Prepare to handle traps on deferred VM sysregs
-  KVM: arm64: Prepare to handle traps on deferred EL0 sysregs
-  KVM: arm64: Prepare to handle traps on remaining deferred EL1 sysregs
-  KVM: arm64: Prepare to handle traps on deferred AArch32 sysregs
-  KVM: arm64: Defer saving/restoring system registers to vcpu load/put
-    on VHE
-  KVM: arm64: Move common VHE/non-VHE trap config in separate functions
-  KVM: arm64: Configure FPSIMD traps on vcpu load/put for VHE
-  KVM: arm64: Configure c15, PMU, and debug register traps on cpu
-    load/put for VHE
-  KVM: arm64: Separate activate_traps and deactive_traps for VHE and
-    non-VHE
-  KVM: arm/arm64: Handle VGICv2 save/restore from the main VGIC code
-  KVM: arm/arm64: Move arm64-only vgic-v2-sr.c file to arm64
-  KVM: arm/arm64: Handle VGICv3 save/restore from the main VGIC code on
-    VHE
-  KVM: arm/arm64: Get rid of vgic_elrsr
-  KVM: arm/arm64: Move VGIC APR save/restore to vgic put/load
-  KVM: arm/arm64: Avoid VGICv3 save/restore on VHE with no IRQs
-
-Shih-Wei Li (1):
-  KVM: arm64: Move HCR_INT_OVERRIDE to default HCR_EL2 guest flag
-
- arch/arm/include/asm/kvm_asm.h       |   4 +
- arch/arm/include/asm/kvm_emulate.h   |   9 +-
- arch/arm/include/asm/kvm_host.h      |   6 +-
- arch/arm/include/asm/kvm_hyp.h       |   4 +
- arch/arm/kvm/emulate.c               |   2 +-
- arch/arm/kvm/hyp/Makefile            |   1 -
- arch/arm/kvm/hyp/switch.c            |  14 +-
- arch/arm64/include/asm/kvm_arm.h     |   4 +-
- arch/arm64/include/asm/kvm_asm.h     |  22 ++
- arch/arm64/include/asm/kvm_emulate.h |  22 +-
- arch/arm64/include/asm/kvm_host.h    |  21 +-
- arch/arm64/include/asm/kvm_hyp.h     |  29 +--
- arch/arm64/kernel/asm-offsets.c      |   2 +
- arch/arm64/kvm/debug.c               |   9 +
- arch/arm64/kvm/hyp/Makefile          |   2 +-
- arch/arm64/kvm/hyp/debug-sr.c        |  84 ++++----
- arch/arm64/kvm/hyp/entry.S           |   8 +-
- arch/arm64/kvm/hyp/hyp-entry.S       |  39 ++--
- arch/arm64/kvm/hyp/switch.c          | 392 ++++++++++++++++++++---------------
- arch/arm64/kvm/hyp/sysreg-sr.c       | 160 +++++++++++---
- arch/arm64/kvm/hyp/vgic-v2-sr.c      |  77 +++++++
- arch/arm64/kvm/inject_fault.c        |  93 ++++++++-
- arch/arm64/kvm/sys_regs.c            |  76 ++++++-
- arch/arm64/kvm/sys_regs_generic_v8.c |   5 +-
- arch/x86/kvm/vmx.c                   |   2 +-
- arch/x86/kvm/x86.c                   |   8 +-
- include/kvm/arm_vgic.h               |   2 -
- include/linux/kvm_host.h             |   3 +-
- virt/kvm/arm/arm.c                   |  24 ++-
- virt/kvm/arm/hyp/timer-sr.c          |  10 +-
- virt/kvm/arm/hyp/vgic-v2-sr.c        | 162 ---------------
- virt/kvm/arm/hyp/vgic-v3-sr.c        | 239 ++++++++++++---------
- virt/kvm/arm/mmu.c                   |   6 +-
- virt/kvm/arm/vgic/vgic-init.c        |  22 +-
- virt/kvm/arm/vgic/vgic-v2.c          |  72 ++++++-
- virt/kvm/arm/vgic/vgic-v3.c          |  12 +-
- virt/kvm/arm/vgic/vgic.c             |  22 ++
- virt/kvm/arm/vgic/vgic.h             |   5 +
- virt/kvm/kvm_main.c                  |   6 +-
- 39 files changed, 1046 insertions(+), 634 deletions(-)
- create mode 100644 arch/arm64/kvm/hyp/vgic-v2-sr.c
- delete mode 100644 virt/kvm/arm/hyp/vgic-v2-sr.c
-
+diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+index 98089ff..34663a8 100644
+--- a/arch/arm/include/asm/kvm_emulate.h
++++ b/arch/arm/include/asm/kvm_emulate.h
+@@ -62,14 +62,9 @@ static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
+ 	vcpu->arch.hcr = HCR_GUEST_MASK;
+ }
+ 
+-static inline unsigned long vcpu_get_hcr(const struct kvm_vcpu *vcpu)
++static inline unsigned long *vcpu_hcr(const struct kvm_vcpu *vcpu)
+ {
+-	return vcpu->arch.hcr;
+-}
+-
+-static inline void vcpu_set_hcr(struct kvm_vcpu *vcpu, unsigned long hcr)
+-{
+-	vcpu->arch.hcr = hcr;
++	return (unsigned long *)&vcpu->arch.hcr;
+ }
+ 
+ static inline bool vcpu_mode_is_32bit(const struct kvm_vcpu *vcpu)
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 4a879f6..1100170 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -153,9 +153,6 @@ struct kvm_vcpu_arch {
+ 	/* HYP trapping configuration */
+ 	u32 hcr;
+ 
+-	/* Interrupt related fields */
+-	u32 irq_lines;		/* IRQ and FIQ levels */
+-
+ 	/* Exception Information */
+ 	struct kvm_vcpu_fault_info fault;
+ 
+diff --git a/arch/arm/kvm/emulate.c b/arch/arm/kvm/emulate.c
+index 0064b86..4286a89 100644
+--- a/arch/arm/kvm/emulate.c
++++ b/arch/arm/kvm/emulate.c
+@@ -313,5 +313,5 @@ void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr)
+  */
+ void kvm_inject_vabt(struct kvm_vcpu *vcpu)
+ {
+-	vcpu_set_hcr(vcpu, vcpu_get_hcr(vcpu) | HCR_VA);
++	*vcpu_hcr(vcpu) |= HCR_VA;
+ }
+diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
+index 330c9ce..c3b9799 100644
+--- a/arch/arm/kvm/hyp/switch.c
++++ b/arch/arm/kvm/hyp/switch.c
+@@ -43,7 +43,7 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu, u32 *fpexc_host)
+ 		isb();
+ 	}
+ 
+-	write_sysreg(vcpu->arch.hcr | vcpu->arch.irq_lines, HCR);
++	write_sysreg(vcpu->arch.hcr, HCR);
+ 	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
+ 	write_sysreg(HSTR_T(15), HSTR);
+ 	write_sysreg(HCPTR_TTA | HCPTR_TCP(10) | HCPTR_TCP(11), HCPTR);
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index e5df3fc..1fbfe96 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -51,14 +51,9 @@ static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
+ 		vcpu->arch.hcr_el2 &= ~HCR_RW;
+ }
+ 
+-static inline unsigned long vcpu_get_hcr(struct kvm_vcpu *vcpu)
++static inline unsigned long *vcpu_hcr(struct kvm_vcpu *vcpu)
+ {
+-	return vcpu->arch.hcr_el2;
+-}
+-
+-static inline void vcpu_set_hcr(struct kvm_vcpu *vcpu, unsigned long hcr)
+-{
+-	vcpu->arch.hcr_el2 = hcr;
++	return (unsigned long *)&vcpu->arch.hcr_el2;
+ }
+ 
+ static inline unsigned long *vcpu_pc(const struct kvm_vcpu *vcpu)
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 806ccef..27305e7 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -266,9 +266,6 @@ struct kvm_vcpu_arch {
+ 	/* IO related fields */
+ 	struct kvm_decode mmio_decode;
+ 
+-	/* Interrupt related fields */
+-	u64 irq_lines;		/* IRQ and FIQ levels */
+-
+ 	/* Cache some mmu pages needed inside spinlock regions */
+ 	struct kvm_mmu_memory_cache mmu_page_cache;
+ 
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index bcf1a79..7703d63 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -168,12 +168,6 @@ static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
+ 
+ static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
+ {
+-	u64 val;
+-
+-	val = read_sysreg(hcr_el2);
+-	val |= vcpu->arch.irq_lines;
+-	write_sysreg(val, hcr_el2);
+-
+ 	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
+ 		__vgic_v3_restore_state(vcpu);
+ 	else
+diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
+index da6a8cf..45c7026 100644
+--- a/arch/arm64/kvm/inject_fault.c
++++ b/arch/arm64/kvm/inject_fault.c
+@@ -241,5 +241,5 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
+  */
+ void kvm_inject_vabt(struct kvm_vcpu *vcpu)
+ {
+-	vcpu_set_hcr(vcpu, vcpu_get_hcr(vcpu) | HCR_VSE);
++	*vcpu_hcr(vcpu) |= HCR_VSE;
+ }
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 7f9296a..6e9513e 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -411,7 +411,8 @@ int kvm_arch_vcpu_ioctl_set_mpstate(struct kvm_vcpu *vcpu,
+  */
+ int kvm_arch_vcpu_runnable(struct kvm_vcpu *v)
+ {
+-	return ((!!v->arch.irq_lines || kvm_vgic_vcpu_pending_irq(v))
++	bool irq_lines = *vcpu_hcr(v) & (HCR_VI | HCR_VF);
++	return ((irq_lines || kvm_vgic_vcpu_pending_irq(v))
+ 		&& !v->arch.power_off && !v->arch.pause);
+ }
+ 
+@@ -771,18 +772,18 @@ static int vcpu_interrupt_line(struct kvm_vcpu *vcpu, int number, bool level)
+ {
+ 	int bit_index;
+ 	bool set;
+-	unsigned long *ptr;
++	unsigned long *hcr;
+ 
+ 	if (number == KVM_ARM_IRQ_CPU_IRQ)
+ 		bit_index = __ffs(HCR_VI);
+ 	else /* KVM_ARM_IRQ_CPU_FIQ */
+ 		bit_index = __ffs(HCR_VF);
+ 
+-	ptr = (unsigned long *)&vcpu->arch.irq_lines;
++	hcr = vcpu_hcr(vcpu);
+ 	if (level)
+-		set = test_and_set_bit(bit_index, ptr);
++		set = test_and_set_bit(bit_index, hcr);
+ 	else
+-		set = test_and_clear_bit(bit_index, ptr);
++		set = test_and_clear_bit(bit_index, hcr);
+ 
+ 	/*
+ 	 * If we didn't change anything, no need to wake up or kick other CPUs
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index b36945d..d93d56d 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1987,7 +1987,7 @@ void kvm_arch_flush_shadow_memslot(struct kvm *kvm,
+  */
+ void kvm_set_way_flush(struct kvm_vcpu *vcpu)
+ {
+-	unsigned long hcr = vcpu_get_hcr(vcpu);
++	unsigned long hcr = *vcpu_hcr(vcpu);
+ 
+ 	/*
+ 	 * If this is the first time we do a S/W operation
+@@ -2002,7 +2002,7 @@ void kvm_set_way_flush(struct kvm_vcpu *vcpu)
+ 		trace_kvm_set_way_flush(*vcpu_pc(vcpu),
+ 					vcpu_has_cache_enabled(vcpu));
+ 		stage2_flush_vm(vcpu->kvm);
+-		vcpu_set_hcr(vcpu, hcr | HCR_TVM);
++		*vcpu_hcr(vcpu) = hcr | HCR_TVM;
+ 	}
+ }
+ 
+@@ -2020,7 +2020,7 @@ void kvm_toggle_cache(struct kvm_vcpu *vcpu, bool was_enabled)
+ 
+ 	/* Caches are now on, stop trapping VM ops (until a S/W op) */
+ 	if (now_enabled)
+-		vcpu_set_hcr(vcpu, vcpu_get_hcr(vcpu) & ~HCR_TVM);
++		*vcpu_hcr(vcpu) &= ~HCR_TVM;
+ 
+ 	trace_kvm_toggle_cache(*vcpu_pc(vcpu), was_enabled, now_enabled);
+ }
 -- 
 2.9.0
