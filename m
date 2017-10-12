@@ -1,34 +1,60 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Thu, 12 Oct 2017 14:48:56 -0500
-Subject: [PATCH v3 7/7] ACPI: Add PPTT to injectable table list
-In-Reply-To: <20171012194856.13844-1-jeremy.linton@arm.com>
-References: <20171012194856.13844-1-jeremy.linton@arm.com>
-Message-ID: <20171012194856.13844-8-jeremy.linton@arm.com>
+From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
+Date: Thu, 12 Oct 2017 20:12:36 +0000
+Subject: [PATCH 3/3] ARM: mvebu: dts: connect interrupt for WD on
+ armada-38x
+References: <20171011022958.31268-1-chris.packham@alliedtelesis.co.nz>
+ <20171011022958.31268-4-chris.packham@alliedtelesis.co.nz>
+ <874lr4bgdh.fsf@free-electrons.com>
+Message-ID: <69ab72d5008744df9455712c2c821730@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ACPI_SIG_PPTT to the table so initrd's can override the
-system topology.
+On 13/10/17 03:17, Gregory CLEMENT wrote:
+> Hi Chris,
+>   
+>   On mer., oct. 11 2017, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
+> 
+>> The watchdog timer interrupt is available internally on the Armada-38x
+>> SoCs. Connect it so that we can have the orion_wdt_irq generate debug
+>> information when a watchdog timeout occurs.
+> 
+> Given the patch 2, when an interrupt is provided by the dt, then the
+> behavior of the watchdog changes. So we can't do it for all the
+> platform.
+> 
+> As you propose on your cover letter it is better to set it at board
+> level.
+> 
+> So instead of this patch you should update the binding documentation
+> with this new resources. Thanks to this each board developer will be
+> able to decide to use this feature or not.
 
-Suggested-by: Geoffrey Blake <geoffrey.blake@arm.com>
-Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
----
- drivers/acpi/tables.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Agreed. I'll drop this patch in favor of a documentation update in v2.
 
-diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
-index 80ce2a7d224b..6d254450115b 100644
---- a/drivers/acpi/tables.c
-+++ b/drivers/acpi/tables.c
-@@ -456,7 +456,8 @@ static const char * const table_sigs[] = {
- 	ACPI_SIG_SLIC, ACPI_SIG_SPCR, ACPI_SIG_SPMI, ACPI_SIG_TCPA,
- 	ACPI_SIG_UEFI, ACPI_SIG_WAET, ACPI_SIG_WDAT, ACPI_SIG_WDDT,
- 	ACPI_SIG_WDRT, ACPI_SIG_DSDT, ACPI_SIG_FADT, ACPI_SIG_PSDT,
--	ACPI_SIG_RSDT, ACPI_SIG_XSDT, ACPI_SIG_SSDT, NULL };
-+	ACPI_SIG_RSDT, ACPI_SIG_XSDT, ACPI_SIG_SSDT, ACPI_SIG_PPTT,
-+	NULL };
- 
- #define ACPI_HEADER_SIZE sizeof(struct acpi_table_header)
- 
--- 
-2.13.5
+> 
+> Thanks,
+> 
+> Gregory
+> 
+>>
+>> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+>> ---
+>>   arch/arm/boot/dts/armada-38x.dtsi | 1 +
+>>   1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+>> index 7ff0811e61db..9ac76c54c9e5 100644
+>> --- a/arch/arm/boot/dts/armada-38x.dtsi
+>> +++ b/arch/arm/boot/dts/armada-38x.dtsi
+>> @@ -408,6 +408,7 @@
+>>   				reg = <0x20300 0x34>, <0x20704 0x4>, <0x18260 0x4>;
+>>   				clocks = <&coreclk 2>, <&refclk>;
+>>   				clock-names = "nbclk", "fixed";
+>> +				interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_HIGH>;
+>>   			};
+>>   
+>>   			cpurst: cpurst at 20800 {
+>> -- 
+>> 2.14.2
+>>
+> 
