@@ -1,70 +1,110 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Thu, 12 Oct 2017 11:40:27 +0200
-Subject: [PATCH V2 0/1] Optimise IOVA allocations for PCI devices
-In-Reply-To: <1505897522-9237-1-git-send-email-tomasz.nowicki@caviumnetworks.com>
-References: <1505897522-9237-1-git-send-email-tomasz.nowicki@caviumnetworks.com>
-Message-ID: <cda4f03f-acf5-9b74-d8f1-774065bfc94e@semihalf.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Thu, 12 Oct 2017 10:40:57 +0100
+Subject: [PATCH v3 1/2] arm_arch_timer: Expose event stream status
+In-Reply-To: <20171012093010.GA7395@arm.com>
+References: <1506682350-9023-1-git-send-email-julien.thierry@arm.com>
+ <1506682350-9023-2-git-send-email-julien.thierry@arm.com>
+ <88b96039-f0a5-879f-6f68-d30b09ab0cc7@arm.com>
+ <20171012093010.GA7395@arm.com>
+Message-ID: <e94ecbdc-47ae-7351-e422-1fa426e35fad@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
 
-Can you please have a look and see if you are fine with this patch?
 
-Thanks in advance,
-Tomasz
+On 12/10/17 10:30, Will Deacon wrote:
+> On Thu, Oct 12, 2017 at 10:27:06AM +0100, Suzuki K Poulose wrote:
+>> On 29/09/17 11:52, Julien Thierry wrote:
+>>> The arch timer configuration for a CPU might get reset after suspending
+>>> said CPU.
+>>>
+>>> In order to reliably use the event stream in the kernel (e.g. for delays),
+>>> we keep track of the state where we can safely concider the event stream as
+>>
+>> nit: consider
+>>
+>>> properly configured.
+>>>
+>>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>> Cc: Russell King <linux@armlinux.org.uk>
+>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>>> Cc: Will Deacon <will.deacon@arm.com>
+>>> ---
+>>>   arch/arm/include/asm/arch_timer.h    |  1 +
+>>>   arch/arm64/include/asm/arch_timer.h  |  1 +
+>>>   drivers/clocksource/arm_arch_timer.c | 20 ++++++++++++++++++--
+>>>   include/clocksource/arm_arch_timer.h |  6 ++++++
+>>>   4 files changed, 26 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+>>> index d4ebf56..0b6e104 100644
+>>> --- a/arch/arm/include/asm/arch_timer.h
+>>> +++ b/arch/arm/include/asm/arch_timer.h
+>>> @@ -106,6 +106,7 @@ static inline u32 arch_timer_get_cntkctl(void)
+>>>   static inline void arch_timer_set_cntkctl(u32 cntkctl)
+>>>   {
+>>>   	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
+>>> +	isb();
+>>>   }
+>>>
+>>>   #endif
+>>> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+>>> index a652ce0..bdedd8f 100644
+>>> --- a/arch/arm64/include/asm/arch_timer.h
+>>> +++ b/arch/arm64/include/asm/arch_timer.h
+>>> @@ -144,6 +144,7 @@ static inline u32 arch_timer_get_cntkctl(void)
+>>>   static inline void arch_timer_set_cntkctl(u32 cntkctl)
+>>>   {
+>>>   	write_sysreg(cntkctl, cntkctl_el1);
+>>> +	isb();
+>>>   }
+>>>
+>>>   static inline u64 arch_counter_get_cntpct(void)
+>>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+>>> index fd4b7f6..47cf15e 100644
+>>> --- a/drivers/clocksource/arm_arch_timer.c
+>>> +++ b/drivers/clocksource/arm_arch_timer.c
+>>> @@ -77,6 +77,7 @@ struct arch_timer {
+>>>   static bool arch_counter_suspend_stop;
+>>>   static bool vdso_default = true;
+>>>
+>>> +static cpumask_t evtstrm_available;
+>>>   static bool evtstrm_enable = IS_ENABLED(CONFIG_ARM_ARCH_TIMER_EVTSTREAM);
+>>>
+>>>   static int __init early_evtstrm_cfg(char *buf)
+>>> @@ -740,6 +741,7 @@ static void arch_timer_evtstrm_enable(int divider)
+>>>   #ifdef CONFIG_COMPAT
+>>>   	compat_elf_hwcap |= COMPAT_HWCAP_EVTSTRM;
+>>>   #endif
+>>> +	cpumask_set_cpu(smp_processor_id(), &evtstrm_available);
+>>>   }
+>>>
+>>>   static void arch_timer_configure_evtstream(void)
+>>> @@ -864,6 +866,11 @@ u32 arch_timer_get_rate(void)
+>>>   	return arch_timer_rate;
+>>>   }
+>>>
+>>> +bool arch_timer_evtstrm_available(void)
+>>> +{
+>>> +	return !!cpumask_test_cpu(smp_processor_id(), &evtstrm_available);
+>>> +}
+>>> +
+>>
+>> This could live in the header file as static inlin, if the evtstrm_available
+>> is made global and could avoid a function call where it is used.
+> 
+> You might need an EXPORT_SYMBOl as well if you go down that route.
 
-On 20.09.2017 10:52, Tomasz Nowicki wrote:
-> Here is my test setup where I have stareted performance measurements.
-> 
->   ------------  PCIe  -------------   TX   -------------  PCIe  -----
-> | ThunderX2  |------| Intel XL710 | ---> | Intel XL710 |------| X86 |
-> | (128 cpus) |      |   40GbE     |      |    40GbE    |       -----
->   ------------        -------------        -------------
-> 
-> As the reference lets take v4.13 host, SMMUv3 off and 1-thread iperf
-> taskset to one CPU. The performance results I got:
-> 
-> SMMU off -> 100%
-> SMMU on -> 0,02%
-> 
-> I followed down the DMA mapping path and found out IOVA 32-bit space
-> full so that kernel was flushing rcaches for all CPUs in (1).
-> For 128 CPUs, this kills the performance. Furthermore, for my case, rcaches
-> contained PFNs > 32-bit mostly so the second round of IOVA allocation failed
-> as well. As the consequence IOVA had to be allocated outside of 32-bit (2)
-> from scratch since all rcaches have been flushed in (1).
-> 
->      if (dma_limit > DMA_BIT_MASK(32) && dev_is_pci(dev))
-> (1)-->  iova = alloc_iova_fast(iovad, iova_len, DMA_BIT_MASK(32) >> shift);
-> 
->      if (!iova)
-> (2)-->  iova = alloc_iova_fast(iovad, iova_len, dma_limit >> shift);
-> 
-> My fix simply introduces parameter for alloc_iova_fast() to decide whether
-> rcache flush has to be done or not. All users follow mentioned scenario
-> so they should let flush as the last chance to avoid time costly iteration
-> over all CPUs.
-> 
-> This bring my iperf performance back to 100% with SMMU on.
-> 
-> My bad feelings regarding this solution is that machines with relatively
-> small numbers of CPUs may get DAC addresses more frequently for PCI
-> devices. Please let me know your thoughts.
-> 
-> Changelog:
-> 
-> v1 --> v2
-> - add missing documentation
-> - fix typo
-> 
-> Tomasz Nowicki (1):
->    iommu/iova: Make rcache flush optional on IOVA allocation failure
-> 
->   drivers/iommu/amd_iommu.c   |  5 +++--
->   drivers/iommu/dma-iommu.c   |  6 ++++--
->   drivers/iommu/intel-iommu.c |  5 +++--
->   drivers/iommu/iova.c        | 11 ++++++-----
->   include/linux/iova.h        |  5 +++--
->   5 files changed, 19 insertions(+), 13 deletions(-)
-> 
+Hmmm, I'm not fond of making the cpu mask global. I understand you can 
+avoid the branch + ret of the function, but generally you want to check 
+if the event stream is present to know if you can use wfe and wake up, 
+so I don't think it might be used in a performance critical path.
+
+So I'm wondering, is it really worth it?
+
+Cheers,
+
+-- 
+Julien Thierry
