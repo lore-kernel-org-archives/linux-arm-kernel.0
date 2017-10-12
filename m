@@ -1,68 +1,64 @@
 From: minghuan.lian@nxp.com (M.h. Lian)
-Date: Thu, 12 Oct 2017 03:01:19 +0000
-Subject: [PATCH 1/2] PCI: Disable MSI for Freescale PCIe RC mode
-In-Reply-To: <20171011193737.GP25517@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170922072522.36306-1-Zhiqiang.Hou@nxp.com>
- <20170922072522.36306-2-Zhiqiang.Hou@nxp.com>
- <20171011193737.GP25517@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <VI1PR04MB161585379E4D3D7CB4794F35E84B0@VI1PR04MB1615.eurprd04.prod.outlook.com>
+Date: Thu, 12 Oct 2017 03:12:47 +0000
+Subject: [PATCH 0/5] arm64: add ls1012a and ls1046a pcie support
+In-Reply-To: <20171011185719.GL25517@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170919092658.22482-1-Zhiqiang.Hou@nxp.com>
+ <20171011185719.GL25517@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <VI1PR04MB16157ABDE174A8DD1567173CE84B0@VI1PR04MB1615.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Bjorn,
 
-Thanks for your review.
-Yes. All the freescale's PCIe controllers do not support to generate MSI interrupt.
-The PCIe controllers developed for the next generation SoC do not support it either.
+I greatly appreciate for your review and picking up them.
 
 Acked-by: Minghuan Lian <minghuan.Lian@nxp.com>
 
+
 > -----Original Message-----
 > From: Bjorn Helgaas [mailto:helgaas at kernel.org]
-> Sent: Thursday, October 12, 2017 3:38 AM
+> Sent: Thursday, October 12, 2017 2:57 AM
 > To: Z.q. Hou <zhiqiang.hou@nxp.com>
-> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> pci at vger.kernel.org; bhelgaas at google.com; Roy Zang <roy.zang@nxp.com>;
-> Mingkai Hu <mingkai.hu@nxp.com>; M.h. Lian <minghuan.lian@nxp.com>
-> Subject: Re: [PATCH 1/2] PCI: Disable MSI for Freescale PCIe RC mode
+> Cc: linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; linux-
+> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linuxppc-
+> dev at lists.ozlabs.org; marc.zyngier at arm.com; robh+dt at kernel.org;
+> mark.rutland at arm.com; bhelgaas at google.com; shawnguo at kernel.org;
+> Mingkai Hu <mingkai.hu@nxp.com>; M.h. Lian <minghuan.lian@nxp.com>; Roy
+> Zang <roy.zang@nxp.com>; Thomas Gleixner <tglx@linutronix.de>; Jason
+> Cooper <jason@lakedaemon.net>
+> Subject: Re: [PATCH 0/5] arm64: add ls1012a and ls1046a pcie support
 > 
-> On Fri, Sep 22, 2017 at 03:25:21PM +0800, Zhiqiang Hou wrote:
+> On Tue, Sep 19, 2017 at 05:26:53PM +0800, Zhiqiang Hou wrote:
 > > From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 > >
-> > The Freescale PCIe controller advertises the MSI/MSI-X capability in
-> > both RC and Endpoint mode, but in RC mode it doesn't support MSI/MSI-X
-> > by it self, it can only transfer MSI/MSI-X from downstream
-> 
-> s/it self,/itself;/
-> 
-> > devices. So add this quirk to prevent use of MSI/MSI-X in RC mode.
+> > This patch set adds ls1012a MSI and PCIe support, including driver and
+> > device tree nodes. The ls1046a's MSI support patch and PCIe driver
+> > patch has been applied, so only adds the PCIe device tree nodes.
 > >
-> > Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> > ---
-> >  drivers/pci/quirks.c | 8 ++++++++
-> >  1 file changed, 8 insertions(+)
+> > Hou Zhiqiang (5):
+> >   irqchip/ls-scfg-msi: add LS1012a MSI support
+> >   arm64: dts: ls1012a: Add MSI controller DT node
+> >   PCI: layerscape: Add support for ls1012a
+> >   arm64: dts: ls1012a: Add PCIe controller DT node
+> >   arm64: dts: ls1046a: add PCIe controller DT nodes
 > >
-> > diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c index
-> > a4d33619a7bb..c1063a420f0c 100644
-> > --- a/drivers/pci/quirks.c
-> > +++ b/drivers/pci/quirks.c
-> > @@ -4799,3 +4799,11 @@ static void quirk_no_ats(struct pci_dev *pdev)
-> >  /* AMD Stoney platform GPU */
-> >  DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_ATI, 0x98e4, quirk_no_ats);
-> > #endif /* CONFIG_PCI_ATS */
-> > +
-> > +/* Freescale PCIe doesn't support MSI in RC mode */ static void
-> > +quirk_fsl_no_msi(struct pci_dev *pdev) {
-> > +	if (pci_pcie_type(pdev) == PCI_EXP_TYPE_ROOT_PORT)
-> > +		pdev->no_msi = 1;
-> > +}
-> > +DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_FREESCALE, PCI_ANY_ID,
-> > +quirk_fsl_no_msi);
+> >  .../interrupt-controller/fsl,ls-scfg-msi.txt       |  1 +
+> >  .../devicetree/bindings/pci/layerscape-pci.txt     |  1 +
+> >  arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi     | 31 +++++++++
+> >  arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi     | 75
+> ++++++++++++++++++++++
+> >  drivers/irqchip/irq-ls-scfg-msi.c                  |  1 +
+> >  drivers/pci/dwc/pci-layerscape.c                   |  1 +
+> >  6 files changed, 110 insertions(+)
 > 
-> This disables MSI for all Freescale root ports, past, present, and future.  Is that
-> really what you want?  This is a bug (the root port shouldn't advertise MSI if it
-> doesn't support it), and presumably it might be fixed in some future device?
+> I'm not 100% sure who should take these.  They trivially touch PCI and I haven't
+> seen anybody else respond, so I put them on pci/host-layerscape with Rob's acks.
 > 
-> This needs an ack from Minghuan or Mingkai (based on MAINTAINERS).
+> If somebody else wants to take them, just let me know and I'll drop them.
 > 
-> Bjorn
+> They really should be acked by Minghuan or Mingkai, who are listed as the
+> maintainers of drivers/pci/dwc/pci-layerscape.c and are presumably responsible
+> for the related dtsi files, too.
+> 
+> Thomas, Jason, and Marc are listed as maintainers of drivers/irqchip/irq-ls-scfg-
+> msi.c.  It's a trivial change, but I added them to the cc list.
