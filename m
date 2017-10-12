@@ -1,50 +1,132 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Thu, 12 Oct 2017 19:11:59 +0800
-Subject: [PATCH 0/2] arm64 SMMUv3 PMU driver with IORT support
-In-Reply-To: <20171012110538.GA8509@red-moon>
-References: <1501876754-1064-1-git-send-email-nleeder@codeaurora.org>
- <394bd3b8-2583-01fa-02d3-6a49c2a6a6c0@linaro.org>
- <3eac1295-dba2-ad79-d868-b538b13de91a@codeaurora.org>
- <f1d864be-8ce4-f2d2-9c71-8fff202a76d1@linaro.org>
- <67a696ad-98e9-d505-1d73-7246d2efc398@codeaurora.org>
- <59DF4AD9.2060903@huawei.com> <20171012110538.GA8509@red-moon>
-Message-ID: <59DF4DFF.9070609@huawei.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Thu, 12 Oct 2017 12:24:10 +0100
+Subject: [PATCH 1/2] vgaarb: Select a default VGA device even if there's
+ no legacy VGA
+In-Reply-To: <20171006222428.12211.3635.stgit@bhelgaas-glaptop.roam.corp.google.com>
+References: <20171006221358.12211.42879.stgit@bhelgaas-glaptop.roam.corp.google.com>
+ <20171006222428.12211.3635.stgit@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <b5373cbb-7d0d-a626-159b-dee0b82d32d0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/10/12 19:05, Lorenzo Pieralisi wrote:
-> On Thu, Oct 12, 2017 at 06:58:33PM +0800, Hanjun Guo wrote:
->> On 2017/8/11 11:28, Leeder, Neil wrote:
->>> On 8/9/2017 9:26 PM, Hanjun Guo wrote:
->>>>> On 2017/8/9 23:48, Leeder, Neil wrote:
->>>>>>>>>>>    drivers/perf/Kconfig          |   9 +
->>>>>>>>>>>    drivers/perf/Makefile         |   1 +
->>>>>>>>>>>    drivers/perf/arm_smmuv3_pmu.c | 823 ++++++++++++++++++++++++++++++++++++++++++
->>>>>>>>>>>    include/acpi/actbl2.h         |   9 +-
->>>>>>>>> Do you have the acpica support code? I'm currently
->>>>>>>>> working on SMMUv3 MSI support and I would like to test
->>>>>>>>> it with MSI support for PMCG as well.
->>>>>>> I don't have any code other than what was posted here.
->>>>>>> What additional ACPICA support code is needed?
->>>>> Sorry for not clear, I mean the acpica code for iASL and
->>>>> other tool: github.com/acpica/acpica.git
->>>>>
->>>>> With that code, I can compile my IORT table with PMCG node.
->>> Unfortunately it looks like I'm the first person from Qualcomm Datacenter
->>> Technologies to try to add something to ACPICA, which means I'll have to
->>> kick off an internal legal process which may take some time. Unless someone
->>> else wants to take a crack at it - and really, there's nothing more than is
->>> in the ARM IORT spec - it could be a while before I can do that.
->> Just a update, I sent a pull request to Bob for ACPICA changes,
->> please take a look:
->>
->> https://github.com/acpica/acpica/pull/327
-> You should not have done that. We need to update IORT specifications
-> for IORT PMCG before merging ACPICA PMCG support.
->
-> Ask Robert to drop it straight away or I will.
+Hi Bjorn,
 
-Sorry, I will do that, thanks for the reminder.
+On 06/10/17 23:24, Bjorn Helgaas wrote:
+> From: Bjorn Helgaas <bhelgaas@google.com>
+> 
+> Daniel Axtens reported that on the HiSilicon D05 board, the VGA device is
+> behind a bridge that doesn't support PCI_BRIDGE_CTL_VGA, so the VGA arbiter
+> never selects it as the default, which means Xorg auto-detection doesn't
+> work.
+> 
+> VGA is a legacy PCI feature: a VGA device can respond to addresses, e.g.,
+> [mem 0xa0000-0xbffff], [io 0x3b0-0x3bb], [io 0x3c0-0x3df], etc., that are
+> not configurable by BARs.  Consequently, multiple VGA devices can conflict
+> with each other.  The VGA arbiter avoids conflicts by ensuring that those
+> legacy resources are only routed to one VGA device at a time.
+> 
+> The arbiter identifies the "default VGA" device, i.e., a legacy VGA device
+> that was used by boot firmware.  It selects the first device that:
+> 
+>    - is of PCI_CLASS_DISPLAY_VGA,
+>    - has both PCI_COMMAND_IO and PCI_COMMAND_MEMORY enabled, and
+>    - has PCI_BRIDGE_CTL_VGA set in all upstream bridges.
+> 
+> Some systems don't have such a device.  For example, if a host bridge
+> doesn't support I/O space, PCI_COMMAND_IO probably won't be enabled for any
+> devices below it.  Or, as on the HiSilicon D05, the VGA device may be
+> behind a bridge that doesn't support PCI_BRIDGE_CTL_VGA, so accesses to the
+> legacy VGA resources will never reach the device.
+> 
+> This patch extends the arbiter so that if it doesn't find a device that
+> meets all the above criteria, it selects the first device that:
+> 
+>    - is of PCI_CLASS_DISPLAY_VGA and
+>    - has PCI_COMMAND_IO or PCI_COMMAND_MEMORY enabled
+> 
+> If it doesn't find even that, it selects the first device that:
+> 
+>    - is of class PCI_CLASS_DISPLAY_VGA.
+> 
+> Such a device may not be able to use the legacy VGA resources, but most
+> drivers can operate the device without those.  Setting it as the default
+> device means its "boot_vga" sysfs file will contain "1", which Xorg (via
+> libpciaccess) uses to help select its default output device.
+> 
+> This fixes Xorg auto-detection on some arm64 systems (HiSilicon D05 in
+> particular; see the link below).
+> 
+> It also replaces the powerpc fixup_vga() quirk, albeit with slightly
+> different semantics: the quirk selected the first VGA device we found, and
+> overrode that selection with any enabled VGA device we found.  If there
+> were several enabled VGA devices, the *last* one we found would become the
+> default.
+> 
+> The code here instead selects the *first* enabled VGA device we find, and
+> if none are enabled, the first VGA device we find.
+> 
+> Link: http://lkml.kernel.org/r/20170901072744.2409-1-dja at axtens.net
+> Tested-by: Daniel Axtens <dja@axtens.net>    # arm64, ppc64-qemu-tcg
+> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+> ---
+>   arch/powerpc/kernel/pci-common.c |   12 ------------
+>   drivers/gpu/vga/vgaarb.c         |   25 +++++++++++++++++++++++++
+>   2 files changed, 25 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/powerpc/kernel/pci-common.c b/arch/powerpc/kernel/pci-common.c
+> index 02831a396419..0ac7aa346c69 100644
+> --- a/arch/powerpc/kernel/pci-common.c
+> +++ b/arch/powerpc/kernel/pci-common.c
+> @@ -1740,15 +1740,3 @@ static void fixup_hide_host_resource_fsl(struct pci_dev *dev)
+>   }
+>   DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MOTOROLA, PCI_ANY_ID, fixup_hide_host_resource_fsl);
+>   DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_FREESCALE, PCI_ANY_ID, fixup_hide_host_resource_fsl);
+> -
+> -static void fixup_vga(struct pci_dev *pdev)
+> -{
+> -	u16 cmd;
+> -
+> -	pci_read_config_word(pdev, PCI_COMMAND, &cmd);
+> -	if ((cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY)) || !vga_default_device())
+> -		vga_set_default_device(pdev);
+> -
+> -}
+> -DECLARE_PCI_FIXUP_CLASS_FINAL(PCI_ANY_ID, PCI_ANY_ID,
+> -			      PCI_CLASS_DISPLAY_VGA, 8, fixup_vga);
+> diff --git a/drivers/gpu/vga/vgaarb.c b/drivers/gpu/vga/vgaarb.c
+> index 76875f6299b8..aeb41f793ed4 100644
+> --- a/drivers/gpu/vga/vgaarb.c
+> +++ b/drivers/gpu/vga/vgaarb.c
+> @@ -1468,6 +1468,31 @@ static int __init vga_arb_device_init(void)
+>   			vgaarb_info(dev, "no bridge control possible\n");
+>   	}
+>   
+> +	if (!vga_default_device()) {
+> +		list_for_each_entry(vgadev, &vga_list, list) {
+> +			struct device *dev = &vgadev->pdev->dev;
+> +			u16 cmd;
+> +
+> +			pdev = vgadev->pdev;
+> +			pci_read_config_word(pdev, PCI_COMMAND, &cmd);
+> +			if (cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY)) {
+> +				vgaarb_info(dev, "setting as boot device (VGA legacy resources not available)\n");
+> +				vga_set_default_device(pdev);
+> +				break;
+> +			}
+> +		}
+> +	}
+> +
+> +	if (!vga_default_device()) {
+> +		vgadev = list_first_entry_or_null(&vga_list,
+> +						  struct vga_device, list);
+> +		if (vgadev) {
+> +			struct device *dev = &vgadev->pdev->dev;
+> +			vgaarb_info(dev, "setting as boot device (VGA legacy resources not available)\n");
+> +			vga_set_default_device(pdev);
 
-Thanks
-Hanjun
+Isn't 'pdev' NULL here? shouldn't it be vgadev->pdev instead?
+
+Cheers,
+
+-- 
+Julien Thierry
