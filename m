@@ -1,121 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 12 Oct 2017 18:06:32 +0100
-Subject: [PATCH v3 19/28] arm64/sve: ptrace and ELF coredump support
-In-Reply-To: <1507660725-7986-20-git-send-email-Dave.Martin@arm.com>
-References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
- <1507660725-7986-20-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20171012170632.35zifttm55rzu745@armageddon.cambridge.arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 12 Oct 2017 18:06:48 +0100
+Subject: [PATCH 4/9] arm64: dma-mapping: export symbol arch_setup_dma_ops
+In-Reply-To: <1507761269-7017-5-git-send-email-jim2101024@gmail.com>
+References: <1507761269-7017-1-git-send-email-jim2101024@gmail.com>
+ <1507761269-7017-5-git-send-email-jim2101024@gmail.com>
+Message-ID: <a8fa87e4-4d70-eb60-f1c5-94071d6394aa@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 10, 2017 at 07:38:36PM +0100, Dave P Martin wrote:
-> @@ -702,6 +737,211 @@ static int system_call_set(struct task_struct *target,
->  	return ret;
+On 11/10/17 23:34, Jim Quinlan wrote:
+> The BrcmSTB driver needs to get ahold of a pointer to swiotlb_dma_ops.
+> However, that variable is defined as static.  Instead, we use
+> arch_setup_dma_ops() to get the pointer to swiotlb_dma_ops.  Since
+> we also want our driver to be a separate module, we need to
+> export this function.
+
+NAK. Retrieve the platform-assigned ops from the device via
+get_dma_ops() and stash them in your drvdata or wherever before you
+replace them. Don't go poking around arch code internals directly from a
+driver.
+
+Robin.
+
+> Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
+> ---
+>  arch/arm64/mm/dma-mapping.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index 614af88..dae572f 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -936,3 +936,4 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+>  	}
+>  #endif
 >  }
->  
-> +#ifdef CONFIG_ARM64_SVE
-> +
-> +static void sve_init_header_from_task(struct user_sve_header *header,
-> +				      struct task_struct *target)
-> +{
-> +	unsigned int vq;
-> +
-> +	memset(header, 0, sizeof(*header));
-> +
-> +	header->flags = test_tsk_thread_flag(target, TIF_SVE) ?
-> +		SVE_PT_REGS_SVE : SVE_PT_REGS_FPSIMD;
-
-For PTRACE_SYSCALL, we may or may not have TIF_SVE depending on what
-happened with the target. Just a thought: shall we clear TIF_SVE (and
-sync it to fpsimd) in syscall_trace_enter()?
-
-> +	if (test_tsk_thread_flag(target, TIF_SVE_VL_INHERIT))
-> +		header->flags |= SVE_PT_VL_INHERIT;
-> +
-> +	header->vl = target->thread.sve_vl;
-> +	vq = sve_vq_from_vl(header->vl);
-> +
-> +	header->max_vl = sve_max_vl;
-> +	if (WARN_ON(!sve_vl_valid(sve_max_vl)))
-> +		header->max_vl = header->vl;
-> +
-> +	header->size = SVE_PT_SIZE(vq, header->flags);
-> +	header->max_size = SVE_PT_SIZE(sve_vq_from_vl(header->max_vl),
-> +				      SVE_PT_REGS_SVE);
-> +}
-[...]
-> +static int sve_set(struct task_struct *target,
-> +		   const struct user_regset *regset,
-> +		   unsigned int pos, unsigned int count,
-> +		   const void *kbuf, const void __user *ubuf)
-> +{
-> +	int ret;
-> +	struct user_sve_header header;
-> +	unsigned int vq;
-> +	unsigned long start, end;
-> +
-> +	if (!system_supports_sve())
-> +		return -EINVAL;
-> +
-> +	/* Header */
-> +	if (count < sizeof(header))
-> +		return -EINVAL;
-> +	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf, &header,
-> +				 0, sizeof(header));
-> +	if (ret)
-> +		goto out;
-> +
-> +	/*
-> +	 * Apart from PT_SVE_REGS_MASK, all PT_SVE_* flags are consumed by
-> +	 * sve_set_vector_length(), which will also validate them for us:
-> +	 */
-> +	ret = sve_set_vector_length(target, header.vl,
-> +		((unsigned long)header.flags & ~SVE_PT_REGS_MASK) << 16);
-> +	if (ret)
-> +		goto out;
-> +
-> +	/* Actual VL set may be less than the user asked for: */
-> +	vq = sve_vq_from_vl(target->thread.sve_vl);
-> +
-> +	/* Registers: FPSIMD-only case */
-> +
-> +	BUILD_BUG_ON(SVE_PT_FPSIMD_OFFSET != sizeof(header));
-> +	if ((header.flags & SVE_PT_REGS_MASK) == SVE_PT_REGS_FPSIMD) {
-> +		sve_sync_to_fpsimd(target);
-> +
-> +		ret = __fpr_set(target, regset, pos, count, kbuf, ubuf,
-> +				SVE_PT_FPSIMD_OFFSET);
-> +		clear_tsk_thread_flag(target, TIF_SVE);
-> +		goto out;
-> +	}
-
-__fpr_set() already calls sve_sync_to_fpsimd(). Anyway, do you actually
-need this since we are going to override the FPSIMD state anyway here.
-
-> +
-> +	/* Otherwise: full SVE case */
-> +
-> +	/*
-> +	 * If setting a different VL from the requested VL and there is
-> +	 * register data, the data layout will be wrong: don't even
-> +	 * try to set the registers in this case.
-> +	 */
-> +	if (count && vq != sve_vq_from_vl(header.vl)) {
-> +		ret = -EIO;
-> +		goto out;
-> +	}
-> +
-> +	sve_alloc(target);
-> +	fpsimd_sync_to_sve(target);
-
-Similarly here, it's a full SVE case, so we are going to override it
-anyway.
-
-> +	set_tsk_thread_flag(target, TIF_SVE);
-
-This has the side-effect of enabling TIF_SVE even for PTRACE_SYSCALL
-which may be cleared in some circumstances. It may not be an issue
-though.
-
--- 
-Catalin
+> +EXPORT_SYMBOL(arch_setup_dma_ops);
+> 
