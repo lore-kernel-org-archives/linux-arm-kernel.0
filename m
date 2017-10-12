@@ -1,99 +1,49 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 12 Oct 2017 12:04:12 +0100
-Subject: [PATCH v3 22/28] arm64/sve: KVM: Prevent guests from using SVE
-In-Reply-To: <c28b3f0d-7beb-cca3-46db-3fce964f4725@arm.com>
-References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
- <1507660725-7986-23-git-send-email-Dave.Martin@arm.com>
- <c28b3f0d-7beb-cca3-46db-3fce964f4725@arm.com>
-Message-ID: <20171012110409.GG19485@e103592.cambridge.arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 12 Oct 2017 12:05:38 +0100
+Subject: [PATCH 0/2] arm64 SMMUv3 PMU driver with IORT support
+In-Reply-To: <59DF4AD9.2060903@huawei.com>
+References: <1501876754-1064-1-git-send-email-nleeder@codeaurora.org>
+ <394bd3b8-2583-01fa-02d3-6a49c2a6a6c0@linaro.org>
+ <3eac1295-dba2-ad79-d868-b538b13de91a@codeaurora.org>
+ <f1d864be-8ce4-f2d2-9c71-8fff202a76d1@linaro.org>
+ <67a696ad-98e9-d505-1d73-7246d2efc398@codeaurora.org>
+ <59DF4AD9.2060903@huawei.com>
+Message-ID: <20171012110538.GA8509@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 11, 2017 at 05:28:06PM +0100, Marc Zyngier wrote:
-> [+ Christoffer]
+On Thu, Oct 12, 2017 at 06:58:33PM +0800, Hanjun Guo wrote:
+> On 2017/8/11 11:28, Leeder, Neil wrote:
+> > On 8/9/2017 9:26 PM, Hanjun Guo wrote:
+> >> > On 2017/8/9 23:48, Leeder, Neil wrote:
+> >>>>> >>>>    drivers/perf/Kconfig          |   9 +
+> >>>>> >>>>    drivers/perf/Makefile         |   1 +
+> >>>>> >>>>    drivers/perf/arm_smmuv3_pmu.c | 823 ++++++++++++++++++++++++++++++++++++++++++
+> >>>>> >>>>    include/acpi/actbl2.h         |   9 +-
+> >>>> >>> Do you have the acpica support code? I'm currently
+> >>>> >>> working on SMMUv3 MSI support and I would like to test
+> >>>> >>> it with MSI support for PMCG as well.
+> >>> >> I don't have any code other than what was posted here.
+> >>> >> What additional ACPICA support code is needed?
+> >> > 
+> >> > Sorry for not clear, I mean the acpica code for iASL and
+> >> > other tool: github.com/acpica/acpica.git
+> >> > 
+> >> > With that code, I can compile my IORT table with PMCG node.
+> > Unfortunately it looks like I'm the first person from Qualcomm Datacenter
+> > Technologies to try to add something to ACPICA, which means I'll have to
+> > kick off an internal legal process which may take some time. Unless someone
+> > else wants to take a crack at it - and really, there's nothing more than is
+> > in the ARM IORT spec - it could be a while before I can do that.
 > 
-> On 10/10/17 19:38, Dave Martin wrote:
-> > Until KVM has full SVE support, guests must not be allowed to
-> > execute SVE instructions.
-> > 
-> > This patch enables the necessary traps, and also ensures that the
-> > traps are disabled again on exit from the guest so that the host
-> > can still use SVE if it wants to.
-> > 
-> > This patch introduces another instance of
-> > __this_cpu_write(fpsimd_last_state, NULL), so this flush operation
-> > is abstracted out as a separate helper fpsimd_flush_cpu_state().
-> > Other instances are ported appropriately.
-> > 
-> > As a side effect of this refactoring, a this_cpu_write() in
-> > fpsimd_cpu_pm_notifier() is changed to __this_cpu_write().  This
-> > should be fine, since cpu_pm_enter() is supposed to be called only
-> > with interrupts disabled.
-> > 
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-> > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > ---
-
-[...]
-
-> > diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> > index e923b58..674912d 100644
-> > --- a/arch/arm64/include/asm/kvm_host.h
-> > +++ b/arch/arm64/include/asm/kvm_host.h
-
-[...]
-
-> > @@ -384,4 +385,14 @@ static inline void __cpu_init_stage2(void)
-
-[...]
-
-> > +static inline void kvm_fpsimd_flush_cpu_state(void)
-> > +{
-> > +	if (system_supports_sve())
-> > +		sve_flush_cpu_state();
+> Just a update, I sent a pull request to Bob for ACPICA changes,
+> please take a look:
 > 
-> Hmmm. How does this work if...
+> https://github.com/acpica/acpica/pull/327
 
-!IS_ENABLED(CONFIG_ARM64_SVE) implies !system_supports_sve(), so
-if CONFIG_ARM64_SVE is not set, the call is optimised away.
+You should not have done that. We need to update IORT specifications
+for IORT PMCG before merging ACPICA PMCG support.
 
-[...]
+Ask Robert to drop it straight away or I will.
 
-> > diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> > index a9cb794..6ae3703 100644
-> > --- a/arch/arm64/kernel/fpsimd.c
-> > +++ b/arch/arm64/kernel/fpsimd.c
-> > @@ -1073,6 +1073,33 @@ void fpsimd_flush_task_state(struct task_struct *t)
-
-[...]
-
-> > +#ifdef CONFIG_ARM64_SVE
-> > +void sve_flush_cpu_state(void)
-> > +{
-> > +	struct fpsimd_state *const fpstate = __this_cpu_read(fpsimd_last_state);
-> > +	struct task_struct *tsk;
-> > +
-> > +	if (!fpstate)
-> > +		return;
-> > +
-> > +	tsk = container_of(fpstate, struct task_struct, thread.fpsimd_state);
-> > +	if (test_tsk_thread_flag(tsk, TIF_SVE))
-> > +		fpsimd_flush_cpu_state();
-> > +}
-> > +#endif /* CONFIG_ARM64_SVE */
-> 
-> ... CONFIG_ARM64_SVE is not set? Fixing this should just be a matter of
-> moving the #ifdef/#endif inside the function...
-
-Because sve_flush_cpu_state() is not in the same compilation unit it
-can't be static, and that means the compiler won't remove it
-automatically if it's unused -- hence the #ifdef.
-
-Because the call site is optimised away, there is no link failure.
-
-Don't we rely on this sort of thing all over the place?
-
-Cheers
----Dave
+Lorenzo
