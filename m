@@ -1,7 +1,7 @@
 From: felipe.balbi@linux.intel.com (Felipe Balbi)
-Date: Thu, 12 Oct 2017 14:51:13 +0300
+Date: Thu, 12 Oct 2017 14:53:26 +0300
 Subject: [PATCHv2 0/7] Add support for USB OTG on STM32F7
-In-Reply-To: <d6e8be43-cbb9-89cd-eb3f-b34ac23ad99f@st.com>
+In-Reply-To: <878tgg1t5a.fsf@linux.intel.com>
 References: <1503930018-536-1-git-send-email-amelie.delaunay@st.com>
  <878tgim24i.fsf@linux.intel.com>
  <04a49088-b615-d7b8-0387-e7bfa32ee19f@st.com>
@@ -12,89 +12,30 @@ References: <1503930018-536-1-git-send-email-amelie.delaunay@st.com>
  <21df4d0c-075c-0c5a-c39b-b1dd94fe819d@st.com>
  <87efq821tz.fsf@linux.intel.com>
  <d6e8be43-cbb9-89cd-eb3f-b34ac23ad99f@st.com>
-Message-ID: <878tgg1t5a.fsf@linux.intel.com>
+ <878tgg1t5a.fsf@linux.intel.com>
+Message-ID: <8760bk1t1l.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 Hi,
 
-Alexandre Torgue <alexandre.torgue@st.com> writes:
-> Hi Felipe
+Felipe Balbi <felipe.balbi@linux.intel.com> writes:
+>>>> I thought that patches 1 and 2, as they are "driver" patches, had to be
+>>>> applied on USB tree (so Felipe's one), and the others (3 to 7) had to be
+>>>> applied on STM32-DT tree (Alex's one). Did I miss something?
+>>> 
+>>> patch 1 is documentation, right? Without the documentation patch,
+>>> checkpatch will cringe :-) So either way works.
+>>> 
+>>> If you insist, I can take 1-2 through my tree. No worries.
+>>
+>> I don't want to insist :) but for me it is better (and more safe) if you 
+>> take patch 1&2 in your tree, and will take others in mine.
 >
-> On 10/12/2017 10:43 AM, Felipe Balbi wrote:
->> 
->> Hi,
->> 
->>>>>>>>
->>>>>>>> On 10/11/2017 12:04 PM, Felipe Balbi wrote:
->>>>>>>>>
->>>>>>>>> Hi,
->>>>>>>>>
->>>>>>>>> Amelie Delaunay <amelie.delaunay@st.com> writes:
->>>>>>>>>> The STM32F7 MCU family embeds two DWC2 USB OTG cores. One core is
->>>>>>>>>> USB
->>>>>>>>>> OTG FS and the other is USB OTG HS. The USB FS core only works
->>>>>>>>>> with its
->>>>>>>>>> internal phy whilst the USB HS core can work in HS with external
->>>>>>>>>> ULPI phy
->>>>>>>>>> or in FS/LS with the on-chip FS phy.
->>>>>>>>>>
->>>>>>>>>> Amelie Delaunay (7):
->>>>>>>>>>  ???? dt-bindings: usb: Document the STM32F7 DWC2 USB OTG HS core
->>>>>>>>>> binding
->>>>>>>>>>  ???? usb: dwc2: add support for STM32F7 USB OTG HS
->>>>>>>>>>  ???? ARM: dts: stm32: Add USB HS support for STM32F746 MCU
->>>>>>>>>
->>>>>>>>> I have applied these three patches. Should I take the rest? They
->>>>>>>>> seems
->>>>>>>>> like they could go upstream through the ARM maintainers.
->>>>>>>>>
->>>>>>>>
->>>>>>>> I will take other DT patches in my PR.
->>>>>>>>
->>>>>>>> Concerning "ARM: dts: stm32: Add USB HS support for STM32F746 MCU"
->>>>>>>> patch
->>>>>>>> I prefer also to take it. This patch adds some pinctrl groups but
->>>>>>>> stm32
->>>>>>>> pinctrl bindings will change in my next PR (we will use a macro to
->>>>>>>> define pins instead of using defined values). So if you push the DT
->>>>>>>> patch through your pull request there will be a merge issue.
->>>>>>>> It is possible that I take also this one ?
->>>>>>>
->>>>>>> In that case, it's best if you take them all :-) Here's my Ack:
->>>>>>>
->>>>>>> Acked-by: Felipe Balbi <felipe.balbi@linux.intel.com>
->>>>>>>
->>>>>>> I'll drop them from my tree now
->>>>>>
->>>>>> Ok perfect, I will take DT patches (3 to 7) and I let you take patch 1&2
->>>>>> in your tree.
->>>>>
->>>>> Well, I have dropped them from my tree. Please two 1-7 through yours.
->>>>
->>>> Hum, ok for this patchset but IMO it is better (next time) that you take
->>>> driver pacthes in your tree and I take only DT patches in mine.
->>>> No ?
->>>>
->>>> Regards
->>>> Alex
->>>>
->>>>>
->>>
->>> I thought that patches 1 and 2, as they are "driver" patches, had to be
->>> applied on USB tree (so Felipe's one), and the others (3 to 7) had to be
->>> applied on STM32-DT tree (Alex's one). Did I miss something?
->> 
->> patch 1 is documentation, right? Without the documentation patch,
->> checkpatch will cringe :-) So either way works.
->> 
->> If you insist, I can take 1-2 through my tree. No worries.
->
-> I don't want to insist :) but for me it is better (and more safe) if you 
-> take patch 1&2 in your tree, and will take others in mine.
+> Okay, I'll apply 1&2
 
-Okay, I'll apply 1&2
+they are now in my testing/next and next branches.
 
 -- 
 balbi
