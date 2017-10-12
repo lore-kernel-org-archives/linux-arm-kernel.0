@@ -1,48 +1,97 @@
-From: zhangshaokun@hisilicon.com (Zhangshaokun)
-Date: Thu, 12 Oct 2017 19:45:24 +0800
-Subject: [PATCH v7 0/4] Add support for ThunderX2 pmu events using json
- files
-In-Reply-To: <20171012105851.GC7395@arm.com>
-References: <20171012103419.29824-1-ganapatrao.kulkarni@cavium.com>
- <20171012103820.GC17924@rric.localdomain>
- <CAKTKpr5=msG9b-f2Mj+1SibUvMXefg9DAcNA7M3hgHCX=hpQ6g@mail.gmail.com>
- <20171012105851.GC7395@arm.com>
-Message-ID: <e1a2913c-f56f-44c5-19e7-0c061cf21639@hisilicon.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Thu, 12 Oct 2017 13:46:14 +0200
+Subject: [PATCHv2 0/7] Add support for USB OTG on STM32F7
+In-Reply-To: <87efq821tz.fsf@linux.intel.com>
+References: <1503930018-536-1-git-send-email-amelie.delaunay@st.com>
+ <878tgim24i.fsf@linux.intel.com>
+ <04a49088-b615-d7b8-0387-e7bfa32ee19f@st.com>
+ <87vajllx8t.fsf@linux.intel.com>
+ <1c4180ef-2da6-b420-7c6e-41769608384a@st.com>
+ <87sheplsrm.fsf@linux.intel.com>
+ <3c36db6d-75fd-1be6-e946-b75a04e3760e@st.com>
+ <21df4d0c-075c-0c5a-c39b-b1dd94fe819d@st.com>
+ <87efq821tz.fsf@linux.intel.com>
+Message-ID: <d6e8be43-cbb9-89cd-eb3f-b34ac23ad99f@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hi Felipe
 
-On 2017/10/12 18:58, Will Deacon wrote:
-> On Thu, Oct 12, 2017 at 04:20:06PM +0530, Ganapatrao Kulkarni wrote:
->> Hi Robert,
->>
->> On Thu, Oct 12, 2017 at 4:08 PM, Robert Richter <rric@kernel.org> wrote:
->>> On 12.10.17 16:04:15, Ganapatrao Kulkarni wrote:
+On 10/12/2017 10:43 AM, Felipe Balbi wrote:
+> 
+> Hi,
+> 
+>>>>>>>
+>>>>>>> On 10/11/2017 12:04 PM, Felipe Balbi wrote:
+>>>>>>>>
+>>>>>>>> Hi,
+>>>>>>>>
+>>>>>>>> Amelie Delaunay <amelie.delaunay@st.com> writes:
+>>>>>>>>> The STM32F7 MCU family embeds two DWC2 USB OTG cores. One core is
+>>>>>>>>> USB
+>>>>>>>>> OTG FS and the other is USB OTG HS. The USB FS core only works
+>>>>>>>>> with its
+>>>>>>>>> internal phy whilst the USB HS core can work in HS with external
+>>>>>>>>> ULPI phy
+>>>>>>>>> or in FS/LS with the on-chip FS phy.
+>>>>>>>>>
+>>>>>>>>> Amelie Delaunay (7):
+>>>>>>>>>  ???? dt-bindings: usb: Document the STM32F7 DWC2 USB OTG HS core
+>>>>>>>>> binding
+>>>>>>>>>  ???? usb: dwc2: add support for STM32F7 USB OTG HS
+>>>>>>>>>  ???? ARM: dts: stm32: Add USB HS support for STM32F746 MCU
+>>>>>>>>
+>>>>>>>> I have applied these three patches. Should I take the rest? They
+>>>>>>>> seems
+>>>>>>>> like they could go upstream through the ARM maintainers.
+>>>>>>>>
+>>>>>>>
+>>>>>>> I will take other DT patches in my PR.
+>>>>>>>
+>>>>>>> Concerning "ARM: dts: stm32: Add USB HS support for STM32F746 MCU"
+>>>>>>> patch
+>>>>>>> I prefer also to take it. This patch adds some pinctrl groups but
+>>>>>>> stm32
+>>>>>>> pinctrl bindings will change in my next PR (we will use a macro to
+>>>>>>> define pins instead of using defined values). So if you push the DT
+>>>>>>> patch through your pull request there will be a merge issue.
+>>>>>>> It is possible that I take also this one ?
+>>>>>>
+>>>>>> In that case, it's best if you take them all :-) Here's my Ack:
+>>>>>>
+>>>>>> Acked-by: Felipe Balbi <felipe.balbi@linux.intel.com>
+>>>>>>
+>>>>>> I'll drop them from my tree now
+>>>>>
+>>>>> Ok perfect, I will take DT patches (3 to 7) and I let you take patch 1&2
+>>>>> in your tree.
+>>>>
+>>>> Well, I have dropped them from my tree. Please two 1-7 through yours.
 >>>
->>>>  tools/perf/arch/arm64/util/Build                   |  1 +
->>>>  tools/perf/arch/arm64/util/header.c                | 65 ++++++++++++++++++++++
->>>>  tools/perf/arch/powerpc/util/header.c              |  2 +-
->>>>  tools/perf/arch/x86/util/header.c                  |  2 +-
->>>>  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 +++++
->>>>  .../arch/arm64/thunderx2/thunderx2-imp-def.json    | 62 +++++++++++++++++++++
+>>> Hum, ok for this patchset but IMO it is better (next time) that you take
+>>> driver pacthes in your tree and I take only DT patches in mine.
+>>> No ?
 >>>
->>> I guess the dir needs to be named 'cavium'.
+>>> Regards
+>>> Alex
+>>>
+>>>>
 >>
->> i dont think so ,  while compilation arch type is detected, it has to be arm64
->> refer SRCARCH in pmu-events/Build
+>> I thought that patches 1 and 2, as they are "driver" patches, had to be
+>> applied on USB tree (so Felipe's one), and the others (3 to 7) had to be
+>> applied on STM32-DT tree (Alex's one). Did I miss something?
 > 
-> The full name should be:
+> patch 1 is documentation, right? Without the documentation patch,
+> checkpatch will cringe :-) So either way works.
 > 
-> .../arch/arm64/cavium/thunderx2-imp-def.json
-> 
+> If you insist, I can take 1-2 through my tree. No worries.
 
-It works for us (HiSilicon) as .../arch/arm64/hisilicon/hip08-imp-def.json.
+I don't want to insist :) but for me it is better (and more safe) if you 
+take patch 1&2 in your tree, and will take others in mine.
 
-Thanks,
-Shaokun
+Thanks in advance.
+Alex
 
-> Will
 > 
-> .
+> let me know
 > 
