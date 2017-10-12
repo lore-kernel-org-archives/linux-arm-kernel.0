@@ -1,171 +1,163 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 12 Oct 2017 17:00:47 +0100
-Subject: [PATCH v2 3/3] ACPI/IORT: Make platform devices initialization code
- SMMU agnostic
-In-Reply-To: <1507824047-17045-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1507824047-17045-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1507824047-17045-4-git-send-email-lorenzo.pieralisi@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 12 Oct 2017 17:05:07 +0100
+Subject: [PATCH v3 11/28] arm64/sve: Core task context handling
+In-Reply-To: <20171011161558.ts7adaryabttg47z@armageddon.cambridge.arm.com>
+References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
+ <1507660725-7986-12-git-send-email-Dave.Martin@arm.com>
+ <20171011161558.ts7adaryabttg47z@armageddon.cambridge.arm.com>
+Message-ID: <20171012160506.GH19485@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The way current IORT code initializes platform devices for SMMU nodes
-is somewhat tied (mostly for naming convention) to the SMMU nodes
-themselves but it need not be in that it is completely generic and
-can easily be made so by structures renaming and code reshuffling.
+On Wed, Oct 11, 2017 at 05:15:58PM +0100, Catalin Marinas wrote:
+> On Tue, Oct 10, 2017 at 07:38:28PM +0100, Dave P Martin wrote:
+> > diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+> > index 026a7c7..b1409de 100644
+> > --- a/arch/arm64/include/asm/fpsimd.h
+> > +++ b/arch/arm64/include/asm/fpsimd.h
+> > @@ -72,6 +75,20 @@ extern void sve_load_state(void const *state, u32 const *pfpsr,
+> >  			   unsigned long vq_minus_1);
+> >  extern unsigned int sve_get_vl(void);
+> >  
+> > +#ifdef CONFIG_ARM64_SVE
+> > +
+> > +extern size_t sve_state_size(struct task_struct const *task);
+> > +
+> > +extern void sve_alloc(struct task_struct *task);
+> > +extern void fpsimd_release_thread(struct task_struct *task);
+> > +
+> > +#else /* ! CONFIG_ARM64_SVE */
+> > +
+> > +static void __maybe_unused sve_alloc(struct task_struct *task) { }
+> > +static void __maybe_unused fpsimd_release_thread(struct task_struct *task) { }
+> 
+> Nitpick: usually we just add static inline functions here rather than
+> __maybe_unused.
 
-Rework IORT platform devices initialization code to make the functions
-and data structures SMMU agnostic.
+Fair enough -- come to think of it I've already converted some other
+instances of this at Ard's request.
 
-No functional changes intended.
+> 
+> > diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+> > index 29adab8..4831d28 100644
+> > --- a/arch/arm64/include/asm/processor.h
+> > +++ b/arch/arm64/include/asm/processor.h
+> > @@ -39,6 +47,8 @@
+> >  #define FPEXC_IDF	(1 << 7)
+> >  
+> >  /*
+> > + * (Note: in this discussion, statements about FPSIMD apply equally to SVE.)
+> > + *
+> >   * In order to reduce the number of times the FPSIMD state is needlessly saved
+> >   * and restored, we need to keep track of two things:
+> >   * (a) for each task, we need to remember which CPU was the last one to have
+> > @@ -99,6 +109,287 @@
+> >   */
+> >  static DEFINE_PER_CPU(struct fpsimd_state *, fpsimd_last_state);
+> >  
+> > +static void sve_free(struct task_struct *task)
+> > +{
+> > +	kfree(task->thread.sve_state);
+> > +	task->thread.sve_state = NULL;
+> > +}
+> 
+> I think we need a WARN_ON if TIF_SVE is still set here (and the callers
+> making sure it is cleared). I haven't checked the code paths via
+> fpsimd_release_thread() but wondering what happens if we get an
+> interrupt between freeing the state and making the pointer NULL, with
+> some context switching in a preemptible kernel.
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
----
- drivers/acpi/arm64/iort.c | 63 ++++++++++++++++++++++-------------------------
- 1 file changed, 30 insertions(+), 33 deletions(-)
+Having a WARN_ON() here may be a decent way to sanity-check that we
+don't ever have sve_state NULL with TIF_SVE set.  This is a lot more
+economical than putting a WARN_ON() at each dereference of sve_state
+(of which there are quite a few).  sve_free() is also a slow path.
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 2e54f87..0ff7020 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -1049,33 +1049,33 @@ static bool __init arm_smmu_is_coherent(struct acpi_iort_node *node)
- 	return smmu->flags & ACPI_IORT_SMMU_COHERENT_WALK;
- }
- 
--struct iort_iommu_config {
-+struct iort_dev_config {
- 	const char *name;
--	int (*iommu_init)(struct acpi_iort_node *node);
--	bool (*iommu_is_coherent)(struct acpi_iort_node *node);
--	int (*iommu_count_resources)(struct acpi_iort_node *node);
--	void (*iommu_init_resources)(struct resource *res,
-+	int (*dev_init)(struct acpi_iort_node *node);
-+	bool (*dev_is_coherent)(struct acpi_iort_node *node);
-+	int (*dev_count_resources)(struct acpi_iort_node *node);
-+	void (*dev_init_resources)(struct resource *res,
- 				     struct acpi_iort_node *node);
--	void (*iommu_set_proximity)(struct device *dev,
-+	void (*dev_set_proximity)(struct device *dev,
- 				    struct acpi_iort_node *node);
- };
- 
--static const struct iort_iommu_config iort_arm_smmu_v3_cfg __initconst = {
-+static const struct iort_dev_config iort_arm_smmu_v3_cfg __initconst = {
- 	.name = "arm-smmu-v3",
--	.iommu_is_coherent = arm_smmu_v3_is_coherent,
--	.iommu_count_resources = arm_smmu_v3_count_resources,
--	.iommu_init_resources = arm_smmu_v3_init_resources,
--	.iommu_set_proximity = arm_smmu_v3_set_proximity,
-+	.dev_is_coherent = arm_smmu_v3_is_coherent,
-+	.dev_count_resources = arm_smmu_v3_count_resources,
-+	.dev_init_resources = arm_smmu_v3_init_resources,
-+	.dev_set_proximity = arm_smmu_v3_set_proximity,
- };
- 
--static const struct iort_iommu_config iort_arm_smmu_cfg __initconst = {
-+static const struct iort_dev_config iort_arm_smmu_cfg __initconst = {
- 	.name = "arm-smmu",
--	.iommu_is_coherent = arm_smmu_is_coherent,
--	.iommu_count_resources = arm_smmu_count_resources,
--	.iommu_init_resources = arm_smmu_init_resources
-+	.dev_is_coherent = arm_smmu_is_coherent,
-+	.dev_count_resources = arm_smmu_count_resources,
-+	.dev_init_resources = arm_smmu_init_resources
- };
- 
--static __init const struct iort_iommu_config *iort_get_iommu_cfg(
-+static __init const struct iort_dev_config *iort_get_dev_cfg(
- 			struct acpi_iort_node *node)
- {
- 	switch (node->type) {
-@@ -1089,31 +1089,28 @@ static __init const struct iort_iommu_config *iort_get_iommu_cfg(
- }
- 
- /**
-- * iort_add_smmu_platform_device() - Allocate a platform device for SMMU
-- * @node: Pointer to SMMU ACPI IORT node
-+ * iort_add_platform_device() - Allocate a platform device for IORT node
-+ * @node: Pointer to device ACPI IORT node
-  *
-  * Returns: 0 on success, <0 failure
-  */
--static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
-+static int __init iort_add_platform_device(struct acpi_iort_node *node,
-+					   const struct iort_dev_config *ops)
- {
- 	struct fwnode_handle *fwnode;
- 	struct platform_device *pdev;
- 	struct resource *r;
- 	enum dev_dma_attr attr;
- 	int ret, count;
--	const struct iort_iommu_config *ops = iort_get_iommu_cfg(node);
--
--	if (!ops)
--		return -ENODEV;
- 
- 	pdev = platform_device_alloc(ops->name, PLATFORM_DEVID_AUTO);
- 	if (!pdev)
- 		return -ENOMEM;
- 
--	if (ops->iommu_set_proximity)
--		ops->iommu_set_proximity(&pdev->dev, node);
-+	if (ops->dev_set_proximity)
-+		ops->dev_set_proximity(&pdev->dev, node);
- 
--	count = ops->iommu_count_resources(node);
-+	count = ops->dev_count_resources(node);
- 
- 	r = kcalloc(count, sizeof(*r), GFP_KERNEL);
- 	if (!r) {
-@@ -1121,7 +1118,7 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
- 		goto dev_put;
- 	}
- 
--	ops->iommu_init_resources(r, node);
-+	ops->dev_init_resources(r, node);
- 
- 	ret = platform_device_add_resources(pdev, r, count);
- 	/*
-@@ -1156,8 +1153,8 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
- 
- 	pdev->dev.fwnode = fwnode;
- 
--	attr = ops->iommu_is_coherent(node) ?
--			     DEV_DMA_COHERENT : DEV_DMA_NON_COHERENT;
-+	attr = ops->dev_is_coherent && ops->dev_is_coherent(node) ?
-+			DEV_DMA_COHERENT : DEV_DMA_NON_COHERENT;
- 
- 	/* Configure DMA for the page table walker */
- 	acpi_dma_configure(&pdev->dev, attr);
-@@ -1214,6 +1211,7 @@ static void __init iort_init_platform_devices(void)
- 	struct fwnode_handle *fwnode;
- 	int i, ret;
- 	bool acs_enabled = false;
-+	const struct iort_dev_config *ops;
- 
- 	/*
- 	 * iort_table and iort both point to the start of IORT table, but
-@@ -1236,16 +1234,15 @@ static void __init iort_init_platform_devices(void)
- 		if (!acs_enabled)
- 			acs_enabled = iort_enable_acs(iort_node);
- 
--		if ((iort_node->type == ACPI_IORT_NODE_SMMU) ||
--			(iort_node->type == ACPI_IORT_NODE_SMMU_V3)) {
--
-+		ops = iort_get_dev_cfg(iort_node);
-+		if (ops) {
- 			fwnode = acpi_alloc_fwnode_static();
- 			if (!fwnode)
- 				return;
- 
- 			iort_set_fwnode(iort_node, fwnode);
- 
--			ret = iort_add_smmu_platform_device(iort_node);
-+			ret = iort_add_platform_device(iort_node, ops);
- 			if (ret) {
- 				iort_delete_fwnode(iort_node);
- 				acpi_free_fwnode_static(fwnode);
--- 
-2.4.12
+Currently, there are two callsites: sve_set_vector_length(), where we
+test_and_clear_tsk_thread_flags(task, TIF_SVE) before calling sve_free();
+and fpsimd_release_thread() where we "don't care" because the thread
+is dying.
+
+Looking more closely though, is the release_thread() path preemptible?
+I can't see anything in the scheduler core to ensure this, nor any
+general reason why it should be needed.
+
+In which case preemption during thread exit after sve_free() could
+result in a NULL deference in fpsimd_thread_switch().
+
+
+So, I think my favoured approach is:
+
+sve_release_thread()
+{
+	local_bh_disable();
+	fpsimd_flush_task_state(current);
+	clear_thread_flag(TIF_SVE);
+	local_bh_enable();
+
+	sve_free();
+}
+
+The local_bh stuff is cumbersome here, and could be replaced with
+barrier()s to force the order of fpsimd_flusk_task_state() versus
+clearing TIF_SVE.  Or should the barrier really be in
+fpsimd_flush_task_state()?  Disabling softirqs avoids the need to answer
+such questions...
+
+
+Then:
+
+sve_free(task)
+{
+	WARN_ON(test_thread_flag(TIF_SVE));
+
+	barrier();
+	kfree(task->thread.sve_state);
+	tash->thread.sve_state = NULL;
+}
+
+I'm assuming here that kfree() can't be called safely from atomic
+context, but this is unclear.  I would expect to be able to free
+GFP_ATOMIC memory from atomic context (though sve_statue is GFP_KERNEL,
+so dunno).
+
+> Alternatively, always clear TIF_SVE here before freeing (also wondering
+> whether we should make sve_state NULL before the actual freeing but I
+> think TIF_SVE clearing should suffice).
+
+Could do.  I feel that the current placement of the TIF_SVE clearing in
+sve_set_vector_length() feels "more natural", but this is a pretty
+flimsy argument.  How strongly do you feel about this?
+
+[...]
+
+> > + *  * TIF_SVE set:
+
+[...]
+
+> > + *  * TIF_SVE clear:
+> > + *
+> > + *    An attempt by the user task to execute an SVE instruction causes
+> > + *    do_sve_acc() to be called, which does some preparation and then
+> > + *    sets TIF_SVE.
+> > + *
+> > + *    When stored, FPSIMD registers V0-V31 are encoded in
+> > + *    task->fpsimd_state; bits [max : 128] for each of Z0-Z31 are
+> > + *    logically zero but not stored anywhere; P0-P15 and FFR are not
+> > + *    stored and have unspecified values from userspace's point of
+> > + *    view.  For hygiene purposes, the kernel zeroes them on next use,
+> > + *    but userspace is discouraged from relying on this.
+> > + *
+> > + *    task->thread.sve_state does not need to be non-NULL, valid or any
+> > + *    particular size: it must not be dereferenced.
+> > + *
+> > + *  * FPSR and FPCR are always stored in task->fpsimd_state irrespctive of
+> > + *    whether TIF_SVE is clear or set, since these are not vector length
+> > + *    dependent.
+> > + */
+> 
+> This looks fine, thanks for adding the description.
+
+OK, thanks for checking it.
+
+Cheers
+---Dave
