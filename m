@@ -1,24 +1,61 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 12 Oct 2017 19:35:05 +0530
-Subject: [PATCH][dma-next] dmaengine: stm32: remove redundant
- initialization of hwdesc
-In-Reply-To: <20171011102822.19166-1-colin.king@canonical.com>
-References: <20171011102822.19166-1-colin.king@canonical.com>
-Message-ID: <20171012140505.GP30097@localhost>
+From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
+Date: Thu, 12 Oct 2017 19:41:12 +0530
+Subject: [PATCH v8 0/4] Add support for ThunderX2 pmu events using json files
+Message-ID: <20171012141116.32475-1-ganapatrao.kulkarni@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 11, 2017 at 11:28:22AM +0100, Colin King wrote:
-> From: Colin Ian King <colin.king@canonical.com>
-> 
-> hwdesc is being initialized to desc->hwdesc but this is never read
-> as hwdesc is overwritten in a for-loop.  Remove the redundant
-> initialization and move the declaration of hwdesc into the for-loop.
-> 
-> Cleans up clang warning:
-> Value stored to 'hwdesc' during its initialization is never read
+Extending json/jevent framework for parsing arm64 event files.
+Adding jevents for ThunderX2 implementation defined PMU events.
 
-Applied, thanks
+v8:
+   - Rename thunderx2 directory to cavium
+
+v7:
+   - Addressed some more comments from Will Deacon.
+
+v6 : Addressed comments [1] [2]
+
+[1] https://patchwork.kernel.org/patch/9903099/
+[2] https://patchwork.kernel.org/patch/9853899/
+
+v5:
+   - Addressed comments from Arnaldo.
+   - Rebased to 4.13-rc5
+
+v4:
+   - Rebased to 4.13-rc1
+
+v3:
+   - Addressed comments from Will Deacon and Jayachandran C.
+   - Rebased to 4.12-rc1
+
+v2:
+   - Updated as per Mark Rutland's suggestions.
+   - Added provision for get_cpuid_str to get cpu id string
+     from associated cpus of pmu core device.
+
+v1: Initial patchset.
+
+Ganapatrao Kulkarni (4):
+  perf utils: passing pmu as a parameter to function get_cpuid_str
+  perf tools arm64: Add support for get_cpuid_str function.
+  perf utils: Add helper function is_pmu_core to detect PMU CORE devices
+  perf vendor events arm64: Add ThunderX2 implementation defined pmu
+    core events
+
+ tools/perf/arch/arm64/util/Build                   |  1 +
+ tools/perf/arch/arm64/util/header.c                | 65 ++++++++++++++++++++++
+ tools/perf/arch/powerpc/util/header.c              |  2 +-
+ tools/perf/arch/x86/util/header.c                  |  2 +-
+ .../arch/arm64/cavium/thunderx2-imp-def.json       | 62 +++++++++++++++++++++
+ tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 +++++
+ tools/perf/util/header.h                           |  3 +-
+ tools/perf/util/pmu.c                              | 52 +++++++++++++----
+ 8 files changed, 189 insertions(+), 13 deletions(-)
+ create mode 100644 tools/perf/arch/arm64/util/header.c
+ create mode 100644 tools/perf/pmu-events/arch/arm64/cavium/thunderx2-imp-def.json
+ create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
 
 -- 
-~Vinod
+2.9.4
