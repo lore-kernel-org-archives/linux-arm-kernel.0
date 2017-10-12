@@ -1,48 +1,137 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Thu, 12 Oct 2017 14:48:54 -0500
-Subject: [PATCH v3 5/7] arm64: Fixup users of topology_physical_package_id
+Date: Thu, 12 Oct 2017 14:48:55 -0500
+Subject: [PATCH v3 6/7] arm64: topology: Enable ACPI/PPTT based CPU topology.
 In-Reply-To: <20171012194856.13844-1-jeremy.linton@arm.com>
 References: <20171012194856.13844-1-jeremy.linton@arm.com>
-Message-ID: <20171012194856.13844-6-jeremy.linton@arm.com>
+Message-ID: <20171012194856.13844-7-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are a few arm64 specific users (cpufreq, psci, etc) which really
-want the cluster rather than the topology_physical_package_id(). Lets
-convert those users to topology_cod_id(). That way when we start
-differentiating the socket/cluster they will continue to behave correctly.
+Propagate the topology information from the PPTT tree to the
+cpu_topology array. We can get the thread id, core_id and
+cluster_id by assuming certain levels of the PPTT tree correspond
+to those concepts. The package_id is flagged in the tree and can be
+found by passing an arbitrary large level to setup_acpi_cpu_topology()
+which terminates its search when it finds an ACPI node flagged
+as the physical package. If the tree doesn't contain enough
+levels to represent all of thread/core/cod/package then the package
+id will be used for the missing levels.
+
+Since server/ACPI machines are more likely to be multisocket and NUMA,
+this patch also modifies the default clusters=sockets behavior
+for ACPI machines to sockets=sockets. DT machines continue to
+represent sockets as clusters. For ACPI machines, this results in a
+more normalized view of the topology. Cluster level scheduler decisions
+are still being made due to the "MC" level in the scheduler which has
+knowledge of cache sharing domains.
+
+This code is loosely based on a combination of code from:
+Xiongfeng Wang <wangxiongfeng2@huawei.com>
+John Garry <john.garry@huawei.com>
+Jeffrey Hugo <jhugo@codeaurora.org>
 
 Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
- drivers/cpufreq/arm_big_little.c | 2 +-
- drivers/firmware/psci_checker.c  | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/kernel/topology.c | 54 +++++++++++++++++++++++++++++++++++++++++++-
+ include/linux/topology.h     |  1 +
+ 2 files changed, 54 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/cpufreq/arm_big_little.c b/drivers/cpufreq/arm_big_little.c
-index 17504129fd77..6ee69b3820de 100644
---- a/drivers/cpufreq/arm_big_little.c
-+++ b/drivers/cpufreq/arm_big_little.c
-@@ -72,7 +72,7 @@ static struct mutex cluster_lock[MAX_CLUSTERS];
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index 9147e5b6326d..42f3e7f28b2b 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -11,6 +11,7 @@
+  * for more details.
+  */
  
- static inline int raw_cpu_to_cluster(int cpu)
- {
--	return topology_physical_package_id(cpu);
-+	return topology_cod_id(cpu);
++#include <linux/acpi.h>
+ #include <linux/arch_topology.h>
+ #include <linux/cpu.h>
+ #include <linux/cpumask.h>
+@@ -22,6 +23,7 @@
+ #include <linux/sched.h>
+ #include <linux/sched/topology.h>
+ #include <linux/slab.h>
++#include <linux/smp.h>
+ #include <linux/string.h>
+ 
+ #include <asm/cpu.h>
+@@ -304,6 +306,54 @@ static void __init reset_cpu_topology(void)
+ 	}
  }
  
- static inline int cpu_to_cluster(int cpu)
-diff --git a/drivers/firmware/psci_checker.c b/drivers/firmware/psci_checker.c
-index 6523ce962865..a9465f5d344a 100644
---- a/drivers/firmware/psci_checker.c
-+++ b/drivers/firmware/psci_checker.c
-@@ -202,7 +202,7 @@ static int hotplug_tests(void)
++#ifdef CONFIG_ACPI
++/*
++ * Propagate the topology information of the processor_topology_node tree to the
++ * cpu_topology array.
++ */
++static int __init parse_acpi_topology(void)
++{
++	u64 is_threaded;
++	int cpu;
++	int topology_id;
++	/* set a large depth, to hit ACPI_PPTT_PHYSICAL_PACKAGE if one exists */
++	const int max_topo = 0xFF;
++
++	is_threaded = read_cpuid_mpidr() & MPIDR_MT_BITMASK;
++
++	for_each_possible_cpu(cpu) {
++		topology_id = setup_acpi_cpu_topology(cpu, 0);
++		if (topology_id < 0)
++			return topology_id;
++
++		if (is_threaded) {
++			cpu_topology[cpu].thread_id = topology_id;
++			topology_id = setup_acpi_cpu_topology(cpu, 1);
++			cpu_topology[cpu].core_id   = topology_id;
++			topology_id = setup_acpi_cpu_topology(cpu, 2);
++			cpu_topology[cpu].cluster_id = topology_id;
++			topology_id = setup_acpi_cpu_topology(cpu, max_topo);
++			cpu_topology[cpu].package_id = topology_id;
++		} else {
++			cpu_topology[cpu].thread_id  = -1;
++			cpu_topology[cpu].core_id    = topology_id;
++			topology_id = setup_acpi_cpu_topology(cpu, 1);
++			cpu_topology[cpu].cluster_id = topology_id;
++			topology_id = setup_acpi_cpu_topology(cpu, max_topo);
++			cpu_topology[cpu].package_id = topology_id;
++		}
++	}
++	return 0;
++}
++
++#else
++static int __init parse_acpi_topology(void)
++{
++	/*ACPI kernels should be built with PPTT support*/
++	return -EINVAL;
++}
++#endif
++
+ void __init init_cpu_topology(void)
+ {
+ 	reset_cpu_topology();
+@@ -312,6 +362,8 @@ void __init init_cpu_topology(void)
+ 	 * Discard anything that was parsed if we hit an error so we
+ 	 * don't use partial information.
  	 */
- 	for (i = 0; i < nb_cluster; ++i) {
- 		int cluster_id =
--			topology_physical_package_id(cpumask_any(clusters[i]));
-+			topology_cod_id(cpumask_any(clusters[i]));
- 		ssize_t len = cpumap_print_to_pagebuf(true, page_buf,
- 						      clusters[i]);
- 		/* Remove trailing newline. */
+-	if (of_have_populated_dt() && parse_dt_topology())
++	if ((!acpi_disabled) && parse_acpi_topology())
++		reset_cpu_topology();
++	else if (of_have_populated_dt() && parse_dt_topology())
+ 		reset_cpu_topology();
+ }
+diff --git a/include/linux/topology.h b/include/linux/topology.h
+index 4660749a7303..cbf2fb13bf92 100644
+--- a/include/linux/topology.h
++++ b/include/linux/topology.h
+@@ -43,6 +43,7 @@
+ 		if (nr_cpus_node(node))
+ 
+ int arch_update_cpu_topology(void);
++int setup_acpi_cpu_topology(unsigned int cpu, int level);
+ 
+ /* Conform to ACPI 2.0 SLIT distance definitions */
+ #define LOCAL_DISTANCE		10
 -- 
 2.13.5
