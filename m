@@ -1,69 +1,21 @@
-From: Zhiqiang.Hou@nxp.com (Zhiqiang Hou)
-Date: Thu, 12 Oct 2017 17:44:48 +0800
-Subject: [PATCHv2 2/2] pci/layerscape: change the default error response
- behavior
-In-Reply-To: <20171012094448.31217-1-Zhiqiang.Hou@nxp.com>
-References: <20171012094448.31217-1-Zhiqiang.Hou@nxp.com>
-Message-ID: <20171012094448.31217-3-Zhiqiang.Hou@nxp.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Thu, 12 Oct 2017 12:04:44 +0200
+Subject: [PATCH V2 0/1] Optimise IOVA allocations for PCI devices
+In-Reply-To: <cda4f03f-acf5-9b74-d8f1-774065bfc94e@semihalf.com>
+References: <1505897522-9237-1-git-send-email-tomasz.nowicki@caviumnetworks.com>
+ <cda4f03f-acf5-9b74-d8f1-774065bfc94e@semihalf.com>
+Message-ID: <20171012100444.GI30803@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Minghuan Lian <Minghuan.Lian@nxp.com>
+Hi Tomasz,
 
-By default, when the PCIe controller experiences an erroneous
-completion from an external completer for its outbound non-posted
-request, it always sends an OKAY response to the device's internal
-AXI slave system interface. However, such default system error
-response behavior cannot be used for other types of outbound
-non-posted requests. For example, the outbound memory read
-transaction requires an actual ERROR response, like UR completion
-or completion timeout. The patch is to fix it by forwarding
-the error response of the non-posted request.
+On Thu, Oct 12, 2017 at 11:40:27AM +0200, Tomasz Nowicki wrote:
+> Can you please have a look and see if you are fine with this patch?
 
-Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
-Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
----
-V2:
- - Removed the parameter ls_pcie which is for debugging.
+How do these changes relate to Robin's IOVA optimizations already in the
+iommu-tree?
 
- drivers/pci/dwc/pci-layerscape.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+Regards,
 
-diff --git a/drivers/pci/dwc/pci-layerscape.c b/drivers/pci/dwc/pci-layerscape.c
-index 87fa486bee2c..3a4277a5ab2c 100644
---- a/drivers/pci/dwc/pci-layerscape.c
-+++ b/drivers/pci/dwc/pci-layerscape.c
-@@ -33,6 +33,8 @@
- 
- /* PEX Internal Configuration Registers */
- #define PCIE_STRFMR1		0x71c /* Symbol Timer & Filter Mask Register1 */
-+#define PCIE_ABSERR		0x8d0 /* Bridge Slave Error Response Register */
-+#define PCIE_ABSERR_SETTING	0x9401 /* Forward error of non-posted request */
- 
- #define PCIE_IATU_NUM		6
- 
-@@ -124,6 +126,14 @@ static int ls_pcie_link_up(struct dw_pcie *pci)
- 	return 1;
- }
- 
-+/* Forward error response of outbound non-posted requests */
-+static void ls_pcie_fix_error_response(struct ls_pcie *pcie)
-+{
-+	struct dw_pcie *pci = pcie->pci;
-+
-+	iowrite32(PCIE_ABSERR_SETTING, pci->dbi_base + PCIE_ABSERR);
-+}
-+
- static int ls_pcie_host_init(struct pcie_port *pp)
- {
- 	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
-@@ -135,6 +145,7 @@ static int ls_pcie_host_init(struct pcie_port *pp)
- 	 * dw_pcie_setup_rc() will reconfigure the outbound windows.
- 	 */
- 	ls_pcie_disable_outbound_atus(pcie);
-+	ls_pcie_fix_error_response(pcie);
- 
- 	dw_pcie_dbi_ro_wr_en(pci);
- 	ls_pcie_clear_multifunction(pcie);
--- 
-2.14.1
+	Joerg
