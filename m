@@ -1,138 +1,171 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Thu, 12 Oct 2017 14:05:48 +0200
-Subject: [PATCH 1/2] vgaarb: Select a default VGA device even if there's
- no legacy VGA
-In-Reply-To: <b5373cbb-7d0d-a626-159b-dee0b82d32d0@arm.com>
-References: <20171006221358.12211.42879.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <20171006222428.12211.3635.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <b5373cbb-7d0d-a626-159b-dee0b82d32d0@arm.com>
-Message-ID: <20171012140548.10754506@karo-electronics.de>
+From: xieyisheng1@huawei.com (Yisheng Xie)
+Date: Thu, 12 Oct 2017 20:05:38 +0800
+Subject: [RFCv2 PATCH 00/36] Process management for IOMMU + SVM for SMMUv3
+In-Reply-To: <0fecd29e-eaf7-9503-b087-7bfbc251da88@arm.com>
+References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
+ <0c6778d8-741f-0db7-fe3c-df88a75ebbb2@huawei.com>
+ <0fecd29e-eaf7-9503-b087-7bfbc251da88@arm.com>
+Message-ID: <c6b7fb4b-4f2b-0d81-8bb5-8fa6b62aca3a@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Jean,
 
-On Thu, 12 Oct 2017 12:24:10 +0100 Julien Thierry wrote:
-> Hi Bjorn,
+Thanks for replying.
+On 2017/10/9 19:36, Jean-Philippe Brucker wrote:
+> Hi,
 > 
-> On 06/10/17 23:24, Bjorn Helgaas wrote:
-> > From: Bjorn Helgaas <bhelgaas@google.com>
-> > 
-> > Daniel Axtens reported that on the HiSilicon D05 board, the VGA device is
-> > behind a bridge that doesn't support PCI_BRIDGE_CTL_VGA, so the VGA arbiter
-> > never selects it as the default, which means Xorg auto-detection doesn't
-> > work.
-> > 
-> > VGA is a legacy PCI feature: a VGA device can respond to addresses, e.g.,
-> > [mem 0xa0000-0xbffff], [io 0x3b0-0x3bb], [io 0x3c0-0x3df], etc., that are
-> > not configurable by BARs.  Consequently, multiple VGA devices can conflict
-> > with each other.  The VGA arbiter avoids conflicts by ensuring that those
-> > legacy resources are only routed to one VGA device at a time.
-> > 
-> > The arbiter identifies the "default VGA" device, i.e., a legacy VGA device
-> > that was used by boot firmware.  It selects the first device that:
-> > 
-> >    - is of PCI_CLASS_DISPLAY_VGA,
-> >    - has both PCI_COMMAND_IO and PCI_COMMAND_MEMORY enabled, and
-> >    - has PCI_BRIDGE_CTL_VGA set in all upstream bridges.
-> > 
-> > Some systems don't have such a device.  For example, if a host bridge
-> > doesn't support I/O space, PCI_COMMAND_IO probably won't be enabled for any
-> > devices below it.  Or, as on the HiSilicon D05, the VGA device may be
-> > behind a bridge that doesn't support PCI_BRIDGE_CTL_VGA, so accesses to the
-> > legacy VGA resources will never reach the device.
-> > 
-> > This patch extends the arbiter so that if it doesn't find a device that
-> > meets all the above criteria, it selects the first device that:
-> > 
-> >    - is of PCI_CLASS_DISPLAY_VGA and
-> >    - has PCI_COMMAND_IO or PCI_COMMAND_MEMORY enabled
-> > 
-> > If it doesn't find even that, it selects the first device that:
-> > 
-> >    - is of class PCI_CLASS_DISPLAY_VGA.
-> > 
-> > Such a device may not be able to use the legacy VGA resources, but most
-> > drivers can operate the device without those.  Setting it as the default
-> > device means its "boot_vga" sysfs file will contain "1", which Xorg (via
-> > libpciaccess) uses to help select its default output device.
-> > 
-> > This fixes Xorg auto-detection on some arm64 systems (HiSilicon D05 in
-> > particular; see the link below).
-> > 
-> > It also replaces the powerpc fixup_vga() quirk, albeit with slightly
-> > different semantics: the quirk selected the first VGA device we found, and
-> > overrode that selection with any enabled VGA device we found.  If there
-> > were several enabled VGA devices, the *last* one we found would become the
-> > default.
-> > 
-> > The code here instead selects the *first* enabled VGA device we find, and
-> > if none are enabled, the first VGA device we find.
-> > 
-> > Link: http://lkml.kernel.org/r/20170901072744.2409-1-dja at axtens.net
-> > Tested-by: Daniel Axtens <dja@axtens.net>    # arm64, ppc64-qemu-tcg
-> > Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-> > ---
-> >   arch/powerpc/kernel/pci-common.c |   12 ------------
-> >   drivers/gpu/vga/vgaarb.c         |   25 +++++++++++++++++++++++++
-> >   2 files changed, 25 insertions(+), 12 deletions(-)
-> > 
-> > diff --git a/arch/powerpc/kernel/pci-common.c b/arch/powerpc/kernel/pci-common.c
-> > index 02831a396419..0ac7aa346c69 100644
-> > --- a/arch/powerpc/kernel/pci-common.c
-> > +++ b/arch/powerpc/kernel/pci-common.c
-> > @@ -1740,15 +1740,3 @@ static void fixup_hide_host_resource_fsl(struct pci_dev *dev)
-> >   }
-> >   DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MOTOROLA, PCI_ANY_ID, fixup_hide_host_resource_fsl);
-> >   DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_FREESCALE, PCI_ANY_ID, fixup_hide_host_resource_fsl);
-> > -
-> > -static void fixup_vga(struct pci_dev *pdev)
-> > -{
-> > -	u16 cmd;
-> > -
-> > -	pci_read_config_word(pdev, PCI_COMMAND, &cmd);
-> > -	if ((cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY)) || !vga_default_device())
-> > -		vga_set_default_device(pdev);
-> > -
-> > -}
-> > -DECLARE_PCI_FIXUP_CLASS_FINAL(PCI_ANY_ID, PCI_ANY_ID,
-> > -			      PCI_CLASS_DISPLAY_VGA, 8, fixup_vga);
-> > diff --git a/drivers/gpu/vga/vgaarb.c b/drivers/gpu/vga/vgaarb.c
-> > index 76875f6299b8..aeb41f793ed4 100644
-> > --- a/drivers/gpu/vga/vgaarb.c
-> > +++ b/drivers/gpu/vga/vgaarb.c
-> > @@ -1468,6 +1468,31 @@ static int __init vga_arb_device_init(void)
-> >   			vgaarb_info(dev, "no bridge control possible\n");
-> >   	}
-> >   
-> > +	if (!vga_default_device()) {
-> > +		list_for_each_entry(vgadev, &vga_list, list) {
-> > +			struct device *dev = &vgadev->pdev->dev;
-> > +			u16 cmd;
-> > +
-> > +			pdev = vgadev->pdev;
-> > +			pci_read_config_word(pdev, PCI_COMMAND, &cmd);
-> > +			if (cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY)) {
-> > +				vgaarb_info(dev, "setting as boot device (VGA legacy resources not available)\n");
-> > +				vga_set_default_device(pdev);
-> > +				break;
-> > +			}
-> > +		}
-> > +	}
-> > +
-> > +	if (!vga_default_device()) {
-> > +		vgadev = list_first_entry_or_null(&vga_list,
-> > +						  struct vga_device, list);
-> > +		if (vgadev) {
-> > +			struct device *dev = &vgadev->pdev->dev;
-> > +			vgaarb_info(dev, "setting as boot device (VGA legacy resources not available)\n");
-> > +			vga_set_default_device(pdev);
+> On 09/10/17 10:49, Yisheng Xie wrote:
+>> Hi Jean,
+>>
+>> On 2017/10/6 21:31, Jean-Philippe Brucker wrote:
+>>> Following discussions at plumbers and elsewhere, it seems like we need to
+>>> unify some of the Shared Virtual Memory (SVM) code, in order to define
+>>> clear semantics for the SVM API.
+>>>
+>>> My previous RFC [1] was centered on the SMMUv3, but some of this code will
+>>> need to be reused by the SMMUv2 and virtio-iommu drivers. This second
+>>> proposal focuses on abstracting a little more into the core IOMMU API, and
+>>> also trying to find common ground for all SVM-capable IOMMUs.
+>>>
+>>> SVM is, in the context of the IOMMU, sharing page tables between a process
+>>> and a device. Traditionally it requires IO Page Fault and Process Address
+>>> Space ID capabilities in device and IOMMU.
+>>>
+>>> * A device driver can bind a process to a device, with iommu_process_bind.
+>>>   Internally we hold on to the mm and get notified of its activity with an
+>>>   mmu_notifier. The bond is removed by exit_mm, by a call to
+>>>   iommu_process_unbind or iommu_detach_device.
+>>>
+>>> * iommu_process_bind returns a 20-bit PASID (PCI terminology) to the
+>>>   device driver, which programs it into the device to access the process
+>>>   address space.
+>>>
+>>> * The device and the IOMMU support recoverable page faults. This can be
+>>>   either ATS+PRI for PCI, or platform-specific mechanisms such as Stall
+>>>   for SMMU.
+>>>
+>>> Ideally systems wanting to use SVM have to support these three features,
+>>> but in practice we'll see implementations supporting just a subset of
+>>> them, especially in validation environments. So even if this particular
+>>> patchset assumes all three capabilities, it should also be possible to
+>>> support PASID without IOPF (by pinning everything, see non-system SVM in
+>>> OpenCL)
+>> How to pin everything? If user malloc anything we should pin it. It should
+>> from user or driver?
 > 
-> Isn't 'pdev' NULL here? shouldn't it be vgadev->pdev instead?
+> For userspace drivers, I guess it would be via a VFIO ioctl, that does the
+> same preparatory work as VFIO_IOMMU_MAP_DMA, but doesn't call iommu_map.
+> For things like OpenCL SVM buffers, it's the kernel driver that does the
+> pinning, just like VFIO does it, before launching the work on a SVM buffer.
 > 
-That cannot not happen, though it isn't quite obvious.
-'vgadev' will only be non-NULL, when the vga_list isn't empty and in
-that case pdev has been set up in the list_for_each_entry() loop above.
+>>> , or IOPF without PASID (sharing the single device address space
+>>> with a process, could be useful for DPDK+VFIO).
+>>>
+>>> Implementing both these cases would enable PT sharing alone. Some people
+>>> would also like IOPF alone without SVM (covered by this series) or process
+>>> management without shared PT (not covered). Using these features
+>>> individually is also important for testing, as SVM is in its infancy and
+>>> providing easy ways to test is essential to reduce the number of quirks
+>>> down the line.
+>>>
+>>>   Process management
+>>>   ==================
+>>>
+>>> The first part of this series introduces boilerplate code for managing
+>>> PASIDs and processes bound to devices. It's something any IOMMU driver
+>>> that wants to support bind/unbind will have to do, and it is difficult to
+>>> get right.
+>>>
+>>> Patches
+>>> 1: iommu_process and PASID allocation, attach and release
+>>> 2: process_exit callback for device drivers
+>>> 3: iommu_process search by PASID
+>>> 4: track process changes with an MMU notifiers
+>>> 5: bind and unbind operations
+>>>
+>>> My proposal uses the following model:
+>>>
+>>> * The PASID space is system-wide. This means that a Linux process will
+>>>   have a single PASID. I introduce the iommu_process structure and a
+>>>   global IDR to manage this.
+>>>
+>>> * An iommu_process can be bound to multiple domains, and a domain can have
+>>>   multiple iommu_process.
+>> when bind a task to device, can we create a single domain for it? I am thinking
+>> about process management without shared PT(for some device only support PASID
+>> without pri ability), it seems hard to expand if a domain have multiple iommu_process?
+>> Do you have any idea about this?
+> 
+> A device always has to be in a domain, as far as I know. Not supporting
+> PRI forces you to pin down all user mappings (or just the ones you use for
+> DMA) but you should sill be able to share PT. Now if you don't support
+> shared PT either, but only PASID, then you'll have to use io-pgtable and a
+> new map/unmap API on an iommu_process. I don't understand your concern
+> though, how would the link between process and domains prevent this use-case?
+> 
+So you mean that if an iommu_process bind to multiple devices it should create
+multiple io-pgtables? or just share the same io-pgtable?
 
+>>> * IOMMU groups share same PASID table. IOMMU groups are a convenient way
+>>>   to cover various hardware weaknesses that prevent a group of device to
+>>>   be isolated by the IOMMU (untrusted bridge, for instance). It's foolish
+>>>   to assume that all PASID implementations will perfectly isolate devices
+>>>   within a bus and functions within a device, so let's assume all devices
+>>>   within an IOMMU group have to share PASID traffic as well. In general
+>>>   there will be a single device per group.
+>>>
+>>> * It's up to the driver implementation to decide where to implement the
+>>>   PASID tables. For SMMU it's more convenient to have a single PASID table
+>>>   per domain. And I think the model fits better with the existing IOMMU
+>>>   API: IOVA traffic is shared by all devices in a domain, so should PASID
+>>>   traffic.
+>> What's the meaning of "share PASID traffic"? PASID space is system-wide,
+>> and a domain can have multiple iommu_process , so a domain can have multiple
+>> PASIDs , one PASID for a iommu_process, right?
+I get what your mean now, thanks for your explain.
 
-Lothar Wa?mann
+> 
+> Yes, I meant that if a device can access mappings for a specific PASID,
+> then other devices in that same domain are also able to access them.
+> 
+> A few reasons for this choice in the SMMU:
+> * As all devices in an IOMMU group will be in the same domain and share
+> the same PASID traffic, it encompasses that case. Groups are the smallest
+> isolation granularity, then users are free to choose to put different
+> IOMMU groups in different domains.
+> * For architectures that can have both non-PASID and PASID traffic
+> simultaneously, like the SMMU, it is simpler to reason about PASID tables
+> being a domain, rather than sharing PASID0 within the domain and handling
+> all others per device.
+> * It's the same principle as non-PASID mappings (iommu_map/unmap is on a
+> domain).
+> * It implement the classic example of IOMMU architectures where multiple
+> device descriptors point to the same PASID tables.
+> * It may be desirable for drivers to share PASIDs within a domain, if they
+> are actually using domains for conveniently sharing address spaces between
+> devices. I'm not sure how much this is used as a feature. It does model a
+> shared bus where each device can snoop DMA, so it may be useful.
+> 
+
+I get another question about this design, thinking about the following case:
+
+If a platform device with PASID ability, e.g. accelerator, which have multiple
+accelerator process units(APUs), it may create multiple virtual devices, one
+virtual device represent for an APU, with the same sid.
+
+They can be in different groups, however must be in the same domain as this
+design, for domain held the PASID table, right? So how could they be used by
+different guest OS?
+
+Thanks
+Yisheng Xie
+
+> bind/unbind operations are done on devices and not domains, though,
+> because it allows users to know which device supports PASID, PRI, etc.
+> 
+> Thanks,
+> Jean
+> 
+> .
+> 
