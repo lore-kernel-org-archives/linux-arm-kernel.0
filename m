@@ -1,98 +1,39 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Thu, 12 Oct 2017 12:13:20 +0100
-Subject: [RFCv2 PATCH 05/36] iommu/process: Bind and unbind process to and
- from devices
-In-Reply-To: <20171011113348.GE30803@8bytes.org>
-References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
- <20171006133203.22803-6-jean-philippe.brucker@arm.com>
- <20171011113348.GE30803@8bytes.org>
-Message-ID: <ee7f80e3-ca30-0ee7-53f3-3e57b2b58df6@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 12 Oct 2017 12:14:08 +0100
+Subject: [PATCH V2 0/1] Optimise IOVA allocations for PCI devices
+In-Reply-To: <f7210a76-399c-3767-74d0-24a98cbf7d78@caviumnetworks.com>
+References: <1505897522-9237-1-git-send-email-tomasz.nowicki@caviumnetworks.com>
+ <cda4f03f-acf5-9b74-d8f1-774065bfc94e@semihalf.com>
+ <20171012100444.GI30803@8bytes.org>
+ <f7210a76-399c-3767-74d0-24a98cbf7d78@caviumnetworks.com>
+Message-ID: <c0be8925-a78d-7f9b-99c5-8a812564ce89@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+On 12/10/17 11:08, Tomasz Nowicki wrote:
+> Hi Joerg,
+> 
+> On 12.10.2017 12:04, Joerg Roedel wrote:
+>> Hi Tomasz,
+>>
+>> On Thu, Oct 12, 2017 at 11:40:27AM +0200, Tomasz Nowicki wrote:
+>>> Can you please have a look and see if you are fine with this patch?
+>>
+>> How do these changes relate to Robin's IOVA optimizations already in the
+>> iommu-tree?
+>>
+> 
+> This is another optimization patch which does not conflict with Robin's
+> patches.
+> 
+> Robin, please correct me if I am wrong.
 
-On 11/10/17 12:33, Joerg Roedel wrote:
-> Hi Jean-Philipe,
-> 
-> Thanks for your patches, this is definitly a step in the right direction
-> to get generic support for IO virtual memory into the IOMMU core code.
-> 
-> But I see an issue with the design around task_struct, please see
-> below.
-> 
-> On Fri, Oct 06, 2017 at 02:31:32PM +0100, Jean-Philippe Brucker wrote:
->> +int iommu_process_bind_device(struct device *dev, struct task_struct *task,
->> +			      int *pasid, int flags)
-> 
-> I just took this patch as an example, it is in the other patches as
-> well. The code is designed around 'struct task_struct' while it should
-> really be designed around 'struct mm_struct'. You are not attaching a
-> specific process to a device, but the address-space of one or more
-> processes. And that should be reflected in the design.
+Yup, I've had Tomasz' patch included in my iommu/iova branch for a
+while, and the "Misc. IOVA tweaks" patches were actually written on top
+of it.
 
-Agreed. The task struct is only really needed for obtaining the mm in my
-code. It also keeps hold of a pid, but that's wrong and easy to remove.
+This should be the final piece of the puzzle for several arm64 server
+platforms, which exacerbate the problem by using 64K pages and having
+host bridge windows consume most of the 32-bit mem space.
 
-> There are several bad implications of building it around task_struct,
-> one is the life-time of the binding. If the address space is detached
-> from the device when the process exits, only the thread that did the
-> setup can can safely make use of the device, because if the device is
-> accessed from another thread it will crash when the setup-thread exits.
-> 
-> There are other benefits of using mm_struct, for example that you can
-> use mmu_notifiers to exit-handling.
-> 
-> Here is how I think the base API should look like:
-> 
-> 	* iommu_iovm_device_init(struct device *dev);
-> 	  iommu_iovm_device_shutdown(struct device *dev);
-> 
-> 	  These two functions do the device specific setup/shutdown. For
-> 	  PCI this would include enabling the PRI, PASID, and ATS
-> 	  capabilities and setting up a PASID table for the device.
-
-Ok. On SMMU the PASID table also hosts the non-PASID page table pointer,
-so the table and capability cannot be setup later than attach_device (and
-we'll probably have to enable PASID in add_device). But I suppose it's an
-implementation detail.
-
-Some device drivers will want to use ATS alone, for accelerating IOVA
-traffic. Should we enable it automatically, or provide device drivers with
-a way to enable it manually? According to the PCI spec, PASID has to be
-enabled before ATS, so device_init would have to first disable ATS in that
-case.
-
-> 	* iommu_iovm_bind_mm(struct device *dev, struct mm_struct *mm,
-> 			     iovm_shutdown_cb *cb);
-> 	  iommu_iovm_unbind_mm(struct device *dev, struct mm_struct *mm);
-> 
-> 	  These functions add and delete the entries in the PASID table
-> 	  for the device and setup mmu_notifiers for the mm_struct to
-> 	  keep IOMMU TLBs in sync with the CPU TLBs.
-> 
-> 	  The shutdown_cb is invoked by the IOMMU core code when the
-> 	  mm_struct goes away, for example because the process
-> 	  segfaults.
-> 
-> 	The PASID handling is best done these functions as well, unless
-> 	there is a strong reason to allow device drivers to do the
-> 	handling themselves.
-> 
-> The context data can be stored directly in mm_struct, including the
-> PASID for that mm.
-
-Changing mm_struct probably isn't required at the moment, since the mm
-subsystem won't use the context data or the PASID. Outside of
-drivers/iommu/, only the caller of bind_mm needs the PASID in order to
-program it into the device. The only advantage I see would be slightly
-faster bind(), when finding out if a mm is already bound to devices. But
-we don't really need fast bind(), so I don't think we'd have enough
-material to argue for a change in mm_struct.
-
-We do need to allocate a separate "iommu_mm_struct" wrapper to store the
-mmu_notifier. Maybe bind() could return this structure (that contains the
-PASID), and unbind() would take this iommu_mm_struct as argument?
-
-Thanks
-Jean
+Robin.
