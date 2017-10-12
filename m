@@ -1,38 +1,63 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 12 Oct 2017 13:30:34 +0100
-Subject: [PATCH v6 3/7] perf/core: Add PERF_AUX_FLAG_COLLISION to report
- colliding samples
-In-Reply-To: <1507811438-2267-1-git-send-email-will.deacon@arm.com>
-References: <1507811438-2267-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1507811438-2267-4-git-send-email-will.deacon@arm.com>
+Date: Thu, 12 Oct 2017 13:30:31 +0100
+Subject: [PATCH v6 0/7] Add support for the ARMv8.2 Statistical Profiling
+ Extension
+Message-ID: <1507811438-2267-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM SPE architecture permits an implementation to ignore a sample
-if the sample is due to be taken whilst another sample is already being
-produced. In this case, it is desirable to report the collision to
-userspace, as they may want to lower the sample period.
+Hi all,
 
-This patch adds a PERF_AUX_FLAG_COLLISION flag, so that such events can
-be relayed to userspace.
+This is the 8th posting of the patches previously posted here:
 
-Acked-by: Peter Zijlstra <peterz@infradead.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- include/uapi/linux/perf_event.h | 1 +
- 1 file changed, 1 insertion(+)
+  rfcv1: http://lists.infradead.org/pipermail/linux-arm-kernel/2017-January/476450.html
+  rfcv2: http://lists.infradead.org/pipermail/linux-arm-kernel/2017-January/479387.html
+     v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2017-January/483684.html
+     v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/499938.html
+     v3: http://lists.infradead.org/pipermail/linux-arm-kernel/2017-May/507132.html
+     v4: http://lists.infradead.org/pipermail/linux-arm-kernel/2017-June/510799.html
+     v5: http://lists.infradead.org/pipermail/linux-arm-kernel/2017-September/533478.html
 
-diff --git a/include/uapi/linux/perf_event.h b/include/uapi/linux/perf_event.h
-index 140ae638cfd6..7ca1b22ea417 100644
---- a/include/uapi/linux/perf_event.h
-+++ b/include/uapi/linux/perf_event.h
-@@ -941,6 +941,7 @@ enum perf_callchain_context {
- #define PERF_AUX_FLAG_TRUNCATED		0x01	/* record was truncated to fit */
- #define PERF_AUX_FLAG_OVERWRITE		0x02	/* snapshot from overwrite mode */
- #define PERF_AUX_FLAG_PARTIAL		0x04	/* record contains gaps */
-+#define PERF_AUX_FLAG_COLLISION		0x08	/* sample collided with another */
- 
- #define PERF_FLAG_FD_NO_GROUP		(1UL << 0)
- #define PERF_FLAG_FD_OUTPUT		(1UL << 1)
+The only change since v5 is the addition of Acked-by tags, so I'd like to
+queue this soon.
+
+The architecture documentation is available here:
+
+  https://developer.arm.com/products/architecture/a-profile/docs/ddi0586/latest/arm-architecture-reference-manual-supplement-statistical-profiling-extension-for-armv8-a
+
+and there's a high-level overview on this official ARM blog:
+
+  https://community.arm.com/processors/b/blog/posts/statistical-profiling-extension-for-armv8-a
+
+Cheers,
+
+Will
+
+--->8
+
+Will Deacon (7):
+  genirq: export irq_get_percpu_devid_partition to modules
+  perf/core: Export AUX buffer helpers to modules
+  perf/core: Add PERF_AUX_FLAG_COLLISION to report colliding samples
+  arm64: sysreg: Move SPE registers and PSB into common header files
+  arm64: head: Init PMSCR_EL2.{PA,PCT} when entered at EL2 without VHE
+  dt-bindings: Document devicetree binding for ARM SPE
+  drivers/perf: Add support for ARMv8.2 Statistical Profiling Extension
+
+ Documentation/devicetree/bindings/arm/spe-pmu.txt |   20 +
+ arch/arm64/include/asm/barrier.h                  |    2 +
+ arch/arm64/include/asm/sysreg.h                   |   93 ++
+ arch/arm64/kernel/head.S                          |   17 +-
+ arch/arm64/kvm/hyp/debug-sr.c                     |   24 +-
+ drivers/perf/Kconfig                              |    8 +
+ drivers/perf/Makefile                             |    1 +
+ drivers/perf/arm_spe_pmu.c                        | 1246 +++++++++++++++++++++
+ include/uapi/linux/perf_event.h                   |    1 +
+ kernel/events/ring_buffer.c                       |    4 +
+ kernel/irq/irqdesc.c                              |    1 +
+ 11 files changed, 1395 insertions(+), 22 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/spe-pmu.txt
+ create mode 100644 drivers/perf/arm_spe_pmu.c
+
 -- 
 2.1.4
