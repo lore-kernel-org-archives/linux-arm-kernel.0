@@ -1,102 +1,40 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 12 Oct 2017 16:37:05 +0800
-Subject: [PATCH 9/9] clk: sunxi-ng: sun8i: a23: Use sigma-delta modulation for
- audio PLL
-In-Reply-To: <20171012083705.24409-1-wens@csie.org>
-References: <20171012083705.24409-1-wens@csie.org>
-Message-ID: <20171012083705.24409-10-wens@csie.org>
+From: matthijsvanduin@gmail.com (Matthijs van Duin)
+Date: Thu, 12 Oct 2017 10:40:30 +0200
+Subject: [PATCH 5/7] ARM: dts: Add nodes for missing omap4 interconnect
+ target modules
+In-Reply-To: <da8d1d7f-f16d-8d71-cf49-acff79614610@ti.com>
+References: <20170929223411.9691-1-tony@atomide.com>
+ <20170929223411.9691-6-tony@atomide.com>
+ <f5c57f0b-1423-c362-0fda-4069b77a2e38@ti.com>
+ <20171011165850.jnaievrgcszcawh3@earth>
+ <da8d1d7f-f16d-8d71-cf49-acff79614610@ti.com>
+Message-ID: <20171012084030.lshobr3ewu3t5goc@squirrel.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The audio blocks require specific clock rates. Until now we were using
-the closest clock rate possible with integer N-M factors. This resulted
-in audio playback being slightly slower than it should be.
+On Thu, Oct 12, 2017 at 09:07:55AM +0300, Peter Ujfalusi wrote:
+> I don't see much benefit of using McASP on OMAP4, only drawbacks... It
+> lacks AFIFO so it is prone to underrun and if it underruns you need to
+> reset McASP. Been there with the Samsung Galaxy Nexus.
 
-The vendor kernel gets around this (for newer SoCs) by using sigma-delta
-modulation to generate a fractional-N factor. As the PLL hardware is
-identical in most chips, we can back port the settings from the newer
-SoC, in this case the H3, onto the A23.
+AESS/ATC isn't able to consistently respond to a DMA request within 20
+us ?  Strange.. I would have expected it to have no trouble with that.
+(And presumably so did TI, or they would have included AFIFO?)
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- drivers/clk/sunxi-ng/ccu-sun8i-a23.c | 38 ++++++++++++++++++++++++------------
- 1 file changed, 25 insertions(+), 13 deletions(-)
+> I wonder how Motorola is using the McASP as the OMAP4 version
+> (officially) does not support I2S.
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-a23.c b/drivers/clk/sunxi-ng/ccu-sun8i-a23.c
-index d93b452f0df9..a4fa2945f230 100644
---- a/drivers/clk/sunxi-ng/ccu-sun8i-a23.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-a23.c
-@@ -26,6 +26,7 @@
- #include "ccu_nkmp.h"
- #include "ccu_nm.h"
- #include "ccu_phase.h"
-+#include "ccu_sdm.h"
- 
- #include "ccu-sun8i-a23-a33.h"
- 
-@@ -52,18 +53,29 @@ static struct ccu_nkmp pll_cpux_clk = {
-  * the base (2x, 4x and 8x), and one variable divider (the one true
-  * pll audio).
-  *
-- * We don't have any need for the variable divider for now, so we just
-- * hardcode it to match with the clock names
-+ * With sigma-delta modulation for fractional-N on the audio PLL,
-+ * we have to use specific dividers. This means the variable divider
-+ * can no longer be used, as the audio codec requests the exact clock
-+ * rates we support through this mechanism. So we now hard code the
-+ * variable divider to 1. This means the clock rates will no longer
-+ * match the clock names.
-  */
- #define SUN8I_A23_PLL_AUDIO_REG	0x008
- 
--static SUNXI_CCU_NM_WITH_GATE_LOCK(pll_audio_base_clk, "pll-audio-base",
--				   "osc24M", 0x008,
--				   8, 7,		/* N */
--				   0, 5,		/* M */
--				   BIT(31),		/* gate */
--				   BIT(28),		/* lock */
--				   CLK_SET_RATE_UNGATE);
-+static struct ccu_sdm_setting pll_audio_sdm_table[] = {
-+	{ .rate = 22579200, .pattern = 0xc0010d84, .m = 8, .n = 7 },
-+	{ .rate = 24576000, .pattern = 0xc000ac02, .m = 14, .n = 14 },
-+};
-+
-+static SUNXI_CCU_NM_WITH_SDM_GATE_LOCK(pll_audio_base_clk, "pll-audio-base",
-+				       "osc24M", 0x008,
-+				       8, 7,	/* N */
-+				       0, 5,	/* M */
-+				       pll_audio_sdm_table, BIT(24),
-+				       0x284, BIT(31),
-+				       BIT(31),	/* gate */
-+				       BIT(28),	/* lock */
-+				       CLK_SET_RATE_UNGATE);
- 
- static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_video_clk, "pll-video",
- 					"osc24M", 0x010,
-@@ -538,9 +550,9 @@ static struct ccu_common *sun8i_a23_ccu_clks[] = {
- 	&ats_clk.common,
- };
- 
--/* We hardcode the divider to 4 for now */
-+/* We hardcode the divider to 1 for now */
- static CLK_FIXED_FACTOR(pll_audio_clk, "pll-audio",
--			"pll-audio-base", 4, 1, CLK_SET_RATE_PARENT);
-+			"pll-audio-base", 1, 1, CLK_SET_RATE_PARENT);
- static CLK_FIXED_FACTOR(pll_audio_2x_clk, "pll-audio-2x",
- 			"pll-audio-base", 2, 1, CLK_SET_RATE_PARENT);
- static CLK_FIXED_FACTOR(pll_audio_4x_clk, "pll-audio-4x",
-@@ -720,10 +732,10 @@ static void __init sun8i_a23_ccu_setup(struct device_node *node)
- 		return;
- 	}
- 
--	/* Force the PLL-Audio-1x divider to 4 */
-+	/* Force the PLL-Audio-1x divider to 1 */
- 	val = readl(reg + SUN8I_A23_PLL_AUDIO_REG);
- 	val &= ~GENMASK(19, 16);
--	writel(val | (3 << 16), reg + SUN8I_A23_PLL_AUDIO_REG);
-+	writel(val | (0 << 16), reg + SUN8I_A23_PLL_AUDIO_REG);
- 
- 	/* Force PLL-MIPI to MIPI mode */
- 	val = readl(reg + SUN8I_A23_PLL_MIPI_REG);
--- 
-2.14.2
+Hmm? I checked the omap4430 TRM and I don't see that mentioned. It seems
+to have pins for i2s transmit:
+
+	abe_mcasp_axr              O     Audio transmit data
+	abe_mcasp_aclkx            O     Transmit bit clock
+	abe_mcasp_ahclkx           O     Transmit high-frequency master clock
+	abe_mcasp_afsx             O     Transmit frame synchronization
+	abe_mcasp_amute            O     Mute out to external
+	abe_mcasp_amutein          I     Mute in from external
+
+If it supported s/pdif tx only, then all of these except axr would be
+useless.
+
+Matthijs
