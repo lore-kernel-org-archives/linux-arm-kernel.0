@@ -1,145 +1,126 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Thu, 12 Oct 2017 09:38:52 +0100
-Subject: [PATCH v3 1/2] arm_arch_timer: Expose event stream status
-In-Reply-To: <20171011151409.GB14341@arm.com>
-References: <1506682350-9023-1-git-send-email-julien.thierry@arm.com>
- <1506682350-9023-2-git-send-email-julien.thierry@arm.com>
- <20171011151409.GB14341@arm.com>
-Message-ID: <13c260d3-d0e4-3a6c-b7fb-000dda9c26ea@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 12 Oct 2017 10:50:17 +0100
+Subject: [PATCH 3/4] ACPI: IORT: Skip SMMUv3 device ID map for two steps
+ mappings
+In-Reply-To: <59DF1A02.9040008@huawei.com>
+References: <1506475215-2731-1-git-send-email-hanjun.guo@linaro.org>
+ <1506475215-2731-4-git-send-email-hanjun.guo@linaro.org>
+ <20170927135449.GA11347@red-moon>
+ <CAGHbJ3DbuGeKH16zr+PdZYjoaZrHJrTmV5tmMxZ5CDPObErUCQ@mail.gmail.com>
+ <20171010092036.GA8507@red-moon> <59DDAB72.7070605@huawei.com>
+ <20171011102424.GA10795@red-moon> <59DF1A02.9040008@huawei.com>
+Message-ID: <20171012095017.GA19816@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Thu, Oct 12, 2017 at 03:30:10PM +0800, Hanjun Guo wrote:
+> On 2017/10/11 18:24, Lorenzo Pieralisi wrote:
+> > On Wed, Oct 11, 2017 at 01:26:10PM +0800, Hanjun Guo wrote:
+> >> On 2017/10/10 17:20, Lorenzo Pieralisi wrote:
+> >>> On Tue, Oct 10, 2017 at 02:47:53PM +0800, Hanjun Guo wrote:
+> >>>> Hi Lorenzo,
+> >>>>
+> >>>> Sorry for the late reply, holidays in China for the past week.
+> >>>>
+> >>>> At 2017/9/27 21:54, Lorenzo Pieralisi wrote:
+> >>>>> Hi Hanjun,
+> >>>>>
+> >>>>> On Wed, Sep 27, 2017 at 09:20:14AM +0800, Hanjun Guo wrote:
+> >>>>>> IORT revision C introduced SMMUv3 MSI support which adding a
+> >>>>>> device ID mapping index in SMMUv3 sub table, to get the SMMUv3
+> >>>>>> device ID mapping for the output ID (dev ID for ITS) and the
+> >>>>>> link to which ITS.
+> >>>>>>
+> >>>>>> So if a platform supports SMMUv3 MSI for control interrupt,
+> >>>>>> there will be a additional single map entry under SMMU, this
+> >>>>>> will not introduce any difference for devices just use one
+> >>>>>> step map to get its output ID and parent (ITS or SMMU), such
+> >>>>>> as PCI/NC/PMCG ---> ITS or PCI/NC ---> SMMU, but we need to
+> >>>>>> do the special handling for two steps map case such as
+> >>>>>> PCI/NC--->SMMUv3--->ITS.
+> >>>>>>
+> >>>>>> Take a PCI hostbridge for example,
+> >>>>>>
+> >>>>>> |----------------------|
+> >>>>>> |  Root Complex Node   |
+> >>>>>> |----------------------|
+> >>>>>> |    map entry[x]      |
+> >>>>>> |----------------------|
+> >>>>>> |       id value       |
+> >>>>>> | output_reference     |
+> >>>>>> |---|------------------|
+> >>>>>>      |
+> >>>>>>      |   |----------------------|
+> >>>>>>      |-->|        SMMUv3        |
+> >>>>>>          |----------------------|
+> >>>>>>          |     SMMU dev ID      |
+> >>>>>>          |     mapping index 0  |
+> >>>>>>          |----------------------|
+> >>>>>>          |      map entry[0]    |
+> >>>>>>          |----------------------|
+> >>>>>>          |       id value       |
+> >>>>>>          | output_reference-----------> ITS 1 (SMMU MSI domain)
+> >>>>>>          |----------------------|
+> >>>>>>          |      map entry[1]    |
+> >>>>>>          |----------------------|
+> >>>>>>          |       id value       |
+> >>>>>>          | output_reference-----------> ITS 2 (PCI MSI domain)
+> >>>>>>          |----------------------|
+> >>>>>>
+> >>>>>> When the SMMU dev ID mapping index is 0, there is entry[0]
+> >>>>>> to map to a ITS, we need to skip that map entry for PCI
+> >>>>>> or NC (named component), or we may get the wrong ITS parent.
+> >>>>> Is this actually true ? I think that currently we would simply skip
+> >>>>> the entry and print an error log but we can't get a wrong ITS parent.
+> >>>> So the only valid single mapping under type SMMUv3 is SMMUv3's dev id
+> >>>> mapping, we need to fix the IORT spec as well.
+> >>>>
+> >>>>> I am rewriting this commit (I will probably split it), it is doing the
+> >>>>> right thing but the commit log is stale (probably caused by code
+> >>>>> reshuffling).
+> >>>> Do I need to resend another version, or you can help to update it?
+> >>>> please let me know.
+> >>> I reworked the patches, you can repost/retest them I made them available
+> >>> in the branch below, we will have to add a guard around ACPICA smmu
+> >>> struct (unfortunately I think we will have to use the ACPICA version as
+> >>> a guard) or I can ask Rafael to pull the series if ACPICA goes via ACPI
+> >>> tree (and your patch made it into the release - I will check ACPICA
+> >>> upstream).
+> >> Bob already merged my pull request yesterday, I think it will be ready for
+> >> acpica release for this month.
+> > That's good, mind updating the patch series with an ACPICA guard in IORT
+> > code in preparation for the pull request ?
+> 
+> Do you mean drop the acpica patch in this patch set and adding the code below?
 
-On 11/10/17 16:14, Will Deacon wrote:
-> Hi Julien,
-> 
-> On Fri, Sep 29, 2017 at 11:52:29AM +0100, Julien Thierry wrote:
->> The arch timer configuration for a CPU might get reset after suspending
->> said CPU.
->>
->> In order to reliably use the event stream in the kernel (e.g. for delays),
->> we keep track of the state where we can safely concider the event stream as
->> properly configured.
->>
->> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Russell King <linux@armlinux.org.uk>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> ---
->>   arch/arm/include/asm/arch_timer.h    |  1 +
->>   arch/arm64/include/asm/arch_timer.h  |  1 +
->>   drivers/clocksource/arm_arch_timer.c | 20 ++++++++++++++++++--
->>   include/clocksource/arm_arch_timer.h |  6 ++++++
->>   4 files changed, 26 insertions(+), 2 deletions(-)
-> 
-> The arch-timer bits needs an ack from Marc or Mark.
-> 
->> diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
->> index d4ebf56..0b6e104 100644
->> --- a/arch/arm/include/asm/arch_timer.h
->> +++ b/arch/arm/include/asm/arch_timer.h
->> @@ -106,6 +106,7 @@ static inline u32 arch_timer_get_cntkctl(void)
->>   static inline void arch_timer_set_cntkctl(u32 cntkctl)
->>   {
->>   	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
->> +	isb();
->>   }
->>
->>   #endif
->> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
->> index a652ce0..bdedd8f 100644
->> --- a/arch/arm64/include/asm/arch_timer.h
->> +++ b/arch/arm64/include/asm/arch_timer.h
->> @@ -144,6 +144,7 @@ static inline u32 arch_timer_get_cntkctl(void)
->>   static inline void arch_timer_set_cntkctl(u32 cntkctl)
->>   {
->>   	write_sysreg(cntkctl, cntkctl_el1);
->> +	isb();
->>   }
->>
->>   static inline u64 arch_counter_get_cntpct(void)
->> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
->> index fd4b7f6..47cf15e 100644
->> --- a/drivers/clocksource/arm_arch_timer.c
->> +++ b/drivers/clocksource/arm_arch_timer.c
->> @@ -77,6 +77,7 @@ struct arch_timer {
->>   static bool arch_counter_suspend_stop;
->>   static bool vdso_default = true;
->>
->> +static cpumask_t evtstrm_available;
->>   static bool evtstrm_enable = IS_ENABLED(CONFIG_ARM_ARCH_TIMER_EVTSTREAM);
->>
->>   static int __init early_evtstrm_cfg(char *buf)
->> @@ -740,6 +741,7 @@ static void arch_timer_evtstrm_enable(int divider)
->>   #ifdef CONFIG_COMPAT
->>   	compat_elf_hwcap |= COMPAT_HWCAP_EVTSTRM;
->>   #endif
->> +	cpumask_set_cpu(smp_processor_id(), &evtstrm_available);
->>   }
->>
->>   static void arch_timer_configure_evtstream(void)
->> @@ -864,6 +866,11 @@ u32 arch_timer_get_rate(void)
->>   	return arch_timer_rate;
->>   }
->>
->> +bool arch_timer_evtstrm_available(void)
->> +{
->> +	return !!cpumask_test_cpu(smp_processor_id(), &evtstrm_available);
->> +}
-> 
-> I don't think you need the '!!' prefix here.
-
-True, I'll remove that.
-
-> 
->> +
->>   static u64 arch_counter_get_cntvct_mem(void)
->>   {
->>   	u32 vct_lo, vct_hi, tmp_hi;
->> @@ -929,6 +936,8 @@ static int arch_timer_dying_cpu(unsigned int cpu)
->>   {
->>   	struct clock_event_device *clk = this_cpu_ptr(arch_timer_evt);
->>
->> +	cpumask_clear_cpu(smp_processor_id(), &evtstrm_available);
->> +
->>   	arch_timer_stop(clk);
->>   	return 0;
->>   }
->> @@ -938,10 +947,16 @@ static int arch_timer_dying_cpu(unsigned int cpu)
->>   static int arch_timer_cpu_pm_notify(struct notifier_block *self,
->>   				    unsigned long action, void *hcpu)
->>   {
->> -	if (action == CPU_PM_ENTER)
->> +	if (action == CPU_PM_ENTER) {
->>   		__this_cpu_write(saved_cntkctl, arch_timer_get_cntkctl());
->> -	else if (action == CPU_PM_ENTER_FAILED || action == CPU_PM_EXIT)
->> +
->> +		cpumask_clear_cpu(smp_processor_id(), &evtstrm_available);
->> +	} else if (action == CPU_PM_ENTER_FAILED || action == CPU_PM_EXIT) {
->>   		arch_timer_set_cntkctl(__this_cpu_read(saved_cntkctl));
->> +
->> +		if (elf_hwcap & HWCAP_EVTSTRM)
->> +			cpumask_set_cpu(smp_processor_id(), &evtstrm_available);
->> +	}
->>   	return NOTIFY_OK;
->>   }
->>
->> @@ -1017,6 +1032,7 @@ static int __init arch_timer_register(void)
->>   	if (err)
->>   		goto out_unreg_notify;
->>
->> +	cpumask_clear(&evtstrm_available);
-> 
-> This should already be ok by virtue of the mask being static, no?
-> Alternatively, you could use the CPU_MASK_NONE static initialiser.
-
-Yes, I just prefer explicit initialisations. But you're right, I'll use 
-CPU_MASK_NONE unless it is encouraged to rely on implicit intilisation.
+Yes unless we find a "smarter" way of handling the dependency.
 
 Thanks,
+Lorenzo
 
--- 
-Julien Thierry
+> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> index 37a1b9f..a883bec 100644
+> --- a/drivers/acpi/arm64/iort.c
+> +++ b/drivers/acpi/arm64/iort.c
+> @@ -366,6 +366,7 @@ static struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
+>         return NULL;
+>  }
+>  
+> +#if (ACPI_CA_VERSION > 0x20170929)
+>  static int iort_get_id_mapping_index(struct acpi_iort_node *node)
+>  {
+>         struct acpi_iort_smmu_v3 *smmu;
+> @@ -399,6 +400,12 @@ static int iort_get_id_mapping_index(struct acpi_iort_node *node)
+>                 return -EINVAL;
+>         }
+>  }
+> +#else
+> +static int iort_get_id_mapping_index(struct acpi_iort_node *node)
+> +{
+> + return -EINVAL;
+> +}
+> +#endif
+>  
+> Thanks
+> Hanjun
+> 
