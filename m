@@ -1,83 +1,58 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 12 Oct 2017 06:55:59 -0700
-Subject: [PATCH v2 3/4] dt-bindings: hwmon: Add
- ti-max-expected-current-microamp property to ina2xx
-In-Reply-To: <4597b058-ecb1-59ef-8693-1a23f374eae0@samsung.com>
-References: <CGME20171012123635eucas1p1ff9a982db9d541cd0475d44d114ff92a@eucas1p1.samsung.com>
- <1507811765-31005-1-git-send-email-m.purski@samsung.com>
- <1507811765-31005-4-git-send-email-m.purski@samsung.com>
- <CAJKOXPc1B1uqravtmHrh4eUK5JiQRiZLeoveSMk5qVyF-mK7Kw@mail.gmail.com>
- <4597b058-ecb1-59ef-8693-1a23f374eae0@samsung.com>
-Message-ID: <79da3a8b-e885-8a02-cbba-dfd1834450db@roeck-us.net>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 12 Oct 2017 15:56:20 +0200
+Subject: [PATCH] arm64: dts: marvell: 7040-db: Add the carrier detect pin
+ for SD card on CP
+In-Reply-To: <20171005160549.23741-1-gregory.clement@free-electrons.com>
+ (Gregory CLEMENT's message of "Thu, 5 Oct 2017 18:05:49 +0200")
+References: <20171005160549.23741-1-gregory.clement@free-electrons.com>
+Message-ID: <878tggbhbv.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/12/2017 06:00 AM, Maciej Purski wrote:
-> 
-> 
-> On 10/12/2017 02:39 PM, Krzysztof Kozlowski wrote:
->> On Thu, Oct 12, 2017 at 2:36 PM, Maciej Purski <m.purski@samsung.com> wrote:
->>> Add optional max expected current property which allows calibrating
->>> the ina sensor in order to achieve requested measure scale. Document
->>> the changes in Documentation/hwmon/ina2xx.
->>>
->>> Signed-off-by: Maciej Purski <m.purski@samsung.com>
->>> ---
->>> ? Documentation/devicetree/bindings/hwmon/ina2xx.txt | 4 +++-
->>> ? Documentation/hwmon/ina2xx???????????????????????? | 3 +++
->>> ? 2 files changed, 6 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/Documentation/devicetree/bindings/hwmon/ina2xx.txt b/Documentation/devicetree/bindings/hwmon/ina2xx.txt
->>> index 02af0d9..49ef0be 100644
->>> --- a/Documentation/devicetree/bindings/hwmon/ina2xx.txt
->>> +++ b/Documentation/devicetree/bindings/hwmon/ina2xx.txt
->>> @@ -14,11 +14,13 @@ Optional properties:
->>>
->>> ? - shunt-resistor
->>> ???????? Shunt resistor value in micro-Ohm
->>> -
->>> +- ti-max-expected-current-microamp
->>> +?????? Max expected current value in mA
->>> ? Example:
->>>
->>> ? ina220 at 44 {
->>> ???????? compatible = "ti,ina220";
->>> ???????? reg = <0x44>;
->>> ???????? shunt-resistor = <1000>;
->>> +?????? ti-max-expected-current-microamp = <3000>;
->>> ? };
->>> diff --git a/Documentation/hwmon/ina2xx b/Documentation/hwmon/ina2xx
->>> index cfd31d9..30620e8 100644
->>> --- a/Documentation/hwmon/ina2xx
->>> +++ b/Documentation/hwmon/ina2xx
->>> @@ -55,6 +55,9 @@ The shunt value in micro-ohms can be set via platform data or device tree at
->>> ? compile-time or via the shunt_resistor attribute in sysfs at run-time. Please
->>> ? refer to the Documentation/devicetree/bindings/i2c/ina2xx.txt for bindings
->>> ? if the device tree is used.
->>> +The max expected current value in miliamp can be set via platform data
->>
->> mili or micro?
->>
->> BR,
->> Krzysztof
-> 
-> Sorry, these should be mili everywhere. I'll fix this.
-> 
+Hi,
+ 
+ On jeu., oct. 05 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
-You sure ? I think DT usually uses micro.
+> The SD card slot connected to the SD controller of the CP part has a
+> carrier detect pin connected the gpio expander. This patch enables it
+> allowing supporting the hotplug event for the SD card.
 
-Guenter
 
->>
->>> +or device tree at compile-time or via currX_max attribute in sysfs
->>> +at run-time.
->>>
->>> ? Additionally ina226 supports update_interval attribute as described in
->>> ? Documentation/hwmon/sysfs-interface. Internally the interval is the sum of
->>> -- 
->>> 2.7.4
->>>
->>
->>
->>
-> 
+Applied on mvebu/dt64
+
+Gregory
+
+
+>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  arch/arm64/boot/dts/marvell/armada-7040-db.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-7040-db.dts b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+> index 18a75fad1e8d..d339ad5c8c27 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+> +++ b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+> @@ -239,7 +239,7 @@
+>  	status = "okay";
+>  	bus-width = <4>;
+>  	no-1-8-v;
+> -	non-removable;
+> +	cd-gpios = <&expander0 12 GPIO_ACTIVE_LOW>;
+>  };
+>  
+>  &cpm_mdio {
+> -- 
+> 2.14.2
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
