@@ -1,36 +1,30 @@
-From: phh@phh.me (Pierre-Hugues Husson)
-Date: Sat, 14 Oct 2017 00:53:36 +0200
-Subject: [PATCH 2/3] arm64: dts: rockchip: add the cec clk for dw-mipi-hdmi on
- rk3399
-In-Reply-To: <20171013225337.5196-1-phh@phh.me>
-References: <20171013225337.5196-1-phh@phh.me>
-Message-ID: <20171013225337.5196-3-phh@phh.me>
+From: dlan@gentoo.org (Yixun Lan)
+Date: Sat, 14 Oct 2017 07:13:11 +0800
+Subject: [PATCH 0/2] Introduce new DT files for Meson-AXG SoC
+Message-ID: <20171013231313.22850-1-dlan@gentoo.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Pierre-Hugues Husson <phh@phh.me>
----
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+This attempt will try to add new DT files to support Meson-AXG SoC.
+Due to the AXG series has new memory layout, we decide to start a new
+DT structure without sharing with previous meson-gx.dtsi
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index ab7629c5b856..a65f7f744a40 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -1601,8 +1601,12 @@
- 		compatible = "rockchip,rk3399-dw-hdmi";
- 		reg = <0x0 0xff940000 0x0 0x20000>;
- 		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH 0>;
--		clocks = <&cru PCLK_HDMI_CTRL>, <&cru SCLK_HDMI_SFR>, <&cru PLL_VPLL>, <&cru PCLK_VIO_GRF>;
--		clock-names = "iahb", "isfr", "vpll", "grf";
-+		clocks = <&cru PCLK_HDMI_CTRL>,
-+			 <&cru SCLK_HDMI_SFR>,
-+			 <&cru PLL_VPLL>,
-+			 <&cru PCLK_VIO_GRF>,
-+			 <&cru SCLK_HDMI_CEC>;
-+		clock-names = "iahb", "isfr", "vpll", "grf", "cec";
- 		power-domains = <&power RK3399_PD_HDCP>;
- 		reg-io-width = <4>;
- 		rockchip,grf = <&grf>;
+1) in the first patch, we try to document the new Meson-AXG bindings
+2) in the second patch, we try to bring up a minimal serial console,
+so it's capable of running a minimal system (in ramdisk).
+
+
+Yixun Lan (2):
+  dt-bindings: arm: amlogic: Add Meson AXG binding
+  arm64: dts: meson-axg: add initial A113D SoC DT support
+
+ Documentation/devicetree/bindings/arm/amlogic.txt |   6 +
+ arch/arm64/boot/dts/amlogic/Makefile              |   1 +
+ arch/arm64/boot/dts/amlogic/meson-axg-s400.dts    |  22 +++
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi        | 204 ++++++++++++++++++++++
+ 4 files changed, 233 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+
 -- 
 2.14.1
