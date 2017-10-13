@@ -1,130 +1,101 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Fri, 13 Oct 2017 10:23:21 +0100
-Subject: [PATCH v1 2/2] kvm: arm64: handle single-step of userspace mmio
- instructions
-In-Reply-To: <20171013085947.GE8927@cbox>
-References: <20171006113921.24880-1-alex.bennee@linaro.org>
- <20171006113921.24880-3-alex.bennee@linaro.org>
- <a9f8905e-18e9-267a-2479-f498c248e2f4@arm.com> <878tgoxudc.fsf@linaro.org>
- <20171013085947.GE8927@cbox>
-Message-ID: <87po9r9zau.fsf@linaro.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Oct 2017 10:24:18 +0100
+Subject: [PATCH v3 0/8] ARM: NOMMU: MPU updates
+In-Reply-To: <e2e80a26-4a87-6d4c-51ad-11d6ea683c16@arm.com>
+References: <1506330344-31556-1-git-send-email-vladimir.murzin@arm.com>
+ <68a6eb4d-4d8e-7c6a-0875-3165bde8de89@arm.com>
+ <e2e80a26-4a87-6d4c-51ad-11d6ea683c16@arm.com>
+Message-ID: <20171013092418.GF20805@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Sorry, but I have no working MPS3 platform since it killed its uSD card
+with all the FPGA bitstreams on.  I'm waiting (since end of September)
+for a replacement from ARM Ltd but there hasn't yet been any progress.
 
-Christoffer Dall <cdall@linaro.org> writes:
+Sure, I can replace the uSD card myself, but the problem is the contents
+of the card.
 
-> On Fri, Oct 06, 2017 at 02:45:35PM +0100, Alex Benn?e wrote:
->>
->> Julien Thierry <julien.thierry@arm.com> writes:
->>
->> > On 06/10/17 12:39, Alex Benn?e wrote:
->> >> The system state of KVM when using userspace emulation is not complete
->> >> until we return into KVM_RUN. To handle mmio related updates we wait
->> >> until they have been committed and then schedule our KVM_EXIT_DEBUG.
->> >>
->> >> I've introduced a new function kvm_arm_maybe_return_debug() to wrap up
->> >> the differences between arm/arm64 which is currently null for arm.
->> >>
->> >> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->> >> ---
->> >>   arch/arm/include/asm/kvm_host.h   |  2 ++
->> >>   arch/arm64/include/asm/kvm_host.h |  1 +
->> >>   arch/arm64/kvm/debug.c            | 21 +++++++++++++++++++++
->> >>   arch/arm64/kvm/handle_exit.c      |  9 +++------
->> >>   virt/kvm/arm/arm.c                |  2 +-
->> >>   virt/kvm/arm/mmio.c               |  3 ++-
->> >>   6 files changed, 30 insertions(+), 8 deletions(-)
->> >>
->> >> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->> >> index 4a879f6ff13b..aec943f6d123 100644
->> >> --- a/arch/arm/include/asm/kvm_host.h
->> >> +++ b/arch/arm/include/asm/kvm_host.h
->> >> @@ -285,6 +285,8 @@ static inline void kvm_arm_init_debug(void) {}
->> >>   static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
->> >>   static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
->> >>   static inline void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu) {}
->> >> +static inline int  kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu,
->> >> +						struct kvm_run *run) {}
->> >>
->> >
->> > This function should return 1.
->>
->> So I did ponder making this a bool, returning true if we need to exit
->> and testing in v/k/a/arm.c exit leg rather than in the mmio handler.
->>
->> At the moment it mirrors the existing exit logic which follows -1 err, 0
->> return, >0 handled. But as I mentioned in the cover letter this fell
->> down a bit when dealing with the mmio case.
->>
->> >
->> >>   int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
->> >>   			       struct kvm_device_attr *attr);
->> >> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->> >> index e923b58606e2..fa67d21662f6 100644
->> >> --- a/arch/arm64/include/asm/kvm_host.h
->> >> +++ b/arch/arm64/include/asm/kvm_host.h
->> >> @@ -369,6 +369,7 @@ void kvm_arm_init_debug(void);
->> >>   void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
->> >>   void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
->> >>   void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu);
->> >> +int  kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu, struct kvm_run *run);
->> >
->> > I feel the name could be a little bit more explicit:
->> >
->> > kvm_arm_trap_need_step_debug, kvm_arm_trap_step_return_debug,
->> > kvm_arm_trap_need_return_debug.
->>
->> I wanted to keep the debug suffix so that's fine although I'm not so
->> sure trap is correct because on the tail end of mmio emulation are we
->> still trapping?
->>
->> Maybe kvm_arm_step_emulated_debug?
->
-> I think you should name it:
->
-> kvm_arm_should_complete_emulated_instr_debug() - or something better -
+On Fri, Oct 13, 2017 at 10:17:00AM +0100, Vladimir Murzin wrote:
+> Gentle ping...
+> 
+> On 09/10/17 10:20, Vladimir Murzin wrote:
+> > Russell, do you have concerns on this series?
+> > 
+> > Thanks
+> > Vladimir
+> > 
+> > On 25/09/17 10:05, Vladimir Murzin wrote:
+> >> Hi,
+> >>
+> >> This is an update of the existent MPU code which consist set of
+> >> clean-ups and enhancements. The most significant changes are in the
+> >> way how MPU settings sync-up for secondaries (PATCH 3/8), more
+> >> flexible layout for memory (PATCH 7/8) and support for XIP (PATCH
+> >> 8/8). Since there is no in-tree user of MPU, support for M-class has
+> >> been added (PATCH 6/8).
+> >>
+> >> There is also practical benefit of patch set:
+> >>
+> >> "These MPU patches introduce a nice feature that it simplifies the
+> >> bootloader: do not need to setup the MPU, for example for coherent DMA
+> >> region, which is described in device-tree too." Andr?s Szemz?
+> >>
+> >> Changelog:
+> >>            v2 -> v3
+> >>               - fixed support for XIP (PATCH 8/8)
+> >> 	      - rebased on 4.14-rc2
+> >>
+> >>            v1 -> v2
+> >>               - support for XIP (PATCH 8/8)
+> >> 	      - rebased on 4.13-rc1
+> >>
+> >>         RFC v2 -> v1
+> >>                - dropped RFC tag
+> >> 	       - Tested-by from Andr?s
+> >> 	       - rebased on 4.12-rc5
+> >>
+> >>            RFC -> RFC v2
+> >> 	       - fixed MPU enable for v7m (PATCH 6/7)
+> >>
+> >> Thanks!
+> >>
+> >> Vladimir Murzin (8):
+> >>   ARM: NOMMU: Move out MPU setup in separate module
+> >>   ARM: NOMMU: Update MPU accessors to use cp15 helpers
+> >>   ARM: NOMMU: Rework MPU to be mostly done in C
+> >>   ARM: NOMMU: Disallow MPU for XIP
+> >>   ARM: Kconfig: Kill CONFIG_VECTORS_BASE
+> >>   ARM: V7M: Add support for MPU to M-class
+> >>   ARM: NOMMU: Use more MPU regions to cover memory
+> >>   ARM: NOMMU: Support MPU in XIP configuration
+> >>
+> >>  arch/arm/Kconfig                  |   9 -
+> >>  arch/arm/Kconfig-nommu            |   4 +-
+> >>  arch/arm/include/asm/cputype.h    |  10 +
+> >>  arch/arm/include/asm/mpu.h        |  26 +-
+> >>  arch/arm/include/asm/smp.h        |   2 +-
+> >>  arch/arm/include/asm/v7m.h        |  10 +
+> >>  arch/arm/kernel/asm-offsets.c     |  11 +
+> >>  arch/arm/kernel/head-nommu.S      | 148 +++++++++---
+> >>  arch/arm/kernel/smp.c             |   2 +-
+> >>  arch/arm/kernel/vmlinux-xip.lds.S |  23 ++
+> >>  arch/arm/mm/Makefile              |   1 +
+> >>  arch/arm/mm/nommu.c               | 254 +-------------------
+> >>  arch/arm/mm/pmsa-v7.c             | 484 ++++++++++++++++++++++++++++++++++++++
+> >>  13 files changed, 682 insertions(+), 302 deletions(-)
+> >>  create mode 100644 arch/arm/mm/pmsa-v7.c
+> >>
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > 
+> 
 
-Naming is hard :-/
-
-> and call it directly from kvm_arch_vcpu_ioctl_run, so that it becomes:
->
-> 	ret = kvm_handle_mmio_return(vcpu, vcpu->run);
-> 	if (ret)
-> 		return ret;
-> 	ret = kvm_arm_should_complete_emulated_instr_debug(vcpu);
-> 	if (ret)
-> 		return ret;
-
-This runs into the problem of slightly different ret semantics for here
-and in handle_exit. Maybe just having a bool response and:
-
-    if (kvm_arm_should_complete_emulated_instr_debug(vcpu))
-        return 0;
-
-And then in handle_exit:
-
-    if (handled == 1 && kvm_arm_should_complete_emulated_instr_debug(vcpu))
-        return 0;
-    else
-        return handled;
-
-?
->
->>
->> > At least, I think it would be nice that the name reflect that this
->> > check is meant for emulated instructions.
->> >
->> > Otherwise:
->> >
->> > Reviewed-by: Julien Thierry <julien.thierry@arm.com>
->> >
->> > Thanks,
->>
->>
-> Thanks,
-> -Christoffer
-
-
---
-Alex Benn?e
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
