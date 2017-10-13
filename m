@@ -1,55 +1,55 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 13 Oct 2017 17:30:23 +0200
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.14 (#2)
-Message-ID: <87r2u783qo.fsf@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 13 Oct 2017 16:31:48 +0100
+Subject: [PATCH v3 04/13] arm64: alternatives: use tpidr_el2 on VHE hosts
+In-Reply-To: <20170922182614.27885-5-james.morse@arm.com>
+References: <20170922182614.27885-1-james.morse@arm.com>
+ <20170922182614.27885-5-james.morse@arm.com>
+Message-ID: <20171013153148.dnejsvhxeui6opfw@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Sep 22, 2017 at 07:26:05PM +0100, James Morse wrote:
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index cd52d365d1f0..8e4c7da2b126 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -865,6 +865,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+>  		.capability = ARM64_HAS_VIRT_HOST_EXTN,
+>  		.def_scope = SCOPE_SYSTEM,
+>  		.matches = runs_at_el2,
+> +		.enable = cpu_copy_el2regs,
+>  	},
+>  	{
+>  		.desc = "32-bit EL0 Support",
+> @@ -1308,3 +1309,25 @@ static int __init enable_mrs_emulation(void)
+>  }
+>  
+>  late_initcall(enable_mrs_emulation);
+> +
+> +int cpu_copy_el2regs(void *__unused)
+> +{
+> +	int do_copyregs = 0;
+> +
+> +	/*
+> +	 * Copy register values that aren't redirected by hardware.
+> +	 *
+> +	 * Before code patching, we only set tpidr_el1, all CPUs need to copy
+> +	 * this value to tpidr_el2 before we patch the code. Once we've done
+> +	 * that, freshly-onlined CPUs will set tpidr_el2, so we don't need to
+> +	 * do anything here.
+> +	 */
+> +	asm volatile(ALTERNATIVE("mov %0, #1", "mov %0, #0",
+> +				 ARM64_HAS_VIRT_HOST_EXTN)
+> +		    : "=r" (do_copyregs) : : );
 
-Here is the second pull request for fixes for mvebu for v4.14.
+Can you just do:
 
-Gregory
+	if (cpu_have_const_cap(ARM64_HAS_VIRT_HOST_EXTN))
+		write_sysreg(read_sysreg(tpidr_el1), tpidr_el2);
 
-The following changes since commit 9e7460fc325dad06d2066abdbc1f4dd49456f9a4:
+At this point the capability bits should be set and the jump labels
+enabled.
 
-  arm64: dt marvell: Fix AP806 system controller size (2017-09-19 16:40:07 +0200)
+Otherwise:
 
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.14-2
-
-for you to fetch changes up to 2bbbd96357ce76cc45ec722c00f654aa7b189112:
-
-  bus: mbus: fix window size calculation for 4GB windows (2017-10-12 15:01:30 +0200)
-
-----------------------------------------------------------------
-mvebu fixes for 4.14 (part 2)
-
-Two device tree related fixes:
-
-- One on Armada 38x using a other compatible string for I2C in order
-  to cover an errata.
-
-- One for Armada 7K/8K fixing a typo on interrupt-map property for
-  PCIe leading to fail PME and AER root port service initialization
-
-And the last one for the mbus fixing the window size calculation when
-it exceed 32bits
-
-----------------------------------------------------------------
-Jan Luebbe (1):
-      bus: mbus: fix window size calculation for 4GB windows
-
-Kalyan Kinthada (1):
-      ARM: dts: Fix I2C repeated start issue on Armada-38x
-
-Thomas Petazzoni (1):
-      arm64: dts: marvell: fix interrupt-map property for Armada CP110 PCIe controller
-
- arch/arm/boot/dts/armada-38x.dtsi                    | 4 ++--
- arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 6 +++---
- arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 6 +++---
- drivers/bus/mvebu-mbus.c                             | 2 +-
- include/linux/mbus.h                                 | 4 ++--
- 5 files changed, 11 insertions(+), 11 deletions(-)
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
