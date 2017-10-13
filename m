@@ -1,98 +1,181 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 13 Oct 2017 16:07:57 +0200
-Subject: [PATCH v4 4/7] soc: mediatek: pwrap: update pwrap_init without
- slave programming
-In-Reply-To: <1507887704.21840.32.camel@mtkswgap22>
-References: <cover.1505980364.git.sean.wang@mediatek.com>
- <604078485ca9ab04cea5bc531425d6035b27bc88.1505980364.git.sean.wang@mediatek.com>
- <f3a04159-8491-6ca6-d2ad-7df1dfd64331@gmail.com>
- <1507887704.21840.32.camel@mtkswgap22>
-Message-ID: <fe0952f1-c018-8492-7336-149f917463e1@gmail.com>
+From: pasha.tatashin@oracle.com (Pavel Tatashin)
+Date: Fri, 13 Oct 2017 10:10:09 -0400
+Subject: [PATCH v11 7/9] arm64/kasan: add and use kasan_map_populate()
+In-Reply-To: <CAOAebxtrSthSP4NAa0obBbsCK1KZxO+x0w5xNrpY6m2y9UZFvQ@mail.gmail.com>
+References: <20171009221931.1481-1-pasha.tatashin@oracle.com>
+ <20171009221931.1481-8-pasha.tatashin@oracle.com>
+ <20171010155619.GA2517@arm.com>
+ <CAOAebxv21+KtXPAk-xWz=+2fqWQDgp9SAFZz-N=XsuBxev=zcg@mail.gmail.com>
+ <20171010171047.GC2517@arm.com>
+ <CAOAebxtrSthSP4NAa0obBbsCK1KZxO+x0w5xNrpY6m2y9UZFvQ@mail.gmail.com>
+Message-ID: <CAOAebxu5WL-FQLgfCxNcWy36V6zsTO1v3LLqXv5rM1Pp9R-=YA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Will,
+
+I have a couple concerns about your patch:
+
+One of the reasons (and actually, the main reason) why I preferred to
+keep vmemmap_populate() instead of implementing kasan's own variant,
+which btw can be done in common code similarly to
+vmemmap_populate_basepages() is that vmemmap_populate() uses large
+pages when available. I think it is a considerable downgrade to go
+back to base pages, when we already have large page support available
+to us.
+
+The kasan shadow tree is large, it is up-to 1/8th of system memory, so
+even on moderate size servers, shadow tree is going to be multiple
+gigabytes.
+
+The second concern is that there is an existing bug associated with
+your patch that I am not sure how to solve:
+
+Try building your patch with CONFIG_DEBUG_VM. This config makes
+memblock_virt_alloc_try_nid_raw() to do memset(0xff) on all allocated
+memory.
+
+I am getting the following panic during boot:
+
+[    0.012637] pid_max: default: 32768 minimum: 301
+[    0.016037] Security Framework initialized
+[    0.018389] Dentry cache hash table entries: 16384 (order: 5, 131072 bytes)
+[    0.019559] Inode-cache hash table entries: 8192 (order: 4, 65536 bytes)
+[    0.020409] Mount-cache hash table entries: 512 (order: 0, 4096 bytes)
+[    0.020721] Mountpoint-cache hash table entries: 512 (order: 0, 4096 bytes)
+[    0.055337] Unable to handle kernel paging request at virtual
+address ffff0400010065af
+[    0.055422] Mem abort info:
+[    0.055518]   Exception class = DABT (current EL), IL = 32 bits
+[    0.055579]   SET = 0, FnV = 0
+[    0.055640]   EA = 0, S1PTW = 0
+[    0.055699] Data abort info:
+[    0.055762]   ISV = 0, ISS = 0x00000007
+[    0.055822]   CM = 0, WnR = 0
+[    0.055966] swapper pgtable: 4k pages, 48-bit VAs, pgd = ffff20000a8f4000
+[    0.056047] [ffff0400010065af] *pgd=0000000046fe7003,
+*pud=0000000046fe6003, *pmd=0000000046fe5003, *pte=0000000000000000
+[    0.056436] Internal error: Oops: 96000007 [#1] PREEMPT SMP
+[    0.056701] Modules linked in:
+[    0.056939] CPU: 0 PID: 0 Comm: swapper/0 Not tainted
+4.14.0-rc4_pt_memset12-00096-gfca5985f860e-dirty #16
+[    0.057001] Hardware name: linux,dummy-virt (DT)
+[    0.057084] task: ffff2000099d9000 task.stack: ffff2000099c0000
+[    0.057275] PC is at __asan_load8+0x34/0xb0
+[    0.057375] LR is at __d_rehash+0xf0/0x240
+[    0.057460] pc : [<ffff200008317d7c>] lr : [<ffff20000837e168>]
+pstate: 60000045
+[    0.057522] sp : ffff2000099c6a60
+[    0.057590] x29: ffff2000099c6a60 x28: ffff2000099d9010
+[    0.057733] x27: 0000000000000004 x26: ffff200008031000
+[    0.057846] x25: ffff2000099d9000 x24: ffff800003c06410
+---Type <return> to continue, or q <return> to quit---
+[    0.057954] x23: 00000000000003af x22: ffff800003c06400
+[    0.058065] x21: 1fffe40001338d5a x20: ffff200008032d78
+[    0.058175] x19: ffff800003c06408 x18: 0000000000000000
+[    0.058311] x17: 0000000000000009 x16: 0000000000007fff
+[    0.058417] x15: 000000000000002a x14: ffff2000080ef374
+[    0.058528] x13: ffff200008126648 x12: ffff200008411a7c
+[    0.058638] x11: ffff200008392358 x10: ffff200008392184
+[    0.058770] x9 : ffff20000835aad8 x8 : ffff200009850e90
+[    0.058883] x7 : ffff20000904b23c x6 : 00000000f2f2f200
+[    0.058990] x5 : 0000000000000000 x4 : ffff200008032d78
+[    0.059097] x3 : 0000000000000000 x2 : dfff200000000000
+[    0.059206] x1 : 0000000000000007 x0 : 1fffe400010065af
+[    0.059372] Process swapper/0 (pid: 0, stack limit = 0xffff2000099c0000)
+[    0.059442] Call trace:
+[    0.059603] Exception stack(0xffff2000099c6920 to 0xffff2000099c6a60)
+[    0.059771] 6920: 1fffe400010065af 0000000000000007
+dfff200000000000 0000000000000000
+[    0.059877] 6940: ffff200008032d78 0000000000000000
+00000000f2f2f200 ffff20000904b23c
+[    0.059973] 6960: ffff200009850e90 ffff20000835aad8
+ffff200008392184 ffff200008392358
+[    0.060066] 6980: ffff200008411a7c ffff200008126648
+ffff2000080ef374 000000000000002a
+[    0.060154] 69a0: 0000000000007fff 0000000000000009
+0000000000000000 ffff800003c06408
+[    0.060246] 69c0: ffff200008032d78 1fffe40001338d5a
+ffff800003c06400 00000000000003af
+[    0.060338] 69e0: ffff800003c06410 ffff2000099d9000
+ffff200008031000 0000000000000004
+[    0.060432] 6a00: ffff2000099d9010 ffff2000099c6a60
+ffff20000837e168 ffff2000099c6a60
+[    0.060525] 6a20: ffff200008317d7c 0000000060000045
+ffff200008392358 ffff200008411a7c
+[    0.060620] 6a40: ffffffffffffffff ffff2000080ef374
+ffff2000099c6a60 ffff200008317d7c
+[    0.060762] [<ffff200008317d7c>] __asan_load8+0x34/0xb0
+[    0.060856] [<ffff20000837e168>] __d_rehash+0xf0/0x240
+[    0.060944] [<ffff20000837fb80>] d_add+0x288/0x3f0
+[    0.061041] [<ffff200008420db8>] proc_setup_self+0x110/0x198
+[    0.061139] [<ffff200008411594>] proc_fill_super+0x13c/0x198
+[    0.061234] [<ffff200008359648>] mount_ns+0x98/0x148
+[    0.061328] [<ffff2000084116ac>] proc_mount+0x5c/0x70
+[    0.061422] [<ffff20000835aad8>] mount_fs+0x50/0x1a8
+[    0.061515] [<ffff200008392184>] vfs_kern_mount.part.7+0x9c/0x218
+[    0.061602] [<ffff200008392358>] kern_mount_data+0x38/0x70
+[    0.061699] [<ffff200008411a7c>] pid_ns_prepare_proc+0x24/0x50
+[    0.061796] [<ffff200008126648>] alloc_pid+0x6e8/0x730
+[    0.061891] [<ffff2000080ef374>] copy_process.isra.6.part.7+0x11cc/0x2cb8
+[    0.061978] [<ffff2000080f1104>] _do_fork+0x14c/0x4c0
+[    0.062065] [<ffff2000080f14c0>] kernel_thread+0x30/0x38
+[    0.062156] [<ffff20000904b23c>] rest_init+0x34/0x108
+[    0.062260] [<ffff200009850e90>] start_kernel+0x45c/0x48c
+[    0.062458] Code: 540001e1 d343fc00 d2c40002 f2fbffe2 (38e26800)
+[    0.063559] ---[ end trace 390c5d4fc6641888 ]---
+[    0.064164] Kernel panic - not syncing: Attempted to kill the idle task!
+[    0.064438] ---[ end Kernel panic - not syncing: Attempted to kill
+the idle task!
 
 
-On 10/13/2017 11:41 AM, Sean Wang wrote:
-> On Tue, 2017-10-10 at 20:00 +0200, Matthias Brugger wrote:
->>
->> On 09/21/2017 10:26 AM, sean.wang at mediatek.com wrote:
->>> From: Sean Wang <sean.wang@mediatek.com>
->>>
->>> pwrap initialization is highly associated with the base SoC, so
->>> update here for allowing pwrap_init without slave program which would be
->>> used to those PMICs without extra encryption on bus such as MT6380.
->>>
->>> Signed-off-by: Chenglin Xu <chenglin.xu@mediatek.com>
->>> Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
->>> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
->>> ---
->>>    drivers/soc/mediatek/mtk-pmic-wrap.c | 91 +++++++++++++++++++++---------------
->>>    1 file changed, 54 insertions(+), 37 deletions(-)
->>>
->>> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
->>> index 27d7ccc..9c6d855 100644
->>> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
->>> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
->>> @@ -531,6 +531,7 @@ struct pmic_wrapper_type {
->>>    	u32 spi_w;
->>>    	u32 wdt_src;
->>>    	int has_bridge:1;
->>> +	int slv_program:1;
->>>    	int (*init_reg_clock)(struct pmic_wrapper *wrp);
->>>    	int (*init_soc_specific)(struct pmic_wrapper *wrp);
->>>    };
->>> @@ -999,9 +1000,12 @@ static int pwrap_init(struct pmic_wrapper *wrp)
->>>    	}
->>>    
->>>    	/* Reset SPI slave */
->>> -	ret = pwrap_reset_spislave(wrp);
->>> -	if (ret)
->>> -		return ret;
->>> +
->>> +	if (wrp->master->slv_program) {
->>> +		ret = pwrap_reset_spislave(wrp);
->>> +		if (ret)
->>> +			return ret;
->>> +	}
->>>    
->>>    	pwrap_writel(wrp, 1, PWRAP_WRAP_EN);
->>>    
->>> @@ -1013,45 +1017,52 @@ static int pwrap_init(struct pmic_wrapper *wrp)
->>>    	if (ret)
->>>    		return ret;
->>>    
->>> -	/* Setup serial input delay */
->>> -	ret = pwrap_init_sidly(wrp);
->>> -	if (ret)
->>> -		return ret;
->>> +	if (wrp->master->slv_program) {
->>
->> This if branch is really long and complex enough to put it into function apart.
->>
->> Thanks,
->> Matthias
->>
->> PD please take into account the comments I made on v3 of the series.
->>
-> 
-> I'll try to breakdown the long logic into the short one and use a flag
-> indicating the slave capability decides whether the functions is
-> required being enabled for the slave instead of slv_program which is
-> less meaningful. In this way, pmic_init will be more extensible when
-> more different SoCs and target slaves with various flavors into the
-> driver. And also take into accounts those suggestions you made in v3 in
-> the next version.
-> 
-> 	Sean
-> 
+So, I've been trying to root cause it, and here is what I've got:
 
-I totally agree, but I wanted to underline that right now the if branch under
-"if (wrp->master->slv_program)" is around 30 lines, so I think it would be a 
-good candidate to put it into it's own function. For example: 
-pwrap_init_encryption()
-As from what I understand from the commit log, slv_program in the end enables 
-encryption of the communication, right?
+First, I went back to my version of kasan_map_populate() and replaced
+vmemmap_populate() with vmemmap_populate_basepages(), which
+behavior-vise made it very similar to your patch. After doing this I
+got the same panic. So, I figured there must be something to do with
+the differences that regular vmemmap allocated with granularity of
+SWAPPER_BLOCK_SIZE while kasan with granularity of PAGE_SIZE.
 
-Regards,
-Matthias
+So, I made the following modification to your patch:
+
+static void __init kasan_map_populate(unsigned long start, unsigned long end,
+                                      int node)
+{
++        start = round_down(start, SWAPPER_BLOCK_SIZE);
++       end = round_up(end, SWAPPER_BLOCK_SIZE);
+        kasan_pgd_populate(start & PAGE_MASK, PAGE_ALIGN(end), node, false);
+}
+
+This is basically makes shadow tree ranges to be SWAPPER_BLOCK_SIZE
+aligned. After, this modification everything is working.  However, I
+am not sure if this is a proper fix.
+
+I feel, this patch requires more work, and I am troubled with using
+base pages instead of large pages.
+
+Thank you,
+Pavel
+
+On Tue, Oct 10, 2017 at 1:41 PM, Pavel Tatashin
+<pasha.tatashin@oracle.com> wrote:
+> Hi Will,
+>
+> Ok, I will add your patch at the end of my series.
+>
+> Thank you,
+> Pavel
+>
+>>
+>> I was thinking that you could just add my patch to the end of your series
+>> and have the whole lot go up like that. If you want to merge it with your
+>> patch, I'm fine with that too.
+>>
+>> Will
+>>
+>> --
+>> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+>> the body to majordomo at kvack.org.  For more info on Linux MM,
+>> see: http://www.linux-mm.org/ .
+>> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
