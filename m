@@ -1,186 +1,127 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 13 Oct 2017 19:59:17 +0100
-Subject: [PATCH v2 4/4] iommu/arm-smmu-v3: Poll for CMD_SYNC outside cmdq
- lock
-In-Reply-To: <ff239173e47dfa0fc76eaa2a25b3cbcfe8dce5e6.1504182142.git.robin.murphy@arm.com>
-References: <cover.1504182142.git.robin.murphy@arm.com>
- <ff239173e47dfa0fc76eaa2a25b3cbcfe8dce5e6.1504182142.git.robin.murphy@arm.com>
-Message-ID: <20171013185917.GB30572@arm.com>
+From: jeffy.chen@rock-chips.com (jeffy)
+Date: Sat, 14 Oct 2017 03:01:42 +0800
+Subject: [RESEND PATCH 1/2] spi: rockchip: Convert to late and early system
+ PM callbacks
+In-Reply-To: <59E10971.6020200@rock-chips.com>
+References: <20171013104138.3216-1-jeffy.chen@rock-chips.com>
+ <20171013104138.3216-2-jeffy.chen@rock-chips.com>
+ <CAD=FV=X6pkaY3t=ceh3QEUws+_gqRGMN9zveW0fXR1noF1T6ew@mail.gmail.com>
+ <20171013155120.GA137489@google.com>
+ <20171013164235.thgqha7sl5tdptwv@sirena.co.uk>
+ <59E103B0.8060705@rock-chips.com> <20171013183006.k6pzcr5tcwsxxtmp@dtor-ws>
+ <59E10971.6020200@rock-chips.com>
+Message-ID: <59E10D96.90307@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+Hi guys,
 
-Some of my comments on patch 3 are addressed here, but I'm really struggling
-to convince myself that this algorithm is correct. My preference would
-be to leave the code as it is for SMMUs that don't implement MSIs, but
-comments below anyway because it's an interesting idea.
+so what happens here is:
+1/ we put display-subsystem dt node before spi node, which cause 
+rockchip drm driver probed before spi(also before edp driver/vop driver...)
 
-On Thu, Aug 31, 2017 at 02:44:28PM +0100, Robin Murphy wrote:
-> Even without the MSI trick, we can still do a lot better than hogging
-> the entire queue while it drains. All we actually need to do for the
-> necessary guarantee of completion is wait for our particular command to
-> have been consumed, and as long as we keep track of where it is there is
-> no need to block other CPUs from adding further commands in the
-> meantime. There is one theoretical (but incredibly unlikely) edge case
-> to avoid, where cons has wrapped twice to still appear 'behind' the sync
-> position - this is easily disambiguated by adding a generation count to
-> the queue to indicate when prod wraps, since cons cannot wrap twice
-> without prod having wrapped at least once.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
-> 
-> v2: New
-> 
->  drivers/iommu/arm-smmu-v3.c | 81 ++++++++++++++++++++++++++++++++-------------
->  1 file changed, 58 insertions(+), 23 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 311f482b93d5..f5c5da553803 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -417,7 +417,6 @@
->  
->  /* High-level queue structures */
->  #define ARM_SMMU_POLL_TIMEOUT_US	100
-> -#define ARM_SMMU_CMDQ_DRAIN_TIMEOUT_US	1000000 /* 1s! */
->  #define ARM_SMMU_SYNC_TIMEOUT_US	1000000 /* 1s! */
->  
->  #define MSI_IOVA_BASE			0x8000000
-> @@ -540,6 +539,7 @@ struct arm_smmu_queue {
->  struct arm_smmu_cmdq {
->  	struct arm_smmu_queue		q;
->  	spinlock_t			lock;
-> +	int				generation;
->  };
->  
->  struct arm_smmu_evtq {
-> @@ -770,21 +770,12 @@ static void queue_inc_prod(struct arm_smmu_queue *q)
->  	writel(q->prod, q->prod_reg);
->  }
->  
-> -/*
-> - * Wait for the SMMU to consume items. If drain is true, wait until the queue
-> - * is empty. Otherwise, wait until there is at least one free slot.
-> - */
-> -static int queue_poll_cons(struct arm_smmu_queue *q, bool drain, bool wfe)
-> +/* Wait for the SMMU to consume items, until there is at least one free slot */
-> +static int queue_poll_cons(struct arm_smmu_queue *q, bool wfe)
->  {
-> -	ktime_t timeout;
-> -	unsigned int delay = 1;
-> +	ktime_t timeout = ktime_add_us(ktime_get(), ARM_SMMU_POLL_TIMEOUT_US);
->  
-> -	/* Wait longer if it's queue drain */
-> -	timeout = ktime_add_us(ktime_get(), drain ?
-> -					    ARM_SMMU_CMDQ_DRAIN_TIMEOUT_US :
-> -					    ARM_SMMU_POLL_TIMEOUT_US);
-> -
-> -	while (queue_sync_cons(q), (drain ? !queue_empty(q) : queue_full(q))) {
-> +	while (queue_sync_cons(q), queue_full(q)) {
->  		if (ktime_compare(ktime_get(), timeout) > 0)
->  			return -ETIMEDOUT;
->  
-> @@ -792,8 +783,7 @@ static int queue_poll_cons(struct arm_smmu_queue *q, bool drain, bool wfe)
->  			wfe();
->  		} else {
->  			cpu_relax();
-> -			udelay(delay);
-> -			delay *= 2;
-> +			udelay(1);
->  		}
->  	}
->  
-> @@ -959,15 +949,20 @@ static void arm_smmu_cmdq_skip_err(struct arm_smmu_device *smmu)
->  	queue_write(Q_ENT(q, cons), cmd, q->ent_dwords);
->  }
->  
-> -static void arm_smmu_cmdq_insert_cmd(struct arm_smmu_device *smmu, u64 *cmd)
-> +static u32 arm_smmu_cmdq_insert_cmd(struct arm_smmu_device *smmu, u64 *cmd)
->  {
->  	struct arm_smmu_queue *q = &smmu->cmdq.q;
->  	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
->  
->  	while (queue_insert_raw(q, cmd) == -ENOSPC) {
-> -		if (queue_poll_cons(q, false, wfe))
-> +		if (queue_poll_cons(q, wfe))
->  			dev_err_ratelimited(smmu->dev, "CMDQ timeout\n");
->  	}
-> +
-> +	if (Q_IDX(q, q->prod) == 0)
-> +		smmu->cmdq.generation++;
+2/ rockchip drm driver bound after spi/edp/vop... drivers probed
 
-The readers of generation are using READ_ONCE, so you're missing something
-here.
+3/ in rockchip drm driver's resume callback, it would try to enable edp 
+panel backlight(through spi), but spi master is still suspended, then we 
+got these errors:
 
-> +
-> +	return q->prod;
->  }
->  
->  static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
-> @@ -997,15 +992,54 @@ static int arm_smmu_sync_poll_msi(struct arm_smmu_device *smmu, u32 sync_idx)
->  	return (int)(val - sync_idx) < 0 ? -ETIMEDOUT : 0;
->  }
->  
-> +static int arm_smmu_sync_poll_cons(struct arm_smmu_device *smmu, u32 sync_idx,
-> +				   int sync_gen)
-> +{
-> +	ktime_t timeout = ktime_add_us(ktime_get(), ARM_SMMU_SYNC_TIMEOUT_US);
-> +	struct arm_smmu_queue *q = &smmu->cmdq.q;
-> +	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
-> +	unsigned int delay = 1;
-> +
-> +	do {
-> +		queue_sync_cons(q);
-> +		/*
-> +		 * If we see updates quickly enough, cons has passed sync_idx,
-> +		 * but not yet wrapped. At worst, cons might have actually
-> +		 * wrapped an even number of times, but that still guarantees
-> +		 * the original sync must have been consumed.
-> +		 */
-> +		if (Q_IDX(q, q->cons) >= Q_IDX(q, sync_idx) &&
-> +		    Q_WRP(q, sync_idx) == Q_WRP(q, q->cons))
+1970-01-01T08:02:59.607315+08:00 ERR kernel: [  178.754005] cros-ec-spi 
+spi2.0: spi
+  transfer failed: -108
+1970-01-01T08:02:59.607320+08:00 ERR kernel: [  178.760102] cros-ec-spi 
+spi2.0: cs-
+deassert spi transfer failed: -108
+1970-01-01T08:02:59.607325+08:00 ERR kernel: [  178.767380] cros-ec-spi 
+spi2.0: Com
+mand xfer error (err:-108)
+1970-01-01T08:02:59.607331+08:00 ERR kernel: [  178.773963] cros-ec-spi 
+spi2.0: spi
+  transfer failed: -108
+1970-01-01T08:02:59.607336+08:00 ERR kernel: [  178.780066] cros-ec-spi 
+spi2.0: cs-
+deassert spi transfer failed: -108
+1970-01-01T08:02:59.607341+08:00 ERR kernel: [  178.787359] cros-ec-spi 
+spi2.0: Com
+mand xfer error (err:-108)
 
-Can you move this into a separate function please, like we have for
-queue_full and queue_empty?
+so other than move spi master suspend to late suspend, maybe we could 
+defer rockchip drm driver probe after it's component drivers somehow?
 
-> +			return 0;
-> +		/*
-> +		 * Otherwise, cons may have passed sync_idx and wrapped one or
-> +		 * more times to appear behind it again, but in that case prod
-> +		 * must also be one or more generations ahead.
-> +		 */
-> +		if (Q_IDX(q, q->cons) < Q_IDX(q, sync_idx) &&
-> +		    READ_ONCE(smmu->cmdq.generation) != sync_gen)
 
-There's another daft overflow case here which deserves a comment (and even
-if it *did* happen, we'll recover gracefully).
 
-> +			return 0;
-> +
-> +		if (wfe) {
-> +			wfe();
-
-This is a bit scary... if we miss a generation update, just due to store
-propagation latency (maybe it's buffered by the updater), I think we can
-end up going into wfe when there's not an event pending. Using xchg
-everywhere might work, but there's still a race on having somebody update
-generation. The ordering here just looks generally suspicious to me because
-you have the generation writer in arm_smmu_cmdq_insert_cmd effectively
-doing:
-
-  Write prod
-  Write generation
-
-and the reader in arm_smmu_sync_poll_cons doing:
-
-  Read cons
-  Read generation
-
-so I can't see anything that gives you order to guarantee that the
-generation is seen to be up-to-date.
-
-But it's also Friday evening and my brain is pretty fried ;)
-
-Will
+On 10/14/2017 02:44 AM, jeffy wrote:
+> Hi Dmitry,
+>
+> On 10/14/2017 02:30 AM, Dmitry Torokhov wrote:
+>> On Sat, Oct 14, 2017 at 02:19:28AM +0800, jeffy wrote:
+>>> Hi guys,
+>>>
+>>> it looks like the suspend sequence depends on the dt node sequence,
+>>> and we
+>>> are putting display-subsystem dt node above spi dt node, so it would be
+>>> earlier in the device list, then got suspended later than spi device.
+>>
+>> Would it not get a deferral when trying to get resource reference, which
+>> would cause it bumped down to the end of dpm list?
+> hmm, right, check again, the rockchip drm would not depend on spi, but
+> the edp driver does.
+>
+> so the drm driver(display-subsystem) would probed before spi, but try to
+> control the backlight in the suspend/resume...
+>
+> so i was wrong in the commit message, will fix it in next version.
+>>
+>>>
+>>> the pwm backlight and cros_ec_spi pwm are very interesting, not only
+>>> about
+>>> suspend dependency... if we unbind cros_ec_spi pwm, the pwm backlight
+>>> would
+>>> still hold a reference to it, and crash the kernel later.
+>>
+>> That would be a bug in PWM/cors_ec and it should keep the PWM object
+>> until last reference drops and simply error out on all requests.
+> right, and maybe try to refresh the pwm reference when we bind it again
+>>
+>>>
+>>> On 10/14/2017 12:42 AM, Mark Brown wrote:
+>>>> On Fri, Oct 13, 2017 at 08:51:21AM -0700, Brian Norris wrote:
+>>>>
+>>>>> Yes, this does seem odd to me too. This looks like an arms race hack
+>>>>> that should be avoided unless we know a legit root cause. Also,
+>>>>> "probe order implies suspend order" doesn't quite work for async
+>>>>> suspend
+>>>>> anyway, so we'd probably want to express the dependency properly
+>>>>> anyway.
+>>>>
+>>>> Yeah, it's the same stuff as we get with initcall ordering.  This sort
+>>>> of thing does happen with things like PMICs which tend to have hardware
+>>>> that the system wants to manipulate in the IRQs off part of suspend.
+>>>> Ideally the dependency annotation stuff would figure things out though
+>>>> I'm not sure what the status of that is.
+>>
+>> I'd say non-existent for resources such as regulators, pwms, clocks,
+>> etc. I do not think many places call device_link_add()... I think adding
+>> this to devm_* APIs might be easiest to get the ball going as they
+>> naturally have consumer device and can easily figure out the supplier
+>> side.
+>>
+>>>>
+>>>>> Any chance this is related? Seems like that might break the
+>>>>> parent/child
+>>>>> relationship for master/slave:
+>>>>
+>>>>> commit d7e2ee257038baeb03baef602500368a51ee9eef
+>>>>> Author: Linus Walleij <linus.walleij@linaro.org>
+>>>>> Date:   Mon Apr 11 13:51:03 2016 +0200
+>>>>
+>>>>>       spi: let SPI masters ignore their children for PM
+>>>>
+>>>> That's for runtime PM, I'd not expect it to affect system suspend.
+>>>>
+>>>
+>>>
+>>
+>> Thanks.
+>>
+>
