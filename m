@@ -1,18 +1,132 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 13 Oct 2017 11:40:42 +0800
-Subject: [PATCH] ARM: dts: imx6q-utilite-pro: add HDMI CEC pinctrl
-In-Reply-To: <8c5150c5-3aff-4068-a548-05eb02b73138@rwthex-s3-b.rwth-ad.de>
-References: <8c5150c5-3aff-4068-a548-05eb02b73138@rwthex-s3-b.rwth-ad.de>
-Message-ID: <20171013034041.GD8833@dragon>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 12 Oct 2017 22:44:06 -0500
+Subject: [PATCH 1/2] vgaarb: Select a default VGA device even if there's
+ no legacy VGA
+In-Reply-To: <b5373cbb-7d0d-a626-159b-dee0b82d32d0@arm.com>
+References: <20171006221358.12211.42879.stgit@bhelgaas-glaptop.roam.corp.google.com>
+ <20171006222428.12211.3635.stgit@bhelgaas-glaptop.roam.corp.google.com>
+ <b5373cbb-7d0d-a626-159b-dee0b82d32d0@arm.com>
+Message-ID: <20171013034406.GD25517@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 20, 2017 at 06:48:34PM +0200, christopher.spinrath at rwth-aachen.de wrote:
-> From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+On Thu, Oct 12, 2017 at 12:24:10PM +0100, Julien Thierry wrote:
+> Hi Bjorn,
 > 
-> On the Utilite Pro the CEC line is wired up to the HDMI connector.
-> Add the required pinctrl setting.
+> On 06/10/17 23:24, Bjorn Helgaas wrote:
+> >From: Bjorn Helgaas <bhelgaas@google.com>
+> >
+> >Daniel Axtens reported that on the HiSilicon D05 board, the VGA device is
+> >behind a bridge that doesn't support PCI_BRIDGE_CTL_VGA, so the VGA arbiter
+> >never selects it as the default, which means Xorg auto-detection doesn't
+> >work.
+> >
+> >VGA is a legacy PCI feature: a VGA device can respond to addresses, e.g.,
+> >[mem 0xa0000-0xbffff], [io 0x3b0-0x3bb], [io 0x3c0-0x3df], etc., that are
+> >not configurable by BARs.  Consequently, multiple VGA devices can conflict
+> >with each other.  The VGA arbiter avoids conflicts by ensuring that those
+> >legacy resources are only routed to one VGA device at a time.
+> >
+> >The arbiter identifies the "default VGA" device, i.e., a legacy VGA device
+> >that was used by boot firmware.  It selects the first device that:
+> >
+> >   - is of PCI_CLASS_DISPLAY_VGA,
+> >   - has both PCI_COMMAND_IO and PCI_COMMAND_MEMORY enabled, and
+> >   - has PCI_BRIDGE_CTL_VGA set in all upstream bridges.
+> >
+> >Some systems don't have such a device.  For example, if a host bridge
+> >doesn't support I/O space, PCI_COMMAND_IO probably won't be enabled for any
+> >devices below it.  Or, as on the HiSilicon D05, the VGA device may be
+> >behind a bridge that doesn't support PCI_BRIDGE_CTL_VGA, so accesses to the
+> >legacy VGA resources will never reach the device.
+> >
+> >This patch extends the arbiter so that if it doesn't find a device that
+> >meets all the above criteria, it selects the first device that:
+> >
+> >   - is of PCI_CLASS_DISPLAY_VGA and
+> >   - has PCI_COMMAND_IO or PCI_COMMAND_MEMORY enabled
+> >
+> >If it doesn't find even that, it selects the first device that:
+> >
+> >   - is of class PCI_CLASS_DISPLAY_VGA.
+> >
+> >Such a device may not be able to use the legacy VGA resources, but most
+> >drivers can operate the device without those.  Setting it as the default
+> >device means its "boot_vga" sysfs file will contain "1", which Xorg (via
+> >libpciaccess) uses to help select its default output device.
+> >
+> >This fixes Xorg auto-detection on some arm64 systems (HiSilicon D05 in
+> >particular; see the link below).
+> >
+> >It also replaces the powerpc fixup_vga() quirk, albeit with slightly
+> >different semantics: the quirk selected the first VGA device we found, and
+> >overrode that selection with any enabled VGA device we found.  If there
+> >were several enabled VGA devices, the *last* one we found would become the
+> >default.
+> >
+> >The code here instead selects the *first* enabled VGA device we find, and
+> >if none are enabled, the first VGA device we find.
+> >
+> >Link: http://lkml.kernel.org/r/20170901072744.2409-1-dja at axtens.net
+> >Tested-by: Daniel Axtens <dja@axtens.net>    # arm64, ppc64-qemu-tcg
+> >Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+> >---
+> >  arch/powerpc/kernel/pci-common.c |   12 ------------
+> >  drivers/gpu/vga/vgaarb.c         |   25 +++++++++++++++++++++++++
+> >  2 files changed, 25 insertions(+), 12 deletions(-)
+> >
+> >diff --git a/arch/powerpc/kernel/pci-common.c b/arch/powerpc/kernel/pci-common.c
+> >index 02831a396419..0ac7aa346c69 100644
+> >--- a/arch/powerpc/kernel/pci-common.c
+> >+++ b/arch/powerpc/kernel/pci-common.c
+> >@@ -1740,15 +1740,3 @@ static void fixup_hide_host_resource_fsl(struct pci_dev *dev)
+> >  }
+> >  DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MOTOROLA, PCI_ANY_ID, fixup_hide_host_resource_fsl);
+> >  DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_FREESCALE, PCI_ANY_ID, fixup_hide_host_resource_fsl);
+> >-
+> >-static void fixup_vga(struct pci_dev *pdev)
+> >-{
+> >-	u16 cmd;
+> >-
+> >-	pci_read_config_word(pdev, PCI_COMMAND, &cmd);
+> >-	if ((cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY)) || !vga_default_device())
+> >-		vga_set_default_device(pdev);
+> >-
+> >-}
+> >-DECLARE_PCI_FIXUP_CLASS_FINAL(PCI_ANY_ID, PCI_ANY_ID,
+> >-			      PCI_CLASS_DISPLAY_VGA, 8, fixup_vga);
+> >diff --git a/drivers/gpu/vga/vgaarb.c b/drivers/gpu/vga/vgaarb.c
+> >index 76875f6299b8..aeb41f793ed4 100644
+> >--- a/drivers/gpu/vga/vgaarb.c
+> >+++ b/drivers/gpu/vga/vgaarb.c
+> >@@ -1468,6 +1468,31 @@ static int __init vga_arb_device_init(void)
+> >  			vgaarb_info(dev, "no bridge control possible\n");
+> >  	}
+> >+	if (!vga_default_device()) {
+> >+		list_for_each_entry(vgadev, &vga_list, list) {
+> >+			struct device *dev = &vgadev->pdev->dev;
+> >+			u16 cmd;
+> >+
+> >+			pdev = vgadev->pdev;
+> >+			pci_read_config_word(pdev, PCI_COMMAND, &cmd);
+> >+			if (cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY)) {
+> >+				vgaarb_info(dev, "setting as boot device (VGA legacy resources not available)\n");
+> >+				vga_set_default_device(pdev);
+> >+				break;
+> >+			}
+> >+		}
+> >+	}
+> >+
+> >+	if (!vga_default_device()) {
+> >+		vgadev = list_first_entry_or_null(&vga_list,
+> >+						  struct vga_device, list);
+> >+		if (vgadev) {
+> >+			struct device *dev = &vgadev->pdev->dev;
+> >+			vgaarb_info(dev, "setting as boot device (VGA legacy resources not available)\n");
+> >+			vga_set_default_device(pdev);
 > 
-> Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+> Isn't 'pdev' NULL here? shouldn't it be vgadev->pdev instead?
 
-Applied, thanks.
+Yes, vgadev->pdev is what I intended, thanks a lot for pointing that out!
+
+Bjorn
