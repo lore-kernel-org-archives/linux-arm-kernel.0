@@ -1,64 +1,42 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Fri, 13 Oct 2017 16:26:41 +0800
-Subject: [PATCH v2 9/9] dt-bindings: usb: mtk-xhci: remove dummy clocks and
- add optional ones
+Date: Fri, 13 Oct 2017 16:26:35 +0800
+Subject: [PATCH v2 3/9] usb: xhci-mtk: check clock stability of U3_MAC
 In-Reply-To: <994382d16d6bdc0f3d7c11b22f1710252e056e34.1507882470.git.chunfeng.yun@mediatek.com>
 References: <994382d16d6bdc0f3d7c11b22f1710252e056e34.1507882470.git.chunfeng.yun@mediatek.com>
-Message-ID: <6a5d01f35d7df6a49d0442c8326c3daa9bcda9d3.1507882470.git.chunfeng.yun@mediatek.com>
+Message-ID: <afc5cff346c5a349177990999df3dd7604966de4.1507882470.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove dummy clocks for usb wakeup and add optional ones for
-MCU_BUS_CK and DMA_BUS_CK.
+This is useful to find out the root cause when the Super Speed doesn't
+work. Such as when the T-PHY is switched to PCIe or SATA, and affects
+Super Speed function, the check will fail.
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/usb/mediatek,mtk-xhci.txt  |   18 ++++++++----------
- 1 file changed, 8 insertions(+), 10 deletions(-)
+ drivers/usb/host/xhci-mtk.c |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
-index 2d9b459..3059596 100644
---- a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
-+++ b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
-@@ -26,10 +26,11 @@ Required properties:
-  - clocks : a list of phandle + clock-specifier pairs, one for each
- 	entry in clock-names
-  - clock-names : must contain
--	"sys_ck": for clock of xHCI MAC
--	"ref_ck": for reference clock of xHCI MAC
--	"wakeup_deb_p0": for USB wakeup debounce clock of port0
--	"wakeup_deb_p1": for USB wakeup debounce clock of port1
-+	"sys_ck": controller clock used by normal mode,
-+	the following ones are optional:
-+	"ref_ck": reference clock used by low power mode etc,
-+	"mcu_ck": mcu_bus clock for register access,
-+	"dma_ck": dma_bus clock for data transfer by DMA
+diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
+index 9502ca4..7a92bb7 100644
+--- a/drivers/usb/host/xhci-mtk.c
++++ b/drivers/usb/host/xhci-mtk.c
+@@ -43,6 +43,7 @@
  
-  - phys : a list of phandle + phy specifier pairs
+ /* ip_pw_sts1 register */
+ #define STS1_IP_SLEEP_STS	BIT(30)
++#define STS1_U3_MAC_RST	BIT(16)
+ #define STS1_XHCI_RST		BIT(11)
+ #define STS1_SYS125_RST	BIT(10)
+ #define STS1_REF_RST		BIT(8)
+@@ -125,6 +126,9 @@ static int xhci_mtk_host_enable(struct xhci_hcd_mtk *mtk)
+ 	check_val = STS1_SYSPLL_STABLE | STS1_REF_RST |
+ 			STS1_SYS125_RST | STS1_XHCI_RST;
  
-@@ -57,9 +58,7 @@ usb30: usb at 11270000 {
- 	clocks = <&topckgen CLK_TOP_USB30_SEL>, <&clk26m>,
- 		 <&pericfg CLK_PERI_USB0>,
- 		 <&pericfg CLK_PERI_USB1>;
--	clock-names = "sys_ck", "ref_ck",
--		      "wakeup_deb_p0",
--		      "wakeup_deb_p1";
-+	clock-names = "sys_ck", "ref_ck";
- 	phys = <&phy_port0 PHY_TYPE_USB3>,
- 	       <&phy_port1 PHY_TYPE_USB2>;
- 	vusb33-supply = <&mt6397_vusb_reg>;
-@@ -91,9 +90,8 @@ Required properties:
- 
-  - clocks : a list of phandle + clock-specifier pairs, one for each
- 	entry in clock-names
-- - clock-names : must be
--	"sys_ck": for clock of xHCI MAC
--	"ref_ck": for reference clock of xHCI MAC
-+ - clock-names : must contain "sys_ck", and the following ones are optional:
-+	"ref_ck", "mcu_ck" and "dma_ck"
- 
- Optional properties:
-  - vbus-supply : reference to the VBUS regulator;
++	if (mtk->num_u3_ports)
++		check_val |= STS1_U3_MAC_RST;
++
+ 	ret = readl_poll_timeout(&ippc->ip_pw_sts1, value,
+ 			  (check_val == (value & check_val)), 100, 20000);
+ 	if (ret) {
 -- 
 1.7.9.5
