@@ -1,86 +1,43 @@
-From: jeffy.chen@rock-chips.com (jeffy)
-Date: Sat, 14 Oct 2017 02:33:45 +0800
-Subject: [PATCH v5 1/3] PCI: rockchip: Add support for pcie wake irq
-In-Reply-To: <2453698.N4jfPaHx71@aspire.rjw.lan>
-References: <20170911151029.25185-1-jeffy.chen@rock-chips.com>
- <20170911151029.25185-2-jeffy.chen@rock-chips.com>
- <20171013030441.GA25517@bhelgaas-glaptop.roam.corp.google.com>
- <2453698.N4jfPaHx71@aspire.rjw.lan>
-Message-ID: <59E10709.4020300@rock-chips.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 13 Oct 2017 19:37:50 +0100
+Subject: [RESEND PATCH 1/2] spi: rockchip: Convert to late and early
+ system PM callbacks
+In-Reply-To: <20171013183006.k6pzcr5tcwsxxtmp@dtor-ws>
+References: <20171013104138.3216-1-jeffy.chen@rock-chips.com>
+ <20171013104138.3216-2-jeffy.chen@rock-chips.com>
+ <CAD=FV=X6pkaY3t=ceh3QEUws+_gqRGMN9zveW0fXR1noF1T6ew@mail.gmail.com>
+ <20171013155120.GA137489@google.com>
+ <20171013164235.thgqha7sl5tdptwv@sirena.co.uk>
+ <59E103B0.8060705@rock-chips.com>
+ <20171013183006.k6pzcr5tcwsxxtmp@dtor-ws>
+Message-ID: <20171013183750.piabs7m3dnpabnkm@sirena.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+On Fri, Oct 13, 2017 at 11:30:06AM -0700, Dmitry Torokhov wrote:
+> On Sat, Oct 14, 2017 at 02:19:28AM +0800, jeffy wrote:
 
-On 10/13/2017 09:21 PM, Rafael J. Wysocki wrote:
->>
->>I'm a little skeptical about dev_pm_set_dedicated_wake_irq(), not
->>because I know anything at all about it, but because there are only
->>five callers in the whole tree, three of which are in UART code, and
->>none in anything resembling PCI code.
->>
->>Is Rockchip really that special, or are we going about this the wrong
->>way?
+> > > Yeah, it's the same stuff as we get with initcall ordering.  This sort
+> > > of thing does happen with things like PMICs which tend to have hardware
+> > > that the system wants to manipulate in the IRQs off part of suspend.
+> > > Ideally the dependency annotation stuff would figure things out though
+> > > I'm not sure what the status of that is.
 
-we used to put these codes in the wifi driver, but another wifi vendor 
-suggests these should go into the pcie driver.
+> I'd say non-existent for resources such as regulators, pwms, clocks,
+> etc. I do not think many places call device_link_add()... I think adding
+> this to devm_* APIs might be easiest to get the ball going as they
+> naturally have consumer device and can easily figure out the supplier
+> side.
 
-and as tony said, it could go into pcie common code :)
->>
->> > >+		if (err)
->> > >+			dev_err(dev, "failed to setup PCIe wakeup IRQ\n");
->> > >+	}
->> > >+
->> > >  	return 0;
->>
->>The above could be structured as:
->>
->>   irq = platform_get_irq_byname(pdev, "wakeup");
->>   if (irq < 0)
->>     return 0;
->>
->>   device_init_wakeup(dev, true);
->>   err = dev_pm_set_dedicated_wake_irq(dev, irq);
->>   if (err) {
->>     dev_pm_clear_wake_irq(dev);
->>     device_init_wakeup(dev, false);
->>   }
->>
-there's no need to call dev_pm_clear_wake_irq when 
-dev_pm_set_dedicated_wake_irq failed...and i agree the 
-device_init_wakeup part, i'll add that in the next version(with brian's 
-comment too)
->>   return 0;
->>
->>to unindent the mainline non-error code.
->>
->> > >  }
->> > >
->> > >@@ -1542,11 +1552,11 @@ static int rockchip_pcie_probe(struct platform_device *pdev)
->> > >
->> > >  	err = rockchip_pcie_parse_dt(rockchip);
->> > >  	if (err)
->> > >-		return err;
->> > >+		goto err_disable_wake;
->> > >
->> > >  	err = rockchip_pcie_enable_clocks(rockchip);
->> > >  	if (err)
->> > >-		return err;
->> > >+		goto err_disable_wake;
->> > >
->> > >  	err = rockchip_pcie_set_vpcie(rockchip);
->> > >  	if (err) {
->> > >@@ -1656,6 +1666,9 @@ static int rockchip_pcie_probe(struct platform_device *pdev)
->> > >  		regulator_disable(rockchip->vpcie0v9);
->> > >  err_set_vpcie:
->> > >  	rockchip_pcie_disable_clocks(rockchip);
->> > >+err_disable_wake:
->> > >+	dev_pm_clear_wake_irq(dev);
->> > >+	device_init_wakeup(dev, false);
->>
->>I think this error cleanup should be done in rockchip_pcie_setup_irq()
->>as shown above.  There's no real connection between
->>rockchip_pcie_probe() and the wake setup.
-
-this error handling is like inline "rockchip_pcie_cleanup_irq()", and 
-they are harmless to be called even if we don't have the wakeup irq :)
+Hrm, are things in a state where we're supposed to be doing that?  I've
+not seen anyone even trying which is a bit odd, I'd thought there was
+some core work still ongoing (and it wasn't clear to me if we were going
+to try to do things like use DT/ACPI cross references to figure this
+stuff out).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171013/15987c86/attachment.sig>
