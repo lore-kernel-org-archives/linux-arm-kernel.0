@@ -1,40 +1,38 @@
-From: jeffy.chen@rock-chips.com (jeffy)
-Date: Sat, 14 Oct 2017 03:26:16 +0800
-Subject: [PATCH v5 1/3] PCI: rockchip: Add support for pcie wake irq
-In-Reply-To: <20171013191906.GF25517@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170911151029.25185-1-jeffy.chen@rock-chips.com>
- <20170911151029.25185-2-jeffy.chen@rock-chips.com>
- <20171013030441.GA25517@bhelgaas-glaptop.roam.corp.google.com>
- <2453698.N4jfPaHx71@aspire.rjw.lan> <59E10709.4020300@rock-chips.com>
- <20171013191906.GF25517@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <59E11358.3090409@rock-chips.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 13 Oct 2017 14:27:33 -0500
+Subject: [PATCH 3/3] arm64: cpuinfo: display product info in /proc/cpuinfo
+In-Reply-To: <20170926222324.17409-4-ahs3@redhat.com>
+References: <20170926222324.17409-1-ahs3@redhat.com>
+ <20170926222324.17409-4-ahs3@redhat.com>
+Message-ID: <CAOZdJXWok=kHsLQLqf9sWiPibnhjnJptAteWoOA57ddEacniRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+On Tue, Sep 26, 2017 at 5:23 PM, Al Stone <ahs3@redhat.com> wrote:
+> +               if (IS_ENABLED(CONFIG_DMI)) {
+> +                       seq_puts(m, "product name\t: ");
+> +
+> +                       if (!dmi_product_info)
+> +                               get_dmi_product_info();
+> +                       if (dmi_product_info)
+> +                               seq_printf(m, "%s", dmi_product_info);
 
-On 10/14/2017 03:19 AM, Bjorn Helgaas wrote:
-> I'm sure they're harmless.  The point is that the cleanup should be
-> done near the failure, not in the caller of the caller of the function
-> where the failure was detected.  You have:
->
->    rockchip_pcie_probe
->      rockchip_pcie_parse_dt
->        rockchip_pcie_setup_irq
->          err = dev_pm_set_dedicated_wake_irq
->          if (err)
->            dev_err(...)
->
-> So you detect the error in rockchip_pcie_setup_irq(), but you clean up
-> from it in rockchip_pcie_probe(), which doesn't make sense because
-> rockchip_pcie_probe() doesn't do anything related to wakeup interupts.
->
-right, but if something wrong happens in rockchip_pcie_probe() later 
-than rockchip_pcie_setup_irq(), we may still need to clean it up ;)
+This line prints out like this:
 
-i think the error handling is a little like what we do in the remove 
-callback
-> Bjorn
->
->
->
+product name    : QUALCOMM BASEBOARD ASSEMBLY, AMBERWIN
+ 20-P7989-H1S   , ARM 8.0 (r0p0) CPU @ 2.500GHz
+
+Is this a bug in our DMI table?  'dmidecode' reports this:
+
+Handle 0x0004, DMI type 2, 17 bytes
+Base Board Information
+        Manufacturer: QUALCOMM
+        Product Name: BASEBOARD ASSEMBLY, AMBERWIN..
+        Version: 20-P7989-H1S
+
+I'm guessing that the actual string has a CR/LF at the end of "AMBERWIN"
+
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
