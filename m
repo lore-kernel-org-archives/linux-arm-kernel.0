@@ -1,42 +1,93 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Fri, 13 Oct 2017 16:26:35 +0800
-Subject: [PATCH v2 3/9] usb: xhci-mtk: check clock stability of U3_MAC
+Date: Fri, 13 Oct 2017 16:26:37 +0800
+Subject: [PATCH v2 5/9] usb: xhci-mtk: remove dummy wakeup debounce clocks
 In-Reply-To: <994382d16d6bdc0f3d7c11b22f1710252e056e34.1507882470.git.chunfeng.yun@mediatek.com>
 References: <994382d16d6bdc0f3d7c11b22f1710252e056e34.1507882470.git.chunfeng.yun@mediatek.com>
-Message-ID: <afc5cff346c5a349177990999df3dd7604966de4.1507882470.git.chunfeng.yun@mediatek.com>
+Message-ID: <ff9ee49a872084b4fc8c7fbabddc820058acb9b7.1507882470.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is useful to find out the root cause when the Super Speed doesn't
-work. Such as when the T-PHY is switched to PCIe or SATA, and affects
-Super Speed function, the check will fail.
+The wakeup debounce clocks for each ports in fact are not
+needed, so remove them.
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- drivers/usb/host/xhci-mtk.c |    4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/usb/host/xhci-mtk.c |   33 ---------------------------------
+ drivers/usb/host/xhci-mtk.h |    2 --
+ 2 files changed, 35 deletions(-)
 
 diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
-index 9502ca4..7a92bb7 100644
+index 97ba51e..d60463c 100644
 --- a/drivers/usb/host/xhci-mtk.c
 +++ b/drivers/usb/host/xhci-mtk.c
-@@ -43,6 +43,7 @@
+@@ -237,25 +237,8 @@ static int xhci_mtk_clks_enable(struct xhci_hcd_mtk *mtk)
+ 		goto sys_clk_err;
+ 	}
  
- /* ip_pw_sts1 register */
- #define STS1_IP_SLEEP_STS	BIT(30)
-+#define STS1_U3_MAC_RST	BIT(16)
- #define STS1_XHCI_RST		BIT(11)
- #define STS1_SYS125_RST	BIT(10)
- #define STS1_REF_RST		BIT(8)
-@@ -125,6 +126,9 @@ static int xhci_mtk_host_enable(struct xhci_hcd_mtk *mtk)
- 	check_val = STS1_SYSPLL_STABLE | STS1_REF_RST |
- 			STS1_SYS125_RST | STS1_XHCI_RST;
+-	if (mtk->wakeup_src) {
+-		ret = clk_prepare_enable(mtk->wk_deb_p0);
+-		if (ret) {
+-			dev_err(mtk->dev, "failed to enable wk_deb_p0\n");
+-			goto usb_p0_err;
+-		}
+-
+-		ret = clk_prepare_enable(mtk->wk_deb_p1);
+-		if (ret) {
+-			dev_err(mtk->dev, "failed to enable wk_deb_p1\n");
+-			goto usb_p1_err;
+-		}
+-	}
+ 	return 0;
  
-+	if (mtk->num_u3_ports)
-+		check_val |= STS1_U3_MAC_RST;
-+
- 	ret = readl_poll_timeout(&ippc->ip_pw_sts1, value,
- 			  (check_val == (value & check_val)), 100, 20000);
- 	if (ret) {
+-usb_p1_err:
+-	clk_disable_unprepare(mtk->wk_deb_p0);
+-usb_p0_err:
+-	clk_disable_unprepare(mtk->sys_clk);
+ sys_clk_err:
+ 	clk_disable_unprepare(mtk->ref_clk);
+ ref_clk_err:
+@@ -264,10 +247,6 @@ static int xhci_mtk_clks_enable(struct xhci_hcd_mtk *mtk)
+ 
+ static void xhci_mtk_clks_disable(struct xhci_hcd_mtk *mtk)
+ {
+-	if (mtk->wakeup_src) {
+-		clk_disable_unprepare(mtk->wk_deb_p1);
+-		clk_disable_unprepare(mtk->wk_deb_p0);
+-	}
+ 	clk_disable_unprepare(mtk->sys_clk);
+ 	clk_disable_unprepare(mtk->ref_clk);
+ }
+@@ -371,18 +350,6 @@ static int usb_wakeup_of_property_parse(struct xhci_hcd_mtk *mtk,
+ 	if (!mtk->wakeup_src)
+ 		return 0;
+ 
+-	mtk->wk_deb_p0 = devm_clk_get(dev, "wakeup_deb_p0");
+-	if (IS_ERR(mtk->wk_deb_p0)) {
+-		dev_err(dev, "fail to get wakeup_deb_p0\n");
+-		return PTR_ERR(mtk->wk_deb_p0);
+-	}
+-
+-	mtk->wk_deb_p1 = devm_clk_get(dev, "wakeup_deb_p1");
+-	if (IS_ERR(mtk->wk_deb_p1)) {
+-		dev_err(dev, "fail to get wakeup_deb_p1\n");
+-		return PTR_ERR(mtk->wk_deb_p1);
+-	}
+-
+ 	mtk->pericfg = syscon_regmap_lookup_by_phandle(dn,
+ 						"mediatek,syscon-wakeup");
+ 	if (IS_ERR(mtk->pericfg)) {
+diff --git a/drivers/usb/host/xhci-mtk.h b/drivers/usb/host/xhci-mtk.h
+index db55a12..67783a7 100644
+--- a/drivers/usb/host/xhci-mtk.h
++++ b/drivers/usb/host/xhci-mtk.h
+@@ -126,8 +126,6 @@ struct xhci_hcd_mtk {
+ 	struct regulator *vbus;
+ 	struct clk *sys_clk;	/* sys and mac clock */
+ 	struct clk *ref_clk;
+-	struct clk *wk_deb_p0;	/* port0's wakeup debounce clock */
+-	struct clk *wk_deb_p1;
+ 	struct regmap *pericfg;
+ 	struct phy **phys;
+ 	int num_phys;
 -- 
 1.7.9.5
