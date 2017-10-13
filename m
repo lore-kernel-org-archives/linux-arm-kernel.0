@@ -1,139 +1,86 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Fri, 13 Oct 2017 10:15:09 +0100
-Subject: [PATCH v1 1/2] KVM: arm64: handle single-stepping trapped
- instructions
-In-Reply-To: <20171013082615.GC8927@cbox>
-References: <20171006113921.24880-1-alex.bennee@linaro.org>
- <20171006113921.24880-2-alex.bennee@linaro.org> <20171013082615.GC8927@cbox>
-Message-ID: <87r2u79zoi.fsf@linaro.org>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Fri, 13 Oct 2017 10:17:00 +0100
+Subject: [PATCH v3 0/8] ARM: NOMMU: MPU updates
+In-Reply-To: <68a6eb4d-4d8e-7c6a-0875-3165bde8de89@arm.com>
+References: <1506330344-31556-1-git-send-email-vladimir.murzin@arm.com>
+ <68a6eb4d-4d8e-7c6a-0875-3165bde8de89@arm.com>
+Message-ID: <e2e80a26-4a87-6d4c-51ad-11d6ea683c16@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Gentle ping...
 
-Christoffer Dall <cdall@linaro.org> writes:
-
-> On Fri, Oct 06, 2017 at 12:39:20PM +0100, Alex Benn?e wrote:
->> If we are using guest debug to single-step the guest we need to ensure
->> we exit after emulating the instruction. This only affects
->> instructions completely emulated by the kernel. For userspace emulated
->> instructions we need to exit and return to complete the emulation.
+On 09/10/17 10:20, Vladimir Murzin wrote:
+> Russell, do you have concerns on this series?
+> 
+> Thanks
+> Vladimir
+> 
+> On 25/09/17 10:05, Vladimir Murzin wrote:
+>> Hi,
 >>
->> We fake debug.arch.hsr to contain ESR_ELx_EC_SOFTSTP_LOW so QEMU knows
->> it was a single-step event (and without altering the userspace ABI).
+>> This is an update of the existent MPU code which consist set of
+>> clean-ups and enhancements. The most significant changes are in the
+>> way how MPU settings sync-up for secondaries (PATCH 3/8), more
+>> flexible layout for memory (PATCH 7/8) and support for XIP (PATCH
+>> 8/8). Since there is no in-tree user of MPU, support for M-class has
+>> been added (PATCH 6/8).
 >>
->> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->> ---
->>  arch/arm64/kvm/handle_exit.c | 48 +++++++++++++++++++++++++++++++-------------
->>  1 file changed, 34 insertions(+), 14 deletions(-)
+>> There is also practical benefit of patch set:
 >>
->> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
->> index 7debb74843a0..c918d291cb58 100644
->> --- a/arch/arm64/kvm/handle_exit.c
->> +++ b/arch/arm64/kvm/handle_exit.c
->> @@ -178,6 +178,39 @@ static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
->>  	return arm_exit_handlers[hsr_ec];
->>  }
+>> "These MPU patches introduce a nice feature that it simplifies the
+>> bootloader: do not need to setup the MPU, for example for coherent DMA
+>> region, which is described in device-tree too." Andr?s Szemz?
 >>
->> +/*
->> + * When handling traps we need to ensure exit the guest if we
->> + * completely emulated the instruction while single-stepping. Stuff to
->> + * be emulated in userspace needs to complete that first.
->> + */
->
-> I really don't understand the first sentence here.  We are already out
-> of the guest, so do you mean a return to userspace?
-> I think the second sentence could be more clear as well.  Is 'stuff' not
-> actually 'MMIO emulation' or 'emulation' more broadly?
-
-Your right - it's sloppily worded how about:
-
- /*
-  * We may be single-stepping an emulated instruction. If the emulation
-  * has been completed in-kernel we can return to userspace with a
-  * KVM_EXIT_DEBUG, otherwise the userspace needs to complete it's
-  * emulation first.
-  */
-
-For x86 there is also IO emulation but in principle anything that might
-be passed off to userspace to be completed should be done first.
-
->
->> +
->> +static int handle_trap_exceptions(struct kvm_vcpu *vcpu, struct kvm_run *run)
->> +{
->> +	int handled;
->> +
->> +	/*
->> +	 * See ARM ARM B1.14.1: "Hyp traps on instructions
->> +	 * that fail their condition code check"
->> +	 */
->> +	if (!kvm_condition_valid(vcpu)) {
->> +		kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
->> +		handled = 1;
->> +	} else {
->> +		exit_handle_fn exit_handler;
->> +
->> +		exit_handler = kvm_get_exit_handler(vcpu);
->> +		handled = exit_handler(vcpu, run);
->> +	}
->> +
->> +	if (handled && (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP)) {
->
-> Don't you want if (handled == 1) or if (handled > 0) ?
->
-> If there was an error I think we want to just return that to userspace
-> and not override it and present single-stepping.
-
-Yes, I'll fix it.
-
->
->> +		handled = 0;
->> +		run->exit_reason = KVM_EXIT_DEBUG;
->> +		run->debug.arch.hsr = ESR_ELx_EC_SOFTSTP_LOW << ESR_ELx_EC_SHIFT;
->> +	}
->> +
->> +	return handled;
->> +}
->> +
->>  /*
->>   * Return > 0 to return to guest, < 0 on error, 0 (and set exit_reason) on
->>   * proper exit to userspace.
->> @@ -185,8 +218,6 @@ static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
->>  int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
->>  		       int exception_index)
->>  {
->> -	exit_handle_fn exit_handler;
->> -
->>  	if (ARM_SERROR_PENDING(exception_index)) {
->>  		u8 hsr_ec = ESR_ELx_EC(kvm_vcpu_get_hsr(vcpu));
+>> Changelog:
+>>            v2 -> v3
+>>               - fixed support for XIP (PATCH 8/8)
+>> 	      - rebased on 4.14-rc2
 >>
->> @@ -214,18 +245,7 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
->>  		kvm_inject_vabt(vcpu);
->>  		return 1;
->>  	case ARM_EXCEPTION_TRAP:
->> -		/*
->> -		 * See ARM ARM B1.14.1: "Hyp traps on instructions
->> -		 * that fail their condition code check"
->> -		 */
->> -		if (!kvm_condition_valid(vcpu)) {
->> -			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
->> -			return 1;
->> -		}
->> -
->> -		exit_handler = kvm_get_exit_handler(vcpu);
->> -
->> -		return exit_handler(vcpu, run);
->> +		return handle_trap_exceptions(vcpu, run);
->>  	case ARM_EXCEPTION_HYP_GONE:
->>  		/*
->>  		 * EL2 has been reset to the hyp-stub. This happens when a guest
->> --
->> 2.14.1
+>>            v1 -> v2
+>>               - support for XIP (PATCH 8/8)
+>> 	      - rebased on 4.13-rc1
 >>
->
-> Thanks,
-> -Christoffer
-
-
---
-Alex Benn?e
+>>         RFC v2 -> v1
+>>                - dropped RFC tag
+>> 	       - Tested-by from Andr?s
+>> 	       - rebased on 4.12-rc5
+>>
+>>            RFC -> RFC v2
+>> 	       - fixed MPU enable for v7m (PATCH 6/7)
+>>
+>> Thanks!
+>>
+>> Vladimir Murzin (8):
+>>   ARM: NOMMU: Move out MPU setup in separate module
+>>   ARM: NOMMU: Update MPU accessors to use cp15 helpers
+>>   ARM: NOMMU: Rework MPU to be mostly done in C
+>>   ARM: NOMMU: Disallow MPU for XIP
+>>   ARM: Kconfig: Kill CONFIG_VECTORS_BASE
+>>   ARM: V7M: Add support for MPU to M-class
+>>   ARM: NOMMU: Use more MPU regions to cover memory
+>>   ARM: NOMMU: Support MPU in XIP configuration
+>>
+>>  arch/arm/Kconfig                  |   9 -
+>>  arch/arm/Kconfig-nommu            |   4 +-
+>>  arch/arm/include/asm/cputype.h    |  10 +
+>>  arch/arm/include/asm/mpu.h        |  26 +-
+>>  arch/arm/include/asm/smp.h        |   2 +-
+>>  arch/arm/include/asm/v7m.h        |  10 +
+>>  arch/arm/kernel/asm-offsets.c     |  11 +
+>>  arch/arm/kernel/head-nommu.S      | 148 +++++++++---
+>>  arch/arm/kernel/smp.c             |   2 +-
+>>  arch/arm/kernel/vmlinux-xip.lds.S |  23 ++
+>>  arch/arm/mm/Makefile              |   1 +
+>>  arch/arm/mm/nommu.c               | 254 +-------------------
+>>  arch/arm/mm/pmsa-v7.c             | 484 ++++++++++++++++++++++++++++++++++++++
+>>  13 files changed, 682 insertions(+), 302 deletions(-)
+>>  create mode 100644 arch/arm/mm/pmsa-v7.c
+>>
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
