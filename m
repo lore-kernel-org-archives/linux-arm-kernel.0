@@ -1,90 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 13 Oct 2017 16:44:26 +0100
-Subject: [PATCH v11 7/9] arm64/kasan: add and use kasan_map_populate()
-In-Reply-To: <CAOAebxv4h+8ej6JA_DZbXaNV5JsAk4MbcCLf1+2RvwKGF2+MxQ@mail.gmail.com>
-References: <20171009221931.1481-1-pasha.tatashin@oracle.com>
- <20171009221931.1481-8-pasha.tatashin@oracle.com>
- <20171010155619.GA2517@arm.com>
- <CAOAebxv21+KtXPAk-xWz=+2fqWQDgp9SAFZz-N=XsuBxev=zcg@mail.gmail.com>
- <20171010171047.GC2517@arm.com>
- <CAOAebxtrSthSP4NAa0obBbsCK1KZxO+x0w5xNrpY6m2y9UZFvQ@mail.gmail.com>
- <CAOAebxu5WL-FQLgfCxNcWy36V6zsTO1v3LLqXv5rM1Pp9R-=YA@mail.gmail.com>
- <20171013144319.GB4746@arm.com>
- <CAOAebxv4h+8ej6JA_DZbXaNV5JsAk4MbcCLf1+2RvwKGF2+MxQ@mail.gmail.com>
-Message-ID: <20171013154426.GC4746@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 13 Oct 2017 16:49:14 +0100
+Subject: [PATCH v3 07/13] firmware: arm_sdei: Add driver for Software
+ Delegated Exceptions
+In-Reply-To: <20170922182614.27885-8-james.morse@arm.com>
+References: <20170922182614.27885-1-james.morse@arm.com>
+ <20170922182614.27885-8-james.morse@arm.com>
+Message-ID: <20171013154914.ktxecc6zobh7fmr6@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
-
-On Fri, Oct 13, 2017 at 11:09:41AM -0400, Pavel Tatashin wrote:
-> > It shouldn't be difficult to use section mappings with my patch, I just
-> > don't really see the need to try to optimise TLB pressure when you're
-> > running with KASAN enabled which already has something like a 3x slowdown
-> > afaik. If it ends up being a big deal, we can always do that later, but
-> > my main aim here is to divorce kasan from vmemmap because they should be
-> > completely unrelated.
+On Fri, Sep 22, 2017 at 07:26:08PM +0100, James Morse wrote:
+> The Software Delegated Exception Interface (SDEI) is an ARM standard
+> for registering callbacks from the platform firmware into the OS.
+> This is typically used to implement firmware notifications (such as
+> firmware-first RAS) or promote an IRQ that has been promoted to a
+> firmware-assisted NMI.
 > 
-> Yes, I understand that kasan makes system slow, but my point is why
-> make it even slower? However, I am OK adding your patch to the series,
-> BTW, symmetric changes will be needed for x86 as well sometime later.
+> Add the code for detecting the SDEI version and the framework for
+> registering and unregistering events. Subsequent patches will add the
+> arch-specific backend code and the necessary power management hooks.
 > 
-> >
-> > This certainly doesn't sound right; mapping the shadow with pages shouldn't
-> > lead to problems. I also can't seem to reproduce this myself -- could you
-> > share your full .config and a pointer to the git tree that you're using,
-> > please?
+> Only shared events are supported, power management, private events and
+> discovery for ACPI systems will be added by later patches.
 > 
-> Config is attached. I am using my patch series + your patch + today's
-> clone from https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
-
-Great, I hit the same problem with your .config. It might actually be
-CONFIG_DEBUG_MEMORY_INIT which does it.
-
-> Also, in a separate e-mail i sent out the qemu arguments.
+> Signed-off-by: James Morse <james.morse@arm.com>
+> ---
+> Changes since v2:
+>  * Copy the priority into the structure the arch asm handler gets. This
+>    is used for VMAP stacks where we can't know if a critical event interrupted
+>    a normal priority event, thus they need separate stacks.
 > 
-> >
-> >> I feel, this patch requires more work, and I am troubled with using
-> >> base pages instead of large pages.
-> >
-> > I'm happy to try fixing this, because I think splitting up kasan and vmemmap
-> > is the right thing to do here.
+> Changes since v1:
+>  * Changed entry point to unsigned long, if we support non-vhe systems this
+>    won't be a valid pointer
+>  * Made invoke_sdei_fn() pass the only register we are interested in, instead
+>    of the whole arm_smccc_res
+>  * Made all the locking WARN_ON()s lockdep_assert_held()s.
+>  * Moved more messages from 'err' to 'warn'.
+>  * Made IS_SDEI_CALL() not depend on whether the config option is selected.
+>  * Made 'event failed' messages rate limited.
 > 
-> Thank you very much.
+>  drivers/firmware/Kconfig    |   7 +
+>  drivers/firmware/Makefile   |   1 +
+>  drivers/firmware/arm_sdei.c | 616 ++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/sdei.h        | 100 +++++++
+>  include/uapi/linux/sdei.h   |  91 +++++++
+>  5 files changed, 815 insertions(+)
+>  create mode 100644 drivers/firmware/arm_sdei.c
+>  create mode 100644 include/linux/sdei.h
+>  create mode 100644 include/uapi/linux/sdei.h
 
-Thanks for sharing the .config and tree. It looks like the problem is that
-kimg_shadow_start and kimg_shadow_end are not page-aligned. Whilst I fix
-them up in kasan_map_populate, they remain unaligned when passed to
-kasan_populate_zero_shadow, which confuses the loop termination conditions
-in e.g. zero_pte_populate and the shadow isn't configured properly.
+I haven't reviewed this patch (yet...). However, I think it's worth
+adding a MAINTAINERS entry with your name on it (unless you really want
+to distance yourself from this code once merged ;)).
 
-Fixup diff below; please merge in with my original patch.
+Thanks.
 
-Will
-
---->8
-
-diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
-index b922826d9908..207b1acb823a 100644
---- a/arch/arm64/mm/kasan_init.c
-+++ b/arch/arm64/mm/kasan_init.c
-@@ -146,7 +146,7 @@ asmlinkage void __init kasan_early_init(void)
- static void __init kasan_map_populate(unsigned long start, unsigned long end,
-				      int node)
- {
--	kasan_pgd_populate(start & PAGE_MASK, PAGE_ALIGN(end), node, false);
-+	kasan_pgd_populate(start, end, node, false);
- }
- 
- /*
-@@ -183,8 +183,8 @@ void __init kasan_init(void)
-	struct memblock_region *reg;
-	int i;
- 
--	kimg_shadow_start = (u64)kasan_mem_to_shadow(_text);
--	kimg_shadow_end = (u64)kasan_mem_to_shadow(_end);
-+	kimg_shadow_start = (u64)kasan_mem_to_shadow(_text) & PAGE_MASK;
-+	kimg_shadow_end = PAGE_ALIGN((u64)kasan_mem_to_shadow(_end));
- 
-	mod_shadow_start = (u64)kasan_mem_to_shadow((void *)MODULES_VADDR);
-	mod_shadow_end = (u64)kasan_mem_to_shadow((void *)MODULES_END);
+-- 
+Catalin
