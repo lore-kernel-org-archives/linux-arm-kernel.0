@@ -1,74 +1,162 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 13 Oct 2017 11:30:06 -0700
-Subject: [RESEND PATCH 1/2] spi: rockchip: Convert to late and early
- system PM callbacks
-In-Reply-To: <59E103B0.8060705@rock-chips.com>
-References: <20171013104138.3216-1-jeffy.chen@rock-chips.com>
- <20171013104138.3216-2-jeffy.chen@rock-chips.com>
- <CAD=FV=X6pkaY3t=ceh3QEUws+_gqRGMN9zveW0fXR1noF1T6ew@mail.gmail.com>
- <20171013155120.GA137489@google.com>
- <20171013164235.thgqha7sl5tdptwv@sirena.co.uk>
- <59E103B0.8060705@rock-chips.com>
-Message-ID: <20171013183006.k6pzcr5tcwsxxtmp@dtor-ws>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 13 Oct 2017 19:32:38 +0100
+Subject: [PATCH v2 3/4] iommu/arm-smmu-v3: Use CMD_SYNC completion MSI
+In-Reply-To: <dbf0ce00f8e249c64f3d2041acd8d91818178e52.1504182142.git.robin.murphy@arm.com>
+References: <cover.1504182142.git.robin.murphy@arm.com>
+ <dbf0ce00f8e249c64f3d2041acd8d91818178e52.1504182142.git.robin.murphy@arm.com>
+Message-ID: <20171013183237.GA30572@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 14, 2017 at 02:19:28AM +0800, jeffy wrote:
-> Hi guys,
+Hi Robin,
+
+This mostly looks good. Just a few comments below.
+
+On Thu, Aug 31, 2017 at 02:44:27PM +0100, Robin Murphy wrote:
+> As an IRQ, the CMD_SYNC interrupt is not particularly useful, not least
+> because we often need to wait for sync completion within someone else's
+> IRQ handler anyway. However, when the SMMU is both coherent and supports
+> MSIs, we can have a lot more fun by not using it as an interrupt at all.
+> Following the example suggested in the architecture and using a write
+> targeting normal memory, we can let callers wait on a status variable
+> outside the lock instead of having to stall the entire queue or even
+> touch MMIO registers. Since multiple sync commands are guaranteed to
+> complete in order, a simple incrementing sequence count is all we need
+> to unambiguously support any realistic number of overlapping waiters.
 > 
-> it looks like the suspend sequence depends on the dt node sequence, and we
-> are putting display-subsystem dt node above spi dt node, so it would be
-> earlier in the device list, then got suspended later than spi device.
-
-Would it not get a deferral when trying to get resource reference, which
-would cause it bumped down to the end of dpm list?
-
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
 > 
-> the pwm backlight and cros_ec_spi pwm are very interesting, not only about
-> suspend dependency... if we unbind cros_ec_spi pwm, the pwm backlight would
-> still hold a reference to it, and crash the kernel later.
-
-That would be a bug in PWM/cors_ec and it should keep the PWM object
-until last reference drops and simply error out on all requests.
-
+> v2: Remove redundant 'bool msi' command member, other cosmetic tweaks
 > 
-> On 10/14/2017 12:42 AM, Mark Brown wrote:
-> > On Fri, Oct 13, 2017 at 08:51:21AM -0700, Brian Norris wrote:
-> > 
-> > > Yes, this does seem odd to me too. This looks like an arms race hack
-> > > that should be avoided unless we know a legit root cause. Also,
-> > > "probe order implies suspend order" doesn't quite work for async suspend
-> > > anyway, so we'd probably want to express the dependency properly
-> > > anyway.
-> > 
-> > Yeah, it's the same stuff as we get with initcall ordering.  This sort
-> > of thing does happen with things like PMICs which tend to have hardware
-> > that the system wants to manipulate in the IRQs off part of suspend.
-> > Ideally the dependency annotation stuff would figure things out though
-> > I'm not sure what the status of that is.
-
-I'd say non-existent for resources such as regulators, pwms, clocks,
-etc. I do not think many places call device_link_add()... I think adding
-this to devm_* APIs might be easiest to get the ball going as they
-naturally have consumer device and can easily figure out the supplier
-side.
-
-> > 
-> > > Any chance this is related? Seems like that might break the parent/child
-> > > relationship for master/slave:
-> > 
-> > > commit d7e2ee257038baeb03baef602500368a51ee9eef
-> > > Author: Linus Walleij <linus.walleij@linaro.org>
-> > > Date:   Mon Apr 11 13:51:03 2016 +0200
-> > 
-> > >      spi: let SPI masters ignore their children for PM
-> > 
-> > That's for runtime PM, I'd not expect it to affect system suspend.
-> > 
+>  drivers/iommu/arm-smmu-v3.c | 47 +++++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 45 insertions(+), 2 deletions(-)
 > 
-> 
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index f066725298cd..311f482b93d5 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -377,7 +377,16 @@
+>  
+>  #define CMDQ_SYNC_0_CS_SHIFT		12
+>  #define CMDQ_SYNC_0_CS_NONE		(0UL << CMDQ_SYNC_0_CS_SHIFT)
+> +#define CMDQ_SYNC_0_CS_IRQ		(1UL << CMDQ_SYNC_0_CS_SHIFT)
+>  #define CMDQ_SYNC_0_CS_SEV		(2UL << CMDQ_SYNC_0_CS_SHIFT)
+> +#define CMDQ_SYNC_0_MSH_SHIFT		22
+> +#define CMDQ_SYNC_0_MSH_ISH		(3UL << CMDQ_SYNC_0_MSH_SHIFT)
+> +#define CMDQ_SYNC_0_MSIATTR_SHIFT	24
+> +#define CMDQ_SYNC_0_MSIATTR_OIWB	(0xfUL << CMDQ_SYNC_0_MSIATTR_SHIFT)
+> +#define CMDQ_SYNC_0_MSIDATA_SHIFT	32
+> +#define CMDQ_SYNC_0_MSIDATA_MASK	0xffffffffUL
+> +#define CMDQ_SYNC_1_MSIADDR_SHIFT	0
+> +#define CMDQ_SYNC_1_MSIADDR_MASK	0xffffffffffffcUL
+>  
+>  /* Event queue */
+>  #define EVTQ_ENT_DWORDS			4
+> @@ -409,6 +418,7 @@
+>  /* High-level queue structures */
+>  #define ARM_SMMU_POLL_TIMEOUT_US	100
+>  #define ARM_SMMU_CMDQ_DRAIN_TIMEOUT_US	1000000 /* 1s! */
+> +#define ARM_SMMU_SYNC_TIMEOUT_US	1000000 /* 1s! */
 
-Thanks.
+We only ever do this when waiting for the queue to drain, so may as well
+just reuse the drain timeout.
 
--- 
-Dmitry
+>  #define MSI_IOVA_BASE			0x8000000
+>  #define MSI_IOVA_LENGTH			0x100000
+> @@ -504,6 +514,10 @@ struct arm_smmu_cmdq_ent {
+>  		} pri;
+>  
+>  		#define CMDQ_OP_CMD_SYNC	0x46
+> +		struct {
+> +			u32			msidata;
+> +			u64			msiaddr;
+> +		} sync;
+>  	};
+>  };
+>  
+> @@ -617,6 +631,9 @@ struct arm_smmu_device {
+>  	int				gerr_irq;
+>  	int				combined_irq;
+>  
+> +	atomic_t			sync_nr;
+> +	u32				sync_count;
+
+It's probably worth sticking these in separate cachelines so we don't
+get spurious wakeups when sync_nr is incremented. (yes, I know it should
+be the ERG, but that can be unreasonably huge!).
+
+> +
+>  	unsigned long			ias; /* IPA */
+>  	unsigned long			oas; /* PA */
+>  	unsigned long			pgsize_bitmap;
+> @@ -878,7 +895,13 @@ static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
+>  		}
+>  		break;
+>  	case CMDQ_OP_CMD_SYNC:
+> -		cmd[0] |= CMDQ_SYNC_0_CS_SEV;
+> +		if (ent->sync.msiaddr)
+> +			cmd[0] |= CMDQ_SYNC_0_CS_IRQ;
+> +		else
+> +			cmd[0] |= CMDQ_SYNC_0_CS_SEV;
+> +		cmd[0] |= CMDQ_SYNC_0_MSH_ISH | CMDQ_SYNC_0_MSIATTR_OIWB;
+> +		cmd[0] |= (u64)ent->sync.msidata << CMDQ_SYNC_0_MSIDATA_SHIFT;
+> +		cmd[1] |= ent->sync.msiaddr & CMDQ_SYNC_1_MSIADDR_MASK;
+>  		break;
+>  	default:
+>  		return -ENOENT;
+> @@ -964,21 +987,40 @@ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
+>  	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
+>  }
+>  
+> +static int arm_smmu_sync_poll_msi(struct arm_smmu_device *smmu, u32 sync_idx)
+> +{
+> +	ktime_t timeout = ktime_add_us(ktime_get(), ARM_SMMU_SYNC_TIMEOUT_US);
+> +	u32 val = smp_cond_load_acquire(&smmu->sync_count,
+> +					(int)(VAL - sync_idx) >= 0 ||
+> +					!ktime_before(ktime_get(), timeout));
+> +
+> +	return (int)(val - sync_idx) < 0 ? -ETIMEDOUT : 0;
+
+There are some theoretical overflow issues here which I don't think will
+ever occur in practice, but deserve@least a comment to explain why.
+
+> +}
+> +
+>  static void arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
+>  {
+>  	u64 cmd[CMDQ_ENT_DWORDS];
+>  	unsigned long flags;
+>  	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
+> +	bool msi = (smmu->features & ARM_SMMU_FEAT_MSI) &&
+> +		   (smmu->features & ARM_SMMU_FEAT_COHERENCY);
+
+I don't think this is sufficient for the case where we fail to setup MSIs
+and fall back on legacy IRQs.
+
+>  	struct arm_smmu_cmdq_ent ent = { .opcode = CMDQ_OP_CMD_SYNC };
+>  	int ret;
+>  
+> +	if (msi) {
+> +		ent.sync.msidata = atomic_inc_return(&smmu->sync_nr);
+
+I don't think you need barrier semantics here.
+
+> +		ent.sync.msiaddr = virt_to_phys(&smmu->sync_count);
+> +	}
+>  	arm_smmu_cmdq_build_cmd(cmd, &ent);
+>  
+>  	spin_lock_irqsave(&smmu->cmdq.lock, flags);
+>  	arm_smmu_cmdq_insert_cmd(smmu, cmd);
+> -	ret = queue_poll_cons(&smmu->cmdq.q, true, wfe);
+> +	if (!msi)
+> +		ret = queue_poll_cons(&smmu->cmdq.q, true, wfe);
+>  	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
+>  
+> +	if (msi)
+> +		ret = arm_smmu_sync_poll_msi(smmu, ent.sync.msidata);
+
+This looks like the queue polling should be wrapped up in a function that
+returns with the spinlock released.
+
+Will
