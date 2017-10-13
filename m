@@ -1,112 +1,95 @@
-From: john.garry@huawei.com (John Garry)
-Date: Fri, 13 Oct 2017 12:08:01 +0100
-Subject: [PATCH v3 0/7] Support PPTT for ARM64
-In-Reply-To: <20171012194856.13844-1-jeremy.linton@arm.com>
-References: <20171012194856.13844-1-jeremy.linton@arm.com>
-Message-ID: <f3fab8a0-48e1-57c2-fdc0-be1faccfff2b@huawei.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 13 Oct 2017 12:17:19 +0100
+Subject: [PATCH v3 13/28] arm64/sve: Signal handling support
+In-Reply-To: <20171012161156.GI19485@e103592.cambridge.arm.com>
+References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
+ <1507660725-7986-14-git-send-email-Dave.Martin@arm.com>
+ <20171011164052.exvy2w5p47mewrmg@armageddon.cambridge.arm.com>
+ <20171012161156.GI19485@e103592.cambridge.arm.com>
+Message-ID: <20171013111718.nqd2nllr7niytfss@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/2017 20:48, Jeremy Linton wrote:
-> ACPI 6.2 adds the Processor Properties Topology Table (PPTT), which is
-> used to describe the processor and cache topology. Ideally it is
-> used to extend/override information provided by the hardware, but
-> right now ARM64 is entirely dependent on firmware provided tables.
->
-> This patch parses the table for the cache topology and CPU topology.
-> For the latter we also add an additional topology_cod_id() macro,
-> and a package_id for arm64. Initially the physical id will match
-> the cluster id, but we update users of the cluster to utilize
-> the new macro. When we enable ACPI/PPTT for arm64 we map the socket
-> to the physical id as the remainder of the kernel expects.
->
+On Thu, Oct 12, 2017 at 05:11:57PM +0100, Dave P Martin wrote:
+> On Wed, Oct 11, 2017 at 05:40:52PM +0100, Catalin Marinas wrote:
+> > On Tue, Oct 10, 2017 at 07:38:30PM +0100, Dave P Martin wrote:
+> > > diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> > > index aabeaee..fa4ed34 100644
+> > > --- a/arch/arm64/kernel/fpsimd.c
+> > > +++ b/arch/arm64/kernel/fpsimd.c
+> > > @@ -310,6 +310,32 @@ static void fpsimd_to_sve(struct task_struct *task)
+> > >  		       sizeof(fst->vregs[i]));
+> > >  }
+> > >  
+> > > +/*
+> > > + * Transfer the SVE state in task->thread.sve_state to
+> > > + * task->thread.fpsimd_state.
+> > > + *
+> > > + * Task can be a non-runnable task, or current.  In the latter case,
+> > > + * softirqs (and preemption) must be disabled.
+> > > + * task->thread.sve_state must point to at least sve_state_size(task)
+> > > + * bytes of allocated kernel memory.
+> > > + * task->thread.sve_state must be up to date before calling this function.
+> > > + */
+> > > +static void sve_to_fpsimd(struct task_struct *task)
+> > > +{
+> > > +	unsigned int vq;
+> > > +	void const *sst = task->thread.sve_state;
+> > > +	struct fpsimd_state *fst = &task->thread.fpsimd_state;
+> > > +	unsigned int i;
+> > > +
+> > > +	if (!system_supports_sve())
+> > > +		return;
+> > > +
+> > > +	vq = sve_vq_from_vl(task->thread.sve_vl);
+> > > +	for (i = 0; i < 32; ++i)
+> > > +		memcpy(&fst->vregs[i], ZREG(sst, vq, i),
+> > > +		       sizeof(fst->vregs[i]));
+> > > +}
+> > 
+> > Nit: could we actually just do an assignment with some pointer casting?
+> > It looks like we invoke memcpy for every 16 bytes (same for
+> > fpsimd_to_sve).
+> 
+> I was uneasy about what the type of ZREG(sst, vq, i) ought to be.
+> In any case, memest() is magic: my oldskool GCC (5.3.0) generates:
+> 
+> ffff000008084c70 <sve_to_fpsimd>:
+> ffff000008084c70:       14000004        b       ffff000008084c80 <sve_to_fpsimd+0x10>
+> ffff000008084c74:       d503201f        nop
+> ffff000008084c78:       d65f03c0        ret
+> ffff000008084c7c:       d503201f        nop
+> ffff000008084c80:       f0007d61        adrp    x1, ffff000009033000 <reset_devices>
+> ffff000008084c84:       f942a021        ldr     x1, [x1,#1344]
+> ffff000008084c88:       36b001c1        tbz     w1, #22, ffff000008084cc0 <sve_to_fpsimd+0x50>
+> ffff000008084c8c:       b94ca805        ldr     w5, [x0,#3240]
+> ffff000008084c90:       912a0001        add     x1, x0, #0xa80
+> ffff000008084c94:       91320004        add     x4, x0, #0xc80
+> ffff000008084c98:       f9465006        ldr     x6, [x0,#3232]
+> ffff000008084c9c:       121c6ca5        and     w5, w5, #0xfffffff0
+> ffff000008084ca0:       52800000        mov     w0, #0x0                        // #0
+> ffff000008084ca4:       8b2040c2        add     x2, x6, w0, uxtw
+> ffff000008084ca8:       0b050000        add     w0, w0, w5
+> ffff000008084cac:       a9400c42        ldp     x2, x3, [x2]
+> ffff000008084cb0:       a8810c22        stp     x2, x3, [x1],#16
+> ffff000008084cb4:       eb01009f        cmp     x4, x1
+> ffff000008084cb8:       54ffff61        b.ne    ffff000008084ca4 <sve_to_fpsimd+0x34>
+> ffff000008084cbc:       d65f03c0        ret
+> ffff000008084cc0:       d65f03c0        ret
+> ffff000008084cc4:       d503201f        nop
+> 
+> 
+> Without volatile, I think assigning a single object and doing a memcpy()
+> are equivalent to the compiler: which it actually uses depends solely on
+> optimisation considerations.
+> 
+> (But then I'm not a language lawyer ... not a professional one anyway).
+> 
+> Are you concerned compilers may mess this up?
 
-Hi Jeremy,
+That's fine, please ignore my comment then. I was worried that gcc would
+always generate a call to the memcpy implementation rather than inlining
+it.
 
-Can you put this series on a public branch for convenience of review and 
-test?
-
-Also, what is your idea for supporting Type 2 ID structure?
-
-Cheers,
-John
-
-> For example on juno:
-> [root at mammon-juno-rh topology]# lstopo-no-graphics
->   Package L#0
->     L2 L#0 (1024KB)
->       L1d L#0 (32KB) + L1i L#0 (32KB) + Core L#0 + PU L#0 (P#0)
->       L1d L#1 (32KB) + L1i L#1 (32KB) + Core L#1 + PU L#1 (P#1)
->       L1d L#2 (32KB) + L1i L#2 (32KB) + Core L#2 + PU L#2 (P#2)
->       L1d L#3 (32KB) + L1i L#3 (32KB) + Core L#3 + PU L#3 (P#3)
->     L2 L#1 (2048KB)
->       L1d L#4 (32KB) + L1i L#4 (48KB) + Core L#4 + PU L#4 (P#4)
->       L1d L#5 (32KB) + L1i L#5 (48KB) + Core L#5 + PU L#5 (P#5)
->   HostBridge L#0
->     PCIBridge
->       PCIBridge
->         PCIBridge
->           PCI 1095:3132
->             Block(Disk) L#0 "sda"
->         PCIBridge
->           PCI 1002:68f9
->             GPU L#1 "renderD128"
->             GPU L#2 "card0"
->             GPU L#3 "controlD64"
->         PCIBridge
->           PCI 11ab:4380
->             Net L#4 "enp8s0"
->
-> v2->v3:
->
-> Remove valid bit check on leaf nodes. Now simply being a leaf node
->   is sufficient to verify the processor id against the ACPI
->   processor ids (gotten from MADT).
->
-> Use the acpi processor for the "level 0" Id. This makes the /sys
->   visible core/thread ids more human readable if the firmware uses
->   small consecutive values for processor ids.
->
-> Added PPTT to the list of injectable ACPI tables.
->
-> Fix bug which kept the code from using the processor node as intended
->   in v2, caused by misuse of git rebase/fixup.
->
-> v1->v2:
->
-> The parser keys off the acpi_pptt_processor node to determine
->   unique cache's rather than the acpi_pptt_cache referenced by the
->   processor node. This allows PPTT tables which "share" cache nodes
->   across cpu nodes despite not being a shared cache.
->
-> Normalize the socket, cluster and thread mapping so that they match
->   linux's traditional mapping for the physical id, and thread id.
->   Adding explicit scheduler knowledge of clusters (rather than just
->   their cache sharing attributes) is a subject for a future patch.
->
-> Jeremy Linton (7):
->   ACPI/PPTT: Add Processor Properties Topology Table parsing
->   ACPI: Enable PPTT support on ARM64
->   drivers: base: cacheinfo: arm64: Add support for ACPI based firmware
->     tables
->   Topology: Add cluster on die macros and arm64 decoding
->   arm64: Fixup users of topology_physical_package_id
->   arm64: topology: Enable ACPI/PPTT based CPU topology.
->   ACPI: Add PPTT to injectable table list
->
->  arch/arm64/Kconfig                |   1 +
->  arch/arm64/include/asm/topology.h |   4 +-
->  arch/arm64/kernel/cacheinfo.c     |  23 +-
->  arch/arm64/kernel/topology.c      |  62 ++++-
->  drivers/acpi/Makefile             |   1 +
->  drivers/acpi/arm64/Kconfig        |   3 +
->  drivers/acpi/pptt.c               | 486 ++++++++++++++++++++++++++++++++++++++
->  drivers/acpi/tables.c             |   3 +-
->  drivers/base/cacheinfo.c          |  17 +-
->  drivers/cpufreq/arm_big_little.c  |   2 +-
->  drivers/firmware/psci_checker.c   |   2 +-
->  include/linux/cacheinfo.h         |  11 +-
->  include/linux/topology.h          |   4 +
->  13 files changed, 599 insertions(+), 20 deletions(-)
->  create mode 100644 drivers/acpi/pptt.c
->
+-- 
+Catalin
