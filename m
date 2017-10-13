@@ -1,71 +1,55 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 13 Oct 2017 05:51:27 -0700
-Subject: [PATCH 1/2] hwmon: (jc42) optionally try to disable the SMBUS
- timeout
-In-Reply-To: <20171013092705.7038-2-peda@axentia.se>
-References: <20171013092705.7038-1-peda@axentia.se>
- <20171013092705.7038-2-peda@axentia.se>
-Message-ID: <3aae0c68-f001-50fa-8db7-3090978cf16d@roeck-us.net>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 13 Oct 2017 14:52:31 +0200
+Subject: [PATCH v3 01/10] ARM: dts: r8a7778: Use R-Car GPIO Gen1 fallback
+ compat string
+In-Reply-To: <20171013123311.15278-2-horms+renesas@verge.net.au>
+References: <20171013123311.15278-1-horms+renesas@verge.net.au>
+ <20171013123311.15278-2-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdV+8=xDW+AxJkXBfB7EkrNCKErjg7Exv8BFR1m0otSWqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/13/2017 02:27 AM, Peter Rosin wrote:
-> With a nxp,se97 chip on an atmel sama5d31 board, the I2C adapter driver
-> is not always capable of avoiding the 25-35 ms timeout as specified by
-> the SMBUS protocol. This may cause silent corruption of the last bit of
-> any transfer, e.g. a one is read instead of a zero if the sensor chip
-> times out. This also affects the eeprom half of the nxp-se97 chip, where
-> this silent corruption was originally noticed. Other I2C adapters probably
-> suffer similar issues, e.g. bit-banging comes to mind as risky...
-> 
-> The SMBUS register in the nxp chip is not a standard Jedec register, but
-> it is not special to the nxp chips either, at least the atmel chips
-> have the same mechanism. Therefore, do not special case this on the
-> manufacturer, it is opt-in via the device property anyway.
-> 
-> Signed-off-by: Peter Rosin <peda@axentia.se>
+On Fri, Oct 13, 2017 at 2:33 PM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Use newly added R-Car GPIO Gen1 fallback compat string
+> in place of now deprecated non-generation specific
+> R-Car GPIO fallback compat string in DT of r8a7778 SoC.
+>
+> As the driver does not match on "renesas,gpio-r8a7778" there
+> are some run-time considerations for this patch:
+>
+> * When a resulting DTB is used with kernels newer than v4.14 this should
+>   not have any run-time effect as renesas,rcar-gen1-gpio is matched by the
+>   driver since commit dbd1dad2ab8f ("gpio: rcar: add gen[123] fallback
+>   compatibility strings")
+>
+> * However, when used with older kernels GPIO will be disabled as
+>   no compat string match will be made by the driver.
+>
+> The regression documented above for the new DTB with old kernel case
+> is acceptable in my opinion.
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > ---
->   Documentation/devicetree/bindings/hwmon/jc42.txt |  4 ++++
->   drivers/hwmon/jc42.c                             | 20 ++++++++++++++++++++
->   2 files changed, 24 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/hwmon/jc42.txt b/Documentation/devicetree/bindings/hwmon/jc42.txt
-> index 07a250498fbb..f569db58f64a 100644
-> --- a/Documentation/devicetree/bindings/hwmon/jc42.txt
-> +++ b/Documentation/devicetree/bindings/hwmon/jc42.txt
-> @@ -34,6 +34,10 @@ Required properties:
->   
->   - reg: I2C address
->   
-> +Optional properties:
-> +- smbus-timeout-disable: When set, the smbus timeout function will be disabled.
-> +			 This is not supported on all chips.
-> +
->   Example:
->   
->   temp-sensor at 1a {
-> diff --git a/drivers/hwmon/jc42.c b/drivers/hwmon/jc42.c
-> index 1bf22eff0b08..fd816902fa30 100644
-> --- a/drivers/hwmon/jc42.c
-> +++ b/drivers/hwmon/jc42.c
-> @@ -45,6 +45,7 @@ static const unsigned short normal_i2c[] = {
->   #define JC42_REG_TEMP		0x05
->   #define JC42_REG_MANID		0x06
->   #define JC42_REG_DEVICEID	0x07
-> +#define JC42_REG_SMBUS		0x22 /* NXP and Atmel, possibly others? */
->   
->   /* Status bits in temperature register */
->   #define JC42_ALARM_CRIT_BIT	15
-> @@ -73,6 +74,9 @@ static const unsigned short normal_i2c[] = {
->   #define ONS_MANID		0x1b09  /* ON Semiconductor */
->   #define STM_MANID		0x104a  /* ST Microelectronics */
->   
-> +/* SMBUS register */
-> +#define SMBUS_STMOUT		BIT(7)  /* SMBus time-out, active low */
+> v3
+> * Consistently use gen1 rather than gen2 binding in patch and refer to it
+>   in changelog.
+>
+> v2
+> * Note run-time considerations in changelog as pointed out by
+>   Geert Uytterhoeven
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Requires bitops.h.
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Otherwise looks good, though we'll have to wait for Rob's ack.
+Gr{oetje,eeting}s,
 
-Thanks,
-Guenter
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
