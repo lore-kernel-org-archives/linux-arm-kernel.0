@@ -1,109 +1,59 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 13 Oct 2017 17:47:15 +0100
-Subject: [RESEND PATCH 2/2] arm/arm64: pmu: Distinguish percpu irq and
- percpu_devid irq
-In-Reply-To: <1507894005-53778-3-git-send-email-julien.thierry@arm.com>
-References: <1507894005-53778-1-git-send-email-julien.thierry@arm.com>
- <1507894005-53778-3-git-send-email-julien.thierry@arm.com>
-Message-ID: <20171013164715.GB5919@leverpostej>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 13 Oct 2017 11:51:52 -0500
+Subject: [PATCH 1/3] Documentation/devicetree: Add pcie-reset-suspend
+ property
+In-Reply-To: <20171012205220.130048-2-briannorris@chromium.org>
+References: <20171012205220.130048-1-briannorris@chromium.org>
+ <20171012205220.130048-2-briannorris@chromium.org>
+Message-ID: <20171013165152.GE25517@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 13, 2017 at 12:26:45PM +0100, Julien Thierry wrote:
-> arm_pmu interrupts are maked as PERCPU even when these are not local
-> physical interrupts to a single CPU. When using non-local interrupts,
-> interrupts marked as PERCPU will not get freed not disabled properly
-> by the PMU driver.
+[+cc Doug]
+
+On Thu, Oct 12, 2017 at 01:52:18PM -0700, Brian Norris wrote:
+> The patch is self-descriptive. I've found that we may need
+> platform-specific behavior for the PERST# signal in system suspend,
+> depending on the type of PCIe endpoints are attached.
 > 
-> Check if interrupts are local to a single CPU with PERCPU_DEVID since
-> this is what the PMU driver really needs to know.
-> 
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Will Deacon <will.deacon@arm.com>
-> Mark Rutland <mark.rutland@arm.com>
-
-I guess these should have been with prefixed 'Cc: '.
-
-The patch itself looks good to me:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-I suspect we'll need to take both patches via the usual arm pmu tree, so
-it'd be good if we could get an ack on patch 1.
-
-Thanks,
-Mark.
-
+> Signed-off-by: Brian Norris <briannorris@chromium.org>
 > ---
->  drivers/perf/arm_pmu.c          | 10 +++++-----
->  drivers/perf/arm_pmu_platform.c |  4 ++--
->  2 files changed, 7 insertions(+), 7 deletions(-)
+>  Documentation/devicetree/bindings/pci/pci.txt | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
 > 
-> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-> index d14fc2e..7bc5eee 100644
-> --- a/drivers/perf/arm_pmu.c
-> +++ b/drivers/perf/arm_pmu.c
-> @@ -539,7 +539,7 @@ void armpmu_free_irq(struct arm_pmu *armpmu, int cpu)
->  	if (!cpumask_test_and_clear_cpu(cpu, &armpmu->active_irqs))
->  		return;
-> 
-> -	if (irq_is_percpu(irq)) {
-> +	if (irq_is_percpu_devid(irq)) {
->  		free_percpu_irq(irq, &hw_events->percpu_pmu);
->  		cpumask_clear(&armpmu->active_irqs);
->  		return;
-> @@ -565,10 +565,10 @@ int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
->  	if (!irq)
->  		return 0;
-> 
-> -	if (irq_is_percpu(irq) && cpumask_empty(&armpmu->active_irqs)) {
-> +	if (irq_is_percpu_devid(irq) && cpumask_empty(&armpmu->active_irqs)) {
->  		err = request_percpu_irq(irq, handler, "arm-pmu",
->  					 &hw_events->percpu_pmu);
-> -	} else if (irq_is_percpu(irq)) {
-> +	} else if (irq_is_percpu_devid(irq)) {
->  		int other_cpu = cpumask_first(&armpmu->active_irqs);
->  		int other_irq = per_cpu(hw_events->irq, other_cpu);
-> 
-> @@ -649,7 +649,7 @@ static int arm_perf_starting_cpu(unsigned int cpu, struct hlist_node *node)
-> 
->  	irq = armpmu_get_cpu_irq(pmu, cpu);
->  	if (irq) {
-> -		if (irq_is_percpu(irq)) {
-> +		if (irq_is_percpu_devid(irq)) {
->  			enable_percpu_irq(irq, IRQ_TYPE_NONE);
->  			return 0;
->  		}
-> @@ -667,7 +667,7 @@ static int arm_perf_teardown_cpu(unsigned int cpu, struct hlist_node *node)
->  		return 0;
-> 
->  	irq = armpmu_get_cpu_irq(pmu, cpu);
-> -	if (irq && irq_is_percpu(irq))
-> +	if (irq && irq_is_percpu_devid(irq))
->  		disable_percpu_irq(irq);
-> 
->  	return 0;
-> diff --git a/drivers/perf/arm_pmu_platform.c b/drivers/perf/arm_pmu_platform.c
-> index 4eafa7a..bbc64ee 100644
-> --- a/drivers/perf/arm_pmu_platform.c
-> +++ b/drivers/perf/arm_pmu_platform.c
-> @@ -126,7 +126,7 @@ static int pmu_parse_irqs(struct arm_pmu *pmu)
-> 
->  	if (num_irqs == 1) {
->  		int irq = platform_get_irq(pdev, 0);
-> -		if (irq && irq_is_percpu(irq))
-> +		if (irq && irq_is_percpu_devid(irq))
->  			return pmu_parse_percpu_irq(pmu, irq);
->  	}
-> 
-> @@ -149,7 +149,7 @@ static int pmu_parse_irqs(struct arm_pmu *pmu)
->  		if (WARN_ON(irq <= 0))
->  			continue;
-> 
-> -		if (irq_is_percpu(irq)) {
-> +		if (irq_is_percpu_devid(irq)) {
->  			pr_warn("multiple PPIs or mismatched SPI/PPI detected\n");
->  			return -EINVAL;
->  		}
-> --
-> 1.9.1
+> diff --git a/Documentation/devicetree/bindings/pci/pci.txt b/Documentation/devicetree/bindings/pci/pci.txt
+> index c77981c5dd18..91339b6d0652 100644
+> --- a/Documentation/devicetree/bindings/pci/pci.txt
+> +++ b/Documentation/devicetree/bindings/pci/pci.txt
+> @@ -24,3 +24,14 @@ driver implementation may support the following properties:
+>     unsupported link speed, for instance, trying to do training for
+>     unsupported link speed, etc.  Must be '4' for gen4, '3' for gen3, '2'
+>     for gen2, and '1' for gen1. Any other values are invalid.
+> +- pcie-reset-suspend:
+> +   If present this property defines whether the PCIe Reset signal (referred to
+> +   as PERST#) should be asserted when the system enters low-power suspend modes
+> +   (e.g., S3). Depending on the form factor, the associated PCIe
+> +   electromechanical specification may specify a particular behavior (e.g.,
+> +   "PERST# is asserted in advance of the power being switched off in a
+> +   power-managed state like S3") or it may be less clear. The net result is
+> +   that some endpoints perform better (e.g., lower power consumption) with
+> +   PERST# asserted, and others prefer PERST# deasserted. The value must be '0'
+> +   or '1', where '0' means do not assert PERST# and '1' means assert PERST#.
+> +   When absent, behavior may be platform-specific.
+
+I don't understand this at all.  Are you suggesting that we need
+different "pcie-reset-suspend" values based on what sort of endpoint
+the user plugs in?
+
+If so, I really don't want to get involved in that, because that's an
+issue that needs to be resolved by the vendors and the PCI-SIG.  If we
+put in a tweak like this, I think it would be a band-aid that only
+delays getting a real solution figured out.
+
+If you want a quirk to tune this based on specific devices, that might
+make sense.  It would still sound like an interoperability issue and
+an ongoing maintenance problem, but at least we would have specific
+details about which devices are involved, and we'd have a chance to
+make them work on more controllers than just Rockchip.
+
+Bjorn
