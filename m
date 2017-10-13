@@ -1,102 +1,126 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Fri, 13 Oct 2017 19:31:51 +0200
-Subject: [PATCH 05/37] KVM: Record the executing ioctl number on the vcpu
- struct
-In-Reply-To: <20171013171307.GA16116@flask>
-References: <20171012104141.26902-1-christoffer.dall@linaro.org>
- <20171012104141.26902-6-christoffer.dall@linaro.org>
- <20171013171307.GA16116@flask>
-Message-ID: <20171013173151.GA17578@cbox>
+From: pasha.tatashin@oracle.com (Pavel Tatashin)
+Date: Fri, 13 Oct 2017 13:32:10 -0400
+Subject: [PATCH v12 07/11] x86/kasan: add and use kasan_map_populate()
+In-Reply-To: <20171013173214.27300-1-pasha.tatashin@oracle.com>
+References: <20171013173214.27300-1-pasha.tatashin@oracle.com>
+Message-ID: <20171013173214.27300-8-pasha.tatashin@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 13, 2017 at 07:13:07PM +0200, Radim Kr?m?? wrote:
-> 2017-10-12 12:41+0200, Christoffer Dall:
-> > Some architectures may decide to do different things during
-> > kvm_arch_vcpu_load depending on the ioctl being executed.  For example,
-> > arm64 is about to do significant work in vcpu load/put when running a
-> > vcpu, but not when doing things like KVM_SET_ONE_REG or
-> > KVM_SET_MP_STATE.
-> > 
-> > Therefore, store the ioctl number that we are executing on the VCPU
-> > during the first vcpu_load() which succeeds in getting the vcpu->mutex
-> > and set the ioctl number to 0 when exiting kvm_vcpu_ioctl() after
-> > successfully loading the vcpu.
-> > 
-> > Cc: Paolo Bonzini <pbonzini@redhat.com>
-> > Cc: Radim Kr?m?? <rkrcmar@redhat.com>
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > ---
-> > diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-> > @@ -147,12 +147,13 @@ bool kvm_is_reserved_pfn(kvm_pfn_t pfn)
-> >  /*
-> >   * Switches to specified vcpu, until a matching vcpu_put()
-> >   */
-> > -int vcpu_load(struct kvm_vcpu *vcpu)
-> > +int vcpu_load(struct kvm_vcpu *vcpu, unsigned int ioctl)
-> >  {
-> >  	int cpu;
-> >  
-> >  	if (mutex_lock_killable(&vcpu->mutex))
-> >  		return -EINTR;
-> > +	vcpu->ioctl = ioctl;
-> 
-> This seems to prevent races by protecting the store by a mutex, but
-> 
-> >  	cpu = get_cpu();
-> >  	preempt_notifier_register(&vcpu->preempt_notifier);
-> >  	kvm_arch_vcpu_load(vcpu, cpu);
-> > @@ -2529,7 +2530,7 @@ static long kvm_vcpu_ioctl(struct file *filp,
-> >  #endif
-> >  
-> >  
-> > -	r = vcpu_load(vcpu);
-> > +	r = vcpu_load(vcpu, ioctl);
-> >  	if (r)
-> >  		return r;
-> >  	switch (ioctl) {
-> > @@ -2704,6 +2705,7 @@ static long kvm_vcpu_ioctl(struct file *filp,
-> >  	}
-> >  out:
-> >  	vcpu_put(vcpu);
-> > +	vcpu->ioctl = 0;
-> 
-> we should still have a race as we clear ioctl only after releasing the
-> lock.  For example malicious userspace could break KVM terms of use and
-> issue !KVM_RUN followed by KVM_RUN, so we would have these races:
-> 
->    !KVM_RUN                             |   KVM_RUN
-> 
->    mutex_lock_killable(&vcpu->mutex);   |
->    vcpu->ioctl = !KVM_RUN;              |
->    ...                                  | mutex_lock_killable(&vcpu->mutex);
->    mutex_unlock(&vcpu->mutex);          |
->                                         | vcpu->ioctl = KVM_RUN;
->                                         | kvm_arch_vcpu_load() // variant 1
->    vcpu->ioctl = 0;                     | ...
->                                         | kvm_arch_vcpu_load() // variant 2
->                                         | vcpu_put()
-> 
-> where the observed value of vcpu->ioctl in vcpu_put() would not
-> correctly pair with vcpu_load() or worse, kvm_arch_arch_load() in
-> KVM_RUN would execute with vcpu->ioctl = 0.
+During early boot, kasan uses vmemmap_populate() to establish its shadow
+memory. But, that interface is intended for struct pages use.
 
-Yeah, this is super racy, thanks for pointing that out.
+Because of the current project, vmemmap won't be zeroed during allocation,
+but kasan expects that memory to be zeroed. We are adding a new
+kasan_map_populate() function to resolve this difference.
 
-> 
-> I think that other (special) callsites of vcpu_load()/vcpu_put() have a
-> well defined IOCTL that can be used instead of vcpu->ioctl, so we could
-> just pass the ioctl value all the way to arch code and never save it
-> anywhere,
+Therefore, we must use a new interface to allocate and map kasan shadow
+memory, that also zeroes memory for us.
 
-I don't think that works; what would you do with preempt notifier calls?
+Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
+---
+ arch/x86/mm/kasan_init_64.c | 75 ++++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 71 insertions(+), 4 deletions(-)
 
-One solution is to add a parameter to vcpu_put, lie for vcpu_load, which
-also sets the ioctl, and other callers than the final vcpu_put in
-kvm_vcpu_ioctl() just pass the existing value, where the kvm_vcpu_ioctl
-call can pass 0 which gets set before releasing the mutex.
-
-Can you think of a more elegant solution?
-
-Thanks,
--Christoffer
+diff --git a/arch/x86/mm/kasan_init_64.c b/arch/x86/mm/kasan_init_64.c
+index bc84b73684b7..9778fec8a5dc 100644
+--- a/arch/x86/mm/kasan_init_64.c
++++ b/arch/x86/mm/kasan_init_64.c
+@@ -15,6 +15,73 @@
+ 
+ extern struct range pfn_mapped[E820_MAX_ENTRIES];
+ 
++/* Creates mappings for kasan during early boot. The mapped memory is zeroed */
++static int __meminit kasan_map_populate(unsigned long start, unsigned long end,
++					int node)
++{
++	unsigned long addr, pfn, next;
++	unsigned long long size;
++	pgd_t *pgd;
++	p4d_t *p4d;
++	pud_t *pud;
++	pmd_t *pmd;
++	pte_t *pte;
++	int ret;
++
++	ret = vmemmap_populate(start, end, node);
++	/*
++	 * We might have partially populated memory, so check for no entries,
++	 * and zero only those that actually exist.
++	 */
++	for (addr = start; addr < end; addr = next) {
++		pgd = pgd_offset_k(addr);
++		if (pgd_none(*pgd)) {
++			next = pgd_addr_end(addr, end);
++			continue;
++		}
++
++		p4d = p4d_offset(pgd, addr);
++		if (p4d_none(*p4d)) {
++			next = p4d_addr_end(addr, end);
++			continue;
++		}
++
++		pud = pud_offset(p4d, addr);
++		if (pud_none(*pud)) {
++			next = pud_addr_end(addr, end);
++			continue;
++		}
++		if (pud_large(*pud)) {
++			/* This is PUD size page */
++			next = pud_addr_end(addr, end);
++			size = PUD_SIZE;
++			pfn = pud_pfn(*pud);
++		} else {
++			pmd = pmd_offset(pud, addr);
++			if (pmd_none(*pmd)) {
++				next = pmd_addr_end(addr, end);
++				continue;
++			}
++			if (pmd_large(*pmd)) {
++				/* This is PMD size page */
++				next = pmd_addr_end(addr, end);
++				size = PMD_SIZE;
++				pfn = pmd_pfn(*pmd);
++			} else {
++				pte = pte_offset_kernel(pmd, addr);
++				next = addr + PAGE_SIZE;
++				if (pte_none(*pte))
++					continue;
++				/* This is base size page */
++				size = PAGE_SIZE;
++				pfn = pte_pfn(*pte);
++			}
++		}
++		memset(phys_to_virt(PFN_PHYS(pfn)), 0, size);
++	}
++	return ret;
++}
++
+ static int __init map_range(struct range *range)
+ {
+ 	unsigned long start;
+@@ -23,7 +90,7 @@ static int __init map_range(struct range *range)
+ 	start = (unsigned long)kasan_mem_to_shadow(pfn_to_kaddr(range->start));
+ 	end = (unsigned long)kasan_mem_to_shadow(pfn_to_kaddr(range->end));
+ 
+-	return vmemmap_populate(start, end, NUMA_NO_NODE);
++	return kasan_map_populate(start, end, NUMA_NO_NODE);
+ }
+ 
+ static void __init clear_pgds(unsigned long start,
+@@ -136,9 +203,9 @@ void __init kasan_init(void)
+ 		kasan_mem_to_shadow((void *)PAGE_OFFSET + MAXMEM),
+ 		kasan_mem_to_shadow((void *)__START_KERNEL_map));
+ 
+-	vmemmap_populate((unsigned long)kasan_mem_to_shadow(_stext),
+-			(unsigned long)kasan_mem_to_shadow(_end),
+-			NUMA_NO_NODE);
++	kasan_map_populate((unsigned long)kasan_mem_to_shadow(_stext),
++			   (unsigned long)kasan_mem_to_shadow(_end),
++			   NUMA_NO_NODE);
+ 
+ 	kasan_populate_zero_shadow(kasan_mem_to_shadow((void *)MODULES_END),
+ 			(void *)KASAN_SHADOW_END);
+-- 
+2.14.2
