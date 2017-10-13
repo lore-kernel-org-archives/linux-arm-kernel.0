@@ -1,162 +1,86 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 13 Oct 2017 19:32:38 +0100
-Subject: [PATCH v2 3/4] iommu/arm-smmu-v3: Use CMD_SYNC completion MSI
-In-Reply-To: <dbf0ce00f8e249c64f3d2041acd8d91818178e52.1504182142.git.robin.murphy@arm.com>
-References: <cover.1504182142.git.robin.murphy@arm.com>
- <dbf0ce00f8e249c64f3d2041acd8d91818178e52.1504182142.git.robin.murphy@arm.com>
-Message-ID: <20171013183237.GA30572@arm.com>
+From: jeffy.chen@rock-chips.com (jeffy)
+Date: Sat, 14 Oct 2017 02:33:45 +0800
+Subject: [PATCH v5 1/3] PCI: rockchip: Add support for pcie wake irq
+In-Reply-To: <2453698.N4jfPaHx71@aspire.rjw.lan>
+References: <20170911151029.25185-1-jeffy.chen@rock-chips.com>
+ <20170911151029.25185-2-jeffy.chen@rock-chips.com>
+ <20171013030441.GA25517@bhelgaas-glaptop.roam.corp.google.com>
+ <2453698.N4jfPaHx71@aspire.rjw.lan>
+Message-ID: <59E10709.4020300@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+Hi Rafael,
 
-This mostly looks good. Just a few comments below.
+On 10/13/2017 09:21 PM, Rafael J. Wysocki wrote:
+>>
+>>I'm a little skeptical about dev_pm_set_dedicated_wake_irq(), not
+>>because I know anything at all about it, but because there are only
+>>five callers in the whole tree, three of which are in UART code, and
+>>none in anything resembling PCI code.
+>>
+>>Is Rockchip really that special, or are we going about this the wrong
+>>way?
 
-On Thu, Aug 31, 2017 at 02:44:27PM +0100, Robin Murphy wrote:
-> As an IRQ, the CMD_SYNC interrupt is not particularly useful, not least
-> because we often need to wait for sync completion within someone else's
-> IRQ handler anyway. However, when the SMMU is both coherent and supports
-> MSIs, we can have a lot more fun by not using it as an interrupt at all.
-> Following the example suggested in the architecture and using a write
-> targeting normal memory, we can let callers wait on a status variable
-> outside the lock instead of having to stall the entire queue or even
-> touch MMIO registers. Since multiple sync commands are guaranteed to
-> complete in order, a simple incrementing sequence count is all we need
-> to unambiguously support any realistic number of overlapping waiters.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
-> 
-> v2: Remove redundant 'bool msi' command member, other cosmetic tweaks
-> 
->  drivers/iommu/arm-smmu-v3.c | 47 +++++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 45 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index f066725298cd..311f482b93d5 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -377,7 +377,16 @@
->  
->  #define CMDQ_SYNC_0_CS_SHIFT		12
->  #define CMDQ_SYNC_0_CS_NONE		(0UL << CMDQ_SYNC_0_CS_SHIFT)
-> +#define CMDQ_SYNC_0_CS_IRQ		(1UL << CMDQ_SYNC_0_CS_SHIFT)
->  #define CMDQ_SYNC_0_CS_SEV		(2UL << CMDQ_SYNC_0_CS_SHIFT)
-> +#define CMDQ_SYNC_0_MSH_SHIFT		22
-> +#define CMDQ_SYNC_0_MSH_ISH		(3UL << CMDQ_SYNC_0_MSH_SHIFT)
-> +#define CMDQ_SYNC_0_MSIATTR_SHIFT	24
-> +#define CMDQ_SYNC_0_MSIATTR_OIWB	(0xfUL << CMDQ_SYNC_0_MSIATTR_SHIFT)
-> +#define CMDQ_SYNC_0_MSIDATA_SHIFT	32
-> +#define CMDQ_SYNC_0_MSIDATA_MASK	0xffffffffUL
-> +#define CMDQ_SYNC_1_MSIADDR_SHIFT	0
-> +#define CMDQ_SYNC_1_MSIADDR_MASK	0xffffffffffffcUL
->  
->  /* Event queue */
->  #define EVTQ_ENT_DWORDS			4
-> @@ -409,6 +418,7 @@
->  /* High-level queue structures */
->  #define ARM_SMMU_POLL_TIMEOUT_US	100
->  #define ARM_SMMU_CMDQ_DRAIN_TIMEOUT_US	1000000 /* 1s! */
-> +#define ARM_SMMU_SYNC_TIMEOUT_US	1000000 /* 1s! */
+we used to put these codes in the wifi driver, but another wifi vendor 
+suggests these should go into the pcie driver.
 
-We only ever do this when waiting for the queue to drain, so may as well
-just reuse the drain timeout.
+and as tony said, it could go into pcie common code :)
+>>
+>> > >+		if (err)
+>> > >+			dev_err(dev, "failed to setup PCIe wakeup IRQ\n");
+>> > >+	}
+>> > >+
+>> > >  	return 0;
+>>
+>>The above could be structured as:
+>>
+>>   irq = platform_get_irq_byname(pdev, "wakeup");
+>>   if (irq < 0)
+>>     return 0;
+>>
+>>   device_init_wakeup(dev, true);
+>>   err = dev_pm_set_dedicated_wake_irq(dev, irq);
+>>   if (err) {
+>>     dev_pm_clear_wake_irq(dev);
+>>     device_init_wakeup(dev, false);
+>>   }
+>>
+there's no need to call dev_pm_clear_wake_irq when 
+dev_pm_set_dedicated_wake_irq failed...and i agree the 
+device_init_wakeup part, i'll add that in the next version(with brian's 
+comment too)
+>>   return 0;
+>>
+>>to unindent the mainline non-error code.
+>>
+>> > >  }
+>> > >
+>> > >@@ -1542,11 +1552,11 @@ static int rockchip_pcie_probe(struct platform_device *pdev)
+>> > >
+>> > >  	err = rockchip_pcie_parse_dt(rockchip);
+>> > >  	if (err)
+>> > >-		return err;
+>> > >+		goto err_disable_wake;
+>> > >
+>> > >  	err = rockchip_pcie_enable_clocks(rockchip);
+>> > >  	if (err)
+>> > >-		return err;
+>> > >+		goto err_disable_wake;
+>> > >
+>> > >  	err = rockchip_pcie_set_vpcie(rockchip);
+>> > >  	if (err) {
+>> > >@@ -1656,6 +1666,9 @@ static int rockchip_pcie_probe(struct platform_device *pdev)
+>> > >  		regulator_disable(rockchip->vpcie0v9);
+>> > >  err_set_vpcie:
+>> > >  	rockchip_pcie_disable_clocks(rockchip);
+>> > >+err_disable_wake:
+>> > >+	dev_pm_clear_wake_irq(dev);
+>> > >+	device_init_wakeup(dev, false);
+>>
+>>I think this error cleanup should be done in rockchip_pcie_setup_irq()
+>>as shown above.  There's no real connection between
+>>rockchip_pcie_probe() and the wake setup.
 
->  #define MSI_IOVA_BASE			0x8000000
->  #define MSI_IOVA_LENGTH			0x100000
-> @@ -504,6 +514,10 @@ struct arm_smmu_cmdq_ent {
->  		} pri;
->  
->  		#define CMDQ_OP_CMD_SYNC	0x46
-> +		struct {
-> +			u32			msidata;
-> +			u64			msiaddr;
-> +		} sync;
->  	};
->  };
->  
-> @@ -617,6 +631,9 @@ struct arm_smmu_device {
->  	int				gerr_irq;
->  	int				combined_irq;
->  
-> +	atomic_t			sync_nr;
-> +	u32				sync_count;
-
-It's probably worth sticking these in separate cachelines so we don't
-get spurious wakeups when sync_nr is incremented. (yes, I know it should
-be the ERG, but that can be unreasonably huge!).
-
-> +
->  	unsigned long			ias; /* IPA */
->  	unsigned long			oas; /* PA */
->  	unsigned long			pgsize_bitmap;
-> @@ -878,7 +895,13 @@ static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
->  		}
->  		break;
->  	case CMDQ_OP_CMD_SYNC:
-> -		cmd[0] |= CMDQ_SYNC_0_CS_SEV;
-> +		if (ent->sync.msiaddr)
-> +			cmd[0] |= CMDQ_SYNC_0_CS_IRQ;
-> +		else
-> +			cmd[0] |= CMDQ_SYNC_0_CS_SEV;
-> +		cmd[0] |= CMDQ_SYNC_0_MSH_ISH | CMDQ_SYNC_0_MSIATTR_OIWB;
-> +		cmd[0] |= (u64)ent->sync.msidata << CMDQ_SYNC_0_MSIDATA_SHIFT;
-> +		cmd[1] |= ent->sync.msiaddr & CMDQ_SYNC_1_MSIADDR_MASK;
->  		break;
->  	default:
->  		return -ENOENT;
-> @@ -964,21 +987,40 @@ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
->  	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
->  }
->  
-> +static int arm_smmu_sync_poll_msi(struct arm_smmu_device *smmu, u32 sync_idx)
-> +{
-> +	ktime_t timeout = ktime_add_us(ktime_get(), ARM_SMMU_SYNC_TIMEOUT_US);
-> +	u32 val = smp_cond_load_acquire(&smmu->sync_count,
-> +					(int)(VAL - sync_idx) >= 0 ||
-> +					!ktime_before(ktime_get(), timeout));
-> +
-> +	return (int)(val - sync_idx) < 0 ? -ETIMEDOUT : 0;
-
-There are some theoretical overflow issues here which I don't think will
-ever occur in practice, but deserve@least a comment to explain why.
-
-> +}
-> +
->  static void arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
->  {
->  	u64 cmd[CMDQ_ENT_DWORDS];
->  	unsigned long flags;
->  	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
-> +	bool msi = (smmu->features & ARM_SMMU_FEAT_MSI) &&
-> +		   (smmu->features & ARM_SMMU_FEAT_COHERENCY);
-
-I don't think this is sufficient for the case where we fail to setup MSIs
-and fall back on legacy IRQs.
-
->  	struct arm_smmu_cmdq_ent ent = { .opcode = CMDQ_OP_CMD_SYNC };
->  	int ret;
->  
-> +	if (msi) {
-> +		ent.sync.msidata = atomic_inc_return(&smmu->sync_nr);
-
-I don't think you need barrier semantics here.
-
-> +		ent.sync.msiaddr = virt_to_phys(&smmu->sync_count);
-> +	}
->  	arm_smmu_cmdq_build_cmd(cmd, &ent);
->  
->  	spin_lock_irqsave(&smmu->cmdq.lock, flags);
->  	arm_smmu_cmdq_insert_cmd(smmu, cmd);
-> -	ret = queue_poll_cons(&smmu->cmdq.q, true, wfe);
-> +	if (!msi)
-> +		ret = queue_poll_cons(&smmu->cmdq.q, true, wfe);
->  	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
->  
-> +	if (msi)
-> +		ret = arm_smmu_sync_poll_msi(smmu, ent.sync.msidata);
-
-This looks like the queue polling should be wrapped up in a function that
-returns with the spinlock released.
-
-Will
+this error handling is like inline "rockchip_pcie_cleanup_irq()", and 
+they are harmless to be called even if we don't have the wakeup irq :)
