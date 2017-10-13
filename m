@@ -1,43 +1,47 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 13 Oct 2017 19:37:50 +0100
-Subject: [RESEND PATCH 1/2] spi: rockchip: Convert to late and early
- system PM callbacks
-In-Reply-To: <20171013183006.k6pzcr5tcwsxxtmp@dtor-ws>
-References: <20171013104138.3216-1-jeffy.chen@rock-chips.com>
- <20171013104138.3216-2-jeffy.chen@rock-chips.com>
- <CAD=FV=X6pkaY3t=ceh3QEUws+_gqRGMN9zveW0fXR1noF1T6ew@mail.gmail.com>
- <20171013155120.GA137489@google.com>
- <20171013164235.thgqha7sl5tdptwv@sirena.co.uk>
- <59E103B0.8060705@rock-chips.com>
- <20171013183006.k6pzcr5tcwsxxtmp@dtor-ws>
-Message-ID: <20171013183750.piabs7m3dnpabnkm@sirena.co.uk>
+From: rkrcmar@redhat.com (Radim =?utf-8?B?S3LEjW3DocWZ?=)
+Date: Fri, 13 Oct 2017 20:38:13 +0200
+Subject: [PATCH 05/37] KVM: Record the executing ioctl number on the vcpu
+ struct
+In-Reply-To: <20171013173151.GA17578@cbox>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+ <20171012104141.26902-6-christoffer.dall@linaro.org>
+ <20171013171307.GA16116@flask> <20171013173151.GA17578@cbox>
+Message-ID: <20171013183812.GA26563@flask>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 13, 2017 at 11:30:06AM -0700, Dmitry Torokhov wrote:
-> On Sat, Oct 14, 2017 at 02:19:28AM +0800, jeffy wrote:
+2017-10-13 19:31+0200, Christoffer Dall:
+> On Fri, Oct 13, 2017 at 07:13:07PM +0200, Radim Kr?m?? wrote:
+> > I think that other (special) callsites of vcpu_load()/vcpu_put() have a
+> > well defined IOCTL that can be used instead of vcpu->ioctl, so we could
+> > just pass the ioctl value all the way to arch code and never save it
+> > anywhere,
+> 
+> I don't think that works; what would you do with preempt notifier calls?
 
-> > > Yeah, it's the same stuff as we get with initcall ordering.  This sort
-> > > of thing does happen with things like PMICs which tend to have hardware
-> > > that the system wants to manipulate in the IRQs off part of suspend.
-> > > Ideally the dependency annotation stuff would figure things out though
-> > > I'm not sure what the status of that is.
+Right, BUG :), I didn't consider them before and they need to know.
 
-> I'd say non-existent for resources such as regulators, pwms, clocks,
-> etc. I do not think many places call device_link_add()... I think adding
-> this to devm_* APIs might be easiest to get the ball going as they
-> naturally have consumer device and can easily figure out the supplier
-> side.
+> One solution is to add a parameter to vcpu_put, lie for vcpu_load, which
+> also sets the ioctl, and other callers than the final vcpu_put in
+> kvm_vcpu_ioctl() just pass the existing value, where the kvm_vcpu_ioctl
+> call can pass 0 which gets set before releasing the mutex.
+> 
+> Can you think of a more elegant solution?
 
-Hrm, are things in a state where we're supposed to be doing that?  I've
-not seen anyone even trying which is a bit odd, I'd thought there was
-some core work still ongoing (and it wasn't clear to me if we were going
-to try to do things like use DT/ACPI cross references to figure this
-stuff out).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171013/15987c86/attachment.sig>
+Not really, only thought of touching preempt notifiers and it seems to
+be more complicated.
+
+I think we shouldn't restore ioctl on vcpu_put() at all -- the value
+isn't well defined outside of the mutex, so there is no point in looking
+and we can just zero the ioctl.
+
+Actually, I wouldn't rely on the existing value at all because that.
+The need for load/put depends on the current code path, not on the one
+we race with.
+
+x86 seems to be the only user of vcpu_load() outside of kvm_vcpu_ioctl()
+and the callers are either under a VM ioctl or under a VM destruction
+paths (invalid IOCTL) and we can just hardcode that.
+
+Passing 0 to all other vcpu_load()s and unconditionally zeroing ioctl
+before mutex_unlock() should work.
