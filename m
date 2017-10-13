@@ -1,70 +1,42 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 13 Oct 2017 14:42:52 -0500
-Subject: [PATCH 1/2] dt-bindings: add binding for Allwinner R40 SATA AHCI
- controller
-In-Reply-To: <20171008043541.48564-1-icenowy@aosc.io>
-References: <20171008043541.48564-1-icenowy@aosc.io>
-Message-ID: <20171013194252.yt2zv3xpjgvzonvk@rob-hp-laptop>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Sat, 14 Oct 2017 03:50:55 +0800
+Subject: [PATCH v6 0/3] PCI: rockchip: Move PCIE_WAKE handling into rockchip
+ pcie driver
+Message-ID: <20171013195059.23865-1-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 08, 2017 at 12:35:40PM +0800, Icenowy Zheng wrote:
-> The Allwinner R40 SoC contains a SATA AHCI controller like the one in
-> A10/A20 SoCs, however a reset control and two power supplies are added
-> to it.
-> 
-> Add a binding document for it.
-> 
-> As a dedicated binding document is needed now for the A10/A20/R40 AHCI
-> controller, drop the A10 compatible line from generic platform AHCI
-> controller binding document.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  .../devicetree/bindings/ata/ahci-platform.txt      |  1 -
->  .../bindings/ata/allwinner,sun4i-a10-ahci.txt      | 40 ++++++++++++++++++++++
->  2 files changed, 40 insertions(+), 1 deletion(-)
->  create mode 100644 Documentation/devicetree/bindings/ata/allwinner,sun4i-a10-ahci.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-> index fedc213b5f1a..da6818b2c204 100644
-> --- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
-> +++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-> @@ -9,7 +9,6 @@ PHYs.
->  
->  Required properties:
->  - compatible        : compatible string, one of:
-> -  - "allwinner,sun4i-a10-ahci"
->    - "brcm,iproc-ahci"
->    - "hisilicon,hisi-ahci"
->    - "cavium,octeon-7130-ahci"
-> diff --git a/Documentation/devicetree/bindings/ata/allwinner,sun4i-a10-ahci.txt b/Documentation/devicetree/bindings/ata/allwinner,sun4i-a10-ahci.txt
-> new file mode 100644
-> index 000000000000..0eea78c14ad3
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/ata/allwinner,sun4i-a10-ahci.txt
-> @@ -0,0 +1,40 @@
-> +Allwinner A10/A20/R40 SoC SATA AHCI Controller
-> +
-> +Required properties:
-> +- compatible        : compatible string, one of:
-> +  - "allwinner,sun4i-a10-ahci"
-> +  - "allwinner,sun8i-r40-ahci"
-> +- interrupts        : the SATA IRQ
-> +- reg               : the register mapping
-> +- clocks            : the clocks needed by SATA controller, usually contains
-> +		      an AHB clock and a mod clock
-> +
-> +Optional properties:
-> +- target-supply     : regulator for SATA target power
-> +
-> +Required properties for the following compatibles:
-> +  - "allwinner,sun8i-r40-ahci"
-> +- resets            : the reset control needed by SATA controller
-> +- vdd1v2-supply     : regulator for SATA controller's 1.2V VDD
-> +- vdd2v5-supply     : regulator for SATA controller's 2.5V VDD
 
-I have to wonder, are these really for the controller and not the phy? 
-You don't have any phy?
+Currently we are handling pcie wake in mrvl wifi driver. But Brian
+suggests to move it into rockchip pcie driver.
 
-Rob
+Tested on my chromebook bob(with cros 4.4 kernel and mrvl wifi).
+
+
+Changes in v6:
+Fix device_init_wake error handling, and add some comments.
+
+Changes in v5:
+Rebase
+Move to pci.txt
+Use "wakeup" instead of "wake"
+
+Changes in v3:
+Fix error handling
+
+Changes in v2:
+Use dev_pm_set_dedicated_wake_irq
+        -- Suggested by Brian Norris <briannorris@chromium.com>
+
+Jeffy Chen (3):
+  PCI: rockchip: Add support for pcie wake irq
+  dt-bindings: PCI: Add definition of pcie wake irq
+  arm64: dts: rockchip: Handle pcie wake in pcie driver for Gru
+
+ Documentation/devicetree/bindings/pci/pci.txt |  2 ++
+ arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi  | 15 +++++++++------
+ drivers/pci/host/pcie-rockchip.c              | 27 +++++++++++++++++++++------
+ 3 files changed, 32 insertions(+), 12 deletions(-)
+
+-- 
+2.11.0
