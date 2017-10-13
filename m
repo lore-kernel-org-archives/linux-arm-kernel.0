@@ -1,50 +1,57 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Fri, 13 Oct 2017 11:35:16 +0200
-Subject: Dramatic lockdep slowdown in 4.14
-In-Reply-To: <20171013090744.lvvc66qexmomsd5f@hirez.programming.kicks-ass.net>
-References: <20171013090333.GA17356@localhost>
- <20171013090744.lvvc66qexmomsd5f@hirez.programming.kicks-ass.net>
-Message-ID: <20171013093516.GB17356@localhost>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Fri, 13 Oct 2017 10:38:18 +0100
+Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.15
+Message-ID: <59E0898A.3050307@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 13, 2017 at 11:07:44AM +0200, Peter Zijlstra wrote:
-> On Fri, Oct 13, 2017 at 11:03:33AM +0200, Johan Hovold wrote:
-> > Hi,
-> > 
-> > I had noticed that the BeagleBone Black boot time appeared to have
-> > increased significantly with 4.14 and yesterday I finally had time to
-> > investigate it.
-> > 
-> > Boot time (from "Linux version" to login prompt) had in fact doubled
-> > since 4.13 where it took 17 seconds (with my current config) compared to
-> > the 35 seconds I now see with 4.14-rc4.
-> > 
-> > I quick bisect pointed to lockdep and specifically the following commit:
-> > 
-> > 	28a903f63ec0 ("locking/lockdep: Handle non(or multi)-acquisition
-> > 	               of a crosslock")
-> > 
-> > which I've verified is the commit which doubled the boot time (compared
-> > to 28a903f63ec0^) (added by lockdep crossrelease series [1]).
-> > 
-> > I also verified that simply disabling CONFIG_PROVE_LOCKING on 4.14-rc4
-> > brought boot time down to about 14 seconds.
-> > 
-> > Now since it's lockdep I guess this can't really be considered a
-> > regression if these changes did improve lockdep correctness, but still,
-> > this dramatic slow down essentially forces me to disable PROVE_LOCKING
-> > by default on this system.
-> > 
-> > Is this lockdep slowdown expected and desirable?
-> 
-> Expected yes, desirable not so much. Its the save_stack_trace() in
-> add_xhlock() (IIRC).
-> 
-> I've not yet had time to figure out what to do about that.
+Hi Arnd, Hi Olof, Hi Kevin,
 
-Thanks for confirming. Do you think it makes sense to track this as a
-4.14 regression to avoid having others spend time on tracking this down
-meanwhile? (Adding Thorsten on CC.)
+Please help to pull the following changes.
+Thanks!
 
-Johan
+Best Regards,
+Wei
+
+---
+
+The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+
+  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+
+are available in the git repository at:
+
+  git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.15
+
+for you to fetch changes up to a7ab4cb46902cd481d7def6869cf38a1e157f829:
+
+  arm64: dts: Register Hi3660's thermal sensor (2017-10-11 09:51:50 +0100)
+
+----------------------------------------------------------------
+ARM64: DT: Hisilicon SoC DT updates for 4.15
+
+- Add CoreSight related nodes for hi6220
+- Add GPIO line names for hikey960
+- Rectify the GPIO line names of the Poplar board to keep consistency
+- Add thermal sensor binding doc and dt nodes for hi3660
+
+----------------------------------------------------------------
+Kevin Wangtao (2):
+      dt-bindings: Document the hi3660 thermal sensor binding
+      arm64: dts: Register Hi3660's thermal sensor
+
+Li Pengcheng (1):
+      arm64: dts: hi6220: add coresight dt nodes
+
+Linus Walleij (2):
+      arm64: dts: hikey960: Update HiKey960 with GPIO line names
+      arm64: dts: hisilicon: Standardize Poplar GPIO line names
+
+ .../bindings/thermal/hisilicon-thermal.txt         |   9 +
+ arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts  | 319 +++++++++++++++++
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi          |   7 +
+ .../boot/dts/hisilicon/hi3798cv200-poplar.dts      |  20 +-
+ .../arm64/boot/dts/hisilicon/hi6220-coresight.dtsi | 381 +++++++++++++++++++++
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |   2 +
+ 6 files changed, 728 insertions(+), 10 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hi6220-coresight.dtsi
