@@ -1,77 +1,49 @@
 From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Fri, 13 Oct 2017 11:01:44 +0200
-Subject: [PATCH v2 00/16] Support armada-37xx second UART port
-Message-ID: <20171013090200.31034-1-miquel.raynal@free-electrons.com>
+Date: Fri, 13 Oct 2017 11:01:53 +0200
+Subject: [PATCH v2 09/16] serial: mvebu-uart: add TX interrupt trigger for
+ pulse interrupts
+In-Reply-To: <20171013090200.31034-1-miquel.raynal@free-electrons.com>
+References: <20171013090200.31034-1-miquel.raynal@free-electrons.com>
+Message-ID: <20171013090200.31034-10-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes since v1:
-- Added a fallback in probe() to allow the use of this driver without
-  device tree.
-- Used devm_free_irq() instead of free_irq().
-- Changed comments on ESPRESSObin DTS.
-- Fixed various typos.
-- Added Gregory's Acked-by/Reviewed-by tags.
+From: Allen Yan <yanwei@marvell.com>
 
+Pulse interrupts (extended UART only) needs a change of state to trigger
+the TX interrupt. In addition to enabling the TX_READY_INT_EN flag,
+produce a FIFO state change from 'empty' to 'not full'. For this, write
+only one data byte in TX start, making the TX FIFO not empty, and wait
+for the TX interrupt to continue the transfer.
 
-Hi,
+Signed-off-by: Allen Yan <yanwei@marvell.com>
+Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/tty/serial/mvebu-uart.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-This series adds support for the armada-37xx extended UART port. The new
-capabilities of this IP compared to the standard port are the possibility
-to use DMA, it has bigger FIFOs (128 bytes instead of 32/64), it is
-possible to fill the FIFO byte-per-byte or 4 bytes at a time, it as RTS
-and CTS control, it supports transfer count for RX/TX with transfer
-finish status and finally it may achieve higher baudrates by the use of
-special dividers.
-
-Almost none of these extended features are implemented though. For now,
-the extended UART is just supported with the same features as the
-standard UART.
-
-This IP is present on the Armada 3720 SoC and is now enabled by the
-device tree related patches on the Armada-3720-DB. As adding the node to
-enable the second port on Armada-3720-ESPRESSObin could break existing
-users by changing the configuration of some pins on the main headers,
-only a side note is added on how to do it easily.
-
-- The driver patches should go through Greg KH.
-- The DT patches should go through the mvebu maintainers.
-- We would also like the DT binding documentation update to go through
-  the mvebu maintainers, as it conflicts with another DT change.
-
-Thank you,
-Miquel
-
-
-Allen Yan (5):
-  serial: mvebu-uart: support probe of multiple ports
-  serial: mvebu-uart: add soft reset at probe
-  serial: mvebu-uart: add function to change baudrate
-  serial: mvebu-uart: clear state register before IRQ request
-  serial: mvebu-uart: add TX interrupt trigger for pulse interrupts
-
-Miquel Raynal (10):
-  dt-bindings: mvebu-uart: update documentation with extended UART
-  pinctrl: dt-bindings: Fix A37xx uart2 group name
-  serial: mvebu-uart: use a generic way to access the registers
-  serial: mvebu-uart: dissociate RX and TX interrupts
-  serial: mvebu-uart: augment the maximum number of ports
-  serial: mvebu-uart: support extended port registers layout
-  arm64: dts: marvell: armada-37xx: add UART clock
-  arm64: dts: marvell: armada-37xx: add second UART port
-  arm64: dts: marvell: armada-3720-db: enable second UART port
-  arm64: dts: marvell: armada-3720-espressobin: fill UART nodes
-
-Yehuda Yitschak (1):
-  serial: mvebu-uart: use driver name when requesting an interrupt
-
- .../pinctrl/marvell,armada-37xx-pinctrl.txt        |   4 +-
- .../devicetree/bindings/serial/mvebu-uart.txt      |  49 ++-
- arch/arm64/boot/dts/marvell/armada-3720-db.dts     |   9 +-
- .../boot/dts/marvell/armada-3720-espressobin.dts   |  12 +
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |  19 +-
- drivers/tty/serial/mvebu-uart.c                    | 483 +++++++++++++++++----
- 6 files changed, 473 insertions(+), 103 deletions(-)
-
+diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
+index 6bd0c40008bb..e52248ec2689 100644
+--- a/drivers/tty/serial/mvebu-uart.c
++++ b/drivers/tty/serial/mvebu-uart.c
+@@ -165,8 +165,16 @@ static void mvebu_uart_stop_tx(struct uart_port *port)
+ 
+ static void mvebu_uart_start_tx(struct uart_port *port)
+ {
+-	unsigned int ctl = readl(port->membase + UART_INTR(port));
++	unsigned int ctl;
++	struct circ_buf *xmit = &port->state->xmit;
+ 
++	if (IS_EXTENDED(port) && !uart_circ_empty(xmit)) {
++		writel(xmit->buf[xmit->tail], port->membase + UART_TSH(port));
++		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
++		port->icount.tx++;
++	}
++
++	ctl = readl(port->membase + UART_INTR(port));
+ 	ctl |= CTRL_TX_RDY_INT(port);
+ 	writel(ctl, port->membase + UART_INTR(port));
+ }
 -- 
 2.11.0
