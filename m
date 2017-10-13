@@ -1,133 +1,22 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 12 Oct 2017 22:04:41 -0500
-Subject: [PATCH v5 1/3] PCI: rockchip: Add support for pcie wake irq
-In-Reply-To: <20170911151029.25185-2-jeffy.chen@rock-chips.com>
-References: <20170911151029.25185-1-jeffy.chen@rock-chips.com>
- <20170911151029.25185-2-jeffy.chen@rock-chips.com>
-Message-ID: <20171013030441.GA25517@bhelgaas-glaptop.roam.corp.google.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 13 Oct 2017 11:04:32 +0800
+Subject: [PATCH v5 1/5] ARM: dts: imx6qdl-icore: Add Sound card support
+In-Reply-To: <1505734113-9708-1-git-send-email-jteki@openedev.com>
+References: <1505734113-9708-1-git-send-email-jteki@openedev.com>
+Message-ID: <20171013030430.GA8833@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Rafael, linux-pm]
-
-On Mon, Sep 11, 2017 at 11:10:27PM +0800, Jeffy Chen wrote:
-> Add support for PCIE_WAKE pin in rockchip pcie driver.
+On Mon, Sep 18, 2017 at 04:58:29PM +0530, Jagan Teki wrote:
+> From: Jagan Teki <jagan@amarulasolutions.com>
 > 
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> ---
+> Linux Sound card now uses generic simple-audio-card, so add
+> the same along with related audmux and codec(via u2c3) for
+> i.CoreM6 QDL module boards.
 > 
-> Changes in v5:
-> Rebase
-> 
-> Changes in v3:
-> Fix error handling
-> 
-> Changes in v2:
-> Use dev_pm_set_dedicated_wake_irq
->         -- Suggested by Brian Norris <briannorris@chromium.com>
-> 
->  drivers/pci/host/pcie-rockchip.c | 19 +++++++++++++++++--
->  1 file changed, 17 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
-> index 9051c6c8fea4..a8b7272597a7 100644
-> --- a/drivers/pci/host/pcie-rockchip.c
-> +++ b/drivers/pci/host/pcie-rockchip.c
-> @@ -37,6 +37,7 @@
->  #include <linux/pci_ids.h>
->  #include <linux/phy/phy.h>
->  #include <linux/platform_device.h>
-> +#include <linux/pm_wakeirq.h>
->  #include <linux/reset.h>
->  #include <linux/regmap.h>
->  
-> @@ -995,6 +996,15 @@ static int rockchip_pcie_setup_irq(struct rockchip_pcie *rockchip)
->  		return err;
->  	}
->  
-> +	/* Must init wakeup before setting dedicated wakeup irq. */
-> +	device_init_wakeup(dev, true);
-> +	irq = platform_get_irq_byname(pdev, "wakeup");
-> +	if (irq >= 0) {
-> +		err = dev_pm_set_dedicated_wake_irq(dev, irq);
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Matteo Lisi <matteo.lisi@engicam.com>
+> Cc: Michael Trimarchi <michael@amarulasolutions.com>
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 
-I'm a little skeptical about dev_pm_set_dedicated_wake_irq(), not
-because I know anything at all about it, but because there are only
-five callers in the whole tree, three of which are in UART code, and
-none in anything resembling PCI code.
-
-Is Rockchip really that special, or are we going about this the wrong
-way?
-
-> +		if (err)
-> +			dev_err(dev, "failed to setup PCIe wakeup IRQ\n");
-> +	}
-> +
->  	return 0;
-
-The above could be structured as:
-
-  irq = platform_get_irq_byname(pdev, "wakeup");
-  if (irq < 0)
-    return 0;
-
-  device_init_wakeup(dev, true);
-  err = dev_pm_set_dedicated_wake_irq(dev, irq);
-  if (err) {
-    dev_pm_clear_wake_irq(dev);
-    device_init_wakeup(dev, false);
-  }
-
-  return 0;
-
-to unindent the mainline non-error code.
-
->  }
->  
-> @@ -1542,11 +1552,11 @@ static int rockchip_pcie_probe(struct platform_device *pdev)
->  
->  	err = rockchip_pcie_parse_dt(rockchip);
->  	if (err)
-> -		return err;
-> +		goto err_disable_wake;
->  
->  	err = rockchip_pcie_enable_clocks(rockchip);
->  	if (err)
-> -		return err;
-> +		goto err_disable_wake;
->  
->  	err = rockchip_pcie_set_vpcie(rockchip);
->  	if (err) {
-> @@ -1656,6 +1666,9 @@ static int rockchip_pcie_probe(struct platform_device *pdev)
->  		regulator_disable(rockchip->vpcie0v9);
->  err_set_vpcie:
->  	rockchip_pcie_disable_clocks(rockchip);
-> +err_disable_wake:
-> +	dev_pm_clear_wake_irq(dev);
-> +	device_init_wakeup(dev, false);
-
-I think this error cleanup should be done in rockchip_pcie_setup_irq()
-as shown above.  There's no real connection between
-rockchip_pcie_probe() and the wake setup.
-
->  	return err;
->  }
->  
-> @@ -1682,6 +1695,8 @@ static int rockchip_pcie_remove(struct platform_device *pdev)
->  	if (!IS_ERR(rockchip->vpcie0v9))
->  		regulator_disable(rockchip->vpcie0v9);
->  
-> +	dev_pm_clear_wake_irq(dev);
-> +	device_init_wakeup(dev, false);
->  	return 0;
->  }
->  
-> -- 
-> 2.11.0
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Applied all, thanks.
