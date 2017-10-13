@@ -1,70 +1,108 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 13 Oct 2017 15:17:34 +0200
-Subject: [PATCH v2] KVM: arm64: its: Fix missing dynamic allocation check in
- scan_its_table
-Message-ID: <20171013131734.16485-1-christoffer.dall@linaro.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 13 Oct 2017 15:25:24 +0200
+Subject: [RESEND PATCH 2/2] arm64: dts: rockchip: Enable edp disaplay on
+ kevin
+In-Reply-To: <20171013104138.3216-3-jeffy.chen@rock-chips.com>
+References: <20171013104138.3216-1-jeffy.chen@rock-chips.com>
+ <20171013104138.3216-3-jeffy.chen@rock-chips.com>
+Message-ID: <3037285.0MAZvLKA4I@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently allocate an entry dynamically, but we never check if the
-allocation actually succeeded.  We actually don't need a dynamic
-allocation, because we know the maximum size of an ITS table entry, so
-we can simply use an allocation on the stack.
+Hi Jeffy,
 
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- virt/kvm/arm/vgic/vgic-its.c | 18 +++++++-----------
- 1 file changed, 7 insertions(+), 11 deletions(-)
+Am Freitag, 13. Oktober 2017, 18:41:38 CEST schrieb Jeffy Chen:
+> Add edp panel and enable related nodes on kevin.
+> 
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index f51c1e1..1d2668b 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -1801,37 +1801,33 @@ typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *entry,
- static int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
- 			  int start_id, entry_fn_t fn, void *opaque)
- {
--	void *entry = kzalloc(esz, GFP_KERNEL);
- 	struct kvm *kvm = its->dev->kvm;
- 	unsigned long len = size;
- 	int id = start_id;
- 	gpa_t gpa = base;
-+	char entry[esz]
- 	int ret;
- 
-+	memset(entry, 0, esz);
-+
- 	while (len > 0) {
- 		int next_offset;
- 		size_t byte_offset;
- 
- 		ret = kvm_read_guest(kvm, gpa, entry, esz);
- 		if (ret)
--			goto out;
-+			return ret;
- 
- 		next_offset = fn(its, id, entry, opaque);
--		if (next_offset <= 0) {
--			ret = next_offset;
--			goto out;
--		}
-+		if (next_offset <= 0)
-+			return next_offset;
- 
- 		byte_offset = next_offset * esz;
- 		id += next_offset;
- 		gpa += byte_offset;
- 		len -= byte_offset;
- 	}
--	ret =  1;
--
--out:
--	kfree(entry);
--	return ret;
-+	return 1;
- }
- 
- /**
--- 
-2.9.0
+does this actually work with mainline kernel sources?
+
+Sean Paul did look at making the edp work on Chromebooks recently,
+but it seemed there were still parts missing to make it actually display
+something.
+
+
+Heiko
+
+> ---
+> 
+>  arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 29 +++++++++++++++++++++++
+>  arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi      | 16 +++++++++++++
+>  2 files changed, 45 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+> index a3d3cea7dc4f..bc67b19f0af5 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+> @@ -93,6 +93,18 @@
+>  		pwm-delay-us = <10000>;
+>  	};
+>  
+> +	edp_panel: edp-panel {
+> +		compatible = "sharp,lq123p1jx31", "simple-panel";
+> +		backlight = <&backlight>;
+> +		power-supply = <&pp3300_disp>;
+> +
+> +		ports {
+> +			panel_in_edp: endpoint {
+> +				remote-endpoint = <&edp_out_panel>;
+> +			};
+> +		};
+> +	};
+> +
+>  	thermistor_ppvar_bigcpu: thermistor-ppvar-bigcpu {
+>  		compatible = "murata,ncp15wb473";
+>  		pullup-uv = <1800000>;
+> @@ -264,6 +276,23 @@ ap_i2c_dig: &i2c2 {
+>  	};
+>  };
+>  
+> +&edp {
+> +	status = "okay";
+> +
+> +	ports {
+> +		edp_out: port at 1 {
+> +			reg = <1>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			edp_out_panel: endpoint at 0 {
+> +				reg = <0>;
+> +				remote-endpoint = <&panel_in_edp>;
+> +			};
+> +		};
+> +	};
+> +};
+> +
+>  &ppvar_bigcpu_pwm {
+>  	regulator-min-microvolt = <798674>;
+>  	regulator-max-microvolt = <1302172>;
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+> index 5772c52fbfd3..470105d651c2 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+> @@ -927,6 +927,22 @@ ap_i2c_audio: &i2c8 {
+>  	dr_mode = "host";
+>  };
+>  
+> +&vopb {
+> +	status = "okay";
+> +};
+> +
+> +&vopb_mmu {
+> +	status = "okay";
+> +};
+> +
+> +&vopl {
+> +	status = "okay";
+> +};
+> +
+> +&vopl_mmu {
+> +	status = "okay";
+> +};
+> +
+>  #include <arm/cros-ec-keyboard.dtsi>
+>  #include <arm/cros-ec-sbs.dtsi>
+>  
+> 
