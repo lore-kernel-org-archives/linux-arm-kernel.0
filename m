@@ -1,101 +1,71 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 13 Oct 2017 14:33:10 +0200
-Subject: [PATCH v3 09/10] arm64: dts: r8a7795: Use R-Car GPIO Gen3 fallback
- compat string
-In-Reply-To: <20171013123311.15278-1-horms+renesas@verge.net.au>
-References: <20171013123311.15278-1-horms+renesas@verge.net.au>
-Message-ID: <20171013123311.15278-10-horms+renesas@verge.net.au>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 13 Oct 2017 05:51:27 -0700
+Subject: [PATCH 1/2] hwmon: (jc42) optionally try to disable the SMBUS
+ timeout
+In-Reply-To: <20171013092705.7038-2-peda@axentia.se>
+References: <20171013092705.7038-1-peda@axentia.se>
+ <20171013092705.7038-2-peda@axentia.se>
+Message-ID: <3aae0c68-f001-50fa-8db7-3090978cf16d@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use newly added R-Car GPIO Gen3 fallback compat string
-in place of now deprecated non-generation specific
-R-Car GPIO fallback compat string in the DT of the r8a7795 SoC.
+On 10/13/2017 02:27 AM, Peter Rosin wrote:
+> With a nxp,se97 chip on an atmel sama5d31 board, the I2C adapter driver
+> is not always capable of avoiding the 25-35 ms timeout as specified by
+> the SMBUS protocol. This may cause silent corruption of the last bit of
+> any transfer, e.g. a one is read instead of a zero if the sensor chip
+> times out. This also affects the eeprom half of the nxp-se97 chip, where
+> this silent corruption was originally noticed. Other I2C adapters probably
+> suffer similar issues, e.g. bit-banging comes to mind as risky...
+> 
+> The SMBUS register in the nxp chip is not a standard Jedec register, but
+> it is not special to the nxp chips either, at least the atmel chips
+> have the same mechanism. Therefore, do not special case this on the
+> manufacturer, it is opt-in via the device property anyway.
+> 
+> Signed-off-by: Peter Rosin <peda@axentia.se>
+> ---
+>   Documentation/devicetree/bindings/hwmon/jc42.txt |  4 ++++
+>   drivers/hwmon/jc42.c                             | 20 ++++++++++++++++++++
+>   2 files changed, 24 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/hwmon/jc42.txt b/Documentation/devicetree/bindings/hwmon/jc42.txt
+> index 07a250498fbb..f569db58f64a 100644
+> --- a/Documentation/devicetree/bindings/hwmon/jc42.txt
+> +++ b/Documentation/devicetree/bindings/hwmon/jc42.txt
+> @@ -34,6 +34,10 @@ Required properties:
+>   
+>   - reg: I2C address
+>   
+> +Optional properties:
+> +- smbus-timeout-disable: When set, the smbus timeout function will be disabled.
+> +			 This is not supported on all chips.
+> +
+>   Example:
+>   
+>   temp-sensor at 1a {
+> diff --git a/drivers/hwmon/jc42.c b/drivers/hwmon/jc42.c
+> index 1bf22eff0b08..fd816902fa30 100644
+> --- a/drivers/hwmon/jc42.c
+> +++ b/drivers/hwmon/jc42.c
+> @@ -45,6 +45,7 @@ static const unsigned short normal_i2c[] = {
+>   #define JC42_REG_TEMP		0x05
+>   #define JC42_REG_MANID		0x06
+>   #define JC42_REG_DEVICEID	0x07
+> +#define JC42_REG_SMBUS		0x22 /* NXP and Atmel, possibly others? */
+>   
+>   /* Status bits in temperature register */
+>   #define JC42_ALARM_CRIT_BIT	15
+> @@ -73,6 +74,9 @@ static const unsigned short normal_i2c[] = {
+>   #define ONS_MANID		0x1b09  /* ON Semiconductor */
+>   #define STM_MANID		0x104a  /* ST Microelectronics */
+>   
+> +/* SMBUS register */
+> +#define SMBUS_STMOUT		BIT(7)  /* SMBus time-out, active low */
 
-This should have no run-time effect as the driver matches against
-the per-SoC compat string before considering the fallback compat string.
+Requires bitops.h.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+Otherwise looks good, though we'll have to wait for Rob's ack.
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index d5cfd1a1c539..15ef292a8d9f 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -220,7 +220,7 @@
- 
- 		gpio0: gpio at e6050000 {
- 			compatible = "renesas,gpio-r8a7795",
--				     "renesas,gpio-rcar";
-+				     "renesas,rcar-gen3-gpio";
- 			reg = <0 0xe6050000 0 0x50>;
- 			interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
- 			#gpio-cells = <2>;
-@@ -235,7 +235,7 @@
- 
- 		gpio1: gpio at e6051000 {
- 			compatible = "renesas,gpio-r8a7795",
--				     "renesas,gpio-rcar";
-+				     "renesas,rcar-gen3-gpio";
- 			reg = <0 0xe6051000 0 0x50>;
- 			interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
- 			#gpio-cells = <2>;
-@@ -250,7 +250,7 @@
- 
- 		gpio2: gpio at e6052000 {
- 			compatible = "renesas,gpio-r8a7795",
--				     "renesas,gpio-rcar";
-+				     "renesas,rcar-gen3-gpio";
- 			reg = <0 0xe6052000 0 0x50>;
- 			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
- 			#gpio-cells = <2>;
-@@ -265,7 +265,7 @@
- 
- 		gpio3: gpio at e6053000 {
- 			compatible = "renesas,gpio-r8a7795",
--				     "renesas,gpio-rcar";
-+				     "renesas,rcar-gen3-gpio";
- 			reg = <0 0xe6053000 0 0x50>;
- 			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
- 			#gpio-cells = <2>;
-@@ -280,7 +280,7 @@
- 
- 		gpio4: gpio at e6054000 {
- 			compatible = "renesas,gpio-r8a7795",
--				     "renesas,gpio-rcar";
-+				     "renesas,rcar-gen3-gpio";
- 			reg = <0 0xe6054000 0 0x50>;
- 			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
- 			#gpio-cells = <2>;
-@@ -295,7 +295,7 @@
- 
- 		gpio5: gpio at e6055000 {
- 			compatible = "renesas,gpio-r8a7795",
--				     "renesas,gpio-rcar";
-+				     "renesas,rcar-gen3-gpio";
- 			reg = <0 0xe6055000 0 0x50>;
- 			interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
- 			#gpio-cells = <2>;
-@@ -310,7 +310,7 @@
- 
- 		gpio6: gpio at e6055400 {
- 			compatible = "renesas,gpio-r8a7795",
--				     "renesas,gpio-rcar";
-+				     "renesas,rcar-gen3-gpio";
- 			reg = <0 0xe6055400 0 0x50>;
- 			interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
- 			#gpio-cells = <2>;
-@@ -325,7 +325,7 @@
- 
- 		gpio7: gpio at e6055800 {
- 			compatible = "renesas,gpio-r8a7795",
--				     "renesas,gpio-rcar";
-+				     "renesas,rcar-gen3-gpio";
- 			reg = <0 0xe6055800 0 0x50>;
- 			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
- 			#gpio-cells = <2>;
--- 
-2.11.0
+Thanks,
+Guenter
