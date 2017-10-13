@@ -1,137 +1,78 @@
-From: todor.tomov@linaro.org (Todor Tomov)
-Date: Fri, 13 Oct 2017 13:56:43 +0300
-Subject: [PATCH v2 4/4] arm64: dts: qcom: Add Camera Control Interface support
-In-Reply-To: <1507892203-17033-1-git-send-email-todor.tomov@linaro.org>
-References: <1507892203-17033-1-git-send-email-todor.tomov@linaro.org>
-Message-ID: <1507892203-17033-5-git-send-email-todor.tomov@linaro.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 13 Oct 2017 12:52:59 +0200
+Subject: [PATCH] KVM: arm64: its: Fix missing dynamic allocation check in
+ scan_its_table
+Message-ID: <20171013105259.9728-1-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds the CCI node for the CCI controller that resides on
-the Qualcomm MSM8916 and MSM8996 platforms.
+We currently allocate an entry dynamically, but we never check if the
+allocation actually succeeded.  We actually don't need a dynamic
+allocation, because we know the maximum size of an ITS table entry, so
+we can simply use an allocation on the stack.
 
-CC: Andy Gross <andy.gross@linaro.org>
-CC: Rob Herring <robh+dt@kernel.org>
-CC: Mark Rutland <mark.rutland@arm.com>
-CC: devicetree at vger.kernel.org
-CC: linux-soc at vger.kernel.org
-CC: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Todor Tomov <todor.tomov@linaro.org>
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/boot/dts/qcom/msm8916-pins.dtsi | 14 ++++++++++++++
- arch/arm64/boot/dts/qcom/msm8916.dtsi      | 19 +++++++++++++++++++
- arch/arm64/boot/dts/qcom/msm8996-pins.dtsi | 14 ++++++++++++++
- arch/arm64/boot/dts/qcom/msm8996.dtsi      | 22 ++++++++++++++++++++++
- 4 files changed, 69 insertions(+)
+ virt/kvm/arm/vgic/vgic-its.c | 19 ++++++++-----------
+ 1 file changed, 8 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi b/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
-index 4cb0b58..4fa6a72 100644
---- a/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
-@@ -733,4 +733,18 @@
- 			bias-pull-up;
- 		};
- 	};
-+
-+	cci_lines {
-+		cci0_default: cci0_default {
-+			pinmux {
-+				function = "cci_i2c";
-+				pins = "gpio29", "gpio30";
-+			};
-+			pinconf {
-+				pins = "gpio29", "gpio30";
-+				drive-strength = <16>;
-+				bias-disable;
-+			};
-+		};
-+	};
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index f51c1e1..555f42f 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -176,6 +176,7 @@ static const struct vgic_its_abi its_table_abi_versions[] = {
  };
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index dc38175..9f64130 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -1325,6 +1325,25 @@
- 				compatible = "venus-encoder";
- 			};
- 		};
-+
-+		cci: cci at 1b0c000 {
-+			compatible = "qcom,cci-v1.0.8";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x1b0c000 0x1000>;
-+			interrupts = <GIC_SPI 50 IRQ_TYPE_EDGE_RISING>;
-+			clocks = <&gcc GCC_CAMSS_TOP_AHB_CLK>,
-+				<&gcc GCC_CAMSS_CCI_AHB_CLK>,
-+				<&gcc GCC_CAMSS_CCI_CLK>,
-+				<&gcc GCC_CAMSS_AHB_CLK>;
-+			clock-names = "camss_top_ahb",
-+				"cci_ahb",
-+				"cci",
-+				"camss_ahb";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&cci0_default>;
-+			status = "disabled";
-+		};
- 	};
  
- 	smd {
-diff --git a/arch/arm64/boot/dts/qcom/msm8996-pins.dtsi b/arch/arm64/boot/dts/qcom/msm8996-pins.dtsi
-index 6599404..3faaa4c 100644
---- a/arch/arm64/boot/dts/qcom/msm8996-pins.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8996-pins.dtsi
-@@ -300,4 +300,18 @@
- 			drive-strength = <2>;	/* 2 MA */
- 		};
- 	};
-+
-+	cci_lines {
-+		cci0_default: cci0_default {
-+			pinmux {
-+				function = "cci_i2c";
-+				pins = "gpio17", "gpio18";
-+			};
-+			pinconf {
-+				pins = "gpio17", "gpio18";
-+				drive-strength = <16>;
-+				bias-disable;
-+			};
-+		};
-+	};
- };
-diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-index 887b61c..ae128d3 100644
---- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-@@ -819,6 +819,28 @@
- 				phy-names = "usb2-phy", "usb3-phy";
- 			};
- 		};
-+
-+		cci: cci at a0c000 {
-+			compatible = "qcom,cci-v1.4.0";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0xa0c000 0x1000>;
-+			interrupts = <GIC_SPI 295 IRQ_TYPE_EDGE_RISING>;
-+			power-domains = <&mmcc CAMSS_GDSC>;
-+			clocks = <&mmcc MMSS_MMAGIC_AHB_CLK>,
-+					<&mmcc CAMSS_TOP_AHB_CLK>,
-+					<&mmcc CAMSS_CCI_AHB_CLK>,
-+					<&mmcc CAMSS_CCI_CLK>,
-+					<&mmcc CAMSS_AHB_CLK>;
-+			clock-names = "mmss_mmagic_ahb",
-+					"camss_top_ahb",
-+					"cci_ahb",
-+					"cci",
-+					"camss_ahb";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&cci0_default>;
-+			status = "disabled";
-+		};
- 	};
+ #define NR_ITS_ABIS	ARRAY_SIZE(its_table_abi_versions)
++#define MAX_ENTRY_SIZE	8	/* Max Entry size across all ABI versions */
  
- 	adsp-pil {
+ inline const struct vgic_its_abi *vgic_its_get_abi(struct vgic_its *its)
+ {
+@@ -1801,37 +1802,33 @@ typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *entry,
+ static int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
+ 			  int start_id, entry_fn_t fn, void *opaque)
+ {
+-	void *entry = kzalloc(esz, GFP_KERNEL);
+ 	struct kvm *kvm = its->dev->kvm;
+ 	unsigned long len = size;
+ 	int id = start_id;
+ 	gpa_t gpa = base;
++	char entry[MAX_ENTRY_SIZE];
+ 	int ret;
+ 
++	memset(entry, 0, MAX_ENTRY_SIZE);
++
+ 	while (len > 0) {
+ 		int next_offset;
+ 		size_t byte_offset;
+ 
+ 		ret = kvm_read_guest(kvm, gpa, entry, esz);
+ 		if (ret)
+-			goto out;
++			return ret;
+ 
+ 		next_offset = fn(its, id, entry, opaque);
+-		if (next_offset <= 0) {
+-			ret = next_offset;
+-			goto out;
+-		}
++		if (next_offset <= 0)
++			return next_offset;
+ 
+ 		byte_offset = next_offset * esz;
+ 		id += next_offset;
+ 		gpa += byte_offset;
+ 		len -= byte_offset;
+ 	}
+-	ret =  1;
+-
+-out:
+-	kfree(entry);
+-	return ret;
++	return 1;
+ }
+ 
+ /**
 -- 
-2.7.4
+2.9.0
