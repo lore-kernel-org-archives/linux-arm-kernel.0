@@ -1,51 +1,105 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 13 Oct 2017 13:27:49 +0200
-Subject: [PATCH v2 02/10] ARM: dts: r8a7779: Use R-Car GPIO Gen1 fallback
- compat string
-In-Reply-To: <20171013110600.6858-3-horms+renesas@verge.net.au>
-References: <20171013110600.6858-1-horms+renesas@verge.net.au>
- <20171013110600.6858-3-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdUCQNO+_Y1SXA0F+_OSdZcsfyH9on0eQ_tKgehM_Ph-Sw@mail.gmail.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Fri, 13 Oct 2017 13:57:42 +0200
+Subject: [PATCH] KVM: arm64: its: Fix missing dynamic allocation check in
+ scan_its_table
+In-Reply-To: <0fbee4b3-c555-76d6-4a9e-8a869e87d8ee@arm.com>
+References: <20171013105259.9728-1-christoffer.dall@linaro.org>
+ <0fbee4b3-c555-76d6-4a9e-8a869e87d8ee@arm.com>
+Message-ID: <20171013115742.GA10539@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Fri, Oct 13, 2017 at 12:00:50PM +0100, Marc Zyngier wrote:
+> On 13/10/17 11:52, Christoffer Dall wrote:
+> > We currently allocate an entry dynamically, but we never check if the
+> > allocation actually succeeded.  We actually don't need a dynamic
+> > allocation, because we know the maximum size of an ITS table entry, so
+> > we can simply use an allocation on the stack.
+> > 
+> > Cc: <stable@vger.kernel.org>
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > ---
+> >  virt/kvm/arm/vgic/vgic-its.c | 19 ++++++++-----------
+> >  1 file changed, 8 insertions(+), 11 deletions(-)
+> > 
+> > diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> > index f51c1e1..555f42f 100644
+> > --- a/virt/kvm/arm/vgic/vgic-its.c
+> > +++ b/virt/kvm/arm/vgic/vgic-its.c
+> > @@ -176,6 +176,7 @@ static const struct vgic_its_abi its_table_abi_versions[] = {
+> >  };
+> >  
+> >  #define NR_ITS_ABIS	ARRAY_SIZE(its_table_abi_versions)
+> > +#define MAX_ENTRY_SIZE	8	/* Max Entry size across all ABI versions */
+> >  
+> >  inline const struct vgic_its_abi *vgic_its_get_abi(struct vgic_its *its)
+> >  {
+> > @@ -1801,37 +1802,33 @@ typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *entry,
+> >  static int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
+> >  			  int start_id, entry_fn_t fn, void *opaque)
+> >  {
+> > -	void *entry = kzalloc(esz, GFP_KERNEL);
+> >  	struct kvm *kvm = its->dev->kvm;
+> >  	unsigned long len = size;
+> >  	int id = start_id;
+> >  	gpa_t gpa = base;
+> > +	char entry[MAX_ENTRY_SIZE];
+> 
+> Nit: you can drop the memset below if you initialize immediately, and
+> GCC supporting dynamic arrays allows you to write this:
+> 
+> 	char entry[esz] = { 0, };
+> 
+> so that you don't have to add the MAX_ENTRY_SIZE.
+> 
 
-On Fri, Oct 13, 2017 at 1:05 PM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Use newly added R-Car GPIO Gen1 fallback compat string
-> in place of now deprecated non-generation specific
-> R-Car GPIO fallback compat string in DT of r8a7779 SoC.
->
-> As the driver does not match on "renesas,gpio-r8a7779" there
-> are some run-time considerations for this patch:
->
-> * When a resulting DTB is used with kernels newer than v4.14 this should
->   not have any run-time effect as renesas,rcar-gen2-gpio is matched by the
+Using a dynamic sized array is a great idea, but trying to initalize it
+at the same time gives me:
 
-gen1
+    error: variable-sized object may not be initialized
 
->   driver since commit dbd1dad2ab8f ("gpio: rcar: add gen[123] fallback
->   compatibility strings")
->
-> * However, when used with older kernels GPIO will be disabled as
->   no compat string match will be made by the driver.
->
-> The regression documented above for the new DTB with old kernel case
-> is acceptable in my opinion.
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Is there a trick I'm unfamiliar with?
 
-Apart from that:
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> >  	int ret;
+> >  
+> > +	memset(entry, 0, MAX_ENTRY_SIZE);
+> > +
+> >  	while (len > 0) {
+> >  		int next_offset;
+> >  		size_t byte_offset;
+> >  
+> >  		ret = kvm_read_guest(kvm, gpa, entry, esz);
+> >  		if (ret)
+> > -			goto out;
+> > +			return ret;
+> >  
+> >  		next_offset = fn(its, id, entry, opaque);
+> > -		if (next_offset <= 0) {
+> > -			ret = next_offset;
+> > -			goto out;
+> > -		}
+> > +		if (next_offset <= 0)
+> > +			return next_offset;
+> >  
+> >  		byte_offset = next_offset * esz;
+> >  		id += next_offset;
+> >  		gpa += byte_offset;
+> >  		len -= byte_offset;
+> >  	}
+> > -	ret =  1;
+> > -
+> > -out:
+> > -	kfree(entry);
+> > -	return ret;
+> > +	return 1;
+> >  }
+> >  
+> >  /**
+> > 
+> 
+> Otherwise:
+> 
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+Thanks!
+-Christoffer
