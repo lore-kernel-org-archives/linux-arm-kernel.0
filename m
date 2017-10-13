@@ -1,42 +1,35 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 13 Oct 2017 11:07:44 +0200
-Subject: Dramatic lockdep slowdown in 4.14
-In-Reply-To: <20171013090333.GA17356@localhost>
-References: <20171013090333.GA17356@localhost>
-Message-ID: <20171013090744.lvvc66qexmomsd5f@hirez.programming.kicks-ass.net>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Fri, 13 Oct 2017 17:10:37 +0800
+Subject: [PATCH v2 01/13] usb: mtu3: fix error return code in
+ ssusb_gadget_init()
+Message-ID: <6dc39e99240f25c83f8c36d23361ec89dcfb33ce.1507885126.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 13, 2017 at 11:03:33AM +0200, Johan Hovold wrote:
-> Hi,
-> 
-> I had noticed that the BeagleBone Black boot time appeared to have
-> increased significantly with 4.14 and yesterday I finally had time to
-> investigate it.
-> 
-> Boot time (from "Linux version" to login prompt) had in fact doubled
-> since 4.13 where it took 17 seconds (with my current config) compared to
-> the 35 seconds I now see with 4.14-rc4.
-> 
-> I quick bisect pointed to lockdep and specifically the following commit:
-> 
-> 	28a903f63ec0 ("locking/lockdep: Handle non(or multi)-acquisition
-> 	               of a crosslock")
-> 
-> which I've verified is the commit which doubled the boot time (compared
-> to 28a903f63ec0^) (added by lockdep crossrelease series [1]).
-> 
-> I also verified that simply disabling CONFIG_PROVE_LOCKING on 4.14-rc4
-> brought boot time down to about 14 seconds.
-> 
-> Now since it's lockdep I guess this can't really be considered a
-> regression if these changes did improve lockdep correctness, but still,
-> this dramatic slow down essentially forces me to disable PROVE_LOCKING
-> by default on this system.
-> 
-> Is this lockdep slowdown expected and desirable?
+When failing to get IRQ number, platform_get_irq() may return
+-EPROBE_DEFER, but we ignore it and always return -ENODEV,
+so fix it.
 
-Expected yes, desirable not so much. Its the save_stack_trace() in
-add_xhlock() (IIRC).
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+---
+ drivers/usb/mtu3/mtu3_core.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-I've not yet had time to figure out what to do about that.
+diff --git a/drivers/usb/mtu3/mtu3_core.c b/drivers/usb/mtu3/mtu3_core.c
+index 99c65b0..9475798 100644
+--- a/drivers/usb/mtu3/mtu3_core.c
++++ b/drivers/usb/mtu3/mtu3_core.c
+@@ -774,9 +774,9 @@ int ssusb_gadget_init(struct ssusb_mtk *ssusb)
+ 		return -ENOMEM;
+ 
+ 	mtu->irq = platform_get_irq(pdev, 0);
+-	if (mtu->irq <= 0) {
++	if (mtu->irq < 0) {
+ 		dev_err(dev, "fail to get irq number\n");
+-		return -ENODEV;
++		return mtu->irq;
+ 	}
+ 	dev_info(dev, "irq %d\n", mtu->irq);
+ 
+-- 
+1.7.9.5
