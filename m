@@ -1,82 +1,130 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri, 13 Oct 2017 11:16:42 +0200
-Subject: [PATCH] pwm: meson: use generic compatibles
-Message-ID: <20171013091642.31948-1-jbrunet@baylibre.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Fri, 13 Oct 2017 10:23:21 +0100
+Subject: [PATCH v1 2/2] kvm: arm64: handle single-step of userspace mmio
+ instructions
+In-Reply-To: <20171013085947.GE8927@cbox>
+References: <20171006113921.24880-1-alex.bennee@linaro.org>
+ <20171006113921.24880-3-alex.bennee@linaro.org>
+ <a9f8905e-18e9-267a-2479-f498c248e2f4@arm.com> <878tgoxudc.fsf@linaro.org>
+ <20171013085947.GE8927@cbox>
+Message-ID: <87po9r9zau.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The meson pwm driver seems to be compatible with more SoCs than
-initially thought. Let's use the most generic compatibles he have in
-DT instead of the gxbb specific ones
 
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
- Documentation/devicetree/bindings/pwm/pwm-meson.txt |  6 +++---
- drivers/pwm/pwm-meson.c                             | 12 ++++++------
- 2 files changed, 9 insertions(+), 9 deletions(-)
+Christoffer Dall <cdall@linaro.org> writes:
 
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-meson.txt b/Documentation/devicetree/bindings/pwm/pwm-meson.txt
-index 1ee81321c35e..439e05030553 100644
---- a/Documentation/devicetree/bindings/pwm/pwm-meson.txt
-+++ b/Documentation/devicetree/bindings/pwm/pwm-meson.txt
-@@ -3,8 +3,8 @@ Amlogic Meson PWM Controller
- 
- Required properties:
- - compatible: Shall contain "amlogic,meson8b-pwm"
--                         or "amlogic,meson-gxbb-pwm"
--                         or "amlogic,meson-gxbb-ao-pwm"
-+                         or "amlogic,meson-gx-pwm"
-+                         or "amlogic,meson-gx-ao-pwm"
- - #pwm-cells: Should be 3. See pwm.txt in this directory for a description of
-   the cells format.
- 
-@@ -16,7 +16,7 @@ Optional properties:
- Example:
- 
- 	pwm_ab: pwm at 8550 {
--		compatible = "amlogic,meson-gxbb-pwm";
-+		compatible = "amlogic,meson-gx-pwm";
- 		reg = <0x0 0x08550 0x0 0x10>;
- 		#pwm-cells = <3>;
- 		clocks = <&xtal>, <&xtal>;
-diff --git a/drivers/pwm/pwm-meson.c b/drivers/pwm/pwm-meson.c
-index d589331d1884..ababcc5ca3f1 100644
---- a/drivers/pwm/pwm-meson.c
-+++ b/drivers/pwm/pwm-meson.c
-@@ -393,7 +393,7 @@ static const char * const pwm_gxbb_parent_names[] = {
- 	"xtal", "hdmi_pll", "fclk_div4", "fclk_div3"
- };
- 
--static const struct meson_pwm_data pwm_gxbb_data = {
-+static const struct meson_pwm_data pwm_gx_data = {
- 	.parent_names = pwm_gxbb_parent_names,
- 	.num_parents = ARRAY_SIZE(pwm_gxbb_parent_names),
- };
-@@ -406,7 +406,7 @@ static const char * const pwm_gxbb_ao_parent_names[] = {
- 	"xtal", "clk81"
- };
- 
--static const struct meson_pwm_data pwm_gxbb_ao_data = {
-+static const struct meson_pwm_data pwm_gx_ao_data = {
- 	.parent_names = pwm_gxbb_ao_parent_names,
- 	.num_parents = ARRAY_SIZE(pwm_gxbb_ao_parent_names),
- };
-@@ -417,12 +417,12 @@ static const struct of_device_id meson_pwm_matches[] = {
- 		.data = &pwm_meson8b_data
- 	},
- 	{
--		.compatible = "amlogic,meson-gxbb-pwm",
--		.data = &pwm_gxbb_data
-+		.compatible = "amlogic,meson-gx-pwm",
-+		.data = &pwm_gx_data
- 	},
- 	{
--		.compatible = "amlogic,meson-gxbb-ao-pwm",
--		.data = &pwm_gxbb_ao_data
-+		.compatible = "amlogic,meson-gx-ao-pwm",
-+		.data = &pwm_gx_ao_data
- 	},
- 	{},
- };
--- 
-2.13.6
+> On Fri, Oct 06, 2017 at 02:45:35PM +0100, Alex Benn?e wrote:
+>>
+>> Julien Thierry <julien.thierry@arm.com> writes:
+>>
+>> > On 06/10/17 12:39, Alex Benn?e wrote:
+>> >> The system state of KVM when using userspace emulation is not complete
+>> >> until we return into KVM_RUN. To handle mmio related updates we wait
+>> >> until they have been committed and then schedule our KVM_EXIT_DEBUG.
+>> >>
+>> >> I've introduced a new function kvm_arm_maybe_return_debug() to wrap up
+>> >> the differences between arm/arm64 which is currently null for arm.
+>> >>
+>> >> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+>> >> ---
+>> >>   arch/arm/include/asm/kvm_host.h   |  2 ++
+>> >>   arch/arm64/include/asm/kvm_host.h |  1 +
+>> >>   arch/arm64/kvm/debug.c            | 21 +++++++++++++++++++++
+>> >>   arch/arm64/kvm/handle_exit.c      |  9 +++------
+>> >>   virt/kvm/arm/arm.c                |  2 +-
+>> >>   virt/kvm/arm/mmio.c               |  3 ++-
+>> >>   6 files changed, 30 insertions(+), 8 deletions(-)
+>> >>
+>> >> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+>> >> index 4a879f6ff13b..aec943f6d123 100644
+>> >> --- a/arch/arm/include/asm/kvm_host.h
+>> >> +++ b/arch/arm/include/asm/kvm_host.h
+>> >> @@ -285,6 +285,8 @@ static inline void kvm_arm_init_debug(void) {}
+>> >>   static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
+>> >>   static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
+>> >>   static inline void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu) {}
+>> >> +static inline int  kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu,
+>> >> +						struct kvm_run *run) {}
+>> >>
+>> >
+>> > This function should return 1.
+>>
+>> So I did ponder making this a bool, returning true if we need to exit
+>> and testing in v/k/a/arm.c exit leg rather than in the mmio handler.
+>>
+>> At the moment it mirrors the existing exit logic which follows -1 err, 0
+>> return, >0 handled. But as I mentioned in the cover letter this fell
+>> down a bit when dealing with the mmio case.
+>>
+>> >
+>> >>   int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
+>> >>   			       struct kvm_device_attr *attr);
+>> >> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>> >> index e923b58606e2..fa67d21662f6 100644
+>> >> --- a/arch/arm64/include/asm/kvm_host.h
+>> >> +++ b/arch/arm64/include/asm/kvm_host.h
+>> >> @@ -369,6 +369,7 @@ void kvm_arm_init_debug(void);
+>> >>   void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
+>> >>   void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
+>> >>   void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu);
+>> >> +int  kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu, struct kvm_run *run);
+>> >
+>> > I feel the name could be a little bit more explicit:
+>> >
+>> > kvm_arm_trap_need_step_debug, kvm_arm_trap_step_return_debug,
+>> > kvm_arm_trap_need_return_debug.
+>>
+>> I wanted to keep the debug suffix so that's fine although I'm not so
+>> sure trap is correct because on the tail end of mmio emulation are we
+>> still trapping?
+>>
+>> Maybe kvm_arm_step_emulated_debug?
+>
+> I think you should name it:
+>
+> kvm_arm_should_complete_emulated_instr_debug() - or something better -
+
+Naming is hard :-/
+
+> and call it directly from kvm_arch_vcpu_ioctl_run, so that it becomes:
+>
+> 	ret = kvm_handle_mmio_return(vcpu, vcpu->run);
+> 	if (ret)
+> 		return ret;
+> 	ret = kvm_arm_should_complete_emulated_instr_debug(vcpu);
+> 	if (ret)
+> 		return ret;
+
+This runs into the problem of slightly different ret semantics for here
+and in handle_exit. Maybe just having a bool response and:
+
+    if (kvm_arm_should_complete_emulated_instr_debug(vcpu))
+        return 0;
+
+And then in handle_exit:
+
+    if (handled == 1 && kvm_arm_should_complete_emulated_instr_debug(vcpu))
+        return 0;
+    else
+        return handled;
+
+?
+>
+>>
+>> > At least, I think it would be nice that the name reflect that this
+>> > check is meant for emulated instructions.
+>> >
+>> > Otherwise:
+>> >
+>> > Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+>> >
+>> > Thanks,
+>>
+>>
+> Thanks,
+> -Christoffer
+
+
+--
+Alex Benn?e
