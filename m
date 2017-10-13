@@ -1,33 +1,98 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 13 Oct 2017 19:32:40 +0530
-Subject: [GIT PULL 2/2] DaVinci defconfig updates for v4.15
-In-Reply-To: <20171013140240.18599-1-nsekhar@ti.com>
-References: <20171013140240.18599-1-nsekhar@ti.com>
-Message-ID: <20171013140240.18599-2-nsekhar@ti.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 13 Oct 2017 16:07:57 +0200
+Subject: [PATCH v4 4/7] soc: mediatek: pwrap: update pwrap_init without
+ slave programming
+In-Reply-To: <1507887704.21840.32.camel@mtkswgap22>
+References: <cover.1505980364.git.sean.wang@mediatek.com>
+ <604078485ca9ab04cea5bc531425d6035b27bc88.1505980364.git.sean.wang@mediatek.com>
+ <f3a04159-8491-6ca6-d2ad-7df1dfd64331@gmail.com>
+ <1507887704.21840.32.camel@mtkswgap22>
+Message-ID: <fe0952f1-c018-8492-7336-149f917463e1@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 
-  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
 
-are available in the git repository at:
+On 10/13/2017 11:41 AM, Sean Wang wrote:
+> On Tue, 2017-10-10 at 20:00 +0200, Matthias Brugger wrote:
+>>
+>> On 09/21/2017 10:26 AM, sean.wang at mediatek.com wrote:
+>>> From: Sean Wang <sean.wang@mediatek.com>
+>>>
+>>> pwrap initialization is highly associated with the base SoC, so
+>>> update here for allowing pwrap_init without slave program which would be
+>>> used to those PMICs without extra encryption on bus such as MT6380.
+>>>
+>>> Signed-off-by: Chenglin Xu <chenglin.xu@mediatek.com>
+>>> Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
+>>> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+>>> ---
+>>>    drivers/soc/mediatek/mtk-pmic-wrap.c | 91 +++++++++++++++++++++---------------
+>>>    1 file changed, 54 insertions(+), 37 deletions(-)
+>>>
+>>> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+>>> index 27d7ccc..9c6d855 100644
+>>> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
+>>> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+>>> @@ -531,6 +531,7 @@ struct pmic_wrapper_type {
+>>>    	u32 spi_w;
+>>>    	u32 wdt_src;
+>>>    	int has_bridge:1;
+>>> +	int slv_program:1;
+>>>    	int (*init_reg_clock)(struct pmic_wrapper *wrp);
+>>>    	int (*init_soc_specific)(struct pmic_wrapper *wrp);
+>>>    };
+>>> @@ -999,9 +1000,12 @@ static int pwrap_init(struct pmic_wrapper *wrp)
+>>>    	}
+>>>    
+>>>    	/* Reset SPI slave */
+>>> -	ret = pwrap_reset_spislave(wrp);
+>>> -	if (ret)
+>>> -		return ret;
+>>> +
+>>> +	if (wrp->master->slv_program) {
+>>> +		ret = pwrap_reset_spislave(wrp);
+>>> +		if (ret)
+>>> +			return ret;
+>>> +	}
+>>>    
+>>>    	pwrap_writel(wrp, 1, PWRAP_WRAP_EN);
+>>>    
+>>> @@ -1013,45 +1017,52 @@ static int pwrap_init(struct pmic_wrapper *wrp)
+>>>    	if (ret)
+>>>    		return ret;
+>>>    
+>>> -	/* Setup serial input delay */
+>>> -	ret = pwrap_init_sidly(wrp);
+>>> -	if (ret)
+>>> -		return ret;
+>>> +	if (wrp->master->slv_program) {
+>>
+>> This if branch is really long and complex enough to put it into function apart.
+>>
+>> Thanks,
+>> Matthias
+>>
+>> PD please take into account the comments I made on v3 of the series.
+>>
+> 
+> I'll try to breakdown the long logic into the short one and use a flag
+> indicating the slave capability decides whether the functions is
+> required being enabled for the slave instead of slv_program which is
+> less meaningful. In this way, pmic_init will be more extensible when
+> more different SoCs and target slaves with various flavors into the
+> driver. And also take into accounts those suggestions you made in v3 in
+> the next version.
+> 
+> 	Sean
+> 
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.15/defconfig
+I totally agree, but I wanted to underline that right now the if branch under
+"if (wrp->master->slv_program)" is around 30 lines, so I think it would be a 
+good candidate to put it into it's own function. For example: 
+pwrap_init_encryption()
+As from what I understand from the commit log, slv_program in the end enables 
+encryption of the communication, right?
 
-for you to fetch changes up to 5627453efabf8eef84ce1dce6767d1268570a6c5:
-
-  ARM: davinci_all_defconfig: enable CMA options (2017-09-21 20:08:29 +0530)
-
-----------------------------------------------------------------
-Enable CMA and MTD command line partitioning support.
-
-----------------------------------------------------------------
-Adam Ford (1):
-      ARM: davinci_all_defconfig: enable MTD_CMDLINE_PARTS
-
-Suman Anna (1):
-      ARM: davinci_all_defconfig: enable CMA options
-
- arch/arm/configs/davinci_all_defconfig | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+Regards,
+Matthias
