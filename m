@@ -1,73 +1,110 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 13 Oct 2017 13:21:46 +0100
-Subject: [PATCH] KVM: arm64: its: Fix missing dynamic allocation check in
- scan_its_table
-In-Reply-To: <20171013115742.GA10539@cbox>
-References: <20171013105259.9728-1-christoffer.dall@linaro.org>
- <0fbee4b3-c555-76d6-4a9e-8a869e87d8ee@arm.com> <20171013115742.GA10539@cbox>
-Message-ID: <cc5715e9-af5b-679d-d8a9-5596d25156d1@arm.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 13 Oct 2017 14:33:03 +0200
+Subject: [PATCH v3 02/10] ARM: dts: r8a7779: Use R-Car GPIO Gen1 fallback
+ compat string
+In-Reply-To: <20171013123311.15278-1-horms+renesas@verge.net.au>
+References: <20171013123311.15278-1-horms+renesas@verge.net.au>
+Message-ID: <20171013123311.15278-3-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/10/17 12:57, Christoffer Dall wrote:
-> On Fri, Oct 13, 2017 at 12:00:50PM +0100, Marc Zyngier wrote:
->> On 13/10/17 11:52, Christoffer Dall wrote:
->>> We currently allocate an entry dynamically, but we never check if the
->>> allocation actually succeeded.  We actually don't need a dynamic
->>> allocation, because we know the maximum size of an ITS table entry, so
->>> we can simply use an allocation on the stack.
->>>
->>> Cc: <stable@vger.kernel.org>
->>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->>> ---
->>>  virt/kvm/arm/vgic/vgic-its.c | 19 ++++++++-----------
->>>  1 file changed, 8 insertions(+), 11 deletions(-)
->>>
->>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->>> index f51c1e1..555f42f 100644
->>> --- a/virt/kvm/arm/vgic/vgic-its.c
->>> +++ b/virt/kvm/arm/vgic/vgic-its.c
->>> @@ -176,6 +176,7 @@ static const struct vgic_its_abi its_table_abi_versions[] = {
->>>  };
->>>  
->>>  #define NR_ITS_ABIS	ARRAY_SIZE(its_table_abi_versions)
->>> +#define MAX_ENTRY_SIZE	8	/* Max Entry size across all ABI versions */
->>>  
->>>  inline const struct vgic_its_abi *vgic_its_get_abi(struct vgic_its *its)
->>>  {
->>> @@ -1801,37 +1802,33 @@ typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *entry,
->>>  static int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
->>>  			  int start_id, entry_fn_t fn, void *opaque)
->>>  {
->>> -	void *entry = kzalloc(esz, GFP_KERNEL);
->>>  	struct kvm *kvm = its->dev->kvm;
->>>  	unsigned long len = size;
->>>  	int id = start_id;
->>>  	gpa_t gpa = base;
->>> +	char entry[MAX_ENTRY_SIZE];
->>
->> Nit: you can drop the memset below if you initialize immediately, and
->> GCC supporting dynamic arrays allows you to write this:
->>
->> 	char entry[esz] = { 0, };
->>
->> so that you don't have to add the MAX_ENTRY_SIZE.
->>
-> 
-> Using a dynamic sized array is a great idea, but trying to initalize it
-> at the same time gives me:
-> 
->     error: variable-sized object may not be initialized
-> 
-> Is there a trick I'm unfamiliar with?
+Use newly added R-Car GPIO Gen1 fallback compat string
+in place of now deprecated non-generation specific
+R-Car GPIO fallback compat string in DT of r8a7779 SoC.
 
-No, it is just that these two things are mutually incompatible, and I
-didn't realize it. You have to choose one or the other... :-(
+As the driver does not match on "renesas,gpio-r8a7779" there
+are some run-time considerations for this patch:
 
-I suggest you keep the memset...
+* When a resulting DTB is used with kernels newer than v4.14 this should
+  not have any run-time effect as renesas,rcar-gen1-gpio is matched by the
+  driver since commit dbd1dad2ab8f ("gpio: rcar: add gen[123] fallback
+  compatibility strings")
 
-Thanks,
+* However, when used with older kernels GPIO will be disabled as
+  no compat string match will be made by the driver.
 
-	M.
+The regression documented above for the new DTB with old kernel case
+is acceptable in my opinion.
+
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v3
+* Consistently refer to gen1 rather than gen2 binding in changelog
+
+v2
+* Note run-time considerations in changelog as pointed out by
+  Geert Uytterhoeven
+---
+ arch/arm/boot/dts/r8a7779.dtsi | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+index 8ee0b2ca5d39..ccef2cfab6e0 100644
+--- a/arch/arm/boot/dts/r8a7779.dtsi
++++ b/arch/arm/boot/dts/r8a7779.dtsi
+@@ -76,7 +76,7 @@
+ 	};
+ 
+ 	gpio0: gpio at ffc40000 {
+-		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7779", "renesas,rcar-gen1-gpio";
+ 		reg = <0xffc40000 0x2c>;
+ 		interrupts = <GIC_SPI 141 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -87,7 +87,7 @@
+ 	};
+ 
+ 	gpio1: gpio at ffc41000 {
+-		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7779", "renesas,rcar-gen1-gpio";
+ 		reg = <0xffc41000 0x2c>;
+ 		interrupts = <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -98,7 +98,7 @@
+ 	};
+ 
+ 	gpio2: gpio at ffc42000 {
+-		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7779", "renesas,rcar-gen1-gpio";
+ 		reg = <0xffc42000 0x2c>;
+ 		interrupts = <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -109,7 +109,7 @@
+ 	};
+ 
+ 	gpio3: gpio at ffc43000 {
+-		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7779", "renesas,rcar-gen1-gpio";
+ 		reg = <0xffc43000 0x2c>;
+ 		interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -120,7 +120,7 @@
+ 	};
+ 
+ 	gpio4: gpio at ffc44000 {
+-		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7779", "renesas,rcar-gen1-gpio";
+ 		reg = <0xffc44000 0x2c>;
+ 		interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -131,7 +131,7 @@
+ 	};
+ 
+ 	gpio5: gpio at ffc45000 {
+-		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7779", "renesas,rcar-gen1-gpio";
+ 		reg = <0xffc45000 0x2c>;
+ 		interrupts = <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -142,7 +142,7 @@
+ 	};
+ 
+ 	gpio6: gpio at ffc46000 {
+-		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7779", "renesas,rcar-gen1-gpio";
+ 		reg = <0xffc46000 0x2c>;
+ 		interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
 -- 
-Jazz is not dead. It just smells funny...
+2.11.0
