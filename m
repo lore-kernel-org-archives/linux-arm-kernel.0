@@ -1,128 +1,119 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Fri, 13 Oct 2017 17:10:39 +0800
-Subject: [PATCH v2 03/13] usb: mtu3: remove dummy wakeup debounce clocks
+Date: Fri, 13 Oct 2017 17:10:38 +0800
+Subject: [PATCH v2 02/13] usb: mtu3: support option to disable usb3 ports
 In-Reply-To: <6dc39e99240f25c83f8c36d23361ec89dcfb33ce.1507885126.git.chunfeng.yun@mediatek.com>
 References: <6dc39e99240f25c83f8c36d23361ec89dcfb33ce.1507885126.git.chunfeng.yun@mediatek.com>
-Message-ID: <4514680659663498f28025827d650550d044c4ac.1507885126.git.chunfeng.yun@mediatek.com>
+Message-ID: <61b4bd47ac6e2c3cc004d943a93bf9d2737a3610.1507885126.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The wakeup debounce clocks for each ports in fact are not
-needed, so remove them.
+Add support to disable specific usb3 ports, it's useful when
+usb3 phy is shared with PCIe or SATA, because we should disable
+the corresponding usb3 port if the phy is used by PCIe or SATA.
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- drivers/usb/mtu3/mtu3.h      |    4 ---
- drivers/usb/mtu3/mtu3_host.c |   57 +++---------------------------------------
- 2 files changed, 4 insertions(+), 57 deletions(-)
+ drivers/usb/mtu3/mtu3.h      |    3 +++
+ drivers/usb/mtu3/mtu3_host.c |   16 +++++++++++++---
+ drivers/usb/mtu3/mtu3_plat.c |    8 ++++++--
+ 3 files changed, 22 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/usb/mtu3/mtu3.h b/drivers/usb/mtu3/mtu3.h
-index 112723d..6d3278e 100644
+index b26fffc..112723d 100644
 --- a/drivers/usb/mtu3/mtu3.h
 +++ b/drivers/usb/mtu3/mtu3.h
-@@ -214,8 +214,6 @@ struct otg_switch_mtk {
-  *		disable u3port0, bit1==1 to disable u3port1,... etc
+@@ -210,6 +210,8 @@ struct otg_switch_mtk {
+  *		host only, device only or dual-role mode
+  * @u2_ports: number of usb2.0 host ports
+  * @u3_ports: number of usb3.0 host ports
++ * @u3p_dis_msk: mask of disabling usb3 ports, for example, bit0==1 to
++ *		disable u3port0, bit1==1 to disable u3port1,... etc
   * @dbgfs_root: only used when supports manual dual-role switch via debugfs
   * @wakeup_en: it's true when supports remote wakeup in host mode
-- * @wk_deb_p0: port0's wakeup debounce clock
-- * @wk_deb_p1: it's optional, and depends on port1 is supported or not
-  */
- struct ssusb_mtk {
- 	struct device *dev;
-@@ -238,8 +236,6 @@ struct ssusb_mtk {
+  * @wk_deb_p0: port0's wakeup debounce clock
+@@ -232,6 +234,7 @@ struct ssusb_mtk {
+ 	bool is_host;
+ 	int u2_ports;
+ 	int u3_ports;
++	int u3p_dis_msk;
  	struct dentry *dbgfs_root;
  	/* usb wakeup for host mode */
  	bool wakeup_en;
--	struct clk *wk_deb_p0;
--	struct clk *wk_deb_p1;
- 	struct regmap *pericfg;
- };
- 
 diff --git a/drivers/usb/mtu3/mtu3_host.c b/drivers/usb/mtu3/mtu3_host.c
-index 4dd9508..edcc591 100644
+index e42d308..4dd9508 100644
 --- a/drivers/usb/mtu3/mtu3_host.c
 +++ b/drivers/usb/mtu3/mtu3_host.c
-@@ -79,20 +79,6 @@ int ssusb_wakeup_of_property_parse(struct ssusb_mtk *ssusb,
- 	if (!ssusb->wakeup_en)
+@@ -151,6 +151,7 @@ int ssusb_host_enable(struct ssusb_mtk *ssusb)
+ 	void __iomem *ibase = ssusb->ippc_base;
+ 	int num_u3p = ssusb->u3_ports;
+ 	int num_u2p = ssusb->u2_ports;
++	int u3_ports_disabed;
+ 	u32 check_clk;
+ 	u32 value;
+ 	int i;
+@@ -158,8 +159,14 @@ int ssusb_host_enable(struct ssusb_mtk *ssusb)
+ 	/* power on host ip */
+ 	mtu3_clrbits(ibase, U3D_SSUSB_IP_PW_CTRL1, SSUSB_IP_HOST_PDN);
+ 
+-	/* power on and enable all u3 ports */
++	/* power on and enable u3 ports except skipped ones */
++	u3_ports_disabed = 0;
+ 	for (i = 0; i < num_u3p; i++) {
++		if ((0x1 << i) & ssusb->u3p_dis_msk) {
++			u3_ports_disabed++;
++			continue;
++		}
++
+ 		value = mtu3_readl(ibase, SSUSB_U3_CTRL(i));
+ 		value &= ~(SSUSB_U3_PORT_PDN | SSUSB_U3_PORT_DIS);
+ 		value |= SSUSB_U3_PORT_HOST_SEL;
+@@ -175,7 +182,7 @@ int ssusb_host_enable(struct ssusb_mtk *ssusb)
+ 	}
+ 
+ 	check_clk = SSUSB_XHCI_RST_B_STS;
+-	if (num_u3p)
++	if (num_u3p > u3_ports_disabed)
+ 		check_clk = SSUSB_U3_MAC_RST_B_STS;
+ 
+ 	return ssusb_check_clocks(ssusb, check_clk);
+@@ -190,8 +197,11 @@ int ssusb_host_disable(struct ssusb_mtk *ssusb, bool suspend)
+ 	int ret;
+ 	int i;
+ 
+-	/* power down and disable all u3 ports */
++	/* power down and disable u3 ports except skipped ones */
+ 	for (i = 0; i < num_u3p; i++) {
++		if ((0x1 << i) & ssusb->u3p_dis_msk)
++			continue;
++
+ 		value = mtu3_readl(ibase, SSUSB_U3_CTRL(i));
+ 		value |= SSUSB_U3_PORT_PDN;
+ 		value |= suspend ? 0 : SSUSB_U3_PORT_DIS;
+diff --git a/drivers/usb/mtu3/mtu3_plat.c b/drivers/usb/mtu3/mtu3_plat.c
+index 088e3e6..9edad30 100644
+--- a/drivers/usb/mtu3/mtu3_plat.c
++++ b/drivers/usb/mtu3/mtu3_plat.c
+@@ -276,6 +276,10 @@ static int get_ssusb_rscs(struct platform_device *pdev, struct ssusb_mtk *ssusb)
+ 	if (ret)
+ 		return ret;
+ 
++	/* optional property, ignore the error if it does not exist */
++	of_property_read_u32(node, "mediatek,u3p-dis-msk",
++			     &ssusb->u3p_dis_msk);
++
+ 	if (ssusb->dr_mode != USB_DR_MODE_OTG)
  		return 0;
  
--	ssusb->wk_deb_p0 = devm_clk_get(dev, "wakeup_deb_p0");
--	if (IS_ERR(ssusb->wk_deb_p0)) {
--		dev_err(dev, "fail to get wakeup_deb_p0\n");
--		return PTR_ERR(ssusb->wk_deb_p0);
--	}
--
--	if (of_property_read_bool(dn, "wakeup_deb_p1")) {
--		ssusb->wk_deb_p1 = devm_clk_get(dev, "wakeup_deb_p1");
--		if (IS_ERR(ssusb->wk_deb_p1)) {
--			dev_err(dev, "fail to get wakeup_deb_p1\n");
--			return PTR_ERR(ssusb->wk_deb_p1);
--		}
--	}
--
- 	ssusb->pericfg = syscon_regmap_lookup_by_phandle(dn,
- 						"mediatek,syscon-wakeup");
- 	if (IS_ERR(ssusb->pericfg)) {
-@@ -103,36 +89,6 @@ int ssusb_wakeup_of_property_parse(struct ssusb_mtk *ssusb,
+@@ -304,8 +308,8 @@ static int get_ssusb_rscs(struct platform_device *pdev, struct ssusb_mtk *ssusb)
+ 		}
+ 	}
+ 
+-	dev_info(dev, "dr_mode: %d, is_u3_dr: %d\n",
+-		ssusb->dr_mode, otg_sx->is_u3_drd);
++	dev_info(dev, "dr_mode: %d, is_u3_dr: %d, u3p_dis_msk:%x\n",
++		ssusb->dr_mode, otg_sx->is_u3_drd, ssusb->u3p_dis_msk);
+ 
  	return 0;
- }
- 
--static int ssusb_wakeup_clks_enable(struct ssusb_mtk *ssusb)
--{
--	int ret;
--
--	ret = clk_prepare_enable(ssusb->wk_deb_p0);
--	if (ret) {
--		dev_err(ssusb->dev, "failed to enable wk_deb_p0\n");
--		goto usb_p0_err;
--	}
--
--	ret = clk_prepare_enable(ssusb->wk_deb_p1);
--	if (ret) {
--		dev_err(ssusb->dev, "failed to enable wk_deb_p1\n");
--		goto usb_p1_err;
--	}
--
--	return 0;
--
--usb_p1_err:
--	clk_disable_unprepare(ssusb->wk_deb_p0);
--usb_p0_err:
--	return -EINVAL;
--}
--
--static void ssusb_wakeup_clks_disable(struct ssusb_mtk *ssusb)
--{
--	clk_disable_unprepare(ssusb->wk_deb_p1);
--	clk_disable_unprepare(ssusb->wk_deb_p0);
--}
--
- static void host_ports_num_get(struct ssusb_mtk *ssusb)
- {
- 	u32 xhci_cap;
-@@ -286,19 +242,14 @@ void ssusb_host_exit(struct ssusb_mtk *ssusb)
- 
- int ssusb_wakeup_enable(struct ssusb_mtk *ssusb)
- {
--	int ret = 0;
--
--	if (ssusb->wakeup_en) {
--		ret = ssusb_wakeup_clks_enable(ssusb);
-+	if (ssusb->wakeup_en)
- 		ssusb_wakeup_ip_sleep_en(ssusb);
--	}
--	return ret;
-+
-+	return 0;
- }
- 
- void ssusb_wakeup_disable(struct ssusb_mtk *ssusb)
- {
--	if (ssusb->wakeup_en) {
-+	if (ssusb->wakeup_en)
- 		ssusb_wakeup_ip_sleep_dis(ssusb);
--		ssusb_wakeup_clks_disable(ssusb);
--	}
  }
 -- 
 1.7.9.5
