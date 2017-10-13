@@ -1,93 +1,83 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Fri, 13 Oct 2017 16:26:37 +0800
-Subject: [PATCH v2 5/9] usb: xhci-mtk: remove dummy wakeup debounce clocks
-In-Reply-To: <994382d16d6bdc0f3d7c11b22f1710252e056e34.1507882470.git.chunfeng.yun@mediatek.com>
-References: <994382d16d6bdc0f3d7c11b22f1710252e056e34.1507882470.git.chunfeng.yun@mediatek.com>
-Message-ID: <ff9ee49a872084b4fc8c7fbabddc820058acb9b7.1507882470.git.chunfeng.yun@mediatek.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 13 Oct 2017 17:36:54 +0900
+Subject: kdump: need help with kexec -p
+In-Reply-To: <59DF54B3.1050404@arm.com>
+References: <HE1PR04MB12416F54193B1A61BC0652ED974A0@HE1PR04MB1241.eurprd04.prod.outlook.com>
+ <59DF54B3.1050404@arm.com>
+Message-ID: <20171013083653.GG6756@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The wakeup debounce clocks for each ports in fact are not
-needed, so remove them.
+On Thu, Oct 12, 2017 at 12:40:35PM +0100, James Morse wrote:
+> Hi Prabhakar,
+> 
+> (+CC: Akashi Takahiro, who wrote the arm64 kdump support)
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- drivers/usb/host/xhci-mtk.c |   33 ---------------------------------
- drivers/usb/host/xhci-mtk.h |    2 --
- 2 files changed, 35 deletions(-)
+Thanks.
 
-diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
-index 97ba51e..d60463c 100644
---- a/drivers/usb/host/xhci-mtk.c
-+++ b/drivers/usb/host/xhci-mtk.c
-@@ -237,25 +237,8 @@ static int xhci_mtk_clks_enable(struct xhci_hcd_mtk *mtk)
- 		goto sys_clk_err;
- 	}
- 
--	if (mtk->wakeup_src) {
--		ret = clk_prepare_enable(mtk->wk_deb_p0);
--		if (ret) {
--			dev_err(mtk->dev, "failed to enable wk_deb_p0\n");
--			goto usb_p0_err;
--		}
--
--		ret = clk_prepare_enable(mtk->wk_deb_p1);
--		if (ret) {
--			dev_err(mtk->dev, "failed to enable wk_deb_p1\n");
--			goto usb_p1_err;
--		}
--	}
- 	return 0;
- 
--usb_p1_err:
--	clk_disable_unprepare(mtk->wk_deb_p0);
--usb_p0_err:
--	clk_disable_unprepare(mtk->sys_clk);
- sys_clk_err:
- 	clk_disable_unprepare(mtk->ref_clk);
- ref_clk_err:
-@@ -264,10 +247,6 @@ static int xhci_mtk_clks_enable(struct xhci_hcd_mtk *mtk)
- 
- static void xhci_mtk_clks_disable(struct xhci_hcd_mtk *mtk)
- {
--	if (mtk->wakeup_src) {
--		clk_disable_unprepare(mtk->wk_deb_p1);
--		clk_disable_unprepare(mtk->wk_deb_p0);
--	}
- 	clk_disable_unprepare(mtk->sys_clk);
- 	clk_disable_unprepare(mtk->ref_clk);
- }
-@@ -371,18 +350,6 @@ static int usb_wakeup_of_property_parse(struct xhci_hcd_mtk *mtk,
- 	if (!mtk->wakeup_src)
- 		return 0;
- 
--	mtk->wk_deb_p0 = devm_clk_get(dev, "wakeup_deb_p0");
--	if (IS_ERR(mtk->wk_deb_p0)) {
--		dev_err(dev, "fail to get wakeup_deb_p0\n");
--		return PTR_ERR(mtk->wk_deb_p0);
--	}
--
--	mtk->wk_deb_p1 = devm_clk_get(dev, "wakeup_deb_p1");
--	if (IS_ERR(mtk->wk_deb_p1)) {
--		dev_err(dev, "fail to get wakeup_deb_p1\n");
--		return PTR_ERR(mtk->wk_deb_p1);
--	}
--
- 	mtk->pericfg = syscon_regmap_lookup_by_phandle(dn,
- 						"mediatek,syscon-wakeup");
- 	if (IS_ERR(mtk->pericfg)) {
-diff --git a/drivers/usb/host/xhci-mtk.h b/drivers/usb/host/xhci-mtk.h
-index db55a12..67783a7 100644
---- a/drivers/usb/host/xhci-mtk.h
-+++ b/drivers/usb/host/xhci-mtk.h
-@@ -126,8 +126,6 @@ struct xhci_hcd_mtk {
- 	struct regulator *vbus;
- 	struct clk *sys_clk;	/* sys and mac clock */
- 	struct clk *ref_clk;
--	struct clk *wk_deb_p0;	/* port0's wakeup debounce clock */
--	struct clk *wk_deb_p1;
- 	struct regmap *pericfg;
- 	struct phy **phys;
- 	int num_phys;
--- 
-1.7.9.5
+> On 11/10/17 10:11, Prabhakar Kushwaha wrote:
+> > We are facing some issues while using  kexec -p on ARM64 NXP platforms. 
+> >
+> > 1) After calling kexec -p, if immediately "panic" is triggered the crash kernel
+> > does not boot. If we run few commands and wait for atleast (20-30 secs), before
+> > triggering the panic, the crash kernel boots.
+> 
+> What kernel version do you see this on?
+
+Now I know, from his private e-mail, that this only happens
+on lsk(Linaro Stable Kernel) 4.4, to which I also backported my dump :)
+
+So, first, I would like to determine whether this issue is really
+lsk-specific or not.
+
+Thanks,
+-Takahiro AKASHI
+
+> Can you log the kernel output in each
+> case, (do you get a 'bye' message even when the new kernel doesn't boot).
+> 
+> Does 'kexec -p' report success in both cases? ($? == 0)
+> 
+> 
+> kdump can take many seconds in purgatory, it checksums the kdump image to check
+> it didn't get corrupted between 'kexec -p' and crash time, but it doesn't sound
+> like this is what you're seeing.
+> 
+> 
+> > 2) We do not see the issue ("1" ), when we do umount -a, before calling the panic
+> > after kexec-p.
+> 
+> What filesystems (ext4, nfs etc) do you have mounted, and which ones does
+> 'umount -a' get rid of?
+> Where are these filesystems stored?
+> 
+> How many CPUs does your platform have?
+> 
+> (...does crashing on a different CPU change the behaviour?)
+> > taskset -c 1 bash -c "echo c > /proc/sysrq-trigger"
+> 
+> 
+> > The issue does not seem to pertain to the NXP software it seems.   (because this
+> > observation has been observed on very simple kernel, where most of the
+> > controllers have been removed from device tree).
+> 
+> > Also found some info related to this on  internet where it is mentioned that
+> > without un-mounting the mounted filesystems, the boot of next kernel is not
+> > recommended. (this is in context of kexec -e though)
+> > https://www.linux.com/news/reboot-racecar-kexec.
+> 
+> This is because the filesystem is marked as mounted on-disk, and there may be
+> vital data you've written but hasn't made it to the disk yet.
+> 
+> For 'kexec -e' I think it tries to shutdown and reboot, then jumps to the new
+> kernel instead of calling the firmware. This means all filesystems should be
+> sync()d, umounted or at least remounted read-only.
+> 
+> For kdump, we've already crashed, so you've already lost data. Its a best effort
+> can we get to a point where you can debug the original crash.
+> 
+> 
+> Thanks,
+> 
+> James
+> 
