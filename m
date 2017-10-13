@@ -1,64 +1,69 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 13 Oct 2017 14:10:51 -0500
-Subject: [RFCv2 PATCH 12/36] dt-bindings: document stall and PASID
- properties for IOMMU masters
-In-Reply-To: <20171006133203.22803-13-jean-philippe.brucker@arm.com>
-References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
- <20171006133203.22803-13-jean-philippe.brucker@arm.com>
-Message-ID: <20171013191051.lgxbcobkzzj5guhv@rob-hp-laptop>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Fri, 13 Oct 2017 21:14:59 +0200
+Subject: [PATCH] nvmem: meson: use generic compatible
+In-Reply-To: <20171012152450.12454-1-jbrunet@baylibre.com>
+References: <20171012152450.12454-1-jbrunet@baylibre.com>
+Message-ID: <CAFBinCBVNEqTk+NUHz62FetLhYagFb5K+g17P_2Xb7sBUfEmdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 06, 2017 at 02:31:39PM +0100, Jean-Philippe Brucker wrote:
-> On ARM systems, some platform devices behind an IOMMU may support stall
-> and PASID features. Stall is the ability to recover from page faults and
-> PASID offers multiple process address spaces to the device. Together they
-> allow to do paging with a device. Let the firmware tell us when a device
-> supports stall and PASID.
+Hi Jerome,
 
-Can't these be implied by the compatible string of the devices?
-
-> 
-> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+On Thu, Oct 12, 2017 at 5:24 PM, Jerome Brunet <jbrunet@baylibre.com> wrote:
+> The meson efuse driver seems to be compatible with more SoCs than
+> initially thought. Let's use the most generic compatible he have in
+> DT instead of the gxbb specific one
+>
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 > ---
->  Documentation/devicetree/bindings/iommu/iommu.txt | 24 +++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/iommu/iommu.txt b/Documentation/devicetree/bindings/iommu/iommu.txt
-> index 5a8b4624defc..c589b75f7277 100644
-> --- a/Documentation/devicetree/bindings/iommu/iommu.txt
-> +++ b/Documentation/devicetree/bindings/iommu/iommu.txt
-> @@ -86,6 +86,30 @@ have a means to turn off translation. But it is invalid in such cases to
->  disable the IOMMU's device tree node in the first place because it would
->  prevent any driver from properly setting up the translations.
->  
-> +Optional properties:
-> +--------------------
-> +- dma-can-stall: When present, the master can wait for a transaction to
-> +  complete for an indefinite amount of time. Upon translation fault some
-> +  IOMMUs, instead of aborting the translation immediately, may first
-> +  notify the driver and keep the transaction in flight. This allows the OS
-> +  to inspect the fault and, for example, make physical pages resident
-> +  before updating the mappings and completing the transaction. Such IOMMU
-> +  accepts a limited number of simultaneous stalled transactions before
-> +  having to either put back-pressure on the master, or abort new faulting
-> +  transactions.
-> +
-> +  Firmware has to opt-in stalling, because most buses and masters don't
-> +  support it. In particular it isn't compatible with PCI, where
-> +  transactions have to complete before a time limit. More generally it
-> +  won't work in systems and masters that haven't been designed for
-> +  stalling. For example the OS, in order to handle a stalled transaction,
-> +  may attempt to retrieve pages from secondary storage in a stalled
-> +  domain, leading to a deadlock.
-> +
-> +- pasid-bits: Some masters support multiple address spaces for DMA. By
-> +  tagging DMA transactions with an address space identifier. By default,
-> +  this is 0, which means that the device only has one address space.
-> +
->  
->  Notes:
->  ======
-> -- 
-> 2.13.3
-> 
+>  Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt | 4 ++--
+>  drivers/nvmem/meson-efuse.c                               | 2 +-
+>  2 files changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt b/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
+> index fafd85bd67a6..0260524292fe 100644
+> --- a/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
+> +++ b/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
+> @@ -1,7 +1,7 @@
+>  = Amlogic eFuse device tree bindings =
+>
+>  Required properties:
+> -- compatible: should be "amlogic,meson-gxbb-efuse"
+> +- compatible: should be "amlogic,meson-gx-efuse"
+have you checked with the devicetree maintainers how they want the
+documentation to look like in this case?
+(I don't know if the old one should be kept instead of removing it)
+
+>
+>  = Data cells =
+>  Are child nodes of eFuse, bindings of which as described in
+> @@ -10,7 +10,7 @@ bindings/nvmem/nvmem.txt
+>  Example:
+>
+>         efuse: efuse {
+> -               compatible = "amlogic,meson-gxbb-efuse";
+> +               compatible = "amlogic,meson-gx-efuse";
+>                 #address-cells = <1>;
+>                 #size-cells = <1>;
+>
+> diff --git a/drivers/nvmem/meson-efuse.c b/drivers/nvmem/meson-efuse.c
+> index 70bfc9839bb2..e90c6d68a263 100644
+> --- a/drivers/nvmem/meson-efuse.c
+> +++ b/drivers/nvmem/meson-efuse.c
+> @@ -44,7 +44,7 @@ static struct nvmem_config econfig = {
+>  };
+>
+>  static const struct of_device_id meson_efuse_match[] = {
+> -       { .compatible = "amlogic,meson-gxbb-efuse", },
+> +       { .compatible = "amlogic,meson-gx-efuse", },
+>         { /* sentinel */ },
+>  };
+>  MODULE_DEVICE_TABLE(of, meson_efuse_match);
+> --
+> 2.13.6
+>
+>
+> _______________________________________________
+> linux-amlogic mailing list
+> linux-amlogic at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-amlogic
