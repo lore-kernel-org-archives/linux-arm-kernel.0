@@ -1,150 +1,91 @@
 From: guohanjun@huawei.com (Hanjun Guo)
-Date: Fri, 13 Oct 2017 15:09:48 +0800
-Subject: [PATCH v2 2/4] ACPI/IORT: Enable special index ITS group mappings for
- IORT nodes
+Date: Fri, 13 Oct 2017 15:09:50 +0800
+Subject: [PATCH v2 4/4] ACPI/IORT: Enable SMMUv3/PMCG IORT MSI domain set-up
 In-Reply-To: <1507878590-51066-1-git-send-email-guohanjun@huawei.com>
 References: <1507878590-51066-1-git-send-email-guohanjun@huawei.com>
-Message-ID: <1507878590-51066-3-git-send-email-guohanjun@huawei.com>
+Message-ID: <1507878590-51066-5-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hanjun Guo <hanjun.guo@linaro.org>
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-IORT revision C introduced SMMUv3 and PMCG MSI support by adding
-specific mapping entries in the SMMUv3/PMCG subtables to retrieve
-the device ID and the ITS group it maps to for a given SMMUv3/PMCG
-IORT node.
+ITS specific mappings for SMMUv3/PMCG components can be retrieved
+through special index mapping entries introduced in IORT revision C.
 
-Introduce a mapping function (ie iort_get_id_mapping_index()), that
-for a given IORT node looks up if an ITS specific ID mapping entry
-exists and if so retrieve the corresponding mapping index in the IORT
-node mapping array.
+Introduce a new API iort_set_device_domain() to set the MSI domain for
+SMMUv3/PMCG nodes (extendable to any future IORT node requiring special
+index ITS mapping entries) that represent MSI through special index
+mappings in order to enable MSI support for the devices their nodes
+represent.
 
-Since an ITS specific index mapping can be present for an IORT
-node that is not a leaf node (eg SMMUv3 - to describe its own
-ITS device ID) special handling is required for two steps mapping
-cases such as PCI/NamedComponent--->SMMUv3--->ITS because the SMMUv3
-ITS specific index mapping entry should be skipped to prevent the
-IORT API from considering the mapping entry as a regular mapping one.
-
-If we take the following IORT topology example:
-
-|----------------------|
-|  Root Complex Node   |
-|----------------------|
-|    map entry[x]      |
-|----------------------|
-|       id value       |
-| output_reference     |
-|---|------------------|
-    |
-    |   |----------------------|
-    |-->|        SMMUv3        |
-        |----------------------|
-        |     SMMUv3 dev ID    |
-        |     mapping index 0  |
-        |----------------------|
-        |      map entry[0]    |
-        |----------------------|
-        |       id value       |
-        | output_reference-----------> ITS 1 (SMMU MSI domain)
-        |----------------------|
-        |      map entry[1]    |
-        |----------------------|
-        |       id value       |
-        | output_reference-----------> ITS 2 (PCI MSI domain)
-        |----------------------|
-
-where the SMMUv3 ITS specific mapping entry is index 0 and it
-represents the SMMUv3 ITS specific index mapping entry (describing its
-own ITS device ID), we need to skip that mapping entry while carrying
-out the Root Complex Node regular mappings to prevent erroneous
-translations.
-
-Reuse the iort_get_id_mapping_index() function to detect the ITS
-specific mapping index for a specific IORT node and skip it in the IORT
-mapping API (ie iort_node_map_id()) loop to prevent considering it a
-normal PCI/Named Component ID mapping entry.
-
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-[lorenzo.pieralisi at arm.com: split patch/rewrote commit log]
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- drivers/acpi/arm64/iort.c | 32 ++++++++++++++++++++++++++++----
- 1 file changed, 28 insertions(+), 4 deletions(-)
+ drivers/acpi/arm64/iort.c | 45 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
 
 diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 03d3dd2..c3f3ac3 100644
+index ca5dd21..373c58f 100644
 --- a/drivers/acpi/arm64/iort.c
 +++ b/drivers/acpi/arm64/iort.c
-@@ -365,6 +365,11 @@ static struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
- 	return NULL;
+@@ -638,6 +638,49 @@ struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id)
+ 	return irq_find_matching_fwnode(handle, DOMAIN_BUS_PCI_MSI);
  }
  
-+static inline int iort_get_id_mapping_index(struct acpi_iort_node *node)
++static void iort_set_device_domain(struct device *dev,
++				   struct acpi_iort_node *node)
 +{
-+	return -EINVAL;
++	struct acpi_iort_its_group *its;
++	struct acpi_iort_node *msi_parent;
++	struct acpi_iort_id_mapping *map;
++	struct fwnode_handle *iort_fwnode;
++	struct irq_domain *domain;
++	int index;
++
++	index = iort_get_id_mapping_index(node);
++	if (index < 0)
++		return;
++
++	map = ACPI_ADD_PTR(struct acpi_iort_id_mapping, node,
++			   node->mapping_offset + index * sizeof(*map));
++
++	/* Firmware bug! */
++	if (!map->output_reference ||
++	    !(map->flags & ACPI_IORT_ID_SINGLE_MAPPING)) {
++		pr_err(FW_BUG "[node %p type %d] Invalid MSI mapping\n",
++		       node, node->type);
++		return;
++	}
++
++	msi_parent = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
++				  map->output_reference);
++
++	if (!msi_parent || msi_parent->type != ACPI_IORT_NODE_ITS_GROUP)
++		return;
++
++	/* Move to ITS specific data */
++	its = (struct acpi_iort_its_group *)msi_parent->node_data;
++
++	iort_fwnode = iort_find_domain_token(its->identifiers[0]);
++	if (!iort_fwnode)
++		return;
++
++	domain = irq_find_matching_fwnode(iort_fwnode, DOMAIN_BUS_PLATFORM_MSI);
++	if (domain)
++		dev_set_msi_domain(dev, domain);
 +}
 +
- static struct acpi_iort_node *iort_node_map_id(struct acpi_iort_node *node,
- 					       u32 id_in, u32 *id_out,
- 					       u8 type_mask)
-@@ -374,7 +379,7 @@ static struct acpi_iort_node *iort_node_map_id(struct acpi_iort_node *node,
- 	/* Parse the ID mapping tree to find specified node type */
- 	while (node) {
- 		struct acpi_iort_id_mapping *map;
--		int i;
-+		int i, index;
+ /**
+  * iort_get_platform_device_domain() - Find MSI domain related to a
+  * platform device
+@@ -1261,6 +1304,8 @@ static int __init iort_add_platform_device(struct acpi_iort_node *node,
+ 	/* Configure DMA for the page table walker */
+ 	acpi_dma_configure(&pdev->dev, attr);
  
- 		if (IORT_TYPE_MASK(node->type) & type_mask) {
- 			if (id_out)
-@@ -395,8 +400,19 @@ static struct acpi_iort_node *iort_node_map_id(struct acpi_iort_node *node,
- 			goto fail_map;
- 		}
- 
-+		/*
-+		 * Get the special ID mapping index (if any) and skip its
-+		 * associated ID map to prevent erroneous multi-stage
-+		 * IORT ID translations.
-+		 */
-+		index = iort_get_id_mapping_index(node);
++	iort_set_device_domain(&pdev->dev, node);
 +
- 		/* Do the ID translation */
- 		for (i = 0; i < node->mapping_count; i++, map++) {
-+			/* if it is special mapping index, skip it */
-+			if (i == index)
-+				continue;
-+
- 			if (!iort_id_map(map, node->type, id, &id))
- 				break;
- 		}
-@@ -505,16 +521,24 @@ u32 iort_msi_map_rid(struct device *dev, u32 req_id)
-  */
- int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id)
- {
--	int i;
-+	int i, index;
- 	struct acpi_iort_node *node;
- 
- 	node = iort_find_dev_node(dev);
- 	if (!node)
- 		return -ENODEV;
- 
--	for (i = 0; i < node->mapping_count; i++) {
--		if (iort_node_map_platform_id(node, dev_id, IORT_MSI_TYPE, i))
-+	index = iort_get_id_mapping_index(node);
-+	/* if there is a valid index, go get the dev_id directly */
-+	if (index >= 0) {
-+		if (iort_node_get_id(node, dev_id, index))
- 			return 0;
-+	} else {
-+		for (i = 0; i < node->mapping_count; i++) {
-+			if (iort_node_map_platform_id(node, dev_id,
-+						      IORT_MSI_TYPE, i))
-+				return 0;
-+		}
- 	}
- 
- 	return -ENODEV;
+ 	ret = platform_device_add(pdev);
+ 	if (ret)
+ 		goto dma_deconfigure;
 -- 
 1.7.12.4
