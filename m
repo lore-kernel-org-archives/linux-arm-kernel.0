@@ -1,119 +1,167 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Fri, 13 Oct 2017 17:10:38 +0800
-Subject: [PATCH v2 02/13] usb: mtu3: support option to disable usb3 ports
+Date: Fri, 13 Oct 2017 17:10:43 +0800
+Subject: [PATCH v2 07/13] usb: mtu3: add support for usb3.1 IP
 In-Reply-To: <6dc39e99240f25c83f8c36d23361ec89dcfb33ce.1507885126.git.chunfeng.yun@mediatek.com>
 References: <6dc39e99240f25c83f8c36d23361ec89dcfb33ce.1507885126.git.chunfeng.yun@mediatek.com>
-Message-ID: <61b4bd47ac6e2c3cc004d943a93bf9d2737a3610.1507885126.git.chunfeng.yun@mediatek.com>
+Message-ID: <0fbaad84362efe045843db268c205c9690accf70.1507885127.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support to disable specific usb3 ports, it's useful when
-usb3 phy is shared with PCIe or SATA, because we should disable
-the corresponding usb3 port if the phy is used by PCIe or SATA.
+Support SuperSpeedPlus for usb3.1 device IP
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- drivers/usb/mtu3/mtu3.h      |    3 +++
- drivers/usb/mtu3/mtu3_host.c |   16 +++++++++++++---
- drivers/usb/mtu3/mtu3_plat.c |    8 ++++++--
- 3 files changed, 22 insertions(+), 5 deletions(-)
+ drivers/usb/mtu3/mtu3.h            |    1 +
+ drivers/usb/mtu3/mtu3_core.c       |   14 +++++++++++---
+ drivers/usb/mtu3/mtu3_gadget.c     |    3 ++-
+ drivers/usb/mtu3/mtu3_gadget_ep0.c |   16 ++++++++--------
+ drivers/usb/mtu3/mtu3_hw_regs.h    |    1 +
+ 5 files changed, 23 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/usb/mtu3/mtu3.h b/drivers/usb/mtu3/mtu3.h
-index b26fffc..112723d 100644
+index b0c2b5d..d80e4e8 100644
 --- a/drivers/usb/mtu3/mtu3.h
 +++ b/drivers/usb/mtu3/mtu3.h
-@@ -210,6 +210,8 @@ struct otg_switch_mtk {
-  *		host only, device only or dual-role mode
-  * @u2_ports: number of usb2.0 host ports
-  * @u3_ports: number of usb3.0 host ports
-+ * @u3p_dis_msk: mask of disabling usb3 ports, for example, bit0==1 to
-+ *		disable u3port0, bit1==1 to disable u3port1,... etc
-  * @dbgfs_root: only used when supports manual dual-role switch via debugfs
-  * @wakeup_en: it's true when supports remote wakeup in host mode
-  * @wk_deb_p0: port0's wakeup debounce clock
-@@ -232,6 +234,7 @@ struct ssusb_mtk {
- 	bool is_host;
- 	int u2_ports;
- 	int u3_ports;
-+	int u3p_dis_msk;
- 	struct dentry *dbgfs_root;
- 	/* usb wakeup for host mode */
- 	bool wakeup_en;
-diff --git a/drivers/usb/mtu3/mtu3_host.c b/drivers/usb/mtu3/mtu3_host.c
-index e42d308..4dd9508 100644
---- a/drivers/usb/mtu3/mtu3_host.c
-+++ b/drivers/usb/mtu3/mtu3_host.c
-@@ -151,6 +151,7 @@ int ssusb_host_enable(struct ssusb_mtk *ssusb)
- 	void __iomem *ibase = ssusb->ippc_base;
- 	int num_u3p = ssusb->u3_ports;
- 	int num_u2p = ssusb->u2_ports;
-+	int u3_ports_disabed;
- 	u32 check_clk;
- 	u32 value;
- 	int i;
-@@ -158,8 +159,14 @@ int ssusb_host_enable(struct ssusb_mtk *ssusb)
- 	/* power on host ip */
- 	mtu3_clrbits(ibase, U3D_SSUSB_IP_PW_CTRL1, SSUSB_IP_HOST_PDN);
+@@ -94,6 +94,7 @@ enum mtu3_speed {
+ 	MTU3_SPEED_FULL = 1,
+ 	MTU3_SPEED_HIGH = 3,
+ 	MTU3_SPEED_SUPER = 4,
++	MTU3_SPEED_SUPER_PLUS = 5,
+ };
  
--	/* power on and enable all u3 ports */
-+	/* power on and enable u3 ports except skipped ones */
-+	u3_ports_disabed = 0;
- 	for (i = 0; i < num_u3p; i++) {
-+		if ((0x1 << i) & ssusb->u3p_dis_msk) {
-+			u3_ports_disabed++;
-+			continue;
-+		}
-+
- 		value = mtu3_readl(ibase, SSUSB_U3_CTRL(i));
- 		value &= ~(SSUSB_U3_PORT_PDN | SSUSB_U3_PORT_DIS);
- 		value |= SSUSB_U3_PORT_HOST_SEL;
-@@ -175,7 +182,7 @@ int ssusb_host_enable(struct ssusb_mtk *ssusb)
+ /**
+diff --git a/drivers/usb/mtu3/mtu3_core.c b/drivers/usb/mtu3/mtu3_core.c
+index cd4528f..67f7a30 100644
+--- a/drivers/usb/mtu3/mtu3_core.c
++++ b/drivers/usb/mtu3/mtu3_core.c
+@@ -237,7 +237,7 @@ void mtu3_ep_stall_set(struct mtu3_ep *mep, bool set)
+ 
+ void mtu3_dev_on_off(struct mtu3 *mtu, int is_on)
+ {
+-	if (mtu->is_u3_ip && (mtu->max_speed == USB_SPEED_SUPER))
++	if (mtu->is_u3_ip && mtu->max_speed >= USB_SPEED_SUPER)
+ 		mtu3_ss_func_set(mtu, is_on);
+ 	else
+ 		mtu3_hs_softconn_set(mtu, is_on);
+@@ -547,6 +547,9 @@ static void mtu3_set_speed(struct mtu3 *mtu)
+ 		mtu3_clrbits(mbase, U3D_USB3_CONFIG, USB3_EN);
+ 		/* HS/FS detected by HW */
+ 		mtu3_setbits(mbase, U3D_POWER_MANAGEMENT, HS_ENABLE);
++	} else if (mtu->max_speed == USB_SPEED_SUPER) {
++		mtu3_clrbits(mtu->ippc_base, SSUSB_U3_CTRL(0),
++			     SSUSB_U3_PORT_SSP_SPEED);
  	}
  
- 	check_clk = SSUSB_XHCI_RST_B_STS;
--	if (num_u3p)
-+	if (num_u3p > u3_ports_disabed)
- 		check_clk = SSUSB_U3_MAC_RST_B_STS;
+ 	dev_info(mtu->dev, "max_speed: %s\n",
+@@ -624,6 +627,10 @@ static irqreturn_t mtu3_link_isr(struct mtu3 *mtu)
+ 		udev_speed = USB_SPEED_SUPER;
+ 		maxpkt = 512;
+ 		break;
++	case MTU3_SPEED_SUPER_PLUS:
++		udev_speed = USB_SPEED_SUPER_PLUS;
++		maxpkt = 512;
++		break;
+ 	default:
+ 		udev_speed = USB_SPEED_UNKNOWN;
+ 		break;
+@@ -825,14 +832,15 @@ int ssusb_gadget_init(struct ssusb_mtk *ssusb)
+ 	case USB_SPEED_FULL:
+ 	case USB_SPEED_HIGH:
+ 	case USB_SPEED_SUPER:
++	case USB_SPEED_SUPER_PLUS:
+ 		break;
+ 	default:
+ 		dev_err(dev, "invalid max_speed: %s\n",
+ 			usb_speed_string(mtu->max_speed));
+ 		/* fall through */
+ 	case USB_SPEED_UNKNOWN:
+-		/* default as SS */
+-		mtu->max_speed = USB_SPEED_SUPER;
++		/* default as SSP */
++		mtu->max_speed = USB_SPEED_SUPER_PLUS;
+ 		break;
+ 	}
  
- 	return ssusb_check_clocks(ssusb, check_clk);
-@@ -190,8 +197,11 @@ int ssusb_host_disable(struct ssusb_mtk *ssusb, bool suspend)
- 	int ret;
- 	int i;
+diff --git a/drivers/usb/mtu3/mtu3_gadget.c b/drivers/usb/mtu3/mtu3_gadget.c
+index 434fca5..b495471 100644
+--- a/drivers/usb/mtu3/mtu3_gadget.c
++++ b/drivers/usb/mtu3/mtu3_gadget.c
+@@ -89,6 +89,7 @@ static int mtu3_ep_enable(struct mtu3_ep *mep)
  
--	/* power down and disable all u3 ports */
-+	/* power down and disable u3 ports except skipped ones */
- 	for (i = 0; i < num_u3p; i++) {
-+		if ((0x1 << i) & ssusb->u3p_dis_msk)
-+			continue;
+ 	switch (mtu->g.speed) {
+ 	case USB_SPEED_SUPER:
++	case USB_SPEED_SUPER_PLUS:
+ 		if (usb_endpoint_xfer_int(desc) ||
+ 				usb_endpoint_xfer_isoc(desc)) {
+ 			interval = desc->bInterval;
+@@ -456,7 +457,7 @@ static int mtu3_gadget_wakeup(struct usb_gadget *gadget)
+ 		return  -EOPNOTSUPP;
+ 
+ 	spin_lock_irqsave(&mtu->lock, flags);
+-	if (mtu->g.speed == USB_SPEED_SUPER) {
++	if (mtu->g.speed >= USB_SPEED_SUPER) {
+ 		mtu3_setbits(mtu->mac_base, U3D_LINK_POWER_CONTROL, UX_EXIT);
+ 	} else {
+ 		mtu3_setbits(mtu->mac_base, U3D_POWER_MANAGEMENT, RESUME);
+diff --git a/drivers/usb/mtu3/mtu3_gadget_ep0.c b/drivers/usb/mtu3/mtu3_gadget_ep0.c
+index 958d74d..020b253 100644
+--- a/drivers/usb/mtu3/mtu3_gadget_ep0.c
++++ b/drivers/usb/mtu3/mtu3_gadget_ep0.c
+@@ -212,8 +212,8 @@ static int ep0_set_sel(struct mtu3 *mtu, struct usb_ctrlrequest *setup)
+ 	case USB_RECIP_DEVICE:
+ 		result[0] = mtu->is_self_powered << USB_DEVICE_SELF_POWERED;
+ 		result[0] |= mtu->may_wakeup << USB_DEVICE_REMOTE_WAKEUP;
+-		/* superspeed only */
+-		if (mtu->g.speed == USB_SPEED_SUPER) {
 +
- 		value = mtu3_readl(ibase, SSUSB_U3_CTRL(i));
- 		value |= SSUSB_U3_PORT_PDN;
- 		value |= suspend ? 0 : SSUSB_U3_PORT_DIS;
-diff --git a/drivers/usb/mtu3/mtu3_plat.c b/drivers/usb/mtu3/mtu3_plat.c
-index 088e3e6..9edad30 100644
---- a/drivers/usb/mtu3/mtu3_plat.c
-+++ b/drivers/usb/mtu3/mtu3_plat.c
-@@ -276,6 +276,10 @@ static int get_ssusb_rscs(struct platform_device *pdev, struct ssusb_mtk *ssusb)
- 	if (ret)
- 		return ret;
- 
-+	/* optional property, ignore the error if it does not exist */
-+	of_property_read_u32(node, "mediatek,u3p-dis-msk",
-+			     &ssusb->u3p_dis_msk);
-+
- 	if (ssusb->dr_mode != USB_DR_MODE_OTG)
- 		return 0;
- 
-@@ -304,8 +308,8 @@ static int get_ssusb_rscs(struct platform_device *pdev, struct ssusb_mtk *ssusb)
++		if (mtu->g.speed >= USB_SPEED_SUPER) {
+ 			result[0] |= mtu->u1_enable << USB_DEV_STAT_U1_ENABLED;
+ 			result[0] |= mtu->u2_enable << USB_DEV_STAT_U2_ENABLED;
  		}
- 	}
+@@ -329,8 +329,8 @@ static int ep0_handle_feature_dev(struct mtu3 *mtu,
+ 		handled = handle_test_mode(mtu, setup);
+ 		break;
+ 	case USB_DEVICE_U1_ENABLE:
+-		if (mtu->g.speed != USB_SPEED_SUPER ||
+-			mtu->g.state != USB_STATE_CONFIGURED)
++		if (mtu->g.speed < USB_SPEED_SUPER ||
++		    mtu->g.state != USB_STATE_CONFIGURED)
+ 			break;
  
--	dev_info(dev, "dr_mode: %d, is_u3_dr: %d\n",
--		ssusb->dr_mode, otg_sx->is_u3_drd);
-+	dev_info(dev, "dr_mode: %d, is_u3_dr: %d, u3p_dis_msk:%x\n",
-+		ssusb->dr_mode, otg_sx->is_u3_drd, ssusb->u3p_dis_msk);
+ 		lpc = mtu3_readl(mbase, U3D_LINK_POWER_CONTROL);
+@@ -344,8 +344,8 @@ static int ep0_handle_feature_dev(struct mtu3 *mtu,
+ 		handled = 1;
+ 		break;
+ 	case USB_DEVICE_U2_ENABLE:
+-		if (mtu->g.speed != USB_SPEED_SUPER ||
+-			mtu->g.state != USB_STATE_CONFIGURED)
++		if (mtu->g.speed < USB_SPEED_SUPER ||
++		    mtu->g.state != USB_STATE_CONFIGURED)
+ 			break;
  
- 	return 0;
- }
+ 		lpc = mtu3_readl(mbase, U3D_LINK_POWER_CONTROL);
+@@ -384,8 +384,8 @@ static int ep0_handle_feature(struct mtu3 *mtu,
+ 		break;
+ 	case USB_RECIP_INTERFACE:
+ 		/* superspeed only */
+-		if ((value == USB_INTRF_FUNC_SUSPEND)
+-			&& (mtu->g.speed == USB_SPEED_SUPER)) {
++		if (value == USB_INTRF_FUNC_SUSPEND &&
++		    mtu->g.speed >= USB_SPEED_SUPER) {
+ 			/*
+ 			 * forward the request because function drivers
+ 			 * should handle it
+diff --git a/drivers/usb/mtu3/mtu3_hw_regs.h b/drivers/usb/mtu3/mtu3_hw_regs.h
+index a7e35f6..6953436 100644
+--- a/drivers/usb/mtu3/mtu3_hw_regs.h
++++ b/drivers/usb/mtu3/mtu3_hw_regs.h
+@@ -467,6 +467,7 @@
+ #define SSUSB_VBUS_CHG_INT_B_EN		BIT(6)
+ 
+ /* U3D_SSUSB_U3_CTRL_0P */
++#define SSUSB_U3_PORT_SSP_SPEED	BIT(9)
+ #define SSUSB_U3_PORT_HOST_SEL		BIT(2)
+ #define SSUSB_U3_PORT_PDN		BIT(1)
+ #define SSUSB_U3_PORT_DIS		BIT(0)
 -- 
 1.7.9.5
