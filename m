@@ -1,113 +1,70 @@
-From: volodymyr_babchuk@epam.com (Volodymyr Babchuk)
-Date: Fri, 13 Oct 2017 22:32:35 +0300
-Subject: [PATCH v1 05/14] tee: optee: Update protocol definitions
-In-Reply-To: <1507923164-12796-1-git-send-email-volodymyr_babchuk@epam.com>
-References: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
- <1507923164-12796-1-git-send-email-volodymyr_babchuk@epam.com>
-Message-ID: <1507923164-12796-6-git-send-email-volodymyr_babchuk@epam.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 13 Oct 2017 14:42:52 -0500
+Subject: [PATCH 1/2] dt-bindings: add binding for Allwinner R40 SATA AHCI
+ controller
+In-Reply-To: <20171008043541.48564-1-icenowy@aosc.io>
+References: <20171008043541.48564-1-icenowy@aosc.io>
+Message-ID: <20171013194252.yt2zv3xpjgvzonvk@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Volodymyr Babchuk <vlad.babchuk@gmail.com>
+On Sun, Oct 08, 2017 at 12:35:40PM +0800, Icenowy Zheng wrote:
+> The Allwinner R40 SoC contains a SATA AHCI controller like the one in
+> A10/A20 SoCs, however a reset control and two power supplies are added
+> to it.
+> 
+> Add a binding document for it.
+> 
+> As a dedicated binding document is needed now for the A10/A20/R40 AHCI
+> controller, drop the A10 compatible line from generic platform AHCI
+> controller binding document.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>  .../devicetree/bindings/ata/ahci-platform.txt      |  1 -
+>  .../bindings/ata/allwinner,sun4i-a10-ahci.txt      | 40 ++++++++++++++++++++++
+>  2 files changed, 40 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/ata/allwinner,sun4i-a10-ahci.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+> index fedc213b5f1a..da6818b2c204 100644
+> --- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
+> +++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+> @@ -9,7 +9,6 @@ PHYs.
+>  
+>  Required properties:
+>  - compatible        : compatible string, one of:
+> -  - "allwinner,sun4i-a10-ahci"
+>    - "brcm,iproc-ahci"
+>    - "hisilicon,hisi-ahci"
+>    - "cavium,octeon-7130-ahci"
+> diff --git a/Documentation/devicetree/bindings/ata/allwinner,sun4i-a10-ahci.txt b/Documentation/devicetree/bindings/ata/allwinner,sun4i-a10-ahci.txt
+> new file mode 100644
+> index 000000000000..0eea78c14ad3
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/ata/allwinner,sun4i-a10-ahci.txt
+> @@ -0,0 +1,40 @@
+> +Allwinner A10/A20/R40 SoC SATA AHCI Controller
+> +
+> +Required properties:
+> +- compatible        : compatible string, one of:
+> +  - "allwinner,sun4i-a10-ahci"
+> +  - "allwinner,sun8i-r40-ahci"
+> +- interrupts        : the SATA IRQ
+> +- reg               : the register mapping
+> +- clocks            : the clocks needed by SATA controller, usually contains
+> +		      an AHB clock and a mod clock
+> +
+> +Optional properties:
+> +- target-supply     : regulator for SATA target power
+> +
+> +Required properties for the following compatibles:
+> +  - "allwinner,sun8i-r40-ahci"
+> +- resets            : the reset control needed by SATA controller
+> +- vdd1v2-supply     : regulator for SATA controller's 1.2V VDD
+> +- vdd2v5-supply     : regulator for SATA controller's 2.5V VDD
 
-There were changes in REE<->OP-TEE ABI recently.
-Now ABI allows us to pass non-contiguous memory buffers as list of
-pages to OP-TEE. This can be achieved by using new parameter attribute
-OPTEE_MSG_ATTR_NONCONTIG.
+I have to wonder, are these really for the controller and not the phy? 
+You don't have any phy?
 
-OP-TEE also is able to use all non-secure RAM for shared buffers. This
-new capability is enabled with OPTEE_SMC_SEC_CAP_DYNAMIC_SHM flag.
-
-This patch adds necessary definitions to the protocol definition files at
-Linux side.
-
-Signed-off-by: Volodymyr Babchuk <vlad.babchuk@gmail.com>
----
- drivers/tee/optee/optee_msg.h | 38 ++++++++++++++++++++++++++++++++------
- drivers/tee/optee/optee_smc.h |  7 +++++++
- 2 files changed, 39 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/tee/optee/optee_msg.h b/drivers/tee/optee/optee_msg.h
-index dd7a06e..3050490 100644
---- a/drivers/tee/optee/optee_msg.h
-+++ b/drivers/tee/optee/optee_msg.h
-@@ -67,11 +67,32 @@
- #define OPTEE_MSG_ATTR_META			BIT(8)
- 
- /*
-- * The temporary shared memory object is not physically contigous and this
-- * temp memref is followed by another fragment until the last temp memref
-- * that doesn't have this bit set.
-+ * Pointer to a list of pages used to register user-defined SHM buffer.
-+ * Used with OPTEE_MSG_ATTR_TYPE_TMEM_*.
-+ * buf_ptr should point to the beginning of the buffer. Buffer will contain
-+ * list of page addresses. OP-TEE core can reconstruct contiguous buffer from
-+ * that page addresses list. Page addresses are stored as 64 bit values.
-+ * Last entry on a page should point to the next page of buffer.
-+ * Every entry in buffer should point to a 4k page beginning (12 least
-+ * significant bits must be equal to zero).
-+ *
-+ * 12 least significant bints of optee_msg_param.u.tmem.buf_ptr should hold page
-+ * offset of the user buffer.
-+ *
-+ * So, entries should be placed like members of this structure:
-+ *
-+ * struct page_data {
-+ *   uint64_t pages_array[OPTEE_MSG_NONCONTIG_PAGE_SIZE/sizeof(uint64_t) - 1];
-+ *   uint64_t next_page_data;
-+ * };
-+ *
-+ * Structure is designed to exactly fit into the page size
-+ * OPTEE_MSG_NONCONTIG_PAGE_SIZE which is a standard 4KB page.
-+ *
-+ * The size of 4KB is chosen because this is the smallest page size for ARM
-+ * architectures. If REE uses larger pages, it should divide them to 4KB ones.
-  */
--#define OPTEE_MSG_ATTR_FRAGMENT			BIT(9)
-+#define OPTEE_MSG_ATTR_NONCONTIG		BIT(9)
- 
- /*
-  * Memory attributes for caching passed with temp memrefs. The actual value
-@@ -94,6 +115,11 @@
- #define OPTEE_MSG_LOGIN_APPLICATION_USER	0x00000005
- #define OPTEE_MSG_LOGIN_APPLICATION_GROUP	0x00000006
- 
-+/*
-+ * Page size used in non-contiguous buffer entries
-+ */
-+#define OPTEE_MSG_NONCONTIG_PAGE_SIZE		4096
-+
- /**
-  * struct optee_msg_param_tmem - temporary memory reference parameter
-  * @buf_ptr:	Address of the buffer
-@@ -145,8 +171,8 @@ struct optee_msg_param_value {
-  *
-  * @attr & OPTEE_MSG_ATTR_TYPE_MASK indicates if tmem, rmem or value is used in
-  * the union. OPTEE_MSG_ATTR_TYPE_VALUE_* indicates value,
-- * OPTEE_MSG_ATTR_TYPE_TMEM_* indicates tmem and
-- * OPTEE_MSG_ATTR_TYPE_RMEM_* indicates rmem.
-+ * OPTEE_MSG_ATTR_TYPE_TMEM_* indicates @tmem and
-+ * OPTEE_MSG_ATTR_TYPE_RMEM_* indicates @rmem,
-  * OPTEE_MSG_ATTR_TYPE_NONE indicates that none of the members are used.
-  */
- struct optee_msg_param {
-diff --git a/drivers/tee/optee/optee_smc.h b/drivers/tee/optee/optee_smc.h
-index 069c8e1..7cd3272 100644
---- a/drivers/tee/optee/optee_smc.h
-+++ b/drivers/tee/optee/optee_smc.h
-@@ -222,6 +222,13 @@ struct optee_smc_get_shm_config_result {
- #define OPTEE_SMC_SEC_CAP_HAVE_RESERVED_SHM	BIT(0)
- /* Secure world can communicate via previously unregistered shared memory */
- #define OPTEE_SMC_SEC_CAP_UNREGISTERED_SHM	BIT(1)
-+
-+/*
-+ * Secure world supports commands "register/unregister shared memory",
-+ * secure world accepts command buffers located in any parts of non-secure RAM
-+ */
-+#define OPTEE_SMC_SEC_CAP_DYNAMIC_SHM		BIT(2)
-+
- #define OPTEE_SMC_FUNCID_EXCHANGE_CAPABILITIES	9
- #define OPTEE_SMC_EXCHANGE_CAPABILITIES \
- 	OPTEE_SMC_FAST_CALL_VAL(OPTEE_SMC_FUNCID_EXCHANGE_CAPABILITIES)
--- 
-2.7.4
+Rob
