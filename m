@@ -1,64 +1,113 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 13 Oct 2017 19:42:11 +0530
-Subject: [PATCH v3 16/22] firmware: arm_scmi: add arm_mhu specific mailbox
- interface
-In-Reply-To: <0b65a3fd-32ff-f708-7dce-8e3a5cabf908@arm.com>
-References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
- <1506604306-20739-17-git-send-email-sudeep.holla@arm.com>
- <CAK8P3a0XmiXqZ-z7WV+nk7B86p23Jmf31Q=pVovXVebhA28_0Q@mail.gmail.com>
- <CABb+yY1N6hmC6Kd2QteMw_oCf=-mYHf7p6RdhYPQK+QUO7VP4A@mail.gmail.com>
- <f142dac2-a27c-4c46-4d22-4df4f2e8cfb1@arm.com>
- <CABb+yY1w358uw2EoeioAvZy06LTuOO0krGFFXoQSNAR5m5ANmQ@mail.gmail.com>
- <25023d1a-a221-b131-5a1e-7d909b006d1b@arm.com>
- <CAOCOHw54mQUVxVyLRWbV5Ty7trK99MM6zgXsuuxQEHnD3qvKVA@mail.gmail.com>
- <0b65a3fd-32ff-f708-7dce-8e3a5cabf908@arm.com>
-Message-ID: <CABb+yY0HxvLs51PmB7K-T2pp+OJE8ckiBAdBa=ss2rfUes=u2A@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 13 Oct 2017 15:15:40 +0100
+Subject: [PATCH v3 22/28] arm64/sve: KVM: Prevent guests from using SVE
+In-Reply-To: <d8a50bf1-bfe0-2423-c56b-adac3925309e@arm.com>
+References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
+ <1507660725-7986-23-git-send-email-Dave.Martin@arm.com>
+ <c28b3f0d-7beb-cca3-46db-3fce964f4725@arm.com>
+ <20171012110409.GG19485@e103592.cambridge.arm.com>
+ <d8a50bf1-bfe0-2423-c56b-adac3925309e@arm.com>
+Message-ID: <20171013141539.GK19485@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 13, 2017 at 7:12 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->
-> Hi Bjorn,
->
-> Thanks for taking a look at this. Much appreciated.
->
-> On 12/10/17 22:03, Bjorn Andersson wrote:
->> On Fri, Oct 6, 2017 at 6:51 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>>
->>>
->>> On 06/10/17 14:47, Jassi Brar wrote:
->>>> On Fri, Oct 6, 2017 at 7:02 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> [..]
->>>>> Again that's not the point, doorbell is more common feature and that can
->>>>> be supported. As SCMI expects doorbell feature in the specification, it
->>>>> just need to support that class of controllers.
->>>>>
->>>> NO.  All SCMI expects is SHMEM and a signal reaching the other end.
->>>> The signal mechanism need not necessarily be "doorbell".
->>>>
->>>
->>> Agreed, but creating an abstraction ro do something as generic as
->>> doorbell and writing shim layer for each controller to use SCMI also
->>> sounds bad.
->>>
->>
->> In the Qualcomm platform we have a single register that exposes 32
->> doorbells, wired to interrupts on the various processors/co-processors
->> in the SoC.
->>
->
-> It's exactly same even on ARM MHU controller.
->
-This has been a big problem in our communication. You start with
-"exactly same..." and go on telling the difference.
-And that difference is important.
+On Thu, Oct 12, 2017 at 12:28:32PM +0100, Marc Zyngier wrote:
+> On 12/10/17 12:04, Dave Martin wrote:
+> > On Wed, Oct 11, 2017 at 05:28:06PM +0100, Marc Zyngier wrote:
+> >> [+ Christoffer]
+> >>
+> >> On 10/10/17 19:38, Dave Martin wrote:
+> >>> Until KVM has full SVE support, guests must not be allowed to
+> >>> execute SVE instructions.
+> >>>
+> >>> This patch enables the necessary traps, and also ensures that the
+> >>> traps are disabled again on exit from the guest so that the host
+> >>> can still use SVE if it wants to.
+> >>>
+> >>> This patch introduces another instance of
+> >>> __this_cpu_write(fpsimd_last_state, NULL), so this flush operation
+> >>> is abstracted out as a separate helper fpsimd_flush_cpu_state().
+> >>> Other instances are ported appropriately.
+> >>>
+> >>> As a side effect of this refactoring, a this_cpu_write() in
+> >>> fpsimd_cpu_pm_notifier() is changed to __this_cpu_write().  This
+> >>> should be fine, since cpu_pm_enter() is supposed to be called only
+> >>> with interrupts disabled.
+> >>>
+> >>> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> >>> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+> >>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> >>> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >>> ---
+> > 
+> > [...]
+> > 
+> >>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> >>> index e923b58..674912d 100644
+> >>> --- a/arch/arm64/include/asm/kvm_host.h
+> >>> +++ b/arch/arm64/include/asm/kvm_host.h
+> > 
+> > [...]
+> > 
+> >>> @@ -384,4 +385,14 @@ static inline void __cpu_init_stage2(void)
+> > 
+> > [...]
+> > 
+> >>> +static inline void kvm_fpsimd_flush_cpu_state(void)
+> >>> +{
+> >>> +	if (system_supports_sve())
+> >>> +		sve_flush_cpu_state();
+> >>
+> >> Hmmm. How does this work if...
+> > 
+> > !IS_ENABLED(CONFIG_ARM64_SVE) implies !system_supports_sve(), so
+> > if CONFIG_ARM64_SVE is not set, the call is optimised away.
+> > 
+> > [...]
+> > 
+> >>> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> >>> index a9cb794..6ae3703 100644
+> >>> --- a/arch/arm64/kernel/fpsimd.c
+> >>> +++ b/arch/arm64/kernel/fpsimd.c
+> >>> @@ -1073,6 +1073,33 @@ void fpsimd_flush_task_state(struct task_struct *t)
+> > 
+> > [...]
+> > 
+> >>> +#ifdef CONFIG_ARM64_SVE
+> >>> +void sve_flush_cpu_state(void)
+> >>> +{
+> >>> +	struct fpsimd_state *const fpstate = __this_cpu_read(fpsimd_last_state);
+> >>> +	struct task_struct *tsk;
+> >>> +
+> >>> +	if (!fpstate)
+> >>> +		return;
+> >>> +
+> >>> +	tsk = container_of(fpstate, struct task_struct, thread.fpsimd_state);
+> >>> +	if (test_tsk_thread_flag(tsk, TIF_SVE))
+> >>> +		fpsimd_flush_cpu_state();
+> >>> +}
+> >>> +#endif /* CONFIG_ARM64_SVE */
+> >>
+> >> ... CONFIG_ARM64_SVE is not set? Fixing this should just be a matter of
+> >> moving the #ifdef/#endif inside the function...
+> > 
+> > Because sve_flush_cpu_state() is not in the same compilation unit it
+> > can't be static, and that means the compiler won't remove it
+> > automatically if it's unused -- hence the #ifdef.
+> > 
+> > Because the call site is optimised away, there is no link failure.
+> > 
+> > Don't we rely on this sort of thing all over the place?
+> Dunno. It just feels weird. But if you are sure that it won't break,
+> fine by me. I guess we'll find out pretty quickly how this fares,
+> specially with older toolchains.
 
-In MHU the 32bits are tied together and all go to one target
-processor. Whereas on QCom, each bit corresponds to independent signal
-going to a different target processor.
+I thought this was why the kernel doesn't support building with -O0.
+There are many instances of this in the series, not just here.
 
-IOW, QCom has 32 channels per register whereas MHU has one. The
-current drivers reflect that reality and hence I am against any change
-in MHU driver.  Not to mean even changing the MHU driver will fix the
-core issue - which is https://lkml.org/lkml/2017/7/7/465 and this
-patchset tries to address that.
+Let me know if you feel this isn't good enough though.
+
+Do you have any other comments on this patch?
+
+Cheers
+---Dave
