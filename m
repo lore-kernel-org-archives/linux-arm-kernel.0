@@ -1,55 +1,35 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 13 Oct 2017 14:52:31 +0200
-Subject: [PATCH v3 01/10] ARM: dts: r8a7778: Use R-Car GPIO Gen1 fallback
- compat string
-In-Reply-To: <20171013123311.15278-2-horms+renesas@verge.net.au>
-References: <20171013123311.15278-1-horms+renesas@verge.net.au>
- <20171013123311.15278-2-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdV+8=xDW+AxJkXBfB7EkrNCKErjg7Exv8BFR1m0otSWqA@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 13 Oct 2017 21:54:46 +0900
+Subject: [PATCH] clk: uniphier: fix clock data for PXs3
+Message-ID: <1507899286-1953-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 13, 2017 at 2:33 PM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Use newly added R-Car GPIO Gen1 fallback compat string
-> in place of now deprecated non-generation specific
-> R-Car GPIO fallback compat string in DT of r8a7778 SoC.
->
-> As the driver does not match on "renesas,gpio-r8a7778" there
-> are some run-time considerations for this patch:
->
-> * When a resulting DTB is used with kernels newer than v4.14 this should
->   not have any run-time effect as renesas,rcar-gen1-gpio is matched by the
->   driver since commit dbd1dad2ab8f ("gpio: rcar: add gen[123] fallback
->   compatibility strings")
->
-> * However, when used with older kernels GPIO will be disabled as
->   no compat string match will be made by the driver.
->
-> The regression documented above for the new DTB with old kernel case
-> is acceptable in my opinion.
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
-> v3
-> * Consistently use gen1 rather than gen2 binding in patch and refer to it
->   in changelog.
->
-> v2
-> * Note run-time considerations in changelog as pointed out by
->   Geert Uytterhoeven
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Fix reg offsets of USB clocks.
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Fixes: 736de651a836 ("clk: uniphier: add PXs3 clock data")
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-Gr{oetje,eeting}s,
+ drivers/clk/uniphier/clk-uniphier-sys.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/clk/uniphier/clk-uniphier-sys.c b/drivers/clk/uniphier/clk-uniphier-sys.c
+index acdba08..bea1327 100644
+--- a/drivers/clk/uniphier/clk-uniphier-sys.c
++++ b/drivers/clk/uniphier/clk-uniphier-sys.c
+@@ -312,9 +312,9 @@ const struct uniphier_clk_data uniphier_pxs3_sys_clk_data[] = {
+ 	UNIPHIER_LD20_SYS_CLK_SD,
+ 	UNIPHIER_LD11_SYS_CLK_NAND(2),
+ 	UNIPHIER_LD11_SYS_CLK_EMMC(4),
+-	UNIPHIER_CLK_GATE("usb30", 12, NULL, 0x2104, 4),	/* =GIO0 */
+-	UNIPHIER_CLK_GATE("usb31-0", 13, NULL, 0x2104, 5),	/* =GIO1 */
+-	UNIPHIER_CLK_GATE("usb31-1", 14, NULL, 0x2104, 6),	/* =GIO1-1 */
++	UNIPHIER_CLK_GATE("usb30", 12, NULL, 0x210c, 4),	/* =GIO0 */
++	UNIPHIER_CLK_GATE("usb31-0", 13, NULL, 0x210c, 5),	/* =GIO1 */
++	UNIPHIER_CLK_GATE("usb31-1", 14, NULL, 0x210c, 6),	/* =GIO1-1 */
+ 	UNIPHIER_CLK_GATE("usb30-phy0", 16, NULL, 0x210c, 16),
+ 	UNIPHIER_CLK_GATE("usb30-phy1", 17, NULL, 0x210c, 18),
+ 	UNIPHIER_CLK_GATE("usb30-phy2", 18, NULL, 0x210c, 20),
+-- 
+2.7.4
