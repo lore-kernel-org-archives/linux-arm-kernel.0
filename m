@@ -1,81 +1,47 @@
-From: pasha.tatashin@oracle.com (Pavel Tatashin)
-Date: Fri, 13 Oct 2017 13:32:13 -0400
-Subject: [PATCH v12 10/11] sparc64: optimized struct page zeroing
-In-Reply-To: <20171013173214.27300-1-pasha.tatashin@oracle.com>
-References: <20171013173214.27300-1-pasha.tatashin@oracle.com>
-Message-ID: <20171013173214.27300-11-pasha.tatashin@oracle.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 13 Oct 2017 18:35:01 +0100
+Subject: [PATCH v3 26/28] arm64/sve: Add documentation
+In-Reply-To: <20171013142421.j32jzisukewxtosx@armageddon.cambridge.arm.com>
+References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
+ <1507660725-7986-27-git-send-email-Dave.Martin@arm.com>
+ <20171013142421.j32jzisukewxtosx@armageddon.cambridge.arm.com>
+Message-ID: <20171013173500.GP19485@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an optimized mm_zero_struct_page(), so struct page's are zeroed without
-calling memset(). We do eight to ten regular stores based on the size of
-struct page. Compiler optimizes out the conditions of switch() statement.
+On Fri, Oct 13, 2017 at 03:24:21PM +0100, Catalin Marinas wrote:
+> On Tue, Oct 10, 2017 at 07:38:43PM +0100, Dave P Martin wrote:
 
-SPARC-M6 with 15T of memory, single thread performance:
+[...]
 
-                               BASE            FIX  OPTIMIZED_FIX
-        bootmem_init   28.440467985s   2.305674818s   2.305161615s
-free_area_init_nodes  202.845901673s 225.343084508s 172.556506560s
-                      --------------------------------------------
-Total                 231.286369658s 227.648759326s 174.861668175s
+> > +* If the SVE context is too big to fit in sigcontext.__reserved[], then extra
+> > +  space is allocated on the stack, an extra_context record is written in
+> > +  __reserved[] referencing this space.  sve_context is then written in the
+> > +  extra space.  Refer to [1] for further details about this mechanism.
+> 
+> Does this document require that the user stack is sufficiently large or
+> should we cap the vector length (prior to the last two RFC patches)?
 
-BASE:  current linux
-FIX:   This patch series without "optimized struct page zeroing"
-OPTIMIZED_FIX: This patch series including the current patch.
+Oh, I think I missed your point here.
 
-bootmem_init() is where memory for struct pages is zeroed during
-allocation. Note, about two seconds in this function is a fixed time: it
-does not increase as memory is increased.
+I don't think it's worth capping the vector length beyond what the
+series alread does: the last two patches provide a way to find out how
+big the signal frame could be, but software still needs porting either
+way if it enables large vectors via prctl or ptrace.
 
-Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
-Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
-Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
-Reviewed-by: Bob Picco <bob.picco@oracle.com>
-Acked-by: David S. Miller <davem@davemloft.net>
----
- arch/sparc/include/asm/pgtable_64.h | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+Conversely, software basing its stack allocations on SIGSTKSZ (16K) will
+probably get away with it: this seems to be the common choice when
+allocating stacks.  Apart from models, we're not likely to see SVE
+implementations with huge vector lengths for a while yet.
 
-diff --git a/arch/sparc/include/asm/pgtable_64.h b/arch/sparc/include/asm/pgtable_64.h
-index 4fefe3762083..8ed478abc630 100644
---- a/arch/sparc/include/asm/pgtable_64.h
-+++ b/arch/sparc/include/asm/pgtable_64.h
-@@ -230,6 +230,36 @@ extern unsigned long _PAGE_ALL_SZ_BITS;
- extern struct page *mem_map_zero;
- #define ZERO_PAGE(vaddr)	(mem_map_zero)
- 
-+/* This macro must be updated when the size of struct page grows above 80
-+ * or reduces below 64.
-+ * The idea that compiler optimizes out switch() statement, and only
-+ * leaves clrx instructions
-+ */
-+#define	mm_zero_struct_page(pp) do {					\
-+	unsigned long *_pp = (void *)(pp);				\
-+									\
-+	 /* Check that struct page is either 64, 72, or 80 bytes */	\
-+	BUILD_BUG_ON(sizeof(struct page) & 7);				\
-+	BUILD_BUG_ON(sizeof(struct page) < 64);				\
-+	BUILD_BUG_ON(sizeof(struct page) > 80);				\
-+									\
-+	switch (sizeof(struct page)) {					\
-+	case 80:							\
-+		_pp[9] = 0;	/* fallthrough */			\
-+	case 72:							\
-+		_pp[8] = 0;	/* fallthrough */			\
-+	default:							\
-+		_pp[7] = 0;						\
-+		_pp[6] = 0;						\
-+		_pp[5] = 0;						\
-+		_pp[4] = 0;						\
-+		_pp[3] = 0;						\
-+		_pp[2] = 0;						\
-+		_pp[1] = 0;						\
-+		_pp[0] = 0;						\
-+	}								\
-+} while (0)
-+
- /* PFNs are real physical page numbers.  However, mem_map only begins to record
-  * per-page information starting at pfn_base.  This is to handle systems where
-  * the first physical page in the machine is at some huge physical address,
--- 
-2.14.2
+
+In any case, /proc/sys/abi/sve_default_vector_length proves a
+discretionary global clamp that can be set by the distro or admin.  This
+will prevent programs from seeing large frames unless the VL is set
+explicitly to something > 64 bytes via prctl/ptrace (which current
+software won't do).
+
+[...]
+
+Cheers
+---Dave
