@@ -1,97 +1,101 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 13 Oct 2017 11:44:26 +0100
-Subject: [PATCH 2/2] arm/arm64: pmu: Distinguish percpu irq and percpu_devid
- irq
-In-Reply-To: <1507891466-52292-1-git-send-email-julien.thierry@arm.com>
-References: <1507891466-52292-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1507891466-52292-2-git-send-email-julien.thierry@arm.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 13 Oct 2017 13:05:53 +0200
+Subject: [PATCH v2 03/10] ARM: dts: r8a7743: Use R-Car GPIO Gen2 fallback
+ compat string
+In-Reply-To: <20171013110600.6858-1-horms+renesas@verge.net.au>
+References: <20171013110600.6858-1-horms+renesas@verge.net.au>
+Message-ID: <20171013110600.6858-4-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm_pmu interrupts are maked as PERCPU even when these are not local
-physical interrupts to a single CPU. When using non-local interrupts,
-interrupts marked as PERCPU will not get freed not disabled properly
-by the PMU driver.
+Use newly added R-Car GPIO Gen2 fallback compat string
+in place of now deprecated non-generation specific
+R-Car GPIO fallback compat string in the DT of the r8a7743 SoC.
 
-Check if interrupts are local to a single CPU with PERCPU_DEVID since
-this is what the PMU driver really needs to know.
+This should have no run-time effect as the driver matches against
+the per-SoC compat string before considering the fallback compat string.
 
-Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Will Deacon <will.deacon@arm.com>
-Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- drivers/perf/arm_pmu.c          | 10 +++++-----
- drivers/perf/arm_pmu_platform.c |  4 ++--
- 2 files changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/r8a7743.dtsi | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-So far this has not been an issue because enable_percpu_irq does nothing
-when the irq is not marked as percpu devid.
-
-diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index d14fc2e..7bc5eee 100644
---- a/drivers/perf/arm_pmu.c
-+++ b/drivers/perf/arm_pmu.c
-@@ -539,7 +539,7 @@ void armpmu_free_irq(struct arm_pmu *armpmu, int cpu)
- 	if (!cpumask_test_and_clear_cpu(cpu, &armpmu->active_irqs))
- 		return;
-
--	if (irq_is_percpu(irq)) {
-+	if (irq_is_percpu_devid(irq)) {
- 		free_percpu_irq(irq, &hw_events->percpu_pmu);
- 		cpumask_clear(&armpmu->active_irqs);
- 		return;
-@@ -565,10 +565,10 @@ int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
- 	if (!irq)
- 		return 0;
-
--	if (irq_is_percpu(irq) && cpumask_empty(&armpmu->active_irqs)) {
-+	if (irq_is_percpu_devid(irq) && cpumask_empty(&armpmu->active_irqs)) {
- 		err = request_percpu_irq(irq, handler, "arm-pmu",
- 					 &hw_events->percpu_pmu);
--	} else if (irq_is_percpu(irq)) {
-+	} else if (irq_is_percpu_devid(irq)) {
- 		int other_cpu = cpumask_first(&armpmu->active_irqs);
- 		int other_irq = per_cpu(hw_events->irq, other_cpu);
-
-@@ -649,7 +649,7 @@ static int arm_perf_starting_cpu(unsigned int cpu, struct hlist_node *node)
-
- 	irq = armpmu_get_cpu_irq(pmu, cpu);
- 	if (irq) {
--		if (irq_is_percpu(irq)) {
-+		if (irq_is_percpu_devid(irq)) {
- 			enable_percpu_irq(irq, IRQ_TYPE_NONE);
- 			return 0;
- 		}
-@@ -667,7 +667,7 @@ static int arm_perf_teardown_cpu(unsigned int cpu, struct hlist_node *node)
- 		return 0;
-
- 	irq = armpmu_get_cpu_irq(pmu, cpu);
--	if (irq && irq_is_percpu(irq))
-+	if (irq && irq_is_percpu_devid(irq))
- 		disable_percpu_irq(irq);
-
- 	return 0;
-diff --git a/drivers/perf/arm_pmu_platform.c b/drivers/perf/arm_pmu_platform.c
-index 4eafa7a..bbc64ee 100644
---- a/drivers/perf/arm_pmu_platform.c
-+++ b/drivers/perf/arm_pmu_platform.c
-@@ -126,7 +126,7 @@ static int pmu_parse_irqs(struct arm_pmu *pmu)
-
- 	if (num_irqs == 1) {
- 		int irq = platform_get_irq(pdev, 0);
--		if (irq && irq_is_percpu(irq))
-+		if (irq && irq_is_percpu_devid(irq))
- 			return pmu_parse_percpu_irq(pmu, irq);
- 	}
-
-@@ -149,7 +149,7 @@ static int pmu_parse_irqs(struct arm_pmu *pmu)
- 		if (WARN_ON(irq <= 0))
- 			continue;
-
--		if (irq_is_percpu(irq)) {
-+		if (irq_is_percpu_devid(irq)) {
- 			pr_warn("multiple PPIs or mismatched SPI/PPI detected\n");
- 			return -EINVAL;
- 		}
---
-1.9.1
+diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
+index 699c04003eac..f29f15d4d659 100644
+--- a/arch/arm/boot/dts/r8a7743.dtsi
++++ b/arch/arm/boot/dts/r8a7743.dtsi
+@@ -108,7 +108,7 @@
+ 
+ 		gpio0: gpio at e6050000 {
+ 			compatible = "renesas,gpio-r8a7743",
+-				     "renesas,gpio-rcar";
++				     "renesas,rcar-gen2-gpio";
+ 			reg = <0 0xe6050000 0 0x50>;
+ 			interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
+ 			#gpio-cells = <2>;
+@@ -123,7 +123,7 @@
+ 
+ 		gpio1: gpio at e6051000 {
+ 			compatible = "renesas,gpio-r8a7743",
+-				     "renesas,gpio-rcar";
++				     "renesas,rcar-gen2-gpio";
+ 			reg = <0 0xe6051000 0 0x50>;
+ 			interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
+ 			#gpio-cells = <2>;
+@@ -138,7 +138,7 @@
+ 
+ 		gpio2: gpio at e6052000 {
+ 			compatible = "renesas,gpio-r8a7743",
+-				     "renesas,gpio-rcar";
++				     "renesas,rcar-gen2-gpio";
+ 			reg = <0 0xe6052000 0 0x50>;
+ 			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
+ 			#gpio-cells = <2>;
+@@ -153,7 +153,7 @@
+ 
+ 		gpio3: gpio at e6053000 {
+ 			compatible = "renesas,gpio-r8a7743",
+-				     "renesas,gpio-rcar";
++				     "renesas,rcar-gen2-gpio";
+ 			reg = <0 0xe6053000 0 0x50>;
+ 			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
+ 			#gpio-cells = <2>;
+@@ -168,7 +168,7 @@
+ 
+ 		gpio4: gpio at e6054000 {
+ 			compatible = "renesas,gpio-r8a7743",
+-				     "renesas,gpio-rcar";
++				     "renesas,rcar-gen2-gpio";
+ 			reg = <0 0xe6054000 0 0x50>;
+ 			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
+ 			#gpio-cells = <2>;
+@@ -183,7 +183,7 @@
+ 
+ 		gpio5: gpio at e6055000 {
+ 			compatible = "renesas,gpio-r8a7743",
+-				     "renesas,gpio-rcar";
++				     "renesas,rcar-gen2-gpio";
+ 			reg = <0 0xe6055000 0 0x50>;
+ 			interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
+ 			#gpio-cells = <2>;
+@@ -198,7 +198,7 @@
+ 
+ 		gpio6: gpio at e6055400 {
+ 			compatible = "renesas,gpio-r8a7743",
+-				     "renesas,gpio-rcar";
++				     "renesas,rcar-gen2-gpio";
+ 			reg = <0 0xe6055400 0 0x50>;
+ 			interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
+ 			#gpio-cells = <2>;
+@@ -213,7 +213,7 @@
+ 
+ 		gpio7: gpio at e6055800 {
+ 			compatible = "renesas,gpio-r8a7743",
+-				     "renesas,gpio-rcar";
++				     "renesas,rcar-gen2-gpio";
+ 			reg = <0 0xe6055800 0 0x50>;
+ 			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
+ 			#gpio-cells = <2>;
+-- 
+2.11.0
