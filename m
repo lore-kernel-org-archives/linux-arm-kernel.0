@@ -1,34 +1,42 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 13 Oct 2017 11:06:13 +0200
-Subject: [PATCH/RFC 3/5] mfd: bd9571mwv: Allow DDR Backup Power register
- access
-In-Reply-To: <20171013085851.ljvgmyd6ei2tv5fw@dell>
-References: <1507649178-31473-1-git-send-email-geert+renesas@glider.be>
- <1507649178-31473-4-git-send-email-geert+renesas@glider.be>
- <20171013085851.ljvgmyd6ei2tv5fw@dell>
-Message-ID: <CAMuHMdVZiaq40r0Su01n9C7oXR7i_QWmNhZtY7Udhy9gdYHVRA@mail.gmail.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 13 Oct 2017 11:07:44 +0200
+Subject: Dramatic lockdep slowdown in 4.14
+In-Reply-To: <20171013090333.GA17356@localhost>
+References: <20171013090333.GA17356@localhost>
+Message-ID: <20171013090744.lvvc66qexmomsd5f@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+On Fri, Oct 13, 2017 at 11:03:33AM +0200, Johan Hovold wrote:
+> Hi,
+> 
+> I had noticed that the BeagleBone Black boot time appeared to have
+> increased significantly with 4.14 and yesterday I finally had time to
+> investigate it.
+> 
+> Boot time (from "Linux version" to login prompt) had in fact doubled
+> since 4.13 where it took 17 seconds (with my current config) compared to
+> the 35 seconds I now see with 4.14-rc4.
+> 
+> I quick bisect pointed to lockdep and specifically the following commit:
+> 
+> 	28a903f63ec0 ("locking/lockdep: Handle non(or multi)-acquisition
+> 	               of a crosslock")
+> 
+> which I've verified is the commit which doubled the boot time (compared
+> to 28a903f63ec0^) (added by lockdep crossrelease series [1]).
+> 
+> I also verified that simply disabling CONFIG_PROVE_LOCKING on 4.14-rc4
+> brought boot time down to about 14 seconds.
+> 
+> Now since it's lockdep I guess this can't really be considered a
+> regression if these changes did improve lockdep correctness, but still,
+> this dramatic slow down essentially forces me to disable PROVE_LOCKING
+> by default on this system.
+> 
+> Is this lockdep slowdown expected and desirable?
 
-On Fri, Oct 13, 2017 at 10:58 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Tue, 10 Oct 2017, Geert Uytterhoeven wrote:
->
->> Enable read/write access to the BD9571MWV_BKUP_MODE_CNT register, which
->> is a.o. used to configure DDR Backup Power.
->
-> a.o.?  That's a new one on me.
+Expected yes, desirable not so much. Its the save_stack_trace() in
+add_xhlock() (IIRC).
 
-among(st) others
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+I've not yet had time to figure out what to do about that.
