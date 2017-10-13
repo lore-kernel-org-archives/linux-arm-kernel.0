@@ -1,59 +1,53 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 13 Oct 2017 11:51:52 -0500
-Subject: [PATCH 1/3] Documentation/devicetree: Add pcie-reset-suspend
- property
-In-Reply-To: <20171012205220.130048-2-briannorris@chromium.org>
-References: <20171012205220.130048-1-briannorris@chromium.org>
- <20171012205220.130048-2-briannorris@chromium.org>
-Message-ID: <20171013165152.GE25517@bhelgaas-glaptop.roam.corp.google.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 13 Oct 2017 17:53:36 +0100
+Subject: [RESEND PATCH 1/2] irqdesc: Add function to identify percpu_devid
+ irqs
+In-Reply-To: <1507894005-53778-2-git-send-email-julien.thierry@arm.com>
+References: <1507894005-53778-1-git-send-email-julien.thierry@arm.com>
+ <1507894005-53778-2-git-send-email-julien.thierry@arm.com>
+Message-ID: <dc756382-6f70-c2f1-9b91-b5359dca3597@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Doug]
-
-On Thu, Oct 12, 2017 at 01:52:18PM -0700, Brian Norris wrote:
-> The patch is self-descriptive. I've found that we may need
-> platform-specific behavior for the PERST# signal in system suspend,
-> depending on the type of PCIe endpoints are attached.
+On 13/10/17 12:26, Julien Thierry wrote:
+> irq_is_percpu indicates whether an irq should only target a single cpu.
+> PERCPU_DEVID flag indicates that an irq can be configured differently on
+> each cpu it can target.
 > 
-> Signed-off-by: Brian Norris <briannorris@chromium.org>
+> Provide a function to check whether an irq is PERCPU_DEVID.
+> 
+> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  Documentation/devicetree/bindings/pci/pci.txt | 11 +++++++++++
->  1 file changed, 11 insertions(+)
+>  include/linux/irqdesc.h | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/pci/pci.txt b/Documentation/devicetree/bindings/pci/pci.txt
-> index c77981c5dd18..91339b6d0652 100644
-> --- a/Documentation/devicetree/bindings/pci/pci.txt
-> +++ b/Documentation/devicetree/bindings/pci/pci.txt
-> @@ -24,3 +24,14 @@ driver implementation may support the following properties:
->     unsupported link speed, for instance, trying to do training for
->     unsupported link speed, etc.  Must be '4' for gen4, '3' for gen3, '2'
->     for gen2, and '1' for gen1. Any other values are invalid.
-> +- pcie-reset-suspend:
-> +   If present this property defines whether the PCIe Reset signal (referred to
-> +   as PERST#) should be asserted when the system enters low-power suspend modes
-> +   (e.g., S3). Depending on the form factor, the associated PCIe
-> +   electromechanical specification may specify a particular behavior (e.g.,
-> +   "PERST# is asserted in advance of the power being switched off in a
-> +   power-managed state like S3") or it may be less clear. The net result is
-> +   that some endpoints perform better (e.g., lower power consumption) with
-> +   PERST# asserted, and others prefer PERST# deasserted. The value must be '0'
-> +   or '1', where '0' means do not assert PERST# and '1' means assert PERST#.
-> +   When absent, behavior may be platform-specific.
+> diff --git a/include/linux/irqdesc.h b/include/linux/irqdesc.h
+> index 3e90a09..93960cf 100644
+> --- a/include/linux/irqdesc.h
+> +++ b/include/linux/irqdesc.h
+> @@ -244,6 +244,14 @@ static inline int irq_is_percpu(unsigned int irq)
+>  	return desc->status_use_accessors & IRQ_PER_CPU;
+>  }
+> 
+> +static inline int irq_is_percpu_devid(unsigned int irq)
+> +{
+> +	struct irq_desc *desc;
+> +
+> +	desc = irq_to_desc(irq);
+> +	return desc->status_use_accessors & IRQ_PER_CPU_DEVID;
+> +}
+> +
+>  static inline void
+>  irq_set_lockdep_class(unsigned int irq, struct lock_class_key *class)
+>  {
+> --
+> 1.9.1
+> 
 
-I don't understand this at all.  Are you suggesting that we need
-different "pcie-reset-suspend" values based on what sort of endpoint
-the user plugs in?
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-If so, I really don't want to get involved in that, because that's an
-issue that needs to be resolved by the vendors and the PCI-SIG.  If we
-put in a tweak like this, I think it would be a band-aid that only
-delays getting a real solution figured out.
-
-If you want a quirk to tune this based on specific devices, that might
-make sense.  It would still sound like an interoperability issue and
-an ongoing maintenance problem, but at least we would have specific
-details about which devices are involved, and we'd have a chance to
-make them work on more controllers than just Rockchip.
-
-Bjorn
+	M.
+-- 
+Jazz is not dead. It just smells funny...
