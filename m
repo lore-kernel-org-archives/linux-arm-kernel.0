@@ -1,23 +1,21 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 13 Oct 2017 11:17:19 +0100
-Subject: [PATCH 1/2] spi: rockchip: Convert to late and early system PM
- callbacks
-In-Reply-To: <20171013100116.8271-1-jeffy.chen@rock-chips.com>
-References: <20171013100116.8271-1-jeffy.chen@rock-chips.com>
-Message-ID: <20171013101719.bophbiz7qb5wi7n2@sirena.co.uk>
+From: mathias.nyman@linux.intel.com (Mathias Nyman)
+Date: Fri, 13 Oct 2017 13:32:14 +0300
+Subject: [PATCH v2 7/9] usb: host: modify description for MTK xHCI config
+In-Reply-To: <37153cd259af6e1fc34b32a2e0dd1a15b8214579.1507882470.git.chunfeng.yun@mediatek.com>
+References: <994382d16d6bdc0f3d7c11b22f1710252e056e34.1507882470.git.chunfeng.yun@mediatek.com>
+ <37153cd259af6e1fc34b32a2e0dd1a15b8214579.1507882470.git.chunfeng.yun@mediatek.com>
+Message-ID: <59E0962E.9030508@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 13, 2017 at 06:01:15PM +0800, Jeffy Chen wrote:
-> Currently we are suspending the spi master in it's ->suspend callback,
-> which is racy as some other drivers may still want to transmit messages
-> on the bus(e.g. spi based pwm backlight).
+On 13.10.2017 11:26, Chunfeng Yun wrote:
+> Due to all MediaTek SoCs with xHCI host controller use this
+> driver, remove limitation for specific SoCs
+>
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> ---
 
-I'm missing patch 2/2.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171013/e0813609/attachment.sig>
+xHCI parts of series look good to me, If Rob Herring agrees with the
+dt changes I can send it forward
+
+-Mathias
