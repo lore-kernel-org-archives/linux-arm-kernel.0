@@ -1,137 +1,59 @@
-From: emil.renner.berthing@gmail.com (Emil Renner Berthing)
-Date: Fri, 13 Oct 2017 17:15:50 +0200
-Subject: [RESEND PATCH 2/2] arm64: dts: rockchip: Enable edp disaplay on
- kevin
-In-Reply-To: <CANBLGcyqbfmVJ75Nu_RtVD2TUJs_pXZ+jZBhQ7J0E9U4DvwtSg@mail.gmail.com>
-References: <20171013104138.3216-1-jeffy.chen@rock-chips.com>
- <20171013104138.3216-3-jeffy.chen@rock-chips.com> <3037285.0MAZvLKA4I@phil>
- <CANBLGcyqbfmVJ75Nu_RtVD2TUJs_pXZ+jZBhQ7J0E9U4DvwtSg@mail.gmail.com>
-Message-ID: <CANBLGczVi9=+3um-jMmRxbtG+WsJNDXeKTFQYCZ=e=gnNj67gA@mail.gmail.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Fri, 13 Oct 2017 10:16:47 -0500
+Subject: [PATCH v2] irqchip/gic-v3-its: Fix the incorrect BUG_ON in
+ its_init_vpe_domain()
+Message-ID: <1507907807-10148-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 October 2017 at 15:42, Emil Renner Berthing
-<emil.renner.berthing@gmail.com> wrote:
-> On 13 October 2017 at 15:25, Heiko Stuebner <heiko@sntech.de> wrote:
->> Am Freitag, 13. Oktober 2017, 18:41:38 CEST schrieb Jeffy Chen:
->>> Add edp panel and enable related nodes on kevin.
->>>
->>> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
->>
->> does this actually work with mainline kernel sources?
->>
->> Sean Paul did look at making the edp work on Chromebooks recently,
->> but it seemed there were still parts missing to make it actually display
->> something.
->
-> That's funny. I've been using your own similar patch on my Chromebook
-> Plus for a while now and it works "fine":
-> https://github.com/esmil/linux/commits/kevin
->
-> ..where fine means I can't get the armsoc X11 driver to work, but
-> modesetting works and screenblank seems to freeze the kernel.
->
-> I'll test this version of the dts changes as soon as I'm near my
-> chrombook again.
+The driver probe path hits 'BUG_ON(entries != vpe_proxy.dev->nr_ites)'
+on systems where it has VLPI capability, doesn't support direct LPI
+feature and boot with a single CPU.
 
-I've just tested this series and the internal screen works with this
-too. Screenblank still seems to freeze the kernel though. Eg.
-# setterm --powersave on
-# setterm --blank 1
-#  < wait 1 minute >
+Relax the BUG_ON() condition to fix the issue.
 
-But getting output on the screen is progress ;)
+Crash log messages on QDF2400 when booting with a single core.
 
-As for the spi change suspend now works too, which it didn't before,
-but the screen just didn't come up properly after the suspend. I could
-still ssh into it after suspend though.
+------------[ cut here ]------------
+kernel BUG at /v4.14-rc2/kernel/drivers/irqchip/irq-gic-v3-its.c:2854!
+Internal error: Oops - BUG: 0 [#1] SMP
+0.000000] Modules linked in:
+CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.14.0+ #5
+[<ffff000008c2edd8>] its_init+0x310/0x370
+[<ffff000008c2da94>] gic_init_bases+0x18c/0x29c
+[<ffff000008c2de94>] gic_acpi_init+0x118/0x234
+[<ffff000008c31f74>] acpi_match_madt+0x44/0x78
+[<ffff000008c30a34>] acpi_table_parse_entries_array+0x11c/0x1e0
+[<ffff000008c30b20>] acpi_table_parse_entries+0x28/0x30
+[<ffff000008c30b4c>] acpi_table_parse_madt+0x24/0x2c
+[<ffff000008c32234>] __acpi_probe_device_table+0x80/0xdc
+[<ffff000008c2c760>] irqchip_init+0x30/0x38
+[<ffff000008c123e8>] init_IRQ+0xb4/0xe8
+[<ffff000008c10a10>] start_kernel+0x238/0x3a0
+Code: 14000011 b9407802 6b15005f 54000040 (d4210000)
+---[ end trace 4defdcd9ed65d530 ]---
 
-/Emil
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+---
+Changes since v1:
+  -Added crash log messages to commit text.
 
->>>
->>>  arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 29 +++++++++++++++++++++++
->>>  arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi      | 16 +++++++++++++
->>>  2 files changed, 45 insertions(+)
->>>
->>> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
->>> index a3d3cea7dc4f..bc67b19f0af5 100644
->>> --- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
->>> +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
->>> @@ -93,6 +93,18 @@
->>>               pwm-delay-us = <10000>;
->>>       };
->>>
->>> +     edp_panel: edp-panel {
->>> +             compatible = "sharp,lq123p1jx31", "simple-panel";
->>> +             backlight = <&backlight>;
->>> +             power-supply = <&pp3300_disp>;
->>> +
->>> +             ports {
->>> +                     panel_in_edp: endpoint {
->>> +                             remote-endpoint = <&edp_out_panel>;
->>> +                     };
->>> +             };
->>> +     };
->>> +
->>>       thermistor_ppvar_bigcpu: thermistor-ppvar-bigcpu {
->>>               compatible = "murata,ncp15wb473";
->>>               pullup-uv = <1800000>;
->>> @@ -264,6 +276,23 @@ ap_i2c_dig: &i2c2 {
->>>       };
->>>  };
->>>
->>> +&edp {
->>> +     status = "okay";
->>> +
->>> +     ports {
->>> +             edp_out: port at 1 {
->>> +                     reg = <1>;
->>> +                     #address-cells = <1>;
->>> +                     #size-cells = <0>;
->>> +
->>> +                     edp_out_panel: endpoint at 0 {
->>> +                             reg = <0>;
->>> +                             remote-endpoint = <&panel_in_edp>;
->>> +                     };
->>> +             };
->>> +     };
->>> +};
->>> +
->>>  &ppvar_bigcpu_pwm {
->>>       regulator-min-microvolt = <798674>;
->>>       regulator-max-microvolt = <1302172>;
->>> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
->>> index 5772c52fbfd3..470105d651c2 100644
->>> --- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
->>> +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
->>> @@ -927,6 +927,22 @@ ap_i2c_audio: &i2c8 {
->>>       dr_mode = "host";
->>>  };
->>>
->>> +&vopb {
->>> +     status = "okay";
->>> +};
->>> +
->>> +&vopb_mmu {
->>> +     status = "okay";
->>> +};
->>> +
->>> +&vopl {
->>> +     status = "okay";
->>> +};
->>> +
->>> +&vopl_mmu {
->>> +     status = "okay";
->>> +};
->>> +
->>>  #include <arm/cros-ec-keyboard.dtsi>
->>>  #include <arm/cros-ec-sbs.dtsi>
->>>
->>>
->>
->>
->>
->> _______________________________________________
->> Linux-rockchip mailing list
->> Linux-rockchip at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+ drivers/irqchip/irq-gic-v3-its.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 4b598b6..83220f7 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -2921,7 +2921,7 @@ static int its_init_vpe_domain(void)
+ 		return -ENOMEM;
+ 	}
+ 
+-	BUG_ON(entries != vpe_proxy.dev->nr_ites);
++	BUG_ON(entries > vpe_proxy.dev->nr_ites);
+ 
+ 	raw_spin_lock_init(&vpe_proxy.lock);
+ 	vpe_proxy.next_victim = 0;
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
