@@ -1,47 +1,34 @@
 From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Fri, 13 Oct 2017 11:01:52 +0200
-Subject: [PATCH v2 08/16] serial: mvebu-uart: clear state register before IRQ
- request
+Date: Fri, 13 Oct 2017 11:01:57 +0200
+Subject: [PATCH v2 13/16] arm64: dts: marvell: armada-37xx: add UART clock
 In-Reply-To: <20171013090200.31034-1-miquel.raynal@free-electrons.com>
 References: <20171013090200.31034-1-miquel.raynal@free-electrons.com>
-Message-ID: <20171013090200.31034-9-miquel.raynal@free-electrons.com>
+Message-ID: <20171013090200.31034-14-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Allen Yan <yanwei@marvell.com>
+Add the missing clock property to armada-3700 UART node.
 
-When receiving data on RX pin before ->uart_startup() is called, some
-error bits in the state register could be set up (like BRK_DET).
+This clock will be used to derive the prescaler value to comply with
+the requested baudrate.
 
-This is harmless when using only the standard UART (error bits are
-read-only), but may procude an endless loop once in the extended UART
-RX interrupt handler (error bits must be cleared).
-
-Clear the status register in ->uart_startup() to avoid this situation.
-
-Signed-off-by: Allen Yan <yanwei@marvell.com>
 Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/tty/serial/mvebu-uart.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
-index 5767196ec0a9..6bd0c40008bb 100644
---- a/drivers/tty/serial/mvebu-uart.c
-+++ b/drivers/tty/serial/mvebu-uart.c
-@@ -322,6 +322,12 @@ static int mvebu_uart_startup(struct uart_port *port)
- 	writel(CTRL_TXFIFO_RST | CTRL_RXFIFO_RST,
- 	       port->membase + UART_CTRL(port));
- 	udelay(1);
-+
-+	/* Clear the error bits of state register before IRQ request */
-+	ret = readl(port->membase + UART_STAT);
-+	ret |= STAT_BRK_ERR;
-+	writel(ret, port->membase + UART_STAT);
-+
- 	writel(CTRL_BRK_INT, port->membase + UART_CTRL(port));
- 
- 	ctl = readl(port->membase + UART_INTR(port));
+diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+index b554cdaf5e53..a36d667f770e 100644
+--- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+@@ -135,6 +135,7 @@
+ 			uart0: serial at 12000 {
+ 				compatible = "marvell,armada-3700-uart";
+ 				reg = <0x12000 0x200>;
++				clocks = <&xtalclk>;
+ 				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
+ 				status = "disabled";
+ 			};
 -- 
 2.11.0
