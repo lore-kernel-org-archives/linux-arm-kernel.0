@@ -1,50 +1,64 @@
-From: jeffy.chen@rock-chips.com (jeffy)
-Date: Sat, 14 Oct 2017 02:19:28 +0800
-Subject: [RESEND PATCH 1/2] spi: rockchip: Convert to late and early system
- PM callbacks
-In-Reply-To: <20171013164235.thgqha7sl5tdptwv@sirena.co.uk>
-References: <20171013104138.3216-1-jeffy.chen@rock-chips.com>
- <20171013104138.3216-2-jeffy.chen@rock-chips.com>
- <CAD=FV=X6pkaY3t=ceh3QEUws+_gqRGMN9zveW0fXR1noF1T6ew@mail.gmail.com>
- <20171013155120.GA137489@google.com>
- <20171013164235.thgqha7sl5tdptwv@sirena.co.uk>
-Message-ID: <59E103B0.8060705@rock-chips.com>
+From: tpiepho@impinj.com (Trent Piepho)
+Date: Fri, 13 Oct 2017 18:22:01 +0000
+Subject: [PATCH 1/4] spi: imx: GPIO based chip selects should not be required
+Message-ID: <1507918921.24265.8.camel@impinj.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
+The driver will fail to load if no gpio chip selects are specified,
+this patch changes this so that it no longer fails.
 
-it looks like the suspend sequence depends on the dt node sequence, and 
-we are putting display-subsystem dt node above spi dt node, so it would 
-be earlier in the device list, then got suspended later than spi device.
+It's possible to use all native chip selects, in which case there is
+no reason to have a gpio chip select array.  This is what happens if
+the *optional* device tree property "cs-gpios" is omitted.
 
-the pwm backlight and cros_ec_spi pwm are very interesting, not only 
-about suspend dependency... if we unbind cros_ec_spi pwm, the pwm 
-backlight would still hold a reference to it, and crash the kernel later.
+The spi core already checks for the absence of gpio chip selects in
+the master and assigns any slaves the gpio_cs value of -ENOENT.
 
-On 10/14/2017 12:42 AM, Mark Brown wrote:
-> On Fri, Oct 13, 2017 at 08:51:21AM -0700, Brian Norris wrote:
->
->> Yes, this does seem odd to me too. This looks like an arms race hack
->> that should be avoided unless we know a legit root cause. Also,
->> "probe order implies suspend order" doesn't quite work for async suspend
->> anyway, so we'd probably want to express the dependency properly
->> anyway.
->
-> Yeah, it's the same stuff as we get with initcall ordering.  This sort
-> of thing does happen with things like PMICs which tend to have hardware
-> that the system wants to manipulate in the IRQs off part of suspend.
-> Ideally the dependency annotation stuff would figure things out though
-> I'm not sure what the status of that is.
->
->> Any chance this is related? Seems like that might break the parent/child
->> relationship for master/slave:
->
->> commit d7e2ee257038baeb03baef602500368a51ee9eef
->> Author: Linus Walleij <linus.walleij@linaro.org>
->> Date:   Mon Apr 11 13:51:03 2016 +0200
->
->>      spi: let SPI masters ignore their children for PM
->
-> That's for runtime PM, I'd not expect it to affect system suspend.
->
+Signed-off-by: Trent Piepho <tpiepho@impinj.com>
+---
+ drivers/spi/spi-imx.c | 29 +++++++++++++----------------
+ 1 file changed, 13 insertions(+), 16 deletions(-)
+
+diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+index babb15f07995..07e6250f2dad 100644
+--- a/drivers/spi/spi-imx.c
++++ b/drivers/spi/spi-imx.c
+@@ -1457,22 +1457,19 @@ static int spi_imx_probe(struct platform_device *pdev)
+ 		goto out_clk_put;
+ 	}
+ 
+-	if (!master->cs_gpios) {
+-		dev_err(&pdev->dev, "No CS GPIOs available\n");
+-		ret = -EINVAL;
+-		goto out_clk_put;
+-	}
+-
+-	for (i = 0; i < master->num_chipselect; i++) {
+-		if (!gpio_is_valid(master->cs_gpios[i]))
+-			continue;
+-
+-		ret = devm_gpio_request(&pdev->dev, master->cs_gpios[i],
+-					DRIVER_NAME);
+-		if (ret) {
+-			dev_err(&pdev->dev, "Can't get CS GPIO %i\n",
+-				master->cs_gpios[i]);
+-			goto out_clk_put;
++	/* Request GPIO CS lines, if any */
++	if (master->cs_gpios) {
++		for (i = 0; i < master->num_chipselect; i++) {
++			if (!gpio_is_valid(master->cs_gpios[i]))
++				continue;
++
++			ret = devm_gpio_request(&pdev->dev, master->cs_gpios[i],
++						DRIVER_NAME);
++			if (ret) {
++				dev_err(&pdev->dev, "Can't get CS GPIO %i\n",
++					master->cs_gpios[i]);
++				goto out_clk_put;
++			}
+ 		}
+ 	}
+ 
+-- 
+2.13.6
