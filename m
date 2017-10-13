@@ -1,100 +1,109 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 13 Oct 2017 15:26:32 +0100
-Subject: [PATCH v3 13/28] arm64/sve: Signal handling support
-In-Reply-To: <20171013111718.nqd2nllr7niytfss@armageddon.cambridge.arm.com>
-References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
- <1507660725-7986-14-git-send-email-Dave.Martin@arm.com>
- <20171011164052.exvy2w5p47mewrmg@armageddon.cambridge.arm.com>
- <20171012161156.GI19485@e103592.cambridge.arm.com>
- <20171013111718.nqd2nllr7niytfss@armageddon.cambridge.arm.com>
-Message-ID: <20171013142632.GL19485@e103592.cambridge.arm.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Fri, 13 Oct 2017 16:26:57 +0200
+Subject: [PATCH 1/2] hwmon: (jc42) optionally try to disable the SMBUS
+ timeout
+In-Reply-To: <554a4494-14c9-7743-898c-5f83e3de227d@roeck-us.net>
+References: <20171013092705.7038-1-peda@axentia.se>
+ <20171013092705.7038-2-peda@axentia.se>
+ <554a4494-14c9-7743-898c-5f83e3de227d@roeck-us.net>
+Message-ID: <2d1bf447-489f-9e15-3b1e-d2f4a2c1dcfe@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 13, 2017 at 12:17:19PM +0100, Catalin Marinas wrote:
-> On Thu, Oct 12, 2017 at 05:11:57PM +0100, Dave P Martin wrote:
-> > On Wed, Oct 11, 2017 at 05:40:52PM +0100, Catalin Marinas wrote:
-> > > On Tue, Oct 10, 2017 at 07:38:30PM +0100, Dave P Martin wrote:
-> > > > diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> > > > index aabeaee..fa4ed34 100644
-> > > > --- a/arch/arm64/kernel/fpsimd.c
-> > > > +++ b/arch/arm64/kernel/fpsimd.c
-> > > > @@ -310,6 +310,32 @@ static void fpsimd_to_sve(struct task_struct *task)
-> > > >  		       sizeof(fst->vregs[i]));
-> > > >  }
-> > > >  
-> > > > +/*
-> > > > + * Transfer the SVE state in task->thread.sve_state to
-> > > > + * task->thread.fpsimd_state.
-> > > > + *
-> > > > + * Task can be a non-runnable task, or current.  In the latter case,
-> > > > + * softirqs (and preemption) must be disabled.
-> > > > + * task->thread.sve_state must point to at least sve_state_size(task)
-> > > > + * bytes of allocated kernel memory.
-> > > > + * task->thread.sve_state must be up to date before calling this function.
-> > > > + */
-> > > > +static void sve_to_fpsimd(struct task_struct *task)
-> > > > +{
-> > > > +	unsigned int vq;
-> > > > +	void const *sst = task->thread.sve_state;
-> > > > +	struct fpsimd_state *fst = &task->thread.fpsimd_state;
-> > > > +	unsigned int i;
-> > > > +
-> > > > +	if (!system_supports_sve())
-> > > > +		return;
-> > > > +
-> > > > +	vq = sve_vq_from_vl(task->thread.sve_vl);
-> > > > +	for (i = 0; i < 32; ++i)
-> > > > +		memcpy(&fst->vregs[i], ZREG(sst, vq, i),
-> > > > +		       sizeof(fst->vregs[i]));
-> > > > +}
-> > > 
-> > > Nit: could we actually just do an assignment with some pointer casting?
-> > > It looks like we invoke memcpy for every 16 bytes (same for
-> > > fpsimd_to_sve).
-> > 
-> > I was uneasy about what the type of ZREG(sst, vq, i) ought to be.
-> > In any case, memest() is magic: my oldskool GCC (5.3.0) generates:
-> > 
-> > ffff000008084c70 <sve_to_fpsimd>:
-> > ffff000008084c70:       14000004        b       ffff000008084c80 <sve_to_fpsimd+0x10>
-> > ffff000008084c74:       d503201f        nop
-> > ffff000008084c78:       d65f03c0        ret
-> > ffff000008084c7c:       d503201f        nop
-> > ffff000008084c80:       f0007d61        adrp    x1, ffff000009033000 <reset_devices>
-> > ffff000008084c84:       f942a021        ldr     x1, [x1,#1344]
-> > ffff000008084c88:       36b001c1        tbz     w1, #22, ffff000008084cc0 <sve_to_fpsimd+0x50>
-> > ffff000008084c8c:       b94ca805        ldr     w5, [x0,#3240]
-> > ffff000008084c90:       912a0001        add     x1, x0, #0xa80
-> > ffff000008084c94:       91320004        add     x4, x0, #0xc80
-> > ffff000008084c98:       f9465006        ldr     x6, [x0,#3232]
-> > ffff000008084c9c:       121c6ca5        and     w5, w5, #0xfffffff0
-> > ffff000008084ca0:       52800000        mov     w0, #0x0                        // #0
-> > ffff000008084ca4:       8b2040c2        add     x2, x6, w0, uxtw
-> > ffff000008084ca8:       0b050000        add     w0, w0, w5
-> > ffff000008084cac:       a9400c42        ldp     x2, x3, [x2]
-> > ffff000008084cb0:       a8810c22        stp     x2, x3, [x1],#16
-> > ffff000008084cb4:       eb01009f        cmp     x4, x1
-> > ffff000008084cb8:       54ffff61        b.ne    ffff000008084ca4 <sve_to_fpsimd+0x34>
-> > ffff000008084cbc:       d65f03c0        ret
-> > ffff000008084cc0:       d65f03c0        ret
-> > ffff000008084cc4:       d503201f        nop
-> > 
-> > 
-> > Without volatile, I think assigning a single object and doing a memcpy()
-> > are equivalent to the compiler: which it actually uses depends solely on
-> > optimisation considerations.
-> > 
-> > (But then I'm not a language lawyer ... not a professional one anyway).
-> > 
-> > Are you concerned compilers may mess this up?
+On 2017-10-13 15:50, Guenter Roeck wrote:
+> On 10/13/2017 02:27 AM, Peter Rosin wrote:
+>> With a nxp,se97 chip on an atmel sama5d31 board, the I2C adapter driver
+>> is not always capable of avoiding the 25-35 ms timeout as specified by
+>> the SMBUS protocol. This may cause silent corruption of the last bit of
+>> any transfer, e.g. a one is read instead of a zero if the sensor chip
+>> times out. This also affects the eeprom half of the nxp-se97 chip, where
+>> this silent corruption was originally noticed. Other I2C adapters probably
+>> suffer similar issues, e.g. bit-banging comes to mind as risky...
+>>
+>> The SMBUS register in the nxp chip is not a standard Jedec register, but
+>> it is not special to the nxp chips either, at least the atmel chips
+>> have the same mechanism. Therefore, do not special case this on the
+>> manufacturer, it is opt-in via the device property anyway.
+>>
+>> Signed-off-by: Peter Rosin <peda@axentia.se>
+>> ---
+>>   Documentation/devicetree/bindings/hwmon/jc42.txt |  4 ++++
+>>   drivers/hwmon/jc42.c                             | 20 ++++++++++++++++++++
+>>   2 files changed, 24 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/hwmon/jc42.txt b/Documentation/devicetree/bindings/hwmon/jc42.txt
+>> index 07a250498fbb..f569db58f64a 100644
+>> --- a/Documentation/devicetree/bindings/hwmon/jc42.txt
+>> +++ b/Documentation/devicetree/bindings/hwmon/jc42.txt
+>> @@ -34,6 +34,10 @@ Required properties:
+>>   
+>>   - reg: I2C address
+>>   
+>> +Optional properties:
+>> +- smbus-timeout-disable: When set, the smbus timeout function will be disabled.
+>> +			 This is not supported on all chips.
+>> +
+>>   Example:
+>>   
+>>   temp-sensor at 1a {
+>> diff --git a/drivers/hwmon/jc42.c b/drivers/hwmon/jc42.c
+>> index 1bf22eff0b08..fd816902fa30 100644
+>> --- a/drivers/hwmon/jc42.c
+>> +++ b/drivers/hwmon/jc42.c
+>> @@ -45,6 +45,7 @@ static const unsigned short normal_i2c[] = {
+>>   #define JC42_REG_TEMP		0x05
+>>   #define JC42_REG_MANID		0x06
+>>   #define JC42_REG_DEVICEID	0x07
+>> +#define JC42_REG_SMBUS		0x22 /* NXP and Atmel, possibly others? */
+>>   
+>>   /* Status bits in temperature register */
+>>   #define JC42_ALARM_CRIT_BIT	15
+>> @@ -73,6 +74,9 @@ static const unsigned short normal_i2c[] = {
+>>   #define ONS_MANID		0x1b09  /* ON Semiconductor */
+>>   #define STM_MANID		0x104a  /* ST Microelectronics */
+>>   
+>> +/* SMBUS register */
+>> +#define SMBUS_STMOUT		BIT(7)  /* SMBus time-out, active low */
+>> +
+>>   /* Supported chips */
+>>   
+>>   /* Analog Devices */
+>> @@ -476,6 +480,22 @@ static int jc42_probe(struct i2c_client *client, const struct i2c_device_id *id)
+>>   
+>>   	data->extended = !!(cap & JC42_CAP_RANGE);
+>>   
+>> +	if (device_property_read_bool(dev, "smbus-timeout-disable")) {
+>> +		int smbus;
+>> +
+>> +		/*
+>> +		 * Not all chips support this register, but from a
+>> +		 * quick read of various datasheets no chip appears
+>> +		 * incompatible with the below attempt to disable
+>> +		 * the timeout. And the whole thing is opt-in...
+>> +		 */
+>> +		smbus = i2c_smbus_read_word_swapped(client, JC42_REG_SMBUS);
+>> +		if (smbus < 0)
+>> +			return smbus;
+>> +		i2c_smbus_write_word_swapped(client, JC42_REG_SMBUS,
+>> +					     smbus | SMBUS_STMOUT);
 > 
-> That's fine, please ignore my comment then. I was worried that gcc would
-> always generate a call to the memcpy implementation rather than inlining
-> it.
+> Looking into the SE97 datasheet, the bit is only writable if the alarm bits
+> are not locked. Should we take this into account and unlock the alarm bits
+> if necessary ?
 
-OK.  I'll keep an eye on this, but in any case it won't impact the
-FPSIMD-only case.
+Right. And I thought about the case when the timeout was disabled before
+probing but with the property not present (perhaps by someone trying things
+out, like I have). Should the timeout be re-enabled in that case?
+But, someone might have disabled the timeout by some previous arrangement
+(e.g. in a boot-loader) but without having this newfangled property in the
+device tree. Re-enabling the timeout in that case would break things. Slim
+chance for that to be an issue, but perhaps not?
 
-Cheers
----Dave
+Unlocking the alarm bits is somewhat similar, since it should only be an
+issue for warm starts. But the risk of breakage is perhaps not there at
+all?
+
+Your call, I can fix thing however you like...
+
+Cheers,
+Peter
