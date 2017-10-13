@@ -1,53 +1,69 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 13 Oct 2017 22:59:16 +0200
-Subject: [PATCH] i2c: pxa: move header file out of deprecated i2c folder
-In-Reply-To: <20170814164303.2383-1-wsa@the-dreams.de> (Wolfram Sang's message
- of "Mon, 14 Aug 2017 18:43:01 +0200")
-References: <20170814164303.2383-1-wsa@the-dreams.de>
-Message-ID: <87d15qlq6z.fsf@belgarion.home>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Fri, 13 Oct 2017 15:59:14 -0500
+Subject: [PATCH v5 1/2] Documentation: dt: Update ti,emif bindings
+In-Reply-To: <20171013205915.9652-1-d-gerlach@ti.com>
+References: <20171013205915.9652-1-d-gerlach@ti.com>
+Message-ID: <20171013205915.9652-2-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wolfram Sang <wsa@the-dreams.de> writes:
+Update the Texas Instruments EMIF binding document to include the device
+tree bindings for ti,emif-am3352 and ti,emif-am4372 which are used by
+the ti-emif-sram driver to provide low-level PM functionality.
 
-> include/linux/i2c is deprecated because too many platform_data of i2c
-> clients incorrectly ended up there. The few still relevant include files
-> for I2C bus masters with their platform_data have been moved to the
-> platform_data directory. This final one, PXA, is not entirely
-> platform_data, so it is simply moved one layer up. After that, the i2c
-> subfolder can finally go soon.
->
-> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
-> ---
->
-> If you think this should rather go to "include/linux/platform_data" instead of
-> "include/linux", I am open for that. I like the latter a tad better, but not
-> super much.
->
-> No runtime testing because of no HW, but buildbot is happy with this series at
-> least and I did build testing, too.
+Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+ .../devicetree/bindings/memory-controllers/ti/emif.txt | 18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
 
-Hi Wolfram,
-
-I'm sorry I completely missed this one.
-Either it's too late and trash this mail, or it's not, and then I'd suggest
-another approach :
- - patch 1 : move include/linux/i2c/pxa-i2c.h to include/platform_data/i2c-pxa.h
-   (i2c-pxa.h and not pxa-i2c.h to be consistent)
- - patch 2 : move this chunk to arch/arm/mach-pxa/devices.h
-> extern void pxa_set_i2c_info(struct i2c_pxa_platform_data *info);
-> 
-> #ifdef CONFIG_PXA27x
-> extern void pxa27x_set_i2c_power_info(struct i2c_pxa_platform_data *info);
-> #endif
-> 
-> #ifdef CONFIG_PXA3xx
-> extern void pxa3xx_set_i2c_power_info(struct i2c_pxa_platform_data *info);
-> #endif
-
-This is the cleanest approach I could think of.
-
-Cheers.
-
---
-Robert
+diff --git a/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt b/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
+index 0db60470ebb6..8c0214b17c2b 100644
+--- a/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
++++ b/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
+@@ -8,6 +8,7 @@ of the EMIF IP and memory parts attached to it.
+ Required properties:
+ - compatible	: Should be of the form "ti,emif-<ip-rev>" where <ip-rev>
+   is the IP revision of the specific EMIF instance.
++		  For am335x should be ti,emif-am3352.
+ 		  For am437x should be ti,emif-am4372.
+ 
+ - phy-type	: <u32> indicating the DDR phy type. Following are the
+@@ -21,6 +22,13 @@ Required properties:
+   the value shall be "emif<n>" where <n> is the number of the EMIF
+   instance with base 1.
+ 
++Required only for "ti,emif-am3352" and "ti,emif-am4372":
++- sram			: Phandles for generic sram driver nodes,
++  first should be type 'protect-exec' for the driver to use to copy
++  and run PM functions, second should be regular pool to be used for
++  data region for code. See Documentation/devicetree/bindings/sram/sram.txt
++  for more details.
++
+ Optional properties:
+ - cs1-used		: Have this property if CS1 of this EMIF
+   instance has a memory part attached to it. If there is a memory
+@@ -42,7 +50,7 @@ Optional properties:
+ - hw-caps-temp-alert	: Have this property if the controller
+   has capability for generating SDRAM temperature alerts
+ 
+-Example:
++-Examples:
+ 
+ emif1: emif at 0x4c000000 {
+ 	compatible	= "ti,emif-4d";
+@@ -54,3 +62,11 @@ emif1: emif at 0x4c000000 {
+ 	hw-caps-ll-interface;
+ 	hw-caps-temp-alert;
+ };
++
++/* From am33xx.dtsi */
++emif: emif at 4c000000 {
++        compatible = "ti,emif-am3352";
++        reg =   <0x4C000000 0x1000>;
++        sram = <&pm_sram_code
++                &pm_sram_data>;
++};
+-- 
+2.13.4
