@@ -1,56 +1,150 @@
 From: guohanjun@huawei.com (Hanjun Guo)
-Date: Fri, 13 Oct 2017 15:09:46 +0800
-Subject: [PATCH v2 0/4] IORT SMMUv3 MSI support
-Message-ID: <1507878590-51066-1-git-send-email-guohanjun@huawei.com>
+Date: Fri, 13 Oct 2017 15:09:48 +0800
+Subject: [PATCH v2 2/4] ACPI/IORT: Enable special index ITS group mappings for
+ IORT nodes
+In-Reply-To: <1507878590-51066-1-git-send-email-guohanjun@huawei.com>
+References: <1507878590-51066-1-git-send-email-guohanjun@huawei.com>
+Message-ID: <1507878590-51066-3-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hanjun Guo <hanjun.guo@linaro.org>
 
-IORT revision C introduced SMMUv3 MSI support for control interrupts,
-which introduced a device ID mapping index to retrieve the dev ID
-and ITS parent, adding its support in this patch set, please refer
-to each patch for detail commit message.
+IORT revision C introduced SMMUv3 and PMCG MSI support by adding
+specific mapping entries in the SMMUv3/PMCG subtables to retrieve
+the device ID and the ITS group it maps to for a given SMMUv3/PMCG
+IORT node.
 
-This patch set is based on Lorenzo's v2 clearup/rework for iort:
-https://www.spinics.net/lists/arm-kernel/msg611089.html
+Introduce a mapping function (ie iort_get_id_mapping_index()), that
+for a given IORT node looks up if an ITS specific ID mapping entry
+exists and if so retrieve the corresponding mapping index in the IORT
+node mapping array.
 
-Tested on D05 without breakage, and SMMU msi function is OK
-on hip08 platform, this version is intented for merge.
+Since an ITS specific index mapping can be present for an IORT
+node that is not a leaf node (eg SMMUv3 - to describe its own
+ITS device ID) special handling is required for two steps mapping
+cases such as PCI/NamedComponent--->SMMUv3--->ITS because the SMMUv3
+ITS specific index mapping entry should be skipped to prevent the
+IORT API from considering the mapping entry as a regular mapping one.
 
-v1 -> v2:
- - Rewrote commit message by Lorenzo to remove some wrong
-   message;
- - Split patch 3/4 in v1 into two by Lorenzo to make the logic
-   clearer;
- - Drop acpica patch but use the ACPICA version as a guard
-   for function iort_get_id_mapping_index() in case acpica for
-   linux kernel is not ready (patch for acpica iasl was merged
-   already).
+If we take the following IORT topology example:
 
-RFC v2 -> v1:
- - Drop RFC tag;
- - return the index value directly from iort_get_id_mapping_index()
-   then make the logic simple in iort_node_map_id();
- - To make sure ID mapping index is only ignored if all interrupts are
-   GSIV based
- - Sqursh part of the patch 4 to patch 3
+|----------------------|
+|  Root Complex Node   |
+|----------------------|
+|    map entry[x]      |
+|----------------------|
+|       id value       |
+| output_reference     |
+|---|------------------|
+    |
+    |   |----------------------|
+    |-->|        SMMUv3        |
+        |----------------------|
+        |     SMMUv3 dev ID    |
+        |     mapping index 0  |
+        |----------------------|
+        |      map entry[0]    |
+        |----------------------|
+        |       id value       |
+        | output_reference-----------> ITS 1 (SMMU MSI domain)
+        |----------------------|
+        |      map entry[1]    |
+        |----------------------|
+        |       id value       |
+        | output_reference-----------> ITS 2 (PCI MSI domain)
+        |----------------------|
 
-RFC v1 -> RFC v2:
- - Introduce a new API iort_set_device_domain() to find the MSI domain
-   for an SMMUv3 (or any other IORT table node) to reduce the complex
-   of doing that via acpi_configure_pmsi_domain().
+where the SMMUv3 ITS specific mapping entry is index 0 and it
+represents the SMMUv3 ITS specific index mapping entry (describing its
+own ITS device ID), we need to skip that mapping entry while carrying
+out the Root Complex Node regular mappings to prevent erroneous
+translations.
 
-Hanjun Guo (3):
-  ACPI/IORT: Look up IORT node through struct fwnode_handle pointer
-  ACPI/IORT: Enable special index ITS group mappings for IORT nodes
-  ACPI/IORT: Add SMMUv3 specific special index mapping handling
+Reuse the iort_get_id_mapping_index() function to detect the ITS
+specific mapping index for a specific IORT node and skip it in the IORT
+mapping API (ie iort_node_map_id()) loop to prevent considering it a
+normal PCI/Named Component ID mapping entry.
 
-Lorenzo Pieralisi (1):
-  ACPI/IORT: Enable SMMUv3/PMCG IORT MSI domain set-up
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+[lorenzo.pieralisi at arm.com: split patch/rewrote commit log]
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ drivers/acpi/arm64/iort.c | 32 ++++++++++++++++++++++++++++----
+ 1 file changed, 28 insertions(+), 4 deletions(-)
 
- drivers/acpi/arm64/iort.c | 159 ++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 153 insertions(+), 6 deletions(-)
-
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index 03d3dd2..c3f3ac3 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -365,6 +365,11 @@ static struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
+ 	return NULL;
+ }
+ 
++static inline int iort_get_id_mapping_index(struct acpi_iort_node *node)
++{
++	return -EINVAL;
++}
++
+ static struct acpi_iort_node *iort_node_map_id(struct acpi_iort_node *node,
+ 					       u32 id_in, u32 *id_out,
+ 					       u8 type_mask)
+@@ -374,7 +379,7 @@ static struct acpi_iort_node *iort_node_map_id(struct acpi_iort_node *node,
+ 	/* Parse the ID mapping tree to find specified node type */
+ 	while (node) {
+ 		struct acpi_iort_id_mapping *map;
+-		int i;
++		int i, index;
+ 
+ 		if (IORT_TYPE_MASK(node->type) & type_mask) {
+ 			if (id_out)
+@@ -395,8 +400,19 @@ static struct acpi_iort_node *iort_node_map_id(struct acpi_iort_node *node,
+ 			goto fail_map;
+ 		}
+ 
++		/*
++		 * Get the special ID mapping index (if any) and skip its
++		 * associated ID map to prevent erroneous multi-stage
++		 * IORT ID translations.
++		 */
++		index = iort_get_id_mapping_index(node);
++
+ 		/* Do the ID translation */
+ 		for (i = 0; i < node->mapping_count; i++, map++) {
++			/* if it is special mapping index, skip it */
++			if (i == index)
++				continue;
++
+ 			if (!iort_id_map(map, node->type, id, &id))
+ 				break;
+ 		}
+@@ -505,16 +521,24 @@ u32 iort_msi_map_rid(struct device *dev, u32 req_id)
+  */
+ int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id)
+ {
+-	int i;
++	int i, index;
+ 	struct acpi_iort_node *node;
+ 
+ 	node = iort_find_dev_node(dev);
+ 	if (!node)
+ 		return -ENODEV;
+ 
+-	for (i = 0; i < node->mapping_count; i++) {
+-		if (iort_node_map_platform_id(node, dev_id, IORT_MSI_TYPE, i))
++	index = iort_get_id_mapping_index(node);
++	/* if there is a valid index, go get the dev_id directly */
++	if (index >= 0) {
++		if (iort_node_get_id(node, dev_id, index))
+ 			return 0;
++	} else {
++		for (i = 0; i < node->mapping_count; i++) {
++			if (iort_node_map_platform_id(node, dev_id,
++						      IORT_MSI_TYPE, i))
++				return 0;
++		}
+ 	}
+ 
+ 	return -ENODEV;
 -- 
 1.7.12.4
