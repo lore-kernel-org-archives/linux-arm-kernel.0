@@ -1,144 +1,55 @@
 From: volodymyr_babchuk@epam.com (Volodymyr Babchuk)
-Date: Fri, 13 Oct 2017 22:32:38 +0300
-Subject: [PATCH v1 08/14] tee: optee: add registered shared parameters handling
+Date: Fri, 13 Oct 2017 22:32:40 +0300
+Subject: [PATCH v1 10/14] tee: optee: store OP-TEE capabilities in private data
 In-Reply-To: <1507923164-12796-1-git-send-email-volodymyr_babchuk@epam.com>
 References: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
  <1507923164-12796-1-git-send-email-volodymyr_babchuk@epam.com>
-Message-ID: <1507923164-12796-9-git-send-email-volodymyr_babchuk@epam.com>
+Message-ID: <1507923164-12796-11-git-send-email-volodymyr_babchuk@epam.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Volodymyr Babchuk <vlad.babchuk@gmail.com>
 
-Now, when client applications can register own shared buffers in OP-TEE,
-we need to extend ABI for parameter passing to/from OP-TEE.
-
-So, if OP-TEE core detects that parameter belongs to registered shared
-memory, it will use corresponding parameter attribute.
+Those capabilities will be used in subsequent patches.
 
 Signed-off-by: Volodymyr Babchuk <vlad.babchuk@gmail.com>
 ---
-
- * Removed check on u.memref.size at optee_from_msg_param(), because
-   it caused fail on some tests. According to GlobalPlatform specs,
-   we don't need to check returned SHM size, because in this case
-   TA can indicate desired buffer size.
-
----
- drivers/tee/optee/core.c | 78 ++++++++++++++++++++++++++++++++++++++----------
- 1 file changed, 63 insertions(+), 15 deletions(-)
+ drivers/tee/optee/core.c          | 1 +
+ drivers/tee/optee/optee_private.h | 3 +++
+ 2 files changed, 4 insertions(+)
 
 diff --git a/drivers/tee/optee/core.c b/drivers/tee/optee/core.c
-index 4d448bf..3729ebb 100644
+index d22433c..dbe5a61 100644
 --- a/drivers/tee/optee/core.c
 +++ b/drivers/tee/optee/core.c
-@@ -97,6 +97,25 @@ int optee_from_msg_param(struct tee_param *params, size_t num_params,
- 					return rc;
- 			}
- 			break;
-+		case OPTEE_MSG_ATTR_TYPE_RMEM_INPUT:
-+		case OPTEE_MSG_ATTR_TYPE_RMEM_OUTPUT:
-+		case OPTEE_MSG_ATTR_TYPE_RMEM_INOUT:
-+			p->attr = TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT +
-+				  attr - OPTEE_MSG_ATTR_TYPE_RMEM_INPUT;
-+			p->u.memref.size = mp->u.rmem.size;
-+			shm = (struct tee_shm *)(unsigned long)
-+				mp->u.rmem.shm_ref;
-+
-+			if (!shm) {
-+				p->u.memref.shm_offs = 0;
-+				p->u.memref.shm = NULL;
-+				break;
-+			}
-+			p->u.memref.shm_offs = mp->u.rmem.offs;
-+			p->u.memref.shm = shm;
-+
-+			break;
-+
- 		default:
- 			return -EINVAL;
- 		}
-@@ -104,6 +123,46 @@ int optee_from_msg_param(struct tee_param *params, size_t num_params,
- 	return 0;
- }
+@@ -545,6 +545,7 @@ static struct optee *optee_probe(struct device_node *np)
+ 	}
  
-+static int to_msg_param_tmp_mem(struct optee_msg_param *mp,
-+				const struct tee_param *p)
-+{
-+	int rc;
-+	phys_addr_t pa;
-+
-+	mp->attr = OPTEE_MSG_ATTR_TYPE_TMEM_INPUT + p->attr -
-+		   TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT;
-+
-+	mp->u.tmem.shm_ref = (unsigned long)p->u.memref.shm;
-+	mp->u.tmem.size = p->u.memref.size;
-+
-+	if (!p->u.memref.shm) {
-+		mp->u.tmem.buf_ptr = 0;
-+		return 0;
-+	}
-+
-+	rc = tee_shm_get_pa(p->u.memref.shm, p->u.memref.shm_offs, &pa);
-+	if (rc)
-+		return rc;
-+
-+	mp->u.tmem.buf_ptr = pa;
-+	mp->attr |= OPTEE_MSG_ATTR_CACHE_PREDEFINED <<
-+		    OPTEE_MSG_ATTR_CACHE_SHIFT;
-+
-+	return 0;
-+}
-+
-+static int to_msg_param_reg_mem(struct optee_msg_param *mp,
-+				const struct tee_param *p)
-+{
-+	mp->attr = OPTEE_MSG_ATTR_TYPE_RMEM_INPUT + p->attr -
-+		   TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT;
-+
-+	mp->u.rmem.shm_ref = (unsigned long)p->u.memref.shm;
-+	mp->u.rmem.size = p->u.memref.size;
-+	mp->u.rmem.offs = p->u.memref.shm_offs;
-+	return 0;
-+}
-+
- /**
-  * optee_to_msg_param() - convert from struct tee_params to OPTEE_MSG parameters
-  * @msg_params:	OPTEE_MSG parameters
-@@ -116,7 +175,6 @@ int optee_to_msg_param(struct optee_msg_param *msg_params, size_t num_params,
- {
- 	int rc;
- 	size_t n;
--	phys_addr_t pa;
+ 	optee->invoke_fn = invoke_fn;
++	optee->sec_caps = sec_caps;
  
- 	for (n = 0; n < num_params; n++) {
- 		const struct tee_param *p = params + n;
-@@ -139,22 +197,12 @@ int optee_to_msg_param(struct optee_msg_param *msg_params, size_t num_params,
- 		case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT:
- 		case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_OUTPUT:
- 		case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INOUT:
--			mp->attr = OPTEE_MSG_ATTR_TYPE_TMEM_INPUT +
--				   p->attr -
--				   TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT;
--			mp->u.tmem.shm_ref = (unsigned long)p->u.memref.shm;
--			mp->u.tmem.size = p->u.memref.size;
--			if (!p->u.memref.shm) {
--				mp->u.tmem.buf_ptr = 0;
--				break;
--			}
--			rc = tee_shm_get_pa(p->u.memref.shm,
--					    p->u.memref.shm_offs, &pa);
-+			if (tee_shm_is_registered(p->u.memref.shm))
-+				rc = to_msg_param_reg_mem(mp, p);
-+			else
-+				rc = to_msg_param_tmp_mem(mp, p);
- 			if (rc)
- 				return rc;
--			mp->u.tmem.buf_ptr = pa;
--			mp->attr |= OPTEE_MSG_ATTR_CACHE_PREDEFINED <<
--					OPTEE_MSG_ATTR_CACHE_SHIFT;
- 			break;
- 		default:
- 			return -EINVAL;
+ 	teedev = tee_device_alloc(&optee_desc, NULL, pool, optee);
+ 	if (IS_ERR(teedev)) {
+diff --git a/drivers/tee/optee/optee_private.h b/drivers/tee/optee/optee_private.h
+index 61a0052..de7962e 100644
+--- a/drivers/tee/optee/optee_private.h
++++ b/drivers/tee/optee/optee_private.h
+@@ -96,6 +96,8 @@ struct optee_supp {
+  * @supp:		supplicant synchronization struct for RPC to supplicant
+  * @pool:		shared memory pool
+  * @memremaped_shm	virtual address of memory in shared memory pool
++ * @sec_caps:		secure world capabilities defined by
++ *			OPTEE_SMC_SEC_CAP_* in optee_smc.h
+  */
+ struct optee {
+ 	struct tee_device *supp_teedev;
+@@ -106,6 +108,7 @@ struct optee {
+ 	struct optee_supp supp;
+ 	struct tee_shm_pool *pool;
+ 	void *memremaped_shm;
++	u32 sec_caps;
+ };
+ 
+ struct optee_session {
 -- 
 2.7.4
