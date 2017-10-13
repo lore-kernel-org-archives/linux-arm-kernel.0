@@ -1,46 +1,65 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 13 Oct 2017 23:45:04 +0200
-Subject: [PATCH] i2c: pxa: move header file out of deprecated i2c folder
-In-Reply-To: <87d15qlq6z.fsf@belgarion.home>
-References: <20170814164303.2383-1-wsa@the-dreams.de>
- <87d15qlq6z.fsf@belgarion.home>
-Message-ID: <20171013214504.ugu5nquhv7dbg2kr@ninjato>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 13 Oct 2017 16:50:16 -0500
+Subject: [PATCH v5 01/12] mmc: dt-bindings: Add reg/source_cg/latch-ck
+ for Mediatek MMC bindings
+In-Reply-To: <1507689696-25928-2-git-send-email-chaotian.jing@mediatek.com>
+References: <1507689696-25928-1-git-send-email-chaotian.jing@mediatek.com>
+ <1507689696-25928-2-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <20171013215016.bkuwhhhnkvgilump@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
-
-> I'm sorry I completely missed this one.
-
-No worries, that happens.
-
-> Either it's too late and trash this mail, or it's not, and then I'd suggest
-> another approach :
->  - patch 1 : move include/linux/i2c/pxa-i2c.h to include/platform_data/i2c-pxa.h
->    (i2c-pxa.h and not pxa-i2c.h to be consistent)
->  - patch 2 : move this chunk to arch/arm/mach-pxa/devices.h
-> > extern void pxa_set_i2c_info(struct i2c_pxa_platform_data *info);
-> > 
-> > #ifdef CONFIG_PXA27x
-> > extern void pxa27x_set_i2c_power_info(struct i2c_pxa_platform_data *info);
-> > #endif
-> > 
-> > #ifdef CONFIG_PXA3xx
-> > extern void pxa3xx_set_i2c_power_info(struct i2c_pxa_platform_data *info);
-> > #endif
+On Wed, Oct 11, 2017 at 10:41:25AM +0800, Chaotian Jing wrote:
+> Change the comptiable for support of multi-platform
+> Make compatible explicit
+> Add description for reg
+> Add description for source_cg
+> Add description for mediatek,latch-ck
+> Note that source_cg and mediatek,latch-ck are optional for some projects,
+> eg, MT2701 do not have source_cg, and MT2712 do not need
+> mediatek,latch-ck
 > 
-> This is the cleanest approach I could think of.
+> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> ---
+>  Documentation/devicetree/bindings/mmc/mtk-sd.txt | 16 +++++++++++++---
+>  1 file changed, 13 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+> index 4182ea3..2bb585b 100644
+> --- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+> +++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+> @@ -7,10 +7,18 @@ This file documents differences between the core properties in mmc.txt
+>  and the properties used by the msdc driver.
+>  
+>  Required properties:
+> -- compatible: Should be "mediatek,mt8173-mmc","mediatek,mt8135-mmc"
+> +- compatible: value should be either of the following.
+> +	"mediatek,mt8135-mmc": for mmc host ip compatible with mt8135
+> +	"mediatek,mt8173-mmc": for mmc host ip compatible with mt8173
+> +	"mediatek,mt2701-mmc": for mmc host ip compatible with mt2701
+> +	"mediatek,mt2712-mmc": for mmc host ip compatible with mt2712
+> +- reg: physical base address of the controller and length
+>  - interrupts: Should contain MSDC interrupt number
+> -- clocks: MSDC source clock, HCLK
+> -- clock-names: "source", "hclk"
+> +- clocks: Should contain phandle for the clock feeding the MMC controller
+> +- clock-names: Should contain the following:
+> +	"source" - source clock (required)
+> +	"hclk" - HCLK which used for host (required)
+> +	"source_cg" - independent source clock gate (required for MT2712)
+>  - pinctrl-names: should be "default", "state_uhs"
+>  - pinctrl-0: should contain default/high speed pin ctrl
+>  - pinctrl-1: should contain uhs mode pin ctrl
+> @@ -30,6 +38,8 @@ Optional properties:
+>  - mediatek,hs400-cmd-resp-sel-rising:  HS400 command response sample selection
+>  				       If present,HS400 command responses are sampled on rising edges.
+>  				       If not present,HS400 command responses are sampled on falling edges.
+> +- mediatek,latch-ck: Some SoCs do not support enhance_rx, need set correct latch-ck to avoid data crc
+> +		     error caused by stop clock(fifo full)
 
-OK, will resend with your suggestions somewhen soon.
+What values are supported? What's the default if not present.
 
-Thanks,
+Be clear what compatible strings this property applies to or doesn't 
+apply to.
 
-   Wolfram
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171013/86896f5e/attachment.sig>
+Rob
