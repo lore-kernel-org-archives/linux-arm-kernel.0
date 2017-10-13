@@ -1,68 +1,36 @@
 From: phh@phh.me (Pierre-Hugues Husson)
-Date: Sat, 14 Oct 2017 00:53:35 +0200
-Subject: [PATCH 1/3] drm: bridge: synopsys/dw-hdmi: Enable cec clock
+Date: Sat, 14 Oct 2017 00:53:36 +0200
+Subject: [PATCH 2/3] arm64: dts: rockchip: add the cec clk for dw-mipi-hdmi on
+ rk3399
 In-Reply-To: <20171013225337.5196-1-phh@phh.me>
 References: <20171013225337.5196-1-phh@phh.me>
-Message-ID: <20171013225337.5196-2-phh@phh.me>
+Message-ID: <20171013225337.5196-3-phh@phh.me>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The documentation already mentions "cec" optional clock, but
-currently the driver doesn't enable it.
-
 Signed-off-by: Pierre-Hugues Husson <phh@phh.me>
 ---
- drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-index bf14214fa464..5007cdf43131 100644
---- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-+++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-@@ -138,6 +138,7 @@ struct dw_hdmi {
- 	struct device *dev;
- 	struct clk *isfr_clk;
- 	struct clk *iahb_clk;
-+	struct clk *cec_clk;
- 	struct dw_hdmi_i2c *i2c;
- 
- 	struct hdmi_data_info hdmi_data;
-@@ -2382,6 +2383,18 @@ __dw_hdmi_probe(struct platform_device *pdev,
- 		goto err_isfr;
- 	}
- 
-+	hdmi->cec_clk = devm_clk_get(hdmi->dev, "cec");
-+	if (IS_ERR(hdmi->cec_clk)) {
-+		hdmi->cec_clk = NULL;
-+	} else {
-+		ret = clk_prepare_enable(hdmi->cec_clk);
-+		if (ret) {
-+			dev_err(hdmi->dev, "Cannot enable HDMI cec clock: %d\n",
-+					ret);
-+			goto err_res;
-+		}
-+	}
-+
- 	/* Product and revision IDs */
- 	hdmi->version = (hdmi_readb(hdmi, HDMI_DESIGN_ID) << 8)
- 		      | (hdmi_readb(hdmi, HDMI_REVISION_ID) << 0);
-@@ -2518,6 +2531,8 @@ __dw_hdmi_probe(struct platform_device *pdev,
- 		cec_notifier_put(hdmi->cec_notifier);
- 
- 	clk_disable_unprepare(hdmi->iahb_clk);
-+	if (hdmi->cec_clk)
-+		clk_disable_unprepare(hdmi->cec_clk);
- err_isfr:
- 	clk_disable_unprepare(hdmi->isfr_clk);
- err_res:
-@@ -2541,6 +2556,8 @@ static void __dw_hdmi_remove(struct dw_hdmi *hdmi)
- 
- 	clk_disable_unprepare(hdmi->iahb_clk);
- 	clk_disable_unprepare(hdmi->isfr_clk);
-+	if (hdmi->cec_clk)
-+		clk_disable_unprepare(hdmi->cec_clk);
- 
- 	if (hdmi->i2c)
- 		i2c_del_adapter(&hdmi->i2c->adap);
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index ab7629c5b856..a65f7f744a40 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -1601,8 +1601,12 @@
+ 		compatible = "rockchip,rk3399-dw-hdmi";
+ 		reg = <0x0 0xff940000 0x0 0x20000>;
+ 		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH 0>;
+-		clocks = <&cru PCLK_HDMI_CTRL>, <&cru SCLK_HDMI_SFR>, <&cru PLL_VPLL>, <&cru PCLK_VIO_GRF>;
+-		clock-names = "iahb", "isfr", "vpll", "grf";
++		clocks = <&cru PCLK_HDMI_CTRL>,
++			 <&cru SCLK_HDMI_SFR>,
++			 <&cru PLL_VPLL>,
++			 <&cru PCLK_VIO_GRF>,
++			 <&cru SCLK_HDMI_CEC>;
++		clock-names = "iahb", "isfr", "vpll", "grf", "cec";
+ 		power-domains = <&power RK3399_PD_HDCP>;
+ 		reg-io-width = <4>;
+ 		rockchip,grf = <&grf>;
 -- 
 2.14.1
