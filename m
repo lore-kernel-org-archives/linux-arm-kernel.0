@@ -1,63 +1,90 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 13 Oct 2017 16:42:26 +0100
-Subject: [PATCH v3 08/13] arm64: Add vmap_stack header file
-In-Reply-To: <20170922182614.27885-9-james.morse@arm.com>
-References: <20170922182614.27885-1-james.morse@arm.com>
- <20170922182614.27885-9-james.morse@arm.com>
-Message-ID: <20171013154226.xswo4y2viht22wvk@armageddon.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 13 Oct 2017 16:44:26 +0100
+Subject: [PATCH v11 7/9] arm64/kasan: add and use kasan_map_populate()
+In-Reply-To: <CAOAebxv4h+8ej6JA_DZbXaNV5JsAk4MbcCLf1+2RvwKGF2+MxQ@mail.gmail.com>
+References: <20171009221931.1481-1-pasha.tatashin@oracle.com>
+ <20171009221931.1481-8-pasha.tatashin@oracle.com>
+ <20171010155619.GA2517@arm.com>
+ <CAOAebxv21+KtXPAk-xWz=+2fqWQDgp9SAFZz-N=XsuBxev=zcg@mail.gmail.com>
+ <20171010171047.GC2517@arm.com>
+ <CAOAebxtrSthSP4NAa0obBbsCK1KZxO+x0w5xNrpY6m2y9UZFvQ@mail.gmail.com>
+ <CAOAebxu5WL-FQLgfCxNcWy36V6zsTO1v3LLqXv5rM1Pp9R-=YA@mail.gmail.com>
+ <20171013144319.GB4746@arm.com>
+ <CAOAebxv4h+8ej6JA_DZbXaNV5JsAk4MbcCLf1+2RvwKGF2+MxQ@mail.gmail.com>
+Message-ID: <20171013154426.GC4746@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 22, 2017 at 07:26:09PM +0100, James Morse wrote:
-> diff --git a/arch/arm64/include/asm/vmap_stack.h b/arch/arm64/include/asm/vmap_stack.h
-> new file mode 100644
-> index 000000000000..f41d043cac31
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/vmap_stack.h
-> @@ -0,0 +1,41 @@
-> +/*
-> + * Copyright (C) 2017 ARM Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +#ifndef __ASM_VMAP_STACK_H
-> +#define __ASM_VMAP_STACK_H
-> +
-> +#include <linux/vmalloc.h>
-> +#include <asm/memory.h>
-> +#include <asm/pgtable.h>
-> +#include <asm/thread_info.h>
-> +
-> +#ifdef CONFIG_VMAP_STACK
-> +/*
-> + * To ensure that VMAP'd stack overflow detection works correctly, all VMAP'd
-> + * stacks need to have the same alignment.
-> + */
-> +static inline unsigned long *arch_alloc_vmap_stack(size_t stack_size, int node)
-> +{
-> +	return __vmalloc_node_range(stack_size, THREAD_ALIGN,
-> +				    VMALLOC_START, VMALLOC_END,
-> +				    THREADINFO_GFP, PAGE_KERNEL, 0, node,
-> +				    __builtin_return_address(0));
-> +}
-> +
-> +#else
-> +unsigned long *arch_alloc_vmap_stack(size_t stack_size, int node); // link error
+Hi Pavel,
 
-Do you actually need this here? The calling site (at least in this
-patch), is surrounded by CONFIG_VMAP_STACK. Removing the dummy
-declaration should be fine (I haven't read the rest of the patches yet,
-maybe it's needed later; would a BUILD_BUG do?).
+On Fri, Oct 13, 2017 at 11:09:41AM -0400, Pavel Tatashin wrote:
+> > It shouldn't be difficult to use section mappings with my patch, I just
+> > don't really see the need to try to optimise TLB pressure when you're
+> > running with KASAN enabled which already has something like a 3x slowdown
+> > afaik. If it ends up being a big deal, we can always do that later, but
+> > my main aim here is to divorce kasan from vmemmap because they should be
+> > completely unrelated.
+> 
+> Yes, I understand that kasan makes system slow, but my point is why
+> make it even slower? However, I am OK adding your patch to the series,
+> BTW, symmetric changes will be needed for x86 as well sometime later.
+> 
+> >
+> > This certainly doesn't sound right; mapping the shadow with pages shouldn't
+> > lead to problems. I also can't seem to reproduce this myself -- could you
+> > share your full .config and a pointer to the git tree that you're using,
+> > please?
+> 
+> Config is attached. I am using my patch series + your patch + today's
+> clone from https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
 
--- 
-Catalin
+Great, I hit the same problem with your .config. It might actually be
+CONFIG_DEBUG_MEMORY_INIT which does it.
+
+> Also, in a separate e-mail i sent out the qemu arguments.
+> 
+> >
+> >> I feel, this patch requires more work, and I am troubled with using
+> >> base pages instead of large pages.
+> >
+> > I'm happy to try fixing this, because I think splitting up kasan and vmemmap
+> > is the right thing to do here.
+> 
+> Thank you very much.
+
+Thanks for sharing the .config and tree. It looks like the problem is that
+kimg_shadow_start and kimg_shadow_end are not page-aligned. Whilst I fix
+them up in kasan_map_populate, they remain unaligned when passed to
+kasan_populate_zero_shadow, which confuses the loop termination conditions
+in e.g. zero_pte_populate and the shadow isn't configured properly.
+
+Fixup diff below; please merge in with my original patch.
+
+Will
+
+--->8
+
+diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
+index b922826d9908..207b1acb823a 100644
+--- a/arch/arm64/mm/kasan_init.c
++++ b/arch/arm64/mm/kasan_init.c
+@@ -146,7 +146,7 @@ asmlinkage void __init kasan_early_init(void)
+ static void __init kasan_map_populate(unsigned long start, unsigned long end,
+				      int node)
+ {
+-	kasan_pgd_populate(start & PAGE_MASK, PAGE_ALIGN(end), node, false);
++	kasan_pgd_populate(start, end, node, false);
+ }
+ 
+ /*
+@@ -183,8 +183,8 @@ void __init kasan_init(void)
+	struct memblock_region *reg;
+	int i;
+ 
+-	kimg_shadow_start = (u64)kasan_mem_to_shadow(_text);
+-	kimg_shadow_end = (u64)kasan_mem_to_shadow(_end);
++	kimg_shadow_start = (u64)kasan_mem_to_shadow(_text) & PAGE_MASK;
++	kimg_shadow_end = PAGE_ALIGN((u64)kasan_mem_to_shadow(_end));
+ 
+	mod_shadow_start = (u64)kasan_mem_to_shadow((void *)MODULES_VADDR);
+	mod_shadow_end = (u64)kasan_mem_to_shadow((void *)MODULES_END);
