@@ -1,235 +1,47 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Fri, 13 Oct 2017 17:10:40 +0800
-Subject: [PATCH v2 04/13] usb: mtu3: add optional mcu and dma bus clocks
+Date: Fri, 13 Oct 2017 17:10:44 +0800
+Subject: [PATCH v2 08/13] usb: mtu3: get optional vbus for host only mode
 In-Reply-To: <6dc39e99240f25c83f8c36d23361ec89dcfb33ce.1507885126.git.chunfeng.yun@mediatek.com>
 References: <6dc39e99240f25c83f8c36d23361ec89dcfb33ce.1507885126.git.chunfeng.yun@mediatek.com>
-Message-ID: <1ba6c8b1984cdc7765d55fa6740ff2ce9371f715.1507885126.git.chunfeng.yun@mediatek.com>
+Message-ID: <a0927da253e9994e9854d7bd3f486548f96a18f2.1507885127.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are mcu_bus and dma_bus clocks needed to be turned on/off by
-driver on some SoCs, so add them as optional ones
+When dr_mode is set as USB_DR_MODE_HOST, it's better to try to
+get optional vbus, this can increase flexibility, although we
+can set vbus as always on for regulator or put it in host driver
+to turn it on.
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- drivers/usb/mtu3/mtu3.h      |    5 ++
- drivers/usb/mtu3/mtu3_plat.c |  121 ++++++++++++++++++++++++++++--------------
- 2 files changed, 86 insertions(+), 40 deletions(-)
+ drivers/usb/mtu3/mtu3_plat.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/usb/mtu3/mtu3.h b/drivers/usb/mtu3/mtu3.h
-index 6d3278e..2795294 100644
---- a/drivers/usb/mtu3/mtu3.h
-+++ b/drivers/usb/mtu3/mtu3.h
-@@ -206,6 +206,9 @@ struct otg_switch_mtk {
-  * @ippc_base: register base address of IP Power and Clock interface (IPPC)
-  * @vusb33: usb3.3V shared by device/host IP
-  * @sys_clk: system clock of mtu3, shared by device/host IP
-+ * @ref_clk: reference clock
-+ * @mcu_clk: mcu_bus_ck clock for AHB bus etc
-+ * @dma_clk: dma_bus_ck clock for AXI bus etc
-  * @dr_mode: works in which mode:
-  *		host only, device only or dual-role mode
-  * @u2_ports: number of usb2.0 host ports
-@@ -226,6 +229,8 @@ struct ssusb_mtk {
- 	struct regulator *vusb33;
- 	struct clk *sys_clk;
- 	struct clk *ref_clk;
-+	struct clk *mcu_clk;
-+	struct clk *dma_clk;
- 	/* otg */
- 	struct otg_switch_mtk otg_switch;
- 	enum usb_dr_mode dr_mode;
 diff --git a/drivers/usb/mtu3/mtu3_plat.c b/drivers/usb/mtu3/mtu3_plat.c
-index 9edad30..fb89920 100644
+index 1e473b0..7ca81f4e 100644
 --- a/drivers/usb/mtu3/mtu3_plat.c
 +++ b/drivers/usb/mtu3/mtu3_plat.c
-@@ -110,15 +110,9 @@ static void ssusb_phy_power_off(struct ssusb_mtk *ssusb)
- 		phy_power_off(ssusb->phys[i]);
- }
+@@ -300,10 +300,6 @@ static int get_ssusb_rscs(struct platform_device *pdev, struct ssusb_mtk *ssusb)
+ 	of_property_read_u32(node, "mediatek,u3p-dis-msk",
+ 			     &ssusb->u3p_dis_msk);
  
--static int ssusb_rscs_init(struct ssusb_mtk *ssusb)
-+static int ssusb_clks_enable(struct ssusb_mtk *ssusb)
- {
--	int ret = 0;
+-	if (ssusb->dr_mode != USB_DR_MODE_OTG)
+-		return 0;
 -
--	ret = regulator_enable(ssusb->vusb33);
--	if (ret) {
--		dev_err(ssusb->dev, "failed to enable vusb33\n");
--		goto vusb33_err;
--	}
-+	int ret;
- 
- 	ret = clk_prepare_enable(ssusb->sys_clk);
- 	if (ret) {
-@@ -132,6 +126,52 @@ static int ssusb_rscs_init(struct ssusb_mtk *ssusb)
- 		goto ref_clk_err;
+-	/* if dual-role mode is supported */
+ 	vbus = devm_regulator_get(&pdev->dev, "vbus");
+ 	if (IS_ERR(vbus)) {
+ 		dev_err(dev, "failed to get vbus\n");
+@@ -311,6 +307,10 @@ static int get_ssusb_rscs(struct platform_device *pdev, struct ssusb_mtk *ssusb)
  	}
+ 	otg_sx->vbus = vbus;
  
-+	ret = clk_prepare_enable(ssusb->mcu_clk);
-+	if (ret) {
-+		dev_err(ssusb->dev, "failed to enable mcu_clk\n");
-+		goto mcu_clk_err;
-+	}
++	if (ssusb->dr_mode == USB_DR_MODE_HOST)
++		return 0;
 +
-+	ret = clk_prepare_enable(ssusb->dma_clk);
-+	if (ret) {
-+		dev_err(ssusb->dev, "failed to enable dma_clk\n");
-+		goto dma_clk_err;
-+	}
-+
-+	return 0;
-+
-+dma_clk_err:
-+	clk_disable_unprepare(ssusb->mcu_clk);
-+mcu_clk_err:
-+	clk_disable_unprepare(ssusb->ref_clk);
-+ref_clk_err:
-+	clk_disable_unprepare(ssusb->sys_clk);
-+sys_clk_err:
-+	return ret;
-+}
-+
-+static void ssusb_clks_disable(struct ssusb_mtk *ssusb)
-+{
-+	clk_disable_unprepare(ssusb->dma_clk);
-+	clk_disable_unprepare(ssusb->mcu_clk);
-+	clk_disable_unprepare(ssusb->ref_clk);
-+	clk_disable_unprepare(ssusb->sys_clk);
-+}
-+
-+static int ssusb_rscs_init(struct ssusb_mtk *ssusb)
-+{
-+	int ret = 0;
-+
-+	ret = regulator_enable(ssusb->vusb33);
-+	if (ret) {
-+		dev_err(ssusb->dev, "failed to enable vusb33\n");
-+		goto vusb33_err;
-+	}
-+
-+	ret = ssusb_clks_enable(ssusb);
-+	if (ret)
-+		goto clks_err;
-+
- 	ret = ssusb_phy_init(ssusb);
- 	if (ret) {
- 		dev_err(ssusb->dev, "failed to init phy\n");
-@@ -149,20 +189,16 @@ static int ssusb_rscs_init(struct ssusb_mtk *ssusb)
- phy_err:
- 	ssusb_phy_exit(ssusb);
- phy_init_err:
--	clk_disable_unprepare(ssusb->ref_clk);
--ref_clk_err:
--	clk_disable_unprepare(ssusb->sys_clk);
--sys_clk_err:
-+	ssusb_clks_disable(ssusb);
-+clks_err:
- 	regulator_disable(ssusb->vusb33);
- vusb33_err:
--
- 	return ret;
- }
- 
- static void ssusb_rscs_exit(struct ssusb_mtk *ssusb)
- {
--	clk_disable_unprepare(ssusb->sys_clk);
--	clk_disable_unprepare(ssusb->ref_clk);
-+	ssusb_clks_disable(ssusb);
- 	regulator_disable(ssusb->vusb33);
- 	ssusb_phy_power_off(ssusb);
- 	ssusb_phy_exit(ssusb);
-@@ -203,6 +239,19 @@ static int get_iddig_pinctrl(struct ssusb_mtk *ssusb)
- 	return 0;
- }
- 
-+/* ignore the error if the clock does not exist */
-+static struct clk *get_optional_clk(struct device *dev, const char *id)
-+{
-+	struct clk *opt_clk;
-+
-+	opt_clk = devm_clk_get(dev, id);
-+	/* ignore error number except EPROBE_DEFER */
-+	if (IS_ERR(opt_clk) && (PTR_ERR(opt_clk) != -EPROBE_DEFER))
-+		opt_clk = NULL;
-+
-+	return opt_clk;
-+}
-+
- static int get_ssusb_rscs(struct platform_device *pdev, struct ssusb_mtk *ssusb)
- {
- 	struct device_node *node = pdev->dev.of_node;
-@@ -225,18 +274,17 @@ static int get_ssusb_rscs(struct platform_device *pdev, struct ssusb_mtk *ssusb)
- 		return PTR_ERR(ssusb->sys_clk);
- 	}
- 
--	/*
--	 * reference clock is usually a "fixed-clock", make it optional
--	 * for backward compatibility and ignore the error if it does
--	 * not exist.
--	 */
--	ssusb->ref_clk = devm_clk_get(dev, "ref_ck");
--	if (IS_ERR(ssusb->ref_clk)) {
--		if (PTR_ERR(ssusb->ref_clk) == -EPROBE_DEFER)
--			return -EPROBE_DEFER;
-+	ssusb->ref_clk = get_optional_clk(dev, "ref_ck");
-+	if (IS_ERR(ssusb->ref_clk))
-+		return PTR_ERR(ssusb->ref_clk);
- 
--		ssusb->ref_clk = NULL;
--	}
-+	ssusb->mcu_clk = get_optional_clk(dev, "mcu_ck");
-+	if (IS_ERR(ssusb->mcu_clk))
-+		return PTR_ERR(ssusb->mcu_clk);
-+
-+	ssusb->dma_clk = get_optional_clk(dev, "dma_ck");
-+	if (IS_ERR(ssusb->dma_clk))
-+		return PTR_ERR(ssusb->dma_clk);
- 
- 	ssusb->num_phys = of_count_phandle_with_args(node,
- 			"phys", "#phy-cells");
-@@ -451,8 +499,7 @@ static int __maybe_unused mtu3_suspend(struct device *dev)
- 
- 	ssusb_host_disable(ssusb, true);
- 	ssusb_phy_power_off(ssusb);
--	clk_disable_unprepare(ssusb->sys_clk);
--	clk_disable_unprepare(ssusb->ref_clk);
-+	ssusb_clks_disable(ssusb);
- 	ssusb_wakeup_enable(ssusb);
- 
- 	return 0;
-@@ -470,27 +517,21 @@ static int __maybe_unused mtu3_resume(struct device *dev)
- 		return 0;
- 
- 	ssusb_wakeup_disable(ssusb);
--	ret = clk_prepare_enable(ssusb->sys_clk);
--	if (ret)
--		goto err_sys_clk;
--
--	ret = clk_prepare_enable(ssusb->ref_clk);
-+	ret = ssusb_clks_enable(ssusb);
- 	if (ret)
--		goto err_ref_clk;
-+		goto clks_err;
- 
- 	ret = ssusb_phy_power_on(ssusb);
- 	if (ret)
--		goto err_power_on;
-+		goto phy_err;
- 
- 	ssusb_host_enable(ssusb);
- 
- 	return 0;
- 
--err_power_on:
--	clk_disable_unprepare(ssusb->ref_clk);
--err_ref_clk:
--	clk_disable_unprepare(ssusb->sys_clk);
--err_sys_clk:
-+phy_err:
-+	ssusb_clks_disable(ssusb);
-+clks_err:
- 	return ret;
- }
- 
++	/* if dual-role mode is supported */
+ 	otg_sx->is_u3_drd = of_property_read_bool(node, "mediatek,usb3-drd");
+ 	otg_sx->manual_drd_enabled =
+ 		of_property_read_bool(node, "enable-manual-drd");
 -- 
 1.7.9.5
