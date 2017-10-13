@@ -1,43 +1,39 @@
 From: xuwei5@hisilicon.com (Wei Xu)
-Date: Fri, 13 Oct 2017 09:57:02 +0100
-Subject: [PATCH 0/2] Add support for Hi6220 coresight
-In-Reply-To: <20171007121802.GC23080@leoy-linaro>
-References: <1504226835-2115-1-git-send-email-leo.yan@linaro.org>
- <20170901013301.GN21656@codeaurora.org> <20171007121802.GC23080@leoy-linaro>
-Message-ID: <59E07FDE.40307@hisilicon.com>
+Date: Fri, 13 Oct 2017 09:58:23 +0100
+Subject: [PATCH] arm64: defconfig: Enable hisilicon hibmc drm driver
+In-Reply-To: <1503408056-177861-1-git-send-email-wangkefeng.wang@huawei.com>
+References: <1503408056-177861-1-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <59E0802F.3070904@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leo,
+Hi Kefeng,
 
-On 2017/10/7 13:18, Leo Yan wrote:
-> Hi Stephen, Wei,
+On 2017/8/22 14:20, Kefeng Wang wrote:
+> Enable DRM_HISI_HIBMC as module for Hisilicon D03/D05 board.
 > 
-> On Thu, Aug 31, 2017 at 06:33:01PM -0700, Stephen Boyd wrote:
->> On 09/01, Leo Yan wrote:
->>> This patch series adds support for coresight on Hi6220; the first patch
->>> is to fix coresight PLL so can avoid system hang after we enable
->>> coresight, the second patch is to add DT binding according to coresight
->>> topology.
->>>
->>> The patch has been tested on Hikey; By using OpenCSD snapshot mode, it
->>> can successfully decode ETF and ETB trace data.
->>>
->>
->> I can take the first one and second one goes through arm-soc?
-> 
-> Could you pick these two patches for Hi6220 coresight enabling for
-> this merge window? Or need me resend these two patches?
+> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> ---
 
-Applied patch 2 into hisilicon dt tree with slight fix.
+Applied into hisilicon defconfig tree.
 Thanks!
 
 BR,
 Wei
 
+>  arch/arm64/configs/defconfig | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> Thanks,
-> Leo Yan
-> 
-> .
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index b4ca115..f4d2a8e 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -365,6 +365,7 @@ CONFIG_DRM_TEGRA=m
+>  CONFIG_DRM_PANEL_SIMPLE=m
+>  CONFIG_DRM_I2C_ADV7511=m
+>  CONFIG_DRM_VC4=m
+> +CONFIG_DRM_HISI_HIBMC=m
+>  CONFIG_DRM_HISI_KIRIN=m
+>  CONFIG_DRM_MESON=m
+>  CONFIG_FB=y
 > 
