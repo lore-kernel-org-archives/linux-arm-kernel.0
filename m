@@ -1,101 +1,112 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 13 Oct 2017 13:05:55 +0200
-Subject: [PATCH v2 05/10] ARM: dts: r8a7791: Use R-Car GPIO Gen2 fallback
- compat string
-In-Reply-To: <20171013110600.6858-1-horms+renesas@verge.net.au>
-References: <20171013110600.6858-1-horms+renesas@verge.net.au>
-Message-ID: <20171013110600.6858-6-horms+renesas@verge.net.au>
+From: john.garry@huawei.com (John Garry)
+Date: Fri, 13 Oct 2017 12:08:01 +0100
+Subject: [PATCH v3 0/7] Support PPTT for ARM64
+In-Reply-To: <20171012194856.13844-1-jeremy.linton@arm.com>
+References: <20171012194856.13844-1-jeremy.linton@arm.com>
+Message-ID: <f3fab8a0-48e1-57c2-fdc0-be1faccfff2b@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use newly added R-Car GPIO Gen2 fallback compat string
-in place of now deprecated non-generation specific
-R-Car GPIO fallback compat string in the DT of the r8a7791 SoC.
+On 12/10/2017 20:48, Jeremy Linton wrote:
+> ACPI 6.2 adds the Processor Properties Topology Table (PPTT), which is
+> used to describe the processor and cache topology. Ideally it is
+> used to extend/override information provided by the hardware, but
+> right now ARM64 is entirely dependent on firmware provided tables.
+>
+> This patch parses the table for the cache topology and CPU topology.
+> For the latter we also add an additional topology_cod_id() macro,
+> and a package_id for arm64. Initially the physical id will match
+> the cluster id, but we update users of the cluster to utilize
+> the new macro. When we enable ACPI/PPTT for arm64 we map the socket
+> to the physical id as the remainder of the kernel expects.
+>
 
-This should have no run-time effect as the driver matches against
-the per-SoC compat string before considering the fallback compat string.
+Hi Jeremy,
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/boot/dts/r8a7791.dtsi | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+Can you put this series on a public branch for convenience of review and 
+test?
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 97bed8253bc3..3c7b919efa48 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -124,7 +124,7 @@
- 	};
- 
- 	gpio0: gpio at e6050000 {
--		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
-+		compatible = "renesas,gpio-r8a7791", "renesas,rcar-gen2-gpio";
- 		reg = <0 0xe6050000 0 0x50>;
- 		interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
- 		#gpio-cells = <2>;
-@@ -138,7 +138,7 @@
- 	};
- 
- 	gpio1: gpio at e6051000 {
--		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
-+		compatible = "renesas,gpio-r8a7791", "renesas,rcar-gen2-gpio";
- 		reg = <0 0xe6051000 0 0x50>;
- 		interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
- 		#gpio-cells = <2>;
-@@ -152,7 +152,7 @@
- 	};
- 
- 	gpio2: gpio at e6052000 {
--		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
-+		compatible = "renesas,gpio-r8a7791", "renesas,rcar-gen2-gpio";
- 		reg = <0 0xe6052000 0 0x50>;
- 		interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
- 		#gpio-cells = <2>;
-@@ -166,7 +166,7 @@
- 	};
- 
- 	gpio3: gpio at e6053000 {
--		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
-+		compatible = "renesas,gpio-r8a7791", "renesas,rcar-gen2-gpio";
- 		reg = <0 0xe6053000 0 0x50>;
- 		interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
- 		#gpio-cells = <2>;
-@@ -180,7 +180,7 @@
- 	};
- 
- 	gpio4: gpio at e6054000 {
--		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
-+		compatible = "renesas,gpio-r8a7791", "renesas,rcar-gen2-gpio";
- 		reg = <0 0xe6054000 0 0x50>;
- 		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
- 		#gpio-cells = <2>;
-@@ -194,7 +194,7 @@
- 	};
- 
- 	gpio5: gpio at e6055000 {
--		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
-+		compatible = "renesas,gpio-r8a7791", "renesas,rcar-gen2-gpio";
- 		reg = <0 0xe6055000 0 0x50>;
- 		interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
- 		#gpio-cells = <2>;
-@@ -208,7 +208,7 @@
- 	};
- 
- 	gpio6: gpio at e6055400 {
--		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
-+		compatible = "renesas,gpio-r8a7791", "renesas,rcar-gen2-gpio";
- 		reg = <0 0xe6055400 0 0x50>;
- 		interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
- 		#gpio-cells = <2>;
-@@ -222,7 +222,7 @@
- 	};
- 
- 	gpio7: gpio at e6055800 {
--		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
-+		compatible = "renesas,gpio-r8a7791", "renesas,rcar-gen2-gpio";
- 		reg = <0 0xe6055800 0 0x50>;
- 		interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
- 		#gpio-cells = <2>;
--- 
-2.11.0
+Also, what is your idea for supporting Type 2 ID structure?
+
+Cheers,
+John
+
+> For example on juno:
+> [root at mammon-juno-rh topology]# lstopo-no-graphics
+>   Package L#0
+>     L2 L#0 (1024KB)
+>       L1d L#0 (32KB) + L1i L#0 (32KB) + Core L#0 + PU L#0 (P#0)
+>       L1d L#1 (32KB) + L1i L#1 (32KB) + Core L#1 + PU L#1 (P#1)
+>       L1d L#2 (32KB) + L1i L#2 (32KB) + Core L#2 + PU L#2 (P#2)
+>       L1d L#3 (32KB) + L1i L#3 (32KB) + Core L#3 + PU L#3 (P#3)
+>     L2 L#1 (2048KB)
+>       L1d L#4 (32KB) + L1i L#4 (48KB) + Core L#4 + PU L#4 (P#4)
+>       L1d L#5 (32KB) + L1i L#5 (48KB) + Core L#5 + PU L#5 (P#5)
+>   HostBridge L#0
+>     PCIBridge
+>       PCIBridge
+>         PCIBridge
+>           PCI 1095:3132
+>             Block(Disk) L#0 "sda"
+>         PCIBridge
+>           PCI 1002:68f9
+>             GPU L#1 "renderD128"
+>             GPU L#2 "card0"
+>             GPU L#3 "controlD64"
+>         PCIBridge
+>           PCI 11ab:4380
+>             Net L#4 "enp8s0"
+>
+> v2->v3:
+>
+> Remove valid bit check on leaf nodes. Now simply being a leaf node
+>   is sufficient to verify the processor id against the ACPI
+>   processor ids (gotten from MADT).
+>
+> Use the acpi processor for the "level 0" Id. This makes the /sys
+>   visible core/thread ids more human readable if the firmware uses
+>   small consecutive values for processor ids.
+>
+> Added PPTT to the list of injectable ACPI tables.
+>
+> Fix bug which kept the code from using the processor node as intended
+>   in v2, caused by misuse of git rebase/fixup.
+>
+> v1->v2:
+>
+> The parser keys off the acpi_pptt_processor node to determine
+>   unique cache's rather than the acpi_pptt_cache referenced by the
+>   processor node. This allows PPTT tables which "share" cache nodes
+>   across cpu nodes despite not being a shared cache.
+>
+> Normalize the socket, cluster and thread mapping so that they match
+>   linux's traditional mapping for the physical id, and thread id.
+>   Adding explicit scheduler knowledge of clusters (rather than just
+>   their cache sharing attributes) is a subject for a future patch.
+>
+> Jeremy Linton (7):
+>   ACPI/PPTT: Add Processor Properties Topology Table parsing
+>   ACPI: Enable PPTT support on ARM64
+>   drivers: base: cacheinfo: arm64: Add support for ACPI based firmware
+>     tables
+>   Topology: Add cluster on die macros and arm64 decoding
+>   arm64: Fixup users of topology_physical_package_id
+>   arm64: topology: Enable ACPI/PPTT based CPU topology.
+>   ACPI: Add PPTT to injectable table list
+>
+>  arch/arm64/Kconfig                |   1 +
+>  arch/arm64/include/asm/topology.h |   4 +-
+>  arch/arm64/kernel/cacheinfo.c     |  23 +-
+>  arch/arm64/kernel/topology.c      |  62 ++++-
+>  drivers/acpi/Makefile             |   1 +
+>  drivers/acpi/arm64/Kconfig        |   3 +
+>  drivers/acpi/pptt.c               | 486 ++++++++++++++++++++++++++++++++++++++
+>  drivers/acpi/tables.c             |   3 +-
+>  drivers/base/cacheinfo.c          |  17 +-
+>  drivers/cpufreq/arm_big_little.c  |   2 +-
+>  drivers/firmware/psci_checker.c   |   2 +-
+>  include/linux/cacheinfo.h         |  11 +-
+>  include/linux/topology.h          |   4 +
+>  13 files changed, 599 insertions(+), 20 deletions(-)
+>  create mode 100644 drivers/acpi/pptt.c
+>
