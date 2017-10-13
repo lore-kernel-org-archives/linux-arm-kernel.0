@@ -1,152 +1,70 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 13 Oct 2017 15:55:27 +0200
-Subject: [PATCH v2 6/9] usb: xhci-mtk: add optional mcu and dma bus clocks
-In-Reply-To: <3f81e076f513ef7d3e3e20ba2f752ed5bd48c9a2.1507882470.git.chunfeng.yun@mediatek.com>
+Date: Fri, 13 Oct 2017 15:56:12 +0200
+Subject: [PATCH v2 9/9] dt-bindings: usb: mtk-xhci: remove dummy clocks
+ and add optional ones
+In-Reply-To: <6a5d01f35d7df6a49d0442c8326c3daa9bcda9d3.1507882470.git.chunfeng.yun@mediatek.com>
 References: <994382d16d6bdc0f3d7c11b22f1710252e056e34.1507882470.git.chunfeng.yun@mediatek.com>
- <3f81e076f513ef7d3e3e20ba2f752ed5bd48c9a2.1507882470.git.chunfeng.yun@mediatek.com>
-Message-ID: <7a64bd4c-9bf3-4807-fa75-fb5d73e8507c@gmail.com>
+ <6a5d01f35d7df6a49d0442c8326c3daa9bcda9d3.1507882470.git.chunfeng.yun@mediatek.com>
+Message-ID: <7378e644-a44d-d83f-44a4-64b0e7c00e2e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
 On 10/13/2017 10:26 AM, Chunfeng Yun wrote:
-> There are mcu_bus and dma_bus clocks needed to be controlled by
-> driver on some SoCs, so add them as optional ones
+> Remove dummy clocks for usb wakeup and add optional ones for
+> MCU_BUS_CK and DMA_BUS_CK.
 > 
 > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> Acked-by: Rob Herring <robh@kernel.org>
 > ---
 
-Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+Reviewed-by: <matthias.bgg@gmail.com>
 
->   drivers/usb/host/xhci-mtk.c |   79 ++++++++++++++++++++++++++++++++-----------
->   drivers/usb/host/xhci-mtk.h |    2 ++
->   2 files changed, 62 insertions(+), 19 deletions(-)
+>   .../devicetree/bindings/usb/mediatek,mtk-xhci.txt  |   18 ++++++++----------
+>   1 file changed, 8 insertions(+), 10 deletions(-)
 > 
-> diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
-> index d60463c..e5caabe 100644
-> --- a/drivers/usb/host/xhci-mtk.c
-> +++ b/drivers/usb/host/xhci-mtk.c
-> @@ -221,6 +221,44 @@ static int xhci_mtk_ssusb_config(struct xhci_hcd_mtk *mtk)
->   	return xhci_mtk_host_enable(mtk);
->   }
+> diff --git a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
+> index 2d9b459..3059596 100644
+> --- a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
+> +++ b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
+> @@ -26,10 +26,11 @@ Required properties:
+>    - clocks : a list of phandle + clock-specifier pairs, one for each
+>   	entry in clock-names
+>    - clock-names : must contain
+> -	"sys_ck": for clock of xHCI MAC
+> -	"ref_ck": for reference clock of xHCI MAC
+> -	"wakeup_deb_p0": for USB wakeup debounce clock of port0
+> -	"wakeup_deb_p1": for USB wakeup debounce clock of port1
+> +	"sys_ck": controller clock used by normal mode,
+> +	the following ones are optional:
+> +	"ref_ck": reference clock used by low power mode etc,
+> +	"mcu_ck": mcu_bus clock for register access,
+> +	"dma_ck": dma_bus clock for data transfer by DMA
 >   
-> +/* ignore the error if the clock does not exist */
-> +static struct clk *optional_clk_get(struct device *dev, const char *id)
-> +{
-> +	struct clk *opt_clk;
-> +
-> +	opt_clk = devm_clk_get(dev, id);
-> +	/* ignore error number except EPROBE_DEFER */
-> +	if (IS_ERR(opt_clk) && (PTR_ERR(opt_clk) != -EPROBE_DEFER))
-> +		opt_clk = NULL;
-> +
-> +	return opt_clk;
-> +}
-> +
-> +static int xhci_mtk_clks_get(struct xhci_hcd_mtk *mtk)
-> +{
-> +	struct device *dev = mtk->dev;
-> +
-> +	mtk->sys_clk = devm_clk_get(dev, "sys_ck");
-> +	if (IS_ERR(mtk->sys_clk)) {
-> +		dev_err(dev, "fail to get sys_ck\n");
-> +		return PTR_ERR(mtk->sys_clk);
-> +	}
-> +
-> +	mtk->ref_clk = optional_clk_get(dev, "ref_ck");
-> +	if (IS_ERR(mtk->ref_clk))
-> +		return PTR_ERR(mtk->ref_clk);
-> +
-> +	mtk->mcu_clk = optional_clk_get(dev, "mcu_ck");
-> +	if (IS_ERR(mtk->mcu_clk))
-> +		return PTR_ERR(mtk->mcu_clk);
-> +
-> +	mtk->dma_clk = optional_clk_get(dev, "dma_ck");
-> +	if (IS_ERR(mtk->dma_clk))
-> +		return PTR_ERR(mtk->dma_clk);
-> +
-> +	return 0;
-> +}
-> +
->   static int xhci_mtk_clks_enable(struct xhci_hcd_mtk *mtk)
->   {
->   	int ret;
-> @@ -237,16 +275,34 @@ static int xhci_mtk_clks_enable(struct xhci_hcd_mtk *mtk)
->   		goto sys_clk_err;
->   	}
+>    - phys : a list of phandle + phy specifier pairs
 >   
-> +	ret = clk_prepare_enable(mtk->mcu_clk);
-> +	if (ret) {
-> +		dev_err(mtk->dev, "failed to enable mcu_clk\n");
-> +		goto mcu_clk_err;
-> +	}
-> +
-> +	ret = clk_prepare_enable(mtk->dma_clk);
-> +	if (ret) {
-> +		dev_err(mtk->dev, "failed to enable dma_clk\n");
-> +		goto dma_clk_err;
-> +	}
-> +
->   	return 0;
+> @@ -57,9 +58,7 @@ usb30: usb at 11270000 {
+>   	clocks = <&topckgen CLK_TOP_USB30_SEL>, <&clk26m>,
+>   		 <&pericfg CLK_PERI_USB0>,
+>   		 <&pericfg CLK_PERI_USB1>;
+> -	clock-names = "sys_ck", "ref_ck",
+> -		      "wakeup_deb_p0",
+> -		      "wakeup_deb_p1";
+> +	clock-names = "sys_ck", "ref_ck";
+>   	phys = <&phy_port0 PHY_TYPE_USB3>,
+>   	       <&phy_port1 PHY_TYPE_USB2>;
+>   	vusb33-supply = <&mt6397_vusb_reg>;
+> @@ -91,9 +90,8 @@ Required properties:
 >   
-> +dma_clk_err:
-> +	clk_disable_unprepare(mtk->mcu_clk);
-> +mcu_clk_err:
-> +	clk_disable_unprepare(mtk->sys_clk);
->   sys_clk_err:
->   	clk_disable_unprepare(mtk->ref_clk);
->   ref_clk_err:
-> -	return -EINVAL;
-> +	return ret;
->   }
+>    - clocks : a list of phandle + clock-specifier pairs, one for each
+>   	entry in clock-names
+> - - clock-names : must be
+> -	"sys_ck": for clock of xHCI MAC
+> -	"ref_ck": for reference clock of xHCI MAC
+> + - clock-names : must contain "sys_ck", and the following ones are optional:
+> +	"ref_ck", "mcu_ck" and "dma_ck"
 >   
->   static void xhci_mtk_clks_disable(struct xhci_hcd_mtk *mtk)
->   {
-> +	clk_disable_unprepare(mtk->dma_clk);
-> +	clk_disable_unprepare(mtk->mcu_clk);
->   	clk_disable_unprepare(mtk->sys_clk);
->   	clk_disable_unprepare(mtk->ref_clk);
->   }
-> @@ -529,24 +585,9 @@ static int xhci_mtk_probe(struct platform_device *pdev)
->   		return PTR_ERR(mtk->vusb33);
->   	}
->   
-> -	mtk->sys_clk = devm_clk_get(dev, "sys_ck");
-> -	if (IS_ERR(mtk->sys_clk)) {
-> -		dev_err(dev, "fail to get sys_ck\n");
-> -		return PTR_ERR(mtk->sys_clk);
-> -	}
-> -
-> -	/*
-> -	 * reference clock is usually a "fixed-clock", make it optional
-> -	 * for backward compatibility and ignore the error if it does
-> -	 * not exist.
-> -	 */
-> -	mtk->ref_clk = devm_clk_get(dev, "ref_ck");
-> -	if (IS_ERR(mtk->ref_clk)) {
-> -		if (PTR_ERR(mtk->ref_clk) == -EPROBE_DEFER)
-> -			return -EPROBE_DEFER;
-> -
-> -		mtk->ref_clk = NULL;
-> -	}
-> +	ret = xhci_mtk_clks_get(mtk);
-> +	if (ret)
-> +		return ret;
->   
->   	mtk->lpm_support = of_property_read_bool(node, "usb3-lpm-capable");
->   	/* optional property, ignore the error if it does not exist */
-> diff --git a/drivers/usb/host/xhci-mtk.h b/drivers/usb/host/xhci-mtk.h
-> index 67783a7..45ff5c6 100644
-> --- a/drivers/usb/host/xhci-mtk.h
-> +++ b/drivers/usb/host/xhci-mtk.h
-> @@ -126,6 +126,8 @@ struct xhci_hcd_mtk {
->   	struct regulator *vbus;
->   	struct clk *sys_clk;	/* sys and mac clock */
->   	struct clk *ref_clk;
-> +	struct clk *mcu_clk;
-> +	struct clk *dma_clk;
->   	struct regmap *pericfg;
->   	struct phy **phys;
->   	int num_phys;
+>   Optional properties:
+>    - vbus-supply : reference to the VBUS regulator;
 > 
