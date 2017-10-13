@@ -1,38 +1,64 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Fri, 13 Oct 2017 11:03:33 +0200
-Subject: Dramatic lockdep slowdown in 4.14
-Message-ID: <20171013090333.GA17356@localhost>
+From: miquel.raynal@free-electrons.com (Miquel Raynal)
+Date: Fri, 13 Oct 2017 11:01:58 +0200
+Subject: [PATCH v2 14/16] arm64: dts: marvell: armada-37xx: add second UART
+ port
+In-Reply-To: <20171013090200.31034-1-miquel.raynal@free-electrons.com>
+References: <20171013090200.31034-1-miquel.raynal@free-electrons.com>
+Message-ID: <20171013090200.31034-15-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add a node in Armada 37xx DTSI file for the second UART, with a
+different compatible due to its extended IP which has some
+differences with the first UART already in place.
 
-I had noticed that the BeagleBone Black boot time appeared to have
-increased significantly with 4.14 and yesterday I finally had time to
-investigate it.
+Make use of this commit to also fully describe the first port and
+use the same clear and named interrupt bindings for both ports.
 
-Boot time (from "Linux version" to login prompt) had in fact doubled
-since 4.13 where it took 17 seconds (with my current config) compared to
-the 35 seconds I now see with 4.14-rc4.
+The standard UART (UART0) uses level-interrupts while the extended
+UART (UART1) uses edge-triggered interrupts.
 
-I quick bisect pointed to lockdep and specifically the following commit:
+Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
 
-	28a903f63ec0 ("locking/lockdep: Handle non(or multi)-acquisition
-	               of a crosslock")
-
-which I've verified is the commit which doubled the boot time (compared
-to 28a903f63ec0^) (added by lockdep crossrelease series [1]).
-
-I also verified that simply disabling CONFIG_PROVE_LOCKING on 4.14-rc4
-brought boot time down to about 14 seconds.
-
-Now since it's lockdep I guess this can't really be considered a
-regression if these changes did improve lockdep correctness, but still,
-this dramatic slow down essentially forces me to disable PROVE_LOCKING
-by default on this system.
-
-Is this lockdep slowdown expected and desirable?
-
-Johan
-
-[1] https://lkml.kernel.org/r/1502089981-21272-1-git-send-email-byungchul.park at lge.com
+diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+index a36d667f770e..72b68f23c001 100644
+--- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+@@ -55,6 +55,7 @@
+ 
+ 	aliases {
+ 		serial0 = &uart0;
++		serial1 = &uart1;
+ 	};
+ 
+ 	cpus {
+@@ -136,7 +137,22 @@
+ 				compatible = "marvell,armada-3700-uart";
+ 				reg = <0x12000 0x200>;
+ 				clocks = <&xtalclk>;
+-				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
++				interrupts =
++				<GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
++				interrupt-names = "uart-sum", "uart-tx", "uart-rx";
++				status = "disabled";
++			};
++
++			uart1: serial at 12200 {
++				compatible = "marvell,armada-3700-uart-ext";
++				reg = <0x12200 0x30>;
++				clocks = <&xtalclk>;
++				interrupts =
++				<GIC_SPI 30 IRQ_TYPE_EDGE_RISING>,
++				<GIC_SPI 31 IRQ_TYPE_EDGE_RISING>;
++				interrupt-names = "uart-tx", "uart-rx";
+ 				status = "disabled";
+ 			};
+ 
+-- 
+2.11.0
