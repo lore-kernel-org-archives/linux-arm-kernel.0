@@ -1,47 +1,58 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 13 Oct 2017 18:35:01 +0100
-Subject: [PATCH v3 26/28] arm64/sve: Add documentation
-In-Reply-To: <20171013142421.j32jzisukewxtosx@armageddon.cambridge.arm.com>
-References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
- <1507660725-7986-27-git-send-email-Dave.Martin@arm.com>
- <20171013142421.j32jzisukewxtosx@armageddon.cambridge.arm.com>
-Message-ID: <20171013173500.GP19485@e103592.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 13 Oct 2017 18:44:23 +0100
+Subject: [RESEND PATCH 1/2] irqdesc: Add function to identify
+ percpu_devid irqs
+In-Reply-To: <1507894005-53778-2-git-send-email-julien.thierry@arm.com>
+References: <1507894005-53778-1-git-send-email-julien.thierry@arm.com>
+ <1507894005-53778-2-git-send-email-julien.thierry@arm.com>
+Message-ID: <20171013174422.GA6050@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 13, 2017 at 03:24:21PM +0100, Catalin Marinas wrote:
-> On Tue, Oct 10, 2017 at 07:38:43PM +0100, Dave P Martin wrote:
+Hi Thomas,
 
-[...]
+Would you be happy for this patch to be taken via the arm64 tree?
 
-> > +* If the SVE context is too big to fit in sigcontext.__reserved[], then extra
-> > +  space is allocated on the stack, an extra_context record is written in
-> > +  __reserved[] referencing this space.  sve_context is then written in the
-> > +  extra space.  Refer to [1] for further details about this mechanism.
+The next patch [1] makes use of this in the arm_pmu driver, and we're
+likely to have some other changes there shortly.
+
+Thanks,
+Mark
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-October/536532.html
+
+On Fri, Oct 13, 2017 at 12:26:44PM +0100, Julien Thierry wrote:
+> irq_is_percpu indicates whether an irq should only target a single cpu.
+> PERCPU_DEVID flag indicates that an irq can be configured differently on
+> each cpu it can target.
 > 
-> Does this document require that the user stack is sufficiently large or
-> should we cap the vector length (prior to the last two RFC patches)?
-
-Oh, I think I missed your point here.
-
-I don't think it's worth capping the vector length beyond what the
-series alread does: the last two patches provide a way to find out how
-big the signal frame could be, but software still needs porting either
-way if it enables large vectors via prctl or ptrace.
-
-Conversely, software basing its stack allocations on SIGSTKSZ (16K) will
-probably get away with it: this seems to be the common choice when
-allocating stacks.  Apart from models, we're not likely to see SVE
-implementations with huge vector lengths for a while yet.
-
-
-In any case, /proc/sys/abi/sve_default_vector_length proves a
-discretionary global clamp that can be set by the distro or admin.  This
-will prevent programs from seeing large frames unless the VL is set
-explicitly to something > 64 bytes via prctl/ptrace (which current
-software won't do).
-
-[...]
-
-Cheers
----Dave
+> Provide a function to check whether an irq is PERCPU_DEVID.
+> 
+> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  include/linux/irqdesc.h | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/include/linux/irqdesc.h b/include/linux/irqdesc.h
+> index 3e90a09..93960cf 100644
+> --- a/include/linux/irqdesc.h
+> +++ b/include/linux/irqdesc.h
+> @@ -244,6 +244,14 @@ static inline int irq_is_percpu(unsigned int irq)
+>  	return desc->status_use_accessors & IRQ_PER_CPU;
+>  }
+> 
+> +static inline int irq_is_percpu_devid(unsigned int irq)
+> +{
+> +	struct irq_desc *desc;
+> +
+> +	desc = irq_to_desc(irq);
+> +	return desc->status_use_accessors & IRQ_PER_CPU_DEVID;
+> +}
+> +
+>  static inline void
+>  irq_set_lockdep_class(unsigned int irq, struct lock_class_key *class)
+>  {
+> --
+> 1.9.1
