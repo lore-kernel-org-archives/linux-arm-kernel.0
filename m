@@ -1,90 +1,109 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 13 Oct 2017 17:47:07 +0100
-Subject: [PATCH v3 22/28] arm64/sve: KVM: Prevent guests from using SVE
-In-Reply-To: <f273491e-2ae6-18b1-53de-6fbda2056631@arm.com>
-References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
- <1507660725-7986-23-git-send-email-Dave.Martin@arm.com>
- <c28b3f0d-7beb-cca3-46db-3fce964f4725@arm.com>
- <20171012110409.GG19485@e103592.cambridge.arm.com>
- <d8a50bf1-bfe0-2423-c56b-adac3925309e@arm.com>
- <20171013141539.GK19485@e103592.cambridge.arm.com>
- <f273491e-2ae6-18b1-53de-6fbda2056631@arm.com>
-Message-ID: <20171013164706.GN19485@e103592.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 13 Oct 2017 17:47:15 +0100
+Subject: [RESEND PATCH 2/2] arm/arm64: pmu: Distinguish percpu irq and
+ percpu_devid irq
+In-Reply-To: <1507894005-53778-3-git-send-email-julien.thierry@arm.com>
+References: <1507894005-53778-1-git-send-email-julien.thierry@arm.com>
+ <1507894005-53778-3-git-send-email-julien.thierry@arm.com>
+Message-ID: <20171013164715.GB5919@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 13, 2017 at 03:21:59PM +0100, Marc Zyngier wrote:
-> On 13/10/17 15:15, Dave Martin wrote:
-> > On Thu, Oct 12, 2017 at 12:28:32PM +0100, Marc Zyngier wrote:
-> >> On 12/10/17 12:04, Dave Martin wrote:
-> >>> On Wed, Oct 11, 2017 at 05:28:06PM +0100, Marc Zyngier wrote:
-> >>>> [+ Christoffer]
-> >>>>
-> >>>> On 10/10/17 19:38, Dave Martin wrote:
-
-[...]
-
-> >>>> Hmmm. How does this work if...
-> >>>
-> >>> !IS_ENABLED(CONFIG_ARM64_SVE) implies !system_supports_sve(), so
-> >>> if CONFIG_ARM64_SVE is not set, the call is optimised away.
-> >>>
-> >>> [...]
-> >>>
-> >>>>> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> >>>>> index a9cb794..6ae3703 100644
-> >>>>> --- a/arch/arm64/kernel/fpsimd.c
-> >>>>> +++ b/arch/arm64/kernel/fpsimd.c
-> >>>>> @@ -1073,6 +1073,33 @@ void fpsimd_flush_task_state(struct task_struct *t)
-> >>>
-> >>> [...]
-> >>>
-> >>>>> +#ifdef CONFIG_ARM64_SVE
-> >>>>> +void sve_flush_cpu_state(void)
-> >>>>> +{
-> >>>>> +	struct fpsimd_state *const fpstate = __this_cpu_read(fpsimd_last_state);
-> >>>>> +	struct task_struct *tsk;
-> >>>>> +
-> >>>>> +	if (!fpstate)
-> >>>>> +		return;
-> >>>>> +
-> >>>>> +	tsk = container_of(fpstate, struct task_struct, thread.fpsimd_state);
-> >>>>> +	if (test_tsk_thread_flag(tsk, TIF_SVE))
-> >>>>> +		fpsimd_flush_cpu_state();
-> >>>>> +}
-> >>>>> +#endif /* CONFIG_ARM64_SVE */
-> >>>>
-> >>>> ... CONFIG_ARM64_SVE is not set? Fixing this should just be a matter of
-> >>>> moving the #ifdef/#endif inside the function...
-> >>>
-> >>> Because sve_flush_cpu_state() is not in the same compilation unit it
-> >>> can't be static, and that means the compiler won't remove it
-> >>> automatically if it's unused -- hence the #ifdef.
-> >>>
-> >>> Because the call site is optimised away, there is no link failure.
-> >>>
-> >>> Don't we rely on this sort of thing all over the place?
-> >> Dunno. It just feels weird. But if you are sure that it won't break,
-> >> fine by me. I guess we'll find out pretty quickly how this fares,
-> >> specially with older toolchains.
-> > 
-> > I thought this was why the kernel doesn't support building with -O0.
-> > There are many instances of this in the series, not just here.
-> > 
-> > Let me know if you feel this isn't good enough though.
+On Fri, Oct 13, 2017 at 12:26:45PM +0100, Julien Thierry wrote:
+> arm_pmu interrupts are maked as PERCPU even when these are not local
+> physical interrupts to a single CPU. When using non-local interrupts,
+> interrupts marked as PERCPU will not get freed not disabled properly
+> by the PMU driver.
 > 
-> That's OK to me. As I said, we'll find out pretty quickly if anything
-> breaks unexpectedly.
-
-Yup
-
+> Check if interrupts are local to a single CPU with PERCPU_DEVID since
+> this is what the PMU driver really needs to know.
 > 
-> > Do you have any other comments on this patch?
-> None. You can add my:
+> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> Will Deacon <will.deacon@arm.com>
+> Mark Rutland <mark.rutland@arm.com>
+
+I guess these should have been with prefixed 'Cc: '.
+
+The patch itself looks good to me:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+I suspect we'll need to take both patches via the usual arm pmu tree, so
+it'd be good if we could get an ack on patch 1.
+
+Thanks,
+Mark.
+
+> ---
+>  drivers/perf/arm_pmu.c          | 10 +++++-----
+>  drivers/perf/arm_pmu_platform.c |  4 ++--
+>  2 files changed, 7 insertions(+), 7 deletions(-)
 > 
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-OK, thanks for the input.
-
-Cheers
----Dave
+> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+> index d14fc2e..7bc5eee 100644
+> --- a/drivers/perf/arm_pmu.c
+> +++ b/drivers/perf/arm_pmu.c
+> @@ -539,7 +539,7 @@ void armpmu_free_irq(struct arm_pmu *armpmu, int cpu)
+>  	if (!cpumask_test_and_clear_cpu(cpu, &armpmu->active_irqs))
+>  		return;
+> 
+> -	if (irq_is_percpu(irq)) {
+> +	if (irq_is_percpu_devid(irq)) {
+>  		free_percpu_irq(irq, &hw_events->percpu_pmu);
+>  		cpumask_clear(&armpmu->active_irqs);
+>  		return;
+> @@ -565,10 +565,10 @@ int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
+>  	if (!irq)
+>  		return 0;
+> 
+> -	if (irq_is_percpu(irq) && cpumask_empty(&armpmu->active_irqs)) {
+> +	if (irq_is_percpu_devid(irq) && cpumask_empty(&armpmu->active_irqs)) {
+>  		err = request_percpu_irq(irq, handler, "arm-pmu",
+>  					 &hw_events->percpu_pmu);
+> -	} else if (irq_is_percpu(irq)) {
+> +	} else if (irq_is_percpu_devid(irq)) {
+>  		int other_cpu = cpumask_first(&armpmu->active_irqs);
+>  		int other_irq = per_cpu(hw_events->irq, other_cpu);
+> 
+> @@ -649,7 +649,7 @@ static int arm_perf_starting_cpu(unsigned int cpu, struct hlist_node *node)
+> 
+>  	irq = armpmu_get_cpu_irq(pmu, cpu);
+>  	if (irq) {
+> -		if (irq_is_percpu(irq)) {
+> +		if (irq_is_percpu_devid(irq)) {
+>  			enable_percpu_irq(irq, IRQ_TYPE_NONE);
+>  			return 0;
+>  		}
+> @@ -667,7 +667,7 @@ static int arm_perf_teardown_cpu(unsigned int cpu, struct hlist_node *node)
+>  		return 0;
+> 
+>  	irq = armpmu_get_cpu_irq(pmu, cpu);
+> -	if (irq && irq_is_percpu(irq))
+> +	if (irq && irq_is_percpu_devid(irq))
+>  		disable_percpu_irq(irq);
+> 
+>  	return 0;
+> diff --git a/drivers/perf/arm_pmu_platform.c b/drivers/perf/arm_pmu_platform.c
+> index 4eafa7a..bbc64ee 100644
+> --- a/drivers/perf/arm_pmu_platform.c
+> +++ b/drivers/perf/arm_pmu_platform.c
+> @@ -126,7 +126,7 @@ static int pmu_parse_irqs(struct arm_pmu *pmu)
+> 
+>  	if (num_irqs == 1) {
+>  		int irq = platform_get_irq(pdev, 0);
+> -		if (irq && irq_is_percpu(irq))
+> +		if (irq && irq_is_percpu_devid(irq))
+>  			return pmu_parse_percpu_irq(pmu, irq);
+>  	}
+> 
+> @@ -149,7 +149,7 @@ static int pmu_parse_irqs(struct arm_pmu *pmu)
+>  		if (WARN_ON(irq <= 0))
+>  			continue;
+> 
+> -		if (irq_is_percpu(irq)) {
+> +		if (irq_is_percpu_devid(irq)) {
+>  			pr_warn("multiple PPIs or mismatched SPI/PPI detected\n");
+>  			return -EINVAL;
+>  		}
+> --
+> 1.9.1
