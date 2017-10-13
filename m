@@ -1,109 +1,115 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Fri, 13 Oct 2017 16:26:57 +0200
-Subject: [PATCH 1/2] hwmon: (jc42) optionally try to disable the SMBUS
- timeout
-In-Reply-To: <554a4494-14c9-7743-898c-5f83e3de227d@roeck-us.net>
-References: <20171013092705.7038-1-peda@axentia.se>
- <20171013092705.7038-2-peda@axentia.se>
- <554a4494-14c9-7743-898c-5f83e3de227d@roeck-us.net>
-Message-ID: <2d1bf447-489f-9e15-3b1e-d2f4a2c1dcfe@axentia.se>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 13 Oct 2017 15:27:25 +0100
+Subject: [PATCH 0/3] arm64: cpuinfo: make /proc/cpuinfo more human-readable
+In-Reply-To: <CAOZdJXUzo3JrHW1h6W3y3BnVq472NjPpaqTztzEODZnnMyvJRg@mail.gmail.com>
+References: <20170926222324.17409-1-ahs3@redhat.com>
+ <20170927103406.GC32150@leverpostej>
+ <CAOZdJXUzo3JrHW1h6W3y3BnVq472NjPpaqTztzEODZnnMyvJRg@mail.gmail.com>
+Message-ID: <20171013142724.GA5893@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-10-13 15:50, Guenter Roeck wrote:
-> On 10/13/2017 02:27 AM, Peter Rosin wrote:
->> With a nxp,se97 chip on an atmel sama5d31 board, the I2C adapter driver
->> is not always capable of avoiding the 25-35 ms timeout as specified by
->> the SMBUS protocol. This may cause silent corruption of the last bit of
->> any transfer, e.g. a one is read instead of a zero if the sensor chip
->> times out. This also affects the eeprom half of the nxp-se97 chip, where
->> this silent corruption was originally noticed. Other I2C adapters probably
->> suffer similar issues, e.g. bit-banging comes to mind as risky...
->>
->> The SMBUS register in the nxp chip is not a standard Jedec register, but
->> it is not special to the nxp chips either, at least the atmel chips
->> have the same mechanism. Therefore, do not special case this on the
->> manufacturer, it is opt-in via the device property anyway.
->>
->> Signed-off-by: Peter Rosin <peda@axentia.se>
->> ---
->>   Documentation/devicetree/bindings/hwmon/jc42.txt |  4 ++++
->>   drivers/hwmon/jc42.c                             | 20 ++++++++++++++++++++
->>   2 files changed, 24 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/hwmon/jc42.txt b/Documentation/devicetree/bindings/hwmon/jc42.txt
->> index 07a250498fbb..f569db58f64a 100644
->> --- a/Documentation/devicetree/bindings/hwmon/jc42.txt
->> +++ b/Documentation/devicetree/bindings/hwmon/jc42.txt
->> @@ -34,6 +34,10 @@ Required properties:
->>   
->>   - reg: I2C address
->>   
->> +Optional properties:
->> +- smbus-timeout-disable: When set, the smbus timeout function will be disabled.
->> +			 This is not supported on all chips.
->> +
->>   Example:
->>   
->>   temp-sensor at 1a {
->> diff --git a/drivers/hwmon/jc42.c b/drivers/hwmon/jc42.c
->> index 1bf22eff0b08..fd816902fa30 100644
->> --- a/drivers/hwmon/jc42.c
->> +++ b/drivers/hwmon/jc42.c
->> @@ -45,6 +45,7 @@ static const unsigned short normal_i2c[] = {
->>   #define JC42_REG_TEMP		0x05
->>   #define JC42_REG_MANID		0x06
->>   #define JC42_REG_DEVICEID	0x07
->> +#define JC42_REG_SMBUS		0x22 /* NXP and Atmel, possibly others? */
->>   
->>   /* Status bits in temperature register */
->>   #define JC42_ALARM_CRIT_BIT	15
->> @@ -73,6 +74,9 @@ static const unsigned short normal_i2c[] = {
->>   #define ONS_MANID		0x1b09  /* ON Semiconductor */
->>   #define STM_MANID		0x104a  /* ST Microelectronics */
->>   
->> +/* SMBUS register */
->> +#define SMBUS_STMOUT		BIT(7)  /* SMBus time-out, active low */
->> +
->>   /* Supported chips */
->>   
->>   /* Analog Devices */
->> @@ -476,6 +480,22 @@ static int jc42_probe(struct i2c_client *client, const struct i2c_device_id *id)
->>   
->>   	data->extended = !!(cap & JC42_CAP_RANGE);
->>   
->> +	if (device_property_read_bool(dev, "smbus-timeout-disable")) {
->> +		int smbus;
->> +
->> +		/*
->> +		 * Not all chips support this register, but from a
->> +		 * quick read of various datasheets no chip appears
->> +		 * incompatible with the below attempt to disable
->> +		 * the timeout. And the whole thing is opt-in...
->> +		 */
->> +		smbus = i2c_smbus_read_word_swapped(client, JC42_REG_SMBUS);
->> +		if (smbus < 0)
->> +			return smbus;
->> +		i2c_smbus_write_word_swapped(client, JC42_REG_SMBUS,
->> +					     smbus | SMBUS_STMOUT);
+Hi Timur,
+
+On Fri, Oct 13, 2017 at 08:39:09AM -0500, Timur Tabi wrote:
+> On Wed, Sep 27, 2017 at 5:34 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Tue, Sep 26, 2017 at 04:23:21PM -0600, Al Stone wrote:
+> >> As ARMv8 servers get deployed, I keep getting the same set of questions
+> >> from end-users of those systems: what do all the hex numbers mean in
+> >> /proc/cpuinfo and could you make them so I don't have to carry a cheat
+> >> sheet with me all the time?
+> >
+> > I appreciate that /proc/cpuinfo can be opaque to end users, but I do not
+> > believe that this is the right solution to that problem.
+> >
+> > There are a number of issues stemming from the face that /proc/cpuinfo
+> > is ill-defined and overused for a number of cases. Changes to it almost
+> > certainly violate brittle de-facto ABI details people are relying on,
+> > and there's a very long tail on fallout resulting from this. In
+> > addition, many niceties come at an excessive maintenance cost, and are
+> > simply unreliable as an ABI.
+> >
+> > So, as with all other patches modifying /proc/cpuinfo, I must NAK this
+> > series.
 > 
-> Looking into the SE97 datasheet, the bit is only writable if the alarm bits
-> are not locked. Should we take this into account and unlock the alarm bits
-> if necessary ?
+> Qualcomm Datacenter Technologies is very interested in seeing these
+> patches (or some variant of them) accepted. Updates to /proc/cpuinfo
+> are long overdue, and I'm asking you to reconsider your objections.
 
-Right. And I thought about the case when the timeout was disabled before
-probing but with the property not present (perhaps by someone trying things
-out, like I have). Should the timeout be re-enabled in that case?
-But, someone might have disabled the timeout by some previous arrangement
-(e.g. in a boot-loader) but without having this newfangled property in the
-device tree. Re-enabling the timeout in that case would break things. Slim
-chance for that to be an issue, but perhaps not?
+I more than appreciate that there is information that people want access
+to, and I'd really like to expose that in a consistent and structured
+manner.
 
-Unlocking the alarm bits is somewhat similar, since it should only be an
-issue for warm starts. But the risk of breakage is perhaps not there at
-all?
+So please propose exposing the information elsewhere, which I would be
+more than happy with for information that the kernel already has access
+to.
 
-Your call, I can fix thing however you like...
+I object to /proc/cpuinfo changes because they impose an ABI break, and
+because some of the proposed changes impose new and requirements on the
+kernel that cannot be maintained in a forwards-compatible manner (which
+is liable to result in other ABI breaks).
 
-Cheers,
-Peter
+For better or worse, we're stuck with the existing arch-specific format
+of /proc/cpuinfo, as this is parsed by a wide variety of applications,
+and any change risks breaking these.
+
+> We're willing to work with distro vendors to get this information
+> added to their products while upstream is left behind, but I hope that
+> won't be necessary.
+
+Please understand that this is an ABI break, and that is why it is being
+NAK'd.
+
+I don't have the power to stop Red Hat or other vendors from
+deliberately breaking ABI, but I would very strongly recommend that they
+do not.
+
+> I would even go so far as to say that we should be making
+> /proc/cpuinfo for ARM match the x86 output as closely as possible,
+
+As has been stated before, /proc/cpuinfo is an existing arch-specific ABI.
+
+For better or worse, we're stuck with it as-is, regardless of what could
+be nicer had we done something different from the outset.
+
+It has never been portable across architectures, and applications
+relying upon it have never been portable except by chance.
+
+> even using their terminology.  We should be providing information like
+> frequencies and product names.
+
+As has been stated before, the problem with exposing these is that we
+don't have the relevant information.
+
+We have no consistent mechanism for acquiring product names, and for
+those cases where it is truly necessary to identify an implementation,
+the MIDR+REVIDR provide the exact same information.
+
+For frequencies, I'd be more than happy to expose this information when
+we have it, in new files. In practice today, we do not have this
+information most of the time.
+
+> Having a human-readable /proc/cpuinfo with extensive details of the
+> CPU spelled out is very useful, and Al's reasoning is valid.  The fact
+> that it's "fragile" is not as important as the fact that on x86,
+> /proc/cpuinfo is much more useful.
+
+I must disagree.
+
+We care about that fragility so that we do not break userspace, which is
+the most important upstream rule.
+
+I certainly agree that exposing the information that we have is useful,
+as I have stated several times. I'm not NAKing exposing this information
+elsewhere.
+
+If you want a consistent cross-architecture interface for this
+information, then you need to propose a new one. That was we can
+actually solve the underlying issues, for all architectures, without
+breaking ABI.
+
+I would be *very* interested in such an interface, and would be more
+than happy to help.
+
+Thanks,
+Mark.
