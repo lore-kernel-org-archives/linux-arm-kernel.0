@@ -1,53 +1,81 @@
-From: salyzyn@android.com (Mark Salyzyn)
-Date: Thu, 12 Oct 2017 15:59:52 -0700
-Subject: [PATCH v2 4/10] arm: vdso: enforce monotonic and realtime as inline
-Message-ID: <20171012225956.86705-1-salyzyn@android.com>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Fri, 13 Oct 2017 09:35:27 +0900
+Subject: [PATCH net-next v2 1/2] dt-bindings: net: add DT bindings for
+ Socionext UniPhier AVE
+In-Reply-To: <1507854928-4357-1-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1507854928-4357-1-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <1507854928-4357-2-git-send-email-hayashi.kunihiko@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ensure monotonic and realtime are inline, small price to pay for
-high volume common request.
+DT bindings for the AVE ethernet controller found on Socionext's
+UniPhier platforms.
 
-Signed-off-by: Mark Salyzyn <salyzyn@android.com>
-
-v2: split first CL into 4 of 7 pieces
+Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
 ---
- arch/arm/vdso/vgettimeofday.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ .../bindings/net/socionext,uniphier-ave4.txt       | 53 ++++++++++++++++++++++
+ 1 file changed, 53 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
 
-diff --git a/arch/arm/vdso/vgettimeofday.c b/arch/arm/vdso/vgettimeofday.c
-index 5f596911bd53..71003a1997c4 100644
---- a/arch/arm/vdso/vgettimeofday.c
-+++ b/arch/arm/vdso/vgettimeofday.c
-@@ -99,7 +99,7 @@ static notrace int do_monotonic_coarse(const struct vdso_data *vd,
- 
- #ifdef CONFIG_ARM_ARCH_TIMER
- 
--static notrace u64 get_ns(const struct vdso_data *vd)
-+static __always_inline notrace u64 get_ns(const struct vdso_data *vd)
- {
- 	u64 cycle_delta;
- 	u64 cycle_now;
-@@ -115,7 +115,9 @@ static notrace u64 get_ns(const struct vdso_data *vd)
- 	return nsec;
- }
- 
--static notrace int do_realtime(const struct vdso_data *vd, struct timespec *ts)
-+/* Code size doesn't matter (vdso is 4k/16k/64k anyway) and this is faster. */
-+static __always_inline notrace int do_realtime(const struct vdso_data *vd,
-+					       struct timespec *ts)
- {
- 	u64 nsecs;
- 	u32 seq;
-@@ -137,7 +139,8 @@ static notrace int do_realtime(const struct vdso_data *vd, struct timespec *ts)
- 	return 0;
- }
- 
--static notrace int do_monotonic(const struct vdso_data *vd, struct timespec *ts)
-+static __always_inline notrace int do_monotonic(const struct vdso_data *vd,
-+						struct timespec *ts)
- {
- 	struct timespec tomono;
- 	u64 nsecs;
+diff --git a/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt b/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
+new file mode 100644
+index 0000000..25f4d92
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
+@@ -0,0 +1,53 @@
++* Socionext AVE ethernet controller
++
++This describes the devicetree bindings for AVE ethernet controller
++implemented on Socionext UniPhier SoCs.
++
++Required properties:
++ - compatible: Should be
++	- "socionext,uniphier-pro4-ave4" : for Pro4 SoC
++	- "socionext,uniphier-pxs2-ave4" : for PXs2 SoC
++	- "socionext,uniphier-ld20-ave4" : for LD20 SoC
++	- "socionext,uniphier-ld11-ave4" : for LD11 SoC
++ - reg: Address where registers are mapped and size of region.
++ - interrupts: Should contain the MAC interrupt.
++ - phy-mode: See ethernet.txt in the same directory. Allow to choose
++	"rgmii", "rmii", or "mii" according to the PHY.
++ - pinctrl-names: List of assigned state names, see pinctrl
++	binding documentation.
++ - pinctrl-0: List of phandles to configure the GPIO pin,
++	see pinctrl binding documentation. Choose this appropriately
++	according to phy-mode.
++	- <&pinctrl_ether_rgmii> if phy-mode is "rgmii".
++	- <&pinctrl_ether_rmii> if phy-mode is "rmii".
++	- <&pinctrl_ether_mii> if phy-mode is "mii".
++ - phy-handle: Should point to the external phy device.
++	See ethernet.txt file in the same directory.
++ - mdio subnode: Should be device tree subnode with the following required
++	properties:
++	- #address-cells: Must be <1>.
++	- #size-cells: Must be <0>.
++	- reg: phy ID number, usually a small integer.
++
++Optional properties:
++ - local-mac-address: See ethernet.txt in the same directory.
++
++Example:
++
++	ether: ethernet at 65000000 {
++		compatible = "socionext,uniphier-ld20-ave4";
++		reg = <0x65000000 0x8500>;
++		interrupts = <0 66 4>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_ether_rgmii>;
++		phy-mode = "rgmii";
++		phy-handle = <&ethphy>;
++		local-mac-address = [00 00 00 00 00 00];
++		mdio {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			ethphy: ethphy at 1 {
++				reg = <1>;
++			};
++		};
++	};
 -- 
-2.15.0.rc0.271.g36b669edcc-goog
+2.7.4
