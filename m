@@ -1,58 +1,36 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 13 Oct 2017 18:44:23 +0100
-Subject: [RESEND PATCH 1/2] irqdesc: Add function to identify
- percpu_devid irqs
-In-Reply-To: <1507894005-53778-2-git-send-email-julien.thierry@arm.com>
-References: <1507894005-53778-1-git-send-email-julien.thierry@arm.com>
- <1507894005-53778-2-git-send-email-julien.thierry@arm.com>
-Message-ID: <20171013174422.GA6050@leverpostej>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Fri, 13 Oct 2017 23:03:32 +0530
+Subject: [PATCH] ARM: dts: rockchip: Enable thermal on rk3288-vyasa board
+Message-ID: <1507916012-3980-1-git-send-email-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+From: Michael Trimarchi <michael@amarulasolutions.com>
 
-Would you be happy for this patch to be taken via the arm64 tree?
+Enable thermal on rk3288-vyasa board, TSHUT is high active.
 
-The next patch [1] makes use of this in the arm_pmu driver, and we're
-likely to have some other changes there shortly.
+Signed-off-by: Michael Trimarchi <michael@amarulasolutions.com>
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+ arch/arm/boot/dts/rk3288-vyasa.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Thanks,
-Mark
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-October/536532.html
-
-On Fri, Oct 13, 2017 at 12:26:44PM +0100, Julien Thierry wrote:
-> irq_is_percpu indicates whether an irq should only target a single cpu.
-> PERCPU_DEVID flag indicates that an irq can be configured differently on
-> each cpu it can target.
-> 
-> Provide a function to check whether an irq is PERCPU_DEVID.
-> 
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  include/linux/irqdesc.h | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/include/linux/irqdesc.h b/include/linux/irqdesc.h
-> index 3e90a09..93960cf 100644
-> --- a/include/linux/irqdesc.h
-> +++ b/include/linux/irqdesc.h
-> @@ -244,6 +244,14 @@ static inline int irq_is_percpu(unsigned int irq)
->  	return desc->status_use_accessors & IRQ_PER_CPU;
->  }
-> 
-> +static inline int irq_is_percpu_devid(unsigned int irq)
-> +{
-> +	struct irq_desc *desc;
-> +
-> +	desc = irq_to_desc(irq);
-> +	return desc->status_use_accessors & IRQ_PER_CPU_DEVID;
-> +}
-> +
->  static inline void
->  irq_set_lockdep_class(unsigned int irq, struct lock_class_key *class)
->  {
-> --
-> 1.9.1
+diff --git a/arch/arm/boot/dts/rk3288-vyasa.dts b/arch/arm/boot/dts/rk3288-vyasa.dts
+index 932311c..3546eb8 100644
+--- a/arch/arm/boot/dts/rk3288-vyasa.dts
++++ b/arch/arm/boot/dts/rk3288-vyasa.dts
+@@ -302,6 +302,12 @@
+ 	status = "okay";
+ };
+ 
++&tsadc {
++	rockchip,hw-tshut-mode = <1>; /* tshut mode 0:CRU 1:GPIO */
++	rockchip,hw-tshut-polarity = <1>; /* tshut polarity 0:LOW 1:HIGH */
++	status = "okay";
++};
++
+ &uart2 {
+ 	status = "okay";
+ };
+-- 
+2.7.4
