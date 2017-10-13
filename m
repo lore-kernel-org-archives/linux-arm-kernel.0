@@ -1,96 +1,60 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Fri, 13 Oct 2017 09:51:51 +0100
-Subject: [PATCH] arm64: dts: hisilicon: Standardize Poplar GPIO line names
-In-Reply-To: <20171002142129.13102-1-linus.walleij@linaro.org>
-References: <20171002142129.13102-1-linus.walleij@linaro.org>
-Message-ID: <59E07EA7.9000501@hisilicon.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 13 Oct 2017 09:55:04 +0100
+Subject: [PATCH/RFC 1/5] dt-bindings: mfd: bd9571mwv: Document
+ rohm,ddr-backup-power
+In-Reply-To: <1507649178-31473-2-git-send-email-geert+renesas@glider.be>
+References: <1507649178-31473-1-git-send-email-geert+renesas@glider.be>
+ <1507649178-31473-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <20171013085504.i65ohil6dqdzrd2q@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Tue, 10 Oct 2017, Geert Uytterhoeven wrote:
 
-On 2017/10/2 15:21, Linus Walleij wrote:
-> The hi6220-HiKey board started to name GPIO lines for
-> 96boards, using just the plain names "GPIO-A" etc from the
-> 96boards specification.
+> Document the new optional "rohm,ddr-backup-power" property.
 > 
-> Poplar started to use an arbitrary "LS-GPIO-A" (etc) prefix
-> that is not part of the 96boards specification.
-> 
-> As the former notation arrived first, and we need
-> consistency among 96board, rectify the Poplar board to use
-> this too. This is important for userspace that wants to
-> look up GPIO names from these strings.
-> 
-> Cc: Jiancheng Xue <xuejiancheng@hisilicon.com>
-> Cc: Alex Elder <elder@linaro.org>
-> Cc: Peter Griffin <peter.griffin@linaro.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 > ---
-
-Applied to hisilicon dt tree.
-Thanks!
-
-BR,
-Wei
-
->  arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts | 20 ++++++++++----------
->  1 file changed, 10 insertions(+), 10 deletions(-)
+>  Documentation/devicetree/bindings/mfd/bd9571mwv.txt | 7 +++++++
+>  1 file changed, 7 insertions(+)
 > 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts b/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
-> index b9142871d6fe..a6fd13389f8d 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
-> +++ b/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
-> @@ -78,17 +78,17 @@
+> diff --git a/Documentation/devicetree/bindings/mfd/bd9571mwv.txt b/Documentation/devicetree/bindings/mfd/bd9571mwv.txt
+> index 9ab216a851d5619b..7ea3f2db41d4e501 100644
+> --- a/Documentation/devicetree/bindings/mfd/bd9571mwv.txt
+> +++ b/Documentation/devicetree/bindings/mfd/bd9571mwv.txt
+> @@ -25,6 +25,12 @@ Required properties:
+>  			    Each child node is defined using the standard
+>  			    binding for regulators.
 >  
->  &gpio1 {
->  	status = "okay";
-> -	gpio-line-names = "LS-GPIO-E",	"",
-> +	gpio-line-names = "GPIO-E",	"",
->  			  "",		"",
-> -			  "",		"LS-GPIO-F",
-> -			  "",		"LS-GPIO-J";
-> +			  "",		"GPIO-F",
-> +			  "",		"GPIO-J";
->  };
+> +Optional properties:
+> +  - rohm,ddr-backup-power : Value to use for DDR-Backup Power.  This controls
+> +			    which DDR rails need to be kept powered when backup
+> +			    mode is enabled, cfr. the KEEPON_DDR* bits in the
+
+Perhaps it's just me, but I'm confused by this line.
+
+Can you word it another way?
+
+> +			    documentation for the "BKUP Mode Cnt" register.
+> +
+>  Example:
 >  
->  &gpio2 {
->  	status = "okay";
-> -	gpio-line-names = "LS-GPIO-H",	"LS-GPIO-I",
-> -			  "LS-GPIO-L",	"LS-GPIO-G",
-> -			  "LS-GPIO-K",	"",
-> +	gpio-line-names = "GPIO-H",	"GPIO-I",
-> +			  "GPIO-L",	"GPIO-G",
-> +			  "GPIO-K",	"",
->  			  "",		"";
->  };
->  
-> @@ -96,15 +96,15 @@
->  	status = "okay";
->  	gpio-line-names = "",		"",
->  			  "",		"",
-> -			  "LS-GPIO-C",	"",
-> -			  "",		"LS-GPIO-B";
-> +			  "GPIO-C",	"",
-> +			  "",		"GPIO-B";
->  };
->  
->  &gpio4 {
->  	status = "okay";
->  	gpio-line-names = "",		"",
->  			  "",		"",
-> -			  "",		"LS-GPIO-D",
-> +			  "",		"GPIO-D",
->  			  "",		"";
->  };
->  
-> @@ -112,7 +112,7 @@
->  	status = "okay";
->  	gpio-line-names = "",		"USER-LED-1",
->  			  "USER-LED-2",	"",
-> -			  "",		"LS-GPIO-A",
-> +			  "",		"GPIO-A",
->  			  "",		"";
->  };
->  
-> 
+>  	pmic: pmic at 30 {
+> @@ -36,6 +42,7 @@ Example:
+>  		#interrupt-cells = <2>;
+>  		gpio-controller;
+>  		#gpio-cells = <2>;
+> +		rohm,ddr-backup-power = <15>;
+
+Can you explain what this means?  Is it a mask, or does line 15 need
+to be kept on?  What is the range?  Is 0 acceptable?  Clarification
+required please.
+
+>  		regulators {
+>  			dvfs: dvfs {
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
