@@ -1,19 +1,56 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 13 Oct 2017 15:06:39 -0500
-Subject: [PATCH] dt-bindings: samsung: Document binding for new Odroid
- HC1 board
-In-Reply-To: <20171008122628.30973-1-krzk@kernel.org>
-References: <20171008122628.30973-1-krzk@kernel.org>
-Message-ID: <20171013200639.rewwxfi3rwnckrsm@rob-hp-laptop>
+Date: Fri, 13 Oct 2017 15:09:43 -0500
+Subject: [PATCH v2 03/13] mmc: dt-bindings: make compatible explicit
+In-Reply-To: <CAPDyKFpzuctUJ7FB9thMi0h602iJZc=kbs7iaVb+0oNCC4K4ng@mail.gmail.com>
+References: <1507548926-9555-1-git-send-email-chaotian.jing@mediatek.com>
+ <1507548926-9555-4-git-send-email-chaotian.jing@mediatek.com>
+ <e4e5fa8b-b6a5-dc70-fbfc-6328493cd073@gmail.com>
+ <1507599473.19789.1.camel@mhfsdcap03>
+ <CAPDyKFpzuctUJ7FB9thMi0h602iJZc=kbs7iaVb+0oNCC4K4ng@mail.gmail.com>
+Message-ID: <20171013200943.qjyyjxuo54b4jgnu@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 08, 2017 at 02:26:28PM +0200, Krzysztof Kozlowski wrote:
-> Document the binding for new Hardkernel Odroid HC1 board.
+On Tue, Oct 10, 2017 at 09:19:14AM +0200, Ulf Hansson wrote:
+> On 10 October 2017 at 03:37, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> > On Mon, 2017-10-09 at 16:54 +0200, Matthias Brugger wrote:
+> >>
+> >> On 10/09/2017 01:35 PM, Chaotian Jing wrote:
+> >> > the driver has updated to have an explicit compatible, so update
+> >> > binding file according to the driver change.
+> >> >
+> >> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> >> > ---
+> >> >   Documentation/devicetree/bindings/mmc/mtk-sd.txt | 4 ++--
+> >> >   1 file changed, 2 insertions(+), 2 deletions(-)
+> >> >
+> >> > diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+> >> > index 3e0a97c..2bb585b 100644
+> >> > --- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+> >> > +++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+> >> > @@ -8,8 +8,8 @@ and the properties used by the msdc driver.
+> >> >
+> >> >   Required properties:
+> >> >   - compatible: value should be either of the following.
+> >> > -   "mediatek,mt8173-mmc","mediatek,mt8135-mmc": for mmc host ip compatible with mt8135
+> >> > -   "mediatek,mt8173-mmc","mediatek,mt8135-mmc": for mmc host ip compatible with mt8173
+> >> > +   "mediatek,mt8135-mmc": for mmc host ip compatible with mt8135
+> >> > +   "mediatek,mt8173-mmc": for mmc host ip compatible with mt8173
+> >>
+> >> You can merge this with patch 1.
+> >
+> > OK, will merge it in next patch.
 > 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> ---
->  Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt | 1 +
->  1 file changed, 1 insertion(+)
+> No, please don't!
+> 
+> I would like DT documentation changes to be posted in separate
+> patches. Moreover, those should be before driver changes, when you
+> order the changes in your series.
+> 
+> In this way, the bindings can be reviewed and acked separately, which
+> makes it more convenient.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Yes. Also, it is step 2 in 
+Documentation/devicetree/bindings/submitting-patches.txt.
+
+Rob
