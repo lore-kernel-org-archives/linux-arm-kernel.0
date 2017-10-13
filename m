@@ -1,144 +1,225 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 14 Oct 2017 01:04:17 +0900
-Subject: [PATCH v2 1/3] dt-bindings: nvmem: add description for UniPhier
- eFuse
-In-Reply-To: <20171013134902.7gvmkvxvwnjlmstp@rob-hp-laptop>
-References: <1507266180-11840-1-git-send-email-hayashibara.keiji@socionext.com>
- <1507266180-11840-2-git-send-email-hayashibara.keiji@socionext.com>
- <20171013134902.7gvmkvxvwnjlmstp@rob-hp-laptop>
-Message-ID: <CAK7LNARg6G152joHq06RkPab=NoWEkFArvF+Ccc1behdXFokmg@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 13 Oct 2017 17:16:39 +0100
+Subject: [PATCH v3 19/28] arm64/sve: ptrace and ELF coredump support
+In-Reply-To: <20171012170632.35zifttm55rzu745@armageddon.cambridge.arm.com>
+References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
+ <1507660725-7986-20-git-send-email-Dave.Martin@arm.com>
+ <20171012170632.35zifttm55rzu745@armageddon.cambridge.arm.com>
+Message-ID: <20171013161638.GM19485@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Thu, Oct 12, 2017 at 06:06:32PM +0100, Catalin Marinas wrote:
+> On Tue, Oct 10, 2017 at 07:38:36PM +0100, Dave P Martin wrote:
+> > @@ -702,6 +737,211 @@ static int system_call_set(struct task_struct *target,
+> >  	return ret;
+> >  }
+> >  
+> > +#ifdef CONFIG_ARM64_SVE
+> > +
+> > +static void sve_init_header_from_task(struct user_sve_header *header,
+> > +				      struct task_struct *target)
+> > +{
+> > +	unsigned int vq;
+> > +
+> > +	memset(header, 0, sizeof(*header));
+> > +
+> > +	header->flags = test_tsk_thread_flag(target, TIF_SVE) ?
+> > +		SVE_PT_REGS_SVE : SVE_PT_REGS_FPSIMD;
+> 
+> For PTRACE_SYSCALL, we may or may not have TIF_SVE depending on what
+> happened with the target. Just a thought: shall we clear TIF_SVE (and
+> sync it to fpsimd) in syscall_trace_enter()?
+
+I'm not so sure: if we were to do that, a syscall that is cancelled by
+writing -1 to REGSET_SYSCALL could still discard the SVE registers as a
+side-effect.
+
+The target committed to discard by executing SVC, but my feeling is
+that cancellation of a syscall in this way shouldn't have avoidable
+side-effects for the target.  But the semantics of cancelled syscalls
+are a bit of a grey area, so I can see potential arguments on both
+sides.
+
+The current approach at least saves a bit of code.  What do you think?
+
+> > +	if (test_tsk_thread_flag(target, TIF_SVE_VL_INHERIT))
+> > +		header->flags |= SVE_PT_VL_INHERIT;
+> > +
+> > +	header->vl = target->thread.sve_vl;
+> > +	vq = sve_vq_from_vl(header->vl);
+> > +
+> > +	header->max_vl = sve_max_vl;
+> > +	if (WARN_ON(!sve_vl_valid(sve_max_vl)))
+> > +		header->max_vl = header->vl;
+> > +
+> > +	header->size = SVE_PT_SIZE(vq, header->flags);
+> > +	header->max_size = SVE_PT_SIZE(sve_vq_from_vl(header->max_vl),
+> > +				      SVE_PT_REGS_SVE);
+> > +}
+> [...]
+> > +static int sve_set(struct task_struct *target,
+> > +		   const struct user_regset *regset,
+> > +		   unsigned int pos, unsigned int count,
+> > +		   const void *kbuf, const void __user *ubuf)
+> > +{
+> > +	int ret;
+> > +	struct user_sve_header header;
+> > +	unsigned int vq;
+> > +	unsigned long start, end;
+> > +
+> > +	if (!system_supports_sve())
+> > +		return -EINVAL;
+> > +
+> > +	/* Header */
+> > +	if (count < sizeof(header))
+> > +		return -EINVAL;
+> > +	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf, &header,
+> > +				 0, sizeof(header));
+> > +	if (ret)
+> > +		goto out;
+> > +
+> > +	/*
+> > +	 * Apart from PT_SVE_REGS_MASK, all PT_SVE_* flags are consumed by
+> > +	 * sve_set_vector_length(), which will also validate them for us:
+> > +	 */
+> > +	ret = sve_set_vector_length(target, header.vl,
+> > +		((unsigned long)header.flags & ~SVE_PT_REGS_MASK) << 16);
+> > +	if (ret)
+> > +		goto out;
+> > +
+> > +	/* Actual VL set may be less than the user asked for: */
+> > +	vq = sve_vq_from_vl(target->thread.sve_vl);
+> > +
+> > +	/* Registers: FPSIMD-only case */
+> > +
+> > +	BUILD_BUG_ON(SVE_PT_FPSIMD_OFFSET != sizeof(header));
+> > +	if ((header.flags & SVE_PT_REGS_MASK) == SVE_PT_REGS_FPSIMD) {
+> > +		sve_sync_to_fpsimd(target);
+> > +
+> > +		ret = __fpr_set(target, regset, pos, count, kbuf, ubuf,
+> > +				SVE_PT_FPSIMD_OFFSET);
+> > +		clear_tsk_thread_flag(target, TIF_SVE);
+> > +		goto out;
+> > +	}
+> 
+> __fpr_set() already calls sve_sync_to_fpsimd(). Anyway, do you actually
+
+Yes, the call to sve_sync_to_fpsimd() is superfluous here -- I think
+that I realised that all callers of __fpr_set() need this to happen,
+but never deleted the explicit call from sve_set().
+
+I'll delete it.
 
 
-2017-10-13 22:49 GMT+09:00 Rob Herring <robh@kernel.org>:
-> On Fri, Oct 06, 2017 at 02:02:58PM +0900, Keiji Hayashibara wrote:
->> Add uniphier-efuse dt-bindings documentation.
->>
->> Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
->> ---
->>  .../devicetree/bindings/nvmem/uniphier-efuse.txt   | 49 ++++++++++++++++++++++
->>  1 file changed, 49 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt
->>
->> diff --git a/Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt b/Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt
->> new file mode 100644
->> index 0000000..1a394e5
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt
->> @@ -0,0 +1,49 @@
->> += UniPhier eFuse device tree bindings =
->> +
->> +This UniPhier eFuse must be under soc-glue.
->> +
->> +Required properties:
->> +- compatible: should be "socionext,uniphier-efuse"
->> +- reg: should contain the register location and length
->> +
->> += Data cells =
->> +Are child nodes of efuse, bindings of which as described in
->> +bindings/nvmem/nvmem.txt
->> +
->> +Example:
->> +
->> +     soc-glue at 5f900000 {
->> +             compatible = "socionext,uniphier-ld20-soc-glue-debug",
->> +                          "simple-mfd";
->> +             #address-cells = <1>;
->> +             #size-cells = <1>;
->> +             ranges = <0x0 0x5f900000 0x2000>;
->> +
->> +             efuse at 100 {
->> +                     compatible = "socionext,uniphier-efuse";
->> +                     reg = <0x100 0x28>;
->> +             };
->> +
->> +             efuse at 200 {
->> +                     compatible = "socionext,uniphier-efuse";
->> +                     reg = <0x200 0x68>;
->> +                     #address-cells = <1>;
->> +                     #size-cells = <1>;
->> +
->> +                     /* Data cells */
->> +                     usb_mon: usb_mon {
->
-> Don't use '_' and needs a unit-address. Build your dtb with W=2 option
-> and you'll get these warnings.
+Looking more closely at __fpr_set() though, I think it needs this change
+too, because the sync is unintentionally placed after reading
+thread.fpsimd_state instead of before:
+
+@@ -652,11 +652,12 @@ static int __fpr_set(struct task_struct *target,
+                     unsigned int start_pos)
+ {
+        int ret;
+-       struct user_fpsimd_state newstate =
+-               target->thread.fpsimd_state.user_fpsimd;
++       struct user_fpsimd_state newstate;
+ 
+        sve_sync_to_fpsimd(target);
+ 
++       newstate = target->thread.fpsimd_state.user_fpsimd;
++
+        ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf, &newstate,
+[...]
+
+(Or were you confident that this was already OK?  Maybe I'm confusing
+myself.)
+
+> need this since we are going to override the FPSIMD state anyway here.
+
+The underlying reason for this is the issue of what should happen
+for short regset writes.  Historically, writes through fpr_set() can
+be truncated arbitrarily, and the rest of fpsimd_state will remain
+unchanged.
+
+The issue is that if TIF_SVE is set, fpsimd_state can be stale for
+target.  If the initial sve_sync_to_fpsimd() is removed in sve_set()
+above, then we may resurrect old values for the untouched registers,
+instead of simply leaving them unmodified.
+
+Should I add comments explaining the purpose?  I guess it is rather
+non-obvious.
 
 
-Do you mean "usb_mon: usb-mon at 54" ?
+Of course, I don't know whether userspace should really rely on partial
+regset writes doing anything sane, but I figured the implemented
+behaviour is at least less surprising with respect to the fpr_set()
+behavior.
+
+No legacy software can be relying on NT_ARM_SVE at all, so the behaviour
+here may not matter that much.  My idea was to reduce the invasiveness
+of porting ptrace clients to use NT_ARM_SVE.
+
+> 
+> > +
+> > +	/* Otherwise: full SVE case */
+> > +
+> > +	/*
+> > +	 * If setting a different VL from the requested VL and there is
+> > +	 * register data, the data layout will be wrong: don't even
+> > +	 * try to set the registers in this case.
+> > +	 */
+> > +	if (count && vq != sve_vq_from_vl(header.vl)) {
+> > +		ret = -EIO;
+> > +		goto out;
+> > +	}
+> > +
+> > +	sve_alloc(target);
+> > +	fpsimd_sync_to_sve(target);
+> 
+> Similarly here, it's a full SVE case, so we are going to override it
+> anyway.
+
+The argument here is similar: target->sve_state might already be
+allocated and if so it could contain data that doesn't match the user
+task's idea of what's in the V-regs.  (In fact, sve_alloc() currently
+zeroes sve_state, but that's still different from the current V-regs.)
+
+There is no possibility of legacy software relying on this code path,
+so we could say that a short write to NT_ARM_SVE with PT_SVE_REGS_SVE
+in flags zeroes any trailing data instead of preserving it.
 
 
-DT files in kernel sprinkle tons of warnings even with W=1.
+Either way, I don't intend to document the behaviour of partial
+writes to NT_ARM_SVE.  From a userspace point of view, I leave it
+unspecified.
 
-I always eliminate W=1, so I agree with "@54".
+> > +	set_tsk_thread_flag(target, TIF_SVE);
+> 
+> This has the side-effect of enabling TIF_SVE even for PTRACE_SYSCALL
+> which may be cleared in some circumstances. It may not be an issue
+> though.
 
-I do not care W=2 much.
-If you see arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi,
-yeah, I generally use '-' for node names, but I see some exceptions.
+I would argue that this is correct behaviour: the syscall enter trap and
+exit traps should both behave as if they are outside the syscall,
+allowing the debugger to simulate the effect of inserting any
+instructions the target could have inserted before or after the SVC.
+This may include simulating SVE instructions or modifying SVE regs,
+which would require TIF_SVE to get set.
 
-You admitted -Wnode_name_chars_strict is "subjective"
-in commit 8654cb8d0371.
+If the tracer doesn't cancel the syscall at the enter trap, then a
+real syscall will execute and that may cause the SVE state to be
+discarded in the usual way in the case of preemption or blocking: it
+seems cleaner for the debug illusion that this decision isn't made
+differently just because the target is being traced.
 
-If you are unhappy about it, we can fix,
-but I am not sure how picky we should be.
-
-
-
-
-
->> +                             reg = <0x54 0xc>;
->
-> Without ranges above, this is address 5f900054. I think you want
-> 5f900254. You need:
->
-> ranges = <0x0 0x200 0x68>;
-
-
-I do not get it.
-
-The parent is an efuse, not any kind of bus.
-
-<0x54, 0c> just represents the offset and size
-within the efuse device, so this is not mapped in
-CPU address view.
-The is apparent from of_nvmem_cell_get().
-
-Some efuse devices _may_ be directly accessed
-as MMIO from CPU, but it is abstracted under an efuse driver.
-
-I believe missing "ranges" is correct.
+(Spoiler alert though: the syscall exit trap will force the target
+to be scheduled out, which will force discard with the current
+task_fpsimd_save() behaviour ... but that could be changed in the
+future, and I prefer not to document any sort of guarantee here.)
 
 
+Does this make sense?  There may be issues or corner cases here
+that I didn't spot...
 
-
-
->> +                     };
->> +             };
->> +     };
->> +
->> += Data consumers =
->> +Are device nodes which consume nvmem data cells.
->> +
->> +Example:
->> +
->> +     usb {
->> +             ...
->> +             nvmem-cells = <&usb_mon>;
->> +             nvmem-cell-names = "usb_mon";
->> +     }
->> --
->> 2.7.4
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+Cheers
+---Dave
