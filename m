@@ -1,125 +1,83 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 13 Oct 2017 13:42:18 -0500
-Subject: [PATCH v2 1/3] dt-bindings: nvmem: add description for UniPhier
- eFuse
-In-Reply-To: <CAK7LNARg6G152joHq06RkPab=NoWEkFArvF+Ccc1behdXFokmg@mail.gmail.com>
-References: <1507266180-11840-1-git-send-email-hayashibara.keiji@socionext.com>
- <1507266180-11840-2-git-send-email-hayashibara.keiji@socionext.com>
- <20171013134902.7gvmkvxvwnjlmstp@rob-hp-laptop>
- <CAK7LNARg6G152joHq06RkPab=NoWEkFArvF+Ccc1behdXFokmg@mail.gmail.com>
-Message-ID: <CAL_JsqJdbLFHqEU8+1e_hvA3Hd1MLJHETWAkd2pcsXpDKwONog@mail.gmail.com>
+From: jeffy.chen@rock-chips.com (jeffy)
+Date: Sat, 14 Oct 2017 02:44:01 +0800
+Subject: [RESEND PATCH 1/2] spi: rockchip: Convert to late and early system
+ PM callbacks
+In-Reply-To: <20171013183006.k6pzcr5tcwsxxtmp@dtor-ws>
+References: <20171013104138.3216-1-jeffy.chen@rock-chips.com>
+ <20171013104138.3216-2-jeffy.chen@rock-chips.com>
+ <CAD=FV=X6pkaY3t=ceh3QEUws+_gqRGMN9zveW0fXR1noF1T6ew@mail.gmail.com>
+ <20171013155120.GA137489@google.com>
+ <20171013164235.thgqha7sl5tdptwv@sirena.co.uk>
+ <59E103B0.8060705@rock-chips.com> <20171013183006.k6pzcr5tcwsxxtmp@dtor-ws>
+Message-ID: <59E10971.6020200@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 13, 2017 at 11:04 AM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> Hi Rob,
+Hi Dmitry,
+
+On 10/14/2017 02:30 AM, Dmitry Torokhov wrote:
+> On Sat, Oct 14, 2017 at 02:19:28AM +0800, jeffy wrote:
+>> Hi guys,
+>>
+>> it looks like the suspend sequence depends on the dt node sequence, and we
+>> are putting display-subsystem dt node above spi dt node, so it would be
+>> earlier in the device list, then got suspended later than spi device.
 >
+> Would it not get a deferral when trying to get resource reference, which
+> would cause it bumped down to the end of dpm list?
+hmm, right, check again, the rockchip drm would not depend on spi, but 
+the edp driver does.
+
+so the drm driver(display-subsystem) would probed before spi, but try to 
+control the backlight in the suspend/resume...
+
+so i was wrong in the commit message, will fix it in next version.
 >
-> 2017-10-13 22:49 GMT+09:00 Rob Herring <robh@kernel.org>:
->> On Fri, Oct 06, 2017 at 02:02:58PM +0900, Keiji Hayashibara wrote:
->>> Add uniphier-efuse dt-bindings documentation.
+>>
+>> the pwm backlight and cros_ec_spi pwm are very interesting, not only about
+>> suspend dependency... if we unbind cros_ec_spi pwm, the pwm backlight would
+>> still hold a reference to it, and crash the kernel later.
+>
+> That would be a bug in PWM/cors_ec and it should keep the PWM object
+> until last reference drops and simply error out on all requests.
+right, and maybe try to refresh the pwm reference when we bind it again
+>
+>>
+>> On 10/14/2017 12:42 AM, Mark Brown wrote:
+>>> On Fri, Oct 13, 2017 at 08:51:21AM -0700, Brian Norris wrote:
 >>>
->>> Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
->>> ---
->>>  .../devicetree/bindings/nvmem/uniphier-efuse.txt   | 49 ++++++++++++++++++++++
->>>  1 file changed, 49 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt
+>>>> Yes, this does seem odd to me too. This looks like an arms race hack
+>>>> that should be avoided unless we know a legit root cause. Also,
+>>>> "probe order implies suspend order" doesn't quite work for async suspend
+>>>> anyway, so we'd probably want to express the dependency properly
+>>>> anyway.
 >>>
->>> diff --git a/Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt b/Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt
->>> new file mode 100644
->>> index 0000000..1a394e5
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt
->>> @@ -0,0 +1,49 @@
->>> += UniPhier eFuse device tree bindings =
->>> +
->>> +This UniPhier eFuse must be under soc-glue.
->>> +
->>> +Required properties:
->>> +- compatible: should be "socionext,uniphier-efuse"
->>> +- reg: should contain the register location and length
->>> +
->>> += Data cells =
->>> +Are child nodes of efuse, bindings of which as described in
->>> +bindings/nvmem/nvmem.txt
->>> +
->>> +Example:
->>> +
->>> +     soc-glue at 5f900000 {
->>> +             compatible = "socionext,uniphier-ld20-soc-glue-debug",
->>> +                          "simple-mfd";
->>> +             #address-cells = <1>;
->>> +             #size-cells = <1>;
->>> +             ranges = <0x0 0x5f900000 0x2000>;
->>> +
->>> +             efuse at 100 {
->>> +                     compatible = "socionext,uniphier-efuse";
->>> +                     reg = <0x100 0x28>;
->>> +             };
->>> +
->>> +             efuse at 200 {
->>> +                     compatible = "socionext,uniphier-efuse";
->>> +                     reg = <0x200 0x68>;
->>> +                     #address-cells = <1>;
->>> +                     #size-cells = <1>;
->>> +
->>> +                     /* Data cells */
->>> +                     usb_mon: usb_mon {
+>>> Yeah, it's the same stuff as we get with initcall ordering.  This sort
+>>> of thing does happen with things like PMICs which tend to have hardware
+>>> that the system wants to manipulate in the IRQs off part of suspend.
+>>> Ideally the dependency annotation stuff would figure things out though
+>>> I'm not sure what the status of that is.
+>
+> I'd say non-existent for resources such as regulators, pwms, clocks,
+> etc. I do not think many places call device_link_add()... I think adding
+> this to devm_* APIs might be easiest to get the ball going as they
+> naturally have consumer device and can easily figure out the supplier
+> side.
+>
+>>>
+>>>> Any chance this is related? Seems like that might break the parent/child
+>>>> relationship for master/slave:
+>>>
+>>>> commit d7e2ee257038baeb03baef602500368a51ee9eef
+>>>> Author: Linus Walleij <linus.walleij@linaro.org>
+>>>> Date:   Mon Apr 11 13:51:03 2016 +0200
+>>>
+>>>>       spi: let SPI masters ignore their children for PM
+>>>
+>>> That's for runtime PM, I'd not expect it to affect system suspend.
+>>>
 >>
->> Don't use '_' and needs a unit-address. Build your dtb with W=2 option
->> and you'll get these warnings.
->
->
-> Do you mean "usb_mon: usb-mon at 54" ?
-
-Yes.
-
-> DT files in kernel sprinkle tons of warnings even with W=1.
->
-> I always eliminate W=1, so I agree with "@54".
->
-> I do not care W=2 much.
-> If you see arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi,
-> yeah, I generally use '-' for node names, but I see some exceptions.
->
-> You admitted -Wnode_name_chars_strict is "subjective"
-> in commit 8654cb8d0371.
-
-Yes, meaning fixing existing cases is questionable and I'd put doing
-so at a lower priority. I didn't mean it is up to each person to
-decide whether they like to use '_' or not.
-
-> If you are unhappy about it, we can fix,
-> but I am not sure how picky we should be.
-
-Let me put it clearly: Don't add new warnings with W=2.
-
-
->
->
->>> +                             reg = <0x54 0xc>;
 >>
->> Without ranges above, this is address 5f900054. I think you want
->> 5f900254. You need:
->>
->> ranges = <0x0 0x200 0x68>;
 >
+> Thanks.
 >
-> I do not get it.
->
-> The parent is an efuse, not any kind of bus.
->
-> <0x54, 0c> just represents the offset and size
-> within the efuse device, so this is not mapped in
-> CPU address view.
-> The is apparent from of_nvmem_cell_get().
->
-> Some efuse devices _may_ be directly accessed
-> as MMIO from CPU, but it is abstracted under an efuse driver.
->
-> I believe missing "ranges" is correct.
-
-Okay, you're right. If those are not memory mapped then it is fine.
-
-Rob
