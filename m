@@ -1,69 +1,60 @@
 From: d-gerlach@ti.com (Dave Gerlach)
-Date: Fri, 13 Oct 2017 15:59:14 -0500
-Subject: [PATCH v5 1/2] Documentation: dt: Update ti,emif bindings
-In-Reply-To: <20171013205915.9652-1-d-gerlach@ti.com>
-References: <20171013205915.9652-1-d-gerlach@ti.com>
-Message-ID: <20171013205915.9652-2-d-gerlach@ti.com>
+Date: Fri, 13 Oct 2017 15:59:13 -0500
+Subject: [PATCH v5 0/2] memory: Introduce ti-emif-sram driver
+Message-ID: <20171013205915.9652-1-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the Texas Instruments EMIF binding document to include the device
-tree bindings for ti,emif-am3352 and ti,emif-am4372 which are used by
-the ti-emif-sram driver to provide low-level PM functionality.
+Hi,
+This is v5 of the series introduces a ti-emif-sram driver to be used on
+am335x and am437x. The previous version of this 
+series can be found here [1].
 
-Acked-by: Rob Herring <robh@kernel.org>
-Acked-by: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
- .../devicetree/bindings/memory-controllers/ti/emif.txt | 18 +++++++++++++++++-
- 1 file changed, 17 insertions(+), 1 deletion(-)
+The only change to this version is to greatly simplify the makefile rules
+used to generate the emif-asm-offsets header to fix some build issues
+caught by the kbuild robot. The file has been renamed as ti-emif-asm-offsets.h
+and is also now placed under include/generated so that it is handled along
+with the other generated headers.
 
-diff --git a/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt b/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
-index 0db60470ebb6..8c0214b17c2b 100644
---- a/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
-+++ b/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
-@@ -8,6 +8,7 @@ of the EMIF IP and memory parts attached to it.
- Required properties:
- - compatible	: Should be of the form "ti,emif-<ip-rev>" where <ip-rev>
-   is the IP revision of the specific EMIF instance.
-+		  For am335x should be ti,emif-am3352.
- 		  For am437x should be ti,emif-am4372.
- 
- - phy-type	: <u32> indicating the DDR phy type. Following are the
-@@ -21,6 +22,13 @@ Required properties:
-   the value shall be "emif<n>" where <n> is the number of the EMIF
-   instance with base 1.
- 
-+Required only for "ti,emif-am3352" and "ti,emif-am4372":
-+- sram			: Phandles for generic sram driver nodes,
-+  first should be type 'protect-exec' for the driver to use to copy
-+  and run PM functions, second should be regular pool to be used for
-+  data region for code. See Documentation/devicetree/bindings/sram/sram.txt
-+  for more details.
-+
- Optional properties:
- - cs1-used		: Have this property if CS1 of this EMIF
-   instance has a memory part attached to it. If there is a memory
-@@ -42,7 +50,7 @@ Optional properties:
- - hw-caps-temp-alert	: Have this property if the controller
-   has capability for generating SDRAM temperature alerts
- 
--Example:
-+-Examples:
- 
- emif1: emif at 0x4c000000 {
- 	compatible	= "ti,emif-4d";
-@@ -54,3 +62,11 @@ emif1: emif at 0x4c000000 {
- 	hw-caps-ll-interface;
- 	hw-caps-temp-alert;
- };
-+
-+/* From am33xx.dtsi */
-+emif: emif at 4c000000 {
-+        compatible = "ti,emif-am3352";
-+        reg =   <0x4C000000 0x1000>;
-+        sram = <&pm_sram_code
-+                &pm_sram_data>;
-+};
+The macros were left inside the "ti_emif_offsets" inline function in the
+ti-emif-sram header as they are also needed by the sleep33xx and sleep43xx
+from the "code (seen here [2]), and describing the build depency on the
+generated ti-emif-asm-offsets.h file got messy. Just including the macros in
+the asm-offsets file generated for the arch/arm/mach-omap2 was the cleanest
+way I could come up with, otherwise ensuring that ti-emif-asm-offsets.h is
+generated before sleep33/43xx.S gets built was problematic. Of course,
+I am open to a better idea if someone has one.
+
+This code is required for low-power modes to work on AM335x and AM437x and a
+forthcoming PM series for those platforms will depend on this series. After
+both this and the PM series are reviewed I will send the necessary device tree
+changes for both, but in the meantime all remaining patches for am335x and
+am437x PM can be found here [3].
+
+Regards,
+Dave
+
+[1] https://www.spinics.net/lists/arm-kernel/msg607959.html
+[2] https://www.spinics.net/lists/arm-kernel/msg595934.html
+[3] https://github.com/dgerlach/linux-pm/tree/upstream/v4.14/amx3-suspend-v5
+
+Dave Gerlach (2):
+  Documentation: dt: Update ti,emif bindings
+  memory: ti-emif-sram: introduce relocatable suspend/resume handlers
+
+ .../bindings/memory-controllers/ti/emif.txt        |  18 +-
+ drivers/memory/Kconfig                             |  10 +
+ drivers/memory/Makefile                            |  13 +
+ drivers/memory/emif-asm-offsets.c                  |  22 ++
+ drivers/memory/emif.h                              |  17 ++
+ drivers/memory/ti-emif-pm.c                        | 339 +++++++++++++++++++++
+ drivers/memory/ti-emif-sram-pm.S                   | 334 ++++++++++++++++++++
+ include/linux/ti-emif-sram.h                       | 144 +++++++++
+ 8 files changed, 896 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/memory/emif-asm-offsets.c
+ create mode 100644 drivers/memory/ti-emif-pm.c
+ create mode 100644 drivers/memory/ti-emif-sram-pm.S
+ create mode 100644 include/linux/ti-emif-sram.h
+
 -- 
 2.13.4
