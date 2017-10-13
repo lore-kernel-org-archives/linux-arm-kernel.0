@@ -1,60 +1,52 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 13 Oct 2017 16:49:14 +0100
-Subject: [PATCH v3 07/13] firmware: arm_sdei: Add driver for Software
- Delegated Exceptions
-In-Reply-To: <20170922182614.27885-8-james.morse@arm.com>
-References: <20170922182614.27885-1-james.morse@arm.com>
- <20170922182614.27885-8-james.morse@arm.com>
-Message-ID: <20171013154914.ktxecc6zobh7fmr6@armageddon.cambridge.arm.com>
+From: briannorris@chromium.org (Brian Norris)
+Date: Fri, 13 Oct 2017 08:51:21 -0700
+Subject: [RESEND PATCH 1/2] spi: rockchip: Convert to late and early
+ system PM callbacks
+In-Reply-To: <CAD=FV=X6pkaY3t=ceh3QEUws+_gqRGMN9zveW0fXR1noF1T6ew@mail.gmail.com>
+References: <20171013104138.3216-1-jeffy.chen@rock-chips.com>
+ <20171013104138.3216-2-jeffy.chen@rock-chips.com>
+ <CAD=FV=X6pkaY3t=ceh3QEUws+_gqRGMN9zveW0fXR1noF1T6ew@mail.gmail.com>
+Message-ID: <20171013155120.GA137489@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 22, 2017 at 07:26:08PM +0100, James Morse wrote:
-> The Software Delegated Exception Interface (SDEI) is an ARM standard
-> for registering callbacks from the platform firmware into the OS.
-> This is typically used to implement firmware notifications (such as
-> firmware-first RAS) or promote an IRQ that has been promoted to a
-> firmware-assisted NMI.
-> 
-> Add the code for detecting the SDEI version and the framework for
-> registering and unregistering events. Subsequent patches will add the
-> arch-specific backend code and the necessary power management hooks.
-> 
-> Only shared events are supported, power management, private events and
-> discovery for ACPI systems will be added by later patches.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> ---
-> Changes since v2:
->  * Copy the priority into the structure the arch asm handler gets. This
->    is used for VMAP stacks where we can't know if a critical event interrupted
->    a normal priority event, thus they need separate stacks.
-> 
-> Changes since v1:
->  * Changed entry point to unsigned long, if we support non-vhe systems this
->    won't be a valid pointer
->  * Made invoke_sdei_fn() pass the only register we are interested in, instead
->    of the whole arm_smccc_res
->  * Made all the locking WARN_ON()s lockdep_assert_held()s.
->  * Moved more messages from 'err' to 'warn'.
->  * Made IS_SDEI_CALL() not depend on whether the config option is selected.
->  * Made 'event failed' messages rate limited.
-> 
->  drivers/firmware/Kconfig    |   7 +
->  drivers/firmware/Makefile   |   1 +
->  drivers/firmware/arm_sdei.c | 616 ++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/sdei.h        | 100 +++++++
->  include/uapi/linux/sdei.h   |  91 +++++++
->  5 files changed, 815 insertions(+)
->  create mode 100644 drivers/firmware/arm_sdei.c
->  create mode 100644 include/linux/sdei.h
->  create mode 100644 include/uapi/linux/sdei.h
+Hi,
 
-I haven't reviewed this patch (yet...). However, I think it's worth
-adding a MAINTAINERS entry with your name on it (unless you really want
-to distance yourself from this code once merged ;)).
+On Fri, Oct 13, 2017 at 08:32:12AM -0700, Doug Anderson wrote:
+> Hi,
+> 
+> On Fri, Oct 13, 2017 at 3:41 AM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
+> > Currently we are suspending the spi master in it's ->suspend callback,
+> > which is racy as some other drivers may still want to transmit messages
+> > on the bus(e.g. spi based pwm backlight).
+> >
+> > Convert to late and early system PM callbacks to avoid the race.
+> >
+> > Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> > ---
+> >
+> >  drivers/spi/spi-rockchip.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> It shouldn't hurt to do this, but I'm curious if you did any digging
+> about why this happens?  As I understood it suspend order is supposed
+> to be opposite of probe order.  Thus anything that was able to get a
+> reference to the cros-ec PWM at its probe time should get suspended
+> before cros-ec suspends.
 
-Thanks.
+Yes, this does seem odd to me too. This looks like an arms race hack
+that should be avoided unless we know a legit root cause. Also,
+"probe order implies suspend order" doesn't quite work for async suspend
+anyway, so we'd probably want to express the dependency properly
+anyway.
 
--- 
-Catalin
+Any chance this is related? Seems like that might break the parent/child
+relationship for master/slave:
+
+commit d7e2ee257038baeb03baef602500368a51ee9eef
+Author: Linus Walleij <linus.walleij@linaro.org>
+Date:   Mon Apr 11 13:51:03 2016 +0200
+
+    spi: let SPI masters ignore their children for PM
+
+Brian
