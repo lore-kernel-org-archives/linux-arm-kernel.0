@@ -1,64 +1,186 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Fri, 13 Oct 2017 20:51:21 +0200
-Subject: [PATCH 05/37] KVM: Record the executing ioctl number on the vcpu
- struct
-In-Reply-To: <20171013183812.GA26563@flask>
-References: <20171012104141.26902-1-christoffer.dall@linaro.org>
- <20171012104141.26902-6-christoffer.dall@linaro.org>
- <20171013171307.GA16116@flask>
- <20171013173151.GA17578@cbox> <20171013183812.GA26563@flask>
-Message-ID: <CAMJs5B92f9dxZDwuLz_GCgSCmeCRdG=oZzwnfSwKxikYQyncvw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 13 Oct 2017 19:59:17 +0100
+Subject: [PATCH v2 4/4] iommu/arm-smmu-v3: Poll for CMD_SYNC outside cmdq
+ lock
+In-Reply-To: <ff239173e47dfa0fc76eaa2a25b3cbcfe8dce5e6.1504182142.git.robin.murphy@arm.com>
+References: <cover.1504182142.git.robin.murphy@arm.com>
+ <ff239173e47dfa0fc76eaa2a25b3cbcfe8dce5e6.1504182142.git.robin.murphy@arm.com>
+Message-ID: <20171013185917.GB30572@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 13, 2017 at 8:38 PM, Radim Kr?m?? <rkrcmar@redhat.com> wrote:
-> 2017-10-13 19:31+0200, Christoffer Dall:
->> On Fri, Oct 13, 2017 at 07:13:07PM +0200, Radim Kr?m?? wrote:
->> > I think that other (special) callsites of vcpu_load()/vcpu_put() have a
->> > well defined IOCTL that can be used instead of vcpu->ioctl, so we could
->> > just pass the ioctl value all the way to arch code and never save it
->> > anywhere,
->>
->> I don't think that works; what would you do with preempt notifier calls?
->
-> Right, BUG :), I didn't consider them before and they need to know.
->
->> One solution is to add a parameter to vcpu_put, lie for vcpu_load, which
->> also sets the ioctl, and other callers than the final vcpu_put in
->> kvm_vcpu_ioctl() just pass the existing value, where the kvm_vcpu_ioctl
->> call can pass 0 which gets set before releasing the mutex.
->>
->> Can you think of a more elegant solution?
->
-> Not really, only thought of touching preempt notifiers and it seems to
-> be more complicated.
->
-> I think we shouldn't restore ioctl on vcpu_put() at all -- the value
-> isn't well defined outside of the mutex, so there is no point in looking
-> and we can just zero the ioctl.
+Hi Robin,
 
-I agree, that fits with the semantics of vcpu_put() quit nicely actually.
+Some of my comments on patch 3 are addressed here, but I'm really struggling
+to convince myself that this algorithm is correct. My preference would
+be to leave the code as it is for SMMUs that don't implement MSIs, but
+comments below anyway because it's an interesting idea.
 
->
-> Actually, I wouldn't rely on the existing value at all because that.
-> The need for load/put depends on the current code path, not on the one
-> we race with.
->
-> x86 seems to be the only user of vcpu_load() outside of kvm_vcpu_ioctl()
-> and the callers are either under a VM ioctl or under a VM destruction
-> paths (invalid IOCTL) and we can just hardcode that.
+On Thu, Aug 31, 2017 at 02:44:28PM +0100, Robin Murphy wrote:
+> Even without the MSI trick, we can still do a lot better than hogging
+> the entire queue while it drains. All we actually need to do for the
+> necessary guarantee of completion is wait for our particular command to
+> have been consumed, and as long as we keep track of where it is there is
+> no need to block other CPUs from adding further commands in the
+> meantime. There is one theoretical (but incredibly unlikely) edge case
+> to avoid, where cons has wrapped twice to still appear 'behind' the sync
+> position - this is easily disambiguated by adding a generation count to
+> the queue to indicate when prod wraps, since cons cannot wrap twice
+> without prod having wrapped at least once.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+> 
+> v2: New
+> 
+>  drivers/iommu/arm-smmu-v3.c | 81 ++++++++++++++++++++++++++++++++-------------
+>  1 file changed, 58 insertions(+), 23 deletions(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 311f482b93d5..f5c5da553803 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -417,7 +417,6 @@
+>  
+>  /* High-level queue structures */
+>  #define ARM_SMMU_POLL_TIMEOUT_US	100
+> -#define ARM_SMMU_CMDQ_DRAIN_TIMEOUT_US	1000000 /* 1s! */
+>  #define ARM_SMMU_SYNC_TIMEOUT_US	1000000 /* 1s! */
+>  
+>  #define MSI_IOVA_BASE			0x8000000
+> @@ -540,6 +539,7 @@ struct arm_smmu_queue {
+>  struct arm_smmu_cmdq {
+>  	struct arm_smmu_queue		q;
+>  	spinlock_t			lock;
+> +	int				generation;
+>  };
+>  
+>  struct arm_smmu_evtq {
+> @@ -770,21 +770,12 @@ static void queue_inc_prod(struct arm_smmu_queue *q)
+>  	writel(q->prod, q->prod_reg);
+>  }
+>  
+> -/*
+> - * Wait for the SMMU to consume items. If drain is true, wait until the queue
+> - * is empty. Otherwise, wait until there is at least one free slot.
+> - */
+> -static int queue_poll_cons(struct arm_smmu_queue *q, bool drain, bool wfe)
+> +/* Wait for the SMMU to consume items, until there is at least one free slot */
+> +static int queue_poll_cons(struct arm_smmu_queue *q, bool wfe)
+>  {
+> -	ktime_t timeout;
+> -	unsigned int delay = 1;
+> +	ktime_t timeout = ktime_add_us(ktime_get(), ARM_SMMU_POLL_TIMEOUT_US);
+>  
+> -	/* Wait longer if it's queue drain */
+> -	timeout = ktime_add_us(ktime_get(), drain ?
+> -					    ARM_SMMU_CMDQ_DRAIN_TIMEOUT_US :
+> -					    ARM_SMMU_POLL_TIMEOUT_US);
+> -
+> -	while (queue_sync_cons(q), (drain ? !queue_empty(q) : queue_full(q))) {
+> +	while (queue_sync_cons(q), queue_full(q)) {
+>  		if (ktime_compare(ktime_get(), timeout) > 0)
+>  			return -ETIMEDOUT;
+>  
+> @@ -792,8 +783,7 @@ static int queue_poll_cons(struct arm_smmu_queue *q, bool drain, bool wfe)
+>  			wfe();
+>  		} else {
+>  			cpu_relax();
+> -			udelay(delay);
+> -			delay *= 2;
+> +			udelay(1);
+>  		}
+>  	}
+>  
+> @@ -959,15 +949,20 @@ static void arm_smmu_cmdq_skip_err(struct arm_smmu_device *smmu)
+>  	queue_write(Q_ENT(q, cons), cmd, q->ent_dwords);
+>  }
+>  
+> -static void arm_smmu_cmdq_insert_cmd(struct arm_smmu_device *smmu, u64 *cmd)
+> +static u32 arm_smmu_cmdq_insert_cmd(struct arm_smmu_device *smmu, u64 *cmd)
+>  {
+>  	struct arm_smmu_queue *q = &smmu->cmdq.q;
+>  	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
+>  
+>  	while (queue_insert_raw(q, cmd) == -ENOSPC) {
+> -		if (queue_poll_cons(q, false, wfe))
+> +		if (queue_poll_cons(q, wfe))
+>  			dev_err_ratelimited(smmu->dev, "CMDQ timeout\n");
+>  	}
+> +
+> +	if (Q_IDX(q, q->prod) == 0)
+> +		smmu->cmdq.generation++;
 
-Yes, we should.  I honestly just wanted feedback on this before
-tracing through all call paths to the vcpu_load() calls on the x86
-side.
+The readers of generation are using READ_ONCE, so you're missing something
+here.
 
->
-> Passing 0 to all other vcpu_load()s and unconditionally zeroing ioctl
-> before mutex_unlock() should work.
+> +
+> +	return q->prod;
+>  }
+>  
+>  static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
+> @@ -997,15 +992,54 @@ static int arm_smmu_sync_poll_msi(struct arm_smmu_device *smmu, u32 sync_idx)
+>  	return (int)(val - sync_idx) < 0 ? -ETIMEDOUT : 0;
+>  }
+>  
+> +static int arm_smmu_sync_poll_cons(struct arm_smmu_device *smmu, u32 sync_idx,
+> +				   int sync_gen)
+> +{
+> +	ktime_t timeout = ktime_add_us(ktime_get(), ARM_SMMU_SYNC_TIMEOUT_US);
+> +	struct arm_smmu_queue *q = &smmu->cmdq.q;
+> +	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
+> +	unsigned int delay = 1;
+> +
+> +	do {
+> +		queue_sync_cons(q);
+> +		/*
+> +		 * If we see updates quickly enough, cons has passed sync_idx,
+> +		 * but not yet wrapped. At worst, cons might have actually
+> +		 * wrapped an even number of times, but that still guarantees
+> +		 * the original sync must have been consumed.
+> +		 */
+> +		if (Q_IDX(q, q->cons) >= Q_IDX(q, sync_idx) &&
+> +		    Q_WRP(q, sync_idx) == Q_WRP(q, q->cons))
 
+Can you move this into a separate function please, like we have for
+queue_full and queue_empty?
 
-Agreed.  I'll do that for the next version.
+> +			return 0;
+> +		/*
+> +		 * Otherwise, cons may have passed sync_idx and wrapped one or
+> +		 * more times to appear behind it again, but in that case prod
+> +		 * must also be one or more generations ahead.
+> +		 */
+> +		if (Q_IDX(q, q->cons) < Q_IDX(q, sync_idx) &&
+> +		    READ_ONCE(smmu->cmdq.generation) != sync_gen)
 
-Thanks for having a look!
+There's another daft overflow case here which deserves a comment (and even
+if it *did* happen, we'll recover gracefully).
 
--Christoffer
+> +			return 0;
+> +
+> +		if (wfe) {
+> +			wfe();
+
+This is a bit scary... if we miss a generation update, just due to store
+propagation latency (maybe it's buffered by the updater), I think we can
+end up going into wfe when there's not an event pending. Using xchg
+everywhere might work, but there's still a race on having somebody update
+generation. The ordering here just looks generally suspicious to me because
+you have the generation writer in arm_smmu_cmdq_insert_cmd effectively
+doing:
+
+  Write prod
+  Write generation
+
+and the reader in arm_smmu_sync_poll_cons doing:
+
+  Read cons
+  Read generation
+
+so I can't see anything that gives you order to guarantee that the
+generation is seen to be up-to-date.
+
+But it's also Friday evening and my brain is pretty fried ;)
+
+Will
