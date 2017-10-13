@@ -1,43 +1,94 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 13 Oct 2017 12:26:44 +0100
-Subject: [RESEND PATCH 1/2] irqdesc: Add function to identify percpu_devid irqs
+Date: Fri, 13 Oct 2017 12:26:45 +0100
+Subject: [RESEND PATCH 2/2] arm/arm64: pmu: Distinguish percpu irq and
+ percpu_devid irq
 In-Reply-To: <1507894005-53778-1-git-send-email-julien.thierry@arm.com>
 References: <1507894005-53778-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1507894005-53778-2-git-send-email-julien.thierry@arm.com>
+Message-ID: <1507894005-53778-3-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-irq_is_percpu indicates whether an irq should only target a single cpu.
-PERCPU_DEVID flag indicates that an irq can be configured differently on
-each cpu it can target.
+arm_pmu interrupts are maked as PERCPU even when these are not local
+physical interrupts to a single CPU. When using non-local interrupts,
+interrupts marked as PERCPU will not get freed not disabled properly
+by the PMU driver.
 
-Provide a function to check whether an irq is PERCPU_DEVID.
+Check if interrupts are local to a single CPU with PERCPU_DEVID since
+this is what the PMU driver really needs to know.
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
+Will Deacon <will.deacon@arm.com>
+Mark Rutland <mark.rutland@arm.com>
 ---
- include/linux/irqdesc.h | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/perf/arm_pmu.c          | 10 +++++-----
+ drivers/perf/arm_pmu_platform.c |  4 ++--
+ 2 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/include/linux/irqdesc.h b/include/linux/irqdesc.h
-index 3e90a09..93960cf 100644
---- a/include/linux/irqdesc.h
-+++ b/include/linux/irqdesc.h
-@@ -244,6 +244,14 @@ static inline int irq_is_percpu(unsigned int irq)
- 	return desc->status_use_accessors & IRQ_PER_CPU;
- }
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index d14fc2e..7bc5eee 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -539,7 +539,7 @@ void armpmu_free_irq(struct arm_pmu *armpmu, int cpu)
+ 	if (!cpumask_test_and_clear_cpu(cpu, &armpmu->active_irqs))
+ 		return;
 
-+static inline int irq_is_percpu_devid(unsigned int irq)
-+{
-+	struct irq_desc *desc;
-+
-+	desc = irq_to_desc(irq);
-+	return desc->status_use_accessors & IRQ_PER_CPU_DEVID;
-+}
-+
- static inline void
- irq_set_lockdep_class(unsigned int irq, struct lock_class_key *class)
- {
+-	if (irq_is_percpu(irq)) {
++	if (irq_is_percpu_devid(irq)) {
+ 		free_percpu_irq(irq, &hw_events->percpu_pmu);
+ 		cpumask_clear(&armpmu->active_irqs);
+ 		return;
+@@ -565,10 +565,10 @@ int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
+ 	if (!irq)
+ 		return 0;
+
+-	if (irq_is_percpu(irq) && cpumask_empty(&armpmu->active_irqs)) {
++	if (irq_is_percpu_devid(irq) && cpumask_empty(&armpmu->active_irqs)) {
+ 		err = request_percpu_irq(irq, handler, "arm-pmu",
+ 					 &hw_events->percpu_pmu);
+-	} else if (irq_is_percpu(irq)) {
++	} else if (irq_is_percpu_devid(irq)) {
+ 		int other_cpu = cpumask_first(&armpmu->active_irqs);
+ 		int other_irq = per_cpu(hw_events->irq, other_cpu);
+
+@@ -649,7 +649,7 @@ static int arm_perf_starting_cpu(unsigned int cpu, struct hlist_node *node)
+
+ 	irq = armpmu_get_cpu_irq(pmu, cpu);
+ 	if (irq) {
+-		if (irq_is_percpu(irq)) {
++		if (irq_is_percpu_devid(irq)) {
+ 			enable_percpu_irq(irq, IRQ_TYPE_NONE);
+ 			return 0;
+ 		}
+@@ -667,7 +667,7 @@ static int arm_perf_teardown_cpu(unsigned int cpu, struct hlist_node *node)
+ 		return 0;
+
+ 	irq = armpmu_get_cpu_irq(pmu, cpu);
+-	if (irq && irq_is_percpu(irq))
++	if (irq && irq_is_percpu_devid(irq))
+ 		disable_percpu_irq(irq);
+
+ 	return 0;
+diff --git a/drivers/perf/arm_pmu_platform.c b/drivers/perf/arm_pmu_platform.c
+index 4eafa7a..bbc64ee 100644
+--- a/drivers/perf/arm_pmu_platform.c
++++ b/drivers/perf/arm_pmu_platform.c
+@@ -126,7 +126,7 @@ static int pmu_parse_irqs(struct arm_pmu *pmu)
+
+ 	if (num_irqs == 1) {
+ 		int irq = platform_get_irq(pdev, 0);
+-		if (irq && irq_is_percpu(irq))
++		if (irq && irq_is_percpu_devid(irq))
+ 			return pmu_parse_percpu_irq(pmu, irq);
+ 	}
+
+@@ -149,7 +149,7 @@ static int pmu_parse_irqs(struct arm_pmu *pmu)
+ 		if (WARN_ON(irq <= 0))
+ 			continue;
+
+-		if (irq_is_percpu(irq)) {
++		if (irq_is_percpu_devid(irq)) {
+ 			pr_warn("multiple PPIs or mismatched SPI/PPI detected\n");
+ 			return -EINVAL;
+ 		}
 --
 1.9.1
