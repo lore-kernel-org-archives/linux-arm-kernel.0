@@ -1,37 +1,94 @@
 From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Fri, 13 Oct 2017 18:41:37 +0800
-Subject: [RESEND PATCH 1/2] spi: rockchip: Convert to late and early system PM
- callbacks
+Date: Fri, 13 Oct 2017 18:41:38 +0800
+Subject: [RESEND PATCH 2/2] arm64: dts: rockchip: Enable edp disaplay on kevin
 In-Reply-To: <20171013104138.3216-1-jeffy.chen@rock-chips.com>
 References: <20171013104138.3216-1-jeffy.chen@rock-chips.com>
-Message-ID: <20171013104138.3216-2-jeffy.chen@rock-chips.com>
+Message-ID: <20171013104138.3216-3-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we are suspending the spi master in it's ->suspend callback,
-which is racy as some other drivers may still want to transmit messages
-on the bus(e.g. spi based pwm backlight).
-
-Convert to late and early system PM callbacks to avoid the race.
+Add edp panel and enable related nodes on kevin.
 
 Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 ---
 
- drivers/spi/spi-rockchip.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 29 +++++++++++++++++++++++
+ arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi      | 16 +++++++++++++
+ 2 files changed, 45 insertions(+)
 
-diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
-index fdcf3076681b..ae539c735ea6 100644
---- a/drivers/spi/spi-rockchip.c
-+++ b/drivers/spi/spi-rockchip.c
-@@ -914,7 +914,7 @@ static int rockchip_spi_runtime_resume(struct device *dev)
- #endif /* CONFIG_PM */
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+index a3d3cea7dc4f..bc67b19f0af5 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+@@ -93,6 +93,18 @@
+ 		pwm-delay-us = <10000>;
+ 	};
  
- static const struct dev_pm_ops rockchip_spi_pm = {
--	SET_SYSTEM_SLEEP_PM_OPS(rockchip_spi_suspend, rockchip_spi_resume)
-+	SET_LATE_SYSTEM_SLEEP_PM_OPS(rockchip_spi_suspend, rockchip_spi_resume)
- 	SET_RUNTIME_PM_OPS(rockchip_spi_runtime_suspend,
- 			   rockchip_spi_runtime_resume, NULL)
++	edp_panel: edp-panel {
++		compatible = "sharp,lq123p1jx31", "simple-panel";
++		backlight = <&backlight>;
++		power-supply = <&pp3300_disp>;
++
++		ports {
++			panel_in_edp: endpoint {
++				remote-endpoint = <&edp_out_panel>;
++			};
++		};
++	};
++
+ 	thermistor_ppvar_bigcpu: thermistor-ppvar-bigcpu {
+ 		compatible = "murata,ncp15wb473";
+ 		pullup-uv = <1800000>;
+@@ -264,6 +276,23 @@ ap_i2c_dig: &i2c2 {
+ 	};
  };
+ 
++&edp {
++	status = "okay";
++
++	ports {
++		edp_out: port at 1 {
++			reg = <1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			edp_out_panel: endpoint at 0 {
++				reg = <0>;
++				remote-endpoint = <&panel_in_edp>;
++			};
++		};
++	};
++};
++
+ &ppvar_bigcpu_pwm {
+ 	regulator-min-microvolt = <798674>;
+ 	regulator-max-microvolt = <1302172>;
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+index 5772c52fbfd3..470105d651c2 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+@@ -927,6 +927,22 @@ ap_i2c_audio: &i2c8 {
+ 	dr_mode = "host";
+ };
+ 
++&vopb {
++	status = "okay";
++};
++
++&vopb_mmu {
++	status = "okay";
++};
++
++&vopl {
++	status = "okay";
++};
++
++&vopl_mmu {
++	status = "okay";
++};
++
+ #include <arm/cros-ec-keyboard.dtsi>
+ #include <arm/cros-ec-sbs.dtsi>
+ 
 -- 
 2.11.0
