@@ -1,30 +1,69 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 13 Oct 2017 17:18:09 +0100
-Subject: [PATCH v11 7/9] arm64/kasan: add and use kasan_map_populate()
-In-Reply-To: <CAOAebxv=u4cKS=_Bvyqs7pDA=5Oi0HNWvC4zRmhCiaEUMgQu3w@mail.gmail.com>
-References: <20171010155619.GA2517@arm.com>
- <CAOAebxv21+KtXPAk-xWz=+2fqWQDgp9SAFZz-N=XsuBxev=zcg@mail.gmail.com>
- <20171010171047.GC2517@arm.com>
- <CAOAebxtrSthSP4NAa0obBbsCK1KZxO+x0w5xNrpY6m2y9UZFvQ@mail.gmail.com>
- <CAOAebxu5WL-FQLgfCxNcWy36V6zsTO1v3LLqXv5rM1Pp9R-=YA@mail.gmail.com>
- <20171013144319.GB4746@arm.com>
- <CAOAebxv4h+8ej6JA_DZbXaNV5JsAk4MbcCLf1+2RvwKGF2+MxQ@mail.gmail.com>
- <20171013154426.GC4746@arm.com>
- <CAOAebxspETEqFXL1Ez_4TK9CAwwk+uhHbYOmZk2QR8b=GO80cQ@mail.gmail.com>
- <CAOAebxv=u4cKS=_Bvyqs7pDA=5Oi0HNWvC4zRmhCiaEUMgQu3w@mail.gmail.com>
-Message-ID: <20171013161809.GE4746@arm.com>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Fri, 13 Oct 2017 17:06:33 +0100
+Subject: [PATCH] ARM: dts: r8a7745: Add IIC cores to dtsi
+Message-ID: <1507910793-13919-1-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 13, 2017 at 12:00:27PM -0400, Pavel Tatashin wrote:
-> BTW, don't we need the same aligments inside for_each_memblock() loop?
+Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+---
+ arch/arm/boot/dts/r8a7745.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-Hmm, yes actually, given that we shift them right for the shadow address.
-
-> How about change kasan_map_populate() to accept regular VA start, end
-> address, and convert them internally after aligning to PAGE_SIZE?
-
-That's what my original patch did, but it doesn't help on its own because
-kasan_populate_zero_shadow would need the same change.
-
-Will
+diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
+index fd40daf..cfba7af 100644
+--- a/arch/arm/boot/dts/r8a7745.dtsi
++++ b/arch/arm/boot/dts/r8a7745.dtsi
+@@ -25,6 +25,8 @@
+ 		i2c3 = &i2c3;
+ 		i2c4 = &i2c4;
+ 		i2c5 = &i2c5;
++		i2c6 = &iic0;
++		i2c7 = &iic1;
+ 		spi0 = &qspi;
+ 		spi1 = &msiof0;
+ 		spi2 = &msiof1;
+@@ -768,6 +770,40 @@
+ 			status = "disabled";
+ 		};
+ 
++		iic0: i2c at e6500000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,iic-r8a7745",
++				     "renesas,rcar-gen2-iic",
++				     "renesas,rmobile-iic";
++			reg = <0 0xe6500000 0 0x425>;
++			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 318>;
++			dmas = <&dmac0 0x61>, <&dmac0 0x62>,
++			       <&dmac1 0x61>, <&dmac1 0x62>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
++			resets = <&cpg 318>;
++			status = "disabled";
++		};
++
++		iic1: i2c at e6510000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,iic-r8a7745",
++				     "renesas,rcar-gen2-iic",
++				     "renesas,rmobile-iic";
++			reg = <0 0xe6510000 0 0x425>;
++			interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 323>;
++			dmas = <&dmac0 0x65>, <&dmac0 0x66>,
++			       <&dmac1 0x65>, <&dmac1 0x66>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
++			resets = <&cpg 323>;
++			status = "disabled";
++		};
++
+ 		mmcif0: mmc at ee200000 {
+ 			compatible = "renesas,mmcif-r8a7745",
+ 				     "renesas,sh-mmcif";
+-- 
+2.7.4
