@@ -1,26 +1,23 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Thu, 12 Oct 2017 23:31:00 -0700
-Subject: [PATCH v5 1/3] PCI: rockchip: Add support for pcie wake irq
-In-Reply-To: <20171013023246.GZ25517@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170911151029.25185-1-jeffy.chen@rock-chips.com>
- <20170911151029.25185-2-jeffy.chen@rock-chips.com>
- <20171013015620.GA94568@google.com>
- <20171013023246.GZ25517@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20171013063100.GB56763@google.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 13 Oct 2017 14:46:42 +0800
+Subject: [PATCH 1/4] ARM: imx: imx31moboard: Include
+ "board-mx31moboard.h" header file
+In-Reply-To: <1506365759-28768-1-git-send-email-marco.franchi@nxp.com>
+References: <1506365759-28768-1-git-send-email-marco.franchi@nxp.com>
+Message-ID: <20171013064640.GG8833@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 12, 2017 at 09:32:47PM -0500, Bjorn Helgaas wrote:
-> On Thu, Oct 12, 2017 at 06:56:22PM -0700, Brian Norris wrote:
-> > Bjorn, were you planning to pick this up?
+On Mon, Sep 25, 2017 at 03:55:56PM -0300, Marco Franchi wrote:
+> The following build warnings are seen with W=1:
 > 
-> I had already applied this to pci/host-rockchip, but I must have gotten
-> interrupted before sending the email.
+> warning: no previous prototype for ?mx31moboard_devboard_init? 
+> [-Wmissing-prototypes] void __init mx31moboard_devboard_init(void)
+> warning: no previous prototype for ?mx31moboard_marxbot_init? 
+> [-Wmissing-prototypes] void __init mx31moboard_marxbot_init(void)
+> 
+> Fix these warnings by including "board-mx31moboard.h".
+> 
+> Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
 
-You also hadn't merged it into your /next branch either, which is where
-I was looking (and basing my other patch set).
-
-> But now that you mention it, I looked at this again and have some
-> questions.  I'll respond to the original patch.
-
-Brian
+Applied all, thanks.
