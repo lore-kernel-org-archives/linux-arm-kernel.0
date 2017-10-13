@@ -1,108 +1,129 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 13 Oct 2017 15:25:24 +0200
-Subject: [RESEND PATCH 2/2] arm64: dts: rockchip: Enable edp disaplay on
- kevin
-In-Reply-To: <20171013104138.3216-3-jeffy.chen@rock-chips.com>
-References: <20171013104138.3216-1-jeffy.chen@rock-chips.com>
- <20171013104138.3216-3-jeffy.chen@rock-chips.com>
-Message-ID: <3037285.0MAZvLKA4I@phil>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 13 Oct 2017 15:21:41 +0200
+Subject: [PATCH v5 1/3] PCI: rockchip: Add support for pcie wake irq
+In-Reply-To: <20171013030441.GA25517@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170911151029.25185-1-jeffy.chen@rock-chips.com>
+ <20170911151029.25185-2-jeffy.chen@rock-chips.com>
+ <20171013030441.GA25517@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <2453698.N4jfPaHx71@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeffy,
+[+cc Tony]
 
-Am Freitag, 13. Oktober 2017, 18:41:38 CEST schrieb Jeffy Chen:
-> Add edp panel and enable related nodes on kevin.
+On Friday, October 13, 2017 5:04:41 AM CEST Bjorn Helgaas wrote:
+> [+cc Rafael, linux-pm]
 > 
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-
-does this actually work with mainline kernel sources?
-
-Sean Paul did look at making the edp work on Chromebooks recently,
-but it seemed there were still parts missing to make it actually display
-something.
-
-
-Heiko
-
-> ---
+> On Mon, Sep 11, 2017 at 11:10:27PM +0800, Jeffy Chen wrote:
+> > Add support for PCIE_WAKE pin in rockchip pcie driver.
+> > 
+> > Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> > ---
+> > 
+> > Changes in v5:
+> > Rebase
+> > 
+> > Changes in v3:
+> > Fix error handling
+> > 
+> > Changes in v2:
+> > Use dev_pm_set_dedicated_wake_irq
+> >         -- Suggested by Brian Norris <briannorris@chromium.com>
+> > 
+> >  drivers/pci/host/pcie-rockchip.c | 19 +++++++++++++++++--
+> >  1 file changed, 17 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
+> > index 9051c6c8fea4..a8b7272597a7 100644
+> > --- a/drivers/pci/host/pcie-rockchip.c
+> > +++ b/drivers/pci/host/pcie-rockchip.c
+> > @@ -37,6 +37,7 @@
+> >  #include <linux/pci_ids.h>
+> >  #include <linux/phy/phy.h>
+> >  #include <linux/platform_device.h>
+> > +#include <linux/pm_wakeirq.h>
+> >  #include <linux/reset.h>
+> >  #include <linux/regmap.h>
+> >  
+> > @@ -995,6 +996,15 @@ static int rockchip_pcie_setup_irq(struct rockchip_pcie *rockchip)
+> >  		return err;
+> >  	}
+> >  
+> > +	/* Must init wakeup before setting dedicated wakeup irq. */
+> > +	device_init_wakeup(dev, true);
+> > +	irq = platform_get_irq_byname(pdev, "wakeup");
+> > +	if (irq >= 0) {
+> > +		err = dev_pm_set_dedicated_wake_irq(dev, irq);
 > 
->  arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 29 +++++++++++++++++++++++
->  arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi      | 16 +++++++++++++
->  2 files changed, 45 insertions(+)
+> I'm a little skeptical about dev_pm_set_dedicated_wake_irq(), not
+> because I know anything at all about it, but because there are only
+> five callers in the whole tree, three of which are in UART code, and
+> none in anything resembling PCI code.
 > 
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-> index a3d3cea7dc4f..bc67b19f0af5 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-> @@ -93,6 +93,18 @@
->  		pwm-delay-us = <10000>;
->  	};
->  
-> +	edp_panel: edp-panel {
-> +		compatible = "sharp,lq123p1jx31", "simple-panel";
-> +		backlight = <&backlight>;
-> +		power-supply = <&pp3300_disp>;
-> +
-> +		ports {
-> +			panel_in_edp: endpoint {
-> +				remote-endpoint = <&edp_out_panel>;
-> +			};
-> +		};
-> +	};
-> +
->  	thermistor_ppvar_bigcpu: thermistor-ppvar-bigcpu {
->  		compatible = "murata,ncp15wb473";
->  		pullup-uv = <1800000>;
-> @@ -264,6 +276,23 @@ ap_i2c_dig: &i2c2 {
->  	};
->  };
->  
-> +&edp {
-> +	status = "okay";
-> +
-> +	ports {
-> +		edp_out: port at 1 {
-> +			reg = <1>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			edp_out_panel: endpoint at 0 {
-> +				reg = <0>;
-> +				remote-endpoint = <&panel_in_edp>;
-> +			};
-> +		};
-> +	};
-> +};
-> +
->  &ppvar_bigcpu_pwm {
->  	regulator-min-microvolt = <798674>;
->  	regulator-max-microvolt = <1302172>;
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-> index 5772c52fbfd3..470105d651c2 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-> @@ -927,6 +927,22 @@ ap_i2c_audio: &i2c8 {
->  	dr_mode = "host";
->  };
->  
-> +&vopb {
-> +	status = "okay";
-> +};
-> +
-> +&vopb_mmu {
-> +	status = "okay";
-> +};
-> +
-> +&vopl {
-> +	status = "okay";
-> +};
-> +
-> +&vopl_mmu {
-> +	status = "okay";
-> +};
-> +
->  #include <arm/cros-ec-keyboard.dtsi>
->  #include <arm/cros-ec-sbs.dtsi>
->  
+> Is Rockchip really that special, or are we going about this the wrong
+> way?
+> 
+> > +		if (err)
+> > +			dev_err(dev, "failed to setup PCIe wakeup IRQ\n");
+> > +	}
+> > +
+> >  	return 0;
+> 
+> The above could be structured as:
+> 
+>   irq = platform_get_irq_byname(pdev, "wakeup");
+>   if (irq < 0)
+>     return 0;
+> 
+>   device_init_wakeup(dev, true);
+>   err = dev_pm_set_dedicated_wake_irq(dev, irq);
+>   if (err) {
+>     dev_pm_clear_wake_irq(dev);
+>     device_init_wakeup(dev, false);
+>   }
+> 
+>   return 0;
+> 
+> to unindent the mainline non-error code.
+> 
+> >  }
+> >  
+> > @@ -1542,11 +1552,11 @@ static int rockchip_pcie_probe(struct platform_device *pdev)
+> >  
+> >  	err = rockchip_pcie_parse_dt(rockchip);
+> >  	if (err)
+> > -		return err;
+> > +		goto err_disable_wake;
+> >  
+> >  	err = rockchip_pcie_enable_clocks(rockchip);
+> >  	if (err)
+> > -		return err;
+> > +		goto err_disable_wake;
+> >  
+> >  	err = rockchip_pcie_set_vpcie(rockchip);
+> >  	if (err) {
+> > @@ -1656,6 +1666,9 @@ static int rockchip_pcie_probe(struct platform_device *pdev)
+> >  		regulator_disable(rockchip->vpcie0v9);
+> >  err_set_vpcie:
+> >  	rockchip_pcie_disable_clocks(rockchip);
+> > +err_disable_wake:
+> > +	dev_pm_clear_wake_irq(dev);
+> > +	device_init_wakeup(dev, false);
+> 
+> I think this error cleanup should be done in rockchip_pcie_setup_irq()
+> as shown above.  There's no real connection between
+> rockchip_pcie_probe() and the wake setup.
+> 
+> >  	return err;
+> >  }
+> >  
+> > @@ -1682,6 +1695,8 @@ static int rockchip_pcie_remove(struct platform_device *pdev)
+> >  	if (!IS_ERR(rockchip->vpcie0v9))
+> >  		regulator_disable(rockchip->vpcie0v9);
+> >  
+> > +	dev_pm_clear_wake_irq(dev);
+> > +	device_init_wakeup(dev, false);
+> >  	return 0;
+> >  }
+> >  
 > 
