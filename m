@@ -1,105 +1,122 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Fri, 13 Oct 2017 09:16:52 -0500
-Subject: [PATCH 2/3] arm64: cpuinfo: add human readable CPU names to
- /proc/cpuinfo
-In-Reply-To: <20170926222324.17409-3-ahs3@redhat.com>
-References: <20170926222324.17409-1-ahs3@redhat.com>
- <20170926222324.17409-3-ahs3@redhat.com>
-Message-ID: <CAOZdJXX6te8We+REi2uqTLdx_Vn12ezu5xjgq4m7mBGQ8TaKcg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 13 Oct 2017 15:21:59 +0100
+Subject: [PATCH v3 22/28] arm64/sve: KVM: Prevent guests from using SVE
+In-Reply-To: <20171013141539.GK19485@e103592.cambridge.arm.com>
+References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
+ <1507660725-7986-23-git-send-email-Dave.Martin@arm.com>
+ <c28b3f0d-7beb-cca3-46db-3fce964f4725@arm.com>
+ <20171012110409.GG19485@e103592.cambridge.arm.com>
+ <d8a50bf1-bfe0-2423-c56b-adac3925309e@arm.com>
+ <20171013141539.GK19485@e103592.cambridge.arm.com>
+Message-ID: <f273491e-2ae6-18b1-53de-6fbda2056631@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 26, 2017 at 5:23 PM, Al Stone <ahs3@redhat.com> wrote:
-> In the interest of making things easier for humans to use, add a
-> "CPU name" line to /proc/cpuinfo for each CPU that uses plain old
-> words instead of hex values.  For example, instead of printing only
-> CPU implementer 0x43 and CPU part 0x0A1, print also "CPU name :
-> Cavium ThunderX".
->
-> Note that this is not meant to be an exhaustive list of all possible
-> implementers or CPUs (I'm not even sure that is knowable); this patch
-> is intentionally limited to only those willing to provide info in
-> arch/arm64/include/asm/cputype.h
->
-> Signed-off-by: Al Stone <ahs3@redhat.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> ---
->  arch/arm64/kernel/cpuinfo.c | 84 +++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 84 insertions(+)
->
-> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-> index e505007138eb..0b4261884862 100644
-> --- a/arch/arm64/kernel/cpuinfo.c
-> +++ b/arch/arm64/kernel/cpuinfo.c
-> @@ -75,6 +75,61 @@ static const char *const hwcap_str[] = {
->         NULL
->  };
->
-> +struct hw_part {
-> +       u16     id;
-> +       char    *name;
+On 13/10/17 15:15, Dave Martin wrote:
+> On Thu, Oct 12, 2017 at 12:28:32PM +0100, Marc Zyngier wrote:
+>> On 12/10/17 12:04, Dave Martin wrote:
+>>> On Wed, Oct 11, 2017 at 05:28:06PM +0100, Marc Zyngier wrote:
+>>>> [+ Christoffer]
+>>>>
+>>>> On 10/10/17 19:38, Dave Martin wrote:
+>>>>> Until KVM has full SVE support, guests must not be allowed to
+>>>>> execute SVE instructions.
+>>>>>
+>>>>> This patch enables the necessary traps, and also ensures that the
+>>>>> traps are disabled again on exit from the guest so that the host
+>>>>> can still use SVE if it wants to.
+>>>>>
+>>>>> This patch introduces another instance of
+>>>>> __this_cpu_write(fpsimd_last_state, NULL), so this flush operation
+>>>>> is abstracted out as a separate helper fpsimd_flush_cpu_state().
+>>>>> Other instances are ported appropriately.
+>>>>>
+>>>>> As a side effect of this refactoring, a this_cpu_write() in
+>>>>> fpsimd_cpu_pm_notifier() is changed to __this_cpu_write().  This
+>>>>> should be fine, since cpu_pm_enter() is supposed to be called only
+>>>>> with interrupts disabled.
+>>>>>
+>>>>> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+>>>>> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+>>>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>>>> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>>> ---
+>>>
+>>> [...]
+>>>
+>>>>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>>>>> index e923b58..674912d 100644
+>>>>> --- a/arch/arm64/include/asm/kvm_host.h
+>>>>> +++ b/arch/arm64/include/asm/kvm_host.h
+>>>
+>>> [...]
+>>>
+>>>>> @@ -384,4 +385,14 @@ static inline void __cpu_init_stage2(void)
+>>>
+>>> [...]
+>>>
+>>>>> +static inline void kvm_fpsimd_flush_cpu_state(void)
+>>>>> +{
+>>>>> +	if (system_supports_sve())
+>>>>> +		sve_flush_cpu_state();
+>>>>
+>>>> Hmmm. How does this work if...
+>>>
+>>> !IS_ENABLED(CONFIG_ARM64_SVE) implies !system_supports_sve(), so
+>>> if CONFIG_ARM64_SVE is not set, the call is optimised away.
+>>>
+>>> [...]
+>>>
+>>>>> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+>>>>> index a9cb794..6ae3703 100644
+>>>>> --- a/arch/arm64/kernel/fpsimd.c
+>>>>> +++ b/arch/arm64/kernel/fpsimd.c
+>>>>> @@ -1073,6 +1073,33 @@ void fpsimd_flush_task_state(struct task_struct *t)
+>>>
+>>> [...]
+>>>
+>>>>> +#ifdef CONFIG_ARM64_SVE
+>>>>> +void sve_flush_cpu_state(void)
+>>>>> +{
+>>>>> +	struct fpsimd_state *const fpstate = __this_cpu_read(fpsimd_last_state);
+>>>>> +	struct task_struct *tsk;
+>>>>> +
+>>>>> +	if (!fpstate)
+>>>>> +		return;
+>>>>> +
+>>>>> +	tsk = container_of(fpstate, struct task_struct, thread.fpsimd_state);
+>>>>> +	if (test_tsk_thread_flag(tsk, TIF_SVE))
+>>>>> +		fpsimd_flush_cpu_state();
+>>>>> +}
+>>>>> +#endif /* CONFIG_ARM64_SVE */
+>>>>
+>>>> ... CONFIG_ARM64_SVE is not set? Fixing this should just be a matter of
+>>>> moving the #ifdef/#endif inside the function...
+>>>
+>>> Because sve_flush_cpu_state() is not in the same compilation unit it
+>>> can't be static, and that means the compiler won't remove it
+>>> automatically if it's unused -- hence the #ifdef.
+>>>
+>>> Because the call site is optimised away, there is no link failure.
+>>>
+>>> Don't we rely on this sort of thing all over the place?
+>> Dunno. It just feels weird. But if you are sure that it won't break,
+>> fine by me. I guess we'll find out pretty quickly how this fares,
+>> specially with older toolchains.
+> 
+> I thought this was why the kernel doesn't support building with -O0.
+> There are many instances of this in the series, not just here.
+> 
+> Let me know if you feel this isn't good enough though.
 
-const char *name ?
+That's OK to me. As I said, we'll find out pretty quickly if anything
+breaks unexpectedly.
 
-> +};
-> +
-> +static const struct hw_part arm_hw_part[] = {
-> +       { ARM_CPU_PART_AEM_V8,          "AEMv8 Model" },
+> Do you have any other comments on this patch?
+None. You can add my:
 
-AEMv8?
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-> +       { ARM_CPU_PART_FOUNDATION,      "Foundation Model" },
-> +       { ARM_CPU_PART_CORTEX_A57,      "Cortex A57" },
-> +       { ARM_CPU_PART_CORTEX_A53,      "Cortex A53" },
-> +       { ARM_CPU_PART_CORTEX_A73,      "Cortex A73" },
-> +       { (-1), "unknown" }             /* Potenza == 0, unfortunately */
-
-Since Potenza is an Applied Micro CPU, why is this comment here?
-
-> +static const struct hw_part apm_hw_part[] = {
-> +       { APM_CPU_PART_POTENZA,         "Potenza" },
-> +       { (-1), "unknown" }             /* Potenza == 0, unfortunately */
-> +};
-> +
-> +static const struct hw_part brcm_hw_part[] = {
-> +       { BRCM_CPU_PART_VULCAN,         "Vulcan" },
-> +       { (-1), "unknown" }             /* Potenza == 0, unfortunately */
-> +};
-> +
-> +static const struct hw_part cavium_hw_part[] = {
-> +       { CAVIUM_CPU_PART_THUNDERX,      "ThunderX" },
-> +       { CAVIUM_CPU_PART_THUNDERX_81XX, "ThunderX 81XX" },
-> +       { CAVIUM_CPU_PART_THUNDERX_83XX, "ThunderX 83XX" },
-> +       { (-1), "unknown" }             /* Potenza == 0, unfortunately */
-> +};
-> +
-> +static const struct hw_part qcom_hw_part[] = {
-> +       { QCOM_CPU_PART_FALKOR_V1,      "Falkor v1" },
-
-I guess we should upstream our other part IDs.
-
-> +               impl = (u8) MIDR_IMPLEMENTOR(midr);
-> +               for (j = 0; hw_implementer[j].id != 0; j++) {
-> +                       if (hw_implementer[j].id == impl) {
-> +                               seq_printf(m, "CPU name\t: %s ",
-> +                                          hw_implementer[j].name);
-> +                               parts = hw_implementer[j].parts;
-> +                               break;
-> +                       }
-> +               }
-> +               if (hw_implementer[j].id == 0) {
-> +                       seq_printf(m, "CPU name\t: %s ",
-> +                                  hw_implementer[j].name);
-> +                       parts = hw_implementer[j].parts;
-> +               }
-
-Is this intended to handle Potenza?  I don't understand why a part ID
-of 0 is such a problem.
-
+	M.
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Jazz is not dead. It just smells funny...
