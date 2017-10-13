@@ -1,97 +1,92 @@
 From: guohanjun@huawei.com (Hanjun Guo)
-Date: Fri, 13 Oct 2017 15:09:47 +0800
-Subject: [PATCH v2 1/4] ACPI/IORT: Look up IORT node through struct
- fwnode_handle pointer
+Date: Fri, 13 Oct 2017 15:09:49 +0800
+Subject: [PATCH v2 3/4] ACPI/IORT: Add SMMUv3 specific special index mapping
+ handling
 In-Reply-To: <1507878590-51066-1-git-send-email-guohanjun@huawei.com>
 References: <1507878590-51066-1-git-send-email-guohanjun@huawei.com>
-Message-ID: <1507878590-51066-2-git-send-email-guohanjun@huawei.com>
+Message-ID: <1507878590-51066-4-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hanjun Guo <hanjun.guo@linaro.org>
 
-Current IORT code provides a function (ie iort_get_fwnode())
-which looks up a struct fwnode_handle pointer through a
-struct acpi_iort_node pointer for SMMU components but it
-lacks a function that implements the reverse look-up, namely
-struct fwnode_handle* -> struct acpi_iort_node*.
+IORT revision C introduced a mapping entry binding to describe ITS
+device ID mapping for SMMUv3 MSI interrupts.
 
-Devices that are not IORT named components cannot be retrieved through
-their associated IORT named component scan interface because they just
-are not represented in the ACPI namespace; the reverse look-up is
-therefore required for all platform devices that represent IORT nodes
-(eg SMMUs) so that the struct acpi_iort_node* can be retrieved from the
-struct device->fwnode pointer.
+Enable the single mapping flag (ie that is used by SMMUv3 component for
+its special index mappings) for the SMMUv3 node in the IORT mapping API
+and add IORT code to handle special index mapping entry for the SMMUv3
+IORT nodes to enable their MSI interrupts. In case the ACPICA for
+SMMUv3 device ID mapping is not ready, use the ACPICA version as a guard
+for function iort_get_id_mapping_index().
 
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-[lorenzo.pieralisi at arm.com: re-indented/rewrote the commit log]
+[lorenzo.pieralisi at arm.com: split the patch, rewrote the log]
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- drivers/acpi/arm64/iort.c | 43 ++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 42 insertions(+), 1 deletion(-)
+ drivers/acpi/arm64/iort.c | 39 ++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 38 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 0ff7020..03d3dd2 100644
+index c3f3ac3..ca5dd21 100644
 --- a/drivers/acpi/arm64/iort.c
 +++ b/drivers/acpi/arm64/iort.c
-@@ -126,6 +126,31 @@ static inline void iort_delete_fwnode(struct acpi_iort_node *node)
- 	spin_unlock(&iort_fwnode_lock);
+@@ -356,7 +356,8 @@ static struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
+ 
+ 	if (map->flags & ACPI_IORT_ID_SINGLE_MAPPING) {
+ 		if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT ||
+-		    node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
++		    node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX ||
++		    node->type == ACPI_IORT_NODE_SMMU_V3) {
+ 			*id_out = map->output_base;
+ 			return parent;
+ 		}
+@@ -365,10 +366,46 @@ static struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
+ 	return NULL;
  }
  
-+/**
-+ * iort_get_iort_node() - Retrieve iort_node associated with an fwnode
-+ *
-+ * @fwnode: fwnode associated with device to be looked-up
-+ *
-+ * Returns: iort_node pointer on success, NULL on failure
-+ */
-+static inline struct acpi_iort_node *iort_get_iort_node(
-+			struct fwnode_handle *fwnode)
++#if (ACPI_CA_VERSION > 0x20170929)
++static int iort_get_id_mapping_index(struct acpi_iort_node *node)
 +{
-+	struct iort_fwnode *curr;
-+	struct acpi_iort_node *iort_node = NULL;
++	struct acpi_iort_smmu_v3 *smmu;
 +
-+	spin_lock(&iort_fwnode_lock);
-+	list_for_each_entry(curr, &iort_fwnode_list, list) {
-+		if (curr->fwnode == fwnode) {
-+			iort_node = curr->iort_node;
-+			break;
++	switch (node->type) {
++	case ACPI_IORT_NODE_SMMU_V3:
++		/*
++		 * SMMUv3 dev ID mapping index was introdueced in revision 1
++		 * table, not available in revision 0
++		 */
++		if (node->revision < 1)
++			return -EINVAL;
++
++		smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
++		/*
++		 * ID mapping index is only ignored if all interrupts are
++		 * GSIV based
++		 */
++		if (smmu->event_gsiv && smmu->pri_gsiv && smmu->gerr_gsiv
++		    && smmu->sync_gsiv)
++			return -EINVAL;
++
++		if (smmu->id_mapping_index >= node->mapping_count) {
++			pr_err(FW_BUG "[node %p type %d] ID mapping index overflows valid mappings\n",
++			       node, node->type);
++			return -EINVAL;
 +		}
-+	}
-+	spin_unlock(&iort_fwnode_lock);
 +
-+	return iort_node;
++		return smmu->id_mapping_index;
++	default:
++		return -EINVAL;
++	}
 +}
-+
- typedef acpi_status (*iort_find_node_callback)
- 	(struct acpi_iort_node *node, void *context);
- 
-@@ -422,9 +447,25 @@ static struct acpi_iort_node *iort_find_dev_node(struct device *dev)
++#else
+ static inline int iort_get_id_mapping_index(struct acpi_iort_node *node)
  {
- 	struct pci_bus *pbus;
+ 	return -EINVAL;
+ }
++#endif
  
--	if (!dev_is_pci(dev))
-+	if (!dev_is_pci(dev)) {
-+		struct acpi_iort_node *node;
-+		/*
-+		 * scan iort_fwnode_list to see if it's an iort platform
-+		 * device (such as SMMU, PMCG),its iort node already cached
-+		 * and associated with fwnode when iort platform devices
-+		 * were initialized.
-+		 */
-+		node = iort_get_iort_node(dev->fwnode);
-+		if (node)
-+			return node;
-+
-+		/*
-+		 * if not, then it should be a platform device defined in
-+		 * DSDT/SSDT (with Named Component node in IORT)
-+		 */
- 		return iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
- 				      iort_match_node_callback, dev);
-+	}
- 
- 	/* Find a PCI root bus */
- 	pbus = to_pci_dev(dev)->bus;
+ static struct acpi_iort_node *iort_node_map_id(struct acpi_iort_node *node,
+ 					       u32 id_in, u32 *id_out,
 -- 
 1.7.12.4
