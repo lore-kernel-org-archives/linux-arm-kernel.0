@@ -1,35 +1,38 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 13 Oct 2017 19:26:21 +0800
-Subject: [PATCH] ARM: sun8i: r40: add watchdog device node
-Message-ID: <20171013112621.18932-1-icenowy@aosc.io>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Fri, 13 Oct 2017 12:26:43 +0100
+Subject: [RESEND PATCH 0/2] Distinguish percpu irq and percpu_devid irq
+Message-ID: <1507894005-53778-1-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The R40 SoC has a watchdog like the one on A20, in the timer memory zone
-(which is also the same on A20).
+[Resending with cover letter + better commit message for patch 1]
 
-Add the device tree node for it.
+Hi,
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- arch/arm/boot/dts/sun8i-r40.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+Looking at the arm_pmu driver, it seems we are using irq_is_percpu when we
+want to know if an irq must be configured individually on each cpu. But
+this is not what irq_is_percpu does. The arm_pmu marking all its irqs as
+PERCPU, driver attempts to enable the irq on each CPU even when it is not
+needed.
 
-diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi b/arch/arm/boot/dts/sun8i-r40.dtsi
-index d5a6745409ae..ddcb3fff4cd4 100644
---- a/arch/arm/boot/dts/sun8i-r40.dtsi
-+++ b/arch/arm/boot/dts/sun8i-r40.dtsi
-@@ -229,6 +229,11 @@
- 			};
- 		};
- 
-+		wdt: watchdog at 1c20c90 {
-+			compatible = "allwinner,sun4i-a10-wdt";
-+			reg = <0x01c20c90 0x10>;
-+		};
-+
- 		uart0: serial at 1c28000 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28000 0x400>;
--- 
-2.13.6
+This has not caused issue so far because enable_percpu_irq returns
+immediatly if the provided irq is not PERCPU_DEVID.
+
+* Patch 1 adds the function to identify PERCPU_DEVID irqs.
+* Patch 2 replaces the irq_is_percpu calls with the new function
+
+Cheers,
+
+Julien
+
+Julien Thierry (2):
+  irqdesc: Add function to identify percpu_devid irqs
+  arm/arm64: pmu: Distinguish percpu irq and percpu_devid irq
+
+ drivers/perf/arm_pmu.c          | 10 +++++-----
+ drivers/perf/arm_pmu_platform.c |  4 ++--
+ include/linux/irqdesc.h         |  8 ++++++++
+ 3 files changed, 15 insertions(+), 7 deletions(-)
+
+--
+1.9.1
