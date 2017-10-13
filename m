@@ -1,60 +1,149 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 13 Oct 2017 09:55:04 +0100
-Subject: [PATCH/RFC 1/5] dt-bindings: mfd: bd9571mwv: Document
- rohm,ddr-backup-power
-In-Reply-To: <1507649178-31473-2-git-send-email-geert+renesas@glider.be>
-References: <1507649178-31473-1-git-send-email-geert+renesas@glider.be>
- <1507649178-31473-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <20171013085504.i65ohil6dqdzrd2q@dell>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Fri, 13 Oct 2017 10:56:50 +0200
+Subject: [PATCH v1 2/2] kvm: arm64: handle single-step of userspace mmio
+ instructions
+In-Reply-To: <20171006113921.24880-3-alex.bennee@linaro.org>
+References: <20171006113921.24880-1-alex.bennee@linaro.org>
+ <20171006113921.24880-3-alex.bennee@linaro.org>
+Message-ID: <20171013085650.GD8927@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 10 Oct 2017, Geert Uytterhoeven wrote:
-
-> Document the new optional "rohm,ddr-backup-power" property.
+On Fri, Oct 06, 2017 at 12:39:21PM +0100, Alex Benn?e wrote:
+> The system state of KVM when using userspace emulation is not complete
+> until we return into KVM_RUN. To handle mmio related updates we wait
+> until they have been committed and then schedule our KVM_EXIT_DEBUG.
 > 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> I've introduced a new function kvm_arm_maybe_return_debug() to wrap up
+> the differences between arm/arm64 which is currently null for arm.
+> 
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 > ---
->  Documentation/devicetree/bindings/mfd/bd9571mwv.txt | 7 +++++++
->  1 file changed, 7 insertions(+)
+>  arch/arm/include/asm/kvm_host.h   |  2 ++
+>  arch/arm64/include/asm/kvm_host.h |  1 +
+>  arch/arm64/kvm/debug.c            | 21 +++++++++++++++++++++
+>  arch/arm64/kvm/handle_exit.c      |  9 +++------
+>  virt/kvm/arm/arm.c                |  2 +-
+>  virt/kvm/arm/mmio.c               |  3 ++-
+>  6 files changed, 30 insertions(+), 8 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/mfd/bd9571mwv.txt b/Documentation/devicetree/bindings/mfd/bd9571mwv.txt
-> index 9ab216a851d5619b..7ea3f2db41d4e501 100644
-> --- a/Documentation/devicetree/bindings/mfd/bd9571mwv.txt
-> +++ b/Documentation/devicetree/bindings/mfd/bd9571mwv.txt
-> @@ -25,6 +25,12 @@ Required properties:
->  			    Each child node is defined using the standard
->  			    binding for regulators.
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index 4a879f6ff13b..aec943f6d123 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -285,6 +285,8 @@ static inline void kvm_arm_init_debug(void) {}
+>  static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
+>  static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
+>  static inline void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu) {}
+> +static inline int  kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu,
+> +						struct kvm_run *run) {}
 >  
-> +Optional properties:
-> +  - rohm,ddr-backup-power : Value to use for DDR-Backup Power.  This controls
-> +			    which DDR rails need to be kept powered when backup
-> +			    mode is enabled, cfr. the KEEPON_DDR* bits in the
-
-Perhaps it's just me, but I'm confused by this line.
-
-Can you word it another way?
-
-> +			    documentation for the "BKUP Mode Cnt" register.
+>  int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
+>  			       struct kvm_device_attr *attr);
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index e923b58606e2..fa67d21662f6 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -369,6 +369,7 @@ void kvm_arm_init_debug(void);
+>  void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
+>  void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
+>  void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu);
+> +int  kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu, struct kvm_run *run);
+>  int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
+>  			       struct kvm_device_attr *attr);
+>  int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
+> diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
+> index dbadfaf850a7..a10a18c55c87 100644
+> --- a/arch/arm64/kvm/debug.c
+> +++ b/arch/arm64/kvm/debug.c
+> @@ -221,3 +221,24 @@ void kvm_arm_clear_debug(struct kvm_vcpu *vcpu)
+>  		}
+>  	}
+>  }
 > +
->  Example:
+> +
+> +/*
+> + * When KVM has successfully emulated the instruction we might want to
+> + * return we a KVM_EXIT_DEBUG. We can only do this once the emulation
+> + * is complete though so for userspace emulations we have to wait
+> + * until we have re-entered KVM.
+> + *
+> + * Return > 0 to return to guest, 0 (and set exit_reason) on proper
+> + * exit to userspace.
+> + */
+> +
+> +int kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> +{
+> +	if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
+> +		run->exit_reason = KVM_EXIT_DEBUG;
+> +		run->debug.arch.hsr = ESR_ELx_EC_SOFTSTP_LOW << ESR_ELx_EC_SHIFT;
+> +		return 0;
+> +	}
+> +	return 1;
+> +}
+> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+> index c918d291cb58..7b04f59217bf 100644
+> --- a/arch/arm64/kvm/handle_exit.c
+> +++ b/arch/arm64/kvm/handle_exit.c
+> @@ -202,13 +202,10 @@ static int handle_trap_exceptions(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  		handled = exit_handler(vcpu, run);
+>  	}
 >  
->  	pmic: pmic at 30 {
-> @@ -36,6 +42,7 @@ Example:
->  		#interrupt-cells = <2>;
->  		gpio-controller;
->  		#gpio-cells = <2>;
-> +		rohm,ddr-backup-power = <15>;
+> -	if (handled && (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP)) {
+> -		handled = 0;
+> -		run->exit_reason = KVM_EXIT_DEBUG;
+> -		run->debug.arch.hsr = ESR_ELx_EC_SOFTSTP_LOW << ESR_ELx_EC_SHIFT;
+> -	}
+> +	if (handled)
+> +		return kvm_arm_maybe_return_debug(vcpu, run);
 
-Can you explain what this means?  Is it a mask, or does line 15 need
-to be kept on?  What is the range?  Is 0 acceptable?  Clarification
-required please.
+Again, this seems to override the return value of exit_handler, which
+may be something negative.
 
->  		regulators {
->  			dvfs: dvfs {
+Just so I'm clear: There's no intended functionality change of this
+particular hunk, it's just to share the logic in
+kvm_arm_maybe_return_debug, right?
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+>  
+> -	return handled;
+> +	return 0;
+>  }
+>  
+>  /*
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index b9f68e4add71..3d28fe2daa26 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -623,7 +623,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  
+>  	if (run->exit_reason == KVM_EXIT_MMIO) {
+>  		ret = kvm_handle_mmio_return(vcpu, vcpu->run);
+> -		if (ret)
+> +		if (ret < 1)
+>  			return ret;
+>  	}
+>  
+> diff --git a/virt/kvm/arm/mmio.c b/virt/kvm/arm/mmio.c
+> index b6e715fd3c90..e43e3bd6222f 100644
+> --- a/virt/kvm/arm/mmio.c
+> +++ b/virt/kvm/arm/mmio.c
+> @@ -117,7 +117,8 @@ int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  		vcpu_set_reg(vcpu, vcpu->arch.mmio_decode.rt, data);
+>  	}
+>  
+> -	return 0;
+> +	/* If debugging in effect we may need to return now */
+
+Will this ever be about other types of debugging (watchpoint on a MMIO
+access?) or should we limit the text and description to single-stepping?
+
+> +	return kvm_arm_maybe_return_debug(vcpu, run);
+>  }
+>  
+>  static int decode_hsr(struct kvm_vcpu *vcpu, bool *is_write, int *len)
+> -- 
+> 2.14.1
+> 
+
+Thanks,
+-Christoffer
