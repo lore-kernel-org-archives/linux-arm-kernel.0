@@ -1,33 +1,33 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 13 Oct 2017 19:32:39 +0530
-Subject: [GIT PULL 1/2] DaVinci DT updates for v4.15
-Message-ID: <20171013140240.18599-1-nsekhar@ti.com>
+Date: Fri, 13 Oct 2017 19:32:40 +0530
+Subject: [GIT PULL 2/2] DaVinci defconfig updates for v4.15
+In-Reply-To: <20171013140240.18599-1-nsekhar@ti.com>
+References: <20171013140240.18599-1-nsekhar@ti.com>
+Message-ID: <20171013140240.18599-2-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit ce21574ad1922b403198ee664c4dff276f514f1d:
+The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 
-  ARM: dts: da850-evm: add serial and ethernet aliases (2017-09-20 13:33:41 +0530)
+  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.15/dt
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.15/defconfig
 
-for you to fetch changes up to 933311fdfa5f94aeab95d713500fd680523a884a:
+for you to fetch changes up to 5627453efabf8eef84ce1dce6767d1268570a6c5:
 
-  ARM: davinci: da8xx-dt: Add OF_DEV_AUXDATA entry for DSP clock matching (2017-09-20 14:57:56 +0530)
-
-----------------------------------------------------------------
-Add support for accessing DSP on DA850 SoC when using
-device-tree.
+  ARM: davinci_all_defconfig: enable CMA options (2017-09-21 20:08:29 +0530)
 
 ----------------------------------------------------------------
-Suman Anna (3):
-      ARM: dts: da850: Add DSP node
-      ARM: dts: da850-lcdk: Add and enable CMA reserved pool for DSP
-      ARM: davinci: da8xx-dt: Add OF_DEV_AUXDATA entry for DSP clock matching
+Enable CMA and MTD command line partitioning support.
 
- arch/arm/boot/dts/da850-lcdk.dts | 18 ++++++++++++++++++
- arch/arm/boot/dts/da850.dtsi     | 12 ++++++++++++
- arch/arm/mach-davinci/da8xx-dt.c |  1 +
- 3 files changed, 31 insertions(+)
+----------------------------------------------------------------
+Adam Ford (1):
+      ARM: davinci_all_defconfig: enable MTD_CMDLINE_PARTS
+
+Suman Anna (1):
+      ARM: davinci_all_defconfig: enable CMA options
+
+ arch/arm/configs/davinci_all_defconfig | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
