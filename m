@@ -1,146 +1,130 @@
-From: volodymyr_babchuk@epam.com (Volodymyr Babchuk)
-Date: Fri, 13 Oct 2017 22:32:41 +0300
-Subject: [PATCH v1 11/14] tee: optee: add optee-specific shared pool
- implementation
-In-Reply-To: <1507923164-12796-1-git-send-email-volodymyr_babchuk@epam.com>
-References: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
- <1507923164-12796-1-git-send-email-volodymyr_babchuk@epam.com>
-Message-ID: <1507923164-12796-12-git-send-email-volodymyr_babchuk@epam.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Fri, 13 Oct 2017 14:34:51 -0500
+Subject: [PATCH v3 0/7] Support PPTT for ARM64
+In-Reply-To: <f3fab8a0-48e1-57c2-fdc0-be1faccfff2b@huawei.com>
+References: <20171012194856.13844-1-jeremy.linton@arm.com>
+ <f3fab8a0-48e1-57c2-fdc0-be1faccfff2b@huawei.com>
+Message-ID: <08a1ad07-4bec-2767-d32c-6a5f8406af9c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Volodymyr Babchuk <vlad.babchuk@gmail.com>
+Hi,
 
-This is simple pool that uses kernel page allocator. This pool can be
-used in case OP-TEE supports dynamic shared memory.
+On 10/13/2017 06:08 AM, John Garry wrote:
+> On 12/10/2017 20:48, Jeremy Linton wrote:
+>> ACPI 6.2 adds the Processor Properties Topology Table (PPTT), which is
+>> used to describe the processor and cache topology. Ideally it is
+>> used to extend/override information provided by the hardware, but
+>> right now ARM64 is entirely dependent on firmware provided tables.
+>>
+>> This patch parses the table for the cache topology and CPU topology.
+>> For the latter we also add an additional topology_cod_id() macro,
+>> and a package_id for arm64. Initially the physical id will match
+>> the cluster id, but we update users of the cluster to utilize
+>> the new macro. When we enable ACPI/PPTT for arm64 we map the socket
+>> to the physical id as the remainder of the kernel expects.
+>>
+> 
+> Hi Jeremy,
+> 
+> Can you put this series on a public branch for convenience of review and 
+> test?
 
-Signed-off-by: Volodymyr Babchuk <vlad.babchuk@gmail.com>
----
- drivers/tee/optee/Makefile   |  1 +
- drivers/tee/optee/shm_pool.c | 75 ++++++++++++++++++++++++++++++++++++++++++++
- drivers/tee/optee/shm_pool.h | 23 ++++++++++++++
- 3 files changed, 99 insertions(+)
- create mode 100644 drivers/tee/optee/shm_pool.c
- create mode 100644 drivers/tee/optee/shm_pool.h
+Let me see what I can do..
 
-diff --git a/drivers/tee/optee/Makefile b/drivers/tee/optee/Makefile
-index 92fe578..220cf42 100644
---- a/drivers/tee/optee/Makefile
-+++ b/drivers/tee/optee/Makefile
-@@ -3,3 +3,4 @@ optee-objs += core.o
- optee-objs += call.o
- optee-objs += rpc.o
- optee-objs += supp.o
-+optee-objs += shm_pool.o
-diff --git a/drivers/tee/optee/shm_pool.c b/drivers/tee/optee/shm_pool.c
-new file mode 100644
-index 0000000..4939781
---- /dev/null
-+++ b/drivers/tee/optee/shm_pool.c
-@@ -0,0 +1,75 @@
-+/*
-+ * Copyright (c) 2015, Linaro Limited
-+ * Copyright (c) 2017, EPAM Systems
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+#include <linux/device.h>
-+#include <linux/dma-buf.h>
-+#include <linux/genalloc.h>
-+#include <linux/slab.h>
-+#include <linux/tee_drv.h>
-+#include "optee_private.h"
-+#include "optee_smc.h"
-+#include "shm_pool.h"
-+
-+static int pool_op_alloc(struct tee_shm_pool_mgr *poolm,
-+			 struct tee_shm *shm, size_t size)
-+{
-+	unsigned int order = get_order(size);
-+	struct page *page;
-+
-+	page = alloc_pages(GFP_KERNEL | __GFP_ZERO, order);
-+	if (!page)
-+		return -ENOMEM;
-+
-+	shm->kaddr = page_address(page);
-+	shm->paddr = page_to_phys(page);
-+	shm->size = PAGE_SIZE << order;
-+
-+	return 0;
-+}
-+
-+static void pool_op_free(struct tee_shm_pool_mgr *poolm,
-+			 struct tee_shm *shm)
-+{
-+	free_pages((unsigned long)shm->kaddr, get_order(shm->size));
-+	shm->kaddr = NULL;
-+}
-+
-+static void pool_op_destroy_poolmgr(struct tee_shm_pool_mgr *poolm)
-+{
-+	kfree(poolm);
-+}
-+
-+static const struct tee_shm_pool_mgr_ops pool_ops = {
-+	.alloc = pool_op_alloc,
-+	.free = pool_op_free,
-+	.destroy_poolmgr = pool_op_destroy_poolmgr,
-+};
-+
-+/**
-+ * optee_shm_pool_alloc_pages() - create page-based allocator pool
-+ *
-+ * This pool is used when OP-TEE supports dymanic SHM. In this case
-+ * command buffers and such are allocated from kernel's own memory.
-+ */
-+struct tee_shm_pool_mgr *optee_shm_pool_alloc_pages(void)
-+{
-+	struct tee_shm_pool_mgr *mgr = kzalloc(sizeof(*mgr), GFP_KERNEL);
-+
-+	if (!mgr)
-+		return ERR_PTR(-ENOMEM);
-+
-+	mgr->ops = &pool_ops;
-+
-+	return mgr;
-+}
-diff --git a/drivers/tee/optee/shm_pool.h b/drivers/tee/optee/shm_pool.h
-new file mode 100644
-index 0000000..4e753c3
---- /dev/null
-+++ b/drivers/tee/optee/shm_pool.h
-@@ -0,0 +1,23 @@
-+/*
-+ * Copyright (c) 2015, Linaro Limited
-+ * Copyright (c) 2016, EPAM Systems
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#ifndef SHM_POOL_H
-+#define SHM_POOL_H
-+
-+#include <linux/tee_drv.h>
-+
-+struct tee_shm_pool_mgr *optee_shm_pool_alloc_pages(void);
-+
-+#endif
--- 
-2.7.4
+> 
+> Also, what is your idea for supporting Type 2 ID structure?
+
+I don't have any plans, as you can see the current patches ignore the ID 
+nodes. It should be fairly easy to mine the information from the tables, 
+but what parts are necessary or where to use them isn't clear to me.
+
+Suggestions welcome.
+
+
+> 
+> Cheers,
+> John
+> 
+>> For example on juno:
+>> [root at mammon-juno-rh topology]# lstopo-no-graphics
+>> ? Package L#0
+>> ??? L2 L#0 (1024KB)
+>> ????? L1d L#0 (32KB) + L1i L#0 (32KB) + Core L#0 + PU L#0 (P#0)
+>> ????? L1d L#1 (32KB) + L1i L#1 (32KB) + Core L#1 + PU L#1 (P#1)
+>> ????? L1d L#2 (32KB) + L1i L#2 (32KB) + Core L#2 + PU L#2 (P#2)
+>> ????? L1d L#3 (32KB) + L1i L#3 (32KB) + Core L#3 + PU L#3 (P#3)
+>> ??? L2 L#1 (2048KB)
+>> ????? L1d L#4 (32KB) + L1i L#4 (48KB) + Core L#4 + PU L#4 (P#4)
+>> ????? L1d L#5 (32KB) + L1i L#5 (48KB) + Core L#5 + PU L#5 (P#5)
+>> ? HostBridge L#0
+>> ??? PCIBridge
+>> ????? PCIBridge
+>> ??????? PCIBridge
+>> ????????? PCI 1095:3132
+>> ??????????? Block(Disk) L#0 "sda"
+>> ??????? PCIBridge
+>> ????????? PCI 1002:68f9
+>> ??????????? GPU L#1 "renderD128"
+>> ??????????? GPU L#2 "card0"
+>> ??????????? GPU L#3 "controlD64"
+>> ??????? PCIBridge
+>> ????????? PCI 11ab:4380
+>> ??????????? Net L#4 "enp8s0"
+>>
+>> v2->v3:
+>>
+>> Remove valid bit check on leaf nodes. Now simply being a leaf node
+>> ? is sufficient to verify the processor id against the ACPI
+>> ? processor ids (gotten from MADT).
+>>
+>> Use the acpi processor for the "level 0" Id. This makes the /sys
+>> ? visible core/thread ids more human readable if the firmware uses
+>> ? small consecutive values for processor ids.
+>>
+>> Added PPTT to the list of injectable ACPI tables.
+>>
+>> Fix bug which kept the code from using the processor node as intended
+>> ? in v2, caused by misuse of git rebase/fixup.
+>>
+>> v1->v2:
+>>
+>> The parser keys off the acpi_pptt_processor node to determine
+>> ? unique cache's rather than the acpi_pptt_cache referenced by the
+>> ? processor node. This allows PPTT tables which "share" cache nodes
+>> ? across cpu nodes despite not being a shared cache.
+>>
+>> Normalize the socket, cluster and thread mapping so that they match
+>> ? linux's traditional mapping for the physical id, and thread id.
+>> ? Adding explicit scheduler knowledge of clusters (rather than just
+>> ? their cache sharing attributes) is a subject for a future patch.
+>>
+>> Jeremy Linton (7):
+>> ? ACPI/PPTT: Add Processor Properties Topology Table parsing
+>> ? ACPI: Enable PPTT support on ARM64
+>> ? drivers: base: cacheinfo: arm64: Add support for ACPI based firmware
+>> ??? tables
+>> ? Topology: Add cluster on die macros and arm64 decoding
+>> ? arm64: Fixup users of topology_physical_package_id
+>> ? arm64: topology: Enable ACPI/PPTT based CPU topology.
+>> ? ACPI: Add PPTT to injectable table list
+>>
+>> ?arch/arm64/Kconfig??????????????? |?? 1 +
+>> ?arch/arm64/include/asm/topology.h |?? 4 +-
+>> ?arch/arm64/kernel/cacheinfo.c???? |? 23 +-
+>> ?arch/arm64/kernel/topology.c????? |? 62 ++++-
+>> ?drivers/acpi/Makefile???????????? |?? 1 +
+>> ?drivers/acpi/arm64/Kconfig??????? |?? 3 +
+>> ?drivers/acpi/pptt.c?????????????? | 486 
+>> ++++++++++++++++++++++++++++++++++++++
+>> ?drivers/acpi/tables.c???????????? |?? 3 +-
+>> ?drivers/base/cacheinfo.c????????? |? 17 +-
+>> ?drivers/cpufreq/arm_big_little.c? |?? 2 +-
+>> ?drivers/firmware/psci_checker.c?? |?? 2 +-
+>> ?include/linux/cacheinfo.h???????? |? 11 +-
+>> ?include/linux/topology.h????????? |?? 4 +
+>> ?13 files changed, 599 insertions(+), 20 deletions(-)
+>> ?create mode 100644 drivers/acpi/pptt.c
+>>
+> 
+> 
