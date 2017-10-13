@@ -1,52 +1,28 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Fri, 13 Oct 2017 08:51:21 -0700
-Subject: [RESEND PATCH 1/2] spi: rockchip: Convert to late and early
- system PM callbacks
-In-Reply-To: <CAD=FV=X6pkaY3t=ceh3QEUws+_gqRGMN9zveW0fXR1noF1T6ew@mail.gmail.com>
-References: <20171013104138.3216-1-jeffy.chen@rock-chips.com>
- <20171013104138.3216-2-jeffy.chen@rock-chips.com>
- <CAD=FV=X6pkaY3t=ceh3QEUws+_gqRGMN9zveW0fXR1noF1T6ew@mail.gmail.com>
-Message-ID: <20171013155120.GA137489@google.com>
+From: pasha.tatashin@oracle.com (Pavel Tatashin)
+Date: Fri, 13 Oct 2017 11:54:21 -0400
+Subject: [PATCH v11 7/9] arm64/kasan: add and use kasan_map_populate()
+In-Reply-To: <20171013154426.GC4746@arm.com>
+References: <20171009221931.1481-1-pasha.tatashin@oracle.com>
+ <20171009221931.1481-8-pasha.tatashin@oracle.com>
+ <20171010155619.GA2517@arm.com>
+ <CAOAebxv21+KtXPAk-xWz=+2fqWQDgp9SAFZz-N=XsuBxev=zcg@mail.gmail.com>
+ <20171010171047.GC2517@arm.com>
+ <CAOAebxtrSthSP4NAa0obBbsCK1KZxO+x0w5xNrpY6m2y9UZFvQ@mail.gmail.com>
+ <CAOAebxu5WL-FQLgfCxNcWy36V6zsTO1v3LLqXv5rM1Pp9R-=YA@mail.gmail.com>
+ <20171013144319.GB4746@arm.com>
+ <CAOAebxv4h+8ej6JA_DZbXaNV5JsAk4MbcCLf1+2RvwKGF2+MxQ@mail.gmail.com>
+ <20171013154426.GC4746@arm.com>
+Message-ID: <CAOAebxspETEqFXL1Ez_4TK9CAwwk+uhHbYOmZk2QR8b=GO80cQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+> Thanks for sharing the .config and tree. It looks like the problem is that
+> kimg_shadow_start and kimg_shadow_end are not page-aligned. Whilst I fix
+> them up in kasan_map_populate, they remain unaligned when passed to
+> kasan_populate_zero_shadow, which confuses the loop termination conditions
+> in e.g. zero_pte_populate and the shadow isn't configured properly.
 
-On Fri, Oct 13, 2017 at 08:32:12AM -0700, Doug Anderson wrote:
-> Hi,
-> 
-> On Fri, Oct 13, 2017 at 3:41 AM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
-> > Currently we are suspending the spi master in it's ->suspend callback,
-> > which is racy as some other drivers may still want to transmit messages
-> > on the bus(e.g. spi based pwm backlight).
-> >
-> > Convert to late and early system PM callbacks to avoid the race.
-> >
-> > Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> > ---
-> >
-> >  drivers/spi/spi-rockchip.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> It shouldn't hurt to do this, but I'm curious if you did any digging
-> about why this happens?  As I understood it suspend order is supposed
-> to be opposite of probe order.  Thus anything that was able to get a
-> reference to the cros-ec PWM at its probe time should get suspended
-> before cros-ec suspends.
+This makes sense. Thank you. I will insert these changes into your
+patch, and send out a new series soon after sanity checking it.
 
-Yes, this does seem odd to me too. This looks like an arms race hack
-that should be avoided unless we know a legit root cause. Also,
-"probe order implies suspend order" doesn't quite work for async suspend
-anyway, so we'd probably want to express the dependency properly
-anyway.
-
-Any chance this is related? Seems like that might break the parent/child
-relationship for master/slave:
-
-commit d7e2ee257038baeb03baef602500368a51ee9eef
-Author: Linus Walleij <linus.walleij@linaro.org>
-Date:   Mon Apr 11 13:51:03 2016 +0200
-
-    spi: let SPI masters ignore their children for PM
-
-Brian
+Pavel
