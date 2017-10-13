@@ -1,92 +1,168 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Fri, 13 Oct 2017 13:44:00 -0700
-Subject: [PATCH v5 1/3] PCI: rockchip: Add support for pcie wake irq
-In-Reply-To: <20171013191906.GF25517@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170911151029.25185-1-jeffy.chen@rock-chips.com>
- <20170911151029.25185-2-jeffy.chen@rock-chips.com>
- <20171013030441.GA25517@bhelgaas-glaptop.roam.corp.google.com>
- <2453698.N4jfPaHx71@aspire.rjw.lan>
- <59E10709.4020300@rock-chips.com>
- <20171013191906.GF25517@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20171013204358.GA3585@google.com>
+From: volodymyr_babchuk@epam.com (Volodymyr Babchuk)
+Date: Fri, 13 Oct 2017 22:32:43 +0300
+Subject: [PATCH v1 13/14] tee: use reference counting for tee_context
+In-Reply-To: <1507923164-12796-1-git-send-email-volodymyr_babchuk@epam.com>
+References: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
+ <1507923164-12796-1-git-send-email-volodymyr_babchuk@epam.com>
+Message-ID: <1507923164-12796-14-git-send-email-volodymyr_babchuk@epam.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Volodymyr Babchuk <vlad.babchuk@gmail.com>
 
-On Fri, Oct 13, 2017 at 02:19:06PM -0500, Bjorn Helgaas wrote:
-> On Sat, Oct 14, 2017 at 02:33:45AM +0800, jeffy wrote:
-> > Hi Rafael,
-> > 
-> > On 10/13/2017 09:21 PM, Rafael J. Wysocki wrote:
-> > >>
-> > >>I'm a little skeptical about dev_pm_set_dedicated_wake_irq(), not
-> > >>because I know anything at all about it, but because there are only
-> > >>five callers in the whole tree, three of which are in UART code, and
-> > >>none in anything resembling PCI code.
-> > >>
-> > >>Is Rockchip really that special, or are we going about this the wrong
-> > >>way?
-> > 
-> > we used to put these codes in the wifi driver, but another wifi
-> > vendor suggests these should go into the pcie driver.
-> > 
-> > and as tony said, it could go into pcie common code :)
-> 
-> I guess the implication (I'm speculating here) is that in most
-> existing cases, the WAKE# signal is fielded by an ACPI BIOS, which
-> knows how it's connected.  I suppose that would end up being turned
-> into an SCI that Linux already knows how to handle generically.
+We need to ensure that tee_context is present until last
+shared buffer will be freed.
 
-I wasn't sure how ACPI did this when I first suggested Rockchip take
-this approach, but since then I believe have figured it out. We have:
+Signed-off-by: Volodymyr Babchuk <vlad.babchuk@gmail.com>
+---
+ drivers/tee/tee_core.c    | 40 +++++++++++++++++++++++++++++++---------
+ drivers/tee/tee_private.h |  3 +++
+ drivers/tee/tee_shm.c     |  7 +++++++
+ include/linux/tee_drv.h   |  7 +++++++
+ 4 files changed, 48 insertions(+), 9 deletions(-)
 
-pci_prepare_to_sleep() -> pci_enable_wake()
-
-where pci_enable_wake() will configure PME wakeup and/or "platform" wake
-(which presumably is the WAKE# signal). pci-acpi.c has registered hooks
-for the latter via pci_set_platform_pm().
-
-This doesn't really make it any more generic for discovering this
-platform-specific detail. We'd have to set up some kind of platform ops
-that could be shared for any DT-based platforms.
-
-But that *does* answer the question I had about conditionality: should
-we always enable WAKE# for platforms that have the pin hooked up to the
-host? Or is this configured on a per-device basis? IIUC, the intention
-is that there's only a single open-drain WAKE# pin for the whole system,
-and it's just pulled high for EPs that don't implement it.
-
-> And further, that the non-ACPI drivers are relatively new and you're
-> the first attempt to use WAKE# with a non-ACPI PCI host driver?
-
-Quite possibly. Or everyone just sidestepped this an configured the pin
-elsewhere (e.g., you could stick a GPIO like this into a gpio-keys
-device and it would mostly work).
-
-> If this setup could be done somewhere in PCIe common code, that would
-> be great.  We have so much copy and pasted code already, it'd be nice
-> to avoid adding more.  I don't know if this would fit in
-> pci_scan_root_bus_bridge(), doing something like dma_configure() does
-> to get hold of a struct platform_device * or a struct device * so you
-> could lookup the IRQ?
-
-It looks like the infrastructure is in pci_set_platform_pm(), sort of.
-But that still doesn't help you for the repetition; you're just lucky
-you only have 2 controller drivers that call this right now :)
-
-Side note: there's some dissonance between this statement, in
-Documentation/driver-api/pm/devices.rst:
-
-"Device drivers, however, are not expected to call
-:c:func:`device_set_wakeup_enable()` directly in any case."
-
-Yet:
-
-$ git grep -l device_set_wakeup_enable drivers/ | wc -l
-69
-
-And particularly, I believe that was necessary for Wifi drivers like
-drivers/net/wireless/ath/ath10k/wow.c.
-
-Brian
+diff --git a/drivers/tee/tee_core.c b/drivers/tee/tee_core.c
+index 295910f..3d49ac2 100644
+--- a/drivers/tee/tee_core.c
++++ b/drivers/tee/tee_core.c
+@@ -54,6 +54,7 @@ static int tee_open(struct inode *inode, struct file *filp)
+ 		goto err;
+ 	}
+ 
++	kref_init(&ctx->refcount);
+ 	ctx->teedev = teedev;
+ 	INIT_LIST_HEAD(&ctx->list_shm);
+ 	filp->private_data = ctx;
+@@ -68,19 +69,40 @@ static int tee_open(struct inode *inode, struct file *filp)
+ 	return rc;
+ }
+ 
+-static int tee_release(struct inode *inode, struct file *filp)
++void teedev_ctx_get(struct tee_context *ctx)
+ {
+-	struct tee_context *ctx = filp->private_data;
+-	struct tee_device *teedev = ctx->teedev;
+-	struct tee_shm *shm;
++	if (ctx->releasing)
++		return;
++
++	kref_get(&ctx->refcount);
++}
+ 
++static void teedev_ctx_release(struct kref *ref)
++{
++	struct tee_context *ctx = container_of(ref, struct tee_context,
++					       refcount);
++	ctx->releasing = true;
+ 	ctx->teedev->desc->ops->release(ctx);
+-	mutex_lock(&ctx->teedev->mutex);
+-	list_for_each_entry(shm, &ctx->list_shm, link)
+-		shm->ctx = NULL;
+-	mutex_unlock(&ctx->teedev->mutex);
+ 	kfree(ctx);
+-	tee_device_put(teedev);
++}
++
++void teedev_ctx_put(struct tee_context *ctx)
++{
++	if (ctx->releasing)
++		return;
++
++	kref_put(&ctx->refcount, teedev_ctx_release);
++}
++
++static void teedev_close_context(struct tee_context *ctx)
++{
++	tee_device_put(ctx->teedev);
++	teedev_ctx_put(ctx);
++}
++
++static int tee_release(struct inode *inode, struct file *filp)
++{
++	teedev_close_context(filp->private_data);
+ 	return 0;
+ }
+ 
+diff --git a/drivers/tee/tee_private.h b/drivers/tee/tee_private.h
+index 2bc2b5a..85d99d6 100644
+--- a/drivers/tee/tee_private.h
++++ b/drivers/tee/tee_private.h
+@@ -73,4 +73,7 @@ int tee_shm_get_fd(struct tee_shm *shm);
+ bool tee_device_get(struct tee_device *teedev);
+ void tee_device_put(struct tee_device *teedev);
+ 
++void teedev_ctx_get(struct tee_context *ctx);
++void teedev_ctx_put(struct tee_context *ctx);
++
+ #endif /*TEE_PRIVATE_H*/
+diff --git a/drivers/tee/tee_shm.c b/drivers/tee/tee_shm.c
+index 177e341..b48f83d 100644
+--- a/drivers/tee/tee_shm.c
++++ b/drivers/tee/tee_shm.c
+@@ -53,6 +53,9 @@ static void tee_shm_release(struct tee_shm *shm)
+ 		kfree(shm->pages);
+ 	}
+ 
++	if (shm->ctx)
++		teedev_ctx_put(shm->ctx);
++
+ 	kfree(shm);
+ 
+ 	tee_device_put(teedev);
+@@ -187,6 +190,7 @@ struct tee_shm *__tee_shm_alloc(struct tee_context *ctx,
+ 	}
+ 
+ 	if (ctx) {
++		teedev_ctx_get(ctx);
+ 		mutex_lock(&teedev->mutex);
+ 		list_add_tail(&shm->link, &ctx->list_shm);
+ 		mutex_unlock(&teedev->mutex);
+@@ -252,6 +256,8 @@ struct tee_shm *tee_shm_register(struct tee_context *ctx, unsigned long addr,
+ 		return ERR_PTR(-ENOTSUPP);
+ 	}
+ 
++	teedev_ctx_get(ctx);
++
+ 	shm = kzalloc(sizeof(*shm), GFP_KERNEL);
+ 	if (!shm) {
+ 		ret = ERR_PTR(-ENOMEM);
+@@ -333,6 +339,7 @@ struct tee_shm *tee_shm_register(struct tee_context *ctx, unsigned long addr,
+ 		kfree(shm->pages);
+ 	}
+ 	kfree(shm);
++	teedev_ctx_put(ctx);
+ 	tee_device_put(teedev);
+ 	return ret;
+ }
+diff --git a/include/linux/tee_drv.h b/include/linux/tee_drv.h
+index 5489c38..9cd4e5f 100644
+--- a/include/linux/tee_drv.h
++++ b/include/linux/tee_drv.h
+@@ -17,6 +17,7 @@
+ 
+ #include <linux/types.h>
+ #include <linux/idr.h>
++#include <linux/kref.h>
+ #include <linux/list.h>
+ #include <linux/tee.h>
+ 
+@@ -42,11 +43,17 @@ struct tee_shm_pool;
+  * @teedev:	pointer to this drivers struct tee_device
+  * @list_shm:	List of shared memory object owned by this context
+  * @data:	driver specific context data, managed by the driver
++ * @refcount:	reference counter for this structure
++ * @releasing:  flag that indicates if context is being released right now.
++ *		It is needed to break circular dependency on context during
++ *              shared memory release.
+  */
+ struct tee_context {
+ 	struct tee_device *teedev;
+ 	struct list_head list_shm;
+ 	void *data;
++	struct kref refcount;
++	bool releasing;
+ };
+ 
+ struct tee_param_memref {
+-- 
+2.7.4
