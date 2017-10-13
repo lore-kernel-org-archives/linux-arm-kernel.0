@@ -1,34 +1,38 @@
-From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Fri, 13 Oct 2017 11:01:55 +0200
-Subject: [PATCH v2 11/16] serial: mvebu-uart: augment the maximum number of
- ports
-In-Reply-To: <20171013090200.31034-1-miquel.raynal@free-electrons.com>
-References: <20171013090200.31034-1-miquel.raynal@free-electrons.com>
-Message-ID: <20171013090200.31034-12-miquel.raynal@free-electrons.com>
+From: johan@kernel.org (Johan Hovold)
+Date: Fri, 13 Oct 2017 11:03:33 +0200
+Subject: Dramatic lockdep slowdown in 4.14
+Message-ID: <20171013090333.GA17356@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A3700 boards may have up to two UART ports. Set the new limit to two
-maximum UART ports.
+Hi,
 
-Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/tty/serial/mvebu-uart.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I had noticed that the BeagleBone Black boot time appeared to have
+increased significantly with 4.14 and yesterday I finally had time to
+investigate it.
 
-diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
-index d0e749f6f052..1074054ee5be 100644
---- a/drivers/tty/serial/mvebu-uart.c
-+++ b/drivers/tty/serial/mvebu-uart.c
-@@ -74,7 +74,7 @@
- #define UART_BRDV		0x10
- #define  BRDV_BAUD_MASK         0x3FF
- 
--#define MVEBU_NR_UARTS		1
-+#define MVEBU_NR_UARTS		2
- 
- #define MVEBU_UART_TYPE		"mvebu-uart"
- #define DRIVER_NAME		"mvebu_serial"
--- 
-2.11.0
+Boot time (from "Linux version" to login prompt) had in fact doubled
+since 4.13 where it took 17 seconds (with my current config) compared to
+the 35 seconds I now see with 4.14-rc4.
+
+I quick bisect pointed to lockdep and specifically the following commit:
+
+	28a903f63ec0 ("locking/lockdep: Handle non(or multi)-acquisition
+	               of a crosslock")
+
+which I've verified is the commit which doubled the boot time (compared
+to 28a903f63ec0^) (added by lockdep crossrelease series [1]).
+
+I also verified that simply disabling CONFIG_PROVE_LOCKING on 4.14-rc4
+brought boot time down to about 14 seconds.
+
+Now since it's lockdep I guess this can't really be considered a
+regression if these changes did improve lockdep correctness, but still,
+this dramatic slow down essentially forces me to disable PROVE_LOCKING
+by default on this system.
+
+Is this lockdep slowdown expected and desirable?
+
+Johan
+
+[1] https://lkml.kernel.org/r/1502089981-21272-1-git-send-email-byungchul.park at lge.com
