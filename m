@@ -1,188 +1,112 @@
-From: prabhakar.kushwaha@nxp.com (Prabhakar Kushwaha)
-Date: Fri, 13 Oct 2017 09:41:37 +0000
-Subject: kdump: need help with kexec -p
-In-Reply-To: <59DF54B3.1050404@arm.com>
-References: <HE1PR04MB12416F54193B1A61BC0652ED974A0@HE1PR04MB1241.eurprd04.prod.outlook.com>
- <59DF54B3.1050404@arm.com>
-Message-ID: <HE1PR04MB124165F8510E983992B11EC797480@HE1PR04MB1241.eurprd04.prod.outlook.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 13 Oct 2017 10:47:20 +0100
+Subject: [PATCH v3 2/2] drivers/irqchip: gicv3: add workaround for
+ Synquacer pre-ITS
+In-Reply-To: <CAKv+Gu-rZNhMMU4PoD8V0nBtwEEu+HE71wvaAZk2PWshoeTi4g@mail.gmail.com>
+References: <20171012183247.23679-1-ard.biesheuvel@linaro.org>
+ <20171012183247.23679-3-ard.biesheuvel@linaro.org>
+ <CAL_Jsq+5L=gOzb=NzPJ8CSpqAbnwN3=LWvN2f07=AejwFMbOGg@mail.gmail.com>
+ <CAKv+Gu-rZNhMMU4PoD8V0nBtwEEu+HE71wvaAZk2PWshoeTi4g@mail.gmail.com>
+Message-ID: <c6c00e64-ecc8-0404-5ffc-602626e5cc6d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+[+Mark]
 
-> -----Original Message-----
-> From: James Morse [mailto:james.morse at arm.com]
-> Sent: Thursday, October 12, 2017 5:11 PM
-> To: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>;
-> takahiro.akashi at linaro.org
-> Cc: linux-arm-kernel at lists.infradead.org; Poonam Aggrwal
-> <poonam.aggrwal@nxp.com>; Scott Wood <oss@buserror.net>; Abhimanyu
-> Saini <abhimanyu.saini@nxp.com>
-> Subject: Re: kdump: need help with kexec -p
+On 12/10/17 23:24, Ard Biesheuvel wrote:
+> On 12 October 2017 at 22:34, Rob Herring <robh+dt@kernel.org> wrote:
+>> On Thu, Oct 12, 2017 at 1:32 PM, Ard Biesheuvel
+>> <ard.biesheuvel@linaro.org> wrote:
+>>> The Socionext Synquacer SoC's implementation of GICv3 has a so-called
+>>> 'pre-ITS', which maps 32-bit writes targeted at a separate window of
+>>> size '4 << device_id_bits' onto writes to GITS_TRANSLATER with device
+>>> ID taken from bits [device_id_bits + 1:2] of the window offset.
+>>> Writes that target GITS_TRANSLATER directly are reported as originating
+>>> from device ID #0.
+>>>
+>>> So add a workaround for this. Given that this breaks isolation, clear
+>>> the IRQ_DOMAIN_FLAG_MSI_REMAP flag as well.
+>>>
+>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>> ---
+>>>  Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt |  4 ++
+>>>  arch/arm64/Kconfig                                                    |  8 +++
+>>>  drivers/irqchip/irq-gic-v3-its.c                                      | 63 +++++++++++++++++++-
+>>>  3 files changed, 72 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt b/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
+>>> index 4c29cdab0ea5..0798a61bbf99 100644
+>>> --- a/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
+>>> +++ b/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
+>>> @@ -75,6 +75,10 @@ These nodes must have the following properties:
+>>>  - reg: Specifies the base physical address and size of the ITS
+>>>    registers.
+>>>
+>>> +Optional:
+>>> +- socionext,synquacer-pre-its: (u32, u32) tuple describing the host address
+>>> +  and size of the pre-ITS window, as implemented on the Socionext Synquacer SoC
+>>
+>> Sounds like a separate h/w block to me and addresses should be in
+>> "reg". I would suggest you define a separate node for the pre-its
+>> block and then use of_find_compatible_node() from the GIC driver to
+>> retrieve the node and whatever you need from it. Or do an SoC specific
+>> compatible string for the GIC and let that imply whatever information
+>> you need. Then the next quirk doesn't need a DT update.
+>>
 > 
-> Hi Prabhakar,
+> For my understanding, you mean either
 > 
-> (+CC: Akashi Takahiro, who wrote the arm64 kdump support)
+>     gic: interrupt-controller at 30000000 {
+>         compatible = "arm,gic-v3";
+>         ...
 > 
-> On 11/10/17 10:11, Prabhakar Kushwaha wrote:
-> > We are facing some issues while using  kexec -p on ARM64 NXP platforms.
-> >
-> > 1) After calling kexec -p, if immediately "panic" is triggered the crash kernel
-> > does not boot. If we run few commands and wait for atleast (20-30 secs),
-> before
-> > triggering the panic, the crash kernel boots.
+>         its: gic-its at 30020000 {
+>             compatible = "arm,gic-v3-its";
+>             reg = <0x0 0x30020000 0x0 0x20000>;
+>             #msi-cells = <1>;
+>             msi-controller;
+>         };
+>     };
 > 
-> What kernel version do you see this on? 
-linux-linaro-lsk-v4.4  (f3b1dec5e8f2b4d17442a79bcb1f15953056519d)
-
-> Can you log the kernel output in each
-> case, (do you get a 'bye' message even when the new kernel doesn't boot).
+>     preits at 58000000 {
+>         compatible = "socionext,synquacer-pre-its";
+>         reg = <0x0 0x58000000 0x0 0x200000>;
+>         msi-slave = <&its>;
+>     };
 > 
-Yes I get 'bye' message in all cases. 
-
-> Does 'kexec -p' report success in both cases? ($? == 0)
+> or
 > 
+>     gic: interrupt-controller at 30000000 {
+>         compatible = "arm,gic-v3";
+>         ...
 > 
-
-Unfortunately this command not support in my root file system.
-
-I always gets prompt. So I assume kexec runs successfully. 
-
-> kdump can take many seconds in purgatory, it checksums the kdump image to
-> check
-> it didn't get corrupted between 'kexec -p' and crash time, but it doesn't sound
-> like this is what you're seeing.
+>         its: gic-its at 30020000 {
+>             compatible = "socionext,synquacer-pre-its", "arm,gic-v3-its";
+>             reg = <0x0 0x30020000 0x0 0x20000>,
+>                   <0x0 0x58000000 0x0 0x200000>;
+>             #msi-cells = <1>;
+>             msi-controller;
+>         };
+>     };
 > 
+> right?
 > 
+> Marc, what do you think? IIRC we did discuss option #2 at some point,
+> but I don't remember if/why we rejected it.
 
-Yes, this is correct understanding
+I dislike #2 because these registers are not part of the regular ITS,
+and would get in the way of potential extensions of the ITS (I don't
+know of any, but just in case...).
 
-> > 2) We do not see the issue ("1" ), when we do umount -a, before calling the
-> panic
-> > after kexec-p.
-> 
-> What filesystems (ext4, nfs etc) do you have mounted, and which ones does
-> 'umount -a' get rid of?
+I also dislike #1 as the "msi-slave" part is both ugly and confusing
+(are we writing to the ITS? to the pre-ITS?).
 
-root at ls1043ardb:~# mkdir temp; mount -t ext4 /dev/mmcblk0p3 temp/
-[   27.786681] EXT4-fs (mmcblk0p3): mounted filesystem with ordered data mode. Opts: (null)
-root at ls1043ardb:~# cat /proc/mounts
-/dev/root / ext4 rw,relatime,block_validity,delalloc,barrier,user_xattr,acl 0 0
-devtmpfs /dev devtmpfs rw,relatime,mode=0755 0 0
-proc /proc proc rw,relatime 0 0
-sysfs /sys sysfs rw,relatime 0 0
-debugfs /sys/kernel/debug debugfs rw,relatime 0 0
-devpts /dev/pts devpts rw,relatime,gid=5,mode=620,ptmxmode=000 0 0
-/dev/mmcblk0p3 /home/root/temp ext4 rw,relatime,data=ordered 0 0
+How about putting the pre-its node *inside* the its node itself? It
+makes it obvious which pre-ITS corresponds to which ITS, and it leaves
+the ITS regs untouched.
 
-root at ls1043ardb:~# umount -a
-umount: /dev: target is busy
-        (In some cases useful info about processes that
-         use the device is found by lsof(8) or fuser(1).)
-umount: /: target is busy
-        (In some cases useful info about processes that
-         use the device is found by lsof(8) or fuser(1).)
+Thoughts?
 
-root at ls1043ardb:~# cat /proc/mounts
-/dev/root / ext4 rw,relatime,block_validity,delalloc,barrier,user_xattr,acl 0 0
-devtmpfs /dev devtmpfs rw,relatime,mode=0755 0 0
-proc /proc proc rw,relatime 0 0
-sysfs /sys sysfs rw,relatime 0 0
-devpts /dev/pts devpts rw,relatime,gid=5,mode=620,ptmxmode=000 0 0
-root at ls1043ardb:~#
-
-
-> Where are these filesystems stored?
-> 
-
-We are using ramdisk.
-
-Bootargs: ttyS0,115200 root=/dev/ram0 earlycon=uart8250,mmio,0x21c0500 crashkernel=512M loglevel=8 ramdisk_size=0x20000000
-
-> How many CPUs does your platform have?
-> 
-
-4
-
-> (...does crashing on a different CPU change the behaviour?)
-> > taskset -c 1 bash -c "echo c > /proc/sysrq-trigger"
-> 
-
-I tired taskset -c 1 bash -c "echo c > /proc/sysrq-trigger" and taskset -c 2 bash -c "echo c > /proc/sysrq-trigger".
-Both worked i.e. crash kernel boot. 
-
-One strange observation: Very first time crash kernel never boot. If you restart and try again.. it start working. 
-I tried 3 iteration.   1/3 --> failed for both core 1 and core 2.    Subsequent restart and try always worked. 
-
-Not able to correlate with anything. 
-
-> 
-> > The issue does not seem to pertain to the NXP software it seems.   (because
-> this
-> > observation has been observed on very simple kernel, where most of the
-> > controllers have been removed from device tree).
-> 
-> > Also found some info related to this on  internet where it is mentioned that
-> > without un-mounting the mounted filesystems, the boot of next kernel is not
-> > recommended. (this is in context of kexec -e though)
-> > https://www.linux.com/news/reboot-racecar-kexec.
-> 
-> This is because the filesystem is marked as mounted on-disk, and there may be
-> vital data you've written but hasn't made it to the disk yet.
-> 
-> For 'kexec -e' I think it tries to shutdown and reboot, then jumps to the new
-> kernel instead of calling the firmware. This means all filesystems should be
-> sync()d, umounted or at least remounted read-only.
-
-Ok. understood
-
-> 
-> For kdump, we've already crashed, so you've already lost data. Its a best effort
-> can we get to a point where you can debug the original crash.
-> 
-
-Looks like umount  -a is not mandatory for kexec -p
-
-
-Further observation 
----------------------------
-** On upstream the dump capture boots (the issue is not observed) **
-Default config + enabled RAM Block Device
-The commit details as below:
-commit 569dbb88e80deb68974ef6fdd6a13edb9d686261
-Author: Linus Torvalds <torvalds@linux-foundation.org>
-Date:   Sun Sep 3 13:56:17 2017 -0700
-
-    Linux 4.13
-
-commit 5e3b19d8165c2af2afee313c9b40eee55cf27a55
-Merge: d0fa6ea 2c0e838
-Author: Linus Torvalds <torvalds@linux-foundation.org>
-Date:   Sun Sep 3 09:50:26 2017 -0700
-
-    Merge branch 'upstream' of git://git.linux-mips.org/pub/scm/ralf/upstream-linus
-    
-    Pull MIPS fixes from Ralf Baechle:
-     "The two indirect syscall fixes have sat in linux-next for a few days.
-      I did check back with a hardware designer to ensure a SYNC is really
-      what's required for the GIC fix and so the GIC fix didn't make it into
-      to linux-next in time for this final pull request.
-    
-      It builds in local build tests and passes Imagination's test system"
-    
-    * 'upstream' of git://git.linux-mips.org/pub/scm/ralf/upstream-linus:
-      irqchip: mips-gic: SYNC after enabling GIC region
-      MIPS: Remove pt_regs adjustments in indirect syscall handler
-      MIPS: seccomp: Fix indirect syscall args
-
-
-** On 4.4 LSK: (default defconfig + enabled RAM Block Device); issue is observed **
- commit f3b1dec5e8f2b4d17442a79bcb1f15953056519d
- Merge: f5ca0eb 09e6960
- Author: Alex Shi <alex.shi@linaro.org>
- Date:   Mon Aug 7 12:02:09 2017 +0800
- 
-      Merge tag 'v4.4.80' into linux-linaro-lsk-v4.4
-    
-      This is the 4.4.80 stable release
-
---prabhakar
+	M.
+-- 
+Jazz is not dead. It just smells funny...
