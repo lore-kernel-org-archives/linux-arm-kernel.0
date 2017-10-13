@@ -1,124 +1,44 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 14 Oct 2017 01:41:12 +0900
-Subject: [PATCH net-next v2 1/2] dt-bindings: net: add DT bindings for
- Socionext UniPhier AVE
-In-Reply-To: <1507854928-4357-2-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1507854928-4357-1-git-send-email-hayashi.kunihiko@socionext.com>
- <1507854928-4357-2-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <CAK7LNATkHsbr4cOh_F6u0Fznui3BFXfWJXgKwCk0EZANSmk0pg@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 13 Oct 2017 17:42:35 +0100
+Subject: [RESEND PATCH 1/2] spi: rockchip: Convert to late and early
+ system PM callbacks
+In-Reply-To: <20171013155120.GA137489@google.com>
+References: <20171013104138.3216-1-jeffy.chen@rock-chips.com>
+ <20171013104138.3216-2-jeffy.chen@rock-chips.com>
+ <CAD=FV=X6pkaY3t=ceh3QEUws+_gqRGMN9zveW0fXR1noF1T6ew@mail.gmail.com>
+ <20171013155120.GA137489@google.com>
+Message-ID: <20171013164235.thgqha7sl5tdptwv@sirena.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-10-13 9:35 GMT+09:00 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>:
-> DT bindings for the AVE ethernet controller found on Socionext's
-> UniPhier platforms.
->
-> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
-> ---
->  .../bindings/net/socionext,uniphier-ave4.txt       | 53 ++++++++++++++++++++++
->  1 file changed, 53 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
->
-> diff --git a/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt b/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
-> new file mode 100644
-> index 0000000..25f4d92
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
-> @@ -0,0 +1,53 @@
-> +* Socionext AVE ethernet controller
-> +
-> +This describes the devicetree bindings for AVE ethernet controller
-> +implemented on Socionext UniPhier SoCs.
-> +
-> +Required properties:
-> + - compatible: Should be
-> +       - "socionext,uniphier-pro4-ave4" : for Pro4 SoC
-> +       - "socionext,uniphier-pxs2-ave4" : for PXs2 SoC
-> +       - "socionext,uniphier-ld20-ave4" : for LD20 SoC
-> +       - "socionext,uniphier-ld11-ave4" : for LD11 SoC
+On Fri, Oct 13, 2017 at 08:51:21AM -0700, Brian Norris wrote:
 
-Nit.  LD11, LD20, in this order please.
+> Yes, this does seem odd to me too. This looks like an arms race hack
+> that should be avoided unless we know a legit root cause. Also,
+> "probe order implies suspend order" doesn't quite work for async suspend
+> anyway, so we'd probably want to express the dependency properly
+> anyway.
 
-> + - reg: Address where registers are mapped and size of region.
-> + - interrupts: Should contain the MAC interrupt.
-> + - phy-mode: See ethernet.txt in the same directory. Allow to choose
-> +       "rgmii", "rmii", or "mii" according to the PHY.
-> + - pinctrl-names: List of assigned state names, see pinctrl
-> +       binding documentation.
-> + - pinctrl-0: List of phandles to configure the GPIO pin,
+Yeah, it's the same stuff as we get with initcall ordering.  This sort
+of thing does happen with things like PMICs which tend to have hardware
+that the system wants to manipulate in the IRQs off part of suspend.
+Ideally the dependency annotation stuff would figure things out though
+I'm not sure what the status of that is.
 
+> Any chance this is related? Seems like that might break the parent/child
+> relationship for master/slave:
 
-configure the GPIO pin?
+> commit d7e2ee257038baeb03baef602500368a51ee9eef
+> Author: Linus Walleij <linus.walleij@linaro.org>
+> Date:   Mon Apr 11 13:51:03 2016 +0200
 
-git-grep found this phrase.
+>     spi: let SPI masters ignore their children for PM
 
-
-$ git grep "List of phandles to configure the GPIO"
-Documentation/devicetree/bindings/net/microchip,enc28j60.txt:-
-pinctrl-0: List of phandles to configure the GPIO pin used as
-interrupt line,
-
-
-
-
-
-> +       see pinctrl binding documentation. Choose this appropriately
-> +       according to phy-mode.
-> +       - <&pinctrl_ether_rgmii> if phy-mode is "rgmii".
-> +       - <&pinctrl_ether_rmii> if phy-mode is "rmii".
-> +       - <&pinctrl_ether_mii> if phy-mode is "mii".
-
-pinctrl_ether_rgmii is just a label
-you just happened to write in your DT file.
-
-This information is totally unrelated to hardware specification.
-It is not stable, either.
-
-
-
-> + - phy-handle: Should point to the external phy device.
-> +       See ethernet.txt file in the same directory.
-> + - mdio subnode: Should be device tree subnode with the following required
-> +       properties:
-> +       - #address-cells: Must be <1>.
-> +       - #size-cells: Must be <0>.
-> +       - reg: phy ID number, usually a small integer.
-
-
-Are you talking about "Required subnode" in the "Required properties"?
-
-
-
-
-> +Optional properties:
-> + - local-mac-address: See ethernet.txt in the same directory.
-> +
-> +Example:
-> +
-> +       ether: ethernet at 65000000 {
-> +               compatible = "socionext,uniphier-ld20-ave4";
-> +               reg = <0x65000000 0x8500>;
-> +               interrupts = <0 66 4>;
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&pinctrl_ether_rgmii>;
-> +               phy-mode = "rgmii";
-> +               phy-handle = <&ethphy>;
-> +               local-mac-address = [00 00 00 00 00 00];
-> +               mdio {
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +                       ethphy: ethphy at 1 {
-> +                               reg = <1>;
-> +                       };
-> +               };
-> +       };
-> --
-> 2.7.4
->
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+That's for runtime PM, I'd not expect it to affect system suspend.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171013/5cd83500/attachment.sig>
