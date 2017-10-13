@@ -1,39 +1,146 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Fri, 13 Oct 2017 16:26:33 +0800
-Subject: [PATCH v2 1/9] usb: xhci-mtk: use dma_set_mask_and_coherent() in
- probe function
-Message-ID: <994382d16d6bdc0f3d7c11b22f1710252e056e34.1507882470.git.chunfeng.yun@mediatek.com>
+Date: Fri, 13 Oct 2017 16:26:38 +0800
+Subject: [PATCH v2 6/9] usb: xhci-mtk: add optional mcu and dma bus clocks
+In-Reply-To: <994382d16d6bdc0f3d7c11b22f1710252e056e34.1507882470.git.chunfeng.yun@mediatek.com>
+References: <994382d16d6bdc0f3d7c11b22f1710252e056e34.1507882470.git.chunfeng.yun@mediatek.com>
+Message-ID: <3f81e076f513ef7d3e3e20ba2f752ed5bd48c9a2.1507882470.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch uses the simpler dma_set_mask_and_coherent() instead of
-doing these as separate steps
+There are mcu_bus and dma_bus clocks needed to be controlled by
+driver on some SoCs, so add them as optional ones
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- drivers/usb/host/xhci-mtk.c |    7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
+ drivers/usb/host/xhci-mtk.c |   79 ++++++++++++++++++++++++++++++++-----------
+ drivers/usb/host/xhci-mtk.h |    2 ++
+ 2 files changed, 62 insertions(+), 19 deletions(-)
 
 diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
-index 8fb6065..c197a6d 100644
+index d60463c..e5caabe 100644
 --- a/drivers/usb/host/xhci-mtk.c
 +++ b/drivers/usb/host/xhci-mtk.c
-@@ -606,15 +606,10 @@ static int xhci_mtk_probe(struct platform_device *pdev)
+@@ -221,6 +221,44 @@ static int xhci_mtk_ssusb_config(struct xhci_hcd_mtk *mtk)
+ 	return xhci_mtk_host_enable(mtk);
+ }
+ 
++/* ignore the error if the clock does not exist */
++static struct clk *optional_clk_get(struct device *dev, const char *id)
++{
++	struct clk *opt_clk;
++
++	opt_clk = devm_clk_get(dev, id);
++	/* ignore error number except EPROBE_DEFER */
++	if (IS_ERR(opt_clk) && (PTR_ERR(opt_clk) != -EPROBE_DEFER))
++		opt_clk = NULL;
++
++	return opt_clk;
++}
++
++static int xhci_mtk_clks_get(struct xhci_hcd_mtk *mtk)
++{
++	struct device *dev = mtk->dev;
++
++	mtk->sys_clk = devm_clk_get(dev, "sys_ck");
++	if (IS_ERR(mtk->sys_clk)) {
++		dev_err(dev, "fail to get sys_ck\n");
++		return PTR_ERR(mtk->sys_clk);
++	}
++
++	mtk->ref_clk = optional_clk_get(dev, "ref_ck");
++	if (IS_ERR(mtk->ref_clk))
++		return PTR_ERR(mtk->ref_clk);
++
++	mtk->mcu_clk = optional_clk_get(dev, "mcu_ck");
++	if (IS_ERR(mtk->mcu_clk))
++		return PTR_ERR(mtk->mcu_clk);
++
++	mtk->dma_clk = optional_clk_get(dev, "dma_ck");
++	if (IS_ERR(mtk->dma_clk))
++		return PTR_ERR(mtk->dma_clk);
++
++	return 0;
++}
++
+ static int xhci_mtk_clks_enable(struct xhci_hcd_mtk *mtk)
+ {
+ 	int ret;
+@@ -237,16 +275,34 @@ static int xhci_mtk_clks_enable(struct xhci_hcd_mtk *mtk)
+ 		goto sys_clk_err;
  	}
  
- 	/* Initialize dma_mask and coherent_dma_mask to 32-bits */
--	ret = dma_set_coherent_mask(dev, DMA_BIT_MASK(32));
-+	ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32));
- 	if (ret)
- 		goto disable_clk;
++	ret = clk_prepare_enable(mtk->mcu_clk);
++	if (ret) {
++		dev_err(mtk->dev, "failed to enable mcu_clk\n");
++		goto mcu_clk_err;
++	}
++
++	ret = clk_prepare_enable(mtk->dma_clk);
++	if (ret) {
++		dev_err(mtk->dev, "failed to enable dma_clk\n");
++		goto dma_clk_err;
++	}
++
+ 	return 0;
  
--	if (!dev->dma_mask)
--		dev->dma_mask = &dev->coherent_dma_mask;
--	else
--		dma_set_mask(dev, DMA_BIT_MASK(32));
++dma_clk_err:
++	clk_disable_unprepare(mtk->mcu_clk);
++mcu_clk_err:
++	clk_disable_unprepare(mtk->sys_clk);
+ sys_clk_err:
+ 	clk_disable_unprepare(mtk->ref_clk);
+ ref_clk_err:
+-	return -EINVAL;
++	return ret;
+ }
+ 
+ static void xhci_mtk_clks_disable(struct xhci_hcd_mtk *mtk)
+ {
++	clk_disable_unprepare(mtk->dma_clk);
++	clk_disable_unprepare(mtk->mcu_clk);
+ 	clk_disable_unprepare(mtk->sys_clk);
+ 	clk_disable_unprepare(mtk->ref_clk);
+ }
+@@ -529,24 +585,9 @@ static int xhci_mtk_probe(struct platform_device *pdev)
+ 		return PTR_ERR(mtk->vusb33);
+ 	}
+ 
+-	mtk->sys_clk = devm_clk_get(dev, "sys_ck");
+-	if (IS_ERR(mtk->sys_clk)) {
+-		dev_err(dev, "fail to get sys_ck\n");
+-		return PTR_ERR(mtk->sys_clk);
+-	}
 -
- 	hcd = usb_create_hcd(driver, dev, dev_name(dev));
- 	if (!hcd) {
- 		ret = -ENOMEM;
+-	/*
+-	 * reference clock is usually a "fixed-clock", make it optional
+-	 * for backward compatibility and ignore the error if it does
+-	 * not exist.
+-	 */
+-	mtk->ref_clk = devm_clk_get(dev, "ref_ck");
+-	if (IS_ERR(mtk->ref_clk)) {
+-		if (PTR_ERR(mtk->ref_clk) == -EPROBE_DEFER)
+-			return -EPROBE_DEFER;
+-
+-		mtk->ref_clk = NULL;
+-	}
++	ret = xhci_mtk_clks_get(mtk);
++	if (ret)
++		return ret;
+ 
+ 	mtk->lpm_support = of_property_read_bool(node, "usb3-lpm-capable");
+ 	/* optional property, ignore the error if it does not exist */
+diff --git a/drivers/usb/host/xhci-mtk.h b/drivers/usb/host/xhci-mtk.h
+index 67783a7..45ff5c6 100644
+--- a/drivers/usb/host/xhci-mtk.h
++++ b/drivers/usb/host/xhci-mtk.h
+@@ -126,6 +126,8 @@ struct xhci_hcd_mtk {
+ 	struct regulator *vbus;
+ 	struct clk *sys_clk;	/* sys and mac clock */
+ 	struct clk *ref_clk;
++	struct clk *mcu_clk;
++	struct clk *dma_clk;
+ 	struct regmap *pericfg;
+ 	struct phy **phys;
+ 	int num_phys;
 -- 
 1.7.9.5
