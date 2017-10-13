@@ -1,94 +1,61 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 13 Oct 2017 12:26:45 +0100
-Subject: [RESEND PATCH 2/2] arm/arm64: pmu: Distinguish percpu irq and
- percpu_devid irq
-In-Reply-To: <1507894005-53778-1-git-send-email-julien.thierry@arm.com>
-References: <1507894005-53778-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1507894005-53778-3-git-send-email-julien.thierry@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 13 Oct 2017 13:26:59 +0200
+Subject: [PATCH v2 01/10] ARM: dts: r8a7778: Use R-Car GPIO Gen1 fallback
+ compat string
+In-Reply-To: <20171013110600.6858-2-horms+renesas@verge.net.au>
+References: <20171013110600.6858-1-horms+renesas@verge.net.au>
+ <20171013110600.6858-2-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdU_f3TCQoL3ys3_+fLK0W-YUMn12ohW6md1-TWF-Aegrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm_pmu interrupts are maked as PERCPU even when these are not local
-physical interrupts to a single CPU. When using non-local interrupts,
-interrupts marked as PERCPU will not get freed not disabled properly
-by the PMU driver.
+Hi Simon,
 
-Check if interrupts are local to a single CPU with PERCPU_DEVID since
-this is what the PMU driver really needs to know.
+On Fri, Oct 13, 2017 at 1:05 PM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Use newly added R-Car GPIO Gen1 fallback compat string
+> in place of now deprecated non-generation specific
+> R-Car GPIO fallback compat string in DT of r8a7778 SoC.
+>
+> As the driver does not match on "renesas,gpio-r8a7778" there
+> are some run-time considerations for this patch:
+>
+> * When a resulting DTB is used with kernels newer than v4.14 this should
+>   not have any run-time effect as renesas,rcar-gen2-gpio is matched by the
 
-Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Will Deacon <will.deacon@arm.com>
-Mark Rutland <mark.rutland@arm.com>
----
- drivers/perf/arm_pmu.c          | 10 +++++-----
- drivers/perf/arm_pmu_platform.c |  4 ++--
- 2 files changed, 7 insertions(+), 7 deletions(-)
+renesas,rcar-gen1-gpio
 
-diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index d14fc2e..7bc5eee 100644
---- a/drivers/perf/arm_pmu.c
-+++ b/drivers/perf/arm_pmu.c
-@@ -539,7 +539,7 @@ void armpmu_free_irq(struct arm_pmu *armpmu, int cpu)
- 	if (!cpumask_test_and_clear_cpu(cpu, &armpmu->active_irqs))
- 		return;
+>   driver since commit dbd1dad2ab8f ("gpio: rcar: add gen[123] fallback
+>   compatibility strings")
+>
+> * However, when used with older kernels GPIO will be disabled as
+>   no compat string match will be made by the driver.
+>
+> The regression documented above for the new DTB with old kernel case
+> is acceptable in my opinion.
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
--	if (irq_is_percpu(irq)) {
-+	if (irq_is_percpu_devid(irq)) {
- 		free_percpu_irq(irq, &hw_events->percpu_pmu);
- 		cpumask_clear(&armpmu->active_irqs);
- 		return;
-@@ -565,10 +565,10 @@ int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
- 	if (!irq)
- 		return 0;
+> --- a/arch/arm/boot/dts/r8a7778.dtsi
+> +++ b/arch/arm/boot/dts/r8a7778.dtsi
+> @@ -88,7 +88,7 @@
+>         };
+>
+>         gpio0: gpio at ffc40000 {
+> -               compatible = "renesas,gpio-r8a7778", "renesas,gpio-rcar";
+> +               compatible = "renesas,gpio-r8a7778", "renesas,rcar-gen2-gpio";
 
--	if (irq_is_percpu(irq) && cpumask_empty(&armpmu->active_irqs)) {
-+	if (irq_is_percpu_devid(irq) && cpumask_empty(&armpmu->active_irqs)) {
- 		err = request_percpu_irq(irq, handler, "arm-pmu",
- 					 &hw_events->percpu_pmu);
--	} else if (irq_is_percpu(irq)) {
-+	} else if (irq_is_percpu_devid(irq)) {
- 		int other_cpu = cpumask_first(&armpmu->active_irqs);
- 		int other_irq = per_cpu(hw_events->irq, other_cpu);
+renesas,rcar-gen1-gpio
 
-@@ -649,7 +649,7 @@ static int arm_perf_starting_cpu(unsigned int cpu, struct hlist_node *node)
+The compatible values for the other nodes are correct.
 
- 	irq = armpmu_get_cpu_irq(pmu, cpu);
- 	if (irq) {
--		if (irq_is_percpu(irq)) {
-+		if (irq_is_percpu_devid(irq)) {
- 			enable_percpu_irq(irq, IRQ_TYPE_NONE);
- 			return 0;
- 		}
-@@ -667,7 +667,7 @@ static int arm_perf_teardown_cpu(unsigned int cpu, struct hlist_node *node)
- 		return 0;
+Gr{oetje,eeting}s,
 
- 	irq = armpmu_get_cpu_irq(pmu, cpu);
--	if (irq && irq_is_percpu(irq))
-+	if (irq && irq_is_percpu_devid(irq))
- 		disable_percpu_irq(irq);
+                        Geert
 
- 	return 0;
-diff --git a/drivers/perf/arm_pmu_platform.c b/drivers/perf/arm_pmu_platform.c
-index 4eafa7a..bbc64ee 100644
---- a/drivers/perf/arm_pmu_platform.c
-+++ b/drivers/perf/arm_pmu_platform.c
-@@ -126,7 +126,7 @@ static int pmu_parse_irqs(struct arm_pmu *pmu)
-
- 	if (num_irqs == 1) {
- 		int irq = platform_get_irq(pdev, 0);
--		if (irq && irq_is_percpu(irq))
-+		if (irq && irq_is_percpu_devid(irq))
- 			return pmu_parse_percpu_irq(pmu, irq);
- 	}
-
-@@ -149,7 +149,7 @@ static int pmu_parse_irqs(struct arm_pmu *pmu)
- 		if (WARN_ON(irq <= 0))
- 			continue;
-
--		if (irq_is_percpu(irq)) {
-+		if (irq_is_percpu_devid(irq)) {
- 			pr_warn("multiple PPIs or mismatched SPI/PPI detected\n");
- 			return -EINVAL;
- 		}
 --
-1.9.1
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
