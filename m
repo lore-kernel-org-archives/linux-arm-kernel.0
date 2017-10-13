@@ -1,69 +1,121 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Fri, 13 Oct 2017 21:14:59 +0200
-Subject: [PATCH] nvmem: meson: use generic compatible
-In-Reply-To: <20171012152450.12454-1-jbrunet@baylibre.com>
-References: <20171012152450.12454-1-jbrunet@baylibre.com>
-Message-ID: <CAFBinCBVNEqTk+NUHz62FetLhYagFb5K+g17P_2Xb7sBUfEmdA@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 13 Oct 2017 14:19:06 -0500
+Subject: [PATCH v5 1/3] PCI: rockchip: Add support for pcie wake irq
+In-Reply-To: <59E10709.4020300@rock-chips.com>
+References: <20170911151029.25185-1-jeffy.chen@rock-chips.com>
+ <20170911151029.25185-2-jeffy.chen@rock-chips.com>
+ <20171013030441.GA25517@bhelgaas-glaptop.roam.corp.google.com>
+ <2453698.N4jfPaHx71@aspire.rjw.lan>
+ <59E10709.4020300@rock-chips.com>
+Message-ID: <20171013191906.GF25517@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jerome,
+On Sat, Oct 14, 2017 at 02:33:45AM +0800, jeffy wrote:
+> Hi Rafael,
+> 
+> On 10/13/2017 09:21 PM, Rafael J. Wysocki wrote:
+> >>
+> >>I'm a little skeptical about dev_pm_set_dedicated_wake_irq(), not
+> >>because I know anything at all about it, but because there are only
+> >>five callers in the whole tree, three of which are in UART code, and
+> >>none in anything resembling PCI code.
+> >>
+> >>Is Rockchip really that special, or are we going about this the wrong
+> >>way?
+> 
+> we used to put these codes in the wifi driver, but another wifi
+> vendor suggests these should go into the pcie driver.
+> 
+> and as tony said, it could go into pcie common code :)
 
-On Thu, Oct 12, 2017 at 5:24 PM, Jerome Brunet <jbrunet@baylibre.com> wrote:
-> The meson efuse driver seems to be compatible with more SoCs than
-> initially thought. Let's use the most generic compatible he have in
-> DT instead of the gxbb specific one
->
-> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> ---
->  Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt | 4 ++--
->  drivers/nvmem/meson-efuse.c                               | 2 +-
->  2 files changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt b/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
-> index fafd85bd67a6..0260524292fe 100644
-> --- a/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
-> +++ b/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
-> @@ -1,7 +1,7 @@
->  = Amlogic eFuse device tree bindings =
->
->  Required properties:
-> -- compatible: should be "amlogic,meson-gxbb-efuse"
-> +- compatible: should be "amlogic,meson-gx-efuse"
-have you checked with the devicetree maintainers how they want the
-documentation to look like in this case?
-(I don't know if the old one should be kept instead of removing it)
+I guess the implication (I'm speculating here) is that in most
+existing cases, the WAKE# signal is fielded by an ACPI BIOS, which
+knows how it's connected.  I suppose that would end up being turned
+into an SCI that Linux already knows how to handle generically.
 
->
->  = Data cells =
->  Are child nodes of eFuse, bindings of which as described in
-> @@ -10,7 +10,7 @@ bindings/nvmem/nvmem.txt
->  Example:
->
->         efuse: efuse {
-> -               compatible = "amlogic,meson-gxbb-efuse";
-> +               compatible = "amlogic,meson-gx-efuse";
->                 #address-cells = <1>;
->                 #size-cells = <1>;
->
-> diff --git a/drivers/nvmem/meson-efuse.c b/drivers/nvmem/meson-efuse.c
-> index 70bfc9839bb2..e90c6d68a263 100644
-> --- a/drivers/nvmem/meson-efuse.c
-> +++ b/drivers/nvmem/meson-efuse.c
-> @@ -44,7 +44,7 @@ static struct nvmem_config econfig = {
->  };
->
->  static const struct of_device_id meson_efuse_match[] = {
-> -       { .compatible = "amlogic,meson-gxbb-efuse", },
-> +       { .compatible = "amlogic,meson-gx-efuse", },
->         { /* sentinel */ },
->  };
->  MODULE_DEVICE_TABLE(of, meson_efuse_match);
-> --
-> 2.13.6
->
->
-> _______________________________________________
-> linux-amlogic mailing list
-> linux-amlogic at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-amlogic
+And further, that the non-ACPI drivers are relatively new and you're
+the first attempt to use WAKE# with a non-ACPI PCI host driver?
+
+If this setup could be done somewhere in PCIe common code, that would
+be great.  We have so much copy and pasted code already, it'd be nice
+to avoid adding more.  I don't know if this would fit in
+pci_scan_root_bus_bridge(), doing something like dma_configure() does
+to get hold of a struct platform_device * or a struct device * so you
+could lookup the IRQ?
+
+> >>> >+		if (err)
+> >>> >+			dev_err(dev, "failed to setup PCIe wakeup IRQ\n");
+> >>> >+	}
+> >>> >+
+> >>> >  	return 0;
+> >>
+> >>The above could be structured as:
+> >>
+> >>  irq = platform_get_irq_byname(pdev, "wakeup");
+> >>  if (irq < 0)
+> >>    return 0;
+> >>
+> >>  device_init_wakeup(dev, true);
+> >>  err = dev_pm_set_dedicated_wake_irq(dev, irq);
+> >>  if (err) {
+> >>    dev_pm_clear_wake_irq(dev);
+> >>    device_init_wakeup(dev, false);
+> >>  }
+> >>
+> there's no need to call dev_pm_clear_wake_irq when
+> dev_pm_set_dedicated_wake_irq failed...and i agree the
+> device_init_wakeup part, i'll add that in the next version(with
+> brian's comment too)
+> >>  return 0;
+> >>
+> >>to unindent the mainline non-error code.
+> >>
+> >>> >  }
+> >>> >
+> >>> >@@ -1542,11 +1552,11 @@ static int rockchip_pcie_probe(struct platform_device *pdev)
+> >>> >
+> >>> >  	err = rockchip_pcie_parse_dt(rockchip);
+> >>> >  	if (err)
+> >>> >-		return err;
+> >>> >+		goto err_disable_wake;
+> >>> >
+> >>> >  	err = rockchip_pcie_enable_clocks(rockchip);
+> >>> >  	if (err)
+> >>> >-		return err;
+> >>> >+		goto err_disable_wake;
+> >>> >
+> >>> >  	err = rockchip_pcie_set_vpcie(rockchip);
+> >>> >  	if (err) {
+> >>> >@@ -1656,6 +1666,9 @@ static int rockchip_pcie_probe(struct platform_device *pdev)
+> >>> >  		regulator_disable(rockchip->vpcie0v9);
+> >>> >  err_set_vpcie:
+> >>> >  	rockchip_pcie_disable_clocks(rockchip);
+> >>> >+err_disable_wake:
+> >>> >+	dev_pm_clear_wake_irq(dev);
+> >>> >+	device_init_wakeup(dev, false);
+> >>
+> >>I think this error cleanup should be done in rockchip_pcie_setup_irq()
+> >>as shown above.  There's no real connection between
+> >>rockchip_pcie_probe() and the wake setup.
+> 
+> this error handling is like inline "rockchip_pcie_cleanup_irq()",
+> and they are harmless to be called even if we don't have the wakeup
+> irq :)
+
+I'm sure they're harmless.  The point is that the cleanup should be
+done near the failure, not in the caller of the caller of the function
+where the failure was detected.  You have:
+
+  rockchip_pcie_probe
+    rockchip_pcie_parse_dt
+      rockchip_pcie_setup_irq
+        err = dev_pm_set_dedicated_wake_irq
+        if (err)
+          dev_err(...)
+
+So you detect the error in rockchip_pcie_setup_irq(), but you clean up
+from it in rockchip_pcie_probe(), which doesn't make sense because
+rockchip_pcie_probe() doesn't do anything related to wakeup interupts.
+
+Bjorn
