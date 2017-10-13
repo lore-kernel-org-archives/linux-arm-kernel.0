@@ -1,92 +1,152 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 13 Oct 2017 06:50:35 -0700
-Subject: [PATCH 1/2] hwmon: (jc42) optionally try to disable the SMBUS
- timeout
-In-Reply-To: <20171013092705.7038-2-peda@axentia.se>
-References: <20171013092705.7038-1-peda@axentia.se>
- <20171013092705.7038-2-peda@axentia.se>
-Message-ID: <554a4494-14c9-7743-898c-5f83e3de227d@roeck-us.net>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 13 Oct 2017 15:55:27 +0200
+Subject: [PATCH v2 6/9] usb: xhci-mtk: add optional mcu and dma bus clocks
+In-Reply-To: <3f81e076f513ef7d3e3e20ba2f752ed5bd48c9a2.1507882470.git.chunfeng.yun@mediatek.com>
+References: <994382d16d6bdc0f3d7c11b22f1710252e056e34.1507882470.git.chunfeng.yun@mediatek.com>
+ <3f81e076f513ef7d3e3e20ba2f752ed5bd48c9a2.1507882470.git.chunfeng.yun@mediatek.com>
+Message-ID: <7a64bd4c-9bf3-4807-fa75-fb5d73e8507c@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/13/2017 02:27 AM, Peter Rosin wrote:
-> With a nxp,se97 chip on an atmel sama5d31 board, the I2C adapter driver
-> is not always capable of avoiding the 25-35 ms timeout as specified by
-> the SMBUS protocol. This may cause silent corruption of the last bit of
-> any transfer, e.g. a one is read instead of a zero if the sensor chip
-> times out. This also affects the eeprom half of the nxp-se97 chip, where
-> this silent corruption was originally noticed. Other I2C adapters probably
-> suffer similar issues, e.g. bit-banging comes to mind as risky...
+
+
+On 10/13/2017 10:26 AM, Chunfeng Yun wrote:
+> There are mcu_bus and dma_bus clocks needed to be controlled by
+> driver on some SoCs, so add them as optional ones
 > 
-> The SMBUS register in the nxp chip is not a standard Jedec register, but
-> it is not special to the nxp chips either, at least the atmel chips
-> have the same mechanism. Therefore, do not special case this on the
-> manufacturer, it is opt-in via the device property anyway.
-> 
-> Signed-off-by: Peter Rosin <peda@axentia.se>
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 > ---
->   Documentation/devicetree/bindings/hwmon/jc42.txt |  4 ++++
->   drivers/hwmon/jc42.c                             | 20 ++++++++++++++++++++
->   2 files changed, 24 insertions(+)
+
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+
+>   drivers/usb/host/xhci-mtk.c |   79 ++++++++++++++++++++++++++++++++-----------
+>   drivers/usb/host/xhci-mtk.h |    2 ++
+>   2 files changed, 62 insertions(+), 19 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/hwmon/jc42.txt b/Documentation/devicetree/bindings/hwmon/jc42.txt
-> index 07a250498fbb..f569db58f64a 100644
-> --- a/Documentation/devicetree/bindings/hwmon/jc42.txt
-> +++ b/Documentation/devicetree/bindings/hwmon/jc42.txt
-> @@ -34,6 +34,10 @@ Required properties:
+> diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
+> index d60463c..e5caabe 100644
+> --- a/drivers/usb/host/xhci-mtk.c
+> +++ b/drivers/usb/host/xhci-mtk.c
+> @@ -221,6 +221,44 @@ static int xhci_mtk_ssusb_config(struct xhci_hcd_mtk *mtk)
+>   	return xhci_mtk_host_enable(mtk);
+>   }
 >   
->   - reg: I2C address
->   
-> +Optional properties:
-> +- smbus-timeout-disable: When set, the smbus timeout function will be disabled.
-> +			 This is not supported on all chips.
+> +/* ignore the error if the clock does not exist */
+> +static struct clk *optional_clk_get(struct device *dev, const char *id)
+> +{
+> +	struct clk *opt_clk;
 > +
->   Example:
->   
->   temp-sensor at 1a {
-> diff --git a/drivers/hwmon/jc42.c b/drivers/hwmon/jc42.c
-> index 1bf22eff0b08..fd816902fa30 100644
-> --- a/drivers/hwmon/jc42.c
-> +++ b/drivers/hwmon/jc42.c
-> @@ -45,6 +45,7 @@ static const unsigned short normal_i2c[] = {
->   #define JC42_REG_TEMP		0x05
->   #define JC42_REG_MANID		0x06
->   #define JC42_REG_DEVICEID	0x07
-> +#define JC42_REG_SMBUS		0x22 /* NXP and Atmel, possibly others? */
->   
->   /* Status bits in temperature register */
->   #define JC42_ALARM_CRIT_BIT	15
-> @@ -73,6 +74,9 @@ static const unsigned short normal_i2c[] = {
->   #define ONS_MANID		0x1b09  /* ON Semiconductor */
->   #define STM_MANID		0x104a  /* ST Microelectronics */
->   
-> +/* SMBUS register */
-> +#define SMBUS_STMOUT		BIT(7)  /* SMBus time-out, active low */
+> +	opt_clk = devm_clk_get(dev, id);
+> +	/* ignore error number except EPROBE_DEFER */
+> +	if (IS_ERR(opt_clk) && (PTR_ERR(opt_clk) != -EPROBE_DEFER))
+> +		opt_clk = NULL;
 > +
->   /* Supported chips */
->   
->   /* Analog Devices */
-> @@ -476,6 +480,22 @@ static int jc42_probe(struct i2c_client *client, const struct i2c_device_id *id)
->   
->   	data->extended = !!(cap & JC42_CAP_RANGE);
->   
-> +	if (device_property_read_bool(dev, "smbus-timeout-disable")) {
-> +		int smbus;
+> +	return opt_clk;
+> +}
 > +
-> +		/*
-> +		 * Not all chips support this register, but from a
-> +		 * quick read of various datasheets no chip appears
-> +		 * incompatible with the below attempt to disable
-> +		 * the timeout. And the whole thing is opt-in...
-> +		 */
-> +		smbus = i2c_smbus_read_word_swapped(client, JC42_REG_SMBUS);
-> +		if (smbus < 0)
-> +			return smbus;
-> +		i2c_smbus_write_word_swapped(client, JC42_REG_SMBUS,
-> +					     smbus | SMBUS_STMOUT);
-
-Looking into the SE97 datasheet, the bit is only writable if the alarm bits
-are not locked. Should we take this into account and unlock the alarm bits
-if necessary ?
-
-Guenter
+> +static int xhci_mtk_clks_get(struct xhci_hcd_mtk *mtk)
+> +{
+> +	struct device *dev = mtk->dev;
+> +
+> +	mtk->sys_clk = devm_clk_get(dev, "sys_ck");
+> +	if (IS_ERR(mtk->sys_clk)) {
+> +		dev_err(dev, "fail to get sys_ck\n");
+> +		return PTR_ERR(mtk->sys_clk);
+> +	}
+> +
+> +	mtk->ref_clk = optional_clk_get(dev, "ref_ck");
+> +	if (IS_ERR(mtk->ref_clk))
+> +		return PTR_ERR(mtk->ref_clk);
+> +
+> +	mtk->mcu_clk = optional_clk_get(dev, "mcu_ck");
+> +	if (IS_ERR(mtk->mcu_clk))
+> +		return PTR_ERR(mtk->mcu_clk);
+> +
+> +	mtk->dma_clk = optional_clk_get(dev, "dma_ck");
+> +	if (IS_ERR(mtk->dma_clk))
+> +		return PTR_ERR(mtk->dma_clk);
+> +
+> +	return 0;
+> +}
+> +
+>   static int xhci_mtk_clks_enable(struct xhci_hcd_mtk *mtk)
+>   {
+>   	int ret;
+> @@ -237,16 +275,34 @@ static int xhci_mtk_clks_enable(struct xhci_hcd_mtk *mtk)
+>   		goto sys_clk_err;
+>   	}
+>   
+> +	ret = clk_prepare_enable(mtk->mcu_clk);
+> +	if (ret) {
+> +		dev_err(mtk->dev, "failed to enable mcu_clk\n");
+> +		goto mcu_clk_err;
+> +	}
+> +
+> +	ret = clk_prepare_enable(mtk->dma_clk);
+> +	if (ret) {
+> +		dev_err(mtk->dev, "failed to enable dma_clk\n");
+> +		goto dma_clk_err;
+> +	}
+> +
+>   	return 0;
+>   
+> +dma_clk_err:
+> +	clk_disable_unprepare(mtk->mcu_clk);
+> +mcu_clk_err:
+> +	clk_disable_unprepare(mtk->sys_clk);
+>   sys_clk_err:
+>   	clk_disable_unprepare(mtk->ref_clk);
+>   ref_clk_err:
+> -	return -EINVAL;
+> +	return ret;
+>   }
+>   
+>   static void xhci_mtk_clks_disable(struct xhci_hcd_mtk *mtk)
+>   {
+> +	clk_disable_unprepare(mtk->dma_clk);
+> +	clk_disable_unprepare(mtk->mcu_clk);
+>   	clk_disable_unprepare(mtk->sys_clk);
+>   	clk_disable_unprepare(mtk->ref_clk);
+>   }
+> @@ -529,24 +585,9 @@ static int xhci_mtk_probe(struct platform_device *pdev)
+>   		return PTR_ERR(mtk->vusb33);
+>   	}
+>   
+> -	mtk->sys_clk = devm_clk_get(dev, "sys_ck");
+> -	if (IS_ERR(mtk->sys_clk)) {
+> -		dev_err(dev, "fail to get sys_ck\n");
+> -		return PTR_ERR(mtk->sys_clk);
+> -	}
+> -
+> -	/*
+> -	 * reference clock is usually a "fixed-clock", make it optional
+> -	 * for backward compatibility and ignore the error if it does
+> -	 * not exist.
+> -	 */
+> -	mtk->ref_clk = devm_clk_get(dev, "ref_ck");
+> -	if (IS_ERR(mtk->ref_clk)) {
+> -		if (PTR_ERR(mtk->ref_clk) == -EPROBE_DEFER)
+> -			return -EPROBE_DEFER;
+> -
+> -		mtk->ref_clk = NULL;
+> -	}
+> +	ret = xhci_mtk_clks_get(mtk);
+> +	if (ret)
+> +		return ret;
+>   
+>   	mtk->lpm_support = of_property_read_bool(node, "usb3-lpm-capable");
+>   	/* optional property, ignore the error if it does not exist */
+> diff --git a/drivers/usb/host/xhci-mtk.h b/drivers/usb/host/xhci-mtk.h
+> index 67783a7..45ff5c6 100644
+> --- a/drivers/usb/host/xhci-mtk.h
+> +++ b/drivers/usb/host/xhci-mtk.h
+> @@ -126,6 +126,8 @@ struct xhci_hcd_mtk {
+>   	struct regulator *vbus;
+>   	struct clk *sys_clk;	/* sys and mac clock */
+>   	struct clk *ref_clk;
+> +	struct clk *mcu_clk;
+> +	struct clk *dma_clk;
+>   	struct regmap *pericfg;
+>   	struct phy **phys;
+>   	int num_phys;
+> 
