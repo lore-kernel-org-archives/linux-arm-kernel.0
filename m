@@ -1,29 +1,68 @@
 From: phh@phh.me (Pierre-Hugues Husson)
-Date: Sat, 14 Oct 2017 00:53:37 +0200
-Subject: [PATCH 3/3] arm64: dts: rockchip: enable cec pin for rk3399 firefly
+Date: Sat, 14 Oct 2017 00:53:35 +0200
+Subject: [PATCH 1/3] drm: bridge: synopsys/dw-hdmi: Enable cec clock
 In-Reply-To: <20171013225337.5196-1-phh@phh.me>
 References: <20171013225337.5196-1-phh@phh.me>
-Message-ID: <20171013225337.5196-4-phh@phh.me>
+Message-ID: <20171013225337.5196-2-phh@phh.me>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The documentation already mentions "cec" optional clock, but
+currently the driver doesn't enable it.
+
 Signed-off-by: Pierre-Hugues Husson <phh@phh.me>
 ---
- arch/arm64/boot/dts/rockchip/rk3399-firefly.dts | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts b/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
-index f6fbcc05073e..431ff1bb3720 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
-@@ -257,6 +257,8 @@
+diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+index bf14214fa464..5007cdf43131 100644
+--- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
++++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+@@ -138,6 +138,7 @@ struct dw_hdmi {
+ 	struct device *dev;
+ 	struct clk *isfr_clk;
+ 	struct clk *iahb_clk;
++	struct clk *cec_clk;
+ 	struct dw_hdmi_i2c *i2c;
  
- &hdmi {
- 	ddc-i2c-bus = <&i2c3>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&hdmi_cec>;
- 	status = "okay";
- };
+ 	struct hdmi_data_info hdmi_data;
+@@ -2382,6 +2383,18 @@ __dw_hdmi_probe(struct platform_device *pdev,
+ 		goto err_isfr;
+ 	}
  
++	hdmi->cec_clk = devm_clk_get(hdmi->dev, "cec");
++	if (IS_ERR(hdmi->cec_clk)) {
++		hdmi->cec_clk = NULL;
++	} else {
++		ret = clk_prepare_enable(hdmi->cec_clk);
++		if (ret) {
++			dev_err(hdmi->dev, "Cannot enable HDMI cec clock: %d\n",
++					ret);
++			goto err_res;
++		}
++	}
++
+ 	/* Product and revision IDs */
+ 	hdmi->version = (hdmi_readb(hdmi, HDMI_DESIGN_ID) << 8)
+ 		      | (hdmi_readb(hdmi, HDMI_REVISION_ID) << 0);
+@@ -2518,6 +2531,8 @@ __dw_hdmi_probe(struct platform_device *pdev,
+ 		cec_notifier_put(hdmi->cec_notifier);
+ 
+ 	clk_disable_unprepare(hdmi->iahb_clk);
++	if (hdmi->cec_clk)
++		clk_disable_unprepare(hdmi->cec_clk);
+ err_isfr:
+ 	clk_disable_unprepare(hdmi->isfr_clk);
+ err_res:
+@@ -2541,6 +2556,8 @@ static void __dw_hdmi_remove(struct dw_hdmi *hdmi)
+ 
+ 	clk_disable_unprepare(hdmi->iahb_clk);
+ 	clk_disable_unprepare(hdmi->isfr_clk);
++	if (hdmi->cec_clk)
++		clk_disable_unprepare(hdmi->cec_clk);
+ 
+ 	if (hdmi->i2c)
+ 		i2c_del_adapter(&hdmi->i2c->adap);
 -- 
 2.14.1
