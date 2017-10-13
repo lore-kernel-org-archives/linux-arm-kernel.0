@@ -1,112 +1,86 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 13 Oct 2017 15:43:19 +0100
-Subject: [PATCH v11 7/9] arm64/kasan: add and use kasan_map_populate()
-In-Reply-To: <CAOAebxu5WL-FQLgfCxNcWy36V6zsTO1v3LLqXv5rM1Pp9R-=YA@mail.gmail.com>
-References: <20171009221931.1481-1-pasha.tatashin@oracle.com>
- <20171009221931.1481-8-pasha.tatashin@oracle.com>
- <20171010155619.GA2517@arm.com>
- <CAOAebxv21+KtXPAk-xWz=+2fqWQDgp9SAFZz-N=XsuBxev=zcg@mail.gmail.com>
- <20171010171047.GC2517@arm.com>
- <CAOAebxtrSthSP4NAa0obBbsCK1KZxO+x0w5xNrpY6m2y9UZFvQ@mail.gmail.com>
- <CAOAebxu5WL-FQLgfCxNcWy36V6zsTO1v3LLqXv5rM1Pp9R-=YA@mail.gmail.com>
-Message-ID: <20171013144319.GB4746@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 13 Oct 2017 15:47:22 +0100
+Subject: [PATCH v3 16/22] firmware: arm_scmi: add arm_mhu specific mailbox
+ interface
+In-Reply-To: <CABb+yY0HxvLs51PmB7K-T2pp+OJE8ckiBAdBa=ss2rfUes=u2A@mail.gmail.com>
+References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
+ <1506604306-20739-17-git-send-email-sudeep.holla@arm.com>
+ <CAK8P3a0XmiXqZ-z7WV+nk7B86p23Jmf31Q=pVovXVebhA28_0Q@mail.gmail.com>
+ <CABb+yY1N6hmC6Kd2QteMw_oCf=-mYHf7p6RdhYPQK+QUO7VP4A@mail.gmail.com>
+ <f142dac2-a27c-4c46-4d22-4df4f2e8cfb1@arm.com>
+ <CABb+yY1w358uw2EoeioAvZy06LTuOO0krGFFXoQSNAR5m5ANmQ@mail.gmail.com>
+ <25023d1a-a221-b131-5a1e-7d909b006d1b@arm.com>
+ <CAOCOHw54mQUVxVyLRWbV5Ty7trK99MM6zgXsuuxQEHnD3qvKVA@mail.gmail.com>
+ <0b65a3fd-32ff-f708-7dce-8e3a5cabf908@arm.com>
+ <CABb+yY0HxvLs51PmB7K-T2pp+OJE8ckiBAdBa=ss2rfUes=u2A@mail.gmail.com>
+Message-ID: <94004135-8ce2-8006-21f6-f8d219c0430d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
 
-On Fri, Oct 13, 2017 at 10:10:09AM -0400, Pavel Tatashin wrote:
-> I have a couple concerns about your patch:
-> 
-> One of the reasons (and actually, the main reason) why I preferred to
-> keep vmemmap_populate() instead of implementing kasan's own variant,
-> which btw can be done in common code similarly to
-> vmemmap_populate_basepages() is that vmemmap_populate() uses large
-> pages when available. I think it is a considerable downgrade to go
-> back to base pages, when we already have large page support available
-> to us.
 
-It shouldn't be difficult to use section mappings with my patch, I just
-don't really see the need to try to optimise TLB pressure when you're
-running with KASAN enabled which already has something like a 3x slowdown
-afaik. If it ends up being a big deal, we can always do that later, but
-my main aim here is to divorce kasan from vmemmap because they should be
-completely unrelated.
+On 13/10/17 15:12, Jassi Brar wrote:
+> On Fri, Oct 13, 2017 at 7:12 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>
+>> Hi Bjorn,
+>>
+>> Thanks for taking a look at this. Much appreciated.
+>>
+>> On 12/10/17 22:03, Bjorn Andersson wrote:
+>>> On Fri, Oct 6, 2017 at 6:51 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>>>
+>>>>
+>>>> On 06/10/17 14:47, Jassi Brar wrote:
+>>>>> On Fri, Oct 6, 2017 at 7:02 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>> [..]
+>>>>>> Again that's not the point, doorbell is more common feature and that can
+>>>>>> be supported. As SCMI expects doorbell feature in the specification, it
+>>>>>> just need to support that class of controllers.
+>>>>>>
+>>>>> NO.  All SCMI expects is SHMEM and a signal reaching the other end.
+>>>>> The signal mechanism need not necessarily be "doorbell".
+>>>>>
+>>>>
+>>>> Agreed, but creating an abstraction ro do something as generic as
+>>>> doorbell and writing shim layer for each controller to use SCMI also
+>>>> sounds bad.
+>>>>
+>>>
+>>> In the Qualcomm platform we have a single register that exposes 32
+>>> doorbells, wired to interrupts on the various processors/co-processors
+>>> in the SoC.
+>>>
+>>
+>> It's exactly same even on ARM MHU controller.
+>>
+> This has been a big problem in our communication. You start with
+> "exactly same..." and go on telling the difference.
+> And that difference is important.
+> 
 
-> The kasan shadow tree is large, it is up-to 1/8th of system memory, so
-> even on moderate size servers, shadow tree is going to be multiple
-> gigabytes.
-> 
-> The second concern is that there is an existing bug associated with
-> your patch that I am not sure how to solve:
-> 
-> Try building your patch with CONFIG_DEBUG_VM. This config makes
-> memblock_virt_alloc_try_nid_raw() to do memset(0xff) on all allocated
-> memory.
-> 
-> I am getting the following panic during boot:
-> 
-> [    0.012637] pid_max: default: 32768 minimum: 301
-> [    0.016037] Security Framework initialized
-> [    0.018389] Dentry cache hash table entries: 16384 (order: 5, 131072 bytes)
-> [    0.019559] Inode-cache hash table entries: 8192 (order: 4, 65536 bytes)
-> [    0.020409] Mount-cache hash table entries: 512 (order: 0, 4096 bytes)
-> [    0.020721] Mountpoint-cache hash table entries: 512 (order: 0, 4096 bytes)
-> [    0.055337] Unable to handle kernel paging request at virtual
-> address ffff0400010065af
-> [    0.055422] Mem abort info:
-> [    0.055518]   Exception class = DABT (current EL), IL = 32 bits
-> [    0.055579]   SET = 0, FnV = 0
-> [    0.055640]   EA = 0, S1PTW = 0
-> [    0.055699] Data abort info:
-> [    0.055762]   ISV = 0, ISS = 0x00000007
-> [    0.055822]   CM = 0, WnR = 0
-> [    0.055966] swapper pgtable: 4k pages, 48-bit VAs, pgd = ffff20000a8f4000
-> [    0.056047] [ffff0400010065af] *pgd=0000000046fe7003,
-> *pud=0000000046fe6003, *pmd=0000000046fe5003, *pte=0000000000000000
-> [    0.056436] Internal error: Oops: 96000007 [#1] PREEMPT SMP
-> [    0.056701] Modules linked in:
-> [    0.056939] CPU: 0 PID: 0 Comm: swapper/0 Not tainted
-> 4.14.0-rc4_pt_memset12-00096-gfca5985f860e-dirty #16
-> [    0.057001] Hardware name: linux,dummy-virt (DT)
-> [    0.057084] task: ffff2000099d9000 task.stack: ffff2000099c0000
-> [    0.057275] PC is at __asan_load8+0x34/0xb0
-> [    0.057375] LR is at __d_rehash+0xf0/0x240
+Sure and sorry for that.
 
-[...]
-
-> So, I've been trying to root cause it, and here is what I've got:
+> In MHU the 32bits are tied together and all go to one target
+> processor. Whereas on QCom, each bit corresponds to independent signal
+> going to a different target processor.
 > 
-> First, I went back to my version of kasan_map_populate() and replaced
-> vmemmap_populate() with vmemmap_populate_basepages(), which
-> behavior-vise made it very similar to your patch. After doing this I
-> got the same panic. So, I figured there must be something to do with
-> the differences that regular vmemmap allocated with granularity of
-> SWAPPER_BLOCK_SIZE while kasan with granularity of PAGE_SIZE.
+
+I was not aware of that. Thanks for clarifying the differences.
+
+> IOW, QCom has 32 channels per register whereas MHU has one. The
+
+OK, that depends on how we consider it. As you said yes it just goes to
+single target processor, but hardware designers consider it still 32
+channels are they can be controller independently without any locking.
+
+> current drivers reflect that reality and hence I am against any change
+> in MHU driver.  Not to mean even changing the MHU driver will fix the
+> core issue - which is https://lkml.org/lkml/2017/7/7/465 and this
+> patchset tries to address that.
 > 
-> So, I made the following modification to your patch:
-> 
-> static void __init kasan_map_populate(unsigned long start, unsigned long end,
->                                       int node)
-> {
-> +        start = round_down(start, SWAPPER_BLOCK_SIZE);
-> +       end = round_up(end, SWAPPER_BLOCK_SIZE);
->         kasan_pgd_populate(start & PAGE_MASK, PAGE_ALIGN(end), node, false);
-> }
-> 
-> This is basically makes shadow tree ranges to be SWAPPER_BLOCK_SIZE
-> aligned. After, this modification everything is working.  However, I
-> am not sure if this is a proper fix.
 
-This certainly doesn't sound right; mapping the shadow with pages shouldn't
-lead to problems. I also can't seem to reproduce this myself -- could you
-share your full .config and a pointer to the git tree that you're using,
-please?
+Sure, that's the reason I have this abstraction now.
 
-> I feel, this patch requires more work, and I am troubled with using
-> base pages instead of large pages.
-
-I'm happy to try fixing this, because I think splitting up kasan and vmemmap
-is the right thing to do here.
-
-Will
+-- 
+Regards,
+Sudeep
