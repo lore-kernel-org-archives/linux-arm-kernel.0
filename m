@@ -1,96 +1,97 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 13 Oct 2017 12:00:50 +0100
-Subject: [PATCH] KVM: arm64: its: Fix missing dynamic allocation check in
- scan_its_table
-In-Reply-To: <20171013105259.9728-1-christoffer.dall@linaro.org>
-References: <20171013105259.9728-1-christoffer.dall@linaro.org>
-Message-ID: <0fbee4b3-c555-76d6-4a9e-8a869e87d8ee@arm.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Fri, 13 Oct 2017 11:44:26 +0100
+Subject: [PATCH 2/2] arm/arm64: pmu: Distinguish percpu irq and percpu_devid
+ irq
+In-Reply-To: <1507891466-52292-1-git-send-email-julien.thierry@arm.com>
+References: <1507891466-52292-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <1507891466-52292-2-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/10/17 11:52, Christoffer Dall wrote:
-> We currently allocate an entry dynamically, but we never check if the
-> allocation actually succeeded.  We actually don't need a dynamic
-> allocation, because we know the maximum size of an ITS table entry, so
-> we can simply use an allocation on the stack.
-> 
-> Cc: <stable@vger.kernel.org>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  virt/kvm/arm/vgic/vgic-its.c | 19 ++++++++-----------
->  1 file changed, 8 insertions(+), 11 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index f51c1e1..555f42f 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -176,6 +176,7 @@ static const struct vgic_its_abi its_table_abi_versions[] = {
->  };
->  
->  #define NR_ITS_ABIS	ARRAY_SIZE(its_table_abi_versions)
-> +#define MAX_ENTRY_SIZE	8	/* Max Entry size across all ABI versions */
->  
->  inline const struct vgic_its_abi *vgic_its_get_abi(struct vgic_its *its)
->  {
-> @@ -1801,37 +1802,33 @@ typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *entry,
->  static int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
->  			  int start_id, entry_fn_t fn, void *opaque)
->  {
-> -	void *entry = kzalloc(esz, GFP_KERNEL);
->  	struct kvm *kvm = its->dev->kvm;
->  	unsigned long len = size;
->  	int id = start_id;
->  	gpa_t gpa = base;
-> +	char entry[MAX_ENTRY_SIZE];
+arm_pmu interrupts are maked as PERCPU even when these are not local
+physical interrupts to a single CPU. When using non-local interrupts,
+interrupts marked as PERCPU will not get freed not disabled properly
+by the PMU driver.
 
-Nit: you can drop the memset below if you initialize immediately, and
-GCC supporting dynamic arrays allows you to write this:
+Check if interrupts are local to a single CPU with PERCPU_DEVID since
+this is what the PMU driver really needs to know.
 
-	char entry[esz] = { 0, };
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Will Deacon <will.deacon@arm.com>
+Mark Rutland <mark.rutland@arm.com>
+---
+ drivers/perf/arm_pmu.c          | 10 +++++-----
+ drivers/perf/arm_pmu_platform.c |  4 ++--
+ 2 files changed, 7 insertions(+), 7 deletions(-)
 
-so that you don't have to add the MAX_ENTRY_SIZE.
+So far this has not been an issue because enable_percpu_irq does nothing
+when the irq is not marked as percpu devid.
 
->  	int ret;
->  
-> +	memset(entry, 0, MAX_ENTRY_SIZE);
-> +
->  	while (len > 0) {
->  		int next_offset;
->  		size_t byte_offset;
->  
->  		ret = kvm_read_guest(kvm, gpa, entry, esz);
->  		if (ret)
-> -			goto out;
-> +			return ret;
->  
->  		next_offset = fn(its, id, entry, opaque);
-> -		if (next_offset <= 0) {
-> -			ret = next_offset;
-> -			goto out;
-> -		}
-> +		if (next_offset <= 0)
-> +			return next_offset;
->  
->  		byte_offset = next_offset * esz;
->  		id += next_offset;
->  		gpa += byte_offset;
->  		len -= byte_offset;
->  	}
-> -	ret =  1;
-> -
-> -out:
-> -	kfree(entry);
-> -	return ret;
-> +	return 1;
->  }
->  
->  /**
-> 
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index d14fc2e..7bc5eee 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -539,7 +539,7 @@ void armpmu_free_irq(struct arm_pmu *armpmu, int cpu)
+ 	if (!cpumask_test_and_clear_cpu(cpu, &armpmu->active_irqs))
+ 		return;
 
-Otherwise:
+-	if (irq_is_percpu(irq)) {
++	if (irq_is_percpu_devid(irq)) {
+ 		free_percpu_irq(irq, &hw_events->percpu_pmu);
+ 		cpumask_clear(&armpmu->active_irqs);
+ 		return;
+@@ -565,10 +565,10 @@ int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
+ 	if (!irq)
+ 		return 0;
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+-	if (irq_is_percpu(irq) && cpumask_empty(&armpmu->active_irqs)) {
++	if (irq_is_percpu_devid(irq) && cpumask_empty(&armpmu->active_irqs)) {
+ 		err = request_percpu_irq(irq, handler, "arm-pmu",
+ 					 &hw_events->percpu_pmu);
+-	} else if (irq_is_percpu(irq)) {
++	} else if (irq_is_percpu_devid(irq)) {
+ 		int other_cpu = cpumask_first(&armpmu->active_irqs);
+ 		int other_irq = per_cpu(hw_events->irq, other_cpu);
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+@@ -649,7 +649,7 @@ static int arm_perf_starting_cpu(unsigned int cpu, struct hlist_node *node)
+
+ 	irq = armpmu_get_cpu_irq(pmu, cpu);
+ 	if (irq) {
+-		if (irq_is_percpu(irq)) {
++		if (irq_is_percpu_devid(irq)) {
+ 			enable_percpu_irq(irq, IRQ_TYPE_NONE);
+ 			return 0;
+ 		}
+@@ -667,7 +667,7 @@ static int arm_perf_teardown_cpu(unsigned int cpu, struct hlist_node *node)
+ 		return 0;
+
+ 	irq = armpmu_get_cpu_irq(pmu, cpu);
+-	if (irq && irq_is_percpu(irq))
++	if (irq && irq_is_percpu_devid(irq))
+ 		disable_percpu_irq(irq);
+
+ 	return 0;
+diff --git a/drivers/perf/arm_pmu_platform.c b/drivers/perf/arm_pmu_platform.c
+index 4eafa7a..bbc64ee 100644
+--- a/drivers/perf/arm_pmu_platform.c
++++ b/drivers/perf/arm_pmu_platform.c
+@@ -126,7 +126,7 @@ static int pmu_parse_irqs(struct arm_pmu *pmu)
+
+ 	if (num_irqs == 1) {
+ 		int irq = platform_get_irq(pdev, 0);
+-		if (irq && irq_is_percpu(irq))
++		if (irq && irq_is_percpu_devid(irq))
+ 			return pmu_parse_percpu_irq(pmu, irq);
+ 	}
+
+@@ -149,7 +149,7 @@ static int pmu_parse_irqs(struct arm_pmu *pmu)
+ 		if (WARN_ON(irq <= 0))
+ 			continue;
+
+-		if (irq_is_percpu(irq)) {
++		if (irq_is_percpu_devid(irq)) {
+ 			pr_warn("multiple PPIs or mismatched SPI/PPI detected\n");
+ 			return -EINVAL;
+ 		}
+--
+1.9.1
