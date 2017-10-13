@@ -1,57 +1,120 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Fri, 13 Oct 2017 10:38:18 +0100
-Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.15
-Message-ID: <59E0898A.3050307@hisilicon.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Fri, 13 Oct 2017 10:40:39 +0100
+Subject: [PATCH v3 0/8] ARM: NOMMU: MPU updates
+In-Reply-To: <20171013092418.GF20805@n2100.armlinux.org.uk>
+References: <1506330344-31556-1-git-send-email-vladimir.murzin@arm.com>
+ <68a6eb4d-4d8e-7c6a-0875-3165bde8de89@arm.com>
+ <e2e80a26-4a87-6d4c-51ad-11d6ea683c16@arm.com>
+ <20171013092418.GF20805@n2100.armlinux.org.uk>
+Message-ID: <0edd802a-d596-5d46-ff53-97b1db1a453e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Hi Olof, Hi Kevin,
+On 13/10/17 10:24, Russell King - ARM Linux wrote:
+> Sorry, but I have no working MPS3 platform since it killed its uSD card
+> with all the FPGA bitstreams on.  I'm waiting (since end of September)
+> for a replacement from ARM Ltd but there hasn't yet been any progress.
+> 
+> Sure, I can replace the uSD card myself, but the problem is the contents
+> of the card.
 
-Please help to pull the following changes.
-Thanks!
+Thanks for prompt reply!
 
-Best Regards,
-Wei
+I should say that board won't help you with testing this series since it
+implements different MPU model (I have patches for that too but they are
+on top of this series).
 
----
+I've been working closely with Alex and Andr?s (since they needed this for
+their Cortex-M7 platform) to make sure it works as expected. It was also
+tested with R-class FastModels.
 
-The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+I intentionally kept CONFIG_ARM_MPU disabled by default for M-class
+(PATCH 6/8), so it won't interfere with existing bootloaders.
 
-  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+I'd be glad if you can review the series and give it a chance to sit in
+linux-next (I can provide a branch on top of yours for-next).
 
-are available in the git repository at:
+Cheers
+Vladimir
 
-  git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.15
 
-for you to fetch changes up to a7ab4cb46902cd481d7def6869cf38a1e157f829:
-
-  arm64: dts: Register Hi3660's thermal sensor (2017-10-11 09:51:50 +0100)
-
-----------------------------------------------------------------
-ARM64: DT: Hisilicon SoC DT updates for 4.15
-
-- Add CoreSight related nodes for hi6220
-- Add GPIO line names for hikey960
-- Rectify the GPIO line names of the Poplar board to keep consistency
-- Add thermal sensor binding doc and dt nodes for hi3660
-
-----------------------------------------------------------------
-Kevin Wangtao (2):
-      dt-bindings: Document the hi3660 thermal sensor binding
-      arm64: dts: Register Hi3660's thermal sensor
-
-Li Pengcheng (1):
-      arm64: dts: hi6220: add coresight dt nodes
-
-Linus Walleij (2):
-      arm64: dts: hikey960: Update HiKey960 with GPIO line names
-      arm64: dts: hisilicon: Standardize Poplar GPIO line names
-
- .../bindings/thermal/hisilicon-thermal.txt         |   9 +
- arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts  | 319 +++++++++++++++++
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi          |   7 +
- .../boot/dts/hisilicon/hi3798cv200-poplar.dts      |  20 +-
- .../arm64/boot/dts/hisilicon/hi6220-coresight.dtsi | 381 +++++++++++++++++++++
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |   2 +
- 6 files changed, 728 insertions(+), 10 deletions(-)
- create mode 100644 arch/arm64/boot/dts/hisilicon/hi6220-coresight.dtsi
+> 
+> On Fri, Oct 13, 2017 at 10:17:00AM +0100, Vladimir Murzin wrote:
+>> Gentle ping...
+>>
+>> On 09/10/17 10:20, Vladimir Murzin wrote:
+>>> Russell, do you have concerns on this series?
+>>>
+>>> Thanks
+>>> Vladimir
+>>>
+>>> On 25/09/17 10:05, Vladimir Murzin wrote:
+>>>> Hi,
+>>>>
+>>>> This is an update of the existent MPU code which consist set of
+>>>> clean-ups and enhancements. The most significant changes are in the
+>>>> way how MPU settings sync-up for secondaries (PATCH 3/8), more
+>>>> flexible layout for memory (PATCH 7/8) and support for XIP (PATCH
+>>>> 8/8). Since there is no in-tree user of MPU, support for M-class has
+>>>> been added (PATCH 6/8).
+>>>>
+>>>> There is also practical benefit of patch set:
+>>>>
+>>>> "These MPU patches introduce a nice feature that it simplifies the
+>>>> bootloader: do not need to setup the MPU, for example for coherent DMA
+>>>> region, which is described in device-tree too." Andr?s Szemz?
+>>>>
+>>>> Changelog:
+>>>>            v2 -> v3
+>>>>               - fixed support for XIP (PATCH 8/8)
+>>>> 	      - rebased on 4.14-rc2
+>>>>
+>>>>            v1 -> v2
+>>>>               - support for XIP (PATCH 8/8)
+>>>> 	      - rebased on 4.13-rc1
+>>>>
+>>>>         RFC v2 -> v1
+>>>>                - dropped RFC tag
+>>>> 	       - Tested-by from Andr?s
+>>>> 	       - rebased on 4.12-rc5
+>>>>
+>>>>            RFC -> RFC v2
+>>>> 	       - fixed MPU enable for v7m (PATCH 6/7)
+>>>>
+>>>> Thanks!
+>>>>
+>>>> Vladimir Murzin (8):
+>>>>   ARM: NOMMU: Move out MPU setup in separate module
+>>>>   ARM: NOMMU: Update MPU accessors to use cp15 helpers
+>>>>   ARM: NOMMU: Rework MPU to be mostly done in C
+>>>>   ARM: NOMMU: Disallow MPU for XIP
+>>>>   ARM: Kconfig: Kill CONFIG_VECTORS_BASE
+>>>>   ARM: V7M: Add support for MPU to M-class
+>>>>   ARM: NOMMU: Use more MPU regions to cover memory
+>>>>   ARM: NOMMU: Support MPU in XIP configuration
+>>>>
+>>>>  arch/arm/Kconfig                  |   9 -
+>>>>  arch/arm/Kconfig-nommu            |   4 +-
+>>>>  arch/arm/include/asm/cputype.h    |  10 +
+>>>>  arch/arm/include/asm/mpu.h        |  26 +-
+>>>>  arch/arm/include/asm/smp.h        |   2 +-
+>>>>  arch/arm/include/asm/v7m.h        |  10 +
+>>>>  arch/arm/kernel/asm-offsets.c     |  11 +
+>>>>  arch/arm/kernel/head-nommu.S      | 148 +++++++++---
+>>>>  arch/arm/kernel/smp.c             |   2 +-
+>>>>  arch/arm/kernel/vmlinux-xip.lds.S |  23 ++
+>>>>  arch/arm/mm/Makefile              |   1 +
+>>>>  arch/arm/mm/nommu.c               | 254 +-------------------
+>>>>  arch/arm/mm/pmsa-v7.c             | 484 ++++++++++++++++++++++++++++++++++++++
+>>>>  13 files changed, 682 insertions(+), 302 deletions(-)
+>>>>  create mode 100644 arch/arm/mm/pmsa-v7.c
+>>>>
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>
+>>
+> 
