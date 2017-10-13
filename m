@@ -1,62 +1,102 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Fri, 13 Oct 2017 16:33:08 -0300
-Subject: [PATCH v8 0/4] Add support for ThunderX2 pmu events using json
- files
-In-Reply-To: <20171013130442.GK3503@kernel.org>
-References: <20171012141116.32475-1-ganapatrao.kulkarni@cavium.com>
- <20171012152402.GC5614@arm.com>
- <CAKTKpr6RCzq3QhgptZECZG=YoEmTWCEhM2QaHpzx-ZEtactbHQ@mail.gmail.com>
- <20171013091141.GA11429@arm.com> <20171013130442.GK3503@kernel.org>
-Message-ID: <20171013193308.GA5311@kernel.org>
+From: volodymyr_babchuk@epam.com (Volodymyr Babchuk)
+Date: Fri, 13 Oct 2017 22:32:30 +0300
+Subject: [PATCH v1 00/14] tee: optee: add dynamic shared memory support
+In-Reply-To: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
+References: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
+Message-ID: <1507923164-12796-1-git-send-email-volodymyr_babchuk@epam.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Fri, Oct 13, 2017 at 10:04:43AM -0300, Arnaldo Carvalho de Melo escreveu:
-> Em Fri, Oct 13, 2017 at 10:11:42AM +0100, Will Deacon escreveu:
-> > On Thu, Oct 12, 2017 at 10:54:50PM +0530, Ganapatrao Kulkarni wrote:
-> > > On Thu, Oct 12, 2017 at 8:54 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > > > On Thu, Oct 12, 2017 at 07:41:12PM +0530, Ganapatrao Kulkarni wrote:
-> > > >> Extending json/jevent framework for parsing arm64 event files.
-> > > >> Adding jevents for ThunderX2 implementation defined PMU events.
-> > > >>
-> > > >> v8:
-> > > >>    - Rename thunderx2 directory to cavium
-> > > >
-> > > > For the series:
-> > > >
-> > > > Acked-by: Will Deacon <will.deacon@arm.com>
-> > > 
-> > > thanks.
-> > > >
-> > > > Although note that this conflicts against a queued fix from Mark[1], so
-> > > > you'll need to rebase on top of that.
-> > > 
-> > > sure, will do.
-> > > may i know the branch/repo which i can rebase to?
-> > 
-> > Arnaldo said he was going to apply it to his perf/urgent branch [1],
-> 
-> It is already in tip/perf/urgent, on its way to Linus:
-> 
-> [acme at jouet linux]$ git log -7 --oneline tip/perf/urgent
-> 47a74bdcbfef (HEAD -> perf/urgent, tip/perf/urgent) Merge tag 'perf-urgent-for-mingo-4.14-20171010' of git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux into perf/urgent
-> 629eb703d3e4 perf/x86/intel/uncore: Fix memory leaks on allocation failures
-> e6a5203399d1 perf/core: Fix cgroup time when scheduling descendants
-> df0062b27ebf perf/core: Avoid freeing static PMU contexts when PMU is unregistered
-> aa7b4e02b328 (tag: perf-urgent-for-mingo-4.14-20171010) tools include uapi bpf.h: Sync kernel ABI header with tooling header
-> 66ec11919a0f perf pmu: Unbreak perf record for arm/arm64 with events with explicit PMU
-> e9516c0813ae (tag: perf-urgent-for-mingo-4.14-20171006, acme/perf/urgent, acme.korg/perf/urgent) perf script: Add missing separator for "-F ip,brstack" (and brstackoff)
-> [acme at jouet linux]$
-> 
-> > although I can't spot it there yet. I'm also not sure whether that's the
-> > right thing on which to base 4.15 material. Arnaldo -- what's the best
-> > thing to do here?
-> 
-> I'll read about the json bits now.
+From: Volodymyr Babchuk <vlad.babchuk@gmail.com>
 
-Ok, I merged tip/perf/urgent into acme/perf/core, can you please rebase
-from there and check that everything is ok?
+Changes from v1:
 
-Thanks,
+ * Added support for 16K and 64K pages.
+ * Elaborated commit messages
+ * More minor changes are described in corresponding patches.
 
-- Arnaldo
+While this patches are necessary for use OP-TEE in virualized environment,
+they are not sufficient. Stuart Yoder was right, when proposed to make
+static SHM optional. But that would be a breaking change, because this
+will render unusable older client libraries and supplicants.
+
+Also, as Mark Rutland pointed, OP-TEE virtualization will need support
+from hypervisor side.
+
+Anyways, those patches allowed me to call OP-TEE from XEN's Dom0 without
+remapping static SHM region into Dom0 userspace.
+
+Also, this patches allow me to share quite big buffers (I tried to
+use three 2M buffers at a time). This is imposible with static SHM,
+because static SHM on most platforms is only 2M.
+
+Thanks to Yury Norov <ynorov@caviumnetworks.com> and
+Mark Rutland <mark.rutland@arm.com> for reviewing this patch series.
+
+---
+v1 cover letter:
+This patch series enables dynamic shared memory support in the TEE
+subsystem as a whole and in OP-TEE in particular.
+
+Global Platform TEE specification [1] allows client applications
+to register part of own memory as a shared buffer between
+application and TEE. This allows fast zero-copy communication between
+TEE and REE. But current implementation of TEE in Linux does not support
+this feature.
+
+Also, current implementation of OP-TEE transport uses fixed size
+pre-shared buffer for all communications with OP-TEE OS. This is okay
+in the most use cases. But this prevents use of OP-TEE in virtualized
+environments, because:
+ a) We can't share the same buffer between different virtual machines
+ b) Physically contiguous memory as seen by VM can be non-contiguous
+    in reality (and as seen by OP-TEE OS) due to second stage of
+    MMU translation.
+ c) Size of this pre-shared buffer is limited.
+
+So, first part of this patch series adds generic register/unregister
+interface to tee subsystem. Next patches add necessary features
+into OP-TEE driver, so it can use not only static pre-shared buffer,
+but whole RAM to communicate with OP-TEE OS.
+
+[1] https://www.globalplatform.org/specificationsdevice.asp
+
+Jens Wiklander (2):
+  tee: flexible shared memory  pool creation
+  tee: add register user memory
+
+Volodymyr Babchuk (12):
+  tee: shm: add accessors for buffer size and page offset
+  tee: shm: add page accessor functions
+  tee: optee: Update protocol definitions
+  tee: optee: add page list manipulation functions
+  tee: optee: add shared buffer registration functions
+  tee: optee: add registered shared parameters handling
+  tee: optee: add registered buffers handling into RPC calls
+  tee: optee: store OP-TEE capabilities in private data
+  tee: optee: add optee-specific shared pool implementation
+  tee: optee: enable dynamic SHM support
+  tee: use reference counting for tee_context
+  tee: shm: inline tee_shm_get_id()
+
+ drivers/tee/optee/Makefile        |   1 +
+ drivers/tee/optee/call.c          | 179 +++++++++++++++++++++++++++++-
+ drivers/tee/optee/core.c          | 152 +++++++++++++++++++------
+ drivers/tee/optee/optee_msg.h     |  38 ++++++-
+ drivers/tee/optee/optee_private.h |  27 ++++-
+ drivers/tee/optee/optee_smc.h     |   7 ++
+ drivers/tee/optee/rpc.c           |  77 +++++++++++--
+ drivers/tee/optee/shm_pool.c      |  75 +++++++++++++
+ drivers/tee/optee/shm_pool.h      |  23 ++++
+ drivers/tee/tee_core.c            |  81 ++++++++++++--
+ drivers/tee/tee_private.h         |  60 +---------
+ drivers/tee/tee_shm.c             | 227 +++++++++++++++++++++++++++++++-------
+ drivers/tee/tee_shm_pool.c        | 165 ++++++++++++++++-----------
+ include/linux/tee_drv.h           | 183 +++++++++++++++++++++++++++++-
+ include/uapi/linux/tee.h          |  30 +++++
+ 15 files changed, 1104 insertions(+), 221 deletions(-)
+ create mode 100644 drivers/tee/optee/shm_pool.c
+ create mode 100644 drivers/tee/optee/shm_pool.h
+
+-- 
+2.7.4
