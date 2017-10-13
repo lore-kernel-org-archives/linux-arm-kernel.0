@@ -1,38 +1,43 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 13 Oct 2017 12:26:43 +0100
-Subject: [RESEND PATCH 0/2] Distinguish percpu irq and percpu_devid irq
-Message-ID: <1507894005-53778-1-git-send-email-julien.thierry@arm.com>
+Date: Fri, 13 Oct 2017 12:26:44 +0100
+Subject: [RESEND PATCH 1/2] irqdesc: Add function to identify percpu_devid irqs
+In-Reply-To: <1507894005-53778-1-git-send-email-julien.thierry@arm.com>
+References: <1507894005-53778-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <1507894005-53778-2-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Resending with cover letter + better commit message for patch 1]
+irq_is_percpu indicates whether an irq should only target a single cpu.
+PERCPU_DEVID flag indicates that an irq can be configured differently on
+each cpu it can target.
 
-Hi,
+Provide a function to check whether an irq is PERCPU_DEVID.
 
-Looking at the arm_pmu driver, it seems we are using irq_is_percpu when we
-want to know if an irq must be configured individually on each cpu. But
-this is not what irq_is_percpu does. The arm_pmu marking all its irqs as
-PERCPU, driver attempts to enable the irq on each CPU even when it is not
-needed.
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+---
+ include/linux/irqdesc.h | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-This has not caused issue so far because enable_percpu_irq returns
-immediatly if the provided irq is not PERCPU_DEVID.
+diff --git a/include/linux/irqdesc.h b/include/linux/irqdesc.h
+index 3e90a09..93960cf 100644
+--- a/include/linux/irqdesc.h
++++ b/include/linux/irqdesc.h
+@@ -244,6 +244,14 @@ static inline int irq_is_percpu(unsigned int irq)
+ 	return desc->status_use_accessors & IRQ_PER_CPU;
+ }
 
-* Patch 1 adds the function to identify PERCPU_DEVID irqs.
-* Patch 2 replaces the irq_is_percpu calls with the new function
-
-Cheers,
-
-Julien
-
-Julien Thierry (2):
-  irqdesc: Add function to identify percpu_devid irqs
-  arm/arm64: pmu: Distinguish percpu irq and percpu_devid irq
-
- drivers/perf/arm_pmu.c          | 10 +++++-----
- drivers/perf/arm_pmu_platform.c |  4 ++--
- include/linux/irqdesc.h         |  8 ++++++++
- 3 files changed, 15 insertions(+), 7 deletions(-)
-
++static inline int irq_is_percpu_devid(unsigned int irq)
++{
++	struct irq_desc *desc;
++
++	desc = irq_to_desc(irq);
++	return desc->status_use_accessors & IRQ_PER_CPU_DEVID;
++}
++
+ static inline void
+ irq_set_lockdep_class(unsigned int irq, struct lock_class_key *class)
+ {
 --
 1.9.1
