@@ -1,115 +1,112 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 13 Oct 2017 15:27:25 +0100
-Subject: [PATCH 0/3] arm64: cpuinfo: make /proc/cpuinfo more human-readable
-In-Reply-To: <CAOZdJXUzo3JrHW1h6W3y3BnVq472NjPpaqTztzEODZnnMyvJRg@mail.gmail.com>
-References: <20170926222324.17409-1-ahs3@redhat.com>
- <20170927103406.GC32150@leverpostej>
- <CAOZdJXUzo3JrHW1h6W3y3BnVq472NjPpaqTztzEODZnnMyvJRg@mail.gmail.com>
-Message-ID: <20171013142724.GA5893@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 13 Oct 2017 15:43:19 +0100
+Subject: [PATCH v11 7/9] arm64/kasan: add and use kasan_map_populate()
+In-Reply-To: <CAOAebxu5WL-FQLgfCxNcWy36V6zsTO1v3LLqXv5rM1Pp9R-=YA@mail.gmail.com>
+References: <20171009221931.1481-1-pasha.tatashin@oracle.com>
+ <20171009221931.1481-8-pasha.tatashin@oracle.com>
+ <20171010155619.GA2517@arm.com>
+ <CAOAebxv21+KtXPAk-xWz=+2fqWQDgp9SAFZz-N=XsuBxev=zcg@mail.gmail.com>
+ <20171010171047.GC2517@arm.com>
+ <CAOAebxtrSthSP4NAa0obBbsCK1KZxO+x0w5xNrpY6m2y9UZFvQ@mail.gmail.com>
+ <CAOAebxu5WL-FQLgfCxNcWy36V6zsTO1v3LLqXv5rM1Pp9R-=YA@mail.gmail.com>
+Message-ID: <20171013144319.GB4746@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Timur,
+Hi Pavel,
 
-On Fri, Oct 13, 2017 at 08:39:09AM -0500, Timur Tabi wrote:
-> On Wed, Sep 27, 2017 at 5:34 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Tue, Sep 26, 2017 at 04:23:21PM -0600, Al Stone wrote:
-> >> As ARMv8 servers get deployed, I keep getting the same set of questions
-> >> from end-users of those systems: what do all the hex numbers mean in
-> >> /proc/cpuinfo and could you make them so I don't have to carry a cheat
-> >> sheet with me all the time?
-> >
-> > I appreciate that /proc/cpuinfo can be opaque to end users, but I do not
-> > believe that this is the right solution to that problem.
-> >
-> > There are a number of issues stemming from the face that /proc/cpuinfo
-> > is ill-defined and overused for a number of cases. Changes to it almost
-> > certainly violate brittle de-facto ABI details people are relying on,
-> > and there's a very long tail on fallout resulting from this. In
-> > addition, many niceties come at an excessive maintenance cost, and are
-> > simply unreliable as an ABI.
-> >
-> > So, as with all other patches modifying /proc/cpuinfo, I must NAK this
-> > series.
+On Fri, Oct 13, 2017 at 10:10:09AM -0400, Pavel Tatashin wrote:
+> I have a couple concerns about your patch:
 > 
-> Qualcomm Datacenter Technologies is very interested in seeing these
-> patches (or some variant of them) accepted. Updates to /proc/cpuinfo
-> are long overdue, and I'm asking you to reconsider your objections.
+> One of the reasons (and actually, the main reason) why I preferred to
+> keep vmemmap_populate() instead of implementing kasan's own variant,
+> which btw can be done in common code similarly to
+> vmemmap_populate_basepages() is that vmemmap_populate() uses large
+> pages when available. I think it is a considerable downgrade to go
+> back to base pages, when we already have large page support available
+> to us.
 
-I more than appreciate that there is information that people want access
-to, and I'd really like to expose that in a consistent and structured
-manner.
+It shouldn't be difficult to use section mappings with my patch, I just
+don't really see the need to try to optimise TLB pressure when you're
+running with KASAN enabled which already has something like a 3x slowdown
+afaik. If it ends up being a big deal, we can always do that later, but
+my main aim here is to divorce kasan from vmemmap because they should be
+completely unrelated.
 
-So please propose exposing the information elsewhere, which I would be
-more than happy with for information that the kernel already has access
-to.
+> The kasan shadow tree is large, it is up-to 1/8th of system memory, so
+> even on moderate size servers, shadow tree is going to be multiple
+> gigabytes.
+> 
+> The second concern is that there is an existing bug associated with
+> your patch that I am not sure how to solve:
+> 
+> Try building your patch with CONFIG_DEBUG_VM. This config makes
+> memblock_virt_alloc_try_nid_raw() to do memset(0xff) on all allocated
+> memory.
+> 
+> I am getting the following panic during boot:
+> 
+> [    0.012637] pid_max: default: 32768 minimum: 301
+> [    0.016037] Security Framework initialized
+> [    0.018389] Dentry cache hash table entries: 16384 (order: 5, 131072 bytes)
+> [    0.019559] Inode-cache hash table entries: 8192 (order: 4, 65536 bytes)
+> [    0.020409] Mount-cache hash table entries: 512 (order: 0, 4096 bytes)
+> [    0.020721] Mountpoint-cache hash table entries: 512 (order: 0, 4096 bytes)
+> [    0.055337] Unable to handle kernel paging request at virtual
+> address ffff0400010065af
+> [    0.055422] Mem abort info:
+> [    0.055518]   Exception class = DABT (current EL), IL = 32 bits
+> [    0.055579]   SET = 0, FnV = 0
+> [    0.055640]   EA = 0, S1PTW = 0
+> [    0.055699] Data abort info:
+> [    0.055762]   ISV = 0, ISS = 0x00000007
+> [    0.055822]   CM = 0, WnR = 0
+> [    0.055966] swapper pgtable: 4k pages, 48-bit VAs, pgd = ffff20000a8f4000
+> [    0.056047] [ffff0400010065af] *pgd=0000000046fe7003,
+> *pud=0000000046fe6003, *pmd=0000000046fe5003, *pte=0000000000000000
+> [    0.056436] Internal error: Oops: 96000007 [#1] PREEMPT SMP
+> [    0.056701] Modules linked in:
+> [    0.056939] CPU: 0 PID: 0 Comm: swapper/0 Not tainted
+> 4.14.0-rc4_pt_memset12-00096-gfca5985f860e-dirty #16
+> [    0.057001] Hardware name: linux,dummy-virt (DT)
+> [    0.057084] task: ffff2000099d9000 task.stack: ffff2000099c0000
+> [    0.057275] PC is at __asan_load8+0x34/0xb0
+> [    0.057375] LR is at __d_rehash+0xf0/0x240
 
-I object to /proc/cpuinfo changes because they impose an ABI break, and
-because some of the proposed changes impose new and requirements on the
-kernel that cannot be maintained in a forwards-compatible manner (which
-is liable to result in other ABI breaks).
+[...]
 
-For better or worse, we're stuck with the existing arch-specific format
-of /proc/cpuinfo, as this is parsed by a wide variety of applications,
-and any change risks breaking these.
+> So, I've been trying to root cause it, and here is what I've got:
+> 
+> First, I went back to my version of kasan_map_populate() and replaced
+> vmemmap_populate() with vmemmap_populate_basepages(), which
+> behavior-vise made it very similar to your patch. After doing this I
+> got the same panic. So, I figured there must be something to do with
+> the differences that regular vmemmap allocated with granularity of
+> SWAPPER_BLOCK_SIZE while kasan with granularity of PAGE_SIZE.
+> 
+> So, I made the following modification to your patch:
+> 
+> static void __init kasan_map_populate(unsigned long start, unsigned long end,
+>                                       int node)
+> {
+> +        start = round_down(start, SWAPPER_BLOCK_SIZE);
+> +       end = round_up(end, SWAPPER_BLOCK_SIZE);
+>         kasan_pgd_populate(start & PAGE_MASK, PAGE_ALIGN(end), node, false);
+> }
+> 
+> This is basically makes shadow tree ranges to be SWAPPER_BLOCK_SIZE
+> aligned. After, this modification everything is working.  However, I
+> am not sure if this is a proper fix.
 
-> We're willing to work with distro vendors to get this information
-> added to their products while upstream is left behind, but I hope that
-> won't be necessary.
+This certainly doesn't sound right; mapping the shadow with pages shouldn't
+lead to problems. I also can't seem to reproduce this myself -- could you
+share your full .config and a pointer to the git tree that you're using,
+please?
 
-Please understand that this is an ABI break, and that is why it is being
-NAK'd.
+> I feel, this patch requires more work, and I am troubled with using
+> base pages instead of large pages.
 
-I don't have the power to stop Red Hat or other vendors from
-deliberately breaking ABI, but I would very strongly recommend that they
-do not.
+I'm happy to try fixing this, because I think splitting up kasan and vmemmap
+is the right thing to do here.
 
-> I would even go so far as to say that we should be making
-> /proc/cpuinfo for ARM match the x86 output as closely as possible,
-
-As has been stated before, /proc/cpuinfo is an existing arch-specific ABI.
-
-For better or worse, we're stuck with it as-is, regardless of what could
-be nicer had we done something different from the outset.
-
-It has never been portable across architectures, and applications
-relying upon it have never been portable except by chance.
-
-> even using their terminology.  We should be providing information like
-> frequencies and product names.
-
-As has been stated before, the problem with exposing these is that we
-don't have the relevant information.
-
-We have no consistent mechanism for acquiring product names, and for
-those cases where it is truly necessary to identify an implementation,
-the MIDR+REVIDR provide the exact same information.
-
-For frequencies, I'd be more than happy to expose this information when
-we have it, in new files. In practice today, we do not have this
-information most of the time.
-
-> Having a human-readable /proc/cpuinfo with extensive details of the
-> CPU spelled out is very useful, and Al's reasoning is valid.  The fact
-> that it's "fragile" is not as important as the fact that on x86,
-> /proc/cpuinfo is much more useful.
-
-I must disagree.
-
-We care about that fragility so that we do not break userspace, which is
-the most important upstream rule.
-
-I certainly agree that exposing the information that we have is useful,
-as I have stated several times. I'm not NAKing exposing this information
-elsewhere.
-
-If you want a consistent cross-architecture interface for this
-information, then you need to propose a new one. That was we can
-actually solve the underlying issues, for all architectures, without
-breaking ABI.
-
-I would be *very* interested in such an interface, and would be more
-than happy to help.
-
-Thanks,
-Mark.
+Will
