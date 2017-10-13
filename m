@@ -1,120 +1,65 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 13 Oct 2017 10:40:39 +0100
-Subject: [PATCH v3 0/8] ARM: NOMMU: MPU updates
-In-Reply-To: <20171013092418.GF20805@n2100.armlinux.org.uk>
-References: <1506330344-31556-1-git-send-email-vladimir.murzin@arm.com>
- <68a6eb4d-4d8e-7c6a-0875-3165bde8de89@arm.com>
- <e2e80a26-4a87-6d4c-51ad-11d6ea683c16@arm.com>
- <20171013092418.GF20805@n2100.armlinux.org.uk>
-Message-ID: <0edd802a-d596-5d46-ff53-97b1db1a453e@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 13 Oct 2017 11:40:32 +0200
+Subject: [PATCH v2 04/16] serial: mvebu-uart: support probe of multiple
+ ports
+In-Reply-To: <20171013090200.31034-5-miquel.raynal@free-electrons.com> (Miquel
+ Raynal's message of "Fri, 13 Oct 2017 11:01:48 +0200")
+References: <20171013090200.31034-1-miquel.raynal@free-electrons.com>
+ <20171013090200.31034-5-miquel.raynal@free-electrons.com>
+Message-ID: <877evz9yi7.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/10/17 10:24, Russell King - ARM Linux wrote:
-> Sorry, but I have no working MPS3 platform since it killed its uSD card
-> with all the FPGA bitstreams on.  I'm waiting (since end of September)
-> for a replacement from ARM Ltd but there hasn't yet been any progress.
-> 
-> Sure, I can replace the uSD card myself, but the problem is the contents
-> of the card.
+Hi Miquel,
+ 
+ On ven., oct. 13 2017, Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
 
-Thanks for prompt reply!
+> -	port = &mvebu_uart_ports[0];
+> +	/* Assume that all UART ports have a DT alias or none has */
+> +	id = of_alias_get_id(pdev->dev.of_node, "serial");
 
-I should say that board won't help you with testing this series since it
-implements different MPU model (I have patches for that too but they are
-on top of this series).
+You stil need to check the pdev->dev.of_node before calling
+of_alias_get_id.
 
-I've been working closely with Alex and Andr?s (since they needed this for
-their Cortex-M7 platform) to make sure it works as expected. It was also
-tested with R-class FastModels.
+Once it will be fixed, you can add:
 
-I intentionally kept CONFIG_ARM_MPU disabled by default for M-class
-(PATCH 6/8), so it won't interfere with existing bootloaders.
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-I'd be glad if you can review the series and give it a chance to sit in
-linux-next (I can provide a branch on top of yours for-next).
+Thanks,
 
-Cheers
-Vladimir
+Gregory
 
 
-> 
-> On Fri, Oct 13, 2017 at 10:17:00AM +0100, Vladimir Murzin wrote:
->> Gentle ping...
->>
->> On 09/10/17 10:20, Vladimir Murzin wrote:
->>> Russell, do you have concerns on this series?
->>>
->>> Thanks
->>> Vladimir
->>>
->>> On 25/09/17 10:05, Vladimir Murzin wrote:
->>>> Hi,
->>>>
->>>> This is an update of the existent MPU code which consist set of
->>>> clean-ups and enhancements. The most significant changes are in the
->>>> way how MPU settings sync-up for secondaries (PATCH 3/8), more
->>>> flexible layout for memory (PATCH 7/8) and support for XIP (PATCH
->>>> 8/8). Since there is no in-tree user of MPU, support for M-class has
->>>> been added (PATCH 6/8).
->>>>
->>>> There is also practical benefit of patch set:
->>>>
->>>> "These MPU patches introduce a nice feature that it simplifies the
->>>> bootloader: do not need to setup the MPU, for example for coherent DMA
->>>> region, which is described in device-tree too." Andr?s Szemz?
->>>>
->>>> Changelog:
->>>>            v2 -> v3
->>>>               - fixed support for XIP (PATCH 8/8)
->>>> 	      - rebased on 4.14-rc2
->>>>
->>>>            v1 -> v2
->>>>               - support for XIP (PATCH 8/8)
->>>> 	      - rebased on 4.13-rc1
->>>>
->>>>         RFC v2 -> v1
->>>>                - dropped RFC tag
->>>> 	       - Tested-by from Andr?s
->>>> 	       - rebased on 4.12-rc5
->>>>
->>>>            RFC -> RFC v2
->>>> 	       - fixed MPU enable for v7m (PATCH 6/7)
->>>>
->>>> Thanks!
->>>>
->>>> Vladimir Murzin (8):
->>>>   ARM: NOMMU: Move out MPU setup in separate module
->>>>   ARM: NOMMU: Update MPU accessors to use cp15 helpers
->>>>   ARM: NOMMU: Rework MPU to be mostly done in C
->>>>   ARM: NOMMU: Disallow MPU for XIP
->>>>   ARM: Kconfig: Kill CONFIG_VECTORS_BASE
->>>>   ARM: V7M: Add support for MPU to M-class
->>>>   ARM: NOMMU: Use more MPU regions to cover memory
->>>>   ARM: NOMMU: Support MPU in XIP configuration
->>>>
->>>>  arch/arm/Kconfig                  |   9 -
->>>>  arch/arm/Kconfig-nommu            |   4 +-
->>>>  arch/arm/include/asm/cputype.h    |  10 +
->>>>  arch/arm/include/asm/mpu.h        |  26 +-
->>>>  arch/arm/include/asm/smp.h        |   2 +-
->>>>  arch/arm/include/asm/v7m.h        |  10 +
->>>>  arch/arm/kernel/asm-offsets.c     |  11 +
->>>>  arch/arm/kernel/head-nommu.S      | 148 +++++++++---
->>>>  arch/arm/kernel/smp.c             |   2 +-
->>>>  arch/arm/kernel/vmlinux-xip.lds.S |  23 ++
->>>>  arch/arm/mm/Makefile              |   1 +
->>>>  arch/arm/mm/nommu.c               | 254 +-------------------
->>>>  arch/arm/mm/pmsa-v7.c             | 484 ++++++++++++++++++++++++++++++++++++++
->>>>  13 files changed, 682 insertions(+), 302 deletions(-)
->>>>  create mode 100644 arch/arm/mm/pmsa-v7.c
->>>>
->>>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>
->>
-> 
+> +	if (!pdev->dev.of_node || id < 0)
+> +		pdev->id = uart_num_counter++;
+> +	else
+> +		pdev->id = id;
+> +
+> +	if (pdev->id >= MVEBU_NR_UARTS) {
+> +		dev_err(&pdev->dev, "cannot have more than %d UART ports\n",
+> +			MVEBU_NR_UARTS);
+> +		return -EINVAL;
+> +	}
+> +
+> +	port = &mvebu_uart_ports[pdev->id];
+>  
+>  	spin_lock_init(&port->lock);
+>  
+> @@ -572,7 +588,7 @@ static int mvebu_uart_probe(struct platform_device *pdev)
+>  	port->fifosize   = 32;
+>  	port->iotype     = UPIO_MEM32;
+>  	port->flags      = UPF_FIXED_PORT;
+> -	port->line       = 0; /* single port: force line number to  0 */
+> +	port->line       = pdev->id;
+>  
+>  	port->irq        = irq->start;
+>  	port->irqflags   = 0;
+> -- 
+> 2.11.0
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
