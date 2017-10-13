@@ -1,118 +1,132 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Fri, 13 Oct 2017 16:24:19 -0700
-Subject: [PATCH] PCI: iproc: Allow allocation of multiple MSIs
-In-Reply-To: <CABLWAfR+Nk85wurWnPArpmFPXVhxn0jZ+7H13WnKEPCMJVU0XA@mail.gmail.com>
-References: <20171007120851.20230-1-sbodomerle@gmail.com>
- <d0467282-a44a-bd1e-e449-0bba953c4cfd@broadcom.com>
- <CABLWAfR+Nk85wurWnPArpmFPXVhxn0jZ+7H13WnKEPCMJVU0XA@mail.gmail.com>
-Message-ID: <893cb377-53c0-5a65-af82-c8be4c74c83b@broadcom.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 13 Oct 2017 18:26:23 -0500
+Subject: [PATCH 0/2] [v5] pinctrl: qcom: add support for sparse GPIOs
+In-Reply-To: <20171003220311.GU457@codeaurora.org>
+References: <1504798409-32041-1-git-send-email-timur@codeaurora.org>
+ <20170919070422.GI3349@codeaurora.org>
+ <CACRpkdZcdLac_wYW+XqtZ=-APo8VmvYL4B1oL-wZyLy8KEs9AA@mail.gmail.com>
+ <1ecdf6ee-5098-15d3-f85e-66b39a6c25f9@codeaurora.org>
+ <CACRpkdaUV1Mjh7U9bBAgZA5Zq1oqN0HBT=VH5NkvPnY4gHxDVw@mail.gmail.com>
+ <d53e67a2-4f69-752f-ba35-53872d9b9760@codeaurora.org>
+ <CACRpkdYfAcKrgbgybccurUKTyR0E+tHDyzp7sbXxXxKuyMOGhQ@mail.gmail.com>
+ <619f48d2-59c7-c090-4ace-9e8db9f92064@codeaurora.org>
+ <CACRpkdZFunwQ=tiQqsapap7Ozz42hr=df5vqbC0S5xy5Wn+ZWw@mail.gmail.com>
+ <255ad0dc-2d16-ae7f-0b45-500e23cff1a4@codeaurora.org>
+ <20171003220311.GU457@codeaurora.org>
+Message-ID: <4f067c09-9ecf-9266-baa0-18575bca94eb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks, the change looks okay to me. It would be nice to test it on an 
-SMP system if possible. But I don't see how the change should break 
-existing support for IRQ affinity setting.
+On 10/03/2017 05:03 PM, Stephen Boyd wrote:
+> I don't see any value
+> beyond system wide debug in figuring out the default pin
+> configuration of a pin that doesn't have a consumer in Linux.
 
-With that,
+I can agree with that.
 
-Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+> Could we remove the pin direction finding part here in
+> gpiochip_add_pin_range() and lazily resolve the pin direction
+> when a pin is requested? We would need a similar check in the msm
+> specific debugfs code where we skip pins that aren't requested.
+> This is basically a revert of commit 72d320006177 ("gpio: set up
+> initial state from .get_direction()").
+> 
+> ACPI can still describe only the pin ranges that they care about
+> exposing, but from the devicetree side it's been working well
+> enough to not touch pins that aren't used by anything in Linux.
+> 
+> ---8<----
+> diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+> index cd003b74512f..673028823bc5 100644
+> --- a/drivers/gpio/gpiolib.c
+> +++ b/drivers/gpio/gpiolib.c
+> @@ -1210,16 +1210,7 @@ int gpiochip_add_data(struct gpio_chip *chip, void *data)
+>   		 * wrong direction in sysfs.
+>   		 */
+>   
+> -		if (chip->get_direction) {
+> -			/*
+> -			 * If we have .get_direction, set up the initial
+> -			 * direction flag from the hardware.
+> -			 */
+> -			int dir = chip->get_direction(chip, i);
+> -
+> -			if (!dir)
+> -				set_bit(FLAG_IS_OUT, &desc->flags);
+> -		} else if (!chip->direction_input) {
+> +		if (!chip->direction_input) {
+>   			/*
+>   			 * If the chip lacks the .direction_input callback
+>   			 * we logically assume all lines are outputs.
+> diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c b/drivers/pinctrl/qcom/pinctrl-msm.c
+> index 273badd92561..4a0aeceb42f1 100644
+> --- a/drivers/pinctrl/qcom/pinctrl-msm.c
+> +++ b/drivers/pinctrl/qcom/pinctrl-msm.c
+> @@ -24,7 +24,7 @@
+>   #include <linux/pinctrl/pinconf.h>
+>   #include <linux/pinctrl/pinconf-generic.h>
+>   #include <linux/slab.h>
+> -#include <linux/gpio.h>
+> +#include <linux/gpio/driver.h>
+>   #include <linux/interrupt.h>
+>   #include <linux/spinlock.h>
+>   #include <linux/reboot.h>
+> @@ -494,6 +494,12 @@ static void msm_gpio_dbg_show_one(struct seq_file *s,
+>   	};
+>   
+>   	g = &pctrl->soc->groups[offset];
+> +
+> +	if (!gpiochip_is_requested(chip, gpio)) {
+> +		seq_printf(s, " %-8s:", g->name);
+> +		return;
+> +	}
+> +
+>   	ctl_reg = readl(pctrl->regs + g->ctl_reg);
+>   
+>   	is_out = !!(ctl_reg & BIT(g->oe_bit));
 
-Regards,
+In order for this to work, I had to add this function from patch #1:
 
-Ray
+static int msm_gpio_request(struct gpio_chip *chip, unsigned int offset)
+{
+	struct msm_pinctrl *pctrl = gpiochip_get_data(chip);
+	const struct msm_pingroup *g = &pctrl->soc->groups[offset];
 
-On 10/11/2017 1:26 AM, Sandor Bodo-Merle wrote:
-> Hi Ray,
-> 
-> we tested on a custom board based on BCM56260. SMP affinity was not
-> tested as our board runs on a single core.
-> 
-> br,
-> 
-> Sandor
-> 
-> ps - sorry for the duplicate, but by default gmail sent out html
-> formatted mail :(
-> 
-> On Tue, Oct 10, 2017 at 8:09 PM, Ray Jui <ray.jui@broadcom.com> wrote:
->> Hi Bodo,
->>
->>
->> On 10/7/2017 5:08 AM, Bodo-Merle Sandor wrote:
->>>
->>> From: Sandor Bodo-Merle <sbodomerle@gmail.com>
->>>
->>> Add support for allocating multiple MSIs at the same time, so that the
->>> MSI_FLAG_MULTI_PCI_MSI flag can be added to the msi_domain_info
->>> structure.
->>>
->>> Avoid storing the hwirq in the low 5 bits of the message data, as it is
->>> used by the device. Also fix an endianness problem by using readl().
->>>
->>> Signed-off-by: Sandor Bodo-Merle <sbodomerle@gmail.com>
->>> ---
->>>    drivers/pci/host/pcie-iproc-msi.c | 19 ++++++++++++-------
->>>    1 file changed, 12 insertions(+), 7 deletions(-)
->>>
->>> diff --git a/drivers/pci/host/pcie-iproc-msi.c
->>> b/drivers/pci/host/pcie-iproc-msi.c
->>> index 2d0f535a2f69..990fc906d73d 100644
->>> --- a/drivers/pci/host/pcie-iproc-msi.c
->>> +++ b/drivers/pci/host/pcie-iproc-msi.c
->>> @@ -179,7 +179,7 @@ static struct irq_chip iproc_msi_irq_chip = {
->>>      static struct msi_domain_info iproc_msi_domain_info = {
->>>          .flags = MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
->>> -               MSI_FLAG_PCI_MSIX,
->>> +               MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX,
->>>          .chip = &iproc_msi_irq_chip,
->>>    };
->>>    @@ -237,7 +237,7 @@ static void iproc_msi_irq_compose_msi_msg(struct
->>> irq_data *data,
->>>          addr = msi->msi_addr + iproc_msi_addr_offset(msi, data->hwirq);
->>>          msg->address_lo = lower_32_bits(addr);
->>>          msg->address_hi = upper_32_bits(addr);
->>> -       msg->data = data->hwirq;
->>> +       msg->data = data->hwirq << 5; >   }
->>>      static struct irq_chip iproc_msi_bottom_irq_chip = {
->>> @@ -251,7 +251,7 @@ static int iproc_msi_irq_domain_alloc(struct
->>> irq_domain *domain,
->>>                                        void *args)
->>>    {
->>>          struct iproc_msi *msi = domain->host_data;
->>> -       int hwirq;
->>> +       int hwirq, i;
->>>          mutex_lock(&msi->bitmap_lock);
->>>    @@ -267,10 +267,14 @@ static int iproc_msi_irq_domain_alloc(struct
->>> irq_domain *domain,
->>>          mutex_unlock(&msi->bitmap_lock);
->>>    -     irq_domain_set_info(domain, virq, hwirq,
->>> &iproc_msi_bottom_irq_chip,
->>> -                           domain->host_data, handle_simple_irq, NULL,
->>> NULL);
->>> +       for (i = 0; i < nr_irqs; i++) {
->>> +               irq_domain_set_info(domain, virq + i, hwirq + i,
->>> +                                   &iproc_msi_bottom_irq_chip,
->>> +                                   domain->host_data, handle_simple_irq,
->>> +                                   NULL, NULL);
->>> +       }
->>>    -     return 0;
->>> +       return hwirq;
->>>    }
->>>      static void iproc_msi_irq_domain_free(struct irq_domain *domain,
->>> @@ -302,7 +306,8 @@ static inline u32 decode_msi_hwirq(struct iproc_msi
->>> *msi, u32 eq, u32 head)
->>>          offs = iproc_msi_eq_offset(msi, eq) + head * sizeof(u32);
->>>          msg = (u32 *)(msi->eq_cpu + offs);
->>> -       hwirq = *msg & IPROC_MSI_EQ_MASK;
->>> +       hwirq = readl(msg);
->>> +       hwirq = (hwirq >> 5) + (hwirq & 0x1f);
->>>          /*
->>>           * Since we have multiple hwirq mapped to a single MSI vector,nnn
->>>
->>
->> Change looks okay to me in general. May I know which platform you tested
->> this patch on and was SMP affinity configuration tested?
->>
->> Thanks,
->>
->> Ray
+	if (!g->npins)
+		return -ENODEV;
+
+	return gpiochip_generic_request(chip, offset);
+}
+
+The problem with this is that none of the GPIOs are "requested", so it 
+displays an output like this:
+
+# cat /sys/kernel/debug/gpio
+gpiochip0: GPIOs 0-149, parent: platform/QCOM8002:00, QCOM8002:00:
+  (null)  :
+  (null)  :
+  (null)  :
+[... truncated ]]
+  (null)  :
+  (null)  :
+  (null)  :
+  (null)  :
+  gpio36  :
+  gpio37  :
+  gpio38  :
+  gpio39  :
+  (null)  :
+  (null)  :
+
+It can't differentiate between GPIOs that don't exist and GPIOs that 
+haven't been requested.  Plus, the "(null)" entries are what I've been 
+trying to avoid in the first place.
+
+So overall, this patch seems okay, although it needs a little work. 
+However, it doesn't address Bjorn's complaint that he doesn't want me to 
+use pin ranges at all.
+
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
