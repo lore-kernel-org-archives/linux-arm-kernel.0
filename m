@@ -1,44 +1,71 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 13 Oct 2017 17:42:35 +0100
-Subject: [RESEND PATCH 1/2] spi: rockchip: Convert to late and early
- system PM callbacks
-In-Reply-To: <20171013155120.GA137489@google.com>
-References: <20171013104138.3216-1-jeffy.chen@rock-chips.com>
- <20171013104138.3216-2-jeffy.chen@rock-chips.com>
- <CAD=FV=X6pkaY3t=ceh3QEUws+_gqRGMN9zveW0fXR1noF1T6ew@mail.gmail.com>
- <20171013155120.GA137489@google.com>
-Message-ID: <20171013164235.thgqha7sl5tdptwv@sirena.co.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 13 Oct 2017 09:46:41 -0700
+Subject: [PATCH 5/7] ARM: dts: Add nodes for missing omap4 interconnect
+ target modules
+In-Reply-To: <f5c57f0b-1423-c362-0fda-4069b77a2e38@ti.com>
+References: <20170929223411.9691-1-tony@atomide.com>
+ <20170929223411.9691-6-tony@atomide.com>
+ <f5c57f0b-1423-c362-0fda-4069b77a2e38@ti.com>
+Message-ID: <20171013164640.GI4394@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 13, 2017 at 08:51:21AM -0700, Brian Norris wrote:
+Hi,
 
-> Yes, this does seem odd to me too. This looks like an arms race hack
-> that should be avoided unless we know a legit root cause. Also,
-> "probe order implies suspend order" doesn't quite work for async suspend
-> anyway, so we'd probably want to express the dependency properly
-> anyway.
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [171011 08:56]:
+> On 09/30/2017 01:34 AM, Tony Lindgren wrote:
+> > +		target-module at 40128000 {
+> > +			compatible = "ti,sysc-mcasp";
+> > +			ti,hwmods = "mcasp";
+> > +			reg = <0x40128004 0x4>;
+> > +			reg-names = "sysc";
+> > +			#address-cells = <1>;
+> > +			#size-cells = <1>;
+> > +			ranges = <0x00000000 0x40128000 0x1000>, /* MPU */
+> > +				 <0x49028000 0x49028000 0x1000>; /* L3 */
+> > +
+> > +			/*
+> > +			 * Child device unsupported by davinci-mcasp. At least
+> > +			 * TX path is disabled for omap4, and only DIT mode
+> 
+> s/TX/RX
+> 
+> > +			 * works with no I2S. See also old Android kernel
+> > +			 * omap-mcasp driver for more information.
 
-Yeah, it's the same stuff as we get with initcall ordering.  This sort
-of thing does happen with things like PMICs which tend to have hardware
-that the system wants to manipulate in the IRQs off part of suspend.
-Ideally the dependency annotation stuff would figure things out though
-I'm not sure what the status of that is.
+Below is a fix for the RX comment.
 
-> Any chance this is related? Seems like that might break the parent/child
-> relationship for master/slave:
+Regards,
 
-> commit d7e2ee257038baeb03baef602500368a51ee9eef
-> Author: Linus Walleij <linus.walleij@linaro.org>
-> Date:   Mon Apr 11 13:51:03 2016 +0200
+Tony
 
->     spi: let SPI masters ignore their children for PM
+8< ------------------
+>From tony Mon Sep 17 00:00:00 2001
+From: Tony Lindgren <tony@atomide.com>
+Date: Fri, 13 Oct 2017 09:43:22 -0700
+Subject: [PATCH] ARM: dts: Fix typo for omap4 mcasp rx path
 
-That's for runtime PM, I'd not expect it to affect system suspend.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171013/5cd83500/attachment.sig>
+As reported by Peter Ujfalusi <peter.ujfalusi@ti.com>, the rx path on macsp
+is disabled and only tx is usable if the davinci-mcasp driver is updated for
+it.
+
+Reported-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/boot/dts/omap4.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -828,7 +828,7 @@
+ 
+ 			/*
+ 			 * Child device unsupported by davinci-mcasp. At least
+-			 * TX path is disabled for omap4, and only DIT mode
++			 * RX path is disabled for omap4, and only DIT mode
+ 			 * works with no I2S. See also old Android kernel
+ 			 * omap-mcasp driver for more information.
+ 			 */
+-- 
+2.14.2
