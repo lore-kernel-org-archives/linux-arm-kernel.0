@@ -1,86 +1,76 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 13 Oct 2017 15:47:22 +0100
-Subject: [PATCH v3 16/22] firmware: arm_scmi: add arm_mhu specific mailbox
- interface
-In-Reply-To: <CABb+yY0HxvLs51PmB7K-T2pp+OJE8ckiBAdBa=ss2rfUes=u2A@mail.gmail.com>
-References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
- <1506604306-20739-17-git-send-email-sudeep.holla@arm.com>
- <CAK8P3a0XmiXqZ-z7WV+nk7B86p23Jmf31Q=pVovXVebhA28_0Q@mail.gmail.com>
- <CABb+yY1N6hmC6Kd2QteMw_oCf=-mYHf7p6RdhYPQK+QUO7VP4A@mail.gmail.com>
- <f142dac2-a27c-4c46-4d22-4df4f2e8cfb1@arm.com>
- <CABb+yY1w358uw2EoeioAvZy06LTuOO0krGFFXoQSNAR5m5ANmQ@mail.gmail.com>
- <25023d1a-a221-b131-5a1e-7d909b006d1b@arm.com>
- <CAOCOHw54mQUVxVyLRWbV5Ty7trK99MM6zgXsuuxQEHnD3qvKVA@mail.gmail.com>
- <0b65a3fd-32ff-f708-7dce-8e3a5cabf908@arm.com>
- <CABb+yY0HxvLs51PmB7K-T2pp+OJE8ckiBAdBa=ss2rfUes=u2A@mail.gmail.com>
-Message-ID: <94004135-8ce2-8006-21f6-f8d219c0430d@arm.com>
+From: nandor.han@ge.com (Han, Nandor (GE Healthcare))
+Date: Fri, 13 Oct 2017 14:47:12 +0000
+Subject: [PATCH 1/1] tty: serial: imx: disable ageing timer interrupt if dma
+ in use
+In-Reply-To: <7c5a3ef3-6da7-815e-04a3-a1f18344032e@boundarydevices.com>
+References: <20171007014648.6989-1-troy.kisky@boundarydevices.com>
+ <AM3P101MB01800FAA2029393C5A859629E64A0@AM3P101MB0180.NAMP101.PROD.OUTLOOK.COM>
+ <7c5a3ef3-6da7-815e-04a3-a1f18344032e@boundarydevices.com>
+Message-ID: <AM3P101MB01801D525028F3992D8E284AE6480@AM3P101MB0180.NAMP101.PROD.OUTLOOK.COM>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 13/10/17 15:12, Jassi Brar wrote:
-> On Fri, Oct 13, 2017 at 7:12 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>
->> Hi Bjorn,
->>
->> Thanks for taking a look at this. Much appreciated.
->>
->> On 12/10/17 22:03, Bjorn Andersson wrote:
->>> On Fri, Oct 6, 2017 at 6:51 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>>>
->>>>
->>>> On 06/10/17 14:47, Jassi Brar wrote:
->>>>> On Fri, Oct 6, 2017 at 7:02 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>> [..]
->>>>>> Again that's not the point, doorbell is more common feature and that can
->>>>>> be supported. As SCMI expects doorbell feature in the specification, it
->>>>>> just need to support that class of controllers.
->>>>>>
->>>>> NO.  All SCMI expects is SHMEM and a signal reaching the other end.
->>>>> The signal mechanism need not necessarily be "doorbell".
->>>>>
->>>>
->>>> Agreed, but creating an abstraction ro do something as generic as
->>>> doorbell and writing shim layer for each controller to use SCMI also
->>>> sounds bad.
->>>>
->>>
->>> In the Qualcomm platform we have a single register that exposes 32
->>> doorbells, wired to interrupts on the various processors/co-processors
->>> in the SoC.
->>>
->>
->> It's exactly same even on ARM MHU controller.
->>
-> This has been a big problem in our communication. You start with
-> "exactly same..." and go on telling the difference.
-> And that difference is important.
+> -----Original Message-----
+> From: Troy Kisky [mailto:troy.kisky at boundarydevices.com]
+> Sent: 11 October 2017 19:10
+> To: Han, Nandor (GE Healthcare) <nandor.han@ge.com>;
+> gregkh at linuxfoundation.org
+> Cc: fabio.estevam at nxp.com; l.stach at pengutronix.de; u.kleine-
+> koenig at pengutronix.de; linux-serial at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: EXT: Re: [PATCH 1/1] tty: serial: imx: disable ageing timer interrupt if
+> dma in use
+> 
+> On 10/10/2017 11:22 PM, Han, Nandor (GE Healthcare) wrote:
+
+<snip>
+
+> >> -			imx_rxint(irq, dev_id);
+> >> +	if (!sport->dma_is_enabled && (sts & (USR1_RRDY |
+> >> USR1_AGTIM))) {
+> >> +		imx_rxint(irq, dev_id);
+> >
+> > I don't think we need the check `!sport->dma_is_enabled ` since RRDY and
+> AGTIM interrupts should be disable when DMA is enabled.
+> 
+> If I AND the status with its corresponding interrupt enable. But that is just as
+> complicated, and more different from the original.
+> 
 > 
 
-Sure and sorry for that.
+Yes, I agree, but it would be the right thing to do. :) 
 
-> In MHU the 32bits are tied together and all go to one target
-> processor. Whereas on QCom, each bit corresponds to independent signal
-> going to a different target processor.
+> >
+> >>  		ret = IRQ_HANDLED;
+> >>  	}
+> >>
+> >> @@ -1207,10 +1181,6 @@ static void imx_enable_dma(struct imx_port
+> >> *sport)
+> >>  	temp |= UCR1_RDMAEN | UCR1_TDMAEN | UCR1_ATDMAEN;
+> >>  	writel(temp, sport->port.membase + UCR1);
+> >>
+> >> -	temp = readl(sport->port.membase + UCR2);
+> >> -	temp |= UCR2_ATEN;
+> >> -	writel(temp, sport->port.membase + UCR2);
+> >> -
+> >
+> > I think this should be moved to imx_startup. At least RRDY is configured
+> there.
+> >
+> 
+> 
+> Currently, non-dma mode does not use the ageing timer. You get an interrupt
+> immediately when
+> 1 character is in the fifo. So, enabling the ageing timer and changing fifo level,
+> should really be a separate patch. But it would be a nice patch.
+> 
 > 
 
-I was not aware of that. Thanks for clarifying the differences.
+Ok but in this case, we are left with aging timer and rrdy check in the interrupt and imx-startup enables only rrdy. (which is not much different than what it was before, since aging timer didn't get a chance to be triggered)
+I agree that changing the fifo level to give a chance also to the aging timer will be the right thing to do here.
 
-> IOW, QCom has 32 channels per register whereas MHU has one. The
+Overall, I think is ok, my main concern with not enabling the aging timer in startup is that people can be confused about this.
 
-OK, that depends on how we consider it. As you said yes it just goes to
-single target processor, but hardware designers consider it still 32
-channels are they can be controller independently without any locking.
-
-> current drivers reflect that reality and hence I am against any change
-> in MHU driver.  Not to mean even changing the MHU driver will fix the
-> core issue - which is https://lkml.org/lkml/2017/7/7/465 and this
-> patchset tries to address that.
-> 
-
-Sure, that's the reason I have this abstraction now.
-
--- 
-Regards,
-Sudeep
+Reviewed-by: Nandor Han <Nandor.han@ge.com>
