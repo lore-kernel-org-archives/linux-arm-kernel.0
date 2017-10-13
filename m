@@ -1,28 +1,52 @@
-From: jeffy.chen@rock-chips.com (jeffy)
-Date: Fri, 13 Oct 2017 18:47:18 +0800
-Subject: [PATCH 1/2] spi: rockchip: Convert to late and early system PM
- callbacks
-In-Reply-To: <20171013101719.bophbiz7qb5wi7n2@sirena.co.uk>
-References: <20171013100116.8271-1-jeffy.chen@rock-chips.com>
- <20171013101719.bophbiz7qb5wi7n2@sirena.co.uk>
-Message-ID: <59E099B6.1000804@rock-chips.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 13 Oct 2017 11:52:08 +0100
+Subject: [PATCH 1/2] irqdesc: Add function to identify percpu_devid irqs
+In-Reply-To: <1507891466-52292-1-git-send-email-julien.thierry@arm.com>
+References: <1507891466-52292-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <4e5aa92c-221a-fb85-3b8a-198c3067ece9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Julien,
 
-On 10/13/2017 06:17 PM, Mark Brown wrote:
-> On Fri, Oct 13, 2017 at 06:01:15PM +0800, Jeffy Chen wrote:
->> Currently we are suspending the spi master in it's ->suspend callback,
->> which is racy as some other drivers may still want to transmit messages
->> on the bus(e.g. spi based pwm backlight).
->
-> I'm missing patch 2/2.
->
-Sorry, i'll resend them...
+On 13/10/17 11:44, Julien Thierry wrote:
+> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  include/linux/irqdesc.h | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/include/linux/irqdesc.h b/include/linux/irqdesc.h
+> index 3e90a09..93960cf 100644
+> --- a/include/linux/irqdesc.h
+> +++ b/include/linux/irqdesc.h
+> @@ -244,6 +244,14 @@ static inline int irq_is_percpu(unsigned int irq)
+>  	return desc->status_use_accessors & IRQ_PER_CPU;
+>  }
+> 
+> +static inline int irq_is_percpu_devid(unsigned int irq)
+> +{
+> +	struct irq_desc *desc;
+> +
+> +	desc = irq_to_desc(irq);
+> +	return desc->status_use_accessors & IRQ_PER_CPU_DEVID;
+> +}
+> +
+>  static inline void
+>  irq_set_lockdep_class(unsigned int irq, struct lock_class_key *class)
+>  {
+> --
+> 1.9.1
+> 
 
-This patch is to defer suspend_spi_master to late suspend.
+Please write a proper commit message (for example explaining why
+irq_is_percpu is not necessarily the right thing). A cover letter also
+wouldn't hurt (that's pretty much customary if you send more than a
+single patch).
 
-Since we put display-subsystem dt node above spi dt node, which makes 
-spi suspend been called before display driver. Then the display driver 
-would fail to set pwm backlight through spi in it's suspend/resume.
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
