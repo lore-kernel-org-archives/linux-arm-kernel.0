@@ -1,147 +1,90 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Fri, 13 Oct 2017 17:25:35 +0800
-Subject: [PATCH v3 15/20] KVM: arm64: Set an impdef ESR for Virtual-SError
- using VSESR_EL2.
-In-Reply-To: <20171005191812.5678-16-james.morse@arm.com>
-References: <20171005191812.5678-1-james.morse@arm.com>
- <20171005191812.5678-16-james.morse@arm.com>
-Message-ID: <f5f7859b-71a5-5f65-0344-7682bfac43bb@huawei.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Fri, 13 Oct 2017 11:27:04 +0200
+Subject: [PATCH 1/2] hwmon: (jc42) optionally try to disable the SMBUS timeout
+In-Reply-To: <20171013092705.7038-1-peda@axentia.se>
+References: <20171013092705.7038-1-peda@axentia.se>
+Message-ID: <20171013092705.7038-2-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+With a nxp,se97 chip on an atmel sama5d31 board, the I2C adapter driver
+is not always capable of avoiding the 25-35 ms timeout as specified by
+the SMBUS protocol. This may cause silent corruption of the last bit of
+any transfer, e.g. a one is read instead of a zero if the sensor chip
+times out. This also affects the eeprom half of the nxp-se97 chip, where
+this silent corruption was originally noticed. Other I2C adapters probably
+suffer similar issues, e.g. bit-banging comes to mind as risky...
 
-   After checking this patch, I think my patch[1] already include this logic(only a little difference). In my first version patch [2], It sets the virtual ESR in the KVM, but Marc and
-other people disagree that[3][4],and propose to set its value and injection by userspace(when RAS is enabled). If you think we also need to support injection by KVM, I can extend my
-patch to support that(but I think we should not support according previous review comments). So I think we no need to submit another patch, it will be duplicated, and waste our review
-time. thank you very much. I will combine that.
+The SMBUS register in the nxp chip is not a standard Jedec register, but
+it is not special to the nxp chips either, at least the atmel chips
+have the same mechanism. Therefore, do not special case this on the
+manufacturer, it is opt-in via the device property anyway.
 
-[1] https://lkml.org/lkml/2017/8/28/497
-[2] https://patchwork.kernel.org/patch/9633105/
-[3]https://lkml.org/lkml/2017/3/20/441
-[4]https://lkml.org/lkml/2017/3/20/516
+Signed-off-by: Peter Rosin <peda@axentia.se>
+---
+ Documentation/devicetree/bindings/hwmon/jc42.txt |  4 ++++
+ drivers/hwmon/jc42.c                             | 20 ++++++++++++++++++++
+ 2 files changed, 24 insertions(+)
 
-
-On 2017/10/6 3:18, James Morse wrote:
-> Prior to v8.2's RAS Extensions, the HCR_EL2.VSE 'virtual SError' feature
-> generated an SError with an implementation defined ESR_EL1.ISS, because we
-> had no mechanism to specify the ESR value.
-> 
-> On Juno this generates an all-zero ESR, the most significant bit 'ISV'
-> is clear indicating the remainder of the ISS field is invalid.
-> 
-> With the RAS Extensions we have a mechanism to specify this value, and the
-> most significant bit has a new meaning: 'IDS - Implementation Defined
-> Syndrome'. An all-zero SError ESR now means: 'RAS error: Uncategorized'
-> instead of 'no valid ISS'.
-> 
-> Add KVM support for the VSESR_EL2 register to specify an ESR value when
-> HCR_EL2.VSE generates a virtual SError. Change kvm_inject_vabt() to
-> specify an implementation-defined value.
-> 
-> We only need to restore the VSESR_EL2 value when HCR_EL2.VSE is set, KVM
-> save/restores this bit during __deactivate_traps() and hardware clears the
-> bit once the guest has consumed the virtual-SError.
-> 
-> Future patches may add an API (or KVM CAP) to pend a virtual SError with
-> a specified ESR.
-> 
-> Cc: Dongjiu Geng <gengdongjiu@huawei.com>
-> Signed-off-by: James Morse <james.morse@arm.com>
-> ---
->  arch/arm64/include/asm/kvm_emulate.h |  5 +++++
->  arch/arm64/include/asm/kvm_host.h    |  3 +++
->  arch/arm64/include/asm/sysreg.h      |  1 +
->  arch/arm64/kvm/hyp/switch.c          |  4 ++++
->  arch/arm64/kvm/inject_fault.c        | 13 ++++++++++++-
->  5 files changed, 25 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-> index e5df3fce0008..8a7a838eb17a 100644
-> --- a/arch/arm64/include/asm/kvm_emulate.h
-> +++ b/arch/arm64/include/asm/kvm_emulate.h
-> @@ -61,6 +61,11 @@ static inline void vcpu_set_hcr(struct kvm_vcpu *vcpu, unsigned long hcr)
->  	vcpu->arch.hcr_el2 = hcr;
->  }
->  
-> +static inline void vcpu_set_vsesr(struct kvm_vcpu *vcpu, u64 vsesr)
-> +{
-> +	vcpu->arch.vsesr_el2 = vsesr;
-> +}
-> +
->  static inline unsigned long *vcpu_pc(const struct kvm_vcpu *vcpu)
->  {
->  	return (unsigned long *)&vcpu_gp_regs(vcpu)->regs.pc;
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index d3eb79a9ed6b..0af35e71fedb 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -277,6 +277,9 @@ struct kvm_vcpu_arch {
->  
->  	/* Detect first run of a vcpu */
->  	bool has_run_once;
-> +
-> +	/* Virtual SError ESR to restore when HCR_EL2.VSE is set */
-> +	u64 vsesr_el2;
->  };
->  
->  #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
-> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> index 427c36bc5dd6..a493e93de296 100644
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -253,6 +253,7 @@
->  
->  #define SYS_DACR32_EL2			sys_reg(3, 4, 3, 0, 0)
->  #define SYS_IFSR32_EL2			sys_reg(3, 4, 5, 0, 1)
-> +#define SYS_VSESR_EL2			sys_reg(3, 4, 5, 2, 3)
->  #define SYS_FPEXC32_EL2			sys_reg(3, 4, 5, 3, 0)
->  
->  #define __SYS__AP0Rx_EL2(x)		sys_reg(3, 4, 12, 8, x)
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index 945e79c641c4..af37658223a0 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -86,6 +86,10 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
->  		isb();
->  	}
->  	write_sysreg(val, hcr_el2);
-> +
-> +	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN) && (val & HCR_VSE))
-> +		write_sysreg_s(vcpu->arch.vsesr_el2, SYS_VSESR_EL2);
-> +
->  	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
->  	write_sysreg(1 << 15, hstr_el2);
->  	/*
-> diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
-> index da6a8cfa54a0..52f7f66f1356 100644
-> --- a/arch/arm64/kvm/inject_fault.c
-> +++ b/arch/arm64/kvm/inject_fault.c
-> @@ -232,14 +232,25 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
->  		inject_undef64(vcpu);
->  }
->  
-> +static void pend_guest_serror(struct kvm_vcpu *vcpu, u64 esr)
-> +{
-> +	vcpu_set_vsesr(vcpu, esr);
-> +	vcpu_set_hcr(vcpu, vcpu_get_hcr(vcpu) | HCR_VSE);
-> +}
-> +
->  /**
->   * kvm_inject_vabt - inject an async abort / SError into the guest
->   * @vcpu: The VCPU to receive the exception
->   *
->   * It is assumed that this code is called from the VCPU thread and that the
->   * VCPU therefore is not currently executing guest code.
-> + *
-> + * Systems with the RAS Extensions specify an imp-def ESR (ISV/IDS = 1) with
-> + * the remaining ISS all-zeros so that this error is not interpreted as an
-> + * uncatagorized RAS error. Without the RAS Extensions we can't specify an ESR
-> + * value, so the CPU generates an imp-def value.
->   */
->  void kvm_inject_vabt(struct kvm_vcpu *vcpu)
->  {
-> -	vcpu_set_hcr(vcpu, vcpu_get_hcr(vcpu) | HCR_VSE);
-> +	pend_guest_serror(vcpu, ESR_ELx_ISV);
->  }
-> 
+diff --git a/Documentation/devicetree/bindings/hwmon/jc42.txt b/Documentation/devicetree/bindings/hwmon/jc42.txt
+index 07a250498fbb..f569db58f64a 100644
+--- a/Documentation/devicetree/bindings/hwmon/jc42.txt
++++ b/Documentation/devicetree/bindings/hwmon/jc42.txt
+@@ -34,6 +34,10 @@ Required properties:
+ 
+ - reg: I2C address
+ 
++Optional properties:
++- smbus-timeout-disable: When set, the smbus timeout function will be disabled.
++			 This is not supported on all chips.
++
+ Example:
+ 
+ temp-sensor at 1a {
+diff --git a/drivers/hwmon/jc42.c b/drivers/hwmon/jc42.c
+index 1bf22eff0b08..fd816902fa30 100644
+--- a/drivers/hwmon/jc42.c
++++ b/drivers/hwmon/jc42.c
+@@ -45,6 +45,7 @@ static const unsigned short normal_i2c[] = {
+ #define JC42_REG_TEMP		0x05
+ #define JC42_REG_MANID		0x06
+ #define JC42_REG_DEVICEID	0x07
++#define JC42_REG_SMBUS		0x22 /* NXP and Atmel, possibly others? */
+ 
+ /* Status bits in temperature register */
+ #define JC42_ALARM_CRIT_BIT	15
+@@ -73,6 +74,9 @@ static const unsigned short normal_i2c[] = {
+ #define ONS_MANID		0x1b09  /* ON Semiconductor */
+ #define STM_MANID		0x104a  /* ST Microelectronics */
+ 
++/* SMBUS register */
++#define SMBUS_STMOUT		BIT(7)  /* SMBus time-out, active low */
++
+ /* Supported chips */
+ 
+ /* Analog Devices */
+@@ -476,6 +480,22 @@ static int jc42_probe(struct i2c_client *client, const struct i2c_device_id *id)
+ 
+ 	data->extended = !!(cap & JC42_CAP_RANGE);
+ 
++	if (device_property_read_bool(dev, "smbus-timeout-disable")) {
++		int smbus;
++
++		/*
++		 * Not all chips support this register, but from a
++		 * quick read of various datasheets no chip appears
++		 * incompatible with the below attempt to disable
++		 * the timeout. And the whole thing is opt-in...
++		 */
++		smbus = i2c_smbus_read_word_swapped(client, JC42_REG_SMBUS);
++		if (smbus < 0)
++			return smbus;
++		i2c_smbus_write_word_swapped(client, JC42_REG_SMBUS,
++					     smbus | SMBUS_STMOUT);
++	}
++
+ 	config = i2c_smbus_read_word_swapped(client, JC42_REG_CONFIG);
+ 	if (config < 0)
+ 		return config;
+-- 
+2.11.0
