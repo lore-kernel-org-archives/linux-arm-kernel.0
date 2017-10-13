@@ -1,71 +1,90 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 13 Oct 2017 09:46:41 -0700
-Subject: [PATCH 5/7] ARM: dts: Add nodes for missing omap4 interconnect
- target modules
-In-Reply-To: <f5c57f0b-1423-c362-0fda-4069b77a2e38@ti.com>
-References: <20170929223411.9691-1-tony@atomide.com>
- <20170929223411.9691-6-tony@atomide.com>
- <f5c57f0b-1423-c362-0fda-4069b77a2e38@ti.com>
-Message-ID: <20171013164640.GI4394@atomide.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 13 Oct 2017 17:47:07 +0100
+Subject: [PATCH v3 22/28] arm64/sve: KVM: Prevent guests from using SVE
+In-Reply-To: <f273491e-2ae6-18b1-53de-6fbda2056631@arm.com>
+References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
+ <1507660725-7986-23-git-send-email-Dave.Martin@arm.com>
+ <c28b3f0d-7beb-cca3-46db-3fce964f4725@arm.com>
+ <20171012110409.GG19485@e103592.cambridge.arm.com>
+ <d8a50bf1-bfe0-2423-c56b-adac3925309e@arm.com>
+ <20171013141539.GK19485@e103592.cambridge.arm.com>
+ <f273491e-2ae6-18b1-53de-6fbda2056631@arm.com>
+Message-ID: <20171013164706.GN19485@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Oct 13, 2017 at 03:21:59PM +0100, Marc Zyngier wrote:
+> On 13/10/17 15:15, Dave Martin wrote:
+> > On Thu, Oct 12, 2017 at 12:28:32PM +0100, Marc Zyngier wrote:
+> >> On 12/10/17 12:04, Dave Martin wrote:
+> >>> On Wed, Oct 11, 2017 at 05:28:06PM +0100, Marc Zyngier wrote:
+> >>>> [+ Christoffer]
+> >>>>
+> >>>> On 10/10/17 19:38, Dave Martin wrote:
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [171011 08:56]:
-> On 09/30/2017 01:34 AM, Tony Lindgren wrote:
-> > +		target-module at 40128000 {
-> > +			compatible = "ti,sysc-mcasp";
-> > +			ti,hwmods = "mcasp";
-> > +			reg = <0x40128004 0x4>;
-> > +			reg-names = "sysc";
-> > +			#address-cells = <1>;
-> > +			#size-cells = <1>;
-> > +			ranges = <0x00000000 0x40128000 0x1000>, /* MPU */
-> > +				 <0x49028000 0x49028000 0x1000>; /* L3 */
-> > +
-> > +			/*
-> > +			 * Child device unsupported by davinci-mcasp. At least
-> > +			 * TX path is disabled for omap4, and only DIT mode
+[...]
+
+> >>>> Hmmm. How does this work if...
+> >>>
+> >>> !IS_ENABLED(CONFIG_ARM64_SVE) implies !system_supports_sve(), so
+> >>> if CONFIG_ARM64_SVE is not set, the call is optimised away.
+> >>>
+> >>> [...]
+> >>>
+> >>>>> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> >>>>> index a9cb794..6ae3703 100644
+> >>>>> --- a/arch/arm64/kernel/fpsimd.c
+> >>>>> +++ b/arch/arm64/kernel/fpsimd.c
+> >>>>> @@ -1073,6 +1073,33 @@ void fpsimd_flush_task_state(struct task_struct *t)
+> >>>
+> >>> [...]
+> >>>
+> >>>>> +#ifdef CONFIG_ARM64_SVE
+> >>>>> +void sve_flush_cpu_state(void)
+> >>>>> +{
+> >>>>> +	struct fpsimd_state *const fpstate = __this_cpu_read(fpsimd_last_state);
+> >>>>> +	struct task_struct *tsk;
+> >>>>> +
+> >>>>> +	if (!fpstate)
+> >>>>> +		return;
+> >>>>> +
+> >>>>> +	tsk = container_of(fpstate, struct task_struct, thread.fpsimd_state);
+> >>>>> +	if (test_tsk_thread_flag(tsk, TIF_SVE))
+> >>>>> +		fpsimd_flush_cpu_state();
+> >>>>> +}
+> >>>>> +#endif /* CONFIG_ARM64_SVE */
+> >>>>
+> >>>> ... CONFIG_ARM64_SVE is not set? Fixing this should just be a matter of
+> >>>> moving the #ifdef/#endif inside the function...
+> >>>
+> >>> Because sve_flush_cpu_state() is not in the same compilation unit it
+> >>> can't be static, and that means the compiler won't remove it
+> >>> automatically if it's unused -- hence the #ifdef.
+> >>>
+> >>> Because the call site is optimised away, there is no link failure.
+> >>>
+> >>> Don't we rely on this sort of thing all over the place?
+> >> Dunno. It just feels weird. But if you are sure that it won't break,
+> >> fine by me. I guess we'll find out pretty quickly how this fares,
+> >> specially with older toolchains.
+> > 
+> > I thought this was why the kernel doesn't support building with -O0.
+> > There are many instances of this in the series, not just here.
+> > 
+> > Let me know if you feel this isn't good enough though.
 > 
-> s/TX/RX
+> That's OK to me. As I said, we'll find out pretty quickly if anything
+> breaks unexpectedly.
+
+Yup
+
 > 
-> > +			 * works with no I2S. See also old Android kernel
-> > +			 * omap-mcasp driver for more information.
+> > Do you have any other comments on this patch?
+> None. You can add my:
+> 
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Below is a fix for the RX comment.
+OK, thanks for the input.
 
-Regards,
-
-Tony
-
-8< ------------------
->From tony Mon Sep 17 00:00:00 2001
-From: Tony Lindgren <tony@atomide.com>
-Date: Fri, 13 Oct 2017 09:43:22 -0700
-Subject: [PATCH] ARM: dts: Fix typo for omap4 mcasp rx path
-
-As reported by Peter Ujfalusi <peter.ujfalusi@ti.com>, the rx path on macsp
-is disabled and only tx is usable if the davinci-mcasp driver is updated for
-it.
-
-Reported-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/boot/dts/omap4.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -828,7 +828,7 @@
- 
- 			/*
- 			 * Child device unsupported by davinci-mcasp. At least
--			 * TX path is disabled for omap4, and only DIT mode
-+			 * RX path is disabled for omap4, and only DIT mode
- 			 * works with no I2S. See also old Android kernel
- 			 * omap-mcasp driver for more information.
- 			 */
--- 
-2.14.2
+Cheers
+---Dave
