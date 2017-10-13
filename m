@@ -1,23 +1,97 @@
 From: guohanjun@huawei.com (Hanjun Guo)
-Date: Fri, 13 Oct 2017 15:19:44 +0800
-Subject: [PATCH v2 2/3] ACPI/IORT: Improve functions return type/storage
- class specifier indentation
-In-Reply-To: <1507824047-17045-3-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1507824047-17045-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1507824047-17045-3-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <59E06910.40404@huawei.com>
+Date: Fri, 13 Oct 2017 15:09:47 +0800
+Subject: [PATCH v2 1/4] ACPI/IORT: Look up IORT node through struct
+ fwnode_handle pointer
+In-Reply-To: <1507878590-51066-1-git-send-email-guohanjun@huawei.com>
+References: <1507878590-51066-1-git-send-email-guohanjun@huawei.com>
+Message-ID: <1507878590-51066-2-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/10/13 0:00, Lorenzo Pieralisi wrote:
-> Some functions definition indentations are using a style that is frowned
-> upon with return value type/storage class specifier in a separate line.
->
-> Reindent the function definitions to fix them.
+From: Hanjun Guo <hanjun.guo@linaro.org>
 
-Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
+Current IORT code provides a function (ie iort_get_fwnode())
+which looks up a struct fwnode_handle pointer through a
+struct acpi_iort_node pointer for SMMU components but it
+lacks a function that implements the reverse look-up, namely
+struct fwnode_handle* -> struct acpi_iort_node*.
 
-By the way, I tested this patch set on D05 with no regressions.
+Devices that are not IORT named components cannot be retrieved through
+their associated IORT named component scan interface because they just
+are not represented in the ACPI namespace; the reverse look-up is
+therefore required for all platform devices that represent IORT nodes
+(eg SMMUs) so that the struct acpi_iort_node* can be retrieved from the
+struct device->fwnode pointer.
 
-Thanks
-Hanjun
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+[lorenzo.pieralisi at arm.com: re-indented/rewrote the commit log]
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ drivers/acpi/arm64/iort.c | 43 ++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 42 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index 0ff7020..03d3dd2 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -126,6 +126,31 @@ static inline void iort_delete_fwnode(struct acpi_iort_node *node)
+ 	spin_unlock(&iort_fwnode_lock);
+ }
+ 
++/**
++ * iort_get_iort_node() - Retrieve iort_node associated with an fwnode
++ *
++ * @fwnode: fwnode associated with device to be looked-up
++ *
++ * Returns: iort_node pointer on success, NULL on failure
++ */
++static inline struct acpi_iort_node *iort_get_iort_node(
++			struct fwnode_handle *fwnode)
++{
++	struct iort_fwnode *curr;
++	struct acpi_iort_node *iort_node = NULL;
++
++	spin_lock(&iort_fwnode_lock);
++	list_for_each_entry(curr, &iort_fwnode_list, list) {
++		if (curr->fwnode == fwnode) {
++			iort_node = curr->iort_node;
++			break;
++		}
++	}
++	spin_unlock(&iort_fwnode_lock);
++
++	return iort_node;
++}
++
+ typedef acpi_status (*iort_find_node_callback)
+ 	(struct acpi_iort_node *node, void *context);
+ 
+@@ -422,9 +447,25 @@ static struct acpi_iort_node *iort_find_dev_node(struct device *dev)
+ {
+ 	struct pci_bus *pbus;
+ 
+-	if (!dev_is_pci(dev))
++	if (!dev_is_pci(dev)) {
++		struct acpi_iort_node *node;
++		/*
++		 * scan iort_fwnode_list to see if it's an iort platform
++		 * device (such as SMMU, PMCG),its iort node already cached
++		 * and associated with fwnode when iort platform devices
++		 * were initialized.
++		 */
++		node = iort_get_iort_node(dev->fwnode);
++		if (node)
++			return node;
++
++		/*
++		 * if not, then it should be a platform device defined in
++		 * DSDT/SSDT (with Named Component node in IORT)
++		 */
+ 		return iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
+ 				      iort_match_node_callback, dev);
++	}
+ 
+ 	/* Find a PCI root bus */
+ 	pbus = to_pci_dev(dev)->bus;
+-- 
+1.7.12.4
