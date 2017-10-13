@@ -1,65 +1,37 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 13 Oct 2017 16:50:16 -0500
-Subject: [PATCH v5 01/12] mmc: dt-bindings: Add reg/source_cg/latch-ck
- for Mediatek MMC bindings
-In-Reply-To: <1507689696-25928-2-git-send-email-chaotian.jing@mediatek.com>
-References: <1507689696-25928-1-git-send-email-chaotian.jing@mediatek.com>
- <1507689696-25928-2-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <20171013215016.bkuwhhhnkvgilump@rob-hp-laptop>
+Date: Fri, 13 Oct 2017 16:51:42 -0500
+Subject: [PATCH v2 1/5] dt-bindings: iio: at91-sama5d2_adc: add optional
+ dma property
+In-Reply-To: <1507703732-29175-2-git-send-email-eugen.hristev@microchip.com>
+References: <1507703732-29175-1-git-send-email-eugen.hristev@microchip.com>
+ <1507703732-29175-2-git-send-email-eugen.hristev@microchip.com>
+Message-ID: <20171013215142.vlfhzzzetmc7resq@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 11, 2017 at 10:41:25AM +0800, Chaotian Jing wrote:
-> Change the comptiable for support of multi-platform
-> Make compatible explicit
-> Add description for reg
-> Add description for source_cg
-> Add description for mediatek,latch-ck
-> Note that source_cg and mediatek,latch-ck are optional for some projects,
-> eg, MT2701 do not have source_cg, and MT2712 do not need
-> mediatek,latch-ck
+On Wed, Oct 11, 2017 at 09:35:28AM +0300, Eugen Hristev wrote:
+> Added property for DMA configuration of the device.
 > 
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
 > ---
->  Documentation/devicetree/bindings/mmc/mtk-sd.txt | 16 +++++++++++++---
->  1 file changed, 13 insertions(+), 3 deletions(-)
+>  Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt | 7 +++++++
+>  1 file changed, 7 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> index 4182ea3..2bb585b 100644
-> --- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> +++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> @@ -7,10 +7,18 @@ This file documents differences between the core properties in mmc.txt
->  and the properties used by the msdc driver.
+> diff --git a/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt b/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
+> index 552e7a8..5f94d479 100644
+> --- a/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
+> +++ b/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
+> @@ -17,6 +17,11 @@ Required properties:
+>    This property uses the IRQ edge types values: IRQ_TYPE_EDGE_RISING ,
+>    IRQ_TYPE_EDGE_FALLING or IRQ_TYPE_EDGE_BOTH
 >  
->  Required properties:
-> -- compatible: Should be "mediatek,mt8173-mmc","mediatek,mt8135-mmc"
-> +- compatible: value should be either of the following.
-> +	"mediatek,mt8135-mmc": for mmc host ip compatible with mt8135
-> +	"mediatek,mt8173-mmc": for mmc host ip compatible with mt8173
-> +	"mediatek,mt2701-mmc": for mmc host ip compatible with mt2701
-> +	"mediatek,mt2712-mmc": for mmc host ip compatible with mt2712
-> +- reg: physical base address of the controller and length
->  - interrupts: Should contain MSDC interrupt number
-> -- clocks: MSDC source clock, HCLK
-> -- clock-names: "source", "hclk"
-> +- clocks: Should contain phandle for the clock feeding the MMC controller
-> +- clock-names: Should contain the following:
-> +	"source" - source clock (required)
-> +	"hclk" - HCLK which used for host (required)
-> +	"source_cg" - independent source clock gate (required for MT2712)
->  - pinctrl-names: should be "default", "state_uhs"
->  - pinctrl-0: should contain default/high speed pin ctrl
->  - pinctrl-1: should contain uhs mode pin ctrl
-> @@ -30,6 +38,8 @@ Optional properties:
->  - mediatek,hs400-cmd-resp-sel-rising:  HS400 command response sample selection
->  				       If present,HS400 command responses are sampled on rising edges.
->  				       If not present,HS400 command responses are sampled on falling edges.
-> +- mediatek,latch-ck: Some SoCs do not support enhance_rx, need set correct latch-ck to avoid data crc
-> +		     error caused by stop clock(fifo full)
+> +Optional properties:
+> +  - dmas: Phandle to dma channel for the ADC.
+> +  See ../../dma/dma.txt for details.
+> +  - dma-names: Must be "rx" when dmas property is being used.
 
-What values are supported? What's the default if not present.
+-names is pointless when there is only one.
 
-Be clear what compatible strings this property applies to or doesn't 
-apply to.
+Otherwise,
 
-Rob
+Acked-by: Rob Herring <robh@kernel.org>
