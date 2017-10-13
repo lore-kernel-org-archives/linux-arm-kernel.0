@@ -1,53 +1,51 @@
 From: volodymyr_babchuk@epam.com (Volodymyr Babchuk)
-Date: Fri, 13 Oct 2017 22:32:33 +0300
-Subject: [PATCH v1 03/14] tee: shm: add accessors for buffer size and page
- offset
+Date: Fri, 13 Oct 2017 22:32:34 +0300
+Subject: [PATCH v1 04/14] tee: shm: add page accessor functions
 In-Reply-To: <1507923164-12796-1-git-send-email-volodymyr_babchuk@epam.com>
 References: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
  <1507923164-12796-1-git-send-email-volodymyr_babchuk@epam.com>
-Message-ID: <1507923164-12796-4-git-send-email-volodymyr_babchuk@epam.com>
+Message-ID: <1507923164-12796-5-git-send-email-volodymyr_babchuk@epam.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Volodymyr Babchuk <vlad.babchuk@gmail.com>
 
-These two function will be needed for shared memory registration in OP-TEE
+In order to register a shared buffer in TEE, we need accessor
+function that return list of pages for that buffer.
 
 Signed-off-by: Volodymyr Babchuk <vlad.babchuk@gmail.com>
 ---
- include/linux/tee_drv.h | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+
+ * Removed check for validity of num_pages pointer. As Yury Norov pointed,
+   this check can lead to mistakes in the future.
+
+---
+ include/linux/tee_drv.h | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
 diff --git a/include/linux/tee_drv.h b/include/linux/tee_drv.h
-index 70b9c73..0d7f2a5 100644
+index 0d7f2a5..5489c38 100644
 --- a/include/linux/tee_drv.h
 +++ b/include/linux/tee_drv.h
-@@ -384,6 +384,26 @@ void *tee_shm_get_va(struct tee_shm *shm, size_t offs);
- int tee_shm_get_pa(struct tee_shm *shm, size_t offs, phys_addr_t *pa);
+@@ -394,6 +394,19 @@ static inline size_t tee_shm_get_size(struct tee_shm *shm)
+ }
  
  /**
-+ * tee_shm_get_size() - Get size of shared memory buffer
++ * tee_shm_get_pages() - Get list of pages that hold shared buffer
 + * @shm:	Shared memory handle
-+ * @returns size of shared memory
++ * @num_pages:	Number of pages will be stored there
++ * @returns pointer to pages array
 + */
-+static inline size_t tee_shm_get_size(struct tee_shm *shm)
++static inline struct page **tee_shm_get_pages(struct tee_shm *shm,
++					      size_t *num_pages)
 +{
-+	return shm->size;
++	*num_pages = shm->num_pages;
++	return shm->pages;
 +}
 +
 +/**
-+ * tee_shm_get_page_offset() - Get shared buffer offset from page start
-+ * @shm:	Shared memory handle
-+ * @returns page offset of shared buffer
-+ */
-+static inline size_t tee_shm_get_page_offset(struct tee_shm *shm)
-+{
-+	return shm->offset;
-+}
-+
-+/**
-  * tee_shm_get_id() - Get id of a shared memory object
+  * tee_shm_get_page_offset() - Get shared buffer offset from page start
   * @shm:	Shared memory handle
-  * @returns id
+  * @returns page offset of shared buffer
 -- 
 2.7.4
