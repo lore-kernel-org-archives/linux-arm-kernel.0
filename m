@@ -1,30 +1,52 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 13 Oct 2017 19:23:38 +0100
-Subject: [PATCH 0/4] ipmmu-vmsa cleanup
-Message-ID: <cover.1507918320.git.robin.murphy@arm.com>
+From: bob.picco@oracle.com (Bob Picco)
+Date: Fri, 13 Oct 2017 14:23:58 -0400
+Subject: [PATCH v12 00/11] complete deferred page initialization
+In-Reply-To: <20171013173214.27300-1-pasha.tatashin@oracle.com>
+References: <20171013173214.27300-1-pasha.tatashin@oracle.com>
+Message-ID: <20171013182358.GE17753@zareason>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd reports a build warning[1] thanks to me missing ipmmu-vmsa's second
-set of ops when converting io-pgtable-arm users to the new iommu_iotlb_*
-callbacks. Rather than just treat the symptom with a point fix, this
-seemed like a good excuse to clean up the messy #ifdeffery and
-duplication in the driver that led to the oversight in the first place.
-
-Build-tested successfully for arm64, ARM, and ARM + CONFIG_IOMMU_DMA.
-
-Robin.
-
-[1]:https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1510423.html
-
-Robin Murphy (4):
-  iommu/ipmmu-vmsa: Unify domain alloc/free
-  iommu/ipmmu-vmsa: Simplify group allocation
-  iommu/ipmmu-vmsa: Clean up struct ipmmu_vmsa_iommu_priv
-  iommu/ipmmu-vmsa: Unify ipmmu_ops
-
- drivers/iommu/ipmmu-vmsa.c | 251 ++++++++++++++-------------------------------
- 1 file changed, 78 insertions(+), 173 deletions(-)
-
--- 
-2.13.4.dirty
+Pavel Tatashin wrote:	[Fri Oct 13 2017, 01:32:03PM EDT]
+> Changelog:
+> v12 - v11
+> - Improved comments for mm: zero reserved and unavailable struct pages
+> - Added back patch: mm: deferred_init_memmap improvements
+> - Added patch from Will Deacon: arm64: kasan: Avoid using
+>   vmemmap_populate to initialise shadow
+[...]
+> Pavel Tatashin (10):
+>   mm: deferred_init_memmap improvements
+>   x86/mm: setting fields in deferred pages
+>   sparc64/mm: setting fields in deferred pages
+>   sparc64: simplify vmemmap_populate
+>   mm: defining memblock_virt_alloc_try_nid_raw
+>   mm: zero reserved and unavailable struct pages
+>   x86/kasan: add and use kasan_map_populate()
+>   arm64/kasan: add and use kasan_map_populate()
+>   mm: stop zeroing memory during allocation in vmemmap
+>   sparc64: optimized struct page zeroing
+> 
+> Will Deacon (1):
+>   arm64: kasan: Avoid using vmemmap_populate to initialise shadow
+> 
+>  arch/arm64/Kconfig                  |   2 +-
+>  arch/arm64/mm/kasan_init.c          | 130 +++++++++++++--------
+>  arch/sparc/include/asm/pgtable_64.h |  30 +++++
+>  arch/sparc/mm/init_64.c             |  32 +++---
+>  arch/x86/mm/init_64.c               |  10 +-
+>  arch/x86/mm/kasan_init_64.c         |  75 +++++++++++-
+>  include/linux/bootmem.h             |  27 +++++
+>  include/linux/memblock.h            |  16 +++
+>  include/linux/mm.h                  |  26 +++++
+>  mm/memblock.c                       |  60 ++++++++--
+>  mm/page_alloc.c                     | 224 +++++++++++++++++++++---------------
+>  mm/sparse-vmemmap.c                 |  15 ++-
+>  mm/sparse.c                         |   6 +-
+>  13 files changed, 469 insertions(+), 184 deletions(-)
+> 
+> -- 
+> 2.14.2
+> 
+Boot tested on ThunderX2 VM.
+Tested-by: Bob Picco <bob.picco@oracle.com>
