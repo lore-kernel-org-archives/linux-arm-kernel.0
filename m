@@ -1,55 +1,75 @@
-From: pasha.tatashin@oracle.com (Pavel Tatashin)
-Date: Fri, 13 Oct 2017 11:09:41 -0400
-Subject: [PATCH v11 7/9] arm64/kasan: add and use kasan_map_populate()
-In-Reply-To: <20171013144319.GB4746@arm.com>
-References: <20171009221931.1481-1-pasha.tatashin@oracle.com>
- <20171009221931.1481-8-pasha.tatashin@oracle.com>
- <20171010155619.GA2517@arm.com>
- <CAOAebxv21+KtXPAk-xWz=+2fqWQDgp9SAFZz-N=XsuBxev=zcg@mail.gmail.com>
- <20171010171047.GC2517@arm.com>
- <CAOAebxtrSthSP4NAa0obBbsCK1KZxO+x0w5xNrpY6m2y9UZFvQ@mail.gmail.com>
- <CAOAebxu5WL-FQLgfCxNcWy36V6zsTO1v3LLqXv5rM1Pp9R-=YA@mail.gmail.com>
- <20171013144319.GB4746@arm.com>
-Message-ID: <CAOAebxv4h+8ej6JA_DZbXaNV5JsAk4MbcCLf1+2RvwKGF2+MxQ@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 13 Oct 2017 17:11:32 +0200
+Subject: [PATCH 3/3] arm64: dts: mt2712: Add auxadc device node.
+In-Reply-To: <20170924164705.78cbb856@archlinux>
+References: <1505957212-13402-1-git-send-email-zhiyong.tao@mediatek.com>
+ <1505957212-13402-4-git-send-email-zhiyong.tao@mediatek.com>
+ <20170924164705.78cbb856@archlinux>
+Message-ID: <0e1bac27-18ca-121c-f1d7-8063af177a8b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> It shouldn't be difficult to use section mappings with my patch, I just
-> don't really see the need to try to optimise TLB pressure when you're
-> running with KASAN enabled which already has something like a 3x slowdown
-> afaik. If it ends up being a big deal, we can always do that later, but
-> my main aim here is to divorce kasan from vmemmap because they should be
-> completely unrelated.
 
-Yes, I understand that kasan makes system slow, but my point is why
-make it even slower? However, I am OK adding your patch to the series,
-BTW, symmetric changes will be needed for x86 as well sometime later.
 
->
-> This certainly doesn't sound right; mapping the shadow with pages shouldn't
-> lead to problems. I also can't seem to reproduce this myself -- could you
-> share your full .config and a pointer to the git tree that you're using,
-> please?
+On 09/24/2017 05:47 PM, Jonathan Cameron wrote:
+> On Thu, 21 Sep 2017 09:26:52 +0800
+> Zhiyong Tao <zhiyong.tao@mediatek.com> wrote:
+> 
+>> Add auxadc device node for MT2712.
+>>
+>> Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
+> 
+> I've applied the IIO patches to make this work, so assume this will get
+> picked up in due course.
+> 
 
-Config is attached. I am using my patch series + your patch + today's
-clone from https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+pushed now to v4.14-next/dts64
+Thanks.
 
-Also, in a separate e-mail i sent out the qemu arguments.
-
->
->> I feel, this patch requires more work, and I am troubled with using
->> base pages instead of large pages.
->
-> I'm happy to try fixing this, because I think splitting up kasan and vmemmap
-> is the right thing to do here.
-
-Thank you very much.
-
-Pavel
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: config.gz
-Type: application/x-gzip
-Size: 36799 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171013/6c7f5e6d/attachment-0001.bin>
+> Jonathan
+> 
+>> ---
+>> This patch dependents on "Mediatek MT2712 clock and scpsys support"[1].
+>> Please accept this patch together with [1].
+>> [1]http://lists.infradead.org/pipermail/linux-mediatek/2017-September/010461.html
+>> ---
+>>   arch/arm64/boot/dts/mediatek/mt2712-evb.dts |    4 ++++
+>>   arch/arm64/boot/dts/mediatek/mt2712e.dtsi   |    9 +++++++++
+>>   2 files changed, 13 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/mediatek/mt2712-evb.dts b/arch/arm64/boot/dts/mediatek/mt2712-evb.dts
+>> index 14163b9..76cbf4a 100644
+>> --- a/arch/arm64/boot/dts/mediatek/mt2712-evb.dts
+>> +++ b/arch/arm64/boot/dts/mediatek/mt2712-evb.dts
+>> @@ -28,6 +28,10 @@
+>>   	};
+>>   };
+>>   
+>> +&auxadc {
+>> +	status = "okay";
+>> +};
+>> +
+>>   &uart0 {
+>>   	status = "okay";
+>>   };
+>> diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+>> index 3232e4e..bf65c92 100644
+>> --- a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+>> +++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+>> @@ -225,6 +225,15 @@
+>>   			 (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_HIGH)>;
+>>   	};
+>>   
+>> +	auxadc: adc at 11001000 {
+>> +		compatible = "mediatek,mt2712-auxadc";
+>> +		reg = <0 0x11001000 0 0x1000>;
+>> +		clocks = <&pericfg CLK_PERI_AUXADC>;
+>> +		clock-names = "main";
+>> +		#io-channel-cells = <1>;
+>> +		status = "disabled";
+>> +	};
+>> +
+>>   	uart0: serial at 11002000 {
+>>   		compatible = "mediatek,mt2712-uart",
+>>   			     "mediatek,mt6577-uart";
+> 
