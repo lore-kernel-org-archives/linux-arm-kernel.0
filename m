@@ -1,105 +1,43 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Fri, 13 Oct 2017 10:59:47 +0200
-Subject: [PATCH v1 2/2] kvm: arm64: handle single-step of userspace mmio
- instructions
-In-Reply-To: <878tgoxudc.fsf@linaro.org>
-References: <20171006113921.24880-1-alex.bennee@linaro.org>
- <20171006113921.24880-3-alex.bennee@linaro.org>
- <a9f8905e-18e9-267a-2479-f498c248e2f4@arm.com>
- <878tgoxudc.fsf@linaro.org>
-Message-ID: <20171013085947.GE8927@cbox>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Fri, 13 Oct 2017 09:57:02 +0100
+Subject: [PATCH 0/2] Add support for Hi6220 coresight
+In-Reply-To: <20171007121802.GC23080@leoy-linaro>
+References: <1504226835-2115-1-git-send-email-leo.yan@linaro.org>
+ <20170901013301.GN21656@codeaurora.org> <20171007121802.GC23080@leoy-linaro>
+Message-ID: <59E07FDE.40307@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 06, 2017 at 02:45:35PM +0100, Alex Benn?e wrote:
-> 
-> Julien Thierry <julien.thierry@arm.com> writes:
-> 
-> > On 06/10/17 12:39, Alex Benn?e wrote:
-> >> The system state of KVM when using userspace emulation is not complete
-> >> until we return into KVM_RUN. To handle mmio related updates we wait
-> >> until they have been committed and then schedule our KVM_EXIT_DEBUG.
-> >>
-> >> I've introduced a new function kvm_arm_maybe_return_debug() to wrap up
-> >> the differences between arm/arm64 which is currently null for arm.
-> >>
-> >> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-> >> ---
-> >>   arch/arm/include/asm/kvm_host.h   |  2 ++
-> >>   arch/arm64/include/asm/kvm_host.h |  1 +
-> >>   arch/arm64/kvm/debug.c            | 21 +++++++++++++++++++++
-> >>   arch/arm64/kvm/handle_exit.c      |  9 +++------
-> >>   virt/kvm/arm/arm.c                |  2 +-
-> >>   virt/kvm/arm/mmio.c               |  3 ++-
-> >>   6 files changed, 30 insertions(+), 8 deletions(-)
-> >>
-> >> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> >> index 4a879f6ff13b..aec943f6d123 100644
-> >> --- a/arch/arm/include/asm/kvm_host.h
-> >> +++ b/arch/arm/include/asm/kvm_host.h
-> >> @@ -285,6 +285,8 @@ static inline void kvm_arm_init_debug(void) {}
-> >>   static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
-> >>   static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
-> >>   static inline void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu) {}
-> >> +static inline int  kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu,
-> >> +						struct kvm_run *run) {}
-> >>
-> >
-> > This function should return 1.
-> 
-> So I did ponder making this a bool, returning true if we need to exit
-> and testing in v/k/a/arm.c exit leg rather than in the mmio handler.
-> 
-> At the moment it mirrors the existing exit logic which follows -1 err, 0
-> return, >0 handled. But as I mentioned in the cover letter this fell
-> down a bit when dealing with the mmio case.
-> 
-> >
-> >>   int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
-> >>   			       struct kvm_device_attr *attr);
-> >> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> >> index e923b58606e2..fa67d21662f6 100644
-> >> --- a/arch/arm64/include/asm/kvm_host.h
-> >> +++ b/arch/arm64/include/asm/kvm_host.h
-> >> @@ -369,6 +369,7 @@ void kvm_arm_init_debug(void);
-> >>   void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
-> >>   void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
-> >>   void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu);
-> >> +int  kvm_arm_maybe_return_debug(struct kvm_vcpu *vcpu, struct kvm_run *run);
-> >
-> > I feel the name could be a little bit more explicit:
-> >
-> > kvm_arm_trap_need_step_debug, kvm_arm_trap_step_return_debug,
-> > kvm_arm_trap_need_return_debug.
-> 
-> I wanted to keep the debug suffix so that's fine although I'm not so
-> sure trap is correct because on the tail end of mmio emulation are we
-> still trapping?
-> 
-> Maybe kvm_arm_step_emulated_debug?
+Hi Leo,
 
-I think you should name it:
+On 2017/10/7 13:18, Leo Yan wrote:
+> Hi Stephen, Wei,
+> 
+> On Thu, Aug 31, 2017 at 06:33:01PM -0700, Stephen Boyd wrote:
+>> On 09/01, Leo Yan wrote:
+>>> This patch series adds support for coresight on Hi6220; the first patch
+>>> is to fix coresight PLL so can avoid system hang after we enable
+>>> coresight, the second patch is to add DT binding according to coresight
+>>> topology.
+>>>
+>>> The patch has been tested on Hikey; By using OpenCSD snapshot mode, it
+>>> can successfully decode ETF and ETB trace data.
+>>>
+>>
+>> I can take the first one and second one goes through arm-soc?
+> 
+> Could you pick these two patches for Hi6220 coresight enabling for
+> this merge window? Or need me resend these two patches?
 
-kvm_arm_should_complete_emulated_instr_debug() - or something better -
-and call it directly from kvm_arch_vcpu_ioctl_run, so that it becomes:
+Applied patch 2 into hisilicon dt tree with slight fix.
+Thanks!
 
-	ret = kvm_handle_mmio_return(vcpu, vcpu->run);
-	if (ret)
-		return ret;
-	ret = kvm_arm_should_complete_emulated_instr_debug(vcpu);
-	if (ret)
-		return ret;
+BR,
+Wei
 
 > 
-> > At least, I think it would be nice that the name reflect that this
-> > check is meant for emulated instructions.
-> >
-> > Otherwise:
-> >
-> > Reviewed-by: Julien Thierry <julien.thierry@arm.com>
-> >
-> > Thanks,
+> Thanks,
+> Leo Yan
 > 
+> .
 > 
-Thanks,
--Christoffer
