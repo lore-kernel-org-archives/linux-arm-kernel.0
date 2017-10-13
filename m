@@ -1,152 +1,113 @@
 From: volodymyr_babchuk@epam.com (Volodymyr Babchuk)
-Date: Fri, 13 Oct 2017 22:32:42 +0300
-Subject: [PATCH v1 12/14] tee: optee: enable dynamic SHM support
+Date: Fri, 13 Oct 2017 22:32:35 +0300
+Subject: [PATCH v1 05/14] tee: optee: Update protocol definitions
 In-Reply-To: <1507923164-12796-1-git-send-email-volodymyr_babchuk@epam.com>
 References: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
  <1507923164-12796-1-git-send-email-volodymyr_babchuk@epam.com>
-Message-ID: <1507923164-12796-13-git-send-email-volodymyr_babchuk@epam.com>
+Message-ID: <1507923164-12796-6-git-send-email-volodymyr_babchuk@epam.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Volodymyr Babchuk <vlad.babchuk@gmail.com>
 
-Previous patches added various features that are needed for dynamic SHM.
-Dynamic SHM allows Normal World to share any buffers with OP-TEE.
-While original design suggested to use pre-allocated region (usually of
-1M to 2M of size), this new approach allows to use all non-secure RAM for
-command buffers, RPC allocations and TA parameters.
+There were changes in REE<->OP-TEE ABI recently.
+Now ABI allows us to pass non-contiguous memory buffers as list of
+pages to OP-TEE. This can be achieved by using new parameter attribute
+OPTEE_MSG_ATTR_NONCONTIG.
 
-This patch checks capability OPTEE_SMC_SEC_CAP_DYNAMIC_SHM. If it was set
-by OP-TEE, then kernel part of OP-TEE will use kernel page allocator
-to allocate command buffers. Also it will set TEE_GEN_CAP_REG_MEM
-capability to tell userspace that it supports shared memory registration.
+OP-TEE also is able to use all non-secure RAM for shared buffers. This
+new capability is enabled with OPTEE_SMC_SEC_CAP_DYNAMIC_SHM flag.
+
+This patch adds necessary definitions to the protocol definition files at
+Linux side.
 
 Signed-off-by: Volodymyr Babchuk <vlad.babchuk@gmail.com>
 ---
- drivers/tee/optee/core.c | 69 +++++++++++++++++++++++++++++++++++-------------
- 1 file changed, 51 insertions(+), 18 deletions(-)
+ drivers/tee/optee/optee_msg.h | 38 ++++++++++++++++++++++++++++++++------
+ drivers/tee/optee/optee_smc.h |  7 +++++++
+ 2 files changed, 39 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/tee/optee/core.c b/drivers/tee/optee/core.c
-index dbe5a61..51d5575 100644
---- a/drivers/tee/optee/core.c
-+++ b/drivers/tee/optee/core.c
-@@ -28,6 +28,7 @@
- #include <linux/uaccess.h>
- #include "optee_private.h"
- #include "optee_smc.h"
-+#include "shm_pool.h"
+diff --git a/drivers/tee/optee/optee_msg.h b/drivers/tee/optee/optee_msg.h
+index dd7a06e..3050490 100644
+--- a/drivers/tee/optee/optee_msg.h
++++ b/drivers/tee/optee/optee_msg.h
+@@ -67,11 +67,32 @@
+ #define OPTEE_MSG_ATTR_META			BIT(8)
  
- #define DRIVER_NAME "optee"
+ /*
+- * The temporary shared memory object is not physically contigous and this
+- * temp memref is followed by another fragment until the last temp memref
+- * that doesn't have this bit set.
++ * Pointer to a list of pages used to register user-defined SHM buffer.
++ * Used with OPTEE_MSG_ATTR_TYPE_TMEM_*.
++ * buf_ptr should point to the beginning of the buffer. Buffer will contain
++ * list of page addresses. OP-TEE core can reconstruct contiguous buffer from
++ * that page addresses list. Page addresses are stored as 64 bit values.
++ * Last entry on a page should point to the next page of buffer.
++ * Every entry in buffer should point to a 4k page beginning (12 least
++ * significant bits must be equal to zero).
++ *
++ * 12 least significant bints of optee_msg_param.u.tmem.buf_ptr should hold page
++ * offset of the user buffer.
++ *
++ * So, entries should be placed like members of this structure:
++ *
++ * struct page_data {
++ *   uint64_t pages_array[OPTEE_MSG_NONCONTIG_PAGE_SIZE/sizeof(uint64_t) - 1];
++ *   uint64_t next_page_data;
++ * };
++ *
++ * Structure is designed to exactly fit into the page size
++ * OPTEE_MSG_NONCONTIG_PAGE_SIZE which is a standard 4KB page.
++ *
++ * The size of 4KB is chosen because this is the smallest page size for ARM
++ * architectures. If REE uses larger pages, it should divide them to 4KB ones.
+  */
+-#define OPTEE_MSG_ATTR_FRAGMENT			BIT(9)
++#define OPTEE_MSG_ATTR_NONCONTIG		BIT(9)
  
-@@ -219,6 +220,10 @@ static void optee_get_version(struct tee_device *teedev,
- 		.impl_caps = TEE_OPTEE_CAP_TZ,
- 		.gen_caps = TEE_GEN_CAP_GP,
- 	};
-+	struct optee *optee = tee_get_drvdata(teedev);
+ /*
+  * Memory attributes for caching passed with temp memrefs. The actual value
+@@ -94,6 +115,11 @@
+ #define OPTEE_MSG_LOGIN_APPLICATION_USER	0x00000005
+ #define OPTEE_MSG_LOGIN_APPLICATION_GROUP	0x00000006
+ 
++/*
++ * Page size used in non-contiguous buffer entries
++ */
++#define OPTEE_MSG_NONCONTIG_PAGE_SIZE		4096
 +
-+	if (optee->sec_caps & OPTEE_SMC_SEC_CAP_DYNAMIC_SHM)
-+		v.gen_caps |= TEE_GEN_CAP_REG_MEM;
- 	*vers = v;
- }
- 
-@@ -397,21 +402,22 @@ static bool optee_msg_exchange_capabilities(optee_invoke_fn *invoke_fn,
- }
- 
- static struct tee_shm_pool *
--optee_config_shm_memremap(optee_invoke_fn *invoke_fn, void **memremaped_shm)
-+optee_config_shm_memremap(optee_invoke_fn *invoke_fn, void **memremaped_shm,
-+			  u32 sec_caps)
- {
- 	union {
- 		struct arm_smccc_res smccc;
- 		struct optee_smc_get_shm_config_result result;
- 	} res;
--	struct tee_shm_pool *pool;
- 	unsigned long vaddr;
- 	phys_addr_t paddr;
- 	size_t size;
- 	phys_addr_t begin;
- 	phys_addr_t end;
- 	void *va;
--	struct tee_shm_pool_mem_info priv_info;
--	struct tee_shm_pool_mem_info dmabuf_info;
-+	struct tee_shm_pool_mgr *priv_mgr;
-+	struct tee_shm_pool_mgr *dmabuf_mgr;
-+	void *rc;
- 
- 	invoke_fn(OPTEE_SMC_GET_SHM_CONFIG, 0, 0, 0, 0, 0, 0, 0, &res.smccc);
- 	if (res.result.status != OPTEE_SMC_RETURN_OK) {
-@@ -441,22 +447,49 @@ optee_config_shm_memremap(optee_invoke_fn *invoke_fn, void **memremaped_shm)
- 	}
- 	vaddr = (unsigned long)va;
- 
--	priv_info.vaddr = vaddr;
--	priv_info.paddr = paddr;
--	priv_info.size = OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE;
--	dmabuf_info.vaddr = vaddr + OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE;
--	dmabuf_info.paddr = paddr + OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE;
--	dmabuf_info.size = size - OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE;
--
--	pool = tee_shm_pool_alloc_res_mem(&priv_info, &dmabuf_info);
--	if (IS_ERR(pool)) {
--		memunmap(va);
--		goto out;
-+	/*
-+	 * If OP-TEE can work with unregistered SHM, we will use own pool
-+	 * for private shm
-+	 */
-+	if (sec_caps & OPTEE_SMC_SEC_CAP_DYNAMIC_SHM) {
-+		rc = optee_shm_pool_alloc_pages();
-+		if (IS_ERR(rc))
-+			goto err_memunmap;
-+		priv_mgr = rc;
-+	} else {
-+		const size_t sz = OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE;
+ /**
+  * struct optee_msg_param_tmem - temporary memory reference parameter
+  * @buf_ptr:	Address of the buffer
+@@ -145,8 +171,8 @@ struct optee_msg_param_value {
+  *
+  * @attr & OPTEE_MSG_ATTR_TYPE_MASK indicates if tmem, rmem or value is used in
+  * the union. OPTEE_MSG_ATTR_TYPE_VALUE_* indicates value,
+- * OPTEE_MSG_ATTR_TYPE_TMEM_* indicates tmem and
+- * OPTEE_MSG_ATTR_TYPE_RMEM_* indicates rmem.
++ * OPTEE_MSG_ATTR_TYPE_TMEM_* indicates @tmem and
++ * OPTEE_MSG_ATTR_TYPE_RMEM_* indicates @rmem,
+  * OPTEE_MSG_ATTR_TYPE_NONE indicates that none of the members are used.
+  */
+ struct optee_msg_param {
+diff --git a/drivers/tee/optee/optee_smc.h b/drivers/tee/optee/optee_smc.h
+index 069c8e1..7cd3272 100644
+--- a/drivers/tee/optee/optee_smc.h
++++ b/drivers/tee/optee/optee_smc.h
+@@ -222,6 +222,13 @@ struct optee_smc_get_shm_config_result {
+ #define OPTEE_SMC_SEC_CAP_HAVE_RESERVED_SHM	BIT(0)
+ /* Secure world can communicate via previously unregistered shared memory */
+ #define OPTEE_SMC_SEC_CAP_UNREGISTERED_SHM	BIT(1)
 +
-+		rc = tee_shm_pool_mgr_alloc_res_mem(vaddr, paddr, sz,
-+						    3 /* 8 bytes aligned */);
-+		if (IS_ERR(rc))
-+			goto err_memunmap;
-+		priv_mgr = rc;
++/*
++ * Secure world supports commands "register/unregister shared memory",
++ * secure world accepts command buffers located in any parts of non-secure RAM
++ */
++#define OPTEE_SMC_SEC_CAP_DYNAMIC_SHM		BIT(2)
 +
-+		vaddr += sz;
-+		paddr += sz;
-+		size -= sz;
- 	}
- 
-+	rc = tee_shm_pool_mgr_alloc_res_mem(vaddr, paddr, size, PAGE_SHIFT);
-+	if (IS_ERR(rc))
-+		goto err_free_priv_mgr;
-+	dmabuf_mgr = rc;
-+
-+	rc = tee_shm_pool_alloc(priv_mgr, dmabuf_mgr);
-+	if (IS_ERR(rc))
-+		goto err_free_dmabuf_mgr;
-+
- 	*memremaped_shm = va;
--out:
--	return pool;
-+
-+	return rc;
-+
-+err_free_dmabuf_mgr:
-+	tee_shm_pool_mgr_destroy(dmabuf_mgr);
-+err_free_priv_mgr:
-+	tee_shm_pool_mgr_destroy(priv_mgr);
-+err_memunmap:
-+	memunmap(va);
-+	return rc;
- }
- 
- /* Simple wrapper functions to be able to use a function pointer */
-@@ -534,7 +567,7 @@ static struct optee *optee_probe(struct device_node *np)
- 	if (!(sec_caps & OPTEE_SMC_SEC_CAP_HAVE_RESERVED_SHM))
- 		return ERR_PTR(-EINVAL);
- 
--	pool = optee_config_shm_memremap(invoke_fn, &memremaped_shm);
-+	pool = optee_config_shm_memremap(invoke_fn, &memremaped_shm, sec_caps);
- 	if (IS_ERR(pool))
- 		return (void *)pool;
- 
+ #define OPTEE_SMC_FUNCID_EXCHANGE_CAPABILITIES	9
+ #define OPTEE_SMC_EXCHANGE_CAPABILITIES \
+ 	OPTEE_SMC_FAST_CALL_VAL(OPTEE_SMC_FUNCID_EXCHANGE_CAPABILITIES)
 -- 
 2.7.4
