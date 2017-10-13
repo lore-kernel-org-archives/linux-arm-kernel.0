@@ -1,78 +1,53 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 13 Oct 2017 14:38:34 +0100
-Subject: [PATCH v2] KVM: arm64: its: Fix missing dynamic allocation check
- in scan_its_table
-In-Reply-To: <20171013131734.16485-1-christoffer.dall@linaro.org>
-References: <20171013131734.16485-1-christoffer.dall@linaro.org>
-Message-ID: <78a0270d-fc96-2796-1d32-91ba5f1807ab@arm.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 13 Oct 2017 08:39:09 -0500
+Subject: [PATCH 0/3] arm64: cpuinfo: make /proc/cpuinfo more human-readable
+In-Reply-To: <20170927103406.GC32150@leverpostej>
+References: <20170926222324.17409-1-ahs3@redhat.com>
+ <20170927103406.GC32150@leverpostej>
+Message-ID: <CAOZdJXUzo3JrHW1h6W3y3BnVq472NjPpaqTztzEODZnnMyvJRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/10/17 14:17, Christoffer Dall wrote:
-> We currently allocate an entry dynamically, but we never check if the
-> allocation actually succeeded.  We actually don't need a dynamic
-> allocation, because we know the maximum size of an ITS table entry, so
-> we can simply use an allocation on the stack.
-> 
-> Cc: <stable@vger.kernel.org>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  virt/kvm/arm/vgic/vgic-its.c | 18 +++++++-----------
->  1 file changed, 7 insertions(+), 11 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index f51c1e1..1d2668b 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -1801,37 +1801,33 @@ typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *entry,
->  static int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
->  			  int start_id, entry_fn_t fn, void *opaque)
->  {
-> -	void *entry = kzalloc(esz, GFP_KERNEL);
->  	struct kvm *kvm = its->dev->kvm;
->  	unsigned long len = size;
->  	int id = start_id;
->  	gpa_t gpa = base;
-> +	char entry[esz]
->  	int ret;
->  
-> +	memset(entry, 0, esz);
-> +
->  	while (len > 0) {
->  		int next_offset;
->  		size_t byte_offset;
->  
->  		ret = kvm_read_guest(kvm, gpa, entry, esz);
->  		if (ret)
-> -			goto out;
-> +			return ret;
->  
->  		next_offset = fn(its, id, entry, opaque);
-> -		if (next_offset <= 0) {
-> -			ret = next_offset;
-> -			goto out;
-> -		}
-> +		if (next_offset <= 0)
-> +			return next_offset;
->  
->  		byte_offset = next_offset * esz;
->  		id += next_offset;
->  		gpa += byte_offset;
->  		len -= byte_offset;
->  	}
-> -	ret =  1;
-> -
-> -out:
-> -	kfree(entry);
-> -	return ret;
-> +	return 1;
->  }
->  
->  /**
-> 
+On Wed, Sep 27, 2017 at 5:34 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi Al,
+>
+> On Tue, Sep 26, 2017 at 04:23:21PM -0600, Al Stone wrote:
+>> As ARMv8 servers get deployed, I keep getting the same set of questions
+>> from end-users of those systems: what do all the hex numbers mean in
+>> /proc/cpuinfo and could you make them so I don't have to carry a cheat
+>> sheet with me all the time?
+>
+> I appreciate that /proc/cpuinfo can be opaque to end users, but I do not
+> believe that this is the right solution to that problem.
+>
+> There are a number of issues stemming from the face that /proc/cpuinfo
+> is ill-defined and overused for a number of cases. Changes to it almost
+> certainly violate brittle de-facto ABI details people are relying on,
+> and there's a very long tail on fallout resulting from this. In
+> addition, many niceties come at an excessive maintenance cost, and are
+> simply unreliable as an ABI.
+>
+> So, as with all other patches modifying /proc/cpuinfo, I must NAK this
+> series.
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Qualcomm Datacenter Technologies is very interested in seeing these
+patches (or some variant of them) accepted.  Updates to /proc/cpuinfo
+are long overdue, and I'm asking you to reconsider your objections.
+We're willing to work with distro vendors to get this information
+added to their products while upstream is left behind, but I hope that
+won't be necessary.
 
-	M.
+I would even go so far as to say that we should be making
+/proc/cpuinfo for ARM match the x86 output as closely as possible,
+even using their terminology.  We should be providing information like
+frequencies and product names.
+
+Having a human-readable /proc/cpuinfo with extensive details of the
+CPU spelled out is very useful, and Al's reasoning is valid.  The fact
+that it's "fragile" is not as important as the fact that on x86,
+/proc/cpuinfo is much more useful.
+
 -- 
-Jazz is not dead. It just smells funny...
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
