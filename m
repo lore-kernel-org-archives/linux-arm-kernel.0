@@ -1,22 +1,29 @@
 From: phh@phh.me (Pierre-Hugues Husson)
-Date: Sat, 14 Oct 2017 00:53:34 +0200
-Subject: [PATCH 0/3] Enable CEC on rk3399
-Message-ID: <20171013225337.5196-1-phh@phh.me>
+Date: Sat, 14 Oct 2017 00:53:37 +0200
+Subject: [PATCH 3/3] arm64: dts: rockchip: enable cec pin for rk3399 firefly
+In-Reply-To: <20171013225337.5196-1-phh@phh.me>
+References: <20171013225337.5196-1-phh@phh.me>
+Message-ID: <20171013225337.5196-4-phh@phh.me>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable CEC on firefly-rk3399.
-Tested on a TV with cec-ctl --playback; cec-ctl -S
+Signed-off-by: Pierre-Hugues Husson <phh@phh.me>
+---
+ arch/arm64/boot/dts/rockchip/rk3399-firefly.dts | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Pierre-Hugues Husson (3):
-  drm: bridge: synopsys/dw-hdmi: Enable cec clock
-  arm64: dts: rockchip: add the cec clk for dw-mipi-hdmi on rk3399
-  arm64: dts: rockchip: enable cec pin for rk3399 firefly
-
- arch/arm64/boot/dts/rockchip/rk3399-firefly.dts |  2 ++
- arch/arm64/boot/dts/rockchip/rk3399.dtsi        |  8 ++++++--
- drivers/gpu/drm/bridge/synopsys/dw-hdmi.c       | 16 ++++++++++++++++
- 3 files changed, 24 insertions(+), 2 deletions(-)
-
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts b/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
+index f6fbcc05073e..431ff1bb3720 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
+@@ -257,6 +257,8 @@
+ 
+ &hdmi {
+ 	ddc-i2c-bus = <&i2c3>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&hdmi_cec>;
+ 	status = "okay";
+ };
+ 
 -- 
 2.14.1
