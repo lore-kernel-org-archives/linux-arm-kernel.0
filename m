@@ -1,146 +1,53 @@
-From: volodymyr_babchuk@epam.com (Volodymyr Babchuk)
-Date: Fri, 13 Oct 2017 22:32:37 +0300
-Subject: [PATCH v1 07/14] tee: optee: add shared buffer registration functions
-In-Reply-To: <1507923164-12796-1-git-send-email-volodymyr_babchuk@epam.com>
-References: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
- <1507923164-12796-1-git-send-email-volodymyr_babchuk@epam.com>
-Message-ID: <1507923164-12796-8-git-send-email-volodymyr_babchuk@epam.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 13 Oct 2017 22:59:16 +0200
+Subject: [PATCH] i2c: pxa: move header file out of deprecated i2c folder
+In-Reply-To: <20170814164303.2383-1-wsa@the-dreams.de> (Wolfram Sang's message
+ of "Mon, 14 Aug 2017 18:43:01 +0200")
+References: <20170814164303.2383-1-wsa@the-dreams.de>
+Message-ID: <87d15qlq6z.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Volodymyr Babchuk <vlad.babchuk@gmail.com>
+Wolfram Sang <wsa@the-dreams.de> writes:
 
-This change adds ops for shm_(un)register functions in tee interface.
-Client application can use these functions to (un)register an own shared
-buffer in OP-TEE address space. This allows zero copy data sharing between
-Normal and Secure Worlds.
+> include/linux/i2c is deprecated because too many platform_data of i2c
+> clients incorrectly ended up there. The few still relevant include files
+> for I2C bus masters with their platform_data have been moved to the
+> platform_data directory. This final one, PXA, is not entirely
+> platform_data, so it is simply moved one layer up. After that, the i2c
+> subfolder can finally go soon.
+>
+> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+> ---
+>
+> If you think this should rather go to "include/linux/platform_data" instead of
+> "include/linux", I am open for that. I like the latter a tad better, but not
+> super much.
+>
+> No runtime testing because of no HW, but buildbot is happy with this series at
+> least and I did build testing, too.
 
-Please note that while those functions were added to optee code,
-it does not report to userspace that those functions are available.
-OP-TEE code does not set TEE_GEN_CAP_REG_MEM flag. This flag will be
-enabled only after all other features of dynamic shared memory will be
-implemented in subsequent patches. Of course user can ignore presence of
-TEE_GEN_CAP_REG_MEM flag and try do call those functions. This is okay,
-driver will register shared buffer in OP-TEE, but any attempts to use
-this shared buffer will fail.
+Hi Wolfram,
 
-Signed-off-by: Volodymyr Babchuk <vlad.babchuk@gmail.com>
----
- * Extended commit message. Now it describes what will happen if user
-   will call optee_shm_register() exactly at this patch (without next ones)
+I'm sorry I completely missed this one.
+Either it's too late and trash this mail, or it's not, and then I'd suggest
+another approach :
+ - patch 1 : move include/linux/i2c/pxa-i2c.h to include/platform_data/i2c-pxa.h
+   (i2c-pxa.h and not pxa-i2c.h to be consistent)
+ - patch 2 : move this chunk to arch/arm/mach-pxa/devices.h
+> extern void pxa_set_i2c_info(struct i2c_pxa_platform_data *info);
+> 
+> #ifdef CONFIG_PXA27x
+> extern void pxa27x_set_i2c_power_info(struct i2c_pxa_platform_data *info);
+> #endif
+> 
+> #ifdef CONFIG_PXA3xx
+> extern void pxa3xx_set_i2c_power_info(struct i2c_pxa_platform_data *info);
+> #endif
 
- * Added comment that describesx desctibe why we abuse least bits of
-   msg_arg->params->u.tmem.buf_ptr
----
- drivers/tee/optee/call.c          | 69 +++++++++++++++++++++++++++++++++++++++
- drivers/tee/optee/core.c          |  2 ++
- drivers/tee/optee/optee_private.h |  4 +++
- 3 files changed, 75 insertions(+)
+This is the cleanest approach I could think of.
 
-diff --git a/drivers/tee/optee/call.c b/drivers/tee/optee/call.c
-index 4873666..a22f5f0 100644
---- a/drivers/tee/optee/call.c
-+++ b/drivers/tee/optee/call.c
-@@ -533,3 +533,72 @@ void optee_free_pages_list(void *array, size_t num_entries)
- 	free_pages_exact(array, get_pages_list_size(num_entries));
- }
- 
-+int optee_shm_register(struct tee_context *ctx, struct tee_shm *shm,
-+		       struct page **pages, size_t num_pages)
-+{
-+	struct tee_shm *shm_arg = NULL;
-+	struct optee_msg_arg *msg_arg;
-+	u64 *pages_list;
-+	phys_addr_t msg_parg;
-+	int rc = 0;
-+
-+	if (!num_pages)
-+		return -EINVAL;
-+
-+	pages_list = optee_allocate_pages_list(num_pages);
-+	if (!pages_list)
-+		return -ENOMEM;
-+
-+	shm_arg = get_msg_arg(ctx, 1, &msg_arg, &msg_parg);
-+	if (IS_ERR(shm_arg)) {
-+		rc = PTR_ERR(shm_arg);
-+		goto out;
-+	}
-+
-+	optee_fill_pages_list(pages_list, pages, num_pages,
-+			      tee_shm_get_page_offset(shm));
-+
-+	msg_arg->cmd = OPTEE_MSG_CMD_REGISTER_SHM;
-+	msg_arg->params->attr = OPTEE_MSG_ATTR_TYPE_TMEM_OUTPUT |
-+				OPTEE_MSG_ATTR_NONCONTIG;
-+	msg_arg->params->u.tmem.shm_ref = (unsigned long)shm;
-+	msg_arg->params->u.tmem.size = tee_shm_get_size(shm);
-+	/*
-+	 * In the least bits of msg_arg->params->u.tmem.buf_ptr we
-+	 * store buffer offset from 4k page, as described in OP-TEE ABI.
-+	 */
-+	msg_arg->params->u.tmem.buf_ptr = virt_to_phys(pages_list) |
-+	  (tee_shm_get_page_offset(shm) & (OPTEE_MSG_NONCONTIG_PAGE_SIZE - 1));
-+
-+	if (optee_do_call_with_arg(ctx, msg_parg) ||
-+	    msg_arg->ret != TEEC_SUCCESS)
-+		rc = -EINVAL;
-+
-+	tee_shm_free(shm_arg);
-+out:
-+	optee_free_pages_list(pages_list, num_pages);
-+	return rc;
-+}
-+
-+int optee_shm_unregister(struct tee_context *ctx, struct tee_shm *shm)
-+{
-+	struct tee_shm *shm_arg;
-+	struct optee_msg_arg *msg_arg;
-+	phys_addr_t msg_parg;
-+	int rc = 0;
-+
-+	shm_arg = get_msg_arg(ctx, 1, &msg_arg, &msg_parg);
-+	if (IS_ERR(shm_arg))
-+		return PTR_ERR(shm_arg);
-+
-+	msg_arg->cmd = OPTEE_MSG_CMD_UNREGISTER_SHM;
-+
-+	msg_arg->params[0].attr = OPTEE_MSG_ATTR_TYPE_RMEM_INPUT;
-+	msg_arg->params[0].u.rmem.shm_ref = (unsigned long)shm;
-+
-+	if (optee_do_call_with_arg(ctx, msg_parg) ||
-+	    msg_arg->ret != TEEC_SUCCESS)
-+		rc = -EINVAL;
-+	tee_shm_free(shm_arg);
-+	return rc;
-+}
-diff --git a/drivers/tee/optee/core.c b/drivers/tee/optee/core.c
-index 7952357..4d448bf 100644
---- a/drivers/tee/optee/core.c
-+++ b/drivers/tee/optee/core.c
-@@ -267,6 +267,8 @@ static const struct tee_driver_ops optee_ops = {
- 	.close_session = optee_close_session,
- 	.invoke_func = optee_invoke_func,
- 	.cancel_req = optee_cancel_req,
-+	.shm_register = optee_shm_register,
-+	.shm_unregister = optee_shm_unregister,
- };
- 
- static const struct tee_desc optee_desc = {
-diff --git a/drivers/tee/optee/optee_private.h b/drivers/tee/optee/optee_private.h
-index b63213d..d7bc77d 100644
---- a/drivers/tee/optee/optee_private.h
-+++ b/drivers/tee/optee/optee_private.h
-@@ -160,6 +160,10 @@ int optee_cancel_req(struct tee_context *ctx, u32 cancel_id, u32 session);
- void optee_enable_shm_cache(struct optee *optee);
- void optee_disable_shm_cache(struct optee *optee);
- 
-+int optee_shm_register(struct tee_context *ctx, struct tee_shm *shm,
-+		       struct page **pages, size_t num_pages);
-+int optee_shm_unregister(struct tee_context *ctx, struct tee_shm *shm);
-+
- int optee_from_msg_param(struct tee_param *params, size_t num_params,
- 			 const struct optee_msg_param *msg_params);
- int optee_to_msg_param(struct optee_msg_param *msg_params, size_t num_params,
--- 
-2.7.4
+Cheers.
+
+--
+Robert
