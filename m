@@ -1,67 +1,80 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri, 13 Oct 2017 17:53:57 +0100
-Subject: [PATCH v3 15/20] KVM: arm64: Set an impdef ESR for Virtual-SError
- using VSESR_EL2.
-In-Reply-To: <f5f7859b-71a5-5f65-0344-7682bfac43bb@huawei.com>
-References: <20171005191812.5678-1-james.morse@arm.com>
- <20171005191812.5678-16-james.morse@arm.com>
- <f5f7859b-71a5-5f65-0344-7682bfac43bb@huawei.com>
-Message-ID: <59E0EFA5.1020103@arm.com>
+Date: Fri, 13 Oct 2017 17:50:45 +0100
+Subject: [PATCH v3 04/13] arm64: alternatives: use tpidr_el2 on VHE hosts
+In-Reply-To: <20171013153148.dnejsvhxeui6opfw@armageddon.cambridge.arm.com>
+References: <20170922182614.27885-1-james.morse@arm.com>
+ <20170922182614.27885-5-james.morse@arm.com>
+ <20171013153148.dnejsvhxeui6opfw@armageddon.cambridge.arm.com>
+Message-ID: <59E0EEE5.2020208@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi gengdongjiu,
+Hi Catalin,
 
-On 13/10/17 10:25, gengdongjiu wrote:
-> After checking this patch, I think my patch[1] already include this logic(only a little
-> difference).
+On 13/10/17 16:31, Catalin Marinas wrote:
+> On Fri, Sep 22, 2017 at 07:26:05PM +0100, James Morse wrote:
+>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+>> index cd52d365d1f0..8e4c7da2b126 100644
+>> --- a/arch/arm64/kernel/cpufeature.c
+>> +++ b/arch/arm64/kernel/cpufeature.c
 
-Your kvm_handle_guest_sei() is similar to where this series ends up, but the
-purpose of this patch is to keep KVMs existing behaviour.
+>> @@ -1308,3 +1309,25 @@ static int __init enable_mrs_emulation(void)
+>>  }
+>>  
+>>  late_initcall(enable_mrs_emulation);
+>> +
+>> +int cpu_copy_el2regs(void *__unused)
+>> +{
+>> +	int do_copyregs = 0;
+>> +
+>> +	/*
+>> +	 * Copy register values that aren't redirected by hardware.
+>> +	 *
+>> +	 * Before code patching, we only set tpidr_el1, all CPUs need to copy
+>> +	 * this value to tpidr_el2 before we patch the code. Once we've done
+>> +	 * that, freshly-onlined CPUs will set tpidr_el2, so we don't need to
+>> +	 * do anything here.
+>> +	 */
+>> +	asm volatile(ALTERNATIVE("mov %0, #1", "mov %0, #0",
+>> +				 ARM64_HAS_VIRT_HOST_EXTN)
+>> +		    : "=r" (do_copyregs) : : );
+> 
+> Can you just do:
+> 
+> 	if (cpu_have_const_cap(ARM64_HAS_VIRT_HOST_EXTN))
+> 		write_sysreg(read_sysreg(tpidr_el1), tpidr_el2);
+> 
+> At this point the capability bits should be set and the jump labels
+> enabled.
 
-KVM already injects SError into the guest all by itself, now with the RAS
-extensions it can specify and ESR, and because of the new ESR encoding it can't
-use the reset value of all-zeroes.
+These are enabled too early, we haven't done patching yet.
+
+We need to copy tpidr_el1 -> tpidr_el2 on all CPUs that are online before code
+patching.
+
+After code patching new CPUs set tpidr_el2 when they come online, so we don't
+need to do the copy... but this enable method is still called. There is nothing
+for us to do, and tpidr_el1 now contains junk, so the copy
 
 
-> In my first version patch [2], It sets the virtual ESR in the KVM, but Marc and
-> other people disagree that[3][4],and propose to set its value and injection by userspace(when
-> RAS is enabled). 
+cpu_have_const_cap() is great for knowing if we have a feature, here we want to
+know if we've done the patching for this feature.
 
-Not quite: for RAS errors.
-When we want to hand a RAS error to a guest, Qemu should be driving that.
+I can wrap the ALTERNATIVE() into a helper, something like:
+> arm64_alternatives_applied(ARM64_HAS_VIRT_HOST_EXTN)
 
-What about impdef SError? Qemu should be able to drive that with the same API.
+which should make it clearer.
 
-What about this nasty corner where KVM already injects an impdef SError
-directly? This patch keeps that working.
-
-
-I'd love to get rid of KVMs internal use of kvm_inject_vabt(). But what do we
-replace it with? It needs to be a guest exit type that existing software can't
-ignore...
-
-(The best I can suggest is: Once we have a mechanism to inject SError into a
-guest from Qemu, KVM could make an impdef SError pending, then give Qemu the
-opportunity to kill the guest, or set a different ESR. Existing software can
-ignore the exit, and take the existing behaviour.)
+Christoffer had the same question at connect, so I evidently haven't found the
+right way of describing this yet.
 
 
-> So I think we no need to submit another patch, it will be duplicated, and waste our review
-> time. thank you very much. I will combine that.
+> Otherwise:
+> 
+> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 
-I agree we're posting competing series, there was some off-list co-ordination on
-this with Xie XiuQi and Xiongfeng Wang in ~may, it looks like you weren't
-involved at that point.
-
-In your last series touching all this:
-https://lkml.org/lkml/2017/8/31/698
-
-You had Xie XiuQi's RAS-cpufeature patch in isolation, without the SError rework
-underneath it. Applied like this SError is still always masked in the kernel, so
-any system without firmware-first will silently consume and discard an
-uncontained-RAS-error using the esb() in __switch_to(). We can't do this, hence
-the first half of this series.
+Thanks for taking a look, I'll leave this RB until your happy with the
+ALTERNATIVE() hackery above.
 
 
 James
