@@ -1,112 +1,25 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Thu, 12 Oct 2017 18:56:22 -0700
-Subject: [PATCH v5 1/3] PCI: rockchip: Add support for pcie wake irq
-In-Reply-To: <20170911151029.25185-2-jeffy.chen@rock-chips.com>
-References: <20170911151029.25185-1-jeffy.chen@rock-chips.com>
- <20170911151029.25185-2-jeffy.chen@rock-chips.com>
-Message-ID: <20171013015620.GA94568@google.com>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Fri, 13 Oct 2017 10:28:07 +0800
+Subject: [PATCH] drm/rockchip: add PINCTRL dependency for LVDS
+In-Reply-To: <20171005120957.485433-1-arnd@arndb.de>
+References: <20171005120957.485433-1-arnd@arndb.de>
+Message-ID: <c0d08177-00b6-7d20-5fd0-5d4a9b3c2b7b@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 2017?10?05? 20:09, Arnd Bergmann wrote:
+> The new driver fails to build when CONFIG_PINCTRL is disabled:
+>
+> drivers/gpu/drm/rockchip/rockchip_lvds.c: In function 'rockchip_lvds_grf_config':
+> drivers/gpu/drm/rockchip/rockchip_lvds.c:229:39: error: dereferencing pointer to incomplete type 'struct dev_pin_info'
+>     if (lvds->pins && !IS_ERR(lvds->pins->default_state))
+>
+> This adds the respective Kconfig dependency.
+>
+> Fixes: 34cc0aa25456 ("drm/rockchip: Add support for Rockchip Soc LVDS")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-On Mon, Sep 11, 2017 at 11:10:27PM +0800, Jeffy Chen wrote:
-> Add support for PCIE_WAKE pin in rockchip pcie driver.
-> 
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> ---
-> 
-> Changes in v5:
-> Rebase
-> 
-> Changes in v3:
-> Fix error handling
-> 
-> Changes in v2:
-> Use dev_pm_set_dedicated_wake_irq
->         -- Suggested by Brian Norris <briannorris@chromium.com>
-> 
->  drivers/pci/host/pcie-rockchip.c | 19 +++++++++++++++++--
->  1 file changed, 17 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
-> index 9051c6c8fea4..a8b7272597a7 100644
-> --- a/drivers/pci/host/pcie-rockchip.c
-> +++ b/drivers/pci/host/pcie-rockchip.c
-> @@ -37,6 +37,7 @@
->  #include <linux/pci_ids.h>
->  #include <linux/phy/phy.h>
->  #include <linux/platform_device.h>
-> +#include <linux/pm_wakeirq.h>
->  #include <linux/reset.h>
->  #include <linux/regmap.h>
->  
-> @@ -995,6 +996,15 @@ static int rockchip_pcie_setup_irq(struct rockchip_pcie *rockchip)
->  		return err;
->  	}
->  
-> +	/* Must init wakeup before setting dedicated wakeup irq. */
-> +	device_init_wakeup(dev, true);
+Pushed to drm-misc-next
 
-Am I crazy, or should this go inside the 'irq >= 0' conditional?
-Otherwise, for the whole series:
-
-Reviewed-by: Brian Norris <briannorris@chromium.org>
-Tested-by: Brian Norris <briannorris@chromium.org>
-
-Bjorn, were you planning to pick this up?
-
-Also, the DT binding change conflicts (just simple context) with the
-PERST# series I just sent out. Would be good if we could land one or
-both :)
-
-Thanks,
-Brian
-
-> +	irq = platform_get_irq_byname(pdev, "wakeup");
-> +	if (irq >= 0) {
-> +		err = dev_pm_set_dedicated_wake_irq(dev, irq);
-> +		if (err)
-> +			dev_err(dev, "failed to setup PCIe wakeup IRQ\n");
-> +	}
-> +
->  	return 0;
->  }
->  
-> @@ -1542,11 +1552,11 @@ static int rockchip_pcie_probe(struct platform_device *pdev)
->  
->  	err = rockchip_pcie_parse_dt(rockchip);
->  	if (err)
-> -		return err;
-> +		goto err_disable_wake;
->  
->  	err = rockchip_pcie_enable_clocks(rockchip);
->  	if (err)
-> -		return err;
-> +		goto err_disable_wake;
->  
->  	err = rockchip_pcie_set_vpcie(rockchip);
->  	if (err) {
-> @@ -1656,6 +1666,9 @@ static int rockchip_pcie_probe(struct platform_device *pdev)
->  		regulator_disable(rockchip->vpcie0v9);
->  err_set_vpcie:
->  	rockchip_pcie_disable_clocks(rockchip);
-> +err_disable_wake:
-> +	dev_pm_clear_wake_irq(dev);
-> +	device_init_wakeup(dev, false);
->  	return err;
->  }
->  
-> @@ -1682,6 +1695,8 @@ static int rockchip_pcie_remove(struct platform_device *pdev)
->  	if (!IS_ERR(rockchip->vpcie0v9))
->  		regulator_disable(rockchip->vpcie0v9);
->  
-> +	dev_pm_clear_wake_irq(dev);
-> +	device_init_wakeup(dev, false);
->  	return 0;
->  }
->  
-> -- 
-> 2.11.0
-> 
-> 
+Thanks
+Mark
