@@ -1,167 +1,74 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 13 Oct 2017 18:51:19 +0100
-Subject: [PATCH v4 1/2] arm_arch_timer: Expose event stream status
-In-Reply-To: <1507901576-34641-2-git-send-email-julien.thierry@arm.com>
-References: <1507901576-34641-1-git-send-email-julien.thierry@arm.com>
- <1507901576-34641-2-git-send-email-julien.thierry@arm.com>
-Message-ID: <20171013175118.GB6050@leverpostej>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Fri, 13 Oct 2017 12:51:39 -0500
+Subject: [PATCH v3 2/7] ACPI: Enable PPTT support on ARM64
+In-Reply-To: <59E08D32.2010605@huawei.com>
+References: <20171012194856.13844-1-jeremy.linton@arm.com>
+ <20171012194856.13844-3-jeremy.linton@arm.com> <59E08D32.2010605@huawei.com>
+Message-ID: <68f0af6f-2552-0e1a-5242-a89acf3656d9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 13, 2017 at 02:32:55PM +0100, Julien Thierry wrote:
-> The arch timer configuration for a CPU might get reset after suspending
-> said CPU.
-> 
-> In order to reliably use the event stream in the kernel (e.g. for delays),
-> we keep track of the state where we can safely consider the event stream as
-> properly configured.
-> 
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
+Hi,
 
-It would be nice to call out that the ISBs are necessary to ensure the
-that event stream is active before we make use of it in the kernel.
-Previously that only mattered for userspace, and the exception return
-was sufficient.
+On 10/13/2017 04:53 AM, Hanjun Guo wrote:
+> Hi Jeremy,
+> 
+> On 2017/10/13 3:48, Jeremy Linton wrote:
+>> Now that we have a PPTT parser, in preparation for its use
+>> on arm64, lets build it.
+>>
+>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+>> ---
+>>   arch/arm64/Kconfig         | 1 +
+>>   drivers/acpi/Makefile      | 1 +
+>>   drivers/acpi/arm64/Kconfig | 3 +++
+>>   3 files changed, 5 insertions(+)
+>>
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 0df64a6a56d4..68c9d1289735 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -7,6 +7,7 @@ config ARM64
+>>   	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
+>>   	select ACPI_MCFG if ACPI
+>>   	select ACPI_SPCR_TABLE if ACPI
+>> +	select ACPI_PPTT if ACPI
+>>   	select ARCH_CLOCKSOURCE_DATA
+>>   	select ARCH_HAS_DEBUG_VIRTUAL
+>>   	select ARCH_HAS_DEVMEM_IS_ALLOWED
+>> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+>> index 90265ab4437a..c92a0c937551 100644
+>> --- a/drivers/acpi/Makefile
+>> +++ b/drivers/acpi/Makefile
+>> @@ -85,6 +85,7 @@ obj-$(CONFIG_ACPI_BGRT)		+= bgrt.o
+>>   obj-$(CONFIG_ACPI_CPPC_LIB)	+= cppc_acpi.o
+>>   obj-$(CONFIG_ACPI_SPCR_TABLE)	+= spcr.o
+>>   obj-$(CONFIG_ACPI_DEBUGGER_USER) += acpi_dbg.o
+>> +obj-$(CONFIG_ACPI_PPTT) 	+= pptt.o
+>>   
+>>   # processor has its own "processor." module_param namespace
+>>   processor-y			:= processor_driver.o
+>> diff --git a/drivers/acpi/arm64/Kconfig b/drivers/acpi/arm64/Kconfig
+>> index 5a6f80fce0d6..74b855a669ea 100644
+>> --- a/drivers/acpi/arm64/Kconfig
+>> +++ b/drivers/acpi/arm64/Kconfig
+>> @@ -7,3 +7,6 @@ config ACPI_IORT
+>>   
+>>   config ACPI_GTDT
+>>   	bool
+>> +
+>> +config ACPI_PPTT
+>> +	bool
+> 
+> Can this be located in drivers/acpi/Kconfig? then other
+> platform can select ACPI_PPTT if they want.
 
-I think that can be fixed up when applying this, so:
+It can be, but I've been resisting doing that because without any 
+callers using it will do little but bloat the code of anyone that dares 
+enable it.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+So my assumption is that when the code to enable PPTT on x86 shows up 
+the config option can be moved as well.
 
-Thanks,
-Mark.
-
-> ---
->  arch/arm/include/asm/arch_timer.h    |  1 +
->  arch/arm64/include/asm/arch_timer.h  |  1 +
->  drivers/clocksource/arm_arch_timer.c | 25 ++++++++++++++++++++++---
->  include/clocksource/arm_arch_timer.h |  6 ++++++
->  4 files changed, 30 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-> index d4ebf56..0b6e104 100644
-> --- a/arch/arm/include/asm/arch_timer.h
-> +++ b/arch/arm/include/asm/arch_timer.h
-> @@ -106,6 +106,7 @@ static inline u32 arch_timer_get_cntkctl(void)
->  static inline void arch_timer_set_cntkctl(u32 cntkctl)
->  {
->  	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
-> +	isb();
->  }
-> 
->  #endif
-> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-> index a652ce0..bdedd8f 100644
-> --- a/arch/arm64/include/asm/arch_timer.h
-> +++ b/arch/arm64/include/asm/arch_timer.h
-> @@ -144,6 +144,7 @@ static inline u32 arch_timer_get_cntkctl(void)
->  static inline void arch_timer_set_cntkctl(u32 cntkctl)
->  {
->  	write_sysreg(cntkctl, cntkctl_el1);
-> +	isb();
->  }
-> 
->  static inline u64 arch_counter_get_cntpct(void)
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index fd4b7f6..13e6baa 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -77,6 +77,7 @@ struct arch_timer {
->  static bool arch_counter_suspend_stop;
->  static bool vdso_default = true;
-> 
-> +static cpumask_t evtstrm_available = CPU_MASK_NONE;
->  static bool evtstrm_enable = IS_ENABLED(CONFIG_ARM_ARCH_TIMER_EVTSTREAM);
-> 
->  static int __init early_evtstrm_cfg(char *buf)
-> @@ -740,6 +741,7 @@ static void arch_timer_evtstrm_enable(int divider)
->  #ifdef CONFIG_COMPAT
->  	compat_elf_hwcap |= COMPAT_HWCAP_EVTSTRM;
->  #endif
-> +	cpumask_set_cpu(smp_processor_id(), &evtstrm_available);
->  }
-> 
->  static void arch_timer_configure_evtstream(void)
-> @@ -864,6 +866,16 @@ u32 arch_timer_get_rate(void)
->  	return arch_timer_rate;
->  }
-> 
-> +bool arch_timer_evtstrm_available(void)
-> +{
-> +	/*
-> +	 * We might get called from a preemptible context. This is fine
-> +	 * because availability of the event stream should be always the same
-> +	 * for a preemptible context and context where we might resume a task.
-> +	 */
-> +	return cpumask_test_cpu(raw_smp_processor_id(), &evtstrm_available);
-> +}
-> +
->  static u64 arch_counter_get_cntvct_mem(void)
->  {
->  	u32 vct_lo, vct_hi, tmp_hi;
-> @@ -929,6 +941,8 @@ static int arch_timer_dying_cpu(unsigned int cpu)
->  {
->  	struct clock_event_device *clk = this_cpu_ptr(arch_timer_evt);
-> 
-> +	cpumask_clear_cpu(smp_processor_id(), &evtstrm_available);
-> +
->  	arch_timer_stop(clk);
->  	return 0;
->  }
-> @@ -938,10 +952,16 @@ static int arch_timer_dying_cpu(unsigned int cpu)
->  static int arch_timer_cpu_pm_notify(struct notifier_block *self,
->  				    unsigned long action, void *hcpu)
->  {
-> -	if (action == CPU_PM_ENTER)
-> +	if (action == CPU_PM_ENTER) {
->  		__this_cpu_write(saved_cntkctl, arch_timer_get_cntkctl());
-> -	else if (action == CPU_PM_ENTER_FAILED || action == CPU_PM_EXIT)
-> +
-> +		cpumask_clear_cpu(smp_processor_id(), &evtstrm_available);
-> +	} else if (action == CPU_PM_ENTER_FAILED || action == CPU_PM_EXIT) {
->  		arch_timer_set_cntkctl(__this_cpu_read(saved_cntkctl));
-> +
-> +		if (elf_hwcap & HWCAP_EVTSTRM)
-> +			cpumask_set_cpu(smp_processor_id(), &evtstrm_available);
-> +	}
->  	return NOTIFY_OK;
->  }
-> 
-> @@ -1017,7 +1037,6 @@ static int __init arch_timer_register(void)
->  	if (err)
->  		goto out_unreg_notify;
-> 
-> -
->  	/* Register and immediately configure the timer on the boot CPU */
->  	err = cpuhp_setup_state(CPUHP_AP_ARM_ARCH_TIMER_STARTING,
->  				"clockevents/arm/arch_timer:starting",
-> diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
-> index cc805b7..4e28283 100644
-> --- a/include/clocksource/arm_arch_timer.h
-> +++ b/include/clocksource/arm_arch_timer.h
-> @@ -93,6 +93,7 @@ struct arch_timer_mem {
->  extern u32 arch_timer_get_rate(void);
->  extern u64 (*arch_timer_read_counter)(void);
->  extern struct arch_timer_kvm_info *arch_timer_get_kvm_info(void);
-> +extern bool arch_timer_evtstrm_available(void);
-> 
->  #else
-> 
-> @@ -106,6 +107,11 @@ static inline u64 arch_timer_read_counter(void)
->  	return 0;
->  }
-> 
-> +static inline bool arch_timer_evtstrm_available(void)
-> +{
-> +	return false;
-> +}
-> +
->  #endif
-> 
->  #endif
-> --
-> 1.9.1
+How about I meet you 1/2 way, and put it in the acpi/Kconfig but wrapped 
+in the arm64 exclusive section?
