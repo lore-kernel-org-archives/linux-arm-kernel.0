@@ -1,125 +1,92 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 13 Oct 2017 21:38:02 +0100
-Subject: [PATCH v3 2/2] drivers/irqchip: gicv3: add workaround for
- Synquacer pre-ITS
-In-Reply-To: <CAL_Jsq+dsEW3M374e_ivwcBnk7s8rQToagWLx3EsBof8bK__JQ@mail.gmail.com>
-References: <20171012183247.23679-1-ard.biesheuvel@linaro.org>
- <20171012183247.23679-3-ard.biesheuvel@linaro.org>
- <CAL_Jsq+5L=gOzb=NzPJ8CSpqAbnwN3=LWvN2f07=AejwFMbOGg@mail.gmail.com>
- <CAKv+Gu-rZNhMMU4PoD8V0nBtwEEu+HE71wvaAZk2PWshoeTi4g@mail.gmail.com>
- <c6c00e64-ecc8-0404-5ffc-602626e5cc6d@arm.com>
- <CAL_Jsq+dsEW3M374e_ivwcBnk7s8rQToagWLx3EsBof8bK__JQ@mail.gmail.com>
-Message-ID: <CAKv+Gu_3zWqiUOhr+GOFZY5SWfJpo+y0DVsA8tYpVLjsN6hnrw@mail.gmail.com>
+From: briannorris@chromium.org (Brian Norris)
+Date: Fri, 13 Oct 2017 13:44:00 -0700
+Subject: [PATCH v5 1/3] PCI: rockchip: Add support for pcie wake irq
+In-Reply-To: <20171013191906.GF25517@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170911151029.25185-1-jeffy.chen@rock-chips.com>
+ <20170911151029.25185-2-jeffy.chen@rock-chips.com>
+ <20171013030441.GA25517@bhelgaas-glaptop.roam.corp.google.com>
+ <2453698.N4jfPaHx71@aspire.rjw.lan>
+ <59E10709.4020300@rock-chips.com>
+ <20171013191906.GF25517@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20171013204358.GA3585@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 October 2017 at 19:50, Rob Herring <robh+dt@kernel.org> wrote:
-> On Fri, Oct 13, 2017 at 4:47 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> [+Mark]
->>
->> On 12/10/17 23:24, Ard Biesheuvel wrote:
->>> On 12 October 2017 at 22:34, Rob Herring <robh+dt@kernel.org> wrote:
->>>> On Thu, Oct 12, 2017 at 1:32 PM, Ard Biesheuvel
->>>> <ard.biesheuvel@linaro.org> wrote:
->>>>> The Socionext Synquacer SoC's implementation of GICv3 has a so-called
->>>>> 'pre-ITS', which maps 32-bit writes targeted at a separate window of
->>>>> size '4 << device_id_bits' onto writes to GITS_TRANSLATER with device
->>>>> ID taken from bits [device_id_bits + 1:2] of the window offset.
->>>>> Writes that target GITS_TRANSLATER directly are reported as originating
->>>>> from device ID #0.
->>>>>
->>>>> So add a workaround for this. Given that this breaks isolation, clear
->>>>> the IRQ_DOMAIN_FLAG_MSI_REMAP flag as well.
->>>>>
->>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>>> ---
->>>>>  Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt |  4 ++
->>>>>  arch/arm64/Kconfig                                                    |  8 +++
->>>>>  drivers/irqchip/irq-gic-v3-its.c                                      | 63 +++++++++++++++++++-
->>>>>  3 files changed, 72 insertions(+), 3 deletions(-)
->>>>>
->>>>> diff --git a/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt b/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
->>>>> index 4c29cdab0ea5..0798a61bbf99 100644
->>>>> --- a/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
->>>>> +++ b/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
->>>>> @@ -75,6 +75,10 @@ These nodes must have the following properties:
->>>>>  - reg: Specifies the base physical address and size of the ITS
->>>>>    registers.
->>>>>
->>>>> +Optional:
->>>>> +- socionext,synquacer-pre-its: (u32, u32) tuple describing the host address
->>>>> +  and size of the pre-ITS window, as implemented on the Socionext Synquacer SoC
->>>>
->>>> Sounds like a separate h/w block to me and addresses should be in
->>>> "reg". I would suggest you define a separate node for the pre-its
->>>> block and then use of_find_compatible_node() from the GIC driver to
->>>> retrieve the node and whatever you need from it. Or do an SoC specific
->>>> compatible string for the GIC and let that imply whatever information
->>>> you need. Then the next quirk doesn't need a DT update.
->>>>
->>>
->>> For my understanding, you mean either
->>>
->>>     gic: interrupt-controller at 30000000 {
->>>         compatible = "arm,gic-v3";
->>>         ...
->>>
->>>         its: gic-its at 30020000 {
->>>             compatible = "arm,gic-v3-its";
->>>             reg = <0x0 0x30020000 0x0 0x20000>;
->>>             #msi-cells = <1>;
->>>             msi-controller;
->>>         };
->>>     };
->>>
->>>     preits at 58000000 {
->>>         compatible = "socionext,synquacer-pre-its";
->>>         reg = <0x0 0x58000000 0x0 0x200000>;
->>>         msi-slave = <&its>;
->>>     };
->>>
->>> or
->>>
->>>     gic: interrupt-controller at 30000000 {
->>>         compatible = "arm,gic-v3";
->>>         ...
->>>
->>>         its: gic-its at 30020000 {
->>>             compatible = "socionext,synquacer-pre-its", "arm,gic-v3-its";
->>>             reg = <0x0 0x30020000 0x0 0x20000>,
->>>                   <0x0 0x58000000 0x0 0x200000>;
->>>             #msi-cells = <1>;
->>>             msi-controller;
->>>         };
->>>     };
->>>
->>> right?
->>>
->>> Marc, what do you think? IIRC we did discuss option #2 at some point,
->>> but I don't remember if/why we rejected it.
->>
->> I dislike #2 because these registers are not part of the regular ITS,
->> and would get in the way of potential extensions of the ITS (I don't
->> know of any, but just in case...).
->>
->> I also dislike #1 as the "msi-slave" part is both ugly and confusing
->> (are we writing to the ITS? to the pre-ITS?).
->
-> Why do you need this? Are you ever going to have multiple pre-its's?
+Hi,
 
-The question is really whether we are ever going to have multiple
-ITSes, in which case we will need to identify which ITS this single
-pre-ITS is associated with, given that it can only target one. And
-while I would prefer zero pre-ITSes in all cases [as would Marc, I'm
-sure], having a pre-ITS for each ITS frame is not unimaginable either.
-So yes, we need to record this information in one way or the other.
+On Fri, Oct 13, 2017 at 02:19:06PM -0500, Bjorn Helgaas wrote:
+> On Sat, Oct 14, 2017 at 02:33:45AM +0800, jeffy wrote:
+> > Hi Rafael,
+> > 
+> > On 10/13/2017 09:21 PM, Rafael J. Wysocki wrote:
+> > >>
+> > >>I'm a little skeptical about dev_pm_set_dedicated_wake_irq(), not
+> > >>because I know anything at all about it, but because there are only
+> > >>five callers in the whole tree, three of which are in UART code, and
+> > >>none in anything resembling PCI code.
+> > >>
+> > >>Is Rockchip really that special, or are we going about this the wrong
+> > >>way?
+> > 
+> > we used to put these codes in the wifi driver, but another wifi
+> > vendor suggests these should go into the pcie driver.
+> > 
+> > and as tony said, it could go into pcie common code :)
+> 
+> I guess the implication (I'm speculating here) is that in most
+> existing cases, the WAKE# signal is fielded by an ACPI BIOS, which
+> knows how it's connected.  I suppose that would end up being turned
+> into an SCI that Linux already knows how to handle generically.
 
-> That's why I suggested just using of_find_compatible_node().
->
->> How about putting the pre-its node *inside* the its node itself? It
->> makes it obvious which pre-ITS corresponds to which ITS, and it leaves
->> the ITS regs untouched.
->
-> Not wild about this, but it's fine if you do need to handle multiple instances.
->
-> Rob
+I wasn't sure how ACPI did this when I first suggested Rockchip take
+this approach, but since then I believe have figured it out. We have:
+
+pci_prepare_to_sleep() -> pci_enable_wake()
+
+where pci_enable_wake() will configure PME wakeup and/or "platform" wake
+(which presumably is the WAKE# signal). pci-acpi.c has registered hooks
+for the latter via pci_set_platform_pm().
+
+This doesn't really make it any more generic for discovering this
+platform-specific detail. We'd have to set up some kind of platform ops
+that could be shared for any DT-based platforms.
+
+But that *does* answer the question I had about conditionality: should
+we always enable WAKE# for platforms that have the pin hooked up to the
+host? Or is this configured on a per-device basis? IIUC, the intention
+is that there's only a single open-drain WAKE# pin for the whole system,
+and it's just pulled high for EPs that don't implement it.
+
+> And further, that the non-ACPI drivers are relatively new and you're
+> the first attempt to use WAKE# with a non-ACPI PCI host driver?
+
+Quite possibly. Or everyone just sidestepped this an configured the pin
+elsewhere (e.g., you could stick a GPIO like this into a gpio-keys
+device and it would mostly work).
+
+> If this setup could be done somewhere in PCIe common code, that would
+> be great.  We have so much copy and pasted code already, it'd be nice
+> to avoid adding more.  I don't know if this would fit in
+> pci_scan_root_bus_bridge(), doing something like dma_configure() does
+> to get hold of a struct platform_device * or a struct device * so you
+> could lookup the IRQ?
+
+It looks like the infrastructure is in pci_set_platform_pm(), sort of.
+But that still doesn't help you for the repetition; you're just lucky
+you only have 2 controller drivers that call this right now :)
+
+Side note: there's some dissonance between this statement, in
+Documentation/driver-api/pm/devices.rst:
+
+"Device drivers, however, are not expected to call
+:c:func:`device_set_wakeup_enable()` directly in any case."
+
+Yet:
+
+$ git grep -l device_set_wakeup_enable drivers/ | wc -l
+69
+
+And particularly, I believe that was necessary for Wifi drivers like
+drivers/net/wireless/ath/ath10k/wow.c.
+
+Brian
