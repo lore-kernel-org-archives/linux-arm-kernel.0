@@ -1,57 +1,68 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 14 Oct 2017 11:21:51 +0800
-Subject: [linux-sunxi] Re: [PATCH v4 00/11] dmaengine: sun6i: Fixes for
- H3/A83T, enable A64
-In-Reply-To: <20170928152646.jteewxaqqbkw777s@flea>
-References: <3c78e966-2ece-4e67-94de-801aa569089f@rwthex-w2-a.rwth-ad.de>
- <20170928152646.jteewxaqqbkw777s@flea>
-Message-ID: <CAGb2v647ZjWogvGTCJbdv93QGaguGv8A4YOyk87XRkYi2Bjd2w@mail.gmail.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Sat, 14 Oct 2017 09:26:59 +0200
+Subject: Dramatic lockdep slowdown in 4.14
+In-Reply-To: <20171013090333.GA17356@localhost>
+References: <20171013090333.GA17356@localhost>
+Message-ID: <20171014072659.f2yr6mhm5ha3eou7@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
 
-On Thu, Sep 28, 2017 at 11:26 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Thu, Sep 28, 2017 at 01:49:17AM +0000, Stefan Br?ns wrote:
->> Commit 3a03ea763a67 ("dmaengine: sun6i: Add support for Allwinner A83T
->> (sun8i) variant") and commit f008db8c00c1 ("dmaengine: sun6i: Add support for
->> Allwinner H3 (sun8i) variant") added support for the A83T resp. H3, but missed
->> some differences between the original A31 and A83T/H3.
->>
->> The first patch adds a callback to the controller config to set the clock
->> autogating register of different SoC generations, i.e. A31, A23+A83T, H3+later,
->> and uses it to for the correct clock autogating setting.
->>
->> The second patch adds a callback for the burst length setting in the channel
->> config register, which has different field offsets and new burst widths/lengths,
->> which differs between H3 and earlier generations
->>
->> The third patch restructures some code required for the fourth patch and adds the
->> burst lengths to the controller config.
->>
->> The fourth patch adds the burst widths to the config and adds the handling of the
->> H3 specific burst widths.
->>
->> Patch 5 restructures the code to decouple some controller details (e.g. channel
->> count) from the compatible string/the config.
->>
->> Patches 6, 7 and 8 introduce and use the "dma-chans" property for the A64. Although
->> register compatible to the H3, the channel count differs and thus it requires a
->> new compatible. To avoid introduction of new compatibles for each minor variation,
->> anything but the register model is moved to devicetree properties. There
->> is at least one SoC (R40) which can then reuse the A64 compatible, the same
->> would have worked for A83T+V3s.
->>
->> Patches 9 and 10 add the DMA controller node to the devicetree and add the DMA
->> controller reference to the SPI nodes.
->>
->> Patch 11 fixes a small error in the devicetree binding example.
->
-> Applied patches 9-11, thanks!
-> Maxime
+* Johan Hovold <johan@kernel.org> wrote:
 
-Can you pick up patches 1-8?
+> Hi,
+> 
+> I had noticed that the BeagleBone Black boot time appeared to have
+> increased significantly with 4.14 and yesterday I finally had time to
+> investigate it.
+> 
+> Boot time (from "Linux version" to login prompt) had in fact doubled
+> since 4.13 where it took 17 seconds (with my current config) compared to
+> the 35 seconds I now see with 4.14-rc4.
+> 
+> I quick bisect pointed to lockdep and specifically the following commit:
+> 
+> 	28a903f63ec0 ("locking/lockdep: Handle non(or multi)-acquisition
+> 	               of a crosslock")
+> 
+> which I've verified is the commit which doubled the boot time (compared
+> to 28a903f63ec0^) (added by lockdep crossrelease series [1]).
+> 
+> I also verified that simply disabling CONFIG_PROVE_LOCKING on 4.14-rc4
+> brought boot time down to about 14 seconds.
+> 
+> Now since it's lockdep I guess this can't really be considered a
+> regression if these changes did improve lockdep correctness, but still,
+> this dramatic slow down essentially forces me to disable PROVE_LOCKING
+> by default on this system.
+> 
+> Is this lockdep slowdown expected and desirable?
 
-Thanks!
-ChenYu
+It's not desirable at all.
+
+Does the patch below fix the regression for you - or does the introduction and 
+handling of ->nr_acquire hurt as well?
+
+Thanks,
+
+	Ingo
+
+====================>
+ lib/Kconfig.debug | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
+index c6401d325b0e..f5b40c1668ea 100644
+--- a/lib/Kconfig.debug
++++ b/lib/Kconfig.debug
+@@ -1138,8 +1138,8 @@ config PROVE_LOCKING
+ 	select DEBUG_MUTEXES
+ 	select DEBUG_RT_MUTEXES if RT_MUTEXES
+ 	select DEBUG_LOCK_ALLOC
+-	select LOCKDEP_CROSSRELEASE
+-	select LOCKDEP_COMPLETIONS
++#	select LOCKDEP_CROSSRELEASE
++#	select LOCKDEP_COMPLETIONS
+ 	select TRACE_IRQFLAGS
+ 	default n
+ 	help
