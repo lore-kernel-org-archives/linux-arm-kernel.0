@@ -1,45 +1,54 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sat, 14 Oct 2017 02:15:34 +0200
-Subject: [RESEND PATCH 1/2] spi: rockchip: Convert to late and early
- system PM callbacks
-In-Reply-To: <20171013234511.dxazu5wvvz7sjiiu@dtor-ws>
-References: <20171013104138.3216-1-jeffy.chen@rock-chips.com>
- <20171013183750.piabs7m3dnpabnkm@sirena.co.uk>
- <20171013234511.dxazu5wvvz7sjiiu@dtor-ws>
-Message-ID: <1617641.TtuYKIH8aZ@aspire.rjw.lan>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Sat, 14 Oct 2017 10:11:55 +0800
+Subject: [PATCH v2 03/13] mmc: dt-bindings: make compatible explicit
+In-Reply-To: <20171013201412.ces7ttqfwfuj4mnn@rob-hp-laptop>
+References: <1507548926-9555-1-git-send-email-chaotian.jing@mediatek.com>
+ <1507548926-9555-4-git-send-email-chaotian.jing@mediatek.com>
+ <20171013201412.ces7ttqfwfuj4mnn@rob-hp-laptop>
+Message-ID: <1507947115.19789.16.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, October 14, 2017 1:45:11 AM CEST Dmitry Torokhov wrote:
-> On Fri, Oct 13, 2017 at 07:37:50PM +0100, Mark Brown wrote:
-> > On Fri, Oct 13, 2017 at 11:30:06AM -0700, Dmitry Torokhov wrote:
-> > > On Sat, Oct 14, 2017 at 02:19:28AM +0800, jeffy wrote:
-> > 
-> > > > > Yeah, it's the same stuff as we get with initcall ordering.  This sort
-> > > > > of thing does happen with things like PMICs which tend to have hardware
-> > > > > that the system wants to manipulate in the IRQs off part of suspend.
-> > > > > Ideally the dependency annotation stuff would figure things out though
-> > > > > I'm not sure what the status of that is.
-> > 
-> > > I'd say non-existent for resources such as regulators, pwms, clocks,
-> > > etc. I do not think many places call device_link_add()... I think adding
-> > > this to devm_* APIs might be easiest to get the ball going as they
-> > > naturally have consumer device and can easily figure out the supplier
-> > > side.
-> > 
-> > Hrm, are things in a state where we're supposed to be doing that?  I've
-> > not seen anyone even trying which is a bit odd, I'd thought there was
-> > some core work still ongoing (and it wasn't clear to me if we were going
-> > to try to do things like use DT/ACPI cross references to figure this
-> > stuff out).
+On Fri, 2017-10-13 at 15:14 -0500, Rob Herring wrote:
+> On Mon, Oct 09, 2017 at 07:35:16PM +0800, Chaotian Jing wrote:
+> > the driver has updated to have an explicit compatible, so update
+> > binding file according to the driver change.
 > 
-> Not sure, adding Rafael...
+> Normally, that's not a reason for a binding change. An old kernel 
+> without the driver change is still valid.
+> 
+> > 
+> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> > ---
+> >  Documentation/devicetree/bindings/mmc/mtk-sd.txt | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+> > index 3e0a97c..2bb585b 100644
+> > --- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+> > +++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+> > @@ -8,8 +8,8 @@ and the properties used by the msdc driver.
+> >  
+> >  Required properties:
+> >  - compatible: value should be either of the following.
+> > -	"mediatek,mt8173-mmc","mediatek,mt8135-mmc": for mmc host ip compatible with mt8135
+> 
+> Except this one didn't really make sense. "mediatek,mt8135-mmc" should 
+> be the most specific compatible on a MT8135.
+> 
+> > -	"mediatek,mt8173-mmc","mediatek,mt8135-mmc": for mmc host ip compatible with mt8173
+> 
+> Why is the version in MT8173 no longer compatible with a driver that 
+> supports "mediatek,mt8135-mmc"? Your commit msg needs to answer that 
+> question.
 
-The infrastructure in the core is there, the part related to getting that
-information from firmware is (mostly) missing.
-
-Still, moving system suspend/resume callbacks to the late/early phases may
-be a good idea anyway.
-
-Thanks,
-Rafael
+OK, will answer it in commit msg at next version.
+> 
+> > +	"mediatek,mt8135-mmc": for mmc host ip compatible with mt8135
+> > +	"mediatek,mt8173-mmc": for mmc host ip compatible with mt8173
+> >  	"mediatek,mt2701-mmc": for mmc host ip compatible with mt2701
+> >  	"mediatek,mt2712-mmc": for mmc host ip compatible with mt2712
+> >  - reg: physical base address of the controller and length
+> > -- 
+> > 1.8.1.1.dirty
+> > 
