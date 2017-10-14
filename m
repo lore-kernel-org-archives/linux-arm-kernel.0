@@ -1,68 +1,28 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Sat, 14 Oct 2017 09:26:59 +0200
-Subject: Dramatic lockdep slowdown in 4.14
-In-Reply-To: <20171013090333.GA17356@localhost>
-References: <20171013090333.GA17356@localhost>
-Message-ID: <20171014072659.f2yr6mhm5ha3eou7@gmail.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Sat, 14 Oct 2017 00:31:18 -0700
+Subject: [PATCH v2 4/4] mmc: sdhci-msm: Add sdhci msm register write APIs
+ which wait for pwr irq
+In-Reply-To: <1506490483-46871-5-git-send-email-vviswana@codeaurora.org>
+References: <1506490483-46871-1-git-send-email-vviswana@codeaurora.org>
+ <1506490483-46871-5-git-send-email-vviswana@codeaurora.org>
+Message-ID: <20171014073118.GD1575@tuxbook>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue 26 Sep 22:34 PDT 2017, Vijay Viswanath wrote:
 
-* Johan Hovold <johan@kernel.org> wrote:
+> diff --git a/drivers/mmc/host/sdhci-msm.c b/drivers/mmc/host/sdhci-msm.c
+[..]
+> +	if (!done) {
+> +		if (!wait_event_timeout(msm_host->pwr_irq_wait,
+> +				msm_host->pwr_irq_flag,
+> +				msecs_to_jiffies(MSM_PWR_IRQ_TIMEOUT_MS)))
+> +			__WARN_printf("%s: pwr_irq for req: (%d) timed out\n",
+> +					mmc_hostname(host->mmc), req_type);
 
-> Hi,
-> 
-> I had noticed that the BeagleBone Black boot time appeared to have
-> increased significantly with 4.14 and yesterday I finally had time to
-> investigate it.
-> 
-> Boot time (from "Linux version" to login prompt) had in fact doubled
-> since 4.13 where it took 17 seconds (with my current config) compared to
-> the 35 seconds I now see with 4.14-rc4.
-> 
-> I quick bisect pointed to lockdep and specifically the following commit:
-> 
-> 	28a903f63ec0 ("locking/lockdep: Handle non(or multi)-acquisition
-> 	               of a crosslock")
-> 
-> which I've verified is the commit which doubled the boot time (compared
-> to 28a903f63ec0^) (added by lockdep crossrelease series [1]).
-> 
-> I also verified that simply disabling CONFIG_PROVE_LOCKING on 4.14-rc4
-> brought boot time down to about 14 seconds.
-> 
-> Now since it's lockdep I guess this can't really be considered a
-> regression if these changes did improve lockdep correctness, but still,
-> this dramatic slow down essentially forces me to disable PROVE_LOCKING
-> by default on this system.
-> 
-> Is this lockdep slowdown expected and desirable?
+Bumped my MSM8974AB device to latest linux-next and found this patch; I
+see this print every five seconds during boot and the eMMC never comes
+up.
 
-It's not desirable at all.
-
-Does the patch below fix the regression for you - or does the introduction and 
-handling of ->nr_acquire hurt as well?
-
-Thanks,
-
-	Ingo
-
-====================>
- lib/Kconfig.debug | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
-index c6401d325b0e..f5b40c1668ea 100644
---- a/lib/Kconfig.debug
-+++ b/lib/Kconfig.debug
-@@ -1138,8 +1138,8 @@ config PROVE_LOCKING
- 	select DEBUG_MUTEXES
- 	select DEBUG_RT_MUTEXES if RT_MUTEXES
- 	select DEBUG_LOCK_ALLOC
--	select LOCKDEP_CROSSRELEASE
--	select LOCKDEP_COMPLETIONS
-+#	select LOCKDEP_CROSSRELEASE
-+#	select LOCKDEP_COMPLETIONS
- 	select TRACE_IRQFLAGS
- 	default n
- 	help
+Regards,
+Bjorn
