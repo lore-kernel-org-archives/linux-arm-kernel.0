@@ -1,21 +1,24 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 14 Oct 2017 23:29:07 +0200
-Subject: [PATCH v2 2/4] clk: rockchip: export clock pclk_efuse_256 for
- RK3368 SoCs
-In-Reply-To: <20170904085119.25981-3-romain.perier@collabora.com>
+Date: Sat, 14 Oct 2017 23:31:50 +0200
+Subject: [PATCH v2 3/4] nvmem: rockchip: add support for RK3368
+In-Reply-To: <20170904085119.25981-4-romain.perier@collabora.com>
 References: <20170904085119.25981-1-romain.perier@collabora.com>
- <20170904085119.25981-3-romain.perier@collabora.com>
-Message-ID: <2959871.y9lmPDGV1V@phil>
+ <20170904085119.25981-4-romain.perier@collabora.com>
+Message-ID: <1634846.UTLyzHzuUI@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 4. September 2017, 10:51:17 CEST schrieb Romain Perier:
-> This exports the clock for the pclk gate of the eFuse that is part of
-> the RK3368 SoCs. So we can use it from the dt-bindings.
+Hi Srinivas,
+
+Am Montag, 4. September 2017, 10:51:18 CEST schrieb Romain Perier:
+> This adds the necessary function for handling support on RK3368 SoCs
 > 
 > Signed-off-by: Romain Perier <romain.perier@collabora.com>
+> Acked-by: Rob Herring <robh@kernel.org>
 
-applied for 4.15
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+
+Srinivas, could you take a look at this patch and maybe pick it up?
 
 
 Thanks
