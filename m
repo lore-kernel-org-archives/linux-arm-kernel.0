@@ -1,52 +1,59 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sat, 14 Oct 2017 15:37:21 +0100
-Subject: [PATCH v3 0/8] ARM: NOMMU: MPU updates
-In-Reply-To: <0edd802a-d596-5d46-ff53-97b1db1a453e@arm.com>
-References: <1506330344-31556-1-git-send-email-vladimir.murzin@arm.com>
- <68a6eb4d-4d8e-7c6a-0875-3165bde8de89@arm.com>
- <e2e80a26-4a87-6d4c-51ad-11d6ea683c16@arm.com>
- <20171013092418.GF20805@n2100.armlinux.org.uk>
- <0edd802a-d596-5d46-ff53-97b1db1a453e@arm.com>
-Message-ID: <20171014143721.GH20805@n2100.armlinux.org.uk>
+Date: Sat, 14 Oct 2017 15:43:51 +0100
+Subject: [PATCH] PM: ARM: sa1111: Drop suspend and resume bus type
+ callbacks
+In-Reply-To: <CAJZ5v0iuzDk+gT=6KG3fX1d4C9dfzp0s8t-Y0pAM4SsVgaU=0A@mail.gmail.com>
+References: <2654085.Tx1JnNWXkX@aspire.rjw.lan>
+ <20170926212812.GS20805@n2100.armlinux.org.uk>
+ <CAJZ5v0i1iwBpkUYN=DbpbtVDu+xMKwza=4EbjYNyGr5rs7-D8Q@mail.gmail.com>
+ <20170928094936.GV20805@n2100.armlinux.org.uk>
+ <CAJZ5v0iuzDk+gT=6KG3fX1d4C9dfzp0s8t-Y0pAM4SsVgaU=0A@mail.gmail.com>
+Message-ID: <20171014144351.GI20805@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 13, 2017 at 10:40:39AM +0100, Vladimir Murzin wrote:
-> On 13/10/17 10:24, Russell King - ARM Linux wrote:
-> > Sorry, but I have no working MPS3 platform since it killed its uSD card
-> > with all the FPGA bitstreams on.  I'm waiting (since end of September)
-> > for a replacement from ARM Ltd but there hasn't yet been any progress.
-> > 
-> > Sure, I can replace the uSD card myself, but the problem is the contents
-> > of the card.
+On Thu, Sep 28, 2017 at 09:09:42PM +0200, Rafael J. Wysocki wrote:
+> On Thu, Sep 28, 2017 at 11:49 AM, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+> > On Tue, Sep 26, 2017 at 11:37:40PM +0200, Rafael J. Wysocki wrote:
+> >> On Tue, Sep 26, 2017 at 11:28 PM, Russell King - ARM Linux
+> >> <linux@armlinux.org.uk> wrote:
+> >> > On Tue, Sep 26, 2017 at 10:47:10PM +0200, Rafael J. Wysocki wrote:
+> >> >> From: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> >> >>
+> >> >> None of the sa1111 drivers in the tree implements the suspend and
+> >> >> resume callbacks from struct sa1111_driver, so drop them and drop
+> >> >> the corresponding callbacks from sa1111_bus_type.
+> >> >>
+> >> >> Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> >> >
+> >> > This will conflict with some patches I have - would you like me to queue
+> >> > it along with my changes?
+> >>
+> >> Yes, please.
+> >>
+> >> >  When would you like to get this merged?
+> >>
+> >> When possible. :-)
+> >>
+> >> I would like to drop the legacy suspend/resume callbacks from struct
+> >> bus_type eventually, as that's long overdue, and this is needed for
+> >> that purpose.  Not too urgent, though.
+> >
+> > Sorry, I'd forgotten that I already had a similar patch:
+> >
+> > http://git.armlinux.org.uk/cgit/linux-arm.git/commit/?h=sa1100&id=0e4ec3edb1c7e44aba1f48b924ab0c77431fd155
+> >
+> > so no need to merge your veresion... I just need to get my version merged.
 > 
-> Thanks for prompt reply!
-> 
-> I should say that board won't help you with testing this series since it
-> implements different MPU model (I have patches for that too but they are
-> on top of this series).
+> OK
 
-It assists as far as making sure the changes don't cause a
-regression for the platform.
+As other maintainers have taken patches from my series, I can no longer
+merge your patch this cycle, (due to the dependencies involving multiple
+trees.)  I'll postpone the change until after the next merge window.
 
-> I've been working closely with Alex and Andr?s (since they needed this for
-> their Cortex-M7 platform) to make sure it works as expected. It was also
-> tested with R-class FastModels.
-> 
-> I intentionally kept CONFIG_ARM_MPU disabled by default for M-class
-> (PATCH 6/8), so it won't interfere with existing bootloaders.
-
-It looks like patch 6 will allow me to select ARM_MPU for the MPS3
-config (by way of CPU_V7M being enabled).  As I'm unable to test
-what effect that has here, and I don't know when I'll be able to do
-so, please check if not already done so.
-
-> I'd be glad if you can review the series and give it a chance to sit in
-> linux-next (I can provide a branch on top of yours for-next).
-
-Please never provide a branch on top of my for-next, it's an "unstable"
-commit in that it's regenerated from several sub-branches (fixes, misc,
-devel-stable, and whatever other work I want to include in linux-next.)
+I can't really say about Locomo, having never really been involved with
+that stuff.
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
