@@ -1,19 +1,14 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 14 Oct 2017 23:05:05 +0800
-Subject: [PATCH v2] ARM: imx: Enable cpuidle for i.MX6DL starting at 1.1
-In-Reply-To: <800ef25ed868f303bb2aece5dba59d395340f25d.1507722933.git.leonard.crestez@nxp.com>
-References: <800ef25ed868f303bb2aece5dba59d395340f25d.1507722933.git.leonard.crestez@nxp.com>
-Message-ID: <20171014150503.GO8833@dragon>
+Date: Sat, 14 Oct 2017 23:08:38 +0800
+Subject: [PATCH 0/4] ARM: dts: imx28: Update Ka-Ro TX28 dts file
+In-Reply-To: <1507719939-27250-1-git-send-email-LW@KARO-electronics.de>
+References: <1507719939-27250-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <20171014150837.GP8833@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 11, 2017 at 03:08:23PM +0300, Leonard Crestez wrote:
-> Enable cpuidle support on i.MX6DL starting from IMX_CHIP_REVISION_1_1.
-> 
-> This also makes the code cleaner because 6q and 6dl actually have
-> different revision histories.
-> 
-> Signed-off-by: Bai Ping <ping.bai@nxp.com>
-> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+On Wed, Oct 11, 2017 at 01:05:35PM +0200, Lothar Wa?mann wrote:
+> This patch set brings the Ka-Ro electronics GmbH TX28 board support up
+> to date.
 
-Applied, thanks.
+Applied all, thanks.
