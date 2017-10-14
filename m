@@ -1,111 +1,41 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Sat, 14 Oct 2017 20:00:52 +0800
-Subject: [PATCH v3 1/2] dt-bindings: add device tree binding for Allwinner
- XR819 SDIO Wi-Fi
-In-Reply-To: <878tgq5beu.fsf@codeaurora.org>
-References: <20171003165944.13056-1-icenowy@aosc.io>
- <20171003165944.13056-2-icenowy@aosc.io>
- <871smjxp46.fsf@kamboji.qca.qualcomm.com>
- <E46F3A20-294A-497E-AF71-C77A67AFDB8C@aosc.io>
- <59D4B1C8.8020105@broadcom.com> <20171004101145.kgjufpcktodppuy3@flea>
- <C4895259-FCDE-4B21-BB15-8F150FC53BE3@aosc.io>
- <878tgq5beu.fsf@codeaurora.org>
-Message-ID: <dba5f095f9f25f0726ee3a2852e01b88@aosc.io>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Sat, 14 Oct 2017 20:29:24 +0800
+Subject: [PATCH 1/2] dt-bindings: add binding for A64 DE2 CCU with SRAM section
+Message-ID: <20171014122925.13220-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-10-05 14:58?Kalle Valo ???
-> Icenowy Zheng <icenowy@aosc.io> writes:
-> 
->> ? 2017?10?4? GMT+08:00 ??6:11:45, Maxime Ripard
->> <maxime.ripard@free-electrons.com> ??:
->>> On Wed, Oct 04, 2017 at 10:02:48AM +0000, Arend van Spriel wrote:
->>>> On 10/4/2017 11:03 AM, Icenowy Zheng wrote:
->>>> >
->>>> >
->>>> > ? 2017?10?4? GMT+08:00 ??5:02:17, Kalle Valo <kvalo@codeaurora.org>
->>> ??:
->>>> > > Icenowy Zheng <icenowy@aosc.io> writes:
->>>> > >
->>>> > > > Allwinner XR819 is a SDIO Wi-Fi chip, which has the
->>> functionality to
->>>> > > use
->>>> > > > an out-of-band interrupt pin instead of SDIO in-band interrupt.
->>>> > > >
->>>> > > > Add the device tree binding of this chip, in order to make it
->>>> > > possible
->>>> > > > to add this interrupt pin to device trees.
->>>> > > >
->>>> > > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->>>> > > > Acked-by: Rob Herring <robh@kernel.org>
->>>> > > > ---
->>>> > > > Changes in v3:
->>>> > > > - Renames the node name.
->>>> > > > - Adds ACK from Rob.
->>>> > > > Changes in v2:
->>>> > > > - Removed status property in example.
->>>> > > > - Added required property reg.
->>>> > > >
->>>> > > >   .../bindings/net/wireless/allwinner,xr819.txt      | 38
->>>> > > ++++++++++++++++++++++
->>>> > > >   1 file changed, 38 insertions(+)
->>>> > > >   create mode 100644
->>>> > >
->>> Documentation/devicetree/bindings/net/wireless/allwinner,xr819.txt
->>>> > >
->>>> > > Like I asked already last time, AFAICS there is no upstream xr819
->>>> > > wireless driver in drivers/net/wireless directory. Do we still
->>> accept
->>>> > > bindings like this for out-of-tree drivers?
->>>> >
->>>> > See esp8089.
->>>> >
->>>> > There's also no in-tree driver for it.
->>>> 
->>>> The question is whether we should. The above might be a precedent,
->>> but it
->>>> may not necessarily be the way to go. The commit message for esp8089
->>> seems
->>>> to hint that there is intent to have an in-tree driver:
->>>> 
->>>> """
->>>>     Note that at this point there only is an out of tree driver for
->>> this
->>>>     hardware, there is no clear timeline / path for merging this.
->>> Still
->>>>     I believe it would be good to specify the binding for this in
->>> tree
->>>>     now, so that any future migration to an in tree driver will not
->>> cause
->>>>     compatiblity issues.
->>>> 
->>>>     Cc: Icenowy Zheng <icenowy@aosc.xyz>
->>>>     Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>>     Signed-off-by: Rob Herring <robh@kernel.org>
->>>> """
->>>> 
->>>> Regardless the bindings are in principle independent of the kernel
->>> and just
->>>> describing hardware. I think there have been discussions to move the
->>>> bindings to their own repository, but apparently it was decided
->>> otherwise.
->>> 
->>> Yeah, I guess especially how it could be merged with the cw1200 
->>> driver
->>> would be very relevant to that commit log.
->> 
->> The cw1200 driver seems to still have some legacy platform
->> data. Maybe they should also be convert to DT.
->> (Or maybe compatible = "allwinner,xr819" is enough, as
->> xr819 is a specified variant of cw1200 family)
-> 
-> Ah, so the upstream cw1200 driver supports xr819? Has anyone tested
-> that? Or does cw1200 more changes than just adding the DT support?
+A64's Display Engine 2.0 needs a section of SRAM (SRAM C) to be claimed.
 
-The support of XR819 in CW1200 driver is far more difficult than I
-imagined -- the codedrop used in the mainlined CW1200 driver seems to
-be so old that it's before XR819 (which seems to be based on CW1160),
-and there's a large number of problems to adapt it to a modern CW1200
-variant.
+Add binding for this.
 
-P.S. could you apply this device tree binding patch now?
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ Documentation/devicetree/bindings/clock/sun8i-de2.txt | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/clock/sun8i-de2.txt b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
+index 631d27cd89d6..8b1f86080d3d 100644
+--- a/Documentation/devicetree/bindings/clock/sun8i-de2.txt
++++ b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
+@@ -5,6 +5,7 @@ Required properties :
+ - compatible: must contain one of the following compatibles:
+ 		- "allwinner,sun8i-a83t-de2-clk"
+ 		- "allwinner,sun8i-v3s-de2-clk"
++		- "allwinner,sun50i-a64-de2-clk"
+ 		- "allwinner,sun50i-h5-de2-clk"
+ 
+ - reg: Must contain the registers base address and length
+@@ -17,6 +18,10 @@ Required properties :
+ - #clock-cells : must contain 1
+ - #reset-cells : must contain 1
+ 
++Additional required properties for "allwinner,sun50i-a64-de2-clk" :
++- allwinner,sram: See Documentation/devicetree/bindings/sram/sunxi-sram.txt,
++		  should be the SRAM C section on A64 SoC.
++
+ Example:
+ de2_clocks: clock at 1000000 {
+ 	compatible = "allwinner,sun8i-a83t-de2-clk";
+-- 
+2.13.6
