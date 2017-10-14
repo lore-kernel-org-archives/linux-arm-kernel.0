@@ -1,39 +1,24 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 14 Oct 2017 17:13:03 +0200
-Subject: [PATCH] pinctrl: gemini: Add missing functions
-Message-ID: <20171014151303.17080-1-linus.walleij@linaro.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sat, 14 Oct 2017 23:16:27 +0800
+Subject: [PATCH] ARM: dts: imx6ul-14x14-evk: switch lcdif pixel clock to
+ video pll
+In-Reply-To: <20171012133019.17086-1-p.zabel@pengutronix.de>
+References: <20171012133019.17086-1-p.zabel@pengutronix.de>
+Message-ID: <20171014151626.GR8833@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some two functions were missing from the Gemini pin control
-driver. Noticed when trying to use ethernet. Fix it up by
-adding them.
+On Thu, Oct 12, 2017 at 03:30:19PM +0200, Philipp Zabel wrote:
+> By default, the lcdif_pre_sel mux is switched to the pll3_pfd1_540m PFD
+> source. If this mux is allowed to propagate rate changes to its parent,
+> setting the LCDIF pixel clock rate to 9 MHz, as required by the LCD
+> panel, will cause the pll3_pfd1_540m PFD to be switched away from its
+> nominal rate to 288 MHz.
+> This has no negative side effects, as there are no other children to
+> this PFD. Still, to avoid surprises, it might be preferrable to switch
+> to the designated video PLL (pll5_video_div) as clock source for the
+> LCDIF pixel clock.
+> 
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/pinctrl/pinctrl-gemini.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
-
-diff --git a/drivers/pinctrl/pinctrl-gemini.c b/drivers/pinctrl/pinctrl-gemini.c
-index 39e6221e7100..7ffd768c0e02 100644
---- a/drivers/pinctrl/pinctrl-gemini.c
-+++ b/drivers/pinctrl/pinctrl-gemini.c
-@@ -2074,6 +2074,16 @@ static const struct gemini_pmx_func gemini_pmx_functions[] = {
- 		.num_groups = ARRAY_SIZE(satagrps),
- 	},
- 	{
-+		.name = "usb",
-+		.groups = usbgrps,
-+		.num_groups = ARRAY_SIZE(usbgrps),
-+	},
-+	{
-+		.name = "gmii",
-+		.groups = gmiigrps,
-+		.num_groups = ARRAY_SIZE(gmiigrps),
-+	},
-+	{
- 		.name = "pci",
- 		.groups = pcigrps,
- 		.num_groups = ARRAY_SIZE(pcigrps),
--- 
-2.13.6
+Applied, thanks.
