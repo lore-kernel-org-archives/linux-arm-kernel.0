@@ -1,32 +1,19 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 14 Oct 2017 22:59:55 +0800
-Subject: [PATCH] ARM: dts: imx7d: Invert legacy PCI irq mapping
-In-Reply-To: <20171009184344.5839-1-andrew.smirnov@gmail.com>
-References: <20171009184344.5839-1-andrew.smirnov@gmail.com>
-Message-ID: <20171014145954.GN8833@dragon>
+Date: Sat, 14 Oct 2017 23:05:05 +0800
+Subject: [PATCH v2] ARM: imx: Enable cpuidle for i.MX6DL starting at 1.1
+In-Reply-To: <800ef25ed868f303bb2aece5dba59d395340f25d.1507722933.git.leonard.crestez@nxp.com>
+References: <800ef25ed868f303bb2aece5dba59d395340f25d.1507722933.git.leonard.crestez@nxp.com>
+Message-ID: <20171014150503.GO8833@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 09, 2017 at 11:43:44AM -0700, Andrey Smirnov wrote:
-> According to i.MX7D reference manual (Rev. 0.1, table 7-1, page 1221)
-> legacy PCI interrupt mapping is as follows:
+On Wed, Oct 11, 2017 at 03:08:23PM +0300, Leonard Crestez wrote:
+> Enable cpuidle support on i.MX6DL starting from IMX_CHIP_REVISION_1_1.
 > 
->  - PCIE INT A is IRQ 122
->  - PCIE INT B is IRQ 123
->  - PCIE INT C is IRQ 124
->  - PCIE INT D is IRQ 125
+> This also makes the code cleaner because 6q and 6dl actually have
+> different revision histories.
 > 
-> Invert the mapping information in corresponding DT node to reflect
-> that.
-> 
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: yurovsky at gmail.com
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+> Signed-off-by: Bai Ping <ping.bai@nxp.com>
+> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 
 Applied, thanks.
