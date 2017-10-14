@@ -1,32 +1,32 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 14 Oct 2017 16:52:29 +0200
-Subject: [PATCH 0/3] Enable CEC on rk3399
-In-Reply-To: <CAJ-oXjQ3e1UHVGq=uV=yAK9Bu=ZoiNZaEbnHyvNtyc15RQQSKg@mail.gmail.com>
-References: <20171013225337.5196-1-phh@phh.me>
- <9833f103-769f-b9b9-05c7-4d75bd7e487c@xs4all.nl>
- <CAJ-oXjQ3e1UHVGq=uV=yAK9Bu=ZoiNZaEbnHyvNtyc15RQQSKg@mail.gmail.com>
-Message-ID: <2009704.s5LEIeT6xV@phil>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sat, 14 Oct 2017 22:59:55 +0800
+Subject: [PATCH] ARM: dts: imx7d: Invert legacy PCI irq mapping
+In-Reply-To: <20171009184344.5839-1-andrew.smirnov@gmail.com>
+References: <20171009184344.5839-1-andrew.smirnov@gmail.com>
+Message-ID: <20171014145954.GN8833@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Samstag, 14. Oktober 2017, 15:14:40 CEST schrieb Pierre-Hugues Husson:
-> Hi Hans,
+On Mon, Oct 09, 2017 at 11:43:44AM -0700, Andrey Smirnov wrote:
+> According to i.MX7D reference manual (Rev. 0.1, table 7-1, page 1221)
+> legacy PCI interrupt mapping is as follows:
 > 
-> > Nice! I had a similar dw-hdmi.c patch pending but got around to posting it.
-> >
-> > I'll brush off my old rk3288 patches and see if I can get CEC enabled
-> > for my firefly-reload. I was close to getting it work, but I guess
-> > missed the "enable cec pin" change.
-> Please note that on rk3288, there are two CEC pins, and you must write
-> in RK3288_GRF_SOC_CON8 which pin you're using.
-> On the firefly-reload, the pin used is GPIO7C0, while the default pin
-> configuration is GPIO7C7.
+>  - PCIE INT A is IRQ 122
+>  - PCIE INT B is IRQ 123
+>  - PCIE INT C is IRQ 124
+>  - PCIE INT D is IRQ 125
+> 
+> Invert the mapping information in corresponding DT node to reflect
+> that.
+> 
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: yurovsky at gmail.com
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 
-And as an additional note, later socs have even more of these pin-routing
-settings and we currently have infrastructure in the pinctrl driver to do
-this automatically depending on the pinctrl settings.
-
-So most likely this can also be added there for the rk3288.
-
-
-Heiko
+Applied, thanks.
