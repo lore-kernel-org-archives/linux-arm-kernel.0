@@ -1,69 +1,57 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Sat, 14 Oct 2017 10:12:46 +0800
-Subject: [PATCH v5 01/12] mmc: dt-bindings: Add reg/source_cg/latch-ck
- for Mediatek MMC bindings
-In-Reply-To: <20171013215016.bkuwhhhnkvgilump@rob-hp-laptop>
-References: <1507689696-25928-1-git-send-email-chaotian.jing@mediatek.com>
- <1507689696-25928-2-git-send-email-chaotian.jing@mediatek.com>
- <20171013215016.bkuwhhhnkvgilump@rob-hp-laptop>
-Message-ID: <1507947166.19789.17.camel@mhfsdcap03>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 14 Oct 2017 11:21:51 +0800
+Subject: [linux-sunxi] Re: [PATCH v4 00/11] dmaengine: sun6i: Fixes for
+ H3/A83T, enable A64
+In-Reply-To: <20170928152646.jteewxaqqbkw777s@flea>
+References: <3c78e966-2ece-4e67-94de-801aa569089f@rwthex-w2-a.rwth-ad.de>
+ <20170928152646.jteewxaqqbkw777s@flea>
+Message-ID: <CAGb2v647ZjWogvGTCJbdv93QGaguGv8A4YOyk87XRkYi2Bjd2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-10-13 at 16:50 -0500, Rob Herring wrote:
-> On Wed, Oct 11, 2017 at 10:41:25AM +0800, Chaotian Jing wrote:
-> > Change the comptiable for support of multi-platform
-> > Make compatible explicit
-> > Add description for reg
-> > Add description for source_cg
-> > Add description for mediatek,latch-ck
-> > Note that source_cg and mediatek,latch-ck are optional for some projects,
-> > eg, MT2701 do not have source_cg, and MT2712 do not need
-> > mediatek,latch-ck
-> > 
-> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> > ---
-> >  Documentation/devicetree/bindings/mmc/mtk-sd.txt | 16 +++++++++++++---
-> >  1 file changed, 13 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> > index 4182ea3..2bb585b 100644
-> > --- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> > +++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> > @@ -7,10 +7,18 @@ This file documents differences between the core properties in mmc.txt
-> >  and the properties used by the msdc driver.
-> >  
-> >  Required properties:
-> > -- compatible: Should be "mediatek,mt8173-mmc","mediatek,mt8135-mmc"
-> > +- compatible: value should be either of the following.
-> > +	"mediatek,mt8135-mmc": for mmc host ip compatible with mt8135
-> > +	"mediatek,mt8173-mmc": for mmc host ip compatible with mt8173
-> > +	"mediatek,mt2701-mmc": for mmc host ip compatible with mt2701
-> > +	"mediatek,mt2712-mmc": for mmc host ip compatible with mt2712
-> > +- reg: physical base address of the controller and length
-> >  - interrupts: Should contain MSDC interrupt number
-> > -- clocks: MSDC source clock, HCLK
-> > -- clock-names: "source", "hclk"
-> > +- clocks: Should contain phandle for the clock feeding the MMC controller
-> > +- clock-names: Should contain the following:
-> > +	"source" - source clock (required)
-> > +	"hclk" - HCLK which used for host (required)
-> > +	"source_cg" - independent source clock gate (required for MT2712)
-> >  - pinctrl-names: should be "default", "state_uhs"
-> >  - pinctrl-0: should contain default/high speed pin ctrl
-> >  - pinctrl-1: should contain uhs mode pin ctrl
-> > @@ -30,6 +38,8 @@ Optional properties:
-> >  - mediatek,hs400-cmd-resp-sel-rising:  HS400 command response sample selection
-> >  				       If present,HS400 command responses are sampled on rising edges.
-> >  				       If not present,HS400 command responses are sampled on falling edges.
-> > +- mediatek,latch-ck: Some SoCs do not support enhance_rx, need set correct latch-ck to avoid data crc
-> > +		     error caused by stop clock(fifo full)
-> 
-> What values are supported? What's the default if not present.
-> 
-> Be clear what compatible strings this property applies to or doesn't 
-> apply to.
-OK, will make it more clearly at next version.
-Thx!
-> 
-> Rob
+Hi Vinod,
+
+On Thu, Sep 28, 2017 at 11:26 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Thu, Sep 28, 2017 at 01:49:17AM +0000, Stefan Br?ns wrote:
+>> Commit 3a03ea763a67 ("dmaengine: sun6i: Add support for Allwinner A83T
+>> (sun8i) variant") and commit f008db8c00c1 ("dmaengine: sun6i: Add support for
+>> Allwinner H3 (sun8i) variant") added support for the A83T resp. H3, but missed
+>> some differences between the original A31 and A83T/H3.
+>>
+>> The first patch adds a callback to the controller config to set the clock
+>> autogating register of different SoC generations, i.e. A31, A23+A83T, H3+later,
+>> and uses it to for the correct clock autogating setting.
+>>
+>> The second patch adds a callback for the burst length setting in the channel
+>> config register, which has different field offsets and new burst widths/lengths,
+>> which differs between H3 and earlier generations
+>>
+>> The third patch restructures some code required for the fourth patch and adds the
+>> burst lengths to the controller config.
+>>
+>> The fourth patch adds the burst widths to the config and adds the handling of the
+>> H3 specific burst widths.
+>>
+>> Patch 5 restructures the code to decouple some controller details (e.g. channel
+>> count) from the compatible string/the config.
+>>
+>> Patches 6, 7 and 8 introduce and use the "dma-chans" property for the A64. Although
+>> register compatible to the H3, the channel count differs and thus it requires a
+>> new compatible. To avoid introduction of new compatibles for each minor variation,
+>> anything but the register model is moved to devicetree properties. There
+>> is at least one SoC (R40) which can then reuse the A64 compatible, the same
+>> would have worked for A83T+V3s.
+>>
+>> Patches 9 and 10 add the DMA controller node to the devicetree and add the DMA
+>> controller reference to the SPI nodes.
+>>
+>> Patch 11 fixes a small error in the devicetree binding example.
+>
+> Applied patches 9-11, thanks!
+> Maxime
+
+Can you pick up patches 1-8?
+
+Thanks!
+ChenYu
