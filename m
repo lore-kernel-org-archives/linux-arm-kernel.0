@@ -1,24 +1,22 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 14 Oct 2017 21:14:13 +0200
-Subject: [PATCH] arm64: dts: rockchip: enable touchpad button for
- rk3399-gru-kevin
-In-Reply-To: <20171009184028.11829-1-kernel@esmil.dk>
-References: <20171009184028.11829-1-kernel@esmil.dk>
-Message-ID: <6303636.5G9IA0odAe@phil>
+Date: Sat, 14 Oct 2017 21:20:03 +0200
+Subject: [PATCH 1/1] arm64: dts: rockchip: default serial for
+ Firefly-RK3399
+In-Reply-To: <20170930040640.25526-1-xypron.glpk@gmx.de>
+References: <20170930040640.25526-1-xypron.glpk@gmx.de>
+Message-ID: <2041727.0dCHrNDLFI@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 9. Oktober 2017, 20:40:28 CEST schrieb Emil Renner Berthing:
-> Adding the linux,gpio-keymap entry also has
-> the side-effect of making the driver register
-> the touchpad as a touchpad rather than another
-> touchscreen.
+Am Samstag, 30. September 2017, 06:06:40 CEST schrieb Heinrich Schuchardt:
+> The Firefly-RK3399 uses serial2 with 1,500,000 baud by default
+> for communication in U-Boot and in the vendor provided distros.
 > 
-> The index for BTN_LEFT was found by trial and error.
+> So let us set the same default in the Linux kernel.
 > 
-> Signed-off-by: Emil Renner Berthing <kernel@esmil.dk>
+> Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
 
-applied for 4.15 with Dmitry's Ack
+applied for 4.15
 
 
 Thanks
