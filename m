@@ -1,20 +1,34 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 14 Oct 2017 21:30:48 +0200
-Subject: [PATCH 1/9] clk: rockchip: add more rk3188 graphics clock ids
-In-Reply-To: <20170915083357.11296-2-heiko@sntech.de>
-References: <20170915083357.11296-1-heiko@sntech.de>
- <20170915083357.11296-2-heiko@sntech.de>
-Message-ID: <5386849.LLMIu0zLOz@phil>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 14 Oct 2017 21:53:46 +0200
+Subject: Stack protector kernel build error
+Message-ID: <87tvz1y08l.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 15. September 2017, 10:33:49 CEST schrieb Heiko Stuebner:
-> Add ids for cif, v{d/e}pu clocks on rk3188. ACLK_CIF does get a needed
-> 1 at it's end but that should be safe because no driver for the camera
-> interface has surfaced so far and the old vendor kernels for these socs
-> are based on linux-3.0 and still used board files then, so there really
-> are no previous users anywhere to be found.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Hi Kees,
 
-applied for 4.15
+Today my linux-next build broke for the pxa architecture.
+My specific setup is :
+ - ARCH=arm make pxa_defconfig; ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- make
+ - my compiler is:
+	rj at belgarion:~/mio_linux/kernel$ arm-linux-gnueabi-gcc --version
+	arm-linux-gnueabi-gcc (Debian 6.3.0-18) 6.3.0 20170516
+
+And the error message is :
+rj at belgarion:~/mio_linux/kernel$ make -j 4
+  CHK     include/config/kernel.release
+CONFIG_CC_STACKPROTECTOR_AUTO: Compiler does not support any known stack-protector
+Cannot use CONFIG_CC_STACKPROTECTOR_AUTO: not supported by compiler
+Makefile:1097: recipe for target 'prepare-compiler-check' failed
+make: *** [prepare-compiler-check] Error 1
+make: *** Waiting for unfinished jobs....
+make: *** wait: No child processes.  Stop.
+
+
+Is this expected, as I was under the impression my compiler was not that
+outdated ...
+
+Cheers.
+
+-- 
+Robert
