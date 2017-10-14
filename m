@@ -1,60 +1,62 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sat, 14 Oct 2017 11:49:25 -0400 (EDT)
-Subject: [PATCH] ARM: head-common.S: Clear lr before jumping to
- start_kernel()
-In-Reply-To: <20171014141740.GH23750@n2100.armlinux.org.uk>
-References: <1507044184-27152-1-git-send-email-geert+renesas@glider.be>
- <nycvar.YSQ.7.76.1710031134140.5407@knanqh.ubzr>
- <CAMuHMdWJKQb5JY+diH=7dqNuypkPUqBeOEPSLOrfrnbfh2siRQ@mail.gmail.com>
- <CAMuHMdXpPfipmEdW0Dap6Pjwhz3QxLcrcbtU0RhCu721k-sBpA@mail.gmail.com>
- <CAMuHMdWH_pebSYAp04gmVceu3qqPczGaXS36R8CtzAYHo-CNog@mail.gmail.com>
- <20171010203324.GX4394@atomide.com>
- <20171012102341.GF23750@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1710121123530.1718@knanqh.ubzr>
- <20171014141405.GG23750@n2100.armlinux.org.uk>
- <20171014141740.GH23750@n2100.armlinux.org.uk>
-Message-ID: <nycvar.YSQ.7.76.1710141147550.1750@knanqh.ubzr>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sat, 14 Oct 2017 17:40:53 +0200
+Subject: [PATCH] PM: ARM: sa1111: Drop suspend and resume bus type
+ callbacks
+In-Reply-To: <20171014144351.GI20805@n2100.armlinux.org.uk>
+References: <2654085.Tx1JnNWXkX@aspire.rjw.lan>
+ <CAJZ5v0iuzDk+gT=6KG3fX1d4C9dfzp0s8t-Y0pAM4SsVgaU=0A@mail.gmail.com>
+ <20171014144351.GI20805@n2100.armlinux.org.uk>
+Message-ID: <5379392.Hf9acynvgJ@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 14 Oct 2017, Russell King - ARM Linux wrote:
-
-> On Sat, Oct 14, 2017 at 03:14:05PM +0100, Russell King - ARM Linux wrote:
-> > On Thu, Oct 12, 2017 at 11:25:50AM -0400, Nicolas Pitre wrote:
-> > > It should go into your devel-testing branch as this must be applied on 
-> > > top of my xip_zdata branch that you merged there.
+On Saturday, October 14, 2017 4:43:51 PM CEST Russell King - ARM Linux wrote:
+> On Thu, Sep 28, 2017 at 09:09:42PM +0200, Rafael J. Wysocki wrote:
+> > On Thu, Sep 28, 2017 at 11:49 AM, Russell King - ARM Linux
+> > <linux@armlinux.org.uk> wrote:
+> > > On Tue, Sep 26, 2017 at 11:37:40PM +0200, Rafael J. Wysocki wrote:
+> > >> On Tue, Sep 26, 2017 at 11:28 PM, Russell King - ARM Linux
+> > >> <linux@armlinux.org.uk> wrote:
+> > >> > On Tue, Sep 26, 2017 at 10:47:10PM +0200, Rafael J. Wysocki wrote:
+> > >> >> From: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> > >> >>
+> > >> >> None of the sa1111 drivers in the tree implements the suspend and
+> > >> >> resume callbacks from struct sa1111_driver, so drop them and drop
+> > >> >> the corresponding callbacks from sa1111_bus_type.
+> > >> >>
+> > >> >> Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> > >> >
+> > >> > This will conflict with some patches I have - would you like me to queue
+> > >> > it along with my changes?
+> > >>
+> > >> Yes, please.
+> > >>
+> > >> >  When would you like to get this merged?
+> > >>
+> > >> When possible. :-)
+> > >>
+> > >> I would like to drop the legacy suspend/resume callbacks from struct
+> > >> bus_type eventually, as that's long overdue, and this is needed for
+> > >> that purpose.  Not too urgent, though.
+> > >
+> > > Sorry, I'd forgotten that I already had a similar patch:
+> > >
+> > > http://git.armlinux.org.uk/cgit/linux-arm.git/commit/?h=sa1100&id=0e4ec3edb1c7e44aba1f48b924ab0c77431fd155
+> > >
+> > > so no need to merge your veresion... I just need to get my version merged.
 > > 
-> > Thanks, it would've been good to have known that ahead of time.
-> > 
-> > It's why the patch system has the KernelVersion: tag:
-> > 
-> > ?6.?Kernel version.
-> >     On a separate line, add a tag "KernelVersion: " followed by the kernel
-> >     version that the patch was generated against. This should be formatted
-> >     as "KernelVersion: 2.6.0-rmk1"
-> > 
-> > This is because that information is relevant for knowing where it should
-> > be applied, and to which branch.  Having it be something else means I
-> > have to guess, and that can result in the patch being discarded in this
-> > manner if I don't find where it's supposed to be applied.
-> > 
-> > Yes, I know it's a pain to have to supply this information, but giving
-> > accurate information there makes things a lot easier and quicker when
-> > applying patches, rather than playing a game of "guess where it needs
-> > to be applied, nope, doesn't apply there, try somewhere else."
-> > 
-> > Various people in the kernel community have different solutions to this.
-> > For example, on netdev, it is preferred to state whether you want your
-> > patch to be applied to "net" or "net-next" by adding that into the
-> > "[PATCH ...]" tag in the subject line.  It's really about streamlining
-> > the patch submission and application process.
+> > OK
 > 
-> The tag can take a plain kernel version and a kernel version suffixed
-> with a shortened git hash (please avoid the full hash, it doesn't
-> display well with the web presentation, and will probably be truncated
-> when it's inserted into the database.)
+> As other maintainers have taken patches from my series, I can no longer
+> merge your patch this cycle, (due to the dependencies involving multiple
+> trees.)  I'll postpone the change until after the next merge window.
 
-Probably what you want is the output of 'git describe'.
+That's OK, thanks.
 
+> I can't really say about Locomo, having never really been involved with
+> that stuff.
 
-Nicolas
+Well, so far no on has been complaining about that patch. :-)
+
+Thanks,
+Rafael
