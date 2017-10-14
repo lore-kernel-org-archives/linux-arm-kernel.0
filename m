@@ -1,34 +1,32 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Sun, 15 Oct 2017 05:37:00 +0800
-Subject: [arm:sa1100 102/110] ERROR: "ipaq_micro_tx_msg"
- [arch/arm/mach-sa1100/h3xxx-sleeve.ko] undefined!
-Message-ID: <201710150551.SdmnGxih%fengguang.wu@intel.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Sun, 15 Oct 2017 00:50:42 +0300
+Subject: ARM: pxa/corgi: armv5te kernel 4.12 fails to decompress compiled
+ with gcc7
+In-Reply-To: <CAAQYJAtEmJMc766kUx+bhFCNQKmwK53nSDNL0nFz-9UXSUO5CQ@mail.gmail.com>
+References: <CAAQYJAvR2_wqf2Axe4aVMOu08t7w5tNEjK0s3fw_oemtqCRo7g@mail.gmail.com>
+ <87a83zsiid.fsf@belgarion.home>
+ <CAAQYJAtEmJMc766kUx+bhFCNQKmwK53nSDNL0nFz-9UXSUO5CQ@mail.gmail.com>
+Message-ID: <20171014215042.kfrhb2kjhm7wb7vb@darkstar.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git sa1100
-head:   0e45384d18da4cac34be8c26dd2b2592d4c9a437
-commit: 2452b62d24f24635dcb97df1c9d23eb7b3821015 [102/110] ARM: sa1100/h3xxx: sleeve support
-config: arm-assabet_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 2452b62d24f24635dcb97df1c9d23eb7b3821015
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+Hi,
 
-All errors (new ones prefixed by >>):
+On Sat, Sep 02, 2017 at 11:50:55PM +0200, Andrea Adami wrote:
+> On Thu, Jul 20, 2017 at 8:57 AM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> > Andrea Adami <andrea.adami@gmail.com> writes:
+> > I have the same report on userspace side on buildroot from Petr [1], which
+> > triggers endless segfaults in userspace (init) with gcc7 while everything is
+> > fine with gcc6. I have confirmation on my test farm the problem happens as well.
+> >
+> > Since debugging in userspace is far easier, I would suggest attacking the debug
+> > with Petr on userspace side, and once sorted out, come back to kernel side.
+> 
+> sorry for the delay, I was awaiting to test gcc 7.2 and binutils 2.29.
+> Unfortunately, same issue: XZ-compressed data is corrupt - System Halted.
 
->> ERROR: "ipaq_micro_tx_msg" [arch/arm/mach-sa1100/h3xxx-sleeve.ko] undefined!
+Has anyone been able to debug this further? It seems there are also issues
+on iop32x/n2100 with GCC 7.2 and binutils 2.29.1 - early boot hangs silently
+and I cannot get earlyprintk to work. Compiling with GCC 6.4.0 it's OK.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 12336 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171015/b82a7778/attachment-0001.gz>
+A.
