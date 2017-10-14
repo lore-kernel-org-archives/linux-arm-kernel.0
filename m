@@ -1,99 +1,57 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Sat, 14 Oct 2017 07:16:00 -0700
-Subject: [PATCH v1 1/2] KVM: arm64: handle single-stepping trapped
- instructions
-In-Reply-To: <87r2u79zoi.fsf@linaro.org>
-References: <20171006113921.24880-1-alex.bennee@linaro.org>
- <20171006113921.24880-2-alex.bennee@linaro.org>
- <20171013082615.GC8927@cbox> <87r2u79zoi.fsf@linaro.org>
-Message-ID: <20171014141529.GA5886@lvm>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Sat, 14 Oct 2017 15:17:41 +0100
+Subject: [PATCH] ARM: head-common.S: Clear lr before jumping to
+ start_kernel()
+In-Reply-To: <20171014141405.GG23750@n2100.armlinux.org.uk>
+References: <1507044184-27152-1-git-send-email-geert+renesas@glider.be>
+ <nycvar.YSQ.7.76.1710031134140.5407@knanqh.ubzr>
+ <CAMuHMdWJKQb5JY+diH=7dqNuypkPUqBeOEPSLOrfrnbfh2siRQ@mail.gmail.com>
+ <CAMuHMdXpPfipmEdW0Dap6Pjwhz3QxLcrcbtU0RhCu721k-sBpA@mail.gmail.com>
+ <CAMuHMdWH_pebSYAp04gmVceu3qqPczGaXS36R8CtzAYHo-CNog@mail.gmail.com>
+ <20171010203324.GX4394@atomide.com>
+ <20171012102341.GF23750@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1710121123530.1718@knanqh.ubzr>
+ <20171014141405.GG23750@n2100.armlinux.org.uk>
+Message-ID: <20171014141740.GH23750@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 13, 2017 at 10:15:09AM +0100, Alex Benn?e wrote:
+On Sat, Oct 14, 2017 at 03:14:05PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Oct 12, 2017 at 11:25:50AM -0400, Nicolas Pitre wrote:
+> > It should go into your devel-testing branch as this must be applied on 
+> > top of my xip_zdata branch that you merged there.
 > 
-> Christoffer Dall <cdall@linaro.org> writes:
+> Thanks, it would've been good to have known that ahead of time.
 > 
-> > On Fri, Oct 06, 2017 at 12:39:20PM +0100, Alex Benn?e wrote:
-> >> If we are using guest debug to single-step the guest we need to ensure
-> >> we exit after emulating the instruction. This only affects
-> >> instructions completely emulated by the kernel. For userspace emulated
-> >> instructions we need to exit and return to complete the emulation.
-> >>
-> >> We fake debug.arch.hsr to contain ESR_ELx_EC_SOFTSTP_LOW so QEMU knows
-> >> it was a single-step event (and without altering the userspace ABI).
-> >>
-> >> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-> >> ---
-> >>  arch/arm64/kvm/handle_exit.c | 48 +++++++++++++++++++++++++++++++-------------
-> >>  1 file changed, 34 insertions(+), 14 deletions(-)
-> >>
-> >> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-> >> index 7debb74843a0..c918d291cb58 100644
-> >> --- a/arch/arm64/kvm/handle_exit.c
-> >> +++ b/arch/arm64/kvm/handle_exit.c
-> >> @@ -178,6 +178,39 @@ static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
-> >>  	return arm_exit_handlers[hsr_ec];
-> >>  }
-> >>
-> >> +/*
-> >> + * When handling traps we need to ensure exit the guest if we
-> >> + * completely emulated the instruction while single-stepping. Stuff to
-> >> + * be emulated in userspace needs to complete that first.
-> >> + */
-> >
-> > I really don't understand the first sentence here.  We are already out
-> > of the guest, so do you mean a return to userspace?
-> > I think the second sentence could be more clear as well.  Is 'stuff' not
-> > actually 'MMIO emulation' or 'emulation' more broadly?
+> It's why the patch system has the KernelVersion: tag:
 > 
-> Your right - it's sloppily worded how about:
+> ?6.?Kernel version.
+>     On a separate line, add a tag "KernelVersion: " followed by the kernel
+>     version that the patch was generated against. This should be formatted
+>     as "KernelVersion: 2.6.0-rmk1"
 > 
->  /*
->   * We may be single-stepping an emulated instruction. If the emulation
->   * has been completed in-kernel we can return to userspace with a
->   * KVM_EXIT_DEBUG, otherwise the userspace needs to complete it's
+> This is because that information is relevant for knowing where it should
+> be applied, and to which branch.  Having it be something else means I
+> have to guess, and that can result in the patch being discarded in this
+> manner if I don't find where it's supposed to be applied.
+> 
+> Yes, I know it's a pain to have to supply this information, but giving
+> accurate information there makes things a lot easier and quicker when
+> applying patches, rather than playing a game of "guess where it needs
+> to be applied, nope, doesn't apply there, try somewhere else."
+> 
+> Various people in the kernel community have different solutions to this.
+> For example, on netdev, it is preferred to state whether you want your
+> patch to be applied to "net" or "net-next" by adding that into the
+> "[PATCH ...]" tag in the subject line.  It's really about streamlining
+> the patch submission and application process.
 
-s/it's/its/
+The tag can take a plain kernel version and a kernel version suffixed
+with a shortened git hash (please avoid the full hash, it doesn't
+display well with the web presentation, and will probably be truncated
+when it's inserted into the database.)
 
->   * emulation first.
->   */
-
-Otherwise looks much better, thanks.
-
-> 
-> For x86 there is also IO emulation but in principle anything that might
-> be passed off to userspace to be completed should be done first.
-> 
-> >
-> >> +
-> >> +static int handle_trap_exceptions(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> >> +{
-> >> +	int handled;
-> >> +
-> >> +	/*
-> >> +	 * See ARM ARM B1.14.1: "Hyp traps on instructions
-> >> +	 * that fail their condition code check"
-> >> +	 */
-> >> +	if (!kvm_condition_valid(vcpu)) {
-> >> +		kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
-> >> +		handled = 1;
-> >> +	} else {
-> >> +		exit_handle_fn exit_handler;
-> >> +
-> >> +		exit_handler = kvm_get_exit_handler(vcpu);
-> >> +		handled = exit_handler(vcpu, run);
-> >> +	}
-> >> +
-> >> +	if (handled && (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP)) {
-> >
-> > Don't you want if (handled == 1) or if (handled > 0) ?
-> >
-> > If there was an error I think we want to just return that to userspace
-> > and not override it and present single-stepping.
-> 
-> Yes, I'll fix it.
-> 
-
-Thanks,
--Christoffer
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
