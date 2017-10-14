@@ -1,66 +1,60 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 14 Oct 2017 17:39:17 +0200
-Subject: [PATCH] pinctrl: rockchip: Add iomux-route switching support for
- rk3288
-In-Reply-To: <2009704.s5LEIeT6xV@phil>
-References: <20171013225337.5196-1-phh@phh.me>
- <CAJ-oXjQ3e1UHVGq=uV=yAK9Bu=ZoiNZaEbnHyvNtyc15RQQSKg@mail.gmail.com>
- <2009704.s5LEIeT6xV@phil>
-Message-ID: <13020229.tRmotBUImn@phil>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Sat, 14 Oct 2017 11:49:25 -0400 (EDT)
+Subject: [PATCH] ARM: head-common.S: Clear lr before jumping to
+ start_kernel()
+In-Reply-To: <20171014141740.GH23750@n2100.armlinux.org.uk>
+References: <1507044184-27152-1-git-send-email-geert+renesas@glider.be>
+ <nycvar.YSQ.7.76.1710031134140.5407@knanqh.ubzr>
+ <CAMuHMdWJKQb5JY+diH=7dqNuypkPUqBeOEPSLOrfrnbfh2siRQ@mail.gmail.com>
+ <CAMuHMdXpPfipmEdW0Dap6Pjwhz3QxLcrcbtU0RhCu721k-sBpA@mail.gmail.com>
+ <CAMuHMdWH_pebSYAp04gmVceu3qqPczGaXS36R8CtzAYHo-CNog@mail.gmail.com>
+ <20171010203324.GX4394@atomide.com>
+ <20171012102341.GF23750@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1710121123530.1718@knanqh.ubzr>
+ <20171014141405.GG23750@n2100.armlinux.org.uk>
+ <20171014141740.GH23750@n2100.armlinux.org.uk>
+Message-ID: <nycvar.YSQ.7.76.1710141147550.1750@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far only the hdmi cec supports using one of two different pins
-as source, so add the route switching for it.
+On Sat, 14 Oct 2017, Russell King - ARM Linux wrote:
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
-If I didn't mess up any numbering, the pinctrl change should look like
-the following patch.
+> On Sat, Oct 14, 2017 at 03:14:05PM +0100, Russell King - ARM Linux wrote:
+> > On Thu, Oct 12, 2017 at 11:25:50AM -0400, Nicolas Pitre wrote:
+> > > It should go into your devel-testing branch as this must be applied on 
+> > > top of my xip_zdata branch that you merged there.
+> > 
+> > Thanks, it would've been good to have known that ahead of time.
+> > 
+> > It's why the patch system has the KernelVersion: tag:
+> > 
+> > ?6.?Kernel version.
+> >     On a separate line, add a tag "KernelVersion: " followed by the kernel
+> >     version that the patch was generated against. This should be formatted
+> >     as "KernelVersion: 2.6.0-rmk1"
+> > 
+> > This is because that information is relevant for knowing where it should
+> > be applied, and to which branch.  Having it be something else means I
+> > have to guess, and that can result in the patch being discarded in this
+> > manner if I don't find where it's supposed to be applied.
+> > 
+> > Yes, I know it's a pain to have to supply this information, but giving
+> > accurate information there makes things a lot easier and quicker when
+> > applying patches, rather than playing a game of "guess where it needs
+> > to be applied, nope, doesn't apply there, try somewhere else."
+> > 
+> > Various people in the kernel community have different solutions to this.
+> > For example, on netdev, it is preferred to state whether you want your
+> > patch to be applied to "net" or "net-next" by adding that into the
+> > "[PATCH ...]" tag in the subject line.  It's really about streamlining
+> > the patch submission and application process.
+> 
+> The tag can take a plain kernel version and a kernel version suffixed
+> with a shortened git hash (please avoid the full hash, it doesn't
+> display well with the web presentation, and will probably be truncated
+> when it's inserted into the database.)
 
-Hope that helps
-Heiko
+Probably what you want is the output of 'git describe'.
 
- drivers/pinctrl/pinctrl-rockchip.c | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
 
-diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
-index b5cb7858ffdc..8dd49e2e144b 100644
---- a/drivers/pinctrl/pinctrl-rockchip.c
-+++ b/drivers/pinctrl/pinctrl-rockchip.c
-@@ -884,6 +884,24 @@ static struct rockchip_mux_route_data rk3228_mux_route_data[] = {
- 	},
- };
- 
-+static struct rockchip_mux_route_data rk3288_mux_route_data[] = {
-+	{
-+		/* edphdmi_cecinoutt1 */
-+		.bank_num = 7,
-+		.pin = 16,
-+		.func = 2,
-+		.route_offset = 0x264,
-+		.route_val = BIT(16 + 12) | BIT(12),
-+	}, {
-+		/* edphdmi_cecinout */
-+		.bank_num = 7,
-+		.pin = 23,
-+		.func = 4,
-+		.route_offset = 0x264,
-+		.route_val = BIT(16 + 12),
-+	},
-+};
-+
- static struct rockchip_mux_route_data rk3328_mux_route_data[] = {
- 	{
- 		/* uart2dbg_rxm0 */
-@@ -3391,6 +3409,8 @@ static struct rockchip_pin_ctrl rk3288_pin_ctrl = {
- 		.type			= RK3288,
- 		.grf_mux_offset		= 0x0,
- 		.pmu_mux_offset		= 0x84,
-+		.iomux_routes		= rk3288_mux_route_data,
-+		.niomux_routes		= ARRAY_SIZE(rk3288_mux_route_data),
- 		.pull_calc_reg		= rk3288_calc_pull_reg_and_bit,
- 		.drv_calc_reg		= rk3288_calc_drv_reg_and_bit,
- };
--- 
-2.14.1
+Nicolas
