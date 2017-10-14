@@ -1,33 +1,28 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Sat, 14 Oct 2017 10:23:12 +0200
-Subject: [PATCH 0/3] Enable CEC on rk3399
-In-Reply-To: <20171013225337.5196-1-phh@phh.me>
-References: <20171013225337.5196-1-phh@phh.me>
-Message-ID: <9833f103-769f-b9b9-05c7-4d75bd7e487c@xs4all.nl>
+From: broonie@kernel.org (Mark Brown)
+Date: Sat, 14 Oct 2017 01:59:45 -0700
+Subject: [RESEND PATCH 1/2] spi: rockchip: Convert to late and early
+ system PM callbacks
+In-Reply-To: <1617641.TtuYKIH8aZ@aspire.rjw.lan>
+References: <20171013104138.3216-1-jeffy.chen@rock-chips.com>
+ <20171013183750.piabs7m3dnpabnkm@sirena.co.uk>
+ <20171013234511.dxazu5wvvz7sjiiu@dtor-ws>
+ <1617641.TtuYKIH8aZ@aspire.rjw.lan>
+Message-ID: <20171014085945.grm6gtdzuunogbwf@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14/2017 12:53 AM, Pierre-Hugues Husson wrote:
-> Enable CEC on firefly-rk3399.
-> Tested on a TV with cec-ctl --playback; cec-ctl -S
-> 
-> Pierre-Hugues Husson (3):
->   drm: bridge: synopsys/dw-hdmi: Enable cec clock
->   arm64: dts: rockchip: add the cec clk for dw-mipi-hdmi on rk3399
->   arm64: dts: rockchip: enable cec pin for rk3399 firefly
-> 
->  arch/arm64/boot/dts/rockchip/rk3399-firefly.dts |  2 ++
->  arch/arm64/boot/dts/rockchip/rk3399.dtsi        |  8 ++++++--
->  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c       | 16 ++++++++++++++++
->  3 files changed, 24 insertions(+), 2 deletions(-)
-> 
+On Sat, Oct 14, 2017 at 02:15:34AM +0200, Rafael J. Wysocki wrote:
 
-Nice! I had a similar dw-hdmi.c patch pending but got around to posting it.
+> The infrastructure in the core is there, the part related to getting that
+> information from firmware is (mostly) missing.
 
-I'll brush off my old rk3288 patches and see if I can get CEC enabled
-for my firefly-reload. I was close to getting it work, but I guess
-missed the "enable cec pin" change.
-
-Regards,
-
-	Hans
+Ah, yes - now I remember.  We want this for probe ordering so we don't
+really want to be doing it in the subsystems when they request resources
+as that's too late (though I guess duplication there won't hurt).  Fun.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171014/6de47038/attachment.sig>
