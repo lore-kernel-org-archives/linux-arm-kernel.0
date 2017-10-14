@@ -1,32 +1,35 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sun, 15 Oct 2017 00:32:54 +0200
-Subject: [PATCH 0/2] Introduce new DT files for Meson-AXG SoC
-In-Reply-To: <20171013231313.22850-1-dlan@gentoo.org>
-References: <20171013231313.22850-1-dlan@gentoo.org>
-Message-ID: <1886d509-297c-62a1-9c34-13d83e18bb65@suse.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 15 Oct 2017 00:43:16 +0200
+Subject: [PATCH 0/2] [v5] pinctrl: qcom: add support for sparse GPIOs
+In-Reply-To: <20171012073922.GB18706@codeaurora.org>
+References: <CACRpkdZcdLac_wYW+XqtZ=-APo8VmvYL4B1oL-wZyLy8KEs9AA@mail.gmail.com>
+ <1ecdf6ee-5098-15d3-f85e-66b39a6c25f9@codeaurora.org>
+ <CACRpkdaUV1Mjh7U9bBAgZA5Zq1oqN0HBT=VH5NkvPnY4gHxDVw@mail.gmail.com>
+ <d53e67a2-4f69-752f-ba35-53872d9b9760@codeaurora.org>
+ <CACRpkdYfAcKrgbgybccurUKTyR0E+tHDyzp7sbXxXxKuyMOGhQ@mail.gmail.com>
+ <619f48d2-59c7-c090-4ace-9e8db9f92064@codeaurora.org>
+ <CACRpkdZFunwQ=tiQqsapap7Ozz42hr=df5vqbC0S5xy5Wn+ZWw@mail.gmail.com>
+ <255ad0dc-2d16-ae7f-0b45-500e23cff1a4@codeaurora.org>
+ <20171003220311.GU457@codeaurora.org>
+ <CACRpkdYXsY5eixYkEeuZTHJn7q6_6BdTxZ-2yneUyEKUjKF3Gw@mail.gmail.com>
+ <20171012073922.GB18706@codeaurora.org>
+Message-ID: <CACRpkdYis3kNG45zmkTcP8vCutfRJkh5UjnzwFVeyLmFYFEC-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 14.10.2017 um 01:13 schrieb Yixun Lan:
-> This attempt will try to add new DT files to support Meson-AXG SoC.
-> Due to the AXG series has new memory layout, we decide to start a new
-> DT structure without sharing with previous meson-gx.dtsi
-> 
-> 1) in the first patch, we try to document the new Meson-AXG bindings
-> 2) in the second patch, we try to bring up a minimal serial console,
-> so it's capable of running a minimal system (in ramdisk).
-> 
-> 
-> Yixun Lan (2):
->   dt-bindings: arm: amlogic: Add Meson AXG binding
->   arm64: dts: meson-axg: add initial A113D SoC DT support
+On Thu, Oct 12, 2017 at 9:39 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
 
-Reviewed-by: Andreas F?rber <afaerber@suse.de>
+> For qcom platforms the driver will never be able to return the
+> direction for these certain pins because reading the register is
+> not allowed by the firmware. Doing so will cause the device to
+> crash with a security violation.
 
-Regards,
-Andreas
+So I guess the driver needs to know what pin registers it can't
+access so the user does not get a gun to shoot in the foot with.
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+If we augment gpiolib to just handle -EACCES or something
+(-EIO?) from the driver .get_direction() callback for these lines,
+things should be smooth?
+
+Yours,
+Linus Walleij
