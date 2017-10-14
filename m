@@ -1,24 +1,20 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 14 Oct 2017 23:16:27 +0800
-Subject: [PATCH] ARM: dts: imx6ul-14x14-evk: switch lcdif pixel clock to
- video pll
-In-Reply-To: <20171012133019.17086-1-p.zabel@pengutronix.de>
-References: <20171012133019.17086-1-p.zabel@pengutronix.de>
-Message-ID: <20171014151626.GR8833@dragon>
+Date: Sat, 14 Oct 2017 23:38:30 +0800
+Subject: [PATCH 4/7] ARM: dts: imx6ul-txul: use panel-simple driver for LCD
+In-Reply-To: <1507891383-15452-5-git-send-email-LW@KARO-electronics.de>
+References: <1507891383-15452-1-git-send-email-LW@KARO-electronics.de>
+ <1507891383-15452-5-git-send-email-LW@KARO-electronics.de>
+Message-ID: <20171014153828.GS8833@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 12, 2017 at 03:30:19PM +0200, Philipp Zabel wrote:
-> By default, the lcdif_pre_sel mux is switched to the pll3_pfd1_540m PFD
-> source. If this mux is allowed to propagate rate changes to its parent,
-> setting the LCDIF pixel clock rate to 9 MHz, as required by the LCD
-> panel, will cause the pll3_pfd1_540m PFD to be switched away from its
-> nominal rate to 288 MHz.
-> This has no negative side effects, as there are no other children to
-> this PFD. Still, to avoid surprises, it might be preferrable to switch
-> to the designated video PLL (pll5_video_div) as clock source for the
-> LCDIF pixel clock.
+On Fri, Oct 13, 2017 at 12:43:00PM +0200, Lothar Wa?mann wrote:
+> Convert the TXUL board support to use the panel-simple driver.
+> The now obsolete 'display-timings' node is kept for compatibility with
+> U-Boot, which derives its display configuration therefrom.
 > 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 
-Applied, thanks.
+It needs a rebase on imx/dt branch.
+
+Shawn
