@@ -1,21 +1,24 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 14 Oct 2017 21:11:32 +0200
-Subject: [PATCH] ARM: dts: rockchip: Enable thermal on rk3288-vyasa board
-In-Reply-To: <1507916012-3980-1-git-send-email-jagan@amarulasolutions.com>
-References: <1507916012-3980-1-git-send-email-jagan@amarulasolutions.com>
-Message-ID: <2652045.P3tYhJ1IQu@phil>
+Date: Sat, 14 Oct 2017 21:14:13 +0200
+Subject: [PATCH] arm64: dts: rockchip: enable touchpad button for
+ rk3399-gru-kevin
+In-Reply-To: <20171009184028.11829-1-kernel@esmil.dk>
+References: <20171009184028.11829-1-kernel@esmil.dk>
+Message-ID: <6303636.5G9IA0odAe@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 13. Oktober 2017, 23:03:32 CEST schrieb Jagan Teki:
-> From: Michael Trimarchi <michael@amarulasolutions.com>
+Am Montag, 9. Oktober 2017, 20:40:28 CEST schrieb Emil Renner Berthing:
+> Adding the linux,gpio-keymap entry also has
+> the side-effect of making the driver register
+> the touchpad as a touchpad rather than another
+> touchscreen.
 > 
-> Enable thermal on rk3288-vyasa board, TSHUT is high active.
+> The index for BTN_LEFT was found by trial and error.
 > 
-> Signed-off-by: Michael Trimarchi <michael@amarulasolutions.com>
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> Signed-off-by: Emil Renner Berthing <kernel@esmil.dk>
 
-applied for 4.15
+applied for 4.15 with Dmitry's Ack
 
 
 Thanks
