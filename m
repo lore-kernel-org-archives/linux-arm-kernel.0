@@ -1,9 +1,9 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sun, 15 Oct 2017 09:48:22 +0200
-Subject: [GIT PULL 2/4] soc: samsung: Pull for v4.15
+Date: Sun, 15 Oct 2017 09:48:21 +0200
+Subject: [GIT PULL 4/4] ARM: deffconfig: Pull for v4.15
 In-Reply-To: <20171015074825.11338-1-krzk@kernel.org>
 References: <20171015074825.11338-1-krzk@kernel.org>
-Message-ID: <20171015074825.11338-3-krzk@kernel.org>
+Message-ID: <20171015074825.11338-2-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,23 +14,26 @@ The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-drivers-4.15
+  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-defconfig-4.15
 
-for you to fetch changes up to c40610198f35e8264f9175dafe74db6288a07eda:
+for you to fetch changes up to a7620b2dff23409bb5a906e19814021e8dec00e5:
 
-  soc: samsung: Remove Exynos4212 related dead code (2017-10-08 14:17:13 +0200)
-
-----------------------------------------------------------------
-Samsung soc drivers changes for v4.15
-
-Remove of Exynos4212 related dead code (no more support for this SoC).
+  ARM: multi_v7_defconfig: Enable UAS support for Odroid HC1 board (2017-10-04 19:20:20 +0200)
 
 ----------------------------------------------------------------
-Marek Szyprowski (1):
-      soc: samsung: Remove Exynos4212 related dead code
+Samsung defconfig changes for v4.15
 
- Documentation/devicetree/bindings/arm/samsung/pmu.txt |  1 -
- drivers/soc/samsung/exynos-pmu.c                      |  9 ---------
- drivers/soc/samsung/exynos-pmu.h                      |  2 --
- drivers/soc/samsung/exynos4-pmu.c                     | 13 ++-----------
- 4 files changed, 2 insertions(+), 23 deletions(-)
+1. Enable USB3503 on multi_v7 for Odroid U3.
+2. Enable USB Attached SCSI for Odroid HC1.
+
+----------------------------------------------------------------
+Linus L?ssing (1):
+      ARM: multi_v7_defconfig: Enable USB3503 driver
+
+Marek Szyprowski (2):
+      ARM: exynos_defconfig: Enable UAS support for Odroid HC1 board
+      ARM: multi_v7_defconfig: Enable UAS support for Odroid HC1 board
+
+ arch/arm/configs/exynos_defconfig   | 2 +-
+ arch/arm/configs/multi_v7_defconfig | 2 ++
+ 2 files changed, 3 insertions(+), 1 deletion(-)
