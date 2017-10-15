@@ -1,63 +1,242 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Sun, 15 Oct 2017 12:31:29 +0200
-Subject: [PATCH 0/3] Enable CEC on rk3399
-In-Reply-To: <2009704.s5LEIeT6xV@phil>
-References: <20171013225337.5196-1-phh@phh.me>
- <9833f103-769f-b9b9-05c7-4d75bd7e487c@xs4all.nl>
- <CAJ-oXjQ3e1UHVGq=uV=yAK9Bu=ZoiNZaEbnHyvNtyc15RQQSKg@mail.gmail.com>
- <2009704.s5LEIeT6xV@phil>
-Message-ID: <4592c26c-3aab-ba86-7e70-de0cac1e2e71@xs4all.nl>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 15 Oct 2017 11:38:48 +0100
+Subject: [PATCH v3 1/4] iio: adc: ina2xx: Make max expected current
+ configurable
+In-Reply-To: <1507814282-1486-2-git-send-email-m.purski@samsung.com>
+References: <1507814282-1486-1-git-send-email-m.purski@samsung.com>
+ <CGME20171012131814eucas1p172faad38314e077e3395befaceef77af@eucas1p1.samsung.com>
+ <1507814282-1486-2-git-send-email-m.purski@samsung.com>
+Message-ID: <20171015113848.7f0d678f@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14/2017 04:52 PM, Heiko Stuebner wrote:
-> Am Samstag, 14. Oktober 2017, 15:14:40 CEST schrieb Pierre-Hugues Husson:
->> Hi Hans,
->>
->>> Nice! I had a similar dw-hdmi.c patch pending but got around to posting it.
->>>
->>> I'll brush off my old rk3288 patches and see if I can get CEC enabled
->>> for my firefly-reload. I was close to getting it work, but I guess
->>> missed the "enable cec pin" change.
->> Please note that on rk3288, there are two CEC pins, and you must write
->> in RK3288_GRF_SOC_CON8 which pin you're using.
->> On the firefly-reload, the pin used is GPIO7C0, while the default pin
->> configuration is GPIO7C7.
+On Thu, 12 Oct 2017 15:17:59 +0200
+Maciej Purski <m.purski@samsung.com> wrote:
+
+> Max expected current is used for calculating calibration register value,
+> Current LSB and Power LSB according to equations found in ina datasheet:
+> current_lsb = max_expected_current / 2^15
+> calibration_register = 0.00512 / (current_lsb * r_shunt)
+> power_lsb = 25 * current_lsb (for ina231, 230, 226)
+> power_lsb = 20 * current_lsb (for older ones)
 > 
-> And as an additional note, later socs have even more of these pin-routing
-> settings and we currently have infrastructure in the pinctrl driver to do
-> this automatically depending on the pinctrl settings.
+> Max expected current is now implicitly set to default value,
+> which is 2^15, thanks to which Current LSB is equal to 1 mA and
+> Power LSB is equal to 20000 uW or 25000 uW depending on ina model, but
+> users have no impact on the precision of the device.
 > 
-> So most likely this can also be added there for the rk3288.
+> Make max expected current configurable from device tree or platform_data.
+> Allow changing current_lsb from sysfs. It is exposed in sysfs as
+> scale attribute for IIO current channel. Update calibration register and
+> power_lsb value on each scale change.
 > 
+> Signed-off-by: Maciej Purski <m.purski@samsung.com>
+I'm going to hold off on this until the discussion around Stefan's
+point in the thread
+Re: [2/3] iio: adc: ina2xx: Adhere to documented ABI, use Ohm instead of uOhm
+is addressed.
+
+There he points out that current_lsb and presumably the calibration register
+are just conveniences, but that they result in lost precision.
+
+As I understand it, Stefan's suggestion is that we always use a fixed
+value and perform any 'calibration' by providing appropriate scale values
+to let it be done in userspace where floating point is available.
+
+Other than that fundamental question of whether this makes sense at all,
+the below looks good to me.
+
+Jonathan
+> ---
+>  drivers/iio/adc/ina2xx-adc.c         | 96 ++++++++++++++++++++++++++----------
+>  include/linux/platform_data/ina2xx.h |  2 +
+>  2 files changed, 73 insertions(+), 25 deletions(-)
 > 
-> Heiko
-> 
-
-How does 'GPIO7C0' translate to a 'rockchip,pins' line?
-
-I have this in rk3288-firefly-reload.dts:
-
-       hdmi {
-                hdmi_cec: hdmi-cec {
-                        rockchip,pins = <7 16 RK_FUNC_2 &pcfg_pull_none>;
-                };
-        };
-
-I think this is correct. You can find my patches for the firefly reload here:
-
-https://git.linuxtv.org/hverkuil/media_tree.git/log/?h=firefly2
-
-I don't have access to my firefly reload until Friday, so I can't test this
-until then.
-
-I'd be very grateful though if you can check the last three patches in that
-branch. It's just a test branch, so the subject/changelog of those patches
-are incomplete.
-
-The very last patch adds CEC support for the firefly/firefly beta. I don't
-have that hardware, so I won't be able to test that.
-
-Regards,
-
-	Hans
+> diff --git a/drivers/iio/adc/ina2xx-adc.c b/drivers/iio/adc/ina2xx-adc.c
+> index a16f8c6..be26dfc 100644
+> --- a/drivers/iio/adc/ina2xx-adc.c
+> +++ b/drivers/iio/adc/ina2xx-adc.c
+> @@ -56,6 +56,7 @@
+>  #define INA226_DEFAULT_IT		1110
+>  
+>  #define INA2XX_RSHUNT_DEFAULT           10000
+> +#define INA2XX_MAX_EXPECTED_MA_DEFAULT	BIT(15)	/* current_lsb = 1 mA */
+>  
+>  /*
+>   * bit masks for reading the settings in the configuration register
+> @@ -114,7 +115,7 @@ struct ina2xx_config {
+>  	int shunt_div;
+>  	int bus_voltage_shift;
+>  	int bus_voltage_lsb;	/* uV */
+> -	int power_lsb;		/* uW */
+> +	int power_lsb_factor;
+>  	enum ina2xx_ids chip_id;
+>  };
+>  
+> @@ -123,7 +124,9 @@ struct ina2xx_chip_info {
+>  	struct task_struct *task;
+>  	const struct ina2xx_config *config;
+>  	struct mutex state_lock;
+> -	unsigned int shunt_resistor;
+> +	unsigned int shunt_resistor;		/* uOhms */
+> +	int current_lsb;			/* uA */
+> +	int power_lsb;				/* uW */
+>  	int avg;
+>  	int int_time_vbus; /* Bus voltage integration time uS */
+>  	int int_time_vshunt; /* Shunt voltage integration time uS */
+> @@ -137,7 +140,7 @@ static const struct ina2xx_config ina2xx_config[] = {
+>  		.shunt_div = 100,
+>  		.bus_voltage_shift = 3,
+>  		.bus_voltage_lsb = 4000,
+> -		.power_lsb = 20000,
+> +		.power_lsb_factor = 20,
+>  		.chip_id = ina219,
+>  	},
+>  	[ina226] = {
+> @@ -146,7 +149,7 @@ static const struct ina2xx_config ina2xx_config[] = {
+>  		.shunt_div = 400,
+>  		.bus_voltage_shift = 0,
+>  		.bus_voltage_lsb = 1250,
+> -		.power_lsb = 25000,
+> +		.power_lsb_factor = 25,
+>  		.chip_id = ina226,
+>  	},
+>  };
+> @@ -210,14 +213,15 @@ static int ina2xx_read_raw(struct iio_dev *indio_dev,
+>  
+>  		case INA2XX_POWER:
+>  			/* processed (mW) = raw*lsb (uW) / 1000 */
+> -			*val = chip->config->power_lsb;
+> +			*val = chip->power_lsb;
+>  			*val2 = 1000;
+>  			return IIO_VAL_FRACTIONAL;
+>  
+>  		case INA2XX_CURRENT:
+> -			/* processed (mA) = raw (mA) */
+> -			*val = 1;
+> -			return IIO_VAL_INT;
+> +			/* processed (mA) = raw*lsb (uA) / 1000 */
+> +			*val = chip->current_lsb;
+> +			*val2 = 1000;
+> +			return IIO_VAL_FRACTIONAL;
+>  		}
+>  	}
+>  
+> @@ -353,6 +357,36 @@ static int ina219_set_int_time_vshunt(struct ina2xx_chip_info *chip,
+>  	return 0;
+>  }
+>  
+> +/*
+> + * Calculate calibration value according to equation 1 in ina226 datasheet
+> + * http://www.ti.com/lit/ds/symlink/ina226.pdf.
+> + * Current LSB is in uA and RShunt is in uOhms, so RShunt should be
+> + * converted to mOhms in order to keep the scale.
+> + * There is no need to expose the CALIBRATION register
+> + * to the user for now. But we need to reset this register
+> + * if the user updates RShunt or max expected current after driver
+> + * init, e.g upon reading an EEPROM/Probe-type value.
+> + */
+> +static int ina2xx_set_calibration(struct ina2xx_chip_info *chip)
+> +{
+> +	unsigned int rshunt = DIV_ROUND_CLOSEST(chip->shunt_resistor, 1000);
+> +	u16 regval = DIV_ROUND_CLOSEST(chip->config->calibration_factor,
+> +				     chip->current_lsb * rshunt);
+> +
+> +	return regmap_write(chip->regmap, INA2XX_CALIBRATION, regval);
+> +}
+> +
+> +static int ina2xx_set_scale(struct ina2xx_chip_info *chip, unsigned int val)
+> +{
+> +	if (val <= 0 || val > chip->config->calibration_factor)
+> +		return -EINVAL;
+> +
+> +	chip->current_lsb = val;
+> +	chip->power_lsb = chip->current_lsb * chip->config->power_lsb_factor;
+> +
+> +	return 0;
+> +}
+> +
+>  static int ina2xx_write_raw(struct iio_dev *indio_dev,
+>  			    struct iio_chan_spec const *chan,
+>  			    int val, int val2, long mask)
+> @@ -394,7 +428,18 @@ static int ina2xx_write_raw(struct iio_dev *indio_dev,
+>  							       &tmp);
+>  		}
+>  		break;
+> -
+> +	case IIO_CHAN_INFO_SCALE:
+> +		switch (chan->type) {
+> +		case IIO_CURRENT:
+> +			val = val * 1000 + DIV_ROUND_CLOSEST(val2, 1000);
+> +			ret = ina2xx_set_scale(chip, val);
+> +			if (!ret)
+> +				ret = ina2xx_set_calibration(chip);
+> +			break;
+> +		default:
+> +			ret = -EINVAL;
+> +		}
+> +		break;
+>  	default:
+>  		ret = -EINVAL;
+>  	}
+> @@ -433,22 +478,6 @@ static ssize_t ina2xx_allow_async_readout_store(struct device *dev,
+>  	return len;
+>  }
+>  
+> -/*
+> - * Set current LSB to 1mA, shunt is in uOhms
+> - * (equation 13 in datasheet). We hardcode a Current_LSB
+> - * of 1.0 x10-6. The only remaining parameter is RShunt.
+> - * There is no need to expose the CALIBRATION register
+> - * to the user for now. But we need to reset this register
+> - * if the user updates RShunt after driver init, e.g upon
+> - * reading an EEPROM/Probe-type value.
+> - */
+> -static int ina2xx_set_calibration(struct ina2xx_chip_info *chip)
+> -{
+> -	u16 regval = DIV_ROUND_CLOSEST(chip->config->calibration_factor,
+> -				   chip->shunt_resistor);
+> -
+> -	return regmap_write(chip->regmap, INA2XX_CALIBRATION, regval);
+> -}
+>  
+>  static int set_shunt_resistor(struct ina2xx_chip_info *chip, unsigned int val)
+>  {
+> @@ -849,6 +878,23 @@ static int ina2xx_probe(struct i2c_client *client,
+>  	if (ret)
+>  		return ret;
+>  
+> +	if (of_property_read_u32(client->dev.of_node,
+> +				"ti-max-expected-current-milliamp", &val) < 0) {
+> +		struct ina2xx_platform_data *pdata =
+> +		    dev_get_platdata(&client->dev);
+> +
+> +		if (pdata && pdata->max_mA != 0)
+> +			val = pdata->max_mA;
+> +		else
+> +			val = INA2XX_MAX_EXPECTED_MA_DEFAULT;
+> +	}
+> +
+> +	/* Calculate current_lsb: max-expected-current / 2^15 */
+> +	val = DIV_ROUND_CLOSEST(val * 1000, (1 << 15));
+> +	ret = ina2xx_set_scale(chip, val);
+> +	if (ret)
+> +		return ret;
+> +
+>  	/* Patch the current config register with default. */
+>  	val = chip->config->config_default;
+>  
+> diff --git a/include/linux/platform_data/ina2xx.h b/include/linux/platform_data/ina2xx.h
+> index 9abc0ca..f02b1d8 100644
+> --- a/include/linux/platform_data/ina2xx.h
+> +++ b/include/linux/platform_data/ina2xx.h
+> @@ -13,7 +13,9 @@
+>  /**
+>   * struct ina2xx_platform_data - ina2xx info
+>   * @shunt_uohms		shunt resistance in microohms
+> + * @max_mA		max expected current in mA
+>   */
+>  struct ina2xx_platform_data {
+>  	long shunt_uohms;
+> +	int max_mA;
+>  };
