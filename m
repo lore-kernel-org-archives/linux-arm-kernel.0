@@ -1,45 +1,63 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 15 Oct 2017 11:28:47 +0100
-Subject: [PATCH v2 5/5] iio: adc: at91-sama5d2_adc: use max sample rate
-In-Reply-To: <1507703732-29175-6-git-send-email-eugen.hristev@microchip.com>
-References: <1507703732-29175-1-git-send-email-eugen.hristev@microchip.com>
- <1507703732-29175-6-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <20171015112847.5c035e7a@archlinux>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Sun, 15 Oct 2017 12:31:29 +0200
+Subject: [PATCH 0/3] Enable CEC on rk3399
+In-Reply-To: <2009704.s5LEIeT6xV@phil>
+References: <20171013225337.5196-1-phh@phh.me>
+ <9833f103-769f-b9b9-05c7-4d75bd7e487c@xs4all.nl>
+ <CAJ-oXjQ3e1UHVGq=uV=yAK9Bu=ZoiNZaEbnHyvNtyc15RQQSKg@mail.gmail.com>
+ <2009704.s5LEIeT6xV@phil>
+Message-ID: <4592c26c-3aab-ba86-7e70-de0cac1e2e71@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 11 Oct 2017 09:35:32 +0300
-Eugen Hristev <eugen.hristev@microchip.com> wrote:
-
-> Change driver settings to use maximum sample rate clock.
-> This is useful to achieve best possible sampling rate
-> if we use DMA.
+On 10/14/2017 04:52 PM, Heiko Stuebner wrote:
+> Am Samstag, 14. Oktober 2017, 15:14:40 CEST schrieb Pierre-Hugues Husson:
+>> Hi Hans,
+>>
+>>> Nice! I had a similar dw-hdmi.c patch pending but got around to posting it.
+>>>
+>>> I'll brush off my old rk3288 patches and see if I can get CEC enabled
+>>> for my firefly-reload. I was close to getting it work, but I guess
+>>> missed the "enable cec pin" change.
+>> Please note that on rk3288, there are two CEC pins, and you must write
+>> in RK3288_GRF_SOC_CON8 which pin you're using.
+>> On the firefly-reload, the pin used is GPIO7C0, while the default pin
+>> configuration is GPIO7C7.
 > 
-> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
-
-I would normally expect this to have some bearing on the 
-noise levels on the measured signals.  All I can find
-is a reference to the track time being 15*a single
-clock cycle.  We could change this so that it is appropriate
-for the currently samping frequency rather than leaving it
-as a fixed value.
-
-Jonathan
-
-> ---
->  drivers/iio/adc/at91-sama5d2_adc.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> And as an additional note, later socs have even more of these pin-routing
+> settings and we currently have infrastructure in the pinctrl driver to do
+> this automatically depending on the pinctrl settings.
 > 
-> diff --git a/drivers/iio/adc/at91-sama5d2_adc.c b/drivers/iio/adc/at91-sama5d2_adc.c
-> index 7e51ecb..b76f88f 100644
-> --- a/drivers/iio/adc/at91-sama5d2_adc.c
-> +++ b/drivers/iio/adc/at91-sama5d2_adc.c
-> @@ -934,7 +934,7 @@ static void at91_adc_hw_init(struct at91_adc_state *st)
->  	at91_adc_writel(st, AT91_SAMA5D2_MR,
->  			AT91_SAMA5D2_MR_TRANSFER(2) | AT91_SAMA5D2_MR_ANACH);
->  
-> -	at91_adc_setup_samp_freq(st, st->soc_info.min_sample_rate);
-> +	at91_adc_setup_samp_freq(st, st->soc_info.max_sample_rate);
->  }
->  
->  static ssize_t at91_adc_get_fifo_state(struct device *dev,
+> So most likely this can also be added there for the rk3288.
+> 
+> 
+> Heiko
+> 
+
+How does 'GPIO7C0' translate to a 'rockchip,pins' line?
+
+I have this in rk3288-firefly-reload.dts:
+
+       hdmi {
+                hdmi_cec: hdmi-cec {
+                        rockchip,pins = <7 16 RK_FUNC_2 &pcfg_pull_none>;
+                };
+        };
+
+I think this is correct. You can find my patches for the firefly reload here:
+
+https://git.linuxtv.org/hverkuil/media_tree.git/log/?h=firefly2
+
+I don't have access to my firefly reload until Friday, so I can't test this
+until then.
+
+I'd be very grateful though if you can check the last three patches in that
+branch. It's just a test branch, so the subject/changelog of those patches
+are incomplete.
+
+The very last patch adds CEC support for the firefly/firefly beta. I don't
+have that hardware, so I won't be able to test that.
+
+Regards,
+
+	Hans
