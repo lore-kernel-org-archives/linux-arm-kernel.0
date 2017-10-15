@@ -1,56 +1,59 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Sat, 14 Oct 2017 15:48:29 -0700
-Subject: Stack protector kernel build error
-In-Reply-To: <CAGXu5jLdBzv-SdVhJJ6AGrCV8TUEpK71S3FugEqxKRtYbcTbwQ@mail.gmail.com>
-References: <87tvz1y08l.fsf@belgarion.home>
- <CAGXu5jLdBzv-SdVhJJ6AGrCV8TUEpK71S3FugEqxKRtYbcTbwQ@mail.gmail.com>
-Message-ID: <CAGXu5jJ9Zcoo_Byb3LfLXJtueVmh1TuSE3LfPrM2Wy_YE2=AcQ@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sun, 15 Oct 2017 11:04:47 +0800
+Subject: [PATCH] arm64: dts: hi3798cv200: add SD card support
+Message-ID: <1508036687-13926-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 14, 2017 at 3:45 PM, Kees Cook <keescook@chromium.org> wrote:
-> On Sat, Oct 14, 2017 at 12:53 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
->> Hi Kees,
->>
->> Today my linux-next build broke for the pxa architecture.
->> My specific setup is :
->>  - ARCH=arm make pxa_defconfig; ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- make
->>  - my compiler is:
->>         rj at belgarion:~/mio_linux/kernel$ arm-linux-gnueabi-gcc --version
->>         arm-linux-gnueabi-gcc (Debian 6.3.0-18) 6.3.0 20170516
->>
->> And the error message is :
->> rj at belgarion:~/mio_linux/kernel$ make -j 4
->>   CHK     include/config/kernel.release
->> CONFIG_CC_STACKPROTECTOR_AUTO: Compiler does not support any known stack-protector
->> Cannot use CONFIG_CC_STACKPROTECTOR_AUTO: not supported by compiler
->> Makefile:1097: recipe for target 'prepare-compiler-check' failed
->> make: *** [prepare-compiler-check] Error 1
->> make: *** Waiting for unfinished jobs....
->> make: *** wait: No child processes.  Stop.
->>
->>
->> Is this expected, as I was under the impression my compiler was not that
->> outdated ...
->
-> Hmm, there's probably a bug in my attempt at making the ..._AUTO mode work.
+From: Shawn Guo <shawn.guo@linaro.org>
 
-(Specifically, that report about compiler support should be a
-_warning_ not a _failure_ for _AUTO mode...)
+It adds device mmc at 9820000 which is used as SD card on poplar board.
 
--Kees
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts |  6 ++++++
+ arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi       | 12 ++++++++++++
+ 2 files changed, 18 insertions(+)
 
->
-> What does "arm-linux-gnueabi-gcc -fstack-protector" say?
->
-> -Kees
->
-> --
-> Kees Cook
-> Pixel Security
-
-
-
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts b/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
+index b9142871d6fe..e6fd9f296497 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
+@@ -146,6 +146,12 @@
+ 	status = "okay";
+ };
+ 
++&sd0 {
++	bus-width = <4>;
++	cap-sd-highspeed;
++	status = "okay";
++};
++
+ &spi0 {
+ 	status = "okay";
+ 	label = "LS-SPI0";
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi b/arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi
+index 75865f8a862a..962bd79139e4 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi
+@@ -192,6 +192,18 @@
+ 			status = "disabled";
+ 		};
+ 
++		sd0: mmc at 9820000 {
++			compatible = "snps,dw-mshc";
++			reg = <0x9820000 0x10000>;
++			interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&crg HISTB_SDIO0_CIU_CLK>,
++				 <&crg HISTB_SDIO0_BIU_CLK>;
++			clock-names = "ciu", "biu";
++			resets = <&crg 0x9c 4>;
++			reset-names = "reset";
++			status = "disabled";
++		};
++
+ 		emmc: mmc at 9830000 {
+ 			compatible = "snps,dw-mshc";
+ 			reg = <0x9830000 0x10000>;
 -- 
-Kees Cook
-Pixel Security
+1.9.1
