@@ -1,30 +1,24 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Sun, 15 Oct 2017 23:38:31 +0800
-Subject: [PATCH v9 00/20] simplify crypto wait for async op
-In-Reply-To: <1508059209-25529-1-git-send-email-gilad@benyossef.com>
-References: <1508059209-25529-1-git-send-email-gilad@benyossef.com>
-Message-ID: <20171015153831.GA22867@gondor.apana.org.au>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 15 Oct 2017 13:42:19 -0200
+Subject: [PATCH v3] cpufreq: imx6q: Move speed grading check to cpufreq
+ driver
+In-Reply-To: <20171013065141.GI8833@dragon>
+References: <1506784606-2064-1-git-send-email-festevam@gmail.com>
+ <20171004061328.GC8478@vireshk-i7> <20171013065141.GI8833@dragon>
+Message-ID: <CAOMZO5AwB_2Nbky1wA8neU2-2-LDCTCMFOKGQk4jn5O9zuwKpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 15, 2017 at 10:19:45AM +0100, Gilad Ben-Yossef wrote:
+Hi Viresh,
+
+On Fri, Oct 13, 2017 at 3:51 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+
+>> Looks fine to me.
+>>
+>> @Shawn: Can you please let us know if you are fine with it?
 >
-> Changes from v8:
-> - Remove the translation of EAGAIN return code to the
->   previous return code of EBUSY for the user space
->   interface of algif as no one seems to rely on it as
->   requested by Herbert Xu.
+> Acked-by: Shawn Guo <shawnguo@kernel.org>
 
-Sorry, but I forgot to mention that EAGAIN is not a good value
-to use because it's used by the network system calls for other
-meanings (interrupted by a signal).
+Will this one go through your tree?
 
-So if we stop doing the translation then we also need to pick
-a different value, perhaps E2BIG or something similar that have
-no current use within the crypto API or network API.
-
-Thanks,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Thanks
