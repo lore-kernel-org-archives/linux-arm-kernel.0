@@ -1,163 +1,69 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 16 Oct 2017 00:08:21 +0900
-Subject: [PATCH net-next v2 2/2] net: ethernet: socionext: add AVE
- ethernet driver
-In-Reply-To: <1507854928-4357-3-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1507854928-4357-1-git-send-email-hayashi.kunihiko@socionext.com>
- <1507854928-4357-3-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <CAK7LNAR0Dy0aUjQKw7YxSbXZkpjn=1B7_knkSed6=EDVzL6v9w@mail.gmail.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Sun, 15 Oct 2017 18:14:14 +0300
+Subject: ARM: pxa/corgi: armv5te kernel 4.12 fails to decompress compiled
+ with gcc7
+In-Reply-To: <20171015130118.GJ20805@n2100.armlinux.org.uk>
+References: <CAAQYJAvR2_wqf2Axe4aVMOu08t7w5tNEjK0s3fw_oemtqCRo7g@mail.gmail.com>
+ <87a83zsiid.fsf@belgarion.home>
+ <CAAQYJAtEmJMc766kUx+bhFCNQKmwK53nSDNL0nFz-9UXSUO5CQ@mail.gmail.com>
+ <20171014215042.kfrhb2kjhm7wb7vb@darkstar.musicnaut.iki.fi>
+ <87mv4txuid.fsf@belgarion.home>
+ <20171015104640.hazujjkbqyik7fgg@darkstar.musicnaut.iki.fi>
+ <20171015130118.GJ20805@n2100.armlinux.org.uk>
+Message-ID: <20171015151414.tedqu3byaelsm3e2@darkstar.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-10-13 9:35 GMT+09:00 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>:
-> +static int ave_probe(struct platform_device *pdev)
-> +{
-> +       struct device *dev = &pdev->dev;
-> +       struct device_node *np = dev->of_node;
-> +       u32 ave_id;
-> +       struct ave_private *priv;
-> +       const struct ave_soc_data *data;
-> +       phy_interface_t phy_mode;
-> +       struct net_device *ndev;
-> +       struct resource *res;
-> +       void __iomem *base;
-> +       int irq, ret = 0;
-> +       char buf[ETHTOOL_FWVERS_LEN];
-> +       const void *mac_addr;
-> +
-> +       data = of_device_get_match_data(dev);
-> +       if (WARN_ON(!data))
-> +               return -EINVAL;
-> +
-> +       phy_mode = of_get_phy_mode(np);
-> +       if (phy_mode < 0) {
-> +               dev_err(dev, "phy-mode not found\n");
-> +               return -EINVAL;
-> +       }
-> +       if ((!phy_interface_mode_is_rgmii(phy_mode)) &&
-> +           phy_mode != PHY_INTERFACE_MODE_RMII &&
-> +           phy_mode != PHY_INTERFACE_MODE_MII) {
-> +               dev_err(dev, "phy-mode is invalid\n");
-> +               return -EINVAL;
-> +       }
-> +
-> +       irq = platform_get_irq(pdev, 0);
-> +       if (irq < 0) {
-> +               dev_err(dev, "IRQ not found\n");
-> +               return irq;
-> +       }
-> +
-> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       base = devm_ioremap_resource(dev, res);
-> +       if (IS_ERR(base))
-> +               return PTR_ERR(base);
-> +
-> +       /* alloc netdevice */
-> +       ndev = alloc_etherdev(sizeof(struct ave_private));
-> +       if (!ndev) {
-> +               dev_err(dev, "can't allocate ethernet device\n");
-> +               return -ENOMEM;
-> +       }
-> +
-> +       ndev->netdev_ops = &ave_netdev_ops;
-> +       ndev->ethtool_ops = &ave_ethtool_ops;
-> +       SET_NETDEV_DEV(ndev, dev);
-> +
-> +       /* support hardware checksum */
-> +       ndev->features    |= (NETIF_F_IP_CSUM | NETIF_F_RXCSUM);
-> +       ndev->hw_features |= (NETIF_F_IP_CSUM | NETIF_F_RXCSUM);
-> +
-> +       ndev->max_mtu = AVE_MAX_ETHFRAME - (ETH_HLEN + ETH_FCS_LEN);
-> +
-> +       /* get mac address */
-> +       mac_addr = of_get_mac_address(np);
-> +       if (mac_addr)
-> +               ether_addr_copy(ndev->dev_addr, mac_addr);
-> +
-> +       /* if the mac address is invalid, use random mac address */
-> +       if (!is_valid_ether_addr(ndev->dev_addr)) {
-> +               eth_hw_addr_random(ndev);
-> +               dev_warn(dev, "Using random MAC address: %pM\n",
-> +                        ndev->dev_addr);
-> +       }
-> +
-> +       priv = netdev_priv(ndev);
-> +       priv->base = base;
-> +       priv->irq = irq;
-> +       priv->ndev = ndev;
-> +       priv->msg_enable = netif_msg_init(-1, AVE_DEFAULT_MSG_ENABLE);
-> +       priv->phy_mode = phy_mode;
-> +       priv->data = data;
-> +
-> +       if (IS_DESC_64BIT(priv)) {
-> +               priv->desc_size = AVE_DESC_SIZE_64;
-> +               priv->tx.daddr  = AVE_TXDM_64;
-> +               priv->rx.daddr  = AVE_RXDM_64;
-> +       } else {
-> +               priv->desc_size = AVE_DESC_SIZE_32;
-> +               priv->tx.daddr  = AVE_TXDM_32;
-> +               priv->rx.daddr  = AVE_RXDM_32;
-> +       }
-> +       priv->tx.ndesc = AVE_NR_TXDESC;
-> +       priv->rx.ndesc = AVE_NR_RXDESC;
-> +
-> +       u64_stats_init(&priv->stats_rx.syncp);
-> +       u64_stats_init(&priv->stats_tx.syncp);
-> +
-> +       /* get clock */
+Hi,
 
-Please remove this super-obvious comment.
+On Sun, Oct 15, 2017 at 02:01:19PM +0100, Russell King - ARM Linux wrote:
+> On Sun, Oct 15, 2017 at 01:46:40PM +0300, Aaro Koskinen wrote:
+> > This seems to be simpler to debug/reproduce using busybox. Compiling
+> > just busybox with GCC 7.2 and march=armv5te/mtune=xscale already
+> > produces failing xz decompression:
+> > 
+> > root at thecus-n2100:~$ echo foo > foo.txt
+> > root at thecus-n2100:~$ xz foo.txt 
+> > root at thecus-n2100:~$ ./busybox.gcc-7.2 xz -d foo.txt.xz 
+> > xz: corrupted data
 
+[...]
 
-> +       priv->clk = clk_get(dev, NULL);
+> What mode do you have for alignment handling?
+> 
+> cat /proc/cpu/alignment
 
-Missing clk_put() in the failure path.
+Oh right, thanks, yes it seems GCC generates unaligned access:
 
-Why don't you use devm?
+root at thecus-n2100:~$ echo 0 > /proc/cpu/alignment 
+root at thecus-n2100:~$ ./busybox.gcc-7.2 gzip -d foo.txt.gz 
+gzip: crc error
+root at thecus-n2100:~$ echo 2 > /proc/cpu/alignment 
+root at thecus-n2100:~$ ./busybox.gcc-7.2 gzip -d foo.txt.gz 
+root at thecus-n2100:~$ 
 
+> Default for older CPUs is to "ignore" then, which basically means that
+> unaligned loads are rotated - in other words, the 32-bit naturally
+> aligned word is loaded and then rotated such that the addressed byte
+> is in bits 0-7.  This is standard behaviour for older CPUs - it's
+> how the CPU works when there's no trapping of unaligned accesses, and
+> it should really be the way that GCC expects these CPUs to work.
+> 
+> Since there have been moves to drop older architecture support from GCC,
+> I wouldn't be surprised if handling for pre-ARMv6 CPUs was bitrotting
+> and GCC was producing code that fails.
+> 
+> I also know that various folk have put out calls for help with tooling
+> for older CPUs (without which support gets dropped), but I don't think
+> anyone stepped up.
+> 
+> So... you might be able to work around the userspace issues by setting
+> the alignment fault handling to "fixup" but that really won't help the
+> decompressor - we have no ways to take any faults in the decompressor,
+> so we can't fix up an unaligned access.
 
+Yes, the fixup is not really a solution. What is confusing is that I
+was able to compile bootable kernels for OMAP1 boards, so there GCC is
+compiling the decompressor correctly.
 
-> +       if (IS_ERR(priv->clk))
-> +               priv->clk = NULL;
-
-So, clk is optional, but
-you need to check EPROBE_DEFER.
-
-
-
-
-> +       /* get reset */
-
-Remove.
-
-
-> +       priv->rst = reset_control_get(dev, NULL);
-> +       if (IS_ERR(priv->rst))
-> +               priv->rst = NULL;
-
-
-reset_control_get() is deprecated.  Do not use it in a new driver.
-
-Again, missing reset_control_put().   devm?
-
-
-The reset seems optional (again, ignoring EPROBE_DEFER)
-but you did not use reset_control_get_optional, why?
-
->From your code, this reset is used as shared.
-
-
-priv->rst = devm_reset_control_get_optional_shared(dev, NULL);
-if (IS_ERR(priv->rst))
-          return PTR_ERR(priv->rst);
-
-
-
-
-
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+A.
