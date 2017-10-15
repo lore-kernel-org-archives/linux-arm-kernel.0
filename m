@@ -1,538 +1,260 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Mon, 16 Oct 2017 07:48:22 +0900
-Subject: [PATCH v3] drm: exynos: Add driver for HDMI audio interface
-In-Reply-To: <dce1bc56-ecb1-e029-6d2b-ddf3b560d894@samsung.com>
-References: <CGME20170926141814epcas1p1923ab779847932395bf2c2899291dfcd@epcas1p1.samsung.com>
- <1506435469-10591-1-git-send-email-s.nawrocki@samsung.com>
- <dce1bc56-ecb1-e029-6d2b-ddf3b560d894@samsung.com>
-Message-ID: <59E3E5B6.9050300@samsung.com>
+From: gerg@linux-m68k.org (Greg Ungerer)
+Date: Mon, 16 Oct 2017 09:34:13 +1000
+Subject: [PATCH 4/4] ARM: imx: Update spi_imx platform data to reflect
+ current state
+In-Reply-To: <20171013195410.30767-4-tpiepho@impinj.com>
+References: <20171013195410.30767-1-tpiepho@impinj.com>
+ <20171013195410.30767-4-tpiepho@impinj.com>
+Message-ID: <8cdf2bc7-e0ab-b8ec-1cc5-7cc397f13197@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Trent,
+
+On 14/10/17 05:54, Trent Piepho wrote:
+> The docs for the spi_imx platform data still refer to a -32 offset used to
+> specify a native chip select.  This was removed in commit 602c8f4485cd
+> ("spi: imx: fix use of native chip-selects with devicetree") and no
+> longer works as documented.  Update documentation.
+> 
+> The macro MXC_SPI_CS() is no longer is needed.
+> 
+> If a board uses all native chip selects, then it's not necessary to
+> specify a chip select array at all, as all native is the default (this is
+> how device-tree configured SPI masters work too).  Most of the spi-imx
+> platform data users have their chip select arrays removed by this patch.
+> 
+> This patch also fixes a bug in mx31moboard introduced in the '602 commit.
+> When that board was updated in commit 901f26bce64a ("ARM: imx: set
+> correct chip_select in platform setup") to reflect the SPI change, only
+> SPI bus 2 was updated and SPI bus 1 was left with non-sequential chip
+> selects.  The mc13783 spi device on bus 1 had its chip select updated as
+> if it were on bus 2.
+> 
+> CC: Greg Ungerer <gerg@linux-m68k.org>
+
+Looks like a nice cleanup.
+For whatever it is worth:
+
+Acked-by: Greg Ungerer <gerg@linux-m68k.org>
+
+Regards
+Greg
 
 
-2017? 10? 12? 18:51? Sylwester Nawrocki ?(?) ? ?:
-> On 09/26/2017 04:17 PM, Sylwester Nawrocki wrote:
->> The hdmi-codec interface added in this patch is required to properly
->> support HDMI audio. Currently the audio part of the SoC internal
->> HDMI transmitter is configured with fixed values, which makes HDMI
->> audio working by chance, only on boards having an external audio
->> codec connected in parallel with the HDMI audio transmitter's input
->> I2S interface.
->>
->> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
-> 
-> Any comments on this patch?
 
-I will review this patch including other patch series which should go to -next at end of this week.
-
-Thanks,
-Inki Dae
-
+> CC: Shawn Guo <shawnguo@kernel.org>
+> CC: Sascha Hauer <kernel@pengutronix.de>
+> CC: Fabio Estevam <fabio.estevam@nxp.com>
+> Signed-off-by: Trent Piepho <tpiepho@impinj.com>
+> ---
+>  arch/arm/mach-imx/mach-mx31_3ds.c     | 18 ++----------------
+>  arch/arm/mach-imx/mach-mx31lilly.c    | 12 ++----------
+>  arch/arm/mach-imx/mach-mx31lite.c     | 16 ++--------------
+>  arch/arm/mach-imx/mach-mx31moboard.c  | 17 +++--------------
+>  arch/arm/mach-imx/mach-pcm037_eet.c   |  5 +----
+>  include/linux/platform_data/spi-imx.h | 29 +++++++++++++++++------------
+>  6 files changed, 27 insertions(+), 70 deletions(-)
 > 
-> Thanks,
-> Sylwester
-> 
->> ---
->> Tested on Odroid XU3 and Odroid XU4 with Ubuntu 14.04.
->>
->> Changes since v2:
->>  - u8 replaced with bool type,
->>  - the  HDMI codec iec.status data used directly for setting up
->>    the HDMI controller registers rather than using hard coded
->>    constants,
->>  - constants used for configuring the HDMI_AUI_CON register
->>    instead of plain numbers,
->>  - if/IS_ERR/return replaced with PTR_ERR_OR_ZERO().
->>
->> Changes since v1:
->>  - rebased onto v4.14-rc1 and adapted locking
->>
->> Changes since RFC version:
->>  - fixed hdmi-codec locking issue
->>  - added a comment documenting struct hdmi_contex::mutex
->> ---
->>  drivers/gpu/drm/exynos/Kconfig       |   1 +
->>  drivers/gpu/drm/exynos/exynos_hdmi.c | 253 ++++++++++++++++++++++++++---------
->>  drivers/gpu/drm/exynos/regs-hdmi.h   |   8 +-
->>  3 files changed, 197 insertions(+), 65 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/exynos/Kconfig b/drivers/gpu/drm/exynos/Kconfig
->> index 305dc3d..5a7c9d8 100644
->> --- a/drivers/gpu/drm/exynos/Kconfig
->> +++ b/drivers/gpu/drm/exynos/Kconfig
->> @@ -3,6 +3,7 @@ config DRM_EXYNOS
->>  	depends on OF && DRM && (ARCH_S3C64XX || ARCH_EXYNOS || ARCH_MULTIPLATFORM)
->>  	select DRM_KMS_HELPER
->>  	select VIDEOMODE_HELPERS
->> +	select SND_SOC_HDMI_CODEC if SND_SOC
->>  	help
->>  	  Choose this option if you have a Samsung SoC EXYNOS chipset.
->>  	  If M is selected the module will be called exynosdrm.
->> diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
->> index 214fa5e..d2b389a 100644
->> --- a/drivers/gpu/drm/exynos/exynos_hdmi.c
->> +++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
->> @@ -40,7 +40,7 @@
->>  #include <linux/component.h>
->>  #include <linux/mfd/syscon.h>
->>  #include <linux/regmap.h>
->> -
->> +#include <sound/hdmi-codec.h>
->>  #include <drm/exynos_drm.h>
->>
->>  #include <media/cec-notifier.h>
->> @@ -111,12 +111,18 @@ struct hdmi_driver_data {
->>  	struct string_array_spec clk_muxes;
->>  };
->>
->> +struct hdmi_audio {
->> +	struct platform_device		*pdev;
->> +	struct hdmi_audio_infoframe	infoframe;
->> +	struct hdmi_codec_params	params;
->> +	bool				enable;
->> +};
->> +
->>  struct hdmi_context {
->>  	struct drm_encoder		encoder;
->>  	struct device			*dev;
->>  	struct drm_device		*drm_dev;
->>  	struct drm_connector		connector;
->> -	bool				powered;
->>  	bool				dvi_mode;
->>  	struct delayed_work		hotplug_work;
->>  	struct drm_display_mode		current_mode;
->> @@ -137,6 +143,11 @@ struct hdmi_context {
->>  	struct regulator		*reg_hdmi_en;
->>  	struct exynos_drm_clk		phy_clk;
->>  	struct drm_bridge		*bridge;
->> +
->> +	/* mutex protecting subsequent fields below */
->> +	struct mutex			mutex;
->> +	struct hdmi_audio		audio;
->> +	bool				powered;
->>  };
->>
->>  static inline struct hdmi_context *encoder_to_hdmi(struct drm_encoder *e)
->> @@ -768,6 +779,22 @@ static int hdmi_clk_set_parents(struct hdmi_context *hdata, bool to_phy)
->>  	return ret;
->>  }
->>
->> +static int hdmi_audio_infoframe_apply(struct hdmi_context *hdata)
->> +{
->> +	struct hdmi_audio_infoframe *infoframe = &hdata->audio.infoframe;
->> +	u8 buf[HDMI_INFOFRAME_SIZE(AUDIO)];
->> +	int len;
->> +
->> +	len = hdmi_audio_infoframe_pack(infoframe, buf, sizeof(buf));
->> +	if (len < 0)
->> +		return len;
->> +
->> +	hdmi_reg_writeb(hdata, HDMI_AUI_CON, HDMI_AUI_CON_EVERY_VSYNC);
->> +	hdmi_reg_write_buf(hdata, HDMI_AUI_HEADER0, buf, len);
->> +
->> +	return 0;
->> +}
->> +
->>  static void hdmi_reg_infoframes(struct hdmi_context *hdata)
->>  {
->>  	union hdmi_infoframe frm;
->> @@ -805,15 +832,7 @@ static void hdmi_reg_infoframes(struct hdmi_context *hdata)
->>  		hdmi_reg_write_buf(hdata, HDMI_VSI_DATA(0), buf + 3, ret - 3);
->>  	}
->>
->> -	ret = hdmi_audio_infoframe_init(&frm.audio);
->> -	if (!ret) {
->> -		frm.audio.channels = 2;
->> -		ret = hdmi_audio_infoframe_pack(&frm.audio, buf, sizeof(buf));
->> -	}
->> -	if (ret > 0) {
->> -		hdmi_reg_writeb(hdata, HDMI_AUI_CON, HDMI_AUI_CON_EVERY_VSYNC);
->> -		hdmi_reg_write_buf(hdata, HDMI_AUI_HEADER0, buf, ret);
->> -	}
->> +	hdmi_audio_infoframe_apply(hdata);
->>  }
->>
->>  static enum drm_connector_status hdmi_detect(struct drm_connector *connector,
->> @@ -995,23 +1014,18 @@ static void hdmi_reg_acr(struct hdmi_context *hdata, u32 freq)
->>  	hdmi_reg_writeb(hdata, HDMI_ACR_CON, 4);
->>  }
->>
->> -static void hdmi_audio_init(struct hdmi_context *hdata)
->> +static void hdmi_audio_config(struct hdmi_context *hdata)
->>  {
->> -	u32 sample_rate, bits_per_sample;
->> -	u32 data_num, bit_ch, sample_frq;
->> -	u32 val;
->> -
->> -	sample_rate = 44100;
->> -	bits_per_sample = 16;
->> +	u32 bit_ch = 1;
->> +	u32 data_num, val;
->> +	int i;
->>
->> -	switch (bits_per_sample) {
->> +	switch (hdata->audio.params.sample_width) {
->>  	case 20:
->>  		data_num = 2;
->> -		bit_ch = 1;
->>  		break;
->>  	case 24:
->>  		data_num = 3;
->> -		bit_ch = 1;
->>  		break;
->>  	default:
->>  		data_num = 1;
->> @@ -1019,7 +1033,7 @@ static void hdmi_audio_init(struct hdmi_context *hdata)
->>  		break;
->>  	}
->>
->> -	hdmi_reg_acr(hdata, sample_rate);
->> +	hdmi_reg_acr(hdata, hdata->audio.params.sample_rate);
->>
->>  	hdmi_reg_writeb(hdata, HDMI_I2S_MUX_CON, HDMI_I2S_IN_DISABLE
->>  				| HDMI_I2S_AUD_I2S | HDMI_I2S_CUV_I2S_ENABLE
->> @@ -1029,12 +1043,6 @@ static void hdmi_audio_init(struct hdmi_context *hdata)
->>  			| HDMI_I2S_CH1_EN | HDMI_I2S_CH2_EN);
->>
->>  	hdmi_reg_writeb(hdata, HDMI_I2S_MUX_CUV, HDMI_I2S_CUV_RL_EN);
->> -
->> -	sample_frq = (sample_rate == 44100) ? 0 :
->> -			(sample_rate == 48000) ? 2 :
->> -			(sample_rate == 32000) ? 3 :
->> -			(sample_rate == 96000) ? 0xa : 0x0;
->> -
->>  	hdmi_reg_writeb(hdata, HDMI_I2S_CLK_CON, HDMI_I2S_CLK_DIS);
->>  	hdmi_reg_writeb(hdata, HDMI_I2S_CLK_CON, HDMI_I2S_CLK_EN);
->>
->> @@ -1058,31 +1066,24 @@ static void hdmi_audio_init(struct hdmi_context *hdata)
->>  			| HDMI_I2S_SET_SDATA_BIT(data_num)
->>  			| HDMI_I2S_BASIC_FORMAT);
->>
->> -	/* Configure register related to CUV information */
->> -	hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST_0, HDMI_I2S_CH_STATUS_MODE_0
->> -			| HDMI_I2S_2AUD_CH_WITHOUT_PREEMPH
->> -			| HDMI_I2S_COPYRIGHT
->> -			| HDMI_I2S_LINEAR_PCM
->> -			| HDMI_I2S_CONSUMER_FORMAT);
->> -	hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST_1, HDMI_I2S_CD_PLAYER);
->> -	hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST_2, HDMI_I2S_SET_SOURCE_NUM(0));
->> -	hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST_3, HDMI_I2S_CLK_ACCUR_LEVEL_2
->> -			| HDMI_I2S_SET_SMP_FREQ(sample_frq));
->> -	hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST_4,
->> -			HDMI_I2S_ORG_SMP_FREQ_44_1
->> -			| HDMI_I2S_WORD_LEN_MAX24_24BITS
->> -			| HDMI_I2S_WORD_LEN_MAX_24BITS);
->> +	/* Configure registers related to CUV information */
->> +	for (i = 0; i < HDMI_I2S_CH_ST_MAXNUM; i++)
->> +		hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST(i),
->> +				hdata->audio.params.iec.status[i]);
->>
->>  	hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST_CON, HDMI_I2S_CH_STATUS_RELOAD);
->>  }
->>
->> -static void hdmi_audio_control(struct hdmi_context *hdata, bool onoff)
->> +static void hdmi_audio_control(struct hdmi_context *hdata)
->>  {
->> +	bool enable = hdata->audio.enable;
->> +
->>  	if (hdata->dvi_mode)
->>  		return;
->>
->> -	hdmi_reg_writeb(hdata, HDMI_AUI_CON, onoff ? 2 : 0);
->> -	hdmi_reg_writemask(hdata, HDMI_CON_0, onoff ?
->> +	hdmi_reg_writeb(hdata, HDMI_AUI_CON, enable ?
->> +			HDMI_AVI_CON_EVERY_VSYNC : HDMI_AUI_CON_NO_TRAN);
->> +	hdmi_reg_writemask(hdata, HDMI_CON_0, enable ?
->>  			HDMI_ASP_EN : HDMI_ASP_DIS, HDMI_ASP_MASK);
->>  }
->>
->> @@ -1398,13 +1399,14 @@ static void hdmiphy_conf_apply(struct hdmi_context *hdata)
->>  	hdmiphy_wait_for_pll(hdata);
->>  }
->>
->> +/* Should be called with hdata->mutex mutex held */
->>  static void hdmi_conf_apply(struct hdmi_context *hdata)
->>  {
->>  	hdmi_start(hdata, false);
->>  	hdmi_conf_init(hdata);
->> -	hdmi_audio_init(hdata);
->> +	hdmi_audio_config(hdata);
->>  	hdmi_mode_apply(hdata);
->> -	hdmi_audio_control(hdata, true);
->> +	hdmi_audio_control(hdata);
->>  }
->>
->>  static void hdmi_mode_set(struct drm_encoder *encoder,
->> @@ -1431,6 +1433,7 @@ static void hdmi_set_refclk(struct hdmi_context *hdata, bool on)
->>  			   SYSREG_HDMI_REFCLK_INT_CLK, on ? ~0 : 0);
->>  }
->>
->> +/* Should be called with hdata->mutex mutex held. */
->>  static void hdmiphy_enable(struct hdmi_context *hdata)
->>  {
->>  	if (hdata->powered)
->> @@ -1453,6 +1456,7 @@ static void hdmiphy_enable(struct hdmi_context *hdata)
->>  	hdata->powered = true;
->>  }
->>
->> +/* Should be called with hdata->mutex mutex held. */
->>  static void hdmiphy_disable(struct hdmi_context *hdata)
->>  {
->>  	if (!hdata->powered)
->> @@ -1478,28 +1482,38 @@ static void hdmi_enable(struct drm_encoder *encoder)
->>  {
->>  	struct hdmi_context *hdata = encoder_to_hdmi(encoder);
->>
->> +	mutex_lock(&hdata->mutex);
->> +
->>  	hdmiphy_enable(hdata);
->>  	hdmi_conf_apply(hdata);
->> +
->> +	mutex_unlock(&hdata->mutex);
->>  }
->>
->>  static void hdmi_disable(struct drm_encoder *encoder)
->>  {
->>  	struct hdmi_context *hdata = encoder_to_hdmi(encoder);
->>
->> -	if (!hdata->powered)
->> +	mutex_lock(&hdata->mutex);
->> +
->> +	if (hdata->powered) {
->> +		/*
->> +		 * The SFRs of VP and Mixer are updated by Vertical Sync of
->> +		 * Timing generator which is a part of HDMI so the sequence
->> +		 * to disable TV Subsystem should be as following,
->> +		 *	VP -> Mixer -> HDMI
->> +		 *
->> +		 * To achieve such sequence HDMI is disabled together with
->> +		 * HDMI PHY, via pipe clock callback.
->> +		 */
->> +		mutex_unlock(&hdata->mutex);
->> +		cancel_delayed_work(&hdata->hotplug_work);
->> +		cec_notifier_set_phys_addr(hdata->notifier,
->> +					   CEC_PHYS_ADDR_INVALID);
->>  		return;
->> +	}
->>
->> -	/*
->> -	 * The SFRs of VP and Mixer are updated by Vertical Sync of
->> -	 * Timing generator which is a part of HDMI so the sequence
->> -	 * to disable TV Subsystem should be as following,
->> -	 *	VP -> Mixer -> HDMI
->> -	 *
->> -	 * To achieve such sequence HDMI is disabled together with HDMI PHY, via
->> -	 * pipe clock callback.
->> -	 */
->> -	cancel_delayed_work(&hdata->hotplug_work);
->> -	cec_notifier_set_phys_addr(hdata->notifier, CEC_PHYS_ADDR_INVALID);
->> +	mutex_unlock(&hdata->mutex);
->>  }
->>
->>  static const struct drm_encoder_helper_funcs exynos_hdmi_encoder_helper_funcs = {
->> @@ -1513,6 +1527,104 @@ static void hdmi_disable(struct drm_encoder *encoder)
->>  	.destroy = drm_encoder_cleanup,
->>  };
->>
->> +static void hdmi_audio_shutdown(struct device *dev, void *data)
->> +{
->> +	struct hdmi_context *hdata = dev_get_drvdata(dev);
->> +
->> +	mutex_lock(&hdata->mutex);
->> +
->> +	hdata->audio.enable = false;
->> +
->> +	if (hdata->powered)
->> +		hdmi_audio_control(hdata);
->> +
->> +	mutex_unlock(&hdata->mutex);
->> +}
->> +
->> +static int hdmi_audio_hw_params(struct device *dev, void *data,
->> +				struct hdmi_codec_daifmt *daifmt,
->> +				struct hdmi_codec_params *params)
->> +{
->> +	struct hdmi_context *hdata = dev_get_drvdata(dev);
->> +
->> +	if (daifmt->fmt != HDMI_I2S || daifmt->bit_clk_inv ||
->> +	    daifmt->frame_clk_inv || daifmt->bit_clk_master ||
->> +	    daifmt->frame_clk_master) {
->> +		dev_err(dev, "%s: Bad flags %d %d %d %d\n", __func__,
->> +			daifmt->bit_clk_inv, daifmt->frame_clk_inv,
->> +			daifmt->bit_clk_master,
->> +			daifmt->frame_clk_master);
->> +		return -EINVAL;
->> +	}
->> +
->> +	mutex_lock(&hdata->mutex);
->> +
->> +	hdata->audio.params = *params;
->> +
->> +	if (hdata->powered) {
->> +		hdmi_audio_config(hdata);
->> +		hdmi_audio_infoframe_apply(hdata);
->> +	}
->> +
->> +	mutex_unlock(&hdata->mutex);
->> +
->> +	return 0;
->> +}
->> +
->> +static int hdmi_audio_digital_mute(struct device *dev, void *data, bool mute)
->> +{
->> +	struct hdmi_context *hdata = dev_get_drvdata(dev);
->> +
->> +	mutex_lock(&hdata->mutex);
->> +
->> +	hdata->audio.enable = !mute;
->> +
->> +	if (hdata->powered)
->> +		hdmi_audio_control(hdata);
->> +
->> +	mutex_unlock(&hdata->mutex);
->> +
->> +	return 0;
->> +}
->> +
->> +static int hdmi_audio_get_eld(struct device *dev, void *data, uint8_t *buf,
->> +			      size_t len)
->> +{
->> +	struct hdmi_context *hdata = dev_get_drvdata(dev);
->> +	struct drm_connector *connector = &hdata->connector;
->> +
->> +	memcpy(buf, connector->eld, min(sizeof(connector->eld), len));
->> +
->> +	return 0;
->> +}
->> +
->> +static const struct hdmi_codec_ops audio_codec_ops = {
->> +	.hw_params = hdmi_audio_hw_params,
->> +	.audio_shutdown = hdmi_audio_shutdown,
->> +	.digital_mute = hdmi_audio_digital_mute,
->> +	.get_eld = hdmi_audio_get_eld,
->> +};
->> +
->> +static int hdmi_register_audio_device(struct hdmi_context *hdata)
->> +{
->> +	struct hdmi_codec_pdata codec_data = {
->> +		.ops = &audio_codec_ops,
->> +		.max_i2s_channels = 6,
->> +		.i2s = 1,
->> +	};
->> +
->> +	hdata->audio.pdev = platform_device_register_data(
->> +		hdata->dev, HDMI_CODEC_DRV_NAME, PLATFORM_DEVID_AUTO,
->> +		&codec_data, sizeof(codec_data));
->> +
->> +	return PTR_ERR_OR_ZERO(hdata->audio.pdev);
->> +}
->> +
->> +static void hdmi_unregister_audio_device(struct hdmi_context *hdata)
->> +{
->> +	platform_device_unregister(hdata->audio.pdev);
->> +}
->> +
->>  static void hdmi_hotplug_work_func(struct work_struct *work)
->>  {
->>  	struct hdmi_context *hdata;
->> @@ -1588,11 +1700,14 @@ static void hdmiphy_clk_enable(struct exynos_drm_clk *clk, bool enable)
->>  {
->>  	struct hdmi_context *hdata = container_of(clk, struct hdmi_context,
->>  						  phy_clk);
->> +	mutex_lock(&hdata->mutex);
->>
->>  	if (enable)
->>  		hdmiphy_enable(hdata);
->>  	else
->>  		hdmiphy_disable(hdata);
->> +
->> +	mutex_unlock(&hdata->mutex);
->>  }
->>
->>  static int hdmi_bridge_init(struct hdmi_context *hdata)
->> @@ -1697,6 +1812,7 @@ static int hdmi_bind(struct device *dev, struct device *master, void *data)
->>  	struct drm_device *drm_dev = data;
->>  	struct hdmi_context *hdata = dev_get_drvdata(dev);
->>  	struct drm_encoder *encoder = &hdata->encoder;
->> +	struct hdmi_audio_infoframe *audio_infoframe = &hdata->audio.infoframe;
->>  	struct exynos_drm_crtc *crtc;
->>  	int ret;
->>
->> @@ -1704,6 +1820,12 @@ static int hdmi_bind(struct device *dev, struct device *master, void *data)
->>
->>  	hdata->phy_clk.enable = hdmiphy_clk_enable;
->>
->> +	hdmi_audio_infoframe_init(audio_infoframe);
->> +	audio_infoframe->coding_type = HDMI_AUDIO_CODING_TYPE_STREAM;
->> +	audio_infoframe->sample_size = HDMI_AUDIO_SAMPLE_SIZE_STREAM;
->> +	audio_infoframe->sample_frequency = HDMI_AUDIO_SAMPLE_FREQUENCY_STREAM;
->> +	audio_infoframe->channels = 2;
->> +
->>  	drm_encoder_init(drm_dev, encoder, &exynos_hdmi_encoder_funcs,
->>  			 DRM_MODE_ENCODER_TMDS, NULL);
->>
->> @@ -1818,6 +1940,8 @@ static int hdmi_probe(struct platform_device *pdev)
->>
->>  	hdata->dev = dev;
->>
->> +	mutex_init(&hdata->mutex);
->> +
->>  	ret = hdmi_resources_init(hdata);
->>  	if (ret) {
->>  		if (ret != -EPROBE_DEFER)
->> @@ -1877,12 +2001,19 @@ static int hdmi_probe(struct platform_device *pdev)
->>
->>  	pm_runtime_enable(dev);
->>
->> -	ret = component_add(&pdev->dev, &hdmi_component_ops);
->> +	ret = hdmi_register_audio_device(hdata);
->>  	if (ret)
->>  		goto err_notifier_put;
->>
->> +	ret = component_add(&pdev->dev, &hdmi_component_ops);
->> +	if (ret)
->> +		goto err_unregister_audio;
->> +
->>  	return ret;
->>
->> +err_unregister_audio:
->> +	hdmi_unregister_audio_device(hdata);
->> +
->>  err_notifier_put:
->>  	cec_notifier_put(hdata->notifier);
->>  	pm_runtime_disable(dev);
->> @@ -1921,6 +2052,8 @@ static int hdmi_remove(struct platform_device *pdev)
->>
->>  	put_device(&hdata->ddc_adpt->dev);
->>
->> +	mutex_destroy(&hdata->mutex);
->> +
->>  	return 0;
->>  }
->>
->> diff --git a/drivers/gpu/drm/exynos/regs-hdmi.h b/drivers/gpu/drm/exynos/regs-hdmi.h
->> index a0507dc..d843b1f 100644
->> --- a/drivers/gpu/drm/exynos/regs-hdmi.h
->> +++ b/drivers/gpu/drm/exynos/regs-hdmi.h
->> @@ -419,11 +419,9 @@
->>  #define HDMI_I2S_DSD_CON		HDMI_I2S_BASE(0x01c)
->>  #define HDMI_I2S_MUX_CON		HDMI_I2S_BASE(0x020)
->>  #define HDMI_I2S_CH_ST_CON		HDMI_I2S_BASE(0x024)
->> -#define HDMI_I2S_CH_ST_0		HDMI_I2S_BASE(0x028)
->> -#define HDMI_I2S_CH_ST_1		HDMI_I2S_BASE(0x02c)
->> -#define HDMI_I2S_CH_ST_2		HDMI_I2S_BASE(0x030)
->> -#define HDMI_I2S_CH_ST_3		HDMI_I2S_BASE(0x034)
->> -#define HDMI_I2S_CH_ST_4		HDMI_I2S_BASE(0x038)
->> +/* n must be withing range 0...(HDMI_I2S_CH_ST_MAXNUM - 1) */
->> +#define HDMI_I2S_CH_ST_MAXNUM		5
->> +#define HDMI_I2S_CH_ST(n)		HDMI_I2S_BASE(0x028 + 4 * (n))
->>  #define HDMI_I2S_CH_ST_SH_0		HDMI_I2S_BASE(0x03c)
->>  #define HDMI_I2S_CH_ST_SH_1		HDMI_I2S_BASE(0x040)
->>  #define HDMI_I2S_CH_ST_SH_2		HDMI_I2S_BASE(0x044)
->> --
->> 1.9.1
-> 
-> 
+> diff --git a/arch/arm/mach-imx/mach-mx31_3ds.c b/arch/arm/mach-imx/mach-mx31_3ds.c
+> index 68c3f0799d5b..9d87f1dcf7bb 100644
+> --- a/arch/arm/mach-imx/mach-mx31_3ds.c
+> +++ b/arch/arm/mach-imx/mach-mx31_3ds.c
+> @@ -374,26 +374,12 @@ static struct imx_ssi_platform_data mx31_3ds_ssi_pdata = {
+>  };
+>  
+>  /* SPI */
+> -static int spi0_internal_chipselect[] = {
+> -	MXC_SPI_CS(0),
+> -	MXC_SPI_CS(1),
+> -	MXC_SPI_CS(2),
+> -};
+> -
+>  static const struct spi_imx_master spi0_pdata __initconst = {
+> -	.chipselect	= spi0_internal_chipselect,
+> -	.num_chipselect	= ARRAY_SIZE(spi0_internal_chipselect),
+> -};
+> -
+> -static int spi1_internal_chipselect[] = {
+> -	MXC_SPI_CS(0),
+> -	MXC_SPI_CS(1),
+> -	MXC_SPI_CS(2),
+> +	.num_chipselect	= 3,
+>  };
+>  
+>  static const struct spi_imx_master spi1_pdata __initconst = {
+> -	.chipselect	= spi1_internal_chipselect,
+> -	.num_chipselect	= ARRAY_SIZE(spi1_internal_chipselect),
+> +	.num_chipselect	= 3,
+>  };
+>  
+>  static struct spi_board_info mx31_3ds_spi_devs[] __initdata = {
+> diff --git a/arch/arm/mach-imx/mach-mx31lilly.c b/arch/arm/mach-imx/mach-mx31lilly.c
+> index 6fd463642954..8bf52819d4d9 100644
+> --- a/arch/arm/mach-imx/mach-mx31lilly.c
+> +++ b/arch/arm/mach-imx/mach-mx31lilly.c
+> @@ -226,20 +226,12 @@ static void __init lilly1131_usb_init(void)
+>  
+>  /* SPI */
+>  
+> -static int spi_internal_chipselect[] = {
+> -	MXC_SPI_CS(0),
+> -	MXC_SPI_CS(1),
+> -	MXC_SPI_CS(2),
+> -};
+> -
+>  static const struct spi_imx_master spi0_pdata __initconst = {
+> -	.chipselect = spi_internal_chipselect,
+> -	.num_chipselect = ARRAY_SIZE(spi_internal_chipselect),
+> +	.num_chipselect = 3,
+>  };
+>  
+>  static const struct spi_imx_master spi1_pdata __initconst = {
+> -	.chipselect = spi_internal_chipselect,
+> -	.num_chipselect = ARRAY_SIZE(spi_internal_chipselect),
+> +	.num_chipselect = 3,
+>  };
+>  
+>  static struct mc13xxx_platform_data mc13783_pdata __initdata = {
+> diff --git a/arch/arm/mach-imx/mach-mx31lite.c b/arch/arm/mach-imx/mach-mx31lite.c
+> index f033a57d5694..fcbaf0070ccf 100644
+> --- a/arch/arm/mach-imx/mach-mx31lite.c
+> +++ b/arch/arm/mach-imx/mach-mx31lite.c
+> @@ -83,15 +83,8 @@ static const struct imxuart_platform_data uart_pdata __initconst = {
+>  };
+>  
+>  /* SPI */
+> -static int spi0_internal_chipselect[] = {
+> -	MXC_SPI_CS(0),
+> -	MXC_SPI_CS(1),
+> -	MXC_SPI_CS(2),
+> -};
+> -
+>  static const struct spi_imx_master spi0_pdata __initconst = {
+> -	.chipselect	= spi0_internal_chipselect,
+> -	.num_chipselect	= ARRAY_SIZE(spi0_internal_chipselect),
+> +	.num_chipselect	= 3,
+>  };
+>  
+>  static const struct mxc_nand_platform_data
+> @@ -133,13 +126,8 @@ static struct platform_device smsc911x_device = {
+>   * The MC13783 is the only hard-wired SPI device on the module.
+>   */
+>  
+> -static int spi1_internal_chipselect[] = {
+> -	MXC_SPI_CS(0),
+> -};
+> -
+>  static const struct spi_imx_master spi1_pdata __initconst = {
+> -	.chipselect	= spi1_internal_chipselect,
+> -	.num_chipselect	= ARRAY_SIZE(spi1_internal_chipselect),
+> +	.num_chipselect	= 1,
+>  };
+>  
+>  static struct mc13xxx_platform_data mc13783_pdata __initdata = {
+> diff --git a/arch/arm/mach-imx/mach-mx31moboard.c b/arch/arm/mach-imx/mach-mx31moboard.c
+> index 7716f83aecdd..643a3d749703 100644
+> --- a/arch/arm/mach-imx/mach-mx31moboard.c
+> +++ b/arch/arm/mach-imx/mach-mx31moboard.c
+> @@ -152,14 +152,8 @@ static const struct imxi2c_platform_data moboard_i2c1_data __initconst = {
+>  	.bitrate = 100000,
+>  };
+>  
+> -static int moboard_spi1_cs[] = {
+> -	MXC_SPI_CS(0),
+> -	MXC_SPI_CS(2),
+> -};
+> -
+>  static const struct spi_imx_master moboard_spi1_pdata __initconst = {
+> -	.chipselect	= moboard_spi1_cs,
+> -	.num_chipselect	= ARRAY_SIZE(moboard_spi1_cs),
+> +	.num_chipselect	= 3,
+>  };
+>  
+>  static struct regulator_consumer_supply sdhc_consumers[] = {
+> @@ -296,19 +290,14 @@ static struct spi_board_info moboard_spi_board_info[] __initdata = {
+>  		/* irq number is run-time assigned */
+>  		.max_speed_hz = 300000,
+>  		.bus_num = 1,
+> -		.chip_select = 1,
+> +		.chip_select = 0,
+>  		.platform_data = &moboard_pmic,
+>  		.mode = SPI_CS_HIGH,
+>  	},
+>  };
+>  
+> -static int moboard_spi2_cs[] = {
+> -	MXC_SPI_CS(0), MXC_SPI_CS(1),
+> -};
+> -
+>  static const struct spi_imx_master moboard_spi2_pdata __initconst = {
+> -	.chipselect	= moboard_spi2_cs,
+> -	.num_chipselect	= ARRAY_SIZE(moboard_spi2_cs),
+> +	.num_chipselect	= 2,
+>  };
+>  
+>  #define SDHC1_CD IOMUX_TO_GPIO(MX31_PIN_ATA_CS0)
+> diff --git a/arch/arm/mach-imx/mach-pcm037_eet.c b/arch/arm/mach-imx/mach-pcm037_eet.c
+> index 95bd97710494..15bc956d466b 100644
+> --- a/arch/arm/mach-imx/mach-pcm037_eet.c
+> +++ b/arch/arm/mach-imx/mach-pcm037_eet.c
+> @@ -56,11 +56,8 @@ static struct spi_board_info pcm037_spi_dev[] = {
+>  };
+>  
+>  /* Platform Data for MXC CSPI */
+> -static int pcm037_spi1_cs[] = { MXC_SPI_CS(0), MXC_SPI_CS(1), };
+> -
+>  static const struct spi_imx_master pcm037_spi1_pdata __initconst = {
+> -	.chipselect = pcm037_spi1_cs,
+> -	.num_chipselect = ARRAY_SIZE(pcm037_spi1_cs),
+> +	.num_chipselect = 2,
+>  };
+>  
+>  /* GPIO-keys input device */
+> diff --git a/include/linux/platform_data/spi-imx.h b/include/linux/platform_data/spi-imx.h
+> index 08be445e8eb8..9b2ed66ef7a2 100644
+> --- a/include/linux/platform_data/spi-imx.h
+> +++ b/include/linux/platform_data/spi-imx.h
+> @@ -4,24 +4,29 @@
+>  
+>  /*
+>   * struct spi_imx_master - device.platform_data for SPI controller devices.
+> - * @chipselect: Array of chipselects for this master. Numbers >= 0 mean gpio
+> - *              pins, numbers < 0 mean internal CSPI chipselects according
+> - *              to MXC_SPI_CS(). Normally you want to use gpio based chip
+> - *              selects as the CSPI module tries to be intelligent about
+> - *              when to assert the chipselect: The CSPI module deasserts the
+> - *              chipselect once it runs out of input data. The other problem
+> - *              is that it is not possible to mix between high active and low
+> - *              active chipselects on one single bus using the internal
+> - *              chipselects. Unfortunately Freescale decided to put some
+> + * @chipselect: Array of chipselects for this master or NULL.  Numbers >= 0
+> + *              mean GPIO pins, -ENOENT means internal CSPI chipselect
+> + *              matching the position in the array.  E.g., if chipselect[1] =
+> + *              -ENOENT then a SPI slave using chip select 1 will use the
+> + *              native SS1 line of the CSPI.  Omitting the array will use
+> + *              all native chip selects.
+> +
+> + *              Normally you want to use gpio based chip selects as the CSPI
+> + *              module tries to be intelligent about when to assert the
+> + *              chipselect:  The CSPI module deasserts the chipselect once it
+> + *              runs out of input data.  The other problem is that it is not
+> + *              possible to mix between high active and low active chipselects
+> + *              on one single bus using the internal chipselects.
+> + *              Unfortunately, on some SoCs, Freescale decided to put some
+>   *              chipselects on dedicated pins which are not usable as gpios,
+>   *              so we have to support the internal chipselects.
+> - * @num_chipselect: ARRAY_SIZE(chipselect)
+> + *
+> + * @num_chipselect: If @chipselect is specified, ARRAY_SIZE(chipselect),
+> + *                  otherwise the number of native chip selects.
+>   */
+>  struct spi_imx_master {
+>  	int	*chipselect;
+>  	int	num_chipselect;
+>  };
+>  
+> -#define MXC_SPI_CS(no)	((no) - 32)
+> -
+>  #endif /* __MACH_SPI_H_*/
 > 
