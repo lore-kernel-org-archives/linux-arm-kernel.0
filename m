@@ -1,104 +1,161 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun, 15 Oct 2017 23:52:06 +0900
-Subject: [PATCH net-next v2 1/2] dt-bindings: net: add DT bindings for
- Socionext UniPhier AVE
-In-Reply-To: <1507854928-4357-2-git-send-email-hayashi.kunihiko@socionext.com>
+Date: Mon, 16 Oct 2017 00:08:21 +0900
+Subject: [PATCH net-next v2 2/2] net: ethernet: socionext: add AVE
+ ethernet driver
+In-Reply-To: <1507854928-4357-3-git-send-email-hayashi.kunihiko@socionext.com>
 References: <1507854928-4357-1-git-send-email-hayashi.kunihiko@socionext.com>
- <1507854928-4357-2-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <CAK7LNATq7cpRj2shyR03drEefNNsW3_ABW116smauP2vw4NAUQ@mail.gmail.com>
+ <1507854928-4357-3-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <CAK7LNAR0Dy0aUjQKw7YxSbXZkpjn=1B7_knkSed6=EDVzL6v9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 2017-10-13 9:35 GMT+09:00 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>:
-> DT bindings for the AVE ethernet controller found on Socionext's
-> UniPhier platforms.
->
-> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
-> ---
->  .../bindings/net/socionext,uniphier-ave4.txt       | 53 ++++++++++++++++++++++
->  1 file changed, 53 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
->
-> diff --git a/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt b/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
-> new file mode 100644
-> index 0000000..25f4d92
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
-> @@ -0,0 +1,53 @@
-> +* Socionext AVE ethernet controller
+> +static int ave_probe(struct platform_device *pdev)
+> +{
+> +       struct device *dev = &pdev->dev;
+> +       struct device_node *np = dev->of_node;
+> +       u32 ave_id;
+> +       struct ave_private *priv;
+> +       const struct ave_soc_data *data;
+> +       phy_interface_t phy_mode;
+> +       struct net_device *ndev;
+> +       struct resource *res;
+> +       void __iomem *base;
+> +       int irq, ret = 0;
+> +       char buf[ETHTOOL_FWVERS_LEN];
+> +       const void *mac_addr;
 > +
-> +This describes the devicetree bindings for AVE ethernet controller
-> +implemented on Socionext UniPhier SoCs.
+> +       data = of_device_get_match_data(dev);
+> +       if (WARN_ON(!data))
+> +               return -EINVAL;
 > +
-> +Required properties:
-> + - compatible: Should be
-> +       - "socionext,uniphier-pro4-ave4" : for Pro4 SoC
-> +       - "socionext,uniphier-pxs2-ave4" : for PXs2 SoC
-> +       - "socionext,uniphier-ld20-ave4" : for LD20 SoC
-> +       - "socionext,uniphier-ld11-ave4" : for LD11 SoC
-> + - reg: Address where registers are mapped and size of region.
-> + - interrupts: Should contain the MAC interrupt.
-> + - phy-mode: See ethernet.txt in the same directory. Allow to choose
-> +       "rgmii", "rmii", or "mii" according to the PHY.
-> + - pinctrl-names: List of assigned state names, see pinctrl
-> +       binding documentation.
-> + - pinctrl-0: List of phandles to configure the GPIO pin,
-> +       see pinctrl binding documentation. Choose this appropriately
-> +       according to phy-mode.
-> +       - <&pinctrl_ether_rgmii> if phy-mode is "rgmii".
-> +       - <&pinctrl_ether_rmii> if phy-mode is "rmii".
-> +       - <&pinctrl_ether_mii> if phy-mode is "mii".
-> + - phy-handle: Should point to the external phy device.
-> +       See ethernet.txt file in the same directory.
-> + - mdio subnode: Should be device tree subnode with the following required
-> +       properties:
-> +       - #address-cells: Must be <1>.
-> +       - #size-cells: Must be <0>.
-> +       - reg: phy ID number, usually a small integer.
+> +       phy_mode = of_get_phy_mode(np);
+> +       if (phy_mode < 0) {
+> +               dev_err(dev, "phy-mode not found\n");
+> +               return -EINVAL;
+> +       }
+> +       if ((!phy_interface_mode_is_rgmii(phy_mode)) &&
+> +           phy_mode != PHY_INTERFACE_MODE_RMII &&
+> +           phy_mode != PHY_INTERFACE_MODE_MII) {
+> +               dev_err(dev, "phy-mode is invalid\n");
+> +               return -EINVAL;
+> +       }
 > +
-> +Optional properties:
-> + - local-mac-address: See ethernet.txt in the same directory.
+> +       irq = platform_get_irq(pdev, 0);
+> +       if (irq < 0) {
+> +               dev_err(dev, "IRQ not found\n");
+> +               return irq;
+> +       }
 > +
-> +Example:
+> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +       base = devm_ioremap_resource(dev, res);
+> +       if (IS_ERR(base))
+> +               return PTR_ERR(base);
 > +
-> +       ether: ethernet at 65000000 {
-> +               compatible = "socionext,uniphier-ld20-ave4";
-> +               reg = <0x65000000 0x8500>;
-> +               interrupts = <0 66 4>;
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&pinctrl_ether_rgmii>;
-> +               phy-mode = "rgmii";
-> +               phy-handle = <&ethphy>;
-> +               local-mac-address = [00 00 00 00 00 00];
-> +               mdio {
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +                       ethphy: ethphy at 1 {
-> +                               reg = <1>;
-> +                       };
-> +               };
-> +       };
-> --
-> 2.7.4
->
+> +       /* alloc netdevice */
+> +       ndev = alloc_etherdev(sizeof(struct ave_private));
+> +       if (!ndev) {
+> +               dev_err(dev, "can't allocate ethernet device\n");
+> +               return -ENOMEM;
+> +       }
+> +
+> +       ndev->netdev_ops = &ave_netdev_ops;
+> +       ndev->ethtool_ops = &ave_ethtool_ops;
+> +       SET_NETDEV_DEV(ndev, dev);
+> +
+> +       /* support hardware checksum */
+> +       ndev->features    |= (NETIF_F_IP_CSUM | NETIF_F_RXCSUM);
+> +       ndev->hw_features |= (NETIF_F_IP_CSUM | NETIF_F_RXCSUM);
+> +
+> +       ndev->max_mtu = AVE_MAX_ETHFRAME - (ETH_HLEN + ETH_FCS_LEN);
+> +
+> +       /* get mac address */
+> +       mac_addr = of_get_mac_address(np);
+> +       if (mac_addr)
+> +               ether_addr_copy(ndev->dev_addr, mac_addr);
+> +
+> +       /* if the mac address is invalid, use random mac address */
+> +       if (!is_valid_ether_addr(ndev->dev_addr)) {
+> +               eth_hw_addr_random(ndev);
+> +               dev_warn(dev, "Using random MAC address: %pM\n",
+> +                        ndev->dev_addr);
+> +       }
+> +
+> +       priv = netdev_priv(ndev);
+> +       priv->base = base;
+> +       priv->irq = irq;
+> +       priv->ndev = ndev;
+> +       priv->msg_enable = netif_msg_init(-1, AVE_DEFAULT_MSG_ENABLE);
+> +       priv->phy_mode = phy_mode;
+> +       priv->data = data;
+> +
+> +       if (IS_DESC_64BIT(priv)) {
+> +               priv->desc_size = AVE_DESC_SIZE_64;
+> +               priv->tx.daddr  = AVE_TXDM_64;
+> +               priv->rx.daddr  = AVE_RXDM_64;
+> +       } else {
+> +               priv->desc_size = AVE_DESC_SIZE_32;
+> +               priv->tx.daddr  = AVE_TXDM_32;
+> +               priv->rx.daddr  = AVE_RXDM_32;
+> +       }
+> +       priv->tx.ndesc = AVE_NR_TXDESC;
+> +       priv->rx.ndesc = AVE_NR_RXDESC;
+> +
+> +       u64_stats_init(&priv->stats_rx.syncp);
+> +       u64_stats_init(&priv->stats_tx.syncp);
+> +
+> +       /* get clock */
+
+Please remove this super-obvious comment.
 
 
-I found the following code in 2/2.
+> +       priv->clk = clk_get(dev, NULL);
 
-+ /* get clock */
-+ priv->clk = clk_get(dev, NULL);
-+ if (IS_ERR(priv->clk))
-+ priv->clk = NULL;
-+
-+ /* get reset */
-+ priv->rst = reset_control_get(dev, NULL);
-+ if (IS_ERR(priv->rst))
-+ priv->rst = NULL;
-+
+Missing clk_put() in the failure path.
+
+Why don't you use devm?
 
 
-This doc needs to describe "clocks", "resets".
+
+> +       if (IS_ERR(priv->clk))
+> +               priv->clk = NULL;
+
+So, clk is optional, but
+you need to check EPROBE_DEFER.
+
+
+
+
+> +       /* get reset */
+
+Remove.
+
+
+> +       priv->rst = reset_control_get(dev, NULL);
+> +       if (IS_ERR(priv->rst))
+> +               priv->rst = NULL;
+
+
+reset_control_get() is deprecated.  Do not use it in a new driver.
+
+Again, missing reset_control_put().   devm?
+
+
+The reset seems optional (again, ignoring EPROBE_DEFER)
+but you did not use reset_control_get_optional, why?
+
+>From your code, this reset is used as shared.
+
+
+priv->rst = devm_reset_control_get_optional_shared(dev, NULL);
+if (IS_ERR(priv->rst))
+          return PTR_ERR(priv->rst);
+
+
+
+
+
+
 
 
 -- 
