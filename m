@@ -1,89 +1,77 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Sun, 15 Oct 2017 13:46:40 +0300
-Subject: ARM: pxa/corgi: armv5te kernel 4.12 fails to decompress compiled
- with gcc7
-In-Reply-To: <87mv4txuid.fsf@belgarion.home>
-References: <CAAQYJAvR2_wqf2Axe4aVMOu08t7w5tNEjK0s3fw_oemtqCRo7g@mail.gmail.com>
- <87a83zsiid.fsf@belgarion.home>
- <CAAQYJAtEmJMc766kUx+bhFCNQKmwK53nSDNL0nFz-9UXSUO5CQ@mail.gmail.com>
- <20171014215042.kfrhb2kjhm7wb7vb@darkstar.musicnaut.iki.fi>
- <87mv4txuid.fsf@belgarion.home>
-Message-ID: <20171015104640.hazujjkbqyik7fgg@darkstar.musicnaut.iki.fi>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sun, 15 Oct 2017 13:13:57 +0200
+Subject: [PATCH 0/3] Enable CEC on rk3399
+In-Reply-To: <4592c26c-3aab-ba86-7e70-de0cac1e2e71@xs4all.nl>
+References: <20171013225337.5196-1-phh@phh.me> <2009704.s5LEIeT6xV@phil>
+ <4592c26c-3aab-ba86-7e70-de0cac1e2e71@xs4all.nl>
+Message-ID: <3386486.DJGKCdk2Sx@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Hans,
 
-On Sat, Oct 14, 2017 at 11:57:30PM +0200, Robert Jarzmik wrote:
-> Aaro Koskinen <aaro.koskinen@iki.fi> writes:
-> > On Sat, Sep 02, 2017 at 11:50:55PM +0200, Andrea Adami wrote:
-> >> On Thu, Jul 20, 2017 at 8:57 AM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> >> > Andrea Adami <andrea.adami@gmail.com> writes:
-> >> > I have the same report on userspace side on buildroot from Petr [1], which
-> >> > triggers endless segfaults in userspace (init) with gcc7 while everything is
-> >> > fine with gcc6. I have confirmation on my test farm the problem happens as well.
-> >> >
-> >> > Since debugging in userspace is far easier, I would suggest attacking the debug
-> >> > with Petr on userspace side, and once sorted out, come back to kernel side.
-> >> 
-> >> sorry for the delay, I was awaiting to test gcc 7.2 and binutils 2.29.
-> >> Unfortunately, same issue: XZ-compressed data is corrupt - System Halted.
-> >
-> > Has anyone been able to debug this further? It seems there are also issues
-> > on iop32x/n2100 with GCC 7.2 and binutils 2.29.1 - early boot hangs silently
-> > and I cannot get earlyprintk to work. Compiling with GCC 6.4.0 it's OK.
+Am Sonntag, 15. Oktober 2017, 12:31:29 CEST schrieb Hans Verkuil:
+> On 10/14/2017 04:52 PM, Heiko Stuebner wrote:
+> > Am Samstag, 14. Oktober 2017, 15:14:40 CEST schrieb Pierre-Hugues Husson:
+> >>> Nice! I had a similar dw-hdmi.c patch pending but got around to posting it.
+> >>>
+> >>> I'll brush off my old rk3288 patches and see if I can get CEC enabled
+> >>> for my firefly-reload. I was close to getting it work, but I guess
+> >>> missed the "enable cec pin" change.
+> >> Please note that on rk3288, there are two CEC pins, and you must write
+> >> in RK3288_GRF_SOC_CON8 which pin you're using.
+> >> On the firefly-reload, the pin used is GPIO7C0, while the default pin
+> >> configuration is GPIO7C7.
+> > 
+> > And as an additional note, later socs have even more of these pin-routing
+> > settings and we currently have infrastructure in the pinctrl driver to do
+> > this automatically depending on the pinctrl settings.
+> > 
+> > So most likely this can also be added there for the rk3288.
+> > 
+> > 
+> > Heiko
+> > 
 > 
-> I didn't find the time for GCC 7.2 testing.
-> Yet I have earlyprintk working on my platforms, you need :
->  - on kernel command line for ttyS0 in my case :
->    earlycon=early_pxa,mmio,0x40100000
+> How does 'GPIO7C0' translate to a 'rockchip,pins' line?
+> 
+> I have this in rk3288-firefly-reload.dts:
+> 
+>        hdmi {
+>                 hdmi_cec: hdmi-cec {
+>                         rockchip,pins = <7 16 RK_FUNC_2 &pcfg_pull_none>;
+>                 };
+>         };
+> 
+> I think this is correct. You can find my patches for the firefly reload here:
 
-It dies already during decompression so earlycon does not help much.
+Yep, looks correct (i.e. we have 8 pins per A,B,C,D bank, so C0 is pin 16)
+but as a helping measure we now also have constants, RK_PC7 in your case.
 
-This seems to be simpler to debug/reproduce using busybox. Compiling
-just busybox with GCC 7.2 and march=armv5te/mtune=xscale already
-produces failing xz decompression:
+> https://git.linuxtv.org/hverkuil/media_tree.git/log/?h=firefly2
+> 
+> I don't have access to my firefly reload until Friday, so I can't test this
+> until then.
+> 
+> I'd be very grateful though if you can check the last three patches in that
+> branch. It's just a test branch, so the subject/changelog of those patches
+> are incomplete.
 
-root at thecus-n2100:~$ echo foo > foo.txt
-root at thecus-n2100:~$ xz foo.txt 
-root at thecus-n2100:~$ ./busybox.gcc-7.2 xz -d foo.txt.xz 
-xz: corrupted data
-root at thecus-n2100:~$ ./busybox.gcc-6.4 xz -d foo.txt.xz 
-root at thecus-n2100:~$ cat foo.txt
-foo
+While basically ok, I'd suggest having the cec pin definitions in rk3288.dtsi,
+like adding entries "hdmi-cec-c0" and "hdmi-cec-c7" or similar and selecting
+the correct one per board, so that we don't need to duplicate them into each
+and every board dts.
 
-gzip is no better:
+The cec pin function is after all a function of the soc itself.
 
-root at thecus-n2100:~$ gzip foo.txt 
-root at thecus-n2100:~$ ./busybox.gcc-7.2 gzip -d foo.txt.gz 
-gzip: crc error
-root at thecus-n2100:~$ ./busybox.gcc-6.4 gzip -d foo.txt.gz 
-root at thecus-n2100:~$ cat foo.txt
-foo
 
-With bigger files (e.g. compressed binary), gzip gets stuck and produces
-an ever growing file.
+> The very last patch adds CEC support for the firefly/firefly beta. I don't
+> have that hardware, so I won't be able to test that.
 
-This requires specific hardware to reproduce:
+at least in the schematics for the old firefly-rk3288 it specifies gpio7c0
+as cec pin, similar to the reload but in your patch you selected gpio7c7?
 
-root at thecus-n2100:~$ cat /proc/cpuinfo 
-processor       : 0
-model name      : XScale-80219 rev 0 (v5l)
-BogoMIPS        : 591.87
-Features        : swp half thumb fastmult edsp 
-CPU implementer : 0x69
-CPU architecture: 5TE
-CPU variant     : 0x0
-CPU part        : 0x2e3
-CPU revision    : 0
+Especially as gpio7c7 is part of the debug uart, this would be quite strange.
 
-Hardware        : Thecus N2100
-Revision        : 0000
-Serial          : 0000000000000000
 
-The same failing binary (busybox.gcc-7.2) seems to work fine on RPi 2...?!
-
-Anyway it seems that GCC 7.2 is unsuitable for building Linux at least
-for some ARM platforms.
-
-A.
+Heiko
