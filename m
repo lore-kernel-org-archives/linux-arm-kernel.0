@@ -1,84 +1,117 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 15 Oct 2017 10:04:16 +0200
-Subject: [PATCH] ARM: head-common.S: Clear lr before jumping to
- start_kernel()
-In-Reply-To: <20171014141405.GG23750@n2100.armlinux.org.uk>
-References: <1507044184-27152-1-git-send-email-geert+renesas@glider.be>
- <nycvar.YSQ.7.76.1710031134140.5407@knanqh.ubzr>
- <CAMuHMdWJKQb5JY+diH=7dqNuypkPUqBeOEPSLOrfrnbfh2siRQ@mail.gmail.com>
- <CAMuHMdXpPfipmEdW0Dap6Pjwhz3QxLcrcbtU0RhCu721k-sBpA@mail.gmail.com>
- <CAMuHMdWH_pebSYAp04gmVceu3qqPczGaXS36R8CtzAYHo-CNog@mail.gmail.com>
- <20171010203324.GX4394@atomide.com>
- <20171012102341.GF23750@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1710121123530.1718@knanqh.ubzr>
- <20171014141405.GG23750@n2100.armlinux.org.uk>
-Message-ID: <CAMuHMdX7Z0D2unRqC9z04f0MVsxLuVxouvquyYBHKavnycfh=w@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sun, 15 Oct 2017 17:04:54 +0900
+Subject: [PATCH v2 1/3] dt-bindings: nvmem: add description for UniPhier
+ eFuse
+In-Reply-To: <CAL_JsqJdbLFHqEU8+1e_hvA3Hd1MLJHETWAkd2pcsXpDKwONog@mail.gmail.com>
+References: <1507266180-11840-1-git-send-email-hayashibara.keiji@socionext.com>
+ <1507266180-11840-2-git-send-email-hayashibara.keiji@socionext.com>
+ <20171013134902.7gvmkvxvwnjlmstp@rob-hp-laptop>
+ <CAK7LNARg6G152joHq06RkPab=NoWEkFArvF+Ccc1behdXFokmg@mail.gmail.com>
+ <CAL_JsqJdbLFHqEU8+1e_hvA3Hd1MLJHETWAkd2pcsXpDKwONog@mail.gmail.com>
+Message-ID: <CAK7LNASpHvnicebVLbOgTDCmPp7UDVkf4FYWGsjAiB8ENo_2iw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 14, 2017 at 4:14 PM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Thu, Oct 12, 2017 at 11:25:50AM -0400, Nicolas Pitre wrote:
->> On Thu, 12 Oct 2017, Russell King - ARM Linux wrote:
+2017-10-14 3:42 GMT+09:00 Rob Herring <robh@kernel.org>:
+> On Fri, Oct 13, 2017 at 11:04 AM, Masahiro Yamada
+> <yamada.masahiro@socionext.com> wrote:
+>> Hi Rob,
 >>
->> > On Tue, Oct 10, 2017 at 01:33:25PM -0700, Tony Lindgren wrote:
->> > > * Geert Uytterhoeven <geert@linux-m68k.org> [171003 11:32]:
->> > > > On Tue, Oct 3, 2017 at 8:15 PM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
->> > > > > On Tue, Oct 3, 2017 at 8:11 PM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
->> > > > >> On Tue, Oct 3, 2017 at 5:37 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
->> > > > >>> On Tue, 3 Oct 2017, Geert Uytterhoeven wrote:
->> > > > >>> Please send it to RMK's patch system.
->> > > > >>
->> > > > >> Done (I hope so ;-)
->> > > > >
->> > > > > Failed. Retrying.
->> > > >
->> > > > Yiha ;-)
->> > > >
->> > > > http://www.armlinux.org.uk/developer/patches/viewpatch.php?id=8702/1
->> > >
->> > > This also fixes the spamming I started seeing with next-20171009:
->> > >
->> > > Tested-by: Tony Lindgren <tony@atomide.com>
->> >
->> > It's all nice and good that people are testing this patch, but I can't
->> > apply it to -rc1, nor my "misc" branch.  It appears that this is due
->> > to patches going through other trees.
->> >
->> > Sorry, I can't take this patch.
 >>
->> It should go into your devel-testing branch as this must be applied on
->> top of my xip_zdata branch that you merged there.
+>> 2017-10-13 22:49 GMT+09:00 Rob Herring <robh@kernel.org>:
+>>> On Fri, Oct 06, 2017 at 02:02:58PM +0900, Keiji Hayashibara wrote:
+>>>> Add uniphier-efuse dt-bindings documentation.
+>>>>
+>>>> Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
+>>>> ---
+>>>>  .../devicetree/bindings/nvmem/uniphier-efuse.txt   | 49 ++++++++++++++++++++++
+>>>>  1 file changed, 49 insertions(+)
+>>>>  create mode 100644 Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt b/Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt
+>>>> new file mode 100644
+>>>> index 0000000..1a394e5
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt
+>>>> @@ -0,0 +1,49 @@
+>>>> += UniPhier eFuse device tree bindings =
+>>>> +
+>>>> +This UniPhier eFuse must be under soc-glue.
+>>>> +
+>>>> +Required properties:
+>>>> +- compatible: should be "socionext,uniphier-efuse"
+>>>> +- reg: should contain the register location and length
+>>>> +
+>>>> += Data cells =
+>>>> +Are child nodes of efuse, bindings of which as described in
+>>>> +bindings/nvmem/nvmem.txt
+>>>> +
+>>>> +Example:
+>>>> +
+>>>> +     soc-glue at 5f900000 {
+>>>> +             compatible = "socionext,uniphier-ld20-soc-glue-debug",
+>>>> +                          "simple-mfd";
+>>>> +             #address-cells = <1>;
+>>>> +             #size-cells = <1>;
+>>>> +             ranges = <0x0 0x5f900000 0x2000>;
+>>>> +
+>>>> +             efuse at 100 {
+>>>> +                     compatible = "socionext,uniphier-efuse";
+>>>> +                     reg = <0x100 0x28>;
+>>>> +             };
+>>>> +
+>>>> +             efuse at 200 {
+>>>> +                     compatible = "socionext,uniphier-efuse";
+>>>> +                     reg = <0x200 0x68>;
+>>>> +                     #address-cells = <1>;
+>>>> +                     #size-cells = <1>;
+>>>> +
+>>>> +                     /* Data cells */
+>>>> +                     usb_mon: usb_mon {
+>>>
+>>> Don't use '_' and needs a unit-address. Build your dtb with W=2 option
+>>> and you'll get these warnings.
+>>
+>>
+>> Do you mean "usb_mon: usb-mon at 54" ?
 >
-> Thanks, it would've been good to have known that ahead of time.
+> Yes.
 >
-> It's why the patch system has the KernelVersion: tag:
+>> DT files in kernel sprinkle tons of warnings even with W=1.
+>>
+>> I always eliminate W=1, so I agree with "@54".
+>>
+>> I do not care W=2 much.
+>> If you see arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi,
+>> yeah, I generally use '-' for node names, but I see some exceptions.
+>>
+>> You admitted -Wnode_name_chars_strict is "subjective"
+>> in commit 8654cb8d0371.
 >
->  6. Kernel version.
->     On a separate line, add a tag "KernelVersion: " followed by the kernel
->     version that the patch was generated against. This should be formatted
->     as "KernelVersion: 2.6.0-rmk1"
+> Yes, meaning fixing existing cases is questionable and I'd put doing
+> so at a lower priority. I didn't mean it is up to each person to
+> decide whether they like to use '_' or not.
 >
-> This is because that information is relevant for knowing where it should
-> be applied, and to which branch.  Having it be something else means I
-> have to guess, and that can result in the patch being discarded in this
-> manner if I don't find where it's supposed to be applied.
+>> If you are unhappy about it, we can fix,
+>> but I am not sure how picky we should be.
+>
+> Let me put it clearly: Don't add new warnings with W=2.
 
-That's why we have the standard Fixes tag, which was included
-Fixes: 9520b1a1b5f7a348 ("ARM: head-common.S: speed up startup code")
 
-It's trivial for the repo maintainer to know which branch the fix to apply to,
-given the Fixes tag.
-It's non-trivial to know the branch for the patch submitter, who is forced to
-use a non-standard patch submission system.
+OK.
 
-Gr{oetje,eeting}s,
+usb_mon: usb_mon {
 
-                        Geert
+should be fixed.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Srinivas forwarded this to Greg,
+but I guess Greg has not applied this yet.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+The author can do re-spin,
+or a follow-up patch will do if it is too late.
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
