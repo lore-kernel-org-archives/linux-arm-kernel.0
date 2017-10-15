@@ -1,117 +1,207 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun, 15 Oct 2017 17:04:54 +0900
-Subject: [PATCH v2 1/3] dt-bindings: nvmem: add description for UniPhier
- eFuse
-In-Reply-To: <CAL_JsqJdbLFHqEU8+1e_hvA3Hd1MLJHETWAkd2pcsXpDKwONog@mail.gmail.com>
-References: <1507266180-11840-1-git-send-email-hayashibara.keiji@socionext.com>
- <1507266180-11840-2-git-send-email-hayashibara.keiji@socionext.com>
- <20171013134902.7gvmkvxvwnjlmstp@rob-hp-laptop>
- <CAK7LNARg6G152joHq06RkPab=NoWEkFArvF+Ccc1behdXFokmg@mail.gmail.com>
- <CAL_JsqJdbLFHqEU8+1e_hvA3Hd1MLJHETWAkd2pcsXpDKwONog@mail.gmail.com>
-Message-ID: <CAK7LNASpHvnicebVLbOgTDCmPp7UDVkf4FYWGsjAiB8ENo_2iw@mail.gmail.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Sun, 15 Oct 2017 16:26:18 +0800
+Subject: [PATCH v5 02/12] mmc: mediatek: add support of mt2701/mt2712
+In-Reply-To: <1507689696-25928-3-git-send-email-chaotian.jing@mediatek.com>
+References: <1507689696-25928-1-git-send-email-chaotian.jing@mediatek.com>
+ <1507689696-25928-3-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <1508055978.8978.5.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-10-14 3:42 GMT+09:00 Rob Herring <robh@kernel.org>:
-> On Fri, Oct 13, 2017 at 11:04 AM, Masahiro Yamada
-> <yamada.masahiro@socionext.com> wrote:
->> Hi Rob,
->>
->>
->> 2017-10-13 22:49 GMT+09:00 Rob Herring <robh@kernel.org>:
->>> On Fri, Oct 06, 2017 at 02:02:58PM +0900, Keiji Hayashibara wrote:
->>>> Add uniphier-efuse dt-bindings documentation.
->>>>
->>>> Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
->>>> ---
->>>>  .../devicetree/bindings/nvmem/uniphier-efuse.txt   | 49 ++++++++++++++++++++++
->>>>  1 file changed, 49 insertions(+)
->>>>  create mode 100644 Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt b/Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt
->>>> new file mode 100644
->>>> index 0000000..1a394e5
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt
->>>> @@ -0,0 +1,49 @@
->>>> += UniPhier eFuse device tree bindings =
->>>> +
->>>> +This UniPhier eFuse must be under soc-glue.
->>>> +
->>>> +Required properties:
->>>> +- compatible: should be "socionext,uniphier-efuse"
->>>> +- reg: should contain the register location and length
->>>> +
->>>> += Data cells =
->>>> +Are child nodes of efuse, bindings of which as described in
->>>> +bindings/nvmem/nvmem.txt
->>>> +
->>>> +Example:
->>>> +
->>>> +     soc-glue at 5f900000 {
->>>> +             compatible = "socionext,uniphier-ld20-soc-glue-debug",
->>>> +                          "simple-mfd";
->>>> +             #address-cells = <1>;
->>>> +             #size-cells = <1>;
->>>> +             ranges = <0x0 0x5f900000 0x2000>;
->>>> +
->>>> +             efuse at 100 {
->>>> +                     compatible = "socionext,uniphier-efuse";
->>>> +                     reg = <0x100 0x28>;
->>>> +             };
->>>> +
->>>> +             efuse at 200 {
->>>> +                     compatible = "socionext,uniphier-efuse";
->>>> +                     reg = <0x200 0x68>;
->>>> +                     #address-cells = <1>;
->>>> +                     #size-cells = <1>;
->>>> +
->>>> +                     /* Data cells */
->>>> +                     usb_mon: usb_mon {
->>>
->>> Don't use '_' and needs a unit-address. Build your dtb with W=2 option
->>> and you'll get these warnings.
->>
->>
->> Do you mean "usb_mon: usb-mon at 54" ?
->
-> Yes.
->
->> DT files in kernel sprinkle tons of warnings even with W=1.
->>
->> I always eliminate W=1, so I agree with "@54".
->>
->> I do not care W=2 much.
->> If you see arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi,
->> yeah, I generally use '-' for node names, but I see some exceptions.
->>
->> You admitted -Wnode_name_chars_strict is "subjective"
->> in commit 8654cb8d0371.
->
-> Yes, meaning fixing existing cases is questionable and I'd put doing
-> so at a lower priority. I didn't mean it is up to each person to
-> decide whether they like to use '_' or not.
->
->> If you are unhappy about it, we can fix,
->> but I am not sure how picky we should be.
->
-> Let me put it clearly: Don't add new warnings with W=2.
+Hi, Chaotian:
 
+On Wed, 2017-10-11 at 10:41 +0800, Chaotian Jing wrote:
+> mt2701/mt2712 has 12bit clock div, which is not compatible with
+> mt8135/mt8173. and, some additional features will be added in
+> mt2701/mt2712, so that need distinguish it by comatibale name.
+> 
+> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> ---
+>  drivers/mmc/host/mtk-sd.c | 82 +++++++++++++++++++++++++++++++++++++++--------
+>  1 file changed, 69 insertions(+), 13 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+> index 267f7ab..643c795 100644
+> --- a/drivers/mmc/host/mtk-sd.c
+> +++ b/drivers/mmc/host/mtk-sd.c
+> @@ -95,6 +95,9 @@
+>  #define MSDC_CFG_CKDIV          (0xff << 8)	/* RW */
+>  #define MSDC_CFG_CKMOD          (0x3 << 16)	/* RW */
+>  #define MSDC_CFG_HS400_CK_MODE  (0x1 << 18)	/* RW */
+> +#define MSDC_CFG_HS400_CK_MODE_EXTRA  (0x1 << 22)	/* RW */
+> +#define MSDC_CFG_CKDIV_EXTRA    (0xfff << 8)	/* RW */
+> +#define MSDC_CFG_CKMOD_EXTRA    (0x3 << 20)	/* RW */
+>  
+>  /* MSDC_IOCON mask */
+>  #define MSDC_IOCON_SDR104CKS    (0x1 << 0)	/* RW */
+> @@ -295,6 +298,10 @@ struct msdc_save_para {
+>  	u32 emmc50_cfg0;
+>  };
+>  
+> +struct mtk_mmc_compatible {
+> +	u8 clk_div_bits;
+> +};
+> +
+>  struct msdc_tune_para {
+>  	u32 iocon;
+>  	u32 pad_tune;
+> @@ -309,6 +316,7 @@ struct msdc_delay_phase {
+>  
+>  struct msdc_host {
+>  	struct device *dev;
+> +	const struct mtk_mmc_compatible *dev_comp;
+>  	struct mmc_host *mmc;	/* mmc structure */
+>  	int cmd_rsp;
+>  
+> @@ -350,6 +358,31 @@ struct msdc_host {
+>  	struct msdc_tune_para saved_tune_para; /* tune result of CMD21/CMD19 */
+>  };
+>  
+> +static const struct mtk_mmc_compatible mt8135_compat = {
+> +	.clk_div_bits = 8,
+> +};
+> +
+> +static const struct mtk_mmc_compatible mt8173_compat = {
+> +	.clk_div_bits = 8,
+> +};
+> +
+> +static const struct mtk_mmc_compatible mt2701_compat = {
+> +	.clk_div_bits = 12,
+> +};
+> +
+> +static const struct mtk_mmc_compatible mt2712_compat = {
+> +	.clk_div_bits = 12,
+> +};
+> +
+> +static const struct of_device_id msdc_of_ids[] = {
+> +	{ .compatible = "mediatek,mt8135-mmc", .data = &mt8135_compat},
+> +	{ .compatible = "mediatek,mt8173-mmc", .data = &mt8173_compat},
 
-OK.
+Because mt8135_compat is equal to mt8173_compat, so I think the
+compatible of "mediatek,mt8173-mmc" is redundant. You could just keep
+compatible of "mediatek,mt8135-mmc" in driver, and use
+"mediatek,mt8135-mmc" for both mt8135.dtsi and mt8173.dtsi.
 
-usb_mon: usb_mon {
+> +	{ .compatible = "mediatek,mt2701-mmc", .data = &mt2701_compat},
+> +	{ .compatible = "mediatek,mt2712-mmc", .data = &mt2712_compat},
 
-should be fixed.
+Ditto.
 
-Srinivas forwarded this to Greg,
-but I guess Greg has not applied this yet.
+Regards,
+CK
 
-The author can do re-spin,
-or a follow-up patch will do if it is too late.
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(of, msdc_of_ids);
+> +
+>  static void sdr_set_bits(void __iomem *reg, u32 bs)
+>  {
+>  	u32 val = readl(reg);
+> @@ -509,7 +542,12 @@ static void msdc_set_timeout(struct msdc_host *host, u32 ns, u32 clks)
+>  		timeout = (ns + clk_ns - 1) / clk_ns + clks;
+>  		/* in 1048576 sclk cycle unit */
+>  		timeout = (timeout + (0x1 << 20) - 1) >> 20;
+> -		sdr_get_field(host->base + MSDC_CFG, MSDC_CFG_CKMOD, &mode);
+> +		if (host->dev_comp->clk_div_bits == 8)
+> +			sdr_get_field(host->base + MSDC_CFG,
+> +				      MSDC_CFG_CKMOD, &mode);
+> +		else
+> +			sdr_get_field(host->base + MSDC_CFG,
+> +				      MSDC_CFG_CKMOD_EXTRA, &mode);
+>  		/*DDR mode will double the clk cycles for data timeout */
+>  		timeout = mode >= 2 ? timeout * 2 : timeout;
+>  		timeout = timeout > 1 ? timeout - 1 : 0;
+> @@ -548,7 +586,11 @@ static void msdc_set_mclk(struct msdc_host *host, unsigned char timing, u32 hz)
+>  
+>  	flags = readl(host->base + MSDC_INTEN);
+>  	sdr_clr_bits(host->base + MSDC_INTEN, flags);
+> -	sdr_clr_bits(host->base + MSDC_CFG, MSDC_CFG_HS400_CK_MODE);
+> +	if (host->dev_comp->clk_div_bits == 8)
+> +		sdr_clr_bits(host->base + MSDC_CFG, MSDC_CFG_HS400_CK_MODE);
+> +	else
+> +		sdr_clr_bits(host->base + MSDC_CFG,
+> +			     MSDC_CFG_HS400_CK_MODE_EXTRA);
+>  	if (timing == MMC_TIMING_UHS_DDR50 ||
+>  	    timing == MMC_TIMING_MMC_DDR52 ||
+>  	    timing == MMC_TIMING_MMC_HS400) {
+> @@ -568,8 +610,12 @@ static void msdc_set_mclk(struct msdc_host *host, unsigned char timing, u32 hz)
+>  
+>  		if (timing == MMC_TIMING_MMC_HS400 &&
+>  		    hz >= (host->src_clk_freq >> 1)) {
+> -			sdr_set_bits(host->base + MSDC_CFG,
+> -				     MSDC_CFG_HS400_CK_MODE);
+> +			if (host->dev_comp->clk_div_bits == 8)
+> +				sdr_set_bits(host->base + MSDC_CFG,
+> +					     MSDC_CFG_HS400_CK_MODE);
+> +			else
+> +				sdr_set_bits(host->base + MSDC_CFG,
+> +					     MSDC_CFG_HS400_CK_MODE_EXTRA);
+>  			sclk = host->src_clk_freq >> 1;
+>  			div = 0; /* div is ignore when bit18 is set */
+>  		}
+> @@ -587,8 +633,15 @@ static void msdc_set_mclk(struct msdc_host *host, unsigned char timing, u32 hz)
+>  			sclk = (host->src_clk_freq >> 2) / div;
+>  		}
+>  	}
+> -	sdr_set_field(host->base + MSDC_CFG, MSDC_CFG_CKMOD | MSDC_CFG_CKDIV,
+> -		      (mode << 8) | div);
+> +	if (host->dev_comp->clk_div_bits == 8)
+> +		sdr_set_field(host->base + MSDC_CFG,
+> +			      MSDC_CFG_CKMOD | MSDC_CFG_CKDIV,
+> +			      (mode << 8) | div);
+> +	else
+> +		sdr_set_field(host->base + MSDC_CFG,
+> +			      MSDC_CFG_CKMOD_EXTRA | MSDC_CFG_CKDIV_EXTRA,
+> +			      (mode << 12) | div);
+> +
+>  	sdr_set_bits(host->base + MSDC_CFG, MSDC_CFG_CKPDN);
+>  	while (!(readl(host->base + MSDC_CFG) & MSDC_CFG_CKSTB))
+>  		cpu_relax();
+> @@ -1617,12 +1670,17 @@ static int msdc_drv_probe(struct platform_device *pdev)
+>  	struct mmc_host *mmc;
+>  	struct msdc_host *host;
+>  	struct resource *res;
+> +	const struct of_device_id *of_id;
+>  	int ret;
+>  
+>  	if (!pdev->dev.of_node) {
+>  		dev_err(&pdev->dev, "No DT found\n");
+>  		return -EINVAL;
+>  	}
+> +
+> +	of_id = of_match_node(msdc_of_ids, pdev->dev.of_node);
+> +	if (!of_id)
+> +		return -EINVAL;
+>  	/* Allocate MMC host for this device */
+>  	mmc = mmc_alloc_host(sizeof(struct msdc_host), &pdev->dev);
+>  	if (!mmc)
+> @@ -1686,11 +1744,15 @@ static int msdc_drv_probe(struct platform_device *pdev)
+>  	msdc_of_property_parse(pdev, host);
+>  
+>  	host->dev = &pdev->dev;
+> +	host->dev_comp = of_id->data;
+>  	host->mmc = mmc;
+>  	host->src_clk_freq = clk_get_rate(host->src_clk);
+>  	/* Set host parameters to mmc */
+>  	mmc->ops = &mt_msdc_ops;
+> -	mmc->f_min = DIV_ROUND_UP(host->src_clk_freq, 4 * 255);
+> +	if (host->dev_comp->clk_div_bits == 8)
+> +		mmc->f_min = DIV_ROUND_UP(host->src_clk_freq, 4 * 255);
+> +	else
+> +		mmc->f_min = DIV_ROUND_UP(host->src_clk_freq, 4 * 4095);
+>  
+>  	mmc->caps |= MMC_CAP_ERASE | MMC_CAP_CMD23;
+>  	/* MMC core transfer sizes tunable parameters */
+> @@ -1839,12 +1901,6 @@ static int msdc_runtime_resume(struct device *dev)
+>  	SET_RUNTIME_PM_OPS(msdc_runtime_suspend, msdc_runtime_resume, NULL)
+>  };
+>  
+> -static const struct of_device_id msdc_of_ids[] = {
+> -	{   .compatible = "mediatek,mt8135-mmc", },
+> -	{}
+> -};
+> -MODULE_DEVICE_TABLE(of, msdc_of_ids);
+> -
+>  static struct platform_driver mt_msdc_driver = {
+>  	.probe = msdc_drv_probe,
+>  	.remove = msdc_drv_remove,
