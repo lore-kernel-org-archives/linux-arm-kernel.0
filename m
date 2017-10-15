@@ -1,242 +1,89 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 15 Oct 2017 11:38:48 +0100
-Subject: [PATCH v3 1/4] iio: adc: ina2xx: Make max expected current
- configurable
-In-Reply-To: <1507814282-1486-2-git-send-email-m.purski@samsung.com>
-References: <1507814282-1486-1-git-send-email-m.purski@samsung.com>
- <CGME20171012131814eucas1p172faad38314e077e3395befaceef77af@eucas1p1.samsung.com>
- <1507814282-1486-2-git-send-email-m.purski@samsung.com>
-Message-ID: <20171015113848.7f0d678f@archlinux>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Sun, 15 Oct 2017 13:46:40 +0300
+Subject: ARM: pxa/corgi: armv5te kernel 4.12 fails to decompress compiled
+ with gcc7
+In-Reply-To: <87mv4txuid.fsf@belgarion.home>
+References: <CAAQYJAvR2_wqf2Axe4aVMOu08t7w5tNEjK0s3fw_oemtqCRo7g@mail.gmail.com>
+ <87a83zsiid.fsf@belgarion.home>
+ <CAAQYJAtEmJMc766kUx+bhFCNQKmwK53nSDNL0nFz-9UXSUO5CQ@mail.gmail.com>
+ <20171014215042.kfrhb2kjhm7wb7vb@darkstar.musicnaut.iki.fi>
+ <87mv4txuid.fsf@belgarion.home>
+Message-ID: <20171015104640.hazujjkbqyik7fgg@darkstar.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 12 Oct 2017 15:17:59 +0200
-Maciej Purski <m.purski@samsung.com> wrote:
+Hi,
 
-> Max expected current is used for calculating calibration register value,
-> Current LSB and Power LSB according to equations found in ina datasheet:
-> current_lsb = max_expected_current / 2^15
-> calibration_register = 0.00512 / (current_lsb * r_shunt)
-> power_lsb = 25 * current_lsb (for ina231, 230, 226)
-> power_lsb = 20 * current_lsb (for older ones)
+On Sat, Oct 14, 2017 at 11:57:30PM +0200, Robert Jarzmik wrote:
+> Aaro Koskinen <aaro.koskinen@iki.fi> writes:
+> > On Sat, Sep 02, 2017 at 11:50:55PM +0200, Andrea Adami wrote:
+> >> On Thu, Jul 20, 2017 at 8:57 AM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> >> > Andrea Adami <andrea.adami@gmail.com> writes:
+> >> > I have the same report on userspace side on buildroot from Petr [1], which
+> >> > triggers endless segfaults in userspace (init) with gcc7 while everything is
+> >> > fine with gcc6. I have confirmation on my test farm the problem happens as well.
+> >> >
+> >> > Since debugging in userspace is far easier, I would suggest attacking the debug
+> >> > with Petr on userspace side, and once sorted out, come back to kernel side.
+> >> 
+> >> sorry for the delay, I was awaiting to test gcc 7.2 and binutils 2.29.
+> >> Unfortunately, same issue: XZ-compressed data is corrupt - System Halted.
+> >
+> > Has anyone been able to debug this further? It seems there are also issues
+> > on iop32x/n2100 with GCC 7.2 and binutils 2.29.1 - early boot hangs silently
+> > and I cannot get earlyprintk to work. Compiling with GCC 6.4.0 it's OK.
 > 
-> Max expected current is now implicitly set to default value,
-> which is 2^15, thanks to which Current LSB is equal to 1 mA and
-> Power LSB is equal to 20000 uW or 25000 uW depending on ina model, but
-> users have no impact on the precision of the device.
-> 
-> Make max expected current configurable from device tree or platform_data.
-> Allow changing current_lsb from sysfs. It is exposed in sysfs as
-> scale attribute for IIO current channel. Update calibration register and
-> power_lsb value on each scale change.
-> 
-> Signed-off-by: Maciej Purski <m.purski@samsung.com>
-I'm going to hold off on this until the discussion around Stefan's
-point in the thread
-Re: [2/3] iio: adc: ina2xx: Adhere to documented ABI, use Ohm instead of uOhm
-is addressed.
+> I didn't find the time for GCC 7.2 testing.
+> Yet I have earlyprintk working on my platforms, you need :
+>  - on kernel command line for ttyS0 in my case :
+>    earlycon=early_pxa,mmio,0x40100000
 
-There he points out that current_lsb and presumably the calibration register
-are just conveniences, but that they result in lost precision.
+It dies already during decompression so earlycon does not help much.
 
-As I understand it, Stefan's suggestion is that we always use a fixed
-value and perform any 'calibration' by providing appropriate scale values
-to let it be done in userspace where floating point is available.
+This seems to be simpler to debug/reproduce using busybox. Compiling
+just busybox with GCC 7.2 and march=armv5te/mtune=xscale already
+produces failing xz decompression:
 
-Other than that fundamental question of whether this makes sense at all,
-the below looks good to me.
+root at thecus-n2100:~$ echo foo > foo.txt
+root at thecus-n2100:~$ xz foo.txt 
+root at thecus-n2100:~$ ./busybox.gcc-7.2 xz -d foo.txt.xz 
+xz: corrupted data
+root at thecus-n2100:~$ ./busybox.gcc-6.4 xz -d foo.txt.xz 
+root at thecus-n2100:~$ cat foo.txt
+foo
 
-Jonathan
-> ---
->  drivers/iio/adc/ina2xx-adc.c         | 96 ++++++++++++++++++++++++++----------
->  include/linux/platform_data/ina2xx.h |  2 +
->  2 files changed, 73 insertions(+), 25 deletions(-)
-> 
-> diff --git a/drivers/iio/adc/ina2xx-adc.c b/drivers/iio/adc/ina2xx-adc.c
-> index a16f8c6..be26dfc 100644
-> --- a/drivers/iio/adc/ina2xx-adc.c
-> +++ b/drivers/iio/adc/ina2xx-adc.c
-> @@ -56,6 +56,7 @@
->  #define INA226_DEFAULT_IT		1110
->  
->  #define INA2XX_RSHUNT_DEFAULT           10000
-> +#define INA2XX_MAX_EXPECTED_MA_DEFAULT	BIT(15)	/* current_lsb = 1 mA */
->  
->  /*
->   * bit masks for reading the settings in the configuration register
-> @@ -114,7 +115,7 @@ struct ina2xx_config {
->  	int shunt_div;
->  	int bus_voltage_shift;
->  	int bus_voltage_lsb;	/* uV */
-> -	int power_lsb;		/* uW */
-> +	int power_lsb_factor;
->  	enum ina2xx_ids chip_id;
->  };
->  
-> @@ -123,7 +124,9 @@ struct ina2xx_chip_info {
->  	struct task_struct *task;
->  	const struct ina2xx_config *config;
->  	struct mutex state_lock;
-> -	unsigned int shunt_resistor;
-> +	unsigned int shunt_resistor;		/* uOhms */
-> +	int current_lsb;			/* uA */
-> +	int power_lsb;				/* uW */
->  	int avg;
->  	int int_time_vbus; /* Bus voltage integration time uS */
->  	int int_time_vshunt; /* Shunt voltage integration time uS */
-> @@ -137,7 +140,7 @@ static const struct ina2xx_config ina2xx_config[] = {
->  		.shunt_div = 100,
->  		.bus_voltage_shift = 3,
->  		.bus_voltage_lsb = 4000,
-> -		.power_lsb = 20000,
-> +		.power_lsb_factor = 20,
->  		.chip_id = ina219,
->  	},
->  	[ina226] = {
-> @@ -146,7 +149,7 @@ static const struct ina2xx_config ina2xx_config[] = {
->  		.shunt_div = 400,
->  		.bus_voltage_shift = 0,
->  		.bus_voltage_lsb = 1250,
-> -		.power_lsb = 25000,
-> +		.power_lsb_factor = 25,
->  		.chip_id = ina226,
->  	},
->  };
-> @@ -210,14 +213,15 @@ static int ina2xx_read_raw(struct iio_dev *indio_dev,
->  
->  		case INA2XX_POWER:
->  			/* processed (mW) = raw*lsb (uW) / 1000 */
-> -			*val = chip->config->power_lsb;
-> +			*val = chip->power_lsb;
->  			*val2 = 1000;
->  			return IIO_VAL_FRACTIONAL;
->  
->  		case INA2XX_CURRENT:
-> -			/* processed (mA) = raw (mA) */
-> -			*val = 1;
-> -			return IIO_VAL_INT;
-> +			/* processed (mA) = raw*lsb (uA) / 1000 */
-> +			*val = chip->current_lsb;
-> +			*val2 = 1000;
-> +			return IIO_VAL_FRACTIONAL;
->  		}
->  	}
->  
-> @@ -353,6 +357,36 @@ static int ina219_set_int_time_vshunt(struct ina2xx_chip_info *chip,
->  	return 0;
->  }
->  
-> +/*
-> + * Calculate calibration value according to equation 1 in ina226 datasheet
-> + * http://www.ti.com/lit/ds/symlink/ina226.pdf.
-> + * Current LSB is in uA and RShunt is in uOhms, so RShunt should be
-> + * converted to mOhms in order to keep the scale.
-> + * There is no need to expose the CALIBRATION register
-> + * to the user for now. But we need to reset this register
-> + * if the user updates RShunt or max expected current after driver
-> + * init, e.g upon reading an EEPROM/Probe-type value.
-> + */
-> +static int ina2xx_set_calibration(struct ina2xx_chip_info *chip)
-> +{
-> +	unsigned int rshunt = DIV_ROUND_CLOSEST(chip->shunt_resistor, 1000);
-> +	u16 regval = DIV_ROUND_CLOSEST(chip->config->calibration_factor,
-> +				     chip->current_lsb * rshunt);
-> +
-> +	return regmap_write(chip->regmap, INA2XX_CALIBRATION, regval);
-> +}
-> +
-> +static int ina2xx_set_scale(struct ina2xx_chip_info *chip, unsigned int val)
-> +{
-> +	if (val <= 0 || val > chip->config->calibration_factor)
-> +		return -EINVAL;
-> +
-> +	chip->current_lsb = val;
-> +	chip->power_lsb = chip->current_lsb * chip->config->power_lsb_factor;
-> +
-> +	return 0;
-> +}
-> +
->  static int ina2xx_write_raw(struct iio_dev *indio_dev,
->  			    struct iio_chan_spec const *chan,
->  			    int val, int val2, long mask)
-> @@ -394,7 +428,18 @@ static int ina2xx_write_raw(struct iio_dev *indio_dev,
->  							       &tmp);
->  		}
->  		break;
-> -
-> +	case IIO_CHAN_INFO_SCALE:
-> +		switch (chan->type) {
-> +		case IIO_CURRENT:
-> +			val = val * 1000 + DIV_ROUND_CLOSEST(val2, 1000);
-> +			ret = ina2xx_set_scale(chip, val);
-> +			if (!ret)
-> +				ret = ina2xx_set_calibration(chip);
-> +			break;
-> +		default:
-> +			ret = -EINVAL;
-> +		}
-> +		break;
->  	default:
->  		ret = -EINVAL;
->  	}
-> @@ -433,22 +478,6 @@ static ssize_t ina2xx_allow_async_readout_store(struct device *dev,
->  	return len;
->  }
->  
-> -/*
-> - * Set current LSB to 1mA, shunt is in uOhms
-> - * (equation 13 in datasheet). We hardcode a Current_LSB
-> - * of 1.0 x10-6. The only remaining parameter is RShunt.
-> - * There is no need to expose the CALIBRATION register
-> - * to the user for now. But we need to reset this register
-> - * if the user updates RShunt after driver init, e.g upon
-> - * reading an EEPROM/Probe-type value.
-> - */
-> -static int ina2xx_set_calibration(struct ina2xx_chip_info *chip)
-> -{
-> -	u16 regval = DIV_ROUND_CLOSEST(chip->config->calibration_factor,
-> -				   chip->shunt_resistor);
-> -
-> -	return regmap_write(chip->regmap, INA2XX_CALIBRATION, regval);
-> -}
->  
->  static int set_shunt_resistor(struct ina2xx_chip_info *chip, unsigned int val)
->  {
-> @@ -849,6 +878,23 @@ static int ina2xx_probe(struct i2c_client *client,
->  	if (ret)
->  		return ret;
->  
-> +	if (of_property_read_u32(client->dev.of_node,
-> +				"ti-max-expected-current-milliamp", &val) < 0) {
-> +		struct ina2xx_platform_data *pdata =
-> +		    dev_get_platdata(&client->dev);
-> +
-> +		if (pdata && pdata->max_mA != 0)
-> +			val = pdata->max_mA;
-> +		else
-> +			val = INA2XX_MAX_EXPECTED_MA_DEFAULT;
-> +	}
-> +
-> +	/* Calculate current_lsb: max-expected-current / 2^15 */
-> +	val = DIV_ROUND_CLOSEST(val * 1000, (1 << 15));
-> +	ret = ina2xx_set_scale(chip, val);
-> +	if (ret)
-> +		return ret;
-> +
->  	/* Patch the current config register with default. */
->  	val = chip->config->config_default;
->  
-> diff --git a/include/linux/platform_data/ina2xx.h b/include/linux/platform_data/ina2xx.h
-> index 9abc0ca..f02b1d8 100644
-> --- a/include/linux/platform_data/ina2xx.h
-> +++ b/include/linux/platform_data/ina2xx.h
-> @@ -13,7 +13,9 @@
->  /**
->   * struct ina2xx_platform_data - ina2xx info
->   * @shunt_uohms		shunt resistance in microohms
-> + * @max_mA		max expected current in mA
->   */
->  struct ina2xx_platform_data {
->  	long shunt_uohms;
-> +	int max_mA;
->  };
+gzip is no better:
+
+root at thecus-n2100:~$ gzip foo.txt 
+root at thecus-n2100:~$ ./busybox.gcc-7.2 gzip -d foo.txt.gz 
+gzip: crc error
+root at thecus-n2100:~$ ./busybox.gcc-6.4 gzip -d foo.txt.gz 
+root at thecus-n2100:~$ cat foo.txt
+foo
+
+With bigger files (e.g. compressed binary), gzip gets stuck and produces
+an ever growing file.
+
+This requires specific hardware to reproduce:
+
+root at thecus-n2100:~$ cat /proc/cpuinfo 
+processor       : 0
+model name      : XScale-80219 rev 0 (v5l)
+BogoMIPS        : 591.87
+Features        : swp half thumb fastmult edsp 
+CPU implementer : 0x69
+CPU architecture: 5TE
+CPU variant     : 0x0
+CPU part        : 0x2e3
+CPU revision    : 0
+
+Hardware        : Thecus N2100
+Revision        : 0000
+Serial          : 0000000000000000
+
+The same failing binary (busybox.gcc-7.2) seems to work fine on RPi 2...?!
+
+Anyway it seems that GCC 7.2 is unsuitable for building Linux at least
+for some ARM platforms.
+
+A.
