@@ -1,24 +1,33 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 15 Oct 2017 13:42:19 -0200
-Subject: [PATCH v3] cpufreq: imx6q: Move speed grading check to cpufreq
- driver
-In-Reply-To: <20171013065141.GI8833@dragon>
-References: <1506784606-2064-1-git-send-email-festevam@gmail.com>
- <20171004061328.GC8478@vireshk-i7> <20171013065141.GI8833@dragon>
-Message-ID: <CAOMZO5AwB_2Nbky1wA8neU2-2-LDCTCMFOKGQk4jn5O9zuwKpQ@mail.gmail.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Sun, 15 Oct 2017 22:06:32 +0200
+Subject: [PATCH v2 1/3] dt-bindings: Add vendor prefix for ProBox2
+In-Reply-To: <20170919215454.5820-1-afaerber@suse.de>
+References: <7c7224a9-b0a6-caa4-483a-d9613af48d13@suse.de>
+ <20170919215454.5820-1-afaerber@suse.de>
+Message-ID: <b878c64c-b071-8f77-35eb-59154577a358@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+Am 19.09.2017 um 23:54 schrieb Andreas F?rber:
+> PROBOX2 is a TV box brand by Hong Kong based online reseller W2COMP
+> Company Limited.
+> 
+> Cc: support at probox2.com
+> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>  v1 -> v2:
+>  * Extend the vendor prefix explanation with info provided by PROBOX2
+>  * Fix the commit message accordingly
 
-On Fri, Oct 13, 2017 at 3:51 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+No objections to the v2 texts, so full series applied:
 
->> Looks fine to me.
->>
->> @Shawn: Can you please let us know if you are fine with it?
->
-> Acked-by: Shawn Guo <shawnguo@kernel.org>
+https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-realtek.git/log/?h=v4.15/dt64
 
-Will this one go through your tree?
+Thanks,
+Andreas
 
-Thanks
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
