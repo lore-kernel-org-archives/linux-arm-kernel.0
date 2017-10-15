@@ -1,44 +1,50 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 15 Oct 2017 18:53:57 -0200
-Subject: [PATCH v2 1/2] ARM: dts: imx6q-novena: Use the 'vpcie-supply' property
-Message-ID: <1508100838-13406-1-git-send-email-festevam@gmail.com>
+Date: Sun, 15 Oct 2017 18:53:58 -0200
+Subject: [PATCH v2 2/2] ARM: dts: imx6q-cm-fx6: Use the 'vpcie-supply' property
+In-Reply-To: <1508100838-13406-1-git-send-email-festevam@gmail.com>
+References: <1508100838-13406-1-git-send-email-festevam@gmail.com>
+Message-ID: <1508100838-13406-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Since commit c26ebe98a103 ("PCI: imx6: Add regulator support"), it is
-possible to pass the 'vpcie-supply' property to describe the PCIE supply.
+According to Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt,
+the property for specifying the PCIe regulator is 'vpcie-supply', so
+use the correct one.
 
-This way we can remove the 'regulator-always-on' property from the
-regulator and have a better device tree description.
+Also fix the polarity of GPIO2_24 so that the regulator can operate
+correctly.
 
-Cc: Marek Vasut <marex@denx.de>
+Cc: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
 Changes since v1:
-- None
+- Also fix the GPIO2_24 polarity. (Christopher)
 
- arch/arm/boot/dts/imx6q-novena.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/imx6q-cm-fx6.dts | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6q-novena.dts b/arch/arm/boot/dts/imx6q-novena.dts
-index d83cfb6..eadc371 100644
---- a/arch/arm/boot/dts/imx6q-novena.dts
-+++ b/arch/arm/boot/dts/imx6q-novena.dts
-@@ -158,7 +158,6 @@
- 		regulator-max-microvolt = <1500000>;
- 		gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
- 		enable-active-high;
--		regulator-always-on;
+diff --git a/arch/arm/boot/dts/imx6q-cm-fx6.dts b/arch/arm/boot/dts/imx6q-cm-fx6.dts
+index fe6ab0a..bc7587c 100644
+--- a/arch/arm/boot/dts/imx6q-cm-fx6.dts
++++ b/arch/arm/boot/dts/imx6q-cm-fx6.dts
+@@ -77,8 +77,7 @@
+ 		regulator-name = "regulator-pcie-power-on-gpio";
+ 		regulator-min-microvolt = <3300000>;
+ 		regulator-max-microvolt = <3300000>;
+-		gpio = <&gpio2 24 GPIO_ACTIVE_HIGH>;
+-		enable-active-high;
++		gpio = <&gpio2 24 GPIO_ACTIVE_LOW>;
  	};
  
- 	reg_sata: regulator-sata {
-@@ -447,6 +446,7 @@
+ 	reg_usb_h1_vbus: usb_h1_vbus {
+@@ -362,7 +361,7 @@
  	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_pcie_novena>;
- 	reset-gpio = <&gpio3 29 GPIO_ACTIVE_LOW>;
-+	vpcie-supply = <&reg_pcie>;
+ 	pinctrl-0 = <&pinctrl_pcie>;
+ 	reset-gpio = <&gpio1 26 GPIO_ACTIVE_LOW>;
+-	vdd-supply = <&reg_pcie_power_on_gpio>;
++	vpcie-supply = <&reg_pcie_power_on_gpio>;
  	status = "okay";
  };
  
