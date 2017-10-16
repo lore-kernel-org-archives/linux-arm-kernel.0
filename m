@@ -1,45 +1,52 @@
-From: gengdj.1984@gmail.com (gengdongjiu)
-Date: Mon, 16 Oct 2017 21:44:59 +0800
-Subject: [PATCH v6 5/7] arm64: kvm: route synchronous external abort
- exceptions to el2
-In-Reply-To: <59E49BB8.8080801@arm.com>
-References: <1503916701-13516-1-git-send-email-gengdongjiu@huawei.com>
- <1503916701-13516-6-git-send-email-gengdongjiu@huawei.com>
- <59B17449.6010201@arm.com> <fb7da3e3-d0f7-7ac6-b088-888a563d7ee7@huawei.com>
- <59E49BB8.8080801@arm.com>
-Message-ID: <CAMj-D2Bn8HUL=HJO-tysisVT4HSTZW0z-xY-1w1EsgPvShFooQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 16 Oct 2017 14:48:19 +0100
+Subject: ARM64: Regression with commit e3067861ba66 ("arm64: add basic
+ VMAP_STACK support")
+In-Reply-To: <20171016011723.GB12470@leoy-linaro>
+References: <20171010142725.GA24797@leoy-linaro>
+ <20171010154558.GJ27659@leverpostej>
+ <da09fd83-f3f0-f800-fea4-988cfa56bac7@arm.com>
+ <20171016011723.GB12470@leoy-linaro>
+Message-ID: <20171016134819.jv3udrcwsedc4cgs@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+Hi Leo,
 
->
->> Today I added the support to do some minimal emulation for
->> RAS-Error-Record registers, thanks
->> for the good suggestion.
->
-> Where can I find this patch?
-> I'd like to repost it as part of the SError_rework/RAS/IESB series: this is
-> one
-> of the bits KVM needs but I didn't touch as it looks like your updated
-> version
-> of this patch should cover it.
+On Mon, Oct 16, 2017 at 09:17:23AM +0800, Leo Yan wrote:
+> On Tue, Oct 10, 2017 at 05:03:44PM +0100, Robin Murphy wrote:
+> > On 10/10/17 16:45, Mark Rutland wrote:
+> > > On Tue, Oct 10, 2017 at 10:27:25PM +0800, Leo Yan wrote:
+> > >> I work mainline kernel on Hikey620 board, I find it's easily to
+> > >> introduce the panic and report the log as below. So I bisect the kernel
+> > >> and finally narrow down the commit e3067861ba66 ("arm64: add basic
+> > >> VMAP_STACK support") which introduce this issue.
+> > >>
+> > >> I tried to remove 'select HAVE_ARCH_VMAP_STACK' from
+> > >> arch/arm64/Kconfig, then I can see the panic issue will dismiss. So
+> > >> could you check this and have insight for this issue?
+> > > 
+> > > Given the stuff in the backtrace, my suspicion is something is trying to
+> > > perform DMA to/from the stack, getting junk addresses form the attempted
+> > > virt<->phys conversions.
+> > > 
+> > > Could you try enabling both VMAP_STACK and CONFIG_DEBUG_VIRTUAL?
+> > 
+> > CONFIG_DMA_API_DEBUG should scream about drivers trying to use stack
+> > addresses either way, too.
+> 
+> Thanks for suggestions, Mark & Robin.
+> 
+> I enabled these debugging configs but cannot get clue from it; but
+> occasionally found this issue is quite likely related with CA53 errata,
+> especialy ERRATA_A53_855873 is the relative one. So I changed to use
+> ARM-TF mainline code with ERRATA fixing, this issue can be dismissed.
 
-I have updated this patch according your suggestion that do some
-emulation for the ERR* trap. and have verified it. but still not sent
-it out. Tomorrow I will send it out for your review(now it is Chinese
-midnight), if you think it is ok, you can add it as part of the
-SError_rework/RAS/IESB series. thanks for your reminder and good
-review comments.
+Thanks for the update.
 
+Just to confirm, with the updated firmware you no longer see the issue?
 
->
->
-> Thanks,
->
-> James
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
->
+I can't immediately see how that would be related.
+
+Thanks,
+Mark.
