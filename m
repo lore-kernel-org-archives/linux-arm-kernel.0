@@ -1,129 +1,34 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 16 Oct 2017 10:58:45 +0100
-Subject: [PATCH v3 04/13] arm64: alternatives: use tpidr_el2 on VHE hosts
-In-Reply-To: <59E0EEE5.2020208@arm.com>
-References: <20170922182614.27885-1-james.morse@arm.com>
- <20170922182614.27885-5-james.morse@arm.com>
- <20171013153148.dnejsvhxeui6opfw@armageddon.cambridge.arm.com>
- <59E0EEE5.2020208@arm.com>
-Message-ID: <20171016095845.htg2g4jkyw3nvzub@armageddon.cambridge.arm.com>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Mon, 16 Oct 2017 17:59:13 +0800
+Subject: [PATCH 0/5] rockchip: kevin: Enable edp display
+Message-ID: <20171016095918.25588-1-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 13, 2017 at 05:50:45PM +0100, James Morse wrote:
-> Hi Catalin,
-> 
-> On 13/10/17 16:31, Catalin Marinas wrote:
-> > On Fri, Sep 22, 2017 at 07:26:05PM +0100, James Morse wrote:
-> >> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> >> index cd52d365d1f0..8e4c7da2b126 100644
-> >> --- a/arch/arm64/kernel/cpufeature.c
-> >> +++ b/arch/arm64/kernel/cpufeature.c
-> 
-> >> @@ -1308,3 +1309,25 @@ static int __init enable_mrs_emulation(void)
-> >>  }
-> >>  
-> >>  late_initcall(enable_mrs_emulation);
-> >> +
-> >> +int cpu_copy_el2regs(void *__unused)
-> >> +{
-> >> +	int do_copyregs = 0;
-> >> +
-> >> +	/*
-> >> +	 * Copy register values that aren't redirected by hardware.
-> >> +	 *
-> >> +	 * Before code patching, we only set tpidr_el1, all CPUs need to copy
-> >> +	 * this value to tpidr_el2 before we patch the code. Once we've done
-> >> +	 * that, freshly-onlined CPUs will set tpidr_el2, so we don't need to
-> >> +	 * do anything here.
-> >> +	 */
-> >> +	asm volatile(ALTERNATIVE("mov %0, #1", "mov %0, #0",
-> >> +				 ARM64_HAS_VIRT_HOST_EXTN)
-> >> +		    : "=r" (do_copyregs) : : );
-> > 
-> > Can you just do:
-> > 
-> > 	if (cpu_have_const_cap(ARM64_HAS_VIRT_HOST_EXTN))
-> > 		write_sysreg(read_sysreg(tpidr_el1), tpidr_el2);
-> > 
-> > At this point the capability bits should be set and the jump labels
-> > enabled.
-> 
-> These are enabled too early, we haven't done patching yet.
-> 
-> We need to copy tpidr_el1 -> tpidr_el2 on all CPUs that are online before code
-> patching.
-> 
-> After code patching new CPUs set tpidr_el2 when they come online, so we don't
-> need to do the copy... but this enable method is still called. There is nothing
-> for us to do, and tpidr_el1 now contains junk, so the copy
 
-Ah, I get it now (should've read the comment but I usually expect the
-code to be obvious; it wasn't, at least to me, in this case ;)). You
-could have added the sysreg copying directly in the asm volatile.
+Make edp display works on chromebook kevin(at least for boot animation).
 
-Anyway, I think it's better if we keep it entirely in C with this hunk
-(untested):
+Also solve some issues i meet during the bringup.
 
---------------8<------------------------------
-diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
-index 6e1cb8c5af4d..f9e2f69f296e 100644
---- a/arch/arm64/include/asm/alternative.h
-+++ b/arch/arm64/include/asm/alternative.h
-@@ -11,6 +11,8 @@
- #include <linux/stddef.h>
- #include <linux/stringify.h>
- 
-+extern int alternatives_applied;
-+
- struct alt_instr {
- 	s32 orig_offset;	/* offset to original instruction */
- 	s32 alt_offset;		/* offset to replacement instruction */
-diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
-index 6dd0a3a3e5c9..414288a558c8 100644
---- a/arch/arm64/kernel/alternative.c
-+++ b/arch/arm64/kernel/alternative.c
-@@ -32,6 +32,8 @@
- #define ALT_ORIG_PTR(a)		__ALT_PTR(a, orig_offset)
- #define ALT_REPL_PTR(a)		__ALT_PTR(a, alt_offset)
- 
-+int alternatives_applied;
-+
- struct alt_region {
- 	struct alt_instr *begin;
- 	struct alt_instr *end;
-@@ -143,7 +145,6 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
-  */
- static int __apply_alternatives_multi_stop(void *unused)
- {
--	static int patched = 0;
- 	struct alt_region region = {
- 		.begin	= (struct alt_instr *)__alt_instructions,
- 		.end	= (struct alt_instr *)__alt_instructions_end,
-@@ -151,14 +152,14 @@ static int __apply_alternatives_multi_stop(void *unused)
- 
- 	/* We always have a CPU 0 at this point (__init) */
- 	if (smp_processor_id()) {
--		while (!READ_ONCE(patched))
-+		while (!READ_ONCE(alternatives_applied))
- 			cpu_relax();
- 		isb();
- 	} else {
--		BUG_ON(patched);
-+		BUG_ON(alternatives_applied);
- 		__apply_alternatives(&region, true);
- 		/* Barriers provided by the cache flushing */
--		WRITE_ONCE(patched, 1);
-+		WRITE_ONCE(alternatives_applied, 1);
- 	}
- 
- 	return 0;
---------------8<------------------------------
 
-and in the cpu_copy_el2regs():
+Jeffy Chen (4):
+  arm64: dts: rockchip: Enable edp disaplay on kevin
+  backlight: pwm_bl: Add device link for pwm_bl and pwm
+  drm/rockchip: Fix error handling path in rockchip_dp_bind()
+  drm/rockchip: Add device links for master and components
 
-	if (!READ_ONCE(alternatives_applied))
- 		write_sysreg(read_sysreg(tpidr_el1), tpidr_el2);
+Tomasz Figa (1):
+  drm/bridge/analogix: Do not use device's drvdata
+
+ arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts  | 29 +++++++++++
+ arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi       | 16 ++++++
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 50 ++++++++-----------
+ drivers/gpu/drm/exynos/exynos_dp.c                 | 26 +++++-----
+ drivers/gpu/drm/rockchip/analogix_dp-rockchip.c    | 57 ++++++++++++++--------
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c        | 24 +++++++--
+ drivers/video/backlight/pwm_bl.c                   |  2 +
+ include/drm/bridge/analogix_dp.h                   | 19 +++++---
+ 8 files changed, 151 insertions(+), 72 deletions(-)
 
 -- 
-Catalin
+2.11.0
