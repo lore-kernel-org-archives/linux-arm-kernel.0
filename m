@@ -1,74 +1,31 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Mon, 16 Oct 2017 09:46:38 +0800
-Subject: [PATCH v6 11/12] mmc: mediatek: improve eMMC hs400 mode read
- performance
-In-Reply-To: <1508118399-21828-1-git-send-email-chaotian.jing@mediatek.com>
-References: <1508118399-21828-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <1508118399-21828-12-git-send-email-chaotian.jing@mediatek.com>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Mon, 16 Oct 2017 05:01:51 +0200
+Subject: [PATCH 1/3] dt-bindings: Add vendor prefix for MeLE
+In-Reply-To: <20171016030153.11078-1-afaerber@suse.de>
+References: <20171016030153.11078-1-afaerber@suse.de>
+Message-ID: <20171016030153.11078-2-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-enlarge outstanding value to improve read performance
+MeLE is a Chinese manufacturer of TV boxes and Mini PCs.
 
-Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+Cc: meleservice at mele.cn
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- drivers/mmc/host/mtk-sd.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-index d75a93d..95759bb 100644
---- a/drivers/mmc/host/mtk-sd.c
-+++ b/drivers/mmc/host/mtk-sd.c
-@@ -81,6 +81,7 @@
- #define PAD_DS_TUNE      0x188
- #define PAD_CMD_TUNE     0x18c
- #define EMMC50_CFG0      0x208
-+#define EMMC50_CFG3      0x220
- #define SDC_FIFO_CFG     0x228
- 
- /*--------------------------------------------------------------------------*/
-@@ -249,6 +250,8 @@
- #define EMMC50_CFG_CRCSTS_EDGE    (0x1 << 3)   /* RW */
- #define EMMC50_CFG_CFCSTS_SEL     (0x1 << 4)   /* RW */
- 
-+#define EMMC50_CFG3_OUTS_WR       (0x1f << 0)  /* RW */
-+
- #define SDC_FIFO_CFG_WRVALIDSEL   (0x1 << 24)  /* RW */
- #define SDC_FIFO_CFG_RDVALIDSEL   (0x1 << 25)  /* RW */
- 
-@@ -318,6 +321,7 @@ struct msdc_save_para {
- 	u32 pad_ds_tune;
- 	u32 pad_cmd_tune;
- 	u32 emmc50_cfg0;
-+	u32 emmc50_cfg3;
- 	u32 sdc_fifo_cfg;
- };
- 
-@@ -1747,6 +1751,9 @@ static int msdc_prepare_hs400_tuning(struct mmc_host *mmc, struct mmc_ios *ios)
- 	writel(host->hs400_ds_delay, host->base + PAD_DS_TUNE);
- 	/* hs400 mode must set it to 0 */
- 	sdr_clr_bits(host->base + MSDC_PATCH_BIT2, MSDC_PATCH_BIT2_CFGCRCSTS);
-+	/* to improve read performance, set outstanding to 2 */
-+	sdr_set_field(host->base + EMMC50_CFG3, EMMC50_CFG3_OUTS_WR, 2);
-+
- 	return 0;
- }
- 
-@@ -1997,6 +2004,7 @@ static void msdc_save_reg(struct msdc_host *host)
- 	host->save_para.pad_ds_tune = readl(host->base + PAD_DS_TUNE);
- 	host->save_para.pad_cmd_tune = readl(host->base + PAD_CMD_TUNE);
- 	host->save_para.emmc50_cfg0 = readl(host->base + EMMC50_CFG0);
-+	host->save_para.emmc50_cfg3 = readl(host->base + EMMC50_CFG3);
- 	host->save_para.sdc_fifo_cfg = readl(host->base + SDC_FIFO_CFG);
- }
- 
-@@ -2014,6 +2022,7 @@ static void msdc_restore_reg(struct msdc_host *host)
- 	writel(host->save_para.pad_ds_tune, host->base + PAD_DS_TUNE);
- 	writel(host->save_para.pad_cmd_tune, host->base + PAD_CMD_TUNE);
- 	writel(host->save_para.emmc50_cfg0, host->base + EMMC50_CFG0);
-+	writel(host->save_para.emmc50_cfg3, host->base + EMMC50_CFG3);
- 	writel(host->save_para.sdc_fifo_cfg, host->base + SDC_FIFO_CFG);
- }
- 
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index dbbde903682b..bc7f7b4618b4 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -199,6 +199,7 @@ mcube	mCube
+ meas	Measurement Specialties
+ mediatek	MediaTek Inc.
+ megachips	MegaChips
++mele	Shenzhen MeLE Digital Technology Ltd.
+ melexis	Melexis N.V.
+ melfas	MELFAS Inc.
+ mellanox	Mellanox Technologies
 -- 
-1.8.1.1.dirty
+2.13.6
