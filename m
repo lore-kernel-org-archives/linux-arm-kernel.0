@@ -1,46 +1,92 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 16 Oct 2017 12:29:25 +0200
-Subject: [PATCH v4 0/9] Mediatek MT2712 clock and scpsys support
-In-Reply-To: <1508136134.20464.49.camel@mtksdaap41>
-References: <1505793630-12590-1-git-send-email-weiyi.lu@mediatek.com>
- <20171012224540.GE18706@codeaurora.org>
- <ac7940d1-e23d-add2-b4b6-bd7cf66fea34@gmail.com>
- <1508136134.20464.49.camel@mtksdaap41>
-Message-ID: <4b2b1a94-2a0e-4c5e-030e-d35edb3ac2f1@gmail.com>
+From: harinikatakamlinux@gmail.com (Harini Katakam)
+Date: Mon, 16 Oct 2017 16:08:30 +0530
+Subject: [PATCH] Fix Bug for cadence i2c interrupt overrunning buffer
+In-Reply-To: <CA+Y=x3nnQ0hQkBaGQ4+MDZsVgpdFCYqaMae9UrJ2vOOuAD9FdQ@mail.gmail.com>
+References: <20170916030252.10680-1-amworsley@gmail.com>
+ <20171005120125.nnhomwg2e2twbaqm@ninjato>
+ <CA+Y=x3=Ab-tZt-32Ve1qTB=REuQAZnGbX72ZeNpyX3EX7cR0pg@mail.gmail.com>
+ <20171013184646.cy5gmpwrxbacje3m@ninjato>
+ <CAFcVECJTUu7Kwd-2hx=4=iGwKFnpTAebR3ffjJHQLHKDZ3T4aw@mail.gmail.com>
+ <CA+Y=x3nnQ0hQkBaGQ4+MDZsVgpdFCYqaMae9UrJ2vOOuAD9FdQ@mail.gmail.com>
+Message-ID: <CAFcVECK85xW_8oxVQGsHBGyZ4_5bcghpbonqDH-8tLp+Mwq=xQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Andrew,
 
+On Mon, Oct 16, 2017 at 2:48 PM, Andrew Worsley <amworsley@gmail.com> wrote:
+> Thanks I think I know understand how this transfer register is set up.
+> I will add some diagnostic printk's to track down exactly how it is
+> failing and get back to you.
+>
+>  Yes it is zynq. The test case is large (128 byte) transfers from a
+> tpm to fill an rng driver. I just pull large amounts of data via dd.
+>
+> It may depend on the i2c slave being willing to just respond to
+> requests that read arbitrary amounts of data. In this case the TPM
+> appeared to generate FF when requested for more data than was in the
+> TPM_RANDOM request.
+>
+>
+>
+> On 16 October 2017 at 16:55, Harini Katakam
+> <harinikatakamlinux@gmail.com> wrote:
+>> Hi Andrew,
+>>
+>> On Sat, Oct 14, 2017 at 12:16 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
+> .....
+>>>
+>>> So, let's add Harini Katakam to CC who implemented this. But I'd be
+>>> happy for anyone from Xilinx to respond...
+>>
+>> The workaround you are referring to is implemented under
+>> "if (cdns_is_holdquirk(id, hold_quirk)) {"
+>> and should not apply to your case of 128 byte transfer at all.
+>
+> Ah I can see the logic now. If the transfer is small (< 250 or so
+> bytes) it will just write it into the transfer register. Yes my
+> transfers are only 128 + some TPM related headers ( not big I expect).
+> ....
+>
+>
+>>
+>> The specific place you have problem is under the loop
+>> where RX data valid is being checked and ideally, that
+>> buffer should never be written with more data than requested -
+>> because no. of bytes requested is written to transfer size register,
+>> the same is the amount the controller (master) fetches and
+>> RX data valid remains set only for that duration.
+>
+> If the transfer register was set with the
 
-On 10/16/2017 08:42 AM, Weiyi Lu wrote:
-> On Fri, 2017-10-13 at 16:50 +0200, Matthias Brugger wrote:
+Yes, this is assuming the transfer size register was not set inittially
+or later with more byted than required.
+
 >>
->> On 10/13/2017 12:45 AM, Stephen Boyd wrote:
->>> On 09/19, Weiyi Lu wrote:
->>>> This series is based on v4.14-rc1 and composed of
->>>> clock control (PATCH 1-4) and scpsys control (PATCH 5-9)
->>>
->>> What's the merge plan? Can I apply the clk ones to clk tree and
->>> ignore the rest?
->>>
->>
->> Yes, please do so. I'll take scpsys, which depends on the clock patches.
+>> Are you using Zynq?
+>> I'm not working on this anymore but we could take a look at
+>> your error if we are able to reproduce it.
+>> Could you please provide more details of your application and
+>> setup?
 >>
 >> Regards,
->> Matthias
-> 
-> Hi Stephen & Matthias,
-> 
-> I will start to separate this patch set into three series
-> (clk/scpsys/dts) when I send the next version.
-> 
+>> Harini
+>
+> Yes - I will get back to you with more details and further debugging
+> around exactly how it is failing.
+>
+> Assuming it is not obvious how to fix it - perhaps I can try setting
+> the transfer register to zero when it hits the end of the transfer?
+> (if recv_count == 0).
 
-There are no comments on the clk patches, so no need to resend them, if Stephen 
-is ok with taking patch 1,2,3.
+Yes, that can be done as a workaround but ideally, the transfer
+size register should have decremented to zero by this point.
 
-If you want you can split out patch 4 and 9, but for me it's ok if they go 
-together with the scpsys driver. When scpsys is ready I will take them all 
-through my tree.
+>
+> Thanks very much Harini  - that was just the pointer I needed to
+> follow the code.
+
+Thanks for the information - please let me know what you find.
 
 Regards,
-Matthias
+Harini
