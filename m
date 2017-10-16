@@ -1,263 +1,236 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Mon, 16 Oct 2017 15:07:43 +0800
-Subject: [PATCH v5 6/7] soc: mediatek: pwrap: add support for MT7622 SoC
+Date: Mon, 16 Oct 2017 15:07:41 +0800
+Subject: [PATCH v5 4/7] soc: mediatek: pwrap: refactor pwrap_init for the
+ various PMIC types
 In-Reply-To: <cover.1508135937.git.sean.wang@mediatek.com>
 References: <cover.1508135937.git.sean.wang@mediatek.com>
-Message-ID: <f828c79152d02ead0431bee17ee349b1a3068d2e.1508135937.git.sean.wang@mediatek.com>
+Message-ID: <740aad1d877a32f162c3b18b45c019f32141ff0f.1508135937.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chenglin Xu <chenglin.xu@mediatek.com>
+From: Sean Wang <sean.wang@mediatek.com>
 
-Add the registers, callbacks and data structures required to make the
-PMIC wrapper work on MT7622.
+pwrap initialization is highly associated with the base SoC and the
+target PMICs, so slight refactorization is made here for allowing
+pwrap_init to run on those PMICs with different capability from the
+previous MediaTek PMICs and the determination for the enablement of the
+pwrap capability depending on PMIC type. Apart from this, the patch
+makes the driver more extensible especially when more PMICs join into
+the pwrap driver.
 
 Signed-off-by: Chenglin Xu <chenglin.xu@mediatek.com>
-Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 ---
- drivers/soc/mediatek/mtk-pmic-wrap.c | 180 +++++++++++++++++++++++++++++++++++
- 1 file changed, 180 insertions(+)
+ drivers/soc/mediatek/mtk-pmic-wrap.c | 130 ++++++++++++++++++++++++-----------
+ 1 file changed, 90 insertions(+), 40 deletions(-)
 
 diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-index a4cdc5f..9ac304a 100644
+index 2e435be..f764908 100644
 --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
 +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-@@ -214,6 +214,36 @@ enum pwrap_regs {
- 	PWRAP_ADC_RDATA_ADDR1,
- 	PWRAP_ADC_RDATA_ADDR2,
+@@ -70,6 +70,12 @@
+ 					  PWRAP_WDT_SRC_EN_HARB_STAUPD_DLE | \
+ 					  PWRAP_WDT_SRC_EN_HARB_STAUPD_ALE)
  
-+	/* MT7622 only regs */
-+	PWRAP_EINT_STA0_ADR,
-+	PWRAP_EINT_STA1_ADR,
-+	PWRAP_STA,
-+	PWRAP_CLR,
-+	PWRAP_DVFS_ADR8,
-+	PWRAP_DVFS_WDATA8,
-+	PWRAP_DVFS_ADR9,
-+	PWRAP_DVFS_WDATA9,
-+	PWRAP_DVFS_ADR10,
-+	PWRAP_DVFS_WDATA10,
-+	PWRAP_DVFS_ADR11,
-+	PWRAP_DVFS_WDATA11,
-+	PWRAP_DVFS_ADR12,
-+	PWRAP_DVFS_WDATA12,
-+	PWRAP_DVFS_ADR13,
-+	PWRAP_DVFS_WDATA13,
-+	PWRAP_DVFS_ADR14,
-+	PWRAP_DVFS_WDATA14,
-+	PWRAP_DVFS_ADR15,
-+	PWRAP_DVFS_WDATA15,
-+	PWRAP_EXT_CK,
-+	PWRAP_ADC_RDATA_ADDR,
-+	PWRAP_GPS_STA,
-+	PWRAP_SW_RST,
-+	PWRAP_DVFS_STEP_CTRL0,
-+	PWRAP_DVFS_STEP_CTRL1,
-+	PWRAP_DVFS_STEP_CTRL2,
-+	PWRAP_SPI2_CTRL,
++/* Group of bits used for shown slave capability */
++#define PWRAP_SLV_CAP_SPI	BIT(0)
++#define PWRAP_SLV_CAP_DUALIO	BIT(1)
++#define PWRAP_SLV_CAP_SECURITY	BIT(2)
++#define HAS_CAP(_c, _x)	(((_c) & (_x)) == (_x))
 +
- 	/* MT8135 only regs */
- 	PWRAP_CSHEXT,
- 	PWRAP_EVENT_IN_EN,
-@@ -336,6 +366,118 @@ static int mt2701_regs[] = {
- 	[PWRAP_ADC_RDATA_ADDR2] =	0x154,
- };
- 
-+static int mt7622_regs[] = {
-+	[PWRAP_MUX_SEL] =		0x0,
-+	[PWRAP_WRAP_EN] =		0x4,
-+	[PWRAP_DIO_EN] =		0x8,
-+	[PWRAP_SIDLY] =			0xC,
-+	[PWRAP_RDDMY] =			0x10,
-+	[PWRAP_SI_CK_CON] =		0x14,
-+	[PWRAP_CSHEXT_WRITE] =		0x18,
-+	[PWRAP_CSHEXT_READ] =		0x1C,
-+	[PWRAP_CSLEXT_START] =		0x20,
-+	[PWRAP_CSLEXT_END] =		0x24,
-+	[PWRAP_STAUPD_PRD] =		0x28,
-+	[PWRAP_STAUPD_GRPEN] =		0x2C,
-+	[PWRAP_EINT_STA0_ADR] =		0x30,
-+	[PWRAP_EINT_STA1_ADR] =		0x34,
-+	[PWRAP_STA] =			0x38,
-+	[PWRAP_CLR] =			0x3C,
-+	[PWRAP_STAUPD_MAN_TRIG] =	0x40,
-+	[PWRAP_STAUPD_STA] =		0x44,
-+	[PWRAP_WRAP_STA] =		0x48,
-+	[PWRAP_HARB_INIT] =		0x4C,
-+	[PWRAP_HARB_HPRIO] =		0x50,
-+	[PWRAP_HIPRIO_ARB_EN] =		0x54,
-+	[PWRAP_HARB_STA0] =		0x58,
-+	[PWRAP_HARB_STA1] =		0x5C,
-+	[PWRAP_MAN_EN] =		0x60,
-+	[PWRAP_MAN_CMD] =		0x64,
-+	[PWRAP_MAN_RDATA] =		0x68,
-+	[PWRAP_MAN_VLDCLR] =		0x6C,
-+	[PWRAP_WACS0_EN] =		0x70,
-+	[PWRAP_INIT_DONE0] =		0x74,
-+	[PWRAP_WACS0_CMD] =		0x78,
-+	[PWRAP_WACS0_RDATA] =		0x7C,
-+	[PWRAP_WACS0_VLDCLR] =		0x80,
-+	[PWRAP_WACS1_EN] =		0x84,
-+	[PWRAP_INIT_DONE1] =		0x88,
-+	[PWRAP_WACS1_CMD] =		0x8C,
-+	[PWRAP_WACS1_RDATA] =		0x90,
-+	[PWRAP_WACS1_VLDCLR] =		0x94,
-+	[PWRAP_WACS2_EN] =		0x98,
-+	[PWRAP_INIT_DONE2] =		0x9C,
-+	[PWRAP_WACS2_CMD] =		0xA0,
-+	[PWRAP_WACS2_RDATA] =		0xA4,
-+	[PWRAP_WACS2_VLDCLR] =		0xA8,
-+	[PWRAP_INT_EN] =		0xAC,
-+	[PWRAP_INT_FLG_RAW] =		0xB0,
-+	[PWRAP_INT_FLG] =		0xB4,
-+	[PWRAP_INT_CLR] =		0xB8,
-+	[PWRAP_SIG_ADR] =		0xBC,
-+	[PWRAP_SIG_MODE] =		0xC0,
-+	[PWRAP_SIG_VALUE] =		0xC4,
-+	[PWRAP_SIG_ERRVAL] =		0xC8,
-+	[PWRAP_CRC_EN] =		0xCC,
-+	[PWRAP_TIMER_EN] =		0xD0,
-+	[PWRAP_TIMER_STA] =		0xD4,
-+	[PWRAP_WDT_UNIT] =		0xD8,
-+	[PWRAP_WDT_SRC_EN] =		0xDC,
-+	[PWRAP_WDT_FLG] =		0xE0,
-+	[PWRAP_DEBUG_INT_SEL] =		0xE4,
-+	[PWRAP_DVFS_ADR0] =		0xE8,
-+	[PWRAP_DVFS_WDATA0] =		0xEC,
-+	[PWRAP_DVFS_ADR1] =		0xF0,
-+	[PWRAP_DVFS_WDATA1] =		0xF4,
-+	[PWRAP_DVFS_ADR2] =		0xF8,
-+	[PWRAP_DVFS_WDATA2] =		0xFC,
-+	[PWRAP_DVFS_ADR3] =		0x100,
-+	[PWRAP_DVFS_WDATA3] =		0x104,
-+	[PWRAP_DVFS_ADR4] =		0x108,
-+	[PWRAP_DVFS_WDATA4] =		0x10C,
-+	[PWRAP_DVFS_ADR5] =		0x110,
-+	[PWRAP_DVFS_WDATA5] =		0x114,
-+	[PWRAP_DVFS_ADR6] =		0x118,
-+	[PWRAP_DVFS_WDATA6] =		0x11C,
-+	[PWRAP_DVFS_ADR7] =		0x120,
-+	[PWRAP_DVFS_WDATA7] =		0x124,
-+	[PWRAP_DVFS_ADR8] =		0x128,
-+	[PWRAP_DVFS_WDATA8] =		0x12C,
-+	[PWRAP_DVFS_ADR9] =		0x130,
-+	[PWRAP_DVFS_WDATA9] =		0x134,
-+	[PWRAP_DVFS_ADR10] =		0x138,
-+	[PWRAP_DVFS_WDATA10] =		0x13C,
-+	[PWRAP_DVFS_ADR11] =		0x140,
-+	[PWRAP_DVFS_WDATA11] =		0x144,
-+	[PWRAP_DVFS_ADR12] =		0x148,
-+	[PWRAP_DVFS_WDATA12] =		0x14C,
-+	[PWRAP_DVFS_ADR13] =		0x150,
-+	[PWRAP_DVFS_WDATA13] =		0x154,
-+	[PWRAP_DVFS_ADR14] =		0x158,
-+	[PWRAP_DVFS_WDATA14] =		0x15C,
-+	[PWRAP_DVFS_ADR15] =		0x160,
-+	[PWRAP_DVFS_WDATA15] =		0x164,
-+	[PWRAP_SPMINF_STA] =		0x168,
-+	[PWRAP_CIPHER_KEY_SEL] =	0x16C,
-+	[PWRAP_CIPHER_IV_SEL] =		0x170,
-+	[PWRAP_CIPHER_EN] =		0x174,
-+	[PWRAP_CIPHER_RDY] =		0x178,
-+	[PWRAP_CIPHER_MODE] =		0x17C,
-+	[PWRAP_CIPHER_SWRST] =		0x180,
-+	[PWRAP_DCM_EN] =		0x184,
-+	[PWRAP_DCM_DBC_PRD] =		0x188,
-+	[PWRAP_EXT_CK] =		0x18C,
-+	[PWRAP_ADC_CMD_ADDR] =		0x190,
-+	[PWRAP_PWRAP_ADC_CMD] =		0x194,
-+	[PWRAP_ADC_RDATA_ADDR] =	0x198,
-+	[PWRAP_GPS_STA] =		0x19C,
-+	[PWRAP_SW_RST] =		0x1A0,
-+	[PWRAP_DVFS_STEP_CTRL0] =	0x238,
-+	[PWRAP_DVFS_STEP_CTRL1] =	0x23C,
-+	[PWRAP_DVFS_STEP_CTRL2] =	0x240,
-+	[PWRAP_SPI2_CTRL] =		0x244,
-+};
-+
- static int mt8173_regs[] = {
- 	[PWRAP_MUX_SEL] =		0x0,
- 	[PWRAP_WRAP_EN] =		0x4,
-@@ -499,6 +641,7 @@ enum pmic_type {
- 
- enum pwrap_type {
- 	PWRAP_MT2701,
-+	PWRAP_MT7622,
- 	PWRAP_MT8135,
- 	PWRAP_MT8173,
- };
-@@ -873,6 +1016,16 @@ static int pwrap_mt2701_init_reg_clock(struct pmic_wrapper *wrp)
+ /* defines for slave device wrapper registers */
+ enum dew_regs {
+ 	PWRAP_DEW_BASE,
+@@ -501,6 +507,8 @@ struct pmic_wrapper;
+ struct pwrap_slv_type {
+ 	const u32 *dew_regs;
+ 	enum pmic_type type;
++	/* Flags indicating the capability for the target slave */
++	u32 caps;
+ 	/* pwrap operations are highly associated with the PMIC types,
+ 	 * so the pointers added increases flexibility allowing determination
+ 	 * which type is used by the detection through device tree.
+@@ -785,6 +793,37 @@ static int pwrap_init_sidly(struct pmic_wrapper *wrp)
  	return 0;
  }
  
-+static int pwrap_mt7622_init_reg_clock(struct pmic_wrapper *wrp)
++static int pwrap_init_dual_io(struct pmic_wrapper *wrp)
 +{
-+	pwrap_writel(wrp, 0x0, PWRAP_CSHEXT_WRITE);
-+	pwrap_writel(wrp, 0x4, PWRAP_CSHEXT_READ);
-+	pwrap_writel(wrp, 0x2, PWRAP_CSLEXT_START);
-+	pwrap_writel(wrp, 0x2, PWRAP_CSLEXT_END);
++	int ret;
++	u32 rdata;
++
++	/* Enable dual IO mode */
++	pwrap_write(wrp, wrp->slave->dew_regs[PWRAP_DEW_DIO_EN], 1);
++
++	/* Check IDLE & INIT_DONE in advance */
++	ret = pwrap_wait_for_state(wrp,
++				   pwrap_is_fsm_idle_and_sync_idle);
++	if (ret) {
++		dev_err(wrp->dev, "%s fail, ret=%d\n", __func__, ret);
++		return ret;
++	}
++
++	pwrap_writel(wrp, 1, PWRAP_DIO_EN);
++
++	/* Read Test */
++	pwrap_read(wrp,
++		   wrp->slave->dew_regs[PWRAP_DEW_READ_TEST], &rdata);
++	if (rdata != PWRAP_DEW_READ_TEST_VAL) {
++		dev_err(wrp->dev,
++			"Read failed on DIO mode: 0x%04x!=0x%04x\n",
++			PWRAP_DEW_READ_TEST_VAL, rdata);
++		return -EFAULT;
++	}
 +
 +	return 0;
 +}
 +
- static bool pwrap_is_cipher_ready(struct pmic_wrapper *wrp)
+ static int pwrap_mt8135_init_reg_clock(struct pmic_wrapper *wrp)
  {
- 	return pwrap_readl(wrp, PWRAP_CIPHER_RDY) & 1;
-@@ -910,6 +1063,9 @@ static int pwrap_init_cipher(struct pmic_wrapper *wrp)
- 	case PWRAP_MT8173:
- 		pwrap_writel(wrp, 1, PWRAP_CIPHER_EN);
- 		break;
-+	case PWRAP_MT7622:
-+		pwrap_writel(wrp, 0, PWRAP_CIPHER_EN);
-+		break;
- 	}
- 
- 	/* Config cipher mode @PMIC */
-@@ -1053,6 +1209,15 @@ static int pwrap_mt2701_init_soc_specific(struct pmic_wrapper *wrp)
+ 	pwrap_writel(wrp, 0x4, PWRAP_CSHEXT);
+@@ -932,6 +971,30 @@ static int pwrap_init_cipher(struct pmic_wrapper *wrp)
  	return 0;
  }
  
-+static int pwrap_mt7622_init_soc_specific(struct pmic_wrapper *wrp)
++static int pwrap_init_security(struct pmic_wrapper *wrp)
 +{
-+	pwrap_writel(wrp, 0, PWRAP_STAUPD_PRD);
-+	/*enable 2wire SPI master*/
-+	pwrap_writel(wrp, 0x8000000, PWRAP_SPI2_CTRL);
++	int ret;
++
++	/* Enable encryption */
++	ret = pwrap_init_cipher(wrp);
++	if (ret)
++		return ret;
++
++	/* Signature checking - using CRC */
++	if (pwrap_write(wrp,
++			wrp->slave->dew_regs[PWRAP_DEW_CRC_EN], 0x1))
++		return -EFAULT;
++
++	pwrap_writel(wrp, 0x1, PWRAP_CRC_EN);
++	pwrap_writel(wrp, 0x0, PWRAP_SIG_MODE);
++	pwrap_writel(wrp, wrp->slave->dew_regs[PWRAP_DEW_CRC_VAL],
++		     PWRAP_SIG_ADR);
++	pwrap_writel(wrp,
++		     wrp->master->arb_en_all, PWRAP_HIPRIO_ARB_EN);
 +
 +	return 0;
 +}
 +
+ static int pwrap_mt8135_init_soc_specific(struct pmic_wrapper *wrp)
+ {
+ 	/* enable pwrap events and pwrap bridge in AP side */
+@@ -992,7 +1055,6 @@ static int pwrap_mt2701_init_soc_specific(struct pmic_wrapper *wrp)
  static int pwrap_init(struct pmic_wrapper *wrp)
  {
  	int ret;
-@@ -1224,6 +1389,18 @@ static const struct pmic_wrapper_type pwrap_mt2701 = {
- 	.init_soc_specific = pwrap_mt2701_init_soc_specific,
- };
+-	u32 rdata;
  
-+static const struct pmic_wrapper_type pwrap_mt7622 = {
-+	.regs = mt7622_regs,
-+	.type = PWRAP_MT7622,
-+	.arb_en_all = 0xff,
-+	.int_en_all = ~(u32)BIT(31),
-+	.spi_w = PWRAP_MAN_CMD_SPI_WRITE,
-+	.wdt_src = PWRAP_WDT_SRC_MASK_ALL,
-+	.has_bridge = 0,
-+	.init_reg_clock = pwrap_mt7622_init_reg_clock,
-+	.init_soc_specific = pwrap_mt7622_init_soc_specific,
-+};
-+
- static const struct pmic_wrapper_type pwrap_mt8135 = {
- 	.regs = mt8135_regs,
- 	.type = PWRAP_MT8135,
-@@ -1253,6 +1430,9 @@ static const struct of_device_id of_pwrap_match_tbl[] = {
- 		.compatible = "mediatek,mt2701-pwrap",
- 		.data = &pwrap_mt2701,
- 	}, {
-+		.compatible = "mediatek,mt7622-pwrap",
-+		.data = &pwrap_mt7622,
-+	}, {
- 		.compatible = "mediatek,mt8135-pwrap",
- 		.data = &pwrap_mt8135,
- 	}, {
+ 	reset_control_reset(wrp->rstc);
+ 	if (wrp->rstc_bridge)
+@@ -1004,10 +1066,12 @@ static int pwrap_init(struct pmic_wrapper *wrp)
+ 		pwrap_writel(wrp, 0, PWRAP_DCM_DBC_PRD);
+ 	}
+ 
+-	/* Reset SPI slave */
+-	ret = pwrap_reset_spislave(wrp);
+-	if (ret)
+-		return ret;
++	if (HAS_CAP(wrp->slave->caps, PWRAP_SLV_CAP_SPI)) {
++		/* Reset SPI slave */
++		ret = pwrap_reset_spislave(wrp);
++		if (ret)
++			return ret;
++	}
+ 
+ 	pwrap_writel(wrp, 1, PWRAP_WRAP_EN);
+ 
+@@ -1019,45 +1083,26 @@ static int pwrap_init(struct pmic_wrapper *wrp)
+ 	if (ret)
+ 		return ret;
+ 
+-	/* Setup serial input delay */
+-	ret = pwrap_init_sidly(wrp);
+-	if (ret)
+-		return ret;
+-
+-	/* Enable dual IO mode */
+-	pwrap_write(wrp, wrp->slave->dew_regs[PWRAP_DEW_DIO_EN], 1);
+-
+-	/* Check IDLE & INIT_DONE in advance */
+-	ret = pwrap_wait_for_state(wrp, pwrap_is_fsm_idle_and_sync_idle);
+-	if (ret) {
+-		dev_err(wrp->dev, "%s fail, ret=%d\n", __func__, ret);
+-		return ret;
++	if (HAS_CAP(wrp->slave->caps, PWRAP_SLV_CAP_SPI)) {
++		/* Setup serial input delay */
++		ret = pwrap_init_sidly(wrp);
++		if (ret)
++			return ret;
+ 	}
+ 
+-	pwrap_writel(wrp, 1, PWRAP_DIO_EN);
+-
+-	/* Read Test */
+-	pwrap_read(wrp, wrp->slave->dew_regs[PWRAP_DEW_READ_TEST], &rdata);
+-	if (rdata != PWRAP_DEW_READ_TEST_VAL) {
+-		dev_err(wrp->dev, "Read test failed after switch to DIO mode: 0x%04x != 0x%04x\n",
+-				PWRAP_DEW_READ_TEST_VAL, rdata);
+-		return -EFAULT;
++	if (HAS_CAP(wrp->slave->caps, PWRAP_SLV_CAP_DUALIO)) {
++		/* Enable dual I/O mode */
++		ret = pwrap_init_dual_io(wrp);
++		if (ret)
++			return ret;
+ 	}
+ 
+-	/* Enable encryption */
+-	ret = pwrap_init_cipher(wrp);
+-	if (ret)
+-		return ret;
+-
+-	/* Signature checking - using CRC */
+-	if (pwrap_write(wrp, wrp->slave->dew_regs[PWRAP_DEW_CRC_EN], 0x1))
+-		return -EFAULT;
+-
+-	pwrap_writel(wrp, 0x1, PWRAP_CRC_EN);
+-	pwrap_writel(wrp, 0x0, PWRAP_SIG_MODE);
+-	pwrap_writel(wrp, wrp->slave->dew_regs[PWRAP_DEW_CRC_VAL],
+-		     PWRAP_SIG_ADR);
+-	pwrap_writel(wrp, wrp->master->arb_en_all, PWRAP_HIPRIO_ARB_EN);
++	if (HAS_CAP(wrp->slave->caps, PWRAP_SLV_CAP_SECURITY)) {
++		/* Enable security on bus */
++		ret = pwrap_init_security(wrp);
++		if (ret)
++			return ret;
++	}
+ 
+ 	if (wrp->master->type == PWRAP_MT8135)
+ 		pwrap_writel(wrp, 0x7, PWRAP_RRARB_EN);
+@@ -1113,6 +1158,8 @@ static const struct regmap_config pwrap_regmap_config = {
+ static const struct pwrap_slv_type pmic_mt6323 = {
+ 	.dew_regs = mt6323_regs,
+ 	.type = PMIC_MT6323,
++	.caps = PWRAP_SLV_CAP_SPI | PWRAP_SLV_CAP_DUALIO |
++		PWRAP_SLV_CAP_SECURITY,
+ 	.pwrap_read = pwrap_read16,
+ 	.pwrap_write = pwrap_write16,
+ };
+@@ -1120,6 +1167,7 @@ static const struct pwrap_slv_type pmic_mt6323 = {
+ static const struct pwrap_slv_type pmic_mt6380 = {
+ 	.dew_regs = NULL,
+ 	.type = PMIC_MT6380,
++	.caps = 0,
+ 	.pwrap_read = pwrap_read32,
+ 	.pwrap_write = pwrap_write32,
+ };
+@@ -1127,6 +1175,8 @@ static const struct pwrap_slv_type pmic_mt6380 = {
+ static const struct pwrap_slv_type pmic_mt6397 = {
+ 	.dew_regs = mt6397_regs,
+ 	.type = PMIC_MT6397,
++	.caps = PWRAP_SLV_CAP_SPI | PWRAP_SLV_CAP_DUALIO |
++		PWRAP_SLV_CAP_SECURITY,
+ 	.pwrap_read = pwrap_read16,
+ 	.pwrap_write = pwrap_write16,
+ };
 -- 
 2.7.4
