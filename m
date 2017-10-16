@@ -1,96 +1,67 @@
-From: stefan.bruens@rwth-aachen.de (=?UTF-8?q?Stefan=20Br=C3=BCns?=)
-Date: Tue, 17 Oct 2017 01:06:34 +0200
-Subject: [PATCH v5 07/11] dmaengine: sun6i: Retrieve channel count/max request
- from devicetree
-In-Reply-To: <20170928014928.2272-1-stefan.bruens@rwth-aachen.de>
-References: <20170928014928.2272-1-stefan.bruens@rwth-aachen.de>
-Message-ID: <2200ff4f-67f6-45c7-a2c8-99d066af3391@rwthex-w2-a.rwth-ad.de>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 16 Oct 2017 16:20:07 -0700
+Subject: [PATCH] watchdog: lpc18xx_wdt: Convert timers to use timer_setup()
+Message-ID: <20171016232007.GA100300@beast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To avoid introduction of a new compatible for each small SoC/DMA controller
-variation, move the definition of the channel count to the devicetree.
+In preparation for unconditionally passing the struct timer_list pointer to
+all timer callbacks, switch to using the new timer_setup() and from_timer()
+to pass the timer pointer explicitly.
 
-The number of vchans is no longer explicit, but limited by the highest
-port/DMA request number. The result is a slight overallocation for SoCs
-with a sparse port mapping.
-
-Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-
+Cc: Wim Van Sebroeck <wim@iguana.be>
+Cc: Guenter Roeck <linux@roeck-us.net>
+Cc: linux-watchdog at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Kees Cook <keescook@chromium.org>
+Acked-by: Guenter Roeck <linux@roeck-us.net>
 ---
+ drivers/watchdog/lpc18xx_wdt.c | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
 
-Changes in v5:
-- Rebase on slave-dma/next tree
-
-Changes in v4:
-- remove range checks for dma-channels/dma-requests DT properties
-
-Changes in v3: None
-Changes in v2:
-- Set default number of dma-request if not provided in config or devicetree
-
- drivers/dma/sun6i-dma.c | 27 ++++++++++++++++++++++++++-
- 1 file changed, 26 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-index f27b126dd6cd..78653b97316e 100644
---- a/drivers/dma/sun6i-dma.c
-+++ b/drivers/dma/sun6i-dma.c
-@@ -42,6 +42,9 @@
+diff --git a/drivers/watchdog/lpc18xx_wdt.c b/drivers/watchdog/lpc18xx_wdt.c
+index 3b8bb59adf02..b4221f43cd94 100644
+--- a/drivers/watchdog/lpc18xx_wdt.c
++++ b/drivers/watchdog/lpc18xx_wdt.c
+@@ -78,10 +78,10 @@ static int lpc18xx_wdt_feed(struct watchdog_device *wdt_dev)
+ 	return 0;
+ }
  
- #define DMA_STAT		0x30
- 
-+/* Offset between DMA_IRQ_EN and DMA_IRQ_STAT limits number of channels */
-+#define DMA_MAX_CHANNELS	(DMA_IRQ_CHAN_NR * 0x10 / 4)
-+
- /*
-  * sun8i specific registers
-  */
-@@ -65,7 +68,8 @@
- #define DMA_CHAN_LLI_ADDR	0x08
- 
- #define DMA_CHAN_CUR_CFG	0x0c
--#define DMA_CHAN_CFG_SRC_DRQ(x)		((x) & 0x1f)
-+#define DMA_CHAN_MAX_DRQ		0x1f
-+#define DMA_CHAN_CFG_SRC_DRQ(x)		((x) & DMA_CHAN_MAX_DRQ)
- #define DMA_CHAN_CFG_SRC_IO_MODE	BIT(5)
- #define DMA_CHAN_CFG_SRC_LINEAR_MODE	(0 << 5)
- #define DMA_CHAN_CFG_SRC_BURST_A31(x)	(((x) & 0x3) << 7)
-@@ -1154,6 +1158,7 @@ MODULE_DEVICE_TABLE(of, sun6i_dma_match);
- 
- static int sun6i_dma_probe(struct platform_device *pdev)
+-static void lpc18xx_wdt_timer_feed(unsigned long data)
++static void lpc18xx_wdt_timer_feed(struct timer_list *t)
  {
-+	struct device_node *np = pdev->dev.of_node;
- 	struct sun6i_dma_dev *sdc;
- 	struct resource *res;
- 	int ret, i;
-@@ -1228,6 +1233,26 @@ static int sun6i_dma_probe(struct platform_device *pdev)
- 	sdc->num_vchans = sdc->cfg->nr_max_vchans;
- 	sdc->max_request = sdc->cfg->nr_max_requests;
+-	struct watchdog_device *wdt_dev = (struct watchdog_device *)data;
+-	struct lpc18xx_wdt_dev *lpc18xx_wdt = watchdog_get_drvdata(wdt_dev);
++	struct lpc18xx_wdt_dev *lpc18xx_wdt = from_timer(lpc18xx_wdt, t, timer);
++	struct watchdog_device *wdt_dev = &lpc18xx_wdt->wdt_dev;
  
-+	ret = of_property_read_u32(np, "dma-channels", &sdc->num_pchans);
-+	if (ret && !sdc->num_pchans) {
-+		dev_err(&pdev->dev, "Can't get dma-channels.\n");
-+		return ret;
-+	}
+ 	lpc18xx_wdt_feed(wdt_dev);
+ 
+@@ -96,7 +96,9 @@ static void lpc18xx_wdt_timer_feed(unsigned long data)
+  */
+ static int lpc18xx_wdt_stop(struct watchdog_device *wdt_dev)
+ {
+-	lpc18xx_wdt_timer_feed((unsigned long)wdt_dev);
++	struct lpc18xx_wdt_dev *lpc18xx_wdt = watchdog_get_drvdata(wdt_dev);
 +
-+	ret = of_property_read_u32(np, "dma-requests", &sdc->max_request);
-+	if (ret && !sdc->max_request) {
-+		dev_info(&pdev->dev, "Missing dma-requests, using %u.\n",
-+			 DMA_CHAN_MAX_DRQ);
-+		sdc->max_request = DMA_CHAN_MAX_DRQ;
-+	}
-+
-+	/*
-+	 * If the number of vchans is not specified, derive it from the
-+	 * highest port number, at most one channel per port and direction.
-+	 */
-+	if (!sdc->num_vchans)
-+		sdc->num_vchans = 2 * (sdc->max_request + 1);
-+
- 	sdc->pchans = devm_kcalloc(&pdev->dev, sdc->num_pchans,
- 				   sizeof(struct sun6i_pchan), GFP_KERNEL);
- 	if (!sdc->pchans)
++	lpc18xx_wdt_timer_feed(&lpc18xx_wdt->timer);
+ 
+ 	return 0;
+ }
+@@ -267,8 +269,7 @@ static int lpc18xx_wdt_probe(struct platform_device *pdev)
+ 
+ 	__lpc18xx_wdt_set_timeout(lpc18xx_wdt);
+ 
+-	setup_timer(&lpc18xx_wdt->timer, lpc18xx_wdt_timer_feed,
+-		    (unsigned long)&lpc18xx_wdt->wdt_dev);
++	timer_setup(&lpc18xx_wdt->timer, lpc18xx_wdt_timer_feed, 0);
+ 
+ 	watchdog_set_nowayout(&lpc18xx_wdt->wdt_dev, nowayout);
+ 	watchdog_set_restart_priority(&lpc18xx_wdt->wdt_dev, 128);
 -- 
-2.14.2
+2.7.4
+
+
+-- 
+Kees Cook
+Pixel Security
