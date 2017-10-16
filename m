@@ -1,107 +1,370 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 16 Oct 2017 16:46:00 +0100
-Subject: [PATCH v3 16/28] arm64/sve: Probe SVE capabilities and usable
- vector lengths
-In-Reply-To: <a39354fb-9f21-47ff-2ad9-b5bcb04e9990@arm.com>
-References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
- <1507660725-7986-17-git-send-email-Dave.Martin@arm.com>
- <a39354fb-9f21-47ff-2ad9-b5bcb04e9990@arm.com>
-Message-ID: <20171016154557.GR19485@e103592.cambridge.arm.com>
+From: ulrich.hecht+renesas@gmail.com (Ulrich Hecht)
+Date: Mon, 16 Oct 2017 17:31:39 +0200
+Subject: [RFC v2 7/8] drm/mediatek: Add DRM-based framebuffer device
+In-Reply-To: <1508167900-27415-1-git-send-email-ulrich.hecht+renesas@gmail.com>
+References: <1508167900-27415-1-git-send-email-ulrich.hecht+renesas@gmail.com>
+Message-ID: <1508167900-27415-8-git-send-email-ulrich.hecht+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 12, 2017 at 01:56:51PM +0100, Suzuki K Poulose wrote:
-> On 10/10/17 19:38, Dave Martin wrote:
-> >This patch uses the cpufeatures framework to determine common SVE
-> >capabilities and vector lengths, and configures the runtime SVE
-> >support code appropriately.
-> >
-> >ZCR_ELx is not really a feature register, but it is convenient to
-> >use it as a template for recording the maximum vector length
-> >supported by a CPU, using the LEN field.  This field is similar to
-> >a feature field in that it is a contiguous bitfield for which we
-> >want to determine the minimum system-wide value.  This patch adds
-> >ZCR as a pseudo-register in cpuinfo/cpufeatures, with appropriate
-> >custom code to populate it.  Finding the minimum supported value of
-> >the LEN field is left to the cpufeatures framework in the usual
-> >way.
-> >
-> >The meaning of ID_AA64ZFR0_EL1 is not architecturally defined yet,
-> >so for now we just require it to be zero.
-> >
-> >Note that much of this code is dormant and SVE still won't be used
-> >yet, since system_supports_sve() remains hardwired to false.
-> >
-> >Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> >Cc: Alex Benn?e <alex.bennee@linaro.org>
-> >Cc: Suzuki K Poulose <Suzuki.Poulose@arm.com>
-> >
-> >---
-> >
-> >Dropped Alex Benn?e's Reviewed-by, since there is new logic in this
-> >patch.
-> >
-> >Changes since v2
-> >----------------
-> >
-> >Bug fixes:
-> >
-> >  * Got rid of dynamic allocation of the shadow vector length map during
-> >    secondary boot.  Secondary CPU boot takes place in atomic context,
-> >    and relying on GFP_ATOMIC here doesn't seem justified.
-> >
-> >    Instead, the needed additional bitmap is allocated statically.  Only
-> >    one shadow map is needed, because CPUs don't boot concurrently.
-> >
-> >Requested by Alex Benn?e:
-> >
-> >  * Reflowed untidy comment above read_zcr_features()
-> >
-> >  * Added comments to read_zcr_features() to explain what it's trying to do
-> >    (which is otherwise not readily apparent).
-> >
-> >Requested by Catalin Marinas:
-> >
-> >  * Moved disabling of the EL1 SVE trap to the cpufeatures C code.
-> >    This allows addition of new assembler in __cpu_setup to be
-> >    avoided.
-> >
-> >Miscellaneous:
-> >
-> >  * Added comments explaining the intent, purpose and basic constraints
-> >    for fpsimd.c helpers.
-> 
-> ...
-> 
-> >diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> >index 92a9502..c5acf38 100644
-> >--- a/arch/arm64/kernel/cpufeature.c
-> >+++ b/arch/arm64/kernel/cpufeature.c
-> 
-> ...
-> 
-> >@@ -670,6 +689,14 @@ void update_cpu_features(int cpu,
-> >  					info->reg_mvfr2, boot->reg_mvfr2);
-> >  	}
-> >+	if (id_aa64pfr0_sve(info->reg_id_aa64pfr0)) {
-> >+		taint |= check_update_ftr_reg(SYS_ZCR_EL1, cpu,
-> >+					info->reg_zcr, boot->reg_zcr);
-> >+
-> >+		if (!sys_caps_initialised)
-> >+			sve_update_vq_map();
-> >+	}
-> 
-> nit: I am not sure if we should also check if the "current" sanitised value
-> of the id_aa64pfr0 also supports sve and skip the update if it isn't. The code
-> is as such fine without the check, its just that we can avoid computing the
-> map. It is in the CPU boot up path and hence is not performance critical.
-> So, either way we are fine.
-> 
-> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Add fbdev support to the Mediatek DRM driver.
 
-I think I prefer to avoid adding extra code to optimise the "broken SoC
-design" case.
+Signed-off-by: CK Hu <ck.hu@mediatek.com>
+Signed-off-by: YT Shen <yt.shen@mediatek.com>
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+[uli: Forward-ported from chromeos-3.18 vendor kernel.]
+Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+---
+ drivers/gpu/drm/mediatek/Makefile        |   2 +
+ drivers/gpu/drm/mediatek/mtk_drm_drv.c   |   8 ++
+ drivers/gpu/drm/mediatek/mtk_drm_drv.h   |   4 +-
+ drivers/gpu/drm/mediatek/mtk_drm_fb.c    |  13 +++
+ drivers/gpu/drm/mediatek/mtk_drm_fb.h    |   3 +
+ drivers/gpu/drm/mediatek/mtk_drm_fbdev.c | 181 +++++++++++++++++++++++++++++++
+ drivers/gpu/drm/mediatek/mtk_drm_fbdev.h |  32 ++++++
+ 7 files changed, 242 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/gpu/drm/mediatek/mtk_drm_fbdev.c
+ create mode 100644 drivers/gpu/drm/mediatek/mtk_drm_fbdev.h
 
-Maybe we could revisit this later if needed.
-
-Can you suggest some code?  Maybe the check is simpler than I think.
+diff --git a/drivers/gpu/drm/mediatek/Makefile b/drivers/gpu/drm/mediatek/Makefile
+index e37b55a..8306fb5 100644
+--- a/drivers/gpu/drm/mediatek/Makefile
++++ b/drivers/gpu/drm/mediatek/Makefile
+@@ -12,6 +12,8 @@ mediatek-drm-y := mtk_disp_color.o \
+ 		  mtk_mipi_tx.o \
+ 		  mtk_dpi.o
+ 
++mediatek-drm-$(CONFIG_DRM_FBDEV_EMULATION) += mtk_drm_fbdev.o
++
+ obj-$(CONFIG_DRM_MEDIATEK) += mediatek-drm.o
+ 
+ mediatek-drm-hdmi-objs := mtk_cec.o \
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+index ce99921..636b8db 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+@@ -30,6 +30,7 @@
+ #include "mtk_drm_ddp_comp.h"
+ #include "mtk_drm_drv.h"
+ #include "mtk_drm_fb.h"
++#include "mtk_drm_fbdev.h"
+ #include "mtk_drm_gem.h"
+ 
+ #define DRIVER_NAME "mediatek"
+@@ -257,8 +258,14 @@ static int mtk_drm_kms_init(struct drm_device *drm)
+ 	drm_kms_helper_poll_init(drm);
+ 	drm_mode_config_reset(drm);
+ 
++	ret = mtk_fbdev_init(drm);
++	if (ret)
++		goto err_kms_helper_poll_fini;
++
+ 	return 0;
+ 
++err_kms_helper_poll_fini:
++	drm_kms_helper_poll_fini(drm);
+ err_component_unbind:
+ 	component_unbind_all(drm->dev, drm);
+ err_config_cleanup:
+@@ -269,6 +276,7 @@ static int mtk_drm_kms_init(struct drm_device *drm)
+ 
+ static void mtk_drm_kms_deinit(struct drm_device *drm)
+ {
++	mtk_fbdev_fini(drm);
+ 	drm_kms_helper_poll_fini(drm);
+ 
+ 	component_unbind_all(drm->dev, drm);
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+index c3378c4..4edc002 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
++++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+@@ -14,6 +14,7 @@
+ #ifndef MTK_DRM_DRV_H
+ #define MTK_DRM_DRV_H
+ 
++#include <drm/drm_fb_helper.h>
+ #include <linux/io.h>
+ #include "mtk_drm_ddp_comp.h"
+ 
+@@ -24,7 +25,6 @@ struct device;
+ struct device_node;
+ struct drm_crtc;
+ struct drm_device;
+-struct drm_fb_helper;
+ struct drm_property;
+ struct regmap;
+ 
+@@ -56,6 +56,8 @@ struct mtk_drm_private {
+ 	} commit;
+ 
+ 	struct drm_atomic_state *suspend_state;
++	struct drm_fb_helper fb_helper;
++	struct drm_gem_object *fbdev_bo;
+ };
+ 
+ extern struct platform_driver mtk_ddp_driver;
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_fb.c b/drivers/gpu/drm/mediatek/mtk_drm_fb.c
+index 0d8d506..ac8561d 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_fb.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_fb.c
+@@ -96,6 +96,19 @@ static struct mtk_drm_fb *mtk_drm_framebuffer_init(struct drm_device *dev,
+ 	return mtk_fb;
+ }
+ 
++struct drm_framebuffer *mtk_drm_framebuffer_create(struct drm_device *dev,
++		const struct drm_mode_fb_cmd2 *mode,
++		struct drm_gem_object *obj)
++{
++	struct mtk_drm_fb *mtk_fb;
++
++	mtk_fb = mtk_drm_framebuffer_init(dev, mode, obj);
++	if (IS_ERR(mtk_fb))
++		return ERR_CAST(mtk_fb);
++
++	return &mtk_fb->base;
++}
++
+ /*
+  * Wait for any exclusive fence in fb's gem object's reservation object.
+  *
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_fb.h b/drivers/gpu/drm/mediatek/mtk_drm_fb.h
+index 9b2ae34..9ee1ac2 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_fb.h
++++ b/drivers/gpu/drm/mediatek/mtk_drm_fb.h
+@@ -19,5 +19,8 @@ int mtk_fb_wait(struct drm_framebuffer *fb);
+ struct drm_framebuffer *mtk_drm_mode_fb_create(struct drm_device *dev,
+ 					       struct drm_file *file,
+ 					       const struct drm_mode_fb_cmd2 *cmd);
++struct drm_framebuffer *mtk_drm_framebuffer_create(struct drm_device *dev,
++		const struct drm_mode_fb_cmd2 *mode,
++		struct drm_gem_object *obj);
+ 
+ #endif /* MTK_DRM_FB_H */
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_fbdev.c b/drivers/gpu/drm/mediatek/mtk_drm_fbdev.c
+new file mode 100644
+index 0000000..9193647
+--- /dev/null
++++ b/drivers/gpu/drm/mediatek/mtk_drm_fbdev.c
+@@ -0,0 +1,181 @@
++/*
++ * Copyright (c) 2016 MediaTek Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <drm/drmP.h>
++#include <drm/drm_crtc_helper.h>
++#include <drm/drm_fb_helper.h>
++#include <drm/drm_gem.h>
++
++#include "mtk_drm_drv.h"
++#include "mtk_drm_fb.h"
++#include "mtk_drm_gem.h"
++
++#define to_drm_private(x) \
++		container_of(x, struct mtk_drm_private, fb_helper)
++
++#if 1
++static int mtk_drm_fbdev_mmap(struct fb_info *info, struct vm_area_struct *vma)
++{
++	struct drm_fb_helper *helper = info->par;
++	struct mtk_drm_private *private = helper->dev->dev_private;
++
++	return mtk_drm_gem_mmap_buf(private->fbdev_bo, vma);
++}
++#endif
++
++static struct fb_ops mtk_fbdev_ops = {
++	.owner = THIS_MODULE,
++	.fb_fillrect = drm_fb_helper_cfb_fillrect,
++	.fb_copyarea = drm_fb_helper_cfb_copyarea,
++	.fb_imageblit = drm_fb_helper_cfb_imageblit,
++	.fb_check_var = drm_fb_helper_check_var,
++	.fb_set_par = drm_fb_helper_set_par,
++	.fb_blank = drm_fb_helper_blank,
++	.fb_pan_display = drm_fb_helper_pan_display,
++	.fb_setcmap = drm_fb_helper_setcmap,
++	.fb_mmap = mtk_drm_fbdev_mmap,
++};
++
++static int mtk_fbdev_probe(struct drm_fb_helper *helper,
++			   struct drm_fb_helper_surface_size *sizes)
++{
++	struct drm_device *dev = helper->dev;
++	struct mtk_drm_private *private = helper->dev->dev_private;
++	struct drm_mode_fb_cmd2 mode = { 0 };
++	struct mtk_drm_gem_obj *mtk_gem;
++	struct fb_info *info;
++	struct drm_framebuffer *fb;
++	unsigned int bytes_per_pixel;
++	unsigned long offset;
++	size_t size;
++	int err;
++
++	bytes_per_pixel = DIV_ROUND_UP(sizes->surface_bpp, 8);
++
++	mode.width = sizes->surface_width;
++	mode.height = sizes->surface_height;
++	mode.pitches[0] = sizes->surface_width * bytes_per_pixel;
++	mode.pixel_format = drm_mode_legacy_fb_format(sizes->surface_bpp,
++						      sizes->surface_depth);
++
++	size = mode.pitches[0] * mode.height;
++
++	mtk_gem = mtk_drm_gem_create(dev, size, true);
++	if (IS_ERR(mtk_gem))
++		return PTR_ERR(mtk_gem);
++
++	private->fbdev_bo = &mtk_gem->base;
++
++	info = drm_fb_helper_alloc_fbi(helper);
++	if (IS_ERR(info)) {
++		err = PTR_ERR(info);
++		dev_err(dev->dev, "failed to allocate framebuffer info, %d\n",
++			err);
++		goto err_gem_free_object;
++	}
++
++	fb = mtk_drm_framebuffer_create(dev, &mode, private->fbdev_bo);
++	if (IS_ERR(fb)) {
++		err = PTR_ERR(fb);
++		dev_err(dev->dev, "failed to allocate DRM framebuffer, %d\n",
++			err);
++		goto err_release_fbi;
++	}
++	helper->fb = fb;
++
++	info->par = helper;
++	info->flags = FBINFO_FLAG_DEFAULT;
++	info->fbops = &mtk_fbdev_ops;
++
++	drm_fb_helper_fill_fix(info, fb->pitches[0], fb->format->depth);
++	drm_fb_helper_fill_var(info, helper, sizes->fb_width, sizes->fb_height);
++
++	offset = info->var.xoffset * bytes_per_pixel;
++	offset += info->var.yoffset * fb->pitches[0];
++
++	dev->mode_config.fb_base = 0;
++	info->screen_base = mtk_gem->kvaddr + offset;
++	info->screen_size = size;
++	info->fix.smem_len = size;
++
++	DRM_DEBUG_KMS("FB [%ux%u]-%u offset=%lu size=%zd\n",
++		      fb->width, fb->height, fb->format->depth, offset, size);
++
++	info->skip_vt_switch = true;
++
++	return 0;
++
++err_release_fbi:
++err_gem_free_object:
++	mtk_drm_gem_free_object(&mtk_gem->base);
++	return err;
++}
++
++static const struct drm_fb_helper_funcs mtk_drm_fb_helper_funcs = {
++	.fb_probe = mtk_fbdev_probe,
++};
++
++int mtk_fbdev_init(struct drm_device *dev)
++{
++	struct mtk_drm_private *priv = dev->dev_private;
++	struct drm_fb_helper *helper = &priv->fb_helper;
++	int ret;
++
++	if (!dev->mode_config.num_crtc || !dev->mode_config.num_connector)
++		return -EINVAL;
++
++	drm_fb_helper_prepare(dev, helper, &mtk_drm_fb_helper_funcs);
++
++	ret = drm_fb_helper_init(dev, helper,
++				 dev->mode_config.num_connector);
++	if (ret) {
++		dev_err(dev->dev, "failed to initialize DRM FB helper, %d\n",
++			ret);
++		goto fini;
++	}
++
++	ret = drm_fb_helper_single_add_all_connectors(helper);
++	if (ret) {
++		dev_err(dev->dev, "failed to add connectors, %d\n", ret);
++		goto fini;
++	}
++
++	ret = drm_fb_helper_initial_config(helper, 32);
++	if (ret) {
++		dev_err(dev->dev, "failed to set initial configuration, %d\n",
++			ret);
++		goto fini;
++	}
++
++	return 0;
++
++fini:
++	drm_fb_helper_fini(helper);
++
++	return ret;
++}
++
++void mtk_fbdev_fini(struct drm_device *dev)
++{
++	struct mtk_drm_private *priv = dev->dev_private;
++	struct drm_fb_helper *helper = &priv->fb_helper;
++
++	drm_fb_helper_unregister_fbi(helper);
++
++	if (helper->fb) {
++		drm_framebuffer_unregister_private(helper->fb);
++		drm_framebuffer_remove(helper->fb);
++	}
++
++	drm_fb_helper_fini(helper);
++}
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_fbdev.h b/drivers/gpu/drm/mediatek/mtk_drm_fbdev.h
+new file mode 100644
+index 0000000..f3e0949
+--- /dev/null
++++ b/drivers/gpu/drm/mediatek/mtk_drm_fbdev.h
+@@ -0,0 +1,32 @@
++/*
++ * Copyright (c) 2016 MediaTek Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef MTK_DRM_FBDEV_H
++#define MTK_DRM_FBDEV_H
++
++#ifdef CONFIG_DRM_FBDEV_EMULATION
++int mtk_fbdev_init(struct drm_device *dev);
++void mtk_fbdev_fini(struct drm_device *dev);
++#else
++int mtk_fbdev_init(struct drm_device *dev)
++{
++	return 0;
++}
++
++void mtk_fbdev_fini(struct drm_device *dev)
++{
++
++}
++#endif /* CONFIG_DRM_FBDEV_EMULATION */
++
++#endif /* MTK_DRM_FBDEV_H */
+-- 
+2.7.4
