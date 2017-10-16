@@ -1,49 +1,44 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 16 Oct 2017 20:34:02 -0200
-Subject: [PATCH 2/4] ARM: dts: imx6sx-softing-vining-2000: Fix the
- 'interrupt-parent' property
-In-Reply-To: <1508193244-14599-1-git-send-email-festevam@gmail.com>
-References: <1508193244-14599-1-git-send-email-festevam@gmail.com>
-Message-ID: <1508193244-14599-2-git-send-email-festevam@gmail.com>
+Date: Mon, 16 Oct 2017 20:40:43 -0200
+Subject: [PATCH] ARM: dts: imx25-eukrea-mbimxsd25-baseboard: Fix the
+ 'cd-gpios' property
+Message-ID: <1508193643-30243-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@nxp.com>
 
-The correct property name is 'interrupt-parent', so fix it accordingly.
+The GPIO polarity is missing in the cd-gpios property.
 
-This fixes the following build warning:
+Fix it, so that the following build warnings are gone:
 
-arch/arm/boot/dts/imx6sx-softing-vining-2000.dtb: Warning (interrupts_property): interrupts size is (8), expected multiple of 12 in /soc/aips-bus at 02100000/ethernet at 02188000/mdio/ethernet0-phy at 0
-arch/arm/boot/dts/imx6sx-softing-vining-2000.dtb: Warning (interrupts_property): interrupts size is (8), expected multiple of 12 in /soc/aips-bus at 02100000/ethernet at 021b4000/mdio/ethernet1-phy at 0
+  DTC     arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dtb
+arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dtb: Warning (gpios_property): cd-gpios property size (8) too small for cell size 2 in /soc/aips at 53f00000/esdhc at 53fb4000
+  DTC     arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dtb
+arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dtb: Warning (gpios_property): cd-gpios property size (8) too small for cell size 2 in /soc/aips at 53f00000/esdhc at 53fb4000
+  DTC     arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-svga.dtb
+arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-svga.dtb: Warning (gpios_property): cd-gpios property size (8) too small for cell size 2 in /soc/aips at 53f00000/esdhc at 53fb4000
+  DTC     arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dtb
+arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dtb: Warning (gpios_property): cd-gpios property size (8) too small for cell size 2 in /soc/aips at 53f00000/esdhc at 53fb4000
 
-Cc: Christoph Fritz <chf.fritz@googlemail.com>
+
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/boot/dts/imx6sx-softing-vining-2000.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx6sx-softing-vining-2000.dts b/arch/arm/boot/dts/imx6sx-softing-vining-2000.dts
-index ee012bc..44bfeac 100644
---- a/arch/arm/boot/dts/imx6sx-softing-vining-2000.dts
-+++ b/arch/arm/boot/dts/imx6sx-softing-vining-2000.dts
-@@ -116,7 +116,7 @@
- 		ethphy0: ethernet0-phy at 0 {
- 			reg = <0>;
- 			max-speed = <100>;
--			interrupts-parent = <&gpio2>;
-+			interrupt-parent = <&gpio2>;
- 			interrupts = <17 IRQ_TYPE_LEVEL_LOW>;
- 		};
- 	};
-@@ -139,7 +139,7 @@
- 		ethphy1: ethernet1-phy at 0 {
- 			reg = <0>;
- 			max-speed = <100>;
--			interrupts-parent = <&gpio2>;
-+			interrupt-parent = <&gpio2>;
- 			interrupts = <19 IRQ_TYPE_LEVEL_LOW>;
- 		};
- 	};
+diff --git a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
+index db39bd6..0f05372 100644
+--- a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
++++ b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
+@@ -64,7 +64,7 @@
+ &esdhc1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_esdhc1>;
+-	cd-gpios = <&gpio1 20>;
++	cd-gpios = <&gpio1 20 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
+ 
 -- 
 2.7.4
