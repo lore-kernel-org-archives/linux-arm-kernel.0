@@ -1,28 +1,36 @@
 From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Mon, 16 Oct 2017 17:46:18 +0530
-Subject: [PATCH 0/9] rockchip: rk3288-vyasa: dts fixes/additions
-Message-ID: <1508156187-27519-1-git-send-email-jagan@amarulasolutions.com>
+Date: Mon, 16 Oct 2017 17:46:19 +0530
+Subject: [PATCH 1/9] ARM: dts: rockchip: rk3288-vyasa: Remove vdd_log from
+ rk808, DCDC_REG1
+In-Reply-To: <1508156187-27519-1-git-send-email-jagan@amarulasolutions.com>
+References: <1508156187-27519-1-git-send-email-jagan@amarulasolutions.com>
+Message-ID: <1508156187-27519-2-git-send-email-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Series add new dts nodes like gmac, usb, io_domains and fixed existing
-regulator, pmic stuff as per schematic. 
+vdd_log, never used on DCDC_REG1 of rk808 from latest schematic so
+remove the same and update the regulator-name as 'vdd_arm' to sync
+with existing rk3288 board dts files.
 
-Jagan Teki (9):
-  ARM: dts: rockchip: rk3288-vyasa: Remove vdd_log from rk808, DCDC_REG1
-  ARM: dts: rockchip: rk3288-vyasa: Use fixed voltage range for vccio_sd
-  ARM: dts: rockchip: rk3288-vyasa: Use vmmc-supply from PMIC
-  ARM: dts: rockchip: Add regulators for rk3288-vyasa
-  ARM: dts: rockchip: Add gmac support for rk3288-vyasa board
-  ARM: dts: rockchip: Add usb host for rk3288-vyasa
-  ARM: dts: rockchip: Add usb otg for rk3288-vyasa
-  ARM: dts: rockchip: Add io domains for rk3288-vyasa
-  ARM: multi_v7_defconfig: Statically build RTC_DRV_RK808
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+ arch/arm/boot/dts/rk3288-vyasa.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
- arch/arm/boot/dts/rk3288-vyasa.dts     | 181 ++++++++++++++++++++++++++++++---
- arch/arm/configs/multi_v7_defconfig    |   2 +-
- include/dt-bindings/pinctrl/rockchip.h |   1 +
- 3 files changed, 168 insertions(+), 16 deletions(-)
-
+diff --git a/arch/arm/boot/dts/rk3288-vyasa.dts b/arch/arm/boot/dts/rk3288-vyasa.dts
+index 3546eb8..7a0f945 100644
+--- a/arch/arm/boot/dts/rk3288-vyasa.dts
++++ b/arch/arm/boot/dts/rk3288-vyasa.dts
+@@ -121,8 +121,8 @@
+ 		vcc12-supply = <&vcc_io>;
+ 
+ 		regulators {
+-			vdd_cpu: vdd_log: DCDC_REG1 {
+-				regulator-name = "vdd_log";
++			vdd_cpu: DCDC_REG1 {
++				regulator-name = "vdd_arm";
+ 				regulator-min-microvolt = <750000>;
+ 				regulator-max-microvolt = <1350000>;
+ 				regulator-always-on;
 -- 
 2.7.4
