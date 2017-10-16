@@ -1,103 +1,58 @@
 From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
-Date: Tue, 17 Oct 2017 00:02:19 +0530
-Subject: [PATCH v9 2/5] perf tools arm64: Add support for get_cpuid_str
- function.
+Date: Tue, 17 Oct 2017 00:02:20 +0530
+Subject: [PATCH v9 3/5] perf utils: use pmu->is_uncore to detect PMU UNCORE
+ devices
 In-Reply-To: <20171016183222.25750-1-ganapatrao.kulkarni@cavium.com>
 References: <20171016183222.25750-1-ganapatrao.kulkarni@cavium.com>
-Message-ID: <20171016183222.25750-3-ganapatrao.kulkarni@cavium.com>
+Message-ID: <20171016183222.25750-4-ganapatrao.kulkarni@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-function get_cpuid_str returns MIDR string of the first online
-cpu from the range of cpus associated with the PMU CORE device.
+PMU CORE devices are identified using sysfs filename cpu, however
+on some platforms(like arm/arm64), PMU CORE sysfs name is not cpu.
+Hence cpu cannot be used to differentiate PMU CORE/UNCORE devices.
+
+commit:
+ 66ec1191 ("perf pmu: Unbreak perf record for arm/arm64 with events with explicit PMU")
+
+has introduced pmu->is_uncore, which is set to PMU UNCORE devices only.
+Adding changes to use pmu->is_uncore to identify UNCORE devices.
 
 Acked-by: Will Deacon <will.deacon@arm.com>
+Tested-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
 Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
 ---
- tools/perf/arch/arm64/util/Build    |  1 +
- tools/perf/arch/arm64/util/header.c | 65 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 66 insertions(+)
- create mode 100644 tools/perf/arch/arm64/util/header.c
+ tools/perf/util/pmu.c | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
-diff --git a/tools/perf/arch/arm64/util/Build b/tools/perf/arch/arm64/util/Build
-index cef6fb3..b1ab72d 100644
---- a/tools/perf/arch/arm64/util/Build
-+++ b/tools/perf/arch/arm64/util/Build
-@@ -1,3 +1,4 @@
-+libperf-y += header.o
- libperf-$(CONFIG_DWARF)     += dwarf-regs.o
- libperf-$(CONFIG_LOCAL_LIBUNWIND) += unwind-libunwind.o
+diff --git a/tools/perf/util/pmu.c b/tools/perf/util/pmu.c
+index 8b17db5..9110718 100644
+--- a/tools/perf/util/pmu.c
++++ b/tools/perf/util/pmu.c
+@@ -603,7 +603,6 @@ static void pmu_add_cpu_aliases(struct list_head *head, struct perf_pmu *pmu)
+ 	 */
+ 	i = 0;
+ 	while (1) {
+-		const char *pname;
  
-diff --git a/tools/perf/arch/arm64/util/header.c b/tools/perf/arch/arm64/util/header.c
-new file mode 100644
-index 0000000..534cd25
---- /dev/null
-+++ b/tools/perf/arch/arm64/util/header.c
-@@ -0,0 +1,65 @@
-+#include <stdio.h>
-+#include <stdlib.h>
-+#include <api/fs/fs.h>
-+#include "header.h"
-+
-+#define MIDR "/regs/identification/midr_el1"
-+#define MIDR_SIZE 19
-+#define MIDR_REVISION_MASK      0xf
-+#define MIDR_VARIANT_SHIFT      20
-+#define MIDR_VARIANT_MASK       (0xf << MIDR_VARIANT_SHIFT)
-+
-+char *get_cpuid_str(struct perf_pmu *pmu)
-+{
-+	char *buf = NULL;
-+	char path[PATH_MAX];
-+	const char *sysfs = sysfs__mountpoint();
-+	int cpu;
-+	u64 midr = 0;
-+	struct cpu_map *cpus;
-+	FILE *file;
-+
-+	if (!sysfs || !pmu || !pmu->cpus)
-+		return NULL;
-+
-+	buf = malloc(MIDR_SIZE);
-+	if (!buf)
-+		return NULL;
-+
-+	/* read midr from list of cpus mapped to this pmu */
-+	cpus = cpu_map__get(pmu->cpus);
-+	for (cpu = 0; cpu < cpus->nr; cpu++) {
-+		scnprintf(path, PATH_MAX, "%s/devices/system/cpu/cpu%d"MIDR,
-+				sysfs, cpus->map[cpu]);
-+
-+		file = fopen(path, "r");
-+		if (!file) {
-+			pr_debug("fopen failed for file %s\n", path);
-+			continue;
+ 		pe = &map->table[i++];
+ 		if (!pe->name) {
+@@ -612,9 +611,13 @@ static void pmu_add_cpu_aliases(struct list_head *head, struct perf_pmu *pmu)
+ 			break;
+ 		}
+ 
+-		pname = pe->pmu ? pe->pmu : "cpu";
+-		if (strncmp(pname, name, strlen(pname)))
+-			continue;
++		if (pmu->is_uncore) {
++			/* check for uncore devices */
++			if (pe->pmu == NULL)
++				continue;
++			if (strncmp(pe->pmu, name, strlen(pe->pmu)))
++				continue;
 +		}
-+
-+		if (!fgets(buf, MIDR_SIZE, file)) {
-+			fclose(file);
-+			continue;
-+		}
-+		fclose(file);
-+
-+		/* Ignore/clear Variant[23:20] and
-+		 * Revision[3:0] of MIDR
-+		 */
-+		midr = strtoul(buf, NULL, 16);
-+		midr &= (~(MIDR_VARIANT_MASK | MIDR_REVISION_MASK));
-+		scnprintf(buf, MIDR_SIZE, "0x%016lx", midr);
-+		/* got midr break loop */
-+		break;
-+	}
-+
-+	if (!midr) {
-+		pr_err("failed to get cpuid string for PMU %s\n", pmu->name);
-+		free(buf);
-+		buf = NULL;
-+	}
-+
-+	cpu_map__put(cpus);
-+	return buf;
-+}
+ 
+ 		/* need type casts to override 'const' */
+ 		__perf_pmu__new_alias(head, NULL, (char *)pe->name,
 -- 
 2.9.4
