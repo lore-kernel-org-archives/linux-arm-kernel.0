@@ -1,73 +1,51 @@
 From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Mon, 16 Oct 2017 09:46:34 +0800
-Subject: [PATCH v6 07/12] mmc: mediatek: add busy_check support
+Date: Mon, 16 Oct 2017 09:46:37 +0800
+Subject: [PATCH v6 10/12] mmc: mediatek: add latch-ck support
 In-Reply-To: <1508118399-21828-1-git-send-email-chaotian.jing@mediatek.com>
 References: <1508118399-21828-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <1508118399-21828-8-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <1508118399-21828-11-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-bit7 of PATCH_BIT1 has different meaning in new design, to
-compatible with previous platform, clear this bit in new
-platform.
+some platform(eg.mt2701) does not support "stop clk fix", in
+this case, need set correct latch-ck to avoid crc error caused
+by stop clock block-internally.
 
 Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
 ---
- drivers/mmc/host/mtk-sd.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ drivers/mmc/host/mtk-sd.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
 diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-index 8113bac..eceaee8 100644
+index a2f26c9..d75a93d 100644
 --- a/drivers/mmc/host/mtk-sd.c
 +++ b/drivers/mmc/host/mtk-sd.c
-@@ -316,6 +316,7 @@ struct mtk_mmc_compatible {
- 	u32 pad_tune_reg;
- 	bool async_fifo;
- 	bool data_tune;
-+	bool busy_check;
- };
+@@ -378,6 +378,7 @@ struct msdc_host {
+ 	u32 sclk;		/* SD/MS bus clock frequency */
+ 	unsigned char timing;
+ 	bool vqmmc_enabled;
++	u32 latch_ck;
+ 	u32 hs400_ds_delay;
+ 	u32 hs200_cmd_int_delay; /* cmd internal delay for HS200/SDR104 */
+ 	u32 hs400_cmd_int_delay; /* cmd internal delay for HS400 */
+@@ -1661,6 +1662,8 @@ static int msdc_tune_data(struct mmc_host *mmc, u32 opcode)
+ 	u32 tune_reg = host->dev_comp->pad_tune_reg;
+ 	int i, ret;
  
- struct msdc_tune_para {
-@@ -380,6 +381,7 @@ struct msdc_host {
- 	.pad_tune_reg = MSDC_PAD_TUNE,
- 	.async_fifo = false,
- 	.data_tune = false,
-+	.busy_check = false,
- };
++	sdr_set_field(host->base + MSDC_PATCH_BIT, MSDC_INT_DAT_LATCH_CK_SEL,
++		      host->latch_ck);
+ 	sdr_clr_bits(host->base + MSDC_IOCON, MSDC_IOCON_DSPL);
+ 	sdr_clr_bits(host->base + MSDC_IOCON, MSDC_IOCON_W_DSPL);
+ 	for (i = 0 ; i < PAD_DELAY_MAX; i++) {
+@@ -1773,6 +1776,9 @@ static void msdc_hw_reset(struct mmc_host *mmc)
+ static void msdc_of_property_parse(struct platform_device *pdev,
+ 				   struct msdc_host *host)
+ {
++	of_property_read_u32(pdev->dev.of_node, "mediatek,latch-ck",
++			     &host->latch_ck);
++
+ 	of_property_read_u32(pdev->dev.of_node, "hs400-ds-delay",
+ 			     &host->hs400_ds_delay);
  
- static const struct mtk_mmc_compatible mt8173_compat = {
-@@ -388,6 +390,7 @@ struct msdc_host {
- 	.pad_tune_reg = MSDC_PAD_TUNE,
- 	.async_fifo = false,
- 	.data_tune = false,
-+	.busy_check = false,
- };
- 
- static const struct mtk_mmc_compatible mt2701_compat = {
-@@ -396,6 +399,7 @@ struct msdc_host {
- 	.pad_tune_reg = MSDC_PAD_TUNE0,
- 	.async_fifo = true,
- 	.data_tune = true,
-+	.busy_check = false,
- };
- 
- static const struct mtk_mmc_compatible mt2712_compat = {
-@@ -404,6 +408,7 @@ struct msdc_host {
- 	.pad_tune_reg = MSDC_PAD_TUNE0,
- 	.async_fifo = true,
- 	.data_tune = true,
-+	.busy_check = true,
- };
- 
- static const struct of_device_id msdc_of_ids[] = {
-@@ -1275,6 +1280,8 @@ static void msdc_init_hw(struct msdc_host *host)
- 	sdr_set_field(host->base + MSDC_PATCH_BIT, MSDC_CKGEN_MSDC_DLY_SEL, 1);
- 	writel(0xffff4089, host->base + MSDC_PATCH_BIT1);
- 	sdr_set_bits(host->base + EMMC50_CFG0, EMMC50_CFG_CFCSTS_SEL);
-+	if (host->dev_comp->busy_check)
-+		sdr_clr_bits(host->base + MSDC_PATCH_BIT1, (1 << 7));
- 	if (host->dev_comp->async_fifo) {
- 		sdr_set_field(host->base + MSDC_PATCH_BIT2,
- 			      MSDC_PB2_RESPWAIT, 3);
 -- 
 1.8.1.1.dirty
