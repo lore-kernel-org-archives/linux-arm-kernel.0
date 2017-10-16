@@ -1,41 +1,33 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 16 Oct 2017 11:32:29 +0200
-Subject: [PATCH 2/6] ARM: sun8i: r40: add USB host port nodes for R40
-In-Reply-To: <55B35500-67FC-40AA-9A07-98C843DE55B3@aosc.io>
-References: <20171008042906.46779-1-icenowy@aosc.io>
- <20171008042906.46779-3-icenowy@aosc.io>
- <20171009210340.ak6wo3vqnwj4gom4@flea.home>
- <55B35500-67FC-40AA-9A07-98C843DE55B3@aosc.io>
-Message-ID: <20171016093229.waizww2n4gwn4qpw@flea.lan>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 16 Oct 2017 11:34:57 +0200
+Subject: [PATCH 0/2] Introduce new DT files for Meson-AXG SoC
+In-Reply-To: <20171013231313.22850-1-dlan@gentoo.org>
+References: <20171013231313.22850-1-dlan@gentoo.org>
+Message-ID: <90f8d36a-c045-7851-19ce-ce2cfcc619d6@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 10, 2017 at 07:24:28AM +0800, Icenowy Zheng wrote:
-> >> +			interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
-> >> +			clocks = <&ccu CLK_BUS_OHCI1>,
-> >> +				 <&ccu CLK_BUS_EHCI1>,
-> >> +				 <&ccu CLK_USB_OHCI1>;
-> >> +			resets = <&ccu RST_BUS_OHCI1>,
-> >> +				 <&ccu RST_BUS_EHCI1>;
-> >
-> >Why do you need to take the OHCI resources too?
+On 14/10/2017 01:13, Yixun Lan wrote:
+> This attempt will try to add new DT files to support Meson-AXG SoC.
+> Due to the AXG series has new memory layout, we decide to start a new
+> DT structure without sharing with previous meson-gx.dtsi
 > 
-> AW's strange design -- without OHCI resources taken EHCI
-> won't work.
+> 1) in the first patch, we try to document the new Meson-AXG bindings
+> 2) in the second patch, we try to bring up a minimal serial console,
+> so it's capable of running a minimal system (in ramdisk).
+> 
+> 
+> Yixun Lan (2):
+>   dt-bindings: arm: amlogic: Add Meson AXG binding
+>   arm64: dts: meson-axg: add initial A113D SoC DT support
+> 
+>  Documentation/devicetree/bindings/arm/amlogic.txt |   6 +
+>  arch/arm64/boot/dts/amlogic/Makefile              |   1 +
+>  arch/arm64/boot/dts/amlogic/meson-axg-s400.dts    |  22 +++
+>  arch/arm64/boot/dts/amlogic/meson-axg.dtsi        | 204 ++++++++++++++++++++++
+>  4 files changed, 233 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> 
 
-How has this been tested?
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171016/471575cd/attachment.sig>
+Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
