@@ -1,46 +1,58 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 16 Oct 2017 14:09:12 +0200
-Subject: [PATCH 1/2] dt-bindings: add binding for A64 DE2 CCU with SRAM
- section
-In-Reply-To: <d62ac8b8ff9073b886ceaa9ce54e6903@aosc.io>
-References: <20171014122925.13220-1-icenowy@aosc.io>
- <20171016091136.b4rnckh2tfi26shx@flea.lan>
- <d62ac8b8ff9073b886ceaa9ce54e6903@aosc.io>
-Message-ID: <20171016120912.lxu7rikhffxsu5o4@flea.lan>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 16 Oct 2017 13:14:54 +0100
+Subject: [PATCH 04/11] Define the virtual space of KASan's shadow region
+In-Reply-To: <B8AC3E80E903784988AB3003E3E97330C005B9BF@dggemm510-mbx.china.huawei.com>
+References: <20171011082227.20546-5-liuwenliang@huawei.com>
+ <201710141957.mbxeZJHB%fengguang.wu@intel.com>
+ <B8AC3E80E903784988AB3003E3E97330C005B9BF@dggemm510-mbx.china.huawei.com>
+Message-ID: <CAKv+Gu98M9PZk3qm0PYC8nQ3zMvLZmNmOn4=hNdFE7NTBuHbgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 16, 2017 at 05:41:10PM +0800, icenowy at aosc.io wrote:
-> ? 2017-10-16 17:11?Maxime Ripard ???
-> > On Sat, Oct 14, 2017 at 08:29:24PM +0800, Icenowy Zheng wrote:
-> > > A64's Display Engine 2.0 needs a section of SRAM (SRAM C) to be
-> > > claimed.
-> > 
-> > Why?
-> 
-> Allwinner didn't document this, but if the SRAM is not claimed, the
-> DE2 MMIO zone is totally not accessible.
+On 16 October 2017 at 12:42, Liuwenliang (Lamb) <liuwenliang@huawei.com> wrote:
+> On 10/16/2017 07:03 PM, Abbott Liu wrote:
+>>arch/arm/kernel/entry-armv.S:348: Error: selected processor does not support `movw r1,
+>   #:lower16:((((0xC0000000-0x01000000)>>3)+((0xC0000000-0x01000000)-(1<<29))))' in ARM mode
+>>arch/arm/kernel/entry-armv.S:348: Error: selected processor does not support `movt r1,
+>   #:upper16:((((0xC0000000-0x01000000)>>3)+((0xC0000000-0x01000000)-(1<<29))))' in ARM mode
+>
+> Thanks for building test. This error can be solved by following code:
+> --- a/arch/arm/kernel/entry-armv.S
+> +++ b/arch/arm/kernel/entry-armv.S
+> @@ -188,8 +188,7 @@ ENDPROC(__und_invalid)
+>         get_thread_info tsk
+>         ldr     r0, [tsk, #TI_ADDR_LIMIT]
+>  #ifdef CONFIG_KASAN
+> -   movw r1, #:lower16:TASK_SIZE
+> -   movt r1, #:upper16:TASK_SIZE
+> + ldr r1, =TASK_SIZE
+>  #else
+>         mov r1, #TASK_SIZE
+>  #endif
 
-Not accessible how? It generates an abort when you access it? It
-returns 0?
+This is unnecessary:
 
-> It seems that Allwinner uses the SRAM C in the DE2 internally.
+ldr r1, =TASK_SIZE
 
-Then shouldn't it be tied to all the DE2 devices then? So mixers
-too. Either way, this should be mentionned in your commit logs. How
-you're fixing things is much less interesting than why you're doing
-them. You can tell how you're doing them from your code already.
+will be converted to a mov instruction by the assembler if the value
+of TASK_SIZE fits its 12-bit immediate field.
 
-Maxime
+So please remove the whole #ifdef, and just use ldr r1, =xxx
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171016/bc0d5cac/attachment.sig>
+> @@ -446,7 +445,12 @@ ENDPROC(__fiq_abt)
+>         @ if it was interrupted in a critical region.  Here we
+>         @ perform a quick test inline since it should be false
+>         @ 99.9999% of the time.  The rest is done out of line.
+> +#if CONFIG_KASAN
+> + ldr r0, =TASK_SIZE
+> + cmp r4, r0
+> +#else
+>         cmp     r4, #TASK_SIZE
+> +#endif
+>         blhs    kuser_cmpxchg64_fixup
+>  #endif
+>  #endif
+>
+> movt,movw can only be used in ARMv6*, ARMv7 instruction set. But ldr can be used in ARMv4*, ARMv5T*, ARMv6*, ARMv7.
+> Maybe the performance is going to fall down by using ldr, but I think the influence of performance is very limited.
+>
