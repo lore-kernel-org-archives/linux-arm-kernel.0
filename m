@@ -1,32 +1,50 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 16 Oct 2017 09:45:10 +0100
-Subject: [PATCH v3 1/8] ARM: NOMMU: Move out MPU setup in separate module
-In-Reply-To: <20171014142254.GG20805@n2100.armlinux.org.uk>
-References: <1506330344-31556-1-git-send-email-vladimir.murzin@arm.com>
- <1506330344-31556-2-git-send-email-vladimir.murzin@arm.com>
- <20171014142254.GG20805@n2100.armlinux.org.uk>
-Message-ID: <7313631c-36a2-15e5-368a-8ff0eb1b5322@arm.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Mon, 16 Oct 2017 10:56:32 +0200
+Subject: [PATCH 3/4] ARM: dts: imx28-tx28: fix interrupt flags and use
+ interrupts-extended property
+In-Reply-To: <20171016071726.gyzvalxzk4o3jsuz@pengutronix.de>
+References: <1507719939-27250-1-git-send-email-LW@KARO-electronics.de>
+ <1507719939-27250-4-git-send-email-LW@KARO-electronics.de>
+ <20171016071726.gyzvalxzk4o3jsuz@pengutronix.de>
+Message-ID: <20171016105632.709e653c@karo-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/10/17 15:22, Russell King - ARM Linux wrote:
-> On Mon, Sep 25, 2017 at 10:05:37AM +0100, Vladimir Murzin wrote:
->> diff --git a/arch/arm/mm/pmsa-v7.c b/arch/arm/mm/pmsa-v7.c
->> new file mode 100644
->> index 0000000..ee3cf51
->> --- /dev/null
->> +++ b/arch/arm/mm/pmsa-v7.c
->> @@ -0,0 +1,262 @@
->> +/*
->> + *  linux/arch/arm/mm/nommu.c
->> + *
->> + * ARM uCLinux supporting functions.
-> 
-> If this is for "a different MPU model" wouldn't it be better to say here?
-> uCLinux itself doesn't require a MPU (think pre-Cortex MMU-less systems.)
-> 
+Hi,
 
-Agree, content of this file it not related to uCLinux. I'll update a comment.
+On Mon, 16 Oct 2017 09:17:26 +0200 Uwe Kleine-K?nig wrote:
+> Hello,
+> 
+> On Wed, Oct 11, 2017 at 01:05:38PM +0200, Lothar Wa?mann wrote:
+> > diff --git a/arch/arm/boot/dts/imx28-tx28.dts b/arch/arm/boot/dts/imx28-tx28.dts
+> > index 211e67d..3c852f7 100644
+> > --- a/arch/arm/boot/dts/imx28-tx28.dts
+> > +++ b/arch/arm/boot/dts/imx28-tx28.dts
+> > @@ -328,8 +328,7 @@
+> >  		reg = <0x20>;
+> >  		pinctrl-names = "default";
+> >  		pinctrl-0 = <&tx28_pca9554_pins>;
+> > -		interrupt-parent = <&gpio3>;
+> > -		interrupts = <28 0>;
+> > +		interrupts-extended = <&gpio3 28 IRQ_TYPE_NONE>;
+> >  		gpio-controller;
+> >  		#gpio-cells = <2>;
+> >  		interrupt-controller;
+> 
+> While interrupts-extended looks nice,
+> Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
+> has:
+> 
+> 	"interrupts-extended" should only be used when a device has
+> 	multiple interrupt parents.
+> 
+> If this is still true, this patch is wrong.
+>
+Thanks for the hint. It really helps to read the documentation
+sometimes, rahter than relying on existing code only...
 
-Thanks
-Vladimir
+A quick check shows, that more than 100 of the 130 uses of
+interrupts-extended are wrong. :(
+
+
+Lothar Wa?mann
