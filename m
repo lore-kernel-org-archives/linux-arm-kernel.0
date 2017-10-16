@@ -1,71 +1,185 @@
-From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Mon, 16 Oct 2017 17:46:25 +0530
-Subject: [PATCH 7/9] ARM: dts: rockchip: Add usb otg for rk3288-vyasa
-In-Reply-To: <1508156187-27519-1-git-send-email-jagan@amarulasolutions.com>
-References: <1508156187-27519-1-git-send-email-jagan@amarulasolutions.com>
-Message-ID: <1508156187-27519-8-git-send-email-jagan@amarulasolutions.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 16 Oct 2017 13:25:17 +0100
+Subject: [PATCH v2 3/4] iommu/arm-smmu-v3: Use CMD_SYNC completion MSI
+In-Reply-To: <20171013183237.GA30572@arm.com>
+References: <cover.1504182142.git.robin.murphy@arm.com>
+ <dbf0ce00f8e249c64f3d2041acd8d91818178e52.1504182142.git.robin.murphy@arm.com>
+ <20171013183237.GA30572@arm.com>
+Message-ID: <9dbbac49-669e-9294-7e8e-26a55ebb1d04@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add usb otg support for rk3288-vyasa, board support usb1 otg
-power through otg_vbus_drv and naming conversion followed
-as per schematic.
+On 13/10/17 19:32, Will Deacon wrote:
+> Hi Robin,
+> 
+> This mostly looks good. Just a few comments below.
+> 
+> On Thu, Aug 31, 2017 at 02:44:27PM +0100, Robin Murphy wrote:
+>> As an IRQ, the CMD_SYNC interrupt is not particularly useful, not least
+>> because we often need to wait for sync completion within someone else's
+>> IRQ handler anyway. However, when the SMMU is both coherent and supports
+>> MSIs, we can have a lot more fun by not using it as an interrupt at all.
+>> Following the example suggested in the architecture and using a write
+>> targeting normal memory, we can let callers wait on a status variable
+>> outside the lock instead of having to stall the entire queue or even
+>> touch MMIO registers. Since multiple sync commands are guaranteed to
+>> complete in order, a simple incrementing sequence count is all we need
+>> to unambiguously support any realistic number of overlapping waiters.
+>>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>
+>> v2: Remove redundant 'bool msi' command member, other cosmetic tweaks
+>>
+>>  drivers/iommu/arm-smmu-v3.c | 47 +++++++++++++++++++++++++++++++++++++++++++--
+>>  1 file changed, 45 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>> index f066725298cd..311f482b93d5 100644
+>> --- a/drivers/iommu/arm-smmu-v3.c
+>> +++ b/drivers/iommu/arm-smmu-v3.c
+>> @@ -377,7 +377,16 @@
+>>  
+>>  #define CMDQ_SYNC_0_CS_SHIFT		12
+>>  #define CMDQ_SYNC_0_CS_NONE		(0UL << CMDQ_SYNC_0_CS_SHIFT)
+>> +#define CMDQ_SYNC_0_CS_IRQ		(1UL << CMDQ_SYNC_0_CS_SHIFT)
+>>  #define CMDQ_SYNC_0_CS_SEV		(2UL << CMDQ_SYNC_0_CS_SHIFT)
+>> +#define CMDQ_SYNC_0_MSH_SHIFT		22
+>> +#define CMDQ_SYNC_0_MSH_ISH		(3UL << CMDQ_SYNC_0_MSH_SHIFT)
+>> +#define CMDQ_SYNC_0_MSIATTR_SHIFT	24
+>> +#define CMDQ_SYNC_0_MSIATTR_OIWB	(0xfUL << CMDQ_SYNC_0_MSIATTR_SHIFT)
+>> +#define CMDQ_SYNC_0_MSIDATA_SHIFT	32
+>> +#define CMDQ_SYNC_0_MSIDATA_MASK	0xffffffffUL
+>> +#define CMDQ_SYNC_1_MSIADDR_SHIFT	0
+>> +#define CMDQ_SYNC_1_MSIADDR_MASK	0xffffffffffffcUL
+>>  
+>>  /* Event queue */
+>>  #define EVTQ_ENT_DWORDS			4
+>> @@ -409,6 +418,7 @@
+>>  /* High-level queue structures */
+>>  #define ARM_SMMU_POLL_TIMEOUT_US	100
+>>  #define ARM_SMMU_CMDQ_DRAIN_TIMEOUT_US	1000000 /* 1s! */
+>> +#define ARM_SMMU_SYNC_TIMEOUT_US	1000000 /* 1s! */
+> 
+> We only ever do this when waiting for the queue to drain, so may as well
+> just reuse the drain timeout.
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
-Note: g_ether/g_serial fired an issue with mainline tree 
-https://paste.ubuntu.com/25752571/
+As you've discovered, we remove the "drain" case entirely in the end.
 
- arch/arm/boot/dts/rk3288-vyasa.dts | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+>>  #define MSI_IOVA_BASE			0x8000000
+>>  #define MSI_IOVA_LENGTH			0x100000
+>> @@ -504,6 +514,10 @@ struct arm_smmu_cmdq_ent {
+>>  		} pri;
+>>  
+>>  		#define CMDQ_OP_CMD_SYNC	0x46
+>> +		struct {
+>> +			u32			msidata;
+>> +			u64			msiaddr;
+>> +		} sync;
+>>  	};
+>>  };
+>>  
+>> @@ -617,6 +631,9 @@ struct arm_smmu_device {
+>>  	int				gerr_irq;
+>>  	int				combined_irq;
+>>  
+>> +	atomic_t			sync_nr;
+>> +	u32				sync_count;
+> 
+> It's probably worth sticking these in separate cachelines so we don't
+> get spurious wakeups when sync_nr is incremented. (yes, I know it should
+> be the ERG, but that can be unreasonably huge!).
 
-diff --git a/arch/arm/boot/dts/rk3288-vyasa.dts b/arch/arm/boot/dts/rk3288-vyasa.dts
-index c22d674..2f1389a 100644
---- a/arch/arm/boot/dts/rk3288-vyasa.dts
-+++ b/arch/arm/boot/dts/rk3288-vyasa.dts
-@@ -115,6 +115,20 @@
- 		vin-supply = <&vcc_io>;
- 	};
- 
-+	vusb1_5v: vusb1-5v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vusb1_5v";
-+		enable-active-high;
-+		gpio = <&gpio0 RK_PB4 GPIO_ACTIVE_HIGH>; /* OTG_VBUS_DRV */
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&otg_vbus_drv>;
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+		vin-supply = <&vsus_5v>;
-+	};
-+
- 	vusb2_5v: vusb2-5v {
- 		compatible = "regulator-fixed";
- 		regulator-name = "vusb2_5v";
-@@ -401,6 +415,10 @@
- 	status = "okay";
- };
- 
-+&usb_otg {
-+	status = "okay";
-+};
-+
- &vopb {
- 	status = "okay";
- };
-@@ -455,4 +473,11 @@
- 			rockchip,pins = <RK_GPIO8 RK_PB1 RK_FUNC_GPIO &pcfg_pull_none>;
- 		};
- 	};
-+
-+	usb_otg {
-+		otg_vbus_drv: otg-vbus-drv {
-+			rockchip,pins = <RK_GPIO0 RK_PB4 RK_FUNC_GPIO &pcfg_pull_none>;
-+
-+		};
-+	};
- };
--- 
-2.7.4
+Good point - we've got 8K of bitmaps embedded in the structure anyway,
+so even maximum ERG separation is easily possible.
+
+>> +
+>>  	unsigned long			ias; /* IPA */
+>>  	unsigned long			oas; /* PA */
+>>  	unsigned long			pgsize_bitmap;
+>> @@ -878,7 +895,13 @@ static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
+>>  		}
+>>  		break;
+>>  	case CMDQ_OP_CMD_SYNC:
+>> -		cmd[0] |= CMDQ_SYNC_0_CS_SEV;
+>> +		if (ent->sync.msiaddr)
+>> +			cmd[0] |= CMDQ_SYNC_0_CS_IRQ;
+>> +		else
+>> +			cmd[0] |= CMDQ_SYNC_0_CS_SEV;
+>> +		cmd[0] |= CMDQ_SYNC_0_MSH_ISH | CMDQ_SYNC_0_MSIATTR_OIWB;
+>> +		cmd[0] |= (u64)ent->sync.msidata << CMDQ_SYNC_0_MSIDATA_SHIFT;
+>> +		cmd[1] |= ent->sync.msiaddr & CMDQ_SYNC_1_MSIADDR_MASK;
+>>  		break;
+>>  	default:
+>>  		return -ENOENT;
+>> @@ -964,21 +987,40 @@ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
+>>  	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
+>>  }
+>>  
+>> +static int arm_smmu_sync_poll_msi(struct arm_smmu_device *smmu, u32 sync_idx)
+>> +{
+>> +	ktime_t timeout = ktime_add_us(ktime_get(), ARM_SMMU_SYNC_TIMEOUT_US);
+>> +	u32 val = smp_cond_load_acquire(&smmu->sync_count,
+>> +					(int)(VAL - sync_idx) >= 0 ||
+>> +					!ktime_before(ktime_get(), timeout));
+>> +
+>> +	return (int)(val - sync_idx) < 0 ? -ETIMEDOUT : 0;
+> 
+> There are some theoretical overflow issues here which I don't think will
+> ever occur in practice, but deserve at least a comment to explain why.
+
+Even if we did have 2^31 or more CPUs, the size of a queue is bounded at
+2^20, so we can never have enough in-flight syncs to get near to an
+overflow problem. I can certainly document that if you like.
+
+>> +}
+>> +
+>>  static void arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
+>>  {
+>>  	u64 cmd[CMDQ_ENT_DWORDS];
+>>  	unsigned long flags;
+>>  	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
+>> +	bool msi = (smmu->features & ARM_SMMU_FEAT_MSI) &&
+>> +		   (smmu->features & ARM_SMMU_FEAT_COHERENCY);
+> 
+> I don't think this is sufficient for the case where we fail to setup MSIs
+> and fall back on legacy IRQs.
+
+Remember this 'MSI' is going nowhere near the GIC, so the IRQ
+configuration is irrelevant (especially after patch #2) - the feature
+bits tell us "is the SMMU capable of generating sync-completion writes?"
+and "are those writes coherent?", which is precisely what matters here.
+
+>>  	struct arm_smmu_cmdq_ent ent = { .opcode = CMDQ_OP_CMD_SYNC };
+>>  	int ret;
+>>  
+>> +	if (msi) {
+>> +		ent.sync.msidata = atomic_inc_return(&smmu->sync_nr);
+> 
+> I don't think you need barrier semantics here.
+
+You mean atomic_inc_return_relaxed() would be sufficient? TBH I don't
+think I'd given this any thought - I guess the coherency protocols make
+it impossible to do an atomic op on stale data, so that seems reasonable.
+>> +		ent.sync.msiaddr = virt_to_phys(&smmu->sync_count);
+>> +	}
+>>  	arm_smmu_cmdq_build_cmd(cmd, &ent);
+>>  
+>>  	spin_lock_irqsave(&smmu->cmdq.lock, flags);
+>>  	arm_smmu_cmdq_insert_cmd(smmu, cmd);
+>> -	ret = queue_poll_cons(&smmu->cmdq.q, true, wfe);
+>> +	if (!msi)
+>> +		ret = queue_poll_cons(&smmu->cmdq.q, true, wfe);
+>>  	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
+>>  
+>> +	if (msi)
+>> +		ret = arm_smmu_sync_poll_msi(smmu, ent.sync.msidata);
+> 
+> This looks like the queue polling should be wrapped up in a function that
+> returns with the spinlock released.
+
+I did ponder that, but I can't help finding such asymmetric interfaces
+pretty grim, and things do get better again once both cases can wait
+outside the lock.
+
+Robin.
