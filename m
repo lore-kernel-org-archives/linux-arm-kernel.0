@@ -1,129 +1,36 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 16 Oct 2017 22:08:38 +0200
-Subject: [PATCH 08/10] KVM: arm/arm64: Drop vcpu parameter from
- coherent_{d,i}cache_guest_page
-In-Reply-To: <20171009152032.27804-9-marc.zyngier@arm.com>
-References: <20171009152032.27804-1-marc.zyngier@arm.com>
- <20171009152032.27804-9-marc.zyngier@arm.com>
-Message-ID: <20171016200838.GK1845@lvm>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Mon, 16 Oct 2017 22:18:57 +0200
+Subject: [PATCH] xilinx_hwicap: Improve a size determination in hwicap_setup()
+Message-ID: <a5c9b285-7c07-0023-b123-34da09556826@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 09, 2017 at 04:20:30PM +0100, Marc Zyngier wrote:
-> The vcpu parameter isn't used for anything, and gets in the way of
-> further cleanups. Let's get rid of it.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Mon, 16 Oct 2017 22:10:32 +0200
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Replace the specification of a data structure by a pointer dereference
+as the parameter for the operator "sizeof" to make the corresponding size
+determination a bit safer according to the Linux coding style convention.
 
-> ---
->  arch/arm/include/asm/kvm_mmu.h   |  6 ++----
->  arch/arm64/include/asm/kvm_mmu.h |  6 ++----
->  virt/kvm/arm/mmu.c               | 18 ++++++++----------
->  3 files changed, 12 insertions(+), 18 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> index ad442d86c23e..5f1ac88a5951 100644
-> --- a/arch/arm/include/asm/kvm_mmu.h
-> +++ b/arch/arm/include/asm/kvm_mmu.h
-> @@ -150,8 +150,7 @@ static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
->  	return (vcpu_cp15(vcpu, c1_SCTLR) & 0b101) == 0b101;
->  }
->  
-> -static inline void __coherent_dcache_guest_page(struct kvm_vcpu *vcpu,
-> -						kvm_pfn_t pfn,
-> +static inline void __coherent_dcache_guest_page(kvm_pfn_t pfn,
->  						unsigned long size)
->  {
->  	/*
-> @@ -177,8 +176,7 @@ static inline void __coherent_dcache_guest_page(struct kvm_vcpu *vcpu,
->  	}
->  }
->  
-> -static inline void __coherent_icache_guest_page(struct kvm_vcpu *vcpu,
-> -						kvm_pfn_t pfn,
-> +static inline void __coherent_icache_guest_page(kvm_pfn_t pfn,
->  						unsigned long size)
->  {
->  	u32 iclsz;
-> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> index e7af74b8b51a..33dcc3c79574 100644
-> --- a/arch/arm64/include/asm/kvm_mmu.h
-> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> @@ -252,8 +252,7 @@ static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
->  	return (vcpu_sys_reg(vcpu, SCTLR_EL1) & 0b101) == 0b101;
->  }
->  
-> -static inline void __coherent_dcache_guest_page(struct kvm_vcpu *vcpu,
-> -						kvm_pfn_t pfn,
-> +static inline void __coherent_dcache_guest_page(kvm_pfn_t pfn,
->  						unsigned long size)
->  {
->  	void *va = page_address(pfn_to_page(pfn));
-> @@ -261,8 +260,7 @@ static inline void __coherent_dcache_guest_page(struct kvm_vcpu *vcpu,
->  	kvm_flush_dcache_to_poc(va, size);
->  }
->  
-> -static inline void __coherent_icache_guest_page(struct kvm_vcpu *vcpu,
-> -						kvm_pfn_t pfn,
-> +static inline void __coherent_icache_guest_page(kvm_pfn_t pfn,
->  						unsigned long size)
->  {
->  	if (icache_is_aliasing()) {
-> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> index ccc6106764a6..5b495450e92f 100644
-> --- a/virt/kvm/arm/mmu.c
-> +++ b/virt/kvm/arm/mmu.c
-> @@ -1268,16 +1268,14 @@ void kvm_arch_mmu_enable_log_dirty_pt_masked(struct kvm *kvm,
->  	kvm_mmu_write_protect_pt_masked(kvm, slot, gfn_offset, mask);
->  }
->  
-> -static void coherent_dcache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
-> -				       unsigned long size)
-> +static void coherent_dcache_guest_page(kvm_pfn_t pfn, unsigned long size)
->  {
-> -	__coherent_dcache_guest_page(vcpu, pfn, size);
-> +	__coherent_dcache_guest_page(pfn, size);
->  }
->  
-> -static void coherent_icache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
-> -				       unsigned long size)
-> +static void coherent_icache_guest_page(kvm_pfn_t pfn, unsigned long size)
->  {
-> -	__coherent_icache_guest_page(vcpu, pfn, size);
-> +	__coherent_icache_guest_page(pfn, size);
->  }
->  
->  static void kvm_send_hwpoison_signal(unsigned long address,
-> @@ -1413,11 +1411,11 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  		}
->  
->  		if (fault_status != FSC_PERM)
-> -			coherent_dcache_guest_page(vcpu, pfn, PMD_SIZE);
-> +			coherent_dcache_guest_page(pfn, PMD_SIZE);
->  
->  		if (exec_fault) {
->  			new_pmd = kvm_s2pmd_mkexec(new_pmd);
-> -			coherent_icache_guest_page(vcpu, pfn, PMD_SIZE);
-> +			coherent_icache_guest_page(pfn, PMD_SIZE);
->  		} else if (fault_status == FSC_PERM) {
->  			/* Preserve execute if XN was already cleared */
->  			pmd_t *old_pmdp = stage2_get_pmd(kvm, NULL, fault_ipa);
-> @@ -1438,11 +1436,11 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  		}
->  
->  		if (fault_status != FSC_PERM)
-> -			coherent_dcache_guest_page(vcpu, pfn, PAGE_SIZE);
-> +			coherent_dcache_guest_page(pfn, PAGE_SIZE);
->  
->  		if (exec_fault) {
->  			new_pte = kvm_s2pte_mkexec(new_pte);
-> -			coherent_icache_guest_page(vcpu, pfn, PAGE_SIZE);
-> +			coherent_icache_guest_page(pfn, PAGE_SIZE);
->  		} else if (fault_status == FSC_PERM) {
->  			/* Preserve execute if XN was already cleared */
->  			pte_t *old_ptep = stage2_get_pte(kvm, fault_ipa);
-> -- 
-> 2.14.1
-> 
+This issue was detected by using the Coccinelle software.
+
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ drivers/char/xilinx_hwicap/xilinx_hwicap.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/char/xilinx_hwicap/xilinx_hwicap.c b/drivers/char/xilinx_hwicap/xilinx_hwicap.c
+index 067396bedf22..2ab9df5a60bd 100644
+--- a/drivers/char/xilinx_hwicap/xilinx_hwicap.c
++++ b/drivers/char/xilinx_hwicap/xilinx_hwicap.c
+@@ -634,7 +634,7 @@ static int hwicap_setup(struct device *dev, int id,
+ 
+ 	devt = MKDEV(XHWICAP_MAJOR, XHWICAP_MINOR + id);
+ 
+-	drvdata = kzalloc(sizeof(struct hwicap_drvdata), GFP_KERNEL);
++	drvdata = kzalloc(sizeof(*drvdata), GFP_KERNEL);
+ 	if (!drvdata) {
+ 		retval = -ENOMEM;
+ 		goto failed0;
+-- 
+2.14.2
