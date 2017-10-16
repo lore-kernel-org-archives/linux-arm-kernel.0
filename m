@@ -1,38 +1,26 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 16 Oct 2017 21:41:01 +0200
-Subject: [PATCH 0/5 v2] watchdog: consolidate FTWDT010 derivatives
-Message-ID: <20171016194106.3995-1-linus.walleij@linaro.org>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Mon, 16 Oct 2017 21:59:01 +0200
+Subject: [PATCH] arm64: KVM: set right LR register value for 32 bit guest
+ when inject abort
+In-Reply-To: <0184EA26B2509940AA629AE1405DD7F201699F61@DGGEMA503-MBX.china.huawei.com>
+References: <0184EA26B2509940AA629AE1405DD7F201699F61@DGGEMA503-MBX.china.huawei.com>
+Message-ID: <20171016195901.GA5753@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This cuts off the consolidation of MOXA ART and Aspeed for
-the time being, simply renaming the Gemini version into
-"ftwdt010" so we can work from that point.
+On Mon, Oct 16, 2017 at 04:10:01PM +0000, gengdongjiu wrote:
+> Hi Marc,
+> 
+> > 
+> > Please also update the 32bit code accordingly, as it looks broken too.
+> 
+> I have updated the 32 bit code according, in my hand, there is no arm32 host environment,
+> So there is no method to verify it in the arm32 host, only verify the patch in the arm64 host.
+> 
+> Anyway I firstly send the patch out for review. Thanks.
+> 
+In this case, if you just clearly specify in the patches you send out
+that the 32-bit one is untested, you can ask someone to test it for you.
 
-I have sent patches updating the MOXA ART and Aspeed device
-trees but they may not go into v4.15 so taking it a bit
-easy.
-
-This is a good first step.
-
-Linus Walleij (5):
-  watchdog: gemini/ftwdt010: rename DT bindings
-  watchdog: gemini/ftwdt010: rename driver and symbols
-  watchdog: ftwdt010: Make interrupt optional
-  watchdog: ftwdt010: Add clock support
-  watchdog: ftwdt010: Add restart support
-
- .../bindings/watchdog/cortina,gemini-watchdog.txt  |  17 --
- ...ina,gemin-watchdog.txt => faraday,ftwdt010.txt} |  11 +-
- drivers/watchdog/Kconfig                           |  15 +-
- drivers/watchdog/Makefile                          |   2 +-
- drivers/watchdog/ftwdt010_wdt.c                    | 315 +++++++++++++++++++++
- drivers/watchdog/gemini_wdt.c                      | 229 ---------------
- 6 files changed, 333 insertions(+), 256 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/watchdog/cortina,gemini-watchdog.txt
- rename Documentation/devicetree/bindings/watchdog/{cortina,gemin-watchdog.txt => faraday,ftwdt010.txt} (55%)
- create mode 100644 drivers/watchdog/ftwdt010_wdt.c
- delete mode 100644 drivers/watchdog/gemini_wdt.c
-
--- 
-2.13.6
+Thanks,
+-Christoffer
