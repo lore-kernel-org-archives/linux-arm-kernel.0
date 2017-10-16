@@ -1,370 +1,58 @@
-From: ulrich.hecht+renesas@gmail.com (Ulrich Hecht)
-Date: Mon, 16 Oct 2017 17:31:39 +0200
-Subject: [RFC v2 7/8] drm/mediatek: Add DRM-based framebuffer device
-In-Reply-To: <1508167900-27415-1-git-send-email-ulrich.hecht+renesas@gmail.com>
-References: <1508167900-27415-1-git-send-email-ulrich.hecht+renesas@gmail.com>
-Message-ID: <1508167900-27415-8-git-send-email-ulrich.hecht+renesas@gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 16 Oct 2017 17:34:44 +0200
+Subject: [PATCH 1/2] clk: meson: gxbb: Add VPU and VAPB clockids
+In-Reply-To: <1508168085-19032-1-git-send-email-narmstrong@baylibre.com>
+References: <1508168085-19032-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1508168085-19032-2-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add fbdev support to the Mediatek DRM driver.
+Add the clkids for the clocks feeding the Video Processing Unit.
 
-Signed-off-by: CK Hu <ck.hu@mediatek.com>
-Signed-off-by: YT Shen <yt.shen@mediatek.com>
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-[uli: Forward-ported from chromeos-3.18 vendor kernel.]
-Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- drivers/gpu/drm/mediatek/Makefile        |   2 +
- drivers/gpu/drm/mediatek/mtk_drm_drv.c   |   8 ++
- drivers/gpu/drm/mediatek/mtk_drm_drv.h   |   4 +-
- drivers/gpu/drm/mediatek/mtk_drm_fb.c    |  13 +++
- drivers/gpu/drm/mediatek/mtk_drm_fb.h    |   3 +
- drivers/gpu/drm/mediatek/mtk_drm_fbdev.c | 181 +++++++++++++++++++++++++++++++
- drivers/gpu/drm/mediatek/mtk_drm_fbdev.h |  32 ++++++
- 7 files changed, 242 insertions(+), 1 deletion(-)
- create mode 100644 drivers/gpu/drm/mediatek/mtk_drm_fbdev.c
- create mode 100644 drivers/gpu/drm/mediatek/mtk_drm_fbdev.h
+ drivers/clk/meson/gxbb.h              |  6 +++++-
+ include/dt-bindings/clock/gxbb-clkc.h | 11 +++++++++++
+ 2 files changed, 16 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/mediatek/Makefile b/drivers/gpu/drm/mediatek/Makefile
-index e37b55a..8306fb5 100644
---- a/drivers/gpu/drm/mediatek/Makefile
-+++ b/drivers/gpu/drm/mediatek/Makefile
-@@ -12,6 +12,8 @@ mediatek-drm-y := mtk_disp_color.o \
- 		  mtk_mipi_tx.o \
- 		  mtk_dpi.o
+diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
+index 5b1d4b3..aee6fbb 100644
+--- a/drivers/clk/meson/gxbb.h
++++ b/drivers/clk/meson/gxbb.h
+@@ -190,8 +190,12 @@
+ #define CLKID_SD_EMMC_B_CLK0_DIV  121
+ #define CLKID_SD_EMMC_C_CLK0_SEL  123
+ #define CLKID_SD_EMMC_C_CLK0_DIV  124
++#define CLKID_VPU_0_DIV		  127
++#define CLKID_VPU_1_DIV		  130
++#define CLKID_VAPB_0_DIV	  134
++#define CLKID_VAPB_1_DIV	  137
  
-+mediatek-drm-$(CONFIG_DRM_FBDEV_EMULATION) += mtk_drm_fbdev.o
-+
- obj-$(CONFIG_DRM_MEDIATEK) += mediatek-drm.o
+-#define NR_CLKS			  126
++#define NR_CLKS			  141
  
- mediatek-drm-hdmi-objs := mtk_cec.o \
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-index ce99921..636b8db 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-@@ -30,6 +30,7 @@
- #include "mtk_drm_ddp_comp.h"
- #include "mtk_drm_drv.h"
- #include "mtk_drm_fb.h"
-+#include "mtk_drm_fbdev.h"
- #include "mtk_drm_gem.h"
+ /* include the CLKIDs that have been made part of the DT binding */
+ #include <dt-bindings/clock/gxbb-clkc.h>
+diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-bindings/clock/gxbb-clkc.h
+index c04a76d..7c5a6f3 100644
+--- a/include/dt-bindings/clock/gxbb-clkc.h
++++ b/include/dt-bindings/clock/gxbb-clkc.h
+@@ -113,5 +113,16 @@
+ #define CLKID_SD_EMMC_A_CLK0	119
+ #define CLKID_SD_EMMC_B_CLK0	122
+ #define CLKID_SD_EMMC_C_CLK0	125
++#define CLKID_VPU_0_SEL		126
++#define CLKID_VPU_0		128
++#define CLKID_VPU_1_SEL		129
++#define CLKID_VPU_1		131
++#define CLKID_VPU		132
++#define CLKID_VAPB_0_SEL	133
++#define CLKID_VAPB_0		135
++#define CLKID_VAPB_1_SEL	136
++#define CLKID_VAPB_1		138
++#define CLKID_VAPB_SEL		139
++#define CLKID_VAPB		140
  
- #define DRIVER_NAME "mediatek"
-@@ -257,8 +258,14 @@ static int mtk_drm_kms_init(struct drm_device *drm)
- 	drm_kms_helper_poll_init(drm);
- 	drm_mode_config_reset(drm);
- 
-+	ret = mtk_fbdev_init(drm);
-+	if (ret)
-+		goto err_kms_helper_poll_fini;
-+
- 	return 0;
- 
-+err_kms_helper_poll_fini:
-+	drm_kms_helper_poll_fini(drm);
- err_component_unbind:
- 	component_unbind_all(drm->dev, drm);
- err_config_cleanup:
-@@ -269,6 +276,7 @@ static int mtk_drm_kms_init(struct drm_device *drm)
- 
- static void mtk_drm_kms_deinit(struct drm_device *drm)
- {
-+	mtk_fbdev_fini(drm);
- 	drm_kms_helper_poll_fini(drm);
- 
- 	component_unbind_all(drm->dev, drm);
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-index c3378c4..4edc002 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-@@ -14,6 +14,7 @@
- #ifndef MTK_DRM_DRV_H
- #define MTK_DRM_DRV_H
- 
-+#include <drm/drm_fb_helper.h>
- #include <linux/io.h>
- #include "mtk_drm_ddp_comp.h"
- 
-@@ -24,7 +25,6 @@ struct device;
- struct device_node;
- struct drm_crtc;
- struct drm_device;
--struct drm_fb_helper;
- struct drm_property;
- struct regmap;
- 
-@@ -56,6 +56,8 @@ struct mtk_drm_private {
- 	} commit;
- 
- 	struct drm_atomic_state *suspend_state;
-+	struct drm_fb_helper fb_helper;
-+	struct drm_gem_object *fbdev_bo;
- };
- 
- extern struct platform_driver mtk_ddp_driver;
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_fb.c b/drivers/gpu/drm/mediatek/mtk_drm_fb.c
-index 0d8d506..ac8561d 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_fb.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_fb.c
-@@ -96,6 +96,19 @@ static struct mtk_drm_fb *mtk_drm_framebuffer_init(struct drm_device *dev,
- 	return mtk_fb;
- }
- 
-+struct drm_framebuffer *mtk_drm_framebuffer_create(struct drm_device *dev,
-+		const struct drm_mode_fb_cmd2 *mode,
-+		struct drm_gem_object *obj)
-+{
-+	struct mtk_drm_fb *mtk_fb;
-+
-+	mtk_fb = mtk_drm_framebuffer_init(dev, mode, obj);
-+	if (IS_ERR(mtk_fb))
-+		return ERR_CAST(mtk_fb);
-+
-+	return &mtk_fb->base;
-+}
-+
- /*
-  * Wait for any exclusive fence in fb's gem object's reservation object.
-  *
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_fb.h b/drivers/gpu/drm/mediatek/mtk_drm_fb.h
-index 9b2ae34..9ee1ac2 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_fb.h
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_fb.h
-@@ -19,5 +19,8 @@ int mtk_fb_wait(struct drm_framebuffer *fb);
- struct drm_framebuffer *mtk_drm_mode_fb_create(struct drm_device *dev,
- 					       struct drm_file *file,
- 					       const struct drm_mode_fb_cmd2 *cmd);
-+struct drm_framebuffer *mtk_drm_framebuffer_create(struct drm_device *dev,
-+		const struct drm_mode_fb_cmd2 *mode,
-+		struct drm_gem_object *obj);
- 
- #endif /* MTK_DRM_FB_H */
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_fbdev.c b/drivers/gpu/drm/mediatek/mtk_drm_fbdev.c
-new file mode 100644
-index 0000000..9193647
---- /dev/null
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_fbdev.c
-@@ -0,0 +1,181 @@
-+/*
-+ * Copyright (c) 2016 MediaTek Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <drm/drmP.h>
-+#include <drm/drm_crtc_helper.h>
-+#include <drm/drm_fb_helper.h>
-+#include <drm/drm_gem.h>
-+
-+#include "mtk_drm_drv.h"
-+#include "mtk_drm_fb.h"
-+#include "mtk_drm_gem.h"
-+
-+#define to_drm_private(x) \
-+		container_of(x, struct mtk_drm_private, fb_helper)
-+
-+#if 1
-+static int mtk_drm_fbdev_mmap(struct fb_info *info, struct vm_area_struct *vma)
-+{
-+	struct drm_fb_helper *helper = info->par;
-+	struct mtk_drm_private *private = helper->dev->dev_private;
-+
-+	return mtk_drm_gem_mmap_buf(private->fbdev_bo, vma);
-+}
-+#endif
-+
-+static struct fb_ops mtk_fbdev_ops = {
-+	.owner = THIS_MODULE,
-+	.fb_fillrect = drm_fb_helper_cfb_fillrect,
-+	.fb_copyarea = drm_fb_helper_cfb_copyarea,
-+	.fb_imageblit = drm_fb_helper_cfb_imageblit,
-+	.fb_check_var = drm_fb_helper_check_var,
-+	.fb_set_par = drm_fb_helper_set_par,
-+	.fb_blank = drm_fb_helper_blank,
-+	.fb_pan_display = drm_fb_helper_pan_display,
-+	.fb_setcmap = drm_fb_helper_setcmap,
-+	.fb_mmap = mtk_drm_fbdev_mmap,
-+};
-+
-+static int mtk_fbdev_probe(struct drm_fb_helper *helper,
-+			   struct drm_fb_helper_surface_size *sizes)
-+{
-+	struct drm_device *dev = helper->dev;
-+	struct mtk_drm_private *private = helper->dev->dev_private;
-+	struct drm_mode_fb_cmd2 mode = { 0 };
-+	struct mtk_drm_gem_obj *mtk_gem;
-+	struct fb_info *info;
-+	struct drm_framebuffer *fb;
-+	unsigned int bytes_per_pixel;
-+	unsigned long offset;
-+	size_t size;
-+	int err;
-+
-+	bytes_per_pixel = DIV_ROUND_UP(sizes->surface_bpp, 8);
-+
-+	mode.width = sizes->surface_width;
-+	mode.height = sizes->surface_height;
-+	mode.pitches[0] = sizes->surface_width * bytes_per_pixel;
-+	mode.pixel_format = drm_mode_legacy_fb_format(sizes->surface_bpp,
-+						      sizes->surface_depth);
-+
-+	size = mode.pitches[0] * mode.height;
-+
-+	mtk_gem = mtk_drm_gem_create(dev, size, true);
-+	if (IS_ERR(mtk_gem))
-+		return PTR_ERR(mtk_gem);
-+
-+	private->fbdev_bo = &mtk_gem->base;
-+
-+	info = drm_fb_helper_alloc_fbi(helper);
-+	if (IS_ERR(info)) {
-+		err = PTR_ERR(info);
-+		dev_err(dev->dev, "failed to allocate framebuffer info, %d\n",
-+			err);
-+		goto err_gem_free_object;
-+	}
-+
-+	fb = mtk_drm_framebuffer_create(dev, &mode, private->fbdev_bo);
-+	if (IS_ERR(fb)) {
-+		err = PTR_ERR(fb);
-+		dev_err(dev->dev, "failed to allocate DRM framebuffer, %d\n",
-+			err);
-+		goto err_release_fbi;
-+	}
-+	helper->fb = fb;
-+
-+	info->par = helper;
-+	info->flags = FBINFO_FLAG_DEFAULT;
-+	info->fbops = &mtk_fbdev_ops;
-+
-+	drm_fb_helper_fill_fix(info, fb->pitches[0], fb->format->depth);
-+	drm_fb_helper_fill_var(info, helper, sizes->fb_width, sizes->fb_height);
-+
-+	offset = info->var.xoffset * bytes_per_pixel;
-+	offset += info->var.yoffset * fb->pitches[0];
-+
-+	dev->mode_config.fb_base = 0;
-+	info->screen_base = mtk_gem->kvaddr + offset;
-+	info->screen_size = size;
-+	info->fix.smem_len = size;
-+
-+	DRM_DEBUG_KMS("FB [%ux%u]-%u offset=%lu size=%zd\n",
-+		      fb->width, fb->height, fb->format->depth, offset, size);
-+
-+	info->skip_vt_switch = true;
-+
-+	return 0;
-+
-+err_release_fbi:
-+err_gem_free_object:
-+	mtk_drm_gem_free_object(&mtk_gem->base);
-+	return err;
-+}
-+
-+static const struct drm_fb_helper_funcs mtk_drm_fb_helper_funcs = {
-+	.fb_probe = mtk_fbdev_probe,
-+};
-+
-+int mtk_fbdev_init(struct drm_device *dev)
-+{
-+	struct mtk_drm_private *priv = dev->dev_private;
-+	struct drm_fb_helper *helper = &priv->fb_helper;
-+	int ret;
-+
-+	if (!dev->mode_config.num_crtc || !dev->mode_config.num_connector)
-+		return -EINVAL;
-+
-+	drm_fb_helper_prepare(dev, helper, &mtk_drm_fb_helper_funcs);
-+
-+	ret = drm_fb_helper_init(dev, helper,
-+				 dev->mode_config.num_connector);
-+	if (ret) {
-+		dev_err(dev->dev, "failed to initialize DRM FB helper, %d\n",
-+			ret);
-+		goto fini;
-+	}
-+
-+	ret = drm_fb_helper_single_add_all_connectors(helper);
-+	if (ret) {
-+		dev_err(dev->dev, "failed to add connectors, %d\n", ret);
-+		goto fini;
-+	}
-+
-+	ret = drm_fb_helper_initial_config(helper, 32);
-+	if (ret) {
-+		dev_err(dev->dev, "failed to set initial configuration, %d\n",
-+			ret);
-+		goto fini;
-+	}
-+
-+	return 0;
-+
-+fini:
-+	drm_fb_helper_fini(helper);
-+
-+	return ret;
-+}
-+
-+void mtk_fbdev_fini(struct drm_device *dev)
-+{
-+	struct mtk_drm_private *priv = dev->dev_private;
-+	struct drm_fb_helper *helper = &priv->fb_helper;
-+
-+	drm_fb_helper_unregister_fbi(helper);
-+
-+	if (helper->fb) {
-+		drm_framebuffer_unregister_private(helper->fb);
-+		drm_framebuffer_remove(helper->fb);
-+	}
-+
-+	drm_fb_helper_fini(helper);
-+}
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_fbdev.h b/drivers/gpu/drm/mediatek/mtk_drm_fbdev.h
-new file mode 100644
-index 0000000..f3e0949
---- /dev/null
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_fbdev.h
-@@ -0,0 +1,32 @@
-+/*
-+ * Copyright (c) 2016 MediaTek Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef MTK_DRM_FBDEV_H
-+#define MTK_DRM_FBDEV_H
-+
-+#ifdef CONFIG_DRM_FBDEV_EMULATION
-+int mtk_fbdev_init(struct drm_device *dev);
-+void mtk_fbdev_fini(struct drm_device *dev);
-+#else
-+int mtk_fbdev_init(struct drm_device *dev)
-+{
-+	return 0;
-+}
-+
-+void mtk_fbdev_fini(struct drm_device *dev)
-+{
-+
-+}
-+#endif /* CONFIG_DRM_FBDEV_EMULATION */
-+
-+#endif /* MTK_DRM_FBDEV_H */
+ #endif /* __GXBB_CLKC_H */
 -- 
 2.7.4
