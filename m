@@ -1,31 +1,23 @@
-From: weiyi.lu@mediatek.com (Weiyi Lu)
-Date: Mon, 16 Oct 2017 14:42:14 +0800
-Subject: [PATCH v4 0/9] Mediatek MT2712 clock and scpsys support
-In-Reply-To: <ac7940d1-e23d-add2-b4b6-bd7cf66fea34@gmail.com>
-References: <1505793630-12590-1-git-send-email-weiyi.lu@mediatek.com>
- <20171012224540.GE18706@codeaurora.org>
- <ac7940d1-e23d-add2-b4b6-bd7cf66fea34@gmail.com>
-Message-ID: <1508136134.20464.49.camel@mtksdaap41>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 16 Oct 2017 12:32:17 +0530
+Subject: [PATCH v4 07/11] dmaengine: sun6i: Retrieve channel count/max
+ request from devicetree
+In-Reply-To: <6277478a-601a-48b0-8e1f-1d309049d4f4@rwthex-w2-a.rwth-ad.de>
+References: <20170928014928.2272-1-stefan.bruens@rwth-aachen.de>
+ <6277478a-601a-48b0-8e1f-1d309049d4f4@rwthex-w2-a.rwth-ad.de>
+Message-ID: <20171016070217.GO30097@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-10-13 at 16:50 +0200, Matthias Brugger wrote:
+On Thu, Sep 28, 2017 at 03:49:24AM +0200, Stefan Br?ns wrote:
+> To avoid introduction of a new compatible for each small SoC/DMA controller
+> variation, move the definition of the channel count to the devicetree.
 > 
-> On 10/13/2017 12:45 AM, Stephen Boyd wrote:
-> > On 09/19, Weiyi Lu wrote:
-> >> This series is based on v4.14-rc1 and composed of
-> >> clock control (PATCH 1-4) and scpsys control (PATCH 5-9)
-> > 
-> > What's the merge plan? Can I apply the clk ones to clk tree and
-> > ignore the rest?
-> > 
-> 
-> Yes, please do so. I'll take scpsys, which depends on the clock patches.
-> 
-> Regards,
-> Matthias
+> The number of vchans is no longer explicit, but limited by the highest
+> port/DMA request number. The result is a slight overallocation for SoCs
+> with a sparse port mapping.
 
-Hi Stephen & Matthias,
+This doesnt apply for me, please check
 
-I will start to separate this patch set into three series
-(clk/scpsys/dts) when I send the next version.
+-- 
+~Vinod
