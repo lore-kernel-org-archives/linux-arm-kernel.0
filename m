@@ -1,34 +1,83 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 16 Oct 2017 11:17:37 +0100
-Subject: [PATCH v3 04/13] arm64: alternatives: use tpidr_el2 on VHE hosts
-In-Reply-To: <20170922182614.27885-5-james.morse@arm.com>
-References: <20170922182614.27885-1-james.morse@arm.com>
- <20170922182614.27885-5-james.morse@arm.com>
-Message-ID: <20171016101736.fkaikxflyc46zczf@armageddon.cambridge.arm.com>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Mon, 16 Oct 2017 18:06:40 +0800
+Subject: [RESEND PATCH v2 5/5] drm/rockchip: Add device links for master and
+ components
+In-Reply-To: <20171016100640.26575-1-jeffy.chen@rock-chips.com>
+References: <20171016100640.26575-1-jeffy.chen@rock-chips.com>
+Message-ID: <20171016100640.26575-6-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 22, 2017 at 07:26:05PM +0100, James Morse wrote:
-> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-> index 29adab8138c3..8f2d0f7d193b 100644
-> --- a/arch/arm64/include/asm/processor.h
-> +++ b/arch/arm64/include/asm/processor.h
-> @@ -193,5 +193,6 @@ static inline void spin_lock_prefetch(const void *ptr)
->  
->  int cpu_enable_pan(void *__unused);
->  int cpu_enable_cache_maint_trap(void *__unused);
-> +int cpu_copy_el2regs(void *__unused);
->  
->  #endif /* __ASM_PROCESSOR_H */
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index cd52d365d1f0..8e4c7da2b126 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-[...]
-> +int cpu_copy_el2regs(void *__unused)
+Since we are trying to access components' resources in the master's
+suspend/resume PM callbacks(e.g. panel), add device links to correct
+the suspend/resume and shutdown ordering.
 
-Can this be static? I couldn't find it used anywhere else apart from
-cpufeature.c
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
 
+Changes in v2:
+Use device link to correct the suspend/resume and shutdown ordering,
+instead of converting rockchip spi's suspend/resume PM callbacks to
+late suspend/resume PM callbacks.
+
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 24 +++++++++++++++++++++---
+ 1 file changed, 21 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+index 76d63de5921d..af18967f699b 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+@@ -337,6 +337,8 @@ static struct component_match *rockchip_drm_match_add(struct device *dev)
+ 
+ 			if (!d)
+ 				break;
++
++			device_link_add(dev, d, DL_FLAG_STATELESS);
+ 			component_match_add(dev, &match, compare_dev, d);
+ 		} while (true);
+ 	}
+@@ -406,6 +408,7 @@ static int rockchip_drm_platform_of_probe(struct device *dev)
+ static int rockchip_drm_platform_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
++	struct device_link *link;
+ 	struct component_match *match = NULL;
+ 	int ret;
+ 
+@@ -414,16 +417,31 @@ static int rockchip_drm_platform_probe(struct platform_device *pdev)
+ 		return ret;
+ 
+ 	match = rockchip_drm_match_add(dev);
+-	if (IS_ERR(match))
+-		return PTR_ERR(match);
++	if (IS_ERR(match)) {
++		ret = PTR_ERR(match);
++		goto err_cleanup_dev_links;
++	}
+ 
+-	return component_master_add_with_match(dev, &rockchip_drm_ops, match);
++	ret = component_master_add_with_match(dev, &rockchip_drm_ops, match);
++	if (ret < 0)
++		goto err_cleanup_dev_links;
++
++	return 0;
++err_cleanup_dev_links:
++	list_for_each_entry(link, &dev->links.consumers, s_node)
++		device_link_del(link);
++	return ret;
+ }
+ 
+ static int rockchip_drm_platform_remove(struct platform_device *pdev)
+ {
++	struct device_link *link;
++
+ 	component_master_del(&pdev->dev, &rockchip_drm_ops);
+ 
++	list_for_each_entry(link, &pdev->dev.links.consumers, s_node)
++		device_link_del(link);
++
+ 	return 0;
+ }
+ 
 -- 
-Catalin
+2.11.0
