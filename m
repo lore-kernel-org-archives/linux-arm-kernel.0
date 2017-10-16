@@ -1,97 +1,55 @@
 From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Mon, 16 Oct 2017 18:06:36 +0800
-Subject: [RESEND PATCH v2 1/5] arm64: dts: rockchip: Enable edp disaplay on
- kevin
+Date: Mon, 16 Oct 2017 18:06:38 +0800
+Subject: [RESEND PATCH v2 3/5] drm/rockchip: Fix error handling path in
+ rockchip_dp_bind()
 In-Reply-To: <20171016100640.26575-1-jeffy.chen@rock-chips.com>
 References: <20171016100640.26575-1-jeffy.chen@rock-chips.com>
-Message-ID: <20171016100640.26575-2-jeffy.chen@rock-chips.com>
+Message-ID: <20171016100640.26575-4-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add edp panel and enable related nodes on kevin.
+Add missing error handling in rockchip_dp_bind().
 
+Fixes: 9e32e16e9e98 ("drm: rockchip: dp: add rockchip platform dp driver")
 Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 ---
 
 Changes in v2: None
 
- arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 29 +++++++++++++++++++++++
- arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi      | 16 +++++++++++++
- 2 files changed, 45 insertions(+)
+ drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-index a3d3cea7dc4f..bc67b19f0af5 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-@@ -93,6 +93,18 @@
- 		pwm-delay-us = <10000>;
- 	};
+diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+index 4d3f6ad0abdd..cb8941e8bcdd 100644
+--- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
++++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+@@ -371,7 +371,7 @@ static int rockchip_dp_bind(struct device *dev, struct device *master,
+ 	ret = rockchip_dp_drm_create_encoder(dp);
+ 	if (ret) {
+ 		DRM_ERROR("failed to create drm encoder\n");
+-		return ret;
++		goto err_deinit_dp;
+ 	}
  
-+	edp_panel: edp-panel {
-+		compatible = "sharp,lq123p1jx31", "simple-panel";
-+		backlight = <&backlight>;
-+		power-supply = <&pp3300_disp>;
-+
-+		ports {
-+			panel_in_edp: endpoint {
-+				remote-endpoint = <&edp_out_panel>;
-+			};
-+		};
-+	};
-+
- 	thermistor_ppvar_bigcpu: thermistor-ppvar-bigcpu {
- 		compatible = "murata,ncp15wb473";
- 		pullup-uv = <1800000>;
-@@ -264,6 +276,23 @@ ap_i2c_dig: &i2c2 {
- 	};
- };
+ 	dp->plat_data.encoder = &dp->encoder;
+@@ -387,7 +387,17 @@ static int rockchip_dp_bind(struct device *dev, struct device *master,
  
-+&edp {
-+	status = "okay";
-+
-+	ports {
-+		edp_out: port at 1 {
-+			reg = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			edp_out_panel: endpoint at 0 {
-+				reg = <0>;
-+				remote-endpoint = <&panel_in_edp>;
-+			};
-+		};
-+	};
-+};
-+
- &ppvar_bigcpu_pwm {
- 	regulator-min-microvolt = <798674>;
- 	regulator-max-microvolt = <1302172>;
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-index 5772c52fbfd3..470105d651c2 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-@@ -927,6 +927,22 @@ ap_i2c_audio: &i2c8 {
- 	dr_mode = "host";
- };
+ 	rockchip_drm_psr_register(&dp->encoder, analogix_dp_psr_set);
  
-+&vopb {
-+	status = "okay";
-+};
+-	return analogix_dp_bind(dev, dp->drm_dev, &dp->plat_data);
++	ret = analogix_dp_bind(dev, dp->drm_dev, &dp->plat_data);
++	if (ret < 0)
++		goto err_unreg_psr;
++	return 0;
 +
-+&vopb_mmu {
-+	status = "okay";
-+};
-+
-+&vopl {
-+	status = "okay";
-+};
-+
-+&vopl_mmu {
-+	status = "okay";
-+};
-+
- #include <arm/cros-ec-keyboard.dtsi>
- #include <arm/cros-ec-sbs.dtsi>
++err_unreg_psr:
++	rockchip_drm_psr_unregister(&dp->encoder);
++	rockchip_dp_drm_encoder_destroy(&dp->encoder);
++err_deinit_dp:
++	clk_disable_unprepare(dp->pclk);
++	return ret;
+ }
  
+ static void rockchip_dp_unbind(struct device *dev, struct device *master,
 -- 
 2.11.0
