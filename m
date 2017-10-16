@@ -1,60 +1,79 @@
-From: Chris.Paterson2@renesas.com (Chris Paterson)
-Date: Mon, 16 Oct 2017 10:52:51 +0000
-Subject: [PATCH RESEND] phy: rcar-gen2: Add r8a7743/5 support
-In-Reply-To: <1507544543-28654-1-git-send-email-biju.das@bp.renesas.com>
-References: <1507544543-28654-1-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <TY1PR06MB0702439B7CD95E771FAC001DB74F0@TY1PR06MB0702.apcprd06.prod.outlook.com>
+From: tanxiaojun@huawei.com (Tan Xiaojun)
+Date: Mon, 16 Oct 2017 19:42:35 +0800
+Subject: [bug report & help] arm64: ltp testcase "migrate_pages01" failed
+Message-ID: <59E49B2B.8020802@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kishon,
+Hi all,
 
-> From: Biju Das [mailto:biju.das at bp.renesas.com]
-> Sent: 09 October 2017 11:22
-> 
-> Add USB PHY support for r8a7743/5 SoC. Renesas RZ/G1[ME] (R8A7743/5)
-> USB PHY is identical to the R-Car Gen2 family.
-> 
-> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> Acked-by: Simon Horman <horms+renesas@verge.net.au>
-> Acked-by: Rob Herring <robh@kernel.org>
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+I test ltp in Hisilicon D05 board and get a failed result about the testcase "migrate_pages01".
 
-Does this patch look okay to you?
+In fact, The sub testcase "test_invalid_nodes" failed. The testcase is to find a invalid numa node and migrate memory pages to this node via syscall of "migrate_pages".
+The expected result of this case is returning "-1", but it actually return "0".
 
-Thanks, Chris
+--------------------------------------------------------
+# ./migrate_pages01
+migrate_pages01    0  TINFO  :  test_empty_mask
+migrate_pages01    1  TPASS  :  expected ret success: returned value = 0
+migrate_pages01    0  TINFO  :  test_invalid_pid -1
+migrate_pages01    2  TPASS  :  expected ret success: returned value = -1
+migrate_pages01    3  TPASS  :  expected failure: TEST_ERRNO=ESRCH(3): No such process
+migrate_pages01    0  TINFO  :  test_invalid_pid unused pid
+migrate_pages01    4  TPASS  :  expected ret success: returned value = -1
+migrate_pages01    5  TPASS  :  expected failure: TEST_ERRNO=ESRCH(3): No such process
+migrate_pages01    0  TINFO  :  test_invalid_masksize
+migrate_pages01    6  TPASS  :  expected ret success: returned value = -1
+migrate_pages01    7  TPASS  :  expected failure: TEST_ERRNO=EINVAL(22): Invalid argument
+migrate_pages01    0  TINFO  :  test_invalid_mem -1
+migrate_pages01    8  TPASS  :  expected ret success: returned value = -1
+migrate_pages01    9  TPASS  :  expected failure: TEST_ERRNO=EFAULT(14): Bad address
+migrate_pages01    0  TINFO  :  test_invalid_mem invalid prot
+migrate_pages01   10  TPASS  :  expected ret success: returned value = -1
+migrate_pages01   11  TPASS  :  expected failure: TEST_ERRNO=EFAULT(14): Bad address
+migrate_pages01    0  TINFO  :  test_invalid_mem unmmaped
+migrate_pages01   12  TPASS  :  expected ret success: returned value = -1
+migrate_pages01   13  TPASS  :  expected failure: TEST_ERRNO=EFAULT(14): Bad address
+migrate_pages01    0  TINFO  :  test_invalid_nodes
+migrate_pages01   14  TFAIL  :  migrate_pages_common.c:45: unexpected failure - returned value = 0, expected: -1
+migrate_pages01   15  TFAIL  :  migrate_pages_common.c:55: call succeeded unexpectedly
+migrate_pages01    0  TINFO  :  test_invalid_perm
+migrate_pages01   16  TPASS  :  expected ret success: returned value = -1
+migrate_pages01   17  TPASS  :  expected failure: TEST_ERRNO=EPERM(1): Operation not permitted
+--------------------------------------------------------
 
+I debug and find a interesting thing, this case does not always fail.
 
-> ---
-> This patch is tested against Linux next tag next-20170929.
-> 
->  Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt | 7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt
-> b/Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt
-> index 91da947..eeb9e18 100644
-> --- a/Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt
-> +++ b/Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt
-> @@ -4,10 +4,13 @@ This file provides information on what the device node
-> for the R-Car generation
->  2 USB PHY contains.
-> 
->  Required properties:
-> -- compatible: "renesas,usb-phy-r8a7790" if the device is a part of R8A7790
-> SoC.
-> +- compatible: "renesas,usb-phy-r8a7743" if the device is a part of R8A7743
-> SoC.
-> +	      "renesas,usb-phy-r8a7745" if the device is a part of R8A7745 SoC.
-> +	      "renesas,usb-phy-r8a7790" if the device is a part of R8A7790 SoC.
->  	      "renesas,usb-phy-r8a7791" if the device is a part of R8A7791 SoC.
->  	      "renesas,usb-phy-r8a7794" if the device is a part of R8A7794 SoC.
-> -	      "renesas,rcar-gen2-usb-phy" for a generic R-Car Gen2 compatible
-> device.
-> +	      "renesas,rcar-gen2-usb-phy" for a generic R-Car Gen2 or
-> +					  RZ/G1 compatible device.
-> 
->  	      When compatible with the generic version, nodes must list the
->  	      SoC-specific version corresponding to the platform first
-> --
-> 1.9.1
+1) If one or several numa nodes have no memory, this case will run successfully like below:
+
+--------------------
+available: 4 nodes (0-3)
+node 0 cpus: 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+node 0 size: 65309 MB
+node 0 free: 61650 MB
+node 1 cpus: 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+node 1 size: 65404 MB
+node 1 free: 61377 MB
+node 2 cpus: 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47
+node 2 size: 65401 MB
+node 2 free: 62316 MB
+node 3 cpus: 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63
+node 3 size: 0 MB
+node 3 free: 0 MB
+node distances:
+node   0   1   2   3
+  0:  10  15  20  20
+  1:  15  10  20  20
+  2:  20  20  10  15
+  3:  20  20  15  10
+---------------------
+
+This testcase will find node number 3 and migrate pages to node 3. And syscall of "migrate_pages" return -1, test succeeded.
+
+2) In most cases, all nodes have memory, and the testcase will get non-existent node like node number 4. The syscall of "migrate_pages" should also return -1, but return 0 actually.
+So the testcase failed.
+
+I think it is a problem in arm64. But I am not familiar with numa, so I ask for help from you.
+
+Thanks.
+Xiaojun.
