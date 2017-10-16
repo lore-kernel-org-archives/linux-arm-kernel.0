@@ -1,210 +1,40 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 16 Oct 2017 17:00:47 +0200
-Subject: [PATCH v5 6/7] soc: mediatek: pwrap: add support for MT7622 SoC
-In-Reply-To: <f828c79152d02ead0431bee17ee349b1a3068d2e.1508135937.git.sean.wang@mediatek.com>
-References: <cover.1508135937.git.sean.wang@mediatek.com>
- <f828c79152d02ead0431bee17ee349b1a3068d2e.1508135937.git.sean.wang@mediatek.com>
-Message-ID: <7dcbeb5c-0b7f-839b-3810-78156b7965a4@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 16 Oct 2017 16:02:09 +0100
+Subject: [PATCH v2 0/4] SMMUv3 CMD_SYNC optimisation
+In-Reply-To: <20171013190521.GD30572@arm.com>
+References: <cover.1504182142.git.robin.murphy@arm.com>
+ <20171013190521.GD30572@arm.com>
+Message-ID: <20171016150208.GA10500@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 10/16/2017 09:07 AM, sean.wang at mediatek.com wrote:
-> From: Chenglin Xu <chenglin.xu@mediatek.com>
+On Fri, Oct 13, 2017 at 08:05:21PM +0100, Will Deacon wrote:
+> On Thu, Aug 31, 2017 at 02:44:24PM +0100, Robin Murphy wrote:
+> > Since Nate reported a reasonable performance boost from the out-of-line
+> > MSI polling in v1 [1], I've now implemented the equivalent for cons
+> > polling as well - that has been boot-tested on D05 with some trivial I/O
+> > and at least doesn't seem to lock up or explode. There's also a little
+> > cosmetic tweaking to make the patches a bit cleaner as a series.
+> > 
+> > Robin.
+> > 
+> > [1] https://www.mail-archive.com/iommu at lists.linux-foundation.org/msg19657.html
+> > 
+> > Robin Murphy (5):
+> >   iommu/arm-smmu-v3: Specialise CMD_SYNC handling
+> >   iommu/arm-smmu-v3: Forget about cmdq-sync interrupt
+> >   iommu/arm-smmu-v3: Use CMD_SYNC completion interrupt
+> >   iommu/arm-smmu-v3: Poll for CMD_SYNC outside cmdq lock
+> >   iommu/arm-smmu-v3: Use burst-polling for sync completion
 > 
-> Add the registers, callbacks and data structures required to make the
-> PMIC wrapper work on MT7622.
+> What's this final mythical patch about? I don't see it in the series.
 > 
-> Signed-off-by: Chenglin Xu <chenglin.xu@mediatek.com>
-> Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> ---
->   drivers/soc/mediatek/mtk-pmic-wrap.c | 180 +++++++++++++++++++++++++++++++++++
->   1 file changed, 180 insertions(+)
-> 
-> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> index a4cdc5f..9ac304a 100644
-> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> @@ -214,6 +214,36 @@ enum pwrap_regs {
->   	PWRAP_ADC_RDATA_ADDR1,
->   	PWRAP_ADC_RDATA_ADDR2,
->   
-> +	/* MT7622 only regs */
-> +	PWRAP_EINT_STA0_ADR,
-> +	PWRAP_EINT_STA1_ADR,
-> +	PWRAP_STA,
-> +	PWRAP_CLR,
-> +	PWRAP_DVFS_ADR8,
-> +	PWRAP_DVFS_WDATA8,
-> +	PWRAP_DVFS_ADR9,
-> +	PWRAP_DVFS_WDATA9,
-> +	PWRAP_DVFS_ADR10,
-> +	PWRAP_DVFS_WDATA10,
-> +	PWRAP_DVFS_ADR11,
-> +	PWRAP_DVFS_WDATA11,
-> +	PWRAP_DVFS_ADR12,
-> +	PWRAP_DVFS_WDATA12,
-> +	PWRAP_DVFS_ADR13,
-> +	PWRAP_DVFS_WDATA13,
-> +	PWRAP_DVFS_ADR14,
-> +	PWRAP_DVFS_WDATA14,
-> +	PWRAP_DVFS_ADR15,
-> +	PWRAP_DVFS_WDATA15,
-> +	PWRAP_EXT_CK,
-> +	PWRAP_ADC_RDATA_ADDR,
-> +	PWRAP_GPS_STA,
-> +	PWRAP_SW_RST,
-> +	PWRAP_DVFS_STEP_CTRL0,
-> +	PWRAP_DVFS_STEP_CTRL1,
-> +	PWRAP_DVFS_STEP_CTRL2,
-> +	PWRAP_SPI2_CTRL,
-> +
->   	/* MT8135 only regs */
->   	PWRAP_CSHEXT,
->   	PWRAP_EVENT_IN_EN,
-> @@ -336,6 +366,118 @@ static int mt2701_regs[] = {
->   	[PWRAP_ADC_RDATA_ADDR2] =	0x154,
->   };
->   
-> +static int mt7622_regs[] = {
-> +	[PWRAP_MUX_SEL] =		0x0,
-> +	[PWRAP_WRAP_EN] =		0x4,
-> +	[PWRAP_DIO_EN] =		0x8,
-> +	[PWRAP_SIDLY] =			0xC,
-> +	[PWRAP_RDDMY] =			0x10,
-> +	[PWRAP_SI_CK_CON] =		0x14,
-> +	[PWRAP_CSHEXT_WRITE] =		0x18,
-> +	[PWRAP_CSHEXT_READ] =		0x1C,
-> +	[PWRAP_CSLEXT_START] =		0x20,
-> +	[PWRAP_CSLEXT_END] =		0x24,
-> +	[PWRAP_STAUPD_PRD] =		0x28,
-> +	[PWRAP_STAUPD_GRPEN] =		0x2C,
-> +	[PWRAP_EINT_STA0_ADR] =		0x30,
-> +	[PWRAP_EINT_STA1_ADR] =		0x34,
-> +	[PWRAP_STA] =			0x38,
-> +	[PWRAP_CLR] =			0x3C,
-> +	[PWRAP_STAUPD_MAN_TRIG] =	0x40,
-> +	[PWRAP_STAUPD_STA] =		0x44,
-> +	[PWRAP_WRAP_STA] =		0x48,
-> +	[PWRAP_HARB_INIT] =		0x4C,
-> +	[PWRAP_HARB_HPRIO] =		0x50,
-> +	[PWRAP_HIPRIO_ARB_EN] =		0x54,
-> +	[PWRAP_HARB_STA0] =		0x58,
-> +	[PWRAP_HARB_STA1] =		0x5C,
-> +	[PWRAP_MAN_EN] =		0x60,
-> +	[PWRAP_MAN_CMD] =		0x64,
-> +	[PWRAP_MAN_RDATA] =		0x68,
-> +	[PWRAP_MAN_VLDCLR] =		0x6C,
-> +	[PWRAP_WACS0_EN] =		0x70,
-> +	[PWRAP_INIT_DONE0] =		0x74,
-> +	[PWRAP_WACS0_CMD] =		0x78,
-> +	[PWRAP_WACS0_RDATA] =		0x7C,
-> +	[PWRAP_WACS0_VLDCLR] =		0x80,
-> +	[PWRAP_WACS1_EN] =		0x84,
-> +	[PWRAP_INIT_DONE1] =		0x88,
-> +	[PWRAP_WACS1_CMD] =		0x8C,
-> +	[PWRAP_WACS1_RDATA] =		0x90,
-> +	[PWRAP_WACS1_VLDCLR] =		0x94,
-> +	[PWRAP_WACS2_EN] =		0x98,
-> +	[PWRAP_INIT_DONE2] =		0x9C,
-> +	[PWRAP_WACS2_CMD] =		0xA0,
-> +	[PWRAP_WACS2_RDATA] =		0xA4,
-> +	[PWRAP_WACS2_VLDCLR] =		0xA8,
-> +	[PWRAP_INT_EN] =		0xAC,
-> +	[PWRAP_INT_FLG_RAW] =		0xB0,
-> +	[PWRAP_INT_FLG] =		0xB4,
-> +	[PWRAP_INT_CLR] =		0xB8,
-> +	[PWRAP_SIG_ADR] =		0xBC,
-> +	[PWRAP_SIG_MODE] =		0xC0,
-> +	[PWRAP_SIG_VALUE] =		0xC4,
-> +	[PWRAP_SIG_ERRVAL] =		0xC8,
-> +	[PWRAP_CRC_EN] =		0xCC,
-> +	[PWRAP_TIMER_EN] =		0xD0,
-> +	[PWRAP_TIMER_STA] =		0xD4,
-> +	[PWRAP_WDT_UNIT] =		0xD8,
-> +	[PWRAP_WDT_SRC_EN] =		0xDC,
-> +	[PWRAP_WDT_FLG] =		0xE0,
-> +	[PWRAP_DEBUG_INT_SEL] =		0xE4,
-> +	[PWRAP_DVFS_ADR0] =		0xE8,
-> +	[PWRAP_DVFS_WDATA0] =		0xEC,
-> +	[PWRAP_DVFS_ADR1] =		0xF0,
-> +	[PWRAP_DVFS_WDATA1] =		0xF4,
-> +	[PWRAP_DVFS_ADR2] =		0xF8,
-> +	[PWRAP_DVFS_WDATA2] =		0xFC,
-> +	[PWRAP_DVFS_ADR3] =		0x100,
-> +	[PWRAP_DVFS_WDATA3] =		0x104,
-> +	[PWRAP_DVFS_ADR4] =		0x108,
-> +	[PWRAP_DVFS_WDATA4] =		0x10C,
-> +	[PWRAP_DVFS_ADR5] =		0x110,
-> +	[PWRAP_DVFS_WDATA5] =		0x114,
-> +	[PWRAP_DVFS_ADR6] =		0x118,
-> +	[PWRAP_DVFS_WDATA6] =		0x11C,
-> +	[PWRAP_DVFS_ADR7] =		0x120,
-> +	[PWRAP_DVFS_WDATA7] =		0x124,
-> +	[PWRAP_DVFS_ADR8] =		0x128,
-> +	[PWRAP_DVFS_WDATA8] =		0x12C,
-> +	[PWRAP_DVFS_ADR9] =		0x130,
-> +	[PWRAP_DVFS_WDATA9] =		0x134,
-> +	[PWRAP_DVFS_ADR10] =		0x138,
-> +	[PWRAP_DVFS_WDATA10] =		0x13C,
-> +	[PWRAP_DVFS_ADR11] =		0x140,
-> +	[PWRAP_DVFS_WDATA11] =		0x144,
-> +	[PWRAP_DVFS_ADR12] =		0x148,
-> +	[PWRAP_DVFS_WDATA12] =		0x14C,
-> +	[PWRAP_DVFS_ADR13] =		0x150,
-> +	[PWRAP_DVFS_WDATA13] =		0x154,
-> +	[PWRAP_DVFS_ADR14] =		0x158,
-> +	[PWRAP_DVFS_WDATA14] =		0x15C,
-> +	[PWRAP_DVFS_ADR15] =		0x160,
-> +	[PWRAP_DVFS_WDATA15] =		0x164,
-> +	[PWRAP_SPMINF_STA] =		0x168,
-> +	[PWRAP_CIPHER_KEY_SEL] =	0x16C,
-> +	[PWRAP_CIPHER_IV_SEL] =		0x170,
-> +	[PWRAP_CIPHER_EN] =		0x174,
-> +	[PWRAP_CIPHER_RDY] =		0x178,
-> +	[PWRAP_CIPHER_MODE] =		0x17C,
-> +	[PWRAP_CIPHER_SWRST] =		0x180,
-> +	[PWRAP_DCM_EN] =		0x184,
-> +	[PWRAP_DCM_DBC_PRD] =		0x188,
-> +	[PWRAP_EXT_CK] =		0x18C,
-> +	[PWRAP_ADC_CMD_ADDR] =		0x190,
-> +	[PWRAP_PWRAP_ADC_CMD] =		0x194,
-> +	[PWRAP_ADC_RDATA_ADDR] =	0x198,
-> +	[PWRAP_GPS_STA] =		0x19C,
-> +	[PWRAP_SW_RST] =		0x1A0,
-> +	[PWRAP_DVFS_STEP_CTRL0] =	0x238,
-> +	[PWRAP_DVFS_STEP_CTRL1] =	0x23C,
-> +	[PWRAP_DVFS_STEP_CTRL2] =	0x240,
-> +	[PWRAP_SPI2_CTRL] =		0x244,
-> +};
-> +
->   static int mt8173_regs[] = {
->   	[PWRAP_MUX_SEL] =		0x0,
->   	[PWRAP_WRAP_EN] =		0x4,
-> @@ -499,6 +641,7 @@ enum pmic_type {
->   
->   enum pwrap_type {
->   	PWRAP_MT2701,
-> +	PWRAP_MT7622,
->   	PWRAP_MT8135,
->   	PWRAP_MT8173,
->   };
-> @@ -873,6 +1016,16 @@ static int pwrap_mt2701_init_reg_clock(struct pmic_wrapper *wrp)
->   	return 0;
->   }
->   
-> +static int pwrap_mt7622_init_reg_clock(struct pmic_wrapper *wrp)
-> +{
-> +	pwrap_writel(wrp, 0x0, PWRAP_CSHEXT_WRITE);
-> +	pwrap_writel(wrp, 0x4, PWRAP_CSHEXT_READ);
-> +	pwrap_writel(wrp, 0x2, PWRAP_CSLEXT_START);
-> +	pwrap_writel(wrp, 0x2, PWRAP_CSLEXT_END);
-> +
+> Anyway, the first two patches look fine to me, but this doesn't apply
+> on top of my iommu/devel branch so they will need rebasing.
 
-This is the same function as pwrap_mt8173_init_reg_clock. Can we somehow group 
-them together to get rid of the code duplication?
+No idea what I was doing wrong on Friday, but the first two patches apply
+cleanly now, so I'll push them out in a bit.
 
-Regards,
-Matthias
+Sorry for the noise,
+
+Will
