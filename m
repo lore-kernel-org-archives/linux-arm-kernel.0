@@ -1,83 +1,46 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Mon, 16 Oct 2017 18:06:40 +0800
-Subject: [RESEND PATCH v2 5/5] drm/rockchip: Add device links for master and
- components
-In-Reply-To: <20171016100640.26575-1-jeffy.chen@rock-chips.com>
-References: <20171016100640.26575-1-jeffy.chen@rock-chips.com>
-Message-ID: <20171016100640.26575-6-jeffy.chen@rock-chips.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 16 Oct 2017 12:29:25 +0200
+Subject: [PATCH v4 0/9] Mediatek MT2712 clock and scpsys support
+In-Reply-To: <1508136134.20464.49.camel@mtksdaap41>
+References: <1505793630-12590-1-git-send-email-weiyi.lu@mediatek.com>
+ <20171012224540.GE18706@codeaurora.org>
+ <ac7940d1-e23d-add2-b4b6-bd7cf66fea34@gmail.com>
+ <1508136134.20464.49.camel@mtksdaap41>
+Message-ID: <4b2b1a94-2a0e-4c5e-030e-d35edb3ac2f1@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we are trying to access components' resources in the master's
-suspend/resume PM callbacks(e.g. panel), add device links to correct
-the suspend/resume and shutdown ordering.
 
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
----
 
-Changes in v2:
-Use device link to correct the suspend/resume and shutdown ordering,
-instead of converting rockchip spi's suspend/resume PM callbacks to
-late suspend/resume PM callbacks.
+On 10/16/2017 08:42 AM, Weiyi Lu wrote:
+> On Fri, 2017-10-13 at 16:50 +0200, Matthias Brugger wrote:
+>>
+>> On 10/13/2017 12:45 AM, Stephen Boyd wrote:
+>>> On 09/19, Weiyi Lu wrote:
+>>>> This series is based on v4.14-rc1 and composed of
+>>>> clock control (PATCH 1-4) and scpsys control (PATCH 5-9)
+>>>
+>>> What's the merge plan? Can I apply the clk ones to clk tree and
+>>> ignore the rest?
+>>>
+>>
+>> Yes, please do so. I'll take scpsys, which depends on the clock patches.
+>>
+>> Regards,
+>> Matthias
+> 
+> Hi Stephen & Matthias,
+> 
+> I will start to separate this patch set into three series
+> (clk/scpsys/dts) when I send the next version.
+> 
 
- drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 24 +++++++++++++++++++++---
- 1 file changed, 21 insertions(+), 3 deletions(-)
+There are no comments on the clk patches, so no need to resend them, if Stephen 
+is ok with taking patch 1,2,3.
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-index 76d63de5921d..af18967f699b 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-@@ -337,6 +337,8 @@ static struct component_match *rockchip_drm_match_add(struct device *dev)
- 
- 			if (!d)
- 				break;
-+
-+			device_link_add(dev, d, DL_FLAG_STATELESS);
- 			component_match_add(dev, &match, compare_dev, d);
- 		} while (true);
- 	}
-@@ -406,6 +408,7 @@ static int rockchip_drm_platform_of_probe(struct device *dev)
- static int rockchip_drm_platform_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
-+	struct device_link *link;
- 	struct component_match *match = NULL;
- 	int ret;
- 
-@@ -414,16 +417,31 @@ static int rockchip_drm_platform_probe(struct platform_device *pdev)
- 		return ret;
- 
- 	match = rockchip_drm_match_add(dev);
--	if (IS_ERR(match))
--		return PTR_ERR(match);
-+	if (IS_ERR(match)) {
-+		ret = PTR_ERR(match);
-+		goto err_cleanup_dev_links;
-+	}
- 
--	return component_master_add_with_match(dev, &rockchip_drm_ops, match);
-+	ret = component_master_add_with_match(dev, &rockchip_drm_ops, match);
-+	if (ret < 0)
-+		goto err_cleanup_dev_links;
-+
-+	return 0;
-+err_cleanup_dev_links:
-+	list_for_each_entry(link, &dev->links.consumers, s_node)
-+		device_link_del(link);
-+	return ret;
- }
- 
- static int rockchip_drm_platform_remove(struct platform_device *pdev)
- {
-+	struct device_link *link;
-+
- 	component_master_del(&pdev->dev, &rockchip_drm_ops);
- 
-+	list_for_each_entry(link, &pdev->dev.links.consumers, s_node)
-+		device_link_del(link);
-+
- 	return 0;
- }
- 
--- 
-2.11.0
+If you want you can split out patch 4 and 9, but for me it's ok if they go 
+together with the scpsys driver. When scpsys is ready I will take them all 
+through my tree.
+
+Regards,
+Matthias
