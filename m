@@ -1,45 +1,42 @@
-From: liuwenliang@huawei.com (Liuwenliang (Lamb))
-Date: Mon, 16 Oct 2017 11:42:05 +0000
-Subject: [PATCH 04/11] Define the virtual space of KASan's shadow region
-In-Reply-To: <201710141957.mbxeZJHB%fengguang.wu@intel.com>
-References: <20171011082227.20546-5-liuwenliang@huawei.com>
- <201710141957.mbxeZJHB%fengguang.wu@intel.com>
-Message-ID: <B8AC3E80E903784988AB3003E3E97330C005B9BF@dggemm510-mbx.china.huawei.com>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 16 Oct 2017 12:44:56 +0100
+Subject: [PATCH v6 5/7] arm64: kvm: route synchronous external abort
+ exceptions to el2
+In-Reply-To: <fb7da3e3-d0f7-7ac6-b088-888a563d7ee7@huawei.com>
+References: <1503916701-13516-1-git-send-email-gengdongjiu@huawei.com>
+ <1503916701-13516-6-git-send-email-gengdongjiu@huawei.com>
+ <59B17449.6010201@arm.com> <fb7da3e3-d0f7-7ac6-b088-888a563d7ee7@huawei.com>
+Message-ID: <59E49BB8.8080801@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/16/2017 07:03 PM, Abbott Liu wrote:
->arch/arm/kernel/entry-armv.S:348: Error: selected processor does not support `movw r1,
-  #:lower16:((((0xC0000000-0x01000000)>>3)+((0xC0000000-0x01000000)-(1<<29))))' in ARM mode
->arch/arm/kernel/entry-armv.S:348: Error: selected processor does not support `movt r1,
-  #:upper16:((((0xC0000000-0x01000000)>>3)+((0xC0000000-0x01000000)-(1<<29))))' in ARM mode
+Hi gengdongjiu,
 
-Thanks for building test. This error can be solved by following code:
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -188,8 +188,7 @@ ENDPROC(__und_invalid)
-        get_thread_info tsk
-        ldr     r0, [tsk, #TI_ADDR_LIMIT]
- #ifdef CONFIG_KASAN
--   movw r1, #:lower16:TASK_SIZE
--   movt r1, #:upper16:TASK_SIZE
-+ ldr r1, =TASK_SIZE
- #else
-        mov r1, #TASK_SIZE
- #endif
-@@ -446,7 +445,12 @@ ENDPROC(__fiq_abt)
-        @ if it was interrupted in a critical region.  Here we
-        @ perform a quick test inline since it should be false
-        @ 99.9999% of the time.  The rest is done out of line.
-+#if CONFIG_KASAN
-+ ldr r0, =TASK_SIZE
-+ cmp r4, r0
-+#else
-        cmp     r4, #TASK_SIZE
-+#endif
-        blhs    kuser_cmpxchg64_fixup
- #endif
- #endif
+On 14/09/17 12:12, gengdongjiu wrote:
+> On 2017/9/8 0:31, James Morse wrote:
+>> KVM already handles external aborts from lower exception levels, no more work
+>> needs doing for TEA.
+> If it is firmware first solution, that is SCR_EL3.EA=1, all SError interrupt and synchronous External
+> Abort exceptions are taken to EL3, so EL3 firmware will handle it, KVM no needs to handle it.
+> 
+> HCR_EL3.TEA is only for EL3 to check its value to decide to jump to hypervisor or kernel.
+> 
+>>
+>> What happens when a guest access the RAS-Error-Record registers?
+>>
+>> Before we can set HCR_EL2.TERR I think we need to add some minimal emulation for
+>> the registers it traps. Most of them should be RAZ/WI, so it should be
+>> straightforward. (I think KVMs default is to emulate an undef for unknown traps).
 
-movt,movw can only be used in ARMv6*, ARMv7 instruction set. But ldr can be used in ARMv4*, ARMv5T*, ARMv6*, ARMv7.
-Maybe the performance is going to fall down by using ldr, but I think the influence of performance is very limited.
+> Today I added the support to do some minimal emulation for RAS-Error-Record registers, thanks
+> for the good suggestion.
+
+Where can I find this patch?
+I'd like to repost it as part of the SError_rework/RAS/IESB series: this is one
+of the bits KVM needs but I didn't touch as it looks like your updated version
+of this patch should cover it.
+
+
+Thanks,
+
+James
