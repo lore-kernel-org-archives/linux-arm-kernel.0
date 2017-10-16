@@ -1,50 +1,81 @@
-From: jwerner@chromium.org (Julius Werner)
-Date: Mon, 16 Oct 2017 13:49:11 -0700
-Subject: usb: dwc2: NMI watchdog: BUG: soft lockup - CPU#0 stuck for 146s
-In-Reply-To: <446301756.220218.1494678481761@email.1und1.de>
-References: <172093673.40121.1492427140661@email.1und1.de>
- <CAD=FV=WJBTUcMPw8OgQT_jhz0H8AsH=YqWMR7LtudUKrF5-XOA@mail.gmail.com>
- <79b9b35b-0600-771f-4cd2-9e03c5ba3a25@i2se.com>
- <186569458.91967.1492547106553@email.1und1.de>
- <CAD=FV=VHkJFrsJDmMytbUw=WjKQaGZ-8Ewfy5bPCA82AWS4O2Q@mail.gmail.com>
- <212870399.174480.1492633502649@email.1und1.de>
- <87mvbaykn1.fsf@eliezer.anholt.net>
- <1998517910.54108.1492894253010@email.1und1.de>
- <2127594073.298820.1493143869792@email.1und1.de>
- <316369012.317772.1494274928708@email.1und1.de>
- <20170510163150.GK30445@localhost>
- <CAD=FV=VUaqtR2t04wodRJ33bqHo5DPke7zsvqBMYqZ5imX5+=A@mail.gmail.com>
- <446301756.220218.1494678481761@email.1und1.de>
-Message-ID: <CAODwPW8qtw0qVxUGJUNt2H8TTCOEvn6G9qbUBi6_MKWgeAwcaQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 16 Oct 2017 22:54:23 +0200
+Subject: [PATCH 1/5 v2] watchdog: gemini/ftwdt010: rename DT bindings
+Message-ID: <20171016205427.4297-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> d9a14b00 339317035 C Ii:1:004:1 -32:1 0
-> d9a14b00 339317049 S Ii:1:004:1 -115:1 10 <
-> d9a14b00 339318040 C Ii:1:004:1 -32:1 0
-> d9a14b00 339318057 S Ii:1:004:1 -115:1 10 <
-> d9a14b00 339319042 C Ii:1:004:1 -32:1 0
-> d9a14b00 339319056 S Ii:1:004:1 -115:1 10 <
-> d9a14b00 339329551 C Ii:1:004:1 -32:1 0
-> d9a14b00 339329571 S Ii:1:004:1 -115:1 10 <
-> d9a14b00 339330586 C Ii:1:004:1 -32:1 0
-> d9a14b00 339330601 S Ii:1:004:1 -115:1 10 <
-> d9a14b00 339331035 C Ii:1:004:1 -32:1 0
+The device tree bindings are in two copies and also should be
+consolidated into a single Faraday Technology FTWDT010
+binding since we uncovered that this IP part is a standard
+IP from Faraday.
 
-Sorry for necromancing an old thread, but I just happened to read
-through this and thought someone might care:
+Cc: devicetree at vger.kernel.org
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Collect Rob's ACK.
+---
+ .../bindings/watchdog/cortina,gemini-watchdog.txt       | 17 -----------------
+ ...{cortina,gemin-watchdog.txt => faraday,ftwdt010.txt} | 11 ++++++++---
+ 2 files changed, 8 insertions(+), 20 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/watchdog/cortina,gemini-watchdog.txt
+ rename Documentation/devicetree/bindings/watchdog/{cortina,gemin-watchdog.txt => faraday,ftwdt010.txt} (55%)
 
-If I read that right, the usbmon output shows that the interrupt
-endpoint is stalled (keeps returning -EPIPE). A STALL is a special
-device-side USB condition that tells the host something is wrong and
-will persist until cleared manually. It seems that the driver isn't
-prepared for this (see
-drivers/usb/serial/pl2303.c#pl2303_read_int_callback) and just keeps
-resubmitting the URB, so it will stall again as fast as the endpoint
-allows it to. This may be the reason why you get so many transfers
-that it overwhelms the CPU.
-
-A fix would be to catch -EPIPE in that function and handle it
-explicitly (with either a CLEAR_STALL to the endpoint or a full USB
-reset... would have to look at the documentation for PL2303 to see
-what the stall actually means and how you're supposed to treat it).
+diff --git a/Documentation/devicetree/bindings/watchdog/cortina,gemini-watchdog.txt b/Documentation/devicetree/bindings/watchdog/cortina,gemini-watchdog.txt
+deleted file mode 100644
+index bc4b865d178b..000000000000
+--- a/Documentation/devicetree/bindings/watchdog/cortina,gemini-watchdog.txt
++++ /dev/null
+@@ -1,17 +0,0 @@
+-Cortina Systems Gemini SoC Watchdog
+-
+-Required properties:
+-- compatible : must be "cortina,gemini-watchdog"
+-- reg : shall contain base register location and length
+-- interrupts : shall contain the interrupt for the watchdog
+-
+-Optional properties:
+-- timeout-sec : the default watchdog timeout in seconds.
+-
+-Example:
+-
+-watchdog at 41000000 {
+-	compatible = "cortina,gemini-watchdog";
+-	reg = <0x41000000 0x1000>;
+-	interrupts = <3 IRQ_TYPE_LEVEL_HIGH>;
+-};
+diff --git a/Documentation/devicetree/bindings/watchdog/cortina,gemin-watchdog.txt b/Documentation/devicetree/bindings/watchdog/faraday,ftwdt010.txt
+similarity index 55%
+rename from Documentation/devicetree/bindings/watchdog/cortina,gemin-watchdog.txt
+rename to Documentation/devicetree/bindings/watchdog/faraday,ftwdt010.txt
+index bc4b865d178b..9ecdb502e605 100644
+--- a/Documentation/devicetree/bindings/watchdog/cortina,gemin-watchdog.txt
++++ b/Documentation/devicetree/bindings/watchdog/faraday,ftwdt010.txt
+@@ -1,7 +1,12 @@
+-Cortina Systems Gemini SoC Watchdog
++Faraday Technology FTWDT010 watchdog
++
++This is an IP part from Faraday Technology found in the Gemini
++SoCs and others.
+ 
+ Required properties:
+-- compatible : must be "cortina,gemini-watchdog"
++- compatible : must be one of
++  "faraday,ftwdt010"
++  "cortina,gemini-watchdog", "faraday,ftwdt010"
+ - reg : shall contain base register location and length
+ - interrupts : shall contain the interrupt for the watchdog
+ 
+@@ -11,7 +16,7 @@ Optional properties:
+ Example:
+ 
+ watchdog at 41000000 {
+-	compatible = "cortina,gemini-watchdog";
++	compatible = "faraday,ftwdt010";
+ 	reg = <0x41000000 0x1000>;
+ 	interrupts = <3 IRQ_TYPE_LEVEL_HIGH>;
+ };
+-- 
+2.13.6
