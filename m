@@ -1,7 +1,9 @@
 From: andy.gross@linaro.org (Andy Gross)
-Date: Mon, 16 Oct 2017 14:31:27 -0500
-Subject: [GIT PULL] Qualcomm ARM64 DT updates for 4.15
-Message-ID: <1508182291-23352-1-git-send-email-andy.gross@linaro.org>
+Date: Mon, 16 Oct 2017 14:31:31 -0500
+Subject: [GIT PULL] Qualcomm Device Tree updates for 4.15
+In-Reply-To: <1508182291-23352-1-git-send-email-andy.gross@linaro.org>
+References: <1508182291-23352-1-git-send-email-andy.gross@linaro.org>
+Message-ID: <1508182291-23352-5-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,45 +13,50 @@ The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-arm64-for-4.15
+  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-dts-for-4.15
 
-for you to fetch changes up to 8cd00d5a43982417d0671f94af933ad3be2f3be9:
+for you to fetch changes up to e8c4c6eeaacd0fbc18fe8954b262cfd97836a76f:
 
-  arm64: dts: msm8916: Mark rmtfs node as qcom, rmtfs-mem compatible (2017-10-11 23:57:05 -0500)
-
-----------------------------------------------------------------
-Qualcomm ARM64 Updates for v4.15
-
-* Add PCIE support to relevant MSM8996 based boards
-* Add RPM clock controller node on MSM8996
-* Add dload address on MSM8916 and MSM8996
-* Add MBHC button support on APQ8016 SBC
-* Add RTMFS specific compatible for rmtfs memory node
-* Fixups for MSM8916 GPIO line names and MDP address length
+  ARM: dts: msm8974-FP2: Add USB node (2017-10-11 15:52:49 -0500)
 
 ----------------------------------------------------------------
-Bjorn Andersson (2):
-      arm64: dts: qcom: Specify dload address for msm8916 and msm8996
-      arm64: dts: msm8916: Mark rmtfs node as qcom, rmtfs-mem compatible
+Qualcomm Device Tree Changes for v4.15
 
-Craig Tatlor (1):
-      arm64: dts: qcom: msm8916: Shrink mdp address length for msm8916
+* Add Support for MSM8974 based Fairphone 2 phone
+* Add support for MSM8974 based Sony Xperia Z2 Tablet
+* Add MSM8660 GSBI6/7 nodes
+* Disable GSBI6 at APQ8064 platform level
+* Fix phy cells on APQ8064
+
+----------------------------------------------------------------
+Andy Gross (1):
+      ARM: dts: qcom-apq8064: Fix dsi and hdmi phy cells
+
+Bjorn Andersson (1):
+      ARM: dts: qcom: msm8974: Add Sony Xperia Z2 Tablet
 
 Linus Walleij (1):
-      arm64: dts: qcom: sbc: Name GPIO lines
+      ARM: dts: qcom: add MSM8660 GSBI6 and GSBI7
 
-Rajendra Nayak (1):
-      arm64: dts: msm8996: Add the rpm clock controller node
+Luca Weiss (5):
+      ARM: dts: qcom: Add initial DTS file for Fairphone 2 phone
+      ARM: dts: msm8974-FP2: Introduce gpio-keys nodes
+      ARM: dts: msm8974-FP2: Add regulator nodes for FP2
+      ARM: dts: msm8974-FP2: Add sdhci1 node
+      ARM: dts: msm8974-FP2: Add USB node
 
-Srinivas Kandagatla (4):
-      arm64: dts: qcom: msm8996: add support to pcie
-      arm64: dts: apq8096-db820c: Enable on board 3 pcie root complex
-      arm64: dts: apq8096-db820c: never disable regulator on LS expansion
-      arm64: dts: apq8016-sbc: add mbhc buttons support
+Srinivas Kandagatla (1):
+      ARM: dts: qcom-apq8064: disable gsbi6 i2c by default at soc dtsi
 
- arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi    | 171 +++++++++++++++++++++++
- arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi |  22 +++
- arch/arm64/boot/dts/qcom/msm8916.dtsi        |   7 +-
- arch/arm64/boot/dts/qcom/msm8996-pins.dtsi   | 195 +++++++++++++++++++++++++++
- arch/arm64/boot/dts/qcom/msm8996.dtsi        | 179 ++++++++++++++++++++++++
- 5 files changed, 573 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/qcom-apq8064.dtsi                |   5 +-
+ arch/arm/boot/dts/qcom-msm8660.dtsi                |  67 +++
+ arch/arm/boot/dts/qcom-msm8974-fairphone-fp2.dts   | 321 +++++++++++
+ .../boot/dts/qcom-msm8974-sony-xperia-castor.dts   | 641 +++++++++++++++++++++
+ arch/arm/boot/dts/qcom-msm8974.dtsi                |  14 +
+ arch/arm/boot/dts/qcom-msm8974pro.dtsi             |  18 +
+ 8 files changed, 1068 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/qcom-msm8974-fairphone-fp2.dts
+ create mode 100644 arch/arm/boot/dts/qcom-msm8974-sony-xperia-castor.dts
+ create mode 100644 arch/arm/boot/dts/qcom-msm8974pro.dtsi
