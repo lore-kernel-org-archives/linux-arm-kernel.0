@@ -1,138 +1,106 @@
-From: ahs3@redhat.com (Al Stone)
-Date: Mon, 16 Oct 2017 17:43:19 -0600
-Subject: [PATCH 0/3] arm64: cpuinfo: make /proc/cpuinfo more human-readable
-In-Reply-To: <20171013142724.GA5893@leverpostej>
-References: <20170926222324.17409-1-ahs3@redhat.com>
- <20170927103406.GC32150@leverpostej>
- <CAOZdJXUzo3JrHW1h6W3y3BnVq472NjPpaqTztzEODZnnMyvJRg@mail.gmail.com>
- <20171013142724.GA5893@leverpostej>
-Message-ID: <abeb1756-3635-2f86-131c-cd904731a308@redhat.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 16 Oct 2017 16:48:52 -0700
+Subject: [PATCH] arm: pxa: Convert timers to use timer_setup()
+Message-ID: <20171016234852.GA102339@beast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/13/2017 08:27 AM, Mark Rutland wrote:
-> Hi Timur,
-> 
-> On Fri, Oct 13, 2017 at 08:39:09AM -0500, Timur Tabi wrote:
->> On Wed, Sep 27, 2017 at 5:34 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->>> On Tue, Sep 26, 2017 at 04:23:21PM -0600, Al Stone wrote:
->>>> As ARMv8 servers get deployed, I keep getting the same set of questions
->>>> from end-users of those systems: what do all the hex numbers mean in
->>>> /proc/cpuinfo and could you make them so I don't have to carry a cheat
->>>> sheet with me all the time?
->>>
->>> I appreciate that /proc/cpuinfo can be opaque to end users, but I do not
->>> believe that this is the right solution to that problem.
->>>
->>> There are a number of issues stemming from the face that /proc/cpuinfo
->>> is ill-defined and overused for a number of cases. Changes to it almost
->>> certainly violate brittle de-facto ABI details people are relying on,
->>> and there's a very long tail on fallout resulting from this. In
->>> addition, many niceties come at an excessive maintenance cost, and are
->>> simply unreliable as an ABI.
->>>
->>> So, as with all other patches modifying /proc/cpuinfo, I must NAK this
->>> series.
->>
->> Qualcomm Datacenter Technologies is very interested in seeing these
->> patches (or some variant of them) accepted. Updates to /proc/cpuinfo
->> are long overdue, and I'm asking you to reconsider your objections.
-> 
-> I more than appreciate that there is information that people want access
-> to, and I'd really like to expose that in a consistent and structured
-> manner.
-> 
-> So please propose exposing the information elsewhere, which I would be
-> more than happy with for information that the kernel already has access
-> to.
-> 
-> I object to /proc/cpuinfo changes because they impose an ABI break, and
-> because some of the proposed changes impose new and requirements on the
-> kernel that cannot be maintained in a forwards-compatible manner (which
-> is liable to result in other ABI breaks).
-> 
-> For better or worse, we're stuck with the existing arch-specific format
-> of /proc/cpuinfo, as this is parsed by a wide variety of applications,
-> and any change risks breaking these.
-> 
->> We're willing to work with distro vendors to get this information
->> added to their products while upstream is left behind, but I hope that
->> won't be necessary.
-> 
-> Please understand that this is an ABI break, and that is why it is being
-> NAK'd.
-> 
-> I don't have the power to stop Red Hat or other vendors from
-> deliberately breaking ABI, but I would very strongly recommend that they
-> do not.
-> 
->> I would even go so far as to say that we should be making
->> /proc/cpuinfo for ARM match the x86 output as closely as possible,
-> 
-> As has been stated before, /proc/cpuinfo is an existing arch-specific ABI.
-> 
-> For better or worse, we're stuck with it as-is, regardless of what could
-> be nicer had we done something different from the outset.
-> 
-> It has never been portable across architectures, and applications
-> relying upon it have never been portable except by chance.
-> 
->> even using their terminology.  We should be providing information like
->> frequencies and product names.
-> 
-> As has been stated before, the problem with exposing these is that we
-> don't have the relevant information.
-> 
-> We have no consistent mechanism for acquiring product names, and for
-> those cases where it is truly necessary to identify an implementation,
-> the MIDR+REVIDR provide the exact same information.
-> 
-> For frequencies, I'd be more than happy to expose this information when
-> we have it, in new files. In practice today, we do not have this
-> information most of the time.
-> 
->> Having a human-readable /proc/cpuinfo with extensive details of the
->> CPU spelled out is very useful, and Al's reasoning is valid.  The fact
->> that it's "fragile" is not as important as the fact that on x86,
->> /proc/cpuinfo is much more useful.
-> 
-> I must disagree.
-> 
-> We care about that fragility so that we do not break userspace, which is
-> the most important upstream rule.
-> 
-> I certainly agree that exposing the information that we have is useful,
-> as I have stated several times. I'm not NAKing exposing this information
-> elsewhere.
-> 
-> If you want a consistent cross-architecture interface for this
-> information, then you need to propose a new one. That was we can
-> actually solve the underlying issues, for all architectures, without
-> breaking ABI.
-> 
-> I would be *very* interested in such an interface, and would be more
-> than happy to help.
+In preparation for unconditionally passing the struct timer_list pointer to
+all timer callbacks, switch to using the new timer_setup() and from_timer()
+to pass the timer pointer explicitly. Adds a static variable to hold the
+interrupt private data pointer.
 
-I'm playing with some patches that do very similar things in sysfs, vs
-proc.  Is that better :)?  Obviously, you'll have to see the patches to
-properly answer that, but what I'm playing with at present is placing
-this info in new entries in /sys/devices/cpu and/or /sys/devices/system,
-and generating some of the content based on what's already in header files
-(e.g., in cputype.h).  The idea of course is to keep this new info from
-touching any existing info so we don't break compatibility -- does that
-feel like a better direction, at least?
+Cc: Daniel Mack <daniel@zonque.org>
+Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+Cc: Robert Jarzmik <robert.jarzmik@free.fr>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+ arch/arm/mach-pxa/lubbock.c    | 15 ++++++---------
+ arch/arm/mach-pxa/sharpsl_pm.c |  8 ++++----
+ 2 files changed, 10 insertions(+), 13 deletions(-)
 
-> Thanks,
-> Mark.
-> 
+diff --git a/arch/arm/mach-pxa/lubbock.c b/arch/arm/mach-pxa/lubbock.c
+index d6159f8ef0c2..df45682e99a5 100644
+--- a/arch/arm/mach-pxa/lubbock.c
++++ b/arch/arm/mach-pxa/lubbock.c
+@@ -381,14 +381,11 @@ static struct pxafb_mach_info sharp_lm8v31 = {
+ 
+ #define	MMC_POLL_RATE		msecs_to_jiffies(1000)
+ 
+-static void lubbock_mmc_poll(unsigned long);
+ static irq_handler_t mmc_detect_int;
++static void *mmc_detect_int_data;
++static struct timer_list mmc_timer;
+ 
+-static struct timer_list mmc_timer = {
+-	.function	= lubbock_mmc_poll,
+-};
+-
+-static void lubbock_mmc_poll(unsigned long data)
++static void lubbock_mmc_poll(struct timer_list *unused)
+ {
+ 	unsigned long flags;
+ 
+@@ -401,7 +398,7 @@ static void lubbock_mmc_poll(unsigned long data)
+ 	if (LUB_IRQ_SET_CLR & (1 << 0))
+ 		mod_timer(&mmc_timer, jiffies + MMC_POLL_RATE);
+ 	else {
+-		(void) mmc_detect_int(LUBBOCK_SD_IRQ, (void *)data);
++		(void) mmc_detect_int(LUBBOCK_SD_IRQ, mmc_detect_int_data);
+ 		enable_irq(LUBBOCK_SD_IRQ);
+ 	}
+ }
+@@ -421,8 +418,8 @@ static int lubbock_mci_init(struct device *dev,
+ {
+ 	/* detect card insert/eject */
+ 	mmc_detect_int = detect_int;
+-	init_timer(&mmc_timer);
+-	mmc_timer.data = (unsigned long) data;
++	mmc_detect_int_data = data;
++	timer_setup(&mmc_timer, lubbock_mmc_poll, 0);
+ 	return request_irq(LUBBOCK_SD_IRQ, lubbock_detect_int,
+ 			   0, "lubbock-sd-detect", data);
+ }
+diff --git a/arch/arm/mach-pxa/sharpsl_pm.c b/arch/arm/mach-pxa/sharpsl_pm.c
+index 249b7bd5fbc4..398ba9ba2632 100644
+--- a/arch/arm/mach-pxa/sharpsl_pm.c
++++ b/arch/arm/mach-pxa/sharpsl_pm.c
+@@ -341,7 +341,7 @@ static void sharpsl_charge_toggle(struct work_struct *private_)
+ 	sharpsl_pm.charge_start_time = jiffies;
+ }
+ 
+-static void sharpsl_ac_timer(unsigned long data)
++static void sharpsl_ac_timer(struct timer_list *unused)
+ {
+ 	int acin = sharpsl_pm.machinfo->read_devdata(SHARPSL_STATUS_ACIN);
+ 
+@@ -366,7 +366,7 @@ static irqreturn_t sharpsl_ac_isr(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static void sharpsl_chrg_full_timer(unsigned long data)
++static void sharpsl_chrg_full_timer(struct timer_list *unused)
+ {
+ 	dev_dbg(sharpsl_pm.dev, "Charge Full at time: %lx\n", jiffies);
+ 
+@@ -841,9 +841,9 @@ static int sharpsl_pm_probe(struct platform_device *pdev)
+ 	sharpsl_pm.charge_mode = CHRG_OFF;
+ 	sharpsl_pm.flags = 0;
+ 
+-	setup_timer(&sharpsl_pm.ac_timer, sharpsl_ac_timer, 0UL);
++	timer_setup(&sharpsl_pm.ac_timer, sharpsl_ac_timer, 0);
+ 
+-	setup_timer(&sharpsl_pm.chrg_full_timer, sharpsl_chrg_full_timer, 0UL);
++	timer_setup(&sharpsl_pm.chrg_full_timer, sharpsl_chrg_full_timer, 0);
+ 
+ 	led_trigger_register_simple("sharpsl-charge", &sharpsl_charge_led_trigger);
+ 
+-- 
+2.7.4
 
 
 -- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Red Hat, Inc.
-ahs3 at redhat.com
------------------------------------
+Kees Cook
+Pixel Security
