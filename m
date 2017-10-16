@@ -1,47 +1,51 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 16 Oct 2017 18:31:08 +0200
-Subject: [PATCH v5 4/4] ARM: configs: stm32: Add MDMA support in STM32
- defconfig
-In-Reply-To: <1506613003-28376-5-git-send-email-pierre-yves.mordret@st.com>
-References: <1506613003-28376-1-git-send-email-pierre-yves.mordret@st.com>
- <1506613003-28376-5-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <579b83f8-d2bb-b926-2365-92b11a09f6cf@st.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 16 Oct 2017 17:32:13 +0100
+Subject: [PATCH] checkpatch: Allow DEFINE_PER_CPU definitions to exceed
+ line length
+In-Reply-To: <1508170320.6530.15.camel@perches.com>
+References: <20171016152839.14964-1-mark.rutland@arm.com>
+ <20171016152839.14964-3-mark.rutland@arm.com>
+ <1508170320.6530.15.camel@perches.com>
+Message-ID: <20171016163149.lhgqbmn2oxdcfvaw@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi
+On Mon, Oct 16, 2017 at 09:12:00AM -0700, Joe Perches wrote:
+> Some of the definitions are very long and can't be split
+> into multiple lines because ctags is limited.
+> 
+> Exempt these lines from the line length checks.
+> 
+> Signed-off-by: Joe Perches <joe@perches.com>
 
-On 09/28/2017 05:36 PM, Pierre-Yves MORDRET wrote:
-> This patch adds MDMA support in STM32 defconfig file
-> 
-> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
-> ---
->   Version history:
->      v5:
->      v4:
->      v3:
->          * None
->      v2:
->          * Add MDMA support in STM32 defconfig
-> ---
-> ---
->   arch/arm/configs/stm32_defconfig | 1 +
->   1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
-> index 90e5c46..dd8919b 100644
-> --- a/arch/arm/configs/stm32_defconfig
-> +++ b/arch/arm/configs/stm32_defconfig
-> @@ -67,6 +67,7 @@ CONFIG_RTC_CLASS=y
->   CONFIG_RTC_DRV_STM32=y
->   CONFIG_DMADEVICES=y
->   CONFIG_STM32_DMA=y
-> +CONFIG_STM32_MDMA=y
->   CONFIG_IIO=y
->   CONFIG_STM32_ADC_CORE=y
->   CONFIG_STM32_ADC=y
-> 
-Applied on stm32-defconfig-for-v4.15.
+It might make sense to point at commit:
 
-Thanks
-Alex
+  25528213fe9f75f4 ("tags: Fix DEFINE_PER_CPU expansions")
+
+... for the gory details, but either way:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
+
+> ---
+>  scripts/checkpatch.pl | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/scripts/checkpatch.pl b/scripts/checkpatch.pl
+> index 2a8c6c3c1bdb..5fa0f5467d99 100755
+> --- a/scripts/checkpatch.pl
+> +++ b/scripts/checkpatch.pl
+> @@ -2900,8 +2900,9 @@ sub process {
+>  				 $line =~ /^\+\s*#\s*define\s+\w+\s+$String$/) {
+>  				$msg_type = "";
+>  
+> -			# EFI_GUID is another special case
+> -			} elsif ($line =~ /^\+.*\bEFI_GUID\s*\(/) {
+> +			# More special cases
+> +			} elsif ($line =~ /^\+.*\bEFI_GUID\s*\(/ ||
+> +				 $line =~ /^\+\s*(?:\w+)?\s*DEFINE_PER_CPU/) {
+>  				$msg_type = "";
+>  
+>  			# Otherwise set the alternate message types
