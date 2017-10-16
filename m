@@ -1,63 +1,53 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 16 Oct 2017 18:02:51 +0100
-Subject: [PATCH v3 15/20] KVM: arm64: Set an impdef ESR for Virtual-SError
- using VSESR_EL2.
-In-Reply-To: <CAMj-D2BbOJBOUnY5r6mGUBB34Lq_z6xGAhvHyuNFjp29KLif7Q@mail.gmail.com>
-References: <0184EA26B2509940AA629AE1405DD7F2016959EE@DGGEMA503-MBX.china.huawei.com>
- <CAMj-D2BbOJBOUnY5r6mGUBB34Lq_z6xGAhvHyuNFjp29KLif7Q@mail.gmail.com>
-Message-ID: <59E4E63B.2050208@arm.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 16 Oct 2017 22:45:23 +0530
+Subject: [PATCH v4 07/11] dmaengine: sun6i: Retrieve channel count/max
+ request from devicetree
+In-Reply-To: <1918888.BSE68NRsHe@sbruens-linux>
+References: <20170928014928.2272-1-stefan.bruens@rwth-aachen.de>
+ <6277478a-601a-48b0-8e1f-1d309049d4f4@rwthex-w2-a.rwth-ad.de>
+ <20171016070217.GO30097@localhost>
+ <1918888.BSE68NRsHe@sbruens-linux>
+Message-ID: <20171016171523.GR30097@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi gengdongjiu,
-
-On 16/10/17 04:17, gengdongjiu wrote:
->> In fact I have below method for that, what do you think about that?
->>
->> 1.  If there is no RAS, old method, directly inject virtual SError, not need to specify ESR, as shown in the [1]
->> 2.  If there is RAS, KVM set "the kvm_run" guest exit type value to let user space handle the SError abort
->>    A. If ESR_EL2 is IMPLEMENTATION or uncategorized, return " ESR_ELx_ISV " to let user space specify an implementation-defined value, as shown [2]
->>    B. If ESR_EL2 is categorized and error not propagated,  the error come from guest user space, return " (ESR_ELx_AET_UCU | ESR_ELx_FSC_SERROR " to let user space specify a recoverable ESR.
->>      Here one side calling memory failure, another side let user pace inject SError. Because usually SEI notification does not deliver SIGBUS signal to user space, so here inject virtual SEI to ensure that. As shown [3]
->>    C. If ESR_EL2 is categorized and error not propagated,  the error come from guest kernel, return "-1" to terminate guest. As shown [4]
->>    D. Otherwise, Panic host OS. As shown [5]
->>
+On Mon, Oct 16, 2017 at 02:21:02PM +0000, Br?ns, Stefan wrote:
+> On Montag, 16. Oktober 2017 09:02:17 CEST Vinod Koul wrote:
+> > On Thu, Sep 28, 2017 at 03:49:24AM +0200, Stefan Br?ns wrote:
+> > > To avoid introduction of a new compatible for each small SoC/DMA
+> > > controller
+> > > variation, move the definition of the channel count to the devicetree.
+> > > 
+> > > The number of vchans is no longer explicit, but limited by the highest
+> > > port/DMA request number. The result is a slight overallocation for SoCs
+> > > with a sparse port mapping.
+> > 
+> > This doesnt apply for me, please check
 > 
-> For the IMPLEMENTATION ESR, for the safety purposes, I have below suggestion
+> The hunk below fails after https://git.kernel.org/pub/scm/linux/kernel/git/
+> vkoul/slave-dma.git/commit/?h=topic/
+> sun&id=8f3b00347bf075fb457f90ce76573615f567e7bc
+> , which removed the "const struct of_device_id *device;" declaration.
 > 
-> 1. When there is no guest,  host OS receives IMPLEMENTATION ESR, I
-> hope host can be panic, because we do not know its implementation
-> meaning.
+> 
+> > diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+> > index 7fce976a13d8..b5906da2a975 100644
+> > --- a/drivers/dma/sun6i-dma.c
+> > +++ b/drivers/dma/sun6i-dma.c
+> > @@ -42,6 +42,9 @@
+> ..
+> > @@ -1155,6 +1159,7 @@ MODULE_DEVICE_TABLE(of, sun6i_dma_match);
+> >  static int sun6i_dma_probe(struct platform_device *pdev)
+> >  {
+> >  	const struct of_device_id *device;
+> > +	struct device_node *np = pdev->dev.of_node;
+> >  	struct sun6i_dma_dev *sdc;
+> >  	struct resource *res;
+> >  	int ret, i;
+> 
+> Can you fix this up, or should I send a new version of this patch?
 
-> 2. when guest received MPLEMENTATION  ESR, and the Error is isolated
-> to guest by "ESB" instruction, not propagate to host. I hope guest
-> will exit, but host not panic.
+rebased one please
 
-How do we know if impdef SError values are contained by ESB?
-
-'2.4.3 ESB and other physical errors' of [0]:
-> It is IMPLEMENTATION DEFINED whether IMPLEMENTATION DEFINED and uncategorized
-> SError interrupts are containable or Uncontainable, and whether they can be
-> synchronized by an Error Synchronization Barrier.
-
-
-> 3. when guest received MPLEMENTATION  ESR, and the Error is propagate
-> to host, I hope host can be panic.
-
-
-I tried to keep this behaviour 'the same' because I don't think there is a
-'right thing' to do here:
-If the SError is due to some catastrophic failure, we should panic the host. If
-the SError is due to the guest poking a device we don't want to panic the host.
-
-We can't tell these two cases apart.
-
-We can spot RAS errors and handle those.
-
-
-Thanks,
-
-James
-
-[0]
-https://static.docs.arm.com/ddi0587/a/RAS%20Extension-release%20candidate_march_29.pdf
+-- 
+~Vinod
