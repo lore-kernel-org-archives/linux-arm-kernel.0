@@ -1,44 +1,55 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 16 Oct 2017 14:48:54 +0200
-Subject: [PATCH 0/2] fix lockdep warnings in s5p_mfc and exynos-gsc vb2
- drivers
-In-Reply-To: <cover.1507935819.git.shuahkh@osg.samsung.com>
-References: <CGME20171013231531epcas5p2f009317ed58f5177e7a0768b69a62b6c@epcas5p2.samsung.com>
- <cover.1507935819.git.shuahkh@osg.samsung.com>
-Message-ID: <c2dae5ff-a35c-bdd1-910b-75db6c9c16b2@samsung.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 16 Oct 2017 15:08:01 +0200
+Subject: [GIT PULL] ARM: Xilinx Zynq DT patches for v4.15
+Message-ID: <de3bd1fb-85b4-81de-d546-7f9fc92ecf16@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shuah,
+Hi,
 
-On 2017-10-14 01:13, Shuah Khan wrote:
-> Driver mmap functions shouldn't hold lock when calling vb2_mmap(). The
-> vb2_mmap() function has its own lock that it uses to protect the critical
-> section.
->
-> Reference: commit log for f035eb4e976ef5a059e30bc91cfd310ff030a7d3
+please apply the following patch.
 
-It would make sense to add the information about the reference commit to 
-each
-commit message and also point to commit 
-e752577ed7bf55c81e10343fced8b378cda2b63b,
-as it is exactly the same case here. Anyway:
+Thanks,
+Michal
 
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 
-I wonder if makes sense to send those patches also to stable at vget.kernel.org
-(maybe v4.3+, like the mentioned above commit, if they really apply?).
+  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
 
-> Shuah Khan (2):
->    media: exynos-gsc: fix lockdep warning
->    media: s5p-mfc: fix lockdep warning
->
->   drivers/media/platform/exynos-gsc/gsc-m2m.c | 5 -----
->   drivers/media/platform/s5p-mfc/s5p_mfc.c    | 3 ---
->   2 files changed, 8 deletions(-)
->
+are available in the git repository at:
 
-Best regards
+  https://github.com/Xilinx/linux-xlnx.git tags/zynq-dt-for-4.15
+
+for you to fetch changes up to 3a42d36c6a2be960d9c7fe1ec7676aa04db572d4:
+
+  ARM: dts: zynq: Add generic compatible string for I2C EEPROM
+(2017-09-20 15:10:40 +0200)
+
+----------------------------------------------------------------
+arm: Xilinx ZynqMP DT changes for v4.15
+
+- Change 24c08 compatible string
+
+----------------------------------------------------------------
+Javier Martinez Canillas (1):
+      ARM: dts: zynq: Add generic compatible string for I2C EEPROM
+
+ arch/arm/boot/dts/zynq-zc702.dts | 2 +-
+ arch/arm/boot/dts/zynq-zc706.dts | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Xilinx Microblaze
+Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
+U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171016/9f18bb1f/attachment-0001.sig>
