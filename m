@@ -1,62 +1,37 @@
-From: net147@gmail.com (Jonathan Liu)
-Date: Mon, 16 Oct 2017 23:54:27 +1100
-Subject: [PATCH v2] usb: musb: sunxi: Explicitly release USB PHY on exit
-In-Reply-To: <20171016124949.GA73@LTA0271908.dhcp.ti.com>
-References: <20171010024525.21971-1-net147@gmail.com>
- <20171010032252.GA25830@uda0271908>
- <CANwerB2qnWXDi_wkxk9EZ0WeAunUjzVOBepEOXXnsm0PiByHMg@mail.gmail.com>
- <20171016124949.GA73@LTA0271908.dhcp.ti.com>
-Message-ID: <CANwerB0V+iXaPqrwizyAfUcD2kPt0Lg-_muuzOdD5Mq7MPf-Qw@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 16 Oct 2017 14:55:55 +0200
+Subject: [GIT PULL] ARM: Xilinx Zynq SoC patches for v4.15
+Message-ID: <e0070498-8a23-3608-ac27-9da816f0d990@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 October 2017 at 23:49, Bin Liu <b-liu@ti.com> wrote:
-> On Mon, Oct 16, 2017 at 04:13:51PM +1100, Jonathan Liu wrote:
->> On 10 October 2017 at 14:22, Bin Liu <b-liu@ti.com> wrote:
->> > On Tue, Oct 10, 2017 at 01:45:25PM +1100, Jonathan Liu wrote:
->> >> This fixes a kernel oops when unloading the driver due to usb_put_phy
->> >> being called after usb_phy_generic_unregister when the device is
->> >> detached. Calling usb_phy_generic_unregister causes x->dev->driver to
->> >> be NULL in usb_put_phy and results in a NULL pointer dereference.
->> >>
->> >> Cc: stable at vger.kernel.org # v4.3+
->> >> Signed-off-by: Jonathan Liu <net147@gmail.com>
->> >> ---
->> >> Changes for v2:
->> >>  - Use devm_usb_put_phy instead of usb_put_phy
->> >>
->> >>  drivers/usb/musb/sunxi.c | 2 ++
->> >>  1 file changed, 2 insertions(+)
->> >>
->> >> diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
->> >> index c9a09b5bb6e5..dc353e24d53c 100644
->> >> --- a/drivers/usb/musb/sunxi.c
->> >> +++ b/drivers/usb/musb/sunxi.c
->> >> @@ -297,6 +297,8 @@ static int sunxi_musb_exit(struct musb *musb)
->> >>       if (test_bit(SUNXI_MUSB_FL_HAS_SRAM, &glue->flags))
->> >>               sunxi_sram_release(musb->controller->parent);
->> >>
->> >> +     devm_usb_put_phy(glue->dev, glue->xceiv);
->> >> +
->> >>       return 0;
->> >>  }
->> >
->> >
->>
->> > Applied. Thanks.
->> > -Bin.
->>
->> Which repository was it applied to?
->
-> I don't have a public repo (yet), but the patch has been sent to Greg,
-> so it should be merged into the next -rc.
->
-> Regards,
-> -Bin.
+Hi,
 
-The MAINTAINERS file has
-git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git listed as
-the tree for drivers/usb/musb/. I guess that should be updated.
+please apply the following patch.
 
-Regards,
-Jonathan
+Thanks,
+Michal
+
+The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+
+  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+
+are available in the git repository at:
+
+  https://github.com/Xilinx/linux-xlnx.git tags/zynq-soc-for-4.15
+
+for you to fetch changes up to 57fc5529972b4c7c424a5fac56508c72ae020796:
+
+  MAINTAINERS: Remove myself as reviewer (2017-10-02 07:57:49 +0200)
+
+----------------------------------------------------------------
+arm: Xilinx Zynq patches for v4.15
+
+- Remove Soren from reviewer list
+
+----------------------------------------------------------------
+Soren Brinkmann (1):
+      MAINTAINERS: Remove myself as reviewer
+
+ MAINTAINERS | 1 -
+ 1 file changed, 1 deletion(-)
