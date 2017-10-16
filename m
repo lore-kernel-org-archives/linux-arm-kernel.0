@@ -1,92 +1,35 @@
-From: harinikatakamlinux@gmail.com (Harini Katakam)
-Date: Mon, 16 Oct 2017 16:08:30 +0530
-Subject: [PATCH] Fix Bug for cadence i2c interrupt overrunning buffer
-In-Reply-To: <CA+Y=x3nnQ0hQkBaGQ4+MDZsVgpdFCYqaMae9UrJ2vOOuAD9FdQ@mail.gmail.com>
-References: <20170916030252.10680-1-amworsley@gmail.com>
- <20171005120125.nnhomwg2e2twbaqm@ninjato>
- <CA+Y=x3=Ab-tZt-32Ve1qTB=REuQAZnGbX72ZeNpyX3EX7cR0pg@mail.gmail.com>
- <20171013184646.cy5gmpwrxbacje3m@ninjato>
- <CAFcVECJTUu7Kwd-2hx=4=iGwKFnpTAebR3ffjJHQLHKDZ3T4aw@mail.gmail.com>
- <CA+Y=x3nnQ0hQkBaGQ4+MDZsVgpdFCYqaMae9UrJ2vOOuAD9FdQ@mail.gmail.com>
-Message-ID: <CAFcVECK85xW_8oxVQGsHBGyZ4_5bcghpbonqDH-8tLp+Mwq=xQ@mail.gmail.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Mon, 16 Oct 2017 12:44:09 +0200
+Subject: [RESEND PATCH v2 4/5] drm/bridge/analogix: Do not use device's
+ drvdata
+In-Reply-To: <20171016100640.26575-5-jeffy.chen@rock-chips.com>
+References: <20171016100640.26575-1-jeffy.chen@rock-chips.com>
+ <CGME20171016100746epcas2p436f3573bcb862275aea1869aabe4ad17@epcas2p4.samsung.com>
+ <20171016100640.26575-5-jeffy.chen@rock-chips.com>
+Message-ID: <be199812-9fc5-11ec-cca4-5b9fcff57070@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+On 16.10.2017 12:06, Jeffy Chen wrote:
+> From: Tomasz Figa <tfiga@chromium.org>
+>
+> The driver that instantiates the bridge should own the drvdata, as all
+> driver model callbacks (probe, remove, shutdown, PM ops, etc.) are also
+> owned by its driver struct. Moreover, storing two different pointer
+> types in driver data depending on driver initialization status is barely
+> a good practice and in fact has led to many bugs in this driver.
+>
+> Let's clean up this mess and change Analogix entry points to simply
+> accept some opaque struct pointer, adjusting their users at the same
+> time to avoid breaking the compilation.
+>
+> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 
-On Mon, Oct 16, 2017 at 2:48 PM, Andrew Worsley <amworsley@gmail.com> wrote:
-> Thanks I think I know understand how this transfer register is set up.
-> I will add some diagnostic printk's to track down exactly how it is
-> failing and get back to you.
->
->  Yes it is zynq. The test case is large (128 byte) transfers from a
-> tpm to fill an rng driver. I just pull large amounts of data via dd.
->
-> It may depend on the i2c slave being willing to just respond to
-> requests that read arbitrary amounts of data. In this case the TPM
-> appeared to generate FF when requested for more data than was in the
-> TPM_RANDOM request.
->
->
->
-> On 16 October 2017 at 16:55, Harini Katakam
-> <harinikatakamlinux@gmail.com> wrote:
->> Hi Andrew,
->>
->> On Sat, Oct 14, 2017 at 12:16 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
-> .....
->>>
->>> So, let's add Harini Katakam to CC who implemented this. But I'd be
->>> happy for anyone from Xilinx to respond...
->>
->> The workaround you are referring to is implemented under
->> "if (cdns_is_holdquirk(id, hold_quirk)) {"
->> and should not apply to your case of 128 byte transfer at all.
->
-> Ah I can see the logic now. If the transfer is small (< 250 or so
-> bytes) it will just write it into the transfer register. Yes my
-> transfers are only 128 + some TPM related headers ( not big I expect).
-> ....
->
->
->>
->> The specific place you have problem is under the loop
->> where RX data valid is being checked and ideally, that
->> buffer should never be written with more data than requested -
->> because no. of bytes requested is written to transfer size register,
->> the same is the amount the controller (master) fetches and
->> RX data valid remains set only for that duration.
->
-> If the transfer register was set with the
+Thanks for making it a bit saner.
 
-Yes, this is assuming the transfer size register was not set inittially
-or later with more byted than required.
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 
->>
->> Are you using Zynq?
->> I'm not working on this anymore but we could take a look at
->> your error if we are able to reproduce it.
->> Could you please provide more details of your application and
->> setup?
->>
->> Regards,
->> Harini
->
-> Yes - I will get back to you with more details and further debugging
-> around exactly how it is failing.
->
-> Assuming it is not obvious how to fix it - perhaps I can try setting
-> the transfer register to zero when it hits the end of the transfer?
-> (if recv_count == 0).
-
-Yes, that can be done as a workaround but ideally, the transfer
-size register should have decremented to zero by this point.
-
->
-> Thanks very much Harini  - that was just the pointer I needed to
-> follow the code.
-
-Thanks for the information - please let me know what you find.
-
-Regards,
-Harini
+?--
+Regards
+Andrzej
