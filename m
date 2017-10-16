@@ -1,83 +1,56 @@
-From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Mon, 16 Oct 2017 22:43:07 +0530
-Subject: [PATCH v2 5/9] ARM: dts: rockchip: Add gmac support for rk3288-vyasa
- board
-Message-ID: <1508173987-26688-1-git-send-email-jagan@amarulasolutions.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 16 Oct 2017 15:51:57 -0200
+Subject: [PATCH] ARM: dts: imx: add ZII RDU1 board
+In-Reply-To: <20171016165540.917-1-l.stach@pengutronix.de>
+References: <20171016165540.917-1-l.stach@pengutronix.de>
+Message-ID: <CAOMZO5Bub-TrF-X+s-N_tVy5mtCb=_m35U0stvmFHh4GeU0mAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
-Changes for v2:
-- status s/ok/okay
+Hi Lucas,
 
- arch/arm/boot/dts/rk3288-vyasa.dts | 41 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
+On Mon, Oct 16, 2017 at 2:55 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
 
-diff --git a/arch/arm/boot/dts/rk3288-vyasa.dts b/arch/arm/boot/dts/rk3288-vyasa.dts
-index 0fa447f..c79a4c7 100644
---- a/arch/arm/boot/dts/rk3288-vyasa.dts
-+++ b/arch/arm/boot/dts/rk3288-vyasa.dts
-@@ -104,12 +104,35 @@
- 		regulator-boot-on;
- 		vin-supply = <&dc12_vbat>;
- 	};
-+
-+	ext_gmac: external-gmac-clock {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <125000000>;
-+		clock-output-names = "ext_gmac";
-+	};
- };
- 
- &cpu0 {
- 	cpu0-supply = <&vdd_cpu>;
- };
- 
-+&gmac {
-+	assigned-clocks = <&cru SCLK_MAC>;
-+	assigned-clock-parents = <&ext_gmac>;
-+	clock_in_out = "input";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&rgmii_pins>, <&phy_rst>, <&phy_pmeb>, <&phy_int>;
-+	phy-supply = <&vcc_lan>;
-+	phy-mode = "rgmii";
-+	snps,reset-active-low;
-+	snps,reset-delays-us = <0 10000 1000000>;
-+	snps,reset-gpio = <&gpio4 RK_PB0 GPIO_ACTIVE_LOW>;
-+	tx_delay = <0x30>;
-+	rx_delay = <0x10>;
-+	status = "okay";
-+};
-+
- &gpu {
- 	mali-supply = <&vdd_gpu>;
- 	status = "okay";
-@@ -361,6 +384,24 @@
- };
- 
- &pinctrl {
-+	pcfg_output_high: pcfg-output-high {
-+		output-high;
-+	};
-+
-+	gmac {
-+		phy_int: phy-int {
-+			rockchip,pins = <0 RK_PB1 RK_FUNC_GPIO &pcfg_pull_up>;
-+		};
-+
-+		phy_pmeb: phy-pmeb {
-+			rockchip,pins = <0 RK_PA6 RK_FUNC_GPIO &pcfg_pull_up>;
-+		};
-+
-+		phy_rst: phy-rst {
-+			rockchip,pins = <4 RK_PB0 RK_FUNC_GPIO &pcfg_output_high>;
-+		};
-+	};
-+
- 	pmic {
- 		pmic_int: pmic-int {
- 			rockchip,pins = <RK_GPIO0 4 RK_FUNC_GPIO &pcfg_pull_up>;
--- 
-2.7.4
+> +       disp0 {
+> +               compatible = "fsl,imx-parallel-display";
+> +               pinctrl-names = "default";
+> +               pinctrl-0 = <&pinctrl_ipu_disp1>;
+> +
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               port at 0 {
+> +                       reg = <0>;
+> +
+> +                       display_in: endpoint {
+> +                               remote-endpoint = <&ipu_di0_disp0>;
+
+Please use ipu_di0_disp1 instead as done in this recent commit:
+https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git/commit/?h=imx/dt&id=f7059428ec1b16785bdc2a70e056ef20f3a8df41
+
+> +       usbh1phy: usbphy at 1 {
+
+This will give a warning when building with W=1 as a unit-address is
+passed without its corresponding reg node.
+
+You could simply remove the @1.
+
+> +               compatible = "usb-nop-xceiv";
+> +               pinctrl-names = "default";
+> +               pinctrl-0 = <&pinctrl_usbh1phy>;
+> +               clocks = <&clk_26M_usb>;
+> +               clock-names = "main_clk";
+> +               reset-gpios = <&gpio4 8 GPIO_ACTIVE_LOW>;
+> +               vcc-supply = <&vusb_reg>;
+> +       };
+> +
+> +       usbh2phy: usbphy at 2 {
+
+Ditto.
+
+> +&ecspi1 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&pinctrl_ecspi1>;
+> +       fsl,spi-num-chipselects = <2>;
+
+This is an obsolete property, please remove it.
