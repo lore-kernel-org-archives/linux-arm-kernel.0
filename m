@@ -1,59 +1,50 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 16 Oct 2017 15:12:45 +0100
-Subject: ARM64: Regression with commit e3067861ba66 ("arm64: add basic
- VMAP_STACK support")
-In-Reply-To: <20171016134819.jv3udrcwsedc4cgs@lakrids.cambridge.arm.com>
-References: <20171010142725.GA24797@leoy-linaro>
- <20171010154558.GJ27659@leverpostej>
- <da09fd83-f3f0-f800-fea4-988cfa56bac7@arm.com>
- <20171016011723.GB12470@leoy-linaro>
- <20171016134819.jv3udrcwsedc4cgs@lakrids.cambridge.arm.com>
-Message-ID: <34ccf02d-fd65-bade-327a-ed8df1d3eea5@arm.com>
+From: Stefan.Bruens@rwth-aachen.de (=?iso-8859-1?Q?Br=FCns=2C_Stefan?=)
+Date: Mon, 16 Oct 2017 14:21:02 +0000
+Subject: [PATCH v4 07/11] dmaengine: sun6i: Retrieve channel count/max
+ request from devicetree
+In-Reply-To: <20171016070217.GO30097@localhost>
+References: <20170928014928.2272-1-stefan.bruens@rwth-aachen.de>
+ <6277478a-601a-48b0-8e1f-1d309049d4f4@rwthex-w2-a.rwth-ad.de>
+ <20171016070217.GO30097@localhost>
+Message-ID: <1918888.BSE68NRsHe@sbruens-linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/10/17 14:48, Mark Rutland wrote:
-> Hi Leo,
+On Montag, 16. Oktober 2017 09:02:17 CEST Vinod Koul wrote:
+> On Thu, Sep 28, 2017 at 03:49:24AM +0200, Stefan Br?ns wrote:
+> > To avoid introduction of a new compatible for each small SoC/DMA
+> > controller
+> > variation, move the definition of the channel count to the devicetree.
+> > 
+> > The number of vchans is no longer explicit, but limited by the highest
+> > port/DMA request number. The result is a slight overallocation for SoCs
+> > with a sparse port mapping.
 > 
-> On Mon, Oct 16, 2017 at 09:17:23AM +0800, Leo Yan wrote:
->> On Tue, Oct 10, 2017 at 05:03:44PM +0100, Robin Murphy wrote:
->>> On 10/10/17 16:45, Mark Rutland wrote:
->>>> On Tue, Oct 10, 2017 at 10:27:25PM +0800, Leo Yan wrote:
->>>>> I work mainline kernel on Hikey620 board, I find it's easily to
->>>>> introduce the panic and report the log as below. So I bisect the kernel
->>>>> and finally narrow down the commit e3067861ba66 ("arm64: add basic
->>>>> VMAP_STACK support") which introduce this issue.
->>>>>
->>>>> I tried to remove 'select HAVE_ARCH_VMAP_STACK' from
->>>>> arch/arm64/Kconfig, then I can see the panic issue will dismiss. So
->>>>> could you check this and have insight for this issue?
->>>>
->>>> Given the stuff in the backtrace, my suspicion is something is trying to
->>>> perform DMA to/from the stack, getting junk addresses form the attempted
->>>> virt<->phys conversions.
->>>>
->>>> Could you try enabling both VMAP_STACK and CONFIG_DEBUG_VIRTUAL?
->>>
->>> CONFIG_DMA_API_DEBUG should scream about drivers trying to use stack
->>> addresses either way, too.
->>
->> Thanks for suggestions, Mark & Robin.
->>
->> I enabled these debugging configs but cannot get clue from it; but
->> occasionally found this issue is quite likely related with CA53 errata,
->> especialy ERRATA_A53_855873 is the relative one. So I changed to use
->> ARM-TF mainline code with ERRATA fixing, this issue can be dismissed.
-> 
-> Thanks for the update.
-> 
-> Just to confirm, with the updated firmware you no longer see the issue?
-> 
-> I can't immediately see how that would be related.
+> This doesnt apply for me, please check
 
-Cores up to r0p2 have the other errata to which
-ARM64_WORKAROUND_CLEAN_CACHE also applies anyway; r3p0+ have an ACTLR
-bit to do thee CVAC->CIVAC upgrade in hardware, and our policy is that
-we expect firmware to enable such hardware workarounds where possible. I
-assume that's why we don't explicitly document 855873 anywhere in Linux.
+The hunk below fails after https://git.kernel.org/pub/scm/linux/kernel/git/
+vkoul/slave-dma.git/commit/?h=topic/
+sun&id=8f3b00347bf075fb457f90ce76573615f567e7bc
+, which removed the "const struct of_device_id *device;" declaration.
 
-Robin.
+
+> diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+> index 7fce976a13d8..b5906da2a975 100644
+> --- a/drivers/dma/sun6i-dma.c
+> +++ b/drivers/dma/sun6i-dma.c
+> @@ -42,6 +42,9 @@
+...
+> @@ -1155,6 +1159,7 @@ MODULE_DEVICE_TABLE(of, sun6i_dma_match);
+>  static int sun6i_dma_probe(struct platform_device *pdev)
+>  {
+>  	const struct of_device_id *device;
+> +	struct device_node *np = pdev->dev.of_node;
+>  	struct sun6i_dma_dev *sdc;
+>  	struct resource *res;
+>  	int ret, i;
+
+Can you fix this up, or should I send a new version of this patch?
+
+Kind regards,
+
+Stefan
