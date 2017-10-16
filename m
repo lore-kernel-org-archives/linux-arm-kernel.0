@@ -1,104 +1,79 @@
 From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Mon, 16 Oct 2017 17:46:24 +0530
-Subject: [PATCH 6/9] ARM: dts: rockchip: Add usb host for rk3288-vyasa
+Date: Mon, 16 Oct 2017 17:46:22 +0530
+Subject: [PATCH 4/9] ARM: dts: rockchip: Add regulators for rk3288-vyasa
 In-Reply-To: <1508156187-27519-1-git-send-email-jagan@amarulasolutions.com>
 References: <1508156187-27519-1-git-send-email-jagan@amarulasolutions.com>
-Message-ID: <1508156187-27519-7-git-send-email-jagan@amarulasolutions.com>
+Message-ID: <1508156187-27519-5-git-send-email-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add usb host support for rk3288-vyasa, board support hub power
-through phy_pwr_en and usb2 host power through usb2_pwr_en and
-naming conversion followed as per schematic.
+Add supporting regulators for rk3288-vyasa board, dc12_vbat is
+parent regulatorand followed regulators as are child regulators.
+regulator naming conversion followed as per schematic for better
+readability and easy for identification.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- arch/arm/boot/dts/rk3288-vyasa.dts     | 48 ++++++++++++++++++++++++++++++++++
- include/dt-bindings/pinctrl/rockchip.h |  1 +
- 2 files changed, 49 insertions(+)
+ arch/arm/boot/dts/rk3288-vyasa.dts | 40 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
 diff --git a/arch/arm/boot/dts/rk3288-vyasa.dts b/arch/arm/boot/dts/rk3288-vyasa.dts
-index c79a4c7..c22d674 100644
+index c14ebf9..0fa447f 100644
 --- a/arch/arm/boot/dts/rk3288-vyasa.dts
 +++ b/arch/arm/boot/dts/rk3288-vyasa.dts
-@@ -105,6 +105,30 @@
- 		vin-supply = <&dc12_vbat>;
+@@ -56,13 +56,53 @@
+ 		device_type = "memory";
  	};
  
-+	vsus_5v: vsus-5v {
++	dc12_vbat: dc12-vbat {
 +		compatible = "regulator-fixed";
-+		regulator-name = "vsus_5v";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
++		regulator-name = "dc12_vbat";
++		regulator-min-microvolt = <12000000>;
++		regulator-max-microvolt = <12000000>;
 +		regulator-always-on;
 +		regulator-boot-on;
-+		vin-supply = <&vcc_io>;
 +	};
 +
-+	vusb2_5v: vusb2-5v {
++	vboot_3v3: vboot-3v3 {
 +		compatible = "regulator-fixed";
-+		regulator-name = "vusb2_5v";
-+		enable-active-high;
-+		gpio = <&gpio8 RK_PB1 GPIO_ACTIVE_HIGH>; /* USB2_PWR_EN */
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&usb2_pwr_en>;
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
++		regulator-name = "vboot_3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
 +		regulator-always-on;
 +		regulator-boot-on;
-+		vin-supply = <&vsus_5v>;
++		vin-supply = <&dc12_vbat>;
 +	};
 +
- 	ext_gmac: external-gmac-clock {
- 		compatible = "fixed-clock";
- 		#clock-cells = <0>;
-@@ -363,6 +387,20 @@
- 	status = "okay";
- };
- 
-+&usbphy {
-+	status = "okay";
-+};
+ 	vcc_sys: vsys-regulator {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "vcc_sys";
++		regulator-min-microvolt = <3700000>;
++		regulator-max-microvolt = <3700000>;
++		regulator-always-on;
++		regulator-boot-on;
++		vin-supply = <&dc12_vbat>;
++	};
 +
-+&usb_host0_ehci {
-+	status = "okay";
-+};
++	vboot_5v: vboot-5v {
++		compatible = "regulator-fixed";
++		regulator-name = "vboot_sv";
+ 		regulator-min-microvolt = <5000000>;
+ 		regulator-max-microvolt = <5000000>;
+ 		regulator-always-on;
+ 		regulator-boot-on;
++		vin-supply = <&dc12_vbat>;
++	};
 +
-+&usb_host1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&phy_pwr_en>;
-+	status = "okay";
-+};
-+
- &vopb {
- 	status = "okay";
- };
-@@ -407,4 +445,14 @@
- 			rockchip,pins = <RK_GPIO0 4 RK_FUNC_GPIO &pcfg_pull_up>;
- 		};
++	v3g_3v3: v3g-3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "v3g_3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++		regulator-boot-on;
++		vin-supply = <&dc12_vbat>;
  	};
-+
-+	usb_host {
-+		phy_pwr_en: phy-pwr-en {
-+			rockchip,pins = <RK_GPIO2 RK_PB1 RK_FUNC_GPIO &pcfg_output_high>;
-+		};
-+
-+		usb2_pwr_en: usb2-pwr-en {
-+			rockchip,pins = <RK_GPIO8 RK_PB1 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
  };
-diff --git a/include/dt-bindings/pinctrl/rockchip.h b/include/dt-bindings/pinctrl/rockchip.h
-index aaec8ba..dc3d661 100644
---- a/include/dt-bindings/pinctrl/rockchip.h
-+++ b/include/dt-bindings/pinctrl/rockchip.h
-@@ -24,6 +24,7 @@
- #define RK_GPIO3	3
- #define RK_GPIO4	4
- #define RK_GPIO6	6
-+#define RK_GPIO8	8
  
- #define RK_PA0		0
- #define RK_PA1		1
 -- 
 2.7.4
