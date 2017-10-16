@@ -1,36 +1,71 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Mon, 16 Oct 2017 23:43:29 +0530
-Subject: [PATCH 9/9] ARM: multi_v7_defconfig: Statically build
- RTC_DRV_RK808
-In-Reply-To: <3238534.Bk1TS2fSCp@diego>
-References: <1508156187-27519-1-git-send-email-jagan@amarulasolutions.com>
- <1508156187-27519-10-git-send-email-jagan@amarulasolutions.com>
- <3238534.Bk1TS2fSCp@diego>
-Message-ID: <CAMty3ZBcBAHTk5eQU99rRqYm7tQAjtuEaTT_q6J5FYmY=ybvOA@mail.gmail.com>
+From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
+Date: Tue, 17 Oct 2017 00:02:17 +0530
+Subject: [PATCH v9 0/5] Add support for ThunderX2 pmu events using json files
+Message-ID: <20171016183222.25750-1-ganapatrao.kulkarni@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 16, 2017 at 11:32 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> Hi,
->
-> Am Montag, 16. Oktober 2017, 17:46:27 CEST schrieb Jagan Teki:
->> RTC_DRV_RK808 need to have build statically for the platforms
->> do use MFB_RK808 so replace module with statical link.
->
-> why would you need this to be compiled on? MFD_RK808 will happily
-> just create the platform-devices which are then bound to the RTC
-> driver later once the module is ready.
+Extending json/jevent framework for parsing arm64 event files.
+Adding jevents for ThunderX2 implementation defined PMU events.
 
-Yeah, that can be true but seems like rk808 need rtc at the
-beginning(like boot time) because we observed the boot hang even with
-gmac (like one with HDMI [1]) eventually booting continue only when it
-linked statically.
+v9:
+   - Rebased to [3] and resolved conficts in PATCH 1/5 and reworked PATCH 3/5.
+   - Added PATCH 5 to fix segmentation fault in perf_pmu__find_map
 
-[1] https://lkml.org/lkml/2017/9/4/224
+[3] https://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git/log/?h=perf/core
 
-thanks!
+v8:
+   - Rename thunderx2 directory to cavium
+
+v7:
+   - Addressed some more comments from Will Deacon.
+
+v6 : Addressed comments [1] [2]
+
+[1] https://patchwork.kernel.org/patch/9903099/
+[2] https://patchwork.kernel.org/patch/9853899/
+
+v5:
+   - Addressed comments from Arnaldo.
+   - Rebased to 4.13-rc5
+
+v4:
+   - Rebased to 4.13-rc1
+
+v3:
+   - Addressed comments from Will Deacon and Jayachandran C.
+   - Rebased to 4.12-rc1
+
+v2:
+   - Updated as per Mark Rutland's suggestions.
+   - Added provision for get_cpuid_str to get cpu id string
+     from associated cpus of pmu core device.
+
+v1: Initial patchset.
+
+
+Ganapatrao Kulkarni (5):
+  perf utils: passing pmu as a parameter to function get_cpuid_str
+  perf tools arm64: Add support for get_cpuid_str function.
+  perf utils: use pmu->is_uncore to detect PMU CORE/UNCORE devices
+  perf vendor events arm64: Add ThunderX2 implementation defined pmu
+    core events
+  perf utils: add check for valid cpuid in function perf_pmu__find_map
+
+ tools/perf/arch/arm64/util/Build                   |  1 +
+ tools/perf/arch/arm64/util/header.c                | 65 ++++++++++++++++++++++
+ tools/perf/arch/powerpc/util/header.c              |  2 +-
+ tools/perf/arch/x86/util/header.c                  |  2 +-
+ .../arch/arm64/cavium/thunderx2-imp-def.json       | 62 +++++++++++++++++++++
+ tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 +++++
+ tools/perf/util/header.h                           |  3 +-
+ tools/perf/util/metricgroup.c                      |  4 +-
+ tools/perf/util/pmu.c                              | 39 ++++++++-----
+ tools/perf/util/pmu.h                              |  2 +-
+ 10 files changed, 174 insertions(+), 21 deletions(-)
+ create mode 100644 tools/perf/arch/arm64/util/header.c
+ create mode 100644 tools/perf/pmu-events/arch/arm64/cavium/thunderx2-imp-def.json
+ create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
+
 -- 
-Jagan Teki
-Senior Linux Kernel Engineer | Amarula Solutions
-U-Boot, Linux | Upstream Maintainer
-Hyderabad, India.
+2.9.4
