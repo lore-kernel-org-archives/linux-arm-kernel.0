@@ -1,65 +1,45 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Mon, 16 Oct 2017 08:42:41 -0500
-Subject: [PATCH 0/2] [v5] pinctrl: qcom: add support for sparse GPIOs
-In-Reply-To: <CACRpkdYis3kNG45zmkTcP8vCutfRJkh5UjnzwFVeyLmFYFEC-A@mail.gmail.com>
-References: <CACRpkdZcdLac_wYW+XqtZ=-APo8VmvYL4B1oL-wZyLy8KEs9AA@mail.gmail.com>
- <1ecdf6ee-5098-15d3-f85e-66b39a6c25f9@codeaurora.org>
- <CACRpkdaUV1Mjh7U9bBAgZA5Zq1oqN0HBT=VH5NkvPnY4gHxDVw@mail.gmail.com>
- <d53e67a2-4f69-752f-ba35-53872d9b9760@codeaurora.org>
- <CACRpkdYfAcKrgbgybccurUKTyR0E+tHDyzp7sbXxXxKuyMOGhQ@mail.gmail.com>
- <619f48d2-59c7-c090-4ace-9e8db9f92064@codeaurora.org>
- <CACRpkdZFunwQ=tiQqsapap7Ozz42hr=df5vqbC0S5xy5Wn+ZWw@mail.gmail.com>
- <255ad0dc-2d16-ae7f-0b45-500e23cff1a4@codeaurora.org>
- <20171003220311.GU457@codeaurora.org>
- <CACRpkdYXsY5eixYkEeuZTHJn7q6_6BdTxZ-2yneUyEKUjKF3Gw@mail.gmail.com>
- <20171012073922.GB18706@codeaurora.org>
- <CACRpkdYis3kNG45zmkTcP8vCutfRJkh5UjnzwFVeyLmFYFEC-A@mail.gmail.com>
-Message-ID: <22ef3c75-bdf6-6aeb-a1dd-2d03eb46fd58@codeaurora.org>
+From: gengdj.1984@gmail.com (gengdongjiu)
+Date: Mon, 16 Oct 2017 21:44:59 +0800
+Subject: [PATCH v6 5/7] arm64: kvm: route synchronous external abort
+ exceptions to el2
+In-Reply-To: <59E49BB8.8080801@arm.com>
+References: <1503916701-13516-1-git-send-email-gengdongjiu@huawei.com>
+ <1503916701-13516-6-git-send-email-gengdongjiu@huawei.com>
+ <59B17449.6010201@arm.com> <fb7da3e3-d0f7-7ac6-b088-888a563d7ee7@huawei.com>
+ <59E49BB8.8080801@arm.com>
+Message-ID: <CAMj-D2Bn8HUL=HJO-tysisVT4HSTZW0z-xY-1w1EsgPvShFooQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14/2017 05:43 PM, Linus Walleij wrote:
-> So I guess the driver needs to know what pin registers it can't
-> access so the user does not get a gun to shoot in the foot with.
-> 
-> If we augment gpiolib to just handle -EACCES or something
-> (-EIO?) from the driver .get_direction() callback for these lines,
-> things should be smooth?
+Hi James,
 
-You mean like this:
+>
+>> Today I added the support to do some minimal emulation for
+>> RAS-Error-Record registers, thanks
+>> for the good suggestion.
+>
+> Where can I find this patch?
+> I'd like to repost it as part of the SError_rework/RAS/IESB series: this is
+> one
+> of the bits KVM needs but I didn't touch as it looks like your updated
+> version
+> of this patch should cover it.
 
-diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c 
-b/drivers/pinctrl/qcom/pinctrl-msm.c
-index ff491da64dab..ca4ae3d76eb4 100644
---- a/drivers/pinctrl/qcom/pinctrl-msm.c
-+++ b/drivers/pinctrl/qcom/pinctrl-msm.c
-@@ -443,6 +443,14 @@ static int msm_gpio_get_direction(struct gpio_chip 
-*chip, unsigned int offset)
-
-  	g = &pctrl->soc->groups[offset];
-
-+	/*
-+	 * During initialization, gpiolib may query all GPIOs for their
-+	 * initial direction, regardless if they exist, so block access
-+	 * to those that are unavailable.
-+	 */
-+	if (!g->npins)
-+		return -ENODEV;
-+
-  	val = readl(pctrl->regs + g->ctl_reg);
-
-  	/* 0 = output, 1 = input */
+I have updated this patch according your suggestion that do some
+emulation for the ERR* trap. and have verified it. but still not sent
+it out. Tomorrow I will send it out for your review(now it is Chinese
+midnight), if you think it is ok, you can add it as part of the
+SError_rework/RAS/IESB series. thanks for your reminder and good
+review comments.
 
 
-This is what I have in my patch already.  I can return any error message 
-you like, but -ENODEV already works.
-
-The problem is that it's insufficient.  I also want the non-available 
-GPIOs to be as absent as possible.  I don't want them to show up in 
-/sys/kernel/debug/gpio, and I don't want to be able to create them via 
-/sys/class/gpio/export.
-
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+>
+>
+> Thanks,
+>
+> James
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+>
