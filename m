@@ -1,57 +1,108 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Mon, 16 Oct 2017 11:45:49 +0530
-Subject: [PATCH v4 0/6] K2G: Add QSPI support
-In-Reply-To: <20171003051925.8821-1-vigneshr@ti.com>
-References: <20171003051925.8821-1-vigneshr@ti.com>
-Message-ID: <09cc0a61-3f73-4a10-2d67-32515a7da861@ti.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Mon, 16 Oct 2017 14:22:19 +0800
+Subject: [PATCH v4 4/7] soc: mediatek: pwrap: update pwrap_init without
+ slave programming
+In-Reply-To: <fe0952f1-c018-8492-7336-149f917463e1@gmail.com>
+References: <cover.1505980364.git.sean.wang@mediatek.com>
+ <604078485ca9ab04cea5bc531425d6035b27bc88.1505980364.git.sean.wang@mediatek.com>
+ <f3a04159-8491-6ca6-d2ad-7df1dfd64331@gmail.com>
+ <1507887704.21840.32.camel@mtkswgap22>
+ <fe0952f1-c018-8492-7336-149f917463e1@gmail.com>
+Message-ID: <1508134939.21840.39.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, 2017-10-13 at 16:07 +0200, Matthias Brugger wrote:
+> 
+> On 10/13/2017 11:41 AM, Sean Wang wrote:
+> > On Tue, 2017-10-10 at 20:00 +0200, Matthias Brugger wrote:
+> >>
+> >> On 09/21/2017 10:26 AM, sean.wang at mediatek.com wrote:
+> >>> From: Sean Wang <sean.wang@mediatek.com>
+> >>>
+> >>> pwrap initialization is highly associated with the base SoC, so
+> >>> update here for allowing pwrap_init without slave program which would be
+> >>> used to those PMICs without extra encryption on bus such as MT6380.
+> >>>
+> >>> Signed-off-by: Chenglin Xu <chenglin.xu@mediatek.com>
+> >>> Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
+> >>> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> >>> ---
+> >>>    drivers/soc/mediatek/mtk-pmic-wrap.c | 91 +++++++++++++++++++++---------------
+> >>>    1 file changed, 54 insertions(+), 37 deletions(-)
+> >>>
+> >>> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> >>> index 27d7ccc..9c6d855 100644
+> >>> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
+> >>> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> >>> @@ -531,6 +531,7 @@ struct pmic_wrapper_type {
+> >>>    	u32 spi_w;
+> >>>    	u32 wdt_src;
+> >>>    	int has_bridge:1;
+> >>> +	int slv_program:1;
+> >>>    	int (*init_reg_clock)(struct pmic_wrapper *wrp);
+> >>>    	int (*init_soc_specific)(struct pmic_wrapper *wrp);
+> >>>    };
+> >>> @@ -999,9 +1000,12 @@ static int pwrap_init(struct pmic_wrapper *wrp)
+> >>>    	}
+> >>>    
+> >>>    	/* Reset SPI slave */
+> >>> -	ret = pwrap_reset_spislave(wrp);
+> >>> -	if (ret)
+> >>> -		return ret;
+> >>> +
+> >>> +	if (wrp->master->slv_program) {
+> >>> +		ret = pwrap_reset_spislave(wrp);
+> >>> +		if (ret)
+> >>> +			return ret;
+> >>> +	}
+> >>>    
+> >>>    	pwrap_writel(wrp, 1, PWRAP_WRAP_EN);
+> >>>    
+> >>> @@ -1013,45 +1017,52 @@ static int pwrap_init(struct pmic_wrapper *wrp)
+> >>>    	if (ret)
+> >>>    		return ret;
+> >>>    
+> >>> -	/* Setup serial input delay */
+> >>> -	ret = pwrap_init_sidly(wrp);
+> >>> -	if (ret)
+> >>> -		return ret;
+> >>> +	if (wrp->master->slv_program) {
+> >>
+> >> This if branch is really long and complex enough to put it into function apart.
+> >>
+> >> Thanks,
+> >> Matthias
+> >>
+> >> PD please take into account the comments I made on v3 of the series.
+> >>
+> > 
+> > I'll try to breakdown the long logic into the short one and use a flag
+> > indicating the slave capability decides whether the functions is
+> > required being enabled for the slave instead of slv_program which is
+> > less meaningful. In this way, pmic_init will be more extensible when
+> > more different SoCs and target slaves with various flavors into the
+> > driver. And also take into accounts those suggestions you made in v3 in
+> > the next version.
+> > 
+> > 	Sean
+> > 
+> 
+> I totally agree, but I wanted to underline that right now the if branch under
+> "if (wrp->master->slv_program)" is around 30 lines, so I think it would be a 
+> good candidate to put it into it's own function. For example: 
+> pwrap_init_encryption()
+
+understood. I'll try to turn the code block into a function.
+
+> As from what I understand from the commit log, slv_program in the end enables 
+> encryption of the communication, right?
+> 
+
+yes. slv_program in the end will enable the security feature over the
+bus such as the encryption and the signature for the data integrity when
+the pwrap slave can support it.
 
 
-On Tuesday 03 October 2017 10:49 AM, Vignesh R wrote:
-> 
-> 
-> This series adds support for Cadence QSPI IP present in TI's 66AK2G SoC.
-> The patches enhance the existing cadence-quadspi driver to support
-> loopback clock circuit, pm_runtime support and tweaks for 66AK2G SoC.
-
-Gentle ping on the series...
-
-> 
-> Change log:
-> 
-> v4:
-> * New patch to fix error handling sequence in probe.
-> 
-> v3:
-> * Fix build warnings reported by kbuild test bot.
-> 
-> Resend:
-> * Rebase to latest linux-next.
-> * Collect Acked-bys
-> 
-> v2:
-> * Drop DT patches. Will be sent as separate series as requested by
->  maintainer.
-> * Split binding docs into separate patches.
-> * Address comments by Rob Herring.
-> 
-> Vignesh R (6):
->   mtd: spi-nor: cadence-quadspi: Add TI 66AK2G SoC specific compatible
->   mtd: spi-nor: cadence-quadspi: add a delay in write sequence
->   mtd: spi-nor: cadence-quadspi: Add new binding to enable loop-back
->     circuit
->   mtd: spi-nor: cadence-quadspi: Add support to enable loop-back clock
->     circuit
->   mtd: spi-nor: cadence-quadspi: Fix error path in probe
->   mtd: spi-nor: cadence-quadspi: Add runtime PM support
-> 
->  .../devicetree/bindings/mtd/cadence-quadspi.txt    |  7 ++-
->  drivers/mtd/spi-nor/cadence-quadspi.c              | 55 +++++++++++++++++++---
->  2 files changed, 55 insertions(+), 7 deletions(-)
-> 
-
--- 
-Regards
-Vignesh
+> Regards,
+> Matthias
