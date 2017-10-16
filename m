@@ -1,60 +1,60 @@
 From: ulrich.hecht+renesas@gmail.com (Ulrich Hecht)
-Date: Mon, 16 Oct 2017 17:31:33 +0200
-Subject: [RFC v2 1/8] drm/bridge: GPIO-controlled display multiplexer driver
+Date: Mon, 16 Oct 2017 17:31:36 +0200
+Subject: [RFC v2 4/8] drm/bridge: Analogix ANX7688 HDMI -> DP bridge driver
 In-Reply-To: <1508167900-27415-1-git-send-email-ulrich.hecht+renesas@gmail.com>
 References: <1508167900-27415-1-git-send-email-ulrich.hecht+renesas@gmail.com>
-Message-ID: <1508167900-27415-2-git-send-email-ulrich.hecht+renesas@gmail.com>
+Message-ID: <1508167900-27415-5-git-send-email-ulrich.hecht+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ported from chromeos-3.18 kernel.
+Ported from chromeos-3.18.
 
 Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 ---
- drivers/gpu/drm/bridge/Kconfig            |  11 ++
+ drivers/gpu/drm/bridge/Kconfig            |   9 ++
  drivers/gpu/drm/bridge/Makefile           |   1 +
- drivers/gpu/drm/bridge/generic-gpio-mux.c | 316 ++++++++++++++++++++++++++++++
- 3 files changed, 328 insertions(+)
- create mode 100644 drivers/gpu/drm/bridge/generic-gpio-mux.c
+ drivers/gpu/drm/bridge/analogix-anx7688.c | 233 ++++++++++++++++++++++++++++++
+ 3 files changed, 243 insertions(+)
+ create mode 100644 drivers/gpu/drm/bridge/analogix-anx7688.c
 
 diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
-index adf9ae0..966f4eb 100644
+index a1c0d95..712ac0a 100644
 --- a/drivers/gpu/drm/bridge/Kconfig
 +++ b/drivers/gpu/drm/bridge/Kconfig
-@@ -15,6 +15,17 @@ config DRM_PANEL_BRIDGE
- menu "Display Interface Bridges"
- 	depends on DRM && DRM_BRIDGE
+@@ -38,6 +38,15 @@ config DRM_PARADE_PS8640
+ 	  The PS8640 is a high-performance and low-power
+ 	  MIPI DSI to eDP converter
  
-+config DRM_GENERIC_GPIO_MUX
-+	tristate "Generic GPIO-controlled mux"
++config DRM_ANALOGIX_ANX7688
++	tristate "Analogix ANX7688 bridge"
 +	depends on DRM
-+	depends on OF
 +	select DRM_KMS_HELPER
 +	---help---
-+	  This bridge driver models a GPIO-controlled display mux with one
-+	  input, 2 outputs (e.g. an HDMI mux). The hardware decides which output
-+	  is active, reports it as a GPIO, and the driver redirects calls to the
-+	  appropriate downstream bridge (if any).
++	  ANX7688 is a transmitter to support DisplayPort over USB-C for
++	  smartphone and tablets.
++	  This driver only supports the HDMI to DP component of the chip.
 +
  config DRM_ANALOGIX_ANX78XX
  	tristate "Analogix ANX78XX bridge"
  	select DRM_KMS_HELPER
 diff --git a/drivers/gpu/drm/bridge/Makefile b/drivers/gpu/drm/bridge/Makefile
-index defcf1e..2d5652e 100644
+index 6be8a9d..9cbf788 100644
 --- a/drivers/gpu/drm/bridge/Makefile
 +++ b/drivers/gpu/drm/bridge/Makefile
-@@ -1,4 +1,5 @@
+@@ -1,6 +1,7 @@
+ ccflags-y := -Iinclude/drm
+ 
+ obj-$(CONFIG_DRM_PARADE_PS8640) += parade-ps8640.o
++obj-$(CONFIG_DRM_ANALOGIX_ANX7688) += analogix-anx7688.o
  obj-$(CONFIG_DRM_ANALOGIX_ANX78XX) += analogix-anx78xx.o
-+obj-$(CONFIG_DRM_GENERIC_GPIO_MUX) += generic-gpio-mux.o
+ obj-$(CONFIG_DRM_GENERIC_GPIO_MUX) += generic-gpio-mux.o
  obj-$(CONFIG_DRM_DUMB_VGA_DAC) += dumb-vga-dac.o
- obj-$(CONFIG_DRM_LVDS_ENCODER) += lvds-encoder.o
- obj-$(CONFIG_DRM_MEGACHIPS_STDPXXXX_GE_B850V3_FW) += megachips-stdpxxxx-ge-b850v3-fw.o
-diff --git a/drivers/gpu/drm/bridge/generic-gpio-mux.c b/drivers/gpu/drm/bridge/generic-gpio-mux.c
+diff --git a/drivers/gpu/drm/bridge/analogix-anx7688.c b/drivers/gpu/drm/bridge/analogix-anx7688.c
 new file mode 100644
-index 0000000..744804b
+index 0000000..cc995c8
 --- /dev/null
-+++ b/drivers/gpu/drm/bridge/generic-gpio-mux.c
-@@ -0,0 +1,316 @@
++++ b/drivers/gpu/drm/bridge/analogix-anx7688.c
+@@ -0,0 +1,233 @@
 +/*
 + * ANX7688 HDMI->DP bridge driver
 + *
@@ -70,305 +70,222 @@ index 0000000..744804b
 + * GNU General Public License for more details.
 + */
 +
-+#include <linux/gpio.h>
-+#include <linux/interrupt.h>
-+#include <linux/platform_device.h>
++#include <linux/i2c.h>
 +#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_gpio.h>
-+#include <linux/of_graph.h>
 +#include <drm/drm_crtc.h>
-+#include <drm/drm_crtc_helper.h>
 +
-+struct gpio_display_mux {
-+	struct device *dev;
++/* Register addresses */
++#define VENDOR_ID_REG 0x00
++#define DEVICE_ID_REG 0x02
 +
-+	struct gpio_desc *gpiod_detect;
-+	int detect_irq;
++#define FW_VERSION_REG 0x80
 +
++#define DP_BANDWIDTH_REG 0x85
++#define DP_LANE_COUNT_REG 0x86
++
++#define VENDOR_ID 0x1f29
++#define DEVICE_ID 0x7688
++
++/* First supported firmware version (0.85) */
++#define MINIMUM_FW_VERSION 0x0085
++
++struct anx7688 {
 +	struct drm_bridge bridge;
++	struct i2c_client *client;
 +
-+	struct drm_bridge *next[2];
++	bool filter;
 +};
 +
-+static inline struct gpio_display_mux *bridge_to_gpio_display_mux(
-+		struct drm_bridge *bridge)
++static int anx7688_read(struct i2c_client *client, u8 reg, u8 *data,
++			u16 data_len)
 +{
-+	return container_of(bridge, struct gpio_display_mux, bridge);
-+}
-+
-+static irqreturn_t gpio_display_mux_det_threaded_handler(int unused, void *data)
-+{
-+	struct gpio_display_mux *gpio_display_mux = data;
-+	int active = gpiod_get_value(gpio_display_mux->gpiod_detect);
-+
-+	dev_dbg(gpio_display_mux->dev, "Interrupt %d!\n", active);
-+
-+	if (gpio_display_mux->bridge.dev)
-+		drm_kms_helper_hotplug_event(gpio_display_mux->bridge.dev);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int gpio_display_mux_attach(struct drm_bridge *bridge)
-+{
-+	struct gpio_display_mux *gpio_display_mux =
-+			bridge_to_gpio_display_mux(bridge);
-+	struct drm_bridge *next;
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(gpio_display_mux->next); i++) {
-+		next = gpio_display_mux->next[i];
-+		if (next)
-+			next->encoder = bridge->encoder;
-+	}
-+
-+	return 0;
-+}
-+
-+static bool gpio_display_mux_mode_fixup(struct drm_bridge *bridge,
-+				const struct drm_display_mode *mode,
-+				struct drm_display_mode *adjusted_mode)
-+{
-+	struct gpio_display_mux *gpio_display_mux =
-+		bridge_to_gpio_display_mux(bridge);
-+	int active;
-+	struct drm_bridge *next;
-+
-+	active = gpiod_get_value(gpio_display_mux->gpiod_detect);
-+	next = gpio_display_mux->next[active];
-+
-+	if (next && next->funcs->mode_fixup)
-+		return next->funcs->mode_fixup(next, mode, adjusted_mode);
-+	else
-+		return true;
-+}
-+
-+static void gpio_display_mux_mode_set(struct drm_bridge *bridge,
-+				struct drm_display_mode *mode,
-+				struct drm_display_mode *adjusted_mode)
-+{
-+	struct gpio_display_mux *gpio_display_mux =
-+		bridge_to_gpio_display_mux(bridge);
-+	int active;
-+	struct drm_bridge *next;
-+
-+	active = gpiod_get_value(gpio_display_mux->gpiod_detect);
-+	next = gpio_display_mux->next[active];
-+
-+	if (next && next->funcs->mode_set)
-+		next->funcs->mode_set(next, mode, adjusted_mode);
-+}
-+
-+/**
-+ * Since this driver _reacts_ to mux changes, we need to make sure all
-+ * downstream bridges are pre-enabled.
-+ */
-+static void gpio_display_mux_pre_enable(struct drm_bridge *bridge)
-+{
-+	struct gpio_display_mux *gpio_display_mux =
-+		bridge_to_gpio_display_mux(bridge);
-+	struct drm_bridge *next;
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(gpio_display_mux->next); i++) {
-+		next = gpio_display_mux->next[i];
-+		if (next && next->funcs->pre_enable)
-+			next->funcs->pre_enable(next);
-+	}
-+}
-+
-+static void gpio_display_mux_post_disable(struct drm_bridge *bridge)
-+{
-+	struct gpio_display_mux *gpio_display_mux =
-+		bridge_to_gpio_display_mux(bridge);
-+	struct drm_bridge *next;
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(gpio_display_mux->next); i++) {
-+		next = gpio_display_mux->next[i];
-+		if (next && next->funcs->post_disable)
-+			next->funcs->post_disable(next);
-+	}
-+}
-+
-+/**
-+ * In an ideal mux driver, only the currently selected bridge should be enabled.
-+ * For the sake of simplicity, we just just enable/disable all downstream
-+ * bridges at the same time.
-+ */
-+static void gpio_display_mux_enable(struct drm_bridge *bridge)
-+{
-+	struct gpio_display_mux *gpio_display_mux =
-+		bridge_to_gpio_display_mux(bridge);
-+	struct drm_bridge *next;
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(gpio_display_mux->next); i++) {
-+		next = gpio_display_mux->next[i];
-+		if (next && next->funcs->enable)
-+			next->funcs->enable(next);
-+	}
-+}
-+
-+static void gpio_display_mux_disable(struct drm_bridge *bridge)
-+{
-+	struct gpio_display_mux *gpio_display_mux =
-+		bridge_to_gpio_display_mux(bridge);
-+	struct drm_bridge *next;
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(gpio_display_mux->next); i++) {
-+		next = gpio_display_mux->next[i];
-+		if (next && next->funcs->disable)
-+			next->funcs->disable(next);
-+	}
-+}
-+
-+static const struct drm_bridge_funcs gpio_display_mux_bridge_funcs = {
-+	.attach = gpio_display_mux_attach,
-+	.mode_fixup = gpio_display_mux_mode_fixup,
-+	.disable = gpio_display_mux_disable,
-+	.post_disable = gpio_display_mux_post_disable,
-+	.mode_set = gpio_display_mux_mode_set,
-+	.pre_enable = gpio_display_mux_pre_enable,
-+	.enable = gpio_display_mux_enable,
-+};
-+
-+static int gpio_display_mux_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct gpio_display_mux *gpio_display_mux;
-+	struct device_node *port, *ep, *remote;
 +	int ret;
-+	u32 reg;
++	struct i2c_msg msgs[] = {
++		{
++		 .addr = client->addr,
++		 .flags = 0,
++		 .len = 1,
++		 .buf = &reg,
++		 },
++		{
++		 .addr = client->addr,
++		 .flags = I2C_M_RD,
++		 .len = data_len,
++		 .buf = data,
++		 }
++	};
 +
-+	gpio_display_mux = devm_kzalloc(dev, sizeof(*gpio_display_mux),
-+					GFP_KERNEL);
-+	if (!gpio_display_mux)
++	ret = i2c_transfer(client->adapter, msgs, 2);
++
++	if (ret == 2)
++		return 0;
++	if (ret < 0)
++		return ret;
++	else
++		return -EIO;
++}
++
++static inline struct anx7688 *bridge_to_anx7688(struct drm_bridge *bridge)
++{
++	return container_of(bridge, struct anx7688, bridge);
++}
++
++static bool anx7688_bridge_mode_fixup(struct drm_bridge *bridge,
++				      const struct drm_display_mode *mode,
++				      struct drm_display_mode *adjusted_mode)
++{
++	struct anx7688 *anx7688 = bridge_to_anx7688(bridge);
++	u8 regs[2];
++	u8 dpbw, lanecount;
++	int totalbw, requiredbw;
++	int ret;
++
++	if (!anx7688->filter)
++		return true;
++
++	/* Read both regs 0x85 (bandwidth) and 0x86 (lane count). */
++	ret = anx7688_read(anx7688->client, DP_BANDWIDTH_REG, regs, 2);
++	if (ret < 0) {
++		dev_err(&anx7688->client->dev,
++			"Failed to read bandwidth/lane count\n");
++		return false;
++	}
++	dpbw = regs[0];
++	lanecount = regs[1];
++
++	/* Maximum 0x19 bandwidth (6.75 Gbps Turbo mode), 2 lanes */
++	if (dpbw > 0x19 || lanecount > 2) {
++		dev_err(&anx7688->client->dev,
++			"Invalid bandwidth/lane count (%02x/%d)\n",
++			dpbw, lanecount);
++		return false;
++	}
++
++	/* Compute available bandwidth (kHz) */
++	totalbw = dpbw * lanecount * 270000 * 8 / 10;
++
++	/* Required bandwidth (8 bpc, kHz) */
++	requiredbw = mode->clock * 8 * 3;
++
++	dev_dbg(&anx7688->client->dev,
++		"DP bandwidth: %d kHz (%02x/%d); mode requires %d Khz\n",
++		totalbw, dpbw, lanecount, requiredbw);
++
++	if (totalbw == 0) {
++		dev_warn(&anx7688->client->dev,
++			 "Bandwidth/lane count are 0, not rejecting modes\n");
++		return true;
++	}
++
++	return totalbw >= requiredbw;
++}
++
++static const struct drm_bridge_funcs anx7688_bridge_funcs = {
++	.mode_fixup	= anx7688_bridge_mode_fixup,
++};
++
++static int anx7688_i2c_probe(struct i2c_client *client,
++			     const struct i2c_device_id *id)
++{
++	struct anx7688 *anx7688;
++	int ret;
++	u8 buffer[4];
++	u16 vendor, device, fwversion;
++
++	anx7688 = devm_kzalloc(&client->dev, sizeof(*anx7688), GFP_KERNEL);
++	if (!anx7688)
 +		return -ENOMEM;
 +
-+	platform_set_drvdata(pdev, gpio_display_mux);
-+	gpio_display_mux->dev = &pdev->dev;
++#if IS_ENABLED(CONFIG_OF)
++	anx7688->bridge.of_node = client->dev.of_node;
++#endif
 +
-+	gpio_display_mux->bridge.of_node = dev->of_node;
++	anx7688->client = client;
++	i2c_set_clientdata(client, anx7688);
 +
-+	gpio_display_mux->gpiod_detect =
-+		devm_gpiod_get(dev, "detect", GPIOD_IN);
-+	if (IS_ERR(gpio_display_mux->gpiod_detect))
-+		return PTR_ERR(gpio_display_mux->gpiod_detect);
-+
-+	gpio_display_mux->detect_irq =
-+		gpiod_to_irq(gpio_display_mux->gpiod_detect);
-+	if (gpio_display_mux->detect_irq < 0) {
-+		dev_err(dev, "Failed to get output irq %d\n",
-+			gpio_display_mux->detect_irq);
-+		return -ENODEV;
-+	}
-+
-+	port = of_graph_get_port_by_id(dev->of_node, 1);
-+	if (!port) {
-+		dev_err(dev, "Missing output port node\n");
-+		return -EINVAL;
-+	}
-+
-+	for_each_child_of_node(port, ep) {
-+		if (!ep->name || (of_node_cmp(ep->name, "endpoint") != 0)) {
-+			of_node_put(ep);
-+			continue;
-+		}
-+
-+		if (of_property_read_u32(ep, "reg", &reg) < 0 ||
-+				reg >= ARRAY_SIZE(gpio_display_mux->next)) {
-+			dev_err(dev,
-+			    "Missing/invalid reg property for endpoint %s\n",
-+				ep->full_name);
-+			of_node_put(ep);
-+			of_node_put(port);
-+			return -EINVAL;
-+		}
-+
-+		remote = of_graph_get_remote_port_parent(ep);
-+		if (!remote) {
-+			dev_err(dev,
-+			    "Missing connector/bridge node for endpoint %s\n",
-+				ep->full_name);
-+			of_node_put(ep);
-+			of_node_put(port);
-+			return -EINVAL;
-+		}
-+		of_node_put(ep);
-+
-+		if (of_device_is_compatible(remote, "hdmi-connector")) {
-+			of_node_put(remote);
-+			continue;
-+		}
-+
-+		gpio_display_mux->next[reg] = of_drm_find_bridge(remote);
-+		if (!gpio_display_mux->next[reg]) {
-+			dev_err(dev, "Waiting for external bridge %s\n",
-+				remote->name);
-+			of_node_put(remote);
-+			of_node_put(port);
-+			return -EPROBE_DEFER;
-+		}
-+
-+		of_node_put(remote);
-+	}
-+	of_node_put(port);
-+
-+	gpio_display_mux->bridge.funcs = &gpio_display_mux_bridge_funcs;
-+	ret = drm_bridge_add(&gpio_display_mux->bridge);
-+	if (ret < 0) {
-+		dev_err(dev, "Failed to add drm bridge\n");
++	/* Read both vendor and device id (4 bytes). */
++	ret = anx7688_read(client, VENDOR_ID_REG, buffer, 4);
++	if (ret) {
++		dev_err(&client->dev, "Failed to read chip vendor/device id\n");
 +		return ret;
 +	}
 +
-+	ret = devm_request_threaded_irq(dev, gpio_display_mux->detect_irq,
-+				NULL,
-+				gpio_display_mux_det_threaded_handler,
-+				IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING |
-+					IRQF_ONESHOT,
-+				"gpio-display-mux-det", gpio_display_mux);
++	vendor = (u16)buffer[1] << 8 | buffer[0];
++	device = (u16)buffer[3] << 8 | buffer[2];
++	if (vendor != VENDOR_ID || device != DEVICE_ID) {
++		dev_err(&client->dev,
++			"Invalid vendor/device id %04x/%04x\n",
++			vendor, device);
++		return -ENODEV;
++	}
++
++	ret = anx7688_read(client, FW_VERSION_REG, buffer, 2);
 +	if (ret) {
-+		dev_err(dev, "Failed to request MUX_DET threaded irq\n");
-+		goto err_bridge_remove;
++		dev_err(&client->dev, "Failed to read firmware version\n");
++		return ret;
++	}
++
++	fwversion = (u16)buffer[0] << 8 | buffer[1];
++	dev_info(&client->dev, "ANX7688 firwmare version %02x.%02x\n",
++		 buffer[0], buffer[1]);
++
++	/* FW version >= 0.85 supports bandwidth/lane count registers */
++	if (fwversion >= MINIMUM_FW_VERSION) {
++		anx7688->filter = true;
++	} else {
++		/* Warn, but not fail, for backwards compatibility. */
++		dev_warn(&client->dev,
++			 "Old ANX7688 FW version (%02x.%02x), not filtering\n",
++			 buffer[0], buffer[1]);
++	}
++
++	anx7688->bridge.funcs = &anx7688_bridge_funcs;
++	ret = drm_bridge_add(&anx7688->bridge);
++	if (ret < 0) {
++		dev_err(&client->dev, "Failed to add drm bridge\n");
++		return ret;
 +	}
 +
 +	return 0;
-+
-+err_bridge_remove:
-+	drm_bridge_remove(&gpio_display_mux->bridge);
-+
-+	return ret;
 +}
 +
-+static int gpio_display_mux_remove(struct platform_device *pdev)
++static int anx7688_i2c_remove(struct i2c_client *client)
 +{
-+	struct gpio_display_mux *gpio_display_mux = platform_get_drvdata(pdev);
++	struct anx7688 *anx7688 = i2c_get_clientdata(client);
 +
-+	drm_bridge_remove(&gpio_display_mux->bridge);
++	drm_bridge_remove(&anx7688->bridge);
 +
 +	return 0;
 +}
 +
-+static const struct of_device_id gpio_display_mux_match[] = {
-+	{ .compatible = "gpio-display-mux", },
-+	{},
++static const struct i2c_device_id anx7688_id[] = {
++	{ "anx7688", 0 },
++	{ /* sentinel */ }
 +};
 +
-+struct platform_driver gpio_display_mux_driver = {
-+	.probe = gpio_display_mux_probe,
-+	.remove = gpio_display_mux_remove,
++MODULE_DEVICE_TABLE(i2c, anx7688_id);
++
++#if IS_ENABLED(CONFIG_OF)
++static const struct of_device_id anx7688_match_table[] = {
++	{ .compatible = "analogix,anx7688", },
++	{ /* sentinel */ },
++};
++MODULE_DEVICE_TABLE(of, anx7688_match_table);
++#endif
++
++static struct i2c_driver anx7688_driver = {
 +	.driver = {
-+		.name = "gpio-display-mux",
-+		.of_match_table = gpio_display_mux_match,
-+	},
++		   .name = "anx7688",
++		   .of_match_table = of_match_ptr(anx7688_match_table),
++		  },
++	.probe = anx7688_i2c_probe,
++	.remove = anx7688_i2c_remove,
++	.id_table = anx7688_id,
 +};
 +
-+module_platform_driver(gpio_display_mux_driver);
++module_i2c_driver(anx7688_driver);
 +
-+MODULE_DESCRIPTION("GPIO-controlled display mux");
++MODULE_DESCRIPTION("ANX7688 SlimPort Transmitter driver");
 +MODULE_AUTHOR("Nicolas Boichat <drinkcat@chromium.org>");
 +MODULE_LICENSE("GPL v2");
 -- 
