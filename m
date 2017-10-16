@@ -1,32 +1,104 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 16 Oct 2017 02:13:24 +0200
-Subject: [PATCH v3] cpufreq: imx6q: Move speed grading check to cpufreq
- driver
-In-Reply-To: <CAOMZO5AwB_2Nbky1wA8neU2-2-LDCTCMFOKGQk4jn5O9zuwKpQ@mail.gmail.com>
-References: <1506784606-2064-1-git-send-email-festevam@gmail.com>
- <20171013065141.GI8833@dragon>
- <CAOMZO5AwB_2Nbky1wA8neU2-2-LDCTCMFOKGQk4jn5O9zuwKpQ@mail.gmail.com>
-Message-ID: <5060748.qBWaaqo0sL@aspire.rjw.lan>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Mon, 16 Oct 2017 09:08:46 +0800
+Subject: [PATCH] arm64: kdump: Avoid to power off nonpanic CPUs
+In-Reply-To: <CANLsYkzwKM3tKFy8kaAKsifZjB9L4Jop2TCbC_iXL-EK2R2tSw@mail.gmail.com>
+References: <1507471966-15367-1-git-send-email-leo.yan@linaro.org>
+ <20171008153540.GB1694@remoulade>
+ <CANLsYkzwKM3tKFy8kaAKsifZjB9L4Jop2TCbC_iXL-EK2R2tSw@mail.gmail.com>
+Message-ID: <20171016010846.GA12470@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, October 15, 2017 5:42:19 PM CEST Fabio Estevam wrote:
-> Hi Viresh,
-> 
-> On Fri, Oct 13, 2017 at 3:51 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> 
-> >> Looks fine to me.
-> >>
-> >> @Shawn: Can you please let us know if you are fine with it?
+Hi Mark,
+
+On Tue, Oct 10, 2017 at 01:51:33PM -0600, Mathieu Poirier wrote:
+> On 8 October 2017 at 09:35, Mark Rutland <mark.rutland@arm.com> wrote:
+> > Hi Leo,
 > >
-> > Acked-by: Shawn Guo <shawnguo@kernel.org>
+> > On Sun, Oct 08, 2017 at 10:12:46PM +0800, Leo Yan wrote:
+> >> commit a88ce63b642c ("arm64: kexec: have own crash_smp_send_stop() for
+> >> crash dump for nonpanic cores") introduces ARM64 architecture function
+> >> crash_smp_send_stop() to replace the weak function, this results in
+> >> the nonpanic CPUs to be hot-plugged out and CPUs are placed into low
+> >> power state on ARM64 platforms with the flow:
+> >>
+> >>   Panic CPU:
+> >>     machine_crash_shutdown()
+> >>       crash_smp_send_stop()
+> >>       smp_cross_call(&mask, IPI_CPU_CRASH_STOP)
+> >>
+> >>   Nonpanic CPUs:
+> >>     handle_IPI()
+> >>       ipi_cpu_crash_stop()
+> >>         cpu_ops[cpu]->cpu_die()
+> >>
+> >> The upper patch has no issue if enabled crash dump only; but if enabled
+> >> crash dump and Coresight debug module for panic dumping at the meantime,
+> >> nonpanic CPUs are powered off in crash dump flow,
+> >
+> > We want to turn secondary CPUs off if at all possible, since we want to prevent
+> > issues resulting from asynchronous behaviour (e.g. TLB/cache fetches) that
+> > could result in subsequent problems (e.g. if bad page tables resulted in page
+> > table walks to MMIO devices).
+> >
+> > So we *really* want this behaviour in the general case.
+> >
+> >> later this may introduce conflicts with the Coresight debug module because
+> >> Coresight debug registers dumping requires the CPU must be powered on for
+> >> some platforms (e.g. Hi6220 on Hikey board). If we cannot keep the CPUs
+> >> powered on, we can see the hardware lockup issue when access Coresight debug
+> >> registers.
+> >
+> > Just to check I understand, the coresight debug module is being invoked as a
+> > panic notifier in the current kernel, right?
+> >
+> >> To fix this issue, this commit removes CPU hotplug operation in func
+> >> crash_smp_send_stop() and let CPUs to run into WFE/WFI states so CPUs
+> >> can still be powered on after crash dump. This finally is more safe
+> >> for Coresight debug module to dump registers and avoid hardware lockup.
+> >>
+> >> Cc: James Morse <james.morse@arm.com>
+> >> Cc: Will Deacon <will.deacon@arm.com>
+> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> >> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> >> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> >> ---
+> >>  arch/arm64/kernel/smp.c | 6 ------
+> >>  1 file changed, 6 deletions(-)
+> >>
+> >> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> >> index 9f7195a..a65e68b 100644
+> >> --- a/arch/arm64/kernel/smp.c
+> >> +++ b/arch/arm64/kernel/smp.c
+> >> @@ -856,12 +856,6 @@ static void ipi_cpu_crash_stop(unsigned int cpu, struct pt_regs *regs)
+> >>
+> >>       local_irq_disable();
+> >>
+> >> -#ifdef CONFIG_HOTPLUG_CPU
+> >> -     if (cpu_ops[cpu]->cpu_die)
+> >> -             cpu_ops[cpu]->cpu_die(cpu);
+> >> -#endif
+> >> -
+> >
+> > If it's really necessary to keep secondary CPUs online, please limit that to
+> > the case where the coresight debug module is being used.
+> >
+> > IIRC there were similar interactions with cpuidle, and I don't see why hotplug
+> > should be any different.
 > 
-> Will this one go through your tree?
+> Can you point to where it was fixed for CPUidle?  We should try to do
+> the same for coresight_debug so that things are done the same way.
+> I'm also thinking that we could call ->cpu_die(cpu) in a #ifdef
+> CONFIG_HOTPLUG_CPU clause in debug_notifier_call().  That way the
+> behaviour remains the same, just enacted a little later - please
+> advise on what option you prefer.
 
-No, it won't.
+IMHO 's more readable to place hotplug operations into the function
+ipi_cpu_crash_stop(), due this function is doing stuffs related with
+"cpu stop".
 
-It could go in via the PM tree (which covers cpufreq), but I'd prefer
-it to go in via arm-soc.
+But I think Mathieu's question is for you :) Could you give advice
+as well?
 
 Thanks,
-Rafael
+Leo Yan
