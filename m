@@ -1,55 +1,239 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 16 Oct 2017 15:08:01 +0200
-Subject: [GIT PULL] ARM: Xilinx Zynq DT patches for v4.15
-Message-ID: <de3bd1fb-85b4-81de-d546-7f9fc92ecf16@monstr.eu>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 16 Oct 2017 14:12:23 +0100
+Subject: [PATCH v2 4/4] iommu/arm-smmu-v3: Poll for CMD_SYNC outside cmdq
+ lock
+In-Reply-To: <20171013185917.GB30572@arm.com>
+References: <cover.1504182142.git.robin.murphy@arm.com>
+ <ff239173e47dfa0fc76eaa2a25b3cbcfe8dce5e6.1504182142.git.robin.murphy@arm.com>
+ <20171013185917.GB30572@arm.com>
+Message-ID: <495d0124-f5e4-04a4-f6e7-d0934bd38196@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 13/10/17 19:59, Will Deacon wrote:
+> Hi Robin,
+> 
+> Some of my comments on patch 3 are addressed here, but I'm really struggling
+> to convince myself that this algorithm is correct. My preference would
+> be to leave the code as it is for SMMUs that don't implement MSIs, but
+> comments below anyway because it's an interesting idea.
 
-please apply the following patch.
+>From scrounging up boot logs I can see that neither the Cavium nor
+HiSilicon SMMUv3 implementations have MSI support (the one in D05
+doesn't even have WFE), so there is a real motivation to improve
+scalability on current systems - it's not *just* a cool feature!
 
-Thanks,
-Michal
+> On Thu, Aug 31, 2017 at 02:44:28PM +0100, Robin Murphy wrote:
+>> Even without the MSI trick, we can still do a lot better than hogging
+>> the entire queue while it drains. All we actually need to do for the
+>> necessary guarantee of completion is wait for our particular command to
+>> have been consumed, and as long as we keep track of where it is there is
+>> no need to block other CPUs from adding further commands in the
+>> meantime. There is one theoretical (but incredibly unlikely) edge case
+>> to avoid, where cons has wrapped twice to still appear 'behind' the sync
+>> position - this is easily disambiguated by adding a generation count to
+>> the queue to indicate when prod wraps, since cons cannot wrap twice
+>> without prod having wrapped at least once.
+>>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>
+>> v2: New
+>>
+>>  drivers/iommu/arm-smmu-v3.c | 81 ++++++++++++++++++++++++++++++++-------------
+>>  1 file changed, 58 insertions(+), 23 deletions(-)
+>>
+>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>> index 311f482b93d5..f5c5da553803 100644
+>> --- a/drivers/iommu/arm-smmu-v3.c
+>> +++ b/drivers/iommu/arm-smmu-v3.c
+>> @@ -417,7 +417,6 @@
+>>  
+>>  /* High-level queue structures */
+>>  #define ARM_SMMU_POLL_TIMEOUT_US	100
+>> -#define ARM_SMMU_CMDQ_DRAIN_TIMEOUT_US	1000000 /* 1s! */
+>>  #define ARM_SMMU_SYNC_TIMEOUT_US	1000000 /* 1s! */
+>>  
+>>  #define MSI_IOVA_BASE			0x8000000
+>> @@ -540,6 +539,7 @@ struct arm_smmu_queue {
+>>  struct arm_smmu_cmdq {
+>>  	struct arm_smmu_queue		q;
+>>  	spinlock_t			lock;
+>> +	int				generation;
+>>  };
+>>  
+>>  struct arm_smmu_evtq {
+>> @@ -770,21 +770,12 @@ static void queue_inc_prod(struct arm_smmu_queue *q)
+>>  	writel(q->prod, q->prod_reg);
+>>  }
+>>  
+>> -/*
+>> - * Wait for the SMMU to consume items. If drain is true, wait until the queue
+>> - * is empty. Otherwise, wait until there is at least one free slot.
+>> - */
+>> -static int queue_poll_cons(struct arm_smmu_queue *q, bool drain, bool wfe)
+>> +/* Wait for the SMMU to consume items, until there is at least one free slot */
+>> +static int queue_poll_cons(struct arm_smmu_queue *q, bool wfe)
+>>  {
+>> -	ktime_t timeout;
+>> -	unsigned int delay = 1;
+>> +	ktime_t timeout = ktime_add_us(ktime_get(), ARM_SMMU_POLL_TIMEOUT_US);
+>>  
+>> -	/* Wait longer if it's queue drain */
+>> -	timeout = ktime_add_us(ktime_get(), drain ?
+>> -					    ARM_SMMU_CMDQ_DRAIN_TIMEOUT_US :
+>> -					    ARM_SMMU_POLL_TIMEOUT_US);
+>> -
+>> -	while (queue_sync_cons(q), (drain ? !queue_empty(q) : queue_full(q))) {
+>> +	while (queue_sync_cons(q), queue_full(q)) {
+>>  		if (ktime_compare(ktime_get(), timeout) > 0)
+>>  			return -ETIMEDOUT;
+>>  
+>> @@ -792,8 +783,7 @@ static int queue_poll_cons(struct arm_smmu_queue *q, bool drain, bool wfe)
+>>  			wfe();
+>>  		} else {
+>>  			cpu_relax();
+>> -			udelay(delay);
+>> -			delay *= 2;
+>> +			udelay(1);
+>>  		}
+>>  	}
+>>  
+>> @@ -959,15 +949,20 @@ static void arm_smmu_cmdq_skip_err(struct arm_smmu_device *smmu)
+>>  	queue_write(Q_ENT(q, cons), cmd, q->ent_dwords);
+>>  }
+>>  
+>> -static void arm_smmu_cmdq_insert_cmd(struct arm_smmu_device *smmu, u64 *cmd)
+>> +static u32 arm_smmu_cmdq_insert_cmd(struct arm_smmu_device *smmu, u64 *cmd)
+>>  {
+>>  	struct arm_smmu_queue *q = &smmu->cmdq.q;
+>>  	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
+>>  
+>>  	while (queue_insert_raw(q, cmd) == -ENOSPC) {
+>> -		if (queue_poll_cons(q, false, wfe))
+>> +		if (queue_poll_cons(q, wfe))
+>>  			dev_err_ratelimited(smmu->dev, "CMDQ timeout\n");
+>>  	}
+>> +
+>> +	if (Q_IDX(q, q->prod) == 0)
+>> +		smmu->cmdq.generation++;
+> 
+> The readers of generation are using READ_ONCE, so you're missing something
+> here.
 
-The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+Yeah, I was a bit back-and-forth on this. The readers want a READ_ONCE
+if only to prevent it being hoisted out of the polling loop, but as long
+as the update of generation is single-copy-atomic, the exact point at
+which it occurs shouldn't matter so much, since it's only written under
+the cmdq lock. I guess it depends how much we trust GCC's claim of the
+atomicity of int - I have no great objection to
 
-  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+	smmu->cmdq.generation = WRITE_ONCE(smmu->cmdq.generation + 1);
 
-are available in the git repository at:
+other than it being really long.
 
-  https://github.com/Xilinx/linux-xlnx.git tags/zynq-dt-for-4.15
+>> +
+>> +	return q->prod;
+>>  }
+>>  
+>>  static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
+>> @@ -997,15 +992,54 @@ static int arm_smmu_sync_poll_msi(struct arm_smmu_device *smmu, u32 sync_idx)
+>>  	return (int)(val - sync_idx) < 0 ? -ETIMEDOUT : 0;
+>>  }
+>>  
+>> +static int arm_smmu_sync_poll_cons(struct arm_smmu_device *smmu, u32 sync_idx,
+>> +				   int sync_gen)
+>> +{
+>> +	ktime_t timeout = ktime_add_us(ktime_get(), ARM_SMMU_SYNC_TIMEOUT_US);
+>> +	struct arm_smmu_queue *q = &smmu->cmdq.q;
+>> +	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
+>> +	unsigned int delay = 1;
+>> +
+>> +	do {
+>> +		queue_sync_cons(q);
+>> +		/*
+>> +		 * If we see updates quickly enough, cons has passed sync_idx,
+>> +		 * but not yet wrapped. At worst, cons might have actually
+>> +		 * wrapped an even number of times, but that still guarantees
+>> +		 * the original sync must have been consumed.
+>> +		 */
+>> +		if (Q_IDX(q, q->cons) >= Q_IDX(q, sync_idx) &&
+>> +		    Q_WRP(q, sync_idx) == Q_WRP(q, q->cons))
+> 
+> Can you move this into a separate function please, like we have for
+> queue_full and queue_empty?
 
-for you to fetch changes up to 3a42d36c6a2be960d9c7fe1ec7676aa04db572d4:
+OK, but given that it's only half of the "has cons moved past this
+index" operation, I'm not really sure what it could be called -
+queue_ahead_not_wrapped() comes to mind, but still seems a bit cryptic.
 
-  ARM: dts: zynq: Add generic compatible string for I2C EEPROM
-(2017-09-20 15:10:40 +0200)
+>> +			return 0;
+>> +		/*
+>> +		 * Otherwise, cons may have passed sync_idx and wrapped one or
+>> +		 * more times to appear behind it again, but in that case prod
+>> +		 * must also be one or more generations ahead.
+>> +		 */
+>> +		if (Q_IDX(q, q->cons) < Q_IDX(q, sync_idx) &&
+>> +		    READ_ONCE(smmu->cmdq.generation) != sync_gen)
+> 
+> There's another daft overflow case here which deserves a comment (and even
+> if it *did* happen, we'll recover gracefully).
 
-----------------------------------------------------------------
-arm: Xilinx ZynqMP DT changes for v4.15
+You mean exactly 2^32 queue generations passing between polls? Yeah, not
+happening :P
 
-- Change 24c08 compatible string
+>> +			return 0;
+>> +
+>> +		if (wfe) {
+>> +			wfe();
+> 
+> This is a bit scary... if we miss a generation update, just due to store
+> propagation latency (maybe it's buffered by the updater), I think we can
+> end up going into wfe when there's not an event pending. Using xchg
+> everywhere might work, but there's still a race on having somebody update
+> generation. The ordering here just looks generally suspicious to me because
+> you have the generation writer in arm_smmu_cmdq_insert_cmd effectively
+> doing:
+> 
+>   Write prod
+>   Write generation
+> 
+> and the reader in arm_smmu_sync_poll_cons doing:
+> 
+>   Read cons
+>   Read generation
+> 
+> so I can't see anything that gives you order to guarantee that the
+> generation is seen to be up-to-date.
 
-----------------------------------------------------------------
-Javier Martinez Canillas (1):
-      ARM: dts: zynq: Add generic compatible string for I2C EEPROM
+On reflection I'm pretty sure the below should suffice, to piggy-back
+off the DSB implicit in queue_insert_raw(). The readers only care about
+the generation *after* cons has been observed to go backwards, so the
+exact order of the generation and prod updates makes no practical
+difference other than closing that race window.
 
- arch/arm/boot/dts/zynq-zc702.dts | 2 +-
- arch/arm/boot/dts/zynq-zc706.dts | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+Robin
 
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Xilinx Microblaze
-Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
-U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
+----->8-----
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 12cdc5e50675..78ba8269c44c 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -959,14 +959,14 @@ static u32 arm_smmu_cmdq_insert_cmd(struct
+arm_smmu_device *smmu, u64 *cmd)
+ 	struct arm_smmu_queue *q = &smmu->cmdq.q;
+ 	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
 
++	if (Q_IDX(q, q->prod + 1) == 0)
++		smmu->cmdq.generation++;
++
+ 	while (queue_insert_raw(q, cmd) == -ENOSPC) {
+ 		if (queue_poll_cons(q, wfe))
+ 			dev_err_ratelimited(smmu->dev, "CMDQ timeout\n");
+ 	}
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171016/9f18bb1f/attachment-0001.sig>
+-	if (Q_IDX(q, q->prod) == 0)
+-		smmu->cmdq.generation++;
+-
+ 	return q->prod;
+ }
