@@ -1,57 +1,37 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 16 Oct 2017 11:27:00 +0200
-Subject: [PATCH v2 1/2] ARM: dts: imx6q-novena: Use the 'vpcie-supply'
- property
-In-Reply-To: <1508100838-13406-1-git-send-email-festevam@gmail.com>
-References: <1508100838-13406-1-git-send-email-festevam@gmail.com>
-Message-ID: <8fce3d43-6ed0-4a67-c3d0-546d881bd9d9@denx.de>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Mon, 16 Oct 2017 11:23:02 +0100
+Subject: [RFCv2 PATCH 12/36] dt-bindings: document stall and PASID
+ properties for IOMMU masters
+In-Reply-To: <20171013191051.lgxbcobkzzj5guhv@rob-hp-laptop>
+References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
+ <20171006133203.22803-13-jean-philippe.brucker@arm.com>
+ <20171013191051.lgxbcobkzzj5guhv@rob-hp-laptop>
+Message-ID: <e7288f51-1cfa-44ce-e3ce-e9f3daf91579@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/15/2017 10:53 PM, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
+On 13/10/17 20:10, Rob Herring wrote:
+> On Fri, Oct 06, 2017 at 02:31:39PM +0100, Jean-Philippe Brucker wrote:
+>> On ARM systems, some platform devices behind an IOMMU may support stall
+>> and PASID features. Stall is the ability to recover from page faults and
+>> PASID offers multiple process address spaces to the device. Together they
+>> allow to do paging with a device. Let the firmware tell us when a device
+>> supports stall and PASID.
 > 
-> Since commit c26ebe98a103 ("PCI: imx6: Add regulator support"), it is
-> possible to pass the 'vpcie-supply' property to describe the PCIE supply.
-> 
-> This way we can remove the 'regulator-always-on' property from the
-> regulator and have a better device tree description.
-> 
-> Cc: Marek Vasut <marex@denx.de>
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> Can't these be implied by the compatible string of the devices?
 
-Reviewed-by: Marek Vasut <marex@denx.de>
+I think that PASID capacity can be deduced from the compatible string but
+don't know how these devices will be implemented (the only known example
+being a software model for testing). In any case implementing PASID based
+on the compatible string is tricky, because the IOMMU driver needs to know
+PASID capacity before the device driver has had time to probe the device.
+Maybe we could get away with a static table associating compatible string
+to PASID capacity, but it's not very nice.
 
-> ---
-> Changes since v1:
-> - None
-> 
->  arch/arm/boot/dts/imx6q-novena.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6q-novena.dts b/arch/arm/boot/dts/imx6q-novena.dts
-> index d83cfb6..eadc371 100644
-> --- a/arch/arm/boot/dts/imx6q-novena.dts
-> +++ b/arch/arm/boot/dts/imx6q-novena.dts
-> @@ -158,7 +158,6 @@
->  		regulator-max-microvolt = <1500000>;
->  		gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
->  		enable-active-high;
-> -		regulator-always-on;
->  	};
->  
->  	reg_sata: regulator-sata {
-> @@ -447,6 +446,7 @@
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_pcie_novena>;
->  	reset-gpio = <&gpio3 29 GPIO_ACTIVE_LOW>;
-> +	vpcie-supply = <&reg_pcie>;
->  	status = "okay";
->  };
->  
-> 
+For stall it's a property of the integration between device and IOMMU,
+much like the "iommus" property, so it can't be deduced only from the
+compatible string. It's crucial that the firmware validates that stalling
+is safe, because we don't have any other way to discover it.
 
-
--- 
-Best regards,
-Marek Vasut
+Thanks,
+Jean
