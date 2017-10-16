@@ -1,41 +1,42 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 16 Oct 2017 14:24:36 +0100
-Subject: [PATCH 0/4] Cleanup instrumentation avoidance
-Message-ID: <20171016132440.38098-1-mark.rutland@arm.com>
+Date: Mon, 16 Oct 2017 14:24:38 +0100
+Subject: [PATCH 2/4] arm64: prevent instrumentation of LL/SC atomics
+In-Reply-To: <20171016132440.38098-1-mark.rutland@arm.com>
+References: <20171016132440.38098-1-mark.rutland@arm.com>
+Message-ID: <20171016132440.38098-3-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recently we spotted that some code with special ABI requirements was
-being instrumented by KCOV [1], and we need to avoid all instrumentation
-in this case.
+While we build the LL/SC atomics as a C object file, this does not
+follow the AAPCS. This does not interoperate with other C code, and can
+only be called from special wrapper assembly.
 
-While it's possible to disable each instrumentation option manually,
-this is tedious and error prone as new options are introduced.
+Bulding a kernel with CONFIG_KCOV and CONFIG_ARM64_LSE_ATOMICS results
+in the cmopiler inserting calls to __sanitizer_cov_trace_pc within the
+LL/SC atomics. As __sanitizer_cov_trace_pc is built per the AAPCS, these
+calls corrupt register values, resulting in failures at boot time.
 
-This series adds a new CC_INSTRUMENT option which can be used to disable
-all instrumentation of a given file or directory, and makes use of this
-throught arm64.
+Avoid this (and other similar issues) by opting out of all compiler
+instrumentation. We can opt-in to specific instrumentation in future if
+we want to.
 
-There are other places where this could be used (e.g. the EFI stub), but
-I've avoided altering those for now in the hope that this can be taken
-via the arm64 tree.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/lib/Makefile | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks,
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-September/533105.html
-
-Mark Rutland (4):
-  kbuild: allow global override of CC instrumentation
-  arm64: prevent instrumentation of LL/SC atomics
-  kvm/arm64: simplify CC instrumentation opt-out
-  arm64: vdso: remove pointless gcov option
-
- arch/arm64/kernel/vdso/Makefile |  3 ---
- arch/arm64/kvm/hyp/Makefile     |  5 +----
- arch/arm64/lib/Makefile         |  1 +
- scripts/Makefile.lib            | 17 +++++++++++++----
- 4 files changed, 15 insertions(+), 11 deletions(-)
-
+diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
+index a0abc142c92b..af77516f71b2 100644
+--- a/arch/arm64/lib/Makefile
++++ b/arch/arm64/lib/Makefile
+@@ -17,5 +17,6 @@ CFLAGS_atomic_ll_sc.o	:= -fcall-used-x0 -ffixed-x1 -ffixed-x2		\
+ 		   -fcall-saved-x10 -fcall-saved-x11 -fcall-saved-x12	\
+ 		   -fcall-saved-x13 -fcall-saved-x14 -fcall-saved-x15	\
+ 		   -fcall-saved-x18
++CC_INSTRUMENT_atomic_ll_sc.o := n
+ 
+ lib-$(CONFIG_ARCH_HAS_UACCESS_FLUSHCACHE) += uaccess_flushcache.o
 -- 
 2.11.0
