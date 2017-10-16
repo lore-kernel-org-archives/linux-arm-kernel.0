@@ -1,60 +1,54 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 16 Oct 2017 11:28:47 +0200
-Subject: [PATCH v4 0/6] K2G: Add QSPI support
-In-Reply-To: <09cc0a61-3f73-4a10-2d67-32515a7da861@ti.com>
-References: <20171003051925.8821-1-vigneshr@ti.com>
- <09cc0a61-3f73-4a10-2d67-32515a7da861@ti.com>
-Message-ID: <6f507813-388a-13e5-31ba-736b419744fa@gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 16 Oct 2017 11:27:00 +0200
+Subject: [PATCH v2 1/2] ARM: dts: imx6q-novena: Use the 'vpcie-supply'
+ property
+In-Reply-To: <1508100838-13406-1-git-send-email-festevam@gmail.com>
+References: <1508100838-13406-1-git-send-email-festevam@gmail.com>
+Message-ID: <8fce3d43-6ed0-4a67-c3d0-546d881bd9d9@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/16/2017 08:15 AM, Vignesh R wrote:
+On 10/15/2017 10:53 PM, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
+> Since commit c26ebe98a103 ("PCI: imx6: Add regulator support"), it is
+> possible to pass the 'vpcie-supply' property to describe the PCIE supply.
 > 
-> On Tuesday 03 October 2017 10:49 AM, Vignesh R wrote:
->>
->>
->> This series adds support for Cadence QSPI IP present in TI's 66AK2G SoC.
->> The patches enhance the existing cadence-quadspi driver to support
->> loopback clock circuit, pm_runtime support and tweaks for 66AK2G SoC.
+> This way we can remove the 'regulator-always-on' property from the
+> regulator and have a better device tree description.
 > 
-> Gentle ping on the series...
+> Cc: Marek Vasut <marex@denx.de>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-It's IMO OK, Cyrille, can you pick it ?
+Reviewed-by: Marek Vasut <marex@denx.de>
 
->>
->> Change log:
->>
->> v4:
->> * New patch to fix error handling sequence in probe.
->>
->> v3:
->> * Fix build warnings reported by kbuild test bot.
->>
->> Resend:
->> * Rebase to latest linux-next.
->> * Collect Acked-bys
->>
->> v2:
->> * Drop DT patches. Will be sent as separate series as requested by
->>  maintainer.
->> * Split binding docs into separate patches.
->> * Address comments by Rob Herring.
->>
->> Vignesh R (6):
->>   mtd: spi-nor: cadence-quadspi: Add TI 66AK2G SoC specific compatible
->>   mtd: spi-nor: cadence-quadspi: add a delay in write sequence
->>   mtd: spi-nor: cadence-quadspi: Add new binding to enable loop-back
->>     circuit
->>   mtd: spi-nor: cadence-quadspi: Add support to enable loop-back clock
->>     circuit
->>   mtd: spi-nor: cadence-quadspi: Fix error path in probe
->>   mtd: spi-nor: cadence-quadspi: Add runtime PM support
->>
->>  .../devicetree/bindings/mtd/cadence-quadspi.txt    |  7 ++-
->>  drivers/mtd/spi-nor/cadence-quadspi.c              | 55 +++++++++++++++++++---
->>  2 files changed, 55 insertions(+), 7 deletions(-)
->>
+> ---
+> Changes since v1:
+> - None
+> 
+>  arch/arm/boot/dts/imx6q-novena.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q-novena.dts b/arch/arm/boot/dts/imx6q-novena.dts
+> index d83cfb6..eadc371 100644
+> --- a/arch/arm/boot/dts/imx6q-novena.dts
+> +++ b/arch/arm/boot/dts/imx6q-novena.dts
+> @@ -158,7 +158,6 @@
+>  		regulator-max-microvolt = <1500000>;
+>  		gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
+>  		enable-active-high;
+> -		regulator-always-on;
+>  	};
+>  
+>  	reg_sata: regulator-sata {
+> @@ -447,6 +446,7 @@
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_pcie_novena>;
+>  	reset-gpio = <&gpio3 29 GPIO_ACTIVE_LOW>;
+> +	vpcie-supply = <&reg_pcie>;
+>  	status = "okay";
+>  };
+>  
 > 
 
 
