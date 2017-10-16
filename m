@@ -1,28 +1,19 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Mon, 16 Oct 2017 17:41:10 +0800
-Subject: [PATCH 1/2] dt-bindings: add binding for A64 DE2 CCU with SRAM
- section
-In-Reply-To: <20171016091136.b4rnckh2tfi26shx@flea.lan>
-References: <20171014122925.13220-1-icenowy@aosc.io>
- <20171016091136.b4rnckh2tfi26shx@flea.lan>
-Message-ID: <d62ac8b8ff9073b886ceaa9ce54e6903@aosc.io>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 16 Oct 2017 11:42:17 +0200
+Subject: [PATCH 07/13] ARM: dts: r8a7790: Add missing clocks for
+ secondary CA15 CPU cores
+In-Reply-To: <1507800916-11509-8-git-send-email-geert+renesas@glider.be>
+References: <1507800916-11509-1-git-send-email-geert+renesas@glider.be>
+ <1507800916-11509-8-git-send-email-geert+renesas@glider.be>
+Message-ID: <20171016094209.2rnsdgye2dfx7dol@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-10-16 17:11?Maxime Ripard ???
-> On Sat, Oct 14, 2017 at 08:29:24PM +0800, Icenowy Zheng wrote:
->> A64's Display Engine 2.0 needs a section of SRAM (SRAM C) to be 
->> claimed.
+On Thu, Oct 12, 2017 at 11:35:10AM +0200, Geert Uytterhoeven wrote:
+> Currently only the primary CPU in the CA15 cluster has a clocks
+> property, while the secondary CPU cores are driven by the same clock.
+> Add the missing clocks properties to fix this.
 > 
-> Why?
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Allwinner didn't document this, but if the SRAM is not claimed, the
-DE2 MMIO zone is totally not accessible.
-
-It seems that Allwinner uses the SRAM C in the DE2 internally.
-
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Tested-by: Simon Horman <horms+renesas@verge.net.au>
