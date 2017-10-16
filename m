@@ -1,51 +1,77 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 16 Oct 2017 17:32:13 +0100
-Subject: [PATCH] checkpatch: Allow DEFINE_PER_CPU definitions to exceed
- line length
-In-Reply-To: <1508170320.6530.15.camel@perches.com>
-References: <20171016152839.14964-1-mark.rutland@arm.com>
- <20171016152839.14964-3-mark.rutland@arm.com>
- <1508170320.6530.15.camel@perches.com>
-Message-ID: <20171016163149.lhgqbmn2oxdcfvaw@lakrids.cambridge.arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 16 Oct 2017 17:44:07 +0100
+Subject: [PATCH v3 16/28] arm64/sve: Probe SVE capabilities and usable
+ vector lengths
+In-Reply-To: <812b6d11-2458-6d5d-c490-3421f7d3afb3@arm.com>
+References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
+ <1507660725-7986-17-git-send-email-Dave.Martin@arm.com>
+ <a39354fb-9f21-47ff-2ad9-b5bcb04e9990@arm.com>
+ <20171016154557.GR19485@e103592.cambridge.arm.com>
+ <812b6d11-2458-6d5d-c490-3421f7d3afb3@arm.com>
+Message-ID: <20171016164407.GS19485@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 16, 2017 at 09:12:00AM -0700, Joe Perches wrote:
-> Some of the definitions are very long and can't be split
-> into multiple lines because ctags is limited.
+On Mon, Oct 16, 2017 at 05:27:59PM +0100, Suzuki K Poulose wrote:
+> On 16/10/17 16:46, Dave Martin wrote:
+> >On Thu, Oct 12, 2017 at 01:56:51PM +0100, Suzuki K Poulose wrote:
+> >>On 10/10/17 19:38, Dave Martin wrote:
+
+[...]
+
+> >>>@@ -670,6 +689,14 @@ void update_cpu_features(int cpu,
+> >>>  					info->reg_mvfr2, boot->reg_mvfr2);
+> >>>  	}
+> >>>+	if (id_aa64pfr0_sve(info->reg_id_aa64pfr0)) {
+> >>>+		taint |= check_update_ftr_reg(SYS_ZCR_EL1, cpu,
+> >>>+					info->reg_zcr, boot->reg_zcr);
+> >>>+
+> >>>+		if (!sys_caps_initialised)
+> >>>+			sve_update_vq_map();
+> >>>+	}
+> >>
+> >>nit: I am not sure if we should also check if the "current" sanitised value
+> >>of the id_aa64pfr0 also supports sve and skip the update if it isn't. The code
+> >>is as such fine without the check, its just that we can avoid computing the
+> >>map. It is in the CPU boot up path and hence is not performance critical.
+> >>So, either way we are fine.
+> >>
+> >>Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> >
+> >I think I prefer to avoid adding extra code to optimise the "broken SoC
+> >design" case.
+> >
 > 
-> Exempt these lines from the line length checks.
+> Sure.
 > 
-> Signed-off-by: Joe Perches <joe@perches.com>
-
-It might make sense to point at commit:
-
-  25528213fe9f75f4 ("tags: Fix DEFINE_PER_CPU expansions")
-
-... for the gory details, but either way:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
-
-> ---
->  scripts/checkpatch.pl | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
+> >Maybe we could revisit this later if needed.
+> >
+> >Can you suggest some code?  Maybe the check is simpler than I think.
 > 
-> diff --git a/scripts/checkpatch.pl b/scripts/checkpatch.pl
-> index 2a8c6c3c1bdb..5fa0f5467d99 100755
-> --- a/scripts/checkpatch.pl
-> +++ b/scripts/checkpatch.pl
-> @@ -2900,8 +2900,9 @@ sub process {
->  				 $line =~ /^\+\s*#\s*define\s+\w+\s+$String$/) {
->  				$msg_type = "";
->  
-> -			# EFI_GUID is another special case
-> -			} elsif ($line =~ /^\+.*\bEFI_GUID\s*\(/) {
-> +			# More special cases
-> +			} elsif ($line =~ /^\+.*\bEFI_GUID\s*\(/ ||
-> +				 $line =~ /^\+\s*(?:\w+)?\s*DEFINE_PER_CPU/) {
->  				$msg_type = "";
->  
->  			# Otherwise set the alternate message types
+> Something like :
+> 
+> if (id_aa64pfr0_sve(read_sanitised_ftr_reg(SYS_IDAA64PFR0)) &&
+>     id_aa64pfr0_sve(id_aa64pfr0)) {
+>     ...
+> }
+> 
+> should be enough.
+> 
+> Or even we could hack it to :
+> 
+> if (id_aa64pfr0_sve(id_aa64pfr0 | read_sanitised_ftr_reg(SYS_IDAA64PFR0)))
+> 
+> As I mentioned, the code as such is fine. Its just that we try to detect
+> if the SVE is already moot and skip the steps for this CPU.
+
+How about the following, keeping the outer
+if(id_aa64pfr0_sve(int->reg_id_aa64pfr0)) from my current code:
+
+-		if (!sys_caps_initialised)
++		/* Probe vector lengths, unless we already gave up on SVE */
++		if (id_aa64pfr0_sve(read_sanitised_ftr_reg(ID_AA64PFR0_SVE)) &&
++		    !sys_caps_initialised)
+			sve_update_vq_map();
+
+Cheers
+---Dave
