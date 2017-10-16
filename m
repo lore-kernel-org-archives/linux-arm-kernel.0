@@ -1,44 +1,132 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 16 Oct 2017 18:16:26 +0200
-Subject: [PATCHv2 0/7] Add support for USB OTG on STM32F7
-In-Reply-To: <1503930018-536-1-git-send-email-amelie.delaunay@st.com>
-References: <1503930018-536-1-git-send-email-amelie.delaunay@st.com>
-Message-ID: <f80312bc-e9bd-2216-404c-016a6ad690a3@st.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 16 Oct 2017 17:27:59 +0100
+Subject: [PATCH v3 16/28] arm64/sve: Probe SVE capabilities and usable
+ vector lengths
+In-Reply-To: <20171016154557.GR19485@e103592.cambridge.arm.com>
+References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
+ <1507660725-7986-17-git-send-email-Dave.Martin@arm.com>
+ <a39354fb-9f21-47ff-2ad9-b5bcb04e9990@arm.com>
+ <20171016154557.GR19485@e103592.cambridge.arm.com>
+Message-ID: <812b6d11-2458-6d5d-c490-3421f7d3afb3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Am?lie,
-
-On 08/28/2017 04:20 PM, Amelie Delaunay wrote:
-> The STM32F7 MCU family embeds two DWC2 USB OTG cores. One core is USB
-> OTG FS and the other is USB OTG HS. The USB FS core only works with its
-> internal phy whilst the USB HS core can work in HS with external ULPI phy
-> or in FS/LS with the on-chip FS phy.
+On 16/10/17 16:46, Dave Martin wrote:
+> On Thu, Oct 12, 2017 at 01:56:51PM +0100, Suzuki K Poulose wrote:
+>> On 10/10/17 19:38, Dave Martin wrote:
+>>> This patch uses the cpufeatures framework to determine common SVE
+>>> capabilities and vector lengths, and configures the runtime SVE
+>>> support code appropriately.
+>>>
+>>> ZCR_ELx is not really a feature register, but it is convenient to
+>>> use it as a template for recording the maximum vector length
+>>> supported by a CPU, using the LEN field.  This field is similar to
+>>> a feature field in that it is a contiguous bitfield for which we
+>>> want to determine the minimum system-wide value.  This patch adds
+>>> ZCR as a pseudo-register in cpuinfo/cpufeatures, with appropriate
+>>> custom code to populate it.  Finding the minimum supported value of
+>>> the LEN field is left to the cpufeatures framework in the usual
+>>> way.
+>>>
+>>> The meaning of ID_AA64ZFR0_EL1 is not architecturally defined yet,
+>>> so for now we just require it to be zero.
+>>>
+>>> Note that much of this code is dormant and SVE still won't be used
+>>> yet, since system_supports_sve() remains hardwired to false.
+>>>
+>>> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+>>> Cc: Alex Benn?e <alex.bennee@linaro.org>
+>>> Cc: Suzuki K Poulose <Suzuki.Poulose@arm.com>
+>>>
+>>> ---
+>>>
+>>> Dropped Alex Benn?e's Reviewed-by, since there is new logic in this
+>>> patch.
+>>>
+>>> Changes since v2
+>>> ----------------
+>>>
+>>> Bug fixes:
+>>>
+>>>   * Got rid of dynamic allocation of the shadow vector length map during
+>>>     secondary boot.  Secondary CPU boot takes place in atomic context,
+>>>     and relying on GFP_ATOMIC here doesn't seem justified.
+>>>
+>>>     Instead, the needed additional bitmap is allocated statically.  Only
+>>>     one shadow map is needed, because CPUs don't boot concurrently.
+>>>
+>>> Requested by Alex Benn?e:
+>>>
+>>>   * Reflowed untidy comment above read_zcr_features()
+>>>
+>>>   * Added comments to read_zcr_features() to explain what it's trying to do
+>>>     (which is otherwise not readily apparent).
+>>>
+>>> Requested by Catalin Marinas:
+>>>
+>>>   * Moved disabling of the EL1 SVE trap to the cpufeatures C code.
+>>>     This allows addition of new assembler in __cpu_setup to be
+>>>     avoided.
+>>>
+>>> Miscellaneous:
+>>>
+>>>   * Added comments explaining the intent, purpose and basic constraints
+>>>     for fpsimd.c helpers.
+>>
+>> ...
+>>
+>>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+>>> index 92a9502..c5acf38 100644
+>>> --- a/arch/arm64/kernel/cpufeature.c
+>>> +++ b/arch/arm64/kernel/cpufeature.c
+>>
+>> ...
+>>
+>>> @@ -670,6 +689,14 @@ void update_cpu_features(int cpu,
+>>>   					info->reg_mvfr2, boot->reg_mvfr2);
+>>>   	}
+>>> +	if (id_aa64pfr0_sve(info->reg_id_aa64pfr0)) {
+>>> +		taint |= check_update_ftr_reg(SYS_ZCR_EL1, cpu,
+>>> +					info->reg_zcr, boot->reg_zcr);
+>>> +
+>>> +		if (!sys_caps_initialised)
+>>> +			sve_update_vq_map();
+>>> +	}
+>>
+>> nit: I am not sure if we should also check if the "current" sanitised value
+>> of the id_aa64pfr0 also supports sve and skip the update if it isn't. The code
+>> is as such fine without the check, its just that we can avoid computing the
+>> map. It is in the CPU boot up path and hence is not performance critical.
+>> So, either way we are fine.
+>>
+>> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 > 
-> Amelie Delaunay (7):
->    dt-bindings: usb: Document the STM32F7 DWC2 USB OTG HS core binding
->    usb: dwc2: add support for STM32F7 USB OTG HS
->    ARM: dts: stm32: Add USB HS support for STM32F746 MCU
->    ARM: dts: stm32: Enable USB HS on stm32746g-eval
->    ARM: dts: stm32: Enable USB HS on stm32f746-disco
->    ARM: dts: stm32: Add USB FS support for STM32F746 MCU
->    ARM: dts: stm32: Enable USB FS on stm32f746-disco
-> 
->   Documentation/devicetree/bindings/usb/dwc2.txt |  2 +
->   arch/arm/boot/dts/stm32746g-eval.dts           | 16 ++++++
->   arch/arm/boot/dts/stm32f746-disco.dts          | 30 ++++++++++
->   arch/arm/boot/dts/stm32f746.dtsi               | 80 ++++++++++++++++++++++++++
->   drivers/usb/dwc2/params.c                      | 11 ++++
->   5 files changed, 139 insertions(+)
+> I think I prefer to avoid adding extra code to optimise the "broken SoC
+> design" case.
 > 
 
-Patches 3 to 7 applied on stm32-dt-for-v4.15 branch.
-Currently USB stack is not enabled by default (and will not be). If you 
-plan to use USB don't forget to create a reserved memory region for DMA 
-pool (as DMA and caches are not friends on cortex-M7) in devicetree.
-Reserved memory region for DMA pool support will be added in stm32F7 and 
-stm32H7 devicetree as soon series "ARM: NOMMU: MPU updates" from 
-Vladimir Murzin will be merged.
+Sure.
 
-Regards
-Alex
+> Maybe we could revisit this later if needed.
+> 
+> Can you suggest some code?  Maybe the check is simpler than I think.
+
+Something like :
+
+if (id_aa64pfr0_sve(read_sanitised_ftr_reg(SYS_IDAA64PFR0)) &&
+     id_aa64pfr0_sve(id_aa64pfr0)) {
+     ...
+}
+
+should be enough.
+
+Or even we could hack it to :
+
+if (id_aa64pfr0_sve(id_aa64pfr0 | read_sanitised_ftr_reg(SYS_IDAA64PFR0)))
+
+As I mentioned, the code as such is fine. Its just that we try to detect
+if the SVE is already moot and skip the steps for this CPU.
+
+
+Cheers
+Suzuki
