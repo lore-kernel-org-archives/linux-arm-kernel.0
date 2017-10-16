@@ -1,66 +1,76 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Mon, 16 Oct 2017 15:15:21 -0700
-Subject: [PATCH] arm64: defconfig: re-enable Qualcomm DB410c USB
-In-Reply-To: <20171016142257.12882-1-elder@linaro.org>
-References: <20171016142257.12882-1-elder@linaro.org>
-Message-ID: <20171016221521.GO1165@minitux>
+From: cyrille.pitchen@wedev4u.fr (Cyrille Pitchen)
+Date: Tue, 17 Oct 2017 00:29:42 +0200
+Subject: [PATCH v4 0/6] K2G: Add QSPI support
+In-Reply-To: <6f507813-388a-13e5-31ba-736b419744fa@gmail.com>
+References: <20171003051925.8821-1-vigneshr@ti.com>
+ <09cc0a61-3f73-4a10-2d67-32515a7da861@ti.com>
+ <6f507813-388a-13e5-31ba-736b419744fa@gmail.com>
+Message-ID: <69beca0c-68a2-2d2c-d4a8-6f05a1fbc957@wedev4u.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 16 Oct 07:22 PDT 2017, Alex Elder wrote:
+Hi all,
 
-> Stephen Boyd reworked some Qualcomm USB code earlier this year.
-> The result requires a few different config options to be enabled
-> in order for the USB on the DragonBoard 410c to continue working,
-> but these were never added to arm64 "defconfig".  As a result, USB
-> on that board stopped working during the v4.13-rc1 merge window.
+Le 16/10/2017 ? 11:28, Marek Vasut a ?crit?:
+> On 10/16/2017 08:15 AM, Vignesh R wrote:
+>>
+>>
+>> On Tuesday 03 October 2017 10:49 AM, Vignesh R wrote:
+>>>
+>>>
+>>> This series adds support for Cadence QSPI IP present in TI's 66AK2G SoC.
+>>> The patches enhance the existing cadence-quadspi driver to support
+>>> loopback clock circuit, pm_runtime support and tweaks for 66AK2G SoC.
+>>
+>> Gentle ping on the series...
 > 
-> Re-enable this functionality by setting the needed config options
-> in the arm64 "defconfig" file.
-> 
+> It's IMO OK, Cyrille, can you pick it ?
+>
 
-Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+The series looks good to me too.
 
-Regards,
-Bjorn
+Marek, could you please add you "Acked-by" or "Reviewed-by" tag for the
+record in patchwork ? It will be automatically added when I use
+"pwclient git-am -s" to merge the patches into the spi-nor/next branch.
 
-> Signed-off-by: Alex Elder <elder@linaro.org>
-> ---
->  arch/arm64/configs/defconfig | 3 +++
->  1 file changed, 3 insertions(+)
+Best regards,
+
+Cyrille
+
+
+>>>
+>>> Change log:
+>>>
+>>> v4:
+>>> * New patch to fix error handling sequence in probe.
+>>>
+>>> v3:
+>>> * Fix build warnings reported by kbuild test bot.
+>>>
+>>> Resend:
+>>> * Rebase to latest linux-next.
+>>> * Collect Acked-bys
+>>>
+>>> v2:
+>>> * Drop DT patches. Will be sent as separate series as requested by
+>>>  maintainer.
+>>> * Split binding docs into separate patches.
+>>> * Address comments by Rob Herring.
+>>>
+>>> Vignesh R (6):
+>>>   mtd: spi-nor: cadence-quadspi: Add TI 66AK2G SoC specific compatible
+>>>   mtd: spi-nor: cadence-quadspi: add a delay in write sequence
+>>>   mtd: spi-nor: cadence-quadspi: Add new binding to enable loop-back
+>>>     circuit
+>>>   mtd: spi-nor: cadence-quadspi: Add support to enable loop-back clock
+>>>     circuit
+>>>   mtd: spi-nor: cadence-quadspi: Fix error path in probe
+>>>   mtd: spi-nor: cadence-quadspi: Add runtime PM support
+>>>
+>>>  .../devicetree/bindings/mtd/cadence-quadspi.txt    |  7 ++-
+>>>  drivers/mtd/spi-nor/cadence-quadspi.c              | 55 +++++++++++++++++++---
+>>>  2 files changed, 55 insertions(+), 7 deletions(-)
+>>>
+>>
 > 
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index 34480e9af2e7..325a9991ab72 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -423,6 +423,7 @@ CONFIG_USB_DWC2=y
->  CONFIG_USB_CHIPIDEA=y
->  CONFIG_USB_CHIPIDEA_UDC=y
->  CONFIG_USB_CHIPIDEA_HOST=y
-> +CONFIG_USB_CHIPIDEA_ULPI=y
->  CONFIG_USB_ISP1760=y
->  CONFIG_USB_HSIC_USB3503=y
->  CONFIG_NOP_USB_XCEIV=y
-> @@ -431,6 +432,7 @@ CONFIG_USB_QCOM_8X16_PHY=y
->  CONFIG_USB_ULPI=y
->  CONFIG_USB_GADGET=y
->  CONFIG_USB_RENESAS_USBHS_UDC=m
-> +CONFIG_USB_ULPI_BUS=y
->  CONFIG_MMC=y
->  CONFIG_MMC_BLOCK_MINORS=32
->  CONFIG_MMC_ARMMMCI=y
-> @@ -533,6 +535,7 @@ CONFIG_PWM_SAMSUNG=y
->  CONFIG_PWM_TEGRA=m
->  CONFIG_PHY_RCAR_GEN3_USB2=y
->  CONFIG_PHY_HI6220_USB=y
-> +CONFIG_PHY_QCOM_USB_HS=y
->  CONFIG_PHY_SUN4I_USB=y
->  CONFIG_PHY_ROCKCHIP_INNO_USB2=y
->  CONFIG_PHY_ROCKCHIP_EMMC=y
-> -- 
-> 2.11.0
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
