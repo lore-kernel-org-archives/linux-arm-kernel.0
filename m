@@ -1,37 +1,34 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon, 16 Oct 2017 11:23:02 +0100
-Subject: [RFCv2 PATCH 12/36] dt-bindings: document stall and PASID
- properties for IOMMU masters
-In-Reply-To: <20171013191051.lgxbcobkzzj5guhv@rob-hp-laptop>
-References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
- <20171006133203.22803-13-jean-philippe.brucker@arm.com>
- <20171013191051.lgxbcobkzzj5guhv@rob-hp-laptop>
-Message-ID: <e7288f51-1cfa-44ce-e3ce-e9f3daf91579@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 16 Oct 2017 11:17:37 +0100
+Subject: [PATCH v3 04/13] arm64: alternatives: use tpidr_el2 on VHE hosts
+In-Reply-To: <20170922182614.27885-5-james.morse@arm.com>
+References: <20170922182614.27885-1-james.morse@arm.com>
+ <20170922182614.27885-5-james.morse@arm.com>
+Message-ID: <20171016101736.fkaikxflyc46zczf@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/10/17 20:10, Rob Herring wrote:
-> On Fri, Oct 06, 2017 at 02:31:39PM +0100, Jean-Philippe Brucker wrote:
->> On ARM systems, some platform devices behind an IOMMU may support stall
->> and PASID features. Stall is the ability to recover from page faults and
->> PASID offers multiple process address spaces to the device. Together they
->> allow to do paging with a device. Let the firmware tell us when a device
->> supports stall and PASID.
-> 
-> Can't these be implied by the compatible string of the devices?
+On Fri, Sep 22, 2017 at 07:26:05PM +0100, James Morse wrote:
+> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+> index 29adab8138c3..8f2d0f7d193b 100644
+> --- a/arch/arm64/include/asm/processor.h
+> +++ b/arch/arm64/include/asm/processor.h
+> @@ -193,5 +193,6 @@ static inline void spin_lock_prefetch(const void *ptr)
+>  
+>  int cpu_enable_pan(void *__unused);
+>  int cpu_enable_cache_maint_trap(void *__unused);
+> +int cpu_copy_el2regs(void *__unused);
+>  
+>  #endif /* __ASM_PROCESSOR_H */
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index cd52d365d1f0..8e4c7da2b126 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+[...]
+> +int cpu_copy_el2regs(void *__unused)
 
-I think that PASID capacity can be deduced from the compatible string but
-don't know how these devices will be implemented (the only known example
-being a software model for testing). In any case implementing PASID based
-on the compatible string is tricky, because the IOMMU driver needs to know
-PASID capacity before the device driver has had time to probe the device.
-Maybe we could get away with a static table associating compatible string
-to PASID capacity, but it's not very nice.
+Can this be static? I couldn't find it used anywhere else apart from
+cpufeature.c
 
-For stall it's a property of the integration between device and IOMMU,
-much like the "iommus" property, so it can't be deduced only from the
-compatible string. It's crucial that the firmware validates that stalling
-is safe, because we don't have any other way to discover it.
-
-Thanks,
-Jean
+-- 
+Catalin
