@@ -1,58 +1,162 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 16 Oct 2017 22:59:16 +0200
-Subject: [PATCH 00/10] arm/arm64: KVM: limit icache invalidation to
- prefetch aborts
-In-Reply-To: <20171009152032.27804-1-marc.zyngier@arm.com>
-References: <20171009152032.27804-1-marc.zyngier@arm.com>
-Message-ID: <20171016205916.GP1845@lvm>
+Date: Mon, 16 Oct 2017 23:18:57 +0200
+Subject: [RFC 4/7] arm64: irqflags: Use ICC sysregs to implement IRQ
+ masking
+In-Reply-To: <1507726862-11944-5-git-send-email-julien.thierry@arm.com>
+References: <1507726862-11944-1-git-send-email-julien.thierry@arm.com>
+ <1507726862-11944-5-git-send-email-julien.thierry@arm.com>
+Message-ID: <20171016211857.GQ1845@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 09, 2017 at 04:20:22PM +0100, Marc Zyngier wrote:
-> It was recently reported that on a VM restore, we seem to spend a
-> disproportionate amount of time invalidation the icache. This is
-> partially due to some HW behaviour, but also because we're being a bit
-> dumb and are invalidating the icache for every page we map at S2, even
-> if that on a data access.
+On Wed, Oct 11, 2017 at 02:00:59PM +0100, Julien Thierry wrote:
+> From: Daniel Thompson <daniel.thompson@linaro.org>
 > 
-> The slightly better way of doing this is to mark the pages XN at S2,
-> and wait for the the guest to execute something in that page, at which
-> point we perform the invalidation. As it is likely that there is a lot
-> less instruction than data, we win (or so we hope).
+> Currently irqflags is implemented using the PSR's I bit. It is possible
+> to implement irqflags by using the co-processor interface to the GIC.
+> Using the co-processor interface makes it feasible to simulate NMIs
+> using GIC interrupt prioritization.
 > 
-> We also take this opportunity to drop the extra dcache clean to the
-> PoU which is pretty useless, as we already clean all the way to the
-> PoC...
+> This patch changes the irqflags macros to modify, save and restore
+> ICC_PMR_EL1. This has a substantial knock on effect for the rest of
+> the kernel. There are four reasons for this:
 > 
-> Running a bare metal test that touches 1GB of memory (using a 4kB
-> stride) leads to the following results on Seattle:
+> 1. The state of the PMR becomes part of the interrupt context and must be
+>    saved and restored during exceptions. It is saved on the stack as part
+>    of the saved context when an interrupt/exception is taken.
 > 
-> 4.13:
-> do_fault_read.bin:       0.565885992 seconds time elapsed
-> do_fault_write.bin:       0.738296337 seconds time elapsed
-> do_fault_read_write.bin:       1.241812231 seconds time elapsed
+> 2. The hardware automatically masks the I bit (at boot, during traps, etc).
+>    When the I bit is set by hardware we must add code to switch from I
+>    bit masking and PMR masking:
+>        - For IRQs, this is done after the interrupt has been acknowledged
+>        	 avoiding the need to unmask.
+>        - For other exceptions, this is done right after saving the context.
 > 
-> 4.14-rc3+patches:
-> do_fault_read.bin:       0.244961803 seconds time elapsed
-> do_fault_write.bin:       0.422740092 seconds time elapsed
-> do_fault_read_write.bin:       0.643402470 seconds time elapsed
+> 3. Some instructions, such as wfi, require that the PMR not be used
+>    for interrupt masking. Before calling these instructions we must
+>    switch from PMR masking to I bit masking.
+>    This is also the case when KVM runs a guest, if the CPU receives
+>    an interrupt from the host, interrupts must not be masked in PMR
+>    otherwise the GIC will not signal it to the CPU.
 > 
-> We're almost halving the time of something that more or less looks
-> like a restore operation. Some larger systems will show much bigger
-> benefits as they become less impacted by the icache invalidation
-> (which is broadcast in the inner shareable domain).
+> 4. We use the alternatives system to allow a single kernel to boot and
+>    be switched to the alternative masking approach at runtime.
 > 
-> I've also given it a test run on both Cubietruck and Jetson-TK1.
-> 
-> Tests are archived here:
-> https://git.kernel.org/pub/scm/linux/kernel/git/maz/kvm-ws-tests.git/
-> 
-> I'd value some additional test results on HW I don't have access to.
-> 
+> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+> [julien.thierry at arm.com: changes reflected in commit,
+> 			 message, fixes, renaming]
+> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+---
 
-What would also be interesting is some insight into how big the hit then
-is on first execution, but that should in no way gate merging these
-patches.
+I just gave a quick look to the KVM part here but didn't get into
+whether this rather invasive change is warranted or not (it's definitely
+entertaining though).
 
+[...]
+
+
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index e923b58..070e8a5 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -38,6 +38,10 @@
+>  #include <kvm/arm_arch_timer.h>
+>  #include <kvm/arm_pmu.h>
+> 
+> +#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+> +#include <asm/arch_gicv3.h>
+> +#endif
+> +
+>  #define KVM_MAX_VCPUS VGIC_V3_MAX_CPUS
+> 
+>  #define KVM_VCPU_MAX_FEATURES 4
+> @@ -332,7 +336,30 @@ int kvm_unmap_hva_range(struct kvm *kvm,
+>  void kvm_arm_resume_guest(struct kvm *kvm);
+> 
+>  u64 __kvm_call_hyp(void *hypfn, ...);
+> +
+> +#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+> +/*
+> + * If we use PMR to disable interrupts, interrupts happening while the
+
+I would describe this as 'masking' interrupts, as opposed to 'disabling'
+interrupts, in general, and probably we can be more precise by
+categorizing interrupts as 'normal' vs. 'priority (NMIs)' or something
+like that.
+
+> + * guest is executing will not be signaled to the host by the GIC  (and
+
+signaled to the CPU.  (Whether this then causes an exception to EL2
+depends on the HCR_EL2.IMO flag and what KVM does with that exception).
+
+> + * any call to a waiting kvm_kick_many_cpus will likely cause a
+> + * deadlock).
+
+This kick thing is an unccessary specific example to bring out here, I
+don't think it adds to the general understanding.
+
+> + * We need to switch back to using PSR.I.
+> + */
+> +#define kvm_call_hyp(f, ...)						\
+> +	({								\
+> +		u64 res;						\
+> +		unsigned long flags;					\
+> +									\
+> +		flags = arch_local_irq_save();				\
+> +		gic_end_pmr_masking();					\
+> +		res = __kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__);	\
+> +		gic_start_pmr_masking();				\
+> +		arch_local_irq_restore(flags);				\
+> +		res;							\
+
+This is in the critical path, so ideally this could instead be done
+inside the function, because the trap will set PSTATE.I already, so it
+should be possible to reduce this to a set of save/clear/restore
+operations after __kvm_call_hyp.
+
+> +	})
+> +#else
+>  #define kvm_call_hyp(f, ...) __kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__)
+> +#endif
+> 
+>  void force_vm_exit(const cpumask_t *mask);
+>  void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
+> @@ -349,6 +376,9 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
+>  				       unsigned long hyp_stack_ptr,
+>  				       unsigned long vector_ptr)
+>  {
+> +#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+> +	unsigned long flags;
+> +#endif
+>  	/*
+>  	 * Call initialization code, and switch to the full blown HYP code.
+>  	 * If the cpucaps haven't been finalized yet, something has gone very
+> @@ -356,7 +386,17 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
+>  	 * cpus_have_const_cap() wrapper.
+>  	 */
+>  	BUG_ON(!static_branch_likely(&arm64_const_caps_ready));
+> +#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+> +	flags = arch_local_irq_save();
+> +	gic_end_pmr_masking();
+> +#endif
+> +
+>  	__kvm_call_hyp((void *)pgd_ptr, hyp_stack_ptr, vector_ptr);
+> +
+> +#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+> +	gic_start_pmr_masking();
+> +	arch_local_irq_restore(flags);
+> +#endif
+
+I don't think you need any of this, because I don't think you'd ever
+need to handle interrupts while initializing hyp mode.
+
+>  }
+> 
 Thanks,
 -Christoffer
