@@ -1,37 +1,42 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 16 Oct 2017 14:24:39 +0100
-Subject: [PATCH 3/4] kvm/arm64: simplify CC instrumentation opt-out
+Date: Mon, 16 Oct 2017 14:24:40 +0100
+Subject: [PATCH 4/4] arm64: vdso: remove pointless gcov option
 In-Reply-To: <20171016132440.38098-1-mark.rutland@arm.com>
 References: <20171016132440.38098-1-mark.rutland@arm.com>
-Message-ID: <20171016132440.38098-4-mark.rutland@arm.com>
+Message-ID: <20171016132440.38098-5-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we can opt out of all instrumentation with a single option,
-make use of this in the KVM hyp code. Hopefully, this will also avoid
-fragility as new options are introduced.
+The arm64 VDSO Makefile explicitly disables gcov; a practice we seem to
+have inherited from other VDSO Makefiles.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+The arm64 VDSO is written entirely in assembly, so this is not
+necessary. Further, if the VDSO were written in C it would be necessary
+to disable all other instrumentation, and this alone would not be
+sufficient.
+
+This patch remosves the redundant GCOV option for now.
+
 Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Marc Zyngier <mark.zyngier@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Reported-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 ---
- arch/arm64/kvm/hyp/Makefile | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+ arch/arm64/kernel/vdso/Makefile | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-index 14c4e3b14bcb..a8a212eb66f1 100644
---- a/arch/arm64/kvm/hyp/Makefile
-+++ b/arch/arm64/kvm/hyp/Makefile
-@@ -22,7 +22,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += s2-setup.o
- # KVM code is run at a different exception code with a different map, so
- # compiler instrumentation that inserts callbacks or checks into the code may
- # cause crashes. Just disable it.
--GCOV_PROFILE	:= n
--KASAN_SANITIZE	:= n
--UBSAN_SANITIZE	:= n
--KCOV_INSTRUMENT	:= n
-+CC_INSTRUMENT	:= n
+diff --git a/arch/arm64/kernel/vdso/Makefile b/arch/arm64/kernel/vdso/Makefile
+index 62c84f7cb01b..350190b749dd 100644
+--- a/arch/arm64/kernel/vdso/Makefile
++++ b/arch/arm64/kernel/vdso/Makefile
+@@ -15,9 +15,6 @@ ccflags-y := -shared -fno-common -fno-builtin
+ ccflags-y += -nostdlib -Wl,-soname=linux-vdso.so.1 \
+ 		$(call cc-ldoption, -Wl$(comma)--hash-style=sysv)
+ 
+-# Disable gcov profiling for VDSO code
+-GCOV_PROFILE := n
+-
+ # Workaround for bare-metal (ELF) toolchains that neglect to pass -shared
+ # down to collect2, resulting in silent corruption of the vDSO image.
+ ccflags-y += -Wl,-shared
 -- 
 2.11.0
