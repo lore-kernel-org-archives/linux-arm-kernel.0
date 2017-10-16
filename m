@@ -1,36 +1,26 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Mon, 16 Oct 2017 22:18:57 +0200
-Subject: [PATCH] xilinx_hwicap: Improve a size determination in hwicap_setup()
-Message-ID: <a5c9b285-7c07-0023-b123-34da09556826@users.sourceforge.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 16 Oct 2017 18:33:17 -0200
+Subject: [PATCH 6/7] ARM: dts: imx6ul: add support for TXUL modules on
+ TXUL-Mainboard
+In-Reply-To: <1507891383-15452-7-git-send-email-LW@KARO-electronics.de>
+References: <1507891383-15452-1-git-send-email-LW@KARO-electronics.de>
+ <1507891383-15452-7-git-send-email-LW@KARO-electronics.de>
+Message-ID: <CAOMZO5BbRwnggKPUo=evT=nHxo9k6v3d-zNLaiOPWabDNdLgpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Mon, 16 Oct 2017 22:10:32 +0200
+Hi Lothar,
 
-Replace the specification of a data structure by a pointer dereference
-as the parameter for the operator "sizeof" to make the corresponding size
-determination a bit safer according to the Linux coding style convention.
+On Fri, Oct 13, 2017 at 7:43 AM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
 
-This issue was detected by using the Coccinelle software.
+> +/ {
+> +       aliases {
+> +               lcdif_24bit_pins_a = &pinctrl_disp0_3;
+> +               mmc0 = &usdhc1;
 
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- drivers/char/xilinx_hwicap/xilinx_hwicap.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Is this mmc0 alias really needed here?
 
-diff --git a/drivers/char/xilinx_hwicap/xilinx_hwicap.c b/drivers/char/xilinx_hwicap/xilinx_hwicap.c
-index 067396bedf22..2ab9df5a60bd 100644
---- a/drivers/char/xilinx_hwicap/xilinx_hwicap.c
-+++ b/drivers/char/xilinx_hwicap/xilinx_hwicap.c
-@@ -634,7 +634,7 @@ static int hwicap_setup(struct device *dev, int id,
- 
- 	devt = MKDEV(XHWICAP_MAJOR, XHWICAP_MINOR + id);
- 
--	drvdata = kzalloc(sizeof(struct hwicap_drvdata), GFP_KERNEL);
-+	drvdata = kzalloc(sizeof(*drvdata), GFP_KERNEL);
- 	if (!drvdata) {
- 		retval = -ENOMEM;
- 		goto failed0;
--- 
-2.14.2
+I see it inside imx6ul.dtsi, but even inside imx6ul.dtsi: does it make
+sense to have mmc alias?
+
+As far as I recall mmc alias are not supported.
