@@ -1,142 +1,79 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Mon, 16 Oct 2017 15:07:39 +0800
-Subject: [PATCH v5 2/7] soc: mediatek: pwrap: add pwrap_read32 for reading in
- 32-bit mode
+Date: Mon, 16 Oct 2017 15:07:44 +0800
+Subject: [PATCH v5 7/7] soc: mediatek: pwrap: fixup warnings from coding style
 In-Reply-To: <cover.1508135937.git.sean.wang@mediatek.com>
 References: <cover.1508135937.git.sean.wang@mediatek.com>
-Message-ID: <7a67dca4843196941e5fc2e03a7f71199a9a32a9.1508135937.git.sean.wang@mediatek.com>
+Message-ID: <e9ae9b01628924bb0715227064c307ffe613ae50.1508135937.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-Some regulators such as MediaTek MT6380 has to be read in 32-bit mode.
-So the patch adds pwrap_read32, rename old pwrap_read into pwrap_read16
-and one function pointer is introduced for increasing flexibility allowing
-the determination which mode is used by the pwrap slave detection through
-device tree.
+fixup those warnings such as lines over 80 words and parenthesis
+alignment which would be complained by checkpatch.pl.
 
-Signed-off-by: Chenglin Xu <chenglin.xu@mediatek.com>
-Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 ---
- drivers/soc/mediatek/mtk-pmic-wrap.c | 54 +++++++++++++++++++++++++++++++++++-
- 1 file changed, 53 insertions(+), 1 deletion(-)
+ drivers/soc/mediatek/mtk-pmic-wrap.c | 20 +++++++++++++-------
+ 1 file changed, 13 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-index c204838..db55f13 100644
+index 9ac304a..51b8894 100644
 --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
 +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-@@ -487,6 +487,7 @@ static int mt8135_regs[] = {
- 
- enum pmic_type {
- 	PMIC_MT6323,
-+	PMIC_MT6380,
- 	PMIC_MT6397,
- };
- 
-@@ -496,9 +497,15 @@ enum pwrap_type {
- 	PWRAP_MT8173,
- };
- 
-+struct pmic_wrapper;
- struct pwrap_slv_type {
- 	const u32 *dew_regs;
- 	enum pmic_type type;
-+	/* pwrap operations are highly associated with the PMIC types,
-+	 * so the pointers added increases flexibility allowing determination
-+	 * which type is used by the detection through device tree.
-+	 */
-+	int (*pwrap_read)(struct pmic_wrapper *wrp, u32 adr, u32 *rdata);
- };
- 
- struct pmic_wrapper {
-@@ -609,7 +616,7 @@ static int pwrap_write(struct pmic_wrapper *wrp, u32 adr, u32 wdata)
- 	return 0;
- }
- 
--static int pwrap_read(struct pmic_wrapper *wrp, u32 adr, u32 *rdata)
-+static int pwrap_read16(struct pmic_wrapper *wrp, u32 adr, u32 *rdata)
- {
- 	int ret;
- 
-@@ -632,6 +639,39 @@ static int pwrap_read(struct pmic_wrapper *wrp, u32 adr, u32 *rdata)
- 	return 0;
- }
- 
-+static int pwrap_read32(struct pmic_wrapper *wrp, u32 adr, u32 *rdata)
-+{
-+	int ret, msb;
-+
-+	*rdata = 0;
-+	for (msb = 0; msb < 2; msb++) {
-+		ret = pwrap_wait_for_state(wrp, pwrap_is_fsm_idle);
-+		if (ret) {
-+			pwrap_leave_fsm_vldclr(wrp);
-+			return ret;
-+		}
-+
-+		pwrap_writel(wrp, ((msb << 30) | (adr << 16)),
-+			     PWRAP_WACS2_CMD);
-+
-+		ret = pwrap_wait_for_state(wrp, pwrap_is_fsm_vldclr);
-+		if (ret)
-+			return ret;
-+
-+		*rdata += (PWRAP_GET_WACS_RDATA(pwrap_readl(wrp,
-+			   PWRAP_WACS2_RDATA)) << (16 * msb));
-+
-+		pwrap_writel(wrp, 1, PWRAP_WACS2_VLDCLR);
-+	}
-+
-+	return 0;
-+}
-+
-+static int pwrap_read(struct pmic_wrapper *wrp, u32 adr, u32 *rdata)
-+{
-+	return wrp->slave->pwrap_read(wrp, adr, rdata);
-+}
-+
- static int pwrap_regmap_read(void *context, u32 adr, u32 *rdata)
- {
- 	return pwrap_read(context, adr, rdata);
-@@ -752,6 +792,8 @@ static int pwrap_mt2701_init_reg_clock(struct pmic_wrapper *wrp)
- 		pwrap_writel(wrp, 0x2, PWRAP_CSLEXT_START);
- 		pwrap_writel(wrp, 0x2, PWRAP_CSLEXT_END);
- 		break;
-+	default:
-+		break;
+@@ -1101,7 +1101,8 @@ static int pwrap_init_cipher(struct pmic_wrapper *wrp)
+ 	/* wait for cipher data ready at PMIC */
+ 	ret = pwrap_wait_for_state(wrp, pwrap_is_pmic_cipher_ready);
+ 	if (ret) {
+-		dev_err(wrp->dev, "timeout waiting for cipher data ready at PMIC\n");
++		dev_err(wrp->dev,
++			"timeout waiting for cipher data ready at PMIC\n");
+ 		return ret;
  	}
  
- 	return 0;
-@@ -815,6 +857,8 @@ static int pwrap_init_cipher(struct pmic_wrapper *wrp)
- 		pwrap_write(wrp, wrp->slave->dew_regs[PWRAP_DEW_CIPHER_EN],
- 			    0x1);
- 		break;
-+	default:
-+		break;
+@@ -1496,23 +1497,27 @@ static int pwrap_probe(struct platform_device *pdev)
+ 		if (IS_ERR(wrp->bridge_base))
+ 			return PTR_ERR(wrp->bridge_base);
+ 
+-		wrp->rstc_bridge = devm_reset_control_get(wrp->dev, "pwrap-bridge");
++		wrp->rstc_bridge = devm_reset_control_get(wrp->dev,
++							  "pwrap-bridge");
+ 		if (IS_ERR(wrp->rstc_bridge)) {
+ 			ret = PTR_ERR(wrp->rstc_bridge);
+-			dev_dbg(wrp->dev, "cannot get pwrap-bridge reset: %d\n", ret);
++			dev_dbg(wrp->dev,
++				"cannot get pwrap-bridge reset: %d\n", ret);
+ 			return ret;
+ 		}
  	}
  
- 	/* wait for cipher data ready at AP */
-@@ -1035,11 +1079,19 @@ static const struct regmap_config pwrap_regmap_config = {
- static const struct pwrap_slv_type pmic_mt6323 = {
- 	.dew_regs = mt6323_regs,
- 	.type = PMIC_MT6323,
-+	.pwrap_read = pwrap_read16,
-+};
-+
-+static const struct pwrap_slv_type pmic_mt6380 = {
-+	.dew_regs = NULL,
-+	.type = PMIC_MT6380,
-+	.pwrap_read = pwrap_read32,
- };
+ 	wrp->clk_spi = devm_clk_get(wrp->dev, "spi");
+ 	if (IS_ERR(wrp->clk_spi)) {
+-		dev_dbg(wrp->dev, "failed to get clock: %ld\n", PTR_ERR(wrp->clk_spi));
++		dev_dbg(wrp->dev, "failed to get clock: %ld\n",
++			PTR_ERR(wrp->clk_spi));
+ 		return PTR_ERR(wrp->clk_spi);
+ 	}
  
- static const struct pwrap_slv_type pmic_mt6397 = {
- 	.dew_regs = mt6397_regs,
- 	.type = PMIC_MT6397,
-+	.pwrap_read = pwrap_read16,
- };
+ 	wrp->clk_wrap = devm_clk_get(wrp->dev, "wrap");
+ 	if (IS_ERR(wrp->clk_wrap)) {
+-		dev_dbg(wrp->dev, "failed to get clock: %ld\n", PTR_ERR(wrp->clk_wrap));
++		dev_dbg(wrp->dev, "failed to get clock: %ld\n",
++			PTR_ERR(wrp->clk_wrap));
+ 		return PTR_ERR(wrp->clk_wrap);
+ 	}
  
- static const struct of_device_id of_slave_match_tbl[] = {
+@@ -1557,8 +1562,9 @@ static int pwrap_probe(struct platform_device *pdev)
+ 	pwrap_writel(wrp, wrp->master->int_en_all, PWRAP_INT_EN);
+ 
+ 	irq = platform_get_irq(pdev, 0);
+-	ret = devm_request_irq(wrp->dev, irq, pwrap_interrupt, IRQF_TRIGGER_HIGH,
+-			"mt-pmic-pwrap", wrp);
++	ret = devm_request_irq(wrp->dev, irq, pwrap_interrupt,
++			       IRQF_TRIGGER_HIGH,
++			       "mt-pmic-pwrap", wrp);
+ 	if (ret)
+ 		goto err_out2;
+ 
 -- 
 2.7.4
