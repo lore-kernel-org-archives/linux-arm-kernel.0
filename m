@@ -1,51 +1,25 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 16 Oct 2017 16:28:39 +0100
-Subject: [PATCH 2/2] clocksource: arm_arch_timer: fix DEFINE_PER_CPU expansion
-In-Reply-To: <20171016152839.14964-1-mark.rutland@arm.com>
-References: <20171016152839.14964-1-mark.rutland@arm.com>
-Message-ID: <20171016152839.14964-3-mark.rutland@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 16 Oct 2017 16:30:56 +0100
+Subject: A issue about ptrace/SINGLESTEP on arm64
+In-Reply-To: <8ad32f6b-e04d-98f8-d944-7ec3582fbdf4@huawei.com>
+References: <8ad32f6b-e04d-98f8-d944-7ec3582fbdf4@huawei.com>
+Message-ID: <20171016153055.GD10500@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our ctags mangling script can't handle newlines inside of a
-DEFINE_PER_CPU(), leading to an annoying message whenever tags are
-built:
+On Mon, Oct 16, 2017 at 12:27:17PM +0800, chengjian (D) wrote:
+> Hi
+> I write demo use ptrace/SINGLESTEP to count the number of instructions
+> executed by the process
+> The parent process fork+exec a child process, and trace(SINGLESTEP) it,
+> 
+> It works fine under the x86_64 architecture but has an exception under
+> arm64.
 
-  ctags: Warning: drivers/clocksource/arm_arch_timer.c:302: null expansion of name pattern "\1"
+My guess is that you are getting stuck in an LDXR/STXR loop, which cannot
+be stepped. Can you jump the PC once the child appears to be "stuck"?
 
-This was dealt with elsewhere in commit:
+IIRC, GDB has special heuristics to step through LDXR/STXR critical
+sections.
 
-  25528213fe9f75f4 ("tags: Fix DEFINE_PER_CPU expansions")
-
-... by ensuring each DEFINE_PER_CPU() was contained on a single line,
-even where this would violate the usual code style (checkpatch warnings
-and all).
-
-Let's do the same for the arch timer driver, and get rid of the
-distraction.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- drivers/clocksource/arm_arch_timer.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 14e2419063e9..0ecf5beb56ec 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -299,8 +299,7 @@ static u64 notrace arm64_858921_read_cntvct_el0(void)
- #endif
- 
- #ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
--DEFINE_PER_CPU(const struct arch_timer_erratum_workaround *,
--	       timer_unstable_counter_workaround);
-+DEFINE_PER_CPU(const struct arch_timer_erratum_workaround *, timer_unstable_counter_workaround);
- EXPORT_SYMBOL_GPL(timer_unstable_counter_workaround);
- 
- DEFINE_STATIC_KEY_FALSE(arch_timer_read_ool_enabled);
--- 
-2.11.0
+Will
