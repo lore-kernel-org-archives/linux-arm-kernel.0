@@ -1,35 +1,21 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Mon, 16 Oct 2017 12:44:09 +0200
-Subject: [RESEND PATCH v2 4/5] drm/bridge/analogix: Do not use device's
- drvdata
-In-Reply-To: <20171016100640.26575-5-jeffy.chen@rock-chips.com>
-References: <20171016100640.26575-1-jeffy.chen@rock-chips.com>
- <CGME20171016100746epcas2p436f3573bcb862275aea1869aabe4ad17@epcas2p4.samsung.com>
- <20171016100640.26575-5-jeffy.chen@rock-chips.com>
-Message-ID: <be199812-9fc5-11ec-cca4-5b9fcff57070@samsung.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 16 Oct 2017 08:46:10 -0200
+Subject: [PATCH v3] cpufreq: imx6q: Move speed grading check to cpufreq
+ driver
+In-Reply-To: <5060748.qBWaaqo0sL@aspire.rjw.lan>
+References: <1506784606-2064-1-git-send-email-festevam@gmail.com>
+ <20171013065141.GI8833@dragon>
+ <CAOMZO5AwB_2Nbky1wA8neU2-2-LDCTCMFOKGQk4jn5O9zuwKpQ@mail.gmail.com>
+ <5060748.qBWaaqo0sL@aspire.rjw.lan>
+Message-ID: <CAOMZO5DTtE12znCVbA1YG=1ugggn1fqfbsuCXnkFTwV8b=yNEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.10.2017 12:06, Jeffy Chen wrote:
-> From: Tomasz Figa <tfiga@chromium.org>
->
-> The driver that instantiates the bridge should own the drvdata, as all
-> driver model callbacks (probe, remove, shutdown, PM ops, etc.) are also
-> owned by its driver struct. Moreover, storing two different pointer
-> types in driver data depending on driver initialization status is barely
-> a good practice and in fact has led to many bugs in this driver.
->
-> Let's clean up this mess and change Analogix entry points to simply
-> accept some opaque struct pointer, adjusting their users at the same
-> time to avoid breaking the compilation.
->
-> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+On Sun, Oct 15, 2017 at 10:13 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
 
-Thanks for making it a bit saner.
+> It could go in via the PM tree (which covers cpufreq), but I'd prefer
+> it to go in via arm-soc.
 
-Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+Sounds good for me. In this case I think Shawn will apply it.
 
-?--
-Regards
-Andrzej
+Thanks
