@@ -1,54 +1,31 @@
-From: kdinh@apm.com (Khuong Dinh)
-Date: Mon, 16 Oct 2017 14:19:50 -0700
-Subject: [PATCH v4 pci 0/2] PCI/MSI: pci-xgene-msi: Enable MSI support in
- ACPI boot for X-Gene v1
-In-Reply-To: <1506448161-30961-1-git-send-email-kdinh@apm.com>
-References: <1506448161-30961-1-git-send-email-kdinh@apm.com>
-Message-ID: <CAAsHzqv-oQVNm-pNP4Q1KmiSmjaiFx1S4j8uCnij53Te3h8KKg@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 16 Oct 2017 20:01:45 -0200
+Subject: [PATCH] ARM: dts: imx6qp-wandboard-revd1: Add sata support
+Message-ID: <1508191305-13747-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
-  Do you have any comments for this patch?
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Best regards,
-Khuong Dinh
+The imx6qp variant also has sata, so add support for it.
 
-On Tue, Sep 26, 2017 at 10:49 AM, Khuong Dinh <kdinh@apm.com> wrote:
-> This patch set enables ACPI MSI support for X-Gene PCIe v1 hardware
-> and provides the proper MSI driver initialization ordering.
->
-> Signed-off-by: Khuong Dinh <kdinh@apm.com>
-> ---
-> v4:
->  - Remove Marc Zyngier ACK in v2
->  - Use acpi_bus_scan on MSI controller handle when MSI device is found
->  - Register ACPI MSI driver when MSI device is found instead of using
->  subsys_initcall
->  - Split ACPI MSI driver support into two patches - one to enable MSI
-> support for X-Gene PCIe v1 hardware, one to enforce MSI driver loaded
-> before PCIe controller driver in ACPI boot mode
-> v3:
->  - Input X-Gene MSI base address for irq_domain_alloc_fwnode
->  - Add a hook to enforce X-Gene MSI be probed prior acpi_bus_scan happens
-> v2:
->  - Verify with BIOS version 3.06.25 and 3.07.09
-> v1:
->  - Initial version
-> ---
->
-> Khuong Dinh (2):
->   PCI/MSI: pci-xgene-msi: Enable MSI support in ACPI boot for X-Gene v1
->   PCI/MSI: Enforce MSI driver loaded before PCIe in ACPI boot
->
->  drivers/acpi/Makefile            |    2 +-
->  drivers/acpi/acpi_msi.c          |   86 ++++++++++++++++++++++++++++++++++++++
->  drivers/acpi/acpi_platform.c     |    3 +-
->  drivers/acpi/internal.h          |    1 +
->  drivers/acpi/scan.c              |    1 +
->  drivers/pci/host/pci-xgene-msi.c |   60 ++++++++++++++++++++++++--
->  include/linux/acpi_msi.h         |   37 ++++++++++++++++
->  7 files changed, 183 insertions(+), 7 deletions(-)
->  create mode 100644 drivers/acpi/acpi_msi.c
->  create mode 100644 include/linux/acpi_msi.h
->
+Reported-by: Lu?s Mendes <luis.p.mendes@gmail.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/boot/dts/imx6qp-wandboard-revd1.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6qp-wandboard-revd1.dts b/arch/arm/boot/dts/imx6qp-wandboard-revd1.dts
+index 7df5d96..f7badd8 100644
+--- a/arch/arm/boot/dts/imx6qp-wandboard-revd1.dts
++++ b/arch/arm/boot/dts/imx6qp-wandboard-revd1.dts
+@@ -20,3 +20,7 @@
+ 		reg = <0x10000000 0x80000000>;
+ 	};
+ };
++
++&sata {
++	status = "okay";
++};
+-- 
+2.7.4
