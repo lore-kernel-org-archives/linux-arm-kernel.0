@@ -1,51 +1,174 @@
 From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Mon, 16 Oct 2017 09:46:37 +0800
-Subject: [PATCH v6 10/12] mmc: mediatek: add latch-ck support
+Date: Mon, 16 Oct 2017 09:46:35 +0800
+Subject: [PATCH v6 08/12] mmc: mediatek: add stop_clk fix and enhance_rx
+ support
 In-Reply-To: <1508118399-21828-1-git-send-email-chaotian.jing@mediatek.com>
 References: <1508118399-21828-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <1508118399-21828-11-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <1508118399-21828-9-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-some platform(eg.mt2701) does not support "stop clk fix", in
-this case, need set correct latch-ck to avoid crc error caused
-by stop clock block-internally.
+mt2712 supports stop_clk fix and enhance_rx, which can improve
+host stability.
 
 Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
 ---
- drivers/mmc/host/mtk-sd.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/mmc/host/mtk-sd.c | 47 +++++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 43 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-index a2f26c9..d75a93d 100644
+index eceaee8..94d16a3 100644
 --- a/drivers/mmc/host/mtk-sd.c
 +++ b/drivers/mmc/host/mtk-sd.c
-@@ -378,6 +378,7 @@ struct msdc_host {
- 	u32 sclk;		/* SD/MS bus clock frequency */
- 	unsigned char timing;
- 	bool vqmmc_enabled;
-+	u32 latch_ck;
- 	u32 hs400_ds_delay;
- 	u32 hs200_cmd_int_delay; /* cmd internal delay for HS200/SDR104 */
- 	u32 hs400_cmd_int_delay; /* cmd internal delay for HS400 */
-@@ -1661,6 +1662,8 @@ static int msdc_tune_data(struct mmc_host *mmc, u32 opcode)
- 	u32 tune_reg = host->dev_comp->pad_tune_reg;
- 	int i, ret;
+@@ -67,6 +67,7 @@
+ #define SDC_RESP2        0x48
+ #define SDC_RESP3        0x4c
+ #define SDC_BLK_NUM      0x50
++#define SDC_ADV_CFG0     0x64
+ #define EMMC_IOCON       0x7c
+ #define SDC_ACMD_RESP    0x80
+ #define MSDC_DMA_SA      0x90
+@@ -80,6 +81,7 @@
+ #define PAD_DS_TUNE      0x188
+ #define PAD_CMD_TUNE     0x18c
+ #define EMMC50_CFG0      0x208
++#define SDC_FIFO_CFG     0x228
  
-+	sdr_set_field(host->base + MSDC_PATCH_BIT, MSDC_INT_DAT_LATCH_CK_SEL,
-+		      host->latch_ck);
- 	sdr_clr_bits(host->base + MSDC_IOCON, MSDC_IOCON_DSPL);
- 	sdr_clr_bits(host->base + MSDC_IOCON, MSDC_IOCON_W_DSPL);
- 	for (i = 0 ; i < PAD_DELAY_MAX; i++) {
-@@ -1773,6 +1776,9 @@ static void msdc_hw_reset(struct mmc_host *mmc)
- static void msdc_of_property_parse(struct platform_device *pdev,
- 				   struct msdc_host *host)
- {
-+	of_property_read_u32(pdev->dev.of_node, "mediatek,latch-ck",
-+			     &host->latch_ck);
+ /*--------------------------------------------------------------------------*/
+ /* Register Mask                                                            */
+@@ -188,6 +190,9 @@
+ #define SDC_STS_CMDBUSY         (0x1 << 1)	/* RW */
+ #define SDC_STS_SWR_COMPL       (0x1 << 31)	/* RW */
+ 
++/* SDC_ADV_CFG0 mask */
++#define SDC_RX_ENHANCE_EN	(0x1 << 20)	/* RW */
 +
- 	of_property_read_u32(pdev->dev.of_node, "hs400-ds-delay",
- 			     &host->hs400_ds_delay);
+ /* MSDC_DMA_CTRL mask */
+ #define MSDC_DMA_CTRL_START     (0x1 << 0)	/* W */
+ #define MSDC_DMA_CTRL_STOP      (0x1 << 1)	/* W */
+@@ -217,6 +222,8 @@
+ #define MSDC_PATCH_BIT_SPCPUSH    (0x1 << 29)	/* RW */
+ #define MSDC_PATCH_BIT_DECRCTMO   (0x1 << 30)	/* RW */
  
++#define MSDC_PATCH_BIT1_STOP_DLY  (0xf << 8)    /* RW */
++
+ #define MSDC_PATCH_BIT2_CFGRESP   (0x1 << 15)   /* RW */
+ #define MSDC_PATCH_BIT2_CFGCRCSTS (0x1 << 28)   /* RW */
+ #define MSDC_PB2_RESPWAIT         (0x3 << 2)    /* RW */
+@@ -242,6 +249,9 @@
+ #define EMMC50_CFG_CRCSTS_EDGE    (0x1 << 3)   /* RW */
+ #define EMMC50_CFG_CFCSTS_SEL     (0x1 << 4)   /* RW */
+ 
++#define SDC_FIFO_CFG_WRVALIDSEL   (0x1 << 24)  /* RW */
++#define SDC_FIFO_CFG_RDVALIDSEL   (0x1 << 25)  /* RW */
++
+ #define REQ_CMD_EIO  (0x1 << 0)
+ #define REQ_CMD_TMO  (0x1 << 1)
+ #define REQ_DAT_ERR  (0x1 << 2)
+@@ -308,6 +318,7 @@ struct msdc_save_para {
+ 	u32 pad_ds_tune;
+ 	u32 pad_cmd_tune;
+ 	u32 emmc50_cfg0;
++	u32 sdc_fifo_cfg;
+ };
+ 
+ struct mtk_mmc_compatible {
+@@ -317,6 +328,8 @@ struct mtk_mmc_compatible {
+ 	bool async_fifo;
+ 	bool data_tune;
+ 	bool busy_check;
++	bool stop_clk_fix;
++	bool enhance_rx;
+ };
+ 
+ struct msdc_tune_para {
+@@ -382,6 +395,8 @@ struct msdc_host {
+ 	.async_fifo = false,
+ 	.data_tune = false,
+ 	.busy_check = false,
++	.stop_clk_fix = false,
++	.enhance_rx = false,
+ };
+ 
+ static const struct mtk_mmc_compatible mt8173_compat = {
+@@ -391,6 +406,8 @@ struct msdc_host {
+ 	.async_fifo = false,
+ 	.data_tune = false,
+ 	.busy_check = false,
++	.stop_clk_fix = false,
++	.enhance_rx = false,
+ };
+ 
+ static const struct mtk_mmc_compatible mt2701_compat = {
+@@ -400,6 +417,8 @@ struct msdc_host {
+ 	.async_fifo = true,
+ 	.data_tune = true,
+ 	.busy_check = false,
++	.stop_clk_fix = false,
++	.enhance_rx = false,
+ };
+ 
+ static const struct mtk_mmc_compatible mt2712_compat = {
+@@ -409,6 +428,8 @@ struct msdc_host {
+ 	.async_fifo = true,
+ 	.data_tune = true,
+ 	.busy_check = true,
++	.stop_clk_fix = true,
++	.enhance_rx = true,
+ };
+ 
+ static const struct of_device_id msdc_of_ids[] = {
+@@ -1280,15 +1301,31 @@ static void msdc_init_hw(struct msdc_host *host)
+ 	sdr_set_field(host->base + MSDC_PATCH_BIT, MSDC_CKGEN_MSDC_DLY_SEL, 1);
+ 	writel(0xffff4089, host->base + MSDC_PATCH_BIT1);
+ 	sdr_set_bits(host->base + EMMC50_CFG0, EMMC50_CFG_CFCSTS_SEL);
++
++	if (host->dev_comp->stop_clk_fix) {
++		sdr_set_field(host->base + MSDC_PATCH_BIT1,
++			      MSDC_PATCH_BIT1_STOP_DLY, 3);
++		sdr_clr_bits(host->base + SDC_FIFO_CFG,
++			     SDC_FIFO_CFG_WRVALIDSEL);
++		sdr_clr_bits(host->base + SDC_FIFO_CFG,
++			     SDC_FIFO_CFG_RDVALIDSEL);
++	}
++
+ 	if (host->dev_comp->busy_check)
+ 		sdr_clr_bits(host->base + MSDC_PATCH_BIT1, (1 << 7));
++
+ 	if (host->dev_comp->async_fifo) {
+ 		sdr_set_field(host->base + MSDC_PATCH_BIT2,
+ 			      MSDC_PB2_RESPWAIT, 3);
+-		sdr_set_field(host->base + MSDC_PATCH_BIT2,
+-			      MSDC_PB2_RESPSTSENSEL, 2);
+-		sdr_set_field(host->base + MSDC_PATCH_BIT2,
+-			      MSDC_PB2_CRCSTSENSEL, 2);
++		if (host->dev_comp->enhance_rx) {
++			sdr_set_bits(host->base + SDC_ADV_CFG0,
++				     SDC_RX_ENHANCE_EN);
++		} else {
++			sdr_set_field(host->base + MSDC_PATCH_BIT2,
++				      MSDC_PB2_RESPSTSENSEL, 2);
++			sdr_set_field(host->base + MSDC_PATCH_BIT2,
++				      MSDC_PB2_CRCSTSENSEL, 2);
++		}
+ 		/* use async fifo, then no need tune internal delay */
+ 		sdr_clr_bits(host->base + MSDC_PATCH_BIT2,
+ 			     MSDC_PATCH_BIT2_CFGRESP);
+@@ -1933,6 +1970,7 @@ static void msdc_save_reg(struct msdc_host *host)
+ 	host->save_para.pad_ds_tune = readl(host->base + PAD_DS_TUNE);
+ 	host->save_para.pad_cmd_tune = readl(host->base + PAD_CMD_TUNE);
+ 	host->save_para.emmc50_cfg0 = readl(host->base + EMMC50_CFG0);
++	host->save_para.sdc_fifo_cfg = readl(host->base + SDC_FIFO_CFG);
+ }
+ 
+ static void msdc_restore_reg(struct msdc_host *host)
+@@ -1949,6 +1987,7 @@ static void msdc_restore_reg(struct msdc_host *host)
+ 	writel(host->save_para.pad_ds_tune, host->base + PAD_DS_TUNE);
+ 	writel(host->save_para.pad_cmd_tune, host->base + PAD_CMD_TUNE);
+ 	writel(host->save_para.emmc50_cfg0, host->base + EMMC50_CFG0);
++	writel(host->save_para.sdc_fifo_cfg, host->base + SDC_FIFO_CFG);
+ }
+ 
+ static int msdc_runtime_suspend(struct device *dev)
 -- 
 1.8.1.1.dirty
