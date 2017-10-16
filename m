@@ -1,50 +1,49 @@
 From: frowand.list@gmail.com (Frank Rowand)
-Date: Mon, 16 Oct 2017 15:44:07 -0700
-Subject: [RESEND][PATCH 0/4] firmware: of: populate /firmware/ node during
- init
-In-Reply-To: <1506595562-10592-1-git-send-email-sudeep.holla@arm.com>
+Date: Mon, 16 Oct 2017 15:44:33 -0700
+Subject: [RESEND][PATCH 1/4] of: platform: populate /firmware/ node from
+ of_platform_default_populate_init()
+In-Reply-To: <1506595562-10592-2-git-send-email-sudeep.holla@arm.com>
 References: <1506595562-10592-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <59E53637.8020502@gmail.com>
+ <1506595562-10592-2-git-send-email-sudeep.holla@arm.com>
+Message-ID: <59E53651.5070704@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 + me
 
 On 09/28/17 03:45, Sudeep Holla wrote:
-> Hi Rob, Arnd,
+> Since "/firmware" does not have its own "compatible" property as it's
+> just collection of nodes representing firmware interface, it's sub-nodes
+> are not populated during system initialization.
 > 
-> There's a push to place all firmware related device node under
-> /firmware/ node. However all the associated drivers are dealing with
-> device creation in their own ways. For example, qcom_scm, optee and
-> meson-sm drivers deal with the node in their own way. The SCMI drivers
-> I am about to add also needs to do the same. This small series is to
-> make it generic so that all the users of /firmware/ node need not
-> repeat the same.
+> Currently different firmware drivers search the /firmware/ node and
+> populate the sub-node devices selectively. Instead we can populate
+> the /firmware/ node during init to avoid more drivers continuing to
+> populate the devices selectively.
 > 
-> There was concern that /firmware in DT is fit for /sys/firmware in sysfs.
-> IMO anything exposed to userspace from such firmware interface must
-> be in "/sys/firmware", but I don't see any issue with kernel handling
-> them as platform device/driver internally.
+> To generalize the solution this patch populates the /firmware/ node
+> explicitly from of_platform_default_populate_init().
 > 
-> Sudeep Holla (4):
->   of: platform: populate /firmware/ node from
->     of_platform_default_populate_init()
->   firmware: qcom_scm: drop redandant of_platform_populate
->   drivers: tee: rework optee_driver_{init,exit} to use platform device
->   firmware: meson-sm: rework meson_sm_init to use
->     module_platform_driver_probe
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Rob Herring <robh@kernel.org>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  drivers/of/platform.c | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
->  drivers/firmware/meson/meson_sm.c | 21 ++++++-----
->  drivers/firmware/qcom_scm.c       | 24 -------------
->  drivers/of/platform.c             |  4 +++
->  drivers/tee/optee/core.c          | 74 +++++++++++++--------------------------
->  4 files changed, 41 insertions(+), 82 deletions(-)
-> 
-> --
-> 2.7.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index ac15d0e3d27d..3a213a6aee89 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -515,6 +515,10 @@ static int __init of_platform_default_populate_init(void)
+>  			of_platform_device_create(node, NULL, NULL);
+>  	}
+>  
+> +	node = of_find_node_by_path("/firmware");
+> +	if (node)
+> +		of_platform_populate(node, NULL, NULL, NULL);
+> +
+>  	/* Populate everything else. */
+>  	of_platform_default_populate(NULL, NULL, NULL);
+>  
 > 
