@@ -1,69 +1,46 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Mon, 16 Oct 2017 05:01:53 +0200
-Subject: [PATCH 3/3] arm64: dts: realtek: Add MeLE V9
-In-Reply-To: <20171016030153.11078-1-afaerber@suse.de>
-References: <20171016030153.11078-1-afaerber@suse.de>
-Message-ID: <20171016030153.11078-4-afaerber@suse.de>
+Date: Mon, 16 Oct 2017 05:01:50 +0200
+Subject: [PATCH 0/3] arm64: dts: Initial MeLE V9 support
+Message-ID: <20171016030153.11078-1-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an initial Device Tree for MeLE V9 Media Player.
+Hello,
+
+This mini-series adds a Device Tree for the MeLE V9 Android Media Player.
+
+Same as with PROBOX2 AVA, serial (loady) was the only working way to boot a new
+kernel from the vendor's U-Boot on this TV box.
+
+More details at:
+https://en.opensuse.org/HCL:Mele_V9
+
+@MeLE: Please review the following three patches and either signal your
+acknowledgement of my naming proposals with an "Acked-by: name <email>"
+response or point out any changes you would like to see applied. Thanks!
+
+Latest experimental patches at:
+https://github.com/afaerber/linux/commits/rtd1295-next
+
+Have a lot of fun!
+
+Cheers,
+Andreas
 
 Cc: meleservice at mele.cn
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
- arch/arm64/boot/dts/realtek/Makefile            |  1 +
- arch/arm64/boot/dts/realtek/rtd1295-mele-v9.dts | 31 +++++++++++++++++++++++++
- 2 files changed, 32 insertions(+)
+Cc: devicetree at vger.kernel.org
+
+Andreas F?rber (3):
+  dt-bindings: Add vendor prefix for MeLE
+  dt-bindings: arm: realtek: Document MeLE V9
+  arm64: dts: realtek: Add MeLE V9
+
+ Documentation/devicetree/bindings/arm/realtek.txt  |  1 +
+ .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+ arch/arm64/boot/dts/realtek/Makefile               |  1 +
+ arch/arm64/boot/dts/realtek/rtd1295-mele-v9.dts    | 31 ++++++++++++++++++++++
+ 4 files changed, 34 insertions(+)
  create mode 100644 arch/arm64/boot/dts/realtek/rtd1295-mele-v9.dts
 
-diff --git a/arch/arm64/boot/dts/realtek/Makefile b/arch/arm64/boot/dts/realtek/Makefile
-index cf93f4db7a69..c0b36ba64a1e 100644
---- a/arch/arm64/boot/dts/realtek/Makefile
-+++ b/arch/arm64/boot/dts/realtek/Makefile
-@@ -1,5 +1,6 @@
- dtb-$(CONFIG_ARCH_REALTEK) += rtd1293-ds418j.dtb
- 
-+dtb-$(CONFIG_ARCH_REALTEK) += rtd1295-mele-v9.dtb
- dtb-$(CONFIG_ARCH_REALTEK) += rtd1295-probox2-ava.dtb
- dtb-$(CONFIG_ARCH_REALTEK) += rtd1295-zidoo-x9s.dtb
- 
-diff --git a/arch/arm64/boot/dts/realtek/rtd1295-mele-v9.dts b/arch/arm64/boot/dts/realtek/rtd1295-mele-v9.dts
-new file mode 100644
-index 000000000000..bd584e99fff9
---- /dev/null
-+++ b/arch/arm64/boot/dts/realtek/rtd1295-mele-v9.dts
-@@ -0,0 +1,31 @@
-+/*
-+ * Copyright (c) 2017 Andreas F?rber
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+ */
-+
-+/dts-v1/;
-+
-+#include "rtd1295.dtsi"
-+
-+/ {
-+	compatible = "mele,v9", "realtek,rtd1295";
-+	model = "MeLE V9";
-+
-+	memory at 0 {
-+		device_type = "memory";
-+		reg = <0x0 0x80000000>;
-+	};
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
 -- 
 2.13.6
