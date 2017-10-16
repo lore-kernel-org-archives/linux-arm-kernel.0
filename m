@@ -1,9 +1,10 @@
 From: ulrich.hecht+renesas@gmail.com (Ulrich Hecht)
-Date: Mon, 16 Oct 2017 17:31:34 +0200
-Subject: [RFC v2 2/8] platform/chrome: ChromeOS firmware interface driver
+Date: Mon, 16 Oct 2017 17:31:35 +0200
+Subject: [RFC v2 3/8] drm/bridge: Parade PS8640 MIPI DSI -> eDP converter
+ driver
 In-Reply-To: <1508167900-27415-1-git-send-email-ulrich.hecht+renesas@gmail.com>
 References: <1508167900-27415-1-git-send-email-ulrich.hecht+renesas@gmail.com>
-Message-ID: <1508167900-27415-3-git-send-email-ulrich.hecht+renesas@gmail.com>
+Message-ID: <1508167900-27415-4-git-send-email-ulrich.hecht+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,747 +12,1155 @@ Ported from chromeos-3.18 kernel.
 
 Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 ---
- drivers/platform/chrome/Kconfig        |  18 +++
- drivers/platform/chrome/Makefile       |   2 +
- drivers/platform/chrome/chromeos.c     | 120 +++++++++++++++
- drivers/platform/chrome/chromeos.h     |  61 ++++++++
- drivers/platform/chrome/chromeos_arm.c | 264 +++++++++++++++++++++++++++++++++
- drivers/platform/chrome/elog.h         | 186 +++++++++++++++++++++++
- include/linux/chromeos_platform.h      |  27 ++++
- 7 files changed, 678 insertions(+)
- create mode 100644 drivers/platform/chrome/chromeos.c
- create mode 100644 drivers/platform/chrome/chromeos.h
- create mode 100644 drivers/platform/chrome/chromeos_arm.c
- create mode 100644 drivers/platform/chrome/elog.h
- create mode 100644 include/linux/chromeos_platform.h
+ drivers/gpu/drm/bridge/Kconfig         |   12 +
+ drivers/gpu/drm/bridge/Makefile        |    3 +
+ drivers/gpu/drm/bridge/parade-ps8640.c | 1104 ++++++++++++++++++++++++++++++++
+ 3 files changed, 1119 insertions(+)
+ create mode 100644 drivers/gpu/drm/bridge/parade-ps8640.c
 
-diff --git a/drivers/platform/chrome/Kconfig b/drivers/platform/chrome/Kconfig
-index 0ad6e29..f8b1876 100644
---- a/drivers/platform/chrome/Kconfig
-+++ b/drivers/platform/chrome/Kconfig
-@@ -14,6 +14,24 @@ menuconfig CHROME_PLATFORMS
+diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
+index 966f4eb..a1c0d95 100644
+--- a/drivers/gpu/drm/bridge/Kconfig
++++ b/drivers/gpu/drm/bridge/Kconfig
+@@ -26,6 +26,18 @@ config DRM_GENERIC_GPIO_MUX
+ 	  is active, reports it as a GPIO, and the driver redirects calls to the
+ 	  appropriate downstream bridge (if any).
  
- if CHROME_PLATFORMS
- 
-+config CHROMEOS
-+	bool
-+	depends on CHROMEOS_OF_FIRMWARE || (NVRAM && ACPI_CHROMEOS)
-+
-+	---help---
-+	  Provides abstracted interfaces to the firmware features provided on
-+	  ChromeOS devices. It depends on a lowlevel driver to implement the
-+	  firmware interface on the platform.
-+
-+config CHROMEOS_OF_FIRMWARE
-+	bool "ChromeOS firmware interface driver"
++config DRM_PARADE_PS8640
++	tristate "Parade PS8640 MIPI DSI to eDP Converter"
++	depends on DRM
 +	depends on OF
-+	select CHROMEOS
++	select DRM_KMS_HELPER
++	select DRM_MIPI_DSI
++	select DRM_PANEL
 +	---help---
-+	  This driver provides an interface to ChromeOS firmware.
++	  Choose this option if you have PS8640 for display
++	  The PS8640 is a high-performance and low-power
++	  MIPI DSI to eDP converter
 +
-+	  Say Y here if you are building for a ChromeOS device.
+ config DRM_ANALOGIX_ANX78XX
+ 	tristate "Analogix ANX78XX bridge"
+ 	select DRM_KMS_HELPER
+diff --git a/drivers/gpu/drm/bridge/Makefile b/drivers/gpu/drm/bridge/Makefile
+index 2d5652e..6be8a9d 100644
+--- a/drivers/gpu/drm/bridge/Makefile
++++ b/drivers/gpu/drm/bridge/Makefile
+@@ -1,3 +1,6 @@
++ccflags-y := -Iinclude/drm
 +
- config CHROMEOS_LAPTOP
- 	tristate "Chrome OS Laptop"
- 	depends on I2C && DMI && X86
-diff --git a/drivers/platform/chrome/Makefile b/drivers/platform/chrome/Makefile
-index 66c345c..f10a7b6 100644
---- a/drivers/platform/chrome/Makefile
-+++ b/drivers/platform/chrome/Makefile
-@@ -1,4 +1,6 @@
- 
-+obj-$(CONFIG_CHROMEOS)		+= chromeos.o
-+obj-$(CONFIG_CHROMEOS_OF_FIRMWARE) += chromeos_arm.o
- obj-$(CONFIG_CHROMEOS_LAPTOP)		+= chromeos_laptop.o
- obj-$(CONFIG_CHROMEOS_PSTORE)		+= chromeos_pstore.o
- cros_ec_devs-objs			:= cros_ec_dev.o cros_ec_sysfs.o \
-diff --git a/drivers/platform/chrome/chromeos.c b/drivers/platform/chrome/chromeos.c
++obj-$(CONFIG_DRM_PARADE_PS8640) += parade-ps8640.o
+ obj-$(CONFIG_DRM_ANALOGIX_ANX78XX) += analogix-anx78xx.o
+ obj-$(CONFIG_DRM_GENERIC_GPIO_MUX) += generic-gpio-mux.o
+ obj-$(CONFIG_DRM_DUMB_VGA_DAC) += dumb-vga-dac.o
+diff --git a/drivers/gpu/drm/bridge/parade-ps8640.c b/drivers/gpu/drm/bridge/parade-ps8640.c
 new file mode 100644
-index 0000000..8b01630
+index 0000000..8489f6c
 --- /dev/null
-+++ b/drivers/platform/chrome/chromeos.c
-@@ -0,0 +1,120 @@
++++ b/drivers/gpu/drm/bridge/parade-ps8640.c
+@@ -0,0 +1,1104 @@
 +/*
-+ *  ChromeOS platform support code. Glue layer between higher level functions
-+ *  and per-platform firmware interfaces.
-+ *
-+ *  Copyright (C) 2010 The Chromium OS Authors
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License as published by
-+ *  the Free Software Foundation; either version 2 of the License, or
-+ *  (at your option) any later version.
-+ *
-+ *  This program is distributed in the hope that it will be useful,
-+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *  GNU General Public License for more details.
-+ *
-+ *  You should have received a copy of the GNU General Public License
-+ *  along with this program; if not, write to the Free Software
-+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ */
-+
-+#include <linux/types.h>
-+#include <linux/chromeos_platform.h>
-+#include <linux/module.h>
-+#include "chromeos.h"
-+
-+static struct chromeos_vbc *chromeos_vbc_ptr;
-+
-+static int vbc_read(u8 *buf, int buf_size);
-+static int vbc_write_byte(unsigned offset, u8 value);
-+
-+/* the following defines are copied from
-+ * vboot_reference:firmware/lib/vboot_nvstorage.c.
-+ */
-+#define RECOVERY_OFFSET              2
-+#define VBNV_RECOVERY_RW_INVALID_OS  0x43
-+
-+int chromeos_set_need_recovery(void)
-+{
-+	if (!chromeos_legacy_set_need_recovery())
-+		return 0;
-+
-+	return vbc_write_byte(RECOVERY_OFFSET, VBNV_RECOVERY_RW_INVALID_OS);
-+}
-+EXPORT_SYMBOL(chromeos_set_need_recovery);
-+
-+/*
-+ * Lifted from vboot_reference:firmware/lib/vboot_nvstorage.c and formatted.
-+ *
-+ * Return CRC-8 of the data, using x^8 + x^2 + x + 1 polynomial. A table-based
-+ * algorithm would be faster, but for only 15 bytes isn't worth the code size.
-+ */
-+static u8 crc8(const u8 *data, int len)
-+{
-+	unsigned crc = 0;
-+	int i, j;
-+
-+	for (j = len; j; j--, data++) {
-+		crc ^= (*data << 8);
-+		for (i = 8; i; i--) {
-+			if (crc & 0x8000)
-+				crc ^= (0x1070 << 3);
-+			crc <<= 1;
-+		}
-+	}
-+	return (u8)(crc >> 8);
-+}
-+
-+static int vbc_write_byte(unsigned offset, u8 value)
-+{
-+	u8 buf[MAX_VBOOT_CONTEXT_BUFFER_SIZE];
-+	ssize_t size;
-+
-+	if (!chromeos_vbc_ptr)
-+		return -ENOSYS;
-+
-+	size = vbc_read(buf, sizeof(buf));
-+	if (size <= 0)
-+		return -EINVAL;
-+
-+	if (offset >= (size - 1))
-+		return -EINVAL;
-+
-+	if (buf[offset] == value)
-+		return 0;
-+
-+	buf[offset] = value;
-+	buf[size - 1] = crc8(buf, size - 1);
-+
-+	return chromeos_vbc_ptr->write(buf, size);
-+}
-+
-+/*
-+ * Read vboot context and verify it.  If everything checks out, return number
-+ * of bytes in the vboot context buffer, -1 on any error (uninitialized
-+ * subsystem, corrupted crc8 value, not enough room in the buffer, etc.).
-+ */
-+static int vbc_read(u8 *buf, int buf_size)
-+{
-+	ssize_t size;
-+
-+	if (!chromeos_vbc_ptr)
-+		return -ENOSYS;
-+
-+	size = chromeos_vbc_ptr->read(buf, buf_size);
-+	if (size <= 0)
-+		return -1;
-+
-+	if (buf[size - 1] != crc8(buf, size - 1)) {
-+		pr_err("%s: vboot context contents corrupted\n", __func__);
-+		return -1;
-+	}
-+	return size;
-+}
-+
-+int chromeos_vbc_register(struct chromeos_vbc *chromeos_vbc)
-+{
-+	chromeos_vbc_ptr = chromeos_vbc;
-+	return 0;
-+}
-diff --git a/drivers/platform/chrome/chromeos.h b/drivers/platform/chrome/chromeos.h
-new file mode 100644
-index 0000000..8f4384a
---- /dev/null
-+++ b/drivers/platform/chrome/chromeos.h
-@@ -0,0 +1,61 @@
-+/*
-+ *  Copyright (C) 2011 The Chromium OS Authors
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License as published by
-+ *  the Free Software Foundation; either version 2 of the License, or
-+ *  (at your option) any later version.
-+ *
-+ *  This program is distributed in the hope that it will be useful,
-+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *  GNU General Public License for more details.
-+ *
-+ *  You should have received a copy of the GNU General Public License
-+ *  along with this program; if not, write to the Free Software
-+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ */
-+#ifndef _DRIVERS_PLATFORM_CHROMEOS_H
-+#define _DRIVERS_PLATFORM_CHROMEOS_H
-+
-+#define MAX_VBOOT_CONTEXT_BUFFER_SIZE 64  /* Should be enough for anything. */
-+
-+#ifdef CONFIG_ACPI_CHROMEOS
-+extern int chromeos_legacy_set_need_recovery(void);
-+#else
-+static inline int chromeos_legacy_set_need_recovery(void) { return -ENODEV; }
-+#endif
-+
-+struct chromeos_vbc {
-+	/**
-+	 * Read vboot context to buffer
-+	 *
-+	 * @param buf		Pointer to buffer for storing vboot context
-+	 * @param count		Size of buffer
-+	 * @return	on success, the number of bytes read is returned and
-+	 *		on error, -err is returned.
-+	 */
-+	ssize_t (*read)(void *buf, size_t count);
-+
-+	/**
-+	 * Write vboot context from buffer
-+	 *
-+	 * @param buf		Pointer to buffer of new vboot context content
-+	 * @param count		Size of buffer
-+	 * @return	on success, the number of bytes written is returned and
-+	 *		on error, -err is returned.
-+	 */
-+	ssize_t (*write)(const void *buf, size_t count);
-+
-+	const char *name;
-+};
-+
-+/**
-+ * Register chromeos_vbc callbacks.
-+ *
-+ * @param chromeos_vbc	Pointer to struct holding callbacks
-+ * @return	on success, return 0, on error, -err is returned.
-+ */
-+int chromeos_vbc_register(struct chromeos_vbc *chromeos_vbc);
-+
-+#endif /* _DRIVERS_PLATFORM_CHROMEOS_H */
-diff --git a/drivers/platform/chrome/chromeos_arm.c b/drivers/platform/chrome/chromeos_arm.c
-new file mode 100644
-index 0000000..337e24d
---- /dev/null
-+++ b/drivers/platform/chrome/chromeos_arm.c
-@@ -0,0 +1,264 @@
-+/*
-+ *  Copyright (C) 2011 The Chromium OS Authors
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License as published by
-+ *  the Free Software Foundation; either version 2 of the License, or
-+ *  (at your option) any later version.
-+ *
-+ *  This program is distributed in the hope that it will be useful,
-+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *  GNU General Public License for more details.
-+ *
-+ *  You should have received a copy of the GNU General Public License
-+ *  along with this program; if not, write to the Free Software
-+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ */
-+
-+#define pr_fmt(fmt) "chromeos_arm: " fmt
-+
-+#include <linux/bcd.h>
-+#include <linux/gpio.h>
-+#include <linux/notifier.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_gpio.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+
-+#include "chromeos.h"
-+#include "elog.h"
-+
-+struct chromeos_arm_elog_panic_buffer {
-+	uint32_t start;
-+	uint32_t size;
-+	void __iomem *virt_addr;
-+	struct notifier_block nb;
-+};
-+
-+/*
-+ * Update the checksum at the last byte
-+ */
-+static void elog_update_checksum(struct event_header *event, u8 checksum)
-+{
-+	u8 *event_data = (u8 *)event;
-+	event_data[event->length - 1] = checksum;
-+}
-+
-+/*
-+ * Simple byte checksum for events
-+ */
-+static u8 elog_checksum_event(struct event_header *event)
-+{
-+	u8 index, checksum = 0;
-+	u8 *data = (u8 *)event;
-+
-+	for (index = 0; index < event->length; index++)
-+		checksum += data[index];
-+	return checksum;
-+}
-+
-+/*
-+ * Populate timestamp in event header with current time
-+ */
-+static void elog_fill_timestamp(struct event_header *event)
-+{
-+	struct timeval timeval;
-+	struct tm time;
-+
-+	do_gettimeofday(&timeval);
-+	time_to_tm(timeval.tv_sec, 0, &time);
-+
-+	event->second = bin2bcd(time.tm_sec);
-+	event->minute = bin2bcd(time.tm_min);
-+	event->hour   = bin2bcd(time.tm_hour);
-+	event->day    = bin2bcd(time.tm_mday);
-+	event->month  = bin2bcd(time.tm_mon + 1);
-+	event->year   = bin2bcd(time.tm_year % 100);
-+}
-+
-+/*
-+ * Fill out an event structure with space for the data and checksum.
-+ */
-+void elog_prepare_event(struct event_header *event, u8 event_type, void *data,
-+			u8 data_size)
-+{
-+	event->type = event_type;
-+	event->length = sizeof(*event) + data_size + 1;
-+	elog_fill_timestamp(event);
-+
-+	if (data_size)
-+		memcpy(&event[1], data, data_size);
-+
-+	/* Zero the checksum byte and then compute checksum */
-+	elog_update_checksum(event, 0);
-+	elog_update_checksum(event, -(elog_checksum_event(event)));
-+}
-+
-+static int chromeos_arm_elog_panic(struct notifier_block *this,
-+				   unsigned long p_event, void *ptr)
-+{
-+	struct chromeos_arm_elog_panic_buffer *buf;
-+	uint32_t reason = ELOG_SHUTDOWN_PANIC;
-+	const u8 data_size = sizeof(reason);
-+	union {
-+		struct event_header hdr;
-+		u8 bytes[sizeof(struct event_header) + data_size + 1];
-+	} event;
-+
-+	buf = container_of(this, struct chromeos_arm_elog_panic_buffer, nb);
-+	elog_prepare_event(&event.hdr, ELOG_TYPE_OS_EVENT, &reason, data_size);
-+	memcpy_toio(buf->virt_addr, event.bytes, sizeof(event.bytes));
-+
-+	return NOTIFY_DONE;
-+}
-+
-+static int chromeos_arm_panic_init(struct platform_device *pdev, u32 start,
-+				   u32 size)
-+{
-+	int ret = -EINVAL;
-+	struct chromeos_arm_elog_panic_buffer *buf;
-+
-+	buf = kmalloc(sizeof(*buf), GFP_KERNEL);
-+	if (!buf) {
-+		dev_err(&pdev->dev, "failed to allocate panic notifier.\n");
-+		ret = -ENOMEM;
-+		goto fail1;
-+	}
-+
-+	buf->start = start;
-+	buf->size = size;
-+	buf->nb.notifier_call = chromeos_arm_elog_panic;
-+
-+	if (!request_mem_region(start, size, "elog panic event")) {
-+		dev_err(&pdev->dev, "failed to request panic event buffer.\n");
-+		goto fail2;
-+	}
-+
-+	buf->virt_addr = ioremap(start, size);
-+	if (!buf->virt_addr) {
-+		dev_err(&pdev->dev, "failed to map panic event buffer.\n");
-+		goto fail3;
-+	}
-+
-+	atomic_notifier_chain_register(&panic_notifier_list, &buf->nb);
-+
-+	platform_set_drvdata(pdev, buf);
-+
-+	return 0;
-+
-+fail3:
-+	release_mem_region(start, size);
-+fail2:
-+	kfree(buf);
-+fail1:
-+	return ret;
-+}
-+
-+static int dt_gpio_init(struct platform_device *pdev, const char *of_list_name,
-+			const char *gpio_desc_name, const char *sysfs_name)
-+{
-+	int gpio, err, active_low;
-+	enum of_gpio_flags flags;
-+	struct device_node *np = pdev->dev.of_node;
-+
-+	gpio = of_get_named_gpio_flags(np, of_list_name, 0, &flags);
-+	if (!gpio_is_valid(gpio)) {
-+		dev_err(&pdev->dev, "invalid %s descriptor\n", of_list_name);
-+		return -EINVAL;
-+	}
-+
-+	err = gpio_request_one(gpio, GPIOF_DIR_IN, gpio_desc_name);
-+	if (err)
-+		return err;
-+
-+	active_low = !!(flags & OF_GPIO_ACTIVE_LOW);
-+//	err = gpio_sysfs_set_active_low(gpio, active_low);
-+//	if (err)
-+//		return err;
-+
-+	gpio_export(gpio, 0);
-+	gpio_export_link(&pdev->dev, sysfs_name, gpio);
-+	return 0;
-+}
-+
-+static int chromeos_arm_probe(struct platform_device *pdev)
-+{
-+	int err;
-+	u32 elog_panic_event[2];
-+	struct device_node *np = pdev->dev.of_node;
-+
-+	if (!np) {
-+		err = -ENODEV;
-+		goto err;
-+	}
-+
-+	err = dt_gpio_init(pdev, "write-protect-gpio",
-+			   "firmware-write-protect", "write-protect");
-+	if (err)
-+		goto err;
-+	err = dt_gpio_init(pdev, "recovery-switch",
-+			   "firmware-recovery-switch", "recovery-switch");
-+	err = dt_gpio_init(pdev, "developer-switch",
-+			   "firmware-developer-switch", "developer-switch");
-+
-+	if (!of_property_read_u32_array(np, "elog-panic-event",
-+					elog_panic_event,
-+					ARRAY_SIZE(elog_panic_event))) {
-+		err = chromeos_arm_panic_init(pdev, elog_panic_event[0],
-+					      elog_panic_event[1]);
-+		if (err)
-+			goto err;
-+	}
-+
-+	dev_info(&pdev->dev, "chromeos system detected\n");
-+
-+	err = 0;
-+err:
-+	of_node_put(np);
-+
-+	return err;
-+}
-+
-+static int chromeos_arm_remove(struct platform_device *pdev)
-+{
-+	struct chromeos_arm_elog_panic_buffer *buf;
-+
-+	buf = platform_get_drvdata(pdev);
-+	platform_set_drvdata(pdev, NULL);
-+	if (buf) {
-+		atomic_notifier_chain_unregister(&panic_notifier_list,
-+						 &buf->nb);
-+		release_mem_region(buf->start, buf->size);
-+		iounmap(buf->virt_addr);
-+		kfree(buf);
-+	}
-+	return 0;
-+}
-+
-+static struct platform_driver chromeos_arm_driver = {
-+	.probe = chromeos_arm_probe,
-+	.remove = chromeos_arm_remove,
-+	.driver = {
-+		.name = "chromeos_arm",
-+	},
-+};
-+
-+static int __init chromeos_arm_init(void)
-+{
-+	struct device_node *fw_dn;
-+	struct platform_device *pdev;
-+
-+	fw_dn = of_find_compatible_node(NULL, NULL, "chromeos-firmware");
-+	if (!fw_dn)
-+		return -ENODEV;
-+
-+	pdev = platform_device_register_simple("chromeos_arm", -1, NULL, 0);
-+	pdev->dev.of_node = fw_dn;
-+
-+	platform_driver_register(&chromeos_arm_driver);
-+
-+	return 0;
-+}
-+subsys_initcall(chromeos_arm_init);
-diff --git a/drivers/platform/chrome/elog.h b/drivers/platform/chrome/elog.h
-new file mode 100644
-index 0000000..84b005f
---- /dev/null
-+++ b/drivers/platform/chrome/elog.h
-@@ -0,0 +1,186 @@
-+/*
-+ * This file is part of the coreboot project.
-+ *
-+ * Copyright (C) 2012 The ChromiumOS Authors.  All rights reserved.
++ * Copyright (c) 2016 MediaTek Inc.
 + *
 + * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; version 2 of the License.
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + *
 + * This program is distributed in the hope that it will be useful,
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA, 02110-1301 USA
 + */
 +
-+#ifndef ELOG_H_
-+#define ELOG_H_
++#include <linux/delay.h>
++#include <linux/err.h>
++#include <linux/firmware.h>
++#include <linux/gpio.h>
++#include <linux/gpio/consumer.h>
++#include <linux/i2c.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_gpio.h>
++#include <linux/of_graph.h>
++#include <linux/regulator/consumer.h>
++#include <asm/unaligned.h>
++#include <drm/drm_panel.h>
 +
-+/* SMI command code for GSMI event logging */
-+#define ELOG_GSMI_APM_CNT                 0xEF
++#include <drmP.h>
++#include <drm_atomic_helper.h>
++#include <drm_crtc_helper.h>
++#include <drm_crtc.h>
++#include <drm_edid.h>
++#include <drm_mipi_dsi.h>
 +
-+#define MAX_EVENT_SIZE                    0x7F
++#define PAGE1_VSTART		0x6b
++#define PAGE2_SPI_CFG3		0x82
++#define I2C_TO_SPI_RESET	0x20
++#define PAGE2_ROMADD_BYTE1	0x8e
++#define PAGE2_ROMADD_BYTE2	0x8f
++#define PAGE2_SWSPI_WDATA	0x90
++#define PAGE2_SWSPI_RDATA	0x91
++#define PAGE2_SWSPI_LEN		0x92
++#define PAGE2_SWSPI_CTL		0x93
++#define TRIGGER_NO_READBACK	0x05
++#define TRIGGER_READBACK	0x01
++#define PAGE2_SPI_STATUS	0x9e
++#define SPI_READY		0x0c
++#define PAGE2_GPIO_L		0xa6
++#define PAGE2_GPIO_H		0xa7
++#define PS_GPIO9		BIT(1)
++#define PAGE2_IROM_CTRL		0xb0
++#define IROM_ENABLE		0xc0
++#define IROM_DISABLE		0x80
++#define PAGE2_SW_RESET		0xbc
++#define SPI_SW_RESET		BIT(7)
++#define MPU_SW_RESET		BIT(6)
++#define PAGE2_ENCTLSPI_WR	0xda
++#define PAGE2_I2C_BYPASS	0xea
++#define I2C_BYPASS_EN		0xd0
++#define PAGE2_MCS_EN		0xf3
++#define MCS_EN			BIT(0)
++#define PAGE3_SET_ADD		0xfe
++#define PAGE3_SET_VAL		0xff
++#define VDO_CTL_ADD		0x13
++#define VDO_DIS			0x18
++#define VDO_EN			0x1c
++#define PAGE4_REV_L		0xf0
++#define PAGE4_REV_H		0xf1
++#define PAGE4_CHIP_L		0xf2
++#define PAGE4_CHIP_H		0xf3
 +
-+/* End of log */
-+#define ELOG_TYPE_EOL                     0xFF
++/* Firmware */
++#define SPI_MAX_RETRY_CNT	8
++#define PS_FW_NAME		"ps864x_fw.bin"
 +
-+/*
-+ * Standard SMBIOS event log types below 0x80
-+ */
-+#define ELOG_TYPE_UNDEFINED_EVENT         0x00
-+#define ELOG_TYPE_SINGLE_BIT_ECC_MEM_ERR  0x01
-+#define ELOG_TYPE_MULTI_BIT_ECC_MEM_ERR   0x02
-+#define ELOG_TYPE_MEM_PARITY_ERR          0x03
-+#define ELOG_TYPE_BUS_TIMEOUT             0x04
-+#define ELOG_TYPE_IO_CHECK                0x05
-+#define ELOG_TYPE_SW_NMI                  0x06
-+#define ELOG_TYPE_POST_MEM_RESIZE         0x07
-+#define ELOG_TYPE_POST_ERR                0x08
-+#define ELOG_TYPE_PCI_PERR                0x09
-+#define ELOG_TYPE_PCI_SERR                0x0A
-+#define ELOG_TYPE_CPU_FAIL                0x0B
-+#define ELOG_TYPE_EISA_TIMEOUT            0x0C
-+#define ELOG_TYPE_CORRECTABLE_MEMLOG_DIS  0x0D
-+#define ELOG_TYPE_LOG_DISABLED            0x0E
-+#define ELOG_TYPE_UNDEFINED_EVENT2        0x0F
-+#define ELOG_TYPE_SYS_LIMIT_EXCEED        0x10
-+#define ELOG_TYPE_ASYNC_HW_TIMER_EXPIRED  0x11
-+#define ELOG_TYPE_SYS_CONFIG_INFO         0x12
-+#define ELOG_TYPE_HDD_INFO                0x13
-+#define ELOG_TYPE_SYS_RECONFIG            0x14
-+#define ELOG_TYPE_CPU_ERROR               0x15
-+#define ELOG_TYPE_LOG_CLEAR               0x16
-+#define ELOG_TYPE_BOOT                    0x17
++#define FW_CHIP_ID_OFFSET	0
++#define FW_VERSION_OFFSET	2
++#define EDID_I2C_ADDR		0x50
 +
-+/*
-+ * Extended defined OEM event types start at 0x80
-+ */
++#define WRITE_STATUS_REG_CMD	0x01
++#define READ_STATUS_REG_CMD	0x05
++#define BUSY			BIT(0)
++#define CLEAR_ALL_PROTECT	0x00
++#define BLK_PROTECT_BITS	0x0c
++#define STATUS_REG_PROTECT	BIT(7)
++#define WRITE_ENABLE_CMD	0x06
++#define CHIP_ERASE_CMD		0xc7
++#define MAX_DEVS		0x8
++struct ps8640_info {
++	u8 family_id;
++	u8 variant_id;
++	u16 version;
++};
 +
-+/* OS/kernel events */
-+#define ELOG_TYPE_OS_EVENT                0x81
-+#define  ELOG_SHUTDOWN_CLEAN              0    /* Clean Shutdown */
-+#define  ELOG_SHUTDOWN_NMIWDT             1    /* NMI Watchdog */
-+#define  ELOG_SHUTDOWN_PANIC              2    /* Panic */
-+#define  ELOG_SHUTDOWN_OOPS               3    /* Oops */
-+#define  ELOG_SHUTDOWN_DIE                4    /* Die - No longer meaningful */
-+#define  ELOG_SHUTDOWN_MCE                5    /* Machine Check */
-+#define  ELOG_SHUTDOWN_SOFTWDT            6    /* Software Watchdog */
-+#define  ELOG_SHUTDOWN_MBE                7    /* Uncorrected ECC */
-+#define  ELOG_SHUTDOWN_TRIPLE             8    /* Triple Fault */
-+#define  ELOG_SHUTDOWN_THERMAL            9    /* Critical Thermal Threshold */
++struct ps8640 {
++	struct drm_connector connector;
++	struct drm_bridge bridge;
++	struct edid *edid;
++	struct mipi_dsi_device dsi;
++	struct i2c_client *page[MAX_DEVS];
++	struct i2c_client *ddc_i2c;
++	struct regulator *v33;
++	struct regulator *v12;
++	struct drm_panel *panel;
++	struct gpio_desc *gpio_rst_n;
++	struct gpio_desc *gpio_slp_n;
++	struct gpio_desc *gpio_mode_sel_n;
++	bool enabled;
 +
-+/* Last event from coreboot */
-+#define ELOG_TYPE_OS_BOOT                 0x90
++	/* firmware file info */
++	struct ps8640_info info;
++	bool in_fw_update;
++	/* for firmware update protect */
++	struct mutex fw_mutex;
++};
 +
-+/* Embedded controller event */
-+#define ELOG_TYPE_EC_EVENT                0x91
-+#define EC_EVENT_LID_CLOSED                0x01
-+#define EC_EVENT_LID_OPEN                  0x02
-+#define EC_EVENT_POWER_BUTTON              0x03
-+#define EC_EVENT_AC_CONNECTED              0x04
-+#define EC_EVENT_AC_DISCONNECTED           0x05
-+#define EC_EVENT_BATTERY_LOW               0x06
-+#define EC_EVENT_BATTERY_CRITICAL          0x07
-+#define EC_EVENT_BATTERY                   0x08
-+#define EC_EVENT_THERMAL_THRESHOLD         0x09
-+#define EC_EVENT_THERMAL_OVERLOAD          0x0a
-+#define EC_EVENT_THERMAL                   0x0b
-+#define EC_EVENT_USB_CHARGER               0x0c
-+#define EC_EVENT_KEY_PRESSED               0x0d
-+#define EC_EVENT_INTERFACE_READY           0x0e
-+#define EC_EVENT_KEYBOARD_RECOVERY         0x0f
-+#define EC_EVENT_THERMAL_SHUTDOWN          0x10
-+#define EC_EVENT_BATTERY_SHUTDOWN          0x11
-+#define EC_EVENT_FAN_ERROR                 0x12
++static const u8 enc_ctrl_code[6] = { 0xaa, 0x55, 0x50, 0x41, 0x52, 0x44 };
++static const u8 hw_chip_id[4] = { 0x00, 0x0a, 0x00, 0x30 };
 +
-+/* Power */
-+#define ELOG_TYPE_POWER_FAIL              0x92
-+#define ELOG_TYPE_SUS_POWER_FAIL          0x93
-+#define ELOG_TYPE_PWROK_FAIL              0x94
-+#define ELOG_TYPE_SYS_PWROK_FAIL          0x95
-+#define ELOG_TYPE_POWER_ON                0x96
-+#define ELOG_TYPE_POWER_BUTTON            0x97
-+#define ELOG_TYPE_POWER_BUTTON_OVERRIDE   0x98
-+
-+/* Reset */
-+#define ELOG_TYPE_RESET_BUTTON            0x99
-+#define ELOG_TYPE_SYSTEM_RESET            0x9a
-+#define ELOG_TYPE_RTC_RESET               0x9b
-+#define ELOG_TYPE_TCO_RESET               0x9c
-+
-+/* Sleep/Wake */
-+#define ELOG_TYPE_ACPI_ENTER              0x9d
-+#define ELOG_TYPE_ACPI_WAKE               0x9e
-+#define ELOG_TYPE_WAKE_SOURCE             0x9f
-+#define  ELOG_WAKE_SOURCE_PCIE             0x00
-+#define  ELOG_WAKE_SOURCE_PME              0x01
-+#define  ELOG_WAKE_SOURCE_PME_INTERNAL     0x02
-+#define  ELOG_WAKE_SOURCE_RTC              0x03
-+#define  ELOG_WAKE_SOURCE_GPIO             0x04
-+#define  ELOG_WAKE_SOURCE_SMBUS            0x05
-+#define  ELOG_WAKE_SOURCE_PWRBTN           0x06
-+struct elog_event_data_wake {
-+	u8 source;
-+	u32 instance;
-+} __packed;
-+
-+/* Chrome OS related events */
-+#define ELOG_TYPE_CROS_DEVELOPER_MODE     0xa0
-+#define ELOG_TYPE_CROS_RECOVERY_MODE      0xa1
-+#define  ELOG_CROS_RECOVERY_MODE_BUTTON    0x02
-+
-+/* Management Engine Events */
-+#define ELOG_TYPE_MANAGEMENT_ENGINE       0xa2
-+#define ELOG_TYPE_MANAGEMENT_ENGINE_EXT   0xa4
-+struct elog_event_data_me_extended {
-+	u8 current_working_state;
-+	u8 operation_state;
-+	u8 operation_mode;
-+	u8 error_code;
-+	u8 progress_code;
-+	u8 current_pmevent;
-+	u8 current_state;
-+} __packed;
-+
-+/* Last post code from previous boot */
-+#define ELOG_TYPE_LAST_POST_CODE          0xa3
-+
-+/* EC Shutdown Reason */
-+#define ELOG_TYPE_EC_SHUTDOWN             0xa5
-+
-+/* ARM/generic versions of sleep/wake */
-+#define ELOG_TYPE_SLEEP                   0xa7
-+#define ELOG_TYPE_WAKE                    0xa8
-+
-+/* ELOG header */
-+struct elog_header {
-+	u32 magic;
-+	u8 version;
-+	u8 header_size;
-+	u8 reserved[2];
-+} __packed;
-+
-+/* ELOG related constants */
-+#define ELOG_SIGNATURE			0x474f4c45  /* 'ELOG' */
-+#define ELOG_VERSION			1
-+
-+/* SMBIOS event log header */
-+struct event_header {
-+	u8 type;
-+	u8 length;
-+	u8 year;
-+	u8 month;
-+	u8 day;
-+	u8 hour;
-+	u8 minute;
-+	u8 second;
-+} __packed;
-+
-+extern void elog_prepare_event(struct event_header *event, u8 event_type,
-+			       void *data, u8 data_size);
-+
-+#endif /* ELOG_H_ */
-diff --git a/include/linux/chromeos_platform.h b/include/linux/chromeos_platform.h
-new file mode 100644
-index 0000000..32c4510
---- /dev/null
-+++ b/include/linux/chromeos_platform.h
-@@ -0,0 +1,27 @@
-+#ifndef _LINUX_CHROMEOS_PLATFORM_H
-+#define _LINUX_CHROMEOS_PLATFORM_H
-+
-+#include <linux/errno.h>
-+#include <linux/types.h>
-+
-+#ifdef CONFIG_CHROMEOS
-+/*
-+ * ChromeOS platform support code. Glue layer between higher level functions
-+ * and per-platform firmware interfaces.
-+ */
-+
-+/*
-+ * Set the taint bit telling firmware that the currently running side needs
-+ * recovery (or reinstall).
-+ */
-+extern int chromeos_set_need_recovery(void);
-+
-+#else
-+
-+static inline int chromeos_set_need_recovery(void)
++static inline struct ps8640 *bridge_to_ps8640(struct drm_bridge *e)
 +{
-+	return -ENODEV;
++	return container_of(e, struct ps8640, bridge);
 +}
-+#endif /* CONFIG_CHROMEOS */
 +
-+#endif /* _LINUX_CHROMEOS_PLATFORM_H */
++static inline struct ps8640 *connector_to_ps8640(struct drm_connector *e)
++{
++	return container_of(e, struct ps8640, connector);
++}
++
++static int ps8640_read(struct i2c_client *client, u8 reg, u8 *data,
++		       u16 data_len)
++{
++	int ret;
++	struct i2c_msg msgs[] = {
++		{
++		 .addr = client->addr,
++		 .flags = 0,
++		 .len = 1,
++		 .buf = &reg,
++		},
++		{
++		 .addr = client->addr,
++		 .flags = I2C_M_RD,
++		 .len = data_len,
++		 .buf = data,
++		}
++	};
++
++	ret = i2c_transfer(client->adapter, msgs, 2);
++
++	if (ret == 2)
++		return 0;
++	if (ret < 0)
++		return ret;
++	else
++		return -EIO;
++}
++
++static int ps8640_write_bytes(struct i2c_client *client, const u8 *data,
++			      u16 data_len)
++{
++	int ret;
++	struct i2c_msg msg;
++
++	msg.addr = client->addr;
++	msg.flags = 0;
++	msg.len = data_len;
++	msg.buf = (u8 *)data;
++
++	ret = i2c_transfer(client->adapter, &msg, 1);
++	if (ret == 1)
++		return 0;
++	if (ret < 0)
++		return ret;
++	else
++		return -EIO;
++}
++
++static int ps8640_write_byte(struct i2c_client *client, u8 reg,  u8 data)
++{
++	u8 buf[] = { reg, data };
++
++	return ps8640_write_bytes(client, buf, sizeof(buf));
++}
++
++static void ps8640_get_mcu_fw_version(struct ps8640 *ps_bridge)
++{
++	struct i2c_client *client = ps_bridge->page[5];
++	u8 fw_ver[2];
++
++	ps8640_read(client, 0x4, fw_ver, sizeof(fw_ver));
++	ps_bridge->info.version = (fw_ver[0] << 8) | fw_ver[1];
++
++	DRM_INFO_ONCE("ps8640 rom fw version %d.%d\n", fw_ver[0], fw_ver[1]);
++}
++
++static int ps8640_bridge_unmute(struct ps8640 *ps_bridge)
++{
++	struct i2c_client *client = ps_bridge->page[3];
++	u8 vdo_ctrl_buf[3] = { PAGE3_SET_ADD, VDO_CTL_ADD, VDO_EN };
++
++	return ps8640_write_bytes(client, vdo_ctrl_buf, sizeof(vdo_ctrl_buf));
++}
++
++static int ps8640_bridge_mute(struct ps8640 *ps_bridge)
++{
++	struct i2c_client *client = ps_bridge->page[3];
++	u8 vdo_ctrl_buf[3] = { PAGE3_SET_ADD, VDO_CTL_ADD, VDO_DIS };
++
++	return ps8640_write_bytes(client, vdo_ctrl_buf, sizeof(vdo_ctrl_buf));
++}
++
++static void ps8640_pre_enable(struct drm_bridge *bridge)
++{
++	struct ps8640 *ps_bridge = bridge_to_ps8640(bridge);
++	struct i2c_client *client = ps_bridge->page[2];
++	struct i2c_client *page1 = ps_bridge->page[1];
++	int err;
++	u8 set_vdo_done, mcs_en, vstart;
++	ktime_t timeout;
++
++	if (ps_bridge->in_fw_update)
++		return;
++
++	if (ps_bridge->enabled)
++		return;
++
++	err = drm_panel_prepare(ps_bridge->panel);
++	if (err < 0) {
++		DRM_ERROR("failed to prepare panel: %d\n", err);
++		return;
++	}
++
++	err = regulator_enable(ps_bridge->v12);
++	if (err) {
++		DRM_ERROR("failed to enable power 1.2v %d", err);
++		goto err_panel_unprepare;
++	}
++
++	usleep_range(5000, 5500);
++
++	err = regulator_enable(ps_bridge->v33);
++	if (err) {
++		DRM_ERROR("failed to enable power 3.3v %d", err);
++		goto err_pwr_v12_disable;
++	}
++
++	gpiod_set_value(ps_bridge->gpio_slp_n, 1);
++	usleep_range(2000, 2500);
++	gpiod_set_value(ps_bridge->gpio_rst_n, 1);
++
++	/*
++	 * Wait for the ps8640 embed mcu ready
++	 * First wait 200ms and then check the mcu ready flag every 20ms
++	 */
++	msleep(200);
++
++	timeout = ktime_add_ms(ktime_get(), 200);
++	for (;;) {
++		err = ps8640_read(client, PAGE2_GPIO_H, &set_vdo_done, 1);
++		if (err < 0) {
++			DRM_ERROR("failed read PAGE2_GPIO_H: %d\n", err);
++			goto err_pwr_v33_disable;
++		}
++		if ((set_vdo_done & PS_GPIO9) == PS_GPIO9)
++			break;
++		if (ktime_compare(ktime_get(), timeout) > 0)
++			break;
++		msleep(20);
++	}
++
++	msleep(50);
++
++	ps8640_read(page1, PAGE1_VSTART, &vstart, 1);
++	DRM_INFO("PS8640 PAGE1.0x6B = 0x%x\n", vstart);
++
++	/**
++	 * The Manufacturer Command Set (MCS) is a device dependent interface
++	 * intended for factory programming of the display module default
++	 * parameters. Once the display module is configured, the MCS shall be
++	 * disabled by the manufacturer. Once disabled, all MCS commands are
++	 * ignored by the display interface.
++	 */
++	ps8640_read(client, PAGE2_MCS_EN, &mcs_en, 1);
++	ps8640_write_byte(client, PAGE2_MCS_EN, mcs_en & ~MCS_EN);
++
++	if (ps_bridge->info.version == 0)
++		ps8640_get_mcu_fw_version(ps_bridge);
++
++	err = ps8640_bridge_unmute(ps_bridge);
++	if (err)
++		DRM_ERROR("failed to enable unmutevideo: %d\n", err);
++	/* Switch access edp panel's edid through i2c */
++	ps8640_write_byte(client, PAGE2_I2C_BYPASS, I2C_BYPASS_EN);
++	ps_bridge->enabled = true;
++
++	return;
++
++err_pwr_v33_disable:
++	gpiod_set_value(ps_bridge->gpio_rst_n, 0);
++	gpiod_set_value(ps_bridge->gpio_slp_n, 0);
++	regulator_disable(ps_bridge->v33);
++err_pwr_v12_disable:
++	regulator_disable(ps_bridge->v12);
++err_panel_unprepare:
++	drm_panel_unprepare(ps_bridge->panel);
++}
++
++static void ps8640_enable(struct drm_bridge *bridge)
++{
++	struct ps8640 *ps_bridge = bridge_to_ps8640(bridge);
++	int err;
++
++	err = drm_panel_enable(ps_bridge->panel);
++	if (err < 0)
++		DRM_ERROR("failed to enable panel: %d\n", err);
++}
++
++static void ps8640_disable(struct drm_bridge *bridge)
++{
++	struct ps8640 *ps_bridge = bridge_to_ps8640(bridge);
++	int err;
++
++	err = drm_panel_disable(ps_bridge->panel);
++	if (err < 0)
++		DRM_ERROR("failed to disable panel: %d\n", err);
++}
++
++static void ps8640_post_disable(struct drm_bridge *bridge)
++{
++	struct ps8640 *ps_bridge = bridge_to_ps8640(bridge);
++	int err;
++
++	if (ps_bridge->in_fw_update)
++		return;
++
++	if (!ps_bridge->enabled)
++		return;
++
++	ps_bridge->enabled = false;
++
++	err = ps8640_bridge_mute(ps_bridge);
++	if (err < 0)
++		DRM_ERROR("failed to unmutevideo: %d\n", err);
++
++	gpiod_set_value(ps_bridge->gpio_rst_n, 0);
++	gpiod_set_value(ps_bridge->gpio_slp_n, 0);
++
++	err = regulator_disable(ps_bridge->v33);
++	if (err)
++		DRM_ERROR("failed to disable power 3.3v: %d\n", err);
++
++	err = regulator_disable(ps_bridge->v12);
++	if (err)
++		DRM_ERROR("failed to disable power 1.2v: %d\n", err);
++
++	err = drm_panel_unprepare(ps_bridge->panel);
++	if (err)
++		DRM_ERROR("failed to unprepare panel: %d\n", err);
++}
++
++static int ps8640_get_modes(struct drm_connector *connector)
++{
++	struct ps8640 *ps_bridge = connector_to_ps8640(connector);
++	struct device *dev = &ps_bridge->page[0]->dev;
++	struct edid *edid;
++	int num_modes = 0;
++	bool power_off;
++
++	if (ps_bridge->edid)
++		return drm_add_edid_modes(connector, ps_bridge->edid);
++
++	power_off = !ps_bridge->enabled;
++	ps8640_pre_enable(&ps_bridge->bridge);
++
++	edid = devm_kmalloc(dev, sizeof(edid), GFP_KERNEL);
++	if (!edid) {
++		DRM_ERROR("Failed to allocate EDID\n");
++		return 0;
++	}
++
++	edid = drm_get_edid(connector, ps_bridge->ddc_i2c->adapter);
++	if (edid == NULL)
++		goto out;
++
++	ps_bridge->edid = edid;
++	drm_mode_connector_update_edid_property(connector, ps_bridge->edid);
++	num_modes = drm_add_edid_modes(connector, ps_bridge->edid);
++
++out:
++	if (power_off)
++		ps8640_post_disable(&ps_bridge->bridge);
++
++	return num_modes;
++}
++
++static struct drm_encoder *ps8640_best_encoder(struct drm_connector *connector)
++{
++	struct ps8640 *ps_bridge = connector_to_ps8640(connector);
++
++	return ps_bridge->bridge.encoder;
++}
++
++static const struct drm_connector_helper_funcs ps8640_connector_helper_funcs = {
++	.get_modes = ps8640_get_modes,
++	.best_encoder = ps8640_best_encoder,
++};
++
++static enum drm_connector_status ps8640_detect(struct drm_connector *connector,
++					       bool force)
++{
++	return connector_status_connected;
++}
++
++static const struct drm_connector_funcs ps8640_connector_funcs = {
++	.fill_modes = drm_helper_probe_single_connector_modes,
++	.detect = ps8640_detect,
++	.destroy = drm_connector_cleanup,
++	.reset = drm_atomic_helper_connector_reset,
++	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
++	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
++};
++
++int ps8640_bridge_attach(struct drm_bridge *bridge)
++{
++	struct ps8640 *ps_bridge = bridge_to_ps8640(bridge);
++	struct device *dev = &ps_bridge->page[0]->dev;
++	struct device_node *np = dev->of_node;
++	struct device_node *port, *in_ep;
++	struct device_node *dsi_node = NULL;
++	struct mipi_dsi_host *host = ps_bridge->dsi.host;
++	int ret;
++
++	ret = drm_connector_init(bridge->dev, &ps_bridge->connector,
++				 &ps8640_connector_funcs,
++				 DRM_MODE_CONNECTOR_eDP);
++
++	if (ret) {
++		DRM_ERROR("Failed to initialize connector with drm: %d\n", ret);
++		return ret;
++	}
++
++	drm_connector_helper_add(&ps_bridge->connector,
++				 &ps8640_connector_helper_funcs);
++
++	ps_bridge->connector.dpms = DRM_MODE_DPMS_ON;
++	drm_mode_connector_attach_encoder(&ps_bridge->connector,
++					  bridge->encoder);
++
++	if (ps_bridge->panel)
++		drm_panel_attach(ps_bridge->panel, &ps_bridge->connector);
++
++	/* port at 0 is ps8640 dsi input port */
++	port = of_graph_get_port_by_id(np, 0);
++	if (port) {
++		in_ep = of_get_child_by_name(port, "endpoint");
++		of_node_put(port);
++		if (in_ep) {
++			dsi_node = of_graph_get_remote_port_parent(in_ep);
++			of_node_put(in_ep);
++		}
++	}
++	if (dsi_node) {
++		host = of_find_mipi_dsi_host_by_node(dsi_node);
++		of_node_put(dsi_node);
++		if (!host) {
++			ret = -ENODEV;
++			goto err;
++		}
++	}
++
++	ps_bridge->dsi.host = host;
++	ps_bridge->dsi.mode_flags = MIPI_DSI_MODE_VIDEO |
++				     MIPI_DSI_MODE_VIDEO_SYNC_PULSE;
++	ps_bridge->dsi.format = MIPI_DSI_FMT_RGB888;
++	ps_bridge->dsi.lanes = 4;
++	ret = mipi_dsi_attach(&ps_bridge->dsi);
++	if (ret)
++		goto err;
++
++	return 0;
++err:
++	if (ps_bridge->panel)
++		drm_panel_detach(ps_bridge->panel);
++	drm_connector_cleanup(&ps_bridge->connector);
++	return ret;
++}
++
++static const struct drm_bridge_funcs ps8640_bridge_funcs = {
++	.attach = ps8640_bridge_attach,
++	.disable = ps8640_disable,
++	.post_disable = ps8640_post_disable,
++	.pre_enable = ps8640_pre_enable,
++	.enable = ps8640_enable,
++};
++
++/* Firmware Version is returned as Major.Minor */
++static ssize_t ps8640_fw_version_show(struct device *dev,
++				      struct device_attribute *attr, char *buf)
++{
++	struct ps8640 *ps_bridge = dev_get_drvdata(dev);
++	struct ps8640_info *info = &ps_bridge->info;
++
++	return scnprintf(buf, PAGE_SIZE, "%u.%u\n", info->version >> 8,
++			 info->version & 0xff);
++}
++
++/* Hardware Version is returned as FamilyID.VariantID */
++static ssize_t ps8640_hw_version_show(struct device *dev,
++				      struct device_attribute *attr, char *buf)
++{
++	struct ps8640 *ps_bridge = dev_get_drvdata(dev);
++	struct ps8640_info *info = &ps_bridge->info;
++
++	return scnprintf(buf, PAGE_SIZE, "ps%u.%u\n", info->family_id,
++			 info->variant_id);
++}
++
++static int ps8640_spi_send_cmd(struct ps8640 *ps_bridge, u8 *cmd, u8 cmd_len)
++{
++	struct i2c_client *client = ps_bridge->page[2];
++	u8 i, buf[3] = { PAGE2_SWSPI_LEN, cmd_len - 1, TRIGGER_NO_READBACK };
++	int ret;
++
++	ret = ps8640_write_byte(client, PAGE2_IROM_CTRL, IROM_ENABLE);
++	if (ret)
++		goto err;
++
++	/* write command in write port */
++	for (i = 0; i < cmd_len; i++) {
++		ret = ps8640_write_byte(client, PAGE2_SWSPI_WDATA, cmd[i]);
++		if (ret)
++			goto err_irom_disable;
++	}
++
++	ret = ps8640_write_bytes(client, buf, sizeof(buf));
++	if (ret)
++		goto err_irom_disable;
++
++	ret = ps8640_write_byte(client, PAGE2_IROM_CTRL, IROM_DISABLE);
++	if (ret)
++		goto err;
++
++	return 0;
++err_irom_disable:
++	ps8640_write_byte(client, PAGE2_IROM_CTRL, IROM_DISABLE);
++err:
++	dev_err(&client->dev, "send command err: %d\n", ret);
++	return ret;
++}
++
++static int ps8640_wait_spi_ready(struct ps8640 *ps_bridge)
++{
++	struct i2c_client *client = ps_bridge->page[2];
++	u8 spi_rdy_st;
++	ktime_t timeout;
++
++	timeout = ktime_add_ms(ktime_get(), 200);
++	for (;;) {
++		ps8640_read(client, PAGE2_SPI_STATUS, &spi_rdy_st, 1);
++		if ((spi_rdy_st & SPI_READY) != SPI_READY)
++			break;
++
++		if (ktime_compare(ktime_get(), timeout) > 0) {
++			dev_err(&client->dev, "wait spi ready timeout\n");
++			return -EBUSY;
++		}
++
++		msleep(20);
++	}
++
++	return 0;
++}
++
++static int ps8640_wait_spi_nobusy(struct ps8640 *ps_bridge)
++{
++	struct i2c_client *client = ps_bridge->page[2];
++	u8 spi_status, buf[3] = { PAGE2_SWSPI_LEN, 0, TRIGGER_READBACK };
++	int ret;
++	ktime_t timeout;
++
++	timeout = ktime_add_ms(ktime_get(), 500);
++	for (;;) {
++		/* 0x05 RDSR; Read-Status-Register */
++		ret = ps8640_write_byte(client, PAGE2_SWSPI_WDATA,
++					READ_STATUS_REG_CMD);
++		if (ret)
++			goto err_send_cmd_exit;
++
++		ret = ps8640_write_bytes(client, buf, 3);
++		if (ret)
++			goto err_send_cmd_exit;
++
++		/* delay for cmd send */
++		usleep_range(300, 500);
++		/* wait for SPI ROM until not busy */
++		ret = ps8640_read(client, PAGE2_SWSPI_RDATA, &spi_status, 1);
++		if (ret)
++			goto err_send_cmd_exit;
++
++		if (!(spi_status & BUSY))
++			break;
++
++		if (ktime_compare(ktime_get(), timeout) > 0) {
++			dev_err(&client->dev, "wait spi no busy timeout: %d\n",
++				ret);
++			return -EBUSY;
++		}
++	}
++
++	return 0;
++
++err_send_cmd_exit:
++	dev_err(&client->dev, "send command err: %d\n", ret);
++	return ret;
++}
++
++static int ps8640_wait_rom_idle(struct ps8640 *ps_bridge)
++{
++	struct i2c_client *client = ps_bridge->page[0];
++	int ret;
++
++	ret = ps8640_write_byte(client, PAGE2_IROM_CTRL, IROM_ENABLE);
++	if (ret)
++		goto exit;
++
++	ret = ps8640_wait_spi_ready(ps_bridge);
++	if (ret)
++		goto err_spi;
++
++	ret = ps8640_wait_spi_nobusy(ps_bridge);
++	if (ret)
++		goto err_spi;
++
++	ret = ps8640_write_byte(client, PAGE2_IROM_CTRL, IROM_DISABLE);
++	if (ret)
++		goto exit;
++
++	return 0;
++
++err_spi:
++	ps8640_write_byte(client, PAGE2_IROM_CTRL, IROM_DISABLE);
++exit:
++	if (ret)
++		dev_err(&client->dev, "wait ps8640 rom idle fail: %d\n", ret);
++
++	return ret;
++}
++
++static int ps8640_spi_dl_mode(struct ps8640 *ps_bridge)
++{
++	struct i2c_client *client = ps_bridge->page[2];
++	int ret;
++
++	/* switch ps8640 mode to spi dl mode */
++	if (ps_bridge->gpio_mode_sel_n)
++		gpiod_set_value(ps_bridge->gpio_mode_sel_n, 0);
++
++	/* reset spi interface */
++	ret = ps8640_write_byte(client, PAGE2_SW_RESET,
++				SPI_SW_RESET | MPU_SW_RESET);
++	if (ret)
++		goto exit;
++
++	ret = ps8640_write_byte(client, PAGE2_SW_RESET, MPU_SW_RESET);
++	if (ret)
++		goto exit;
++
++exit:
++	if (ret)
++		dev_err(&client->dev, "fail reset spi interface: %d\n", ret);
++
++	return ret;
++}
++
++static int ps8640_rom_prepare(struct ps8640 *ps_bridge)
++{
++	struct i2c_client *client = ps_bridge->page[2];
++	struct device *dev = &client->dev;
++	u8 i, cmd[2];
++	int ret;
++
++	cmd[0] = WRITE_ENABLE_CMD;
++	ret = ps8640_spi_send_cmd(ps_bridge, cmd, 1);
++	if (ret) {
++		dev_err(dev, "failed enable-write-status-register: %d\n", ret);
++		return ret;
++	}
++
++	cmd[0] = WRITE_STATUS_REG_CMD;
++	cmd[1] = CLEAR_ALL_PROTECT;
++	ret = ps8640_spi_send_cmd(ps_bridge, cmd, 2);
++	if (ret) {
++		dev_err(dev, "fail disable all protection: %d\n", ret);
++		return ret;
++	}
++
++	/* wait for SPI module ready */
++	ret = ps8640_wait_rom_idle(ps_bridge);
++	if (ret) {
++		dev_err(dev, "fail wait rom idle: %d\n", ret);
++		return ret;
++	}
++
++	ps8640_write_byte(client, PAGE2_IROM_CTRL, IROM_ENABLE);
++	for (i = 0; i < 6; i++)
++		ps8640_write_byte(client, PAGE2_ENCTLSPI_WR, enc_ctrl_code[i]);
++	ps8640_write_byte(client, PAGE2_IROM_CTRL, IROM_DISABLE);
++
++	/* Enable-Write-Status-Register */
++	cmd[0] = WRITE_ENABLE_CMD;
++	ret = ps8640_spi_send_cmd(ps_bridge, cmd, 1);
++	if (ret) {
++		dev_err(dev, "fail enable-write-status-register: %d\n", ret);
++		return ret;
++	}
++
++	/* chip erase command */
++	cmd[0] = CHIP_ERASE_CMD;
++	ret = ps8640_spi_send_cmd(ps_bridge, cmd, 1);
++	if (ret) {
++		dev_err(dev, "fail disable all protection: %d\n", ret);
++		return ret;
++	}
++
++	ret = ps8640_wait_rom_idle(ps_bridge);
++	if (ret) {
++		dev_err(dev, "fail wait rom idle: %d\n", ret);
++		return ret;
++	}
++
++	return 0;
++}
++
++static int ps8640_check_chip_id(struct ps8640 *ps_bridge)
++{
++	struct i2c_client *client = ps_bridge->page[4];
++	u8 buf[4];
++
++	ps8640_read(client, PAGE4_REV_L, buf, 4);
++	return memcmp(buf, hw_chip_id, sizeof(buf));
++}
++
++static int ps8640_validate_firmware(struct ps8640 *ps_bridge,
++				    const struct firmware *fw)
++{
++	struct i2c_client *client = ps_bridge->page[0];
++	u16 fw_chip_id;
++
++	/*
++	 * Get the chip_id from the firmware. Make sure that it is the
++	 * right controller to do the firmware and config update.
++	 */
++	fw_chip_id = get_unaligned_le16(fw->data + FW_CHIP_ID_OFFSET);
++
++	if (fw_chip_id != 0x8640 && ps8640_check_chip_id(ps_bridge) == 0) {
++		dev_err(&client->dev,
++			"chip id mismatch: fw 0x%x vs. chip 0x8640\n",
++			fw_chip_id);
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static int ps8640_write_rom(struct ps8640 *ps_bridge, const struct firmware *fw)
++{
++	struct i2c_client *client = ps_bridge->page[0];
++	struct device *dev = &client->dev;
++	struct i2c_client *client2 = ps_bridge->page[2];
++	struct i2c_client *client7 = ps_bridge->page[7];
++	size_t pos;
++	u8 buf[257], rom_page_id_buf[3];
++	int ret;
++	u16 cpy_len;
++
++	ps8640_write_byte(client2, PAGE2_SPI_CFG3, I2C_TO_SPI_RESET);
++	msleep(100);
++	ps8640_write_byte(client2, PAGE2_SPI_CFG3, 0x00);
++
++	for (pos = 0; pos < fw->size; pos += cpy_len) {
++		rom_page_id_buf[0] = PAGE2_ROMADD_BYTE1;
++		rom_page_id_buf[1] = pos >> 8;
++		rom_page_id_buf[2] = pos >> 16;
++		ret = ps8640_write_bytes(client2, rom_page_id_buf, 3);
++		if (ret)
++			goto error;
++		cpy_len = fw->size >= 256 + pos ? 256 : fw->size - pos;
++		buf[0] = 0;
++		memcpy(buf + 1, fw->data + pos, cpy_len);
++		ret = ps8640_write_bytes(client7, buf, cpy_len + 1);
++		if (ret)
++			goto error;
++
++		dev_dbg(dev, "fw update completed %zu / %zu bytes\n", pos,
++			fw->size);
++	}
++	return 0;
++
++error:
++	dev_err(dev, "failed write external flash, %d\n", ret);
++	return ret;
++}
++
++static int ps8640_spi_normal_mode(struct ps8640 *ps_bridge)
++{
++	u8 cmd[2];
++	struct i2c_client *client = ps_bridge->page[2];
++
++	/* Enable-Write-Status-Register */
++	cmd[0] = WRITE_ENABLE_CMD;
++	ps8640_spi_send_cmd(ps_bridge, cmd, 1);
++
++	/* protect BPL/BP0/BP1 */
++	cmd[0] = WRITE_STATUS_REG_CMD;
++	cmd[1] = BLK_PROTECT_BITS | STATUS_REG_PROTECT;
++	ps8640_spi_send_cmd(ps_bridge, cmd, 2);
++
++	/* wait for SPI rom ready */
++	ps8640_wait_rom_idle(ps_bridge);
++
++	/* disable PS8640 mapping function */
++	ps8640_write_byte(client, PAGE2_ENCTLSPI_WR, 0x00);
++
++	if (ps_bridge->gpio_mode_sel_n)
++		gpiod_set_value(ps_bridge->gpio_mode_sel_n, 1);
++	return 0;
++}
++
++static int ps8640_enter_bl(struct ps8640 *ps_bridge)
++{
++	ps_bridge->in_fw_update = true;
++	return ps8640_spi_dl_mode(ps_bridge);
++}
++
++static void ps8640_exit_bl(struct ps8640 *ps_bridge, const struct firmware *fw)
++{
++	ps8640_spi_normal_mode(ps_bridge);
++	ps_bridge->in_fw_update = false;
++}
++
++static int ps8640_load_fw(struct ps8640 *ps_bridge, const struct firmware *fw)
++{
++	struct i2c_client *client = ps_bridge->page[0];
++	struct device *dev = &client->dev;
++	int ret;
++	bool ps8640_status_backup = ps_bridge->enabled;
++
++	ret = ps8640_validate_firmware(ps_bridge, fw);
++	if (ret)
++		return ret;
++
++	mutex_lock(&ps_bridge->fw_mutex);
++	if (!ps_bridge->in_fw_update) {
++		if (!ps8640_status_backup)
++			ps8640_pre_enable(&ps_bridge->bridge);
++
++		ret = ps8640_enter_bl(ps_bridge);
++		if (ret)
++			goto exit;
++	}
++
++	ret = ps8640_rom_prepare(ps_bridge);
++	if (ret)
++		goto exit;
++
++	ret = ps8640_write_rom(ps_bridge, fw);
++
++exit:
++	if (ret)
++		dev_err(dev, "Failed to load firmware, %d\n", ret);
++
++	ps8640_exit_bl(ps_bridge, fw);
++	if (!ps8640_status_backup)
++		ps8640_post_disable(&ps_bridge->bridge);
++	mutex_unlock(&ps_bridge->fw_mutex);
++	return ret;
++}
++
++static ssize_t ps8640_update_fw_store(struct device *dev,
++				      struct device_attribute *attr,
++				      const char *buf, size_t count)
++{
++	struct i2c_client *client = to_i2c_client(dev);
++	struct ps8640 *ps_bridge = i2c_get_clientdata(client);
++	const struct firmware *fw;
++	int error;
++
++	error = request_firmware(&fw, PS_FW_NAME, dev);
++	if (error) {
++		dev_err(dev, "Unable to open firmware %s: %d\n",
++			PS_FW_NAME, error);
++		return error;
++	}
++
++	error = ps8640_load_fw(ps_bridge, fw);
++	if (error)
++		dev_err(dev, "The firmware update failed(%d)\n", error);
++	else
++		dev_info(dev, "The firmware update succeeded\n");
++
++	release_firmware(fw);
++	return error ? error : count;
++}
++
++static DEVICE_ATTR(fw_version, S_IRUGO, ps8640_fw_version_show, NULL);
++static DEVICE_ATTR(hw_version, S_IRUGO, ps8640_hw_version_show, NULL);
++static DEVICE_ATTR(update_fw, S_IWUSR, NULL, ps8640_update_fw_store);
++
++static struct attribute *ps8640_attrs[] = {
++	&dev_attr_fw_version.attr,
++	&dev_attr_hw_version.attr,
++	&dev_attr_update_fw.attr,
++	NULL
++};
++
++static const struct attribute_group ps8640_attr_group = {
++	.attrs = ps8640_attrs,
++};
++
++static void ps8640_remove_sysfs_group(void *data)
++{
++	struct ps8640 *ps_bridge = data;
++
++	sysfs_remove_group(&ps_bridge->page[0]->dev.kobj, &ps8640_attr_group);
++}
++
++static int ps8640_probe(struct i2c_client *client,
++			const struct i2c_device_id *id)
++{
++	struct device *dev = &client->dev;
++	struct ps8640 *ps_bridge;
++	struct device_node *np = dev->of_node;
++	struct device_node *port, *out_ep;
++	struct device_node *panel_node = NULL;
++	int ret;
++	u32 i;
++
++	ps_bridge = devm_kzalloc(dev, sizeof(*ps_bridge), GFP_KERNEL);
++	if (!ps_bridge)
++		return -ENOMEM;
++
++	/* port at 1 is ps8640 output port */
++	port = of_graph_get_port_by_id(np, 1);
++	if (port) {
++		out_ep = of_get_child_by_name(port, "endpoint");
++		of_node_put(port);
++		if (out_ep) {
++			panel_node = of_graph_get_remote_port_parent(out_ep);
++			of_node_put(out_ep);
++		}
++	}
++	if (panel_node) {
++		ps_bridge->panel = of_drm_find_panel(panel_node);
++		of_node_put(panel_node);
++		if (!ps_bridge->panel)
++			return -EPROBE_DEFER;
++	}
++
++	mutex_init(&ps_bridge->fw_mutex);
++	ps_bridge->v12 = devm_regulator_get(dev, "vdd12");
++	if (IS_ERR(ps_bridge->v12))
++		return PTR_ERR(ps_bridge->v12);
++
++	ps_bridge->v33 = devm_regulator_get(dev, "vdd33");
++	if (IS_ERR(ps_bridge->v33))
++		return PTR_ERR(ps_bridge->v33);
++
++	if (ret) {
++		dev_info(dev, "failed to get regulators: %d\n", ret);
++		return ret;
++	}
++
++	ps_bridge->gpio_mode_sel_n = devm_gpiod_get_optional(&client->dev,
++							     "mode-sel",
++							     GPIOD_OUT_HIGH);
++	if (IS_ERR(ps_bridge->gpio_mode_sel_n)) {
++		ret = PTR_ERR(ps_bridge->gpio_mode_sel_n);
++		dev_err(dev, "cannot get mode-sel %d\n", ret);
++		return ret;
++	}
++
++	ps_bridge->gpio_slp_n = devm_gpiod_get(&client->dev, "sleep",
++					       GPIOD_OUT_LOW);
++	if (IS_ERR(ps_bridge->gpio_slp_n)) {
++		ret = PTR_ERR(ps_bridge->gpio_slp_n);
++		dev_err(dev, "cannot get sleep: %d\n", ret);
++		return ret;
++	}
++
++	/*
++	 * Request the reset pin low to avoid the bridge being
++	 * initialized prematurely
++	 */
++	ps_bridge->gpio_rst_n = devm_gpiod_get(&client->dev, "reset",
++					       GPIOD_OUT_LOW);
++	if (IS_ERR(ps_bridge->gpio_rst_n)) {
++		ret = PTR_ERR(ps_bridge->gpio_rst_n);
++		dev_err(dev, "cannot get reset: %d\n", ret);
++		return ret;
++	}
++
++	ps_bridge->bridge.funcs = &ps8640_bridge_funcs;
++	ps_bridge->bridge.of_node = dev->of_node;
++
++	ps_bridge->page[0] = client;
++	ps_bridge->ddc_i2c = i2c_new_dummy(client->adapter, EDID_I2C_ADDR);
++	if (!ps_bridge->ddc_i2c) {
++		dev_err(dev, "failed ddc_i2c dummy device, address%02x\n",
++			EDID_I2C_ADDR);
++		return -EBUSY;
++	}
++	/*
++	 * ps8640 uses multiple addresses, use dummy devices for them
++	 * page[0]: for DP control
++	 * page[1]: for VIDEO Bridge
++	 * page[2]: for control top
++	 * page[3]: for DSI Link Control1
++	 * page[4]: for MIPI Phy
++	 * page[5]: for VPLL
++	 * page[6]: for DSI Link Control2
++	 * page[7]: for spi rom mapping
++	 */
++	for (i = 1; i < MAX_DEVS; i++) {
++		ps_bridge->page[i] = i2c_new_dummy(client->adapter,
++						   client->addr + i);
++		if (!ps_bridge->page[i]) {
++			dev_err(dev, "failed i2c dummy device, address%02x\n",
++				client->addr + i);
++			ret = -EBUSY;
++			goto exit_dummy;
++		}
++	}
++	i2c_set_clientdata(client, ps_bridge);
++
++	ret = sysfs_create_group(&client->dev.kobj, &ps8640_attr_group);
++	if (ret) {
++		dev_err(dev, "failed to create sysfs entries: %d\n", ret);
++		goto exit_dummy;
++	}
++
++	ret = devm_add_action(dev, ps8640_remove_sysfs_group, ps_bridge);
++	if (ret) {
++		dev_err(dev, "failed to add sysfs cleanup action: %d\n", ret);
++		goto exit_remove_sysfs;
++	}
++
++	ret = drm_bridge_add(&ps_bridge->bridge);
++	if (ret) {
++		dev_err(dev, "Failed to add bridge: %d\n", ret);
++		goto exit_remove_sysfs;
++	}
++	return 0;
++
++exit_remove_sysfs:
++	sysfs_remove_group(&ps_bridge->page[0]->dev.kobj, &ps8640_attr_group);
++exit_dummy:
++	while (--i)
++		i2c_unregister_device(ps_bridge->page[i]);
++	i2c_unregister_device(ps_bridge->ddc_i2c);
++	return ret;
++}
++
++static int ps8640_remove(struct i2c_client *client)
++{
++	struct ps8640 *ps_bridge = i2c_get_clientdata(client);
++	int i = MAX_DEVS;
++
++	drm_bridge_remove(&ps_bridge->bridge);
++	sysfs_remove_group(&ps_bridge->page[0]->dev.kobj, &ps8640_attr_group);
++	while (--i)
++			i2c_unregister_device(ps_bridge->page[i]);
++
++	i2c_unregister_device(ps_bridge->ddc_i2c);
++	return 0;
++}
++
++static const struct i2c_device_id ps8640_i2c_table[] = {
++	{ "parade,ps8640", 0 },
++	{},
++};
++MODULE_DEVICE_TABLE(i2c, ps8640_i2c_table);
++
++static const struct of_device_id ps8640_match[] = {
++	{ .compatible = "parade,ps8640" },
++	{},
++};
++MODULE_DEVICE_TABLE(of, ps8640_match);
++
++static struct i2c_driver ps8640_driver = {
++	.id_table = ps8640_i2c_table,
++	.probe = ps8640_probe,
++	.remove = ps8640_remove,
++	.driver = {
++		.name = "parade,ps8640",
++		.of_match_table = ps8640_match,
++	},
++};
++module_i2c_driver(ps8640_driver);
++
++MODULE_AUTHOR("Jitao Shi <jitao.shi@mediatek.com>");
++MODULE_AUTHOR("CK Hu <ck.hu@mediatek.com>");
++MODULE_DESCRIPTION("PARADE ps8640 DSI-eDP converter driver");
++MODULE_LICENSE("GPL v2");
 -- 
 2.7.4
