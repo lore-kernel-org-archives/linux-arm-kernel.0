@@ -1,56 +1,42 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 16 Oct 2017 15:51:57 -0200
-Subject: [PATCH] ARM: dts: imx: add ZII RDU1 board
-In-Reply-To: <20171016165540.917-1-l.stach@pengutronix.de>
-References: <20171016165540.917-1-l.stach@pengutronix.de>
-Message-ID: <CAOMZO5Bub-TrF-X+s-N_tVy5mtCb=_m35U0stvmFHh4GeU0mAQ@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 16 Oct 2017 20:02:29 +0200
+Subject: [PATCH 9/9] ARM: multi_v7_defconfig: Statically build
+ RTC_DRV_RK808
+In-Reply-To: <1508156187-27519-10-git-send-email-jagan@amarulasolutions.com>
+References: <1508156187-27519-1-git-send-email-jagan@amarulasolutions.com>
+ <1508156187-27519-10-git-send-email-jagan@amarulasolutions.com>
+Message-ID: <3238534.Bk1TS2fSCp@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lucas,
+Hi,
 
-On Mon, Oct 16, 2017 at 2:55 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
+Am Montag, 16. Oktober 2017, 17:46:27 CEST schrieb Jagan Teki:
+> RTC_DRV_RK808 need to have build statically for the platforms
+> do use MFB_RK808 so replace module with statical link.
 
-> +       disp0 {
-> +               compatible = "fsl,imx-parallel-display";
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&pinctrl_ipu_disp1>;
-> +
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +
-> +               port at 0 {
-> +                       reg = <0>;
-> +
-> +                       display_in: endpoint {
-> +                               remote-endpoint = <&ipu_di0_disp0>;
+why would you need this to be compiled on? MFD_RK808 will happily
+just create the platform-devices which are then bound to the RTC
+driver later once the module is ready.
 
-Please use ipu_di0_disp1 instead as done in this recent commit:
-https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git/commit/?h=imx/dt&id=f7059428ec1b16785bdc2a70e056ef20f3a8df41
+Heiko
 
-> +       usbh1phy: usbphy at 1 {
-
-This will give a warning when building with W=1 as a unit-address is
-passed without its corresponding reg node.
-
-You could simply remove the @1.
-
-> +               compatible = "usb-nop-xceiv";
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&pinctrl_usbh1phy>;
-> +               clocks = <&clk_26M_usb>;
-> +               clock-names = "main_clk";
-> +               reset-gpios = <&gpio4 8 GPIO_ACTIVE_LOW>;
-> +               vcc-supply = <&vusb_reg>;
-> +       };
-> +
-> +       usbh2phy: usbphy at 2 {
-
-Ditto.
-
-> +&ecspi1 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_ecspi1>;
-> +       fsl,spi-num-chipselects = <2>;
-
-This is an obsolete property, please remove it.
+> 
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> ---
+>  arch/arm/configs/multi_v7_defconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/configs/multi_v7_defconfig
+> b/arch/arm/configs/multi_v7_defconfig index 2adef49..6ddc35c 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -768,7 +768,7 @@ CONFIG_RTC_DRV_MAX8907=y
+>  CONFIG_RTC_DRV_MAX8998=m
+>  CONFIG_RTC_DRV_MAX8997=m
+>  CONFIG_RTC_DRV_MAX77686=y
+> -CONFIG_RTC_DRV_RK808=m
+> +CONFIG_RTC_DRV_RK808=y
+>  CONFIG_RTC_DRV_RS5C372=m
+>  CONFIG_RTC_DRV_BQ32K=m
+>  CONFIG_RTC_DRV_PALMAS=y
