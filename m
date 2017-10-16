@@ -1,37 +1,31 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Mon, 16 Oct 2017 15:31:59 +0800
-Subject: [PATCH] soc: Allow test-building of MediaTek drivers
-In-Reply-To: <20171005111743.6367f128@endymion>
-References: <20171005111743.6367f128@endymion>
-Message-ID: <1508139119.21840.47.camel@mtkswgap22>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 16 Oct 2017 15:38:52 +0800
+Subject: [GIT PULL] i.MX fixes for 4.14
+Message-ID: <20171016073851.GA8320@x250>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-10-05 at 11:17 +0200, Jean Delvare wrote:
-> The COMPILE_TEST alternative dependency allows test-building the
-> drivers but only as long as the build system itself will look into
-> the directory where the drivers reside.
-> 
-> Signed-off-by: Jean Delvare <jdelvare@suse.de>
-> Cc: Sean Wang <sean.wang@mediatek.com>
-> Cc: Matthias Brugger <matthias.bgg@gmail.com>
+The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 
-Acked-by: Sean Wang <sean.wang@mediatek.com>
+  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
 
-> ---
->  drivers/soc/Makefile |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> --- linux-4.14-rc3.orig/drivers/soc/Makefile	2017-09-17 00:47:51.000000000 +0200
-> +++ linux-4.14-rc3/drivers/soc/Makefile	2017-10-05 09:44:01.478589469 +0200
-> @@ -10,7 +10,7 @@ obj-$(CONFIG_MACH_DOVE)		+= dove/
->  obj-y				+= fsl/
->  obj-$(CONFIG_ARCH_MXC)		+= imx/
->  obj-$(CONFIG_SOC_XWAY)		+= lantiq/
-> -obj-$(CONFIG_ARCH_MEDIATEK)	+= mediatek/
-> +obj-y				+= mediatek/
->  obj-$(CONFIG_ARCH_MESON)	+= amlogic/
->  obj-$(CONFIG_ARCH_QCOM)		+= qcom/
->  obj-y				+= renesas/
-> 
-> 
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.14
+
+for you to fetch changes up to 1c86c9dd82f859b474474a7fee0d5195da2c9c1d:
+
+  ARM: dts: imx7d: Invert legacy PCI irq mapping (2017-10-14 23:32:51 +0800)
+
+----------------------------------------------------------------
+i.MX fixes for 4.14:
+ - Fix the legacy PCI interrupt numbers for i.MX7.  The numbers were
+   wrongly coded in an inverted order than what Reference Manual tells.
+   It causes problem for PCI devices using legacy interrupt.
+
+----------------------------------------------------------------
+Andrey Smirnov (1):
+      ARM: dts: imx7d: Invert legacy PCI irq mapping
+
+ arch/arm/boot/dts/imx7d.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
