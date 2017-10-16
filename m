@@ -1,132 +1,119 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
-Date: Mon, 16 Oct 2017 16:09:36 +0000
-Subject: [PATCH v9 2/4] iommu/dma: Add a helper function to reserve HW
- MSI address regions for IOMMU drivers
-In-Reply-To: <20171013192350.GA32130@arm.com>
-References: <20171006140450.89652-1-shameerali.kolothum.thodi@huawei.com>
- <20171006140450.89652-3-shameerali.kolothum.thodi@huawei.com>
- <20171013192350.GA32130@arm.com>
-Message-ID: <5FC3163CFD30C246ABAA99954A238FA83844672A@FRAEML521-MBX.china.huawei.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 16 Oct 2017 17:11:06 +0100
+Subject: [GIT PULL v2] ACPI IORT changes for v4.15
+Message-ID: <20171016161106.GA18942@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+Hi Catalin, Will,
 
-> -----Original Message-----
-> From: Will Deacon [mailto:will.deacon at arm.com]
-> Sent: Friday, October 13, 2017 8:24 PM
-> To: Shameerali Kolothum Thodi <shameerali.kolothum.thodi@huawei.com>
-> Cc: lorenzo.pieralisi at arm.com; marc.zyngier at arm.com;
-> sudeep.holla at arm.com; robin.murphy at arm.com; joro at 8bytes.org;
-> bhelgaas at google.com; Gabriele Paoloni <gabriele.paoloni@huawei.com>;
-> John Garry <john.garry@huawei.com>; iommu at lists.linux-foundation.org;
-> linux-arm-kernel at lists.infradead.org; linux-acpi at vger.kernel.org; linux-
-> pci at vger.kernel.org; devel at acpica.org; Linuxarm <linuxarm@huawei.com>;
-> Wangzhou (B) <wangzhou1@hisilicon.com>; Guohanjun (Hanjun Guo)
-> <guohanjun@huawei.com>
-> Subject: Re: [PATCH v9 2/4] iommu/dma: Add a helper function to reserve HW
-> MSI address regions for IOMMU drivers
-> 
-> On Fri, Oct 06, 2017 at 03:04:48PM +0100, Shameer Kolothum wrote:
-> > IOMMU drivers can use this to implement their .get_resv_regions callback
-> > for HW MSI specific reservations(e.g. ARM GICv3 ITS MSI region).
-> >
-> > Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
-> > ---
-> >  drivers/iommu/dma-iommu.c | 20 ++++++++++++++++++++
-> >  include/linux/dma-iommu.h |  7 +++++++
-> >  2 files changed, 27 insertions(+)
-> 
-> I'd like to see Robin's Ack on this, because this is his code and he had
-> ideas on ways to solve this problem properly.
+this is a v2 of a previous PR:
 
-Please let us know if it is ok to go ahead with ACPI support for now.
-It will help our customers to start using pass-through for PCIe.
+v1 -> v2:
+	 Rebased pull request on top of v4.14-rc3
 
-Thanks,
-Shameer
+v1: http://lkml.kernel.org/r/20171013152937.GA13386 at red-moon
 
-> 
-> Will
-> 
-> > diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-> > index 9d1cebe..bae677e 100644
-> > --- a/drivers/iommu/dma-iommu.c
-> > +++ b/drivers/iommu/dma-iommu.c
-> > @@ -19,6 +19,7 @@
-> >   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> >   */
-> >
-> > +#include <linux/acpi_iort.h>
-> >  #include <linux/device.h>
-> >  #include <linux/dma-iommu.h>
-> >  #include <linux/gfp.h>
-> > @@ -27,6 +28,7 @@
-> >  #include <linux/iova.h>
-> >  #include <linux/irq.h>
-> >  #include <linux/mm.h>
-> > +#include <linux/of_iommu.h>
-> >  #include <linux/pci.h>
-> >  #include <linux/scatterlist.h>
-> >  #include <linux/vmalloc.h>
-> > @@ -198,6 +200,24 @@ void iommu_dma_get_resv_regions(struct device
-> *dev, struct list_head *list)
-> >  }
-> >  EXPORT_SYMBOL(iommu_dma_get_resv_regions);
-> >
-> > +/**
-> > + * iommu_dma_get_msi_resv_regions - Reserved region driver helper
-> > + * @dev: Device from iommu_get_resv_regions()
-> > + * @list: Reserved region list from iommu_get_resv_regions()
-> > + *
-> > + * IOMMU drivers can use this to implement their .get_resv_regions
-> > + * callback for HW MSI specific reservations. For now, this only
-> > + * covers ITS MSI region reservation using ACPI IORT helper function.
-> > + */
-> > +int iommu_dma_get_msi_resv_regions(struct device *dev, struct list_head
-> *list)
-> > +{
-> > +	if (!is_of_node(dev->iommu_fwspec->iommu_fwnode))
-> > +		return iort_iommu_msi_get_resv_regions(dev, list);
-> > +
-> > +	return -ENODEV;
-> > +}
-> > +EXPORT_SYMBOL(iommu_dma_get_msi_resv_regions);
-> > +
-> >  static int cookie_init_hw_msi_region(struct iommu_dma_cookie *cookie,
-> >  		phys_addr_t start, phys_addr_t end)
-> >  {
-> > diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
-> > index 92f2083..6062ef0 100644
-> > --- a/include/linux/dma-iommu.h
-> > +++ b/include/linux/dma-iommu.h
-> > @@ -74,6 +74,8 @@ void iommu_dma_unmap_resource(struct device *dev,
-> dma_addr_t handle,
-> >  void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg);
-> >  void iommu_dma_get_resv_regions(struct device *dev, struct list_head
-> *list);
-> >
-> > +int iommu_dma_get_msi_resv_regions(struct device *dev, struct list_head
-> *list);
-> > +
-> >  #else
-> >
-> >  struct iommu_domain;
-> > @@ -107,6 +109,11 @@ static inline void
-> iommu_dma_get_resv_regions(struct device *dev, struct list_he
-> >  {
-> >  }
-> >
-> > +static inline int iommu_dma_get_msi_resv_regions(struct device *dev,
-> struct list_head *list)
-> > +{
-> > +	return -ENODEV;
-> > +}
-> > +
-> >  #endif	/* CONFIG_IOMMU_DMA */
-> >  #endif	/* __KERNEL__ */
-> >  #endif	/* __DMA_IOMMU_H */
-> > --
-> > 1.9.1
-> >
-> >
+Here are the ACPI IORT changes I have queued aimed at the v4.15 kernel
+release.
+
+Main changes:
+
+- SMMUv3 MSI enablement work based on IORT issue C spec updates
+  (Hanjun Guo)
+- Clean-ups/rework in preparation for PMCG support (Lorenzo Pieralisi)
+
+Patches have a compile time dependency on the ACPICA tree that we handled
+through an ACPI_CA_VERSION guard; I will remove it at v4.15-rc1 when
+dependencies have settled.
+
+Reference discussion:
+
+http://lkml.kernel.org/r/20171013130445.GA27895 at red-moon
+
+I expect no merge conflict with the arm64 tree for-next/core branch.
+
+The content patches will cause a minor conflict when pulled into mainline,
+since mainline contains a fix:
+
+commit 37f6b42e9c ("ACPI/IORT: Fix PCI ACS enablement"))
+
+that was merged in v4.14-rc4 and code in this pull request does not
+rebase cleanly on top of it; my commit resolution below.
+
+Please consider pulling, thank you.
+
+Lorenzo
+
+-- >8 --
+diff --cc drivers/acpi/arm64/iort.c
+index de56394,7dc964f..0000000
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@@ -1215,7 -1326,7 +1357,8 @@@ static void __init iort_init_platform_d
+  	struct acpi_table_iort *iort;
+  	struct fwnode_handle *fwnode;
+  	int i, ret;
+ +	bool acs_enabled = false;
++ 	const struct iort_dev_config *ops;
+  
+  	/*
+  	 * iort_table and iort both point to the start of IORT table, but
+@@@ -1235,12 -1346,8 +1378,11 @@@
+  			return;
+  		}
+  
+ +		if (!acs_enabled)
+ +			acs_enabled = iort_enable_acs(iort_node);
+ +
+- 		if ((iort_node->type == ACPI_IORT_NODE_SMMU) ||
+- 			(iort_node->type == ACPI_IORT_NODE_SMMU_V3)) {
+- 
++ 		ops = iort_get_dev_cfg(iort_node);
++ 		if (ops) {
+  			fwnode = acpi_alloc_fwnode_static();
+  			if (!fwnode)
+  				return;
+-- >8 --
+
+The following changes since commit 9e66317d3c92ddaab330c125dfe9d06eee268aff:
+
+  Linux 4.14-rc3 (2017-10-01 14:54:54 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git tags/acpi/iort-for-v4.15
+
+for you to fetch changes up to 65637901a3409f8a7952750e975536bde70fa1f8:
+
+  ACPI/IORT: Enable SMMUv3/PMCG IORT MSI domain set-up (2017-10-16 14:30:15 +0100)
+
+----------------------------------------------------------------
+ACPI IORT updates for v4.15; patches content is logically split into
+the following subseries:
+
+- Code clean-ups (A.Yadav, L.Pieralisi)
+- Platform devices inizialization rework in preparation for IORT PMCG
+  handling (L.Pieralisi)
+- Mapping API rework to enable MSIs for IORT components as defined in
+  IORT specification issue C (H.Guo, L.Pieralisi)
+
+----------------------------------------------------------------
+Arvind Yadav (1):
+      acpi/arm64: pr_err() strings should end with newlines
+
+Hanjun Guo (3):
+      ACPI/IORT: Look up IORT node through struct fwnode_handle pointer
+      ACPI/IORT: Enable special index ITS group mappings for IORT nodes
+      ACPI/IORT: Add SMMUv3 specific special index mapping handling
+
+Lorenzo Pieralisi (4):
+      ACPI/IORT: Remove leftover ACPI_IORT_SMMU_V3_PXM_VALID guard
+      ACPI/IORT: Improve functions return type/storage class specifier indentation
+      ACPI/IORT: Make platform devices initialization code SMMU agnostic
+      ACPI/IORT: Enable SMMUv3/PMCG IORT MSI domain set-up
+
+ drivers/acpi/arm64/gtdt.c |   2 +-
+ drivers/acpi/arm64/iort.c | 258 +++++++++++++++++++++++++++++++++++-----------
+ include/linux/acpi_iort.h |   4 +-
+ 3 files changed, 203 insertions(+), 61 deletions(-)
