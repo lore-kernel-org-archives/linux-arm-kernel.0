@@ -1,194 +1,65 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 16 Oct 2017 14:41:39 +0100
-Subject: [PATCH v3 09/13] arm64: kernel: Add arch-specific SDEI entry
- code and CPU masking
-In-Reply-To: <20170922182614.27885-10-james.morse@arm.com>
-References: <20170922182614.27885-1-james.morse@arm.com>
- <20170922182614.27885-10-james.morse@arm.com>
-Message-ID: <20171016134139.sqe6xabdson2d5rd@armageddon.cambridge.arm.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Mon, 16 Oct 2017 08:42:41 -0500
+Subject: [PATCH 0/2] [v5] pinctrl: qcom: add support for sparse GPIOs
+In-Reply-To: <CACRpkdYis3kNG45zmkTcP8vCutfRJkh5UjnzwFVeyLmFYFEC-A@mail.gmail.com>
+References: <CACRpkdZcdLac_wYW+XqtZ=-APo8VmvYL4B1oL-wZyLy8KEs9AA@mail.gmail.com>
+ <1ecdf6ee-5098-15d3-f85e-66b39a6c25f9@codeaurora.org>
+ <CACRpkdaUV1Mjh7U9bBAgZA5Zq1oqN0HBT=VH5NkvPnY4gHxDVw@mail.gmail.com>
+ <d53e67a2-4f69-752f-ba35-53872d9b9760@codeaurora.org>
+ <CACRpkdYfAcKrgbgybccurUKTyR0E+tHDyzp7sbXxXxKuyMOGhQ@mail.gmail.com>
+ <619f48d2-59c7-c090-4ace-9e8db9f92064@codeaurora.org>
+ <CACRpkdZFunwQ=tiQqsapap7Ozz42hr=df5vqbC0S5xy5Wn+ZWw@mail.gmail.com>
+ <255ad0dc-2d16-ae7f-0b45-500e23cff1a4@codeaurora.org>
+ <20171003220311.GU457@codeaurora.org>
+ <CACRpkdYXsY5eixYkEeuZTHJn7q6_6BdTxZ-2yneUyEKUjKF3Gw@mail.gmail.com>
+ <20171012073922.GB18706@codeaurora.org>
+ <CACRpkdYis3kNG45zmkTcP8vCutfRJkh5UjnzwFVeyLmFYFEC-A@mail.gmail.com>
+Message-ID: <22ef3c75-bdf6-6aeb-a1dd-2d03eb46fd58@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 22, 2017 at 07:26:10PM +0100, James Morse wrote:
-> diff --git a/arch/arm64/include/asm/sdei.h b/arch/arm64/include/asm/sdei.h
-> new file mode 100644
-> index 000000000000..ed329e01a301
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/sdei.h
-> @@ -0,0 +1,63 @@
-> +/*
-> + * Copyright (C) 2017 ARM Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +#ifndef __ASM_SDEI_H
-> +#define __ASM_SDEI_H
-> +
-> +/* Values for sdei_exit_mode */
-> +#define SDEI_EXIT_HVC  0
-> +#define SDEI_EXIT_SMC  1
-> +
-> +#define SDEI_STACK_SIZE		IRQ_STACK_SIZE
-> +
-> +#ifndef __ASSEMBLY__
-> +
-> +#include <linux/linkage.h>
-> +#include <linux/types.h>
-> +
-> +#include <asm/virt.h>
-> +
-> +extern unsigned long sdei_exit_mode;
-> +
-> +/* Software Delegated Exception entry point from firmware*/
-> +asmlinkage void __sdei_asm_handler(unsigned long event_num, unsigned long arg,
-> +				   unsigned long pc, unsigned long pstate);
-> +
-> +/*
-> + * The above entry point does the minimum to call C code. This function does
-> + * anything else, before calling the driver.
-> + */
-> +struct sdei_registered_event;
-> +asmlinkage unsigned long __sdei_handler(struct pt_regs *regs,
-> +					struct sdei_registered_event *arg);
-> +
-> +extern unsigned long sdei_arch_get_entry_point(int conduit);
+On 10/14/2017 05:43 PM, Linus Walleij wrote:
+> So I guess the driver needs to know what pin registers it can't
+> access so the user does not get a gun to shoot in the foot with.
+> 
+> If we augment gpiolib to just handle -EACCES or something
+> (-EIO?) from the driver .get_direction() callback for these lines,
+> things should be smooth?
 
-Nitpick: drop the "extern" here.
+You mean like this:
 
-> diff --git a/arch/arm64/kernel/sdei-entry.S b/arch/arm64/kernel/sdei-entry.S
-> new file mode 100644
-> index 000000000000..cf12f8da0789
-> --- /dev/null
-> +++ b/arch/arm64/kernel/sdei-entry.S
-> @@ -0,0 +1,122 @@
-> +/*
-> + * Software Delegated Exception entry point from firmware to the kernel.
-> + *
-> + * Copyright (C) 2017 ARM Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/linkage.h>
-> +
-> +#include <asm/alternative.h>
-> +#include <asm/asm-offsets.h>
-> +#include <asm/assembler.h>
-> +#include <asm/memory.h>
-> +#include <asm/ptrace.h>
-> +#include <asm/sdei.h>
-> +#include <uapi/linux/sdei.h>
-> +
-> +/*
-> + * Software Delegated Exception entry point.
-> + *
-> + * x0: Event number
+diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c 
+b/drivers/pinctrl/qcom/pinctrl-msm.c
+index ff491da64dab..ca4ae3d76eb4 100644
+--- a/drivers/pinctrl/qcom/pinctrl-msm.c
++++ b/drivers/pinctrl/qcom/pinctrl-msm.c
+@@ -443,6 +443,14 @@ static int msm_gpio_get_direction(struct gpio_chip 
+*chip, unsigned int offset)
 
-Currently the only event number is 0. Shall we plan for having other
-events in the future or we just ignore this argument?
+  	g = &pctrl->soc->groups[offset];
 
-> + * x1: struct sdei_registered_event argument from registration time.
-> + * x2: interrupted PC
-> + * x3: interrupted PSTATE
-[...]
-> +/*
-> + * __sdei_handler() returns one of:
-> + *  SDEI_EV_HANDLED -  success, return to the interrupted context.
-> + *  SDEI_EV_FAILED  -  failure, return this error code to firmare.
-> + *  virtual-address -  success, return to this address.
-> + */
-> +static __kprobes unsigned long _sdei_handler(struct pt_regs *regs,
-> +					     struct sdei_registered_event *arg)
-> +{
-> +	u32 mode;
-> +	int i, err = 0;
-> +	int clobbered_registers = 4;
++	/*
++	 * During initialization, gpiolib may query all GPIOs for their
++	 * initial direction, regardless if they exist, so block access
++	 * to those that are unavailable.
++	 */
++	if (!g->npins)
++		return -ENODEV;
++
+  	val = readl(pctrl->regs + g->ctl_reg);
 
-Maybe const int here if you want to avoid magic numbers in the 'for'
-loop below. Otherwise it looks like some variable you intend to modify
-in this function.
+  	/* 0 = output, 1 = input */
 
-> +	u64 elr = read_sysreg(elr_el1);
-> +	u32 kernel_mode = read_sysreg(CurrentEL) | 1;	/* +SPSel */
-> +	unsigned long vbar = read_sysreg(vbar_el1);
-> +
-> +	/* Retrieve the missing registers values */
-> +	for (i = 0; i < clobbered_registers; i++) {
-> +		/* from within the handler, this call always succeeds */
-> +		sdei_api_event_context(i, &regs->regs[i]);
-> +	}
-> +
-> +	/*
-> +	 * We didn't take an exception to get here, set PAN. UAO will be cleared
-> +	 * by sdei_event_handler()s set_fs(USER_DS) call.
-> +	 */
-> +	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,
-> +			CONFIG_ARM64_PAN));
 
-Can you use uaccess_disable() directly?
+This is what I have in my patch already.  I can return any error message 
+you like, but -ENODEV already works.
 
-> diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
-> index d8a9859f6102..1f6633b337aa 100644
-> --- a/drivers/firmware/Kconfig
-> +++ b/drivers/firmware/Kconfig
-> @@ -50,6 +50,7 @@ config ARM_SCPI_POWER_DOMAIN
->  
->  config ARM_SDE_INTERFACE
->  	bool "ARM Software Delegated Exception Interface (SDEI)"
-> +	depends on ARM64
->  	help
->  	  The Software Delegated Exception Interface (SDEI) is an ARM
->  	  standard for registering callbacks from the platform firmware
-> diff --git a/drivers/firmware/arm_sdei.c b/drivers/firmware/arm_sdei.c
-> index 4b3c7fd99c34..3ea6a19ae439 100644
-> --- a/drivers/firmware/arm_sdei.c
-> +++ b/drivers/firmware/arm_sdei.c
-> @@ -154,6 +154,7 @@ int sdei_api_event_context(u32 query, u64 *result)
->  	return invoke_sdei_fn(SDEI_1_0_FN_SDEI_EVENT_CONTEXT, query, 0, 0, 0, 0,
->  			      result);
->  }
-> +NOKPROBE_SYMBOL(sdei_api_event_context);
-
-Should this be part of the patch introducing arm_sdei.c?
-
->  
->  static int sdei_api_event_get_info(u32 event, u32 info, u64 *result)
->  {
-> diff --git a/include/linux/sdei.h b/include/linux/sdei.h
-> index bb3dd000771e..df3fe6373e32 100644
-> --- a/include/linux/sdei.h
-> +++ b/include/linux/sdei.h
-> @@ -32,6 +32,8 @@ enum sdei_conduit_types {
->  	CONDUIT_HVC,
->  };
->  
-> +#include <asm/sdei.h>
-> +
->  /* Arch code should override this to set the entry point from firmware... */
->  #ifndef sdei_arch_get_entry_point
->  #define sdei_arch_get_entry_point(conduit)	(0)
-
-Same here. This should not be built before the Kconfig change anyway.
+The problem is that it's insufficient.  I also want the non-available 
+GPIOs to be as absent as possible.  I don't want them to show up in 
+/sys/kernel/debug/gpio, and I don't want to be able to create them via 
+/sys/class/gpio/export.
 
 -- 
-Catalin
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
