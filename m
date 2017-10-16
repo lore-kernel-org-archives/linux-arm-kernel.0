@@ -1,128 +1,59 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 16 Oct 2017 15:24:46 +0100
-Subject: [PATCH v3] arm64: acpi/gtdt: validate CNTFRQ after having
- enabled the frame
-In-Reply-To: <20170901103533.8970-1-ard.biesheuvel@linaro.org>
-References: <20170901103533.8970-1-ard.biesheuvel@linaro.org>
-Message-ID: <20171016142445.skn2nue3ddcexmia@lakrids.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 16 Oct 2017 16:26:07 +0200
+Subject: [PATCH] ARM: dts: fix PCLK name on Gemini and MOXA ART
+Message-ID: <20171016142607.11930-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+These platforms provide a clock to their watchdog, in each
+case this is the peripheral clock (PCLK), so explicitly
+name the clock in the device tree.
 
-Sorry it's taken so long to review this, and thanks for respinning this.
+Take this opportunity to add the "faraday,ftwdt010"
+compatible as fallback to the watchdog IP blocks.
 
-I'll get this queued for v4.15.
+Cc: Jonas Jensen <jonas.jensen@gmail.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ARM SoC folks: please apply this directly for DTS.
+---
+ arch/arm/boot/dts/gemini.dtsi | 3 ++-
+ arch/arm/boot/dts/moxart.dtsi | 3 ++-
+ 2 files changed, 4 insertions(+), 2 deletions(-)
 
-Thanks,
-Mark.
-
-On Fri, Sep 01, 2017 at 11:35:33AM +0100, Ard Biesheuvel wrote:
-> The ACPI GTDT code validates the CNTFRQ field of each MMIO timer
-> frame against the CNTFRQ system register of the current CPU, to
-> ensure that they are equal, which is mandated by the architecture.
-> 
-> However, reading the CNTFRQ field of a frame is not possible until
-> the RFRQ bit in the frame's CNTACRn register is set, and doing so
-> before that willl produce the following error:
-> 
->   arch_timer: [Firmware Bug]: CNTFRQ mismatch: frame @ 0x00000000e0be0000: (0x00000000), CPU: (0x0ee6b280)
->   arch_timer: Disabling MMIO timers due to CNTFRQ mismatch
->   arch_timer: Failed to initialize memory-mapped timer.
-> 
-> The reason is that the CNTFRQ field is RES0 if access is not enabled.
-> 
-> So move the validation of CNTFRQ into the loop that iterates over the
-> timers to find the best frame, but defer it until after we have selected
-> the best frame, which should also have enabled the RFRQ bit.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> v3: - preserve existing logic as much as possible wrt verifying all frames of
->       all timers before selecting a suitable one
-> 
->  drivers/clocksource/arm_arch_timer.c | 38 +++++++++++---------
->  1 file changed, 21 insertions(+), 17 deletions(-)
-> 
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 72bbfccef113..30071cdea846 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -1264,10 +1264,6 @@ arch_timer_mem_find_best_frame(struct arch_timer_mem *timer_mem)
->  
->  	iounmap(cntctlbase);
->  
-> -	if (!best_frame)
-> -		pr_err("Unable to find a suitable frame in timer @ %pa\n",
-> -			&timer_mem->cntctlbase);
-> -
->  	return best_frame;
->  }
->  
-> @@ -1368,6 +1364,8 @@ static int __init arch_timer_mem_of_init(struct device_node *np)
->  
->  	frame = arch_timer_mem_find_best_frame(timer_mem);
->  	if (!frame) {
-> +		pr_err("Unable to find a suitable frame in timer @ %pa\n",
-> +			&timer_mem->cntctlbase);
->  		ret = -EINVAL;
->  		goto out;
->  	}
-> @@ -1416,7 +1414,7 @@ arch_timer_mem_verify_cntfrq(struct arch_timer_mem *timer_mem)
->  static int __init arch_timer_mem_acpi_init(int platform_timer_count)
->  {
->  	struct arch_timer_mem *timers, *timer;
-> -	struct arch_timer_mem_frame *frame;
-> +	struct arch_timer_mem_frame *frame, *best_frame = NULL;
->  	int timer_count, i, ret = 0;
->  
->  	timers = kcalloc(platform_timer_count, sizeof(*timers),
-> @@ -1428,14 +1426,6 @@ static int __init arch_timer_mem_acpi_init(int platform_timer_count)
->  	if (ret || !timer_count)
->  		goto out;
->  
-> -	for (i = 0; i < timer_count; i++) {
-> -		ret = arch_timer_mem_verify_cntfrq(&timers[i]);
-> -		if (ret) {
-> -			pr_err("Disabling MMIO timers due to CNTFRQ mismatch\n");
-> -			goto out;
-> -		}
-> -	}
-> -
->  	/*
->  	 * While unlikely, it's theoretically possible that none of the frames
->  	 * in a timer expose the combination of feature we want.
-> @@ -1444,12 +1434,26 @@ static int __init arch_timer_mem_acpi_init(int platform_timer_count)
->  		timer = &timers[i];
->  
->  		frame = arch_timer_mem_find_best_frame(timer);
-> -		if (frame)
-> -			break;
-> +		if (!best_frame)
-> +			best_frame = frame;
-> +
-> +		ret = arch_timer_mem_verify_cntfrq(timer);
-> +		if (ret) {
-> +			pr_err("Disabling MMIO timers due to CNTFRQ mismatch\n");
-> +			goto out;
-> +		}
-> +
-> +		if (!best_frame) /* implies !frame */
-> +			/*
-> +			 * Only complain about missing suitable frames if we
-> +			 * haven't already found one in a previous iteration.
-> +			 */
-> +			pr_err("Unable to find a suitable frame in timer @ %pa\n",
-> +				&timer->cntctlbase);
->  	}
->  
-> -	if (frame)
-> -		ret = arch_timer_mem_frame_register(frame);
-> +	if (best_frame)
-> +		ret = arch_timer_mem_frame_register(best_frame);
->  out:
->  	kfree(timers);
->  	return ret;
-> -- 
-> 2.11.0
-> 
+diff --git a/arch/arm/boot/dts/gemini.dtsi b/arch/arm/boot/dts/gemini.dtsi
+index c68e8d430234..f0d178c77153 100644
+--- a/arch/arm/boot/dts/gemini.dtsi
++++ b/arch/arm/boot/dts/gemini.dtsi
+@@ -145,11 +145,12 @@
+ 		};
+ 
+ 		watchdog at 41000000 {
+-			compatible = "cortina,gemini-watchdog";
++			compatible = "cortina,gemini-watchdog", "faraday,ftwdt010";
+ 			reg = <0x41000000 0x1000>;
+ 			interrupts = <3 IRQ_TYPE_LEVEL_HIGH>;
+ 			resets = <&syscon GEMINI_RESET_WDOG>;
+ 			clocks = <&syscon GEMINI_CLK_APB>;
++			clock-names = "PCLK";
+ 		};
+ 
+ 		uart0: serial at 42000000 {
+diff --git a/arch/arm/boot/dts/moxart.dtsi b/arch/arm/boot/dts/moxart.dtsi
+index 1f4c795d3f72..da7b3237bfe9 100644
+--- a/arch/arm/boot/dts/moxart.dtsi
++++ b/arch/arm/boot/dts/moxart.dtsi
+@@ -87,9 +87,10 @@
+ 		};
+ 
+ 		watchdog: watchdog at 98500000 {
+-			compatible = "moxa,moxart-watchdog";
++			compatible = "moxa,moxart-watchdog", "faraday,ftwdt010";
+ 			reg = <0x98500000 0x10>;
+ 			clocks = <&clk_apb>;
++			clock-names = "PCLK";
+ 		};
+ 
+ 		sdhci: sdhci at 98e00000 {
+-- 
+2.13.6
