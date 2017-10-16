@@ -1,42 +1,74 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 16 Oct 2017 09:43:31 +0200
-Subject: [PATCH v3 00/10] arm64: dts: renesas: Use R-Car GPIO Gen[123]
- fallback compat strings
-In-Reply-To: <20171013123311.15278-1-horms+renesas@verge.net.au>
-References: <20171013123311.15278-1-horms+renesas@verge.net.au>
-Message-ID: <20171016074331.26ofkgihmyje4wa7@verge.net.au>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 16 Oct 2017 09:49:33 +0200
+Subject: [PATCH v5 02/12] mmc: mediatek: add support of mt2701/mt2712
+In-Reply-To: <1508055978.8978.5.camel@mtksdaap41>
+References: <1507689696-25928-1-git-send-email-chaotian.jing@mediatek.com>
+ <1507689696-25928-3-git-send-email-chaotian.jing@mediatek.com>
+ <1508055978.8978.5.camel@mtksdaap41>
+Message-ID: <a506506b-a326-6d54-9827-4fd82680700d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 13, 2017 at 02:33:01PM +0200, Simon Horman wrote:
-> Use newly added R-Car GPIO Gen 1, 2 and 3 fallback compat strings in peace
-> of now deprecated non-generation specific R-Car GPIO fallback compat string
-> in the DT of Renesas ARM and arm64 based SoCs.
-> 
-> As notied in the changelogs for the r8a777[89] changes, this introduces
-> an incompatibility with pre-v4.14 kernels used with new DTBs. There is
-> no run-time effect for other SoCs updated by this changeset.
-> 
-> Based on renesas-devel-20171013-v4.14-rc4
-> 
-> Changes since v2:
-> * Consistently use and refer to gen1 rather than gen2 binding
->   in patches for gen1 SoCs
-> 
-> Changes since v1:
-> * Accumulate review tags
-> * Note run-time effect for r8a777[89] SoCs
-> 
-> Simon Horman (10):
->   ARM: dts: r8a7778: Use R-Car GPIO Gen1 fallback compat string
->   ARM: dts: r8a7779: Use R-Car GPIO Gen1 fallback compat string
->   ARM: dts: r8a7743: Use R-Car GPIO Gen2 fallback compat string
->   ARM: dts: r8a7790: Use R-Car GPIO Gen2 fallback compat string
->   ARM: dts: r8a7791: Use R-Car GPIO Gen2 fallback compat string
->   ARM: dts: r8a7792: Use R-Car GPIO Gen2 fallback compat string
->   ARM: dts: r8a7793: Use R-Car GPIO Gen2 fallback compat string
->   ARM: dts: r8a7794: Use R-Car GPIO Gen2 fallback compat string
->   arm64: dts: r8a7795: Use R-Car GPIO Gen3 fallback compat string
->   arm64: dts: r8a7796: Use R-Car GPIO Gen3 fallback compat string
 
-Applied with Geert's review tags.
+
+On 10/15/2017 10:26 AM, CK Hu wrote:
+> Hi, Chaotian:
+> 
+> On Wed, 2017-10-11 at 10:41 +0800, Chaotian Jing wrote:
+>> mt2701/mt2712 has 12bit clock div, which is not compatible with
+>> mt8135/mt8173. and, some additional features will be added in
+>> mt2701/mt2712, so that need distinguish it by comatibale name.
+>>
+>> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+>> ---
+>>   drivers/mmc/host/mtk-sd.c | 82 +++++++++++++++++++++++++++++++++++++++--------
+>>   1 file changed, 69 insertions(+), 13 deletions(-)
+>>
+>> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+>> index 267f7ab..643c795 100644
+>> --- a/drivers/mmc/host/mtk-sd.c
+>> +++ b/drivers/mmc/host/mtk-sd.c
+[...]
+>> @@ -350,6 +358,31 @@ struct msdc_host {
+>>   	struct msdc_tune_para saved_tune_para; /* tune result of CMD21/CMD19 */
+>>   };
+>>   
+>> +static const struct mtk_mmc_compatible mt8135_compat = {
+>> +	.clk_div_bits = 8,
+>> +};
+>> +
+>> +static const struct mtk_mmc_compatible mt8173_compat = {
+>> +	.clk_div_bits = 8,
+>> +};
+>> +
+>> +static const struct mtk_mmc_compatible mt2701_compat = {
+>> +	.clk_div_bits = 12,
+>> +};
+>> +
+>> +static const struct mtk_mmc_compatible mt2712_compat = {
+>> +	.clk_div_bits = 12,
+>> +};
+>> +
+>> +static const struct of_device_id msdc_of_ids[] = {
+>> +	{ .compatible = "mediatek,mt8135-mmc", .data = &mt8135_compat},
+>> +	{ .compatible = "mediatek,mt8173-mmc", .data = &mt8173_compat},
+> 
+> Because mt8135_compat is equal to mt8173_compat, so I think the
+> compatible of "mediatek,mt8173-mmc" is redundant. You could just keep
+> compatible of "mediatek,mt8135-mmc" in driver, and use
+> "mediatek,mt8135-mmc" for both mt8135.dtsi and mt8173.dtsi.
+> 
+
+Well thing is, that in the follow-up patches, new data types get added to the 
+different compat structures and in the end all four a different.
+
+>> +	{ .compatible = "mediatek,mt2701-mmc", .data = &mt2701_compat},
+>> +	{ .compatible = "mediatek,mt2712-mmc", .data = &mt2712_compat},
+> 
+> Ditto.
+> 
+
+Same here.
+
+Regards,
+Matthias
