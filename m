@@ -1,39 +1,42 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 16 Oct 2017 20:34:03 -0200
-Subject: [PATCH 3/4] ARM: dts: imx35-eukrea-mbimxsd35-baseboard: Fix the
- 'cd-gpios' property
-In-Reply-To: <1508193244-14599-1-git-send-email-festevam@gmail.com>
-References: <1508193244-14599-1-git-send-email-festevam@gmail.com>
-Message-ID: <1508193244-14599-3-git-send-email-festevam@gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 17 Oct 2017 00:34:10 +0200
+Subject: [PATCH v4 0/6] K2G: Add QSPI support
+In-Reply-To: <69beca0c-68a2-2d2c-d4a8-6f05a1fbc957@wedev4u.fr>
+References: <20171003051925.8821-1-vigneshr@ti.com>
+ <09cc0a61-3f73-4a10-2d67-32515a7da861@ti.com>
+ <6f507813-388a-13e5-31ba-736b419744fa@gmail.com>
+ <69beca0c-68a2-2d2c-d4a8-6f05a1fbc957@wedev4u.fr>
+Message-ID: <ebd85d99-431b-3f6d-4bdf-e7d47b81567c@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+On 10/17/2017 12:29 AM, Cyrille Pitchen wrote:
+> Hi all,
+> 
+> Le 16/10/2017 ? 11:28, Marek Vasut a ?crit?:
+>> On 10/16/2017 08:15 AM, Vignesh R wrote:
+>>>
+>>>
+>>> On Tuesday 03 October 2017 10:49 AM, Vignesh R wrote:
+>>>>
+>>>>
+>>>> This series adds support for Cadence QSPI IP present in TI's 66AK2G SoC.
+>>>> The patches enhance the existing cadence-quadspi driver to support
+>>>> loopback clock circuit, pm_runtime support and tweaks for 66AK2G SoC.
+>>>
+>>> Gentle ping on the series...
+>>
+>> It's IMO OK, Cyrille, can you pick it ?
+>>
+> 
+> The series looks good to me too.
+> 
+> Marek, could you please add you "Acked-by" or "Reviewed-by" tag for the
+> record in patchwork ? It will be automatically added when I use
+> "pwclient git-am -s" to merge the patches into the spi-nor/next branch.
 
-The GPIO polarity is missing in the cd-gpios property.
+Acked-by: Marek Vasut <marek.vasut@gmail.com>
 
-Fix it, so that the following build warning is gone:
-
-  DTC     arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dtb
-arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dtb: Warning (gpios_property): cd-gpios property size (8) too small for cell size 2 in /soc/aips at 53f00000/esdhc at 53fb400
-
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
-index e935713..dfc7f45 100644
---- a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
-+++ b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
-@@ -65,7 +65,7 @@
- &esdhc1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_esdhc1>;
--	cd-gpios = <&gpio3 24>;
-+	cd-gpios = <&gpio3 24 GPIO_ACTIVE_LOW>;
- 	status = "okay";
- };
- 
 -- 
-2.7.4
+Best regards,
+Marek Vasut
