@@ -1,57 +1,48 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Mon, 16 Oct 2017 08:51:20 -0600
-Subject: [PATCH 0/2] fix lockdep warnings in s5p_mfc and exynos-gsc vb2
- drivers
-In-Reply-To: <c2dae5ff-a35c-bdd1-910b-75db6c9c16b2@samsung.com>
-References: <CGME20171013231531epcas5p2f009317ed58f5177e7a0768b69a62b6c@epcas5p2.samsung.com>
- <cover.1507935819.git.shuahkh@osg.samsung.com>
- <c2dae5ff-a35c-bdd1-910b-75db6c9c16b2@samsung.com>
-Message-ID: <649e7ce7-6d2a-55da-7ca4-214400dc1708@osg.samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 16 Oct 2017 07:54:44 -0700
+Subject: [PATCH v5 2/2] memory: ti-emif-sram: introduce relocatable
+ suspend/resume handlers
+In-Reply-To: <20171013205915.9652-3-d-gerlach@ti.com>
+References: <20171013205915.9652-1-d-gerlach@ti.com>
+ <20171013205915.9652-3-d-gerlach@ti.com>
+Message-ID: <20171016145444.GX4394@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
-
-On 10/16/2017 06:48 AM, Marek Szyprowski wrote:
-> Hi Shuah,
+* Dave Gerlach <d-gerlach@ti.com> [171013 14:00]:
+> Certain SoCs like Texas Instruments AM335x and AM437x require parts
+> of the EMIF PM code to run late in the suspend sequence from SRAM,
+> such as saving and restoring the EMIF context and placing the memory
+> into self-refresh.
 > 
-> On 2017-10-14 01:13, Shuah Khan wrote:
->> Driver mmap functions shouldn't hold lock when calling vb2_mmap(). The
->> vb2_mmap() function has its own lock that it uses to protect the critical
->> section.
->>
->> Reference: commit log for f035eb4e976ef5a059e30bc91cfd310ff030a7d3
+> One requirement for these SoCs to suspend and enter its lowest power
+> mode, called DeepSleep0, is that the PER power domain must be shut off.
+> Because the EMIF (DDR Controller) resides within this power domain, it
+> will lose context during a suspend operation, so we must save it so we
+> can restore once we resume. However, we cannot execute this code from
+> external memory, as it is not available at this point, so the code must
+> be executed late in the suspend path from SRAM.
 > 
-> It would make sense to add the information about the reference commit to each
-> commit message and also point to commit e752577ed7bf55c81e10343fced8b378cda2b63b,
-> as it is exactly the same case here. Anyway:
-
-I think It does make sense to add the commit information to each commit message.
-I can do that send v2.
-
+> This patch introduces a ti-emif-sram driver that includes several
+> functions written in ARM ASM that are relocatable so the PM SRAM
+> code can use them. It also allocates a region of writable SRAM to
+> be used by the code running in the executable region of SRAM to save
+> and restore the EMIF context. It can export a table containing the
+> absolute addresses of the available PM functions so that other SRAM
+> code can branch to them. This code is required for suspend/resume on
+> AM335x and AM437x to work.
 > 
-> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
-
-Thanks.
-
+> In addition to this, to be able to share data structures between C and
+> the ti-emif-sram-pm assembly code, we can automatically generate all of
+> the C struct member offsets and sizes as macros by processing
+> emif-asm-offsets.c into assembly code and then extracting the relevant
+> data as is done for the generated platform asm-offsets.h files.
 > 
-> I wonder if makes sense to send those patches also to stable at vget.kernel.org
-> (maybe v4.3+, like the mentioned above commit, if they really apply?).
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> ---
+> v4->v5:
+> * Simplify Makefile to generate include/generated/ti-emif-asm-offsets.h
 
-I don't believe they will apply as is. I can work back-porting once these get into
-the mainline.
+Looks good to me:
 
-> 
->> Shuah Khan (2):
->>    media: exynos-gsc: fix lockdep warning
->>    media: s5p-mfc: fix lockdep warning
->>
->>   drivers/media/platform/exynos-gsc/gsc-m2m.c | 5 -----
->>   drivers/media/platform/s5p-mfc/s5p_mfc.c    | 3 ---
->>   2 files changed, 8 deletions(-)
->>
-> 
-> Best regards
-
-thanks,
--- Shuah
+Acked-by: Tony Lindgren <tony@atomide.com>
