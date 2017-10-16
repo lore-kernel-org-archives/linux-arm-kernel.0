@@ -1,44 +1,50 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 16 Oct 2017 20:40:43 -0200
-Subject: [PATCH] ARM: dts: imx25-eukrea-mbimxsd25-baseboard: Fix the
- 'cd-gpios' property
-Message-ID: <1508193643-30243-1-git-send-email-festevam@gmail.com>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Mon, 16 Oct 2017 15:44:07 -0700
+Subject: [RESEND][PATCH 0/4] firmware: of: populate /firmware/ node during
+ init
+In-Reply-To: <1506595562-10592-1-git-send-email-sudeep.holla@arm.com>
+References: <1506595562-10592-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <59E53637.8020502@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
++ me
 
-The GPIO polarity is missing in the cd-gpios property.
-
-Fix it, so that the following build warnings are gone:
-
-  DTC     arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dtb
-arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dtb: Warning (gpios_property): cd-gpios property size (8) too small for cell size 2 in /soc/aips at 53f00000/esdhc at 53fb4000
-  DTC     arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dtb
-arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dtb: Warning (gpios_property): cd-gpios property size (8) too small for cell size 2 in /soc/aips at 53f00000/esdhc at 53fb4000
-  DTC     arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-svga.dtb
-arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-svga.dtb: Warning (gpios_property): cd-gpios property size (8) too small for cell size 2 in /soc/aips at 53f00000/esdhc at 53fb4000
-  DTC     arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dtb
-arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dtb: Warning (gpios_property): cd-gpios property size (8) too small for cell size 2 in /soc/aips at 53f00000/esdhc at 53fb4000
-
-
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
-index db39bd6..0f05372 100644
---- a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
-+++ b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
-@@ -64,7 +64,7 @@
- &esdhc1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_esdhc1>;
--	cd-gpios = <&gpio1 20>;
-+	cd-gpios = <&gpio1 20 GPIO_ACTIVE_LOW>;
- 	status = "okay";
- };
- 
--- 
-2.7.4
+On 09/28/17 03:45, Sudeep Holla wrote:
+> Hi Rob, Arnd,
+> 
+> There's a push to place all firmware related device node under
+> /firmware/ node. However all the associated drivers are dealing with
+> device creation in their own ways. For example, qcom_scm, optee and
+> meson-sm drivers deal with the node in their own way. The SCMI drivers
+> I am about to add also needs to do the same. This small series is to
+> make it generic so that all the users of /firmware/ node need not
+> repeat the same.
+> 
+> There was concern that /firmware in DT is fit for /sys/firmware in sysfs.
+> IMO anything exposed to userspace from such firmware interface must
+> be in "/sys/firmware", but I don't see any issue with kernel handling
+> them as platform device/driver internally.
+> 
+> Sudeep Holla (4):
+>   of: platform: populate /firmware/ node from
+>     of_platform_default_populate_init()
+>   firmware: qcom_scm: drop redandant of_platform_populate
+>   drivers: tee: rework optee_driver_{init,exit} to use platform device
+>   firmware: meson-sm: rework meson_sm_init to use
+>     module_platform_driver_probe
+> 
+>  drivers/firmware/meson/meson_sm.c | 21 ++++++-----
+>  drivers/firmware/qcom_scm.c       | 24 -------------
+>  drivers/of/platform.c             |  4 +++
+>  drivers/tee/optee/core.c          | 74 +++++++++++++--------------------------
+>  4 files changed, 41 insertions(+), 82 deletions(-)
+> 
+> --
+> 2.7.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
