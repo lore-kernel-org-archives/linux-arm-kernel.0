@@ -1,41 +1,35 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 16 Oct 2017 14:06:33 +0200
-Subject: [PATCH 2/6] ARM: sun8i: r40: add USB host port nodes for R40
-In-Reply-To: <7ee77556174b84846a59d57525ec1cb9@aosc.io>
-References: <20171008042906.46779-1-icenowy@aosc.io>
- <20171008042906.46779-3-icenowy@aosc.io>
- <20171009210340.ak6wo3vqnwj4gom4@flea.home>
- <55B35500-67FC-40AA-9A07-98C843DE55B3@aosc.io>
- <20171016093229.waizww2n4gwn4qpw@flea.lan>
- <7ee77556174b84846a59d57525ec1cb9@aosc.io>
-Message-ID: <20171016120633.6jof6wvsre27rxhv@flea.lan>
+Date: Mon, 16 Oct 2017 14:09:12 +0200
+Subject: [PATCH 1/2] dt-bindings: add binding for A64 DE2 CCU with SRAM
+ section
+In-Reply-To: <d62ac8b8ff9073b886ceaa9ce54e6903@aosc.io>
+References: <20171014122925.13220-1-icenowy@aosc.io>
+ <20171016091136.b4rnckh2tfi26shx@flea.lan>
+ <d62ac8b8ff9073b886ceaa9ce54e6903@aosc.io>
+Message-ID: <20171016120912.lxu7rikhffxsu5o4@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 16, 2017 at 05:39:58PM +0800, icenowy at aosc.io wrote:
-> ? 2017-10-16 17:32?Maxime Ripard ???
-> > On Tue, Oct 10, 2017 at 07:24:28AM +0800, Icenowy Zheng wrote:
-> > > >> +			interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
-> > > >> +			clocks = <&ccu CLK_BUS_OHCI1>,
-> > > >> +				 <&ccu CLK_BUS_EHCI1>,
-> > > >> +				 <&ccu CLK_USB_OHCI1>;
-> > > >> +			resets = <&ccu RST_BUS_OHCI1>,
-> > > >> +				 <&ccu RST_BUS_EHCI1>;
-> > > >
-> > > >Why do you need to take the OHCI resources too?
-> > > 
-> > > AW's strange design -- without OHCI resources taken EHCI
-> > > won't work.
+On Mon, Oct 16, 2017 at 05:41:10PM +0800, icenowy at aosc.io wrote:
+> ? 2017-10-16 17:11?Maxime Ripard ???
+> > On Sat, Oct 14, 2017 at 08:29:24PM +0800, Icenowy Zheng wrote:
+> > > A64's Display Engine 2.0 needs a section of SRAM (SRAM C) to be
+> > > claimed.
 > > 
-> > How has this been tested?
+> > Why?
 > 
-> As EHCI is probed before OHCI, this behavior is easy to
-> appear if the OHCI resources are removed.
+> Allwinner didn't document this, but if the SRAM is not claimed, the
+> DE2 MMIO zone is totally not accessible.
 
-And what is "this behaviour" exactly?
+Not accessible how? It generates an abort when you access it? It
+returns 0?
 
-What have you tested, what device did you connect, what is the outcome
-that isn't something you expected, etc.
+> It seems that Allwinner uses the SRAM C in the DE2 internally.
+
+Then shouldn't it be tied to all the DE2 devices then? So mixers
+too. Either way, this should be mentionned in your commit logs. How
+you're fixing things is much less interesting than why you're doing
+them. You can tell how you're doing them from your code already.
 
 Maxime
 
@@ -49,4 +43,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171016/c307ddc5/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171016/bc0d5cac/attachment.sig>
