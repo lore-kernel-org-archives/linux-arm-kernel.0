@@ -1,45 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 16 Oct 2017 16:04:57 +0100
-Subject: [GIT PULL] ACPI IORT changes for v4.15
-In-Reply-To: <20171013152937.GA13386@red-moon>
-References: <20171013152937.GA13386@red-moon>
-Message-ID: <20171016150456.GB10500@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 16 Oct 2017 17:09:14 +0200
+Subject: [PATCH 3/3] arm64: dts: mt2712: Add auxadc device node.
+In-Reply-To: <0e1bac27-18ca-121c-f1d7-8063af177a8b@gmail.com>
+References: <1505957212-13402-1-git-send-email-zhiyong.tao@mediatek.com>
+ <1505957212-13402-4-git-send-email-zhiyong.tao@mediatek.com>
+ <20170924164705.78cbb856@archlinux>
+ <0e1bac27-18ca-121c-f1d7-8063af177a8b@gmail.com>
+Message-ID: <6680d15a-625a-cc16-830f-9831f5f52ad3@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
 
-On Fri, Oct 13, 2017 at 04:29:37PM +0100, Lorenzo Pieralisi wrote:
-> Hi Catalin, Will,
-> 
-> here are the ACPI IORT changes I have queued aimed at the v4.15 kernel
-> release.
-> 
-> Main changes:
-> 
-> - SMMUv3 MSI enablement work based on IORT issue C spec updates
->   (Hanjun Guo)
-> - Clean-ups/rework in preparation for PMCG support (Lorenzo Pieralisi)
-> 
-> Patches have a compile time dependency on the ACPICA tree that we handled
-> through an ACPI_CA_VERSION guard; I will remove it at v4.15-rc1 when
-> dependencies have settled.
-> 
-> Reference discussion:
-> 
-> http://lkml.kernel.org/r/20171013130445.GA27895 at red-moon
-> 
-> I expect no merge conflict with the arm64 tree for-next/core branch.
-> 
-> Patches are based on v4.14-rc4 owing to an IORT dependency on a fix
-> (ie commit 37f6b42e9c ("ACPI/IORT: Fix PCI ACS enablement")) that
-> was merged in v4.14-rc4.
 
-As discussed offline, given that this is a trivial one-line conflict as
-opposed to a functional dependency, could you please send another pull
-request based on -rc3? The arm64 for-next/core branch is already based on
-that, and this doesn't seem like a good reason to pull in -rc4.
+On 10/13/2017 05:11 PM, Matthias Brugger wrote:
+> 
+> 
+> On 09/24/2017 05:47 PM, Jonathan Cameron wrote:
+>> On Thu, 21 Sep 2017 09:26:52 +0800
+>> Zhiyong Tao <zhiyong.tao@mediatek.com> wrote:
+>>
+>>> Add auxadc device node for MT2712.
+>>>
+>>> Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
+>>
+>> I've applied the IIO patches to make this work, so assume this will get
+>> picked up in due course.
+>>
+> 
+> pushed now to v4.14-next/dts64
+> Thanks.
+> 
 
-Cheers,
+I realized that this needs the mt2712 clock patches to actually work.
+Dropped for now. Please resubmit as soon as mt2712 clock patches got [1] 
+accepted upstream.
 
-Will
+Thanks,
+Matthias
+
+[1] https://lkml.org/lkml/2017/9/19/9
