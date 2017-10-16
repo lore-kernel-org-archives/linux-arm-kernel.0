@@ -1,46 +1,40 @@
-From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Mon, 16 Oct 2017 05:01:50 +0200
-Subject: [PATCH 0/3] arm64: dts: Initial MeLE V9 support
-Message-ID: <20171016030153.11078-1-afaerber@suse.de>
+From: wenyou.yang@microchip.com (Wenyou Yang)
+Date: Mon, 16 Oct 2017 11:14:24 +0800
+Subject: [PATCH v6 0/3] media: ov7670: Add entity init and power operation
+Message-ID: <20171016031427.4194-1-wenyou.yang@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This patch set is to add the media entity pads initialization,
+the ov7670_s_power function and get_fmt callback support.
 
-This mini-series adds a Device Tree for the MeLE V9 Android Media Player.
+Changes in v6:
+ - Remove .s_power callback to keep the ov7670 powered at all times.
+ - Update the commit log accordingly.
 
-Same as with PROBOX2 AVA, serial (loady) was the only working way to boot a new
-kernel from the vendor's U-Boot on this TV box.
+Changes in v5:
+ - Fix the build warning on the declaration *mbus_fmt(ISO C90 forbids mixed).
 
-More details at:
-https://en.opensuse.org/HCL:Mele_V9
+Changes in v4:
+ - Fix the build error when not enabling Media Controller API option.
+ - Fix the build error when not enabling V4L2 sub-device userspace API option.
 
-@MeLE: Please review the following three patches and either signal your
-acknowledgement of my naming proposals with an "Acked-by: name <email>"
-response or point out any changes you would like to see applied. Thanks!
+Changes in v3:
+ - Keep tried format info in the try_fmt member of
+   v4l2_subdev__pad_config struct.
+ - Add the internal_ops callback to set default format.
 
-Latest experimental patches at:
-https://github.com/afaerber/linux/commits/rtd1295-next
+Changes in v2:
+ - Add the patch to support the get_fmt ops.
+ - Remove the redundant invoking ov7670_init_gpio().
 
-Have a lot of fun!
+Wenyou Yang (3):
+  media: ov7670: Add entity pads initialization
+  media: ov7670: Add the get_fmt callback
+  media: ov7670: Add the ov7670_s_power function
 
-Cheers,
-Andreas
-
-Cc: meleservice at mele.cn
-Cc: devicetree at vger.kernel.org
-
-Andreas F?rber (3):
-  dt-bindings: Add vendor prefix for MeLE
-  dt-bindings: arm: realtek: Document MeLE V9
-  arm64: dts: realtek: Add MeLE V9
-
- Documentation/devicetree/bindings/arm/realtek.txt  |  1 +
- .../devicetree/bindings/vendor-prefixes.txt        |  1 +
- arch/arm64/boot/dts/realtek/Makefile               |  1 +
- arch/arm64/boot/dts/realtek/rtd1295-mele-v9.dts    | 31 ++++++++++++++++++++++
- 4 files changed, 34 insertions(+)
- create mode 100644 arch/arm64/boot/dts/realtek/rtd1295-mele-v9.dts
+ drivers/media/i2c/ov7670.c | 129 ++++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 122 insertions(+), 7 deletions(-)
 
 -- 
-2.13.6
+2.13.0
