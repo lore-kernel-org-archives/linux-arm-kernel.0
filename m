@@ -1,45 +1,140 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Mon, 16 Oct 2017 15:07:37 +0800
-Subject: [PATCH v5 0/7] Add PMIC support to MediaTek MT7622 SoC
-Message-ID: <cover.1508135937.git.sean.wang@mediatek.com>
+Date: Mon, 16 Oct 2017 15:07:40 +0800
+Subject: [PATCH v5 3/7] soc: mediatek: pwrap: add pwrap_write32 for writing in
+ 32-bit mode
+In-Reply-To: <cover.1508135937.git.sean.wang@mediatek.com>
+References: <cover.1508135937.git.sean.wang@mediatek.com>
+Message-ID: <3b87c3f06e59a3025634aae228f8a654ce2b5c36.1508135937.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-Changes since v4:
-- for patch 1/7 and 5/7, add the description about how to bind pmic wrapper with MT6380.
-- for patch 3/7, add more comments explaining why additional pwrap_read is 
-required in the pwrap_write32.
-- for patch 4/7 and 5/7, refactoring pwrap_init would help the driver to be more extensible 
-when more various SoC and PMICs join.
-- for patch 6/7, change pwrap_mt7622 into a const struct.
+Some regulators such as MediaTek MT6380 also has to be written in
+32-bit mode. So the patch adds pwrap_write32, rename old pwrap_write
+into pwrap_write16 and one additional function pointer is introduced
+for increasing flexibility allowing the determination which mode is
+used by the pwrap slave detection through device tree.
 
-Changes since v3
-- rebase into Linux 4.14-rc1
-- removed those patches already applied
+Signed-off-by: Chenglin Xu <chenglin.xu@mediatek.com>
+Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+---
+ drivers/soc/mediatek/mtk-pmic-wrap.c | 69 +++++++++++++++++++++++++++---------
+ 1 file changed, 53 insertions(+), 16 deletions(-)
 
-Changes since v2:
-- for patch 1/2, enhance the document as the suggestions from v2.
-- for patch 3, constify the table with struct regulator_ops, also fix that
-regulator doesn't have modesetting facilities it just shouldn't have the ops
-and finally fix copy+paste mistake in warranty disclaimer.
-- for patch 7/8, sort the things added for MT7622/MT6380 alphabetically.
-
-Chenglin Xu (1):
-  soc: mediatek: pwrap: add support for MT7622 SoC
-
-Sean Wang (6):
-  dt-bindings: arm: mediatek: add MT7622 string to the PMIC wrapper doc
-  soc: mediatek: pwrap: add pwrap_read32 for reading in 32-bit mode
-  soc: mediatek: pwrap: add pwrap_write32 for writing in 32-bit mode
-  soc: mediatek: pwrap: refactor pwrap_init for the various PMIC types
-  soc: mediatek: pwrap: add MediaTek MT6380 as one slave of pwrap
-  soc: mediatek: pwrap: fixup warnings from coding style
-
- .../devicetree/bindings/soc/mediatek/pwrap.txt     |   6 +-
- drivers/soc/mediatek/mtk-pmic-wrap.c               | 461 ++++++++++++++++++---
- 2 files changed, 407 insertions(+), 60 deletions(-)
-
+diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+index db55f13..2e435be 100644
+--- a/drivers/soc/mediatek/mtk-pmic-wrap.c
++++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+@@ -506,6 +506,7 @@ struct pwrap_slv_type {
+ 	 * which type is used by the detection through device tree.
+ 	 */
+ 	int (*pwrap_read)(struct pmic_wrapper *wrp, u32 adr, u32 *rdata);
++	int (*pwrap_write)(struct pmic_wrapper *wrp, u32 adr, u32 wdata);
+ };
+ 
+ struct pmic_wrapper {
+@@ -600,22 +601,6 @@ static int pwrap_wait_for_state(struct pmic_wrapper *wrp,
+ 	} while (1);
+ }
+ 
+-static int pwrap_write(struct pmic_wrapper *wrp, u32 adr, u32 wdata)
+-{
+-	int ret;
+-
+-	ret = pwrap_wait_for_state(wrp, pwrap_is_fsm_idle);
+-	if (ret) {
+-		pwrap_leave_fsm_vldclr(wrp);
+-		return ret;
+-	}
+-
+-	pwrap_writel(wrp, (1 << 31) | ((adr >> 1) << 16) | wdata,
+-			PWRAP_WACS2_CMD);
+-
+-	return 0;
+-}
+-
+ static int pwrap_read16(struct pmic_wrapper *wrp, u32 adr, u32 *rdata)
+ {
+ 	int ret;
+@@ -672,6 +657,55 @@ static int pwrap_read(struct pmic_wrapper *wrp, u32 adr, u32 *rdata)
+ 	return wrp->slave->pwrap_read(wrp, adr, rdata);
+ }
+ 
++static int pwrap_write16(struct pmic_wrapper *wrp, u32 adr, u32 wdata)
++{
++	int ret;
++
++	ret = pwrap_wait_for_state(wrp, pwrap_is_fsm_idle);
++	if (ret) {
++		pwrap_leave_fsm_vldclr(wrp);
++		return ret;
++	}
++
++	pwrap_writel(wrp, (1 << 31) | ((adr >> 1) << 16) | wdata,
++		     PWRAP_WACS2_CMD);
++
++	return 0;
++}
++
++static int pwrap_write32(struct pmic_wrapper *wrp, u32 adr, u32 wdata)
++{
++	int ret, msb, rdata;
++
++	for (msb = 0; msb < 2; msb++) {
++		ret = pwrap_wait_for_state(wrp, pwrap_is_fsm_idle);
++		if (ret) {
++			pwrap_leave_fsm_vldclr(wrp);
++			return ret;
++		}
++
++		pwrap_writel(wrp, (1 << 31) | (msb << 30) | (adr << 16) |
++			     ((wdata >> (msb * 16)) & 0xffff),
++			     PWRAP_WACS2_CMD);
++
++		/* The pwrap_read operation is the requirement of hardware used
++		 * for the synchronization between two successive 16-bit
++		 * pwrap_writel operations composing one 32-bit bus writing.
++		 * Otherwise, we'll find the result fails on the lower 16-bit
++		 * pwrap writing.
++		 */
++		if (!msb)
++			pwrap_read(wrp, adr, &rdata);
++	}
++
++	return 0;
++}
++
++static int pwrap_write(struct pmic_wrapper *wrp, u32 adr, u32 wdata)
++{
++	return wrp->slave->pwrap_write(wrp, adr, wdata);
++}
++
+ static int pwrap_regmap_read(void *context, u32 adr, u32 *rdata)
+ {
+ 	return pwrap_read(context, adr, rdata);
+@@ -1080,18 +1114,21 @@ static const struct pwrap_slv_type pmic_mt6323 = {
+ 	.dew_regs = mt6323_regs,
+ 	.type = PMIC_MT6323,
+ 	.pwrap_read = pwrap_read16,
++	.pwrap_write = pwrap_write16,
+ };
+ 
+ static const struct pwrap_slv_type pmic_mt6380 = {
+ 	.dew_regs = NULL,
+ 	.type = PMIC_MT6380,
+ 	.pwrap_read = pwrap_read32,
++	.pwrap_write = pwrap_write32,
+ };
+ 
+ static const struct pwrap_slv_type pmic_mt6397 = {
+ 	.dew_regs = mt6397_regs,
+ 	.type = PMIC_MT6397,
+ 	.pwrap_read = pwrap_read16,
++	.pwrap_write = pwrap_write16,
+ };
+ 
+ static const struct of_device_id of_slave_match_tbl[] = {
 -- 
 2.7.4
