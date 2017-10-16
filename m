@@ -1,49 +1,194 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 16 Oct 2017 14:35:31 +0100
-Subject: [PATCH 0/4] Cleanup instrumentation avoidance
-In-Reply-To: <20171016132440.38098-1-mark.rutland@arm.com>
-References: <20171016132440.38098-1-mark.rutland@arm.com>
-Message-ID: <20171016133530.fhspouznccpprjc6@lakrids.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 16 Oct 2017 14:41:39 +0100
+Subject: [PATCH v3 09/13] arm64: kernel: Add arch-specific SDEI entry
+ code and CPU masking
+In-Reply-To: <20170922182614.27885-10-james.morse@arm.com>
+References: <20170922182614.27885-1-james.morse@arm.com>
+ <20170922182614.27885-10-james.morse@arm.com>
+Message-ID: <20171016134139.sqe6xabdson2d5rd@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry Marc, I somehow typo'd your name when sending this out...
+On Fri, Sep 22, 2017 at 07:26:10PM +0100, James Morse wrote:
+> diff --git a/arch/arm64/include/asm/sdei.h b/arch/arm64/include/asm/sdei.h
+> new file mode 100644
+> index 000000000000..ed329e01a301
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/sdei.h
+> @@ -0,0 +1,63 @@
+> +/*
+> + * Copyright (C) 2017 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +#ifndef __ASM_SDEI_H
+> +#define __ASM_SDEI_H
+> +
+> +/* Values for sdei_exit_mode */
+> +#define SDEI_EXIT_HVC  0
+> +#define SDEI_EXIT_SMC  1
+> +
+> +#define SDEI_STACK_SIZE		IRQ_STACK_SIZE
+> +
+> +#ifndef __ASSEMBLY__
+> +
+> +#include <linux/linkage.h>
+> +#include <linux/types.h>
+> +
+> +#include <asm/virt.h>
+> +
+> +extern unsigned long sdei_exit_mode;
+> +
+> +/* Software Delegated Exception entry point from firmware*/
+> +asmlinkage void __sdei_asm_handler(unsigned long event_num, unsigned long arg,
+> +				   unsigned long pc, unsigned long pstate);
+> +
+> +/*
+> + * The above entry point does the minimum to call C code. This function does
+> + * anything else, before calling the driver.
+> + */
+> +struct sdei_registered_event;
+> +asmlinkage unsigned long __sdei_handler(struct pt_regs *regs,
+> +					struct sdei_registered_event *arg);
+> +
+> +extern unsigned long sdei_arch_get_entry_point(int conduit);
 
-Mark.
+Nitpick: drop the "extern" here.
 
-On Mon, Oct 16, 2017 at 02:24:36PM +0100, Mark Rutland wrote:
-> Recently we spotted that some code with special ABI requirements was
-> being instrumented by KCOV [1], and we need to avoid all instrumentation
-> in this case.
-> 
-> While it's possible to disable each instrumentation option manually,
-> this is tedious and error prone as new options are introduced.
-> 
-> This series adds a new CC_INSTRUMENT option which can be used to disable
-> all instrumentation of a given file or directory, and makes use of this
-> throught arm64.
-> 
-> There are other places where this could be used (e.g. the EFI stub), but
-> I've avoided altering those for now in the hope that this can be taken
-> via the arm64 tree.
-> 
-> Thanks,
-> Mark.
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-September/533105.html
-> 
-> Mark Rutland (4):
->   kbuild: allow global override of CC instrumentation
->   arm64: prevent instrumentation of LL/SC atomics
->   kvm/arm64: simplify CC instrumentation opt-out
->   arm64: vdso: remove pointless gcov option
-> 
->  arch/arm64/kernel/vdso/Makefile |  3 ---
->  arch/arm64/kvm/hyp/Makefile     |  5 +----
->  arch/arm64/lib/Makefile         |  1 +
->  scripts/Makefile.lib            | 17 +++++++++++++----
->  4 files changed, 15 insertions(+), 11 deletions(-)
-> 
-> -- 
-> 2.11.0
-> 
+> diff --git a/arch/arm64/kernel/sdei-entry.S b/arch/arm64/kernel/sdei-entry.S
+> new file mode 100644
+> index 000000000000..cf12f8da0789
+> --- /dev/null
+> +++ b/arch/arm64/kernel/sdei-entry.S
+> @@ -0,0 +1,122 @@
+> +/*
+> + * Software Delegated Exception entry point from firmware to the kernel.
+> + *
+> + * Copyright (C) 2017 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/linkage.h>
+> +
+> +#include <asm/alternative.h>
+> +#include <asm/asm-offsets.h>
+> +#include <asm/assembler.h>
+> +#include <asm/memory.h>
+> +#include <asm/ptrace.h>
+> +#include <asm/sdei.h>
+> +#include <uapi/linux/sdei.h>
+> +
+> +/*
+> + * Software Delegated Exception entry point.
+> + *
+> + * x0: Event number
+
+Currently the only event number is 0. Shall we plan for having other
+events in the future or we just ignore this argument?
+
+> + * x1: struct sdei_registered_event argument from registration time.
+> + * x2: interrupted PC
+> + * x3: interrupted PSTATE
+[...]
+> +/*
+> + * __sdei_handler() returns one of:
+> + *  SDEI_EV_HANDLED -  success, return to the interrupted context.
+> + *  SDEI_EV_FAILED  -  failure, return this error code to firmare.
+> + *  virtual-address -  success, return to this address.
+> + */
+> +static __kprobes unsigned long _sdei_handler(struct pt_regs *regs,
+> +					     struct sdei_registered_event *arg)
+> +{
+> +	u32 mode;
+> +	int i, err = 0;
+> +	int clobbered_registers = 4;
+
+Maybe const int here if you want to avoid magic numbers in the 'for'
+loop below. Otherwise it looks like some variable you intend to modify
+in this function.
+
+> +	u64 elr = read_sysreg(elr_el1);
+> +	u32 kernel_mode = read_sysreg(CurrentEL) | 1;	/* +SPSel */
+> +	unsigned long vbar = read_sysreg(vbar_el1);
+> +
+> +	/* Retrieve the missing registers values */
+> +	for (i = 0; i < clobbered_registers; i++) {
+> +		/* from within the handler, this call always succeeds */
+> +		sdei_api_event_context(i, &regs->regs[i]);
+> +	}
+> +
+> +	/*
+> +	 * We didn't take an exception to get here, set PAN. UAO will be cleared
+> +	 * by sdei_event_handler()s set_fs(USER_DS) call.
+> +	 */
+> +	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,
+> +			CONFIG_ARM64_PAN));
+
+Can you use uaccess_disable() directly?
+
+> diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
+> index d8a9859f6102..1f6633b337aa 100644
+> --- a/drivers/firmware/Kconfig
+> +++ b/drivers/firmware/Kconfig
+> @@ -50,6 +50,7 @@ config ARM_SCPI_POWER_DOMAIN
+>  
+>  config ARM_SDE_INTERFACE
+>  	bool "ARM Software Delegated Exception Interface (SDEI)"
+> +	depends on ARM64
+>  	help
+>  	  The Software Delegated Exception Interface (SDEI) is an ARM
+>  	  standard for registering callbacks from the platform firmware
+> diff --git a/drivers/firmware/arm_sdei.c b/drivers/firmware/arm_sdei.c
+> index 4b3c7fd99c34..3ea6a19ae439 100644
+> --- a/drivers/firmware/arm_sdei.c
+> +++ b/drivers/firmware/arm_sdei.c
+> @@ -154,6 +154,7 @@ int sdei_api_event_context(u32 query, u64 *result)
+>  	return invoke_sdei_fn(SDEI_1_0_FN_SDEI_EVENT_CONTEXT, query, 0, 0, 0, 0,
+>  			      result);
+>  }
+> +NOKPROBE_SYMBOL(sdei_api_event_context);
+
+Should this be part of the patch introducing arm_sdei.c?
+
+>  
+>  static int sdei_api_event_get_info(u32 event, u32 info, u64 *result)
+>  {
+> diff --git a/include/linux/sdei.h b/include/linux/sdei.h
+> index bb3dd000771e..df3fe6373e32 100644
+> --- a/include/linux/sdei.h
+> +++ b/include/linux/sdei.h
+> @@ -32,6 +32,8 @@ enum sdei_conduit_types {
+>  	CONDUIT_HVC,
+>  };
+>  
+> +#include <asm/sdei.h>
+> +
+>  /* Arch code should override this to set the entry point from firmware... */
+>  #ifndef sdei_arch_get_entry_point
+>  #define sdei_arch_get_entry_point(conduit)	(0)
+
+Same here. This should not be built before the Kconfig change anyway.
+
+-- 
+Catalin
