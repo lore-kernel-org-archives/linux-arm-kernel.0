@@ -1,30 +1,62 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 16 Oct 2017 14:52:23 +0200
-Subject: [PATCH 1/2] drm: bridge: Add bindings for TI THS8134
-In-Reply-To: <2446705.uuxjYiEYNm@avalon>
-References: <20170901094038.4312-1-linus.walleij@linaro.org>
- <2446705.uuxjYiEYNm@avalon>
-Message-ID: <CACRpkda2SDjG--zT+AbCJeqWyAcyNFs6h7AfUUKiDKHiQG2S3A@mail.gmail.com>
+From: net147@gmail.com (Jonathan Liu)
+Date: Mon, 16 Oct 2017 23:54:27 +1100
+Subject: [PATCH v2] usb: musb: sunxi: Explicitly release USB PHY on exit
+In-Reply-To: <20171016124949.GA73@LTA0271908.dhcp.ti.com>
+References: <20171010024525.21971-1-net147@gmail.com>
+ <20171010032252.GA25830@uda0271908>
+ <CANwerB2qnWXDi_wkxk9EZ0WeAunUjzVOBepEOXXnsm0PiByHMg@mail.gmail.com>
+ <20171016124949.GA73@LTA0271908.dhcp.ti.com>
+Message-ID: <CANwerB0V+iXaPqrwizyAfUcD2kPt0Lg-_muuzOdD5Mq7MPf-Qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 13, 2017 at 2:08 AM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-
->> -- compatible: Must be "ti,ths8135"
->> +- compatible: Must be one of
->> +  "ti,ths8134a"
->> +  "ti,ths8134b"
->> +  "ti,ths8135"
+On 16 October 2017 at 23:49, Bin Liu <b-liu@ti.com> wrote:
+> On Mon, Oct 16, 2017 at 04:13:51PM +1100, Jonathan Liu wrote:
+>> On 10 October 2017 at 14:22, Bin Liu <b-liu@ti.com> wrote:
+>> > On Tue, Oct 10, 2017 at 01:45:25PM +1100, Jonathan Liu wrote:
+>> >> This fixes a kernel oops when unloading the driver due to usb_put_phy
+>> >> being called after usb_phy_generic_unregister when the device is
+>> >> detached. Calling usb_phy_generic_unregister causes x->dev->driver to
+>> >> be NULL in usb_put_phy and results in a NULL pointer dereference.
+>> >>
+>> >> Cc: stable at vger.kernel.org # v4.3+
+>> >> Signed-off-by: Jonathan Liu <net147@gmail.com>
+>> >> ---
+>> >> Changes for v2:
+>> >>  - Use devm_usb_put_phy instead of usb_put_phy
+>> >>
+>> >>  drivers/usb/musb/sunxi.c | 2 ++
+>> >>  1 file changed, 2 insertions(+)
+>> >>
+>> >> diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
+>> >> index c9a09b5bb6e5..dc353e24d53c 100644
+>> >> --- a/drivers/usb/musb/sunxi.c
+>> >> +++ b/drivers/usb/musb/sunxi.c
+>> >> @@ -297,6 +297,8 @@ static int sunxi_musb_exit(struct musb *musb)
+>> >>       if (test_bit(SUNXI_MUSB_FL_HAS_SRAM, &glue->flags))
+>> >>               sunxi_sram_release(musb->controller->parent);
+>> >>
+>> >> +     devm_usb_put_phy(glue->dev, glue->xceiv);
+>> >> +
+>> >>       return 0;
+>> >>  }
+>> >
+>> >
+>>
+>> > Applied. Thanks.
+>> > -Bin.
+>>
+>> Which repository was it applied to?
 >
-> As mentioned in the review of patch 2/2, would it make sense to also introduce
-> a ti,ths813x compatible string ? I haven't checked the datasheets so the
-> answer might very well be no.
+> I don't have a public repo (yet), but the patch has been sent to Greg,
+> so it should be merged into the next -rc.
+>
+> Regards,
+> -Bin.
 
-That should be fine, compatible-properties from the most specific to the
-most generic should work just fine.
+The MAINTAINERS file has
+git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git listed as
+the tree for drivers/usb/musb/. I guess that should be updated.
 
-I'll respin with a ths813x compatible.
-
-Yours,
-Linus Walleij
+Regards,
+Jonathan
