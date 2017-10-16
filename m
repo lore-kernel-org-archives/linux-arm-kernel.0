@@ -1,136 +1,48 @@
-From: cj.chengjian@huawei.com (chengjian (D))
-Date: Mon, 16 Oct 2017 12:27:17 +0800
-Subject: A issue about ptrace/SINGLESTEP on arm64
-Message-ID: <8ad32f6b-e04d-98f8-d944-7ec3582fbdf4@huawei.com>
+From: net147@gmail.com (Jonathan Liu)
+Date: Mon, 16 Oct 2017 16:13:51 +1100
+Subject: [PATCH v2] usb: musb: sunxi: Explicitly release USB PHY on exit
+In-Reply-To: <20171010032252.GA25830@uda0271908>
+References: <20171010024525.21971-1-net147@gmail.com>
+ <20171010032252.GA25830@uda0271908>
+Message-ID: <CANwerB2qnWXDi_wkxk9EZ0WeAunUjzVOBepEOXXnsm0PiByHMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-I write demo use ptrace/SINGLESTEP to count the number of instructions 
-executed by the process
-The parent process fork+exec a child process, and trace(SINGLESTEP) it,
+On 10 October 2017 at 14:22, Bin Liu <b-liu@ti.com> wrote:
+> On Tue, Oct 10, 2017 at 01:45:25PM +1100, Jonathan Liu wrote:
+>> This fixes a kernel oops when unloading the driver due to usb_put_phy
+>> being called after usb_phy_generic_unregister when the device is
+>> detached. Calling usb_phy_generic_unregister causes x->dev->driver to
+>> be NULL in usb_put_phy and results in a NULL pointer dereference.
+>>
+>> Cc: stable at vger.kernel.org # v4.3+
+>> Signed-off-by: Jonathan Liu <net147@gmail.com>
+>> ---
+>> Changes for v2:
+>>  - Use devm_usb_put_phy instead of usb_put_phy
+>>
+>>  drivers/usb/musb/sunxi.c | 2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
+>> index c9a09b5bb6e5..dc353e24d53c 100644
+>> --- a/drivers/usb/musb/sunxi.c
+>> +++ b/drivers/usb/musb/sunxi.c
+>> @@ -297,6 +297,8 @@ static int sunxi_musb_exit(struct musb *musb)
+>>       if (test_bit(SUNXI_MUSB_FL_HAS_SRAM, &glue->flags))
+>>               sunxi_sram_release(musb->controller->parent);
+>>
+>> +     devm_usb_put_phy(glue->dev, glue->xceiv);
+>> +
+>>       return 0;
+>>  }
+>
+>
 
-It works fine under the x86_64 architecture but has an exception under 
-arm64.
+> Applied. Thanks.
+> -Bin.
 
-```cpp
-//demo.c
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+Which repository was it applied to?
 
-#include <sys/ptrace.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-
-#include <unistd.h>
-
-#ifdef DEBUG
-#define dprintf printf
-#else
-#define dprintf 0 && printf
-#endif
-
-
-int main(int argc, char *argv[])
-{
-     long long counter = 0;
-     int wait_val;
-     int pid;
-
-     puts("Please wait");
-
-     switch (pid = fork()) {
-     case -1:
-         perror("fork");
-         break;
-
-     case 0:
-         ptrace(PTRACE_TRACEME, 0, 0, 0);
-         execl("/bin/ls", "ls", NULL);
-         break;
-
-     default:
-         //ptrace(PTRACE_ATTACH, pid, NULL, NULL);
-         //waitpid(pid, &wait_val, 0);
-          //while (wait_val == 1407 ) {
-          while ( 1 )
-          {
-             wait(&wait_val);
-             if(WIFEXITED(&wait_val)) {
-                 break;
-             }
-             counter++;
-             if (ptrace(PTRACE_SINGLESTEP, pid, 0, 0) != 0)
-                 perror("ptrace");
-             else
-             dprintf("counter = %lld\n", counter);
-         }
-     }
-
-     printf("Number of machine instructions : %lld\n", counter);
-     return 0;
-}
-```
-
-It run for a long long time and seems never to stop.
-
-
-./demo /bin/ls
-
-
-     counter = 8033129
-     counter = 8033130
-     counter = 8033131
-     counter = 8033132
-     counter = 8033133
-     counter = 8033134
-     counter = 8033135
-     counter = 8033136
-     counter = 8033137
-     counter = 8033138
-     counter = 8033139
-     ^C
-
-
-
-
-It return the same results when track other the other C processes
-And then I make an assembly demo(just print Hello-World),
-
-It looks just all right
-
-```asm
-//hello.s
-// as hello.s ?o hello.o
-// ld hello.o ?o hello
-.text //code section
-.globl _start
-_start:
-     mov x0, 0     // stdout has file descriptor 0
-     ldr x1, =msg  // buffer to write
-     mov x2, len   // size of buffer
-     mov x8, 64    // sys_write() is at index 64 in kernel functions table
-     svc #0        // generate kernel call sys_write(stdout, msg, len);
-     mov x0, 123 // exit code
-     mov x8, 93  // sys_exit() is at index 93 in kernel functions table
-     svc #0      // generate kernel call sys_exit(123);
-.data //data section
-msg:
-     .ascii      "Hello, ARM!\n"
-len = . - msg
-```
-
-
-
-./demo ./hello
-
-
-     ./hello : hello
-
-     Please wait
-     Hello, ARM!
-     Number of machine instructions : 8
-
-
-I want to know what's going on about it, Is this a bug?
+Regards,
+Jonathan
