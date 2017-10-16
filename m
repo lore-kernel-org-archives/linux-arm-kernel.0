@@ -1,43 +1,89 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 16 Oct 2017 14:18:00 +0100
-Subject: [PATCH v2 0/4] SMMUv3 CMD_SYNC optimisation
-In-Reply-To: <20171013190521.GD30572@arm.com>
-References: <cover.1504182142.git.robin.murphy@arm.com>
- <20171013190521.GD30572@arm.com>
-Message-ID: <0414f685-1673-bb4e-bd7a-b99f2054b86e@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 16 Oct 2017 14:24:37 +0100
+Subject: [PATCH 1/4] kbuild: allow global override of CC instrumentation
+In-Reply-To: <20171016132440.38098-1-mark.rutland@arm.com>
+References: <20171016132440.38098-1-mark.rutland@arm.com>
+Message-ID: <20171016132440.38098-2-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/10/17 20:05, Will Deacon wrote:
-> Hi Robin,
-> 
-> On Thu, Aug 31, 2017 at 02:44:24PM +0100, Robin Murphy wrote:
->> Since Nate reported a reasonable performance boost from the out-of-line
->> MSI polling in v1 [1], I've now implemented the equivalent for cons
->> polling as well - that has been boot-tested on D05 with some trivial I/O
->> and at least doesn't seem to lock up or explode. There's also a little
->> cosmetic tweaking to make the patches a bit cleaner as a series.
->>
->> Robin.
->>
->> [1] https://www.mail-archive.com/iommu at lists.linux-foundation.org/msg19657.html
->>
->> Robin Murphy (5):
->>   iommu/arm-smmu-v3: Specialise CMD_SYNC handling
->>   iommu/arm-smmu-v3: Forget about cmdq-sync interrupt
->>   iommu/arm-smmu-v3: Use CMD_SYNC completion interrupt
->>   iommu/arm-smmu-v3: Poll for CMD_SYNC outside cmdq lock
->>   iommu/arm-smmu-v3: Use burst-polling for sync completion
-> 
-> What's this final mythical patch about? I don't see it in the series.
+Currently, we have a number of compiler instrumentation features, each
+with its own overrides to disable instrumentation of a file or
+directory.
 
-It's in the place 5/5 would be, I just tagged it as [RFT] since I have
-zero evidence whether it's worth the bother or not.
+In a few cases, there are files with special ABI requirements, for which
+we need to avoid all instrumentation. Having to apply each override
+manually is tedious, and error-prone as new instrumentation features are
+introduced.
 
-> Anyway, the first two patches look fine to me, but this doesn't apply
-> on top of my iommu/devel branch so they will need rebasing.
+To make matters easier, this patch adds a new CC_INSTRUMENT override,
+allowing instrumentation to be avoided for certain files or directories.
+This can also be overridden on a per-file or per-directory basis, to
+allow opting in to some instrumentation.
 
-Will do.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Andrey Konovalov <adech.fo@gmail.com>
+Cc: Andrey Ryabinin <aryabinin@virtuozzo.com>
+Cc: Dmitry Vyukov <dvyukov@google.com>
+Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+Cc: Michal Marek <mmarek@suse.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: linux-kbuild at vger.kernel.org
+---
+ scripts/Makefile.lib | 17 +++++++++++++----
+ 1 file changed, 13 insertions(+), 4 deletions(-)
 
-Thanks for the review,
-Robin.
+diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
+index 5e975fee0f5b..c7d71f482b57 100644
+--- a/scripts/Makefile.lib
++++ b/scripts/Makefile.lib
+@@ -109,6 +109,15 @@ orig_a_flags   = $(KBUILD_CPPFLAGS) $(KBUILD_AFLAGS) $(KBUILD_SUBDIR_ASFLAGS) \
+ _a_flags       = $(filter-out $(AFLAGS_REMOVE_$(basetarget).o), $(orig_a_flags))
+ _cpp_flags     = $(KBUILD_CPPFLAGS) $(cppflags-y) $(CPPFLAGS_$(@F))
+ 
++# Each of the compiler instrumentation features below can be selectively
++# enabled or disable for files or directoies. In decreasing order of
++# predence, each option foo is controlled by:
++# FOO_obj.o := [yn]
++# CC_INSTRUMENT_obj.o := [yn]
++# FOO := [yn]
++# CC_INSTRUMENT := [yn]
++# FOO_all := [yn]
++
+ #
+ # Enable gcov profiling flags for a file, directory or for all files depending
+ # on variables GCOV_PROFILE_obj.o, GCOV_PROFILE and CONFIG_GCOV_PROFILE_ALL
+@@ -116,7 +125,7 @@ _cpp_flags     = $(KBUILD_CPPFLAGS) $(cppflags-y) $(CPPFLAGS_$(@F))
+ #
+ ifeq ($(CONFIG_GCOV_KERNEL),y)
+ _c_flags += $(if $(patsubst n%,, \
+-		$(GCOV_PROFILE_$(basetarget).o)$(GCOV_PROFILE)$(CONFIG_GCOV_PROFILE_ALL)), \
++		$(GCOV_PROFILE_$(basetarget).o)$(CC_INSTRUMENT_$(basetarget).o)$(GCOV_PROFILE)$(CC_INSTRUMENT)$(CONFIG_GCOV_PROFILE_ALL)), \
+ 		$(CFLAGS_GCOV))
+ endif
+ 
+@@ -126,19 +135,19 @@ endif
+ #
+ ifeq ($(CONFIG_KASAN),y)
+ _c_flags += $(if $(patsubst n%,, \
+-		$(KASAN_SANITIZE_$(basetarget).o)$(KASAN_SANITIZE)y), \
++		$(KASAN_SANITIZE_$(basetarget).o)$(CC_INSTRUMENT_$(basetarget).o)$(KASAN_SANITIZE)$(CC_INSTRUMENT)y), \
+ 		$(CFLAGS_KASAN))
+ endif
+ 
+ ifeq ($(CONFIG_UBSAN),y)
+ _c_flags += $(if $(patsubst n%,, \
+-		$(UBSAN_SANITIZE_$(basetarget).o)$(UBSAN_SANITIZE)$(CONFIG_UBSAN_SANITIZE_ALL)), \
++		$(UBSAN_SANITIZE_$(basetarget).o)$(CC_INSTRUMENT_$(basetarget).o)$(UBSAN_SANITIZE)$(CC_INSTRUMENT)$(CONFIG_UBSAN_SANITIZE_ALL)), \
+ 		$(CFLAGS_UBSAN))
+ endif
+ 
+ ifeq ($(CONFIG_KCOV),y)
+ _c_flags += $(if $(patsubst n%,, \
+-	$(KCOV_INSTRUMENT_$(basetarget).o)$(KCOV_INSTRUMENT)$(CONFIG_KCOV_INSTRUMENT_ALL)), \
++	$(KCOV_INSTRUMENT_$(basetarget).o)$(CC_INSTRUMENT_$(basetarget).o)$(KCOV_INSTRUMENT)$(CC_INSTRUMENT)$(CONFIG_KCOV_INSTRUMENT_ALL)), \
+ 	$(CFLAGS_KCOV))
+ endif
+ 
+-- 
+2.11.0
