@@ -1,51 +1,128 @@
-From: elder@linaro.org (Alex Elder)
-Date: Mon, 16 Oct 2017 09:22:57 -0500
-Subject: [PATCH] arm64: defconfig: re-enable Qualcomm DB410c USB
-Message-ID: <20171016142257.12882-1-elder@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 16 Oct 2017 15:24:46 +0100
+Subject: [PATCH v3] arm64: acpi/gtdt: validate CNTFRQ after having
+ enabled the frame
+In-Reply-To: <20170901103533.8970-1-ard.biesheuvel@linaro.org>
+References: <20170901103533.8970-1-ard.biesheuvel@linaro.org>
+Message-ID: <20171016142445.skn2nue3ddcexmia@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Boyd reworked some Qualcomm USB code earlier this year.
-The result requires a few different config options to be enabled
-in order for the USB on the DragonBoard 410c to continue working,
-but these were never added to arm64 "defconfig".  As a result, USB
-on that board stopped working during the v4.13-rc1 merge window.
+Hi Ard,
 
-Re-enable this functionality by setting the needed config options
-in the arm64 "defconfig" file.
+Sorry it's taken so long to review this, and thanks for respinning this.
 
-Signed-off-by: Alex Elder <elder@linaro.org>
----
- arch/arm64/configs/defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+I'll get this queued for v4.15.
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 34480e9af2e7..325a9991ab72 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -423,6 +423,7 @@ CONFIG_USB_DWC2=y
- CONFIG_USB_CHIPIDEA=y
- CONFIG_USB_CHIPIDEA_UDC=y
- CONFIG_USB_CHIPIDEA_HOST=y
-+CONFIG_USB_CHIPIDEA_ULPI=y
- CONFIG_USB_ISP1760=y
- CONFIG_USB_HSIC_USB3503=y
- CONFIG_NOP_USB_XCEIV=y
-@@ -431,6 +432,7 @@ CONFIG_USB_QCOM_8X16_PHY=y
- CONFIG_USB_ULPI=y
- CONFIG_USB_GADGET=y
- CONFIG_USB_RENESAS_USBHS_UDC=m
-+CONFIG_USB_ULPI_BUS=y
- CONFIG_MMC=y
- CONFIG_MMC_BLOCK_MINORS=32
- CONFIG_MMC_ARMMMCI=y
-@@ -533,6 +535,7 @@ CONFIG_PWM_SAMSUNG=y
- CONFIG_PWM_TEGRA=m
- CONFIG_PHY_RCAR_GEN3_USB2=y
- CONFIG_PHY_HI6220_USB=y
-+CONFIG_PHY_QCOM_USB_HS=y
- CONFIG_PHY_SUN4I_USB=y
- CONFIG_PHY_ROCKCHIP_INNO_USB2=y
- CONFIG_PHY_ROCKCHIP_EMMC=y
--- 
-2.11.0
+Thanks,
+Mark.
+
+On Fri, Sep 01, 2017 at 11:35:33AM +0100, Ard Biesheuvel wrote:
+> The ACPI GTDT code validates the CNTFRQ field of each MMIO timer
+> frame against the CNTFRQ system register of the current CPU, to
+> ensure that they are equal, which is mandated by the architecture.
+> 
+> However, reading the CNTFRQ field of a frame is not possible until
+> the RFRQ bit in the frame's CNTACRn register is set, and doing so
+> before that willl produce the following error:
+> 
+>   arch_timer: [Firmware Bug]: CNTFRQ mismatch: frame @ 0x00000000e0be0000: (0x00000000), CPU: (0x0ee6b280)
+>   arch_timer: Disabling MMIO timers due to CNTFRQ mismatch
+>   arch_timer: Failed to initialize memory-mapped timer.
+> 
+> The reason is that the CNTFRQ field is RES0 if access is not enabled.
+> 
+> So move the validation of CNTFRQ into the loop that iterates over the
+> timers to find the best frame, but defer it until after we have selected
+> the best frame, which should also have enabled the RFRQ bit.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+> v3: - preserve existing logic as much as possible wrt verifying all frames of
+>       all timers before selecting a suitable one
+> 
+>  drivers/clocksource/arm_arch_timer.c | 38 +++++++++++---------
+>  1 file changed, 21 insertions(+), 17 deletions(-)
+> 
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index 72bbfccef113..30071cdea846 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -1264,10 +1264,6 @@ arch_timer_mem_find_best_frame(struct arch_timer_mem *timer_mem)
+>  
+>  	iounmap(cntctlbase);
+>  
+> -	if (!best_frame)
+> -		pr_err("Unable to find a suitable frame in timer @ %pa\n",
+> -			&timer_mem->cntctlbase);
+> -
+>  	return best_frame;
+>  }
+>  
+> @@ -1368,6 +1364,8 @@ static int __init arch_timer_mem_of_init(struct device_node *np)
+>  
+>  	frame = arch_timer_mem_find_best_frame(timer_mem);
+>  	if (!frame) {
+> +		pr_err("Unable to find a suitable frame in timer @ %pa\n",
+> +			&timer_mem->cntctlbase);
+>  		ret = -EINVAL;
+>  		goto out;
+>  	}
+> @@ -1416,7 +1414,7 @@ arch_timer_mem_verify_cntfrq(struct arch_timer_mem *timer_mem)
+>  static int __init arch_timer_mem_acpi_init(int platform_timer_count)
+>  {
+>  	struct arch_timer_mem *timers, *timer;
+> -	struct arch_timer_mem_frame *frame;
+> +	struct arch_timer_mem_frame *frame, *best_frame = NULL;
+>  	int timer_count, i, ret = 0;
+>  
+>  	timers = kcalloc(platform_timer_count, sizeof(*timers),
+> @@ -1428,14 +1426,6 @@ static int __init arch_timer_mem_acpi_init(int platform_timer_count)
+>  	if (ret || !timer_count)
+>  		goto out;
+>  
+> -	for (i = 0; i < timer_count; i++) {
+> -		ret = arch_timer_mem_verify_cntfrq(&timers[i]);
+> -		if (ret) {
+> -			pr_err("Disabling MMIO timers due to CNTFRQ mismatch\n");
+> -			goto out;
+> -		}
+> -	}
+> -
+>  	/*
+>  	 * While unlikely, it's theoretically possible that none of the frames
+>  	 * in a timer expose the combination of feature we want.
+> @@ -1444,12 +1434,26 @@ static int __init arch_timer_mem_acpi_init(int platform_timer_count)
+>  		timer = &timers[i];
+>  
+>  		frame = arch_timer_mem_find_best_frame(timer);
+> -		if (frame)
+> -			break;
+> +		if (!best_frame)
+> +			best_frame = frame;
+> +
+> +		ret = arch_timer_mem_verify_cntfrq(timer);
+> +		if (ret) {
+> +			pr_err("Disabling MMIO timers due to CNTFRQ mismatch\n");
+> +			goto out;
+> +		}
+> +
+> +		if (!best_frame) /* implies !frame */
+> +			/*
+> +			 * Only complain about missing suitable frames if we
+> +			 * haven't already found one in a previous iteration.
+> +			 */
+> +			pr_err("Unable to find a suitable frame in timer @ %pa\n",
+> +				&timer->cntctlbase);
+>  	}
+>  
+> -	if (frame)
+> -		ret = arch_timer_mem_frame_register(frame);
+> +	if (best_frame)
+> +		ret = arch_timer_mem_frame_register(best_frame);
+>  out:
+>  	kfree(timers);
+>  	return ret;
+> -- 
+> 2.11.0
+> 
