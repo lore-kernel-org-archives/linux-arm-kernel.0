@@ -1,65 +1,104 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 Oct 2017 13:29:09 +0100
-Subject: [PATCH] ARM: head-common.S: Clear lr before jumping to
- start_kernel()
-In-Reply-To: <CAMuHMdX7Z0D2unRqC9z04f0MVsxLuVxouvquyYBHKavnycfh=w@mail.gmail.com>
-References: <1507044184-27152-1-git-send-email-geert+renesas@glider.be>
- <nycvar.YSQ.7.76.1710031134140.5407@knanqh.ubzr>
- <CAMuHMdWJKQb5JY+diH=7dqNuypkPUqBeOEPSLOrfrnbfh2siRQ@mail.gmail.com>
- <CAMuHMdXpPfipmEdW0Dap6Pjwhz3QxLcrcbtU0RhCu721k-sBpA@mail.gmail.com>
- <CAMuHMdWH_pebSYAp04gmVceu3qqPczGaXS36R8CtzAYHo-CNog@mail.gmail.com>
- <20171010203324.GX4394@atomide.com>
- <20171012102341.GF23750@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1710121123530.1718@knanqh.ubzr>
- <20171014141405.GG23750@n2100.armlinux.org.uk>
- <CAMuHMdX7Z0D2unRqC9z04f0MVsxLuVxouvquyYBHKavnycfh=w@mail.gmail.com>
-Message-ID: <20171016122908.GJ23750@n2100.armlinux.org.uk>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Mon, 16 Oct 2017 17:46:24 +0530
+Subject: [PATCH 6/9] ARM: dts: rockchip: Add usb host for rk3288-vyasa
+In-Reply-To: <1508156187-27519-1-git-send-email-jagan@amarulasolutions.com>
+References: <1508156187-27519-1-git-send-email-jagan@amarulasolutions.com>
+Message-ID: <1508156187-27519-7-git-send-email-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 15, 2017 at 10:04:16AM +0200, Geert Uytterhoeven wrote:
-> On Sat, Oct 14, 2017 at 4:14 PM, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
-> > Thanks, it would've been good to have known that ahead of time.
-> >
-> > It's why the patch system has the KernelVersion: tag:
-> >
-> >  6. Kernel version.
-> >     On a separate line, add a tag "KernelVersion: " followed by the kernel
-> >     version that the patch was generated against. This should be formatted
-> >     as "KernelVersion: 2.6.0-rmk1"
-> >
-> > This is because that information is relevant for knowing where it should
-> > be applied, and to which branch.  Having it be something else means I
-> > have to guess, and that can result in the patch being discarded in this
-> > manner if I don't find where it's supposed to be applied.
-> 
-> That's why we have the standard Fixes tag, which was included
-> Fixes: 9520b1a1b5f7a348 ("ARM: head-common.S: speed up startup code")
+Add usb host support for rk3288-vyasa, board support hub power
+through phy_pwr_en and usb2 host power through usb2_pwr_en and
+naming conversion followed as per schematic.
 
-Wrong.  You're confusing two different things.
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+ arch/arm/boot/dts/rk3288-vyasa.dts     | 48 ++++++++++++++++++++++++++++++++++
+ include/dt-bindings/pinctrl/rockchip.h |  1 +
+ 2 files changed, 49 insertions(+)
 
-The fixes tag identifies the commit to which the FIX applies.  That's
-not what the kernelversion tag described above is for.  That's to
-describe where the patch was GENERATED, so that it's easier to know
-where it should be applied.
-
-> It's trivial for the repo maintainer to know which branch the fix to
-> apply to, given the Fixes tag.
-> It's non-trivial to know the branch for the patch submitter, who is
-> forced to use a non-standard patch submission system.
-
-So what you're telling me is that you're unable to describe what commit
-or the kernel version that the patch was GENERATED against.
-
-I /really/ don't buy such an argument one bit.  If you don't have that
-information, by definition you can't generate a git patch.
-
-If it was trivial, then don't you think the patch would've been applied
-without all this crap?  The proof is here in this thread, it's not as
-trivial as you think it is.
-
+diff --git a/arch/arm/boot/dts/rk3288-vyasa.dts b/arch/arm/boot/dts/rk3288-vyasa.dts
+index c79a4c7..c22d674 100644
+--- a/arch/arm/boot/dts/rk3288-vyasa.dts
++++ b/arch/arm/boot/dts/rk3288-vyasa.dts
+@@ -105,6 +105,30 @@
+ 		vin-supply = <&dc12_vbat>;
+ 	};
+ 
++	vsus_5v: vsus-5v {
++		compatible = "regulator-fixed";
++		regulator-name = "vsus_5v";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++		regulator-boot-on;
++		vin-supply = <&vcc_io>;
++	};
++
++	vusb2_5v: vusb2-5v {
++		compatible = "regulator-fixed";
++		regulator-name = "vusb2_5v";
++		enable-active-high;
++		gpio = <&gpio8 RK_PB1 GPIO_ACTIVE_HIGH>; /* USB2_PWR_EN */
++		pinctrl-names = "default";
++		pinctrl-0 = <&usb2_pwr_en>;
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++		regulator-boot-on;
++		vin-supply = <&vsus_5v>;
++	};
++
+ 	ext_gmac: external-gmac-clock {
+ 		compatible = "fixed-clock";
+ 		#clock-cells = <0>;
+@@ -363,6 +387,20 @@
+ 	status = "okay";
+ };
+ 
++&usbphy {
++	status = "okay";
++};
++
++&usb_host0_ehci {
++	status = "okay";
++};
++
++&usb_host1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&phy_pwr_en>;
++	status = "okay";
++};
++
+ &vopb {
+ 	status = "okay";
+ };
+@@ -407,4 +445,14 @@
+ 			rockchip,pins = <RK_GPIO0 4 RK_FUNC_GPIO &pcfg_pull_up>;
+ 		};
+ 	};
++
++	usb_host {
++		phy_pwr_en: phy-pwr-en {
++			rockchip,pins = <RK_GPIO2 RK_PB1 RK_FUNC_GPIO &pcfg_output_high>;
++		};
++
++		usb2_pwr_en: usb2-pwr-en {
++			rockchip,pins = <RK_GPIO8 RK_PB1 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
+ };
+diff --git a/include/dt-bindings/pinctrl/rockchip.h b/include/dt-bindings/pinctrl/rockchip.h
+index aaec8ba..dc3d661 100644
+--- a/include/dt-bindings/pinctrl/rockchip.h
++++ b/include/dt-bindings/pinctrl/rockchip.h
+@@ -24,6 +24,7 @@
+ #define RK_GPIO3	3
+ #define RK_GPIO4	4
+ #define RK_GPIO6	6
++#define RK_GPIO8	8
+ 
+ #define RK_PA0		0
+ #define RK_PA1		1
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.7.4
