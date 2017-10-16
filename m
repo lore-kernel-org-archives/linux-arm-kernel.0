@@ -1,58 +1,28 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 16 Oct 2017 13:14:54 +0100
-Subject: [PATCH 04/11] Define the virtual space of KASan's shadow region
-In-Reply-To: <B8AC3E80E903784988AB3003E3E97330C005B9BF@dggemm510-mbx.china.huawei.com>
-References: <20171011082227.20546-5-liuwenliang@huawei.com>
- <201710141957.mbxeZJHB%fengguang.wu@intel.com>
- <B8AC3E80E903784988AB3003E3E97330C005B9BF@dggemm510-mbx.china.huawei.com>
-Message-ID: <CAKv+Gu98M9PZk3qm0PYC8nQ3zMvLZmNmOn4=hNdFE7NTBuHbgg@mail.gmail.com>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Mon, 16 Oct 2017 17:46:18 +0530
+Subject: [PATCH 0/9] rockchip: rk3288-vyasa: dts fixes/additions
+Message-ID: <1508156187-27519-1-git-send-email-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 October 2017 at 12:42, Liuwenliang (Lamb) <liuwenliang@huawei.com> wrote:
-> On 10/16/2017 07:03 PM, Abbott Liu wrote:
->>arch/arm/kernel/entry-armv.S:348: Error: selected processor does not support `movw r1,
->   #:lower16:((((0xC0000000-0x01000000)>>3)+((0xC0000000-0x01000000)-(1<<29))))' in ARM mode
->>arch/arm/kernel/entry-armv.S:348: Error: selected processor does not support `movt r1,
->   #:upper16:((((0xC0000000-0x01000000)>>3)+((0xC0000000-0x01000000)-(1<<29))))' in ARM mode
->
-> Thanks for building test. This error can be solved by following code:
-> --- a/arch/arm/kernel/entry-armv.S
-> +++ b/arch/arm/kernel/entry-armv.S
-> @@ -188,8 +188,7 @@ ENDPROC(__und_invalid)
->         get_thread_info tsk
->         ldr     r0, [tsk, #TI_ADDR_LIMIT]
->  #ifdef CONFIG_KASAN
-> -   movw r1, #:lower16:TASK_SIZE
-> -   movt r1, #:upper16:TASK_SIZE
-> + ldr r1, =TASK_SIZE
->  #else
->         mov r1, #TASK_SIZE
->  #endif
+Series add new dts nodes like gmac, usb, io_domains and fixed existing
+regulator, pmic stuff as per schematic. 
 
-This is unnecessary:
+Jagan Teki (9):
+  ARM: dts: rockchip: rk3288-vyasa: Remove vdd_log from rk808, DCDC_REG1
+  ARM: dts: rockchip: rk3288-vyasa: Use fixed voltage range for vccio_sd
+  ARM: dts: rockchip: rk3288-vyasa: Use vmmc-supply from PMIC
+  ARM: dts: rockchip: Add regulators for rk3288-vyasa
+  ARM: dts: rockchip: Add gmac support for rk3288-vyasa board
+  ARM: dts: rockchip: Add usb host for rk3288-vyasa
+  ARM: dts: rockchip: Add usb otg for rk3288-vyasa
+  ARM: dts: rockchip: Add io domains for rk3288-vyasa
+  ARM: multi_v7_defconfig: Statically build RTC_DRV_RK808
 
-ldr r1, =TASK_SIZE
+ arch/arm/boot/dts/rk3288-vyasa.dts     | 181 ++++++++++++++++++++++++++++++---
+ arch/arm/configs/multi_v7_defconfig    |   2 +-
+ include/dt-bindings/pinctrl/rockchip.h |   1 +
+ 3 files changed, 168 insertions(+), 16 deletions(-)
 
-will be converted to a mov instruction by the assembler if the value
-of TASK_SIZE fits its 12-bit immediate field.
-
-So please remove the whole #ifdef, and just use ldr r1, =xxx
-
-> @@ -446,7 +445,12 @@ ENDPROC(__fiq_abt)
->         @ if it was interrupted in a critical region.  Here we
->         @ perform a quick test inline since it should be false
->         @ 99.9999% of the time.  The rest is done out of line.
-> +#if CONFIG_KASAN
-> + ldr r0, =TASK_SIZE
-> + cmp r4, r0
-> +#else
->         cmp     r4, #TASK_SIZE
-> +#endif
->         blhs    kuser_cmpxchg64_fixup
->  #endif
->  #endif
->
-> movt,movw can only be used in ARMv6*, ARMv7 instruction set. But ldr can be used in ARMv4*, ARMv5T*, ARMv6*, ARMv7.
-> Maybe the performance is going to fall down by using ldr, but I think the influence of performance is very limited.
->
+-- 
+2.7.4
