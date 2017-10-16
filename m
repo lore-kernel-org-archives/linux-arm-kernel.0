@@ -1,86 +1,84 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 16 Oct 2017 09:58:20 +0200
-Subject: [PATCH v2 1/3] dt-bindings: mmc: renesas_sdhi: provide example in
- bindings documentation
-In-Reply-To: <20171016075822.18177-1-horms+renesas@verge.net.au>
-References: <20171016075822.18177-1-horms+renesas@verge.net.au>
-Message-ID: <20171016075822.18177-2-horms+renesas@verge.net.au>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 16 Oct 2017 10:01:17 +0200
+Subject: [PATCH 1/2] [v5] pinctrl: qcom: disable GPIO groups with no pins
+In-Reply-To: <1504798409-32041-2-git-send-email-timur@codeaurora.org>
+References: <1504798409-32041-1-git-send-email-timur@codeaurora.org>
+ <1504798409-32041-2-git-send-email-timur@codeaurora.org>
+Message-ID: <20171016080117.GA17369@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide an example of the usage of the DT bindings for TMIO
-in their documentation. The example given is for the r8a7790 (R-Car H2).
+On Thu, Sep 07, 2017 at 10:33:28AM -0500, Timur Tabi wrote:
+[...]
+>  	ret = gpiochip_add_data(&pctrl->chip, pctrl);
+>  	if (ret) {
+>  		dev_err(pctrl->dev, "Failed register gpiochip\n");
+>  		return ret;
+>  	}
+>  
+> -	ret = gpiochip_add_pin_range(&pctrl->chip, dev_name(pctrl->dev), 0, 0, chip->ngpio);
+> +	/*
+> +	 * If irq_need_valid_mask is true, then gpiochip_add_data() will
+> +	 * initialize irq_valid_mask to all 1s.  We need to clear all the
+> +	 * GPIOs that are unavailable, and we need to find each block
+> +	 * of consecutive available GPIOs are add them as pin ranges.
+> +	 */
+> +	if (chip->irq_need_valid_mask) {
+> +		for (i = 0; i < ngpio; i++)
+> +			if (!groups[i].npins)
+> +				clear_bit(i, pctrl->chip.irq_valid_mask);
+> +
+> +		while ((count = msm_gpio_get_next_range(pctrl, &start))) {
+> +			ret = gpiochip_add_pin_range(&pctrl->chip,
+> +						     dev_name(pctrl->dev),
+> +						     start, start, count);
+> +			if (ret)
+> +				break;
+> +			start += count;
+> +		}
+> +	} else {
+> +		ret = gpiochip_add_pin_range(&pctrl->chip, dev_name(pctrl->dev),
+> +					     0, 0, ngpio);
+> +	}
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
-v2
-* Correct description of example, it is for the r8a7790 (R-Car H2)
-  rather than the r8a7779 (R-Car H1)
----
- Documentation/devicetree/bindings/mmc/tmio_mmc.txt | 54 ++++++++++++++++++++++
- 1 file changed, 54 insertions(+)
+This is the bit that I don't understand. If you only tell gpiolib about
+the GPIOs that exist, then it won't be initializing the .irq_valid_mask
+in a wrong way.
 
-diff --git a/Documentation/devicetree/bindings/mmc/tmio_mmc.txt b/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
-index 54ef642f23a0..53f8b5280ecd 100644
---- a/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
-+++ b/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
-@@ -43,3 +43,57 @@ Optional properties:
- - pinctrl-names: should be "default", "state_uhs"
- - pinctrl-0: should contain default/high speed pin ctrl
- - pinctrl-1: should contain uhs mode pin ctrl
-+
-+Example: R8A7790 (R-Car H2) SDHI controller nodes
-+
-+	sdhi0: sd at ee100000 {
-+		compatible = "renesas,sdhi-r8a7790";
-+		reg = <0 0xee100000 0 0x328>;
-+		interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp3_clks R8A7790_CLK_SDHI0>;
-+		dmas = <&dmac0 0xcd>, <&dmac0 0xce>,
-+		       <&dmac1 0xcd>, <&dmac1 0xce>;
-+		dma-names = "tx", "rx", "tx", "rx";
-+		max-frequency = <195000000>;
-+		power-domains = <&sysc R8A7790_PD_ALWAYS_ON>;
-+		status = "disabled";
-+	};
-+
-+	sdhi1: sd at ee120000 {
-+		compatible = "renesas,sdhi-r8a7790";
-+		reg = <0 0xee120000 0 0x328>;
-+		interrupts = <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp3_clks R8A7790_CLK_SDHI1>;
-+		dmas = <&dmac0 0xc9>, <&dmac0 0xca>,
-+		       <&dmac1 0xc9>, <&dmac1 0xca>;
-+		dma-names = "tx", "rx", "tx", "rx";
-+		max-frequency = <195000000>;
-+		power-domains = <&sysc R8A7790_PD_ALWAYS_ON>;
-+		status = "disabled";
-+	};
-+
-+	sdhi2: sd at ee140000 {
-+		compatible = "renesas,sdhi-r8a7790";
-+		reg = <0 0xee140000 0 0x100>;
-+		interrupts = <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp3_clks R8A7790_CLK_SDHI2>;
-+		dmas = <&dmac0 0xc1>, <&dmac0 0xc2>,
-+		       <&dmac1 0xc1>, <&dmac1 0xc2>;
-+		dma-names = "tx", "rx", "tx", "rx";
-+		max-frequency = <97500000>;
-+		power-domains = <&sysc R8A7790_PD_ALWAYS_ON>;
-+		status = "disabled";
-+	};
-+
-+	sdhi3: sd at ee160000 {
-+		compatible = "renesas,sdhi-r8a7790";
-+		reg = <0 0xee160000 0 0x100>;
-+		interrupts = <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp3_clks R8A7790_CLK_SDHI3>;
-+		dmas = <&dmac0 0xd3>, <&dmac0 0xd4>,
-+		       <&dmac1 0xd3>, <&dmac1 0xd4>;
-+		dma-names = "tx", "rx", "tx", "rx";
-+		max-frequency = <97500000>;
-+		power-domains = <&sysc R8A7790_PD_ALWAYS_ON>;
-+		status = "disabled";
-+	};
--- 
-2.11.0
+In other words, what I'm trying to say is that in your case, ngpio isn't
+equal to the sum of .npins over all groups. If instead you make the chip
+register only the lines that actually exist, .irq_valid_mask will only
+contain bits that do exist.
+
+The reason I'm bringing this up is because we had the same discussion
+back in November last year (yes, that driver still isn't upstream...):
+
+	https://lkml.org/lkml/2016/11/22/543
+
+In a nutshell: the Tegra driver was assuming that each port had a fixed
+number (8) of lines, but when gpiolib changed to query the direction of
+GPIOs at driver probe time this broke badly because on of the instances
+of the GPIO controller is very strict about what it allows access to.
+
+This seems to be similar to what you're experiencing. In our case we'd
+run into a hard hang trying to access a register for a non-existing
+GPIO. One of the possibilities discussed in the thread was to introduce
+something akin to what's being proposed here.
+
+In the end it turned out to be easiest to just don't tell gpiolib about
+any non-existing GPIOs, because then you don't get to deal with any of
+these workarounds. The downside is that you need a little more code to
+find out exactly what GPIO you're talking about, or to determine how
+many you have. In the end I think it's all worth it by making it a lot
+easier in general to deal with. I think it's really confusing if you
+expose, say, 200 pins, and for 50 of them users will get -EACCES, or
+-ENOENT or whatever if they try to use them.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171016/2a2bf792/attachment.sig>
