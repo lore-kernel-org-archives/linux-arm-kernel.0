@@ -1,31 +1,80 @@
-From: gengdj.1984@gmail.com (gengdongjiu)
-Date: Mon, 16 Oct 2017 11:17:32 +0800
-Subject: [PATCH v3 15/20] KVM: arm64: Set an impdef ESR for Virtual-SError
- using VSESR_EL2.
-In-Reply-To: <0184EA26B2509940AA629AE1405DD7F2016959EE@DGGEMA503-MBX.china.huawei.com>
-References: <0184EA26B2509940AA629AE1405DD7F2016959EE@DGGEMA503-MBX.china.huawei.com>
-Message-ID: <CAMj-D2BbOJBOUnY5r6mGUBB34Lq_z6xGAhvHyuNFjp29KLif7Q@mail.gmail.com>
+From: wenyou.yang@microchip.com (Wenyou Yang)
+Date: Mon, 16 Oct 2017 11:14:25 +0800
+Subject: [PATCH v6 1/3] media: ov7670: Add entity pads initialization
+In-Reply-To: <20171016031427.4194-1-wenyou.yang@microchip.com>
+References: <20171016031427.4194-1-wenyou.yang@microchip.com>
+Message-ID: <20171016031427.4194-2-wenyou.yang@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> In fact I have below method for that, what do you think about that?
->
-> 1.  If there is no RAS, old method, directly inject virtual SError, not need to specify ESR, as shown in the [1]
-> 2.  If there is RAS, KVM set "the kvm_run" guest exit type value to let user space handle the SError abort
->    A. If ESR_EL2 is IMPLEMENTATION or uncategorized, return " ESR_ELx_ISV " to let user space specify an implementation-defined value, as shown [2]
->    B. If ESR_EL2 is categorized and error not propagated,  the error come from guest user space, return " (ESR_ELx_AET_UCU | ESR_ELx_FSC_SERROR " to let user space specify a recoverable ESR.
->      Here one side calling memory failure, another side let user pace inject SError. Because usually SEI notification does not deliver SIGBUS signal to user space, so here inject virtual SEI to ensure that. As shown [3]
->    C. If ESR_EL2 is categorized and error not propagated,  the error come from guest kernel, return "-1" to terminate guest. As shown [4]
->    D. Otherwise, Panic host OS. As shown [5]
->
+Add the media entity pads initialization.
 
-For the IMPLEMENTATION ESR, for the safety purposes, I have below suggestion
+Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
+---
 
-1. When there is no guest,  host OS receives IMPLEMENTATION ESR, I
-hope host can be panic, because we do not know its implementation
-meaning.
-2. when guest received MPLEMENTATION  ESR, and the Error is isolated
-to guest by "ESB" instruction, not propagate to host. I hope guest
-will exit, but host not panic.
-3. when guest received MPLEMENTATION  ESR, and the Error is propagate
-to host, I hope host can be panic.
+Changes in v6: None
+Changes in v5: None
+Changes in v4:
+ - Fix the build error when not enabling Media Controller API option.
+
+Changes in v3: None
+Changes in v2: None
+
+ drivers/media/i2c/ov7670.c | 21 ++++++++++++++++++++-
+ 1 file changed, 20 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/media/i2c/ov7670.c b/drivers/media/i2c/ov7670.c
+index e88549f0e704..553945d4ca28 100644
+--- a/drivers/media/i2c/ov7670.c
++++ b/drivers/media/i2c/ov7670.c
+@@ -213,6 +213,9 @@ struct ov7670_devtype {
+ struct ov7670_format_struct;  /* coming later */
+ struct ov7670_info {
+ 	struct v4l2_subdev sd;
++#if defined(CONFIG_MEDIA_CONTROLLER)
++	struct media_pad pad;
++#endif
+ 	struct v4l2_ctrl_handler hdl;
+ 	struct {
+ 		/* gain cluster */
+@@ -1688,14 +1691,27 @@ static int ov7670_probe(struct i2c_client *client,
+ 	v4l2_ctrl_auto_cluster(2, &info->auto_exposure,
+ 			       V4L2_EXPOSURE_MANUAL, false);
+ 	v4l2_ctrl_cluster(2, &info->saturation);
++
++#if defined(CONFIG_MEDIA_CONTROLLER)
++	info->pad.flags = MEDIA_PAD_FL_SOURCE;
++	info->sd.entity.function = MEDIA_ENT_F_CAM_SENSOR;
++	ret = media_entity_pads_init(&info->sd.entity, 1, &info->pad);
++	if (ret < 0)
++		goto hdl_free;
++#endif
++
+ 	v4l2_ctrl_handler_setup(&info->hdl);
+ 
+ 	ret = v4l2_async_register_subdev(&info->sd);
+ 	if (ret < 0)
+-		goto hdl_free;
++		goto entity_cleanup;
+ 
+ 	return 0;
+ 
++entity_cleanup:
++#if defined(CONFIG_MEDIA_CONTROLLER)
++	media_entity_cleanup(&info->sd.entity);
++#endif
+ hdl_free:
+ 	v4l2_ctrl_handler_free(&info->hdl);
+ clk_disable:
+@@ -1712,6 +1728,9 @@ static int ov7670_remove(struct i2c_client *client)
+ 	v4l2_device_unregister_subdev(sd);
+ 	v4l2_ctrl_handler_free(&info->hdl);
+ 	clk_disable_unprepare(info->clk);
++#if defined(CONFIG_MEDIA_CONTROLLER)
++	media_entity_cleanup(&info->sd.entity);
++#endif
+ 	return 0;
+ }
+ 
+-- 
+2.13.0
