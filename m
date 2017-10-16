@@ -1,74 +1,50 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 16 Oct 2017 22:47:34 +0200
-Subject: [RFC 00/11] KVM, EFI, arm64: EFI Runtime Services Sandboxing
-In-Reply-To: <1506460492.5507.58.camel@gmail.com>
-References: <1503649901-5834-1-git-send-email-florent.revest@arm.com>
- <20170831092615.GB13572@cbox> <1506460492.5507.58.camel@gmail.com>
-Message-ID: <20171016204734.GO1845@lvm>
+From: jwerner@chromium.org (Julius Werner)
+Date: Mon, 16 Oct 2017 13:49:11 -0700
+Subject: usb: dwc2: NMI watchdog: BUG: soft lockup - CPU#0 stuck for 146s
+In-Reply-To: <446301756.220218.1494678481761@email.1und1.de>
+References: <172093673.40121.1492427140661@email.1und1.de>
+ <CAD=FV=WJBTUcMPw8OgQT_jhz0H8AsH=YqWMR7LtudUKrF5-XOA@mail.gmail.com>
+ <79b9b35b-0600-771f-4cd2-9e03c5ba3a25@i2se.com>
+ <186569458.91967.1492547106553@email.1und1.de>
+ <CAD=FV=VHkJFrsJDmMytbUw=WjKQaGZ-8Ewfy5bPCA82AWS4O2Q@mail.gmail.com>
+ <212870399.174480.1492633502649@email.1und1.de>
+ <87mvbaykn1.fsf@eliezer.anholt.net>
+ <1998517910.54108.1492894253010@email.1und1.de>
+ <2127594073.298820.1493143869792@email.1und1.de>
+ <316369012.317772.1494274928708@email.1und1.de>
+ <20170510163150.GK30445@localhost>
+ <CAD=FV=VUaqtR2t04wodRJ33bqHo5DPke7zsvqBMYqZ5imX5+=A@mail.gmail.com>
+ <446301756.220218.1494678481761@email.1und1.de>
+Message-ID: <CAODwPW8qtw0qVxUGJUNt2H8TTCOEvn6G9qbUBi6_MKWgeAwcaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 26, 2017 at 11:14:52PM +0200, Florent Revest wrote:
-> On Thu, 2017-08-31 at 11:26 +0200, Christoffer Dall wrote:
-> > I wonder if this should be split into two series; one that sets up
-> > anything you may need from KVM, and another one that uses that for
-> > UEFI.
-> > 
-> > There's a lot KVM and UEFI intertwined logic and assumptions in patch
-> > 10, which makes this series a bit hard to read.
-> 
-> The way hypercalls are currently handled in handle_hvc required this
-> mixed patch. Would some kind of HVC subscription mechanism be suitable
-> to have in KVM? (e.g: a function allowing to register a callback on a
-> certain HVC function ID) This would allow the 10/11 patch to keep the
-> kvm code intact.
+> d9a14b00 339317035 C Ii:1:004:1 -32:1 0
+> d9a14b00 339317049 S Ii:1:004:1 -115:1 10 <
+> d9a14b00 339318040 C Ii:1:004:1 -32:1 0
+> d9a14b00 339318057 S Ii:1:004:1 -115:1 10 <
+> d9a14b00 339319042 C Ii:1:004:1 -32:1 0
+> d9a14b00 339319056 S Ii:1:004:1 -115:1 10 <
+> d9a14b00 339329551 C Ii:1:004:1 -32:1 0
+> d9a14b00 339329571 S Ii:1:004:1 -115:1 10 <
+> d9a14b00 339330586 C Ii:1:004:1 -32:1 0
+> d9a14b00 339330601 S Ii:1:004:1 -115:1 10 <
+> d9a14b00 339331035 C Ii:1:004:1 -32:1 0
 
-Yes, I would have no objections to that if it were relatively
-non-invasive at runtime for normal VMs.
+Sorry for necromancing an old thread, but I just happened to read
+through this and thought someone might care:
 
-> 
-> > I'd like some documentation (in the series and in
-> > Documentation/virtual/kvm) of how this works, and which hidden
-> > assumptions there are. For example, how do you ensure you never
-> > attempt to return to userspace?
-> 
-> I don't think my code ensured this. I'd need to give it a second look.
-> 
-> >  How many VCPUs do you support?
-> 
-> You can create as many VCPUs as you would in a "normal VM". Also, each
-> VCPU can be ran in a kthread.
-> 
-> >  Do you support any form of virtual interrupts??How about timers?
-> 
-> No support for virtual interrupts or timers indeed. The EFI Runtime
-> Services sandboxing wouldn't require that.
-> 
-> > Can a VM access physical devices?
-> 
-> The very idea of Runtime Services sandboxing requires Internal VMs to
-> have access to some of the physical devices.
-> 
-> >  How do you debug and trace something like this??Can the VM be
-> > monitored from userspace?
-> 
-> There is nothing ready for that.
-> 
-> > These feel like fundamental questions to me that needs addressing
-> > before I can competently review the code.
-> > 
-> > I think a slightly more concrete motivation and outlining the example
-> > of the broken UEFI on Seattle would help paving the way for these
-> > patches.
-> 
-> As far as I can remember, EFI Runtime Services on this platform have
-> already been reported to sometimes disable or enable interrupts. Maybe
-> someone at ARM has more details about the problem ?
-> 
+If I read that right, the usbmon output shows that the interrupt
+endpoint is stalled (keeps returning -EPIPE). A STALL is a special
+device-side USB condition that tells the host something is wrong and
+will persist until cleared manually. It seems that the driver isn't
+prepared for this (see
+drivers/usb/serial/pl2303.c#pl2303_read_int_callback) and just keeps
+resubmitting the URB, so it will stall again as fast as the endpoint
+allows it to. This may be the reason why you get so many transfers
+that it overwhelms the CPU.
 
-Thanks for answering these questions.  If you or anyone else picks up
-this work, we can gather some of the stuff in the thread for
-documentation and todo items.
-
-Thanks,
--Christoffer
+A fix would be to catch -EPIPE in that function and handle it
+explicitly (with either a CLEAR_STALL to the endpoint or a full USB
+reset... would have to look at the documentation for PL2303 to see
+what the stall actually means and how you're supposed to treat it).
