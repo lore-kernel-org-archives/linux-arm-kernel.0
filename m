@@ -1,34 +1,64 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 16 Oct 2017 10:12:18 +0100
-Subject: [PATCH v2 1/3] dt-bindings: nvmem: add description for UniPhier
- eFuse
-In-Reply-To: <CAK7LNASpHvnicebVLbOgTDCmPp7UDVkf4FYWGsjAiB8ENo_2iw@mail.gmail.com>
-References: <1507266180-11840-1-git-send-email-hayashibara.keiji@socionext.com>
- <1507266180-11840-2-git-send-email-hayashibara.keiji@socionext.com>
- <20171013134902.7gvmkvxvwnjlmstp@rob-hp-laptop>
- <CAK7LNARg6G152joHq06RkPab=NoWEkFArvF+Ccc1behdXFokmg@mail.gmail.com>
- <CAL_JsqJdbLFHqEU8+1e_hvA3Hd1MLJHETWAkd2pcsXpDKwONog@mail.gmail.com>
- <CAK7LNASpHvnicebVLbOgTDCmPp7UDVkf4FYWGsjAiB8ENo_2iw@mail.gmail.com>
-Message-ID: <370eba21-1da8-9994-65c1-b51f564343fb@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 16 Oct 2017 11:13:32 +0200
+Subject: [PATCH v2 1/3] dt-bindings: mmc: renesas_sdhi: provide example in
+ bindings documentation
+In-Reply-To: <20171016075822.18177-2-horms+renesas@verge.net.au>
+References: <20171016075822.18177-1-horms+renesas@verge.net.au>
+ <20171016075822.18177-2-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdUSan7j5wf=cYwO-RdcY7KiJSAPuh7nPq4YQMc_4_sfcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Simon,
 
+On Mon, Oct 16, 2017 at 9:58 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Provide an example of the usage of the DT bindings for TMIO
+> in their documentation. The example given is for the r8a7790 (R-Car H2).
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+> v2
+> * Correct description of example, it is for the r8a7790 (R-Car H2)
+>   rather than the r8a7779 (R-Car H1)
 
-On 15/10/17 09:04, Masahiro Yamada wrote:
-> OK.
-> 
-> usb_mon: usb_mon {
-> 
-> should be fixed.
-> 
-> Srinivas forwarded this to Greg,
-> but I guess Greg has not applied this yet.
-> 
-> The author can do re-spin,
-> or a follow-up patch will do if it is too late.
+Thanks for the update!
 
-Please send a patch to fix!
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Thanks,
-srini
+> --- a/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
+> +++ b/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
+> @@ -43,3 +43,57 @@ Optional properties:
+>  - pinctrl-names: should be "default", "state_uhs"
+>  - pinctrl-0: should contain default/high speed pin ctrl
+>  - pinctrl-1: should contain uhs mode pin ctrl
+> +
+> +Example: R8A7790 (R-Car H2) SDHI controller nodes
+> +
+> +       sdhi0: sd at ee100000 {
+> +               compatible = "renesas,sdhi-r8a7790";
+> +               reg = <0 0xee100000 0 0x328>;
+> +               interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
+> +               clocks = <&mstp3_clks R8A7790_CLK_SDHI0>;
+
+You may want to copy the example from the current r8a7790.dtsi, which
+uses the newer CPG/MSSR bindings.
+
+> +               dmas = <&dmac0 0xcd>, <&dmac0 0xce>,
+> +                      <&dmac1 0xcd>, <&dmac1 0xce>;
+> +               dma-names = "tx", "rx", "tx", "rx";
+> +               max-frequency = <195000000>;
+> +               power-domains = <&sysc R8A7790_PD_ALWAYS_ON>;
+> +               status = "disabled";
+> +       };
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
