@@ -1,59 +1,61 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 17 Oct 2017 10:07:43 +0200
-Subject: [PATCH 3/4] drm/meson: dw_hdmi: Add support for an optional external
- 5V regulator
+Date: Tue, 17 Oct 2017 10:07:44 +0200
+Subject: [PATCH 4/4] drm/meson: Add missing VPU init
 In-Reply-To: <1508227664-11171-1-git-send-email-narmstrong@baylibre.com>
 References: <1508227664-11171-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1508227664-11171-4-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1508227664-11171-5-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On reference boards and derivatives, the HDMI Logic is powered by an external
-5V regulator.
-This regulator was set by the Vendor U-Boot, add optional support for it.
+The VPU init misses these configurations values.
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- drivers/gpu/drm/meson/meson_dw_hdmi.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ drivers/gpu/drm/meson/meson_drv.c       | 9 +++++++++
+ drivers/gpu/drm/meson/meson_registers.h | 4 ++++
+ 2 files changed, 13 insertions(+)
 
-diff --git a/drivers/gpu/drm/meson/meson_dw_hdmi.c b/drivers/gpu/drm/meson/meson_dw_hdmi.c
-index cef4144..17de3af 100644
---- a/drivers/gpu/drm/meson/meson_dw_hdmi.c
-+++ b/drivers/gpu/drm/meson/meson_dw_hdmi.c
-@@ -23,6 +23,7 @@
- #include <linux/of_graph.h>
- #include <linux/reset.h>
- #include <linux/clk.h>
-+#include <linux/regulator/consumer.h>
- 
- #include <drm/drmP.h>
- #include <drm/drm_edid.h>
-@@ -137,6 +138,7 @@ struct meson_dw_hdmi {
- 	struct reset_control *hdmitx_phy;
- 	struct clk *hdmi_pclk;
- 	struct clk *venci_clk;
-+	struct regulator *hdmi_supply;
- 	u32 irq_stat;
+diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
+index 7742c7d..19a0d8d 100644
+--- a/drivers/gpu/drm/meson/meson_drv.c
++++ b/drivers/gpu/drm/meson/meson_drv.c
+@@ -150,6 +150,14 @@ static struct regmap_config meson_regmap_config = {
+ 	.max_register   = 0x1000,
  };
- #define encoder_to_meson_dw_hdmi(x) \
-@@ -751,6 +753,17 @@ static int meson_dw_hdmi_bind(struct device *dev, struct device *master,
- 	dw_plat_data = &meson_dw_hdmi->dw_plat_data;
- 	encoder = &meson_dw_hdmi->encoder;
  
-+	meson_dw_hdmi->hdmi_supply = devm_regulator_get_optional(dev, "hdmi");
-+	if (IS_ERR(meson_dw_hdmi->hdmi_supply)) {
-+		if (PTR_ERR(meson_dw_hdmi->hdmi_supply) == -EPROBE_DEFER)
-+			return -EPROBE_DEFER;
-+		meson_dw_hdmi->hdmi_supply = NULL;
-+	} else {
-+		ret = regulator_enable(meson_dw_hdmi->hdmi_supply);
-+		if (ret)
-+			return ret;
-+	}
++static void meson_vpu_init(struct meson_drm *priv)
++{
++	writel_relaxed(0x210000, priv->io_base + _REG(VPU_RDARB_MODE_L1C1));
++	writel_relaxed(0x10000, priv->io_base + _REG(VPU_RDARB_MODE_L1C2));
++	writel_relaxed(0x900000, priv->io_base + _REG(VPU_RDARB_MODE_L2C1));
++	writel_relaxed(0x20000, priv->io_base + _REG(VPU_WRARB_MODE_L2C1));
++}
 +
- 	meson_dw_hdmi->hdmitx_apb = devm_reset_control_get_exclusive(dev,
- 						"hdmitx_apb");
- 	if (IS_ERR(meson_dw_hdmi->hdmitx_apb)) {
+ static int meson_drv_bind_master(struct device *dev, bool has_components)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+@@ -221,6 +229,7 @@ static int meson_drv_bind_master(struct device *dev, bool has_components)
+ 
+ 	/* Hardware Initialization */
+ 
++	meson_vpu_init(priv);
+ 	meson_venc_init(priv);
+ 	meson_vpp_init(priv);
+ 	meson_viu_init(priv);
+diff --git a/drivers/gpu/drm/meson/meson_registers.h b/drivers/gpu/drm/meson/meson_registers.h
+index 2847381..bca8714 100644
+--- a/drivers/gpu/drm/meson/meson_registers.h
++++ b/drivers/gpu/drm/meson/meson_registers.h
+@@ -1363,6 +1363,10 @@
+ #define VPU_PROT3_STAT_1 0x277a
+ #define VPU_PROT3_STAT_2 0x277b
+ #define VPU_PROT3_REQ_ONOFF 0x277c
++#define VPU_RDARB_MODE_L1C1 0x2790
++#define VPU_RDARB_MODE_L1C2 0x2799
++#define VPU_RDARB_MODE_L2C1 0x279d
++#define VPU_WRARB_MODE_L2C1 0x27a2
+ 
+ /* osd super scale */
+ #define OSDSR_HV_SIZEIN 0x3130
 -- 
 2.7.4
