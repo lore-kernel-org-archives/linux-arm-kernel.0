@@ -1,41 +1,53 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 17 Oct 2017 19:52:55 +0200
-Subject: [PATCH] arm64: dts: rockchip: fix typo in iommu nodes
-In-Reply-To: <4123717.0VmPnCpUOn@diego>
-References: <20171010085648.1339605-1-arnd@arndb.de> <4123717.0VmPnCpUOn@diego>
-Message-ID: <35096146.J7tq43JfW1@phil>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 17 Oct 2017 19:53:32 +0200
+Subject: [PATCH v4 1/4] clocksource: stm32: convert driver to timer_of
+In-Reply-To: <CA+M3ks5CBOXfQCMmUZnkVUNwSGCnzaqdzDZa9ap6NYgDTVspsw@mail.gmail.com>
+References: <1506959513-16851-1-git-send-email-benjamin.gaignard@linaro.org>
+ <1506959513-16851-2-git-send-email-benjamin.gaignard@linaro.org>
+ <88c8f124-4cb1-a982-d4a2-c029ab0dcd2a@linaro.org>
+ <CA+M3ks5CBOXfQCMmUZnkVUNwSGCnzaqdzDZa9ap6NYgDTVspsw@mail.gmail.com>
+Message-ID: <28b1df26-8375-1a38-b918-39b80390ef7d@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 10. Oktober 2017, 11:48:25 CEST schrieb Heiko St?bner:
-> Hi Arnd,
+On 17/10/2017 19:34, Benjamin Gaignard wrote:
+> 2017-10-17 19:09 GMT+02:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
+>> On 02/10/2017 17:51, Benjamin Gaignard wrote:
+>>> Convert driver to use timer_of helpers. This allow to remove
+>>> custom proprietary structure.
+>>>
+>>> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+>>> ---
+>>
+>> [ ... ]
+>>
+>>> -     clockevents_config_and_register(&data->evtdev,
+>>> -                                     DIV_ROUND_CLOSEST(rate, prescaler),
+>>> -                                     0x1, max_delta);
+>>> -
+>>> -     ret = request_irq(irq, stm32_clock_event_handler, IRQF_TIMER,
+>>> -                     "stm32 clockevent", data);
+>>> -     if (ret) {
+>>> -             pr_err("%pOF: failed to request irq.\n", np);
+>>> -             goto err_get_irq;
+>>> -     }
+>>> +     clockevents_config_and_register(&to->clkevt,
+>>> +                                     timer_of_period(to), 0x60, max_delta);
+>>
+>>
+>> Why 0x1 -> 0x60 ?
 > 
-> Am Dienstag, 10. Oktober 2017, 10:56:01 CEST schrieb Arnd Bergmann:
-> > The latest dtc warns about an extraneous cell in the interrupt
-> > property of two of the iommu device nodes:
-> > 
-> > Warning (interrupts_property): interrupts size is (16), expected multiple of
-> > 12 in /iommu at ff373f00 Warning (interrupts_property): interrupts size is
-> > (16), expected multiple of 12 in /iommu at ff900800
-> > 
-> > This removes the typo.
-> > 
-> > Fixes: cede4c79de28 ("arm64: dts: rockchip: add rk3368 iommu nodes")
-> > Fixes: 49c82f2b7c5d ("arm64: dts: rockchip: add rk3328 iommu nodes")
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> looks like that got copy-pasted from rk3399 where we have 4 elements per irq.
-> In any case the change looks good, so if you want to apply it directly to 
-> armsoc-fixes here is a
-> 
-> Acked-by: Heiko Stuebner <heiko@sntech.de>
-> 
-> Depending on how you want to handle it I can also merge it, but
-> Olof already picked up my 2 fixes for 4.14, so you applying it might
-> save us the round-trip for a further 1-patch pull request :-)
+> Because if the min delta is too small it could generate too much interrupts
+> and the system will not be able to catch all of them.
 
-as another (somewhat urgent) fix for 64bit dts has come up, I've now also
-picked this change up for the following pull request.
+You did a change not related to what is described in the log.
+
+Shame on you! 50 push-ups! Reply to this email when it is done.
 
 
-Heiko
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
