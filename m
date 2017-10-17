@@ -1,287 +1,239 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Tue, 17 Oct 2017 13:40:28 +0200
-Subject: [PATCH v12 01/11] mm: deferred_init_memmap improvements
-In-Reply-To: <20171013173214.27300-2-pasha.tatashin@oracle.com>
-References: <20171013173214.27300-1-pasha.tatashin@oracle.com>
- <20171013173214.27300-2-pasha.tatashin@oracle.com>
-Message-ID: <20171017114028.uyt63277md5tuc4j@dhcp22.suse.cz>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Tue, 17 Oct 2017 13:50:24 +0200
+Subject: [PATCH v3 22/28] arm64/sve: KVM: Prevent guests from using SVE
+In-Reply-To: <1507660725-7986-23-git-send-email-Dave.Martin@arm.com>
+References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
+ <1507660725-7986-23-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20171017115024.GS1845@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 13-10-17 13:32:04, Pavel Tatashin wrote:
-> deferred_init_memmap() is called when struct pages are initialized later
-> in boot by slave CPUs. This patch simplifies and optimizes this function,
-> and also fixes a couple issues (described below).
+On Tue, Oct 10, 2017 at 07:38:39PM +0100, Dave Martin wrote:
+> Until KVM has full SVE support, guests must not be allowed to
+> execute SVE instructions.
 > 
-> The main change is that now we are iterating through free memblock areas
-> instead of all configured memory. Thus, we do not have to check if the
-> struct page has already been initialized.
+> This patch enables the necessary traps, and also ensures that the
+> traps are disabled again on exit from the guest so that the host
+> can still use SVE if it wants to.
 > 
-> =====
-> In deferred_init_memmap() where all deferred struct pages are initialized
-> we have a check like this:
-> 
-> if (page->flags) {
-> 	VM_BUG_ON(page_zone(page) != zone);
-> 	goto free_range;
-> }
-> 
-> This way we are checking if the current deferred page has already been
-> initialized. It works, because memory for struct pages has been zeroed, and
-> the only way flags are not zero if it went through __init_single_page()
-> before.  But, once we change the current behavior and won't zero the memory
-> in memblock allocator, we cannot trust anything inside "struct page"es
-> until they are initialized. This patch fixes this.
-> 
-> The deferred_init_memmap() is re-written to loop through only free memory
-> ranges provided by memblock.
-> 
-> Note, this first issue is relevant only when the following change is
-> merged:
-> 
-> =====
-> This patch fixes another existing issue on systems that have holes in
-> zones i.e CONFIG_HOLES_IN_ZONE is defined.
-> 
-> In for_each_mem_pfn_range() we have code like this:
-> 
-> if (!pfn_valid_within(pfn)
-> 	goto free_range;
-> 
-> Note: 'page' is not set to NULL and is not incremented but 'pfn' advances.
-> Thus means if deferred struct pages are enabled on systems with these kind
-> of holes, linux would get memory corruptions. I have fixed this issue by
-> defining a new macro that performs all the necessary operations when we
-> free the current set of pages.
+> This patch introduces another instance of
+> __this_cpu_write(fpsimd_last_state, NULL), so this flush operation
+> is abstracted out as a separate helper fpsimd_flush_cpu_state().
+> Other instances are ported appropriately.
 
-This really begs to have two patches... I will not insist though. I also
-suspect the code can be further simplified but again this is nothing to
-block this to go.
- 
-> Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
-> Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
-> Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
-> Reviewed-by: Bob Picco <bob.picco@oracle.com>
+I don't understand this paragraph, beginning from ", so this...".
 
-I do not see any obvious issues in the patch
 
-Acked-by: Michal Hocko <mhocko@suse.com>
+>From reading the code, what I think is the reason for having to flush
+the SVE state (and mark the host state invalid) is that even though we
+disallow SVE usage in the guest, the guest can use the normal FP state,
+and while we always fully preserve the host state, this could still
+corrupt some additional SVE state not properly preserved for the host.
+Is that correct?
 
+> 
+> As a side effect of this refactoring, a this_cpu_write() in
+> fpsimd_cpu_pm_notifier() is changed to __this_cpu_write().  This
+> should be fine, since cpu_pm_enter() is supposed to be called only
+> with interrupts disabled.
+
+Otherwise the patch itself looks good to me.
+
+Thanks,
+-Christoffer
+
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > ---
->  mm/page_alloc.c | 168 ++++++++++++++++++++++++++++----------------------------
->  1 file changed, 85 insertions(+), 83 deletions(-)
+>  arch/arm/include/asm/kvm_host.h   |  3 +++
+>  arch/arm64/include/asm/fpsimd.h   |  1 +
+>  arch/arm64/include/asm/kvm_arm.h  |  4 +++-
+>  arch/arm64/include/asm/kvm_host.h | 11 +++++++++++
+>  arch/arm64/kernel/fpsimd.c        | 31 +++++++++++++++++++++++++++++--
+>  arch/arm64/kvm/hyp/switch.c       |  6 +++---
+>  virt/kvm/arm/arm.c                |  3 +++
+>  7 files changed, 53 insertions(+), 6 deletions(-)
 > 
-> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-> index 77e4d3c5c57b..cdbd14829fd3 100644
-> --- a/mm/page_alloc.c
-> +++ b/mm/page_alloc.c
-> @@ -1410,14 +1410,17 @@ void clear_zone_contiguous(struct zone *zone)
->  }
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index 4a879f6..242151e 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -293,4 +293,7 @@ int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
+>  int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
+>  			       struct kvm_device_attr *attr);
 >  
->  #ifdef CONFIG_DEFERRED_STRUCT_PAGE_INIT
-> -static void __init deferred_free_range(struct page *page,
-> -					unsigned long pfn, int nr_pages)
-> +static void __init deferred_free_range(unsigned long pfn,
-> +				       unsigned long nr_pages)
->  {
-> -	int i;
-> +	struct page *page;
-> +	unsigned long i;
->  
-> -	if (!page)
-> +	if (!nr_pages)
->  		return;
->  
-> +	page = pfn_to_page(pfn);
+> +/* All host FP/SIMD state is restored on guest exit, so nothing to save: */
+> +static inline void kvm_fpsimd_flush_cpu_state(void) {}
 > +
->  	/* Free a large naturally-aligned chunk if possible */
->  	if (nr_pages == pageblock_nr_pages &&
->  	    (pfn & (pageblock_nr_pages - 1)) == 0) {
-> @@ -1443,19 +1446,89 @@ static inline void __init pgdat_init_report_one_done(void)
->  		complete(&pgdat_init_all_done_comp);
+>  #endif /* __ARM_KVM_HOST_H__ */
+> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+> index 3cfdfbe..10b2824 100644
+> --- a/arch/arm64/include/asm/fpsimd.h
+> +++ b/arch/arm64/include/asm/fpsimd.h
+> @@ -75,6 +75,7 @@ extern void fpsimd_restore_current_state(void);
+>  extern void fpsimd_update_current_state(struct fpsimd_state *state);
+>  
+>  extern void fpsimd_flush_task_state(struct task_struct *target);
+> +extern void sve_flush_cpu_state(void);
+>  
+>  /* Maximum VL that SVE VL-agnostic software can transparently support */
+>  #define SVE_VL_ARCH_MAX 0x100
+> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> index dbf0537..7f069ff 100644
+> --- a/arch/arm64/include/asm/kvm_arm.h
+> +++ b/arch/arm64/include/asm/kvm_arm.h
+> @@ -186,7 +186,8 @@
+>  #define CPTR_EL2_TTA	(1 << 20)
+>  #define CPTR_EL2_TFP	(1 << CPTR_EL2_TFP_SHIFT)
+>  #define CPTR_EL2_TZ	(1 << 8)
+> -#define CPTR_EL2_DEFAULT	0x000033ff
+> +#define CPTR_EL2_RES1	0x000032ff /* known RES1 bits in CPTR_EL2 */
+> +#define CPTR_EL2_DEFAULT	CPTR_EL2_RES1
+>  
+>  /* Hyp Debug Configuration Register bits */
+>  #define MDCR_EL2_TPMS		(1 << 14)
+> @@ -237,5 +238,6 @@
+>  
+>  #define CPACR_EL1_FPEN		(3 << 20)
+>  #define CPACR_EL1_TTA		(1 << 28)
+> +#define CPACR_EL1_DEFAULT	(CPACR_EL1_FPEN | CPACR_EL1_ZEN_EL1EN)
+>  
+>  #endif /* __ARM64_KVM_ARM_H__ */
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index e923b58..674912d 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -25,6 +25,7 @@
+>  #include <linux/types.h>
+>  #include <linux/kvm_types.h>
+>  #include <asm/cpufeature.h>
+> +#include <asm/fpsimd.h>
+>  #include <asm/kvm.h>
+>  #include <asm/kvm_asm.h>
+>  #include <asm/kvm_mmio.h>
+> @@ -384,4 +385,14 @@ static inline void __cpu_init_stage2(void)
+>  		  "PARange is %d bits, unsupported configuration!", parange);
 >  }
 >  
 > +/*
-> + * Helper for deferred_init_range, free the given range, reset the counters, and
-> + * return number of pages freed.
+> + * All host FP/SIMD state is restored on guest exit, so nothing needs
+> + * doing here except in the SVE case:
+> +*/
+> +static inline void kvm_fpsimd_flush_cpu_state(void)
+> +{
+> +	if (system_supports_sve())
+> +		sve_flush_cpu_state();
+> +}
+> +
+>  #endif /* __ARM64_KVM_HOST_H__ */
+> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> index a9cb794..6ae3703 100644
+> --- a/arch/arm64/kernel/fpsimd.c
+> +++ b/arch/arm64/kernel/fpsimd.c
+> @@ -1073,6 +1073,33 @@ void fpsimd_flush_task_state(struct task_struct *t)
+>  	t->thread.fpsimd_state.cpu = NR_CPUS;
+>  }
+>  
+> +static inline void fpsimd_flush_cpu_state(void)
+> +{
+> +	__this_cpu_write(fpsimd_last_state, NULL);
+> +}
+> +
+> +/*
+> + * Invalidate any task SVE state currently held in this CPU's regs.
+> + *
+> + * This is used to prevent the kernel from trying to reuse SVE register data
+> + * that is detroyed by KVM guest enter/exit.  This function should go away when
+> + * KVM SVE support is implemented.  Don't use it for anything else.
 > + */
-> +static inline unsigned long __def_free(unsigned long *nr_free,
-> +				       unsigned long *free_base_pfn,
-> +				       struct page **page)
+> +#ifdef CONFIG_ARM64_SVE
+> +void sve_flush_cpu_state(void)
 > +{
-> +	unsigned long nr = *nr_free;
+> +	struct fpsimd_state *const fpstate = __this_cpu_read(fpsimd_last_state);
+> +	struct task_struct *tsk;
 > +
-> +	deferred_free_range(*free_base_pfn, nr);
-> +	*free_base_pfn = 0;
-> +	*nr_free = 0;
-> +	*page = NULL;
+> +	if (!fpstate)
+> +		return;
 > +
-> +	return nr;
+> +	tsk = container_of(fpstate, struct task_struct, thread.fpsimd_state);
+> +	if (test_tsk_thread_flag(tsk, TIF_SVE))
+> +		fpsimd_flush_cpu_state();
 > +}
+> +#endif /* CONFIG_ARM64_SVE */
 > +
-> +static unsigned long deferred_init_range(int nid, int zid, unsigned long pfn,
-> +					 unsigned long end_pfn)
-> +{
-> +	struct mminit_pfnnid_cache nid_init_state = { };
-> +	unsigned long nr_pgmask = pageblock_nr_pages - 1;
-> +	unsigned long free_base_pfn = 0;
-> +	unsigned long nr_pages = 0;
-> +	unsigned long nr_free = 0;
-> +	struct page *page = NULL;
-> +
-> +	for (; pfn < end_pfn; pfn++) {
-> +		/*
-> +		 * First we check if pfn is valid on architectures where it is
-> +		 * possible to have holes within pageblock_nr_pages. On systems
-> +		 * where it is not possible, this function is optimized out.
-> +		 *
-> +		 * Then, we check if a current large page is valid by only
-> +		 * checking the validity of the head pfn.
-> +		 *
-> +		 * meminit_pfn_in_nid is checked on systems where pfns can
-> +		 * interleave within a node: a pfn is between start and end
-> +		 * of a node, but does not belong to this memory node.
-> +		 *
-> +		 * Finally, we minimize pfn page lookups and scheduler checks by
-> +		 * performing it only once every pageblock_nr_pages.
-> +		 */
-> +		if (!pfn_valid_within(pfn)) {
-> +			nr_pages += __def_free(&nr_free, &free_base_pfn, &page);
-> +		} else if (!(pfn & nr_pgmask) && !pfn_valid(pfn)) {
-> +			nr_pages += __def_free(&nr_free, &free_base_pfn, &page);
-> +		} else if (!meminit_pfn_in_nid(pfn, nid, &nid_init_state)) {
-> +			nr_pages += __def_free(&nr_free, &free_base_pfn, &page);
-> +		} else if (page && (pfn & nr_pgmask)) {
-> +			page++;
-> +			__init_single_page(page, pfn, zid, nid);
-> +			nr_free++;
-> +		} else {
-> +			nr_pages += __def_free(&nr_free, &free_base_pfn, &page);
-> +			page = pfn_to_page(pfn);
-> +			__init_single_page(page, pfn, zid, nid);
-> +			free_base_pfn = pfn;
-> +			nr_free = 1;
-> +			cond_resched();
-> +		}
-> +	}
-> +	/* Free the last block of pages to allocator */
-> +	nr_pages += __def_free(&nr_free, &free_base_pfn, &page);
-> +
-> +	return nr_pages;
-> +}
-> +
->  /* Initialise remaining memory on a node */
->  static int __init deferred_init_memmap(void *data)
->  {
->  	pg_data_t *pgdat = data;
->  	int nid = pgdat->node_id;
-> -	struct mminit_pfnnid_cache nid_init_state = { };
->  	unsigned long start = jiffies;
->  	unsigned long nr_pages = 0;
-> -	unsigned long walk_start, walk_end;
-> -	int i, zid;
-> +	unsigned long spfn, epfn;
-> +	phys_addr_t spa, epa;
-> +	int zid;
->  	struct zone *zone;
->  	unsigned long first_init_pfn = pgdat->first_deferred_pfn;
->  	const struct cpumask *cpumask = cpumask_of_node(pgdat->node_id);
-> +	u64 i;
+>  #ifdef CONFIG_KERNEL_MODE_NEON
 >  
->  	if (first_init_pfn == ULONG_MAX) {
->  		pgdat_init_report_one_done();
-> @@ -1477,83 +1550,12 @@ static int __init deferred_init_memmap(void *data)
->  		if (first_init_pfn < zone_end_pfn(zone))
->  			break;
->  	}
-> +	first_init_pfn = max(zone->zone_start_pfn, first_init_pfn);
->  
-> -	for_each_mem_pfn_range(i, nid, &walk_start, &walk_end, NULL) {
-> -		unsigned long pfn, end_pfn;
-> -		struct page *page = NULL;
-> -		struct page *free_base_page = NULL;
-> -		unsigned long free_base_pfn = 0;
-> -		int nr_to_free = 0;
-> -
-> -		end_pfn = min(walk_end, zone_end_pfn(zone));
-> -		pfn = first_init_pfn;
-> -		if (pfn < walk_start)
-> -			pfn = walk_start;
-> -		if (pfn < zone->zone_start_pfn)
-> -			pfn = zone->zone_start_pfn;
-> -
-> -		for (; pfn < end_pfn; pfn++) {
-> -			if (!pfn_valid_within(pfn))
-> -				goto free_range;
-> -
-> -			/*
-> -			 * Ensure pfn_valid is checked every
-> -			 * pageblock_nr_pages for memory holes
-> -			 */
-> -			if ((pfn & (pageblock_nr_pages - 1)) == 0) {
-> -				if (!pfn_valid(pfn)) {
-> -					page = NULL;
-> -					goto free_range;
-> -				}
-> -			}
-> -
-> -			if (!meminit_pfn_in_nid(pfn, nid, &nid_init_state)) {
-> -				page = NULL;
-> -				goto free_range;
-> -			}
-> -
-> -			/* Minimise pfn page lookups and scheduler checks */
-> -			if (page && (pfn & (pageblock_nr_pages - 1)) != 0) {
-> -				page++;
-> -			} else {
-> -				nr_pages += nr_to_free;
-> -				deferred_free_range(free_base_page,
-> -						free_base_pfn, nr_to_free);
-> -				free_base_page = NULL;
-> -				free_base_pfn = nr_to_free = 0;
-> -
-> -				page = pfn_to_page(pfn);
-> -				cond_resched();
-> -			}
-> -
-> -			if (page->flags) {
-> -				VM_BUG_ON(page_zone(page) != zone);
-> -				goto free_range;
-> -			}
-> -
-> -			__init_single_page(page, pfn, zid, nid);
-> -			if (!free_base_page) {
-> -				free_base_page = page;
-> -				free_base_pfn = pfn;
-> -				nr_to_free = 0;
-> -			}
-> -			nr_to_free++;
-> -
-> -			/* Where possible, batch up pages for a single free */
-> -			continue;
-> -free_range:
-> -			/* Free the current block of pages to allocator */
-> -			nr_pages += nr_to_free;
-> -			deferred_free_range(free_base_page, free_base_pfn,
-> -								nr_to_free);
-> -			free_base_page = NULL;
-> -			free_base_pfn = nr_to_free = 0;
-> -		}
-> -		/* Free the last block of pages to allocator */
-> -		nr_pages += nr_to_free;
-> -		deferred_free_range(free_base_page, free_base_pfn, nr_to_free);
-> -
-> -		first_init_pfn = max(end_pfn, first_init_pfn);
-> +	for_each_free_mem_range(i, nid, MEMBLOCK_NONE, &spa, &epa, NULL) {
-> +		spfn = max_t(unsigned long, first_init_pfn, PFN_UP(spa));
-> +		epfn = min_t(unsigned long, zone_end_pfn(zone), PFN_DOWN(epa));
-> +		nr_pages += deferred_init_range(nid, zid, spfn, epfn);
+>  DEFINE_PER_CPU(bool, kernel_neon_busy);
+> @@ -1113,7 +1140,7 @@ void kernel_neon_begin(void)
 >  	}
 >  
->  	/* Sanity check that the next zone really is unpopulated */
+>  	/* Invalidate any task state remaining in the fpsimd regs: */
+> -	__this_cpu_write(fpsimd_last_state, NULL);
+> +	fpsimd_flush_cpu_state();
+>  
+>  	preempt_disable();
+>  
+> @@ -1234,7 +1261,7 @@ static int fpsimd_cpu_pm_notifier(struct notifier_block *self,
+>  	case CPU_PM_ENTER:
+>  		if (current->mm)
+>  			task_fpsimd_save();
+> -		this_cpu_write(fpsimd_last_state, NULL);
+> +		fpsimd_flush_cpu_state();
+>  		break;
+>  	case CPU_PM_EXIT:
+>  		if (current->mm)
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 35a90b8..951f3eb 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -48,7 +48,7 @@ static void __hyp_text __activate_traps_vhe(void)
+>  
+>  	val = read_sysreg(cpacr_el1);
+>  	val |= CPACR_EL1_TTA;
+> -	val &= ~CPACR_EL1_FPEN;
+> +	val &= ~(CPACR_EL1_FPEN | CPACR_EL1_ZEN);
+>  	write_sysreg(val, cpacr_el1);
+>  
+>  	write_sysreg(__kvm_hyp_vector, vbar_el1);
+> @@ -59,7 +59,7 @@ static void __hyp_text __activate_traps_nvhe(void)
+>  	u64 val;
+>  
+>  	val = CPTR_EL2_DEFAULT;
+> -	val |= CPTR_EL2_TTA | CPTR_EL2_TFP;
+> +	val |= CPTR_EL2_TTA | CPTR_EL2_TFP | CPTR_EL2_TZ;
+>  	write_sysreg(val, cptr_el2);
+>  }
+>  
+> @@ -117,7 +117,7 @@ static void __hyp_text __deactivate_traps_vhe(void)
+>  
+>  	write_sysreg(mdcr_el2, mdcr_el2);
+>  	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
+> -	write_sysreg(CPACR_EL1_FPEN, cpacr_el1);
+> +	write_sysreg(CPACR_EL1_DEFAULT, cpacr_el1);
+>  	write_sysreg(vectors, vbar_el1);
+>  }
+>  
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index b9f68e4..4d3cf9c 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -652,6 +652,9 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  		 */
+>  		preempt_disable();
+>  
+> +		/* Flush FP/SIMD state that can't survive guest entry/exit */
+> +		kvm_fpsimd_flush_cpu_state();
+> +
+>  		kvm_pmu_flush_hwstate(vcpu);
+>  
+>  		kvm_timer_flush_hwstate(vcpu);
 > -- 
-> 2.14.2
-
--- 
-Michal Hocko
-SUSE Labs
+> 2.1.4
+> 
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
