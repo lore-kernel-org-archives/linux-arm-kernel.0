@@ -1,164 +1,51 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 17 Oct 2017 15:24:18 -0500
-Subject: [PATCH 2/9] PCI: host: brcmstb: add DT docs for Brcmstb PCIe
- device
-In-Reply-To: <1507761269-7017-3-git-send-email-jim2101024@gmail.com>
-References: <1507761269-7017-1-git-send-email-jim2101024@gmail.com>
- <1507761269-7017-3-git-send-email-jim2101024@gmail.com>
-Message-ID: <20171017202418.ykve2o4zvuwxjdgj@rob-hp-laptop>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Tue, 17 Oct 2017 23:33:11 +0300
+Subject: ARM: pxa/corgi: armv5te kernel 4.12 fails to decompress compiled
+ with gcc7
+In-Reply-To: <f1631768-b26e-62ae-db1f-65686cd0c4de@gmail.com>
+References: <CAAQYJAvR2_wqf2Axe4aVMOu08t7w5tNEjK0s3fw_oemtqCRo7g@mail.gmail.com>
+ <87a83zsiid.fsf@belgarion.home>
+ <CAAQYJAtEmJMc766kUx+bhFCNQKmwK53nSDNL0nFz-9UXSUO5CQ@mail.gmail.com>
+ <20171014215042.kfrhb2kjhm7wb7vb@darkstar.musicnaut.iki.fi>
+ <87mv4txuid.fsf@belgarion.home>
+ <20171015104640.hazujjkbqyik7fgg@darkstar.musicnaut.iki.fi>
+ <f1631768-b26e-62ae-db1f-65686cd0c4de@gmail.com>
+Message-ID: <20171017203311.obi4nqtdvlrxwarm@darkstar.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 11, 2017 at 06:34:22PM -0400, Jim Quinlan wrote:
-> The DT bindings description of the Brcmstb PCIe device is described.  This
-> node can be used by almost all Broadcom settop box chips, using
-> ARM, ARM64, or MIPS CPU architectures.
+Hi,
+
+On Mon, Oct 16, 2017 at 01:55:18PM +0200, Petr Cvek wrote:
+> Dne 15.10.2017 v 12:46 Aaro Koskinen napsal(a):
+> > This seems to be simpler to debug/reproduce using busybox. Compiling
+> > just busybox with GCC 7.2 and march=armv5te/mtune=xscale already
+> > produces failing xz decompression:
 > 
-> Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
-> ---
->  .../devicetree/bindings/pci/brcmstb-pci.txt        | 106 +++++++++++++++++++++
->  1 file changed, 106 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/brcmstb-pci.txt
+> Does it fail too when compiled with gcc 7.2 and with march=armv5t and/or
+> march=armv4t ?
+
+At least armv4t seems to work.
+
+> > root at thecus-n2100:~$ gzip foo.txt
+> > root at thecus-n2100:~$ ./busybox.gcc-7.2 gzip -d foo.txt.gz
+> > gzip: crc error
+> > root at thecus-n2100:~$ ./busybox.gcc-6.4 gzip -d foo.txt.gz
+> > root at thecus-n2100:~$ cat foo.txt
+> > foo
+> > 
 > 
-> diff --git a/Documentation/devicetree/bindings/pci/brcmstb-pci.txt b/Documentation/devicetree/bindings/pci/brcmstb-pci.txt
-> new file mode 100644
-> index 0000000..2f699da
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/brcmstb-pci.txt
-> @@ -0,0 +1,106 @@
-> +Brcmstb PCIe Host Controller Device Tree Bindings
-> +
-> +Introduction:
-> +  The brcmstb host controller closely follows the example set in
-> +
-> +	[1] http://devicetree.org/Device_Tree_Usage#PCI_Host_Bridge
-> +
-> +  The rest of this document explains some added customizations and
-> +  offers an example Brcmstb PCIe host controller DT node.
-> +
-> +Required Properties:
-> +  reg -- the register start address and length for the PCIe block.
-> +      Additional start,length pairs may be specified for clock addresses.
+> Is it really compiled with armv5te ("readelf -n -A")?
 
-Kind of vague and why do you need clock addresses and the clock binding?
+Yes.
 
-Also, typically the config space is defined here? Is that missing or you 
-don't support memory mapped config space?
+> I've just found my old gcc 6.3 compiled some code with a default armv4t.
 
-> +  interrupts -- two interrupts are specified; the first interrupt is for
-> +      the PCI host controller and the second is for MSI if the built-in
-> +      MSI controller is to be used.
-> +  interrupt-names -- names of the interrupts (above): "pcie" and "msi".
-> +  compatible -- must be one of: "brcm,bcm7425-pcie", "brcm,bcm7435-pcie",
-> +      or "brcm,bcm7278-pcie".
+You can set the default with compiling GCC using --with-arch=...
 
-One compatible per line.
+BTW, the failing instruction seems to be STRD and there seems to be
+already a related bug report:
 
-> +  #address-cells -- the number of address cells for PCI-space.
-> +  #size-cells -- the number of size cells for PCI-space.
-> +  ranges -- See [1]; a specification of the outbound windows for the host
-> +      controller.  Each outbound window is described by a n-tuple:
-> +          (3 cells) -- PCIe space start address; one cell for attributes
-> +                       and two cells for the 64-bit PCIe address.
-> +          (x cells) -- CPU/System start address, number of cells is determined
-> +                       by the parent node's #address-cells.
-> +          (y cells) -- Size of region, number of cells determined by the
-> +                       parent node's #size-cells.
-> +      Due to hardware limitations, there may be a maximum of four
-> +      non-contiguous ranges specified.
-> +  #interrupt-cells -- number of cells used to describe the interrupt.
+https://gcc.gnu.org/bugzilla/show_bug.cgi?id=82445
 
-How many cells?
-
-> +  interrupt-map-mask -- see [1]; four cells, the first three are zero
-> +      for our uses and the fourth cell is the mask (val = 0x7) for
-> +      the legacy interrupt number [1..4].
-> +  interrupt-map -- See [1]; there are four interrupts (INTA, INTB,
-> +      INTC, and INTD) to be mapped; each interrupt requires 5 cells
-> +      plus the size of the interrupt specifier.
-> +  linux,pci-domain -- the domain of the host controller.
-> +
-> +Optional Properties:
-> +  clocks -- list of clock phandles.  If specified, this should list one
-> +      clock.
-> +  clock-names -- the "local" names of the clocks specified in 'clocks'.  Note
-> +      that if the 'clocks' property is given, 'clock-names' is mandatory,
-> +      and the name of the clock is expected to be "sw_pcie".
-> +  dma-ranges -- Similar in structure to ranges, each dma region is
-> +      specified with a n-tuple.  Dma-regions describe the inbound
-> +      accesses from EP to RC; it translates the pci address that the
-> +      EP "sees" to the CPU address in memory.  This property is needed
-> +      because the design of the Brcmstb memory subsystem often precludes
-> +      idenity-mapping between CPU address space and PCIe address space.
-> +      Each range is described by a n-tuple:
-> +          (3 cells) -- PCIe space start address; one cell for attributes
-> +                       and two cells for the 64-bit PCIe address.
-> +          (x cells) -- CPU/System start address, number of cells is determined
-> +                       by the parent node's #address-cells.
-> +          (y cells) -- Size of region, number of cells determined by the
-> +                       parent node's #size-cells.
-
-There's no need to describe standard properties. Just put whatever is 
-specific to your platform. That applies throughout this doc.
-
-> +  msi-parent -- if MSI is to be used, this must be a phandle to the
-> +      msi-parent.  If this prop is set to the phandle of the PCIe
-> +      node, or if the msi-parent prop is missing, the PCIE controller
-> +      will attempt to use its built in MSI controller.
-> +  msi-controller -- this property should only be specified if the
-> +      PCIe controller is using its internal MSI controller.
-> +  brcm,ssc -- (boolean) indicates usage of spread-spectrum clocking.
-> +  brcm,gen --  (integer) indicates desired generation of link:
-> +      1 => 2.5 Gbps, 2 => 5.0 Gbps, 3 => 8.0 Gbps.
-
-We have a standard property for this IIRC.
-
-> +  supply-names -- the names of voltage regulators that the root
-> +      complex should turn off/on/on on suspend/resume/boot.  This
-> +      is a string list.
-> +  supplies -- A collection of phandles to a regulator nodes, see
-> +      Documentation/devicetree/bindings/regulator/ for specific
-> +      bindings. The number and order of phandles must match
-> +      exactly the number of strings in the "supply-names" property.
-
-This is not the regulator binding. Use the standard binding.
-
-> +
-> +Example Node:
-> +
-> +pcie0:	pcie at f0460000 {
-> +		reg = <0x0 0xf0460000 0x0 0x9310>;
-> +		interrupts = <0x0 0x0 0x4>;
-> +		compatible = "brcm,pci-plat-dev";
-> +		#address-cells = <3>;
-> +		#size-cells = <2>;
-> +		ranges = <0x02000000 0x00000000 0x00000000 0x00000000 0xc0000000 0x00000000 0x08000000
-> +			  0x02000000 0x00000000 0x08000000 0x00000000 0xc8000000 0x00000000 0x08000000>;
-> +		#interrupt-cells = <1>;
-> +		interrupt-map-mask = <0 0 0 7>;
-> +		interrupt-map = <0 0 0 1 &intc 0 47 3
-> +				 0 0 0 2 &intc 0 48 3
-> +				 0 0 0 3 &intc 0 49 3
-> +				 0 0 0 4 &intc 0 50 3>;
-> +		interrupt-names = "pcie_0_inta",
-> +				  "pcie_0_intb",
-> +				  "pcie_0_intc",
-> +				  "pcie_0_intd";
-> +		clocks = <&sw_pcie0>;
-> +		clock-names = "sw_pcie";
-> +		msi-parent = <&pcie0>;  /* use PCIe's internal MSI controller */
-> +		msi-controller;         /* use PCIe's internal MSI controller */
-> +		brcm,ssc;
-> +		brcm,gen = <1>;
-> +		supply-names = "vreg-wifi-pwr";
-> +		supplies = <&vreg-wifi-pwr>;
-> +		linux,pci-domain = <0>;
-> +	};
-> -- 
-> 1.9.0.138.g2de3478
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+A.
