@@ -1,58 +1,58 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 17 Oct 2017 20:10:05 +0200
-Subject: [linux-sunxi] [PATCH 08/10] ARM: dts: sun4i: Enable HDMI support
- on some A10 devices
-In-Reply-To: <CAGb2v65Z2N24AZp=Y-_YgKuZiT1uSDX5pzMrceU3+TY=+Zdf7g@mail.gmail.com>
-References: <20171017121807.2994-1-wens@csie.org>
- <20171017121807.2994-9-wens@csie.org>
- <CAGb2v65Z2N24AZp=Y-_YgKuZiT1uSDX5pzMrceU3+TY=+Zdf7g@mail.gmail.com>
-Message-ID: <20171017181005.7x6wwuidzsm7kep3@flea.lan>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Tue, 17 Oct 2017 14:10:34 -0400
+Subject: [RFC PATCH v4 4/8] drm/rockchip: dw_hdmi: Fix error handling path
+In-Reply-To: <20171017101624.12506-5-jeffy.chen@rock-chips.com>
+References: <20171017101624.12506-1-jeffy.chen@rock-chips.com>
+ <20171017101624.12506-5-jeffy.chen@rock-chips.com>
+Message-ID: <20171017181034.tsplfsmq7vi4uhmo@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 10:38:45PM +0800, Chen-Yu Tsai wrote:
-> > diff --git a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
-> > index 2d1b4329f54a..e39ec9beef75 100644
-> > --- a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
-> > +++ b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
-> > @@ -58,6 +58,17 @@
-> >                 stdout-path = "serial0:115200n8";
-> >         };
-> >
-> > +       hdmi-connector {
-> > +               compatible = "hdmi-connector";
-> > +               type = "a";
-> > +
-> > +               port {
-> > +                       hdmi_con_in: endpoint {
-> > +                               remote-endpoint = <&hdmi_out_con>;
-> > +                       };
-> > +               };
-> > +       };
-> > +
-> >         leds {
-> >                 compatible = "gpio-leds";
-> >                 pinctrl-names = "default";
-> > @@ -106,6 +117,16 @@
-> >         status = "okay";
-> >  };
+On Tue, Oct 17, 2017 at 06:16:20PM +0800, Jeffy Chen wrote:
+> Add missing clk_disable_unprepare() in bind()'s error handling path.
+
+This also isn't disabled in unbind(), is that intentional?
+
 > 
-> The LIME's dts change is missing the &de part. :(
-> I can fix this when applying.
+> Fixes: 12b9f204e804 ("drm: bridge/dw_hdmi: add rockchip rk3288 support")
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> ---
+> 
+> Changes in v4: None
+> Changes in v3: None
+> Changes in v2: None
+> 
+>  drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+> index 1eb02a82fd91..582283da7861 100644
+> --- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+> +++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+> @@ -383,8 +383,10 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
+>  	 * If dw_hdmi_bind() fails we'll never call dw_hdmi_unbind(),
+>  	 * which would have called the encoder cleanup.  Do it manually.
+>  	 */
+> -	if (ret)
+> +	if (ret) {
+>  		drm_encoder_cleanup(encoder);
+> +		clk_disable_unprepare(hdmi->vpll_clk);
 
-I've applied all of rest, I'll leave that one up to you, with my
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Same comment with respect to rockchip_hdmi_parse_dt(). This bug would have
+probably been avoided if the contents of rockchip_hdmi_parse_dt() were inline
+with dw_hdmi_rockchip_bind(), since then it's obvious what needs to be cleaned
+up.
 
-Maxime
+Sean
+
+> +	}
+>  
+>  	return ret;
+>  }
+> -- 
+> 2.11.0
+> 
+> 
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171017/e5c65c04/attachment.sig>
+Sean Paul, Software Engineer, Google / Chromium OS
