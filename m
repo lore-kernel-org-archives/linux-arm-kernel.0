@@ -1,198 +1,125 @@
-From: jim2101024@gmail.com (Jim Quinlan)
-Date: Tue, 17 Oct 2017 18:42:37 -0400
-Subject: [PATCH 2/9] PCI: host: brcmstb: add DT docs for Brcmstb PCIe
- device
-In-Reply-To: <20171017202418.ykve2o4zvuwxjdgj@rob-hp-laptop>
-References: <1507761269-7017-1-git-send-email-jim2101024@gmail.com>
- <1507761269-7017-3-git-send-email-jim2101024@gmail.com>
- <20171017202418.ykve2o4zvuwxjdgj@rob-hp-laptop>
-Message-ID: <CANCKTBt_gUF8qAEuhS1336Uce+WdP_98ApZhv1sxZgJsWGoiGQ@mail.gmail.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Wed, 18 Oct 2017 01:24:16 +0200
+Subject: arm64: 4.14 of_match_node() issues
+In-Reply-To: <bbf611c8-c7e8-d67f-f933-3e7b23bdba22@arm.com>
+References: <5d2ff063-1f7e-0200-cc02-99804f7d9219@suse.de>
+ <20171009092409.GB5127@arm.com>
+ <66956548-fa7a-332a-8045-8202ae0aa564@arm.com>
+ <CGME20171009120447epcas2p3d22ec871318e38a71a5b92f840b5e4d4@epcas2p3.samsung.com>
+ <d4e48d3d-015f-08d2-7745-51c482c1a09a@arm.com>
+ <42630b8b-8987-57ff-be7e-79af7294856e@samsung.com>
+ <bbf611c8-c7e8-d67f-f933-3e7b23bdba22@arm.com>
+Message-ID: <4155378a-446e-8a18-a1fc-7ff4568a23d3@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 4:24 PM, Rob Herring <robh@kernel.org> wrote:
-> On Wed, Oct 11, 2017 at 06:34:22PM -0400, Jim Quinlan wrote:
->> The DT bindings description of the Brcmstb PCIe device is described.  This
->> node can be used by almost all Broadcom settop box chips, using
->> ARM, ARM64, or MIPS CPU architectures.
+Am 11.10.2017 um 12:07 schrieb Suzuki K Poulose:
+> On 09/10/17 13:20, Marek Szyprowski wrote:
+>> Hi All,
 >>
->> Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
->> ---
->>  .../devicetree/bindings/pci/brcmstb-pci.txt        | 106 +++++++++++++++++++++
->>  1 file changed, 106 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/pci/brcmstb-pci.txt
+>> On 2017-10-09 14:04, Robin Murphy wrote:
+>>> On 09/10/17 11:58, Robin Murphy wrote:
+>>>> On 09/10/17 10:24, Will Deacon wrote:
+>>>>> Hi Andreas,
+>>>>>
+>>>>> On Sat, Oct 07, 2017 at 02:42:13AM +0200, Andreas F?rber wrote:
+>>>>>> Since 4.14-rc1 I am seeing frequent oopses during module loading
+>>>>>> (e.g.,
+>>>>>> MMC, USB) from initrd on aarch64. Symptoms are similar to this in
+>>>>>> -rc3:
+>>>>>>
+>>>>>> [? OK? ] Started udev Coldplug all Devices.
+>>>>>> [?? 10.117775] usbcore: registered new interface driver usbfs
+>>>>>> [?? 10.118235] Unable to handle kernel paging request at virtual
+>>>>>> address
+>>>>>> ffff000008e5abc0
+>>>>>> [?? 10.118238] Mem abort info:
+>>>>>> [?? 10.118245]?? Exception class = DABT (current EL), IL = 32 bits
+>>>>>> [?? 10.118249]?? SET = 0, FnV = 0
+>>>>>> [?? 10.118253]?? EA = 0, S1PTW = 0
+>>>>>> [?? 10.118256] Data abort info:
+>>>>>> [?? 10.118261]?? ISV = 0, ISS = 0x00000006
+>>>>>> [?? 10.118264]?? CM = 0, WnR = 0
+>>>>>> [?? 10.118274] swapper pgtable: 4k pages, 48-bit VAs, pgd =
+>>>>>> ffff0000094a5000
+>>>>>> [?? 10.118279] [ffff000008e5abc0] *pgd=00000000bfffe003,
+>>>>>> *pud=00000000bfffd003, *pmd=0000000000000000
+>>>>>> [?? 10.118299] Internal error: Oops: 96000006 [#1] SMP
+>>>>>> [?? 10.118305] Modules linked in: fixed usbcore(+) sunxi_mmc mmc_core
+>>>>>> phy_sun4i_usb sg
+>>>>>> [?? 10.118341] CPU: 3 PID: 49 Comm: kworker/3:1 Not tainted
+>>>>>> 4.14.0-rc3-2.gf27997b-default #1
+>>>>>> [?? 10.118345] Hardware name: sunxi sunxi/sunxi, BIOS 2017.05-rc1
+>>>>>> 04/13/2017
+>>>>>> [?? 10.118369] Workqueue: events deferred_probe_work_func
+>>>>>> [?? 10.118378] task: ffff80007c8f4000 task.stack: ffff0000099d8000
+>>>>>> [?? 10.118394] PC is at __of_match_node.part.1+0x48/0x88
+>>>>>> [?? 10.118403] LR is at of_match_node+0x40/0x70
+>>>>>> [?? 10.118411] pc : [<ffff00000879aed0>] lr : [<ffff00000879af50>]
+>>>>> [...]
+>>>>>
+>>>>>> This has been observed on Pine64 (>60%; also by Stefan) and
+>>>>>> Odroid-C2;
+>>>>>> my other arm64 boards such as Raspberry Pi 3 have not run into
+>>>>>> this so
+>>>>>> far. No such problems on 32-bit boards.
+>>>>>>
+>>>>>> This is using the openSUSE config:
+>>>>>> https://kernel.opensuse.org/cgit/kernel-source/plain/config/arm64/default
+>>>>>>
+>>>>> Hmm, hard to know what to suggest without a concrete reproducer. Do
+>>>>> you know
+>>>>> which driver is being probed in the log above? Also, does this
+>>>>> still break
+>>>>> if you pass "keepinitrd" on the cmdline? Finally, can you dump the
+>>>>> kernel
+>>>>> virtual memory layout, please?
+>>>> FWIW, this looks a lot like what happens when a built-in driver's
+>>>> of_match_table is marked __init, but for whatever reason (deferred
+>>>> probe
+>>>> etc.) winds up getting poked by a module load after it no longer
+>>>> exists.
+>>> Heh, synchronicity...
+>>>
+>>> https://lists.linuxfoundation.org/pipermail/iommu/2017-October/024572.html
+>>>
+>>>
+>>> Looks like we either have to revert plenty of patches from the const
+>>> brigade, avoid freeing init, or come up with some way to make the driver
+>>> core cleverer about the whole deal :(
 >>
->> diff --git a/Documentation/devicetree/bindings/pci/brcmstb-pci.txt b/Documentation/devicetree/bindings/pci/brcmstb-pci.txt
->> new file mode 100644
->> index 0000000..2f699da
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/pci/brcmstb-pci.txt
->> @@ -0,0 +1,106 @@
->> +Brcmstb PCIe Host Controller Device Tree Bindings
->> +We don't; this line is erroneous.
->> +Introduction:
->> +  The brcmstb host controller closely follows the example set in
->> +
->> +     [1] http://devicetree.org/Device_Tree_Usage#PCI_Host_Bridge
->> +
->> +  The rest of this document explains some added customizations and
->> +  offers an example Brcmstb PCIe host controller DT node.
->> +
->> +Required Properties:
->> +  reg -- the register start address and length for the PCIe block.
->> +      Additional start,length pairs may be specified for clock addresses.
->
-> Kind of vague and why do you need clock addresses and the clock binding?
->
-We don't;  this line is erroneous and will be removed.
-
-> Also, typically the config space is defined here? Is that missing or you
-> don't support memory mapped config space?
->
-We do not support memory mapped config space.
-
->> +  interrupts -- two interrupts are specified; the first interrupt is for
->> +      the PCI host controller and the second is for MSI if the built-in
->> +      MSI controller is to be used.
->> +  interrupt-names -- names of the interrupts (above): "pcie" and "msi".
->> +  compatible -- must be one of: "brcm,bcm7425-pcie", "brcm,bcm7435-pcie",
->> +      or "brcm,bcm7278-pcie".
->
-> One compatible per line.
->
-Will fix.
-
->> +  #address-cells -- the number of address cells for PCI-space.
->> +  #size-cells -- the number of size cells for PCI-space.
->> +  ranges -- See [1]; a specification of the outbound windows for the host
->> +      controller.  Each outbound window is described by a n-tuple:
->> +          (3 cells) -- PCIe space start address; one cell for attributes
->> +                       and two cells for the 64-bit PCIe address.
->> +          (x cells) -- CPU/System start address, number of cells is determined
->> +                       by the parent node's #address-cells.
->> +          (y cells) -- Size of region, number of cells determined by the
->> +                       parent node's #size-cells.
->> +      Due to hardware limitations, there may be a maximum of four
->> +      non-contiguous ranges specified.We don't; this line is erroneous.
->> +  #interrupt-cells -- number of cells used to describe the interrupt.
->
-> How many cells?
->
-This line will be removed.
-
->> +  interrupt-map-mask -- see [1]; four cells, the first three are zero
->> +      for our uses and the fourth cell is the mask (val = 0x7) for
->> +      the legacy interrupt number [1..4].
->> +  interrupt-map -- See [1]; there are four interrupts (INTA, INTB,
->> +      INTC, and INTD) to be mapped; each interrupt requires 5 cells
->> +      plus the size of the interrupt specifier.
->> +  linux,pci-domain -- the domain of the host controller.
->> +
->> +Optional Properties:
->> +  clocks -- list of clock phandles.  If specified, this should list one
->> +      clock.
->> +  clock-names -- the "local" names of the clocks specified in 'clocks'.  Note
->> +      that if the 'clocks' property is given, 'clock-names' is mandatory,
->> +      and the name of the clock is expected to be "sw_pcie".
->> +  dma-ranges -- Similar in structure to ranges, each dma region is
->> +      specified with a n-tuple.  Dma-regions describe the inbound
->> +      accesses from EP to RC; it translates the pci address that the
->> +      EP "sees" to the CPU address in memory.  This property is needed
->> +      because the design of the Brcmstb memory subsystem often precludes
->> +      idenity-mapping between CPU address space and PCIe address space.
->> +      Each range is described by a n-tuple:
->> +          (3 cells) -- PCIe space start address; one cell for attributes
->> +                       and two cells for the 64-bit PCIe address.
->> +          (x cells) -- CPU/System start address, number of cells is determined
->> +                       by the parent node's #address-cells.
->> +          (y cells) -- Size of region, number of cells determined by the
->> +                       parent node's #size-cells.
->
-> There's no need to describe standard properties. Just put whatever is
-> specific to your platform. That applies throughout this doc.
->
-Will fix.
-
->> +  msi-parent -- if MSI is to be used, this must be a phandle to the
->> +      msi-parent.  If this prop is set to the phandle of the PCIe
->> +      node, or if the msi-parent prop is missing, the PCIE controller
->> +      will attempt to use its built in MSI controller.
->> +  msi-controller -- this property should only be specified if the
->> +      PCIe controller is using its internal MSI controller.
->> +  brcm,ssc -- (boolean) indicates usage of spread-spectrum clocking.
->> +  brcm,gen --  (integer) indicates desired generation of link:
->> +      1 => 2.5 Gbps, 2 => 5.0 Gbps, 3 => 8.0 Gbps.
->
-> We have a standard property for this IIRC.
->
-Yes, BrianN pointed that out and it will be fixed.
-
->> +  supply-names -- the names of voltage regulators that the root
->> +      complex should turn off/on/on on suspend/resume/boot.  This
->> +      is a string list.
->> +  supplies -- A collection of phandles to a regulator nodes, see
->> +      Documentation/devicetree/bindings/regulator/ for specificWe don't; this line is erroneous.
->> +      bindings. The number and order of phandles must match
->> +      exactly the number of strings in the "supply-names" property.
->
-> This is not the regulator binding. Use the standard binding.
->
-The reason we do it this way is because the PCIe controller does not
-know or care what the names of the supplies are, or how many there
-will be.  The list of regulators can be different for each board we
-support, as these regulators turn on/off the downstream EP device.
-All the PCIe controller does is turn on/off this list of regulators
-when booting,resuming/suspending.
-
-An alternative would have the node specifying the standard properties
-
-xyz-supply = <&xyz_reg>;
-abc-supply = <&abc_reg>;
-pdq-supply = <&pdq_reg>;
-...
-
-and then have this driver search all of the properties in the PCIe
-node for names matching /-supply$/, and then create a list of phandles
-from that.  Is that what you would like?
-
-Thanks, Jim
-
->> +
->> +Example Node:
->> +
->> +pcie0:       pcie at f0460000 {
->> +             reg = <0x0 0xf0460000 0x0 0x9310>;
->> +             interrupts = <0x0 0x0 0x4>;
->> +             compatible = "brcm,pci-plat-dev";
->> +             #address-cells = <3>;
->> +             #size-cells = <2>;
->> +             ranges = <0x02000000 0x00000000 0x00000000 0x00000000 0xc0000000 0x00000000 0x08000000
->> +                       0x02000000 0x00000000 0x08000000 0x00000000 0xc8000000 0x00000000 0x08000000>;
->> +             #interrupt-cells = <1>;
->> +             interrupt-map-mask = <0 0 0 7>;
->> +             interrupt-map = <0 0 0 1 &intc 0 47 3
->> +                              0 0 0 2 &intc 0 48 3
->> +                              0 0 0 3 &intc 0 49 3
->> +                              0 0 0 4 &intc 0 50 3>;
->> +             interrupt-names = "pcie_0_inta",
->> +                               "pcie_0_intb",
->> +                               "pcie_0_intc",
->> +                               "pcie_0_intd";
->> +             clocks = <&sw_pcie0>;
->> +             clock-names = "sw_pcie";
->> +             msi-parent = <&pcie0>;  /* use PCIe's internal MSI controller */
->> +             msi-controller;         /* use PCIe's internal MSI controller */
->> +             brcm,ssc;
->> +             brcm,gen = <1>;
->> +             supply-names = "vreg-wifi-pwr";
->> +             supplies = <&vreg-wifi-pwr>;
->> +             linux,pci-domain = <0>;
->> +     };
->> --
->> 1.9.0.138.g2de3478
+>> It's not that bad. I did a quick check with
 >>
+>> # git grep "of_device_id.*init"
 >>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> and Exynos SYSMMU driver was the only candidate for a fix. Maybe someone
+>> else should double check that list to make sure that there is no other
+>> platform device/driver related code there.
+>>
+>> Best regards
+> 
+> The root cause of the problem we hit here is definitely the exynos_smmu
+> driver
+> problem. The modrpobe triggers a device scan and the deferred_probe work
+> goes
+> through the registered drivers again for each device and since the
+> exynos_smmu
+> driver table is gone already, we end up in this crash.
+> 
+> Andreas,
+> 
+> Please could you try with the patch above in the link ?
+
+The above patch resolves the symptoms I observed on both boards, thanks.
+
+I'm not on the iommu list and it's not on linux-samsung-soc, so here's my
+
+Tested-by: Andreas F?rber <afaerber@suse.de>
+
+Best regards,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
