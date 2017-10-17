@@ -1,24 +1,90 @@
 From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Tue, 17 Oct 2017 11:17:51 +0200
-Subject: [PATCHv3 00/12] ARM: dts: imx6: Update dts files for the Ka-Ro TX6
- module series
-In-Reply-To: <1508230414-8090-1-git-send-email-LW@KARO-electronics.de>
+Date: Tue, 17 Oct 2017 11:17:56 +0200
+Subject: [PATCHv3 05/12] ARM: dts: imx6-tx6: improve ethernet related pinctrl
+ setup
+In-Reply-To: <1508231883-12067-1-git-send-email-LW@KARO-electronics.de>
 References: <1508230414-8090-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <1508231883-12067-1-git-send-email-LW@KARO-electronics.de>
+ <1508231883-12067-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1508231883-12067-6-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please ignore the V2 series. I accidentally sent the patches from a
-wrong directory.
+Remove the PHY INT and RESET pins from hog section and put them into
+their own pinctrl nodes referenced by the appropriate driver nodes.
+Also, the MDIO pins are required for probing the Ethernet PHY, so they
+must be configured by the FEC driver, not by the PHY driver. Move the
+corresponding pinctrl settings from the PHY subnode to the FEC node.
 
-This patchset updates the dts files for the Ka-Ro electronics GmbH TX6
-module series and adds some include files to facilitate supporting
-various SoM/baseboard combinations.
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+---
+ arch/arm/boot/dts/imx6qdl-tx6.dtsi | 23 +++++++++++++++++------
+ 1 file changed, 17 insertions(+), 6 deletions(-)
 
-Changes vs. v2:
-- resent the correct patches
-
-Changes vs. v1:
-- rebased to imx/dt branch
-- eliminate use of 'interrupts-extended' property according to Uwe
-  Kleine-K?nig's comment
+diff --git a/arch/arm/boot/dts/imx6qdl-tx6.dtsi b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
+index a50bf71..f2cd3e7 100644
+--- a/arch/arm/boot/dts/imx6qdl-tx6.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright 2014-2016 Lothar Wa?mann <LW@KARO-electronics.de>
++ * Copyright 2014-2017 Lothar Wa?mann <LW@KARO-electronics.de>
+  *
+  * This file is dual-licensed: you can use it either under the terms
+  * of the GPL or the X11 license, at your option. Note that this dual
+@@ -241,7 +241,7 @@
+ 
+ &fec {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_enet>;
++	pinctrl-0 = <&pinctrl_enet &pinctrl_enet_mdio &pinctrl_etnphy_rst>;
+ 	clocks = <&clks IMX6QDL_CLK_ENET>,
+ 		 <&clks IMX6QDL_CLK_ENET>,
+ 		 <&clks IMX6QDL_CLK_ENET_REF>,
+@@ -261,8 +261,9 @@
+ 			compatible = "ethernet-phy-ieee802.3-c22";
+ 			reg = <0>;
+ 			pinctrl-names = "default";
+-			pinctrl-0 = <&pinctrl_enet_mdio>;
+-			interrupts-extended = <&gpio7 1 IRQ_TYPE_EDGE_FALLING>;
++			pinctrl-0 = <&pinctrl_etnphy_int>;
++			interrupt-parent = <&gpio7>;
++			interrupts = <1 IRQ_TYPE_EDGE_FALLING>;
+ 		};
+ 	};
+ };
+@@ -334,8 +335,6 @@
+ 
+ 	pinctrl_hog: hoggrp {
+ 		fsl,pins = <
+-			MX6QDL_PAD_SD3_DAT2__GPIO7_IO06		0x1b0b1 /* ETN PHY RESET */
+-			MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x1b0b1 /* ETN PHY INT */
+ 			MX6QDL_PAD_EIM_A25__GPIO5_IO02		0x1b0b1 /* PWR BTN */
+ 		>;
+ 	};
+@@ -453,12 +452,24 @@
+ 		>;
+ 	};
+ 
++	pinctrl_etnphy_int: etnphy-intgrp {
++		fsl,pins = <
++			MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x1b0b1 /* ETN PHY INT */
++		>;
++	};
++
+ 	pinctrl_etnphy_power: etnphy-pwrgrp {
+ 		fsl,pins = <
+ 			MX6QDL_PAD_EIM_D20__GPIO3_IO20		0x1b0b1 /* ETN PHY POWER */
+ 		>;
+ 	};
+ 
++	pinctrl_etnphy_rst: etnphy-rstgrp {
++		fsl,pins = <
++			MX6QDL_PAD_SD3_DAT2__GPIO7_IO06		0x1b0b1 /* ETN PHY RESET */
++		>;
++	};
++
+ 	pinctrl_flexcan1: flexcan1grp {
+ 		fsl,pins = <
+ 			MX6QDL_PAD_GPIO_7__FLEXCAN1_TX		0x1b0b0
+-- 
+2.1.4
