@@ -1,17 +1,15 @@
 From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Tue, 17 Oct 2017 18:16:19 +0800
-Subject: [RFC PATCH v4 3/8] drm/rockchip: dw-mipi-dsi: Fix error handling path
+Date: Tue, 17 Oct 2017 18:16:18 +0800
+Subject: [RFC PATCH v4 2/8] drm/rockchip: analogix_dp: Fix error handling path
 In-Reply-To: <20171017101624.12506-1-jeffy.chen@rock-chips.com>
 References: <20171017101624.12506-1-jeffy.chen@rock-chips.com>
-Message-ID: <20171017101624.12506-4-jeffy.chen@rock-chips.com>
+Message-ID: <20171017101624.12506-3-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing pm_runtime_disable() in bind()'s error handling path.
+Add missing error handling in rockchip_dp_bind().
 
-Also cleanup encoder & connector in unbind().
-
-Fixes: 80a9a059d4e4 ("drm/rockchip/dsi: add dw-mipi power domain support")
+Fixes: 9e32e16e9e98 ("drm: rockchip: dp: add rockchip platform dp driver")
 Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 ---
 
@@ -19,62 +17,40 @@ Changes in v4: None
 Changes in v3: None
 Changes in v2: None
 
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 17 +++++++++++------
- 1 file changed, 11 insertions(+), 6 deletions(-)
+ drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index b15755b6129c..a17ff0f6f489 100644
---- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-+++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -1282,7 +1282,7 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
- 	ret = dw_mipi_dsi_register(drm, dsi);
+diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+index 4d3f6ad0abdd..4b689c0f3fc1 100644
+--- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
++++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+@@ -371,7 +371,7 @@ static int rockchip_dp_bind(struct device *dev, struct device *master,
+ 	ret = rockchip_dp_drm_create_encoder(dp);
  	if (ret) {
- 		DRM_DEV_ERROR(dev, "Failed to register mipi_dsi: %d\n", ret);
--		goto err_pllref;
-+		goto err_disable_pllref;
+ 		DRM_ERROR("failed to create drm encoder\n");
+-		return ret;
++		goto err_disable_pclk;
  	}
  
- 	pm_runtime_enable(dev);
-@@ -1292,23 +1292,24 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
- 	ret = mipi_dsi_host_register(&dsi->dsi_host);
- 	if (ret) {
- 		DRM_DEV_ERROR(dev, "Failed to register MIPI host: %d\n", ret);
--		goto err_cleanup;
-+		goto err_disable_pm_runtime;
- 	}
+ 	dp->plat_data.encoder = &dp->encoder;
+@@ -387,7 +387,17 @@ static int rockchip_dp_bind(struct device *dev, struct device *master,
  
- 	if (!dsi->panel) {
- 		ret = -EPROBE_DEFER;
--		goto err_mipi_dsi_host;
-+		goto err_unreg_mipi_dsi_host;
- 	}
+ 	rockchip_drm_psr_register(&dp->encoder, analogix_dp_psr_set);
  
- 	dev_set_drvdata(dev, dsi);
- 	return 0;
- 
--err_mipi_dsi_host:
-+err_unreg_mipi_dsi_host:
- 	mipi_dsi_host_unregister(&dsi->dsi_host);
--err_cleanup:
-+err_disable_pm_runtime:
-+	pm_runtime_disable(dev);
- 	drm_encoder_cleanup(&dsi->encoder);
- 	drm_connector_cleanup(&dsi->connector);
--err_pllref:
-+err_disable_pllref:
- 	clk_disable_unprepare(dsi->pllref_clk);
- 	return ret;
- }
-@@ -1320,6 +1321,10 @@ static void dw_mipi_dsi_unbind(struct device *dev, struct device *master,
- 
- 	mipi_dsi_host_unregister(&dsi->dsi_host);
- 	pm_runtime_disable(dev);
+-	return analogix_dp_bind(dev, dp->drm_dev, &dp->plat_data);
++	ret = analogix_dp_bind(dev, dp->drm_dev, &dp->plat_data);
++	if (ret < 0)
++		goto err_unreg_psr;
++	return 0;
 +
-+	dsi->connector.funcs->destroy(&dsi->connector);
-+	dsi->encoder.funcs->destroy(&dsi->encoder);
-+
- 	clk_disable_unprepare(dsi->pllref_clk);
++err_unreg_psr:
++	rockchip_drm_psr_unregister(&dp->encoder);
++	rockchip_dp_drm_encoder_destroy(&dp->encoder);
++err_disable_pclk:
++	clk_disable_unprepare(dp->pclk);
++	return ret;
  }
  
+ static void rockchip_dp_unbind(struct device *dev, struct device *master,
 -- 
 2.11.0
