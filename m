@@ -1,71 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 17 Oct 2017 07:34:54 -0700
-Subject: SPI regression in today's Linux next
-Message-ID: <20171017143454.GA4394@atomide.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Tue, 17 Oct 2017 07:36:34 -0700
+Subject: [PATCH 06/10] KVM: arm/arm64: Only clean the dcache on
+ translation fault
+In-Reply-To: <210cf2dc-2566-a29b-637e-901f3dcc80b6@arm.com>
+References: <20171009152032.27804-1-marc.zyngier@arm.com>
+ <20171009152032.27804-7-marc.zyngier@arm.com>
+ <20171016200811.GH1845@lvm>
+ <210cf2dc-2566-a29b-637e-901f3dcc80b6@arm.com>
+Message-ID: <20171017143634.GI5886@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lucas and Mark,
+On Tue, Oct 17, 2017 at 10:34:15AM +0100, Marc Zyngier wrote:
+> On 16/10/17 21:08, Christoffer Dall wrote:
+> > On Mon, Oct 09, 2017 at 04:20:28PM +0100, Marc Zyngier wrote:
+> >> The only case where we actually need to perform a dache maintenance
+> >> is when we map the page for the first time, and subsequent permission
+> >> faults do not require cache maintenance. Let's make it conditional
+> >> on not being a permission fault (and thus a translation fault).
+> > 
+> > Why do we actually need to do any dcache maintenance when faulting in a
+> > page?
+> > 
+> > Is this for the case when the stage 1 MMU is disabled, or to support
+> > guest mappings using uncached attributes?
+> 
+> These are indeed the two cases that require cleaning the dcache to PoC.
+> 
+> > Can we do better, for example
+> > by only flushing the cache if the guest MMU is disabled?
+> 
+> The guest MMU being disabled is easy. But the uncached mapping is much
+> trickier, and would involve parsing the guest page tables. Not something
+> I'm really eager to implement.
+> 
 
-Looks like commit 9ce70d49fa80 ("spi: fix IDR collision on systems with
-both fixed and dynamic SPI bus numbers") causes the following regression
-at least for omaps. Reverting commit 9ce70d49fa80 fixes it.
+Hmm, if the guest actually maps memory uncached, wouldn't it have to
+invalidate caches itself, or is this the annoying thing where disabling
+the MMU on hardware that doesn't have stage 2 would in fact always
+completely bypass the cache, and therefore we have to do this work?
 
-Any ideas?
+Sorry, I have forgotten all the details here, but wanted to make sure
+we're not being overly careful.
 
-Seems it was also reported by the 0day kernel test robot on Saturday:
-
-https://www.spinics.net/lists/kernel/msg2624673.html
-
-Regards,
-
-Tony
-
-8< ------------[ cut here ]------------
-WARNING: CPU: 0 PID: 1@./include/linux/idr.h:113 spi_register_controller+0x81c/0x93c
-Modules linked in:
-CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.14.0-rc4-next-20171016 #1377
-Hardware name: Generic OMAP4 (Flattened Device Tree)
-[<c01112a0>] (unwind_backtrace) from [<c010d164>] (show_stack+0x10/0x14)
-[<c010d164>] (show_stack) from [<c086fd40>] (dump_stack+0xac/0xe0)
-[<c086fd40>] (dump_stack) from [<c0137ed0>] (__warn+0xd8/0x104)
-[<c0137ed0>] (__warn) from [<c0137ff0>] (warn_slowpath_null+0x20/0x28)
-[<c0137ff0>] (warn_slowpath_null) from [<c065ec74>] (spi_register_controller+0x81c/0x93c)
-[<c065ec74>] (spi_register_controller) from [<c065edc4>] (devm_spi_register_controller+0x30/0x70)
-[<c065edc4>] (devm_spi_register_controller) from [<c0662930>] (omap2_mcspi_probe+0x274/0x358)
-[<c0662930>] (omap2_mcspi_probe) from [<c05b7b10>] (platform_drv_probe+0x50/0xb0)
-[<c05b7b10>] (platform_drv_probe) from [<c05b5bf8>] (driver_probe_device+0x264/0x2ec)
-[<c05b5bf8>] (driver_probe_device) from [<c05b5d40>] (__driver_attach+0xc0/0xc4)
-[<c05b5d40>] (__driver_attach) from [<c05b3fe0>] (bus_for_each_dev+0x78/0xc0)
-[<c05b3fe0>] (bus_for_each_dev) from [<c05b5018>] (bus_add_driver+0xf8/0x208)
-[<c05b5018>] (bus_add_driver) from [<c05b6bd8>] (driver_register+0x78/0xf4)
-[<c05b6bd8>] (driver_register) from [<c0101e24>] (do_one_initcall+0x48/0x194)
-[<c0101e24>] (do_one_initcall) from [<c0c00f28>] (kernel_init_freeable+0x1fc/0x2c4)
-[<c0c00f28>] (kernel_init_freeable) from [<c0884830>] (kernel_init+0x8/0x110)
-[<c0884830>] (kernel_init) from [<c0108188>] (ret_from_fork+0x14/0x2c)
----[ end trace 9fd4ad3daaa4f7a3 ]---
-------------[ cut here ]------------
-WARNING: CPU: 0 PID: 1 at drivers/spi/spi.c:2123 spi_register_controller+0x5c4/0x93c
-couldn't get idr
-Modules linked in:
-CPU: 0 PID: 1 Comm: swapper/0 Tainted: G        W        4.14.0-rc4-next-20171016 #1377
-Hardware name: Generic OMAP4 (Flattened Device Tree)
-[<c01112a0>] (unwind_backtrace) from [<c010d164>] (show_stack+0x10/0x14)
-[<c010d164>] (show_stack) from [<c086fd40>] (dump_stack+0xac/0xe0)
-[<c086fd40>] (dump_stack) from [<c0137ed0>] (__warn+0xd8/0x104)
-[<c0137ed0>] (__warn) from [<c0137f3c>] (warn_slowpath_fmt+0x40/0x68)
-[<c0137f3c>] (warn_slowpath_fmt) from [<c065ea1c>] (spi_register_controller+0x5c4/0x93c)
-[<c065ea1c>] (spi_register_controller) from [<c065edc4>] (devm_spi_register_controller+0x30/0x70)
-[<c065edc4>] (devm_spi_register_controller) from [<c0662930>] (omap2_mcspi_probe+0x274/0x358)
-[<c0662930>] (omap2_mcspi_probe) from [<c05b7b10>] (platform_drv_probe+0x50/0xb0)
-[<c05b7b10>] (platform_drv_probe) from [<c05b5bf8>] (driver_probe_device+0x264/0x2ec)
-[<c05b5bf8>] (driver_probe_device) from [<c05b5d40>] (__driver_attach+0xc0/0xc4)
-[<c05b5d40>] (__driver_attach) from [<c05b3fe0>] (bus_for_each_dev+0x78/0xc0)
-[<c05b3fe0>] (bus_for_each_dev) from [<c05b5018>] (bus_add_driver+0xf8/0x208)
-[<c05b5018>] (bus_add_driver) from [<c05b6bd8>] (driver_register+0x78/0xf4)
-[<c05b6bd8>] (driver_register) from [<c0101e24>] (do_one_initcall+0x48/0x194)
-[<c0101e24>] (do_one_initcall) from [<c0c00f28>] (kernel_init_freeable+0x1fc/0x2c4)
-[<c0c00f28>] (kernel_init_freeable) from [<c0884830>] (kernel_init+0x8/0x110)
-[<c0884830>] (kernel_init) from [<c0108188>] (ret_from_fork+0x14/0x2c)
----[ end trace 9fd4ad3daaa4f7a4 ]---
-omap2_mcspi: probe of 48098000.spi failed with error -22
+Thanks,
+-Christoffer
