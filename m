@@ -1,105 +1,107 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 17 Oct 2017 20:18:00 +0800
-Subject: [PATCH 03/10] drm/sun4i: hdmi: Support HDMI controller on A10
+Date: Tue, 17 Oct 2017 20:17:59 +0800
+Subject: [PATCH 02/10] drm/sun4i: tcon: Add support for A10 TCON
 In-Reply-To: <20171017121807.2994-1-wens@csie.org>
 References: <20171017121807.2994-1-wens@csie.org>
-Message-ID: <20171017121807.2994-4-wens@csie.org>
+Message-ID: <20171017121807.2994-3-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The HDMI controller in the A10 SoC is the same as the one currently
-supported in the A10s. It has slightly different setup parameters.
-Since these parameters are not thoroughly understood, we add support
-for this variant by copying these parameters verbatim.
+From: Jonathan Liu <net147@gmail.com>
 
+The A10 has two TCONs that are similar to the ones found on other SoCs.
+Like the A31, TCON0 has a register used to mux the TCON outputs to the
+downstream encoders. The bit fields are slightly different.
+
+Signed-off-by: Jonathan Liu <net147@gmail.com>
+[wens at csie.org: Reworked for A10 and fixed up commit message]
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
  .../bindings/display/sunxi/sun4i-drm.txt           |  1 +
- drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c             | 53 ++++++++++++++++++++++
- 2 files changed, 54 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_drv.c                  |  3 ++-
+ drivers/gpu/drm/sun4i/sun4i_tcon.c                 | 30 ++++++++++++++++++++++
+ 3 files changed, 33 insertions(+), 1 deletion(-)
 
 diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index b2c08af73a95..5650efcfd2ac 100644
+index 46df3b78ae9e..b2c08af73a95 100644
 --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
 +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -40,6 +40,7 @@ CEC. It is one end of the pipeline.
+@@ -86,6 +86,7 @@ The TCON acts as a timing controller for RGB, LVDS and TV interfaces.
  
  Required properties:
-   - compatible: value must be one of:
-+    * allwinner,sun4i-a10-hdmi
-     * allwinner,sun5i-a10s-hdmi
-     * allwinner,sun6i-a31-hdmi
-   - reg: base address and size of memory-mapped region
-diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
-index 6ca6e6a74c4a..bc2ba74d2ae5 100644
---- a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
-@@ -289,6 +289,58 @@ static const struct cec_pin_ops sun4i_hdmi_cec_pin_ops = {
- #define SUN4I_HDMI_PAD_CTRL1_MASK	(GENMASK(24, 7) | GENMASK(5, 0))
- #define SUN4I_HDMI_PLL_CTRL_MASK	(GENMASK(31, 8) | GENMASK(3, 0))
+  - compatible: value must be either:
++   * allwinner,sun4i-a10-tcon
+    * allwinner,sun5i-a13-tcon
+    * allwinner,sun6i-a31-tcon
+    * allwinner,sun6i-a31s-tcon
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index b5879d4620d8..b8089ac6feef 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -184,7 +184,8 @@ static bool sun4i_drv_node_is_frontend(struct device_node *node)
  
-+/* Only difference from sun5i is AMP is 4 instead of 6 */
-+static const struct sun4i_hdmi_variant sun4i_variant = {
-+	.pad_ctrl0_init_val	= SUN4I_HDMI_PAD_CTRL0_TXEN |
-+				  SUN4I_HDMI_PAD_CTRL0_CKEN |
-+				  SUN4I_HDMI_PAD_CTRL0_PWENG |
-+				  SUN4I_HDMI_PAD_CTRL0_PWEND |
-+				  SUN4I_HDMI_PAD_CTRL0_PWENC |
-+				  SUN4I_HDMI_PAD_CTRL0_LDODEN |
-+				  SUN4I_HDMI_PAD_CTRL0_LDOCEN |
-+				  SUN4I_HDMI_PAD_CTRL0_BIASEN,
-+	.pad_ctrl1_init_val	= SUN4I_HDMI_PAD_CTRL1_REG_AMP(4) |
-+				  SUN4I_HDMI_PAD_CTRL1_REG_EMP(2) |
-+				  SUN4I_HDMI_PAD_CTRL1_REG_DENCK |
-+				  SUN4I_HDMI_PAD_CTRL1_REG_DEN |
-+				  SUN4I_HDMI_PAD_CTRL1_EMPCK_OPT |
-+				  SUN4I_HDMI_PAD_CTRL1_EMP_OPT |
-+				  SUN4I_HDMI_PAD_CTRL1_AMPCK_OPT |
-+				  SUN4I_HDMI_PAD_CTRL1_AMP_OPT,
-+	.pll_ctrl_init_val	= SUN4I_HDMI_PLL_CTRL_VCO_S(8) |
-+				  SUN4I_HDMI_PLL_CTRL_CS(7) |
-+				  SUN4I_HDMI_PLL_CTRL_CP_S(15) |
-+				  SUN4I_HDMI_PLL_CTRL_S(7) |
-+				  SUN4I_HDMI_PLL_CTRL_VCO_GAIN(4) |
-+				  SUN4I_HDMI_PLL_CTRL_SDIV2 |
-+				  SUN4I_HDMI_PLL_CTRL_LDO2_EN |
-+				  SUN4I_HDMI_PLL_CTRL_LDO1_EN |
-+				  SUN4I_HDMI_PLL_CTRL_HV_IS_33 |
-+				  SUN4I_HDMI_PLL_CTRL_BWS |
-+				  SUN4I_HDMI_PLL_CTRL_PLL_EN,
-+
-+	.ddc_clk_reg		= REG_FIELD(SUN4I_HDMI_DDC_CLK_REG, 0, 6),
-+	.ddc_clk_pre_divider	= 2,
-+	.ddc_clk_m_offset	= 1,
-+
-+	.field_ddc_en		= REG_FIELD(SUN4I_HDMI_DDC_CTRL_REG, 31, 31),
-+	.field_ddc_start	= REG_FIELD(SUN4I_HDMI_DDC_CTRL_REG, 30, 30),
-+	.field_ddc_reset	= REG_FIELD(SUN4I_HDMI_DDC_CTRL_REG, 0, 0),
-+	.field_ddc_addr_reg	= REG_FIELD(SUN4I_HDMI_DDC_ADDR_REG, 0, 31),
-+	.field_ddc_slave_addr	= REG_FIELD(SUN4I_HDMI_DDC_ADDR_REG, 0, 6),
-+	.field_ddc_int_status	= REG_FIELD(SUN4I_HDMI_DDC_INT_STATUS_REG, 0, 8),
-+	.field_ddc_fifo_clear	= REG_FIELD(SUN4I_HDMI_DDC_FIFO_CTRL_REG, 31, 31),
-+	.field_ddc_fifo_rx_thres = REG_FIELD(SUN4I_HDMI_DDC_FIFO_CTRL_REG, 4, 7),
-+	.field_ddc_fifo_tx_thres = REG_FIELD(SUN4I_HDMI_DDC_FIFO_CTRL_REG, 0, 3),
-+	.field_ddc_byte_count	= REG_FIELD(SUN4I_HDMI_DDC_BYTE_COUNT_REG, 0, 9),
-+	.field_ddc_cmd		= REG_FIELD(SUN4I_HDMI_DDC_CMD_REG, 0, 2),
-+	.field_ddc_sda_en	= REG_FIELD(SUN4I_HDMI_DDC_LINE_CTRL_REG, 9, 9),
-+	.field_ddc_sck_en	= REG_FIELD(SUN4I_HDMI_DDC_LINE_CTRL_REG, 8, 8),
-+
-+	.ddc_fifo_reg		= SUN4I_HDMI_DDC_FIFO_DATA_REG,
-+	.ddc_fifo_has_dir	= true,
-+};
-+
- static const struct sun4i_hdmi_variant sun5i_variant = {
- 	.pad_ctrl0_init_val	= SUN4I_HDMI_PAD_CTRL0_TXEN |
- 				  SUN4I_HDMI_PAD_CTRL0_CKEN |
-@@ -613,6 +665,7 @@ static int sun4i_hdmi_remove(struct platform_device *pdev)
+ static bool sun4i_drv_node_is_tcon(struct device_node *node)
+ {
+-	return of_device_is_compatible(node, "allwinner,sun5i-a13-tcon") ||
++	return of_device_is_compatible(node, "allwinner,sun4i-a10-tcon") ||
++		of_device_is_compatible(node, "allwinner,sun5i-a13-tcon") ||
+ 		of_device_is_compatible(node, "allwinner,sun6i-a31-tcon") ||
+ 		of_device_is_compatible(node, "allwinner,sun6i-a31s-tcon") ||
+ 		of_device_is_compatible(node, "allwinner,sun8i-a33-tcon") ||
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 68751b999877..c6e77f9840c2 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -782,6 +782,30 @@ static int sun4i_tcon_remove(struct platform_device *pdev)
  }
  
- static const struct of_device_id sun4i_hdmi_of_table[] = {
-+	{ .compatible = "allwinner,sun4i-a10-hdmi", .data = &sun4i_variant, },
- 	{ .compatible = "allwinner,sun5i-a10s-hdmi", .data = &sun5i_variant, },
- 	{ .compatible = "allwinner,sun6i-a31-hdmi", .data = &sun6i_variant, },
- 	{ }
+ /* platform specific TCON muxing callbacks */
++static int sun4i_a10_tcon_set_mux(struct sun4i_tcon *tcon,
++				  struct drm_encoder *encoder)
++{
++	struct sun4i_tcon *tcon0 = sun4i_get_tcon0(encoder->dev);
++	u32 shift;
++
++	if (!tcon0)
++		return -EINVAL;
++
++	switch (encoder->encoder_type) {
++	case DRM_MODE_ENCODER_TMDS:
++		/* HDMI */
++		shift = 8;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	regmap_update_bits(tcon0->regs, SUN4I_TCON_MUX_CTRL_REG,
++			   0x3 << shift, tcon->id << shift);
++
++	return 0;
++}
++
+ static int sun5i_a13_tcon_set_mux(struct sun4i_tcon *tcon,
+ 				  struct drm_encoder *encoder)
+ {
+@@ -823,6 +847,11 @@ static int sun6i_tcon_set_mux(struct sun4i_tcon *tcon,
+ 	return 0;
+ }
+ 
++static const struct sun4i_tcon_quirks sun4i_a10_quirks = {
++	.has_channel_1		= true,
++	.set_mux		= sun4i_a10_tcon_set_mux,
++};
++
+ static const struct sun4i_tcon_quirks sun5i_a13_quirks = {
+ 	.has_channel_1		= true,
+ 	.set_mux		= sun5i_a13_tcon_set_mux,
+@@ -848,6 +877,7 @@ static const struct sun4i_tcon_quirks sun8i_v3s_quirks = {
+ };
+ 
+ static const struct of_device_id sun4i_tcon_of_table[] = {
++	{ .compatible = "allwinner,sun4i-a10-tcon", .data = &sun4i_a10_quirks },
+ 	{ .compatible = "allwinner,sun5i-a13-tcon", .data = &sun5i_a13_quirks },
+ 	{ .compatible = "allwinner,sun6i-a31-tcon", .data = &sun6i_a31_quirks },
+ 	{ .compatible = "allwinner,sun6i-a31s-tcon", .data = &sun6i_a31s_quirks },
 -- 
 2.14.2
