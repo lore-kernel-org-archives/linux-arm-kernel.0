@@ -1,177 +1,244 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 17 Oct 2017 16:04:19 +0100
-Subject: [PATCH 07/10] KVM: arm/arm64: Preserve Exec permission across R/W
- permission faults
-In-Reply-To: <20171017144621.GJ5886@lvm>
-References: <20171009152032.27804-1-marc.zyngier@arm.com>
- <20171009152032.27804-8-marc.zyngier@arm.com> <20171016200824.GI1845@lvm>
- <9f1e5366-fe47-69e9-8df9-31105c39094f@arm.com> <20171017144621.GJ5886@lvm>
-Message-ID: <86f238ce-d799-d1ea-b85a-5dae76a36856@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 17 Oct 2017 16:06:21 +0100
+Subject: [PATCH v5 2/6] perf: hisi: Add support for HiSilicon SoC uncore
+ PMU driver
+In-Reply-To: <1503389277-134131-3-git-send-email-zhangshaokun@hisilicon.com>
+References: <1503389277-134131-1-git-send-email-zhangshaokun@hisilicon.com>
+ <1503389277-134131-3-git-send-email-zhangshaokun@hisilicon.com>
+Message-ID: <20171017150621.nfoto5fhma24zvve@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/10/17 15:46, Christoffer Dall wrote:
-> On Tue, Oct 17, 2017 at 12:22:08PM +0100, Marc Zyngier wrote:
->> On 16/10/17 21:08, Christoffer Dall wrote:
->>> On Mon, Oct 09, 2017 at 04:20:29PM +0100, Marc Zyngier wrote:
->>>> So far, we loose the Exec property whenever we take permission
->>>> faults, as we always reconstruct the PTE/PMD from scratch. This
->>>> can be counter productive as we can end-up with the following
->>>> fault sequence:
->>>>
->>>> 	X -> RO -> ROX -> RW -> RWX
->>>>
->>>> Instead, we can lookup the existing PTE/PMD and clear the XN bit in the
->>>> new entry if it was already cleared in the old one, leadig to a much
->>>> nicer fault sequence:
->>>>
->>>> 	X -> ROX -> RWX
->>>>
->>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>> ---
->>>>  arch/arm/include/asm/kvm_mmu.h   | 10 ++++++++++
->>>>  arch/arm64/include/asm/kvm_mmu.h | 10 ++++++++++
->>>>  virt/kvm/arm/mmu.c               | 25 +++++++++++++++++++++++++
->>>>  3 files changed, 45 insertions(+)
->>>>
->>>> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
->>>> index bf76150aad5f..ad442d86c23e 100644
->>>> --- a/arch/arm/include/asm/kvm_mmu.h
->>>> +++ b/arch/arm/include/asm/kvm_mmu.h
->>>> @@ -107,6 +107,11 @@ static inline bool kvm_s2pte_readonly(pte_t *pte)
->>>>  	return (pte_val(*pte) & L_PTE_S2_RDWR) == L_PTE_S2_RDONLY;
->>>>  }
->>>>  
->>>> +static inline bool kvm_s2pte_exec(pte_t *pte)
->>>> +{
->>>> +	return !(pte_val(*pte) & L_PTE_XN);
->>>> +}
->>>> +
->>>>  static inline void kvm_set_s2pmd_readonly(pmd_t *pmd)
->>>>  {
->>>>  	pmd_val(*pmd) = (pmd_val(*pmd) & ~L_PMD_S2_RDWR) | L_PMD_S2_RDONLY;
->>>> @@ -117,6 +122,11 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
->>>>  	return (pmd_val(*pmd) & L_PMD_S2_RDWR) == L_PMD_S2_RDONLY;
->>>>  }
->>>>  
->>>> +static inline bool kvm_s2pmd_exec(pmd_t *pmd)
->>>> +{
->>>> +	return !(pmd_val(*pmd) & PMD_SECT_XN);
->>>> +}
->>>> +
->>>>  static inline bool kvm_page_empty(void *ptr)
->>>>  {
->>>>  	struct page *ptr_page = virt_to_page(ptr);
->>>> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
->>>> index 60c420a5ac0d..e7af74b8b51a 100644
->>>> --- a/arch/arm64/include/asm/kvm_mmu.h
->>>> +++ b/arch/arm64/include/asm/kvm_mmu.h
->>>> @@ -203,6 +203,11 @@ static inline bool kvm_s2pte_readonly(pte_t *pte)
->>>>  	return (pte_val(*pte) & PTE_S2_RDWR) == PTE_S2_RDONLY;
->>>>  }
->>>>  
->>>> +static inline bool kvm_s2pte_exec(pte_t *pte)
->>>> +{
->>>> +	return !(pte_val(*pte) & PTE_S2_XN);
->>>> +}
->>>> +
->>>>  static inline void kvm_set_s2pmd_readonly(pmd_t *pmd)
->>>>  {
->>>>  	kvm_set_s2pte_readonly((pte_t *)pmd);
->>>> @@ -213,6 +218,11 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
->>>>  	return kvm_s2pte_readonly((pte_t *)pmd);
->>>>  }
->>>>  
->>>> +static inline bool kvm_s2pmd_exec(pmd_t *pmd)
->>>> +{
->>>> +	return !(pmd_val(*pmd) & PMD_S2_XN);
->>>> +}
->>>> +
->>>>  static inline bool kvm_page_empty(void *ptr)
->>>>  {
->>>>  	struct page *ptr_page = virt_to_page(ptr);
->>>> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
->>>> index 1911fadde88b..ccc6106764a6 100644
->>>> --- a/virt/kvm/arm/mmu.c
->>>> +++ b/virt/kvm/arm/mmu.c
->>>> @@ -926,6 +926,17 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
->>>>  	return 0;
->>>>  }
->>>>  
->>>> +static pte_t *stage2_get_pte(struct kvm *kvm, phys_addr_t addr)
->>>> +{
->>>> +	pmd_t *pmdp;
->>>> +
->>>> +	pmdp = stage2_get_pmd(kvm, NULL, addr);
->>>> +	if (!pmdp || pmd_none(*pmdp))
->>>> +		return NULL;
->>>> +
->>>> +	return pte_offset_kernel(pmdp, addr);
->>>> +}
->>>> +
->>>
->>> nit, couldn't you change this to be
->>>
->>>     stage2_is_exec(struct kvm *kvm, phys_addr_t addr)
->>>
->>> Which, if the pmd is a section mapping just checks that, and if we find
->>> a pte, we check that, and then we can have a simpler one-line call and
->>> check from both the pte and pmd paths below?
->>
->> Yes, that's pretty neat. I've folded that in.
->>
->>>
->>>>  static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
->>>>  			  phys_addr_t addr, const pte_t *new_pte,
->>>>  			  unsigned long flags)
->>>> @@ -1407,6 +1418,13 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->>>>  		if (exec_fault) {
->>>>  			new_pmd = kvm_s2pmd_mkexec(new_pmd);
->>>>  			coherent_icache_guest_page(vcpu, pfn, PMD_SIZE);
->>>> +		} else if (fault_status == FSC_PERM) {
->>>> +			/* Preserve execute if XN was already cleared */
->>>> +			pmd_t *old_pmdp = stage2_get_pmd(kvm, NULL, fault_ipa);
->>>> +
->>>> +			if (old_pmdp && pmd_present(*old_pmdp) &&
->>>> +			    kvm_s2pmd_exec(old_pmdp))
->>>> +				new_pmd = kvm_s2pmd_mkexec(new_pmd);
->>>
->>> Is the reverse case not also possible then?  That is, if we have an
->>> exec_fault, we could check if the entry is already writable and maintain
->>> the property as well.  Not sure how often that would get hit though, as
->>> a VM would only execute instructions on a page that has been written to,
->>> but is somehow read-only at stage2, meaning the host must have marked
->>> the page as read-only since content was written.  I think this could be
->>> a somewhat common pattern with something like KSM though?
->>
->> I think this is already the case, because we always build the PTE/PMD as
->> either ROXN or RWXN, and only later clear the XN bit (see the
->> unconditional call to gfn_to_pfn_prot which should tell us whether to
->> map the page as writable or not). Or am I missing your point entirely?
->>
-> 
-> I am worried about the flow where we map the page as RWXN, then execute
-> some code on it, so it becomes RW, then make it read-only as ROXN.
-> Shouldn't we we should preserve the exec state here?
+Hi,
 
-I think that for this situation to happen (RW -> ROXN), we must
-transition via an unmap. At that stage, there is nothing to preserve.
+Apologies for the delay for this review.
 
-> I'm guessing that something like KSM will want to make pages read-only
-> to support COW, but perhaps that's always done by copying the content to
-> a new page and redirecting the old mapping to a new mapping (something
-> that calls kvm_set_spte_hva()) and in that case we do probably really
-> want the XN bit to be set again so that we can do the necessary
-> maintenance.
+Largely this seems to look OK, but there are a couple of things which
+stick out.
 
-Exactly. New mapping, fresh caches.
+On Tue, Aug 22, 2017 at 04:07:53PM +0800, Shaokun Zhang wrote:
+> +int hisi_uncore_pmu_event_init(struct perf_event *event)
+> +{
+> +	struct hw_perf_event *hwc = &event->hw;
+> +	struct hisi_pmu *hisi_pmu;
+> +
+> +	if (event->attr.type != event->pmu->type)
+> +		return -ENOENT;
+> +
+> +	/*
+> +	 * We do not support sampling as the counters are all
+> +	 * shared by all CPU cores in a CPU die(SCCL). Also we
+> +	 * do not support attach to a task(per-process mode)
+> +	 */
+> +	if (is_sampling_event(event) || event->attach_state & PERF_ATTACH_TASK)
+> +		return -EOPNOTSUPP;
+> +
+> +	/* counters do not have these bits */
+> +	if (event->attr.exclude_user	||
+> +	    event->attr.exclude_kernel	||
+> +	    event->attr.exclude_host	||
+> +	    event->attr.exclude_guest	||
+> +	    event->attr.exclude_hv	||
+> +	    event->attr.exclude_idle)
+> +		return -EINVAL;
+> +
+> +	/*
+> +	 *  The uncore counters not specific to any CPU, so cannot
+> +	 *  support per-task
+> +	 */
+> +	if (event->cpu < 0)
+> +		return -EINVAL;
+> +
+> +	/*
+> +	 * Validate if the events in group does not exceed the
+> +	 * available counters in hardware.
+> +	 */
+> +	if (!hisi_validate_event_group(event))
+> +		return -EINVAL;
+> +
+> +	/*
+> +	 * We don't assign an index until we actually place the event onto
+> +	 * hardware. Use -1 to signify that we haven't decided where to put it
+> +	 * yet.
+> +	 */
+> +	hwc->idx		= -1;
+> +	hwc->config_base	= event->attr.config;
 
-> However, we shouldn't try to optimize for something we don't know to be
-> a problem, so as long as it's functionally correct, which I think it is,
-> we should be fine.
+Are all event codes valid?
 
-Agreed.
+e.g. is it possible that some value passed by the user would cause a
+problem were it written to the hardware?
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+I see that you only use the low 8 bits of the config field elsewhere, so
+it might make sense to sanity check that here rather than having to mask
+it elsewhere.
+
+That would make future extension safer, since no-one could be relying on
+passing a dodgy value in.
+
+> +
+> +	hisi_pmu = to_hisi_pmu(event->pmu);
+> +	/* Enforce to use the same CPU for all events in this PMU */
+> +	event->cpu = hisi_pmu->on_cpu;
+
+I think you need to check hisi_pmu->on_cpu != -1, otherwise we can
+accidentally create a task-bound event if a cluster is offline, and I'm
+not sure how the perf core code would handle here.
+
+> +
+> +	return 0;
+> +}
+
+[...]
+
+> +int hisi_uncore_pmu_online_cpu(unsigned int cpu, struct hlist_node *node)
+> +{
+> +	struct hisi_pmu *hisi_pmu;
+> +
+> +	hisi_pmu = hlist_entry_safe(node, struct hisi_pmu, node);
+> +
+> +	/*
+> +	 * If the CPU is associated with the PMU, set it in online_cpus of
+> +	 * the PMU.
+> +	 */
+> +	if (cpumask_test_cpu(cpu, &hisi_pmu->associated_cpus))
+> +		cpumask_set_cpu(cpu, &hisi_pmu->online_cpus);
+> +	else
+> +		return 0;
+
+This would be a bit nicer as:
+
+	if (!cpumask_test_cpu(cpu, &hisi_pmu->associated_cpus))
+		return 0;
+
+	cpumask_set_cpu(cpu, &hisi_pmu->online_cpus);
+
+
+However, I don't think you need hisi_pmu::online_cpus. That's only used
+for the online/offline callbacks, and you can use the
+hisi_pmu::associated_cpus mask in hisi_uncore_pmu_offline_cpu(), and
+avoid altering any mask here.
+
+> +
+> +	/* If another CPU is already managing this PMU, simply return. */
+> +	if (hisi_pmu->on_cpu != -1)
+> +		return 0;
+> +
+> +	/* Use this CPU in cpumask for event counting */
+> +	hisi_pmu->on_cpu = cpu;
+> +
+> +	/* Overflow interrupt also should use the same CPU */
+> +	WARN_ON(irq_set_affinity(hisi_pmu->irq, cpumask_of(cpu)));
+> +
+> +	return 0;
+> +}
+> +
+> +int hisi_uncore_pmu_offline_cpu(unsigned int cpu, struct hlist_node *node)
+> +{
+> +	struct hisi_pmu *hisi_pmu;
+> +	cpumask_t pmu_online_cpus;
+> +	unsigned int target;
+> +
+> +	hisi_pmu = hlist_entry_safe(node, struct hisi_pmu, node);
+> +
+> +	/*
+> +	 * If the CPU is online with the PMU, clear it in online_cpus of
+> +	 * the PMU.
+> +	 */
+> +	if (!cpumask_test_and_clear_cpu(cpu, &hisi_pmu->online_cpus) ||
+> +	    (hisi_pmu->on_cpu != cpu))
+> +		return 0;
+> +
+> +	hisi_pmu->on_cpu = -1;
+> +
+> +	/* Any other CPU associated with the PMU is still online */
+> +	cpumask_and(&pmu_online_cpus, &hisi_pmu->online_cpus, cpu_online_mask);
+> +	target = cpumask_any_but(&pmu_online_cpus, cpu);
+> +	if (target >= nr_cpu_ids)
+> +		return 0;
+
+I think you can get rid of hisi_pmu::online_cpus, and replace the mask
+manipulation above with:
+
+	/* Nothing to do if this CPU doesn't own the PMU */
+	if (hisi_pmu->on_cpu != cpu)
+		return 0;
+	
+	/* Give up ownership of the PMU */
+	hisi_pmu->on_cpu = -1;
+
+	/* Choose a new CPU to migrate ownership of the PMU to */
+	cpumask_and(&pmu_online_cpus, &hisi_pmu->associated_cpus,
+		    cpu_online_mask)
+	target = cpumask_any_but(&pmu_online_cpus, cpu);
+	if (target >= nr_cpu_ids)
+		return 0;
+
+> +
+> +	perf_pmu_migrate_context(&hisi_pmu->pmu, cpu, target);
+> +	/* Use this CPU for event counting */
+> +	hisi_pmu->on_cpu = target;
+> +	WARN_ON(irq_set_affinity(hisi_pmu->irq, cpumask_of(target)));
+> +
+> +	return 0;
+> +}
+> +
+> +/*
+> + * Check whether the CPU is associated with this uncore PMU by SCCL_ID,
+> + * if true, set the associated cpumask of the uncore PMU.
+> + */
+> +void hisi_uncore_pmu_set_cpumask_by_sccl(void *arg)
+
+Perhaps:
+
+hisi_uncore_pmu_check_associate_cpu(struct hisi_pmu *pmu)
+
+It's not clear to me why the arg is a void pointer.
+
+> +{
+> +	struct hisi_pmu *hisi_pmu = (struct hisi_pmu *)arg;
+
+This cast shouldn't be necessary.
+
+> +	u32 sccl_id;
+> +
+> +	hisi_read_sccl_and_ccl_id(&sccl_id, NULL);
+> +	if (sccl_id == hisi_pmu->sccl_id)
+> +		cpumask_set_cpu(smp_processor_id(), &hisi_pmu->associated_cpus);
+> +}
+
+[...]
+
+> +/* Generic pmu struct for different pmu types */
+> +struct hisi_pmu {
+> +	struct pmu pmu;
+> +	const struct hisi_uncore_ops *ops;
+> +	struct hisi_pmu_hwevents pmu_events;
+> +	/*
+> +	 * online_cpus: All online CPUs associated with the PMU
+> +	 * associated_cpus: All CPUs associated with the PMU who is
+> +	 * initialised when probe.
+> +	 */
+> +	cpumask_t online_cpus, associated_cpus;
+> +	/* CPU used for counting */
+> +	int on_cpu;
+> +	int irq;
+> +	struct device *dev;
+> +	struct hlist_node node;
+> +	u32 sccl_id;
+> +	u32 ccl_id;
+> +	/* Hardware information for different pmu types */
+> +	void __iomem *base;
+> +	/* the ID of the PMU modules */
+> +	u32 id;
+
+Is this what hte documentation referred to as the index-id?
+
+It might make sense to call it index_id.
+
+> +	int num_counters;
+> +	int counter_bits;
+> +};
+
+Thanks,
+Mark.
