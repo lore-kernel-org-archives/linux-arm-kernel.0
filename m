@@ -1,72 +1,137 @@
-From: lsun@mellanox.com (Liming Sun)
-Date: Tue, 17 Oct 2017 15:52:03 +0000
-Subject: [PATCH 0/9] Enable dw-mmc multi-card support
-In-Reply-To: <8e433531-8f67-d575-635e-c6ced29f6804@rock-chips.com>
-References: <cover.1507315433.git.lsun@mellanox.com>
- <8e433531-8f67-d575-635e-c6ced29f6804@rock-chips.com>
-Message-ID: <AM2PR05MB07533A822C7CCBA7111FD58FA14C0@AM2PR05MB0753.eurprd05.prod.outlook.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Tue, 17 Oct 2017 12:05:14 -0400
+Subject: [RFC v2 0/8] Acer Chromebook R13 support
+In-Reply-To: <18d36386-d3a0-a81f-6240-9703a3d98fbd@gmail.com>
+References: <1508167900-27415-1-git-send-email-ulrich.hecht+renesas@gmail.com>
+ <18d36386-d3a0-a81f-6240-9703a3d98fbd@gmail.com>
+Message-ID: <20171017160514.ivmaz6tzicoxewbx@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> Hrm.... it's so unlucky that your patchset comes a little late. As your patch 8 and 9 said, you need them to fix problem for multi-card support, so definitely there was no such use case, and even the code was buggy to support it right? That makes the code hard to read and maintain, so we decide to remove it.
-
-Thanks for the feedback. Yes, earlier the multi-card support was buggy indeed. We spent some time to debug it and got it working.
-
->> Havn'e check the databook for details yet, but I think it's ok to re-introduce multi-slot support if a real user benefits from it. But you need a new patch to silent the log "num-slots property not found, assuming 1 slot is available" as we removed all the num-slots from DT at that time.
-
-The " num-slots property not found..." log message has already been removed by 8a629d26f back in 2016. Looks like we're good on this one. In dw_mci_probe (), it has code to check pdata->num_slots. If 0, the host->num_slots will be set to 1. So the logic of setting default num_slots seems already there. But correct me if I am wrong.
-
-Thanks,
-Liming
-
------Original Message-----
-From: Shawn Lin [mailto:shawn.lin at rock-chips.com] 
-Sent: Monday, October 16, 2017 9:36 PM
-To: Liming Sun <lsun@mellanox.com>; Jaehoon Chung <jh80.chung@samsung.com>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>; Rob Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>; Kukjin Kim <kgene@kernel.org>; Krzysztof Kozlowski <krzk@kernel.org>; shawn.lin at rock-chips.com; linux-mmc at vger.kernel.org; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-samsung-soc at vger.kernel.org
-Subject: Re: [PATCH 0/9] Enable dw-mmc multi-card support
-
-
-On 2017/10/7 3:21, Liming Sun wrote:
-> This series of commits enables the multi-card support for the dw-mmc 
-> controller. It includes two parts as below.
+On Tue, Oct 17, 2017 at 12:33:09PM +0200, Matthias Brugger wrote:
+> Hi Ulrich,
 > 
-> The first part (patches 1-7) reverts the series of recent commits that 
-> removed the multi-card support with comments saying there was no such 
-> use case in the real world. Actually this feature is being used in 
-> Mellanox Bluefield SoC and has been requested by customers.
-
-Hrm.... it's so unlucky that your patchset comes a little late. As your patch 8 and 9 said, you need them to fix problem for multi-card support, so definitely there was no such use case, and even the code was buggy to support it right? That makes the code hard to read and maintain, so we decide to remove it.
-
+> On 10/16/2017 05:31 PM, Ulrich Hecht wrote:
+> > Hi!
+> > 
+> > This is a new revision of the Acer Chromebook R13 support series. It does
+> > not offer anything new in terms of functionality, but eliminates three out
+> > of four ugly hacks and adds a few minor cleanups; see below for details.
+> > Thanks to Robin Murphy and CK Hu for their comments and suggestions!
+> > 
+> > I'm still looking for advice on how to implement the dual-role mmsys device
+> > correctly; see "hack: mediatek: get mmsys to register as both DRM and clock
+> > device" for details on this.
+> > 
+> > Like the previous revision, you can find this series at
+> > https://github.com/uli/kernel/tree/elm-working, which also contains a config
+> > file and several ancillary bits that are required to build a kernel
+> > partition for the Chromebook. Instructions on how to do so (and various
+> > other things that have to be done to get it running on your device) are
+> > available at
+> > https://www.elinux.org/User:Uli/Acer_Chromebook_R13_GPU_test_system (These
+> > instructions have been written for the vendor kernel, but apply to mainline
+> > as well, except that you won't need any extra patches.)
+> > 
 > 
-> The second part (patches 8-9) fixes the DesignWare multi-card support 
-> according to the dw-mmc databook (synnopsys: DesignWare Cores Mobile 
-> Storage Host Databook, 2.70a). It has changes to set the card number 
-> into the CMD register to multiplex requests to different cards when 
-> working in SD_MMC_CEATA mode, set the CTYPE / CLKENA / CDTHRCTL 
-> registers properly according to the spec, and parse the per-card 
-> configuration to match the Linux Documentation 
-> (bindings/mmc/synopsys-dw-mshc.txt).
+> I appreciate your efforts to get this done. 
 
-Havn'e check the databook for details yet, but I think it's ok to re-introduce multi-slot support if a real user benefits from it. But you need a new patch to silent the log "num-slots property not found, assuming 1 slot is available" as we removed all the num-slots from DT at that time.
+Agreed, thanks for doing this work and posting it! 
+
+> From what I understand you
+> rebased the patches from the chromium kernel to mainline. So you should keep
+> the signed-off-by from the original author and just add you signed-off-by
+> below that.
+> Also it would be nice to CC these persons so that they are aware of your effort.
+> 
+
+Additionally, make sure the author and commit messages are preserved when you send
+patches. You can add your own message in addition to your SoB, but please try to
+preserve history.
+
+Sean
 
 
+> > CU
+> > Uli
+> > 
+> > Changes since RFC v1:
+> > - cmdq: remove obsolete driver; not currently used anyway
 > 
-> Liming Sun (9):
->    Revert "Documentation: dw-mshc: deprecate num-slots"
->    Revert "mmc: dw_mmc: remove the unnecessary slot variable"
->    Revert "mmc: dw_mmc: use the 'slot' instead of 'cur_slot'"
->    Revert "mmc: dw_mmc: remove the 'id' arguments about functions
->      relevant to slot"
->    Revert "mmc: dw_mmc: change the array of slots"
->    Revert "mmc: dw_mmc: remove the loop about finding slots"
->    Revert "mmc: dw_mmc: deprecated the "num-slots" property"
->    mmc: dw_mmc: Support two SD_MMC_CE-ATA cards
->    mmc: dw_mmc: Parse slot-specific configuration
+> Are you sure about this? I remember that Dan (CC'ed) told me that this is
+> one of the requirements to get upstream working.
 > 
->   .../devicetree/bindings/mmc/synopsys-dw-mshc.txt   |  16 +-
->   drivers/mmc/host/dw_mmc-exynos.c                   |   4 +-
->   drivers/mmc/host/dw_mmc.c                          | 277 ++++++++++++++++-----
->   drivers/mmc/host/dw_mmc.h                          |  17 +-
->   4 files changed, 236 insertions(+), 78 deletions(-)
+> Dan, can you clarify please?
 > 
+> Regards,
+> Matthias
+> 
+> > - dt: remove CD GPIO from mmc1, does not seem to be correct
+> > - mmc: remove mtk-sd.c revert hack (works fine without the CD pin)
+> > - dsi: fix port number for drm_of_find_panel_or_bridge(), remove hack
+> > - fbdev: add missing Signed-off-bys
+> > - iommu: remove io-pgtable sanity check hack, has been properly fixed
+> > - minor style fixes
+> > 
+> > 
+> > Ulrich Hecht (8):
+> >    drm/bridge: GPIO-controlled display multiplexer driver
+> >    platform/chrome: ChromeOS firmware interface driver
+> >    drm/bridge: Parade PS8640 MIPI DSI -> eDP converter driver
+> >    drm/bridge: Analogix ANX7688 HDMI -> DP bridge driver
+> >    arm64: dts: mediatek: Add Elm Rev. 3 device tree
+> >    hack: mediatek: get mmsys to register as both DRM and clock device
+> >    drm/mediatek: Add DRM-based framebuffer device
+> >    drm: mediatek: Fix drm_of_find_panel_or_bridge conversion
+> > 
+> >   arch/arm64/boot/dts/mediatek/Makefile            |    1 +
+> >   arch/arm64/boot/dts/mediatek/mt8173-elm-rev3.dts |   21 +
+> >   arch/arm64/boot/dts/mediatek/mt8173-elm.dtsi     |  210 ++++
+> >   arch/arm64/boot/dts/mediatek/mt8173-oak.dtsi     | 1013 ++++++++++++++++++++
+> >   drivers/clk/mediatek/clk-mt8173.c                |    4 +-
+> >   drivers/gpu/drm/bridge/Kconfig                   |   32 +
+> >   drivers/gpu/drm/bridge/Makefile                  |    5 +
+> >   drivers/gpu/drm/bridge/analogix-anx7688.c        |  233 +++++
+> >   drivers/gpu/drm/bridge/generic-gpio-mux.c        |  316 +++++++
+> >   drivers/gpu/drm/bridge/parade-ps8640.c           | 1104 ++++++++++++++++++++++
+> >   drivers/gpu/drm/mediatek/Makefile                |    2 +
+> >   drivers/gpu/drm/mediatek/mtk_dpi.c               |    5 +-
+> >   drivers/gpu/drm/mediatek/mtk_drm_ddp.c           |    5 +-
+> >   drivers/gpu/drm/mediatek/mtk_drm_drv.c           |   15 +
+> >   drivers/gpu/drm/mediatek/mtk_drm_drv.h           |    4 +-
+> >   drivers/gpu/drm/mediatek/mtk_drm_fb.c            |   13 +
+> >   drivers/gpu/drm/mediatek/mtk_drm_fb.h            |    3 +
+> >   drivers/gpu/drm/mediatek/mtk_drm_fbdev.c         |  181 ++++
+> >   drivers/gpu/drm/mediatek/mtk_drm_fbdev.h         |   32 +
+> >   drivers/gpu/drm/mediatek/mtk_dsi.c               |    2 +-
+> >   drivers/gpu/drm/mediatek/mtk_hdmi.c              |    5 +-
+> >   drivers/platform/chrome/Kconfig                  |   18 +
+> >   drivers/platform/chrome/Makefile                 |    2 +
+> >   drivers/platform/chrome/chromeos.c               |  120 +++
+> >   drivers/platform/chrome/chromeos.h               |   61 ++
+> >   drivers/platform/chrome/chromeos_arm.c           |  264 ++++++
+> >   drivers/platform/chrome/elog.h                   |  186 ++++
+> >   include/linux/chromeos_platform.h                |   27 +
+> >   28 files changed, 3874 insertions(+), 10 deletions(-)
+> >   create mode 100644 arch/arm64/boot/dts/mediatek/mt8173-elm-rev3.dts
+> >   create mode 100644 arch/arm64/boot/dts/mediatek/mt8173-elm.dtsi
+> >   create mode 100644 arch/arm64/boot/dts/mediatek/mt8173-oak.dtsi
+> >   create mode 100644 drivers/gpu/drm/bridge/analogix-anx7688.c
+> >   create mode 100644 drivers/gpu/drm/bridge/generic-gpio-mux.c
+> >   create mode 100644 drivers/gpu/drm/bridge/parade-ps8640.c
+> >   create mode 100644 drivers/gpu/drm/mediatek/mtk_drm_fbdev.c
+> >   create mode 100644 drivers/gpu/drm/mediatek/mtk_drm_fbdev.h
+> >   create mode 100644 drivers/platform/chrome/chromeos.c
+> >   create mode 100644 drivers/platform/chrome/chromeos.h
+> >   create mode 100644 drivers/platform/chrome/chromeos_arm.c
+> >   create mode 100644 drivers/platform/chrome/elog.h
+> >   create mode 100644 include/linux/chromeos_platform.h
+> > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Sean Paul, Software Engineer, Google / Chromium OS
