@@ -1,49 +1,96 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 17 Oct 2017 11:06:15 +0200
-Subject: [PATCH 08/23] dt-bindings: panel: lvds: Document power-supply property
+Date: Tue, 17 Oct 2017 11:06:23 +0200
+Subject: [PATCH 16/23] drm/sun4i: Add A83T support
 In-Reply-To: <cover.fe3d65d1ee05a55224d26e7d113388c428592b26.1508231063.git-series.maxime.ripard@free-electrons.com>
 References: <cover.fe3d65d1ee05a55224d26e7d113388c428592b26.1508231063.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <89bee8042b5fa50c8c3dbf52cc0c14b34beef9df.1508231063.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <cfa06492ecb6bfba965e1074604525a4e939c5c1.1508231063.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The power-supply property is used be a vast majority of panels, including
-panel-simple. Let's document it as a common property
+Add support for the A83T display pipeline.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- Documentation/devicetree/bindings/display/panel/panel-common.txt | 6 ++++++
- Documentation/devicetree/bindings/display/panel/panel-lvds.txt   | 1 +
- 2 files changed, 7 insertions(+)
+ Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 3 +++
+ drivers/gpu/drm/sun4i/sun4i_drv.c                             | 2 ++
+ drivers/gpu/drm/sun4i/sun4i_tcon.c                            | 1 +
+ drivers/gpu/drm/sun4i/sun8i_mixer.c                           | 4 ++++
+ 4 files changed, 10 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/panel/panel-common.txt b/Documentation/devicetree/bindings/display/panel/panel-common.txt
-index ec52c472c845..125ea68052af 100644
---- a/Documentation/devicetree/bindings/display/panel/panel-common.txt
-+++ b/Documentation/devicetree/bindings/display/panel/panel-common.txt
-@@ -78,6 +78,12 @@ used for panels that implement compatible control signals.
-   while active. Active high reset signals can be supported by inverting the
-   GPIO specifier polarity flag.
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index 46df3b78ae9e..c0fa233ec1fc 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -90,6 +90,7 @@ Required properties:
+    * allwinner,sun6i-a31-tcon
+    * allwinner,sun6i-a31s-tcon
+    * allwinner,sun8i-a33-tcon
++   * allwinner,sun8i-a83t-tcon
+    * allwinner,sun8i-v3s-tcon
+  - reg: base address and size of memory-mapped region
+  - interrupts: interrupt associated to this IP
+@@ -209,6 +210,7 @@ supported.
  
-+Power
-+-----
-+
-+- power-supply: many display panels need an additional power supply in
-+  order to be fully powered-up. For such panels, power-supply contains
-+  a phandle to the regulator powering the panel.
+ Required properties:
+   - compatible: value must be one of:
++    * allwinner,sun8i-a83t-de2-mixer
+     * allwinner,sun8i-v3s-de2-mixer
+   - reg: base address and size of the memory-mapped region.
+   - clocks: phandles to the clocks feeding the mixer
+@@ -236,6 +238,7 @@ Required properties:
+     * allwinner,sun6i-a31-display-engine
+     * allwinner,sun6i-a31s-display-engine
+     * allwinner,sun8i-a33-display-engine
++    * allwinner,sun8i-a83t-display-engine
+     * allwinner,sun8i-v3s-display-engine
  
- Backlight
- ---------
-diff --git a/Documentation/devicetree/bindings/display/panel/panel-lvds.txt b/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
-index b938269f841e..250850a2150b 100644
---- a/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
-+++ b/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
-@@ -32,6 +32,7 @@ Optional properties:
- - label: See panel-common.txt.
- - gpios: See panel-common.txt.
- - backlight: See panel-common.txt.
-+- power-supply: See panel-common.txt.
- - data-mirror: If set, reverse the bit order described in the data mappings
-   below on all data lanes, transmitting bits for slots 6 to 0 instead of
-   0 to 6.
+   - allwinner,pipelines: list of phandle to the display engine
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index a27efad9bc76..439f116bb3b5 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -189,6 +189,7 @@ static bool sun4i_drv_node_is_tcon(struct device_node *node)
+ 		of_device_is_compatible(node, "allwinner,sun6i-a31-tcon") ||
+ 		of_device_is_compatible(node, "allwinner,sun6i-a31s-tcon") ||
+ 		of_device_is_compatible(node, "allwinner,sun8i-a33-tcon") ||
++		of_device_is_compatible(node, "allwinner,sun8i-a83t-tcon") ||
+ 		of_device_is_compatible(node, "allwinner,sun8i-v3s-tcon");
+ }
+ 
+@@ -347,6 +348,7 @@ static const struct of_device_id sun4i_drv_of_table[] = {
+ 	{ .compatible = "allwinner,sun6i-a31-display-engine" },
+ 	{ .compatible = "allwinner,sun6i-a31s-display-engine" },
+ 	{ .compatible = "allwinner,sun8i-a33-display-engine" },
++	{ .compatible = "allwinner,sun8i-a83t-display-engine" },
+ 	{ .compatible = "allwinner,sun8i-v3s-display-engine" },
+ 	{ }
+ };
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 6a20a467ee6d..eb3c8bad4977 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -1063,6 +1063,7 @@ static const struct of_device_id sun4i_tcon_of_table[] = {
+ 	{ .compatible = "allwinner,sun6i-a31-tcon", .data = &sun6i_a31_quirks },
+ 	{ .compatible = "allwinner,sun6i-a31s-tcon", .data = &sun6i_a31s_quirks },
+ 	{ .compatible = "allwinner,sun8i-a33-tcon", .data = &sun8i_a33_quirks },
++	{ .compatible = "allwinner,sun8i-a83t-tcon", .data = &sun8i_v3s_quirks },
+ 	{ .compatible = "allwinner,sun8i-v3s-tcon", .data = &sun8i_v3s_quirks },
+ 	{ }
+ };
+diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+index 86c6c24b5105..c6030ce130d3 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
++++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+@@ -385,6 +385,10 @@ static const struct sun8i_mixer_cfg sun8i_v3s_mixer_cfg = {
+ 
+ static const struct of_device_id sun8i_mixer_of_table[] = {
+ 	{
++		.compatible = "allwinner,sun8i-a83t-de2-mixer",
++		.data = &sun8i_v3s_mixer_cfg,
++	},
++	{
+ 		.compatible = "allwinner,sun8i-v3s-de2-mixer",
+ 		.data = &sun8i_v3s_mixer_cfg,
+ 	},
 -- 
 git-series 0.9.1
