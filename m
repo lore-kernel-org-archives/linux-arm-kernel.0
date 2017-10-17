@@ -1,268 +1,192 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Tue, 17 Oct 2017 16:26:50 +0200
-Subject: [PATCH v1] dmaengine: stm32_mdma: activate pack/unpack feature
-In-Reply-To: <1508247827-31741-1-git-send-email-pierre-yves.mordret@st.com>
-References: <1508247827-31741-1-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <CA+M3ks4EymJ2aR5Fm1G1mTgyiOaGUcQgWMvDp0K4Hvue+M7rbA@mail.gmail.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Tue, 17 Oct 2017 07:28:34 -0700
+Subject: [PATCH 01/10] KVM: arm/arm64: Split dcache/icache flushing
+In-Reply-To: <33ad478f-dcd7-5a9e-d353-d564e09c3254@arm.com>
+References: <20171009152032.27804-1-marc.zyngier@arm.com>
+ <20171009152032.27804-2-marc.zyngier@arm.com>
+ <20171016200735.GE1845@lvm>
+ <33ad478f-dcd7-5a9e-d353-d564e09c3254@arm.com>
+Message-ID: <20171017142834.GG5886@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Arnd since it should also fix 64 bits division issue
+On Tue, Oct 17, 2017 at 09:57:34AM +0100, Marc Zyngier wrote:
+> On 16/10/17 21:07, Christoffer Dall wrote:
+> > On Mon, Oct 09, 2017 at 04:20:23PM +0100, Marc Zyngier wrote:
+> >> As we're about to introduce opportunistic invalidation of the icache,
+> >> let's split dcache and icache flushing.
+> > 
+> > I'm a little confused abut the naming of these functions now,
+> > because where I believe the current function ensures coherency between
+> > the I-cache and D-cache (and overly so) if you just call one or the
+> > other function after this change, what exactly is the coherency you get?
+> 
+> Yeah, in retrospect, this is a pretty stupid naming scheme. I guess I'll
+> call them clean/invalidate, with the overarching caller still being
+> called coherent_cache_guest for the time being.
+> 
 
-2017-10-17 15:43 GMT+02:00 Pierre-Yves MORDRET <pierre-yves.mordret@st.com>:
-> If source and destination bus width differs pack/unpack MDMA
-> feature has to be activated for alignment.
-> This pack/unpack feature implies to have both source/destination address
-> and buffer length aligned on bus width.
->
-> Fixes: a4ffb13c8946 ("dmaengine: Add STM32 MDMA driver")
-> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
-> ---
->  drivers/dma/stm32-mdma.c | 84 ++++++++++++++++++++++++++++--------------------
->  1 file changed, 50 insertions(+), 34 deletions(-)
->
-> diff --git a/drivers/dma/stm32-mdma.c b/drivers/dma/stm32-mdma.c
-> index d3be6bf..daa1602 100644
-> --- a/drivers/dma/stm32-mdma.c
-> +++ b/drivers/dma/stm32-mdma.c
-> @@ -387,14 +387,20 @@ static int stm32_mdma_get_width(struct stm32_mdma_chan *chan,
->         }
->  }
->
-> -static enum dma_slave_buswidth stm32_mdma_get_max_width(u32 buf_len, u32 tlen)
-> +static enum dma_slave_buswidth stm32_mdma_get_max_width(dma_addr_t addr,
-> +                                                       u32 buf_len, u32 tlen)
->  {
->         enum dma_slave_buswidth max_width = DMA_SLAVE_BUSWIDTH_8_BYTES;
->
->         for (max_width = DMA_SLAVE_BUSWIDTH_8_BYTES;
->              max_width > DMA_SLAVE_BUSWIDTH_1_BYTE;
->              max_width >>= 1) {
-> -               if (((buf_len % max_width) == 0) && (tlen >= max_width))
-> +               /*
-> +                * Address and buffer length both have to be aligned on
-> +                * bus width
-> +                */
-> +               if ((((buf_len | addr) & (max_width - 1)) == 0) &&
-> +                   tlen >= max_width)
->                         break;
->         }
->
-> @@ -486,7 +492,8 @@ static void stm32_mdma_set_bus(struct stm32_mdma_device *dmadev, u32 *ctbr,
->  static int stm32_mdma_set_xfer_param(struct stm32_mdma_chan *chan,
->                                      enum dma_transfer_direction direction,
->                                      u32 *mdma_ccr, u32 *mdma_ctcr,
-> -                                    u32 *mdma_ctbr, u32 buf_len)
-> +                                    u32 *mdma_ctbr, dma_addr_t addr,
-> +                                    u32 buf_len)
->  {
->         struct stm32_mdma_device *dmadev = stm32_mdma_get_dev(chan);
->         struct stm32_mdma_chan_config *chan_config = &chan->chan_config;
-> @@ -520,6 +527,9 @@ static int stm32_mdma_set_xfer_param(struct stm32_mdma_chan *chan,
->         ctcr &= ~STM32_MDMA_CTCR_LEN2_MSK;
->         ctcr |= STM32_MDMA_CTCR_TLEN((tlen - 1));
->
-> +       /* Disable Pack Enable */
-> +       ctcr &= ~STM32_MDMA_CTCR_PKE;
-> +
->         /* Check burst size constraints */
->         if (src_maxburst * src_addr_width > STM32_MDMA_MAX_BURST ||
->             dst_maxburst * dst_addr_width > STM32_MDMA_MAX_BURST) {
-> @@ -551,6 +561,8 @@ static int stm32_mdma_set_xfer_param(struct stm32_mdma_chan *chan,
->
->         switch (direction) {
->         case DMA_MEM_TO_DEV:
-> +               dst_addr = chan->dma_config.dst_addr;
-> +
->                 /* Set device data size */
->                 dst_bus_width = stm32_mdma_get_width(chan, dst_addr_width);
->                 if (dst_bus_width < 0)
-> @@ -567,7 +579,7 @@ static int stm32_mdma_set_xfer_param(struct stm32_mdma_chan *chan,
->                 ctcr |= STM32_MDMA_CTCR_DBURST((ilog2(dst_best_burst)));
->
->                 /* Set memory data size */
-> -               src_addr_width = stm32_mdma_get_max_width(buf_len, tlen);
-> +               src_addr_width = stm32_mdma_get_max_width(addr, buf_len, tlen);
->                 chan->mem_width = src_addr_width;
->                 src_bus_width = stm32_mdma_get_width(chan, src_addr_width);
->                 if (src_bus_width < 0)
-> @@ -587,15 +599,19 @@ static int stm32_mdma_set_xfer_param(struct stm32_mdma_chan *chan,
->                 ctcr |= STM32_MDMA_CTCR_SBURST((ilog2(src_best_burst)));
->
->                 /* Select bus */
-> -               dst_addr = chan->dma_config.dst_addr;
->                 stm32_mdma_set_bus(dmadev, &ctbr, STM32_MDMA_CTBR_DBUS,
->                                    dst_addr);
->
-> +               if (dst_bus_width != src_bus_width)
-> +                       ctcr |= STM32_MDMA_CTCR_PKE;
-> +
->                 /* Set destination address */
->                 stm32_mdma_write(dmadev, STM32_MDMA_CDAR(chan->id), dst_addr);
->                 break;
->
->         case DMA_DEV_TO_MEM:
-> +               src_addr = chan->dma_config.src_addr;
-> +
->                 /* Set device data size */
->                 src_bus_width = stm32_mdma_get_width(chan, src_addr_width);
->                 if (src_bus_width < 0)
-> @@ -611,7 +627,7 @@ static int stm32_mdma_set_xfer_param(struct stm32_mdma_chan *chan,
->                 ctcr |= STM32_MDMA_CTCR_SBURST((ilog2(src_best_burst)));
->
->                 /* Set memory data size */
-> -               dst_addr_width = stm32_mdma_get_max_width(buf_len, tlen);
-> +               dst_addr_width = stm32_mdma_get_max_width(addr, buf_len, tlen);
->                 chan->mem_width = dst_addr_width;
->                 dst_bus_width = stm32_mdma_get_width(chan, dst_addr_width);
->                 if (dst_bus_width < 0)
-> @@ -630,10 +646,12 @@ static int stm32_mdma_set_xfer_param(struct stm32_mdma_chan *chan,
->                 ctcr |= STM32_MDMA_CTCR_DBURST((ilog2(dst_best_burst)));
->
->                 /* Select bus */
-> -               src_addr = chan->dma_config.src_addr;
->                 stm32_mdma_set_bus(dmadev, &ctbr, STM32_MDMA_CTBR_SBUS,
->                                    src_addr);
->
-> +               if (dst_bus_width != src_bus_width)
-> +                       ctcr |= STM32_MDMA_CTCR_PKE;
-> +
->                 /* Set source address */
->                 stm32_mdma_write(dmadev, STM32_MDMA_CSAR(chan->id), src_addr);
->                 break;
-> @@ -719,23 +737,27 @@ static int stm32_mdma_setup_xfer(struct stm32_mdma_chan *chan,
->                         return -EINVAL;
->                 }
->
-> -               ret = stm32_mdma_set_xfer_param(chan, direction, &ccr, &ctcr,
-> -                                               &ctbr, sg_dma_len(sg));
-> -               if (ret < 0)
-> -                       return ret;
-> -
->                 if (direction == DMA_MEM_TO_DEV) {
->                         src_addr = sg_dma_address(sg);
->                         dst_addr = dma_config->dst_addr;
-> +                       ret = stm32_mdma_set_xfer_param(chan, direction, &ccr,
-> +                                                       &ctcr, &ctbr, src_addr,
-> +                                                       sg_dma_len(sg));
->                         stm32_mdma_set_bus(dmadev, &ctbr, STM32_MDMA_CTBR_SBUS,
->                                            src_addr);
->                 } else {
->                         src_addr = dma_config->src_addr;
->                         dst_addr = sg_dma_address(sg);
-> +                       ret = stm32_mdma_set_xfer_param(chan, direction, &ccr,
-> +                                                       &ctcr, &ctbr, dst_addr,
-> +                                                       sg_dma_len(sg));
->                         stm32_mdma_set_bus(dmadev, &ctbr, STM32_MDMA_CTBR_DBUS,
->                                            dst_addr);
->                 }
->
-> +               if (ret < 0)
-> +                       return ret;
-> +
->                 stm32_mdma_setup_hwdesc(chan, desc, direction, i, src_addr,
->                                         dst_addr, sg_dma_len(sg), ctcr, ctbr,
->                                         i == sg_len - 1, i == 0, false);
-> @@ -830,27 +852,29 @@ stm32_mdma_prep_dma_cyclic(struct dma_chan *c, dma_addr_t buf_addr,
->         if (!desc)
->                 return NULL;
->
-> -       ret = stm32_mdma_set_xfer_param(chan, direction, &ccr, &ctcr, &ctbr,
-> -                                       period_len);
-> -       if (ret < 0)
-> -               goto xfer_setup_err;
-> -
-> -       /* Enable interrupts */
-> -       ccr &= ~STM32_MDMA_CCR_IRQ_MASK;
-> -       ccr |= STM32_MDMA_CCR_TEIE | STM32_MDMA_CCR_CTCIE | STM32_MDMA_CCR_BTIE;
-> -       desc->ccr = ccr;
-> -
->         /* Select bus */
->         if (direction == DMA_MEM_TO_DEV) {
->                 src_addr = buf_addr;
-> +               ret = stm32_mdma_set_xfer_param(chan, direction, &ccr, &ctcr,
-> +                                               &ctbr, src_addr, period_len);
->                 stm32_mdma_set_bus(dmadev, &ctbr, STM32_MDMA_CTBR_SBUS,
->                                    src_addr);
->         } else {
->                 dst_addr = buf_addr;
-> +               ret = stm32_mdma_set_xfer_param(chan, direction, &ccr, &ctcr,
-> +                                               &ctbr, dst_addr, period_len);
->                 stm32_mdma_set_bus(dmadev, &ctbr, STM32_MDMA_CTBR_DBUS,
->                                    dst_addr);
->         }
->
-> +       if (ret < 0)
-> +               goto xfer_setup_err;
-> +
-> +       /* Enable interrupts */
-> +       ccr &= ~STM32_MDMA_CCR_IRQ_MASK;
-> +       ccr |= STM32_MDMA_CCR_TEIE | STM32_MDMA_CCR_CTCIE | STM32_MDMA_CCR_BTIE;
-> +       desc->ccr = ccr;
-> +
->         /* Configure hwdesc list */
->         for (i = 0; i < count; i++) {
->                 if (direction == DMA_MEM_TO_DEV) {
-> @@ -956,9 +980,7 @@ stm32_mdma_prep_dma_memcpy(struct dma_chan *c, dma_addr_t dest, dma_addr_t src,
->                 ctcr |= STM32_MDMA_CTCR_TLEN((tlen - 1));
->
->                 /* Set source best burst size */
-> -               max_width = stm32_mdma_get_max_width(len, tlen);
-> -               if (src % max_width)
-> -                       max_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-> +               max_width = stm32_mdma_get_max_width(src, len, tlen);
->                 src_bus_width = stm32_mdma_get_width(chan, max_width);
->
->                 max_burst = tlen / max_width;
-> @@ -971,9 +993,7 @@ stm32_mdma_prep_dma_memcpy(struct dma_chan *c, dma_addr_t dest, dma_addr_t src,
->                         STM32_MDMA_CTCR_SINCOS(src_bus_width);
->
->                 /* Set destination best burst size */
-> -               max_width = stm32_mdma_get_max_width(len, tlen);
-> -               if (dest % max_width)
-> -                       max_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-> +               max_width = stm32_mdma_get_max_width(dest, len, tlen);
->                 dst_bus_width = stm32_mdma_get_width(chan, max_width);
->
->                 max_burst = tlen / max_width;
-> @@ -1014,9 +1034,7 @@ stm32_mdma_prep_dma_memcpy(struct dma_chan *c, dma_addr_t dest, dma_addr_t src,
->                                            STM32_MDMA_MAX_BLOCK_LEN);
->
->                         /* Set source best burst size */
-> -                       max_width = stm32_mdma_get_max_width(len, tlen);
-> -                       if (src % max_width)
-> -                               max_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-> +                       max_width = stm32_mdma_get_max_width(src, len, tlen);
->                         src_bus_width = stm32_mdma_get_width(chan, max_width);
->
->                         max_burst = tlen / max_width;
-> @@ -1030,9 +1048,7 @@ stm32_mdma_prep_dma_memcpy(struct dma_chan *c, dma_addr_t dest, dma_addr_t src,
->                                 STM32_MDMA_CTCR_SINCOS(src_bus_width);
->
->                         /* Set destination best burst size */
-> -                       max_width = stm32_mdma_get_max_width(len, tlen);
-> -                       if (dest % max_width)
-> -                               max_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-> +                       max_width = stm32_mdma_get_max_width(dest, len, tlen);
->                         dst_bus_width = stm32_mdma_get_width(chan, max_width);
->
->                         max_burst = tlen / max_width;
-> --
-> 2.7.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Sounds good.
 
+> > 
+> > 
+> >>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> >>  arch/arm/include/asm/kvm_mmu.h   | 60 ++++++++++++++++++++++++++++------------
+> >>  arch/arm64/include/asm/kvm_mmu.h | 13 +++++++--
+> >>  virt/kvm/arm/mmu.c               | 20 ++++++++++----
+> >>  3 files changed, 67 insertions(+), 26 deletions(-)
+> >>
+> >> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> >> index fa6f2174276b..f553aa62d0c3 100644
+> >> --- a/arch/arm/include/asm/kvm_mmu.h
+> >> +++ b/arch/arm/include/asm/kvm_mmu.h
+> >> @@ -126,21 +126,12 @@ static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
+> >>  	return (vcpu_cp15(vcpu, c1_SCTLR) & 0b101) == 0b101;
+> >>  }
+> >>  
+> >> -static inline void __coherent_cache_guest_page(struct kvm_vcpu *vcpu,
+> >> -					       kvm_pfn_t pfn,
+> >> -					       unsigned long size)
+> >> +static inline void __coherent_dcache_guest_page(struct kvm_vcpu *vcpu,
+> >> +						kvm_pfn_t pfn,
+> >> +						unsigned long size)
+> >>  {
+> >>  	/*
+> >> -	 * If we are going to insert an instruction page and the icache is
+> >> -	 * either VIPT or PIPT, there is a potential problem where the host
+> >> -	 * (or another VM) may have used the same page as this guest, and we
+> >> -	 * read incorrect data from the icache.  If we're using a PIPT cache,
+> >> -	 * we can invalidate just that page, but if we are using a VIPT cache
+> >> -	 * we need to invalidate the entire icache - damn shame - as written
+> >> -	 * in the ARM ARM (DDI 0406C.b - Page B3-1393).
+> >> -	 *
+> >> -	 * VIVT caches are tagged using both the ASID and the VMID and doesn't
+> >> -	 * need any kind of flushing (DDI 0406C.b - Page B3-1392).
+> >> +	 * Clean the dcache to the Point of Coherency.
+> >>  	 *
+> >>  	 * We need to do this through a kernel mapping (using the
+> >>  	 * user-space mapping has proved to be the wrong
+> >> @@ -155,19 +146,52 @@ static inline void __coherent_cache_guest_page(struct kvm_vcpu *vcpu,
+> >>  
+> >>  		kvm_flush_dcache_to_poc(va, PAGE_SIZE);
+> >>  
+> >> -		if (icache_is_pipt())
+> >> -			__cpuc_coherent_user_range((unsigned long)va,
+> >> -						   (unsigned long)va + PAGE_SIZE);
+> >> -
+> >>  		size -= PAGE_SIZE;
+> >>  		pfn++;
+> >>  
+> >>  		kunmap_atomic(va);
+> >>  	}
+> >> +}
+> >>  
+> >> -	if (!icache_is_pipt() && !icache_is_vivt_asid_tagged()) {
+> >> +static inline void __coherent_icache_guest_page(struct kvm_vcpu *vcpu,
+> >> +						kvm_pfn_t pfn,
+> >> +						unsigned long size)
+> >> +{
+> >> +	/*
+> >> +	 * If we are going to insert an instruction page and the icache is
+> >> +	 * either VIPT or PIPT, there is a potential problem where the host
+> >> +	 * (or another VM) may have used the same page as this guest, and we
+> >> +	 * read incorrect data from the icache.  If we're using a PIPT cache,
+> >> +	 * we can invalidate just that page, but if we are using a VIPT cache
+> >> +	 * we need to invalidate the entire icache - damn shame - as written
+> >> +	 * in the ARM ARM (DDI 0406C.b - Page B3-1393).
+> >> +	 *
+> >> +	 * VIVT caches are tagged using both the ASID and the VMID and doesn't
+> >> +	 * need any kind of flushing (DDI 0406C.b - Page B3-1392).
+> >> +	 */
+> >> +
+> >> +	VM_BUG_ON(size & ~PAGE_MASK);
+> >> +
+> >> +	if (icache_is_vivt_asid_tagged())
+> >> +		return;
+> >> +
+> >> +	if (!icache_is_pipt()) {
+> >>  		/* any kind of VIPT cache */
+> >>  		__flush_icache_all();
+> >> +		return;
+> >> +	}
+> >> +
+> >> +	/* PIPT cache. As for the d-side, use a temporary kernel mapping. */
+> >> +	while (size) {
+> >> +		void *va = kmap_atomic_pfn(pfn);
+> >> +
+> >> +		__cpuc_coherent_user_range((unsigned long)va,
+> >> +					   (unsigned long)va + PAGE_SIZE);
+> >> +
+> >> +		size -= PAGE_SIZE;
+> >> +		pfn++;
+> >> +
+> >> +		kunmap_atomic(va);
+> >>  	}
+> >>  }
+> >>  
+> >> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> >> index 672c8684d5c2..4c4cb4f0e34f 100644
+> >> --- a/arch/arm64/include/asm/kvm_mmu.h
+> >> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> >> @@ -230,19 +230,26 @@ static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
+> >>  	return (vcpu_sys_reg(vcpu, SCTLR_EL1) & 0b101) == 0b101;
+> >>  }
+> >>  
+> >> -static inline void __coherent_cache_guest_page(struct kvm_vcpu *vcpu,
+> >> -					       kvm_pfn_t pfn,
+> >> -					       unsigned long size)
+> >> +static inline void __coherent_dcache_guest_page(struct kvm_vcpu *vcpu,
+> >> +						kvm_pfn_t pfn,
+> >> +						unsigned long size)
+> >>  {
+> >>  	void *va = page_address(pfn_to_page(pfn));
+> >>  
+> >>  	kvm_flush_dcache_to_poc(va, size);
+> >> +}
+> >>  
+> >> +static inline void __coherent_icache_guest_page(struct kvm_vcpu *vcpu,
+> >> +						kvm_pfn_t pfn,
+> >> +						unsigned long size)
+> >> +{
+> >>  	if (icache_is_aliasing()) {
+> >>  		/* any kind of VIPT cache */
+> >>  		__flush_icache_all();
+> >>  	} else if (is_kernel_in_hyp_mode() || !icache_is_vpipt()) {
+> >>  		/* PIPT or VPIPT at EL2 (see comment in __kvm_tlb_flush_vmid_ipa) */
+> > 
+> > unrelated: I went and read the comment in __kvm_tlb_flush_vmid_ipa, and
+> > I don't really understand why there is only a need to flush the icache
+> > if the host is running at EL1.
+> > 
+> > The text seems to describe the problem of remapping executable pages
+> > within the guest.  That seems to me would require icache maintenance of
+> > the page that gets overwritten with new code, regardless of whether the
+> > host runs at EL1 or EL2.
+> > 
+> > Of course it's easier done on VHE because we don't have to take a trap,
+> > but the code seems to not invalidate the icache at all for VHE systems
+> > that have VPIPT.  I'm confused.  Can you help?
+> 
+> [+ Will, as he wrote that code and can reply if I say something stupid]
+> 
+> Here's the trick: The VMID-tagged aspect of VPIPT only applies if the
+> CMO is used at EL0 or EL1. When used at EL2, it behaves exactly like a
+> VPIPT operation (see D4.10.2 in the ARMv8 ARM version B_b).
+> 
+> So in the end, we deal with VPIPT the following way:
+> 
+> - Without VHE, we perform the icache invalidation on unmap, blatting the
+> whole icache.
 
+ok, but why can't we do the invalidation by jumping to EL2 like we do
+for some of the other CMOs ?
 
--- 
-Benjamin Gaignard
+> 
+> - With VHE, we do it the usual way (at map time), using the PIPT
+> flavour, as the invalidation is done from EL2
+> 
 
-Graphic Study Group
-
-Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+-Christoffer
