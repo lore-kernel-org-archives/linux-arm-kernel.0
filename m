@@ -1,137 +1,58 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 17 Oct 2017 20:17:58 +0800
-Subject: [PATCH 01/10] drm/sun4i: backend: Support output muxing
+Date: Tue, 17 Oct 2017 20:18:03 +0800
+Subject: [PATCH 06/10] clk: sunxi-ng: sun4i: Export video PLLs
 In-Reply-To: <20171017121807.2994-1-wens@csie.org>
 References: <20171017121807.2994-1-wens@csie.org>
-Message-ID: <20171017121807.2994-2-wens@csie.org>
+Message-ID: <20171017121807.2994-7-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The backend has a mux to select the destination of the data to output
-to. It can select the TCON or the frontends. On the A20, it includes
-an option to output to the second TCON. This is not documented in the
-user manual, but the vendor kernel uses it nevertheless, so the second
-backend outputs to the second TCON.
+From: Jonathan Liu <net147@gmail.com>
 
-Although the muxing can be changed on the fly, DRM needs to be able to
-group a bunch of layers such that they get switched to another crtc
-together. This is because the display backend does the layer compositing,
-while the TCON generates the display timings. This constraint is not
-supported by DRM.
+The video PLLs are used directly by the HDMI controller. Export them so
+that we can use them in our DT node.
 
-Here we simply pair up backends and TCONs with the same ID.
-
+Signed-off-by: Jonathan Liu <net147@gmail.com>
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_backend.c | 52 +++++++++++++++++++++++++++++++++--
- drivers/gpu/drm/sun4i/sun4i_backend.h |  3 +-
- 2 files changed, 51 insertions(+), 4 deletions(-)
+ drivers/clk/sunxi-ng/ccu-sun4i-a10.h      | 4 ++--
+ include/dt-bindings/clock/sun4i-a10-ccu.h | 2 ++
+ 2 files changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index d18d7e88d511..e8477321f978 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -20,6 +20,7 @@
+diff --git a/drivers/clk/sunxi-ng/ccu-sun4i-a10.h b/drivers/clk/sunxi-ng/ccu-sun4i-a10.h
+index c5947c7c050e..23c908ad509f 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun4i-a10.h
++++ b/drivers/clk/sunxi-ng/ccu-sun4i-a10.h
+@@ -29,7 +29,7 @@
+ #define CLK_PLL_AUDIO_4X	6
+ #define CLK_PLL_AUDIO_8X	7
+ #define CLK_PLL_VIDEO0		8
+-#define CLK_PLL_VIDEO0_2X	9
++/* The PLL_VIDEO0_2X clock is exported */
+ #define CLK_PLL_VE		10
+ #define CLK_PLL_DDR_BASE	11
+ #define CLK_PLL_DDR		12
+@@ -38,7 +38,7 @@
+ #define CLK_PLL_PERIPH		15
+ #define CLK_PLL_PERIPH_SATA	16
+ #define CLK_PLL_VIDEO1		17
+-#define CLK_PLL_VIDEO1_2X	18
++/* The PLL_VIDEO1_2X clock is exported */
+ #define CLK_PLL_GPU		19
  
- #include <linux/component.h>
- #include <linux/list.h>
-+#include <linux/of_device.h>
- #include <linux/of_graph.h>
- #include <linux/reset.h>
+ /* The CPU clock is exported */
+diff --git a/include/dt-bindings/clock/sun4i-a10-ccu.h b/include/dt-bindings/clock/sun4i-a10-ccu.h
+index c5a53f38d654..e4fa61be5c75 100644
+--- a/include/dt-bindings/clock/sun4i-a10-ccu.h
++++ b/include/dt-bindings/clock/sun4i-a10-ccu.h
+@@ -43,6 +43,8 @@
+ #define _DT_BINDINGS_CLK_SUN4I_A10_H_
  
-@@ -28,6 +29,11 @@
- #include "sun4i_layer.h"
- #include "sunxi_engine.h"
+ #define CLK_HOSC		1
++#define CLK_PLL_VIDEO0_2X	9
++#define CLK_PLL_VIDEO1_2X	18
+ #define CLK_CPU			20
  
-+struct sun4i_backend_quirks {
-+	/* backend <-> TCON muxing selection done in backend */
-+	bool needs_output_muxing;
-+};
-+
- static const u32 sunxi_rgb2yuv_coef[12] = {
- 	0x00000107, 0x00000204, 0x00000064, 0x00000108,
- 	0x00003f69, 0x00003ed6, 0x000001c1, 0x00000808,
-@@ -345,6 +351,7 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
- 	struct drm_device *drm = data;
- 	struct sun4i_drv *drv = drm->dev_private;
- 	struct sun4i_backend *backend;
-+	const struct sun4i_backend_quirks *quirks;
- 	struct resource *res;
- 	void __iomem *regs;
- 	int i, ret;
-@@ -439,6 +446,27 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
- 		     SUN4I_BACKEND_MODCTL_DEBE_EN |
- 		     SUN4I_BACKEND_MODCTL_START_CTL);
- 
-+	/* Set output selection if needed */
-+	quirks = of_device_get_match_data(dev);
-+	if (quirks->needs_output_muxing) {
-+		/*
-+		 * We assume there is no dynamic muxing of backends
-+		 * and TCONs, so we select the backend with same ID.
-+		 *
-+		 * While dynamic selection might be interesting, since
-+		 * the CRTC is tied to the TCON, while the layers are
-+		 * tied to the backends, this means, we will need to
-+		 * switch between groups of layers. There might not be
-+		 * a way to represent this constraint in DRM.
-+		 */
-+		regmap_update_bits(backend->engine.regs,
-+				   SUN4I_BACKEND_MODCTL_REG,
-+				   SUN4I_BACKEND_MODCTL_OUT_SEL,
-+				   (backend->engine.id
-+				    ? SUN4I_BACKEND_MODCTL_OUT_LCD1
-+				    : SUN4I_BACKEND_MODCTL_OUT_LCD0));
-+	}
-+
- 	return 0;
- 
- err_disable_ram_clk:
-@@ -486,10 +514,28 @@ static int sun4i_backend_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct sun4i_backend_quirks sun5i_backend_quirks = {
-+};
-+
-+static const struct sun4i_backend_quirks sun6i_backend_quirks = {
-+};
-+
-+static const struct sun4i_backend_quirks sun8i_a33_backend_quirks = {
-+};
-+
- static const struct of_device_id sun4i_backend_of_table[] = {
--	{ .compatible = "allwinner,sun5i-a13-display-backend" },
--	{ .compatible = "allwinner,sun6i-a31-display-backend" },
--	{ .compatible = "allwinner,sun8i-a33-display-backend" },
-+	{
-+		.compatible = "allwinner,sun5i-a13-display-backend",
-+		.data = &sun5i_backend_quirks,
-+	},
-+	{
-+		.compatible = "allwinner,sun6i-a31-display-backend",
-+		.data = &sun6i_backend_quirks,
-+	},
-+	{
-+		.compatible = "allwinner,sun8i-a33-display-backend",
-+		.data = &sun8i_a33_backend_quirks,
-+	},
- 	{ }
- };
- MODULE_DEVICE_TABLE(of, sun4i_backend_of_table);
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.h b/drivers/gpu/drm/sun4i/sun4i_backend.h
-index 21945af67a9d..ac3cc029f5cd 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.h
-@@ -25,7 +25,8 @@
- #define SUN4I_BACKEND_MODCTL_LINE_SEL			BIT(29)
- #define SUN4I_BACKEND_MODCTL_ITLMOD_EN			BIT(28)
- #define SUN4I_BACKEND_MODCTL_OUT_SEL			GENMASK(22, 20)
--#define SUN4I_BACKEND_MODCTL_OUT_LCD				(0 << 20)
-+#define SUN4I_BACKEND_MODCTL_OUT_LCD0				(0 << 20)
-+#define SUN4I_BACKEND_MODCTL_OUT_LCD1				(1 << 20)
- #define SUN4I_BACKEND_MODCTL_OUT_FE0				(6 << 20)
- #define SUN4I_BACKEND_MODCTL_OUT_FE1				(7 << 20)
- #define SUN4I_BACKEND_MODCTL_HWC_EN			BIT(16)
+ /* AHB Gates */
 -- 
 2.14.2
