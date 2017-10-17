@@ -1,65 +1,24 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 17 Oct 2017 15:36:31 -0500
-Subject: [PATCH v2 3/4] dt-bindings: hwmon: Add
- ti-max-expected-current-microamp property to ina2xx
-In-Reply-To: <1507811765-31005-4-git-send-email-m.purski@samsung.com>
-References: <1507811765-31005-1-git-send-email-m.purski@samsung.com>
- <CGME20171012123635eucas1p1ff9a982db9d541cd0475d44d114ff92a@eucas1p1.samsung.com>
- <1507811765-31005-4-git-send-email-m.purski@samsung.com>
-Message-ID: <20171017203631.xaut7o3szaiucnqh@rob-hp-laptop>
+Date: Tue, 17 Oct 2017 15:50:00 -0500
+Subject: [PATCH] firmware: meson-sm: use generic compatible
+In-Reply-To: <20171012134743.10625-1-jbrunet@baylibre.com>
+References: <20171012134743.10625-1-jbrunet@baylibre.com>
+Message-ID: <20171017204959.kfbhn2yxhv2sb5qg@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 12, 2017 at 02:36:04PM +0200, Maciej Purski wrote:
-> Add optional max expected current property which allows calibrating
-> the ina sensor in order to achieve requested measure scale. Document
-> the changes in Documentation/hwmon/ina2xx.
+On Thu, Oct 12, 2017 at 03:47:43PM +0200, Jerome Brunet wrote:
+> The meson secure monitor seems to be compatible with more SoCs than
+> initially thought. Let's use the most generic compatible he have in
+> DT instead of the gxbb specific one
 > 
-> Signed-off-by: Maciej Purski <m.purski@samsung.com>
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 > ---
->  Documentation/devicetree/bindings/hwmon/ina2xx.txt | 4 +++-
->  Documentation/hwmon/ina2xx                         | 3 +++
->  2 files changed, 6 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/hwmon/ina2xx.txt b/Documentation/devicetree/bindings/hwmon/ina2xx.txt
-> index 02af0d9..49ef0be 100644
-> --- a/Documentation/devicetree/bindings/hwmon/ina2xx.txt
-> +++ b/Documentation/devicetree/bindings/hwmon/ina2xx.txt
-> @@ -14,11 +14,13 @@ Optional properties:
->  
->  - shunt-resistor
->  	Shunt resistor value in micro-Ohm
-> -
-> +- ti-max-expected-current-microamp
-> +	Max expected current value in mA
+>  Documentation/devicetree/bindings/firmware/meson/meson_sm.txt | 4 ++--
+>  drivers/firmware/meson/meson_sm.c                             | 4 ++--
+>  2 files changed, 4 insertions(+), 4 deletions(-)
 
-ti,max-...
+Seems like a pointless, not backwards compatible change to me. In the 
+end, it's just a string to match on. Who cares what the string is.
 
-The property name is a bit long. Does "expected" add anything? Is there 
-a max unexpected current?
-
->  Example:
->  
->  ina220 at 44 {
->  	compatible = "ti,ina220";
->  	reg = <0x44>;
->  	shunt-resistor = <1000>;
-> +	ti-max-expected-current-microamp = <3000>;
->  };
-> diff --git a/Documentation/hwmon/ina2xx b/Documentation/hwmon/ina2xx
-> index cfd31d9..30620e8 100644
-> --- a/Documentation/hwmon/ina2xx
-> +++ b/Documentation/hwmon/ina2xx
-> @@ -55,6 +55,9 @@ The shunt value in micro-ohms can be set via platform data or device tree at
->  compile-time or via the shunt_resistor attribute in sysfs at run-time. Please
->  refer to the Documentation/devicetree/bindings/i2c/ina2xx.txt for bindings
->  if the device tree is used.
-> +The max expected current value in miliamp can be set via platform data
-> +or device tree at compile-time or via currX_max attribute in sysfs
-> +at run-time.
->  
->  Additionally ina226 supports update_interval attribute as described in
->  Documentation/hwmon/sysfs-interface. Internally the interval is the sum of
-> -- 
-> 2.7.4
-> 
+Rob
