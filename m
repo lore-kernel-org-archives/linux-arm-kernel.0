@@ -1,47 +1,61 @@
-From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
-Date: Tue, 17 Oct 2017 10:10:37 +0900
-Subject: [PATCH v2 1/3] dt-bindings: nvmem: add description for UniPhier
- eFuse
-In-Reply-To: <370eba21-1da8-9994-65c1-b51f564343fb@linaro.org>
-References: <1507266180-11840-1-git-send-email-hayashibara.keiji@socionext.com>
- <1507266180-11840-2-git-send-email-hayashibara.keiji@socionext.com>
- <20171013134902.7gvmkvxvwnjlmstp@rob-hp-laptop>
- <CAK7LNARg6G152joHq06RkPab=NoWEkFArvF+Ccc1behdXFokmg@mail.gmail.com>
- <CAL_JsqJdbLFHqEU8+1e_hvA3Hd1MLJHETWAkd2pcsXpDKwONog@mail.gmail.com>
- <CAK7LNASpHvnicebVLbOgTDCmPp7UDVkf4FYWGsjAiB8ENo_2iw@mail.gmail.com>
- <370eba21-1da8-9994-65c1-b51f564343fb@linaro.org>
-Message-ID: <000001d346e4$be23ee70$3a6bcb50$@socionext.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Tue, 17 Oct 2017 09:36:07 +0800
+Subject: [PATCH 0/9] Enable dw-mmc multi-card support
+In-Reply-To: <cover.1507315433.git.lsun@mellanox.com>
+References: <cover.1507315433.git.lsun@mellanox.com>
+Message-ID: <8e433531-8f67-d575-635e-c6ced29f6804@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Srinivas,
 
-OK. I will send fixed patch as soon as possible.
-
-Thank you.
-
-Best Regards,
-Keiji Hayashibara
-
-
-> -----Original Message-----
-> From: Srinivas Kandagatla [mailto:srinivas.kandagatla at linaro.org]
-> Sent: Monday, October 16, 2017 6:12 PM
+On 2017/10/7 3:21, Liming Sun wrote:
+> This series of commits enables the multi-card support for the dw-mmc
+> controller. It includes two parts as below.
 > 
-> On 15/10/17 09:04, Masahiro Yamada wrote:
-> > OK.
-> >
-> > usb_mon: usb_mon {
-> >
-> > should be fixed.
-> >
-> > Srinivas forwarded this to Greg,
-> > but I guess Greg has not applied this yet.
-> >
-> > The author can do re-spin,
-> > or a follow-up patch will do if it is too late.
+> The first part (patches 1-7) reverts the series of recent commits that
+> removed the multi-card support with comments saying there was no such
+> use case in the real world. Actually this feature is being used in
+> Mellanox Bluefield SoC and has been requested by customers.
+
+Hrm.... it's so unlucky that your patchset comes a little late. As
+your patch 8 and 9 said, you need them to fix problem for multi-card
+support, so definitely there was no such use case, and even the code
+was buggy to support it right? That makes the code hard to read and
+maintain, so we decide to remove it.
+
 > 
-> Please send a patch to fix!
+> The second part (patches 8-9) fixes the DesignWare multi-card support
+> according to the dw-mmc databook (synnopsys: DesignWare Cores Mobile
+> Storage Host Databook, 2.70a). It has changes to set the card number
+> into the CMD register to multiplex requests to different cards when
+> working in SD_MMC_CEATA mode, set the CTYPE / CLKENA / CDTHRCTL
+> registers properly according to the spec, and parse the per-card
+> configuration to match the Linux Documentation
+> (bindings/mmc/synopsys-dw-mshc.txt).
+
+Havn'e check the databook for details yet, but I think it's ok
+to re-introduce multi-slot support if a real user benefits from
+it. But you need a new patch to silent the log "num-slots property not
+found, assuming 1 slot is available" as we removed all the num-slots
+from DT at that time.
+
+
 > 
-> Thanks,
-> srini
+> Liming Sun (9):
+>    Revert "Documentation: dw-mshc: deprecate num-slots"
+>    Revert "mmc: dw_mmc: remove the unnecessary slot variable"
+>    Revert "mmc: dw_mmc: use the 'slot' instead of 'cur_slot'"
+>    Revert "mmc: dw_mmc: remove the 'id' arguments about functions
+>      relevant to slot"
+>    Revert "mmc: dw_mmc: change the array of slots"
+>    Revert "mmc: dw_mmc: remove the loop about finding slots"
+>    Revert "mmc: dw_mmc: deprecated the "num-slots" property"
+>    mmc: dw_mmc: Support two SD_MMC_CE-ATA cards
+>    mmc: dw_mmc: Parse slot-specific configuration
+> 
+>   .../devicetree/bindings/mmc/synopsys-dw-mshc.txt   |  16 +-
+>   drivers/mmc/host/dw_mmc-exynos.c                   |   4 +-
+>   drivers/mmc/host/dw_mmc.c                          | 277 ++++++++++++++++-----
+>   drivers/mmc/host/dw_mmc.h                          |  17 +-
+>   4 files changed, 236 insertions(+), 78 deletions(-)
+> 
