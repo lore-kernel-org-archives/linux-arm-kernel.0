@@ -1,21 +1,38 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Tue, 17 Oct 2017 10:14:22 +0200
-Subject: [PATCH 5/9] PCI: host: brcmstb: add dma-ranges for inbound traffic
-In-Reply-To: <589c04cb-061b-a453-3188-79324a02388e@arm.com>
-References: <1507761269-7017-1-git-send-email-jim2101024@gmail.com>
- <1507761269-7017-6-git-send-email-jim2101024@gmail.com>
- <589c04cb-061b-a453-3188-79324a02388e@arm.com>
-Message-ID: <20171017081422.GA19475@lst.de>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 17 Oct 2017 10:16:05 +0200
+Subject: [PATCH v2 0/2] soc: amlogic: add support for Meson GX VPU Domains
+Message-ID: <1508228167-11753-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just took a quick look over this and I basically agree with the comments
-from Robin.
+On the Amlogic Gx SoCs (GXBB, GXL & GXM), the VPU power domain is initialized
+by the vendor U-Boot code, but running mainline U-boot has been possible
+on these SoCs. But lacking such init made the system lock at kernel boot.
 
-What I don't understand is why you're even trying to do all these
-hacky things.
+This patchset adds the Video Processing Unit power domain driver to enable
+the same power-on and power-down sequences and was designed to allow booting
+with the power domain already initialized or not.
 
-It seems like the controller should simply set dma_pfn_offset for
-each device hanging off it, and all the supported architectures
-should be updated to obey that if they don't do so yet, and
-you're done without needing this giant mess.
+This driver has been tested on :
+- Odroid-C2 (GXBB) with Vendor and Mainline U-Boot
+- P212 (GXL) with Vendor and Mainline U-Boot
+- Khadas Vim (GXL) with Vendor U-Boot
+- Khadas Vim2 with (GXM) Vendor U-Boot
+
+Changes since v1:
+- fixed bindings compatible string
+
+Neil Armstrong (2):
+  soc: amlogic: add Meson GX VPU Domains driver
+  dt-bindings: power: add amlogic meson power domain bindings
+
+ .../bindings/power/amlogic,meson-gx-pwrc.txt       |  61 ++++++
+ drivers/soc/amlogic/Kconfig                        |  10 +
+ drivers/soc/amlogic/Makefile                       |   1 +
+ drivers/soc/amlogic/meson-gx-pwrc-vpu.c            | 234 +++++++++++++++++++++
+ 4 files changed, 306 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/power/amlogic,meson-gx-pwrc.txt
+ create mode 100644 drivers/soc/amlogic/meson-gx-pwrc-vpu.c
+
+-- 
+2.7.4
