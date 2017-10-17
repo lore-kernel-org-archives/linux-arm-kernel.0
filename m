@@ -1,133 +1,75 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 17 Oct 2017 10:26:31 +0100
-Subject: [PATCH 03/10] arm: KVM: Add optimized PIPT icache flushing
-In-Reply-To: <20171016200752.GF1845@lvm>
-References: <20171009152032.27804-1-marc.zyngier@arm.com>
- <20171009152032.27804-4-marc.zyngier@arm.com> <20171016200752.GF1845@lvm>
-Message-ID: <968be34c-fc4c-1a17-d7cf-0e4cc17ef300@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 17 Oct 2017 10:23:00 +0100
+Subject: A issue about ptrace/SINGLESTEP on arm64
+In-Reply-To: <d8b5e71d-f8db-bee0-dadf-c57724a68daa@huawei.com>
+References: <8ad32f6b-e04d-98f8-d944-7ec3582fbdf4@huawei.com>
+ <20171016153055.GD10500@arm.com>
+ <d8b5e71d-f8db-bee0-dadf-c57724a68daa@huawei.com>
+Message-ID: <20171017092259.GA21398@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/10/17 21:07, Christoffer Dall wrote:
-> On Mon, Oct 09, 2017 at 04:20:25PM +0100, Marc Zyngier wrote:
->> Calling __cpuc_coherent_user_range to invalidate the icache on
->> a PIPT icache machine has some pointless overhead, as it starts
->> by cleaning the dcache to the PoU, while we're guaranteed to
->> have already cleaned it to the PoC.
->>
->> As KVM is the only user of such a feature, let's implement some
->> ad-hoc cache flushing in kvm_mmu.h. Should it become useful to
->> other subsystems, it can be moved to a more global location.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm/include/asm/kvm_hyp.h |  2 ++
->>  arch/arm/include/asm/kvm_mmu.h | 24 ++++++++++++++++++++++--
->>  2 files changed, 24 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
->> index 14b5903f0224..ad541f9ecc78 100644
->> --- a/arch/arm/include/asm/kvm_hyp.h
->> +++ b/arch/arm/include/asm/kvm_hyp.h
->> @@ -69,6 +69,8 @@
->>  #define HIFAR		__ACCESS_CP15(c6, 4, c0, 2)
->>  #define HPFAR		__ACCESS_CP15(c6, 4, c0, 4)
->>  #define ICIALLUIS	__ACCESS_CP15(c7, 0, c1, 0)
->> +#define BPIALLIS	__ACCESS_CP15(c7, 0, c1, 6)
->> +#define ICIMVAU		__ACCESS_CP15(c7, 0, c5, 1)
->>  #define ATS1CPR		__ACCESS_CP15(c7, 0, c8, 0)
->>  #define TLBIALLIS	__ACCESS_CP15(c8, 0, c3, 0)
->>  #define TLBIALL		__ACCESS_CP15(c8, 0, c7, 0)
->> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
->> index f553aa62d0c3..6773dcf21bff 100644
->> --- a/arch/arm/include/asm/kvm_mmu.h
->> +++ b/arch/arm/include/asm/kvm_mmu.h
->> @@ -37,6 +37,8 @@
->>  
->>  #include <linux/highmem.h>
->>  #include <asm/cacheflush.h>
->> +#include <asm/cputype.h>
->> +#include <asm/kvm_hyp.h>
->>  #include <asm/pgalloc.h>
->>  #include <asm/stage2_pgtable.h>
->>  
->> @@ -157,6 +159,8 @@ static inline void __coherent_icache_guest_page(struct kvm_vcpu *vcpu,
->>  						kvm_pfn_t pfn,
->>  						unsigned long size)
->>  {
->> +	u32 iclsz;
->> +
->>  	/*
->>  	 * If we are going to insert an instruction page and the icache is
->>  	 * either VIPT or PIPT, there is a potential problem where the host
->> @@ -182,17 +186,33 @@ static inline void __coherent_icache_guest_page(struct kvm_vcpu *vcpu,
->>  	}
->>  
->>  	/* PIPT cache. As for the d-side, use a temporary kernel mapping. */
->> +	iclsz = 4 << (read_cpuid(CPUID_CACHETYPE) & 0xf);
->> +
+On Tue, Oct 17, 2017 at 10:04:00AM +0800, chengjian (D) wrote:
+> On 2017/10/16 23:30, Will Deacon wrote:
+> >Can you jump the PC once the child appears to be "stuck"?
+> >
+> >IIRC, GDB has special heuristics to step through LDXR/STXR critical
+> >sections.
+> The function can be returned, But the number of instructions looks too much
+> We use objdump to count the assembly code length of the program
 > 
-> nit: the 4 here is a bit cryptic, could we say something like (perhaps
-> slightly over-explained):
-> /*
->  * CTR IminLine contains Log2 of the number of words in the cache line,
->  * so we can get the number of words as 2 << (IminLine - 1).  To get the
->  * number of bytes, we multiply by 4 (the number of bytes in a 32-bit
->  * word), and get 4 << (IminLine).
->  */
-
-Absolutely. I'll fold that in. Thanks.
-
->>  	while (size) {
->>  		void *va = kmap_atomic_pfn(pfn);
->> +		void *end = va + PAGE_SIZE;
->> +		void *addr = va;
->> +
->> +		do {
->> +			write_sysreg(addr, ICIMVAU);
+> #=======
+> #trace
+> #=======
+> ptrace/2-arm64-loop # objdump -d ./nop | wc -l
+>     115885
 > 
-> Maybe an oddball place to ask this, but I don't recall why we need PoU
-> everywhere, would PoC potentially be enough?
-
-PoC is in general stronger than PoU. All we care is for instructions to
-be fetched from the point where the icache cannot be distinguished from
-the dcache - the definition of the PoU. Also, I don't think there is a
-way to invalidate the icache to the PoC.
-
 > 
->> +			addr += iclsz;
->> +		} while (addr < end);
->>  
->> -		__cpuc_coherent_user_range((unsigned long)va,
->> -					   (unsigned long)va + PAGE_SIZE);
->> +		dsb(ishst);
->> +		isb();
+> ptrace/2-arm64-loop # ./ptrace_singlestep ./nop
 > 
-> Do we really need this in every iteration of the loop?
-
-The problem is that we need to factor in the interaction with the unmap
-below. If we don't enforce the invalidation now, we may unmap the page
-before the invalidations are finished, with could lead to a page fault.
-If we didn't have to deal with highmem, that would indeed be a good
-optimization.
-
+>     ./nop : nop
+>     Please wait
+>     Number of machine instructions : 186688022
 > 
->>  
->>  		size -= PAGE_SIZE;
->>  		pfn++;
->>  
->>  		kunmap_atomic(va);
->>  	}
->> +
->> +	/* Check if we need to invalidate the BTB */
->> +	if ((read_cpuid_ext(CPUID_EXT_MMFR1) >> 24) != 4) {
 > 
-> Either I'm having a bad day or you meant to shift this 28, not 24?
+> /ptrace/2-arm64-loop # ./ptrace_singlestep ./nop
+> 
+>     ./nop : nop
+>     Please wait
+>     Number of machine instructions : 103670668
+> 
+> 
+> The number of instructions executed twice is not the same
 
-Oops... That's indeed totally broken. Thanks for noticing it!
+What is "nop"? What does perf stat say? Does is "ptrace_singlestep"
+reporting the number of instructions? Is it a periodic dump, or does it
+actually wait for program termination?
 
-Thanks,
+> #=======
+> #trace ls
+> #=======
+> 
+> ptrace/2-arm64-loop # objdump -d /bin/ls | wc -l
+>     18095
+> 
+> ptrace/2-arm64-loop # ./ptrace_singlestep /bin/ls
+>     /bin/ls : ls
+>     Please wait
+>     Number of machine instructions : 7718122167
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+I don't really know where to start here. The dynamic execution of a binary
+includes branches, loops, libraries etc so of course the dynamic instruction
+count is different to the static count of the binary.
+
+> It seems that the child has also been tracked by the parent process
+> when it goes into the kernel space.
+
+Ptrace single-step shouldn't step into the kernel.
+
+> Is this what your 'stuck' mean?
+> Does all the instructions been tracked in kernel space, or only the
+> LDXR/STXR?
+
+Sorry, I don't understand what you're asking here.
+
+Will
