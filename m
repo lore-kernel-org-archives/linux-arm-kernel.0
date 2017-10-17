@@ -1,15 +1,15 @@
 From: jingoohan1@gmail.com (Jingoo Han)
-Date: Tue, 17 Oct 2017 19:42:38 -0400
-Subject: [RFC PATCH v3 3/5] drm/bridge/analogix: Do not use device's
+Date: Tue, 17 Oct 2017 19:43:56 -0400
+Subject: [RFC PATCH v4 6/8] drm/bridge/analogix: Do not use device's
  drvdata
-In-Reply-To: <20171017080925.23763-4-jeffy.chen@rock-chips.com>
-References: <20171017080925.23763-1-jeffy.chen@rock-chips.com>
- <20171017080925.23763-4-jeffy.chen@rock-chips.com>
-Message-ID: <000001d347a1$9f11ffa0$dd35fee0$@gmail.com>
+In-Reply-To: <20171017101624.12506-7-jeffy.chen@rock-chips.com>
+References: <20171017101624.12506-1-jeffy.chen@rock-chips.com>
+ <20171017101624.12506-7-jeffy.chen@rock-chips.com>
+Message-ID: <000101d347a1$cd216160$67642420$@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, October 17, 2017 4:09 AM, Jeffy Chen wrote:
+On Tuesday, October 17, 2017 6:16 AM, Jeffy Chen wrote:
 > 
 > From: Tomasz Figa <tfiga@chromium.org>
 > 
@@ -34,6 +34,7 @@ Jingoo Han
 
 > ---
 > 
+> Changes in v4: None
 > Changes in v3: None
 > Changes in v2: None
 > 
