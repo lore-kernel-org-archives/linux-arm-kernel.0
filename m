@@ -1,48 +1,98 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 17 Oct 2017 15:06:29 +0100
-Subject: [PATCH v9 00/20] simplify crypto wait for async op
-In-Reply-To: <1508059209-25529-1-git-send-email-gilad@benyossef.com>
-References: <1508059209-25529-1-git-send-email-gilad@benyossef.com>
-Message-ID: <20171017140629.GO20805@n2100.armlinux.org.uk>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 17 Oct 2017 15:13:36 +0100
+Subject: [PATCH v3 0/8] ARM: NOMMU: MPU updates
+In-Reply-To: <CA+M3ks7bge8k-5p8cMVHuYX6VLbPPrs9-onj4SoL_tNvcsySGw@mail.gmail.com>
+References: <1506330344-31556-1-git-send-email-vladimir.murzin@arm.com>
+ <CA+M3ks7bge8k-5p8cMVHuYX6VLbPPrs9-onj4SoL_tNvcsySGw@mail.gmail.com>
+Message-ID: <79c7c3f6-9a55-9044-6a6f-df8f64c10241@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 15, 2017 at 10:19:45AM +0100, Gilad Ben-Yossef wrote:
-> Many users of kernel async. crypto services have a pattern of
-> starting an async. crypto op and than using a completion
-> to wait for it to end.
+On 17/10/17 15:05, Benjamin Gaignard wrote:
+> 2017-09-25 11:05 GMT+02:00 Vladimir Murzin <vladimir.murzin@arm.com>:
+>> Hi,
+>>
+>> This is an update of the existent MPU code which consist set of
+>> clean-ups and enhancements. The most significant changes are in the
+>> way how MPU settings sync-up for secondaries (PATCH 3/8), more
+>> flexible layout for memory (PATCH 7/8) and support for XIP (PATCH
+>> 8/8). Since there is no in-tree user of MPU, support for M-class has
+>> been added (PATCH 6/8).
+>>
+>> There is also practical benefit of patch set:
+>>
+>> "These MPU patches introduce a nice feature that it simplifies the
+>> bootloader: do not need to setup the MPU, for example for coherent DMA
+>> region, which is described in device-tree too." Andr?s Szemz?
+>>
+>> Changelog:
+>>            v2 -> v3
+>>               - fixed support for XIP (PATCH 8/8)
+>>               - rebased on 4.14-rc2
+>>
+>>            v1 -> v2
+>>               - support for XIP (PATCH 8/8)
+>>               - rebased on 4.13-rc1
+>>
+>>         RFC v2 -> v1
+>>                - dropped RFC tag
+>>                - Tested-by from Andr?s
+>>                - rebased on 4.12-rc5
+>>
+>>            RFC -> RFC v2
+>>                - fixed MPU enable for v7m (PATCH 6/7)
+>>
+>> Thanks!
 > 
-> This patch set simplifies this common use case in two ways:
+> for the whole serie on stm32f4 and stm32f7:
 > 
-> First, by separating the return codes of the case where a
-> request is queued to a backlog due to the provider being
-> busy (-EBUSY) from the case the request has failed due
-> to the provider being busy and backlogging is not enabled
-> (-EAGAIN).
-> 
-> Next, this change is than built on to create a generic API
-> to wait for a async. crypto operation to complete.
-> 
-> The end result is a smaller code base and an API that is
-> easier to use and more difficult to get wrong.
-> 
-> The patch set was boot tested on x86_64 and arm64 which
-> at the very least tests the crypto users via testmgr and
-> tcrypt but I do note that I do not have access to some
-> of the HW whose drivers are modified nor do I claim I was
-> able to test all of the corner cases.
-> 
-> The patch set is based upon linux-next release tagged
-> next-20171013.
+> Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
 
-Has there been any performance impact analysis of these changes?  I
-ended up with patches for one of the crypto drivers which converted
-its interrupt handling to threaded interrupts being reverted because
-it caused a performance degredation.
+Thanks for giving it a try!
 
-Moving code to latest APIs to simplify it is not always beneficial.
+The series is already in Russell's patch system, so I dunno
+how to add your Tested-by, maybe Russell can made an update
+when he pull patches in his tree...
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Cheers
+Vladimir
+
+> 
+>>
+>> Vladimir Murzin (8):
+>>   ARM: NOMMU: Move out MPU setup in separate module
+>>   ARM: NOMMU: Update MPU accessors to use cp15 helpers
+>>   ARM: NOMMU: Rework MPU to be mostly done in C
+>>   ARM: NOMMU: Disallow MPU for XIP
+>>   ARM: Kconfig: Kill CONFIG_VECTORS_BASE
+>>   ARM: V7M: Add support for MPU to M-class
+>>   ARM: NOMMU: Use more MPU regions to cover memory
+>>   ARM: NOMMU: Support MPU in XIP configuration
+>>
+>>  arch/arm/Kconfig                  |   9 -
+>>  arch/arm/Kconfig-nommu            |   4 +-
+>>  arch/arm/include/asm/cputype.h    |  10 +
+>>  arch/arm/include/asm/mpu.h        |  26 +-
+>>  arch/arm/include/asm/smp.h        |   2 +-
+>>  arch/arm/include/asm/v7m.h        |  10 +
+>>  arch/arm/kernel/asm-offsets.c     |  11 +
+>>  arch/arm/kernel/head-nommu.S      | 148 +++++++++---
+>>  arch/arm/kernel/smp.c             |   2 +-
+>>  arch/arm/kernel/vmlinux-xip.lds.S |  23 ++
+>>  arch/arm/mm/Makefile              |   1 +
+>>  arch/arm/mm/nommu.c               | 254 +-------------------
+>>  arch/arm/mm/pmsa-v7.c             | 484 ++++++++++++++++++++++++++++++++++++++
+>>  13 files changed, 682 insertions(+), 302 deletions(-)
+>>  create mode 100644 arch/arm/mm/pmsa-v7.c
+>>
+>> --
+>> 1.9.1
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> 
+> 
