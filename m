@@ -1,200 +1,67 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 17 Oct 2017 17:55:56 +0100
-Subject: [PATCH v5 3/3] drivers/irqchip: gicv3: add workaround for Synquacer
- pre-ITS
-In-Reply-To: <20171017165556.30250-1-ard.biesheuvel@linaro.org>
-References: <20171017165556.30250-1-ard.biesheuvel@linaro.org>
-Message-ID: <20171017165556.30250-4-ard.biesheuvel@linaro.org>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 17 Oct 2017 12:05:29 -0500
+Subject: [PATCH v4 pci 0/2] PCI/MSI: pci-xgene-msi: Enable MSI support in
+ ACPI boot for X-Gene v1
+In-Reply-To: <1506448161-30961-1-git-send-email-kdinh@apm.com>
+References: <1506448161-30961-1-git-send-email-kdinh@apm.com>
+Message-ID: <20171017170529.GC5641@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Socionext Synquacer SoC's implementation of GICv3 has a so-called
-'pre-ITS', which maps 32-bit writes targeted at a separate window of
-size '4 << device_id_bits' onto writes to GITS_TRANSLATER with device
-ID taken from bits [device_id_bits + 1:2] of the window offset.
-Writes that target GITS_TRANSLATER directly are reported as originating
-from device ID #0.
+On Tue, Sep 26, 2017 at 11:49:19AM -0600, Khuong Dinh wrote:
+> This patch set enables ACPI MSI support for X-Gene PCIe v1 hardware
+> and provides the proper MSI driver initialization ordering.
+> 
+> Signed-off-by: Khuong Dinh <kdinh@apm.com>
+> ---
+> v4:
+>  - Remove Marc Zyngier ACK in v2
+>  - Use acpi_bus_scan on MSI controller handle when MSI device is found
+>  - Register ACPI MSI driver when MSI device is found instead of using
+>  subsys_initcall
+>  - Split ACPI MSI driver support into two patches - one to enable MSI
+> support for X-Gene PCIe v1 hardware, one to enforce MSI driver loaded
+> before PCIe controller driver in ACPI boot mode
+> v3:
+>  - Input X-Gene MSI base address for irq_domain_alloc_fwnode
+>  - Add a hook to enforce X-Gene MSI be probed prior acpi_bus_scan happens
+> v2:
+>  - Verify with BIOS version 3.06.25 and 3.07.09
+> v1:
+>  - Initial version
+> ---
+> 
+> Khuong Dinh (2):
+>   PCI/MSI: pci-xgene-msi: Enable MSI support in ACPI boot for X-Gene v1
+>   PCI/MSI: Enforce MSI driver loaded before PCIe in ACPI boot
+> 
+>  drivers/acpi/Makefile            |    2 +-
+>  drivers/acpi/acpi_msi.c          |   86 ++++++++++++++++++++++++++++++++++++++
+>  drivers/acpi/acpi_platform.c     |    3 +-
+>  drivers/acpi/internal.h          |    1 +
+>  drivers/acpi/scan.c              |    1 +
+>  drivers/pci/host/pci-xgene-msi.c |   60 ++++++++++++++++++++++++--
+>  include/linux/acpi_msi.h         |   37 ++++++++++++++++
+>  7 files changed, 183 insertions(+), 7 deletions(-)
+>  create mode 100644 drivers/acpi/acpi_msi.c
+>  create mode 100644 include/linux/acpi_msi.h
 
-So add a workaround for this. Given that this breaks isolation, clear
-the IRQ_DOMAIN_FLAG_MSI_REMAP flag as well.
+The changelogs don't really give the nitty-gritty details of the
+problem, e.g., apparently the host bridge and the MSI controller are
+enumerated as two separate devices and there's an ordering issue with
+binding drivers to them.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt |  4 ++
- arch/arm64/Kconfig                                                    |  8 +++
- drivers/irqchip/irq-gic-v3-its.c                                      | 72 +++++++++++++++++++-
- 3 files changed, 82 insertions(+), 2 deletions(-)
+They should also contrast the X-Gene situation with other systems so we
+can see why X-Gene has this problem when other systems don't.
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt b/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
-index 4c29cdab0ea5..c3e6092f3add 100644
---- a/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
-+++ b/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
-@@ -75,6 +75,10 @@ These nodes must have the following properties:
- - reg: Specifies the base physical address and size of the ITS
-   registers.
- 
-+Optional:
-+- socionext,synquacer-pre-its: (u32, u32) tuple describing the untranslated
-+  address and size of the pre-ITS window.
-+
- The main GIC node must contain the appropriate #address-cells,
- #size-cells and ranges properties for the reg property of all ITS
- nodes.
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 0df64a6a56d4..c4361dff2b74 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -539,6 +539,14 @@ config QCOM_QDF2400_ERRATUM_0065
- 
- 	  If unsure, say Y.
- 
-+config SOCIONEXT_SYNQUACER_PREITS
-+	bool "Socionext Synquacer: Workaround for GICv3 pre-ITS"
-+	default y
-+	help
-+	  Socionext Synquacer SoCs implement a separate h/w block to generate
-+	  MSI doorbell writes with non-zero values for the device ID.
-+
-+	  If unsure, say Y.
- endmenu
- 
- 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index c34f21c7a38e..1172b8583db4 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -83,6 +83,8 @@ struct its_baser {
- 	u32		psz;
- };
- 
-+struct its_device;
-+
- /*
-  * The ITS structure - contains most of the infrastructure, with the
-  * top-level MSI domain, the command queue, the collections, and the
-@@ -97,11 +99,15 @@ struct its_node {
- 	struct its_cmd_block	*cmd_write;
- 	struct its_baser	tables[GITS_BASER_NR_REGS];
- 	struct its_collection	*collections;
-+	struct fwnode_handle	*fwnode_handle;
-+	u64			(*get_msi_base)(struct its_device *its_dev);
- 	struct list_head	its_device_list;
- 	u64			flags;
- 	u32			ite_size;
- 	u32			device_ids;
- 	int			numa_node;
-+	unsigned int		msi_domain_flags;
-+	u32			pre_its_base; /* for Socionext Synquacer */
- 	bool			is_v4;
- };
- 
-@@ -1095,6 +1101,13 @@ static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
- 	return IRQ_SET_MASK_OK_DONE;
- }
- 
-+static u64 its_irq_get_msi_base(struct its_device *its_dev)
-+{
-+	struct its_node *its = its_dev->its;
-+
-+	return its->phys_base + GITS_TRANSLATER;
-+}
-+
- static void its_irq_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
- {
- 	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
-@@ -1102,7 +1115,7 @@ static void its_irq_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
- 	u64 addr;
- 
- 	its = its_dev->its;
--	addr = its->phys_base + GITS_TRANSLATER;
-+	addr = its->get_msi_base(its_dev);
- 
- 	msg->address_lo		= lower_32_bits(addr);
- 	msg->address_hi		= upper_32_bits(addr);
-@@ -2758,6 +2771,45 @@ static bool __maybe_unused its_enable_quirk_qdf2400_e0065(void *data)
- 	return true;
- }
- 
-+static u64 its_irq_get_msi_base_pre_its(struct its_device *its_dev)
-+{
-+	struct its_node *its = its_dev->its;
-+
-+	/*
-+	 * The Socionext Synquacer SoC has a so-called 'pre-ITS',
-+	 * which maps 32-bit writes targeted at a separate window of
-+	 * size '4 << device_id_bits' onto writes to GITS_TRANSLATER
-+	 * with device ID taken from bits [device_id_bits + 1:2] of
-+	 * the window offset.
-+	 */
-+	return its->pre_its_base + (its_dev->device_id << 2);
-+}
-+
-+static bool __maybe_unused its_enable_quirk_socionext_synquacer(void *data)
-+{
-+	struct its_node *its = data;
-+	u32 pre_its_window[2];
-+	u32 ids;
-+
-+	if (!fwnode_property_read_u32_array(its->fwnode_handle,
-+					   "socionext,synquacer-pre-its",
-+					   pre_its_window,
-+					   ARRAY_SIZE(pre_its_window))) {
-+
-+		its->pre_its_base = pre_its_window[0];
-+		its->get_msi_base = its_irq_get_msi_base_pre_its;
-+
-+		ids = ilog2(pre_its_window[1]) - 2;
-+		if (its->device_ids > ids)
-+			its->device_ids = ids;
-+
-+		/* the pre-ITS breaks isolation, so disable MSI remapping */
-+		its->msi_domain_flags &= ~IRQ_DOMAIN_FLAG_MSI_REMAP;
-+		return true;
-+	}
-+	return false;
-+}
-+
- static const struct gic_quirk its_quirks[] = {
- #ifdef CONFIG_CAVIUM_ERRATUM_22375
- 	{
-@@ -2783,6 +2835,19 @@ static const struct gic_quirk its_quirks[] = {
- 		.init	= its_enable_quirk_qdf2400_e0065,
- 	},
- #endif
-+#ifdef CONFIG_SOCIONEXT_SYNQUACER_PREITS
-+	{
-+		/*
-+		 * The Socionext Synquacer SoC incorporates ARM's own GIC-500
-+		 * implementation, but with a 'pre-ITS' added that requires
-+		 * special handling in software.
-+		 */
-+		.desc	= "ITS: Socionext Synquacer pre-ITS",
-+		.iidr	= 0x0001143b,
-+		.mask	= 0xffffffff,
-+		.init	= its_enable_quirk_socionext_synquacer,
-+	},
-+#endif
- 	{
- 	}
- };
-@@ -2811,7 +2876,7 @@ static int its_init_domain(struct fwnode_handle *handle, struct its_node *its)
- 
- 	inner_domain->parent = its_parent;
- 	irq_domain_update_bus_token(inner_domain, DOMAIN_BUS_NEXUS);
--	inner_domain->flags |= IRQ_DOMAIN_FLAG_MSI_REMAP;
-+	inner_domain->flags |= its->msi_domain_flags;
- 	info->ops = &its_msi_domain_ops;
- 	info->data = its;
- 	inner_domain->host_data = info;
-@@ -2965,6 +3030,9 @@ static int __init its_probe_one(struct resource *res,
- 		goto out_free_its;
- 	}
- 	its->cmd_write = its->cmd_base;
-+	its->fwnode_handle = handle;
-+	its->get_msi_base = its_irq_get_msi_base;
-+	its->msi_domain_flags = IRQ_DOMAIN_FLAG_MSI_REMAP;
- 
- 	its_enable_quirks(its);
- 
--- 
-2.11.0
+I'm not thrilled about all the ACPI code this adds, but I'm guessing
+there'll be some better solution eventually.
+
+I'm going to mark these as "changes requested" even though I haven't
+asked for anything specific to be changed because it sounds like
+Lorenzo et al. may have more concrete proposals soon.
+
+Are there currently systems that do not work and need to be fixed
+ASAP?
+
+Bjorn
