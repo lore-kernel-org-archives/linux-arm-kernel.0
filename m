@@ -1,177 +1,479 @@
-From: xieyisheng1@huawei.com (Yisheng Xie)
-Date: Tue, 17 Oct 2017 21:19:26 +0800
-Subject: [bug report & help] arm64: ltp testcase "migrate_pages01" failed
-In-Reply-To: <20171017092307.GB21398@arm.com>
-References: <59E49B2B.8020802@huawei.com> <59E571ED.9090106@huawei.com>
- <20171017092307.GB21398@arm.com>
-Message-ID: <8d412c29-6dd7-126f-1460-23bdd3415816@huawei.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Tue, 17 Oct 2017 15:25:35 +0200
+Subject: [PATCH v3 1/7] ACPI/PPTT: Add Processor Properties Topology Table
+ parsing
+In-Reply-To: <20171012194856.13844-2-jeremy.linton@arm.com>
+References: <20171012194856.13844-1-jeremy.linton@arm.com>
+ <20171012194856.13844-2-jeremy.linton@arm.com>
+Message-ID: <38c63cfd-4c13-9461-0d4a-74b0943be0fd@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hi Jeremy,
 
-On 2017/10/17 17:23, Will Deacon wrote:
-> On Tue, Oct 17, 2017 at 10:58:53AM +0800, Tan Xiaojun wrote:
->> I'm not sure if this is the problem on arm64 numa. What do you think ?
->> By the way, this testcase can be successful in any case on x86.
+I did second round of review and have some more comments, please see below:
+
+On 12.10.2017 21:48, Jeremy Linton wrote:
+> ACPI 6.2 adds a new table, which describes how processing units
+> are related to each other in tree like fashion. Caches are
+> also sprinkled throughout the tree and describe the properties
+> of the caches in relation to other caches and processing units.
 > 
-> To be honest, this isn't a particularly helpful bug report. I appreciate
-> that a test is reporting failure, but it doesn't look like you've spent
-> very much effort to understand what the test is trying to do and why it
-> thinks it's failed to do it. All I can sensibly do with your bug report
-> is run the test myself, and it passes on the systems I have available.
+> Add the code to parse the cache hierarchy and report the total
+> number of levels of cache for a given core using
+> acpi_find_last_cache_level() as well as fill out the individual
+> cores cache information with cache_setup_acpi() once the
+> cpu_cacheinfo structure has been populated by the arch specific
+> code.
 > 
-> So, you need to:
+> Further, report peers in the topology using setup_acpi_cpu_topology()
+> to report a unique ID for each processing unit at a given level
+> in the tree. These unique id's can then be used to match related
+> processing units which exist as threads, COD (clusters
+> on die), within a given package, etc.
 > 
-> 1. Understand what the test is doing.
-> 2. Figure out which bit isn't doing what it's supposed to
-> 3. See if that part can be isolated to trigger the problem
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> ---
+>   drivers/acpi/pptt.c | 485 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 485 insertions(+)
+>   create mode 100644 drivers/acpi/pptt.c
 > 
-> At that point, it should be possible to describe the unexpected behaviour
-> at a level which we can actually investigate if necessary.
-This test case is to test whether we should migrate successfully if user call
-SYSC_migrate_pages with a invalid node. eg, we should 4 node 0-3, and try to
-migrate to node 4. And this should return -EINVAL.
+> diff --git a/drivers/acpi/pptt.c b/drivers/acpi/pptt.c
+> new file mode 100644
+> index 000000000000..c86715fed4a7
+> --- /dev/null
+> +++ b/drivers/acpi/pptt.c
+> @@ -0,1 +1,485 @@
+> +/*
+> + * Copyright (C) 2017, ARM
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * This file implements parsing of Processor Properties Topology Table (PPTT)
+> + * which is optionally used to describe the processor and cache topology.
+> + * Due to the relative pointers used throughout the table, this doesn't
+> + * leverage the existing subtable parsing in the kernel.
+> + */
+> +#define pr_fmt(fmt) "ACPI PPTT: " fmt
+> +
+> +#include <linux/acpi.h>
+> +#include <linux/cacheinfo.h>
+> +#include <acpi/processor.h>
+> +
+> +/*
+> + * Given the PPTT table, find and verify that the subtable entry
+> + * is located within the table
+> + */
+> +static struct acpi_subtable_header *fetch_pptt_subtable(
+> +	struct acpi_table_header *table_hdr, u32 pptt_ref)
+> +{
+> +	struct acpi_subtable_header *entry;
+> +
+> +	/* there isn't a subtable at reference 0 */
+> +	if (!pptt_ref)
+> +		return NULL;
+> +
+> +	if (pptt_ref + sizeof(struct acpi_subtable_header) > table_hdr->length)
+> +		return NULL;
+> +
+> +	entry = (struct acpi_subtable_header *)((u8 *)table_hdr + pptt_ref);
+> +
+> +	if (pptt_ref + entry->length > table_hdr->length)
+> +		return NULL;
+> +
+> +	return entry;
+> +}
+> +
+> +static struct acpi_pptt_processor *fetch_pptt_node(
+> +	struct acpi_table_header *table_hdr, u32 pptt_ref)
+> +{
+> +	return (struct acpi_pptt_processor *)fetch_pptt_subtable(table_hdr, pptt_ref);
+> +}
+> +
+> +static struct acpi_pptt_cache *fetch_pptt_cache(
+> +	struct acpi_table_header *table_hdr, u32 pptt_ref)
+> +{
+> +	return (struct acpi_pptt_cache *)fetch_pptt_subtable(table_hdr, pptt_ref);
+> +}
+> +
+> +static struct acpi_subtable_header *acpi_get_pptt_resource(
+> +	struct acpi_table_header *table_hdr,
+> +	struct acpi_pptt_processor *node, int resource)
+> +{
+> +	u32 ref;
+> +
+> +	if (resource >= node->number_of_priv_resources)
+> +		return NULL;
+> +
+> +	ref = *(u32 *)((u8 *)node + sizeof(struct acpi_pptt_processor) +
+> +		      sizeof(u32) * resource);
+> +
+> +	return fetch_pptt_subtable(table_hdr, ref);
+> +}
+> +
+> +/*
+> + * given a pptt resource, verify that it is a cache node, then walk
+> + * down each level of caches, counting how many levels are found
+> + * as well as checking the cache type (icache, dcache, unified). If a
+> + * level & type match, then we set found, and continue the search.
+> + * Once the entire cache branch has been walked return its max
+> + * depth.
+> + */
+> +static int acpi_pptt_walk_cache(struct acpi_table_header *table_hdr,
+> +				int local_level,
+> +				struct acpi_subtable_header *res,
+> +				struct acpi_pptt_cache **found,
+> +				int level, int type)
+> +{
+> +	struct acpi_pptt_cache *cache;
+> +
+> +	if (res->type != ACPI_PPTT_TYPE_CACHE)
+> +		return 0;
+> +
+> +	cache = (struct acpi_pptt_cache *) res;
+> +	while (cache) {
+> +		local_level++;
+> +
+> +		if ((local_level == level) &&
+> +		    (cache->flags & ACPI_PPTT_CACHE_TYPE_VALID) &&
+> +		    ((cache->attributes & ACPI_PPTT_MASK_CACHE_TYPE) == type)) {
 
-however, the kernel will migrate the memory to node 0 and return ok(e.g. 0).
-The root cause is for
-	nodes_subset(*new, node_states[N_MEMORY])
+Attributes have to be shifted:
 
-will return true when new = 0x10 and node_states[N_MEMORY]=0xf, MAX_NUMNODES=4.
+(cache->attributes & ACPI_PPTT_MASK_CACHE_TYPE) >> 2
 
-And this is common issue, and I also can reproduce at certain config on X86-64
-e.g. CONFIG_NODES_SHIFT=3 and have 8 node in the system.
+> +			if (*found != NULL)
+> +				pr_err("Found duplicate cache level/type unable to determine uniqueness\n");
+> +
+> +			pr_debug("Found cache @ level %d\n", level);
+> +			*found = cache;
+> +			/*
+> +			 * continue looking at this node's resource list
+> +			 * to verify that we don't find a duplicate
+> +			 * cache node.
+> +			 */
+> +		}
+> +		cache = fetch_pptt_cache(table_hdr, cache->next_level_of_cache);
+> +	}
+> +	return local_level;
+> +}
+> +
+> +/*
+> + * Given a CPU node look for cache levels that exist at this level, and then
+> + * for each cache node, count how many levels exist below (logically above) it.
+> + * If a level and type are specified, and we find that level/type, abort
+> + * processing and return the acpi_pptt_cache structure.
+> + */
+> +static struct acpi_pptt_cache *acpi_find_cache_level(
+> +	struct acpi_table_header *table_hdr,
+> +	struct acpi_pptt_processor *cpu_node,
+> +	int *starting_level, int level, int type)
+> +{
+> +	struct acpi_subtable_header *res;
+> +	int number_of_levels = *starting_level;
+> +	int resource = 0;
+> +	struct acpi_pptt_cache *ret = NULL;
+> +	int local_level;
+> +
+> +	/* walk down from the processor node */
+> +	while ((res = acpi_get_pptt_resource(table_hdr, cpu_node, resource))) {
+> +		resource++;
+> +
+> +		local_level = acpi_pptt_walk_cache(table_hdr, *starting_level,
+> +						   res, &ret, level, type);
+> +		/*
+> +		 * we are looking for the max depth. Since its potentially
+> +		 * possible for a given node to have resources with differing
+> +		 * depths verify that the depth we have found is the largest.
+> +		 */
+> +		if (number_of_levels < local_level)
+> +			number_of_levels = local_level;
+> +	}
+> +	if (number_of_levels > *starting_level)
+> +		*starting_level = number_of_levels;
+> +
+> +	return ret;
+> +}
+> +
+> +/*
+> + * given a processor node containing a processing unit, walk into it and count
+> + * how many levels exist solely for it, and then walk up each level until we hit
+> + * the root node (ignore the package level because it may be possible to have
+> + * caches that exist across packages). Count the number of cache levels that
+> + * exist at each level on the way up.
+> + */
+> +static int acpi_process_node(struct acpi_table_header *table_hdr,
+> +			     struct acpi_pptt_processor *cpu_node)
+> +{
+> +	int total_levels = 0;
+> +
+> +	do {
+> +		acpi_find_cache_level(table_hdr, cpu_node, &total_levels, 0, 0);
+> +		cpu_node = fetch_pptt_node(table_hdr, cpu_node->parent);
+> +	} while (cpu_node);
+> +
+> +	return total_levels;
+> +}
+> +
+> +/* determine if the given node is a leaf node */
+> +static int acpi_pptt_leaf_node(struct acpi_table_header *table_hdr,
+> +			       struct acpi_pptt_processor *node)
+> +{
+> +	struct acpi_subtable_header *entry;
+> +	unsigned long table_end;
+> +	u32 node_entry;
+> +	struct acpi_pptt_processor *cpu_node;
+> +
+> +	table_end = (unsigned long)table_hdr + table_hdr->length;
+> +	node_entry = (u32)((u8 *)node - (u8 *)table_hdr);
+> +	entry = (struct acpi_subtable_header *)((u8 *)table_hdr +
+> +						sizeof(struct acpi_table_pptt));
+> +
+> +	while (((unsigned long)entry) + sizeof(struct acpi_subtable_header) < table_end) {
+> +		cpu_node = (struct acpi_pptt_processor *)entry;
+> +		if ((entry->type == ACPI_PPTT_TYPE_PROCESSOR) &&
+> +		    (cpu_node->parent == node_entry))
+> +			return 0;
+> +		entry = (struct acpi_subtable_header *)((u8 *)entry + entry->length);
+> +	}
+> +	return 1;
+> +}
+> +
+> +/*
+> + * Find the subtable entry describing the provided processor
+> + */
+> +static struct acpi_pptt_processor *acpi_find_processor_node(
+> +	struct acpi_table_header *table_hdr,
+> +	u32 acpi_cpu_id)
+> +{
+> +	struct acpi_subtable_header *entry;
+> +	unsigned long table_end;
+> +	struct acpi_pptt_processor *cpu_node;
+> +
+> +	table_end = (unsigned long)table_hdr + table_hdr->length;
+> +	entry = (struct acpi_subtable_header *)((u8 *)table_hdr +
+> +						sizeof(struct acpi_table_pptt));
+> +
+> +	/* find the processor structure associated with this cpuid */
+> +	while (((unsigned long)entry) + sizeof(struct acpi_subtable_header) < table_end) {
+> +		cpu_node = (struct acpi_pptt_processor *)entry;
+> +
+> +		if ((entry->type == ACPI_PPTT_TYPE_PROCESSOR) &&
+> +		    acpi_pptt_leaf_node(table_hdr, cpu_node)) {
+> +			pr_debug("checking phy_cpu_id %d against acpi id %d\n",
+> +				 acpi_cpu_id, cpu_node->acpi_processor_id);
+> +			if (acpi_cpu_id == cpu_node->acpi_processor_id) {
+> +				/* found the correct entry */
+> +				pr_debug("match found!\n");
+> +				return (struct acpi_pptt_processor *)entry;
+> +			}
+> +		}
+> +
+> +		if (entry->length == 0) {
+> +			pr_err("Invalid zero length subtable\n");
+> +			break;
+> +		}
+> +		entry = (struct acpi_subtable_header *)
+> +			((u8 *)entry + entry->length);
+> +	}
+> +
+> +	return NULL;
+> +}
+> +
+> +/*
+> + * Given a acpi_pptt_processor node, walk up until we identify the
+> + * package that the node is associated with or we run out of levels
+> + * to request.
+> + */
+> +static struct acpi_pptt_processor *acpi_find_processor_package_id(
+> +	struct acpi_table_header *table_hdr,
+> +	struct acpi_pptt_processor *cpu,
+> +	int level)
+> +{
+> +	struct acpi_pptt_processor *prev_node;
+> +
+> +	while (cpu && level && !(cpu->flags & ACPI_PPTT_PHYSICAL_PACKAGE)) {
+> +		pr_debug("level %d\n", level);
+> +		prev_node = fetch_pptt_node(table_hdr, cpu->parent);
+> +		if (prev_node == NULL)
+> +			break;
+> +		cpu = prev_node;
+> +		level--;
+> +	}
+> +	return cpu;
+> +}
+> +
+> +static int acpi_parse_pptt(struct acpi_table_header *table_hdr, u32 acpi_cpu_id)
 
-IMO, if nbits=4, 0x0 or 0x10, 0xFF..F0 should not a subset of anything, so following
-patch may fix this problem:
+The function name can be more descriptive. How about:
 
-From: Yisheng Xie <xieyisheng1@huawei.com>
-Date: Tue, 17 Oct 2017 20:53:55 +0800
-Subject: [PATCH] bitmap: fix corner case of bitmap_subset
+acpi_count_cache_level() ?
 
-As Xiaojun reported the ltp of migrate_pages01 will failed in system
-whoes has 4 node with CONFIG_NODES_SHIFT=2:
+> +{
+> +	int number_of_levels = 0;
+> +	struct acpi_pptt_processor *cpu;
+> +
+> +	cpu = acpi_find_processor_node(table_hdr, acpi_cpu_id);
+> +	if (cpu)
+> +		number_of_levels = acpi_process_node(table_hdr, cpu);
+> +
+> +	return number_of_levels;
+> +}
 
-migrate_pages01    0  TINFO  :  test_invalid_nodes
-migrate_pages01   14  TFAIL  :  migrate_pages_common.c:45: unexpected failure - returned value = 0, expected: -1
-migrate_pages01   15  TFAIL  :  migrate_pages_common.c:55: call succeeded unexpectedly
+It is hard to follow what acpi_find_cache_level() and 
+acpi_pptt_walk_cache() really do. It is because they are trying to do 
+too many things at the same time. IMO, splitting acpi_find_cache_level() 
+logic to:
+1. counting the cache levels (max depth)
+2. finding the specific cache node
+makes sense.
 
-and the root cause is
-	nodes_subset(*new, node_states[N_MEMORY])
+Also, seems like we can merge acpi_parse_pptt() & acpi_process_node().
 
-will return true in the case like: new = 0x10 and node_states[N_MEMORY]=0xf,
-MAX_NUMNODES=4.
+Here are my suggestions:
 
-Fix it by correct the corner case of bitmap_subset, which makes 0x0 or
-0x10, 0xFF..F0  not a subset of bitmap when bitmap lenth is 4.
 
-Reported-by: Tan Xiaojun <tanxiaojun@huawei.com>
-Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
----
- include/linux/bitmap.h | 2 ++
- 1 file changed, 2 insertions(+)
+static struct acpi_pptt_cache *acpi_pptt_cache_type_level(
+	struct acpi_table_header *table_hdr,
+	struct acpi_subtable_header *res,
+	int *local_level,
+	int level, int type)
+{
+	struct acpi_pptt_cache *cache = (struct acpi_pptt_cache *) res;
 
-diff --git a/include/linux/bitmap.h b/include/linux/bitmap.h
-index 700cf5f..bc66978 100644
---- a/include/linux/bitmap.h
-+++ b/include/linux/bitmap.h
-@@ -283,6 +283,8 @@ static inline int bitmap_intersects(const unsigned long *src1,
- static inline int bitmap_subset(const unsigned long *src1,
- 			const unsigned long *src2, unsigned int nbits)
- {
-+	if(!(*src1 & BITMAP_LAST_WORD_MASK(nbits)))
-+		return false;
- 	if (small_const_nbits(nbits))
- 		return ! ((*src1 & ~(*src2)) & BITMAP_LAST_WORD_MASK(nbits));
- 	else
--- 
-1.7.12.4
+	if (res->type != ACPI_PPTT_TYPE_CACHE)
+		return NULL;
 
-Thanks
-Yisheng Xie
+	while (cache) {
+		if ((*local_level == level) &&
+		    (cache->flags & ACPI_PPTT_CACHE_TYPE_VALID) &&
+		    ((cache->attributes & ACPI_PPTT_MASK_CACHE_TYPE) >> 2 == type)) {
 
-> 
-> Will
-> 
->> On 2017/10/16 19:42, Tan Xiaojun wrote:
->>> Hi all,
->>>
->>> I test ltp in Hisilicon D05 board and get a failed result about the testcase "migrate_pages01".
->>>
->>> In fact, The sub testcase "test_invalid_nodes" failed. The testcase is to find a invalid numa node and migrate memory pages to this node via syscall of "migrate_pages".
->>> The expected result of this case is returning "-1", but it actually return "0".
->>>
->>> --------------------------------------------------------
->>> # ./migrate_pages01
->>> migrate_pages01    0  TINFO  :  test_empty_mask
->>> migrate_pages01    1  TPASS  :  expected ret success: returned value = 0
->>> migrate_pages01    0  TINFO  :  test_invalid_pid -1
->>> migrate_pages01    2  TPASS  :  expected ret success: returned value = -1
->>> migrate_pages01    3  TPASS  :  expected failure: TEST_ERRNO=ESRCH(3): No such process
->>> migrate_pages01    0  TINFO  :  test_invalid_pid unused pid
->>> migrate_pages01    4  TPASS  :  expected ret success: returned value = -1
->>> migrate_pages01    5  TPASS  :  expected failure: TEST_ERRNO=ESRCH(3): No such process
->>> migrate_pages01    0  TINFO  :  test_invalid_masksize
->>> migrate_pages01    6  TPASS  :  expected ret success: returned value = -1
->>> migrate_pages01    7  TPASS  :  expected failure: TEST_ERRNO=EINVAL(22): Invalid argument
->>> migrate_pages01    0  TINFO  :  test_invalid_mem -1
->>> migrate_pages01    8  TPASS  :  expected ret success: returned value = -1
->>> migrate_pages01    9  TPASS  :  expected failure: TEST_ERRNO=EFAULT(14): Bad address
->>> migrate_pages01    0  TINFO  :  test_invalid_mem invalid prot
->>> migrate_pages01   10  TPASS  :  expected ret success: returned value = -1
->>> migrate_pages01   11  TPASS  :  expected failure: TEST_ERRNO=EFAULT(14): Bad address
->>> migrate_pages01    0  TINFO  :  test_invalid_mem unmmaped
->>> migrate_pages01   12  TPASS  :  expected ret success: returned value = -1
->>> migrate_pages01   13  TPASS  :  expected failure: TEST_ERRNO=EFAULT(14): Bad address
->>> migrate_pages01    0  TINFO  :  test_invalid_nodes
->>> migrate_pages01   14  TFAIL  :  migrate_pages_common.c:45: unexpected failure - returned value = 0, expected: -1
->>> migrate_pages01   15  TFAIL  :  migrate_pages_common.c:55: call succeeded unexpectedly
->>> migrate_pages01    0  TINFO  :  test_invalid_perm
->>> migrate_pages01   16  TPASS  :  expected ret success: returned value = -1
->>> migrate_pages01   17  TPASS  :  expected failure: TEST_ERRNO=EPERM(1): Operation not permitted
->>> --------------------------------------------------------
->>>
->>> I debug and find a interesting thing, this case does not always fail.
->>>
->>> 1) If one or several numa nodes have no memory, this case will run successfully like below:
->>>
->>> --------------------
->>> available: 4 nodes (0-3)
->>> node 0 cpus: 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
->>> node 0 size: 65309 MB
->>> node 0 free: 61650 MB
->>> node 1 cpus: 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
->>> node 1 size: 65404 MB
->>> node 1 free: 61377 MB
->>> node 2 cpus: 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47
->>> node 2 size: 65401 MB
->>> node 2 free: 62316 MB
->>> node 3 cpus: 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63
->>> node 3 size: 0 MB
->>> node 3 free: 0 MB
->>> node distances:
->>> node   0   1   2   3
->>>   0:  10  15  20  20
->>>   1:  15  10  20  20
->>>   2:  20  20  10  15
->>>   3:  20  20  15  10
->>> ---------------------
->>>
->>> This testcase will find node number 3 and migrate pages to node 3. And syscall of "migrate_pages" return -1, test succeeded.
->>>
->>> 2) In most cases, all nodes have memory, and the testcase will get non-existent node like node number 4. The syscall of "migrate_pages" should also return -1, but return 0 actually.
->>> So the testcase failed.
->>>
->>> I think it is a problem in arm64. But I am not familiar with numa, so I ask for help from you.
->>>
->>> Thanks.
->>> Xiaojun.
->>>
->>>
->>> .
->>>
->>
->>
-> 
-> .
-> 
+			pr_debug("Found cache @ level %d\n", level);
+			return cache;
+		}
+		cache = fetch_pptt_cache(table_hdr, cache->next_level_of_cache);
+		(*local_level)++;
+	}
+	return NULL;
+}
+
+static struct acpi_pptt_cache *_acpi_find_cache_node(
+	struct acpi_table_header *table_hdr,
+	struct acpi_pptt_processor *cpu_node,
+	int *local_level, int level, int type)
+{
+	struct acpi_subtable_header *res;
+	struct acpi_pptt_cache *cache_tmp, *cache = NULL;
+	int resource = 0;
+
+	/* walk down from the processor node */
+	while ((res = acpi_get_pptt_resource(table_hdr, cpu_node, resource))) {
+
+		cache_tmp = acpi_pptt_cache_type_level(table_hdr, res,
+						       local_level, level, type);
+		if (cache_tmp) {
+			if (cache)
+				pr_err("Found duplicate cache level/type unable to determine 
+uniqueness\n");
+
+			cache = cache_tmp;
+		}
+		resource++;
+	}
+	return cache;
+}
+
+/* find the ACPI node describing the cache type/level for the given CPU */
+static struct acpi_pptt_cache *acpi_find_cache_node(
+	struct acpi_table_header *table_hdr, u32 acpi_cpu_id,
+	enum cache_type type, unsigned int level,
+	struct acpi_pptt_processor **node)
+{
+	int total_levels = 0;
+	struct acpi_pptt_cache *found = NULL;
+	struct acpi_pptt_processor *cpu_node;
+	u8 acpi_type = acpi_cache_type(type);
+
+	pr_debug("Looking for CPU %d's level %d cache type %d\n",
+		 acpi_cpu_id, level, acpi_type);
+
+	cpu_node = acpi_find_processor_node(table_hdr, acpi_cpu_id);
+	if (!cpu_node)
+		return NULL;
+
+	do {
+		found = _acpi_find_cache_node(table_hdr, cpu_node,
+					      &total_levels, level, acpi_type);
+		*node = cpu_node;
+		cpu_node = fetch_pptt_node(table_hdr, cpu_node->parent);
+	} while ((cpu_node) && (!found));
+
+	return found;
+}
+
+static int acpi_pptt_cache_level(struct acpi_table_header *table_hdr,
+				struct acpi_subtable_header *res)
+{
+	struct acpi_pptt_cache *cache = (struct acpi_pptt_cache *) res;
+	int local_level = 1;
+
+	if (res->type != ACPI_PPTT_TYPE_CACHE)
+		return 0;
+
+	while ((cache = fetch_pptt_cache(table_hdr, cache->next_level_of_cache)))
+		local_level++;
+	return local_level;
+}
+
+static int _acpi_count_cache_level(
+	struct acpi_table_header *table_hdr,
+	struct acpi_pptt_processor *cpu_node)
+{
+	struct acpi_subtable_header *res;
+	int levels = 0, resource = 0, number_of_levels = 0;
+
+	/* walk down from the processor node */
+	while ((res = acpi_get_pptt_resource(table_hdr, cpu_node, resource))) {
+		levels = acpi_pptt_cache_level(table_hdr, res);
+
+		/*
+		 * we are looking for the max depth. Since its potentially
+		 * possible for a given node to have resources with differing
+		 * depths verify that the depth we have found is the largest.
+		 */
+		if (levels > number_of_levels)
+			number_of_levels = levels;
+
+		resource++;
+	}
+	return number_of_levels;
+}
+
+static int acpi_count_cache_level(struct acpi_table_header *table_hdr,
+				  u32 acpi_cpu_id)
+{
+	int total_levels = 0;
+	struct acpi_pptt_processor *cpu_node;
+
+	cpu_node = acpi_find_processor_node(table_hdr, acpi_cpu_id);
+	while (cpu_node) {
+		total_levels += _acpi_count_cache_level(table_hdr, cpu_node);
+		cpu_node = fetch_pptt_node(table_hdr, cpu_node->parent);
+	}
+
+	return total_levels;
+}
+
+
+Did not compile the code so I may have missed somthing.
+
+Thanks,
+Tomasz
