@@ -1,153 +1,72 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 17 Oct 2017 12:22:08 +0100
-Subject: [PATCH 07/10] KVM: arm/arm64: Preserve Exec permission across R/W
- permission faults
-In-Reply-To: <20171016200824.GI1845@lvm>
-References: <20171009152032.27804-1-marc.zyngier@arm.com>
- <20171009152032.27804-8-marc.zyngier@arm.com> <20171016200824.GI1845@lvm>
-Message-ID: <9f1e5366-fe47-69e9-8df9-31105c39094f@arm.com>
+From: liuwenliang@huawei.com (Liuwenliang (Lamb))
+Date: Tue, 17 Oct 2017 11:27:19 +0000
+Subject: [PATCH 04/11] Define the virtual space of KASan's shadow region
+In-Reply-To: <CAKv+Gu98M9PZk3qm0PYC8nQ3zMvLZmNmOn4=hNdFE7NTBuHbgg@mail.gmail.com>
+References: <20171011082227.20546-5-liuwenliang@huawei.com>
+ <201710141957.mbxeZJHB%fengguang.wu@intel.com>
+ <B8AC3E80E903784988AB3003E3E97330C005B9BF@dggemm510-mbx.china.huawei.com>
+ <CAKv+Gu98M9PZk3qm0PYC8nQ3zMvLZmNmOn4=hNdFE7NTBuHbgg@mail.gmail.com>
+Message-ID: <B8AC3E80E903784988AB3003E3E97330C005CAC2@dggemm510-mbx.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/10/17 21:08, Christoffer Dall wrote:
-> On Mon, Oct 09, 2017 at 04:20:29PM +0100, Marc Zyngier wrote:
->> So far, we loose the Exec property whenever we take permission
->> faults, as we always reconstruct the PTE/PMD from scratch. This
->> can be counter productive as we can end-up with the following
->> fault sequence:
->>
->> 	X -> RO -> ROX -> RW -> RWX
->>
->> Instead, we can lookup the existing PTE/PMD and clear the XN bit in the
->> new entry if it was already cleared in the old one, leadig to a much
->> nicer fault sequence:
->>
->> 	X -> ROX -> RWX
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm/include/asm/kvm_mmu.h   | 10 ++++++++++
->>  arch/arm64/include/asm/kvm_mmu.h | 10 ++++++++++
->>  virt/kvm/arm/mmu.c               | 25 +++++++++++++++++++++++++
->>  3 files changed, 45 insertions(+)
->>
->> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
->> index bf76150aad5f..ad442d86c23e 100644
->> --- a/arch/arm/include/asm/kvm_mmu.h
->> +++ b/arch/arm/include/asm/kvm_mmu.h
->> @@ -107,6 +107,11 @@ static inline bool kvm_s2pte_readonly(pte_t *pte)
->>  	return (pte_val(*pte) & L_PTE_S2_RDWR) == L_PTE_S2_RDONLY;
->>  }
->>  
->> +static inline bool kvm_s2pte_exec(pte_t *pte)
->> +{
->> +	return !(pte_val(*pte) & L_PTE_XN);
->> +}
->> +
->>  static inline void kvm_set_s2pmd_readonly(pmd_t *pmd)
->>  {
->>  	pmd_val(*pmd) = (pmd_val(*pmd) & ~L_PMD_S2_RDWR) | L_PMD_S2_RDONLY;
->> @@ -117,6 +122,11 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
->>  	return (pmd_val(*pmd) & L_PMD_S2_RDWR) == L_PMD_S2_RDONLY;
->>  }
->>  
->> +static inline bool kvm_s2pmd_exec(pmd_t *pmd)
->> +{
->> +	return !(pmd_val(*pmd) & PMD_SECT_XN);
->> +}
->> +
->>  static inline bool kvm_page_empty(void *ptr)
->>  {
->>  	struct page *ptr_page = virt_to_page(ptr);
->> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
->> index 60c420a5ac0d..e7af74b8b51a 100644
->> --- a/arch/arm64/include/asm/kvm_mmu.h
->> +++ b/arch/arm64/include/asm/kvm_mmu.h
->> @@ -203,6 +203,11 @@ static inline bool kvm_s2pte_readonly(pte_t *pte)
->>  	return (pte_val(*pte) & PTE_S2_RDWR) == PTE_S2_RDONLY;
->>  }
->>  
->> +static inline bool kvm_s2pte_exec(pte_t *pte)
->> +{
->> +	return !(pte_val(*pte) & PTE_S2_XN);
->> +}
->> +
->>  static inline void kvm_set_s2pmd_readonly(pmd_t *pmd)
->>  {
->>  	kvm_set_s2pte_readonly((pte_t *)pmd);
->> @@ -213,6 +218,11 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
->>  	return kvm_s2pte_readonly((pte_t *)pmd);
->>  }
->>  
->> +static inline bool kvm_s2pmd_exec(pmd_t *pmd)
->> +{
->> +	return !(pmd_val(*pmd) & PMD_S2_XN);
->> +}
->> +
->>  static inline bool kvm_page_empty(void *ptr)
->>  {
->>  	struct page *ptr_page = virt_to_page(ptr);
->> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
->> index 1911fadde88b..ccc6106764a6 100644
->> --- a/virt/kvm/arm/mmu.c
->> +++ b/virt/kvm/arm/mmu.c
->> @@ -926,6 +926,17 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
->>  	return 0;
->>  }
->>  
->> +static pte_t *stage2_get_pte(struct kvm *kvm, phys_addr_t addr)
->> +{
->> +	pmd_t *pmdp;
->> +
->> +	pmdp = stage2_get_pmd(kvm, NULL, addr);
->> +	if (!pmdp || pmd_none(*pmdp))
->> +		return NULL;
->> +
->> +	return pte_offset_kernel(pmdp, addr);
->> +}
->> +
-> 
-> nit, couldn't you change this to be
-> 
->     stage2_is_exec(struct kvm *kvm, phys_addr_t addr)
-> 
-> Which, if the pmd is a section mapping just checks that, and if we find
-> a pte, we check that, and then we can have a simpler one-line call and
-> check from both the pte and pmd paths below?
+On 10/17/2017 12:40 AM, Abbott Liu wrote:
+> Ard Biesheuvel [ard.biesheuvel at linaro.org] wrote
+>This is unnecessary:
+>
+>ldr r1, =TASK_SIZE
+>
+>will be converted to a mov instruction by the assembler if the value of TASK_SIZE fits its 12-bit immediate field.
+>
+>So please remove the whole #ifdef, and just use ldr r1, =xxx
 
-Yes, that's pretty neat. I've folded that in.
+Thanks for your review. 
 
-> 
->>  static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
->>  			  phys_addr_t addr, const pte_t *new_pte,
->>  			  unsigned long flags)
->> @@ -1407,6 +1418,13 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->>  		if (exec_fault) {
->>  			new_pmd = kvm_s2pmd_mkexec(new_pmd);
->>  			coherent_icache_guest_page(vcpu, pfn, PMD_SIZE);
->> +		} else if (fault_status == FSC_PERM) {
->> +			/* Preserve execute if XN was already cleared */
->> +			pmd_t *old_pmdp = stage2_get_pmd(kvm, NULL, fault_ipa);
->> +
->> +			if (old_pmdp && pmd_present(*old_pmdp) &&
->> +			    kvm_s2pmd_exec(old_pmdp))
->> +				new_pmd = kvm_s2pmd_mkexec(new_pmd);
-> 
-> Is the reverse case not also possible then?  That is, if we have an
-> exec_fault, we could check if the entry is already writable and maintain
-> the property as well.  Not sure how often that would get hit though, as
-> a VM would only execute instructions on a page that has been written to,
-> but is somehow read-only at stage2, meaning the host must have marked
-> the page as read-only since content was written.  I think this could be
-> a somewhat common pattern with something like KSM though?
+The assembler on my computer don't convert ldr r1,=xxx into mov instruction. Here is the objdump for vmlinux:
 
-I think this is already the case, because we always build the PTE/PMD as
-either ROXN or RWXN, and only later clear the XN bit (see the
-unconditional call to gfn_to_pfn_prot which should tell us whether to
-map the page as writable or not). Or am I missing your point entirely?
+c0a3b100 <__irq_svc>:
+c0a3b100:       e24dd04c        sub     sp, sp, #76     ; 0x4c
+c0a3b104:       e31d0004        tst     sp, #4
+c0a3b108:       024dd004        subeq   sp, sp, #4
+c0a3b10c:       e88d1ffe        stm     sp, {r1, r2, r3, r4, r5, r6, r7, r8, r9, sl, fp, ip}
+c0a3b110:       e8900038        ldm     r0, {r3, r4, r5}
+c0a3b114:       e28d7030        add     r7, sp, #48     ; 0x30
+c0a3b118:       e3e06000        mvn     r6, #0
+c0a3b11c:       e28d204c        add     r2, sp, #76     ; 0x4c
+c0a3b120:       02822004        addeq   r2, r2, #4
+c0a3b124:       e52d3004        push    {r3}            ; (str r3, [sp, #-4]!)
+c0a3b128:       e1a0300e        mov     r3, lr
+c0a3b12c:       e887007c        stm     r7, {r2, r3, r4, r5, r6}
+c0a3b130:       e1a0972d        lsr     r9, sp, #14
+c0a3b134:       e1a09709        lsl     r9, r9, #14
+c0a3b138:       e5990008        ldr     r0, [r9, #8]
+---c0a3b13c:       e59f1054        ldr     r1, [pc, #84]   ; c0a3b198 <__irq_svc+0x98>  //ldr r1, =TASK_SIZE
+c0a3b140:       e5891008        str     r1, [r9, #8]
+c0a3b144:       e58d004c        str     r0, [sp, #76]   ; 0x4c
+c0a3b148:       ee130f10        mrc     15, 0, r0, cr3, cr0, {0}
+c0a3b14c:       e58d0048        str     r0, [sp, #72]   ; 0x48
+c0a3b150:       e3a00051        mov     r0, #81 ; 0x51
+c0a3b154:       ee030f10        mcr     15, 0, r0, cr3, cr0, {0}
+---c0a3b158:       e59f103c        ldr     r1, [pc, #60]   ; c0a3b19c <__irq_svc+0x9c>  //orginal irq_svc also used same instruction
+c0a3b15c:       e1a0000d        mov     r0, sp
+c0a3b160:       e28fe000        add     lr, pc, #0
+c0a3b164:       e591f000        ldr     pc, [r1]
+c0a3b168:       e5998004        ldr     r8, [r9, #4]
+c0a3b16c:       e5990000        ldr     r0, [r9]
+c0a3b170:       e3380000        teq     r8, #0
+c0a3b174:       13a00000        movne   r0, #0
+c0a3b178:       e3100002        tst     r0, #2
+c0a3b17c:       1b000007        blne    c0a3b1a0 <svc_preempt>
+c0a3b180:       e59d104c        ldr     r1, [sp, #76]   ; 0x4c
+c0a3b184:       e59d0048        ldr     r0, [sp, #72]   ; 0x48
+c0a3b188:       ee030f10        mcr     15, 0, r0, cr3, cr0, {0}
+c0a3b18c:       e5891008        str     r1, [r9, #8]
+c0a3b190:       e16ff005        msr     SPSR_fsxc, r5
+c0a3b194:       e8ddffff        ldm     sp, {r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, sl, fp, ip, sp, lr, pc}^
+---c0a3b198:       b6e00000        .word   0xb6e00000   //TASK_SIZE:0xb6e00000
+c0a3b19c:       c0ccccf0        .word   0xc0ccccf0
 
-Thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+
+Even "ldr r1, =TASK_SIZE"  won't be converted to a mov instruction by some assembler, I also think it is better
+to remove the whole #ifdef because the influence of performance by ldr is very limited. 
