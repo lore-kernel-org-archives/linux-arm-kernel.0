@@ -1,110 +1,332 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 17 Oct 2017 10:23:07 +0100
-Subject: [bug report & help] arm64: ltp testcase "migrate_pages01" failed
-In-Reply-To: <59E571ED.9090106@huawei.com>
-References: <59E49B2B.8020802@huawei.com>
- <59E571ED.9090106@huawei.com>
-Message-ID: <20171017092307.GB21398@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 17 Oct 2017 11:06:12 +0200
+Subject: [PATCH 05/23] drm/sun4i: tcon: Don't rely on encoders to enable the
+ TCON
+In-Reply-To: <cover.fe3d65d1ee05a55224d26e7d113388c428592b26.1508231063.git-series.maxime.ripard@free-electrons.com>
+References: <cover.fe3d65d1ee05a55224d26e7d113388c428592b26.1508231063.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <90b4396e19b3eca61b2ebfdae0672074b88ad74d.1508231063.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 10:58:53AM +0800, Tan Xiaojun wrote:
-> I'm not sure if this is the problem on arm64 numa. What do you think ?
-> By the way, this testcase can be successful in any case on x86.
+So far, we've required all the TCON-connected encoders to call the TCON
+enable and disable functions.
 
-To be honest, this isn't a particularly helpful bug report. I appreciate
-that a test is reporting failure, but it doesn't look like you've spent
-very much effort to understand what the test is trying to do and why it
-thinks it's failed to do it. All I can sensibly do with your bug report
-is run the test myself, and it passes on the systems I have available.
+This was made this way because in the RGB/LVDS case, the TCON is the CRTC
+and the encoder. However, in all the other cases (HDMI, TV, DSI, etc.), we
+have another encoder down the road that needs to be programmed.
 
-So, you need to:
+We also needed to know which channel the encoder is connected to, which is
+encoder-specific.
 
-1. Understand what the test is doing.
-2. Figure out which bit isn't doing what it's supposed to
-3. See if that part can be isolated to trigger the problem
+The CRTC's enable and disable callbacks can work just fine for our use
+case, and we can get the channel to use just by looking at the type of
+encoder, since that is fixed. Implement those callbacks, which will
+remove some of the encoder boilerplate.
 
-At that point, it should be possible to describe the unexpected behaviour
-at a level which we can actually investigate if necessary.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/gpu/drm/sun4i/sun4i_crtc.c     | 22 ++++++-
+ drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c |  8 +--
+ drivers/gpu/drm/sun4i/sun4i_rgb.c      | 14 +---
+ drivers/gpu/drm/sun4i/sun4i_tcon.c     | 87 ++++++++++++---------------
+ drivers/gpu/drm/sun4i/sun4i_tcon.h     | 10 +---
+ drivers/gpu/drm/sun4i/sun4i_tv.c       |  6 +--
+ 6 files changed, 67 insertions(+), 80 deletions(-)
 
-Will
-
-> On 2017/10/16 19:42, Tan Xiaojun wrote:
-> > Hi all,
-> > 
-> > I test ltp in Hisilicon D05 board and get a failed result about the testcase "migrate_pages01".
-> > 
-> > In fact, The sub testcase "test_invalid_nodes" failed. The testcase is to find a invalid numa node and migrate memory pages to this node via syscall of "migrate_pages".
-> > The expected result of this case is returning "-1", but it actually return "0".
-> > 
-> > --------------------------------------------------------
-> > # ./migrate_pages01
-> > migrate_pages01    0  TINFO  :  test_empty_mask
-> > migrate_pages01    1  TPASS  :  expected ret success: returned value = 0
-> > migrate_pages01    0  TINFO  :  test_invalid_pid -1
-> > migrate_pages01    2  TPASS  :  expected ret success: returned value = -1
-> > migrate_pages01    3  TPASS  :  expected failure: TEST_ERRNO=ESRCH(3): No such process
-> > migrate_pages01    0  TINFO  :  test_invalid_pid unused pid
-> > migrate_pages01    4  TPASS  :  expected ret success: returned value = -1
-> > migrate_pages01    5  TPASS  :  expected failure: TEST_ERRNO=ESRCH(3): No such process
-> > migrate_pages01    0  TINFO  :  test_invalid_masksize
-> > migrate_pages01    6  TPASS  :  expected ret success: returned value = -1
-> > migrate_pages01    7  TPASS  :  expected failure: TEST_ERRNO=EINVAL(22): Invalid argument
-> > migrate_pages01    0  TINFO  :  test_invalid_mem -1
-> > migrate_pages01    8  TPASS  :  expected ret success: returned value = -1
-> > migrate_pages01    9  TPASS  :  expected failure: TEST_ERRNO=EFAULT(14): Bad address
-> > migrate_pages01    0  TINFO  :  test_invalid_mem invalid prot
-> > migrate_pages01   10  TPASS  :  expected ret success: returned value = -1
-> > migrate_pages01   11  TPASS  :  expected failure: TEST_ERRNO=EFAULT(14): Bad address
-> > migrate_pages01    0  TINFO  :  test_invalid_mem unmmaped
-> > migrate_pages01   12  TPASS  :  expected ret success: returned value = -1
-> > migrate_pages01   13  TPASS  :  expected failure: TEST_ERRNO=EFAULT(14): Bad address
-> > migrate_pages01    0  TINFO  :  test_invalid_nodes
-> > migrate_pages01   14  TFAIL  :  migrate_pages_common.c:45: unexpected failure - returned value = 0, expected: -1
-> > migrate_pages01   15  TFAIL  :  migrate_pages_common.c:55: call succeeded unexpectedly
-> > migrate_pages01    0  TINFO  :  test_invalid_perm
-> > migrate_pages01   16  TPASS  :  expected ret success: returned value = -1
-> > migrate_pages01   17  TPASS  :  expected failure: TEST_ERRNO=EPERM(1): Operation not permitted
-> > --------------------------------------------------------
-> > 
-> > I debug and find a interesting thing, this case does not always fail.
-> > 
-> > 1) If one or several numa nodes have no memory, this case will run successfully like below:
-> > 
-> > --------------------
-> > available: 4 nodes (0-3)
-> > node 0 cpus: 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
-> > node 0 size: 65309 MB
-> > node 0 free: 61650 MB
-> > node 1 cpus: 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
-> > node 1 size: 65404 MB
-> > node 1 free: 61377 MB
-> > node 2 cpus: 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47
-> > node 2 size: 65401 MB
-> > node 2 free: 62316 MB
-> > node 3 cpus: 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63
-> > node 3 size: 0 MB
-> > node 3 free: 0 MB
-> > node distances:
-> > node   0   1   2   3
-> >   0:  10  15  20  20
-> >   1:  15  10  20  20
-> >   2:  20  20  10  15
-> >   3:  20  20  15  10
-> > ---------------------
-> > 
-> > This testcase will find node number 3 and migrate pages to node 3. And syscall of "migrate_pages" return -1, test succeeded.
-> > 
-> > 2) In most cases, all nodes have memory, and the testcase will get non-existent node like node number 4. The syscall of "migrate_pages" should also return -1, but return 0 actually.
-> > So the testcase failed.
-> > 
-> > I think it is a problem in arm64. But I am not familiar with numa, so I ask for help from you.
-> > 
-> > Thanks.
-> > Xiaojun.
-> > 
-> > 
-> > .
-> > 
-> 
-> 
+diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+index d097c6f93ad0..e86baa3746af 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
++++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+@@ -30,6 +30,22 @@
+ #include "sunxi_engine.h"
+ #include "sun4i_tcon.h"
+ 
++/*
++ * While this isn't really working in the DRM theory, in practice we
++ * can only ever have one encoder per TCON since we have a mux in our
++ * TCON.
++ */
++static struct drm_encoder *sun4i_crtc_get_encoder(struct drm_crtc *crtc)
++{
++	struct drm_encoder *encoder;
++
++	drm_for_each_encoder(encoder, crtc->dev)
++		if (encoder->crtc == crtc)
++			return encoder;
++
++	return NULL;
++}
++
+ static void sun4i_crtc_atomic_begin(struct drm_crtc *crtc,
+ 				    struct drm_crtc_state *old_state)
+ {
+@@ -72,11 +88,12 @@ static void sun4i_crtc_atomic_flush(struct drm_crtc *crtc,
+ static void sun4i_crtc_atomic_disable(struct drm_crtc *crtc,
+ 				      struct drm_crtc_state *old_state)
+ {
++	struct drm_encoder *encoder = sun4i_crtc_get_encoder(crtc);
+ 	struct sun4i_crtc *scrtc = drm_crtc_to_sun4i_crtc(crtc);
+ 
+ 	DRM_DEBUG_DRIVER("Disabling the CRTC\n");
+ 
+-	sun4i_tcon_disable(scrtc->tcon);
++	sun4i_tcon_set_status(scrtc->tcon, encoder, false);
+ 
+ 	if (crtc->state->event && !crtc->state->active) {
+ 		spin_lock_irq(&crtc->dev->event_lock);
+@@ -90,11 +107,12 @@ static void sun4i_crtc_atomic_disable(struct drm_crtc *crtc,
+ static void sun4i_crtc_atomic_enable(struct drm_crtc *crtc,
+ 				     struct drm_crtc_state *old_state)
+ {
++	struct drm_encoder *encoder = sun4i_crtc_get_encoder(crtc);
+ 	struct sun4i_crtc *scrtc = drm_crtc_to_sun4i_crtc(crtc);
+ 
+ 	DRM_DEBUG_DRIVER("Enabling the CRTC\n");
+ 
+-	sun4i_tcon_enable(scrtc->tcon);
++	sun4i_tcon_set_status(scrtc->tcon, encoder, true);
+ }
+ 
+ static const struct drm_crtc_helper_funcs sun4i_crtc_helper_funcs = {
+diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+index 6ca6e6a74c4a..482bf03d55c1 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
++++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+@@ -86,8 +86,6 @@ static int sun4i_hdmi_atomic_check(struct drm_encoder *encoder,
+ static void sun4i_hdmi_disable(struct drm_encoder *encoder)
+ {
+ 	struct sun4i_hdmi *hdmi = drm_encoder_to_sun4i_hdmi(encoder);
+-	struct sun4i_crtc *crtc = drm_crtc_to_sun4i_crtc(encoder->crtc);
+-	struct sun4i_tcon *tcon = crtc->tcon;
+ 	u32 val;
+ 
+ 	DRM_DEBUG_DRIVER("Disabling the HDMI Output\n");
+@@ -95,22 +93,16 @@ static void sun4i_hdmi_disable(struct drm_encoder *encoder)
+ 	val = readl(hdmi->base + SUN4I_HDMI_VID_CTRL_REG);
+ 	val &= ~SUN4I_HDMI_VID_CTRL_ENABLE;
+ 	writel(val, hdmi->base + SUN4I_HDMI_VID_CTRL_REG);
+-
+-	sun4i_tcon_channel_disable(tcon, 1);
+ }
+ 
+ static void sun4i_hdmi_enable(struct drm_encoder *encoder)
+ {
+ 	struct drm_display_mode *mode = &encoder->crtc->state->adjusted_mode;
+ 	struct sun4i_hdmi *hdmi = drm_encoder_to_sun4i_hdmi(encoder);
+-	struct sun4i_crtc *crtc = drm_crtc_to_sun4i_crtc(encoder->crtc);
+-	struct sun4i_tcon *tcon = crtc->tcon;
+ 	u32 val = 0;
+ 
+ 	DRM_DEBUG_DRIVER("Enabling the HDMI Output\n");
+ 
+-	sun4i_tcon_channel_enable(tcon, 1);
+-
+ 	sun4i_hdmi_setup_avi_infoframes(hdmi, mode);
+ 	val |= SUN4I_HDMI_PKT_CTRL_TYPE(0, SUN4I_HDMI_PKT_AVI);
+ 	val |= SUN4I_HDMI_PKT_CTRL_TYPE(1, SUN4I_HDMI_PKT_END);
+diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+index 7cd7090ad63a..a7f297ed40c1 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
++++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+@@ -134,13 +134,10 @@ static void sun4i_rgb_encoder_enable(struct drm_encoder *encoder)
+ 
+ 	DRM_DEBUG_DRIVER("Enabling RGB output\n");
+ 
+-	if (!IS_ERR(tcon->panel))
++	if (!IS_ERR(tcon->panel)) {
+ 		drm_panel_prepare(tcon->panel);
+-
+-	sun4i_tcon_channel_enable(tcon, 0);
+-
+-	if (!IS_ERR(tcon->panel))
+ 		drm_panel_enable(tcon->panel);
++	}
+ }
+ 
+ static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
+@@ -150,13 +147,10 @@ static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
+ 
+ 	DRM_DEBUG_DRIVER("Disabling RGB output\n");
+ 
+-	if (!IS_ERR(tcon->panel))
++	if (!IS_ERR(tcon->panel)) {
+ 		drm_panel_disable(tcon->panel);
+-
+-	sun4i_tcon_channel_disable(tcon, 0);
+-
+-	if (!IS_ERR(tcon->panel))
+ 		drm_panel_unprepare(tcon->panel);
++	}
+ }
+ 
+ static void sun4i_rgb_encoder_mode_set(struct drm_encoder *encoder,
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 9b5b21ad8378..964cf22a1ced 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -35,66 +35,61 @@
+ #include "sun4i_tcon.h"
+ #include "sunxi_engine.h"
+ 
+-void sun4i_tcon_disable(struct sun4i_tcon *tcon)
++static void sun4i_tcon_channel_set_status(struct sun4i_tcon *tcon, int channel,
++					  bool enabled)
+ {
+-	DRM_DEBUG_DRIVER("Disabling TCON\n");
++	struct clk *clk;
+ 
+-	/* Disable the TCON */
+-	regmap_update_bits(tcon->regs, SUN4I_TCON_GCTL_REG,
+-			   SUN4I_TCON_GCTL_TCON_ENABLE, 0);
+-}
+-EXPORT_SYMBOL(sun4i_tcon_disable);
+-
+-void sun4i_tcon_enable(struct sun4i_tcon *tcon)
+-{
+-	DRM_DEBUG_DRIVER("Enabling TCON\n");
+-
+-	/* Enable the TCON */
+-	regmap_update_bits(tcon->regs, SUN4I_TCON_GCTL_REG,
+-			   SUN4I_TCON_GCTL_TCON_ENABLE,
+-			   SUN4I_TCON_GCTL_TCON_ENABLE);
+-}
+-EXPORT_SYMBOL(sun4i_tcon_enable);
+-
+-void sun4i_tcon_channel_disable(struct sun4i_tcon *tcon, int channel)
+-{
+-	DRM_DEBUG_DRIVER("Disabling TCON channel %d\n", channel);
+-
+-	/* Disable the TCON's channel */
+-	if (channel == 0) {
++	switch (channel) {
++	case 0:
+ 		regmap_update_bits(tcon->regs, SUN4I_TCON0_CTL_REG,
+-				   SUN4I_TCON0_CTL_TCON_ENABLE, 0);
+-		clk_disable_unprepare(tcon->dclk);
++				   SUN4I_TCON0_CTL_TCON_ENABLE,
++				   enabled ? SUN4I_TCON0_CTL_TCON_ENABLE : 0);
++		clk = tcon->dclk;
++		break;
++	case 1:
++		WARN_ON(!tcon->quirks->has_channel_1);
++		regmap_update_bits(tcon->regs, SUN4I_TCON1_CTL_REG,
++				   SUN4I_TCON1_CTL_TCON_ENABLE,
++				   enabled ? SUN4I_TCON1_CTL_TCON_ENABLE : 0);
++		clk = tcon->sclk1;
++		break;
++	default:
++		DRM_WARN("Unknown channel... doing nothing\n");
+ 		return;
+ 	}
+ 
+-	WARN_ON(!tcon->quirks->has_channel_1);
+-	regmap_update_bits(tcon->regs, SUN4I_TCON1_CTL_REG,
+-			   SUN4I_TCON1_CTL_TCON_ENABLE, 0);
+-	clk_disable_unprepare(tcon->sclk1);
++	if (enabled)
++		clk_prepare_enable(clk);
++	else
++		clk_disable_unprepare(clk);
+ }
+-EXPORT_SYMBOL(sun4i_tcon_channel_disable);
+ 
+-void sun4i_tcon_channel_enable(struct sun4i_tcon *tcon, int channel)
++void sun4i_tcon_set_status(struct sun4i_tcon *tcon,
++			   const struct drm_encoder *encoder,
++			   bool enabled)
+ {
+-	DRM_DEBUG_DRIVER("Enabling TCON channel %d\n", channel);
++	int channel;
+ 
+-	/* Enable the TCON's channel */
+-	if (channel == 0) {
+-		regmap_update_bits(tcon->regs, SUN4I_TCON0_CTL_REG,
+-				   SUN4I_TCON0_CTL_TCON_ENABLE,
+-				   SUN4I_TCON0_CTL_TCON_ENABLE);
+-		clk_prepare_enable(tcon->dclk);
++	switch (encoder->encoder_type) {
++	case DRM_MODE_ENCODER_NONE:
++		channel = 0;
++		break;
++	case DRM_MODE_ENCODER_TMDS:
++	case DRM_MODE_ENCODER_TVDAC:
++		channel = 1;
++		break;
++	default:
++		DRM_DEBUG_DRIVER("Unknown encoder type, doing nothing...\n");
+ 		return;
+ 	}
+ 
+-	WARN_ON(!tcon->quirks->has_channel_1);
+-	regmap_update_bits(tcon->regs, SUN4I_TCON1_CTL_REG,
+-			   SUN4I_TCON1_CTL_TCON_ENABLE,
+-			   SUN4I_TCON1_CTL_TCON_ENABLE);
+-	clk_prepare_enable(tcon->sclk1);
++	regmap_update_bits(tcon->regs, SUN4I_TCON_GCTL_REG,
++			   SUN4I_TCON_GCTL_TCON_ENABLE,
++			   enabled ? SUN4I_TCON_GCTL_TCON_ENABLE : 0);
++
++	sun4i_tcon_channel_set_status(tcon, channel, enabled);
+ }
+-EXPORT_SYMBOL(sun4i_tcon_channel_enable);
+ 
+ void sun4i_tcon_enable_vblank(struct sun4i_tcon *tcon, bool enable)
+ {
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+index d81c6e20efe6..03f983927baa 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+@@ -190,15 +190,9 @@ struct sun4i_tcon {
+ struct drm_bridge *sun4i_tcon_find_bridge(struct device_node *node);
+ struct drm_panel *sun4i_tcon_find_panel(struct device_node *node);
+ 
+-/* Global Control */
+-void sun4i_tcon_disable(struct sun4i_tcon *tcon);
+-void sun4i_tcon_enable(struct sun4i_tcon *tcon);
+-
+-/* Channel Control */
+-void sun4i_tcon_channel_disable(struct sun4i_tcon *tcon, int channel);
+-void sun4i_tcon_channel_enable(struct sun4i_tcon *tcon, int channel);
+-
+ void sun4i_tcon_enable_vblank(struct sun4i_tcon *tcon, bool enable);
++void sun4i_tcon_set_status(struct sun4i_tcon *crtc,
++			   const struct drm_encoder *encoder, bool enable);
+ 
+ /* Mode Related Controls */
+ void sun4i_tcon_set_mux(struct sun4i_tcon *tcon, int channel,
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tv.c b/drivers/gpu/drm/sun4i/sun4i_tv.c
+index 050cfd43c7a0..2e27ff9fc58f 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tv.c
+@@ -345,12 +345,9 @@ static void sun4i_tv_disable(struct drm_encoder *encoder)
+ {
+ 	struct sun4i_tv *tv = drm_encoder_to_sun4i_tv(encoder);
+ 	struct sun4i_crtc *crtc = drm_crtc_to_sun4i_crtc(encoder->crtc);
+-	struct sun4i_tcon *tcon = crtc->tcon;
+ 
+ 	DRM_DEBUG_DRIVER("Disabling the TV Output\n");
+ 
+-	sun4i_tcon_channel_disable(tcon, 1);
+-
+ 	regmap_update_bits(tv->regs, SUN4I_TVE_EN_REG,
+ 			   SUN4I_TVE_EN_ENABLE,
+ 			   0);
+@@ -362,7 +359,6 @@ static void sun4i_tv_enable(struct drm_encoder *encoder)
+ {
+ 	struct sun4i_tv *tv = drm_encoder_to_sun4i_tv(encoder);
+ 	struct sun4i_crtc *crtc = drm_crtc_to_sun4i_crtc(encoder->crtc);
+-	struct sun4i_tcon *tcon = crtc->tcon;
+ 
+ 	DRM_DEBUG_DRIVER("Enabling the TV Output\n");
+ 
+@@ -371,8 +367,6 @@ static void sun4i_tv_enable(struct drm_encoder *encoder)
+ 	regmap_update_bits(tv->regs, SUN4I_TVE_EN_REG,
+ 			   SUN4I_TVE_EN_ENABLE,
+ 			   SUN4I_TVE_EN_ENABLE);
+-
+-	sun4i_tcon_channel_enable(tcon, 1);
+ }
+ 
+ static void sun4i_tv_mode_set(struct drm_encoder *encoder,
+-- 
+git-series 0.9.1
