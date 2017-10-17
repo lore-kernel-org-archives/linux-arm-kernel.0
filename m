@@ -1,93 +1,58 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Tue, 17 Oct 2017 14:02:55 -0400
-Subject: [RFC PATCH v4 3/8] drm/rockchip: dw-mipi-dsi: Fix error handling
- path
-In-Reply-To: <20171017101624.12506-4-jeffy.chen@rock-chips.com>
-References: <20171017101624.12506-1-jeffy.chen@rock-chips.com>
- <20171017101624.12506-4-jeffy.chen@rock-chips.com>
-Message-ID: <20171017180255.qdoonirsy6xyhhru@art_vandelay>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 17 Oct 2017 20:10:05 +0200
+Subject: [linux-sunxi] [PATCH 08/10] ARM: dts: sun4i: Enable HDMI support
+ on some A10 devices
+In-Reply-To: <CAGb2v65Z2N24AZp=Y-_YgKuZiT1uSDX5pzMrceU3+TY=+Zdf7g@mail.gmail.com>
+References: <20171017121807.2994-1-wens@csie.org>
+ <20171017121807.2994-9-wens@csie.org>
+ <CAGb2v65Z2N24AZp=Y-_YgKuZiT1uSDX5pzMrceU3+TY=+Zdf7g@mail.gmail.com>
+Message-ID: <20171017181005.7x6wwuidzsm7kep3@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 06:16:19PM +0800, Jeffy Chen wrote:
-> Add missing pm_runtime_disable() in bind()'s error handling path.
+On Tue, Oct 17, 2017 at 10:38:45PM +0800, Chen-Yu Tsai wrote:
+> > diff --git a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
+> > index 2d1b4329f54a..e39ec9beef75 100644
+> > --- a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
+> > +++ b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
+> > @@ -58,6 +58,17 @@
+> >                 stdout-path = "serial0:115200n8";
+> >         };
+> >
+> > +       hdmi-connector {
+> > +               compatible = "hdmi-connector";
+> > +               type = "a";
+> > +
+> > +               port {
+> > +                       hdmi_con_in: endpoint {
+> > +                               remote-endpoint = <&hdmi_out_con>;
+> > +                       };
+> > +               };
+> > +       };
+> > +
+> >         leds {
+> >                 compatible = "gpio-leds";
+> >                 pinctrl-names = "default";
+> > @@ -106,6 +117,16 @@
+> >         status = "okay";
+> >  };
 > 
-> Also cleanup encoder & connector in unbind().
-> 
-> Fixes: 80a9a059d4e4 ("drm/rockchip/dsi: add dw-mipi power domain support")
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> ---
-> 
-> Changes in v4: None
-> Changes in v3: None
-> Changes in v2: None
-> 
->  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 17 +++++++++++------
->  1 file changed, 11 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> index b15755b6129c..a17ff0f6f489 100644
-> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> @@ -1282,7 +1282,7 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
->  	ret = dw_mipi_dsi_register(drm, dsi);
->  	if (ret) {
->  		DRM_DEV_ERROR(dev, "Failed to register mipi_dsi: %d\n", ret);
-> -		goto err_pllref;
-> +		goto err_disable_pllref;
->  	}
->  
->  	pm_runtime_enable(dev);
-> @@ -1292,23 +1292,24 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
->  	ret = mipi_dsi_host_register(&dsi->dsi_host);
->  	if (ret) {
->  		DRM_DEV_ERROR(dev, "Failed to register MIPI host: %d\n", ret);
-> -		goto err_cleanup;
-> +		goto err_disable_pm_runtime;
->  	}
->  
->  	if (!dsi->panel) {
->  		ret = -EPROBE_DEFER;
-> -		goto err_mipi_dsi_host;
-> +		goto err_unreg_mipi_dsi_host;
->  	}
->  
->  	dev_set_drvdata(dev, dsi);
->  	return 0;
->  
-> -err_mipi_dsi_host:
-> +err_unreg_mipi_dsi_host:
->  	mipi_dsi_host_unregister(&dsi->dsi_host);
-> -err_cleanup:
-> +err_disable_pm_runtime:
-> +	pm_runtime_disable(dev);
->  	drm_encoder_cleanup(&dsi->encoder);
->  	drm_connector_cleanup(&dsi->connector);
+> The LIME's dts change is missing the &de part. :(
+> I can fix this when applying.
 
-Should you update these to call the destroy hook like in unbind()?
+I've applied all of rest, I'll leave that one up to you, with my
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Sean
-
-> -err_pllref:
-> +err_disable_pllref:
->  	clk_disable_unprepare(dsi->pllref_clk);
->  	return ret;
->  }
-> @@ -1320,6 +1321,10 @@ static void dw_mipi_dsi_unbind(struct device *dev, struct device *master,
->  
->  	mipi_dsi_host_unregister(&dsi->dsi_host);
->  	pm_runtime_disable(dev);
-> +
-> +	dsi->connector.funcs->destroy(&dsi->connector);
-> +	dsi->encoder.funcs->destroy(&dsi->encoder);
-> +
->  	clk_disable_unprepare(dsi->pllref_clk);
->  }
->  
-> -- 
-> 2.11.0
-> 
-> 
+Maxime
 
 -- 
-Sean Paul, Software Engineer, Google / Chromium OS
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171017/e5c65c04/attachment.sig>
