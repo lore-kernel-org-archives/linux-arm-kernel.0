@@ -1,121 +1,287 @@
-From: tanxiaojun@huawei.com (Tan Xiaojun)
-Date: Tue, 17 Oct 2017 19:33:57 +0800
-Subject: [bug report & help] arm64: ltp testcase "migrate_pages01" failed
-In-Reply-To: <20171017092307.GB21398@arm.com>
-References: <59E49B2B.8020802@huawei.com> <59E571ED.9090106@huawei.com>
- <20171017092307.GB21398@arm.com>
-Message-ID: <59E5EAA5.7000608@huawei.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Tue, 17 Oct 2017 13:40:28 +0200
+Subject: [PATCH v12 01/11] mm: deferred_init_memmap improvements
+In-Reply-To: <20171013173214.27300-2-pasha.tatashin@oracle.com>
+References: <20171013173214.27300-1-pasha.tatashin@oracle.com>
+ <20171013173214.27300-2-pasha.tatashin@oracle.com>
+Message-ID: <20171017114028.uyt63277md5tuc4j@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/10/17 17:23, Will Deacon wrote:
-> On Tue, Oct 17, 2017 at 10:58:53AM +0800, Tan Xiaojun wrote:
->> I'm not sure if this is the problem on arm64 numa. What do you think ?
->> By the way, this testcase can be successful in any case on x86.
+On Fri 13-10-17 13:32:04, Pavel Tatashin wrote:
+> deferred_init_memmap() is called when struct pages are initialized later
+> in boot by slave CPUs. This patch simplifies and optimizes this function,
+> and also fixes a couple issues (described below).
 > 
-> To be honest, this isn't a particularly helpful bug report. I appreciate
-> that a test is reporting failure, but it doesn't look like you've spent
-> very much effort to understand what the test is trying to do and why it
-> thinks it's failed to do it. All I can sensibly do with your bug report
-> is run the test myself, and it passes on the systems I have available.
+> The main change is that now we are iterating through free memblock areas
+> instead of all configured memory. Thus, we do not have to check if the
+> struct page has already been initialized.
 > 
-> So, you need to:
+> =====
+> In deferred_init_memmap() where all deferred struct pages are initialized
+> we have a check like this:
 > 
-> 1. Understand what the test is doing.
-> 2. Figure out which bit isn't doing what it's supposed to
-> 3. See if that part can be isolated to trigger the problem
+> if (page->flags) {
+> 	VM_BUG_ON(page_zone(page) != zone);
+> 	goto free_range;
+> }
 > 
-> At that point, it should be possible to describe the unexpected behaviour
-> at a level which we can actually investigate if necessary.
+> This way we are checking if the current deferred page has already been
+> initialized. It works, because memory for struct pages has been zeroed, and
+> the only way flags are not zero if it went through __init_single_page()
+> before.  But, once we change the current behavior and won't zero the memory
+> in memblock allocator, we cannot trust anything inside "struct page"es
+> until they are initialized. This patch fixes this.
 > 
-> Will
+> The deferred_init_memmap() is re-written to loop through only free memory
+> ranges provided by memblock.
 > 
+> Note, this first issue is relevant only when the following change is
+> merged:
+> 
+> =====
+> This patch fixes another existing issue on systems that have holes in
+> zones i.e CONFIG_HOLES_IN_ZONE is defined.
+> 
+> In for_each_mem_pfn_range() we have code like this:
+> 
+> if (!pfn_valid_within(pfn)
+> 	goto free_range;
+> 
+> Note: 'page' is not set to NULL and is not incremented but 'pfn' advances.
+> Thus means if deferred struct pages are enabled on systems with these kind
+> of holes, linux would get memory corruptions. I have fixed this issue by
+> defining a new macro that performs all the necessary operations when we
+> free the current set of pages.
 
-OK. I will do these things. And can you tell me the model of your test board?
-If possible, run "numactl -H" to make sure all nodes have memory.
+This really begs to have two patches... I will not insist though. I also
+suspect the code can be further simplified but again this is nothing to
+block this to go.
+ 
+> Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
+> Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
+> Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
+> Reviewed-by: Bob Picco <bob.picco@oracle.com>
 
-Thanks.
-Xiaojun.
+I do not see any obvious issues in the patch
 
->> On 2017/10/16 19:42, Tan Xiaojun wrote:
->>> Hi all,
->>>
->>> I test ltp in Hisilicon D05 board and get a failed result about the testcase "migrate_pages01".
->>>
->>> In fact, The sub testcase "test_invalid_nodes" failed. The testcase is to find a invalid numa node and migrate memory pages to this node via syscall of "migrate_pages".
->>> The expected result of this case is returning "-1", but it actually return "0".
->>>
->>> --------------------------------------------------------
->>> # ./migrate_pages01
->>> migrate_pages01    0  TINFO  :  test_empty_mask
->>> migrate_pages01    1  TPASS  :  expected ret success: returned value = 0
->>> migrate_pages01    0  TINFO  :  test_invalid_pid -1
->>> migrate_pages01    2  TPASS  :  expected ret success: returned value = -1
->>> migrate_pages01    3  TPASS  :  expected failure: TEST_ERRNO=ESRCH(3): No such process
->>> migrate_pages01    0  TINFO  :  test_invalid_pid unused pid
->>> migrate_pages01    4  TPASS  :  expected ret success: returned value = -1
->>> migrate_pages01    5  TPASS  :  expected failure: TEST_ERRNO=ESRCH(3): No such process
->>> migrate_pages01    0  TINFO  :  test_invalid_masksize
->>> migrate_pages01    6  TPASS  :  expected ret success: returned value = -1
->>> migrate_pages01    7  TPASS  :  expected failure: TEST_ERRNO=EINVAL(22): Invalid argument
->>> migrate_pages01    0  TINFO  :  test_invalid_mem -1
->>> migrate_pages01    8  TPASS  :  expected ret success: returned value = -1
->>> migrate_pages01    9  TPASS  :  expected failure: TEST_ERRNO=EFAULT(14): Bad address
->>> migrate_pages01    0  TINFO  :  test_invalid_mem invalid prot
->>> migrate_pages01   10  TPASS  :  expected ret success: returned value = -1
->>> migrate_pages01   11  TPASS  :  expected failure: TEST_ERRNO=EFAULT(14): Bad address
->>> migrate_pages01    0  TINFO  :  test_invalid_mem unmmaped
->>> migrate_pages01   12  TPASS  :  expected ret success: returned value = -1
->>> migrate_pages01   13  TPASS  :  expected failure: TEST_ERRNO=EFAULT(14): Bad address
->>> migrate_pages01    0  TINFO  :  test_invalid_nodes
->>> migrate_pages01   14  TFAIL  :  migrate_pages_common.c:45: unexpected failure - returned value = 0, expected: -1
->>> migrate_pages01   15  TFAIL  :  migrate_pages_common.c:55: call succeeded unexpectedly
->>> migrate_pages01    0  TINFO  :  test_invalid_perm
->>> migrate_pages01   16  TPASS  :  expected ret success: returned value = -1
->>> migrate_pages01   17  TPASS  :  expected failure: TEST_ERRNO=EPERM(1): Operation not permitted
->>> --------------------------------------------------------
->>>
->>> I debug and find a interesting thing, this case does not always fail.
->>>
->>> 1) If one or several numa nodes have no memory, this case will run successfully like below:
->>>
->>> --------------------
->>> available: 4 nodes (0-3)
->>> node 0 cpus: 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
->>> node 0 size: 65309 MB
->>> node 0 free: 61650 MB
->>> node 1 cpus: 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
->>> node 1 size: 65404 MB
->>> node 1 free: 61377 MB
->>> node 2 cpus: 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47
->>> node 2 size: 65401 MB
->>> node 2 free: 62316 MB
->>> node 3 cpus: 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63
->>> node 3 size: 0 MB
->>> node 3 free: 0 MB
->>> node distances:
->>> node   0   1   2   3
->>>   0:  10  15  20  20
->>>   1:  15  10  20  20
->>>   2:  20  20  10  15
->>>   3:  20  20  15  10
->>> ---------------------
->>>
->>> This testcase will find node number 3 and migrate pages to node 3. And syscall of "migrate_pages" return -1, test succeeded.
->>>
->>> 2) In most cases, all nodes have memory, and the testcase will get non-existent node like node number 4. The syscall of "migrate_pages" should also return -1, but return 0 actually.
->>> So the testcase failed.
->>>
->>> I think it is a problem in arm64. But I am not familiar with numa, so I ask for help from you.
->>>
->>> Thanks.
->>> Xiaojun.
->>>
->>>
->>> .
->>>
->>
->>
+Acked-by: Michal Hocko <mhocko@suse.com>
+
+> ---
+>  mm/page_alloc.c | 168 ++++++++++++++++++++++++++++----------------------------
+>  1 file changed, 85 insertions(+), 83 deletions(-)
 > 
-> .
-> 
+> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+> index 77e4d3c5c57b..cdbd14829fd3 100644
+> --- a/mm/page_alloc.c
+> +++ b/mm/page_alloc.c
+> @@ -1410,14 +1410,17 @@ void clear_zone_contiguous(struct zone *zone)
+>  }
+>  
+>  #ifdef CONFIG_DEFERRED_STRUCT_PAGE_INIT
+> -static void __init deferred_free_range(struct page *page,
+> -					unsigned long pfn, int nr_pages)
+> +static void __init deferred_free_range(unsigned long pfn,
+> +				       unsigned long nr_pages)
+>  {
+> -	int i;
+> +	struct page *page;
+> +	unsigned long i;
+>  
+> -	if (!page)
+> +	if (!nr_pages)
+>  		return;
+>  
+> +	page = pfn_to_page(pfn);
+> +
+>  	/* Free a large naturally-aligned chunk if possible */
+>  	if (nr_pages == pageblock_nr_pages &&
+>  	    (pfn & (pageblock_nr_pages - 1)) == 0) {
+> @@ -1443,19 +1446,89 @@ static inline void __init pgdat_init_report_one_done(void)
+>  		complete(&pgdat_init_all_done_comp);
+>  }
+>  
+> +/*
+> + * Helper for deferred_init_range, free the given range, reset the counters, and
+> + * return number of pages freed.
+> + */
+> +static inline unsigned long __def_free(unsigned long *nr_free,
+> +				       unsigned long *free_base_pfn,
+> +				       struct page **page)
+> +{
+> +	unsigned long nr = *nr_free;
+> +
+> +	deferred_free_range(*free_base_pfn, nr);
+> +	*free_base_pfn = 0;
+> +	*nr_free = 0;
+> +	*page = NULL;
+> +
+> +	return nr;
+> +}
+> +
+> +static unsigned long deferred_init_range(int nid, int zid, unsigned long pfn,
+> +					 unsigned long end_pfn)
+> +{
+> +	struct mminit_pfnnid_cache nid_init_state = { };
+> +	unsigned long nr_pgmask = pageblock_nr_pages - 1;
+> +	unsigned long free_base_pfn = 0;
+> +	unsigned long nr_pages = 0;
+> +	unsigned long nr_free = 0;
+> +	struct page *page = NULL;
+> +
+> +	for (; pfn < end_pfn; pfn++) {
+> +		/*
+> +		 * First we check if pfn is valid on architectures where it is
+> +		 * possible to have holes within pageblock_nr_pages. On systems
+> +		 * where it is not possible, this function is optimized out.
+> +		 *
+> +		 * Then, we check if a current large page is valid by only
+> +		 * checking the validity of the head pfn.
+> +		 *
+> +		 * meminit_pfn_in_nid is checked on systems where pfns can
+> +		 * interleave within a node: a pfn is between start and end
+> +		 * of a node, but does not belong to this memory node.
+> +		 *
+> +		 * Finally, we minimize pfn page lookups and scheduler checks by
+> +		 * performing it only once every pageblock_nr_pages.
+> +		 */
+> +		if (!pfn_valid_within(pfn)) {
+> +			nr_pages += __def_free(&nr_free, &free_base_pfn, &page);
+> +		} else if (!(pfn & nr_pgmask) && !pfn_valid(pfn)) {
+> +			nr_pages += __def_free(&nr_free, &free_base_pfn, &page);
+> +		} else if (!meminit_pfn_in_nid(pfn, nid, &nid_init_state)) {
+> +			nr_pages += __def_free(&nr_free, &free_base_pfn, &page);
+> +		} else if (page && (pfn & nr_pgmask)) {
+> +			page++;
+> +			__init_single_page(page, pfn, zid, nid);
+> +			nr_free++;
+> +		} else {
+> +			nr_pages += __def_free(&nr_free, &free_base_pfn, &page);
+> +			page = pfn_to_page(pfn);
+> +			__init_single_page(page, pfn, zid, nid);
+> +			free_base_pfn = pfn;
+> +			nr_free = 1;
+> +			cond_resched();
+> +		}
+> +	}
+> +	/* Free the last block of pages to allocator */
+> +	nr_pages += __def_free(&nr_free, &free_base_pfn, &page);
+> +
+> +	return nr_pages;
+> +}
+> +
+>  /* Initialise remaining memory on a node */
+>  static int __init deferred_init_memmap(void *data)
+>  {
+>  	pg_data_t *pgdat = data;
+>  	int nid = pgdat->node_id;
+> -	struct mminit_pfnnid_cache nid_init_state = { };
+>  	unsigned long start = jiffies;
+>  	unsigned long nr_pages = 0;
+> -	unsigned long walk_start, walk_end;
+> -	int i, zid;
+> +	unsigned long spfn, epfn;
+> +	phys_addr_t spa, epa;
+> +	int zid;
+>  	struct zone *zone;
+>  	unsigned long first_init_pfn = pgdat->first_deferred_pfn;
+>  	const struct cpumask *cpumask = cpumask_of_node(pgdat->node_id);
+> +	u64 i;
+>  
+>  	if (first_init_pfn == ULONG_MAX) {
+>  		pgdat_init_report_one_done();
+> @@ -1477,83 +1550,12 @@ static int __init deferred_init_memmap(void *data)
+>  		if (first_init_pfn < zone_end_pfn(zone))
+>  			break;
+>  	}
+> +	first_init_pfn = max(zone->zone_start_pfn, first_init_pfn);
+>  
+> -	for_each_mem_pfn_range(i, nid, &walk_start, &walk_end, NULL) {
+> -		unsigned long pfn, end_pfn;
+> -		struct page *page = NULL;
+> -		struct page *free_base_page = NULL;
+> -		unsigned long free_base_pfn = 0;
+> -		int nr_to_free = 0;
+> -
+> -		end_pfn = min(walk_end, zone_end_pfn(zone));
+> -		pfn = first_init_pfn;
+> -		if (pfn < walk_start)
+> -			pfn = walk_start;
+> -		if (pfn < zone->zone_start_pfn)
+> -			pfn = zone->zone_start_pfn;
+> -
+> -		for (; pfn < end_pfn; pfn++) {
+> -			if (!pfn_valid_within(pfn))
+> -				goto free_range;
+> -
+> -			/*
+> -			 * Ensure pfn_valid is checked every
+> -			 * pageblock_nr_pages for memory holes
+> -			 */
+> -			if ((pfn & (pageblock_nr_pages - 1)) == 0) {
+> -				if (!pfn_valid(pfn)) {
+> -					page = NULL;
+> -					goto free_range;
+> -				}
+> -			}
+> -
+> -			if (!meminit_pfn_in_nid(pfn, nid, &nid_init_state)) {
+> -				page = NULL;
+> -				goto free_range;
+> -			}
+> -
+> -			/* Minimise pfn page lookups and scheduler checks */
+> -			if (page && (pfn & (pageblock_nr_pages - 1)) != 0) {
+> -				page++;
+> -			} else {
+> -				nr_pages += nr_to_free;
+> -				deferred_free_range(free_base_page,
+> -						free_base_pfn, nr_to_free);
+> -				free_base_page = NULL;
+> -				free_base_pfn = nr_to_free = 0;
+> -
+> -				page = pfn_to_page(pfn);
+> -				cond_resched();
+> -			}
+> -
+> -			if (page->flags) {
+> -				VM_BUG_ON(page_zone(page) != zone);
+> -				goto free_range;
+> -			}
+> -
+> -			__init_single_page(page, pfn, zid, nid);
+> -			if (!free_base_page) {
+> -				free_base_page = page;
+> -				free_base_pfn = pfn;
+> -				nr_to_free = 0;
+> -			}
+> -			nr_to_free++;
+> -
+> -			/* Where possible, batch up pages for a single free */
+> -			continue;
+> -free_range:
+> -			/* Free the current block of pages to allocator */
+> -			nr_pages += nr_to_free;
+> -			deferred_free_range(free_base_page, free_base_pfn,
+> -								nr_to_free);
+> -			free_base_page = NULL;
+> -			free_base_pfn = nr_to_free = 0;
+> -		}
+> -		/* Free the last block of pages to allocator */
+> -		nr_pages += nr_to_free;
+> -		deferred_free_range(free_base_page, free_base_pfn, nr_to_free);
+> -
+> -		first_init_pfn = max(end_pfn, first_init_pfn);
+> +	for_each_free_mem_range(i, nid, MEMBLOCK_NONE, &spa, &epa, NULL) {
+> +		spfn = max_t(unsigned long, first_init_pfn, PFN_UP(spa));
+> +		epfn = min_t(unsigned long, zone_end_pfn(zone), PFN_DOWN(epa));
+> +		nr_pages += deferred_init_range(nid, zid, spfn, epfn);
+>  	}
+>  
+>  	/* Sanity check that the next zone really is unpopulated */
+> -- 
+> 2.14.2
+
+-- 
+Michal Hocko
+SUSE Labs
