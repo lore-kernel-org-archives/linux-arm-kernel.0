@@ -1,57 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 17 Oct 2017 08:09:56 +0200
-Subject: [PATCH 08/11] ARM: dts: r8a7791: Use R-Car SDHI Gen2 fallback compat
+Date: Tue, 17 Oct 2017 08:09:57 +0200
+Subject: [PATCH 09/11] ARM: dts: r8a7792: Use R-Car SDHI Gen2 fallback compat
  string
 In-Reply-To: <20171017060959.16702-1-horms+renesas@verge.net.au>
 References: <20171017060959.16702-1-horms+renesas@verge.net.au>
-Message-ID: <20171017060959.16702-9-horms+renesas@verge.net.au>
+Message-ID: <20171017060959.16702-10-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Use newly added R-Car SDHI Gen2 fallback compat string
-in the DT of the r8a7791 SoC.
+in the DT of the r8a7792 SoC.
 
 This should have no run-time effect as the driver matches against
 the per-SoC compat string before considering the fallback compat string.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791.dtsi | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/r8a7792.dtsi | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 67831d0405f3..767702fe6d45 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -612,7 +612,8 @@
- 	};
+diff --git a/arch/arm/boot/dts/r8a7792.dtsi b/arch/arm/boot/dts/r8a7792.dtsi
+index 131f65b0426e..7b394273031e 100644
+--- a/arch/arm/boot/dts/r8a7792.dtsi
++++ b/arch/arm/boot/dts/r8a7792.dtsi
+@@ -507,7 +507,8 @@
+ 		};
  
- 	sdhi0: sd at ee100000 {
--		compatible = "renesas,sdhi-r8a7791";
-+		compatible = "renesas,sdhi-r8a7791",
-+			     "renesas,rcar-gen2-sdhi";
- 		reg = <0 0xee100000 0 0x328>;
- 		interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&cpg CPG_MOD 314>;
-@@ -626,7 +627,8 @@
- 	};
- 
- 	sdhi1: sd at ee140000 {
--		compatible = "renesas,sdhi-r8a7791";
-+		compatible = "renesas,sdhi-r8a7791",
-+			     "renesas,rcar-gen2-sdhi";
- 		reg = <0 0xee140000 0 0x100>;
- 		interrupts = <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&cpg CPG_MOD 312>;
-@@ -640,7 +642,8 @@
- 	};
- 
- 	sdhi2: sd at ee160000 {
--		compatible = "renesas,sdhi-r8a7791";
-+		compatible = "renesas,sdhi-r8a7791",
-+			     "renesas,rcar-gen2-sdhi";
- 		reg = <0 0xee160000 0 0x100>;
- 		interrupts = <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&cpg CPG_MOD 311>;
+ 		sdhi0: sd at ee100000 {
+-			compatible = "renesas,sdhi-r8a7792";
++			compatible = "renesas,sdhi-r8a7792",
++				     "renesas,rcar-gen2-sdhi";
+ 			reg = <0 0xee100000 0 0x328>;
+ 			interrupts = <0 165 IRQ_TYPE_LEVEL_HIGH>;
+ 			dmas = <&dmac0 0xcd>, <&dmac0 0xce>,
 -- 
 2.11.0
