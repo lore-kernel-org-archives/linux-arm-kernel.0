@@ -1,103 +1,197 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 17 Oct 2017 10:56:43 +0100
-Subject: ARM64: Regression with commit e3067861ba66 ("arm64: add basic
- VMAP_STACK support")
-In-Reply-To: <20171017093658.GA32000@leoy-linaro>
-References: <da09fd83-f3f0-f800-fea4-988cfa56bac7@arm.com>
- <20171016011723.GB12470@leoy-linaro>
- <20171016134819.jv3udrcwsedc4cgs@lakrids.cambridge.arm.com>
- <34ccf02d-fd65-bade-327a-ed8df1d3eea5@arm.com>
- <20171016142622.6yjuzdwxxw3sxjed@lakrids.cambridge.arm.com>
- <dad6105d-1ec0-d5a6-e78c-ff832afe3f9e@arm.com>
- <20171017003054.GB19504@leoy-ThinkPad-T440>
- <20171017092914.op4hlzaaqfrpoizm@lakrids.cambridge.arm.com>
- <CAKv+Gu8u1cc14c5ZDeq=oNB9DC2RcHzXu8e9Cc+noHT4w+4mpg@mail.gmail.com>
- <20171017093658.GA32000@leoy-linaro>
-Message-ID: <20171017095643.7bzihiupuxsnkujn@lakrids.cambridge.arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 17 Oct 2017 17:56:47 +0800
+Subject: [PATCH 06/23] drm/sun4i: tcon: Don't rely on encoders to set the
+ TCON mode
+In-Reply-To: <faa3a4d511039af1d116270dfef3a8b60ca3591e.1508231063.git-series.maxime.ripard@free-electrons.com>
+References: <cover.fe3d65d1ee05a55224d26e7d113388c428592b26.1508231063.git-series.maxime.ripard@free-electrons.com>
+ <faa3a4d511039af1d116270dfef3a8b60ca3591e.1508231063.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v679FWRRiTfS5jReFqiAEEiqAg13wUPHOYdT_=gebh25tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 05:36:58PM +0800, Leo Yan wrote:
-> On Tue, Oct 17, 2017 at 10:32:21AM +0100, Ard Biesheuvel wrote:
-> 
-> [...]
-> 
-> > > AFAICT, erratum 836870 results in livelock rather than memory
-> > > corruption, so I think we can ignore that.
-> > >
-> > > I'm a little worried by erratum 843419. The VMAP_STACK patches changed
-> > > {adr,ldr}_this_cpu (and some users thereof), and it's possible we're
-> > > managing to tickle that issue.
-> > >
-> > > If you still have an affected kernel, could you dump the output of:
-> > >
-> > > $ aarch64-linux-gnu-objdump -d vmlinux | grep -A 3 'ff[8c]:\s\+[a-f0-9]\+\s\+adrp'
-> > >
-> > > ... that would show us if there are any affected sequences.
-> > >
-> > > From a quick scan of my own vmlinux build from commit e3067861ba66, I
-> > > didn't see any, but it's possible this depends on the config used.
-> > >
-> > 
-> > The linker should take care of that: it scans the entire executable,
-> > and inserts a veneer if an adrp happens to end up at a vulnerable
-> > offset in the page.
-> 
-> Is this dependent on any GCC version?
+On Tue, Oct 17, 2017 at 5:06 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Just like we did for the TCON enable and disable, for historical reasons we
+> used to rely on the encoders calling the TCON mode_set function, while the
+> CRTC has a callback for that.
+>
+> Let's implement it in order to reduce the boilerplate code.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/gpu/drm/sun4i/sun4i_crtc.c          | 10 +++++++-
+>  drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c  |  1 +-
+>  drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c      |  7 +-----
+>  drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c |  1 +-
+>  drivers/gpu/drm/sun4i/sun4i_rgb.c           | 15 +-----------
+>  drivers/gpu/drm/sun4i/sun4i_tcon.c          | 31 +++++++++++++++++-----
+>  drivers/gpu/drm/sun4i/sun4i_tcon.h          | 11 ++------
+>  drivers/gpu/drm/sun4i/sun4i_tv.c            |  6 +----
+>  8 files changed, 37 insertions(+), 45 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+> index e86baa3746af..5decae0069d0 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+> @@ -115,11 +115,21 @@ static void sun4i_crtc_atomic_enable(struct drm_crtc *crtc,
+>         sun4i_tcon_set_status(scrtc->tcon, encoder, true);
+>  }
+>
+> +static void sun4i_crtc_mode_set_nofb(struct drm_crtc *crtc)
+> +{
+> +       struct drm_display_mode *mode = &crtc->state->adjusted_mode;
+> +       struct drm_encoder *encoder = sun4i_crtc_get_encoder(crtc);
+> +       struct sun4i_crtc *scrtc = drm_crtc_to_sun4i_crtc(crtc);
+> +
+> +       sun4i_tcon_mode_set(scrtc->tcon, encoder, mode);
+> +}
+> +
+>  static const struct drm_crtc_helper_funcs sun4i_crtc_helper_funcs = {
+>         .atomic_begin   = sun4i_crtc_atomic_begin,
+>         .atomic_flush   = sun4i_crtc_atomic_flush,
+>         .atomic_enable  = sun4i_crtc_atomic_enable,
+>         .atomic_disable = sun4i_crtc_atomic_disable,
+> +       .mode_set_nofb  = sun4i_crtc_mode_set_nofb,
+>  };
+>
+>  static int sun4i_crtc_enable_vblank(struct drm_crtc *crtc)
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c
+> index 04f85b1cf922..e826da34e919 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c
+> @@ -13,7 +13,6 @@
+>  #include <linux/clk-provider.h>
+>  #include <linux/regmap.h>
+>
+> -#include "sun4i_tcon.h"
+>  #include "sun4i_hdmi.h"
+>
+>  struct sun4i_ddc {
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+> index 482bf03d55c1..d2eb0a60e568 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+> @@ -30,7 +30,6 @@
+>  #include "sun4i_crtc.h"
+>  #include "sun4i_drv.h"
+>  #include "sun4i_hdmi.h"
+> -#include "sun4i_tcon.h"
+>
+>  static inline struct sun4i_hdmi *
+>  drm_encoder_to_sun4i_hdmi(struct drm_encoder *encoder)
+> @@ -120,15 +119,9 @@ static void sun4i_hdmi_mode_set(struct drm_encoder *encoder,
+>                                 struct drm_display_mode *adjusted_mode)
+>  {
+>         struct sun4i_hdmi *hdmi = drm_encoder_to_sun4i_hdmi(encoder);
+> -       struct sun4i_crtc *crtc = drm_crtc_to_sun4i_crtc(encoder->crtc);
+> -       struct sun4i_tcon *tcon = crtc->tcon;
+>         unsigned int x, y;
+>         u32 val;
+>
+> -       sun4i_tcon1_mode_set(tcon, mode);
+> -       sun4i_tcon_set_mux(tcon, 1, encoder);
+> -
+> -       clk_set_rate(tcon->sclk1, mode->crtc_clock * 1000);
+>         clk_set_rate(hdmi->mod_clk, mode->crtc_clock * 1000);
+>         clk_set_rate(hdmi->tmds_clk, mode->crtc_clock * 1000);
+>
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
+> index 1b6b37aefc38..dc332ea56f6c 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
+> @@ -12,7 +12,6 @@
+>
+>  #include <linux/clk-provider.h>
+>
+> -#include "sun4i_tcon.h"
+>  #include "sun4i_hdmi.h"
+>
+>  struct sun4i_tmds {
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+> index a7f297ed40c1..832f8f9bc47f 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+> @@ -153,22 +153,7 @@ static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
+>         }
+>  }
+>
+> -static void sun4i_rgb_encoder_mode_set(struct drm_encoder *encoder,
+> -                                      struct drm_display_mode *mode,
+> -                                      struct drm_display_mode *adjusted_mode)
+> -{
+> -       struct sun4i_rgb *rgb = drm_encoder_to_sun4i_rgb(encoder);
+> -       struct sun4i_tcon *tcon = rgb->tcon;
+> -
+> -       sun4i_tcon0_mode_set(tcon, mode);
+> -       sun4i_tcon_set_mux(tcon, 0, encoder);
+> -
+> -       /* FIXME: This seems to be board specific */
+> -       clk_set_phase(tcon->dclk, 120);
+> -}
+> -
+>  static struct drm_encoder_helper_funcs sun4i_rgb_enc_helper_funcs = {
+> -       .mode_set       = sun4i_rgb_encoder_mode_set,
+>         .disable        = sun4i_rgb_encoder_disable,
+>         .enable         = sun4i_rgb_encoder_enable,
+>  };
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> index 964cf22a1ced..7ecd4f7c8411 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> @@ -139,7 +139,6 @@ void sun4i_tcon_set_mux(struct sun4i_tcon *tcon, int channel,
+>         DRM_DEBUG_DRIVER("Muxing encoder %s to CRTC %s: %d\n",
+>                          encoder->name, encoder->crtc->name, ret);
+>  }
+> -EXPORT_SYMBOL(sun4i_tcon_set_mux);
+>
+>  static int sun4i_tcon_get_clk_delay(const struct drm_display_mode *mode,
+>                                     int channel)
+> @@ -159,8 +158,8 @@ static int sun4i_tcon_get_clk_delay(const struct drm_display_mode *mode,
+>         return delay;
+>  }
+>
+> -void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
+> -                         struct drm_display_mode *mode)
+> +static void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
+> +                                struct drm_display_mode *mode)
 
-It is, but we should warn if CONFIG_ARM64_ERRATUM_843419 is selected and
-the linked doesn't support the --fix-cortex-a53-843419 option:
+This doesn't have const...
 
-  ld does not support --fix-cortex-a53-843419; kernel may be susceptible to erratum)
+>  {
+>         unsigned int bp, hsync, vsync;
+>         u8 clk_delay;
+> @@ -233,10 +232,9 @@ void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
+>         /* Enable the output on the pins */
+>         regmap_write(tcon->regs, SUN4I_TCON0_IO_TRI_REG, 0);
+>  }
+> -EXPORT_SYMBOL(sun4i_tcon0_mode_set);
+>
+> -void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
+> -                         struct drm_display_mode *mode)
+> +static void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
+> +                                const struct drm_display_mode *mode)
+>  {
+>         unsigned int bp, hsync, vsync, vtotal;
+>         u8 clk_delay;
+> @@ -324,7 +322,26 @@ void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
+>                            SUN4I_TCON_GCTL_IOMAP_MASK,
+>                            SUN4I_TCON_GCTL_IOMAP_TCON1);
+>  }
+> -EXPORT_SYMBOL(sun4i_tcon1_mode_set);
+> +
+> +void sun4i_tcon_mode_set(struct sun4i_tcon *tcon,
+> +                        const struct drm_encoder *encoder,
+> +                        const struct drm_display_mode *mode)
 
-... do you see this when building the kernel?
+But this does...
 
-> I am using GCC 6.2.1, so I get many affected sequences with Mark's command:
+> +{
+> +       switch (encoder->encoder_type) {
+> +       case DRM_MODE_ENCODER_NONE:
+> +               sun4i_tcon0_mode_set(tcon, mode);
 
-I beleive these are all beningn. AFAICT, none of these meet the conditions for
-sequence 1 or sequence 2 affected by the erratum. e.g. many don't have
-loads/stores using the adrp result.
+So you're likely to get some warning about dropping const here.
 
-Thanks,
-Mark.
+Otherwise,
 
-> leoy at leoy-linaro:~/Work/reference/opensource/linux$ aarch64-linux-gnu-objdump -d vmlinux | grep -A 3 'ff[8c]:\s\+[a-f0-9]\+\s\+adrp'
-> ffff0000080a1ffc:	90007340 	adrp	x0, ffff000008f09000 <page_wait_table+0x1280>
-> ffff0000080a2000:	a900fedf 	stp	xzr, xzr, [x22,#8]
-> ffff0000080a2004:	91374000 	add	x0, x0, #0xdd0
-> ffff0000080a2008:	f9000ec0 	str	x0, [x22,#24]
-> --
-> ffff0000080b6ff8:	b0007ce0 	adrp	x0, ffff000009053000 <chunk_hash_heads+0x680>
-> ffff0000080b6ffc:	52901801 	mov	w1, #0x80c0                	// #32960
-> ffff0000080b7000:	72a02801 	movk	w1, #0x140, lsl #16
-> ffff0000080b7004:	9102e273 	add	x19, x19, #0xb8
-> --
-> ffff0000080f1ff8:	d00070a1 	adrp	x1, ffff000008f07000 <bit_wait_table+0xd80>
-> ffff0000080f1ffc:	f9406402 	ldr	x2, [x0,#200]
-> ffff0000080f2000:	f9405c03 	ldr	x3, [x0,#184]
-> ffff0000080f2004:	14002915 	b	ffff0000080fc458 <e843419@00ce_00000e94_3c4>
-> --
-> ffff0000080feff8:	90000002 	adrp	x2, ffff0000080fe000 <prio_changed_rt+0x88>
-> ffff0000080feffc:	9136e042 	add	x2, x2, #0xdb8
-> ffff0000080ff000:	f9000462 	str	x2, [x3,#8]
-> ffff0000080ff004:	f9448e62 	ldr	x2, [x19,#2328]
-> --
-> ffff00000810affc:	f0006fe1 	adrp	x1, ffff000008f09000 <page_wait_table+0x1280>
-> ffff00000810b000:	f94017a2 	ldr	x2, [x29,#40]
-> ffff00000810b004:	aa1303e0 	mov	x0, x19
-> ffff00000810b008:	1400013d 	b	ffff00000810b4fc <e843419@00e7_000010c5_338>
-> --
-> ffff00000811dff8:	d0005c80 	adrp	x0, ffff000008caf000 <kallsyms_token_index+0xaf00>
-> ffff00000811dffc:	912be021 	add	x1, x1, #0xaf8
-> ffff00000811e000:	912ae000 	add	x0, x0, #0xab8
-> ffff00000811e004:	97ffe6ab 	bl	ffff000008117ab0 <printk>
-> --
-> ffff000008137ff8:	f0004443 	adrp	x3, ffff0000089c2000 <clock_monotonic+0x50>
-> ffff000008137ffc:	910ac042 	add	x2, x2, #0x2b0
-> ffff000008138000:	9113c063 	add	x3, x3, #0x4f0
-> ffff000008138004:	71000c9f 	cmp	w4, #0x3
-> --
-> ffff00000815eff8:	b0005aa1 	adrp	x1, ffff000008cb3000 <kallsyms_token_index+0xef00>
-> ffff00000815effc:	91362021 	add	x1, x1, #0xd88
-> ffff00000815f000:	97ffffc8 	bl	ffff00000815ef20 <audit_log_format>
-> ffff00000815f004:	b94023a1 	ldr	w1, [x29,#32]
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
