@@ -1,125 +1,116 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Wed, 18 Oct 2017 01:24:16 +0200
-Subject: arm64: 4.14 of_match_node() issues
-In-Reply-To: <bbf611c8-c7e8-d67f-f933-3e7b23bdba22@arm.com>
-References: <5d2ff063-1f7e-0200-cc02-99804f7d9219@suse.de>
- <20171009092409.GB5127@arm.com>
- <66956548-fa7a-332a-8045-8202ae0aa564@arm.com>
- <CGME20171009120447epcas2p3d22ec871318e38a71a5b92f840b5e4d4@epcas2p3.samsung.com>
- <d4e48d3d-015f-08d2-7745-51c482c1a09a@arm.com>
- <42630b8b-8987-57ff-be7e-79af7294856e@samsung.com>
- <bbf611c8-c7e8-d67f-f933-3e7b23bdba22@arm.com>
-Message-ID: <4155378a-446e-8a18-a1fc-7ff4568a23d3@suse.de>
+From: briannorris@chromium.org (Brian Norris)
+Date: Tue, 17 Oct 2017 16:39:05 -0700
+Subject: [PATCH 1/3] Documentation/devicetree: Add pcie-reset-suspend
+ property
+In-Reply-To: <20171013165152.GE25517@bhelgaas-glaptop.roam.corp.google.com>
+References: <20171012205220.130048-1-briannorris@chromium.org>
+ <20171012205220.130048-2-briannorris@chromium.org>
+ <20171013165152.GE25517@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20171017233904.GA65743@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 11.10.2017 um 12:07 schrieb Suzuki K Poulose:
-> On 09/10/17 13:20, Marek Szyprowski wrote:
->> Hi All,
->>
->> On 2017-10-09 14:04, Robin Murphy wrote:
->>> On 09/10/17 11:58, Robin Murphy wrote:
->>>> On 09/10/17 10:24, Will Deacon wrote:
->>>>> Hi Andreas,
->>>>>
->>>>> On Sat, Oct 07, 2017 at 02:42:13AM +0200, Andreas F?rber wrote:
->>>>>> Since 4.14-rc1 I am seeing frequent oopses during module loading
->>>>>> (e.g.,
->>>>>> MMC, USB) from initrd on aarch64. Symptoms are similar to this in
->>>>>> -rc3:
->>>>>>
->>>>>> [? OK? ] Started udev Coldplug all Devices.
->>>>>> [?? 10.117775] usbcore: registered new interface driver usbfs
->>>>>> [?? 10.118235] Unable to handle kernel paging request at virtual
->>>>>> address
->>>>>> ffff000008e5abc0
->>>>>> [?? 10.118238] Mem abort info:
->>>>>> [?? 10.118245]?? Exception class = DABT (current EL), IL = 32 bits
->>>>>> [?? 10.118249]?? SET = 0, FnV = 0
->>>>>> [?? 10.118253]?? EA = 0, S1PTW = 0
->>>>>> [?? 10.118256] Data abort info:
->>>>>> [?? 10.118261]?? ISV = 0, ISS = 0x00000006
->>>>>> [?? 10.118264]?? CM = 0, WnR = 0
->>>>>> [?? 10.118274] swapper pgtable: 4k pages, 48-bit VAs, pgd =
->>>>>> ffff0000094a5000
->>>>>> [?? 10.118279] [ffff000008e5abc0] *pgd=00000000bfffe003,
->>>>>> *pud=00000000bfffd003, *pmd=0000000000000000
->>>>>> [?? 10.118299] Internal error: Oops: 96000006 [#1] SMP
->>>>>> [?? 10.118305] Modules linked in: fixed usbcore(+) sunxi_mmc mmc_core
->>>>>> phy_sun4i_usb sg
->>>>>> [?? 10.118341] CPU: 3 PID: 49 Comm: kworker/3:1 Not tainted
->>>>>> 4.14.0-rc3-2.gf27997b-default #1
->>>>>> [?? 10.118345] Hardware name: sunxi sunxi/sunxi, BIOS 2017.05-rc1
->>>>>> 04/13/2017
->>>>>> [?? 10.118369] Workqueue: events deferred_probe_work_func
->>>>>> [?? 10.118378] task: ffff80007c8f4000 task.stack: ffff0000099d8000
->>>>>> [?? 10.118394] PC is at __of_match_node.part.1+0x48/0x88
->>>>>> [?? 10.118403] LR is at of_match_node+0x40/0x70
->>>>>> [?? 10.118411] pc : [<ffff00000879aed0>] lr : [<ffff00000879af50>]
->>>>> [...]
->>>>>
->>>>>> This has been observed on Pine64 (>60%; also by Stefan) and
->>>>>> Odroid-C2;
->>>>>> my other arm64 boards such as Raspberry Pi 3 have not run into
->>>>>> this so
->>>>>> far. No such problems on 32-bit boards.
->>>>>>
->>>>>> This is using the openSUSE config:
->>>>>> https://kernel.opensuse.org/cgit/kernel-source/plain/config/arm64/default
->>>>>>
->>>>> Hmm, hard to know what to suggest without a concrete reproducer. Do
->>>>> you know
->>>>> which driver is being probed in the log above? Also, does this
->>>>> still break
->>>>> if you pass "keepinitrd" on the cmdline? Finally, can you dump the
->>>>> kernel
->>>>> virtual memory layout, please?
->>>> FWIW, this looks a lot like what happens when a built-in driver's
->>>> of_match_table is marked __init, but for whatever reason (deferred
->>>> probe
->>>> etc.) winds up getting poked by a module load after it no longer
->>>> exists.
->>> Heh, synchronicity...
->>>
->>> https://lists.linuxfoundation.org/pipermail/iommu/2017-October/024572.html
->>>
->>>
->>> Looks like we either have to revert plenty of patches from the const
->>> brigade, avoid freeing init, or come up with some way to make the driver
->>> core cleverer about the whole deal :(
->>
->> It's not that bad. I did a quick check with
->>
->> # git grep "of_device_id.*init"
->>
->> and Exynos SYSMMU driver was the only candidate for a fix. Maybe someone
->> else should double check that list to make sure that there is no other
->> platform device/driver related code there.
->>
->> Best regards
+Hi Bjorn,
+
+Sorry for a little delay. I haven't been able to get much better answers
+out of the problematic vendor here (they insist they are within the
+spec), so I guess I'll have to go ahead based on current knowledge.
+
+On Fri, Oct 13, 2017 at 11:51:52AM -0500, Bjorn Helgaas wrote:
+> [+cc Doug]
 > 
-> The root cause of the problem we hit here is definitely the exynos_smmu
-> driver
-> problem. The modrpobe triggers a device scan and the deferred_probe work
-> goes
-> through the registered drivers again for each device and since the
-> exynos_smmu
-> driver table is gone already, we end up in this crash.
+> On Thu, Oct 12, 2017 at 01:52:18PM -0700, Brian Norris wrote:
+> > The patch is self-descriptive. I've found that we may need
+> > platform-specific behavior for the PERST# signal in system suspend,
+> > depending on the type of PCIe endpoints are attached.
+> > 
+> > Signed-off-by: Brian Norris <briannorris@chromium.org>
+> > ---
+> >  Documentation/devicetree/bindings/pci/pci.txt | 11 +++++++++++
+> >  1 file changed, 11 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/pci/pci.txt b/Documentation/devicetree/bindings/pci/pci.txt
+> > index c77981c5dd18..91339b6d0652 100644
+> > --- a/Documentation/devicetree/bindings/pci/pci.txt
+> > +++ b/Documentation/devicetree/bindings/pci/pci.txt
+> > @@ -24,3 +24,14 @@ driver implementation may support the following properties:
+> >     unsupported link speed, for instance, trying to do training for
+> >     unsupported link speed, etc.  Must be '4' for gen4, '3' for gen3, '2'
+> >     for gen2, and '1' for gen1. Any other values are invalid.
+> > +- pcie-reset-suspend:
+> > +   If present this property defines whether the PCIe Reset signal (referred to
+> > +   as PERST#) should be asserted when the system enters low-power suspend modes
+> > +   (e.g., S3). Depending on the form factor, the associated PCIe
+> > +   electromechanical specification may specify a particular behavior (e.g.,
+> > +   "PERST# is asserted in advance of the power being switched off in a
+> > +   power-managed state like S3") or it may be less clear. The net result is
+> > +   that some endpoints perform better (e.g., lower power consumption) with
+> > +   PERST# asserted, and others prefer PERST# deasserted. The value must be '0'
+> > +   or '1', where '0' means do not assert PERST# and '1' means assert PERST#.
+> > +   When absent, behavior may be platform-specific.
 > 
-> Andreas,
+> I don't understand this at all.  Are you suggesting that we need
+> different "pcie-reset-suspend" values based on what sort of endpoint
+> the user plugs in?
+
+Partly. I guess I also failed to mention in this particular text (but I
+did, in patch 3) that it can be a board-specific problem, related to the
+fact that the only endpoint used on said board--soldered on, not
+replaceable--never seemed to require PERST# to be asserted in suspend.
+On such boards, I believe [1] it is physically impossible to drive this
+pin low in S3 suspend. So even if we tried to assert PERST#, it would
+pull back up when we suspend the system. I'm not sure if that's better
+or worse than not asserting it at all.
+
+So, that's why I settled on a device tree property. It describes the
+physical ability of the board too, in some cases. (I could document this
+better, I see.)
+
+However, in other cases, we might have boards that are physically
+capable, but where the use of this endpoint might still cause
+interoperability problems, per your next comment. So... (continued
+below)
+
+> If so, I really don't want to get involved in that, because that's an
+> issue that needs to be resolved by the vendors and the PCI-SIG.  If we
+
+Judging by conversations with these vendors, I can't really imagine them
+proactively dealing with the PCI-SIG on this. Is that really what you
+think will work best?
+
+I personally believe deferring (i.e., ignoring) the problem will not
+cause any change; badly behaved vendors will just do whatever suits
+them, and system designers will have to figure it out somehow -- ACPI
+systems will have platform-specific behavior hidden in firmware; device
+tree systems will do whatever they want out of tree; and the rare device
+tree system that gets upstream support will either have suboptimal power
+management, or have to have these sorts of conversations again. None of
+that puts pressure on an endpoint vendor to talk to the PCI-SIG.
+
+(I can try to put that pressure on them, but I only have so much power.)
+
+> put in a tweak like this, I think it would be a band-aid that only
+> delays getting a real solution figured out.
 > 
-> Please could you try with the patch above in the link ?
+> If you want a quirk to tune this based on specific devices, that might
+> make sense.  It would still sound like an interoperability issue and
+> an ongoing maintenance problem, but at least we would have specific
+> details about which devices are involved, and we'd have a chance to
+> make them work on more controllers than just Rockchip.
 
-The above patch resolves the symptoms I observed on both boards, thanks.
+(continued) ...I suppose we could do this too. Like, a new entry in enum
+pci_dev_flags, and code in drivers/pci/quirks.c? And then some helper so
+that a PCIe root port driver like Rockchip's can walk its children and
+check for the existence of this quirk? I'll see if I can write that up
+reasonably.
 
-I'm not on the iommu list and it's not on linux-samsung-soc, so here's my
+Then I guess technically we could get away with not supporting the
+aforementioned device tree property, since any board where the HW won't
+support asserting PERST# in S3 should also have an endpoint with this
+quirk.
 
-Tested-by: Andreas F?rber <afaerber@suse.de>
+Brian
 
-Best regards,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+[1] I say "I believe" because the GPIO power rail is not powered in S3
+    (so at best we can possibly give a weak pull) and it is pulled up
+    externally. I don't think there's any way around this.
