@@ -1,67 +1,133 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 17 Oct 2017 12:05:29 -0500
-Subject: [PATCH v4 pci 0/2] PCI/MSI: pci-xgene-msi: Enable MSI support in
- ACPI boot for X-Gene v1
-In-Reply-To: <1506448161-30961-1-git-send-email-kdinh@apm.com>
-References: <1506448161-30961-1-git-send-email-kdinh@apm.com>
-Message-ID: <20171017170529.GC5641@bhelgaas-glaptop.roam.corp.google.com>
+From: bp@suse.de (Borislav Petkov)
+Date: Tue, 17 Oct 2017 19:06:35 +0200
+Subject: [PATCH v5 2/2] acpi: apei: Add SEI notification type support for
+ ARMv8
+In-Reply-To: <1508227341-15651-2-git-send-email-gengdongjiu@huawei.com>
+References: <1508227341-15651-1-git-send-email-gengdongjiu@huawei.com>
+ <1508227341-15651-2-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <20171017170635.qb4sqyrsnndgbuni@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 26, 2017 at 11:49:19AM -0600, Khuong Dinh wrote:
-> This patch set enables ACPI MSI support for X-Gene PCIe v1 hardware
-> and provides the proper MSI driver initialization ordering.
+On Tue, Oct 17, 2017 at 04:02:21PM +0800, Dongjiu Geng wrote:
+> ARMv8.2 requires implementation of the RAS extension, in
+> this extension it adds SEI(SError Interrupt) notification
+> type, this patch adds new GHES error source SEI handling
+> functions. Because this error source parsing and handling
+> methods are similar with the SEA. So share some SEA handling
+> functions with the SEI
 > 
-> Signed-off-by: Khuong Dinh <kdinh@apm.com>
+> Expose one API ghes_notify_abort() to external users. External
+> modules can call this exposed API to parse and handle the
+> SEA or SEI.
+> 
+> Note: For the SEI(SError Interrupt), it is asynchronous external
+> abort, the error address recorded by firmware may be not accurate.
+> If not accurate, EL3 firmware needs to identify the address to a
+> invalid value.
+> 
+> Cc: Borislav Petkov <bp@suse.de>
+> Cc: James Morse <james.morse@arm.com>
+> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+> Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
+> Tested-by: Dongjiu Geng <gengdongjiu@huawei.com>
 > ---
-> v4:
->  - Remove Marc Zyngier ACK in v2
->  - Use acpi_bus_scan on MSI controller handle when MSI device is found
->  - Register ACPI MSI driver when MSI device is found instead of using
->  subsys_initcall
->  - Split ACPI MSI driver support into two patches - one to enable MSI
-> support for X-Gene PCIe v1 hardware, one to enforce MSI driver loaded
-> before PCIe controller driver in ACPI boot mode
-> v3:
->  - Input X-Gene MSI base address for irq_domain_alloc_fwnode
->  - Add a hook to enforce X-Gene MSI be probed prior acpi_bus_scan happens
-> v2:
->  - Verify with BIOS version 3.06.25 and 3.07.09
-> v1:
->  - Initial version
-> ---
+>  arch/arm64/mm/fault.c     |  4 +--
+>  drivers/acpi/apei/Kconfig | 15 ++++++++++
+>  drivers/acpi/apei/ghes.c  | 71 ++++++++++++++++++++++++++++++++++-------------
+>  include/acpi/ghes.h       |  2 +-
+>  4 files changed, 70 insertions(+), 22 deletions(-)
 > 
-> Khuong Dinh (2):
->   PCI/MSI: pci-xgene-msi: Enable MSI support in ACPI boot for X-Gene v1
->   PCI/MSI: Enforce MSI driver loaded before PCIe in ACPI boot
-> 
->  drivers/acpi/Makefile            |    2 +-
->  drivers/acpi/acpi_msi.c          |   86 ++++++++++++++++++++++++++++++++++++++
->  drivers/acpi/acpi_platform.c     |    3 +-
->  drivers/acpi/internal.h          |    1 +
->  drivers/acpi/scan.c              |    1 +
->  drivers/pci/host/pci-xgene-msi.c |   60 ++++++++++++++++++++++++--
->  include/linux/acpi_msi.h         |   37 ++++++++++++++++
->  7 files changed, 183 insertions(+), 7 deletions(-)
->  create mode 100644 drivers/acpi/acpi_msi.c
->  create mode 100644 include/linux/acpi_msi.h
+> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> index 2509e4f..c98c1b3 100644
+> --- a/arch/arm64/mm/fault.c
+> +++ b/arch/arm64/mm/fault.c
+> @@ -585,7 +585,7 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+>  		if (interrupts_enabled(regs))
+>  			nmi_enter();
+>  
+> -		ret = ghes_notify_sea();
+> +		ret = ghes_notify_abort(ACPI_HEST_NOTIFY_SEA);
+>  
+>  		if (interrupts_enabled(regs))
+>  			nmi_exit();
+> @@ -682,7 +682,7 @@ int handle_guest_sea(phys_addr_t addr, unsigned int esr)
+>  	int ret = -ENOENT;
+>  
+>  	if (IS_ENABLED(CONFIG_ACPI_APEI_SEA))
+> -		ret = ghes_notify_sea();
+> +		ret = ghes_notify_abort(ACPI_HEST_NOTIFY_SEA);
+>  
+>  	return ret;
+>  }
+> diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
+> index de14d49..47fcb0c 100644
+> --- a/drivers/acpi/apei/Kconfig
+> +++ b/drivers/acpi/apei/Kconfig
+> @@ -54,6 +54,21 @@ config ACPI_APEI_SEA
+>  	  option allows the OS to look for such hardware error record, and
+>  	  take appropriate action.
+>  
+> +config ACPI_APEI_SEI
+> +	bool "APEI Asynchronous SError Interrupt logging/recovering support"
 
-The changelogs don't really give the nitty-gritty details of the
-problem, e.g., apparently the host bridge and the MSI controller are
-enumerated as two separate devices and there's an ordering issue with
-binding drivers to them.
+What is "SError" ?
 
-They should also contrast the X-Gene situation with other systems so we
-can see why X-Gene has this problem when other systems don't.
+> +	depends on ARM64 && ACPI_APEI_GHES
+> +	default y
+> +	help
+> +	  This option should be enabled if the system supports
+> +	  firmware first handling of SEI (asynchronous SError interrupt).
+> +
+> +	  SEI happens with asynchronous external abort for errors on device
+> +	  memory reads on ARMv8 systems. If a system supports firmware first
+> +	  handling of SEI, the platform analyzes and handles hardware error
+> +	  notifications from SEI, and it may then form a HW error record for
+> +	  the OS to parse and handle. This option allows the OS to look for
+> +	  such hardware error record, and take appropriate action.
+> +
+>  config ACPI_APEI_MEMORY_FAILURE
+>  	bool "APEI memory error recovering support"
+>  	depends on ACPI_APEI && MEMORY_FAILURE
+> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+> index 3eee30a..24b4233 100644
+> --- a/drivers/acpi/apei/ghes.c
+> +++ b/drivers/acpi/apei/ghes.c
+> @@ -815,43 +815,67 @@ static struct notifier_block ghes_notifier_hed = {
+>  
+>  #ifdef CONFIG_ACPI_APEI_SEA
+>  static LIST_HEAD(ghes_sea);
+> +#endif
+> +
+> +#ifdef CONFIG_ACPI_APEI_SEI
+> +static LIST_HEAD(ghes_sei);
+> +#endif
+>  
+> +#if defined(CONFIG_ACPI_APEI_SEA) || defined(CONFIG_ACPI_APEI_SEI)
+>  /*
+> - * Return 0 only if one of the SEA error sources successfully reported an error
+> - * record sent from the firmware.
+> + * Return 0 only if one of the SEA or SEI error sources successfully
+> + * reported an error record sent from the firmware.
+>   */
+> -int ghes_notify_sea(void)
+> +int ghes_notify_abort(u8 type)
 
-I'm not thrilled about all the ACPI code this adds, but I'm guessing
-there'll be some better solution eventually.
+Adding "abort" everywhere makes it worse: what does this function now
+do, notify or abort or both?
 
-I'm going to mark these as "changes requested" even though I haven't
-asked for anything specific to be changed because it sounds like
-Lorenzo et al. may have more concrete proposals soon.
+Ditto for the remaining ones. Please think of a better name.
 
-Are there currently systems that do not work and need to be fixed
-ASAP?
 
-Bjorn
+ghes_notify_sei() sounds much better to me, for example. And then you
+can add a whole set of *_sei() functions similar to the *_sea() ones and
+then you don't have to do all that checking of the type but simply call
+the proper function set. They're not huge so that the duplication of
+code should be minimal.
+
+-- 
+Regards/Gruss,
+    Boris.
+
+SUSE Linux GmbH, GF: Felix Imend?rffer, Jane Smithard, Graham Norton, HRB 21284 (AG N?rnberg)
+-- 
