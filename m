@@ -1,73 +1,36 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 17 Oct 2017 17:14:47 +0800
-Subject: [PATCH 02/23] drm/sun4i: Realign Makefile padding and reorder it
-In-Reply-To: <9410b284ec97453fa692537dffaaa4fb4833347c.1508231063.git-series.maxime.ripard@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 17 Oct 2017 11:06:26 +0200
+Subject: [PATCH 19/23] arm: dts: sun8i: a83t: Add LVDS pins group
+In-Reply-To: <cover.fe3d65d1ee05a55224d26e7d113388c428592b26.1508231063.git-series.maxime.ripard@free-electrons.com>
 References: <cover.fe3d65d1ee05a55224d26e7d113388c428592b26.1508231063.git-series.maxime.ripard@free-electrons.com>
- <9410b284ec97453fa692537dffaaa4fb4833347c.1508231063.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v649B-M7ya=XmH0+hHgYUHDMxWjAH1vuq+iKOOqgU13eCg@mail.gmail.com>
+Message-ID: <4125c6191f39c67963e018a84441551cc1815620.1508231063.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 5:06 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Some options were not padded as they should, and the order in the Makefile
-> was chaotic. Fix that.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/gpu/drm/sun4i/Makefile | 28 ++++++++++++++--------------
->  1 file changed, 14 insertions(+), 14 deletions(-)
->
-> diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
-> index 43c753cafc88..af18b70ba5ed 100644
-> --- a/drivers/gpu/drm/sun4i/Makefile
-> +++ b/drivers/gpu/drm/sun4i/Makefile
-> @@ -1,24 +1,24 @@
-> -sun4i-drm-y += sun4i_drv.o
-> -sun4i-drm-y += sun4i_framebuffer.o
-> +sun4i-backend-y                        += sun4i_backend.o sun4i_layer.o
->
-> -sun4i-drm-hdmi-y += sun4i_hdmi_enc.o
-> -sun4i-drm-hdmi-y += sun4i_hdmi_i2c.o
-> -sun4i-drm-hdmi-y += sun4i_hdmi_ddc_clk.o
-> -sun4i-drm-hdmi-y += sun4i_hdmi_tmds_clk.o
-> +sun4i-drm-y                    += sun4i_drv.o
-> +sun4i-drm-y                    += sun4i_framebuffer.o
->
-> -sun4i-tcon-y += sun4i_tcon.o
-> -sun4i-tcon-y += sun4i_rgb.o
-> -sun4i-tcon-y += sun4i_dotclock.o
-> -sun4i-tcon-y += sun4i_crtc.o
-> +sun4i-drm-hdmi-y               += sun4i_hdmi_enc.o
-> +sun4i-drm-hdmi-y               += sun4i_hdmi_i2c.o
-> +sun4i-drm-hdmi-y               += sun4i_hdmi_ddc_clk.o
-> +sun4i-drm-hdmi-y               += sun4i_hdmi_tmds_clk.o
->
-> -sun4i-backend-y += sun4i_backend.o sun4i_layer.o
-> +sun4i-tcon-y                   += sun4i_tcon.o
-> +sun4i-tcon-y                   += sun4i_rgb.o
-> +sun4i-tcon-y                   += sun4i_dotclock.o
-> +sun4i-tcon-y                   += sun4i_crtc.o
+The A83T has an LVDS bus that can be connected to a panel or a bridge. Add
+the pinctrl group for it.
 
-I don't know if you wanted to sort the file names as well.
-This would be a good time to do it.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/sun8i-a83t.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Otherwise,
-
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-
->
-> -sun8i-mixer-y += sun8i_mixer.o sun8i_layer.o
-> +sun8i-mixer-y                  += sun8i_mixer.o sun8i_layer.o
->
->  obj-$(CONFIG_DRM_SUN4I)                += sun4i-drm.o sun4i-tcon.o
->  obj-$(CONFIG_DRM_SUN4I)                += sun6i_drc.o
->  obj-$(CONFIG_DRM_SUN4I)                += sun4i_tv.o
->
-> -obj-$(CONFIG_DRM_SUN4I_BACKEND)                += sun4i-backend.o
-> +obj-$(CONFIG_DRM_SUN4I_BACKEND)        += sun4i-backend.o
->  obj-$(CONFIG_DRM_SUN4I_HDMI)   += sun4i-drm-hdmi.o
-> -obj-$(CONFIG_DRM_SUN8I_MIXER)          += sun8i-mixer.o
-> +obj-$(CONFIG_DRM_SUN8I_MIXER)  += sun8i-mixer.o
-> --
-> git-series 0.9.1
+diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+index ef07a58859c7..6f1221556587 100644
+--- a/arch/arm/boot/dts/sun8i-a83t.dtsi
++++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+@@ -414,6 +414,12 @@
+ 			#interrupt-cells = <3>;
+ 			#gpio-cells = <3>;
+ 
++			lcd_lvds_pins: lcd-lvds-pins {
++				pins = "PD18", "PD19", "PD20", "PD21", "PD22",
++				       "PD23", "PD24", "PD25", "PD26", "PD27";
++				function = "lvds0";
++			};
++
+ 			mmc0_pins: mmc0-pins {
+ 				pins = "PF0", "PF1", "PF2",
+ 				       "PF3", "PF4", "PF5";
+-- 
+git-series 0.9.1
