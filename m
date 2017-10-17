@@ -1,9 +1,9 @@
 From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
-Date: Tue, 17 Oct 2017 13:41:02 +0900
-Subject: [PATCH v3 1/3] dt-bindings: nvmem: add description for UniPhier eFuse
-In-Reply-To: <1508215264-3745-1-git-send-email-hayashibara.keiji@socionext.com>
-References: <1508215264-3745-1-git-send-email-hayashibara.keiji@socionext.com>
-Message-ID: <1508215264-3745-2-git-send-email-hayashibara.keiji@socionext.com>
+Date: Tue, 17 Oct 2017 14:20:29 +0900
+Subject: [PATCH v4 1/3] dt-bindings: nvmem: add description for UniPhier eFuse
+In-Reply-To: <1508217631-19365-1-git-send-email-hayashibara.keiji@socionext.com>
+References: <1508217631-19365-1-git-send-email-hayashibara.keiji@socionext.com>
+Message-ID: <1508217631-19365-2-git-send-email-hayashibara.keiji@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,7 +17,7 @@ Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
 
 diff --git a/Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt b/Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt
 new file mode 100644
-index 0000000..dd78bc5
+index 0000000..eccf490
 --- /dev/null
 +++ b/Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt
 @@ -0,0 +1,49 @@
@@ -54,7 +54,7 @@ index 0000000..dd78bc5
 +			#size-cells = <1>;
 +
 +			/* Data cells */
-+			usb-mon: usb-mon at 54 {
++			usb_mon: usb-mon at 54 {
 +				reg = <0x54 0xc>;
 +			};
 +		};
@@ -67,8 +67,8 @@ index 0000000..dd78bc5
 +
 +	usb {
 +		...
-+		nvmem-cells = <&usb-mon>;
-+		nvmem-cell-names = "usb-mon";
++		nvmem-cells = <&usb_mon>;
++		nvmem-cell-names = "usb_mon";
 +	}
 -- 
 2.7.4
