@@ -1,94 +1,94 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 16 Oct 2017 17:28:57 -0700
-Subject: [PATCH 13/58] ethernet/broadcom: Convert timers to use timer_setup()
-In-Reply-To: <1508200182-104605-1-git-send-email-keescook@chromium.org>
-References: <1508200182-104605-1-git-send-email-keescook@chromium.org>
-Message-ID: <1508200182-104605-14-git-send-email-keescook@chromium.org>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Tue, 17 Oct 2017 08:30:54 +0800
+Subject: ARM64: Regression with commit e3067861ba66 ("arm64: add basic
+ VMAP_STACK support")
+In-Reply-To: <dad6105d-1ec0-d5a6-e78c-ff832afe3f9e@arm.com>
+References: <20171010142725.GA24797@leoy-linaro>
+ <20171010154558.GJ27659@leverpostej>
+ <da09fd83-f3f0-f800-fea4-988cfa56bac7@arm.com>
+ <20171016011723.GB12470@leoy-linaro>
+ <20171016134819.jv3udrcwsedc4cgs@lakrids.cambridge.arm.com>
+ <34ccf02d-fd65-bade-327a-ed8df1d3eea5@arm.com>
+ <20171016142622.6yjuzdwxxw3sxjed@lakrids.cambridge.arm.com>
+ <dad6105d-1ec0-d5a6-e78c-ff832afe3f9e@arm.com>
+Message-ID: <20171017003054.GB19504@leoy-ThinkPad-T440>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for unconditionally passing the struct timer_list pointer to
-all timer callbacks, switch to using the new timer_setup() and from_timer()
-helper to pass the timer pointer explicitly.
+On Mon, Oct 16, 2017 at 03:35:46PM +0100, Robin Murphy wrote:
+> On 16/10/17 15:26, Mark Rutland wrote:
+> > On Mon, Oct 16, 2017 at 03:12:45PM +0100, Robin Murphy wrote:
+> >> On 16/10/17 14:48, Mark Rutland wrote:
+> >>> Hi Leo,
+> >>>
+> >>> On Mon, Oct 16, 2017 at 09:17:23AM +0800, Leo Yan wrote:
+> >>>> On Tue, Oct 10, 2017 at 05:03:44PM +0100, Robin Murphy wrote:
+> >>>>> On 10/10/17 16:45, Mark Rutland wrote:
+> >>>>>> On Tue, Oct 10, 2017 at 10:27:25PM +0800, Leo Yan wrote:
+> >>>>>>> I work mainline kernel on Hikey620 board, I find it's easily to
+> >>>>>>> introduce the panic and report the log as below. So I bisect the kernel
+> >>>>>>> and finally narrow down the commit e3067861ba66 ("arm64: add basic
+> >>>>>>> VMAP_STACK support") which introduce this issue.
+> >>>>>>>
+> >>>>>>> I tried to remove 'select HAVE_ARCH_VMAP_STACK' from
+> >>>>>>> arch/arm64/Kconfig, then I can see the panic issue will dismiss. So
+> >>>>>>> could you check this and have insight for this issue?
+> >>>>>>
+> >>>>>> Given the stuff in the backtrace, my suspicion is something is trying to
+> >>>>>> perform DMA to/from the stack, getting junk addresses form the attempted
+> >>>>>> virt<->phys conversions.
+> >>>>>>
+> >>>>>> Could you try enabling both VMAP_STACK and CONFIG_DEBUG_VIRTUAL?
+> >>>>>
+> >>>>> CONFIG_DMA_API_DEBUG should scream about drivers trying to use stack
+> >>>>> addresses either way, too.
+> >>>>
+> >>>> Thanks for suggestions, Mark & Robin.
+> >>>>
+> >>>> I enabled these debugging configs but cannot get clue from it; but
+> >>>> occasionally found this issue is quite likely related with CA53 errata,
+> >>>> especialy ERRATA_A53_855873 is the relative one. So I changed to use
+> >>>> ARM-TF mainline code with ERRATA fixing, this issue can be dismissed.
+> >>>
+> >>> Thanks for the update.
+> >>>
+> >>> Just to confirm, with the updated firmware you no longer see the issue?
+> >>>
+> >>> I can't immediately see how that would be related.
+> >>
+> >> Cores up to r0p2 have the other errata to which
+> >> ARM64_WORKAROUND_CLEAN_CACHE also applies anyway; r3p0+ have an ACTLR
+> >> bit to do thee CVAC->CIVAC upgrade in hardware, and our policy is that
+> >> we expect firmware to enable such hardware workarounds where possible. I
+> >> assume that's why we don't explicitly document 855873 anywhere in Linux.
+> > 
+> > Sure, I also looked it up. ;)
+> > 
+> > I meant that I couldn't immediately see why VMAP'd stacks were likely to
+> > tickle issues with that more reliably.
+> 
+> Ah, right - in context, "that" appeared to refer to "updated firmware",
+> not "VMAP_STACK". Sorry.
+> 
+> I guess the vmap addresses might tickle the "same L2 set" condition
+> differently to when both stack and DMA buffer are linear map addresses.
 
-Cc: Florian Fainelli <f.fainelli@gmail.com>
-Cc: bcm-kernel-feedback-list at broadcom.com
-Cc: "David S. Miller" <davem@davemloft.net>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Jarod Wilson <jarod@redhat.com>
-Cc: netdev at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
- drivers/net/ethernet/broadcom/bcm63xx_enet.c | 24 +++++++++---------------
- 1 file changed, 9 insertions(+), 15 deletions(-)
+A bit more info for this.
 
-diff --git a/drivers/net/ethernet/broadcom/bcm63xx_enet.c b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
-index f6bc13fe8a99..d9346e2ac720 100644
---- a/drivers/net/ethernet/broadcom/bcm63xx_enet.c
-+++ b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
-@@ -295,16 +295,13 @@ static int bcm_enet_refill_rx(struct net_device *dev)
- /*
-  * timer callback to defer refill rx queue in case we're OOM
-  */
--static void bcm_enet_refill_rx_timer(unsigned long data)
-+static void bcm_enet_refill_rx_timer(struct timer_list *t)
- {
--	struct net_device *dev;
--	struct bcm_enet_priv *priv;
--
--	dev = (struct net_device *)data;
--	priv = netdev_priv(dev);
-+	struct bcm_enet_priv *priv = from_timer(priv, t, rx_timeout);
-+	struct net_device *dev = priv->net_dev;
- 
- 	spin_lock(&priv->rx_lock);
--	bcm_enet_refill_rx((struct net_device *)data);
-+	bcm_enet_refill_rx(dev);
- 	spin_unlock(&priv->rx_lock);
- }
- 
-@@ -1860,8 +1857,7 @@ static int bcm_enet_probe(struct platform_device *pdev)
- 	spin_lock_init(&priv->rx_lock);
- 
- 	/* init rx timeout (used for oom) */
--	setup_timer(&priv->rx_timeout, bcm_enet_refill_rx_timer,
--		    (unsigned long)dev);
-+	timer_setup(&priv->rx_timeout, bcm_enet_refill_rx_timer, 0);
- 
- 	/* init the mib update lock&work */
- 	mutex_init(&priv->mib_update_lock);
-@@ -2015,9 +2011,9 @@ static inline int bcm_enet_port_is_rgmii(int portid)
- /*
-  * enet sw PHY polling
-  */
--static void swphy_poll_timer(unsigned long data)
-+static void swphy_poll_timer(struct timer_list *t)
- {
--	struct bcm_enet_priv *priv = (struct bcm_enet_priv *)data;
-+	struct bcm_enet_priv *priv = from_timer(priv, t, swphy_poll);
- 	unsigned int i;
- 
- 	for (i = 0; i < priv->num_ports; i++) {
-@@ -2326,7 +2322,7 @@ static int bcm_enetsw_open(struct net_device *dev)
- 	}
- 
- 	/* start phy polling timer */
--	setup_timer(&priv->swphy_poll, swphy_poll_timer, (unsigned long)priv);
-+	timer_setup(&priv->swphy_poll, swphy_poll_timer, 0);
- 	mod_timer(&priv->swphy_poll, jiffies);
- 	return 0;
- 
-@@ -2743,9 +2739,7 @@ static int bcm_enetsw_probe(struct platform_device *pdev)
- 	spin_lock_init(&priv->rx_lock);
- 
- 	/* init rx timeout (used for oom) */
--	init_timer(&priv->rx_timeout);
--	priv->rx_timeout.function = bcm_enet_refill_rx_timer;
--	priv->rx_timeout.data = (unsigned long)dev;
-+	timer_setup(&priv->rx_timeout, bcm_enet_refill_rx_timer, 0);
- 
- 	/* register netdevice */
- 	dev->netdev_ops = &bcm_enetsw_ops;
--- 
-2.7.4
+I can reproduce this memory abort panic, and the panic places are not
+consistent; usually it's related with kmalloc address. Do you think
+"VMAP_STACK" introduces much more operations for cache clean? If
+so if might be in the same *set* with any other memory access (like
+kmalloc operations), then trigger data abort.
+
+Hikey has CA53 CPUs is r3 version so it's luck can directly apply the
+ERRATA 855873 in ARM-TF.
+
+BTW, in case I may mislead you guys, we should note there have another
+two ERRATAs applied in ARM-TFv1.4 for Hikey:
+
+ERRATA_A53_836870               :=      1
+ERRATA_A53_843419               :=      1
+
+Thanks,
+Leo Yan
