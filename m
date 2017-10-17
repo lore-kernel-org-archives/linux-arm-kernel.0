@@ -1,48 +1,47 @@
-From: cuibixuan@huawei.com (Bixuan Cui)
-Date: Tue, 17 Oct 2017 13:54:35 +0800
-Subject: =?UTF-8?B?44CQQlVH44CRVGhlIGtlcm5lbCBzdGFydCBmYWlsIHdoZW4gZW5hYmw=?=
- =?UTF-8?B?ZSBDT05GSUdfQVJNNjRfTFNFX0FUT01JQ1MgYW5kIEtDT1ZfSU5TVFJVTUVOVF8=?=
- =?UTF-8?B?QUxM?=
-Message-ID: <59E59B1B.9030206@huawei.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue, 17 Oct 2017 08:09:48 +0200
+Subject: [PATCH 00/11] arm64: dts: renesas: Use R-Car SDHI Gen[123] fallback
+ compat strings
+Message-ID: <20171017060959.16702-1-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-I try to start the kernel(v4.14.0-rc4) by qemu while enable CONFIG_ARM64_LSE_ATOMICS and KCOV_INSTRUMENT_ALL(use arch/arm64/configs/defconfig) at the same time. Then
-it hang:
-qemu-system-aarch64 -kernel Image -m 2048 -smp 8 -initrd qemu-le.rootfs -cpu cortex-a57 -nographic -machine virt,kernel_irqchip=on -append 'console=ttyAMA0 root=/dev/ram rdinit=/sbin/init nohz_full=1 earlycon=pl011,0x9000000' -rtc base=localtime -device virtio-net-device,netdev=net0 -netdev type=tap,id=net0,script=no,downscript=no,ifname=tap2
-[    0.000000] Booting Linux on physical CPU 0x0
-[    0.000000] Linux version 4.14.0-rc4 #24 SMP PREEMPT Mon Oct 16 11:02:11 CST 2017
-[    0.000000] Boot CPU: AArch64 Processor [411fd070]
-[    0.000000] Machine model: linux,dummy-virt
-[    0.000000] earlycon: pl11 at MMIO 0x0000000009000000 (options '')
-[    0.000000] bootconsole [pl11] enabled
-[    0.000000] efi: Getting EFI parameters from FDT:
-[    0.000000] efi: UEFI not found.
-[    0.000000] cma: Reserved 64 MiB at 0x00000000bc000000
+Use recently posted R-Car SDHI Gen 1, 2 and 3 fallback compat strings
+in the DT of Renesas ARM and arm64 based SoCs.
 
-After I try kernel v4.13 and it's the same result.
-I trace the code and find it stop at the end of '__init_single_page(page, pfn, zone, nid)' in memmap_init_zone() of mm/page_alloc.c ?
+Based on renesas-devel-20171016-v4.14-rc5
 
-static void __meminit __init_single_page(struct page *page, unsigned long pfn,
-                                unsigned long zone, int nid)
-{
-        set_page_links(page, zone, nid, pfn);
-        init_page_count(page);
-        page_mapcount_reset(page);
-        page_cpupid_reset_last(page);
+Has a binding documentation but no run-time dependency on
+"[PATCH v3 0/3] mmc: renesas_sdhi: add R-Car Gen[123] fallback
+compatibility strings"
 
-        INIT_LIST_HEAD(&page->lru);
+Simon Horman (11):
+  arm64: dts: renesas: r8a7795: Use R-Car SDHI Gen3 fallback compat
+    string
+  arm64: dts: renesas: r8a7796: Use R-Car SDHI Gen3 fallback compat
+    string
+  ARM: dts: r8a7743: Use R-Car SDHI Gen2 fallback compat string
+  ARM: dts: r8a7745: Use R-Car SDHI Gen2 fallback compat string
+  ARM: dts: r8a7778: Use R-Car SDHI Gen1 fallback compat string
+  ARM: dts: r8a7779: Use R-Car SDHI Gen1 fallback compat string
+  ARM: dts: r8a7790: Use R-Car SDHI Gen2 fallback compat string
+  ARM: dts: r8a7791: Use R-Car SDHI Gen2 fallback compat string
+  ARM: dts: r8a7792: Use R-Car SDHI Gen2 fallback compat string
+  ARM: dts: r8a7793: Use R-Car SDHI Gen2 fallback compat string
+  ARM: dts: r8a7794: Use R-Car SDHI Gen2 fallback compat string
 
-#ifdef WANT_PAGE_VIRTUAL
-        /* The shift won't overflow because ZONE_NORMAL is below 4G. */
-        if (!is_highmem_idx(zone))
-                set_page_address(page, __va(pfn << PAGE_SHIFT));
-#endif
-//      printk("stop here\n");
-}
+ arch/arm/boot/dts/r8a7743.dtsi           |  9 ++++++---
+ arch/arm/boot/dts/r8a7745.dtsi           |  9 ++++++---
+ arch/arm/boot/dts/r8a7778.dtsi           |  9 ++++++---
+ arch/arm/boot/dts/r8a7779.dtsi           | 12 ++++++++----
+ arch/arm/boot/dts/r8a7790.dtsi           | 12 ++++++++----
+ arch/arm/boot/dts/r8a7791.dtsi           |  9 ++++++---
+ arch/arm/boot/dts/r8a7792.dtsi           |  3 ++-
+ arch/arm/boot/dts/r8a7793.dtsi           |  9 ++++++---
+ arch/arm/boot/dts/r8a7794.dtsi           |  9 ++++++---
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 12 ++++++++----
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 12 ++++++++----
+ 11 files changed, 70 insertions(+), 35 deletions(-)
 
-Anyone can give me advice?
-
-Thanks,
-Bixuan Cui
+-- 
+2.11.0
