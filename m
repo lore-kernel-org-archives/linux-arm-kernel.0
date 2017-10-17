@@ -1,58 +1,74 @@
-From: rfranz@cavium.com (Roy Franz)
-Date: Tue, 17 Oct 2017 13:56:42 -0700
-Subject: [PATCH] mdt: slram: use memremap() instead of ioremap()
-Message-ID: <20171017205642.1791-1-roy.franz@cavium.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 17 Oct 2017 13:58:21 -0700
+Subject: [PATCH v2 3/4] dt-bindings: hwmon: Add
+ ti-max-expected-current-microamp property to ina2xx
+In-Reply-To: <20171017203631.xaut7o3szaiucnqh@rob-hp-laptop>
+References: <1507811765-31005-1-git-send-email-m.purski@samsung.com>
+ <CGME20171012123635eucas1p1ff9a982db9d541cd0475d44d114ff92a@eucas1p1.samsung.com>
+ <1507811765-31005-4-git-send-email-m.purski@samsung.com>
+ <20171017203631.xaut7o3szaiucnqh@rob-hp-laptop>
+Message-ID: <20171017205821.GA8737@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert slram to use memremap() to map the memory it uses to back an MTD
-device, as this is the proper interface for mapping memory. This change
-enables normal memory to be used to back an MTD device on arm64, as arm64
-prevents ioremap() being used on normal memory.
+On Tue, Oct 17, 2017 at 03:36:31PM -0500, Rob Herring wrote:
+> On Thu, Oct 12, 2017 at 02:36:04PM +0200, Maciej Purski wrote:
+> > Add optional max expected current property which allows calibrating
+> > the ina sensor in order to achieve requested measure scale. Document
+> > the changes in Documentation/hwmon/ina2xx.
+> > 
+> > Signed-off-by: Maciej Purski <m.purski@samsung.com>
+> > ---
+> >  Documentation/devicetree/bindings/hwmon/ina2xx.txt | 4 +++-
+> >  Documentation/hwmon/ina2xx                         | 3 +++
+> >  2 files changed, 6 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/hwmon/ina2xx.txt b/Documentation/devicetree/bindings/hwmon/ina2xx.txt
+> > index 02af0d9..49ef0be 100644
+> > --- a/Documentation/devicetree/bindings/hwmon/ina2xx.txt
+> > +++ b/Documentation/devicetree/bindings/hwmon/ina2xx.txt
+> > @@ -14,11 +14,13 @@ Optional properties:
+> >  
+> >  - shunt-resistor
+> >  	Shunt resistor value in micro-Ohm
+> > -
+> > +- ti-max-expected-current-microamp
+> > +	Max expected current value in mA
+> 
+> ti,max-...
+> 
+> The property name is a bit long. Does "expected" add anything? Is there 
+> a max unexpected current?
+> 
+I am not too happy with it either. To me it suggests that there _can_ be
+an unexpected current (why specify a max _expected_ current otherwise ?),
+and that unexpected current won't be measurable and thus not reported
+because it is ... well, unexpected.
 
-Signed-off-by: Roy Franz <roy.franz@cavium.com>
----
-Tested on arm64 simulation, using simulator to preload filesystem image into RAM,
-and also tested on x86_64 using video card memory.  This is useful for speeding
-up booting on (very slow) emulation environments by avoiding any processing of
-an initramfs.
+Guenter
 
- drivers/mtd/devices/slram.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/mtd/devices/slram.c b/drivers/mtd/devices/slram.c
-index 8087c36dc693..0ec85f316d24 100644
---- a/drivers/mtd/devices/slram.c
-+++ b/drivers/mtd/devices/slram.c
-@@ -163,8 +163,9 @@ static int register_device(char *name, unsigned long start, unsigned long length
- 	}
- 
- 	if (!(((slram_priv_t *)(*curmtd)->mtdinfo->priv)->start =
--				ioremap(start, length))) {
--		E("slram: ioremap failed\n");
-+		memremap(start, length,
-+			 MEMREMAP_WB | MEMREMAP_WT | MEMREMAP_WC))) {
-+		E("slram: memremap failed\n");
- 		return -EIO;
- 	}
- 	((slram_priv_t *)(*curmtd)->mtdinfo->priv)->end =
-@@ -186,7 +187,7 @@ static int register_device(char *name, unsigned long start, unsigned long length
- 
- 	if (mtd_device_register((*curmtd)->mtdinfo, NULL, 0))	{
- 		E("slram: Failed to register new device\n");
--		iounmap(((slram_priv_t *)(*curmtd)->mtdinfo->priv)->start);
-+		memunmap(((slram_priv_t *)(*curmtd)->mtdinfo->priv)->start);
- 		kfree((*curmtd)->mtdinfo->priv);
- 		kfree((*curmtd)->mtdinfo);
- 		return(-EAGAIN);
-@@ -206,7 +207,7 @@ static void unregister_devices(void)
- 	while (slram_mtdlist) {
- 		nextitem = slram_mtdlist->next;
- 		mtd_device_unregister(slram_mtdlist->mtdinfo);
--		iounmap(((slram_priv_t *)slram_mtdlist->mtdinfo->priv)->start);
-+		memunmap(((slram_priv_t *)slram_mtdlist->mtdinfo->priv)->start);
- 		kfree(slram_mtdlist->mtdinfo->priv);
- 		kfree(slram_mtdlist->mtdinfo);
- 		kfree(slram_mtdlist);
--- 
-2.11.0
+> >  Example:
+> >  
+> >  ina220 at 44 {
+> >  	compatible = "ti,ina220";
+> >  	reg = <0x44>;
+> >  	shunt-resistor = <1000>;
+> > +	ti-max-expected-current-microamp = <3000>;
+> >  };
+> > diff --git a/Documentation/hwmon/ina2xx b/Documentation/hwmon/ina2xx
+> > index cfd31d9..30620e8 100644
+> > --- a/Documentation/hwmon/ina2xx
+> > +++ b/Documentation/hwmon/ina2xx
+> > @@ -55,6 +55,9 @@ The shunt value in micro-ohms can be set via platform data or device tree at
+> >  compile-time or via the shunt_resistor attribute in sysfs at run-time. Please
+> >  refer to the Documentation/devicetree/bindings/i2c/ina2xx.txt for bindings
+> >  if the device tree is used.
+> > +The max expected current value in miliamp can be set via platform data
+> > +or device tree at compile-time or via currX_max attribute in sysfs
+> > +at run-time.
+> >  
+> >  Additionally ina226 supports update_interval attribute as described in
+> >  Documentation/hwmon/sysfs-interface. Internally the interval is the sum of
+> > -- 
+> > 2.7.4
+> > 
