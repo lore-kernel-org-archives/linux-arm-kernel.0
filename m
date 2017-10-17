@@ -1,66 +1,38 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Tue, 17 Oct 2017 15:02:18 -0700
-Subject: [PATCH] mdt: slram: use memremap() instead of ioremap()
-In-Reply-To: <20171017205642.1791-1-roy.franz@cavium.com>
-References: <20171017205642.1791-1-roy.franz@cavium.com>
-Message-ID: <befe7e20-da85-1ea5-d3ad-4698af0b7d05@caviumnetworks.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 17 Oct 2017 17:09:20 -0500
+Subject: [PATCH] pwm: meson: use generic compatibles
+In-Reply-To: <20171013091642.31948-1-jbrunet@baylibre.com>
+References: <20171013091642.31948-1-jbrunet@baylibre.com>
+Message-ID: <20171017220920.acjq6dr3ntf7xkid@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/17/2017 01:56 PM, Roy Franz wrote:
-> Convert slram to use memremap() to map the memory it uses to back an MTD
-> device, as this is the proper interface for mapping memory. This change
-> enables normal memory to be used to back an MTD device on arm64, as arm64
-> prevents ioremap() being used on normal memory.
+On Fri, Oct 13, 2017 at 11:16:42AM +0200, Jerome Brunet wrote:
+> The meson pwm driver seems to be compatible with more SoCs than
+> initially thought. Let's use the most generic compatibles he have in
+> DT instead of the gxbb specific ones
 > 
-> Signed-off-by: Roy Franz <roy.franz@cavium.com>
-
-Thanks Roy.  I just tested on MIPS64 with no regressions, so:
-
-Tested-by: David Daney <david.daney@cavium.com>
-
-
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 > ---
-> Tested on arm64 simulation, using simulator to preload filesystem image into RAM,
-> and also tested on x86_64 using video card memory.  This is useful for speeding
-> up booting on (very slow) emulation environments by avoiding any processing of
-> an initramfs.
+>  Documentation/devicetree/bindings/pwm/pwm-meson.txt |  6 +++---
+>  drivers/pwm/pwm-meson.c                             | 12 ++++++------
+>  2 files changed, 9 insertions(+), 9 deletions(-)
 > 
->   drivers/mtd/devices/slram.c | 9 +++++----
->   1 file changed, 5 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/mtd/devices/slram.c b/drivers/mtd/devices/slram.c
-> index 8087c36dc693..0ec85f316d24 100644
-> --- a/drivers/mtd/devices/slram.c
-> +++ b/drivers/mtd/devices/slram.c
-> @@ -163,8 +163,9 @@ static int register_device(char *name, unsigned long start, unsigned long length
->   	}
->   
->   	if (!(((slram_priv_t *)(*curmtd)->mtdinfo->priv)->start =
-> -				ioremap(start, length))) {
-> -		E("slram: ioremap failed\n");
-> +		memremap(start, length,
-> +			 MEMREMAP_WB | MEMREMAP_WT | MEMREMAP_WC))) {
-> +		E("slram: memremap failed\n");
->   		return -EIO;
->   	}
->   	((slram_priv_t *)(*curmtd)->mtdinfo->priv)->end =
-> @@ -186,7 +187,7 @@ static int register_device(char *name, unsigned long start, unsigned long length
->   
->   	if (mtd_device_register((*curmtd)->mtdinfo, NULL, 0))	{
->   		E("slram: Failed to register new device\n");
-> -		iounmap(((slram_priv_t *)(*curmtd)->mtdinfo->priv)->start);
-> +		memunmap(((slram_priv_t *)(*curmtd)->mtdinfo->priv)->start);
->   		kfree((*curmtd)->mtdinfo->priv);
->   		kfree((*curmtd)->mtdinfo);
->   		return(-EAGAIN);
-> @@ -206,7 +207,7 @@ static void unregister_devices(void)
->   	while (slram_mtdlist) {
->   		nextitem = slram_mtdlist->next;
->   		mtd_device_unregister(slram_mtdlist->mtdinfo);
-> -		iounmap(((slram_priv_t *)slram_mtdlist->mtdinfo->priv)->start);
-> +		memunmap(((slram_priv_t *)slram_mtdlist->mtdinfo->priv)->start);
->   		kfree(slram_mtdlist->mtdinfo->priv);
->   		kfree(slram_mtdlist->mtdinfo);
->   		kfree(slram_mtdlist);
-> 
+> diff --git a/Documentation/devicetree/bindings/pwm/pwm-meson.txt b/Documentation/devicetree/bindings/pwm/pwm-meson.txt
+> index 1ee81321c35e..439e05030553 100644
+> --- a/Documentation/devicetree/bindings/pwm/pwm-meson.txt
+> +++ b/Documentation/devicetree/bindings/pwm/pwm-meson.txt
+> @@ -3,8 +3,8 @@ Amlogic Meson PWM Controller
+>  
+>  Required properties:
+>  - compatible: Shall contain "amlogic,meson8b-pwm"
+> -                         or "amlogic,meson-gxbb-pwm"
+> -                         or "amlogic,meson-gxbb-ao-pwm"
+> +                         or "amlogic,meson-gx-pwm"
+> +                         or "amlogic,meson-gx-ao-pwm"
+
+I've already said the same on other patches, but so other 
+maintainers see it, this seems like pointless, non-backwards compatible 
+change.
+
+Rob
