@@ -1,93 +1,43 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 17 Oct 2017 07:48:16 -0700
-Subject: [PATCH 10/10] arm: KVM: Use common implementation for all
- flushes to PoC
-In-Reply-To: <afc3cde3-da2d-de83-40bb-d419370607f2@arm.com>
-References: <20171009152032.27804-1-marc.zyngier@arm.com>
- <20171009152032.27804-11-marc.zyngier@arm.com>
- <20171016200647.GD1845@lvm>
- <afc3cde3-da2d-de83-40bb-d419370607f2@arm.com>
-Message-ID: <20171017144816.GK5886@lvm>
+Date: Tue, 17 Oct 2017 07:50:33 -0700
+Subject: [PATCH 3/4] kvm/arm64: simplify CC instrumentation opt-out
+In-Reply-To: <20171016132440.38098-4-mark.rutland@arm.com>
+References: <20171016132440.38098-1-mark.rutland@arm.com>
+ <20171016132440.38098-4-mark.rutland@arm.com>
+Message-ID: <20171017145033.GL5886@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 01:40:00PM +0100, Marc Zyngier wrote:
-> On 16/10/17 21:06, Christoffer Dall wrote:
-> > On Mon, Oct 09, 2017 at 04:20:32PM +0100, Marc Zyngier wrote:
-> >> We currently have no less than three implementations for the
-> >> "flush to PoC" code. Let standardize on a single one. This
-> >> requires a bit of unpleasant moving around, and relies on
-> >> __kvm_flush_dcache_pte and co being #defines so that they can
-> >> call into coherent_dcache_guest_page...
-> >>
-> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >> ---
-> >>  arch/arm/include/asm/kvm_mmu.h | 28 ++++------------------------
-> >>  virt/kvm/arm/mmu.c             | 20 ++++++++++----------
-> >>  2 files changed, 14 insertions(+), 34 deletions(-)
-> >>
-> >> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> >> index 5f1ac88a5951..011b0db85c02 100644
-> >> --- a/arch/arm/include/asm/kvm_mmu.h
-> >> +++ b/arch/arm/include/asm/kvm_mmu.h
-> >> @@ -235,31 +235,11 @@ static inline void __coherent_icache_guest_page(kvm_pfn_t pfn,
-> >>  	}
-> >>  }
-> >>  
-> >> -static inline void __kvm_flush_dcache_pte(pte_t pte)
-> >> -{
-> >> -	void *va = kmap_atomic(pte_page(pte));
-> >> -
-> >> -	kvm_flush_dcache_to_poc(va, PAGE_SIZE);
-> >> -
-> >> -	kunmap_atomic(va);
-> >> -}
-> >> -
-> >> -static inline void __kvm_flush_dcache_pmd(pmd_t pmd)
-> >> -{
-> >> -	unsigned long size = PMD_SIZE;
-> >> -	kvm_pfn_t pfn = pmd_pfn(pmd);
-> >> -
-> >> -	while (size) {
-> >> -		void *va = kmap_atomic_pfn(pfn);
-> >> +#define __kvm_flush_dcache_pte(p)				\
-> >> +	coherent_dcache_guest_page(pte_pfn((p)), PAGE_SIZE)
-> >>  
-> >> -		kvm_flush_dcache_to_poc(va, PAGE_SIZE);
-> >> -
-> >> -		pfn++;
-> >> -		size -= PAGE_SIZE;
-> >> -
-> >> -		kunmap_atomic(va);
-> >> -	}
-> >> -}
-> >> +#define __kvm_flush_dcache_pmd(p)				\
-> >> +	coherent_dcache_guest_page(pmd_pfn((p)), PMD_SIZE)
-> > 
-> > Why can't these just be static inlines which call
-> > __coherent_dcache_guest_page already in the header file directly?
+On Mon, Oct 16, 2017 at 02:24:39PM +0100, Mark Rutland wrote:
+> Now that we can opt out of all instrumentation with a single option,
+> make use of this in the KVM hyp code. Hopefully, this will also avoid
+> fragility as new options are introduced.
 > 
-> Because if we do that, we get a significant code expansion in the
-> resulting binary (all the call sites end up having a copy of that function.
-> 
-> > I'm really not too crazy about these #defines.
-> 
-> Neither am I. But actually, this patch is completely wrong. Using the
-> same functions as the guest cleaning doesn't provide the guarantees
-> documented next to unmap_stage2_ptes, as we need a clean+invalidate, not
-> just a clean.
-> 
-> I'll rework this patch (or just drop it).
-> 
-> > In fact, why do we need the coherent_Xcache_guest_page static
-> > indirection functions in mmu.c in the first place?
-> 
-> Code expansion. That's the only reason.
-> 
-Then maybe a reworked patch needs a function defined in some
-arch-specific object file that we can just call.  The functions don't
-look that complicated to me, but I suppose if they inline the things
-they call, it could become a bit hairy.
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Marc Zyngier <mark.zyngier@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
 
-Thanks,
--Christoffer
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+
+> ---
+>  arch/arm64/kvm/hyp/Makefile | 5 +----
+>  1 file changed, 1 insertion(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+> index 14c4e3b14bcb..a8a212eb66f1 100644
+> --- a/arch/arm64/kvm/hyp/Makefile
+> +++ b/arch/arm64/kvm/hyp/Makefile
+> @@ -22,7 +22,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += s2-setup.o
+>  # KVM code is run at a different exception code with a different map, so
+>  # compiler instrumentation that inserts callbacks or checks into the code may
+>  # cause crashes. Just disable it.
+> -GCOV_PROFILE	:= n
+> -KASAN_SANITIZE	:= n
+> -UBSAN_SANITIZE	:= n
+> -KCOV_INSTRUMENT	:= n
+> +CC_INSTRUMENT	:= n
+> -- 
+> 2.11.0
+> 
