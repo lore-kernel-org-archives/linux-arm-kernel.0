@@ -1,81 +1,56 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 17 Oct 2017 16:17:39 -0500
-Subject: [PATCH v4 2/5] dt-bindings: scsi: ufs: add document for hisi-ufs
-In-Reply-To: <20171013074936.97284-3-liwei213@huawei.com>
-References: <20171013074936.97284-1-liwei213@huawei.com>
- <20171013074936.97284-3-liwei213@huawei.com>
-Message-ID: <20171017211739.tg7jm2hggega4sfy@rob-hp-laptop>
+Date: Tue, 17 Oct 2017 16:19:13 -0500
+Subject: [PATCH] i2c: meson: use generic compatible
+In-Reply-To: <20171013082206.31632-1-jbrunet@baylibre.com>
+References: <20171013082206.31632-1-jbrunet@baylibre.com>
+Message-ID: <20171017211913.gvspqwmts3aqz5tv@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 13, 2017 at 03:49:33PM +0800, Li Wei wrote:
-> add ufs node document for Hisilicon.
+On Fri, Oct 13, 2017 at 10:22:06AM +0200, Jerome Brunet wrote:
+> The meson i2c driver seems to be compatible with more SoCs than
+> initially thought. Let's use the most generic compatible he have in
+> DT instead of the gxbb specific one
 > 
-> Signed-off-by: Li Wei <liwei213@huawei.com>
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 > ---
->  Documentation/devicetree/bindings/ufs/ufs-hisi.txt | 47 ++++++++++++++++++++++
->  1 file changed, 47 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/ufs/ufs-hisi.txt
+>  Documentation/devicetree/bindings/i2c/i2c-meson.txt | 2 +-
+>  drivers/i2c/busses/i2c-meson.c                      | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/ufs/ufs-hisi.txt b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
-> new file mode 100644
-> index 000000000000..ee114a65143d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
-> @@ -0,0 +1,47 @@
-> +* Hisilicon Universal Flash Storage (UFS) Host Controller
-> +
-> +UFS nodes are defined to describe on-chip UFS hardware macro.
-> +Each UFS Host Controller should have its own node.
-> +
-> +Required properties:
-> +- compatible        : compatible list, contains one of the following -
-> +			"hisilicon,hi3660-ufs" for hisi ufs host controller
-> +			 present on Hi3660 chipset.
-> +- reg               : should contain UFS register address space & UFS SYS CTRL register address,
-> +- interrupt-parent  : interrupt device
-> +- interrupts        : interrupt number
-> +- clocks	        : List of phandle and clock specifier pairs
-> +- clock-names       : List of clock input name strings sorted in the same
-> +		      order as the clocks property. "clk_ref", "clk_phy" is optional
-> +- resets            : reset node register, one reset the clk and the other reset the controller
-> +- reset-names       : describe reset node register
-> +
-> +Optional properties for board device:
-> +- reset-gpio			: specifies to reset devices
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-meson.txt b/Documentation/devicetree/bindings/i2c/i2c-meson.txt
+> index 611b934c7e10..e6a563443e26 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-meson.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-meson.txt
+> @@ -1,7 +1,7 @@
+>  Amlogic Meson I2C controller
+>  
+>  Required properties:
+> - - compatible: must be "amlogic,meson6-i2c" or "amlogic,meson-gxbb-i2c"
+> + - compatible: must be "amlogic,meson6-i2c" or "amlogic,meson-gx-i2c"
 
-Should be "reset-gpios".
+Seems like a pointless, not backwards compatible change.
 
-> +
-> +Example:
-> +
-> +	ufs: ufs at ff3b0000 {
-> +		compatible = "hisilicon,hi3660-ufs", "jedec,ufs-1.1";
-> +		/* 0: HCI standard */
-> +		/* 1: UFS SYS CTRL */
-> +		reg = <0x0 0xff3b0000 0x0 0x1000>,
-> +			<0x0 0xff3b1000 0x0 0x1000>;
-> +		interrupt-parent = <&gic>;
-> +		interrupts = <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&crg_ctrl HI3660_CLK_GATE_UFSIO_REF>,
-> +			<&crg_ctrl HI3660_CLK_GATE_UFSPHY_CFG>;
-> +		clock-names = "clk_ref", "clk_phy";
-> +		freq-table-hz = <0 0>, <0 0>;
-> +		/* offset: 0x84; bit: 12 */
-> +		/* offset: 0x84; bit: 7  */
-> +		resets = <&crg_rst 0x84 12>,
-> +			<&crg_rst 0x84 7>;
-> +		reset-names = "rst", "assert";
-> +	};
-> +
-> +	&ufs {
-> +		reset-gpio = <&gpio18 1 0>;
-> +		status = "okay";
-
-Don't show status or the chip/board split in examples.
-
-> +	};
-> +
+>   - reg: physical address and length of the device registers
+>   - interrupts: a single interrupt specifier
+>   - clocks: clock for the device
+> diff --git a/drivers/i2c/busses/i2c-meson.c b/drivers/i2c/busses/i2c-meson.c
+> index 88d15b92ec35..7b238d8c19af 100644
+> --- a/drivers/i2c/busses/i2c-meson.c
+> +++ b/drivers/i2c/busses/i2c-meson.c
+> @@ -442,7 +442,7 @@ static int meson_i2c_remove(struct platform_device *pdev)
+>  
+>  static const struct of_device_id meson_i2c_match[] = {
+>  	{ .compatible = "amlogic,meson6-i2c" },
+> -	{ .compatible = "amlogic,meson-gxbb-i2c" },
+> +	{ .compatible = "amlogic,meson-gx-i2c" },
+>  	{ },
+>  };
+>  MODULE_DEVICE_TABLE(of, meson_i2c_match);
 > -- 
-> 2.11.0
+> 2.13.6
 > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
