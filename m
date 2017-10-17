@@ -1,48 +1,94 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 17 Oct 2017 20:17:26 +0200
-Subject: [GIT PULL] Rockchip dts64 Fixes for 4.14 part 2
-Message-ID: <6151423.bSX8Os9Bvg@phil>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Tue, 17 Oct 2017 14:18:10 -0400
+Subject: [RFC PATCH v4 5/8] drm/rockchip: inno_hdmi: Fix error handling
+ path
+In-Reply-To: <20171017101624.12506-6-jeffy.chen@rock-chips.com>
+References: <20171017101624.12506-1-jeffy.chen@rock-chips.com>
+ <20171017101624.12506-6-jeffy.chen@rock-chips.com>
+Message-ID: <20171017181810.smvocm63gr2qygw6@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof,
+On Tue, Oct 17, 2017 at 06:16:21PM +0800, Jeffy Chen wrote:
+> Add missing error handling in bind().
+> 
+> Fixes: 412d4ae6b7a5 ("drm/rockchip: hdmi: add Innosilicon HDMI support")
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> ---
+> 
+> Changes in v4: None
+> Changes in v3: None
+> Changes in v2: None
+> 
+>  drivers/gpu/drm/rockchip/inno_hdmi.c | 20 ++++++++++++++++----
+>  1 file changed, 16 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/inno_hdmi.c b/drivers/gpu/drm/rockchip/inno_hdmi.c
+> index ee584d87111f..9c258b05dfa5 100644
+> --- a/drivers/gpu/drm/rockchip/inno_hdmi.c
+> +++ b/drivers/gpu/drm/rockchip/inno_hdmi.c
+> @@ -851,8 +851,10 @@ static int inno_hdmi_bind(struct device *dev, struct device *master,
+>  	}
+>  
+>  	irq = platform_get_irq(pdev, 0);
+> -	if (irq < 0)
+> -		return irq;
+> +	if (irq < 0) {
+> +		ret = irq;
+> +		goto err_disable_clk;
+> +	}
+>  
+>  	inno_hdmi_reset(hdmi);
+>  
+> @@ -860,7 +862,7 @@ static int inno_hdmi_bind(struct device *dev, struct device *master,
+>  	if (IS_ERR(hdmi->ddc)) {
+>  		ret = PTR_ERR(hdmi->ddc);
+>  		hdmi->ddc = NULL;
+> -		return ret;
+> +		goto err_disable_clk;
+>  	}
+>  
+>  	/*
+> @@ -874,7 +876,7 @@ static int inno_hdmi_bind(struct device *dev, struct device *master,
+>  
+>  	ret = inno_hdmi_register(drm, hdmi);
+>  	if (ret)
+> -		return ret;
+> +		goto err_put_adapter;
+>  
+>  	dev_set_drvdata(dev, hdmi);
+>  
+> @@ -884,7 +886,17 @@ static int inno_hdmi_bind(struct device *dev, struct device *master,
+>  	ret = devm_request_threaded_irq(dev, irq, inno_hdmi_hardirq,
+>  					inno_hdmi_irq, IRQF_SHARED,
+>  					dev_name(dev), hdmi);
+> +	if (ret < 0)
+> +		goto err_cleanup_hdmi;
+>  
+> +	return 0;
+> +err_cleanup_hdmi:
+> +	drm_connector_cleanup(&hdmi->connector);
+> +	drm_encoder_cleanup(&hdmi->encoder);
 
-looks like I need two rounds of fixes this time around.
-But the vqmmc voltage issue warrants that I think, especially
-as 4.14 is going to be a LTS release.
+Same question regarding cleanup vs destroy.
 
-Please pull.
+> +err_put_adapter:
+> +	i2c_put_adapter(hdmi->ddc);
+> +err_disable_clk:
+> +	clk_disable_unprepare(hdmi->pclk);
 
-Thanks
-Heiko
+I also noticed the order of these two functions is reversed in unbind(). Can you
+please update the order to match?
 
-The following changes since commit 0bc15d85d97d44e8979ff91d0c1fbafe6fd4172c:
+Sean
 
-  arm64: dts: rockchip: add the grf clk for dw-mipi-dsi on rk3399 (2017-09-26 15:59:17 +0200)
+>  	return ret;
+>  }
+>  
+> -- 
+> 2.11.0
+> 
+> 
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.14-rockchip-dts64fixes-2
-
-for you to fetch changes up to b521102d935d0501f5d95242ade2988f3f069c77:
-
-  arm64: dts: rockchip: fix typo in iommu nodes (2017-10-17 20:13:52 +0200)
-
-----------------------------------------------------------------
-The vqmmc voltages on rk3399 pose a risk for the chip if they
-exceed 3.0V, so they got fixed to not be at 3.3V
-And Arnd found a typo in the recently added iommu nodes.
-
-----------------------------------------------------------------
-Arnd Bergmann (1):
-      arm64: dts: rockchip: fix typo in iommu nodes
-
-Shawn Lin (1):
-      arm64: dts: rockchip: correct vqmmc voltage for rk3399 platforms
-
- arch/arm64/boot/dts/rockchip/rk3328.dtsi          | 2 +-
- arch/arm64/boot/dts/rockchip/rk3368.dtsi          | 2 +-
- arch/arm64/boot/dts/rockchip/rk3399-firefly.dts   | 4 ++--
- arch/arm64/boot/dts/rockchip/rk3399-puma.dtsi     | 4 ++--
- arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi | 4 ++--
- 5 files changed, 8 insertions(+), 8 deletions(-)
+-- 
+Sean Paul, Software Engineer, Google / Chromium OS
