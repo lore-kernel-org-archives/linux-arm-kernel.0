@@ -1,86 +1,48 @@
-From: radoslaw.pietrzyk@gmail.com (=?UTF-8?Q?Rados=C5=82aw_Pietrzyk?=)
-Date: Tue, 17 Oct 2017 15:51:02 +0200
-Subject: [PATCH] i2c: stm32: Fixes multibyte transfer for STM32F4 I2C
- controller
-In-Reply-To: <2d892fec-0496-8a6f-51c9-439b933d9975@st.com>
-References: <1507722788-31224-1-git-send-email-radoslaw.pietrzyk@gmail.com>
- <990c3275-35b3-68da-453c-d1a80e867df7@st.com>
- <CAFvLkMS6+o3D88Rj23of56KtjonwFAVD_aEP3eWaA2H=U5WP4Q@mail.gmail.com>
- <2d892fec-0496-8a6f-51c9-439b933d9975@st.com>
-Message-ID: <CAFvLkMS9Q801biCBYp+fJeiOo22zr436Td43PH3GG8E6diSL3A@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 17 Oct 2017 15:06:29 +0100
+Subject: [PATCH v9 00/20] simplify crypto wait for async op
+In-Reply-To: <1508059209-25529-1-git-send-email-gilad@benyossef.com>
+References: <1508059209-25529-1-git-send-email-gilad@benyossef.com>
+Message-ID: <20171017140629.GO20805@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I can try of course but it means that any IRQ delay may cause the same
-problem so the question is whether the driver should be vulnerable to
-such use cases.
+On Sun, Oct 15, 2017 at 10:19:45AM +0100, Gilad Ben-Yossef wrote:
+> Many users of kernel async. crypto services have a pattern of
+> starting an async. crypto op and than using a completion
+> to wait for it to end.
+> 
+> This patch set simplifies this common use case in two ways:
+> 
+> First, by separating the return codes of the case where a
+> request is queued to a backlog due to the provider being
+> busy (-EBUSY) from the case the request has failed due
+> to the provider being busy and backlogging is not enabled
+> (-EAGAIN).
+> 
+> Next, this change is than built on to create a generic API
+> to wait for a async. crypto operation to complete.
+> 
+> The end result is a smaller code base and an API that is
+> easier to use and more difficult to get wrong.
+> 
+> The patch set was boot tested on x86_64 and arm64 which
+> at the very least tests the crypto users via testmgr and
+> tcrypt but I do note that I do not have access to some
+> of the HW whose drivers are modified nor do I claim I was
+> able to test all of the corner cases.
+> 
+> The patch set is based upon linux-next release tagged
+> next-20171013.
 
-2017-10-17 15:18 GMT+02:00 Pierre Yves MORDRET <pierre-yves.mordret@st.com>:
->
->
-> On 10/12/2017 11:55 AM, Rados?aw Pietrzyk wrote:
->> It looks like there is a use case when IRQ handler is delayed a bit
->> and the logic in the driver does not work. What is the real root cause
->> I don't know.
->>
->
-> As far as I know on this STM32 F4 platform there is some trouble with timer
-> events that may have bad influences on scheduling. Some tasks could be delayed
-> for some reasons.
-> It would be great if the following patches below could help in your matter
-> https://patchwork.kernel.org/patch/9980961/
-> https://patchwork.kernel.org/patch/9980963/
-> https://patchwork.kernel.org/patch/9980965/
-> https://patchwork.kernel.org/patch/9980967/
->
-> Would you mind to test those ?
-> Thanks
->
->> 2017-10-12 11:31 GMT+02:00 Pierre Yves MORDRET <pierre-yves.mordret@st.com>:
->>>
->>>
->>> On 10/11/2017 01:53 PM, Radoslaw Pietrzyk wrote:
->>>>       Do not read data on RXNE but on BTF only due to HW
->>>>       synchronisation problems and NACKing read data too early.
->>>>       It was found during testing of stmpe811 touchscreen driver.
->>>>
->>>
->>> Would you mind to explain what is behind "hw sync issue" you've seen ?
->>>
->>>> Signed-off-by: Radoslaw Pietrzyk <radoslaw.pietrzyk@gmail.com>
->>>> ---
->>>>  drivers/i2c/busses/i2c-stm32f4.c | 11 +----------
->>>>  1 file changed, 1 insertion(+), 10 deletions(-)
->>>>
->>>> diff --git a/drivers/i2c/busses/i2c-stm32f4.c b/drivers/i2c/busses/i2c-stm32f4.c
->>>> index 4ec1084..86bcf4c 100644
->>>> --- a/drivers/i2c/busses/i2c-stm32f4.c
->>>> +++ b/drivers/i2c/busses/i2c-stm32f4.c
->>>> @@ -409,16 +409,9 @@ static void stm32f4_i2c_handle_read(struct stm32f4_i2c_dev *i2c_dev)
->>>>        * So, here we just disable buffer interrupt in order to avoid another
->>>>        * system preemption due to RX not empty event.
->>>>        */
->>>> -     case 2:
->>>> -     case 3:
->>>> +     default:
->>>>               stm32f4_i2c_clr_bits(reg, STM32F4_I2C_CR2_ITBUFEN);
->>>>               break;
->>>> -     /*
->>>> -      * For N byte reception with N > 3 we directly read data register
->>>> -      * until N-2 data.
->>>> -      */
->>>> -     default:
->>>> -             stm32f4_i2c_read_msg(i2c_dev);
->>>>       }
->>>>  }
->>>>
->>>> @@ -470,8 +463,6 @@ static void stm32f4_i2c_handle_rx_done(struct stm32f4_i2c_dev *i2c_dev)
->>>>                */
->>>>               reg = i2c_dev->base + STM32F4_I2C_CR1;
->>>>               stm32f4_i2c_clr_bits(reg, STM32F4_I2C_CR1_ACK);
->>>> -             stm32f4_i2c_read_msg(i2c_dev);
->>>> -             break;
->>>>       default:
->>>>               stm32f4_i2c_read_msg(i2c_dev);
->>>>       }
->>>>
+Has there been any performance impact analysis of these changes?  I
+ended up with patches for one of the crypto drivers which converted
+its interrupt handling to threaded interrupts being reverted because
+it caused a performance degredation.
+
+Moving code to latest APIs to simplify it is not always beneficial.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
