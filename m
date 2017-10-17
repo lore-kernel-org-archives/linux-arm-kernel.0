@@ -1,84 +1,93 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Tue, 17 Oct 2017 16:09:25 +0800
-Subject: [RFC PATCH v3 5/5] drm/rockchip: Add device links for master and
- components
-In-Reply-To: <20171017080925.23763-1-jeffy.chen@rock-chips.com>
-References: <20171017080925.23763-1-jeffy.chen@rock-chips.com>
-Message-ID: <20171017080925.23763-6-jeffy.chen@rock-chips.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 17 Oct 2017 10:11:46 +0200
+Subject: [PATCH 2/2] dt-bindings: power: add amlogic meeson power domain
+ bindings
+In-Reply-To: <1508225882-8795-3-git-send-email-narmstrong@baylibre.com>
+References: <1508225882-8795-1-git-send-email-narmstrong@baylibre.com>
+ <1508225882-8795-3-git-send-email-narmstrong@baylibre.com>
+Message-ID: <2c765b7a-586e-de7c-8f48-0111689146bf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we are trying to access components' resources in the master's
-suspend/resume PM callbacks(e.g. panel), add device links to correct
-the suspend/resume and shutdown ordering.
+On 17/10/2017 09:38, Neil Armstrong wrote:
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  .../bindings/power/amlogic,meson-gx-pwrc.txt       | 65 ++++++++++++++++++++++
+>  1 file changed, 65 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/power/amlogic,meson-gx-pwrc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/power/amlogic,meson-gx-pwrc.txt b/Documentation/devicetree/bindings/power/amlogic,meson-gx-pwrc.txt
+> new file mode 100644
+> index 0000000..94c2474
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/power/amlogic,meson-gx-pwrc.txt
+> @@ -0,0 +1,65 @@
+> +Amlogic Meson Power Controller
+> +==============================
+> +
+> +The Amlogic Meson SoCs embeds an internal Power domain controller.
+> +
+> +VPU Power Domain
+> +----------------
+> +
+> +The Video Processing Unit power domain is controlled by this power controller,
+> +but the domain requires some external resources to meet the correct power
+> +sequences.
+> +The bindings must respect the power domain bindings as described in the file
+> +power_domain.txt
+> +
+> +Device Tree Bindings:
+> +---------------------
+> +
+> +Required properties:
+> +- compatible: value should be different for each SoC family as :
+> +	- GXBB (S905) : "amlogic,meson-gxbb-vpu"
+> +	- GXL (S905X, S905D) : "amlogic,meson-gxl-vpu"
+> +	- GXM (S912) : "amlogic,meson-gxm-vpu"
+> +	followed by the common "amlogic,meson-gx-vpu"
 
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
----
+Oops, wrong compatibles, please ignore this patch, I'll repost it.
 
-Changes in v3: None
-Changes in v2:
-Use device link to correct the suspend/resume and shutdown ordering,
-instead of converting rockchip spi's suspend/resume PM callbacks to
-late suspend/resume PM callbacks.
-
- drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 24 +++++++++++++++++++++---
- 1 file changed, 21 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-index 76d63de5921d..af18967f699b 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-@@ -337,6 +337,8 @@ static struct component_match *rockchip_drm_match_add(struct device *dev)
- 
- 			if (!d)
- 				break;
-+
-+			device_link_add(dev, d, DL_FLAG_STATELESS);
- 			component_match_add(dev, &match, compare_dev, d);
- 		} while (true);
- 	}
-@@ -406,6 +408,7 @@ static int rockchip_drm_platform_of_probe(struct device *dev)
- static int rockchip_drm_platform_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
-+	struct device_link *link;
- 	struct component_match *match = NULL;
- 	int ret;
- 
-@@ -414,16 +417,31 @@ static int rockchip_drm_platform_probe(struct platform_device *pdev)
- 		return ret;
- 
- 	match = rockchip_drm_match_add(dev);
--	if (IS_ERR(match))
--		return PTR_ERR(match);
-+	if (IS_ERR(match)) {
-+		ret = PTR_ERR(match);
-+		goto err_cleanup_dev_links;
-+	}
- 
--	return component_master_add_with_match(dev, &rockchip_drm_ops, match);
-+	ret = component_master_add_with_match(dev, &rockchip_drm_ops, match);
-+	if (ret < 0)
-+		goto err_cleanup_dev_links;
-+
-+	return 0;
-+err_cleanup_dev_links:
-+	list_for_each_entry(link, &dev->links.consumers, s_node)
-+		device_link_del(link);
-+	return ret;
- }
- 
- static int rockchip_drm_platform_remove(struct platform_device *pdev)
- {
-+	struct device_link *link;
-+
- 	component_master_del(&pdev->dev, &rockchip_drm_ops);
- 
-+	list_for_each_entry(link, &pdev->dev.links.consumers, s_node)
-+		device_link_del(link);
-+
- 	return 0;
- }
- 
--- 
-2.11.0
+> +- #power-domain-cells: should be 0
+> +- amlogic,hhi-sysctrl: phandle to the HHI sysctrl node
+> +- resets: phandles to the reset lines needed for this power demain sequence
+> +	as described in ../reset/reset.txt
+> +- clocks: from common clock binding: handle to VPU and VAPB clocks
+> +- clock-names: from common clock binding: must contain "vpu", "vapb"
+> +	corresponding to entry in the clocks property.
+> +
+> +Parent node should have the following properties :
+> +- compatible: "amlogic,meson-gx-ao-sysctrl", "syscon", "simple-mfd"
+> +- reg: base address and size of the AO system control register space.
+> +
+> +Example:
+> +-------
+> +
+> +ao_sysctrl: sys-ctrl at 0 {
+> +	compatible = "amlogic,meson-gx-ao-sysctrl", "syscon", "simple-mfd";
+> +	reg =  <0x0 0x0 0x0 0x100>;
+> +
+> +	pwrc_vpu: power-controller-vpu {
+> +		compatible = "amlogic,meson-gx-pwrc-vpu";
+> +		#power-domain-cells = <0>;
+> +		amlogic,hhi-sysctrl = <&sysctrl>;
+> +		resets = <&reset RESET_VIU>,
+> +			 <&reset RESET_VENC>,
+> +			 <&reset RESET_VCBUS>,
+> +			 <&reset RESET_BT656>,
+> +			 <&reset RESET_DVIN_RESET>,
+> +			 <&reset RESET_RDMA>,
+> +			 <&reset RESET_VENCI>,
+> +			 <&reset RESET_VENCP>,
+> +		 	 <&reset RESET_VDAC>,
+> +		 	 <&reset RESET_VDI6>,
+> +		 	 <&reset RESET_VENCL>,
+> +			 <&reset RESET_VID_LOCK>;
+> +		clocks = <&clkc CLKID_VPU>,
+> +			 <&clkc CLKID_VAPB>;
+> +		clock-names = "vpu", "vapb";
+> +	};
+> +};
+> +
+> +
+> 
