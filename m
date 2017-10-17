@@ -1,48 +1,32 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Tue, 17 Oct 2017 19:34:21 +0200
-Subject: [PATCH v4 1/4] clocksource: stm32: convert driver to timer_of
-In-Reply-To: <88c8f124-4cb1-a982-d4a2-c029ab0dcd2a@linaro.org>
-References: <1506959513-16851-1-git-send-email-benjamin.gaignard@linaro.org>
- <1506959513-16851-2-git-send-email-benjamin.gaignard@linaro.org>
- <88c8f124-4cb1-a982-d4a2-c029ab0dcd2a@linaro.org>
-Message-ID: <CA+M3ks5CBOXfQCMmUZnkVUNwSGCnzaqdzDZa9ap6NYgDTVspsw@mail.gmail.com>
+From: tpiepho@impinj.com (Trent Piepho)
+Date: Tue, 17 Oct 2017 17:37:49 +0000
+Subject: [PATCH 2/2] PCI: imx6: Check for link training status in link up
+ check
+In-Reply-To: <1508229842.2146.4.camel@pengutronix.de>
+References: <20171017001159.109152-1-tpiepho@impinj.com>
+ <20171017001159.109152-2-tpiepho@impinj.com>
+ <1508229842.2146.4.camel@pengutronix.de>
+Message-ID: <1508261868.110408.5.camel@impinj.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-10-17 19:09 GMT+02:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
-> On 02/10/2017 17:51, Benjamin Gaignard wrote:
->> Convert driver to use timer_of helpers. This allow to remove
->> custom proprietary structure.
->>
->> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
->> ---
->
-> [ ... ]
->
->> -     clockevents_config_and_register(&data->evtdev,
->> -                                     DIV_ROUND_CLOSEST(rate, prescaler),
->> -                                     0x1, max_delta);
->> -
->> -     ret = request_irq(irq, stm32_clock_event_handler, IRQF_TIMER,
->> -                     "stm32 clockevent", data);
->> -     if (ret) {
->> -             pr_err("%pOF: failed to request irq.\n", np);
->> -             goto err_get_irq;
->> -     }
->> +     clockevents_config_and_register(&to->clkevt,
->> +                                     timer_of_period(to), 0x60, max_delta);
->
->
-> Why 0x1 -> 0x60 ?
+On Tue, 2017-10-17 at 10:44 +0200, Lucas Stach wrote:
+> Am Montag, den 16.10.2017, 17:11 -0700 schrieb Trent Piepho:
+> > 
+> > 
+> > There result is no link training check.
+> > 
+> > Then commit dac29e6c5460 ("PCI: designware: Add default link up check if
+> > sub-driver doesn't override")
+> 
+> I think you meant 01c076732e82 (PCI: designware: Check LTSSM training
+> bit before deciding link is up) here.
+> 
+> >  added a link training check to the default
+> > version of dw_pcie_link_up(), but since imx6 uses imx6_pcie_link_up() it
+> > does not use the default version with this fix.
 
-Because if the min delta is too small it could generate too much interrupts
-and the system will not be able to catch all of them.
-
->
-> --
->  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
->
-> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-> <http://twitter.com/#!/linaroorg> Twitter |
-> <http://www.linaro.org/linaro-blog/> Blog
->
+It was really the combination of both commits.  'dac added the common
+link up check, which imx6 didn't use, and then '01c added the training
+check to it.  It appears I've attributed both changes to 'dac in my
+message and forgot '01c.  I'll fix.
