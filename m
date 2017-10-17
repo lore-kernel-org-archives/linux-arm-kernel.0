@@ -1,71 +1,96 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 17 Oct 2017 17:55:54 +0100
-Subject: [PATCH v5 1/3] drivers/irqchip: gicv3: probe device ID space before
- quirks handling
+Date: Tue, 17 Oct 2017 17:55:55 +0100
+Subject: [PATCH v5 2/3] drivers/irqchip: gic: make quirks matching conditional
+ on init return value
 In-Reply-To: <20171017165556.30250-1-ard.biesheuvel@linaro.org>
 References: <20171017165556.30250-1-ard.biesheuvel@linaro.org>
-Message-ID: <20171017165556.30250-2-ard.biesheuvel@linaro.org>
+Message-ID: <20171017165556.30250-3-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before adding another SoC whose device ID space deviates from the
-value presented in the GIC ID registers, let's slightly refactor
-the code so that the ID registers are probed before that quirks
-handling executes. This allows us to move the device ID override
-into the quirk handler itself.
+As it turns out, the IIDR is not sufficient to distinguish between GICv3
+implementations when it comes to enabling quirks. So update the prototype
+of the init() hook to return a bool, and interpret a 'false' return value
+as no match, in which case the 'enabling workaround' log message should
+not be printed.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 18 ++++++------------
- 1 file changed, 6 insertions(+), 12 deletions(-)
+ drivers/irqchip/irq-gic-common.c |  5 +++--
+ drivers/irqchip/irq-gic-common.h |  2 +-
+ drivers/irqchip/irq-gic-v3-its.c | 12 +++++++++---
+ 3 files changed, 13 insertions(+), 6 deletions(-)
 
+diff --git a/drivers/irqchip/irq-gic-common.c b/drivers/irqchip/irq-gic-common.c
+index 9ae71804b5dd..30017df5b54c 100644
+--- a/drivers/irqchip/irq-gic-common.c
++++ b/drivers/irqchip/irq-gic-common.c
+@@ -40,8 +40,9 @@ void gic_enable_quirks(u32 iidr, const struct gic_quirk *quirks,
+ 	for (; quirks->desc; quirks++) {
+ 		if (quirks->iidr != (quirks->mask & iidr))
+ 			continue;
+-		quirks->init(data);
+-		pr_info("GIC: enabling workaround for %s\n", quirks->desc);
++		if (quirks->init(data))
++			pr_info("GIC: enabling workaround for %s\n",
++				quirks->desc);
+ 	}
+ }
+ 
+diff --git a/drivers/irqchip/irq-gic-common.h b/drivers/irqchip/irq-gic-common.h
+index 205e5fddf6da..3919cd7c5285 100644
+--- a/drivers/irqchip/irq-gic-common.h
++++ b/drivers/irqchip/irq-gic-common.h
+@@ -23,7 +23,7 @@
+ 
+ struct gic_quirk {
+ 	const char *desc;
+-	void (*init)(void *data);
++	bool (*init)(void *data);
+ 	u32 iidr;
+ 	u32 mask;
+ };
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index e8d89343d613..891de07fd4cc 100644
+index 891de07fd4cc..c34f21c7a38e 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -1650,23 +1650,14 @@ static void its_free_tables(struct its_node *its)
+@@ -2728,28 +2728,34 @@ static int its_force_quiescent(void __iomem *base)
+ 	}
+ }
  
- static int its_alloc_tables(struct its_node *its)
- {
--	u64 typer = gic_read_typer(its->base + GITS_TYPER);
--	u32 ids = GITS_TYPER_DEVBITS(typer);
- 	u64 shr = GITS_BASER_InnerShareable;
- 	u64 cache = GITS_BASER_RaWaWb;
- 	u32 psz = SZ_64K;
- 	int err, i;
- 
--	if (its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_22375) {
--		/*
--		* erratum 22375: only alloc 8MB table size
--		* erratum 24313: ignore memory access type
--		*/
--		cache   = GITS_BASER_nCnB;
--		ids     = 0x14;                 /* 20 bits, 8MB */
--	}
--
--	its->device_ids = ids;
-+	if (its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_22375)
-+		/* erratum 24313: ignore memory access type */
-+		cache = GITS_BASER_nCnB;
- 
- 	for (i = 0; i < GITS_BASER_NR_REGS; i++) {
- 		struct its_baser *baser = its->tables + i;
-@@ -2741,6 +2732,8 @@ static void __maybe_unused its_enable_quirk_cavium_22375(void *data)
+-static void __maybe_unused its_enable_quirk_cavium_22375(void *data)
++static bool __maybe_unused its_enable_quirk_cavium_22375(void *data)
  {
  	struct its_node *its = data;
  
-+	/* erratum 22375: only alloc 8MB table size */
-+	its->device_ids = 0x14;		/* 20 bits, 8MB */
+ 	/* erratum 22375: only alloc 8MB table size */
+ 	its->device_ids = 0x14;		/* 20 bits, 8MB */
  	its->flags |= ITS_FLAGS_WORKAROUND_CAVIUM_22375;
++
++	return true;
  }
  
-@@ -2942,6 +2935,7 @@ static int __init its_probe_one(struct resource *res,
- 	its->base = its_base;
- 	its->phys_base = res->start;
- 	its->ite_size = GITS_TYPER_ITT_ENTRY_SIZE(typer);
-+	its->device_ids = GITS_TYPER_DEVBITS(typer);
- 	its->is_v4 = !!(typer & GITS_TYPER_VLPIS);
- 	if (its->is_v4) {
- 		if (!(typer & GITS_TYPER_VMOVP)) {
+-static void __maybe_unused its_enable_quirk_cavium_23144(void *data)
++static bool __maybe_unused its_enable_quirk_cavium_23144(void *data)
+ {
+ 	struct its_node *its = data;
+ 
+ 	its->flags |= ITS_FLAGS_WORKAROUND_CAVIUM_23144;
++
++	return true;
+ }
+ 
+-static void __maybe_unused its_enable_quirk_qdf2400_e0065(void *data)
++static bool __maybe_unused its_enable_quirk_qdf2400_e0065(void *data)
+ {
+ 	struct its_node *its = data;
+ 
+ 	/* On QDF2400, the size of the ITE is 16Bytes */
+ 	its->ite_size = 16;
++
++	return true;
+ }
+ 
+ static const struct gic_quirk its_quirks[] = {
 -- 
 2.11.0
