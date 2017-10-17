@@ -1,94 +1,86 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 17 Oct 2017 15:07:50 +0100
-Subject: [PATCH v3 24/28] arm64/sve: KVM: Hide SVE from CPU features
- exposed to guests
-In-Reply-To: <20171017135816.GF5886@lvm>
-References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
- <1507660725-7986-25-git-send-email-Dave.Martin@arm.com>
- <20171017135816.GF5886@lvm>
-Message-ID: <20171017140749.GW19485@e103592.cambridge.arm.com>
+From: radoslaw.pietrzyk@gmail.com (=?UTF-8?Q?Rados=C5=82aw_Pietrzyk?=)
+Date: Tue, 17 Oct 2017 15:51:02 +0200
+Subject: [PATCH] i2c: stm32: Fixes multibyte transfer for STM32F4 I2C
+ controller
+In-Reply-To: <2d892fec-0496-8a6f-51c9-439b933d9975@st.com>
+References: <1507722788-31224-1-git-send-email-radoslaw.pietrzyk@gmail.com>
+ <990c3275-35b3-68da-453c-d1a80e867df7@st.com>
+ <CAFvLkMS6+o3D88Rj23of56KtjonwFAVD_aEP3eWaA2H=U5WP4Q@mail.gmail.com>
+ <2d892fec-0496-8a6f-51c9-439b933d9975@st.com>
+Message-ID: <CAFvLkMS9Q801biCBYp+fJeiOo22zr436Td43PH3GG8E6diSL3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 06:58:16AM -0700, Christoffer Dall wrote:
-> On Tue, Oct 10, 2017 at 07:38:41PM +0100, Dave Martin wrote:
-> > KVM guests cannot currently use SVE, because SVE is always
-> > configured to trap to EL2.
-> > 
-> > However, a guest that sees SVE reported as present in
-> > ID_AA64PFR0_EL1 may legitimately expect that SVE works and try to
-> > use it.  Instead of working, the guest will receive an injected
-> > undef exception, which may cause the guest to oops or go into a
-> > spin.
-> > 
-> > To avoid misleading the guest into believing that SVE will work,
-> > this patch masks out the SVE field from ID_AA64PFR0_EL1 when a
-> > guest attempts to read this register.  No support is explicitly
-> > added for ID_AA64ZFR0_EL1 either, so that is still emulated as
-> > reading as zero, which is consistent with SVE not being
-> > implemented.
-> > 
-> > This is a temporary measure, and will be removed in a later series
-> > when full KVM support for SVE is implemented.
-> > 
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-> > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> >  arch/arm64/kvm/sys_regs.c | 12 +++++++++++-
-> >  1 file changed, 11 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> > index b1f7552..a0ee9b0 100644
-> > --- a/arch/arm64/kvm/sys_regs.c
-> > +++ b/arch/arm64/kvm/sys_regs.c
-> > @@ -23,6 +23,7 @@
-> >  #include <linux/bsearch.h>
-> >  #include <linux/kvm_host.h>
-> >  #include <linux/mm.h>
-> > +#include <linux/printk.h>
-> >  #include <linux/uaccess.h>
-> >  
-> >  #include <asm/cacheflush.h>
-> > @@ -897,8 +898,17 @@ static u64 read_id_reg(struct sys_reg_desc const *r, bool raz)
-> >  {
-> >  	u32 id = sys_reg((u32)r->Op0, (u32)r->Op1,
-> >  			 (u32)r->CRn, (u32)r->CRm, (u32)r->Op2);
-> > +	u64 val = raz ? 0 : read_sanitised_ftr_reg(id);
-> >  
-> > -	return raz ? 0 : read_sanitised_ftr_reg(id);
-> > +	if (id == SYS_ID_AA64PFR0_EL1) {
-> > +		if (val & (0xfUL << ID_AA64PFR0_SVE_SHIFT))
-> > +			pr_err_once("kvm [%i]: SVE unsupported for guests, suppressing\n",
-> > +				    task_pid_nr(current));
-> 
-> nit: does this really qualify as an error print?
+I can try of course but it means that any IRQ delay may cause the same
+problem so the question is whether the driver should be vulnerable to
+such use cases.
 
-I have no strong opinion on this: maz suggested I should add this --
-his concern was to make it difficult to ignore.
-
-This is transitional: the main purpose is to circumvent bug reports from
-people who find that SVE doesn't work in their guests, in the interim
-before proper KVM support lands upstream.
-
-Marc, do you still agree with this position?
-
-> > +
-> > +		val &= ~(0xfUL << ID_AA64PFR0_SVE_SHIFT);
-> > +	}
-> > +
-> > +	return val;
-> >  }
-> >  
-> >  /* cpufeature ID register access trap handlers */
-> > -- 
-> > 2.1.4
-> > 
-> Otherwise:
-> 
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-
-Thanks -- I'll wait for Marc's response before applying.
-
-Cheers
----Dave
+2017-10-17 15:18 GMT+02:00 Pierre Yves MORDRET <pierre-yves.mordret@st.com>:
+>
+>
+> On 10/12/2017 11:55 AM, Rados?aw Pietrzyk wrote:
+>> It looks like there is a use case when IRQ handler is delayed a bit
+>> and the logic in the driver does not work. What is the real root cause
+>> I don't know.
+>>
+>
+> As far as I know on this STM32 F4 platform there is some trouble with timer
+> events that may have bad influences on scheduling. Some tasks could be delayed
+> for some reasons.
+> It would be great if the following patches below could help in your matter
+> https://patchwork.kernel.org/patch/9980961/
+> https://patchwork.kernel.org/patch/9980963/
+> https://patchwork.kernel.org/patch/9980965/
+> https://patchwork.kernel.org/patch/9980967/
+>
+> Would you mind to test those ?
+> Thanks
+>
+>> 2017-10-12 11:31 GMT+02:00 Pierre Yves MORDRET <pierre-yves.mordret@st.com>:
+>>>
+>>>
+>>> On 10/11/2017 01:53 PM, Radoslaw Pietrzyk wrote:
+>>>>       Do not read data on RXNE but on BTF only due to HW
+>>>>       synchronisation problems and NACKing read data too early.
+>>>>       It was found during testing of stmpe811 touchscreen driver.
+>>>>
+>>>
+>>> Would you mind to explain what is behind "hw sync issue" you've seen ?
+>>>
+>>>> Signed-off-by: Radoslaw Pietrzyk <radoslaw.pietrzyk@gmail.com>
+>>>> ---
+>>>>  drivers/i2c/busses/i2c-stm32f4.c | 11 +----------
+>>>>  1 file changed, 1 insertion(+), 10 deletions(-)
+>>>>
+>>>> diff --git a/drivers/i2c/busses/i2c-stm32f4.c b/drivers/i2c/busses/i2c-stm32f4.c
+>>>> index 4ec1084..86bcf4c 100644
+>>>> --- a/drivers/i2c/busses/i2c-stm32f4.c
+>>>> +++ b/drivers/i2c/busses/i2c-stm32f4.c
+>>>> @@ -409,16 +409,9 @@ static void stm32f4_i2c_handle_read(struct stm32f4_i2c_dev *i2c_dev)
+>>>>        * So, here we just disable buffer interrupt in order to avoid another
+>>>>        * system preemption due to RX not empty event.
+>>>>        */
+>>>> -     case 2:
+>>>> -     case 3:
+>>>> +     default:
+>>>>               stm32f4_i2c_clr_bits(reg, STM32F4_I2C_CR2_ITBUFEN);
+>>>>               break;
+>>>> -     /*
+>>>> -      * For N byte reception with N > 3 we directly read data register
+>>>> -      * until N-2 data.
+>>>> -      */
+>>>> -     default:
+>>>> -             stm32f4_i2c_read_msg(i2c_dev);
+>>>>       }
+>>>>  }
+>>>>
+>>>> @@ -470,8 +463,6 @@ static void stm32f4_i2c_handle_rx_done(struct stm32f4_i2c_dev *i2c_dev)
+>>>>                */
+>>>>               reg = i2c_dev->base + STM32F4_I2C_CR1;
+>>>>               stm32f4_i2c_clr_bits(reg, STM32F4_I2C_CR1_ACK);
+>>>> -             stm32f4_i2c_read_msg(i2c_dev);
+>>>> -             break;
+>>>>       default:
+>>>>               stm32f4_i2c_read_msg(i2c_dev);
+>>>>       }
+>>>>
