@@ -1,10 +1,9 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 17 Oct 2017 11:06:11 +0200
-Subject: [PATCH 04/23] drm/sun4i: tcon: Make tcon_get_clk_delay mode argument
- const
+Date: Tue, 17 Oct 2017 11:06:10 +0200
+Subject: [PATCH 03/23] drm/sun4i: tcon: Make tcon_set_mux mode argument const
 In-Reply-To: <cover.fe3d65d1ee05a55224d26e7d113388c428592b26.1508231063.git-series.maxime.ripard@free-electrons.com>
 References: <cover.fe3d65d1ee05a55224d26e7d113388c428592b26.1508231063.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <e6f92f126640aa6de639386f9b4677db3d8bb37b.1508231063.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <b0cce5a43fc3b56953d21a54fc3c14672f755f42.1508231063.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,21 +11,53 @@ The drm_display_mode pointer can be mark const, so let's do it.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 6 +++---
+ drivers/gpu/drm/sun4i/sun4i_tcon.h | 2 +-
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index 54e1796d2953..9b5b21ad8378 100644
+index 68751b999877..54e1796d2953 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -146,7 +146,7 @@ void sun4i_tcon_set_mux(struct sun4i_tcon *tcon, int channel,
+@@ -134,7 +134,7 @@ static struct sun4i_tcon *sun4i_get_tcon0(struct drm_device *drm)
  }
- EXPORT_SYMBOL(sun4i_tcon_set_mux);
  
--static int sun4i_tcon_get_clk_delay(struct drm_display_mode *mode,
-+static int sun4i_tcon_get_clk_delay(const struct drm_display_mode *mode,
- 				    int channel)
+ void sun4i_tcon_set_mux(struct sun4i_tcon *tcon, int channel,
+-			struct drm_encoder *encoder)
++			const struct drm_encoder *encoder)
  {
- 	int delay = mode->vtotal - mode->vdisplay;
+ 	int ret = -ENOTSUPP;
+ 
+@@ -783,7 +783,7 @@ static int sun4i_tcon_remove(struct platform_device *pdev)
+ 
+ /* platform specific TCON muxing callbacks */
+ static int sun5i_a13_tcon_set_mux(struct sun4i_tcon *tcon,
+-				  struct drm_encoder *encoder)
++				  const struct drm_encoder *encoder)
+ {
+ 	u32 val;
+ 
+@@ -799,7 +799,7 @@ static int sun5i_a13_tcon_set_mux(struct sun4i_tcon *tcon,
+ }
+ 
+ static int sun6i_tcon_set_mux(struct sun4i_tcon *tcon,
+-			      struct drm_encoder *encoder)
++			      const struct drm_encoder *encoder)
+ {
+ 	struct sun4i_tcon *tcon0 = sun4i_get_tcon0(encoder->dev);
+ 	u32 shift;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+index d9e1357cc8ae..d81c6e20efe6 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+@@ -152,7 +152,7 @@ struct sun4i_tcon_quirks {
+ 	bool	needs_de_be_mux; /* sun6i needs mux to select backend */
+ 
+ 	/* callback to handle tcon muxing options */
+-	int	(*set_mux)(struct sun4i_tcon *, struct drm_encoder *);
++	int	(*set_mux)(struct sun4i_tcon *, const struct drm_encoder *);
+ };
+ 
+ struct sun4i_tcon {
 -- 
 git-series 0.9.1
