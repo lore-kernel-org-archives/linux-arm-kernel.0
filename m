@@ -1,99 +1,19 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 17 Oct 2017 14:03:00 -0500
-Subject: [PATCH] PCI: iproc: Allow allocation of multiple MSIs
-In-Reply-To: <20171007120851.20230-1-sbodomerle@gmail.com>
-References: <20171007120851.20230-1-sbodomerle@gmail.com>
-Message-ID: <20171017190300.GI5641@bhelgaas-glaptop.roam.corp.google.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 17 Oct 2017 21:07:14 +0200
+Subject: [PATCH 1/9] ARM: dts: rockchip: rk3288-vyasa: Remove vdd_log from
+ rk808, DCDC_REG1
+In-Reply-To: <1508156187-27519-2-git-send-email-jagan@amarulasolutions.com>
+References: <1508156187-27519-1-git-send-email-jagan@amarulasolutions.com>
+ <1508156187-27519-2-git-send-email-jagan@amarulasolutions.com>
+Message-ID: <3424934.UivI2BNsfM@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 07, 2017 at 02:08:44PM +0200, Bodo-Merle Sandor wrote:
-> From: Sandor Bodo-Merle <sbodomerle@gmail.com>
+Am Montag, 16. Oktober 2017, 17:46:19 CEST schrieb Jagan Teki:
+> vdd_log, never used on DCDC_REG1 of rk808 from latest schematic so
+> remove the same and update the regulator-name as 'vdd_arm' to sync
+> with existing rk3288 board dts files.
 > 
-> Add support for allocating multiple MSIs at the same time, so that the
-> MSI_FLAG_MULTI_PCI_MSI flag can be added to the msi_domain_info
-> structure.
-> 
-> Avoid storing the hwirq in the low 5 bits of the message data, as it is
-> used by the device. Also fix an endianness problem by using readl().
-> 
-> Signed-off-by: Sandor Bodo-Merle <sbodomerle@gmail.com>
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 
-Applied with Ray's reviewed-by to pci/host-iproc for v4.15, thanks!
-
-BTW, I saw Ray's reviewed-by and associated discussion because I was
-personally addressed, but it didn't appear on linux-pci, probably
-because the emails were not plain text; see
-http://vger.kernel.org/majordomo-info.html
-
-> ---
->  drivers/pci/host/pcie-iproc-msi.c | 19 ++++++++++++-------
->  1 file changed, 12 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pcie-iproc-msi.c b/drivers/pci/host/pcie-iproc-msi.c
-> index 2d0f535a2f69..990fc906d73d 100644
-> --- a/drivers/pci/host/pcie-iproc-msi.c
-> +++ b/drivers/pci/host/pcie-iproc-msi.c
-> @@ -179,7 +179,7 @@ static struct irq_chip iproc_msi_irq_chip = {
->  
->  static struct msi_domain_info iproc_msi_domain_info = {
->  	.flags = MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
-> -		MSI_FLAG_PCI_MSIX,
-> +		MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX,
->  	.chip = &iproc_msi_irq_chip,
->  };
->  
-> @@ -237,7 +237,7 @@ static void iproc_msi_irq_compose_msi_msg(struct irq_data *data,
->  	addr = msi->msi_addr + iproc_msi_addr_offset(msi, data->hwirq);
->  	msg->address_lo = lower_32_bits(addr);
->  	msg->address_hi = upper_32_bits(addr);
-> -	msg->data = data->hwirq;
-> +	msg->data = data->hwirq << 5;
->  }
->  
->  static struct irq_chip iproc_msi_bottom_irq_chip = {
-> @@ -251,7 +251,7 @@ static int iproc_msi_irq_domain_alloc(struct irq_domain *domain,
->  				      void *args)
->  {
->  	struct iproc_msi *msi = domain->host_data;
-> -	int hwirq;
-> +	int hwirq, i;
->  
->  	mutex_lock(&msi->bitmap_lock);
->  
-> @@ -267,10 +267,14 @@ static int iproc_msi_irq_domain_alloc(struct irq_domain *domain,
->  
->  	mutex_unlock(&msi->bitmap_lock);
->  
-> -	irq_domain_set_info(domain, virq, hwirq, &iproc_msi_bottom_irq_chip,
-> -			    domain->host_data, handle_simple_irq, NULL, NULL);
-> +	for (i = 0; i < nr_irqs; i++) {
-> +		irq_domain_set_info(domain, virq + i, hwirq + i,
-> +				    &iproc_msi_bottom_irq_chip,
-> +				    domain->host_data, handle_simple_irq,
-> +				    NULL, NULL);
-> +	}
->  
-> -	return 0;
-> +	return hwirq;
->  }
->  
->  static void iproc_msi_irq_domain_free(struct irq_domain *domain,
-> @@ -302,7 +306,8 @@ static inline u32 decode_msi_hwirq(struct iproc_msi *msi, u32 eq, u32 head)
->  
->  	offs = iproc_msi_eq_offset(msi, eq) + head * sizeof(u32);
->  	msg = (u32 *)(msi->eq_cpu + offs);
-> -	hwirq = *msg & IPROC_MSI_EQ_MASK;
-> +	hwirq = readl(msg);
-> +	hwirq = (hwirq >> 5) + (hwirq & 0x1f);
->  
->  	/*
->  	 * Since we have multiple hwirq mapped to a single MSI vector,
-> -- 
-> 2.15.0.rc0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+applied for 4.15
