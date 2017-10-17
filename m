@@ -1,37 +1,30 @@
 From: hanetzer@startmail.com (Marty E. Plummer)
-Date: Tue, 17 Oct 2017 17:38:53 -0500
-Subject: [PATCH v2 2/3] arm: hisi: enable Hi3521A SoC
-In-Reply-To: <20171017223854.6980-1-hanetzer@startmail.com>
-References: <20171017223854.6980-1-hanetzer@startmail.com>
-Message-ID: <20171017223854.6980-3-hanetzer@startmail.com>
+Date: Tue, 17 Oct 2017 17:38:51 -0500
+Subject: [PATCH v2 0/3] Add support for Hisilicon Hi3521A SoC
+Message-ID: <20171017223854.6980-1-hanetzer@startmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable Hisilicon Hi3521A/Hi3520DCV300 SoC. This SoC series includes
-hardware mutlimedia codec cores, commonly used in consumer cctv/dvr
-security systems and ipcameras. The arm core is a Cortex A7.
+Patched up with suggestions from Rob Herring, resend.
 
-Signed-off-by: Marty E. Plummer <hanetzer@startmail.com>
----
- arch/arm/mach-hisi/Kconfig | 6 ++++++
- 1 file changed, 6 insertions(+)
+Marty E. Plummer (3):
+  clk: hisilicon: add CRG driver Hi3521A SoC
+  arm: hisi: enable Hi3521A SoC
+  arm: dts: add Hi3521A dts
 
-diff --git a/arch/arm/mach-hisi/Kconfig b/arch/arm/mach-hisi/Kconfig
-index 65a048fa08ec..26755414f862 100644
---- a/arch/arm/mach-hisi/Kconfig
-+++ b/arch/arm/mach-hisi/Kconfig
-@@ -12,6 +12,12 @@ if ARCH_HISI
- 
- menu "Hisilicon platform type"
- 
-+config ARCH_HI3521A
-+	bool "Hisilicon Hi3521A/Hi3520DCV300 family"
-+	depends on ARCH_MULTI_V7
-+	help
-+	  Support for Hisilicon Hi3521A/Hi3520DCV300 SoC family
-+
- config ARCH_HI3xxx
- 	bool "Hisilicon Hi36xx family"
- 	depends on ARCH_MULTI_V7
+ arch/arm/boot/dts/Makefile                |   2 +
+ arch/arm/boot/dts/hi3521a-rs-dm290e.dts   |  41 ++++
+ arch/arm/boot/dts/hi3521a.dtsi            | 308 ++++++++++++++++++++++++++++++
+ arch/arm/mach-hisi/Kconfig                |   6 +
+ drivers/clk/hisilicon/Kconfig             |   7 +
+ drivers/clk/hisilicon/Makefile            |   1 +
+ drivers/clk/hisilicon/crg-hi3521a.c       | 196 +++++++++++++++++++
+ include/dt-bindings/clock/hi3521a-clock.h |  23 +++
+ 8 files changed, 584 insertions(+)
+ create mode 100644 arch/arm/boot/dts/hi3521a-rs-dm290e.dts
+ create mode 100644 arch/arm/boot/dts/hi3521a.dtsi
+ create mode 100644 drivers/clk/hisilicon/crg-hi3521a.c
+ create mode 100644 include/dt-bindings/clock/hi3521a-clock.h
+
 -- 
 2.14.2
