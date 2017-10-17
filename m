@@ -1,38 +1,19 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Tue, 17 Oct 2017 11:50:14 +0200
-Subject: [PATCH 6/7] ARM: dts: imx6ul: add support for TXUL modules on
- TXUL-Mainboard
-In-Reply-To: <CAOMZO5BbRwnggKPUo=evT=nHxo9k6v3d-zNLaiOPWabDNdLgpA@mail.gmail.com>
-References: <1507891383-15452-1-git-send-email-LW@KARO-electronics.de>
- <1507891383-15452-7-git-send-email-LW@KARO-electronics.de>
- <CAOMZO5BbRwnggKPUo=evT=nHxo9k6v3d-zNLaiOPWabDNdLgpA@mail.gmail.com>
-Message-ID: <20171017115014.5632584d@karo-electronics.de>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 17 Oct 2017 18:00:10 +0800
+Subject: [PATCH 07/23] drm/sun4i: tcon: Move out the tcon0 common setup
+In-Reply-To: <03df3b0c8a1823b39a2ae0b190722f3623e76894.1508231063.git-series.maxime.ripard@free-electrons.com>
+References: <cover.fe3d65d1ee05a55224d26e7d113388c428592b26.1508231063.git-series.maxime.ripard@free-electrons.com>
+ <03df3b0c8a1823b39a2ae0b190722f3623e76894.1508231063.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v65QoGN02e6qrZa+-5aGrnkhy+hrE_1GmbiEFdvOVY49dA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Oct 17, 2017 at 5:06 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Some channel0 setup has to be done, no matter what the output interface is
+> (RGB, CPU, LVDS). Move that code into a common function in order to avoid
+> duplication.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-On Mon, 16 Oct 2017 18:33:17 -0200 Fabio Estevam wrote:
-> Hi Lothar,
-> 
-> On Fri, Oct 13, 2017 at 7:43 AM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
-> 
-> > +/ {
-> > +       aliases {
-> > +               lcdif_24bit_pins_a = &pinctrl_disp0_3;
-> > +               mmc0 = &usdhc1;
-> 
-> Is this mmc0 alias really needed here?
-> 
-> I see it inside imx6ul.dtsi, but even inside imx6ul.dtsi: does it make
-> sense to have mmc alias?
-> 
-It is not used by Linux, but it's a convenient way to address the mmc
-devices with the U-Boot 'fdt' command.
-E.g.:
-fdt set mmc0 status disabled
-rather than:
-fdt set /soc/aips-bus at 02100000/usdhc at 02190000 status disabled
-
-
-Lothar Wa?mann
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
