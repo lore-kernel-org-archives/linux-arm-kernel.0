@@ -1,103 +1,21 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Tue, 17 Oct 2017 14:24:42 -0400
-Subject: [RFC PATCH v4 8/8] drm/rockchip: Add device links for master and
- components
-In-Reply-To: <20171017101624.12506-9-jeffy.chen@rock-chips.com>
-References: <20171017101624.12506-1-jeffy.chen@rock-chips.com>
- <20171017101624.12506-9-jeffy.chen@rock-chips.com>
-Message-ID: <20171017182442.l74ie27lq4gvt2fs@art_vandelay>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 17 Oct 2017 20:31:00 +0200
+Subject: [PATCH v12 4/5] ARM: dts: rockchip: add RGA device node for RK3288
+In-Reply-To: <20171011072938.383-5-jacob-chen@iotwrt.com>
+References: <20171011072938.383-1-jacob-chen@iotwrt.com>
+ <20171011072938.383-5-jacob-chen@iotwrt.com>
+Message-ID: <6753594.RkbY0XHeV6@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 06:16:24PM +0800, Jeffy Chen wrote:
-> Since we are trying to access components' resources in the master's
-> suspend/resume PM callbacks(e.g. panel), add device links to correct
-> the suspend/resume and shutdown ordering.
+Am Mittwoch, 11. Oktober 2017, 15:29:37 CEST schrieb Jacob Chen:
+> This patch add the RGA dt config of rk3288 SoC.
 > 
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> ---
-> 
-> Changes in v4: None
-> Changes in v3: None
-> Changes in v2:
-> Use device link to correct the suspend/resume and shutdown ordering,
-> instead of converting rockchip spi's suspend/resume PM callbacks to
-> late suspend/resume PM callbacks.
-> 
->  drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 24 +++++++++++++++++++++---
->  1 file changed, 21 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-> index 76d63de5921d..af18967f699b 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-> @@ -337,6 +337,8 @@ static struct component_match *rockchip_drm_match_add(struct device *dev)
->  
->  			if (!d)
->  				break;
-> +
-> +			device_link_add(dev, d, DL_FLAG_STATELESS);
->  			component_match_add(dev, &match, compare_dev, d);
->  		} while (true);
->  	}
-> @@ -406,6 +408,7 @@ static int rockchip_drm_platform_of_probe(struct device *dev)
->  static int rockchip_drm_platform_probe(struct platform_device *pdev)
->  {
->  	struct device *dev = &pdev->dev;
-> +	struct device_link *link;
->  	struct component_match *match = NULL;
->  	int ret;
->  
-> @@ -414,16 +417,31 @@ static int rockchip_drm_platform_probe(struct platform_device *pdev)
->  		return ret;
->  
->  	match = rockchip_drm_match_add(dev);
-> -	if (IS_ERR(match))
-> -		return PTR_ERR(match);
-> +	if (IS_ERR(match)) {
-> +		ret = PTR_ERR(match);
-> +		goto err_cleanup_dev_links;
+> Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 
-This cleanup should take place in rockchip_drm_match_add(). The review theme for
-this entire series is that, when possible, we should cleanup things where they
-are initialized.
+applied for 4.15
 
-Since you'll also need to clean up the links elsewhere, consider adding a helper
-function to do the cleanup (rockchip_drm_match_remove or similar) and calling it
-where needed.
 
-Sean
-
-> +	}
->  
-> -	return component_master_add_with_match(dev, &rockchip_drm_ops, match);
-> +	ret = component_master_add_with_match(dev, &rockchip_drm_ops, match);
-> +	if (ret < 0)
-> +		goto err_cleanup_dev_links;
-> +
-> +	return 0;
-> +err_cleanup_dev_links:
-> +	list_for_each_entry(link, &dev->links.consumers, s_node)
-> +		device_link_del(link);
-> +	return ret;
->  }
->  
->  static int rockchip_drm_platform_remove(struct platform_device *pdev)
->  {
-> +	struct device_link *link;
-> +
->  	component_master_del(&pdev->dev, &rockchip_drm_ops);
->  
-> +	list_for_each_entry(link, &pdev->dev.links.consumers, s_node)
-> +		device_link_del(link);
-> +
->  	return 0;
->  }
->  
-> -- 
-> 2.11.0
-> 
-> 
-
--- 
-Sean Paul, Software Engineer, Google / Chromium OS
+Thanks
+Heiko
