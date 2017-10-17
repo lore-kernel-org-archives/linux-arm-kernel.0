@@ -1,123 +1,88 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Tue, 17 Oct 2017 20:28:46 +0800
-Subject: [PATCH 16/23] drm/sun4i: Add A83T support
-In-Reply-To: <cfa06492ecb6bfba965e1074604525a4e939c5c1.1508231063.git-series.maxime.ripard@free-electrons.com>
-References: <cover.fe3d65d1ee05a55224d26e7d113388c428592b26.1508231063.git-series.maxime.ripard@free-electrons.com>
- <cfa06492ecb6bfba965e1074604525a4e939c5c1.1508231063.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <709d66dedf590f19d10ad94129087fcc@aosc.io>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 17 Oct 2017 13:40:00 +0100
+Subject: [PATCH 10/10] arm: KVM: Use common implementation for all flushes
+ to PoC
+In-Reply-To: <20171016200647.GD1845@lvm>
+References: <20171009152032.27804-1-marc.zyngier@arm.com>
+ <20171009152032.27804-11-marc.zyngier@arm.com> <20171016200647.GD1845@lvm>
+Message-ID: <afc3cde3-da2d-de83-40bb-d419370607f2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-10-17 17:06?Maxime Ripard ???
-> Add support for the A83T display pipeline.
+On 16/10/17 21:06, Christoffer Dall wrote:
+> On Mon, Oct 09, 2017 at 04:20:32PM +0100, Marc Zyngier wrote:
+>> We currently have no less than three implementations for the
+>> "flush to PoC" code. Let standardize on a single one. This
+>> requires a bit of unpleasant moving around, and relies on
+>> __kvm_flush_dcache_pte and co being #defines so that they can
+>> call into coherent_dcache_guest_page...
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm/include/asm/kvm_mmu.h | 28 ++++------------------------
+>>  virt/kvm/arm/mmu.c             | 20 ++++++++++----------
+>>  2 files changed, 14 insertions(+), 34 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+>> index 5f1ac88a5951..011b0db85c02 100644
+>> --- a/arch/arm/include/asm/kvm_mmu.h
+>> +++ b/arch/arm/include/asm/kvm_mmu.h
+>> @@ -235,31 +235,11 @@ static inline void __coherent_icache_guest_page(kvm_pfn_t pfn,
+>>  	}
+>>  }
+>>  
+>> -static inline void __kvm_flush_dcache_pte(pte_t pte)
+>> -{
+>> -	void *va = kmap_atomic(pte_page(pte));
+>> -
+>> -	kvm_flush_dcache_to_poc(va, PAGE_SIZE);
+>> -
+>> -	kunmap_atomic(va);
+>> -}
+>> -
+>> -static inline void __kvm_flush_dcache_pmd(pmd_t pmd)
+>> -{
+>> -	unsigned long size = PMD_SIZE;
+>> -	kvm_pfn_t pfn = pmd_pfn(pmd);
+>> -
+>> -	while (size) {
+>> -		void *va = kmap_atomic_pfn(pfn);
+>> +#define __kvm_flush_dcache_pte(p)				\
+>> +	coherent_dcache_guest_page(pte_pfn((p)), PAGE_SIZE)
+>>  
+>> -		kvm_flush_dcache_to_poc(va, PAGE_SIZE);
+>> -
+>> -		pfn++;
+>> -		size -= PAGE_SIZE;
+>> -
+>> -		kunmap_atomic(va);
+>> -	}
+>> -}
+>> +#define __kvm_flush_dcache_pmd(p)				\
+>> +	coherent_dcache_guest_page(pmd_pfn((p)), PMD_SIZE)
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 3 +++
->  drivers/gpu/drm/sun4i/sun4i_drv.c                             | 2 ++
->  drivers/gpu/drm/sun4i/sun4i_tcon.c                            | 1 +
->  drivers/gpu/drm/sun4i/sun8i_mixer.c                           | 4 ++++
->  4 files changed, 10 insertions(+)
-> 
-> diff --git
-> a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> index 46df3b78ae9e..c0fa233ec1fc 100644
-> --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> @@ -90,6 +90,7 @@ Required properties:
->     * allwinner,sun6i-a31-tcon
->     * allwinner,sun6i-a31s-tcon
->     * allwinner,sun8i-a33-tcon
-> +   * allwinner,sun8i-a83t-tcon
+> Why can't these just be static inlines which call
+> __coherent_dcache_guest_page already in the header file directly?
 
-Should be tcon0 -- tcon0 on A83T has only channel 0 and tcon1 has only
-channel 1.
+Because if we do that, we get a significant code expansion in the
+resulting binary (all the call sites end up having a copy of that function.
 
->     * allwinner,sun8i-v3s-tcon
->   - reg: base address and size of memory-mapped region
->   - interrupts: interrupt associated to this IP
-> @@ -209,6 +210,7 @@ supported.
-> 
->  Required properties:
->    - compatible: value must be one of:
-> +    * allwinner,sun8i-a83t-de2-mixer
+> I'm really not too crazy about these #defines.
 
-Since the capability of mixer0 and mixer1 are different (smart
-backlight, write-back, VEP of the VI channel and extra UI
-channels), I suggest to use ID-specific compatibles here.
+Neither am I. But actually, this patch is completely wrong. Using the
+same functions as the guest cleaning doesn't provide the guarantees
+documented next to unmap_stage2_ptes, as we need a clean+invalidate, not
+just a clean.
 
->      * allwinner,sun8i-v3s-de2-mixer
->    - reg: base address and size of the memory-mapped region.
->    - clocks: phandles to the clocks feeding the mixer
-> @@ -236,6 +238,7 @@ Required properties:
->      * allwinner,sun6i-a31-display-engine
->      * allwinner,sun6i-a31s-display-engine
->      * allwinner,sun8i-a33-display-engine
-> +    * allwinner,sun8i-a83t-display-engine
->      * allwinner,sun8i-v3s-display-engine
-> 
->    - allwinner,pipelines: list of phandle to the display engine
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c
-> b/drivers/gpu/drm/sun4i/sun4i_drv.c
-> index a27efad9bc76..439f116bb3b5 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-> @@ -189,6 +189,7 @@ static bool sun4i_drv_node_is_tcon(struct 
-> device_node *node)
->  		of_device_is_compatible(node, "allwinner,sun6i-a31-tcon") ||
->  		of_device_is_compatible(node, "allwinner,sun6i-a31s-tcon") ||
->  		of_device_is_compatible(node, "allwinner,sun8i-a33-tcon") ||
-> +		of_device_is_compatible(node, "allwinner,sun8i-a83t-tcon") ||
->  		of_device_is_compatible(node, "allwinner,sun8i-v3s-tcon");
->  }
-> 
-> @@ -347,6 +348,7 @@ static const struct of_device_id 
-> sun4i_drv_of_table[] = {
->  	{ .compatible = "allwinner,sun6i-a31-display-engine" },
->  	{ .compatible = "allwinner,sun6i-a31s-display-engine" },
->  	{ .compatible = "allwinner,sun8i-a33-display-engine" },
-> +	{ .compatible = "allwinner,sun8i-a83t-display-engine" },
->  	{ .compatible = "allwinner,sun8i-v3s-display-engine" },
->  	{ }
->  };
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> index 6a20a467ee6d..eb3c8bad4977 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> @@ -1063,6 +1063,7 @@ static const struct of_device_id 
-> sun4i_tcon_of_table[] = {
->  	{ .compatible = "allwinner,sun6i-a31-tcon", .data = &sun6i_a31_quirks 
-> },
->  	{ .compatible = "allwinner,sun6i-a31s-tcon", .data = 
-> &sun6i_a31s_quirks },
->  	{ .compatible = "allwinner,sun8i-a33-tcon", .data = &sun8i_a33_quirks 
-> },
-> +	{ .compatible = "allwinner,sun8i-a83t-tcon", .data = 
-> &sun8i_v3s_quirks },
->  	{ .compatible = "allwinner,sun8i-v3s-tcon", .data = &sun8i_v3s_quirks 
-> },
->  	{ }
->  };
-> diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> index 86c6c24b5105..c6030ce130d3 100644
-> --- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> +++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> @@ -385,6 +385,10 @@ static const struct sun8i_mixer_cfg 
-> sun8i_v3s_mixer_cfg = {
-> 
->  static const struct of_device_id sun8i_mixer_of_table[] = {
->  	{
-> +		.compatible = "allwinner,sun8i-a83t-de2-mixer",
-> +		.data = &sun8i_v3s_mixer_cfg,
+I'll rework this patch (or just drop it).
 
-As I said, V3s has 2 VI channels, so it totally shouldn't share
-config with A83T.
+> In fact, why do we need the coherent_Xcache_guest_page static
+> indirection functions in mmu.c in the first place?
 
-> +	},
-> +	{
->  		.compatible = "allwinner,sun8i-v3s-de2-mixer",
->  		.data = &sun8i_v3s_mixer_cfg,
->  	},
+Code expansion. That's the only reason.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
