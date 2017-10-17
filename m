@@ -1,168 +1,176 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 17 Oct 2017 10:29:08 +0200
-Subject: [PATCH 1/4] ARM64: dts: meson-gx: add VPU power domain
+Date: Tue, 17 Oct 2017 10:29:09 +0200
+Subject: [PATCH 2/4] ARM64: dts: meson-gx: Add HDMI_5V regulator on selected
+ boards
 In-Reply-To: <1508228951-12384-1-git-send-email-narmstrong@baylibre.com>
 References: <1508228951-12384-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1508228951-12384-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1508228951-12384-3-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the VPU Power Domain nodes, and attaches the
-VPU power domain to the VPU node.
+On reference boards and derivatives, the HDMI Logic is powered by an external
+5V regulator.
+This regulator was set by the Vendor U-Boot, add the regulator and phandle
+property to the HDMI node.
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi   | 11 ++++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 43 +++++++++++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 43 +++++++++++++++++++++++++++++
- 3 files changed, 97 insertions(+)
+ arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi          | 12 ++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts         |  1 +
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts   |  1 +
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts | 12 ++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts         |  1 +
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi        | 11 +++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts        | 12 ++++++++++++
+ 7 files changed, 50 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-index f175db8..80a0f2b 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-@@ -371,6 +371,12 @@
- 				compatible = "amlogic,meson-gx-ao-sysctrl", "syscon", "simple-mfd";
- 				reg =  <0x0 0x0 0x0 0x100>;
- 
-+				pwrc_vpu: power-controller-vpu {
-+					compatible = "amlogic,meson-gx-pwrc-vpu";
-+					#power-domain-cells = <0>;
-+					amlogic,hhi-sysctrl = <&sysctrl>;
-+				};
-+
- 				clkc_AO: clock-controller {
- 					compatible = "amlogic,meson-gx-aoclkc";
- 					#clock-cells = <1>;
-@@ -448,6 +454,11 @@
- 			#size-cells = <2>;
- 			ranges = <0x0 0x0 0x0 0xc883c000 0x0 0x2000>;
- 
-+			sysctrl: system-controller at 0 {
-+				compatible = "amlogic,meson-gx-hhi-sysctrl", "syscon", "simple-mfd";
-+				reg = <0 0 0 0x400>;
-+			};
-+
- 			mailbox: mailbox at 404 {
- 				compatible = "amlogic,meson-gx-mhu", "amlogic,meson-gxbb-mhu";
- 				reg = <0 0x404 0 0x4c>;
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-index 3d41db9..512f3dd 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-@@ -688,6 +688,48 @@
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
+index 7d4b95e..aa23185 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
+@@ -59,6 +59,17 @@
+ 		reg = <0x0 0x0 0x0 0x80000000>;
  	};
- };
  
-+&pwrc_vpu {
-+	resets = <&reset RESET_VIU>,
-+		 <&reset RESET_VENC>,
-+		 <&reset RESET_VCBUS>,
-+		 <&reset RESET_BT656>,
-+		 <&reset RESET_DVIN_RESET>,
-+		 <&reset RESET_RDMA>,
-+		 <&reset RESET_VENCI>,
-+		 <&reset RESET_VENCP>,
-+		 <&reset RESET_VDAC>,
-+		 <&reset RESET_VDI6>,
-+		 <&reset RESET_VENCL>,
-+		 <&reset RESET_VID_LOCK>;
-+	clocks = <&clkc CLKID_VPU>,
-+	         <&clkc CLKID_VAPB>;
-+	clock-names = "vpu", "vapb";
-+	/*
-+	 * VPU clocking is provided by two identical clock paths
-+	 * VPU_0 and VPU_1 muxed to a single clock by a glitch
-+	 * free mux to safely change frequency while running.
-+	 * Same for VAPB but with a final gate after the glitch free mux.
-+	 */
-+	assigned-clocks = <&clkc CLKID_VPU_0_SEL>,
-+			  <&clkc CLKID_VPU_0>,
-+			  <&clkc CLKID_VPU>, /* Glitch free mux */
-+			  <&clkc CLKID_VAPB_0_SEL>,
-+			  <&clkc CLKID_VAPB_0>,
-+			  <&clkc CLKID_VAPB_SEL>; /* Glitch free mux */
-+	assigned-clock-parents = <&clkc CLKID_FCLK_DIV3>,
-+				 <0>, /* Do Nothing */
-+				 <&clkc CLKID_VPU_0>,
-+				 <&clkc CLKID_FCLK_DIV4>,
-+				 <0>, /* Do Nothing */
-+				 <&clkc CLKID_VAPB_0>;
-+	assigned-clock-rates = <0>, /* Do Nothing */
-+			       <666666666>,
-+			       <0>, /* Do Nothing */
-+			       <0>, /* Do Nothing */
-+			       <250000000>,
-+			       <0>; /* Do Nothing */
-+};
++	hdmi_5v: regulator-hdmi-5v {
++		compatible = "regulator-fixed";
 +
- &saradc {
- 	compatible = "amlogic,meson-gxbb-saradc", "amlogic,meson-saradc";
- 	clocks = <&xtal>,
-@@ -757,4 +799,5 @@
- 
- &vpu {
- 	compatible = "amlogic,meson-gxbb-vpu", "amlogic,meson-gx-vpu";
-+	power-domains = <&pwrc_vpu>;
++		regulator-name = "HDMI_5V";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++
++		gpio = <&gpio GPIOH_3 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
+ 	vddio_boot: regulator-vddio_boot {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "VDDIO_BOOT";
+@@ -142,6 +153,7 @@
+ 	status = "okay";
+ 	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
+ 	pinctrl-names = "default";
++	hdmi-supply = <&hdmi_5v>;
  };
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-index 19c001a..68f6564 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-@@ -630,6 +630,48 @@
+ 
+ &hdmi_tx_tmds_port {
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts
+index 6827f23..8bc540e 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts
+@@ -135,6 +135,7 @@
+ 	status = "okay";
+ 	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
+ 	pinctrl-names = "default";
++	hdmi-supply = <&hdmi_5v>;
+ };
+ 
+ &hdmi_tx_tmds_port {
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
+index 71a6e1c..d0f22aa 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
+@@ -78,6 +78,7 @@
+ 	status = "okay";
+ 	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
+ 	pinctrl-names = "default";
++	hdmi-supply = <&hdmi_5v>;
+ };
+ 
+ &hdmi_tx_tmds_port {
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
+index dc9c3b8..e6ba66c 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
+@@ -72,6 +72,17 @@
+ 		reg = <0x0 0x0 0x0 0x80000000>;
  	};
- };
  
-+&pwrc_vpu {
-+	resets = <&reset RESET_VIU>,
-+		 <&reset RESET_VENC>,
-+		 <&reset RESET_VCBUS>,
-+		 <&reset RESET_BT656>,
-+		 <&reset RESET_DVIN_RESET>,
-+		 <&reset RESET_RDMA>,
-+		 <&reset RESET_VENCI>,
-+		 <&reset RESET_VENCP>,
-+		 <&reset RESET_VDAC>,
-+		 <&reset RESET_VDI6>,
-+		 <&reset RESET_VENCL>,
-+		 <&reset RESET_VID_LOCK>;
-+	clocks = <&clkc CLKID_VPU>,
-+	         <&clkc CLKID_VAPB>;
-+	clock-names = "vpu", "vapb";
-+	/*
-+	 * VPU clocking is provided by two identical clock paths
-+	 * VPU_0 and VPU_1 muxed to a single clock by a glitch
-+	 * free mux to safely change frequency while running.
-+	 * Same for VAPB but with a final gate after the glitch free mux.
-+	 */
-+	assigned-clocks = <&clkc CLKID_VPU_0_SEL>,
-+			  <&clkc CLKID_VPU_0>,
-+			  <&clkc CLKID_VPU>, /* Glitch free mux */
-+			  <&clkc CLKID_VAPB_0_SEL>,
-+			  <&clkc CLKID_VAPB_0>,
-+			  <&clkc CLKID_VAPB_SEL>; /* Glitch free mux */
-+	assigned-clock-parents = <&clkc CLKID_FCLK_DIV3>,
-+				 <0>, /* Do Nothing */
-+				 <&clkc CLKID_VPU_0>,
-+				 <&clkc CLKID_FCLK_DIV4>,
-+				 <0>, /* Do Nothing */
-+				 <&clkc CLKID_VAPB_0>;
-+	assigned-clock-rates = <0>, /* Do Nothing */
-+			       <666666666>,
-+			       <0>, /* Do Nothing */
-+			       <0>, /* Do Nothing */
-+			       <250000000>,
-+			       <0>; /* Do Nothing */
-+};
++	hdmi_5v: regulator-hdmi-5v {
++		compatible = "regulator-fixed";
 +
- &saradc {
- 	compatible = "amlogic,meson-gxl-saradc", "amlogic,meson-saradc";
- 	clocks = <&xtal>,
-@@ -699,4 +741,5 @@
- 
- &vpu {
- 	compatible = "amlogic,meson-gxl-vpu", "amlogic,meson-gx-vpu";
-+	power-domains = <&pwrc_vpu>;
++		regulator-name = "HDMI_5V";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++
++		gpio = <&gpio GPIOH_3 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
+ 	vcc_3v3: regulator-vcc_3v3 {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "VCC_3V3";
+@@ -143,6 +154,7 @@
+ 	status = "okay";
+ 	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
+ 	pinctrl-names = "default";
++	hdmi-supply = <&hdmi_5v>;
  };
+ 
+ &hdmi_tx_tmds_port {
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
+index 6e2bf85..4f6b1c9 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
+@@ -88,6 +88,7 @@
+ 	status = "okay";
+ 	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
+ 	pinctrl-names = "default";
++	hdmi-supply = <&hdmi_5v>;
+ };
+ 
+ &hdmi_tx_tmds_port {
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi
+index ff09df1..a401126 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi
+@@ -28,6 +28,17 @@
+ 		reg = <0x0 0x0 0x0 0x80000000>;
+ 	};
+ 
++	hdmi_5v: regulator-hdmi-5v {
++		compatible = "regulator-fixed";
++
++		regulator-name = "HDMI_5V";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++
++		gpio = <&gpio GPIOH_3 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
+ 	vddio_boot: regulator-vddio_boot {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "VDDIO_BOOT";
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
+index 32c138e..cd0bce6 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
+@@ -153,6 +153,17 @@
+ 		};
+ 	};
+ 
++	hdmi_5v: regulator-hdmi-5v {
++		compatible = "regulator-fixed";
++
++		regulator-name = "HDMI_5V";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++
++		gpio = <&gpio GPIOH_3 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
+ 	vcc_3v3: regulator-vcc_3v3 {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "VCC_3V3";
+@@ -239,6 +250,7 @@
+ 	status = "okay";
+ 	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
+ 	pinctrl-names = "default";
++	hdmi-supply = <&hdmi_5v>;
+ };
+ 
+ &hdmi_tx_tmds_port {
 -- 
 2.7.4
