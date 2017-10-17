@@ -1,126 +1,76 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 17 Oct 2017 11:06:24 +0200
-Subject: [PATCH 17/23] arm: dts: sun8i: a83t: Add display pipeline
+Date: Tue, 17 Oct 2017 11:06:14 +0200
+Subject: [PATCH 07/23] drm/sun4i: tcon: Move out the tcon0 common setup
 In-Reply-To: <cover.fe3d65d1ee05a55224d26e7d113388c428592b26.1508231063.git-series.maxime.ripard@free-electrons.com>
 References: <cover.fe3d65d1ee05a55224d26e7d113388c428592b26.1508231063.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <d83c9cb9a88677c97272e2b8c08d8f15a33391b7.1508231063.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <03df3b0c8a1823b39a2ae0b190722f3623e76894.1508231063.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The display pipeline on the A83T is mainly composed of the mixers and
-TCONs, plus various encoders.
-
-Let's add the mixers and TCONs to the DTSI.
+Some channel0 setup has to be done, no matter what the output interface is
+(RGB, CPU, LVDS). Move that code into a common function in order to avoid
+duplication.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun8i-a83t.dtsi | 80 ++++++++++++++++++++++++++++++++-
- 1 file changed, 80 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 26 ++++++++++++++++----------
+ 1 file changed, 16 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index ce6e887c8938..57feeb6fee8b 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -151,6 +151,12 @@
- 		};
- 	};
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 7ecd4f7c8411..f69bcdf11cb8 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -158,15 +158,26 @@ static int sun4i_tcon_get_clk_delay(const struct drm_display_mode *mode,
+ 	return delay;
+ }
  
-+	de: display-engine {
-+		compatible = "allwinner,sun8i-a83t-display-engine";
-+		allwinner,pipelines = <&mixer0>;
-+		status = "disabled";
-+	};
+-static void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
+-				 struct drm_display_mode *mode)
++static void sun4i_tcon0_mode_set_common(struct sun4i_tcon *tcon,
++					const struct drm_display_mode *mode)
++{
++	/* Configure the dot clock */
++	clk_set_rate(tcon->dclk, mode->crtc_clock * 1000);
 +
- 	memory {
- 		reg = <0x40000000 0x80000000>;
- 		device_type = "memory";
-@@ -162,6 +168,46 @@
- 		#size-cells = <1>;
- 		ranges;
++	/* Set the resolution */
++	regmap_write(tcon->regs, SUN4I_TCON0_BASIC0_REG,
++		     SUN4I_TCON0_BASIC0_X(mode->crtc_hdisplay) |
++		     SUN4I_TCON0_BASIC0_Y(mode->crtc_vdisplay));
++}
++
++static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
++				     const struct drm_display_mode *mode)
+ {
+ 	unsigned int bp, hsync, vsync;
+ 	u8 clk_delay;
+ 	u32 val = 0;
  
-+		display_clocks: clock at 1000000 {
-+			compatible = "allwinner,sun8i-a83t-de2-clk";
-+			reg = <0x01000000 0x100000>;
-+			clocks = <&ccu CLK_PLL_DE>,
-+				 <&ccu CLK_BUS_DE>;
-+			clock-names = "mod",
-+				      "bus";
-+			resets = <&ccu RST_BUS_DE>;
-+			#clock-cells = <1>;
-+			#reset-cells = <1>;
-+		};
-+
-+		mixer0: mixer at 1100000 {
-+			compatible = "allwinner,sun8i-a83t-de2-mixer";
-+			reg = <0x01100000 0x100000>;
-+			clocks = <&display_clocks 0>,
-+				 <&display_clocks 6>;
-+			clock-names = "bus",
-+				      "mod";
-+			resets = <&display_clocks 0>;
-+			assigned-clocks = <&display_clocks 6>;
-+			assigned-clock-rates = <150000000>;
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				mixer0_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+
-+					mixer0_out_tcon0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&tcon0_in_mixer0>;
-+					};
-+				};
-+			};
-+		};
-+
- 		syscon: syscon at 1c00000 {
- 			compatible = "allwinner,sun8i-a83t-system-controller",
- 				"syscon";
-@@ -177,6 +223,40 @@
- 			#dma-cells = <1>;
- 		};
+-	/* Configure the dot clock */
+-	clk_set_rate(tcon->dclk, mode->crtc_clock * 1000);
++	sun4i_tcon0_mode_set_common(tcon, mode);
  
-+		tcon0: lcd-controller at 1c0c000 {
-+			compatible = "allwinner,sun8i-a83t-tcon";
-+			reg = <0x01c0c000 0x1000>;
-+			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_TCON0>, <&ccu CLK_TCON0>;
-+			clock-names = "ahb", "tcon-ch0";
-+			clock-output-names = "tcon-pixel-clock";
-+			resets = <&ccu RST_BUS_TCON0>, <&ccu RST_BUS_LVDS>;
-+			reset-names = "lcd", "lvds";
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				tcon0_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+
-+					tcon0_in_mixer0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&mixer0_out_tcon0>;
-+					};
-+				};
-+
-+				tcon0_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+				};
-+			};
-+		};
-+
- 		mmc0: mmc at 1c0f000 {
- 			compatible = "allwinner,sun8i-a83t-mmc",
- 				     "allwinner,sun7i-a20-mmc";
+ 	/* Adjust clock delay */
+ 	clk_delay = sun4i_tcon_get_clk_delay(mode, 0);
+@@ -174,11 +185,6 @@ static void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
+ 			   SUN4I_TCON0_CTL_CLK_DELAY_MASK,
+ 			   SUN4I_TCON0_CTL_CLK_DELAY(clk_delay));
+ 
+-	/* Set the resolution */
+-	regmap_write(tcon->regs, SUN4I_TCON0_BASIC0_REG,
+-		     SUN4I_TCON0_BASIC0_X(mode->crtc_hdisplay) |
+-		     SUN4I_TCON0_BASIC0_Y(mode->crtc_vdisplay));
+-
+ 	/*
+ 	 * This is called a backporch in the register documentation,
+ 	 * but it really is the back porch + hsync
+@@ -329,7 +335,7 @@ void sun4i_tcon_mode_set(struct sun4i_tcon *tcon,
+ {
+ 	switch (encoder->encoder_type) {
+ 	case DRM_MODE_ENCODER_NONE:
+-		sun4i_tcon0_mode_set(tcon, mode);
++		sun4i_tcon0_mode_set_rgb(tcon, mode);
+ 		sun4i_tcon_set_mux(tcon, 0, encoder);
+ 		break;
+ 	case DRM_MODE_ENCODER_TVDAC:
 -- 
 git-series 0.9.1
