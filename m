@@ -1,94 +1,56 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Tue, 17 Oct 2017 08:30:54 +0800
+Date: Tue, 17 Oct 2017 08:33:29 +0800
 Subject: ARM64: Regression with commit e3067861ba66 ("arm64: add basic
  VMAP_STACK support")
-In-Reply-To: <dad6105d-1ec0-d5a6-e78c-ff832afe3f9e@arm.com>
+In-Reply-To: <20171016134819.jv3udrcwsedc4cgs@lakrids.cambridge.arm.com>
 References: <20171010142725.GA24797@leoy-linaro>
  <20171010154558.GJ27659@leverpostej>
  <da09fd83-f3f0-f800-fea4-988cfa56bac7@arm.com>
  <20171016011723.GB12470@leoy-linaro>
  <20171016134819.jv3udrcwsedc4cgs@lakrids.cambridge.arm.com>
- <34ccf02d-fd65-bade-327a-ed8df1d3eea5@arm.com>
- <20171016142622.6yjuzdwxxw3sxjed@lakrids.cambridge.arm.com>
- <dad6105d-1ec0-d5a6-e78c-ff832afe3f9e@arm.com>
-Message-ID: <20171017003054.GB19504@leoy-ThinkPad-T440>
+Message-ID: <20171017003329.GC19504@leoy-ThinkPad-T440>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 16, 2017 at 03:35:46PM +0100, Robin Murphy wrote:
-> On 16/10/17 15:26, Mark Rutland wrote:
-> > On Mon, Oct 16, 2017 at 03:12:45PM +0100, Robin Murphy wrote:
-> >> On 16/10/17 14:48, Mark Rutland wrote:
-> >>> Hi Leo,
-> >>>
-> >>> On Mon, Oct 16, 2017 at 09:17:23AM +0800, Leo Yan wrote:
-> >>>> On Tue, Oct 10, 2017 at 05:03:44PM +0100, Robin Murphy wrote:
-> >>>>> On 10/10/17 16:45, Mark Rutland wrote:
-> >>>>>> On Tue, Oct 10, 2017 at 10:27:25PM +0800, Leo Yan wrote:
-> >>>>>>> I work mainline kernel on Hikey620 board, I find it's easily to
-> >>>>>>> introduce the panic and report the log as below. So I bisect the kernel
-> >>>>>>> and finally narrow down the commit e3067861ba66 ("arm64: add basic
-> >>>>>>> VMAP_STACK support") which introduce this issue.
-> >>>>>>>
-> >>>>>>> I tried to remove 'select HAVE_ARCH_VMAP_STACK' from
-> >>>>>>> arch/arm64/Kconfig, then I can see the panic issue will dismiss. So
-> >>>>>>> could you check this and have insight for this issue?
-> >>>>>>
-> >>>>>> Given the stuff in the backtrace, my suspicion is something is trying to
-> >>>>>> perform DMA to/from the stack, getting junk addresses form the attempted
-> >>>>>> virt<->phys conversions.
-> >>>>>>
-> >>>>>> Could you try enabling both VMAP_STACK and CONFIG_DEBUG_VIRTUAL?
-> >>>>>
-> >>>>> CONFIG_DMA_API_DEBUG should scream about drivers trying to use stack
-> >>>>> addresses either way, too.
-> >>>>
-> >>>> Thanks for suggestions, Mark & Robin.
-> >>>>
-> >>>> I enabled these debugging configs but cannot get clue from it; but
-> >>>> occasionally found this issue is quite likely related with CA53 errata,
-> >>>> especialy ERRATA_A53_855873 is the relative one. So I changed to use
-> >>>> ARM-TF mainline code with ERRATA fixing, this issue can be dismissed.
-> >>>
-> >>> Thanks for the update.
-> >>>
-> >>> Just to confirm, with the updated firmware you no longer see the issue?
-> >>>
-> >>> I can't immediately see how that would be related.
-> >>
-> >> Cores up to r0p2 have the other errata to which
-> >> ARM64_WORKAROUND_CLEAN_CACHE also applies anyway; r3p0+ have an ACTLR
-> >> bit to do thee CVAC->CIVAC upgrade in hardware, and our policy is that
-> >> we expect firmware to enable such hardware workarounds where possible. I
-> >> assume that's why we don't explicitly document 855873 anywhere in Linux.
-> > 
-> > Sure, I also looked it up. ;)
-> > 
-> > I meant that I couldn't immediately see why VMAP'd stacks were likely to
-> > tickle issues with that more reliably.
+On Mon, Oct 16, 2017 at 02:48:19PM +0100, Mark Rutland wrote:
+> Hi Leo,
 > 
-> Ah, right - in context, "that" appeared to refer to "updated firmware",
-> not "VMAP_STACK". Sorry.
+> On Mon, Oct 16, 2017 at 09:17:23AM +0800, Leo Yan wrote:
+> > On Tue, Oct 10, 2017 at 05:03:44PM +0100, Robin Murphy wrote:
+> > > On 10/10/17 16:45, Mark Rutland wrote:
+> > > > On Tue, Oct 10, 2017 at 10:27:25PM +0800, Leo Yan wrote:
+> > > >> I work mainline kernel on Hikey620 board, I find it's easily to
+> > > >> introduce the panic and report the log as below. So I bisect the kernel
+> > > >> and finally narrow down the commit e3067861ba66 ("arm64: add basic
+> > > >> VMAP_STACK support") which introduce this issue.
+> > > >>
+> > > >> I tried to remove 'select HAVE_ARCH_VMAP_STACK' from
+> > > >> arch/arm64/Kconfig, then I can see the panic issue will dismiss. So
+> > > >> could you check this and have insight for this issue?
+> > > > 
+> > > > Given the stuff in the backtrace, my suspicion is something is trying to
+> > > > perform DMA to/from the stack, getting junk addresses form the attempted
+> > > > virt<->phys conversions.
+> > > > 
+> > > > Could you try enabling both VMAP_STACK and CONFIG_DEBUG_VIRTUAL?
+> > > 
+> > > CONFIG_DMA_API_DEBUG should scream about drivers trying to use stack
+> > > addresses either way, too.
+> > 
+> > Thanks for suggestions, Mark & Robin.
+> > 
+> > I enabled these debugging configs but cannot get clue from it; but
+> > occasionally found this issue is quite likely related with CA53 errata,
+> > especialy ERRATA_A53_855873 is the relative one. So I changed to use
+> > ARM-TF mainline code with ERRATA fixing, this issue can be dismissed.
 > 
-> I guess the vmap addresses might tickle the "same L2 set" condition
-> differently to when both stack and DMA buffer are linear map addresses.
+> Thanks for the update.
+> 
+> Just to confirm, with the updated firmware you no longer see the issue?
 
-A bit more info for this.
+Yes.
 
-I can reproduce this memory abort panic, and the panic places are not
-consistent; usually it's related with kmalloc address. Do you think
-"VMAP_STACK" introduces much more operations for cache clean? If
-so if might be in the same *set* with any other memory access (like
-kmalloc operations), then trigger data abort.
-
-Hikey has CA53 CPUs is r3 version so it's luck can directly apply the
-ERRATA 855873 in ARM-TF.
-
-BTW, in case I may mislead you guys, we should note there have another
-two ERRATAs applied in ARM-TFv1.4 for Hikey:
-
-ERRATA_A53_836870               :=      1
-ERRATA_A53_843419               :=      1
-
-Thanks,
-Leo Yan
+> I can't immediately see how that would be related.
+> 
+> Thanks,
+> Mark.
