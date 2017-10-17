@@ -1,43 +1,61 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 17 Oct 2017 07:50:33 -0700
-Subject: [PATCH 3/4] kvm/arm64: simplify CC instrumentation opt-out
-In-Reply-To: <20171016132440.38098-4-mark.rutland@arm.com>
-References: <20171016132440.38098-1-mark.rutland@arm.com>
- <20171016132440.38098-4-mark.rutland@arm.com>
-Message-ID: <20171017145033.GL5886@lvm>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 17 Oct 2017 15:52:36 +0100
+Subject: [PATCH 06/10] KVM: arm/arm64: Only clean the dcache on
+ translation fault
+In-Reply-To: <20171017143634.GI5886@lvm>
+References: <20171009152032.27804-1-marc.zyngier@arm.com>
+ <20171009152032.27804-7-marc.zyngier@arm.com> <20171016200811.GH1845@lvm>
+ <210cf2dc-2566-a29b-637e-901f3dcc80b6@arm.com> <20171017143634.GI5886@lvm>
+Message-ID: <07d1238a-78e2-af45-c2fd-bd7c9d1edf4d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 16, 2017 at 02:24:39PM +0100, Mark Rutland wrote:
-> Now that we can opt out of all instrumentation with a single option,
-> make use of this in the KVM hyp code. Hopefully, this will also avoid
-> fragility as new options are introduced.
+On 17/10/17 15:36, Christoffer Dall wrote:
+> On Tue, Oct 17, 2017 at 10:34:15AM +0100, Marc Zyngier wrote:
+>> On 16/10/17 21:08, Christoffer Dall wrote:
+>>> On Mon, Oct 09, 2017 at 04:20:28PM +0100, Marc Zyngier wrote:
+>>>> The only case where we actually need to perform a dache maintenance
+>>>> is when we map the page for the first time, and subsequent permission
+>>>> faults do not require cache maintenance. Let's make it conditional
+>>>> on not being a permission fault (and thus a translation fault).
+>>>
+>>> Why do we actually need to do any dcache maintenance when faulting in a
+>>> page?
+>>>
+>>> Is this for the case when the stage 1 MMU is disabled, or to support
+>>> guest mappings using uncached attributes?
+>>
+>> These are indeed the two cases that require cleaning the dcache to PoC.
+>>
+>>> Can we do better, for example
+>>> by only flushing the cache if the guest MMU is disabled?
+>>
+>> The guest MMU being disabled is easy. But the uncached mapping is much
+>> trickier, and would involve parsing the guest page tables. Not something
+>> I'm really eager to implement.
+>>
 > 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Marc Zyngier <mark.zyngier@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
+> Hmm, if the guest actually maps memory uncached, wouldn't it have to
+> invalidate caches itself, or is this the annoying thing where disabling
+> the MMU on hardware that doesn't have stage 2 would in fact always
+> completely bypass the cache, and therefore we have to do this work?
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+The architecture is massively ambiguous about what is actually required
+in terms of CMOs when using an uncached mapping (and whether you can hit
+in the cache or not).
 
-> ---
->  arch/arm64/kvm/hyp/Makefile | 5 +----
->  1 file changed, 1 insertion(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-> index 14c4e3b14bcb..a8a212eb66f1 100644
-> --- a/arch/arm64/kvm/hyp/Makefile
-> +++ b/arch/arm64/kvm/hyp/Makefile
-> @@ -22,7 +22,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += s2-setup.o
->  # KVM code is run at a different exception code with a different map, so
->  # compiler instrumentation that inserts callbacks or checks into the code may
->  # cause crashes. Just disable it.
-> -GCOV_PROFILE	:= n
-> -KASAN_SANITIZE	:= n
-> -UBSAN_SANITIZE	:= n
-> -KCOV_INSTRUMENT	:= n
-> +CC_INSTRUMENT	:= n
-> -- 
-> 2.11.0
-> 
+But even if the guest had done an invalidate in order not to hit in the
+cache, the host could have evicted the page to disk, the guest faulted
+the page back in, and it would still be the host's responsibility to
+ensure that the guest sees something consistent.
+
+> Sorry, I have forgotten all the details here, but wanted to make sure
+> we're not being overly careful.
+
+No worries, I'm always happy to revisit this particular rabbit hole... ;-)
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
