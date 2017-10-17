@@ -1,70 +1,81 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 17 Oct 2017 22:14:01 +0100
-Subject: [PATCH] mdt: slram: use memremap() instead of ioremap()
-In-Reply-To: <20171017205642.1791-1-roy.franz@cavium.com>
-References: <20171017205642.1791-1-roy.franz@cavium.com>
-Message-ID: <CAKv+Gu8a=0-FERUwbFXayqBtCG4bnvVki7hz4Ozdjr2XG2J3ew@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 17 Oct 2017 16:17:39 -0500
+Subject: [PATCH v4 2/5] dt-bindings: scsi: ufs: add document for hisi-ufs
+In-Reply-To: <20171013074936.97284-3-liwei213@huawei.com>
+References: <20171013074936.97284-1-liwei213@huawei.com>
+ <20171013074936.97284-3-liwei213@huawei.com>
+Message-ID: <20171017211739.tg7jm2hggega4sfy@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 October 2017 at 21:56, Roy Franz <rfranz@cavium.com> wrote:
-> Convert slram to use memremap() to map the memory it uses to back an MTD
-> device, as this is the proper interface for mapping memory. This change
-> enables normal memory to be used to back an MTD device on arm64, as arm64
-> prevents ioremap() being used on normal memory.
->
-> Signed-off-by: Roy Franz <roy.franz@cavium.com>
-
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
+On Fri, Oct 13, 2017 at 03:49:33PM +0800, Li Wei wrote:
+> add ufs node document for Hisilicon.
+> 
+> Signed-off-by: Li Wei <liwei213@huawei.com>
 > ---
-> Tested on arm64 simulation, using simulator to preload filesystem image into RAM,
-> and also tested on x86_64 using video card memory.  This is useful for speeding
-> up booting on (very slow) emulation environments by avoiding any processing of
-> an initramfs.
->
->  drivers/mtd/devices/slram.c | 9 +++++----
->  1 file changed, 5 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/mtd/devices/slram.c b/drivers/mtd/devices/slram.c
-> index 8087c36dc693..0ec85f316d24 100644
-> --- a/drivers/mtd/devices/slram.c
-> +++ b/drivers/mtd/devices/slram.c
-> @@ -163,8 +163,9 @@ static int register_device(char *name, unsigned long start, unsigned long length
->         }
->
->         if (!(((slram_priv_t *)(*curmtd)->mtdinfo->priv)->start =
-> -                               ioremap(start, length))) {
-> -               E("slram: ioremap failed\n");
-> +               memremap(start, length,
-> +                        MEMREMAP_WB | MEMREMAP_WT | MEMREMAP_WC))) {
-> +               E("slram: memremap failed\n");
->                 return -EIO;
->         }
->         ((slram_priv_t *)(*curmtd)->mtdinfo->priv)->end =
-> @@ -186,7 +187,7 @@ static int register_device(char *name, unsigned long start, unsigned long length
->
->         if (mtd_device_register((*curmtd)->mtdinfo, NULL, 0))   {
->                 E("slram: Failed to register new device\n");
-> -               iounmap(((slram_priv_t *)(*curmtd)->mtdinfo->priv)->start);
-> +               memunmap(((slram_priv_t *)(*curmtd)->mtdinfo->priv)->start);
->                 kfree((*curmtd)->mtdinfo->priv);
->                 kfree((*curmtd)->mtdinfo);
->                 return(-EAGAIN);
-> @@ -206,7 +207,7 @@ static void unregister_devices(void)
->         while (slram_mtdlist) {
->                 nextitem = slram_mtdlist->next;
->                 mtd_device_unregister(slram_mtdlist->mtdinfo);
-> -               iounmap(((slram_priv_t *)slram_mtdlist->mtdinfo->priv)->start);
-> +               memunmap(((slram_priv_t *)slram_mtdlist->mtdinfo->priv)->start);
->                 kfree(slram_mtdlist->mtdinfo->priv);
->                 kfree(slram_mtdlist->mtdinfo);
->                 kfree(slram_mtdlist);
-> --
+>  Documentation/devicetree/bindings/ufs/ufs-hisi.txt | 47 ++++++++++++++++++++++
+>  1 file changed, 47 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/ufs/ufs-hisi.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/ufs/ufs-hisi.txt b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
+> new file mode 100644
+> index 000000000000..ee114a65143d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
+> @@ -0,0 +1,47 @@
+> +* Hisilicon Universal Flash Storage (UFS) Host Controller
+> +
+> +UFS nodes are defined to describe on-chip UFS hardware macro.
+> +Each UFS Host Controller should have its own node.
+> +
+> +Required properties:
+> +- compatible        : compatible list, contains one of the following -
+> +			"hisilicon,hi3660-ufs" for hisi ufs host controller
+> +			 present on Hi3660 chipset.
+> +- reg               : should contain UFS register address space & UFS SYS CTRL register address,
+> +- interrupt-parent  : interrupt device
+> +- interrupts        : interrupt number
+> +- clocks	        : List of phandle and clock specifier pairs
+> +- clock-names       : List of clock input name strings sorted in the same
+> +		      order as the clocks property. "clk_ref", "clk_phy" is optional
+> +- resets            : reset node register, one reset the clk and the other reset the controller
+> +- reset-names       : describe reset node register
+> +
+> +Optional properties for board device:
+> +- reset-gpio			: specifies to reset devices
+
+Should be "reset-gpios".
+
+> +
+> +Example:
+> +
+> +	ufs: ufs at ff3b0000 {
+> +		compatible = "hisilicon,hi3660-ufs", "jedec,ufs-1.1";
+> +		/* 0: HCI standard */
+> +		/* 1: UFS SYS CTRL */
+> +		reg = <0x0 0xff3b0000 0x0 0x1000>,
+> +			<0x0 0xff3b1000 0x0 0x1000>;
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&crg_ctrl HI3660_CLK_GATE_UFSIO_REF>,
+> +			<&crg_ctrl HI3660_CLK_GATE_UFSPHY_CFG>;
+> +		clock-names = "clk_ref", "clk_phy";
+> +		freq-table-hz = <0 0>, <0 0>;
+> +		/* offset: 0x84; bit: 12 */
+> +		/* offset: 0x84; bit: 7  */
+> +		resets = <&crg_rst 0x84 12>,
+> +			<&crg_rst 0x84 7>;
+> +		reset-names = "rst", "assert";
+> +	};
+> +
+> +	&ufs {
+> +		reset-gpio = <&gpio18 1 0>;
+> +		status = "okay";
+
+Don't show status or the chip/board split in examples.
+
+> +	};
+> +
+> -- 
 > 2.11.0
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
