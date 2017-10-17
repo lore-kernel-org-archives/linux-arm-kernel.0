@@ -1,49 +1,17 @@
-From: gilad@benyossef.com (Gilad Ben-Yossef)
-Date: Tue, 17 Oct 2017 14:55:21 +0300
-Subject: [PATCH v9 00/20] simplify crypto wait for async op
-In-Reply-To: <20171015153831.GA22867@gondor.apana.org.au>
-References: <1508059209-25529-1-git-send-email-gilad@benyossef.com>
- <20171015153831.GA22867@gondor.apana.org.au>
-Message-ID: <CAOtvUMeESbKKaEvpW_MKrRaCxwQWnBa00m4v4F1jNZ_+Xq7pWA@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 17 Oct 2017 19:57:51 +0800
+Subject: [PATCH 18/23] arm: dts: sun8i: a83t: Enable the PWM
+In-Reply-To: <a2ddf46b633cf7bf658b03df95a6a30bffceddb1.1508231063.git-series.maxime.ripard@free-electrons.com>
+References: <cover.fe3d65d1ee05a55224d26e7d113388c428592b26.1508231063.git-series.maxime.ripard@free-electrons.com>
+ <a2ddf46b633cf7bf658b03df95a6a30bffceddb1.1508231063.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v667SSag=M=PG0yRXc7qESUKBSUDJLHt5o4U7dhKaE9A3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 15, 2017 at 6:38 PM, Herbert Xu <herbert@gondor.apana.org.au> wrote:
+On Tue, Oct 17, 2017 at 5:06 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The A83T has the same PWM block than the H3. Add it to our DT.
 >
-> On Sun, Oct 15, 2017 at 10:19:45AM +0100, Gilad Ben-Yossef wrote:
-> >
-> > Changes from v8:
-> > - Remove the translation of EAGAIN return code to the
-> >   previous return code of EBUSY for the user space
-> >   interface of algif as no one seems to rely on it as
-> >   requested by Herbert Xu.
->
-> Sorry, but I forgot to mention that EAGAIN is not a good value
-> to use because it's used by the network system calls for other
-> meanings (interrupted by a signal).
->
-> So if we stop doing the translation then we also need to pick
-> a different value, perhaps E2BIG or something similar that have
-> no current use within the crypto API or network API.
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Yes, I see what you mean. With a netlink based interface this can
-be confusing to debug.
-
-Would you mind if we used ENOSPC instead of E2BIG?
-
-"No space left on device" seems more appropriate than
-"Argument list too long".
-
-Thanks,
-Gilad
-
-
-
-
--- 
-Gilad Ben-Yossef
-Chief Coffee Drinker
-
-"If you take a class in large-scale robotics, can you end up in a
-situation where the homework eats your dog?"
- -- Jean-Baptiste Queru
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
