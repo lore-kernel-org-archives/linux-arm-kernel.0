@@ -1,17 +1,11 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 17 Oct 2017 19:40:05 +0200
-Subject: [GIT PULL 1/2] Rockchip dts32 updates for 4.15 part1
-Message-ID: <5843673.lOC77YXMZV@phil>
+Date: Tue, 17 Oct 2017 19:40:45 +0200
+Subject: [GIT PULL 2/2] Rockchip dts64 updates for 4.15 part1
+In-Reply-To: <5843673.lOC77YXMZV@phil>
+References: <5843673.lOC77YXMZV@phil>
+Message-ID: <5888991.PG7Gbs0CIl@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Hi Arnd, Kevin, Olof,
-
-please find below the first round of Rockchip dts32 updates targetted
-for 4.15.
-
-Thanks
-Heiko
 
 The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 
@@ -19,55 +13,44 @@ The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.15-rockchip-dts32-1
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.15-rockchip-dts64-1
 
-for you to fetch changes up to 345b40f1e50759d09144c4aa044d07823d77c283:
+for you to fetch changes up to d85438991874205467f9739d5f3ee771245b4754:
 
-  ARM: dts: rockchip: Enable thermal on rk3288-vyasa board (2017-10-14 21:10:31 +0200)
-
-----------------------------------------------------------------
-One new board the Vyasa from Amarula Solutions using a rk3288
-and core lvds node for the newly added driver+binding.
-Also bindings + nodes for the Mali-Utgard GPUs found on some
-Rockchip socs like rk3036 and rk3188. With the recently revived
-Lima project they can even render a red triangle to a png file.
+  arm64: dts: rockchip: enable cec pin for rk3399 firefly (2017-10-15 14:11:32 +0200)
 
 ----------------------------------------------------------------
-Heiko Stuebner (9):
-      dt-bindings: gpu: mali-utgard: Add Rockchip Utgard Malis
-      dt-bindings: gpu: mali-utgard: add optional supply regulator
-      dt-bindings: gpu: mali-utgard: add optional power-domain reference
-      ARM: dts: rockchip: add rk3036 gpu node
-      ARM: dts: rockchip: enable the gpu on rk3036-kylin boards
-      ARM: dts: rockchip: add rk322x gpu node
-      ARM: dts: rockchip: add gpu nodes on rk3066/rk3188
-      ARM: dts: rockchip: enable gpu on rk3188-radxarock
-      ARM: dts: rockchip: fix mali400 ppmmu interrupt names
+The biggest step forward is probably the enablement of display support
+on the rk3399-firefly, which got its default serial set as well and
+got cec support as well.
+Gru boards got their touchpad support refined to actually mark the button
+correctly and also git their rt5514 dsp added.
+And finally the rk3328 eval board got its cpu regulator and mmc nodes.
 
-Jagan Teki (4):
-      dt-bindings: Add vendor prefix for Amarula Solutions
-      ARM: dts: rockchip: Add rk3288 vyasa board
-      ARM: dts: rockchip: enable vops and hdmi output on rk3288-vyasa
-      ARM: dts: rockchip: Enable mali GPU node on rk3288-vyasa
+----------------------------------------------------------------
+Emil Renner Berthing (1):
+      arm64: dts: rockchip: enable touchpad button for rk3399-gru-kevin
 
-Michael Trimarchi (1):
-      ARM: dts: rockchip: Enable thermal on rk3288-vyasa board
+Heiko Stuebner (1):
+      arm64: dts: rockchip: enable display subsystem on rk3399-firefly
 
-Sandy Huang (1):
-      ARM: dts: rockchip: add LVDS node for rk3288
+Heinrich Schuchardt (1):
+      arm64: dts: rockchip: default serial for Firefly-RK3399
 
- Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
- .../devicetree/bindings/gpu/arm,mali-utgard.txt    |  16 +
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- arch/arm/boot/dts/Makefile                         |   3 +-
- arch/arm/boot/dts/rk3036-kylin.dts                 |   5 +
- arch/arm/boot/dts/rk3036.dtsi                      |  19 ++
- arch/arm/boot/dts/rk3066a.dtsi                     |  24 ++
- arch/arm/boot/dts/rk3188-radxarock.dts             |   4 +
- arch/arm/boot/dts/rk3188.dtsi                      |  24 ++
- arch/arm/boot/dts/rk322x.dtsi                      |  21 ++
- arch/arm/boot/dts/rk3288-vyasa.dts                 | 347 +++++++++++++++++++++
- arch/arm/boot/dts/rk3288.dtsi                      |  52 +++
- arch/arm/boot/dts/rk3xxx.dtsi                      |  11 +
- 13 files changed, 530 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/rk3288-vyasa.dts
+Jeffy Chen (1):
+      arm64: dts: rockchip: Add rt5514 dsp for rk3399 gru
+
+Liang Chen (2):
+      arm64: dts: rockchip: add mmc nodes for rk3328 evaluation board
+      arm64: dts: rockchip: add cpu regulator for rk3328 evaluation board
+
+Pierre-Hugues Husson (2):
+      arm64: dts: rockchip: add the cec clk for dw-mipi-hdmi on rk3399
+      arm64: dts: rockchip: enable cec pin for rk3399 firefly
+
+ arch/arm64/boot/dts/rockchip/rk3328-evb.dts       | 72 ++++++++++++++++++++++-
+ arch/arm64/boot/dts/rockchip/rk3399-firefly.dts   | 27 +++++++++
+ arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts |  4 ++
+ arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi      |  3 +-
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi          |  8 ++-
+ 5 files changed, 110 insertions(+), 4 deletions(-)
