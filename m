@@ -1,1323 +1,455 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 17 Oct 2017 15:21:42 +0100
-Subject: [PATCH v6 7/7] drivers/perf: Add support for ARMv8.2 Statistical
- Profiling Extension
-In-Reply-To: <1507811438-2267-8-git-send-email-will.deacon@arm.com>
-References: <1507811438-2267-1-git-send-email-will.deacon@arm.com>
- <1507811438-2267-8-git-send-email-will.deacon@arm.com>
-Message-ID: <20171017142141.nzeqpisybbnjrvvq@lakrids.cambridge.arm.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Tue, 17 Oct 2017 15:51:45 +0200
+Subject: [PATCH v3 02/28] arm64: KVM: Hide unsupported AArch64 CPU
+ features from guests
+In-Reply-To: <1507660725-7986-3-git-send-email-Dave.Martin@arm.com>
+References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
+ <1507660725-7986-3-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20171017135145.GT1845@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 12, 2017 at 01:30:38PM +0100, Will Deacon wrote:
-> The ARMv8.2 architecture introduces the optional Statistical Profiling
-> Extension (SPE).
-
-[...]
- 
-> This patch adds support for SPE in the form of a new perf driver.
+On Tue, Oct 10, 2017 at 07:38:19PM +0100, Dave Martin wrote:
+> Currently, a guest kernel sees the true CPU feature registers
+> (ID_*_EL1) when it reads them using MRS instructions.  This means
+> that the guest will observe features that are present in the
+> hardware but the host doesn't understand or doesn't provide support
+> for.  A guest may legimitately try to use such a feature as per the
+> architecture, but use of the feature may trap instead of working
+> normally, triggering undef injection into the guest.
 > 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-
-While I still hate abusing the software context, I know that's not going
-to change, and I can't find anything else to complain about ;).
-
-I assume you'll remember to wire up the pct_enable field.
-
-FWIW:
-
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
-
+> This is not a problem for the host, but the guest may go wrong when
+> running on newer hardware than the host knows about.
+> 
+> This patch hides from guest VMs any AArch64-specific CPU features
+> that the host doesn't support, by exposing to the guest the
+> sanitised versions of the registers computed by the cpufeatures
+> framework, instead of the true hardware registers.  To achieve
+> this, HCR_EL2.TID3 is now set for AArch64 guests, and emulation
+> code is added to KVM to report the sanitised versions of the
+> affected registers in response to MRS and register reads from
+> userspace.
+> 
+> The affected registers are removed from invariant_sys_regs[] (since
+> the invariant_sys_regs handling is no longer quite correct for
+> them) and added to sys_reg_desgs[], with appropriate access(),
+> get_user() and set_user() methods.  No runtime vcpu storage is
+> allocated for the registers: instead, they are read on demand from
+> the cpufeatures framework.  This may need modification in the
+> future if there is a need for userspace to customise the features
+> visible to the guest.
+> 
+> Attempts by userspace to write the registers are handled similarly
+> to the current invariant_sys_regs handling: writes are permitted,
+> but only if they don't attempt to change the value.  This is
+> sufficient to support VM snapshot/restore from userspace.
+> 
+> Because of the additional registers, restoring a VM on an older
+> kernel may not work unless userspace knows how to handle the extra
+> VM registers exposed to the KVM user ABI by this patch.
+> 
+> Under the principle of least damage, this patch makes no attempt to
+> handle any of the other registers currently in
+> invariant_sys_regs[], or to emulate registers for AArch32: however,
+> these could be handled in a similar way in future, as necessary.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  drivers/perf/Kconfig       |    8 +
->  drivers/perf/Makefile      |    1 +
->  drivers/perf/arm_spe_pmu.c | 1246 ++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 1255 insertions(+)
->  create mode 100644 drivers/perf/arm_spe_pmu.c
+>  arch/arm64/include/asm/sysreg.h |   3 +
+>  arch/arm64/kvm/hyp/switch.c     |   6 +
+>  arch/arm64/kvm/sys_regs.c       | 282 +++++++++++++++++++++++++++++++++-------
+>  3 files changed, 246 insertions(+), 45 deletions(-)
 > 
-> diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
-> index e5197ffb7422..43525a9dc947 100644
-> --- a/drivers/perf/Kconfig
-> +++ b/drivers/perf/Kconfig
-> @@ -43,4 +43,12 @@ config XGENE_PMU
->          help
->            Say y if you want to use APM X-Gene SoC performance monitors.
+> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+> index f707fed..480ecd6 100644
+> --- a/arch/arm64/include/asm/sysreg.h
+> +++ b/arch/arm64/include/asm/sysreg.h
+> @@ -149,6 +149,9 @@
+>  #define SYS_ID_AA64DFR0_EL1		sys_reg(3, 0, 0, 5, 0)
+>  #define SYS_ID_AA64DFR1_EL1		sys_reg(3, 0, 0, 5, 1)
 >  
-> +config ARM_SPE_PMU
-> +	tristate "Enable support for the ARMv8.2 Statistical Profiling Extension"
-> +	depends on PERF_EVENTS && ARM64
-> +	help
-> +	  Enable perf support for the ARMv8.2 Statistical Profiling
-> +	  Extension, which provides periodic sampling of operations in
-> +	  the CPU pipeline and reports this via the perf AUX interface.
+> +#define SYS_ID_AA64AFR0_EL1		sys_reg(3, 0, 0, 5, 4)
+> +#define SYS_ID_AA64AFR1_EL1		sys_reg(3, 0, 0, 5, 5)
 > +
->  endmenu
-> diff --git a/drivers/perf/Makefile b/drivers/perf/Makefile
-> index 6420bd4394d5..eaee60cf4b1b 100644
-> --- a/drivers/perf/Makefile
-> +++ b/drivers/perf/Makefile
-> @@ -3,3 +3,4 @@ obj-$(CONFIG_ARM_PMU_ACPI) += arm_pmu_acpi.o
->  obj-$(CONFIG_QCOM_L2_PMU)	+= qcom_l2_pmu.o
->  obj-$(CONFIG_QCOM_L3_PMU) += qcom_l3_pmu.o
->  obj-$(CONFIG_XGENE_PMU) += xgene_pmu.o
-> +obj-$(CONFIG_ARM_SPE_PMU) += arm_spe_pmu.o
-> diff --git a/drivers/perf/arm_spe_pmu.c b/drivers/perf/arm_spe_pmu.c
-> new file mode 100644
-> index 000000000000..a9cc7b25c116
-> --- /dev/null
-> +++ b/drivers/perf/arm_spe_pmu.c
-> @@ -0,0 +1,1246 @@
+>  #define SYS_ID_AA64ISAR0_EL1		sys_reg(3, 0, 0, 6, 0)
+>  #define SYS_ID_AA64ISAR1_EL1		sys_reg(3, 0, 0, 6, 1)
+>  
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 945e79c..35a90b8 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -81,11 +81,17 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+>  	 * it will cause an exception.
+>  	 */
+>  	val = vcpu->arch.hcr_el2;
+> +
+>  	if (!(val & HCR_RW) && system_supports_fpsimd()) {
+>  		write_sysreg(1 << 30, fpexc32_el2);
+>  		isb();
+>  	}
+> +
+> +	if (val & HCR_RW) /* for AArch64 only: */
+> +		val |= HCR_TID3; /* TID3: trap feature register accesses */
+> +
+
+Since we're setting this for all 64-bit VMs, can we not set this in
+vcpu_reset_hcr instead?
+
+>  	write_sysreg(val, hcr_el2);
+> +
+>  	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
+>  	write_sysreg(1 << 15, hstr_el2);
+>  	/*
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index 2e070d3..b1f7552 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -892,6 +892,137 @@ static bool access_cntp_cval(struct kvm_vcpu *vcpu,
+>  	return true;
+>  }
+>  
+> +/* Read a sanitised cpufeature ID register by sys_reg_desc */
+> +static u64 read_id_reg(struct sys_reg_desc const *r, bool raz)
+> +{
+> +	u32 id = sys_reg((u32)r->Op0, (u32)r->Op1,
+> +			 (u32)r->CRn, (u32)r->CRm, (u32)r->Op2);
+> +
+> +	return raz ? 0 : read_sanitised_ftr_reg(id);
+> +}
+> +
+> +/* cpufeature ID register access trap handlers */
+> +
+> +static bool __access_id_reg(struct kvm_vcpu *vcpu,
+> +			    struct sys_reg_params *p,
+> +			    const struct sys_reg_desc *r,
+> +			    bool raz)
+> +{
+> +	if (p->is_write)
+> +		return write_to_read_only(vcpu, p, r);
+> +
+> +	p->regval = read_id_reg(r, raz);
+> +	return true;
+> +}
+> +
+> +static bool access_id_reg(struct kvm_vcpu *vcpu,
+> +			  struct sys_reg_params *p,
+> +			  const struct sys_reg_desc *r)
+> +{
+> +	return __access_id_reg(vcpu, p, r, false);
+> +}
+> +
+> +static bool access_raz_id_reg(struct kvm_vcpu *vcpu,
+> +			      struct sys_reg_params *p,
+> +			      const struct sys_reg_desc *r)
+> +{
+> +	return __access_id_reg(vcpu, p, r, true);
+> +}
+> +
+> +static int reg_from_user(u64 *val, const void __user *uaddr, u64 id);
+> +static int reg_to_user(void __user *uaddr, const u64 *val, u64 id);
+> +static u64 sys_reg_to_index(const struct sys_reg_desc *reg);
+> +
 > +/*
-> + * Perf support for the Statistical Profiling Extension, introduced as
-> + * part of ARMv8.2.
+> + * cpufeature ID register user accessors
 > + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + *
-> + * Copyright (C) 2016 ARM Limited
-> + *
-> + * Author: Will Deacon <will.deacon@arm.com>
+> + * For now, these registers are immutable for userspace, so no values
+> + * are stored, and for set_id_reg() we don't allow the effective value
+> + * to be changed.
 > + */
-> +
-> +#define PMUNAME					"arm_spe"
-> +#define DRVNAME					PMUNAME "_pmu"
-> +#define pr_fmt(fmt)				DRVNAME ": " fmt
-> +
-> +#include <linux/cpuhotplug.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/irq.h>
-> +#include <linux/module.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_device.h>
-> +#include <linux/perf_event.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/slab.h>
-> +
-> +#include <asm/sysreg.h>
-> +
-> +#define ARM_SPE_BUF_PAD_BYTE			0
-> +
-> +struct arm_spe_pmu_buf {
-> +	int					nr_pages;
-> +	bool					snapshot;
-> +	void					*base;
-> +};
-> +
-> +struct arm_spe_pmu {
-> +	struct pmu				pmu;
-> +	struct platform_device			*pdev;
-> +	cpumask_t				supported_cpus;
-> +	struct hlist_node			hotplug_node;
-> +
-> +	int					irq; /* PPI */
-> +
-> +	u16					min_period;
-> +	u16					counter_sz;
-> +
-> +#define SPE_PMU_FEAT_FILT_EVT			(1UL << 0)
-> +#define SPE_PMU_FEAT_FILT_TYP			(1UL << 1)
-> +#define SPE_PMU_FEAT_FILT_LAT			(1UL << 2)
-> +#define SPE_PMU_FEAT_ARCH_INST			(1UL << 3)
-> +#define SPE_PMU_FEAT_LDS			(1UL << 4)
-> +#define SPE_PMU_FEAT_ERND			(1UL << 5)
-> +#define SPE_PMU_FEAT_DEV_PROBED			(1UL << 63)
-> +	u64					features;
-> +
-> +	u16					max_record_sz;
-> +	u16					align;
-> +	struct perf_output_handle __percpu	*handle;
-> +};
-> +
-> +#define to_spe_pmu(p) (container_of(p, struct arm_spe_pmu, pmu))
-> +
-> +/* Convert a free-running index from perf into an SPE buffer offset */
-> +#define PERF_IDX2OFF(idx, buf)	((idx) % ((buf)->nr_pages << PAGE_SHIFT))
-> +
-> +/* Keep track of our dynamic hotplug state */
-> +static enum cpuhp_state arm_spe_pmu_online;
-> +
-> +enum arm_spe_pmu_buf_fault_action {
-> +	SPE_PMU_BUF_FAULT_ACT_SPURIOUS,
-> +	SPE_PMU_BUF_FAULT_ACT_FATAL,
-> +	SPE_PMU_BUF_FAULT_ACT_OK,
-> +};
-> +
-> +/* This sysfs gunk was really good fun to write. */
-> +enum arm_spe_pmu_capabilities {
-> +	SPE_PMU_CAP_ARCH_INST = 0,
-> +	SPE_PMU_CAP_ERND,
-> +	SPE_PMU_CAP_FEAT_MAX,
-> +	SPE_PMU_CAP_CNT_SZ = SPE_PMU_CAP_FEAT_MAX,
-> +	SPE_PMU_CAP_MIN_IVAL,
-> +};
-> +
-> +static int arm_spe_pmu_feat_caps[SPE_PMU_CAP_FEAT_MAX] = {
-> +	[SPE_PMU_CAP_ARCH_INST]	= SPE_PMU_FEAT_ARCH_INST,
-> +	[SPE_PMU_CAP_ERND]	= SPE_PMU_FEAT_ERND,
-> +};
-> +
-> +static u32 arm_spe_pmu_cap_get(struct arm_spe_pmu *spe_pmu, int cap)
+> +static int __get_id_reg(const struct sys_reg_desc *rd, void __user *uaddr,
+> +			bool raz)
 > +{
-> +	if (cap < SPE_PMU_CAP_FEAT_MAX)
-> +		return !!(spe_pmu->features & arm_spe_pmu_feat_caps[cap]);
+> +	const u64 id = sys_reg_to_index(rd);
+> +	const u64 val = read_id_reg(rd, raz);
 > +
-> +	switch (cap) {
-> +	case SPE_PMU_CAP_CNT_SZ:
-> +		return spe_pmu->counter_sz;
-> +	case SPE_PMU_CAP_MIN_IVAL:
-> +		return spe_pmu->min_period;
-> +	default:
-> +		WARN(1, "unknown cap %d\n", cap);
-> +	}
-> +
-> +	return 0;
+> +	return reg_to_user(uaddr, &val, id);
 > +}
 > +
-> +static ssize_t arm_spe_pmu_cap_show(struct device *dev,
-> +				    struct device_attribute *attr,
-> +				    char *buf)
+> +static int __set_id_reg(const struct sys_reg_desc *rd, void __user *uaddr,
+> +			bool raz)
 > +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct arm_spe_pmu *spe_pmu = platform_get_drvdata(pdev);
-> +	struct dev_ext_attribute *ea =
-> +		container_of(attr, struct dev_ext_attribute, attr);
-> +	int cap = (long)ea->var;
-> +
-> +	return snprintf(buf, PAGE_SIZE, "%u\n",
-> +		arm_spe_pmu_cap_get(spe_pmu, cap));
-> +}
-> +
-> +#define SPE_EXT_ATTR_ENTRY(_name, _func, _var)				\
-> +	&((struct dev_ext_attribute[]) {				\
-> +		{ __ATTR(_name, S_IRUGO, _func, NULL), (void *)_var }	\
-> +	})[0].attr.attr
-> +
-> +#define SPE_CAP_EXT_ATTR_ENTRY(_name, _var)				\
-> +	SPE_EXT_ATTR_ENTRY(_name, arm_spe_pmu_cap_show, _var)
-> +
-> +static struct attribute *arm_spe_pmu_cap_attr[] = {
-> +	SPE_CAP_EXT_ATTR_ENTRY(arch_inst, SPE_PMU_CAP_ARCH_INST),
-> +	SPE_CAP_EXT_ATTR_ENTRY(ernd, SPE_PMU_CAP_ERND),
-> +	SPE_CAP_EXT_ATTR_ENTRY(count_size, SPE_PMU_CAP_CNT_SZ),
-> +	SPE_CAP_EXT_ATTR_ENTRY(min_interval, SPE_PMU_CAP_MIN_IVAL),
-> +	NULL,
-> +};
-> +
-> +static struct attribute_group arm_spe_pmu_cap_group = {
-> +	.name	= "caps",
-> +	.attrs	= arm_spe_pmu_cap_attr,
-> +};
-> +
-> +/* User ABI */
-> +#define ATTR_CFG_FLD_ts_enable_CFG		config	/* PMSCR_EL1.TS */
-> +#define ATTR_CFG_FLD_ts_enable_LO		0
-> +#define ATTR_CFG_FLD_ts_enable_HI		0
-> +#define ATTR_CFG_FLD_pa_enable_CFG		config	/* PMSCR_EL1.PA */
-> +#define ATTR_CFG_FLD_pa_enable_LO		1
-> +#define ATTR_CFG_FLD_pa_enable_HI		1
-> +#define ATTR_CFG_FLD_pct_enable_CFG		config	/* PMSCR_EL1.PCT */
-> +#define ATTR_CFG_FLD_pct_enable_LO		2
-> +#define ATTR_CFG_FLD_pct_enable_HI		2
-> +#define ATTR_CFG_FLD_jitter_CFG			config	/* PMSIRR_EL1.RND */
-> +#define ATTR_CFG_FLD_jitter_LO			16
-> +#define ATTR_CFG_FLD_jitter_HI			16
-> +#define ATTR_CFG_FLD_branch_filter_CFG		config	/* PMSFCR_EL1.B */
-> +#define ATTR_CFG_FLD_branch_filter_LO		32
-> +#define ATTR_CFG_FLD_branch_filter_HI		32
-> +#define ATTR_CFG_FLD_load_filter_CFG		config	/* PMSFCR_EL1.LD */
-> +#define ATTR_CFG_FLD_load_filter_LO		33
-> +#define ATTR_CFG_FLD_load_filter_HI		33
-> +#define ATTR_CFG_FLD_store_filter_CFG		config	/* PMSFCR_EL1.ST */
-> +#define ATTR_CFG_FLD_store_filter_LO		34
-> +#define ATTR_CFG_FLD_store_filter_HI		34
-> +
-> +#define ATTR_CFG_FLD_event_filter_CFG		config1	/* PMSEVFR_EL1 */
-> +#define ATTR_CFG_FLD_event_filter_LO		0
-> +#define ATTR_CFG_FLD_event_filter_HI		63
-> +
-> +#define ATTR_CFG_FLD_min_latency_CFG		config2	/* PMSLATFR_EL1.MINLAT */
-> +#define ATTR_CFG_FLD_min_latency_LO		0
-> +#define ATTR_CFG_FLD_min_latency_HI		11
-> +
-> +/* Why does everything I do descend into this? */
-> +#define __GEN_PMU_FORMAT_ATTR(cfg, lo, hi)				\
-> +	(lo) == (hi) ? #cfg ":" #lo "\n" : #cfg ":" #lo "-" #hi
-> +
-> +#define _GEN_PMU_FORMAT_ATTR(cfg, lo, hi)				\
-> +	__GEN_PMU_FORMAT_ATTR(cfg, lo, hi)
-> +
-> +#define GEN_PMU_FORMAT_ATTR(name)					\
-> +	PMU_FORMAT_ATTR(name,						\
-> +	_GEN_PMU_FORMAT_ATTR(ATTR_CFG_FLD_##name##_CFG,			\
-> +			     ATTR_CFG_FLD_##name##_LO,			\
-> +			     ATTR_CFG_FLD_##name##_HI))
-> +
-> +#define _ATTR_CFG_GET_FLD(attr, cfg, lo, hi)				\
-> +	((((attr)->cfg) >> lo) & GENMASK(hi - lo, 0))
-> +
-> +#define ATTR_CFG_GET_FLD(attr, name)					\
-> +	_ATTR_CFG_GET_FLD(attr,						\
-> +			  ATTR_CFG_FLD_##name##_CFG,			\
-> +			  ATTR_CFG_FLD_##name##_LO,			\
-> +			  ATTR_CFG_FLD_##name##_HI)
-> +
-> +GEN_PMU_FORMAT_ATTR(ts_enable);
-> +GEN_PMU_FORMAT_ATTR(pa_enable);
-> +GEN_PMU_FORMAT_ATTR(jitter);
-> +GEN_PMU_FORMAT_ATTR(load_filter);
-> +GEN_PMU_FORMAT_ATTR(store_filter);
-> +GEN_PMU_FORMAT_ATTR(branch_filter);
-> +GEN_PMU_FORMAT_ATTR(event_filter);
-> +GEN_PMU_FORMAT_ATTR(min_latency);
-> +
-> +static struct attribute *arm_spe_pmu_formats_attr[] = {
-> +	&format_attr_ts_enable.attr,
-> +	&format_attr_pa_enable.attr,
-> +	&format_attr_jitter.attr,
-> +	&format_attr_load_filter.attr,
-> +	&format_attr_store_filter.attr,
-> +	&format_attr_branch_filter.attr,
-> +	&format_attr_event_filter.attr,
-> +	&format_attr_min_latency.attr,
-> +	NULL,
-> +};
-> +
-> +static struct attribute_group arm_spe_pmu_format_group = {
-> +	.name	= "format",
-> +	.attrs	= arm_spe_pmu_formats_attr,
-> +};
-> +
-> +static ssize_t arm_spe_pmu_get_attr_cpumask(struct device *dev,
-> +					    struct device_attribute *attr,
-> +					    char *buf)
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct arm_spe_pmu *spe_pmu = platform_get_drvdata(pdev);
-> +
-> +	return cpumap_print_to_pagebuf(true, buf, &spe_pmu->supported_cpus);
-> +}
-> +static DEVICE_ATTR(cpumask, S_IRUGO, arm_spe_pmu_get_attr_cpumask, NULL);
-> +
-> +static struct attribute *arm_spe_pmu_attrs[] = {
-> +	&dev_attr_cpumask.attr,
-> +	NULL,
-> +};
-> +
-> +static struct attribute_group arm_spe_pmu_group = {
-> +	.attrs	= arm_spe_pmu_attrs,
-> +};
-> +
-> +static const struct attribute_group *arm_spe_pmu_attr_groups[] = {
-> +	&arm_spe_pmu_group,
-> +	&arm_spe_pmu_cap_group,
-> +	&arm_spe_pmu_format_group,
-> +	NULL,
-> +};
-> +
-> +/* Convert between user ABI and register values */
-> +static u64 arm_spe_event_to_pmscr(struct perf_event *event)
-> +{
-> +	struct perf_event_attr *attr = &event->attr;
-> +	u64 reg = 0;
-> +
-> +	reg |= ATTR_CFG_GET_FLD(attr, ts_enable) << SYS_PMSCR_EL1_TS_SHIFT;
-> +	reg |= ATTR_CFG_GET_FLD(attr, pa_enable) << SYS_PMSCR_EL1_PA_SHIFT;
-> +	reg |= ATTR_CFG_GET_FLD(attr, pct_enable) << SYS_PMSCR_EL1_PCT_SHIFT;
-> +
-> +	if (!attr->exclude_user)
-> +		reg |= BIT(SYS_PMSCR_EL1_E0SPE_SHIFT);
-> +
-> +	if (!attr->exclude_kernel)
-> +		reg |= BIT(SYS_PMSCR_EL1_E1SPE_SHIFT);
-> +
-> +	if (IS_ENABLED(CONFIG_PID_IN_CONTEXTIDR) && capable(CAP_SYS_ADMIN))
-> +		reg |= BIT(SYS_PMSCR_EL1_CX_SHIFT);
-> +
-> +	return reg;
-> +}
-> +
-> +static void arm_spe_event_sanitise_period(struct perf_event *event)
-> +{
-> +	struct arm_spe_pmu *spe_pmu = to_spe_pmu(event->pmu);
-> +	u64 period = event->hw.sample_period;
-> +	u64 max_period = SYS_PMSIRR_EL1_INTERVAL_MASK
-> +			 << SYS_PMSIRR_EL1_INTERVAL_SHIFT;
-> +
-> +	if (period < spe_pmu->min_period)
-> +		period = spe_pmu->min_period;
-> +	else if (period > max_period)
-> +		period = max_period;
-> +	else
-> +		period &= max_period;
-> +
-> +	event->hw.sample_period = period;
-> +}
-> +
-> +static u64 arm_spe_event_to_pmsirr(struct perf_event *event)
-> +{
-> +	struct perf_event_attr *attr = &event->attr;
-> +	u64 reg = 0;
-> +
-> +	arm_spe_event_sanitise_period(event);
-> +
-> +	reg |= ATTR_CFG_GET_FLD(attr, jitter) << SYS_PMSIRR_EL1_RND_SHIFT;
-> +	reg |= event->hw.sample_period;
-> +
-> +	return reg;
-> +}
-> +
-> +static u64 arm_spe_event_to_pmsfcr(struct perf_event *event)
-> +{
-> +	struct perf_event_attr *attr = &event->attr;
-> +	u64 reg = 0;
-> +
-> +	reg |= ATTR_CFG_GET_FLD(attr, load_filter) << SYS_PMSFCR_EL1_LD_SHIFT;
-> +	reg |= ATTR_CFG_GET_FLD(attr, store_filter) << SYS_PMSFCR_EL1_ST_SHIFT;
-> +	reg |= ATTR_CFG_GET_FLD(attr, branch_filter) << SYS_PMSFCR_EL1_B_SHIFT;
-> +
-> +	if (reg)
-> +		reg |= BIT(SYS_PMSFCR_EL1_FT_SHIFT);
-> +
-> +	if (ATTR_CFG_GET_FLD(attr, event_filter))
-> +		reg |= BIT(SYS_PMSFCR_EL1_FE_SHIFT);
-> +
-> +	if (ATTR_CFG_GET_FLD(attr, min_latency))
-> +		reg |= BIT(SYS_PMSFCR_EL1_FL_SHIFT);
-> +
-> +	return reg;
-> +}
-> +
-> +static u64 arm_spe_event_to_pmsevfr(struct perf_event *event)
-> +{
-> +	struct perf_event_attr *attr = &event->attr;
-> +	return ATTR_CFG_GET_FLD(attr, event_filter);
-> +}
-> +
-> +static u64 arm_spe_event_to_pmslatfr(struct perf_event *event)
-> +{
-> +	struct perf_event_attr *attr = &event->attr;
-> +	return ATTR_CFG_GET_FLD(attr, min_latency)
-> +	       << SYS_PMSLATFR_EL1_MINLAT_SHIFT;
-> +}
-> +
-> +static void arm_spe_pmu_pad_buf(struct perf_output_handle *handle, int len)
-> +{
-> +	struct arm_spe_pmu_buf *buf = perf_get_aux(handle);
-> +	u64 head = PERF_IDX2OFF(handle->head, buf);
-> +
-> +	memset(buf->base + head, ARM_SPE_BUF_PAD_BYTE, len);
-> +	if (!buf->snapshot)
-> +		perf_aux_output_skip(handle, len);
-> +}
-> +
-> +static u64 arm_spe_pmu_next_snapshot_off(struct perf_output_handle *handle)
-> +{
-> +	struct arm_spe_pmu_buf *buf = perf_get_aux(handle);
-> +	struct arm_spe_pmu *spe_pmu = to_spe_pmu(handle->event->pmu);
-> +	u64 head = PERF_IDX2OFF(handle->head, buf);
-> +	u64 limit = buf->nr_pages * PAGE_SIZE;
-> +
-> +	/*
-> +	 * The trace format isn't parseable in reverse, so clamp
-> +	 * the limit to half of the buffer size in snapshot mode
-> +	 * so that the worst case is half a buffer of records, as
-> +	 * opposed to a single record.
-> +	 */
-> +	if (head < limit >> 1)
-> +		limit >>= 1;
-> +
-> +	/*
-> +	 * If we're within max_record_sz of the limit, we must
-> +	 * pad, move the head index and recompute the limit.
-> +	 */
-> +	if (limit - head < spe_pmu->max_record_sz) {
-> +		arm_spe_pmu_pad_buf(handle, limit - head);
-> +		handle->head = PERF_IDX2OFF(limit, buf);
-> +		limit = ((buf->nr_pages * PAGE_SIZE) >> 1) + handle->head;
-> +	}
-> +
-> +	return limit;
-> +}
-> +
-> +static u64 __arm_spe_pmu_next_off(struct perf_output_handle *handle)
-> +{
-> +	struct arm_spe_pmu *spe_pmu = to_spe_pmu(handle->event->pmu);
-> +	struct arm_spe_pmu_buf *buf = perf_get_aux(handle);
-> +	const u64 bufsize = buf->nr_pages * PAGE_SIZE;
-> +	u64 limit = bufsize;
-> +	u64 head, tail, wakeup;
-> +
-> +	/*
-> +	 * The head can be misaligned for two reasons:
-> +	 *
-> +	 * 1. The hardware left PMBPTR pointing to the first byte after
-> +	 *    a record when generating a buffer management event.
-> +	 *
-> +	 * 2. We used perf_aux_output_skip to consume handle->size bytes
-> +	 *    and CIRC_SPACE was used to compute the size, which always
-> +	 *    leaves one entry free.
-> +	 *
-> +	 * Deal with this by padding to the next alignment boundary and
-> +	 * moving the head index. If we run out of buffer space, we'll
-> +	 * reduce handle->size to zero and end up reporting truncation.
-> +	 */
-> +	head = PERF_IDX2OFF(handle->head, buf);
-> +	if (!IS_ALIGNED(head, spe_pmu->align)) {
-> +		unsigned long delta = roundup(head, spe_pmu->align) - head;
-> +
-> +		delta = min(delta, handle->size);
-> +		arm_spe_pmu_pad_buf(handle, delta);
-> +		head = PERF_IDX2OFF(handle->head, buf);
-> +	}
-> +
-> +	/* If we've run out of free space, then nothing more to do */
-G> +	if (!handle->size)
-> +		goto no_space;
-> +
-> +	/* Compute the tail and wakeup indices now that we've aligned head */
-> +	tail = PERF_IDX2OFF(handle->head + handle->size, buf);
-> +	wakeup = PERF_IDX2OFF(handle->wakeup, buf);
-> +
-> +	/*
-> +	 * Avoid clobbering unconsumed data. We know we have space, so
-> +	 * if we see head == tail we know that the buffer is empty. If
-> +	 * head > tail, then there's nothing to clobber prior to
-> +	 * wrapping.
-> +	 */
-> +	if (head < tail)
-> +		limit = round_down(tail, PAGE_SIZE);
-> +
-> +	/*
-> +	 * Wakeup may be arbitrarily far into the future. If it's not in
-> +	 * the current generation, either we'll wrap before hitting it,
-> +	 * or it's in the past and has been handled already.
-> +	 *
-> +	 * If there's a wakeup before we wrap, arrange to be woken up by
-> +	 * the page boundary following it. Keep the tail boundary if
-> +	 * that's lower.
-> +	 */
-> +	if (handle->wakeup < (handle->head + handle->size) && head <= wakeup)
-> +		limit = min(limit, round_up(wakeup, PAGE_SIZE));
-> +
-> +	if (limit > head)
-> +		return limit;
-> +
-> +	arm_spe_pmu_pad_buf(handle, handle->size);
-> +no_space:
-> +	perf_aux_output_flag(handle, PERF_AUX_FLAG_TRUNCATED);
-> +	perf_aux_output_end(handle, 0);
-> +	return 0;
-> +}
-> +
-> +static u64 arm_spe_pmu_next_off(struct perf_output_handle *handle)
-> +{
-> +	struct arm_spe_pmu_buf *buf = perf_get_aux(handle);
-> +	struct arm_spe_pmu *spe_pmu = to_spe_pmu(handle->event->pmu);
-> +	u64 limit = __arm_spe_pmu_next_off(handle);
-> +	u64 head = PERF_IDX2OFF(handle->head, buf);
-> +
-> +	/*
-> +	 * If the head has come too close to the end of the buffer,
-> +	 * then pad to the end and recompute the limit.
-> +	 */
-> +	if (limit && (limit - head < spe_pmu->max_record_sz)) {
-> +		arm_spe_pmu_pad_buf(handle, limit - head);
-> +		limit = __arm_spe_pmu_next_off(handle);
-> +	}
-> +
-> +	return limit;
-> +}
-> +
-> +static void arm_spe_perf_aux_output_begin(struct perf_output_handle *handle,
-> +					  struct perf_event *event)
-> +{
-> +	u64 base, limit;
-> +	struct arm_spe_pmu_buf *buf;
-> +
-> +	/* Start a new aux session */
-> +	buf = perf_aux_output_begin(handle, event);
-> +	if (!buf) {
-> +		event->hw.state |= PERF_HES_STOPPED;
-> +		/*
-> +		 * We still need to clear the limit pointer, since the
-> +		 * profiler might only be disabled by virtue of a fault.
-> +		 */
-> +		limit = 0;
-> +		goto out_write_limit;
-> +	}
-> +
-> +	limit = buf->snapshot ? arm_spe_pmu_next_snapshot_off(handle)
-> +			      : arm_spe_pmu_next_off(handle);
-> +	if (limit)
-> +		limit |= BIT(SYS_PMBLIMITR_EL1_E_SHIFT);
-> +
-> +	limit += (u64)buf->base;
-> +	base = (u64)buf->base + PERF_IDX2OFF(handle->head, buf);
-> +	write_sysreg_s(base, SYS_PMBPTR_EL1);
-> +
-> +out_write_limit:
-> +	write_sysreg_s(limit, SYS_PMBLIMITR_EL1);
-> +}
-> +
-> +static void arm_spe_perf_aux_output_end(struct perf_output_handle *handle)
-> +{
-> +	struct arm_spe_pmu_buf *buf = perf_get_aux(handle);
-> +	u64 offset, size;
-> +
-> +	offset = read_sysreg_s(SYS_PMBPTR_EL1) - (u64)buf->base;
-> +	size = offset - PERF_IDX2OFF(handle->head, buf);
-> +
-> +	if (buf->snapshot)
-> +		handle->head = offset;
-> +
-> +	perf_aux_output_end(handle, size);
-> +}
-> +
-> +static void arm_spe_pmu_disable_and_drain_local(void)
-> +{
-> +	/* Disable profiling at EL0 and EL1 */
-> +	write_sysreg_s(0, SYS_PMSCR_EL1);
-> +	isb();
-> +
-> +	/* Drain any buffered data */
-> +	psb_csync();
-> +	dsb(nsh);
-> +
-> +	/* Disable the profiling buffer */
-> +	write_sysreg_s(0, SYS_PMBLIMITR_EL1);
-> +	isb();
-> +}
-> +
-> +/* IRQ handling */
-> +static enum arm_spe_pmu_buf_fault_action
-> +arm_spe_pmu_buf_get_fault_act(struct perf_output_handle *handle)
-> +{
-> +	const char *err_str;
-> +	u64 pmbsr;
-> +	enum arm_spe_pmu_buf_fault_action ret;
-> +
-> +	/*
-> +	 * Ensure new profiling data is visible to the CPU and any external
-> +	 * aborts have been resolved.
-> +	 */
-> +	psb_csync();
-> +	dsb(nsh);
-> +
-> +	/* Ensure hardware updates to PMBPTR_EL1 are visible */
-> +	isb();
-> +
-> +	/* Service required? */
-> +	pmbsr = read_sysreg_s(SYS_PMBSR_EL1);
-> +	if (!(pmbsr & BIT(SYS_PMBSR_EL1_S_SHIFT)))
-> +		return SPE_PMU_BUF_FAULT_ACT_SPURIOUS;
-> +
-> +	/*
-> +	 * If we've lost data, disable profiling and also set the PARTIAL
-> +	 * flag to indicate that the last record is corrupted.
-> +	 */
-> +	if (pmbsr & BIT(SYS_PMBSR_EL1_DL_SHIFT))
-> +		perf_aux_output_flag(handle, PERF_AUX_FLAG_TRUNCATED |
-> +					     PERF_AUX_FLAG_PARTIAL);
-> +
-> +	/* Report collisions to userspace so that it can up the period */
-> +	if (pmbsr & BIT(SYS_PMBSR_EL1_COLL_SHIFT))
-> +		perf_aux_output_flag(handle, PERF_AUX_FLAG_COLLISION);
-> +
-> +	/* We only expect buffer management events */
-> +	switch (pmbsr & (SYS_PMBSR_EL1_EC_MASK << SYS_PMBSR_EL1_EC_SHIFT)) {
-> +	case SYS_PMBSR_EL1_EC_BUF:
-> +		/* Handled below */
-> +		break;
-> +	case SYS_PMBSR_EL1_EC_FAULT_S1:
-> +	case SYS_PMBSR_EL1_EC_FAULT_S2:
-> +		err_str = "Unexpected buffer fault";
-> +		goto out_err;
-> +	default:
-> +		err_str = "Unknown error code";
-> +		goto out_err;
-> +	}
-> +
-> +	/* Buffer management event */
-> +	switch (pmbsr &
-> +		(SYS_PMBSR_EL1_BUF_BSC_MASK << SYS_PMBSR_EL1_BUF_BSC_SHIFT)) {
-> +	case SYS_PMBSR_EL1_BUF_BSC_FULL:
-> +		ret = SPE_PMU_BUF_FAULT_ACT_OK;
-> +		goto out_stop;
-> +	default:
-> +		err_str = "Unknown buffer status code";
-> +	}
-> +
-> +out_err:
-> +	pr_err_ratelimited("%s on CPU %d [PMBSR=0x%016llx, PMBPTR=0x%016llx, PMBLIMITR=0x%016llx]\n",
-> +			   err_str, smp_processor_id(), pmbsr,
-> +			   read_sysreg_s(SYS_PMBPTR_EL1),
-> +			   read_sysreg_s(SYS_PMBLIMITR_EL1));
-> +	ret = SPE_PMU_BUF_FAULT_ACT_FATAL;
-> +
-> +out_stop:
-> +	arm_spe_perf_aux_output_end(handle);
-> +	return ret;
-> +}
-> +
-> +static irqreturn_t arm_spe_pmu_irq_handler(int irq, void *dev)
-> +{
-> +	struct perf_output_handle *handle = dev;
-> +	struct perf_event *event = handle->event;
-> +	enum arm_spe_pmu_buf_fault_action act;
-> +
-> +	if (!perf_get_aux(handle))
-> +		return IRQ_NONE;
-> +
-> +	act = arm_spe_pmu_buf_get_fault_act(handle);
-> +	if (act == SPE_PMU_BUF_FAULT_ACT_SPURIOUS)
-> +		return IRQ_NONE;
-> +
-> +	/*
-> +	 * Ensure perf callbacks have completed, which may disable the
-> +	 * profiling buffer in response to a TRUNCATION flag.
-> +	 */
-> +	irq_work_run();
-> +
-> +	switch (act) {
-> +	case SPE_PMU_BUF_FAULT_ACT_FATAL:
-> +		/*
-> +		 * If a fatal exception occurred then leaving the profiling
-> +		 * buffer enabled is a recipe waiting to happen. Since
-> +		 * fatal faults don't always imply truncation, make sure
-> +		 * that the profiling buffer is disabled explicitly before
-> +		 * clearing the syndrome register.
-> +		 */
-> +		arm_spe_pmu_disable_and_drain_local();
-> +		break;
-> +	case SPE_PMU_BUF_FAULT_ACT_OK:
-> +		/*
-> +		 * We handled the fault (the buffer was full), so resume
-> +		 * profiling as long as we didn't detect truncation.
-> +		 * PMBPTR might be misaligned, but we'll burn that bridge
-> +		 * when we get to it.
-> +		 */
-> +		if (!(handle->aux_flags & PERF_AUX_FLAG_TRUNCATED)) {
-> +			arm_spe_perf_aux_output_begin(handle, event);
-> +			isb();
-> +		}
-> +		break;
-> +	case SPE_PMU_BUF_FAULT_ACT_SPURIOUS:
-> +		/* We've seen you before, but GCC has the memory of a sieve. */
-> +		break;
-> +	}
-> +
-> +	/* The buffer pointers are now sane, so resume profiling. */
-> +	write_sysreg_s(0, SYS_PMBSR_EL1);
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +/* Perf callbacks */
-> +static int arm_spe_pmu_event_init(struct perf_event *event)
-> +{
-> +	u64 reg;
-> +	struct perf_event_attr *attr = &event->attr;
-> +	struct arm_spe_pmu *spe_pmu = to_spe_pmu(event->pmu);
-> +
-> +	/* This is, of course, deeply driver-specific */
-> +	if (attr->type != event->pmu->type)
-> +		return -ENOENT;
-> +
-> +	if (event->cpu >= 0 &&
-> +	    !cpumask_test_cpu(event->cpu, &spe_pmu->supported_cpus))
-> +		return -ENOENT;
-> +
-> +	if (arm_spe_event_to_pmsevfr(event) & SYS_PMSEVFR_EL1_RES0)
-> +		return -EOPNOTSUPP;
-> +
-> +	if (attr->exclude_idle)
-> +		return -EOPNOTSUPP;
-> +
-> +	/*
-> +	 * Feedback-directed frequency throttling doesn't work when we
-> +	 * have a buffer of samples. We'd need to manually count the
-> +	 * samples in the buffer when it fills up and adjust the event
-> +	 * count to reflect that. Instead, just force the user to specify
-> +	 * a sample period.
-> +	 */
-> +	if (attr->freq)
+> +	const u64 id = sys_reg_to_index(rd);
+> +	int err;
+> +	u64 val;
+> +
+> +	err = reg_from_user(&val, uaddr, id);
+> +	if (err)
+> +		return err;
+> +
+> +	/* This is what we mean by invariant: you can't change it. */
+> +	if (val != read_id_reg(rd, raz))
 > +		return -EINVAL;
 > +
-> +	reg = arm_spe_event_to_pmsfcr(event);
-> +	if ((reg & BIT(SYS_PMSFCR_EL1_FE_SHIFT)) &&
-> +	    !(spe_pmu->features & SPE_PMU_FEAT_FILT_EVT))
-> +		return -EOPNOTSUPP;
-> +
-> +	if ((reg & BIT(SYS_PMSFCR_EL1_FT_SHIFT)) &&
-> +	    !(spe_pmu->features & SPE_PMU_FEAT_FILT_TYP))
-> +		return -EOPNOTSUPP;
-> +
-> +	if ((reg & BIT(SYS_PMSFCR_EL1_FL_SHIFT)) &&
-> +	    !(spe_pmu->features & SPE_PMU_FEAT_FILT_LAT))
-> +		return -EOPNOTSUPP;
-> +
-> +	reg = arm_spe_event_to_pmscr(event);
-> +	if (!capable(CAP_SYS_ADMIN) &&
-> +	    (reg & (BIT(SYS_PMSCR_EL1_PA_SHIFT) |
-> +		    BIT(SYS_PMSCR_EL1_CX_SHIFT) |
-> +		    BIT(SYS_PMSCR_EL1_PCT_SHIFT))))
-> +		return -EACCES;
-> +
 > +	return 0;
 > +}
 > +
-> +static void arm_spe_pmu_start(struct perf_event *event, int flags)
+> +static int get_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+> +		      const struct kvm_one_reg *reg, void __user *uaddr)
 > +{
-> +	u64 reg;
-> +	struct arm_spe_pmu *spe_pmu = to_spe_pmu(event->pmu);
-> +	struct hw_perf_event *hwc = &event->hw;
-> +	struct perf_output_handle *handle = this_cpu_ptr(spe_pmu->handle);
-> +
-> +	hwc->state = 0;
-> +	arm_spe_perf_aux_output_begin(handle, event);
-> +	if (hwc->state)
-> +		return;
-> +
-> +	reg = arm_spe_event_to_pmsfcr(event);
-> +	write_sysreg_s(reg, SYS_PMSFCR_EL1);
-> +
-> +	reg = arm_spe_event_to_pmsevfr(event);
-> +	write_sysreg_s(reg, SYS_PMSEVFR_EL1);
-> +
-> +	reg = arm_spe_event_to_pmslatfr(event);
-> +	write_sysreg_s(reg, SYS_PMSLATFR_EL1);
-> +
-> +	if (flags & PERF_EF_RELOAD) {
-> +		reg = arm_spe_event_to_pmsirr(event);
-> +		write_sysreg_s(reg, SYS_PMSIRR_EL1);
-> +		isb();
-> +		reg = local64_read(&hwc->period_left);
-> +		write_sysreg_s(reg, SYS_PMSICR_EL1);
-> +	}
-> +
-> +	reg = arm_spe_event_to_pmscr(event);
-> +	isb();
-> +	write_sysreg_s(reg, SYS_PMSCR_EL1);
+> +	return __get_id_reg(rd, uaddr, false);
 > +}
 > +
-> +static void arm_spe_pmu_stop(struct perf_event *event, int flags)
+> +static int set_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+> +		      const struct kvm_one_reg *reg, void __user *uaddr)
 > +{
-> +	struct arm_spe_pmu *spe_pmu = to_spe_pmu(event->pmu);
-> +	struct hw_perf_event *hwc = &event->hw;
-> +	struct perf_output_handle *handle = this_cpu_ptr(spe_pmu->handle);
-> +
-> +	/* If we're already stopped, then nothing to do */
-> +	if (hwc->state & PERF_HES_STOPPED)
-> +		return;
-> +
-> +	/* Stop all trace generation */
-> +	arm_spe_pmu_disable_and_drain_local();
-> +
-> +	if (flags & PERF_EF_UPDATE) {
-> +		/*
-> +		 * If there's a fault pending then ensure we contain it
-> +		 * to this buffer, since we might be on the context-switch
-> +		 * path.
-> +		 */
-> +		if (perf_get_aux(handle)) {
-> +			enum arm_spe_pmu_buf_fault_action act;
-> +
-> +			act = arm_spe_pmu_buf_get_fault_act(handle);
-> +			if (act == SPE_PMU_BUF_FAULT_ACT_SPURIOUS)
-> +				arm_spe_perf_aux_output_end(handle);
-> +			else
-> +				write_sysreg_s(0, SYS_PMBSR_EL1);
-> +		}
-> +
-> +		/*
-> +		 * This may also contain ECOUNT, but nobody else should
-> +		 * be looking at period_left, since we forbid frequency
-> +		 * based sampling.
-> +		 */
-> +		local64_set(&hwc->period_left, read_sysreg_s(SYS_PMSICR_EL1));
-> +		hwc->state |= PERF_HES_UPTODATE;
-> +	}
-> +
-> +	hwc->state |= PERF_HES_STOPPED;
+> +	return __set_id_reg(rd, uaddr, false);
 > +}
 > +
-> +static int arm_spe_pmu_add(struct perf_event *event, int flags)
+> +static int get_raz_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+> +			  const struct kvm_one_reg *reg, void __user *uaddr)
 > +{
-> +	int ret = 0;
-> +	struct arm_spe_pmu *spe_pmu = to_spe_pmu(event->pmu);
-> +	struct hw_perf_event *hwc = &event->hw;
-> +	int cpu = event->cpu == -1 ? smp_processor_id() : event->cpu;
-> +
-> +	if (!cpumask_test_cpu(cpu, &spe_pmu->supported_cpus))
-> +		return -ENOENT;
-> +
-> +	hwc->state = PERF_HES_UPTODATE | PERF_HES_STOPPED;
-> +
-> +	if (flags & PERF_EF_START) {
-> +		arm_spe_pmu_start(event, PERF_EF_RELOAD);
-> +		if (hwc->state & PERF_HES_STOPPED)
-> +			ret = -EINVAL;
-> +	}
-> +
-> +	return ret;
+> +	return __get_id_reg(rd, uaddr, true);
 > +}
 > +
-> +static void arm_spe_pmu_del(struct perf_event *event, int flags)
+> +static int set_raz_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+> +			  const struct kvm_one_reg *reg, void __user *uaddr)
 > +{
-> +	arm_spe_pmu_stop(event, PERF_EF_UPDATE);
+> +	return __set_id_reg(rd, uaddr, true);
 > +}
 > +
-> +static void arm_spe_pmu_read(struct perf_event *event)
-> +{
+> +/* sys_reg_desc initialiser for known cpufeature ID registers */
+> +#define ID_SANITISED(name) {			\
+> +	SYS_DESC(SYS_##name),			\
+> +	.access	= access_id_reg,		\
+> +	.get_user = get_id_reg,			\
+> +	.set_user = set_id_reg,			\
 > +}
 > +
-> +static void *arm_spe_pmu_setup_aux(int cpu, void **pages, int nr_pages,
-> +				   bool snapshot)
-> +{
-> +	int i;
-> +	struct page **pglist;
-> +	struct arm_spe_pmu_buf *buf;
+> +/*
+> + * sys_reg_desc initialiser for architecturally unallocated cpufeature ID
+> + * register with encoding Op0=3, Op1=0, CRn=0, CRm=crm, Op2=op2
+> + * (1 <= crm < 8, 0 <= Op2 < 8).
+> + */
+> +#define ID_UNALLOCATED(crm, op2) {			\
+> +	Op0(3), Op1(0), CRn(0), CRm(crm), Op2(op2),	\
+> +	.access = access_raz_id_reg,			\
+> +	.get_user = get_raz_id_reg,			\
+> +	.set_user = set_raz_id_reg,			\
+> +}
 > +
-> +	/* We need at least two pages for this to work. */
-> +	if (nr_pages < 2)
-> +		return NULL;
+> +/*
+> + * sys_reg_desc initialiser for known ID registers that we hide from guests.
+> + * For now, these are exposed just like unallocated ID regs: they appear
+> + * RAZ for the guest.
+> + */
+
+What is a hidden ID register as opposed to an unallocated one?
+
+Shouldn't one of them presumably cause an undefined exception in the
+guest?
+
+> +#define ID_HIDDEN(name) {			\
+> +	SYS_DESC(SYS_##name),			\
+> +	.access = access_raz_id_reg,		\
+> +	.get_user = get_raz_id_reg,		\
+> +	.set_user = set_raz_id_reg,		\
+> +}
+> +
+>  /*
+>   * Architected system registers.
+>   * Important: Must be sorted ascending by Op0, Op1, CRn, CRm, Op2
+> @@ -944,6 +1075,84 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+>  	{ SYS_DESC(SYS_DBGVCR32_EL2), NULL, reset_val, DBGVCR32_EL2, 0 },
+>  
+>  	{ SYS_DESC(SYS_MPIDR_EL1), NULL, reset_mpidr, MPIDR_EL1 },
 > +
 > +	/*
-> +	 * We require an even number of pages for snapshot mode, so that
-> +	 * we can effectively treat the buffer as consisting of two equal
-> +	 * parts and give userspace a fighting chance of getting some
-> +	 * useful data out of it.
+> +	 * ID regs: all ID_SANITISED() entries here must have corresponding
+> +	 * entries in arm64_ftr_regs[].
 > +	 */
-> +	if (!nr_pages || (snapshot && (nr_pages & 1)))
-> +		return NULL;
 > +
-> +	if (cpu == -1)
-> +		cpu = raw_smp_processor_id();
+> +	/* AArch64 mappings of the AArch32 ID registers */
+> +	/* CRm=1 */
+> +	ID_SANITISED(ID_PFR0_EL1),
+> +	ID_SANITISED(ID_PFR1_EL1),
+> +	ID_SANITISED(ID_DFR0_EL1),
+> +	ID_HIDDEN(ID_AFR0_EL1),
+> +	ID_SANITISED(ID_MMFR0_EL1),
+> +	ID_SANITISED(ID_MMFR1_EL1),
+> +	ID_SANITISED(ID_MMFR2_EL1),
+> +	ID_SANITISED(ID_MMFR3_EL1),
 > +
-> +	buf = kzalloc_node(sizeof(*buf), GFP_KERNEL, cpu_to_node(cpu));
-> +	if (!buf)
-> +		return NULL;
+> +	/* CRm=2 */
+> +	ID_SANITISED(ID_ISAR0_EL1),
+> +	ID_SANITISED(ID_ISAR1_EL1),
+> +	ID_SANITISED(ID_ISAR2_EL1),
+> +	ID_SANITISED(ID_ISAR3_EL1),
+> +	ID_SANITISED(ID_ISAR4_EL1),
+> +	ID_SANITISED(ID_ISAR5_EL1),
+> +	ID_SANITISED(ID_MMFR4_EL1),
+> +	ID_UNALLOCATED(2,7),
 > +
-> +	pglist = kcalloc(nr_pages, sizeof(*pglist), GFP_KERNEL);
-> +	if (!pglist)
-> +		goto out_free_buf;
+> +	/* CRm=3 */
+> +	ID_SANITISED(MVFR0_EL1),
+> +	ID_SANITISED(MVFR1_EL1),
+> +	ID_SANITISED(MVFR2_EL1),
+> +	ID_UNALLOCATED(3,3),
+> +	ID_UNALLOCATED(3,4),
+> +	ID_UNALLOCATED(3,5),
+> +	ID_UNALLOCATED(3,6),
+> +	ID_UNALLOCATED(3,7),
 > +
-> +	for (i = 0; i < nr_pages; ++i) {
-> +		struct page *page = virt_to_page(pages[i]);
+> +	/* AArch64 ID registers */
+> +	/* CRm=4 */
+> +	ID_SANITISED(ID_AA64PFR0_EL1),
+> +	ID_SANITISED(ID_AA64PFR1_EL1),
+> +	ID_UNALLOCATED(4,2),
+> +	ID_UNALLOCATED(4,3),
+> +	ID_UNALLOCATED(4,4),
+> +	ID_UNALLOCATED(4,5),
+> +	ID_UNALLOCATED(4,6),
+> +	ID_UNALLOCATED(4,7),
 > +
-> +		if (PagePrivate(page)) {
-> +			pr_warn("unexpected high-order page for auxbuf!");
-> +			goto out_free_pglist;
-> +		}
+> +	/* CRm=5 */
+> +	ID_SANITISED(ID_AA64DFR0_EL1),
+> +	ID_SANITISED(ID_AA64DFR1_EL1),
+> +	ID_UNALLOCATED(5,2),
+> +	ID_UNALLOCATED(5,3),
+> +	ID_HIDDEN(ID_AA64AFR0_EL1),
+> +	ID_HIDDEN(ID_AA64AFR1_EL1),
+> +	ID_UNALLOCATED(5,6),
+> +	ID_UNALLOCATED(5,7),
 > +
-> +		pglist[i] = virt_to_page(pages[i]);
-> +	}
+> +	/* CRm=6 */
+> +	ID_SANITISED(ID_AA64ISAR0_EL1),
+> +	ID_SANITISED(ID_AA64ISAR1_EL1),
+> +	ID_UNALLOCATED(6,2),
+> +	ID_UNALLOCATED(6,3),
+> +	ID_UNALLOCATED(6,4),
+> +	ID_UNALLOCATED(6,5),
+> +	ID_UNALLOCATED(6,6),
+> +	ID_UNALLOCATED(6,7),
 > +
-> +	buf->base = vmap(pglist, nr_pages, VM_MAP, PAGE_KERNEL);
-> +	if (!buf->base)
-> +		goto out_free_pglist;
+> +	/* CRm=7 */
+> +	ID_SANITISED(ID_AA64MMFR0_EL1),
+> +	ID_SANITISED(ID_AA64MMFR1_EL1),
+> +	ID_SANITISED(ID_AA64MMFR2_EL1),
+> +	ID_UNALLOCATED(7,3),
+> +	ID_UNALLOCATED(7,4),
+> +	ID_UNALLOCATED(7,5),
+> +	ID_UNALLOCATED(7,6),
+> +	ID_UNALLOCATED(7,7),
 > +
-> +	buf->nr_pages	= nr_pages;
-> +	buf->snapshot	= snapshot;
-> +
-> +	kfree(pglist);
-> +	return buf;
-> +
-> +out_free_pglist:
-> +	kfree(pglist);
-> +out_free_buf:
-> +	kfree(buf);
-> +	return NULL;
-> +}
-> +
-> +static void arm_spe_pmu_free_aux(void *aux)
-> +{
-> +	struct arm_spe_pmu_buf *buf = aux;
-> +
-> +	vunmap(buf->base);
-> +	kfree(buf);
-> +}
-> +
-> +/* Initialisation and teardown functions */
-> +static int arm_spe_pmu_perf_init(struct arm_spe_pmu *spe_pmu)
-> +{
-> +	static atomic_t pmu_idx = ATOMIC_INIT(-1);
-> +
-> +	int idx;
-> +	char *name;
-> +	struct device *dev = &spe_pmu->pdev->dev;
-> +
-> +	spe_pmu->pmu = (struct pmu) {
-> +		.capabilities	= PERF_PMU_CAP_EXCLUSIVE | PERF_PMU_CAP_ITRACE,
-> +		.attr_groups	= arm_spe_pmu_attr_groups,
-> +		/*
-> +		 * We hitch a ride on the software context here, so that
-> +		 * we can support per-task profiling (which is not possible
-> +		 * with the invalid context as it doesn't get sched callbacks).
-> +		 * This requires that userspace either uses a dummy event for
-> +		 * perf_event_open, since the aux buffer is not setup until
-> +		 * a subsequent mmap, or creates the profiling event in a
-> +		 * disabled state and explicitly PERF_EVENT_IOC_ENABLEs it
-> +		 * once the buffer has been created.
-> +		 */
-> +		.task_ctx_nr	= perf_sw_context,
-> +		.event_init	= arm_spe_pmu_event_init,
-> +		.add		= arm_spe_pmu_add,
-> +		.del		= arm_spe_pmu_del,
-> +		.start		= arm_spe_pmu_start,
-> +		.stop		= arm_spe_pmu_stop,
-> +		.read		= arm_spe_pmu_read,
-> +		.setup_aux	= arm_spe_pmu_setup_aux,
-> +		.free_aux	= arm_spe_pmu_free_aux,
-> +	};
-> +
-> +	idx = atomic_inc_return(&pmu_idx);
-> +	name = devm_kasprintf(dev, GFP_KERNEL, "%s_%d", PMUNAME, idx);
-> +	return perf_pmu_register(&spe_pmu->pmu, name, -1);
-> +}
-> +
-> +static void arm_spe_pmu_perf_destroy(struct arm_spe_pmu *spe_pmu)
-> +{
-> +	perf_pmu_unregister(&spe_pmu->pmu);
-> +}
-> +
-> +static void __arm_spe_pmu_dev_probe(void *info)
-> +{
-> +	int fld;
-> +	u64 reg;
-> +	struct arm_spe_pmu *spe_pmu = info;
-> +	struct device *dev = &spe_pmu->pdev->dev;
-> +
-> +	fld = cpuid_feature_extract_unsigned_field(read_cpuid(ID_AA64DFR0_EL1),
-> +						   ID_AA64DFR0_PMSVER_SHIFT);
-> +	if (!fld) {
-> +		dev_err(dev,
-> +			"unsupported ID_AA64DFR0_EL1.PMSVer [%d] on CPU %d\n",
-> +			fld, smp_processor_id());
-> +		return;
-> +	}
-> +
-> +	/* Read PMBIDR first to determine whether or not we have access */
-> +	reg = read_sysreg_s(SYS_PMBIDR_EL1);
-> +	if (reg & BIT(SYS_PMBIDR_EL1_P_SHIFT)) {
-> +		dev_err(dev,
-> +			"profiling buffer owned by higher exception level\n");
-> +		return;
-> +	}
-> +
-> +	/* Minimum alignment. If it's out-of-range, then fail the probe */
-> +	fld = reg >> SYS_PMBIDR_EL1_ALIGN_SHIFT & SYS_PMBIDR_EL1_ALIGN_MASK;
-> +	spe_pmu->align = 1 << fld;
-> +	if (spe_pmu->align > SZ_2K) {
-> +		dev_err(dev, "unsupported PMBIDR.Align [%d] on CPU %d\n",
-> +			fld, smp_processor_id());
-> +		return;
-> +	}
-> +
-> +	/* It's now safe to read PMSIDR and figure out what we've got */
-> +	reg = read_sysreg_s(SYS_PMSIDR_EL1);
-> +	if (reg & BIT(SYS_PMSIDR_EL1_FE_SHIFT))
-> +		spe_pmu->features |= SPE_PMU_FEAT_FILT_EVT;
-> +
-> +	if (reg & BIT(SYS_PMSIDR_EL1_FT_SHIFT))
-> +		spe_pmu->features |= SPE_PMU_FEAT_FILT_TYP;
-> +
-> +	if (reg & BIT(SYS_PMSIDR_EL1_FL_SHIFT))
-> +		spe_pmu->features |= SPE_PMU_FEAT_FILT_LAT;
-> +
-> +	if (reg & BIT(SYS_PMSIDR_EL1_ARCHINST_SHIFT))
-> +		spe_pmu->features |= SPE_PMU_FEAT_ARCH_INST;
-> +
-> +	if (reg & BIT(SYS_PMSIDR_EL1_LDS_SHIFT))
-> +		spe_pmu->features |= SPE_PMU_FEAT_LDS;
-> +
-> +	if (reg & BIT(SYS_PMSIDR_EL1_ERND_SHIFT))
-> +		spe_pmu->features |= SPE_PMU_FEAT_ERND;
-> +
-> +	/* This field has a spaced out encoding, so just use a look-up */
-> +	fld = reg >> SYS_PMSIDR_EL1_INTERVAL_SHIFT & SYS_PMSIDR_EL1_INTERVAL_MASK;
-> +	switch (fld) {
-> +	case 0:
-> +		spe_pmu->min_period = 256;
-> +		break;
-> +	case 2:
-> +		spe_pmu->min_period = 512;
-> +		break;
-> +	case 3:
-> +		spe_pmu->min_period = 768;
-> +		break;
-> +	case 4:
-> +		spe_pmu->min_period = 1024;
-> +		break;
-> +	case 5:
-> +		spe_pmu->min_period = 1536;
-> +		break;
-> +	case 6:
-> +		spe_pmu->min_period = 2048;
-> +		break;
-> +	case 7:
-> +		spe_pmu->min_period = 3072;
-> +		break;
-> +	default:
-> +		dev_warn(dev, "unknown PMSIDR_EL1.Interval [%d]; assuming 8\n",
-> +			 fld);
-> +		/* Fallthrough */
-> +	case 8:
-> +		spe_pmu->min_period = 4096;
-> +	}
-> +
-> +	/* Maximum record size. If it's out-of-range, then fail the probe */
-> +	fld = reg >> SYS_PMSIDR_EL1_MAXSIZE_SHIFT & SYS_PMSIDR_EL1_MAXSIZE_MASK;
-> +	spe_pmu->max_record_sz = 1 << fld;
-> +	if (spe_pmu->max_record_sz > SZ_2K || spe_pmu->max_record_sz < 16) {
-> +		dev_err(dev, "unsupported PMSIDR_EL1.MaxSize [%d] on CPU %d\n",
-> +			fld, smp_processor_id());
-> +		return;
-> +	}
-> +
-> +	fld = reg >> SYS_PMSIDR_EL1_COUNTSIZE_SHIFT & SYS_PMSIDR_EL1_COUNTSIZE_MASK;
-> +	switch (fld) {
-> +	default:
-> +		dev_warn(dev, "unknown PMSIDR_EL1.CountSize [%d]; assuming 2\n",
-> +			 fld);
-> +		/* Fallthrough */
-> +	case 2:
-> +		spe_pmu->counter_sz = 12;
-> +	}
-> +
-> +	dev_info(dev,
-> +		 "probed for CPUs %*pbl [max_record_sz %u, align %u, features 0x%llx]\n",
-> +		 cpumask_pr_args(&spe_pmu->supported_cpus),
-> +		 spe_pmu->max_record_sz, spe_pmu->align, spe_pmu->features);
-> +
-> +	spe_pmu->features |= SPE_PMU_FEAT_DEV_PROBED;
-> +	return;
-> +}
-> +
-> +static void __arm_spe_pmu_reset_local(void)
+>  	{ SYS_DESC(SYS_SCTLR_EL1), access_vm_reg, reset_val, SCTLR_EL1, 0x00C50078 },
+>  	{ SYS_DESC(SYS_CPACR_EL1), NULL, reset_val, CPACR_EL1, 0 },
+>  	{ SYS_DESC(SYS_TTBR0_EL1), access_vm_reg, reset_unknown, TTBR0_EL1 },
+> @@ -1790,8 +1999,8 @@ static const struct sys_reg_desc *index_to_sys_reg_desc(struct kvm_vcpu *vcpu,
+>  	if (!r)
+>  		r = find_reg(&params, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
+>  
+> -	/* Not saved in the sys_reg array? */
+> -	if (r && !r->reg)
+> +	/* Not saved in the sys_reg array and not otherwise accessible? */
+> +	if (r && !(r->reg || r->get_user))
+>  		r = NULL;
+>  
+>  	return r;
+> @@ -1815,20 +2024,6 @@ static const struct sys_reg_desc *index_to_sys_reg_desc(struct kvm_vcpu *vcpu,
+>  FUNCTION_INVARIANT(midr_el1)
+>  FUNCTION_INVARIANT(ctr_el0)
+>  FUNCTION_INVARIANT(revidr_el1)
+> -FUNCTION_INVARIANT(id_pfr0_el1)
+> -FUNCTION_INVARIANT(id_pfr1_el1)
+> -FUNCTION_INVARIANT(id_dfr0_el1)
+> -FUNCTION_INVARIANT(id_afr0_el1)
+> -FUNCTION_INVARIANT(id_mmfr0_el1)
+> -FUNCTION_INVARIANT(id_mmfr1_el1)
+> -FUNCTION_INVARIANT(id_mmfr2_el1)
+> -FUNCTION_INVARIANT(id_mmfr3_el1)
+> -FUNCTION_INVARIANT(id_isar0_el1)
+> -FUNCTION_INVARIANT(id_isar1_el1)
+> -FUNCTION_INVARIANT(id_isar2_el1)
+> -FUNCTION_INVARIANT(id_isar3_el1)
+> -FUNCTION_INVARIANT(id_isar4_el1)
+> -FUNCTION_INVARIANT(id_isar5_el1)
+>  FUNCTION_INVARIANT(clidr_el1)
+>  FUNCTION_INVARIANT(aidr_el1)
+>  
+> @@ -1836,20 +2031,6 @@ FUNCTION_INVARIANT(aidr_el1)
+>  static struct sys_reg_desc invariant_sys_regs[] = {
+>  	{ SYS_DESC(SYS_MIDR_EL1), NULL, get_midr_el1 },
+>  	{ SYS_DESC(SYS_REVIDR_EL1), NULL, get_revidr_el1 },
+> -	{ SYS_DESC(SYS_ID_PFR0_EL1), NULL, get_id_pfr0_el1 },
+> -	{ SYS_DESC(SYS_ID_PFR1_EL1), NULL, get_id_pfr1_el1 },
+> -	{ SYS_DESC(SYS_ID_DFR0_EL1), NULL, get_id_dfr0_el1 },
+> -	{ SYS_DESC(SYS_ID_AFR0_EL1), NULL, get_id_afr0_el1 },
+> -	{ SYS_DESC(SYS_ID_MMFR0_EL1), NULL, get_id_mmfr0_el1 },
+> -	{ SYS_DESC(SYS_ID_MMFR1_EL1), NULL, get_id_mmfr1_el1 },
+> -	{ SYS_DESC(SYS_ID_MMFR2_EL1), NULL, get_id_mmfr2_el1 },
+> -	{ SYS_DESC(SYS_ID_MMFR3_EL1), NULL, get_id_mmfr3_el1 },
+> -	{ SYS_DESC(SYS_ID_ISAR0_EL1), NULL, get_id_isar0_el1 },
+> -	{ SYS_DESC(SYS_ID_ISAR1_EL1), NULL, get_id_isar1_el1 },
+> -	{ SYS_DESC(SYS_ID_ISAR2_EL1), NULL, get_id_isar2_el1 },
+> -	{ SYS_DESC(SYS_ID_ISAR3_EL1), NULL, get_id_isar3_el1 },
+> -	{ SYS_DESC(SYS_ID_ISAR4_EL1), NULL, get_id_isar4_el1 },
+> -	{ SYS_DESC(SYS_ID_ISAR5_EL1), NULL, get_id_isar5_el1 },
+>  	{ SYS_DESC(SYS_CLIDR_EL1), NULL, get_clidr_el1 },
+>  	{ SYS_DESC(SYS_AIDR_EL1), NULL, get_aidr_el1 },
+>  	{ SYS_DESC(SYS_CTR_EL0), NULL, get_ctr_el0 },
+> @@ -2079,12 +2260,31 @@ static bool copy_reg_to_user(const struct sys_reg_desc *reg, u64 __user **uind)
+>  	return true;
+>  }
+>  
+> +static int walk_one_sys_reg(const struct sys_reg_desc *rd,
+> +			    u64 __user **uind,
+> +			    unsigned int *total)
 > +{
 > +	/*
-> +	 * This is probably overkill, as we have no idea where we're
-> +	 * draining any buffered data to...
+> +	 * Ignore registers we trap but don't save,
+> +	 * and for which no custom user accessor is provided.
 > +	 */
-> +	arm_spe_pmu_disable_and_drain_local();
-> +
-> +	/* Reset the buffer base pointer */
-> +	write_sysreg_s(0, SYS_PMBPTR_EL1);
-> +	isb();
-> +
-> +	/* Clear any pending management interrupts */
-> +	write_sysreg_s(0, SYS_PMBSR_EL1);
-> +	isb();
-> +}
-> +
-> +static void __arm_spe_pmu_setup_one(void *info)
-> +{
-> +	struct arm_spe_pmu *spe_pmu = info;
-> +
-> +	__arm_spe_pmu_reset_local();
-> +	enable_percpu_irq(spe_pmu->irq, IRQ_TYPE_NONE);
-> +}
-> +
-> +static void __arm_spe_pmu_stop_one(void *info)
-> +{
-> +	struct arm_spe_pmu *spe_pmu = info;
-> +
-> +	disable_percpu_irq(spe_pmu->irq);
-> +	__arm_spe_pmu_reset_local();
-> +}
-> +
-> +static int arm_spe_pmu_cpu_startup(unsigned int cpu, struct hlist_node *node)
-> +{
-> +	struct arm_spe_pmu *spe_pmu;
-> +
-> +	spe_pmu = hlist_entry_safe(node, struct arm_spe_pmu, hotplug_node);
-> +	if (!cpumask_test_cpu(cpu, &spe_pmu->supported_cpus))
+> +	if (!(rd->reg || rd->get_user))
 > +		return 0;
 > +
-> +	__arm_spe_pmu_setup_one(spe_pmu);
+> +	if (!copy_reg_to_user(rd, uind))
+> +		return -EFAULT;
+> +
+> +	(*total)++;
 > +	return 0;
 > +}
 > +
-> +static int arm_spe_pmu_cpu_teardown(unsigned int cpu, struct hlist_node *node)
-> +{
-> +	struct arm_spe_pmu *spe_pmu;
+>  /* Assumed ordered tables, see kvm_sys_reg_table_init. */
+>  static int walk_sys_regs(struct kvm_vcpu *vcpu, u64 __user *uind)
+>  {
+>  	const struct sys_reg_desc *i1, *i2, *end1, *end2;
+>  	unsigned int total = 0;
+>  	size_t num;
+> +	int err;
+>  
+>  	/* We check for duplicates here, to allow arch-specific overrides. */
+>  	i1 = get_target_table(vcpu->arch.target, true, &num);
+> @@ -2098,21 +2298,13 @@ static int walk_sys_regs(struct kvm_vcpu *vcpu, u64 __user *uind)
+>  	while (i1 || i2) {
+>  		int cmp = cmp_sys_reg(i1, i2);
+>  		/* target-specific overrides generic entry. */
+> -		if (cmp <= 0) {
+> -			/* Ignore registers we trap but don't save. */
+> -			if (i1->reg) {
+> -				if (!copy_reg_to_user(i1, &uind))
+> -					return -EFAULT;
+> -				total++;
+> -			}
+> -		} else {
+> -			/* Ignore registers we trap but don't save. */
+> -			if (i2->reg) {
+> -				if (!copy_reg_to_user(i2, &uind))
+> -					return -EFAULT;
+> -				total++;
+> -			}
+> -		}
+> +		if (cmp <= 0)
+> +			err = walk_one_sys_reg(i1, &uind, &total);
+> +		else
+> +			err = walk_one_sys_reg(i2, &uind, &total);
 > +
-> +	spe_pmu = hlist_entry_safe(node, struct arm_spe_pmu, hotplug_node);
-> +	if (!cpumask_test_cpu(cpu, &spe_pmu->supported_cpus))
-> +		return 0;
-> +
-> +	__arm_spe_pmu_stop_one(spe_pmu);
-> +	return 0;
-> +}
-> +
-> +static int arm_spe_pmu_dev_init(struct arm_spe_pmu *spe_pmu)
-> +{
-> +	int ret;
-> +	cpumask_t *mask = &spe_pmu->supported_cpus;
-> +
-> +	/* Make sure we probe the hardware on a relevant CPU */
-> +	ret = smp_call_function_any(mask,  __arm_spe_pmu_dev_probe, spe_pmu, 1);
-> +	if (ret || !(spe_pmu->features & SPE_PMU_FEAT_DEV_PROBED))
-> +		return -ENXIO;
-> +
-> +	/* Request our PPIs (note that the IRQ is still disabled) */
-> +	ret = request_percpu_irq(spe_pmu->irq, arm_spe_pmu_irq_handler, DRVNAME,
-> +				 spe_pmu->handle);
-> +	if (ret)
-> +		return ret;
-> +
-> +	/*
-> +	 * Register our hotplug notifier now so we don't miss any events.
-> +	 * This will enable the IRQ for any supported CPUs that are already
-> +	 * up.
-> +	 */
-> +	ret = cpuhp_state_add_instance(arm_spe_pmu_online,
-> +				       &spe_pmu->hotplug_node);
-> +	if (ret)
-> +		free_percpu_irq(spe_pmu->irq, spe_pmu->handle);
-> +
-> +	return ret;
-> +}
-> +
-> +static void arm_spe_pmu_dev_teardown(struct arm_spe_pmu *spe_pmu)
-> +{
-> +	cpuhp_state_remove_instance(arm_spe_pmu_online, &spe_pmu->hotplug_node);
-> +	free_percpu_irq(spe_pmu->irq, spe_pmu->handle);
-> +}
-> +
-> +/* Driver and device probing */
-> +static int arm_spe_pmu_irq_probe(struct arm_spe_pmu *spe_pmu)
-> +{
-> +	struct platform_device *pdev = spe_pmu->pdev;
-> +	int irq = platform_get_irq(pdev, 0);
-> +
-> +	if (irq < 0) {
-> +		dev_err(&pdev->dev, "failed to get IRQ (%d)\n", irq);
-> +		return -ENXIO;
-> +	}
-> +
-> +	if (!irq_is_percpu(irq)) {
-> +		dev_err(&pdev->dev, "expected PPI but got SPI (%d)\n", irq);
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (irq_get_percpu_devid_partition(irq, &spe_pmu->supported_cpus)) {
-> +		dev_err(&pdev->dev, "failed to get PPI partition (%d)\n", irq);
-> +		return -EINVAL;
-> +	}
-> +
-> +	spe_pmu->irq = irq;
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id arm_spe_pmu_of_match[] = {
-> +	{ .compatible = "arm,statistical-profiling-extension-v1", .data = (void *)1 },
-> +	{ /* Sentinel */ },
-> +};
-> +
-> +static int arm_spe_pmu_device_dt_probe(struct platform_device *pdev)
-> +{
-> +	int ret;
-> +	struct arm_spe_pmu *spe_pmu;
-> +	struct device *dev = &pdev->dev;
-> +
-> +	spe_pmu = devm_kzalloc(dev, sizeof(*spe_pmu), GFP_KERNEL);
-> +	if (!spe_pmu) {
-> +		dev_err(dev, "failed to allocate spe_pmu\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	spe_pmu->handle = alloc_percpu(typeof(*spe_pmu->handle));
-> +	if (!spe_pmu->handle)
-> +		return -ENOMEM;
-> +
-> +	spe_pmu->pdev = pdev;
-> +	platform_set_drvdata(pdev, spe_pmu);
-> +
-> +	ret = arm_spe_pmu_irq_probe(spe_pmu);
-> +	if (ret)
-> +		goto out_free_handle;
-> +
-> +	ret = arm_spe_pmu_dev_init(spe_pmu);
-> +	if (ret)
-> +		goto out_free_handle;
-> +
-> +	ret = arm_spe_pmu_perf_init(spe_pmu);
-> +	if (ret)
-> +		goto out_teardown_dev;
-> +
-> +	return 0;
-> +
-> +out_teardown_dev:
-> +	arm_spe_pmu_dev_teardown(spe_pmu);
-> +out_free_handle:
-> +	free_percpu(spe_pmu->handle);
-> +	return ret;
-> +}
-> +
-> +static int arm_spe_pmu_device_remove(struct platform_device *pdev)
-> +{
-> +	struct arm_spe_pmu *spe_pmu = platform_get_drvdata(pdev);
-> +
-> +	arm_spe_pmu_perf_destroy(spe_pmu);
-> +	arm_spe_pmu_dev_teardown(spe_pmu);
-> +	free_percpu(spe_pmu->handle);
-> +	return 0;
-> +}
-> +
-> +static struct platform_driver arm_spe_pmu_driver = {
-> +	.driver	= {
-> +		.name		= DRVNAME,
-> +		.of_match_table	= of_match_ptr(arm_spe_pmu_of_match),
-> +	},
-> +	.probe	= arm_spe_pmu_device_dt_probe,
-> +	.remove	= arm_spe_pmu_device_remove,
-> +};
-> +
-> +static int __init arm_spe_pmu_init(void)
-> +{
-> +	int ret;
-> +
-> +	ret = cpuhp_setup_state_multi(CPUHP_AP_ONLINE_DYN, DRVNAME,
-> +				      arm_spe_pmu_cpu_startup,
-> +				      arm_spe_pmu_cpu_teardown);
-> +	if (ret < 0)
-> +		return ret;
-> +	arm_spe_pmu_online = ret;
-> +
-> +	ret = platform_driver_register(&arm_spe_pmu_driver);
-> +	if (ret)
-> +		cpuhp_remove_multi_state(arm_spe_pmu_online);
-> +
-> +	return ret;
-> +}
-> +
-> +static void __exit arm_spe_pmu_exit(void)
-> +{
-> +	platform_driver_unregister(&arm_spe_pmu_driver);
-> +	cpuhp_remove_multi_state(arm_spe_pmu_online);
-> +}
-> +
-> +module_init(arm_spe_pmu_init);
-> +module_exit(arm_spe_pmu_exit);
-> +
-> +MODULE_DESCRIPTION("Perf driver for the ARMv8.2 Statistical Profiling Extension");
-> +MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
-> +MODULE_LICENSE("GPL v2");
+> +		if (err)
+> +			return err;
+>  
+>  		if (cmp <= 0 && ++i1 == end1)
+>  			i1 = NULL;
 > -- 
 > 2.1.4
-> 
+
+Thanks,
+-Christoffer
