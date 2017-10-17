@@ -1,85 +1,291 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 17 Oct 2017 10:16:07 +0200
-Subject: [PATCH v2 2/2] dt-bindings: power: add amlogic meson power domain
- bindings
+Date: Tue, 17 Oct 2017 10:16:06 +0200
+Subject: [PATCH v2 1/2] soc: amlogic: add Meson GX VPU Domains driver
 In-Reply-To: <1508228167-11753-1-git-send-email-narmstrong@baylibre.com>
 References: <1508228167-11753-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1508228167-11753-3-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1508228167-11753-2-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The Video Processing Unit needs a specific Power Domain powering scheme
+this driver handles this as a PM Power Domain driver.
+
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- .../bindings/power/amlogic,meson-gx-pwrc.txt       | 61 ++++++++++++++++++++++
- 1 file changed, 61 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/power/amlogic,meson-gx-pwrc.txt
+ drivers/soc/amlogic/Kconfig             |  10 ++
+ drivers/soc/amlogic/Makefile            |   1 +
+ drivers/soc/amlogic/meson-gx-pwrc-vpu.c | 234 ++++++++++++++++++++++++++++++++
+ 3 files changed, 245 insertions(+)
+ create mode 100644 drivers/soc/amlogic/meson-gx-pwrc-vpu.c
 
-diff --git a/Documentation/devicetree/bindings/power/amlogic,meson-gx-pwrc.txt b/Documentation/devicetree/bindings/power/amlogic,meson-gx-pwrc.txt
+diff --git a/drivers/soc/amlogic/Kconfig b/drivers/soc/amlogic/Kconfig
+index ef0b8f6..1621bb2 100644
+--- a/drivers/soc/amlogic/Kconfig
++++ b/drivers/soc/amlogic/Kconfig
+@@ -9,6 +9,16 @@ config MESON_GX_SOCINFO
+ 	  Say yes to support decoding of Amlogic Meson GX SoC family
+ 	  information about the type, package and version.
+ 
++config MESON_GX_PM_DOMAINS
++	bool "Amlogic Meson GX Power Domains driver"
++	depends on ARCH_MESON || COMPILE_TEST
++	default ARCH_MESON
++	select PM_GENERIC_DOMAINS
++	select PM_GENERIC_DOMAINS_OF
++	help
++	  Say yes to expose Amlogic Meson GX Power Domains as
++	  Generic Power Domains.
++
+ config MESON_MX_SOCINFO
+ 	bool "Amlogic Meson MX SoC Information driver"
+ 	depends on ARCH_MESON || COMPILE_TEST
+diff --git a/drivers/soc/amlogic/Makefile b/drivers/soc/amlogic/Makefile
+index 1f5df50..8fa3218 100644
+--- a/drivers/soc/amlogic/Makefile
++++ b/drivers/soc/amlogic/Makefile
+@@ -1,2 +1,3 @@
+ obj-$(CONFIG_MESON_GX_SOCINFO) += meson-gx-socinfo.o
++obj-$(CONFIG_MESON_GX_PM_DOMAINS) += meson-gx-pwrc-vpu.o
+ obj-$(CONFIG_MESON_MX_SOCINFO) += meson-mx-socinfo.o
+diff --git a/drivers/soc/amlogic/meson-gx-pwrc-vpu.c b/drivers/soc/amlogic/meson-gx-pwrc-vpu.c
 new file mode 100644
-index 0000000..95ec49a
+index 0000000..bf5190b
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/power/amlogic,meson-gx-pwrc.txt
-@@ -0,0 +1,61 @@
-+Amlogic Meson Power Controller
-+==============================
++++ b/drivers/soc/amlogic/meson-gx-pwrc-vpu.c
+@@ -0,0 +1,234 @@
++/*
++ * Copyright (c) 2017 BayLibre, SAS
++ * Author: Neil Armstrong <narmstrong@baylibre.com>
++ *
++ * SPDX-License-Identifier: GPL-2.0+
++ */
 +
-+The Amlogic Meson SoCs embeds an internal Power domain controller.
++#include <linux/of_address.h>
++#include <linux/platform_device.h>
++#include <linux/pm_domain.h>
++#include <linux/bitfield.h>
++#include <linux/regmap.h>
++#include <linux/mfd/syscon.h>
++#include <linux/reset.h>
++#include <linux/clk.h>
 +
-+VPU Power Domain
-+----------------
++/* AO Offsets */
 +
-+The Video Processing Unit power domain is controlled by this power controller,
-+but the domain requires some external resources to meet the correct power
-+sequences.
-+The bindings must respect the power domain bindings as described in the file
-+power_domain.txt
++#define AO_RTI_GEN_PWR_SLEEP0		(0x3a << 2)
 +
-+Device Tree Bindings:
-+---------------------
++#define GEN_PWR_VPU_HDMI		BIT(8)
++#define GEN_PWR_VPU_HDMI_ISO		BIT(9)
 +
-+Required properties:
-+- compatible: should be "amlogic,meson-gx-pwrc-vpu" for the Meson GX SoCs
-+- #power-domain-cells: should be 0
-+- amlogic,hhi-sysctrl: phandle to the HHI sysctrl node
-+- resets: phandles to the reset lines needed for this power demain sequence
-+	as described in ../reset/reset.txt
-+- clocks: from common clock binding: handle to VPU and VAPB clocks
-+- clock-names: from common clock binding: must contain "vpu", "vapb"
-+	corresponding to entry in the clocks property.
++/* HHI Offsets */
 +
-+Parent node should have the following properties :
-+- compatible: "amlogic,meson-gx-ao-sysctrl", "syscon", "simple-mfd"
-+- reg: base address and size of the AO system control register space.
++#define HHI_MEM_PD_REG0			(0x40 << 2)
++#define HHI_VPU_MEM_PD_REG0		(0x41 << 2)
++#define HHI_VPU_MEM_PD_REG1		(0x42 << 2)
 +
-+Example:
-+-------
-+
-+ao_sysctrl: sys-ctrl at 0 {
-+	compatible = "amlogic,meson-gx-ao-sysctrl", "syscon", "simple-mfd";
-+	reg =  <0x0 0x0 0x0 0x100>;
-+
-+	pwrc_vpu: power-controller-vpu {
-+		compatible = "amlogic,meson-gx-pwrc-vpu";
-+		#power-domain-cells = <0>;
-+		amlogic,hhi-sysctrl = <&sysctrl>;
-+		resets = <&reset RESET_VIU>,
-+			 <&reset RESET_VENC>,
-+			 <&reset RESET_VCBUS>,
-+			 <&reset RESET_BT656>,
-+			 <&reset RESET_DVIN_RESET>,
-+			 <&reset RESET_RDMA>,
-+			 <&reset RESET_VENCI>,
-+			 <&reset RESET_VENCP>,
-+		 	 <&reset RESET_VDAC>,
-+		 	 <&reset RESET_VDI6>,
-+		 	 <&reset RESET_VENCL>,
-+			 <&reset RESET_VID_LOCK>;
-+		clocks = <&clkc CLKID_VPU>,
-+			 <&clkc CLKID_VAPB>;
-+		clock-names = "vpu", "vapb";
-+	};
++struct meson_gx_pwrc_vpu {
++	struct generic_pm_domain genpd;
++	struct regmap *regmap_ao;
++	struct regmap *regmap_hhi;
++	struct reset_control *rstc;
++	struct clk *vpu_clk;
++	struct clk *vapb_clk;
++	bool powered;
 +};
 +
++static inline
++struct meson_gx_pwrc_vpu *genpd_to_pd(struct generic_pm_domain *d)
++{
++	return container_of(d, struct meson_gx_pwrc_vpu, genpd);
++}
 +
++static int meson_gx_pwrc_vpu_power_off(struct generic_pm_domain *genpd)
++{
++	struct meson_gx_pwrc_vpu *pd = genpd_to_pd(genpd);
++	int i;
++
++	regmap_update_bits(pd->regmap_ao, AO_RTI_GEN_PWR_SLEEP0,
++			   GEN_PWR_VPU_HDMI_ISO, GEN_PWR_VPU_HDMI_ISO);
++	udelay(20);
++
++	/* Power Down Memories */
++	for (i = 0; i < 32; i += 2) {
++		regmap_update_bits(pd->regmap_hhi, HHI_VPU_MEM_PD_REG0,
++				   0x2 << i, 0x3 << i);
++		udelay(5);
++	}
++	for (i = 0; i < 32; i += 2) {
++		regmap_update_bits(pd->regmap_hhi, HHI_VPU_MEM_PD_REG1,
++				   0x2 << i, 0x3 << i);
++		udelay(5);
++	}
++	for (i = 8; i < 16; i++) {
++		regmap_update_bits(pd->regmap_hhi, HHI_MEM_PD_REG0,
++				   BIT(i), BIT(i));
++		udelay(5);
++	}
++	udelay(20);
++
++	regmap_update_bits(pd->regmap_ao, AO_RTI_GEN_PWR_SLEEP0,
++			   GEN_PWR_VPU_HDMI, GEN_PWR_VPU_HDMI);
++
++	msleep(20);
++
++	clk_disable_unprepare(pd->vpu_clk);
++	clk_disable_unprepare(pd->vapb_clk);
++
++	pd->powered = false;
++
++	return 0;
++}
++
++static int meson_gx_pwrc_vpu_setup_clk(struct meson_gx_pwrc_vpu *pd)
++{
++	int ret;
++
++	ret = clk_prepare_enable(pd->vpu_clk);
++	if (ret)
++		return ret;
++
++	return clk_prepare_enable(pd->vapb_clk);
++}
++
++static int meson_gx_pwrc_vpu_power_on(struct generic_pm_domain *genpd)
++{
++	struct meson_gx_pwrc_vpu *pd = genpd_to_pd(genpd);
++	int ret;
++	int i;
++
++	regmap_update_bits(pd->regmap_ao, AO_RTI_GEN_PWR_SLEEP0,
++			   GEN_PWR_VPU_HDMI, 0);
++	udelay(20);
++
++	/* Power Up Memories */
++	for (i = 0; i < 32; i += 2) {
++		regmap_update_bits(pd->regmap_hhi, HHI_VPU_MEM_PD_REG0,
++				   0x2 << i, 0);
++		udelay(5);
++	}
++
++	for (i = 0; i < 32; i += 2) {
++		regmap_update_bits(pd->regmap_hhi, HHI_VPU_MEM_PD_REG1,
++				   0x2 << i, 0);
++		udelay(5);
++	}
++
++	for (i = 8; i < 16; i++) {
++		regmap_update_bits(pd->regmap_hhi, HHI_MEM_PD_REG0,
++				   BIT(i), 0);
++		udelay(5);
++	}
++	udelay(20);
++
++	ret = reset_control_assert(pd->rstc);
++	if (ret)
++		return ret;
++
++	regmap_update_bits(pd->regmap_ao, AO_RTI_GEN_PWR_SLEEP0,
++			   GEN_PWR_VPU_HDMI_ISO, 0);
++
++	ret = reset_control_deassert(pd->rstc);
++	if (ret)
++		return ret;
++
++	ret = meson_gx_pwrc_vpu_setup_clk(pd);
++	if (ret)
++		return ret;
++
++	pd->powered = true;
++
++	return 0;
++}
++
++static bool meson_gx_pwrc_vpu_get_power(struct meson_gx_pwrc_vpu *pd)
++{
++	u32 reg;
++
++	regmap_read(pd->regmap_ao, AO_RTI_GEN_PWR_SLEEP0, &reg);
++
++	return (reg & GEN_PWR_VPU_HDMI);
++}
++
++static struct meson_gx_pwrc_vpu vpu_hdmi_pd = {
++	.genpd = {
++		.name = "vpu_hdmi",
++		.power_off = meson_gx_pwrc_vpu_power_off,
++		.power_on = meson_gx_pwrc_vpu_power_on,
++	},
++};
++
++static int meson_gx_pwrc_vpu_probe(struct platform_device *pdev)
++{
++	struct regmap *regmap_ao, *regmap_hhi;
++	struct reset_control *rstc;
++	struct clk *vpu_clk;
++	struct clk *vapb_clk;
++
++	regmap_ao = syscon_node_to_regmap(of_get_parent(pdev->dev.of_node));
++	if (IS_ERR(regmap_ao)) {
++		dev_err(&pdev->dev, "failed to get regmap\n");
++		return PTR_ERR(regmap_ao);
++	}
++
++	regmap_hhi = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
++						     "amlogic,hhi-sysctrl");
++	if (IS_ERR(regmap_hhi)) {
++		dev_err(&pdev->dev, "failed to get HHI regmap\n");
++		return PTR_ERR(regmap_hhi);
++	}
++
++	rstc = devm_reset_control_array_get(&pdev->dev, false, false);
++	if (IS_ERR(rstc)) {
++		dev_err(&pdev->dev, "failed to get reset lines\n");
++		return PTR_ERR(rstc);
++	}
++
++	vpu_clk = devm_clk_get(&pdev->dev, "vpu");
++	if (IS_ERR(vpu_clk)) {
++		dev_err(&pdev->dev, "vpu clock request failed\n");
++		return PTR_ERR(vpu_clk);
++	}
++
++	vapb_clk = devm_clk_get(&pdev->dev, "vapb");
++	if (IS_ERR(vapb_clk)) {
++		dev_err(&pdev->dev, "vapb clock request failed\n");
++		return PTR_ERR(vapb_clk);
++	}
++
++	vpu_hdmi_pd.regmap_ao = regmap_ao;
++	vpu_hdmi_pd.regmap_hhi = regmap_hhi;
++	vpu_hdmi_pd.rstc = rstc;
++	vpu_hdmi_pd.vpu_clk = vpu_clk;
++	vpu_hdmi_pd.vapb_clk = vapb_clk;
++
++	pm_genpd_init(&vpu_hdmi_pd.genpd, &simple_qos_governor,
++		      meson_gx_pwrc_vpu_get_power(&vpu_hdmi_pd));
++
++	return of_genpd_add_provider_simple(pdev->dev.of_node,
++					    &vpu_hdmi_pd.genpd);
++}
++
++static void meson_gx_pwrc_vpu_shutdown(struct platform_device *pdev)
++{
++	if (vpu_hdmi_pd.powered)
++		meson_gx_pwrc_vpu_power_off(&vpu_hdmi_pd.genpd);
++}
++
++static const struct of_device_id meson_gx_pwrc_vpu_match_table[] = {
++	{ .compatible = "amlogic,meson-gx-pwrc-vpu" },
++	{ /* sentinel */ }
++};
++
++static struct platform_driver meson_gx_pwrc_vpu_driver = {
++	.probe	= meson_gx_pwrc_vpu_probe,
++	.shutdown = meson_gx_pwrc_vpu_shutdown,
++	.driver = {
++		.name		= "meson_gx_pwrc_vpu",
++		.of_match_table	= meson_gx_pwrc_vpu_match_table,
++	},
++};
++builtin_platform_driver(meson_gx_pwrc_vpu_driver);
 -- 
 2.7.4
