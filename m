@@ -1,239 +1,331 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 17 Oct 2017 13:50:24 +0200
-Subject: [PATCH v3 22/28] arm64/sve: KVM: Prevent guests from using SVE
-In-Reply-To: <1507660725-7986-23-git-send-email-Dave.Martin@arm.com>
-References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
- <1507660725-7986-23-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20171017115024.GS1845@lvm>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Tue, 17 Oct 2017 13:50:55 +0200
+Subject: [PATCH v2 2/3] irqchip: Add Realtek RTD1295 mux driver
+In-Reply-To: <daf9b232-69dc-7701-6a0d-b28479d1f7d4@arm.com>
+References: <20170828105344.8338-1-afaerber@suse.de>
+ <20170828105344.8338-3-afaerber@suse.de>
+ <daf9b232-69dc-7701-6a0d-b28479d1f7d4@arm.com>
+Message-ID: <7f4a052b-2543-aed6-a4d8-e842aa994058@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 10, 2017 at 07:38:39PM +0100, Dave Martin wrote:
-> Until KVM has full SVE support, guests must not be allowed to
-> execute SVE instructions.
+Am 11.10.2017 um 19:35 schrieb Marc Zyngier:
+> On 28/08/17 11:53, Andreas F?rber wrote:
+>> This irq mux driver is derived from the RTD1295 vendor DT and assumes a
+>> linear mapping between intr_en and intr_status registers.
+>> Code for RTD119x indicates this may not always be the case (i2c_3).
+>>
+>> Based in part on QNAP's arch/arm/mach-rtk119x/rtk_irq_mux.c code.
+>>
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>> ---
+>>  v1 -> v2:
+>>  * Renamed struct fields to avoid ambiguity (Marc)
+>>  * Refactored offset lookup to avoid per-compatible init functions
+>>  * Inserted white lines to clarify balanced locking (Marc)
+>>  * Dropped forwarding of set_affinity to GIC (Marc)
+>>  * Added spinlocks for consistency (Marc)
+>>  * Limited initialization quirk to iso mux
+>>  * Fixed spinlock initialization (Andrew)
+>>  
+>>  drivers/irqchip/Makefile          |   1 +
+>>  drivers/irqchip/irq-rtd119x-mux.c | 204 ++++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 205 insertions(+)
+>>  create mode 100644 drivers/irqchip/irq-rtd119x-mux.c
+>>
+>> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+>> index e88d856cc09c..46202a0b7d96 100644
+>> --- a/drivers/irqchip/Makefile
+>> +++ b/drivers/irqchip/Makefile
+>> @@ -78,3 +78,4 @@ obj-$(CONFIG_EZNPS_GIC)			+= irq-eznps.o
+>>  obj-$(CONFIG_ARCH_ASPEED)		+= irq-aspeed-vic.o irq-aspeed-i2c-ic.o
+>>  obj-$(CONFIG_STM32_EXTI) 		+= irq-stm32-exti.o
+>>  obj-$(CONFIG_QCOM_IRQ_COMBINER)		+= qcom-irq-combiner.o
+>> +obj-$(CONFIG_ARCH_REALTEK)		+= irq-rtd119x-mux.o
+>> diff --git a/drivers/irqchip/irq-rtd119x-mux.c b/drivers/irqchip/irq-rtd119x-mux.c
+>> new file mode 100644
+>> index 000000000000..65d22e163bef
+>> --- /dev/null
+>> +++ b/drivers/irqchip/irq-rtd119x-mux.c
+>> @@ -0,0 +1,204 @@
+>> +/*
+>> + * Realtek RTD129x IRQ mux
+>> + *
+>> + * Copyright (c) 2017 Andreas F?rber
+>> + *
+>> + * SPDX-License-Identifier: GPL-2.0+
+>> + */
+>> +
+>> +#include <linux/io.h>
+>> +#include <linux/irqchip.h>
+>> +#include <linux/irqchip/chained_irq.h>
+>> +#include <linux/irqdomain.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/of_irq.h>
+>> +#include <linux/slab.h>
+>> +
+>> +struct rtd119x_irq_mux_info {
+>> +	unsigned intr_status_offset;
+>> +	unsigned intr_en_offset;
+>> +};
+>> +
+>> +struct rtd119x_irq_mux_data {
+>> +	void __iomem *intr_status;
+>> +	void __iomem *intr_en;
+>> +	int irq;
+>> +	struct irq_domain *domain;
+>> +	spinlock_t lock;
+>> +};
+>> +
+>> +static void rtd119x_mux_irq_handle(struct irq_desc *desc)
+>> +{
+>> +	struct rtd119x_irq_mux_data *data = irq_desc_get_handler_data(desc);
+>> +	struct irq_chip *chip = irq_desc_get_chip(desc);
+>> +	u32 intr_en, intr_status, status;
+>> +	int ret;
+>> +
+>> +	chained_irq_enter(chip, desc);
+>> +
+>> +	spin_lock(&data->lock);
+>> +	intr_en     = readl(data->intr_en);
 > 
-> This patch enables the necessary traps, and also ensures that the
-> traps are disabled again on exit from the guest so that the host
-> can still use SVE if it wants to.
+> I think that all the MMIO accessors in this file can advantageously
+> turned into their _relaxed version (none of them require any barrier).
+
+Done, works okay.
+
+>> +	intr_status = readl(data->intr_status);
+>> +	spin_unlock(&data->lock);
+>> +
+>> +	status = intr_status & intr_en;
+>> +	if (status != 0) {
+>> +		unsigned irq = __ffs(status);
+>> +		ret = generic_handle_irq(irq_find_mapping(data->domain, irq));
+>> +		if (ret == 0) {
+>> +			spin_lock(&data->lock);
+>> +
+>> +			intr_status = readl(data->intr_status);
+>> +			intr_status |= BIT(irq - 1);
+>> +			writel(intr_status, data->intr_status);
 > 
-> This patch introduces another instance of
-> __this_cpu_write(fpsimd_last_state, NULL), so this flush operation
-> is abstracted out as a separate helper fpsimd_flush_cpu_state().
-> Other instances are ported appropriately.
+> This sequence feels a bit wrong: It seems to imply that writing to the
+> status register is a way to EOI the interrupt. But what happens to the
+> other bits that you've read? I fear that you are inadvertently
+> signalling an EOI for interrupts that you may not have handled yet.
+> 
+> I'd rather see something like this:
+> 
+> 	while (status) {
+> 		irq = __ffs(status) - 1;
+> 		writel_relaxed(BIT(irq), data->intr_status);
+> 		generic_handle_irq(irq_find_mapping(data->domain, irq));
+> 		status &= ~irq;
+> 	}
+> 
+> assuming I've understood how the HW works. No need for additional locking.
 
-I don't understand this paragraph, beginning from ", so this...".
+I've adopted a similar loop from the RTD1296 code, which differs from
+the old RTD1195 code, which was like the above.
 
+Similarly, the UART does a simple write for ack but the RTD1195's
+fallback code here did the read-modify-write cycle. RTD129x removed that
+fallback apparently.
 
->From reading the code, what I think is the reason for having to flush
-the SVE state (and mark the host state invalid) is that even though we
-disallow SVE usage in the guest, the guest can use the normal FP state,
-and while we always fully preserve the host state, this could still
-corrupt some additional SVE state not properly preserved for the host.
-Is that correct?
+I've reworked the code to use register names found in RTD1195 headers,
+which will hopefully clarify things as far as there is code. I did not
+find any code actually using the *_UMSK_ISR register, only *_ISR and
+*_SCPU_INT_EN.
+
+>> +
+>> +			spin_unlock(&data->lock);
+>> +		}
+>> +	}
+>> +
+>> +	chained_irq_exit(chip, desc);
+>> +}
+>> +
+>> +static void rtd119x_mux_mask_irq(struct irq_data *data)
+>> +{
+>> +	struct rtd119x_irq_mux_data *mux_data = irq_data_get_irq_chip_data(data);
+>> +	u32 intr_status;
+>> +
+>> +	spin_lock(&mux_data->lock);
+> 
+> Bang, you're dead. If you get the chained interrupt firing here on the
+> same CPU, it will take the lock in the above function, and everything
+> will grind to a halt. Use the irqsave version.
+
+Done.
 
 > 
-> As a side effect of this refactoring, a this_cpu_write() in
-> fpsimd_cpu_pm_notifier() is changed to __this_cpu_write().  This
-> should be fine, since cpu_pm_enter() is supposed to be called only
-> with interrupts disabled.
-
-Otherwise the patch itself looks good to me.
-
-Thanks,
--Christoffer
-
+>> +
+>> +	intr_status = readl(mux_data->intr_status);
+>> +	intr_status |= BIT(data->hwirq);
+>> +	writel(intr_status, mux_data->intr_status);
 > 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm/include/asm/kvm_host.h   |  3 +++
->  arch/arm64/include/asm/fpsimd.h   |  1 +
->  arch/arm64/include/asm/kvm_arm.h  |  4 +++-
->  arch/arm64/include/asm/kvm_host.h | 11 +++++++++++
->  arch/arm64/kernel/fpsimd.c        | 31 +++++++++++++++++++++++++++++--
->  arch/arm64/kvm/hyp/switch.c       |  6 +++---
->  virt/kvm/arm/arm.c                |  3 +++
->  7 files changed, 53 insertions(+), 6 deletions(-)
+> Or maybe I haven't understood how this works at all. Can you please
+> explain? I'd expect masking to be the opposite of unmasking, but that's
+> not the case...
+
+Again, I have no documentation, just like you, so I cannot definitively
+explain their hardware. Only downstream code and experiments. I've been
+testing it with serial console and I?C access to PMIC.
+
+>> +
+>> +	spin_unlock(&mux_data->lock);
+>> +}
+>> +
+>> +static void rtd119x_mux_unmask_irq(struct irq_data *data)
+>> +{
+>> +	struct rtd119x_irq_mux_data *mux_data = irq_data_get_irq_chip_data(data);
+>> +	u32 intr_en;
+>> +
+>> +	spin_lock(&mux_data->lock);
+>> +
 > 
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index 4a879f6..242151e 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -293,4 +293,7 @@ int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
->  int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
->  			       struct kvm_device_attr *attr);
->  
-> +/* All host FP/SIMD state is restored on guest exit, so nothing to save: */
-> +static inline void kvm_fpsimd_flush_cpu_state(void) {}
-> +
->  #endif /* __ARM_KVM_HOST_H__ */
-> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-> index 3cfdfbe..10b2824 100644
-> --- a/arch/arm64/include/asm/fpsimd.h
-> +++ b/arch/arm64/include/asm/fpsimd.h
-> @@ -75,6 +75,7 @@ extern void fpsimd_restore_current_state(void);
->  extern void fpsimd_update_current_state(struct fpsimd_state *state);
->  
->  extern void fpsimd_flush_task_state(struct task_struct *target);
-> +extern void sve_flush_cpu_state(void);
->  
->  /* Maximum VL that SVE VL-agnostic software can transparently support */
->  #define SVE_VL_ARCH_MAX 0x100
-> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-> index dbf0537..7f069ff 100644
-> --- a/arch/arm64/include/asm/kvm_arm.h
-> +++ b/arch/arm64/include/asm/kvm_arm.h
-> @@ -186,7 +186,8 @@
->  #define CPTR_EL2_TTA	(1 << 20)
->  #define CPTR_EL2_TFP	(1 << CPTR_EL2_TFP_SHIFT)
->  #define CPTR_EL2_TZ	(1 << 8)
-> -#define CPTR_EL2_DEFAULT	0x000033ff
-> +#define CPTR_EL2_RES1	0x000032ff /* known RES1 bits in CPTR_EL2 */
-> +#define CPTR_EL2_DEFAULT	CPTR_EL2_RES1
->  
->  /* Hyp Debug Configuration Register bits */
->  #define MDCR_EL2_TPMS		(1 << 14)
-> @@ -237,5 +238,6 @@
->  
->  #define CPACR_EL1_FPEN		(3 << 20)
->  #define CPACR_EL1_TTA		(1 << 28)
-> +#define CPACR_EL1_DEFAULT	(CPACR_EL1_FPEN | CPACR_EL1_ZEN_EL1EN)
->  
->  #endif /* __ARM64_KVM_ARM_H__ */
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index e923b58..674912d 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -25,6 +25,7 @@
->  #include <linux/types.h>
->  #include <linux/kvm_types.h>
->  #include <asm/cpufeature.h>
-> +#include <asm/fpsimd.h>
->  #include <asm/kvm.h>
->  #include <asm/kvm_asm.h>
->  #include <asm/kvm_mmio.h>
-> @@ -384,4 +385,14 @@ static inline void __cpu_init_stage2(void)
->  		  "PARange is %d bits, unsupported configuration!", parange);
->  }
->  
-> +/*
-> + * All host FP/SIMD state is restored on guest exit, so nothing needs
-> + * doing here except in the SVE case:
-> +*/
-> +static inline void kvm_fpsimd_flush_cpu_state(void)
-> +{
-> +	if (system_supports_sve())
-> +		sve_flush_cpu_state();
-> +}
-> +
->  #endif /* __ARM64_KVM_HOST_H__ */
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index a9cb794..6ae3703 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -1073,6 +1073,33 @@ void fpsimd_flush_task_state(struct task_struct *t)
->  	t->thread.fpsimd_state.cpu = NR_CPUS;
->  }
->  
-> +static inline void fpsimd_flush_cpu_state(void)
-> +{
-> +	__this_cpu_write(fpsimd_last_state, NULL);
-> +}
-> +
-> +/*
-> + * Invalidate any task SVE state currently held in this CPU's regs.
-> + *
-> + * This is used to prevent the kernel from trying to reuse SVE register data
-> + * that is detroyed by KVM guest enter/exit.  This function should go away when
-> + * KVM SVE support is implemented.  Don't use it for anything else.
-> + */
-> +#ifdef CONFIG_ARM64_SVE
-> +void sve_flush_cpu_state(void)
-> +{
-> +	struct fpsimd_state *const fpstate = __this_cpu_read(fpsimd_last_state);
-> +	struct task_struct *tsk;
-> +
-> +	if (!fpstate)
-> +		return;
-> +
-> +	tsk = container_of(fpstate, struct task_struct, thread.fpsimd_state);
-> +	if (test_tsk_thread_flag(tsk, TIF_SVE))
-> +		fpsimd_flush_cpu_state();
-> +}
-> +#endif /* CONFIG_ARM64_SVE */
-> +
->  #ifdef CONFIG_KERNEL_MODE_NEON
->  
->  DEFINE_PER_CPU(bool, kernel_neon_busy);
-> @@ -1113,7 +1140,7 @@ void kernel_neon_begin(void)
->  	}
->  
->  	/* Invalidate any task state remaining in the fpsimd regs: */
-> -	__this_cpu_write(fpsimd_last_state, NULL);
-> +	fpsimd_flush_cpu_state();
->  
->  	preempt_disable();
->  
-> @@ -1234,7 +1261,7 @@ static int fpsimd_cpu_pm_notifier(struct notifier_block *self,
->  	case CPU_PM_ENTER:
->  		if (current->mm)
->  			task_fpsimd_save();
-> -		this_cpu_write(fpsimd_last_state, NULL);
-> +		fpsimd_flush_cpu_state();
->  		break;
->  	case CPU_PM_EXIT:
->  		if (current->mm)
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index 35a90b8..951f3eb 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -48,7 +48,7 @@ static void __hyp_text __activate_traps_vhe(void)
->  
->  	val = read_sysreg(cpacr_el1);
->  	val |= CPACR_EL1_TTA;
-> -	val &= ~CPACR_EL1_FPEN;
-> +	val &= ~(CPACR_EL1_FPEN | CPACR_EL1_ZEN);
->  	write_sysreg(val, cpacr_el1);
->  
->  	write_sysreg(__kvm_hyp_vector, vbar_el1);
-> @@ -59,7 +59,7 @@ static void __hyp_text __activate_traps_nvhe(void)
->  	u64 val;
->  
->  	val = CPTR_EL2_DEFAULT;
-> -	val |= CPTR_EL2_TTA | CPTR_EL2_TFP;
-> +	val |= CPTR_EL2_TTA | CPTR_EL2_TFP | CPTR_EL2_TZ;
->  	write_sysreg(val, cptr_el2);
->  }
->  
-> @@ -117,7 +117,7 @@ static void __hyp_text __deactivate_traps_vhe(void)
->  
->  	write_sysreg(mdcr_el2, mdcr_el2);
->  	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
-> -	write_sysreg(CPACR_EL1_FPEN, cpacr_el1);
-> +	write_sysreg(CPACR_EL1_DEFAULT, cpacr_el1);
->  	write_sysreg(vectors, vbar_el1);
->  }
->  
-> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> index b9f68e4..4d3cf9c 100644
-> --- a/virt/kvm/arm/arm.c
-> +++ b/virt/kvm/arm/arm.c
-> @@ -652,6 +652,9 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  		 */
->  		preempt_disable();
->  
-> +		/* Flush FP/SIMD state that can't survive guest entry/exit */
-> +		kvm_fpsimd_flush_cpu_state();
-> +
->  		kvm_pmu_flush_hwstate(vcpu);
->  
->  		kvm_timer_flush_hwstate(vcpu);
-> -- 
-> 2.1.4
+> Same here.
 > 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+>> +	intr_en = readl(mux_data->intr_en);
+>> +	intr_en |= BIT(data->hwirq);
+>> +	writel(intr_en, mux_data->intr_en);
+>> +
+>> +	spin_unlock(&mux_data->lock);
+>> +}
+>> +
+>> +static int rtd119x_mux_set_affinity(struct irq_data *d,
+>> +			const struct cpumask *mask_val, bool force)
+>> +{
+>> +	/* Forwarding the affinity to the parent would affect all 32 interrupts. */
+>> +	return -EINVAL;
+>> +}
+>> +
+>> +static struct irq_chip rtd119x_mux_irq_chip = {
+>> +	.name			= "rtd119x-mux",
+>> +	.irq_mask		= rtd119x_mux_mask_irq,
+>> +	.irq_unmask		= rtd119x_mux_unmask_irq,
+>> +	.irq_set_affinity	= rtd119x_mux_set_affinity,
+>> +};
+>> +
+>> +static int rtd119x_mux_irq_domain_map(struct irq_domain *d,
+>> +		unsigned int irq, irq_hw_number_t hw)
+>> +{
+>> +	struct rtd119x_irq_mux_data *data = d->host_data;
+>> +
+>> +	irq_set_chip_and_handler(irq, &rtd119x_mux_irq_chip, handle_level_irq);
+>> +	irq_set_chip_data(irq, data);
+>> +	irq_set_probe(irq);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static struct irq_domain_ops rtd119x_mux_irq_domain_ops = {
+>> +	.xlate	= irq_domain_xlate_onecell,
+>> +	.map	= rtd119x_mux_irq_domain_map,
+>> +};
+>> +
+>> +static const struct rtd119x_irq_mux_info rtd1295_iso_irq_mux_info = {
+>> +	.intr_status_offset	= 0x0,
+>> +	.intr_en_offset		= 0x40,
+>> +};
+>> +
+>> +static const struct rtd119x_irq_mux_info rtd1295_irq_mux_info = {
+>> +	.intr_status_offset	= 0xc,
+>> +	.intr_en_offset		= 0x80,
+>> +};
+>> +
+>> +static const struct of_device_id rtd1295_irq_mux_dt_matches[] = {
+>> +	{
+>> +		.compatible = "realtek,rtd1295-iso-irq-mux",
+>> +		.data = &rtd1295_iso_irq_mux_info,
+>> +	}, {
+>> +		.compatible = "realtek,rtd1295-irq-mux",
+>> +		.data = &rtd1295_irq_mux_info,
+>> +	}, {
+>> +	}
+>> +};
+>> +
+>> +static int __init rtd119x_irq_mux_init(struct device_node *node,
+>> +				       struct device_node *parent)
+>> +{
+>> +	struct rtd119x_irq_mux_data *data;
+>> +	const struct of_device_id *match;
+>> +	const struct rtd119x_irq_mux_info *info;
+>> +	void __iomem *base;
+>> +	u32 val;
+>> +
+>> +	match = of_match_node(rtd1295_irq_mux_dt_matches, node);
+>> +	if (!match)
+>> +		return -EINVAL;
+>> +
+>> +	info = match->data;
+>> +	if (!info)
+>> +		return -EINVAL;
+>> +
+>> +	base = of_iomap(node, 0);
+>> +	if (IS_ERR(base))
+>> +		return PTR_ERR(base);
+>> +
+>> +	data = kzalloc(sizeof(*data), GFP_KERNEL);
+>> +	if (!data)
+>> +		return -ENOMEM;
+>> +
+>> +	data->intr_status = base + info->intr_status_offset;
+>> +	data->intr_en     = base + info->intr_en_offset;
+>> +
+>> +	data->irq = irq_of_parse_and_map(node, 0);
+>> +	if (data->irq <= 0) {
+>> +		kfree(data);
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	spin_lock_init(&data->lock);
+>> +
+>> +	data->domain = irq_domain_add_linear(node, 32,
+>> +				&rtd119x_mux_irq_domain_ops, data);
+>> +	if (!data->domain) {
+>> +		kfree(data);
+>> +		return -ENOMEM;
+>> +	}
+>> +
+>> +	if (of_device_is_compatible(node, "realtek,rtd1295-iso-irq-mux")) {
+>> +		const int uart0_irq = 2;
+>> +
+>> +		spin_lock(&data->lock);
+>> +
+>> +		val = readl(data->intr_en);
+>> +		val &= ~BIT(uart0_irq);
+>> +		writel(val, data->intr_en);
+>> +
+>> +		writel(BIT(uart0_irq), data->intr_status);
+> 
+> Same here. Can you please explain what you're trying to do? The locking
+> seems a bit pointless (nobody can request the interrupt yet), and this
+> uart0 needs at least a comment, and maybe a description in the device-tree.
+
+Please see v1... downstream has it unconditionally for both iso and
+misc. I'm adding a comment that this resolves a hang.
+I can drop the lock, was locking all register accesses for consistency.
+
+>> +
+>> +		spin_unlock(&data->lock);
+>> +	}
+>> +
+>> +	irq_set_chained_handler_and_data(data->irq, rtd119x_mux_irq_handle, data);
+>> +
+>> +	return 0;
+>> +}
+>> +IRQCHIP_DECLARE(rtd1295_iso_mux, "realtek,rtd1295-iso-irq-mux", rtd119x_irq_mux_init);
+>> +IRQCHIP_DECLARE(rtd1295_mux, "realtek,rtd1295-irq-mux", rtd119x_irq_mux_init);
+
+Thanks for getting back to this. Note that this driver is needed both
+for UART and I?C, and no lock-ups have been observed so far. So let's
+please try to tidy this up sufficiently for merging into 4.15, so that
+we can flush some more of the 100+ patches on top.
+
+Regards,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
