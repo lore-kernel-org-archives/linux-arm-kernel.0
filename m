@@ -1,20 +1,60 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 17 Oct 2017 18:53:42 +0800
-Subject: [PATCH 22/23] arm: dts: sun8i: a711: Enable USB OTG
-In-Reply-To: <95434e5704d3cf721f011de76526575222e58bd6.1508231063.git-series.maxime.ripard@free-electrons.com>
-References: <cover.fe3d65d1ee05a55224d26e7d113388c428592b26.1508231063.git-series.maxime.ripard@free-electrons.com>
- <95434e5704d3cf721f011de76526575222e58bd6.1508231063.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v67unFX_y=PGf5Qw4Fk0d-G4_cz8hN5=M4DCpsDyXu+FsA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 17 Oct 2017 11:54:54 +0100
+Subject: [PATCH 2/4] arm64: prevent instrumentation of LL/SC atomics
+In-Reply-To: <20171017100315.GA22140@arm.com>
+References: <20171016132440.38098-1-mark.rutland@arm.com>
+ <20171016132440.38098-3-mark.rutland@arm.com>
+ <20171017100315.GA22140@arm.com>
+Message-ID: <20171017105454.drmoezp6yaqmmczg@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 5:06 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
+On Tue, Oct 17, 2017 at 11:03:15AM +0100, Will Deacon wrote:
+> On Mon, Oct 16, 2017 at 02:24:38PM +0100, Mark Rutland wrote:
+> > While we build the LL/SC atomics as a C object file, this does not
+> > follow the AAPCS. This does not interoperate with other C code, and can
+> > only be called from special wrapper assembly.
+> > 
+> > Bulding a kernel with CONFIG_KCOV and CONFIG_ARM64_LSE_ATOMICS results
+> > in the cmopiler inserting calls to __sanitizer_cov_trace_pc within the
+> 
+> cmopiler
 
-No description?
+Bulding, too. ;)
 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > LL/SC atomics. As __sanitizer_cov_trace_pc is built per the AAPCS, these
+> > calls corrupt register values, resulting in failures at boot time.
+> > 
+> > Avoid this (and other similar issues) by opting out of all compiler
+> > instrumentation. We can opt-in to specific instrumentation in future if
+> > we want to.
+> > 
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm64/lib/Makefile | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
+> > index a0abc142c92b..af77516f71b2 100644
+> > --- a/arch/arm64/lib/Makefile
+> > +++ b/arch/arm64/lib/Makefile
+> > @@ -17,5 +17,6 @@ CFLAGS_atomic_ll_sc.o	:= -fcall-used-x0 -ffixed-x1 -ffixed-x2		\
+> >  		   -fcall-saved-x10 -fcall-saved-x11 -fcall-saved-x12	\
+> >  		   -fcall-saved-x13 -fcall-saved-x14 -fcall-saved-x15	\
+> >  		   -fcall-saved-x18
+> > +CC_INSTRUMENT_atomic_ll_sc.o := n
+> 
+> Does this mean we can lose the "notrace" definition of __LL_SC_INLINE
+> when generating the out-of-line atomics?
 
-Changes look good, though unrelated to the rest of the series.
+Unfortunately not.
 
-ChenYu
+I'd missed -pg, since that isn't handled in scripts/Makefile.lib, and
+doesn't seem to have a makefile-level disable.
+
+I'll see if that can be remedied.
+
+Thanks,
+Mark.
