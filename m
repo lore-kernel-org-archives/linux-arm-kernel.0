@@ -1,43 +1,177 @@
-From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Wed, 18 Oct 2017 00:02:21 +0900
-Subject: [PATCH v4 7/8] PM / devfreq: Define the constant governor name
-In-Reply-To: <1507880904-31956-8-git-send-email-cw00.choi@samsung.com>
-References: <CGME20171013074836epcas2p4e70bca2ebe9446353abf5c14a9d16460@epcas2p4.samsung.com>
- <1507880904-31956-1-git-send-email-cw00.choi@samsung.com>
- <1507880904-31956-8-git-send-email-cw00.choi@samsung.com>
-Message-ID: <CAJ0PZbTBmTB+N-p_2bJ5vjTj2uNBmjq5An5fBD2_nTCkW3O1kQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 17 Oct 2017 16:04:19 +0100
+Subject: [PATCH 07/10] KVM: arm/arm64: Preserve Exec permission across R/W
+ permission faults
+In-Reply-To: <20171017144621.GJ5886@lvm>
+References: <20171009152032.27804-1-marc.zyngier@arm.com>
+ <20171009152032.27804-8-marc.zyngier@arm.com> <20171016200824.GI1845@lvm>
+ <9f1e5366-fe47-69e9-8df9-31105c39094f@arm.com> <20171017144621.GJ5886@lvm>
+Message-ID: <86f238ce-d799-d1ea-b85a-5dae76a36856@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 13, 2017 at 4:48 PM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
-> Prior to that, the devfreq device uses the governor name when adding
-> the itself. In order to prevent the mistake used the wrong governor name,
-> this patch defines the governor name as a constant and then uses them
-> instead of using the string directly.
->
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <krzk@kernel.org>
-> Cc: linux-samsung-soc at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
+On 17/10/17 15:46, Christoffer Dall wrote:
+> On Tue, Oct 17, 2017 at 12:22:08PM +0100, Marc Zyngier wrote:
+>> On 16/10/17 21:08, Christoffer Dall wrote:
+>>> On Mon, Oct 09, 2017 at 04:20:29PM +0100, Marc Zyngier wrote:
+>>>> So far, we loose the Exec property whenever we take permission
+>>>> faults, as we always reconstruct the PTE/PMD from scratch. This
+>>>> can be counter productive as we can end-up with the following
+>>>> fault sequence:
+>>>>
+>>>> 	X -> RO -> ROX -> RW -> RWX
+>>>>
+>>>> Instead, we can lookup the existing PTE/PMD and clear the XN bit in the
+>>>> new entry if it was already cleared in the old one, leadig to a much
+>>>> nicer fault sequence:
+>>>>
+>>>> 	X -> ROX -> RWX
+>>>>
+>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>> ---
+>>>>  arch/arm/include/asm/kvm_mmu.h   | 10 ++++++++++
+>>>>  arch/arm64/include/asm/kvm_mmu.h | 10 ++++++++++
+>>>>  virt/kvm/arm/mmu.c               | 25 +++++++++++++++++++++++++
+>>>>  3 files changed, 45 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+>>>> index bf76150aad5f..ad442d86c23e 100644
+>>>> --- a/arch/arm/include/asm/kvm_mmu.h
+>>>> +++ b/arch/arm/include/asm/kvm_mmu.h
+>>>> @@ -107,6 +107,11 @@ static inline bool kvm_s2pte_readonly(pte_t *pte)
+>>>>  	return (pte_val(*pte) & L_PTE_S2_RDWR) == L_PTE_S2_RDONLY;
+>>>>  }
+>>>>  
+>>>> +static inline bool kvm_s2pte_exec(pte_t *pte)
+>>>> +{
+>>>> +	return !(pte_val(*pte) & L_PTE_XN);
+>>>> +}
+>>>> +
+>>>>  static inline void kvm_set_s2pmd_readonly(pmd_t *pmd)
+>>>>  {
+>>>>  	pmd_val(*pmd) = (pmd_val(*pmd) & ~L_PMD_S2_RDWR) | L_PMD_S2_RDONLY;
+>>>> @@ -117,6 +122,11 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
+>>>>  	return (pmd_val(*pmd) & L_PMD_S2_RDWR) == L_PMD_S2_RDONLY;
+>>>>  }
+>>>>  
+>>>> +static inline bool kvm_s2pmd_exec(pmd_t *pmd)
+>>>> +{
+>>>> +	return !(pmd_val(*pmd) & PMD_SECT_XN);
+>>>> +}
+>>>> +
+>>>>  static inline bool kvm_page_empty(void *ptr)
+>>>>  {
+>>>>  	struct page *ptr_page = virt_to_page(ptr);
+>>>> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+>>>> index 60c420a5ac0d..e7af74b8b51a 100644
+>>>> --- a/arch/arm64/include/asm/kvm_mmu.h
+>>>> +++ b/arch/arm64/include/asm/kvm_mmu.h
+>>>> @@ -203,6 +203,11 @@ static inline bool kvm_s2pte_readonly(pte_t *pte)
+>>>>  	return (pte_val(*pte) & PTE_S2_RDWR) == PTE_S2_RDONLY;
+>>>>  }
+>>>>  
+>>>> +static inline bool kvm_s2pte_exec(pte_t *pte)
+>>>> +{
+>>>> +	return !(pte_val(*pte) & PTE_S2_XN);
+>>>> +}
+>>>> +
+>>>>  static inline void kvm_set_s2pmd_readonly(pmd_t *pmd)
+>>>>  {
+>>>>  	kvm_set_s2pte_readonly((pte_t *)pmd);
+>>>> @@ -213,6 +218,11 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
+>>>>  	return kvm_s2pte_readonly((pte_t *)pmd);
+>>>>  }
+>>>>  
+>>>> +static inline bool kvm_s2pmd_exec(pmd_t *pmd)
+>>>> +{
+>>>> +	return !(pmd_val(*pmd) & PMD_S2_XN);
+>>>> +}
+>>>> +
+>>>>  static inline bool kvm_page_empty(void *ptr)
+>>>>  {
+>>>>  	struct page *ptr_page = virt_to_page(ptr);
+>>>> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+>>>> index 1911fadde88b..ccc6106764a6 100644
+>>>> --- a/virt/kvm/arm/mmu.c
+>>>> +++ b/virt/kvm/arm/mmu.c
+>>>> @@ -926,6 +926,17 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
+>>>>  	return 0;
+>>>>  }
+>>>>  
+>>>> +static pte_t *stage2_get_pte(struct kvm *kvm, phys_addr_t addr)
+>>>> +{
+>>>> +	pmd_t *pmdp;
+>>>> +
+>>>> +	pmdp = stage2_get_pmd(kvm, NULL, addr);
+>>>> +	if (!pmdp || pmd_none(*pmdp))
+>>>> +		return NULL;
+>>>> +
+>>>> +	return pte_offset_kernel(pmdp, addr);
+>>>> +}
+>>>> +
+>>>
+>>> nit, couldn't you change this to be
+>>>
+>>>     stage2_is_exec(struct kvm *kvm, phys_addr_t addr)
+>>>
+>>> Which, if the pmd is a section mapping just checks that, and if we find
+>>> a pte, we check that, and then we can have a simpler one-line call and
+>>> check from both the pte and pmd paths below?
+>>
+>> Yes, that's pretty neat. I've folded that in.
+>>
+>>>
+>>>>  static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+>>>>  			  phys_addr_t addr, const pte_t *new_pte,
+>>>>  			  unsigned long flags)
+>>>> @@ -1407,6 +1418,13 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>>>  		if (exec_fault) {
+>>>>  			new_pmd = kvm_s2pmd_mkexec(new_pmd);
+>>>>  			coherent_icache_guest_page(vcpu, pfn, PMD_SIZE);
+>>>> +		} else if (fault_status == FSC_PERM) {
+>>>> +			/* Preserve execute if XN was already cleared */
+>>>> +			pmd_t *old_pmdp = stage2_get_pmd(kvm, NULL, fault_ipa);
+>>>> +
+>>>> +			if (old_pmdp && pmd_present(*old_pmdp) &&
+>>>> +			    kvm_s2pmd_exec(old_pmdp))
+>>>> +				new_pmd = kvm_s2pmd_mkexec(new_pmd);
+>>>
+>>> Is the reverse case not also possible then?  That is, if we have an
+>>> exec_fault, we could check if the entry is already writable and maintain
+>>> the property as well.  Not sure how often that would get hit though, as
+>>> a VM would only execute instructions on a page that has been written to,
+>>> but is somehow read-only at stage2, meaning the host must have marked
+>>> the page as read-only since content was written.  I think this could be
+>>> a somewhat common pattern with something like KSM though?
+>>
+>> I think this is already the case, because we always build the PTE/PMD as
+>> either ROXN or RWXN, and only later clear the XN bit (see the
+>> unconditional call to gfn_to_pfn_prot which should tell us whether to
+>> map the page as writable or not). Or am I missing your point entirely?
+>>
+> 
+> I am worried about the flow where we map the page as RWXN, then execute
+> some code on it, so it becomes RW, then make it read-only as ROXN.
+> Shouldn't we we should preserve the exec state here?
 
-Acked-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+I think that for this situation to happen (RW -> ROXN), we must
+transition via an unmap. At that stage, there is nothing to preserve.
 
-> ---
->  drivers/devfreq/exynos-bus.c              | 5 +++--
->  drivers/devfreq/governor_passive.c        | 2 +-
->  drivers/devfreq/governor_performance.c    | 2 +-
->  drivers/devfreq/governor_powersave.c      | 2 +-
->  drivers/devfreq/governor_simpleondemand.c | 2 +-
->  drivers/devfreq/governor_userspace.c      | 2 +-
->  drivers/devfreq/rk3399_dmc.c              | 2 +-
->  include/linux/devfreq.h                   | 7 +++++++
->  8 files changed, 16 insertions(+), 8 deletions(-)
->
-[]
+> I'm guessing that something like KSM will want to make pages read-only
+> to support COW, but perhaps that's always done by copying the content to
+> a new page and redirecting the old mapping to a new mapping (something
+> that calls kvm_set_spte_hva()) and in that case we do probably really
+> want the XN bit to be set again so that we can do the necessary
+> maintenance.
 
+Exactly. New mapping, fresh caches.
 
+> However, we shouldn't try to optimize for something we don't know to be
+> a problem, so as long as it's functionally correct, which I think it is,
+> we should be fine.
+
+Agreed.
+
+	M.
 -- 
-MyungJoo Ham, Ph.D.
-S/W Center, Samsung Electronics
+Jazz is not dead. It just smells funny...
