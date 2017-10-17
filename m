@@ -1,101 +1,136 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Tue, 17 Oct 2017 09:50:38 +0800
-Subject: [RESEND PATCH v2 1/5] arm64: dts: rockchip: Enable edp disaplay
- on kevin
-In-Reply-To: <20171016100640.26575-2-jeffy.chen@rock-chips.com>
-References: <20171016100640.26575-1-jeffy.chen@rock-chips.com>
- <20171016100640.26575-2-jeffy.chen@rock-chips.com>
-Message-ID: <5295f622-647a-c6d3-9ead-de8182d008e6@rock-chips.com>
+From: dja@axtens.net (Daniel Axtens)
+Date: Tue, 17 Oct 2017 13:03:46 +1100
+Subject: [PATCH v2 2/2] vgaarb: Factor out EFI and fallback default device
+ selection
+In-Reply-To: <20171013034729.14630.30419.stgit@bhelgaas-glaptop.roam.corp.google.com>
+References: <20171013034338.14630.4766.stgit@bhelgaas-glaptop.roam.corp.google.com>
+ <20171013034729.14630.30419.stgit@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <871sm2y1h9.fsf@linkitivity.dja.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017?10?16? 18:06, Jeffy Chen wrote:
-> Add edp panel and enable related nodes on kevin.
+Bjorn Helgaas <bhelgaas@google.com> writes:
+
+> The default VGA device is normally set in vga_arbiter_add_pci_device() when
+> we call it for the first enabled device that can be accessed with the
+> legacy VGA resources ([mem 0xa0000-0xbffff], etc.)
 >
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> That default device can be overridden by an EFI device that owns the boot
+> framebuffer.  As a fallback, we can also select a VGA device that can't be
+> accessed via legacy VGA resources, or a VGA device that isn't even enabled.
+>
+> Factor out this EFI and fallback selection from vga_arb_device_init() into
+> a separate vga_arb_select_default_device() function.  This doesn't change
+> any behavior, but it untangles the "bridge control possible" checking and
+> messages from the default device selection.
+>
+> Tested-by: Zhou Wang <wangzhou1@hisilicon.com>  # D05 Hisi Hip07, Hip08
+> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
 > ---
-
-Looks good.
-
-Reviewed-by: Mark Yao <mark.yao@rock-chips.com>
-
-> Changes in v2: None
+>  drivers/gpu/vga/vgaarb.c |   57 ++++++++++++++++++++++++++++------------------
+>  1 file changed, 35 insertions(+), 22 deletions(-)
 >
->   arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 29 +++++++++++++++++++++++
->   arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi      | 16 +++++++++++++
->   2 files changed, 45 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-> index a3d3cea7dc4f..bc67b19f0af5 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-> @@ -93,6 +93,18 @@
->   		pwm-delay-us = <10000>;
->   	};
->   
-> +	edp_panel: edp-panel {
-> +		compatible = "sharp,lq123p1jx31", "simple-panel";
-> +		backlight = <&backlight>;
-> +		power-supply = <&pp3300_disp>;
+> diff --git a/drivers/gpu/vga/vgaarb.c b/drivers/gpu/vga/vgaarb.c
+> index 8035e38d5110..d35d6d271f3f 100644
+> --- a/drivers/gpu/vga/vgaarb.c
+> +++ b/drivers/gpu/vga/vgaarb.c
+> @@ -1402,29 +1402,14 @@ static struct miscdevice vga_arb_device = {
+>  	MISC_DYNAMIC_MINOR, "vga_arbiter", &vga_arb_device_fops
+>  };
+>  
+> -static int __init vga_arb_device_init(void)
+> +static void __init vga_arb_select_default_device(void)
+>  {
+> -	int rc;
+>  	struct pci_dev *pdev;
+>  	struct vga_device *vgadev;
+>  
+> -	rc = misc_register(&vga_arb_device);
+> -	if (rc < 0)
+> -		pr_err("error %d registering device\n", rc);
+> -
+> -	bus_register_notifier(&pci_bus_type, &pci_notifier);
+> -
+> -	/* We add all pci devices satisfying vga class in the arbiter by
+> -	 * default */
+> -	pdev = NULL;
+> -	while ((pdev =
+> -		pci_get_subsys(PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID,
+> -			       PCI_ANY_ID, pdev)) != NULL)
+> -		vga_arbiter_add_pci_device(pdev);
+> -
+> +#if defined(CONFIG_X86) || defined(CONFIG_IA64)
+>  	list_for_each_entry(vgadev, &vga_list, list) {
+>  		struct device *dev = &vgadev->pdev->dev;
+> -#if defined(CONFIG_X86) || defined(CONFIG_IA64)
+>  		/*
+>  		 * Override vga_arbiter_add_pci_device()'s I/O based detection
+>  		 * as it may take the wrong device (e.g. on Apple system under
+> @@ -1461,12 +1446,8 @@ static int __init vga_arb_device_init(void)
+>  				vgaarb_info(dev, "overriding boot device\n");
+>  			vga_set_default_device(vgadev->pdev);
+>  		}
+> -#endif
+> -		if (vgadev->bridge_has_one_vga)
+> -			vgaarb_info(dev, "bridge control possible\n");
+> -		else
+> -			vgaarb_info(dev, "no bridge control possible\n");
+>  	}
+> +#endif
+>  
+>  	if (!vga_default_device()) {
+>  		list_for_each_entry(vgadev, &vga_list, list) {
+> @@ -1492,6 +1473,38 @@ static int __init vga_arb_device_init(void)
+>  			vga_set_default_device(vgadev->pdev);
+>  		}
+>  	}
+> +}
 > +
-> +		ports {
-> +			panel_in_edp: endpoint {
-> +				remote-endpoint = <&edp_out_panel>;
-> +			};
-> +		};
-> +	};
+> +static int __init vga_arb_device_init(void)
+> +{
+> +	int rc;
+> +	struct pci_dev *pdev;
+> +	struct vga_device *vgadev;
 > +
->   	thermistor_ppvar_bigcpu: thermistor-ppvar-bigcpu {
->   		compatible = "murata,ncp15wb473";
->   		pullup-uv = <1800000>;
-> @@ -264,6 +276,23 @@ ap_i2c_dig: &i2c2 {
->   	};
->   };
->   
-> +&edp {
-> +	status = "okay";
+> +	rc = misc_register(&vga_arb_device);
+> +	if (rc < 0)
+> +		pr_err("error %d registering device\n", rc);
 > +
-> +	ports {
-> +		edp_out: port at 1 {
-> +			reg = <1>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
+> +	bus_register_notifier(&pci_bus_type, &pci_notifier);
 > +
-> +			edp_out_panel: endpoint at 0 {
-> +				reg = <0>;
-> +				remote-endpoint = <&panel_in_edp>;
-> +			};
-> +		};
-> +	};
-> +};
+> +	/* We add all PCI devices satisfying VGA class in the arbiter by
+> +	 * default */
+> +	pdev = NULL;
+> +	while ((pdev =
+> +		pci_get_subsys(PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID,
+> +			       PCI_ANY_ID, pdev)) != NULL)
+> +		vga_arbiter_add_pci_device(pdev);
 > +
->   &ppvar_bigcpu_pwm {
->   	regulator-min-microvolt = <798674>;
->   	regulator-max-microvolt = <1302172>;
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-> index 5772c52fbfd3..470105d651c2 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-> @@ -927,6 +927,22 @@ ap_i2c_audio: &i2c8 {
->   	dr_mode = "host";
->   };
->   
-> +&vopb {
-> +	status = "okay";
-> +};
+> +	list_for_each_entry(vgadev, &vga_list, list) {
+> +		struct device *dev = &vgadev->pdev->dev;
 > +
-> +&vopb_mmu {
-> +	status = "okay";
-> +};
+> +		if (vgadev->bridge_has_one_vga)
+> +			vgaarb_info(dev, "bridge control possible\n");
+> +		else
+> +			vgaarb_info(dev, "no bridge control possible\n");
+> +	}
+
+Initially I wondered if this info printk could be moved into
+vga_arbiter_check_bridge_sharing(), but it's been separated out since
+3448a19da479b ("vgaarb: use bridges to control VGA routing where
+possible."), and upon closer examination, it seems you can't be sure a
+device doesn't share a bridge until the end of the process, so this is
+indeed correct.
+
+Everything else also looks good to me.
+
+Reviewed-by: Daniel Axtens <dja@axtens.net>
+
+Regards,
+Daniel
+
 > +
-> +&vopl {
-> +	status = "okay";
-> +};
-> +
-> +&vopl_mmu {
-> +	status = "okay";
-> +};
-> +
->   #include <arm/cros-ec-keyboard.dtsi>
->   #include <arm/cros-ec-sbs.dtsi>
->   
+> +	vga_arb_select_default_device();
+>  
+>  	pr_info("loaded\n");
+>  	return rc;
