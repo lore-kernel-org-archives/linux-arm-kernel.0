@@ -1,106 +1,68 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 17 Oct 2017 10:44:02 +0200
-Subject: [PATCH 2/2] PCI: imx6: Check for link training status in link
- up check
-In-Reply-To: <20171017001159.109152-2-tpiepho@impinj.com>
-References: <20171017001159.109152-1-tpiepho@impinj.com>
- <20171017001159.109152-2-tpiepho@impinj.com>
-Message-ID: <1508229842.2146.4.camel@pengutronix.de>
+From: johan@kernel.org (Johan Hovold)
+Date: Tue, 17 Oct 2017 10:52:10 +0200
+Subject: usb: dwc2: NMI watchdog: BUG: soft lockup - CPU#0 stuck for 146s
+In-Reply-To: <CAODwPW8qtw0qVxUGJUNt2H8TTCOEvn6G9qbUBi6_MKWgeAwcaQ@mail.gmail.com>
+References: <CAD=FV=VHkJFrsJDmMytbUw=WjKQaGZ-8Ewfy5bPCA82AWS4O2Q@mail.gmail.com>
+ <212870399.174480.1492633502649@email.1und1.de>
+ <87mvbaykn1.fsf@eliezer.anholt.net>
+ <1998517910.54108.1492894253010@email.1und1.de>
+ <2127594073.298820.1493143869792@email.1und1.de>
+ <316369012.317772.1494274928708@email.1und1.de>
+ <20170510163150.GK30445@localhost>
+ <CAD=FV=VUaqtR2t04wodRJ33bqHo5DPke7zsvqBMYqZ5imX5+=A@mail.gmail.com>
+ <446301756.220218.1494678481761@email.1und1.de>
+ <CAODwPW8qtw0qVxUGJUNt2H8TTCOEvn6G9qbUBi6_MKWgeAwcaQ@mail.gmail.com>
+Message-ID: <20171017085210.GB5638@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 16.10.2017, 17:11 -0700 schrieb Trent Piepho:
-> This fixes a regression introduced in merge 562df5c8521e.
+On Mon, Oct 16, 2017 at 01:49:11PM -0700, Julius Werner wrote:
+> > d9a14b00 339317035 C Ii:1:004:1 -32:1 0
+> > d9a14b00 339317049 S Ii:1:004:1 -115:1 10 <
+> > d9a14b00 339318040 C Ii:1:004:1 -32:1 0
+> > d9a14b00 339318057 S Ii:1:004:1 -115:1 10 <
+> > d9a14b00 339319042 C Ii:1:004:1 -32:1 0
+> > d9a14b00 339319056 S Ii:1:004:1 -115:1 10 <
+> > d9a14b00 339329551 C Ii:1:004:1 -32:1 0
+> > d9a14b00 339329571 S Ii:1:004:1 -115:1 10 <
+> > d9a14b00 339330586 C Ii:1:004:1 -32:1 0
+> > d9a14b00 339330601 S Ii:1:004:1 -115:1 10 <
+> > d9a14b00 339331035 C Ii:1:004:1 -32:1 0
 > 
-> Prior to this the link up check done by imx6_pcie_wait_for_link()
-> consisted of a polling loop on imx6_pcie_link_up() (via the former
-> calling dw_pcie_link_up() which called the latter as callback), and
-> imx6_pcie_link_up() polled the link status register checking for link
-> up *and link not still training*.
+> Sorry for necromancing an old thread, but I just happened to read
+> through this and thought someone might care:
 > 
-> This was a polling loop inside another polling loop.??And the outermost
-> loop was duplicated with minor variations in a number of other dwc based
-> host drivers.
-> 
-> This was addressed in two commits.??Commit 4d107d3b5a68 ("PCI: imx6: Move
-> link up check into imx6_pcie_wait_for_link()"), changed
-> imx6_pcie_wait_for_link() to poll the link status register directly,
-> checking for link up and not training, and made imx6_pcie_link_up() only
-> check the link up bit (once, not a polling loop).
-> 
-> While commit commit 886bc5ceb5cc ("PCI: designware: Add generic
-> dw_pcie_wait_for_link()"), replaced the loop in imx6_pcie_wait_for_link()
-> with a call to a new dwc core function, which polled imx6_pcie_link_up(),
-> which still checked both link up and not training in a loop.
-> 
-> When these two commits were merged, the version of
-> imx6_pcie_wait_for_link() from '886 was kept, which eliminated the link
-> training check placed there by '4d1.??But the version of
-> imx6_pcie_link_up() from '4d1 was kept, which eliminated the link training
-> check that had been there and was moved to imx6_pcie_wait_for_link().
-> 
-> There result is no link training check.
-> 
-> Then commit dac29e6c5460 ("PCI: designware: Add default link up check if
-> sub-driver doesn't override")
+> If I read that right, the usbmon output shows that the interrupt
+> endpoint is stalled (keeps returning -EPIPE). A STALL is a special
+> device-side USB condition that tells the host something is wrong and
+> will persist until cleared manually. It seems that the driver isn't
+> prepared for this (see
+> drivers/usb/serial/pl2303.c#pl2303_read_int_callback) and just keeps
+> resubmitting the URB, so it will stall again as fast as the endpoint
+> allows it to. This may be the reason why you get so many transfers
+> that it overwhelms the CPU.
 
-I think you meant 01c076732e82 (PCI: designware: Check LTSSM training
-bit before deciding link is up) here.
+That's a bug in the driver, we should not resubmit (without further
+action) on -EPIPE.
 
->  added a link training check to the default
-> version of dw_pcie_link_up(), but since imx6 uses imx6_pcie_link_up() it
-> does not use the default version with this fix.
-> 
-> This commit eliminates imx6_pcie_link_up() so that the default
-> dw_pcie_link_up() is used.??The default has the correct code and is what
-> the imx6 driver used to do.
-> 
-> Fixes: 562df5c8521e1371f3cbd0b7b868034da376d714
-> > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > Cc: Joao Pinto <Joao.Pinto@synopsys.com>
-> > Cc: Lucas Stach <l.stach@pengutronix.de>
-> Signed-off-by: Trent Piepho <tpiepho@impinj.com>
+> A fix would be to catch -EPIPE in that function and handle it
+> explicitly (with either a CLEAR_STALL to the endpoint or a full USB
+> reset... would have to look at the documentation for PL2303 to see
+> what the stall actually means and how you're supposed to treat it).
 
-With the commit message fixed:
+Yes, but we can't just clear the halt from the completion handler, so
+you'd typically have to schedule a work struct and call usb_clear_halt
+from there. Only then could we try resubmitting the URBs, but chances
+are we'd just hit that stall again (with the hardware setup in
+question). Note that no usb-serial drivers currently implement any such
+stall recovery, and just stop resubmitting the URB on -EPIPE.
 
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+Or at least so I thought. The generic implementation (which most drivers
+rely on) and a few others get this right, but we have a number of legacy
+drivers with custom implementations that do resubmit on -EPIPE
+(including the pl2303 one).
 
-> ---
-> ?drivers/pci/dwc/pci-imx6.c | 10 +---------
-> ?1 file changed, 1 insertion(+), 9 deletions(-)
-> 
-> diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c
-> index b73483534a5b..1f1069b70e45 100644
-> --- a/drivers/pci/dwc/pci-imx6.c
-> +++ b/drivers/pci/dwc/pci-imx6.c
-> @@ -83,8 +83,6 @@ struct imx6_pcie {
-> > ?#define PCIE_PL_PFLR_FORCE_LINK			(1 << 15)
-> ?#define PCIE_PHY_DEBUG_R0 (PL_OFFSET + 0x28)
-> ?#define PCIE_PHY_DEBUG_R1 (PL_OFFSET + 0x2c)
-> > -#define PCIE_PHY_DEBUG_R1_XMLH_LINK_IN_TRAINING	(1 << 29)
-> > -#define PCIE_PHY_DEBUG_R1_XMLH_LINK_UP		(1 << 4)
-> ?
-> ?#define PCIE_PHY_CTRL (PL_OFFSET + 0x114)
-> ?#define PCIE_PHY_CTRL_DATA_LOC 0
-> @@ -653,12 +651,6 @@ static int imx6_pcie_host_init(struct pcie_port *pp)
-> > ?	return 0;
-> ?}
-> ?
-> -static int imx6_pcie_link_up(struct dw_pcie *pci)
-> -{
-> > -	return dw_pcie_readl_dbi(pci, PCIE_PHY_DEBUG_R1) &
-> > -			PCIE_PHY_DEBUG_R1_XMLH_LINK_UP;
-> -}
-> -
-> ?static const struct dw_pcie_host_ops imx6_pcie_host_ops = {
-> > ?	.host_init = imx6_pcie_host_init,
-> ?};
-> @@ -701,7 +693,7 @@ static int imx6_add_pcie_port(struct imx6_pcie *imx6_pcie,
-> ?}
-> ?
-> ?static const struct dw_pcie_ops dw_pcie_ops = {
-> > -	.link_up = imx6_pcie_link_up,
-> > +	/* No special ops needed, but pcie-designware still expects this struct */
-> ?};
-> ?
-> ?static int imx6_pcie_probe(struct platform_device *pdev)
+I'll go fix up that up.
+
+Thanks,
+Johan
