@@ -1,66 +1,161 @@
-From: b-liu@ti.com (Bin Liu)
-Date: Mon, 16 Oct 2017 23:20:23 -0500
-Subject: [PATCH v2] usb: musb: sunxi: Explicitly release USB PHY on exit
-In-Reply-To: <CANwerB0V+iXaPqrwizyAfUcD2kPt0Lg-_muuzOdD5Mq7MPf-Qw@mail.gmail.com>
-References: <20171010024525.21971-1-net147@gmail.com>
- <20171010032252.GA25830@uda0271908>
- <CANwerB2qnWXDi_wkxk9EZ0WeAunUjzVOBepEOXXnsm0PiByHMg@mail.gmail.com>
- <20171016124949.GA73@LTA0271908.dhcp.ti.com>
- <CANwerB0V+iXaPqrwizyAfUcD2kPt0Lg-_muuzOdD5Mq7MPf-Qw@mail.gmail.com>
-Message-ID: <20171017042023.GB73@LTA0271908.dhcp.ti.com>
+From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
+Date: Tue, 17 Oct 2017 13:41:03 +0900
+Subject: [PATCH v3 2/3] nvmem: uniphier: add UniPhier eFuse driver
+In-Reply-To: <1508215264-3745-1-git-send-email-hayashibara.keiji@socionext.com>
+References: <1508215264-3745-1-git-send-email-hayashibara.keiji@socionext.com>
+Message-ID: <1508215264-3745-3-git-send-email-hayashibara.keiji@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 16, 2017 at 11:54:27PM +1100, Jonathan Liu wrote:
-> On 16 October 2017 at 23:49, Bin Liu <b-liu@ti.com> wrote:
-> > On Mon, Oct 16, 2017 at 04:13:51PM +1100, Jonathan Liu wrote:
-> >> On 10 October 2017 at 14:22, Bin Liu <b-liu@ti.com> wrote:
-> >> > On Tue, Oct 10, 2017 at 01:45:25PM +1100, Jonathan Liu wrote:
-> >> >> This fixes a kernel oops when unloading the driver due to usb_put_phy
-> >> >> being called after usb_phy_generic_unregister when the device is
-> >> >> detached. Calling usb_phy_generic_unregister causes x->dev->driver to
-> >> >> be NULL in usb_put_phy and results in a NULL pointer dereference.
-> >> >>
-> >> >> Cc: stable at vger.kernel.org # v4.3+
-> >> >> Signed-off-by: Jonathan Liu <net147@gmail.com>
-> >> >> ---
-> >> >> Changes for v2:
-> >> >>  - Use devm_usb_put_phy instead of usb_put_phy
-> >> >>
-> >> >>  drivers/usb/musb/sunxi.c | 2 ++
-> >> >>  1 file changed, 2 insertions(+)
-> >> >>
-> >> >> diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
-> >> >> index c9a09b5bb6e5..dc353e24d53c 100644
-> >> >> --- a/drivers/usb/musb/sunxi.c
-> >> >> +++ b/drivers/usb/musb/sunxi.c
-> >> >> @@ -297,6 +297,8 @@ static int sunxi_musb_exit(struct musb *musb)
-> >> >>       if (test_bit(SUNXI_MUSB_FL_HAS_SRAM, &glue->flags))
-> >> >>               sunxi_sram_release(musb->controller->parent);
-> >> >>
-> >> >> +     devm_usb_put_phy(glue->dev, glue->xceiv);
-> >> >> +
-> >> >>       return 0;
-> >> >>  }
-> >> >
-> >> >
-> >>
-> >> > Applied. Thanks.
-> >> > -Bin.
-> >>
-> >> Which repository was it applied to?
-> >
-> > I don't have a public repo (yet), but the patch has been sent to Greg,
-> > so it should be merged into the next -rc.
-> >
-> > Regards,
-> > -Bin.
-> 
-> The MAINTAINERS file has
-> git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git listed as
-> the tree for drivers/usb/musb/. I guess that should be updated.
+Add eFuse driver for Socionext UniPhier series SoC.
+Note that eFuse device is under soc-glue and this register
+implements as read only.
 
-I will create a patch for it. Thanks for reporting this.
+Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
+---
+ drivers/nvmem/Kconfig          | 11 +++++
+ drivers/nvmem/Makefile         |  2 +
+ drivers/nvmem/uniphier-efuse.c | 97 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 110 insertions(+)
+ create mode 100644 drivers/nvmem/uniphier-efuse.c
 
-Regards,
--Bin.
+diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
+index 101ced4..9c32cfe 100644
+--- a/drivers/nvmem/Kconfig
++++ b/drivers/nvmem/Kconfig
+@@ -123,6 +123,17 @@ config NVMEM_SUNXI_SID
+ 	  This driver can also be built as a module. If so, the module
+ 	  will be called nvmem_sunxi_sid.
+ 
++config UNIPHIER_EFUSE
++	tristate "UniPhier SoCs eFuse support"
++	depends on ARCH_UNIPHIER || COMPILE_TEST
++	depends on HAS_IOMEM
++	help
++	  This is a simple driver to dump specified values of UniPhier SoC
++	  from eFuse.
++
++	  This driver can also be built as a module. If so, the module
++	  will be called nvmem-uniphier-efuse.
++
+ config NVMEM_VF610_OCOTP
+ 	tristate "VF610 SoC OCOTP support"
+ 	depends on SOC_VF610 || COMPILE_TEST
+diff --git a/drivers/nvmem/Makefile b/drivers/nvmem/Makefile
+index 1731406..2d07162 100644
+--- a/drivers/nvmem/Makefile
++++ b/drivers/nvmem/Makefile
+@@ -26,6 +26,8 @@ obj-$(CONFIG_ROCKCHIP_EFUSE)	+= nvmem_rockchip_efuse.o
+ nvmem_rockchip_efuse-y		:= rockchip-efuse.o
+ obj-$(CONFIG_NVMEM_SUNXI_SID)	+= nvmem_sunxi_sid.o
+ nvmem_sunxi_sid-y		:= sunxi_sid.o
++obj-$(CONFIG_UNIPHIER_EFUSE)	+= nvmem-uniphier-efuse.o
++nvmem-uniphier-efuse-y		:= uniphier-efuse.o
+ obj-$(CONFIG_NVMEM_VF610_OCOTP)	+= nvmem-vf610-ocotp.o
+ nvmem-vf610-ocotp-y		:= vf610-ocotp.o
+ obj-$(CONFIG_MESON_EFUSE)	+= nvmem_meson_efuse.o
+diff --git a/drivers/nvmem/uniphier-efuse.c b/drivers/nvmem/uniphier-efuse.c
+new file mode 100644
+index 0000000..2bb45c4
+--- /dev/null
++++ b/drivers/nvmem/uniphier-efuse.c
+@@ -0,0 +1,97 @@
++/*
++ * UniPhier eFuse driver
++ *
++ * Copyright (C) 2017 Socionext Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/device.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/nvmem-provider.h>
++#include <linux/platform_device.h>
++
++struct uniphier_efuse_priv {
++	void __iomem *base;
++};
++
++static int uniphier_reg_read(void *context,
++			     unsigned int reg, void *_val, size_t bytes)
++{
++	struct uniphier_efuse_priv *priv = context;
++	u32 *val = _val;
++	int offs;
++
++	for (offs = 0; offs < bytes; offs += sizeof(u32))
++		*val++ = readl(priv->base + reg + offs);
++
++	return 0;
++}
++
++static int uniphier_efuse_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct resource *res;
++	struct nvmem_device *nvmem;
++	struct nvmem_config econfig ={};
++	struct uniphier_efuse_priv *priv;
++
++	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	priv->base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(priv->base))
++		return PTR_ERR(priv->base);
++
++	econfig.stride = 4;
++	econfig.word_size = 4;
++	econfig.read_only = true;
++	econfig.reg_read = uniphier_reg_read;
++	econfig.size = resource_size(res);
++	econfig.priv = priv;
++	econfig.dev = dev;
++	nvmem = nvmem_register(&econfig);
++	if (IS_ERR(nvmem))
++		return PTR_ERR(nvmem);
++
++	platform_set_drvdata(pdev, nvmem);
++
++	return 0;
++}
++
++static int uniphier_efuse_remove(struct platform_device *pdev)
++{
++	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
++
++	return nvmem_unregister(nvmem);
++}
++
++static const struct of_device_id uniphier_efuse_of_match[] = {
++	{ .compatible = "socionext,uniphier-efuse",},
++	{/* sentinel */},
++};
++MODULE_DEVICE_TABLE(of, uniphier_efuse_of_match);
++
++static struct platform_driver uniphier_efuse_driver = {
++	.probe = uniphier_efuse_probe,
++	.remove = uniphier_efuse_remove,
++	.driver = {
++		.name = "uniphier-efuse",
++		.of_match_table = uniphier_efuse_of_match,
++	},
++};
++module_platform_driver(uniphier_efuse_driver);
++
++MODULE_AUTHOR("Keiji Hayashibara <hayashibara.keiji@socionext.com>");
++MODULE_DESCRIPTION("UniPhier eFuse driver");
++MODULE_LICENSE("GPL v2");
+-- 
+2.7.4
