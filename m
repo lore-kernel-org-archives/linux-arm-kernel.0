@@ -1,160 +1,147 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 17 Oct 2017 15:03:05 +0200
-Subject: [PATCH v4 4/5] reset: stm32: use the reset-simple driver
+Date: Tue, 17 Oct 2017 15:03:03 +0200
+Subject: [PATCH v4 2/5] reset: sunxi: use reset-simple driver
 In-Reply-To: <20171017130306.881-1-p.zabel@pengutronix.de>
 References: <20171017130306.881-1-p.zabel@pengutronix.de>
-Message-ID: <20171017130306.881-5-p.zabel@pengutronix.de>
+Message-ID: <20171017130306.881-3-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The reset-simple driver can be used without changes.
+Use the newly created copies in the reset-simple driver to replace the
+sunxi platform driver code and reset operations. The separate sunxi
+driver still remains to register the early reset controllers, but it
+reuses the reset operations in reset-simple.
 
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Acked-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+Reviewed-by: Alexandru Gagniuc <alex.g@adaptrum.com>
 ---
- drivers/reset/Kconfig        |  11 ++---
- drivers/reset/Makefile       |   1 -
- drivers/reset/reset-simple.c |   1 +
- drivers/reset/reset-stm32.c  | 108 -------------------------------------------
- 4 files changed, 4 insertions(+), 117 deletions(-)
- delete mode 100644 drivers/reset/reset-stm32.c
+Changes since v3:
+ - Split patch 1 into reset-simple and reset-sunxi parts.
+---
+ drivers/reset/Kconfig       |   1 +
+ drivers/reset/reset-sunxi.c | 104 +++-----------------------------------------
+ 2 files changed, 7 insertions(+), 98 deletions(-)
 
 diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
-index 2d6770b210ed7..9bdb4fe1b03e6 100644
+index 392e65187cd5a..a14c0fe498771 100644
 --- a/drivers/reset/Kconfig
 +++ b/drivers/reset/Kconfig
-@@ -77,19 +77,14 @@ config RESET_PISTACHIO
- 
- config RESET_SIMPLE
- 	bool "Simple Reset Controller Driver" if COMPILE_TEST
--	default ARCH_SOCFPGA || ARCH_STRATIX10 || ARCH_SUNXI
-+	default ARCH_SOCFPGA || ARCH_STM32 || ARCH_STRATIX10 || ARCH_SUNXI
- 	help
- 	  This enables a simple reset controller driver for reset lines that
- 	  that can be asserted and deasserted by toggling bits in a contiguous,
- 	  exclusive register space.
- 
--	  Currently this driver supports Altera SoCFPGAs and Allwinner SoCs.
--
--config RESET_STM32
--	bool "STM32 Reset Driver" if COMPILE_TEST
--	default ARCH_STM32
--	help
--	  This enables the RCC reset controller driver for STM32 MCUs.
-+	  Currently this driver supports Altera SoCFPGAs, the RCC reset
-+	  controller in STM32 MCUs, and Allwinner SoCs.
- 
+@@ -100,6 +100,7 @@ config RESET_STM32
  config RESET_SUNXI
  	bool "Allwinner SoCs Reset Driver" if COMPILE_TEST && !ARCH_SUNXI
-diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-index 3bf3b4e6a9fd2..98dd1eccc820c 100644
---- a/drivers/reset/Makefile
-+++ b/drivers/reset/Makefile
-@@ -13,7 +13,6 @@ obj-$(CONFIG_RESET_MESON) += reset-meson.o
- obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
- obj-$(CONFIG_RESET_PISTACHIO) += reset-pistachio.o
- obj-$(CONFIG_RESET_SIMPLE) += reset-simple.o
--obj-$(CONFIG_RESET_STM32) += reset-stm32.o
- obj-$(CONFIG_RESET_SUNXI) += reset-sunxi.o
- obj-$(CONFIG_RESET_TI_SCI) += reset-ti-sci.o
- obj-$(CONFIG_RESET_TI_SYSCON) += reset-ti-syscon.o
-diff --git a/drivers/reset/reset-simple.c b/drivers/reset/reset-simple.c
-index 98ff0f924948e..273039ef02e64 100644
---- a/drivers/reset/reset-simple.c
-+++ b/drivers/reset/reset-simple.c
-@@ -120,6 +120,7 @@ static const struct reset_simple_devdata reset_simple_active_low = {
+ 	default ARCH_SUNXI
++	select RESET_SIMPLE
+ 	help
+ 	  This enables the reset driver for Allwinner SoCs.
  
- static const struct of_device_id reset_simple_dt_ids[] = {
- 	{ .compatible = "altr,rst-mgr", .data = &reset_simple_socfpga },
-+	{ .compatible = "st,stm32-rcc", },
- 	{ .compatible = "allwinner,sun6i-a31-clock-reset",
- 		.data = &reset_simple_active_low },
- 	{ /* sentinel */ },
-diff --git a/drivers/reset/reset-stm32.c b/drivers/reset/reset-stm32.c
-deleted file mode 100644
-index 3a7c8527e66af..0000000000000
---- a/drivers/reset/reset-stm32.c
-+++ /dev/null
-@@ -1,108 +0,0 @@
--/*
-- * Copyright (C) Maxime Coquelin 2015
-- * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
-- * License terms:  GNU General Public License (GPL), version 2
-- *
-- * Heavily based on sunxi driver from Maxime Ripard.
-- */
--
--#include <linux/err.h>
--#include <linux/io.h>
--#include <linux/of.h>
--#include <linux/of_address.h>
--#include <linux/platform_device.h>
--#include <linux/reset-controller.h>
--#include <linux/slab.h>
--#include <linux/spinlock.h>
--#include <linux/types.h>
--
--struct stm32_reset_data {
+diff --git a/drivers/reset/reset-sunxi.c b/drivers/reset/reset-sunxi.c
+index 2c7dd1fd08df6..db9a1a75523f4 100644
+--- a/drivers/reset/reset-sunxi.c
++++ b/drivers/reset/reset-sunxi.c
+@@ -22,64 +22,11 @@
+ #include <linux/spinlock.h>
+ #include <linux/types.h>
+ 
+-struct sunxi_reset_data {
 -	spinlock_t			lock;
 -	void __iomem			*membase;
 -	struct reset_controller_dev	rcdev;
 -};
 -
--static int stm32_reset_assert(struct reset_controller_dev *rcdev,
+-static int sunxi_reset_assert(struct reset_controller_dev *rcdev,
 -			      unsigned long id)
 -{
--	struct stm32_reset_data *data = container_of(rcdev,
--						     struct stm32_reset_data,
+-	struct sunxi_reset_data *data = container_of(rcdev,
+-						     struct sunxi_reset_data,
 -						     rcdev);
--	int bank = id / BITS_PER_LONG;
--	int offset = id % BITS_PER_LONG;
+-	int reg_width = sizeof(u32);
+-	int bank = id / (reg_width * BITS_PER_BYTE);
+-	int offset = id % (reg_width * BITS_PER_BYTE);
 -	unsigned long flags;
 -	u32 reg;
 -
 -	spin_lock_irqsave(&data->lock, flags);
 -
--	reg = readl(data->membase + (bank * 4));
--	writel(reg | BIT(offset), data->membase + (bank * 4));
+-	reg = readl(data->membase + (bank * reg_width));
+-	writel(reg & ~BIT(offset), data->membase + (bank * reg_width));
 -
 -	spin_unlock_irqrestore(&data->lock, flags);
 -
 -	return 0;
 -}
 -
--static int stm32_reset_deassert(struct reset_controller_dev *rcdev,
+-static int sunxi_reset_deassert(struct reset_controller_dev *rcdev,
 -				unsigned long id)
 -{
--	struct stm32_reset_data *data = container_of(rcdev,
--						     struct stm32_reset_data,
+-	struct sunxi_reset_data *data = container_of(rcdev,
+-						     struct sunxi_reset_data,
 -						     rcdev);
--	int bank = id / BITS_PER_LONG;
--	int offset = id % BITS_PER_LONG;
+-	int reg_width = sizeof(u32);
+-	int bank = id / (reg_width * BITS_PER_BYTE);
+-	int offset = id % (reg_width * BITS_PER_BYTE);
 -	unsigned long flags;
 -	u32 reg;
 -
 -	spin_lock_irqsave(&data->lock, flags);
 -
--	reg = readl(data->membase + (bank * 4));
--	writel(reg & ~BIT(offset), data->membase + (bank * 4));
+-	reg = readl(data->membase + (bank * reg_width));
+-	writel(reg | BIT(offset), data->membase + (bank * reg_width));
 -
 -	spin_unlock_irqrestore(&data->lock, flags);
 -
 -	return 0;
 -}
 -
--static const struct reset_control_ops stm32_reset_ops = {
--	.assert		= stm32_reset_assert,
--	.deassert	= stm32_reset_deassert,
+-static const struct reset_control_ops sunxi_reset_ops = {
+-	.assert		= sunxi_reset_assert,
+-	.deassert	= sunxi_reset_deassert,
 -};
++#include "reset-simple.h"
+ 
+ static int sunxi_reset_init(struct device_node *np)
+ {
+-	struct sunxi_reset_data *data;
++	struct reset_simple_data *data;
+ 	struct resource res;
+ 	resource_size_t size;
+ 	int ret;
+@@ -108,8 +55,9 @@ static int sunxi_reset_init(struct device_node *np)
+ 
+ 	data->rcdev.owner = THIS_MODULE;
+ 	data->rcdev.nr_resets = size * 8;
+-	data->rcdev.ops = &sunxi_reset_ops;
++	data->rcdev.ops = &reset_simple_ops;
+ 	data->rcdev.of_node = np;
++	data->active_low = true;
+ 
+ 	return reset_controller_register(&data->rcdev);
+ 
+@@ -122,6 +70,8 @@ static int sunxi_reset_init(struct device_node *np)
+  * These are the reset controller we need to initialize early on in
+  * our system, before we can even think of using a regular device
+  * driver for it.
++ * The controllers that we can register through the regular device
++ * model are handled by the simple reset driver directly.
+  */
+ static const struct of_device_id sunxi_early_reset_dt_ids[] __initconst = {
+ 	{ .compatible = "allwinner,sun6i-a31-ahb1-reset", },
+@@ -135,45 +85,3 @@ void __init sun6i_reset_init(void)
+ 	for_each_matching_node(np, sunxi_early_reset_dt_ids)
+ 		sunxi_reset_init(np);
+ }
 -
--static const struct of_device_id stm32_reset_dt_ids[] = {
--	 { .compatible = "st,stm32-rcc", },
+-/*
+- * And these are the controllers we can register through the regular
+- * device model.
+- */
+-static const struct of_device_id sunxi_reset_dt_ids[] = {
+-	 { .compatible = "allwinner,sun6i-a31-clock-reset", },
 -	 { /* sentinel */ },
 -};
 -
--static int stm32_reset_probe(struct platform_device *pdev)
+-static int sunxi_reset_probe(struct platform_device *pdev)
 -{
--	struct stm32_reset_data *data;
+-	struct sunxi_reset_data *data;
 -	struct resource *res;
 -
 -	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
@@ -170,19 +157,19 @@ index 3a7c8527e66af..0000000000000
 -
 -	data->rcdev.owner = THIS_MODULE;
 -	data->rcdev.nr_resets = resource_size(res) * 8;
--	data->rcdev.ops = &stm32_reset_ops;
+-	data->rcdev.ops = &sunxi_reset_ops;
 -	data->rcdev.of_node = pdev->dev.of_node;
 -
 -	return devm_reset_controller_register(&pdev->dev, &data->rcdev);
 -}
 -
--static struct platform_driver stm32_reset_driver = {
--	.probe	= stm32_reset_probe,
+-static struct platform_driver sunxi_reset_driver = {
+-	.probe	= sunxi_reset_probe,
 -	.driver = {
--		.name		= "stm32-rcc-reset",
--		.of_match_table	= stm32_reset_dt_ids,
+-		.name		= "sunxi-reset",
+-		.of_match_table	= sunxi_reset_dt_ids,
 -	},
 -};
--builtin_platform_driver(stm32_reset_driver);
+-builtin_platform_driver(sunxi_reset_driver);
 -- 
 2.11.0
