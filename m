@@ -1,72 +1,103 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 17 Oct 2017 11:06:17 +0200
-Subject: [PATCH 10/23] clk: sunxi-ng: Add A83T display clocks
-In-Reply-To: <cover.fe3d65d1ee05a55224d26e7d113388c428592b26.1508231063.git-series.maxime.ripard@free-electrons.com>
-References: <cover.fe3d65d1ee05a55224d26e7d113388c428592b26.1508231063.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <19afdfb5c4fea9c3b49e951cea1a184d3eec40b1.1508231063.git-series.maxime.ripard@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 17 Oct 2017 10:56:43 +0100
+Subject: ARM64: Regression with commit e3067861ba66 ("arm64: add basic
+ VMAP_STACK support")
+In-Reply-To: <20171017093658.GA32000@leoy-linaro>
+References: <da09fd83-f3f0-f800-fea4-988cfa56bac7@arm.com>
+ <20171016011723.GB12470@leoy-linaro>
+ <20171016134819.jv3udrcwsedc4cgs@lakrids.cambridge.arm.com>
+ <34ccf02d-fd65-bade-327a-ed8df1d3eea5@arm.com>
+ <20171016142622.6yjuzdwxxw3sxjed@lakrids.cambridge.arm.com>
+ <dad6105d-1ec0-d5a6-e78c-ff832afe3f9e@arm.com>
+ <20171017003054.GB19504@leoy-ThinkPad-T440>
+ <20171017092914.op4hlzaaqfrpoizm@lakrids.cambridge.arm.com>
+ <CAKv+Gu8u1cc14c5ZDeq=oNB9DC2RcHzXu8e9Cc+noHT4w+4mpg@mail.gmail.com>
+ <20171017093658.GA32000@leoy-linaro>
+Message-ID: <20171017095643.7bzihiupuxsnkujn@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unfortunately, the A83t display clocks are not children of the de clock,
-since that clocks doesn't exist at all on the A83t.
+On Tue, Oct 17, 2017 at 05:36:58PM +0800, Leo Yan wrote:
+> On Tue, Oct 17, 2017 at 10:32:21AM +0100, Ard Biesheuvel wrote:
+> 
+> [...]
+> 
+> > > AFAICT, erratum 836870 results in livelock rather than memory
+> > > corruption, so I think we can ignore that.
+> > >
+> > > I'm a little worried by erratum 843419. The VMAP_STACK patches changed
+> > > {adr,ldr}_this_cpu (and some users thereof), and it's possible we're
+> > > managing to tickle that issue.
+> > >
+> > > If you still have an affected kernel, could you dump the output of:
+> > >
+> > > $ aarch64-linux-gnu-objdump -d vmlinux | grep -A 3 'ff[8c]:\s\+[a-f0-9]\+\s\+adrp'
+> > >
+> > > ... that would show us if there are any affected sequences.
+> > >
+> > > From a quick scan of my own vmlinux build from commit e3067861ba66, I
+> > > didn't see any, but it's possible this depends on the config used.
+> > >
+> > 
+> > The linker should take care of that: it scans the entire executable,
+> > and inserts a veneer if an adrp happens to end up at a vulnerable
+> > offset in the page.
+> 
+> Is this dependent on any GCC version?
 
-For now, they are orphans, so let's move them to their true, existing,
-parent.
+It is, but we should warn if CONFIG_ARM64_ERRATUM_843419 is selected and
+the linked doesn't support the --fix-cortex-a53-843419 option:
 
-Fixes: 763c5bd045b1 ("clk: sunxi-ng: add support for DE2 CCU")
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/clk/sunxi-ng/ccu-sun8i-de2.c | 21 +++++++++++++--------
- 1 file changed, 13 insertions(+), 8 deletions(-)
+  ld does not support --fix-cortex-a53-843419; kernel may be susceptible to erratum)
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-de2.c b/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
-index 5cdaf52669e4..5cc9d9952121 100644
---- a/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
-@@ -41,11 +41,16 @@ static SUNXI_CCU_GATE(wb_clk,		"wb",		"wb-div",
- 
- static SUNXI_CCU_M(mixer0_div_clk, "mixer0-div", "de", 0x0c, 0, 4,
- 		   CLK_SET_RATE_PARENT);
--static SUNXI_CCU_M(mixer1_div_clk, "mixer1-div", "de", 0x0c, 4, 4,
--		   CLK_SET_RATE_PARENT);
- static SUNXI_CCU_M(wb_div_clk, "wb-div", "de", 0x0c, 8, 4,
- 		   CLK_SET_RATE_PARENT);
- 
-+static SUNXI_CCU_M(mixer0_div_a83_clk, "mixer0-div", "pll-de", 0x0c, 0, 4,
-+		   CLK_SET_RATE_PARENT);
-+static SUNXI_CCU_M(mixer1_div_a83_clk, "mixer1-div", "pll-de", 0x0c, 4, 4,
-+		   CLK_SET_RATE_PARENT);
-+static SUNXI_CCU_M(wb_div_a83_clk, "wb-div", "pll-de", 0x0c, 8, 4,
-+		   CLK_SET_RATE_PARENT);
-+
- static struct ccu_common *sun8i_a83t_de2_clks[] = {
- 	&mixer0_clk.common,
- 	&mixer1_clk.common,
-@@ -55,9 +60,9 @@ static struct ccu_common *sun8i_a83t_de2_clks[] = {
- 	&bus_mixer1_clk.common,
- 	&bus_wb_clk.common,
- 
--	&mixer0_div_clk.common,
--	&mixer1_div_clk.common,
--	&wb_div_clk.common,
-+	&mixer0_div_a83_clk.common,
-+	&mixer1_div_a83_clk.common,
-+	&wb_div_a83_clk.common,
- };
- 
- static struct ccu_common *sun8i_v3s_de2_clks[] = {
-@@ -81,9 +86,9 @@ static struct clk_hw_onecell_data sun8i_a83t_de2_hw_clks = {
- 		[CLK_BUS_MIXER1]	= &bus_mixer1_clk.common.hw,
- 		[CLK_BUS_WB]		= &bus_wb_clk.common.hw,
- 
--		[CLK_MIXER0_DIV]	= &mixer0_div_clk.common.hw,
--		[CLK_MIXER1_DIV]	= &mixer1_div_clk.common.hw,
--		[CLK_WB_DIV]		= &wb_div_clk.common.hw,
-+		[CLK_MIXER0_DIV]	= &mixer0_div_a83_clk.common.hw,
-+		[CLK_MIXER1_DIV]	= &mixer1_div_a83_clk.common.hw,
-+		[CLK_WB_DIV]		= &wb_div_a83_clk.common.hw,
- 	},
- 	.num	= CLK_NUMBER,
- };
--- 
-git-series 0.9.1
+... do you see this when building the kernel?
+
+> I am using GCC 6.2.1, so I get many affected sequences with Mark's command:
+
+I beleive these are all beningn. AFAICT, none of these meet the conditions for
+sequence 1 or sequence 2 affected by the erratum. e.g. many don't have
+loads/stores using the adrp result.
+
+Thanks,
+Mark.
+
+> leoy at leoy-linaro:~/Work/reference/opensource/linux$ aarch64-linux-gnu-objdump -d vmlinux | grep -A 3 'ff[8c]:\s\+[a-f0-9]\+\s\+adrp'
+> ffff0000080a1ffc:	90007340 	adrp	x0, ffff000008f09000 <page_wait_table+0x1280>
+> ffff0000080a2000:	a900fedf 	stp	xzr, xzr, [x22,#8]
+> ffff0000080a2004:	91374000 	add	x0, x0, #0xdd0
+> ffff0000080a2008:	f9000ec0 	str	x0, [x22,#24]
+> --
+> ffff0000080b6ff8:	b0007ce0 	adrp	x0, ffff000009053000 <chunk_hash_heads+0x680>
+> ffff0000080b6ffc:	52901801 	mov	w1, #0x80c0                	// #32960
+> ffff0000080b7000:	72a02801 	movk	w1, #0x140, lsl #16
+> ffff0000080b7004:	9102e273 	add	x19, x19, #0xb8
+> --
+> ffff0000080f1ff8:	d00070a1 	adrp	x1, ffff000008f07000 <bit_wait_table+0xd80>
+> ffff0000080f1ffc:	f9406402 	ldr	x2, [x0,#200]
+> ffff0000080f2000:	f9405c03 	ldr	x3, [x0,#184]
+> ffff0000080f2004:	14002915 	b	ffff0000080fc458 <e843419@00ce_00000e94_3c4>
+> --
+> ffff0000080feff8:	90000002 	adrp	x2, ffff0000080fe000 <prio_changed_rt+0x88>
+> ffff0000080feffc:	9136e042 	add	x2, x2, #0xdb8
+> ffff0000080ff000:	f9000462 	str	x2, [x3,#8]
+> ffff0000080ff004:	f9448e62 	ldr	x2, [x19,#2328]
+> --
+> ffff00000810affc:	f0006fe1 	adrp	x1, ffff000008f09000 <page_wait_table+0x1280>
+> ffff00000810b000:	f94017a2 	ldr	x2, [x29,#40]
+> ffff00000810b004:	aa1303e0 	mov	x0, x19
+> ffff00000810b008:	1400013d 	b	ffff00000810b4fc <e843419@00e7_000010c5_338>
+> --
+> ffff00000811dff8:	d0005c80 	adrp	x0, ffff000008caf000 <kallsyms_token_index+0xaf00>
+> ffff00000811dffc:	912be021 	add	x1, x1, #0xaf8
+> ffff00000811e000:	912ae000 	add	x0, x0, #0xab8
+> ffff00000811e004:	97ffe6ab 	bl	ffff000008117ab0 <printk>
+> --
+> ffff000008137ff8:	f0004443 	adrp	x3, ffff0000089c2000 <clock_monotonic+0x50>
+> ffff000008137ffc:	910ac042 	add	x2, x2, #0x2b0
+> ffff000008138000:	9113c063 	add	x3, x3, #0x4f0
+> ffff000008138004:	71000c9f 	cmp	w4, #0x3
+> --
+> ffff00000815eff8:	b0005aa1 	adrp	x1, ffff000008cb3000 <kallsyms_token_index+0xef00>
+> ffff00000815effc:	91362021 	add	x1, x1, #0xd88
+> ffff00000815f000:	97ffffc8 	bl	ffff00000815ef20 <audit_log_format>
+> ffff00000815f004:	b94023a1 	ldr	w1, [x29,#32]
