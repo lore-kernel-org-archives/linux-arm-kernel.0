@@ -1,879 +1,202 @@
 From: james.morse@arm.com (James Morse)
-Date: Tue, 17 Oct 2017 18:44:26 +0100
-Subject: [PATCH v4 07/13] firmware: arm_sdei: Add driver for Software
- Delegated Exceptions
+Date: Tue, 17 Oct 2017 18:44:28 +0100
+Subject: [PATCH v4 09/13] arm64: kernel: Add arch-specific SDEI entry code and
+ CPU masking
 In-Reply-To: <20171017174432.1684-1-james.morse@arm.com>
 References: <20171017174432.1684-1-james.morse@arm.com>
-Message-ID: <20171017174432.1684-8-james.morse@arm.com>
+Message-ID: <20171017174432.1684-10-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The Software Delegated Exception Interface (SDEI) is an ARM standard
 for registering callbacks from the platform firmware into the OS.
-This is typically used to implement firmware notifications (such as
-firmware-first RAS) or promote an IRQ that has been promoted to a
-firmware-assisted NMI.
+This is typically used to implement RAS notifications.
 
-Add the code for detecting the SDEI version and the framework for
-registering and unregistering events. Subsequent patches will add the
-arch-specific backend code and the necessary power management hooks.
+Such notifications enter the kernel at the registered entry-point
+with the register values of the interrupted CPU context. Because this
+is not a CPU exception, it cannot reuse the existing entry code.
+(crucially we don't implicitly know which exception level we interrupted),
 
-Only shared events are supported, power management, private events and
-discovery for ACPI systems will be added by later patches.
+Add an sdei-entry.S asm file to set us up for calling into C code. If
+the event interrupted code that had interrupts masked, we always return
+to that location. Otherwise we pretend this was an IRQ, and use SDEI's
+complete_and_resume call to return to vbar_el1 + offset.
+
+This allows the kernel to deliver signals to user space processes. For
+KVM this triggers the world switch, a quick spin round vcpu_run, then
+back into the guest, unless there are pending signals.
+
+Add sdei_mask_local_cpu() calls to the smp_send_stop() code, this covers
+the panic() code-path, which doesn't invoke cpuhotplug notifiers.
+
+Because we can interrupt entry-from/exit-to another EL, we can't trust the
+value in sp_el0 or x29, even if we interrupted the kernel, in this case
+the code in entry.S will save/restore sp_el0 and use the value in
+__entry_task.
+
+When we have VMAP stacks we can interrupt the stack-overflow test, which
+stirs x0 into sp, meaning we have to have our own VMAP stack.
 
 Signed-off-by: James Morse <james.morse@arm.com>
 
 ---
 Changes since v3:
- * Depend on arm64 from the beginning, add a placeholder arch asm file.
- * Added MAINTAINER record
- * Renamed sdei.h files to arm_sdei.h
- * Removed IS_SDEI_CALL(), KVM won't need this...
+ * Added const to clobbered_registers,
+ * Removed extern from C function declarations.
+ * Header file names changed
 
 Changes since v2:
- * Copy the priority into the structure the arch asm handler gets. This
-   is used for VMAP stacks where we can't know if a critical event interrupted
-   a normal priority event, thus they need separate stacks.
+ * Added PAN-setting as we didn't take an exception to get here.
+ * Added VMAP stack allocation and switching.
+ * overwrite x29 on entry from not-the-kernel.
+ * Added a pe-mask to crash_smp_send_stop()s 'no secondaries' path (oops).
+ * Added ELR-hasn't-changed test. Any exception in the handler will panic KVM
+   as its switched VBAR_EL1, but go silently undetected otherwise. Generate a
+   warning.
 
-Changes since v1:
- * Changed entry point to unsigned long, if we support non-vhe systems this
-   won't be a valid pointer
- * Made invoke_sdei_fn() pass the only register we are interested in, instead
-   of the whole arm_smccc_res
- * Made all the locking WARN_ON()s lockdep_assert_held()s.
- * Moved more messages from 'err' to 'warn'.
- * Made IS_SDEI_CALL() not depend on whether the config option is selected.
- * Made 'event failed' messages rate limited.
+ arch/arm64/Kconfig                  |   2 +-
+ arch/arm64/include/asm/sdei.h       |  46 ++++++-
+ arch/arm64/include/asm/stacktrace.h |   3 +
+ arch/arm64/kernel/Makefile          |   1 +
+ arch/arm64/kernel/asm-offsets.c     |   5 +
+ arch/arm64/kernel/sdei-entry.S      | 122 +++++++++++++++++++
+ arch/arm64/kernel/sdei.c            | 235 ++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/smp.c             |  11 +-
+ 8 files changed, 421 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm64/kernel/sdei-entry.S
+ create mode 100644 arch/arm64/kernel/sdei.c
 
- MAINTAINERS                   |   9 +
- arch/arm64/include/asm/sdei.h |  21 ++
- drivers/firmware/Kconfig      |   8 +
- drivers/firmware/Makefile     |   1 +
- drivers/firmware/arm_sdei.c   | 616 ++++++++++++++++++++++++++++++++++++++++++
- include/linux/arm_sdei.h      |  99 +++++++
- include/uapi/linux/arm_sdei.h |  91 +++++++
- 7 files changed, 845 insertions(+)
- create mode 100644 arch/arm64/include/asm/sdei.h
- create mode 100644 drivers/firmware/arm_sdei.c
- create mode 100644 include/linux/arm_sdei.h
- create mode 100644 include/uapi/linux/arm_sdei.h
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 65b0c88d5ee0..6c9c7483e2b3 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -12441,6 +12441,15 @@ L:	linux-media at vger.kernel.org
- S:	Supported
- F:	drivers/media/pci/solo6x10/
- 
-+SOFTWARE DELEGATED EXCEPTION INTERFACE (SDEI)
-+M:	James Morse <james.morse@arm.com>
-+L:	linux-arm-kernel at lists.infradead.org
-+S:	Maintained
-+F:	Documentation/devicetree/bindings/arm/firmware/sdei.txt
-+F:	drivers/firmware/arm_sdei.c
-+F:	include/linux/sdei.h
-+F:	include/uapi/linux/sdei.h
-+
- SOFTWARE RAID (Multiple Disks) SUPPORT
- M:	Shaohua Li <shli@kernel.org>
- L:	linux-raid at vger.kernel.org
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 0df64a6a56d4..70dfe4e9ccc5 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -98,7 +98,7 @@ config ARM64
+ 	select HAVE_IRQ_TIME_ACCOUNTING
+ 	select HAVE_MEMBLOCK
+ 	select HAVE_MEMBLOCK_NODE_MAP if NUMA
+-	select HAVE_NMI if ACPI_APEI_SEA
++	select HAVE_NMI
+ 	select HAVE_PATA_PLATFORM
+ 	select HAVE_PERF_EVENTS
+ 	select HAVE_PERF_REGS
 diff --git a/arch/arm64/include/asm/sdei.h b/arch/arm64/include/asm/sdei.h
-new file mode 100644
-index 000000000000..b60381a05787
---- /dev/null
+index b60381a05787..bbebdbc0b754 100644
+--- a/arch/arm64/include/asm/sdei.h
 +++ b/arch/arm64/include/asm/sdei.h
-@@ -0,0 +1,21 @@
-+/*
-+ * Copyright (C) 2017 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_SDEI_H
-+#define __ASM_SDEI_H
-+
-+/* Later patches add the arch specific bits */
-+
-+#endif /* __ASM_SDEI_H */
-diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
-index 6e4ed5a9c6fd..1f6633b337aa 100644
---- a/drivers/firmware/Kconfig
-+++ b/drivers/firmware/Kconfig
-@@ -48,6 +48,14 @@ config ARM_SCPI_POWER_DOMAIN
- 	  This enables support for the SCPI power domains which can be
- 	  enabled or disabled via the SCP firmware
+@@ -16,6 +16,48 @@
+ #ifndef __ASM_SDEI_H
+ #define __ASM_SDEI_H
  
-+config ARM_SDE_INTERFACE
-+	bool "ARM Software Delegated Exception Interface (SDEI)"
-+	depends on ARM64
-+	help
-+	  The Software Delegated Exception Interface (SDEI) is an ARM
-+	  standard for registering callbacks from the platform firmware
-+	  into the OS. This is typically used to implement RAS notifications.
+-/* Later patches add the arch specific bits */
++/* Values for sdei_exit_mode */
++#define SDEI_EXIT_HVC  0
++#define SDEI_EXIT_SMC  1
+ 
+-#endif /* __ASM_SDEI_H */
++#define SDEI_STACK_SIZE		IRQ_STACK_SIZE
 +
- config EDD
- 	tristate "BIOS Enhanced Disk Drive calls determine boot disk"
- 	depends on X86
-diff --git a/drivers/firmware/Makefile b/drivers/firmware/Makefile
-index a37f12e8d137..229984feca4a 100644
---- a/drivers/firmware/Makefile
-+++ b/drivers/firmware/Makefile
-@@ -5,6 +5,7 @@ obj-$(CONFIG_ARM_PSCI_FW)	+= psci.o
- obj-$(CONFIG_ARM_PSCI_CHECKER)	+= psci_checker.o
- obj-$(CONFIG_ARM_SCPI_PROTOCOL)	+= arm_scpi.o
- obj-$(CONFIG_ARM_SCPI_POWER_DOMAIN) += scpi_pm_domain.o
-+obj-$(CONFIG_ARM_SDE_INTERFACE)	+= arm_sdei.o
- obj-$(CONFIG_DMI)		+= dmi_scan.o
- obj-$(CONFIG_DMI_SYSFS)		+= dmi-sysfs.o
- obj-$(CONFIG_EDD)		+= edd.o
-diff --git a/drivers/firmware/arm_sdei.c b/drivers/firmware/arm_sdei.c
-new file mode 100644
-index 000000000000..676659976c3c
---- /dev/null
-+++ b/drivers/firmware/arm_sdei.c
-@@ -0,0 +1,616 @@
-+/*
-+ * Software Delegated Exception Interface (SDEI) driver code.
-+ *
-+ * Copyright (C) 2017 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program. If not, see <http://www.gnu.org/licenses/>.
-+ */
++#ifndef __ASSEMBLY__
 +
-+#define pr_fmt(fmt) "sdei: " fmt
++#include <linux/linkage.h>
++#include <linux/types.h>
 +
-+#include <linux/acpi.h>
-+#include <linux/arm_sdei.h>
-+#include <linux/arm-smccc.h>
-+#include <linux/bitops.h>
-+#include <linux/compiler.h>
-+#include <linux/errno.h>
-+#include <linux/hardirq.h>
-+#include <linux/kernel.h>
-+#include <linux/kprobes.h>
-+#include <linux/kvm_host.h>
-+#include <linux/list.h>
-+#include <linux/lockdep.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
-+#include <linux/percpu.h>
-+#include <linux/platform_device.h>
-+#include <linux/ptrace.h>
-+#include <linux/preempt.h>
-+#include <linux/slab.h>
-+#include <linux/smp.h>
-+#include <linux/spinlock.h>
-+#include <linux/uaccess.h>
++#include <asm/virt.h>
++
++extern unsigned long sdei_exit_mode;
++
++/* Software Delegated Exception entry point from firmware*/
++asmlinkage void __sdei_asm_handler(unsigned long event_num, unsigned long arg,
++				   unsigned long pc, unsigned long pstate);
 +
 +/*
-+ * The call to use to reach the firmware.
++ * The above entry point does the minimum to call C code. This function does
++ * anything else, before calling the driver.
 + */
-+static asmlinkage void (*sdei_firmware_call)(unsigned long function_id,
-+		      unsigned long arg0, unsigned long arg1,
-+		      unsigned long arg2, unsigned long arg3,
-+		      unsigned long arg4, struct arm_smccc_res *res);
++struct sdei_registered_event;
++asmlinkage unsigned long __sdei_handler(struct pt_regs *regs,
++					struct sdei_registered_event *arg);
 +
-+/* entry point from firmware to arch asm code */
-+static unsigned long sdei_entry_point;
++unsigned long sdei_arch_get_entry_point(int conduit);
++#define sdei_arch_get_entry_point(x)	sdei_arch_get_entry_point(x)
 +
-+struct sdei_event {
-+	struct list_head	list;
-+	u32			event_num;
-+	u8			type;
-+	u8			priority;
-+
-+	/* This pointer is handed to firmware as the event argument. */
-+	struct sdei_registered_event *registered;
-+};
-+
-+static LIST_HEAD(sdei_events);
-+static DEFINE_SPINLOCK(sdei_events_lock);
-+
-+static int sdei_to_linux_errno(unsigned long sdei_err)
++bool _on_sdei_stack(unsigned long sp);
++static inline bool on_sdei_stack(unsigned long sp)
 +{
-+	switch (sdei_err) {
-+	case SDEI_NOT_SUPPORTED:
-+		return -EOPNOTSUPP;
-+	case SDEI_INVALID_PARAMETERS:
-+		return -EINVAL;
-+	case SDEI_DENIED:
-+		return -EPERM;
-+	case SDEI_PENDING:
-+		return -EINPROGRESS;
-+	case SDEI_OUT_OF_RESOURCE:
-+		return -ENOMEM;
-+	}
-+
-+	/* Not an error value ... */
-+	return sdei_err;
-+}
-+
-+/*
-+ * If x0 is any of these values, then the call failed, use sdei_to_linux_errno()
-+ * to translate.
-+ */
-+static int sdei_is_err(struct arm_smccc_res *res)
-+{
-+	switch (res->a0) {
-+	case SDEI_NOT_SUPPORTED:
-+	case SDEI_INVALID_PARAMETERS:
-+	case SDEI_DENIED:
-+	case SDEI_PENDING:
-+	case SDEI_OUT_OF_RESOURCE:
-+		return true;
-+	}
++	if (!IS_ENABLED(CONFIG_VMAP_STACK))
++		return false;
++	if (!IS_ENABLED(CONFIG_ARM_SDE_INTERFACE))
++		return false;
++	if (in_nmi())
++		return _on_sdei_stack(sp);
 +
 +	return false;
 +}
 +
-+static int invoke_sdei_fn(unsigned long function_id, unsigned long arg0,
-+			  unsigned long arg1, unsigned long arg2,
-+			  unsigned long arg3, unsigned long arg4,
-+			  u64 *result)
-+{
-+	int err = 0;
-+	struct arm_smccc_res res;
-+
-+	if (sdei_firmware_call) {
-+		sdei_firmware_call(function_id, arg0, arg1, arg2, arg3, arg4,
-+				   &res);
-+		if (sdei_is_err(&res))
-+			err = sdei_to_linux_errno(res.a0);
-+	} else {
-+		/*
-+		 * !sdei_firmware_call means we failed to probe or called
-+		 * sdei_mark_interface_broken(). -EIO is not an error returned
-+		 * by sdei_to_linux_errno() and is used to suppress messages
-+		 * from this driver.
-+		 */
-+		err = -EIO;
-+		res.a0 = SDEI_NOT_SUPPORTED;
-+	}
-+
-+	if (result)
-+		*result = res.a0;
-+
-+	return err;
-+}
-+
-+static struct sdei_event *sdei_event_find(u32 event_num)
-+{
-+	struct sdei_event *e, *found = NULL;
-+
-+	lockdep_assert_held(&sdei_events_lock);
-+
-+	list_for_each_entry(e, &sdei_events, list) {
-+		if (e->event_num == event_num) {
-+			found = e;
-+			break;
-+		}
-+	}
-+
-+	return found;
-+}
-+
-+int sdei_api_event_context(u32 query, u64 *result)
-+{
-+	return invoke_sdei_fn(SDEI_1_0_FN_SDEI_EVENT_CONTEXT, query, 0, 0, 0, 0,
-+			      result);
-+}
-+NOKPROBE_SYMBOL(sdei_api_event_context);
-+
-+static int sdei_api_event_get_info(u32 event, u32 info, u64 *result)
-+{
-+	return invoke_sdei_fn(SDEI_1_0_FN_SDEI_EVENT_GET_INFO, event, info, 0,
-+			      0, 0, result);
-+}
-+
-+static struct sdei_event *sdei_event_create(u32 event_num,
-+					    sdei_event_callback *cb,
-+					    void *cb_arg, gfp_t gfp_flags)
-+{
-+	int err;
-+	u64 result;
-+	struct sdei_event *event;
-+	struct sdei_registered_event *reg;
-+
-+	lockdep_assert_held(&sdei_events_lock);
-+
-+	event = kzalloc(sizeof(*event), gfp_flags);
-+	if (!event)
-+		return ERR_PTR(-ENOMEM);
-+
-+	INIT_LIST_HEAD(&event->list);
-+	event->event_num = event_num;
-+
-+	err = sdei_api_event_get_info(event_num, SDEI_EVENT_INFO_EV_PRIORITY,
-+				      &result);
-+	if (err) {
-+		kfree(event);
-+		return ERR_PTR(err);
-+	}
-+	event->priority = result;
-+
-+	err = sdei_api_event_get_info(event_num, SDEI_EVENT_INFO_EV_TYPE,
-+				      &result);
-+	if (err) {
-+		kfree(event);
-+		return ERR_PTR(err);
-+	}
-+	event->type = result;
-+
-+	if (event->type == SDEI_EVENT_TYPE_SHARED) {
-+		reg = kzalloc(sizeof(*reg), GFP_KERNEL);
-+		if (!reg) {
-+			kfree(event);
-+			return ERR_PTR(-ENOMEM);
-+		}
-+
-+		reg->event_num = event_num;
-+		reg->priority = event->priority;
-+
-+		reg->callback = cb;
-+		reg->callback_arg = cb_arg;
-+		event->registered = reg;
-+	}
-+
-+	if (sdei_event_find(event_num)) {
-+		kfree(event->registered);
-+		kfree(event);
-+		event = ERR_PTR(-EBUSY);
-+	} else {
-+		list_add(&event->list, &sdei_events);
-+	}
-+
-+	return event;
-+}
-+
-+static void sdei_event_destroy(struct sdei_event *event)
-+{
-+	lockdep_assert_held(&sdei_events_lock);
-+
-+	list_del(&event->list);
-+
-+	if (event->type == SDEI_EVENT_TYPE_SHARED)
-+		kfree(event->registered);
-+
-+	kfree(event);
-+}
-+
-+static int sdei_api_get_version(u64 *version)
-+{
-+	return invoke_sdei_fn(SDEI_1_0_FN_SDEI_VERSION, 0, 0, 0, 0, 0, version);
-+}
-+
-+int sdei_mask_local_cpu(void)
-+{
-+	int err;
-+
-+	WARN_ON_ONCE(preemptible());
-+
-+	err = invoke_sdei_fn(SDEI_1_0_FN_SDEI_PE_MASK, 0, 0, 0, 0, 0, NULL);
-+	if (err && err != -EIO) {
-+		pr_warn_once("failed to mask CPU[%u]: %d\n",
-+			      smp_processor_id(), err);
-+		return err;
-+	}
-+
-+	return 0;
-+}
-+
-+static void _ipi_mask_cpu(void *ignored)
-+{
-+	sdei_mask_local_cpu();
-+}
-+
-+int sdei_unmask_local_cpu(void)
-+{
-+	int err;
-+
-+	WARN_ON_ONCE(preemptible());
-+
-+	err = invoke_sdei_fn(SDEI_1_0_FN_SDEI_PE_UNMASK, 0, 0, 0, 0, 0, NULL);
-+	if (err && err != -EIO) {
-+		pr_warn_once("failed to unmask CPU[%u]: %d\n",
-+			     smp_processor_id(), err);
-+		return err;
-+	}
-+
-+	return 0;
-+}
-+
-+static void _ipi_unmask_cpu(void *ignored)
-+{
-+	sdei_unmask_local_cpu();
-+}
-+
-+static void _ipi_private_reset(void *ignored)
-+{
-+	int err;
-+
-+	err = invoke_sdei_fn(SDEI_1_0_FN_SDEI_PRIVATE_RESET, 0, 0, 0, 0, 0,
-+			     NULL);
-+	if (err && err != -EIO)
-+		pr_warn_once("failed to reset CPU[%u]: %d\n",
-+			     smp_processor_id(), err);
-+}
-+
-+static int sdei_api_shared_reset(void)
-+{
-+	return invoke_sdei_fn(SDEI_1_0_FN_SDEI_SHARED_RESET, 0, 0, 0, 0, 0,
-+			      NULL);
-+}
-+
-+static void sdei_mark_interface_broken(void)
-+{
-+	pr_err("disabling SDEI firmware interface\n");
-+	on_each_cpu(&_ipi_mask_cpu, NULL, true);
-+	sdei_firmware_call = NULL;
-+}
-+
-+static int sdei_platform_reset(void)
-+{
-+	int err;
-+
-+	on_each_cpu(&_ipi_private_reset, NULL, true);
-+	err = sdei_api_shared_reset();
-+	if (err) {
-+		pr_err("Failed to reset platform: %d\n", err);
-+		sdei_mark_interface_broken();
-+	}
-+
-+	return err;
-+}
-+
-+static int sdei_api_event_enable(u32 event_num)
-+{
-+	return invoke_sdei_fn(SDEI_1_0_FN_SDEI_EVENT_ENABLE, event_num, 0, 0, 0,
-+			      0, NULL);
-+}
-+
-+int sdei_event_enable(u32 event_num)
-+{
-+	int err = -EINVAL;
-+	struct sdei_event *event;
-+
-+	spin_lock(&sdei_events_lock);
-+	event = sdei_event_find(event_num);
-+	if (!event)
-+		err = -ENOENT;
-+	else if (event->type == SDEI_EVENT_TYPE_SHARED)
-+		err = sdei_api_event_enable(event->event_num);
-+	spin_unlock(&sdei_events_lock);
-+
-+	return err;
-+}
-+EXPORT_SYMBOL(sdei_event_enable);
-+
-+static int sdei_api_event_disable(u32 event_num)
-+{
-+	return invoke_sdei_fn(SDEI_1_0_FN_SDEI_EVENT_DISABLE, event_num, 0, 0,
-+			      0, 0, NULL);
-+}
-+
-+int sdei_event_disable(u32 event_num)
-+{
-+	int err = -EINVAL;
-+	struct sdei_event *event;
-+
-+	spin_lock(&sdei_events_lock);
-+	event = sdei_event_find(event_num);
-+	if (!event)
-+		err = -ENOENT;
-+	else if (event->type == SDEI_EVENT_TYPE_SHARED)
-+		err = sdei_api_event_disable(event->event_num);
-+	spin_unlock(&sdei_events_lock);
-+
-+	return err;
-+}
-+EXPORT_SYMBOL(sdei_event_disable);
-+
-+static int sdei_api_event_unregister(u32 event_num)
-+{
-+	return invoke_sdei_fn(SDEI_1_0_FN_SDEI_EVENT_UNREGISTER, event_num, 0,
-+			      0, 0, 0, NULL);
-+}
-+
-+static int _sdei_event_unregister(struct sdei_event *event)
-+{
-+	if (event->type == SDEI_EVENT_TYPE_SHARED)
-+		return sdei_api_event_unregister(event->event_num);
-+
-+	return -EINVAL;
-+}
-+
-+int sdei_event_unregister(u32 event_num)
-+{
-+	int err;
-+	struct sdei_event *event;
-+
-+	WARN_ON(in_nmi());
-+
-+	spin_lock(&sdei_events_lock);
-+	event = sdei_event_find(event_num);
-+	do {
-+		if (!event) {
-+			pr_warn("Event %u not registered\n", event_num);
-+			err = -ENOENT;
-+			break;
-+		}
-+
-+		err = _sdei_event_unregister(event);
-+		if (err)
-+			break;
-+
-+		sdei_event_destroy(event);
-+	} while (0);
-+	spin_unlock(&sdei_events_lock);
-+
-+	return err;
-+}
-+EXPORT_SYMBOL(sdei_event_unregister);
-+
-+static int sdei_api_event_register(u32 event_num, unsigned long entry_point,
-+				   void *arg, u64 flags, u64 affinity)
-+{
-+	return invoke_sdei_fn(SDEI_1_0_FN_SDEI_EVENT_REGISTER, event_num,
-+			      (unsigned long)entry_point, (unsigned long)arg,
-+			      flags, affinity, NULL);
-+}
-+
-+static int _sdei_event_register(struct sdei_event *event)
-+{
-+	if (event->type == SDEI_EVENT_TYPE_SHARED)
-+		return sdei_api_event_register(event->event_num,
-+					       sdei_entry_point,
-+					       event->registered,
-+					       SDEI_EVENT_REGISTER_RM_ANY, 0);
-+
-+	return -EINVAL;
-+}
-+
-+int sdei_event_register(u32 event_num, sdei_event_callback *cb, void *arg,
-+			gfp_t gfp_flags)
-+{
-+	int err;
-+	struct sdei_event *event;
-+
-+	WARN_ON(in_nmi());
-+
-+	spin_lock(&sdei_events_lock);
-+	do {
-+		if (sdei_event_find(event_num)) {
-+			pr_warn("Event %u already registered\n", event_num);
-+			err = -EBUSY;
-+			break;
-+		}
-+
-+		event = sdei_event_create(event_num, cb, arg, gfp_flags);
-+		if (IS_ERR(event)) {
-+			err = PTR_ERR(event);
-+			pr_warn("Failed to create event %u: %d\n", event_num,
-+				err);
-+			break;
-+		}
-+
-+		err = _sdei_event_register(event);
-+		if (err) {
-+			sdei_event_destroy(event);
-+			pr_warn("Failed to register event %u: %d\n", event_num,
-+				err);
-+		}
-+	} while (0);
-+	spin_unlock(&sdei_events_lock);
-+
-+	return err;
-+}
-+EXPORT_SYMBOL(sdei_event_register);
-+
-+static void sdei_smccc_smc(unsigned long function_id,
-+			   unsigned long arg0, unsigned long arg1,
-+			   unsigned long arg2, unsigned long arg3,
-+			   unsigned long arg4, struct arm_smccc_res *res)
-+{
-+	arm_smccc_smc(function_id, arg0, arg1, arg2, arg3, arg4, 0, 0, res);
-+}
-+
-+static void sdei_smccc_hvc(unsigned long function_id,
-+			   unsigned long arg0, unsigned long arg1,
-+			   unsigned long arg2, unsigned long arg3,
-+			   unsigned long arg4, struct arm_smccc_res *res)
-+{
-+	arm_smccc_hvc(function_id, arg0, arg1, arg2, arg3, arg4, 0, 0, res);
-+}
-+
-+static int sdei_get_conduit(struct platform_device *pdev)
-+{
-+	const char *method;
-+	struct device_node *np = pdev->dev.of_node;
-+
-+	sdei_firmware_call = NULL;
-+	if (np) {
-+		if (of_property_read_string(np, "method", &method)) {
-+			pr_warn("missing \"method\" property\n");
-+			return CONDUIT_INVALID;
-+		}
-+
-+		if (!strcmp("hvc", method)) {
-+			sdei_firmware_call = &sdei_smccc_hvc;
-+			return CONDUIT_HVC;
-+		} else if (!strcmp("smc", method)) {
-+			sdei_firmware_call = &sdei_smccc_smc;
-+			return CONDUIT_SMC;
-+		}
-+
-+		pr_warn("invalid \"method\" property: %s\n", method);
-+	}
-+
-+	return CONDUIT_INVALID;
-+}
-+
-+static int sdei_probe(struct platform_device *pdev)
-+{
-+	int err;
-+	u64 ver = 0;
-+	int conduit;
-+
-+	conduit = sdei_get_conduit(pdev);
-+	if (!sdei_firmware_call)
-+		return 0;
-+
-+	err = sdei_api_get_version(&ver);
-+	if (err == -EOPNOTSUPP)
-+		pr_err("advertised but not implemented in platform firmware\n");
-+	if (err) {
-+		pr_err("Failed to get SDEI version: %d\n", err);
-+		sdei_mark_interface_broken();
-+		return err;
-+	}
-+
-+	pr_info("SDEIv%d.%d (0x%x) detected in firmware.\n",
-+		(int)SDEI_VERSION_MAJOR(ver), (int)SDEI_VERSION_MINOR(ver),
-+		(int)SDEI_VERSION_VENDOR(ver));
-+
-+	if (SDEI_VERSION_MAJOR(ver) != 1) {
-+		pr_warn("Conflicting SDEI version detected.\n");
-+		sdei_mark_interface_broken();
-+		return -EINVAL;
-+	}
-+
-+	err = sdei_platform_reset();
-+	if (err)
-+		return err;
-+
-+	sdei_entry_point = sdei_arch_get_entry_point(conduit);
-+	if (!sdei_entry_point) {
-+		/* Not supported due to hardware or boot configuration */
-+		sdei_mark_interface_broken();
-+		return 0;
-+	}
-+
-+	on_each_cpu(&_ipi_unmask_cpu, NULL, false);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id sdei_of_match[] = {
-+	{ .compatible = "arm,sdei-1.0" },
-+	{}
-+};
-+
-+static struct platform_driver sdei_driver = {
-+	.driver		= {
-+		.name			= "sdei",
-+		.of_match_table		= sdei_of_match,
-+	},
-+	.probe		= sdei_probe,
-+};
-+
-+static bool __init sdei_present_dt(void)
-+{
-+	struct platform_device *pdev;
-+	struct device_node *np, *fw_np;
-+
-+	fw_np = of_find_node_by_name(NULL, "firmware");
-+	if (!fw_np)
-+		return false;
-+
-+	np = of_find_matching_node(fw_np, sdei_of_match);
-+	of_node_put(fw_np);
-+	if (!np)
-+		return false;
-+
-+	pdev = of_platform_device_create(np, sdei_driver.driver.name, NULL);
-+	of_node_put(np);
-+	if (IS_ERR(pdev))
-+		return false;
-+
-+	return true;
-+}
-+
-+static int __init sdei_init(void)
-+{
-+	if (sdei_present_dt())
-+		platform_driver_register(&sdei_driver);
-+
-+	return 0;
-+}
-+
-+subsys_initcall_sync(sdei_init);
-+
-+int sdei_event_handler(struct pt_regs *regs,
-+		       struct sdei_registered_event *arg)
-+{
-+	int err;
-+	mm_segment_t orig_addr_limit;
-+	u32 event_num = arg->event_num;
-+
-+	orig_addr_limit = get_fs();
-+	set_fs(USER_DS);
-+
-+	err = arg->callback(event_num, regs, arg->callback_arg);
-+	if (err)
-+		pr_err_ratelimited("event %u on CPU %u failed with error: %d\n",
-+				   event_num, smp_processor_id(), err);
-+
-+	set_fs(orig_addr_limit);
-+
-+	return err;
-+}
-+NOKPROBE_SYMBOL(sdei_event_handler);
-diff --git a/include/linux/arm_sdei.h b/include/linux/arm_sdei.h
-new file mode 100644
-index 000000000000..157b6c297ea4
---- /dev/null
-+++ b/include/linux/arm_sdei.h
-@@ -0,0 +1,99 @@
-+/*
-+ * Software Delegated Exception Interface (SDEI) API
-+ *
-+ * Copyright (C) 2017 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program. If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#ifndef __LINUX_ARM_SDEI_H
-+#define __LINUX_ARM_SDEI_H
-+
-+#include <linux/gfp.h>
-+
-+#include <uapi/linux/arm_sdei.h>
-+
-+enum sdei_conduit_types {
-+	CONDUIT_INVALID = 0,
-+	CONDUIT_SMC,
-+	CONDUIT_HVC,
-+};
-+
++#endif /* __ASSEMBLY__ */
++#endif	/* __ASM_SDEI_H */
+diff --git a/arch/arm64/include/asm/stacktrace.h b/arch/arm64/include/asm/stacktrace.h
+index 6ad30776e984..472ef944e932 100644
+--- a/arch/arm64/include/asm/stacktrace.h
++++ b/arch/arm64/include/asm/stacktrace.h
+@@ -22,6 +22,7 @@
+ 
+ #include <asm/memory.h>
+ #include <asm/ptrace.h>
 +#include <asm/sdei.h>
-+
-+/* Arch code should override this to set the entry point from firmware... */
-+#ifndef sdei_arch_get_entry_point
-+#define sdei_arch_get_entry_point(conduit)	(0)
-+#endif
-+
-+/*
-+ * When an event occurs sdei_event_handler() will call a user-provided callback
-+ * like this in NMI context on the CPU that received the event.
-+ */
-+typedef int (sdei_event_callback)(u32 event, struct pt_regs *regs, void *arg);
-+
-+/*
-+ * Register your callback to claim an event. The event must be described
-+ * by firmware.
-+ * This function allocates memory, pass an appropriate gfp_flags.
-+ */
-+int sdei_event_register(u32 event_num, sdei_event_callback *cb, void *arg,
-+			gfp_t gfp_flags);
-+
-+/*
-+ * Calls to sdei_event_unregister() may return EINPROGRESS. Keep calling
-+ * it until it succeeds.
-+ */
-+int sdei_event_unregister(u32 event_num);
-+
-+int sdei_event_enable(u32 event_num);
-+int sdei_event_disable(u32 event_num);
-+
+ 
+ struct stackframe {
+ 	unsigned long fp;
+@@ -85,6 +86,8 @@ static inline bool on_accessible_stack(struct task_struct *tsk, unsigned long sp
+ 		return true;
+ 	if (on_overflow_stack(sp))
+ 		return true;
++	if (on_sdei_stack(sp))
++		return true;
+ 
+ 	return false;
+ }
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index f2b4e816b6de..d22bae586ade 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -53,6 +53,7 @@ arm64-obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o	\
+ arm64-obj-$(CONFIG_ARM64_RELOC_TEST)	+= arm64-reloc-test.o
+ arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
+ arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
++arm64-obj-$(CONFIG_ARM_SDE_INTERFACE)	+= sdei.o sdei-entry.o
+ 
+ obj-y					+= $(arm64-obj-y) vdso/ probes/
+ obj-m					+= $(arm64-obj-m)
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 71bf088f1e4b..bd67a04d40f0 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -18,6 +18,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
++#include <linux/arm_sdei.h>
+ #include <linux/sched.h>
+ #include <linux/mm.h>
+ #include <linux/dma-mapping.h>
+@@ -154,5 +155,9 @@ int main(void)
+   DEFINE(HIBERN_PBE_ADDR,	offsetof(struct pbe, address));
+   DEFINE(HIBERN_PBE_NEXT,	offsetof(struct pbe, next));
+   DEFINE(ARM64_FTR_SYSVAL,	offsetof(struct arm64_ftr_reg, sys_val));
 +#ifdef CONFIG_ARM_SDE_INTERFACE
-+/* For use by arch code when CPU hotplug notifiers are not appropriate. */
-+int sdei_mask_local_cpu(void);
-+int sdei_unmask_local_cpu(void);
-+#else
-+static inline int sdei_mask_local_cpu(void) { return 0; }
-+static inline int sdei_unmask_local_cpu(void) { return 0; }
-+#endif /* CONFIG_ARM_SDE_INTERFACE */
-+
-+
-+/*
-+ * This struct represents an event that has been registered. The driver
-+ * maintains a list of all events, and which ones are registered. (Private
-+ * events have one entry in the list, but are registered on each CPU).
-+ * A pointer to this struct is passed to firmware, and back to the event
-+ * handler. The event handler can then use this to invoke the registered
-+ * callback, without having to walk the list.
-+ *
-+ * For CPU private events, this structure is per-cpu.
-+ */
-+struct sdei_registered_event {
-+	/* For use by arch code: */
-+	struct pt_regs          interrupted_regs;
-+
-+	sdei_event_callback	*callback;
-+	void			*callback_arg;
-+	u32			 event_num;
-+	u8			 priority;
-+};
-+
-+/* The arch code entry point should then call this when an event arrives. */
-+int notrace sdei_event_handler(struct pt_regs *regs,
-+			       struct sdei_registered_event *arg);
-+
-+/* arch code may use this to retrieve the extra registers. */
-+int sdei_api_event_context(u32 query, u64 *result);
-+
-+#endif /* __LINUX_ARM_SDEI_H */
-diff --git a/include/uapi/linux/arm_sdei.h b/include/uapi/linux/arm_sdei.h
++  DEFINE(SDEI_EVENT_INTREGS,	offsetof(struct sdei_registered_event, interrupted_regs));
++  DEFINE(SDEI_EVENT_PRIORITY,	offsetof(struct sdei_registered_event, priority));
++#endif
+   return 0;
+ }
+diff --git a/arch/arm64/kernel/sdei-entry.S b/arch/arm64/kernel/sdei-entry.S
 new file mode 100644
-index 000000000000..643bb785d1f5
+index 000000000000..047bfa566310
 --- /dev/null
-+++ b/include/uapi/linux/arm_sdei.h
-@@ -0,0 +1,91 @@
++++ b/arch/arm64/kernel/sdei-entry.S
+@@ -0,0 +1,122 @@
 +/*
-+ *Software Delegated Exception Interface (SDEI) Firmware API
-+ *
-+ * This header holds common SDEI defines and macros shared
-+ * by: ARM64 kernel, KVM and user space.
++ * Software Delegated Exception entry point from firmware to the kernel.
 + *
 + * Copyright (C) 2017 ARM Ltd.
 + *
@@ -889,76 +212,409 @@ index 000000000000..643bb785d1f5
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#ifndef _UAPI_LINUX_ARM_SDEI_H
-+#define _UAPI_LINUX_ARM_SDEI_H
 +
-+#define SDEI_1_0_FN_BASE			0xC4000020
-+#define SDEI_1_0_MASK				0xFFFFFFE0
-+#define SDEI_1_0_FN(n)				(SDEI_1_0_FN_BASE + (n))
++#include <linux/linkage.h>
 +
-+#define SDEI_1_0_FN_SDEI_VERSION			SDEI_1_0_FN(0x00)
-+#define SDEI_1_0_FN_SDEI_EVENT_REGISTER			SDEI_1_0_FN(0x01)
-+#define SDEI_1_0_FN_SDEI_EVENT_ENABLE			SDEI_1_0_FN(0x02)
-+#define SDEI_1_0_FN_SDEI_EVENT_DISABLE			SDEI_1_0_FN(0x03)
-+#define SDEI_1_0_FN_SDEI_EVENT_CONTEXT			SDEI_1_0_FN(0x04)
-+#define SDEI_1_0_FN_SDEI_EVENT_COMPLETE			SDEI_1_0_FN(0x05)
-+#define SDEI_1_0_FN_SDEI_EVENT_COMPLETE_AND_RESUME	SDEI_1_0_FN(0x06)
-+#define SDEI_1_0_FN_SDEI_EVENT_UNREGISTER		SDEI_1_0_FN(0x07)
-+#define SDEI_1_0_FN_SDEI_EVENT_STATUS			SDEI_1_0_FN(0x08)
-+#define SDEI_1_0_FN_SDEI_EVENT_GET_INFO			SDEI_1_0_FN(0x09)
-+#define SDEI_1_0_FN_SDEI_EVENT_ROUTING_SET		SDEI_1_0_FN(0x0A)
-+#define SDEI_1_0_FN_SDEI_PE_MASK			SDEI_1_0_FN(0x0B)
-+#define SDEI_1_0_FN_SDEI_PE_UNMASK			SDEI_1_0_FN(0x0C)
-+#define SDEI_1_0_FN_SDEI_INTERRUPT_BIND			SDEI_1_0_FN(0x0D)
-+#define SDEI_1_0_FN_SDEI_INTERRUPT_RELEASE		SDEI_1_0_FN(0x0E)
-+#define SDEI_1_0_FN_SDEI_PRIVATE_RESET			SDEI_1_0_FN(0x11)
-+#define SDEI_1_0_FN_SDEI_SHARED_RESET			SDEI_1_0_FN(0x12)
++#include <asm/alternative.h>
++#include <asm/asm-offsets.h>
++#include <asm/assembler.h>
++#include <asm/memory.h>
++#include <asm/ptrace.h>
++#include <asm/sdei.h>
++#include <uapi/linux/arm_sdei.h>
 +
-+#define SDEI_VERSION_MAJOR_SHIFT			48
-+#define SDEI_VERSION_MAJOR_MASK				0x7fff
-+#define SDEI_VERSION_MINOR_SHIFT			32
-+#define SDEI_VERSION_MINOR_MASK				0xffff
-+#define SDEI_VERSION_VENDOR_SHIFT			0
-+#define SDEI_VERSION_VENDOR_MASK			0xffffffff
++/*
++ * Software Delegated Exception entry point.
++ *
++ * x0: Event number
++ * x1: struct sdei_registered_event argument from registration time.
++ * x2: interrupted PC
++ * x3: interrupted PSTATE
++ *
++ * Firmware has preserved x0->x17 for us, we must save/restore the rest to
++ * follow SMC-CC. We save (or retrieve) all the registers as the handler may
++ * want them.
++ */
++ENTRY(__sdei_asm_handler)
++	stp     x2, x3, [x1, #SDEI_EVENT_INTREGS + S_PC]
++	stp     x4, x5, [x1, #SDEI_EVENT_INTREGS + 16 * 2]
++	stp     x6, x7, [x1, #SDEI_EVENT_INTREGS + 16 * 3]
++	stp     x8, x9, [x1, #SDEI_EVENT_INTREGS + 16 * 4]
++	stp     x10, x11, [x1, #SDEI_EVENT_INTREGS + 16 * 5]
++	stp     x12, x13, [x1, #SDEI_EVENT_INTREGS + 16 * 6]
++	stp     x14, x15, [x1, #SDEI_EVENT_INTREGS + 16 * 7]
++	stp     x16, x17, [x1, #SDEI_EVENT_INTREGS + 16 * 8]
++	stp     x18, x19, [x1, #SDEI_EVENT_INTREGS + 16 * 9]
++	stp     x20, x21, [x1, #SDEI_EVENT_INTREGS + 16 * 10]
++	stp     x22, x23, [x1, #SDEI_EVENT_INTREGS + 16 * 11]
++	stp     x24, x25, [x1, #SDEI_EVENT_INTREGS + 16 * 12]
++	stp     x26, x27, [x1, #SDEI_EVENT_INTREGS + 16 * 13]
++	stp     x28, x29, [x1, #SDEI_EVENT_INTREGS + 16 * 14]
++	mov	x4, sp
++	stp     lr, x4, [x1, #SDEI_EVENT_INTREGS + S_LR]
 +
-+#define SDEI_VERSION_MAJOR(x)	(x>>SDEI_VERSION_MAJOR_SHIFT & SDEI_VERSION_MAJOR_MASK)
-+#define SDEI_VERSION_MINOR(x)	(x>>SDEI_VERSION_MINOR_SHIFT & SDEI_VERSION_MINOR_MASK)
-+#define SDEI_VERSION_VENDOR(x)	(x>>SDEI_VERSION_VENDOR_SHIFT & SDEI_VERSION_VENDOR_MASK)
++	mov	x19, x1
 +
-+/* SDEI return values */
-+#define SDEI_SUCCESS		0
-+#define SDEI_NOT_SUPPORTED	-1
-+#define SDEI_INVALID_PARAMETERS	-2
-+#define SDEI_DENIED		-3
-+#define SDEI_PENDING		-5
-+#define SDEI_OUT_OF_RESOURCE	-10
++#ifdef CONFIG_VMAP_STACK
++	/*
++	 * entry.S may have been using sp as a scratch register, find whether
++	 * this is a normal or critical event and switch to the appropriate
++	 * stack for this CPU.
++	 */
++	ldrb	w4, [x19, #SDEI_EVENT_PRIORITY]
++	cbnz	w4, 1f
++	ldr_this_cpu dst=x5, sym=sdei_stack_normal_ptr, tmp=x6
++	b	2f
++1:	ldr_this_cpu dst=x5, sym=sdei_stack_critical_ptr, tmp=x6
++2:	mov	x6, #SDEI_STACK_SIZE
++	add	x5, x5, x6
++	mov	sp, x5
++#endif
 +
-+/* EVENT_REGISTER flags */
-+#define SDEI_EVENT_REGISTER_RM_ANY	0
-+#define SDEI_EVENT_REGISTER_RM_PE	1
++	/*
++	 * We may have interrupted userspace, or a guest, or exit-from or
++	 * return-to either of these. We can't trust sp_el0, restore it.
++	 */
++	mrs	x28, sp_el0
++	ldr_this_cpu	dst=x0, sym=__entry_task, tmp=x1
++	msr	sp_el0, x0
 +
-+/* EVENT_STATUS return value bits */
-+#define SDEI_EVENT_STATUS_RUNNING	2
-+#define SDEI_EVENT_STATUS_ENABLED	1
-+#define SDEI_EVENT_STATUS_REGISTERED	0
++	/* If we interrupted the kernel point to the previous stack/frame. */
++	and     x0, x3, #0xc
++	mrs     x1, CurrentEL
++	cmp     x0, x1
++	csel	x29, x29, xzr, eq	// fp, or zero
++	csel	x4, x2, xzr, eq		// elr, or zero
 +
-+/* EVENT_COMPLETE status values */
-+#define SDEI_EV_HANDLED	0
-+#define SDEI_EV_FAILED	1
++	stp	x29, x4, [sp, #-16]!
++	mov	x29, sp
 +
-+/* GET_INFO values */
-+#define SDEI_EVENT_INFO_EV_TYPE			0
-+#define SDEI_EVENT_INFO_EV_SIGNALED		1
-+#define SDEI_EVENT_INFO_EV_PRIORITY		2
-+#define SDEI_EVENT_INFO_EV_ROUTING_MODE		3
-+#define SDEI_EVENT_INFO_EV_ROUTING_AFF		4
++	add	x0, x19, #SDEI_EVENT_INTREGS
++	mov	x1, x19
++	bl	__sdei_handler
 +
-+/* and their results */
-+#define SDEI_EVENT_TYPE_PRIVATE			0
-+#define SDEI_EVENT_TYPE_SHARED			1
-+#define SDEI_EVENT_PRIORITY_NORMAL		0
-+#define SDEI_EVENT_PRIORITY_CRITICAL		1
++	msr	sp_el0, x28
++	/* restore regs >x17 that we clobbered */
++	ldp     x28, x29, [x19, #SDEI_EVENT_INTREGS + 16 * 14]
++	ldp     lr, x4, [x19, #SDEI_EVENT_INTREGS + S_LR]
++	mov	sp, x4
++	ldp     x18, x19, [x19, #SDEI_EVENT_INTREGS + 16 * 9]
 +
-+#endif /* _UAPI_LINUX_ARM_SDEI_H */
++	mov	x1, x0			// address to complete_and_resume
++	/* x0 = (x0 <= 1) ? EVENT_COMPLETE:EVENT_COMPLETE_AND_RESUME */
++	cmp	x0, #1
++	mov_q	x2, SDEI_1_0_FN_SDEI_EVENT_COMPLETE
++	mov_q	x3, SDEI_1_0_FN_SDEI_EVENT_COMPLETE_AND_RESUME
++	csel	x0, x2, x3, ls
++
++	/* On success, this call never returns... */
++	ldr_l	x2, sdei_exit_mode
++	cmp	x2, #SDEI_EXIT_SMC
++	b.ne	1f
++	smc	#0
++	b	.
++1:	hvc	#0
++	b	.
++ENDPROC(__sdei_asm_handler)
++NOKPROBE(__sdei_asm_handler)
+diff --git a/arch/arm64/kernel/sdei.c b/arch/arm64/kernel/sdei.c
+new file mode 100644
+index 000000000000..6ec098e17dab
+--- /dev/null
++++ b/arch/arm64/kernel/sdei.c
+@@ -0,0 +1,235 @@
++/*
++ * Copyright (C) 2017 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#define pr_fmt(fmt) "sdei: " fmt
++
++#include <linux/arm_sdei.h>
++#include <linux/sched/task_stack.h>
++#include <linux/irqflags.h>
++#include <linux/hardirq.h>
++
++#include <asm/alternative.h>
++#include <asm/kprobes.h>
++#include <asm/ptrace.h>
++#include <asm/sysreg.h>
++#include <asm/vmap_stack.h>
++
++unsigned long sdei_exit_mode;
++
++/*
++ * VMAP'd stacks checking for stack overflow on exception using sp as a scratch
++ * register, meaning SDEI has to switch to its own stack. We need two stacks as
++ * a critical event may interrupt a normal event that has just taken a
++ * synchronous exception, and is using sp as scratch register. For a critical
++ * event interrupting a normal event, we can't reliably tell if we were on the
++ * sdei stack.
++ * For private events we need per-cpu stacks, these can't be allocated lazily
++ * as THREADINFO_GFP is a subset of GFP_KERNEL which can't necessarily be used
++ * when the first private event is registered.
++ */
++DECLARE_PER_CPU(unsigned long *, sdei_stack_normal_ptr);
++DECLARE_PER_CPU(unsigned long *, sdei_stack_critical_ptr);
++
++#ifdef CONFIG_VMAP_STACK
++DEFINE_PER_CPU(unsigned long *, sdei_stack_normal_ptr);
++DEFINE_PER_CPU(unsigned long *, sdei_stack_critical_ptr);
++#endif
++
++static void _free_sdei_stack(unsigned long * __percpu *ptr, int cpu)
++{
++	unsigned long *p;
++
++	p = per_cpu(*ptr, cpu);
++	if (p) {
++		per_cpu(*ptr, cpu) = NULL;
++		vfree(p);
++	}
++}
++
++static void free_sdei_stacks(void)
++{
++	int cpu;
++
++	for_each_possible_cpu(cpu) {
++		_free_sdei_stack(&sdei_stack_normal_ptr, cpu);
++		_free_sdei_stack(&sdei_stack_critical_ptr, cpu);
++	}
++}
++
++static int _init_sdei_stack(unsigned long * __percpu *ptr, int cpu)
++{
++	unsigned long *p;
++
++	p = arch_alloc_vmap_stack(SDEI_STACK_SIZE, cpu_to_node(cpu));
++	if (!p)
++		return -ENOMEM;
++	per_cpu(*ptr, cpu) = p;
++
++	return 0;
++}
++
++static int init_sdei_stacks(void)
++{
++	int cpu;
++	int err = 0;
++
++	for_each_possible_cpu(cpu) {
++		err = _init_sdei_stack(&sdei_stack_normal_ptr, cpu);
++		if (err)
++			break;
++		err = _init_sdei_stack(&sdei_stack_critical_ptr, cpu);
++		if (err)
++			break;
++	}
++
++	if (err)
++		free_sdei_stacks();
++
++	return err;
++}
++
++bool _on_sdei_stack(unsigned long sp)
++{
++	unsigned long low, high;
++
++	if (!IS_ENABLED(CONFIG_VMAP_STACK))
++		return false;
++
++	low = (unsigned long)raw_cpu_read(sdei_stack_critical_ptr);
++	high = low + SDEI_STACK_SIZE;
++
++	if (low <= sp && sp < high)
++		return true;
++
++	low = (unsigned long)raw_cpu_read(sdei_stack_normal_ptr);
++	high = low + SDEI_STACK_SIZE;
++
++	return (low <= sp && sp < high);
++}
++
++unsigned long sdei_arch_get_entry_point(int conduit)
++{
++	/*
++	 * SDEI works between adjacent exception levels. If we booted at EL1 we
++	 * assume a hypervisor is marshalling events. If we booted@EL2 and
++	 * dropped to EL1 because we don't support VHE, then we can't support
++	 * SDEI.
++	 */
++	if (is_hyp_mode_available() && !is_kernel_in_hyp_mode()) {
++		pr_err("Not supported on this hardware/boot configuration\n");
++		return 0;
++	}
++
++	if (IS_ENABLED(CONFIG_VMAP_STACK)) {
++		if (init_sdei_stacks())
++			return 0;
++	}
++
++	sdei_exit_mode = (conduit == CONDUIT_HVC) ? SDEI_EXIT_HVC : SDEI_EXIT_SMC;
++	return (unsigned long)__sdei_asm_handler;
++}
++
++/*
++ * __sdei_handler() returns one of:
++ *  SDEI_EV_HANDLED -  success, return to the interrupted context.
++ *  SDEI_EV_FAILED  -  failure, return this error code to firmare.
++ *  virtual-address -  success, return to this address.
++ */
++static __kprobes unsigned long _sdei_handler(struct pt_regs *regs,
++					     struct sdei_registered_event *arg)
++{
++	u32 mode;
++	int i, err = 0;
++	const int clobbered_registers = 4;
++	u64 elr = read_sysreg(elr_el1);
++	u32 kernel_mode = read_sysreg(CurrentEL) | 1;	/* +SPSel */
++	unsigned long vbar = read_sysreg(vbar_el1);
++
++	/* Retrieve the missing registers values */
++	for (i = 0; i < clobbered_registers; i++) {
++		/* from within the handler, this call always succeeds */
++		sdei_api_event_context(i, &regs->regs[i]);
++	}
++
++	/*
++	 * We didn't take an exception to get here, set PAN. UAO will be cleared
++	 * by sdei_event_handler()s set_fs(USER_DS) call.
++	 */
++	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,
++			CONFIG_ARM64_PAN));
++
++	err = sdei_event_handler(regs, arg);
++	if (err)
++		return SDEI_EV_FAILED;
++
++	if (elr != read_sysreg(elr_el1)) {
++		/*
++		 * We took a synchronous exception from the SDEI handler.
++		 * This could deadlock, and if you interrupt KVM it will
++		 * hyp-panic instead.
++		 */
++		pr_warn("unsafe: exception during handler\n");
++	}
++
++	mode = regs->pstate & (PSR_MODE32_BIT | PSR_MODE_MASK);
++
++	/*
++	 * If we interrupted the kernel with interrupts masked, we always go
++	 * back to wherever we came from.
++	 */
++	if (mode == kernel_mode && !interrupts_enabled(regs))
++		return SDEI_EV_HANDLED;
++
++	/*
++	 * Otherwise, we pretend this was an IRQ. This lets user space tasks
++	 * receive signals before we return to them, and KVM to invoke it's
++	 * world switch to do the same.
++	 *
++	 * See DDI0487B.a Table D1-7 'Vector offsets from vector table base
++	 * address'.
++	 */
++	if (mode == kernel_mode)
++		return vbar + 0x280;
++	else if (mode & PSR_MODE32_BIT)
++		return vbar + 0x680;
++
++	return vbar + 0x480;
++}
++
++
++asmlinkage __kprobes notrace unsigned long
++__sdei_handler(struct pt_regs *regs, struct sdei_registered_event *arg)
++{
++	unsigned long ret;
++	bool do_nmi_exit = false;
++
++	/*
++	 * nmi_enter() deals with printk() re-entrance and use of RCU when
++	 * RCU believed this CPU was idle. Because critical events can
++	 * interrupt normal events, we may already be in_nmi().
++	 */
++	if (!in_nmi()) {
++		nmi_enter();
++		do_nmi_exit = true;
++	}
++
++	ret = _sdei_handler(regs, arg);
++
++	if (do_nmi_exit)
++		nmi_exit();
++
++	return ret;
++}
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 9f7195a5773e..ca972cf9bafb 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -18,6 +18,7 @@
+  */
+ 
+ #include <linux/acpi.h>
++#include <linux/arm_sdei.h>
+ #include <linux/delay.h>
+ #include <linux/init.h>
+ #include <linux/spinlock.h>
+@@ -838,6 +839,7 @@ static void ipi_cpu_stop(unsigned int cpu)
+ 	set_cpu_online(cpu, false);
+ 
+ 	local_irq_disable();
++	sdei_mask_local_cpu();
+ 
+ 	while (1)
+ 		cpu_relax();
+@@ -855,6 +857,7 @@ static void ipi_cpu_crash_stop(unsigned int cpu, struct pt_regs *regs)
+ 	atomic_dec(&waiting_for_crash_ipi);
+ 
+ 	local_irq_disable();
++	sdei_mask_local_cpu();
+ 
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	if (cpu_ops[cpu]->cpu_die)
+@@ -974,6 +977,8 @@ void smp_send_stop(void)
+ 	if (num_online_cpus() > 1)
+ 		pr_warning("SMP: failed to stop secondary CPUs %*pbl\n",
+ 			   cpumask_pr_args(cpu_online_mask));
++
++	sdei_mask_local_cpu();
+ }
+ 
+ #ifdef CONFIG_KEXEC_CORE
+@@ -992,8 +997,10 @@ void crash_smp_send_stop(void)
+ 
+ 	cpus_stopped = 1;
+ 
+-	if (num_online_cpus() == 1)
++	if (num_online_cpus() == 1) {
++		sdei_mask_local_cpu();
+ 		return;
++	}
+ 
+ 	cpumask_copy(&mask, cpu_online_mask);
+ 	cpumask_clear_cpu(smp_processor_id(), &mask);
+@@ -1011,6 +1018,8 @@ void crash_smp_send_stop(void)
+ 	if (atomic_read(&waiting_for_crash_ipi) > 0)
+ 		pr_warning("SMP: failed to stop secondary CPUs %*pbl\n",
+ 			   cpumask_pr_args(&mask));
++
++	sdei_mask_local_cpu();
+ }
+ 
+ bool smp_crash_stop_failed(void)
 -- 
 2.13.3
