@@ -1,151 +1,104 @@
 From: james.morse@arm.com (James Morse)
-Date: Tue, 17 Oct 2017 18:44:19 +0100
-Subject: [PATCH v4 00/13] arm64/firmware: Software Delegated Exception
- Interface
-Message-ID: <20171017174432.1684-1-james.morse@arm.com>
+Date: Tue, 17 Oct 2017 18:44:27 +0100
+Subject: [PATCH v4 08/13] arm64: Add vmap_stack header file
+In-Reply-To: <20171017174432.1684-1-james.morse@arm.com>
+References: <20171017174432.1684-1-james.morse@arm.com>
+Message-ID: <20171017174432.1684-9-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+Today the arm64 arch code allocates an extra IRQ stack per-cpu. If we
+also have SDEI and VMAP stacks we need two extra per-cpu VMAP stacks.
 
-The Software Delegated Exception Interface (SDEI) is an ARM specification
-for registering callbacks from the platform firmware into the OS.
-This is intended to be used to implement firmware-first RAS notifications,
-but also supports vendor-defined events and binding IRQs as events.
+Move the VMAP stack allocation out to a helper in a new header file.
+This avoids missing THREADINFO_GFP, or getting the all-important alignment
+wrong.
 
-The document is here:
-http://infocenter.arm.com/help/topic/com.arm.doc.den0054a/ARM_DEN0054A_Software_Delegated_Exception_Interface.pdf
+Signed-off-by: James Morse <james.morse@arm.com>
 
-I anticpate once reviewed this series will go via the arm-soc tree, as the
-bulk of the code is under /drivers/firmware/.
+---
+Changes since v3:
+ * Added BUILD_BUG() instead of a spooky link error
 
-The major change in v4 is file renames.
-The major change in v3 was due to VMAP stacks. We can't trust sp when we take
-an event, so need our own SDEI stack. Events can nest, so we need two. Private
-events can be delivered per-cpu, so we need two per-cpu SDEI stacks.
-
-Future patches may try to reduce this stack size, or push the stacks to be
-allocated when events are registered.
-
-
-The APCICA support for the SDEI table is now in mainline, so this series has
-grown the detection code for non-DT systems. The APEI/GHES wire-up is still
-being held back as APEI's ghes_proc() isn't (yet) safe for multiple sources
-of NMI.
-
-Exposing the HVC range through KVM to user-space is gone, this will be
-re-incarnated as something that better fits KVMs architecture emulation,
-as opposed to assuming all-the-world's-SMC-CC.
-
-
-This series (juggles some registers with KVM+VHE, then) adds a DT binding to
-trigger probing of the interface and support for the SDEI API.
-
-SDEI runs between adjacent exception levels, so events will always be delivered
-to EL2 if firmware is at EL3. For VHE hosts we run the SDEI event handler
-behind KVM's back with all exceptions masked. Once the handler has done its
-work we return to the appropriate vbar+irq entry. This allows KVM to
-world-switch and deliver any signals sent by the handler to Qemu/kvmtool. We
-do the same thing if we interrupt host EL0. If we interrupted code with
-interrupts masked, we use a different API call to return to the interrupted
-context.
-
-What about non-VHE KVM? If you don't have VHE support and boot at EL2, the
-kernel drops to EL1. This driver will print an error message then give up. This
-is because events would still be delivered to EL2 hitting either KVM, or the
-hyp-stub. Supporting this is complicated, but because the main use-case is
-RAS, and ARM v8.2's RAS extensions imply v8.1's Virtual Host Extensions, we
-can assume all platforms with SDEI will support VHE too. (I have some ideas
-on how to support non-VHE).
-
-Running the event handler behind VHE-KVM's back has some side effects: The
-event handler will blindly use any registers that are shared between the host
-and guest. The two that I think matter are TPIDR_EL1, and the debug state. The
-guest may have set MDSCR_EL1 so debug exceptions must remain masked. The
-guest's TPIDR_EL1 will be used by the event handler if it accesses per-cpu
-variables. This needs fixing. The first part of this series juggles KVMs use
-of TPIDR_EL2 so that we share it with the host on VHE systems. An equivalent
-change for 32bit is (still) on my todo list. (the alternative to this is to
-have a parody world switch in the SDEI event handler, but this would mean
-special casing interrupted guests, and be an ABI link to KVM.)
-
-Is this another begins-with-S RAS mechanism for arm64? Yes.
-Why? Any notification delivered as an exception will overwrite the exception
-registers. This is fatal for the running thread if it happens during entry.S's
-kernel_enter or kernel_exit. Instead of adding masking and routing controls,
-events are delivered to a registered address at a fixed exception level and
-don't change the exception registers when delivered.
-
-This series can be retrieved from:
-git://linux-arm.org/linux-jm.git -b sdei/v4/base
-
-
-Questions and contradictions welcome!
-
-Thanks,
-
-James
-
-[Changes since previous versions are noted on each patch]
-
-James Morse (13):
-  KVM: arm64: Store vcpu on the stack during __guest_enter()
-  KVM: arm/arm64: Convert kvm_host_cpu_state to a static per-cpu
-    allocation
-  KVM: arm64: Change hyp_panic()s dependency on tpidr_el2
-  arm64: alternatives: use tpidr_el2 on VHE hosts
-  KVM: arm64: Stop save/restoring host tpidr_el1 on VHE
-  Docs: dt: add devicetree binding for describing arm64 SDEI firmware
-  firmware: arm_sdei: Add driver for Software Delegated Exceptions
-  arm64: Add vmap_stack header file
-  arm64: kernel: Add arch-specific SDEI entry code and CPU masking
-  firmware: arm_sdei: Add support for CPU and system power states
-  firmware: arm_sdei: add support for CPU private events
-  arm64: acpi: Remove __init from acpi_psci_use_hvc() for use by SDEI
-  firmware: arm_sdei: Discover SDEI support via ACPI
-
- .../devicetree/bindings/arm/firmware/sdei.txt      |   42 +
- MAINTAINERS                                        |    9 +
- arch/arm64/Kconfig                                 |    2 +-
- arch/arm64/include/asm/alternative.h               |    2 +
- arch/arm64/include/asm/assembler.h                 |    8 +
- arch/arm64/include/asm/kvm_host.h                  |    2 +
- arch/arm64/include/asm/percpu.h                    |   11 +-
- arch/arm64/include/asm/sdei.h                      |   63 ++
- arch/arm64/include/asm/stacktrace.h                |    3 +
- arch/arm64/include/asm/vmap_stack.h                |   38 +
- arch/arm64/kernel/Makefile                         |    1 +
- arch/arm64/kernel/acpi.c                           |    2 +-
- arch/arm64/kernel/alternative.c                    |    9 +-
- arch/arm64/kernel/asm-offsets.c                    |    5 +
- arch/arm64/kernel/cpufeature.c                     |   17 +
- arch/arm64/kernel/irq.c                            |   13 +-
- arch/arm64/kernel/sdei-entry.S                     |  122 +++
- arch/arm64/kernel/sdei.c                           |  235 +++++
- arch/arm64/kernel/smp.c                            |   11 +-
- arch/arm64/kvm/hyp-init.S                          |    4 +
- arch/arm64/kvm/hyp/entry.S                         |   10 +-
- arch/arm64/kvm/hyp/hyp-entry.S                     |   18 +-
- arch/arm64/kvm/hyp/switch.c                        |   25 +-
- arch/arm64/kvm/hyp/sysreg-sr.c                     |   16 +-
- arch/arm64/mm/proc.S                               |    8 +
- drivers/firmware/Kconfig                           |    8 +
- drivers/firmware/Makefile                          |    1 +
- drivers/firmware/arm_sdei.c                        | 1095 ++++++++++++++++++++
- include/linux/arm_sdei.h                           |  102 ++
- include/linux/cpuhotplug.h                         |    1 +
- include/linux/psci.h                               |    3 +-
- include/uapi/linux/arm_sdei.h                      |   91 ++
- virt/kvm/arm/arm.c                                 |   18 +-
- 33 files changed, 1933 insertions(+), 62 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/firmware/sdei.txt
- create mode 100644 arch/arm64/include/asm/sdei.h
+ arch/arm64/include/asm/vmap_stack.h | 38 +++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/irq.c             | 13 ++-----------
+ 2 files changed, 40 insertions(+), 11 deletions(-)
  create mode 100644 arch/arm64/include/asm/vmap_stack.h
- create mode 100644 arch/arm64/kernel/sdei-entry.S
- create mode 100644 arch/arm64/kernel/sdei.c
- create mode 100644 drivers/firmware/arm_sdei.c
- create mode 100644 include/linux/arm_sdei.h
- create mode 100644 include/uapi/linux/arm_sdei.h
 
+diff --git a/arch/arm64/include/asm/vmap_stack.h b/arch/arm64/include/asm/vmap_stack.h
+new file mode 100644
+index 000000000000..8fc1ef846b15
+--- /dev/null
++++ b/arch/arm64/include/asm/vmap_stack.h
+@@ -0,0 +1,38 @@
++/*
++ * Copyright (C) 2017 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __ASM_VMAP_STACK_H
++#define __ASM_VMAP_STACK_H
++
++#include <linux/vmalloc.h>
++#include <asm/memory.h>
++#include <asm/pgtable.h>
++#include <asm/thread_info.h>
++
++/*
++ * To ensure that VMAP'd stack overflow detection works correctly, all VMAP'd
++ * stacks need to have the same alignment.
++ */
++static inline unsigned long *arch_alloc_vmap_stack(size_t stack_size, int node)
++{
++	BUILD_BUG_ON(!IS_ENABLED(CONFIG_VMAP_STACK));
++
++	return __vmalloc_node_range(stack_size, THREAD_ALIGN,
++				    VMALLOC_START, VMALLOC_END,
++				    THREADINFO_GFP, PAGE_KERNEL, 0, node,
++				    __builtin_return_address(0));
++}
++
++#endif /* __ASM_VMAP_STACK_H */
+diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
+index 713561e5bcab..60e5fc661f74 100644
+--- a/arch/arm64/kernel/irq.c
++++ b/arch/arm64/kernel/irq.c
+@@ -29,6 +29,7 @@
+ #include <linux/irqchip.h>
+ #include <linux/seq_file.h>
+ #include <linux/vmalloc.h>
++#include <asm/vmap_stack.h>
+ 
+ unsigned long irq_err_count;
+ 
+@@ -58,17 +59,7 @@ static void init_irq_stacks(void)
+ 	unsigned long *p;
+ 
+ 	for_each_possible_cpu(cpu) {
+-		/*
+-		* To ensure that VMAP'd stack overflow detection works
+-		* correctly, the IRQ stacks need to have the same
+-		* alignment as other stacks.
+-		*/
+-		p = __vmalloc_node_range(IRQ_STACK_SIZE, THREAD_ALIGN,
+-					 VMALLOC_START, VMALLOC_END,
+-					 THREADINFO_GFP, PAGE_KERNEL,
+-					 0, cpu_to_node(cpu),
+-					 __builtin_return_address(0));
+-
++		p = arch_alloc_vmap_stack(IRQ_STACK_SIZE, cpu_to_node(cpu));
+ 		per_cpu(irq_stack_ptr, cpu) = p;
+ 	}
+ }
 -- 
 2.13.3
