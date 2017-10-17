@@ -1,32 +1,73 @@
-From: tpiepho@impinj.com (Trent Piepho)
-Date: Tue, 17 Oct 2017 17:37:49 +0000
-Subject: [PATCH 2/2] PCI: imx6: Check for link training status in link up
- check
-In-Reply-To: <1508229842.2146.4.camel@pengutronix.de>
-References: <20171017001159.109152-1-tpiepho@impinj.com>
- <20171017001159.109152-2-tpiepho@impinj.com>
- <1508229842.2146.4.camel@pengutronix.de>
-Message-ID: <1508261868.110408.5.camel@impinj.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 17 Oct 2017 19:40:05 +0200
+Subject: [GIT PULL 1/2] Rockchip dts32 updates for 4.15 part1
+Message-ID: <5843673.lOC77YXMZV@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-10-17 at 10:44 +0200, Lucas Stach wrote:
-> Am Montag, den 16.10.2017, 17:11 -0700 schrieb Trent Piepho:
-> > 
-> > 
-> > There result is no link training check.
-> > 
-> > Then commit dac29e6c5460 ("PCI: designware: Add default link up check if
-> > sub-driver doesn't override")
-> 
-> I think you meant 01c076732e82 (PCI: designware: Check LTSSM training
-> bit before deciding link is up) here.
-> 
-> >  added a link training check to the default
-> > version of dw_pcie_link_up(), but since imx6 uses imx6_pcie_link_up() it
-> > does not use the default version with this fix.
+Hi Arnd, Kevin, Olof,
 
-It was really the combination of both commits.  'dac added the common
-link up check, which imx6 didn't use, and then '01c added the training
-check to it.  It appears I've attributed both changes to 'dac in my
-message and forgot '01c.  I'll fix.
+please find below the first round of Rockchip dts32 updates targetted
+for 4.15.
+
+Thanks
+Heiko
+
+The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+
+  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.15-rockchip-dts32-1
+
+for you to fetch changes up to 345b40f1e50759d09144c4aa044d07823d77c283:
+
+  ARM: dts: rockchip: Enable thermal on rk3288-vyasa board (2017-10-14 21:10:31 +0200)
+
+----------------------------------------------------------------
+One new board the Vyasa from Amarula Solutions using a rk3288
+and core lvds node for the newly added driver+binding.
+Also bindings + nodes for the Mali-Utgard GPUs found on some
+Rockchip socs like rk3036 and rk3188. With the recently revived
+Lima project they can even render a red triangle to a png file.
+
+----------------------------------------------------------------
+Heiko Stuebner (9):
+      dt-bindings: gpu: mali-utgard: Add Rockchip Utgard Malis
+      dt-bindings: gpu: mali-utgard: add optional supply regulator
+      dt-bindings: gpu: mali-utgard: add optional power-domain reference
+      ARM: dts: rockchip: add rk3036 gpu node
+      ARM: dts: rockchip: enable the gpu on rk3036-kylin boards
+      ARM: dts: rockchip: add rk322x gpu node
+      ARM: dts: rockchip: add gpu nodes on rk3066/rk3188
+      ARM: dts: rockchip: enable gpu on rk3188-radxarock
+      ARM: dts: rockchip: fix mali400 ppmmu interrupt names
+
+Jagan Teki (4):
+      dt-bindings: Add vendor prefix for Amarula Solutions
+      ARM: dts: rockchip: Add rk3288 vyasa board
+      ARM: dts: rockchip: enable vops and hdmi output on rk3288-vyasa
+      ARM: dts: rockchip: Enable mali GPU node on rk3288-vyasa
+
+Michael Trimarchi (1):
+      ARM: dts: rockchip: Enable thermal on rk3288-vyasa board
+
+Sandy Huang (1):
+      ARM: dts: rockchip: add LVDS node for rk3288
+
+ Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
+ .../devicetree/bindings/gpu/arm,mali-utgard.txt    |  16 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/Makefile                         |   3 +-
+ arch/arm/boot/dts/rk3036-kylin.dts                 |   5 +
+ arch/arm/boot/dts/rk3036.dtsi                      |  19 ++
+ arch/arm/boot/dts/rk3066a.dtsi                     |  24 ++
+ arch/arm/boot/dts/rk3188-radxarock.dts             |   4 +
+ arch/arm/boot/dts/rk3188.dtsi                      |  24 ++
+ arch/arm/boot/dts/rk322x.dtsi                      |  21 ++
+ arch/arm/boot/dts/rk3288-vyasa.dts                 | 347 +++++++++++++++++++++
+ arch/arm/boot/dts/rk3288.dtsi                      |  52 +++
+ arch/arm/boot/dts/rk3xxx.dtsi                      |  11 +
+ 13 files changed, 530 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/rk3288-vyasa.dts
