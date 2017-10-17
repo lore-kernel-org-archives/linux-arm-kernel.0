@@ -1,140 +1,99 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 17 Oct 2017 07:34:35 -0700
-Subject: [PATCH 03/10] arm: KVM: Add optimized PIPT icache flushing
-In-Reply-To: <968be34c-fc4c-1a17-d7cf-0e4cc17ef300@arm.com>
-References: <20171009152032.27804-1-marc.zyngier@arm.com>
- <20171009152032.27804-4-marc.zyngier@arm.com>
- <20171016200752.GF1845@lvm>
- <968be34c-fc4c-1a17-d7cf-0e4cc17ef300@arm.com>
-Message-ID: <20171017143435.GH5886@lvm>
+From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
+Date: Tue, 17 Oct 2017 16:35:13 +0200
+Subject: [PATCH] i2c: stm32: Fixes multibyte transfer for STM32F4 I2C
+ controller
+In-Reply-To: <CAFvLkMS9Q801biCBYp+fJeiOo22zr436Td43PH3GG8E6diSL3A@mail.gmail.com>
+References: <1507722788-31224-1-git-send-email-radoslaw.pietrzyk@gmail.com>
+ <990c3275-35b3-68da-453c-d1a80e867df7@st.com>
+ <CAFvLkMS6+o3D88Rj23of56KtjonwFAVD_aEP3eWaA2H=U5WP4Q@mail.gmail.com>
+ <2d892fec-0496-8a6f-51c9-439b933d9975@st.com>
+ <CAFvLkMS9Q801biCBYp+fJeiOo22zr436Td43PH3GG8E6diSL3A@mail.gmail.com>
+Message-ID: <b24d9699-a88d-6a83-ceaf-140ea8b4db97@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 10:26:31AM +0100, Marc Zyngier wrote:
-> On 16/10/17 21:07, Christoffer Dall wrote:
-> > On Mon, Oct 09, 2017 at 04:20:25PM +0100, Marc Zyngier wrote:
-> >> Calling __cpuc_coherent_user_range to invalidate the icache on
-> >> a PIPT icache machine has some pointless overhead, as it starts
-> >> by cleaning the dcache to the PoU, while we're guaranteed to
-> >> have already cleaned it to the PoC.
-> >>
-> >> As KVM is the only user of such a feature, let's implement some
-> >> ad-hoc cache flushing in kvm_mmu.h. Should it become useful to
-> >> other subsystems, it can be moved to a more global location.
-> >>
-> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >> ---
-> >>  arch/arm/include/asm/kvm_hyp.h |  2 ++
-> >>  arch/arm/include/asm/kvm_mmu.h | 24 ++++++++++++++++++++++--
-> >>  2 files changed, 24 insertions(+), 2 deletions(-)
-> >>
-> >> diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
-> >> index 14b5903f0224..ad541f9ecc78 100644
-> >> --- a/arch/arm/include/asm/kvm_hyp.h
-> >> +++ b/arch/arm/include/asm/kvm_hyp.h
-> >> @@ -69,6 +69,8 @@
-> >>  #define HIFAR		__ACCESS_CP15(c6, 4, c0, 2)
-> >>  #define HPFAR		__ACCESS_CP15(c6, 4, c0, 4)
-> >>  #define ICIALLUIS	__ACCESS_CP15(c7, 0, c1, 0)
-> >> +#define BPIALLIS	__ACCESS_CP15(c7, 0, c1, 6)
-> >> +#define ICIMVAU		__ACCESS_CP15(c7, 0, c5, 1)
-> >>  #define ATS1CPR		__ACCESS_CP15(c7, 0, c8, 0)
-> >>  #define TLBIALLIS	__ACCESS_CP15(c8, 0, c3, 0)
-> >>  #define TLBIALL		__ACCESS_CP15(c8, 0, c7, 0)
-> >> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> >> index f553aa62d0c3..6773dcf21bff 100644
-> >> --- a/arch/arm/include/asm/kvm_mmu.h
-> >> +++ b/arch/arm/include/asm/kvm_mmu.h
-> >> @@ -37,6 +37,8 @@
-> >>  
-> >>  #include <linux/highmem.h>
-> >>  #include <asm/cacheflush.h>
-> >> +#include <asm/cputype.h>
-> >> +#include <asm/kvm_hyp.h>
-> >>  #include <asm/pgalloc.h>
-> >>  #include <asm/stage2_pgtable.h>
-> >>  
-> >> @@ -157,6 +159,8 @@ static inline void __coherent_icache_guest_page(struct kvm_vcpu *vcpu,
-> >>  						kvm_pfn_t pfn,
-> >>  						unsigned long size)
-> >>  {
-> >> +	u32 iclsz;
-> >> +
-> >>  	/*
-> >>  	 * If we are going to insert an instruction page and the icache is
-> >>  	 * either VIPT or PIPT, there is a potential problem where the host
-> >> @@ -182,17 +186,33 @@ static inline void __coherent_icache_guest_page(struct kvm_vcpu *vcpu,
-> >>  	}
-> >>  
-> >>  	/* PIPT cache. As for the d-side, use a temporary kernel mapping. */
-> >> +	iclsz = 4 << (read_cpuid(CPUID_CACHETYPE) & 0xf);
-> >> +
-> > 
-> > nit: the 4 here is a bit cryptic, could we say something like (perhaps
-> > slightly over-explained):
-> > /*
-> >  * CTR IminLine contains Log2 of the number of words in the cache line,
-> >  * so we can get the number of words as 2 << (IminLine - 1).  To get the
-> >  * number of bytes, we multiply by 4 (the number of bytes in a 32-bit
-> >  * word), and get 4 << (IminLine).
-> >  */
-> 
-> Absolutely. I'll fold that in. Thanks.
-> 
-> >>  	while (size) {
-> >>  		void *va = kmap_atomic_pfn(pfn);
-> >> +		void *end = va + PAGE_SIZE;
-> >> +		void *addr = va;
-> >> +
-> >> +		do {
-> >> +			write_sysreg(addr, ICIMVAU);
-> > 
-> > Maybe an oddball place to ask this, but I don't recall why we need PoU
-> > everywhere, would PoC potentially be enough?
-> 
-> PoC is in general stronger than PoU. All we care is for instructions to
-> be fetched from the point where the icache cannot be distinguished from
-> the dcache - the definition of the PoU. Also, I don't think there is a
-> way to invalidate the icache to the PoC.
+
+
+On 10/17/2017 03:51 PM, Rados?aw Pietrzyk wrote:
+> I can try of course but it means that any IRQ delay may cause the same
+> problem so the question is whether the driver should be vulnerable to
+> such use cases.
 > 
 
-Doi, I switched the meaning around in my head.  Sorry about the noise.
+I may or ... may or not. If those patches don't find effectiveness at your side
+I will have to look at it closer.
+Nonetheless I prefer to start from something more stable in term of clock before
+investigating further.
 
-> > 
-> >> +			addr += iclsz;
-> >> +		} while (addr < end);
-> >>  
-> >> -		__cpuc_coherent_user_range((unsigned long)va,
-> >> -					   (unsigned long)va + PAGE_SIZE);
-> >> +		dsb(ishst);
-> >> +		isb();
-> > 
-> > Do we really need this in every iteration of the loop?
-> 
-> The problem is that we need to factor in the interaction with the unmap
-> below. If we don't enforce the invalidation now, we may unmap the page
-> before the invalidations are finished, with could lead to a page fault.
-> If we didn't have to deal with highmem, that would indeed be a good
-> optimization.
-> 
+Please let me know
 
-Ah, I completely failed to see that.  Thanks for the explanation.
-
-> > 
-> >>  
-> >>  		size -= PAGE_SIZE;
-> >>  		pfn++;
-> >>  
-> >>  		kunmap_atomic(va);
-> >>  	}
-> >> +
-> >> +	/* Check if we need to invalidate the BTB */
-> >> +	if ((read_cpuid_ext(CPUID_EXT_MMFR1) >> 24) != 4) {
-> > 
-> > Either I'm having a bad day or you meant to shift this 28, not 24?
-> 
-> Oops... That's indeed totally broken. Thanks for noticing it!
-> 
-With that fixed:
-
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Regards
+> 2017-10-17 15:18 GMT+02:00 Pierre Yves MORDRET <pierre-yves.mordret@st.com>:
+>>
+>>
+>> On 10/12/2017 11:55 AM, Rados?aw Pietrzyk wrote:
+>>> It looks like there is a use case when IRQ handler is delayed a bit
+>>> and the logic in the driver does not work. What is the real root cause
+>>> I don't know.
+>>>
+>>
+>> As far as I know on this STM32 F4 platform there is some trouble with timer
+>> events that may have bad influences on scheduling. Some tasks could be delayed
+>> for some reasons.
+>> It would be great if the following patches below could help in your matter
+>> https://patchwork.kernel.org/patch/9980961/
+>> https://patchwork.kernel.org/patch/9980963/
+>> https://patchwork.kernel.org/patch/9980965/
+>> https://patchwork.kernel.org/patch/9980967/
+>>
+>> Would you mind to test those ?
+>> Thanks
+>>
+>>> 2017-10-12 11:31 GMT+02:00 Pierre Yves MORDRET <pierre-yves.mordret@st.com>:
+>>>>
+>>>>
+>>>> On 10/11/2017 01:53 PM, Radoslaw Pietrzyk wrote:
+>>>>>       Do not read data on RXNE but on BTF only due to HW
+>>>>>       synchronisation problems and NACKing read data too early.
+>>>>>       It was found during testing of stmpe811 touchscreen driver.
+>>>>>
+>>>>
+>>>> Would you mind to explain what is behind "hw sync issue" you've seen ?
+>>>>
+>>>>> Signed-off-by: Radoslaw Pietrzyk <radoslaw.pietrzyk@gmail.com>
+>>>>> ---
+>>>>>  drivers/i2c/busses/i2c-stm32f4.c | 11 +----------
+>>>>>  1 file changed, 1 insertion(+), 10 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/i2c/busses/i2c-stm32f4.c b/drivers/i2c/busses/i2c-stm32f4.c
+>>>>> index 4ec1084..86bcf4c 100644
+>>>>> --- a/drivers/i2c/busses/i2c-stm32f4.c
+>>>>> +++ b/drivers/i2c/busses/i2c-stm32f4.c
+>>>>> @@ -409,16 +409,9 @@ static void stm32f4_i2c_handle_read(struct stm32f4_i2c_dev *i2c_dev)
+>>>>>        * So, here we just disable buffer interrupt in order to avoid another
+>>>>>        * system preemption due to RX not empty event.
+>>>>>        */
+>>>>> -     case 2:
+>>>>> -     case 3:
+>>>>> +     default:
+>>>>>               stm32f4_i2c_clr_bits(reg, STM32F4_I2C_CR2_ITBUFEN);
+>>>>>               break;
+>>>>> -     /*
+>>>>> -      * For N byte reception with N > 3 we directly read data register
+>>>>> -      * until N-2 data.
+>>>>> -      */
+>>>>> -     default:
+>>>>> -             stm32f4_i2c_read_msg(i2c_dev);
+>>>>>       }
+>>>>>  }
+>>>>>
+>>>>> @@ -470,8 +463,6 @@ static void stm32f4_i2c_handle_rx_done(struct stm32f4_i2c_dev *i2c_dev)
+>>>>>                */
+>>>>>               reg = i2c_dev->base + STM32F4_I2C_CR1;
+>>>>>               stm32f4_i2c_clr_bits(reg, STM32F4_I2C_CR1_ACK);
+>>>>> -             stm32f4_i2c_read_msg(i2c_dev);
+>>>>> -             break;
+>>>>>       default:
+>>>>>               stm32f4_i2c_read_msg(i2c_dev);
+>>>>>       }
+>>>>>
