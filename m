@@ -1,138 +1,92 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 17 Oct 2017 12:19:18 +0200
-Subject: [PATCH v2] reset: meson: add level reset support for GX SoC family
-Message-ID: <1508235558-24860-1-git-send-email-narmstrong@baylibre.com>
+From: christophe.leroy@c-s.fr (Christophe LEROY)
+Date: Tue, 17 Oct 2017 12:50:41 +0200
+Subject: [PATCH v9 17/20] crypto: talitos: move to generic async completion
+In-Reply-To: <1508059209-25529-18-git-send-email-gilad@benyossef.com>
+References: <1508059209-25529-1-git-send-email-gilad@benyossef.com>
+ <1508059209-25529-18-git-send-email-gilad@benyossef.com>
+Message-ID: <b75d3b02-2aba-124c-ccf5-7241775c004c@c-s.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Amlogic GX SoC family embeds alternate registers to drive the reset
-levels next to the pulse registers.
+Le 15/10/2017 ? 11:20, Gilad Ben-Yossef a ?crit?:
+> The talitos driver starts several async crypto ops and  waits for their
+> completions. Move it over to generic code doing the same.
+> 
+> Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
 
-This patch adds support for level reset handling on the GX family only.
+Tested-by: Christophe Leroy <christophe.leroy@c-s.fr>
 
-The Meson8 family has an alternate way to handle level reset.
-
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- drivers/reset/reset-meson.c | 62 ++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 58 insertions(+), 4 deletions(-)
-
-Changes since v1:
-- protected read/change/modify with a spinlock
-- removed unnedded check
-- remove useless type conversion
-
-diff --git a/drivers/reset/reset-meson.c b/drivers/reset/reset-meson.c
-index a8b915e..f3b9d69 100644
---- a/drivers/reset/reset-meson.c
-+++ b/drivers/reset/reset-meson.c
-@@ -62,13 +62,16 @@
- #include <linux/reset-controller.h>
- #include <linux/slab.h>
- #include <linux/types.h>
-+#include <linux/of_device.h>
- 
- #define REG_COUNT	8
- #define BITS_PER_REG	32
-+#define LEVEL_OFFSET	0x7c
- 
- struct meson_reset {
- 	void __iomem *reg_base;
- 	struct reset_controller_dev rcdev;
-+	spinlock_t lock;
- };
- 
- static int meson_reset_reset(struct reset_controller_dev *rcdev,
-@@ -88,18 +91,63 @@ static int meson_reset_reset(struct reset_controller_dev *rcdev,
- 	return 0;
- }
- 
--static const struct reset_control_ops meson_reset_ops = {
-+static int meson_reset_level(struct reset_controller_dev *rcdev,
-+			    unsigned long id, bool assert)
-+{
-+	struct meson_reset *data =
-+		container_of(rcdev, struct meson_reset, rcdev);
-+	unsigned int bank = id / BITS_PER_REG;
-+	unsigned int offset = id % BITS_PER_REG;
-+	void __iomem *reg_addr = data->reg_base + LEVEL_OFFSET + (bank << 2);
-+	unsigned long flags;
-+	u32 reg;
-+
-+	spin_lock_irqsave(&data->lock, flags);
-+
-+	reg = readl(reg_addr);
-+	if (assert)
-+		writel(reg & ~BIT(offset), reg_addr);
-+	else
-+		writel(reg | BIT(offset), reg_addr);
-+
-+	spin_unlock_irqrestore(&data->lock, flags);
-+
-+	return 0;
-+}
-+
-+static int meson_reset_assert(struct reset_controller_dev *rcdev,
-+			      unsigned long id)
-+{
-+	return meson_reset_level(rcdev, id, true);
-+}
-+
-+static int meson_reset_deassert(struct reset_controller_dev *rcdev,
-+				unsigned long id)
-+{
-+	return meson_reset_level(rcdev, id, false);
-+}
-+
-+static const struct reset_control_ops meson_reset_meson8_ops = {
- 	.reset		= meson_reset_reset,
- };
- 
-+static const struct reset_control_ops meson_reset_gx_ops = {
-+	.reset		= meson_reset_reset,
-+	.assert		= meson_reset_assert,
-+	.deassert	= meson_reset_deassert,
-+};
-+
- static const struct of_device_id meson_reset_dt_ids[] = {
--	 { .compatible = "amlogic,meson8b-reset", },
--	 { .compatible = "amlogic,meson-gxbb-reset", },
-+	 { .compatible = "amlogic,meson8b-reset",
-+	   .data = &meson_reset_meson8_ops, },
-+	 { .compatible = "amlogic,meson-gxbb-reset",
-+	   .data = &meson_reset_gx_ops, },
- 	 { /* sentinel */ },
- };
- 
- static int meson_reset_probe(struct platform_device *pdev)
- {
-+	const struct reset_control_ops *ops;
- 	struct meson_reset *data;
- 	struct resource *res;
- 
-@@ -107,6 +155,10 @@ static int meson_reset_probe(struct platform_device *pdev)
- 	if (!data)
- 		return -ENOMEM;
- 
-+	ops = of_device_get_match_data(&pdev->dev);
-+	if (!ops)
-+		return -EINVAL;
-+
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	data->reg_base = devm_ioremap_resource(&pdev->dev, res);
- 	if (IS_ERR(data->reg_base))
-@@ -114,9 +166,11 @@ static int meson_reset_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, data);
- 
-+	spin_lock_init(&data->lock);
-+
- 	data->rcdev.owner = THIS_MODULE;
- 	data->rcdev.nr_resets = REG_COUNT * BITS_PER_REG;
--	data->rcdev.ops = &meson_reset_ops;
-+	data->rcdev.ops = ops;
- 	data->rcdev.of_node = pdev->dev.of_node;
- 
- 	return devm_reset_controller_register(&pdev->dev, &data->rcdev);
--- 
-2.7.4
+> ---
+>   drivers/crypto/talitos.c | 38 +++++---------------------------------
+>   1 file changed, 5 insertions(+), 33 deletions(-)
+> 
+> diff --git a/drivers/crypto/talitos.c b/drivers/crypto/talitos.c
+> index 5bd8191..9c80e0c 100644
+> --- a/drivers/crypto/talitos.c
+> +++ b/drivers/crypto/talitos.c
+> @@ -2160,22 +2160,6 @@ static int ahash_import(struct ahash_request *areq, const void *in)
+>   	return 0;
+>   }
+>   
+> -struct keyhash_result {
+> -	struct completion completion;
+> -	int err;
+> -};
+> -
+> -static void keyhash_complete(struct crypto_async_request *req, int err)
+> -{
+> -	struct keyhash_result *res = req->data;
+> -
+> -	if (err == -EINPROGRESS)
+> -		return;
+> -
+> -	res->err = err;
+> -	complete(&res->completion);
+> -}
+> -
+>   static int keyhash(struct crypto_ahash *tfm, const u8 *key, unsigned int keylen,
+>   		   u8 *hash)
+>   {
+> @@ -2183,10 +2167,10 @@ static int keyhash(struct crypto_ahash *tfm, const u8 *key, unsigned int keylen,
+>   
+>   	struct scatterlist sg[1];
+>   	struct ahash_request *req;
+> -	struct keyhash_result hresult;
+> +	struct crypto_wait wait;
+>   	int ret;
+>   
+> -	init_completion(&hresult.completion);
+> +	crypto_init_wait(&wait);
+>   
+>   	req = ahash_request_alloc(tfm, GFP_KERNEL);
+>   	if (!req)
+> @@ -2195,25 +2179,13 @@ static int keyhash(struct crypto_ahash *tfm, const u8 *key, unsigned int keylen,
+>   	/* Keep tfm keylen == 0 during hash of the long key */
+>   	ctx->keylen = 0;
+>   	ahash_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG,
+> -				   keyhash_complete, &hresult);
+> +				   crypto_req_done, &wait);
+>   
+>   	sg_init_one(&sg[0], key, keylen);
+>   
+>   	ahash_request_set_crypt(req, sg, hash, keylen);
+> -	ret = crypto_ahash_digest(req);
+> -	switch (ret) {
+> -	case 0:
+> -		break;
+> -	case -EINPROGRESS:
+> -	case -EBUSY:
+> -		ret = wait_for_completion_interruptible(
+> -			&hresult.completion);
+> -		if (!ret)
+> -			ret = hresult.err;
+> -		break;
+> -	default:
+> -		break;
+> -	}
+> +	ret = crypto_wait_req(crypto_ahash_digest(req), &wait);
+> +
+>   	ahash_request_free(req);
+>   
+>   	return ret;
+> 
