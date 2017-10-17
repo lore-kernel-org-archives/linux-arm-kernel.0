@@ -1,44 +1,194 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 17 Oct 2017 10:35:10 +0200
-Subject: [PATCH 1/2] PCI: dwc: Adjust Kconfig to allow IMX6 PCIe host on
- IMX7
-In-Reply-To: <20171017001159.109152-1-tpiepho@impinj.com>
-References: <20171017001159.109152-1-tpiepho@impinj.com>
-Message-ID: <1508229310.2146.2.camel@pengutronix.de>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Tue, 17 Oct 2017 09:36:51 +0100
+Subject: [RFC 4/7] arm64: irqflags: Use ICC sysregs to implement IRQ
+ masking
+In-Reply-To: <20171016211857.GQ1845@lvm>
+References: <1507726862-11944-1-git-send-email-julien.thierry@arm.com>
+ <1507726862-11944-5-git-send-email-julien.thierry@arm.com>
+ <20171016211857.GQ1845@lvm>
+Message-ID: <86952124-b669-2e97-76fe-2aa30d5735e1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 16.10.2017, 17:11 -0700 schrieb Trent Piepho:
-> The IMX6 PCI-e host driver also supports the IMX7d.??However, the
-> Kconfig dependencies of the driver prevented it from being enabled
-> unless the kernel was built with both IMX6 and IMX7 support.??It
-> works
-> fine to build with only IMX7 support enabled.
-> 
-> Cc: Andrey Smirnov <andrew.smirnov@gmail.com>
-> Cc: Richard Zhu <hongxing.zhu@nxp.com>
-> CC: Lucas Stach <l.stach@pengutronix.de>
-> Signed-off-by: Trent Piepho <tpiepho@impinj.com>
 
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 
+On 16/10/17 22:18, Christoffer Dall wrote:
+> On Wed, Oct 11, 2017 at 02:00:59PM +0100, Julien Thierry wrote:
+>> From: Daniel Thompson <daniel.thompson@linaro.org>
+>>
+>> Currently irqflags is implemented using the PSR's I bit. It is possible
+>> to implement irqflags by using the co-processor interface to the GIC.
+>> Using the co-processor interface makes it feasible to simulate NMIs
+>> using GIC interrupt prioritization.
+>>
+>> This patch changes the irqflags macros to modify, save and restore
+>> ICC_PMR_EL1. This has a substantial knock on effect for the rest of
+>> the kernel. There are four reasons for this:
+>>
+>> 1. The state of the PMR becomes part of the interrupt context and must be
+>>     saved and restored during exceptions. It is saved on the stack as part
+>>     of the saved context when an interrupt/exception is taken.
+>>
+>> 2. The hardware automatically masks the I bit (at boot, during traps, etc).
+>>     When the I bit is set by hardware we must add code to switch from I
+>>     bit masking and PMR masking:
+>>         - For IRQs, this is done after the interrupt has been acknowledged
+>>         	 avoiding the need to unmask.
+>>         - For other exceptions, this is done right after saving the context.
+>>
+>> 3. Some instructions, such as wfi, require that the PMR not be used
+>>     for interrupt masking. Before calling these instructions we must
+>>     switch from PMR masking to I bit masking.
+>>     This is also the case when KVM runs a guest, if the CPU receives
+>>     an interrupt from the host, interrupts must not be masked in PMR
+>>     otherwise the GIC will not signal it to the CPU.
+>>
+>> 4. We use the alternatives system to allow a single kernel to boot and
+>>     be switched to the alternative masking approach at runtime.
+>>
+>> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+>> [julien.thierry at arm.com: changes reflected in commit,
+>> 			 message, fixes, renaming]
+>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> Cc: Jason Cooper <jason@lakedaemon.net>
 > ---
-> ?drivers/pci/dwc/Kconfig | 4 ++--
-> ?1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/pci/dwc/Kconfig b/drivers/pci/dwc/Kconfig
-> index 22ec82fcdea2..85cf392921a9 100644
-> --- a/drivers/pci/dwc/Kconfig
-> +++ b/drivers/pci/dwc/Kconfig
-> @@ -71,9 +71,9 @@ config PCI_EXYNOS
-> ?	select PCIE_DW_HOST
-> ?
-> ?config PCI_IMX6
-> -	bool "Freescale i.MX6 PCIe controller"
-> +	bool "Freescale i.MX6/7 PCIe controller"
-> ?	depends on PCI
-> -	depends on SOC_IMX6Q
-> +	depends on SOC_IMX6Q || SOC_IMX7D
-> ?	depends on PCI_MSI_IRQ_DOMAIN
-> ?	select PCIEPORTBUS
-> ?	select PCIE_DW_HOST
+> I just gave a quick look to the KVM part here but didn't get into
+> whether this rather invasive change is warranted or not (it's definitely
+> entertaining though).
+> 
+
+I appreciate you looking into this, it wasn't very clear to me how to 
+deal with that for KVM.
+
+> [...]
+> 
+> 
+>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>> index e923b58..070e8a5 100644
+>> --- a/arch/arm64/include/asm/kvm_host.h
+>> +++ b/arch/arm64/include/asm/kvm_host.h
+>> @@ -38,6 +38,10 @@
+>>   #include <kvm/arm_arch_timer.h>
+>>   #include <kvm/arm_pmu.h>
+>>
+>> +#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+>> +#include <asm/arch_gicv3.h>
+>> +#endif
+>> +
+>>   #define KVM_MAX_VCPUS VGIC_V3_MAX_CPUS
+>>
+>>   #define KVM_VCPU_MAX_FEATURES 4
+>> @@ -332,7 +336,30 @@ int kvm_unmap_hva_range(struct kvm *kvm,
+>>   void kvm_arm_resume_guest(struct kvm *kvm);
+>>
+>>   u64 __kvm_call_hyp(void *hypfn, ...);
+>> +
+>> +#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+>> +/*
+>> + * If we use PMR to disable interrupts, interrupts happening while the
+> 
+> I would describe this as 'masking' interrupts, as opposed to 'disabling'
+> interrupts, in general, and probably we can be more precise by
+> categorizing interrupts as 'normal' vs. 'priority (NMIs)' or something
+> like that.
+> 
+
+Right, I'll do that.
+
+>> + * guest is executing will not be signaled to the host by the GIC  (and
+> 
+> signaled to the CPU.  (Whether this then causes an exception to EL2
+> depends on the HCR_EL2.IMO flag and what KVM does with that exception).
+> 
+
+True, I'll fix that.
+
+>> + * any call to a waiting kvm_kick_many_cpus will likely cause a
+>> + * deadlock).
+> 
+> This kick thing is an unccessary specific example to bring out here, I
+> don't think it adds to the general understanding.
+> 
+
+Yes, makes sense.
+
+>> + * We need to switch back to using PSR.I.
+>> + */
+>> +#define kvm_call_hyp(f, ...)						\
+>> +	({								\
+>> +		u64 res;						\
+>> +		unsigned long flags;					\
+>> +									\
+>> +		flags = arch_local_irq_save();				\
+>> +		gic_end_pmr_masking();					\
+>> +		res = __kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__);	\
+>> +		gic_start_pmr_masking();				\
+>> +		arch_local_irq_restore(flags);				\
+>> +		res;							\
+> 
+> This is in the critical path, so ideally this could instead be done
+> inside the function, because the trap will set PSTATE.I already, so it
+> should be possible to reduce this to a set of save/clear/restore
+> operations after __kvm_call_hyp.
+
+Hmmm, you are talking about the function called by __kvm_call_hyp, right?
+
+But this means we'll need to add the save/clear/restore to each function 
+that can be called by __kvm_call_hyp, no?
+
+Also in the VHE case we don't have the trap setting the PSTATE.I (the 
+code calling kvm_call_hyp disables interrupts before entering the guest, 
+but now the function disabling interrupts is just masking them with PMR).
+
+> 
+>> +	})
+>> +#else
+>>   #define kvm_call_hyp(f, ...) __kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__)
+>> +#endif
+>>
+>>   void force_vm_exit(const cpumask_t *mask);
+>>   void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
+>> @@ -349,6 +376,9 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
+>>   				       unsigned long hyp_stack_ptr,
+>>   				       unsigned long vector_ptr)
+>>   {
+>> +#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+>> +	unsigned long flags;
+>> +#endif
+>>   	/*
+>>   	 * Call initialization code, and switch to the full blown HYP code.
+>>   	 * If the cpucaps haven't been finalized yet, something has gone very
+>> @@ -356,7 +386,17 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
+>>   	 * cpus_have_const_cap() wrapper.
+>>   	 */
+>>   	BUG_ON(!static_branch_likely(&arm64_const_caps_ready));
+>> +#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+>> +	flags = arch_local_irq_save();
+>> +	gic_end_pmr_masking();
+>> +#endif
+>> +
+>>   	__kvm_call_hyp((void *)pgd_ptr, hyp_stack_ptr, vector_ptr);
+>> +
+>> +#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+>> +	gic_start_pmr_masking();
+>> +	arch_local_irq_restore(flags);
+>> +#endif
+> 
+> I don't think you need any of this, because I don't think you'd ever
+> need to handle interrupts while initializing hyp mode.
+> 
+
+I was more worried about getting an "NMI" during the EL2 initialisation 
+rather than missing the masked interrupts. Do you know whether this 
+might be an issue here or not?
+
+Thanks,
+
+-- 
+Julien Thierry
