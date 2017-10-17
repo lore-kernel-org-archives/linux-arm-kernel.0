@@ -1,186 +1,231 @@
 From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Tue, 17 Oct 2017 11:17:53 +0200
-Subject: [PATCHv3 02/12] ARM: dts: imx6-tx6: remove obsolete eeti,egalax_ts
+Date: Tue, 17 Oct 2017 11:18:02 +0200
+Subject: [PATCHv3 11/12] ARM: dts: imx: add support for TX6QP
 In-Reply-To: <1508231883-12067-1-git-send-email-LW@KARO-electronics.de>
 References: <1508230414-8090-1-git-send-email-LW@KARO-electronics.de>
  <1508231883-12067-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <1508231883-12067-3-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1508231883-12067-12-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The display, that incorporates this touchpanel is obsolete and won't
-be supported any more.
+The TX6QP-8037 is a Computer On Module manufactured by
+  Ka-Ro electronics GmbH with the following characteristics:
+  Processor    Freescale i.MX 6QuadPlus MCIMX6QP7, 1 GHz
+  RAM          1GiB 64-bit DDR3 SDRAM
+  ROM          4GB HiRel eMMC
+  Power supply Single 3.3 to 5V
+  Size         26mm SO-DIMM
+  Temp. Range  -40?C to 105?C
 
 Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 ---
- arch/arm/boot/dts/imx6dl-tx6u-811x.dts     | 23 +----------------------
- arch/arm/boot/dts/imx6dl-tx6u-81xx-mb7.dts | 22 +---------------------
- arch/arm/boot/dts/imx6q-tx6q-1110.dts      | 21 ---------------------
- arch/arm/boot/dts/imx6q-tx6q-11x0-mb7.dts  | 22 +---------------------
- 4 files changed, 3 insertions(+), 85 deletions(-)
+ arch/arm/boot/dts/Makefile              |  2 +
+ arch/arm/boot/dts/imx6qp-tx6qp-8037.dts | 86 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6qp-tx6qp-8137.dts | 90 +++++++++++++++++++++++++++++++++
+ 3 files changed, 178 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6qp-tx6qp-8037.dts
+ create mode 100644 arch/arm/boot/dts/imx6qp-tx6qp-8137.dts
 
-diff --git a/arch/arm/boot/dts/imx6dl-tx6u-811x.dts b/arch/arm/boot/dts/imx6dl-tx6u-811x.dts
-index 5e0c6bb..f0f759a 100644
---- a/arch/arm/boot/dts/imx6dl-tx6u-811x.dts
-+++ b/arch/arm/boot/dts/imx6dl-tx6u-811x.dts
-@@ -1,5 +1,5 @@
- /*
-- * Copyright 2014-2016 Lothar Wa?mann <LW@KARO-electronics.de>
-+ * Copyright 2014-2017 Lothar Wa?mann <LW@KARO-electronics.de>
-  *
-  * This file is dual-licensed: you can use it either under the terms
-  * of the GPL or the X11 license, at your option. Note that this dual
-@@ -98,19 +98,6 @@
- 	};
- };
- 
--&i2c3 {
--	polytouch2: eeti at 04 {
--		compatible = "eeti,egalax_ts";
--		reg = <0x04>;
--		pinctrl-names = "default";
--		pinctrl-0 = <&pinctrl_eeti>;
--		interrupt-parent = <&gpio3>;
--		interrupts = <22 0>;
--		wakeup-gpios = <&gpio3 22 GPIO_ACTIVE_HIGH>;
--		wakeup-source;
--	};
--};
--
- &kpp {
- 	status = "disabled"; /* pad conflict with backlight1 PWM */
- };
-@@ -168,11 +155,3 @@
- &pwm1 {
- 	status = "okay";
- };
--
--&iomuxc {
--	pinctrl_eeti: eetigrp {
--		fsl,pins = <
--			MX6QDL_PAD_EIM_D22__GPIO3_IO22 0x1b0b1 /* Interrupt */
--		>;
--	};
--};
-diff --git a/arch/arm/boot/dts/imx6dl-tx6u-81xx-mb7.dts b/arch/arm/boot/dts/imx6dl-tx6u-81xx-mb7.dts
-index b9a783f..c817324 100644
---- a/arch/arm/boot/dts/imx6dl-tx6u-81xx-mb7.dts
-+++ b/arch/arm/boot/dts/imx6dl-tx6u-81xx-mb7.dts
-@@ -1,5 +1,5 @@
- /*
-- * Copyright 2016 Lothar Wa?mann <LW@KARO-electronics.de>
-+ * Copyright 2016-2017 Lothar Wa?mann <LW@KARO-electronics.de>
-  *
-  * This file is dual-licensed: you can use it either under the terms
-  * of the GPL or the X11 license, at your option. Note that this dual
-@@ -106,18 +106,6 @@
- 	xceiver-supply = <&reg_3v3>;
- };
- 
--&i2c3 {
--	polytouch1: eeti at 04 {
--		compatible = "eeti,egalax_ts";
--		reg = <0x04>;
--		pinctrl-names = "default";
--		pinctrl-0 = <&pinctrl_eeti>;
--		interrupts-extended = <&gpio3 22 IRQ_TYPE_EDGE_FALLING>;
--		wakeup-gpios = <&gpio3 22 GPIO_ACTIVE_HIGH>;
--		wakeup-source;
--	};
--};
--
- &kpp {
- 	status = "disabled"; /* pads partially clash with backlight1 PWM */
- };
-@@ -245,11 +233,3 @@
- &pwm1 {
- 	status = "okay";
- };
--
--&iomuxc {
--	pinctrl_eeti: eetigrp {
--		fsl,pins = <
--			MX6QDL_PAD_EIM_D22__GPIO3_IO22 0x1b0b1 /* Interrupt */
--		>;
--	};
--};
-diff --git a/arch/arm/boot/dts/imx6q-tx6q-1110.dts b/arch/arm/boot/dts/imx6q-tx6q-1110.dts
-index 0f5e638..900557d 100644
---- a/arch/arm/boot/dts/imx6q-tx6q-1110.dts
-+++ b/arch/arm/boot/dts/imx6q-tx6q-1110.dts
-@@ -98,19 +98,6 @@
- 	};
- };
- 
--&i2c3 {
--	polytouch1: eeti at 04 {
--		compatible = "eeti,egalax_ts";
--		reg = <0x04>;
--		pinctrl-names = "default";
--		pinctrl-0 = <&pinctrl_eeti>;
--		interrupt-parent = <&gpio3>;
--		interrupts = <22 0>;
--		wakeup-gpios = <&gpio3 22 GPIO_ACTIVE_HIGH>;
--		wakeup-source;
--	};
--};
--
- &kpp {
- 	status = "disabled"; /* pad conflict with backlight1 PWM */
- };
-@@ -172,11 +159,3 @@
- &sata {
- 	status = "okay";
- };
--
--&iomuxc {
--	pinctrl_eeti: eetigrp {
--		fsl,pins = <
--			MX6QDL_PAD_EIM_D22__GPIO3_IO22 0x1b0b1 /* Interrupt */
--		>;
--	};
--};
-diff --git a/arch/arm/boot/dts/imx6q-tx6q-11x0-mb7.dts b/arch/arm/boot/dts/imx6q-tx6q-11x0-mb7.dts
-index d78b129..6b42c44 100644
---- a/arch/arm/boot/dts/imx6q-tx6q-11x0-mb7.dts
-+++ b/arch/arm/boot/dts/imx6q-tx6q-11x0-mb7.dts
-@@ -1,5 +1,5 @@
- /*
-- * Copyright 2016 Lothar Wa?mann <LW@KARO-electronics.de>
-+ * Copyright 2016-2017 Lothar Wa?mann <LW@KARO-electronics.de>
-  *
-  * This file is dual-licensed: you can use it either under the terms
-  * of the GPL or the X11 license, at your option. Note that this dual
-@@ -107,18 +107,6 @@
- 	xceiver-supply = <&reg_3v3>;
- };
- 
--&i2c3 {
--	polytouch1: eeti at 04 {
--		compatible = "eeti,egalax_ts";
--		reg = <0x04>;
--		pinctrl-names = "default";
--		pinctrl-0 = <&pinctrl_eeti>;
--		interrupts-extended = <&gpio3 22 IRQ_TYPE_EDGE_FALLING>;
--		wakeup-gpios = <&gpio3 22 GPIO_ACTIVE_HIGH>;
--		wakeup-source;
--	};
--};
--
- &ipu2 {
- 	status = "disabled";
- };
-@@ -254,11 +242,3 @@
- &sata {
- 	status = "okay";
- };
--
--&iomuxc {
--	pinctrl_eeti: eetigrp {
--		fsl,pins = <
--			MX6QDL_PAD_EIM_D22__GPIO3_IO22 0x1b0b1 /* Interrupt */
--		>;
--	};
--};
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 946a4b1..add34d1 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -462,6 +462,8 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6qp-nitrogen6_som2.dtb \
+ 	imx6qp-sabreauto.dtb \
+ 	imx6qp-sabresd.dtb \
++	imx6qp-tx6qp-8037.dtb \
++	imx6qp-tx6qp-8137.dtb \
+ 	imx6qp-wandboard-revd1.dtb \
+ 	imx6qp-zii-rdu2.dtb
+ dtb-$(CONFIG_SOC_IMX6SL) += \
+diff --git a/arch/arm/boot/dts/imx6qp-tx6qp-8037.dts b/arch/arm/boot/dts/imx6qp-tx6qp-8037.dts
+new file mode 100644
+index 0000000..ffc0f2e
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6qp-tx6qp-8037.dts
+@@ -0,0 +1,86 @@
++/*
++ * Copyright 2017 Lothar Wa?mann <LW@KARO-electronics.de>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "imx6qp.dtsi"
++#include "imx6qdl-tx6.dtsi"
++#include "imx6qdl-tx6-lcd.dtsi"
++
++/ {
++	model = "Ka-Ro electronics TX6QP-8037 Module";
++	compatible = "karo,imx6qp-tx6qp", "fsl,imx6qp";
++};
++
++&ds1339 {
++	status = "disabled";
++};
++
++&gpmi {
++	status = "disabled";
++};
++
++&ipu2 {
++	status = "disabled";
++};
++
++&usdhc4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc4>;
++	bus-width = <4>;
++	non-removable;
++	no-1-8-v;
++	fsl,wp-controller;
++	status = "okay";
++};
++
++&iomuxc {
++	pinctrl_usdhc4: usdhc4grp {
++		fsl,pins = <
++			MX6QDL_PAD_SD4_CMD__SD4_CMD		0x070b1
++			MX6QDL_PAD_SD4_CLK__SD4_CLK		0x070b1
++			MX6QDL_PAD_SD4_DAT0__SD4_DATA0		0x070b1
++			MX6QDL_PAD_SD4_DAT1__SD4_DATA1		0x070b1
++			MX6QDL_PAD_SD4_DAT2__SD4_DATA2		0x070b1
++			MX6QDL_PAD_SD4_DAT3__SD4_DATA3		0x070b1
++			MX6QDL_PAD_NANDF_ALE__SD4_RESET		0x0b0b1
++		>;
++	};
++};
+diff --git a/arch/arm/boot/dts/imx6qp-tx6qp-8137.dts b/arch/arm/boot/dts/imx6qp-tx6qp-8137.dts
+new file mode 100644
+index 0000000..dd494d5
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6qp-tx6qp-8137.dts
+@@ -0,0 +1,90 @@
++/*
++ * Copyright 2017 Lothar Wa?mann <LW@KARO-electronics.de>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "imx6qp.dtsi"
++#include "imx6qdl-tx6.dtsi"
++#include "imx6qdl-tx6-lvds.dtsi"
++
++/ {
++	model = "Ka-Ro electronics TX6QP-8137 Module";
++	compatible = "karo,imx6qp-tx6qp", "fsl,imx6qp";
++};
++
++&ds1339 {
++	status = "disabled";
++};
++
++&gpmi {
++	status = "disabled";
++};
++
++&ipu2 {
++	status = "disabled";
++};
++
++&sata {
++	status = "okay";
++};
++
++&usdhc4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc4>;
++	bus-width = <4>;
++	non-removable;
++	no-1-8-v;
++	fsl,wp-controller;
++	status = "okay";
++};
++
++&iomuxc {
++	pinctrl_usdhc4: usdhc4grp {
++		fsl,pins = <
++			MX6QDL_PAD_SD4_CMD__SD4_CMD		0x070b1
++			MX6QDL_PAD_SD4_CLK__SD4_CLK		0x070b1
++			MX6QDL_PAD_SD4_DAT0__SD4_DATA0		0x070b1
++			MX6QDL_PAD_SD4_DAT1__SD4_DATA1		0x070b1
++			MX6QDL_PAD_SD4_DAT2__SD4_DATA2		0x070b1
++			MX6QDL_PAD_SD4_DAT3__SD4_DATA3		0x070b1
++			MX6QDL_PAD_NANDF_ALE__SD4_RESET		0x0b0b1
++		>;
++	};
++};
 -- 
 2.1.4
