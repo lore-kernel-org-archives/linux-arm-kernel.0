@@ -1,166 +1,59 @@
-From: gengdongjiu@huawei.com (Dongjiu Geng)
-Date: Tue, 17 Oct 2017 22:14:47 +0800
-Subject: [PATCH v7 2/4] arm64: kvm: Introduce KVM_ARM_SET_SERROR_ESR ioctl
-In-Reply-To: <1508249689-10350-1-git-send-email-gengdongjiu@huawei.com>
-References: <1508249689-10350-1-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <1508249689-10350-3-git-send-email-gengdongjiu@huawei.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 17 Oct 2017 14:56:08 +0100
+Subject: [PATCH 4/4] arm64: vdso: remove pointless gcov option
+In-Reply-To: <20171016132440.38098-5-mark.rutland@arm.com>
+References: <20171016132440.38098-1-mark.rutland@arm.com>
+ <20171016132440.38098-5-mark.rutland@arm.com>
+Message-ID: <20171017135607.copc5duf5oon4azr@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ARM64 SError syndrome value is specific to the model being
-emulated for the guest and user space needs a way to tell the
-kernel this value. userspace can specify different value to
-affect guest OS error recovery behaviour.
+On Mon, Oct 16, 2017 at 02:24:40PM +0100, Mark Rutland wrote:
+> The arm64 VDSO Makefile explicitly disables gcov; a practice we seem to
+> have inherited from other VDSO Makefiles.
+> 
+> The arm64 VDSO is written entirely in assembly, so this is not
+> necessary. Further, if the VDSO were written in C it would be necessary
+> to disable all other instrumentation, and this alone would not be
+> sufficient.
 
-We make this API ARM-specific as we haven't yet reached a consensus
-for a generic API for all KVM architectures that will allow us to
-do something like this.
+Evidently, I haven't looked hrough the history thoroughly enough. It
+turns out that this was deliberately added in commit:
 
-Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
-Signed-off-by: Quanming Wu <wuquanming@huawei.com>
----
- Documentation/virtual/kvm/api.txt | 11 +++++++++++
- arch/arm/include/asm/kvm_host.h   |  1 +
- arch/arm/kvm/guest.c              |  9 +++++++++
- arch/arm64/include/asm/kvm_host.h |  2 ++
- arch/arm64/kvm/guest.c            |  5 +++++
- arch/arm64/kvm/reset.c            |  3 +++
- include/uapi/linux/kvm.h          |  3 +++
- virt/kvm/arm/arm.c                |  7 +++++++
- 8 files changed, 41 insertions(+)
+  543097843ca7c9ac ("arm64: build vdso without libgcov")
 
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index e63a35f..b076fc8 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -4347,3 +4347,14 @@ This capability indicates that userspace can load HV_X64_MSR_VP_INDEX msr.  Its
- value is used to denote the target vcpu for a SynIC interrupt.  For
- compatibilty, KVM initializes this msr to KVM's internal vcpu index.  When this
- capability is absent, userspace can still query this msr's value.
-+
-+8.13 KVM_CAP_ARM_SET_SERROR_ESR
-+
-+Architectures: arm, arm64
-+
-+This capability indicates that userspace can specify syndrome value reported to
-+software on taking a virtual SError interrupt exception.
-+Userspace can only specify the ISS field for the ESR syndrome, EC field is set
-+by hardware when the virtual SError interrupt is taken. If this virtual SError
-+is taken to EL1 using AArch64, this value will be reported in ESR_EL1, otherwise
-+if it is taken to EL1 using AArch32, this value will be reported in DFSR.{AET, ExT}.
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 127e2dd..3723138 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -211,6 +211,7 @@ unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
- int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
- int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
- int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
-+int kvm_arm_set_sei_esr(struct kvm_vcpu *vcpu, u64 *syndrome);
- unsigned long kvm_call_hyp(void *hypfn, ...);
- void force_vm_exit(const cpumask_t *mask);
- 
-diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
-index 1e0784e..309b236 100644
---- a/arch/arm/kvm/guest.c
-+++ b/arch/arm/kvm/guest.c
-@@ -248,6 +248,15 @@ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
- 	return -EINVAL;
- }
- 
-+/*
-+ * we only support SEI injection with specified synchronous
-+ * in ARM64, not support it in ARM32.
-+ */
-+int kvm_arm_set_sei_esr(struct kvm_vcpu *vcpu, u64 *syndrome)
-+{
-+	return -EINVAL;
-+}
-+
- int __attribute_const__ kvm_target_cpu(void)
- {
- 	switch (read_cpuid_part()) {
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index af55b3bc..dd4cb25 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -320,6 +320,8 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
- int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
- int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
- 
-+int kvm_arm_set_sei_esr(struct kvm_vcpu *vcpu, u64 *syndrome);
-+
- #define KVM_ARCH_WANT_MMU_NOTIFIER
- int kvm_unmap_hva(struct kvm *kvm, unsigned long hva);
- int kvm_unmap_hva_range(struct kvm *kvm,
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index 5c7f657..0a08b05 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -277,6 +277,11 @@ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
- 	return -EINVAL;
- }
- 
-+int kvm_arm_set_sei_esr(struct kvm_vcpu *vcpu, u64 *syndrome)
-+{
-+	return -EINVAL;
-+}
-+
- int __attribute_const__ kvm_target_cpu(void)
- {
- 	unsigned long implementor = read_cpuid_implementor();
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index 3256b92..9163628 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -77,6 +77,9 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
- 	case KVM_CAP_ARM_PMU_V3:
- 		r = kvm_arm_support_pmu_v3();
- 		break;
-+	case KVM_CAP_ARM_SET_SERROR_ESR:
-+		r = cpus_have_const_cap(ARM64_HAS_RAS_EXTN);
-+		break;
- 	case KVM_CAP_SET_GUEST_DEBUG:
- 	case KVM_CAP_VCPU_ATTRIBUTES:
- 		r = 1;
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index 6cd63c1..aece611 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -929,6 +929,7 @@ struct kvm_ppc_resize_hpt {
- #define KVM_CAP_PPC_SMT_POSSIBLE 147
- #define KVM_CAP_HYPERV_SYNIC2 148
- #define KVM_CAP_HYPERV_VP_INDEX 149
-+#define KVM_CAP_ARM_SET_SERROR_ESR 150
- 
- #ifdef KVM_CAP_IRQ_ROUTING
- 
-@@ -1355,6 +1356,8 @@ struct kvm_s390_ucas_mapping {
- /* Available with KVM_CAP_S390_CMMA_MIGRATION */
- #define KVM_S390_GET_CMMA_BITS      _IOWR(KVMIO, 0xb8, struct kvm_s390_cmma_log)
- #define KVM_S390_SET_CMMA_BITS      _IOW(KVMIO, 0xb9, struct kvm_s390_cmma_log)
-+/* Available with KVM_CAP_ARM_SET_SERROR_ESR */
-+#define KVM_ARM_SET_SERROR_ESR       _IOW(KVMIO,  0xb10, __u64)
- 
- #define KVM_DEV_ASSIGN_ENABLE_IOMMU	(1 << 0)
- #define KVM_DEV_ASSIGN_PCI_2_3		(1 << 1)
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index a39a1e1..2d8abeb 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -1022,6 +1022,13 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
- 			return -EFAULT;
- 		return kvm_arm_vcpu_has_attr(vcpu, &attr);
- 	}
-+	case KVM_ARM_SET_SERROR_ESR: {
-+		u64 syndrome;
-+
-+		if (copy_from_user(&syndrome, argp, sizeof(syndrome)))
-+			return -EFAULT;
-+		return kvm_arm_set_sei_esr(vcpu, &syndrome);
-+	}
- 	default:
- 		return -EINVAL;
- 	}
--- 
-2.10.1
+... this is necessary because we use the compiler to do the actual
+linking. That causes us to have -lgcov in the compilr flags, and the
+link can fail.
+
+Please ignore this patch for now.
+
+Thanks,
+Mark.
+
+> This patch remosves the redundant GCOV option for now.
+> 
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Reported-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> ---
+>  arch/arm64/kernel/vdso/Makefile | 3 ---
+>  1 file changed, 3 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/vdso/Makefile b/arch/arm64/kernel/vdso/Makefile
+> index 62c84f7cb01b..350190b749dd 100644
+> --- a/arch/arm64/kernel/vdso/Makefile
+> +++ b/arch/arm64/kernel/vdso/Makefile
+> @@ -15,9 +15,6 @@ ccflags-y := -shared -fno-common -fno-builtin
+>  ccflags-y += -nostdlib -Wl,-soname=linux-vdso.so.1 \
+>  		$(call cc-ldoption, -Wl$(comma)--hash-style=sysv)
+>  
+> -# Disable gcov profiling for VDSO code
+> -GCOV_PROFILE := n
+> -
+>  # Workaround for bare-metal (ELF) toolchains that neglect to pass -shared
+>  # down to collect2, resulting in silent corruption of the vDSO image.
+>  ccflags-y += -Wl,-shared
+> -- 
+> 2.11.0
+> 
