@@ -1,29 +1,29 @@
 From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Tue, 17 Oct 2017 11:17:56 +0200
-Subject: [PATCHv3 05/12] ARM: dts: imx6-tx6: improve ethernet related pinctrl
- setup
+Date: Tue, 17 Oct 2017 11:17:52 +0200
+Subject: [PATCHv3 01/12] ARM: dts: imx6-tx6: update model property to match
+ current module HW revision
 In-Reply-To: <1508231883-12067-1-git-send-email-LW@KARO-electronics.de>
 References: <1508230414-8090-1-git-send-email-LW@KARO-electronics.de>
  <1508231883-12067-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <1508231883-12067-6-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1508231883-12067-2-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the PHY INT and RESET pins from hog section and put them into
-their own pinctrl nodes referenced by the appropriate driver nodes.
-Also, the MDIO pins are required for probing the Ethernet PHY, so they
-must be configured by the FEC driver, not by the PHY driver. Move the
-corresponding pinctrl settings from the PHY subnode to the FEC node.
+The current TX6Q module HW revision is 3 reflected in the module name
+suffix '-1030' (-1130 for LVDS).
+Change the model string to prevent confusion about what DTS file to
+use for these modules.
 
 Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 ---
- arch/arm/boot/dts/imx6qdl-tx6.dtsi | 23 +++++++++++++++++------
- 1 file changed, 17 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/imx6q-tx6q-1010.dts | 4 ++--
+ arch/arm/boot/dts/imx6q-tx6q-1110.dts | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-tx6.dtsi b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-index a50bf71..f2cd3e7 100644
---- a/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
+diff --git a/arch/arm/boot/dts/imx6q-tx6q-1010.dts b/arch/arm/boot/dts/imx6q-tx6q-1010.dts
+index e14e6be..17ff7e7 100644
+--- a/arch/arm/boot/dts/imx6q-tx6q-1010.dts
++++ b/arch/arm/boot/dts/imx6q-tx6q-1010.dts
 @@ -1,5 +1,5 @@
  /*
 - * Copyright 2014-2016 Lothar Wa?mann <LW@KARO-electronics.de>
@@ -31,60 +31,34 @@ index a50bf71..f2cd3e7 100644
   *
   * This file is dual-licensed: you can use it either under the terms
   * of the GPL or the X11 license, at your option. Note that this dual
-@@ -241,7 +241,7 @@
+@@ -44,7 +44,7 @@
+ #include "imx6qdl-tx6.dtsi"
  
- &fec {
- 	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_enet>;
-+	pinctrl-0 = <&pinctrl_enet &pinctrl_enet_mdio &pinctrl_etnphy_rst>;
- 	clocks = <&clks IMX6QDL_CLK_ENET>,
- 		 <&clks IMX6QDL_CLK_ENET>,
- 		 <&clks IMX6QDL_CLK_ENET_REF>,
-@@ -261,8 +261,9 @@
- 			compatible = "ethernet-phy-ieee802.3-c22";
- 			reg = <0>;
- 			pinctrl-names = "default";
--			pinctrl-0 = <&pinctrl_enet_mdio>;
--			interrupts-extended = <&gpio7 1 IRQ_TYPE_EDGE_FALLING>;
-+			pinctrl-0 = <&pinctrl_etnphy_int>;
-+			interrupt-parent = <&gpio7>;
-+			interrupts = <1 IRQ_TYPE_EDGE_FALLING>;
- 		};
- 	};
- };
-@@ -334,8 +335,6 @@
+ / {
+-	model = "Ka-Ro electronics TX6Q-1010 Module";
++	model = "Ka-Ro electronics TX6Q-1010/-1030 Module";
+ 	compatible = "karo,imx6q-tx6q", "fsl,imx6q";
  
- 	pinctrl_hog: hoggrp {
- 		fsl,pins = <
--			MX6QDL_PAD_SD3_DAT2__GPIO7_IO06		0x1b0b1 /* ETN PHY RESET */
--			MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x1b0b1 /* ETN PHY INT */
- 			MX6QDL_PAD_EIM_A25__GPIO5_IO02		0x1b0b1 /* PWR BTN */
- 		>;
- 	};
-@@ -453,12 +452,24 @@
- 		>;
- 	};
+ 	aliases {
+diff --git a/arch/arm/boot/dts/imx6q-tx6q-1110.dts b/arch/arm/boot/dts/imx6q-tx6q-1110.dts
+index 0433e22..0f5e638 100644
+--- a/arch/arm/boot/dts/imx6q-tx6q-1110.dts
++++ b/arch/arm/boot/dts/imx6q-tx6q-1110.dts
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright 2014-2016 Lothar Wa?mann <LW@KARO-electronics.de>
++ * Copyright 2014-2017 Lothar Wa?mann <LW@KARO-electronics.de>
+  *
+  * This file is dual-licensed: you can use it either under the terms
+  * of the GPL or the X11 license, at your option. Note that this dual
+@@ -44,7 +44,7 @@
+ #include "imx6qdl-tx6.dtsi"
  
-+	pinctrl_etnphy_int: etnphy-intgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x1b0b1 /* ETN PHY INT */
-+		>;
-+	};
-+
- 	pinctrl_etnphy_power: etnphy-pwrgrp {
- 		fsl,pins = <
- 			MX6QDL_PAD_EIM_D20__GPIO3_IO20		0x1b0b1 /* ETN PHY POWER */
- 		>;
- 	};
+ / {
+-	model = "Ka-Ro electronics TX6Q-1110 Module";
++	model = "Ka-Ro electronics TX6Q-1110/-1130 Module";
+ 	compatible = "karo,imx6q-tx6q", "fsl,imx6q";
  
-+	pinctrl_etnphy_rst: etnphy-rstgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD3_DAT2__GPIO7_IO06		0x1b0b1 /* ETN PHY RESET */
-+		>;
-+	};
-+
- 	pinctrl_flexcan1: flexcan1grp {
- 		fsl,pins = <
- 			MX6QDL_PAD_GPIO_7__FLEXCAN1_TX		0x1b0b0
+ 	aliases {
 -- 
 2.1.4
