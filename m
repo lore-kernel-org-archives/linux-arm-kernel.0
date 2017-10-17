@@ -1,100 +1,80 @@
 From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Tue, 17 Oct 2017 18:16:17 +0800
-Subject: [RFC PATCH v4 1/8] arm64: dts: rockchip: Enable edp disaplay on kevin
+Date: Tue, 17 Oct 2017 18:16:19 +0800
+Subject: [RFC PATCH v4 3/8] drm/rockchip: dw-mipi-dsi: Fix error handling path
 In-Reply-To: <20171017101624.12506-1-jeffy.chen@rock-chips.com>
 References: <20171017101624.12506-1-jeffy.chen@rock-chips.com>
-Message-ID: <20171017101624.12506-2-jeffy.chen@rock-chips.com>
+Message-ID: <20171017101624.12506-4-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add edp panel and enable related nodes on kevin.
+Add missing pm_runtime_disable() in bind()'s error handling path.
 
+Also cleanup encoder & connector in unbind().
+
+Fixes: 80a9a059d4e4 ("drm/rockchip/dsi: add dw-mipi power domain support")
 Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-Reviewed-by: Mark Yao <mark.yao@rock-chips.com>
-
 ---
 
 Changes in v4: None
 Changes in v3: None
 Changes in v2: None
 
- arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 29 +++++++++++++++++++++++
- arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi      | 16 +++++++++++++
- 2 files changed, 45 insertions(+)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 17 +++++++++++------
+ 1 file changed, 11 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-index a3d3cea7dc4f..bc67b19f0af5 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-@@ -93,6 +93,18 @@
- 		pwm-delay-us = <10000>;
- 	};
+diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+index b15755b6129c..a17ff0f6f489 100644
+--- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
++++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+@@ -1282,7 +1282,7 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
+ 	ret = dw_mipi_dsi_register(drm, dsi);
+ 	if (ret) {
+ 		DRM_DEV_ERROR(dev, "Failed to register mipi_dsi: %d\n", ret);
+-		goto err_pllref;
++		goto err_disable_pllref;
+ 	}
  
-+	edp_panel: edp-panel {
-+		compatible = "sharp,lq123p1jx31", "simple-panel";
-+		backlight = <&backlight>;
-+		power-supply = <&pp3300_disp>;
-+
-+		ports {
-+			panel_in_edp: endpoint {
-+				remote-endpoint = <&edp_out_panel>;
-+			};
-+		};
-+	};
-+
- 	thermistor_ppvar_bigcpu: thermistor-ppvar-bigcpu {
- 		compatible = "murata,ncp15wb473";
- 		pullup-uv = <1800000>;
-@@ -264,6 +276,23 @@ ap_i2c_dig: &i2c2 {
- 	};
- };
+ 	pm_runtime_enable(dev);
+@@ -1292,23 +1292,24 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
+ 	ret = mipi_dsi_host_register(&dsi->dsi_host);
+ 	if (ret) {
+ 		DRM_DEV_ERROR(dev, "Failed to register MIPI host: %d\n", ret);
+-		goto err_cleanup;
++		goto err_disable_pm_runtime;
+ 	}
  
-+&edp {
-+	status = "okay";
-+
-+	ports {
-+		edp_out: port at 1 {
-+			reg = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			edp_out_panel: endpoint at 0 {
-+				reg = <0>;
-+				remote-endpoint = <&panel_in_edp>;
-+			};
-+		};
-+	};
-+};
-+
- &ppvar_bigcpu_pwm {
- 	regulator-min-microvolt = <798674>;
- 	regulator-max-microvolt = <1302172>;
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-index 5772c52fbfd3..470105d651c2 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-@@ -927,6 +927,22 @@ ap_i2c_audio: &i2c8 {
- 	dr_mode = "host";
- };
+ 	if (!dsi->panel) {
+ 		ret = -EPROBE_DEFER;
+-		goto err_mipi_dsi_host;
++		goto err_unreg_mipi_dsi_host;
+ 	}
  
-+&vopb {
-+	status = "okay";
-+};
+ 	dev_set_drvdata(dev, dsi);
+ 	return 0;
+ 
+-err_mipi_dsi_host:
++err_unreg_mipi_dsi_host:
+ 	mipi_dsi_host_unregister(&dsi->dsi_host);
+-err_cleanup:
++err_disable_pm_runtime:
++	pm_runtime_disable(dev);
+ 	drm_encoder_cleanup(&dsi->encoder);
+ 	drm_connector_cleanup(&dsi->connector);
+-err_pllref:
++err_disable_pllref:
+ 	clk_disable_unprepare(dsi->pllref_clk);
+ 	return ret;
+ }
+@@ -1320,6 +1321,10 @@ static void dw_mipi_dsi_unbind(struct device *dev, struct device *master,
+ 
+ 	mipi_dsi_host_unregister(&dsi->dsi_host);
+ 	pm_runtime_disable(dev);
 +
-+&vopb_mmu {
-+	status = "okay";
-+};
++	dsi->connector.funcs->destroy(&dsi->connector);
++	dsi->encoder.funcs->destroy(&dsi->encoder);
 +
-+&vopl {
-+	status = "okay";
-+};
-+
-+&vopl_mmu {
-+	status = "okay";
-+};
-+
- #include <arm/cros-ec-keyboard.dtsi>
- #include <arm/cros-ec-sbs.dtsi>
+ 	clk_disable_unprepare(dsi->pllref_clk);
+ }
  
 -- 
 2.11.0
