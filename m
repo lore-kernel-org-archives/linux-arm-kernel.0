@@ -1,61 +1,23 @@
 From: bhumirks@gmail.com (Bhumika Goyal)
-Date: Tue, 17 Oct 2017 16:38:34 +0200
-Subject: [PATCH 2/2] CLK: SPEAr: make aux_clk_masks structures const
-In-Reply-To: <1508251114-7042-1-git-send-email-bhumirks@gmail.com>
-References: <1508251114-7042-1-git-send-email-bhumirks@gmail.com>
-Message-ID: <1508251114-7042-3-git-send-email-bhumirks@gmail.com>
+Date: Tue, 17 Oct 2017 16:38:32 +0200
+Subject: [PATCH 0/2] CLK: SPEAr: make structure field,
+ function arg and strutcure const
+Message-ID: <1508251114-7042-1-git-send-email-bhumirks@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make these const as they are either stored in the masks 'const' field
-of a clk_aux structure or passed to the function clk_register_aux 
-having the argument as const.
+Make structure field and function argument as const. After this change, 
+make the structures as const.
 
-Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
----
- drivers/clk/spear/clk-aux-synth.c   | 2 +-
+Bhumika Goyal (2):
+  CLK: SPEAr: make structure field and function argument as const
+  CLK: SPEAr: make aux_clk_masks structures const
+
+ drivers/clk/spear/clk-aux-synth.c   | 4 ++--
+ drivers/clk/spear/clk.h             | 4 ++--
  drivers/clk/spear/spear1310_clock.c | 2 +-
  drivers/clk/spear/spear1340_clock.c | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ 4 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/clk/spear/clk-aux-synth.c b/drivers/clk/spear/clk-aux-synth.c
-index 8bea5df..2f145e3 100644
---- a/drivers/clk/spear/clk-aux-synth.c
-+++ b/drivers/clk/spear/clk-aux-synth.c
-@@ -29,7 +29,7 @@
- 
- #define to_clk_aux(_hw) container_of(_hw, struct clk_aux, hw)
- 
--static struct aux_clk_masks default_aux_masks = {
-+static const  struct aux_clk_masks default_aux_masks = {
- 	.eq_sel_mask = AUX_EQ_SEL_MASK,
- 	.eq_sel_shift = AUX_EQ_SEL_SHIFT,
- 	.eq1_mask = AUX_EQ1_SEL,
-diff --git a/drivers/clk/spear/spear1310_clock.c b/drivers/clk/spear/spear1310_clock.c
-index 2f86e3f..591248c 100644
---- a/drivers/clk/spear/spear1310_clock.c
-+++ b/drivers/clk/spear/spear1310_clock.c
-@@ -284,7 +284,7 @@
- };
- 
- /* i2s prescaler1 masks */
--static struct aux_clk_masks i2s_prs1_masks = {
-+static const struct aux_clk_masks i2s_prs1_masks = {
- 	.eq_sel_mask = AUX_EQ_SEL_MASK,
- 	.eq_sel_shift = SPEAR1310_I2S_PRS1_EQ_SEL_SHIFT,
- 	.eq1_mask = AUX_EQ1_SEL,
-diff --git a/drivers/clk/spear/spear1340_clock.c b/drivers/clk/spear/spear1340_clock.c
-index cbb19a9..e5bc8c8 100644
---- a/drivers/clk/spear/spear1340_clock.c
-+++ b/drivers/clk/spear/spear1340_clock.c
-@@ -323,7 +323,7 @@
- };
- 
- /* i2s prescaler1 masks */
--static struct aux_clk_masks i2s_prs1_masks = {
-+static const struct aux_clk_masks i2s_prs1_masks = {
- 	.eq_sel_mask = AUX_EQ_SEL_MASK,
- 	.eq_sel_shift = SPEAR1340_I2S_PRS1_EQ_SEL_SHIFT,
- 	.eq1_mask = AUX_EQ1_SEL,
 -- 
 1.9.1
