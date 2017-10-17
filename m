@@ -1,73 +1,70 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 17 Oct 2017 15:31:42 +0100
-Subject: [PATCH v3 22/28] arm64/sve: KVM: Prevent guests from using SVE
-In-Reply-To: <20171017115024.GS1845@lvm>
-References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
- <1507660725-7986-23-git-send-email-Dave.Martin@arm.com>
- <20171017115024.GS1845@lvm>
-Message-ID: <20171017143142.GX19485@e103592.cambridge.arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 17 Oct 2017 16:34:35 +0200
+Subject: [PATCH 02/23] drm/sun4i: Realign Makefile padding and reorder it
+In-Reply-To: <CAGb2v649B-M7ya=XmH0+hHgYUHDMxWjAH1vuq+iKOOqgU13eCg@mail.gmail.com>
+References: <cover.fe3d65d1ee05a55224d26e7d113388c428592b26.1508231063.git-series.maxime.ripard@free-electrons.com>
+ <9410b284ec97453fa692537dffaaa4fb4833347c.1508231063.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v649B-M7ya=XmH0+hHgYUHDMxWjAH1vuq+iKOOqgU13eCg@mail.gmail.com>
+Message-ID: <20171017143435.5vj4obbxcnodgcu7@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 01:50:24PM +0200, Christoffer Dall wrote:
-> On Tue, Oct 10, 2017 at 07:38:39PM +0100, Dave Martin wrote:
-> > Until KVM has full SVE support, guests must not be allowed to
-> > execute SVE instructions.
-> > 
-> > This patch enables the necessary traps, and also ensures that the
-> > traps are disabled again on exit from the guest so that the host
-> > can still use SVE if it wants to.
-> > 
-> > This patch introduces another instance of
-> > __this_cpu_write(fpsimd_last_state, NULL), so this flush operation
-> > is abstracted out as a separate helper fpsimd_flush_cpu_state().
-> > Other instances are ported appropriately.
+On Tue, Oct 17, 2017 at 05:14:47PM +0800, Chen-Yu Tsai wrote:
+> On Tue, Oct 17, 2017 at 5:06 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Some options were not padded as they should, and the order in the Makefile
+> > was chaotic. Fix that.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  drivers/gpu/drm/sun4i/Makefile | 28 ++++++++++++++--------------
+> >  1 file changed, 14 insertions(+), 14 deletions(-)
+> >
+> > diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
+> > index 43c753cafc88..af18b70ba5ed 100644
+> > --- a/drivers/gpu/drm/sun4i/Makefile
+> > +++ b/drivers/gpu/drm/sun4i/Makefile
+> > @@ -1,24 +1,24 @@
+> > -sun4i-drm-y += sun4i_drv.o
+> > -sun4i-drm-y += sun4i_framebuffer.o
+> > +sun4i-backend-y                        += sun4i_backend.o sun4i_layer.o
+> >
+> > -sun4i-drm-hdmi-y += sun4i_hdmi_enc.o
+> > -sun4i-drm-hdmi-y += sun4i_hdmi_i2c.o
+> > -sun4i-drm-hdmi-y += sun4i_hdmi_ddc_clk.o
+> > -sun4i-drm-hdmi-y += sun4i_hdmi_tmds_clk.o
+> > +sun4i-drm-y                    += sun4i_drv.o
+> > +sun4i-drm-y                    += sun4i_framebuffer.o
+> >
+> > -sun4i-tcon-y += sun4i_tcon.o
+> > -sun4i-tcon-y += sun4i_rgb.o
+> > -sun4i-tcon-y += sun4i_dotclock.o
+> > -sun4i-tcon-y += sun4i_crtc.o
+> > +sun4i-drm-hdmi-y               += sun4i_hdmi_enc.o
+> > +sun4i-drm-hdmi-y               += sun4i_hdmi_i2c.o
+> > +sun4i-drm-hdmi-y               += sun4i_hdmi_ddc_clk.o
+> > +sun4i-drm-hdmi-y               += sun4i_hdmi_tmds_clk.o
+> >
+> > -sun4i-backend-y += sun4i_backend.o sun4i_layer.o
+> > +sun4i-tcon-y                   += sun4i_tcon.o
+> > +sun4i-tcon-y                   += sun4i_rgb.o
+> > +sun4i-tcon-y                   += sun4i_dotclock.o
+> > +sun4i-tcon-y                   += sun4i_crtc.o
 > 
-> I don't understand this paragraph, beginning from ", so this...".
-> 
-> 
-> From reading the code, what I think is the reason for having to flush
-> the SVE state (and mark the host state invalid) is that even though we
-> disallow SVE usage in the guest, the guest can use the normal FP state,
-> and while we always fully preserve the host state, this could still
-> corrupt some additional SVE state not properly preserved for the host.
-> Is that correct?
+> I don't know if you wanted to sort the file names as well.
+> This would be a good time to do it.
 
-Yes, that's right: the guest can't touch the SVE-specific registers
-Pn/FFR, but FPSIMD accesses to Vn regs cause the high bits of the
-corresponding SVE Zn registers to be clobbered.  In any case, the
-FPSIMD restore done by KVM after guest exit is sufficient to clobber
-those bits even if the guest didn't do it.
+Fixed while applying, thanks!
+Maxime
 
-This is a band-aid for not making the KVM world switch code properly
-SVE-aware yet.
-
-Does the following wording sound better:
-
---8<--
-
-On guest exit, high bits of the SVE Zn registers may have been
-clobbered as a side-effect the execution of FPSIMD instructions in
-the guest.  The existing KVM host FPSIMD restore code is not
-sufficient to restore these bits, so this patch explicitly marks
-the CPU as not containing cached vector state for any task, this
-forcing a reload on the next return to userspace.  This is an
-interim measure, in advance of adding full SVE awareness to KVM.
-
-Because of the duplication of this operation
-(__this_cpu_write(fpsimd_last_state, NULL)), it is factored out as
-a new helper fpsimd_flush_cpu_state() to make the purpose clearer.
-
--->8--
-
-> > 
-> > As a side effect of this refactoring, a this_cpu_write() in
-> > fpsimd_cpu_pm_notifier() is changed to __this_cpu_write().  This
-> > should be fine, since cpu_pm_enter() is supposed to be called only
-> > with interrupts disabled.
-> 
-> Otherwise the patch itself looks good to me.
-
-Thanks, let me know about the above wording change though.
-
----Dave
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171017/16f3dfc8/attachment.sig>
