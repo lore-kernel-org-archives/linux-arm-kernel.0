@@ -1,52 +1,49 @@
-From: andrea.adami@gmail.com (Andrea Adami)
-Date: Tue, 17 Oct 2017 10:02:48 +0200
-Subject: ARM: pxa/corgi: armv5te kernel 4.12 fails to decompress compiled
- with gcc7
-In-Reply-To: <f1631768-b26e-62ae-db1f-65686cd0c4de@gmail.com>
-References: <CAAQYJAvR2_wqf2Axe4aVMOu08t7w5tNEjK0s3fw_oemtqCRo7g@mail.gmail.com>
- <87a83zsiid.fsf@belgarion.home>
- <CAAQYJAtEmJMc766kUx+bhFCNQKmwK53nSDNL0nFz-9UXSUO5CQ@mail.gmail.com>
- <20171014215042.kfrhb2kjhm7wb7vb@darkstar.musicnaut.iki.fi>
- <87mv4txuid.fsf@belgarion.home>
- <20171015104640.hazujjkbqyik7fgg@darkstar.musicnaut.iki.fi>
- <f1631768-b26e-62ae-db1f-65686cd0c4de@gmail.com>
-Message-ID: <CAAQYJAsmOr2qnykO=rWH1N43q3+d27aHMAyXHTXMYpPQ1=9ikA@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 17 Oct 2017 10:04:42 +0200
+Subject: [PATCH v2 1/3] dt-bindings: mmc: renesas_sdhi: provide example
+ in bindings documentation
+In-Reply-To: <CAMuHMdUSan7j5wf=cYwO-RdcY7KiJSAPuh7nPq4YQMc_4_sfcA@mail.gmail.com>
+References: <20171016075822.18177-1-horms+renesas@verge.net.au>
+ <20171016075822.18177-2-horms+renesas@verge.net.au>
+ <CAMuHMdUSan7j5wf=cYwO-RdcY7KiJSAPuh7nPq4YQMc_4_sfcA@mail.gmail.com>
+Message-ID: <20171017080441.6wbznyz5xlroecyk@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-<cut>
+On Mon, Oct 16, 2017 at 11:13:32AM +0200, Geert Uytterhoeven wrote:
+> Hi Simon,
+> 
+> On Mon, Oct 16, 2017 at 9:58 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > Provide an example of the usage of the DT bindings for TMIO
+> > in their documentation. The example given is for the r8a7790 (R-Car H2).
+> >
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > ---
+> > v2
+> > * Correct description of example, it is for the r8a7790 (R-Car H2)
+> >   rather than the r8a7779 (R-Car H1)
+> 
+> Thanks for the update!
+> 
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> 
+> > --- a/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
+> > +++ b/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
+> > @@ -43,3 +43,57 @@ Optional properties:
+> >  - pinctrl-names: should be "default", "state_uhs"
+> >  - pinctrl-0: should contain default/high speed pin ctrl
+> >  - pinctrl-1: should contain uhs mode pin ctrl
+> > +
+> > +Example: R8A7790 (R-Car H2) SDHI controller nodes
+> > +
+> > +       sdhi0: sd at ee100000 {
+> > +               compatible = "renesas,sdhi-r8a7790";
+> > +               reg = <0 0xee100000 0 0x328>;
+> > +               interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
+> > +               clocks = <&mstp3_clks R8A7790_CLK_SDHI0>;
+> 
+> You may want to copy the example from the current r8a7790.dtsi, which
+> uses the newer CPG/MSSR bindings.
 
-Hi,
-
-I am trying to debug further but I don't have any output on serial console...
-I enabled:
-
-CONFIG_DEBUG_LL=y
-CONFIG_DEBUG_PXA_UART1=y
-# CONFIG_DEBUG_ICEDCC is not set
-# CONFIG_DEBUG_SEMIHOSTING is not set
-# CONFIG_DEBUG_LL_UART_8250 is not set
-# CONFIG_DEBUG_LL_UART_PL01X is not set
-CONFIG_DEBUG_LL_INCLUDE="debug/8250.S"
-CONFIG_DEBUG_UART_8250=y
-CONFIG_DEBUG_UART_PHYS=0x40100000
-CONFIG_DEBUG_UART_VIRT=0xf6200000
-CONFIG_DEBUG_UART_8250_SHIFT=2
-# CONFIG_DEBUG_UART_8250_WORD is not set
-# CONFIG_DEBUG_UART_8250_PALMCHIP is not set
-# CONFIG_DEBUG_UART_8250_FLOW_CONTROL is not set
-CONFIG_UNCOMPRESS_INCLUDE="mach/uncompress.h"
-CONFIG_EARLY_PRINTK=y
-
-then I added #define DEBUG  to both head.S and decompress.c under
-arm/boot/compressed.
-I added earlyprintk to the cmdline args used by the kexec bootloader but nothing
-
-That kernel does boot silently, just 'Uncompresing..' then
-'XZ-compressed data is corrupt -- System halted'
-
-I do have output from the Angel bootloader at 9600 and by the kernel
-at 115200 so the uart is working...
-Any hint?
-Thanks
-Andrea
+Thanks, v3 sent.
