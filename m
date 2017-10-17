@@ -1,58 +1,76 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 17 Oct 2017 16:26:18 +0100
-Subject: [PATCH v8 6/8] arm_pmu: Use of_cpu_node_to_id helper
-In-Reply-To: <20171010103303.32436-7-suzuki.poulose@arm.com>
-References: <20171010103303.32436-1-suzuki.poulose@arm.com>
- <20171010103303.32436-7-suzuki.poulose@arm.com>
-Message-ID: <20171017152618.bjmbazrwjkhixm7l@lakrids.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 17 Oct 2017 16:33:05 +0100
+Subject: [PATCH v3 02/20] arm64: Use physical counter for in-kernel reads
+In-Reply-To: <20170923004207.22356-3-cdall@linaro.org>
+References: <20170923004207.22356-1-cdall@linaro.org>
+ <20170923004207.22356-3-cdall@linaro.org>
+Message-ID: <20171017153305.GB19711@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 10, 2017 at 11:33:01AM +0100, Suzuki K Poulose wrote:
-> Use the new generic helper, of_cpu_node_to_id(), to map a
-> a phandle to the logical CPU number while parsing the
-> PMU irq affinity.
-> 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Hi Christoffer,
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+On Sat, Sep 23, 2017 at 02:41:49AM +0200, Christoffer Dall wrote:
+> Using the physical counter allows KVM to retain the offset between the
+> virtual and physical counter as long as it is actively running a VCPU.
+> 
+> As soon as a VCPU is released, another thread is scheduled or we start
+> running userspace applications, we reset the offset to 0, so that
+> userspace accessing the virtual timer can still read the cirtual counter
+> and get the same view of time as the kernel.
+> 
+> This opens up potential improvements for KVM performance.
+> 
+> VHE kernels or kernels continuing to use the virtual timer are
+> unaffected.
+> 
+> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+> ---
+>  arch/arm64/include/asm/arch_timer.h  | 9 ++++-----
+>  drivers/clocksource/arm_arch_timer.c | 3 +--
+>  2 files changed, 5 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+> index a652ce0..1859a1c 100644
+> --- a/arch/arm64/include/asm/arch_timer.h
+> +++ b/arch/arm64/include/asm/arch_timer.h
+> @@ -148,11 +148,10 @@ static inline void arch_timer_set_cntkctl(u32 cntkctl)
+>  
+>  static inline u64 arch_counter_get_cntpct(void)
+>  {
+> -	/*
+> -	 * AArch64 kernel and user space mandate the use of CNTVCT.
+> -	 */
+> -	BUG();
+> -	return 0;
+> +	u64 cval;
+> +	isb();
+> +	asm volatile("mrs %0, cntpct_el0" : "=r" (cval));
+> +	return cval;
+>  }
+>  
+>  static inline u64 arch_counter_get_cntvct(void)
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index fd4b7f6..9b3322a 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -890,8 +890,7 @@ static void __init arch_counter_register(unsigned type)
+>  
+>  	/* Register the CP15 based counter if we have one */
+>  	if (type & ARCH_TIMER_TYPE_CP15) {
+> -		if (IS_ENABLED(CONFIG_ARM64) ||
+> -		    arch_timer_uses_ppi == ARCH_TIMER_VIRT_PPI)
+> +		if (arch_timer_uses_ppi == ARCH_TIMER_VIRT_PPI)
+
+Please can you add an is_hyp_mode_available() check here, as you suggested
+last time?
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2017-July/521542.html
+
+Without it, I worry that the kernel timekeeper will be out of sync with the
+vDSO (which uses the virtual counter) on systems where CNTVOFF is
+initialised to a consistent non-zero offset and Linux was loaded at EL1.
 
 Thanks,
-Mark.
 
-> ---
->  drivers/perf/arm_pmu_platform.c | 15 +++------------
->  1 file changed, 3 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/perf/arm_pmu_platform.c b/drivers/perf/arm_pmu_platform.c
-> index 4eafa7a42e52..a96884e37eaf 100644
-> --- a/drivers/perf/arm_pmu_platform.c
-> +++ b/drivers/perf/arm_pmu_platform.c
-> @@ -81,19 +81,10 @@ static int pmu_parse_irq_affinity(struct device_node *node, int i)
->  		return -EINVAL;
->  	}
->  
-> -	/* Now look up the logical CPU number */
-> -	for_each_possible_cpu(cpu) {
-> -		struct device_node *cpu_dn;
-> -
-> -		cpu_dn = of_cpu_device_node_get(cpu);
-> -		of_node_put(cpu_dn);
-> -
-> -		if (dn == cpu_dn)
-> -			break;
-> -	}
-> -
-> -	if (cpu >= nr_cpu_ids) {
-> +	cpu = of_cpu_node_to_id(dn);
-> +	if (cpu < 0) {
->  		pr_warn("failed to find logical CPU for %s\n", dn->name);
-> +		cpu = nr_cpu_ids;
->  	}
->  
->  	of_node_put(dn);
-> -- 
-> 2.13.6
-> 
+Will
