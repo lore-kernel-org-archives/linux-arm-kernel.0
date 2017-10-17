@@ -1,35 +1,74 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 17 Oct 2017 15:32:30 +0200
-Subject: [PATCH 0/8] sa1100fb updates
-In-Reply-To: <20170929105004.GY20805@n2100.armlinux.org.uk>
-References: <CGME20170929105024epcas5p336177e386c65b530c4cb5fac379cedfa@epcas5p3.samsung.com>
- <20170929105004.GY20805@n2100.armlinux.org.uk>
-Message-ID: <2590375.JKTUJ5JGIV@amdc3058>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 17 Oct 2017 14:38:07 +0100
+Subject: [PATCH v4 pci 0/2] PCI/MSI: pci-xgene-msi: Enable MSI support in
+ ACPI boot for X-Gene v1
+In-Reply-To: <CAAsHzqv-oQVNm-pNP4Q1KmiSmjaiFx1S4j8uCnij53Te3h8KKg@mail.gmail.com>
+References: <1506448161-30961-1-git-send-email-kdinh@apm.com>
+ <CAAsHzqv-oQVNm-pNP4Q1KmiSmjaiFx1S4j8uCnij53Te3h8KKg@mail.gmail.com>
+Message-ID: <20171017133807.GB948@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 29, 2017 11:50:04 AM Russell King - ARM Linux wrote:
-> Hi Bart,
+Hi Khuong,
 
-Hi Russell,
+On Mon, Oct 16, 2017 at 02:19:50PM -0700, Khuong Dinh wrote:
+> Hi Lorenzo,
+>   Do you have any comments for this patch?
 
-> This series updates the sa1100fb fbdev driver's initialisation paths
-> to be more robust.  In doing these updates, I realised that we omitted
-> to free some memory which was allocated for the framebuffer if
-> initialisation fails - something that was hidden due to the complex
-> cleanup that the driver performs.  Switching to managed resources made
-> this more obvious.
+I'd have some comments but given that there are related issues with ACPI
+probe ordering that Marc is trying to solve on his side - I will work
+with him to see if we can accommodate changes that can solve this issue
+too.
+
+Again - I recognize it is a complex problem (that is not even
+contemplated by the current ACPI specs), we have to try to make
+the solution as generic as we can to prevent reinventing the wheel
+anytime a sligthly different issue (related to ACPI probe ordering)
+comes up.
+
+Leave it to me (us) and I will get back to you on this.
+
+Thanks,
+Lorenzo
+
+> Best regards,
+> Khuong Dinh
 > 
-> Tested on H3600 iPAQ and Assabet.
-> 
->  drivers/video/fbdev/sa1100fb.c | 75 +++++++++++++++---------------------------
->  drivers/video/fbdev/sa1100fb.h |  2 ++
->  2 files changed, 29 insertions(+), 48 deletions(-)
-
-I queued all patches for 4.15, thanks!
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+> On Tue, Sep 26, 2017 at 10:49 AM, Khuong Dinh <kdinh@apm.com> wrote:
+> > This patch set enables ACPI MSI support for X-Gene PCIe v1 hardware
+> > and provides the proper MSI driver initialization ordering.
+> >
+> > Signed-off-by: Khuong Dinh <kdinh@apm.com>
+> > ---
+> > v4:
+> >  - Remove Marc Zyngier ACK in v2
+> >  - Use acpi_bus_scan on MSI controller handle when MSI device is found
+> >  - Register ACPI MSI driver when MSI device is found instead of using
+> >  subsys_initcall
+> >  - Split ACPI MSI driver support into two patches - one to enable MSI
+> > support for X-Gene PCIe v1 hardware, one to enforce MSI driver loaded
+> > before PCIe controller driver in ACPI boot mode
+> > v3:
+> >  - Input X-Gene MSI base address for irq_domain_alloc_fwnode
+> >  - Add a hook to enforce X-Gene MSI be probed prior acpi_bus_scan happens
+> > v2:
+> >  - Verify with BIOS version 3.06.25 and 3.07.09
+> > v1:
+> >  - Initial version
+> > ---
+> >
+> > Khuong Dinh (2):
+> >   PCI/MSI: pci-xgene-msi: Enable MSI support in ACPI boot for X-Gene v1
+> >   PCI/MSI: Enforce MSI driver loaded before PCIe in ACPI boot
+> >
+> >  drivers/acpi/Makefile            |    2 +-
+> >  drivers/acpi/acpi_msi.c          |   86 ++++++++++++++++++++++++++++++++++++++
+> >  drivers/acpi/acpi_platform.c     |    3 +-
+> >  drivers/acpi/internal.h          |    1 +
+> >  drivers/acpi/scan.c              |    1 +
+> >  drivers/pci/host/pci-xgene-msi.c |   60 ++++++++++++++++++++++++--
+> >  include/linux/acpi_msi.h         |   37 ++++++++++++++++
+> >  7 files changed, 183 insertions(+), 7 deletions(-)
+> >  create mode 100644 drivers/acpi/acpi_msi.c
+> >  create mode 100644 include/linux/acpi_msi.h
+> >
