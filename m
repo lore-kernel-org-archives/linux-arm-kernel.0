@@ -1,169 +1,87 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 17 Oct 2017 07:46:21 -0700
-Subject: [PATCH 07/10] KVM: arm/arm64: Preserve Exec permission across
- R/W permission faults
-In-Reply-To: <9f1e5366-fe47-69e9-8df9-31105c39094f@arm.com>
-References: <20171009152032.27804-1-marc.zyngier@arm.com>
- <20171009152032.27804-8-marc.zyngier@arm.com>
- <20171016200824.GI1845@lvm>
- <9f1e5366-fe47-69e9-8df9-31105c39094f@arm.com>
-Message-ID: <20171017144621.GJ5886@lvm>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 17 Oct 2017 15:46:56 +0100
+Subject: [PATCH v3 0/8] ARM: NOMMU: MPU updates
+In-Reply-To: <79c7c3f6-9a55-9044-6a6f-df8f64c10241@arm.com>
+References: <1506330344-31556-1-git-send-email-vladimir.murzin@arm.com>
+ <CA+M3ks7bge8k-5p8cMVHuYX6VLbPPrs9-onj4SoL_tNvcsySGw@mail.gmail.com>
+ <79c7c3f6-9a55-9044-6a6f-df8f64c10241@arm.com>
+Message-ID: <20171017144656.GP20805@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 12:22:08PM +0100, Marc Zyngier wrote:
-> On 16/10/17 21:08, Christoffer Dall wrote:
-> > On Mon, Oct 09, 2017 at 04:20:29PM +0100, Marc Zyngier wrote:
-> >> So far, we loose the Exec property whenever we take permission
-> >> faults, as we always reconstruct the PTE/PMD from scratch. This
-> >> can be counter productive as we can end-up with the following
-> >> fault sequence:
+On Tue, Oct 17, 2017 at 03:13:36PM +0100, Vladimir Murzin wrote:
+> On 17/10/17 15:05, Benjamin Gaignard wrote:
+> > 2017-09-25 11:05 GMT+02:00 Vladimir Murzin <vladimir.murzin@arm.com>:
+> >> Hi,
 > >>
-> >> 	X -> RO -> ROX -> RW -> RWX
+> >> This is an update of the existent MPU code which consist set of
+> >> clean-ups and enhancements. The most significant changes are in the
+> >> way how MPU settings sync-up for secondaries (PATCH 3/8), more
+> >> flexible layout for memory (PATCH 7/8) and support for XIP (PATCH
+> >> 8/8). Since there is no in-tree user of MPU, support for M-class has
+> >> been added (PATCH 6/8).
 > >>
-> >> Instead, we can lookup the existing PTE/PMD and clear the XN bit in the
-> >> new entry if it was already cleared in the old one, leadig to a much
-> >> nicer fault sequence:
+> >> There is also practical benefit of patch set:
 > >>
-> >> 	X -> ROX -> RWX
+> >> "These MPU patches introduce a nice feature that it simplifies the
+> >> bootloader: do not need to setup the MPU, for example for coherent DMA
+> >> region, which is described in device-tree too." Andr?s Szemz?
 > >>
-> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >> ---
-> >>  arch/arm/include/asm/kvm_mmu.h   | 10 ++++++++++
-> >>  arch/arm64/include/asm/kvm_mmu.h | 10 ++++++++++
-> >>  virt/kvm/arm/mmu.c               | 25 +++++++++++++++++++++++++
-> >>  3 files changed, 45 insertions(+)
+> >> Changelog:
+> >>            v2 -> v3
+> >>               - fixed support for XIP (PATCH 8/8)
+> >>               - rebased on 4.14-rc2
 > >>
-> >> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> >> index bf76150aad5f..ad442d86c23e 100644
-> >> --- a/arch/arm/include/asm/kvm_mmu.h
-> >> +++ b/arch/arm/include/asm/kvm_mmu.h
-> >> @@ -107,6 +107,11 @@ static inline bool kvm_s2pte_readonly(pte_t *pte)
-> >>  	return (pte_val(*pte) & L_PTE_S2_RDWR) == L_PTE_S2_RDONLY;
-> >>  }
-> >>  
-> >> +static inline bool kvm_s2pte_exec(pte_t *pte)
-> >> +{
-> >> +	return !(pte_val(*pte) & L_PTE_XN);
-> >> +}
-> >> +
-> >>  static inline void kvm_set_s2pmd_readonly(pmd_t *pmd)
-> >>  {
-> >>  	pmd_val(*pmd) = (pmd_val(*pmd) & ~L_PMD_S2_RDWR) | L_PMD_S2_RDONLY;
-> >> @@ -117,6 +122,11 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
-> >>  	return (pmd_val(*pmd) & L_PMD_S2_RDWR) == L_PMD_S2_RDONLY;
-> >>  }
-> >>  
-> >> +static inline bool kvm_s2pmd_exec(pmd_t *pmd)
-> >> +{
-> >> +	return !(pmd_val(*pmd) & PMD_SECT_XN);
-> >> +}
-> >> +
-> >>  static inline bool kvm_page_empty(void *ptr)
-> >>  {
-> >>  	struct page *ptr_page = virt_to_page(ptr);
-> >> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> >> index 60c420a5ac0d..e7af74b8b51a 100644
-> >> --- a/arch/arm64/include/asm/kvm_mmu.h
-> >> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> >> @@ -203,6 +203,11 @@ static inline bool kvm_s2pte_readonly(pte_t *pte)
-> >>  	return (pte_val(*pte) & PTE_S2_RDWR) == PTE_S2_RDONLY;
-> >>  }
-> >>  
-> >> +static inline bool kvm_s2pte_exec(pte_t *pte)
-> >> +{
-> >> +	return !(pte_val(*pte) & PTE_S2_XN);
-> >> +}
-> >> +
-> >>  static inline void kvm_set_s2pmd_readonly(pmd_t *pmd)
-> >>  {
-> >>  	kvm_set_s2pte_readonly((pte_t *)pmd);
-> >> @@ -213,6 +218,11 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
-> >>  	return kvm_s2pte_readonly((pte_t *)pmd);
-> >>  }
-> >>  
-> >> +static inline bool kvm_s2pmd_exec(pmd_t *pmd)
-> >> +{
-> >> +	return !(pmd_val(*pmd) & PMD_S2_XN);
-> >> +}
-> >> +
-> >>  static inline bool kvm_page_empty(void *ptr)
-> >>  {
-> >>  	struct page *ptr_page = virt_to_page(ptr);
-> >> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> >> index 1911fadde88b..ccc6106764a6 100644
-> >> --- a/virt/kvm/arm/mmu.c
-> >> +++ b/virt/kvm/arm/mmu.c
-> >> @@ -926,6 +926,17 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
-> >>  	return 0;
-> >>  }
-> >>  
-> >> +static pte_t *stage2_get_pte(struct kvm *kvm, phys_addr_t addr)
-> >> +{
-> >> +	pmd_t *pmdp;
-> >> +
-> >> +	pmdp = stage2_get_pmd(kvm, NULL, addr);
-> >> +	if (!pmdp || pmd_none(*pmdp))
-> >> +		return NULL;
-> >> +
-> >> +	return pte_offset_kernel(pmdp, addr);
-> >> +}
-> >> +
+> >>            v1 -> v2
+> >>               - support for XIP (PATCH 8/8)
+> >>               - rebased on 4.13-rc1
+> >>
+> >>         RFC v2 -> v1
+> >>                - dropped RFC tag
+> >>                - Tested-by from Andr?s
+> >>                - rebased on 4.12-rc5
+> >>
+> >>            RFC -> RFC v2
+> >>                - fixed MPU enable for v7m (PATCH 6/7)
+> >>
+> >> Thanks!
 > > 
-> > nit, couldn't you change this to be
+> > for the whole serie on stm32f4 and stm32f7:
 > > 
-> >     stage2_is_exec(struct kvm *kvm, phys_addr_t addr)
-> > 
-> > Which, if the pmd is a section mapping just checks that, and if we find
-> > a pte, we check that, and then we can have a simpler one-line call and
-> > check from both the pte and pmd paths below?
+> > Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
 > 
-> Yes, that's pretty neat. I've folded that in.
+> Thanks for giving it a try!
 > 
-> > 
-> >>  static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
-> >>  			  phys_addr_t addr, const pte_t *new_pte,
-> >>  			  unsigned long flags)
-> >> @@ -1407,6 +1418,13 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
-> >>  		if (exec_fault) {
-> >>  			new_pmd = kvm_s2pmd_mkexec(new_pmd);
-> >>  			coherent_icache_guest_page(vcpu, pfn, PMD_SIZE);
-> >> +		} else if (fault_status == FSC_PERM) {
-> >> +			/* Preserve execute if XN was already cleared */
-> >> +			pmd_t *old_pmdp = stage2_get_pmd(kvm, NULL, fault_ipa);
-> >> +
-> >> +			if (old_pmdp && pmd_present(*old_pmdp) &&
-> >> +			    kvm_s2pmd_exec(old_pmdp))
-> >> +				new_pmd = kvm_s2pmd_mkexec(new_pmd);
-> > 
-> > Is the reverse case not also possible then?  That is, if we have an
-> > exec_fault, we could check if the entry is already writable and maintain
-> > the property as well.  Not sure how often that would get hit though, as
-> > a VM would only execute instructions on a page that has been written to,
-> > but is somehow read-only at stage2, meaning the host must have marked
-> > the page as read-only since content was written.  I think this could be
-> > a somewhat common pattern with something like KSM though?
-> 
-> I think this is already the case, because we always build the PTE/PMD as
-> either ROXN or RWXN, and only later clear the XN bit (see the
-> unconditional call to gfn_to_pfn_prot which should tell us whether to
-> map the page as writable or not). Or am I missing your point entirely?
-> 
+> The series is already in Russell's patch system, so I dunno
+> how to add your Tested-by, maybe Russell can made an update
+> when he pull patches in his tree...
 
-I am worried about the flow where we map the page as RWXN, then execute
-some code on it, so it becomes RW, then make it read-only as ROXN.
-Shouldn't we we should preserve the exec state here?
+Applied, along with the tested-by, and with the fixup patch folded.
 
-I'm guessing that something like KSM will want to make pages read-only
-to support COW, but perhaps that's always done by copying the content to
-a new page and redirecting the old mapping to a new mapping (something
-that calls kvm_set_spte_hva()) and in that case we do probably really
-want the XN bit to be set again so that we can do the necessary
-maintenance.
+However, I notice that with "Szemz? Andr?s" name, the ? character has
+been replaced by a "?" somewhere along the lines (and my VT console
+can't even display it, so (a) I've no idea what character it's
+supposed to be, and (b) I can't cut'n'paste it either - as illustrated
+by my pasting above making it come out as a rectangular block.)
 
-However, we shouldn't try to optimize for something we don't know to be
-a problem, so as long as it's functionally correct, which I think it is,
-we should be fine.
+The problem I have is that if I push these patches out, as soon as I
+do, I can't fix this up, because it's the "devel-stable" branch - and
+the promise I make to everyone is that branch is never rebased (which
+is why it has the -stable suffix.)  Once commits are published in that
+branch, they're set in stone.
 
-Thanks,
--Christoffer
+>From what I can tell, the patches were emailed to the patch system,
+which means it would've gone through perl's Unicode::Map8 - internally
+the patch system uses UTF-8 to store the summary and description,
+while preserving the patch as a byte stream.  Your emails to the list
+claim to be UTF-8, so it should've been a no-op.  So, don't know what
+has happened, and I can't fix it at the moment, not even in the actual
+commits.
+
+So, I won't be pushing this out, nor will I be marking the patches as
+applied in the patch system until I have some kind of solution.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
