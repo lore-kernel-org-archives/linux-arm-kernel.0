@@ -1,104 +1,75 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 17 Oct 2017 20:18:01 +0800
-Subject: [PATCH 04/10] drm/sun4i: Add support for A10 display pipeline
- components
-In-Reply-To: <20171017121807.2994-1-wens@csie.org>
-References: <20171017121807.2994-1-wens@csie.org>
-Message-ID: <20171017121807.2994-5-wens@csie.org>
+Date: Tue, 17 Oct 2017 20:17:57 +0800
+Subject: [PATCH 00/10] drm/sunxi: Display pipeline and HDMI output on A10/A20
+Message-ID: <20171017121807.2994-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A10 display pipeline has 2 frontends, 2 backends, and 2 TCONs.
-This patch adds support (or a compatible string in the frontend's
-case) for these components.
+Hi everyone,
 
-The TCONs support directly outputting to CPU/RGB/LVDS LCD panels,
-or it can output to HDMI via an on-chip HDMI controller, or
-CVBS/YPbPr/VGA signals via on-chip TV encoders. These additional
-encoders are not covered in this patch.
+This series adds display support for Allwinner A10/A20 SoCs to the
+sun4i-drm driver. The core display pipeline components and HDMI are
+covered. LCD panel RGB output should also be available, but I do not
+have devices to test this on.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 3 +++
- drivers/gpu/drm/sun4i/sun4i_backend.c                         | 8 ++++++++
- drivers/gpu/drm/sun4i/sun4i_drv.c                             | 4 +++-
- 3 files changed, 14 insertions(+), 1 deletion(-)
+Jonathan had HDMI working on the A20, along with LCD panels for a
+development board. I've picked up the work, polished it, and added A10
+(which is what the A20 is based on) support to the batch.
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index 5650efcfd2ac..8f9a58181f89 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -155,6 +155,7 @@ system.
+The series is based on my latest sun4i-drm cleanup series. The patches
+should apply without them, but display would be broken on devices with
+more than 1GB RAM, and HDMI display colors would be inverted on A10
+devices.
+
+The TCON changes will likely conflict with the A83T LVDS series Maxime
+posted, but they would be obvious and easy to fix.
+
+The patches are pretty self-explaining:
+
+  - 1 patch exports the PLLs used by the HDMI controller
+
+  - 1 patch adds support for the backend output mux
+
+  - 3 patches add A10/A20 compatible strings to the sun4i-drm driver
+
+  - 2 patches add the display pipeline nodes to the .dtsi files
  
- Required properties:
-   - compatible: value must be one of:
-+    * allwinner,sun4i-a10-display-backend
-     * allwinner,sun5i-a13-display-backend
-     * allwinner,sun6i-a31-display-backend
-     * allwinner,sun8i-a33-display-backend
-@@ -187,6 +188,7 @@ deinterlacing and color space conversion.
- 
- Required properties:
-   - compatible: value must be one of:
-+    * allwinner,sun4i-a10-display-frontend
-     * allwinner,sun5i-a13-display-frontend
-     * allwinner,sun6i-a31-display-frontend
-     * allwinner,sun8i-a33-display-frontend
-@@ -233,6 +235,7 @@ extra node.
- 
- Required properties:
-   - compatible: value must be one of:
-+    * allwinner,sun4i-a10-display-engine
-     * allwinner,sun5i-a10s-display-engine
-     * allwinner,sun5i-a13-display-engine
-     * allwinner,sun6i-a31-display-engine
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index e8477321f978..77f9e183df00 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -514,6 +514,10 @@ static int sun4i_backend_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct sun4i_backend_quirks sun4i_backend_quirks = {
-+	.needs_output_muxing = true,
-+};
-+
- static const struct sun4i_backend_quirks sun5i_backend_quirks = {
- };
- 
-@@ -524,6 +528,10 @@ static const struct sun4i_backend_quirks sun8i_a33_backend_quirks = {
- };
- 
- static const struct of_device_id sun4i_backend_of_table[] = {
-+	{
-+		.compatible = "allwinner,sun4i-a10-display-backend",
-+		.data = &sun4i_backend_quirks,
-+	},
- 	{
- 		.compatible = "allwinner,sun5i-a13-display-backend",
- 		.data = &sun5i_backend_quirks,
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index b8089ac6feef..5dbaf8bb414d 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -177,7 +177,8 @@ static bool sun4i_drv_node_is_connector(struct device_node *node)
- 
- static bool sun4i_drv_node_is_frontend(struct device_node *node)
- {
--	return of_device_is_compatible(node, "allwinner,sun5i-a13-display-frontend") ||
-+	return of_device_is_compatible(node, "allwinner,sun4i-a10-display-frontend") ||
-+		of_device_is_compatible(node, "allwinner,sun5i-a13-display-frontend") ||
- 		of_device_is_compatible(node, "allwinner,sun6i-a31-display-frontend") ||
- 		of_device_is_compatible(node, "allwinner,sun8i-a33-display-frontend");
- }
-@@ -388,6 +389,7 @@ static int sun4i_drv_remove(struct platform_device *pdev)
- }
- 
- static const struct of_device_id sun4i_drv_of_table[] = {
-+	{ .compatible = "allwinner,sun4i-a10-display-engine" },
- 	{ .compatible = "allwinner,sun5i-a10s-display-engine" },
- 	{ .compatible = "allwinner,sun5i-a13-display-engine" },
- 	{ .compatible = "allwinner,sun6i-a31-display-engine" },
+  - 2 patches enable HDMI output on various boards
+
+Chen-Yu Tsai (6):
+  drm/sun4i: backend: Support output muxing
+  drm/sun4i: hdmi: Support HDMI controller on A10
+  drm/sun4i: Add support for A10 display pipeline components
+  ARM: dts: sun4i: Add device nodes for display pipelines
+  ARM: dts: sun4i: Enable HDMI support on some A10 devices
+  ARM: dts: sun7i: Enable HDMI support on some A20 devices
+
+Jonathan Liu (4):
+  drm/sun4i: tcon: Add support for A10 TCON
+  drm/sun4i: Add support for A20 display pipeline components
+  clk: sunxi-ng: sun4i: Export video PLLs
+  ARM: dts: sun7i: Add device nodes for display pipelines
+
+ .../bindings/display/sunxi/sun4i-drm.txt           |   9 +
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts         |  25 ++
+ arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts     |  21 ++
+ arch/arm/boot/dts/sun4i-a10.dtsi                   | 306 ++++++++++++++++++++
+ arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts   |  25 ++
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts        |  25 ++
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts         |  25 ++
+ arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts          |  25 ++
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts     |  25 ++
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts    |  25 ++
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts    |  25 ++
+ arch/arm/boot/dts/sun7i-a20.dtsi                   | 307 +++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu-sun4i-a10.h               |   4 +-
+ drivers/gpu/drm/sun4i/sun4i_backend.c              |  68 ++++-
+ drivers/gpu/drm/sun4i/sun4i_backend.h              |   3 +-
+ drivers/gpu/drm/sun4i/sun4i_drv.c                  |  10 +-
+ drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c             |  53 ++++
+ drivers/gpu/drm/sun4i/sun4i_tcon.c                 |  37 +++
+ include/dt-bindings/clock/sun4i-a10-ccu.h          |   2 +
+ 19 files changed, 1012 insertions(+), 8 deletions(-)
+
 -- 
 2.14.2
