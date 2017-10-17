@@ -1,49 +1,45 @@
-From: hch@infradead.org (Christoph Hellwig)
-Date: Tue, 17 Oct 2017 01:24:13 -0700
-Subject: [PATCH 1/9] SOC: brcmstb: add memory API
-In-Reply-To: <1507761269-7017-2-git-send-email-jim2101024@gmail.com>
-References: <1507761269-7017-1-git-send-email-jim2101024@gmail.com>
- <1507761269-7017-2-git-send-email-jim2101024@gmail.com>
-Message-ID: <20171017082413.GA10574@infradead.org>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 17 Oct 2017 10:29:07 +0200
+Subject: [PATCH 0/4] ARM64: dts: meson-gx: fix VPU init for non-vendor u-boot
+Message-ID: <1508228951-12384-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +/* Macros to help extract property data */
-> +#define U8TOU32(b, offs) \
-> +	((((u32)b[0 + offs] << 0)  & 0x000000ff) | \
-> +	 (((u32)b[1 + offs] << 8)  & 0x0000ff00) | \
-> +	 (((u32)b[2 + offs] << 16) & 0x00ff0000) | \
-> +	 (((u32)b[3 + offs] << 24) & 0xff000000))
+On the Amlogic Gx SoCs (GXBB, GXL & GXM), the VPU power domain is initialized
+by the vendor U-Boot code, but running mainline U-boot has been possible
+on these SoCs. But lacking such init made the system lock at kernel boot.
 
-Please us helpers like get_unaligned_le32 instead opencoding them.
+A PM Power Domain driver has been pushed at [1] to solve the main issue.
 
-> +#define DT_PROP_DATA_TO_U32(b, offs) (fdt32_to_cpu(U8TOU32(b, offs)))
+This patchset depends on the the following patchsets :
+- [1] soc: amlogic: add support for Meson GX VPU Domains
+- [2] reset: meson: add level reset support for GX SoC family
+- [3] clk: meson: gxbb: Add VPU and VAPB clocks
+- [4] drm/meson: power domain init related fixes
 
-And together with this it looks really whacky.  So you're converting
-from le to native first and then do another conversion from be to cpu?
+[1] https://lkml.kernel.org/r/1508228167-11753-1-git-send-email-narmstrong at baylibre.com
+[2] https://lkml.kernel.org/r/1508167573-17396-1-git-send-email-narmstrong at baylibre.com
+[3] https://lkml.kernel.org/r/1508168085-19032-1-git-send-email-narmstrong at baylibre.com
+[4] https://lkml.kernel.org/r/1508227664-11171-1-git-send-email-narmstrong at baylibre.com
 
-Something doesn't work out here.
+Neil Armstrong (4):
+  ARM64: dts: meson-gx: add VPU power domain
+  ARM64: dts: meson-gx: Add HDMI_5V regulator on selected boards
+  ARM64: dts: meson-gx: grow reset controller memory zone
+  ARM64: dts: odroid-c2: Add HDMI and CEC Nodes
 
-> +/* -------------------- Functions -------------------- */
+ .../arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi | 12 ++++++
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi          | 13 ++++++-
+ .../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 30 +++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        | 43 ++++++++++++++++++++++
+ .../boot/dts/amlogic/meson-gxl-s905d-p230.dts      |  1 +
+ .../dts/amlogic/meson-gxl-s905x-khadas-vim.dts     |  1 +
+ .../dts/amlogic/meson-gxl-s905x-libretech-cc.dts   | 12 ++++++
+ .../boot/dts/amlogic/meson-gxl-s905x-p212.dts      |  1 +
+ .../boot/dts/amlogic/meson-gxl-s905x-p212.dtsi     | 11 ++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         | 43 ++++++++++++++++++++++
+ .../boot/dts/amlogic/meson-gxm-khadas-vim2.dts     | 12 ++++++
+ 11 files changed, 178 insertions(+), 1 deletion(-)
 
-Please remove pointless comments like this one.
-
-> +
-> +/*
-> + * If the DT nodes are handy, determine which MEMC holds the specified
-> + * physical address.
-> + */
-> +#ifdef CONFIG_ARCH_BRCMSTB
-> +int __brcmstb_memory_phys_addr_to_memc(phys_addr_t pa, void __iomem *base)
-
-Please move this into the arm arch code.
-
-> +#elif defined(CONFIG_MIPS)
-
-And this into the mips arch code.
-
-> +EXPORT_SYMBOL(brcmstb_memory_phys_addr_to_memc);
-
-> +EXPORT_SYMBOL(brcmstb_memory_memc_size);
-
-Why is this exported?
+-- 
+2.7.4
