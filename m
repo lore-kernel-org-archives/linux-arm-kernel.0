@@ -1,86 +1,103 @@
 From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Tue, 17 Oct 2017 10:53:27 +0200
-Subject: [PATCH 05/12] ARM: dts: imx6-tx6: improve ethernet related pinctrl
- setup
+Date: Tue, 17 Oct 2017 10:53:29 +0200
+Subject: [PATCH 07/12] ARM: dts: imx6-tx6: convert to using simple-audio-card
 In-Reply-To: <1508230414-8090-1-git-send-email-LW@KARO-electronics.de>
 References: <1508230414-8090-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <1508230414-8090-6-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1508230414-8090-8-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the PHY INT and RESET pins from hog section and put them into
-their own pinctrl nodes referenced by the appropriate driver nodes.
-Also, the MDIO pins are required for probing the Ethernet PHY, so they
-must be configured by the FEC driver, not by the PHY driver. Move the
-corresponding pinctrl settings from the PHY subnode to the FEC node.
+Convert the DTS sound setup to use the simple-audio-card driver.
 
 Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 ---
- arch/arm/boot/dts/imx6qdl-tx6.dtsi | 20 +++++++++++++++-----
- 1 file changed, 15 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/imx6qdl-tx6.dtsi | 50 ++++++++++++++++++++++++++++++++------
+ 1 file changed, 42 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm/boot/dts/imx6qdl-tx6.dtsi b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-index a50bf71..aa32956 100644
+index c6b2d63..e0dbf8b 100644
 --- a/arch/arm/boot/dts/imx6qdl-tx6.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-@@ -1,5 +1,5 @@
- /*
-- * Copyright 2014-2016 Lothar Wa?mann <LW@KARO-electronics.de>
-+ * Copyright 2014-2017 Lothar Wa?mann <LW@KARO-electronics.de>
-  *
-  * This file is dual-licensed: you can use it either under the terms
-  * of the GPL or the X11 license, at your option. Note that this dual
-@@ -241,7 +241,7 @@
+@@ -43,6 +43,7 @@
+ #include <dt-bindings/input/input.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/pwm/pwm.h>
++#include <dt-bindings/sound/fsl-imx-audmux.h>
  
- &fec {
- 	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_enet>;
-+	pinctrl-0 = <&pinctrl_enet &pinctrl_enet_mdio &pinctrl_etnphy_rst>;
- 	clocks = <&clks IMX6QDL_CLK_ENET>,
- 		 <&clks IMX6QDL_CLK_ENET>,
- 		 <&clks IMX6QDL_CLK_ENET_REF>,
-@@ -261,7 +261,7 @@
- 			compatible = "ethernet-phy-ieee802.3-c22";
- 			reg = <0>;
- 			pinctrl-names = "default";
--			pinctrl-0 = <&pinctrl_enet_mdio>;
-+			pinctrl-0 = <&pinctrl_etnphy_int>;
- 			interrupts-extended = <&gpio7 1 IRQ_TYPE_EDGE_FALLING>;
- 		};
- 	};
-@@ -334,8 +334,6 @@
- 
- 	pinctrl_hog: hoggrp {
- 		fsl,pins = <
--			MX6QDL_PAD_SD3_DAT2__GPIO7_IO06		0x1b0b1 /* ETN PHY RESET */
--			MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x1b0b1 /* ETN PHY INT */
- 			MX6QDL_PAD_EIM_A25__GPIO5_IO02		0x1b0b1 /* PWR BTN */
- 		>;
- 	};
-@@ -453,12 +451,24 @@
- 		>;
+ / {
+ 	aliases {
+@@ -183,24 +184,56 @@
  	};
  
-+	pinctrl_etnphy_int: etnphy-intgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x1b0b1 /* ETN PHY INT */
+ 	sound {
+-		compatible = "karo,imx6qdl-tx6qdl-sgtl5000",
+-			     "fsl,imx-audio-sgtl5000";
+-		model = "sgtl5000-audio";
++		compatible = "karo,imx6qdl-tx6-sgtl5000",
++			     "simple-audio-card";
++		simple-audio-card,name = "imx6qdl-tx6-sgtl5000-audio";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_audmux>;
+-		ssi-controller = <&ssi1>;
+-		audio-codec = <&sgtl5000>;
+-		audio-routing =
++		simple-audio-card,format = "i2s";
++		simple-audio-card,bitclock-master = <&codec_dai>;
++		simple-audio-card,frame-master = <&codec_dai>;
++		simple-audio-card,widgets =
++			"Microphone", "Mic Jack",
++			"Line", "Line In",
++			"Line", "Line Out",
++			"Headphone", "Headphone Jack";
++		simple-audio-card,routing =
+ 			"MIC_IN", "Mic Jack",
+ 			"Mic Jack", "Mic Bias",
+ 			"Headphone Jack", "HP_OUT";
+-		mux-int-port = <1>;
+-		mux-ext-port = <5>;
++
++		cpu_dai: simple-audio-card,cpu {
++			sound-dai = <&ssi1>;
++		};
++
++		codec_dai: simple-audio-card,codec {
++			sound-dai = <&sgtl5000>;
++		};
+ 	};
+ };
+ 
+ &audmux {
+ 	status = "okay";
++
++	ssi1 {
++		fsl,audmux-port = <0>;
++		fsl,port-config = <
++			(IMX_AUDMUX_V2_PTCR_SYN |
++			IMX_AUDMUX_V2_PTCR_TFSEL(4) |
++			IMX_AUDMUX_V2_PTCR_TCSEL(4) |
++			IMX_AUDMUX_V2_PTCR_TFSDIR |
++			IMX_AUDMUX_V2_PTCR_TCLKDIR)
++			IMX_AUDMUX_V2_PDCR_RXDSEL(4)
 +		>;
 +	};
 +
- 	pinctrl_etnphy_power: etnphy-pwrgrp {
- 		fsl,pins = <
- 			MX6QDL_PAD_EIM_D20__GPIO3_IO20		0x1b0b1 /* ETN PHY POWER */
- 		>;
- 	};
- 
-+	pinctrl_etnphy_rst: etnphy-rstgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD3_DAT2__GPIO7_IO06		0x1b0b1 /* ETN PHY RESET */
++	pins5 {
++		fsl,audmux-port = <4>;
++		fsl,port-config = <
++			IMX_AUDMUX_V2_PTCR_SYN
++			IMX_AUDMUX_V2_PDCR_RXDSEL(0)
 +		>;
 +	};
-+
- 	pinctrl_flexcan1: flexcan1grp {
- 		fsl,pins = <
- 			MX6QDL_PAD_GPIO_7__FLEXCAN1_TX		0x1b0b0
+ };
+ 
+ &can1 {
+@@ -298,6 +331,7 @@
+ 
+ 	sgtl5000: sgtl5000 at 0a {
+ 		compatible = "fsl,sgtl5000";
++		#sound-dai-cells = <0>;
+ 		reg = <0x0a>;
+ 		VDDA-supply = <&reg_2v5>;
+ 		VDDIO-supply = <&reg_3v3>;
 -- 
 2.1.4
