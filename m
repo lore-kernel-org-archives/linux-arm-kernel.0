@@ -1,63 +1,56 @@
-From: petrcvekcz@gmail.com (Petr Cvek)
-Date: Tue, 17 Oct 2017 10:10:31 +0200
-Subject: ARM: pxa/corgi: armv5te kernel 4.12 fails to decompress compiled
- with gcc7
-In-Reply-To: <CAAQYJAsmOr2qnykO=rWH1N43q3+d27aHMAyXHTXMYpPQ1=9ikA@mail.gmail.com>
-References: <CAAQYJAvR2_wqf2Axe4aVMOu08t7w5tNEjK0s3fw_oemtqCRo7g@mail.gmail.com>
- <87a83zsiid.fsf@belgarion.home>
- <CAAQYJAtEmJMc766kUx+bhFCNQKmwK53nSDNL0nFz-9UXSUO5CQ@mail.gmail.com>
- <20171014215042.kfrhb2kjhm7wb7vb@darkstar.musicnaut.iki.fi>
- <87mv4txuid.fsf@belgarion.home>
- <20171015104640.hazujjkbqyik7fgg@darkstar.musicnaut.iki.fi>
- <f1631768-b26e-62ae-db1f-65686cd0c4de@gmail.com>
- <CAAQYJAsmOr2qnykO=rWH1N43q3+d27aHMAyXHTXMYpPQ1=9ikA@mail.gmail.com>
-Message-ID: <26e751ec-7fc7-475a-5603-2fac4e0700cb@gmail.com>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Tue, 17 Oct 2017 16:09:22 +0800
+Subject: [RFC PATCH v3 2/5] drm/rockchip: Fix error handling path in
+ rockchip_dp_bind()
+In-Reply-To: <20171017080925.23763-1-jeffy.chen@rock-chips.com>
+References: <20171017080925.23763-1-jeffy.chen@rock-chips.com>
+Message-ID: <20171017080925.23763-3-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne 17.10.2017 v 10:02 Andrea Adami napsal(a):
-> <cut>
-> 
-> Hi,
-Hi
+Add missing error handling in rockchip_dp_bind().
 
-> 
-> I am trying to debug further but I don't have any output on serial console...
-> I enabled:
-> 
-> CONFIG_DEBUG_LL=y
-> CONFIG_DEBUG_PXA_UART1=y
-> # CONFIG_DEBUG_ICEDCC is not set
-> # CONFIG_DEBUG_SEMIHOSTING is not set
-> # CONFIG_DEBUG_LL_UART_8250 is not set
-> # CONFIG_DEBUG_LL_UART_PL01X is not set
-> CONFIG_DEBUG_LL_INCLUDE="debug/8250.S"
-> CONFIG_DEBUG_UART_8250=y
-> CONFIG_DEBUG_UART_PHYS=0x40100000
-> CONFIG_DEBUG_UART_VIRT=0xf6200000
-> CONFIG_DEBUG_UART_8250_SHIFT=2
-> # CONFIG_DEBUG_UART_8250_WORD is not set
-> # CONFIG_DEBUG_UART_8250_PALMCHIP is not set
-> # CONFIG_DEBUG_UART_8250_FLOW_CONTROL is not set
-> CONFIG_UNCOMPRESS_INCLUDE="mach/uncompress.h"
-> CONFIG_EARLY_PRINTK=y
-> 
-> then I added #define DEBUG  to both head.S and decompress.c under
-> arm/boot/compressed.
-> I added earlyprintk to the cmdline args used by the kexec bootloader but nothing
-> 
-> That kernel does boot silently, just 'Uncompresing..' then
-> 'XZ-compressed data is corrupt -- System halted'
-> 
-> I do have output from the Angel bootloader at 9600 and by the kernel
-> at 115200 so the uart is working...
-> Any hint?
+Fixes: 9e32e16e9e98 ("drm: rockchip: dp: add rockchip platform dp driver")
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
 
-If it is a problem with gcc (as Russell said before), there is no way 
-you can fix it in the kernel. Only compiling it with an older gcc 
-version can help.
+Changes in v3: None
+Changes in v2: None
 
-Maybe you can try to compile it for armv4 code.
+ drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
-best regards,
-Petr
+diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+index 4d3f6ad0abdd..cb8941e8bcdd 100644
+--- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
++++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+@@ -371,7 +371,7 @@ static int rockchip_dp_bind(struct device *dev, struct device *master,
+ 	ret = rockchip_dp_drm_create_encoder(dp);
+ 	if (ret) {
+ 		DRM_ERROR("failed to create drm encoder\n");
+-		return ret;
++		goto err_deinit_dp;
+ 	}
+ 
+ 	dp->plat_data.encoder = &dp->encoder;
+@@ -387,7 +387,17 @@ static int rockchip_dp_bind(struct device *dev, struct device *master,
+ 
+ 	rockchip_drm_psr_register(&dp->encoder, analogix_dp_psr_set);
+ 
+-	return analogix_dp_bind(dev, dp->drm_dev, &dp->plat_data);
++	ret = analogix_dp_bind(dev, dp->drm_dev, &dp->plat_data);
++	if (ret < 0)
++		goto err_unreg_psr;
++	return 0;
++
++err_unreg_psr:
++	rockchip_drm_psr_unregister(&dp->encoder);
++	rockchip_dp_drm_encoder_destroy(&dp->encoder);
++err_deinit_dp:
++	clk_disable_unprepare(dp->pclk);
++	return ret;
+ }
+ 
+ static void rockchip_dp_unbind(struct device *dev, struct device *master,
+-- 
+2.11.0
