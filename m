@@ -1,56 +1,73 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Tue, 17 Oct 2017 08:33:29 +0800
-Subject: ARM64: Regression with commit e3067861ba66 ("arm64: add basic
- VMAP_STACK support")
-In-Reply-To: <20171016134819.jv3udrcwsedc4cgs@lakrids.cambridge.arm.com>
-References: <20171010142725.GA24797@leoy-linaro>
- <20171010154558.GJ27659@leverpostej>
- <da09fd83-f3f0-f800-fea4-988cfa56bac7@arm.com>
- <20171016011723.GB12470@leoy-linaro>
- <20171016134819.jv3udrcwsedc4cgs@lakrids.cambridge.arm.com>
-Message-ID: <20171017003329.GC19504@leoy-ThinkPad-T440>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 16 Oct 2017 17:29:29 -0700
+Subject: [PATCH 45/58] net: seeq: Convert timers to use timer_setup()
+In-Reply-To: <1508200182-104605-1-git-send-email-keescook@chromium.org>
+References: <1508200182-104605-1-git-send-email-keescook@chromium.org>
+Message-ID: <1508200182-104605-46-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 16, 2017 at 02:48:19PM +0100, Mark Rutland wrote:
-> Hi Leo,
-> 
-> On Mon, Oct 16, 2017 at 09:17:23AM +0800, Leo Yan wrote:
-> > On Tue, Oct 10, 2017 at 05:03:44PM +0100, Robin Murphy wrote:
-> > > On 10/10/17 16:45, Mark Rutland wrote:
-> > > > On Tue, Oct 10, 2017 at 10:27:25PM +0800, Leo Yan wrote:
-> > > >> I work mainline kernel on Hikey620 board, I find it's easily to
-> > > >> introduce the panic and report the log as below. So I bisect the kernel
-> > > >> and finally narrow down the commit e3067861ba66 ("arm64: add basic
-> > > >> VMAP_STACK support") which introduce this issue.
-> > > >>
-> > > >> I tried to remove 'select HAVE_ARCH_VMAP_STACK' from
-> > > >> arch/arm64/Kconfig, then I can see the panic issue will dismiss. So
-> > > >> could you check this and have insight for this issue?
-> > > > 
-> > > > Given the stuff in the backtrace, my suspicion is something is trying to
-> > > > perform DMA to/from the stack, getting junk addresses form the attempted
-> > > > virt<->phys conversions.
-> > > > 
-> > > > Could you try enabling both VMAP_STACK and CONFIG_DEBUG_VIRTUAL?
-> > > 
-> > > CONFIG_DMA_API_DEBUG should scream about drivers trying to use stack
-> > > addresses either way, too.
-> > 
-> > Thanks for suggestions, Mark & Robin.
-> > 
-> > I enabled these debugging configs but cannot get clue from it; but
-> > occasionally found this issue is quite likely related with CA53 errata,
-> > especialy ERRATA_A53_855873 is the relative one. So I changed to use
-> > ARM-TF mainline code with ERRATA fixing, this issue can be dismissed.
-> 
-> Thanks for the update.
-> 
-> Just to confirm, with the updated firmware you no longer see the issue?
+In preparation for unconditionally passing the struct timer_list pointer to
+all timer callbacks, switch to using the new timer_setup() and from_timer()
+to pass the timer pointer explicitly.
 
-Yes.
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: netdev at vger.kernel.org
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+ drivers/net/ethernet/seeq/ether3.c | 11 ++++++-----
+ drivers/net/ethernet/seeq/ether3.h |  1 +
+ 2 files changed, 7 insertions(+), 5 deletions(-)
 
-> I can't immediately see how that would be related.
-> 
-> Thanks,
-> Mark.
+diff --git a/drivers/net/ethernet/seeq/ether3.c b/drivers/net/ethernet/seeq/ether3.c
+index 244c1e171017..da4807723a06 100644
+--- a/drivers/net/ethernet/seeq/ether3.c
++++ b/drivers/net/ethernet/seeq/ether3.c
+@@ -170,9 +170,11 @@ ether3_setbuffer(struct net_device *dev, buffer_rw_t read, int start)
+ /*
+  * Switch LED off...
+  */
+-static void ether3_ledoff(unsigned long data)
++static void ether3_ledoff(struct timer_list *t)
+ {
+-	struct net_device *dev = (struct net_device *)data;
++	struct dev_priv *private = from_timer(priv, t, timer);
++	struct net_device *dev = private->dev;
++
+ 	ether3_outw(priv(dev)->regs.config2 |= CFG2_CTRLO, REG_CONFIG2);
+ }
+ 
+@@ -183,8 +185,6 @@ static inline void ether3_ledon(struct net_device *dev)
+ {
+ 	del_timer(&priv(dev)->timer);
+ 	priv(dev)->timer.expires = jiffies + HZ / 50; /* leave on for 1/50th second */
+-	priv(dev)->timer.data = (unsigned long)dev;
+-	priv(dev)->timer.function = ether3_ledoff;
+ 	add_timer(&priv(dev)->timer);
+ 	if (priv(dev)->regs.config2 & CFG2_CTRLO)
+ 		ether3_outw(priv(dev)->regs.config2 &= ~CFG2_CTRLO, REG_CONFIG2);
+@@ -783,7 +783,8 @@ ether3_probe(struct expansion_card *ec, const struct ecard_id *id)
+ 
+ 	ether3_addr(dev->dev_addr, ec);
+ 
+-	init_timer(&priv(dev)->timer);
++	priv(dev)->dev = dev;
++	timer_setup(&priv(dev)->timer, ether3_ledoff, 0);
+ 
+ 	/* Reset card...
+ 	 */
+diff --git a/drivers/net/ethernet/seeq/ether3.h b/drivers/net/ethernet/seeq/ether3.h
+index 2db63b08bdf3..ea2ba286e665 100644
+--- a/drivers/net/ethernet/seeq/ether3.h
++++ b/drivers/net/ethernet/seeq/ether3.h
+@@ -165,6 +165,7 @@ struct dev_priv {
+     unsigned char tx_tail;		/* buffer nr of transmitting packet	 */
+     unsigned int rx_head;		/* address to fetch next packet from	 */
+     struct timer_list timer;
++    net_device *dev;
+     int broken;				/* 0 = ok, 1 = something went wrong	 */
+ };
+ 
+-- 
+2.7.4
