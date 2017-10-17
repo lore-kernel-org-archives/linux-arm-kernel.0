@@ -1,246 +1,188 @@
-From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Tue, 17 Oct 2017 15:43:47 +0200
-Subject: [PATCH v1] dmaengine: stm32_mdma: activate pack/unpack feature
-Message-ID: <1508247827-31741-1-git-send-email-pierre-yves.mordret@st.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 17 Oct 2017 15:03:05 +0200
+Subject: [PATCH v4 4/5] reset: stm32: use the reset-simple driver
+In-Reply-To: <20171017130306.881-1-p.zabel@pengutronix.de>
+References: <20171017130306.881-1-p.zabel@pengutronix.de>
+Message-ID: <20171017130306.881-5-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If source and destination bus width differs pack/unpack MDMA
-feature has to be activated for alignment.
-This pack/unpack feature implies to have both source/destination address
-and buffer length aligned on bus width.
+The reset-simple driver can be used without changes.
 
-Fixes: a4ffb13c8946 ("dmaengine: Add STM32 MDMA driver")
-Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Acked-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 ---
- drivers/dma/stm32-mdma.c | 84 ++++++++++++++++++++++++++++--------------------
- 1 file changed, 50 insertions(+), 34 deletions(-)
+ drivers/reset/Kconfig        |  11 ++---
+ drivers/reset/Makefile       |   1 -
+ drivers/reset/reset-simple.c |   1 +
+ drivers/reset/reset-stm32.c  | 108 -------------------------------------------
+ 4 files changed, 4 insertions(+), 117 deletions(-)
+ delete mode 100644 drivers/reset/reset-stm32.c
 
-diff --git a/drivers/dma/stm32-mdma.c b/drivers/dma/stm32-mdma.c
-index d3be6bf..daa1602 100644
---- a/drivers/dma/stm32-mdma.c
-+++ b/drivers/dma/stm32-mdma.c
-@@ -387,14 +387,20 @@ static int stm32_mdma_get_width(struct stm32_mdma_chan *chan,
- 	}
- }
+diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
+index 2d6770b210ed7..9bdb4fe1b03e6 100644
+--- a/drivers/reset/Kconfig
++++ b/drivers/reset/Kconfig
+@@ -77,19 +77,14 @@ config RESET_PISTACHIO
  
--static enum dma_slave_buswidth stm32_mdma_get_max_width(u32 buf_len, u32 tlen)
-+static enum dma_slave_buswidth stm32_mdma_get_max_width(dma_addr_t addr,
-+							u32 buf_len, u32 tlen)
- {
- 	enum dma_slave_buswidth max_width = DMA_SLAVE_BUSWIDTH_8_BYTES;
+ config RESET_SIMPLE
+ 	bool "Simple Reset Controller Driver" if COMPILE_TEST
+-	default ARCH_SOCFPGA || ARCH_STRATIX10 || ARCH_SUNXI
++	default ARCH_SOCFPGA || ARCH_STM32 || ARCH_STRATIX10 || ARCH_SUNXI
+ 	help
+ 	  This enables a simple reset controller driver for reset lines that
+ 	  that can be asserted and deasserted by toggling bits in a contiguous,
+ 	  exclusive register space.
  
- 	for (max_width = DMA_SLAVE_BUSWIDTH_8_BYTES;
- 	     max_width > DMA_SLAVE_BUSWIDTH_1_BYTE;
- 	     max_width >>= 1) {
--		if (((buf_len % max_width) == 0) && (tlen >= max_width))
-+		/*
-+		 * Address and buffer length both have to be aligned on
-+		 * bus width
-+		 */
-+		if ((((buf_len | addr) & (max_width - 1)) == 0) &&
-+		    tlen >= max_width)
- 			break;
- 	}
- 
-@@ -486,7 +492,8 @@ static void stm32_mdma_set_bus(struct stm32_mdma_device *dmadev, u32 *ctbr,
- static int stm32_mdma_set_xfer_param(struct stm32_mdma_chan *chan,
- 				     enum dma_transfer_direction direction,
- 				     u32 *mdma_ccr, u32 *mdma_ctcr,
--				     u32 *mdma_ctbr, u32 buf_len)
-+				     u32 *mdma_ctbr, dma_addr_t addr,
-+				     u32 buf_len)
- {
- 	struct stm32_mdma_device *dmadev = stm32_mdma_get_dev(chan);
- 	struct stm32_mdma_chan_config *chan_config = &chan->chan_config;
-@@ -520,6 +527,9 @@ static int stm32_mdma_set_xfer_param(struct stm32_mdma_chan *chan,
- 	ctcr &= ~STM32_MDMA_CTCR_LEN2_MSK;
- 	ctcr |= STM32_MDMA_CTCR_TLEN((tlen - 1));
- 
-+	/* Disable Pack Enable */
-+	ctcr &= ~STM32_MDMA_CTCR_PKE;
-+
- 	/* Check burst size constraints */
- 	if (src_maxburst * src_addr_width > STM32_MDMA_MAX_BURST ||
- 	    dst_maxburst * dst_addr_width > STM32_MDMA_MAX_BURST) {
-@@ -551,6 +561,8 @@ static int stm32_mdma_set_xfer_param(struct stm32_mdma_chan *chan,
- 
- 	switch (direction) {
- 	case DMA_MEM_TO_DEV:
-+		dst_addr = chan->dma_config.dst_addr;
-+
- 		/* Set device data size */
- 		dst_bus_width = stm32_mdma_get_width(chan, dst_addr_width);
- 		if (dst_bus_width < 0)
-@@ -567,7 +579,7 @@ static int stm32_mdma_set_xfer_param(struct stm32_mdma_chan *chan,
- 		ctcr |= STM32_MDMA_CTCR_DBURST((ilog2(dst_best_burst)));
- 
- 		/* Set memory data size */
--		src_addr_width = stm32_mdma_get_max_width(buf_len, tlen);
-+		src_addr_width = stm32_mdma_get_max_width(addr, buf_len, tlen);
- 		chan->mem_width = src_addr_width;
- 		src_bus_width = stm32_mdma_get_width(chan, src_addr_width);
- 		if (src_bus_width < 0)
-@@ -587,15 +599,19 @@ static int stm32_mdma_set_xfer_param(struct stm32_mdma_chan *chan,
- 		ctcr |= STM32_MDMA_CTCR_SBURST((ilog2(src_best_burst)));
- 
- 		/* Select bus */
--		dst_addr = chan->dma_config.dst_addr;
- 		stm32_mdma_set_bus(dmadev, &ctbr, STM32_MDMA_CTBR_DBUS,
- 				   dst_addr);
- 
-+		if (dst_bus_width != src_bus_width)
-+			ctcr |= STM32_MDMA_CTCR_PKE;
-+
- 		/* Set destination address */
- 		stm32_mdma_write(dmadev, STM32_MDMA_CDAR(chan->id), dst_addr);
- 		break;
- 
- 	case DMA_DEV_TO_MEM:
-+		src_addr = chan->dma_config.src_addr;
-+
- 		/* Set device data size */
- 		src_bus_width = stm32_mdma_get_width(chan, src_addr_width);
- 		if (src_bus_width < 0)
-@@ -611,7 +627,7 @@ static int stm32_mdma_set_xfer_param(struct stm32_mdma_chan *chan,
- 		ctcr |= STM32_MDMA_CTCR_SBURST((ilog2(src_best_burst)));
- 
- 		/* Set memory data size */
--		dst_addr_width = stm32_mdma_get_max_width(buf_len, tlen);
-+		dst_addr_width = stm32_mdma_get_max_width(addr, buf_len, tlen);
- 		chan->mem_width = dst_addr_width;
- 		dst_bus_width = stm32_mdma_get_width(chan, dst_addr_width);
- 		if (dst_bus_width < 0)
-@@ -630,10 +646,12 @@ static int stm32_mdma_set_xfer_param(struct stm32_mdma_chan *chan,
- 		ctcr |= STM32_MDMA_CTCR_DBURST((ilog2(dst_best_burst)));
- 
- 		/* Select bus */
--		src_addr = chan->dma_config.src_addr;
- 		stm32_mdma_set_bus(dmadev, &ctbr, STM32_MDMA_CTBR_SBUS,
- 				   src_addr);
- 
-+		if (dst_bus_width != src_bus_width)
-+			ctcr |= STM32_MDMA_CTCR_PKE;
-+
- 		/* Set source address */
- 		stm32_mdma_write(dmadev, STM32_MDMA_CSAR(chan->id), src_addr);
- 		break;
-@@ -719,23 +737,27 @@ static int stm32_mdma_setup_xfer(struct stm32_mdma_chan *chan,
- 			return -EINVAL;
- 		}
- 
--		ret = stm32_mdma_set_xfer_param(chan, direction, &ccr, &ctcr,
--						&ctbr, sg_dma_len(sg));
--		if (ret < 0)
--			return ret;
+-	  Currently this driver supports Altera SoCFPGAs and Allwinner SoCs.
 -
- 		if (direction == DMA_MEM_TO_DEV) {
- 			src_addr = sg_dma_address(sg);
- 			dst_addr = dma_config->dst_addr;
-+			ret = stm32_mdma_set_xfer_param(chan, direction, &ccr,
-+							&ctcr, &ctbr, src_addr,
-+							sg_dma_len(sg));
- 			stm32_mdma_set_bus(dmadev, &ctbr, STM32_MDMA_CTBR_SBUS,
- 					   src_addr);
- 		} else {
- 			src_addr = dma_config->src_addr;
- 			dst_addr = sg_dma_address(sg);
-+			ret = stm32_mdma_set_xfer_param(chan, direction, &ccr,
-+							&ctcr, &ctbr, dst_addr,
-+							sg_dma_len(sg));
- 			stm32_mdma_set_bus(dmadev, &ctbr, STM32_MDMA_CTBR_DBUS,
- 					   dst_addr);
- 		}
+-config RESET_STM32
+-	bool "STM32 Reset Driver" if COMPILE_TEST
+-	default ARCH_STM32
+-	help
+-	  This enables the RCC reset controller driver for STM32 MCUs.
++	  Currently this driver supports Altera SoCFPGAs, the RCC reset
++	  controller in STM32 MCUs, and Allwinner SoCs.
  
-+		if (ret < 0)
-+			return ret;
-+
- 		stm32_mdma_setup_hwdesc(chan, desc, direction, i, src_addr,
- 					dst_addr, sg_dma_len(sg), ctcr, ctbr,
- 					i == sg_len - 1, i == 0, false);
-@@ -830,27 +852,29 @@ stm32_mdma_prep_dma_cyclic(struct dma_chan *c, dma_addr_t buf_addr,
- 	if (!desc)
- 		return NULL;
+ config RESET_SUNXI
+ 	bool "Allwinner SoCs Reset Driver" if COMPILE_TEST && !ARCH_SUNXI
+diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+index 3bf3b4e6a9fd2..98dd1eccc820c 100644
+--- a/drivers/reset/Makefile
++++ b/drivers/reset/Makefile
+@@ -13,7 +13,6 @@ obj-$(CONFIG_RESET_MESON) += reset-meson.o
+ obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
+ obj-$(CONFIG_RESET_PISTACHIO) += reset-pistachio.o
+ obj-$(CONFIG_RESET_SIMPLE) += reset-simple.o
+-obj-$(CONFIG_RESET_STM32) += reset-stm32.o
+ obj-$(CONFIG_RESET_SUNXI) += reset-sunxi.o
+ obj-$(CONFIG_RESET_TI_SCI) += reset-ti-sci.o
+ obj-$(CONFIG_RESET_TI_SYSCON) += reset-ti-syscon.o
+diff --git a/drivers/reset/reset-simple.c b/drivers/reset/reset-simple.c
+index 98ff0f924948e..273039ef02e64 100644
+--- a/drivers/reset/reset-simple.c
++++ b/drivers/reset/reset-simple.c
+@@ -120,6 +120,7 @@ static const struct reset_simple_devdata reset_simple_active_low = {
  
--	ret = stm32_mdma_set_xfer_param(chan, direction, &ccr, &ctcr, &ctbr,
--					period_len);
--	if (ret < 0)
--		goto xfer_setup_err;
+ static const struct of_device_id reset_simple_dt_ids[] = {
+ 	{ .compatible = "altr,rst-mgr", .data = &reset_simple_socfpga },
++	{ .compatible = "st,stm32-rcc", },
+ 	{ .compatible = "allwinner,sun6i-a31-clock-reset",
+ 		.data = &reset_simple_active_low },
+ 	{ /* sentinel */ },
+diff --git a/drivers/reset/reset-stm32.c b/drivers/reset/reset-stm32.c
+deleted file mode 100644
+index 3a7c8527e66af..0000000000000
+--- a/drivers/reset/reset-stm32.c
++++ /dev/null
+@@ -1,108 +0,0 @@
+-/*
+- * Copyright (C) Maxime Coquelin 2015
+- * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
+- * License terms:  GNU General Public License (GPL), version 2
+- *
+- * Heavily based on sunxi driver from Maxime Ripard.
+- */
 -
--	/* Enable interrupts */
--	ccr &= ~STM32_MDMA_CCR_IRQ_MASK;
--	ccr |= STM32_MDMA_CCR_TEIE | STM32_MDMA_CCR_CTCIE | STM32_MDMA_CCR_BTIE;
--	desc->ccr = ccr;
+-#include <linux/err.h>
+-#include <linux/io.h>
+-#include <linux/of.h>
+-#include <linux/of_address.h>
+-#include <linux/platform_device.h>
+-#include <linux/reset-controller.h>
+-#include <linux/slab.h>
+-#include <linux/spinlock.h>
+-#include <linux/types.h>
 -
- 	/* Select bus */
- 	if (direction == DMA_MEM_TO_DEV) {
- 		src_addr = buf_addr;
-+		ret = stm32_mdma_set_xfer_param(chan, direction, &ccr, &ctcr,
-+						&ctbr, src_addr, period_len);
- 		stm32_mdma_set_bus(dmadev, &ctbr, STM32_MDMA_CTBR_SBUS,
- 				   src_addr);
- 	} else {
- 		dst_addr = buf_addr;
-+		ret = stm32_mdma_set_xfer_param(chan, direction, &ccr, &ctcr,
-+						&ctbr, dst_addr, period_len);
- 		stm32_mdma_set_bus(dmadev, &ctbr, STM32_MDMA_CTBR_DBUS,
- 				   dst_addr);
- 	}
- 
-+	if (ret < 0)
-+		goto xfer_setup_err;
-+
-+	/* Enable interrupts */
-+	ccr &= ~STM32_MDMA_CCR_IRQ_MASK;
-+	ccr |= STM32_MDMA_CCR_TEIE | STM32_MDMA_CCR_CTCIE | STM32_MDMA_CCR_BTIE;
-+	desc->ccr = ccr;
-+
- 	/* Configure hwdesc list */
- 	for (i = 0; i < count; i++) {
- 		if (direction == DMA_MEM_TO_DEV) {
-@@ -956,9 +980,7 @@ stm32_mdma_prep_dma_memcpy(struct dma_chan *c, dma_addr_t dest, dma_addr_t src,
- 		ctcr |= STM32_MDMA_CTCR_TLEN((tlen - 1));
- 
- 		/* Set source best burst size */
--		max_width = stm32_mdma_get_max_width(len, tlen);
--		if (src % max_width)
--			max_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+		max_width = stm32_mdma_get_max_width(src, len, tlen);
- 		src_bus_width = stm32_mdma_get_width(chan, max_width);
- 
- 		max_burst = tlen / max_width;
-@@ -971,9 +993,7 @@ stm32_mdma_prep_dma_memcpy(struct dma_chan *c, dma_addr_t dest, dma_addr_t src,
- 			STM32_MDMA_CTCR_SINCOS(src_bus_width);
- 
- 		/* Set destination best burst size */
--		max_width = stm32_mdma_get_max_width(len, tlen);
--		if (dest % max_width)
--			max_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+		max_width = stm32_mdma_get_max_width(dest, len, tlen);
- 		dst_bus_width = stm32_mdma_get_width(chan, max_width);
- 
- 		max_burst = tlen / max_width;
-@@ -1014,9 +1034,7 @@ stm32_mdma_prep_dma_memcpy(struct dma_chan *c, dma_addr_t dest, dma_addr_t src,
- 					   STM32_MDMA_MAX_BLOCK_LEN);
- 
- 			/* Set source best burst size */
--			max_width = stm32_mdma_get_max_width(len, tlen);
--			if (src % max_width)
--				max_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+			max_width = stm32_mdma_get_max_width(src, len, tlen);
- 			src_bus_width = stm32_mdma_get_width(chan, max_width);
- 
- 			max_burst = tlen / max_width;
-@@ -1030,9 +1048,7 @@ stm32_mdma_prep_dma_memcpy(struct dma_chan *c, dma_addr_t dest, dma_addr_t src,
- 				STM32_MDMA_CTCR_SINCOS(src_bus_width);
- 
- 			/* Set destination best burst size */
--			max_width = stm32_mdma_get_max_width(len, tlen);
--			if (dest % max_width)
--				max_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+			max_width = stm32_mdma_get_max_width(dest, len, tlen);
- 			dst_bus_width = stm32_mdma_get_width(chan, max_width);
- 
- 			max_burst = tlen / max_width;
+-struct stm32_reset_data {
+-	spinlock_t			lock;
+-	void __iomem			*membase;
+-	struct reset_controller_dev	rcdev;
+-};
+-
+-static int stm32_reset_assert(struct reset_controller_dev *rcdev,
+-			      unsigned long id)
+-{
+-	struct stm32_reset_data *data = container_of(rcdev,
+-						     struct stm32_reset_data,
+-						     rcdev);
+-	int bank = id / BITS_PER_LONG;
+-	int offset = id % BITS_PER_LONG;
+-	unsigned long flags;
+-	u32 reg;
+-
+-	spin_lock_irqsave(&data->lock, flags);
+-
+-	reg = readl(data->membase + (bank * 4));
+-	writel(reg | BIT(offset), data->membase + (bank * 4));
+-
+-	spin_unlock_irqrestore(&data->lock, flags);
+-
+-	return 0;
+-}
+-
+-static int stm32_reset_deassert(struct reset_controller_dev *rcdev,
+-				unsigned long id)
+-{
+-	struct stm32_reset_data *data = container_of(rcdev,
+-						     struct stm32_reset_data,
+-						     rcdev);
+-	int bank = id / BITS_PER_LONG;
+-	int offset = id % BITS_PER_LONG;
+-	unsigned long flags;
+-	u32 reg;
+-
+-	spin_lock_irqsave(&data->lock, flags);
+-
+-	reg = readl(data->membase + (bank * 4));
+-	writel(reg & ~BIT(offset), data->membase + (bank * 4));
+-
+-	spin_unlock_irqrestore(&data->lock, flags);
+-
+-	return 0;
+-}
+-
+-static const struct reset_control_ops stm32_reset_ops = {
+-	.assert		= stm32_reset_assert,
+-	.deassert	= stm32_reset_deassert,
+-};
+-
+-static const struct of_device_id stm32_reset_dt_ids[] = {
+-	 { .compatible = "st,stm32-rcc", },
+-	 { /* sentinel */ },
+-};
+-
+-static int stm32_reset_probe(struct platform_device *pdev)
+-{
+-	struct stm32_reset_data *data;
+-	struct resource *res;
+-
+-	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+-	if (!data)
+-		return -ENOMEM;
+-
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	data->membase = devm_ioremap_resource(&pdev->dev, res);
+-	if (IS_ERR(data->membase))
+-		return PTR_ERR(data->membase);
+-
+-	spin_lock_init(&data->lock);
+-
+-	data->rcdev.owner = THIS_MODULE;
+-	data->rcdev.nr_resets = resource_size(res) * 8;
+-	data->rcdev.ops = &stm32_reset_ops;
+-	data->rcdev.of_node = pdev->dev.of_node;
+-
+-	return devm_reset_controller_register(&pdev->dev, &data->rcdev);
+-}
+-
+-static struct platform_driver stm32_reset_driver = {
+-	.probe	= stm32_reset_probe,
+-	.driver = {
+-		.name		= "stm32-rcc-reset",
+-		.of_match_table	= stm32_reset_dt_ids,
+-	},
+-};
+-builtin_platform_driver(stm32_reset_driver);
 -- 
-2.7.4
+2.11.0
