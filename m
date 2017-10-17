@@ -1,199 +1,255 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 17 Oct 2017 15:03:06 +0200
-Subject: [PATCH v4 5/5] reset: zx2967: use the reset-simple driver
+Date: Tue, 17 Oct 2017 15:03:02 +0200
+Subject: [PATCH v4 1/5] reset: add reset-simple to unify socfpga, stm32, sunxi,
+ and zx2967
 In-Reply-To: <20171017130306.881-1-p.zabel@pengutronix.de>
 References: <20171017130306.881-1-p.zabel@pengutronix.de>
-Message-ID: <20171017130306.881-6-p.zabel@pengutronix.de>
+Message-ID: <20171017130306.881-2-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The reset-simple driver can be used without changes.
+Copy reusable parts from the sunxi driver, to add a driver for simple
+reset controllers with reset lines that can be controlled by toggling
+bits in exclusive, contiguous register ranges using read-modify-write
+cycles under a spinlock.
+
+The following patches will replace compatible reset drivers with
+reset-simple, extending it where necessary.
 
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 Reviewed-by: Alexandru Gagniuc <alex.g@adaptrum.com>
 ---
- MAINTAINERS                  |  1 -
- drivers/reset/Kconfig        | 10 +----
- drivers/reset/Makefile       |  1 -
- drivers/reset/reset-simple.c |  2 +
- drivers/reset/reset-zx2967.c | 99 --------------------------------------------
- 5 files changed, 4 insertions(+), 109 deletions(-)
- delete mode 100644 drivers/reset/reset-zx2967.c
+Changes since v3:
+ - Split patch 1 into reset-simple and reset-sunxi parts.
+ - Renamed reset_simple_set to reset_simple_update
+---
+ drivers/reset/Kconfig        |  10 ++++
+ drivers/reset/Makefile       |   1 +
+ drivers/reset/reset-simple.c | 134 +++++++++++++++++++++++++++++++++++++++++++
+ drivers/reset/reset-simple.h |  41 +++++++++++++
+ 4 files changed, 186 insertions(+)
+ create mode 100644 drivers/reset/reset-simple.c
+ create mode 100644 drivers/reset/reset-simple.h
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 3b9887b3644ef..d48d8a238fae1 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2124,7 +2124,6 @@ F:	drivers/gpio/gpio-zx.c
- F:	drivers/i2c/busses/i2c-zx2967.c
- F:	drivers/mmc/host/dw_mmc-zx.*
- F:	drivers/pinctrl/zte/
--F:	drivers/reset/reset-zx2967.c
- F:	drivers/soc/zte/
- F:	drivers/thermal/zx2967_thermal.c
- F:	drivers/watchdog/zx2967_wdt.c
 diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
-index 9bdb4fe1b03e6..de0090c911cd6 100644
+index 1c88af2947245..392e65187cd5a 100644
 --- a/drivers/reset/Kconfig
 +++ b/drivers/reset/Kconfig
-@@ -77,14 +77,14 @@ config RESET_PISTACHIO
- 
- config RESET_SIMPLE
- 	bool "Simple Reset Controller Driver" if COMPILE_TEST
--	default ARCH_SOCFPGA || ARCH_STM32 || ARCH_STRATIX10 || ARCH_SUNXI
-+	default ARCH_SOCFPGA || ARCH_STM32 || ARCH_STRATIX10 || ARCH_SUNXI || ARCH_ZX
+@@ -75,6 +75,16 @@ config RESET_PISTACHIO
  	help
- 	  This enables a simple reset controller driver for reset lines that
- 	  that can be asserted and deasserted by toggling bits in a contiguous,
- 	  exclusive register space.
+ 	  This enables the reset driver for ImgTec Pistachio SoCs.
  
- 	  Currently this driver supports Altera SoCFPGAs, the RCC reset
--	  controller in STM32 MCUs, and Allwinner SoCs.
-+	  controller in STM32 MCUs, Allwinner SoCs, and ZTE's zx2967 family.
- 
- config RESET_SUNXI
- 	bool "Allwinner SoCs Reset Driver" if COMPILE_TEST && !ARCH_SUNXI
-@@ -121,12 +121,6 @@ config RESET_UNIPHIER
- 	  Say Y if you want to control reset signals provided by System Control
- 	  block, Media I/O block, Peripheral Block.
- 
--config RESET_ZX2967
--	bool "ZTE ZX2967 Reset Driver"
--	depends on ARCH_ZX || COMPILE_TEST
--	help
--	  This enables the reset controller driver for ZTE's zx2967 family.
--
- config RESET_ZYNQ
- 	bool "ZYNQ Reset Driver" if COMPILE_TEST
- 	default ARCH_ZYNQ
++config RESET_SIMPLE
++	bool "Simple Reset Controller Driver" if COMPILE_TEST
++	default ARCH_SUNXI
++	help
++	  This enables a simple reset controller driver for reset lines that
++	  that can be asserted and deasserted by toggling bits in a contiguous,
++	  exclusive register space.
++
++	  Currently this driver supports Allwinner SoCs.
++
+ config RESET_SOCFPGA
+ 	bool "SoCFPGA Reset Driver" if COMPILE_TEST
+ 	default ARCH_SOCFPGA || ARCH_STRATIX10
 diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-index 98dd1eccc820c..48b64d63b75aa 100644
+index af1c15c330b30..ddd3eeb193567 100644
 --- a/drivers/reset/Makefile
 +++ b/drivers/reset/Makefile
-@@ -17,6 +17,5 @@ obj-$(CONFIG_RESET_SUNXI) += reset-sunxi.o
- obj-$(CONFIG_RESET_TI_SCI) += reset-ti-sci.o
- obj-$(CONFIG_RESET_TI_SYSCON) += reset-ti-syscon.o
- obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
--obj-$(CONFIG_RESET_ZX2967) += reset-zx2967.o
- obj-$(CONFIG_RESET_ZYNQ) += reset-zynq.o
- 
+@@ -12,6 +12,7 @@ obj-$(CONFIG_RESET_LPC18XX) += reset-lpc18xx.o
+ obj-$(CONFIG_RESET_MESON) += reset-meson.o
+ obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
+ obj-$(CONFIG_RESET_PISTACHIO) += reset-pistachio.o
++obj-$(CONFIG_RESET_SIMPLE) += reset-simple.o
+ obj-$(CONFIG_RESET_SOCFPGA) += reset-socfpga.o
+ obj-$(CONFIG_RESET_STM32) += reset-stm32.o
+ obj-$(CONFIG_RESET_SUNXI) += reset-sunxi.o
 diff --git a/drivers/reset/reset-simple.c b/drivers/reset/reset-simple.c
-index 273039ef02e64..a63f96d92035e 100644
---- a/drivers/reset/reset-simple.c
+new file mode 100644
+index 0000000000000..a5119457cec61
+--- /dev/null
 +++ b/drivers/reset/reset-simple.c
-@@ -123,6 +123,8 @@ static const struct of_device_id reset_simple_dt_ids[] = {
- 	{ .compatible = "st,stm32-rcc", },
- 	{ .compatible = "allwinner,sun6i-a31-clock-reset",
- 		.data = &reset_simple_active_low },
-+	{ .compatible = "zte,zx296718-reset",
+@@ -0,0 +1,134 @@
++/*
++ * Simple Reset Controller Driver
++ *
++ * Copyright (C) 2017 Pengutronix, Philipp Zabel <kernel@pengutronix.de>
++ *
++ * Based on Allwinner SoCs Reset Controller driver
++ *
++ * Copyright 2013 Maxime Ripard
++ *
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#include <linux/device.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/platform_device.h>
++#include <linux/reset-controller.h>
++#include <linux/spinlock.h>
++
++#include "reset-simple.h"
++
++static inline struct reset_simple_data *
++to_reset_simple_data(struct reset_controller_dev *rcdev)
++{
++	return container_of(rcdev, struct reset_simple_data, rcdev);
++}
++
++static int reset_simple_update(struct reset_controller_dev *rcdev,
++			       unsigned long id, bool assert)
++{
++	struct reset_simple_data *data = to_reset_simple_data(rcdev);
++	int reg_width = sizeof(u32);
++	int bank = id / (reg_width * BITS_PER_BYTE);
++	int offset = id % (reg_width * BITS_PER_BYTE);
++	unsigned long flags;
++	u32 reg;
++
++	spin_lock_irqsave(&data->lock, flags);
++
++	reg = readl(data->membase + (bank * reg_width));
++	if (assert ^ data->active_low)
++		reg |= BIT(offset);
++	else
++		reg &= ~BIT(offset);
++	writel(reg, data->membase + (bank * reg_width));
++
++	spin_unlock_irqrestore(&data->lock, flags);
++
++	return 0;
++}
++
++static int reset_simple_assert(struct reset_controller_dev *rcdev,
++			       unsigned long id)
++{
++	return reset_simple_update(rcdev, id, true);
++}
++
++static int reset_simple_deassert(struct reset_controller_dev *rcdev,
++				 unsigned long id)
++{
++	return reset_simple_update(rcdev, id, false);
++}
++
++const struct reset_control_ops reset_simple_ops = {
++	.assert		= reset_simple_assert,
++	.deassert	= reset_simple_deassert,
++};
++
++/**
++ * struct reset_simple_devdata - simple reset controller properties
++ * @active_low: if true, bits are cleared to assert the reset. Otherwise, bits
++ *              are set to assert the reset.
++ */
++struct reset_simple_devdata {
++	bool active_low;
++};
++
++static const struct reset_simple_devdata reset_simple_active_low = {
++	.active_low = true,
++};
++
++static const struct of_device_id reset_simple_dt_ids[] = {
++	{ .compatible = "allwinner,sun6i-a31-clock-reset",
 +		.data = &reset_simple_active_low },
- 	{ /* sentinel */ },
- };
- 
-diff --git a/drivers/reset/reset-zx2967.c b/drivers/reset/reset-zx2967.c
-deleted file mode 100644
-index 4f319f7753d4d..0000000000000
---- a/drivers/reset/reset-zx2967.c
-+++ /dev/null
-@@ -1,99 +0,0 @@
--/*
-- * ZTE's zx2967 family reset controller driver
-- *
-- * Copyright (C) 2017 ZTE Ltd.
-- *
-- * Author: Baoyou Xie <baoyou.xie@linaro.org>
-- *
-- * License terms: GNU General Public License (GPL) version 2
-- */
--
--#include <linux/of_address.h>
--#include <linux/platform_device.h>
--#include <linux/reset-controller.h>
--
--struct zx2967_reset {
--	void __iomem			*reg_base;
--	spinlock_t			lock;
--	struct reset_controller_dev	rcdev;
--};
--
--static int zx2967_reset_act(struct reset_controller_dev *rcdev,
--			    unsigned long id, bool assert)
--{
--	struct zx2967_reset *reset = NULL;
--	int bank = id / 32;
--	int offset = id % 32;
--	u32 reg;
--	unsigned long flags;
--
--	reset = container_of(rcdev, struct zx2967_reset, rcdev);
--
--	spin_lock_irqsave(&reset->lock, flags);
--
--	reg = readl_relaxed(reset->reg_base + (bank * 4));
--	if (assert)
--		reg &= ~BIT(offset);
--	else
--		reg |= BIT(offset);
--	writel_relaxed(reg, reset->reg_base + (bank * 4));
--
--	spin_unlock_irqrestore(&reset->lock, flags);
--
--	return 0;
--}
--
--static int zx2967_reset_assert(struct reset_controller_dev *rcdev,
--			       unsigned long id)
--{
--	return zx2967_reset_act(rcdev, id, true);
--}
--
--static int zx2967_reset_deassert(struct reset_controller_dev *rcdev,
--				 unsigned long id)
--{
--	return zx2967_reset_act(rcdev, id, false);
--}
--
--static const struct reset_control_ops zx2967_reset_ops = {
--	.assert		= zx2967_reset_assert,
--	.deassert	= zx2967_reset_deassert,
--};
--
--static int zx2967_reset_probe(struct platform_device *pdev)
--{
--	struct zx2967_reset *reset;
--	struct resource *res;
--
--	reset = devm_kzalloc(&pdev->dev, sizeof(*reset), GFP_KERNEL);
--	if (!reset)
--		return -ENOMEM;
--
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	reset->reg_base = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(reset->reg_base))
--		return PTR_ERR(reset->reg_base);
--
--	spin_lock_init(&reset->lock);
--
--	reset->rcdev.owner = THIS_MODULE;
--	reset->rcdev.nr_resets = resource_size(res) * 8;
--	reset->rcdev.ops = &zx2967_reset_ops;
--	reset->rcdev.of_node = pdev->dev.of_node;
--
--	return devm_reset_controller_register(&pdev->dev, &reset->rcdev);
--}
--
--static const struct of_device_id zx2967_reset_dt_ids[] = {
--	 { .compatible = "zte,zx296718-reset", },
--	 {},
--};
--
--static struct platform_driver zx2967_reset_driver = {
--	.probe	= zx2967_reset_probe,
--	.driver = {
--		.name		= "zx2967-reset",
--		.of_match_table	= zx2967_reset_dt_ids,
--	},
--};
--builtin_platform_driver(zx2967_reset_driver);
++	{ /* sentinel */ },
++};
++
++static int reset_simple_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	const struct reset_simple_devdata *devdata;
++	struct reset_simple_data *data;
++	void __iomem *membase;
++	struct resource *res;
++
++	devdata = of_device_get_match_data(dev);
++
++	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
++	if (!data)
++		return -ENOMEM;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	membase = devm_ioremap_resource(dev, res);
++	if (IS_ERR(membase))
++		return PTR_ERR(membase);
++
++	spin_lock_init(&data->lock);
++	data->membase = membase;
++	data->rcdev.owner = THIS_MODULE;
++	data->rcdev.nr_resets = resource_size(res) * BITS_PER_BYTE;
++	data->rcdev.ops = &reset_simple_ops;
++	data->rcdev.of_node = dev->of_node;
++
++	if (devdata)
++		data->active_low = devdata->active_low;
++
++	return devm_reset_controller_register(dev, &data->rcdev);
++}
++
++static struct platform_driver reset_simple_driver = {
++	.probe	= reset_simple_probe,
++	.driver = {
++		.name		= "simple-reset",
++		.of_match_table	= reset_simple_dt_ids,
++	},
++};
++builtin_platform_driver(reset_simple_driver);
+diff --git a/drivers/reset/reset-simple.h b/drivers/reset/reset-simple.h
+new file mode 100644
+index 0000000000000..39af2014b5f12
+--- /dev/null
++++ b/drivers/reset/reset-simple.h
+@@ -0,0 +1,41 @@
++/*
++ * Simple Reset Controller ops
++ *
++ * Based on Allwinner SoCs Reset Controller driver
++ *
++ * Copyright 2013 Maxime Ripard
++ *
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#ifndef __RESET_SIMPLE_H__
++#define __RESET_SIMPLE_H__
++
++#include <linux/io.h>
++#include <linux/reset-controller.h>
++#include <linux/spinlock.h>
++
++/**
++ * struct reset_simple_data - driver data for simple reset controllers
++ * @lock: spinlock to protect registers during read-modify-write cycles
++ * @membase: memory mapped I/O register range
++ * @rcdev: reset controller device base structure
++ * @active_low: if true, bits are cleared to assert the reset. Otherwise, bits
++ *              are set to assert the reset. Note that this says nothing about
++ *              the voltage level of the actual reset line.
++ */
++struct reset_simple_data {
++	spinlock_t			lock;
++	void __iomem			*membase;
++	struct reset_controller_dev	rcdev;
++	bool				active_low;
++};
++
++extern const struct reset_control_ops reset_simple_ops;
++
++#endif /* __RESET_SIMPLE_H__ */
 -- 
 2.11.0
