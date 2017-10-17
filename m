@@ -1,46 +1,23 @@
-From: cyrille.pitchen@wedev4u.fr (Cyrille Pitchen)
-Date: Tue, 17 Oct 2017 20:50:51 +0200
-Subject: [PATCH v4 0/6] K2G: Add QSPI support
-In-Reply-To: <ebd85d99-431b-3f6d-4bdf-e7d47b81567c@gmail.com>
-References: <20171003051925.8821-1-vigneshr@ti.com>
- <09cc0a61-3f73-4a10-2d67-32515a7da861@ti.com>
- <6f507813-388a-13e5-31ba-736b419744fa@gmail.com>
- <69beca0c-68a2-2d2c-d4a8-6f05a1fbc957@wedev4u.fr>
- <ebd85d99-431b-3f6d-4bdf-e7d47b81567c@gmail.com>
-Message-ID: <012e14f4-1eb0-2641-feaa-5fc8f9028810@wedev4u.fr>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 17 Oct 2017 21:00:54 +0200
+Subject: [PATCH 4/5] arm: dts: rockchip: add thermal nodes for RV1108 SoC
+In-Reply-To: <1503570475-7850-5-git-send-email-rocky.hao@rock-chips.com>
+References: <1503570475-7850-1-git-send-email-rocky.hao@rock-chips.com>
+ <1503570475-7850-5-git-send-email-rocky.hao@rock-chips.com>
+Message-ID: <2261377.Dl0AzrzCiW@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 17/10/2017 ? 00:34, Marek Vasut a ?crit?:
-> On 10/17/2017 12:29 AM, Cyrille Pitchen wrote:
->> Hi all,
->>
->> Le 16/10/2017 ? 11:28, Marek Vasut a ?crit?:
->>> On 10/16/2017 08:15 AM, Vignesh R wrote:
->>>>
->>>>
->>>> On Tuesday 03 October 2017 10:49 AM, Vignesh R wrote:
->>>>>
->>>>>
->>>>> This series adds support for Cadence QSPI IP present in TI's 66AK2G SoC.
->>>>> The patches enhance the existing cadence-quadspi driver to support
->>>>> loopback clock circuit, pm_runtime support and tweaks for 66AK2G SoC.
->>>>
->>>> Gentle ping on the series...
->>>
->>> It's IMO OK, Cyrille, can you pick it ?
->>>
->>
->> The series looks good to me too.
->>
->> Marek, could you please add you "Acked-by" or "Reviewed-by" tag for the
->> record in patchwork ? It will be automatically added when I use
->> "pwclient git-am -s" to merge the patches into the spi-nor/next branch.
+Am Donnerstag, 24. August 2017, 18:27:54 CEST schrieb Rocky Hao:
+> Add thermal zone and dynamic CPU power coefficients for RV1108
 > 
-> Acked-by: Marek Vasut <marek.vasut@gmail.com>
-> 
+> Signed-off-by: Rocky Hao <rocky.hao@rock-chips.com>
 
-added Marek's "Acked-by" tags on the whole series and applied it into
-the spi-nor/next branch of l2-mtd
+applied for 4.15 with Eduardo's Ack.
 
-Thanks!
+Please make further adjustments for things like temperatures
+in follow-up patches.
+
+
+Thanks
+Heiko
