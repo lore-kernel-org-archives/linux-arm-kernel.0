@@ -1,68 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 17 Oct 2017 17:11:40 +0100
-Subject: [PATCH v8 5/8] arm64: Use of_cpu_node_to_id helper for CPU
- topology parsing
-In-Reply-To: <20171017152422.fawwvx6e3nn4dsej@lakrids.cambridge.arm.com>
-References: <20171010103303.32436-1-suzuki.poulose@arm.com>
- <20171010103303.32436-6-suzuki.poulose@arm.com>
- <20171017152422.fawwvx6e3nn4dsej@lakrids.cambridge.arm.com>
-Message-ID: <20171017161140.GD19711@arm.com>
+From: jim2101024@gmail.com (Jim Quinlan)
+Date: Tue, 17 Oct 2017 12:11:55 -0400
+Subject: [PATCH 5/9] PCI: host: brcmstb: add dma-ranges for inbound traffic
+In-Reply-To: <20171017081422.GA19475@lst.de>
+References: <1507761269-7017-1-git-send-email-jim2101024@gmail.com>
+ <1507761269-7017-6-git-send-email-jim2101024@gmail.com>
+ <589c04cb-061b-a453-3188-79324a02388e@arm.com>
+ <20171017081422.GA19475@lst.de>
+Message-ID: <CANCKTBsCB+x2XgrND9AhRtxPkCXfps1nA+YymkZjKHOUZfjSHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 04:24:23PM +0100, Mark Rutland wrote:
-> On Tue, Oct 10, 2017 at 11:33:00AM +0100, Suzuki K Poulose wrote:
-> > Make use of the new generic helper to convert an of_node of a CPU
-> > to the logical CPU id in parsing the topology.
-> > 
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Leo Yan <leo.yan@linaro.org>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> 
-> This looks sane to me, but it will need an ack from Will or Catalin.
-> 
-> FWIW:
-> 
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> 
-> Thanks,
-> Mark.
-> 
-> > ---
-> >  arch/arm64/kernel/topology.c | 16 ++++++----------
-> >  1 file changed, 6 insertions(+), 10 deletions(-)
-> > 
-> > diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-> > index 8d48b233e6ce..21868530018e 100644
-> > --- a/arch/arm64/kernel/topology.c
-> > +++ b/arch/arm64/kernel/topology.c
-> > @@ -37,18 +37,14 @@ static int __init get_cpu_for_node(struct device_node *node)
-> >  	if (!cpu_node)
-> >  		return -1;
-> >  
-> > -	for_each_possible_cpu(cpu) {
-> > -		if (of_get_cpu_node(cpu, NULL) == cpu_node) {
-> > -			topology_parse_cpu_capacity(cpu_node, cpu);
-> > -			of_node_put(cpu_node);
-> > -			return cpu;
-> > -		}
-> > -	}
-> > -
-> > -	pr_crit("Unable to find CPU node for %pOF\n", cpu_node);
-> > +	cpu = of_cpu_node_to_id(cpu_node);
-> > +	if (cpu >= 0)
-> > +		topology_parse_cpu_capacity(cpu_node, cpu);
-> > +	else
-> > +		pr_crit("Unable to find CPU node for %pOF\n", cpu_node);
-> >  
-> >  	of_node_put(cpu_node);
+On Tue, Oct 17, 2017 at 4:14 AM, Christoph Hellwig <hch@lst.de> wrote:
+> Just took a quick look over this and I basically agree with the comments
+> from Robin.
+>
+> What I don't understand is why you're even trying to do all these
+> hacky things.
+>
+> It seems like the controller should simply set dma_pfn_offset for
+> each device hanging off it, and all the supported architectures
+> should be updated to obey that if they don't do so yet, and
+> you're done without needing this giant mess.
 
-This of_node_put is confusing me. Since of_cpu_node_to_id appears to be
-balanced with its use of the node refcount, is this one intended to pair
-with the earlier call to of_parse_phandle? If so, does that mainline is
-currently broken here because it doesn't drop the refcount twice for the
-matching node? Or do we need to return with that held?
-
-Will
+My understanding is that dma_pfn_offset is that it is a single
+constant offset from RAM, in our case, to map to PCIe space.  But in
+my commit message I detail how our PCIe controller presents memory
+with multiple regions with multiple different offsets. If an EP device
+maps to a region on the host memory, yes we can set the dma_pfn_offset
+for that device for that location within that range,.  But if the
+device then unmaps and allocates from another region with a different
+offset, it won't work.  If  I set dma_pfn_offset I have to assume that
+the device is using only one region of memory only, not more than one,
+and that it is not unmapping that region and mapping another (with a
+different offset).  Can I make those assumptions?
