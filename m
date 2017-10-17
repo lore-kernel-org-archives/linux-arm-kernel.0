@@ -1,48 +1,48 @@
-From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
-Date: Tue, 17 Oct 2017 14:20:31 +0900
-Subject: [PATCH v4 3/3] arm64: dts: uniphier: add efuse node for LD20
-In-Reply-To: <1508217631-19365-1-git-send-email-hayashibara.keiji@socionext.com>
-References: <1508217631-19365-1-git-send-email-hayashibara.keiji@socionext.com>
-Message-ID: <1508217631-19365-4-git-send-email-hayashibara.keiji@socionext.com>
+From: cuibixuan@huawei.com (Bixuan Cui)
+Date: Tue, 17 Oct 2017 13:54:35 +0800
+Subject: =?UTF-8?B?44CQQlVH44CRVGhlIGtlcm5lbCBzdGFydCBmYWlsIHdoZW4gZW5hYmw=?=
+ =?UTF-8?B?ZSBDT05GSUdfQVJNNjRfTFNFX0FUT01JQ1MgYW5kIEtDT1ZfSU5TVFJVTUVOVF8=?=
+ =?UTF-8?B?QUxM?=
+Message-ID: <59E59B1B.9030206@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add efuse node for UniPhier LD20 SoC.
-This efuse node is included in soc-glue.
+Hi,
+I try to start the kernel(v4.14.0-rc4) by qemu while enable CONFIG_ARM64_LSE_ATOMICS and KCOV_INSTRUMENT_ALL(use arch/arm64/configs/defconfig) at the same time. Then
+it hang:
+qemu-system-aarch64 -kernel Image -m 2048 -smp 8 -initrd qemu-le.rootfs -cpu cortex-a57 -nographic -machine virt,kernel_irqchip=on -append 'console=ttyAMA0 root=/dev/ram rdinit=/sbin/init nohz_full=1 earlycon=pl011,0x9000000' -rtc base=localtime -device virtio-net-device,netdev=net0 -netdev type=tap,id=net0,script=no,downscript=no,ifname=tap2
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Linux version 4.14.0-rc4 #24 SMP PREEMPT Mon Oct 16 11:02:11 CST 2017
+[    0.000000] Boot CPU: AArch64 Processor [411fd070]
+[    0.000000] Machine model: linux,dummy-virt
+[    0.000000] earlycon: pl11 at MMIO 0x0000000009000000 (options '')
+[    0.000000] bootconsole [pl11] enabled
+[    0.000000] efi: Getting EFI parameters from FDT:
+[    0.000000] efi: UEFI not found.
+[    0.000000] cma: Reserved 64 MiB at 0x00000000bc000000
 
-Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
----
- arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+After I try kernel v4.13 and it's the same result.
+I trace the code and find it stop at the end of '__init_single_page(page, pfn, zone, nid)' in memmap_init_zone() of mm/page_alloc.c ?
 
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-index a29c279..ddefde6 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-@@ -376,6 +376,24 @@
- 			};
- 		};
- 
-+		soc-glue at 5f900000 {
-+			compatible = "socionext,uniphier-ld20-soc-glue-debug",
-+				     "simple-mfd";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0x0 0x5f900000 0x2000>;
-+
-+			efuse at 100 {
-+				compatible = "socionext,uniphier-efuse";
-+				reg = <0x100 0x28>;
-+			};
-+
-+			efuse at 200 {
-+				compatible = "socionext,uniphier-efuse";
-+				reg = <0x200 0x68>;
-+			};
-+		};
-+
- 		aidet: aidet at 5fc20000 {
- 			compatible = "socionext,uniphier-ld20-aidet";
- 			reg = <0x5fc20000 0x200>;
--- 
-2.7.4
+static void __meminit __init_single_page(struct page *page, unsigned long pfn,
+                                unsigned long zone, int nid)
+{
+        set_page_links(page, zone, nid, pfn);
+        init_page_count(page);
+        page_mapcount_reset(page);
+        page_cpupid_reset_last(page);
+
+        INIT_LIST_HEAD(&page->lru);
+
+#ifdef WANT_PAGE_VIRTUAL
+        /* The shift won't overflow because ZONE_NORMAL is below 4G. */
+        if (!is_highmem_idx(zone))
+                set_page_address(page, __va(pfn << PAGE_SHIFT));
+#endif
+//      printk("stop here\n");
+}
+
+Anyone can give me advice?
+
+Thanks,
+Bixuan Cui
