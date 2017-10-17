@@ -1,134 +1,216 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 17 Oct 2017 22:38:45 +0800
-Subject: [linux-sunxi] [PATCH 08/10] ARM: dts: sun4i: Enable HDMI support
- on some A10 devices
-In-Reply-To: <20171017121807.2994-9-wens@csie.org>
-References: <20171017121807.2994-1-wens@csie.org>
- <20171017121807.2994-9-wens@csie.org>
-Message-ID: <CAGb2v65Z2N24AZp=Y-_YgKuZiT1uSDX5pzMrceU3+TY=+Zdf7g@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 17 Oct 2017 16:39:35 +0200
+Subject: [PATCH 06/23] drm/sun4i: tcon: Don't rely on encoders to set the
+ TCON mode
+In-Reply-To: <CAGb2v679FWRRiTfS5jReFqiAEEiqAg13wUPHOYdT_=gebh25tg@mail.gmail.com>
+References: <cover.fe3d65d1ee05a55224d26e7d113388c428592b26.1508231063.git-series.maxime.ripard@free-electrons.com>
+ <faa3a4d511039af1d116270dfef3a8b60ca3591e.1508231063.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v679FWRRiTfS5jReFqiAEEiqAg13wUPHOYdT_=gebh25tg@mail.gmail.com>
+Message-ID: <20171017143935.hdpo5enms3qjqbcy@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 8:18 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> Various A10-based development boards have standard HDMI connectors
-> wired to the dedicated HDMI pins on the SoC.
->
-> Enable the display pipeline and HDMI output on boards I have or have
-> access to schematics:
->
->   - Cubieboard
->   - Olimex A10-OLinuXino-LIME
->
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->
-> Can someone could double check the LIME for me? It should work given
-> it's the same layout as the A20 variant, which has been tested.
->
-> ---
->  arch/arm/boot/dts/sun4i-a10-cubieboard.dts     | 25 +++++++++++++++++++++++++
->  arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts | 21 +++++++++++++++++++++
->  2 files changed, 46 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-> index d5ba5400a975..1982c8c238c5 100644
-> --- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-> +++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-> @@ -59,6 +59,17 @@
->                 stdout-path = "serial0:115200n8";
->         };
->
-> +       hdmi-connector {
-> +               compatible = "hdmi-connector";
-> +               type = "a";
-> +
-> +               port {
-> +                       hdmi_con_in: endpoint {
-> +                               remote-endpoint = <&hdmi_out_con>;
-> +                       };
-> +               };
-> +       };
-> +
->         leds {
->                 compatible = "gpio-leds";
->                 pinctrl-names = "default";
-> @@ -90,6 +101,10 @@
->         cpu-supply = <&reg_dcdc2>;
->  };
->
-> +&de {
-> +       status = "okay";
-> +};
-> +
->  &ehci0 {
->         status = "okay";
->  };
-> @@ -107,6 +122,16 @@
->         status = "okay";
->  };
->
-> +&hdmi {
-> +       status = "okay";
-> +};
-> +
-> +&hdmi_out {
-> +       hdmi_out_con: endpoint {
-> +               remote-endpoint = <&hdmi_con_in>;
-> +       };
-> +};
-> +
->  &i2c0 {
->         status = "okay";
->
-> diff --git a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
-> index 2d1b4329f54a..e39ec9beef75 100644
-> --- a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
-> +++ b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
-> @@ -58,6 +58,17 @@
->                 stdout-path = "serial0:115200n8";
->         };
->
-> +       hdmi-connector {
-> +               compatible = "hdmi-connector";
-> +               type = "a";
-> +
-> +               port {
-> +                       hdmi_con_in: endpoint {
-> +                               remote-endpoint = <&hdmi_out_con>;
-> +                       };
-> +               };
-> +       };
-> +
->         leds {
->                 compatible = "gpio-leds";
->                 pinctrl-names = "default";
-> @@ -106,6 +117,16 @@
->         status = "okay";
->  };
+On Tue, Oct 17, 2017 at 05:56:47PM +0800, Chen-Yu Tsai wrote:
+> On Tue, Oct 17, 2017 at 5:06 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Just like we did for the TCON enable and disable, for historical reasons we
+> > used to rely on the encoders calling the TCON mode_set function, while the
+> > CRTC has a callback for that.
+> >
+> > Let's implement it in order to reduce the boilerplate code.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  drivers/gpu/drm/sun4i/sun4i_crtc.c          | 10 +++++++-
+> >  drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c  |  1 +-
+> >  drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c      |  7 +-----
+> >  drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c |  1 +-
+> >  drivers/gpu/drm/sun4i/sun4i_rgb.c           | 15 +-----------
+> >  drivers/gpu/drm/sun4i/sun4i_tcon.c          | 31 +++++++++++++++++-----
+> >  drivers/gpu/drm/sun4i/sun4i_tcon.h          | 11 ++------
+> >  drivers/gpu/drm/sun4i/sun4i_tv.c            |  6 +----
+> >  8 files changed, 37 insertions(+), 45 deletions(-)
+> >
+> > diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+> > index e86baa3746af..5decae0069d0 100644
+> > --- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
+> > +++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+> > @@ -115,11 +115,21 @@ static void sun4i_crtc_atomic_enable(struct drm_crtc *crtc,
+> >         sun4i_tcon_set_status(scrtc->tcon, encoder, true);
+> >  }
+> >
+> > +static void sun4i_crtc_mode_set_nofb(struct drm_crtc *crtc)
+> > +{
+> > +       struct drm_display_mode *mode = &crtc->state->adjusted_mode;
+> > +       struct drm_encoder *encoder = sun4i_crtc_get_encoder(crtc);
+> > +       struct sun4i_crtc *scrtc = drm_crtc_to_sun4i_crtc(crtc);
+> > +
+> > +       sun4i_tcon_mode_set(scrtc->tcon, encoder, mode);
+> > +}
+> > +
+> >  static const struct drm_crtc_helper_funcs sun4i_crtc_helper_funcs = {
+> >         .atomic_begin   = sun4i_crtc_atomic_begin,
+> >         .atomic_flush   = sun4i_crtc_atomic_flush,
+> >         .atomic_enable  = sun4i_crtc_atomic_enable,
+> >         .atomic_disable = sun4i_crtc_atomic_disable,
+> > +       .mode_set_nofb  = sun4i_crtc_mode_set_nofb,
+> >  };
+> >
+> >  static int sun4i_crtc_enable_vblank(struct drm_crtc *crtc)
+> > diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c
+> > index 04f85b1cf922..e826da34e919 100644
+> > --- a/drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c
+> > +++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c
+> > @@ -13,7 +13,6 @@
+> >  #include <linux/clk-provider.h>
+> >  #include <linux/regmap.h>
+> >
+> > -#include "sun4i_tcon.h"
+> >  #include "sun4i_hdmi.h"
+> >
+> >  struct sun4i_ddc {
+> > diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+> > index 482bf03d55c1..d2eb0a60e568 100644
+> > --- a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+> > +++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+> > @@ -30,7 +30,6 @@
+> >  #include "sun4i_crtc.h"
+> >  #include "sun4i_drv.h"
+> >  #include "sun4i_hdmi.h"
+> > -#include "sun4i_tcon.h"
+> >
+> >  static inline struct sun4i_hdmi *
+> >  drm_encoder_to_sun4i_hdmi(struct drm_encoder *encoder)
+> > @@ -120,15 +119,9 @@ static void sun4i_hdmi_mode_set(struct drm_encoder *encoder,
+> >                                 struct drm_display_mode *adjusted_mode)
+> >  {
+> >         struct sun4i_hdmi *hdmi = drm_encoder_to_sun4i_hdmi(encoder);
+> > -       struct sun4i_crtc *crtc = drm_crtc_to_sun4i_crtc(encoder->crtc);
+> > -       struct sun4i_tcon *tcon = crtc->tcon;
+> >         unsigned int x, y;
+> >         u32 val;
+> >
+> > -       sun4i_tcon1_mode_set(tcon, mode);
+> > -       sun4i_tcon_set_mux(tcon, 1, encoder);
+> > -
+> > -       clk_set_rate(tcon->sclk1, mode->crtc_clock * 1000);
+> >         clk_set_rate(hdmi->mod_clk, mode->crtc_clock * 1000);
+> >         clk_set_rate(hdmi->tmds_clk, mode->crtc_clock * 1000);
+> >
+> > diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
+> > index 1b6b37aefc38..dc332ea56f6c 100644
+> > --- a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
+> > +++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
+> > @@ -12,7 +12,6 @@
+> >
+> >  #include <linux/clk-provider.h>
+> >
+> > -#include "sun4i_tcon.h"
+> >  #include "sun4i_hdmi.h"
+> >
+> >  struct sun4i_tmds {
+> > diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+> > index a7f297ed40c1..832f8f9bc47f 100644
+> > --- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
+> > +++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+> > @@ -153,22 +153,7 @@ static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
+> >         }
+> >  }
+> >
+> > -static void sun4i_rgb_encoder_mode_set(struct drm_encoder *encoder,
+> > -                                      struct drm_display_mode *mode,
+> > -                                      struct drm_display_mode *adjusted_mode)
+> > -{
+> > -       struct sun4i_rgb *rgb = drm_encoder_to_sun4i_rgb(encoder);
+> > -       struct sun4i_tcon *tcon = rgb->tcon;
+> > -
+> > -       sun4i_tcon0_mode_set(tcon, mode);
+> > -       sun4i_tcon_set_mux(tcon, 0, encoder);
+> > -
+> > -       /* FIXME: This seems to be board specific */
+> > -       clk_set_phase(tcon->dclk, 120);
+> > -}
+> > -
+> >  static struct drm_encoder_helper_funcs sun4i_rgb_enc_helper_funcs = {
+> > -       .mode_set       = sun4i_rgb_encoder_mode_set,
+> >         .disable        = sun4i_rgb_encoder_disable,
+> >         .enable         = sun4i_rgb_encoder_enable,
+> >  };
+> > diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> > index 964cf22a1ced..7ecd4f7c8411 100644
+> > --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> > +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> > @@ -139,7 +139,6 @@ void sun4i_tcon_set_mux(struct sun4i_tcon *tcon, int channel,
+> >         DRM_DEBUG_DRIVER("Muxing encoder %s to CRTC %s: %d\n",
+> >                          encoder->name, encoder->crtc->name, ret);
+> >  }
+> > -EXPORT_SYMBOL(sun4i_tcon_set_mux);
+> >
+> >  static int sun4i_tcon_get_clk_delay(const struct drm_display_mode *mode,
+> >                                     int channel)
+> > @@ -159,8 +158,8 @@ static int sun4i_tcon_get_clk_delay(const struct drm_display_mode *mode,
+> >         return delay;
+> >  }
+> >
+> > -void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
+> > -                         struct drm_display_mode *mode)
+> > +static void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
+> > +                                struct drm_display_mode *mode)
+> 
+> This doesn't have const...
+> 
+> >  {
+> >         unsigned int bp, hsync, vsync;
+> >         u8 clk_delay;
+> > @@ -233,10 +232,9 @@ void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
+> >         /* Enable the output on the pins */
+> >         regmap_write(tcon->regs, SUN4I_TCON0_IO_TRI_REG, 0);
+> >  }
+> > -EXPORT_SYMBOL(sun4i_tcon0_mode_set);
+> >
+> > -void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
+> > -                         struct drm_display_mode *mode)
+> > +static void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
+> > +                                const struct drm_display_mode *mode)
+> >  {
+> >         unsigned int bp, hsync, vsync, vtotal;
+> >         u8 clk_delay;
+> > @@ -324,7 +322,26 @@ void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
+> >                            SUN4I_TCON_GCTL_IOMAP_MASK,
+> >                            SUN4I_TCON_GCTL_IOMAP_TCON1);
+> >  }
+> > -EXPORT_SYMBOL(sun4i_tcon1_mode_set);
+> > +
+> > +void sun4i_tcon_mode_set(struct sun4i_tcon *tcon,
+> > +                        const struct drm_encoder *encoder,
+> > +                        const struct drm_display_mode *mode)
+> 
+> But this does...
+> 
+> > +{
+> > +       switch (encoder->encoder_type) {
+> > +       case DRM_MODE_ENCODER_NONE:
+> > +               sun4i_tcon0_mode_set(tcon, mode);
+> 
+> So you're likely to get some warning about dropping const here.
+> 
+> Otherwise,
+> 
+> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 
-The LIME's dts change is missing the &de part. :(
-I can fix this when applying.
+Strangely enough, it doesn't. I've fixed it and applied.
 
-ChenYu
+Thanks!
+Maxime
 
->
-> +&hdmi {
-> +       status = "okay";
-> +};
-> +
-> +&hdmi_out {
-> +       hdmi_out_con: endpoint {
-> +               remote-endpoint = <&hdmi_con_in>;
-> +       };
-> +};
-> +
->  &i2c0 {
->         status = "okay";
->
-> --
-> 2.14.2
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171017/61dd8aaa/attachment.sig>
