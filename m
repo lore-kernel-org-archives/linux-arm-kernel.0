@@ -1,84 +1,49 @@
-From: andrea.adami@gmail.com (Andrea Adami)
-Date: Tue, 17 Oct 2017 10:18:57 +0200
-Subject: ARM: pxa/corgi: armv5te kernel 4.12 fails to decompress compiled
- with gcc7
-In-Reply-To: <26e751ec-7fc7-475a-5603-2fac4e0700cb@gmail.com>
-References: <CAAQYJAvR2_wqf2Axe4aVMOu08t7w5tNEjK0s3fw_oemtqCRo7g@mail.gmail.com>
- <87a83zsiid.fsf@belgarion.home>
- <CAAQYJAtEmJMc766kUx+bhFCNQKmwK53nSDNL0nFz-9UXSUO5CQ@mail.gmail.com>
- <20171014215042.kfrhb2kjhm7wb7vb@darkstar.musicnaut.iki.fi>
- <87mv4txuid.fsf@belgarion.home>
- <20171015104640.hazujjkbqyik7fgg@darkstar.musicnaut.iki.fi>
- <f1631768-b26e-62ae-db1f-65686cd0c4de@gmail.com>
- <CAAQYJAsmOr2qnykO=rWH1N43q3+d27aHMAyXHTXMYpPQ1=9ikA@mail.gmail.com>
- <26e751ec-7fc7-475a-5603-2fac4e0700cb@gmail.com>
-Message-ID: <CAAQYJAuxMHGiyMCFqryYa6QGrXd1JHZnTG60VSGnG6hu9zhitA@mail.gmail.com>
+From: hch@infradead.org (Christoph Hellwig)
+Date: Tue, 17 Oct 2017 01:24:13 -0700
+Subject: [PATCH 1/9] SOC: brcmstb: add memory API
+In-Reply-To: <1507761269-7017-2-git-send-email-jim2101024@gmail.com>
+References: <1507761269-7017-1-git-send-email-jim2101024@gmail.com>
+ <1507761269-7017-2-git-send-email-jim2101024@gmail.com>
+Message-ID: <20171017082413.GA10574@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 10:10 AM, Petr Cvek <petrcvekcz@gmail.com> wrote:
-> Dne 17.10.2017 v 10:02 Andrea Adami napsal(a):
->>
->> <cut>
->>
->> Hi,
->
-> Hi
->
->
->>
->> I am trying to debug further but I don't have any output on serial
->> console...
->> I enabled:
->>
->> CONFIG_DEBUG_LL=y
->> CONFIG_DEBUG_PXA_UART1=y
->> # CONFIG_DEBUG_ICEDCC is not set
->> # CONFIG_DEBUG_SEMIHOSTING is not set
->> # CONFIG_DEBUG_LL_UART_8250 is not set
->> # CONFIG_DEBUG_LL_UART_PL01X is not set
->> CONFIG_DEBUG_LL_INCLUDE="debug/8250.S"
->> CONFIG_DEBUG_UART_8250=y
->> CONFIG_DEBUG_UART_PHYS=0x40100000
->> CONFIG_DEBUG_UART_VIRT=0xf6200000
->> CONFIG_DEBUG_UART_8250_SHIFT=2
->> # CONFIG_DEBUG_UART_8250_WORD is not set
->> # CONFIG_DEBUG_UART_8250_PALMCHIP is not set
->> # CONFIG_DEBUG_UART_8250_FLOW_CONTROL is not set
->> CONFIG_UNCOMPRESS_INCLUDE="mach/uncompress.h"
->> CONFIG_EARLY_PRINTK=y
->>
->> then I added #define DEBUG  to both head.S and decompress.c under
->> arm/boot/compressed.
->> I added earlyprintk to the cmdline args used by the kexec bootloader but
->> nothing
->>
->> That kernel does boot silently, just 'Uncompresing..' then
->> 'XZ-compressed data is corrupt -- System halted'
->>
->> I do have output from the Angel bootloader at 9600 and by the kernel
->> at 115200 so the uart is working...
->> Any hint?
->
->
-> If it is a problem with gcc (as Russell said before), there is no way you
-> can fix it in the kernel. Only compiling it with an older gcc version can
-> help.
->
-> Maybe you can try to compile it for armv4 code.
->
-> best regards,
-> Petr
+> +/* Macros to help extract property data */
+> +#define U8TOU32(b, offs) \
+> +	((((u32)b[0 + offs] << 0)  & 0x000000ff) | \
+> +	 (((u32)b[1 + offs] << 8)  & 0x0000ff00) | \
+> +	 (((u32)b[2 + offs] << 16) & 0x00ff0000) | \
+> +	 (((u32)b[3 + offs] << 24) & 0xff000000))
 
-Hi,
-yes, out of curtiosity I'll test on collie/sa1100 later.
+Please us helpers like get_unaligned_le32 instead opencoding them.
 
-As far as I can see, the disassembled code is indeed for armv5 (there
-are 'bx lr') but apparently there are no misalignments.
-I could only disassemble the gcc6 and gcc7 versions and upload for
-competent eyes...
+> +#define DT_PROP_DATA_TO_U32(b, offs) (fdt32_to_cpu(U8TOU32(b, offs)))
 
-https://github.com/andrea-adami/gcc7-kernel-debug/tree/master/disassembled
+And together with this it looks really whacky.  So you're converting
+from le to native first and then do another conversion from be to cpu?
 
-Cheers
-Andrea
+Something doesn't work out here.
+
+> +/* -------------------- Functions -------------------- */
+
+Please remove pointless comments like this one.
+
+> +
+> +/*
+> + * If the DT nodes are handy, determine which MEMC holds the specified
+> + * physical address.
+> + */
+> +#ifdef CONFIG_ARCH_BRCMSTB
+> +int __brcmstb_memory_phys_addr_to_memc(phys_addr_t pa, void __iomem *base)
+
+Please move this into the arm arch code.
+
+> +#elif defined(CONFIG_MIPS)
+
+And this into the mips arch code.
+
+> +EXPORT_SYMBOL(brcmstb_memory_phys_addr_to_memc);
+
+> +EXPORT_SYMBOL(brcmstb_memory_memc_size);
+
+Why is this exported?
