@@ -1,32 +1,168 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 17 Oct 2017 10:29:10 +0200
-Subject: [PATCH 3/4] ARM64: dts: meson-gx: grow reset controller memory zone
+Date: Tue, 17 Oct 2017 10:29:08 +0200
+Subject: [PATCH 1/4] ARM64: dts: meson-gx: add VPU power domain
 In-Reply-To: <1508228951-12384-1-git-send-email-narmstrong@baylibre.com>
 References: <1508228951-12384-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1508228951-12384-4-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1508228951-12384-2-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now the Amlogic Meson GX SoCs datasheet documents all the Reset registers,
-grow the memory in the node to allow usage of the level registers.
+This patch adds support for the VPU Power Domain nodes, and attaches the
+VPU power domain to the VPU node.
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi   | 11 ++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 43 +++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 43 +++++++++++++++++++++++++++++
+ 3 files changed, 97 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-index 80a0f2b..9b19656 100644
+index f175db8..80a0f2b 100644
 --- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
 +++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-@@ -220,7 +220,7 @@
+@@ -371,6 +371,12 @@
+ 				compatible = "amlogic,meson-gx-ao-sysctrl", "syscon", "simple-mfd";
+ 				reg =  <0x0 0x0 0x0 0x100>;
  
- 			reset: reset-controller at 4404 {
- 				compatible = "amlogic,meson-gx-reset", "amlogic,meson-gxbb-reset";
--				reg = <0x0 0x04404 0x0 0x20>;
-+				reg = <0x0 0x04404 0x0 0x9c>;
- 				#reset-cells = <1>;
- 			};
++				pwrc_vpu: power-controller-vpu {
++					compatible = "amlogic,meson-gx-pwrc-vpu";
++					#power-domain-cells = <0>;
++					amlogic,hhi-sysctrl = <&sysctrl>;
++				};
++
+ 				clkc_AO: clock-controller {
+ 					compatible = "amlogic,meson-gx-aoclkc";
+ 					#clock-cells = <1>;
+@@ -448,6 +454,11 @@
+ 			#size-cells = <2>;
+ 			ranges = <0x0 0x0 0x0 0xc883c000 0x0 0x2000>;
  
++			sysctrl: system-controller at 0 {
++				compatible = "amlogic,meson-gx-hhi-sysctrl", "syscon", "simple-mfd";
++				reg = <0 0 0 0x400>;
++			};
++
+ 			mailbox: mailbox at 404 {
+ 				compatible = "amlogic,meson-gx-mhu", "amlogic,meson-gxbb-mhu";
+ 				reg = <0 0x404 0 0x4c>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index 3d41db9..512f3dd 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -688,6 +688,48 @@
+ 	};
+ };
+ 
++&pwrc_vpu {
++	resets = <&reset RESET_VIU>,
++		 <&reset RESET_VENC>,
++		 <&reset RESET_VCBUS>,
++		 <&reset RESET_BT656>,
++		 <&reset RESET_DVIN_RESET>,
++		 <&reset RESET_RDMA>,
++		 <&reset RESET_VENCI>,
++		 <&reset RESET_VENCP>,
++		 <&reset RESET_VDAC>,
++		 <&reset RESET_VDI6>,
++		 <&reset RESET_VENCL>,
++		 <&reset RESET_VID_LOCK>;
++	clocks = <&clkc CLKID_VPU>,
++	         <&clkc CLKID_VAPB>;
++	clock-names = "vpu", "vapb";
++	/*
++	 * VPU clocking is provided by two identical clock paths
++	 * VPU_0 and VPU_1 muxed to a single clock by a glitch
++	 * free mux to safely change frequency while running.
++	 * Same for VAPB but with a final gate after the glitch free mux.
++	 */
++	assigned-clocks = <&clkc CLKID_VPU_0_SEL>,
++			  <&clkc CLKID_VPU_0>,
++			  <&clkc CLKID_VPU>, /* Glitch free mux */
++			  <&clkc CLKID_VAPB_0_SEL>,
++			  <&clkc CLKID_VAPB_0>,
++			  <&clkc CLKID_VAPB_SEL>; /* Glitch free mux */
++	assigned-clock-parents = <&clkc CLKID_FCLK_DIV3>,
++				 <0>, /* Do Nothing */
++				 <&clkc CLKID_VPU_0>,
++				 <&clkc CLKID_FCLK_DIV4>,
++				 <0>, /* Do Nothing */
++				 <&clkc CLKID_VAPB_0>;
++	assigned-clock-rates = <0>, /* Do Nothing */
++			       <666666666>,
++			       <0>, /* Do Nothing */
++			       <0>, /* Do Nothing */
++			       <250000000>,
++			       <0>; /* Do Nothing */
++};
++
+ &saradc {
+ 	compatible = "amlogic,meson-gxbb-saradc", "amlogic,meson-saradc";
+ 	clocks = <&xtal>,
+@@ -757,4 +799,5 @@
+ 
+ &vpu {
+ 	compatible = "amlogic,meson-gxbb-vpu", "amlogic,meson-gx-vpu";
++	power-domains = <&pwrc_vpu>;
+ };
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+index 19c001a..68f6564 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+@@ -630,6 +630,48 @@
+ 	};
+ };
+ 
++&pwrc_vpu {
++	resets = <&reset RESET_VIU>,
++		 <&reset RESET_VENC>,
++		 <&reset RESET_VCBUS>,
++		 <&reset RESET_BT656>,
++		 <&reset RESET_DVIN_RESET>,
++		 <&reset RESET_RDMA>,
++		 <&reset RESET_VENCI>,
++		 <&reset RESET_VENCP>,
++		 <&reset RESET_VDAC>,
++		 <&reset RESET_VDI6>,
++		 <&reset RESET_VENCL>,
++		 <&reset RESET_VID_LOCK>;
++	clocks = <&clkc CLKID_VPU>,
++	         <&clkc CLKID_VAPB>;
++	clock-names = "vpu", "vapb";
++	/*
++	 * VPU clocking is provided by two identical clock paths
++	 * VPU_0 and VPU_1 muxed to a single clock by a glitch
++	 * free mux to safely change frequency while running.
++	 * Same for VAPB but with a final gate after the glitch free mux.
++	 */
++	assigned-clocks = <&clkc CLKID_VPU_0_SEL>,
++			  <&clkc CLKID_VPU_0>,
++			  <&clkc CLKID_VPU>, /* Glitch free mux */
++			  <&clkc CLKID_VAPB_0_SEL>,
++			  <&clkc CLKID_VAPB_0>,
++			  <&clkc CLKID_VAPB_SEL>; /* Glitch free mux */
++	assigned-clock-parents = <&clkc CLKID_FCLK_DIV3>,
++				 <0>, /* Do Nothing */
++				 <&clkc CLKID_VPU_0>,
++				 <&clkc CLKID_FCLK_DIV4>,
++				 <0>, /* Do Nothing */
++				 <&clkc CLKID_VAPB_0>;
++	assigned-clock-rates = <0>, /* Do Nothing */
++			       <666666666>,
++			       <0>, /* Do Nothing */
++			       <0>, /* Do Nothing */
++			       <250000000>,
++			       <0>; /* Do Nothing */
++};
++
+ &saradc {
+ 	compatible = "amlogic,meson-gxl-saradc", "amlogic,meson-saradc";
+ 	clocks = <&xtal>,
+@@ -699,4 +741,5 @@
+ 
+ &vpu {
+ 	compatible = "amlogic,meson-gxl-vpu", "amlogic,meson-gx-vpu";
++	power-domains = <&pwrc_vpu>;
+ };
 -- 
 2.7.4
