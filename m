@@ -1,42 +1,84 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Tue, 17 Oct 2017 16:09:20 +0800
-Subject: [RFC PATCH v3 0/5] rockchip: kevin: Enable edp display
-Message-ID: <20171017080925.23763-1-jeffy.chen@rock-chips.com>
+From: andrea.adami@gmail.com (Andrea Adami)
+Date: Tue, 17 Oct 2017 10:18:57 +0200
+Subject: ARM: pxa/corgi: armv5te kernel 4.12 fails to decompress compiled
+ with gcc7
+In-Reply-To: <26e751ec-7fc7-475a-5603-2fac4e0700cb@gmail.com>
+References: <CAAQYJAvR2_wqf2Axe4aVMOu08t7w5tNEjK0s3fw_oemtqCRo7g@mail.gmail.com>
+ <87a83zsiid.fsf@belgarion.home>
+ <CAAQYJAtEmJMc766kUx+bhFCNQKmwK53nSDNL0nFz-9UXSUO5CQ@mail.gmail.com>
+ <20171014215042.kfrhb2kjhm7wb7vb@darkstar.musicnaut.iki.fi>
+ <87mv4txuid.fsf@belgarion.home>
+ <20171015104640.hazujjkbqyik7fgg@darkstar.musicnaut.iki.fi>
+ <f1631768-b26e-62ae-db1f-65686cd0c4de@gmail.com>
+ <CAAQYJAsmOr2qnykO=rWH1N43q3+d27aHMAyXHTXMYpPQ1=9ikA@mail.gmail.com>
+ <26e751ec-7fc7-475a-5603-2fac4e0700cb@gmail.com>
+Message-ID: <CAAQYJAuxMHGiyMCFqryYa6QGrXd1JHZnTG60VSGnG6hu9zhitA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Oct 17, 2017 at 10:10 AM, Petr Cvek <petrcvekcz@gmail.com> wrote:
+> Dne 17.10.2017 v 10:02 Andrea Adami napsal(a):
+>>
+>> <cut>
+>>
+>> Hi,
+>
+> Hi
+>
+>
+>>
+>> I am trying to debug further but I don't have any output on serial
+>> console...
+>> I enabled:
+>>
+>> CONFIG_DEBUG_LL=y
+>> CONFIG_DEBUG_PXA_UART1=y
+>> # CONFIG_DEBUG_ICEDCC is not set
+>> # CONFIG_DEBUG_SEMIHOSTING is not set
+>> # CONFIG_DEBUG_LL_UART_8250 is not set
+>> # CONFIG_DEBUG_LL_UART_PL01X is not set
+>> CONFIG_DEBUG_LL_INCLUDE="debug/8250.S"
+>> CONFIG_DEBUG_UART_8250=y
+>> CONFIG_DEBUG_UART_PHYS=0x40100000
+>> CONFIG_DEBUG_UART_VIRT=0xf6200000
+>> CONFIG_DEBUG_UART_8250_SHIFT=2
+>> # CONFIG_DEBUG_UART_8250_WORD is not set
+>> # CONFIG_DEBUG_UART_8250_PALMCHIP is not set
+>> # CONFIG_DEBUG_UART_8250_FLOW_CONTROL is not set
+>> CONFIG_UNCOMPRESS_INCLUDE="mach/uncompress.h"
+>> CONFIG_EARLY_PRINTK=y
+>>
+>> then I added #define DEBUG  to both head.S and decompress.c under
+>> arm/boot/compressed.
+>> I added earlyprintk to the cmdline args used by the kexec bootloader but
+>> nothing
+>>
+>> That kernel does boot silently, just 'Uncompresing..' then
+>> 'XZ-compressed data is corrupt -- System halted'
+>>
+>> I do have output from the Angel bootloader at 9600 and by the kernel
+>> at 115200 so the uart is working...
+>> Any hint?
+>
+>
+> If it is a problem with gcc (as Russell said before), there is no way you
+> can fix it in the kernel. Only compiling it with an older gcc version can
+> help.
+>
+> Maybe you can try to compile it for armv4 code.
+>
+> best regards,
+> Petr
 
-Make edp display works on chromebook kevin(at least for boot animation).
+Hi,
+yes, out of curtiosity I'll test on collie/sa1100 later.
 
-Also solve some issues i meet during the bringup.
+As far as I can see, the disassembled code is indeed for armv5 (there
+are 'bx lr') but apparently there are no misalignments.
+I could only disassemble the gcc6 and gcc7 versions and upload for
+competent eyes...
 
-Changes in v3:
-Assign orphan pwms to dummy pwmchip instead of adding device link in the
-customer driver.
+https://github.com/andrea-adami/gcc7-kernel-debug/tree/master/disassembled
 
-Changes in v2:
-Use device link to correct the suspend/resume and shutdown ordering,
-instead of converting rockchip spi's suspend/resume PM callbacks to
-late suspend/resume PM callbacks.
-
-Jeffy Chen (4):
-  arm64: dts: rockchip: Enable edp disaplay on kevin
-  drm/rockchip: Fix error handling path in rockchip_dp_bind()
-  pwm: Add dummy pwmchip for orphan pwms
-  drm/rockchip: Add device links for master and components
-
-Tomasz Figa (1):
-  drm/bridge/analogix: Do not use device's drvdata
-
- arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts  | 29 ++++++++
- arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi       | 16 +++++
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 50 ++++++-------
- drivers/gpu/drm/exynos/exynos_dp.c                 | 26 ++++---
- drivers/gpu/drm/rockchip/analogix_dp-rockchip.c    | 57 +++++++++------
- drivers/gpu/drm/rockchip/rockchip_drm_drv.c        | 24 ++++++-
- drivers/pwm/core.c                                 | 84 ++++++++++++++++++++--
- include/drm/bridge/analogix_dp.h                   | 19 ++---
- 8 files changed, 226 insertions(+), 79 deletions(-)
-
--- 
-2.11.0
+Cheers
+Andrea
