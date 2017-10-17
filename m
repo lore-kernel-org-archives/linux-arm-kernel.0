@@ -1,10 +1,10 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 17 Oct 2017 10:07:42 +0200
-Subject: [PATCH 2/4] dt-bindings: display: amlogic,
- meson-dw-hdmi: Add optional HDMI 5V regulator
+Date: Tue, 17 Oct 2017 10:07:43 +0200
+Subject: [PATCH 3/4] drm/meson: dw_hdmi: Add support for an optional external
+ 5V regulator
 In-Reply-To: <1508227664-11171-1-git-send-email-narmstrong@baylibre.com>
 References: <1508227664-11171-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1508227664-11171-3-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1508227664-11171-4-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,23 +14,46 @@ This regulator was set by the Vendor U-Boot, add optional support for it.
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/gpu/drm/meson/meson_dw_hdmi.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt b/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
-index 7f040ed..bf4a180 100644
---- a/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
-+++ b/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
-@@ -48,6 +48,10 @@ Required properties:
-   Documentation/devicetree/bindings/reset/reset.txt,
-   the reset-names should be "hdmitx_apb", "hdmitx", "hdmitx_phy"
+diff --git a/drivers/gpu/drm/meson/meson_dw_hdmi.c b/drivers/gpu/drm/meson/meson_dw_hdmi.c
+index cef4144..17de3af 100644
+--- a/drivers/gpu/drm/meson/meson_dw_hdmi.c
++++ b/drivers/gpu/drm/meson/meson_dw_hdmi.c
+@@ -23,6 +23,7 @@
+ #include <linux/of_graph.h>
+ #include <linux/reset.h>
+ #include <linux/clk.h>
++#include <linux/regulator/consumer.h>
  
-+Optional properties:
-+- hdmi-supply: Optional phandle to an external 5V regulator to power the HDMI
-+  logic, as described in the file ../regulator/regulator.txt
+ #include <drm/drmP.h>
+ #include <drm/drm_edid.h>
+@@ -137,6 +138,7 @@ struct meson_dw_hdmi {
+ 	struct reset_control *hdmitx_phy;
+ 	struct clk *hdmi_pclk;
+ 	struct clk *venci_clk;
++	struct regulator *hdmi_supply;
+ 	u32 irq_stat;
+ };
+ #define encoder_to_meson_dw_hdmi(x) \
+@@ -751,6 +753,17 @@ static int meson_dw_hdmi_bind(struct device *dev, struct device *master,
+ 	dw_plat_data = &meson_dw_hdmi->dw_plat_data;
+ 	encoder = &meson_dw_hdmi->encoder;
+ 
++	meson_dw_hdmi->hdmi_supply = devm_regulator_get_optional(dev, "hdmi");
++	if (IS_ERR(meson_dw_hdmi->hdmi_supply)) {
++		if (PTR_ERR(meson_dw_hdmi->hdmi_supply) == -EPROBE_DEFER)
++			return -EPROBE_DEFER;
++		meson_dw_hdmi->hdmi_supply = NULL;
++	} else {
++		ret = regulator_enable(meson_dw_hdmi->hdmi_supply);
++		if (ret)
++			return ret;
++	}
 +
- Required nodes:
- 
- The connections to the HDMI ports are modeled using the OF graph
+ 	meson_dw_hdmi->hdmitx_apb = devm_reset_control_get_exclusive(dev,
+ 						"hdmitx_apb");
+ 	if (IS_ERR(meson_dw_hdmi->hdmitx_apb)) {
 -- 
 2.7.4
