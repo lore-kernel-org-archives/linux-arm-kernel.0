@@ -1,129 +1,84 @@
 From: james.morse@arm.com (James Morse)
-Date: Tue, 17 Oct 2017 18:44:24 +0100
-Subject: [PATCH v4 05/13] KVM: arm64: Stop save/restoring host tpidr_el1 on VHE
+Date: Tue, 17 Oct 2017 18:44:21 +0100
+Subject: [PATCH v4 02/13] KVM: arm/arm64: Convert kvm_host_cpu_state to a
+ static per-cpu allocation
 In-Reply-To: <20171017174432.1684-1-james.morse@arm.com>
 References: <20171017174432.1684-1-james.morse@arm.com>
-Message-ID: <20171017174432.1684-6-james.morse@arm.com>
+Message-ID: <20171017174432.1684-3-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that a VHE host uses tpidr_el2 for the cpu offset we no longer
-need KVM to save/restore tpidr_el1. Move this from the 'common' code
-into the non-vhe code. While we're at it, on VHE we don't need to
-save the ELR or SPSR as kernel_entry in entry.S will have pushed these
-onto the kernel stack, and will restore them from there. Move these
-to the non-vhe code as we need them to get back to the host.
+kvm_host_cpu_state is a per-cpu allocation made from kvm_arch_init()
+used to store the host EL1 registers when KVM switches to a guest.
 
-Finally remove the always-copy-tpidr we hid in the stage2 setup
-code, cpufeature's enable callback will do this for VHE, we only
-need KVM to do it for non-vhe. Add the copy into kvm-init instead.
+Make it easier for ASM to generate pointers into this per-cpu memory
+by making it a static allocation.
 
 Signed-off-by: James Morse <james.morse@arm.com>
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
-
+Acked-by: Christoffer Dall <cdall@linaro.org>
 ---
-Changes since v1:
- * Switched KVM<->arm64 in the subject.
+ virt/kvm/arm/arm.c | 18 +++---------------
+ 1 file changed, 3 insertions(+), 15 deletions(-)
 
- arch/arm64/kvm/hyp-init.S      |  4 ++++
- arch/arm64/kvm/hyp/s2-setup.c  |  3 ---
- arch/arm64/kvm/hyp/sysreg-sr.c | 16 ++++++++--------
- 3 files changed, 12 insertions(+), 11 deletions(-)
-
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-index 3f9615582377..fbf259893f6a 100644
---- a/arch/arm64/kvm/hyp-init.S
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -122,6 +122,10 @@ CPU_BE(	orr	x4, x4, #SCTLR_ELx_EE)
- 	kern_hyp_va	x2
- 	msr	vbar_el2, x2
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index b9f68e4add71..3786dd7e277d 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -51,8 +51,8 @@
+ __asm__(".arch_extension	virt");
+ #endif
  
-+	/* copy tpidr_el1 into tpidr_el2 for use by HYP */
-+	mrs	x1, tpidr_el1
-+	msr	tpidr_el2, x1
-+
- 	/* Hello, World! */
- 	eret
- ENDPROC(__kvm_hyp_init)
-diff --git a/arch/arm64/kvm/hyp/s2-setup.c b/arch/arm64/kvm/hyp/s2-setup.c
-index 7fb88274eba1..a81f5e10fc8c 100644
---- a/arch/arm64/kvm/hyp/s2-setup.c
-+++ b/arch/arm64/kvm/hyp/s2-setup.c
-@@ -84,8 +84,5 @@ u32 __hyp_text __init_stage2_translation(void)
++DEFINE_PER_CPU(kvm_cpu_context_t, kvm_host_cpu_state);
+ static DEFINE_PER_CPU(unsigned long, kvm_arm_hyp_stack_page);
+-static kvm_cpu_context_t __percpu *kvm_host_cpu_state;
  
- 	write_sysreg(val, vtcr_el2);
+ /* Per-CPU variable containing the currently running vcpu. */
+ static DEFINE_PER_CPU(struct kvm_vcpu *, kvm_arm_running_vcpu);
+@@ -351,7 +351,7 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+ 	}
  
--	/* copy tpidr_el1 into tpidr_el2 for use by HYP */
--	write_sysreg(read_sysreg(tpidr_el1), tpidr_el2);
+ 	vcpu->cpu = cpu;
+-	vcpu->arch.host_cpu_context = this_cpu_ptr(kvm_host_cpu_state);
++	vcpu->arch.host_cpu_context = this_cpu_ptr(&kvm_host_cpu_state);
+ 
+ 	kvm_arm_set_running_vcpu(vcpu);
+ 
+@@ -1255,19 +1255,8 @@ static inline void hyp_cpu_pm_exit(void)
+ }
+ #endif
+ 
+-static void teardown_common_resources(void)
+-{
+-	free_percpu(kvm_host_cpu_state);
+-}
 -
- 	return parange;
- }
-diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-index 934137647837..c54cc2afb92b 100644
---- a/arch/arm64/kvm/hyp/sysreg-sr.c
-+++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-@@ -27,8 +27,8 @@ static void __hyp_text __sysreg_do_nothing(struct kvm_cpu_context *ctxt) { }
- /*
-  * Non-VHE: Both host and guest must save everything.
-  *
-- * VHE: Host must save tpidr*_el[01], actlr_el1, mdscr_el1, sp0, pc,
-- * pstate, and guest must save everything.
-+ * VHE: Host must save tpidr*_el0, actlr_el1, mdscr_el1, sp_el0,
-+ * and guest must save everything.
-  */
+ static int init_common_resources(void)
+ {
+-	kvm_host_cpu_state = alloc_percpu(kvm_cpu_context_t);
+-	if (!kvm_host_cpu_state) {
+-		kvm_err("Cannot allocate host CPU state\n");
+-		return -ENOMEM;
+-	}
+-
+ 	/* set size of VMID supported by CPU */
+ 	kvm_vmid_bits = kvm_get_vmid_bits();
+ 	kvm_info("%d-bit VMID\n", kvm_vmid_bits);
+@@ -1412,7 +1401,7 @@ static int init_hyp_mode(void)
+ 	for_each_possible_cpu(cpu) {
+ 		kvm_cpu_context_t *cpu_ctxt;
  
- static void __hyp_text __sysreg_save_common_state(struct kvm_cpu_context *ctxt)
-@@ -36,11 +36,8 @@ static void __hyp_text __sysreg_save_common_state(struct kvm_cpu_context *ctxt)
- 	ctxt->sys_regs[ACTLR_EL1]	= read_sysreg(actlr_el1);
- 	ctxt->sys_regs[TPIDR_EL0]	= read_sysreg(tpidr_el0);
- 	ctxt->sys_regs[TPIDRRO_EL0]	= read_sysreg(tpidrro_el0);
--	ctxt->sys_regs[TPIDR_EL1]	= read_sysreg(tpidr_el1);
- 	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
- 	ctxt->gp_regs.regs.sp		= read_sysreg(sp_el0);
--	ctxt->gp_regs.regs.pc		= read_sysreg_el2(elr);
--	ctxt->gp_regs.regs.pstate	= read_sysreg_el2(spsr);
- }
+-		cpu_ctxt = per_cpu_ptr(kvm_host_cpu_state, cpu);
++		cpu_ctxt = per_cpu_ptr(&kvm_host_cpu_state, cpu);
+ 		err = create_hyp_mappings(cpu_ctxt, cpu_ctxt + 1, PAGE_HYP);
  
- static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
-@@ -62,10 +59,13 @@ static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
- 	ctxt->sys_regs[AMAIR_EL1]	= read_sysreg_el1(amair);
- 	ctxt->sys_regs[CNTKCTL_EL1]	= read_sysreg_el1(cntkctl);
- 	ctxt->sys_regs[PAR_EL1]		= read_sysreg(par_el1);
-+	ctxt->sys_regs[TPIDR_EL1]	= read_sysreg(tpidr_el1);
- 
- 	ctxt->gp_regs.sp_el1		= read_sysreg(sp_el1);
- 	ctxt->gp_regs.elr_el1		= read_sysreg_el1(elr);
- 	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg_el1(spsr);
-+	ctxt->gp_regs.regs.pc		= read_sysreg_el2(elr);
-+	ctxt->gp_regs.regs.pstate	= read_sysreg_el2(spsr);
+ 		if (err) {
+@@ -1490,7 +1479,6 @@ int kvm_arch_init(void *opaque)
+ out_hyp:
+ 	teardown_hyp_mode();
+ out_err:
+-	teardown_common_resources();
+ 	return err;
  }
  
- static hyp_alternate_select(__sysreg_call_save_host_state,
-@@ -89,11 +89,8 @@ static void __hyp_text __sysreg_restore_common_state(struct kvm_cpu_context *ctx
- 	write_sysreg(ctxt->sys_regs[ACTLR_EL1],	  actlr_el1);
- 	write_sysreg(ctxt->sys_regs[TPIDR_EL0],	  tpidr_el0);
- 	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], tpidrro_el0);
--	write_sysreg(ctxt->sys_regs[TPIDR_EL1],	  tpidr_el1);
- 	write_sysreg(ctxt->sys_regs[MDSCR_EL1],	  mdscr_el1);
- 	write_sysreg(ctxt->gp_regs.regs.sp,	  sp_el0);
--	write_sysreg_el2(ctxt->gp_regs.regs.pc,	  elr);
--	write_sysreg_el2(ctxt->gp_regs.regs.pstate, spsr);
- }
- 
- static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
-@@ -115,10 +112,13 @@ static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
- 	write_sysreg_el1(ctxt->sys_regs[AMAIR_EL1],	amair);
- 	write_sysreg_el1(ctxt->sys_regs[CNTKCTL_EL1], 	cntkctl);
- 	write_sysreg(ctxt->sys_regs[PAR_EL1],		par_el1);
-+	write_sysreg(ctxt->sys_regs[TPIDR_EL1],		tpidr_el1);
- 
- 	write_sysreg(ctxt->gp_regs.sp_el1,		sp_el1);
- 	write_sysreg_el1(ctxt->gp_regs.elr_el1,		elr);
- 	write_sysreg_el1(ctxt->gp_regs.spsr[KVM_SPSR_EL1],spsr);
-+	write_sysreg_el2(ctxt->gp_regs.regs.pc,		elr);
-+	write_sysreg_el2(ctxt->gp_regs.regs.pstate,	spsr);
- }
- 
- static hyp_alternate_select(__sysreg_call_restore_host_state,
 -- 
 2.13.3
