@@ -1,92 +1,82 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 17 Oct 2017 16:29:49 +0200
-Subject: [PATCH 01/23] drm/sun4i: Implement endpoint parsing using kfifo
-In-Reply-To: <CAGb2v65zJh1Fqqxo22RTL8TQ90FrxywVo0J_bhD04JYHnVjdhg@mail.gmail.com>
-References: <cover.fe3d65d1ee05a55224d26e7d113388c428592b26.1508231063.git-series.maxime.ripard@free-electrons.com>
- <4ecb323e787918208f6a5d9f0ebba12c62583c98.1508231063.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v65zJh1Fqqxo22RTL8TQ90FrxywVo0J_bhD04JYHnVjdhg@mail.gmail.com>
-Message-ID: <20171017142949.lkefs4m7majjh4ey@flea.lan>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 17 Oct 2017 15:29:36 +0100
+Subject: [PATCH v3 24/28] arm64/sve: KVM: Hide SVE from CPU features
+ exposed to guests
+In-Reply-To: <20171017140749.GW19485@e103592.cambridge.arm.com>
+References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
+ <1507660725-7986-25-git-send-email-Dave.Martin@arm.com>
+ <20171017135816.GF5886@lvm>
+ <20171017140749.GW19485@e103592.cambridge.arm.com>
+Message-ID: <2c6d9aa4-f6a8-2c6b-4138-e07d773bf4a2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 05:19:04PM +0800, Chen-Yu Tsai wrote:
-> On Tue, Oct 17, 2017 at 5:06 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > The commit da82b8785eeb ("drm/sun4i: add components in breadth first
-> > traversal order") implemented a breadth first traversal of our device tree
-> > nodes graph. However, it was relying on the kernel linked lists, and those
-> > are not really safe for addition.
-> >
-> > Indeed, in a single pipeline stage, your first stage (ie, the mixer or
-> > fronted) will be queued, and it will be the final iteration of that list as
-> > far as list_for_each_entry_safe is concerned. Then, during that final
-> > iteration, we'll queue another element (the TCON or the backend) that
-> > list_for_each_entry_safe will not account for, and we will leave the loop
-> > without having iterated over all the elements. And since we won't have
-> > built our components list properly, the DRM driver will be left
-> > non-functional.
-> >
-> > We can instead use a kfifo to queue and enqueue components in-order, as was
-> > the original intention. This also has the benefit of removing any dynamic
-> > allocation, making the error handling path simpler too. The only thing
-> > we're losing is the ability to tell whether an element has already been
-> > queued, but that was only needed to remove spurious logs, and therefore
-> > purely cosmetic.
-> >
-> > This means that this commit effectively reverses e8afb7b67fba ("drm/sun4i:
-> > don't add components that are already in the queue").
-> >
-> > Fixes: da82b8785eeb ("drm/sun4i: add components in breadth first traversal order")
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  drivers/gpu/drm/sun4i/sun4i_drv.c | 71 +++++---------------------------
-> >  1 file changed, 13 insertions(+), 58 deletions(-)
-> >
-> > diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-> > index b5879d4620d8..a27efad9bc76 100644
-> > --- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-> > +++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-> > @@ -11,6 +11,7 @@
-> >   */
-> >
-> >  #include <linux/component.h>
-> > +#include <linux/kfifo.h>
-> >  #include <linux/of_graph.h>
-> >  #include <linux/of_reserved_mem.h>
-> >
-> > @@ -222,29 +223,15 @@ static int compare_of(struct device *dev, void *data)
-> >   * matching system handles this for us.
-> >   */
-> >  struct endpoint_list {
-> > -       struct device_node *node;
-> > -       struct list_head list;
-> > +       DECLARE_KFIFO(fifo, struct device_node *, 16);
-> >  };
+On 17/10/17 15:07, Dave Martin wrote:
+> On Tue, Oct 17, 2017 at 06:58:16AM -0700, Christoffer Dall wrote:
+>> On Tue, Oct 10, 2017 at 07:38:41PM +0100, Dave Martin wrote:
+>>> KVM guests cannot currently use SVE, because SVE is always
+>>> configured to trap to EL2.
+>>>
+>>> However, a guest that sees SVE reported as present in
+>>> ID_AA64PFR0_EL1 may legitimately expect that SVE works and try to
+>>> use it.  Instead of working, the guest will receive an injected
+>>> undef exception, which may cause the guest to oops or go into a
+>>> spin.
+>>>
+>>> To avoid misleading the guest into believing that SVE will work,
+>>> this patch masks out the SVE field from ID_AA64PFR0_EL1 when a
+>>> guest attempts to read this register.  No support is explicitly
+>>> added for ID_AA64ZFR0_EL1 either, so that is still emulated as
+>>> reading as zero, which is consistent with SVE not being
+>>> implemented.
+>>>
+>>> This is a temporary measure, and will be removed in a later series
+>>> when full KVM support for SVE is implemented.
+>>>
+>>> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+>>> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>> ---
+>>>  arch/arm64/kvm/sys_regs.c | 12 +++++++++++-
+>>>  1 file changed, 11 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+>>> index b1f7552..a0ee9b0 100644
+>>> --- a/arch/arm64/kvm/sys_regs.c
+>>> +++ b/arch/arm64/kvm/sys_regs.c
+>>> @@ -23,6 +23,7 @@
+>>>  #include <linux/bsearch.h>
+>>>  #include <linux/kvm_host.h>
+>>>  #include <linux/mm.h>
+>>> +#include <linux/printk.h>
+>>>  #include <linux/uaccess.h>
+>>>  
+>>>  #include <asm/cacheflush.h>
+>>> @@ -897,8 +898,17 @@ static u64 read_id_reg(struct sys_reg_desc const *r, bool raz)
+>>>  {
+>>>  	u32 id = sys_reg((u32)r->Op0, (u32)r->Op1,
+>>>  			 (u32)r->CRn, (u32)r->CRm, (u32)r->Op2);
+>>> +	u64 val = raz ? 0 : read_sanitised_ftr_reg(id);
+>>>  
+>>> -	return raz ? 0 : read_sanitised_ftr_reg(id);
+>>> +	if (id == SYS_ID_AA64PFR0_EL1) {
+>>> +		if (val & (0xfUL << ID_AA64PFR0_SVE_SHIFT))
+>>> +			pr_err_once("kvm [%i]: SVE unsupported for guests, suppressing\n",
+>>> +				    task_pid_nr(current));
+>>
+>> nit: does this really qualify as an error print?
 > 
-> Is there any reason to keep using struct endpoint_list, other than
-> to avoid using kfifo in function parameter lists?
-
-It appears that you can't just pass a kifo pointer as a function
-argument, so the only two remaining solutions were to have a global
-pointer or embed it in a structure. It just seems like the best
-solution.
-
+> I have no strong opinion on this: maz suggested I should add this --
+> his concern was to make it difficult to ignore.
 > 
-> Otherwise the rest of the code looks sound.
+> This is transitional: the main purpose is to circumvent bug reports from
+> people who find that SVE doesn't work in their guests, in the interim
+> before proper KVM support lands upstream.
 > 
-> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+> Marc, do you still agree with this position?
 
-Applied, thanks!
-Maxime
+As long as this is transitional, I'm OK with this.
 
+	M.
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171017/1013eea8/attachment-0001.sig>
+Jazz is not dead. It just smells funny...
