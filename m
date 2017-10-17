@@ -1,32 +1,185 @@
 From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Tue, 17 Oct 2017 10:53:26 +0200
-Subject: [PATCH 04/12] ARM: dts: imx6-tx6: add trickle-charge config for DS1339
+Date: Tue, 17 Oct 2017 10:53:24 +0200
+Subject: [PATCH 02/12] ARM: dts: imx6-tx6: remove obsolete eeti,egalax_ts
 In-Reply-To: <1508230414-8090-1-git-send-email-LW@KARO-electronics.de>
 References: <1508230414-8090-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <1508230414-8090-5-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1508230414-8090-3-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the DS1339 driver now supports enabling the trickle charge feature
-via DTB, add the appropriate properties to utilize this feature.
+The display, that incorporates this touchpanel is obsolete and won't
+be supported any more.
 
 Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 ---
- arch/arm/boot/dts/imx6qdl-tx6.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/imx6dl-tx6u-811x.dts     | 23 +----------------------
+ arch/arm/boot/dts/imx6dl-tx6u-81xx-mb7.dts | 22 +---------------------
+ arch/arm/boot/dts/imx6q-tx6q-1110.dts      | 21 ---------------------
+ arch/arm/boot/dts/imx6q-tx6q-11x0-mb7.dts  | 22 +---------------------
+ 4 files changed, 3 insertions(+), 85 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-tx6.dtsi b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-index c6bec97..a50bf71 100644
---- a/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-@@ -284,6 +284,8 @@
- 	ds1339: rtc at 68 {
- 		compatible = "dallas,ds1339";
- 		reg = <0x68>;
-+		trickle-resistor-ohms = <250>;
-+		trickle-diode-disable;
+diff --git a/arch/arm/boot/dts/imx6dl-tx6u-811x.dts b/arch/arm/boot/dts/imx6dl-tx6u-811x.dts
+index 5e0c6bb..f0f759a 100644
+--- a/arch/arm/boot/dts/imx6dl-tx6u-811x.dts
++++ b/arch/arm/boot/dts/imx6dl-tx6u-811x.dts
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright 2014-2016 Lothar Wa?mann <LW@KARO-electronics.de>
++ * Copyright 2014-2017 Lothar Wa?mann <LW@KARO-electronics.de>
+  *
+  * This file is dual-licensed: you can use it either under the terms
+  * of the GPL or the X11 license, at your option. Note that this dual
+@@ -98,19 +98,6 @@
  	};
  };
  
+-&i2c3 {
+-	polytouch2: eeti at 04 {
+-		compatible = "eeti,egalax_ts";
+-		reg = <0x04>;
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_eeti>;
+-		interrupt-parent = <&gpio3>;
+-		interrupts = <22 0>;
+-		wakeup-gpios = <&gpio3 22 GPIO_ACTIVE_HIGH>;
+-		wakeup-source;
+-	};
+-};
+-
+ &kpp {
+ 	status = "disabled"; /* pad conflict with backlight1 PWM */
+ };
+@@ -168,11 +155,3 @@
+ &pwm1 {
+ 	status = "okay";
+ };
+-
+-&iomuxc {
+-	pinctrl_eeti: eetigrp {
+-		fsl,pins = <
+-			MX6QDL_PAD_EIM_D22__GPIO3_IO22 0x1b0b1 /* Interrupt */
+-		>;
+-	};
+-};
+diff --git a/arch/arm/boot/dts/imx6dl-tx6u-81xx-mb7.dts b/arch/arm/boot/dts/imx6dl-tx6u-81xx-mb7.dts
+index b9a783f..c817324 100644
+--- a/arch/arm/boot/dts/imx6dl-tx6u-81xx-mb7.dts
++++ b/arch/arm/boot/dts/imx6dl-tx6u-81xx-mb7.dts
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright 2016 Lothar Wa?mann <LW@KARO-electronics.de>
++ * Copyright 2016-2017 Lothar Wa?mann <LW@KARO-electronics.de>
+  *
+  * This file is dual-licensed: you can use it either under the terms
+  * of the GPL or the X11 license, at your option. Note that this dual
+@@ -106,18 +106,6 @@
+ 	xceiver-supply = <&reg_3v3>;
+ };
+ 
+-&i2c3 {
+-	polytouch1: eeti at 04 {
+-		compatible = "eeti,egalax_ts";
+-		reg = <0x04>;
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_eeti>;
+-		interrupts-extended = <&gpio3 22 IRQ_TYPE_EDGE_FALLING>;
+-		wakeup-gpios = <&gpio3 22 GPIO_ACTIVE_HIGH>;
+-		wakeup-source;
+-	};
+-};
+-
+ &kpp {
+ 	status = "disabled"; /* pads partially clash with backlight1 PWM */
+ };
+@@ -245,11 +233,3 @@
+ &pwm1 {
+ 	status = "okay";
+ };
+-
+-&iomuxc {
+-	pinctrl_eeti: eetigrp {
+-		fsl,pins = <
+-			MX6QDL_PAD_EIM_D22__GPIO3_IO22 0x1b0b1 /* Interrupt */
+-		>;
+-	};
+-};
+diff --git a/arch/arm/boot/dts/imx6q-tx6q-1110.dts b/arch/arm/boot/dts/imx6q-tx6q-1110.dts
+index 0f5e638..900557d 100644
+--- a/arch/arm/boot/dts/imx6q-tx6q-1110.dts
++++ b/arch/arm/boot/dts/imx6q-tx6q-1110.dts
+@@ -98,19 +98,6 @@
+ 	};
+ };
+ 
+-&i2c3 {
+-	polytouch1: eeti at 04 {
+-		compatible = "eeti,egalax_ts";
+-		reg = <0x04>;
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_eeti>;
+-		interrupt-parent = <&gpio3>;
+-		interrupts = <22 0>;
+-		wakeup-gpios = <&gpio3 22 GPIO_ACTIVE_HIGH>;
+-		wakeup-source;
+-	};
+-};
+-
+ &kpp {
+ 	status = "disabled"; /* pad conflict with backlight1 PWM */
+ };
+@@ -172,11 +159,3 @@
+ &sata {
+ 	status = "okay";
+ };
+-
+-&iomuxc {
+-	pinctrl_eeti: eetigrp {
+-		fsl,pins = <
+-			MX6QDL_PAD_EIM_D22__GPIO3_IO22 0x1b0b1 /* Interrupt */
+-		>;
+-	};
+-};
+diff --git a/arch/arm/boot/dts/imx6q-tx6q-11x0-mb7.dts b/arch/arm/boot/dts/imx6q-tx6q-11x0-mb7.dts
+index d78b129..6b42c44 100644
+--- a/arch/arm/boot/dts/imx6q-tx6q-11x0-mb7.dts
++++ b/arch/arm/boot/dts/imx6q-tx6q-11x0-mb7.dts
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright 2016 Lothar Wa?mann <LW@KARO-electronics.de>
++ * Copyright 2016-2017 Lothar Wa?mann <LW@KARO-electronics.de>
+  *
+  * This file is dual-licensed: you can use it either under the terms
+  * of the GPL or the X11 license, at your option. Note that this dual
+@@ -107,18 +107,6 @@
+ 	xceiver-supply = <&reg_3v3>;
+ };
+ 
+-&i2c3 {
+-	polytouch1: eeti at 04 {
+-		compatible = "eeti,egalax_ts";
+-		reg = <0x04>;
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_eeti>;
+-		interrupts-extended = <&gpio3 22 IRQ_TYPE_EDGE_FALLING>;
+-		wakeup-gpios = <&gpio3 22 GPIO_ACTIVE_HIGH>;
+-		wakeup-source;
+-	};
+-};
+-
+ &ipu2 {
+ 	status = "disabled";
+ };
+@@ -254,11 +242,3 @@
+ &sata {
+ 	status = "okay";
+ };
+-
+-&iomuxc {
+-	pinctrl_eeti: eetigrp {
+-		fsl,pins = <
+-			MX6QDL_PAD_EIM_D22__GPIO3_IO22 0x1b0b1 /* Interrupt */
+-		>;
+-	};
+-};
 -- 
 2.1.4
