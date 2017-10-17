@@ -1,194 +1,106 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Tue, 17 Oct 2017 09:36:51 +0100
-Subject: [RFC 4/7] arm64: irqflags: Use ICC sysregs to implement IRQ
- masking
-In-Reply-To: <20171016211857.GQ1845@lvm>
-References: <1507726862-11944-1-git-send-email-julien.thierry@arm.com>
- <1507726862-11944-5-git-send-email-julien.thierry@arm.com>
- <20171016211857.GQ1845@lvm>
-Message-ID: <86952124-b669-2e97-76fe-2aa30d5735e1@arm.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 17 Oct 2017 10:44:02 +0200
+Subject: [PATCH 2/2] PCI: imx6: Check for link training status in link
+ up check
+In-Reply-To: <20171017001159.109152-2-tpiepho@impinj.com>
+References: <20171017001159.109152-1-tpiepho@impinj.com>
+ <20171017001159.109152-2-tpiepho@impinj.com>
+Message-ID: <1508229842.2146.4.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Am Montag, den 16.10.2017, 17:11 -0700 schrieb Trent Piepho:
+> This fixes a regression introduced in merge 562df5c8521e.
+> 
+> Prior to this the link up check done by imx6_pcie_wait_for_link()
+> consisted of a polling loop on imx6_pcie_link_up() (via the former
+> calling dw_pcie_link_up() which called the latter as callback), and
+> imx6_pcie_link_up() polled the link status register checking for link
+> up *and link not still training*.
+> 
+> This was a polling loop inside another polling loop.??And the outermost
+> loop was duplicated with minor variations in a number of other dwc based
+> host drivers.
+> 
+> This was addressed in two commits.??Commit 4d107d3b5a68 ("PCI: imx6: Move
+> link up check into imx6_pcie_wait_for_link()"), changed
+> imx6_pcie_wait_for_link() to poll the link status register directly,
+> checking for link up and not training, and made imx6_pcie_link_up() only
+> check the link up bit (once, not a polling loop).
+> 
+> While commit commit 886bc5ceb5cc ("PCI: designware: Add generic
+> dw_pcie_wait_for_link()"), replaced the loop in imx6_pcie_wait_for_link()
+> with a call to a new dwc core function, which polled imx6_pcie_link_up(),
+> which still checked both link up and not training in a loop.
+> 
+> When these two commits were merged, the version of
+> imx6_pcie_wait_for_link() from '886 was kept, which eliminated the link
+> training check placed there by '4d1.??But the version of
+> imx6_pcie_link_up() from '4d1 was kept, which eliminated the link training
+> check that had been there and was moved to imx6_pcie_wait_for_link().
+> 
+> There result is no link training check.
+> 
+> Then commit dac29e6c5460 ("PCI: designware: Add default link up check if
+> sub-driver doesn't override")
 
+I think you meant 01c076732e82 (PCI: designware: Check LTSSM training
+bit before deciding link is up) here.
 
-On 16/10/17 22:18, Christoffer Dall wrote:
-> On Wed, Oct 11, 2017 at 02:00:59PM +0100, Julien Thierry wrote:
->> From: Daniel Thompson <daniel.thompson@linaro.org>
->>
->> Currently irqflags is implemented using the PSR's I bit. It is possible
->> to implement irqflags by using the co-processor interface to the GIC.
->> Using the co-processor interface makes it feasible to simulate NMIs
->> using GIC interrupt prioritization.
->>
->> This patch changes the irqflags macros to modify, save and restore
->> ICC_PMR_EL1. This has a substantial knock on effect for the rest of
->> the kernel. There are four reasons for this:
->>
->> 1. The state of the PMR becomes part of the interrupt context and must be
->>     saved and restored during exceptions. It is saved on the stack as part
->>     of the saved context when an interrupt/exception is taken.
->>
->> 2. The hardware automatically masks the I bit (at boot, during traps, etc).
->>     When the I bit is set by hardware we must add code to switch from I
->>     bit masking and PMR masking:
->>         - For IRQs, this is done after the interrupt has been acknowledged
->>         	 avoiding the need to unmask.
->>         - For other exceptions, this is done right after saving the context.
->>
->> 3. Some instructions, such as wfi, require that the PMR not be used
->>     for interrupt masking. Before calling these instructions we must
->>     switch from PMR masking to I bit masking.
->>     This is also the case when KVM runs a guest, if the CPU receives
->>     an interrupt from the host, interrupts must not be masked in PMR
->>     otherwise the GIC will not signal it to the CPU.
->>
->> 4. We use the alternatives system to allow a single kernel to boot and
->>     be switched to the alternative masking approach at runtime.
->>
->> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
->> [julien.thierry at arm.com: changes reflected in commit,
->> 			 message, fixes, renaming]
->> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Christoffer Dall <christoffer.dall@linaro.org>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> Cc: Jason Cooper <jason@lakedaemon.net>
+>  added a link training check to the default
+> version of dw_pcie_link_up(), but since imx6 uses imx6_pcie_link_up() it
+> does not use the default version with this fix.
+> 
+> This commit eliminates imx6_pcie_link_up() so that the default
+> dw_pcie_link_up() is used.??The default has the correct code and is what
+> the imx6 driver used to do.
+> 
+> Fixes: 562df5c8521e1371f3cbd0b7b868034da376d714
+> > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > Cc: Joao Pinto <Joao.Pinto@synopsys.com>
+> > Cc: Lucas Stach <l.stach@pengutronix.de>
+> Signed-off-by: Trent Piepho <tpiepho@impinj.com>
+
+With the commit message fixed:
+
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+
 > ---
+> ?drivers/pci/dwc/pci-imx6.c | 10 +---------
+> ?1 file changed, 1 insertion(+), 9 deletions(-)
 > 
-> I just gave a quick look to the KVM part here but didn't get into
-> whether this rather invasive change is warranted or not (it's definitely
-> entertaining though).
-> 
-
-I appreciate you looking into this, it wasn't very clear to me how to 
-deal with that for KVM.
-
-> [...]
-> 
-> 
->> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->> index e923b58..070e8a5 100644
->> --- a/arch/arm64/include/asm/kvm_host.h
->> +++ b/arch/arm64/include/asm/kvm_host.h
->> @@ -38,6 +38,10 @@
->>   #include <kvm/arm_arch_timer.h>
->>   #include <kvm/arm_pmu.h>
->>
->> +#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
->> +#include <asm/arch_gicv3.h>
->> +#endif
->> +
->>   #define KVM_MAX_VCPUS VGIC_V3_MAX_CPUS
->>
->>   #define KVM_VCPU_MAX_FEATURES 4
->> @@ -332,7 +336,30 @@ int kvm_unmap_hva_range(struct kvm *kvm,
->>   void kvm_arm_resume_guest(struct kvm *kvm);
->>
->>   u64 __kvm_call_hyp(void *hypfn, ...);
->> +
->> +#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
->> +/*
->> + * If we use PMR to disable interrupts, interrupts happening while the
-> 
-> I would describe this as 'masking' interrupts, as opposed to 'disabling'
-> interrupts, in general, and probably we can be more precise by
-> categorizing interrupts as 'normal' vs. 'priority (NMIs)' or something
-> like that.
-> 
-
-Right, I'll do that.
-
->> + * guest is executing will not be signaled to the host by the GIC  (and
-> 
-> signaled to the CPU.  (Whether this then causes an exception to EL2
-> depends on the HCR_EL2.IMO flag and what KVM does with that exception).
-> 
-
-True, I'll fix that.
-
->> + * any call to a waiting kvm_kick_many_cpus will likely cause a
->> + * deadlock).
-> 
-> This kick thing is an unccessary specific example to bring out here, I
-> don't think it adds to the general understanding.
-> 
-
-Yes, makes sense.
-
->> + * We need to switch back to using PSR.I.
->> + */
->> +#define kvm_call_hyp(f, ...)						\
->> +	({								\
->> +		u64 res;						\
->> +		unsigned long flags;					\
->> +									\
->> +		flags = arch_local_irq_save();				\
->> +		gic_end_pmr_masking();					\
->> +		res = __kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__);	\
->> +		gic_start_pmr_masking();				\
->> +		arch_local_irq_restore(flags);				\
->> +		res;							\
-> 
-> This is in the critical path, so ideally this could instead be done
-> inside the function, because the trap will set PSTATE.I already, so it
-> should be possible to reduce this to a set of save/clear/restore
-> operations after __kvm_call_hyp.
-
-Hmmm, you are talking about the function called by __kvm_call_hyp, right?
-
-But this means we'll need to add the save/clear/restore to each function 
-that can be called by __kvm_call_hyp, no?
-
-Also in the VHE case we don't have the trap setting the PSTATE.I (the 
-code calling kvm_call_hyp disables interrupts before entering the guest, 
-but now the function disabling interrupts is just masking them with PMR).
-
-> 
->> +	})
->> +#else
->>   #define kvm_call_hyp(f, ...) __kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__)
->> +#endif
->>
->>   void force_vm_exit(const cpumask_t *mask);
->>   void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
->> @@ -349,6 +376,9 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
->>   				       unsigned long hyp_stack_ptr,
->>   				       unsigned long vector_ptr)
->>   {
->> +#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
->> +	unsigned long flags;
->> +#endif
->>   	/*
->>   	 * Call initialization code, and switch to the full blown HYP code.
->>   	 * If the cpucaps haven't been finalized yet, something has gone very
->> @@ -356,7 +386,17 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
->>   	 * cpus_have_const_cap() wrapper.
->>   	 */
->>   	BUG_ON(!static_branch_likely(&arm64_const_caps_ready));
->> +#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
->> +	flags = arch_local_irq_save();
->> +	gic_end_pmr_masking();
->> +#endif
->> +
->>   	__kvm_call_hyp((void *)pgd_ptr, hyp_stack_ptr, vector_ptr);
->> +
->> +#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
->> +	gic_start_pmr_masking();
->> +	arch_local_irq_restore(flags);
->> +#endif
-> 
-> I don't think you need any of this, because I don't think you'd ever
-> need to handle interrupts while initializing hyp mode.
-> 
-
-I was more worried about getting an "NMI" during the EL2 initialisation 
-rather than missing the masked interrupts. Do you know whether this 
-might be an issue here or not?
-
-Thanks,
-
--- 
-Julien Thierry
+> diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c
+> index b73483534a5b..1f1069b70e45 100644
+> --- a/drivers/pci/dwc/pci-imx6.c
+> +++ b/drivers/pci/dwc/pci-imx6.c
+> @@ -83,8 +83,6 @@ struct imx6_pcie {
+> > ?#define PCIE_PL_PFLR_FORCE_LINK			(1 << 15)
+> ?#define PCIE_PHY_DEBUG_R0 (PL_OFFSET + 0x28)
+> ?#define PCIE_PHY_DEBUG_R1 (PL_OFFSET + 0x2c)
+> > -#define PCIE_PHY_DEBUG_R1_XMLH_LINK_IN_TRAINING	(1 << 29)
+> > -#define PCIE_PHY_DEBUG_R1_XMLH_LINK_UP		(1 << 4)
+> ?
+> ?#define PCIE_PHY_CTRL (PL_OFFSET + 0x114)
+> ?#define PCIE_PHY_CTRL_DATA_LOC 0
+> @@ -653,12 +651,6 @@ static int imx6_pcie_host_init(struct pcie_port *pp)
+> > ?	return 0;
+> ?}
+> ?
+> -static int imx6_pcie_link_up(struct dw_pcie *pci)
+> -{
+> > -	return dw_pcie_readl_dbi(pci, PCIE_PHY_DEBUG_R1) &
+> > -			PCIE_PHY_DEBUG_R1_XMLH_LINK_UP;
+> -}
+> -
+> ?static const struct dw_pcie_host_ops imx6_pcie_host_ops = {
+> > ?	.host_init = imx6_pcie_host_init,
+> ?};
+> @@ -701,7 +693,7 @@ static int imx6_add_pcie_port(struct imx6_pcie *imx6_pcie,
+> ?}
+> ?
+> ?static const struct dw_pcie_ops dw_pcie_ops = {
+> > -	.link_up = imx6_pcie_link_up,
+> > +	/* No special ops needed, but pcie-designware still expects this struct */
+> ?};
+> ?
+> ?static int imx6_pcie_probe(struct platform_device *pdev)
