@@ -1,37 +1,48 @@
 From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
-Date: Tue, 17 Oct 2017 13:41:01 +0900
-Subject: [PATCH v3 0/3] add UniPhier efuse support
-Message-ID: <1508215264-3745-1-git-send-email-hayashibara.keiji@socionext.com>
+Date: Tue, 17 Oct 2017 13:41:04 +0900
+Subject: [PATCH v3 3/3] arm64: dts: uniphier: add efuse node for LD20
+In-Reply-To: <1508215264-3745-1-git-send-email-hayashibara.keiji@socionext.com>
+References: <1508215264-3745-1-git-send-email-hayashibara.keiji@socionext.com>
+Message-ID: <1508215264-3745-4-git-send-email-hayashibara.keiji@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for eFuse implemented on UniPhier LD20 SoCs.
-The eFuse device is under soc-glue and this register implements as read only.
+Add efuse node for UniPhier LD20 SoC.
+This efuse node is included in soc-glue.
 
-patch v1
-https://lkml.org/lkml/2017/8/31/880
+Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
+---
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-patch v2
-https://lkml.org/lkml/2017/10/6/20
-
-Changes between v3 and v2
-=========================
-1. Fix use of '_' in dt-binnding documentation.
-
-
-Keiji Hayashibara (3):
-  dt-bindings: nvmem: add description for UniPhier eFuse
-  nvmem: uniphier: add UniPhier eFuse driver
-  arm64: dts: uniphier: add efuse node for LD20
-
- .../devicetree/bindings/nvmem/uniphier-efuse.txt   | 49 +++++++++++
- arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi   | 18 ++++
- drivers/nvmem/Kconfig                              | 11 +++
- drivers/nvmem/Makefile                             |  2 +
- drivers/nvmem/uniphier-efuse.c                     | 97 ++++++++++++++++++++++
- 5 files changed, 177 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt
- create mode 100644 drivers/nvmem/uniphier-efuse.c
-
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+index a29c279..ddefde6 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+@@ -376,6 +376,24 @@
+ 			};
+ 		};
+ 
++		soc-glue at 5f900000 {
++			compatible = "socionext,uniphier-ld20-soc-glue-debug",
++				     "simple-mfd";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0x0 0x5f900000 0x2000>;
++
++			efuse at 100 {
++				compatible = "socionext,uniphier-efuse";
++				reg = <0x100 0x28>;
++			};
++
++			efuse at 200 {
++				compatible = "socionext,uniphier-efuse";
++				reg = <0x200 0x68>;
++			};
++		};
++
+ 		aidet: aidet at 5fc20000 {
+ 			compatible = "socionext,uniphier-ld20-aidet";
+ 			reg = <0x5fc20000 0x200>;
 -- 
 2.7.4
