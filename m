@@ -1,84 +1,174 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 17 Oct 2017 11:06:07 +0200
-Subject: [PATCH 00/23] drm/sun4i: Add A83t LVDS support
-Message-ID: <cover.fe3d65d1ee05a55224d26e7d113388c428592b26.1508231063.git-series.maxime.ripard@free-electrons.com>
+Date: Tue, 17 Oct 2017 11:06:08 +0200
+Subject: [PATCH 01/23] drm/sun4i: Implement endpoint parsing using kfifo
+In-Reply-To: <cover.fe3d65d1ee05a55224d26e7d113388c428592b26.1508231063.git-series.maxime.ripard@free-electrons.com>
+References: <cover.fe3d65d1ee05a55224d26e7d113388c428592b26.1508231063.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <4ecb323e787918208f6a5d9f0ebba12c62583c98.1508231063.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The commit da82b8785eeb ("drm/sun4i: add components in breadth first
+traversal order") implemented a breadth first traversal of our device tree
+nodes graph. However, it was relying on the kernel linked lists, and those
+are not really safe for addition.
 
-Here is an attempt at supporting the LVDS output in our DRM driver. This
-has been tested on the A83T (with DE2), but since everything is basically
-in the TCON, it should also be usable on the older SoCs with minor
-modifications.
+Indeed, in a single pipeline stage, your first stage (ie, the mixer or
+fronted) will be queued, and it will be the final iteration of that list as
+far as list_for_each_entry_safe is concerned. Then, during that final
+iteration, we'll queue another element (the TCON or the backend) that
+list_for_each_entry_safe will not account for, and we will leave the loop
+without having iterated over all the elements. And since we won't have
+built our components list properly, the DRM driver will be left
+non-functional.
 
-This was the occasion to refactor a bunch of things. The most notable ones
-would be the documentation, and split of the UI layers in the mixer code,
-and the switch to kfifo for our endpoint parsing code in the driver that
-fixes an issue introduced by the switch to BFS.
+We can instead use a kfifo to queue and enqueue components in-order, as was
+the original intention. This also has the benefit of removing any dynamic
+allocation, making the error handling path simpler too. The only thing
+we're losing is the ability to tell whether an element has already been
+queued, but that was only needed to remove spurious logs, and therefore
+purely cosmetic.
 
-Let me know what you think,
-Maxime
+This means that this commit effectively reverses e8afb7b67fba ("drm/sun4i:
+don't add components that are already in the queue").
 
-Maxime Ripard (23):
-  drm/sun4i: Implement endpoint parsing using kfifo
-  drm/sun4i: Realign Makefile padding and reorder it
-  drm/sun4i: tcon: Make tcon_set_mux mode argument const
-  drm/sun4i: tcon: Make tcon_get_clk_delay mode argument const
-  drm/sun4i: tcon: Don't rely on encoders to enable the TCON
-  drm/sun4i: tcon: Don't rely on encoders to set the TCON mode
-  drm/sun4i: tcon: Move out the tcon0 common setup
-  dt-bindings: panel: lvds: Document power-supply property
-  drm/panel: lvds: Add support for the power-supply property
-  clk: sunxi-ng: Add A83T display clocks
-  drm/sun4i: Rename layers to UI planes
-  drm/sun4i: sun8i: properly support UI channels
-  drm/sun4i: Reorder and document DE2 mixer registers
-  drm/sun4i: Create minimal multipliers and dividers
-  drm/sun4i: Add LVDS support
-  drm/sun4i: Add A83T support
-  arm: dts: sun8i: a83t: Add display pipeline
-  arm: dts: sun8i: a83t: Enable the PWM
-  arm: dts: sun8i: a83t: Add LVDS pins group
-  arm: dts: sun8i: a83t: Add the PWM pin group
-  arm: dts: sun8i: a711: Add regulator support
-  arm: dts: sun8i: a711: Enable USB OTG
-  arm: dts: sun8i: a711: Enable the LCD
+Fixes: da82b8785eeb ("drm/sun4i: add components in breadth first traversal order")
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/gpu/drm/sun4i/sun4i_drv.c | 71 +++++---------------------------
+ 1 file changed, 13 insertions(+), 58 deletions(-)
 
- Documentation/devicetree/bindings/display/panel/panel-common.txt |   6 +-
- Documentation/devicetree/bindings/display/panel/panel-lvds.txt   |   1 +-
- Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt    |   3 +-
- arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts                        | 232 +++++++++++++++++++++++++++++++++++++++++++++++++--
- arch/arm/boot/dts/sun8i-a83t.dtsi                                | 100 ++++++++++++++++++++++-
- drivers/clk/sunxi-ng/ccu-sun8i-de2.c                             |  21 +++--
- drivers/gpu/drm/panel/panel-lvds.c                               |  23 +++++-
- drivers/gpu/drm/sun4i/Makefile                                   |  29 +++---
- drivers/gpu/drm/sun4i/sun4i_crtc.c                               |  32 ++++++-
- drivers/gpu/drm/sun4i/sun4i_dotclock.c                           |  10 +-
- drivers/gpu/drm/sun4i/sun4i_drv.c                                |  73 +++-------------
- drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c                       |   1 +-
- drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c                           |  15 +---
- drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c                      |   1 +-
- drivers/gpu/drm/sun4i/sun4i_lvds.c                               | 183 ++++++++++++++++++++++++++++++++++++++++-
- drivers/gpu/drm/sun4i/sun4i_lvds.h                               |  18 ++++-
- drivers/gpu/drm/sun4i/sun4i_rgb.c                                |  29 +------
- drivers/gpu/drm/sun4i/sun4i_tcon.c                               | 326 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-------------
- drivers/gpu/drm/sun4i/sun4i_tcon.h                               |  50 +++++++----
- drivers/gpu/drm/sun4i/sun4i_tv.c                                 |  12 +---
- drivers/gpu/drm/sun4i/sun8i_layer.c                              | 134 +------------------------------
- drivers/gpu/drm/sun4i/sun8i_layer.h                              |  36 +--------
- drivers/gpu/drm/sun4i/sun8i_mixer.c                              |  81 ++++++++----------
- drivers/gpu/drm/sun4i/sun8i_mixer.h                              | 101 ++++++++++++----------
- drivers/gpu/drm/sun4i/sun8i_ui.c                                 | 136 ++++++++++++++++++++++++++++++-
- drivers/gpu/drm/sun4i/sun8i_ui.h                                 |  37 ++++++++-
- 26 files changed, 1212 insertions(+), 478 deletions(-)
- create mode 100644 drivers/gpu/drm/sun4i/sun4i_lvds.c
- create mode 100644 drivers/gpu/drm/sun4i/sun4i_lvds.h
- delete mode 100644 drivers/gpu/drm/sun4i/sun8i_layer.c
- delete mode 100644 drivers/gpu/drm/sun4i/sun8i_layer.h
- create mode 100644 drivers/gpu/drm/sun4i/sun8i_ui.c
- create mode 100644 drivers/gpu/drm/sun4i/sun8i_ui.h
-
-base-commit: 5ffd95d0dc16c6491631b6ca19403c96fd3db5d5
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index b5879d4620d8..a27efad9bc76 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -11,6 +11,7 @@
+  */
+ 
+ #include <linux/component.h>
++#include <linux/kfifo.h>
+ #include <linux/of_graph.h>
+ #include <linux/of_reserved_mem.h>
+ 
+@@ -222,29 +223,15 @@ static int compare_of(struct device *dev, void *data)
+  * matching system handles this for us.
+  */
+ struct endpoint_list {
+-	struct device_node *node;
+-	struct list_head list;
++	DECLARE_KFIFO(fifo, struct device_node *, 16);
+ };
+ 
+-static bool node_is_in_list(struct list_head *endpoints,
+-			    struct device_node *node)
+-{
+-	struct endpoint_list *endpoint;
+-
+-	list_for_each_entry(endpoint, endpoints, list)
+-		if (endpoint->node == node)
+-			return true;
+-
+-	return false;
+-}
+-
+ static int sun4i_drv_add_endpoints(struct device *dev,
+-				   struct list_head *endpoints,
++				   struct endpoint_list *list,
+ 				   struct component_match **match,
+ 				   struct device_node *node)
+ {
+ 	struct device_node *port, *ep, *remote;
+-	struct endpoint_list *endpoint;
+ 	int count = 0;
+ 
+ 	/*
+@@ -304,19 +291,7 @@ static int sun4i_drv_add_endpoints(struct device *dev,
+ 			}
+ 		}
+ 
+-		/* skip downstream node if it is already in the queue */
+-		if (node_is_in_list(endpoints, remote))
+-			continue;
+-
+-		/* Add downstream nodes to the queue */
+-		endpoint = kzalloc(sizeof(*endpoint), GFP_KERNEL);
+-		if (!endpoint) {
+-			of_node_put(remote);
+-			return -ENOMEM;
+-		}
+-
+-		endpoint->node = remote;
+-		list_add_tail(&endpoint->list, endpoints);
++		kfifo_put(&list->fifo, remote);
+ 	}
+ 
+ 	return count;
+@@ -325,10 +300,11 @@ static int sun4i_drv_add_endpoints(struct device *dev,
+ static int sun4i_drv_probe(struct platform_device *pdev)
+ {
+ 	struct component_match *match = NULL;
+-	struct device_node *np = pdev->dev.of_node;
+-	struct endpoint_list *endpoint, *endpoint_temp;
++	struct device_node *np = pdev->dev.of_node, *endpoint;
++	struct endpoint_list list;
+ 	int i, ret, count = 0;
+-	LIST_HEAD(endpoints);
++
++	INIT_KFIFO(list.fifo);
+ 
+ 	for (i = 0;; i++) {
+ 		struct device_node *pipeline = of_parse_phandle(np,
+@@ -337,31 +313,19 @@ static int sun4i_drv_probe(struct platform_device *pdev)
+ 		if (!pipeline)
+ 			break;
+ 
+-		endpoint = kzalloc(sizeof(*endpoint), GFP_KERNEL);
+-		if (!endpoint) {
+-			ret = -ENOMEM;
+-			goto err_free_endpoints;
+-		}
+-
+-		endpoint->node = pipeline;
+-		list_add_tail(&endpoint->list, &endpoints);
++		kfifo_put(&list.fifo, pipeline);
+ 	}
+ 
+-	list_for_each_entry_safe(endpoint, endpoint_temp, &endpoints, list) {
++	while (kfifo_get(&list.fifo, &endpoint)) {
+ 		/* process this endpoint */
+-		ret = sun4i_drv_add_endpoints(&pdev->dev, &endpoints, &match,
+-					      endpoint->node);
++		ret = sun4i_drv_add_endpoints(&pdev->dev, &list, &match,
++					      endpoint);
+ 
+ 		/* sun4i_drv_add_endpoints can fail to allocate memory */
+ 		if (ret < 0)
+-			goto err_free_endpoints;
++			return ret;
+ 
+ 		count += ret;
+-
+-		/* delete and cleanup the current entry */
+-		list_del(&endpoint->list);
+-		of_node_put(endpoint->node);
+-		kfree(endpoint);
+ 	}
+ 
+ 	if (count)
+@@ -370,15 +334,6 @@ static int sun4i_drv_probe(struct platform_device *pdev)
+ 						       match);
+ 	else
+ 		return 0;
+-
+-err_free_endpoints:
+-	list_for_each_entry_safe(endpoint, endpoint_temp, &endpoints, list) {
+-		list_del(&endpoint->list);
+-		of_node_put(endpoint->node);
+-		kfree(endpoint);
+-	}
+-
+-	return ret;
+ }
+ 
+ static int sun4i_drv_remove(struct platform_device *pdev)
 -- 
 git-series 0.9.1
