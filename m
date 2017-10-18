@@ -1,80 +1,82 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Wed, 18 Oct 2017 12:00:07 +0200
-Subject: [PATCH v3 02/20] arm64: Use physical counter for in-kernel reads
-In-Reply-To: <20171017153305.GB19711@arm.com>
-References: <20170923004207.22356-1-cdall@linaro.org>
- <20170923004207.22356-3-cdall@linaro.org>
- <20171017153305.GB19711@arm.com>
-Message-ID: <20171018100007.GK8326@lvm>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 18 Oct 2017 12:00:31 +0200
+Subject: [PATCH v5 02/12] mmc: mediatek: add support of mt2701/mt2712
+In-Reply-To: <1508291195.30936.7.camel@mtksdaap41>
+References: <1507689696-25928-1-git-send-email-chaotian.jing@mediatek.com>
+ <1507689696-25928-3-git-send-email-chaotian.jing@mediatek.com>
+ <1508055978.8978.5.camel@mtksdaap41>
+ <a506506b-a326-6d54-9827-4fd82680700d@gmail.com>
+ <1508291195.30936.7.camel@mtksdaap41>
+Message-ID: <42effbc0-ec5d-d99a-ca00-bdeaf3bcdc8d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 04:33:05PM +0100, Will Deacon wrote:
-> Hi Christoffer,
+
+
+On 10/18/2017 03:46 AM, CK Hu wrote:
+> Hi, Matthias:
 > 
-> On Sat, Sep 23, 2017 at 02:41:49AM +0200, Christoffer Dall wrote:
-> > Using the physical counter allows KVM to retain the offset between the
-> > virtual and physical counter as long as it is actively running a VCPU.
-> > 
-> > As soon as a VCPU is released, another thread is scheduled or we start
-> > running userspace applications, we reset the offset to 0, so that
-> > userspace accessing the virtual timer can still read the cirtual counter
-> > and get the same view of time as the kernel.
-> > 
-> > This opens up potential improvements for KVM performance.
-> > 
-> > VHE kernels or kernels continuing to use the virtual timer are
-> > unaffected.
-> > 
-> > Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> > ---
-> >  arch/arm64/include/asm/arch_timer.h  | 9 ++++-----
-> >  drivers/clocksource/arm_arch_timer.c | 3 +--
-> >  2 files changed, 5 insertions(+), 7 deletions(-)
-> > 
-> > diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-> > index a652ce0..1859a1c 100644
-> > --- a/arch/arm64/include/asm/arch_timer.h
-> > +++ b/arch/arm64/include/asm/arch_timer.h
-> > @@ -148,11 +148,10 @@ static inline void arch_timer_set_cntkctl(u32 cntkctl)
-> >  
-> >  static inline u64 arch_counter_get_cntpct(void)
-> >  {
-> > -	/*
-> > -	 * AArch64 kernel and user space mandate the use of CNTVCT.
-> > -	 */
-> > -	BUG();
-> > -	return 0;
-> > +	u64 cval;
-> > +	isb();
-> > +	asm volatile("mrs %0, cntpct_el0" : "=r" (cval));
-> > +	return cval;
-> >  }
-> >  
-> >  static inline u64 arch_counter_get_cntvct(void)
-> > diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> > index fd4b7f6..9b3322a 100644
-> > --- a/drivers/clocksource/arm_arch_timer.c
-> > +++ b/drivers/clocksource/arm_arch_timer.c
-> > @@ -890,8 +890,7 @@ static void __init arch_counter_register(unsigned type)
-> >  
-> >  	/* Register the CP15 based counter if we have one */
-> >  	if (type & ARCH_TIMER_TYPE_CP15) {
-> > -		if (IS_ENABLED(CONFIG_ARM64) ||
-> > -		    arch_timer_uses_ppi == ARCH_TIMER_VIRT_PPI)
-> > +		if (arch_timer_uses_ppi == ARCH_TIMER_VIRT_PPI)
+> On Mon, 2017-10-16 at 09:49 +0200, Matthias Brugger wrote:
+>>
+>> On 10/15/2017 10:26 AM, CK Hu wrote:
+>>> Hi, Chaotian:
+>>>
+>>> On Wed, 2017-10-11 at 10:41 +0800, Chaotian Jing wrote:
+>>>> mt2701/mt2712 has 12bit clock div, which is not compatible with
+>>>> mt8135/mt8173. and, some additional features will be added in
+>>>> mt2701/mt2712, so that need distinguish it by comatibale name.
+>>>>
+>>>> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+>>>> ---
+>>>>    drivers/mmc/host/mtk-sd.c | 82 +++++++++++++++++++++++++++++++++++++++--------
+>>>>    1 file changed, 69 insertions(+), 13 deletions(-)
+>>>>
+>>>> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+>>>> index 267f7ab..643c795 100644
+>>>> --- a/drivers/mmc/host/mtk-sd.c
+>>>> +++ b/drivers/mmc/host/mtk-sd.c
+>> [...]
+>>>> @@ -350,6 +358,31 @@ struct msdc_host {
+>>>>    	struct msdc_tune_para saved_tune_para; /* tune result of CMD21/CMD19 */
+>>>>    };
+>>>>    
+>>>> +static const struct mtk_mmc_compatible mt8135_compat = {
+>>>> +	.clk_div_bits = 8,
+>>>> +};
+>>>> +
+>>>> +static const struct mtk_mmc_compatible mt8173_compat = {
+>>>> +	.clk_div_bits = 8,
+>>>> +};
+>>>> +
+>>>> +static const struct mtk_mmc_compatible mt2701_compat = {
+>>>> +	.clk_div_bits = 12,
+>>>> +};
+>>>> +
+>>>> +static const struct mtk_mmc_compatible mt2712_compat = {
+>>>> +	.clk_div_bits = 12,
+>>>> +};
+>>>> +
+>>>> +static const struct of_device_id msdc_of_ids[] = {
+>>>> +	{ .compatible = "mediatek,mt8135-mmc", .data = &mt8135_compat},
+>>>> +	{ .compatible = "mediatek,mt8173-mmc", .data = &mt8173_compat},
+>>>
+>>> Because mt8135_compat is equal to mt8173_compat, so I think the
+>>> compatible of "mediatek,mt8173-mmc" is redundant. You could just keep
+>>> compatible of "mediatek,mt8135-mmc" in driver, and use
+>>> "mediatek,mt8135-mmc" for both mt8135.dtsi and mt8173.dtsi.
+>>>
+>>
+>> Well thing is, that in the follow-up patches, new data types get added to the
+>> different compat structures and in the end all four a different.
 > 
-> Please can you add an is_hyp_mode_available() check here, as you suggested
-> last time?
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-July/521542.html
-> 
-> Without it, I worry that the kernel timekeeper will be out of sync with the
-> vDSO (which uses the virtual counter) on systems where CNTVOFF is
-> initialised to a consistent non-zero offset and Linux was loaded at EL1.
+> You are right, these modification are necessary. If so, adding
+> "mediatek,mt8173-mmc" in the patch of "add support of mt2701/mt2712"
+> looks irrelevant. Maybe the title should be modified as "add support of
+> mt8173/mt2701/mt2712" or move mt8173 part to another patch.
 > 
 
-Yes, will do.
+I would prefer to split it in two patches. But I leave that to Ulf to decide 
+what he prefers.
 
-Thanks,
--Christoffer
+Regards,
+Matthias
