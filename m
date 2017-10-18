@@ -1,87 +1,89 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 18 Oct 2017 15:45:10 +0100
-Subject: [PATCH v3 02/28] arm64: KVM: Hide unsupported AArch64 CPU
- features from guests
-In-Reply-To: <20171018132026.GE8900@cbox>
+Date: Wed, 18 Oct 2017 16:00:05 +0100
+Subject: [PATCH v3 22/28] arm64/sve: KVM: Prevent guests from using SVE
+In-Reply-To: <20171018132323.GG8900@cbox>
 References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
- <1507660725-7986-3-git-send-email-Dave.Martin@arm.com>
- <20171017135145.GT1845@lvm>
- <d7b9fac4-1a71-d7be-822a-1898f133aa70@arm.com>
- <20171018132026.GE8900@cbox>
-Message-ID: <20171018144509.GZ19485@e103592.cambridge.arm.com>
+ <1507660725-7986-23-git-send-email-Dave.Martin@arm.com>
+ <20171017115024.GS1845@lvm>
+ <20171017143142.GX19485@e103592.cambridge.arm.com>
+ <20171018132323.GG8900@cbox>
+Message-ID: <20171018150004.GA19485@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 18, 2017 at 03:20:26PM +0200, Christoffer Dall wrote:
-> On Tue, Oct 17, 2017 at 03:08:40PM +0100, Marc Zyngier wrote:
-> > On 17/10/17 14:51, Christoffer Dall wrote:
-> > > On Tue, Oct 10, 2017 at 07:38:19PM +0100, Dave Martin wrote:
-
-[...]
-
-> > >> +/* sys_reg_desc initialiser for known cpufeature ID registers */
-> > >> +#define ID_SANITISED(name) {			\
-> > >> +	SYS_DESC(SYS_##name),			\
-> > >> +	.access	= access_id_reg,		\
-> > >> +	.get_user = get_id_reg,			\
-> > >> +	.set_user = set_id_reg,			\
-> > >> +}
-> > >> +
-> > >> +/*
-> > >> + * sys_reg_desc initialiser for architecturally unallocated cpufeature ID
-> > >> + * register with encoding Op0=3, Op1=0, CRn=0, CRm=crm, Op2=op2
-> > >> + * (1 <= crm < 8, 0 <= Op2 < 8).
-> > >> + */
-> > >> +#define ID_UNALLOCATED(crm, op2) {			\
-> > >> +	Op0(3), Op1(0), CRn(0), CRm(crm), Op2(op2),	\
-> > >> +	.access = access_raz_id_reg,			\
-> > >> +	.get_user = get_raz_id_reg,			\
-> > >> +	.set_user = set_raz_id_reg,			\
-> > >> +}
-> > >> +
-> > >> +/*
-> > >> + * sys_reg_desc initialiser for known ID registers that we hide from guests.
-> > >> + * For now, these are exposed just like unallocated ID regs: they appear
-> > >> + * RAZ for the guest.
-> > >> + */
+On Wed, Oct 18, 2017 at 03:23:23PM +0200, Christoffer Dall wrote:
+> On Tue, Oct 17, 2017 at 03:31:42PM +0100, Dave Martin wrote:
+> > On Tue, Oct 17, 2017 at 01:50:24PM +0200, Christoffer Dall wrote:
+> > > On Tue, Oct 10, 2017 at 07:38:39PM +0100, Dave Martin wrote:
+> > > > Until KVM has full SVE support, guests must not be allowed to
+> > > > execute SVE instructions.
+> > > > 
+> > > > This patch enables the necessary traps, and also ensures that the
+> > > > traps are disabled again on exit from the guest so that the host
+> > > > can still use SVE if it wants to.
+> > > > 
+> > > > This patch introduces another instance of
+> > > > __this_cpu_write(fpsimd_last_state, NULL), so this flush operation
+> > > > is abstracted out as a separate helper fpsimd_flush_cpu_state().
+> > > > Other instances are ported appropriately.
 > > > 
-> > > What is a hidden ID register as opposed to an unallocated one?
+> > > I don't understand this paragraph, beginning from ", so this...".
+> > > 
+> > > 
+> > > From reading the code, what I think is the reason for having to flush
+> > > the SVE state (and mark the host state invalid) is that even though we
+> > > disallow SVE usage in the guest, the guest can use the normal FP state,
+> > > and while we always fully preserve the host state, this could still
+> > > corrupt some additional SVE state not properly preserved for the host.
+> > > Is that correct?
 > > 
-> > A hidden register is one where all the features have been removed (RAZ),
-> > making it similar to an unallocated one.
+> > Yes, that's right: the guest can't touch the SVE-specific registers
+> > Pn/FFR, but FPSIMD accesses to Vn regs cause the high bits of the
+> > corresponding SVE Zn registers to be clobbered.  In any case, the
+> > FPSIMD restore done by KVM after guest exit is sufficient to clobber
+> > those bits even if the guest didn't do it.
 > > 
-> > > Shouldn't one of them presumably cause an undefined exception in the
-> > > guest?
+> > This is a band-aid for not making the KVM world switch code properly
+> > SVE-aware yet.
 > > 
-> > No, that'd be a violation of the architecture. The unallocated ID
-> > registers are required to be RAZ (see table D9-2 in D9.3.1), so that
-> > software can probe for feature without running the risk of getting an UNDEF.
+> > Does the following wording sound better:
 > > 
-> Then I'm not really sure why we need the two defines.  Is that just to
-> make it clear what the different rationales for dealing with various
-> registers in the same way are?
+> > --8<--
+> > 
+> > On guest exit, high bits of the SVE Zn registers may have been
+> > clobbered as a side-effect the execution of FPSIMD instructions in
+> > the guest.  The existing KVM host FPSIMD restore code is not
+> > sufficient to restore these bits, so this patch explicitly marks
+> > the CPU as not containing cached vector state for any task, this
+> > forcing a reload on the next return to userspace.  This is an
+> > interim measure, in advance of adding full SVE awareness to KVM.
+> > 
+> > Because of the duplication of this operation
+> > (__this_cpu_write(fpsimd_last_state, NULL)), it is factored out as
+> 
+> s/it is/is/  (I think)
+> 
+> > a new helper fpsimd_flush_cpu_state() to make the purpose clearer.
+> 
+> Yes, the wording is good and helps a lot.  Thanks for writing that.
+> 
 
-Basically yes.
+I think it "it is" is correct, but it's a pretty ghastly sentence...
 
-ID_HIDDEN() means we are bodging around something that we don't know
-how to sanitise, whereas ID_UNALLOCATED() means that we follow the
-architecture in returning zero for reads (maybe following an older
-architecture version than the silicon).  
+I'll split it as:
 
-ID_HIDDEN()s may need to evolve SoC-specific quirkage if we need to
-expose non-architectural SoC-specific features via the mechanism.
-These should never simply be exposed unless the architecture is
-tightened in the future in such a way as to make this safe (unlikely).
+This marking of cached vector state in the CPU as invalid is done using
+__this_cpu_write(fpsimd_last_state, NULL) in fpsimd.c.  Due to the
+repeated use of this rather obscure operation, it makes sense to factor
+it out as a separate helper with a clearer name.  This patch factors it
+out as fpsimd_flush_cpu_state().
 
-ID_UNALLOCATED()s OTOH will mostly turn into ID_SANITISED() as the
-architecture gains new features.  The architecture could allocate new
-IMP DEF feature regs though, in which case they would become ID_HIDDEN()
-as soon as we know about them.
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 
+I'll assume I can keep keep your Reviewed-by, since this change is just
+clarification.
 
-The distinction is drawn in attempt to help maintainers: the future
-maintenance requirements for IN_UNALLOCATED()s will differ from
-ID_HIDDEN()s.
+But if you're not happy, please shout!
 
 Cheers
 ---Dave
