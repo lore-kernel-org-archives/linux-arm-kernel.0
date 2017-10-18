@@ -1,36 +1,31 @@
 From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 18 Oct 2017 20:31:27 +0200 (CEST)
-Subject: [PATCH v6 2/5] clocksource: stm32: convert driver to timer_of
-In-Reply-To: <1508331506-23782-3-git-send-email-benjamin.gaignard@linaro.org>
+Date: Wed, 18 Oct 2017 20:35:51 +0200 (CEST)
+Subject: [PATCH v6 3/5] clocksource: stm32: only use 32 bits timers
+In-Reply-To: <1508331506-23782-4-git-send-email-benjamin.gaignard@linaro.org>
 References: <1508331506-23782-1-git-send-email-benjamin.gaignard@linaro.org>
- <1508331506-23782-3-git-send-email-benjamin.gaignard@linaro.org>
-Message-ID: <alpine.DEB.2.20.1710182028080.2477@nanos>
+ <1508331506-23782-4-git-send-email-benjamin.gaignard@linaro.org>
+Message-ID: <alpine.DEB.2.20.1710182032170.2477@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, 18 Oct 2017, Benjamin Gaignard wrote:
 
-> Convert driver to use timer_of helpers. This allow to remove
-> custom proprietary structure.
-> 
-> Increase min delta value because if it is too small it could
-> generate too much interrupts and the system will not be able
-> to catch them all.
+> 16 bits hardware are not enough accure to be used.
 
-This does two completely independent changes at once. What the heck has
-increasing min delta to do with converting it to timer_of() helpers?
+That should probably read:
 
-Nothing at all. So please split this into two distinct patches. Each doing
-ONE thing.
+  16 bit counters are not accurate enough to be used.
 
-See Documentation/process/submitting-patches.rst:
+Right?
 
-  3) Separate your changes
-  ------------------------
+> Do no allow them to be probed by tested max counter value.
 
-  Separate each **logical change** into a separate patch.
+I really do not understand why you want to do this. Accuracy is not really
+a reason to dismiss working hardware right away. What you can do is to
+lower the rating so other eventually available hardware will be preferred.
 
-Reading, understanding and complying with that document is not optional.
+I might be missing something, but if so this is obviously missing in the
+changelog.
 
 Thanks,
 
