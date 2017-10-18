@@ -1,71 +1,59 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Wed, 18 Oct 2017 10:02:46 +0100
-Subject: [PATCH 3/4] spi: imx: Don't require platform data chipselect array
-In-Reply-To: <20171013195410.30767-3-tpiepho@impinj.com>
-References: <20171013195410.30767-1-tpiepho@impinj.com>
- <20171013195410.30767-3-tpiepho@impinj.com>
-Message-ID: <36d381de-ee3f-26d4-59c3-b9d361758ace@arm.com>
+From: eugen.hristev@microchip.com (Eugen Hristev)
+Date: Wed, 18 Oct 2017 11:49:46 +0300
+Subject: [PATCH v2 5/5] iio: adc: at91-sama5d2_adc: use max sample rate
+In-Reply-To: <20171015112847.5c035e7a@archlinux>
+References: <1507703732-29175-1-git-send-email-eugen.hristev@microchip.com>
+ <1507703732-29175-6-git-send-email-eugen.hristev@microchip.com>
+ <20171015112847.5c035e7a@archlinux>
+Message-ID: <14117d77-00b8-66eb-922c-e56f624633f5@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Trent,
 
-On 13/10/17 20:54, Trent Piepho wrote:
-> If the array is not present, assume all chip selects are native.  This
-> is the standard behavior for SPI masters configured via the device
-> tree and the behavior of this driver as well when it is configured via
-> device tree.
+
+On 15.10.2017 13:28, Jonathan Cameron wrote:
+> On Wed, 11 Oct 2017 09:35:32 +0300
+> Eugen Hristev <eugen.hristev@microchip.com> wrote:
 > 
-> This reduces platform data vs DT differences and allows most of the
-> platform data based boards to remove their chip select arrays.
+>> Change driver settings to use maximum sample rate clock.
+>> This is useful to achieve best possible sampling rate
+>> if we use DMA.
+>>
+>> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
 > 
-> Signed-off-by: Trent Piepho <tpiepho@impinj.com>
-> ---
->   drivers/spi/spi-imx.c | 16 +++++++++-------
->   1 file changed, 9 insertions(+), 7 deletions(-)
+> I would normally expect this to have some bearing on the
+> noise levels on the measured signals.  All I can find
+> is a reference to the track time being 15*a single
+> clock cycle.  We could change this so that it is appropriate
+> for the currently samping frequency rather than leaving it
+> as a fixed value.
+
+Actually this is the startup (default) value. The sampling frequency
+can be changed from sysfs.
+I will drop this change to let the ADC work with minimum frequency
+at startup and user can change it from sysfs if greater speed is
+required (as with the watermark).
+
+Thanks !
+Eugen
 > 
-> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-> index fea46cbf458a..3a2c34522655 100644
-> --- a/drivers/spi/spi-imx.c
-> +++ b/drivers/spi/spi-imx.c
-> @@ -1364,13 +1364,15 @@ static int spi_imx_probe(struct platform_device *pdev)
->   
->   	if (mxc_platform_info) {
->   		master->num_chipselect = mxc_platform_info->num_chipselect;
-
-nit:
-This is only useful when num_chipselect is non-zero (master's memory is 
-zeroed on allocation). So maybe this could be simplified a bit more as:
-
-if (mxc_platform_info && mxc_platform_info->chipselect) {
-	master->num_chipselect = mxc_platform_info->num_chipselect;
-	[...]
-}
-
-Reducing an indentation level for all the following statements.
-
-Cheers,
-
-> -		master->cs_gpios = devm_kzalloc(&master->dev,
-> -			sizeof(int) * master->num_chipselect, GFP_KERNEL);
-> -		if (!master->cs_gpios)
-> -			return -ENOMEM;
-> -
-> -		for (i = 0; i < master->num_chipselect; i++)
-> -			master->cs_gpios[i] = mxc_platform_info->chipselect[i];
-> +		if (mxc_platform_info->chipselect) {
-> +			master->cs_gpios = devm_kzalloc(&master->dev,
-> +				sizeof(int) * master->num_chipselect, GFP_KERNEL);
-> +			if (!master->cs_gpios)
-> +				return -ENOMEM;
-> +
-> +			for (i = 0; i < master->num_chipselect; i++)
-> +				master->cs_gpios[i] = mxc_platform_info->chipselect[i];
-> +		}
->    	}
->   
->   	spi_imx->bitbang.chipselect = spi_imx_chipselect;
+> Jonathan
 > 
-
--- 
-Julien Thierry
+>> ---
+>>   drivers/iio/adc/at91-sama5d2_adc.c | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/iio/adc/at91-sama5d2_adc.c b/drivers/iio/adc/at91-sama5d2_adc.c
+>> index 7e51ecb..b76f88f 100644
+>> --- a/drivers/iio/adc/at91-sama5d2_adc.c
+>> +++ b/drivers/iio/adc/at91-sama5d2_adc.c
+>> @@ -934,7 +934,7 @@ static void at91_adc_hw_init(struct at91_adc_state *st)
+>>   	at91_adc_writel(st, AT91_SAMA5D2_MR,
+>>   			AT91_SAMA5D2_MR_TRANSFER(2) | AT91_SAMA5D2_MR_ANACH);
+>>   
+>> -	at91_adc_setup_samp_freq(st, st->soc_info.min_sample_rate);
+>> +	at91_adc_setup_samp_freq(st, st->soc_info.max_sample_rate);
+>>   }
+>>   
+>>   static ssize_t at91_adc_get_fifo_state(struct device *dev,
+> 
