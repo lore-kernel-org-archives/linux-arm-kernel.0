@@ -1,129 +1,52 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 18 Oct 2017 18:47:01 +0300
-Subject: [RFC PATCH 1/4] dt-bindings: add bindings for USB physical
- connector
-In-Reply-To: <3079487.ip075DyLUk@avalon>
-References: <20170928130730.8747-1-a.hajda@samsung.com>
- <20170928130730.8747-2-a.hajda@samsung.com> <3079487.ip075DyLUk@avalon>
-Message-ID: <2206421.ioyYkBuUpd@avalon>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Wed, 18 Oct 2017 17:47:18 +0200
+Subject: libbattery was Re: [RFC PATCH 5/5] power: generic-adc-battery:
+ Add capacity handling
+In-Reply-To: <20171018132204.GD4394@atomide.com>
+References: <1501620926-22669-1-git-send-email-marek.belisko@open-nandra.com>
+ <1501620926-22669-6-git-send-email-marek.belisko@open-nandra.com>
+ <20170829101147.debhadzyfrxhkrvt@earth> <20170908113231.GJ18365@amd>
+ <20171018122804.GA14376@amd>
+ <61BFA8AF-657A-4AD7-A7AC-3E5DC3B7E83D@goldelico.com>
+ <20171018132204.GD4394@atomide.com>
+Message-ID: <0C0901E1-23E8-4D04-B3A9-8314809A7A6B@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrzej,
 
-On Wednesday, 18 October 2017 18:11:25 EEST Laurent Pinchart wrote:
-> On Thursday, 28 September 2017 16:07:27 EEST Andrzej Hajda wrote:
-> > These bindings allows to describe most known standard USB connectors
-> > and it should be possible to extend it if necessary.
-> > USB connectors, beside USB can be used to route other protocols,
-> > for example UART, Audio, MHL. In such case every device passing data
-> > through the connector should have appropriate graph bindings.
-> > 
-> > Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-> > ---
-> > There are few things for discussion (IMO):
-> > 1. vendor specific connectors, I have added them here, but maybe better is
-> > 
-> >    to place them in separate files.
+> Am 18.10.2017 um 15:22 schrieb Tony Lindgren <tony@atomide.com>:
 > 
-> It's useful to have one vendor-specific compatible string to be used in the
-> example. We could split vendor-specific connectors to separate files later
-> if needed, but for now I'm fine keeping them here.
+> * H. Nikolaus Schaller <hns@goldelico.com> [171018 05:49]:
+>>> Am 18.10.2017 um 14:28 schrieb Pavel Machek <pavel@ucw.cz>:
+>>> 
+>>> So I started something, it is at.
+>>> 
+>>> https://github.com/pavelmachek/libbattery
+>>> 
+>>> My battery on n900 is currently uncalibrated (and charging), still it
+>>> gets some kind of estimation:
+>>> 
+>>> Battery -1 %
+>>> Seconds -1
+>>> State 1
+>>> Voltage 3.88 V
+>>> Battery 63 %
+>>> 
+>>> Of course, there's a lot more work to be done.
+>> 
+>> Nice start but not a solution to our problem.
+>> 
+>> Our problem is that people simply expect that for example https://packages.debian.org/wheezy/xfce/xfce4-battery-plugin
+>> displays the battery percentage.
 > 
-> > 2. physical connector description - I have split it to three properties:
-> >    type(a,b,ab,c), max-mode(ls,fs,hs,ss,ss+), size(mini,micro,powered).
-> >    This tripled is able to describe all USB-standard connectors, but there
-> >    are also impossible combinations, for example(c, *, micro). Maybe
-> >    better
-> >    would be to just enumerate all possible connectors in include file.
-> 
-> I don't have a strong opinion on this. The three properties are nicely
-> descriptive. You might want to list the valid combinations in the bindings
-> though.
-> 
-> > 3. Numbering of port/remote nodes, currently only 0 is assigned for
-> > 
-> > Interface Controller. Maybe other functions should be also assigned:
-> >    HS, SS, CC, SBU, ... whatever. Maybe functions should be described
-> >    as an additional property of remote node?
-> 
-> Given that one of the main reasons this binding is needed is to describe MHL
-> connection to a USB connector, I think we'll need to define additional
-> functions, yes. I'm not sure yet how that should look like though.
-> > ---
-> > 
-> >  .../bindings/connector/usb-connector.txt           | 49 +++++++++++++++++
-> >  1 file changed, 49 insertions(+)
-> >  create mode 100644
-> > 
-> > Documentation/devicetree/bindings/connector/usb-connector.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/connector/usb-connector.txt
-> > b/Documentation/devicetree/bindings/connector/usb-connector.txt new file
-> > mode 100644
-> > index 000000000000..f3a4e85122d5
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/connector/usb-connector.txt
-> > @@ -0,0 +1,49 @@
-> > +USB Connector
-> > +=============
-> > +
-> > +Required properties:
-> > +- compatible: "usb-connector"
-> > +  connectors with vendor specific extensions can add one of additional
-> > +  compatibles:
-> > +    "samsung,usb-connector-11pin": 11-pin Samsung micro-USB connector
-> > +- type: the USB connector type: "a", "b", "ab", "c"
-> > +- max-mode: max USB speed mode supported by the connector:
-> > +  "ls", "fs", "hs", "ss", "ss+"
-> > +
-> > +Optional properties:
-> > +- label: a symbolic name for the connector
-> > +- size: size of the connector, should be specified in case of
-> > +  non-standard USB connectors: "mini", "micro", "powered"
-> 
-> "non-standard" sounds like "vendor-specific", while I assume you're talking
-> about the size. The USB specification uses the term "standard" for this
-> purpose, so it's hard to use another one that would convey the right meaning
-> precisely. Maybe "non-standard ('large') USB connector sizes" ?
-> 
-> > +Required nodes:
-> > +- any data bus to the connector should be modeled using the
-> > +  OF graph bindings specified in bindings/graph.txt.
-> > +  There should be exactly one port with at least one endpoint to
-> > +  different device nodes. The first endpoint (reg = <0>) should
-> > +  point to USB Interface Controller.
-> > +
-> > +Example
-> > +-------
-> > +
-> > +musb_con: connector {
-> > +	compatible = "samsung,usb-connector-11pin", "usb-connector";
-> > +	label = "usb";
-> > +	type = "b";
-> > +	size = "micro";
-> > +	max-mode = "hs";
-> > +
-> > +	port {
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +
-> > +		musb_con_usb_in: endpoint at 0 {
-> > +			reg = <0>;
-> > +			remote-endpoint = <&muic_usb_out>;
-> > +		};
-> > +
-> > +		musb_con_mhl_in: endpoint at 1 {
-> > +			reg = <1>;
-> > +			remote-endpoint = <&mhl_out>;
-> > +		};
-> > +	};
-> > +};
+> I think we could make things compatible with various battery apps by
+> having libbattery write back the capacity percentage and time remaining
+> to the kernel driver via sysfs or a dev entry. Then the kernel interface
+> can just display the data to whatever apps.
 
-One more comment, do I assume correctly that the Samsung 11-pin connector 
-carries USB and MHL on different pins ?
+Hm. That would be quite difficult to understand and maintain code.
+Why not have the kernel driver do the simple calculations (they do
+not need float) and provide the standard /sys/class/power attribute?
 
--- 
-Regards,
-
-Laurent Pinchart
+BR,
+Nikolaus
