@@ -1,79 +1,65 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Wed, 18 Oct 2017 11:04:28 +0800
-Subject: [PATCH v5 1/2] acpi: apei: remove the unused dead-code for
- SEA/NMI notification type
-In-Reply-To: <20171017164336.cedso3f35lpeam7f@pd.tnic>
-References: <1508227341-15651-1-git-send-email-gengdongjiu@huawei.com>
- <20171017164336.cedso3f35lpeam7f@pd.tnic>
-Message-ID: <642709ec-05d0-2ffd-0e2e-bcdd6b12281b@huawei.com>
+From: xuejiancheng@hisilicon.com (Jiancheng Xue)
+Date: Wed, 18 Oct 2017 07:22:08 -0400
+Subject: [PATCH 3/3] arm64: dts: hisilicon: supplement properties of emmc
+ nodes for hi3798cv200-poplar board
+In-Reply-To: <1508325728-55823-1-git-send-email-xuejiancheng@hisilicon.com>
+References: <1508325728-55823-1-git-send-email-xuejiancheng@hisilicon.com>
+Message-ID: <1508325728-55823-4-git-send-email-xuejiancheng@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,Borislav
+From: tianshuliang <tianshuliang@hisilicon.com>
 
-On 2017/10/18 0:43, Borislav Petkov wrote:
->> -}
->> -
-> So GHES NMI notification method is x86-only AFAIK and HAVE_ACPI_APEI_NMI
-> is selected only on x86. Why are you removing those guards? Does ARM
-> have ACPI_HEST_NOTIFY_NMI notification type now too?
+Supplement properties of emmc nodes to support high performance.
 
-ARM does not have ACPI_HEST_NOTIFY_NMI notification, which should only used by x86.
-In the code, I see those guards are never used. As you see, if the 'CONFIG_HAVE_ACPI_APEI_NMI'
-does not defined in [1], it will print error info and goto [2], in the [2], it will return error,
-then the probe for GHES NMI is failed. so those guards( ghes_nmi_add() and ghes_nmi_remove()) have no chance
-to execute. so I redefine them to NULL for compiling[3].
+Signed-off-by: tianshuliang <tianshuliang@hisilicon.com>
+---
+ arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts | 12 ++++++++++++
+ arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi       |  8 +++++---
+ 2 files changed, 17 insertions(+), 3 deletions(-)
 
-    static int ghes_probe(struct platform_device *ghes_dev)
-    {
-      struct acpi_hest_generic *generic;
-      struct ghes *ghes = NULL;
-
-      int rc = -EINVAL;
-
-       switch (generic->notify.type) {
-	   ...................
-       case ACPI_HEST_NOTIFY_NMI:                        [1]
-          if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_NMI)) {
-              pr_warn(GHES_PFX "Generic hardware error source: %d notified via NMI interrupt is not supported!\n",
-                  generic->header.source_id);
-              goto err;
-          }
-           ..............
-	  }
-	  switch (generic->notify.type) {
-          ...............
-          case ACPI_HEST_NOTIFY_NMI:
-             ghes_nmi_add(ghes);
-             break;
-          }
-          ..........
- err:                                                [2]
-      if (ghes) {
-          ghes_fini(ghes);
-          kfree(ghes);
-      }
-      return rc;
-    }
-
-[3]:
--static inline void ghes_nmi_add(struct ghes *ghes)
--{
--       pr_err(GHES_PFX "ID: %d, trying to add NMI notification which is not supported!\n",
--              ghes->generic->header.source_id);
--       BUG();
--}
--
--static inline void ghes_nmi_remove(struct ghes *ghes)
--{
--       pr_err(GHES_PFX "ID: %d, trying to remove NMI notification which is not supported!\n",
--              ghes->generic->header.source_id);
--       BUG();
--}
--
--static inline void ghes_nmi_init_cxt(void)
--{
--}
-+static inline void ghes_nmi_add(struct ghes *ghes) { }
-+static inline void ghes_nmi_remove(struct ghes *ghes) { }
-+static inline void ghes_nmi_init_cxt(void) { }
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts b/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
+index 6a0b7e9..b890829 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
+@@ -160,4 +160,16 @@
+ 	status = "okay";
+ 	label = "LS-UART0";
+ };
++
++&emmc {
++	status = "okay";
++	num-slots = <1>;
++	fifo-depth = <256>;
++	clock-frequency = <200000000>;
++	cap-mmc-highspeed;
++	mmc-ddr-1_8v;
++	mmc-hs200-1_8v;
++	non-removable;
++	bus-width = <8>;
++};
+ /* No optional LS-UART1 on Low Speed Expansion Connector. */
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi b/arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi
+index 5a73c68..df62382 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi
+@@ -241,12 +241,14 @@
+ 		};
+ 
+ 		emmc: mmc at 9830000 {
+-			compatible = "snps,dw-mshc";
++			compatible = "hisilicon,hi3798cv200-dw-mshc";
+ 			reg = <0x9830000 0x10000>;
+ 			interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&crg HISTB_MMC_CIU_CLK>,
+-				 <&crg HISTB_MMC_BIU_CLK>;
+-			clock-names = "ciu", "biu";
++				 <&crg HISTB_MMC_BIU_CLK>,
++				 <&crg HISTB_MMC_SAMPLE_CLK>,
++				 <&crg HISTB_MMC_DRV_CLK>;
++			clock-names = "ciu", "biu", "ciu-sample", "ciu-drive";
+ 		};
+ 
+ 		gpio0: gpio at 8b20000 {
+-- 
+2.7.4
