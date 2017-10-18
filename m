@@ -1,53 +1,65 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 18 Oct 2017 10:26:39 +0100
-Subject: [PATCH v4 pci 0/2] PCI/MSI: pci-xgene-msi: Enable MSI support in
- ACPI boot for X-Gene v1
-In-Reply-To: <CAAsHzqsxMy8On5ThggTwYohqMCLEJTbA=b1LgUPiuKu9C+eHeQ@mail.gmail.com>
-References: <1506448161-30961-1-git-send-email-kdinh@apm.com>
- <CAAsHzqv-oQVNm-pNP4Q1KmiSmjaiFx1S4j8uCnij53Te3h8KKg@mail.gmail.com>
- <20171017133807.GB948@red-moon>
- <CAAsHzqsxMy8On5ThggTwYohqMCLEJTbA=b1LgUPiuKu9C+eHeQ@mail.gmail.com>
-Message-ID: <20171018092639.GD14820@red-moon>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 18 Oct 2017 10:32:03 +0100
+Subject: [PATCH v3 26/28] arm64/sve: Add documentation
+In-Reply-To: <20171013171758.GO19485@e103592.cambridge.arm.com>
+References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
+ <1507660725-7986-27-git-send-email-Dave.Martin@arm.com>
+ <20171013142421.j32jzisukewxtosx@armageddon.cambridge.arm.com>
+ <20171013171758.GO19485@e103592.cambridge.arm.com>
+Message-ID: <20171018093203.xp5tro636chgaiuq@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[removed unintended disclaimer]
-
-On Tue, Oct 17, 2017 at 10:45:35PM -0700, Khuong Dinh wrote:
-> Hi Lorenzo,
+On Fri, Oct 13, 2017 at 06:17:59PM +0100, Dave P Martin wrote:
+> On Fri, Oct 13, 2017 at 03:24:21PM +0100, Catalin Marinas wrote:
+> > On Tue, Oct 10, 2017 at 07:38:43PM +0100, Dave P Martin wrote:
+> > > +* If the SVE context is too big to fit in sigcontext.__reserved[], then extra
+> > > +  space is allocated on the stack, an extra_context record is written in
+> > > +  __reserved[] referencing this space.  sve_context is then written in the
+> > > +  extra space.  Refer to [1] for further details about this mechanism.
+> > 
+> > Does this document require that the user stack is sufficiently large or
+> > should we cap the vector length (prior to the last two RFC patches)?
 > 
-> On Tue, Oct 17, 2017 at 6:38 AM, Lorenzo Pieralisi
-> <lorenzo.pieralisi@arm.com> wrote:
-> > Hi Khuong,
-> >
-> > On Mon, Oct 16, 2017 at 02:19:50PM -0700, Khuong Dinh wrote:
-> >> Hi Lorenzo,
-> >>   Do you have any comments for this patch?
-> >
-> > I'd have some comments but given that there are related issues with ACPI
-> > probe ordering that Marc is trying to solve on his side - I will work
-> > with him to see if we can accommodate changes that can solve this issue
-> > too.
-> >
-> > Again - I recognize it is a complex problem (that is not even
-> > contemplated by the current ACPI specs), we have to try to make
-> > the solution as generic as we can to prevent reinventing the wheel
-> > anytime a sligthly different issue (related to ACPI probe ordering)
-> > comes up.
-> >
-> > Leave it to me (us) and I will get back to you on this.
+> We don't know how much free stack space there actually is until the
+> signal is delivered.
+[...]
+> Possibly sigaltstack() should fail with ENOMEM if ss_size is too small
+> for the maximum VL supported by the system, but strictly speaking that
+> violates POSIX if ss_size >= MINSIGSTKSZ.
+
+We also don't know whether the application is going to use SVE or not,
+so MINSIGSTKSZ could be just fine. I don't have a better idea here
+without the last two RFC patches. So just ignore my comment.
+
+> > > +5.  Signal return
+> > > +-----------------
+> > > +
+> > > +When returning from a signal handler:
+> > > +
+> > > +* If there is no sve_context record in the signal frame, or if the record is
+> > > +  present but contains no register data as desribed in the previous section,
+> > > +  then the SVE registers/bits become non-live and take unspecified values.
+> > > +
+> > > +* If sve_context is present in the signal frame and contains full register
+> > > +  data, the SVE registers become live and are populated with the specified
+> > > +  data.  However, for backward compatibility reasons, bits [127:0] of Z0..Z31
+> > > +  are always restored from the corresponding members of fpsimd_context.vregs[]
+> > > +  and not from sve_context.  The remaining bits are restored from sve_context.
+> > > +
+> > > +* Inclusion of fpsimd_context in the signal frame remains mandatory,
+> > > +  irrespective of whether sve_context is present or not.
+> > 
+> > Could we relax this? I'm not sure it's worth it.
 > 
-> Thanks for helping to take care of the generic ACPI probe ordering issue.
-> Given that the patch 'PCI/MSI: pci-xgene-msi: Enable MSI support in ACPI
-> boot for X-Gene v1" adds only the ACPI ID, can you pull in this patch
-> independently from the ACPI probe ordering issue?
+> It would be cleaner, but I think it's an ABI break.  Consider a non-SVE
+> program that gets linked (perhaps dynamically) against a library variant
+> that happens to use SVE:
 
-No. For two reasons:
+I agree that in general the kernel always needs to provide user space
+with FPSIMD_MAGIC. I was wondering whether on sigreturn the kernel may
+choose not to enforce this. But I'm not sure we have a scenario where it
+actually matters (IIUC set/getcontext is done in user space anyway).
 
-1) It's Bjorn who decides whether that code can be merged or not, not me
-2) That patch sneaks in ACPI MSI support for X-gene v1 that depends on
-   kernel link ordering. As soon as it is pulled in the mainline it
-   creates a dependency on pseudo-working code that may break anytime
-   and as I said many times before I am not willing to rely on that.
-
-Lorenzo
+-- 
+Catalin
