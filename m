@@ -1,204 +1,366 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Wed, 18 Oct 2017 14:58:25 +0200
-Subject: [PATCH v6 4/5] clocksource: stm32: add clocksource support
-In-Reply-To: <1508331506-23782-1-git-send-email-benjamin.gaignard@linaro.org>
-References: <1508331506-23782-1-git-send-email-benjamin.gaignard@linaro.org>
-Message-ID: <1508331506-23782-5-git-send-email-benjamin.gaignard@linaro.org>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 18 Oct 2017 14:00:23 +0100
+Subject: [PATCH v4 3/5] reset: socfpga: use the reset-simple driver
+In-Reply-To: <20171017130306.881-4-p.zabel@pengutronix.de>
+References: <20171017130306.881-1-p.zabel@pengutronix.de>
+ <20171017130306.881-4-p.zabel@pengutronix.de>
+Message-ID: <ce77d20c-7d62-77c3-8c89-991eeb8d2405@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rework driver code to be able to implement clocksource and clockevent
-on the same hardware block.
-Before this patch only the counter of the hardware block was used to
-generate clock events. Now counter will be used to provide a 32 bits
-clock source and a comparator will provide clock events.
+Hi,
 
-Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
----
- drivers/clocksource/timer-stm32.c | 104 ++++++++++++++++++++++++++++----------
- 1 file changed, 76 insertions(+), 28 deletions(-)
+On 17/10/17 14:03, Philipp Zabel wrote:
+> Add reset line status readback, inverted status support, and socfpga
+> device tree quirks to the simple reset driver, and use it to replace
+> the socfpga driver.
+> 
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> ---
+> Changes since v3:
+>  - Rebased onto reset/next
+>  - Only warn about missing altr,modrst-offset property on socfpga
+> ---
+>  drivers/reset/Kconfig         |  10 +--
+>  drivers/reset/Makefile        |   1 -
+>  drivers/reset/reset-simple.c  |  51 +++++++++++++-
+>  drivers/reset/reset-simple.h  |   4 ++
+>  drivers/reset/reset-socfpga.c | 157 ------------------------------------------
+>  5 files changed, 56 insertions(+), 167 deletions(-)
+>  delete mode 100644 drivers/reset/reset-socfpga.c
+> 
+> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
+> index a14c0fe498771..2d6770b210ed7 100644
+> --- a/drivers/reset/Kconfig
+> +++ b/drivers/reset/Kconfig
+> @@ -77,19 +77,13 @@ config RESET_PISTACHIO
+>  
+>  config RESET_SIMPLE
+>  	bool "Simple Reset Controller Driver" if COMPILE_TEST
+> -	default ARCH_SUNXI
+> +	default ARCH_SOCFPGA || ARCH_STRATIX10 || ARCH_SUNXI
+>  	help
+>  	  This enables a simple reset controller driver for reset lines that
+>  	  that can be asserted and deasserted by toggling bits in a contiguous,
+>  	  exclusive register space.
+>  
+> -	  Currently this driver supports Allwinner SoCs.
+> -
+> -config RESET_SOCFPGA
+> -	bool "SoCFPGA Reset Driver" if COMPILE_TEST
+> -	default ARCH_SOCFPGA || ARCH_STRATIX10
+> -	help
+> -	  This enables the reset controller driver for Altera SoCFPGAs.
+> +	  Currently this driver supports Altera SoCFPGAs and Allwinner SoCs.
+>  
+>  config RESET_STM32
+>  	bool "STM32 Reset Driver" if COMPILE_TEST
+> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+> index ddd3eeb193567..3bf3b4e6a9fd2 100644
+> --- a/drivers/reset/Makefile
+> +++ b/drivers/reset/Makefile
+> @@ -13,7 +13,6 @@ obj-$(CONFIG_RESET_MESON) += reset-meson.o
+>  obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
+>  obj-$(CONFIG_RESET_PISTACHIO) += reset-pistachio.o
+>  obj-$(CONFIG_RESET_SIMPLE) += reset-simple.o
+> -obj-$(CONFIG_RESET_SOCFPGA) += reset-socfpga.o
+>  obj-$(CONFIG_RESET_STM32) += reset-stm32.o
+>  obj-$(CONFIG_RESET_SUNXI) += reset-sunxi.o
+>  obj-$(CONFIG_RESET_TI_SCI) += reset-ti-sci.o
+> diff --git a/drivers/reset/reset-simple.c b/drivers/reset/reset-simple.c
+> index a5119457cec61..98ff0f924948e 100644
+> --- a/drivers/reset/reset-simple.c
+> +++ b/drivers/reset/reset-simple.c
+> @@ -68,25 +68,58 @@ static int reset_simple_deassert(struct reset_controller_dev *rcdev,
+>  	return reset_simple_update(rcdev, id, false);
+>  }
+>  
+> +static int reset_simple_status(struct reset_controller_dev *rcdev,
+> +			       unsigned long id)
+> +{
+> +	struct reset_simple_data *data = to_reset_simple_data(rcdev);
+> +	int reg_width = sizeof(u32);
+> +	int bank = id / (reg_width * BITS_PER_BYTE);
+> +	int offset = id % (reg_width * BITS_PER_BYTE);
+> +	u32 reg;
+> +
+> +	reg = readl(data->membase + (bank * reg_width));
+> +
+> +	return !(reg & BIT(offset)) ^ !data->status_active_low;
+> +}
+> +
+>  const struct reset_control_ops reset_simple_ops = {
+>  	.assert		= reset_simple_assert,
+>  	.deassert	= reset_simple_deassert,
+> +	.status		= reset_simple_status,
+>  };
+>  
+>  /**
+>   * struct reset_simple_devdata - simple reset controller properties
+> + * @reg_offset: offset between base address and first reset register.
+> + * @nr_resets: number of resets. If not set, default to resource size in bits.
+>   * @active_low: if true, bits are cleared to assert the reset. Otherwise, bits
+>   *              are set to assert the reset.
+> + * @status_active_low: if true, bits read back as cleared while the reset is
+> + *                     asserted. Otherwise, bits read back as set while the
+> + *                     reset is asserted.
+>   */
+>  struct reset_simple_devdata {
+> +	u32 reg_offset;
+> +	u32 nr_resets;
+>  	bool active_low;
+> +	bool status_active_low;
+> +};
+> +
+> +#define SOCFPGA_NR_BANKS	8
+> +
+> +static const struct reset_simple_devdata reset_simple_socfpga = {
+> +	.reg_offset = 0x10,
+> +	.nr_resets = SOCFPGA_NR_BANKS * 32,
+> +	.status_active_low = true,
+>  };
+>  
+>  static const struct reset_simple_devdata reset_simple_active_low = {
+>  	.active_low = true,
+> +	.status_active_low = true,
+>  };
+>  
+>  static const struct of_device_id reset_simple_dt_ids[] = {
+> +	{ .compatible = "altr,rst-mgr", .data = &reset_simple_socfpga },
+>  	{ .compatible = "allwinner,sun6i-a31-clock-reset",
+>  		.data = &reset_simple_active_low },
+>  	{ /* sentinel */ },
+> @@ -99,6 +132,7 @@ static int reset_simple_probe(struct platform_device *pdev)
+>  	struct reset_simple_data *data;
+>  	void __iomem *membase;
+>  	struct resource *res;
+> +	u32 reg_offset = 0;
+>  
+>  	devdata = of_device_get_match_data(dev);
+>  
+> @@ -118,8 +152,23 @@ static int reset_simple_probe(struct platform_device *pdev)
+>  	data->rcdev.ops = &reset_simple_ops;
+>  	data->rcdev.of_node = dev->of_node;
+>  
+> -	if (devdata)
+> +	if (devdata) {
+> +		reg_offset = devdata->reg_offset;
+> +		if (devdata->nr_resets)
+> +			data->rcdev.nr_resets = devdata->nr_resets;
+>  		data->active_low = devdata->active_low;
+> +		data->status_active_low = devdata->status_active_low;
+> +	}
+> +
+> +	if (devdata == &reset_simple_socfpga &&
 
-diff --git a/drivers/clocksource/timer-stm32.c b/drivers/clocksource/timer-stm32.c
-index c834648..461b3ba 100644
---- a/drivers/clocksource/timer-stm32.c
-+++ b/drivers/clocksource/timer-stm32.c
-@@ -16,6 +16,8 @@
- #include <linux/of_irq.h>
- #include <linux/clk.h>
- #include <linux/reset.h>
-+#include <linux/sched_clock.h>
-+#include <linux/slab.h>
- 
- #include "timer-of.h"
- 
-@@ -23,16 +25,16 @@
- #define TIM_DIER	0x0c
- #define TIM_SR		0x10
- #define TIM_EGR		0x14
-+#define TIM_CNT		0x24
- #define TIM_PSC		0x28
- #define TIM_ARR		0x2c
-+#define TIM_CCR1	0x34
- 
- #define TIM_CR1_CEN	BIT(0)
--#define TIM_CR1_OPM	BIT(3)
-+#define TIM_CR1_UDIS	BIT(1)
- #define TIM_CR1_ARPE	BIT(7)
- 
--#define TIM_DIER_UIE	BIT(0)
--
--#define TIM_SR_UIF	BIT(0)
-+#define TIM_DIER_CC1IE	BIT(1)
- 
- #define TIM_EGR_UG	BIT(0)
- 
-@@ -40,30 +42,34 @@ static int stm32_clock_event_shutdown(struct clock_event_device *evt)
- {
- 	struct timer_of *to = to_timer_of(evt);
- 
--	writel_relaxed(0, timer_of_base(to) + TIM_CR1);
-+	writel_relaxed(0, timer_of_base(to) + TIM_DIER);
-+
- 	return 0;
- }
- 
--static int stm32_clock_event_set_periodic(struct clock_event_device *evt)
-+static int stm32_clock_event_set_next_event(unsigned long evt,
-+					    struct clock_event_device *clkevt)
- {
--	struct timer_of *to = to_timer_of(evt);
-+	struct timer_of *to = to_timer_of(clkevt);
-+	unsigned long cnt;
- 
--	writel_relaxed(timer_of_period(to), timer_of_base(to) + TIM_ARR);
--	writel_relaxed(TIM_CR1_ARPE | TIM_CR1_CEN, timer_of_base(to) + TIM_CR1);
-+	cnt = readl_relaxed(timer_of_base(to) + TIM_CNT);
-+	writel_relaxed(cnt + evt, timer_of_base(to) + TIM_CCR1);
-+	writel_relaxed(TIM_DIER_CC1IE, timer_of_base(to) + TIM_DIER);
- 
- 	return 0;
- }
- 
--static int stm32_clock_event_set_next_event(unsigned long evt,
--					    struct clock_event_device *clkevt)
-+static int stm32_clock_event_set_periodic(struct clock_event_device *evt)
- {
--	struct timer_of *to = to_timer_of(clkevt);
-+	struct timer_of *to = to_timer_of(evt);
- 
--	writel_relaxed(evt, timer_of_base(to) + TIM_ARR);
--	writel_relaxed(TIM_CR1_ARPE | TIM_CR1_OPM | TIM_CR1_CEN,
--		       timer_of_base(to) + TIM_CR1);
-+	return stm32_clock_event_set_next_event(timer_of_period(to), evt);
-+}
- 
--	return 0;
-+static int stm32_clock_event_set_oneshot(struct clock_event_device *evt)
-+{
-+	return stm32_clock_event_set_next_event(0, evt);
- }
- 
- static irqreturn_t stm32_clock_event_handler(int irq, void *dev_id)
-@@ -73,12 +79,57 @@ static irqreturn_t stm32_clock_event_handler(int irq, void *dev_id)
- 
- 	writel_relaxed(0, timer_of_base(to) + TIM_SR);
- 
-+	if (clockevent_state_periodic(evt))
-+		stm32_clock_event_set_periodic(evt);
-+	else
-+		stm32_clock_event_shutdown(evt);
-+
- 	evt->event_handler(evt);
- 
- 	return IRQ_HANDLED;
- }
- 
--static int __init stm32_clockevent_init(struct device_node *node)
-+static void __init stm32_clockevent_init(struct timer_of *to)
-+{
-+	writel_relaxed(0, timer_of_base(to) + TIM_DIER);
-+	writel_relaxed(0, timer_of_base(to) + TIM_SR);
-+
-+	clockevents_config_and_register(&to->clkevt,
-+					timer_of_rate(to), 0x60, ~0U);
-+}
-+
-+static void __iomem *stm32_timer_cnt __read_mostly;
-+static u64 notrace stm32_read_sched_clock(void)
-+{
-+	return readl_relaxed(stm32_timer_cnt);
-+}
-+
-+static int __init stm32_clocksource_init(struct timer_of *to)
-+{
-+	writel_relaxed(~0U, timer_of_base(to) + TIM_ARR);
-+	writel_relaxed(0, timer_of_base(to) + TIM_PSC);
-+	writel_relaxed(0, timer_of_base(to) + TIM_SR);
-+	writel_relaxed(0, timer_of_base(to) + TIM_DIER);
-+	writel_relaxed(0, timer_of_base(to) + TIM_SR);
-+	writel_relaxed(TIM_CR1_ARPE | TIM_CR1_UDIS,
-+		       timer_of_base(to) + TIM_CR1);
-+
-+	/* Make sure that registers are updated */
-+	writel_relaxed(TIM_EGR_UG, timer_of_base(to) + TIM_EGR);
-+
-+	/* Enable controller */
-+	writel_relaxed(TIM_CR1_ARPE | TIM_CR1_UDIS | TIM_CR1_CEN,
-+		       timer_of_base(to) + TIM_CR1);
-+
-+	stm32_timer_cnt = timer_of_base(to) + TIM_CNT;
-+	sched_clock_register(stm32_read_sched_clock, 32, timer_of_rate(to));
-+
-+	return clocksource_mmio_init(stm32_timer_cnt, "stm32_timer",
-+				     timer_of_rate(to), 250, 32,
-+				     clocksource_mmio_readl_up);
-+}
-+
-+static int __init stm32_timer_init(struct device_node *node)
- {
- 	struct reset_control *rstc;
- 	unsigned long max_arr;
-@@ -90,12 +141,13 @@ static int __init stm32_clockevent_init(struct device_node *node)
- 		return -ENOMEM;
- 
- 	to->flags = TIMER_OF_IRQ | TIMER_OF_CLOCK | TIMER_OF_BASE;
-+
- 	to->clkevt.name = "stm32_clockevent";
- 	to->clkevt.rating = 200;
--	to->clkevt.features = CLOCK_EVT_FEAT_PERIODIC;
-+	to->clkevt.features = CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC;
- 	to->clkevt.set_state_shutdown = stm32_clock_event_shutdown;
- 	to->clkevt.set_state_periodic = stm32_clock_event_set_periodic;
--	to->clkevt.set_state_oneshot = stm32_clock_event_shutdown;
-+	to->clkevt.set_state_oneshot = stm32_clock_event_set_oneshot;
- 	to->clkevt.tick_resume = stm32_clock_event_shutdown;
- 	to->clkevt.set_next_event = stm32_clock_event_set_next_event;
- 
-@@ -120,15 +172,11 @@ static int __init stm32_clockevent_init(struct device_node *node)
- 		goto deinit;
- 	}
- 
--	writel_relaxed(0, timer_of_base(to) + TIM_ARR);
--
--	writel_relaxed(0, timer_of_base(to) + TIM_PSC);
--	writel_relaxed(TIM_EGR_UG, timer_of_base(to) + TIM_EGR);
--	writel_relaxed(TIM_DIER_UIE, timer_of_base(to) + TIM_DIER);
--	writel_relaxed(0, timer_of_base(to) + TIM_SR);
-+	ret = stm32_clocksource_init(to);
-+	if (ret)
-+		goto deinit;
- 
--	clockevents_config_and_register(&to->clkevt,
--					timer_of_period(to), 0x60, ~0U);
-+	stm32_clockevent_init(to);
- 
- 	return 0;
- 
-@@ -139,4 +187,4 @@ static int __init stm32_clockevent_init(struct device_node *node)
- 	return ret;
- }
- 
--TIMER_OF_DECLARE(stm32, "st,stm32-timer", stm32_clockevent_init);
-+TIMER_OF_DECLARE(stm32, "st,stm32-timer", stm32_timer_init);
--- 
-2.7.4
+Mmh, this pointer comparison looks a bit dodgy. Isn't
+of_device_is_compatible() the right solution here? Also semantically, as
+the property is tied to a certain compatible string (and not to our data
+structure)?
+
+> +	    of_property_read_u32(dev->of_node, "altr,modrst-offset",
+> +				 &reg_offset)) {
+> +		dev_warn(dev,
+> +			 "missing altr,modrst-offset property, assuming 0x%x!\n",
+> +			 reg_offset);
+
+The existing driver falls back to 0x10 if no explicit property is found.
+Should we copy this here for compatibility reasons? We could simply use:
+"reg_offset = 0x10;" before the dev_warn().
+
+The rest looks good to me.
+
+Cheers,
+Andre.
+
+> +	}
+> +
+> +	data->membase += reg_offset;
+>  
+>  	return devm_reset_controller_register(dev, &data->rcdev);
+>  }
+> diff --git a/drivers/reset/reset-simple.h b/drivers/reset/reset-simple.h
+> index 39af2014b5f12..8a496022baeff 100644
+> --- a/drivers/reset/reset-simple.h
+> +++ b/drivers/reset/reset-simple.h
+> @@ -28,12 +28,16 @@
+>   * @active_low: if true, bits are cleared to assert the reset. Otherwise, bits
+>   *              are set to assert the reset. Note that this says nothing about
+>   *              the voltage level of the actual reset line.
+> + * @status_active_low: if true, bits read back as cleared while the reset is
+> + *                     asserted. Otherwise, bits read back as set while the
+> + *                     reset is asserted.
+>   */
+>  struct reset_simple_data {
+>  	spinlock_t			lock;
+>  	void __iomem			*membase;
+>  	struct reset_controller_dev	rcdev;
+>  	bool				active_low;
+> +	bool				status_active_low;
+>  };
+>  
+>  extern const struct reset_control_ops reset_simple_ops;
+> diff --git a/drivers/reset/reset-socfpga.c b/drivers/reset/reset-socfpga.c
+> deleted file mode 100644
+> index 3907bbc9c6cf7..0000000000000
+> --- a/drivers/reset/reset-socfpga.c
+> +++ /dev/null
+> @@ -1,157 +0,0 @@
+> -/*
+> - * Socfpga Reset Controller Driver
+> - *
+> - * Copyright 2014 Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> - *
+> - * based on
+> - * Allwinner SoCs Reset Controller driver
+> - *
+> - * Copyright 2013 Maxime Ripard
+> - *
+> - * Maxime Ripard <maxime.ripard@free-electrons.com>
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License as published by
+> - * the Free Software Foundation; either version 2 of the License, or
+> - * (at your option) any later version.
+> - */
+> -
+> -#include <linux/err.h>
+> -#include <linux/io.h>
+> -#include <linux/init.h>
+> -#include <linux/of.h>
+> -#include <linux/platform_device.h>
+> -#include <linux/reset-controller.h>
+> -#include <linux/spinlock.h>
+> -#include <linux/types.h>
+> -
+> -#define BANK_INCREMENT		4
+> -#define NR_BANKS		8
+> -
+> -struct socfpga_reset_data {
+> -	spinlock_t			lock;
+> -	void __iomem			*membase;
+> -	struct reset_controller_dev	rcdev;
+> -};
+> -
+> -static int socfpga_reset_assert(struct reset_controller_dev *rcdev,
+> -				unsigned long id)
+> -{
+> -	struct socfpga_reset_data *data = container_of(rcdev,
+> -						     struct socfpga_reset_data,
+> -						     rcdev);
+> -	int reg_width = sizeof(u32);
+> -	int bank = id / (reg_width * BITS_PER_BYTE);
+> -	int offset = id % (reg_width * BITS_PER_BYTE);
+> -	unsigned long flags;
+> -	u32 reg;
+> -
+> -	spin_lock_irqsave(&data->lock, flags);
+> -
+> -	reg = readl(data->membase + (bank * BANK_INCREMENT));
+> -	writel(reg | BIT(offset), data->membase + (bank * BANK_INCREMENT));
+> -	spin_unlock_irqrestore(&data->lock, flags);
+> -
+> -	return 0;
+> -}
+> -
+> -static int socfpga_reset_deassert(struct reset_controller_dev *rcdev,
+> -				  unsigned long id)
+> -{
+> -	struct socfpga_reset_data *data = container_of(rcdev,
+> -						     struct socfpga_reset_data,
+> -						     rcdev);
+> -
+> -	int reg_width = sizeof(u32);
+> -	int bank = id / (reg_width * BITS_PER_BYTE);
+> -	int offset = id % (reg_width * BITS_PER_BYTE);
+> -	unsigned long flags;
+> -	u32 reg;
+> -
+> -	spin_lock_irqsave(&data->lock, flags);
+> -
+> -	reg = readl(data->membase + (bank * BANK_INCREMENT));
+> -	writel(reg & ~BIT(offset), data->membase + (bank * BANK_INCREMENT));
+> -
+> -	spin_unlock_irqrestore(&data->lock, flags);
+> -
+> -	return 0;
+> -}
+> -
+> -static int socfpga_reset_status(struct reset_controller_dev *rcdev,
+> -				unsigned long id)
+> -{
+> -	struct socfpga_reset_data *data = container_of(rcdev,
+> -						struct socfpga_reset_data, rcdev);
+> -	int reg_width = sizeof(u32);
+> -	int bank = id / (reg_width * BITS_PER_BYTE);
+> -	int offset = id % (reg_width * BITS_PER_BYTE);
+> -	u32 reg;
+> -
+> -	reg = readl(data->membase + (bank * BANK_INCREMENT));
+> -
+> -	return !(reg & BIT(offset));
+> -}
+> -
+> -static const struct reset_control_ops socfpga_reset_ops = {
+> -	.assert		= socfpga_reset_assert,
+> -	.deassert	= socfpga_reset_deassert,
+> -	.status		= socfpga_reset_status,
+> -};
+> -
+> -static int socfpga_reset_probe(struct platform_device *pdev)
+> -{
+> -	struct socfpga_reset_data *data;
+> -	struct resource *res;
+> -	struct device *dev = &pdev->dev;
+> -	struct device_node *np = dev->of_node;
+> -	u32 modrst_offset;
+> -
+> -	/*
+> -	 * The binding was mainlined without the required property.
+> -	 * Do not continue, when we encounter an old DT.
+> -	 */
+> -	if (!of_find_property(pdev->dev.of_node, "#reset-cells", NULL)) {
+> -		dev_err(&pdev->dev, "%pOF missing #reset-cells property\n",
+> -			pdev->dev.of_node);
+> -		return -EINVAL;
+> -	}
+> -
+> -	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+> -	if (!data)
+> -		return -ENOMEM;
+> -
+> -	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	data->membase = devm_ioremap_resource(&pdev->dev, res);
+> -	if (IS_ERR(data->membase))
+> -		return PTR_ERR(data->membase);
+> -
+> -	if (of_property_read_u32(np, "altr,modrst-offset", &modrst_offset)) {
+> -		dev_warn(dev, "missing altr,modrst-offset property, assuming 0x10!\n");
+> -		modrst_offset = 0x10;
+> -	}
+> -	data->membase += modrst_offset;
+> -
+> -	spin_lock_init(&data->lock);
+> -
+> -	data->rcdev.owner = THIS_MODULE;
+> -	data->rcdev.nr_resets = NR_BANKS * (sizeof(u32) * BITS_PER_BYTE);
+> -	data->rcdev.ops = &socfpga_reset_ops;
+> -	data->rcdev.of_node = pdev->dev.of_node;
+> -
+> -	return devm_reset_controller_register(dev, &data->rcdev);
+> -}
+> -
+> -static const struct of_device_id socfpga_reset_dt_ids[] = {
+> -	{ .compatible = "altr,rst-mgr", },
+> -	{ /* sentinel */ },
+> -};
+> -
+> -static struct platform_driver socfpga_reset_driver = {
+> -	.probe	= socfpga_reset_probe,
+> -	.driver = {
+> -		.name		= "socfpga-reset",
+> -		.of_match_table	= socfpga_reset_dt_ids,
+> -	},
+> -};
+> -builtin_platform_driver(socfpga_reset_driver);
+> 
