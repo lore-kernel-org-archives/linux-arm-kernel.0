@@ -1,43 +1,41 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 18 Oct 2017 09:47:52 -0700
-Subject: [PATCH 1/9] SOC: brcmstb: add memory API
-In-Reply-To: <20171018064649.GA7734@infradead.org>
-References: <1507761269-7017-1-git-send-email-jim2101024@gmail.com>
- <1507761269-7017-2-git-send-email-jim2101024@gmail.com>
- <20171017082413.GA10574@infradead.org>
- <abdb1e9d-f8c9-8066-48c5-37b4e2474952@gmail.com>
- <20171018064649.GA7734@infradead.org>
-Message-ID: <eebffba7-6fd7-5b34-577b-a6a42b94563b@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 18 Oct 2017 17:48:24 +0100
+Subject: [PATCH v4 0/2] irqchip: meson: add support for the gpio interrupt
+ controller
+In-Reply-To: <20170918134610.17743-1-jbrunet@baylibre.com> (Jerome Brunet's
+ message of "Mon, 18 Sep 2017 15:46:07 +0200")
+References: <20170918134610.17743-1-jbrunet@baylibre.com>
+Message-ID: <87shegieqv.fsf@on-the-bus.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/17/2017 11:46 PM, Christoph Hellwig wrote:
-> On Tue, Oct 17, 2017 at 09:12:22AM -0700, Florian Fainelli wrote:
->>> Please move this into the arm arch code.
->>
->> No, this needs to work on both ARM and ARM64, hence the reason why this
->> is in a reasonably architecture neutral place.
-> 
-> So there is no other shared code between the ARM and ARM64 ports for
-> this SOC?
+On Mon, Sep 18 2017 at  3:46:07 pm BST, Jerome Brunet <jbrunet@baylibre.com> wrote:
+> This patch series adds support for the GPIO interrupt controller found on
+> Amlogic's meson SoC families.
+>
+> Unlike what the name suggests, this controller is not part of the SoC
+> GPIO subsystem. It is a separate controller which can watch almost all
+> gpio pads of the SoC and generate and interrupt from it. "Almost" because
+> there are always exceptions and some specific gpios (TEST_N) lack this
+> capability.
+>
+> Hardware wise, the controller is a 256 to 8 router with a filtering block
+> to select edge or level input and the polarity of the signal. We can't
+> setup the filtring to generate a signal on both the high and low polarity
+> so, ATM, IRQ_TYPE_EDGE_BOTH is not supported.
+>
+> The number of interrupt line routed to the controller depends on the SoC,
+> and essentially the total number of GPIO available on the different gpio
+> controllers of the SoC.
+>
+> This series has been tested on Amlogic S905-P200 board with the front
+> panel power button. Also tested on the Nanopi-k2 with the ethernet PHY
+> interrupt pin.
+>
+> This work is derived from the previous work of Carlo Caione [1].
 
-The biuctrl.c file is also shared, and there are pending changes for
-v4.15-rc1 that also bring more shared files to this directory.
+Queued for 4.15.
 
-> 
->>>> +EXPORT_SYMBOL(brcmstb_memory_phys_addr_to_memc);
->>>
->>>> +EXPORT_SYMBOL(brcmstb_memory_memc_size);
->>>
->>> Why is this exported?
->>
->> Because the PCIE RC driver can be built as a module.
-> 
-> Hmm, supporting PCIE RC as module sounds odd, but it seems like there
-> are a few others like that.  At least make it EXPORT_SYMBOL_GPL() then
-> to document the internal nature.
-
-Fair enough. Thanks
+	M.
 -- 
--- 
-Florian
+Jazz is not dead, it just smell funny.
