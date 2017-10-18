@@ -1,29 +1,37 @@
-From: tpiepho@impinj.com (Trent Piepho)
-Date: Wed, 18 Oct 2017 17:50:30 +0000
-Subject: [PATCH 4/4] ARM: imx: Update spi_imx platform data to reflect
- current state
-In-Reply-To: <20171018021709.GD18810@dragon>
-References: <20171013195410.30767-1-tpiepho@impinj.com>
- <20171013195410.30767-4-tpiepho@impinj.com> <20171018021709.GD18810@dragon>
-Message-ID: <1508349029.87493.8.camel@impinj.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 18 Oct 2017 20:31:27 +0200 (CEST)
+Subject: [PATCH v6 2/5] clocksource: stm32: convert driver to timer_of
+In-Reply-To: <1508331506-23782-3-git-send-email-benjamin.gaignard@linaro.org>
+References: <1508331506-23782-1-git-send-email-benjamin.gaignard@linaro.org>
+ <1508331506-23782-3-git-send-email-benjamin.gaignard@linaro.org>
+Message-ID: <alpine.DEB.2.20.1710182028080.2477@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-10-18 at 10:17 +0800, Shawn Guo wrote:
-> On Fri, Oct 13, 2017 at 12:54:10PM -0700, Trent Piepho wrote:
-> > 
-> > If a board uses all native chip selects, then it's not necessary to
-> > specify a chip select array at all, as all native is the default (this is
-> > how device-tree configured SPI masters work too).  Most of the spi-imx
-> > platform data users have their chip select arrays removed by this patch.
-> > 
-> > 
-> Does this patch have any dependency on others in this series, or can it
-> be sent via arm-soc tree independently?
+On Wed, 18 Oct 2017, Benjamin Gaignard wrote:
 
-It needs patch 1 and 3 in the series.  Currently supplying cs gpios is
-mandatory for both platform data and DT based systems using spi-imx. 
-The latter is a bug, as the DT binding clearly makes cs-gpios optional
-and other drivers do not require it.  I figured I might as well clean
-up the platform data while I fixed that bug and came across the
-imx31moboard bug in that process.
+> Convert driver to use timer_of helpers. This allow to remove
+> custom proprietary structure.
+> 
+> Increase min delta value because if it is too small it could
+> generate too much interrupts and the system will not be able
+> to catch them all.
+
+This does two completely independent changes at once. What the heck has
+increasing min delta to do with converting it to timer_of() helpers?
+
+Nothing at all. So please split this into two distinct patches. Each doing
+ONE thing.
+
+See Documentation/process/submitting-patches.rst:
+
+  3) Separate your changes
+  ------------------------
+
+  Separate each **logical change** into a separate patch.
+
+Reading, understanding and complying with that document is not optional.
+
+Thanks,
+
+	tglx
