@@ -1,45 +1,41 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 18 Oct 2017 18:36:53 +0200
-Subject: [PATCH v7 02/10] arm: dts: sunxi: Restore EMAC changes
-In-Reply-To: <20171018114458.17891-3-clabbe.montjoie@gmail.com>
-References: <20171018114458.17891-1-clabbe.montjoie@gmail.com>
- <20171018114458.17891-3-clabbe.montjoie@gmail.com>
-Message-ID: <20171018163653.GC15371@lunn.ch>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 18 Oct 2017 17:43:10 +0100
+Subject: [PATCH v3 13/20] arm64: cpufeature: Enable IESB on exception
+ entry/return for firmware-first
+In-Reply-To: <20171005191812.5678-14-james.morse@arm.com>
+References: <20171005191812.5678-1-james.morse@arm.com>
+ <20171005191812.5678-14-james.morse@arm.com>
+Message-ID: <20171018164309.ecwsk7qjmkyevos4@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> index e1dba9ffa94b..f2292deaa590 100644
-> --- a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-> +++ b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-> @@ -52,6 +52,7 @@
->  	compatible = "sinovoip,bpi-m2-plus", "allwinner,sun8i-h3";
+On Thu, Oct 05, 2017 at 08:18:05PM +0100, James Morse wrote:
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index b68f5e93baac..29df2a93688c 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -989,6 +989,21 @@ config ARM64_RAS_EXTN
+>  	  and access the new registers if the system supports the extension.
+>  	  Platform RAS features may additionally depend on firmware support.
 >  
->  	aliases {
-> +		ethernet0 = &emac;
->  		serial0 = &uart0;
->  		serial1 = &uart1;
->  	};
-> @@ -111,6 +112,24 @@
->  	status = "okay";
->  };
->  
-> +&emac {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&emac_rgmii_pins>;
-> +	phy-supply = <&reg_gmac_3v3>;
-> +	phy-handle = <&ext_rgmii_phy>;
-> +	phy-mode = "rgmii";
+> +config ARM64_IESB
+> +	bool "Enable Implicit Error Synchronization Barrier (IESB)"
+> +	default y
+> +	depends on ARM64_RAS_EXTN
+> +	help
+> +	  ARM v8.2 adds a feature to add implicit error synchronization
+> +	  barriers whenever the CPU enters or exits a particular exception
+> +	  level.
 > +
-> +	allwinner,leds-active-low;
-> +	status = "okay";
-> +};
+> +	  On CPUs with this feature and the 'RAS Extensions' feature, we can
+> +	  use this to contain detected (but not yet reported) errors to the
+> +	  relevant exception level.
 > +
-> +&external_mdio {
-> +	ext_rgmii_phy: ethernet-phy at 1 {
-> +		compatible = "ethernet-phy-ieee802.3-c22";
-> +		reg = <0>;
-> +	};
+> +	  The feature is detected at runtime, selecting this option will
+> +	  enable these implicit barriers if the CPU supports the feature.
+>  endmenu
 
-The reg value should match the @ value.
+What's the use-case for not having this option always enabled?
 
-    Andrew
+-- 
+Catalin
