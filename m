@@ -1,106 +1,147 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Wed, 18 Oct 2017 15:41:45 +0200
-Subject: [PATCH v3 06/20] KVM: arm/arm64: Check that system supports
- split eoi/deactivate
-In-Reply-To: <edc875ee-335c-56c1-0cbc-9e45f7915529@arm.com>
-References: <20170923004207.22356-1-cdall@linaro.org>
- <20170923004207.22356-7-cdall@linaro.org>
- <edc875ee-335c-56c1-0cbc-9e45f7915529@arm.com>
-Message-ID: <20171018134145.GH8900@cbox>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 18 Oct 2017 14:45:16 +0100
+Subject: [PATCH v9 4/4] PCI: hisi: blacklist hip06/hip07 controllers
+ behind SMMUv3
+In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA838448830@FRAEML521-MBX.china.huawei.com>
+References: <20171006140450.89652-1-shameerali.kolothum.thodi@huawei.com>
+ <20171006140450.89652-5-shameerali.kolothum.thodi@huawei.com>
+ <20171013192209.GH30572@arm.com>
+ <5FC3163CFD30C246ABAA99954A238FA838437676@FRAEML521-MBS.china.huawei.com>
+ <20171018105145.GC11669@arm.com>
+ <5FC3163CFD30C246ABAA99954A238FA838448830@FRAEML521-MBX.china.huawei.com>
+Message-ID: <20171018134515.GC21820@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 09, 2017 at 05:47:18PM +0100, Marc Zyngier wrote:
-> On 23/09/17 01:41, Christoffer Dall wrote:
-> > Some systems without proper firmware and/or hardware description data
-> > don't support the split EOI and deactivate operation.
-> > 
-> > On such systems, we cannot leave the physical interrupt active after the
-> > timer handler on the host has run, so we cannot support KVM with an
-> > in-kernel GIC with the timer changes we are about to introduce.
-> > 
-> > This patch makes sure that trying to initialize the KVM GIC code will
-> > fail on such systems.
-> > 
-> > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> > Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> > ---
-> >  drivers/irqchip/irq-gic.c | 3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> > index f641e8e..ab12bf4 100644
-> > --- a/drivers/irqchip/irq-gic.c
-> > +++ b/drivers/irqchip/irq-gic.c
-> > @@ -1420,7 +1420,8 @@ static void __init gic_of_setup_kvm_info(struct device_node *node)
-> >  	if (ret)
-> >  		return;
-> >  
-> > -	gic_set_kvm_info(&gic_v2_kvm_info);
-> > +	if (static_key_true(&supports_deactivate))
-> > +		gic_set_kvm_info(&gic_v2_kvm_info);
-> >  }
-> >  
-> >  int __init
-> > 
+On Wed, Oct 18, 2017 at 12:25:09PM +0000, Shameerali Kolothum Thodi wrote:
+> Hi Will,
 > 
-> Should we add the same level of checking on the ACPI path, just for the
-> sake symmetry?
-
-Yes, we should, if anyone is crazy enough to use ACPI :)
-
+> > -----Original Message-----
+> > From: Will Deacon [mailto:will.deacon at arm.com]
+> > Sent: Wednesday, October 18, 2017 11:52 AM
+> > To: Shameerali Kolothum Thodi <shameerali.kolothum.thodi@huawei.com>
+> > Cc: lorenzo.pieralisi at arm.com; marc.zyngier at arm.com;
+> > sudeep.holla at arm.com; robin.murphy at arm.com; joro at 8bytes.org;
+> > bhelgaas at google.com; Gabriele Paoloni <gabriele.paoloni@huawei.com>;
+> > John Garry <john.garry@huawei.com>; iommu at lists.linux-foundation.org;
+> > linux-arm-kernel at lists.infradead.org; linux-acpi at vger.kernel.org; linux-
+> > pci at vger.kernel.org; devel at acpica.org; Linuxarm <linuxarm@huawei.com>;
+> > Wangzhou (B) <wangzhou1@hisilicon.com>; Guohanjun (Hanjun Guo)
+> > <guohanjun@huawei.com>
+> > Subject: Re: [PATCH v9 4/4] PCI: hisi: blacklist hip06/hip07 controllers behind
+> > SMMUv3
+> > 
+> > On Sun, Oct 15, 2017 at 07:46:34AM +0000, Shameerali Kolothum Thodi wrote:
+> > >
+> > >
+> > > > -----Original Message-----
+> > > > From: Will Deacon [mailto:will.deacon at arm.com]
+> > > > Sent: Friday, October 13, 2017 8:22 PM
+> > > > To: Shameerali Kolothum Thodi <shameerali.kolothum.thodi@huawei.com>
+> > > > Cc: lorenzo.pieralisi at arm.com; marc.zyngier at arm.com;
+> > > > sudeep.holla at arm.com; robin.murphy at arm.com; joro at 8bytes.org;
+> > > > bhelgaas at google.com; Gabriele Paoloni <gabriele.paoloni@huawei.com>;
+> > > > John Garry <john.garry@huawei.com>; iommu at lists.linux-foundation.org;
+> > > > linux-arm-kernel at lists.infradead.org; linux-acpi at vger.kernel.org; linux-
+> > > > pci at vger.kernel.org; devel at acpica.org; Linuxarm
+> > <linuxarm@huawei.com>;
+> > > > Wangzhou (B) <wangzhou1@hisilicon.com>; Guohanjun (Hanjun Guo)
+> > > > <guohanjun@huawei.com>
+> > > > Subject: Re: [PATCH v9 4/4] PCI: hisi: blacklist hip06/hip07 controllers
+> > behind
+> > > > SMMUv3
+> > > >
+> > > > On Fri, Oct 06, 2017 at 03:04:50PM +0100, Shameer Kolothum wrote:
+> > > > > The HiSilicon erratum 161010801 describes the limitation of HiSilicon
+> > > > > platforms hip06/hip07 to support the SMMUv3 mappings for MSI
+> > > > > transactions.
+> > > > >
+> > > > > PCIe controller on these platforms has to differentiate the MSI
+> > > > > payload against other DMA payload and has to modify the MSI payload.
+> > > > > This basically makes it difficult for this platforms to have a SMMU
+> > > > > translation for MSI. In order to workaround this, ARM
+> > > > > SMMUv3 driver requires a quirk to treat the MSI regions separately.
+> > > > > Such a quirk is currently missing for DT based systems and therefore
+> > > > > we need to blacklist the hip06/hip07 PCIe controllers.
+> > > > >
+> > > > > Signed-off-by: Shameer Kolothum
+> > > > <shameerali.kolothum.thodi@huawei.com>
+> > > > > ---
+> > > > >  drivers/pci/dwc/pcie-hisi.c | 12 ++++++++++++
+> > > > >  1 file changed, 12 insertions(+)
+> > > > >
+> > > > > diff --git a/drivers/pci/dwc/pcie-hisi.c b/drivers/pci/dwc/pcie-hisi.c
+> > > > > index a201791..6800747 100644
+> > > > > --- a/drivers/pci/dwc/pcie-hisi.c
+> > > > > +++ b/drivers/pci/dwc/pcie-hisi.c
+> > > > > @@ -270,6 +270,12 @@ static int hisi_pcie_probe(struct platform_device
+> > > > *pdev)
+> > > > >  	struct resource *reg;
+> > > > >  	int ret;
+> > > > >
+> > > > > +	if ((IS_BUILTIN(CONFIG_ARM_SMMU_V3)) &&
+> > > > > +			of_property_read_bool(dev->of_node, "iommu-
+> > > > map")) {
+> > > > > +		dev_warn(dev, "HiSilicon erratum 161010801: blacklisting
+> > > > PCIe controllers behind SMMUv3\n");
+> > > > > +		return -ENODEV;
+> > > > > +	}
+> > > > > +
+> > > > >  	hisi_pcie = devm_kzalloc(dev, sizeof(*hisi_pcie), GFP_KERNEL);
+> > > > >  	if (!hisi_pcie)
+> > > > >  		return -ENOMEM;
+> > > > > @@ -340,6 +346,12 @@ static int hisi_pcie_almost_ecam_probe(struct
+> > > > platform_device *pdev)
+> > > > >  	struct device *dev = &pdev->dev;
+> > > > >  	struct pci_ecam_ops *ops;
+> > > > >
+> > > > > +	if ((IS_BUILTIN(CONFIG_ARM_SMMU_V3)) &&
+> > > > > +			of_property_read_bool(dev->of_node, "iommu-
+> > > > map")) {
+> > > > > +		dev_warn(dev, "HiSilicon erratum 161010801: blacklisting
+> > > > PCIe controllers behind SMMUv3\n");
+> > > > > +		return -ENODEV;
+> > > > > +	}
+> > > >
+> > > > This isn't the right way to solve this problem. I was really hoping you'd
+> > come
+> > > > up with a solution for DT, and I know you've been trying, so I suppose for
+> > > > now we'll just have to go with the ACPI workaround you have and leave DT
+> > in
+> > > > the balance. I'm not at all happy with that, but I don't think this patch really
+> > > > improves things.
+> > >
+> > > Yes Will, this is to get the ACPI support enabled for now.
+> > >
+> > > > What I think you should do is remove the relevant smmu/iommu-map
+> > > > entries from the .dts files that are available for these platforms (i.e.
+> > > > comment them out with a description as to why).
+> > >
+> > > We don't have any smmu/iommu-map entries for these platforms in the
+> > > .dts files [1][2]. We are not aiming for any official DT support for these
+> > platforms.
+> > > This patch is to enforce the non-support.
+> > 
+> > Understood, but this has dragged on for a while and I don't think this patch
+> > is the right way to enforce things. The best approach might actually be to
+> > add the SMMU to the DTs, but commented out with a comment explaining why
+> > it's not a good idea to enable it.
 > 
-> Also, do we need to add the same thing for GICv3?
-> 
+> Ok. Just to clarify, you would like to replace this patch with another 
+> one with smmu entries in dts and commenting/disabling them with explanation.
+> Or you would like to have that in addition to this one?
 
-Why would split EOI/deactivate not be available on GICv3, actually?  It
-looks like this is not supported unless you have EL2, but I can't seem
-to find anything in the spec for this, and KVM should support
-EOI/deactivate for GICv3 guests I think.  Am I missing something?
+Yes, I'm saying let's do that instead. My preference is still that we would
+have all of this working for DT, but it's clear that isn't going to happen
+and so I'm trying to unblock the ACPI bits whilst not having subtle breakage
+with DT.
 
-Assuming I'm wrong about GICv3, which I probably am, how does this look
-(on top of the posted patch):
+> +	/** HiSilicon erratum 161010801: Please make sure that
+> +	 *  the smmu (pcie) node on hip06 is disabled as this will
+> +	 *  break the PCIe functionality when iommu-map entry
+> +	 *  is used along with the PCIe node.
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 519149e..aed524c 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -1228,7 +1228,9 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
- 		goto out_unmap_rdist;
- 
- 	gic_populate_ppi_partitions(node);
--	gic_of_setup_kvm_info(node);
-+
-+	if (static_key_true(&supports_deactivate))
-+		gic_of_setup_kvm_info(node);
- 	return 0;
- 
- out_unmap_rdist:
-@@ -1517,7 +1519,9 @@ gic_acpi_init(struct acpi_subtable_header *header, const unsigned long end)
- 		goto out_fwhandle_free;
- 
- 	acpi_set_irq_model(ACPI_IRQ_MODEL_GIC, domain_handle);
--	gic_acpi_setup_kvm_info();
-+
-+	if (static_key_true(&supports_deactivate))
-+		gic_acpi_setup_kvm_info();
- 
- 	return 0;
- 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index ab12bf4..121af5c 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -1653,7 +1653,8 @@ static int __init gic_v2_acpi_init(struct acpi_subtable_header *header,
- 	if (IS_ENABLED(CONFIG_ARM_GIC_V2M))
- 		gicv2m_init(NULL, gic_data[0].domain);
- 
--	gic_acpi_setup_kvm_info();
-+	if (static_key_true(&supports_deactivate))
-+		gic_acpi_setup_kvm_info();
- 
- 	return 0;
- }
+It would be good to have a better description of what is broken and why,
+along with a link to the mailing link discussion.
 
- Thanks,
- -Christoffer
+Will
