@@ -1,50 +1,45 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 18 Oct 2017 17:10:58 +0530
-Subject: [PATCH RESEND] phy: rcar-gen2: Add r8a7743/5 support
-In-Reply-To: <1507544543-28654-1-git-send-email-biju.das@bp.renesas.com>
-References: <1507544543-28654-1-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <bcfa1e90-c497-ee29-687d-9f9a04ce2d4b@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 18 Oct 2017 13:42:19 +0200
+Subject: [PATCH 1/6] phy: sun4i-usb: add support for R40 USB PHY
+In-Reply-To: <46407134-3d1f-0132-f692-1536dcc47980@ti.com>
+References: <20171008042906.46779-1-icenowy@aosc.io>
+ <20171008042906.46779-2-icenowy@aosc.io>
+ <20171009205839.432f6jd5zhmstwp3@flea.home>
+ <46407134-3d1f-0132-f692-1536dcc47980@ti.com>
+Message-ID: <20171018114219.lykghmhzve5yvhaa@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Monday 09 October 2017 03:52 PM, Biju Das wrote:
-> Add USB PHY support for r8a7743/5 SoC. Renesas RZ/G1[ME] (R8A7743/5)
-> USB PHY is identical to the R-Car Gen2 family.
+On Wed, Oct 18, 2017 at 05:09:00PM +0530, Kishon Vijay Abraham I wrote:
+> Hi,
 > 
-> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> Acked-by: Simon Horman <horms+renesas@verge.net.au>
-> Acked-by: Rob Herring <robh@kernel.org>
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> On Tuesday 10 October 2017 02:28 AM, Maxime Ripard wrote:
+> > On Sun, Oct 08, 2017 at 04:29:01AM +0000, Icenowy Zheng wrote:
+> >> Allwinner R40 features a USB PHY like the one in A64, but with 3 PHYs.
+> >>
+> >> Add support for it.
+> >>
+> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> > 
+> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> Is this patch good to be merged? I see you have pending comments on the other
+> patch in the series.
 
-merged, thanks!
+Yeah, but I guess you can merge this one, it's pretty harmless, and it
+will reduce the amount of patches to review / merge later on.
 
--Kishon
-> ---
-> This patch is tested against Linux next tag next-20170929.
-> 
->  Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt | 7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt b/Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt
-> index 91da947..eeb9e18 100644
-> --- a/Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt
-> +++ b/Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt
-> @@ -4,10 +4,13 @@ This file provides information on what the device node for the R-Car generation
->  2 USB PHY contains.
->  
->  Required properties:
-> -- compatible: "renesas,usb-phy-r8a7790" if the device is a part of R8A7790 SoC.
-> +- compatible: "renesas,usb-phy-r8a7743" if the device is a part of R8A7743 SoC.
-> +	      "renesas,usb-phy-r8a7745" if the device is a part of R8A7745 SoC.
-> +	      "renesas,usb-phy-r8a7790" if the device is a part of R8A7790 SoC.
->  	      "renesas,usb-phy-r8a7791" if the device is a part of R8A7791 SoC.
->  	      "renesas,usb-phy-r8a7794" if the device is a part of R8A7794 SoC.
-> -	      "renesas,rcar-gen2-usb-phy" for a generic R-Car Gen2 compatible device.
-> +	      "renesas,rcar-gen2-usb-phy" for a generic R-Car Gen2 or
-> +					  RZ/G1 compatible device.
->  
->  	      When compatible with the generic version, nodes must list the
->  	      SoC-specific version corresponding to the platform first
-> 
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171018/af90732f/attachment.sig>
