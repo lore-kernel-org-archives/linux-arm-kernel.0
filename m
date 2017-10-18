@@ -1,57 +1,105 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 18 Oct 2017 11:44:32 +0100
-Subject: ARM: pxa/corgi: armv5te kernel 4.12 fails to decompress compiled
- with gcc7
-In-Reply-To: <443102ff-9793-a938-1392-9baca727cb98@gmail.com>
-References: <87a83zsiid.fsf@belgarion.home>
- <CAAQYJAtEmJMc766kUx+bhFCNQKmwK53nSDNL0nFz-9UXSUO5CQ@mail.gmail.com>
- <20171014215042.kfrhb2kjhm7wb7vb@darkstar.musicnaut.iki.fi>
- <87mv4txuid.fsf@belgarion.home>
- <20171015104640.hazujjkbqyik7fgg@darkstar.musicnaut.iki.fi>
- <f1631768-b26e-62ae-db1f-65686cd0c4de@gmail.com>
- <CAAQYJAsmOr2qnykO=rWH1N43q3+d27aHMAyXHTXMYpPQ1=9ikA@mail.gmail.com>
- <26e751ec-7fc7-475a-5603-2fac4e0700cb@gmail.com>
- <CAAQYJAuxMHGiyMCFqryYa6QGrXd1JHZnTG60VSGnG6hu9zhitA@mail.gmail.com>
- <443102ff-9793-a938-1392-9baca727cb98@gmail.com>
-Message-ID: <20171018104432.GR20805@n2100.armlinux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 18 Oct 2017 11:51:45 +0100
+Subject: [PATCH v9 4/4] PCI: hisi: blacklist hip06/hip07 controllers
+ behind SMMUv3
+In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA838437676@FRAEML521-MBS.china.huawei.com>
+References: <20171006140450.89652-1-shameerali.kolothum.thodi@huawei.com>
+ <20171006140450.89652-5-shameerali.kolothum.thodi@huawei.com>
+ <20171013192209.GH30572@arm.com>
+ <5FC3163CFD30C246ABAA99954A238FA838437676@FRAEML521-MBS.china.huawei.com>
+Message-ID: <20171018105145.GC11669@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 18, 2017 at 12:39:13PM +0200, Petr Cvek wrote:
+On Sun, Oct 15, 2017 at 07:46:34AM +0000, Shameerali Kolothum Thodi wrote:
 > 
 > 
-> Dne 17.10.2017 v 10:18 Andrea Adami napsal(a):
-> >On Tue, Oct 17, 2017 at 10:10 AM, Petr Cvek <petrcvekcz@gmail.com> wrote:
-> >>If it is a problem with gcc (as Russell said before), there is no way you
-> >>can fix it in the kernel. Only compiling it with an older gcc version can
-> >>help.
-> >>
+> > -----Original Message-----
+> > From: Will Deacon [mailto:will.deacon at arm.com]
+> > Sent: Friday, October 13, 2017 8:22 PM
+> > To: Shameerali Kolothum Thodi <shameerali.kolothum.thodi@huawei.com>
+> > Cc: lorenzo.pieralisi at arm.com; marc.zyngier at arm.com;
+> > sudeep.holla at arm.com; robin.murphy at arm.com; joro at 8bytes.org;
+> > bhelgaas at google.com; Gabriele Paoloni <gabriele.paoloni@huawei.com>;
+> > John Garry <john.garry@huawei.com>; iommu at lists.linux-foundation.org;
+> > linux-arm-kernel at lists.infradead.org; linux-acpi at vger.kernel.org; linux-
+> > pci at vger.kernel.org; devel at acpica.org; Linuxarm <linuxarm@huawei.com>;
+> > Wangzhou (B) <wangzhou1@hisilicon.com>; Guohanjun (Hanjun Guo)
+> > <guohanjun@huawei.com>
+> > Subject: Re: [PATCH v9 4/4] PCI: hisi: blacklist hip06/hip07 controllers behind
+> > SMMUv3
+> > 
+> > On Fri, Oct 06, 2017 at 03:04:50PM +0100, Shameer Kolothum wrote:
+> > > The HiSilicon erratum 161010801 describes the limitation of HiSilicon
+> > > platforms hip06/hip07 to support the SMMUv3 mappings for MSI
+> > > transactions.
+> > >
+> > > PCIe controller on these platforms has to differentiate the MSI
+> > > payload against other DMA payload and has to modify the MSI payload.
+> > > This basically makes it difficult for this platforms to have a SMMU
+> > > translation for MSI. In order to workaround this, ARM
+> > > SMMUv3 driver requires a quirk to treat the MSI regions separately.
+> > > Such a quirk is currently missing for DT based systems and therefore
+> > > we need to blacklist the hip06/hip07 PCIe controllers.
+> > >
+> > > Signed-off-by: Shameer Kolothum
+> > <shameerali.kolothum.thodi@huawei.com>
+> > > ---
+> > >  drivers/pci/dwc/pcie-hisi.c | 12 ++++++++++++
+> > >  1 file changed, 12 insertions(+)
+> > >
+> > > diff --git a/drivers/pci/dwc/pcie-hisi.c b/drivers/pci/dwc/pcie-hisi.c
+> > > index a201791..6800747 100644
+> > > --- a/drivers/pci/dwc/pcie-hisi.c
+> > > +++ b/drivers/pci/dwc/pcie-hisi.c
+> > > @@ -270,6 +270,12 @@ static int hisi_pcie_probe(struct platform_device
+> > *pdev)
+> > >  	struct resource *reg;
+> > >  	int ret;
+> > >
+> > > +	if ((IS_BUILTIN(CONFIG_ARM_SMMU_V3)) &&
+> > > +			of_property_read_bool(dev->of_node, "iommu-
+> > map")) {
+> > > +		dev_warn(dev, "HiSilicon erratum 161010801: blacklisting
+> > PCIe controllers behind SMMUv3\n");
+> > > +		return -ENODEV;
+> > > +	}
+> > > +
+> > >  	hisi_pcie = devm_kzalloc(dev, sizeof(*hisi_pcie), GFP_KERNEL);
+> > >  	if (!hisi_pcie)
+> > >  		return -ENOMEM;
+> > > @@ -340,6 +346,12 @@ static int hisi_pcie_almost_ecam_probe(struct
+> > platform_device *pdev)
+> > >  	struct device *dev = &pdev->dev;
+> > >  	struct pci_ecam_ops *ops;
+> > >
+> > > +	if ((IS_BUILTIN(CONFIG_ARM_SMMU_V3)) &&
+> > > +			of_property_read_bool(dev->of_node, "iommu-
+> > map")) {
+> > > +		dev_warn(dev, "HiSilicon erratum 161010801: blacklisting
+> > PCIe controllers behind SMMUv3\n");
+> > > +		return -ENODEV;
+> > > +	}
+> > 
+> > This isn't the right way to solve this problem. I was really hoping you'd come
+> > up with a solution for DT, and I know you've been trying, so I suppose for
+> > now we'll just have to go with the ACPI workaround you have and leave DT in
+> > the balance. I'm not at all happy with that, but I don't think this patch really
+> > improves things.
 > 
-> BTW you could add "alignment=2" (same as /proc/cpu/alignment) in your kernel
-> parameters and kernel should check it even before you boot userspace.
+> Yes Will, this is to get the ACPI support enabled for now. 
 > 
-> But it will be *extra* slow as there will be many exceptions in the kernel
-> and an emulation of the unaligned instructions. It is not a real permanent
-> fix.
+> > What I think you should do is remove the relevant smmu/iommu-map
+> > entries from the .dts files that are available for these platforms (i.e.
+> > comment them out with a description as to why).
+> 
+> We don't have any smmu/iommu-map entries for these platforms in the 
+> .dts files [1][2]. We are not aiming for any official DT support for these platforms.
+> This patch is to enforce the non-support.
 
-That's wrong.
+Understood, but this has dragged on for a while and I don't think this patch
+is the right way to enforce things. The best approach might actually be to
+add the SMMU to the DTs, but commented out with a comment explaining why
+it's not a good idea to enable it.
 
-Alignment exceptions are always fixed up in the kernel.  The parameter
-(and what you set by writing /proc/cpu/alignment) sets the behaviour of
-_userspace_ alignment exceptions.
-
-> It should be possible to use up to march=armv5t as I elaborated it in the
-> other mail.
-
-If you're building for PXA, it's an ARMv5 architecture.  The kernel will
-use -march=armv5te for all ARMv5 architectures.  Moreover, because one
-of the PXA2* symbols should also be selected, CPU_XSCALE will also be
-enabled, which means we will pass -mtune=xscale to the compiler.
-
-The exception is if CPU_FEROCEON is enabled, in which case we will pass
--mtune=marvell-f to the kernel if supported by the compiler.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Will
