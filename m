@@ -1,62 +1,32 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Wed, 18 Oct 2017 08:40:59 +0200
-Subject: [PATCH 3/4] ARM: dts: imx28-tx28: fix interrupt flags and use
- interrupts-extended property
-In-Reply-To: <20171018021331.GC18810@dragon>
-References: <1507719939-27250-1-git-send-email-LW@KARO-electronics.de>
- <1507719939-27250-4-git-send-email-LW@KARO-electronics.de>
- <20171016071726.gyzvalxzk4o3jsuz@pengutronix.de>
- <20171016105632.709e653c@karo-electronics.de>
- <20171018021331.GC18810@dragon>
-Message-ID: <20171018084059.022d8116@karo-electronics.de>
+From: hch@infradead.org (Christoph Hellwig)
+Date: Tue, 17 Oct 2017 23:46:49 -0700
+Subject: [PATCH 1/9] SOC: brcmstb: add memory API
+In-Reply-To: <abdb1e9d-f8c9-8066-48c5-37b4e2474952@gmail.com>
+References: <1507761269-7017-1-git-send-email-jim2101024@gmail.com>
+ <1507761269-7017-2-git-send-email-jim2101024@gmail.com>
+ <20171017082413.GA10574@infradead.org>
+ <abdb1e9d-f8c9-8066-48c5-37b4e2474952@gmail.com>
+Message-ID: <20171018064649.GA7734@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, 18 Oct 2017 10:13:32 +0800 Shawn Guo wrote:
-> On Mon, Oct 16, 2017 at 10:56:32AM +0200, Lothar Wa?mann wrote:
-> > Hi,
-> > 
-> > On Mon, 16 Oct 2017 09:17:26 +0200 Uwe Kleine-K?nig wrote:
-> > > Hello,
-> > > 
-> > > On Wed, Oct 11, 2017 at 01:05:38PM +0200, Lothar Wa?mann wrote:
-> > > > diff --git a/arch/arm/boot/dts/imx28-tx28.dts b/arch/arm/boot/dts/imx28-tx28.dts
-> > > > index 211e67d..3c852f7 100644
-> > > > --- a/arch/arm/boot/dts/imx28-tx28.dts
-> > > > +++ b/arch/arm/boot/dts/imx28-tx28.dts
-> > > > @@ -328,8 +328,7 @@
-> > > >  		reg = <0x20>;
-> > > >  		pinctrl-names = "default";
-> > > >  		pinctrl-0 = <&tx28_pca9554_pins>;
-> > > > -		interrupt-parent = <&gpio3>;
-> > > > -		interrupts = <28 0>;
-> > > > +		interrupts-extended = <&gpio3 28 IRQ_TYPE_NONE>;
-> > > >  		gpio-controller;
-> > > >  		#gpio-cells = <2>;
-> > > >  		interrupt-controller;
-> > > 
-> > > While interrupts-extended looks nice,
-> > > Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
-> > > has:
-> > > 
-> > > 	"interrupts-extended" should only be used when a device has
-> > > 	multiple interrupt parents.
-> > > 
-> > > If this is still true, this patch is wrong.
-> > >
-> > Thanks for the hint. It really helps to read the documentation
-> > sometimes, rahter than relying on existing code only...
-> > 
-> > A quick check shows, that more than 100 of the 130 uses of
-> > interrupts-extended are wrong. :(
+On Tue, Oct 17, 2017 at 09:12:22AM -0700, Florian Fainelli wrote:
+> > Please move this into the arm arch code.
 > 
-> So should I drop all interrupts-extended patches from you?
->
-Yes, please. Since this patch, and the corresponding patch for tx53
-also fixed the interrupt flags, I will send new patches to only fix
-the interrupt flags.
+> No, this needs to work on both ARM and ARM64, hence the reason why this
+> is in a reasonably architecture neutral place.
 
+So there is no other shared code between the ARM and ARM64 ports for
+this SOC?
 
-Lothar Wa?mann
+> >> +EXPORT_SYMBOL(brcmstb_memory_phys_addr_to_memc);
+> > 
+> >> +EXPORT_SYMBOL(brcmstb_memory_memc_size);
+> > 
+> > Why is this exported?
+> 
+> Because the PCIE RC driver can be built as a module.
+
+Hmm, supporting PCIE RC as module sounds odd, but it seems like there
+are a few others like that.  At least make it EXPORT_SYMBOL_GPL() then
+to document the internal nature.
