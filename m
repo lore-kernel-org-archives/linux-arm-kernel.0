@@ -1,128 +1,35 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Wed, 18 Oct 2017 16:28:47 +0800
-Subject: [PATCH v6 6/7] soc: mediatek: pwrap: add common way for setup CS
- timing extenstion
-In-Reply-To: <cover.1508313105.git.sean.wang@mediatek.com>
-References: <cover.1508313105.git.sean.wang@mediatek.com>
-Message-ID: <7244413bf198a778c42500250d8da5a73a8b81d8.1508313105.git.sean.wang@mediatek.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 18 Oct 2017 16:31:31 +0800
+Subject: [PATCH v2 1/8] mfd: axp20x: Add axp20x-regulator cell for AXP813
+In-Reply-To: <20171018083138.14517-1-wens@csie.org>
+References: <20171018083138.14517-1-wens@csie.org>
+Message-ID: <20171018083138.14517-2-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+Now that axp20x-regulator supports AXP813, we can add a cell for it
+to enable it.
 
-Multiple platforms would always use their own way handling CS timing
-extension on the bus which leads to a little bit code duplication.
-Therefore, the patch groups the similar logic to handle CS timing
-extension into the common function which allows the following SoCs
-have more reusability for configing CS timing.
-
-Signed-off-by: Chenglin Xu <chenglin.xu@mediatek.com>
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Tested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/soc/mediatek/mtk-pmic-wrap.c | 59 ++++++++++++++++++++++--------------
- 1 file changed, 37 insertions(+), 22 deletions(-)
+ drivers/mfd/axp20x.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-index 45c3e44..cbc3f0e 100644
---- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-+++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-@@ -827,23 +827,44 @@ static int pwrap_init_dual_io(struct pmic_wrapper *wrp)
- 	return 0;
- }
- 
--static int pwrap_mt8135_init_reg_clock(struct pmic_wrapper *wrp)
-+/*
-+ * pwrap_init_chip_select_ext is used to configure CS extension time for each
-+ * phase during data transactions on the pwrap bus.
-+ */
-+static void pwrap_init_chip_select_ext(struct pmic_wrapper *wrp, u8 hext_write,
-+				       u8 hext_read, u8 lext_start,
-+				       u8 lext_end)
- {
--	pwrap_writel(wrp, 0x4, PWRAP_CSHEXT);
--	pwrap_writel(wrp, 0x0, PWRAP_CSHEXT_WRITE);
--	pwrap_writel(wrp, 0x4, PWRAP_CSHEXT_READ);
--	pwrap_writel(wrp, 0x0, PWRAP_CSLEXT_START);
--	pwrap_writel(wrp, 0x0, PWRAP_CSLEXT_END);
-+	/*
-+	 * After finishing a write and read transaction, extends CS high time
-+	 * to be at least xT of BUS CLK as hext_write and hext_read specifies
-+	 * respectively.
-+	 */
-+	pwrap_writel(wrp, hext_write, PWRAP_CSHEXT_WRITE);
-+	pwrap_writel(wrp, hext_read, PWRAP_CSHEXT_READ);
- 
--	return 0;
-+	/*
-+	 * Extends CS low time after CSL and before CSH command to be at
-+	 * least xT of BUS CLK as lext_start and lext_end specifies
-+	 * respectively.
-+	 */
-+	pwrap_writel(wrp, lext_start, PWRAP_CSLEXT_START);
-+	pwrap_writel(wrp, lext_end, PWRAP_CSLEXT_END);
- }
- 
--static int pwrap_mt8173_init_reg_clock(struct pmic_wrapper *wrp)
-+static int pwrap_common_init_reg_clock(struct pmic_wrapper *wrp)
- {
--	pwrap_writel(wrp, 0x0, PWRAP_CSHEXT_WRITE);
--	pwrap_writel(wrp, 0x4, PWRAP_CSHEXT_READ);
--	pwrap_writel(wrp, 0x2, PWRAP_CSLEXT_START);
--	pwrap_writel(wrp, 0x2, PWRAP_CSLEXT_END);
-+	switch (wrp->master->type) {
-+	case PWRAP_MT8173:
-+		pwrap_init_chip_select_ext(wrp, 0, 4, 2, 2);
-+		break;
-+	case PWRAP_MT8135:
-+		pwrap_writel(wrp, 0x4, PWRAP_CSHEXT);
-+		pwrap_init_chip_select_ext(wrp, 0, 4, 0, 0);
-+		break;
-+	default:
-+		break;
-+	}
- 
- 	return 0;
- }
-@@ -853,20 +874,14 @@ static int pwrap_mt2701_init_reg_clock(struct pmic_wrapper *wrp)
- 	switch (wrp->slave->type) {
- 	case PMIC_MT6397:
- 		pwrap_writel(wrp, 0xc, PWRAP_RDDMY);
--		pwrap_writel(wrp, 0x4, PWRAP_CSHEXT_WRITE);
--		pwrap_writel(wrp, 0x0, PWRAP_CSHEXT_READ);
--		pwrap_writel(wrp, 0x2, PWRAP_CSLEXT_START);
--		pwrap_writel(wrp, 0x2, PWRAP_CSLEXT_END);
-+		pwrap_init_chip_select_ext(wrp, 4, 0, 2, 2);
- 		break;
- 
- 	case PMIC_MT6323:
- 		pwrap_writel(wrp, 0x8, PWRAP_RDDMY);
- 		pwrap_write(wrp, wrp->slave->dew_regs[PWRAP_DEW_RDDMY_NO],
- 			    0x8);
--		pwrap_writel(wrp, 0x5, PWRAP_CSHEXT_WRITE);
--		pwrap_writel(wrp, 0x0, PWRAP_CSHEXT_READ);
--		pwrap_writel(wrp, 0x2, PWRAP_CSLEXT_START);
--		pwrap_writel(wrp, 0x2, PWRAP_CSLEXT_END);
-+		pwrap_init_chip_select_ext(wrp, 5, 0, 2, 2);
- 		break;
- 	default:
- 		break;
-@@ -1235,7 +1250,7 @@ static const struct pmic_wrapper_type pwrap_mt8135 = {
- 	.spi_w = PWRAP_MAN_CMD_SPI_WRITE,
- 	.wdt_src = PWRAP_WDT_SRC_MASK_ALL,
- 	.has_bridge = 1,
--	.init_reg_clock = pwrap_mt8135_init_reg_clock,
-+	.init_reg_clock = pwrap_common_init_reg_clock,
- 	.init_soc_specific = pwrap_mt8135_init_soc_specific,
- };
- 
-@@ -1247,7 +1262,7 @@ static const struct pmic_wrapper_type pwrap_mt8173 = {
- 	.spi_w = PWRAP_MAN_CMD_SPI_WRITE,
- 	.wdt_src = PWRAP_WDT_SRC_MASK_NO_STAUPD,
- 	.has_bridge = 0,
--	.init_reg_clock = pwrap_mt8173_init_reg_clock,
-+	.init_reg_clock = pwrap_common_init_reg_clock,
- 	.init_soc_specific = pwrap_mt8173_init_soc_specific,
+diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+index 336de66ca408..2468b431bb22 100644
+--- a/drivers/mfd/axp20x.c
++++ b/drivers/mfd/axp20x.c
+@@ -876,6 +876,8 @@ static struct mfd_cell axp813_cells[] = {
+ 		.name			= "axp221-pek",
+ 		.num_resources		= ARRAY_SIZE(axp803_pek_resources),
+ 		.resources		= axp803_pek_resources,
++	}, {
++		.name			= "axp20x-regulator",
+ 	}
  };
  
 -- 
-2.7.4
+2.14.2
