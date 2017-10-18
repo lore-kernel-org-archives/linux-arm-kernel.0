@@ -1,33 +1,80 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 18 Oct 2017 09:37:42 +0200
-Subject: [PATCH 3/7] ARM: dts: r8a7778: Use R-Car Gen1 Ether fallback
- compat string
-In-Reply-To: <20171018072728.14681-4-horms+renesas@verge.net.au>
-References: <20171018072728.14681-1-horms+renesas@verge.net.au>
- <20171018072728.14681-4-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdVs3F3C5j=mojt3ZFAttEeVVJWhxQHo7QfZnZDkuy-7=Q@mail.gmail.com>
+From: gilad@benyossef.com (Gilad Ben-Yossef)
+Date: Wed, 18 Oct 2017 08:00:50 +0100
+Subject: [PATCH v10 18/20] crypto: qce: move to generic async completion
+In-Reply-To: <1508310057-25369-1-git-send-email-gilad@benyossef.com>
+References: <1508310057-25369-1-git-send-email-gilad@benyossef.com>
+Message-ID: <1508310057-25369-19-git-send-email-gilad@benyossef.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 18, 2017 at 9:27 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Use newly added R-Car Gen1 Ether fallback compat string
-> in the DT of the r8a7778 SoC.
->
-> This should have no run-time effect as the driver matches against
-> the per-SoC compat string before considering the fallback compat string.
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+The qce driver starts several async crypto ops and  waits for their
+completions. Move it over to generic code doing the same.
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
+---
+ drivers/crypto/qce/sha.c | 30 ++++--------------------------
+ 1 file changed, 4 insertions(+), 26 deletions(-)
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/crypto/qce/sha.c b/drivers/crypto/qce/sha.c
+index 47e114a..53227d7 100644
+--- a/drivers/crypto/qce/sha.c
++++ b/drivers/crypto/qce/sha.c
+@@ -349,28 +349,12 @@ static int qce_ahash_digest(struct ahash_request *req)
+ 	return qce->async_req_enqueue(tmpl->qce, &req->base);
+ }
+ 
+-struct qce_ahash_result {
+-	struct completion completion;
+-	int error;
+-};
+-
+-static void qce_digest_complete(struct crypto_async_request *req, int error)
+-{
+-	struct qce_ahash_result *result = req->data;
+-
+-	if (error == -EINPROGRESS)
+-		return;
+-
+-	result->error = error;
+-	complete(&result->completion);
+-}
+-
+ static int qce_ahash_hmac_setkey(struct crypto_ahash *tfm, const u8 *key,
+ 				 unsigned int keylen)
+ {
+ 	unsigned int digestsize = crypto_ahash_digestsize(tfm);
+ 	struct qce_sha_ctx *ctx = crypto_tfm_ctx(&tfm->base);
+-	struct qce_ahash_result result;
++	struct crypto_wait wait;
+ 	struct ahash_request *req;
+ 	struct scatterlist sg;
+ 	unsigned int blocksize;
+@@ -405,9 +389,9 @@ static int qce_ahash_hmac_setkey(struct crypto_ahash *tfm, const u8 *key,
+ 		goto err_free_ahash;
+ 	}
+ 
+-	init_completion(&result.completion);
++	crypto_init_wait(&wait);
+ 	ahash_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG,
+-				   qce_digest_complete, &result);
++				   crypto_req_done, &wait);
+ 	crypto_ahash_clear_flags(ahash_tfm, ~0);
+ 
+ 	buf = kzalloc(keylen + QCE_MAX_ALIGN_SIZE, GFP_KERNEL);
+@@ -420,13 +404,7 @@ static int qce_ahash_hmac_setkey(struct crypto_ahash *tfm, const u8 *key,
+ 	sg_init_one(&sg, buf, keylen);
+ 	ahash_request_set_crypt(req, &sg, ctx->authkey, keylen);
+ 
+-	ret = crypto_ahash_digest(req);
+-	if (ret == -EINPROGRESS || ret == -EBUSY) {
+-		ret = wait_for_completion_interruptible(&result.completion);
+-		if (!ret)
+-			ret = result.error;
+-	}
+-
++	ret = crypto_wait_req(crypto_ahash_digest(req), &wait);
+ 	if (ret)
+ 		crypto_ahash_set_flags(tfm, CRYPTO_TFM_RES_BAD_KEY_LEN);
+ 
+-- 
+2.7.4
