@@ -1,32 +1,39 @@
-From: hch@infradead.org (Christoph Hellwig)
-Date: Tue, 17 Oct 2017 23:46:49 -0700
-Subject: [PATCH 1/9] SOC: brcmstb: add memory API
-In-Reply-To: <abdb1e9d-f8c9-8066-48c5-37b4e2474952@gmail.com>
+From: hch@lst.de (Christoph Hellwig)
+Date: Wed, 18 Oct 2017 08:53:16 +0200
+Subject: [PATCH 5/9] PCI: host: brcmstb: add dma-ranges for inbound traffic
+In-Reply-To: <CANCKTBsCB+x2XgrND9AhRtxPkCXfps1nA+YymkZjKHOUZfjSHQ@mail.gmail.com>
 References: <1507761269-7017-1-git-send-email-jim2101024@gmail.com>
- <1507761269-7017-2-git-send-email-jim2101024@gmail.com>
- <20171017082413.GA10574@infradead.org>
- <abdb1e9d-f8c9-8066-48c5-37b4e2474952@gmail.com>
-Message-ID: <20171018064649.GA7734@infradead.org>
+ <1507761269-7017-6-git-send-email-jim2101024@gmail.com>
+ <589c04cb-061b-a453-3188-79324a02388e@arm.com>
+ <20171017081422.GA19475@lst.de>
+ <CANCKTBsCB+x2XgrND9AhRtxPkCXfps1nA+YymkZjKHOUZfjSHQ@mail.gmail.com>
+Message-ID: <20171018065316.GA11183@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 09:12:22AM -0700, Florian Fainelli wrote:
-> > Please move this into the arm arch code.
-> 
-> No, this needs to work on both ARM and ARM64, hence the reason why this
-> is in a reasonably architecture neutral place.
+On Tue, Oct 17, 2017 at 12:11:55PM -0400, Jim Quinlan wrote:
+> My understanding is that dma_pfn_offset is that it is a single
+> constant offset from RAM, in our case, to map to PCIe space.
 
-So there is no other shared code between the ARM and ARM64 ports for
-this SOC?
+Yes.
 
-> >> +EXPORT_SYMBOL(brcmstb_memory_phys_addr_to_memc);
-> > 
-> >> +EXPORT_SYMBOL(brcmstb_memory_memc_size);
-> > 
-> > Why is this exported?
-> 
-> Because the PCIE RC driver can be built as a module.
+> But in
+> my commit message I detail how our PCIe controller presents memory
+> with multiple regions with multiple different offsets. If an EP device
+> maps to a region on the host memory, yes we can set the dma_pfn_offset
+> for that device for that location within that range,.  But if the
+> device then unmaps and allocates from another region with a different
+> offset, it won't work.  If  I set dma_pfn_offset I have to assume that
+> the device is using only one region of memory only, not more than one,
+> and that it is not unmapping that region and mapping another (with a
+> different offset).  Can I make those assumptions?
 
-Hmm, supporting PCIE RC as module sounds odd, but it seems like there
-are a few others like that.  At least make it EXPORT_SYMBOL_GPL() then
-to document the internal nature.
+No, we can't make that assumption unfortunately.  But how is your
+code going to work if the mapping spans multiple of your translation
+regions?
+
+Also I really don't think the stacking of dma_ops as in this patch
+is a good idea.  For MIPS you should do the variant suggested in
+the patch description and hook into dma_to_phys/phys_to_dma helpers,
+and for ARM/ARM64 you should talk to the maintainers on how they
+want the translation integrated.
