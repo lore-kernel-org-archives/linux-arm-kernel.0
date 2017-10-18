@@ -1,23 +1,23 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 18 Oct 2017 10:45:34 +0800
-Subject: [PATCH v2 1/2] ARM: dts: imx6q-novena: Use the 'vpcie-supply'
- property
-In-Reply-To: <1508100838-13406-1-git-send-email-festevam@gmail.com>
-References: <1508100838-13406-1-git-send-email-festevam@gmail.com>
-Message-ID: <20171018024532.GG18810@dragon>
+Date: Wed, 18 Oct 2017 10:51:25 +0800
+Subject: [PATCH 2/6] ARM: dts: imx51-ts4800: Fix 'port@0' node with unit
+ name and no reg property
+In-Reply-To: <1508158110-5188-2-git-send-email-marco.franchi@nxp.com>
+References: <1508158110-5188-1-git-send-email-marco.franchi@nxp.com>
+ <1508158110-5188-2-git-send-email-marco.franchi@nxp.com>
+Message-ID: <20171018025124.GH18810@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 15, 2017 at 06:53:57PM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
+On Mon, Oct 16, 2017 at 10:48:26AM -0200, Marco Franchi wrote:
+> The following build warning is seen with W=1:
 > 
-> Since commit c26ebe98a103 ("PCI: imx6: Add regulator support"), it is
-> possible to pass the 'vpcie-supply' property to describe the PCIE supply.
+> Warning (unit_address_vs_reg): Node /display-di0/port at 0 has a unit name, but no reg property
 > 
-> This way we can remove the 'regulator-always-on' property from the
-> regulator and have a better device tree description.
+> Fix this warning by removing '@' from such node.
 > 
-> Cc: Marek Vasut <marex@denx.de>
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
 
-Applied both, thanks.
+This patch and #6 do not apply to imx/dt branch.  Please rebase.
+
+Shawn
