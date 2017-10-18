@@ -1,70 +1,73 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 18 Oct 2017 16:31:38 +0800
-Subject: [PATCH v2 8/8] ARM: dts: sun8i: a83t: bananapi-m3: Enable AP6212 WiFi
- on mmc1
-In-Reply-To: <20171018083138.14517-1-wens@csie.org>
-References: <20171018083138.14517-1-wens@csie.org>
-Message-ID: <20171018083138.14517-9-wens@csie.org>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Wed, 18 Oct 2017 09:47:44 +0100
+Subject: Tegra baseline test results for v4.14-rc4
+Message-ID: <a90b6c7f-cc33-5e39-9b87-6dc69b0de8b9@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The WiFi side of the AP6212 WiFi/BT combo module is connected to
-mmc1. There are also GPIOs for enable and interrupts. An external
-clock from the AC100 RTC is also used.
+Here are some basic Tegra test results for Linux v4.14-rc4.
+Logs and other details at:
 
-Enable WiFi on this board by enabling mmc1 and adding the power
-sequencing clocks and GPIO, as well as the chip's interrupt line.
+    https://nvtb.github.io//linux/test_v4.14-rc4/20171008213104/
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-index 78036b2f2ab4..c606af3dbfed 100644
---- a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-+++ b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-@@ -68,6 +68,17 @@
- 		enable-active-high;
- 		gpio = <&pio 3 24 GPIO_ACTIVE_HIGH>; /* PD24 */
- 	};
-+
-+	wifi_pwrseq: wifi_pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		clocks = <&ac100_rtc 1>;
-+		clock-names = "ext_clock";
-+		/* The WiFi low power clock must be 32768 Hz */
-+		assigned-clocks = <&ac100_rtc 1>;
-+		assigned-clock-rates = <32768>;
-+		/* enables internal regulator and de-asserts reset */
-+		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 WL-PMU-EN */
-+	};
- };
- 
- &ehci0 {
-@@ -87,6 +98,23 @@
- 	status = "okay";
- };
- 
-+&mmc1 {
-+	vmmc-supply = <&reg_dldo1>;
-+	vqmmc-supply = <&reg_dldo1>;
-+	mmc-pwrseq = <&wifi_pwrseq>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+
-+	brcmf: wifi at 1 {
-+		reg = <1>;
-+		compatible = "brcm,bcm4329-fmac";
-+		interrupt-parent = <&r_pio>;
-+		interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>;
-+		interrupt-names = "host-wake";
-+	};
-+};
-+
- &mmc2 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc2_8bit_emmc_pins>;
--- 
-2.14.2
+Test summary
+------------
+
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000, tegra210-smaug
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 4/ 4): tegra124-jetson-tk1, tegra124-nyan-big,
+		   tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 4/ 4): tegra124-jetson-tk1, tegra124-nyan-big,
+		   tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: multi_v7_defconfig:
+    FAIL: ( 3/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra30-beaver
+    Pass: ( 2/ 5): tegra124-nyan-big, tegra20-trimslice
+
+PM: System suspend: tegra_defconfig:
+    FAIL: ( 3/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra30-beaver
+    Pass: ( 2/ 5): tegra124-nyan-big, tegra20-trimslice
+
+
+vmlinux object size
+(delta in bytes from test_v4.14-rc3 (9e66317d3c92ddaab330c125dfe9d06eee268aff)):
+   text     data      bss    total  kernel
+    -84     +588        0     +504  defconfig
+   +852    +4128        0    +4980  multi_v7_defconfig
+   +792      +44        0     +836  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.14-rc3 (9e66317d3c92ddaab330c125dfe9d06eee268aff))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
+        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+
+--
+nvpublic
