@@ -1,49 +1,45 @@
-From: jingoohan1@gmail.com (Jingoo Han)
-Date: Tue, 17 Oct 2017 19:43:56 -0400
-Subject: [RFC PATCH v4 6/8] drm/bridge/analogix: Do not use device's
- drvdata
-In-Reply-To: <20171017101624.12506-7-jeffy.chen@rock-chips.com>
-References: <20171017101624.12506-1-jeffy.chen@rock-chips.com>
- <20171017101624.12506-7-jeffy.chen@rock-chips.com>
-Message-ID: <000101d347a1$cd216160$67642420$@gmail.com>
+From: dja@axtens.net (Daniel Axtens)
+Date: Wed, 18 Oct 2017 11:24:43 +1100
+Subject: [PATCH v2 2/2] vgaarb: Factor out EFI and fallback default device
+ selection
+In-Reply-To: <20171017120506.ervbnyjue55zn67b@phenom.ffwll.local>
+References: <20171013034338.14630.4766.stgit@bhelgaas-glaptop.roam.corp.google.com>
+ <20171013034729.14630.30419.stgit@bhelgaas-glaptop.roam.corp.google.com>
+ <871sm2y1h9.fsf@linkitivity.dja.id.au>
+ <20171017120506.ervbnyjue55zn67b@phenom.ffwll.local>
+Message-ID: <878tg9i9pw.fsf@linkitivity.dja.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, October 17, 2017 6:16 AM, Jeffy Chen wrote:
-> 
-> From: Tomasz Figa <tfiga@chromium.org>
-> 
-> The driver that instantiates the bridge should own the drvdata, as all
-> driver model callbacks (probe, remove, shutdown, PM ops, etc.) are also
-> owned by its driver struct. Moreover, storing two different pointer
-> types in driver data depending on driver initialization status is barely
-> a good practice and in fact has led to many bugs in this driver.
-> 
-> Let's clean up this mess and change Analogix entry points to simply
-> accept some opaque struct pointer, adjusting their users at the same
-> time to avoid breaking the compilation.
-> 
-> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+Hi Daniel,
 
-Acked-by: Jingoo Han <jingoohan1@gmail.com>
+>> Initially I wondered if this info printk could be moved into
+>> vga_arbiter_check_bridge_sharing(), but it's been separated out since
+>> 3448a19da479b ("vgaarb: use bridges to control VGA routing where
+>> possible."), and upon closer examination, it seems you can't be sure a
+>> device doesn't share a bridge until the end of the process, so this is
+>> indeed correct.
+>> 
+>> Everything else also looks good to me.
+>> 
+>> Reviewed-by: Daniel Axtens <dja@axtens.net>
+>
+> R-b for both patches? And ok with everyone if I pull this into drm-misc
+> for 4.15 (deadline is end of this week for feature-y stuff)?
 
-Best regards,
-Jingoo Han
+I had only intended it for patch 2, but I've now read over patch 1 to my
+satisfaction, so it too is:
 
-> ---
-> 
-> Changes in v4: None
-> Changes in v3: None
-> Changes in v2: None
-> 
->  drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 50 +++++++++--------
-> -----
->  drivers/gpu/drm/exynos/exynos_dp.c                 | 26 ++++++-----
->  drivers/gpu/drm/rockchip/analogix_dp-rockchip.c    | 47
-+++++++++++-------
-> --
->  include/drm/bridge/analogix_dp.h                   | 19 ++++----
->  4 files changed, 73 insertions(+), 69 deletions(-)
-> 
+Reviewed-by: Daniel Axtens <dja@axtens.net>
+
+Thanks!
+
+Regards,
+Daniel
+
+>
+> Thanks, Daniel
+> -- 
+> Daniel Vetter
+> Software Engineer, Intel Corporation
+> http://blog.ffwll.ch
