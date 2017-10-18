@@ -1,147 +1,156 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 18 Oct 2017 14:45:16 +0100
-Subject: [PATCH v9 4/4] PCI: hisi: blacklist hip06/hip07 controllers
- behind SMMUv3
-In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA838448830@FRAEML521-MBX.china.huawei.com>
-References: <20171006140450.89652-1-shameerali.kolothum.thodi@huawei.com>
- <20171006140450.89652-5-shameerali.kolothum.thodi@huawei.com>
- <20171013192209.GH30572@arm.com>
- <5FC3163CFD30C246ABAA99954A238FA838437676@FRAEML521-MBS.china.huawei.com>
- <20171018105145.GC11669@arm.com>
- <5FC3163CFD30C246ABAA99954A238FA838448830@FRAEML521-MBX.china.huawei.com>
-Message-ID: <20171018134515.GC21820@arm.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 18 Oct 2017 15:50:36 +0200
+Subject: [PATCH v4 3/5] reset: socfpga: use the reset-simple driver
+In-Reply-To: <ce77d20c-7d62-77c3-8c89-991eeb8d2405@arm.com>
+References: <20171017130306.881-1-p.zabel@pengutronix.de>
+ <20171017130306.881-4-p.zabel@pengutronix.de>
+ <ce77d20c-7d62-77c3-8c89-991eeb8d2405@arm.com>
+Message-ID: <1508334636.9874.4.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 18, 2017 at 12:25:09PM +0000, Shameerali Kolothum Thodi wrote:
-> Hi Will,
-> 
-> > -----Original Message-----
-> > From: Will Deacon [mailto:will.deacon at arm.com]
-> > Sent: Wednesday, October 18, 2017 11:52 AM
-> > To: Shameerali Kolothum Thodi <shameerali.kolothum.thodi@huawei.com>
-> > Cc: lorenzo.pieralisi at arm.com; marc.zyngier at arm.com;
-> > sudeep.holla at arm.com; robin.murphy at arm.com; joro at 8bytes.org;
-> > bhelgaas at google.com; Gabriele Paoloni <gabriele.paoloni@huawei.com>;
-> > John Garry <john.garry@huawei.com>; iommu at lists.linux-foundation.org;
-> > linux-arm-kernel at lists.infradead.org; linux-acpi at vger.kernel.org; linux-
-> > pci at vger.kernel.org; devel at acpica.org; Linuxarm <linuxarm@huawei.com>;
-> > Wangzhou (B) <wangzhou1@hisilicon.com>; Guohanjun (Hanjun Guo)
-> > <guohanjun@huawei.com>
-> > Subject: Re: [PATCH v9 4/4] PCI: hisi: blacklist hip06/hip07 controllers behind
-> > SMMUv3
+On Wed, 2017-10-18 at 14:00 +0100, Andre Przywara wrote:
+> Hi,
+
+Thank you for the review.
+
+> On 17/10/17 14:03, Philipp Zabel wrote:
+> > Add reset line status readback, inverted status support, and socfpga
+> > device tree quirks to the simple reset driver, and use it to replace
+> > the socfpga driver.
 > > 
-> > On Sun, Oct 15, 2017 at 07:46:34AM +0000, Shameerali Kolothum Thodi wrote:
-> > >
-> > >
-> > > > -----Original Message-----
-> > > > From: Will Deacon [mailto:will.deacon at arm.com]
-> > > > Sent: Friday, October 13, 2017 8:22 PM
-> > > > To: Shameerali Kolothum Thodi <shameerali.kolothum.thodi@huawei.com>
-> > > > Cc: lorenzo.pieralisi at arm.com; marc.zyngier at arm.com;
-> > > > sudeep.holla at arm.com; robin.murphy at arm.com; joro at 8bytes.org;
-> > > > bhelgaas at google.com; Gabriele Paoloni <gabriele.paoloni@huawei.com>;
-> > > > John Garry <john.garry@huawei.com>; iommu at lists.linux-foundation.org;
-> > > > linux-arm-kernel at lists.infradead.org; linux-acpi at vger.kernel.org; linux-
-> > > > pci at vger.kernel.org; devel at acpica.org; Linuxarm
-> > <linuxarm@huawei.com>;
-> > > > Wangzhou (B) <wangzhou1@hisilicon.com>; Guohanjun (Hanjun Guo)
-> > > > <guohanjun@huawei.com>
-> > > > Subject: Re: [PATCH v9 4/4] PCI: hisi: blacklist hip06/hip07 controllers
-> > behind
-> > > > SMMUv3
-> > > >
-> > > > On Fri, Oct 06, 2017 at 03:04:50PM +0100, Shameer Kolothum wrote:
-> > > > > The HiSilicon erratum 161010801 describes the limitation of HiSilicon
-> > > > > platforms hip06/hip07 to support the SMMUv3 mappings for MSI
-> > > > > transactions.
-> > > > >
-> > > > > PCIe controller on these platforms has to differentiate the MSI
-> > > > > payload against other DMA payload and has to modify the MSI payload.
-> > > > > This basically makes it difficult for this platforms to have a SMMU
-> > > > > translation for MSI. In order to workaround this, ARM
-> > > > > SMMUv3 driver requires a quirk to treat the MSI regions separately.
-> > > > > Such a quirk is currently missing for DT based systems and therefore
-> > > > > we need to blacklist the hip06/hip07 PCIe controllers.
-> > > > >
-> > > > > Signed-off-by: Shameer Kolothum
-> > > > <shameerali.kolothum.thodi@huawei.com>
-> > > > > ---
-> > > > >  drivers/pci/dwc/pcie-hisi.c | 12 ++++++++++++
-> > > > >  1 file changed, 12 insertions(+)
-> > > > >
-> > > > > diff --git a/drivers/pci/dwc/pcie-hisi.c b/drivers/pci/dwc/pcie-hisi.c
-> > > > > index a201791..6800747 100644
-> > > > > --- a/drivers/pci/dwc/pcie-hisi.c
-> > > > > +++ b/drivers/pci/dwc/pcie-hisi.c
-> > > > > @@ -270,6 +270,12 @@ static int hisi_pcie_probe(struct platform_device
-> > > > *pdev)
-> > > > >  	struct resource *reg;
-> > > > >  	int ret;
-> > > > >
-> > > > > +	if ((IS_BUILTIN(CONFIG_ARM_SMMU_V3)) &&
-> > > > > +			of_property_read_bool(dev->of_node, "iommu-
-> > > > map")) {
-> > > > > +		dev_warn(dev, "HiSilicon erratum 161010801: blacklisting
-> > > > PCIe controllers behind SMMUv3\n");
-> > > > > +		return -ENODEV;
-> > > > > +	}
-> > > > > +
-> > > > >  	hisi_pcie = devm_kzalloc(dev, sizeof(*hisi_pcie), GFP_KERNEL);
-> > > > >  	if (!hisi_pcie)
-> > > > >  		return -ENOMEM;
-> > > > > @@ -340,6 +346,12 @@ static int hisi_pcie_almost_ecam_probe(struct
-> > > > platform_device *pdev)
-> > > > >  	struct device *dev = &pdev->dev;
-> > > > >  	struct pci_ecam_ops *ops;
-> > > > >
-> > > > > +	if ((IS_BUILTIN(CONFIG_ARM_SMMU_V3)) &&
-> > > > > +			of_property_read_bool(dev->of_node, "iommu-
-> > > > map")) {
-> > > > > +		dev_warn(dev, "HiSilicon erratum 161010801: blacklisting
-> > > > PCIe controllers behind SMMUv3\n");
-> > > > > +		return -ENODEV;
-> > > > > +	}
-> > > >
-> > > > This isn't the right way to solve this problem. I was really hoping you'd
-> > come
-> > > > up with a solution for DT, and I know you've been trying, so I suppose for
-> > > > now we'll just have to go with the ACPI workaround you have and leave DT
-> > in
-> > > > the balance. I'm not at all happy with that, but I don't think this patch really
-> > > > improves things.
-> > >
-> > > Yes Will, this is to get the ACPI support enabled for now.
-> > >
-> > > > What I think you should do is remove the relevant smmu/iommu-map
-> > > > entries from the .dts files that are available for these platforms (i.e.
-> > > > comment them out with a description as to why).
-> > >
-> > > We don't have any smmu/iommu-map entries for these platforms in the
-> > > .dts files [1][2]. We are not aiming for any official DT support for these
-> > platforms.
-> > > This patch is to enforce the non-support.
+> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> > ---
+> > Changes since v3:
+> >  - Rebased onto reset/next
+> >  - Only warn about missing altr,modrst-offset property on socfpga
+> > ---
+> >  drivers/reset/Kconfig         |  10 +--
+> >  drivers/reset/Makefile        |   1 -
+> >  drivers/reset/reset-simple.c  |  51 +++++++++++++-
+> >  drivers/reset/reset-simple.h  |   4 ++
+> >  drivers/reset/reset-socfpga.c | 157 ------------------------------------------
+> >  5 files changed, 56 insertions(+), 167 deletions(-)
+> >  delete mode 100644 drivers/reset/reset-socfpga.c
 > > 
-> > Understood, but this has dragged on for a while and I don't think this patch
-> > is the right way to enforce things. The best approach might actually be to
-> > add the SMMU to the DTs, but commented out with a comment explaining why
-> > it's not a good idea to enable it.
+[...]
+> > diff --git a/drivers/reset/reset-simple.c b/drivers/reset/reset-simple.c
+> > index a5119457cec61..98ff0f924948e 100644
+> > --- a/drivers/reset/reset-simple.c
+> > +++ b/drivers/reset/reset-simple.c
+> > @@ -68,25 +68,58 @@ static int reset_simple_deassert(struct reset_controller_dev *rcdev,
+> >  	return reset_simple_update(rcdev, id, false);
+> >  }
+> >  
+> > +static int reset_simple_status(struct reset_controller_dev *rcdev,
+> > +			       unsigned long id)
+> > +{
+> > +	struct reset_simple_data *data = to_reset_simple_data(rcdev);
+> > +	int reg_width = sizeof(u32);
+> > +	int bank = id / (reg_width * BITS_PER_BYTE);
+> > +	int offset = id % (reg_width * BITS_PER_BYTE);
+> > +	u32 reg;
+> > +
+> > +	reg = readl(data->membase + (bank * reg_width));
+> > +
+> > +	return !(reg & BIT(offset)) ^ !data->status_active_low;
+> > +}
+> > +
+> >  const struct reset_control_ops reset_simple_ops = {
+> >  	.assert		= reset_simple_assert,
+> >  	.deassert	= reset_simple_deassert,
+> > +	.status		= reset_simple_status,
+> >  };
+> >  
+> >  /**
+> >   * struct reset_simple_devdata - simple reset controller properties
+> > + * @reg_offset: offset between base address and first reset register.
+> > + * @nr_resets: number of resets. If not set, default to resource size in bits.
+> >   * @active_low: if true, bits are cleared to assert the reset. Otherwise, bits
+> >   *              are set to assert the reset.
+> > + * @status_active_low: if true, bits read back as cleared while the reset is
+> > + *                     asserted. Otherwise, bits read back as set while the
+> > + *                     reset is asserted.
+> >   */
+> >  struct reset_simple_devdata {
+> > +	u32 reg_offset;
+> > +	u32 nr_resets;
+> >  	bool active_low;
+> > +	bool status_active_low;
+> > +};
+> > +
+> > +#define SOCFPGA_NR_BANKS	8
+> > +
+> > +static const struct reset_simple_devdata reset_simple_socfpga = {
+> > +	.reg_offset = 0x10,
+
+Here reset_simple_socfpga.reg_offset is set to the default of 0x10.
+
+> > +	.nr_resets = SOCFPGA_NR_BANKS * 32,
+> > +	.status_active_low = true,
+> >  };
+> >  
+> >  static const struct reset_simple_devdata reset_simple_active_low = {
+> >  	.active_low = true,
+> > +	.status_active_low = true,
+> >  };
+> >  
+> >  static const struct of_device_id reset_simple_dt_ids[] = {
+> > +	{ .compatible = "altr,rst-mgr", .data = &reset_simple_socfpga },
+> >  	{ .compatible = "allwinner,sun6i-a31-clock-reset",
+> >  		.data = &reset_simple_active_low },
+> >  	{ /* sentinel */ },
+> > @@ -99,6 +132,7 @@ static int reset_simple_probe(struct platform_device *pdev)
+> >  	struct reset_simple_data *data;
+> >  	void __iomem *membase;
+> >  	struct resource *res;
+> > +	u32 reg_offset = 0;
+> >  
+> >  	devdata = of_device_get_match_data(dev);
+> >  
+> > @@ -118,8 +152,23 @@ static int reset_simple_probe(struct platform_device *pdev)
+> >  	data->rcdev.ops = &reset_simple_ops;
+> >  	data->rcdev.of_node = dev->of_node;
+> >  
+> > -	if (devdata)
+> > +	if (devdata) {
+> > +		reg_offset = devdata->reg_offset;
+
+And here reg_offset is set to the default of 0x10 on socfpga.
+
+> > +		if (devdata->nr_resets)
+> > +			data->rcdev.nr_resets = devdata->nr_resets;
+> >  		data->active_low = devdata->active_low;
+> > +		data->status_active_low = devdata->status_active_low;
+> > +	}
+> > +
+> > +	if (devdata == &reset_simple_socfpga &&
 > 
-> Ok. Just to clarify, you would like to replace this patch with another 
-> one with smmu entries in dts and commenting/disabling them with explanation.
-> Or you would like to have that in addition to this one?
+> Mmh, this pointer comparison looks a bit dodgy. Isn't
+> of_device_is_compatible() the right solution here?
 
-Yes, I'm saying let's do that instead. My preference is still that we would
-have all of this working for DT, but it's clear that isn't going to happen
-and so I'm trying to unblock the ACPI bits whilst not having subtle breakage
-with DT.
+My thinking was, the of_device_is_compatible is already called inside
+of_device_get_match_data, so why call it again and not reuse the result?
 
-> +	/** HiSilicon erratum 161010801: Please make sure that
-> +	 *  the smmu (pcie) node on hip06 is disabled as this will
-> +	 *  break the PCIe functionality when iommu-map entry
-> +	 *  is used along with the PCIe node.
+> Also semantically, as?the property is tied to a certain compatible
+> string (and not to our data structure)?
 
-It would be good to have a better description of what is broken and why,
-along with a link to the mailing link discussion.
+I agree with this, though. I'll change this line to say:
 
-Will
++	if (of_device_is_compatible(dev->of_node, "altr,rst-mgr") &&
+
+instead.
+
+> > +	    of_property_read_u32(dev->of_node, "altr,modrst-offset",
+> > +		dev_warn(dev,
+> > +			 "missing altr,modrst-offset property, assuming 0x%x!\n",
+> > +			 reg_offset);
+> 
+> The existing driver falls back to 0x10 if no explicit property is found.
+> Should we copy this here for compatibility reasons? We could simply use:
+> "reg_offset = 0x10;" before the dev_warn().
+
+See above.
+
+regards
+Philipp
