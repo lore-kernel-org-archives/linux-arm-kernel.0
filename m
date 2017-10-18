@@ -1,70 +1,59 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Wed, 18 Oct 2017 14:48:04 +0200
-Subject: libbattery was Re: [RFC PATCH 5/5] power: generic-adc-battery:
- Add capacity handling
-In-Reply-To: <20171018122804.GA14376@amd>
-References: <1501620926-22669-1-git-send-email-marek.belisko@open-nandra.com>
- <1501620926-22669-6-git-send-email-marek.belisko@open-nandra.com>
- <20170829101147.debhadzyfrxhkrvt@earth> <20170908113231.GJ18365@amd>
- <20171018122804.GA14376@amd>
-Message-ID: <61BFA8AF-657A-4AD7-A7AC-3E5DC3B7E83D@goldelico.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Wed, 18 Oct 2017 14:58:21 +0200
+Subject: [PATCH v6 0/5] stm32 clocksource driver rework
+Message-ID: <1508331506-23782-1-git-send-email-benjamin.gaignard@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+version 6:
+- add timer_of_deinit function in core
+- rework failure cases in probe function
 
-> Am 18.10.2017 um 14:28 schrieb Pavel Machek <pavel@ucw.cz>:
-> 
-> Hi!
-> 
->>> Without patch description: See Last Question in
->>> 
->>> Documentation/power/power_supply_class.txt
->> 
->> ...should be done in libbattery, yet to be written. :-).
->> 
->> Do you have specific guidance what you'd like to see in libbattery?
+version 5:
+- rebase on top of timer/core branch
+- rework commit message of the first patch
 
-IMHO there was no answer from maintainers. Or I have not received it.
+version 4:
+- split patch in 3 parts
+  - convert code to timer_of
+  - only use 32 bits timers
+  - add clocksource support
 
-> 
-> So I started something, it is at.
-> 
-> https://github.com/pavelmachek/libbattery
-> 
-> My battery on n900 is currently uncalibrated (and charging), still it
-> gets some kind of estimation:
-> 
-> Battery -1 %
-> Seconds -1
-> State 1
-> Voltage 3.88 V
-> Battery 63 %
-> 
-> Of course, there's a lot more work to be done.
+version 3:
+- fix comments done by Daniel
+- use timer_of helper functions
 
-Nice start but not a solution to our problem.
+version 2:
+- fix uninitialized variable
 
-Our problem is that people simply expect that for example https://packages.debian.org/wheezy/xfce/xfce4-battery-plugin
-displays the battery percentage.
+These patches implements clocksource and clockevent by using only one hardware block.
+Getting both clock source and events on the same hardware lead to change quite
+a lot driver code.
+It also limits usage of clocksource to 32 bits timers because 16 bits ones
+aren't enough accurate.
+Thanks to timer_fo helpers this series includes minor clean up in structures,
+function prototypes and driver name.
 
-With using generic-adc-battery driver and Marek's patch in kernel, this can easily be provided.
+Since 16 bits timers become useless it also removes them from stm32f4 and
+stm32f7 devicetree.
 
-With exactly 0 bits of change in user space. Please note that you can't always tell users "upgrade to the latest user space".
-
-So I have three questions:
-a) why do you use float/double instead of fixed point for such simple and imprecise calculations?
-b) what does it provide as additional information over some lines of code in generic-adc-battery driver?
-c) how do yo make sure that this libbattery is included in all the battery monitors that are already in use and
-is backported for example to the old plugin I mentioned above?
-
-BR and thanks,
-Nikolaus
+Increase min delta value to be sure to not have too much interrupts.
 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: Message signed with OpenPGP using GPGMail
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171018/e83b4fb5/attachment.sig>
+Benjamin Gaignard (5):
+  timer: add timer_of_deinit function
+  clocksource: stm32: convert driver to timer_of
+  clocksource: stm32: only use 32 bits timers
+  clocksource: stm32: add clocksource support
+  arm: dts: stm32: remove useless clocksource nodes
+
+ arch/arm/boot/dts/stm32f429.dtsi  |  32 ------
+ arch/arm/boot/dts/stm32f746.dtsi  |  32 ------
+ drivers/clocksource/Kconfig       |   1 +
+ drivers/clocksource/timer-of.c    |  12 ++
+ drivers/clocksource/timer-of.h    |   3 +
+ drivers/clocksource/timer-stm32.c | 232 +++++++++++++++++++-------------------
+ 6 files changed, 132 insertions(+), 180 deletions(-)
+
+-- 
+2.7.4
