@@ -1,28 +1,50 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Wed, 18 Oct 2017 13:39:27 +0200
-Subject: [PATCH] iio: adc: stm32: add tim15 trigger
-Message-ID: <1508326767-24215-1-git-send-email-fabrice.gasnier@st.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 18 Oct 2017 17:10:58 +0530
+Subject: [PATCH RESEND] phy: rcar-gen2: Add r8a7743/5 support
+In-Reply-To: <1507544543-28654-1-git-send-email-biju.das@bp.renesas.com>
+References: <1507544543-28654-1-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <bcfa1e90-c497-ee29-687d-9f9a04ce2d4b@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add TIM15_TRGO trigger that is now supported on STM32H7.
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
----
- drivers/iio/adc/stm32-adc.c | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/iio/adc/stm32-adc.c b/drivers/iio/adc/stm32-adc.c
-index cc7ca50..4725756 100644
---- a/drivers/iio/adc/stm32-adc.c
-+++ b/drivers/iio/adc/stm32-adc.c
-@@ -501,6 +501,7 @@ struct stm32_adc_info {
- 	{ TIM2_TRGO, STM32_EXT11 },
- 	{ TIM4_TRGO, STM32_EXT12 },
- 	{ TIM6_TRGO, STM32_EXT13 },
-+	{ TIM15_TRGO, STM32_EXT14 },
- 	{ TIM3_CH4, STM32_EXT15 },
- 	{ LPTIM1_OUT, STM32_EXT18 },
- 	{ LPTIM2_OUT, STM32_EXT19 },
--- 
-1.9.1
+On Monday 09 October 2017 03:52 PM, Biju Das wrote:
+> Add USB PHY support for r8a7743/5 SoC. Renesas RZ/G1[ME] (R8A7743/5)
+> USB PHY is identical to the R-Car Gen2 family.
+> 
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> Acked-by: Simon Horman <horms+renesas@verge.net.au>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+merged, thanks!
+
+-Kishon
+> ---
+> This patch is tested against Linux next tag next-20170929.
+> 
+>  Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt | 7 +++++--
+>  1 file changed, 5 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt b/Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt
+> index 91da947..eeb9e18 100644
+> --- a/Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt
+> +++ b/Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt
+> @@ -4,10 +4,13 @@ This file provides information on what the device node for the R-Car generation
+>  2 USB PHY contains.
+>  
+>  Required properties:
+> -- compatible: "renesas,usb-phy-r8a7790" if the device is a part of R8A7790 SoC.
+> +- compatible: "renesas,usb-phy-r8a7743" if the device is a part of R8A7743 SoC.
+> +	      "renesas,usb-phy-r8a7745" if the device is a part of R8A7745 SoC.
+> +	      "renesas,usb-phy-r8a7790" if the device is a part of R8A7790 SoC.
+>  	      "renesas,usb-phy-r8a7791" if the device is a part of R8A7791 SoC.
+>  	      "renesas,usb-phy-r8a7794" if the device is a part of R8A7794 SoC.
+> -	      "renesas,rcar-gen2-usb-phy" for a generic R-Car Gen2 compatible device.
+> +	      "renesas,rcar-gen2-usb-phy" for a generic R-Car Gen2 or
+> +					  RZ/G1 compatible device.
+>  
+>  	      When compatible with the generic version, nodes must list the
+>  	      SoC-specific version corresponding to the platform first
+> 
