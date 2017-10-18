@@ -1,68 +1,90 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Wed, 18 Oct 2017 09:31:07 +0200
-Subject: [PATCH] nvmem: meson: use generic compatible
-In-Reply-To: <20171017205204.t4vfvbc2c5nsrnhm@rob-hp-laptop>
-References: <20171012152450.12454-1-jbrunet@baylibre.com>
- <CAFBinCBVNEqTk+NUHz62FetLhYagFb5K+g17P_2Xb7sBUfEmdA@mail.gmail.com>
- <1507923553.30658.10.camel@baylibre.com>
- <20171017205204.t4vfvbc2c5nsrnhm@rob-hp-laptop>
-Message-ID: <1508311867.3957.33.camel@baylibre.com>
+From: gilad@benyossef.com (Gilad Ben-Yossef)
+Date: Wed, 18 Oct 2017 08:00:51 +0100
+Subject: [PATCH v10 19/20] crypto: mediatek: move to generic async completion
+In-Reply-To: <1508310057-25369-1-git-send-email-gilad@benyossef.com>
+References: <1508310057-25369-1-git-send-email-gilad@benyossef.com>
+Message-ID: <1508310057-25369-20-git-send-email-gilad@benyossef.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-10-17 at 15:52 -0500, Rob Herring wrote:
-> On Fri, Oct 13, 2017 at 09:39:13PM +0200, Jerome Brunet wrote:
-> > On Fri, 2017-10-13 at 21:14 +0200, Martin Blumenstingl wrote:
-> > > Hi Jerome,
-> > > 
-> > > On Thu, Oct 12, 2017 at 5:24 PM, Jerome Brunet <jbrunet@baylibre.com>
-> > > wrote:
-> > > > The meson efuse driver seems to be compatible with more SoCs than
-> > > > initially thought. Let's use the most generic compatible he have in
-> > > > DT instead of the gxbb specific one
-> > > > 
-> > > > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> > > > ---
-> > > >  Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt | 4 ++--
-> > > >  drivers/nvmem/meson-efuse.c                               | 2 +-
-> > > >  2 files changed, 3 insertions(+), 3 deletions(-)
-> > > > 
-> > > > diff --git a/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
-> > > > b/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
-> > > > index fafd85bd67a6..0260524292fe 100644
-> > > > --- a/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
-> > > > +++ b/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
-> > > > @@ -1,7 +1,7 @@
-> > > >  = Amlogic eFuse device tree bindings =
-> > > > 
-> > > >  Required properties:
-> > > > -- compatible: should be "amlogic,meson-gxbb-efuse"
-> > > > +- compatible: should be "amlogic,meson-gx-efuse"
-> 
-> Same comment as for the firmware.
-> 
-> > > 
-> > > have you checked with the devicetree maintainers how they want the
-> > > documentation to look like in this case?
-> > 
-> > You mean "Should we put every compatible existing (in DT) in the
-> > documentation"
-> > From what I've seen, at least in meson drivers, only the matched ones are
-> > listed.
-> > 
-> > That's a good question though.
-> > We tend to put soc specific compatible "in case"  we need them later on.
-> > Should
-> > we document those ?
-> 
-> Absolutely.
+The mediatek driver starts several async crypto ops and waits for their
+completions. Move it over to generic code doing the same.
 
-My understanding is that this documentation is the documentation of the bindings
-used by the driver. 
+Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
+Acked-by: Ryder Lee <ryder.lee@mediatek.com>
+---
+ drivers/crypto/mediatek/mtk-aes.c | 31 +++++--------------------------
+ 1 file changed, 5 insertions(+), 26 deletions(-)
 
-If I understand your point, we should document bindings (compatible in that
-case) that are in fact not fact by the driver. This means that if someone refer
-only to the documentation, he might be surprised by the result.
-
-> 
-> Rob
+diff --git a/drivers/crypto/mediatek/mtk-aes.c b/drivers/crypto/mediatek/mtk-aes.c
+index 32aa587..c2058cf 100644
+--- a/drivers/crypto/mediatek/mtk-aes.c
++++ b/drivers/crypto/mediatek/mtk-aes.c
+@@ -138,11 +138,6 @@ struct mtk_aes_gcm_ctx {
+ 	struct crypto_skcipher *ctr;
+ };
+ 
+-struct mtk_aes_gcm_setkey_result {
+-	int err;
+-	struct completion completion;
+-};
+-
+ struct mtk_aes_drv {
+ 	struct list_head dev_list;
+ 	/* Device list lock */
+@@ -942,17 +937,6 @@ static int mtk_aes_gcm_crypt(struct aead_request *req, u64 mode)
+ 				    &req->base);
+ }
+ 
+-static void mtk_gcm_setkey_done(struct crypto_async_request *req, int err)
+-{
+-	struct mtk_aes_gcm_setkey_result *result = req->data;
+-
+-	if (err == -EINPROGRESS)
+-		return;
+-
+-	result->err = err;
+-	complete(&result->completion);
+-}
+-
+ /*
+  * Because of the hardware limitation, we need to pre-calculate key(H)
+  * for the GHASH operation. The result of the encryption operation
+@@ -968,7 +952,7 @@ static int mtk_aes_gcm_setkey(struct crypto_aead *aead, const u8 *key,
+ 		u32 hash[4];
+ 		u8 iv[8];
+ 
+-		struct mtk_aes_gcm_setkey_result result;
++		struct crypto_wait wait;
+ 
+ 		struct scatterlist sg[1];
+ 		struct skcipher_request req;
+@@ -1008,22 +992,17 @@ static int mtk_aes_gcm_setkey(struct crypto_aead *aead, const u8 *key,
+ 	if (!data)
+ 		return -ENOMEM;
+ 
+-	init_completion(&data->result.completion);
++	crypto_init_wait(&data->wait);
+ 	sg_init_one(data->sg, &data->hash, AES_BLOCK_SIZE);
+ 	skcipher_request_set_tfm(&data->req, ctr);
+ 	skcipher_request_set_callback(&data->req, CRYPTO_TFM_REQ_MAY_SLEEP |
+ 				      CRYPTO_TFM_REQ_MAY_BACKLOG,
+-				      mtk_gcm_setkey_done, &data->result);
++				      crypto_req_done, &data->wait);
+ 	skcipher_request_set_crypt(&data->req, data->sg, data->sg,
+ 				   AES_BLOCK_SIZE, data->iv);
+ 
+-	err = crypto_skcipher_encrypt(&data->req);
+-	if (err == -EINPROGRESS || err == -EBUSY) {
+-		err = wait_for_completion_interruptible(
+-			&data->result.completion);
+-		if (!err)
+-			err = data->result.err;
+-	}
++	err = crypto_wait_req(crypto_skcipher_encrypt(&data->req),
++			      &data->wait);
+ 	if (err)
+ 		goto out;
+ 
+-- 
+2.7.4
