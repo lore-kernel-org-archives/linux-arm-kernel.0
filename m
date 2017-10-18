@@ -1,57 +1,27 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed, 18 Oct 2017 21:06:28 +0800
-Subject: [PATCH v2 5/5] ARM: sun8i: v40: enable USB host ports for Banana Pi
- M2 Berry
-In-Reply-To: <20171018130628.11298-1-icenowy@aosc.io>
-References: <20171018130628.11298-1-icenowy@aosc.io>
-Message-ID: <20171018130628.11298-6-icenowy@aosc.io>
+From: bp@suse.de (Borislav Petkov)
+Date: Wed, 18 Oct 2017 15:14:48 +0200
+Subject: [PATCH v5 1/2] acpi: apei: remove the unused dead-code for
+ SEA/NMI notification type
+In-Reply-To: <577d79ad-9357-ea40-63eb-1d2988642710@huawei.com>
+References: <1508227341-15651-1-git-send-email-gengdongjiu@huawei.com>
+ <20171017164336.cedso3f35lpeam7f@pd.tnic>
+ <642709ec-05d0-2ffd-0e2e-bcdd6b12281b@huawei.com>
+ <20171018101722.kce2tcvpd7xdpo46@pd.tnic>
+ <577d79ad-9357-ea40-63eb-1d2988642710@huawei.com>
+Message-ID: <20171018131448.byb3roazl3hf6qmn@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Banana Pi M2 Berry has an on-board USB Hub that provides 4 USB Type-A
-ports, and it's connected to the USB1 port of the SoC.
+On Wed, Oct 18, 2017 at 08:27:00PM +0800, gengdongjiu wrote:
+>   For this patch(the first one), whether it can be firstly applied?
 
-Enable it.
+Sure:
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+Reviewed-by: Borislav Petkov <bp@suse.de>
 
-diff --git a/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts b/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts
-index fe16fc0eb518..45c17c8c5915 100644
---- a/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts
-+++ b/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts
-@@ -87,6 +87,10 @@
- 	};
- };
- 
-+&ehci1 {
-+	status = "okay";
-+};
-+
- &i2c0 {
- 	status = "okay";
- 
-@@ -98,6 +102,10 @@
- 	};
- };
- 
-+&ohci1 {
-+	status = "okay";
-+};
-+
- #include "axp22x.dtsi"
- 
- &reg_aldo3 {
-@@ -171,3 +179,8 @@
- 	pinctrl-0 = <&uart0_pb_pins>;
- 	status = "okay";
- };
-+
-+&usbphy {
-+	usb1_vbus-supply = <&reg_vcc5v0>;
-+	status = "okay";
-+};
 -- 
-2.13.6
+Regards/Gruss,
+    Boris.
+
+SUSE Linux GmbH, GF: Felix Imend?rffer, Jane Smithard, Graham Norton, HRB 21284 (AG N?rnberg)
+-- 
