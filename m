@@ -1,68 +1,59 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 18 Oct 2017 14:55:30 +0100
-Subject: [PATCH v5 3/6] perf: hisi: Add support for HiSilicon SoC L3C PMU
- driver
-In-Reply-To: <04e32a88-a719-9a4a-1f07-fb452e227297@hisilicon.com>
-References: <1503389277-134131-1-git-send-email-zhangshaokun@hisilicon.com>
- <1503389277-134131-4-git-send-email-zhangshaokun@hisilicon.com>
- <20171017151657.fr4k63bynmc65woo@lakrids.cambridge.arm.com>
- <04e32a88-a719-9a4a-1f07-fb452e227297@hisilicon.com>
-Message-ID: <20171018135530.qo54qe36zplp4etp@lakrids.cambridge.arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 18 Oct 2017 15:56:56 +0200
+Subject: libbattery was Re: [RFC PATCH 5/5] power: generic-adc-battery:
+ Add capacity handling
+In-Reply-To: <20171018132204.GD4394@atomide.com>
+References: <1501620926-22669-1-git-send-email-marek.belisko@open-nandra.com>
+ <1501620926-22669-6-git-send-email-marek.belisko@open-nandra.com>
+ <20170829101147.debhadzyfrxhkrvt@earth>
+ <20170908113231.GJ18365@amd> <20171018122804.GA14376@amd>
+ <61BFA8AF-657A-4AD7-A7AC-3E5DC3B7E83D@goldelico.com>
+ <20171018132204.GD4394@atomide.com>
+Message-ID: <20171018135656.GA26432@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 18, 2017 at 09:33:30PM +0800, Zhangshaokun wrote:
-> On 2017/10/17 23:16, Mark Rutland wrote:
-> > On Tue, Aug 22, 2017 at 04:07:54PM +0800, Shaokun Zhang wrote:
-> >> +static int hisi_l3c_pmu_init_data(struct platform_device *pdev,
-> >> +				  struct hisi_pmu *l3c_pmu)
-> >> +{
-> >> +	unsigned long long id;
-> >> +	struct resource *res;
-> >> +	acpi_status status;
-> >> +	int cpu;
-> >> +
-> >> +	status = acpi_evaluate_integer(ACPI_HANDLE(&pdev->dev),
-> >> +				       "_UID", NULL, &id);
-> >> +	if (ACPI_FAILURE(status))
-> >> +		return -EINVAL;
-> >> +
-> >> +	l3c_pmu->id = id;
-> >> +
-> >> +	/*
-> >> +	 * Use the SCCL_ID and CCL_ID to identify the L3C PMU, while
-> >> +	 * SCCL_ID is in MPIDR[aff2] and CCL_ID is in MPIDR[aff1].
-> >> +	 */
-> >> +	if (device_property_read_u32(&pdev->dev, "hisilicon,scl-id",
-> >> +				     &l3c_pmu->sccl_id)) {
-> >> +		dev_err(&pdev->dev, "Can not read l3c sccl-id!\n");
-> >> +		return -EINVAL;
-> >> +	}
-> >> +
-> >> +	if (device_property_read_u32(&pdev->dev, "hisilicon,ccl-id",
-> >> +				     &l3c_pmu->ccl_id)) {
-> >> +		dev_err(&pdev->dev, "Can not read l3c ccl-id!\n");
-> >> +		return -EINVAL;
-> >> +	}
-> >> +
-> >> +	/* Initialise the associated cpumask of the PMU */
-> >> +	for_each_present_cpu(cpu)
-> >> +		smp_call_function_single(cpu, hisi_l3c_pmu_set_cpumask_by_ccl,
-> >> +					 (void *)l3c_pmu, 1);
-
-> > Rather than a proble-time smp_call_function_single(), can you follow the
-> > qcom l2's approach of associating CPUs with a PMU instance in the
-> > notifier? That will work even if CPUs are brought online very late.
+On Wed 2017-10-18 06:22:04, Tony Lindgren wrote:
+> * H. Nikolaus Schaller <hns@goldelico.com> [171018 05:49]:
+> > > Am 18.10.2017 um 14:28 schrieb Pavel Machek <pavel@ucw.cz>:
+> > > 
+> > > So I started something, it is at.
+> > > 
+> > > https://github.com/pavelmachek/libbattery
+> > > 
+> > > My battery on n900 is currently uncalibrated (and charging), still it
+> > > gets some kind of estimation:
+> > > 
+> > > Battery -1 %
+> > > Seconds -1
+> > > State 1
+> > > Voltage 3.88 V
+> > > Battery 63 %
+> > > 
+> > > Of course, there's a lot more work to be done.
+> > 
+> > Nice start but not a solution to our problem.
+> > 
+> > Our problem is that people simply expect that for example https://packages.debian.org/wheezy/xfce/xfce4-battery-plugin
+> > displays the battery percentage.
 > 
-> A good guidance, but HHA and DDRC PMUs are different from L3C PMU, the former
-> share the same SCCL and the latter share the same SCCL and CCL. I will
-> try to deal with this difference in online notifier.
+> I think we could make things compatible with various battery apps by
+> having libbattery write back the capacity percentage and time remaining
+> to the kernel driver via sysfs or a dev entry. Then the kernel interface
+> can just display the data to whatever apps.
 
-FWIW, I think it makes sense for each PMU to have its own notifier
-(perhaps with some shared code that each calls to do the migration).
+Hmm. This could be as simple as providing symlink from
+/sys/class/power/userland-battery to some place writable by
+userspace...
 
-I just want to avoid the smp_call_function_single() at probe time, as
-that doesn't work in some cases.
-
-Thanks,
-Mark.
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171018/98eb36a1/attachment.sig>
