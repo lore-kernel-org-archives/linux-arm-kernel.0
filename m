@@ -1,48 +1,69 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 18 Oct 2017 16:31:36 +0800
-Subject: [PATCH v2 6/8] ARM: dts: sun8i: a83t: Move mmc1 pinctrl setting to
- dtsi file
+Date: Wed, 18 Oct 2017 16:31:37 +0800
+Subject: [PATCH v2 7/8] ARM: dts: sun8i: a83t: cubietruck-plus: Enable AP6330
+ WiFi on mmc1
 In-Reply-To: <20171018083138.14517-1-wens@csie.org>
 References: <20171018083138.14517-1-wens@csie.org>
-Message-ID: <20171018083138.14517-7-wens@csie.org>
+Message-ID: <20171018083138.14517-8-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mmc1 only has 1 possible pinmux setting.
+The WiFi side of the AP6330 WiFi/BT combo module is connected to
+mmc1. There are also GPIOs for enable and interrupts. An external
+clock from the AC100 RTC is also used.
 
-Move any settings to the dtsi file and set it by default.
+Enable WiFi on this board by enabling mmc1 and adding the power
+sequencing clocks and GPIO, as well as the chip's interrupt line.
+
+For the WiFi module to correctly detect the frequency of its main
+oscillator, the external low power clock must be set to 32768 Hz.
+
+Their does not seem to be proper out-of-band interrupt support
+for the BCM4330 chip within the AP6330 module. This part is left
+out for now.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts | 2 --
- arch/arm/boot/dts/sun8i-a83t.dtsi         | 2 ++
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
-index 723641f56a74..de0be140338b 100644
---- a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
-+++ b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
-@@ -115,8 +115,6 @@
- &mmc1 {
- 	mmc-pwrseq = <&wifi_pwrseq>;
- 	bus-width = <4>;
--	pinctrl-names = "default";
--	pinctrl-0 = <&mmc1_pins>;
- 	vmmc-supply = <&reg_vcc3v3>;
- 	vqmmc-supply = <&reg_vcc3v3>;
- 	non-removable;
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index ce6e887c8938..19acae1b4089 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -212,6 +212,8 @@
- 			resets = <&ccu RST_BUS_MMC1>;
- 			reset-names = "ahb";
- 			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&mmc1_pins>;
- 			status = "disabled";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
+diff --git a/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts b/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
+index bd53e5748991..7f0a3f6d0cf2 100644
+--- a/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
++++ b/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
+@@ -131,6 +131,17 @@
+ 		#sound-dai-cells = <0>;
+ 		compatible = "linux,spdif-dit";
+ 	};
++
++	wifi_pwrseq: wifi_pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		clocks = <&ac100_rtc 1>;
++		clock-names = "ext_clock";
++		/* The WiFi low power clock must be 32768 Hz */
++		assigned-clocks = <&ac100_rtc 1>;
++		assigned-clock-rates = <32768>;
++		/* enables internal regulator and de-asserts reset */
++		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 WL-PMU-EN */
++	};
+ };
+ 
+ &ehci0 {
+@@ -153,6 +164,15 @@
+ 	status = "okay";
+ };
+ 
++&mmc1 {
++	vmmc-supply = <&reg_dcdc1>;
++	vqmmc-supply = <&reg_sw>;
++	mmc-pwrseq = <&wifi_pwrseq>;
++	bus-width = <4>;
++	non-removable;
++	status = "okay";
++};
++
+ &mmc2 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc2_8bit_emmc_pins>;
 -- 
 2.14.2
