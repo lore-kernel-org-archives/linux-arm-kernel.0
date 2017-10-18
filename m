@@ -1,103 +1,87 @@
-From: gilad@benyossef.com (Gilad Ben-Yossef)
-Date: Wed, 18 Oct 2017 08:44:31 +0300
-Subject: [PATCH v9 00/20] simplify crypto wait for async op
-In-Reply-To: <20171017140629.GO20805@n2100.armlinux.org.uk>
-References: <1508059209-25529-1-git-send-email-gilad@benyossef.com>
- <20171017140629.GO20805@n2100.armlinux.org.uk>
-Message-ID: <CAOtvUMfOSo4KSBX3UKtYj1sgmReAdhmmi1MhZGq0aFk-vptahg@mail.gmail.com>
+From: kdinh@apm.com (Khuong Dinh)
+Date: Tue, 17 Oct 2017 22:45:35 -0700
+Subject: [PATCH v4 pci 0/2] PCI/MSI: pci-xgene-msi: Enable MSI support in
+ ACPI boot for X-Gene v1
+In-Reply-To: <20171017133807.GB948@red-moon>
+References: <1506448161-30961-1-git-send-email-kdinh@apm.com>
+ <CAAsHzqv-oQVNm-pNP4Q1KmiSmjaiFx1S4j8uCnij53Te3h8KKg@mail.gmail.com>
+ <20171017133807.GB948@red-moon>
+Message-ID: <CAAsHzqsxMy8On5ThggTwYohqMCLEJTbA=b1LgUPiuKu9C+eHeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 5:06 PM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Sun, Oct 15, 2017 at 10:19:45AM +0100, Gilad Ben-Yossef wrote:
->> Many users of kernel async. crypto services have a pattern of
->> starting an async. crypto op and than using a completion
->> to wait for it to end.
->>
->> This patch set simplifies this common use case in two ways:
->>
->> First, by separating the return codes of the case where a
->> request is queued to a backlog due to the provider being
->> busy (-EBUSY) from the case the request has failed due
->> to the provider being busy and backlogging is not enabled
->> (-EAGAIN).
->>
->> Next, this change is than built on to create a generic API
->> to wait for a async. crypto operation to complete.
->>
->> The end result is a smaller code base and an API that is
->> easier to use and more difficult to get wrong.
->>
->> The patch set was boot tested on x86_64 and arm64 which
->> at the very least tests the crypto users via testmgr and
->> tcrypt but I do note that I do not have access to some
->> of the HW whose drivers are modified nor do I claim I was
->> able to test all of the corner cases.
->>
->> The patch set is based upon linux-next release tagged
->> next-20171013.
+Hi Lorenzo,
+
+On Tue, Oct 17, 2017 at 6:38 AM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> Hi Khuong,
 >
-> Has there been any performance impact analysis of these changes?  I
-> ended up with patches for one of the crypto drivers which converted
-> its interrupt handling to threaded interrupts being reverted because
-> it caused a performance degredation.
+> On Mon, Oct 16, 2017 at 02:19:50PM -0700, Khuong Dinh wrote:
+>> Hi Lorenzo,
+>>   Do you have any comments for this patch?
 >
-> Moving code to latest APIs to simplify it is not always beneficial.
+> I'd have some comments but given that there are related issues with ACPI
+> probe ordering that Marc is trying to solve on his side - I will work
+> with him to see if we can accommodate changes that can solve this issue
+> too.
+>
+> Again - I recognize it is a complex problem (that is not even
+> contemplated by the current ACPI specs), we have to try to make
+> the solution as generic as we can to prevent reinventing the wheel
+> anytime a sligthly different issue (related to ACPI probe ordering)
+> comes up.
+>
+> Leave it to me (us) and I will get back to you on this.
 
-I agree with the sentiment but I believe this one is justified.
+Thanks for helping to take care of the generic ACPI probe ordering issue.
+Given that the patch 'PCI/MSI: pci-xgene-msi: Enable MSI support in ACPI
+boot for X-Gene v1" adds only the ACPI ID, can you pull in this patch
+independently from the ACPI probe ordering issue?
 
-This patch set basically does 3 things:
+Best regards,
+Khuong Dinh
 
-1.  Replace one immediate value (-EBUSY) by another (-EAGAIN). Mostly it's just
-s/EBUSY/EAGAIN/g. In very few places this resulted very trivial code
-changes. I don't
-foresee this having any effect on performance.
-
-2. Removal of some conditions and/or conditional jumps that were used to discern
-between two different cases which are now now easily tested for by the
-different return
-value. If at all, this will be an increase in performance, although I
-don't expect it to be
-noticeable.
-
-3. Replacing a whole bunch of open coded code and data structures
-which were pretty much
-cut and pasted from the Documentation and therefore identical, with a
-single copy thereof.
-
-Every place that I found that deviated slightly from the identical
-pattern, it turned out to be
-a bug of some sorts and patches for those were sent and accepted already.
-
-So, we might be losing a few inline optimization opportunities but
-we're gaining better
-cache utilization. Again, I don't expect any of this to have a
-noticeable effect to either
-direction.
-
-I did run the changed code as best I could and did not notice any
-performance changes and
-none of the testers and maintainers that ACKed mentioned any.
-
-Having said that, it's a big change that touches many places,
-sub-systems and drivers. I do
-not claim to have thoroughly tested for performance all the changes in
-person. In some cases,
-I don't even have access to the specialized hardware. I did get a
-reasonable amount of review
-and testers I believe - would always love to see more :-)
-
-Many thanks,
-Gilad
-
-
-
-
--- 
-Gilad Ben-Yossef
-Chief Coffee Drinker
-
-"If you take a class in large-scale robotics, can you end up in a
-situation where the homework eats your dog?"
- -- Jean-Baptiste Queru
+> Thanks,
+> Lorenzo
+>
+>> Best regards,
+>> Khuong Dinh
+>>
+>> On Tue, Sep 26, 2017 at 10:49 AM, Khuong Dinh <kdinh@apm.com> wrote:
+>> > This patch set enables ACPI MSI support for X-Gene PCIe v1 hardware
+>> > and provides the proper MSI driver initialization ordering.
+>> >
+>> > Signed-off-by: Khuong Dinh <kdinh@apm.com>
+>> > ---
+>> > v4:
+>> >  - Remove Marc Zyngier ACK in v2
+>> >  - Use acpi_bus_scan on MSI controller handle when MSI device is found
+>> >  - Register ACPI MSI driver when MSI device is found instead of using
+>> >  subsys_initcall
+>> >  - Split ACPI MSI driver support into two patches - one to enable MSI
+>> > support for X-Gene PCIe v1 hardware, one to enforce MSI driver loaded
+>> > before PCIe controller driver in ACPI boot mode
+>> > v3:
+>> >  - Input X-Gene MSI base address for irq_domain_alloc_fwnode
+>> >  - Add a hook to enforce X-Gene MSI be probed prior acpi_bus_scan happens
+>> > v2:
+>> >  - Verify with BIOS version 3.06.25 and 3.07.09
+>> > v1:
+>> >  - Initial version
+>> > ---
+>> >
+>> > Khuong Dinh (2):
+>> >   PCI/MSI: pci-xgene-msi: Enable MSI support in ACPI boot for X-Gene v1
+>> >   PCI/MSI: Enforce MSI driver loaded before PCIe in ACPI boot
+>> >
+>> >  drivers/acpi/Makefile            |    2 +-
+>> >  drivers/acpi/acpi_msi.c          |   86 ++++++++++++++++++++++++++++++++++++++
+>> >  drivers/acpi/acpi_platform.c     |    3 +-
+>> >  drivers/acpi/internal.h          |    1 +
+>> >  drivers/acpi/scan.c              |    1 +
+>> >  drivers/pci/host/pci-xgene-msi.c |   60 ++++++++++++++++++++++++--
+>> >  include/linux/acpi_msi.h         |   37 ++++++++++++++++
+>> >  7 files changed, 183 insertions(+), 7 deletions(-)
+>> >  create mode 100644 drivers/acpi/acpi_msi.c
+>> >  create mode 100644 include/linux/acpi_msi.h
+>> >
