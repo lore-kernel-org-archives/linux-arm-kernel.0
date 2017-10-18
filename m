@@ -1,89 +1,122 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 18 Oct 2017 18:03:03 +0200
-Subject: [PATCH v5 8/9] drm/bridge/synopsys: dw-hdmi: Do not use device's
- drvdata
-In-Reply-To: <20171018120944.7819-9-jeffy.chen@rock-chips.com>
-References: <20171018120944.7819-1-jeffy.chen@rock-chips.com>
- <20171018120944.7819-9-jeffy.chen@rock-chips.com>
-Message-ID: <40e49fc2-fd7d-12ab-fe49-b4d0586b65a1@baylibre.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 18 Oct 2017 17:03:40 +0100
+Subject: [PATCH v3 06/20] KVM: arm/arm64: Check that system supports split
+ eoi/deactivate
+In-Reply-To: <20171018134145.GH8900@cbox> (Christoffer Dall's message of "Wed,
+ 18 Oct 2017 15:41:45 +0200")
+References: <20170923004207.22356-1-cdall@linaro.org>
+ <20170923004207.22356-7-cdall@linaro.org>
+ <edc875ee-335c-56c1-0cbc-9e45f7915529@arm.com>
+ <20171018134145.GH8900@cbox>
+Message-ID: <874lqwjvdv.fsf@on-the-bus.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/10/2017 14:09, Jeffy Chen wrote:
-> Let plat drivers own the drvdata, so that they could cleanup resources
-> in their unbind().
-> 
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> ---
-> 
-> Changes in v5: None
-> 
->  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c   | 43 ++++++++++-------------------
->  drivers/gpu/drm/imx/dw_hdmi-imx.c           | 22 +++++++++------
->  drivers/gpu/drm/meson/meson_dw_hdmi.c       | 20 ++++++++++----
->  drivers/gpu/drm/rcar-du/rcar_dw_hdmi.c      | 14 ++++++++--
->  drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 23 ++++++++-------
->  include/drm/bridge/dw_hdmi.h                | 17 ++++++------
->  6 files changed, 77 insertions(+), 62 deletions(-)
-> 
+On Wed, Oct 18 2017 at  3:41:45 pm BST, Christoffer Dall <cdall@linaro.org> wrote:
+> On Mon, Oct 09, 2017 at 05:47:18PM +0100, Marc Zyngier wrote:
+>> On 23/09/17 01:41, Christoffer Dall wrote:
+>> > Some systems without proper firmware and/or hardware description data
+>> > don't support the split EOI and deactivate operation.
+>> > 
+>> > On such systems, we cannot leave the physical interrupt active after the
+>> > timer handler on the host has run, so we cannot support KVM with an
+>> > in-kernel GIC with the timer changes we are about to introduce.
+>> > 
+>> > This patch makes sure that trying to initialize the KVM GIC code will
+>> > fail on such systems.
+>> > 
+>> > Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> > Signed-off-by: Christoffer Dall <cdall@linaro.org>
+>> > ---
+>> >  drivers/irqchip/irq-gic.c | 3 ++-
+>> >  1 file changed, 2 insertions(+), 1 deletion(-)
+>> > 
+>> > diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+>> > index f641e8e..ab12bf4 100644
+>> > --- a/drivers/irqchip/irq-gic.c
+>> > +++ b/drivers/irqchip/irq-gic.c
+>> > @@ -1420,7 +1420,8 @@ static void __init gic_of_setup_kvm_info(struct device_node *node)
+>> >  	if (ret)
+>> >  		return;
+>> >  
+>> > -	gic_set_kvm_info(&gic_v2_kvm_info);
+>> > +	if (static_key_true(&supports_deactivate))
+>> > +		gic_set_kvm_info(&gic_v2_kvm_info);
+>> >  }
+>> >  
+>> >  int __init
+>> > 
+>> 
+>> Should we add the same level of checking on the ACPI path, just for the
+>> sake symmetry?
+>
+> Yes, we should, if anyone is crazy enough to use ACPI :)
 
-[...]
+Sadly, the madness is becoming commonplace.
 
-> diff --git a/drivers/gpu/drm/meson/meson_dw_hdmi.c b/drivers/gpu/drm/meson/meson_dw_hdmi.c
-> index cef414466f9f..fc29f69f7108 100644
-> --- a/drivers/gpu/drm/meson/meson_dw_hdmi.c
-> +++ b/drivers/gpu/drm/meson/meson_dw_hdmi.c
-> @@ -138,6 +138,8 @@ struct meson_dw_hdmi {
->  	struct clk *hdmi_pclk;
->  	struct clk *venci_clk;
->  	u32 irq_stat;
+>> 
+>> Also, do we need to add the same thing for GICv3?
+>> 
+>
+> Why would split EOI/deactivate not be available on GICv3, actually?  It
+> looks like this is not supported unless you have EL2, but I can't seem
+> to find anything in the spec for this, and KVM should support
+> EOI/deactivate for GICv3 guests I think.  Am I missing something?
+
+No, you're not. This is just a Linux choice (or rather mine) not to use
+EOImode=1 in guests (or anything booted at EL1), as we don't really need
+the two-stage deactivate in that situation (it is pure overhead).
+
+I'm just worried of potentially broken HW, and would like to make sure
+that when we force EOImode=0 on these systems, we truly tell KVM about
+it.
+
+> Assuming I'm wrong about GICv3, which I probably am, how does this look
+> (on top of the posted patch):
+>
+> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+> index 519149e..aed524c 100644
+> --- a/drivers/irqchip/irq-gic-v3.c
+> +++ b/drivers/irqchip/irq-gic-v3.c
+> @@ -1228,7 +1228,9 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
+>  		goto out_unmap_rdist;
+>  
+>  	gic_populate_ppi_partitions(node);
+> -	gic_of_setup_kvm_info(node);
 > +
-> +	struct dw_hdmi *hdmi;
->  };
->  #define encoder_to_meson_dw_hdmi(x) \
->  	container_of(x, struct meson_dw_hdmi, encoder)
-> @@ -526,7 +528,7 @@ static irqreturn_t dw_hdmi_top_thread_irq(int irq, void *dev_id)
->  		if (stat & HDMITX_TOP_INTR_HPD_RISE)
->  			hpd_connected = true;
+> +	if (static_key_true(&supports_deactivate))
+> +		gic_of_setup_kvm_info(node);
+>  	return 0;
 >  
-> -		dw_hdmi_setup_rx_sense(dw_hdmi->dev, hpd_connected,
-> +		dw_hdmi_setup_rx_sense(dw_hdmi->hdmi, hpd_connected,
->  				       hpd_connected);
+>  out_unmap_rdist:
+> @@ -1517,7 +1519,9 @@ gic_acpi_init(struct acpi_subtable_header *header, const unsigned long end)
+>  		goto out_fwhandle_free;
 >  
->  		drm_helper_hpd_irq_event(dw_hdmi->encoder.dev);
-> @@ -865,9 +867,14 @@ static int meson_dw_hdmi_bind(struct device *dev, struct device *master,
->  	dw_plat_data->input_bus_format = MEDIA_BUS_FMT_YUV8_1X24;
->  	dw_plat_data->input_bus_encoding = V4L2_YCBCR_ENC_709;
->  
-> -	ret = dw_hdmi_bind(pdev, encoder, &meson_dw_hdmi->dw_plat_data);
-> -	if (ret)
-> -		return ret;
-> +	meson_dw_hdmi->hdmi = dw_hdmi_bind(pdev, encoder,
-> +					   &meson_dw_hdmi->dw_plat_data);
-> +	if (IS_ERR(meson_dw_hdmi->hdmi)) {
-> +		encoder->funcs->destroy(encoder);
-> +		return PTR_ERR(meson_dw_hdmi->hdmi);
-> +	}
+>  	acpi_set_irq_model(ACPI_IRQ_MODEL_GIC, domain_handle);
+> -	gic_acpi_setup_kvm_info();
 > +
-> +	dev_set_drvdata(dev, meson_dw_hdmi);
+> +	if (static_key_true(&supports_deactivate))
+> +		gic_acpi_setup_kvm_info();
 >  
->  	DRM_DEBUG_DRIVER("HDMI controller initialized\n");
+>  	return 0;
 >  
-> @@ -877,7 +884,10 @@ static int meson_dw_hdmi_bind(struct device *dev, struct device *master,
->  static void meson_dw_hdmi_unbind(struct device *dev, struct device *master,
->  				   void *data)
->  {
-> -	dw_hdmi_unbind(dev);
-> +	struct meson_dw_hdmi *meson_dw_hdmi = dev_get_drvdata(dev);
-> +
-> +	dw_hdmi_unbind(meson_dw_hdmi->hdmi);
-> +	meson_dw_hdmi->encoder.funcs->destroy(&meson_dw_hdmi->encoder);
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index ab12bf4..121af5c 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -1653,7 +1653,8 @@ static int __init gic_v2_acpi_init(struct acpi_subtable_header *header,
+>  	if (IS_ENABLED(CONFIG_ARM_GIC_V2M))
+>  		gicv2m_init(NULL, gic_data[0].domain);
+>  
+> -	gic_acpi_setup_kvm_info();
+> +	if (static_key_true(&supports_deactivate))
+> +		gic_acpi_setup_kvm_info();
+>  
+>  	return 0;
 >  }
->  
->  static const struct component_ops meson_dw_hdmi_ops = {
 
-[...]
+Yup, looks good to me!
 
-For meson/meson_dw_hdmi.c :
-
-Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+	M.
+-- 
+Jazz is not dead, it just smell funny.
