@@ -1,118 +1,89 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 18 Oct 2017 13:24:33 +0900
-Subject: [PATCH 2/6] arm64: dts: uniphier: add GPIO controller nodes
+Date: Wed, 18 Oct 2017 13:24:34 +0900
+Subject: [PATCH 3/6] ARM: dts: uniphier: route on-board device IRQ to GPIO
+ controller
 In-Reply-To: <1508300677-23190-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1508300677-23190-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1508300677-23190-3-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1508300677-23190-4-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPIO controller also acts as an interrupt controller and the
-interrupt lines are connected to the AIDET block.
+Interrupt lines from on-board devices are connected to the GPIO
+controller.  Handle this correctly.
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 25 ++++++++++++++++++++++++
- arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 19 ++++++++++++++++++
- arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi | 19 ++++++++++++++++++
- 3 files changed, 63 insertions(+)
+ arch/arm/boot/dts/uniphier-ld4-ref.dts       | 2 +-
+ arch/arm/boot/dts/uniphier-ld6b-ref.dts      | 2 +-
+ arch/arm/boot/dts/uniphier-pro4-ref.dts      | 2 +-
+ arch/arm/boot/dts/uniphier-sld8-ref.dts      | 2 +-
+ arch/arm/boot/dts/uniphier-support-card.dtsi | 1 +
+ 5 files changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-index ee4aff5..99f14cc 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-@@ -161,6 +161,31 @@
- 			};
- 		};
+diff --git a/arch/arm/boot/dts/uniphier-ld4-ref.dts b/arch/arm/boot/dts/uniphier-ld4-ref.dts
+index b3aaab3..148e7bb 100644
+--- a/arch/arm/boot/dts/uniphier-ld4-ref.dts
++++ b/arch/arm/boot/dts/uniphier-ld4-ref.dts
+@@ -38,7 +38,7 @@
+ };
  
-+		gpio: gpio at 55000000 {
-+			compatible = "socionext,uniphier-gpio";
-+			reg = <0x55000000 0x200>;
-+			interrupt-parent = <&aidet>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-ranges = <&pinctrl 0 0 0>,
-+				      <&pinctrl 43 0 0>,
-+				      <&pinctrl 51 0 0>,
-+				      <&pinctrl 96 0 0>,
-+				      <&pinctrl 160 0 0>,
-+				      <&pinctrl 184 0 0>;
-+			gpio-ranges-group-names = "gpio_range0",
-+						  "gpio_range1",
-+						  "gpio_range2",
-+						  "gpio_range3",
-+						  "gpio_range4",
-+						  "gpio_range5";
-+			ngpios = <200>;
-+			socionext,interrupt-ranges = <0 48 16>, <16 154 5>,
-+						     <21 217 3>;
-+		};
-+
- 		i2c0: i2c at 58780000 {
- 			compatible = "socionext,uniphier-fi2c";
- 			status = "disabled";
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-index a29c279..17c1c92 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-@@ -230,6 +230,25 @@
- 			};
- 		};
+ &ethsc {
+-	interrupts = <0 49 4>;
++	interrupts = <1 8>;
+ };
  
-+		gpio: gpio at 55000000 {
-+			compatible = "socionext,uniphier-gpio";
-+			reg = <0x55000000 0x200>;
-+			interrupt-parent = <&aidet>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-ranges = <&pinctrl 0 0 0>,
-+				      <&pinctrl 96 0 0>,
-+				      <&pinctrl 160 0 0>;
-+			gpio-ranges-group-names = "gpio_range0",
-+						  "gpio_range1",
-+						  "gpio_range2";
-+			ngpios = <205>;
-+			socionext,interrupt-ranges = <0 48 16>, <16 154 5>,
-+						     <21 217 3>;
-+		};
-+
- 		i2c0: i2c at 58780000 {
- 			compatible = "socionext,uniphier-fi2c";
- 			status = "disabled";
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi b/arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi
-index 384729f..87cb290 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi
-+++ b/arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi
-@@ -178,6 +178,25 @@
- 			clocks = <&peri_clk 3>;
- 		};
+ &serial0 {
+diff --git a/arch/arm/boot/dts/uniphier-ld6b-ref.dts b/arch/arm/boot/dts/uniphier-ld6b-ref.dts
+index 2188d11..ec2a098 100644
+--- a/arch/arm/boot/dts/uniphier-ld6b-ref.dts
++++ b/arch/arm/boot/dts/uniphier-ld6b-ref.dts
+@@ -40,7 +40,7 @@
+ };
  
-+		gpio: gpio at 55000000 {
-+			compatible = "socionext,uniphier-gpio";
-+			reg = <0x55000000 0x200>;
-+			interrupt-parent = <&aidet>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-ranges = <&pinctrl 0 0 0>,
-+				      <&pinctrl 96 0 0>,
-+				      <&pinctrl 160 0 0>;
-+			gpio-ranges-group-names = "gpio_range0",
-+						  "gpio_range1",
-+						  "gpio_range2";
-+			ngpios = <286>;
-+			socionext,interrupt-ranges = <0 48 16>, <16 154 5>,
-+						     <21 217 3>;
-+		};
-+
- 		i2c0: i2c at 58780000 {
- 			compatible = "socionext,uniphier-fi2c";
- 			status = "disabled";
+ &ethsc {
+-	interrupts = <0 52 4>;
++	interrupts = <4 8>;
+ };
+ 
+ &serial0 {
+diff --git a/arch/arm/boot/dts/uniphier-pro4-ref.dts b/arch/arm/boot/dts/uniphier-pro4-ref.dts
+index 903df63..7316cc6 100644
+--- a/arch/arm/boot/dts/uniphier-pro4-ref.dts
++++ b/arch/arm/boot/dts/uniphier-pro4-ref.dts
+@@ -40,7 +40,7 @@
+ };
+ 
+ &ethsc {
+-	interrupts = <0 50 4>;
++	interrupts = <2 8>;
+ };
+ 
+ &serial0 {
+diff --git a/arch/arm/boot/dts/uniphier-sld8-ref.dts b/arch/arm/boot/dts/uniphier-sld8-ref.dts
+index 5accd3c..4ec48a1 100644
+--- a/arch/arm/boot/dts/uniphier-sld8-ref.dts
++++ b/arch/arm/boot/dts/uniphier-sld8-ref.dts
+@@ -38,7 +38,7 @@
+ };
+ 
+ &ethsc {
+-	interrupts = <0 48 4>;
++	interrupts = <0 8>;
+ };
+ 
+ &serial0 {
+diff --git a/arch/arm/boot/dts/uniphier-support-card.dtsi b/arch/arm/boot/dts/uniphier-support-card.dtsi
+index 6c825f1..c6d99c4 100644
+--- a/arch/arm/boot/dts/uniphier-support-card.dtsi
++++ b/arch/arm/boot/dts/uniphier-support-card.dtsi
+@@ -16,6 +16,7 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		ranges = <0x00000000 1 0x01f00000 0x00100000>;
++		interrupt-parent = <&gpio>;
+ 
+ 		ethsc: ethernet at 0 {
+ 			compatible = "smsc,lan9118", "smsc,lan9115";
 -- 
 2.7.4
