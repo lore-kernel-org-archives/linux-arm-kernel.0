@@ -1,161 +1,108 @@
-From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
-Date: Wed, 18 Oct 2017 08:25:31 +0200
-Subject: [PATCH v2 01/16] dt-bindings: mvebu-uart: update documentation
- with extended UART
-In-Reply-To: <20171017220022.kr2qiodln3qfkbwe@rob-hp-laptop>
-References: <20171013090200.31034-1-miquel.raynal@free-electrons.com>
- <20171013090200.31034-2-miquel.raynal@free-electrons.com>
- <20171017220022.kr2qiodln3qfkbwe@rob-hp-laptop>
-Message-ID: <20171018082531.59a2e5d0@xps13>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Wed, 18 Oct 2017 14:33:19 +0800
+Subject: ARM64: Regression with commit e3067861ba66 ("arm64: add basic
+ VMAP_STACK support")
+In-Reply-To: <20171017095643.7bzihiupuxsnkujn@lakrids.cambridge.arm.com>
+References: <20171016011723.GB12470@leoy-linaro>
+ <20171016134819.jv3udrcwsedc4cgs@lakrids.cambridge.arm.com>
+ <34ccf02d-fd65-bade-327a-ed8df1d3eea5@arm.com>
+ <20171016142622.6yjuzdwxxw3sxjed@lakrids.cambridge.arm.com>
+ <dad6105d-1ec0-d5a6-e78c-ff832afe3f9e@arm.com>
+ <20171017003054.GB19504@leoy-ThinkPad-T440>
+ <20171017092914.op4hlzaaqfrpoizm@lakrids.cambridge.arm.com>
+ <CAKv+Gu8u1cc14c5ZDeq=oNB9DC2RcHzXu8e9Cc+noHT4w+4mpg@mail.gmail.com>
+ <20171017093658.GA32000@leoy-linaro>
+ <20171017095643.7bzihiupuxsnkujn@lakrids.cambridge.arm.com>
+Message-ID: <20171018063319.GH19504@leoy-ThinkPad-T440>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-On Tue, 17 Oct 2017 17:00:22 -0500
-Rob Herring <robh@kernel.org> wrote:
-
-> On Fri, Oct 13, 2017 at 11:01:45AM +0200, Miquel Raynal wrote:
-> > Update the Device Tree binding documentation for the Marvell EBU
-> > UART, in order to allow describing the extended UART IP block, in
-> > addition to the already supported standard UART IP. This requires
-> > adding a new compatible string, the introduction of a clocks
-> > property, and extensions to the interrupts property.
+On Tue, Oct 17, 2017 at 10:56:43AM +0100, Mark Rutland wrote:
+> On Tue, Oct 17, 2017 at 05:36:58PM +0800, Leo Yan wrote:
+> > On Tue, Oct 17, 2017 at 10:32:21AM +0100, Ard Biesheuvel wrote:
 > > 
-> > Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
-> > Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > ---
-> >  .../devicetree/bindings/serial/mvebu-uart.txt      | 49
-> > +++++++++++++++++++--- 1 file changed, 44 insertions(+), 5
-> > deletions(-)
+> > [...]
 > > 
-> > diff --git
-> > a/Documentation/devicetree/bindings/serial/mvebu-uart.txt
-> > b/Documentation/devicetree/bindings/serial/mvebu-uart.txt index
-> > d37fabe17bd1..3df3a3fab4bb 100644 ---
-> > a/Documentation/devicetree/bindings/serial/mvebu-uart.txt +++
-> > b/Documentation/devicetree/bindings/serial/mvebu-uart.txt @@ -1,13
-> > +1,52 @@ -* Marvell UART : Non standard UART used in some of
-> > Marvell EBU SoCs (e.g., Armada-3700) +* Marvell UART : Non standard
-> > UART used in some of Marvell EBU SoCs
-> > +                 e.g., Armada-3700.
-> >  
-> >  Required properties:
-> > -- compatible: "marvell,armada-3700-uart"
-> > +- compatible:
-> > +    - "marvell,armada-3700-uart" for the standard variant of the
-> > UART
-> > +      (32 bytes FIFO, no DMA, level interrupts, 8-bit access to the
-> > +      FIFO, baudrate limited to 230400).
-> > +    - "marvell,armada-3700-uart-ext" for the extended variant of
-> > the
-> > +      UART (128 bytes FIFO, DMA, front interrupts, 8-bit or 32-bit
-> > +      accesses to the FIFO, baudrate unlimited by the dividers).  
-> 
-> What do you call the next extended version?
-> marvell,armada-3700-uart-ext-ext?
-
-I don't know what you mean by "next extended version"?
-
-> 
-> This is different versions of UART on the same chip?
-
-Today in mainline there is support for the A3700 UART IP.
-This series add support for another IP, based on the A3700, but with
-extended features (explaining the -ext suffix).
-
-Can you precise what is bothering you?
-
-> 
-> >  - reg: offset and length of the register set for the device.
-> > -- interrupts: device interrupt
-> > +- clocks: UART reference clock used to derive the baudrate (only
-> > +      mandatory with "marvell,armada-3700-uart-ext" compatible).  
-> 
-> How is this optional? The freq is fixed if not present? If so, what 
-> frequency?
-
-The "clocks" property should not be optional at all but that is how the
-bindings were handled before this series, so I can't tell now that
-this property is mandatory as it would break compatibility with older
-versions of the driver.
-
-When no clock is provided, the frequency is fixed by the bootloader
-and cannot be changed. There is no standard frequency for it but the
-one chosen by the bootloader often is 115200 as the UART is usually
-used as the serial console.
-
-Because the bootloader does only initialize the UART in use for the
-serial console, the clock is mandatory when using another port or it
-will not work at all.
-
-> 
-> > +- interrupts:
-> > +    - Must contain three elements for the standard variant of the
-> > IP
-> > +      (marvell,armada-3700-uart): "uart-sum", "uart-tx" and
-> > "uart-rx",
-> > +      respectively the UART sum interrupt, the UART TX interrupt
-> > and
-> > +      UART RX interrupt. A corresponding interrupt-names property
-> > must
-> > +      be defined.
-> > +    - Must contain two elements for the extended variant of the IP
-> > +      (marvell,armada-3700-uart-ext): "uart-tx" and "uart-rx",
-> > +      respectively the UART TX interrupt and the UART RX
-> > interrupt. A
-> > +      corresponding interrupts-names property must be defined.
-> > +    - For backward compatibility reasons, a single element
-> > interrupts
-> > +      property is also supported for the standard variant of the
-> > IP,
-> > +      containing only the UART sum interrupt. This form is
-> > deprecated
-> > +      and should no longer be used.
-> >  
-> >  Example:
-> > -	serial at 12000 {
-> > +	uart0: serial at 12000 {
-> >  		compatible = "marvell,armada-3700-uart";
-> >  		reg = <0x12000 0x200>;
-> > -		interrupts = <43>;
-> > +		clocks = <&xtalclk>;
-> > +		interrupts =
-> > +		<GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
-> > +		<GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
-> > +		<GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
-> > +		interrupt-names = "uart-sum", "uart-tx", "uart-rx";
-> > +		status = "disabled";  
-> 
-> Don't show status in examples.
-
-Ok.
-
-> 
-> > +	};
-> > +
-> > +	uart1: serial at 12200 {
-> > +		compatible = "marvell,armada-3700-uart-ext";
-> > +		reg = <0x12200 0x30>;
-> > +		clocks = <&xtalclk>;
-> > +		interrupts =
-> > +		<GIC_SPI 30 IRQ_TYPE_EDGE_RISING>,
-> > +		<GIC_SPI 31 IRQ_TYPE_EDGE_RISING>;
-> > +		interrupt-names = "uart-tx", "uart-rx";
-> > +		status = "disabled";
-> >  	};
-> > -- 
-> > 2.11.0
+> > > > AFAICT, erratum 836870 results in livelock rather than memory
+> > > > corruption, so I think we can ignore that.
+> > > >
+> > > > I'm a little worried by erratum 843419. The VMAP_STACK patches changed
+> > > > {adr,ldr}_this_cpu (and some users thereof), and it's possible we're
+> > > > managing to tickle that issue.
+> > > >
+> > > > If you still have an affected kernel, could you dump the output of:
+> > > >
+> > > > $ aarch64-linux-gnu-objdump -d vmlinux | grep -A 3 'ff[8c]:\s\+[a-f0-9]\+\s\+adrp'
+> > > >
+> > > > ... that would show us if there are any affected sequences.
+> > > >
+> > > > From a quick scan of my own vmlinux build from commit e3067861ba66, I
+> > > > didn't see any, but it's possible this depends on the config used.
+> > > >
+> > > 
+> > > The linker should take care of that: it scans the entire executable,
+> > > and inserts a veneer if an adrp happens to end up at a vulnerable
+> > > offset in the page.
 > > 
+> > Is this dependent on any GCC version?
+> 
+> It is, but we should warn if CONFIG_ARM64_ERRATUM_843419 is selected and
+> the linked doesn't support the --fix-cortex-a53-843419 option:
+> 
+>   ld does not support --fix-cortex-a53-843419; kernel may be susceptible to erratum)
+> 
+> ... do you see this when building the kernel?
+
+No, I don't see this building warning.
+
+Thanks you and Ard for confirmation.
+
+> > I am using GCC 6.2.1, so I get many affected sequences with Mark's command:
+> 
+> I beleive these are all beningn. AFAICT, none of these meet the conditions for
+> sequence 1 or sequence 2 affected by the erratum. e.g. many don't have
+> loads/stores using the adrp result.
+> 
+> Thanks,
+> Mark.
+> 
+> > leoy at leoy-linaro:~/Work/reference/opensource/linux$ aarch64-linux-gnu-objdump -d vmlinux | grep -A 3 'ff[8c]:\s\+[a-f0-9]\+\s\+adrp'
+> > ffff0000080a1ffc:	90007340 	adrp	x0, ffff000008f09000 <page_wait_table+0x1280>
+> > ffff0000080a2000:	a900fedf 	stp	xzr, xzr, [x22,#8]
+> > ffff0000080a2004:	91374000 	add	x0, x0, #0xdd0
+> > ffff0000080a2008:	f9000ec0 	str	x0, [x22,#24]
 > > --
-> > To unsubscribe from this list: send the line "unsubscribe
-> > devicetree" in the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html  
-
-Thanks,
-Miqu?l
-
--- 
-Miquel Raynal, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> > ffff0000080b6ff8:	b0007ce0 	adrp	x0, ffff000009053000 <chunk_hash_heads+0x680>
+> > ffff0000080b6ffc:	52901801 	mov	w1, #0x80c0                	// #32960
+> > ffff0000080b7000:	72a02801 	movk	w1, #0x140, lsl #16
+> > ffff0000080b7004:	9102e273 	add	x19, x19, #0xb8
+> > --
+> > ffff0000080f1ff8:	d00070a1 	adrp	x1, ffff000008f07000 <bit_wait_table+0xd80>
+> > ffff0000080f1ffc:	f9406402 	ldr	x2, [x0,#200]
+> > ffff0000080f2000:	f9405c03 	ldr	x3, [x0,#184]
+> > ffff0000080f2004:	14002915 	b	ffff0000080fc458 <e843419@00ce_00000e94_3c4>
+> > --
+> > ffff0000080feff8:	90000002 	adrp	x2, ffff0000080fe000 <prio_changed_rt+0x88>
+> > ffff0000080feffc:	9136e042 	add	x2, x2, #0xdb8
+> > ffff0000080ff000:	f9000462 	str	x2, [x3,#8]
+> > ffff0000080ff004:	f9448e62 	ldr	x2, [x19,#2328]
+> > --
+> > ffff00000810affc:	f0006fe1 	adrp	x1, ffff000008f09000 <page_wait_table+0x1280>
+> > ffff00000810b000:	f94017a2 	ldr	x2, [x29,#40]
+> > ffff00000810b004:	aa1303e0 	mov	x0, x19
+> > ffff00000810b008:	1400013d 	b	ffff00000810b4fc <e843419@00e7_000010c5_338>
+> > --
+> > ffff00000811dff8:	d0005c80 	adrp	x0, ffff000008caf000 <kallsyms_token_index+0xaf00>
+> > ffff00000811dffc:	912be021 	add	x1, x1, #0xaf8
+> > ffff00000811e000:	912ae000 	add	x0, x0, #0xab8
+> > ffff00000811e004:	97ffe6ab 	bl	ffff000008117ab0 <printk>
+> > --
+> > ffff000008137ff8:	f0004443 	adrp	x3, ffff0000089c2000 <clock_monotonic+0x50>
+> > ffff000008137ffc:	910ac042 	add	x2, x2, #0x2b0
+> > ffff000008138000:	9113c063 	add	x3, x3, #0x4f0
+> > ffff000008138004:	71000c9f 	cmp	w4, #0x3
+> > --
+> > ffff00000815eff8:	b0005aa1 	adrp	x1, ffff000008cb3000 <kallsyms_token_index+0xef00>
+> > ffff00000815effc:	91362021 	add	x1, x1, #0xd88
+> > ffff00000815f000:	97ffffc8 	bl	ffff00000815ef20 <audit_log_format>
+> > ffff00000815f004:	b94023a1 	ldr	w1, [x29,#32]
