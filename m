@@ -1,79 +1,80 @@
-From: petrcvekcz@gmail.com (Petr Cvek)
-Date: Wed, 18 Oct 2017 11:57:13 +0200
-Subject: ARM: pxa/corgi: armv5te kernel 4.12 fails to decompress compiled
- with gcc7
-In-Reply-To: <20171017203311.obi4nqtdvlrxwarm@darkstar.musicnaut.iki.fi>
-References: <CAAQYJAvR2_wqf2Axe4aVMOu08t7w5tNEjK0s3fw_oemtqCRo7g@mail.gmail.com>
- <87a83zsiid.fsf@belgarion.home>
- <CAAQYJAtEmJMc766kUx+bhFCNQKmwK53nSDNL0nFz-9UXSUO5CQ@mail.gmail.com>
- <20171014215042.kfrhb2kjhm7wb7vb@darkstar.musicnaut.iki.fi>
- <87mv4txuid.fsf@belgarion.home>
- <20171015104640.hazujjkbqyik7fgg@darkstar.musicnaut.iki.fi>
- <f1631768-b26e-62ae-db1f-65686cd0c4de@gmail.com>
- <20171017203311.obi4nqtdvlrxwarm@darkstar.musicnaut.iki.fi>
-Message-ID: <8d660a74-afd5-a757-8a59-39283404c2f9@gmail.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Wed, 18 Oct 2017 12:00:07 +0200
+Subject: [PATCH v3 02/20] arm64: Use physical counter for in-kernel reads
+In-Reply-To: <20171017153305.GB19711@arm.com>
+References: <20170923004207.22356-1-cdall@linaro.org>
+ <20170923004207.22356-3-cdall@linaro.org>
+ <20171017153305.GB19711@arm.com>
+Message-ID: <20171018100007.GK8326@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne 17.10.2017 v 22:33 Aaro Koskinen napsal(a):
-> Hi,
+On Tue, Oct 17, 2017 at 04:33:05PM +0100, Will Deacon wrote:
+> Hi Christoffer,
 > 
-Hi,
-
-> On Mon, Oct 16, 2017 at 01:55:18PM +0200, Petr Cvek wrote:
->> Dne 15.10.2017 v 12:46 Aaro Koskinen napsal(a):
->>> This seems to be simpler to debug/reproduce using busybox. Compiling
->>> just busybox with GCC 7.2 and march=armv5te/mtune=xscale already
->>> produces failing xz decompression:
->>
->> Does it fail too when compiled with gcc 7.2 and with march=armv5t and/or
->> march=armv4t ?
+> On Sat, Sep 23, 2017 at 02:41:49AM +0200, Christoffer Dall wrote:
+> > Using the physical counter allows KVM to retain the offset between the
+> > virtual and physical counter as long as it is actively running a VCPU.
+> > 
+> > As soon as a VCPU is released, another thread is scheduled or we start
+> > running userspace applications, we reset the offset to 0, so that
+> > userspace accessing the virtual timer can still read the cirtual counter
+> > and get the same view of time as the kernel.
+> > 
+> > This opens up potential improvements for KVM performance.
+> > 
+> > VHE kernels or kernels continuing to use the virtual timer are
+> > unaffected.
+> > 
+> > Signed-off-by: Christoffer Dall <cdall@linaro.org>
+> > ---
+> >  arch/arm64/include/asm/arch_timer.h  | 9 ++++-----
+> >  drivers/clocksource/arm_arch_timer.c | 3 +--
+> >  2 files changed, 5 insertions(+), 7 deletions(-)
+> > 
+> > diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+> > index a652ce0..1859a1c 100644
+> > --- a/arch/arm64/include/asm/arch_timer.h
+> > +++ b/arch/arm64/include/asm/arch_timer.h
+> > @@ -148,11 +148,10 @@ static inline void arch_timer_set_cntkctl(u32 cntkctl)
+> >  
+> >  static inline u64 arch_counter_get_cntpct(void)
+> >  {
+> > -	/*
+> > -	 * AArch64 kernel and user space mandate the use of CNTVCT.
+> > -	 */
+> > -	BUG();
+> > -	return 0;
+> > +	u64 cval;
+> > +	isb();
+> > +	asm volatile("mrs %0, cntpct_el0" : "=r" (cval));
+> > +	return cval;
+> >  }
+> >  
+> >  static inline u64 arch_counter_get_cntvct(void)
+> > diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> > index fd4b7f6..9b3322a 100644
+> > --- a/drivers/clocksource/arm_arch_timer.c
+> > +++ b/drivers/clocksource/arm_arch_timer.c
+> > @@ -890,8 +890,7 @@ static void __init arch_counter_register(unsigned type)
+> >  
+> >  	/* Register the CP15 based counter if we have one */
+> >  	if (type & ARCH_TIMER_TYPE_CP15) {
+> > -		if (IS_ENABLED(CONFIG_ARM64) ||
+> > -		    arch_timer_uses_ppi == ARCH_TIMER_VIRT_PPI)
+> > +		if (arch_timer_uses_ppi == ARCH_TIMER_VIRT_PPI)
 > 
-> At least armv4t seems to work.
+> Please can you add an is_hyp_mode_available() check here, as you suggested
+> last time?
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-July/521542.html
+> 
+> Without it, I worry that the kernel timekeeper will be out of sync with the
+> vDSO (which uses the virtual counter) on systems where CNTVOFF is
+> initialised to a consistent non-zero offset and Linux was loaded at EL1.
 > 
 
-Are you sure you used gcc 7.2 and parameters march=armv5te + 
-mtune=xscale? I've compiled the bugzilla code with these same parameters:
+Yes, will do.
 
-	-march=armv5te -mtune=xscale -marm -O2  -c strd.c
-
-For me (on gcc 7.1.0) only mtune=xscale/iwmmxt doesn't generate STRD. 
-Other mtune variants (arm1020e, arm926ej-s generate it). Here is a 
-table, which was tested on a real hardware.
-
--march=armv5te -mtune=xscale	OK, code very long
--march=armv5te -mtune=iwmmxt	OK, same code as v5te/xscale
--march=iwmmxt			OK, same code as v5te/xscale
--march=armv5t			OK, less opcodes than v5te/xscale
--march=armv5			OK, same as armv5t
--march=armv5te			KO, unaligned STRD, alignment exception
--march=armv5tej			KO, unaligned STRD (PXA27x is only v5te)
-
-BTW gcc 6.3.0 generates even longer code and it doesn't support armvtej. 
-Perhaps your 7.2 has even more optimalizations even for mtune=xscale.
-
-So I suppose compiling kernel and userspace with -match=armv5t or less 
-should be fine for now (unless there is another similar problem due to 
-7.x optimizations).
-
-> 
->> I've just found my old gcc 6.3 compiled some code with a default armv4t.
-> 
-> You can set the default with compiling GCC using --with-arch=...
-
-Yeah I know about that, it seems something probably override my settings 
-(most likely my scripts for separate crosstool and buildroot).
-
-> 
-> BTW, the failing instruction seems to be STRD and there seems to be
-> already a related bug report:
-> 
-> https://gcc.gnu.org/bugzilla/show_bug.cgi?id=82445
-
-Big thanks for info.
-
-> 
-> A.
-> 
-
-Petr
+Thanks,
+-Christoffer
