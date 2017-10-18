@@ -1,366 +1,106 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 18 Oct 2017 14:00:23 +0100
-Subject: [PATCH v4 3/5] reset: socfpga: use the reset-simple driver
-In-Reply-To: <20171017130306.881-4-p.zabel@pengutronix.de>
-References: <20171017130306.881-1-p.zabel@pengutronix.de>
- <20171017130306.881-4-p.zabel@pengutronix.de>
-Message-ID: <ce77d20c-7d62-77c3-8c89-991eeb8d2405@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 18 Oct 2017 14:00:03 +0100
+Subject: [PATCH v2 2/3] iommu/arm-smmu-v3: add support for unmap an iova
+ range with only one tlb sync
+In-Reply-To: <1505221238-9428-3-git-send-email-thunder.leizhen@huawei.com>
+References: <1505221238-9428-1-git-send-email-thunder.leizhen@huawei.com>
+ <1505221238-9428-3-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <20171018130003.GE4077@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 17/10/17 14:03, Philipp Zabel wrote:
-> Add reset line status readback, inverted status support, and socfpga
-> device tree quirks to the simple reset driver, and use it to replace
-> the socfpga driver.
+On Tue, Sep 12, 2017 at 09:00:37PM +0800, Zhen Lei wrote:
+> This patch is base on: 
+> (add02cfdc9bc2 "iommu: Introduce Interface for IOMMU TLB Flushing")
 > 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> ---
-> Changes since v3:
->  - Rebased onto reset/next
->  - Only warn about missing altr,modrst-offset property on socfpga
-> ---
->  drivers/reset/Kconfig         |  10 +--
->  drivers/reset/Makefile        |   1 -
->  drivers/reset/reset-simple.c  |  51 +++++++++++++-
->  drivers/reset/reset-simple.h  |   4 ++
->  drivers/reset/reset-socfpga.c | 157 ------------------------------------------
->  5 files changed, 56 insertions(+), 167 deletions(-)
->  delete mode 100644 drivers/reset/reset-socfpga.c
+> Because iotlb_sync is moved out of ".unmap = arm_smmu_unmap", some interval
+> ".unmap" calls should explicitly followed by a iotlb_sync operation.
 > 
-> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
-> index a14c0fe498771..2d6770b210ed7 100644
-> --- a/drivers/reset/Kconfig
-> +++ b/drivers/reset/Kconfig
-> @@ -77,19 +77,13 @@ config RESET_PISTACHIO
->  
->  config RESET_SIMPLE
->  	bool "Simple Reset Controller Driver" if COMPILE_TEST
-> -	default ARCH_SUNXI
-> +	default ARCH_SOCFPGA || ARCH_STRATIX10 || ARCH_SUNXI
->  	help
->  	  This enables a simple reset controller driver for reset lines that
->  	  that can be asserted and deasserted by toggling bits in a contiguous,
->  	  exclusive register space.
->  
-> -	  Currently this driver supports Allwinner SoCs.
-> -
-> -config RESET_SOCFPGA
-> -	bool "SoCFPGA Reset Driver" if COMPILE_TEST
-> -	default ARCH_SOCFPGA || ARCH_STRATIX10
-> -	help
-> -	  This enables the reset controller driver for Altera SoCFPGAs.
-> +	  Currently this driver supports Altera SoCFPGAs and Allwinner SoCs.
->  
->  config RESET_STM32
->  	bool "STM32 Reset Driver" if COMPILE_TEST
-> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-> index ddd3eeb193567..3bf3b4e6a9fd2 100644
-> --- a/drivers/reset/Makefile
-> +++ b/drivers/reset/Makefile
-> @@ -13,7 +13,6 @@ obj-$(CONFIG_RESET_MESON) += reset-meson.o
->  obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
->  obj-$(CONFIG_RESET_PISTACHIO) += reset-pistachio.o
->  obj-$(CONFIG_RESET_SIMPLE) += reset-simple.o
-> -obj-$(CONFIG_RESET_SOCFPGA) += reset-socfpga.o
->  obj-$(CONFIG_RESET_STM32) += reset-stm32.o
->  obj-$(CONFIG_RESET_SUNXI) += reset-sunxi.o
->  obj-$(CONFIG_RESET_TI_SCI) += reset-ti-sci.o
-> diff --git a/drivers/reset/reset-simple.c b/drivers/reset/reset-simple.c
-> index a5119457cec61..98ff0f924948e 100644
-> --- a/drivers/reset/reset-simple.c
-> +++ b/drivers/reset/reset-simple.c
-> @@ -68,25 +68,58 @@ static int reset_simple_deassert(struct reset_controller_dev *rcdev,
->  	return reset_simple_update(rcdev, id, false);
+> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+> ---
+>  drivers/iommu/arm-smmu-v3.c    | 10 ++++++++++
+>  drivers/iommu/io-pgtable-arm.c | 30 ++++++++++++++++++++----------
+>  drivers/iommu/io-pgtable.h     |  1 +
+>  3 files changed, 31 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index ef42c4b..e92828e 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -1772,6 +1772,15 @@ arm_smmu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
+>  	return ops->unmap(ops, iova, size);
 >  }
 >  
-> +static int reset_simple_status(struct reset_controller_dev *rcdev,
-> +			       unsigned long id)
+> +static void arm_smmu_iotlb_sync(struct iommu_domain *domain)
 > +{
-> +	struct reset_simple_data *data = to_reset_simple_data(rcdev);
-> +	int reg_width = sizeof(u32);
-> +	int bank = id / (reg_width * BITS_PER_BYTE);
-> +	int offset = id % (reg_width * BITS_PER_BYTE);
-> +	u32 reg;
+> +	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+> +	struct io_pgtable_ops *ops = smmu_domain->pgtbl_ops;
 > +
-> +	reg = readl(data->membase + (bank * reg_width));
-> +
-> +	return !(reg & BIT(offset)) ^ !data->status_active_low;
+> +	if (ops && ops->iotlb_sync)
+> +		ops->iotlb_sync(ops);
 > +}
 > +
->  const struct reset_control_ops reset_simple_ops = {
->  	.assert		= reset_simple_assert,
->  	.deassert	= reset_simple_deassert,
-> +	.status		= reset_simple_status,
->  };
->  
->  /**
->   * struct reset_simple_devdata - simple reset controller properties
-> + * @reg_offset: offset between base address and first reset register.
-> + * @nr_resets: number of resets. If not set, default to resource size in bits.
->   * @active_low: if true, bits are cleared to assert the reset. Otherwise, bits
->   *              are set to assert the reset.
-> + * @status_active_low: if true, bits read back as cleared while the reset is
-> + *                     asserted. Otherwise, bits read back as set while the
-> + *                     reset is asserted.
->   */
->  struct reset_simple_devdata {
-> +	u32 reg_offset;
-> +	u32 nr_resets;
->  	bool active_low;
-> +	bool status_active_low;
-> +};
+>  static phys_addr_t
+>  arm_smmu_iova_to_phys(struct iommu_domain *domain, dma_addr_t iova)
+>  {
+> @@ -1991,6 +2000,7 @@ static struct iommu_ops arm_smmu_ops = {
+>  	.attach_dev		= arm_smmu_attach_dev,
+>  	.map			= arm_smmu_map,
+>  	.unmap			= arm_smmu_unmap,
+> +	.iotlb_sync		= arm_smmu_iotlb_sync,
+>  	.map_sg			= default_iommu_map_sg,
+>  	.iova_to_phys		= arm_smmu_iova_to_phys,
+>  	.add_device		= arm_smmu_add_device,
+> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+> index e8018a3..805efc9 100644
+> --- a/drivers/iommu/io-pgtable-arm.c
+> +++ b/drivers/iommu/io-pgtable-arm.c
+> @@ -304,6 +304,8 @@ static int arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
+>  		WARN_ON(!selftest_running);
+>  		return -EEXIST;
+>  	} else if (iopte_type(pte, lvl) == ARM_LPAE_PTE_TYPE_TABLE) {
+> +		size_t unmapped;
 > +
-> +#define SOCFPGA_NR_BANKS	8
-> +
-> +static const struct reset_simple_devdata reset_simple_socfpga = {
-> +	.reg_offset = 0x10,
-> +	.nr_resets = SOCFPGA_NR_BANKS * 32,
-> +	.status_active_low = true,
->  };
+>  		/*
+>  		 * We need to unmap and free the old table before
+>  		 * overwriting it with a block entry.
+> @@ -312,7 +314,9 @@ static int arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
+>  		size_t sz = ARM_LPAE_BLOCK_SIZE(lvl, data);
 >  
->  static const struct reset_simple_devdata reset_simple_active_low = {
->  	.active_low = true,
-> +	.status_active_low = true,
->  };
+>  		tblp = ptep - ARM_LPAE_LVL_IDX(iova, lvl, data);
+> -		if (WARN_ON(__arm_lpae_unmap(data, iova, sz, lvl, tblp) != sz))
+> +		unmapped = __arm_lpae_unmap(data, iova, sz, lvl, tblp);
+> +		io_pgtable_tlb_sync(&data->iop);
+> +		if (WARN_ON(unmapped != sz))
+>  			return -EINVAL;
+>  	}
 >  
->  static const struct of_device_id reset_simple_dt_ids[] = {
-> +	{ .compatible = "altr,rst-mgr", .data = &reset_simple_socfpga },
->  	{ .compatible = "allwinner,sun6i-a31-clock-reset",
->  		.data = &reset_simple_active_low },
->  	{ /* sentinel */ },
-> @@ -99,6 +132,7 @@ static int reset_simple_probe(struct platform_device *pdev)
->  	struct reset_simple_data *data;
->  	void __iomem *membase;
->  	struct resource *res;
-> +	u32 reg_offset = 0;
+> @@ -584,7 +588,6 @@ static int __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
+>  			/* Also flush any partial walks */
+>  			io_pgtable_tlb_add_flush(iop, iova, size,
+>  						ARM_LPAE_GRANULE(data), false);
+> -			io_pgtable_tlb_sync(iop);
+>  			ptep = iopte_deref(pte, data);
+>  			__arm_lpae_free_pgtable(data, lvl + 1, ptep);
+>  		} else {
+> @@ -609,7 +612,6 @@ static int __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
+>  static int arm_lpae_unmap(struct io_pgtable_ops *ops, unsigned long iova,
+>  			  size_t size)
+>  {
+> -	size_t unmapped;
+>  	struct arm_lpae_io_pgtable *data = io_pgtable_ops_to_data(ops);
+>  	arm_lpae_iopte *ptep = data->pgd;
+>  	int lvl = ARM_LPAE_START_LVL(data);
+> @@ -617,11 +619,14 @@ static int arm_lpae_unmap(struct io_pgtable_ops *ops, unsigned long iova,
+>  	if (WARN_ON(iova >= (1ULL << data->iop.cfg.ias)))
+>  		return 0;
 >  
->  	devdata = of_device_get_match_data(dev);
->  
-> @@ -118,8 +152,23 @@ static int reset_simple_probe(struct platform_device *pdev)
->  	data->rcdev.ops = &reset_simple_ops;
->  	data->rcdev.of_node = dev->of_node;
->  
-> -	if (devdata)
-> +	if (devdata) {
-> +		reg_offset = devdata->reg_offset;
-> +		if (devdata->nr_resets)
-> +			data->rcdev.nr_resets = devdata->nr_resets;
->  		data->active_low = devdata->active_low;
-> +		data->status_active_low = devdata->status_active_low;
-> +	}
-> +
-> +	if (devdata == &reset_simple_socfpga &&
+> -	unmapped = __arm_lpae_unmap(data, iova, size, lvl, ptep);
+> -	if (unmapped)
+> -		io_pgtable_tlb_sync(&data->iop);
+> +	return __arm_lpae_unmap(data, iova, size, lvl, ptep);
+> +}
 
-Mmh, this pointer comparison looks a bit dodgy. Isn't
-of_device_is_compatible() the right solution here? Also semantically, as
-the property is tied to a certain compatible string (and not to our data
-structure)?
+This change is already queued in Joerg's tree, due to a patch from Robin.
 
-> +	    of_property_read_u32(dev->of_node, "altr,modrst-offset",
-> +				 &reg_offset)) {
-> +		dev_warn(dev,
-> +			 "missing altr,modrst-offset property, assuming 0x%x!\n",
-> +			 reg_offset);
-
-The existing driver falls back to 0x10 if no explicit property is found.
-Should we copy this here for compatibility reasons? We could simply use:
-"reg_offset = 0x10;" before the dev_warn().
-
-The rest looks good to me.
-
-Cheers,
-Andre.
-
-> +	}
-> +
-> +	data->membase += reg_offset;
->  
->  	return devm_reset_controller_register(dev, &data->rcdev);
->  }
-> diff --git a/drivers/reset/reset-simple.h b/drivers/reset/reset-simple.h
-> index 39af2014b5f12..8a496022baeff 100644
-> --- a/drivers/reset/reset-simple.h
-> +++ b/drivers/reset/reset-simple.h
-> @@ -28,12 +28,16 @@
->   * @active_low: if true, bits are cleared to assert the reset. Otherwise, bits
->   *              are set to assert the reset. Note that this says nothing about
->   *              the voltage level of the actual reset line.
-> + * @status_active_low: if true, bits read back as cleared while the reset is
-> + *                     asserted. Otherwise, bits read back as set while the
-> + *                     reset is asserted.
->   */
->  struct reset_simple_data {
->  	spinlock_t			lock;
->  	void __iomem			*membase;
->  	struct reset_controller_dev	rcdev;
->  	bool				active_low;
-> +	bool				status_active_low;
->  };
->  
->  extern const struct reset_control_ops reset_simple_ops;
-> diff --git a/drivers/reset/reset-socfpga.c b/drivers/reset/reset-socfpga.c
-> deleted file mode 100644
-> index 3907bbc9c6cf7..0000000000000
-> --- a/drivers/reset/reset-socfpga.c
-> +++ /dev/null
-> @@ -1,157 +0,0 @@
-> -/*
-> - * Socfpga Reset Controller Driver
-> - *
-> - * Copyright 2014 Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> - *
-> - * based on
-> - * Allwinner SoCs Reset Controller driver
-> - *
-> - * Copyright 2013 Maxime Ripard
-> - *
-> - * Maxime Ripard <maxime.ripard@free-electrons.com>
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License as published by
-> - * the Free Software Foundation; either version 2 of the License, or
-> - * (at your option) any later version.
-> - */
-> -
-> -#include <linux/err.h>
-> -#include <linux/io.h>
-> -#include <linux/init.h>
-> -#include <linux/of.h>
-> -#include <linux/platform_device.h>
-> -#include <linux/reset-controller.h>
-> -#include <linux/spinlock.h>
-> -#include <linux/types.h>
-> -
-> -#define BANK_INCREMENT		4
-> -#define NR_BANKS		8
-> -
-> -struct socfpga_reset_data {
-> -	spinlock_t			lock;
-> -	void __iomem			*membase;
-> -	struct reset_controller_dev	rcdev;
-> -};
-> -
-> -static int socfpga_reset_assert(struct reset_controller_dev *rcdev,
-> -				unsigned long id)
-> -{
-> -	struct socfpga_reset_data *data = container_of(rcdev,
-> -						     struct socfpga_reset_data,
-> -						     rcdev);
-> -	int reg_width = sizeof(u32);
-> -	int bank = id / (reg_width * BITS_PER_BYTE);
-> -	int offset = id % (reg_width * BITS_PER_BYTE);
-> -	unsigned long flags;
-> -	u32 reg;
-> -
-> -	spin_lock_irqsave(&data->lock, flags);
-> -
-> -	reg = readl(data->membase + (bank * BANK_INCREMENT));
-> -	writel(reg | BIT(offset), data->membase + (bank * BANK_INCREMENT));
-> -	spin_unlock_irqrestore(&data->lock, flags);
-> -
-> -	return 0;
-> -}
-> -
-> -static int socfpga_reset_deassert(struct reset_controller_dev *rcdev,
-> -				  unsigned long id)
-> -{
-> -	struct socfpga_reset_data *data = container_of(rcdev,
-> -						     struct socfpga_reset_data,
-> -						     rcdev);
-> -
-> -	int reg_width = sizeof(u32);
-> -	int bank = id / (reg_width * BITS_PER_BYTE);
-> -	int offset = id % (reg_width * BITS_PER_BYTE);
-> -	unsigned long flags;
-> -	u32 reg;
-> -
-> -	spin_lock_irqsave(&data->lock, flags);
-> -
-> -	reg = readl(data->membase + (bank * BANK_INCREMENT));
-> -	writel(reg & ~BIT(offset), data->membase + (bank * BANK_INCREMENT));
-> -
-> -	spin_unlock_irqrestore(&data->lock, flags);
-> -
-> -	return 0;
-> -}
-> -
-> -static int socfpga_reset_status(struct reset_controller_dev *rcdev,
-> -				unsigned long id)
-> -{
-> -	struct socfpga_reset_data *data = container_of(rcdev,
-> -						struct socfpga_reset_data, rcdev);
-> -	int reg_width = sizeof(u32);
-> -	int bank = id / (reg_width * BITS_PER_BYTE);
-> -	int offset = id % (reg_width * BITS_PER_BYTE);
-> -	u32 reg;
-> -
-> -	reg = readl(data->membase + (bank * BANK_INCREMENT));
-> -
-> -	return !(reg & BIT(offset));
-> -}
-> -
-> -static const struct reset_control_ops socfpga_reset_ops = {
-> -	.assert		= socfpga_reset_assert,
-> -	.deassert	= socfpga_reset_deassert,
-> -	.status		= socfpga_reset_status,
-> -};
-> -
-> -static int socfpga_reset_probe(struct platform_device *pdev)
-> -{
-> -	struct socfpga_reset_data *data;
-> -	struct resource *res;
-> -	struct device *dev = &pdev->dev;
-> -	struct device_node *np = dev->of_node;
-> -	u32 modrst_offset;
-> -
-> -	/*
-> -	 * The binding was mainlined without the required property.
-> -	 * Do not continue, when we encounter an old DT.
-> -	 */
-> -	if (!of_find_property(pdev->dev.of_node, "#reset-cells", NULL)) {
-> -		dev_err(&pdev->dev, "%pOF missing #reset-cells property\n",
-> -			pdev->dev.of_node);
-> -		return -EINVAL;
-> -	}
-> -
-> -	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-> -	if (!data)
-> -		return -ENOMEM;
-> -
-> -	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -	data->membase = devm_ioremap_resource(&pdev->dev, res);
-> -	if (IS_ERR(data->membase))
-> -		return PTR_ERR(data->membase);
-> -
-> -	if (of_property_read_u32(np, "altr,modrst-offset", &modrst_offset)) {
-> -		dev_warn(dev, "missing altr,modrst-offset property, assuming 0x10!\n");
-> -		modrst_offset = 0x10;
-> -	}
-> -	data->membase += modrst_offset;
-> -
-> -	spin_lock_init(&data->lock);
-> -
-> -	data->rcdev.owner = THIS_MODULE;
-> -	data->rcdev.nr_resets = NR_BANKS * (sizeof(u32) * BITS_PER_BYTE);
-> -	data->rcdev.ops = &socfpga_reset_ops;
-> -	data->rcdev.of_node = pdev->dev.of_node;
-> -
-> -	return devm_reset_controller_register(dev, &data->rcdev);
-> -}
-> -
-> -static const struct of_device_id socfpga_reset_dt_ids[] = {
-> -	{ .compatible = "altr,rst-mgr", },
-> -	{ /* sentinel */ },
-> -};
-> -
-> -static struct platform_driver socfpga_reset_driver = {
-> -	.probe	= socfpga_reset_probe,
-> -	.driver = {
-> -		.name		= "socfpga-reset",
-> -		.of_match_table	= socfpga_reset_dt_ids,
-> -	},
-> -};
-> -builtin_platform_driver(socfpga_reset_driver);
-> 
+Will
