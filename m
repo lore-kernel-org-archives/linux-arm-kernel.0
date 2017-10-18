@@ -1,53 +1,79 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 18 Oct 2017 10:44:48 +0100
-Subject: [PATCH v5 2/2] acpi: apei: Add SEI notification type support
- for ARMv8
-In-Reply-To: <20171018092547.guf54e6aqbzzfxrq@pd.tnic>
-References: <1508227341-15651-1-git-send-email-gengdongjiu@huawei.com>
- <1508227341-15651-2-git-send-email-gengdongjiu@huawei.com>
- <20171017170635.qb4sqyrsnndgbuni@pd.tnic>
- <0bcba052-700b-5ee8-88fc-aaf8cc6b1d37@huawei.com>
- <20171018090649.e7qgdf2dwmr7yxc3@pd.tnic>
- <4b51bd4e-2bf7-3aed-f17c-565b49781009@huawei.com>
- <20171018092547.guf54e6aqbzzfxrq@pd.tnic>
-Message-ID: <59E72290.6060604@arm.com>
+From: petrcvekcz@gmail.com (Petr Cvek)
+Date: Wed, 18 Oct 2017 11:57:13 +0200
+Subject: ARM: pxa/corgi: armv5te kernel 4.12 fails to decompress compiled
+ with gcc7
+In-Reply-To: <20171017203311.obi4nqtdvlrxwarm@darkstar.musicnaut.iki.fi>
+References: <CAAQYJAvR2_wqf2Axe4aVMOu08t7w5tNEjK0s3fw_oemtqCRo7g@mail.gmail.com>
+ <87a83zsiid.fsf@belgarion.home>
+ <CAAQYJAtEmJMc766kUx+bhFCNQKmwK53nSDNL0nFz-9UXSUO5CQ@mail.gmail.com>
+ <20171014215042.kfrhb2kjhm7wb7vb@darkstar.musicnaut.iki.fi>
+ <87mv4txuid.fsf@belgarion.home>
+ <20171015104640.hazujjkbqyik7fgg@darkstar.musicnaut.iki.fi>
+ <f1631768-b26e-62ae-db1f-65686cd0c4de@gmail.com>
+ <20171017203311.obi4nqtdvlrxwarm@darkstar.musicnaut.iki.fi>
+Message-ID: <8d660a74-afd5-a757-8a59-39283404c2f9@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Borislav!
-
-On 18/10/17 10:25, Borislav Petkov wrote:
-> On Wed, Oct 18, 2017 at 05:17:27PM +0800, gengdongjiu wrote:
->> Thanks Borislav, can I write it as asynchronous exception or
->> asynchronous abort?
+Dne 17.10.2017 v 22:33 Aaro Koskinen napsal(a):
+> Hi,
 > 
-> WTF?!
+Hi,
 
-Yup.
+> On Mon, Oct 16, 2017 at 01:55:18PM +0200, Petr Cvek wrote:
+>> Dne 15.10.2017 v 12:46 Aaro Koskinen napsal(a):
+>>> This seems to be simpler to debug/reproduce using busybox. Compiling
+>>> just busybox with GCC 7.2 and march=armv5te/mtune=xscale already
+>>> produces failing xz decompression:
+>>
+>> Does it fail too when compiled with gcc 7.2 and with march=armv5t and/or
+>> march=armv4t ?
+> 
+> At least armv4t seems to work.
+> 
 
+Are you sure you used gcc 7.2 and parameters march=armv5te + 
+mtune=xscale? I've compiled the bugzilla code with these same parameters:
 
-> The thing is abbreviated as "SEI" and apparently means "System Error
-> Interrupt". Nothing else.
+	-march=armv5te -mtune=xscale -marm -O2  -c strd.c
 
-ARM has 'external abort', which are either synchronous or asynchronous, both are
-delivered as different types of exception.
+For me (on gcc 7.1.0) only mtune=xscale/iwmmxt doesn't generate STRD. 
+Other mtune variants (arm1020e, arm926ej-s generate it). Here is a 
+table, which was tested on a real hardware.
 
-Asynchronous external abort is treated as a special kind of interrupt, 'SError
-Interrupt', (where SError stands for System Error, but its rarely written like
-that). 'SEI' is a relatively new abbreviation for SError interrupt.
+-march=armv5te -mtune=xscale	OK, code very long
+-march=armv5te -mtune=iwmmxt	OK, same code as v5te/xscale
+-march=iwmmxt			OK, same code as v5te/xscale
+-march=armv5t			OK, less opcodes than v5te/xscale
+-march=armv5			OK, same as armv5t
+-march=armv5te			KO, unaligned STRD, alignment exception
+-march=armv5tej			KO, unaligned STRD (PXA27x is only v5te)
 
+BTW gcc 6.3.0 generates even longer code and it doesn't support armvtej. 
+Perhaps your 7.2 has even more optimalizations even for mtune=xscale.
 
-What should we call this thing? In the ACPI code I'd prefer 'SEI' as that is
-what the ACPI spec calls it. Here we are talking about an GHES notification.
+So I suppose compiling kernel and userspace with -match=armv5t or less 
+should be fine for now (unless there is another similar problem due to 
+7.x optimizations).
 
-But in the arm64 arch code this should be called SError Interrupt as this is
-what the ARM-ARM calls it. This code cares about exception routing and interrupt
-masking.
+> 
+>> I've just found my old gcc 6.3 compiled some code with a default armv4t.
+> 
+> You can set the default with compiling GCC using --with-arch=...
 
+Yeah I know about that, it seems something probably override my settings 
+(most likely my scripts for separate crosstool and buildroot).
 
-But, I don't really care.
+> 
+> BTW, the failing instruction seems to be STRD and there seems to be
+> already a related bug report:
+> 
+> https://gcc.gnu.org/bugzilla/show_bug.cgi?id=82445
 
+Big thanks for info.
 
-Thanks,
+> 
+> A.
+> 
 
-James
+Petr
