@@ -1,131 +1,68 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Wed, 18 Oct 2017 15:22:13 +0200
-Subject: [PATCH v5 4/9] drm/bridge: analogix_dp: Fix connector & encoder
- cleanup
-In-Reply-To: <20171018120944.7819-5-jeffy.chen@rock-chips.com>
-References: <20171018120944.7819-1-jeffy.chen@rock-chips.com>
- <CGME20171018121029epcas3p16c50a5eb912c8553dac9bf1dc0e91bb2@epcas3p1.samsung.com>
- <20171018120944.7819-5-jeffy.chen@rock-chips.com>
-Message-ID: <22343b9b-f9fb-200c-45e4-fd3380470864@samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 18 Oct 2017 15:23:02 +0200
+Subject: [PATCH v2 0/8] ARM: sun8i: a83t: Enable AXP813/AXP818 regulators
+In-Reply-To: <20171018083138.14517-1-wens@csie.org>
+References: <20171018083138.14517-1-wens@csie.org>
+Message-ID: <20171018132302.h6yfhzj3ufciynqx@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.10.2017 14:09, Jeffy Chen wrote:
-> Since we are initing connector in the core driver and encoder in the
-> plat driver, let's clean them up in the right places.
->
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> ---
->
-> Changes in v5: None
->
->  drivers/gpu/drm/bridge/analogix/analogix_dp_core.c |  2 --
->  drivers/gpu/drm/exynos/exynos_dp.c                 |  7 +++++--
->  drivers/gpu/drm/rockchip/analogix_dp-rockchip.c    | 15 ++++++---------
->  3 files changed, 11 insertions(+), 13 deletions(-)
->
-> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-> index 74d274b6d31d..3f910ab36ff6 100644
-> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-> @@ -1409,7 +1409,6 @@ analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
->  	ret = analogix_dp_create_bridge(drm_dev, dp);
->  	if (ret) {
->  		DRM_ERROR("failed to create bridge (%d)\n", ret);
-> -		drm_encoder_cleanup(dp->encoder);
->  		goto err_disable_pm_runtime;
->  	}
->  
-> @@ -1432,7 +1431,6 @@ void analogix_dp_unbind(struct analogix_dp_device *dp)
->  {
->  	analogix_dp_bridge_disable(dp->bridge);
->  	dp->connector.funcs->destroy(&dp->connector);
-> -	dp->encoder->funcs->destroy(dp->encoder);
->  
->  	if (dp->plat_data->panel) {
->  		if (drm_panel_unprepare(dp->plat_data->panel))
-> diff --git a/drivers/gpu/drm/exynos/exynos_dp.c b/drivers/gpu/drm/exynos/exynos_dp.c
-> index f7e5b2c405ed..33319a858f3a 100644
-> --- a/drivers/gpu/drm/exynos/exynos_dp.c
-> +++ b/drivers/gpu/drm/exynos/exynos_dp.c
-> @@ -185,8 +185,10 @@ static int exynos_dp_bind(struct device *dev, struct device *master, void *data)
->  	dp->plat_data.encoder = encoder;
->  
->  	dp->adp = analogix_dp_bind(dev, dp->drm_dev, &dp->plat_data);
-> -	if (IS_ERR(dp->adp))
-> +	if (IS_ERR(dp->adp)) {
-> +		dp->encoder.funcs->destroy(&dp->encoder);
->  		return PTR_ERR(dp->adp);
-> +	}
->  
->  	return 0;
->  }
-> @@ -196,7 +198,8 @@ static void exynos_dp_unbind(struct device *dev, struct device *master,
->  {
->  	struct exynos_dp_device *dp = dev_get_drvdata(dev);
->  
-> -	return analogix_dp_unbind(dp->adp);
-> +	analogix_dp_unbind(dp->adp);
-> +	dp->encoder.funcs->destroy(&dp->encoder);
->  }
->  
->  static const struct component_ops exynos_dp_ops = {
-> diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-> index fa0365de31d2..c0fb3f3748f4 100644
-> --- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-> +++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-> @@ -261,13 +261,8 @@ static struct drm_encoder_helper_funcs rockchip_dp_encoder_helper_funcs = {
->  	.atomic_check = rockchip_dp_drm_encoder_atomic_check,
->  };
->  
-> -static void rockchip_dp_drm_encoder_destroy(struct drm_encoder *encoder)
-> -{
-> -	drm_encoder_cleanup(encoder);
-> -}
-> -
->  static struct drm_encoder_funcs rockchip_dp_encoder_funcs = {
-> -	.destroy = rockchip_dp_drm_encoder_destroy,
-> +	.destroy = drm_encoder_cleanup,
->  };
->  
->  static int rockchip_dp_of_probe(struct rockchip_dp_device *dp)
-> @@ -361,12 +356,13 @@ static int rockchip_dp_bind(struct device *dev, struct device *master,
->  	dp->psr_state = ~EDP_VSC_PSR_STATE_ACTIVE;
->  	INIT_WORK(&dp->psr_work, analogix_dp_psr_work);
->  
-> -	rockchip_drm_psr_register(&dp->encoder, analogix_dp_psr_set);
-> -
->  	dp->adp = analogix_dp_bind(dev, dp->drm_dev, &dp->plat_data);
-> -	if (IS_ERR(dp->adp))
-> +	if (IS_ERR(dp->adp)) {
-> +		dp->encoder.funcs->destroy(&dp->encoder);
->  		return PTR_ERR(dp->adp);
-> +	}
->  
-> +	rockchip_drm_psr_register(&dp->encoder, analogix_dp_psr_set);
+On Wed, Oct 18, 2017 at 04:31:30PM +0800, Chen-Yu Tsai wrote:
+> Hi everyone,
+> 
+> This series was originally name "regulator: axp20x: Add support for
+> AXP813/818 regulators". It adds support for the X-Powers AXP813/818 [1]
+> PMICs' regulators. The series is quite straightforward.
+> 
+> Changes since v1:
+> 
+>   - Regulator driver patches were merged and now dropped from the series
+> 
+>   - Chose simpler names for the regulators
+> 
+>   - Added SDIO WiFi enablement patches
+> 
+> Patch 1 adds a axp20x-regulator cell for AXP813, thereby enabling the
+> regulators.
+> 
+> Patch 2 adds a shared dtsi file for the PMIC. This currently contains
+> a list of regulator nodes, but will be expanded with Quentin's power
+> supply work.
+> 
+> Patches 3 through 5 add regulator nodes to board dts files for the A83T
+> boards that I have. They are not squashed together as each file has
+> substantial additions.
+> 
+> Patch 6 moves the mmc1 pinmux setting over to the dtsi, and sets it by
+> default.
+> 
+> Patches 7 & 8 enable SDIO-based WiFi on the Cubietruck Plus and Banana
+> Pi M3.
+> 
+> Originally my work also included enabling Ethernet. But the Ethernet
+> bindings were reverted. Everything can be found here:
+> 
+>     https://github.com/wens/linux/tree/a83t-regulator-wifi-eth
+> 
+> Please have a look.
+> 
+> Lee, we need the mfd changes merged in before merging the dts changes.
+> Otherwise, mmc would break as vmmc/vqmmc is tied to the PMIC regulators.
 
-You are changing here order of calls: psr_reg after bind, it does not
-seem to be related to patch subject.
-Anyway psr_register can fail and its result is not checked, but it can
-be addressed in separate patch.
-So maybe it would be better to leave the order as is, unless there is
-reason for change it in one patch, in such case please explain it in
-commit message.
-Beside this:
-Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-?--
-Regards
-Andrzej
+For the whole serie.
 
->  	return 0;
->  }
->  
-> @@ -377,6 +373,7 @@ static void rockchip_dp_unbind(struct device *dev, struct device *master,
->  
->  	rockchip_drm_psr_unregister(&dp->encoder);
->  	analogix_dp_unbind(dp->adp);
-> +	dp->encoder.funcs->destroy(&dp->encoder);
->  }
->  
->  static const struct component_ops rockchip_dp_component_ops = {
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171018/210b8471/attachment-0001.sig>
