@@ -1,29 +1,26 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 18 Oct 2017 18:16:15 +0100
-Subject: [PATCH v4 00/13] arm64/firmware: Software Delegated Exception
- Interface
-In-Reply-To: <20171017174432.1684-1-james.morse@arm.com>
-References: <20171017174432.1684-1-james.morse@arm.com>
-Message-ID: <20171018171615.GH21820@arm.com>
+From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
+Date: Wed, 18 Oct 2017 20:20:27 +0300
+Subject: [PATCH v12 07/11] x86/kasan: add and use kasan_map_populate()
+In-Reply-To: <6fd8291b-b3f5-46c1-2650-98a775e37fa0@oracle.com>
+References: <20171013173214.27300-1-pasha.tatashin@oracle.com>
+ <20171013173214.27300-8-pasha.tatashin@oracle.com>
+ <f4540f92-2229-53f5-ee74-fe160bedc873@virtuozzo.com>
+ <6fd8291b-b3f5-46c1-2650-98a775e37fa0@oracle.com>
+Message-ID: <56120ddc-e03e-dbac-50c4-adb2287ec407@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
-
-On Tue, Oct 17, 2017 at 06:44:19PM +0100, James Morse wrote:
-> The Software Delegated Exception Interface (SDEI) is an ARM specification
-> for registering callbacks from the platform firmware into the OS.
-> This is intended to be used to implement firmware-first RAS notifications,
-> but also supports vendor-defined events and binding IRQs as events.
+On 10/18/2017 08:14 PM, Pavel Tatashin wrote:
+> Thank you Andrey, I will test this patch. Should it go on top or replace the existing patch in mm-tree? ARM and x86 should be done the same either both as follow-ups or both replace.
 > 
-> The document is here:
-> http://infocenter.arm.com/help/topic/com.arm.doc.den0054a/ARM_DEN0054A_Software_Delegated_Exception_Interface.pdf
+
+ It's a replacement of your patch.
+
+
+> Pavel
 > 
-> I anticpate once reviewed this series will go via the arm-soc tree, as the
-> bulk of the code is under /drivers/firmware/.
-
-Given the close coupling with the arch code, I'm actually fine taking this
-all via arm64 so save it being spread across two merge windows. The driver
-code is a new file, so the scope for conflicts is minimal.
-
-Will
+> -- 
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.? For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
