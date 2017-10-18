@@ -1,107 +1,87 @@
 From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Wed, 18 Oct 2017 16:36:22 +0200
-Subject: [RFC 05/12] dt-bindings: mtd: add Marvell NAND controller
- documentation
+Date: Wed, 18 Oct 2017 16:36:26 +0200
+Subject: [RFC 09/12] ARM: dts: armada-38x: use reworked NAND controller driver
 In-Reply-To: <20171018143629.29302-1-miquel.raynal@free-electrons.com>
 References: <20171018143629.29302-1-miquel.raynal@free-electrons.com>
-Message-ID: <20171018143629.29302-6-miquel.raynal@free-electrons.com>
+Message-ID: <20171018143629.29302-10-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the bindings for the legacy and the new bindings relative to
-Marvell NAND controller driver rework.
+Change the bindings to use the reworked Marvell NAND controller driver.
+Also adapt the nand controller node organization to distinguish which
+property is relevant for the controller, and which one is NAND chip
+specific. Expose the partitions as a subnode of the NAND chip.
+
+Remove the 'marvell,nand-enable-arbiter' property, inefective with
+Armada boards.
 
 Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 ---
- .../devicetree/bindings/mtd/marvell-nand.txt       | 95 ++++++++++++++++++++++
- 1 file changed, 95 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mtd/marvell-nand.txt
+ arch/arm/boot/dts/armada-385-db-ap.dts          |  68 ++++++------
+ arch/arm/boot/dts/armada-385-linksys-caiman.dts | 129 +++++++++++-----------
+ arch/arm/boot/dts/armada-385-linksys-cobra.dts  | 129 +++++++++++-----------
+ arch/arm/boot/dts/armada-385-linksys-rango.dts  | 141 ++++++++++++------------
+ arch/arm/boot/dts/armada-385-linksys-shelby.dts | 129 +++++++++++-----------
+ arch/arm/boot/dts/armada-385-linksys.dtsi       |  15 ++-
+ arch/arm/boot/dts/armada-388-db.dts             |  54 +++++----
+ arch/arm/boot/dts/armada-38x.dtsi               |   6 +-
+ 8 files changed, 353 insertions(+), 318 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mtd/marvell-nand.txt b/Documentation/devicetree/bindings/mtd/marvell-nand.txt
-new file mode 100644
-index 000000000000..ea99f426c03f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mtd/marvell-nand.txt
-@@ -0,0 +1,95 @@
-+Marvell NAND Flash Controller (NFC)
+diff --git a/arch/arm/boot/dts/armada-385-db-ap.dts b/arch/arm/boot/dts/armada-385-db-ap.dts
+index 25d2d720dc0e..625691196acb 100644
+--- a/arch/arm/boot/dts/armada-385-db-ap.dts
++++ b/arch/arm/boot/dts/armada-385-db-ap.dts
+@@ -166,39 +166,6 @@
+ 				status = "okay";
+ 			};
+ 
+-			nfc: flash at d0000 {
+-				status = "okay";
+-				num-cs = <1>;
+-				nand-ecc-strength = <4>;
+-				nand-ecc-step-size = <512>;
+-				marvell,nand-keep-config;
+-				marvell,nand-enable-arbiter;
+-				nand-on-flash-bbt;
+-
+-				partitions {
+-					compatible = "fixed-partitions";
+-					#address-cells = <1>;
+-					#size-cells = <1>;
+-
+-					partition at 0 {
+-						label = "U-Boot";
+-						reg = <0x00000000 0x00800000>;
+-						read-only;
+-					};
+-
+-					partition at 800000 {
+-						label = "uImage";
+-						reg = <0x00800000 0x00400000>;
+-						read-only;
+-					};
+-
+-					partition at c00000 {
+-						label = "Root";
+-						reg = <0x00c00000 0x3f400000>;
+-					};
+-				};
+-			};
+-
+ 			usb3 at f0000 {
+ 				status = "okay";
+ 				usb-phy = <&usb3_phy>;
+@@ -263,3 +230,38 @@
+ 		spi-max-frequency = <54000000>;
+ 	};
+ };
 +
-+Required properties:
-+C'est faux, t'en a rajout? un y a pas longtps :).
-+Je conseille de mettre ?a sous forme de liste, genre
-+
-+- compatible: can be one of the following:
-+    * "marvell,armada-8k-nand-controller"
-+    * "marvell,armada370-nand-controller"
-+    * "marvell,pxa3xx-nand-controller"
-+    * "marvell,armada-8k-nand" (deprecated)
-+    * "marvell,armada370-nand" (deprecated)
-+    * "marvell,pxa3xx-nand" (deprecated)
-+- reg: shall contain registers location and length for data and reg.
-+- #address-cells: shall be set to 1. Encode the nand CS.
-+- #size-cells: shall be set to 0.
-+- interrupts: shall define the nand controller interrupt.
-+- clocks: shall reference nand controller clocks.
-+- marvell,system-controller: Set to retrieve the syscon node that handles
-+  NAND controller related registers (only required with the
-+  "marvell,armada-8k-nand[-controller]" compatibles).
-+
-+Optional properties:
-+- dmas: shall reference DMA channel associated to the NAND controller.
-+- dma-names: shall be "rxtx".
-+
-+Optional children nodes:
-+Children nodes represent the available NAND chips.
-+
-+Required properties:
-+- reg: shall contain the native Chip Select ids (0-3)
-+- marvell,rb: shall contain the native Ready/Busy ids (0-1)
-+
-+Optional properties:
-+- marvell,nand-keep-config: orders the driver not to take the timings
-+  from the core and leaving them completely untouched. Bootloader
-+  timings will then be used.
-+- marvell,nand-enable-arbiter: only useful for PXA platforms, will
-+  enable bus arbiter between NFC and DFI bus (must be enabled for
-+  NFC operation)
-+- nand-on-flash-bbt: speed up the boot process by not discovering all
-+  the bad blocks at each boot and reading directly an on flash table.
-+- nand-ecc-mode: one of the supported ECC modes ("none", "soft",
-+  "hw"). If not specified, hardware ECC will be used.
-+- nand-ecc-algo: algorithm to use if previous choice was "soft"
-+  ("hamming" or "bch). This property may be added for hardware ECC for
-+  clarification but will be ignored by the driver because ECC mode is
-+  chosen depending on the page size and the strength required by the
-+  NAND chip. This value may be overwritten with the nand-ecc-strength
-+  property.
-+- nand-ecc-strength: desired ECC strength.
-+- nand-ecc-step-size: indication on the ECC step size. This has no
-+  effect and will be ignored by the driver when using hardware
-+  ECC. Because Marvell's NAND flash controller does use fixed strength
-+  (1-bit for Hamming, 16-bit for BCH), the step size will shrink or
-+  grown in order to fit the required strength and the value
-+  updated. Step sizes are not completely random for all and follow
-+  certain patterns described in AN-379, "Marvell SoC NFC ECC".
-+
-+See Documentation/devicetree/bindings/mtd/nand.txt for more details on
-+generic bindings.
-+
-+
-+Example:
-+nand_controller: nand-controller at d0000 {
-+	compatible = "marvell,armada370-nand-controller";
-+	reg = <0xd0000 0x54>;
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
-+	clocks = <&coredivclk 0>;
++&nand_controller {
 +	status = "okay";
 +
 +	nand at 0 {
 +		reg = <0>;
 +		marvell,rb = <0>;
-+		nand-ecc-mode = "hw";
-+		marvell,nand-keep-config;
-+		marvell,nand-enable-arbiter;
 +		nand-on-flash-bbt;
 +		nand-ecc-strength = <4>;
 +		nand-ecc-step-size = <512>;
@@ -112,11 +92,708 @@ index 000000000000..ea99f426c03f
 +			#size-cells = <1>;
 +
 +			partition at 0 {
-+				label = "Rootfs";
-+				reg = <0x00000000 0x40000000>;
++				label = "U-Boot";
++				reg = <0x00000000 0x00800000>;
++				read-only;
++			};
++
++			partition at 800000 {
++				label = "uImage";
++				reg = <0x00800000 0x00400000>;
++				read-only;
++			};
++
++			partition at c00000 {
++				label = "Root";
++				reg = <0x00c00000 0x3f400000>;
 +			};
 +		};
 +	};
 +};
+diff --git a/arch/arm/boot/dts/armada-385-linksys-caiman.dts b/arch/arm/boot/dts/armada-385-linksys-caiman.dts
+index ee669ae61011..e769bcf7a9d1 100644
+--- a/arch/arm/boot/dts/armada-385-linksys-caiman.dts
++++ b/arch/arm/boot/dts/armada-385-linksys-caiman.dts
+@@ -105,67 +105,72 @@
+ 
+ &nand {
+ 	/* 128MiB */
+-
+-	partition at 0 {
+-		label = "u-boot";
+-		reg = <0x0000000 0x200000>;  /* 2MiB */
+-		read-only;
+-	};
+-
+-	partition at 100000 {
+-		label = "u_env";
+-		reg = <0x200000 0x40000>;    /* 256KiB */
+-	};
+-
+-	partition at 140000 {
+-		label = "s_env";
+-		reg = <0x240000 0x40000>;    /* 256KiB */
+-	};
+-
+-	partition at 900000 {
+-		label = "devinfo";
+-		reg = <0x900000 0x100000>;   /* 1MiB */
+-		read-only;
+-	};
+-
+-	/* kernel1 overlaps with rootfs1 by design */
+-	partition at a00000 {
+-		label = "kernel1";
+-		reg = <0xa00000 0x2800000>;  /* 40MiB */
+-	};
+-
+-	partition at 1000000 {
+-		label = "rootfs1";
+-		reg = <0x1000000 0x2200000>;  /* 34MiB */
+-	};
+-
+-	/* kernel2 overlaps with rootfs2 by design */
+-	partition at 3200000 {
+-		label = "kernel2";
+-		reg = <0x3200000 0x2800000>; /* 40MiB */
+-	};
+-
+-	partition at 3800000 {
+-		label = "rootfs2";
+-		reg = <0x3800000 0x2200000>; /* 34MiB */
+-	};
+-
+-	/*
+-	 * 38MiB, last MiB is for the BBT, not writable
+-	 */
+-	partition at 5a00000 {
+-		label = "syscfg";
+-		reg = <0x5a00000 0x2600000>;
+-	};
+-
+-	/*
+-	 * Unused area between "s_env" and "devinfo".
+-	 * Moved here because otherwise the renumbered
+-	 * partitions would break the bootloader
+-	 * supplied bootargs
+-	 */
+-	partition at 180000 {
+-		label = "unused_area";
+-		reg = <0x280000 0x680000>;   /* 6.5MiB */
++	partitions {
++		compatible = "fixed-partitions";
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		partition at 0 {
++			label = "u-boot";
++			reg = <0x0000000 0x200000>;  /* 2MiB */
++			read-only;
++		};
++
++		partition at 100000 {
++			label = "u_env";
++			reg = <0x200000 0x40000>;    /* 256KiB */
++		};
++
++		partition at 140000 {
++			label = "s_env";
++			reg = <0x240000 0x40000>;    /* 256KiB */
++		};
++
++		partition at 900000 {
++			label = "devinfo";
++			reg = <0x900000 0x100000>;   /* 1MiB */
++			read-only;
++		};
++
++		/* kernel1 overlaps with rootfs1 by design */
++		partition at a00000 {
++			label = "kernel1";
++			reg = <0xa00000 0x2800000>;  /* 40MiB */
++		};
++
++		partition at 1000000 {
++			label = "rootfs1";
++			reg = <0x1000000 0x2200000>;  /* 34MiB */
++		};
++
++		/* kernel2 overlaps with rootfs2 by design */
++		partition at 3200000 {
++			label = "kernel2";
++			reg = <0x3200000 0x2800000>; /* 40MiB */
++		};
++
++		partition at 3800000 {
++			label = "rootfs2";
++			reg = <0x3800000 0x2200000>; /* 34MiB */
++		};
++
++		/*
++		 * 38MiB, last MiB is for the BBT, not writable
++		 */
++		partition at 5a00000 {
++			label = "syscfg";
++			reg = <0x5a00000 0x2600000>;
++		};
++
++		/*
++		 * Unused area between "s_env" and "devinfo".
++		 * Moved here because otherwise the renumbered
++		 * partitions would break the bootloader
++		 * supplied bootargs
++		 */
++		partition at 180000 {
++			label = "unused_area";
++			reg = <0x280000 0x680000>;   /* 6.5MiB */
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/armada-385-linksys-cobra.dts b/arch/arm/boot/dts/armada-385-linksys-cobra.dts
+index 5169ca89c55a..690be217838c 100644
+--- a/arch/arm/boot/dts/armada-385-linksys-cobra.dts
++++ b/arch/arm/boot/dts/armada-385-linksys-cobra.dts
+@@ -105,67 +105,72 @@
+ 
+ &nand {
+ 	/* 128MiB */
+-
+-	partition at 0 {
+-		label = "u-boot";
+-		reg = <0x0000000 0x200000>;  /* 2MiB */
+-		read-only;
+-	};
+-
+-	partition at 100000 {
+-		label = "u_env";
+-		reg = <0x200000 0x40000>;    /* 256KiB */
+-	};
+-
+-	partition at 140000 {
+-		label = "s_env";
+-		reg = <0x240000 0x40000>;    /* 256KiB */
+-	};
+-
+-	partition at 900000 {
+-		label = "devinfo";
+-		reg = <0x900000 0x100000>;   /* 1MiB */
+-		read-only;
+-	};
+-
+-	/* kernel1 overlaps with rootfs1 by design */
+-	partition at a00000 {
+-		label = "kernel1";
+-		reg = <0xa00000 0x2800000>;  /* 40MiB */
+-	};
+-
+-	partition at 1000000 {
+-		label = "rootfs1";
+-		reg = <0x1000000 0x2200000>;  /* 34MiB */
+-	};
+-
+-	/* kernel2 overlaps with rootfs2 by design */
+-	partition at 3200000 {
+-		label = "kernel2";
+-		reg = <0x3200000 0x2800000>; /* 40MiB */
+-	};
+-
+-	partition at 3800000 {
+-		label = "rootfs2";
+-		reg = <0x3800000 0x2200000>; /* 34MiB */
+-	};
+-
+-	/*
+-	 * 38MiB, last MiB is for the BBT, not writable
+-	 */
+-	partition at 5a00000 {
+-		label = "syscfg";
+-		reg = <0x5a00000 0x2600000>;
+-	};
+-
+-	/*
+-	 * Unused area between "s_env" and "devinfo".
+-	 * Moved here because otherwise the renumbered
+-	 * partitions would break the bootloader
+-	 * supplied bootargs
+-	 */
+-	partition at 180000 {
+-		label = "unused_area";
+-		reg = <0x280000 0x680000>;   /* 6.5MiB */
++	partitions {
++		compatible = "fixed-partitions";
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		partition at 0 {
++			label = "u-boot";
++			reg = <0x0000000 0x200000>;  /* 2MiB */
++			read-only;
++		};
++
++		partition at 100000 {
++			label = "u_env";
++			reg = <0x200000 0x40000>;    /* 256KiB */
++		};
++
++		partition at 140000 {
++			label = "s_env";
++			reg = <0x240000 0x40000>;    /* 256KiB */
++		};
++
++		partition at 900000 {
++			label = "devinfo";
++			reg = <0x900000 0x100000>;   /* 1MiB */
++			read-only;
++		};
++
++		/* kernel1 overlaps with rootfs1 by design */
++		partition at a00000 {
++			label = "kernel1";
++			reg = <0xa00000 0x2800000>;  /* 40MiB */
++		};
++
++		partition at 1000000 {
++			label = "rootfs1";
++			reg = <0x1000000 0x2200000>;  /* 34MiB */
++		};
++
++		/* kernel2 overlaps with rootfs2 by design */
++		partition at 3200000 {
++			label = "kernel2";
++			reg = <0x3200000 0x2800000>; /* 40MiB */
++		};
++
++		partition at 3800000 {
++			label = "rootfs2";
++			reg = <0x3800000 0x2200000>; /* 34MiB */
++		};
++
++		/*
++		 * 38MiB, last MiB is for the BBT, not writable
++		 */
++		partition at 5a00000 {
++			label = "syscfg";
++			reg = <0x5a00000 0x2600000>;
++		};
++
++		/*
++		 * Unused area between "s_env" and "devinfo".
++		 * Moved here because otherwise the renumbered
++		 * partitions would break the bootloader
++		 * supplied bootargs
++		 */
++		partition at 180000 {
++			label = "unused_area";
++			reg = <0x280000 0x680000>;   /* 6.5MiB */
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/armada-385-linksys-rango.dts b/arch/arm/boot/dts/armada-385-linksys-rango.dts
+index da8a0f3d432b..93570c6bfe85 100644
+--- a/arch/arm/boot/dts/armada-385-linksys-rango.dts
++++ b/arch/arm/boot/dts/armada-385-linksys-rango.dts
+@@ -113,74 +113,79 @@
+ 
+ &nand {
+ 	/* AMD/Spansion S34ML02G2 256MiB, OEM Layout */
+-
+-	partition at 0 {
+-		label = "u-boot";
+-		reg = <0x0000000 0x200000>;  /* 2MiB */
+-		read-only;
+-	};
+-
+-	partition at 200000 {
+-		label = "u_env";
+-		reg = <0x200000 0x20000>;    /* 128KiB */
+-	};
+-
+-	partition at 220000 {
+-		label = "s_env";
+-		reg = <0x220000 0x40000>;    /* 256KiB */
+-	};
+-
+-	partition at 7e0000 {
+-		label = "devinfo";
+-		reg = <0x7e0000 0x40000>;   /* 256KiB */
+-		read-only;
+-	};
+-
+-	partition at 820000 {
+-		label = "sysdiag";
+-		reg = <0x820000 0x1e0000>;   /* 1920KiB */
+-		read-only;
+-	};
+-
+-	/* kernel1 overlaps with rootfs1 by design */
+-	partition at a00000 {
+-		label = "kernel1";
+-		reg = <0xa00000 0x5000000>;  /* 80MiB */
+-	};
+-
+-	partition at 1000000 {
+-		label = "rootfs1";
+-		reg = <0x1000000 0x4a00000>;  /* 74MiB */
+-	};
+-
+-	/* kernel2 overlaps with rootfs2 by design */
+-	partition at 5a00000 {
+-		label = "kernel2";
+-		reg = <0x5a00000 0x5000000>; /* 80MiB */
+-	};
+-
+-	partition at 6000000 {
+-		label = "rootfs2";
+-		reg = <0x6000000 0x4a00000>; /* 74MiB */
+-	};
+-
+-	/*
+-	 * 86MiB, last MiB is for the BBT, not writable
+-	 */
+-	partition at aa00000 {
+-		label = "syscfg";
+-		reg = <0xaa00000 0x5600000>;
+-	};
+-
+-	/*
+-	 * Unused area between "s_env" and "devinfo".
+-	 * Moved here because otherwise the renumbered
+-	 * partitions would break the bootloader
+-	 * supplied bootargs
+-	 */
+-	partition at 180000 {
+-		label = "unused_area";
+-		reg = <0x260000 0x5c0000>;   /* 5.75MiB */
++	partitions {
++		compatible = "fixed-partitions";
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		partition at 0 {
++			label = "u-boot";
++			reg = <0x0000000 0x200000>;  /* 2MiB */
++			read-only;
++		};
++
++		partition at 200000 {
++			label = "u_env";
++			reg = <0x200000 0x20000>;    /* 128KiB */
++		};
++
++		partition at 220000 {
++			label = "s_env";
++			reg = <0x220000 0x40000>;    /* 256KiB */
++		};
++
++		partition at 7e0000 {
++			label = "devinfo";
++			reg = <0x7e0000 0x40000>;   /* 256KiB */
++			read-only;
++		};
++
++		partition at 820000 {
++			label = "sysdiag";
++			reg = <0x820000 0x1e0000>;   /* 1920KiB */
++			read-only;
++		};
++
++		/* kernel1 overlaps with rootfs1 by design */
++		partition at a00000 {
++			label = "kernel1";
++			reg = <0xa00000 0x5000000>;  /* 80MiB */
++		};
++
++		partition at 1000000 {
++			label = "rootfs1";
++			reg = <0x1000000 0x4a00000>;  /* 74MiB */
++		};
++
++		/* kernel2 overlaps with rootfs2 by design */
++		partition at 5a00000 {
++			label = "kernel2";
++			reg = <0x5a00000 0x5000000>; /* 80MiB */
++		};
++
++		partition at 6000000 {
++			label = "rootfs2";
++			reg = <0x6000000 0x4a00000>; /* 74MiB */
++		};
++
++		/*
++		 * 86MiB, last MiB is for the BBT, not writable
++		 */
++		partition at aa00000 {
++			label = "syscfg";
++			reg = <0xaa00000 0x5600000>;
++		};
++
++		/*
++		 * Unused area between "s_env" and "devinfo".
++		 * Moved here because otherwise the renumbered
++		 * partitions would break the bootloader
++		 * supplied bootargs
++		 */
++		partition at 180000 {
++			label = "unused_area";
++			reg = <0x260000 0x5c0000>;   /* 5.75MiB */
++		};
+ 	};
+ };
+ 
+diff --git a/arch/arm/boot/dts/armada-385-linksys-shelby.dts b/arch/arm/boot/dts/armada-385-linksys-shelby.dts
+index 94aa35bc0bff..4694556700ff 100644
+--- a/arch/arm/boot/dts/armada-385-linksys-shelby.dts
++++ b/arch/arm/boot/dts/armada-385-linksys-shelby.dts
+@@ -105,67 +105,72 @@
+ 
+ &nand {
+ 	/* 128MiB */
+-
+-	partition at 0 {
+-		label = "u-boot";
+-		reg = <0x0000000 0x200000>;  /* 2MiB */
+-		read-only;
+-	};
+-
+-	partition at 100000 {
+-		label = "u_env";
+-		reg = <0x200000 0x40000>;    /* 256KiB */
+-	};
+-
+-	partition at 140000 {
+-		label = "s_env";
+-		reg = <0x240000 0x40000>;    /* 256KiB */
+-	};
+-
+-	partition at 900000 {
+-		label = "devinfo";
+-		reg = <0x900000 0x100000>;   /* 1MiB */
+-		read-only;
+-	};
+-
+-	/* kernel1 overlaps with rootfs1 by design */
+-	partition at a00000 {
+-		label = "kernel1";
+-		reg = <0xa00000 0x2800000>;  /* 40MiB */
+-	};
+-
+-	partition at 1000000 {
+-		label = "rootfs1";
+-		reg = <0x1000000 0x2200000>;  /* 34MiB */
+-	};
+-
+-	/* kernel2 overlaps with rootfs2 by design */
+-	partition at 3200000 {
+-		label = "kernel2";
+-		reg = <0x3200000 0x2800000>; /* 40MiB */
+-	};
+-
+-	partition at 3800000 {
+-		label = "rootfs2";
+-		reg = <0x3800000 0x2200000>; /* 34MiB */
+-	};
+-
+-	/*
+-	 * 38MiB, last MiB is for the BBT, not writable
+-	 */
+-	partition at 5a00000 {
+-		label = "syscfg";
+-		reg = <0x5a00000 0x2600000>;
+-	};
+-
+-	/*
+-	 * Unused area between "s_env" and "devinfo".
+-	 * Moved here because otherwise the renumbered
+-	 * partitions would break the bootloader
+-	 * supplied bootargs
+-	 */
+-	partition at 180000 {
+-		label = "unused_area";
+-		reg = <0x280000 0x680000>;   /* 6.5MiB */
++	partitions {
++		compatible = "fixed-partitions";
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		partition at 0 {
++			label = "u-boot";
++			reg = <0x0000000 0x200000>;  /* 2MiB */
++			read-only;
++		};
++
++		partition at 100000 {
++			label = "u_env";
++			reg = <0x200000 0x40000>;    /* 256KiB */
++		};
++
++		partition at 140000 {
++			label = "s_env";
++			reg = <0x240000 0x40000>;    /* 256KiB */
++		};
++
++		partition at 900000 {
++			label = "devinfo";
++			reg = <0x900000 0x100000>;   /* 1MiB */
++			read-only;
++		};
++
++		/* kernel1 overlaps with rootfs1 by design */
++		partition at a00000 {
++			label = "kernel1";
++			reg = <0xa00000 0x2800000>;  /* 40MiB */
++		};
++
++		partition at 1000000 {
++			label = "rootfs1";
++			reg = <0x1000000 0x2200000>;  /* 34MiB */
++		};
++
++		/* kernel2 overlaps with rootfs2 by design */
++		partition at 3200000 {
++			label = "kernel2";
++			reg = <0x3200000 0x2800000>; /* 40MiB */
++		};
++
++		partition at 3800000 {
++			label = "rootfs2";
++			reg = <0x3800000 0x2200000>; /* 34MiB */
++		};
++
++		/*
++		 * 38MiB, last MiB is for the BBT, not writable
++		 */
++		partition at 5a00000 {
++			label = "syscfg";
++			reg = <0x5a00000 0x2600000>;
++		};
++
++		/*
++		 * Unused area between "s_env" and "devinfo".
++		 * Moved here because otherwise the renumbered
++		 * partitions would break the bootloader
++		 * supplied bootargs
++		 */
++		partition at 180000 {
++			label = "unused_area";
++			reg = <0x280000 0x680000>;   /* 6.5MiB */
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/armada-385-linksys.dtsi b/arch/arm/boot/dts/armada-385-linksys.dtsi
+index e1f355ffc8f7..358b17e921bb 100644
+--- a/arch/arm/boot/dts/armada-385-linksys.dtsi
++++ b/arch/arm/boot/dts/armada-385-linksys.dtsi
+@@ -169,13 +169,18 @@
+ 	};
+ };
+ 
+-&nand {
++&nand_controller {
+ 	/* 128MiB or 256MiB */
+ 	status = "okay";
+-	num-cs = <1>;
+-	marvell,nand-keep-config;
+-	marvell,nand-enable-arbiter;
+-	nand-on-flash-bbt;
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	nand: nand at 0 {
++		reg = <0>;
++		marvell,rb = <0>;
++		marvell,nand-keep-config;
++		nand-on-flash-bbt;
++	};
+ };
+ 
+ &mdio {
+diff --git a/arch/arm/boot/dts/armada-388-db.dts b/arch/arm/boot/dts/armada-388-db.dts
+index a4ec1fa37529..0c020d7afcc1 100644
+--- a/arch/arm/boot/dts/armada-388-db.dts
++++ b/arch/arm/boot/dts/armada-388-db.dts
+@@ -128,29 +128,6 @@
+ 				status = "okay";
+ 			};
+ 
+-			flash at d0000 {
+-				status = "okay";
+-				num-cs = <1>;
+-				marvell,nand-keep-config;
+-				marvell,nand-enable-arbiter;
+-				nand-on-flash-bbt;
+-				nand-ecc-strength = <4>;
+-				nand-ecc-step-size = <512>;
+-
+-				partition at 0 {
+-					label = "U-Boot";
+-					reg = <0 0x800000>;
+-				};
+-				partition at 800000 {
+-					label = "Linux";
+-					reg = <0x800000 0x800000>;
+-				};
+-				partition at 1000000 {
+-					label = "Filesystem";
+-					reg = <0x1000000 0x3f000000>;
+-				};
+-			};
+-
+ 			sdhci at d8000 {
+ 				broken-cd;
+ 				wp-inverted;
+@@ -202,3 +179,34 @@
+ 	};
+ };
+ 
++&nand_controller {
++	status = "okay";
++
++	nand at 0 {
++		reg = <0>;
++		marvell,rb = <0>;
++		marvell,nand-keep-config;
++		nand-on-flash-bbt;
++		nand-ecc-strength = <4>;
++		nand-ecc-step-size = <512>;
++
++		partitions {
++			compatible = "fixed-partitions";
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			partition at 0 {
++				label = "U-Boot";
++				reg = <0 0x800000>;
++			};
++			partition at 800000 {
++				label = "Linux";
++				reg = <0x800000 0x800000>;
++			};
++			partition at 1000000 {
++				label = "Filesystem";
++				reg = <0x1000000 0x3f000000>;
++			};
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+index 7ff0811e61db..764fcf08ef53 100644
+--- a/arch/arm/boot/dts/armada-38x.dtsi
++++ b/arch/arm/boot/dts/armada-38x.dtsi
+@@ -583,11 +583,11 @@
+ 				status = "okay";
+ 			};
+ 
+-			nand: flash at d0000 {
+-				compatible = "marvell,armada370-nand";
++			nand_controller: nand-controller at d0000 {
++				compatible = "marvell,armada370-nand-controller";
+ 				reg = <0xd0000 0x54>;
+ 				#address-cells = <1>;
+-				#size-cells = <1>;
++				#size-cells = <0>;
+ 				interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&coredivclk 0>;
+ 				status = "disabled";
 -- 
 2.11.0
