@@ -1,82 +1,174 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 18 Oct 2017 16:31:30 +0800
-Subject: [PATCH v2 0/8] ARM: sun8i: a83t: Enable AXP813/AXP818 regulators
-Message-ID: <20171018083138.14517-1-wens@csie.org>
+Date: Wed, 18 Oct 2017 16:31:32 +0800
+Subject: [PATCH v2 2/8] ARM: dts: sunxi: Add dtsi for AXP81x PMIC
+In-Reply-To: <20171018083138.14517-1-wens@csie.org>
+References: <20171018083138.14517-1-wens@csie.org>
+Message-ID: <20171018083138.14517-3-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+The AXP81x family of PMIC is used with the Allwinner A83T and H8 SoCs.
+This includes the AXP813 and AXP818. There is no discernible difference
+except the labeling. The AXP813 is paired with the A83T, while the
+AXP818 is paired with the H8.
 
-This series was originally name "regulator: axp20x: Add support for
-AXP813/818 regulators". It adds support for the X-Powers AXP813/818 [1]
-PMICs' regulators. The series is quite straightforward.
+This patch adds a dtsi file for all the common bindings for these two
+PMICs. Currently this is just listing all the regulator nodes. The
+regulators are initialized based on their device node names.
 
-Changes since v1:
+In the future this would be expanded to include power supplies and
+GPIO controllers.
 
-  - Regulator driver patches were merged and now dropped from the series
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/axp81x.dtsi | 139 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 139 insertions(+)
+ create mode 100644 arch/arm/boot/dts/axp81x.dtsi
 
-  - Chose simpler names for the regulators
-
-  - Added SDIO WiFi enablement patches
-
-Patch 1 adds a axp20x-regulator cell for AXP813, thereby enabling the
-regulators.
-
-Patch 2 adds a shared dtsi file for the PMIC. This currently contains
-a list of regulator nodes, but will be expanded with Quentin's power
-supply work.
-
-Patches 3 through 5 add regulator nodes to board dts files for the A83T
-boards that I have. They are not squashed together as each file has
-substantial additions.
-
-Patch 6 moves the mmc1 pinmux setting over to the dtsi, and sets it by
-default.
-
-Patches 7 & 8 enable SDIO-based WiFi on the Cubietruck Plus and Banana
-Pi M3.
-
-Originally my work also included enabling Ethernet. But the Ethernet
-bindings were reverted. Everything can be found here:
-
-    https://github.com/wens/linux/tree/a83t-regulator-wifi-eth
-
-Please have a look.
-
-Lee, we need the mfd changes merged in before merging the dts changes.
-Otherwise, mmc would break as vmmc/vqmmc is tied to the PMIC regulators.
-
-
-Regards
-ChenYu
-
-
-[1] AXP813 and AXP818 are functionally identical. They have different
-    labels and are bundled with different SoCs (A83T and H8), as a sort
-    of product or market segmentation.
-
-
-
-Chen-Yu Tsai (8):
-  mfd: axp20x: Add axp20x-regulator cell for AXP813
-  ARM: dts: sunxi: Add dtsi for AXP81x PMIC
-  ARM: dts: sun8i: a83t: cubietruck-plus: Add AXP818 regulator nodes
-  ARM: dts: sun8i: a83t: bananapi-m3: Add AXP813 regulator nodes
-  ARM: dts: sun8i: a83t: allwinner-h8homlet-v2: Add AXP818 regulator
-    nodes
-  ARM: dts: sun8i: a83t: Move mmc1 pinctrl setting to dtsi file
-  ARM: dts: sun8i: a83t: cubietruck-plus: Enable AP6330 WiFi on mmc1
-  ARM: dts: sun8i: a83t: bananapi-m3: Enable AP6212 WiFi on mmc1
-
- .../{sun8i-a83t-bananapi-m3.dts => axp81x.dtsi}    | 157 ++++++++---------
- .../boot/dts/sun8i-a83t-allwinner-h8homlet-v2.dts  | 147 ++++++++++++++--
- arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts       | 169 ++++++++++++++++++-
- arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts   | 187 +++++++++++++++++++--
- arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts          |   2 -
- arch/arm/boot/dts/sun8i-a83t.dtsi                  |   2 +
- drivers/mfd/axp20x.c                               |   2 +
- 7 files changed, 547 insertions(+), 119 deletions(-)
- copy arch/arm/boot/dts/{sun8i-a83t-bananapi-m3.dts => axp81x.dtsi} (52%)
-
+diff --git a/arch/arm/boot/dts/axp81x.dtsi b/arch/arm/boot/dts/axp81x.dtsi
+new file mode 100644
+index 000000000000..73b761f850c5
+--- /dev/null
++++ b/arch/arm/boot/dts/axp81x.dtsi
+@@ -0,0 +1,139 @@
++/*
++ * Copyright 2017 Chen-Yu Tsai
++ *
++ * Chen-Yu Tsai <wens@csie.org>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/* AXP813/818 Integrated Power Management Chip */
++
++&axp81x {
++	interrupt-controller;
++	#interrupt-cells = <1>;
++
++	regulators {
++		/* Default work frequency for buck regulators */
++		x-powers,dcdc-freq = <3000>;
++
++		reg_dcdc1: dcdc1 {
++		};
++
++		reg_dcdc2: dcdc2 {
++		};
++
++		reg_dcdc3: dcdc3 {
++		};
++
++		reg_dcdc4: dcdc4 {
++		};
++
++		reg_dcdc5: dcdc5 {
++		};
++
++		reg_dcdc6: dcdc6 {
++		};
++
++		reg_dcdc7: dcdc7 {
++		};
++
++		reg_aldo1: aldo1 {
++		};
++
++		reg_aldo2: aldo2 {
++		};
++
++		reg_aldo3: aldo3 {
++		};
++
++		reg_dldo1: dldo1 {
++		};
++
++		reg_dldo2: dldo2 {
++		};
++
++		reg_dldo3: dldo3 {
++		};
++
++		reg_dldo4: dldo4 {
++		};
++
++		reg_eldo1: eldo1 {
++		};
++
++		reg_eldo2: eldo2 {
++		};
++
++		reg_eldo3: eldo3 {
++		};
++
++		reg_fldo1: fldo1 {
++		};
++
++		reg_fldo2: fldo2 {
++		};
++
++		reg_fldo3: fldo3 {
++		};
++
++		reg_ldo_io0: ldo-io0 {
++			/* Disable by default to avoid conflicts with GPIO */
++			status = "disabled";
++		};
++
++		reg_ldo_io1: ldo-io1 {
++			/* Disable by default to avoid conflicts with GPIO */
++			status = "disabled";
++		};
++
++		reg_rtc_ldo: rtc-ldo {
++			/* RTC_LDO is a fixed, always-on regulator */
++			regulator-always-on;
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++		};
++
++		reg_sw: sw {
++		};
++
++		reg_drivevbus: drivevbus {
++			status = "disabled";
++		};
++	};
++};
 -- 
 2.14.2
