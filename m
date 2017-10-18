@@ -1,70 +1,141 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Wed, 18 Oct 2017 17:52:22 +0200
-Subject: libbattery was Re: [RFC PATCH 5/5] power: generic-adc-battery:
- Add capacity handling
-In-Reply-To: <20171018135656.GA26432@amd>
-References: <1501620926-22669-1-git-send-email-marek.belisko@open-nandra.com>
- <1501620926-22669-6-git-send-email-marek.belisko@open-nandra.com>
- <20170829101147.debhadzyfrxhkrvt@earth> <20170908113231.GJ18365@amd>
- <20171018122804.GA14376@amd>
- <61BFA8AF-657A-4AD7-A7AC-3E5DC3B7E83D@goldelico.com>
- <20171018132204.GD4394@atomide.com> <20171018135656.GA26432@amd>
-Message-ID: <341EC461-B19F-418C-B0BF-26E1EEFAD5B7@goldelico.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 18 Oct 2017 18:57:14 +0300
+Subject: [RFC v2 0/8] Acer Chromebook R13 support
+In-Reply-To: <CAO3366wSii-P+=qzSO13-fqTUnXrx6DJ76+Bt1-wvYPOC8wNDA@mail.gmail.com>
+References: <1508167900-27415-1-git-send-email-ulrich.hecht+renesas@gmail.com>
+ <20171017160514.ivmaz6tzicoxewbx@art_vandelay>
+ <CAO3366wSii-P+=qzSO13-fqTUnXrx6DJ76+Bt1-wvYPOC8wNDA@mail.gmail.com>
+Message-ID: <26935926.iWbvre9SVm@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Ulrich,
 
-> Am 18.10.2017 um 15:56 schrieb Pavel Machek <pavel@ucw.cz>:
+On Wednesday, 18 October 2017 17:53:54 EEST Ulrich Hecht wrote:
+> On Tue, Oct 17, 2017 at 6:05 PM, Sean Paul <seanpaul@chromium.org> wrote:
+> > On Tue, Oct 17, 2017 at 12:33:09PM +0200, Matthias Brugger wrote:
+> >> From what I understand you
+> >> rebased the patches from the chromium kernel to mainline. So you should
+> >> keep the signed-off-by from the original author and just add you
+> >> signed-off-by below that.
+> >> Also it would be nice to CC these persons so that they are aware of your
+> >> effort.> 
+> > Additionally, make sure the author and commit messages are preserved when
+> > you send patches. You can add your own message in addition to your SoB,
+> > but please try to preserve history.
 > 
-> On Wed 2017-10-18 06:22:04, Tony Lindgren wrote:
->> * H. Nikolaus Schaller <hns@goldelico.com> [171018 05:49]:
->>>> Am 18.10.2017 um 14:28 schrieb Pavel Machek <pavel@ucw.cz>:
->>>> 
->>>> So I started something, it is at.
->>>> 
->>>> https://github.com/pavelmachek/libbattery
->>>> 
->>>> My battery on n900 is currently uncalibrated (and charging), still it
->>>> gets some kind of estimation:
->>>> 
->>>> Battery -1 %
->>>> Seconds -1
->>>> State 1
->>>> Voltage 3.88 V
->>>> Battery 63 %
->>>> 
->>>> Of course, there's a lot more work to be done.
->>> 
->>> Nice start but not a solution to our problem.
->>> 
->>> Our problem is that people simply expect that for example https://packages.debian.org/wheezy/xfce/xfce4-battery-plugin
->>> displays the battery percentage.
->> 
->> I think we could make things compatible with various battery apps by
->> having libbattery write back the capacity percentage and time remaining
->> to the kernel driver via sysfs or a dev entry. Then the kernel interface
->> can just display the data to whatever apps.
+> Fair enough, but I'm not sure what exactly to include. The chromium
+> commits include, among other things:
 > 
-> Hmm. This could be as simple as providing symlink from
-> /sys/class/power/userland-battery to some place writable by
-> userspace...
+> - bugtracker numbers and test cases
+> - "Change-Id" and "Commit-Ready" (no idea what those are)
+> - "Reviewed-on", containing links to chromium-review.googlesource.com
+> 
+> With all changes to the PS8640 driver concatenated and non-standard
+> tags removed, the commit message would look like this:
+> 
+> =============================
+>     CHROMIUM: drm/bridge: Add I2C based driver for ps8640 bridge
+> 
+>     This patch adds drm_bridge driver for parade DSI to eDP bridge chip.
+> 
+>     Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
+>     (am from https://patchwork.kernel.org/patch/8357851/)
+>     Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+>     Tested-by: cawa cheng <cawa.cheng@mediatek.com>
+>     Tested-by: Daniel Kurtz <djkurtz@chromium.org>
+>     Reviewed-by: Nicolas Boichat <drinkcat@chromium.org>
+> 
+> 
+>     FIXUP: FROMLIST: drm/bridge: Add I2C based driver for ps8640 bridge
+> 
+>     chromeos-3.18 currently has FROMLIST v15 of the PS8640 driver.
+>     This version is incompatible with UPSTREAM version of the Mediatek
+>     DRM driver.
+> 
+>     To quote Philipp Zabel:
+>     "The main DRM driver mtk_drm_drv now calls
+>     drm_connector_register_all() after drm_dev_register() in the
+>     mtk_drm_bind() function. That function should iterate over all
+>     connectors and call drm_connector_register() for each of them.
+>     The call to drm_connector_init() from mtk_hdmi_bridge_attach()
+>     should be enough to make this happen.
+> 
+>     The drm_connector_(un)register calls also have to be removed
+>     from the ps8640 driver."
+> 
+>     Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
+>     Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+>     Tested-by: PC Liao <pc.liao@mediatek.com>
+>     Tested-by: Daniel Kurtz <djkurtz@chromium.org>
+>     Tested-by: Nicolas Boichat <drinkcat@chromium.org>
+>     Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+> 
+> 
+>     CHROMIUM: drm/bridge: ps8640: Add a 3 ms delay before unmuting output
+> 
+>     For current ps8640 firmware, the PS_GPIO9 signal only indicates the
+> bridge has seen the attached panel's HPD signal and read its EDID. 
+> Unfortunately, the bridge may not yet be ready to properly handle DSI/eDP
+> traffic yet.
+> 
+>     For now, Paradetech has recommended adding a 3 ms delay after PS_GPIO9
+>     before starting video signal transmission.
+> 
+>     Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
+>     Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+> 
+>     Tested-by: cawa cheng <cawa.cheng@mediatek.com>
+>     Tested-by: Daniel Kurtz <djkurtz@chromium.org>
+>     Tested-by: jitao shi <jitao.shi@mediatek.com>
+>     Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+>     Reviewed-by: jitao shi <jitao.shi@mediatek.com>
+> 
+> 
+>     CHROMIUM: drm/bridge: ps8640: disable MIPI MCS
+> 
+>     Disable PS8640 MIPI MCS commands to workaround an issue where normal
+>     MIPI DSI signals are sometimes recognized as an MSC command that can,
+>     for example, disable the bridge output.
+> 
+>     Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
+>     Tested-by: Daniel Kurtz <djkurtz@chromium.org>
+>     Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+> 
+> 
+>     CHROMIUM: drm/bridge: ps8640: Use individual regulators instead of bulk
+> 
+>     According to the latest information from Parade, the PS8640 1.2 V
+>     supply must be enabled before 3.3 V.
+>     So, split the bulk regulator into separate individual regulators that
+>     can be enabled independently.
+> 
+>     Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
+> 
+>     Tested-by: Daniel Kurtz <djkurtz@chromium.org>
+>     Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+> 
+> 
+>     CHROMIUM: drm/bridge: ps8640: add 5ms delay between v12 and v33
+> 
+>     According to Parade, the PS8640 1.2V must be enabled 5 ms before its
+>     3.3V. Otherwise, the PS8650 MCU may hang, and its settings cannot be
+>     written correctly, leading to a black screen.
+> 
+>     Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
+>     Tested-by: Daniel Kurtz <djkurtz@chromium.org>
+>     Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+> =============================
+> 
+> That keeps chronology and attribution intact, but is somewhat
+> redundant. Any suggestions on how to digest it? Or should I just add
+> it as is?
 
-Well, please implement arbitrary symlinks in /sysfs...
+I would keep all the SoB lines, but apart from that I don't think there's a 
+need to copy all commit messages. You can extract relevant information for a 
+digest, but there's no point in copying the whole history.
 
-root at letux:~# ln -sf /tmp/somewhere /sys/class/power_supply/fake-battery
-ln: failed to create symbolic link '/sys/class/power_supply/fake-battery': Operation not permitted
-root at letux:~#
+-- 
+Regards,
 
-And you need to run a daemon so that the data is available
-somewhere.
-
-BR and thanks,
-Nikolaus
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: Message signed with OpenPGP using GPGMail
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171018/ded7a77f/attachment.sig>
+Laurent Pinchart
