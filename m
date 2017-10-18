@@ -1,151 +1,210 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 18 Oct 2017 17:58:28 +0200
-Subject: [RFC v2 0/8] Acer Chromebook R13 support
-In-Reply-To: <CAO3366wSii-P+=qzSO13-fqTUnXrx6DJ76+Bt1-wvYPOC8wNDA@mail.gmail.com>
-References: <1508167900-27415-1-git-send-email-ulrich.hecht+renesas@gmail.com>
- <18d36386-d3a0-a81f-6240-9703a3d98fbd@gmail.com>
- <20171017160514.ivmaz6tzicoxewbx@art_vandelay>
- <CAO3366wSii-P+=qzSO13-fqTUnXrx6DJ76+Bt1-wvYPOC8wNDA@mail.gmail.com>
-Message-ID: <a47fabef-1af8-4787-424b-9ff9cfb32f93@gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 18 Oct 2017 17:02:03 +0100
+Subject: [PATCH v3 19/28] arm64/sve: ptrace and ELF coredump support
+In-Reply-To: <20171018103254.c5ddwnzfz5ghhgad@armageddon.cambridge.arm.com>
+References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
+ <1507660725-7986-20-git-send-email-Dave.Martin@arm.com>
+ <20171012170632.35zifttm55rzu745@armageddon.cambridge.arm.com>
+ <20171013161638.GM19485@e103592.cambridge.arm.com>
+ <20171018103254.c5ddwnzfz5ghhgad@armageddon.cambridge.arm.com>
+Message-ID: <20171018160202.GC19485@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Oct 18, 2017 at 11:32:55AM +0100, Catalin Marinas wrote:
+> On Fri, Oct 13, 2017 at 05:16:39PM +0100, Dave P Martin wrote:
+> > On Thu, Oct 12, 2017 at 06:06:32PM +0100, Catalin Marinas wrote:
+> > > On Tue, Oct 10, 2017 at 07:38:36PM +0100, Dave P Martin wrote:
+> > > > @@ -702,6 +737,211 @@ static int system_call_set(struct task_struct *target,
+> > > >  	return ret;
+> > > >  }
+> > > >  
+> > > > +#ifdef CONFIG_ARM64_SVE
+> > > > +
+> > > > +static void sve_init_header_from_task(struct user_sve_header *header,
+> > > > +				      struct task_struct *target)
+> > > > +{
+> > > > +	unsigned int vq;
+> > > > +
+> > > > +	memset(header, 0, sizeof(*header));
+> > > > +
+> > > > +	header->flags = test_tsk_thread_flag(target, TIF_SVE) ?
+> > > > +		SVE_PT_REGS_SVE : SVE_PT_REGS_FPSIMD;
+> > > 
+> > > For PTRACE_SYSCALL, we may or may not have TIF_SVE depending on what
+> > > happened with the target. Just a thought: shall we clear TIF_SVE (and
+> > > sync it to fpsimd) in syscall_trace_enter()?
+> > 
+> > I'm not so sure: if we were to do that, a syscall that is cancelled by
+> > writing -1 to REGSET_SYSCALL could still discard the SVE registers as a
+> > side-effect.
+> > 
+> > The target committed to discard by executing SVC, but my feeling is
+> > that cancellation of a syscall in this way shouldn't have avoidable
+> > side-effects for the target.  But the semantics of cancelled syscalls
+> > are a bit of a grey area, so I can see potential arguments on both
+> > sides.
+> 
+> We already can't guarantee this - if the task invoking a syscall gets
+> preempted before syscall_trace_enter(), TIF_SVE will be cleared. Are you
+> reinstating TIF_SVE if the syscall was cancelled?
+> 
+> So my comment was more about consistency on presenting the SVE state to
+> the debugger handling PTRACE_SYSCALL.
+
+See the end of this reply.
+
+> > > > +	/* Registers: FPSIMD-only case */
+> > > > +
+> > > > +	BUILD_BUG_ON(SVE_PT_FPSIMD_OFFSET != sizeof(header));
+> > > > +	if ((header.flags & SVE_PT_REGS_MASK) == SVE_PT_REGS_FPSIMD) {
+> > > > +		sve_sync_to_fpsimd(target);
+> > > > +
+> > > > +		ret = __fpr_set(target, regset, pos, count, kbuf, ubuf,
+> > > > +				SVE_PT_FPSIMD_OFFSET);
+> > > > +		clear_tsk_thread_flag(target, TIF_SVE);
+> > > > +		goto out;
+> > > > +	}
+> > > 
+> > > __fpr_set() already calls sve_sync_to_fpsimd(). Anyway, do you actually
+> > 
+> > Yes, the call to sve_sync_to_fpsimd() is superfluous here -- I think
+> > that I realised that all callers of __fpr_set() need this to happen,
+> > but never deleted the explicit call from sve_set().
+> > 
+> > I'll delete it.
+> > 
+> > 
+> > Looking more closely at __fpr_set() though, I think it needs this change
+> > too, because the sync is unintentionally placed after reading
+> > thread.fpsimd_state instead of before:
+> > 
+> > @@ -652,11 +652,12 @@ static int __fpr_set(struct task_struct *target,
+> >                      unsigned int start_pos)
+> >  {
+> >         int ret;
+> > -       struct user_fpsimd_state newstate =
+> > -               target->thread.fpsimd_state.user_fpsimd;
+> > +       struct user_fpsimd_state newstate;
+> >  
+> >         sve_sync_to_fpsimd(target);
+> >  
+> > +       newstate = target->thread.fpsimd_state.user_fpsimd;
+> > +
+> >         ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf, &newstate,
+> > [...]
+> > 
+> > (Or were you confident that this was already OK?  Maybe I'm confusing
+> > myself.)
+> 
+> With the sve_sync_to_fpsimd() called before __fpr_set(), it was ok. Once
+> you removed that you indeed need the change to __fpr_set().
+
+Hmmm, yes.  Anyway, I've applied the above fix, so I think this should
+be fine now.
+
+> > > need this since we are going to override the FPSIMD state anyway here.
+> > 
+> > The underlying reason for this is the issue of what should happen
+> > for short regset writes.  Historically, writes through fpr_set() can
+> > be truncated arbitrarily, and the rest of fpsimd_state will remain
+> > unchanged.
+> 
+> Ah, I forgot about this.
+> 
+> > The issue is that if TIF_SVE is set, fpsimd_state can be stale for
+> > target.  If the initial sve_sync_to_fpsimd() is removed in sve_set()
+> > above, then we may resurrect old values for the untouched registers,
+> > instead of simply leaving them unmodified.
+> > 
+> > Should I add comments explaining the purpose?  I guess it is rather
+> > non-obvious.
+> 
+> Yes, please.
+
+Will do.  It's pretty yucky.
+
+> 
+> > > > +	set_tsk_thread_flag(target, TIF_SVE);
+> > > 
+> > > This has the side-effect of enabling TIF_SVE even for PTRACE_SYSCALL
+> > > which may be cleared in some circumstances. It may not be an issue
+> > > though.
+> > 
+> > I would argue that this is correct behaviour: the syscall enter trap and
+> > exit traps should both behave as if they are outside the syscall,
+> > allowing the debugger to simulate the effect of inserting any
+> > instructions the target could have inserted before or after the SVC.
+> > This may include simulating SVE instructions or modifying SVE regs,
+> > which would require TIF_SVE to get set.
+> 
+> I'm ok with this approach but I'm not sure we can guarantee it with
+> preemption enabled.
+
+Hmmm, I think I'm guilty of inventing a spurious argument here.
 
 
-On 10/18/2017 04:53 PM, Ulrich Hecht wrote:
-> On Tue, Oct 17, 2017 at 6:05 PM, Sean Paul <seanpaul@chromium.org> wrote:
->> On Tue, Oct 17, 2017 at 12:33:09PM +0200, Matthias Brugger wrote:
->>>  From what I understand you
->>> rebased the patches from the chromium kernel to mainline. So you should keep
->>> the signed-off-by from the original author and just add you signed-off-by
->>> below that.
->>> Also it would be nice to CC these persons so that they are aware of your effort.
->>>
->> Additionally, make sure the author and commit messages are preserved when you send
->> patches. You can add your own message in addition to your SoB, but please try to
->> preserve history.
-> 
-> Fair enough, but I'm not sure what exactly to include. The chromium
-> commits include, among other things:
-> 
-> - bugtracker numbers and test cases
-> - "Change-Id" and "Commit-Ready" (no idea what those are)
-> - "Reviewed-on", containing links to chromium-review.googlesource.com
-> 
-> With all changes to the PS8640 driver concatenated and non-standard
-> tags removed, the commit message would look like this:
-> 
-> =============================
->      CHROMIUM: drm/bridge: Add I2C based driver for ps8640 bridge
+Apparently gdb does not do syscall cancelling.
 
-The ones that have a FROMLIST are actually backports taken from the mailinglist, 
-so please search for them. Good starting point is linux-mediatek and 
-linux-arm-kernel newsgroups.
+Strace does though.
+(See http://man7.org/linux/man-pages/man1/strace.1.html, search for
+"syscall tampering" ;)
 
-For this patch the latest submission is these:
-https://patchwork.kernel.org/patch/9427541/
-https://patchwork.kernel.org/patch/9427543/
+However, it never tries to skip a syscall entirelity AFAICT:
+instead, it only attempts to fake what occurs during the syscall,
+such as bailing out with a predetermined return value.
 
-Please take up this patches and resubmit with the comments addressed by the 
-reviewers.
+> > If the tracer doesn't cancel the syscall at the enter trap, then a
+> > real syscall will execute and that may cause the SVE state to be
+> > discarded in the usual way in the case of preemption or blocking: it
+> > seems cleaner for the debug illusion that this decision isn't made
+> > differently just because the target is being traced.
+> > 
+> > (Spoiler alert though: the syscall exit trap will force the target
+> > to be scheduled out, which will force discard with the current
+> > task_fpsimd_save() behaviour ... but that could be changed in the
+> > future, and I prefer not to document any sort of guarantee here.)
+> 
+> If such state isn't guaranteed, then the de-facto ABI is that the
+> debugger cannot simulate any SVE instruction via NO_SYSCALL since the
+> SVE state may be discarded. So it can only rely on what's guaranteed and
+> changing the behaviour later won't actually help.
 
-Keep up the good work!
-Matthias
+I think you're right.
 
-> 
->      This patch adds drm_bridge driver for parade DSI to eDP bridge chip.
-> 
->      Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
->      (am from https://patchwork.kernel.org/patch/8357851/)
->      Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
->      Tested-by: cawa cheng <cawa.cheng@mediatek.com>
->      Tested-by: Daniel Kurtz <djkurtz@chromium.org>
->      Reviewed-by: Nicolas Boichat <drinkcat@chromium.org>
-> 
-> 
->      FIXUP: FROMLIST: drm/bridge: Add I2C based driver for ps8640 bridge
-> 
->      chromeos-3.18 currently has FROMLIST v15 of the PS8640 driver.
->      This version is incompatible with UPSTREAM version of the Mediatek
->      DRM driver.
-> 
->      To quote Philipp Zabel:
->      "The main DRM driver mtk_drm_drv now calls
->      drm_connector_register_all() after drm_dev_register() in the
->      mtk_drm_bind() function. That function should iterate over all
->      connectors and call drm_connector_register() for each of them.
->      The call to drm_connector_init() from mtk_hdmi_bridge_attach()
->      should be enough to make this happen.
-> 
->      The drm_connector_(un)register calls also have to be removed
->      from the ps8640 driver."
-> 
->      Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
->      Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
->      Tested-by: PC Liao <pc.liao@mediatek.com>
->      Tested-by: Daniel Kurtz <djkurtz@chromium.org>
->      Tested-by: Nicolas Boichat <drinkcat@chromium.org>
->      Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
-> 
-> 
->      CHROMIUM: drm/bridge: ps8640: Add a 3 ms delay before unmuting output
-> 
->      For current ps8640 firmware, the PS_GPIO9 signal only indicates the bridge
->      has seen the attached panel's HPD signal and read its EDID.  Unfortunately,
->      the bridge may not yet be ready to properly handle DSI/eDP traffic yet.
-> 
->      For now, Paradetech has recommended adding a 3 ms delay after PS_GPIO9
->      before starting video signal transmission.
-> 
->      Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
->      Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-> 
->      Tested-by: cawa cheng <cawa.cheng@mediatek.com>
->      Tested-by: Daniel Kurtz <djkurtz@chromium.org>
->      Tested-by: jitao shi <jitao.shi@mediatek.com>
->      Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
->      Reviewed-by: jitao shi <jitao.shi@mediatek.com>
-> 
-> 
->      CHROMIUM: drm/bridge: ps8640: disable MIPI MCS
-> 
->      Disable PS8640 MIPI MCS commands to workaround an issue where normal
->      MIPI DSI signals are sometimes recognized as an MSC command that can,
->      for example, disable the bridge output.
-> 
->      Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
->      Tested-by: Daniel Kurtz <djkurtz@chromium.org>
->      Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
-> 
-> 
->      CHROMIUM: drm/bridge: ps8640: Use individual regulators instead of bulk
-> 
->      According to the latest information from Parade, the PS8640 1.2 V
->      supply must be enabled before 3.3 V.
->      So, split the bulk regulator into separate individual regulators that
->      can be enabled independently.
-> 
->      Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
-> 
->      Tested-by: Daniel Kurtz <djkurtz@chromium.org>
->      Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
-> 
-> 
->      CHROMIUM: drm/bridge: ps8640: add 5ms delay between v12 and v33
-> 
->      According to Parade, the PS8640 1.2V must be enabled 5 ms before its
->      3.3V. Otherwise, the PS8650 MCU may hang, and its settings cannot be
->      written correctly, leading to a black screen.
-> 
->      Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
->      Tested-by: Daniel Kurtz <djkurtz@chromium.org>
->      Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
-> =============================
-> 
-> That keeps chronology and attribution intact, but is somewhat
-> redundant. Any suggestions on how to digest it? Or should I just add
-> it as is?
-> 
-> CU
-> Uli
-> 
+Simulating the content of the syscall does work though, and doesn't
+depend on whether SVE discard occurs or not.
+
+If the tracer sets the SVE regs at the syscall enter/exit traps,
+they could still be discarded again before the tracee reenters
+userspace, but that's no different from what happens in a real
+syscall.
+
+
+So I think my overall argument would be:
+
+ptrace should be as orthogonal as possible to SVE discard.
+
+
+Currently ptrace neither assumes that SVE discard will happen or that it
+won't: it just does what the tracer asks for and tries to be safe with
+either and doesn't try to hide the effects from the tracer or tracee.
+
+I worry that introducing more interdependencies between ptrace and the
+fpsimd.c code will complicate maintenance rather than making it easier.
+
+Does that may my position clearer?
+
+If we go with this, I should add a note to the documentation explaining
+how NT_ARM_SVE writes interact with ptrace syscall traps.
+
+
+The alternative would be to forcibly discard SVE in
+syscall_trace_enter(), but this doesn't seem to simplify the NT_ARM_SVE
+implementation at all -- that code needs to work for all types of
+ptrace-stop, not just syscall traps: other that syscall traps, SVE
+is potentially live for the tracee and must not be discarded.
+So I'm still not clear on what the gain is.
+
+Cheers
+---Dave
