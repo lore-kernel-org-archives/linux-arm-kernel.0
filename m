@@ -1,41 +1,104 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 18 Oct 2017 17:43:10 +0100
-Subject: [PATCH v3 13/20] arm64: cpufeature: Enable IESB on exception
- entry/return for firmware-first
-In-Reply-To: <20171005191812.5678-14-james.morse@arm.com>
-References: <20171005191812.5678-1-james.morse@arm.com>
- <20171005191812.5678-14-james.morse@arm.com>
-Message-ID: <20171018164309.ecwsk7qjmkyevos4@armageddon.cambridge.arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 18 Oct 2017 18:44:50 +0200
+Subject: [PATCH v7 02/10] arm: dts: sunxi: Restore EMAC changes
+In-Reply-To: <20171018114458.17891-3-clabbe.montjoie@gmail.com>
+References: <20171018114458.17891-1-clabbe.montjoie@gmail.com>
+ <20171018114458.17891-3-clabbe.montjoie@gmail.com>
+Message-ID: <20171018164450.GE15371@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 05, 2017 at 08:18:05PM +0100, James Morse wrote:
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index b68f5e93baac..29df2a93688c 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -989,6 +989,21 @@ config ARM64_RAS_EXTN
->  	  and access the new registers if the system supports the extension.
->  	  Platform RAS features may additionally depend on firmware support.
+On Wed, Oct 18, 2017 at 01:44:50PM +0200, Corentin Labbe wrote:
+> The original dwmac-sun8i DT bindings have some issue on how to handle
+> integrated PHY and was reverted in last RC of 4.13.
+> But now we have a solution so we need to get back that was reverted.
+> 
+> This patch restore arm DT about dwmac-sun8i
+> This reverts commit fe45174b72ae ("arm: dts: sunxi: Revert EMAC changes")
+> 
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> ---
+>  arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts |  9 ++++++++
+>  arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts   | 19 +++++++++++++++++
+>  arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts     | 19 +++++++++++++++++
+>  arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts         |  7 ++++++
+>  arch/arm/boot/dts/sun8i-h3-orangepi-2.dts         |  8 +++++++
+>  arch/arm/boot/dts/sun8i-h3-orangepi-one.dts       |  8 +++++++
+>  arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts   |  5 +++++
+>  arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts        |  8 +++++++
+>  arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts      | 22 +++++++++++++++++++
+>  arch/arm/boot/dts/sun8i-h3-orangepi-plus2e.dts    | 16 ++++++++++++++
+>  arch/arm/boot/dts/sunxi-h3-h5.dtsi                | 26 +++++++++++++++++++++++
+>  11 files changed, 147 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+> index b1502df7b509..6713d0f2b3f4 100644
+> --- a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+> +++ b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+> @@ -56,6 +56,8 @@
 >  
-> +config ARM64_IESB
-> +	bool "Enable Implicit Error Synchronization Barrier (IESB)"
-> +	default y
-> +	depends on ARM64_RAS_EXTN
-> +	help
-> +	  ARM v8.2 adds a feature to add implicit error synchronization
-> +	  barriers whenever the CPU enters or exits a particular exception
-> +	  level.
+>  	aliases {
+>  		serial0 = &uart0;
+> +		/* ethernet0 is the H3 emac, defined in sun8i-h3.dtsi */
+> +		ethernet0 = &emac;
+>  		ethernet1 = &xr819;
+>  	};
+>  
+> @@ -102,6 +104,13 @@
+>  	status = "okay";
+>  };
+>  
+> +&emac {
+> +	phy-handle = <&int_mii_phy>;
+> +	phy-mode = "mii";
+> +	allwinner,leds-active-low;
+> +	status = "okay";
+> +};
 > +
-> +	  On CPUs with this feature and the 'RAS Extensions' feature, we can
-> +	  use this to contain detected (but not yet reported) errors to the
-> +	  relevant exception level.
+>  &mmc0 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&mmc0_pins_a>;
+> diff --git a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+> index e1dba9ffa94b..f2292deaa590 100644
+> --- a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+> +++ b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+> @@ -52,6 +52,7 @@
+>  	compatible = "sinovoip,bpi-m2-plus", "allwinner,sun8i-h3";
+>  
+>  	aliases {
+> +		ethernet0 = &emac;
+>  		serial0 = &uart0;
+>  		serial1 = &uart1;
+>  	};
+> @@ -111,6 +112,24 @@
+>  	status = "okay";
+>  };
+>  
+> +&emac {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&emac_rgmii_pins>;
+> +	phy-supply = <&reg_gmac_3v3>;
+> +	phy-handle = <&ext_rgmii_phy>;
+> +	phy-mode = "rgmii";
 > +
-> +	  The feature is detected at runtime, selecting this option will
-> +	  enable these implicit barriers if the CPU supports the feature.
->  endmenu
+> +	allwinner,leds-active-low;
+> +	status = "okay";
+> +};
+> +
 
-What's the use-case for not having this option always enabled?
 
--- 
-Catalin
+> +&external_mdio {
+> +	ext_rgmii_phy: ethernet-phy at 1 {
+> +		compatible = "ethernet-phy-ieee802.3-c22";
+> +		reg = <0>;
+> +	};
+> +};
+> +
+
+Hi Corentin
+
+I'm wondering about the order of the patches. Does the external_mdio
+node actually exist at this point? Or only later when other patches
+are applied?
+
+    Andrew
