@@ -1,56 +1,90 @@
-From: jim2101024@gmail.com (Jim Quinlan)
-Date: Wed, 18 Oct 2017 10:41:17 -0400
-Subject: [PATCH 5/9] PCI: host: brcmstb: add dma-ranges for inbound traffic
-In-Reply-To: <20171018065316.GA11183@lst.de>
-References: <1507761269-7017-1-git-send-email-jim2101024@gmail.com>
- <1507761269-7017-6-git-send-email-jim2101024@gmail.com>
- <589c04cb-061b-a453-3188-79324a02388e@arm.com>
- <20171017081422.GA19475@lst.de>
- <CANCKTBsCB+x2XgrND9AhRtxPkCXfps1nA+YymkZjKHOUZfjSHQ@mail.gmail.com>
- <20171018065316.GA11183@lst.de>
-Message-ID: <CANCKTBv+yiCNsrnx3m+W9wPqC4NdKPZ2p=zLtSa8fX6v1rPcYQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 18 Oct 2017 16:52:26 +0100
+Subject: [PATCH v3 03/20] arm64: Use the physical counter when available
+ for read_cycles
+In-Reply-To: <20171018113405.GA8900@cbox> (Christoffer Dall's message of "Wed,
+ 18 Oct 2017 13:34:05 +0200")
+References: <20170923004207.22356-1-cdall@linaro.org>
+ <20170923004207.22356-4-cdall@linaro.org>
+ <9b06425f-7c2c-d44a-cd6c-aeaa4b76849c@arm.com>
+ <20171018113405.GA8900@cbox>
+Message-ID: <878tg8jvwl.fsf@on-the-bus.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 18, 2017 at 2:53 AM, Christoph Hellwig <hch@lst.de> wrote:
-> On Tue, Oct 17, 2017 at 12:11:55PM -0400, Jim Quinlan wrote:
->> My understanding is that dma_pfn_offset is that it is a single
->> constant offset from RAM, in our case, to map to PCIe space.
->
-> Yes.
->
->> But in
->> my commit message I detail how our PCIe controller presents memory
->> with multiple regions with multiple different offsets. If an EP device
->> maps to a region on the host memory, yes we can set the dma_pfn_offset
->> for that device for that location within that range,.  But if the
->> device then unmaps and allocates from another region with a different
->> offset, it won't work.  If  I set dma_pfn_offset I have to assume that
->> the device is using only one region of memory only, not more than one,
->> and that it is not unmapping that region and mapping another (with a
->> different offset).  Can I make those assumptions?
->
-> No, we can't make that assumption unfortunately.  But how is your
-> code going to work if the mapping spans multiple of your translation
-> regions?
+On Wed, Oct 18 2017 at  1:34:05 pm BST, Christoffer Dall <cdall@linaro.org> wrote:
+> On Mon, Oct 09, 2017 at 05:21:24PM +0100, Marc Zyngier wrote:
+>> On 23/09/17 01:41, Christoffer Dall wrote:
+>> > Currently get_cycles() is hardwired to arch_counter_get_cntvct() on
+>> > arm64, but as we move to using the physical timer for the in-kernel
+>> > time-keeping, we need to make that more flexible.
+>> > 
+>> > First, we need to make sure the physical counter can be read on equal
+>> > terms to the virtual counter, which includes adding physical counter
+>> > read functions for timers that require errata.
+>> > 
+>> > Second, we need to make a choice between reading the physical vs virtual
+>> > counter, depending on which timer is used for time keeping in the kernel
+>> > otherwise.  We can do this using a static key to avoid a performance
+>> > penalty during runtime when reading the counter.
+>> > 
+>> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> > Cc: Will Deacon <will.deacon@arm.com>
+>> > Cc: Mark Rutland <mark.rutland@arm.com>
+>> > Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> > Signed-off-by: Christoffer Dall <cdall@linaro.org>
 
-That's what brcm_to_{pci,cpu} are for -- they keep a list of the
-dma-ranges given in the PCIe DT node, and translate from system memory
-addresses to pci-space addresses, and vice versa.  As long as people
-are using the DMA API it should work.  It works for all of the ARM,
-ARM64, and MIPS Broadcom systems I've tested, using eight different EP
-devices.  Note that I am not thrilled to be advocating this mechanism
-but it seemed the best alternative.
+[...]
 
->memorymaintiners
-> Also I really don't think the stacking of dma_ops as in this patch
-> is a good idea.  For MIPS you should do the variant suggested in
-> the patch description and hook into dma_to_phys/phys_to_dma helpers,
-> and for ARM/ARM64 you should talk to the maintainers on how they
-> want the translation integrated.
+>> In my reply to patch #2, I had the following hunk:
+>> 
+>> @@ -310,7 +329,7 @@ static void erratum_set_next_event_tval_generic(const int access, unsigned long
+>>  						struct clock_event_device *clk)
+>>  {
+>>  	unsigned long ctrl;
+>> -	u64 cval = evt + arch_counter_get_cntvct();
+>> +	u64 cval = evt + arch_timer_read_counter();
+>>  
+>>  	ctrl = arch_timer_reg_read(access, ARCH_TIMER_REG_CTRL, clk);
+>>  	ctrl |= ARCH_TIMER_CTRL_ENABLE;
+>> 
+>> Once we start using a different timer, this could well have an effect...
+>> 
+>
+> Right, but wouldn't the following be a more correct way to go about it then:
+>
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index 9a7b359..07f19db 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -329,16 +329,19 @@ static void erratum_set_next_event_tval_generic(const int access, unsigned long
+>  						struct clock_event_device *clk)
+>  {
+>  	unsigned long ctrl;
+> -	u64 cval = evt + arch_timer_read_counter();
+> +	u64 cval;
+>  
+>  	ctrl = arch_timer_reg_read(access, ARCH_TIMER_REG_CTRL, clk);
+>  	ctrl |= ARCH_TIMER_CTRL_ENABLE;
+>  	ctrl &= ~ARCH_TIMER_CTRL_IT_MASK;
+>  
+> -	if (access == ARCH_TIMER_PHYS_ACCESS)
+> +	if (access == ARCH_TIMER_PHYS_ACCESS) {
+> +		cval = evt + arch_counter_get_cntpct();
+>  		write_sysreg(cval, cntp_cval_el0);
+> -	else
+> +	} else {
+> +		cval = evt + arch_counter_get_cntvct();
+>  		write_sysreg(cval, cntv_cval_el0);
+> +	}
+>  
+>  	arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl, clk);
+>  }
 
-I would prefer that the same code work for all three architectures.
-What I would like from ARM/ARM64 is the ability to override
-phys_to_dma() and dma_to_phys(); I thought the chances of that being
-accepted would be slim.  But you are right, I should ask the
-maintainers.
+Yup, that's much better.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead, it just smell funny.
