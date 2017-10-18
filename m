@@ -1,67 +1,81 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Wed, 18 Oct 2017 18:49:29 +0200
-Subject: [PATCH v3 24/28] arm64/sve: KVM: Hide SVE from CPU features
- exposed to guests
-In-Reply-To: <20171018150149.GB19485@e103592.cambridge.arm.com>
-References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
- <1507660725-7986-25-git-send-email-Dave.Martin@arm.com>
- <20171017135816.GF5886@lvm>
- <20171017140749.GW19485@e103592.cambridge.arm.com>
- <2c6d9aa4-f6a8-2c6b-4138-e07d773bf4a2@arm.com>
- <20171017154708.GY19485@e103592.cambridge.arm.com>
- <20171018132145.GF8900@cbox>
- <20171018150149.GB19485@e103592.cambridge.arm.com>
-Message-ID: <CAMJs5B9cA0xMeeZ2UYa9es0HfTH=vt=TZ=oMX6iBkvx5aBLDow@mail.gmail.com>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Wed, 18 Oct 2017 18:48:36 +0200
+Subject: libbattery was Re: [RFC PATCH 5/5] power: generic-adc-battery:
+ Add capacity handling
+In-Reply-To: <20171018161312.GA31392@amd>
+References: <1501620926-22669-1-git-send-email-marek.belisko@open-nandra.com>
+ <1501620926-22669-6-git-send-email-marek.belisko@open-nandra.com>
+ <20170829101147.debhadzyfrxhkrvt@earth> <20170908113231.GJ18365@amd>
+ <20171018122804.GA14376@amd>
+ <61BFA8AF-657A-4AD7-A7AC-3E5DC3B7E83D@goldelico.com>
+ <20171018132204.GD4394@atomide.com> <20171018135656.GA26432@amd>
+ <341EC461-B19F-418C-B0BF-26E1EEFAD5B7@goldelico.com>
+ <20171018161312.GA31392@amd>
+Message-ID: <308D4E97-E80F-406B-95DE-2AD4D4DBCF03@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 18, 2017 at 5:01 PM, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Wed, Oct 18, 2017 at 03:21:45PM +0200, Christoffer Dall wrote:
->> On Tue, Oct 17, 2017 at 04:47:08PM +0100, Dave Martin wrote:
->> > On Tue, Oct 17, 2017 at 03:29:36PM +0100, Marc Zyngier wrote:
->> > > On 17/10/17 15:07, Dave Martin wrote:
->> > > > On Tue, Oct 17, 2017 at 06:58:16AM -0700, Christoffer Dall wrote:
->> > > >> On Tue, Oct 10, 2017 at 07:38:41PM +0100, Dave Martin wrote:
->
-> [...]
->
->> > > >>> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
->
-> [...]
->
->> > > >>> @@ -897,8 +898,17 @@ static u64 read_id_reg(struct sys_reg_desc const *r, bool raz)
->> > > >>>  {
->> > > >>>       u32 id = sys_reg((u32)r->Op0, (u32)r->Op1,
->> > > >>>                        (u32)r->CRn, (u32)r->CRm, (u32)r->Op2);
->> > > >>> +     u64 val = raz ? 0 : read_sanitised_ftr_reg(id);
->> > > >>>
->> > > >>> -     return raz ? 0 : read_sanitised_ftr_reg(id);
->> > > >>> +     if (id == SYS_ID_AA64PFR0_EL1) {
->> > > >>> +             if (val & (0xfUL << ID_AA64PFR0_SVE_SHIFT))
->> > > >>> +                     pr_err_once("kvm [%i]: SVE unsupported for guests, suppressing\n",
->> > > >>> +                                 task_pid_nr(current));
->> > > >>
->> > > >> nit: does this really qualify as an error print?
->> > > >
->> > > > I have no strong opinion on this: maz suggested I should add this --
->> > > > his concern was to make it difficult to ignore.
->> > > >
->> > > > This is transitional: the main purpose is to circumvent bug reports from
->> > > > people who find that SVE doesn't work in their guests, in the interim
->> > > > before proper KVM support lands upstream.
->> > > >
->> > > > Marc, do you still agree with this position?
->> > >
->> > > As long as this is transitional, I'm OK with this.
->> >
->> > No argument from me, since it was your request in the first place ;)
->> >
->> > Christoffer?
->> >
->> No (further) argument from me.
->
-> OK, thanks.  Can I take that as an Ack?
->
-Yes:
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Am 18.10.2017 um 18:13 schrieb Pavel Machek <pavel@ucw.cz>:
+> 
+> On Wed 2017-10-18 17:52:22, H. Nikolaus Schaller wrote:
+>> 
+>>> Am 18.10.2017 um 15:56 schrieb Pavel Machek <pavel@ucw.cz>:
+>>> 
+>>> On Wed 2017-10-18 06:22:04, Tony Lindgren wrote:
+>>>> * H. Nikolaus Schaller <hns@goldelico.com> [171018 05:49]:
+>>>>>> Am 18.10.2017 um 14:28 schrieb Pavel Machek <pavel@ucw.cz>:
+>>>>>> 
+>>>>>> So I started something, it is at.
+>>>>>> 
+>>>>>> https://github.com/pavelmachek/libbattery
+>>>>>> 
+>>>>>> My battery on n900 is currently uncalibrated (and charging), still it
+>>>>>> gets some kind of estimation:
+>>>>>> 
+>>>>>> Battery -1 %
+>>>>>> Seconds -1
+>>>>>> State 1
+>>>>>> Voltage 3.88 V
+>>>>>> Battery 63 %
+>>>>>> 
+>>>>>> Of course, there's a lot more work to be done.
+>>>>> 
+>>>>> Nice start but not a solution to our problem.
+>>>>> 
+>>>>> Our problem is that people simply expect that for example https://packages.debian.org/wheezy/xfce/xfce4-battery-plugin
+>>>>> displays the battery percentage.
+>>>> 
+>>>> I think we could make things compatible with various battery apps by
+>>>> having libbattery write back the capacity percentage and time remaining
+>>>> to the kernel driver via sysfs or a dev entry. Then the kernel interface
+>>>> can just display the data to whatever apps.
+>>> 
+>>> Hmm. This could be as simple as providing symlink from
+>>> /sys/class/power/userland-battery to some place writable by
+>>> userspace...
+>> 
+>> Well, please implement arbitrary symlinks in /sysfs...
+> 
+> Any reason why I'd like to do that?
+
+I don't know if you like it or not.
+
+But it appears to be a strict necessity to make your proposal of
+"as simple as providing symlink from /sys/class/power/userland-battery
+to some place writable by userspace" work.
+
+So if a different solution to provide /sys/class/power/*-battery
+is possible, it should probably be preferred and nobody will ask
+you to do something you don't like.
+
+BR,
+Nikolaus
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: Message signed with OpenPGP using GPGMail
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171018/b7bb8503/attachment.sig>
