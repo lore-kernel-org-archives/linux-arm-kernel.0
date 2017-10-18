@@ -1,42 +1,62 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Wed, 18 Oct 2017 10:18:22 +0200
-Subject: [PATCH v2 2/2] vgaarb: Factor out EFI and fallback default
- device selection
-In-Reply-To: <878tg9i9pw.fsf@linkitivity.dja.id.au>
-References: <20171013034338.14630.4766.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <20171013034729.14630.30419.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <871sm2y1h9.fsf@linkitivity.dja.id.au>
- <20171017120506.ervbnyjue55zn67b@phenom.ffwll.local>
- <878tg9i9pw.fsf@linkitivity.dja.id.au>
-Message-ID: <20171018081822.pqmkj2xfgg6kb6xa@phenom.ffwll.local>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Wed, 18 Oct 2017 09:21:50 +0100
+Subject: [PATCH v5 2/4] clocksource: stm32: only use 32 bits timers
+In-Reply-To: <1508312614-27750-3-git-send-email-benjamin.gaignard@linaro.org>
+References: <1508312614-27750-1-git-send-email-benjamin.gaignard@linaro.org>
+ <1508312614-27750-3-git-send-email-benjamin.gaignard@linaro.org>
+Message-ID: <78e4bf06-7e95-d863-3b3d-c7362643da90@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 18, 2017 at 11:24:43AM +1100, Daniel Axtens wrote:
-> Hi Daniel,
-> 
-> >> Initially I wondered if this info printk could be moved into
-> >> vga_arbiter_check_bridge_sharing(), but it's been separated out since
-> >> 3448a19da479b ("vgaarb: use bridges to control VGA routing where
-> >> possible."), and upon closer examination, it seems you can't be sure a
-> >> device doesn't share a bridge until the end of the process, so this is
-> >> indeed correct.
-> >> 
-> >> Everything else also looks good to me.
-> >> 
-> >> Reviewed-by: Daniel Axtens <dja@axtens.net>
-> >
-> > R-b for both patches? And ok with everyone if I pull this into drm-misc
-> > for 4.15 (deadline is end of this week for feature-y stuff)?
-> 
-> I had only intended it for patch 2, but I've now read over patch 1 to my
-> satisfaction, so it too is:
-> 
-> Reviewed-by: Daniel Axtens <dja@axtens.net>
 
-Both applied for 4.15, thanks.
--Daniel
+
+On 18/10/17 08:43, Benjamin Gaignard wrote:
+> 16 bits hardware are not enough accure to be used.
+> Do no allow them to be probed by tested max counter value.
+> 
+> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+> ---
+>   drivers/clocksource/timer-stm32.c | 23 +++++++++--------------
+>   1 file changed, 9 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/clocksource/timer-stm32.c b/drivers/clocksource/timer-stm32.c
+> index abff21c..f7e4eec 100644
+> --- a/drivers/clocksource/timer-stm32.c
+> +++ b/drivers/clocksource/timer-stm32.c
+> @@ -81,9 +81,9 @@ static irqreturn_t stm32_clock_event_handler(int irq, void *dev_id)
+>   static int __init stm32_clockevent_init(struct device_node *node)
+>   {
+>   	struct reset_control *rstc;
+> -	unsigned long max_delta;
+> -	int ret, bits, prescaler = 1;
+> +	unsigned long max_arr;
+>   	struct timer_of *to;
+> +	int ret;
+>   
+>   	to = kzalloc(sizeof(*to), GFP_KERNEL);
+>   	if (!to)
+> @@ -113,26 +113,21 @@ static int __init stm32_clockevent_init(struct device_node *node)
+>   
+>   	/* Detect whether the timer is 16 or 32 bits */
+>   	writel_relaxed(~0U, timer_of_base(to) + TIM_ARR);
+> -	max_delta = readl_relaxed(timer_of_base(to) + TIM_ARR);
+> -	if (max_delta == ~0U) {
+> -		prescaler = 1;
+> -		bits = 32;
+> -	} else {
+> -		prescaler = 1024;
+> -		bits = 16;
+> +	max_arr = readl_relaxed(timer_of_base(to) + TIM_ARR);
+> +	if (max_arr != ~0U) {
+> +		pr_err("32 bits timer is needed\n");
+> +		return -EINVAL;
+
+Same as with previous patch, I think "to" should get freed.
+
+Also, why is there no function to undo what timer_of_init did? Shouldn't 
+we be able to free the irqs and unmap the timer io base here?
+
+Cheers,
+
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Julien Thierry
