@@ -1,78 +1,33 @@
-From: gilad@benyossef.com (Gilad Ben-Yossef)
-Date: Wed, 18 Oct 2017 08:00:35 +0100
-Subject: [PATCH v10 03/20] net: use -ENOSPC for transient busy indication
-In-Reply-To: <1508310057-25369-1-git-send-email-gilad@benyossef.com>
-References: <1508310057-25369-1-git-send-email-gilad@benyossef.com>
-Message-ID: <1508310057-25369-4-git-send-email-gilad@benyossef.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 18 Oct 2017 09:36:14 +0200
+Subject: [PATCH 2/7] ARM: dts: r8a7745: Use R-Car Gen2 Ether fallback
+ compat string
+In-Reply-To: <20171018072728.14681-3-horms+renesas@verge.net.au>
+References: <20171018072728.14681-1-horms+renesas@verge.net.au>
+ <20171018072728.14681-3-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdV=xgZT9EeCAQxq-xgouVDP0POABUKY9KgJ7GGpsjU6kA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace -EBUSY with -ENOSPC when handling transient busy
-indication in the absence of backlog.
+On Wed, Oct 18, 2017 at 9:27 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Use newly added R-Car Gen2 Ether fallback compat string
+> in the DT of the r8a7745 SoC.
+>
+> This should have no run-time effect as the driver matches against
+> the per-SoC compat string before considering the fallback compat string.
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
----
+Gr{oetje,eeting}s,
 
-Please squash this patch with the previous one when merging upstream.
+                        Geert
 
- net/ipv4/ah4.c  | 2 +-
- net/ipv4/esp4.c | 2 +-
- net/ipv6/ah6.c  | 2 +-
- net/ipv6/esp6.c | 2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-diff --git a/net/ipv4/ah4.c b/net/ipv4/ah4.c
-index 37db44f..4dd95cd 100644
---- a/net/ipv4/ah4.c
-+++ b/net/ipv4/ah4.c
-@@ -240,7 +240,7 @@ static int ah_output(struct xfrm_state *x, struct sk_buff *skb)
- 		if (err == -EINPROGRESS)
- 			goto out;
- 
--		if (err == -EBUSY)
-+		if (err == -ENOSPC)
- 			err = NET_XMIT_DROP;
- 		goto out_free;
- 	}
-diff --git a/net/ipv4/esp4.c b/net/ipv4/esp4.c
-index b00e4a4..d57aa64 100644
---- a/net/ipv4/esp4.c
-+++ b/net/ipv4/esp4.c
-@@ -432,7 +432,7 @@ int esp_output_tail(struct xfrm_state *x, struct sk_buff *skb, struct esp_info *
- 	case -EINPROGRESS:
- 		goto error;
- 
--	case -EBUSY:
-+	case -ENOSPC:
- 		err = NET_XMIT_DROP;
- 		break;
- 
-diff --git a/net/ipv6/ah6.c b/net/ipv6/ah6.c
-index 7802b72..3bd9d80 100644
---- a/net/ipv6/ah6.c
-+++ b/net/ipv6/ah6.c
-@@ -443,7 +443,7 @@ static int ah6_output(struct xfrm_state *x, struct sk_buff *skb)
- 		if (err == -EINPROGRESS)
- 			goto out;
- 
--		if (err == -EBUSY)
-+		if (err == -ENOSPC)
- 			err = NET_XMIT_DROP;
- 		goto out_free;
- 	}
-diff --git a/net/ipv6/esp6.c b/net/ipv6/esp6.c
-index 89910e2..c04d995 100644
---- a/net/ipv6/esp6.c
-+++ b/net/ipv6/esp6.c
-@@ -396,7 +396,7 @@ int esp6_output_tail(struct xfrm_state *x, struct sk_buff *skb, struct esp_info
- 	case -EINPROGRESS:
- 		goto error;
- 
--	case -EBUSY:
-+	case -ENOSPC:
- 		err = NET_XMIT_DROP;
- 		break;
- 
--- 
-2.7.4
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
