@@ -1,55 +1,48 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Wed, 18 Oct 2017 13:40:12 +0200
-Subject: [PATCH] iio: adc: stm32: add check on clock rate
-Message-ID: <1508326812-24297-1-git-send-email-fabrice.gasnier@st.com>
+From: icenowy@aosc.io (icenowy at aosc.io)
+Date: Wed, 18 Oct 2017 20:21:36 +0800
+Subject: [PATCH 2/6] ARM: sun8i: r40: add USB host port nodes for R40
+In-Reply-To: <20171016120633.6jof6wvsre27rxhv@flea.lan>
+References: <20171008042906.46779-1-icenowy@aosc.io>
+ <20171008042906.46779-3-icenowy@aosc.io>
+ <20171009210340.ak6wo3vqnwj4gom4@flea.home>
+ <55B35500-67FC-40AA-9A07-98C843DE55B3@aosc.io>
+ <20171016093229.waizww2n4gwn4qpw@flea.lan>
+ <7ee77556174b84846a59d57525ec1cb9@aosc.io>
+ <20171016120633.6jof6wvsre27rxhv@flea.lan>
+Message-ID: <9c98d27b0cf6afb76edf651e67ec2226@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add check on STM32 ADC clock rate to report an explicit error.
-This may avoid division by 0 later in stm32-adc driver.
+? 2017-10-16 20:06?Maxime Ripard ???
+> On Mon, Oct 16, 2017 at 05:39:58PM +0800, icenowy at aosc.io wrote:
+>> ? 2017-10-16 17:32?Maxime Ripard ???
+>> > On Tue, Oct 10, 2017 at 07:24:28AM +0800, Icenowy Zheng wrote:
+>> > > >> +			interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
+>> > > >> +			clocks = <&ccu CLK_BUS_OHCI1>,
+>> > > >> +				 <&ccu CLK_BUS_EHCI1>,
+>> > > >> +				 <&ccu CLK_USB_OHCI1>;
+>> > > >> +			resets = <&ccu RST_BUS_OHCI1>,
+>> > > >> +				 <&ccu RST_BUS_EHCI1>;
+>> > > >
+>> > > >Why do you need to take the OHCI resources too?
+>> > >
+>> > > AW's strange design -- without OHCI resources taken EHCI
+>> > > won't work.
+>> >
+>> > How has this been tested?
+>> 
+>> As EHCI is probed before OHCI, this behavior is easy to
+>> appear if the OHCI resources are removed.
+> 
+> And what is "this behaviour" exactly?
+> 
+> What have you tested, what device did you connect, what is the outcome
+> that isn't something you expected, etc.
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
----
- drivers/iio/adc/stm32-adc-core.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+Oh sorry this weird behavior doesn't exist on R40, although it do exist
+on H3/H5/A64.
 
-diff --git a/drivers/iio/adc/stm32-adc-core.c b/drivers/iio/adc/stm32-adc-core.c
-index 804198e..6aefef9 100644
---- a/drivers/iio/adc/stm32-adc-core.c
-+++ b/drivers/iio/adc/stm32-adc-core.c
-@@ -139,6 +139,11 @@ static int stm32f4_adc_clk_sel(struct platform_device *pdev,
- 	}
- 
- 	rate = clk_get_rate(priv->aclk);
-+	if (!rate) {
-+		dev_err(&pdev->dev, "Invalid clock rate: 0\n");
-+		return -EINVAL;
-+	}
-+
- 	for (i = 0; i < ARRAY_SIZE(stm32f4_pclk_div); i++) {
- 		if ((rate / stm32f4_pclk_div[i]) <= STM32F4_ADC_MAX_CLK_RATE)
- 			break;
-@@ -216,6 +221,10 @@ static int stm32h7_adc_clk_sel(struct platform_device *pdev,
- 		 * From spec: PLL output musn't exceed max rate
- 		 */
- 		rate = clk_get_rate(priv->aclk);
-+		if (!rate) {
-+			dev_err(&pdev->dev, "Invalid adc clock rate: 0\n");
-+			return -EINVAL;
-+		}
- 
- 		for (i = 0; i < ARRAY_SIZE(stm32h7_adc_ckmodes_spec); i++) {
- 			ckmode = stm32h7_adc_ckmodes_spec[i].ckmode;
-@@ -232,6 +241,10 @@ static int stm32h7_adc_clk_sel(struct platform_device *pdev,
- 
- 	/* Synchronous clock modes (e.g. ckmode is 1, 2 or 3) */
- 	rate = clk_get_rate(priv->bclk);
-+	if (!rate) {
-+		dev_err(&pdev->dev, "Invalid bus clock rate: 0\n");
-+		return -EINVAL;
-+	}
- 
- 	for (i = 0; i < ARRAY_SIZE(stm32h7_adc_ckmodes_spec); i++) {
- 		ckmode = stm32h7_adc_ckmodes_spec[i].ckmode;
--- 
-1.9.1
+I will fix this in the next version.
+
+> 
+> Maxime
