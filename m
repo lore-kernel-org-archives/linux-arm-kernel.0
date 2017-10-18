@@ -1,127 +1,159 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 19 Oct 2017 00:01:58 +0200
-Subject: [RFC 05/12] dt-bindings: mtd: add Marvell NAND controller
- documentation
-In-Reply-To: <20171018143629.29302-6-miquel.raynal@free-electrons.com>
+Date: Thu, 19 Oct 2017 00:29:22 +0200
+Subject: [RFC 00/12] Marvell NAND controller rework with ->exec_op()
+In-Reply-To: <20171018143629.29302-1-miquel.raynal@free-electrons.com>
 References: <20171018143629.29302-1-miquel.raynal@free-electrons.com>
- <20171018143629.29302-6-miquel.raynal@free-electrons.com>
-Message-ID: <20171019000158.43140ce0@bbrezillon>
+Message-ID: <20171019002922.5ab978ed@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Oct 2017 16:36:22 +0200
+Hi Miquel,
+
+On Wed, 18 Oct 2017 16:36:17 +0200
 Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
 
-> Document the bindings for the legacy and the new bindings relative to
-> Marvell NAND controller driver rework.
+> Hi,
 > 
-> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
-> ---
->  .../devicetree/bindings/mtd/marvell-nand.txt       | 95 ++++++++++++++++++++++
->  1 file changed, 95 insertions(+)
+> This series adds the implementation of the NAND framework ->exec_op()
+> interface with all the related hooks and helpers. The reasons for adding
+> it are explained in details in the commit log "mtd: nand: add
+>  ->exec_op() implementation", but mostly it will ease later expansion of  
+> the framework, as well as the implementation of new vendor specific
+> commands, and should also ease driver development.
+
+Still need to review patch 6, but I'd like to say I'm really happy to
+see that happen, finally. Hopefully that will help us make the NAND
+framework a bit easier to maintain and allow us to support advanced
+NAND features without having to patch all NAND controller drivers every
+time we add a new vendor specific operation. I also have in mind a few
+NAND controller drivers that have been rejected because they were not
+fitting in the ->cmd_ctrl() approach and I didn't want to add more
+drivers with their own partially implemented/broken ->cmdfunc() method.
+
+Kudos for the work you've done, and I hope we'll get reviews from other
+active NAND driver maintainers/contributors. To all NAND driver
+maintainers: note that the long term goal is to get rid of
+->cmd_ctrl()/cmdfunc()/read/write_buf/byte/word() entirely and replace
+them with a single ->exec_op() hook. Please let us know if you need
+extra things that are not yet exposed in nand_op_instr/nand_op_parser
+or if you would like things to be done differently.
+
+Thanks,
+
+Boris
+
+> 
+> The series contains as well the reworked NAND controller driver from
+> Marvell.
+> 
+> A lot of comments are written to explain how to use the new API and the
+> Marvell driver shows how to implement it. A proper external
+> documentation is being written and will later be submitted.
+> 
+> It also changes the device tree NAND node definition for all platforms
+> referring to the Marvell driver to use the new bindings. They are more
+> hierarchical and fit the real organization of the hardware, by having
+> NAND partitions that are part of NAND chip nodes, themselves part of
+> the NAND controller node.
+> 
+> See the commit log of "mtd: nand: add reworked Marvell NAND controller
+> driver" for details about why a completely new driver is needed.
+> 
+> As this series changes several core functions and also directly touches
+> multiple controller drivers, it would be great to have reviews and tests
+> from the concerned maintainers. Only PXA3xx SoCs are not supported yet
+> (explaining the RFC) as having a local board to test is really needed.
+> 
+> Thank you,
+> Miqu?l
+> 
+> 
+> Boris Brezillon (2):
+>   mtd: nand: provide several helpers to do common NAND operations
+>   mtd: nand: force drivers to explicitly send READ/PROG commands
+> 
+> Miquel Raynal (10):
+>   mtd: nand: use a static data_interface in the nand_chip structure
+>   mtd: nand: add ->exec_op() implementation
+>   dt-bindings: mtd: add Marvell NAND controller documentation
+>   mtd: nand: add reworked Marvell NAND controller driver
+>   ARM: dts: armada-370-xp: use reworked NAND controller driver
+>   ARM: dts: armada-375: use reworked NAND controller driver
+>   ARM: dts: armada-38x: use reworked NAND controller driver
+>   ARM: dts: armada-39x: use reworked NAND controller driver
+>   ARM: dts: pxa: use reworked NAND controller driver
+>   ARM64: dts: marvell: use reworked NAND controller driver on Armada
+>     7K/8K
+> 
+>  .../devicetree/bindings/mtd/marvell-nand.txt       |   95 +
+>  arch/arm/boot/dts/armada-370-db.dts                |   56 +-
+>  arch/arm/boot/dts/armada-370-dlink-dns327l.dts     |  119 +-
+>  arch/arm/boot/dts/armada-370-mirabox.dts           |   50 +-
+>  arch/arm/boot/dts/armada-370-netgear-rn102.dts     |   89 +-
+>  arch/arm/boot/dts/armada-370-netgear-rn104.dts     |   89 +-
+>  arch/arm/boot/dts/armada-370-rd.dts                |   51 +-
+>  arch/arm/boot/dts/armada-370-seagate-nas-xbay.dtsi |   63 +-
+>  arch/arm/boot/dts/armada-370-xp.dtsi               |    6 +-
+>  arch/arm/boot/dts/armada-375-db.dts                |   49 +-
+>  arch/arm/boot/dts/armada-375.dtsi                  |    6 +-
+>  arch/arm/boot/dts/armada-385-db-ap.dts             |   68 +-
+>  arch/arm/boot/dts/armada-385-linksys-caiman.dts    |  129 +-
+>  arch/arm/boot/dts/armada-385-linksys-cobra.dts     |  129 +-
+>  arch/arm/boot/dts/armada-385-linksys-rango.dts     |  141 +-
+>  arch/arm/boot/dts/armada-385-linksys-shelby.dts    |  129 +-
+>  arch/arm/boot/dts/armada-385-linksys.dtsi          |   15 +-
+>  arch/arm/boot/dts/armada-388-db.dts                |   54 +-
+>  arch/arm/boot/dts/armada-38x.dtsi                  |    6 +-
+>  arch/arm/boot/dts/armada-390-db.dts                |   65 +-
+>  arch/arm/boot/dts/armada-395-gp.dts                |   73 +-
+>  arch/arm/boot/dts/armada-398-db.dts                |   59 +-
+>  arch/arm/boot/dts/armada-39x.dtsi                  |    6 +-
+>  arch/arm/boot/dts/armada-xp-db-dxbc2.dts           |    1 -
+>  arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts      |    1 -
+>  arch/arm/boot/dts/armada-xp-db.dts                 |    1 -
+>  arch/arm/boot/dts/armada-xp-gp.dts                 |    1 -
+>  arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts    |    1 -
+>  arch/arm/boot/dts/armada-xp-linksys-mamba.dts      |  155 +-
+>  arch/arm/boot/dts/armada-xp-netgear-rn2120.dts     |   89 +-
+>  arch/arm/boot/dts/pxa3xx.dtsi                      |    6 +-
+>  arch/arm64/boot/dts/marvell/armada-7040-db.dts     |   47 +-
+>  .../boot/dts/marvell/armada-cp110-master.dtsi      |    6 +-
+>  .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi |    6 +-
+>  drivers/mtd/nand/Kconfig                           |   11 +
+>  drivers/mtd/nand/Makefile                          |    1 +
+>  drivers/mtd/nand/atmel/nand-controller.c           |    9 +-
+>  drivers/mtd/nand/bf5xx_nand.c                      |    6 +-
+>  drivers/mtd/nand/brcmnand/brcmnand.c               |   20 +-
+>  drivers/mtd/nand/cafe_nand.c                       |   20 +-
+>  drivers/mtd/nand/denali.c                          |  109 +-
+>  drivers/mtd/nand/diskonchip.c                      |    4 +-
+>  drivers/mtd/nand/docg4.c                           |   19 +-
+>  drivers/mtd/nand/fsl_elbc_nand.c                   |    6 +-
+>  drivers/mtd/nand/fsl_ifc_nand.c                    |    6 +-
+>  drivers/mtd/nand/fsmc_nand.c                       |    5 +-
+>  drivers/mtd/nand/gpmi-nand/gpmi-nand.c             |   76 +-
+>  drivers/mtd/nand/hisi504_nand.c                    |    9 +-
+>  drivers/mtd/nand/jz4740_nand.c                     |   16 +-
+>  drivers/mtd/nand/lpc32xx_mlc.c                     |    7 +-
+>  drivers/mtd/nand/lpc32xx_slc.c                     |   33 +-
+>  drivers/mtd/nand/marvell_nand.c                    | 2384 ++++++++++++++++++++
+>  drivers/mtd/nand/mtk_nand.c                        |   21 +-
+>  drivers/mtd/nand/nand_base.c                       | 2020 ++++++++++++++---
+>  drivers/mtd/nand/nand_hynix.c                      |  106 +-
+>  drivers/mtd/nand/nand_micron.c                     |   50 +-
+>  drivers/mtd/nand/nand_timings.c                    |   23 +-
+>  drivers/mtd/nand/omap2.c                           |    8 +-
+>  drivers/mtd/nand/pxa3xx_nand.c                     |    8 +-
+>  drivers/mtd/nand/qcom_nandc.c                      |   16 +-
+>  drivers/mtd/nand/r852.c                            |   11 +-
+>  drivers/mtd/nand/sh_flctl.c                        |    6 +-
+>  drivers/mtd/nand/sunxi_nand.c                      |   97 +-
+>  drivers/mtd/nand/tango_nand.c                      |   27 +-
+>  drivers/mtd/nand/tmio_nand.c                       |    5 +-
+>  drivers/mtd/nand/vf610_nfc.c                       |    6 +-
+>  drivers/staging/mt29f_spinand/mt29f_spinand.c      |    7 +-
+>  include/linux/mtd/rawnand.h                        |  391 +++-
+>  68 files changed, 5980 insertions(+), 1424 deletions(-)
 >  create mode 100644 Documentation/devicetree/bindings/mtd/marvell-nand.txt
+>  create mode 100644 drivers/mtd/nand/marvell_nand.c
 > 
-> diff --git a/Documentation/devicetree/bindings/mtd/marvell-nand.txt b/Documentation/devicetree/bindings/mtd/marvell-nand.txt
-> new file mode 100644
-> index 000000000000..ea99f426c03f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mtd/marvell-nand.txt
-> @@ -0,0 +1,95 @@
-> +Marvell NAND Flash Controller (NFC)
-> +
-> +Required properties:
-> +C'est faux, t'en a rajout? un y a pas longtps :).
-> +Je conseille de mettre ?a sous forme de liste, genre
-
-Oops! French words slipped in :-).
-
-> +
-> +- compatible: can be one of the following:
-> +    * "marvell,armada-8k-nand-controller"
-> +    * "marvell,armada370-nand-controller"
-> +    * "marvell,pxa3xx-nand-controller"
-> +    * "marvell,armada-8k-nand" (deprecated)
-> +    * "marvell,armada370-nand" (deprecated)
-> +    * "marvell,pxa3xx-nand" (deprecated)
-> +- reg: shall contain registers location and length for data and reg.
-> +- #address-cells: shall be set to 1. Encode the nand CS.
-> +- #size-cells: shall be set to 0.
-> +- interrupts: shall define the nand controller interrupt.
-> +- clocks: shall reference nand controller clocks.
-> +- marvell,system-controller: Set to retrieve the syscon node that handles
-> +  NAND controller related registers (only required with the
-> +  "marvell,armada-8k-nand[-controller]" compatibles).
-> +
-> +Optional properties:
-> +- dmas: shall reference DMA channel associated to the NAND controller.
-> +- dma-names: shall be "rxtx".
-> +
-> +Optional children nodes:
-> +Children nodes represent the available NAND chips.
-> +
-> +Required properties:
-> +- reg: shall contain the native Chip Select ids (0-3)
-> +- marvell,rb: shall contain the native Ready/Busy ids (0-1)
-> +
-> +Optional properties:
-> +- marvell,nand-keep-config: orders the driver not to take the timings
-> +  from the core and leaving them completely untouched. Bootloader
-> +  timings will then be used.
-> +- marvell,nand-enable-arbiter: only useful for PXA platforms, will
-> +  enable bus arbiter between NFC and DFI bus (must be enabled for
-> +  NFC operation)
-> +- nand-on-flash-bbt: speed up the boot process by not discovering all
-> +  the bad blocks at each boot and reading directly an on flash table.
-> +- nand-ecc-mode: one of the supported ECC modes ("none", "soft",
-> +  "hw"). If not specified, hardware ECC will be used.
-> +- nand-ecc-algo: algorithm to use if previous choice was "soft"
-> +  ("hamming" or "bch). This property may be added for hardware ECC for
-> +  clarification but will be ignored by the driver because ECC mode is
-> +  chosen depending on the page size and the strength required by the
-> +  NAND chip. This value may be overwritten with the nand-ecc-strength
-> +  property.
-> +- nand-ecc-strength: desired ECC strength.
-> +- nand-ecc-step-size: indication on the ECC step size. This has no
-> +  effect and will be ignored by the driver when using hardware
-> +  ECC. Because Marvell's NAND flash controller does use fixed strength
-> +  (1-bit for Hamming, 16-bit for BCH), the step size will shrink or
-> +  grown in order to fit the required strength and the value
-> +  updated. Step sizes are not completely random for all and follow
-> +  certain patterns described in AN-379, "Marvell SoC NFC ECC".
-> +
-> +See Documentation/devicetree/bindings/mtd/nand.txt for more details on
-> +generic bindings.
-> +
-> +
-> +Example:
-> +nand_controller: nand-controller at d0000 {
-> +	compatible = "marvell,armada370-nand-controller";
-> +	reg = <0xd0000 0x54>;
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +	interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
-> +	clocks = <&coredivclk 0>;
-> +	status = "okay";
-> +
-> +	nand at 0 {
-> +		reg = <0>;
-> +		marvell,rb = <0>;
-> +		nand-ecc-mode = "hw";
-> +		marvell,nand-keep-config;
-> +		marvell,nand-enable-arbiter;
-> +		nand-on-flash-bbt;
-> +		nand-ecc-strength = <4>;
-> +		nand-ecc-step-size = <512>;
-> +
-> +		partitions {
-> +			compatible = "fixed-partitions";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +
-> +			partition at 0 {
-> +				label = "Rootfs";
-> +				reg = <0x00000000 0x40000000>;
-> +			};
-> +		};
-> +	};
-> +};
