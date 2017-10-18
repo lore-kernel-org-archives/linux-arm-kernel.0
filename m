@@ -1,18 +1,18 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 18 Oct 2017 09:35:33 +0200
-Subject: [PATCH 1/7] ARM: dts: r8a7743: Use R-Car Gen2 Ether fallback
+Date: Wed, 18 Oct 2017 09:35:53 +0200
+Subject: [PATCH 4/7] ARM: dts: r8a7790: Use R-Car Gen2 Ether fallback
  compat string
-In-Reply-To: <20171018072728.14681-2-horms+renesas@verge.net.au>
+In-Reply-To: <20171018072728.14681-5-horms+renesas@verge.net.au>
 References: <20171018072728.14681-1-horms+renesas@verge.net.au>
- <20171018072728.14681-2-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdWFORA=LL_e8RGYL3hzhZsCaVLfROKTNE57m3oJUD=tbw@mail.gmail.com>
+ <20171018072728.14681-5-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdWca-ZZ-nLFk8EEab8V642MJzrv3E+vdHCKKds4ouwGfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Oct 18, 2017 at 9:27 AM, Simon Horman
 <horms+renesas@verge.net.au> wrote:
 > Use newly added R-Car Gen2 Ether fallback compat string
-> in the DT of the r8a7743 SoC.
+> in the DT of the r8a7790 SoC.
 >
 > This should have no run-time effect as the driver matches against
 > the per-SoC compat string before considering the fallback compat string.
