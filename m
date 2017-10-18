@@ -1,174 +1,240 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 18 Oct 2017 16:31:32 +0800
-Subject: [PATCH v2 2/8] ARM: dts: sunxi: Add dtsi for AXP81x PMIC
+Date: Wed, 18 Oct 2017 16:31:33 +0800
+Subject: [PATCH v2 3/8] ARM: dts: sun8i: a83t: cubietruck-plus: Add AXP818
+ regulator nodes
 In-Reply-To: <20171018083138.14517-1-wens@csie.org>
 References: <20171018083138.14517-1-wens@csie.org>
-Message-ID: <20171018083138.14517-3-wens@csie.org>
+Message-ID: <20171018083138.14517-4-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP81x family of PMIC is used with the Allwinner A83T and H8 SoCs.
-This includes the AXP813 and AXP818. There is no discernible difference
-except the labeling. The AXP813 is paired with the A83T, while the
-AXP818 is paired with the H8.
-
-This patch adds a dtsi file for all the common bindings for these two
-PMICs. Currently this is just listing all the regulator nodes. The
-regulators are initialized based on their device node names.
-
-In the future this would be expanded to include power supplies and
-GPIO controllers.
+This patch adds device nodes for all the regulators of the AXP818 PMIC.
+Sunxi common regulators are removed, and USB VBUS regulators are added.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/axp81x.dtsi | 139 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 139 insertions(+)
- create mode 100644 arch/arm/boot/dts/axp81x.dtsi
+ arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts | 167 +++++++++++++++++++++--
+ 1 file changed, 155 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/boot/dts/axp81x.dtsi b/arch/arm/boot/dts/axp81x.dtsi
-new file mode 100644
-index 000000000000..73b761f850c5
---- /dev/null
-+++ b/arch/arm/boot/dts/axp81x.dtsi
-@@ -0,0 +1,139 @@
-+/*
-+ * Copyright 2017 Chen-Yu Tsai
-+ *
-+ * Chen-Yu Tsai <wens@csie.org>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/* AXP813/818 Integrated Power Management Chip */
-+
-+&axp81x {
-+	interrupt-controller;
-+	#interrupt-cells = <1>;
-+
-+	regulators {
-+		/* Default work frequency for buck regulators */
-+		x-powers,dcdc-freq = <3000>;
-+
-+		reg_dcdc1: dcdc1 {
-+		};
-+
-+		reg_dcdc2: dcdc2 {
-+		};
-+
-+		reg_dcdc3: dcdc3 {
-+		};
-+
-+		reg_dcdc4: dcdc4 {
-+		};
-+
-+		reg_dcdc5: dcdc5 {
-+		};
-+
-+		reg_dcdc6: dcdc6 {
-+		};
-+
-+		reg_dcdc7: dcdc7 {
-+		};
-+
-+		reg_aldo1: aldo1 {
-+		};
-+
-+		reg_aldo2: aldo2 {
-+		};
-+
-+		reg_aldo3: aldo3 {
-+		};
-+
-+		reg_dldo1: dldo1 {
-+		};
-+
-+		reg_dldo2: dldo2 {
-+		};
-+
-+		reg_dldo3: dldo3 {
-+		};
-+
-+		reg_dldo4: dldo4 {
-+		};
-+
-+		reg_eldo1: eldo1 {
-+		};
-+
-+		reg_eldo2: eldo2 {
-+		};
-+
-+		reg_eldo3: eldo3 {
-+		};
-+
-+		reg_fldo1: fldo1 {
-+		};
-+
-+		reg_fldo2: fldo2 {
-+		};
-+
-+		reg_fldo3: fldo3 {
-+		};
-+
-+		reg_ldo_io0: ldo-io0 {
-+			/* Disable by default to avoid conflicts with GPIO */
-+			status = "disabled";
-+		};
-+
-+		reg_ldo_io1: ldo-io1 {
-+			/* Disable by default to avoid conflicts with GPIO */
-+			status = "disabled";
-+		};
-+
-+		reg_rtc_ldo: rtc-ldo {
-+			/* RTC_LDO is a fixed, always-on regulator */
-+			regulator-always-on;
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <1800000>;
-+		};
-+
-+		reg_sw: sw {
-+		};
-+
-+		reg_drivevbus: drivevbus {
-+			status = "disabled";
-+		};
+diff --git a/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts b/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
+index 716a205c6dbb..bd53e5748991 100644
+--- a/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
++++ b/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
+@@ -44,7 +44,6 @@
+ 
+ /dts-v1/;
+ #include "sun8i-a83t.dtsi"
+-#include "sunxi-common-regulators.dtsi"
+ 
+ #include <dt-bindings/gpio/gpio.h>
+ 
+@@ -95,6 +94,26 @@
+ 		refclk-frequency = <19200000>;
+ 	};
+ 
++	reg_usb1_vbus: reg-usb1-vbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usb1-vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-boot-on;
++		enable-active-high;
++		gpio = <&pio 3 29 GPIO_ACTIVE_HIGH>; /* PD29 */
 +	};
++
++	reg_usb2_vbus: reg-usb2-vbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usb2-vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-boot-on;
++		enable-active-high;
++		gpio = <&r_pio 0 6 GPIO_ACTIVE_HIGH>; /* PL6 */
++	};
++
+ 	sound {
+ 		compatible = "simple-audio-card";
+ 		simple-audio-card,name = "On-board SPDIF";
+@@ -127,7 +146,7 @@
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins>;
+-	vmmc-supply = <&reg_vcc3v3>;
++	vmmc-supply = <&reg_dcdc1>;
+ 	bus-width = <4>;
+ 	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
+ 	cd-inverted;
+@@ -137,7 +156,7 @@
+ &mmc2 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc2_8bit_emmc_pins>;
+-	vmmc-supply = <&reg_vcc3v3>;
++	vmmc-supply = <&reg_dcdc1>;
+ 	bus-width = <8>;
+ 	non-removable;
+ 	cap-mmc-hw-reset;
+@@ -152,6 +171,9 @@
+ 		reg = <0x3a3>;
+ 		interrupt-parent = <&r_intc>;
+ 		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++		eldoin-supply = <&reg_dcdc1>;
++		swin-supply = <&reg_dcdc1>;
++		x-powers,drive-vbus-en;
+ 	};
+ 
+ 	ac100: codec at e89 {
+@@ -179,22 +201,143 @@
+ 	};
+ };
+ 
+-&reg_usb1_vbus {
+-	gpio = <&pio 3 29 GPIO_ACTIVE_HIGH>; /* PD29 */
+-	status = "okay";
++#include "axp81x.dtsi"
++
++&reg_aldo1 {
++	regulator-always-on;
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <1800000>;
++	regulator-name = "vcc-1v8";
 +};
++
++&reg_aldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <1800000>;
++	regulator-name = "dram-pll";
++};
++
++&reg_aldo3 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "avcc";
++};
++
++&reg_dcdc1 {
++	/*
++	 * The schematics say this should be 3.3V, but the FEX file says
++	 * it should be 3V. The latter makes sense, as the WiFi module's
++	 * I/O is indirectly powered from DCDC1, through SW. It is rated
++	 * at 2.98V maximum.
++	 */
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "vcc-3v";
++};
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <700000>;
++	regulator-max-microvolt = <1100000>;
++	regulator-name = "vdd-cpua";
++};
++
++&reg_dcdc3 {
++	regulator-always-on;
++	regulator-min-microvolt = <700000>;
++	regulator-max-microvolt = <1100000>;
++	regulator-name = "vdd-cpub";
++};
++
++&reg_dcdc4 {
++	regulator-min-microvolt = <700000>;
++	regulator-max-microvolt = <1100000>;
++	regulator-name = "vdd-gpu";
+ };
+ 
+-&reg_usb2_vbus {
+-	gpio = <&r_pio 0 6 GPIO_ACTIVE_HIGH>; /* PL6 */
++&reg_dcdc5 {
++	regulator-always-on;
++	regulator-min-microvolt = <1500000>;
++	regulator-max-microvolt = <1500000>;
++	regulator-name = "vcc-dram";
++};
++
++&reg_dcdc6 {
++	regulator-always-on;
++	regulator-min-microvolt = <900000>;
++	regulator-max-microvolt = <900000>;
++	regulator-name = "vdd-sys";
++};
++
++&reg_dldo2 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "dp-pwr";
++};
++
++&reg_dldo3 {
++	regulator-always-on;
++	regulator-min-microvolt = <2500000>;
++	regulator-max-microvolt = <2500000>;
++	regulator-name = "ephy-io";
++};
++
++&reg_dldo4 {
++	/*
++	 * The PHY requires 20ms after all voltages are applied until core
++	 * logic is ready and 30ms after the reset pin is de-asserted.
++	 * Set a 100ms delay to account for PMIC ramp time and board traces.
++	 */
++	regulator-enable-ramp-delay = <100000>;
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "ephy";
++};
++
++&reg_drivevbus {
++	regulator-name = "usb0-vbus";
+ 	status = "okay";
+ };
+ 
+-&reg_vcc3v0 {
+-	status = "disabled";
++&reg_eldo1 {
++	regulator-min-microvolt = <1200000>;
++	regulator-max-microvolt = <1200000>;
++	regulator-name = "dp-bridge-1";
++};
++
++&reg_eldo2 {
++	regulator-min-microvolt = <1200000>;
++	regulator-max-microvolt = <1200000>;
++	regulator-name = "dp-bridge-2";
++};
++
++&reg_fldo1 {
++	/* TODO should be handled by USB PHY */
++	regulator-always-on;
++	regulator-min-microvolt = <1080000>;
++	regulator-max-microvolt = <1320000>;
++	regulator-name = "vdd12-hsic";
++};
++
++&reg_fldo2 {
++	/*
++	 * Despite the embedded CPUs core not being used in any way,
++	 * this must remain on or the system will hang.
++	 */
++	regulator-always-on;
++	regulator-min-microvolt = <700000>;
++	regulator-max-microvolt = <1100000>;
++	regulator-name = "vdd-cpus";
++};
++
++&reg_rtc_ldo {
++	regulator-name = "vcc-rtc";
+ };
+ 
+-&reg_vcc5v0 {
+-	status = "disabled";
++&reg_sw {
++	regulator-name = "vcc-wifi-io";
+ };
+ 
+ &spdif {
 -- 
 2.14.2
