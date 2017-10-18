@@ -1,80 +1,40 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Wed, 18 Oct 2017 15:23:23 +0200
-Subject: [PATCH v3 22/28] arm64/sve: KVM: Prevent guests from using SVE
-In-Reply-To: <20171017143142.GX19485@e103592.cambridge.arm.com>
-References: <1507660725-7986-1-git-send-email-Dave.Martin@arm.com>
- <1507660725-7986-23-git-send-email-Dave.Martin@arm.com>
- <20171017115024.GS1845@lvm>
- <20171017143142.GX19485@e103592.cambridge.arm.com>
-Message-ID: <20171018132323.GG8900@cbox>
+From: zhangshaokun@hisilicon.com (Zhangshaokun)
+Date: Wed, 18 Oct 2017 21:37:40 +0800
+Subject: [PATCH v5 5/6] perf: hisi: Add support for HiSilicon SoC DDRC PMU
+ driver
+In-Reply-To: <20171017152109.cuslnq3jsp6kx4au@lakrids.cambridge.arm.com>
+References: <1503389277-134131-1-git-send-email-zhangshaokun@hisilicon.com>
+ <1503389277-134131-6-git-send-email-zhangshaokun@hisilicon.com>
+ <20171017152109.cuslnq3jsp6kx4au@lakrids.cambridge.arm.com>
+Message-ID: <1ce6d265-44cd-abc9-e32e-74a3afa0f162@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 03:31:42PM +0100, Dave Martin wrote:
-> On Tue, Oct 17, 2017 at 01:50:24PM +0200, Christoffer Dall wrote:
-> > On Tue, Oct 10, 2017 at 07:38:39PM +0100, Dave Martin wrote:
-> > > Until KVM has full SVE support, guests must not be allowed to
-> > > execute SVE instructions.
-> > > 
-> > > This patch enables the necessary traps, and also ensures that the
-> > > traps are disabled again on exit from the guest so that the host
-> > > can still use SVE if it wants to.
-> > > 
-> > > This patch introduces another instance of
-> > > __this_cpu_write(fpsimd_last_state, NULL), so this flush operation
-> > > is abstracted out as a separate helper fpsimd_flush_cpu_state().
-> > > Other instances are ported appropriately.
-> > 
-> > I don't understand this paragraph, beginning from ", so this...".
-> > 
-> > 
-> > From reading the code, what I think is the reason for having to flush
-> > the SVE state (and mark the host state invalid) is that even though we
-> > disallow SVE usage in the guest, the guest can use the normal FP state,
-> > and while we always fully preserve the host state, this could still
-> > corrupt some additional SVE state not properly preserved for the host.
-> > Is that correct?
-> 
-> Yes, that's right: the guest can't touch the SVE-specific registers
-> Pn/FFR, but FPSIMD accesses to Vn regs cause the high bits of the
-> corresponding SVE Zn registers to be clobbered.  In any case, the
-> FPSIMD restore done by KVM after guest exit is sufficient to clobber
-> those bits even if the guest didn't do it.
-> 
-> This is a band-aid for not making the KVM world switch code properly
-> SVE-aware yet.
-> 
-> Does the following wording sound better:
-> 
-> --8<--
-> 
-> On guest exit, high bits of the SVE Zn registers may have been
-> clobbered as a side-effect the execution of FPSIMD instructions in
-> the guest.  The existing KVM host FPSIMD restore code is not
-> sufficient to restore these bits, so this patch explicitly marks
-> the CPU as not containing cached vector state for any task, this
-> forcing a reload on the next return to userspace.  This is an
-> interim measure, in advance of adding full SVE awareness to KVM.
-> 
-> Because of the duplication of this operation
-> (__this_cpu_write(fpsimd_last_state, NULL)), it is factored out as
+Hi Mark,
 
-s/it is/is/  (I think)
+On 2017/10/17 23:21, Mark Rutland wrote:
+> On Tue, Aug 22, 2017 at 04:07:56PM +0800, Shaokun Zhang wrote:
+>> This patch adds support for DDRC PMU driver in HiSilicon SoC chip, Each
+>> DDRC has own control, counter and interrupt registers and is an separate
+>> PMU. For each DDRC PMU, it has 8-fixed-purpose counters which have been
+>> mapped to 8-events by hardware, it assumes that counter index is equal
+>> to event code (0 - 7) in DDRC PMU driver. Interrupt is supported to
+>> handle counter (32-bits) overflow.
+>>
+>> Reviewed-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
+>> Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
+>> Signed-off-by: Anurup M <anurup.m@huawei.com>
+> 
+> I have the same comments for this case as for the other two PMU drivers.
+> 
 
-> a new helper fpsimd_flush_cpu_state() to make the purpose clearer.
-> 
-> -->8--
-> 
-> > > 
-> > > As a side effect of this refactoring, a this_cpu_write() in
-> > > fpsimd_cpu_pm_notifier() is changed to __this_cpu_write().  This
-> > > should be fine, since cpu_pm_enter() is supposed to be called only
-> > > with interrupts disabled.
-> > 
-> > Otherwise the patch itself looks good to me.
-> 
-> Thanks, let me know about the above wording change though.
-> 
-Yes, the wording is good and helps a lot.  Thanks for writing that.
+Sure.
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Thanks,
+Shaokun
+
+> Thanks,
+> Mark.
+> 
+> .
+> 
