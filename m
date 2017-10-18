@@ -1,52 +1,132 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 18 Oct 2017 15:25:46 +0100
-Subject: [PATCH v3 01/20] arm64: explicitly mask all exceptions
-In-Reply-To: <20171018142315.vt44zeuke5po3tf7@armageddon.cambridge.arm.com>
-References: <20171005191812.5678-1-james.morse@arm.com>
- <20171005191812.5678-2-james.morse@arm.com>
- <20171018142315.vt44zeuke5po3tf7@armageddon.cambridge.arm.com>
-Message-ID: <20171018142545.fgwihep2hptr44zb@armageddon.cambridge.arm.com>
+From: miquel.raynal@free-electrons.com (Miquel Raynal)
+Date: Wed, 18 Oct 2017 16:36:17 +0200
+Subject: [RFC 00/12] Marvell NAND controller rework with ->exec_op()
+Message-ID: <20171018143629.29302-1-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 18, 2017 at 03:23:16PM +0100, Catalin Marinas wrote:
-> On Thu, Oct 05, 2017 at 08:17:53PM +0100, James Morse wrote:
-> > diff --git a/arch/arm64/include/asm/daifflags.h b/arch/arm64/include/asm/daifflags.h
-> > new file mode 100644
-> > index 000000000000..fb40da8e1457
-> > --- /dev/null
-> > +++ b/arch/arm64/include/asm/daifflags.h
-> > @@ -0,0 +1,59 @@
-> > +/*
-> > + * Copyright (C) 2017 ARM Ltd.
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + *
-> > + * You should have received a copy of the GNU General Public License
-> > + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> > + */
-> > +#ifndef __ASM_DAIFFLAGS_H
-> > +#define __ASM_DAIFFLAGS_H
-> > +
-> > +#include <asm/irqflags.h>
-> > +#include <linux/irqflags.h>
-> 
-> Nitpick: linux/irqflags.h already includes asm/irqflags.h.
-> 
-> We currently have local_dbg_save in asm/irqflags.h. Shall we keep all of
-> them in the same file (either asm/irqflags.h or the new asm/daifflags.h;
-> slight preference for irqflags.h unless you are worried about drivers
-> abusing these).
+Hi,
 
-Ah, you removed local_dbg_* in the following patch, so please ignore
-this.
+This series adds the implementation of the NAND framework ->exec_op()
+interface with all the related hooks and helpers. The reasons for adding
+it are explained in details in the commit log "mtd: nand: add
+ ->exec_op() implementation", but mostly it will ease later expansion of
+the framework, as well as the implementation of new vendor specific
+commands, and should also ease driver development.
+
+The series contains as well the reworked NAND controller driver from
+Marvell.
+
+A lot of comments are written to explain how to use the new API and the
+Marvell driver shows how to implement it. A proper external
+documentation is being written and will later be submitted.
+
+It also changes the device tree NAND node definition for all platforms
+referring to the Marvell driver to use the new bindings. They are more
+hierarchical and fit the real organization of the hardware, by having
+NAND partitions that are part of NAND chip nodes, themselves part of
+the NAND controller node.
+
+See the commit log of "mtd: nand: add reworked Marvell NAND controller
+driver" for details about why a completely new driver is needed.
+
+As this series changes several core functions and also directly touches
+multiple controller drivers, it would be great to have reviews and tests
+from the concerned maintainers. Only PXA3xx SoCs are not supported yet
+(explaining the RFC) as having a local board to test is really needed.
+
+Thank you,
+Miqu?l
+
+
+Boris Brezillon (2):
+  mtd: nand: provide several helpers to do common NAND operations
+  mtd: nand: force drivers to explicitly send READ/PROG commands
+
+Miquel Raynal (10):
+  mtd: nand: use a static data_interface in the nand_chip structure
+  mtd: nand: add ->exec_op() implementation
+  dt-bindings: mtd: add Marvell NAND controller documentation
+  mtd: nand: add reworked Marvell NAND controller driver
+  ARM: dts: armada-370-xp: use reworked NAND controller driver
+  ARM: dts: armada-375: use reworked NAND controller driver
+  ARM: dts: armada-38x: use reworked NAND controller driver
+  ARM: dts: armada-39x: use reworked NAND controller driver
+  ARM: dts: pxa: use reworked NAND controller driver
+  ARM64: dts: marvell: use reworked NAND controller driver on Armada
+    7K/8K
+
+ .../devicetree/bindings/mtd/marvell-nand.txt       |   95 +
+ arch/arm/boot/dts/armada-370-db.dts                |   56 +-
+ arch/arm/boot/dts/armada-370-dlink-dns327l.dts     |  119 +-
+ arch/arm/boot/dts/armada-370-mirabox.dts           |   50 +-
+ arch/arm/boot/dts/armada-370-netgear-rn102.dts     |   89 +-
+ arch/arm/boot/dts/armada-370-netgear-rn104.dts     |   89 +-
+ arch/arm/boot/dts/armada-370-rd.dts                |   51 +-
+ arch/arm/boot/dts/armada-370-seagate-nas-xbay.dtsi |   63 +-
+ arch/arm/boot/dts/armada-370-xp.dtsi               |    6 +-
+ arch/arm/boot/dts/armada-375-db.dts                |   49 +-
+ arch/arm/boot/dts/armada-375.dtsi                  |    6 +-
+ arch/arm/boot/dts/armada-385-db-ap.dts             |   68 +-
+ arch/arm/boot/dts/armada-385-linksys-caiman.dts    |  129 +-
+ arch/arm/boot/dts/armada-385-linksys-cobra.dts     |  129 +-
+ arch/arm/boot/dts/armada-385-linksys-rango.dts     |  141 +-
+ arch/arm/boot/dts/armada-385-linksys-shelby.dts    |  129 +-
+ arch/arm/boot/dts/armada-385-linksys.dtsi          |   15 +-
+ arch/arm/boot/dts/armada-388-db.dts                |   54 +-
+ arch/arm/boot/dts/armada-38x.dtsi                  |    6 +-
+ arch/arm/boot/dts/armada-390-db.dts                |   65 +-
+ arch/arm/boot/dts/armada-395-gp.dts                |   73 +-
+ arch/arm/boot/dts/armada-398-db.dts                |   59 +-
+ arch/arm/boot/dts/armada-39x.dtsi                  |    6 +-
+ arch/arm/boot/dts/armada-xp-db-dxbc2.dts           |    1 -
+ arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts      |    1 -
+ arch/arm/boot/dts/armada-xp-db.dts                 |    1 -
+ arch/arm/boot/dts/armada-xp-gp.dts                 |    1 -
+ arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts    |    1 -
+ arch/arm/boot/dts/armada-xp-linksys-mamba.dts      |  155 +-
+ arch/arm/boot/dts/armada-xp-netgear-rn2120.dts     |   89 +-
+ arch/arm/boot/dts/pxa3xx.dtsi                      |    6 +-
+ arch/arm64/boot/dts/marvell/armada-7040-db.dts     |   47 +-
+ .../boot/dts/marvell/armada-cp110-master.dtsi      |    6 +-
+ .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi |    6 +-
+ drivers/mtd/nand/Kconfig                           |   11 +
+ drivers/mtd/nand/Makefile                          |    1 +
+ drivers/mtd/nand/atmel/nand-controller.c           |    9 +-
+ drivers/mtd/nand/bf5xx_nand.c                      |    6 +-
+ drivers/mtd/nand/brcmnand/brcmnand.c               |   20 +-
+ drivers/mtd/nand/cafe_nand.c                       |   20 +-
+ drivers/mtd/nand/denali.c                          |  109 +-
+ drivers/mtd/nand/diskonchip.c                      |    4 +-
+ drivers/mtd/nand/docg4.c                           |   19 +-
+ drivers/mtd/nand/fsl_elbc_nand.c                   |    6 +-
+ drivers/mtd/nand/fsl_ifc_nand.c                    |    6 +-
+ drivers/mtd/nand/fsmc_nand.c                       |    5 +-
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c             |   76 +-
+ drivers/mtd/nand/hisi504_nand.c                    |    9 +-
+ drivers/mtd/nand/jz4740_nand.c                     |   16 +-
+ drivers/mtd/nand/lpc32xx_mlc.c                     |    7 +-
+ drivers/mtd/nand/lpc32xx_slc.c                     |   33 +-
+ drivers/mtd/nand/marvell_nand.c                    | 2384 ++++++++++++++++++++
+ drivers/mtd/nand/mtk_nand.c                        |   21 +-
+ drivers/mtd/nand/nand_base.c                       | 2020 ++++++++++++++---
+ drivers/mtd/nand/nand_hynix.c                      |  106 +-
+ drivers/mtd/nand/nand_micron.c                     |   50 +-
+ drivers/mtd/nand/nand_timings.c                    |   23 +-
+ drivers/mtd/nand/omap2.c                           |    8 +-
+ drivers/mtd/nand/pxa3xx_nand.c                     |    8 +-
+ drivers/mtd/nand/qcom_nandc.c                      |   16 +-
+ drivers/mtd/nand/r852.c                            |   11 +-
+ drivers/mtd/nand/sh_flctl.c                        |    6 +-
+ drivers/mtd/nand/sunxi_nand.c                      |   97 +-
+ drivers/mtd/nand/tango_nand.c                      |   27 +-
+ drivers/mtd/nand/tmio_nand.c                       |    5 +-
+ drivers/mtd/nand/vf610_nfc.c                       |    6 +-
+ drivers/staging/mt29f_spinand/mt29f_spinand.c      |    7 +-
+ include/linux/mtd/rawnand.h                        |  391 +++-
+ 68 files changed, 5980 insertions(+), 1424 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/marvell-nand.txt
+ create mode 100644 drivers/mtd/nand/marvell_nand.c
 
 -- 
-Catalin
+2.11.0
