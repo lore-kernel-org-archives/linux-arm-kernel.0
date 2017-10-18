@@ -1,50 +1,154 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 18 Oct 2017 14:28:04 +0200
-Subject: libbattery was Re: [RFC PATCH 5/5] power: generic-adc-battery:
- Add capacity handling
-In-Reply-To: <20170908113231.GJ18365@amd>
-References: <1501620926-22669-1-git-send-email-marek.belisko@open-nandra.com>
- <1501620926-22669-6-git-send-email-marek.belisko@open-nandra.com>
- <20170829101147.debhadzyfrxhkrvt@earth>
- <20170908113231.GJ18365@amd>
-Message-ID: <20171018122804.GA14376@amd>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 18 Oct 2017 13:34:25 +0100
+Subject: [PATCH v9 2/4] iommu/dma: Add a helper function to reserve HW MSI
+ address regions for IOMMU drivers
+In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA83844672A@FRAEML521-MBX.china.huawei.com>
+References: <20171006140450.89652-1-shameerali.kolothum.thodi@huawei.com>
+ <20171006140450.89652-3-shameerali.kolothum.thodi@huawei.com>
+ <20171013192350.GA32130@arm.com>
+ <5FC3163CFD30C246ABAA99954A238FA83844672A@FRAEML521-MBX.china.huawei.com>
+Message-ID: <1d49243a-4746-f189-7c5d-4b98937115fb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > Without patch description: See Last Question in
-> > 
-> > Documentation/power/power_supply_class.txt
+On 16/10/17 17:09, Shameerali Kolothum Thodi wrote:
+> Hi Robin,
 > 
-> ...should be done in libbattery, yet to be written. :-).
+>> -----Original Message-----
+>> From: Will Deacon [mailto:will.deacon at arm.com]
+>> Sent: Friday, October 13, 2017 8:24 PM
+>> To: Shameerali Kolothum Thodi <shameerali.kolothum.thodi@huawei.com>
+>> Cc: lorenzo.pieralisi at arm.com; marc.zyngier at arm.com;
+>> sudeep.holla at arm.com; robin.murphy at arm.com; joro at 8bytes.org;
+>> bhelgaas at google.com; Gabriele Paoloni <gabriele.paoloni@huawei.com>;
+>> John Garry <john.garry@huawei.com>; iommu at lists.linux-foundation.org;
+>> linux-arm-kernel at lists.infradead.org; linux-acpi at vger.kernel.org; linux-
+>> pci at vger.kernel.org; devel at acpica.org; Linuxarm <linuxarm@huawei.com>;
+>> Wangzhou (B) <wangzhou1@hisilicon.com>; Guohanjun (Hanjun Guo)
+>> <guohanjun@huawei.com>
+>> Subject: Re: [PATCH v9 2/4] iommu/dma: Add a helper function to reserve HW
+>> MSI address regions for IOMMU drivers
+>>
+>> On Fri, Oct 06, 2017 at 03:04:48PM +0100, Shameer Kolothum wrote:
+>>> IOMMU drivers can use this to implement their .get_resv_regions callback
+>>> for HW MSI specific reservations(e.g. ARM GICv3 ITS MSI region).
+>>>
+>>> Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
+>>> ---
+>>>  drivers/iommu/dma-iommu.c | 20 ++++++++++++++++++++
+>>>  include/linux/dma-iommu.h |  7 +++++++
+>>>  2 files changed, 27 insertions(+)
+>>
+>> I'd like to see Robin's Ack on this, because this is his code and he had
+>> ideas on ways to solve this problem properly.
 > 
-> Do you have specific guidance what you'd like to see in libbattery?
+> Please let us know if it is ok to go ahead with ACPI support for now.
+> It will help our customers to start using pass-through for PCIe.
+> 
+> Thanks,
+> Shameer
+> 
+>>
+>> Will
+>>
+>>> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+>>> index 9d1cebe..bae677e 100644
+>>> --- a/drivers/iommu/dma-iommu.c
+>>> +++ b/drivers/iommu/dma-iommu.c
+>>> @@ -19,6 +19,7 @@
+>>>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>>>   */
+>>>
+>>> +#include <linux/acpi_iort.h>
+>>>  #include <linux/device.h>
+>>>  #include <linux/dma-iommu.h>
+>>>  #include <linux/gfp.h>
+>>> @@ -27,6 +28,7 @@
+>>>  #include <linux/iova.h>
+>>>  #include <linux/irq.h>
+>>>  #include <linux/mm.h>
+>>> +#include <linux/of_iommu.h>
+>>>  #include <linux/pci.h>
+>>>  #include <linux/scatterlist.h>
+>>>  #include <linux/vmalloc.h>
+>>> @@ -198,6 +200,24 @@ void iommu_dma_get_resv_regions(struct device
+>> *dev, struct list_head *list)
+>>>  }
+>>>  EXPORT_SYMBOL(iommu_dma_get_resv_regions);
+>>>
+>>> +/**
+>>> + * iommu_dma_get_msi_resv_regions - Reserved region driver helper
+>>> + * @dev: Device from iommu_get_resv_regions()
+>>> + * @list: Reserved region list from iommu_get_resv_regions()
+>>> + *
+>>> + * IOMMU drivers can use this to implement their .get_resv_regions
+>>> + * callback for HW MSI specific reservations. For now, this only
 
-So I started something, it is at.
+This doesn't make an awful lot of sense - there's only one reserved
+region callback, so iommu-dma shouldn't be offering two separate and
+non-overlapping implementations.
 
-https://github.com/pavelmachek/libbattery
+>>> + * covers ITS MSI region reservation using ACPI IORT helper function.
+>>> + */
+>>> +int iommu_dma_get_msi_resv_regions(struct device *dev, struct list_head
+>> *list)
+>>> +{
+>>> +	if (!is_of_node(dev->iommu_fwspec->iommu_fwnode))
+>>> +		return iort_iommu_msi_get_resv_regions(dev, list);
 
-My battery on n900 is currently uncalibrated (and charging), still it
-gets some kind of estimation:
+Either this call knows how to do the right thing for any platform and
+should be made from iommu_dma_get_reserved_regions() directly, or it's
+tightly coupled to the HiSilicon quirk in the SMMUv3 driver and
+iommu-dma doesn't need to know - the middle ground presented here is
+surely the worst of both worlds.
 
-Battery -1 %
-Seconds -1
-State 1
-Voltage 3.88 V
-Battery 63 %
+Robin.
 
-Of course, there's a lot more work to be done.
-
-Best regards,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171018/fb6dfa3d/attachment.sig>
+>>> +
+>>> +	return -ENODEV;
+>>> +}
+>>> +EXPORT_SYMBOL(iommu_dma_get_msi_resv_regions);
+>>> +
+>>>  static int cookie_init_hw_msi_region(struct iommu_dma_cookie *cookie,
+>>>  		phys_addr_t start, phys_addr_t end)
+>>>  {
+>>> diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
+>>> index 92f2083..6062ef0 100644
+>>> --- a/include/linux/dma-iommu.h
+>>> +++ b/include/linux/dma-iommu.h
+>>> @@ -74,6 +74,8 @@ void iommu_dma_unmap_resource(struct device *dev,
+>> dma_addr_t handle,
+>>>  void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg);
+>>>  void iommu_dma_get_resv_regions(struct device *dev, struct list_head
+>> *list);
+>>>
+>>> +int iommu_dma_get_msi_resv_regions(struct device *dev, struct list_head
+>> *list);
+>>> +
+>>>  #else
+>>>
+>>>  struct iommu_domain;
+>>> @@ -107,6 +109,11 @@ static inline void
+>> iommu_dma_get_resv_regions(struct device *dev, struct list_he
+>>>  {
+>>>  }
+>>>
+>>> +static inline int iommu_dma_get_msi_resv_regions(struct device *dev,
+>> struct list_head *list)
+>>> +{
+>>> +	return -ENODEV;
+>>> +}
+>>> +
+>>>  #endif	/* CONFIG_IOMMU_DMA */
+>>>  #endif	/* __KERNEL__ */
+>>>  #endif	/* __DMA_IOMMU_H */
+>>> --
+>>> 1.9.1
+>>>
+>>>
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
