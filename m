@@ -1,59 +1,52 @@
 From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Wed, 18 Oct 2017 14:58:21 +0200
-Subject: [PATCH v6 0/5] stm32 clocksource driver rework
-Message-ID: <1508331506-23782-1-git-send-email-benjamin.gaignard@linaro.org>
+Date: Wed, 18 Oct 2017 14:58:22 +0200
+Subject: [PATCH v6 1/5] timer: add timer_of_deinit function
+In-Reply-To: <1508331506-23782-1-git-send-email-benjamin.gaignard@linaro.org>
+References: <1508331506-23782-1-git-send-email-benjamin.gaignard@linaro.org>
+Message-ID: <1508331506-23782-2-git-send-email-benjamin.gaignard@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-version 6:
-- add timer_of_deinit function in core
-- rework failure cases in probe function
+Add this deinit function to be able to undo what have been done
+in timer_of_init().
 
-version 5:
-- rebase on top of timer/core branch
-- rework commit message of the first patch
+Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+---
+ drivers/clocksource/timer-of.c | 12 ++++++++++++
+ drivers/clocksource/timer-of.h |  3 +++
+ 2 files changed, 15 insertions(+)
 
-version 4:
-- split patch in 3 parts
-  - convert code to timer_of
-  - only use 32 bits timers
-  - add clocksource support
-
-version 3:
-- fix comments done by Daniel
-- use timer_of helper functions
-
-version 2:
-- fix uninitialized variable
-
-These patches implements clocksource and clockevent by using only one hardware block.
-Getting both clock source and events on the same hardware lead to change quite
-a lot driver code.
-It also limits usage of clocksource to 32 bits timers because 16 bits ones
-aren't enough accurate.
-Thanks to timer_fo helpers this series includes minor clean up in structures,
-function prototypes and driver name.
-
-Since 16 bits timers become useless it also removes them from stm32f4 and
-stm32f7 devicetree.
-
-Increase min delta value to be sure to not have too much interrupts.
-
-
-Benjamin Gaignard (5):
-  timer: add timer_of_deinit function
-  clocksource: stm32: convert driver to timer_of
-  clocksource: stm32: only use 32 bits timers
-  clocksource: stm32: add clocksource support
-  arm: dts: stm32: remove useless clocksource nodes
-
- arch/arm/boot/dts/stm32f429.dtsi  |  32 ------
- arch/arm/boot/dts/stm32f746.dtsi  |  32 ------
- drivers/clocksource/Kconfig       |   1 +
- drivers/clocksource/timer-of.c    |  12 ++
- drivers/clocksource/timer-of.h    |   3 +
- drivers/clocksource/timer-stm32.c | 232 +++++++++++++++++++-------------------
- 6 files changed, 132 insertions(+), 180 deletions(-)
-
+diff --git a/drivers/clocksource/timer-of.c b/drivers/clocksource/timer-of.c
+index c79122d..14404a0 100644
+--- a/drivers/clocksource/timer-of.c
++++ b/drivers/clocksource/timer-of.c
+@@ -176,3 +176,15 @@ int __init timer_of_init(struct device_node *np, struct timer_of *to)
+ 		timer_base_exit(&to->of_base);
+ 	return ret;
+ }
++
++void timer_of_deinit(struct timer_of *to)
++{
++	if (to->flags & TIMER_OF_IRQ)
++		timer_irq_exit(&to->of_irq);
++
++	if (to->flags & TIMER_OF_CLOCK)
++		timer_clk_exit(&to->of_clk);
++
++	if (to->flags & TIMER_OF_BASE)
++		timer_base_exit(&to->of_base);
++}
+diff --git a/drivers/clocksource/timer-of.h b/drivers/clocksource/timer-of.h
+index e0d7272..3833ab1 100644
+--- a/drivers/clocksource/timer-of.h
++++ b/drivers/clocksource/timer-of.h
+@@ -66,4 +66,7 @@ static inline unsigned long timer_of_period(struct timer_of *to)
+ 
+ extern int __init timer_of_init(struct device_node *np,
+ 				struct timer_of *to);
++
++extern void timer_of_deinit(struct timer_of *to);
++
+ #endif
 -- 
 2.7.4
