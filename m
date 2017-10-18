@@ -1,52 +1,75 @@
 From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Wed, 18 Oct 2017 14:58:22 +0200
-Subject: [PATCH v6 1/5] timer: add timer_of_deinit function
+Date: Wed, 18 Oct 2017 14:58:24 +0200
+Subject: [PATCH v6 3/5] clocksource: stm32: only use 32 bits timers
 In-Reply-To: <1508331506-23782-1-git-send-email-benjamin.gaignard@linaro.org>
 References: <1508331506-23782-1-git-send-email-benjamin.gaignard@linaro.org>
-Message-ID: <1508331506-23782-2-git-send-email-benjamin.gaignard@linaro.org>
+Message-ID: <1508331506-23782-4-git-send-email-benjamin.gaignard@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add this deinit function to be able to undo what have been done
-in timer_of_init().
+16 bits hardware are not enough accure to be used.
+Do no allow them to be probed by tested max counter value.
 
 Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
 ---
- drivers/clocksource/timer-of.c | 12 ++++++++++++
- drivers/clocksource/timer-of.h |  3 +++
- 2 files changed, 15 insertions(+)
+ drivers/clocksource/timer-stm32.c | 26 ++++++++++++--------------
+ 1 file changed, 12 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/clocksource/timer-of.c b/drivers/clocksource/timer-of.c
-index c79122d..14404a0 100644
---- a/drivers/clocksource/timer-of.c
-+++ b/drivers/clocksource/timer-of.c
-@@ -176,3 +176,15 @@ int __init timer_of_init(struct device_node *np, struct timer_of *to)
- 		timer_base_exit(&to->of_base);
- 	return ret;
- }
-+
-+void timer_of_deinit(struct timer_of *to)
-+{
-+	if (to->flags & TIMER_OF_IRQ)
-+		timer_irq_exit(&to->of_irq);
-+
-+	if (to->flags & TIMER_OF_CLOCK)
-+		timer_clk_exit(&to->of_clk);
-+
-+	if (to->flags & TIMER_OF_BASE)
-+		timer_base_exit(&to->of_base);
-+}
-diff --git a/drivers/clocksource/timer-of.h b/drivers/clocksource/timer-of.h
-index e0d7272..3833ab1 100644
---- a/drivers/clocksource/timer-of.h
-+++ b/drivers/clocksource/timer-of.h
-@@ -66,4 +66,7 @@ static inline unsigned long timer_of_period(struct timer_of *to)
+diff --git a/drivers/clocksource/timer-stm32.c b/drivers/clocksource/timer-stm32.c
+index 67dcf48..c834648 100644
+--- a/drivers/clocksource/timer-stm32.c
++++ b/drivers/clocksource/timer-stm32.c
+@@ -81,9 +81,9 @@ static irqreturn_t stm32_clock_event_handler(int irq, void *dev_id)
+ static int __init stm32_clockevent_init(struct device_node *node)
+ {
+ 	struct reset_control *rstc;
+-	unsigned long max_delta;
+-	int ret, bits, prescaler = 1;
++	unsigned long max_arr;
+ 	struct timer_of *to;
++	int ret;
  
- extern int __init timer_of_init(struct device_node *np,
- 				struct timer_of *to);
+ 	to = kzalloc(sizeof(*to), GFP_KERNEL);
+ 	if (!to)
+@@ -113,29 +113,27 @@ static int __init stm32_clockevent_init(struct device_node *node)
+ 
+ 	/* Detect whether the timer is 16 or 32 bits */
+ 	writel_relaxed(~0U, timer_of_base(to) + TIM_ARR);
+-	max_delta = readl_relaxed(timer_of_base(to) + TIM_ARR);
+-	if (max_delta == ~0U) {
+-		prescaler = 1;
+-		bits = 32;
+-	} else {
+-		prescaler = 1024;
+-		bits = 16;
++	max_arr = readl_relaxed(timer_of_base(to) + TIM_ARR);
++	if (max_arr != ~0U) {
++		pr_err("32 bits timer is needed\n");
++		ret = -EINVAL;
++		goto deinit;
+ 	}
 +
-+extern void timer_of_deinit(struct timer_of *to);
-+
- #endif
+ 	writel_relaxed(0, timer_of_base(to) + TIM_ARR);
+ 
+-	writel_relaxed(prescaler - 1, timer_of_base(to) + TIM_PSC);
++	writel_relaxed(0, timer_of_base(to) + TIM_PSC);
+ 	writel_relaxed(TIM_EGR_UG, timer_of_base(to) + TIM_EGR);
+ 	writel_relaxed(TIM_DIER_UIE, timer_of_base(to) + TIM_DIER);
+ 	writel_relaxed(0, timer_of_base(to) + TIM_SR);
+ 
+ 	clockevents_config_and_register(&to->clkevt,
+-					timer_of_period(to), 0x60, max_delta);
+-
+-	pr_info("%pOF: STM32 clockevent driver initialized (%d bits)\n",
+-			node, bits);
++					timer_of_period(to), 0x60, ~0U);
+ 
+ 	return 0;
+ 
++deinit:
++	timer_of_deinit(to);
+ err:
+ 	kfree(to);
+ 	return ret;
 -- 
 2.7.4
