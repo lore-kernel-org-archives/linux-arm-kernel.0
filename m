@@ -1,78 +1,68 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 18 Oct 2017 17:11:57 +0100
-Subject: [arm-platforms:irq/irqchip-4.15 7/19]
- drivers/irqchip/irq-gic-v3.c:577:4: note: in expansion of macro 'pr_crit'
-In-Reply-To: <201710181942.2M01lPyt%fengguang.wu@intel.com> (kbuild test
- robot's message of "Wed, 18 Oct 2017 19:25:45 +0800")
-References: <201710181942.2M01lPyt%fengguang.wu@intel.com>
-Message-ID: <87wp3sigfm.fsf@on-the-bus.cambridge.arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 18 Oct 2017 18:13:13 +0200
+Subject: libbattery was Re: [RFC PATCH 5/5] power: generic-adc-battery:
+ Add capacity handling
+In-Reply-To: <341EC461-B19F-418C-B0BF-26E1EEFAD5B7@goldelico.com>
+References: <1501620926-22669-1-git-send-email-marek.belisko@open-nandra.com>
+ <1501620926-22669-6-git-send-email-marek.belisko@open-nandra.com>
+ <20170829101147.debhadzyfrxhkrvt@earth>
+ <20170908113231.GJ18365@amd> <20171018122804.GA14376@amd>
+ <61BFA8AF-657A-4AD7-A7AC-3E5DC3B7E83D@goldelico.com>
+ <20171018132204.GD4394@atomide.com> <20171018135656.GA26432@amd>
+ <341EC461-B19F-418C-B0BF-26E1EEFAD5B7@goldelico.com>
+Message-ID: <20171018161312.GA31392@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 18 2017 at  7:25:45 pm BST, kbuild test robot <fengguang.wu@intel.com> wrote:
-> tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/irqchip-4.15
-> head:   0beae24927562ef40a444409d2a9a0d162a18ae7
-> commit: 0de6aeba71c72a84dfc47568fc68ec187ac4537c [7/19] irqchip/gicv3: Add support for Range Selector (RS) feature
-> config: arm-multi_v7_defconfig (attached as .config)
-> compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-> reproduce:
->         wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         git checkout 0de6aeba71c72a84dfc47568fc68ec187ac4537c
->         # save the attached .config to linux build tree
->         make.cross ARCH=arm 
->
-> All warnings (new ones prefixed by >>):
->
->    In file included from include/linux/printk.h:6:0,
->                     from include/linux/kernel.h:13,
->                     from include/linux/list.h:8,
->                     from include/linux/resource_ext.h:17,
->                     from include/linux/acpi.h:26,
->                     from drivers/irqchip/irq-gic-v3.c:20:
->    drivers/irqchip/irq-gic-v3.c: In function 'gic_cpu_sys_reg_init':
->>> include/linux/kern_levels.h:4:18: warning: format '%llx' expects
->>> argument of type 'long long unsigned int', but argument 5 has type
->>> 'u32 {aka unsigned int}' [-Wformat=]
->     #define KERN_SOH "\001"  /* ASCII Start Of Header */
->                      ^
->    include/linux/kern_levels.h:9:19: note: in expansion of macro 'KERN_SOH'
->     #define KERN_CRIT KERN_SOH "2" /* critical conditions */
->                       ^~~~~~~~
->>> include/linux/printk.h:299:9: note: in expansion of macro 'KERN_CRIT'
->      printk(KERN_CRIT pr_fmt(fmt), ##__VA_ARGS__)
->             ^~~~~~~~~
->>> drivers/irqchip/irq-gic-v3.c:577:4: note: in expansion of macro 'pr_crit'
->        pr_crit("CPU%d (%llx) can't SGI CPU%d (%llx), no RSS\n",
->        ^~~~~~~
-> --
->    In file included from include/linux/printk.h:6:0,
->                     from include/linux/kernel.h:13,
->                     from include/linux/list.h:8,
->                     from include/linux/resource_ext.h:17,
->                     from include/linux/acpi.h:26,
->                     from drivers//irqchip/irq-gic-v3.c:20:
->    drivers//irqchip/irq-gic-v3.c: In function 'gic_cpu_sys_reg_init':
->>> include/linux/kern_levels.h:4:18: warning: format '%llx' expects argument of type 'long long unsigned int', but argument 5 has type 'u32 {aka unsigned int}' [-Wformat=]
->     #define KERN_SOH "\001"  /* ASCII Start Of Header */
->                      ^
->    include/linux/kern_levels.h:9:19: note: in expansion of macro 'KERN_SOH'
->     #define KERN_CRIT KERN_SOH "2" /* critical conditions */
->                       ^~~~~~~~
->>> include/linux/printk.h:299:9: note: in expansion of macro 'KERN_CRIT'
->      printk(KERN_CRIT pr_fmt(fmt), ##__VA_ARGS__)
->             ^~~~~~~~~
->    drivers//irqchip/irq-gic-v3.c:577:4: note: in expansion of macro 'pr_crit'
->        pr_crit("CPU%d (%llx) can't SGI CPU%d (%llx), no RSS\n",
->        ^~~~~~~
+On Wed 2017-10-18 17:52:22, H. Nikolaus Schaller wrote:
+> 
+> > Am 18.10.2017 um 15:56 schrieb Pavel Machek <pavel@ucw.cz>:
+> > 
+> > On Wed 2017-10-18 06:22:04, Tony Lindgren wrote:
+> >> * H. Nikolaus Schaller <hns@goldelico.com> [171018 05:49]:
+> >>>> Am 18.10.2017 um 14:28 schrieb Pavel Machek <pavel@ucw.cz>:
+> >>>> 
+> >>>> So I started something, it is at.
+> >>>> 
+> >>>> https://github.com/pavelmachek/libbattery
+> >>>> 
+> >>>> My battery on n900 is currently uncalibrated (and charging), still it
+> >>>> gets some kind of estimation:
+> >>>> 
+> >>>> Battery -1 %
+> >>>> Seconds -1
+> >>>> State 1
+> >>>> Voltage 3.88 V
+> >>>> Battery 63 %
+> >>>> 
+> >>>> Of course, there's a lot more work to be done.
+> >>> 
+> >>> Nice start but not a solution to our problem.
+> >>> 
+> >>> Our problem is that people simply expect that for example https://packages.debian.org/wheezy/xfce/xfce4-battery-plugin
+> >>> displays the battery percentage.
+> >> 
+> >> I think we could make things compatible with various battery apps by
+> >> having libbattery write back the capacity percentage and time remaining
+> >> to the kernel driver via sysfs or a dev entry. Then the kernel interface
+> >> can just display the data to whatever apps.
+> > 
+> > Hmm. This could be as simple as providing symlink from
+> > /sys/class/power/userland-battery to some place writable by
+> > userspace...
+> 
+> Well, please implement arbitrary symlinks in /sysfs...
 
-[...]
+Any reason why I'd like to do that?
+									Pavel
 
-Fixes for all 3 issues pushed out as fixups. I'll squash them before
-sending out the pull request.
-
-Thanks for the heads up!
-
-	M.
 -- 
-Jazz is not dead, it just smell funny.
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171018/fb198e83/attachment.sig>
