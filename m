@@ -1,37 +1,33 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 18 Oct 2017 09:27:26 +0200
-Subject: [PATCH 5/7] ARM: dts: r8a7791: Use R-Car Gen2 Ether fallback compat
- string
-In-Reply-To: <20171018072728.14681-1-horms+renesas@verge.net.au>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 18 Oct 2017 09:35:33 +0200
+Subject: [PATCH 1/7] ARM: dts: r8a7743: Use R-Car Gen2 Ether fallback
+ compat string
+In-Reply-To: <20171018072728.14681-2-horms+renesas@verge.net.au>
 References: <20171018072728.14681-1-horms+renesas@verge.net.au>
-Message-ID: <20171018072728.14681-6-horms+renesas@verge.net.au>
+ <20171018072728.14681-2-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdWFORA=LL_e8RGYL3hzhZsCaVLfROKTNE57m3oJUD=tbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use newly added R-Car Gen2 Ether fallback compat string
-in the DT of the r8a7791 SoC.
+On Wed, Oct 18, 2017 at 9:27 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Use newly added R-Car Gen2 Ether fallback compat string
+> in the DT of the r8a7743 SoC.
+>
+> This should have no run-time effect as the driver matches against
+> the per-SoC compat string before considering the fallback compat string.
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-This should have no run-time effect as the driver matches against
-the per-SoC compat string before considering the fallback compat string.
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7791.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Gr{oetje,eeting}s,
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 67831d0405f3..9815a933e4cc 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -961,7 +961,8 @@
- 	};
- 
- 	ether: ethernet at ee700000 {
--		compatible = "renesas,ether-r8a7791";
-+		compatible = "renesas,ether-r8a7791",
-+			     "renesas,rcar-gen2-ether";
- 		reg = <0 0xee700000 0 0x400>;
- 		interrupts = <GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&cpg CPG_MOD 813>;
--- 
-2.11.0
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
