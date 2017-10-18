@@ -1,30 +1,29 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 18 Oct 2017 11:01:34 +0800
-Subject: [PATCH] ARM: dts: imx25-eukrea-mbimxsd25-baseboard: Fix the
- 'cd-gpios' property
-In-Reply-To: <1508193643-30243-1-git-send-email-festevam@gmail.com>
-References: <1508193643-30243-1-git-send-email-festevam@gmail.com>
-Message-ID: <20171018030132.GK18810@dragon>
+Date: Wed, 18 Oct 2017 11:06:54 +0800
+Subject: [PATCHv3 00/12] ARM: dts: imx6: Update dts files for the Ka-Ro
+ TX6 module series
+In-Reply-To: <1508231883-12067-1-git-send-email-LW@KARO-electronics.de>
+References: <1508230414-8090-1-git-send-email-LW@KARO-electronics.de>
+ <1508231883-12067-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <20171018030653.GL18810@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 16, 2017 at 08:40:43PM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
+On Tue, Oct 17, 2017 at 11:17:51AM +0200, Lothar Wa?mann wrote:
+> Please ignore the V2 series. I accidentally sent the patches from a
+> wrong directory.
 > 
-> The GPIO polarity is missing in the cd-gpios property.
-> 
-> Fix it, so that the following build warnings are gone:
-> 
->   DTC     arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dtb
-> arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dtb: Warning (gpios_property): cd-gpios property size (8) too small for cell size 2 in /soc/aips at 53f00000/esdhc at 53fb4000
->   DTC     arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dtb
-> arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dtb: Warning (gpios_property): cd-gpios property size (8) too small for cell size 2 in /soc/aips at 53f00000/esdhc at 53fb4000
->   DTC     arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-svga.dtb
-> arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-svga.dtb: Warning (gpios_property): cd-gpios property size (8) too small for cell size 2 in /soc/aips at 53f00000/esdhc at 53fb4000
->   DTC     arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dtb
-> arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dtb: Warning (gpios_property): cd-gpios property size (8) too small for cell size 2 in /soc/aips at 53f00000/esdhc at 53fb4000
-> 
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> This patchset updates the dts files for the Ka-Ro electronics GmbH TX6
+> module series and adds some include files to facilitate supporting
+> various SoM/baseboard combinations.
 
-Applied, thanks.
+Applied all, thanks.
+
+> Changes vs. v2:
+> - resent the correct patches
+> 
+> Changes vs. v1:
+> - rebased to imx/dt branch
+> - eliminate use of 'interrupts-extended' property according to Uwe
+>   Kleine-K?nig's comment
+> 
