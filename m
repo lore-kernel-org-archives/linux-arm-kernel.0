@@ -1,90 +1,70 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 18 Oct 2017 16:52:26 +0100
-Subject: [PATCH v3 03/20] arm64: Use the physical counter when available
- for read_cycles
-In-Reply-To: <20171018113405.GA8900@cbox> (Christoffer Dall's message of "Wed,
- 18 Oct 2017 13:34:05 +0200")
-References: <20170923004207.22356-1-cdall@linaro.org>
- <20170923004207.22356-4-cdall@linaro.org>
- <9b06425f-7c2c-d44a-cd6c-aeaa4b76849c@arm.com>
- <20171018113405.GA8900@cbox>
-Message-ID: <878tg8jvwl.fsf@on-the-bus.cambridge.arm.com>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Wed, 18 Oct 2017 17:52:22 +0200
+Subject: libbattery was Re: [RFC PATCH 5/5] power: generic-adc-battery:
+ Add capacity handling
+In-Reply-To: <20171018135656.GA26432@amd>
+References: <1501620926-22669-1-git-send-email-marek.belisko@open-nandra.com>
+ <1501620926-22669-6-git-send-email-marek.belisko@open-nandra.com>
+ <20170829101147.debhadzyfrxhkrvt@earth> <20170908113231.GJ18365@amd>
+ <20171018122804.GA14376@amd>
+ <61BFA8AF-657A-4AD7-A7AC-3E5DC3B7E83D@goldelico.com>
+ <20171018132204.GD4394@atomide.com> <20171018135656.GA26432@amd>
+Message-ID: <341EC461-B19F-418C-B0BF-26E1EEFAD5B7@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 18 2017 at  1:34:05 pm BST, Christoffer Dall <cdall@linaro.org> wrote:
-> On Mon, Oct 09, 2017 at 05:21:24PM +0100, Marc Zyngier wrote:
->> On 23/09/17 01:41, Christoffer Dall wrote:
->> > Currently get_cycles() is hardwired to arch_counter_get_cntvct() on
->> > arm64, but as we move to using the physical timer for the in-kernel
->> > time-keeping, we need to make that more flexible.
->> > 
->> > First, we need to make sure the physical counter can be read on equal
->> > terms to the virtual counter, which includes adding physical counter
->> > read functions for timers that require errata.
->> > 
->> > Second, we need to make a choice between reading the physical vs virtual
->> > counter, depending on which timer is used for time keeping in the kernel
->> > otherwise.  We can do this using a static key to avoid a performance
->> > penalty during runtime when reading the counter.
->> > 
->> > Cc: Catalin Marinas <catalin.marinas@arm.com>
->> > Cc: Will Deacon <will.deacon@arm.com>
->> > Cc: Mark Rutland <mark.rutland@arm.com>
->> > Cc: Marc Zyngier <marc.zyngier@arm.com>
->> > Signed-off-by: Christoffer Dall <cdall@linaro.org>
 
-[...]
-
->> In my reply to patch #2, I had the following hunk:
+> Am 18.10.2017 um 15:56 schrieb Pavel Machek <pavel@ucw.cz>:
+> 
+> On Wed 2017-10-18 06:22:04, Tony Lindgren wrote:
+>> * H. Nikolaus Schaller <hns@goldelico.com> [171018 05:49]:
+>>>> Am 18.10.2017 um 14:28 schrieb Pavel Machek <pavel@ucw.cz>:
+>>>> 
+>>>> So I started something, it is at.
+>>>> 
+>>>> https://github.com/pavelmachek/libbattery
+>>>> 
+>>>> My battery on n900 is currently uncalibrated (and charging), still it
+>>>> gets some kind of estimation:
+>>>> 
+>>>> Battery -1 %
+>>>> Seconds -1
+>>>> State 1
+>>>> Voltage 3.88 V
+>>>> Battery 63 %
+>>>> 
+>>>> Of course, there's a lot more work to be done.
+>>> 
+>>> Nice start but not a solution to our problem.
+>>> 
+>>> Our problem is that people simply expect that for example https://packages.debian.org/wheezy/xfce/xfce4-battery-plugin
+>>> displays the battery percentage.
 >> 
->> @@ -310,7 +329,7 @@ static void erratum_set_next_event_tval_generic(const int access, unsigned long
->>  						struct clock_event_device *clk)
->>  {
->>  	unsigned long ctrl;
->> -	u64 cval = evt + arch_counter_get_cntvct();
->> +	u64 cval = evt + arch_timer_read_counter();
->>  
->>  	ctrl = arch_timer_reg_read(access, ARCH_TIMER_REG_CTRL, clk);
->>  	ctrl |= ARCH_TIMER_CTRL_ENABLE;
->> 
->> Once we start using a different timer, this could well have an effect...
->> 
->
-> Right, but wouldn't the following be a more correct way to go about it then:
->
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 9a7b359..07f19db 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -329,16 +329,19 @@ static void erratum_set_next_event_tval_generic(const int access, unsigned long
->  						struct clock_event_device *clk)
->  {
->  	unsigned long ctrl;
-> -	u64 cval = evt + arch_timer_read_counter();
-> +	u64 cval;
->  
->  	ctrl = arch_timer_reg_read(access, ARCH_TIMER_REG_CTRL, clk);
->  	ctrl |= ARCH_TIMER_CTRL_ENABLE;
->  	ctrl &= ~ARCH_TIMER_CTRL_IT_MASK;
->  
-> -	if (access == ARCH_TIMER_PHYS_ACCESS)
-> +	if (access == ARCH_TIMER_PHYS_ACCESS) {
-> +		cval = evt + arch_counter_get_cntpct();
->  		write_sysreg(cval, cntp_cval_el0);
-> -	else
-> +	} else {
-> +		cval = evt + arch_counter_get_cntvct();
->  		write_sysreg(cval, cntv_cval_el0);
-> +	}
->  
->  	arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl, clk);
->  }
+>> I think we could make things compatible with various battery apps by
+>> having libbattery write back the capacity percentage and time remaining
+>> to the kernel driver via sysfs or a dev entry. Then the kernel interface
+>> can just display the data to whatever apps.
+> 
+> Hmm. This could be as simple as providing symlink from
+> /sys/class/power/userland-battery to some place writable by
+> userspace...
 
-Yup, that's much better.
+Well, please implement arbitrary symlinks in /sysfs...
 
-Thanks,
+root at letux:~# ln -sf /tmp/somewhere /sys/class/power_supply/fake-battery
+ln: failed to create symbolic link '/sys/class/power_supply/fake-battery': Operation not permitted
+root at letux:~#
 
-	M.
--- 
-Jazz is not dead, it just smell funny.
+And you need to run a daemon so that the data is available
+somewhere.
+
+BR and thanks,
+Nikolaus
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: Message signed with OpenPGP using GPGMail
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171018/ded7a77f/attachment.sig>
