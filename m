@@ -1,87 +1,98 @@
 From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Wed, 18 Oct 2017 20:09:41 +0800
-Subject: [PATCH v5 6/9] drm/rockchip: inno_hdmi: Fix error handling path
+Date: Wed, 18 Oct 2017 20:09:36 +0800
+Subject: [PATCH v5 1/9] arm64: dts: rockchip: Enable edp disaplay on kevin
 In-Reply-To: <20171018120944.7819-1-jeffy.chen@rock-chips.com>
 References: <20171018120944.7819-1-jeffy.chen@rock-chips.com>
-Message-ID: <20171018120944.7819-7-jeffy.chen@rock-chips.com>
+Message-ID: <20171018120944.7819-2-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing error handling in bind().
+Add edp panel and enable related nodes on kevin.
 
-Fixes: 412d4ae6b7a5 ("drm/rockchip: hdmi: add Innosilicon HDMI support")
 Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+Reviewed-by: Mark Yao <mark.yao@rock-chips.com>
+
 ---
 
-Changes in v5:
-Call the destroy hook in the error handling path like in unbind().
-Update cleanup order in unbind().
+Changes in v5: None
 
- drivers/gpu/drm/rockchip/inno_hdmi.c | 22 +++++++++++++++++-----
- 1 file changed, 17 insertions(+), 5 deletions(-)
+ arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 29 +++++++++++++++++++++++
+ arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi      | 16 +++++++++++++
+ 2 files changed, 45 insertions(+)
 
-diff --git a/drivers/gpu/drm/rockchip/inno_hdmi.c b/drivers/gpu/drm/rockchip/inno_hdmi.c
-index ee584d87111f..9a96ff6b022b 100644
---- a/drivers/gpu/drm/rockchip/inno_hdmi.c
-+++ b/drivers/gpu/drm/rockchip/inno_hdmi.c
-@@ -851,8 +851,10 @@ static int inno_hdmi_bind(struct device *dev, struct device *master,
- 	}
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+index a3d3cea7dc4f..bc67b19f0af5 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+@@ -93,6 +93,18 @@
+ 		pwm-delay-us = <10000>;
+ 	};
  
- 	irq = platform_get_irq(pdev, 0);
--	if (irq < 0)
--		return irq;
-+	if (irq < 0) {
-+		ret = irq;
-+		goto err_disable_clk;
-+	}
++	edp_panel: edp-panel {
++		compatible = "sharp,lq123p1jx31", "simple-panel";
++		backlight = <&backlight>;
++		power-supply = <&pp3300_disp>;
++
++		ports {
++			panel_in_edp: endpoint {
++				remote-endpoint = <&edp_out_panel>;
++			};
++		};
++	};
++
+ 	thermistor_ppvar_bigcpu: thermistor-ppvar-bigcpu {
+ 		compatible = "murata,ncp15wb473";
+ 		pullup-uv = <1800000>;
+@@ -264,6 +276,23 @@ ap_i2c_dig: &i2c2 {
+ 	};
+ };
  
- 	inno_hdmi_reset(hdmi);
++&edp {
++	status = "okay";
++
++	ports {
++		edp_out: port at 1 {
++			reg = <1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			edp_out_panel: endpoint at 0 {
++				reg = <0>;
++				remote-endpoint = <&panel_in_edp>;
++			};
++		};
++	};
++};
++
+ &ppvar_bigcpu_pwm {
+ 	regulator-min-microvolt = <798674>;
+ 	regulator-max-microvolt = <1302172>;
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+index 5772c52fbfd3..470105d651c2 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+@@ -927,6 +927,22 @@ ap_i2c_audio: &i2c8 {
+ 	dr_mode = "host";
+ };
  
-@@ -860,7 +862,7 @@ static int inno_hdmi_bind(struct device *dev, struct device *master,
- 	if (IS_ERR(hdmi->ddc)) {
- 		ret = PTR_ERR(hdmi->ddc);
- 		hdmi->ddc = NULL;
--		return ret;
-+		goto err_disable_clk;
- 	}
++&vopb {
++	status = "okay";
++};
++
++&vopb_mmu {
++	status = "okay";
++};
++
++&vopl {
++	status = "okay";
++};
++
++&vopl_mmu {
++	status = "okay";
++};
++
+ #include <arm/cros-ec-keyboard.dtsi>
+ #include <arm/cros-ec-sbs.dtsi>
  
- 	/*
-@@ -874,7 +876,7 @@ static int inno_hdmi_bind(struct device *dev, struct device *master,
- 
- 	ret = inno_hdmi_register(drm, hdmi);
- 	if (ret)
--		return ret;
-+		goto err_put_adapter;
- 
- 	dev_set_drvdata(dev, hdmi);
- 
-@@ -884,7 +886,17 @@ static int inno_hdmi_bind(struct device *dev, struct device *master,
- 	ret = devm_request_threaded_irq(dev, irq, inno_hdmi_hardirq,
- 					inno_hdmi_irq, IRQF_SHARED,
- 					dev_name(dev), hdmi);
-+	if (ret < 0)
-+		goto err_cleanup_hdmi;
- 
-+	return 0;
-+err_cleanup_hdmi:
-+	hdmi->connector.funcs->destroy(&hdmi->connector);
-+	hdmi->encoder.funcs->destroy(&hdmi->encoder);
-+err_put_adapter:
-+	i2c_put_adapter(hdmi->ddc);
-+err_disable_clk:
-+	clk_disable_unprepare(hdmi->pclk);
- 	return ret;
- }
- 
-@@ -896,8 +908,8 @@ static void inno_hdmi_unbind(struct device *dev, struct device *master,
- 	hdmi->connector.funcs->destroy(&hdmi->connector);
- 	hdmi->encoder.funcs->destroy(&hdmi->encoder);
- 
--	clk_disable_unprepare(hdmi->pclk);
- 	i2c_put_adapter(hdmi->ddc);
-+	clk_disable_unprepare(hdmi->pclk);
- }
- 
- static const struct component_ops inno_hdmi_ops = {
 -- 
 2.11.0
