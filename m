@@ -1,75 +1,49 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 18 Oct 2017 12:18:02 +0100
-Subject: [PATCH v4 09/13] arm64: kernel: Add arch-specific SDEI entry
- code and CPU masking
-In-Reply-To: <20171017174432.1684-10-james.morse@arm.com>
-References: <20171017174432.1684-1-james.morse@arm.com>
- <20171017174432.1684-10-james.morse@arm.com>
-Message-ID: <20171018111801.cz6wkhfnpifj4bnl@armageddon.cambridge.arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 18 Oct 2017 13:19:08 +0200
+Subject: [PATCH/RFC 4/5] regulator: bd9571mwv: Add support for backup mode
+In-Reply-To: <20171018110238.hjv7huiievhr5obs@sirena.co.uk>
+References: <1507649178-31473-1-git-send-email-geert+renesas@glider.be>
+ <1507649178-31473-5-git-send-email-geert+renesas@glider.be>
+ <20171018110238.hjv7huiievhr5obs@sirena.co.uk>
+Message-ID: <CAMuHMdU2PpiSftwnqHjb8uFpu5Huw7hpedk4cSzDY-eeKio_Dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 06:44:28PM +0100, James Morse wrote:
-> The Software Delegated Exception Interface (SDEI) is an ARM standard
-> for registering callbacks from the platform firmware into the OS.
-> This is typically used to implement RAS notifications.
-> 
-> Such notifications enter the kernel at the registered entry-point
-> with the register values of the interrupted CPU context. Because this
-> is not a CPU exception, it cannot reuse the existing entry code.
-> (crucially we don't implicitly know which exception level we interrupted),
-> 
-> Add an sdei-entry.S asm file to set us up for calling into C code. If
-> the event interrupted code that had interrupts masked, we always return
-> to that location. Otherwise we pretend this was an IRQ, and use SDEI's
-> complete_and_resume call to return to vbar_el1 + offset.
-> 
-> This allows the kernel to deliver signals to user space processes. For
-> KVM this triggers the world switch, a quick spin round vcpu_run, then
-> back into the guest, unless there are pending signals.
-> 
-> Add sdei_mask_local_cpu() calls to the smp_send_stop() code, this covers
-> the panic() code-path, which doesn't invoke cpuhotplug notifiers.
-> 
-> Because we can interrupt entry-from/exit-to another EL, we can't trust the
-> value in sp_el0 or x29, even if we interrupted the kernel, in this case
-> the code in entry.S will save/restore sp_el0 and use the value in
-> __entry_task.
-> 
-> When we have VMAP stacks we can interrupt the stack-overflow test, which
-> stirs x0 into sp, meaning we have to have our own VMAP stack.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
+Hi Mark,
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+On Wed, Oct 18, 2017 at 1:02 PM, Mark Brown <broonie@kernel.org> wrote:
+> On Tue, Oct 10, 2017 at 05:26:17PM +0200, Geert Uytterhoeven wrote:
+>> Backup mode is not enabled automatically, as e.g. on Renesas
+>> Salvator-X(S) boards enabling backup mode changes the role of the ACC
+>> switch from a power switch to a wake-up switch.  Hence enabling it
+>> prevents the board from being powered off using the ACC switch, which
+>> may confuse the user.
+>
+> This sounds an awful lot like the standard power/wakeup, though the
+> power change is a bit unexpected there.  I'm also wondering if it makes
+> sense to just only enable the wakeup mode when suspending which
+> preserves the power off functionality while also keeping the wakeup
+> support.
 
-> +static __kprobes unsigned long _sdei_handler(struct pt_regs *regs,
-> +					     struct sdei_registered_event *arg)
-> +{
-> +	u32 mode;
-> +	int i, err = 0;
-> +	const int clobbered_registers = 4;
-> +	u64 elr = read_sysreg(elr_el1);
-> +	u32 kernel_mode = read_sysreg(CurrentEL) | 1;	/* +SPSel */
-> +	unsigned long vbar = read_sysreg(vbar_el1);
-> +
-> +	/* Retrieve the missing registers values */
-> +	for (i = 0; i < clobbered_registers; i++) {
-> +		/* from within the handler, this call always succeeds */
-> +		sdei_api_event_context(i, &regs->regs[i]);
-> +	}
-> +
-> +	/*
-> +	 * We didn't take an exception to get here, set PAN. UAO will be cleared
-> +	 * by sdei_event_handler()s set_fs(USER_DS) call.
-> +	 */
-> +	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,
-> +			CONFIG_ARM64_PAN));
+The ACC switch is not a momentary switch (push button), but a toggle
+switch with two positions.
+Hence you cannot enable wakeup mode while suspending, as the proper
+system suspend/resume procedure is:
+  1. Enable backup mode in the PMIC,
+  2. Switch ACC off (no-op as backup mode has been enabled),
+  3. Suspend to RAM (PSCI suspend) => system suspends,
+  4. Switch ACC on => system wakes up.
+If you would combine steps 1 and 3, you can no longer do step 2 in between.
 
-We have a similar asm in __cpu_suspend_exit(), so there's precedent. As
-a separate patch (not part of this series), we should move them into
-a macro, e.g. __uaccess_disable_hw_pan() (enabling as well for
-consistency).
+Yes, it's complicated :-(
 
--- 
-Catalin
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
