@@ -1,73 +1,48 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 18 Oct 2017 09:47:44 +0100
-Subject: Tegra baseline test results for v4.14-rc4
-Message-ID: <a90b6c7f-cc33-5e39-9b87-6dc69b0de8b9@nvidia.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 18 Oct 2017 16:31:36 +0800
+Subject: [PATCH v2 6/8] ARM: dts: sun8i: a83t: Move mmc1 pinctrl setting to
+ dtsi file
+In-Reply-To: <20171018083138.14517-1-wens@csie.org>
+References: <20171018083138.14517-1-wens@csie.org>
+Message-ID: <20171018083138.14517-7-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.14-rc4.
-Logs and other details at:
+mmc1 only has 1 possible pinmux setting.
 
-    https://nvtb.github.io//linux/test_v4.14-rc4/20171008213104/
+Move any settings to the dtsi file and set it by default.
 
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts | 2 --
+ arch/arm/boot/dts/sun8i-a83t.dtsi         | 2 ++
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-Test summary
-------------
-
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Build: Image:
-    Pass: ( 1/ 1): defconfig
-
-Boot to userspace: defconfig:
-    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
-		   tegra210-p2371-0000, tegra210-smaug
-
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 4/ 4): tegra124-jetson-tk1, tegra124-nyan-big,
-		   tegra20-trimslice, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-    Pass: ( 4/ 4): tegra124-jetson-tk1, tegra124-nyan-big,
-		   tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: multi_v7_defconfig:
-    FAIL: ( 3/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra30-beaver
-    Pass: ( 2/ 5): tegra124-nyan-big, tegra20-trimslice
-
-PM: System suspend: tegra_defconfig:
-    FAIL: ( 3/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra30-beaver
-    Pass: ( 2/ 5): tegra124-nyan-big, tegra20-trimslice
-
-
-vmlinux object size
-(delta in bytes from test_v4.14-rc3 (9e66317d3c92ddaab330c125dfe9d06eee268aff)):
-   text     data      bss    total  kernel
-    -84     +588        0     +504  defconfig
-   +852    +4128        0    +4980  multi_v7_defconfig
-   +792      +44        0     +836  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.14-rc3 (9e66317d3c92ddaab330c125dfe9d06eee268aff))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
-        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
-        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
-        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
-        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
-        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
-
---
-nvpublic
+diff --git a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
+index 723641f56a74..de0be140338b 100644
+--- a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
++++ b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
+@@ -115,8 +115,6 @@
+ &mmc1 {
+ 	mmc-pwrseq = <&wifi_pwrseq>;
+ 	bus-width = <4>;
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&mmc1_pins>;
+ 	vmmc-supply = <&reg_vcc3v3>;
+ 	vqmmc-supply = <&reg_vcc3v3>;
+ 	non-removable;
+diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+index ce6e887c8938..19acae1b4089 100644
+--- a/arch/arm/boot/dts/sun8i-a83t.dtsi
++++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+@@ -212,6 +212,8 @@
+ 			resets = <&ccu RST_BUS_MMC1>;
+ 			reset-names = "ahb";
+ 			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&mmc1_pins>;
+ 			status = "disabled";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+-- 
+2.14.2
