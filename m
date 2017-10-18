@@ -1,47 +1,100 @@
 From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Wed, 18 Oct 2017 20:09:35 +0800
-Subject: [PATCH v5 0/9] rockchip: kevin: Enable edp display
-Message-ID: <20171018120944.7819-1-jeffy.chen@rock-chips.com>
+Date: Wed, 18 Oct 2017 20:09:37 +0800
+Subject: [PATCH v5 2/9] drm/rockchip: analogix_dp: Remove unnecessary init code
+In-Reply-To: <20171018120944.7819-1-jeffy.chen@rock-chips.com>
+References: <20171018120944.7819-1-jeffy.chen@rock-chips.com>
+Message-ID: <20171018120944.7819-3-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Remove unnecessary init code, since we would do it in the power_on()
+callback.
 
-Make edp display works on chromebook kevin(at least for boot animation).
+Also move of parse code to probe().
 
-Also solve some issues i meet during the bringup.
+Fixes: 9e32e16e9e98 ("drm: rockchip: dp: add rockchip platform dp driver")
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
 
-Changes in v5:
-Call the destroy hook in the error handling path like in unbind().
-Call the destroy hook in the error handling path like in unbind().
-Update cleanup order in unbind().
-Add disable to unbind(), and inline clk_prepare_enable() with bind().
+Changes in v5: None
 
-Jeffy Chen (9):
-  arm64: dts: rockchip: Enable edp disaplay on kevin
-  drm/rockchip: analogix_dp: Remove unnecessary init code
-  drm/bridge: analogix: Do not use device's drvdata
-  drm/bridge: analogix_dp: Fix connector & encoder cleanup
-  drm/rockchip: dw-mipi-dsi: Fix error handling path
-  drm/rockchip: inno_hdmi: Fix error handling path
-  drm/bridge/synopsys: dw-hdmi: Add missing bridge detach
-  drm/bridge/synopsys: dw-hdmi: Do not use device's drvdata
-  drm/rockchip: dw_hdmi: Fix error handling path
+ drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 27 ++++++-------------------
+ 1 file changed, 6 insertions(+), 21 deletions(-)
 
- arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts  | 29 ++++++++
- arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi       | 16 ++++
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 52 +++++--------
- drivers/gpu/drm/bridge/synopsys/dw-hdmi.c          | 53 ++++++-------
- drivers/gpu/drm/exynos/exynos_dp.c                 | 29 +++++---
- drivers/gpu/drm/imx/dw_hdmi-imx.c                  | 22 +++---
- drivers/gpu/drm/meson/meson_dw_hdmi.c              | 20 +++--
- drivers/gpu/drm/rcar-du/rcar_dw_hdmi.c             | 14 +++-
- drivers/gpu/drm/rockchip/analogix_dp-rockchip.c    | 87 ++++++++++------------
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c             | 21 ++++--
- drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c        | 39 +++++-----
- drivers/gpu/drm/rockchip/inno_hdmi.c               | 22 ++++--
- include/drm/bridge/analogix_dp.h                   | 19 +++--
- include/drm/bridge/dw_hdmi.h                       | 17 +++--
- 14 files changed, 257 insertions(+), 183 deletions(-)
-
+diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+index 4d3f6ad0abdd..8cae5ad926cd 100644
+--- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
++++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+@@ -269,7 +269,7 @@ static struct drm_encoder_funcs rockchip_dp_encoder_funcs = {
+ 	.destroy = rockchip_dp_drm_encoder_destroy,
+ };
+ 
+-static int rockchip_dp_init(struct rockchip_dp_device *dp)
++static int rockchip_dp_of_probe(struct rockchip_dp_device *dp)
+ {
+ 	struct device *dev = dp->dev;
+ 	struct device_node *np = dev->of_node;
+@@ -303,19 +303,6 @@ static int rockchip_dp_init(struct rockchip_dp_device *dp)
+ 		return PTR_ERR(dp->rst);
+ 	}
+ 
+-	ret = clk_prepare_enable(dp->pclk);
+-	if (ret < 0) {
+-		DRM_DEV_ERROR(dp->dev, "failed to enable pclk %d\n", ret);
+-		return ret;
+-	}
+-
+-	ret = rockchip_dp_pre_init(dp);
+-	if (ret < 0) {
+-		DRM_DEV_ERROR(dp->dev, "failed to pre init %d\n", ret);
+-		clk_disable_unprepare(dp->pclk);
+-		return ret;
+-	}
+-
+ 	return 0;
+ }
+ 
+@@ -361,10 +348,6 @@ static int rockchip_dp_bind(struct device *dev, struct device *master,
+ 	if (!dp_data)
+ 		return -ENODEV;
+ 
+-	ret = rockchip_dp_init(dp);
+-	if (ret < 0)
+-		return ret;
+-
+ 	dp->data = dp_data;
+ 	dp->drm_dev = drm_dev;
+ 
+@@ -398,7 +381,6 @@ static void rockchip_dp_unbind(struct device *dev, struct device *master,
+ 	rockchip_drm_psr_unregister(&dp->encoder);
+ 
+ 	analogix_dp_unbind(dev, master, data);
+-	clk_disable_unprepare(dp->pclk);
+ }
+ 
+ static const struct component_ops rockchip_dp_component_ops = {
+@@ -414,7 +396,7 @@ static int rockchip_dp_probe(struct platform_device *pdev)
+ 	int ret;
+ 
+ 	ret = drm_of_find_panel_or_bridge(dev->of_node, 1, 0, &panel, NULL);
+-	if (ret)
++	if (ret < 0)
+ 		return ret;
+ 
+ 	dp = devm_kzalloc(dev, sizeof(*dp), GFP_KERNEL);
+@@ -422,9 +404,12 @@ static int rockchip_dp_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 
+ 	dp->dev = dev;
+-
+ 	dp->plat_data.panel = panel;
+ 
++	ret = rockchip_dp_of_probe(dp);
++	if (ret < 0)
++		return ret;
++
+ 	/*
+ 	 * We just use the drvdata until driver run into component
+ 	 * add function, and then we would set drvdata to null, so
 -- 
 2.11.0
