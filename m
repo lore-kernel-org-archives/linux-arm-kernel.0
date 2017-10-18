@@ -1,105 +1,94 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Wed, 18 Oct 2017 09:10:22 +0100
-Subject: [PATCH v5 1/4] clocksource: stm32: convert driver to timer_of
-In-Reply-To: <1508312614-27750-2-git-send-email-benjamin.gaignard@linaro.org>
-References: <1508312614-27750-1-git-send-email-benjamin.gaignard@linaro.org>
- <1508312614-27750-2-git-send-email-benjamin.gaignard@linaro.org>
-Message-ID: <8919cadc-2e51-4b31-2836-32c45bbfabfe@arm.com>
+From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
+Date: Wed, 18 Oct 2017 09:12:26 +0100
+Subject: [PATCH v2 3/4] dt-bindings: hwmon: Add
+ ti-max-expected-current-microamp property to ina2xx
+In-Reply-To: <20171017205821.GA8737@roeck-us.net>
+References: <1507811765-31005-1-git-send-email-m.purski@samsung.com>
+ <CGME20171012123635eucas1p1ff9a982db9d541cd0475d44d114ff92a@eucas1p1.samsung.com>
+ <1507811765-31005-4-git-send-email-m.purski@samsung.com>
+ <20171017203631.xaut7o3szaiucnqh@rob-hp-laptop>
+ <20171017205821.GA8737@roeck-us.net>
+Message-ID: <20171018091226.000017dd@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benjamin,
+On Tue, 17 Oct 2017 13:58:21 -0700
+Guenter Roeck <linux@roeck-us.net> wrote:
 
-On 18/10/17 08:43, Benjamin Gaignard wrote:
-> Convert driver to use timer_of helpers. This allow to remove
-> custom proprietary structure.
+> On Tue, Oct 17, 2017 at 03:36:31PM -0500, Rob Herring wrote:
+> > On Thu, Oct 12, 2017 at 02:36:04PM +0200, Maciej Purski wrote:  
+> > > Add optional max expected current property which allows calibrating
+> > > the ina sensor in order to achieve requested measure scale. Document
+> > > the changes in Documentation/hwmon/ina2xx.
+> > > 
+> > > Signed-off-by: Maciej Purski <m.purski@samsung.com>
+> > > ---
+> > >  Documentation/devicetree/bindings/hwmon/ina2xx.txt | 4 +++-
+> > >  Documentation/hwmon/ina2xx                         | 3 +++
+> > >  2 files changed, 6 insertions(+), 1 deletion(-)
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/hwmon/ina2xx.txt b/Documentation/devicetree/bindings/hwmon/ina2xx.txt
+> > > index 02af0d9..49ef0be 100644
+> > > --- a/Documentation/devicetree/bindings/hwmon/ina2xx.txt
+> > > +++ b/Documentation/devicetree/bindings/hwmon/ina2xx.txt
+> > > @@ -14,11 +14,13 @@ Optional properties:
+> > >  
+> > >  - shunt-resistor
+> > >  	Shunt resistor value in micro-Ohm
+> > > -
+> > > +- ti-max-expected-current-microamp
+> > > +	Max expected current value in mA  
+> > 
+> > ti,max-...
+> > 
+> > The property name is a bit long. Does "expected" add anything? Is there 
+> > a max unexpected current?
+> >   
+> I am not too happy with it either. To me it suggests that there _can_ be
+> an unexpected current (why specify a max _expected_ current otherwise ?),
+> and that unexpected current won't be measurable and thus not reported
+> because it is ... well, unexpected.
+
+After calibration I 'think' this corresponds to the maximum current
+that the device can measure (it's applying scaling inside to make full use
+of available range of the register - there are some arguments that there is
+an optimum value after which we could do better in software).
+
+I guess the issue here is that this that we might need to separate the maximum
+current the device is capable of measuring from what it is currently configured
+to measure.  No idea how to describe that :)
+
+Jonathan
+
 > 
-> Increase min delta value because if it is too small it could
-> generate too much interrupts and the system will not be able
-> to catch them all.
+> Guenter
 > 
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-> ---
->   drivers/clocksource/Kconfig       |   1 +
->   drivers/clocksource/timer-stm32.c | 162 +++++++++++++-------------------------
->   2 files changed, 57 insertions(+), 106 deletions(-)
-> 
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> index cc60620..755c0cc 100644
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -289,6 +289,7 @@ config CLKSRC_STM32
->   	bool "Clocksource for STM32 SoCs" if !ARCH_STM32
->   	depends on OF && ARM && (ARCH_STM32 || COMPILE_TEST)
->   	select CLKSRC_MMIO
-> +	select TIMER_OF
->   
->   config CLKSRC_MPS2
->   	bool "Clocksource for MPS2 SoCs" if COMPILE_TEST
-> diff --git a/drivers/clocksource/timer-stm32.c b/drivers/clocksource/timer-stm32.c
-> index 8f24237..abff21c 100644
-> --- a/drivers/clocksource/timer-stm32.c
-> +++ b/drivers/clocksource/timer-stm32.c
-
-[...]
-
-> -
-> -static int __init stm32_clockevent_init(struct device_node *np)
-> +static int __init stm32_clockevent_init(struct device_node *node)
->   {
-> -	struct stm32_clock_event_ddata *data = &clock_event_ddata;
-> -	struct clk *clk;
->   	struct reset_control *rstc;
-> -	unsigned long rate, max_delta;
-> -	int irq, ret, bits, prescaler = 1;
-> -
-> -	clk = of_clk_get(np, 0);
-> -	if (IS_ERR(clk)) {
-> -		ret = PTR_ERR(clk);
-> -		pr_err("failed to get clock for clockevent (%d)\n", ret);
-> -		goto err_clk_get;
-> -	}
-> -
-> -	ret = clk_prepare_enable(clk);
-> -	if (ret) {
-> -		pr_err("failed to enable timer clock for clockevent (%d)\n",
-> -		       ret);
-> -		goto err_clk_enable;
-> -	}
-> -
-> -	rate = clk_get_rate(clk);
-> -
-> -	rstc = of_reset_control_get(np, NULL);
-> +	unsigned long max_delta;
-> +	int ret, bits, prescaler = 1;
-> +	struct timer_of *to;
-> +
-> +	to = kzalloc(sizeof(*to), GFP_KERNEL);
-> +	if (!to)
-> +		return -ENOMEM;
-> +
-> +	to->flags = TIMER_OF_IRQ | TIMER_OF_CLOCK | TIMER_OF_BASE;
-> +	to->clkevt.name = "stm32_clockevent";
-> +	to->clkevt.rating = 200;
-> +	to->clkevt.features = CLOCK_EVT_FEAT_PERIODIC;
-> +	to->clkevt.set_state_shutdown = stm32_clock_event_shutdown;
-> +	to->clkevt.set_state_periodic = stm32_clock_event_set_periodic;
-> +	to->clkevt.set_state_oneshot = stm32_clock_event_shutdown;
-> +	to->clkevt.tick_resume = stm32_clock_event_shutdown;
-> +	to->clkevt.set_next_event = stm32_clock_event_set_next_event;
-> +
-> +	to->of_irq.handler = stm32_clock_event_handler;
-> +
-> +	ret = timer_of_init(node, to);
-> +	if (ret)
-> +		return ret;
-
-I don't know if we should keep some "err_*" labels at the end of the 
-function, but here there probably should a "kfree(to)" before returning.
-
-Otherwise the patch looks fine to me.
-
-Cheers,
-
--- 
-Julien Thierry
+> > >  Example:
+> > >  
+> > >  ina220 at 44 {
+> > >  	compatible = "ti,ina220";
+> > >  	reg = <0x44>;
+> > >  	shunt-resistor = <1000>;
+> > > +	ti-max-expected-current-microamp = <3000>;
+> > >  };
+> > > diff --git a/Documentation/hwmon/ina2xx b/Documentation/hwmon/ina2xx
+> > > index cfd31d9..30620e8 100644
+> > > --- a/Documentation/hwmon/ina2xx
+> > > +++ b/Documentation/hwmon/ina2xx
+> > > @@ -55,6 +55,9 @@ The shunt value in micro-ohms can be set via platform data or device tree at
+> > >  compile-time or via the shunt_resistor attribute in sysfs at run-time. Please
+> > >  refer to the Documentation/devicetree/bindings/i2c/ina2xx.txt for bindings
+> > >  if the device tree is used.
+> > > +The max expected current value in miliamp can be set via platform data
+> > > +or device tree at compile-time or via currX_max attribute in sysfs
+> > > +at run-time.
+> > >  
+> > >  Additionally ina226 supports update_interval attribute as described in
+> > >  Documentation/hwmon/sysfs-interface. Internally the interval is the sum of
+> > > -- 
+> > > 2.7.4
+> > >   
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
