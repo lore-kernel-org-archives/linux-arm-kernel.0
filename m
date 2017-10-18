@@ -1,215 +1,287 @@
-From: tnowicki@caviumnetworks.com (Tomasz Nowicki)
-Date: Wed, 18 Oct 2017 12:24:35 +0200
-Subject: [PATCH v3 1/7] ACPI/PPTT: Add Processor Properties Topology Table
- parsing
-In-Reply-To: <4ee4af4d-d987-33f9-4d55-67bfede3ebfa@caviumnetworks.com>
-References: <20171012194856.13844-1-jeremy.linton@arm.com>
- <20171012194856.13844-2-jeremy.linton@arm.com>
- <38c63cfd-4c13-9461-0d4a-74b0943be0fd@semihalf.com>
- <2ce92b90-fc2c-3fff-a3e3-b9517057ab2c@arm.com>
- <4ee4af4d-d987-33f9-4d55-67bfede3ebfa@caviumnetworks.com>
-Message-ID: <ed7f2e82-1e9b-9f46-89af-4e638275355d@caviumnetworks.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 18 Oct 2017 11:26:16 +0100
+Subject: [PATCH v5 2/2] acpi: apei: Add SEI notification type support
+ for ARMv8
+In-Reply-To: <1508227341-15651-2-git-send-email-gengdongjiu@huawei.com>
+References: <1508227341-15651-1-git-send-email-gengdongjiu@huawei.com>
+ <1508227341-15651-2-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <59E72C48.1060002@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.10.2017 07:39, Tomasz Nowicki wrote:
-> Hi,
-> 
-> On 17.10.2017 17:22, Jeremy Linton wrote:
->> Hi,
->>
->> On 10/17/2017 08:25 AM, Tomasz Nowicki wrote:
->>> Hi Jeremy,
->>>
->>> I did second round of review and have some more comments, please see 
->>> below:
->>>
->>> On 12.10.2017 21:48, Jeremy Linton wrote:
->>>> ACPI 6.2 adds a new table, which describes how processing units
->>>> are related to each other in tree like fashion. Caches are
->>>> also sprinkled throughout the tree and describe the properties
->>>> of the caches in relation to other caches and processing units.
->>>>
->>>> Add the code to parse the cache hierarchy and report the total
->>>> number of levels of cache for a given core using
->>>> acpi_find_last_cache_level() as well as fill out the individual
->>>> cores cache information with cache_setup_acpi() once the
->>>> cpu_cacheinfo structure has been populated by the arch specific
->>>> code.
->>>>
->>>> Further, report peers in the topology using setup_acpi_cpu_topology()
->>>> to report a unique ID for each processing unit at a given level
->>>> in the tree. These unique id's can then be used to match related
->>>> processing units which exist as threads, COD (clusters
->>>> on die), within a given package, etc.
->>>>
->>>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
->>>> ---
->>>> ? drivers/acpi/pptt.c | 485 
->>>> ++++++++++++++++++++++++++++++++++++++++++++++++++++
->>>> ? 1 file changed, 485 insertions(+)
->>>> ? create mode 100644 drivers/acpi/pptt.c
->>>>
->>>> diff --git a/drivers/acpi/pptt.c b/drivers/acpi/pptt.c
->>>> new file mode 100644
->>>> index 000000000000..c86715fed4a7
->>>> --- /dev/null
->>>> +++ b/drivers/acpi/pptt.c
->>>> @@ -0,1 +1,485 @@
->>>> +/*
->>>> + * Copyright (C) 2017, ARM
->>>> + *
->>>> + * This program is free software; you can redistribute it and/or 
->>>> modify it
->>>> + * under the terms and conditions of the GNU General Public License,
->>>> + * version 2, as published by the Free Software Foundation.
->>>> + *
->>>> + * This program is distributed in the hope it will be useful, but 
->>>> WITHOUT
->>>> + * ANY WARRANTY; without even the implied warranty of 
->>>> MERCHANTABILITY or
->>>> + * FITNESS FOR A PARTICULAR PURPOSE.? See the GNU General Public 
->>>> License for
->>>> + * more details.
->>>> + *
->>>> + * This file implements parsing of Processor Properties Topology 
->>>> Table (PPTT)
->>>> + * which is optionally used to describe the processor and cache 
->>>> topology.
->>>> + * Due to the relative pointers used throughout the table, this 
->>>> doesn't
->>>> + * leverage the existing subtable parsing in the kernel.
->>>> + */
->>>> +#define pr_fmt(fmt) "ACPI PPTT: " fmt
->>>> +
->>>> +#include <linux/acpi.h>
->>>> +#include <linux/cacheinfo.h>
->>>> +#include <acpi/processor.h>
->>>> +
->>>> +/*
->>>> + * Given the PPTT table, find and verify that the subtable entry
->>>> + * is located within the table
->>>> + */
->>>> +static struct acpi_subtable_header *fetch_pptt_subtable(
->>>> +??? struct acpi_table_header *table_hdr, u32 pptt_ref)
->>>> +{
->>>> +??? struct acpi_subtable_header *entry;
->>>> +
->>>> +??? /* there isn't a subtable at reference 0 */
->>>> +??? if (!pptt_ref)
->>>> +??????? return NULL;
->>>> +
->>>> +??? if (pptt_ref + sizeof(struct acpi_subtable_header) > 
->>>> table_hdr->length)
->>>> +??????? return NULL;
->>>> +
->>>> +??? entry = (struct acpi_subtable_header *)((u8 *)table_hdr + 
->>>> pptt_ref);
->>>> +
->>>> +??? if (pptt_ref + entry->length > table_hdr->length)
->>>> +??????? return NULL;
->>>> +
->>>> +??? return entry;
->>>> +}
->>>> +
->>>> +static struct acpi_pptt_processor *fetch_pptt_node(
->>>> +??? struct acpi_table_header *table_hdr, u32 pptt_ref)
->>>> +{
->>>> +??? return (struct acpi_pptt_processor 
->>>> *)fetch_pptt_subtable(table_hdr, pptt_ref);
->>>> +}
->>>> +
->>>> +static struct acpi_pptt_cache *fetch_pptt_cache(
->>>> +??? struct acpi_table_header *table_hdr, u32 pptt_ref)
->>>> +{
->>>> +??? return (struct acpi_pptt_cache *)fetch_pptt_subtable(table_hdr, 
->>>> pptt_ref);
->>>> +}
->>>> +
->>>> +static struct acpi_subtable_header *acpi_get_pptt_resource(
->>>> +??? struct acpi_table_header *table_hdr,
->>>> +??? struct acpi_pptt_processor *node, int resource)
->>>> +{
->>>> +??? u32 ref;
->>>> +
->>>> +??? if (resource >= node->number_of_priv_resources)
->>>> +??????? return NULL;
->>>> +
->>>> +??? ref = *(u32 *)((u8 *)node + sizeof(struct acpi_pptt_processor) +
->>>> +????????????? sizeof(u32) * resource);
->>>> +
->>>> +??? return fetch_pptt_subtable(table_hdr, ref);
->>>> +}
->>>> +
->>>> +/*
->>>> + * given a pptt resource, verify that it is a cache node, then walk
->>>> + * down each level of caches, counting how many levels are found
->>>> + * as well as checking the cache type (icache, dcache, unified). If a
->>>> + * level & type match, then we set found, and continue the search.
->>>> + * Once the entire cache branch has been walked return its max
->>>> + * depth.
->>>> + */
->>>> +static int acpi_pptt_walk_cache(struct acpi_table_header *table_hdr,
->>>> +??????????????? int local_level,
->>>> +??????????????? struct acpi_subtable_header *res,
->>>> +??????????????? struct acpi_pptt_cache **found,
->>>> +??????????????? int level, int type)
->>>> +{
->>>> +??? struct acpi_pptt_cache *cache;
->>>> +
->>>> +??? if (res->type != ACPI_PPTT_TYPE_CACHE)
->>>> +??????? return 0;
->>>> +
->>>> +??? cache = (struct acpi_pptt_cache *) res;
->>>> +??? while (cache) {
->>>> +??????? local_level++;
->>>> +
->>>> +??????? if ((local_level == level) &&
->>>> +??????????? (cache->flags & ACPI_PPTT_CACHE_TYPE_VALID) &&
->>>> +??????????? ((cache->attributes & ACPI_PPTT_MASK_CACHE_TYPE) == 
->>>> type)) {
->>>
->>> Attributes have to be shifted:
->>>
->>> (cache->attributes & ACPI_PPTT_MASK_CACHE_TYPE) >> 2
->>
->> Hmmm, I'm not sure that is true, the top level function in this 
->> routine convert the "linux" constant to the ACPI version of that 
->> constant. In that case the "type" field is pre-shifted, so that it 
->> matches the result of just anding against the field... That is unless 
->> I messed something up, which I don't see at the moment (and the code 
->> of course has been tested with PPTT's from multiple people at this 
->> point).
-> 
-> For ThunderX2 I got lots of errors in dmesg:
-> Found duplicate cache level/type unable to determine uniqueness
-> 
-> So I fixed "type" macros definitions (without shifting) and shift it 
-> here which fixes the issue. As you said, it can be pre-shifted as well.
-> 
->>
->>
->>>
->>>> +??????????? if (*found != NULL)
->>>> +??????????????? pr_err("Found duplicate cache level/type unable to 
->>>> determine uniqueness\n");
+Hi Dongjiu Geng,
 
-Actually I still see this error messages in my dmesg. It is because the 
-following ThunderX2 per-core L1 and L2 cache hierarchy:
+On 17/10/17 09:02, Dongjiu Geng wrote:
+> ARMv8.2 requires implementation of the RAS extension, in
+> this extension it adds SEI(SError Interrupt) notification
+> type, this patch adds new GHES error source SEI handling
+> functions.
 
-Core
-  ------------------
-|                  |
-| L1i -----        |
-|         |        |
-|          ----L2  |
-|         |        |
-| L1d -----        |
-|                  |
-  ------------------
+This paragraph is merging two things that aren't related.
+The 'ARM v8.2 architecture extensions' have some RAS bits, which if your CPU
+implements v8.2 are required.
 
-In this case we have two paths which lead to L2 cache and hit above 
-case. Is it really error case?
+ACPIv6.1 added NOTIFY_SEI as a notification type for ARMv8 systems.
+
+This patch adds a GHES function for NOTIFY_SEI. Please leave the CPU RAS
+extensions out of it.
+
+
+> Because this error source parsing and handling
+> methods are similar with the SEA. So share some SEA handling
+> functions with the SEI
+> 
+> Expose one API ghes_notify_abort() to external users. External
+> modules can call this exposed API to parse and handle the
+> SEA or SEI.
+
+This series doesn't add a caller/user for this new API, so why do we need to do
+this now?
+
+(I still haven't had a usable answer for 'what does your firmware do when SError
+is masked', but I'll go beat that drum on the other thread).
+
+
+More important for the APEI code is: How do SEA and SEI interact?
+
+As far as I can see they can both interrupt each other, which isn't something
+the single in_nmi() path in APEI can handle. I thinks we should fix this first.
+(I'll try and polish my RFC that had a stab at that...)
+
+
+SEA gets away with a lot of things because its synchronous. SEI isn't. Xie XiuQi
+pointed to the memory_failure_queue() code. We can use this directly from SEA,
+but not SEI. (what happens if an SError arrives while we are queueing
+memory_failure work from an IRQ).
+
+The one that scares me is the trace-point reporting stuff. What happens if an
+SError arrives while we are enabling a trace point? (these are static-keys right?)
+
+
+I don't think we can just plumb SEI in like this and be done with it.
+(I'm looking at teasing out the estatus cache code from being x86:NMI only. This
+way we solve the same 'cant do this from NMI context' with the same code'.)
+
 
 Thanks,
-Tomasz
+
+James
+
+
+
+boring nits below:
+
+> Note: For the SEI(SError Interrupt), it is asynchronous external
+> abort, the error address recorded by firmware may be not accurate.
+> If not accurate, EL3 firmware needs to identify the address to a
+> invalid value.
+
+This paragraph keeps cropping up. Who expects an address with an SError?
+We don't get one for IRQs, but that never needs stating.
+
+
+> Cc: Borislav Petkov <bp@suse.de>
+> Cc: James Morse <james.morse@arm.com>
+> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+> Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
+
+> Tested-by: Dongjiu Geng <gengdongjiu@huawei.com>
+
+(It's expected you test your own code)
+
+
+
+> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> index 2509e4f..c98c1b3 100644
+> --- a/arch/arm64/mm/fault.c
+> +++ b/arch/arm64/mm/fault.c
+> @@ -585,7 +585,7 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+>  		if (interrupts_enabled(regs))
+>  			nmi_enter();
+>  
+> -		ret = ghes_notify_sea();
+> +		ret = ghes_notify_abort(ACPI_HEST_NOTIFY_SEA);
+>  
+>  		if (interrupts_enabled(regs))
+>  			nmi_exit();
+> @@ -682,7 +682,7 @@ int handle_guest_sea(phys_addr_t addr, unsigned int esr)
+>  	int ret = -ENOENT;
+>  
+>  	if (IS_ENABLED(CONFIG_ACPI_APEI_SEA))
+> -		ret = ghes_notify_sea();
+> +		ret = ghes_notify_abort(ACPI_HEST_NOTIFY_SEA);
+>  
+>  	return ret;
+>  }
+> diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
+> index de14d49..47fcb0c 100644
+> --- a/drivers/acpi/apei/Kconfig
+> +++ b/drivers/acpi/apei/Kconfig
+> @@ -54,6 +54,21 @@ config ACPI_APEI_SEA
+>  	  option allows the OS to look for such hardware error record, and
+>  	  take appropriate action.
+>  
+> +config ACPI_APEI_SEI
+> +	bool "APEI Asynchronous SError Interrupt logging/recovering support"
+> +	depends on ARM64 && ACPI_APEI_GHES
+> +	default y
+> +	help
+> +	  This option should be enabled if the system supports
+> +	  firmware first handling of SEI (asynchronous SError interrupt).
+> +
+> +	  SEI happens with asynchronous external abort for errors on device
+> +	  memory reads on ARMv8 systems. If a system supports firmware first
+> +	  handling of SEI, the platform analyzes and handles hardware error
+> +	  notifications from SEI, and it may then form a HW error record for
+> +	  the OS to parse and handle. This option allows the OS to look for
+> +	  such hardware error record, and take appropriate action.
+> +
+>  config ACPI_APEI_MEMORY_FAILURE
+>  	bool "APEI memory error recovering support"
+>  	depends on ACPI_APEI && MEMORY_FAILURE
+> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+> index 3eee30a..24b4233 100644
+> --- a/drivers/acpi/apei/ghes.c
+> +++ b/drivers/acpi/apei/ghes.c
+> @@ -815,43 +815,67 @@ static struct notifier_block ghes_notifier_hed = {
+>  
+>  #ifdef CONFIG_ACPI_APEI_SEA
+>  static LIST_HEAD(ghes_sea);
+> +#endif
+> +
+> +#ifdef CONFIG_ACPI_APEI_SEI
+> +static LIST_HEAD(ghes_sei);
+> +#endif
+>  
+> +#if defined(CONFIG_ACPI_APEI_SEA) || defined(CONFIG_ACPI_APEI_SEI)
+>  /*
+> - * Return 0 only if one of the SEA error sources successfully reported an error
+> - * record sent from the firmware.
+> + * Return 0 only if one of the SEA or SEI error sources successfully
+> + * reported an error record sent from the firmware.
+>   */
+> -int ghes_notify_sea(void)
+> +int ghes_notify_abort(u8 type)
+>  {
+>  	struct ghes *ghes;
+> +	struct list_head *head = NULL;
+>  	int ret = -ENOENT;
+>  
+> -	rcu_read_lock();
+> -	list_for_each_entry_rcu(ghes, &ghes_sea, list) {
+> -		if (!ghes_proc(ghes))
+> -			ret = 0;
+
+> +	if (type == ACPI_HEST_NOTIFY_SEA)
+> +		head = &ghes_sea;
+> +	else if (type == ACPI_HEST_NOTIFY_SEI)
+> +		head = &ghes_sei;
+
+Surely if I only have one of CONFIG_ACPI_APEI_SE{A,I} this can't be compiled.
+
+
+> +
+> +	if (head) {
+> +		rcu_read_lock();
+> +		list_for_each_entry_rcu(ghes, head, list) {
+> +			if (!ghes_proc(ghes))
+> +				ret = 0;
+> +		}
+> +		rcu_read_unlock();
+>  	}
+> -	rcu_read_unlock();
+>  	return ret;
+>  }
+>  
+> -static void ghes_sea_add(struct ghes *ghes)
+> +static void ghes_abort_add(struct ghes *ghes)
+>  {
+> -	mutex_lock(&ghes_list_mutex);
+> -	list_add_rcu(&ghes->list, &ghes_sea);
+> -	mutex_unlock(&ghes_list_mutex);
+> +	struct list_head *head = NULL;
+> +	u8 notify_type = ghes->generic->notify.type;
+> +
+
+> +	if (notify_type == ACPI_HEST_NOTIFY_SEA)
+> +		head = &ghes_sea;
+> +	else if (notify_type == ACPI_HEST_NOTIFY_SEI)
+> +		head = &ghes_sei;
+
+And here.
+
+
+> +
+> +	if (head) {
+> +		mutex_lock(&ghes_list_mutex);
+> +		list_add_rcu(&ghes->list, head);
+> +		mutex_unlock(&ghes_list_mutex);
+> +	}
+>  }
+>  
+> -static void ghes_sea_remove(struct ghes *ghes)
+> +static void ghes_abort_remove(struct ghes *ghes)
+>  {
+>  	mutex_lock(&ghes_list_mutex);
+>  	list_del_rcu(&ghes->list);
+>  	mutex_unlock(&ghes_list_mutex);
+>  	synchronize_rcu();
+>  }
+> -#else /* CONFIG_ACPI_APEI_SEA */
+> -static inline void ghes_sea_add(struct ghes *ghes) { }
+> -static inline void ghes_sea_remove(struct ghes *ghes) { }
+> -#endif /* CONFIG_ACPI_APEI_SEA */
+> +#else
+> +static inline void ghes_abort_add(struct ghes *ghes) { }
+> +static inline void ghes_abort_remove(struct ghes *ghes) { }
+> +#endif
+>  
+>  #ifdef CONFIG_HAVE_ACPI_APEI_NMI
+>  /*
+> @@ -1084,6 +1108,13 @@ static int ghes_probe(struct platform_device *ghes_dev)
+>  			goto err;
+>  		}
+>  		break;
+> +	case ACPI_HEST_NOTIFY_SEI:
+> +		if (!IS_ENABLED(CONFIG_ACPI_APEI_SEI)) {
+> +			pr_warn(GHES_PFX "Generic hardware error source: %d notified via SEI is not supported!\n",
+> +				generic->header.source_id);
+> +		goto err;
+> +	}
+> +	break;
+>  	case ACPI_HEST_NOTIFY_NMI:
+>  		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_NMI)) {
+>  			pr_warn(GHES_PFX "Generic hardware error source: %d notified via NMI interrupt is not supported!\n",
+> @@ -1153,7 +1184,8 @@ static int ghes_probe(struct platform_device *ghes_dev)
+>  		break;
+>  
+>  	case ACPI_HEST_NOTIFY_SEA:
+> -		ghes_sea_add(ghes);
+> +	case ACPI_HEST_NOTIFY_SEI:
+> +		ghes_abort_add(ghes);
+>  		break;
+>  	case ACPI_HEST_NOTIFY_NMI:
+>  		ghes_nmi_add(ghes);
+> @@ -1206,7 +1238,8 @@ static int ghes_remove(struct platform_device *ghes_dev)
+>  		break;
+>  
+>  	case ACPI_HEST_NOTIFY_SEA:
+> -		ghes_sea_remove(ghes);
+> +	case ACPI_HEST_NOTIFY_SEI:
+> +		ghes_abort_remove(ghes);
+>  		break;
+>  	case ACPI_HEST_NOTIFY_NMI:
+>  		ghes_nmi_remove(ghes);
+> diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
+> index 9061c5c..ec6f4ba 100644
+> --- a/include/acpi/ghes.h
+> +++ b/include/acpi/ghes.h
+> @@ -118,6 +118,6 @@ static inline void *acpi_hest_get_next(struct acpi_hest_generic_data *gdata)
+>  	     (void *)section - (void *)(estatus + 1) < estatus->data_length; \
+>  	     section = acpi_hest_get_next(section))
+>  
+> -int ghes_notify_sea(void);
+> +int ghes_notify_abort(u8 type);
+>  
+>  #endif /* GHES_H */
+> 
