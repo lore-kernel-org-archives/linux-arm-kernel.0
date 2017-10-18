@@ -1,135 +1,215 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Wed, 18 Oct 2017 19:23:55 +0900
-Subject: [PATCH net-next v2 1/2] dt-bindings: net: add DT bindings for
- Socionext UniPhier AVE
-In-Reply-To: <CAK7LNATkHsbr4cOh_F6u0Fznui3BFXfWJXgKwCk0EZANSmk0pg@mail.gmail.com>
-References: <1507854928-4357-2-git-send-email-hayashi.kunihiko@socionext.com>
- <CAK7LNATkHsbr4cOh_F6u0Fznui3BFXfWJXgKwCk0EZANSmk0pg@mail.gmail.com>
-Message-ID: <20171018192355.243B.4A936039@socionext.com>
+From: tnowicki@caviumnetworks.com (Tomasz Nowicki)
+Date: Wed, 18 Oct 2017 12:24:35 +0200
+Subject: [PATCH v3 1/7] ACPI/PPTT: Add Processor Properties Topology Table
+ parsing
+In-Reply-To: <4ee4af4d-d987-33f9-4d55-67bfede3ebfa@caviumnetworks.com>
+References: <20171012194856.13844-1-jeremy.linton@arm.com>
+ <20171012194856.13844-2-jeremy.linton@arm.com>
+ <38c63cfd-4c13-9461-0d4a-74b0943be0fd@semihalf.com>
+ <2ce92b90-fc2c-3fff-a3e3-b9517057ab2c@arm.com>
+ <4ee4af4d-d987-33f9-4d55-67bfede3ebfa@caviumnetworks.com>
+Message-ID: <ed7f2e82-1e9b-9f46-89af-4e638275355d@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 14 Oct 2017 01:41:12 +0900 <yamada.masahiro@socionext.com> wrote:
+On 18.10.2017 07:39, Tomasz Nowicki wrote:
+> Hi,
+> 
+> On 17.10.2017 17:22, Jeremy Linton wrote:
+>> Hi,
+>>
+>> On 10/17/2017 08:25 AM, Tomasz Nowicki wrote:
+>>> Hi Jeremy,
+>>>
+>>> I did second round of review and have some more comments, please see 
+>>> below:
+>>>
+>>> On 12.10.2017 21:48, Jeremy Linton wrote:
+>>>> ACPI 6.2 adds a new table, which describes how processing units
+>>>> are related to each other in tree like fashion. Caches are
+>>>> also sprinkled throughout the tree and describe the properties
+>>>> of the caches in relation to other caches and processing units.
+>>>>
+>>>> Add the code to parse the cache hierarchy and report the total
+>>>> number of levels of cache for a given core using
+>>>> acpi_find_last_cache_level() as well as fill out the individual
+>>>> cores cache information with cache_setup_acpi() once the
+>>>> cpu_cacheinfo structure has been populated by the arch specific
+>>>> code.
+>>>>
+>>>> Further, report peers in the topology using setup_acpi_cpu_topology()
+>>>> to report a unique ID for each processing unit at a given level
+>>>> in the tree. These unique id's can then be used to match related
+>>>> processing units which exist as threads, COD (clusters
+>>>> on die), within a given package, etc.
+>>>>
+>>>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+>>>> ---
+>>>> ? drivers/acpi/pptt.c | 485 
+>>>> ++++++++++++++++++++++++++++++++++++++++++++++++++++
+>>>> ? 1 file changed, 485 insertions(+)
+>>>> ? create mode 100644 drivers/acpi/pptt.c
+>>>>
+>>>> diff --git a/drivers/acpi/pptt.c b/drivers/acpi/pptt.c
+>>>> new file mode 100644
+>>>> index 000000000000..c86715fed4a7
+>>>> --- /dev/null
+>>>> +++ b/drivers/acpi/pptt.c
+>>>> @@ -0,1 +1,485 @@
+>>>> +/*
+>>>> + * Copyright (C) 2017, ARM
+>>>> + *
+>>>> + * This program is free software; you can redistribute it and/or 
+>>>> modify it
+>>>> + * under the terms and conditions of the GNU General Public License,
+>>>> + * version 2, as published by the Free Software Foundation.
+>>>> + *
+>>>> + * This program is distributed in the hope it will be useful, but 
+>>>> WITHOUT
+>>>> + * ANY WARRANTY; without even the implied warranty of 
+>>>> MERCHANTABILITY or
+>>>> + * FITNESS FOR A PARTICULAR PURPOSE.? See the GNU General Public 
+>>>> License for
+>>>> + * more details.
+>>>> + *
+>>>> + * This file implements parsing of Processor Properties Topology 
+>>>> Table (PPTT)
+>>>> + * which is optionally used to describe the processor and cache 
+>>>> topology.
+>>>> + * Due to the relative pointers used throughout the table, this 
+>>>> doesn't
+>>>> + * leverage the existing subtable parsing in the kernel.
+>>>> + */
+>>>> +#define pr_fmt(fmt) "ACPI PPTT: " fmt
+>>>> +
+>>>> +#include <linux/acpi.h>
+>>>> +#include <linux/cacheinfo.h>
+>>>> +#include <acpi/processor.h>
+>>>> +
+>>>> +/*
+>>>> + * Given the PPTT table, find and verify that the subtable entry
+>>>> + * is located within the table
+>>>> + */
+>>>> +static struct acpi_subtable_header *fetch_pptt_subtable(
+>>>> +??? struct acpi_table_header *table_hdr, u32 pptt_ref)
+>>>> +{
+>>>> +??? struct acpi_subtable_header *entry;
+>>>> +
+>>>> +??? /* there isn't a subtable at reference 0 */
+>>>> +??? if (!pptt_ref)
+>>>> +??????? return NULL;
+>>>> +
+>>>> +??? if (pptt_ref + sizeof(struct acpi_subtable_header) > 
+>>>> table_hdr->length)
+>>>> +??????? return NULL;
+>>>> +
+>>>> +??? entry = (struct acpi_subtable_header *)((u8 *)table_hdr + 
+>>>> pptt_ref);
+>>>> +
+>>>> +??? if (pptt_ref + entry->length > table_hdr->length)
+>>>> +??????? return NULL;
+>>>> +
+>>>> +??? return entry;
+>>>> +}
+>>>> +
+>>>> +static struct acpi_pptt_processor *fetch_pptt_node(
+>>>> +??? struct acpi_table_header *table_hdr, u32 pptt_ref)
+>>>> +{
+>>>> +??? return (struct acpi_pptt_processor 
+>>>> *)fetch_pptt_subtable(table_hdr, pptt_ref);
+>>>> +}
+>>>> +
+>>>> +static struct acpi_pptt_cache *fetch_pptt_cache(
+>>>> +??? struct acpi_table_header *table_hdr, u32 pptt_ref)
+>>>> +{
+>>>> +??? return (struct acpi_pptt_cache *)fetch_pptt_subtable(table_hdr, 
+>>>> pptt_ref);
+>>>> +}
+>>>> +
+>>>> +static struct acpi_subtable_header *acpi_get_pptt_resource(
+>>>> +??? struct acpi_table_header *table_hdr,
+>>>> +??? struct acpi_pptt_processor *node, int resource)
+>>>> +{
+>>>> +??? u32 ref;
+>>>> +
+>>>> +??? if (resource >= node->number_of_priv_resources)
+>>>> +??????? return NULL;
+>>>> +
+>>>> +??? ref = *(u32 *)((u8 *)node + sizeof(struct acpi_pptt_processor) +
+>>>> +????????????? sizeof(u32) * resource);
+>>>> +
+>>>> +??? return fetch_pptt_subtable(table_hdr, ref);
+>>>> +}
+>>>> +
+>>>> +/*
+>>>> + * given a pptt resource, verify that it is a cache node, then walk
+>>>> + * down each level of caches, counting how many levels are found
+>>>> + * as well as checking the cache type (icache, dcache, unified). If a
+>>>> + * level & type match, then we set found, and continue the search.
+>>>> + * Once the entire cache branch has been walked return its max
+>>>> + * depth.
+>>>> + */
+>>>> +static int acpi_pptt_walk_cache(struct acpi_table_header *table_hdr,
+>>>> +??????????????? int local_level,
+>>>> +??????????????? struct acpi_subtable_header *res,
+>>>> +??????????????? struct acpi_pptt_cache **found,
+>>>> +??????????????? int level, int type)
+>>>> +{
+>>>> +??? struct acpi_pptt_cache *cache;
+>>>> +
+>>>> +??? if (res->type != ACPI_PPTT_TYPE_CACHE)
+>>>> +??????? return 0;
+>>>> +
+>>>> +??? cache = (struct acpi_pptt_cache *) res;
+>>>> +??? while (cache) {
+>>>> +??????? local_level++;
+>>>> +
+>>>> +??????? if ((local_level == level) &&
+>>>> +??????????? (cache->flags & ACPI_PPTT_CACHE_TYPE_VALID) &&
+>>>> +??????????? ((cache->attributes & ACPI_PPTT_MASK_CACHE_TYPE) == 
+>>>> type)) {
+>>>
+>>> Attributes have to be shifted:
+>>>
+>>> (cache->attributes & ACPI_PPTT_MASK_CACHE_TYPE) >> 2
+>>
+>> Hmmm, I'm not sure that is true, the top level function in this 
+>> routine convert the "linux" constant to the ACPI version of that 
+>> constant. In that case the "type" field is pre-shifted, so that it 
+>> matches the result of just anding against the field... That is unless 
+>> I messed something up, which I don't see at the moment (and the code 
+>> of course has been tested with PPTT's from multiple people at this 
+>> point).
+> 
+> For ThunderX2 I got lots of errors in dmesg:
+> Found duplicate cache level/type unable to determine uniqueness
+> 
+> So I fixed "type" macros definitions (without shifting) and shift it 
+> here which fixes the issue. As you said, it can be pre-shifted as well.
+> 
+>>
+>>
+>>>
+>>>> +??????????? if (*found != NULL)
+>>>> +??????????????? pr_err("Found duplicate cache level/type unable to 
+>>>> determine uniqueness\n");
 
-> 2017-10-13 9:35 GMT+09:00 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>:
-> > DT bindings for the AVE ethernet controller found on Socionext's
-> > UniPhier platforms.
-> >
-> > Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> > Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
-> > ---
-> >  .../bindings/net/socionext,uniphier-ave4.txt       | 53 ++++++++++++++++++++++
-> >  1 file changed, 53 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
-> >
-> > diff --git a/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt b/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
-> > new file mode 100644
-> > index 0000000..25f4d92
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
-> > @@ -0,0 +1,53 @@
-> > +* Socionext AVE ethernet controller
-> > +
-> > +This describes the devicetree bindings for AVE ethernet controller
-> > +implemented on Socionext UniPhier SoCs.
-> > +
-> > +Required properties:
-> > + - compatible: Should be
-> > +       - "socionext,uniphier-pro4-ave4" : for Pro4 SoC
-> > +       - "socionext,uniphier-pxs2-ave4" : for PXs2 SoC
-> > +       - "socionext,uniphier-ld20-ave4" : for LD20 SoC
-> > +       - "socionext,uniphier-ld11-ave4" : for LD11 SoC
-> 
-> Nit.  LD11, LD20, in this order please.
+Actually I still see this error messages in my dmesg. It is because the 
+following ThunderX2 per-core L1 and L2 cache hierarchy:
 
-I'll fix it. And also the SoC-dependent structures of the driver.
+Core
+  ------------------
+|                  |
+| L1i -----        |
+|         |        |
+|          ----L2  |
+|         |        |
+| L1d -----        |
+|                  |
+  ------------------
 
-> > + - reg: Address where registers are mapped and size of region.
-> > + - interrupts: Should contain the MAC interrupt.
-> > + - phy-mode: See ethernet.txt in the same directory. Allow to choose
-> > +       "rgmii", "rmii", or "mii" according to the PHY.
-> > + - pinctrl-names: List of assigned state names, see pinctrl
-> > +       binding documentation.
-> > + - pinctrl-0: List of phandles to configure the GPIO pin,
-> 
-> 
-> configure the GPIO pin?
-> 
-> git-grep found this phrase.
-> 
-> 
-> $ git grep "List of phandles to configure the GPIO"
-> Documentation/devicetree/bindings/net/microchip,enc28j60.txt:-
-> pinctrl-0: List of phandles to configure the GPIO pin used as
-> interrupt line,
-> 
-> 
-> 
-> 
-> 
-> > +       see pinctrl binding documentation. Choose this appropriately
-> > +       according to phy-mode.
-> > +       - <&pinctrl_ether_rgmii> if phy-mode is "rgmii".
-> > +       - <&pinctrl_ether_rmii> if phy-mode is "rmii".
-> > +       - <&pinctrl_ether_mii> if phy-mode is "mii".
-> 
-> pinctrl_ether_rgmii is just a label
-> you just happened to write in your DT file.
-> 
-> This information is totally unrelated to hardware specification.
-> It is not stable, either.
+In this case we have two paths which lead to L2 cache and hit above 
+case. Is it really error case?
 
-Surely this driver is independent from the pinctrl.
-I'll remove the descriptions about the pinctrl.
-
-> > + - phy-handle: Should point to the external phy device.
-> > +       See ethernet.txt file in the same directory.
-> > + - mdio subnode: Should be device tree subnode with the following required
-> > +       properties:
-> > +       - #address-cells: Must be <1>.
-> > +       - #size-cells: Must be <0>.
-> > +       - reg: phy ID number, usually a small integer.
-> 
-> 
-> Are you talking about "Required subnode" in the "Required properties"?
-
-It might be confused description. The subnode is separated from the properties.
-
-> > +Optional properties:
-> > + - local-mac-address: See ethernet.txt in the same directory.
-
-In addition, I'll add "clocks" and "resets" according to another mail.
-
-> > +
-> > +Example:
-> > +
-> > +       ether: ethernet at 65000000 {
-> > +               compatible = "socionext,uniphier-ld20-ave4";
-> > +               reg = <0x65000000 0x8500>;
-> > +               interrupts = <0 66 4>;
-> > +               pinctrl-names = "default";
-> > +               pinctrl-0 = <&pinctrl_ether_rgmii>;
-> > +               phy-mode = "rgmii";
-> > +               phy-handle = <&ethphy>;
-> > +               local-mac-address = [00 00 00 00 00 00];
-> > +               mdio {
-> > +                       #address-cells = <1>;
-> > +                       #size-cells = <0>;
-> > +                       ethphy: ethphy at 1 {
-> > +                               reg = <1>;
-> > +                       };
-> > +               };
-> > +       };
-> > --
-> > 2.7.4
-> >
-> 
-> 
-> 
-> -- 
-> Best Regards
-> Masahiro Yamada
-
----
-Best Regards,
-Kunihiko Hayashi
+Thanks,
+Tomasz
