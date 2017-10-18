@@ -1,45 +1,65 @@
 From: briannorris@chromium.org (Brian Norris)
-Date: Tue, 17 Oct 2017 17:56:32 -0700
-Subject: [PATCH 1/3] Documentation/devicetree: Add pcie-reset-suspend
- property
-In-Reply-To: <20171017233904.GA65743@google.com>
-References: <20171012205220.130048-1-briannorris@chromium.org>
- <20171012205220.130048-2-briannorris@chromium.org>
- <20171013165152.GE25517@bhelgaas-glaptop.roam.corp.google.com>
- <20171017233904.GA65743@google.com>
-Message-ID: <CA+ASDXPNcoUE=F+TWsYpxw=e-NcPaqguSRb5fEYC+zoCCdvDvg@mail.gmail.com>
+Date: Tue, 17 Oct 2017 18:03:14 -0700
+Subject: [PATCH v6 1/3] PCI: rockchip: Add support for pcie wake irq
+In-Reply-To: <20171016200350.GH25517@bhelgaas-glaptop.roam.corp.google.com>
+References: <20171013195059.23865-1-jeffy.chen@rock-chips.com>
+ <20171013195059.23865-2-jeffy.chen@rock-chips.com>
+ <20171016200350.GH25517@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20171018010312.GB65743@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 4:39 PM, Brian Norris <briannorris@chromium.org> wrote:
-> On Fri, Oct 13, 2017 at 11:51:52AM -0500, Bjorn Helgaas wrote:
-> > If so, I really don't want to get involved in that, because that's an
-> > issue that needs to be resolved by the vendors and the PCI-SIG.  If we
->
-> Judging by conversations with these vendors, I can't really imagine them
-> proactively dealing with the PCI-SIG on this. Is that really what you
-> think will work best?
->
-> I personally believe deferring (i.e., ignoring) the problem will not
-> cause any change; badly behaved vendors will just do whatever suits
-> them, and system designers will have to figure it out somehow -- ACPI
-> systems will have platform-specific behavior hidden in firmware; device
-> tree systems will do whatever they want out of tree; and the rare device
-> tree system that gets upstream support will either have suboptimal power
-> management, or have to have these sorts of conversations again. None of
-> that puts pressure on an endpoint vendor to talk to the PCI-SIG.
+On Mon, Oct 16, 2017 at 03:03:50PM -0500, Bjorn Helgaas wrote:
+> On Sat, Oct 14, 2017 at 03:50:56AM +0800, Jeffy Chen wrote:
+> > Add support for PCIE_WAKE pin in rockchip pcie driver.
+> > 
+> > Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> > ---
+> > 
+> > Changes in v6:
+> > Fix device_init_wake error handling, and add some comments.
+> > 
+> > Changes in v5:
+> > Rebase
+> > 
+> > Changes in v3:
+> > Fix error handling
+> > 
+> > Changes in v2:
+> > Use dev_pm_set_dedicated_wake_irq
+> >         -- Suggested by Brian Norris <briannorris@chromium.com>
+> > 
+> >  drivers/pci/host/pcie-rockchip.c | 27 +++++++++++++++++++++------
+> >  1 file changed, 21 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
+> > index 9051c6c8fea4..268513b6c9c4 100644
+> > --- a/drivers/pci/host/pcie-rockchip.c
+> > +++ b/drivers/pci/host/pcie-rockchip.c
+...
+> > @@ -995,6 +996,17 @@ static int rockchip_pcie_setup_irq(struct rockchip_pcie *rockchip)
+> >  		return err;
+> >  	}
+> >  
+> > +	irq = platform_get_irq_byname(pdev, "wakeup");
+> > +	if (irq >= 0) {
+> > +		/* Must init wakeup before setting dedicated wakeup irq. */
+> > +		device_init_wakeup(dev, true);
+> > +		err = dev_pm_set_dedicated_wake_irq(dev, irq);
+> > +		if (err) {
+> > +			dev_err(dev, "failed to setup PCIe wakeup IRQ\n");
+> > +			device_init_wakeup(dev, false);
+> > +		}
+> > +	}
+> 
+> There's nothing Rockchip-specific here, so I'm hoping you can explore
+> putting this support in the PCI core, so any system that describes the
+> WAKE# connection in the DT can benefit.
 
-I'll add a little more to my claim about ACPI systems. I chatted a
-little more with another engineer on my team who has dealt with ACPI
-firmware for a few generations of Intel platforms. Even among the
-latest two platforms he dealt with, there have been two different
-sorts of chipset bugs (at the host/root complex side, not just the
-endpoint) that have yielded different decisions on how to handle
-PERST#. This was opaque to Linux though, since that's how system
-firmware rolls :)
+I guess it could work to look into pci_create_root_bus(), and
+do something like the following?
 
-I expect this will not be the last discrepancy on how to handle
-PERST#. And to my knowledge, none of the above initiated any
-discussion with the PCI-SIG.
+	if (IS_ENABLED(CONFIG_OF) && parent && parent->of_node)
+		... do OF parsing for generic features like WAKE# ...
 
 Brian
