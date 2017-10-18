@@ -1,30 +1,50 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Wed, 18 Oct 2017 20:27:00 +0800
-Subject: [PATCH v5 1/2] acpi: apei: remove the unused dead-code for
- SEA/NMI notification type
-In-Reply-To: <20171018101722.kce2tcvpd7xdpo46@pd.tnic>
-References: <1508227341-15651-1-git-send-email-gengdongjiu@huawei.com>
- <20171017164336.cedso3f35lpeam7f@pd.tnic>
- <642709ec-05d0-2ffd-0e2e-bcdd6b12281b@huawei.com>
- <20171018101722.kce2tcvpd7xdpo46@pd.tnic>
-Message-ID: <577d79ad-9357-ea40-63eb-1d2988642710@huawei.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 18 Oct 2017 14:28:04 +0200
+Subject: libbattery was Re: [RFC PATCH 5/5] power: generic-adc-battery:
+ Add capacity handling
+In-Reply-To: <20170908113231.GJ18365@amd>
+References: <1501620926-22669-1-git-send-email-marek.belisko@open-nandra.com>
+ <1501620926-22669-6-git-send-email-marek.belisko@open-nandra.com>
+ <20170829101147.debhadzyfrxhkrvt@earth>
+ <20170908113231.GJ18365@amd>
+Message-ID: <20171018122804.GA14376@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi!
 
-On 2017/10/18 18:17, Borislav Petkov wrote:
-> On Wed, Oct 18, 2017 at 11:04:28AM +0800, gengdongjiu wrote:
->> ARM does not have ACPI_HEST_NOTIFY_NMI notification, which should only
->> used by x86. In the code, I see those guards are never used.
-> Yeah, I see it now.
-
-Borislav/Rafael,
-  For this patch(the first one), whether it can be firstly applied?
-This patch is code clean and not related with the second one.
-For the second, I may discuss more with James.
-Thanks so much in advance.
-
+> > Without patch description: See Last Question in
+> > 
+> > Documentation/power/power_supply_class.txt
 > 
-> Thx.
+> ...should be done in libbattery, yet to be written. :-).
 > 
-> -- 
+> Do you have specific guidance what you'd like to see in libbattery?
+
+So I started something, it is at.
+
+https://github.com/pavelmachek/libbattery
+
+My battery on n900 is currently uncalibrated (and charging), still it
+gets some kind of estimation:
+
+Battery -1 %
+Seconds -1
+State 1
+Voltage 3.88 V
+Battery 63 %
+
+Of course, there's a lot more work to be done.
+
+Best regards,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171018/fb6dfa3d/attachment.sig>
