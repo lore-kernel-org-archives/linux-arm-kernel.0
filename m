@@ -1,52 +1,56 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Wed, 18 Oct 2017 17:47:18 +0200
-Subject: libbattery was Re: [RFC PATCH 5/5] power: generic-adc-battery:
- Add capacity handling
-In-Reply-To: <20171018132204.GD4394@atomide.com>
-References: <1501620926-22669-1-git-send-email-marek.belisko@open-nandra.com>
- <1501620926-22669-6-git-send-email-marek.belisko@open-nandra.com>
- <20170829101147.debhadzyfrxhkrvt@earth> <20170908113231.GJ18365@amd>
- <20171018122804.GA14376@amd>
- <61BFA8AF-657A-4AD7-A7AC-3E5DC3B7E83D@goldelico.com>
- <20171018132204.GD4394@atomide.com>
-Message-ID: <0C0901E1-23E8-4D04-B3A9-8314809A7A6B@goldelico.com>
+From: jim2101024@gmail.com (Jim Quinlan)
+Date: Wed, 18 Oct 2017 10:41:17 -0400
+Subject: [PATCH 5/9] PCI: host: brcmstb: add dma-ranges for inbound traffic
+In-Reply-To: <20171018065316.GA11183@lst.de>
+References: <1507761269-7017-1-git-send-email-jim2101024@gmail.com>
+ <1507761269-7017-6-git-send-email-jim2101024@gmail.com>
+ <589c04cb-061b-a453-3188-79324a02388e@arm.com>
+ <20171017081422.GA19475@lst.de>
+ <CANCKTBsCB+x2XgrND9AhRtxPkCXfps1nA+YymkZjKHOUZfjSHQ@mail.gmail.com>
+ <20171018065316.GA11183@lst.de>
+Message-ID: <CANCKTBv+yiCNsrnx3m+W9wPqC4NdKPZ2p=zLtSa8fX6v1rPcYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Oct 18, 2017 at 2:53 AM, Christoph Hellwig <hch@lst.de> wrote:
+> On Tue, Oct 17, 2017 at 12:11:55PM -0400, Jim Quinlan wrote:
+>> My understanding is that dma_pfn_offset is that it is a single
+>> constant offset from RAM, in our case, to map to PCIe space.
+>
+> Yes.
+>
+>> But in
+>> my commit message I detail how our PCIe controller presents memory
+>> with multiple regions with multiple different offsets. If an EP device
+>> maps to a region on the host memory, yes we can set the dma_pfn_offset
+>> for that device for that location within that range,.  But if the
+>> device then unmaps and allocates from another region with a different
+>> offset, it won't work.  If  I set dma_pfn_offset I have to assume that
+>> the device is using only one region of memory only, not more than one,
+>> and that it is not unmapping that region and mapping another (with a
+>> different offset).  Can I make those assumptions?
+>
+> No, we can't make that assumption unfortunately.  But how is your
+> code going to work if the mapping spans multiple of your translation
+> regions?
 
-> Am 18.10.2017 um 15:22 schrieb Tony Lindgren <tony@atomide.com>:
-> 
-> * H. Nikolaus Schaller <hns@goldelico.com> [171018 05:49]:
->>> Am 18.10.2017 um 14:28 schrieb Pavel Machek <pavel@ucw.cz>:
->>> 
->>> So I started something, it is at.
->>> 
->>> https://github.com/pavelmachek/libbattery
->>> 
->>> My battery on n900 is currently uncalibrated (and charging), still it
->>> gets some kind of estimation:
->>> 
->>> Battery -1 %
->>> Seconds -1
->>> State 1
->>> Voltage 3.88 V
->>> Battery 63 %
->>> 
->>> Of course, there's a lot more work to be done.
->> 
->> Nice start but not a solution to our problem.
->> 
->> Our problem is that people simply expect that for example https://packages.debian.org/wheezy/xfce/xfce4-battery-plugin
->> displays the battery percentage.
-> 
-> I think we could make things compatible with various battery apps by
-> having libbattery write back the capacity percentage and time remaining
-> to the kernel driver via sysfs or a dev entry. Then the kernel interface
-> can just display the data to whatever apps.
+That's what brcm_to_{pci,cpu} are for -- they keep a list of the
+dma-ranges given in the PCIe DT node, and translate from system memory
+addresses to pci-space addresses, and vice versa.  As long as people
+are using the DMA API it should work.  It works for all of the ARM,
+ARM64, and MIPS Broadcom systems I've tested, using eight different EP
+devices.  Note that I am not thrilled to be advocating this mechanism
+but it seemed the best alternative.
 
-Hm. That would be quite difficult to understand and maintain code.
-Why not have the kernel driver do the simple calculations (they do
-not need float) and provide the standard /sys/class/power attribute?
+>memorymaintiners
+> Also I really don't think the stacking of dma_ops as in this patch
+> is a good idea.  For MIPS you should do the variant suggested in
+> the patch description and hook into dma_to_phys/phys_to_dma helpers,
+> and for ARM/ARM64 you should talk to the maintainers on how they
+> want the translation integrated.
 
-BR,
-Nikolaus
+I would prefer that the same code work for all three architectures.
+What I would like from ARM/ARM64 is the ability to override
+phys_to_dma() and dma_to_phys(); I thought the chances of that being
+accepted would be slim.  But you are right, I should ask the
+maintainers.
