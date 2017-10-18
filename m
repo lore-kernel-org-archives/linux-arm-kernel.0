@@ -1,107 +1,47 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Wed, 18 Oct 2017 16:28:46 +0800
-Subject: [PATCH v6 5/7] soc: mediatek: pwrap: add MediaTek MT6380 as one slave
- of pwrap
+Date: Wed, 18 Oct 2017 16:28:42 +0800
+Subject: [PATCH v6 1/7] dt-bindings: arm: mediatek: add MT7622 string to the
+ PMIC wrapper doc
 In-Reply-To: <cover.1508313105.git.sean.wang@mediatek.com>
 References: <cover.1508313105.git.sean.wang@mediatek.com>
-Message-ID: <81b419e1b38a06326aac53bfe0de01fae54805a0.1508313105.git.sean.wang@mediatek.com>
+Message-ID: <e602c5e107693a02eababcf4356c87b746b9950e.1508313105.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-Add MediaTek MT6380 regulator becoming one of PMIC wrapper slave
-and also add extra new regmap_config of 32-bit mode for MT6380
-since old regmap_config of 16-bit mode can't be fit into the need.
-
 Signed-off-by: Chenglin Xu <chenglin.xu@mediatek.com>
-Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/soc/mediatek/mtk-pmic-wrap.c | 24 +++++++++++++++++++++---
- 1 file changed, 21 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/soc/mediatek/pwrap.txt | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-index e3398e3..45c3e44 100644
---- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-+++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-@@ -507,6 +507,7 @@ struct pmic_wrapper;
- struct pwrap_slv_type {
- 	const u32 *dew_regs;
- 	enum pmic_type type;
-+	const struct regmap_config *regmap;
- 	/* Flags indicating the capability for the target slave */
- 	u32 caps;
- 	/*
-@@ -1149,7 +1150,7 @@ static irqreturn_t pwrap_interrupt(int irqno, void *dev_id)
- 	return IRQ_HANDLED;
- }
+diff --git a/Documentation/devicetree/bindings/soc/mediatek/pwrap.txt b/Documentation/devicetree/bindings/soc/mediatek/pwrap.txt
+index 107700d..bf80e3f 100644
+--- a/Documentation/devicetree/bindings/soc/mediatek/pwrap.txt
++++ b/Documentation/devicetree/bindings/soc/mediatek/pwrap.txt
+@@ -19,6 +19,7 @@ IP Pairing
+ Required properties in pwrap device node.
+ - compatible:
+ 	"mediatek,mt2701-pwrap" for MT2701/7623 SoCs
++	"mediatek,mt7622-pwrap" for MT7622 SoCs
+ 	"mediatek,mt8135-pwrap" for MT8135 SoCs
+ 	"mediatek,mt8173-pwrap" for MT8173 SoCs
+ - interrupts: IRQ for pwrap in SOC
+@@ -36,9 +37,12 @@ Required properties in pwrap device node.
+ - clocks: Must contain an entry for each entry in clock-names.
  
--static const struct regmap_config pwrap_regmap_config = {
-+static const struct regmap_config pwrap_regmap_config16 = {
- 	.reg_bits = 16,
- 	.val_bits = 16,
- 	.reg_stride = 2,
-@@ -1158,9 +1159,19 @@ static const struct regmap_config pwrap_regmap_config = {
- 	.max_register = 0xffff,
- };
+ Optional properities:
+-- pmic: Mediatek PMIC MFD is the child device of pwrap
++- pmic: Using either MediaTek PMIC MFD as the child device of pwrap
+   See the following for child node definitions:
+   Documentation/devicetree/bindings/mfd/mt6397.txt
++  or the regulator-only device as the child device of pwrap, such as MT6380.
++  See the following definitions for such kinds of devices.
++  Documentation/devicetree/bindings/regulator/mt6380-regulator.txt
  
-+static const struct regmap_config pwrap_regmap_config32 = {
-+	.reg_bits = 32,
-+	.val_bits = 32,
-+	.reg_stride = 4,
-+	.reg_read = pwrap_regmap_read,
-+	.reg_write = pwrap_regmap_write,
-+	.max_register = 0xffff,
-+};
-+
- static const struct pwrap_slv_type pmic_mt6323 = {
- 	.dew_regs = mt6323_regs,
- 	.type = PMIC_MT6323,
-+	.regmap = &pwrap_regmap_config16,
- 	.caps = PWRAP_SLV_CAP_SPI | PWRAP_SLV_CAP_DUALIO |
- 		PWRAP_SLV_CAP_SECURITY,
- 	.pwrap_read = pwrap_read16,
-@@ -1170,6 +1181,7 @@ static const struct pwrap_slv_type pmic_mt6323 = {
- static const struct pwrap_slv_type pmic_mt6380 = {
- 	.dew_regs = NULL,
- 	.type = PMIC_MT6380,
-+	.regmap = &pwrap_regmap_config32,
- 	.caps = 0,
- 	.pwrap_read = pwrap_read32,
- 	.pwrap_write = pwrap_write32,
-@@ -1178,6 +1190,7 @@ static const struct pwrap_slv_type pmic_mt6380 = {
- static const struct pwrap_slv_type pmic_mt6397 = {
- 	.dew_regs = mt6397_regs,
- 	.type = PMIC_MT6397,
-+	.regmap = &pwrap_regmap_config16,
- 	.caps = PWRAP_SLV_CAP_SPI | PWRAP_SLV_CAP_DUALIO |
- 		PWRAP_SLV_CAP_SECURITY,
- 	.pwrap_read = pwrap_read16,
-@@ -1189,9 +1202,14 @@ static const struct of_device_id of_slave_match_tbl[] = {
- 		.compatible = "mediatek,mt6323",
- 		.data = &pmic_mt6323,
- 	}, {
-+		/* The MT6380 PMIC only implements a regulator, so we bind it
-+		 * directly instead of using a MFD.
-+		 */
-+		.compatible = "mediatek,mt6380-regulator",
-+		.data = &pmic_mt6380,
-+	}, {
- 		.compatible = "mediatek,mt6397",
- 		.data = &pmic_mt6397,
--	}, {
- 		/* sentinel */
- 	}
- };
-@@ -1372,7 +1390,7 @@ static int pwrap_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto err_out2;
- 
--	wrp->regmap = devm_regmap_init(wrp->dev, NULL, wrp, &pwrap_regmap_config);
-+	wrp->regmap = devm_regmap_init(wrp->dev, NULL, wrp, wrp->slave->regmap);
- 	if (IS_ERR(wrp->regmap)) {
- 		ret = PTR_ERR(wrp->regmap);
- 		goto err_out2;
+ Example:
+ 	pwrap: pwrap at 1000f000 {
 -- 
 2.7.4
