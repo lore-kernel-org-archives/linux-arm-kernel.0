@@ -1,159 +1,172 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 18 Oct 2017 15:04:26 +0100
-Subject: [PATCH v3 1/3] iommu/arm-smmu-v3: Use CMD_SYNC completion MSI
-In-Reply-To: <cover.1508334262.git.robin.murphy@arm.com>
-References: <cover.1508334262.git.robin.murphy@arm.com>
-Message-ID: <e3b7c629f3156f65cc682945ec57c11a098daa71.1508334262.git.robin.murphy@arm.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 18 Oct 2017 15:09:28 +0100
+Subject: [PATCH v4 3/5] reset: socfpga: use the reset-simple driver
+In-Reply-To: <1508334636.9874.4.camel@pengutronix.de>
+References: <20171017130306.881-1-p.zabel@pengutronix.de>
+ <20171017130306.881-4-p.zabel@pengutronix.de>
+ <ce77d20c-7d62-77c3-8c89-991eeb8d2405@arm.com>
+ <1508334636.9874.4.camel@pengutronix.de>
+Message-ID: <e1cbdfe1-dee6-7452-ad61-62cf74fa24f6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As an IRQ, the CMD_SYNC interrupt is not particularly useful, not least
-because we often need to wait for sync completion within someone else's
-IRQ handler anyway. However, when the SMMU is both coherent and supports
-MSIs, we can have a lot more fun by not using it as an interrupt at all.
-Following the example suggested in the architecture and using a write
-targeting normal memory, we can let callers wait on a status variable
-outside the lock instead of having to stall the entire queue or even
-touch MMIO registers. Since multiple sync commands are guaranteed to
-complete in order, a simple incrementing sequence count is all we need
-to unambiguously support any realistic number of overlapping waiters.
+Hi,
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+On 18/10/17 14:50, Philipp Zabel wrote:
+> On Wed, 2017-10-18 at 14:00 +0100, Andre Przywara wrote:
+>> Hi,
+> 
+> Thank you for the review.
+> 
+>> On 17/10/17 14:03, Philipp Zabel wrote:
+>>> Add reset line status readback, inverted status support, and socfpga
+>>> device tree quirks to the simple reset driver, and use it to replace
+>>> the socfpga driver.
+>>>
+>>> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+>>> ---
+>>> Changes since v3:
+>>>  - Rebased onto reset/next
+>>>  - Only warn about missing altr,modrst-offset property on socfpga
+>>> ---
+>>>  drivers/reset/Kconfig         |  10 +--
+>>>  drivers/reset/Makefile        |   1 -
+>>>  drivers/reset/reset-simple.c  |  51 +++++++++++++-
+>>>  drivers/reset/reset-simple.h  |   4 ++
+>>>  drivers/reset/reset-socfpga.c | 157 ------------------------------------------
+>>>  5 files changed, 56 insertions(+), 167 deletions(-)
+>>>  delete mode 100644 drivers/reset/reset-socfpga.c
+>>>
+> [...]
+>>> diff --git a/drivers/reset/reset-simple.c b/drivers/reset/reset-simple.c
+>>> index a5119457cec61..98ff0f924948e 100644
+>>> --- a/drivers/reset/reset-simple.c
+>>> +++ b/drivers/reset/reset-simple.c
+>>> @@ -68,25 +68,58 @@ static int reset_simple_deassert(struct reset_controller_dev *rcdev,
+>>>  	return reset_simple_update(rcdev, id, false);
+>>>  }
+>>>  
+>>> +static int reset_simple_status(struct reset_controller_dev *rcdev,
+>>> +			       unsigned long id)
+>>> +{
+>>> +	struct reset_simple_data *data = to_reset_simple_data(rcdev);
+>>> +	int reg_width = sizeof(u32);
+>>> +	int bank = id / (reg_width * BITS_PER_BYTE);
+>>> +	int offset = id % (reg_width * BITS_PER_BYTE);
+>>> +	u32 reg;
+>>> +
+>>> +	reg = readl(data->membase + (bank * reg_width));
+>>> +
+>>> +	return !(reg & BIT(offset)) ^ !data->status_active_low;
+>>> +}
+>>> +
+>>>  const struct reset_control_ops reset_simple_ops = {
+>>>  	.assert		= reset_simple_assert,
+>>>  	.deassert	= reset_simple_deassert,
+>>> +	.status		= reset_simple_status,
+>>>  };
+>>>  
+>>>  /**
+>>>   * struct reset_simple_devdata - simple reset controller properties
+>>> + * @reg_offset: offset between base address and first reset register.
+>>> + * @nr_resets: number of resets. If not set, default to resource size in bits.
+>>>   * @active_low: if true, bits are cleared to assert the reset. Otherwise, bits
+>>>   *              are set to assert the reset.
+>>> + * @status_active_low: if true, bits read back as cleared while the reset is
+>>> + *                     asserted. Otherwise, bits read back as set while the
+>>> + *                     reset is asserted.
+>>>   */
+>>>  struct reset_simple_devdata {
+>>> +	u32 reg_offset;
+>>> +	u32 nr_resets;
+>>>  	bool active_low;
+>>> +	bool status_active_low;
+>>> +};
+>>> +
+>>> +#define SOCFPGA_NR_BANKS	8
+>>> +
+>>> +static const struct reset_simple_devdata reset_simple_socfpga = {
+>>> +	.reg_offset = 0x10,
+> 
+> Here reset_simple_socfpga.reg_offset is set to the default of 0x10.
 
-v3:
- - Give sync_nr and sync_count some spatial separation
- - Document the non-overflow assumption
- - Use relaxed atomic increment
+Ah, right. Sorry, I missed that.
 
- drivers/iommu/arm-smmu-v3.c | 51 +++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 49 insertions(+), 2 deletions(-)
+> 
+>>> +	.nr_resets = SOCFPGA_NR_BANKS * 32,
+>>> +	.status_active_low = true,
+>>>  };
+>>>  
+>>>  static const struct reset_simple_devdata reset_simple_active_low = {
+>>>  	.active_low = true,
+>>> +	.status_active_low = true,
+>>>  };
+>>>  
+>>>  static const struct of_device_id reset_simple_dt_ids[] = {
+>>> +	{ .compatible = "altr,rst-mgr", .data = &reset_simple_socfpga },
+>>>  	{ .compatible = "allwinner,sun6i-a31-clock-reset",
+>>>  		.data = &reset_simple_active_low },
+>>>  	{ /* sentinel */ },
+>>> @@ -99,6 +132,7 @@ static int reset_simple_probe(struct platform_device *pdev)
+>>>  	struct reset_simple_data *data;
+>>>  	void __iomem *membase;
+>>>  	struct resource *res;
+>>> +	u32 reg_offset = 0;
+>>>  
+>>>  	devdata = of_device_get_match_data(dev);
+>>>  
+>>> @@ -118,8 +152,23 @@ static int reset_simple_probe(struct platform_device *pdev)
+>>>  	data->rcdev.ops = &reset_simple_ops;
+>>>  	data->rcdev.of_node = dev->of_node;
+>>>  
+>>> -	if (devdata)
+>>> +	if (devdata) {
+>>> +		reg_offset = devdata->reg_offset;
+> 
+> And here reg_offset is set to the default of 0x10 on socfpga.
+> 
+>>> +		if (devdata->nr_resets)
+>>> +			data->rcdev.nr_resets = devdata->nr_resets;
+>>>  		data->active_low = devdata->active_low;
+>>> +		data->status_active_low = devdata->status_active_low;
+>>> +	}
+>>> +
+>>> +	if (devdata == &reset_simple_socfpga &&
+>>
+>> Mmh, this pointer comparison looks a bit dodgy. Isn't
+>> of_device_is_compatible() the right solution here?
+> 
+> My thinking was, the of_device_is_compatible is already called inside
+> of_device_get_match_data, so why call it again and not reuse the result?
+> 
+>> Also semantically, as?the property is tied to a certain compatible
+>> string (and not to our data structure)?
+> 
+> I agree with this, though. I'll change this line to say:
+> 
+> +	if (of_device_is_compatible(dev->of_node, "altr,rst-mgr") &&
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index d8c2759ba9f2..83b76404e882 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -377,7 +377,16 @@
- 
- #define CMDQ_SYNC_0_CS_SHIFT		12
- #define CMDQ_SYNC_0_CS_NONE		(0UL << CMDQ_SYNC_0_CS_SHIFT)
-+#define CMDQ_SYNC_0_CS_IRQ		(1UL << CMDQ_SYNC_0_CS_SHIFT)
- #define CMDQ_SYNC_0_CS_SEV		(2UL << CMDQ_SYNC_0_CS_SHIFT)
-+#define CMDQ_SYNC_0_MSH_SHIFT		22
-+#define CMDQ_SYNC_0_MSH_ISH		(3UL << CMDQ_SYNC_0_MSH_SHIFT)
-+#define CMDQ_SYNC_0_MSIATTR_SHIFT	24
-+#define CMDQ_SYNC_0_MSIATTR_OIWB	(0xfUL << CMDQ_SYNC_0_MSIATTR_SHIFT)
-+#define CMDQ_SYNC_0_MSIDATA_SHIFT	32
-+#define CMDQ_SYNC_0_MSIDATA_MASK	0xffffffffUL
-+#define CMDQ_SYNC_1_MSIADDR_SHIFT	0
-+#define CMDQ_SYNC_1_MSIADDR_MASK	0xffffffffffffcUL
- 
- /* Event queue */
- #define EVTQ_ENT_DWORDS			4
-@@ -409,6 +418,7 @@
- /* High-level queue structures */
- #define ARM_SMMU_POLL_TIMEOUT_US	100
- #define ARM_SMMU_CMDQ_DRAIN_TIMEOUT_US	1000000 /* 1s! */
-+#define ARM_SMMU_SYNC_TIMEOUT_US	1000000 /* 1s! */
- 
- #define MSI_IOVA_BASE			0x8000000
- #define MSI_IOVA_LENGTH			0x100000
-@@ -504,6 +514,10 @@ struct arm_smmu_cmdq_ent {
- 		} pri;
- 
- 		#define CMDQ_OP_CMD_SYNC	0x46
-+		struct {
-+			u32			msidata;
-+			u64			msiaddr;
-+		} sync;
- 	};
- };
- 
-@@ -616,6 +630,7 @@ struct arm_smmu_device {
- 
- 	int				gerr_irq;
- 	int				combined_irq;
-+	atomic_t			sync_nr;
- 
- 	unsigned long			ias; /* IPA */
- 	unsigned long			oas; /* PA */
-@@ -634,6 +649,8 @@ struct arm_smmu_device {
- 
- 	struct arm_smmu_strtab_cfg	strtab_cfg;
- 
-+	u32				sync_count;
-+
- 	/* IOMMU core code handle */
- 	struct iommu_device		iommu;
- };
-@@ -878,7 +895,13 @@ static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
- 		}
- 		break;
- 	case CMDQ_OP_CMD_SYNC:
--		cmd[0] |= CMDQ_SYNC_0_CS_SEV;
-+		if (ent->sync.msiaddr)
-+			cmd[0] |= CMDQ_SYNC_0_CS_IRQ;
-+		else
-+			cmd[0] |= CMDQ_SYNC_0_CS_SEV;
-+		cmd[0] |= CMDQ_SYNC_0_MSH_ISH | CMDQ_SYNC_0_MSIATTR_OIWB;
-+		cmd[0] |= (u64)ent->sync.msidata << CMDQ_SYNC_0_MSIDATA_SHIFT;
-+		cmd[1] |= ent->sync.msiaddr & CMDQ_SYNC_1_MSIADDR_MASK;
- 		break;
- 	default:
- 		return -ENOENT;
-@@ -964,21 +987,44 @@ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
- 	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
- }
- 
-+/*
-+ * The difference between val and sync_idx is bounded by the maximum size of
-+ * a queue at 2^20 entries, so 32 bits is plenty for wrap-safe arithmetic.
-+ */
-+static int arm_smmu_sync_poll_msi(struct arm_smmu_device *smmu, u32 sync_idx)
-+{
-+	ktime_t timeout = ktime_add_us(ktime_get(), ARM_SMMU_SYNC_TIMEOUT_US);
-+	u32 val = smp_cond_load_acquire(&smmu->sync_count,
-+					(int)(VAL - sync_idx) >= 0 ||
-+					!ktime_before(ktime_get(), timeout));
-+
-+	return (int)(val - sync_idx) < 0 ? -ETIMEDOUT : 0;
-+}
-+
- static void arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
- {
- 	u64 cmd[CMDQ_ENT_DWORDS];
- 	unsigned long flags;
- 	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
-+	bool msi = (smmu->features & ARM_SMMU_FEAT_MSI) &&
-+		   (smmu->features & ARM_SMMU_FEAT_COHERENCY);
- 	struct arm_smmu_cmdq_ent ent = { .opcode = CMDQ_OP_CMD_SYNC };
- 	int ret;
- 
-+	if (msi) {
-+		ent.sync.msidata = atomic_inc_return_relaxed(&smmu->sync_nr);
-+		ent.sync.msiaddr = virt_to_phys(&smmu->sync_count);
-+	}
- 	arm_smmu_cmdq_build_cmd(cmd, &ent);
- 
- 	spin_lock_irqsave(&smmu->cmdq.lock, flags);
- 	arm_smmu_cmdq_insert_cmd(smmu, cmd);
--	ret = queue_poll_cons(&smmu->cmdq.q, true, wfe);
-+	if (!msi)
-+		ret = queue_poll_cons(&smmu->cmdq.q, true, wfe);
- 	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
- 
-+	if (msi)
-+		ret = arm_smmu_sync_poll_msi(smmu, ent.sync.msidata);
- 	if (ret)
- 		dev_err_ratelimited(smmu->dev, "CMD_SYNC timeout\n");
- }
-@@ -2156,6 +2202,7 @@ static int arm_smmu_init_structures(struct arm_smmu_device *smmu)
- {
- 	int ret;
- 
-+	atomic_set(&smmu->sync_nr, 0);
- 	ret = arm_smmu_init_queues(smmu);
- 	if (ret)
- 		return ret;
--- 
-2.13.4.dirty
+Yes, thank you, that is what I was after.
+
+> 
+> instead.
+> 
+>>> +	    of_property_read_u32(dev->of_node, "altr,modrst-offset",
+>>> +		dev_warn(dev,
+>>> +			 "missing altr,modrst-offset property, assuming 0x%x!\n",
+>>> +			 reg_offset);
+>>
+>> The existing driver falls back to 0x10 if no explicit property is found.
+>> Should we copy this here for compatibility reasons? We could simply use:
+>> "reg_offset = 0x10;" before the dev_warn().
+
+Giving the binding documentation a second look, I see that
+altr,modrst-offset is a *required* property. So shall we actually use
+the opportunity here to stop our too generous behaviour of "you are
+missing this required property, but let me fix this up for you anyway
+this (one more) time" and revert to a more strict return -ENODEV
+instead? Otherwise we just proliferate wrong DTs.
+Also this would remove this .reg_offset field from our struct.
+
+Cheers,
+Andre.
