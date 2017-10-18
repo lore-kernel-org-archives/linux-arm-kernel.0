@@ -1,45 +1,45 @@
-From: dja@axtens.net (Daniel Axtens)
-Date: Wed, 18 Oct 2017 11:24:43 +1100
-Subject: [PATCH v2 2/2] vgaarb: Factor out EFI and fallback default device
- selection
-In-Reply-To: <20171017120506.ervbnyjue55zn67b@phenom.ffwll.local>
-References: <20171013034338.14630.4766.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <20171013034729.14630.30419.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <871sm2y1h9.fsf@linkitivity.dja.id.au>
- <20171017120506.ervbnyjue55zn67b@phenom.ffwll.local>
-Message-ID: <878tg9i9pw.fsf@linkitivity.dja.id.au>
+From: briannorris@chromium.org (Brian Norris)
+Date: Tue, 17 Oct 2017 17:56:32 -0700
+Subject: [PATCH 1/3] Documentation/devicetree: Add pcie-reset-suspend
+ property
+In-Reply-To: <20171017233904.GA65743@google.com>
+References: <20171012205220.130048-1-briannorris@chromium.org>
+ <20171012205220.130048-2-briannorris@chromium.org>
+ <20171013165152.GE25517@bhelgaas-glaptop.roam.corp.google.com>
+ <20171017233904.GA65743@google.com>
+Message-ID: <CA+ASDXPNcoUE=F+TWsYpxw=e-NcPaqguSRb5fEYC+zoCCdvDvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
-
->> Initially I wondered if this info printk could be moved into
->> vga_arbiter_check_bridge_sharing(), but it's been separated out since
->> 3448a19da479b ("vgaarb: use bridges to control VGA routing where
->> possible."), and upon closer examination, it seems you can't be sure a
->> device doesn't share a bridge until the end of the process, so this is
->> indeed correct.
->> 
->> Everything else also looks good to me.
->> 
->> Reviewed-by: Daniel Axtens <dja@axtens.net>
+On Tue, Oct 17, 2017 at 4:39 PM, Brian Norris <briannorris@chromium.org> wrote:
+> On Fri, Oct 13, 2017 at 11:51:52AM -0500, Bjorn Helgaas wrote:
+> > If so, I really don't want to get involved in that, because that's an
+> > issue that needs to be resolved by the vendors and the PCI-SIG.  If we
 >
-> R-b for both patches? And ok with everyone if I pull this into drm-misc
-> for 4.15 (deadline is end of this week for feature-y stuff)?
-
-I had only intended it for patch 2, but I've now read over patch 1 to my
-satisfaction, so it too is:
-
-Reviewed-by: Daniel Axtens <dja@axtens.net>
-
-Thanks!
-
-Regards,
-Daniel
-
+> Judging by conversations with these vendors, I can't really imagine them
+> proactively dealing with the PCI-SIG on this. Is that really what you
+> think will work best?
 >
-> Thanks, Daniel
-> -- 
-> Daniel Vetter
-> Software Engineer, Intel Corporation
-> http://blog.ffwll.ch
+> I personally believe deferring (i.e., ignoring) the problem will not
+> cause any change; badly behaved vendors will just do whatever suits
+> them, and system designers will have to figure it out somehow -- ACPI
+> systems will have platform-specific behavior hidden in firmware; device
+> tree systems will do whatever they want out of tree; and the rare device
+> tree system that gets upstream support will either have suboptimal power
+> management, or have to have these sorts of conversations again. None of
+> that puts pressure on an endpoint vendor to talk to the PCI-SIG.
+
+I'll add a little more to my claim about ACPI systems. I chatted a
+little more with another engineer on my team who has dealt with ACPI
+firmware for a few generations of Intel platforms. Even among the
+latest two platforms he dealt with, there have been two different
+sorts of chipset bugs (at the host/root complex side, not just the
+endpoint) that have yielded different decisions on how to handle
+PERST#. This was opaque to Linux though, since that's how system
+firmware rolls :)
+
+I expect this will not be the last discrepancy on how to handle
+PERST#. And to my knowledge, none of the above initiated any
+discussion with the PCI-SIG.
+
+Brian
