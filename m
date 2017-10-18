@@ -1,180 +1,64 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 19 Oct 2017 00:16:50 +0300
-Subject: [PATCH 2/2 v2] drm: bridge: Add THS8134A/B support to dumb VGA DAC
-In-Reply-To: <20171017101904.22308-2-linus.walleij@linaro.org>
-References: <20171017101904.22308-1-linus.walleij@linaro.org>
- <20171017101904.22308-2-linus.walleij@linaro.org>
-Message-ID: <1896170.2c8n16LLNB@avalon>
+From: kdinh@apm.com (Khuong Dinh)
+Date: Wed, 18 Oct 2017 14:43:10 -0700
+Subject: [PATCH v4 pci 0/2] PCI/MSI: pci-xgene-msi: Enable MSI support in
+ ACPI boot for X-Gene v1
+In-Reply-To: <20171018092639.GD14820@red-moon>
+References: <1506448161-30961-1-git-send-email-kdinh@apm.com>
+ <CAAsHzqv-oQVNm-pNP4Q1KmiSmjaiFx1S4j8uCnij53Te3h8KKg@mail.gmail.com>
+ <20171017133807.GB948@red-moon>
+ <CAAsHzqsxMy8On5ThggTwYohqMCLEJTbA=b1LgUPiuKu9C+eHeQ@mail.gmail.com>
+ <20171018092639.GD14820@red-moon>
+Message-ID: <CAAsHzqvrdq91MQy2zuwzogZMOnf6zXs7XEeT1_++E5VssY-f3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Lorenzo,
 
-Thank you for the patch.
 
-On Tuesday, 17 October 2017 13:19:04 EEST Linus Walleij wrote:
-> This extends the dumb VGA DAC bridge to handle the THS8134A
-> and THS8134B VGA DACs in addition to those already handled.
-> 
-> The THS8134A, THS8134B and as it turns out also THS8135 need to
-> have data clocked out at the negative edge of the clock pulse,
-> since they clock it into the DAC at the positive edge (so by
-> then it needs to be stable) so we need some extra logic to flag
-> this on the connector to the driver.
-> 
-> The semantics of the flag DRM_BUS_FLAG_PIXDATA_NEGEDGE in
-> <drm/drm_connector.h> clearly indicates that this flag tells
-> when to *drive* the data, not when the receiver *reads* it,
-> so the TI variants needs to be handled like this.
-> 
-> Introduce a variant struct and contain the information there,
-> and add a bit of helpful comments about how this works so
-> people will get it right when adding new DACs or connectiong
-> new display drivers to DACs.
-> 
-> The fact that THS8135 might be working on some systems today
-> is probably due to the fact that the display driver cannot
-> configure when the data is clocked out and the electronics
-> have simply been designed around it so it works anyways.
-> 
-> The phenomenon is very real on the ARM reference designs using
-> PL111 where the hardware can control which edge to push out
-> the data.
-> 
-> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v1->v2:
-> - Alphabetize includes
-> - Use a u32 with the bus polarity flags and just encode the
->   polarity using the DRM define directly.
-> - Rename vendor_data to vendor_info.
-> - Simplify assignment of the flag as it is just a simple
->   u32 now.
-> - Probe all TI variants on the "ti,ths813x" wildcard for now,
->   we only need to know that the device is in this family to
->   set the clock edge flag right.
-> ---
->  drivers/gpu/drm/bridge/dumb-vga-dac.c | 51 +++++++++++++++++++++++++++++---
->  1 file changed, 47 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/bridge/dumb-vga-dac.c
-> b/drivers/gpu/drm/bridge/dumb-vga-dac.c index 831a606c4706..9cd19e4c33c9
-> 100644
-> --- a/drivers/gpu/drm/bridge/dumb-vga-dac.c
-> +++ b/drivers/gpu/drm/bridge/dumb-vga-dac.c
-> @@ -11,6 +11,7 @@
->   */
-> 
->  #include <linux/module.h>
-> +#include <linux/of_device.h>
->  #include <linux/of_graph.h>
->  #include <linux/regulator/consumer.h>
-> 
-> @@ -19,9 +20,18 @@
->  #include <drm/drm_crtc.h>
->  #include <drm/drm_crtc_helper.h>
-> 
-> +/**
-> + * struct vga_dac_info - characteristics of the DAC
-> + * @clk_edge_latch: this defines the clock edge latch for the variant
-> + */
-> +struct vga_dac_info {
-> +	u32 clk_edge_latch;
-> +};
-> +
->  struct dumb_vga {
->  	struct drm_bridge	bridge;
->  	struct drm_connector	connector;
-> +	struct vga_dac_info const *variant;
+On Wed, Oct 18, 2017 at 2:26 AM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> [removed unintended disclaimer]
+>
+> On Tue, Oct 17, 2017 at 10:45:35PM -0700, Khuong Dinh wrote:
+>> Hi Lorenzo,
+>>
+>> On Tue, Oct 17, 2017 at 6:38 AM, Lorenzo Pieralisi
+>> <lorenzo.pieralisi@arm.com> wrote:
+>> > Hi Khuong,
+>> >
+>> > On Mon, Oct 16, 2017 at 02:19:50PM -0700, Khuong Dinh wrote:
+>> >> Hi Lorenzo,
+>> >>   Do you have any comments for this patch?
+>> >
+>> > I'd have some comments but given that there are related issues with ACPI
+>> > probe ordering that Marc is trying to solve on his side - I will work
+>> > with him to see if we can accommodate changes that can solve this issue
+>> > too.
+>> >
+>> > Again - I recognize it is a complex problem (that is not even
+>> > contemplated by the current ACPI specs), we have to try to make
+>> > the solution as generic as we can to prevent reinventing the wheel
+>> > anytime a sligthly different issue (related to ACPI probe ordering)
+>> > comes up.
+>> >
+>> > Leave it to me (us) and I will get back to you on this.
+>>
+>> Thanks for helping to take care of the generic ACPI probe ordering issue.
+>> Given that the patch 'PCI/MSI: pci-xgene-msi: Enable MSI support in ACPI
+>> boot for X-Gene v1" adds only the ACPI ID, can you pull in this patch
+>> independently from the ACPI probe ordering issue?
+>
+> No. For two reasons:
+>
+> 1) It's Bjorn who decides whether that code can be merged or not, not me
+> 2) That patch sneaks in ACPI MSI support for X-gene v1 that depends on
+>    kernel link ordering. As soon as it is pulled in the mainline it
+>    creates a dependency on pseudo-working code that may break anytime
+>    and as I said many times before I am not willing to rely on that.
 
-Anything wrong with the usual order of keywords (const struct vga_dac_info 
-*variant) ?
+Thanks for your information. I got it.
+I look forward to hearing your updated information about this generic
+ACPI probe ordering issue.
 
->  	struct i2c_adapter	*ddc;
->  	struct regulator	*vdd;
-> @@ -55,7 +65,9 @@ static int dumb_vga_get_modes(struct drm_connector
-> *connector) }
-> 
->  	drm_mode_connector_update_edid_property(connector, edid);
-> -	return drm_add_edid_modes(connector, edid);
-> +	ret = drm_add_edid_modes(connector, edid);
-> +	connector->display_info.bus_flags |= vga->variant->clk_edge_latch;
 
-As far as I can tell drm_add_edid_modes() doesn't set bus_flags, so you could 
-keep the return live as-is and set the clock edge flag just before it.
-
-> +	return ret;
-> 
->  fallback:
->  	/*
-> @@ -67,6 +79,8 @@ static int dumb_vga_get_modes(struct drm_connector
-> *connector) /* And prefer a mode pretty much anyone can handle */
->  	drm_set_preferred_mode(connector, 1024, 768);
-> 
-> +	connector->display_info.bus_flags |= vga->variant->clk_edge_latch;
-> +
->  	return ret;
->  }
-> 
-> @@ -183,6 +197,7 @@ static int dumb_vga_probe(struct platform_device *pdev)
->  	if (!vga)
->  		return -ENOMEM;
->  	platform_set_drvdata(pdev, vga);
-> +	vga->variant = of_device_get_match_data(&pdev->dev);
-> 
->  	vga->vdd = devm_regulator_get_optional(&pdev->dev, "vdd");
->  	if (IS_ERR(vga->vdd)) {
-> @@ -226,10 +241,38 @@ static int dumb_vga_remove(struct platform_device
-> *pdev) return 0;
->  }
-> 
-> +static const struct vga_dac_info default_dac_variant = {
-> +	/*
-> +	 * These DACs read data on the negative edge. For example in the
-> +	 * ADV7123 datasheet (revision D, page 8) there is a timing diagram
-> +	 * making this clear. So consequently we need to latch the data
-> +	 * on the positive edge.
-> +	 */
-> +	.clk_edge_latch = DRM_BUS_FLAG_PIXDATA_POSEDGE,
-> +};
-> +
-> +static const struct vga_dac_info ti_ths_dac_variant = {
-> +	/*
-> +	 * The TI DACs read the data on the positive edge of the CLK,
-> +	 * so consequently we need to latch the data on the negative
-> +	 * edge.
-> +	 */
-> +	.clk_edge_latch = DRM_BUS_FLAG_PIXDATA_NEGEDGE,
-> +};
-> +
->  static const struct of_device_id dumb_vga_match[] = {
-> -	{ .compatible = "dumb-vga-dac" },
-> -	{ .compatible = "adi,adv7123" },
-> -	{ .compatible = "ti,ths8135" },
-
-You need to keep support for this compatible string for backward 
-compatibility.
-
-> +	{
-> +		.compatible = "dumb-vga-dac",
-> +		.data = &default_dac_variant,
-> +	},
-> +	{
-> +		.compatible = "adi,adv7123",
-> +		.data = &default_dac_variant,
-> +	},
-> +	{
-> +		.compatible = "ti,ths813x",
-> +		.data = &ti_ths_dac_variant,
-> +	},
->  	{},
->  };
->  MODULE_DEVICE_TABLE(of, dumb_vga_match);
-
--- 
-Regards,
-
-Laurent Pinchart
+> Lorenzo
