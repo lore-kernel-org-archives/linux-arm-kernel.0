@@ -1,84 +1,75 @@
-From: zhangshaokun@hisilicon.com (Zhangshaokun)
-Date: Wed, 18 Oct 2017 22:08:15 +0800
-Subject: [PATCH v5 3/6] perf: hisi: Add support for HiSilicon SoC L3C PMU
- driver
-In-Reply-To: <20171018135530.qo54qe36zplp4etp@lakrids.cambridge.arm.com>
-References: <1503389277-134131-1-git-send-email-zhangshaokun@hisilicon.com>
- <1503389277-134131-4-git-send-email-zhangshaokun@hisilicon.com>
- <20171017151657.fr4k63bynmc65woo@lakrids.cambridge.arm.com>
- <04e32a88-a719-9a4a-1f07-fb452e227297@hisilicon.com>
- <20171018135530.qo54qe36zplp4etp@lakrids.cambridge.arm.com>
-Message-ID: <2cf90805-e176-fe6f-2c37-59ce71c51781@hisilicon.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 18 Oct 2017 15:14:45 +0100
+Subject: [RFC PATCH 0/3] tty: amba-pl011: Decruft and streamline earlycon
+ output
+Message-ID: <1508336088-3948-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+This series avoids waiting for the UART transmitter to go idle in
+between every earlycon char written, and does some refactoring so that
+this change doesn't have to be implemented multiple times.
 
-Thanks for your further explanation.
+The initial motiviation for this is a performance issue encountered
+during Xen virtual UART development (see [1] and patch 3).
 
-On 2017/10/18 21:55, Mark Rutland wrote:
-> On Wed, Oct 18, 2017 at 09:33:30PM +0800, Zhangshaokun wrote:
->> On 2017/10/17 23:16, Mark Rutland wrote:
->>> On Tue, Aug 22, 2017 at 04:07:54PM +0800, Shaokun Zhang wrote:
->>>> +static int hisi_l3c_pmu_init_data(struct platform_device *pdev,
->>>> +				  struct hisi_pmu *l3c_pmu)
->>>> +{
->>>> +	unsigned long long id;
->>>> +	struct resource *res;
->>>> +	acpi_status status;
->>>> +	int cpu;
->>>> +
->>>> +	status = acpi_evaluate_integer(ACPI_HANDLE(&pdev->dev),
->>>> +				       "_UID", NULL, &id);
->>>> +	if (ACPI_FAILURE(status))
->>>> +		return -EINVAL;
->>>> +
->>>> +	l3c_pmu->id = id;
->>>> +
->>>> +	/*
->>>> +	 * Use the SCCL_ID and CCL_ID to identify the L3C PMU, while
->>>> +	 * SCCL_ID is in MPIDR[aff2] and CCL_ID is in MPIDR[aff1].
->>>> +	 */
->>>> +	if (device_property_read_u32(&pdev->dev, "hisilicon,scl-id",
->>>> +				     &l3c_pmu->sccl_id)) {
->>>> +		dev_err(&pdev->dev, "Can not read l3c sccl-id!\n");
->>>> +		return -EINVAL;
->>>> +	}
->>>> +
->>>> +	if (device_property_read_u32(&pdev->dev, "hisilicon,ccl-id",
->>>> +				     &l3c_pmu->ccl_id)) {
->>>> +		dev_err(&pdev->dev, "Can not read l3c ccl-id!\n");
->>>> +		return -EINVAL;
->>>> +	}
->>>> +
->>>> +	/* Initialise the associated cpumask of the PMU */
->>>> +	for_each_present_cpu(cpu)
->>>> +		smp_call_function_single(cpu, hisi_l3c_pmu_set_cpumask_by_ccl,
->>>> +					 (void *)l3c_pmu, 1);
-> 
->>> Rather than a proble-time smp_call_function_single(), can you follow the
->>> qcom l2's approach of associating CPUs with a PMU instance in the
->>> notifier? That will work even if CPUs are brought online very late.
->>
->> A good guidance, but HHA and DDRC PMUs are different from L3C PMU, the former
->> share the same SCCL and the latter share the same SCCL and CCL. I will
->> try to deal with this difference in online notifier.
-> 
-> FWIW, I think it makes sense for each PMU to have its own notifier
-> (perhaps with some shared code that each calls to do the migration).
-> 
-> I just want to avoid the smp_call_function_single() at probe time, as
-> that doesn't work in some cases.
-> 
+It's debatable whether this is Linux's responsibility or the
+responsibility of the virtual UART: this is a situation where the
+virtualised behaviour is inevitably so different from hardware that
+it's hard to make a ruling on exactly what behaviour is reasonable.
+The best course is probably to work around it on _both_ ends, in the
+interest of best interoperation.
 
-Got it, i shall update the hisi_pmu::associated_cpus only in online
-and offline notifiers.
+Currently amba-pl011 has two distinct earlycon implementations: a
+generic pl011 implementation and a quirked implementation that works
+around the lack of a usable BUSY status bit in QDF2400 SoCs.
 
-Thanks,
-Shaokun
+I don't like applying the same obscure fix in multiple places if I can
+avoid it, so I've had a go at unifying the earlycons here (patches 1-2).
 
-> Thanks,
-> Mark.
-> 
-> .
-> 
+
+I'd appreciate people's views, particularly on:
+
+ * (pl011) Whether to refactor harder: the caching of vendor->reg_offset
+   vendor->access_32b in uart_amba_port is convenient and avoids chasing
+   an extra pointer in the common case, but this the refactoring for the
+   earlycon case a bit ugly.  Maybe we can do better.
+
+ * (pl011, serial_core) Whether the new use of port->private_data will
+   conflict with existing code (no, AFAICT).
+
+ * (earlycon) Whether overriding port->iotype for 32-bit-only
+   implementations is the right thing to do.
+
+ * (earlycon) Whether there is some reason to drain the transmitter
+   after every char that I've overlooked.
+
+
+Currently I don't consider this to be a candidate for stable, but it
+could be backported.  Due to the steady quirkage churn in amba-pl011,
+it would be better to drop the refactoring stuff for backporting
+purposes.
+
+Testing:
+
+ * tested rather casually no ARM Juno r0 (real PL011) and the ARM VFP
+   Base Model (emulated PL011)
+
+ * *Not tested* on QDF2400, since I don't have access to one.
+   Someone probably ought to test that.
+
+
+[1] Re: [Xen-devel] [PATCH 26/27 v12] arm/xen: vpl011: Fix the slow
+early console SBSA UART output
+https://lists.xenproject.org/archives/html/xen-devel/2017-10/msg01949.html
+
+Dave Martin (3):
+  tty: amba-pl011: earlycon: Switch to relaxed I/O
+  tty: amba-pl011: earlycon: Unify earlycon backends
+  tty: amba-pl011: earlycon: Don't drain the transmitter after each char
+
+ drivers/tty/serial/amba-pl011.c | 108 +++++++++++++++++++++++-----------------
+ 1 file changed, 61 insertions(+), 47 deletions(-)
+
+-- 
+2.1.4
