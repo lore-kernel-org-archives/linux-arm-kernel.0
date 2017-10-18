@@ -1,138 +1,61 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Wed, 18 Oct 2017 19:25:45 +0800
-Subject: [arm-platforms:irq/irqchip-4.15 7/19]
- drivers/irqchip/irq-gic-v3.c:577:4: note: in expansion of macro 'pr_crit'
-Message-ID: <201710181942.2M01lPyt%fengguang.wu@intel.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 18 Oct 2017 13:28:30 +0200
+Subject: [PATCH/RFC 4/5] regulator: bd9571mwv: Add support for backup mode
+In-Reply-To: <20171018112419.3eqz34epcshxas3f@sirena.co.uk>
+References: <1507649178-31473-1-git-send-email-geert+renesas@glider.be>
+ <1507649178-31473-5-git-send-email-geert+renesas@glider.be>
+ <20171018110238.hjv7huiievhr5obs@sirena.co.uk>
+ <CAMuHMdU2PpiSftwnqHjb8uFpu5Huw7hpedk4cSzDY-eeKio_Dw@mail.gmail.com>
+ <20171018112419.3eqz34epcshxas3f@sirena.co.uk>
+Message-ID: <CAMuHMdWnJwMk5DrnAQebKB23X2WJGPQ2m-0OX8-AC2QYguTQ5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/irqchip-4.15
-head:   0beae24927562ef40a444409d2a9a0d162a18ae7
-commit: 0de6aeba71c72a84dfc47568fc68ec187ac4537c [7/19] irqchip/gicv3: Add support for Range Selector (RS) feature
-config: arm-multi_v7_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 0de6aeba71c72a84dfc47568fc68ec187ac4537c
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+Hi Mark,
 
-All warnings (new ones prefixed by >>):
+On Wed, Oct 18, 2017 at 1:24 PM, Mark Brown <broonie@kernel.org> wrote:
+> On Wed, Oct 18, 2017 at 01:19:08PM +0200, Geert Uytterhoeven wrote:
+>> On Wed, Oct 18, 2017 at 1:02 PM, Mark Brown <broonie@kernel.org> wrote:
+>> > On Tue, Oct 10, 2017 at 05:26:17PM +0200, Geert Uytterhoeven wrote:
+>> >> Backup mode is not enabled automatically, as e.g. on Renesas
+>> >> Salvator-X(S) boards enabling backup mode changes the role of the ACC
+>> >> switch from a power switch to a wake-up switch.  Hence enabling it
+>> >> prevents the board from being powered off using the ACC switch, which
+>> >> may confuse the user.
+>
+>> > This sounds an awful lot like the standard power/wakeup, though the
+>> > power change is a bit unexpected there.  I'm also wondering if it makes
+>> > sense to just only enable the wakeup mode when suspending which
+>> > preserves the power off functionality while also keeping the wakeup
+>> > support.
+>
+>> The ACC switch is not a momentary switch (push button), but a toggle
+>> switch with two positions.
+>> Hence you cannot enable wakeup mode while suspending, as the proper
+>> system suspend/resume procedure is:
+>>   1. Enable backup mode in the PMIC,
+>>   2. Switch ACC off (no-op as backup mode has been enabled),
+>>   3. Suspend to RAM (PSCI suspend) => system suspends,
+>>   4. Switch ACC on => system wakes up.
+>> If you would combine steps 1 and 3, you can no longer do step 2 in between.
+>
+>> Yes, it's complicated :-(
+>
+> I'm confused, I thought this was a physical switch but that's talking
+> about this as something software controlled (at least in step 2)?
 
-   In file included from include/linux/printk.h:6:0,
-                    from include/linux/kernel.h:13,
-                    from include/linux/list.h:8,
-                    from include/linux/resource_ext.h:17,
-                    from include/linux/acpi.h:26,
-                    from drivers/irqchip/irq-gic-v3.c:20:
-   drivers/irqchip/irq-gic-v3.c: In function 'gic_cpu_sys_reg_init':
->> include/linux/kern_levels.h:4:18: warning: format '%llx' expects argument of type 'long long unsigned int', but argument 5 has type 'u32 {aka unsigned int}' [-Wformat=]
-    #define KERN_SOH "\001"  /* ASCII Start Of Header */
-                     ^
-   include/linux/kern_levels.h:9:19: note: in expansion of macro 'KERN_SOH'
-    #define KERN_CRIT KERN_SOH "2" /* critical conditions */
-                      ^~~~~~~~
->> include/linux/printk.h:299:9: note: in expansion of macro 'KERN_CRIT'
-     printk(KERN_CRIT pr_fmt(fmt), ##__VA_ARGS__)
-            ^~~~~~~~~
->> drivers/irqchip/irq-gic-v3.c:577:4: note: in expansion of macro 'pr_crit'
-       pr_crit("CPU%d (%llx) can't SGI CPU%d (%llx), no RSS\n",
-       ^~~~~~~
+The ACC switch is a physical switch.
+Steps 1 and 3 are performed by software running on the board's SoC.
+Steps 2 and 4 are performed by the external user (human or remote board
+farm control hookup).
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
 --
-   In file included from include/linux/printk.h:6:0,
-                    from include/linux/kernel.h:13,
-                    from include/linux/list.h:8,
-                    from include/linux/resource_ext.h:17,
-                    from include/linux/acpi.h:26,
-                    from drivers//irqchip/irq-gic-v3.c:20:
-   drivers//irqchip/irq-gic-v3.c: In function 'gic_cpu_sys_reg_init':
->> include/linux/kern_levels.h:4:18: warning: format '%llx' expects argument of type 'long long unsigned int', but argument 5 has type 'u32 {aka unsigned int}' [-Wformat=]
-    #define KERN_SOH "\001"  /* ASCII Start Of Header */
-                     ^
-   include/linux/kern_levels.h:9:19: note: in expansion of macro 'KERN_SOH'
-    #define KERN_CRIT KERN_SOH "2" /* critical conditions */
-                      ^~~~~~~~
->> include/linux/printk.h:299:9: note: in expansion of macro 'KERN_CRIT'
-     printk(KERN_CRIT pr_fmt(fmt), ##__VA_ARGS__)
-            ^~~~~~~~~
-   drivers//irqchip/irq-gic-v3.c:577:4: note: in expansion of macro 'pr_crit'
-       pr_crit("CPU%d (%llx) can't SGI CPU%d (%llx), no RSS\n",
-       ^~~~~~~
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-vim +/pr_crit +577 drivers/irqchip/irq-gic-v3.c
-
-   529	
-   530	static void gic_cpu_sys_reg_init(void)
-   531	{
-   532		int i, cpu = smp_processor_id();
-   533		u64 mpidr = cpu_logical_map(cpu);
-   534		u64 need_rss = MPIDR_RS(mpidr);
-   535	
-   536		/*
-   537		 * Need to check that the SRE bit has actually been set. If
-   538		 * not, it means that SRE is disabled at EL2. We're going to
-   539		 * die painfully, and there is nothing we can do about it.
-   540		 *
-   541		 * Kindly inform the luser.
-   542		 */
-   543		if (!gic_enable_sre())
-   544			pr_err("GIC: unable to set SRE (disabled at EL2), panic ahead\n");
-   545	
-   546		/* Set priority mask register */
-   547		gic_write_pmr(DEFAULT_PMR_VALUE);
-   548	
-   549		/*
-   550		 * Some firmwares hand over to the kernel with the BPR changed from
-   551		 * its reset value (and with a value large enough to prevent
-   552		 * any pre-emptive interrupts from working at all). Writing a zero
-   553		 * to BPR restores is reset value.
-   554		 */
-   555		gic_write_bpr1(0);
-   556	
-   557		if (static_key_true(&supports_deactivate)) {
-   558			/* EOI drops priority only (mode 1) */
-   559			gic_write_ctlr(ICC_CTLR_EL1_EOImode_drop);
-   560		} else {
-   561			/* EOI deactivates interrupt too (mode 0) */
-   562			gic_write_ctlr(ICC_CTLR_EL1_EOImode_drop_dir);
-   563		}
-   564	
-   565		/* ... and let's hit the road... */
-   566		gic_write_grpen1(1);
-   567	
-   568		/* Keep the RSS capability status in per_cpu variable */
-   569		per_cpu(has_rss, cpu) = !!(gic_read_ctlr() & ICC_CTLR_EL1_RSS);
-   570	
-   571		/* Check all the CPUs have capable of sending SGIs to other CPUs */
-   572		for_each_online_cpu(i) {
-   573			bool have_rss = per_cpu(has_rss, i) && per_cpu(has_rss, cpu);
-   574	
-   575			need_rss |= MPIDR_RS(cpu_logical_map(i));
-   576			if (need_rss && (!have_rss))
- > 577				pr_crit("CPU%d (%llx) can't SGI CPU%d (%llx), no RSS\n",
-   578					cpu, mpidr, i, cpu_logical_map(i));
-   579		}
-   580	
-   581		/**
-   582		 * GIC spec says, when ICC_CTLR_EL1.RSS==1 and GICD_TYPER.RSS==0,
-   583		 * writing ICC_ASGI1R_EL1 register with RS != 0 is a CONSTRAINED
-   584		 * UNPREDICTABLE choice of :
-   585		 *   - The write is ignored.
-   586		 *   - The RS field is treated as 0.
-   587		 */
-   588		if (need_rss && (!gic_data.has_rss))
-   589			pr_crit_once("RSS is required but GICD doesn't support it\n");
-   590	}
-   591	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 42224 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171018/c08668b9/attachment-0001.gz>
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
