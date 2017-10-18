@@ -1,84 +1,98 @@
-From: rui.zhang@intel.com (Zhang Rui)
-Date: Wed, 18 Oct 2017 09:47:26 +0800
-Subject: linux-next: manual merge of the thermal tree with the imx-mxs tree
-In-Reply-To: <20171016091728.gbtoakghi4ndyyt2@sirena.co.uk>
-References: <20171016091728.gbtoakghi4ndyyt2@sirena.co.uk>
-Message-ID: <1508291246.2746.41.camel@intel.com>
+From: xieyisheng1@huawei.com (Yisheng Xie)
+Date: Wed, 18 Oct 2017 09:45:42 +0800
+Subject: [bug report & help] arm64: ltp testcase "migrate_pages01" failed
+In-Reply-To: <8d412c29-6dd7-126f-1460-23bdd3415816@huawei.com>
+References: <59E49B2B.8020802@huawei.com> <59E571ED.9090106@huawei.com>
+ <20171017092307.GB21398@arm.com>
+ <8d412c29-6dd7-126f-1460-23bdd3415816@huawei.com>
+Message-ID: <250b4ab9-e477-4873-0595-a6bbd0762205@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Mark,
+Hi Will,
 
-thanks for the fix.
+On 2017/10/17 21:19, Yisheng Xie wrote:
+> Hi Will,
+> 
+> On 2017/10/17 17:23, Will Deacon wrote:
+>> On Tue, Oct 17, 2017 at 10:58:53AM +0800, Tan Xiaojun wrote:
+>>> I'm not sure if this is the problem on arm64 numa. What do you think ?
+>>> By the way, this testcase can be successful in any case on x86.
+>>
+>> To be honest, this isn't a particularly helpful bug report. I appreciate
+>> that a test is reporting failure, but it doesn't look like you've spent
+>> very much effort to understand what the test is trying to do and why it
+>> thinks it's failed to do it. All I can sensibly do with your bug report
+>> is run the test myself, and it passes on the systems I have available.
+>>
+>> So, you need to:
+>>
+>> 1. Understand what the test is doing.
+>> 2. Figure out which bit isn't doing what it's supposed to
+>> 3. See if that part can be isolated to trigger the problem
+>>
+>> At that point, it should be possible to describe the unexpected behaviour
+>> at a level which we can actually investigate if necessary.
+> This test case is to test whether we should migrate successfully if user call
+> SYSC_migrate_pages with a invalid node. eg, we should 4 node 0-3, and try to
+> migrate to node 4. And this should return -EINVAL.
+> 
+> however, the kernel will migrate the memory to node 0 and return ok(e.g. 0).
+> The root cause is for
+> 	nodes_subset(*new, node_states[N_MEMORY])
+> 
+> will return true when new = 0x10 and node_states[N_MEMORY]=0xf, MAX_NUMNODES=4.
+> 
+> And this is common issue, and I also can reproduce at certain config on X86-64
+> e.g. CONFIG_NODES_SHIFT=3 and have 8 node in the system.
+> 
+> IMO, if nbits=4, 0x0 or 0x10, 0xFF..F0 should not a subset of anything, so following
+> patch may fix this problem:
 
-On Mon, 2017-10-16 at 10:17 +0100, Mark Brown wrote:
-> Hi Zhang,
-> 
-> Today's linux-next merge of the thermal tree got a conflict in:
-> 
-> ? arch/arm/boot/dts/imx6ul.dtsi
-> 
-> between commit:
-> 
-> ???efb9adb274754 ("ARM: dts: imx6ul: Remove leading zeroes from unit
-> addresses")
-> 
-> from the imx-mxs tree and commit:
-> 
-> ???1dc31d4981dd9 ("ARM: dts: imx6ul: Add imx6ul-tempmon")
-> 
-> from the thermal tree.
-> 
-> I fixed it up (see below) and can carry the fix as necessary. This
-> is now fixed as far as linux-next is concerned, but any non trivial
-> conflicts should be mentioned to your upstream maintainer when your
-> tree
-> is submitted for merging.??You may also want to consider cooperating
-> with the maintainer of the conflicting tree to minimise any
-> particularly
-> complex conflicts.??Usually DTS changes go through arm-soc to avoid
-> issues like this.
+Sorry for having made a mathematics mistake, for empty set should be subset of
+any set. Please forget about following patch, and I will send a new one with
+node_empty check in SYSC_migrate_pages.
 
-Shawn,
-
-https://patchwork.kernel.org/patch/9841191/
-https://patchwork.kernel.org/patch/9841193/
-Should I drop these two dts patches and leave them to you?
-
-thanks,
-rui
-
+Thanks
+Yisheng Xie
 > 
-> diff --cc arch/arm/boot/dts/imx6ul.dtsi
-> index 2057ee695a66,51717d54f285..000000000000
-> --- a/arch/arm/boot/dts/imx6ul.dtsi
-> +++ b/arch/arm/boot/dts/imx6ul.dtsi
-> @@@ -860,13 -869,23 +869,23 @@@
-> ??				reg = <0x021b0000 0x4000>;
-> ??			};
-> ??
-> ?-			ocotp: ocotp-ctrl at 021bc000 {
-> ?+			ocotp: ocotp-ctrl at 21bc000 {
-> +?				#address-cells = <1>;
-> +?				#size-cells = <1>;
-> ??				compatible = "fsl,imx6ul-ocotp",
-> "syscon";
-> ??				reg = <0x021bc000 0x4000>;
-> ??				clocks = <&clks IMX6UL_CLK_OCOTP>;
-> +?
-> +?				tempmon_calib: calib at 38 {
-> +?					reg = <0x38 4>;
-> +?				};
-> +?
-> +?				tempmon_temp_grade: temp-grade at 20 {
-> +?					reg = <0x20 4>;
-> +?				};
-> ??			};
-> ??
-> ?-			lcdif: lcdif at 021c8000 {
-> ?+			lcdif: lcdif at 21c8000 {
-> ??				compatible = "fsl,imx6ul-lcdif",
-> "fsl,imx28-lcdif";
-> ??				reg = <0x021c8000 0x4000>;
-> ??				interrupts = <GIC_SPI 5
-> IRQ_TYPE_LEVEL_HIGH>;
+> From: Yisheng Xie <xieyisheng1@huawei.com>
+> Date: Tue, 17 Oct 2017 20:53:55 +0800
+> Subject: [PATCH] bitmap: fix corner case of bitmap_subset
+> 
+> As Xiaojun reported the ltp of migrate_pages01 will failed in system
+> whoes has 4 node with CONFIG_NODES_SHIFT=2:
+> 
+> migrate_pages01    0  TINFO  :  test_invalid_nodes
+> migrate_pages01   14  TFAIL  :  migrate_pages_common.c:45: unexpected failure - returned value = 0, expected: -1
+> migrate_pages01   15  TFAIL  :  migrate_pages_common.c:55: call succeeded unexpectedly
+> 
+> and the root cause is
+> 	nodes_subset(*new, node_states[N_MEMORY])
+> 
+> will return true in the case like: new = 0x10 and node_states[N_MEMORY]=0xf,
+> MAX_NUMNODES=4.
+> 
+> Fix it by correct the corner case of bitmap_subset, which makes 0x0 or
+> 0x10, 0xFF..F0  not a subset of bitmap when bitmap lenth is 4.
+> 
+> Reported-by: Tan Xiaojun <tanxiaojun@huawei.com>
+> Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
+> ---
+>  include/linux/bitmap.h | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/include/linux/bitmap.h b/include/linux/bitmap.h
+> index 700cf5f..bc66978 100644
+> --- a/include/linux/bitmap.h
+> +++ b/include/linux/bitmap.h
+> @@ -283,6 +283,8 @@ static inline int bitmap_intersects(const unsigned long *src1,
+>  static inline int bitmap_subset(const unsigned long *src1,
+>  			const unsigned long *src2, unsigned int nbits)
+>  {
+> +	if(!(*src1 & BITMAP_LAST_WORD_MASK(nbits)))
+> +		return false;
+>  	if (small_const_nbits(nbits))
+>  		return ! ((*src1 & ~(*src2)) & BITMAP_LAST_WORD_MASK(nbits));
+>  	else
+> 
