@@ -1,42 +1,168 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Wed, 18 Oct 2017 18:21:38 +0800
-Subject: [PATCH v5 2/2] acpi: apei: Add SEI notification type support for
- ARMv8
-In-Reply-To: <59E72290.6060604@arm.com>
-References: <1508227341-15651-1-git-send-email-gengdongjiu@huawei.com>
- <1508227341-15651-2-git-send-email-gengdongjiu@huawei.com>
- <20171017170635.qb4sqyrsnndgbuni@pd.tnic>
- <0bcba052-700b-5ee8-88fc-aaf8cc6b1d37@huawei.com>
- <20171018090649.e7qgdf2dwmr7yxc3@pd.tnic>
- <4b51bd4e-2bf7-3aed-f17c-565b49781009@huawei.com>
- <20171018092547.guf54e6aqbzzfxrq@pd.tnic> <59E72290.6060604@arm.com>
-Message-ID: <cdbf7880-a515-6394-fc24-6a4498cace2c@huawei.com>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Wed, 18 Oct 2017 19:23:59 +0900
+Subject: [PATCH net-next v2 2/2] net: ethernet: socionext: add AVE
+ ethernet driver
+In-Reply-To: <CAK7LNAR0Dy0aUjQKw7YxSbXZkpjn=1B7_knkSed6=EDVzL6v9w@mail.gmail.com>
+References: <1507854928-4357-3-git-send-email-hayashi.kunihiko@socionext.com>
+ <CAK7LNAR0Dy0aUjQKw7YxSbXZkpjn=1B7_knkSed6=EDVzL6v9w@mail.gmail.com>
+Message-ID: <20171018192359.243C.4A936039@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/10/18 17:44, James Morse wrote:
->> The thing is abbreviated as "SEI" and apparently means "System Error
->> Interrupt". Nothing else.
-> ARM has 'external abort', which are either synchronous or asynchronous, both are
-> delivered as different types of exception.
-> 
-> Asynchronous external abort is treated as a special kind of interrupt, 'SError
-> Interrupt', (where SError stands for System Error, but its rarely written like
-> that). 'SEI' is a relatively new abbreviation for SError interrupt.
-> 
-> 
-> What should we call this thing? In the ACPI code I'd prefer 'SEI' as that is
-> what the ACPI spec calls it. Here we are talking about an GHES notification.
-> 
-> But in the arm64 arch code this should be called SError Interrupt as this is
-> what the ARM-ARM calls it. This code cares about exception routing and interrupt
-> masking.
-> 
-> 
-> But, I don't really care.
+On Mon, 16 Oct 2017 00:08:21 +0900 <yamada.masahiro@socionext.com> wrote:
 
-Thanks very much James's clear explanation.
-I agree with James.
+> 2017-10-13 9:35 GMT+09:00 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>:
+> > +static int ave_probe(struct platform_device *pdev)
+> > +{
+> > +       struct device *dev = &pdev->dev;
+> > +       struct device_node *np = dev->of_node;
+> > +       u32 ave_id;
+> > +       struct ave_private *priv;
+> > +       const struct ave_soc_data *data;
+> > +       phy_interface_t phy_mode;
+> > +       struct net_device *ndev;
+> > +       struct resource *res;
+> > +       void __iomem *base;
+> > +       int irq, ret = 0;
+> > +       char buf[ETHTOOL_FWVERS_LEN];
+> > +       const void *mac_addr;
+> > +
+> > +       data = of_device_get_match_data(dev);
+> > +       if (WARN_ON(!data))
+> > +               return -EINVAL;
+> > +
+> > +       phy_mode = of_get_phy_mode(np);
+> > +       if (phy_mode < 0) {
+> > +               dev_err(dev, "phy-mode not found\n");
+> > +               return -EINVAL;
+> > +       }
+> > +       if ((!phy_interface_mode_is_rgmii(phy_mode)) &&
+> > +           phy_mode != PHY_INTERFACE_MODE_RMII &&
+> > +           phy_mode != PHY_INTERFACE_MODE_MII) {
+> > +               dev_err(dev, "phy-mode is invalid\n");
+> > +               return -EINVAL;
+> > +       }
+> > +
+> > +       irq = platform_get_irq(pdev, 0);
+> > +       if (irq < 0) {
+> > +               dev_err(dev, "IRQ not found\n");
+> > +               return irq;
+> > +       }
+> > +
+> > +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +       base = devm_ioremap_resource(dev, res);
+> > +       if (IS_ERR(base))
+> > +               return PTR_ERR(base);
+> > +
+> > +       /* alloc netdevice */
+> > +       ndev = alloc_etherdev(sizeof(struct ave_private));
+> > +       if (!ndev) {
+> > +               dev_err(dev, "can't allocate ethernet device\n");
+> > +               return -ENOMEM;
+> > +       }
+> > +
+> > +       ndev->netdev_ops = &ave_netdev_ops;
+> > +       ndev->ethtool_ops = &ave_ethtool_ops;
+> > +       SET_NETDEV_DEV(ndev, dev);
+> > +
+> > +       /* support hardware checksum */
+> > +       ndev->features    |= (NETIF_F_IP_CSUM | NETIF_F_RXCSUM);
+> > +       ndev->hw_features |= (NETIF_F_IP_CSUM | NETIF_F_RXCSUM);
+> > +
+> > +       ndev->max_mtu = AVE_MAX_ETHFRAME - (ETH_HLEN + ETH_FCS_LEN);
+> > +
+> > +       /* get mac address */
+> > +       mac_addr = of_get_mac_address(np);
+> > +       if (mac_addr)
+> > +               ether_addr_copy(ndev->dev_addr, mac_addr);
+> > +
+> > +       /* if the mac address is invalid, use random mac address */
+> > +       if (!is_valid_ether_addr(ndev->dev_addr)) {
+> > +               eth_hw_addr_random(ndev);
+> > +               dev_warn(dev, "Using random MAC address: %pM\n",
+> > +                        ndev->dev_addr);
+> > +       }
+> > +
+> > +       priv = netdev_priv(ndev);
+> > +       priv->base = base;
+> > +       priv->irq = irq;
+> > +       priv->ndev = ndev;
+> > +       priv->msg_enable = netif_msg_init(-1, AVE_DEFAULT_MSG_ENABLE);
+> > +       priv->phy_mode = phy_mode;
+> > +       priv->data = data;
+> > +
+> > +       if (IS_DESC_64BIT(priv)) {
+> > +               priv->desc_size = AVE_DESC_SIZE_64;
+> > +               priv->tx.daddr  = AVE_TXDM_64;
+> > +               priv->rx.daddr  = AVE_RXDM_64;
+> > +       } else {
+> > +               priv->desc_size = AVE_DESC_SIZE_32;
+> > +               priv->tx.daddr  = AVE_TXDM_32;
+> > +               priv->rx.daddr  = AVE_RXDM_32;
+> > +       }
+> > +       priv->tx.ndesc = AVE_NR_TXDESC;
+> > +       priv->rx.ndesc = AVE_NR_RXDESC;
+> > +
+> > +       u64_stats_init(&priv->stats_rx.syncp);
+> > +       u64_stats_init(&priv->stats_tx.syncp);
+> > +
+> > +       /* get clock */
+> 
+> Please remove this super-obvious comment.
 
-In the ACPI sepc, we usually call SEI as SError Interrupt, we rarely call SError to System Error,
-Anyway I will explain clearly about the abbreviations in my next version patch.
+I'll check comments out and remove them unnecessary.
+
+> > +       priv->clk = clk_get(dev, NULL);
+> 
+> Missing clk_put() in the failure path.
+> 
+> Why don't you use devm?
+> 
+> 
+> 
+> > +       if (IS_ERR(priv->clk))
+> > +               priv->clk = NULL;
+> 
+> So, clk is optional, but
+> you need to check EPROBE_DEFER.
+> 
+> 
+> 
+> 
+> > +       /* get reset */
+> 
+> Remove.
+> 
+> 
+> > +       priv->rst = reset_control_get(dev, NULL);
+> > +       if (IS_ERR(priv->rst))
+> > +               priv->rst = NULL;
+> 
+> 
+> reset_control_get() is deprecated.  Do not use it in a new driver.
+> 
+> Again, missing reset_control_put().   devm?
+> 
+> 
+> The reset seems optional (again, ignoring EPROBE_DEFER)
+> but you did not use reset_control_get_optional, why?
+> 
+> From your code, this reset is used as shared.
+> 
+> 
+> priv->rst = devm_reset_control_get_optional_shared(dev, NULL);
+> if (IS_ERR(priv->rst))
+>           return PTR_ERR(priv->rst);
+
+The clk and reset are optional in the driver.
+Referring to your suggested method, I'll fix the part of clk and reset.
+
+> 
+> 
+> -- 
+> Best Regards
+> Masahiro Yamada
+
+---
+Best Regards,
+Kunihiko Hayashi
