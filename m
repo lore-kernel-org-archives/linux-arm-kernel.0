@@ -1,115 +1,43 @@
-From: gilad@benyossef.com (Gilad Ben-Yossef)
-Date: Wed, 18 Oct 2017 08:00:38 +0100
-Subject: [PATCH v10 06/20] crypto: introduce crypto wait for async op
-In-Reply-To: <1508310057-25369-1-git-send-email-gilad@benyossef.com>
-References: <1508310057-25369-1-git-send-email-gilad@benyossef.com>
-Message-ID: <1508310057-25369-7-git-send-email-gilad@benyossef.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Wed, 18 Oct 2017 09:27:50 +0200
+Subject: [PATCH] firmware: meson-sm: use generic compatible
+In-Reply-To: <20171017204959.kfbhn2yxhv2sb5qg@rob-hp-laptop>
+References: <20171012134743.10625-1-jbrunet@baylibre.com>
+ <20171017204959.kfbhn2yxhv2sb5qg@rob-hp-laptop>
+Message-ID: <1508311670.3957.29.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Invoking a possibly async. crypto op and waiting for completion
-while correctly handling backlog processing is a common task
-in the crypto API implementation and outside users of it.
+On Tue, 2017-10-17 at 15:50 -0500, Rob Herring wrote:
+> On Thu, Oct 12, 2017 at 03:47:43PM +0200, Jerome Brunet wrote:
+> > The meson secure monitor seems to be compatible with more SoCs than
+> > initially thought. Let's use the most generic compatible he have in
+> > DT instead of the gxbb specific one
+> > 
+> > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> > ---
+> >  Documentation/devicetree/bindings/firmware/meson/meson_sm.txt | 4 ++--
+> >  drivers/firmware/meson/meson_sm.c                             | 4 ++--
+> >  2 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> Seems like a pointless, not backwards compatible 
 
-This patch adds a generic implementation for doing so in
-preparation for using it across the board instead of hand
-rolled versions.
+The related DTS have both the SoC family compatible and the SoC specific
+compatible. So it is backward compatible (even if this contraints is relaxed on
+meson because we are figuring out what is shared between SoCs)
 
-Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
-CC: Eric Biggers <ebiggers3@gmail.com>
-CC: Jonathan Cameron <Jonathan.Cameron@huawei.com>
----
- crypto/api.c           | 13 +++++++++++++
- include/linux/crypto.h | 40 ++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 53 insertions(+)
+We are asked to put SoC family and SoC specific compatibles in DTS. What's the
+point of that if we are going to match on whatever was there first ?
 
-diff --git a/crypto/api.c b/crypto/api.c
-index 941cd4c..2a2479d 100644
---- a/crypto/api.c
-+++ b/crypto/api.c
-@@ -24,6 +24,7 @@
- #include <linux/sched/signal.h>
- #include <linux/slab.h>
- #include <linux/string.h>
-+#include <linux/completion.h>
- #include "internal.h"
- 
- LIST_HEAD(crypto_alg_list);
-@@ -595,5 +596,17 @@ int crypto_has_alg(const char *name, u32 type, u32 mask)
- }
- EXPORT_SYMBOL_GPL(crypto_has_alg);
- 
-+void crypto_req_done(struct crypto_async_request *req, int err)
-+{
-+	struct crypto_wait *wait = req->data;
-+
-+	if (err == -EINPROGRESS)
-+		return;
-+
-+	wait->err = err;
-+	complete(&wait->completion);
-+}
-+EXPORT_SYMBOL_GPL(crypto_req_done);
-+
- MODULE_DESCRIPTION("Cryptographic core API");
- MODULE_LICENSE("GPL");
-diff --git a/include/linux/crypto.h b/include/linux/crypto.h
-index 84da997..78508ca 100644
---- a/include/linux/crypto.h
-+++ b/include/linux/crypto.h
-@@ -24,6 +24,7 @@
- #include <linux/slab.h>
- #include <linux/string.h>
- #include <linux/uaccess.h>
-+#include <linux/completion.h>
- 
- /*
-  * Autoloaded crypto modules should only use a prefixed name to avoid allowing
-@@ -468,6 +469,45 @@ struct crypto_alg {
- } CRYPTO_MINALIGN_ATTR;
- 
- /*
-+ * A helper struct for waiting for completion of async crypto ops
-+ */
-+struct crypto_wait {
-+	struct completion completion;
-+	int err;
-+};
-+
-+/*
-+ * Macro for declaring a crypto op async wait object on stack
-+ */
-+#define DECLARE_CRYPTO_WAIT(_wait) \
-+	struct crypto_wait _wait = { \
-+		COMPLETION_INITIALIZER_ONSTACK((_wait).completion), 0 }
-+
-+/*
-+ * Async ops completion helper functioons
-+ */
-+void crypto_req_done(struct crypto_async_request *req, int err);
-+
-+static inline int crypto_wait_req(int err, struct crypto_wait *wait)
-+{
-+	switch (err) {
-+	case -EINPROGRESS:
-+	case -EBUSY:
-+		wait_for_completion(&wait->completion);
-+		reinit_completion(&wait->completion);
-+		err = wait->err;
-+		break;
-+	};
-+
-+	return err;
-+}
-+
-+static inline void crypto_init_wait(struct crypto_wait *wait)
-+{
-+	init_completion(&wait->completion);
-+}
-+
-+/*
-  * Algorithm registration interface.
-  */
- int crypto_register_alg(struct crypto_alg *alg);
--- 
-2.7.4
+> change to me. In the 
+> end, it's just a string to match on. Who cares what the string is.
+> 
+
+The matched string has to keep some sort of logic to be maintainable.
+It should be clear what the data (or the absence of data) attached to a string
+relates to. 
+
+If we really don't care what the string is, we could pick words at random in the
+dictionary ... it would be chaos, but at least it would not be confusing 
+
+> Rob
