@@ -1,75 +1,232 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Wed, 18 Oct 2017 20:37:15 +0800
-Subject: [arm-platforms:irq/irqchip-4.15 18/19]
- drivers//irqchip/irq-gic-v3-its.c:2782:3: warning: 'return' with no value,
- in function returning non-void
-Message-ID: <201710182012.4BZyPBLb%fengguang.wu@intel.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 18 Oct 2017 18:08:01 +0530
+Subject: [PATCH] phy: add inno-usb2-phy driver for hi3798cv200 SoC
+In-Reply-To: <1508078958-16966-1-git-send-email-shawnguo@kernel.org>
+References: <1508078958-16966-1-git-send-email-shawnguo@kernel.org>
+Message-ID: <68cd23ae-544d-a60a-14a9-347b7aaf76bf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/irqchip-4.15
-head:   0beae24927562ef40a444409d2a9a0d162a18ae7
-commit: 698f0a9a6892cdce91cdf64389c0707452c0561c [18/19] irqchip/gic-v3-its: Limit scope of VPE mapping to be per ITS
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 698f0a9a6892cdce91cdf64389c0707452c0561c
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+Hi,
 
-All warnings (new ones prefixed by >>):
+On Sunday 15 October 2017 08:19 PM, Shawn Guo wrote:
+> From: Pengcheng Li <lpc.li@hisilicon.com>
+> 
+> It adds inno-usb2-phy driver for hi3798cv200 SoC USB 2.0 support.  One
+> inno-usb2-phy device can support up to two PHY ports.  While there is
+> device level reference clock and power reset to be controlled, each PHY
+> port has its own utmi reset that needs to assert/de-assert as needed.
+> 
+> Hi3798cv200 needs to access PHY port0 register via particular peripheral
+> syscon controller register to control PHY, like turning on PHY clock.
+> 
+> Signed-off-by: Pengcheng Li <lpc.li@hisilicon.com>
+> Signed-off-by: Jiancheng Xue <xuejiancheng@hisilicon.com>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  .../devicetree/bindings/phy/phy-hisi-inno-usb2.txt |  31 +++
+>  drivers/phy/hisilicon/Kconfig                      |  10 +
+>  drivers/phy/hisilicon/Makefile                     |   1 +
+>  drivers/phy/hisilicon/phy-hisi-inno-usb2.c         | 223 +++++++++++++++++++++
+>  4 files changed, 265 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/phy/phy-hisi-inno-usb2.txt
+>  create mode 100644 drivers/phy/hisilicon/phy-hisi-inno-usb2.c
+> 
+> diff --git a/Documentation/devicetree/bindings/phy/phy-hisi-inno-usb2.txt b/Documentation/devicetree/bindings/phy/phy-hisi-inno-usb2.txt
+> new file mode 100644
+> index 000000000000..4ef7af24a703
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/phy/phy-hisi-inno-usb2.txt
+> @@ -0,0 +1,31 @@
+> +HiSilicon INNO USB2 PHY
+> +
+> +Required properties:
+> +- compatible: Should be one of the following strings:
+> +	"hisilicon,inno-usb2-phy",
+> +	"hisilicon,hi3798cv200-usb2-phy".
+> +- #phy-cells: Should be 1. The specifier is the index of the PHY port to
+> +  reference.
+> +- hisilicon,peripheral-syscon: The phandle of syscon used to control PHY,
+> +  followed by a integer cell which defines the syscon register offset used
+> +  to talk to PHY.
+> +- clocks: The phandle and clock specifier pair for reference clock utmi_refclk.
+> +- resets: The list of phandle and reset specifier pairs for each reset signal
+> +  in reset-names.
+> +- reset-names: Should contain "power_on", "utmi0" and "utmi1". The "utmi1"
+> +  should exist only if the device has two PHY port.
+> +
+> +Refer to phy/phy-bindings.txt for the generic PHY binding properties
+> +
+> +Example:
+> +
+> +	usb2_phy1: usb2-phy1 {
+> +		compatible = "hisilicon,hi3798cv200-usb2-phy";
+> +		#phy-cells = <1>;
+> +		hisilicon,peripheral-syscon = <&peri_ctrl 0x120>;
+> +		clocks = <&crg HISTB_USB2_PHY1_REF_CLK>;
+> +		resets = <&crg 0xbc 4>,
+> +			 <&crg 0xbc 8>,
+> +			 <&crg 0xbc 9>;
+> +		reset-names = "power_on", "utmi0", "utmi1";
+> +	};
 
-   drivers//irqchip/irq-gic-v3-its.c: In function 'its_vpe_irq_domain_activate':
->> drivers//irqchip/irq-gic-v3-its.c:2782:3: warning: 'return' with no value, in function returning non-void [-Wreturn-type]
-      return;
-      ^~~~~~
-   drivers//irqchip/irq-gic-v3-its.c:2774:12: note: declared here
-    static int its_vpe_irq_domain_activate(struct irq_domain *domain,
-               ^~~~~~~~~~~~~~~~~~~~~~~~~~~
-   drivers//irqchip/irq-gic-v3-its.c: At top level:
-   drivers//irqchip/irq-gic-v3-its.c:2982:11: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
-      .init = its_enable_quirk_hip07_161600802,
-              ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   drivers//irqchip/irq-gic-v3-its.c:2982:11: note: (near initialization for 'its_quirks[4].init')
-   cc1: some warnings being treated as errors
+please send the devicetree binding documentation as a separate patch.
+> diff --git a/drivers/phy/hisilicon/Kconfig b/drivers/phy/hisilicon/Kconfig
+> index 6164c4cd0f65..c21470eb7fba 100644
+> --- a/drivers/phy/hisilicon/Kconfig
+> +++ b/drivers/phy/hisilicon/Kconfig
+> @@ -11,6 +11,16 @@ config PHY_HI6220_USB
+>  
+>  	  To compile this driver as a module, choose M here.
+>  
+> +config PHY_HISI_INNO_USB2
+> +       tristate "HiSilicon INNO USB2 PHY support"
+> +       depends on (ARCH_HISI && ARM64) || COMPILE_TEST
+> +       select GENERIC_PHY
+> +       select MFD_SYSCON
+> +       help
+> +         Support for INNO USB2 PHY on HiSilicon SoCs. This Phy supports
+> +         USB 1.5Mb/s, USB 12Mb/s, USB 480Mb/s speeds. It supports one
+> +         USB host port to accept one USB device.
+> +
+>  config PHY_HIX5HD2_SATA
+>  	tristate "HIX5HD2 SATA PHY Driver"
+>  	depends on ARCH_HIX5HD2 && OF && HAS_IOMEM
+> diff --git a/drivers/phy/hisilicon/Makefile b/drivers/phy/hisilicon/Makefile
+> index 541b348187a8..e6c979458d3b 100644
+> --- a/drivers/phy/hisilicon/Makefile
+> +++ b/drivers/phy/hisilicon/Makefile
+> @@ -1,2 +1,3 @@
+>  obj-$(CONFIG_PHY_HI6220_USB)		+= phy-hi6220-usb.o
+> +obj-$(CONFIG_PHY_HISI_INNO_USB2)	+= phy-hisi-inno-usb2.o
+>  obj-$(CONFIG_PHY_HIX5HD2_SATA)		+= phy-hix5hd2-sata.o
+> diff --git a/drivers/phy/hisilicon/phy-hisi-inno-usb2.c b/drivers/phy/hisilicon/phy-hisi-inno-usb2.c
+> new file mode 100644
+> index 000000000000..3772aef23539
+> --- /dev/null
+> +++ b/drivers/phy/hisilicon/phy-hisi-inno-usb2.c
+> @@ -0,0 +1,223 @@
+> +/*
+> + * HiSilicon INNO USB2 PHY Driver.
+> + *
+> + * Copyright (c) 2016-2017 HiSilicon Technologies Co., Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program. If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/phy/phy.h>
+> +#include <linux/regmap.h>
+> +#include <linux/reset.h>
+> +
+> +#define INNO_PHY_PORT_NUM	2
+> +#define REF_CLK_STABLE_TIME	100	/* unit:us */
+> +#define UTMI_CLK_STABLE_TIME	200	/* unit:us */
+> +#define TEST_CLK_STABLE_TIME	2	/* unit:ms */
+> +#define PHY_CLK_STABLE_TIME	2	/* unit:ms */
+> +#define UTMI_RST_COMPLETE_TIME	2	/* unit:ms */
+> +#define POR_RST_COMPLETE_TIME	300	/* unit:us */
+> +#define PHY_TEST_DATA		GENMASK(7, 0)
+> +#define PHY_TEST_ADDR		GENMASK(15, 8)
+> +#define PHY_TEST_PORT		GENMASK(18, 16)
+> +#define PHY_TEST_WREN		BIT(21)
+> +#define PHY_TEST_CLK		BIT(22)	/* rising edge active */
+> +#define PHY_TEST_RST		BIT(23)	/* low active */
+> +#define PHY_CLK_ENABLE		BIT(2)
+> +
+> +struct hisi_inno_phy_port {
+> +	struct phy *phy;
+> +	struct device *dev;
+> +	struct reset_control *utmi_rst;
+> +};
+> +
+> +struct hisi_inno_phy_priv {
+> +	struct regmap *syscon;
+> +	u32 syscon_reg;
+> +	struct clk *ref_clk;
+> +	struct reset_control *por_rst;
+> +	struct hisi_inno_phy_port ports[INNO_PHY_PORT_NUM];
+> +	u32 port_num;
+> +};
+> +
+> +static void hisi_inno_phy_write_reg(struct regmap *syscon, u32 reg,
+> +				    u8 port, u32 addr, u32 data)
+> +{
+> +	u32 value;
+> +
+> +	value = (data & PHY_TEST_DATA)
+> +		| ((addr << 8) & PHY_TEST_ADDR)
+> +		| ((port << 16) & PHY_TEST_PORT)
+> +		| PHY_TEST_WREN | PHY_TEST_RST;
+> +	regmap_write(syscon, reg, value);
+> +	value |= PHY_TEST_CLK;
+> +	regmap_write(syscon, reg, value);
+> +	value &= ~PHY_TEST_CLK;
+> +	regmap_write(syscon, reg, value);
+> +}
+> +
+> +static void hisi_inno_phy_setup(struct hisi_inno_phy_priv *priv)
+> +{
+> +	/* The phy clk is controlled by the port0 register 0x06. */
+> +	hisi_inno_phy_write_reg(priv->syscon, priv->syscon_reg, 0, 0x06,
+> +				PHY_CLK_ENABLE);
+> +	msleep(PHY_CLK_STABLE_TIME);
+> +}
+> +
+> +static int hisi_inno_phy_start(struct phy *phy)
+> +{
+> +	struct hisi_inno_phy_port *port = phy_get_drvdata(phy);
+> +	struct hisi_inno_phy_priv *priv = dev_get_drvdata(port->dev);
+> +	int ret;
+> +
+> +	ret = clk_prepare_enable(priv->ref_clk);
+> +	if (ret)
+> +		return ret;
+> +	udelay(REF_CLK_STABLE_TIME);
+> +
+> +	reset_control_deassert(priv->por_rst);
+> +	udelay(POR_RST_COMPLETE_TIME);
+> +
+> +	/* Set up phy registers via peripheral syscon controller */
+> +	hisi_inno_phy_setup(priv);
+> +
+> +	reset_control_deassert(port->utmi_rst);
+> +	udelay(UTMI_RST_COMPLETE_TIME);
+> +
+> +	return 0;
+> +}
+> +
+> +static int hisi_inno_phy_exit(struct phy *phy)
+> +{
+> +	struct hisi_inno_phy_port *port = phy_get_drvdata(phy);
+> +	struct hisi_inno_phy_priv *priv = dev_get_drvdata(port->dev);
+> +
+> +	reset_control_assert(port->utmi_rst);
+> +	reset_control_assert(priv->por_rst);
+> +	clk_disable_unprepare(priv->ref_clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct phy_ops hisi_inno_phy_ops = {
+> +	.init = hisi_inno_phy_start,
 
-vim +/return +2782 drivers//irqchip/irq-gic-v3-its.c
+in order to make it identical you can just end it with *_init().
 
-  2773	
-  2774	static int its_vpe_irq_domain_activate(struct irq_domain *domain,
-  2775					       struct irq_data *d, bool early)
-  2776	{
-  2777		struct its_vpe *vpe = irq_data_get_irq_chip_data(d);
-  2778		struct its_node *its;
-  2779	
-  2780		/* If we use the list map, we issue VMAPP on demand... */
-  2781		if (its_list_map)
-> 2782			return;
-  2783	
-  2784		/* Map the VPE to the first possible CPU */
-  2785		vpe->col_idx = cpumask_first(cpu_online_mask);
-  2786	
-  2787		list_for_each_entry(its, &its_nodes, entry) {
-  2788			if (!its->is_v4)
-  2789				continue;
-  2790	
-  2791			its_send_vmapp(its, vpe, true);
-  2792			its_send_vinvall(its, vpe);
-  2793		}
-  2794	
-  2795		return 0;
-  2796	}
-  2797	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 36798 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171018/518179ea/attachment-0001.gz>
+Thanks
+Kishon
