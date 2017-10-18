@@ -1,31 +1,57 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 18 Oct 2017 15:09:07 +0200
-Subject: libbattery was Re: [RFC PATCH 5/5] power: generic-adc-battery:
- Add capacity handling
-In-Reply-To: <61BFA8AF-657A-4AD7-A7AC-3E5DC3B7E83D@goldelico.com>
-References: <1501620926-22669-1-git-send-email-marek.belisko@open-nandra.com>
- <1501620926-22669-6-git-send-email-marek.belisko@open-nandra.com>
- <20170829101147.debhadzyfrxhkrvt@earth>
- <20170908113231.GJ18365@amd> <20171018122804.GA14376@amd>
- <61BFA8AF-657A-4AD7-A7AC-3E5DC3B7E83D@goldelico.com>
-Message-ID: <20171018130907.GA25684@amd>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Wed, 18 Oct 2017 21:06:28 +0800
+Subject: [PATCH v2 5/5] ARM: sun8i: v40: enable USB host ports for Banana Pi
+ M2 Berry
+In-Reply-To: <20171018130628.11298-1-icenowy@aosc.io>
+References: <20171018130628.11298-1-icenowy@aosc.io>
+Message-ID: <20171018130628.11298-6-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Banana Pi M2 Berry has an on-board USB Hub that provides 4 USB Type-A
+ports, and it's connected to the USB1 port of the SoC.
 
-> So I have three questions:
-> a) why do you use float/double instead of fixed point for such
-> simple and imprecise calculations?
+Enable it.
 
-Cleaner code, and probably faster, too.
-									Pavel
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts b/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts
+index fe16fc0eb518..45c17c8c5915 100644
+--- a/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts
++++ b/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts
+@@ -87,6 +87,10 @@
+ 	};
+ };
+ 
++&ehci1 {
++	status = "okay";
++};
++
+ &i2c0 {
+ 	status = "okay";
+ 
+@@ -98,6 +102,10 @@
+ 	};
+ };
+ 
++&ohci1 {
++	status = "okay";
++};
++
+ #include "axp22x.dtsi"
+ 
+ &reg_aldo3 {
+@@ -171,3 +179,8 @@
+ 	pinctrl-0 = <&uart0_pb_pins>;
+ 	status = "okay";
+ };
++
++&usbphy {
++	usb1_vbus-supply = <&reg_vcc5v0>;
++	status = "okay";
++};
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171018/691a6ed3/attachment.sig>
+2.13.6
