@@ -1,103 +1,67 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 18 Oct 2017 08:29:07 -0500
-Subject: [PATCH v2 01/16] dt-bindings: mvebu-uart: update documentation
- with extended UART
-In-Reply-To: <20171018082531.59a2e5d0@xps13>
-References: <20171013090200.31034-1-miquel.raynal@free-electrons.com>
- <20171013090200.31034-2-miquel.raynal@free-electrons.com>
- <20171017220022.kr2qiodln3qfkbwe@rob-hp-laptop>
- <20171018082531.59a2e5d0@xps13>
-Message-ID: <CAL_JsqJ3VkXHnh1H2NcBhgiFE+++WvXGA9Phdgj77X-4VGX3+w@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 18 Oct 2017 08:29:36 -0500
+Subject: [PATCH v6 1/3] PCI: rockchip: Add support for pcie wake irq
+In-Reply-To: <20171018010312.GB65743@google.com>
+References: <20171013195059.23865-1-jeffy.chen@rock-chips.com>
+ <20171013195059.23865-2-jeffy.chen@rock-chips.com>
+ <20171016200350.GH25517@bhelgaas-glaptop.roam.corp.google.com>
+ <20171018010312.GB65743@google.com>
+Message-ID: <20171018132936.GP5641@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 18, 2017 at 1:25 AM, Miquel RAYNAL
-<miquel.raynal@free-electrons.com> wrote:
-> Hi Rob,
->
-> On Tue, 17 Oct 2017 17:00:22 -0500
-> Rob Herring <robh@kernel.org> wrote:
->
->> On Fri, Oct 13, 2017 at 11:01:45AM +0200, Miquel Raynal wrote:
->> > Update the Device Tree binding documentation for the Marvell EBU
->> > UART, in order to allow describing the extended UART IP block, in
->> > addition to the already supported standard UART IP. This requires
->> > adding a new compatible string, the introduction of a clocks
->> > property, and extensions to the interrupts property.
->> >
->> > Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
->> > Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> > ---
->> >  .../devicetree/bindings/serial/mvebu-uart.txt      | 49
->> > +++++++++++++++++++--- 1 file changed, 44 insertions(+), 5
->> > deletions(-)
->> >
->> > diff --git
->> > a/Documentation/devicetree/bindings/serial/mvebu-uart.txt
->> > b/Documentation/devicetree/bindings/serial/mvebu-uart.txt index
->> > d37fabe17bd1..3df3a3fab4bb 100644 ---
->> > a/Documentation/devicetree/bindings/serial/mvebu-uart.txt +++
->> > b/Documentation/devicetree/bindings/serial/mvebu-uart.txt @@ -1,13
->> > +1,52 @@ -* Marvell UART : Non standard UART used in some of
->> > Marvell EBU SoCs (e.g., Armada-3700) +* Marvell UART : Non standard
->> > UART used in some of Marvell EBU SoCs
->> > +                 e.g., Armada-3700.
->> >
->> >  Required properties:
->> > -- compatible: "marvell,armada-3700-uart"
->> > +- compatible:
->> > +    - "marvell,armada-3700-uart" for the standard variant of the
->> > UART
->> > +      (32 bytes FIFO, no DMA, level interrupts, 8-bit access to the
->> > +      FIFO, baudrate limited to 230400).
->> > +    - "marvell,armada-3700-uart-ext" for the extended variant of
->> > the
->> > +      UART (128 bytes FIFO, DMA, front interrupts, 8-bit or 32-bit
->> > +      accesses to the FIFO, baudrate unlimited by the dividers).
->>
->> What do you call the next extended version?
->> marvell,armada-3700-uart-ext-ext?
->
-> I don't know what you mean by "next extended version"?
+On Tue, Oct 17, 2017 at 06:03:14PM -0700, Brian Norris wrote:
+> On Mon, Oct 16, 2017 at 03:03:50PM -0500, Bjorn Helgaas wrote:
+> > On Sat, Oct 14, 2017 at 03:50:56AM +0800, Jeffy Chen wrote:
+> > > Add support for PCIE_WAKE pin in rockchip pcie driver.
+> > > 
+> > > Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> > > ---
+> > > 
+> > > Changes in v6:
+> > > Fix device_init_wake error handling, and add some comments.
+> > > 
+> > > Changes in v5:
+> > > Rebase
+> > > 
+> > > Changes in v3:
+> > > Fix error handling
+> > > 
+> > > Changes in v2:
+> > > Use dev_pm_set_dedicated_wake_irq
+> > >         -- Suggested by Brian Norris <briannorris@chromium.com>
+> > > 
+> > >  drivers/pci/host/pcie-rockchip.c | 27 +++++++++++++++++++++------
+> > >  1 file changed, 21 insertions(+), 6 deletions(-)
+> > > 
+> > > diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
+> > > index 9051c6c8fea4..268513b6c9c4 100644
+> > > --- a/drivers/pci/host/pcie-rockchip.c
+> > > +++ b/drivers/pci/host/pcie-rockchip.c
+> ...
+> > > @@ -995,6 +996,17 @@ static int rockchip_pcie_setup_irq(struct rockchip_pcie *rockchip)
+> > >  		return err;
+> > >  	}
+> > >  
+> > > +	irq = platform_get_irq_byname(pdev, "wakeup");
+> > > +	if (irq >= 0) {
+> > > +		/* Must init wakeup before setting dedicated wakeup irq. */
+> > > +		device_init_wakeup(dev, true);
+> > > +		err = dev_pm_set_dedicated_wake_irq(dev, irq);
+> > > +		if (err) {
+> > > +			dev_err(dev, "failed to setup PCIe wakeup IRQ\n");
+> > > +			device_init_wakeup(dev, false);
+> > > +		}
+> > > +	}
+> > 
+> > There's nothing Rockchip-specific here, so I'm hoping you can explore
+> > putting this support in the PCI core, so any system that describes the
+> > WAKE# connection in the DT can benefit.
+> 
+> I guess it could work to look into pci_create_root_bus(), and
+> do something like the following?
+> 
+> 	if (IS_ENABLED(CONFIG_OF) && parent && parent->of_node)
+> 		... do OF parsing for generic features like WAKE# ...
 
-IP evolves on new chips with new features. Just trying to understand
-how you are
-
->> This is different versions of UART on the same chip?
->
-> Today in mainline there is support for the A3700 UART IP.
-> This series add support for another IP, based on the A3700, but with
-> extended features (explaining the -ext suffix).
->
-> Can you precise what is bothering you?
-
-Is this different versions of UART IP on 1 chip or a new version of
-the UART IP on a new SoC? The latter should be a new compatible with
-the new SoC. The former case does happen some, but is not common. I'm
-just trying to understand which applies here.
-
-
->> >  - reg: offset and length of the register set for the device.
->> > -- interrupts: device interrupt
->> > +- clocks: UART reference clock used to derive the baudrate (only
->> > +      mandatory with "marvell,armada-3700-uart-ext" compatible).
->>
->> How is this optional? The freq is fixed if not present? If so, what
->> frequency?
->
-> The "clocks" property should not be optional at all but that is how the
-> bindings were handled before this series, so I can't tell now that
-> this property is mandatory as it would break compatibility with older
-> versions of the driver.
-
-Okay. I think it should be mandatory with a note how missing property
-is handled.
-
-> When no clock is provided, the frequency is fixed by the bootloader
-> and cannot be changed. There is no standard frequency for it but the
-> one chosen by the bootloader often is 115200 as the UART is usually
-> used as the serial console.
->
-> Because the bootloader does only initialize the UART in use for the
-> serial console, the clock is mandatory when using another port or it
-> will not work at all.
+That's exactly the sort of thing I was thinking.
