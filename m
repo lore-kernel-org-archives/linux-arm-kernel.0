@@ -1,105 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 18 Oct 2017 11:51:45 +0100
-Subject: [PATCH v9 4/4] PCI: hisi: blacklist hip06/hip07 controllers
- behind SMMUv3
-In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA838437676@FRAEML521-MBS.china.huawei.com>
-References: <20171006140450.89652-1-shameerali.kolothum.thodi@huawei.com>
- <20171006140450.89652-5-shameerali.kolothum.thodi@huawei.com>
- <20171013192209.GH30572@arm.com>
- <5FC3163CFD30C246ABAA99954A238FA838437676@FRAEML521-MBS.china.huawei.com>
-Message-ID: <20171018105145.GC11669@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 18 Oct 2017 11:54:23 +0100
+Subject: [PATCH v3 09/13] arm64: kernel: Add arch-specific SDEI entry
+ code and CPU masking
+In-Reply-To: <59E63105.9080804@arm.com>
+References: <20170922182614.27885-1-james.morse@arm.com>
+ <20170922182614.27885-10-james.morse@arm.com>
+ <20171016134139.sqe6xabdson2d5rd@armageddon.cambridge.arm.com>
+ <59E63105.9080804@arm.com>
+Message-ID: <20171018105422.53lnvivuq37e2oy4@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 15, 2017 at 07:46:34AM +0000, Shameerali Kolothum Thodi wrote:
+On Tue, Oct 17, 2017 at 05:34:13PM +0100, James Morse wrote:
+> On 16/10/17 14:41, Catalin Marinas wrote:
+> > On Fri, Sep 22, 2017 at 07:26:10PM +0100, James Morse wrote:
+> >> +	u64 elr = read_sysreg(elr_el1);
+> >> +	u32 kernel_mode = read_sysreg(CurrentEL) | 1;	/* +SPSel */
+> >> +	unsigned long vbar = read_sysreg(vbar_el1);
+> >> +
+> >> +	/* Retrieve the missing registers values */
+> >> +	for (i = 0; i < clobbered_registers; i++) {
+> >> +		/* from within the handler, this call always succeeds */
+> >> +		sdei_api_event_context(i, &regs->regs[i]);
+> >> +	}
+> >> +
+> >> +	/*
+> >> +	 * We didn't take an exception to get here, set PAN. UAO will be cleared
+> >> +	 * by sdei_event_handler()s set_fs(USER_DS) call.
+> >> +	 */
+> >> +	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,
+> >> +			CONFIG_ARM64_PAN));
 > 
+> > Can you use uaccess_disable() directly?
 > 
-> > -----Original Message-----
-> > From: Will Deacon [mailto:will.deacon at arm.com]
-> > Sent: Friday, October 13, 2017 8:22 PM
-> > To: Shameerali Kolothum Thodi <shameerali.kolothum.thodi@huawei.com>
-> > Cc: lorenzo.pieralisi at arm.com; marc.zyngier at arm.com;
-> > sudeep.holla at arm.com; robin.murphy at arm.com; joro at 8bytes.org;
-> > bhelgaas at google.com; Gabriele Paoloni <gabriele.paoloni@huawei.com>;
-> > John Garry <john.garry@huawei.com>; iommu at lists.linux-foundation.org;
-> > linux-arm-kernel at lists.infradead.org; linux-acpi at vger.kernel.org; linux-
-> > pci at vger.kernel.org; devel at acpica.org; Linuxarm <linuxarm@huawei.com>;
-> > Wangzhou (B) <wangzhou1@hisilicon.com>; Guohanjun (Hanjun Guo)
-> > <guohanjun@huawei.com>
-> > Subject: Re: [PATCH v9 4/4] PCI: hisi: blacklist hip06/hip07 controllers behind
-> > SMMUv3
-> > 
-> > On Fri, Oct 06, 2017 at 03:04:50PM +0100, Shameer Kolothum wrote:
-> > > The HiSilicon erratum 161010801 describes the limitation of HiSilicon
-> > > platforms hip06/hip07 to support the SMMUv3 mappings for MSI
-> > > transactions.
-> > >
-> > > PCIe controller on these platforms has to differentiate the MSI
-> > > payload against other DMA payload and has to modify the MSI payload.
-> > > This basically makes it difficult for this platforms to have a SMMU
-> > > translation for MSI. In order to workaround this, ARM
-> > > SMMUv3 driver requires a quirk to treat the MSI regions separately.
-> > > Such a quirk is currently missing for DT based systems and therefore
-> > > we need to blacklist the hip06/hip07 PCIe controllers.
-> > >
-> > > Signed-off-by: Shameer Kolothum
-> > <shameerali.kolothum.thodi@huawei.com>
-> > > ---
-> > >  drivers/pci/dwc/pcie-hisi.c | 12 ++++++++++++
-> > >  1 file changed, 12 insertions(+)
-> > >
-> > > diff --git a/drivers/pci/dwc/pcie-hisi.c b/drivers/pci/dwc/pcie-hisi.c
-> > > index a201791..6800747 100644
-> > > --- a/drivers/pci/dwc/pcie-hisi.c
-> > > +++ b/drivers/pci/dwc/pcie-hisi.c
-> > > @@ -270,6 +270,12 @@ static int hisi_pcie_probe(struct platform_device
-> > *pdev)
-> > >  	struct resource *reg;
-> > >  	int ret;
-> > >
-> > > +	if ((IS_BUILTIN(CONFIG_ARM_SMMU_V3)) &&
-> > > +			of_property_read_bool(dev->of_node, "iommu-
-> > map")) {
-> > > +		dev_warn(dev, "HiSilicon erratum 161010801: blacklisting
-> > PCIe controllers behind SMMUv3\n");
-> > > +		return -ENODEV;
-> > > +	}
-> > > +
-> > >  	hisi_pcie = devm_kzalloc(dev, sizeof(*hisi_pcie), GFP_KERNEL);
-> > >  	if (!hisi_pcie)
-> > >  		return -ENOMEM;
-> > > @@ -340,6 +346,12 @@ static int hisi_pcie_almost_ecam_probe(struct
-> > platform_device *pdev)
-> > >  	struct device *dev = &pdev->dev;
-> > >  	struct pci_ecam_ops *ops;
-> > >
-> > > +	if ((IS_BUILTIN(CONFIG_ARM_SMMU_V3)) &&
-> > > +			of_property_read_bool(dev->of_node, "iommu-
-> > map")) {
-> > > +		dev_warn(dev, "HiSilicon erratum 161010801: blacklisting
-> > PCIe controllers behind SMMUv3\n");
-> > > +		return -ENODEV;
-> > > +	}
-> > 
-> > This isn't the right way to solve this problem. I was really hoping you'd come
-> > up with a solution for DT, and I know you've been trying, so I suppose for
-> > now we'll just have to go with the ACPI workaround you have and leave DT in
-> > the balance. I'm not at all happy with that, but I don't think this patch really
-> > improves things.
+> Wouldn't this invoke sw-pan's __uaccess_ttbr0_disable():
+> > write_sysreg(ttbr, ttbr0_el1);
 > 
-> Yes Will, this is to get the ACPI support enabled for now. 
+> Probing depends on VHE if booted at EL2, can we guarantee to have PAN (and
+> therefore not-SW-PAN) too?
 > 
-> > What I think you should do is remove the relevant smmu/iommu-map
-> > entries from the .dts files that are available for these platforms (i.e.
-> > comment them out with a description as to why).
-> 
-> We don't have any smmu/iommu-map entries for these platforms in the 
-> .dts files [1][2]. We are not aiming for any official DT support for these platforms.
-> This patch is to enforce the non-support.
+> (otherwise I can add 'depends on !ARM64_SW_TTBR0_PAN' to the Kconfig)
 
-Understood, but this has dragged on for a while and I don't think this patch
-is the right way to enforce things. The best approach might actually be to
-add the SMMU to the DTs, but commented out with a comment explaining why
-it's not a good idea to enable it.
+We want the Kconfig to be able to include all features. What you can do
+though is:
 
-Will
+	select ARM64_PAN if ARM64_SW_TTBR0_PAN
+
+With VHE (ARMv8.2) we can guarantee that hardware PAN is around.
+
+-- 
+Catalin
