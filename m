@@ -1,9 +1,9 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 18 Oct 2017 13:24:36 +0900
-Subject: [PATCH 5/6] ARM: dts: uniphier: add GPIO hog definition
+Date: Wed, 18 Oct 2017 13:24:37 +0900
+Subject: [PATCH 6/6] arm64: dts: uniphier: add GPIO hog definition
 In-Reply-To: <1508300677-23190-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1508300677-23190-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1508300677-23190-6-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1508300677-23190-7-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,24 +14,22 @@ is automatically requested.
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- arch/arm/boot/dts/uniphier-ld4-ref.dts  | 8 ++++++++
- arch/arm/boot/dts/uniphier-ld6b-ref.dts | 8 ++++++++
- arch/arm/boot/dts/uniphier-pro4-ref.dts | 8 ++++++++
- arch/arm/boot/dts/uniphier-sld8-ref.dts | 8 ++++++++
- 4 files changed, 32 insertions(+)
+ arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts | 8 ++++++++
+ arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts | 8 ++++++++
+ 2 files changed, 16 insertions(+)
 
-diff --git a/arch/arm/boot/dts/uniphier-ld4-ref.dts b/arch/arm/boot/dts/uniphier-ld4-ref.dts
-index 148e7bb..0056852 100644
---- a/arch/arm/boot/dts/uniphier-ld4-ref.dts
-+++ b/arch/arm/boot/dts/uniphier-ld4-ref.dts
-@@ -53,6 +53,14 @@
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts b/arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts
+index 77f50fd..dd7193a 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts
+@@ -48,6 +48,14 @@
  	status = "okay";
  };
  
 +&gpio {
-+	xirq1 {
++	xirq0 {
 +		gpio-hog;
-+		gpios = <121 0>;
++		gpios = <120 0>;
 +		input;
 +	};
 +};
@@ -39,49 +37,11 @@ index 148e7bb..0056852 100644
  &i2c0 {
  	status = "okay";
  };
-diff --git a/arch/arm/boot/dts/uniphier-ld6b-ref.dts b/arch/arm/boot/dts/uniphier-ld6b-ref.dts
-index ec2a098..0e510a7 100644
---- a/arch/arm/boot/dts/uniphier-ld6b-ref.dts
-+++ b/arch/arm/boot/dts/uniphier-ld6b-ref.dts
-@@ -55,6 +55,14 @@
- 	status = "okay";
- };
- 
-+&gpio {
-+	xirq4 {
-+		gpio-hog;
-+		gpios = <124 0>;
-+		input;
-+	};
-+};
-+
- &i2c0 {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/uniphier-pro4-ref.dts b/arch/arm/boot/dts/uniphier-pro4-ref.dts
-index 7316cc6..be99467 100644
---- a/arch/arm/boot/dts/uniphier-pro4-ref.dts
-+++ b/arch/arm/boot/dts/uniphier-pro4-ref.dts
-@@ -55,6 +55,14 @@
- 	status = "okay";
- };
- 
-+&gpio {
-+	xirq2 {
-+		gpio-hog;
-+		gpios = <122 0>;
-+		input;
-+	};
-+};
-+
- &i2c0 {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/uniphier-sld8-ref.dts b/arch/arm/boot/dts/uniphier-sld8-ref.dts
-index 4ec48a1..1c0e707 100644
---- a/arch/arm/boot/dts/uniphier-sld8-ref.dts
-+++ b/arch/arm/boot/dts/uniphier-sld8-ref.dts
-@@ -53,6 +53,14 @@
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts b/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
+index 1f55fe1..d99e373 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
+@@ -48,6 +48,14 @@
  	status = "okay";
  };
  
