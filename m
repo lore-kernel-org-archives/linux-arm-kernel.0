@@ -1,156 +1,70 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 18 Oct 2017 13:24:32 +0900
-Subject: [PATCH 1/6] ARM: dts: uniphier: add GPIO controller nodes
-In-Reply-To: <1508300677-23190-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1508300677-23190-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1508300677-23190-2-git-send-email-yamada.masahiro@socionext.com>
+From: architt@codeaurora.org (Archit Taneja)
+Date: Wed, 18 Oct 2017 10:16:08 +0530
+Subject: [RFC PATCH v4 6/8] drm/bridge/analogix: Do not use device's
+ drvdata
+In-Reply-To: <000101d347a1$cd216160$67642420$@gmail.com>
+References: <20171017101624.12506-1-jeffy.chen@rock-chips.com>
+ <20171017101624.12506-7-jeffy.chen@rock-chips.com>
+ <000101d347a1$cd216160$67642420$@gmail.com>
+Message-ID: <c11c1115-58fb-f6d4-56f8-05277a9ccea9@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPIO controller also acts as an interrupt controller and the
-interrupt lines are connected to the AIDET block.
+Hi,
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+On 10/18/2017 05:13 AM, Jingoo Han wrote:
+> On Tuesday, October 17, 2017 6:16 AM, Jeffy Chen wrote:
+>>
+>> From: Tomasz Figa <tfiga@chromium.org>
+>>
+>> The driver that instantiates the bridge should own the drvdata, as all
+>> driver model callbacks (probe, remove, shutdown, PM ops, etc.) are also
+>> owned by its driver struct. Moreover, storing two different pointer
+>> types in driver data depending on driver initialization status is barely
+>> a good practice and in fact has led to many bugs in this driver.
+>>
+>> Let's clean up this mess and change Analogix entry points to simply
+>> accept some opaque struct pointer, adjusting their users at the same
+>> time to avoid breaking the compilation.
+>>
+>> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+>> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+>> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+> 
 
- arch/arm/boot/dts/uniphier-ld4.dtsi  | 14 ++++++++++++++
- arch/arm/boot/dts/uniphier-pro4.dtsi | 14 ++++++++++++++
- arch/arm/boot/dts/uniphier-pro5.dtsi | 14 ++++++++++++++
- arch/arm/boot/dts/uniphier-pxs2.dtsi | 17 +++++++++++++++++
- arch/arm/boot/dts/uniphier-sld8.dtsi | 18 ++++++++++++++++++
- 5 files changed, 77 insertions(+)
+This depends on previous patches of the series. I guess it would be easier
+to queue this to drm-misc as a part of the eDP support series. For that:
 
-diff --git a/arch/arm/boot/dts/uniphier-ld4.dtsi b/arch/arm/boot/dts/uniphier-ld4.dtsi
-index 79183db..b0151c4 100644
---- a/arch/arm/boot/dts/uniphier-ld4.dtsi
-+++ b/arch/arm/boot/dts/uniphier-ld4.dtsi
-@@ -103,6 +103,20 @@
- 			clocks = <&peri_clk 3>;
- 		};
- 
-+		gpio: gpio at 55000000 {
-+			compatible = "socionext,uniphier-gpio";
-+			reg = <0x55000000 0x200>;
-+			interrupt-parent = <&aidet>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-ranges = <&pinctrl 0 0 0>;
-+			gpio-ranges-group-names = "gpio_range";
-+			ngpios = <136>;
-+			socionext,interrupt-ranges = <0 48 13>, <14 62 2>;
-+		};
-+
- 		i2c0: i2c at 58400000 {
- 			compatible = "socionext,uniphier-i2c";
- 			status = "disabled";
-diff --git a/arch/arm/boot/dts/uniphier-pro4.dtsi b/arch/arm/boot/dts/uniphier-pro4.dtsi
-index b3dbbd9b..2921729 100644
---- a/arch/arm/boot/dts/uniphier-pro4.dtsi
-+++ b/arch/arm/boot/dts/uniphier-pro4.dtsi
-@@ -111,6 +111,20 @@
- 			clocks = <&peri_clk 3>;
- 		};
- 
-+		gpio: gpio at 55000000 {
-+			compatible = "socionext,uniphier-gpio";
-+			reg = <0x55000000 0x200>;
-+			interrupt-parent = <&aidet>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-ranges = <&pinctrl 0 0 0>;
-+			gpio-ranges-group-names = "gpio_range";
-+			ngpios = <248>;
-+			socionext,interrupt-ranges = <0 48 16>, <16 154 5>;
-+		};
-+
- 		i2c0: i2c at 58780000 {
- 			compatible = "socionext,uniphier-fi2c";
- 			status = "disabled";
-diff --git a/arch/arm/boot/dts/uniphier-pro5.dtsi b/arch/arm/boot/dts/uniphier-pro5.dtsi
-index b026bcd..c5d9501 100644
---- a/arch/arm/boot/dts/uniphier-pro5.dtsi
-+++ b/arch/arm/boot/dts/uniphier-pro5.dtsi
-@@ -198,6 +198,20 @@
- 			clocks = <&peri_clk 3>;
- 		};
- 
-+		gpio: gpio at 55000000 {
-+			compatible = "socionext,uniphier-gpio";
-+			reg = <0x55000000 0x200>;
-+			interrupt-parent = <&aidet>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-ranges = <&pinctrl 0 0 0>;
-+			gpio-ranges-group-names = "gpio_range";
-+			ngpios = <248>;
-+			socionext,interrupt-ranges = <0 48 16>, <16 154 5>;
-+		};
-+
- 		i2c0: i2c at 58780000 {
- 			compatible = "socionext,uniphier-fi2c";
- 			status = "disabled";
-diff --git a/arch/arm/boot/dts/uniphier-pxs2.dtsi b/arch/arm/boot/dts/uniphier-pxs2.dtsi
-index 90b020c..4d83001 100644
---- a/arch/arm/boot/dts/uniphier-pxs2.dtsi
-+++ b/arch/arm/boot/dts/uniphier-pxs2.dtsi
-@@ -173,6 +173,23 @@
- 			clocks = <&peri_clk 3>;
- 		};
- 
-+		gpio: gpio at 55000000 {
-+			compatible = "socionext,uniphier-gpio";
-+			reg = <0x55000000 0x200>;
-+			interrupt-parent = <&aidet>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-ranges = <&pinctrl 0 0 0>,
-+				      <&pinctrl 96 0 0>;
-+			gpio-ranges-group-names = "gpio_range0",
-+						  "gpio_range1";
-+			ngpios = <232>;
-+			socionext,interrupt-ranges = <0 48 16>, <16 154 5>,
-+						     <21 217 3>;
-+		};
-+
- 		i2c0: i2c at 58780000 {
- 			compatible = "socionext,uniphier-fi2c";
- 			status = "disabled";
-diff --git a/arch/arm/boot/dts/uniphier-sld8.dtsi b/arch/arm/boot/dts/uniphier-sld8.dtsi
-index b083903..09e52c8 100644
---- a/arch/arm/boot/dts/uniphier-sld8.dtsi
-+++ b/arch/arm/boot/dts/uniphier-sld8.dtsi
-@@ -103,6 +103,24 @@
- 			clocks = <&peri_clk 3>;
- 		};
- 
-+		gpio: gpio at 55000000 {
-+			compatible = "socionext,uniphier-gpio";
-+			reg = <0x55000000 0x200>;
-+			interrupt-parent = <&aidet>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-ranges = <&pinctrl 0 0 0>,
-+				      <&pinctrl 104 0 0>,
-+				      <&pinctrl 112 0 0>;
-+			gpio-ranges-group-names = "gpio_range0",
-+						  "gpio_range1",
-+						  "gpio_range2";
-+			ngpios = <136>;
-+			socionext,interrupt-ranges = <0 48 13>, <14 62 2>;
-+		};
-+
- 		i2c0: i2c at 58400000 {
- 			compatible = "socionext,uniphier-i2c";
- 			status = "disabled";
+Acked-by: Archit Taneja <architt@codeaurora.org>
+
+> Acked-by: Jingoo Han <jingoohan1@gmail.com>
+> 
+> Best regards,
+> Jingoo Han
+> 
+>> ---
+>>
+>> Changes in v4: None
+>> Changes in v3: None
+>> Changes in v2: None
+>>
+>>   drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 50 +++++++++--------
+>> -----
+>>   drivers/gpu/drm/exynos/exynos_dp.c                 | 26 ++++++-----
+>>   drivers/gpu/drm/rockchip/analogix_dp-rockchip.c    | 47
+> +++++++++++-------
+>> --
+>>   include/drm/bridge/analogix_dp.h                   | 19 ++++----
+>>   4 files changed, 73 insertions(+), 69 deletions(-)
+>>
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
 -- 
-2.7.4
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
