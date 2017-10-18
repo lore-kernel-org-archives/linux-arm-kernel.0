@@ -1,70 +1,30 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 18 Oct 2017 10:20:29 +0100
-Subject: [PATCH v8 7/8] dt-bindings: Document devicetree binding for ARM
- DSU PMU
-In-Reply-To: <20171010103303.32436-8-suzuki.poulose@arm.com>
-References: <20171010103303.32436-1-suzuki.poulose@arm.com>
- <20171010103303.32436-8-suzuki.poulose@arm.com>
-Message-ID: <20171018092028.iy3x7j2v4twblm5n@lakrids.cambridge.arm.com>
+From: bp@suse.de (Borislav Petkov)
+Date: Wed, 18 Oct 2017 11:25:47 +0200
+Subject: [PATCH v5 2/2] acpi: apei: Add SEI notification type support for
+ ARMv8
+In-Reply-To: <4b51bd4e-2bf7-3aed-f17c-565b49781009@huawei.com>
+References: <1508227341-15651-1-git-send-email-gengdongjiu@huawei.com>
+ <1508227341-15651-2-git-send-email-gengdongjiu@huawei.com>
+ <20171017170635.qb4sqyrsnndgbuni@pd.tnic>
+ <0bcba052-700b-5ee8-88fc-aaf8cc6b1d37@huawei.com>
+ <20171018090649.e7qgdf2dwmr7yxc3@pd.tnic>
+ <4b51bd4e-2bf7-3aed-f17c-565b49781009@huawei.com>
+Message-ID: <20171018092547.guf54e6aqbzzfxrq@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 10, 2017 at 11:33:02AM +0100, Suzuki K Poulose wrote:
-> This patch documents the devicetree bindings for ARM DSU PMU.
-> 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: devicetree at vger.kernel.org
-> Cc: frowand.list at gmail.com
-> Acked-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+On Wed, Oct 18, 2017 at 05:17:27PM +0800, gengdongjiu wrote:
+> Thanks Borislav, can I write it as asynchronous exception or
+> asynchronous abort?
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+WTF?!
 
-Thanks,
-Mark.
+The thing is abbreviated as "SEI" and apparently means "System Error
+Interrupt". Nothing else.
 
-> ---
-> Changes since V3:
->  - Fixed node name in the example, suggested by Rob
-> ---
->  .../devicetree/bindings/arm/arm-dsu-pmu.txt        | 27 ++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/arm-dsu-pmu.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/arm-dsu-pmu.txt b/Documentation/devicetree/bindings/arm/arm-dsu-pmu.txt
-> new file mode 100644
-> index 000000000000..6efabba530f1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/arm-dsu-pmu.txt
-> @@ -0,0 +1,27 @@
-> +* ARM DynamIQ Shared Unit (DSU) Performance Monitor Unit (PMU)
-> +
-> +ARM DyanmIQ Shared Unit (DSU) integrates one or more CPU cores
-> +with a shared L3 memory system, control logic and external interfaces to
-> +form a multicore cluster. The PMU enables to gather various statistics on
-> +the operations of the DSU. The PMU provides independent 32bit counters that
-> +can count any of the supported events, along with a 64bit cycle counter.
-> +The PMU is accessed via CPU system registers and has no MMIO component.
-> +
-> +** DSU PMU required properties:
-> +
-> +- compatible	: should be one of :
-> +
-> +		"arm,dsu-pmu"
-> +
-> +- interrupts	: Exactly 1 SPI must be listed.
-> +
-> +- cpus		: List of phandles for the CPUs connected to this DSU instance.
-> +
-> +
-> +** Example:
-> +
-> +dsu-pmu-0 {
-> +	compatible = "arm,dsu-pmu";
-> +	interrupts = <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>;
-> +	cpus = <&cpu_0>, <&cpu_1>;
-> +};
-> -- 
-> 2.13.6
-> 
+-- 
+Regards/Gruss,
+    Boris.
+
+SUSE Linux GmbH, GF: Felix Imend?rffer, Jane Smithard, Graham Norton, HRB 21284 (AG N?rnberg)
+-- 
