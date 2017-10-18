@@ -1,48 +1,75 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Wed, 18 Oct 2017 20:21:36 +0800
-Subject: [PATCH 2/6] ARM: sun8i: r40: add USB host port nodes for R40
-In-Reply-To: <20171016120633.6jof6wvsre27rxhv@flea.lan>
-References: <20171008042906.46779-1-icenowy@aosc.io>
- <20171008042906.46779-3-icenowy@aosc.io>
- <20171009210340.ak6wo3vqnwj4gom4@flea.home>
- <55B35500-67FC-40AA-9A07-98C843DE55B3@aosc.io>
- <20171016093229.waizww2n4gwn4qpw@flea.lan>
- <7ee77556174b84846a59d57525ec1cb9@aosc.io>
- <20171016120633.6jof6wvsre27rxhv@flea.lan>
-Message-ID: <9c98d27b0cf6afb76edf651e67ec2226@aosc.io>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Wed, 18 Oct 2017 14:25:18 +0200
+Subject: [PATCH v5 2/4] clocksource: stm32: only use 32 bits timers
+In-Reply-To: <78e4bf06-7e95-d863-3b3d-c7362643da90@arm.com>
+References: <1508312614-27750-1-git-send-email-benjamin.gaignard@linaro.org>
+ <1508312614-27750-3-git-send-email-benjamin.gaignard@linaro.org>
+ <78e4bf06-7e95-d863-3b3d-c7362643da90@arm.com>
+Message-ID: <CA+M3ks5wA08zyt-Z9PPyuEXjayL3LVY+=GWn6A1RBOUU+Qff5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-10-16 20:06?Maxime Ripard ???
-> On Mon, Oct 16, 2017 at 05:39:58PM +0800, icenowy at aosc.io wrote:
->> ? 2017-10-16 17:32?Maxime Ripard ???
->> > On Tue, Oct 10, 2017 at 07:24:28AM +0800, Icenowy Zheng wrote:
->> > > >> +			interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
->> > > >> +			clocks = <&ccu CLK_BUS_OHCI1>,
->> > > >> +				 <&ccu CLK_BUS_EHCI1>,
->> > > >> +				 <&ccu CLK_USB_OHCI1>;
->> > > >> +			resets = <&ccu RST_BUS_OHCI1>,
->> > > >> +				 <&ccu RST_BUS_EHCI1>;
->> > > >
->> > > >Why do you need to take the OHCI resources too?
->> > >
->> > > AW's strange design -- without OHCI resources taken EHCI
->> > > won't work.
->> >
->> > How has this been tested?
->> 
->> As EHCI is probed before OHCI, this behavior is easy to
->> appear if the OHCI resources are removed.
-> 
-> And what is "this behaviour" exactly?
-> 
-> What have you tested, what device did you connect, what is the outcome
-> that isn't something you expected, etc.
+2017-10-18 10:21 GMT+02:00 Julien Thierry <julien.thierry@arm.com>:
+>
+>
+> On 18/10/17 08:43, Benjamin Gaignard wrote:
+>>
+>> 16 bits hardware are not enough accure to be used.
+>> Do no allow them to be probed by tested max counter value.
+>>
+>> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+>> ---
+>>   drivers/clocksource/timer-stm32.c | 23 +++++++++--------------
+>>   1 file changed, 9 insertions(+), 14 deletions(-)
+>>
+>> diff --git a/drivers/clocksource/timer-stm32.c
+>> b/drivers/clocksource/timer-stm32.c
+>> index abff21c..f7e4eec 100644
+>> --- a/drivers/clocksource/timer-stm32.c
+>> +++ b/drivers/clocksource/timer-stm32.c
+>> @@ -81,9 +81,9 @@ static irqreturn_t stm32_clock_event_handler(int irq,
+>> void *dev_id)
+>>   static int __init stm32_clockevent_init(struct device_node *node)
+>>   {
+>>         struct reset_control *rstc;
+>> -       unsigned long max_delta;
+>> -       int ret, bits, prescaler = 1;
+>> +       unsigned long max_arr;
+>>         struct timer_of *to;
+>> +       int ret;
+>>         to = kzalloc(sizeof(*to), GFP_KERNEL);
+>>         if (!to)
+>> @@ -113,26 +113,21 @@ static int __init stm32_clockevent_init(struct
+>> device_node *node)
+>>         /* Detect whether the timer is 16 or 32 bits */
+>>         writel_relaxed(~0U, timer_of_base(to) + TIM_ARR);
+>> -       max_delta = readl_relaxed(timer_of_base(to) + TIM_ARR);
+>> -       if (max_delta == ~0U) {
+>> -               prescaler = 1;
+>> -               bits = 32;
+>> -       } else {
+>> -               prescaler = 1024;
+>> -               bits = 16;
+>> +       max_arr = readl_relaxed(timer_of_base(to) + TIM_ARR);
+>> +       if (max_arr != ~0U) {
+>> +               pr_err("32 bits timer is needed\n");
+>> +               return -EINVAL;
+>
+>
+> Same as with previous patch, I think "to" should get freed.
 
-Oh sorry this weird behavior doesn't exist on R40, although it do exist
-on H3/H5/A64.
+Yes I could solve that in the first patch
 
-I will fix this in the next version.
+>
+> Also, why is there no function to undo what timer_of_init did? Shouldn't we
+> be able to free the irqs and unmap the timer io base here?
 
-> 
-> Maxime
+timer-of doesn't provide deinit function since I will have to do a new version
+I will add it.
+
+Benjamin
+>
+> Cheers,
+>
+> --
+> Julien Thierry
