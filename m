@@ -1,36 +1,134 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 18 Oct 2017 13:58:49 +0100
-Subject: [PATCH v2 1/3] iommu/arm-smmu-v3: put off the execution of TLBI*
- to reduce lock confliction
-In-Reply-To: <1505221238-9428-2-git-send-email-thunder.leizhen@huawei.com>
-References: <1505221238-9428-1-git-send-email-thunder.leizhen@huawei.com>
- <1505221238-9428-2-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <20171018125849.GD4077@arm.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Wed, 18 Oct 2017 14:58:26 +0200
+Subject: [PATCH v6 5/5] arm: dts: stm32: remove useless clocksource nodes
+In-Reply-To: <1508331506-23782-1-git-send-email-benjamin.gaignard@linaro.org>
+References: <1508331506-23782-1-git-send-email-benjamin.gaignard@linaro.org>
+Message-ID: <1508331506-23782-6-git-send-email-benjamin.gaignard@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thunder,
+16 bits timers aren't accurate enough to be used as
+clocksource, remove them from stm32f4 and stm32f7 devicetree.
 
-On Tue, Sep 12, 2017 at 09:00:36PM +0800, Zhen Lei wrote:
-> Because all TLBI commands should be followed by a SYNC command, to make
-> sure that it has been completely finished. So we can just add the TLBI
-> commands into the queue, and put off the execution until meet SYNC or
-> other commands. To prevent the followed SYNC command waiting for a long
-> time because of too many commands have been delayed, restrict the max
-> delayed number.
-> 
-> According to my test, I got the same performance data as I replaced writel
-> with writel_relaxed in queue_inc_prod.
-> 
-> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> ---
->  drivers/iommu/arm-smmu-v3.c | 42 +++++++++++++++++++++++++++++++++++++-----
->  1 file changed, 37 insertions(+), 5 deletions(-)
+Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+---
+ arch/arm/boot/dts/stm32f429.dtsi | 32 --------------------------------
+ arch/arm/boot/dts/stm32f746.dtsi | 32 --------------------------------
+ 2 files changed, 64 deletions(-)
 
-If we want to go down the route of explicit command batching, I'd much
-rather do it by implementing the iotlb_range_add callback in the driver,
-and have a fixed-length array of batched ranges on the domain. We could
-potentially toggle this function pointer based on the compatible string too,
-if it shows only to benefit some systems.
-
-Will
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+index dd7e99b..ac9a3e6 100644
+--- a/arch/arm/boot/dts/stm32f429.dtsi
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -108,14 +108,6 @@
+ 			};
+ 		};
+ 
+-		timer3: timer at 40000400 {
+-			compatible = "st,stm32-timer";
+-			reg = <0x40000400 0x400>;
+-			interrupts = <29>;
+-			clocks = <&rcc 0 STM32F4_APB1_CLOCK(TIM3)>;
+-			status = "disabled";
+-		};
+-
+ 		timers3: timers at 40000400 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -137,14 +129,6 @@
+ 			};
+ 		};
+ 
+-		timer4: timer at 40000800 {
+-			compatible = "st,stm32-timer";
+-			reg = <0x40000800 0x400>;
+-			interrupts = <30>;
+-			clocks = <&rcc 0 STM32F4_APB1_CLOCK(TIM4)>;
+-			status = "disabled";
+-		};
+-
+ 		timers4: timers at 40000800 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -194,14 +178,6 @@
+ 			};
+ 		};
+ 
+-		timer6: timer at 40001000 {
+-			compatible = "st,stm32-timer";
+-			reg = <0x40001000 0x400>;
+-			interrupts = <54>;
+-			clocks = <&rcc 0 STM32F4_APB1_CLOCK(TIM6)>;
+-			status = "disabled";
+-		};
+-
+ 		timers6: timers at 40001000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -218,14 +194,6 @@
+ 			};
+ 		};
+ 
+-		timer7: timer at 40001400 {
+-			compatible = "st,stm32-timer";
+-			reg = <0x40001400 0x400>;
+-			interrupts = <55>;
+-			clocks = <&rcc 0 STM32F4_APB1_CLOCK(TIM7)>;
+-			status = "disabled";
+-		};
+-
+ 		timers7: timers at 40001400 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+diff --git a/arch/arm/boot/dts/stm32f746.dtsi b/arch/arm/boot/dts/stm32f746.dtsi
+index 5633860..a9077e6 100644
+--- a/arch/arm/boot/dts/stm32f746.dtsi
++++ b/arch/arm/boot/dts/stm32f746.dtsi
+@@ -82,22 +82,6 @@
+ 			status = "disabled";
+ 		};
+ 
+-		timer3: timer at 40000400 {
+-			compatible = "st,stm32-timer";
+-			reg = <0x40000400 0x400>;
+-			interrupts = <29>;
+-			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM3)>;
+-			status = "disabled";
+-		};
+-
+-		timer4: timer at 40000800 {
+-			compatible = "st,stm32-timer";
+-			reg = <0x40000800 0x400>;
+-			interrupts = <30>;
+-			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM4)>;
+-			status = "disabled";
+-		};
+-
+ 		timer5: timer at 40000c00 {
+ 			compatible = "st,stm32-timer";
+ 			reg = <0x40000c00 0x400>;
+@@ -105,22 +89,6 @@
+ 			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM5)>;
+ 		};
+ 
+-		timer6: timer at 40001000 {
+-			compatible = "st,stm32-timer";
+-			reg = <0x40001000 0x400>;
+-			interrupts = <54>;
+-			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM6)>;
+-			status = "disabled";
+-		};
+-
+-		timer7: timer at 40001400 {
+-			compatible = "st,stm32-timer";
+-			reg = <0x40001400 0x400>;
+-			interrupts = <55>;
+-			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM7)>;
+-			status = "disabled";
+-		};
+-
+ 		rtc: rtc at 40002800 {
+ 			compatible = "st,stm32-rtc";
+ 			reg = <0x40002800 0x400>;
+-- 
+2.7.4
