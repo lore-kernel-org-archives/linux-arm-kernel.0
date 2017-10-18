@@ -1,41 +1,68 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 17 Oct 2017 21:06:20 -0500
-Subject: [RFCv2 PATCH 12/36] dt-bindings: document stall and PASID
- properties for IOMMU masters
-In-Reply-To: <e7288f51-1cfa-44ce-e3ce-e9f3daf91579@arm.com>
-References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
- <20171006133203.22803-13-jean-philippe.brucker@arm.com>
- <20171013191051.lgxbcobkzzj5guhv@rob-hp-laptop>
- <e7288f51-1cfa-44ce-e3ce-e9f3daf91579@arm.com>
-Message-ID: <CAL_JsqLFDeNq=PoipFv4qjKKP2mhE+2Eou4dBZhfm=XuXxjHrg@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 18 Oct 2017 11:08:28 +0900
+Subject: [PATCH v4 8/8] PM / devfreq: exynos-bus: Register cooling device
+In-Reply-To: <CAJ0PZbRkfNt5eQK5qzunAnFiGmwEF1Dj-TKuqXNhxhN=BxzVEw@mail.gmail.com>
+References: <CGME20171013074837epcas1p49957bd030fc1a27cc845d63c50ad0aba@epcas1p4.samsung.com>
+ <1507880904-31956-1-git-send-email-cw00.choi@samsung.com>
+ <1507880904-31956-9-git-send-email-cw00.choi@samsung.com>
+ <CAJ0PZbRkfNt5eQK5qzunAnFiGmwEF1Dj-TKuqXNhxhN=BxzVEw@mail.gmail.com>
+Message-ID: <59E6B79C.2040000@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 16, 2017 at 5:23 AM, Jean-Philippe Brucker
-<jean-philippe.brucker@arm.com> wrote:
-> On 13/10/17 20:10, Rob Herring wrote:
->> On Fri, Oct 06, 2017 at 02:31:39PM +0100, Jean-Philippe Brucker wrote:
->>> On ARM systems, some platform devices behind an IOMMU may support stall
->>> and PASID features. Stall is the ability to recover from page faults and
->>> PASID offers multiple process address spaces to the device. Together they
->>> allow to do paging with a device. Let the firmware tell us when a device
->>> supports stall and PASID.
+Hi,
+
+On 2017? 10? 18? 00:11, MyungJoo Ham wrote:
+> On Fri, Oct 13, 2017 at 4:48 PM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+>> This patch registers the Exynos Bus-Frequency scaling device
+>> as a cooling device of thermal management.
 >>
->> Can't these be implied by the compatible string of the devices?
->
-> I think that PASID capacity can be deduced from the compatible string but
-> don't know how these devices will be implemented (the only known example
-> being a software model for testing). In any case implementing PASID based
-> on the compatible string is tricky, because the IOMMU driver needs to know
-> PASID capacity before the device driver has had time to probe the device.
-> Maybe we could get away with a static table associating compatible string
-> to PASID capacity, but it's not very nice.
->
-> For stall it's a property of the integration between device and IOMMU,
-> much like the "iommus" property, so it can't be deduced only from the
-> compatible string. It's crucial that the firmware validates that stalling
-> is safe, because we don't have any other way to discover it.
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Cc: Kukjin Kim <kgene@kernel.org>
+>> Cc: Krzysztof Kozlowski <krzk@kernel.org>
+>> Cc: linux-samsung-soc at vger.kernel.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: linux-kernel at vger.kernel.org
+> 
+> I've got a question below.
+> 
+>> ---
+>>  drivers/devfreq/exynos-bus.c | 27 +++++++++++++++++++++++++++
+>>  1 file changed, 27 insertions(+)
+>>
+>> diff --git a/drivers/devfreq/exynos-bus.c b/drivers/devfreq/exynos-bus.c
+>> index c25658b26598..1c7521b65c2f 100644
+> []> @@ -468,6 +471,19 @@ static int exynos_bus_probe(struct
+> platform_device *pdev)
+>>                 goto err;
+>>         }
+>>
+>> +       /*
+>> +        * Register devfreq cooling device if thermal DT code
+>> +        * takes care of matching them.
+>> +        */
+>> +       if (of_find_property(np, "#cooling-cells", NULL)) {
+>> +               bus->cdev = of_devfreq_cooling_register(np, bus->devfreq);
+>> +               if (IS_ERR(bus->cdev)) {
+>> +                       dev_err(dev, "running exynos-bus without cooling device\n");
+>> +                       bus->cdev = NULL;
+>> +               }
+>> +       }
+>> +       of_node_put(np);
+> 
+> Is this of_node_put() is a pair of of_find_property? or for something else?
+> (do you need to call put for of_find_property? or for something else?
+> I'm not seeing a function with "get")
 
-Okay, fair enough. I'll let others comment.
+You're right. The of_node_put(np) call is unneeded.
+Actually, the extcon-bus.c have to use the of_node_get instead of accessing
+the 'dev->of_node' directly.
 
-Rob
+And, when I test this patch, I got a bug related to passive governor.
+I need more time for debugging and redevelopment.
+So, I'll drop this patch on next patchset (v5).
+
+-- 
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
