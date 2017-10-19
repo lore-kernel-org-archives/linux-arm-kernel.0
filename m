@@ -1,136 +1,23 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 19 Oct 2017 16:55:32 +0100
-Subject: [PATCH 2/4] arm64: traps: Don't print stack or raw PC/LR values in
- backtraces
-In-Reply-To: <1508428534-20694-1-git-send-email-will.deacon@arm.com>
-References: <1508428534-20694-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1508428534-20694-3-git-send-email-will.deacon@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 19 Oct 2017 17:57:24 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v4.15
+In-Reply-To: <cover.1506325167.git.horms+renesas@verge.net.au>
+References: <cover.1506325167.git.horms+renesas@verge.net.au>
+Message-ID: <CAK8P3a1oEmmXja55SPqhO+z0O3Xh7hRr+tODtLNCjTjsb-z70Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Printing raw pointer values in backtraces has potential security
-implications and are of questionable value anyway.
+On Mon, Sep 25, 2017 at 9:53 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+>   ARM: multi_v7_defconfig: Enable BQ32000 RTC driver (2017-09-18 07:57:41 +0200)
+>
+> ----------------------------------------------------------------
+> Renesas ARM Based SoC Defconfig Updates for v4.15
+>
+> Enable BQ32000 RTC driver in multi_v7_defconfig.
+>
+> Biju Das says, "The iWave RZ/G1M Q7 SOM supports RTC (TI BQ32000).
+> To increase hardware support enable the driver in the
+> multi_v7_defconfig multiplatform configuration."
 
-This patch follows x86's lead and removes the "Exception stack:" dump
-from kernel backtraces, as well as converting PC/LR values to symbols
-such as "sysrq_handle_crash+0x20/0x30".
-
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/process.c |  8 +++---
- arch/arm64/kernel/traps.c   | 65 +++------------------------------------------
- 2 files changed, 6 insertions(+), 67 deletions(-)
-
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 2dc0f8482210..c20896b8fb2d 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -186,11 +186,9 @@ void __show_regs(struct pt_regs *regs)
- 	}
- 
- 	show_regs_print_info(KERN_DEFAULT);
--	print_symbol("PC is at %s\n", instruction_pointer(regs));
--	print_symbol("LR is at %s\n", lr);
--	printk("pc : [<%016llx>] lr : [<%016llx>] pstate: %08llx\n",
--	       regs->pc, lr, regs->pstate);
--	printk("sp : %016llx\n", sp);
-+	print_symbol("pc : %s\n", regs->pc);
-+	print_symbol("lr : %s\n", lr);
-+	printk("sp : %016llx pstate : %08llx\n", sp, regs->pstate);
- 
- 	i = top_reg;
- 
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 5ea4b85aee0e..57794773863c 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -58,55 +58,9 @@ static const char *handler[]= {
- 
- int show_unhandled_signals = 1;
- 
--/*
-- * Dump out the contents of some kernel memory nicely...
-- */
--static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
--		     unsigned long top)
--{
--	unsigned long first;
--	mm_segment_t fs;
--	int i;
--
--	/*
--	 * We need to switch to kernel mode so that we can use __get_user
--	 * to safely read from kernel space.
--	 */
--	fs = get_fs();
--	set_fs(KERNEL_DS);
--
--	printk("%s%s(0x%016lx to 0x%016lx)\n", lvl, str, bottom, top);
--
--	for (first = bottom & ~31; first < top; first += 32) {
--		unsigned long p;
--		char str[sizeof(" 12345678") * 8 + 1];
--
--		memset(str, ' ', sizeof(str));
--		str[sizeof(str) - 1] = '\0';
--
--		for (p = first, i = 0; i < (32 / 8)
--					&& p < top; i++, p += 8) {
--			if (p >= bottom && p < top) {
--				unsigned long val;
--
--				if (__get_user(val, (unsigned long *)p) == 0)
--					sprintf(str + i * 17, " %016lx", val);
--				else
--					sprintf(str + i * 17, " ????????????????");
--			}
--		}
--		printk("%s%04lx:%s\n", lvl, first & 0xffff, str);
--	}
--
--	set_fs(fs);
--}
--
- static void dump_backtrace_entry(unsigned long where)
- {
--	/*
--	 * Note that 'where' can have a physical address, but it's not handled.
--	 */
--	print_ip_sym(where);
-+	printk(" %pS\n", (void *)where);
- }
- 
- static void __dump_instr(const char *lvl, struct pt_regs *regs)
-@@ -171,10 +125,7 @@ void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
- 
- 	skip = !!regs;
- 	printk("Call trace:\n");
--	while (1) {
--		unsigned long stack;
--		int ret;
--
-+	do {
- 		/* skip until specified stack frame */
- 		if (!skip) {
- 			dump_backtrace_entry(frame.pc);
-@@ -189,17 +140,7 @@ void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
- 			 */
- 			dump_backtrace_entry(regs->pc);
- 		}
--		ret = unwind_frame(tsk, &frame);
--		if (ret < 0)
--			break;
--		if (in_entry_text(frame.pc)) {
--			stack = frame.fp - offsetof(struct pt_regs, stackframe);
--
--			if (on_accessible_stack(tsk, stack))
--				dump_mem("", "Exception stack", stack,
--					 stack + sizeof(struct pt_regs));
--		}
--	}
-+	} while (!unwind_frame(tsk, &frame));
- 
- 	put_task_stack(tsk);
- }
--- 
-2.1.4
+Pulled into next/soc, thanks!
