@@ -1,109 +1,167 @@
 From: james.morse@arm.com (James Morse)
-Date: Thu, 19 Oct 2017 15:58:07 +0100
-Subject: [PATCH v4 21/21] KVM: arm64: Trap RAS error registers and set
- HCR_EL2's TERR & TEA
+Date: Thu, 19 Oct 2017 15:58:00 +0100
+Subject: [PATCH v4 14/21] arm64: kernel: Prepare for a DISR user
 In-Reply-To: <20171019145807.23251-1-james.morse@arm.com>
 References: <20171019145807.23251-1-james.morse@arm.com>
-Message-ID: <20171019145807.23251-22-james.morse@arm.com>
+Message-ID: <20171019145807.23251-15-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dongjiu Geng <gengdongjiu@huawei.com>
+KVM would like to consume any pending SError (or RAS error) after guest
+exit. Today it has to unmask SError and use dsb+isb to synchronise the
+CPU. With the RAS extensions we can use ESB to synchronise any pending
+SError.
 
-ARMv8.2 adds a new bit HCR_EL2.TEA which routes synchronous external
-aborts to EL2, and adds a trap control bit HCR_EL2.TERR which traps
-all Non-secure EL1&0 error record accesses to EL2.
+Add the necessary macros to allow DISR to be read and converted to an
+ESR.
 
-This patch enables the two bits for the guest OS, guaranteeing that
-KVM takes external aborts and traps attempts to access the physical
-error registers.
+We clear the DISR register when we enable the RAS cpufeature. While the
+kernel has issued ESB instructions before this point it has only done so
+with SError unmasked, any value we find in DISR must have belonged to
+firmware. Executing an ESB instruction is the only way to update DISR,
+so we can expect firmware to have handled any deferred SError. By the
+same logic we clear DISR in the idle path.
 
-ERRIDR_EL1 advertises the number of error records, we return
-zero meaning we can treat all the other registers as RAZ/WI too.
-
-Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
-[removed specific emulation, use trap_raz_wi() directly for everything,
- rephrased parts of the commit message]
 Signed-off-by: James Morse <james.morse@arm.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/include/asm/kvm_arm.h     |  2 ++
- arch/arm64/include/asm/kvm_emulate.h |  7 +++++++
- arch/arm64/include/asm/sysreg.h      | 10 ++++++++++
- arch/arm64/kvm/sys_regs.c            | 10 ++++++++++
- 4 files changed, 29 insertions(+)
+ arch/arm64/include/asm/assembler.h |  7 +++++++
+ arch/arm64/include/asm/esr.h       |  7 +++++++
+ arch/arm64/include/asm/exception.h | 14 ++++++++++++++
+ arch/arm64/include/asm/processor.h |  1 +
+ arch/arm64/include/asm/sysreg.h    |  1 +
+ arch/arm64/kernel/cpufeature.c     |  9 +++++++++
+ arch/arm64/mm/proc.S               |  5 +++++
+ 7 files changed, 44 insertions(+)
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 61d694c2eae5..1188272003c4 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -23,6 +23,8 @@
- #include <asm/types.h>
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index e4ac505b7b3d..7a918a4cf4f7 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -109,6 +109,13 @@
+ 	.endm
  
- /* Hyp Configuration Register (HCR) bits */
-+#define HCR_TEA		(UL(1) << 37)
-+#define HCR_TERR	(UL(1) << 36)
- #define HCR_E2H		(UL(1) << 34)
- #define HCR_ID		(UL(1) << 33)
- #define HCR_CD		(UL(1) << 32)
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index 8274d16df3cd..2cd666a9d47e 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -47,6 +47,13 @@ static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
- 	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
- 	if (is_kernel_in_hyp_mode())
- 		vcpu->arch.hcr_el2 |= HCR_E2H;
-+	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN)) {
-+		/* route synchronous external abort exceptions to EL2 */
-+		vcpu->arch.hcr_el2 |= HCR_TEA;
-+		/* trap error record accesses */
-+		vcpu->arch.hcr_el2 |= HCR_TERR;
-+	}
+ /*
++ * RAS Error Synchronization barrier
++ */
++	.macro  esb
++	hint    #16
++	.endm
 +
- 	if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features))
- 		vcpu->arch.hcr_el2 &= ~HCR_RW;
- }
++/*
+  * NOP sequence
+  */
+ 	.macro	nops, num
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index 8ea52f15bf1c..b3f17fd18b14 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -136,6 +136,13 @@
+ #define ESR_ELx_WFx_ISS_WFE	(UL(1) << 0)
+ #define ESR_ELx_xVC_IMM_MASK	((1UL << 16) - 1)
+ 
++#define DISR_EL1_IDS		(UL(1) << 24)
++/*
++ * DISR_EL1 and ESR_ELx share the bottom 13 bits, but the RES0 bits may mean
++ * different things in the future...
++ */
++#define DISR_EL1_ESR_MASK	(ESR_ELx_AET | ESR_ELx_EA | ESR_ELx_FSC)
++
+ /* ESR value templates for specific events */
+ 
+ /* BRK instruction trap from AArch64 state */
+diff --git a/arch/arm64/include/asm/exception.h b/arch/arm64/include/asm/exception.h
+index 0c2eec490abf..bc30429d8e91 100644
+--- a/arch/arm64/include/asm/exception.h
++++ b/arch/arm64/include/asm/exception.h
+@@ -18,6 +18,8 @@
+ #ifndef __ASM_EXCEPTION_H
+ #define __ASM_EXCEPTION_H
+ 
++#include <asm/esr.h>
++
+ #include <linux/interrupt.h>
+ 
+ #define __exception	__attribute__((section(".exception.text")))
+@@ -27,4 +29,16 @@
+ #define __exception_irq_entry	__exception
+ #endif
+ 
++static inline u32 disr_to_esr(u64 disr)
++{
++	unsigned int esr = ESR_ELx_EC_SERROR << ESR_ELx_EC_SHIFT;
++
++	if ((disr & DISR_EL1_IDS) == 0)
++		esr |= (disr & DISR_EL1_ESR_MASK);
++	else
++		esr |= (disr & ESR_ELx_ISS_MASK);
++
++	return esr;
++}
++
+ #endif	/* __ASM_EXCEPTION_H */
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index 6b72ddc33d06..9de3f839be8a 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -194,5 +194,6 @@ static inline void spin_lock_prefetch(const void *ptr)
+ int cpu_enable_pan(void *__unused);
+ int cpu_enable_cache_maint_trap(void *__unused);
+ int cpu_enable_iesb(void *__unused);
++int cpu_clear_disr(void *__unused);
+ 
+ #endif /* __ASM_PROCESSOR_H */
 diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 1b8b9012234d..0d3c5c7bb425 100644
+index 4500a70c6a57..427c36bc5dd6 100644
 --- a/arch/arm64/include/asm/sysreg.h
 +++ b/arch/arm64/include/asm/sysreg.h
-@@ -169,6 +169,16 @@
- #define SYS_AFSR0_EL1			sys_reg(3, 0, 5, 1, 0)
- #define SYS_AFSR1_EL1			sys_reg(3, 0, 5, 1, 1)
- #define SYS_ESR_EL1			sys_reg(3, 0, 5, 2, 0)
-+
-+#define SYS_ERRIDR_EL1			sys_reg(3, 0, 5, 3, 0)
-+#define SYS_ERRSELR_EL1			sys_reg(3, 0, 5, 3, 1)
-+#define SYS_ERXFR_EL1			sys_reg(3, 0, 5, 4, 0)
-+#define SYS_ERXCTLR_EL1			sys_reg(3, 0, 5, 4, 1)
-+#define SYS_ERXSTATUS_EL1		sys_reg(3, 0, 5, 4, 2)
-+#define SYS_ERXADDR_EL1			sys_reg(3, 0, 5, 4, 3)
-+#define SYS_ERXMISC0_EL1		sys_reg(3, 0, 5, 5, 0)
-+#define SYS_ERXMISC1_EL1		sys_reg(3, 0, 5, 5, 1)
-+
- #define SYS_FAR_EL1			sys_reg(3, 0, 6, 0, 0)
- #define SYS_PAR_EL1			sys_reg(3, 0, 7, 4, 0)
+@@ -179,6 +179,7 @@
+ #define SYS_AMAIR_EL1			sys_reg(3, 0, 10, 3, 0)
  
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 713275b501ce..2b3b16bf5275 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -953,6 +953,16 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	{ SYS_DESC(SYS_AFSR0_EL1), access_vm_reg, reset_unknown, AFSR0_EL1 },
- 	{ SYS_DESC(SYS_AFSR1_EL1), access_vm_reg, reset_unknown, AFSR1_EL1 },
- 	{ SYS_DESC(SYS_ESR_EL1), access_vm_reg, reset_unknown, ESR_EL1 },
-+
-+	{ SYS_DESC(SYS_ERRIDR_EL1), trap_raz_wi },
-+	{ SYS_DESC(SYS_ERRSELR_EL1), trap_raz_wi },
-+	{ SYS_DESC(SYS_ERXFR_EL1), trap_raz_wi },
-+	{ SYS_DESC(SYS_ERXCTLR_EL1), trap_raz_wi },
-+	{ SYS_DESC(SYS_ERXSTATUS_EL1), trap_raz_wi },
-+	{ SYS_DESC(SYS_ERXADDR_EL1), trap_raz_wi },
-+	{ SYS_DESC(SYS_ERXMISC0_EL1), trap_raz_wi },
-+	{ SYS_DESC(SYS_ERXMISC1_EL1), trap_raz_wi },
-+
- 	{ SYS_DESC(SYS_FAR_EL1), access_vm_reg, reset_unknown, FAR_EL1 },
- 	{ SYS_DESC(SYS_PAR_EL1), NULL, reset_unknown, PAR_EL1 },
+ #define SYS_VBAR_EL1			sys_reg(3, 0, 12, 0, 0)
++#define SYS_DISR_EL1			sys_reg(3, 0, 12, 1,  1)
  
+ #define SYS_ICC_IAR0_EL1		sys_reg(3, 0, 12, 8, 0)
+ #define SYS_ICC_EOIR0_EL1		sys_reg(3, 0, 12, 8, 1)
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 356a5de51f5e..e799b72f1395 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -911,6 +911,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 		.sign = FTR_UNSIGNED,
+ 		.field_pos = ID_AA64PFR0_RAS_SHIFT,
+ 		.min_field_value = ID_AA64PFR0_RAS_V1,
++		.enable = cpu_clear_disr,
+ 	},
+ 	{
+ 		.desc = "Implicit Error Synchronization Barrier",
+@@ -1340,3 +1341,11 @@ int cpu_enable_iesb(void *__unused)
+ 
+ 	return 0;
+ }
++
++int cpu_clear_disr(void *__unused)
++{
++	/* Firmware may have left a deferred SError in this register. */
++	write_sysreg_s(0, SYS_DISR_EL1);
++
++	return 0;
++}
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 95233dfc4c39..ac571223672d 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -124,6 +124,11 @@ ENTRY(cpu_do_resume)
+ 	ubfx	x11, x11, #1, #1
+ 	msr	oslar_el1, x11
+ 	reset_pmuserenr_el0 x0			// Disable PMU access from EL0
++
++alternative_if ARM64_HAS_RAS_EXTN
++	msr_s	SYS_DISR_EL1, xzr
++alternative_else_nop_endif
++
+ 	isb
+ 	ret
+ ENDPROC(cpu_do_resume)
 -- 
 2.13.3
