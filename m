@@ -1,129 +1,56 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 19 Oct 2017 08:57:46 +0200
-Subject: [PATCH v7 02/10] arm: dts: sunxi: Restore EMAC changes
-In-Reply-To: <20171018185049.GA24584@Red>
-References: <20171018114458.17891-1-clabbe.montjoie@gmail.com>
- <20171018114458.17891-3-clabbe.montjoie@gmail.com>
- <20171018164450.GE15371@lunn.ch> <20171018185049.GA24584@Red>
-Message-ID: <20171019065745.pzurfghdvfnpxeuc@flea.lan>
+From: liuwenliang@huawei.com (Liuwenliang (Lamb))
+Date: Thu, 19 Oct 2017 06:52:54 +0000
+Subject: [PATCH 01/11] Initialize the mapping of KASan shadow memory
+In-Reply-To: <31b16c9d-48c7-bc0a-51d1-cc6cf892329b@gmail.com>
+References: <20171011082227.20546-1-liuwenliang@huawei.com>
+ <20171011082227.20546-2-liuwenliang@huawei.com>
+ <31b16c9d-48c7-bc0a-51d1-cc6cf892329b@gmail.com>
+Message-ID: <B8AC3E80E903784988AB3003E3E97330C005CCBC@dggemm510-mbx.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 18, 2017 at 08:50:49PM +0200, Corentin Labbe wrote:
-> On Wed, Oct 18, 2017 at 06:44:50PM +0200, Andrew Lunn wrote:
-> > On Wed, Oct 18, 2017 at 01:44:50PM +0200, Corentin Labbe wrote:
-> > > The original dwmac-sun8i DT bindings have some issue on how to handle
-> > > integrated PHY and was reverted in last RC of 4.13.
-> > > But now we have a solution so we need to get back that was reverted.
-> > > 
-> > > This patch restore arm DT about dwmac-sun8i
-> > > This reverts commit fe45174b72ae ("arm: dts: sunxi: Revert EMAC changes")
-> > > 
-> > > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> > > ---
-> > >  arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts |  9 ++++++++
-> > >  arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts   | 19 +++++++++++++++++
-> > >  arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts     | 19 +++++++++++++++++
-> > >  arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts         |  7 ++++++
-> > >  arch/arm/boot/dts/sun8i-h3-orangepi-2.dts         |  8 +++++++
-> > >  arch/arm/boot/dts/sun8i-h3-orangepi-one.dts       |  8 +++++++
-> > >  arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts   |  5 +++++
-> > >  arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts        |  8 +++++++
-> > >  arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts      | 22 +++++++++++++++++++
-> > >  arch/arm/boot/dts/sun8i-h3-orangepi-plus2e.dts    | 16 ++++++++++++++
-> > >  arch/arm/boot/dts/sunxi-h3-h5.dtsi                | 26 +++++++++++++++++++++++
-> > >  11 files changed, 147 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-> > > index b1502df7b509..6713d0f2b3f4 100644
-> > > --- a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-> > > +++ b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-> > > @@ -56,6 +56,8 @@
-> > >  
-> > >  	aliases {
-> > >  		serial0 = &uart0;
-> > > +		/* ethernet0 is the H3 emac, defined in sun8i-h3.dtsi */
-> > > +		ethernet0 = &emac;
-> > >  		ethernet1 = &xr819;
-> > >  	};
-> > >  
-> > > @@ -102,6 +104,13 @@
-> > >  	status = "okay";
-> > >  };
-> > >  
-> > > +&emac {
-> > > +	phy-handle = <&int_mii_phy>;
-> > > +	phy-mode = "mii";
-> > > +	allwinner,leds-active-low;
-> > > +	status = "okay";
-> > > +};
-> > > +
-> > >  &mmc0 {
-> > >  	pinctrl-names = "default";
-> > >  	pinctrl-0 = <&mmc0_pins_a>;
-> > > diff --git a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-> > > index e1dba9ffa94b..f2292deaa590 100644
-> > > --- a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-> > > +++ b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-> > > @@ -52,6 +52,7 @@
-> > >  	compatible = "sinovoip,bpi-m2-plus", "allwinner,sun8i-h3";
-> > >  
-> > >  	aliases {
-> > > +		ethernet0 = &emac;
-> > >  		serial0 = &uart0;
-> > >  		serial1 = &uart1;
-> > >  	};
-> > > @@ -111,6 +112,24 @@
-> > >  	status = "okay";
-> > >  };
-> > >  
-> > > +&emac {
-> > > +	pinctrl-names = "default";
-> > > +	pinctrl-0 = <&emac_rgmii_pins>;
-> > > +	phy-supply = <&reg_gmac_3v3>;
-> > > +	phy-handle = <&ext_rgmii_phy>;
-> > > +	phy-mode = "rgmii";
-> > > +
-> > > +	allwinner,leds-active-low;
-> > > +	status = "okay";
-> > > +};
-> > > +
-> > 
-> > 
-> > > +&external_mdio {
-> > > +	ext_rgmii_phy: ethernet-phy at 1 {
-> > > +		compatible = "ethernet-phy-ieee802.3-c22";
-> > > +		reg = <0>;
-> > > +	};
-> > > +};
-> > > +
-> > 
-> > Hi Corentin
-> > 
-> > I'm wondering about the order of the patches. Does the external_mdio
-> > node actually exist at this point? Or only later when other patches
-> > are applied?
-> > 
-> 
-> You are right order of patch are wrong, I need to cut this one in two.
-> "Revert?" sunxi-h3-h5.dtsi
-> apply mdiomux
-> "Revert?" all board nodes
+On 2017.10.12 7:43AM  Dmitry Osipenko [mailto:digetx at gmail.com] wrote:
+>Shouldn't all __pgprot's contain L_PTE_MT_WRITETHROUGH ?
+>
+>[...]
+>
+>--
+>Dmitry
 
-I'm not even sure why you're actually adding them that way. Can't you
-just create the new binding file, support it in the driver, and add
-the matching DT nodes ?
+Thanks for your review. I'm sorry that my replay is so late.
 
-Maxime
+I don't think L_PTE_MT_WRITETHROUGH is need for all arm soc. So I think kasan's
+mapping can use PAGE_KERNEL which can be initialized for different arm soc and 
+__pgprot(pgprot_val(PAGE_KERNEL) | L_PTE_RDONLY)).
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171019/4319d4c5/attachment-0001.sig>
+I don't think the mapping table flags in kasan_early_init need be changed because of the follow reason:
+1) PAGE_KERNEL can't be used in early_kasan_init because the pgprot_kernel which is used to define 
+  PAGE_KERNEL doesn't be initialized. 
+
+2) all of the kasan shadow's mapping table is going to be created again in kasan_init function.
+
+
+All what I say is: I think only the mapping table flags in kasan_init function need to be changed into PAGE_KERNEL 
+or  __pgprot(pgprot_val(PAGE_KERNEL) | L_PTE_RDONLY)). 
+
+Here is the code, I has already tested:
+--- a/arch/arm/mm/kasan_init.c
++++ b/arch/arm/mm/kasan_init.c
+@@ -124,7 +124,7 @@ pte_t * __meminit kasan_pte_populate(pmd_t *pmd, unsigned long addr, int node)
+                void *p = kasan_alloc_block(PAGE_SIZE, node);
+                if (!p)
+                        return NULL;
+-           entry = pfn_pte(virt_to_pfn(p), __pgprot(_L_PTE_DEFAULT | L_PTE_DIRTY | L_PTE_XN));
++         entry = pfn_pte(virt_to_pfn(p), __pgprot(pgprot_val(PAGE_KERNEL)));
+                set_pte_at(&init_mm, addr, pte, entry);
+        }
+        return pte;
+@@ -253,7 +254,7 @@ void __init kasan_init(void)
+                 set_pte_at(&init_mm, KASAN_SHADOW_START + i*PAGE_SIZE,
+                         &kasan_zero_pte[i], pfn_pte(
+                                 virt_to_pfn(kasan_zero_page),
+-                                __pgprot(_L_PTE_DEFAULT | L_PTE_DIRTY | L_PTE_XN | L_PTE_RDONLY)));
++                         __pgprot(pgprot_val(PAGE_KERNEL) | L_PTE_RDONLY)));
+        memset(kasan_zero_page, 0, PAGE_SIZE);
+        cpu_set_ttbr0(orig_ttbr0);
+        flush_cache_all();
