@@ -1,105 +1,110 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Thu, 19 Oct 2017 15:05:48 +0200
-Subject: [PATCH v4 3/7] KVM: arm/arm64: Don't cache the timer IRQ level
-In-Reply-To: <87k203uw01.fsf@on-the-bus.cambridge.arm.com>
-References: <1505513994-77939-1-git-send-email-christoffer.dall@linaro.org>
- <1505513994-77939-4-git-send-email-christoffer.dall@linaro.org>
- <87k203uw01.fsf@on-the-bus.cambridge.arm.com>
-Message-ID: <20171019130548.GR8900@cbox>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 19 Oct 2017 15:10:03 +0200
+Subject: [PATCH] pinctrl: armada-37xx: Add edge both type gpio irq support
+Message-ID: <20171019131003.9684-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 10, 2017 at 11:39:58AM +0100, Marc Zyngier wrote:
-> On Fri, Sep 15 2017 at  3:19:50 pm BST, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> > From: Christoffer Dall <cdall@linaro.org>
-> >
-> > The timer was modeled after a strict idea of modelling an interrupt line
-> > level in software, meaning that only transitions in the level needed to
-> > be reported to the VGIC.  This works well for the timer, because the
-> > arch timer code is in complete control of the device and can track the
-> > transitions of the line.
-> >
-> > However, as we are about to support using the HW bit in the VGIC not
-> > just for the timer, but also for VFIO which cannot track transitions of
-> > the interrupt line, we have to decide on an interface for level
-> > triggered mapped interrupts to the GIC, which both the timer and VFIO
-> > can use.
-> >
-> > VFIO only sees an asserting transition of the physical interrupt line,
-> > and tells the VGIC when that happens.  That means that part of the
-> > interrupt flow is offloaded to the hardware.
-> >
-> > To use the same interface for VFIO devices and the timer, we therefore
-> > have to change the timer (we cannot change VFIO because it doesn't know
-> > the details of the device it is assigning to a VM).
-> >
-> > Luckily, changing the timer is simple, we just need to stop 'caching'
-> > the line level, but instead let the VGIC know the state of the timer on
-> > every entry to the guest, and the VGIC can ignore notifications using
-> > its validate mechanism.
-> >
-> > Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> > ---
-> >  virt/kvm/arm/arch_timer.c | 14 ++++++++------
-> >  1 file changed, 8 insertions(+), 6 deletions(-)
-> >
-> > diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> > index 8e89d63..2a5f877 100644
-> > --- a/virt/kvm/arm/arch_timer.c
-> > +++ b/virt/kvm/arm/arch_timer.c
-> > @@ -219,9 +219,10 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
-> >  	int ret;
-> >  
-> >  	timer_ctx->active_cleared_last = false;
-> > +	if (timer_ctx->irq.level != new_level)
-> > +		trace_kvm_timer_update_irq(vcpu->vcpu_id, timer_ctx->irq.irq,
-> > +					   new_level);
-> >  	timer_ctx->irq.level = new_level;
-> > -	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer_ctx->irq.irq,
-> > -				   timer_ctx->irq.level);
-> >  
-> >  	if (likely(irqchip_in_kernel(vcpu->kvm))) {
-> >  		ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
-> > @@ -241,6 +242,7 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
-> >  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-> >  	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
-> >  	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
-> > +	bool level;
-> >  
-> >  	/*
-> >  	 * If userspace modified the timer registers via SET_ONE_REG before
-> > @@ -251,11 +253,11 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
-> >  	if (unlikely(!timer->enabled))
-> >  		return;
-> >  
-> > -	if (kvm_timer_should_fire(vtimer) != vtimer->irq.level)
-> > -		kvm_timer_update_irq(vcpu, !vtimer->irq.level, vtimer);
-> > +	level = kvm_timer_should_fire(vtimer);
-> > +	kvm_timer_update_irq(vcpu, level, vtimer);
-> >  
-> > -	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
-> > -		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
-> > +	level = kvm_timer_should_fire(ptimer);
-> > +	kvm_timer_update_irq(vcpu, level, ptimer);
-> 
-> Well, at this stage, you might as well fold the kvm_timer_should_fire()
-> into kvm_timer_update_irq() and from the level parameter. But I suspect
-> this is going to clash badly with your timer series?
-> 
+From: Ken Ma <make@marvell.com>
 
-Yes, it's doing extra unnecessary work in the critical path on IRQ
-injections from the ISR after the timer series.
+Current edge both type gpio irqs which need to swap polarity in each
+interrupt are not supported, this patch adds edge both type gpio irq
+support.
 
-How about I rebase this series on the timer series and do a resend of
-this one, without additional changes, and we have a look at it?
+Signed-off-by: Ken Ma <make@marvell.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/pinctrl/mvebu/pinctrl-armada-37xx.c | 64 +++++++++++++++++++++++++++++
+ 1 file changed, 64 insertions(+)
 
-> >  }
-> >  
-> >  /* Schedule the background timer for the emulated timer. */
-> 
-> Otherwise:
-> 
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-Thanks!
--Christoffer
+diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+index 71b944748304..4e8d836a8c6f 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
++++ b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+@@ -576,6 +576,19 @@ static int armada_37xx_irq_set_type(struct irq_data *d, unsigned int type)
+ 	case IRQ_TYPE_EDGE_FALLING:
+ 		val |= (BIT(d->hwirq % GPIO_PER_REG));
+ 		break;
++	case IRQ_TYPE_EDGE_BOTH: {
++		u32 in_val, in_reg = INPUT_VAL;
++
++		armada_37xx_irq_update_reg(&in_reg, d);
++		regmap_read(info->regmap, in_reg, &in_val);
++
++		/* Set initial polarity based on current input level. */
++		if (in_val & d->mask)
++			val |= d->mask;		/* falling */
++		else
++			val &= ~d->mask;	/* rising */
++		break;
++	}
+ 	default:
+ 		spin_unlock_irqrestore(&info->irq_lock, flags);
+ 		return -EINVAL;
+@@ -586,6 +599,40 @@ static int armada_37xx_irq_set_type(struct irq_data *d, unsigned int type)
+ 	return 0;
+ }
+ 
++static int armada_37xx_edge_both_irq_swap_pol(struct armada_37xx_pinctrl *info,
++					     u32 pin_idx)
++{
++	u32 reg_idx = pin_idx / GPIO_PER_REG;
++	u32 bit_num = pin_idx % GPIO_PER_REG;
++	u32 p, l, ret;
++	unsigned long flags;
++
++	regmap_read(info->regmap, INPUT_VAL + 4*reg_idx, &l);
++
++	spin_lock_irqsave(&info->irq_lock, flags);
++	p = readl(info->base + IRQ_POL + 4 * reg_idx);
++	if ((p ^ l) & (1 << bit_num)) {
++		/*
++		 * For the gpios which are used for both-edge irqs, when their
++		 * interrupts happen, their input levels are changed,
++		 * yet their interrupt polarities are kept in old values, we
++		 * should synchronize their interrupt polarities; for example,
++		 *@first a gpio's input level is low and its interrupt
++		 * polarity control is "Detect rising edge", then the gpio has
++		 * a interrupt , its level turns to high, we should change its
++		 * polarity control to "Detect falling edge" correspondingly.
++		 */
++		p ^= 1 << bit_num;
++		writel(p, info->base + IRQ_POL + 4 * reg_idx);
++		ret = 0;
++	} else {
++		/* Spurious irq */
++		ret = -1;
++	}
++
++	spin_unlock_irqrestore(&info->irq_lock, flags);
++	return ret;
++}
+ 
+ static void armada_37xx_irq_handler(struct irq_desc *desc)
+ {
+@@ -609,6 +656,23 @@ static void armada_37xx_irq_handler(struct irq_desc *desc)
+ 			u32 hwirq = ffs(status) - 1;
+ 			u32 virq = irq_find_mapping(d, hwirq +
+ 						     i * GPIO_PER_REG);
++			u32 t = irq_get_trigger_type(virq);
++
++			if ((t & IRQ_TYPE_SENSE_MASK) == IRQ_TYPE_EDGE_BOTH) {
++				/* Swap polarity (race with GPIO line) */
++				if (armada_37xx_edge_both_irq_swap_pol(info,
++					hwirq + i * GPIO_PER_REG)) {
++					/*
++					 * For spurious irq, which gpio level
++					 * is not as expected after incoming
++					 * edge, just ack the gpio irq.
++					 */
++					writel(1 << hwirq,
++					       info->base +
++					       IRQ_STATUS + 4 * i);
++					continue;
++				}
++			}
+ 
+ 			generic_handle_irq(virq);
+ 
+-- 
+2.14.2
