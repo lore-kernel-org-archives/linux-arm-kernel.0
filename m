@@ -1,52 +1,47 @@
 From: weiyi.lu@mediatek.com (Weiyi Lu)
-Date: Thu, 19 Oct 2017 10:48:50 +0800
-Subject: [PATCH v5 9/9] arm: dts: Add power controller device node of MT2712
+Date: Thu, 19 Oct 2017 10:48:48 +0800
+Subject: [PATCH v5 7/9] soc: mediatek: add dependent clock jpgdec/audio for
+ scpsys
 In-Reply-To: <1508381330-3700-1-git-send-email-weiyi.lu@mediatek.com>
 References: <1508381330-3700-1-git-send-email-weiyi.lu@mediatek.com>
-Message-ID: <1508381330-3700-10-git-send-email-weiyi.lu@mediatek.com>
+Message-ID: <1508381330-3700-8-git-send-email-weiyi.lu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add power controller node for MT2712
+There are dependent clock jpgdec/audio in scpsys on MT2712,
+and will exist three dependent clocks on MT2712 VDEC.
 
 Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
 ---
- arch/arm64/boot/dts/mediatek/mt2712e.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ drivers/soc/mediatek/mtk-scpsys.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-index d2ee3cd..fa87f92 100644
---- a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-@@ -8,6 +8,7 @@
- #include <dt-bindings/clock/mt2712-clk.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/power/mt2712-power.h>
+diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+index ebee3e9..a4ece75 100644
+--- a/drivers/soc/mediatek/mtk-scpsys.c
++++ b/drivers/soc/mediatek/mtk-scpsys.c
+@@ -84,6 +84,8 @@ enum clk_id {
+ 	CLK_ETHIF,
+ 	CLK_VDEC,
+ 	CLK_HIFSEL,
++	CLK_JPGDEC,
++	CLK_AUDIO,
+ 	CLK_MAX,
+ };
  
- / {
- 	compatible = "mediatek,mt2712";
-@@ -147,6 +148,21 @@
- 		#clock-cells = <1>;
- 	};
+@@ -96,10 +98,12 @@ enum clk_id {
+ 	"ethif",
+ 	"vdec",
+ 	"hif_sel",
++	"jpgdec",
++	"audio",
+ 	NULL,
+ };
  
-+	scpsys: scpsys at 10006000 {
-+		compatible = "mediatek,mt2712-scpsys", "syscon";
-+		#power-domain-cells = <1>;
-+		reg = <0 0x10006000 0 0x1000>;
-+		clocks = <&topckgen CLK_TOP_MM_SEL>,
-+			 <&topckgen CLK_TOP_MFG_SEL>,
-+			 <&topckgen CLK_TOP_VENC_SEL>,
-+			 <&topckgen CLK_TOP_JPGDEC_SEL>,
-+			 <&topckgen CLK_TOP_A1SYS_HP_SEL>,
-+			 <&topckgen CLK_TOP_VDEC_SEL>;
-+		clock-names = "mm", "mfg", "venc",
-+			"jpgdec", "audio", "vdec";
-+		infracfg = <&infracfg>;
-+	};
-+
- 	uart5: serial at 1000f000 {
- 		compatible = "mediatek,mt2712-uart",
- 			     "mediatek,mt6577-uart";
+-#define MAX_CLKS	2
++#define MAX_CLKS	3
+ 
+ struct scp_domain_data {
+ 	const char *name;
 -- 
 1.9.1
