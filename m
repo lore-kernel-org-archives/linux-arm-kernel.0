@@ -1,27 +1,20 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Oct 2017 17:41:08 +0200
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.14 (#2)
-In-Reply-To: <87r2u783qo.fsf@free-electrons.com>
-References: <87r2u783qo.fsf@free-electrons.com>
-Message-ID: <CAK8P3a3S39KVTpdGgun6YhLCeyGXJbBMFxPufEwz24iftKQ52g@mail.gmail.com>
+Date: Thu, 19 Oct 2017 17:42:18 +0200
+Subject: [GIT PULL] i.MX fixes for 4.14
+In-Reply-To: <20171016073851.GA8320@x250>
+References: <20171016073851.GA8320@x250>
+Message-ID: <CAK8P3a3Fmt8fhFUW9r2ttRUVMxZQ4qjr7nMvx=6qtYxDamxAKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 13, 2017 at 5:30 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> mvebu fixes for 4.14 (part 2)
+On Mon, Oct 16, 2017 at 9:38 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> ----------------------------------------------------------------
+> i.MX fixes for 4.14:
+>  - Fix the legacy PCI interrupt numbers for i.MX7.  The numbers were
+>    wrongly coded in an inverted order than what Reference Manual tells.
+>    It causes problem for PCI devices using legacy interrupt.
 >
-> Two device tree related fixes:
->
-> - One on Armada 38x using a other compatible string for I2C in order
->   to cover an errata.
->
-> - One for Armada 7K/8K fixing a typo on interrupt-map property for
->   PCIe leading to fail PME and AER root port service initialization
->
-> And the last one for the mbus fixing the window size calculation when
-> it exceed 32bits
 
 Pulled into fixes, thanks!
 
-       Arnd
+     Arnd
