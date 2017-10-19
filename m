@@ -1,102 +1,67 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Thu, 19 Oct 2017 16:45:12 +0100
-Subject: [PATCH 1/2] arm/arm64: kvm: Move initialization completion message
-In-Reply-To: <1508427913-34619-1-git-send-email-julien.thierry@arm.com>
-References: <1508427913-34619-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1508427913-34619-2-git-send-email-julien.thierry@arm.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 19 Oct 2017 16:45:16 +0100
+Subject: [PATCH] coresight: ETM: Add support for ARM Cortex-A73
+Message-ID: <20171019154516.24536-1-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KVM is being a bit too optimistic, Hyp mode is said to be initialized
-when Hyp segments have only been mapped.
+Add ARM Cortex A-73 ETM PIDs to the known ETM ips. While at it
+also add description of the CPU to which the ETM belongs, to make
+it easier to identify the ETM devices.
 
-Notify KVM's successful initialization only once it is really fully
-initialized.
-
-Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- virt/kvm/arm/arm.c | 31 ++++++++++++++-----------------
- 1 file changed, 14 insertions(+), 17 deletions(-)
+ drivers/hwtracing/coresight/coresight-etm4x.c | 24 +++++++++++++++---------
+ 1 file changed, 15 insertions(+), 9 deletions(-)
 
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index b9f68e4..95cba07 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -1326,21 +1326,12 @@ static void teardown_hyp_mode(void)
- {
- 	int cpu;
-
--	if (is_kernel_in_hyp_mode())
--		return;
--
- 	free_hyp_pgds();
- 	for_each_possible_cpu(cpu)
- 		free_page(per_cpu(kvm_arm_hyp_stack_page, cpu));
- 	hyp_cpu_pm_exit();
- }
-
--static int init_vhe_mode(void)
--{
--	kvm_info("VHE mode initialized successfully\n");
--	return 0;
--}
--
- /**
-  * Inits Hyp-mode on all online CPUs
-  */
-@@ -1421,8 +1412,6 @@ static int init_hyp_mode(void)
- 		}
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index cf364a514c12..e84d80b008fc 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -1034,7 +1034,8 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
  	}
-
--	kvm_info("Hyp mode initialized successfully\n");
--
- 	return 0;
-
- out_err:
-@@ -1456,6 +1445,7 @@ int kvm_arch_init(void *opaque)
- {
- 	int err;
- 	int ret, cpu;
-+	bool in_hyp_mode;
-
- 	if (!is_hyp_mode_available()) {
- 		kvm_err("HYP mode not available\n");
-@@ -1474,21 +1464,28 @@ int kvm_arch_init(void *opaque)
- 	if (err)
- 		return err;
-
--	if (is_kernel_in_hyp_mode())
--		err = init_vhe_mode();
--	else
-+	in_hyp_mode = is_kernel_in_hyp_mode();
-+
-+	if (!in_hyp_mode) {
- 		err = init_hyp_mode();
--	if (err)
--		goto out_err;
-+		if (err)
-+			goto out_err;
-+	}
-
- 	err = init_subsystems();
- 	if (err)
- 		goto out_hyp;
-
-+	if (in_hyp_mode)
-+		kvm_info("VHE mode initialized successfully\n");
-+	else
-+		kvm_info("Hyp mode initialized successfully\n");
-+
- 	return 0;
-
- out_hyp:
--	teardown_hyp_mode();
-+	if (!in_hyp_mode)
-+		teardown_hyp_mode();
- out_err:
- 	teardown_common_resources();
- 	return err;
---
-1.9.1
+ 
+ 	pm_runtime_put(&adev->dev);
+-	dev_info(dev, "%s initialized\n", (char *)id->data);
++	dev_info(dev, "CPU%d: %s initialized\n",
++			drvdata->cpu, (char *)id->data);
+ 
+ 	if (boot_enable) {
+ 		coresight_enable(drvdata->csdev);
+@@ -1053,20 +1054,25 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
+ }
+ 
+ static const struct amba_id etm4_ids[] = {
+-	{       /* ETM 4.0 - Cortex-A53  */
++	{
+ 		.id	= 0x000bb95d,
+ 		.mask	= 0x000fffff,
+-		.data	= "ETM 4.0",
++		.data	= "Cortex-A53 ETM v4.0",
+ 	},
+-	{       /* ETM 4.0 - Cortex-A57 */
++	{
+ 		.id	= 0x000bb95e,
+ 		.mask	= 0x000fffff,
+-		.data	= "ETM 4.0",
++		.data	= "Cortex-A57 ETM v4.0",
+ 	},
+-	{       /* ETM 4.0 - A72, Maia, HiSilicon */
+-		.id = 0x000bb95a,
+-		.mask = 0x000fffff,
+-		.data = "ETM 4.0",
++	{
++		.id	= 0x000bb95a,
++		.mask	= 0x000fffff,
++		.data	= "Cortex-A72 ETM v4.0",
++	},
++	{
++		.id	= 0x000bb959,
++		.mask	= 0x000fffff,
++		.data	= "Cortex-A73 ETM v4.0",
+ 	},
+ 	{ 0, 0},
+ };
+-- 
+2.13.6
