@@ -1,66 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 19 Oct 2017 17:47:36 +0100
-Subject: [PATCH 02/10] arm64: KVM: Add invalidate_icache_range helper
-In-Reply-To: <20171009152032.27804-3-marc.zyngier@arm.com>
-References: <20171009152032.27804-1-marc.zyngier@arm.com>
- <20171009152032.27804-3-marc.zyngier@arm.com>
-Message-ID: <20171019164736.GC30652@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 19 Oct 2017 18:48:50 +0200
+Subject: [PATCH v3 01/10] arm: dts: mt2701: add pwm backlight device node
+In-Reply-To: <144f5d526d15cbf3ada220765c609eb2b59c240a.1506908511.git.ryder.lee@mediatek.com>
+References: <cover.1506908511.git.ryder.lee@mediatek.com>
+ <144f5d526d15cbf3ada220765c609eb2b59c240a.1506908511.git.ryder.lee@mediatek.com>
+Message-ID: <54df408d-62b8-63dd-05af-68daa455b62c@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 09, 2017 at 04:20:24PM +0100, Marc Zyngier wrote:
-> We currently tightly couple dcache clean with icache invalidation,
-> but KVM could do without the initial flush to PoU, as we've
-> already flushed things to PoC.
+
+
+On 10/02/2017 03:54 AM, Ryder Lee wrote:
+> From: Weiqing Kong <weiqing.kong@mediatek.com>
 > 
-> Let's introduce invalidate_icache_range which is limited to
-> invalidating the icache from the linear mapping (and thus
-> has none of the userspace fault handling complexity), and
-> wire it in KVM instead of flush_icache_range.
+> This patch adds the device node for MT2701 pwm backlight.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Weiqing Kong <weiqing.kong@mediatek.com>
+> Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 > ---
->  arch/arm64/include/asm/cacheflush.h |  8 ++++++++
->  arch/arm64/include/asm/kvm_mmu.h    |  4 ++--
->  arch/arm64/mm/cache.S               | 24 ++++++++++++++++++++++++
->  3 files changed, 34 insertions(+), 2 deletions(-)
+>  arch/arm/boot/dts/mt2701.dtsi | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 
-[...]
+Pushed to v4.14-next/dts32
 
-> diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-> index 7f1dbe962cf5..0c330666a8c9 100644
-> --- a/arch/arm64/mm/cache.S
-> +++ b/arch/arm64/mm/cache.S
-> @@ -80,6 +80,30 @@ USER(9f, ic	ivau, x4	)		// invalidate I line PoU
->  ENDPROC(flush_icache_range)
->  ENDPROC(__flush_cache_user_range)
+Thanks!
+
+> 
+> diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+> index afe12e5..3c85879 100644
+> --- a/arch/arm/boot/dts/mt2701.dtsi
+> +++ b/arch/arm/boot/dts/mt2701.dtsi
+> @@ -530,6 +530,15 @@
+>  		#clock-cells = <1>;
+>  	};
 >  
-> +/*
-> + *	invalidate_icache_range(start,end)
-> + *
-> + *	Ensure that the I cache is invalid within specified region. This
-> + *	assumes that this is done on the linear mapping. Do not use it
-> + *	on a userspace range, as this may fault horribly.
-> + *
-> + *	- start   - virtual start address of region
-> + *	- end     - virtual end address of region
-> + */
-> +ENTRY(invalidate_icache_range)
-> +	icache_line_size x2, x3
-> +	sub	x3, x2, #1
-> +	bic	x4, x0, x3
-> +1:
-> +	ic	ivau, x4			// invalidate I line PoU
-> +	add	x4, x4, x2
-> +	cmp	x4, x1
-> +	b.lo	1b
-> +	dsb	ish
-> +	isb
-> +	ret
-> +ENDPROC(invalidate_icache_range)
-
-Is there a good reason not to make this work for user addresses? If it's as
-simple as adding a USER annotation and a fallback, then we should wrap that
-in a macro and reuse it for __flush_cache_user_range.
-
-Will
+> +	bls: pwm at 1400a000 {
+> +		compatible = "mediatek,mt2701-disp-pwm";
+> +		reg = <0 0x1400a000 0 0x1000>;
+> +		#pwm-cells = <2>;
+> +		clocks = <&mmsys CLK_MM_MDP_BLS_26M>, <&mmsys CLK_MM_DISP_BLS>;
+> +		clock-names = "main", "mm";
+> +		status = "disabled";
+> +	};
+> +
+>  	larb0: larb at 14010000 {
+>  		compatible = "mediatek,mt2701-smi-larb";
+>  		reg = <0 0x14010000 0 0x1000>;
+> 
