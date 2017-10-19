@@ -1,63 +1,96 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 19 Oct 2017 10:12:26 +0100
-Subject: [PATCH v2 1/3] iommu/arm-smmu-v3: put off the execution of TLBI*
- to reduce lock confliction
-In-Reply-To: <59E8155D.2070102@huawei.com>
-References: <1505221238-9428-1-git-send-email-thunder.leizhen@huawei.com>
- <1505221238-9428-2-git-send-email-thunder.leizhen@huawei.com>
- <20171018125849.GD4077@arm.com> <59E8155D.2070102@huawei.com>
-Message-ID: <20171019091225.GA29762@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 19 Oct 2017 10:12:50 +0100
+Subject: [PATCH v3 2/7] ACPI: Enable PPTT support on ARM64
+In-Reply-To: <889154d0-ed39-1621-83ee-1084674ee963@arm.com>
+References: <20171012194856.13844-1-jeremy.linton@arm.com>
+ <20171012194856.13844-3-jeremy.linton@arm.com>
+ <20171018164723.GA15924@red-moon>
+ <889154d0-ed39-1621-83ee-1084674ee963@arm.com>
+Message-ID: <20171019091250.GA17450@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 19, 2017 at 11:00:45AM +0800, Leizhen (ThunderTown) wrote:
-> 
-> 
-> On 2017/10/18 20:58, Will Deacon wrote:
-> > Hi Thunder,
-> > 
-> > On Tue, Sep 12, 2017 at 09:00:36PM +0800, Zhen Lei wrote:
-> >> Because all TLBI commands should be followed by a SYNC command, to make
-> >> sure that it has been completely finished. So we can just add the TLBI
-> >> commands into the queue, and put off the execution until meet SYNC or
-> >> other commands. To prevent the followed SYNC command waiting for a long
-> >> time because of too many commands have been delayed, restrict the max
-> >> delayed number.
+On Wed, Oct 18, 2017 at 12:38:46PM -0500, Jeremy Linton wrote:
+> On 10/18/2017 11:47 AM, Lorenzo Pieralisi wrote:
+> >On Thu, Oct 12, 2017 at 02:48:51PM -0500, Jeremy Linton wrote:
+> >>Now that we have a PPTT parser, in preparation for its use
+> >>on arm64, lets build it.
 > >>
-> >> According to my test, I got the same performance data as I replaced writel
-> >> with writel_relaxed in queue_inc_prod.
+> >>Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> >>---
+> >>  arch/arm64/Kconfig         | 1 +
+> >>  drivers/acpi/Makefile      | 1 +
+> >>  drivers/acpi/arm64/Kconfig | 3 +++
+> >>  3 files changed, 5 insertions(+)
 > >>
-> >> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> >> ---
-> >>  drivers/iommu/arm-smmu-v3.c | 42 +++++++++++++++++++++++++++++++++++++-----
-> >>  1 file changed, 37 insertions(+), 5 deletions(-)
-> > 
-> > If we want to go down the route of explicit command batching, I'd much
-> > rather do it by implementing the iotlb_range_add callback in the driver,
-> > and have a fixed-length array of batched ranges on the domain. We could
-> I think even if iotlb_range_add callback is implemented, this patch is still valuable. The main purpose
-> of this patch is to reduce dsb operation. So in the scenario with iotlb_range_add implemented:
-> .iotlb_range_add:
-> spin_lock_irqsave(&smmu->cmdq.lock, flags);
-> ...
-> add tlbi range-1 to cmq-queue
-> ...
-> add tlbi range-n to cmq-queue			//n
-> dsb
-> ...
-> spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
+> >>diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> >>index 0df64a6a56d4..68c9d1289735 100644
+> >>--- a/arch/arm64/Kconfig
+> >>+++ b/arch/arm64/Kconfig
+> >>@@ -7,6 +7,7 @@ config ARM64
+> >>  	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
+> >>  	select ACPI_MCFG if ACPI
+> >>  	select ACPI_SPCR_TABLE if ACPI
+> >>+	select ACPI_PPTT if ACPI
+> >>  	select ARCH_CLOCKSOURCE_DATA
+> >>  	select ARCH_HAS_DEBUG_VIRTUAL
+> >>  	select ARCH_HAS_DEVMEM_IS_ALLOWED
+> >>diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+> >>index 90265ab4437a..c92a0c937551 100644
+> >>--- a/drivers/acpi/Makefile
+> >>+++ b/drivers/acpi/Makefile
+> >>@@ -85,6 +85,7 @@ obj-$(CONFIG_ACPI_BGRT)		+= bgrt.o
+> >>  obj-$(CONFIG_ACPI_CPPC_LIB)	+= cppc_acpi.o
+> >>  obj-$(CONFIG_ACPI_SPCR_TABLE)	+= spcr.o
+> >>  obj-$(CONFIG_ACPI_DEBUGGER_USER) += acpi_dbg.o
+> >>+obj-$(CONFIG_ACPI_PPTT) 	+= pptt.o
+> >>  # processor has its own "processor." module_param namespace
+> >>  processor-y			:= processor_driver.o
+> >>diff --git a/drivers/acpi/arm64/Kconfig b/drivers/acpi/arm64/Kconfig
+> >>index 5a6f80fce0d6..74b855a669ea 100644
+> >>--- a/drivers/acpi/arm64/Kconfig
+> >>+++ b/drivers/acpi/arm64/Kconfig
+> >>@@ -7,3 +7,6 @@ config ACPI_IORT
+> >>  config ACPI_GTDT
+> >>  	bool
+> >>+
+> >>+config ACPI_PPTT
+> >>+	bool
+> >>\ No newline at end of file
+> >
+> >I do not understand the logic. Why should we have a Kconfig option
+> >in drivers/acpi/arm64 for code in drivers/acpi ?
+> >
+> >AFAIK PPTT is not an ACPI ARM64 specific binding.
 > 
-> .iotlb_sync
-> spin_lock_irqsave(&smmu->cmdq.lock, flags);
-> ...
-> add cmd_sync to cmq-queue
-> dsb
-> ...
-> spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
-> 
-> Although iotlb_range_add can reduce n-1 dsb operations, but there are
-> still 1 left. If n is not large enough, this patch is helpful.
+> Weird hu? Originally I had the whole shebang in arm64 because the
+> x86 (or whatever) bindings have not been written. My assumption is
+> that once that part had been provided it could be moved.
 
-Then pick an n that is large enough, based on the compatible string.
+Which part ? I asked because AFAICS the bindings are completely
+generic (and are meant to be so).
 
-Will
+> The config is sort of an artifact and "easier" to move than the
+> whole file. But, as Hanjun has also been complaining about it I've
+> agreed to move it to the "correct" location but keep it in the arm64
+> wrapper. Of course I think that is a bit strange too, but
+> whatever...
+
+I do not want to cavil but either you have Kconfig and code in
+drivers/acpi or drivers/acpi/arm64 - I would not understand a
+mix of the two.
+
+To reiterate the point, PPTT is not an ARM64 specific binding so
+IMO it does not belong in drivers/acpi/arm64.
+
+> Once the arm64 side of things are all wrapped up (and I can come up
+> for some air) I willing to help with bindings on other architectures
+> if anyone is truly interested.  But, I view that whole exercise as
+> more a "bug" fixing one than providing any real benefit at this
+> point.
+
+Please define "bindings on other architectures" because I do not
+understand what you mean.
+
+Thanks,
+Lorenzo
