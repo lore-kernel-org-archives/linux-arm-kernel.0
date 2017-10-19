@@ -1,21 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Oct 2017 18:10:37 +0200
-Subject: [GIT PULL] Renesas ARM64 Based SoC Defconfig Updates for v4.15
-In-Reply-To: <cover.1506678593.git.horms+renesas@verge.net.au>
-References: <cover.1506678593.git.horms+renesas@verge.net.au>
-Message-ID: <CAK8P3a1U_iK6_zkqWGGAmk_0NjRbVux8cHjmaQfAE3Fw1y41dw@mail.gmail.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Thu, 19 Oct 2017 11:13:27 -0500
+Subject: [PATCH v3 6/7] arm64: topology: Enable ACPI/PPTT based CPU
+ topology.
+In-Reply-To: <20171019155622.GC18883@red-moon>
+References: <20171012194856.13844-1-jeremy.linton@arm.com>
+ <20171012194856.13844-7-jeremy.linton@arm.com>
+ <20171019155622.GC18883@red-moon>
+Message-ID: <6a9836f5-d31c-67fb-b2dd-bc0972ebb1c2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 29, 2017 at 1:52 PM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
->
-> ----------------------------------------------------------------
-> Renesas ARM64 Based SoC Defconfig Updates for v4.15
->
-> * Enable the following to allow further test coverage
->   - r8a77970 (V3M) and r8a77995 (D3) R-Car Gen3 SoCs
->   - R-Car Gen3 thermal driver.
->     This is used on a range of R-Car Gen3 SoCs
+On 10/19/2017 10:56 AM, Lorenzo Pieralisi wrote:
+> On Thu, Oct 12, 2017 at 02:48:55PM -0500, Jeremy Linton wrote:
+>> Propagate the topology information from the PPTT tree to the
+>> cpu_topology array. We can get the thread id, core_id and
+>> cluster_id by assuming certain levels of the PPTT tree correspond
+>> to those concepts. The package_id is flagged in the tree and can be
+>> found by passing an arbitrary large level to setup_acpi_cpu_topology()
+>> which terminates its search when it finds an ACPI node flagged
+>> as the physical package. If the tree doesn't contain enough
+>> levels to represent all of thread/core/cod/package then the package
+>> id will be used for the missing levels.
+>>
+>> Since server/ACPI machines are more likely to be multisocket and NUMA,
+> 
+> I think this stuff is vague enough already so to start with I would drop
+> patch 4 and 5 and stop assuming what machines are more likely to ship
+> with ACPI than DT.
+> 
+> I am just saying, for the umpteenth time, that these levels have no
+> architectural meaning _whatsoever_, level is a hierarchy concept
+> with no architectural meaning attached.
 
-Pulled into next/soc, thanks!
+?
+
+Did anyone say anything about that? No, I think the only thing being 
+guaranteed here is that the kernel's physical_id maps to an ACPI defined 
+socket. Which seems to be the mindset of pretty much the entire !arm64 
+community meaning they are optimizing their software and the kernel with 
+that concept in mind.
+
+Are you denying the existence of non-uniformity between threads running 
+on different physical sockets?
