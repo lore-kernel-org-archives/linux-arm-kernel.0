@@ -1,61 +1,135 @@
-From: bhumirks@gmail.com (Bhumika Goyal)
-Date: Thu, 19 Oct 2017 12:59:15 +0200
-Subject: [PATCH 2/2] cpufreq: arm_big_little: make cpufreq_arm_bL_ops
- structures const
-In-Reply-To: <1508410755-13666-1-git-send-email-bhumirks@gmail.com>
-References: <1508410755-13666-1-git-send-email-bhumirks@gmail.com>
-Message-ID: <1508410755-13666-3-git-send-email-bhumirks@gmail.com>
+From: miles.chen@mediatek.com (Miles Chen)
+Date: Thu, 19 Oct 2017 19:08:02 +0800
+Subject: [RFC/PATCH v3] arm64: define MODULES_VADDR by module_alloc_base
+In-Reply-To: <20171017144328.GG14051@arm.com>
+References: <1504093593-2586-1-git-send-email-miles.chen@mediatek.com>
+ <20171017144328.GG14051@arm.com>
+Message-ID: <1508411282.29778.11.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make these const as they are only getting passed to the functions
-bL_cpufreq_{register/unregister} having the arguments as const.
+On Tue, 2017-10-17 at 15:43 +0100, Will Deacon wrote:
+> On Wed, Aug 30, 2017 at 07:46:33PM +0800, Miles Chen wrote:
+> > After the kernel ASLR, the module virtual address is moved to
+> > [module_alloc_base, module_alloc_base + MODULES_VSIZE).
+> > However, the MODULES_VADDR is still defined as a constant and functions
+> > like is_vmalloc_or_module_addr() or dump functions will not able to
+> > use correct module range information.
+> > 
+> > The patch omits modules information in virtual kenrel memory layout if
+> > the modules area is fully mapped whitin vmalloc area.
+> > 
+> > Use module_alloc_base to define MODULES_VADDR. I tested the patch under
+> > three different conditions:
+> > 1.CONFIG_RANDOMIZE_BASE=y, seed=0
+> > CONFIG_KASAN=n
+> > 2.CONFIG_RANDOMIZE_BASE=y, seed=0x2304909023333333
+> > CONFIG_KASAN=n
+> > 3.CONFIG_RANDOMIZE_BASE=y, seed=0x2304909023333333
+> > CONFIG_KASAN=y
+> > 
+> > test log:
+> 
+> [...]
+> 
+> > diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
+> > index ca74a2a..18be771 100644
+> > --- a/arch/arm64/mm/dump.c
+> > +++ b/arch/arm64/mm/dump.c
+> > @@ -29,15 +29,36 @@
+> >  #include <asm/pgtable-hwdef.h>
+> >  #include <asm/ptdump.h>
+> >  
+> > -static const struct addr_marker address_markers[] = {
+> > +enum marker {
+> > +#ifdef CONFIG_KASAN
+> > +	E_KASAN_SHADOW_START,
+> > +	E_KASAN_SHADOW_END,
+> > +#endif
+> > +	E_MODULES_VADDR,
+> > +	E_MODULES_END,
+> > +	E_VMALLOC_START,
+> > +	E_VMALLOC_END,
+> > +	E_FIXADDR_START,
+> > +	E_FIXADDR_TOP,
+> > +	E_PCI_IO_START,
+> > +	E_PCI_IO_END,
+> > +#ifdef CONFIG_SPARSEMEM_VMEMMAP
+> > +	E_VMEMMAP_START,
+> > +	E_VMEMMAP_END,
+> > +#endif
+> > +	E_PAGE_OFFSET,
+> > +	E_NR_MARKER,
+> > +};
+> > +
+> > +static struct addr_marker address_markers[] = {
+> >  #ifdef CONFIG_KASAN
+> >  	{ KASAN_SHADOW_START,		"Kasan shadow start" },
+> >  	{ KASAN_SHADOW_END,		"Kasan shadow end" },
+> >  #endif
+> > -	{ MODULES_VADDR,		"Modules start" },
+> > -	{ MODULES_END,			"Modules end" },
+> > -	{ VMALLOC_START,		"vmalloc() Area" },
+> > -	{ VMALLOC_END,			"vmalloc() End" },
+> > +	{ -1,				"Modules start" },
+> > +	{ -1,				"Modules end" },
+> > +	{ -1,				"vmalloc() Area" },
+> > +	{ -1,				"vmalloc() End" },
+> >  	{ FIXADDR_START,		"Fixmap start" },
+> >  	{ FIXADDR_TOP,			"Fixmap end" },
+> >  	{ PCI_IO_START,			"PCI I/O start" },
+> > @@ -362,10 +383,32 @@ void ptdump_walk_pgd(struct seq_file *m, struct ptdump_info *info)
+> >  	note_page(&st, 0, 0, 0);
+> >  }
+> >  
+> > +static void fixup_markers(void)
+> > +{
+> > +	int i;
+> > +
+> > +	address_markers[E_MODULES_VADDR].start_address = MODULES_VADDR;
+> > +	address_markers[E_MODULES_END].start_address = MODULES_END;
+> > +	address_markers[E_VMALLOC_START].start_address = VMALLOC_START;
+> > +	address_markers[E_VMALLOC_END].start_address = VMALLOC_END;
+> > +
+> > +	if (MODULES_VADDR < VMALLOC_START) {
+> > +		address_markers[E_MODULES_END].start_address =
+> > +			(MODULES_END < VMALLOC_START) ?
+> > +			MODULES_END : VMALLOC_START;
+> > +	} else {
+> > +		/* modules is contains in vamlloc area, don't show them */
+> > +		for (i = E_MODULES_VADDR; i <= E_NR_MARKER - 2; i++)
+> > +			address_markers[i] = address_markers[i + 2];
+> > +	}
+> > +}
+> 
+> This all seems a bit over-engineered to me and we end up having to maintain
+> enum marker in conjunction with the address_markers array. Fixing the array
+> up at runtime also worries me slightly, because we end up with the last two
+> entries being duplicated. That doesn't seem to hurt for now, but it's weird
+> and I can imagine it causing problems in the future.
+> 
+> Is there not a simpler fix here?
+> 
+> Will
 
-Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
----
- drivers/cpufreq/arm_big_little_dt.c    | 2 +-
- drivers/cpufreq/scpi-cpufreq.c         | 2 +-
- drivers/cpufreq/vexpress-spc-cpufreq.c | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+Sorry for the late reply.
 
-diff --git a/drivers/cpufreq/arm_big_little_dt.c b/drivers/cpufreq/arm_big_little_dt.c
-index 39b3f51..b944f29 100644
---- a/drivers/cpufreq/arm_big_little_dt.c
-+++ b/drivers/cpufreq/arm_big_little_dt.c
-@@ -61,7 +61,7 @@ static int dt_get_transition_latency(struct device *cpu_dev)
- 	return transition_latency;
- }
- 
--static struct cpufreq_arm_bL_ops dt_bL_ops = {
-+static const struct cpufreq_arm_bL_ops dt_bL_ops = {
- 	.name	= "dt-bl",
- 	.get_transition_latency = dt_get_transition_latency,
- 	.init_opp_table = dev_pm_opp_of_cpumask_add_table,
-diff --git a/drivers/cpufreq/scpi-cpufreq.c b/drivers/cpufreq/scpi-cpufreq.c
-index 8de2364..05d2990 100644
---- a/drivers/cpufreq/scpi-cpufreq.c
-+++ b/drivers/cpufreq/scpi-cpufreq.c
-@@ -53,7 +53,7 @@ static int scpi_init_opp_table(const struct cpumask *cpumask)
- 	return ret;
- }
- 
--static struct cpufreq_arm_bL_ops scpi_cpufreq_ops = {
-+static const struct cpufreq_arm_bL_ops scpi_cpufreq_ops = {
- 	.name	= "scpi",
- 	.get_transition_latency = scpi_get_transition_latency,
- 	.init_opp_table = scpi_init_opp_table,
-diff --git a/drivers/cpufreq/vexpress-spc-cpufreq.c b/drivers/cpufreq/vexpress-spc-cpufreq.c
-index 87e5bdc..5323728 100644
---- a/drivers/cpufreq/vexpress-spc-cpufreq.c
-+++ b/drivers/cpufreq/vexpress-spc-cpufreq.c
-@@ -42,7 +42,7 @@ static int ve_spc_get_transition_latency(struct device *cpu_dev)
- 	return 1000000; /* 1 ms */
- }
- 
--static struct cpufreq_arm_bL_ops ve_spc_cpufreq_ops = {
-+static const struct cpufreq_arm_bL_ops ve_spc_cpufreq_ops = {
- 	.name	= "vexpress-spc",
- 	.get_transition_latency = ve_spc_get_transition_latency,
- 	.init_opp_table = ve_spc_init_opp_table,
--- 
-1.9.1
+How about using static defined STATIC_MODULES_VADDR, and
+STATIC_MODULES_END, so we do not need to fixed the address_markers[].
+
+-       { MODULES_VADDR,                "Modules start" },
+-       { MODULES_END,                  "Modules end" },
++       { STATIC_MODULES_VADDR,         "Static modules start" },
++       { STATIC_MODULES_END,           "Static modules end" },
+
+and for the modules:
+1. set the [STATIC_MODULES_VADDR,STATIC_MODULES_END) as the default
+module area (e.g., KASAN=n + KASLR=y with no random seed; KASLR=y and
+KASN=y or KASLR=n)
+
+2. with KASAN=n + KASLR=y with valid random seed, kernel modules are
+loaded to vmalloc area. We can still the STATIC_MODULES_* entries in the
+address_markers[]. We should find nothing between
+[STATIC_MODULES_VADDR,STATIC_MODULES_END) in this case.
+
+Miles
