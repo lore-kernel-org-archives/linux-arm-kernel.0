@@ -1,19 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Oct 2017 22:49:04 +0200
-Subject: [GIT PULL 1/4] ARM: exynos: mach/soc for v4.15
-In-Reply-To: <20171015074825.11338-5-krzk@kernel.org>
-References: <20171015074825.11338-1-krzk@kernel.org>
- <20171015074825.11338-5-krzk@kernel.org>
-Message-ID: <CAK8P3a3z8-6NsZZBkn=mE+mFzeV7trE_5OLDXBspnT3A0BkSOQ@mail.gmail.com>
+Date: Thu, 19 Oct 2017 22:52:09 +0200
+Subject: [GIT PULL] ARM: Xilinx Zynq SoC patches for v4.15
+In-Reply-To: <e0070498-8a23-3608-ac27-9da816f0d990@xilinx.com>
+References: <e0070498-8a23-3608-ac27-9da816f0d990@xilinx.com>
+Message-ID: <CAK8P3a0igZxsQSnayZC7p2pVgFEy+aKzzvvOHjWBUa9AKh1Ovg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 15, 2017 at 9:48 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+On Mon, Oct 16, 2017 at 2:55 PM, Michal Simek <michal.simek@xilinx.com> wrote:
 > ----------------------------------------------------------------
-> Samsung mach/soc changes for v4.15
-> 2. Remove of Exynos4212 related dead code (no more support for this
->    SoC).
+> arm: Xilinx Zynq patches for v4.15
+>
+> - Remove Soren from reviewer list
 
-Pulled into next/soc
+Pulled into next/soc, thanks!
 
-      Arnd
+This would have been a candidate for 4.14 as well, since it's a good idea
+to have an up-to-date maintainer entry for the release, but I guess there
+are not too many patches you get since there is not that much code.
+
+     Arnd
