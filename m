@@ -1,57 +1,41 @@
 From: james.morse@arm.com (James Morse)
-Date: Thu, 19 Oct 2017 15:57:51 +0100
-Subject: [PATCH v4 05/21] arm64: entry.S: Remove disable_dbg
+Date: Thu, 19 Oct 2017 15:58:06 +0100
+Subject: [PATCH v4 20/21] KVM: arm64: Take any host SError before entering the
+ guest
 In-Reply-To: <20171019145807.23251-1-james.morse@arm.com>
 References: <20171019145807.23251-1-james.morse@arm.com>
-Message-ID: <20171019145807.23251-6-james.morse@arm.com>
+Message-ID: <20171019145807.23251-21-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-enable_step_tsk is the only user of disable_dbg, which doesn't respect
-our 'dai' order for exception masking. enable_step_tsk may enable
-single-step, so previously needed to mask debug exceptions to prevent us
-from single-stepping kernel_exit. enable_step_tsk is called at the end
-of the ret_to_user loop, which has already masked all exceptions so this
-is no longer needed.
+On VHE systems KVM masks SError before switching the VBAR value. Any
+host RAS error that the CPU knew about before world-switch may become
+pending as an SError during world-switch, and only be taken once we enter
+the guest.
 
-Remove disable_dbg, add a comment that enable_step_tsk's caller should
-have masked debug.
+Until KVM can take RAS SErrors during world switch, add an ESB to
+force any RAS errors to be synchronised and taken on the host before
+we enter world switch.
+
+RAS errors that become pending during world switch are still taken
+once we enter the guest.
 
 Signed-off-by: James Morse <james.morse@arm.com>
-Reviewed-by: Julien Thierry <julien.thierry@arm.com>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/include/asm/assembler.h | 9 +--------
- 1 file changed, 1 insertion(+), 8 deletions(-)
+ arch/arm64/include/asm/kvm_host.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 114e741ca873..1b0972046a72 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -68,13 +68,6 @@
- 	msr	daif, \flags
- 	.endm
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index cf5d78ba14b5..5dc6f2877762 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -392,6 +392,7 @@ static inline void __cpu_init_stage2(void)
  
--/*
-- * Enable and disable debug exceptions.
-- */
--	.macro	disable_dbg
--	msr	daifset, #8
--	.endm
--
- 	.macro	enable_dbg
- 	msr	daifclr, #8
- 	.endm
-@@ -88,9 +81,9 @@
- 9990:
- 	.endm
+ static inline void kvm_arm_vhe_guest_enter(void)
+ {
++	esb();
+ 	local_daif_mask();
+ }
  
-+	/* call with daif masked */
- 	.macro	enable_step_tsk, flgs, tmp
- 	tbz	\flgs, #TIF_SINGLESTEP, 9990f
--	disable_dbg
- 	mrs	\tmp, mdscr_el1
- 	orr	\tmp, \tmp, #1
- 	msr	mdscr_el1, \tmp
 -- 
 2.13.3
