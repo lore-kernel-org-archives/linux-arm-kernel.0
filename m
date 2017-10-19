@@ -1,32 +1,55 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 19 Oct 2017 13:05:55 +0100
-Subject: [PATCH 02/11] replace memory function
-In-Reply-To: <20171011082227.20546-3-liuwenliang@huawei.com>
-References: <20171011082227.20546-1-liuwenliang@huawei.com>
- <20171011082227.20546-3-liuwenliang@huawei.com>
-Message-ID: <20171019120555.GU20805@n2100.armlinux.org.uk>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Thu, 19 Oct 2017 20:19:26 +0800
+Subject: [RFC resend 1/4] dt-bindings: display: mediatek: add drm binding
+In-Reply-To: <20171019112610.13645-2-mbrugger@suse.com>
+References: <20171019112610.13645-1-mbrugger@suse.com>
+ <20171019112610.13645-2-mbrugger@suse.com>
+Message-ID: <1508415566.5287.10.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 11, 2017 at 04:22:18PM +0800, Abbott Liu wrote:
-> From: Andrey Ryabinin <a.ryabinin@samsung.com>
-> 
-> Functions like memset/memmove/memcpy do a lot of memory accesses.
-> If bad pointer passed to one of these function it is important
-> to catch this. Compiler's instrumentation cannot do this since
-> these functions are written in assembly.
-> 
-> KASan replaces memory functions with manually instrumented variants.
-> Original functions declared as weak symbols so strong definitions
-> in mm/kasan/kasan.c could replace them. Original functions have aliases
-> with '__' prefix in name, so we could call non-instrumented variant
-> if needed.
+Hi Matthias,
 
-KASAN in the decompressor makes no sense, so I think you need to
-mark the decompressor compilation as such in this patch so it,
-as a whole, sees no change.
+Should I base on your changes and resend this patch series
+https://patchwork.kernel.org/patch/9980061/ ?
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+I add a similar node - display_components, but your approach is better
+than mine.
+
+Thanks.
+
+On Thu, 2017-10-19 at 13:26 +0200, Matthias Brugger wrote:
+> DRM subysystem and clock driver shared the same compatible mmsys.
+> This stopped does not work, as only the first driver for a compatible
+> gets probed. We change the comaptible to the new DRM identifier to fix
+> this.
+> 
+> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+> ---
+>  .../devicetree/bindings/display/mediatek/mediatek,disp.txt          | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt b/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
+> index 383183a89164..6db652463e64 100644
+> --- a/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
+> +++ b/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
+> @@ -27,6 +27,7 @@ Documentation/devicetree/bindings/display/mediatek/mediatek,dpi.txt.
+>  
+>  Required properties (all function blocks):
+>  - compatible: "mediatek,<chip>-disp-<function>", one of
+> +	"mediatek,<chip>-dispsys"    - central component for the DRM system
+>  	"mediatek,<chip>-disp-ovl"   - overlay (4 layers, blending, csc)
+>  	"mediatek,<chip>-disp-rdma"  - read DMA / line buffer
+>  	"mediatek,<chip>-disp-wdma"  - write DMA
+> @@ -71,6 +72,11 @@ mmsys: clock-controller at 14000000 {
+>  	#clock-cells = <1>;
+>  };
+>  
+> +dispsys: display-system {
+> +	compatible = "mediatek,mt2701-dispsys";
+> +	mediatek,mmsys = <&mmsys>;
+> +}
+> +
+>  ovl0: ovl at 1400c000 {
+>  	compatible = "mediatek,mt8173-disp-ovl";
+>  	reg = <0 0x1400c000 0 0x1000>;
