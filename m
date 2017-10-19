@@ -1,96 +1,176 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 19 Oct 2017 18:15:36 +0100
-Subject: [PATCH 00/17] coresight: perf: TMC ETR backend support
-Message-ID: <20171019171553.24056-1-suzuki.poulose@arm.com>
+Date: Thu, 19 Oct 2017 18:15:38 +0100
+Subject: [PATCH 02/17] coresight tmc: Hide trace buffer handling for file read
+In-Reply-To: <20171019171553.24056-1-suzuki.poulose@arm.com>
+References: <20171019171553.24056-1-suzuki.poulose@arm.com>
+Message-ID: <20171019171553.24056-3-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The TMC-ETR supports routing the Coresight trace data to the
-System memory. It supports two different modes in which the memory
-could be used.
+At the moment we adjust the buffer pointers for reading the trace
+data via misc device in the common code for ETF/ETB and ETR. Since
+we are going to change how we manage the buffer for ETR, let us
+move the buffer manipulation to the respective driver files, hiding
+it from the common code. We do so by adding type specific helpers
+for finding the length of data and the pointer to the buffer,
+for a given length at a file position.
 
-1) Contiguous memory - The memory is assumed to be physically
-contiguous.
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ drivers/hwtracing/coresight/coresight-tmc-etf.c | 16 ++++++++++++
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 33 ++++++++++++++++++++++++
+ drivers/hwtracing/coresight/coresight-tmc.c     | 34 ++++++++++++++-----------
+ drivers/hwtracing/coresight/coresight-tmc.h     |  4 +++
+ 4 files changed, 72 insertions(+), 15 deletions(-)
 
-2) Scatter Gather list - The memory can be chunks of 4K pages,
-which are specified in a table of pointers which itself could be
-multiple 4K size pages.
-
-To avoid the complications of the managing the buffer, this series
-adds a layer for managing the ETR buffer, which makes the best possibly
-choice based on what is available. The allocation can be tuned by passing
-in flags, existing pages (e.g, perf ring buffer) etc.
-
-Towards supporting ETR Scatter Gather mode, we introduce a generic TMC
-scatter-gather table which can be used to manage the data and table pages.
-The table can be filled in the format expected by the Scatter-Gather
-mode.
-
-The TMC ETR-SG mechanism doesn't allow starting the trace at non-zero
-offset (required by perf). So we make some tricky changes to the table
-at run time to allow starting at any "Page aligned" offset and then
-wrap around to the beginning of the buffer with very less overhead.
-See patches for more description.
-
-The series also improves the way the ETR is controlled by different modes
-(sysfs vs. perf) by keeping mode specific data. This allows access
-to the trace data collected in sysfs mode, even when the ETR is
-operated in perf mode. Also with the transparent management of the
-buffer and scatter-gather mechanism, we can allow the user to
-request for larger trace buffers for sysfs mode. This is supported
-by providing a sysfs file, "buffer_size" which accepts a page aligned
-size, which will be used by the ETR when allocating a buffer.
-
-Finally, it cleans up the etm perf sink callbacks a little bit and
-then adds the support for ETR sink. For the ETR, we try our best to
-use the perf ring buffer as the target hardware buffer, provided :
- 1) The ETR is dma coherent (since the pages will be shared with
-    userspace perf tool).
- 2) The perf is used in snapshot mode (The ETR cannot be stopped
-    based on the size of the data written hence we could easily
-    overwrite the buffer. We may be able to fix this in the future)
- 3) The ETR supports the Scatter-Gather mode.
-
-If we can't use the perf buffers directly, we fallback to using
-software buffering where we have to copy the trace data back
-to the perf ring buffer.
-
-Suzuki K Poulose (17):
-  coresight etr: Disallow perf mode temporarily
-  coresight tmc: Hide trace buffer handling for file read
-  coresight: Add helper for inserting synchronization packets
-  coresight: Add generic TMC sg table framework
-  coresight: Add support for TMC ETR SG unit
-  coresight: tmc: Make ETR SG table circular
-  coresight: tmc etr: Add transparent buffer management
-  coresight: tmc: Add configuration support for trace buffer size
-  coresight: Convert driver messages to dev_dbg
-  coresight: etr: Track if the device is coherent
-  coresight etr: Handle driver mode specific ETR buffers
-  coresight etr: Relax collection of trace from sysfs mode
-  coresight etr: Do not clean ETR trace buffer
-  coresight: etr: Add support for save restore buffers
-  coresight: etr_buf: Add helper for padding an area of trace data
-  coresight: perf: Remove reset_buffer call back for sinks
-  coresight perf: Add ETR backend support for etm-perf
-
- .../ABI/testing/sysfs-bus-coresight-devices-tmc    |    8 +
- .../coresight/coresight-dynamic-replicator.c       |    4 +-
- drivers/hwtracing/coresight/coresight-etb10.c      |   72 +-
- drivers/hwtracing/coresight/coresight-etm-perf.c   |    9 +-
- drivers/hwtracing/coresight/coresight-etm3x.c      |    4 +-
- drivers/hwtracing/coresight/coresight-etm4x.c      |    4 +-
- drivers/hwtracing/coresight/coresight-funnel.c     |    4 +-
- drivers/hwtracing/coresight/coresight-priv.h       |    8 +
- drivers/hwtracing/coresight/coresight-replicator.c |    4 +-
- drivers/hwtracing/coresight/coresight-stm.c        |    4 +-
- drivers/hwtracing/coresight/coresight-tmc-etf.c    |  109 +-
- drivers/hwtracing/coresight/coresight-tmc-etr.c    | 1665 ++++++++++++++++++--
- drivers/hwtracing/coresight/coresight-tmc.c        |   75 +-
- drivers/hwtracing/coresight/coresight-tmc.h        |  128 +-
- drivers/hwtracing/coresight/coresight-tpiu.c       |    4 +-
- include/linux/coresight.h                          |    5 +-
- 16 files changed, 1837 insertions(+), 270 deletions(-)
-
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+index e2513b786242..0b6f1eb746de 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+@@ -120,6 +120,22 @@ static void tmc_etf_disable_hw(struct tmc_drvdata *drvdata)
+ 	CS_LOCK(drvdata->base);
+ }
+ 
++/*
++ * Return the available trace data in the buffer from @pos, with
++ * a maximum limit of @len, updating the @bufpp on where to
++ * find it.
++ */
++ssize_t tmc_etb_get_sysfs_trace(struct tmc_drvdata *drvdata,
++				  loff_t pos, size_t len, char **bufpp)
++{
++	/* Adjust the len to available size @pos */
++	if (pos + len > drvdata->len)
++		len = drvdata->len - pos;
++	if (len > 0)
++		*bufpp = drvdata->buf + pos;
++	return len;
++}
++
+ static int tmc_enable_etf_sink_sysfs(struct coresight_device *csdev)
+ {
+ 	int ret = 0;
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+index d0208f01afd9..063f253f1c99 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+@@ -69,6 +69,39 @@ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
+ 	CS_LOCK(drvdata->base);
+ }
+ 
++/*
++ * Return the available trace data in the buffer @pos, with a maximum
++ * limit of @len, also updating the @bufpp on where to find it.
++ */
++ssize_t tmc_etr_get_sysfs_trace(struct tmc_drvdata *drvdata,
++			    loff_t pos, size_t len, char **bufpp)
++{
++	char *bufp = drvdata->buf + pos;
++	char *bufend = (char *)(drvdata->vaddr + drvdata->size);
++
++	/* Adjust the len to available size @pos */
++	if (pos + len > drvdata->len)
++		len = drvdata->len - pos;
++
++	if (len <= 0)
++		return len;
++
++	/*
++	 * Since we use a circular buffer, with trace data starting
++	 * @drvdata->buf, possibly anywhere in the buffer @drvdata->vaddr,
++	 * wrap the current @pos to within the buffer.
++	 */
++	if (bufp >= bufend)
++		bufp -= drvdata->size;
++	/*
++	 * For simplicity, avoid copying over a wrapped around buffer.
++	 */
++	if ((bufp + len) > bufend)
++		len = bufend - bufp;
++	*bufpp = bufp;
++	return len;
++}
++
+ static void tmc_etr_dump_hw(struct tmc_drvdata *drvdata)
+ {
+ 	const u32 *barrier;
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
+index 2ff4a66a3caa..c7201e40d737 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.c
++++ b/drivers/hwtracing/coresight/coresight-tmc.c
+@@ -131,24 +131,29 @@ static int tmc_open(struct inode *inode, struct file *file)
+ 	return 0;
+ }
+ 
++static inline ssize_t tmc_get_sysfs_trace(struct tmc_drvdata *drvdata,
++					loff_t pos, size_t len, char **bufpp)
++{
++	switch (drvdata->config_type) {
++	case TMC_CONFIG_TYPE_ETB:
++	case TMC_CONFIG_TYPE_ETF:
++		return tmc_etb_get_sysfs_trace(drvdata, pos, len, bufpp);
++	case TMC_CONFIG_TYPE_ETR:
++		return tmc_etr_get_sysfs_trace(drvdata, pos, len, bufpp);
++	}
++
++	return  -EINVAL;
++}
++
+ static ssize_t tmc_read(struct file *file, char __user *data, size_t len,
+ 			loff_t *ppos)
+ {
++	char *bufp;
+ 	struct tmc_drvdata *drvdata = container_of(file->private_data,
+ 						   struct tmc_drvdata, miscdev);
+-	char *bufp = drvdata->buf + *ppos;
+-
+-	if (*ppos + len > drvdata->len)
+-		len = drvdata->len - *ppos;
+-
+-	if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
+-		if (bufp == (char *)(drvdata->vaddr + drvdata->size))
+-			bufp = drvdata->vaddr;
+-		else if (bufp > (char *)(drvdata->vaddr + drvdata->size))
+-			bufp -= drvdata->size;
+-		if ((bufp + len) > (char *)(drvdata->vaddr + drvdata->size))
+-			len = (char *)(drvdata->vaddr + drvdata->size) - bufp;
+-	}
++	len = tmc_get_sysfs_trace(drvdata, *ppos, len, &bufp);
++	if (len <= 0)
++		return 0;
+ 
+ 	if (copy_to_user(data, bufp, len)) {
+ 		dev_dbg(drvdata->dev, "%s: copy_to_user failed\n", __func__);
+@@ -156,9 +161,8 @@ static ssize_t tmc_read(struct file *file, char __user *data, size_t len,
+ 	}
+ 
+ 	*ppos += len;
++	dev_dbg(drvdata->dev, "%zu bytes copied\n", len);
+ 
+-	dev_dbg(drvdata->dev, "%s: %zu bytes copied, %d bytes left\n",
+-		__func__, len, (int)(drvdata->len - *ppos));
+ 	return len;
+ }
+ 
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
+index 8df7a813f537..6deb3afe9db8 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.h
++++ b/drivers/hwtracing/coresight/coresight-tmc.h
+@@ -183,10 +183,14 @@ int tmc_read_unprepare_etb(struct tmc_drvdata *drvdata);
+ extern const struct coresight_ops tmc_etb_cs_ops;
+ extern const struct coresight_ops tmc_etf_cs_ops;
+ 
++ssize_t tmc_etb_get_sysfs_trace(struct tmc_drvdata *drvdata,
++			    loff_t pos, size_t len, char **bufpp);
+ /* ETR functions */
+ int tmc_read_prepare_etr(struct tmc_drvdata *drvdata);
+ int tmc_read_unprepare_etr(struct tmc_drvdata *drvdata);
+ extern const struct coresight_ops tmc_etr_cs_ops;
++ssize_t tmc_etr_get_sysfs_trace(struct tmc_drvdata *drvdata,
++			    loff_t pos, size_t len, char **bufpp);
+ 
+ 
+ #define TMC_REG_PAIR(name, lo_off, hi_off)				\
 -- 
 2.13.6
