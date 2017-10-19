@@ -1,30 +1,37 @@
-From: Hermann.Lauer@iwr.uni-heidelberg.de (Hermann Lauer)
-Date: Thu, 19 Oct 2017 12:36:18 +0200
-Subject: compile error in 4.14-rc5 with nvidia tegra enabled
-In-Reply-To: <c3afe94a-a2eb-05c3-9838-ff1a4871736d@kapsi.fi>
-References: <20171019084210.lql5kffhluvxvquu@lemon.iwr.uni-heidelberg.de>
- <d006a085-d81f-4632-35c9-4e9d607a6504@nvidia.com>
- <c3afe94a-a2eb-05c3-9838-ff1a4871736d@kapsi.fi>
-Message-ID: <20171019103618.anszbwgnrwv45vb5@lemon.iwr.uni-heidelberg.de>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Thu, 19 Oct 2017 19:35:40 +0900
+Subject: [PATCH net-next v2 2/2] net: ethernet: socionext: add AVE
+ ethernet driver
+In-Reply-To: <CAK7LNARuoK-M9iKyP7JxRgH7naA+teikqZMOHm3f2wykEieqLw@mail.gmail.com>
+References: <20171018192359.243C.4A936039@socionext.com>
+ <CAK7LNARuoK-M9iKyP7JxRgH7naA+teikqZMOHm3f2wykEieqLw@mail.gmail.com>
+Message-ID: <20171019193540.0F35.4A936039@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 19, 2017 at 01:21:02PM +0300, Mikko Perttunen wrote:
-> Arnd Bergmann raised this issue previously[1], but I assumed it would only
-> happen on some obscure configuration, as clearly arm tegra_defconfig and
-> multi_v7_defconfig and arm64 defconfig are building.
+On Thu, 19 Oct 2017 09:29:03 +0900 <yamada.masahiro@socionext.com> wrote:
+
+> 2017-10-18 19:23 GMT+09:00 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>:
+> > On Mon, 16 Oct 2017 00:08:21 +0900 <yamada.masahiro@socionext.com> wrote:
 > 
-> It would be interesting to know how this is being triggered here.
+> >> priv->rst = devm_reset_control_get_optional_shared(dev, NULL);
+> >> if (IS_ERR(priv->rst))
+> >>           return PTR_ERR(priv->rst);
+> >
+> > The clk and reset are optional in the driver.
+> > Referring to your suggested method, I'll fix the part of clk and reset.
+> >
+> 
+> 
+> Why is clk optional?
 
-basis is the config-4.13.0-1-armmp from Debian's sid linux-image package -
-will send the exact config when I fetched it from the Allwinner A20 (BananaPro)
-System. Toolchain is the Debian stretch toolchain.
+Indeed. My check point was wrong.
+This clk property should be treated as "required".
 
-Thanks for carering,
-  Hermann
+In v2, the clock enabling code moved to ndo_init().
+Although probing the driver succeeds without clk,
+enabling the driver fails clearly.
 
--- 
-Netzwerkadministration/Zentrale Dienste, Interdiziplinaeres 
-Zentrum fuer wissenschaftliches Rechnen der Universitaet Heidelberg
-IWR; INF 205; 69120 Heidelberg; Tel: (06221)54-14405 Fax: -14427
-Email: Hermann.Lauer at iwr.uni-heidelberg.de
+---
+Best Regards,
+Kunihiko Hayashi
