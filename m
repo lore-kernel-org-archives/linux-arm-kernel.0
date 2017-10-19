@@ -1,44 +1,32 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 19 Oct 2017 16:18:17 -0500
-Subject: [PATCH] firmware: meson-sm: use generic compatible
-In-Reply-To: <7h8tg7zb6t.fsf@baylibre.com>
-References: <20171012134743.10625-1-jbrunet@baylibre.com>
- <20171017204959.kfbhn2yxhv2sb5qg@rob-hp-laptop>
- <7h8tg7zb6t.fsf@baylibre.com>
-Message-ID: <CAL_JsqJ-XAqMA_zjxrJNAtysQsXzmWYUFqLJtKX2wUJ0oebtuw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 19 Oct 2017 23:25:15 +0200
+Subject: [PATCH] arm: boot: dts: artpec6: Remove unnecessary
+ interrupt-parent property from sub-nodes
+In-Reply-To: <5310134e-c371-d43f-175f-a3a9cdc5b657@axis.com>
+References: <1498565735-8208-1-git-send-email-surenderp@techveda.org>
+ <d582c742-4bf9-c658-d105-572d180222a4@axis.com>
+ <8475266d-de55-0760-7ae4-9fcafead36e4@techveda.org>
+ <5310134e-c371-d43f-175f-a3a9cdc5b657@axis.com>
+Message-ID: <CAK8P3a2XYdd-zq+QEwsEW5SzUUROfs0cBX2JMr4RJq2s8EQpyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 19, 2017 at 5:25 AM, Kevin Hilman <khilman@baylibre.com> wrote:
-> Rob Herring <robh@kernel.org> writes:
->
->> On Thu, Oct 12, 2017 at 03:47:43PM +0200, Jerome Brunet wrote:
->>> The meson secure monitor seems to be compatible with more SoCs than
->>> initially thought. Let's use the most generic compatible he have in
->>> DT instead of the gxbb specific one
->>>
->>> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
->>> ---
->>>  Documentation/devicetree/bindings/firmware/meson/meson_sm.txt | 4 ++--
->>>  drivers/firmware/meson/meson_sm.c                             | 4 ++--
->>>  2 files changed, 4 insertions(+), 4 deletions(-)
+On Mon, Sep 4, 2017 at 5:23 PM, Niklas Cassel <niklas.cassel@axis.com> wrote:
+> On 08/11/2017 09:56 AM, Surender Polsani wrote:
+>> On Tuesday 27 June 2017 05:57 PM, Niklas Cassel wrote:
+>>> Acked-by: Niklas Cassel <niklas.cassel@axis.com>
 >>
->> Seems like a pointless, not backwards compatible change to me.
+>> Hi Nik, This patch has been Acknowledged but is not getting added / applied to the
+>> respective git source tree. Please let me know if there is any problem.
 >
-> I've verified that it's backwards compatible with existing upstream DTs.
-
-Perhaps if you all are documenting only what the driver uses, not what
-the dts can have as Jerome said.
-
->> end, it's just a string to match on. Who cares what the string is.
+> Hello Surender,
 >
-> As platform maintiner, I very much care what the strings are and I want
-> it to be coherent with the platform generic names, and I want the
-> SoC-specific strings to correspond to the actual SoC names.
+> Sorry for the delay.
+>
+> Could you please resend your patch,
+> add "To: arm at kernel.org", together with my Ack.
 
-The most specific compatible should be, absolutely. The fallbacks can
-be anything really. Ideally, they are the compatible string for the
-1st SoC with "the same" compatible IP. Could be another vendor
-entirely even because mergers happen.
+I stumbled over this old patch and have applied it to next/dt now with your Ack,
+since I did not see another copy sent to arm at kernel.org.
 
-Rob
+       Arnd
