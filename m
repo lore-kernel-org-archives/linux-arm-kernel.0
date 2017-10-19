@@ -1,240 +1,212 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Thu, 19 Oct 2017 10:44:43 +0200
-Subject: [PATCH v3 18/20] KVM: arm/arm64: Avoid phys timer emulation in
- vcpu entry/exit
-In-Reply-To: <8760bnwd3o.fsf@on-the-bus.cambridge.arm.com>
-References: <20170923004207.22356-1-cdall@linaro.org>
- <20170923004207.22356-19-cdall@linaro.org>
- <8760bnwd3o.fsf@on-the-bus.cambridge.arm.com>
-Message-ID: <20171019084443.GQ8900@cbox>
+From: gregory.0xf0@gmail.com (Gregory Fong)
+Date: Thu, 19 Oct 2017 02:03:59 -0700
+Subject: [PATCH 7/7] gpio: brcmstb: implement suspend/resume/shutdown
+In-Reply-To: <20170930034057.15166-8-opendmb@gmail.com>
+References: <20170930034057.15166-1-opendmb@gmail.com>
+ <20170930034057.15166-8-opendmb@gmail.com>
+Message-ID: <20171019090359.GB31645@kessel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 10, 2017 at 10:45:15AM +0100, Marc Zyngier wrote:
-> On Sat, Sep 23 2017 at  2:42:05 am BST, Christoffer Dall <cdall@linaro.org> wrote:
-> > There is no need to schedule and cancel a hrtimer when entering and
-> > exiting the guest, because we know when the physical timer is going to
-> > fire when the guest programs it, and we can simply program the hrtimer
-> > at that point.
-> >
-> > Now when the register modifications from the guest go through the
-> > kvm_arm_timer_set/get_reg functions, which always call
-> > kvm_timer_update_state(), we can simply consider the timer state in this
-> > function and schedule and cancel the timers as needed.
-> >
-> > This avoids looking at the physical timer emulation state when entering
-> > and exiting the VCPU, allowing for faster servicing of the VM when
-> > needed.
-> >
-> > Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> > ---
-> >  virt/kvm/arm/arch_timer.c | 75 ++++++++++++++++++++++++++++++++---------------
-> >  1 file changed, 51 insertions(+), 24 deletions(-)
-> >
-> > diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> > index 1f82c21..aa18a5d 100644
-> > --- a/virt/kvm/arm/arch_timer.c
-> > +++ b/virt/kvm/arm/arch_timer.c
-> > @@ -199,7 +199,27 @@ static enum hrtimer_restart kvm_bg_timer_expire(struct hrtimer *hrt)
-> >  
-> >  static enum hrtimer_restart kvm_phys_timer_expire(struct hrtimer *hrt)
-> >  {
-> > -	WARN(1, "Timer only used to ensure guest exit - unexpected event.");
-> > +	struct arch_timer_context *ptimer;
-> > +	struct arch_timer_cpu *timer;
-> > +	struct kvm_vcpu *vcpu;
-> > +	u64 ns;
-> > +
-> > +	timer = container_of(hrt, struct arch_timer_cpu, phys_timer);
-> > +	vcpu = container_of(timer, struct kvm_vcpu, arch.timer_cpu);
-> > +	ptimer = vcpu_ptimer(vcpu);
-> > +
-> > +	/*
-> > +	 * Check that the timer has really expired from the guest's
-> > +	 * PoV (NTP on the host may have forced it to expire
-> > +	 * early). If not ready, schedule for a later time.
-> > +	 */
-> > +	ns = kvm_timer_compute_delta(ptimer);
-> > +	if (unlikely(ns)) {
-> > +		hrtimer_forward_now(hrt, ns_to_ktime(ns));
-> > +		return HRTIMER_RESTART;
-> > +	}
+Hi Doug,
+
+Nice description of the problem with dealing with a pending disabled
+wake interrupt and the solution.  A few remarks:
+
+On Fri, Sep 29, 2017 at 08:40:57PM -0700, Doug Berger wrote:
+> diff --git a/drivers/gpio/gpio-brcmstb.c b/drivers/gpio/gpio-brcmstb.c
+> index 752a46ce3589..c964ed71a68d 100644
+> --- a/drivers/gpio/gpio-brcmstb.c
+> +++ b/drivers/gpio/gpio-brcmstb.c
+> @@ -19,17 +19,29 @@
+>  #include <linux/irqdomain.h>
+>  #include <linux/irqchip/chained_irq.h>
+>  #include <linux/interrupt.h>
+> -#include <linux/reboot.h>
+> -
+> -#define GIO_BANK_SIZE           0x20
+> -#define GIO_ODEN(bank)          (((bank) * GIO_BANK_SIZE) + 0x00)
+> -#define GIO_DATA(bank)          (((bank) * GIO_BANK_SIZE) + 0x04)
+> -#define GIO_IODIR(bank)         (((bank) * GIO_BANK_SIZE) + 0x08)
+> -#define GIO_EC(bank)            (((bank) * GIO_BANK_SIZE) + 0x0c)
+> -#define GIO_EI(bank)            (((bank) * GIO_BANK_SIZE) + 0x10)
+> -#define GIO_MASK(bank)          (((bank) * GIO_BANK_SIZE) + 0x14)
+> -#define GIO_LEVEL(bank)         (((bank) * GIO_BANK_SIZE) + 0x18)
+> -#define GIO_STAT(bank)          (((bank) * GIO_BANK_SIZE) + 0x1c)
+> +
+> +enum gio_reg_index {
+> +	GIO_REG_ODEN = 0,
+> +	GIO_REG_DATA,
+> +	GIO_REG_IODIR,
+> +	GIO_REG_EC,
+> +	GIO_REG_EI,
+> +	GIO_REG_MASK,
+> +	GIO_REG_LEVEL,
+> +	GIO_REG_STAT,
+> +	GIO_REG_COUNT
+
+Please change the name or add a comment to make it clear that this is
+not for an actual register.
+
+> +};
+> +
+> [snip]
+> @@ -37,6 +49,8 @@ struct brcmstb_gpio_bank {
+>  	struct gpio_chip gc;
+>  	struct brcmstb_gpio_priv *parent_priv;
+>  	u32 width;
+> +	u32 wake_active;
+> +	u32 regs[GIO_REG_STAT]; /* Don't save and restore GIO_REG_STAT */
+
+Consider naming to make it clearer that this is for save/restore, not
+some kind of shadow reg implementation or anything like that.
+
+>  };
+>  
+>  struct brcmstb_gpio_priv {
+> @@ -49,7 +63,6 @@ struct brcmstb_gpio_priv {
+>  	int gpio_base;
+>  	int num_gpios;
+>  	int parent_wake_irq;
+> -	struct notifier_block reboot_notifier;
+>  };
+>  
+>  #define MAX_GPIO_PER_BANK       32
+> @@ -65,15 +78,22 @@ brcmstb_gpio_gc_to_priv(struct gpio_chip *gc)
+>  }
+>  
+>  static unsigned long
+> -brcmstb_gpio_get_active_irqs(struct brcmstb_gpio_bank *bank)
+> +__brcmstb_gpio_get_active_irqs(struct brcmstb_gpio_bank *bank)
+>  {
+>  	void __iomem *reg_base = bank->parent_priv->reg_base;
+> +
+> +	return bank->gc.read_reg(reg_base + GIO_STAT(bank->id)) &
+> +	       bank->gc.read_reg(reg_base + GIO_MASK(bank->id));
+> +}
+> +
+> +static unsigned long
+> +brcmstb_gpio_get_active_irqs(struct brcmstb_gpio_bank *bank)
+> +{
+>  	unsigned long status;
+>  	unsigned long flags;
+>  
+>  	spin_lock_irqsave(&bank->gc.bgpio_lock, flags);
+> -	status = bank->gc.read_reg(reg_base + GIO_STAT(bank->id)) &
+> -		 bank->gc.read_reg(reg_base + GIO_MASK(bank->id));
+> +	status = __brcmstb_gpio_get_active_irqs(bank);
+>  	spin_unlock_irqrestore(&bank->gc.bgpio_lock, flags);
+>  
+>  	return status;
+> @@ -209,11 +229,6 @@ static int brcmstb_gpio_priv_set_wake(struct brcmstb_gpio_priv *priv,
+>  {
+>  	int ret = 0;
+>  
+> -	/*
+> -	 * Only enable wake IRQ once for however many hwirqs can wake
+> -	 * since they all use the same wake IRQ.  Mask will be set
+> -	 * up appropriately thanks to IRQCHIP_MASK_ON_SUSPEND flag.
+> -	 */
+>  	if (enable)
+>  		ret = enable_irq_wake(priv->parent_wake_irq);
+>  	else
+> @@ -227,7 +242,17 @@ static int brcmstb_gpio_priv_set_wake(struct brcmstb_gpio_priv *priv,
+>  static int brcmstb_gpio_irq_set_wake(struct irq_data *d, unsigned int enable)
+>  {
+>  	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
+> -	struct brcmstb_gpio_priv *priv = brcmstb_gpio_gc_to_priv(gc);
+> +	struct brcmstb_gpio_bank *bank = gpiochip_get_data(gc);
+> +	struct brcmstb_gpio_priv *priv = bank->parent_priv;
+> +	u32 mask = BIT(brcmstb_gpio_hwirq_to_offset(d->hwirq, bank));
+> +
+> +	/* Do not do anything specific for now, suspend/resume callbacks will
+> +	 * configure the interrupt mask appropriately
+> +	 */
+
+Please fix comment format (this is the network subsystem style).
+
 > 
-> Don't we already have a similar logic for the background timer (I must
-> admit I've lost track of how we changed things in this series)? If so,
-> can we make this common code?
-> 
+> [snip] 
+> @@ -508,6 +511,99 @@ static int brcmstb_gpio_irq_setup(struct platform_device *pdev,
+> [...]
+> +static void brcmstb_gpio_shutdown(struct platform_device *pdev)
+> +{
+> +	/* Enable GPIO for S5 cold boot */
+> +	brcmstb_gpio_quiesce(&pdev->dev, 0);
 
-I looked at it, but the functions are slightly different.  In the
-phys_timer, we just have to calculate the delta and figure out if we
-need to restart it.  In the bg_timer, we have to compute the delta of
-both the vtimer and the ptimer, figure out the earliest one, and figure
-out if we have to restart it.  Therefore, kvm_timer_earliest_exp()
-alrady calls kvm_timer_compute_delate() to share code, and the only code
-we can really share is:
+nit: use false instead of 0 (it's a bool).
 
-	if (unlikely(ns)) {
-		hrtimer_forward_now(hrt, ns_to_ktime(ns));
-		return HRTIMER_RESTART;
-	}
+> +}
+> +
+> +#ifdef CONFIG_PM_SLEEP
+> [snip]
+> +static int brcmstb_gpio_resume(struct device *dev)
+> +{
+> +	struct brcmstb_gpio_priv *priv = dev_get_drvdata(dev);
+> +	struct brcmstb_gpio_bank *bank;
+> +	u32 wake_mask = 0;
 
-The following code also cannot really be shared because in one case we
-have to schedule work (the bg timer) and in the other case we have to
-inject an irq (the phys timer).  Ther alternative would be:
+This isn't really being used as a mask, contrary to appearances.  It's
+just tracking whether any active IRQs were seen.  Please change to use a
+bool instead and adjust the name accordingly.
 
-static enum hrtimer_restart kvm_soft_timer_expire(struct hrtimer *hrt, bool is_bg_timer)
-{
-	struct arch_timer_context *ptimer;
-	struct arch_timer_cpu *timer;
-	struct kvm_vcpu *vcpu;
-	u64 ns;
+> +
+> +	list_for_each_entry(bank, &priv->bank_list, node) {
+> +		wake_mask |= __brcmstb_gpio_get_active_irqs(bank);
+> +		brcmstb_gpio_bank_restore(priv, bank);
+> +	}
+> +
+> +	if (priv->parent_wake_irq && wake_mask)
+> +		pm_wakeup_event(dev, 0);
+> +
+> +	/* enable non-wake interrupt */
+> +	if (priv->parent_irq >= 0)
+> +		enable_irq(priv->parent_irq);
+> +
+> +	return 0;
+> +}
+> +
+> +#else
+> +#define brcmstb_gpio_suspend	NULL
+> +#define brcmstb_gpio_resume	NULL
+> +#endif /* CONFIG_PM_SLEEP */
+> +
+> +static const struct dev_pm_ops brcmstb_gpio_pm_ops = {
+> +	.suspend_noirq	= brcmstb_gpio_suspend,
+> +	.resume_noirq = brcmstb_gpio_resume,
+> +};
+> +
+>  static int brcmstb_gpio_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+> @@ -517,7 +613,7 @@ static int brcmstb_gpio_probe(struct platform_device *pdev)
+>  	struct resource *res;
+>  	struct property *prop;
+>  	const __be32 *p;
+> -	u32 bank_width;
+> +	u32 bank_width, wake_mask = 0;
 
-	if (is_bg_timer)
-		timer = container_of(hrt, struct arch_timer_cpu, bg_timer);
-	else
-		timer = container_of(hrt, struct arch_timer_cpu, phys_timer);
-	vcpu = container_of(timer, struct kvm_vcpu, arch.timer_cpu);
-	ptimer = vcpu_ptimer(vcpu);
+Same comment on wake_mask as for brcmstb_gpio_resume() above.
 
-	/*
-	 * Check that the timer has really expired from the guest's
-	 * PoV (NTP on the host may have forced it to expire
-	 * early). If we should have slept longer, restart it.
-	 */
-	if (is_bg_timer)
-		ns = kvm_timer_earliest_exp(vcpu);
-	else
-		ns = kvm_timer_compute_delta(ptimer);
-	if (unlikely(ns)) {
-		hrtimer_forward_now(hrt, ns_to_ktime(ns));
-		return HRTIMER_RESTART;
-	}
+>  	int num_banks = 0;
+>  	int err;
+>  	static int gpio_base;
+> @@ -617,6 +713,7 @@ static int brcmstb_gpio_probe(struct platform_device *pdev)
+>  		 * Mask all interrupts by default, since wakeup interrupts may
+>  		 * be retained from S5 cold boot
+>  		 */
+> +		wake_mask |= __brcmstb_gpio_get_active_irqs(bank);
+>  		gc->write_reg(reg_base + GIO_MASK(bank->id), 0);
+>  
+>  		err = gpiochip_add_data(gc, bank);
+> @@ -646,6 +743,9 @@ static int brcmstb_gpio_probe(struct platform_device *pdev)
+>  	dev_info(dev, "Registered %d banks (GPIO(s): %d-%d)\n",
+>  			num_banks, priv->gpio_base, gpio_base - 1);
+>  
+> +	if (priv->parent_wake_irq && wake_mask)
+> +		pm_wakeup_event(dev, 0);
 
-	if (is_bg_timer)
-		schedule_work(&timer->expired);
-	else
-		kvm_timer_update_irq(vcpu, true, ptimer);
-	return HRTIMER_NORESTART;
-}
+Why is this called in probe?
 
-But I prefer just having them separate.
-
-
-> > +
-> > +	kvm_timer_update_irq(vcpu, true, ptimer);
-> >  	return HRTIMER_NORESTART;
-> >  }
-> >  
-> > @@ -253,24 +273,28 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
-> >  }
-> >  
-> >  /* Schedule the background timer for the emulated timer. */
-> > -static void phys_timer_emulate(struct kvm_vcpu *vcpu,
-> > -			      struct arch_timer_context *timer_ctx)
-> > +static void phys_timer_emulate(struct kvm_vcpu *vcpu)
-> >  {
-> >  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-> > +	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
-> >  
-> > -	if (kvm_timer_should_fire(timer_ctx))
-> > -		return;
-> > -
-> > -	if (!kvm_timer_irq_can_fire(timer_ctx))
-> > +	/*
-> > +	 * If the timer can fire now we have just raised the IRQ line and we
-> > +	 * don't need to have a soft timer scheduled for the future.  If the
-> > +	 * timer cannot fire at all, then we also don't need a soft timer.
-> > +	 */
-> > +	if (kvm_timer_should_fire(ptimer) || !kvm_timer_irq_can_fire(ptimer)) {
-> > +		soft_timer_cancel(&timer->phys_timer, NULL);
-> >  		return;
-> > +	}
-> >  
-> > -	/*  The timer has not yet expired, schedule a background timer */
-> > -	soft_timer_start(&timer->phys_timer, kvm_timer_compute_delta(timer_ctx));
-> > +	soft_timer_start(&timer->phys_timer, kvm_timer_compute_delta(ptimer));
-> >  }
-> >  
-> >  /*
-> > - * Check if there was a change in the timer state (should we raise or lower
-> > - * the line level to the GIC).
-> > + * Check if there was a change in the timer state, so that we should either
-> > + * raise or lower the line level to the GIC or schedule a background timer to
-> > + * emulate the physical timer.
-> >   */
-> >  static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
-> >  {
-> > @@ -292,6 +316,8 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
-> >  
-> >  	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
-> >  		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
-> > +
-> > +	phys_timer_emulate(vcpu);
-> >  }
-> >  
-> >  static void vtimer_save_state(struct kvm_vcpu *vcpu)
-> > @@ -445,6 +471,9 @@ void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu)
-> >  
-> >  	if (has_vhe())
-> >  		disable_el1_phys_timer_access();
-> > +
-> > +	/* Set the background timer for the physical timer emulation. */
-> > +	phys_timer_emulate(vcpu);
-> >  }
-> >  
-> >  bool kvm_timer_should_notify_user(struct kvm_vcpu *vcpu)
-> > @@ -480,12 +509,6 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
-> >  
-> >  	if (unlikely(!timer->enabled))
-> >  		return;
-> > -
-> > -	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
-> > -		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
-> > -
-> > -	/* Set the background timer for the physical timer emulation. */
-> > -	phys_timer_emulate(vcpu, vcpu_ptimer(vcpu));
-> >  }
-> >  
-> >  void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
-> > @@ -500,6 +523,17 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
-> >  
-> >  	vtimer_save_state(vcpu);
-> >  
-> > +	/*
-> > +	 * Cancel the physical timer emulation, because the only case where we
-> > +	 * need it after a vcpu_put is in the context of a sleeping VCPU, and
-> > +	 * in that case we already factor in the deadline for the physical
-> > +	 * timer when scheduling the bg_timer.
-> > +	 *
-> > +	 * In any case, we re-schedule the hrtimer for the physical timer when
-> > +	 * coming back to the VCPU thread in kvm_timer_vcpu_load().
-> > +	 */
-> > +	soft_timer_cancel(&timer->phys_timer, NULL);
-> > +
-> >  	set_cntvoff(0);
-> >  }
-> >  
-> > @@ -536,16 +570,9 @@ static void unmask_vtimer_irq(struct kvm_vcpu *vcpu)
-> >   */
-> >  void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
-> >  {
-> > -	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-> >  	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
-> >  
-> >  	/*
-> > -	 * This is to cancel the background timer for the physical timer
-> > -	 * emulation if it is set.
-> > -	 */
-> > -	soft_timer_cancel(&timer->phys_timer, NULL);
-> > -
-> > -	/*
-> >  	 * If we entered the guest with the vtimer output asserted we have to
-> >  	 * check if the guest has modified the timer so that we should lower
-> >  	 * the line at this point.
-> 
-> Otherwise:
-> 
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
 Thanks,
--Christoffer
+Gregory
