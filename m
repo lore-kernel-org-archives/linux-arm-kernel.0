@@ -1,20 +1,17 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Oct 2017 22:54:33 +0200
-Subject: [GIT PULL] Qualcomm Defconfig updates for 4.15
-In-Reply-To: <1508182291-23352-3-git-send-email-andy.gross@linaro.org>
-References: <1508182291-23352-1-git-send-email-andy.gross@linaro.org>
- <1508182291-23352-3-git-send-email-andy.gross@linaro.org>
-Message-ID: <CAK8P3a1kB+xeLNXYRYtALRLcxz01vTUKR3Y=dwNj-ALkDNBdew@mail.gmail.com>
+Date: Thu, 19 Oct 2017 22:46:58 +0200
+Subject: [GIT PULL 4/4] ARM: deffconfig: Pull for v4.15
+In-Reply-To: <20171015074825.11338-2-krzk@kernel.org>
+References: <20171015074825.11338-1-krzk@kernel.org>
+ <20171015074825.11338-2-krzk@kernel.org>
+Message-ID: <CAK8P3a1-H7HNYv1OYW1R7+KCBCXcY3=syNy8KKYfjHKgM46BSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 16, 2017 at 9:31 PM, Andy Gross <andy.gross@linaro.org> wrote:
-> Qualcomm ARM Based defconfig Updates for v4.15
+On Sun, Oct 15, 2017 at 9:48 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> Samsung defconfig changes for v4.15
 >
-> * Enable Sony Z2 tablet options
-> * Enable USB on APQ8064/MSM8974
-> * Fixup/catchup config to support newer options
+> 1. Enable USB3503 on multi_v7 for Odroid U3.
+> 2. Enable USB Attached SCSI for Odroid HC1.
 
 Pulled into next/soc, thanks!
-
-       Arnd
