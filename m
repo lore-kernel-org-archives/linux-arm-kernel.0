@@ -1,187 +1,113 @@
-From: gregory.0xf0@gmail.com (Gregory Fong)
-Date: Thu, 19 Oct 2017 00:57:43 -0700
-Subject: [PATCH 6/7] gpio: brcmstb: consolidate interrupt domains
-In-Reply-To: <61cb2c09-8078-d3ed-907b-64aff4553650@gmail.com>
-References: <20170930034057.15166-1-opendmb@gmail.com>
- <20170930034057.15166-7-opendmb@gmail.com>
- <CADtm3G5v6_BHwanRYvCq1y-8Hdmn7gxX3zoVHx2c7cOFL-pj+Q@mail.gmail.com>
- <61cb2c09-8078-d3ed-907b-64aff4553650@gmail.com>
-Message-ID: <20171019075743.GA31645@kessel>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Thu, 19 Oct 2017 10:06:05 +0200
+Subject: [PATCH v6 4/5] clocksource: stm32: add clocksource support
+In-Reply-To: <alpine.DEB.2.20.1710182036070.2477@nanos>
+References: <1508331506-23782-1-git-send-email-benjamin.gaignard@linaro.org>
+ <1508331506-23782-5-git-send-email-benjamin.gaignard@linaro.org>
+ <alpine.DEB.2.20.1710182036070.2477@nanos>
+Message-ID: <CA+M3ks5K6+XnK1KDuSwAx1DF=jSJuWuGbvn64cWXrGnOTOPcCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
-
-On Wed, Oct 04, 2017 at 02:24:37PM -0700, Doug Berger wrote:
-> On 10/03/2017 08:03 PM, Gregory Fong wrote:
-> > On Fri, Sep 29, 2017 at 8:40 PM, Doug Berger <opendmb@gmail.com> wrote:
-> >> The GPIOLIB IRQ chip helpers were very appealing, but badly broke
-> >> the 1:1 mapping between a GPIO controller's device_node and its
-> >> interrupt domain.
-> > 
-> > Out of curiosity, what sort of problems have you seen from this?
-> > 
-> 
-> [snip]
-> 
-> When another device-tree node references a GPIO device as its interrupt
-> parent, the irq_create_of_mapping() function looks for the irq domain of
-> the GPIO device and since all bank irq domains reference the same GPIO
-> device node it always resolves to the irq domain of the first bank
-> regardless of which bank the number of the GPIO should resolve. This
-> domain can only map hwirq numbers 0-31 so interrupts on GPIO above that
-> can't be mapped by the device-tree.
-
-Thanks for clarifying.  This would be great information to include in
-the commit message.
-
-> 
-> >>
-> >> This commit consolidates the per bank irq domains to a version
-> >> where we have one larger interrupt domain per GPIO controller
-> >> instance spanning multiple GPIO banks.
-> > 
-> > This works (and is reminiscent to my initially submitted
-> > implementation at [1]), but I think it might make sense to keep as-is
-> > (using the gpiolib irqchip helpers), and instead allocate an irqchip
-> > fwnode per bank and use to_of_node() to set it as the of_node for the
-> > gpiochip before calling gpiochip_irqchip_add().  OTOH, that capability
-> > might go away...
-> > 
-> > Linus, can you comment on the FIXME in gpiochip_irqchip_add_key() that
-> > says "get rid of this and use gpiochip->parent->of_node everywhere"?
-> > It seems like it would still be beneficial to be able to override the
-> > associated node for a gpiochip, since that's what's used for the
-> > irqdomain, but if that's going away, obviously we don't want to start
-> > using that now.
-> > 
-> 
-> Yes, this is effectively a reversion to an earlier implementation. I
-> produced an implementation based on the generic irqchip libraries, but
-> that was stripped from this submission when I discovered that no support
-> exists within the generic irqchip libraries for removal of domain
-> generic chips and we wanted to preserve the module support of this driver.
-
-Considering this is heavily based on my initial implementation (several
-functions are exactly the same), it'd be nice to have some small
-attribution in the commit message. :-)
-
-> 
-> It is conceivable that the current GPIO device-tree nodes could be
-> broken down into separate devices per bank, but it is believed that this
-> would only confuse things for users of the device as the concept
-> diverges from the concept expressed in device documentation.
-
-OK, that sounds like a worse alternative.  And since these are all
-actually using the same parent IRQ, it does make sense to keep them all
-in the same IRQ domain.
-
-
-On Fri, Sep 29, 2017 at 08:40:56PM -0700, Doug Berger wrote:
-> [snip]
-> diff --git a/drivers/gpio/gpio-brcmstb.c b/drivers/gpio/gpio-brcmstb.c
-> index e2fff559c1ca..752a46ce3589 100644
-> --- a/drivers/gpio/gpio-brcmstb.c
-> +++ b/drivers/gpio/gpio-brcmstb.c
-> [snip]
-> @@ -77,12 +79,18 @@ brcmstb_gpio_get_active_irqs(struct brcmstb_gpio_bank *bank)
->  	return status;
->  }
->  
-> +static int brcmstb_gpio_hwirq_to_offset(irq_hw_number_t hwirq,
-> +					struct brcmstb_gpio_bank *bank)
-> +{
-> +	return hwirq - (bank->gc.base - bank->parent_priv->gpio_base);
-> +}
-> +
->  static void brcmstb_gpio_set_imask(struct brcmstb_gpio_bank *bank,
->  		unsigned int offset, bool enable)
->  {
->  	struct gpio_chip *gc = &bank->gc;
->  	struct brcmstb_gpio_priv *priv = bank->parent_priv;
-> -	u32 mask = gc->pin2mask(gc, offset);
-> +	u32 mask = BIT(brcmstb_gpio_hwirq_to_offset(offset, bank));
-
-Consider renaming "offset" to "hwirq".
-
->  	u32 imask;
->  	unsigned long flags;
->  
-> @@ -96,6 +104,17 @@ static void brcmstb_gpio_set_imask(struct brcmstb_gpio_bank *bank,
->  	spin_unlock_irqrestore(&gc->bgpio_lock, flags);
->  }
->  
-> +static int brcmstb_gpio_to_irq(struct gpio_chip *gc, unsigned gc_offset)
-> +{
-> +	struct brcmstb_gpio_priv *priv = brcmstb_gpio_gc_to_priv(gc);
-> +	/* gc_offset is relative to this gpio_chip; want real offset */
-> +	int offset = gc_offset + (gc->base - priv->gpio_base);
-
-Consider renaming "gc_offset" to "offset" and "offset" to "hwirq" to
-keep things consistent.
-
-> +
-> +	if (offset >= priv->num_gpios)
-> +		return -ENXIO;
-> +	return irq_create_mapping(priv->irq_domain, offset);
-> +}
-> +
->  
-> [snip]
+2017-10-18 20:59 GMT+02:00 Thomas Gleixner <tglx@linutronix.de>:
+> On Wed, 18 Oct 2017, Benjamin Gaignard wrote:
 >
-> @@ -226,18 +245,19 @@ static irqreturn_t brcmstb_gpio_wake_irq_handler(int irq, void *data)
->  static void brcmstb_gpio_irq_bank_handler(struct brcmstb_gpio_bank *bank)
->  {
->  	struct brcmstb_gpio_priv *priv = bank->parent_priv;
-> -	struct irq_domain *irq_domain = bank->gc.irqdomain;
-> +	struct irq_domain *domain = priv->irq_domain;
-> +	int hwbase = bank->gc.base - priv->gpio_base;
->  	unsigned long status;
-> +	unsigned int irq;
->  
->  	while ((status = brcmstb_gpio_get_active_irqs(bank))) {
-> -		int bit;
-> -
-> -		for_each_set_bit(bit, &status, 32) {
-> -			if (bit >= bank->width)
-> +		for_each_set_bit(irq, &status, 32) {
-> +			if (irq >= bank->width)
->  				dev_warn(&priv->pdev->dev,
->  					 "IRQ for invalid GPIO (bank=%d, offset=%d)\n",
-> -					 bank->id, bit);
-> -			generic_handle_irq(irq_find_mapping(irq_domain, bit));
-> +					 bank->id, irq);
-> +			irq = irq_linear_revmap(domain, irq + hwbase);
-> +			generic_handle_irq(irq);
+>> Rework driver code to be able to implement clocksource and clockevent
+>> on the same hardware block.
+>> Before this patch only the counter of the hardware block was used to
+>> generate clock events. Now counter will be used to provide a 32 bits
+>> clock source and a comparator will provide clock events.
+>
+> Again. Read, understand and comply with the patch submission
+> documentation. Proper changelogs are not optional.
+>
+> "Before this patch ...." is bogus because it suggests that the patch is
+> already applied which is obviously not the case.
+>
+> Let me give you an example.
+>
+>   The stm32 timer hardware is currently only used as a clock event device,
+>   but it can be utilized as a clocksource as well.
+>
+>   Implement this by enabling the free running counter in the hardware block
+>   and converting the clock event part from a count down event timer to a
+>   comparator based timer.
+>
+> Can you see the difference?
 
-I'm not a fan of the change to use "irq" to mean several different
-things in this function.  How about this instead?
+I will rework the commit message
 
-static void brcmstb_gpio_irq_bank_handler(struct brcmstb_gpio_bank *bank)
-{
-	struct brcmstb_gpio_priv *priv = bank->parent_priv;
-	struct irq_domain *domain = priv->irq_domain;
-	int hwbase = bank->gc.base - priv->gpio_base;
-	unsigned long status;
+>
+>> -static int stm32_clock_event_set_periodic(struct clock_event_device *evt)
+>> +static int stm32_clock_event_set_next_event(unsigned long evt,
+>> +                                         struct clock_event_device *clkevt)
+>>  {
+>> -     struct timer_of *to = to_timer_of(evt);
+>> +     struct timer_of *to = to_timer_of(clkevt);
+>> +     unsigned long cnt;
+>>
+>> -     writel_relaxed(timer_of_period(to), timer_of_base(to) + TIM_ARR);
+>> -     writel_relaxed(TIM_CR1_ARPE | TIM_CR1_CEN, timer_of_base(to) + TIM_CR1);
+>> +     cnt = readl_relaxed(timer_of_base(to) + TIM_CNT);
+>> +     writel_relaxed(cnt + evt, timer_of_base(to) + TIM_CCR1);
+>> +     writel_relaxed(TIM_DIER_CC1IE, timer_of_base(to) + TIM_DIER);
+>
+> This implementation is doomed. You cannot rely on the assumption that the
+> read/modify/write sequence is 'atomic'.
+>
+> Bus/pipeline delays, FIQs, hypervisor exits and whatever can delay it
+> enough so that the write comes too late which means that you have to wait
+> for a full wraparound of the counter for the next interrupt.
+>
+> See the big fat comment in hpet_next_event() for gory details of issues
+> caused by comparator based timers.
 
-	while ((status = brcmstb_gpio_get_active_irqs(bank))) {
-		int offset;
+Other drivers like prima2 have the same problem.
+They have solve it by checking if the current time is still below next event
+time after wirting it, so the function will be like that:
 
-		for_each_set_bit(offset, &status, 32) {
-			if (offset >= bank->width)
- 				dev_warn(&priv->pdev->dev,
- 					 "IRQ for invalid GPIO (bank=%d, offset=%d)\n",
-					 bank->id, offset);
-			generic_handle_irq(irq_linear_revmap(domain, offset + hwbase));
+unsigned long now, next;
 
+next = readl_relaxed(timer_of_base(to) + TIM_CNT) + evt;
+writel_relaxed(next, timer_of_base(to) + TIM_CCR1);
+writel_relaxed(TIM_DIER_CC1IE, timer_of_base(to) + TIM_DIER);
+now = readl_relaxed(timer_of_base(to) + TIM_CNT);
 
->  		}
->  	}
->  }
-> [snip] 
-> 
+return next - now > delta ? -ETIME : 0;
 
-The rest looks good.
+>
+> Your change of min delay in one of the previous patches is papering over
+> this problem and I really wonder if your argumentation of 'required because
+> the CPU can't keep up otherwise' is just wrong and you failed to decode the
+> RMW issue proper.
 
-Thanks,
-Gregory
+The  CPU is a CortexM4 @ 200MHZ and the clocks driving the timers are at 90MHZ
+with a min delta at 1 you could have an interrupt each 0.01 ms which
+is really to much.
+By increase it to 0x60 it give time to CPU to handle the interrupt.
+
+Also want to remove 16 bits counters because the maximum period is around 750 ms
+which is a short period for a clocksource.
+With 32 bits this period is close 47 secondes.
+
+>
+> Though fact is, that your implementation CANNOT cover all potential RMW
+> disturbances safely. You need a proper safety net for these cases.
+>
+> To be honest. I prefer having a slow, inaccurate down counting timer over a
+> fast comparator based one any time as long as the comparator is not
+> cleverly implemented and can do less than equal comparisons which take the
+> wraparound of the counter into account. It's not rocket science to do that,
+> it just takes a few more gates, but hardware people can't be bothered to
+> think about the consequences of their cheap implementations ever.
+
+I will forward you point of to the hardware designer but I will have to deal the
+hardware I have anyway.
+
+Benjamin
+>
+> Thanks,
+>
+>         tglx
+>
+>
