@@ -1,64 +1,177 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 19 Oct 2017 16:24:32 +0800
-Subject: [linux-sunxi] [PATCH v2 6/8] ARM: dts: sun8i: a83t: Move mmc1
- pinctrl setting to dtsi file
-In-Reply-To: <0e934ef6b4254fc94f613d1305c06cde@aosc.io>
-References: <20171018083138.14517-1-wens@csie.org>
- <20171018083138.14517-7-wens@csie.org>
- <f85a30e2-5a9d-a7ba-0010-6602cabaf83e@riseup.net>
- <CAGb2v64O+eyriHG-FirtPKo6hACfbV9JcJRUUZ+rY1QM2w_r1g@mail.gmail.com>
- <0e934ef6b4254fc94f613d1305c06cde@aosc.io>
-Message-ID: <CAGb2v66Bje_=PcvWFJo6cXB+qsXmZqiwGoBgLfcFWrzEMOQRMA@mail.gmail.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Thu, 19 Oct 2017 10:32:33 +0200
+Subject: [PATCH v3 15/20] KVM: arm/arm64: Support EL1 phys timer register
+ access in set/get reg
+In-Reply-To: <87infnwepo.fsf@on-the-bus.cambridge.arm.com>
+References: <20170923004207.22356-1-cdall@linaro.org>
+ <20170923004207.22356-16-cdall@linaro.org>
+ <87infnwepo.fsf@on-the-bus.cambridge.arm.com>
+Message-ID: <20171019083233.GP8900@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 19, 2017 at 4:18 PM,  <icenowy@aosc.io> wrote:
-> ? 2017-10-19 14:48?Chen-Yu Tsai ???
->>
->> On Wed, Oct 18, 2017 at 11:00 PM, Joonas Kylm?l? <joonas.kylmala@iki.fi>
->> wrote:
->>>
->>> Hi,
->>>
->>> Chen-Yu Tsai:
->>>>
->>>> mmc1 only has 1 possible pinmux setting.
->>>
->>>
->>> What if someone is using the MMC with bus width 1 and then using the
->>> remaining 3 pins for something else?
->>
->>
->> I would very much like to see such a design. Currently the devices
->> we see all follow Allwinner's reference design, with only minor
->> modifications. As such, mmc1 is used exclusively for connecting
->> SDIO-based WiFi modules.
->>
->> If such a radical(?) design is done, the vendor can always add
->> a "mmc1-1bit-pins" setting and override the default.
->
->
-> I think this kind of thing happened on A13 -- the MMC2 of A13 is
-> 8-bit, but Lichee Pi One wires it to a SD card slot (4-bit); then
-> the remaining 4 data lines are wired out as GPIO. (Lichee Pi's
-> do not like obeying reference design ;-) )
+On Tue, Oct 10, 2017 at 10:10:27AM +0100, Marc Zyngier wrote:
+> On Sat, Sep 23 2017 at  2:42:02 am BST, Christoffer Dall <cdall@linaro.org> wrote:
+> > Add suport for the physical timer registers in kvm_arm_timer_set_reg and
+> > kvm_arm_timer_get_reg so that these functions can be reused to interact
+> > with the rest of the system.
+> >
+> > Note that this paves part of the way for the physical timer state
+> > save/restore, but we still need to add those registers to
+> > KVM_GET_REG_LIST before we support migrating the physical timer state.
+> >
+> > Signed-off-by: Christoffer Dall <cdall@linaro.org>
+> > ---
+> >  arch/arm/include/uapi/asm/kvm.h   |  6 ++++++
+> >  arch/arm64/include/uapi/asm/kvm.h |  6 ++++++
+> >  virt/kvm/arm/arch_timer.c         | 33 +++++++++++++++++++++++++++++++--
+> >  3 files changed, 43 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+> > index 5db2d4c..665c454 100644
+> > --- a/arch/arm/include/uapi/asm/kvm.h
+> > +++ b/arch/arm/include/uapi/asm/kvm.h
+> > @@ -151,6 +151,12 @@ struct kvm_arch_memory_slot {
+> >  	(__ARM_CP15_REG(op1, 0, crm, 0) | KVM_REG_SIZE_U64)
+> >  #define ARM_CP15_REG64(...) __ARM_CP15_REG64(__VA_ARGS__)
+> >  
+> > +/* PL1 Physical Timer Registers */
+> > +#define KVM_REG_ARM_PTIMER_CTL		ARM_CP15_REG32(0, 14, 2, 1)
+> > +#define KVM_REG_ARM_PTIMER_CNT		ARM_CP15_REG64(0, 14)
+> > +#define KVM_REG_ARM_PTIMER_CVAL		ARM_CP15_REG64(2, 14)
+> > +
+> > +/* Virtual Timer Registers */
+> >  #define KVM_REG_ARM_TIMER_CTL		ARM_CP15_REG32(0, 14, 3, 1)
+> >  #define KVM_REG_ARM_TIMER_CNT		ARM_CP15_REG64(1, 14)
+> >  #define KVM_REG_ARM_TIMER_CVAL		ARM_CP15_REG64(3, 14)
+> > diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> > index 9f3ca24..07be6e2 100644
+> > --- a/arch/arm64/include/uapi/asm/kvm.h
+> > +++ b/arch/arm64/include/uapi/asm/kvm.h
+> > @@ -195,6 +195,12 @@ struct kvm_arch_memory_slot {
+> >  
+> >  #define ARM64_SYS_REG(...) (__ARM64_SYS_REG(__VA_ARGS__) | KVM_REG_SIZE_U64)
+> >  
+> > +/* EL1 Physical Timer Registers */
+> 
+> These are EL0 registers, even if we tend to restrict them to EL1. Even
+> the 32bit version is not strictly a PL1 register, since PL1 can delegate
+> it to userspace (but the ARMv7 ARM still carries this PL1 thing...).
+> 
 
-For MMC2 we have mmc2_pins (4-bit) and mmc2_8bit_emmc_pins (8-bit
-+ emmc reset pin).
+The latest publicly available ARM ARM also refers to the timer as the
+"EL1 Physical Timer", for example, the EL0 register CNTP_CTL_EL0 is
+described as "Control register for the EL1 physical timer", so the
+associativity in my comment was "(EL1 Physical Timer) Registers", and
+not "Physical Timer (EL1 Registers)" :)
 
-ChenYu
+How about "EL0 Registers for the EL1 Physical Timer" or "Physical Timer
+EL0 Registers" or "EL1 Physical Timer EL0 Registers".  Take your pick...
 
->
-> But I think a MMC/SDIO device under 1-bit mode is too slow that
-> maybe no one will use such a setup.
->
->>
->> ChenYu
->
->
-> --
-> You received this message because you are subscribed to the Google Groups
-> "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an
-> email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+> > +#define KVM_REG_ARM_PTIMER_CTL		ARM64_SYS_REG(3, 3, 14, 2, 1)
+> > +#define KVM_REG_ARM_PTIMER_CVAL		ARM64_SYS_REG(3, 3, 14, 2, 2)
+> > +#define KVM_REG_ARM_PTIMER_CNT		ARM64_SYS_REG(3, 3, 14, 0, 1)
+> > +
+> > +/* EL0 Virtual Timer Registers */
+> >  #define KVM_REG_ARM_TIMER_CTL		ARM64_SYS_REG(3, 3, 14, 3, 1)
+> >  #define KVM_REG_ARM_TIMER_CNT		ARM64_SYS_REG(3, 3, 14, 3, 2)
+> >  #define KVM_REG_ARM_TIMER_CVAL		ARM64_SYS_REG(3, 3, 14, 0, 2)
+> > diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> > index 70110ea..d5b632d 100644
+> > --- a/virt/kvm/arm/arch_timer.c
+> > +++ b/virt/kvm/arm/arch_timer.c
+> > @@ -626,10 +626,11 @@ static void kvm_timer_init_interrupt(void *info)
+> >  int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
+> >  {
+> >  	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+> > +	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+> >  
+> >  	switch (regid) {
+> >  	case KVM_REG_ARM_TIMER_CTL:
+> > -		vtimer->cnt_ctl = value;
+> > +		vtimer->cnt_ctl = value & ~ARCH_TIMER_CTRL_IT_STAT;
+> 
+> Ah, interesting. Does this change anything to userspace behaviour?
+> 
+
+The only effect is that you don't get read-as-written from userspace
+behavior, but we don't guarantee that anywhere in the API and the
+current QEMU code doesn't rely on it.
+
+It can't have any meaningful effect, because ISTATUS is purely a
+function of the remaining state of the timer.
+
+> >  		break;
+> >  	case KVM_REG_ARM_TIMER_CNT:
+> >  		update_vtimer_cntvoff(vcpu, kvm_phys_timer_read() - value);
+> > @@ -637,6 +638,13 @@ int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
+> >  	case KVM_REG_ARM_TIMER_CVAL:
+> >  		vtimer->cnt_cval = value;
+> >  		break;
+> > +	case KVM_REG_ARM_PTIMER_CTL:
+> > +		ptimer->cnt_ctl = value & ~ARCH_TIMER_CTRL_IT_STAT;
+> > +		break;
+> > +	case KVM_REG_ARM_PTIMER_CVAL:
+> > +		ptimer->cnt_cval = value;
+> > +		break;
+> > +
+> >  	default:
+> >  		return -1;
+> >  	}
+> > @@ -645,17 +653,38 @@ int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
+> >  	return 0;
+> >  }
+> >  
+> > +static u64 read_timer_ctl(struct arch_timer_context *timer)
+> > +{
+> > +	/*
+> > +	 * Set ISTATUS bit if it's expired.
+> > +	 * Note that according to ARMv8 ARM Issue A.k, ISTATUS bit is
+> > +	 * UNKNOWN when ENABLE bit is 0, so we chose to set ISTATUS bit
+> > +	 * regardless of ENABLE bit for our implementation convenience.
+> > +	 */
+> > +	if (!kvm_timer_compute_delta(timer))
+> > +		return timer->cnt_ctl | ARCH_TIMER_CTRL_IT_STAT;
+> > +	else
+> > +		return timer->cnt_ctl;
+> 
+> Can't we end-up with a stale IT_STAT bit here if the timer has been
+> snapshoted with an interrupt pending, and then CVAL updated to expire
+> later?
+> 
+
+Yes, but that's just the nature of doing business with the timer, and no
+different from the behavior we had before, where you could have run the
+guest, read the cnt_ctl as it was saved in the world-switch, run the
+VCPU again which changes cval, and then the bit would be stale.
+
+Do you see us changing that behavior in some worse way here?
+
+> > +}
+> > +
+> >  u64 kvm_arm_timer_get_reg(struct kvm_vcpu *vcpu, u64 regid)
+> >  {
+> > +	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+> >  	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+> >  
+> >  	switch (regid) {
+> >  	case KVM_REG_ARM_TIMER_CTL:
+> > -		return vtimer->cnt_ctl;
+> > +		return read_timer_ctl(vtimer);
+> >  	case KVM_REG_ARM_TIMER_CNT:
+> >  		return kvm_phys_timer_read() - vtimer->cntvoff;
+> >  	case KVM_REG_ARM_TIMER_CVAL:
+> >  		return vtimer->cnt_cval;
+> > +	case KVM_REG_ARM_PTIMER_CTL:
+> > +		return read_timer_ctl(ptimer);
+> > +	case KVM_REG_ARM_PTIMER_CVAL:
+> > +		return ptimer->cnt_cval;
+> > +	case KVM_REG_ARM_PTIMER_CNT:
+> > +		return kvm_phys_timer_read();
+> >  	}
+> >  	return (u64)-1;
+> >  }
+> 
+
+Thanks,
+-Christoffer
