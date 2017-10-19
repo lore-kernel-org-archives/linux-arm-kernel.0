@@ -1,152 +1,109 @@
 From: james.morse@arm.com (James Morse)
-Date: Thu, 19 Oct 2017 15:57:56 +0100
-Subject: [PATCH v4 10/21] arm64: entry.S: move SError handling into a C
- function for future expansion
+Date: Thu, 19 Oct 2017 15:58:07 +0100
+Subject: [PATCH v4 21/21] KVM: arm64: Trap RAS error registers and set
+ HCR_EL2's TERR & TEA
 In-Reply-To: <20171019145807.23251-1-james.morse@arm.com>
 References: <20171019145807.23251-1-james.morse@arm.com>
-Message-ID: <20171019145807.23251-11-james.morse@arm.com>
+Message-ID: <20171019145807.23251-22-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Xie XiuQi <xiexiuqi@huawei.com>
+From: Dongjiu Geng <gengdongjiu@huawei.com>
 
-Today SError is taken using the inv_entry macro that ends up in
-bad_mode.
+ARMv8.2 adds a new bit HCR_EL2.TEA which routes synchronous external
+aborts to EL2, and adds a trap control bit HCR_EL2.TERR which traps
+all Non-secure EL1&0 error record accesses to EL2.
 
-SError can be used by the RAS Extensions to notify either the OS or
-firmware of CPU problems, some of which may have been corrected.
+This patch enables the two bits for the guest OS, guaranteeing that
+KVM takes external aborts and traps attempts to access the physical
+error registers.
 
-To allow this handling to be added, add a do_serror() C function
-that just panic()s. Add the entry.S boiler plate to save/restore the
-CPU registers and unmask debug exceptions. Future patches may change
-do_serror() to return if the SError Interrupt was notification of a
-corrected error.
+ERRIDR_EL1 advertises the number of error records, we return
+zero meaning we can treat all the other registers as RAZ/WI too.
 
-Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
-Signed-off-by: Wang Xiongfeng <wangxiongfengi2@huawei.com>
-[Split out of a bigger patch, added compat path, renamed, enabled debug
- exceptions]
+Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+[removed specific emulation, use trap_raz_wi() directly for everything,
+ rephrased parts of the commit message]
 Signed-off-by: James Morse <james.morse@arm.com>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/Kconfig        |  2 +-
- arch/arm64/kernel/entry.S | 36 +++++++++++++++++++++++++++++-------
- arch/arm64/kernel/traps.c | 13 +++++++++++++
- 3 files changed, 43 insertions(+), 8 deletions(-)
+ arch/arm64/include/asm/kvm_arm.h     |  2 ++
+ arch/arm64/include/asm/kvm_emulate.h |  7 +++++++
+ arch/arm64/include/asm/sysreg.h      | 10 ++++++++++
+ arch/arm64/kvm/sys_regs.c            | 10 ++++++++++
+ 4 files changed, 29 insertions(+)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 0df64a6a56d4..70dfe4e9ccc5 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -98,7 +98,7 @@ config ARM64
- 	select HAVE_IRQ_TIME_ACCOUNTING
- 	select HAVE_MEMBLOCK
- 	select HAVE_MEMBLOCK_NODE_MAP if NUMA
--	select HAVE_NMI if ACPI_APEI_SEA
-+	select HAVE_NMI
- 	select HAVE_PATA_PLATFORM
- 	select HAVE_PERF_EVENTS
- 	select HAVE_PERF_REGS
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index df085ec003b0..e147c1d00b41 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -375,18 +375,18 @@ ENTRY(vectors)
- 	kernel_ventry	el1_sync			// Synchronous EL1h
- 	kernel_ventry	el1_irq				// IRQ EL1h
- 	kernel_ventry	el1_fiq_invalid			// FIQ EL1h
--	kernel_ventry	el1_error_invalid		// Error EL1h
-+	kernel_ventry	el1_error			// Error EL1h
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index 61d694c2eae5..1188272003c4 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -23,6 +23,8 @@
+ #include <asm/types.h>
  
- 	kernel_ventry	el0_sync			// Synchronous 64-bit EL0
- 	kernel_ventry	el0_irq				// IRQ 64-bit EL0
- 	kernel_ventry	el0_fiq_invalid			// FIQ 64-bit EL0
--	kernel_ventry	el0_error_invalid		// Error 64-bit EL0
-+	kernel_ventry	el0_error			// Error 64-bit EL0
- 
- #ifdef CONFIG_COMPAT
- 	kernel_ventry	el0_sync_compat			// Synchronous 32-bit EL0
- 	kernel_ventry	el0_irq_compat			// IRQ 32-bit EL0
- 	kernel_ventry	el0_fiq_invalid_compat		// FIQ 32-bit EL0
--	kernel_ventry	el0_error_invalid_compat	// Error 32-bit EL0
-+	kernel_ventry	el0_error_compat		// Error 32-bit EL0
- #else
- 	kernel_ventry	el0_sync_invalid		// Synchronous 32-bit EL0
- 	kernel_ventry	el0_irq_invalid			// IRQ 32-bit EL0
-@@ -455,10 +455,6 @@ ENDPROC(el0_error_invalid)
- el0_fiq_invalid_compat:
- 	inv_entry 0, BAD_FIQ, 32
- ENDPROC(el0_fiq_invalid_compat)
--
--el0_error_invalid_compat:
--	inv_entry 0, BAD_ERROR, 32
--ENDPROC(el0_error_invalid_compat)
- #endif
- 
- el1_sync_invalid:
-@@ -663,6 +659,10 @@ el0_svc_compat:
- el0_irq_compat:
- 	kernel_entry 0, 32
- 	b	el0_irq_naked
+ /* Hyp Configuration Register (HCR) bits */
++#define HCR_TEA		(UL(1) << 37)
++#define HCR_TERR	(UL(1) << 36)
+ #define HCR_E2H		(UL(1) << 34)
+ #define HCR_ID		(UL(1) << 33)
+ #define HCR_CD		(UL(1) << 32)
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index 8274d16df3cd..2cd666a9d47e 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -47,6 +47,13 @@ static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
+ 	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
+ 	if (is_kernel_in_hyp_mode())
+ 		vcpu->arch.hcr_el2 |= HCR_E2H;
++	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN)) {
++		/* route synchronous external abort exceptions to EL2 */
++		vcpu->arch.hcr_el2 |= HCR_TEA;
++		/* trap error record accesses */
++		vcpu->arch.hcr_el2 |= HCR_TERR;
++	}
 +
-+el0_error_compat:
-+	kernel_entry 0, 32
-+	b	el0_error_naked
- #endif
- 
- el0_da:
-@@ -780,6 +780,28 @@ el0_irq_naked:
- 	b	ret_to_user
- ENDPROC(el0_irq)
- 
-+el1_error:
-+	kernel_entry 1
-+	mrs	x1, esr_el1
-+	enable_dbg
-+	mov	x0, sp
-+	bl	do_serror
-+	kernel_exit 1
-+ENDPROC(el1_error)
-+
-+el0_error:
-+	kernel_entry 0
-+el0_error_naked:
-+	mrs	x1, esr_el1
-+	enable_dbg
-+	mov	x0, sp
-+	bl	do_serror
-+	enable_daif
-+	ct_user_exit
-+	b	ret_to_user
-+ENDPROC(el0_error)
-+
-+
- /*
-  * This is the fast syscall return path.  We do as little as possible here,
-  * and this includes saving x0 back into the kernel stack.
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 1808be65d22f..773aae69c376 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -709,6 +709,19 @@ asmlinkage void handle_bad_stack(struct pt_regs *regs)
+ 	if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features))
+ 		vcpu->arch.hcr_el2 &= ~HCR_RW;
  }
- #endif
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 1b8b9012234d..0d3c5c7bb425 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -169,6 +169,16 @@
+ #define SYS_AFSR0_EL1			sys_reg(3, 0, 5, 1, 0)
+ #define SYS_AFSR1_EL1			sys_reg(3, 0, 5, 1, 1)
+ #define SYS_ESR_EL1			sys_reg(3, 0, 5, 2, 0)
++
++#define SYS_ERRIDR_EL1			sys_reg(3, 0, 5, 3, 0)
++#define SYS_ERRSELR_EL1			sys_reg(3, 0, 5, 3, 1)
++#define SYS_ERXFR_EL1			sys_reg(3, 0, 5, 4, 0)
++#define SYS_ERXCTLR_EL1			sys_reg(3, 0, 5, 4, 1)
++#define SYS_ERXSTATUS_EL1		sys_reg(3, 0, 5, 4, 2)
++#define SYS_ERXADDR_EL1			sys_reg(3, 0, 5, 4, 3)
++#define SYS_ERXMISC0_EL1		sys_reg(3, 0, 5, 5, 0)
++#define SYS_ERXMISC1_EL1		sys_reg(3, 0, 5, 5, 1)
++
+ #define SYS_FAR_EL1			sys_reg(3, 0, 6, 0, 0)
+ #define SYS_PAR_EL1			sys_reg(3, 0, 7, 4, 0)
  
-+asmlinkage void do_serror(struct pt_regs *regs, unsigned int esr)
-+{
-+	nmi_enter();
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 713275b501ce..2b3b16bf5275 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -953,6 +953,16 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	{ SYS_DESC(SYS_AFSR0_EL1), access_vm_reg, reset_unknown, AFSR0_EL1 },
+ 	{ SYS_DESC(SYS_AFSR1_EL1), access_vm_reg, reset_unknown, AFSR1_EL1 },
+ 	{ SYS_DESC(SYS_ESR_EL1), access_vm_reg, reset_unknown, ESR_EL1 },
 +
-+	console_verbose();
++	{ SYS_DESC(SYS_ERRIDR_EL1), trap_raz_wi },
++	{ SYS_DESC(SYS_ERRSELR_EL1), trap_raz_wi },
++	{ SYS_DESC(SYS_ERXFR_EL1), trap_raz_wi },
++	{ SYS_DESC(SYS_ERXCTLR_EL1), trap_raz_wi },
++	{ SYS_DESC(SYS_ERXSTATUS_EL1), trap_raz_wi },
++	{ SYS_DESC(SYS_ERXADDR_EL1), trap_raz_wi },
++	{ SYS_DESC(SYS_ERXMISC0_EL1), trap_raz_wi },
++	{ SYS_DESC(SYS_ERXMISC1_EL1), trap_raz_wi },
 +
-+	pr_crit("SError Interrupt on CPU%d, code 0x%08x -- %s\n",
-+		smp_processor_id(), esr, esr_get_class_string(esr));
-+	__show_regs(regs);
-+
-+	panic("Asynchronous SError Interrupt");
-+}
-+
- void __pte_error(const char *file, int line, unsigned long val)
- {
- 	pr_err("%s:%d: bad pte %016lx.\n", file, line, val);
+ 	{ SYS_DESC(SYS_FAR_EL1), access_vm_reg, reset_unknown, FAR_EL1 },
+ 	{ SYS_DESC(SYS_PAR_EL1), NULL, reset_unknown, PAR_EL1 },
+ 
 -- 
 2.13.3
