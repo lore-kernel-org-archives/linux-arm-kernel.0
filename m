@@ -1,110 +1,31 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 19 Oct 2017 15:10:03 +0200
-Subject: [PATCH] pinctrl: armada-37xx: Add edge both type gpio irq support
-Message-ID: <20171019131003.9684-1-gregory.clement@free-electrons.com>
+From: olivier.moysan@st.com (Olivier MOYSAN)
+Date: Thu, 19 Oct 2017 13:27:41 +0000
+Subject: [INTERNAL][PATCH 0/7] ASoC: stm32: Add SAI synchronization support
+In-Reply-To: <1508418203-16840-1-git-send-email-olivier.moysan@st.com>
+References: <1508418203-16840-1-git-send-email-olivier.moysan@st.com>
+Message-ID: <85690d88-046e-7092-465e-4a8942a1cb35@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ken Ma <make@marvell.com>
+Please ignore "[INTERNAL]" in subject.
+Sorry for this unappropriated header.
 
-Current edge both type gpio irqs which need to swap polarity in each
-interrupt are not supported, this patch adds edge both type gpio irq
-support.
-
-Signed-off-by: Ken Ma <make@marvell.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/pinctrl/mvebu/pinctrl-armada-37xx.c | 64 +++++++++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
-
-diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-index 71b944748304..4e8d836a8c6f 100644
---- a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-@@ -576,6 +576,19 @@ static int armada_37xx_irq_set_type(struct irq_data *d, unsigned int type)
- 	case IRQ_TYPE_EDGE_FALLING:
- 		val |= (BIT(d->hwirq % GPIO_PER_REG));
- 		break;
-+	case IRQ_TYPE_EDGE_BOTH: {
-+		u32 in_val, in_reg = INPUT_VAL;
-+
-+		armada_37xx_irq_update_reg(&in_reg, d);
-+		regmap_read(info->regmap, in_reg, &in_val);
-+
-+		/* Set initial polarity based on current input level. */
-+		if (in_val & d->mask)
-+			val |= d->mask;		/* falling */
-+		else
-+			val &= ~d->mask;	/* rising */
-+		break;
-+	}
- 	default:
- 		spin_unlock_irqrestore(&info->irq_lock, flags);
- 		return -EINVAL;
-@@ -586,6 +599,40 @@ static int armada_37xx_irq_set_type(struct irq_data *d, unsigned int type)
- 	return 0;
- }
- 
-+static int armada_37xx_edge_both_irq_swap_pol(struct armada_37xx_pinctrl *info,
-+					     u32 pin_idx)
-+{
-+	u32 reg_idx = pin_idx / GPIO_PER_REG;
-+	u32 bit_num = pin_idx % GPIO_PER_REG;
-+	u32 p, l, ret;
-+	unsigned long flags;
-+
-+	regmap_read(info->regmap, INPUT_VAL + 4*reg_idx, &l);
-+
-+	spin_lock_irqsave(&info->irq_lock, flags);
-+	p = readl(info->base + IRQ_POL + 4 * reg_idx);
-+	if ((p ^ l) & (1 << bit_num)) {
-+		/*
-+		 * For the gpios which are used for both-edge irqs, when their
-+		 * interrupts happen, their input levels are changed,
-+		 * yet their interrupt polarities are kept in old values, we
-+		 * should synchronize their interrupt polarities; for example,
-+		 *@first a gpio's input level is low and its interrupt
-+		 * polarity control is "Detect rising edge", then the gpio has
-+		 * a interrupt , its level turns to high, we should change its
-+		 * polarity control to "Detect falling edge" correspondingly.
-+		 */
-+		p ^= 1 << bit_num;
-+		writel(p, info->base + IRQ_POL + 4 * reg_idx);
-+		ret = 0;
-+	} else {
-+		/* Spurious irq */
-+		ret = -1;
-+	}
-+
-+	spin_unlock_irqrestore(&info->irq_lock, flags);
-+	return ret;
-+}
- 
- static void armada_37xx_irq_handler(struct irq_desc *desc)
- {
-@@ -609,6 +656,23 @@ static void armada_37xx_irq_handler(struct irq_desc *desc)
- 			u32 hwirq = ffs(status) - 1;
- 			u32 virq = irq_find_mapping(d, hwirq +
- 						     i * GPIO_PER_REG);
-+			u32 t = irq_get_trigger_type(virq);
-+
-+			if ((t & IRQ_TYPE_SENSE_MASK) == IRQ_TYPE_EDGE_BOTH) {
-+				/* Swap polarity (race with GPIO line) */
-+				if (armada_37xx_edge_both_irq_swap_pol(info,
-+					hwirq + i * GPIO_PER_REG)) {
-+					/*
-+					 * For spurious irq, which gpio level
-+					 * is not as expected after incoming
-+					 * edge, just ack the gpio irq.
-+					 */
-+					writel(1 << hwirq,
-+					       info->base +
-+					       IRQ_STATUS + 4 * i);
-+					continue;
-+				}
-+			}
- 
- 			generic_handle_irq(virq);
- 
--- 
-2.14.2
+On 10/19/2017 03:03 PM, Olivier Moysan wrote:
+> This patch-set adds support of synchronization features for SAI interface.
+> It also adds minor fixes and improvements.
+> 
+> Olivier Moysan (7):
+>    ASoC: stm32: Add synchronization to SAI bindings
+>    ASoC: stm32: sai: Move static settings to DAI init
+>    ASoC: stm32: sai: Fix DMA burst size
+>    ASoC: stm32: sai: fix stop management in isr
+>    ASoC: stm32: sai: Remove spurious IRQs on stop
+>    ASoC: stm32: sai: Fix get reset controller
+>    ASoC: stm32: sai: Add synchronization support
+> 
+>   .../devicetree/bindings/sound/st,stm32-sai.txt     |  14 +-
+>   sound/soc/stm/stm32_sai.c                          | 162 ++++++++++++++++++++-
+>   sound/soc/stm/stm32_sai.h                          |  22 ++-
+>   sound/soc/stm/stm32_sai_sub.c                      | 156 +++++++++++++++++---
+>   4 files changed, 318 insertions(+), 36 deletions(-)
+> 
