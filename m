@@ -1,20 +1,19 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Oct 2017 17:42:18 +0200
-Subject: [GIT PULL] i.MX fixes for 4.14
-In-Reply-To: <20171016073851.GA8320@x250>
-References: <20171016073851.GA8320@x250>
-Message-ID: <CAK8P3a3Fmt8fhFUW9r2ttRUVMxZQ4qjr7nMvx=6qtYxDamxAKw@mail.gmail.com>
+Date: Thu, 19 Oct 2017 17:43:15 +0200
+Subject: [GIT PULL] Rockchip dts64 Fixes for 4.14 part 2
+In-Reply-To: <6151423.bSX8Os9Bvg@phil>
+References: <6151423.bSX8Os9Bvg@phil>
+Message-ID: <CAK8P3a0=Rgt7ZgEgOmo5fzkgOW7skn2Pa2B1fkP1HavatLygGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 16, 2017 at 9:38 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> ----------------------------------------------------------------
-> i.MX fixes for 4.14:
->  - Fix the legacy PCI interrupt numbers for i.MX7.  The numbers were
->    wrongly coded in an inverted order than what Reference Manual tells.
->    It causes problem for PCI devices using legacy interrupt.
+On Tue, Oct 17, 2017 at 8:17 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> Hi Arnd, Kevin, Olof,
 >
+> looks like I need two rounds of fixes this time around.
+> But the vqmmc voltage issue warrants that I think, especially
+> as 4.14 is going to be a LTS release.
 
 Pulled into fixes, thanks!
 
-     Arnd
+       Arnd
