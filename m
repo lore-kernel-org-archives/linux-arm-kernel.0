@@ -1,56 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Oct 2017 11:30:34 +0200
-Subject: [PATCH] [media] rockchip/rga: annotate PM functions as __maybe_unused
-Message-ID: <20171019093044.531871-1-arnd@arndb.de>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Thu, 19 Oct 2017 17:52:54 +0800
+Subject: [PATCH] arm64: mediatek: cleanup message for platform selection
+Message-ID: <82b4e4301bb762af59fd76cfe15f0a5773c78bb3.1508406417.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added driver has incorrect #ifdef annotations on its
-PM functions, leading to a harmless compile-time warning when
-CONFIG_PM is disabled:
+From: Sean Wang <sean.wang@mediatek.com>
 
-drivers/media/platform/rockchip/rga/rga.c:760:13: error: 'rga_disable_clocks' defined but not used [-Werror=unused-function]
- static void rga_disable_clocks(struct rockchip_rga *rga)
-             ^~~~~~~~~~~~~~~~~~
-drivers/media/platform/rockchip/rga/rga.c:728:12: error: 'rga_enable_clocks' defined but not used [-Werror=unused-function]
+The latest kernel tree already can support more MediaTek platforms such as
+MT2712 and MT7622, so additional descriptions for those platforms are added
+and certain cleanups are also being made here.
 
-This removes the #ifdef and marks the functions as __maybe_unused,
-so gcc can silently drop all the unused code.
-
-Fixes: f7e7b48e6d79 ("[media] rockchip/rga: v4l2 m2m support")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 ---
- drivers/media/platform/rockchip/rga/rga.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ arch/arm64/Kconfig.platforms | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/media/platform/rockchip/rga/rga.c b/drivers/media/platform/rockchip/rga/rga.c
-index e7d1b34baf1c..89296de9cf4a 100644
---- a/drivers/media/platform/rockchip/rga/rga.c
-+++ b/drivers/media/platform/rockchip/rga/rga.c
-@@ -960,8 +960,7 @@ static int rga_remove(struct platform_device *pdev)
- 	return 0;
- }
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 6b54ee8..ab69f5f 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -91,12 +91,13 @@ config ARCH_HISI
+ 	  This enables support for Hisilicon ARMv8 SoC family
  
--#ifdef CONFIG_PM
--static int rga_runtime_suspend(struct device *dev)
-+static int __maybe_unused rga_runtime_suspend(struct device *dev)
- {
- 	struct rockchip_rga *rga = dev_get_drvdata(dev);
+ config ARCH_MEDIATEK
+-	bool "Mediatek MT65xx & MT81xx ARMv8 SoC"
++	bool "MediaTek SoC Family"
+ 	select ARM_GIC
+ 	select PINCTRL
+ 	select MTK_TIMER
+ 	help
+-	  Support for Mediatek MT65xx & MT81xx ARMv8 SoCs
++	  This enables support for MediaTek MT27xx, MT65xx, MT76xx
++	  & MT81xx ARMv8 SoCs
  
-@@ -970,13 +969,12 @@ static int rga_runtime_suspend(struct device *dev)
- 	return 0;
- }
- 
--static int rga_runtime_resume(struct device *dev)
-+static int __maybe_unused rga_runtime_resume(struct device *dev)
- {
- 	struct rockchip_rga *rga = dev_get_drvdata(dev);
- 
- 	return rga_enable_clocks(rga);
- }
--#endif
- 
- static const struct dev_pm_ops rga_pm = {
- 	SET_RUNTIME_PM_OPS(rga_runtime_suspend,
+ config ARCH_MESON
+ 	bool "Amlogic Platforms"
 -- 
-2.9.0
+2.7.4
