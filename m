@@ -1,31 +1,24 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 19 Oct 2017 12:50:17 +0200
-Subject: [PATCH v2 3/6] arm64: tegra: Add VIC on Tegra186
-In-Reply-To: <20170905084306.19318-4-mperttunen@nvidia.com>
-References: <20170905084306.19318-1-mperttunen@nvidia.com>
- <20170905084306.19318-4-mperttunen@nvidia.com>
-Message-ID: <20171019105017.GN9005@ulmo>
+From: bhumirks@gmail.com (Bhumika Goyal)
+Date: Thu, 19 Oct 2017 12:59:13 +0200
+Subject: [PATCH 0/2] cpufreq: arm_big_little: make function arguments and
+ structures const
+Message-ID: <1508410755-13666-1-git-send-email-bhumirks@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 05, 2017 at 11:43:03AM +0300, Mikko Perttunen wrote:
-> Add a node for the Video Image Compositor on the Tegra186.
-> 
-> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
-> ---
-> v2:
-> - Fixed reg property in accordance with changed parent cells.
-> 
->  arch/arm64/boot/dts/nvidia/tegra186.dtsi | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
+Make some function arguments as const. After this change make the 
+cpufreq_arm_bL_ops structures const.
 
-Applied, thanks.
+Bhumika Goyal (2):
+  cpufreq: arm_big_little: make function argument and structure const
+  cpufreq: arm_big_little: make cpufreq_arm_bL_ops structures const
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171019/7f1d1e60/attachment.sig>
+ drivers/cpufreq/arm_big_little.c       | 6 +++---
+ drivers/cpufreq/arm_big_little.h       | 4 ++--
+ drivers/cpufreq/arm_big_little_dt.c    | 2 +-
+ drivers/cpufreq/scpi-cpufreq.c         | 2 +-
+ drivers/cpufreq/vexpress-spc-cpufreq.c | 2 +-
+ 5 files changed, 8 insertions(+), 8 deletions(-)
+
+-- 
+1.9.1
