@@ -1,79 +1,173 @@
 From: weiyi.lu@mediatek.com (Weiyi Lu)
-Date: Thu, 19 Oct 2017 10:48:46 +0800
-Subject: [PATCH v5 5/9] dt-bindings: soc: add MT2712 power dt-bindings
+Date: Thu, 19 Oct 2017 10:48:45 +0800
+Subject: [PATCH v5 4/9] arm: dts: mt2712: Add clock controller device nodes
 In-Reply-To: <1508381330-3700-1-git-send-email-weiyi.lu@mediatek.com>
 References: <1508381330-3700-1-git-send-email-weiyi.lu@mediatek.com>
-Message-ID: <1508381330-3700-6-git-send-email-weiyi.lu@mediatek.com>
+Message-ID: <1508381330-3700-5-git-send-email-weiyi.lu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add power dt-bindings for MT2712.
+Add clock controller nodes for MT2712, include topckgen, infracfg,
+pericfg, mcucfg and apmixedsys. This patch also add six oscillators that
+provide clocks for MT2712.
 
-Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
 ---
- .../devicetree/bindings/soc/mediatek/scpsys.txt    |  3 +++
- include/dt-bindings/power/mt2712-power.h           | 26 ++++++++++++++++++++++
- 2 files changed, 29 insertions(+)
- create mode 100644 include/dt-bindings/power/mt2712-power.h
+ arch/arm64/boot/dts/mediatek/mt2712e.dtsi | 115 ++++++++++++++++++++++++++++++
+ 1 file changed, 115 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-index 40056f7..76bf45b 100644
---- a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-+++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-@@ -12,11 +12,13 @@ power/power_domain.txt. It provides the power domains defined in
- - include/dt-bindings/power/mt8173-power.h
- - include/dt-bindings/power/mt6797-power.h
- - include/dt-bindings/power/mt2701-power.h
-+- include/dt-bindings/power/mt2712-power.h
- - include/dt-bindings/power/mt7622-power.h
+diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+index 57d0396..d2ee3cd 100644
+--- a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+@@ -5,6 +5,7 @@
+  * SPDX-License-Identifier: (GPL-2.0 OR MIT)
+  */
  
- Required properties:
- - compatible: Should be one of:
- 	- "mediatek,mt2701-scpsys"
-+	- "mediatek,mt2712-scpsys"
- 	- "mediatek,mt6797-scpsys"
- 	- "mediatek,mt7622-scpsys"
- 	- "mediatek,mt8173-scpsys"
-@@ -27,6 +29,7 @@ Required properties:
-                       These are clocks which hardware needs to be
-                       enabled before enabling certain power domains.
- 	Required clocks for MT2701: "mm", "mfg", "ethif"
-+	Required clocks for MT2712: "mm", "mfg", "venc", "jpgdec", "audio", "vdec"
- 	Required clocks for MT6797: "mm", "mfg", "vdec"
- 	Required clocks for MT7622: "hif_sel"
- 	Required clocks for MT8173: "mm", "mfg", "venc", "venc_lt"
-diff --git a/include/dt-bindings/power/mt2712-power.h b/include/dt-bindings/power/mt2712-power.h
-new file mode 100644
-index 0000000..92b46d7
---- /dev/null
-+++ b/include/dt-bindings/power/mt2712-power.h
-@@ -0,0 +1,26 @@
-+/*
-+ * Copyright (C) 2017 MediaTek Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-+ * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
-+ */
++#include <dt-bindings/clock/mt2712-clk.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ 
+@@ -73,6 +74,48 @@
+ 		#clock-cells = <0>;
+ 	};
+ 
++	clk26m: oscillator at 0 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <26000000>;
++		clock-output-names = "clk26m";
++	};
 +
-+#ifndef _DT_BINDINGS_POWER_MT2712_POWER_H
-+#define _DT_BINDINGS_POWER_MT2712_POWER_H
++	clk32k: oscillator at 1 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <32768>;
++		clock-output-names = "clk32k";
++	};
 +
-+#define MT2712_POWER_DOMAIN_MM		0
-+#define MT2712_POWER_DOMAIN_VDEC	1
-+#define MT2712_POWER_DOMAIN_VENC	2
-+#define MT2712_POWER_DOMAIN_ISP		3
-+#define MT2712_POWER_DOMAIN_AUDIO	4
-+#define MT2712_POWER_DOMAIN_USB		5
-+#define MT2712_POWER_DOMAIN_USB2	6
-+#define MT2712_POWER_DOMAIN_MFG		7
++	clkfpc: oscillator at 2 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <50000000>;
++		clock-output-names = "clkfpc";
++	};
 +
-+#endif /* _DT_BINDINGS_POWER_MT2712_POWER_H */
++	clkaud_ext_i_0: oscillator at 3 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <6500000>;
++		clock-output-names = "clkaud_ext_i_0";
++	};
++
++	clkaud_ext_i_1: oscillator at 4 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <196608000>;
++		clock-output-names = "clkaud_ext_i_1";
++	};
++
++	clkaud_ext_i_2: oscillator at 5 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <180633600>;
++		clock-output-names = "clkaud_ext_i_2";
++	};
++
+ 	timer {
+ 		compatible = "arm,armv8-timer";
+ 		interrupt-parent = <&gic>;
+@@ -86,6 +129,24 @@
+ 			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>;
+ 	};
+ 
++	topckgen: syscon at 10000000 {
++		compatible = "mediatek,mt2712-topckgen", "syscon";
++		reg = <0 0x10000000 0 0x1000>;
++		#clock-cells = <1>;
++	};
++
++	infracfg: syscon at 10001000 {
++		compatible = "mediatek,mt2712-infracfg", "syscon";
++		reg = <0 0x10001000 0 0x1000>;
++		#clock-cells = <1>;
++	};
++
++	pericfg: syscon at 10003000 {
++		compatible = "mediatek,mt2712-pericfg", "syscon";
++		reg = <0 0x10003000 0 0x1000>;
++		#clock-cells = <1>;
++	};
++
+ 	uart5: serial at 1000f000 {
+ 		compatible = "mediatek,mt2712-uart",
+ 			     "mediatek,mt6577-uart";
+@@ -96,6 +157,18 @@
+ 		status = "disabled";
+ 	};
+ 
++	apmixedsys: syscon at 10209000 {
++		compatible = "mediatek,mt2712-apmixedsys", "syscon";
++		reg = <0 0x10209000 0 0x1000>;
++		#clock-cells = <1>;
++	};
++
++	mcucfg: syscon at 10220000 {
++		compatible = "mediatek,mt2712-mcucfg", "syscon";
++		reg = <0 0x10220000 0 0x1000>;
++		#clock-cells = <1>;
++	};
++
+ 	sysirq: interrupt-controller at 10220a80 {
+ 		compatible = "mediatek,mt2712-sysirq",
+ 			     "mediatek,mt6577-sysirq";
+@@ -167,5 +240,47 @@
+ 		clock-names = "baud", "bus";
+ 		status = "disabled";
+ 	};
++
++	mfgcfg: syscon at 13000000 {
++		compatible = "mediatek,mt2712-mfgcfg", "syscon";
++		reg = <0 0x13000000 0 0x1000>;
++		#clock-cells = <1>;
++	};
++
++	mmsys: syscon at 14000000 {
++		compatible = "mediatek,mt2712-mmsys", "syscon";
++		reg = <0 0x14000000 0 0x1000>;
++		#clock-cells = <1>;
++	};
++
++	imgsys: syscon at 15000000 {
++		compatible = "mediatek,mt2712-imgsys", "syscon";
++		reg = <0 0x15000000 0 0x1000>;
++		#clock-cells = <1>;
++	};
++
++	bdpsys: syscon at 15010000 {
++		compatible = "mediatek,mt2712-bdpsys", "syscon";
++		reg = <0 0x15010000 0 0x1000>;
++		#clock-cells = <1>;
++	};
++
++	vdecsys: syscon at 16000000 {
++		compatible = "mediatek,mt2712-vdecsys", "syscon";
++		reg = <0 0x16000000 0 0x1000>;
++		#clock-cells = <1>;
++	};
++
++	vencsys: syscon at 18000000 {
++		compatible = "mediatek,mt2712-vencsys", "syscon";
++		reg = <0 0x18000000 0 0x1000>;
++		#clock-cells = <1>;
++	};
++
++	jpgdecsys: syscon at 19000000 {
++		compatible = "mediatek,mt2712-jpgdecsys", "syscon";
++		reg = <0 0x19000000 0 0x1000>;
++		#clock-cells = <1>;
++	};
+ };
+ 
 -- 
 1.9.1
