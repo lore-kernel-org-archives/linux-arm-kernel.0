@@ -1,27 +1,72 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 19 Oct 2017 13:47:15 +0100
-Subject: [PATCH 05/11] Disable kasan's instrumentation
-In-Reply-To: <20171011082227.20546-6-liuwenliang@huawei.com>
-References: <20171011082227.20546-1-liuwenliang@huawei.com>
- <20171011082227.20546-6-liuwenliang@huawei.com>
-Message-ID: <20171019124714.GZ20805@n2100.armlinux.org.uk>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 19 Oct 2017 13:50:05 +0100
+Subject: linux-next: manual merge of the arm64 tree with Linus' tree
+In-Reply-To: <20171019112833.2h5ah7tidjnkvo7o@sirena.co.uk>
+References: <20171019112833.2h5ah7tidjnkvo7o@sirena.co.uk>
+Message-ID: <20171019125005.GA18883@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 11, 2017 at 04:22:21PM +0800, Abbott Liu wrote:
-> From: Andrey Ryabinin <a.ryabinin@samsung.com>
+[+Will]
+
+On Thu, Oct 19, 2017 at 12:28:33PM +0100, Mark Brown wrote:
+> Hi Catalin,
 > 
->  To avoid some build and runtime errors, compiler's instrumentation must
->  be disabled for code not linked with kernel image.
+> Today's linux-next merge of the arm64 tree got a conflict in:
+> 
+>   drivers/acpi/arm64/iort.c
+> 
+> between commit:
+> 
+>   37f6b42e9c296 ("ACPI/IORT: Fix PCI ACS enablement")
+> 
+> from Linus' tree and commit:
+> 
+>   896dd2c324842 ("ACPI/IORT: Make platform devices initialization code SMMU agnostic")
+> 
+> from the arm64 tree.
+> 
+> I fixed it up (see below) and can carry the fix as necessary. This
+> is now fixed as far as linux-next is concerned, but any non trivial
+> conflicts should be mentioned to your upstream maintainer when your tree
+> is submitted for merging.  You may also want to consider cooperating
+> with the maintainer of the conflicting tree to minimise any particularly
+> complex conflicts.
+> 
+> diff --cc drivers/acpi/arm64/iort.c
+> index de56394dd161,7dc964f4d8f1..000000000000
+> --- a/drivers/acpi/arm64/iort.c
+> +++ b/drivers/acpi/arm64/iort.c
+> @@@ -1215,7 -1326,7 +1357,8 @@@ static void __init iort_init_platform_d
+>   	struct acpi_table_iort *iort;
+>   	struct fwnode_handle *fwnode;
+>   	int i, ret;
+>  +	bool acs_enabled = false;
+> + 	const struct iort_dev_config *ops;
+>   
+>   	/*
+>   	 * iort_table and iort both point to the start of IORT table, but
+> @@@ -1235,12 -1346,8 +1378,11 @@@
+>   			return;
+>   		}
+>   
+>  +		if (!acs_enabled)
+>  +			acs_enabled = iort_enable_acs(iort_node);
+>  +
+> - 		if ((iort_node->type == ACPI_IORT_NODE_SMMU) ||
+> - 			(iort_node->type == ACPI_IORT_NODE_SMMU_V3)) {
+> - 
+> + 		ops = iort_get_dev_cfg(iort_node);
+> + 		if (ops) {
+>   			fwnode = acpi_alloc_fwnode_static();
+>   			if (!fwnode)
+>   				return;
 
-How does that explain the change to unwind.c ?
+Hi Mark,
 
-Does this also disable the string macro changes?
+it is expected and that's the right conflict resolution:
 
-In any case, this should certainly precede patch 4, and very probably
-patch 2.
+https://marc.info/?l=linux-arm-kernel&m=150817031118241&w=2
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Thank you,
+Lorenzo
