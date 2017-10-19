@@ -1,184 +1,82 @@
 From: weiyi.lu@mediatek.com (Weiyi Lu)
-Date: Thu, 19 Oct 2017 10:48:49 +0800
-Subject: [PATCH v5 8/9] soc: mediatek: add MT2712 scpsys support
-In-Reply-To: <1508381330-3700-1-git-send-email-weiyi.lu@mediatek.com>
-References: <1508381330-3700-1-git-send-email-weiyi.lu@mediatek.com>
-Message-ID: <1508381330-3700-9-git-send-email-weiyi.lu@mediatek.com>
+Date: Thu, 19 Oct 2017 10:48:41 +0800
+Subject: [PATCH v5 0/9] Mediatek MT2712 clock and scpsys support 
+Message-ID: <1508381330-3700-1-git-send-email-weiyi.lu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add scpsys driver for MT2712
+This series is based on v4.14-rc1 and composed of
+clock control (PATCH 1-4) and scpsys control (PATCH 5-9)
 
-Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
----
- drivers/soc/mediatek/mtk-scpsys.c | 106 +++++++++++++++++++++++++++++++++++---
- 1 file changed, 100 insertions(+), 6 deletions(-)
+changes since v4:
+- Refine scpsys and infracfg for bus protection by passing 
+  a boolean flag to determine the register update method.
 
-diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-index a4ece75..8809430 100644
---- a/drivers/soc/mediatek/mtk-scpsys.c
-+++ b/drivers/soc/mediatek/mtk-scpsys.c
-@@ -21,6 +21,7 @@
- #include <linux/soc/mediatek/infracfg.h>
- 
- #include <dt-bindings/power/mt2701-power.h>
-+#include <dt-bindings/power/mt2712-power.h>
- #include <dt-bindings/power/mt6797-power.h>
- #include <dt-bindings/power/mt7622-power.h>
- #include <dt-bindings/power/mt8173-power.h>
-@@ -32,7 +33,7 @@
- #define SPM_DIS_PWR_CON			0x023c
- #define SPM_CONN_PWR_CON		0x0280
- #define SPM_VEN2_PWR_CON		0x0298
--#define SPM_AUDIO_PWR_CON		0x029c	/* MT8173 */
-+#define SPM_AUDIO_PWR_CON		0x029c	/* MT8173, MT2712 */
- #define SPM_BDP_PWR_CON			0x029c	/* MT2701 */
- #define SPM_ETH_PWR_CON			0x02a0
- #define SPM_HIF_PWR_CON			0x02a4
-@@ -40,12 +41,12 @@
- #define SPM_MFG_2D_PWR_CON		0x02c0
- #define SPM_MFG_ASYNC_PWR_CON		0x02c4
- #define SPM_USB_PWR_CON			0x02cc
-+#define SPM_USB2_PWR_CON		0x02d4	/* MT2712 */
- #define SPM_ETHSYS_PWR_CON		0x02e0	/* MT7622 */
- #define SPM_HIF0_PWR_CON		0x02e4	/* MT7622 */
- #define SPM_HIF1_PWR_CON		0x02e8	/* MT7622 */
- #define SPM_WB_PWR_CON			0x02ec	/* MT7622 */
- 
--
- #define SPM_PWR_STATUS			0x060c
- #define SPM_PWR_STATUS_2ND		0x0610
- 
-@@ -64,12 +65,13 @@
- #define PWR_STATUS_ETH			BIT(15)
- #define PWR_STATUS_HIF			BIT(16)
- #define PWR_STATUS_IFR_MSC		BIT(17)
-+#define PWR_STATUS_USB2			BIT(19)	/* MT2712 */
- #define PWR_STATUS_VENC_LT		BIT(20)
- #define PWR_STATUS_VENC			BIT(21)
--#define PWR_STATUS_MFG_2D		BIT(22)
--#define PWR_STATUS_MFG_ASYNC		BIT(23)
--#define PWR_STATUS_AUDIO		BIT(24)
--#define PWR_STATUS_USB			BIT(25)
-+#define PWR_STATUS_MFG_2D		BIT(22)	/* MT8173 */
-+#define PWR_STATUS_MFG_ASYNC		BIT(23)	/* MT8173 */
-+#define PWR_STATUS_AUDIO		BIT(24)	/* MT8173, MT2712 */
-+#define PWR_STATUS_USB			BIT(25)	/* MT8173, MT2712 */
- #define PWR_STATUS_ETHSYS		BIT(24)	/* MT7622 */
- #define PWR_STATUS_HIF0			BIT(25)	/* MT7622 */
- #define PWR_STATUS_HIF1			BIT(26)	/* MT7622 */
-@@ -602,6 +604,85 @@ static void mtk_register_power_domains(struct platform_device *pdev,
- };
- 
- /*
-+ * MT2712 power domain support
-+ */
-+static const struct scp_domain_data scp_domain_data_mt2712[] = {
-+	[MT2712_POWER_DOMAIN_MM] = {
-+		.name = "mm",
-+		.sta_mask = PWR_STATUS_DISP,
-+		.ctl_offs = SPM_DIS_PWR_CON,
-+		.sram_pdn_bits = GENMASK(8, 8),
-+		.sram_pdn_ack_bits = GENMASK(12, 12),
-+		.clk_id = {CLK_MM},
-+		.active_wakeup = true,
-+	},
-+	[MT2712_POWER_DOMAIN_VDEC] = {
-+		.name = "vdec",
-+		.sta_mask = PWR_STATUS_VDEC,
-+		.ctl_offs = SPM_VDE_PWR_CON,
-+		.sram_pdn_bits = GENMASK(8, 8),
-+		.sram_pdn_ack_bits = GENMASK(12, 12),
-+		.clk_id = {CLK_MM, CLK_VDEC},
-+		.active_wakeup = true,
-+	},
-+	[MT2712_POWER_DOMAIN_VENC] = {
-+		.name = "venc",
-+		.sta_mask = PWR_STATUS_VENC,
-+		.ctl_offs = SPM_VEN_PWR_CON,
-+		.sram_pdn_bits = GENMASK(11, 8),
-+		.sram_pdn_ack_bits = GENMASK(15, 12),
-+		.clk_id = {CLK_MM, CLK_VENC, CLK_JPGDEC},
-+		.active_wakeup = true,
-+	},
-+	[MT2712_POWER_DOMAIN_ISP] = {
-+		.name = "isp",
-+		.sta_mask = PWR_STATUS_ISP,
-+		.ctl_offs = SPM_ISP_PWR_CON,
-+		.sram_pdn_bits = GENMASK(11, 8),
-+		.sram_pdn_ack_bits = GENMASK(13, 12),
-+		.clk_id = {CLK_MM},
-+		.active_wakeup = true,
-+	},
-+	[MT2712_POWER_DOMAIN_AUDIO] = {
-+		.name = "audio",
-+		.sta_mask = PWR_STATUS_AUDIO,
-+		.ctl_offs = SPM_AUDIO_PWR_CON,
-+		.sram_pdn_bits = GENMASK(11, 8),
-+		.sram_pdn_ack_bits = GENMASK(15, 12),
-+		.clk_id = {CLK_AUDIO},
-+		.active_wakeup = true,
-+	},
-+	[MT2712_POWER_DOMAIN_USB] = {
-+		.name = "usb",
-+		.sta_mask = PWR_STATUS_USB,
-+		.ctl_offs = SPM_USB_PWR_CON,
-+		.sram_pdn_bits = GENMASK(10, 8),
-+		.sram_pdn_ack_bits = GENMASK(14, 12),
-+		.clk_id = {CLK_NONE},
-+		.active_wakeup = true,
-+	},
-+	[MT2712_POWER_DOMAIN_USB2] = {
-+		.name = "usb2",
-+		.sta_mask = PWR_STATUS_USB2,
-+		.ctl_offs = SPM_USB2_PWR_CON,
-+		.sram_pdn_bits = GENMASK(10, 8),
-+		.sram_pdn_ack_bits = GENMASK(14, 12),
-+		.clk_id = {CLK_NONE},
-+		.active_wakeup = true,
-+	},
-+	[MT2712_POWER_DOMAIN_MFG] = {
-+		.name = "mfg",
-+		.sta_mask = PWR_STATUS_MFG,
-+		.ctl_offs = SPM_MFG_PWR_CON,
-+		.sram_pdn_bits = GENMASK(11, 8),
-+		.sram_pdn_ack_bits = GENMASK(19, 16),
-+		.clk_id = {CLK_MFG},
-+		.bus_prot_mask = BIT(14) | BIT(21) | BIT(23),
-+		.active_wakeup = true,
-+	},
-+};
-+
-+/*
-  * MT6797 power domain support
-  */
- 
-@@ -831,6 +912,16 @@ static void mtk_register_power_domains(struct platform_device *pdev,
- 	.bus_prot_use_set_clr_reg = false,
- };
- 
-+static const struct scp_soc_data mt2712_data = {
-+	.domains = scp_domain_data_mt2712,
-+	.num_domains = ARRAY_SIZE(scp_domain_data_mt2712),
-+	.regs = {
-+		.pwr_sta_offs = SPM_PWR_STATUS,
-+		.pwr_sta2nd_offs = SPM_PWR_STATUS_2ND
-+	},
-+	.bus_prot_use_set_clr_reg = true,
-+};
-+
- static const struct scp_soc_data mt6797_data = {
- 	.domains = scp_domain_data_mt6797,
- 	.num_domains = ARRAY_SIZE(scp_domain_data_mt6797),
-@@ -874,6 +965,9 @@ static void mtk_register_power_domains(struct platform_device *pdev,
- 		.compatible = "mediatek,mt2701-scpsys",
- 		.data = &mt2701_data,
- 	}, {
-+		.compatible = "mediatek,mt2712-scpsys",
-+		.data = &mt2712_data,
-+	}, {
- 		.compatible = "mediatek,mt6797-scpsys",
- 		.data = &mt6797_data,
- 	}, {
--- 
-1.9.1
+changes since v3:
+- Rebase to v4.14-rc1.
+
+changes since v2:
+- ensure the clocks used by clocksource driver are registered
+  before clocksource init() by using CLK_OF_DECLARE()
+- correct the frequency of clk32k/clkrtc_ext/clkrtc_int
+
+changes since v1:
+- Rebase to v4.13-next-soc.
+- Refine scpsys and infracfg for bus protection.
+
+Weiyi Lu (9):
+  dt-bindings: ARM: Mediatek: Document bindings for MT2712
+  clk: mediatek: Add dt-bindings for MT2712 clocks
+  clk: mediatek: Add MT2712 clock support
+  arm: dts: mt2712: Add clock controller device nodes
+  dt-bindings: soc: add MT2712 power dt-bindings
+  soc: mediatek: extend bus protection API
+  soc: mediatek: add dependent clock jpgdec/audio for scpsys
+  soc: mediatek: add MT2712 scpsys support
+  arm: dts: Add power controller device node of MT2712
+
+ .../bindings/arm/mediatek/mediatek,apmixedsys.txt  |    1 +
+ .../bindings/arm/mediatek/mediatek,bdpsys.txt      |    1 +
+ .../bindings/arm/mediatek/mediatek,imgsys.txt      |    1 +
+ .../bindings/arm/mediatek/mediatek,infracfg.txt    |    1 +
+ .../bindings/arm/mediatek/mediatek,jpgdecsys.txt   |   22 +
+ .../bindings/arm/mediatek/mediatek,mcucfg.txt      |   22 +
+ .../bindings/arm/mediatek/mediatek,mfgcfg.txt      |   22 +
+ .../bindings/arm/mediatek/mediatek,mmsys.txt       |    1 +
+ .../bindings/arm/mediatek/mediatek,pericfg.txt     |    1 +
+ .../bindings/arm/mediatek/mediatek,topckgen.txt    |    1 +
+ .../bindings/arm/mediatek/mediatek,vdecsys.txt     |    1 +
+ .../bindings/arm/mediatek/mediatek,vencsys.txt     |    1 +
+ .../devicetree/bindings/soc/mediatek/scpsys.txt    |    3 +
+ arch/arm64/boot/dts/mediatek/mt2712e.dtsi          |  131 ++
+ drivers/clk/mediatek/Kconfig                       |   50 +
+ drivers/clk/mediatek/Makefile                      |    8 +
+ drivers/clk/mediatek/clk-mt2712-bdp.c              |  102 ++
+ drivers/clk/mediatek/clk-mt2712-img.c              |   80 ++
+ drivers/clk/mediatek/clk-mt2712-jpgdec.c           |   76 ++
+ drivers/clk/mediatek/clk-mt2712-mfg.c              |   75 +
+ drivers/clk/mediatek/clk-mt2712-mm.c               |  170 +++
+ drivers/clk/mediatek/clk-mt2712-vdec.c             |   94 ++
+ drivers/clk/mediatek/clk-mt2712-venc.c             |   77 ++
+ drivers/clk/mediatek/clk-mt2712.c                  | 1435 ++++++++++++++++++++
+ drivers/clk/mediatek/clk-mtk.h                     |    2 +
+ drivers/clk/mediatek/clk-pll.c                     |   13 +-
+ drivers/soc/mediatek/mtk-infracfg.c                |   24 +-
+ drivers/soc/mediatek/mtk-scpsys.c                  |  140 +-
+ include/dt-bindings/clock/mt2712-clk.h             |  427 ++++++
+ include/dt-bindings/power/mt2712-power.h           |   26 +
+ include/linux/soc/mediatek/infracfg.h              |    7 +-
+ 31 files changed, 2991 insertions(+), 24 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,jpgdecsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,mcucfg.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,mfgcfg.txt
+ create mode 100644 drivers/clk/mediatek/clk-mt2712-bdp.c
+ create mode 100644 drivers/clk/mediatek/clk-mt2712-img.c
+ create mode 100644 drivers/clk/mediatek/clk-mt2712-jpgdec.c
+ create mode 100644 drivers/clk/mediatek/clk-mt2712-mfg.c
+ create mode 100644 drivers/clk/mediatek/clk-mt2712-mm.c
+ create mode 100644 drivers/clk/mediatek/clk-mt2712-vdec.c
+ create mode 100644 drivers/clk/mediatek/clk-mt2712-venc.c
+ create mode 100644 drivers/clk/mediatek/clk-mt2712.c
+ create mode 100644 include/dt-bindings/clock/mt2712-clk.h
+ create mode 100644 include/dt-bindings/power/mt2712-power.h
