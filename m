@@ -1,22 +1,18 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Oct 2017 22:38:19 +0200
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v4.15
-In-Reply-To: <cover.1507623048.git.horms+renesas@verge.net.au>
-References: <cover.1507623048.git.horms+renesas@verge.net.au>
-Message-ID: <CAK8P3a0W3kvBK_ZkqP5wEjj14m6dgm_5Mxv_VZ-7mrukbyntUw@mail.gmail.com>
+Date: Thu, 19 Oct 2017 22:39:55 +0200
+Subject: [PATCH] arm64: Add ThunderX drivers to defconfig
+In-Reply-To: <8d21bb00c687f0f4522f886db5c2836d0b4ca031.1507734829.git.robin.murphy@arm.com>
+References: <8d21bb00c687f0f4522f886db5c2836d0b4ca031.1507734829.git.robin.murphy@arm.com>
+Message-ID: <CAK8P3a08WFk1WKcq2sX06Qr8mXYNhPNghaLXi-eU4-_zD7Gu0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 10, 2017 at 10:12 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Wed, Oct 11, 2017 at 5:15 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> ThunderX needs its PCI host drivers to do anything useful, and
+> it's probably helpful to have networking by default too.
 >
-> Please consider these second round of Renesas ARM based SoC updates for v4.15.
->
-> This pull request is based on the previous round of
-> such requests, tagged as renesas-soc-for-v4.15,
-> which I have already sent a pull-request for.
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-Pulled into next/soc, thanks!
+Applied to next/soc, thanks!
 
-      Arnd
+     Arnd
