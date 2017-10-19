@@ -1,153 +1,200 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 19 Oct 2017 15:58:05 +0100
-Subject: [PATCH v4 19/21] KVM: arm64: Handle RAS SErrors from EL2 on guest exit
-In-Reply-To: <20171019145807.23251-1-james.morse@arm.com>
-References: <20171019145807.23251-1-james.morse@arm.com>
-Message-ID: <20171019145807.23251-20-james.morse@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 19 Oct 2017 16:20:12 +0100
+Subject: [PATCH v3 3/7] drivers: base: cacheinfo: arm64: Add support for
+ ACPI based firmware tables
+In-Reply-To: <20171012194856.13844-4-jeremy.linton@arm.com>
+References: <20171012194856.13844-1-jeremy.linton@arm.com>
+ <20171012194856.13844-4-jeremy.linton@arm.com>
+Message-ID: <20171019152012.GB18883@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We expect to have firmware-first handling of RAS SErrors, with errors
-notified via an APEI method. For systems without firmware-first, add
-some minimal handling to KVM.
+On Thu, Oct 12, 2017 at 02:48:52PM -0500, Jeremy Linton wrote:
+> The /sys cache entries should support ACPI/PPTT generated cache
+> topology information. Lets detect ACPI systems and call
+> an arch specific cache_setup_acpi() routine to update the hardware
+> probed cache topology.
+> 
+> For arm64, if ACPI is enabled, determine the max number of cache
+> levels and populate them using a PPTT table if one is available.
+> 
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> ---
+>  arch/arm64/kernel/cacheinfo.c | 23 ++++++++++++++++++-----
+>  drivers/acpi/pptt.c           |  1 +
+>  drivers/base/cacheinfo.c      | 17 +++++++++++------
+>  include/linux/cacheinfo.h     | 11 +++++++++--
+>  4 files changed, 39 insertions(+), 13 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/cacheinfo.c b/arch/arm64/kernel/cacheinfo.c
+> index 380f2e2fbed5..2e2cf0d312ba 100644
+> --- a/arch/arm64/kernel/cacheinfo.c
+> +++ b/arch/arm64/kernel/cacheinfo.c
+> @@ -17,6 +17,7 @@
+>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>   */
+>  
+> +#include <linux/acpi.h>
+>  #include <linux/cacheinfo.h>
+>  #include <linux/of.h>
+>  
+> @@ -44,9 +45,17 @@ static void ci_leaf_init(struct cacheinfo *this_leaf,
+>  	this_leaf->type = type;
+>  }
+>  
+> +#ifndef CONFIG_ACPI
+> +int acpi_find_last_cache_level(unsigned int cpu)
+> +{
+> +	/*ACPI kernels should be built with PPTT support*/
+> +	return 0;
+> +}
+> +#endif
+> +
+>  static int __init_cache_level(unsigned int cpu)
+>  {
+> -	unsigned int ctype, level, leaves, of_level;
+> +	unsigned int ctype, level, leaves, fw_level;
+>  	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
+>  
+>  	for (level = 1, leaves = 0; level <= MAX_CACHE_LEVEL; level++) {
+> @@ -59,15 +68,19 @@ static int __init_cache_level(unsigned int cpu)
+>  		leaves += (ctype == CACHE_TYPE_SEPARATE) ? 2 : 1;
+>  	}
+>  
+> -	of_level = of_find_last_cache_level(cpu);
+> -	if (level < of_level) {
+> +	if (acpi_disabled)
+> +		fw_level = of_find_last_cache_level(cpu);
+> +	else
+> +		fw_level = acpi_find_last_cache_level(cpu);
+> +
+> +	if (level < fw_level) {
+>  		/*
+>  		 * some external caches not specified in CLIDR_EL1
+>  		 * the information may be available in the device tree
+>  		 * only unified external caches are considered here
+>  		 */
+> -		leaves += (of_level - level);
+> -		level = of_level;
+> +		leaves += (fw_level - level);
+> +		level = fw_level;
+>  	}
+>  
+>  	this_cpu_ci->num_levels = level;
+> diff --git a/drivers/acpi/pptt.c b/drivers/acpi/pptt.c
+> index c86715fed4a7..b5c6de37e328 100644
+> --- a/drivers/acpi/pptt.c
+> +++ b/drivers/acpi/pptt.c
+> @@ -355,6 +355,7 @@ static void update_cache_properties(struct cacheinfo *this_leaf,
+>  				    struct acpi_pptt_cache *found_cache,
+>  				    struct acpi_pptt_processor *cpu_node)
+>  {
+> +	this_leaf->firmware_node = cpu_node;
 
-There are two ways KVM can take an SError due to a guest, either may be a
-RAS error: we exit the guest due to an SError routed to EL2 by HCR_EL2.AMO,
-or we take an SError from EL2 when we unmask PSTATE.A from __guest_exit.
+This pointer comes from an ACPI static table mapping that happens
+to be permanent so it should be safe given that the mapping is carried
+out at device_initcall (ie cache_setup_acpi()) but it is not that
+obvious. More to it below.
 
-The current SError from EL2 code unmasks SError and tries to fence any
-pending SError into a single instruction window. It then leaves SError
-unmasked.
+>  	if (found_cache->flags & ACPI_PPTT_SIZE_PROPERTY_VALID)
+>  		this_leaf->size = found_cache->size;
+>  	if (found_cache->flags & ACPI_PPTT_LINE_SIZE_VALID)
+> diff --git a/drivers/base/cacheinfo.c b/drivers/base/cacheinfo.c
+> index eb3af2739537..8eca279e50d1 100644
+> --- a/drivers/base/cacheinfo.c
+> +++ b/drivers/base/cacheinfo.c
+> @@ -86,7 +86,7 @@ static int cache_setup_of_node(unsigned int cpu)
+>  static inline bool cache_leaves_are_shared(struct cacheinfo *this_leaf,
+>  					   struct cacheinfo *sib_leaf)
+>  {
+> -	return sib_leaf->of_node == this_leaf->of_node;
+> +	return sib_leaf->firmware_node == this_leaf->firmware_node;
+>  }
+>  
+>  /* OF properties to query for a given cache type */
+> @@ -215,6 +215,11 @@ static inline bool cache_leaves_are_shared(struct cacheinfo *this_leaf,
+>  }
+>  #endif
+>  
+> +int __weak cache_setup_acpi(unsigned int cpu)
+> +{
+> +	return -ENOTSUPP;
+> +}
+> +
+>  static int cache_shared_cpu_map_setup(unsigned int cpu)
+>  {
+>  	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
+> @@ -225,11 +230,11 @@ static int cache_shared_cpu_map_setup(unsigned int cpu)
+>  	if (this_cpu_ci->cpu_map_populated)
+>  		return 0;
+>  
+> -	if (of_have_populated_dt())
+> +	if (!acpi_disabled)
+> +		ret = cache_setup_acpi(cpu);
+> +	else if (of_have_populated_dt())
+>  		ret = cache_setup_of_node(cpu);
+> -	else if (!acpi_disabled)
+> -		/* No cache property/hierarchy support yet in ACPI */
+> -		ret = -ENOTSUPP;
+> +
+>  	if (ret)
+>  		return ret;
+>  
+> @@ -286,7 +291,7 @@ static void cache_shared_cpu_map_remove(unsigned int cpu)
+>  
+>  static void cache_override_properties(unsigned int cpu)
+>  {
+> -	if (of_have_populated_dt())
+> +	if (acpi_disabled && of_have_populated_dt())
+>  		return cache_of_override_properties(cpu);
+>  }
+>  
+> diff --git a/include/linux/cacheinfo.h b/include/linux/cacheinfo.h
+> index 6a524bf6a06d..d1e9b8e01981 100644
+> --- a/include/linux/cacheinfo.h
+> +++ b/include/linux/cacheinfo.h
+> @@ -36,6 +36,9 @@ enum cache_type {
+>   * @of_node: if devicetree is used, this represents either the cpu node in
+>   *	case there's no explicit cache node or the cache node itself in the
+>   *	device tree
+> + * @firmware_node: Shared with of_node. When not using DT, this may contain
+> + *	pointers to other firmware based values. Particularly ACPI/PPTT
+> + *	unique values.
+>   * @disable_sysfs: indicates whether this node is visible to the user via
+>   *	sysfs or not
+>   * @priv: pointer to any private data structure specific to particular
+> @@ -64,8 +67,10 @@ struct cacheinfo {
+>  #define CACHE_ALLOCATE_POLICY_MASK	\
+>  	(CACHE_READ_ALLOCATE | CACHE_WRITE_ALLOCATE)
+>  #define CACHE_ID		BIT(4)
+> -
+> -	struct device_node *of_node;
+> +	union {
+> +		struct device_node *of_node;
+> +		void *firmware_node;
+> +	};
 
-With the v8.2 RAS Extensions we may take an SError for a 'corrected'
-error, but KVM is only able to handle SError from EL2 if they occur
-during this single instruction window...
+How about turning of_node into a struct fwnode_handle* (and allocate
+one for each PPTT cache node - acpi_static_fwnode - to have the
+ACPI counterpart) ?
 
-The RAS Extensions give us a new instruction to synchronise and
-consume SErrors. The RAS Extensions document (ARM DDI0587),
-'2.4.1 ESB and Unrecoverable errors' describes ESB as synchronising
-SError interrupts generated by 'instructions, translation table walks,
-hardware updates to the translation tables, and instruction fetches on
-the same PE'. This makes ESB equivalent to KVMs existing
-'dsb, mrs-daifclr, isb' sequence.
+It will make more churn given that that pointer is just used to
+carry out a pointer comparison but it's also a bit more elegant.
 
-Use the alternatives to synchronise and consume any SError using ESB
-instead of unmasking and taking the SError. Set ARM_EXIT_WITH_SERROR_BIT
-in the exit_code so that we can restart the vcpu if it turns out this
-SError has no impact on the vcpu.
+Lorenzo
 
-Signed-off-by: James Morse <james.morse@arm.com>
-
----
-Changes since v3:
- * Moved that nop out of the firing line
-
- arch/arm64/include/asm/kvm_emulate.h |  5 +++++
- arch/arm64/include/asm/kvm_host.h    |  1 +
- arch/arm64/kernel/asm-offsets.c      |  1 +
- arch/arm64/kvm/handle_exit.c         | 10 +++++++++-
- arch/arm64/kvm/hyp/entry.S           | 13 +++++++++++++
- 5 files changed, 29 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index 8a7a838eb17a..8274d16df3cd 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -173,6 +173,11 @@ static inline phys_addr_t kvm_vcpu_get_fault_ipa(const struct kvm_vcpu *vcpu)
- 	return ((phys_addr_t)vcpu->arch.fault.hpfar_el2 & HPFAR_MASK) << 8;
- }
- 
-+static inline u64 kvm_vcpu_get_disr(const struct kvm_vcpu *vcpu)
-+{
-+	return vcpu->arch.fault.disr_el1;
-+}
-+
- static inline u32 kvm_vcpu_hvc_get_imm(const struct kvm_vcpu *vcpu)
- {
- 	return kvm_vcpu_get_hsr(vcpu) & ESR_ELx_xVC_IMM_MASK;
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 97438cc3a9ad..cf5d78ba14b5 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -89,6 +89,7 @@ struct kvm_vcpu_fault_info {
- 	u32 esr_el2;		/* Hyp Syndrom Register */
- 	u64 far_el2;		/* Hyp Fault Address Register */
- 	u64 hpfar_el2;		/* Hyp IPA Fault Address Register */
-+	u64 disr_el1;		/* Deferred [SError] Status Register */
- };
- 
- /*
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 71bf088f1e4b..121889c49542 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -130,6 +130,7 @@ int main(void)
-   BLANK();
- #ifdef CONFIG_KVM_ARM_HOST
-   DEFINE(VCPU_CONTEXT,		offsetof(struct kvm_vcpu, arch.ctxt));
-+  DEFINE(VCPU_FAULT_DISR,	offsetof(struct kvm_vcpu, arch.fault.disr_el1));
-   DEFINE(CPU_GP_REGS,		offsetof(struct kvm_cpu_context, gp_regs));
-   DEFINE(CPU_USER_PT_REGS,	offsetof(struct kvm_regs, regs));
-   DEFINE(CPU_FP_REGS,		offsetof(struct kvm_regs, fp_regs));
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index 345fdbba6c2e..e1e6cfe7d4d9 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -23,6 +23,7 @@
- #include <linux/kvm_host.h>
- 
- #include <asm/esr.h>
-+#include <asm/exception.h>
- #include <asm/kvm_asm.h>
- #include <asm/kvm_coproc.h>
- #include <asm/kvm_emulate.h>
-@@ -208,7 +209,14 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 			*vcpu_pc(vcpu) -= adj;
- 		}
- 
--		kvm_inject_vabt(vcpu);
-+		if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN)) {
-+			u64 disr = kvm_vcpu_get_disr(vcpu);
-+
-+			kvm_handle_guest_serror(vcpu, disr_to_esr(disr));
-+		} else {
-+			kvm_inject_vabt(vcpu);
-+		}
-+
- 		return 1;
- 	}
- 
-diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
-index 12ee62d6d410..024c7afc78f8 100644
---- a/arch/arm64/kvm/hyp/entry.S
-+++ b/arch/arm64/kvm/hyp/entry.S
-@@ -124,6 +124,17 @@ ENTRY(__guest_exit)
- 	// Now restore the host regs
- 	restore_callee_saved_regs x2
- 
-+alternative_if ARM64_HAS_RAS_EXTN
-+	// If we have the RAS extensions we can consume a pending error
-+	// without an unmask-SError and isb.
-+	esb
-+	mrs_s	x2, SYS_DISR_EL1
-+	str	x2, [x1, #(VCPU_FAULT_DISR - VCPU_CONTEXT)]
-+	cbz	x2, 1f
-+	msr_s	SYS_DISR_EL1, xzr
-+	orr	x0, x0, #(1<<ARM_EXIT_WITH_SERROR_BIT)
-+1:	ret
-+alternative_else
- 	// If we have a pending asynchronous abort, now is the
- 	// time to find out. From your VAXorcist book, page 666:
- 	// "Threaten me not, oh Evil one!  For I speak with
-@@ -134,7 +145,9 @@ ENTRY(__guest_exit)
- 	mov	x5, x0
- 
- 	dsb	sy		// Synchronize against in-flight ld/st
-+	nop
- 	msr	daifclr, #4	// Unmask aborts
-+alternative_endif
- 
- 	// This is our single instruction exception window. A pending
- 	// SError is guaranteed to occur@the earliest when we unmask
--- 
-2.13.3
+>  	bool disable_sysfs;
+>  	void *priv;
+>  };
+> @@ -98,6 +103,8 @@ int func(unsigned int cpu)					\
+>  struct cpu_cacheinfo *get_cpu_cacheinfo(unsigned int cpu);
+>  int init_cache_level(unsigned int cpu);
+>  int populate_cache_leaves(unsigned int cpu);
+> +int cache_setup_acpi(unsigned int cpu);
+> +int acpi_find_last_cache_level(unsigned int cpu);
+>  
+>  const struct attribute_group *cache_get_priv_group(struct cacheinfo *this_leaf);
+>  
+> -- 
+> 2.13.5
+> 
