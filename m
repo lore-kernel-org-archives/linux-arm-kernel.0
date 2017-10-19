@@ -1,87 +1,82 @@
 From: james.morse@arm.com (James Morse)
-Date: Thu, 19 Oct 2017 15:58:02 +0100
-Subject: [PATCH v4 16/21] KVM: arm64: Save/Restore guest DISR_EL1
+Date: Thu, 19 Oct 2017 15:57:55 +0100
+Subject: [PATCH v4 09/21] KVM: arm/arm64: mask/unmask daif around VHE guests
 In-Reply-To: <20171019145807.23251-1-james.morse@arm.com>
 References: <20171019145807.23251-1-james.morse@arm.com>
-Message-ID: <20171019145807.23251-17-james.morse@arm.com>
+Message-ID: <20171019145807.23251-10-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we deliver a virtual SError to the guest, the guest may defer it
-with an ESB instruction. The guest reads the deferred value via DISR_EL1,
-but the guests view of DISR_EL1 is re-mapped to VDISR_EL2 when HCR_EL2.AMO
-is set.
+Non-VHE systems take an exception to EL2 in order to world-switch into the
+guest. When returning from the guest KVM implicitly restores the DAIF
+flags when it returns to the kernel at EL1.
 
-Add the KVM code to save/restore VDISR_EL2, and make it accessible to
-userspace as DISR_EL1.
+With VHE none of this exception-level jumping happens, so KVMs
+world-switch code is exposed to the host kernel's DAIF values, and KVM
+spills the guest-exit DAIF values back into the host kernel.
+On entry to a guest we have Debug and SError exceptions unmasked, KVM
+has switched VBAR but isn't prepared to handle these. On guest exit
+Debug exceptions are left disabled once we return to the host and will
+stay this way until we enter user space.
+
+Add a helper to mask/unmask DAIF around VHE guests. The unmask can only
+happen after the hosts VBAR value has been synchronised by the isb in
+__vhe_hyp_call (via kvm_call_hyp()). Masking could be as late as
+setting KVMs VBAR value, but is kept here for symmetry.
 
 Signed-off-by: James Morse <james.morse@arm.com>
+
 ---
- arch/arm64/include/asm/kvm_host.h | 1 +
- arch/arm64/include/asm/sysreg.h   | 1 +
- arch/arm64/kvm/hyp/sysreg-sr.c    | 6 ++++++
- arch/arm64/kvm/sys_regs.c         | 1 +
- 4 files changed, 9 insertions(+)
+Give me a kick if you want this reworked as a fix (which will then
+conflict with this series), or a backportable version.
+
+ arch/arm64/include/asm/kvm_host.h | 10 ++++++++++
+ virt/kvm/arm/arm.c                |  4 ++++
+ 2 files changed, 14 insertions(+)
 
 diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 28a4de85edee..97438cc3a9ad 100644
+index e923b58606e2..a0e2f7962401 100644
 --- a/arch/arm64/include/asm/kvm_host.h
 +++ b/arch/arm64/include/asm/kvm_host.h
-@@ -120,6 +120,7 @@ enum vcpu_sysreg {
- 	PAR_EL1,	/* Physical Address Register */
- 	MDSCR_EL1,	/* Monitor Debug System Control Register */
- 	MDCCINT_EL1,	/* Monitor Debug Comms Channel Interrupt Enable Reg */
-+	DISR_EL1,	/* Deferred Interrupt Status Register */
- 
- 	/* Performance Monitors Registers */
- 	PMCR_EL0,	/* Control Register */
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index a493e93de296..1b8b9012234d 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -256,6 +256,7 @@
- #define SYS_VSESR_EL2			sys_reg(3, 4, 5, 2, 3)
- #define SYS_FPEXC32_EL2			sys_reg(3, 4, 5, 3, 0)
- 
-+#define SYS_VDISR_EL2			sys_reg(3, 4, 12, 1,  1)
- #define __SYS__AP0Rx_EL2(x)		sys_reg(3, 4, 12, 8, x)
- #define SYS_ICH_AP0R0_EL2		__SYS__AP0Rx_EL2(0)
- #define SYS_ICH_AP0R1_EL2		__SYS__AP0Rx_EL2(1)
-diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-index 934137647837..f4d604803b29 100644
---- a/arch/arm64/kvm/hyp/sysreg-sr.c
-+++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-@@ -66,6 +66,9 @@ static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
- 	ctxt->gp_regs.sp_el1		= read_sysreg(sp_el1);
- 	ctxt->gp_regs.elr_el1		= read_sysreg_el1(elr);
- 	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg_el1(spsr);
-+
-+	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN))
-+		ctxt->sys_regs[DISR_EL1] = read_sysreg_s(SYS_VDISR_EL2);
+@@ -25,6 +25,7 @@
+ #include <linux/types.h>
+ #include <linux/kvm_types.h>
+ #include <asm/cpufeature.h>
++#include <asm/daifflags.h>
+ #include <asm/kvm.h>
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_mmio.h>
+@@ -384,4 +385,13 @@ static inline void __cpu_init_stage2(void)
+ 		  "PARange is %d bits, unsupported configuration!", parange);
  }
  
- static hyp_alternate_select(__sysreg_call_save_host_state,
-@@ -119,6 +122,9 @@ static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
- 	write_sysreg(ctxt->gp_regs.sp_el1,		sp_el1);
- 	write_sysreg_el1(ctxt->gp_regs.elr_el1,		elr);
- 	write_sysreg_el1(ctxt->gp_regs.spsr[KVM_SPSR_EL1],spsr);
++static inline void kvm_arm_vhe_guest_enter(void)
++{
++	local_daif_mask();
++}
 +
-+	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN))
-+		write_sysreg_s(ctxt->sys_regs[DISR_EL1], SYS_VDISR_EL2);
- }
++static inline void kvm_arm_vhe_guest_exit(void)
++{
++	local_daif_restore(DAIF_PROCCTX_NOIRQ);
++}
+ #endif /* __ARM64_KVM_HOST_H__ */
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index b9f68e4add71..665529924b34 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -698,9 +698,13 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		 */
+ 		trace_kvm_entry(*vcpu_pc(vcpu));
+ 		guest_enter_irqoff();
++		if (has_vhe())
++			kvm_arm_vhe_guest_enter();
  
- static hyp_alternate_select(__sysreg_call_restore_host_state,
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 2e070d3baf9f..713275b501ce 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -963,6 +963,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	{ SYS_DESC(SYS_AMAIR_EL1), access_vm_reg, reset_amair_el1, AMAIR_EL1 },
+ 		ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);
  
- 	{ SYS_DESC(SYS_VBAR_EL1), NULL, reset_val, VBAR_EL1, 0 },
-+	{ SYS_DESC(SYS_DISR_EL1), NULL, reset_val, DISR_EL1, 0 },
- 
- 	{ SYS_DESC(SYS_ICC_IAR0_EL1), write_to_read_only },
- 	{ SYS_DESC(SYS_ICC_EOIR0_EL1), read_from_write_only },
++		if (has_vhe())
++			kvm_arm_vhe_guest_exit();
+ 		vcpu->mode = OUTSIDE_GUEST_MODE;
+ 		vcpu->stat.exits++;
+ 		/*
 -- 
 2.13.3
