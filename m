@@ -1,27 +1,20 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 19 Oct 2017 12:18:22 +0200
-Subject: [PATCH 0/2] Introduce new DT files for Meson-AXG SoC
-In-Reply-To: <20171013231313.22850-1-dlan@gentoo.org> (Yixun Lan's message of
- "Sat, 14 Oct 2017 07:13:11 +0800")
-References: <20171013231313.22850-1-dlan@gentoo.org>
-Message-ID: <7hfuafzbip.fsf@baylibre.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 19 Oct 2017 08:17:36 -0200
+Subject: [PATCH v2] ARM: dts: imx: add ZII RDU1 board
+In-Reply-To: <20171018172618.11318-1-l.stach@pengutronix.de>
+References: <20171018172618.11318-1-l.stach@pengutronix.de>
+Message-ID: <CAOMZO5CTew39uFNZ_ZF4U4=Lq1HyezgFFRt4Ow1V8eVybvHTqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yixun Lan <dlan@gentoo.org> writes:
-
-> This attempt will try to add new DT files to support Meson-AXG SoC.
-> Due to the AXG series has new memory layout, we decide to start a new
-> DT structure without sharing with previous meson-gx.dtsi
+On Wed, Oct 18, 2017 at 3:26 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> This adds support for the Zodiac Inflight Innovations RDU1 board,
+> which is based on the i.MX51.
 >
-> 1) in the first patch, we try to document the new Meson-AXG bindings
-> 2) in the second patch, we try to bring up a minimal serial console,
-> so it's capable of running a minimal system (in ramdisk).
+> It is the predecessor of the already supported ZII RDU2 board and
+> relies on the bootloader in the same way to enable correct display
+> and touchscreen nodes.
 >
-> Yixun Lan (2):
->   dt-bindings: arm: amlogic: Add Meson AXG binding
->   arm64: dts: meson-axg: add initial A113D SoC DT support
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 
-Applied to v4.15/dt64 with reviews and acks.
-
-Kevin
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
