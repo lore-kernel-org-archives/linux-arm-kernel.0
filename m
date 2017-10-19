@@ -1,17 +1,25 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Oct 2017 22:46:58 +0200
-Subject: [GIT PULL 4/4] ARM: deffconfig: Pull for v4.15
-In-Reply-To: <20171015074825.11338-2-krzk@kernel.org>
-References: <20171015074825.11338-1-krzk@kernel.org>
- <20171015074825.11338-2-krzk@kernel.org>
-Message-ID: <CAK8P3a1-H7HNYv1OYW1R7+KCBCXcY3=syNy8KKYfjHKgM46BSA@mail.gmail.com>
+Date: Thu, 19 Oct 2017 22:40:39 +0200
+Subject: [PATCH] arm64: defconfig: Enable QCOM_IOMMU
+In-Reply-To: <20171011170006.GQ1165@minitux>
+References: <20171011151925.30909-1-nicolas.dechesne@linaro.org>
+ <20171011170006.GQ1165@minitux>
+Message-ID: <CAK8P3a3LODdQUfdrWEms-SaEE-=N4evbsXK9_djBwmsH0FxkNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 15, 2017 at 9:48 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> Samsung defconfig changes for v4.15
+On Wed, Oct 11, 2017 at 7:00 PM, Bjorn Andersson
+<bjorn.andersson@linaro.org> wrote:
+> On Wed 11 Oct 08:19 PDT 2017, Nicolas Dechesne wrote:
 >
-> 1. Enable USB3503 on multi_v7 for Odroid U3.
-> 2. Enable USB Attached SCSI for Odroid HC1.
+>> Enable QCOM IOMMU driver for 'B' family devices, such as APQ8016 found on the
+>> Dragonboard 410c. With this change, graphics console and GPU are working
+>> fine (using mesa/freedreno for GPU driver).
+>>
+>> Signed-off-by: Nicolas Dechesne <nicolas.dechesne@linaro.org>
+>
+> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 
-Pulled into next/soc, thanks!
+Applied to next/soc, thanks!
+
+       Arnd
