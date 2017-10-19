@@ -1,42 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 19 Oct 2017 10:58:38 +0100
-Subject: [PATCH] arm64: Update fault_info table with new exception types
-In-Reply-To: <1508245890-18093-1-git-send-email-julien.thierry@arm.com>
-References: <1508245890-18093-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <20171019095837.GC30231@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Thu, 19 Oct 2017 11:11:46 +0100
+Subject: compile error in 4.14-rc5 with nvidia tegra enabled
+In-Reply-To: <20171019084210.lql5kffhluvxvquu@lemon.iwr.uni-heidelberg.de>
+References: <20171019084210.lql5kffhluvxvquu@lemon.iwr.uni-heidelberg.de>
+Message-ID: <d006a085-d81f-4632-35c9-4e9d607a6504@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 02:11:30PM +0100, Julien Thierry wrote:
-> Based on: ARM Architecture Reference Manual, ARMv8 (DDI 0487B.b).
-> 
-> ARMv8.1 introduces the optional feature ARMv8.1-TTHM which can trigger a
-> new type of memory abort. This exception is triggered when hardware update
-> of page table flags is not atomic in regards to other memory accesses.
-> Replace the corresponding unknown entry with a more accurate one.
-> 
-> Cf: Section D10.2.28 ESR_ELx, Exception Syndrome Register (p D10-2381),
-> section D4.4.11 Restriction on memory types for hardware updates on page
-> tables (p D4-2116 - D4-2117).
-> 
-> ARMv8.2 does not add new exception types, however it is worth mentioning
-> that when obligatory feature RAS (optional for ARMv8.{0,1}) is implemented,
-> exceptions related to "Synchronous parity or ECC error on memory access,
-> not on translation table walk" become reserved and should not occur.
-> 
-> Cf: Section D10.2.28 ESR_ELx, Exception Syndrome Register (p D10-2381).
-> 
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Adding linux-tegra and Mikko ...
 
-I've queued this, but I dropped the end of your commit message because it
-looks weirdly corrupted.
+On 19/10/17 09:42, Hermann Lauer wrote:
+> Hello,
+> compiling 4.14-rc{4,5} with a debian testing arm config yields the attached
+> error. Disabling the Nvidia tegra architecture (unneeded on
+> Banana{Pro,Pi,Ultra}) helps.
+> 
+> Thanks,
+>  greetings
+>    Hermann
+> 
+>   CC [M]  drivers/gpu/host1x/cdma.o                                                                             
+> drivers/gpu/host1x/cdma.c: In function ?host1x_pushbuffer_init?:                                                
+> drivers/gpu/host1x/cdma.c:94:48: error: passing argument 3 of ?dma_alloc_wc? from incompatible pointer type [-We
+> rror=incompatible-pointer-types]                                                                                
+>    pb->mapped = dma_alloc_wc(host1x->dev, size, &pb->phys,                                                      
+>                                                 ^                                                               
+> In file included from drivers/gpu/host1x/cdma.c:22:0:                                                           
+> ./include/linux/dma-mapping.h:780:21: note: expected ?dma_addr_t * {aka long long unsigned int *}? but argument 
+> is of type ?phys_addr_t * {aka unsigned int *}?                                                                 
+>  static inline void *dma_alloc_wc(struct device *dev, size_t size,                                              
+>                      ^~~~~~~~~~~~                                                                               
+> drivers/gpu/host1x/cdma.c:113:48: error: passing argument 3 of ?dma_alloc_wc? from incompatible pointer type [-W
+> error=incompatible-pointer-types]                                                                               
+>    pb->mapped = dma_alloc_wc(host1x->dev, size, &pb->phys,                                                      
+>                                                 ^                                                               
+> In file included from drivers/gpu/host1x/cdma.c:22:0:                                                           
+> ./include/linux/dma-mapping.h:780:21: note: expected ?dma_addr_t * {aka long long unsigned int *}? but argument 
+> is of type ?phys_addr_t * {aka unsigned int *}?                                                                 
+>  static inline void *dma_alloc_wc(struct device *dev, size_t size,                                              
+>                      ^~~~~~~~~~~~                                                                               
+>   CC [M]  drivers/hid/hid-ntrig.o                                                                               
+> cc1: some warnings being treated as errors                                                                      
 
-Will
+Thanks for the report. I don't see this. What config and toolchain are
+you using?
 
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> ---
->  arch/arm64/mm/fault.c | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
+Mikko, have you seen this?
+
+Cheers
+Jon
+
+-- 
+nvpublic
