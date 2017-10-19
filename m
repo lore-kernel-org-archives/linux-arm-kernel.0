@@ -1,82 +1,88 @@
 From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Thu, 19 Oct 2017 11:48:08 +0800
-Subject: [PATCH v6 06/10] drm/rockchip: dw-mipi-dsi: Fix error handling path
+Date: Thu, 19 Oct 2017 11:48:09 +0800
+Subject: [PATCH v6 07/10] drm/rockchip: inno_hdmi: Fix error handling path
 In-Reply-To: <20171019034812.13768-1-jeffy.chen@rock-chips.com>
 References: <20171019034812.13768-1-jeffy.chen@rock-chips.com>
-Message-ID: <20171019034812.13768-7-jeffy.chen@rock-chips.com>
+Message-ID: <20171019034812.13768-8-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing pm_runtime_disable() in bind()'s error handling path.
+Add missing error handling in bind().
 
-Also cleanup encoder & connector in unbind().
-
-Fixes: 80a9a059d4e4 ("drm/rockchip/dsi: add dw-mipi power domain support")
+Fixes: 412d4ae6b7a5 ("drm/rockchip: hdmi: add Innosilicon HDMI support")
 Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 ---
 
 Changes in v6: None
 Changes in v5:
 Call the destroy hook in the error handling path like in unbind().
+Update cleanup order in unbind().
 
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 21 +++++++++++++--------
- 1 file changed, 13 insertions(+), 8 deletions(-)
+ drivers/gpu/drm/rockchip/inno_hdmi.c | 22 +++++++++++++++++-----
+ 1 file changed, 17 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index b15755b6129c..e72d4e2b61aa 100644
---- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-+++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -1282,7 +1282,7 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
- 	ret = dw_mipi_dsi_register(drm, dsi);
- 	if (ret) {
- 		DRM_DEV_ERROR(dev, "Failed to register mipi_dsi: %d\n", ret);
--		goto err_pllref;
-+		goto err_disable_pllref;
+diff --git a/drivers/gpu/drm/rockchip/inno_hdmi.c b/drivers/gpu/drm/rockchip/inno_hdmi.c
+index ee584d87111f..9a96ff6b022b 100644
+--- a/drivers/gpu/drm/rockchip/inno_hdmi.c
++++ b/drivers/gpu/drm/rockchip/inno_hdmi.c
+@@ -851,8 +851,10 @@ static int inno_hdmi_bind(struct device *dev, struct device *master,
  	}
  
- 	pm_runtime_enable(dev);
-@@ -1292,23 +1292,24 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
- 	ret = mipi_dsi_host_register(&dsi->dsi_host);
- 	if (ret) {
- 		DRM_DEV_ERROR(dev, "Failed to register MIPI host: %d\n", ret);
--		goto err_cleanup;
-+		goto err_disable_pm_runtime;
+ 	irq = platform_get_irq(pdev, 0);
+-	if (irq < 0)
+-		return irq;
++	if (irq < 0) {
++		ret = irq;
++		goto err_disable_clk;
++	}
+ 
+ 	inno_hdmi_reset(hdmi);
+ 
+@@ -860,7 +862,7 @@ static int inno_hdmi_bind(struct device *dev, struct device *master,
+ 	if (IS_ERR(hdmi->ddc)) {
+ 		ret = PTR_ERR(hdmi->ddc);
+ 		hdmi->ddc = NULL;
+-		return ret;
++		goto err_disable_clk;
  	}
  
- 	if (!dsi->panel) {
- 		ret = -EPROBE_DEFER;
--		goto err_mipi_dsi_host;
-+		goto err_unreg_mipi_dsi_host;
- 	}
+ 	/*
+@@ -874,7 +876,7 @@ static int inno_hdmi_bind(struct device *dev, struct device *master,
  
- 	dev_set_drvdata(dev, dsi);
- 	return 0;
+ 	ret = inno_hdmi_register(drm, hdmi);
+ 	if (ret)
+-		return ret;
++		goto err_put_adapter;
  
--err_mipi_dsi_host:
-+err_unreg_mipi_dsi_host:
- 	mipi_dsi_host_unregister(&dsi->dsi_host);
--err_cleanup:
--	drm_encoder_cleanup(&dsi->encoder);
--	drm_connector_cleanup(&dsi->connector);
--err_pllref:
-+err_disable_pm_runtime:
-+	pm_runtime_disable(dev);
-+	dsi->connector.funcs->destroy(&dsi->connector);
-+	dsi->encoder.funcs->destroy(&dsi->encoder);
-+err_disable_pllref:
- 	clk_disable_unprepare(dsi->pllref_clk);
+ 	dev_set_drvdata(dev, hdmi);
+ 
+@@ -884,7 +886,17 @@ static int inno_hdmi_bind(struct device *dev, struct device *master,
+ 	ret = devm_request_threaded_irq(dev, irq, inno_hdmi_hardirq,
+ 					inno_hdmi_irq, IRQF_SHARED,
+ 					dev_name(dev), hdmi);
++	if (ret < 0)
++		goto err_cleanup_hdmi;
+ 
++	return 0;
++err_cleanup_hdmi:
++	hdmi->connector.funcs->destroy(&hdmi->connector);
++	hdmi->encoder.funcs->destroy(&hdmi->encoder);
++err_put_adapter:
++	i2c_put_adapter(hdmi->ddc);
++err_disable_clk:
++	clk_disable_unprepare(hdmi->pclk);
  	return ret;
  }
-@@ -1320,6 +1321,10 @@ static void dw_mipi_dsi_unbind(struct device *dev, struct device *master,
  
- 	mipi_dsi_host_unregister(&dsi->dsi_host);
- 	pm_runtime_disable(dev);
-+
-+	dsi->connector.funcs->destroy(&dsi->connector);
-+	dsi->encoder.funcs->destroy(&dsi->encoder);
-+
- 	clk_disable_unprepare(dsi->pllref_clk);
+@@ -896,8 +908,8 @@ static void inno_hdmi_unbind(struct device *dev, struct device *master,
+ 	hdmi->connector.funcs->destroy(&hdmi->connector);
+ 	hdmi->encoder.funcs->destroy(&hdmi->encoder);
+ 
+-	clk_disable_unprepare(hdmi->pclk);
+ 	i2c_put_adapter(hdmi->ddc);
++	clk_disable_unprepare(hdmi->pclk);
  }
  
+ static const struct component_ops inno_hdmi_ops = {
 -- 
 2.11.0
