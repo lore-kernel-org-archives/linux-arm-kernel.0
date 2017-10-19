@@ -1,33 +1,48 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 19 Oct 2017 09:29:03 +0900
-Subject: [PATCH net-next v2 2/2] net: ethernet: socionext: add AVE
- ethernet driver
-In-Reply-To: <20171018192359.243C.4A936039@socionext.com>
-References: <1507854928-4357-3-git-send-email-hayashi.kunihiko@socionext.com>
- <CAK7LNAR0Dy0aUjQKw7YxSbXZkpjn=1B7_knkSed6=EDVzL6v9w@mail.gmail.com>
- <20171018192359.243C.4A936039@socionext.com>
-Message-ID: <CAK7LNARuoK-M9iKyP7JxRgH7naA+teikqZMOHm3f2wykEieqLw@mail.gmail.com>
+Date: Thu, 19 Oct 2017 09:52:46 +0900
+Subject: [PATCH] clk: uniphier: fix parent of miodmac clock data
+Message-ID: <1508374366-27171-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-10-18 19:23 GMT+09:00 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>:
-> On Mon, 16 Oct 2017 00:08:21 +0900 <yamada.masahiro@socionext.com> wrote:
+The "miodmac" is not a child of "stdmac".  They are independent
+from each other.  Fix it.
 
->> priv->rst = devm_reset_control_get_optional_shared(dev, NULL);
->> if (IS_ERR(priv->rst))
->>           return PTR_ERR(priv->rst);
->
-> The clk and reset are optional in the driver.
-> Referring to your suggested method, I'll fix the part of clk and reset.
->
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
+ drivers/clk/uniphier/clk-uniphier-mio.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-Why is clk optional?
-
-
-
-
-
+diff --git a/drivers/clk/uniphier/clk-uniphier-mio.c b/drivers/clk/uniphier/clk-uniphier-mio.c
+index 16e4d30..badc478 100644
+--- a/drivers/clk/uniphier/clk-uniphier-mio.c
++++ b/drivers/clk/uniphier/clk-uniphier-mio.c
+@@ -13,6 +13,8 @@
+  * GNU General Public License for more details.
+  */
+ 
++#include <linux/stddef.h>
++
+ #include "clk-uniphier.h"
+ 
+ #define UNIPHIER_MIO_CLK_SD_FIXED					\
+@@ -73,15 +75,12 @@
+ #define UNIPHIER_MIO_CLK_USB2_PHY(idx, ch)				\
+ 	UNIPHIER_CLK_GATE("usb2" #ch "-phy", (idx), "usb2", 0x20 + 0x200 * (ch), 29)
+ 
+-#define UNIPHIER_MIO_CLK_DMAC(idx)					\
+-	UNIPHIER_CLK_GATE("miodmac", (idx), "stdmac", 0x20, 25)
+-
+ const struct uniphier_clk_data uniphier_ld4_mio_clk_data[] = {
+ 	UNIPHIER_MIO_CLK_SD_FIXED,
+ 	UNIPHIER_MIO_CLK_SD(0, 0),
+ 	UNIPHIER_MIO_CLK_SD(1, 1),
+ 	UNIPHIER_MIO_CLK_SD(2, 2),
+-	UNIPHIER_MIO_CLK_DMAC(7),
++	UNIPHIER_CLK_GATE("miodmac", 7, NULL, 0x20, 25),
+ 	UNIPHIER_MIO_CLK_USB2(8, 0),
+ 	UNIPHIER_MIO_CLK_USB2(9, 1),
+ 	UNIPHIER_MIO_CLK_USB2(10, 2),
 -- 
-Best Regards
-Masahiro Yamada
+2.7.4
