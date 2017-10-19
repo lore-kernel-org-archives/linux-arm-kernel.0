@@ -1,96 +1,45 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 19 Oct 2017 10:12:50 +0100
-Subject: [PATCH v3 2/7] ACPI: Enable PPTT support on ARM64
-In-Reply-To: <889154d0-ed39-1621-83ee-1084674ee963@arm.com>
-References: <20171012194856.13844-1-jeremy.linton@arm.com>
- <20171012194856.13844-3-jeremy.linton@arm.com>
- <20171018164723.GA15924@red-moon>
- <889154d0-ed39-1621-83ee-1084674ee963@arm.com>
-Message-ID: <20171019091250.GA17450@red-moon>
+From: hch@lst.de (Christoph Hellwig)
+Date: Thu, 19 Oct 2017 11:16:44 +0200
+Subject: [PATCH 5/9] PCI: host: brcmstb: add dma-ranges for inbound traffic
+In-Reply-To: <CANCKTBv+yiCNsrnx3m+W9wPqC4NdKPZ2p=zLtSa8fX6v1rPcYQ@mail.gmail.com>
+References: <1507761269-7017-1-git-send-email-jim2101024@gmail.com>
+ <1507761269-7017-6-git-send-email-jim2101024@gmail.com>
+ <589c04cb-061b-a453-3188-79324a02388e@arm.com>
+ <20171017081422.GA19475@lst.de>
+ <CANCKTBsCB+x2XgrND9AhRtxPkCXfps1nA+YymkZjKHOUZfjSHQ@mail.gmail.com>
+ <20171018065316.GA11183@lst.de>
+ <CANCKTBv+yiCNsrnx3m+W9wPqC4NdKPZ2p=zLtSa8fX6v1rPcYQ@mail.gmail.com>
+Message-ID: <20171019091644.GA14983@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 18, 2017 at 12:38:46PM -0500, Jeremy Linton wrote:
-> On 10/18/2017 11:47 AM, Lorenzo Pieralisi wrote:
-> >On Thu, Oct 12, 2017 at 02:48:51PM -0500, Jeremy Linton wrote:
-> >>Now that we have a PPTT parser, in preparation for its use
-> >>on arm64, lets build it.
-> >>
-> >>Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> >>---
-> >>  arch/arm64/Kconfig         | 1 +
-> >>  drivers/acpi/Makefile      | 1 +
-> >>  drivers/acpi/arm64/Kconfig | 3 +++
-> >>  3 files changed, 5 insertions(+)
-> >>
-> >>diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> >>index 0df64a6a56d4..68c9d1289735 100644
-> >>--- a/arch/arm64/Kconfig
-> >>+++ b/arch/arm64/Kconfig
-> >>@@ -7,6 +7,7 @@ config ARM64
-> >>  	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
-> >>  	select ACPI_MCFG if ACPI
-> >>  	select ACPI_SPCR_TABLE if ACPI
-> >>+	select ACPI_PPTT if ACPI
-> >>  	select ARCH_CLOCKSOURCE_DATA
-> >>  	select ARCH_HAS_DEBUG_VIRTUAL
-> >>  	select ARCH_HAS_DEVMEM_IS_ALLOWED
-> >>diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-> >>index 90265ab4437a..c92a0c937551 100644
-> >>--- a/drivers/acpi/Makefile
-> >>+++ b/drivers/acpi/Makefile
-> >>@@ -85,6 +85,7 @@ obj-$(CONFIG_ACPI_BGRT)		+= bgrt.o
-> >>  obj-$(CONFIG_ACPI_CPPC_LIB)	+= cppc_acpi.o
-> >>  obj-$(CONFIG_ACPI_SPCR_TABLE)	+= spcr.o
-> >>  obj-$(CONFIG_ACPI_DEBUGGER_USER) += acpi_dbg.o
-> >>+obj-$(CONFIG_ACPI_PPTT) 	+= pptt.o
-> >>  # processor has its own "processor." module_param namespace
-> >>  processor-y			:= processor_driver.o
-> >>diff --git a/drivers/acpi/arm64/Kconfig b/drivers/acpi/arm64/Kconfig
-> >>index 5a6f80fce0d6..74b855a669ea 100644
-> >>--- a/drivers/acpi/arm64/Kconfig
-> >>+++ b/drivers/acpi/arm64/Kconfig
-> >>@@ -7,3 +7,6 @@ config ACPI_IORT
-> >>  config ACPI_GTDT
-> >>  	bool
-> >>+
-> >>+config ACPI_PPTT
-> >>+	bool
-> >>\ No newline at end of file
-> >
-> >I do not understand the logic. Why should we have a Kconfig option
-> >in drivers/acpi/arm64 for code in drivers/acpi ?
-> >
-> >AFAIK PPTT is not an ACPI ARM64 specific binding.
-> 
-> Weird hu? Originally I had the whole shebang in arm64 because the
-> x86 (or whatever) bindings have not been written. My assumption is
-> that once that part had been provided it could be moved.
+On Wed, Oct 18, 2017 at 10:41:17AM -0400, Jim Quinlan wrote:
+> That's what brcm_to_{pci,cpu} are for -- they keep a list of the
+> dma-ranges given in the PCIe DT node, and translate from system memory
+> addresses to pci-space addresses, and vice versa.  As long as people
+> are using the DMA API it should work.  It works for all of the ARM,
+> ARM64, and MIPS Broadcom systems I've tested, using eight different EP
+> devices.  Note that I am not thrilled to be advocating this mechanism
+> but it seemed the best alternative.
 
-Which part ? I asked because AFAICS the bindings are completely
-generic (and are meant to be so).
+Say we are using your original example ranges:
 
-> The config is sort of an artifact and "easier" to move than the
-> whole file. But, as Hanjun has also been complaining about it I've
-> agreed to move it to the "correct" location but keep it in the arm64
-> wrapper. Of course I think that is a bit strange too, but
-> whatever...
+ memc0-a@[        0....3fffffff] <=> pci@[        0....3fffffff]
+ memc0-b@[100000000...13fffffff] <=> pci@[ 40000000....7fffffff]
+ memc1-a@[ 40000000....7fffffff] <=> pci@[ 80000000....bfffffff]
+ memc1-b@[300000000...33fffffff] <=> pci@[ c0000000....ffffffff]
+ memc2-a@[ 80000000....bfffffff] <=> pci@[100000000...13fffffff]
+ memc2-b@[c00000000...c3fffffff] <=> pci@[140000000...17fffffff]
 
-I do not want to cavil but either you have Kconfig and code in
-drivers/acpi or drivers/acpi/arm64 - I would not understand a
-mix of the two.
+and now you get a dma mapping request for physical addresses
+3fffff00 to 4000000f, which would span two of your ranges.  How
+is this going to work?
 
-To reiterate the point, PPTT is not an ARM64 specific binding so
-IMO it does not belong in drivers/acpi/arm64.
+> I would prefer that the same code work for all three architectures.
+> What I would like from ARM/ARM64 is the ability to override
+> phys_to_dma() and dma_to_phys(); I thought the chances of that being
+> accepted would be slim.  But you are right, I should ask the
+> maintainers.
 
-> Once the arm64 side of things are all wrapped up (and I can come up
-> for some air) I willing to help with bindings on other architectures
-> if anyone is truly interested.  But, I view that whole exercise as
-> more a "bug" fixing one than providing any real benefit at this
-> point.
-
-Please define "bindings on other architectures" because I do not
-understand what you mean.
-
-Thanks,
-Lorenzo
+It is still better than trying to stack dma ops, which is a receipe
+for problems down the road.
