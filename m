@@ -1,71 +1,69 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 19 Oct 2017 17:17:55 +0100
-Subject: [PATCH 3/4] arm64: traps: Pretty-print pstate in register dumps
-In-Reply-To: <1508428534-20694-4-git-send-email-will.deacon@arm.com>
-References: <1508428534-20694-1-git-send-email-will.deacon@arm.com>
- <1508428534-20694-4-git-send-email-will.deacon@arm.com>
-Message-ID: <20171019161754.5xnqloqx52sjbtvr@lakrids.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 19 Oct 2017 09:24:16 -0700
+Subject: libbattery was Re: [RFC PATCH 5/5] power: generic-adc-battery:
+ Add capacity handling
+In-Reply-To: <0C0901E1-23E8-4D04-B3A9-8314809A7A6B@goldelico.com>
+References: <1501620926-22669-1-git-send-email-marek.belisko@open-nandra.com>
+ <1501620926-22669-6-git-send-email-marek.belisko@open-nandra.com>
+ <20170829101147.debhadzyfrxhkrvt@earth>
+ <20170908113231.GJ18365@amd> <20171018122804.GA14376@amd>
+ <61BFA8AF-657A-4AD7-A7AC-3E5DC3B7E83D@goldelico.com>
+ <20171018132204.GD4394@atomide.com>
+ <0C0901E1-23E8-4D04-B3A9-8314809A7A6B@goldelico.com>
+Message-ID: <20171019162416.GE4394@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 19, 2017 at 04:55:33PM +0100, Will Deacon wrote:
-> We can decode the PSTATE easily enough, so pretty-print it in register
-> dumps.
+* H. Nikolaus Schaller <hns@goldelico.com> [171018 08:49]:
 > 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/kernel/process.c | 20 +++++++++++++++++++-
->  1 file changed, 19 insertions(+), 1 deletion(-)
+> > Am 18.10.2017 um 15:22 schrieb Tony Lindgren <tony@atomide.com>:
+> > 
+> > * H. Nikolaus Schaller <hns@goldelico.com> [171018 05:49]:
+> >>> Am 18.10.2017 um 14:28 schrieb Pavel Machek <pavel@ucw.cz>:
+> >>> 
+> >>> So I started something, it is at.
+> >>> 
+> >>> https://github.com/pavelmachek/libbattery
+> >>> 
+> >>> My battery on n900 is currently uncalibrated (and charging), still it
+> >>> gets some kind of estimation:
+> >>> 
+> >>> Battery -1 %
+> >>> Seconds -1
+> >>> State 1
+> >>> Voltage 3.88 V
+> >>> Battery 63 %
+> >>> 
+> >>> Of course, there's a lot more work to be done.
+> >> 
+> >> Nice start but not a solution to our problem.
+> >> 
+> >> Our problem is that people simply expect that for example https://packages.debian.org/wheezy/xfce/xfce4-battery-plugin
+> >> displays the battery percentage.
+> > 
+> > I think we could make things compatible with various battery apps by
+> > having libbattery write back the capacity percentage and time remaining
+> > to the kernel driver via sysfs or a dev entry. Then the kernel interface
+> > can just display the data to whatever apps.
 > 
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index c20896b8fb2d..be3cf9cd7dec 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -170,6 +170,23 @@ void machine_restart(char *cmd)
->  	while (1);
->  }
->  
-> +static void print_pstate(struct pt_regs *regs)
-> +{
-> +	u64 pstate = regs->pstate;
-> +	printk("pstate: %08llx (%c%c%c%c %c%c%c%c %cPAN %cUAO)\n",
-> +		pstate,
-> +		pstate & PSR_N_BIT ? 'N' : 'n',
-> +		pstate & PSR_Z_BIT ? 'Z' : 'z',
-> +		pstate & PSR_C_BIT ? 'C' : 'c',
-> +		pstate & PSR_V_BIT ? 'V' : 'v',
-> +		pstate & PSR_D_BIT ? 'D' : 'd',
-> +		pstate & PSR_A_BIT ? 'A' : 'a',
-> +		pstate & PSR_I_BIT ? 'I' : 'i',
-> +		pstate & PSR_F_BIT ? 'F' : 'f',
-> +		pstate & PSR_PAN_BIT ? '+' : '-',
-> +		pstate & PSR_UAO_BIT ? '+' : '-');
-> +}
+> Hm. That would be quite difficult to understand and maintain code.
 
-Given we use __show_regs for user state, I think we need to check
-compat_user_mode() regs, and adjust the decoding accordingly.
+How so? The libbattery can do it all, then the kernel drivers needing
+that will just display the most recent values to maintain compability
+with battery apps.
 
-e.g. AArch32 has an E bit where the D in DAIF is.
+> Why not have the kernel driver do the simple calculations (they do
+> not need float) and provide the standard /sys/class/power attribute?
 
-Thanks,
-Mark.
+Because the current remaining capacity and battery empty state depend
+on maintaining a database of previous history for battery wear. This
+data needs to be preserved across reboots, so most likely on a file
+on a disk is the way to go.
 
-> +
->  void __show_regs(struct pt_regs *regs)
->  {
->  	int i, top_reg;
-> @@ -186,9 +203,10 @@ void __show_regs(struct pt_regs *regs)
->  	}
->  
->  	show_regs_print_info(KERN_DEFAULT);
-> +	print_pstate(regs);
->  	print_symbol("pc : %s\n", regs->pc);
->  	print_symbol("lr : %s\n", lr);
-> -	printk("sp : %016llx pstate : %08llx\n", sp, regs->pstate);
-> +	printk("sp : %016llx\n", sp);
->  
->  	i = top_reg;
->  
-> -- 
-> 2.1.4
-> 
+There's a nice summary what all is involved here:
+
+http://www.mpoweruk.com/soc.htm
+
+Regards,
+
+Tony
