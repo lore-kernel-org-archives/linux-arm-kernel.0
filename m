@@ -1,60 +1,45 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 19 Oct 2017 15:58:03 +0100
-Subject: [PATCH v4 17/21] KVM: arm64: Save ESR_EL2 on guest SError
-In-Reply-To: <20171019145807.23251-1-james.morse@arm.com>
-References: <20171019145807.23251-1-james.morse@arm.com>
-Message-ID: <20171019145807.23251-18-james.morse@arm.com>
+From: fabien.dessenne@st.com (Fabien Dessenne)
+Date: Thu, 19 Oct 2017 17:10:28 +0200
+Subject: [PATCH v5 0/2] STM32 CRYP crypto driver
+Message-ID: <1508425830-13565-1-git-send-email-fabien.dessenne@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we exit a guest due to an SError the vcpu fault info isn't updated
-with the ESR. Today this is only done for traps.
+This set of patches adds a new crypto driver for STMicroelectronics stm32 HW.
+This drivers uses the crypto API and provides with HW-enabled block cipher
+algorithms.
 
-The v8.2 RAS Extensions define ISS values for SError. Update the vcpu's
-fault_info with the ESR on SError so that handle_exit() can determine
-if this was a RAS SError and decode its severity.
+This driver was successfully tested with tcrypt / testmgr.
 
-Signed-off-by: James Morse <james.morse@arm.com>
----
- arch/arm64/kvm/hyp/switch.c | 15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
+Changes since v5:
+-add timeout in wait_busy function
+-clear key after use
+-misc : remove unused functions, use -Exx, use dev_err
 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index af37658223a0..cba6d8ac105c 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -230,13 +230,20 @@ static bool __hyp_text __translate_far_to_hpfar(u64 far, u64 *hpfar)
- 	return true;
- }
- 
-+static void __hyp_text __populate_fault_info_esr(struct kvm_vcpu *vcpu)
-+{
-+	vcpu->arch.fault.esr_el2 = read_sysreg_el2(esr);
-+}
-+
- static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
- {
--	u64 esr = read_sysreg_el2(esr);
--	u8 ec = ESR_ELx_EC(esr);
-+	u8 ec;
-+	u64 esr;
- 	u64 hpfar, far;
- 
--	vcpu->arch.fault.esr_el2 = esr;
-+	__populate_fault_info_esr(vcpu);
-+	esr = vcpu->arch.fault.esr_el2;
-+	ec = ESR_ELx_EC(esr);
- 
- 	if (ec != ESR_ELx_EC_DABT_LOW && ec != ESR_ELx_EC_IABT_LOW)
- 		return true;
-@@ -325,6 +332,8 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 	 */
- 	if (exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
- 		goto again;
-+	else if (ARM_EXCEPTION_CODE(exit_code) == ARM_EXCEPTION_EL1_SERROR)
-+		__populate_fault_info_esr(vcpu);
- 
- 	if (static_branch_unlikely(&vgic_v2_cpuif_trap) &&
- 	    exit_code == ARM_EXCEPTION_TRAP) {
+Changes since v4:
+- remove AEAD support from crypto engine as proposed by Herbert : waiting for
+  the crypto_engine interface clean up before
+  [https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1474434.html]
+- remove AES GCM & CCM algorithms
+
+Changes since v3:
+- update dt-bindings with Rob Herring remarks
+
+Changes since v2:
+- update dt-bindings (interrupts description)
+- rebase on STM32 crypto patches (L. Debieve : update CRC32 + add HASH)
+
+Fabien Dessenne (2):
+  dt-bindings: Document STM32 CRYP bindings
+  crypto: stm32 - Support for STM32 CRYP crypto module
+
+ .../devicetree/bindings/crypto/st,stm32-cryp.txt   |   19 +
+ drivers/crypto/stm32/Kconfig                       |    9 +
+ drivers/crypto/stm32/Makefile                      |    3 +-
+ drivers/crypto/stm32/stm32-cryp.c                  | 1172 ++++++++++++++++++++
+ 4 files changed, 1202 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/crypto/st,stm32-cryp.txt
+ create mode 100644 drivers/crypto/stm32/stm32-cryp.c
+
 -- 
-2.13.3
+2.7.4
