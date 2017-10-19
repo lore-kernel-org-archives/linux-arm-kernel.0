@@ -1,26 +1,45 @@
-From: jeffy.chen@rock-chips.com (jeffy)
-Date: Thu, 19 Oct 2017 19:19:57 +0800
-Subject: [PATCH v6 1/3] PCI: rockchip: Add support for pcie wake irq
-In-Reply-To: <20171018132936.GP5641@bhelgaas-glaptop.roam.corp.google.com>
-References: <20171013195059.23865-1-jeffy.chen@rock-chips.com>
- <20171013195059.23865-2-jeffy.chen@rock-chips.com>
- <20171016200350.GH25517@bhelgaas-glaptop.roam.corp.google.com>
- <20171018010312.GB65743@google.com>
- <20171018132936.GP5641@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <59E88A5D.8060309@rock-chips.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 19 Oct 2017 12:22:07 +0100
+Subject: [PATCH v6 2/6] perf: hisi: Add support for HiSilicon SoC uncore
+ PMU driver
+In-Reply-To: <1508411121-125691-3-git-send-email-zhangshaokun@hisilicon.com>
+References: <1508411121-125691-1-git-send-email-zhangshaokun@hisilicon.com>
+ <1508411121-125691-3-git-send-email-zhangshaokun@hisilicon.com>
+Message-ID: <20171019112206.gpkwqwvn6mo6z5ry@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
+On Thu, Oct 19, 2017 at 07:05:17PM +0800, Shaokun Zhang wrote:
+> This patch adds support HiSilicon SoC uncore PMU driver framework and
+> interfaces.
 
-On 10/18/2017 09:29 PM, Bjorn Helgaas wrote:
->> >
->> >I guess it could work to look into pci_create_root_bus(), and
->> >do something like the following?
->> >
->> >	if (IS_ENABLED(CONFIG_OF) && parent && parent->of_node)
->> >		... do OF parsing for generic features like WAKE# ...
-> That's exactly the sort of thing I was thinking.
->
-i was looking at that too, but i'm not very clear about how to handle 
-the platform_ops's set_wakeup...
+> +static bool hisi_validate_event_group(struct perf_event *event)
+> +{
+> +	struct perf_event *sibling, *leader = event->group_leader;
+> +	struct hisi_pmu *hisi_pmu = to_hisi_pmu(event->pmu);
+> +	/* Include count for the event */
+> +	int counters = 1;
+> +
+> +	/*
+> +	 * We must NOT create groups containing mixed PMUs, although
+> +	 * software events are acceptable
+> +	 */
+> +	if (leader->pmu != event->pmu && !is_software_event(leader))
+> +		return false;
+> +
+> +	/* Increment counter for the leader */
+> +	counters++;
+
+Sorry I didn't spot this before, but I believe this should be:
+
+	if (event != leader && !is_software_event(leader))
+		counters++;
+
+Since the leader can be a SW event, and for the group leader itself,
+event == leader.
+
+Assuming there aren't any major issues elsewhere, I can fix this up when
+applying the series.
+
+Thanks,
+Mark.
