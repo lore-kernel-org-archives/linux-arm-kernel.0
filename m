@@ -1,44 +1,71 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Thu, 19 Oct 2017 11:13:27 -0500
-Subject: [PATCH v3 6/7] arm64: topology: Enable ACPI/PPTT based CPU
- topology.
-In-Reply-To: <20171019155622.GC18883@red-moon>
-References: <20171012194856.13844-1-jeremy.linton@arm.com>
- <20171012194856.13844-7-jeremy.linton@arm.com>
- <20171019155622.GC18883@red-moon>
-Message-ID: <6a9836f5-d31c-67fb-b2dd-bc0972ebb1c2@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 19 Oct 2017 17:17:55 +0100
+Subject: [PATCH 3/4] arm64: traps: Pretty-print pstate in register dumps
+In-Reply-To: <1508428534-20694-4-git-send-email-will.deacon@arm.com>
+References: <1508428534-20694-1-git-send-email-will.deacon@arm.com>
+ <1508428534-20694-4-git-send-email-will.deacon@arm.com>
+Message-ID: <20171019161754.5xnqloqx52sjbtvr@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/19/2017 10:56 AM, Lorenzo Pieralisi wrote:
-> On Thu, Oct 12, 2017 at 02:48:55PM -0500, Jeremy Linton wrote:
->> Propagate the topology information from the PPTT tree to the
->> cpu_topology array. We can get the thread id, core_id and
->> cluster_id by assuming certain levels of the PPTT tree correspond
->> to those concepts. The package_id is flagged in the tree and can be
->> found by passing an arbitrary large level to setup_acpi_cpu_topology()
->> which terminates its search when it finds an ACPI node flagged
->> as the physical package. If the tree doesn't contain enough
->> levels to represent all of thread/core/cod/package then the package
->> id will be used for the missing levels.
->>
->> Since server/ACPI machines are more likely to be multisocket and NUMA,
+On Thu, Oct 19, 2017 at 04:55:33PM +0100, Will Deacon wrote:
+> We can decode the PSTATE easily enough, so pretty-print it in register
+> dumps.
 > 
-> I think this stuff is vague enough already so to start with I would drop
-> patch 4 and 5 and stop assuming what machines are more likely to ship
-> with ACPI than DT.
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/kernel/process.c | 20 +++++++++++++++++++-
+>  1 file changed, 19 insertions(+), 1 deletion(-)
 > 
-> I am just saying, for the umpteenth time, that these levels have no
-> architectural meaning _whatsoever_, level is a hierarchy concept
-> with no architectural meaning attached.
+> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> index c20896b8fb2d..be3cf9cd7dec 100644
+> --- a/arch/arm64/kernel/process.c
+> +++ b/arch/arm64/kernel/process.c
+> @@ -170,6 +170,23 @@ void machine_restart(char *cmd)
+>  	while (1);
+>  }
+>  
+> +static void print_pstate(struct pt_regs *regs)
+> +{
+> +	u64 pstate = regs->pstate;
+> +	printk("pstate: %08llx (%c%c%c%c %c%c%c%c %cPAN %cUAO)\n",
+> +		pstate,
+> +		pstate & PSR_N_BIT ? 'N' : 'n',
+> +		pstate & PSR_Z_BIT ? 'Z' : 'z',
+> +		pstate & PSR_C_BIT ? 'C' : 'c',
+> +		pstate & PSR_V_BIT ? 'V' : 'v',
+> +		pstate & PSR_D_BIT ? 'D' : 'd',
+> +		pstate & PSR_A_BIT ? 'A' : 'a',
+> +		pstate & PSR_I_BIT ? 'I' : 'i',
+> +		pstate & PSR_F_BIT ? 'F' : 'f',
+> +		pstate & PSR_PAN_BIT ? '+' : '-',
+> +		pstate & PSR_UAO_BIT ? '+' : '-');
+> +}
 
-?
+Given we use __show_regs for user state, I think we need to check
+compat_user_mode() regs, and adjust the decoding accordingly.
 
-Did anyone say anything about that? No, I think the only thing being 
-guaranteed here is that the kernel's physical_id maps to an ACPI defined 
-socket. Which seems to be the mindset of pretty much the entire !arm64 
-community meaning they are optimizing their software and the kernel with 
-that concept in mind.
+e.g. AArch32 has an E bit where the D in DAIF is.
 
-Are you denying the existence of non-uniformity between threads running 
-on different physical sockets?
+Thanks,
+Mark.
+
+> +
+>  void __show_regs(struct pt_regs *regs)
+>  {
+>  	int i, top_reg;
+> @@ -186,9 +203,10 @@ void __show_regs(struct pt_regs *regs)
+>  	}
+>  
+>  	show_regs_print_info(KERN_DEFAULT);
+> +	print_pstate(regs);
+>  	print_symbol("pc : %s\n", regs->pc);
+>  	print_symbol("lr : %s\n", lr);
+> -	printk("sp : %016llx pstate : %08llx\n", sp, regs->pstate);
+> +	printk("sp : %016llx\n", sp);
+>  
+>  	i = top_reg;
+>  
+> -- 
+> 2.1.4
+> 
