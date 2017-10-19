@@ -1,9 +1,9 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 19 Oct 2017 13:26:07 +0200
-Subject: [RFC resend 1/4] dt-bindings: display: mediatek: add drm binding
+Date: Thu, 19 Oct 2017 13:26:09 +0200
+Subject: [RFC resend 3/4] arm64: dts: mt8173: Fix drm subsystem
 In-Reply-To: <20171019112610.13645-1-mbrugger@suse.com>
 References: <20171019112610.13645-1-mbrugger@suse.com>
-Message-ID: <20171019112610.13645-2-mbrugger@suse.com>
+Message-ID: <20171019112610.13645-4-mbrugger@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,32 +14,24 @@ this.
 
 Signed-off-by: Matthias Brugger <mbrugger@suse.com>
 ---
- .../devicetree/bindings/display/mediatek/mediatek,disp.txt          | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt b/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
-index 383183a89164..6db652463e64 100644
---- a/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
-+++ b/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
-@@ -27,6 +27,7 @@ Documentation/devicetree/bindings/display/mediatek/mediatek,dpi.txt.
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index b99a27372965..89db0a3f5950 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -803,6 +803,11 @@
+ 			#clock-cells = <1>;
+ 		};
  
- Required properties (all function blocks):
- - compatible: "mediatek,<chip>-disp-<function>", one of
-+	"mediatek,<chip>-dispsys"    - central component for the DRM system
- 	"mediatek,<chip>-disp-ovl"   - overlay (4 layers, blending, csc)
- 	"mediatek,<chip>-disp-rdma"  - read DMA / line buffer
- 	"mediatek,<chip>-disp-wdma"  - write DMA
-@@ -71,6 +72,11 @@ mmsys: clock-controller at 14000000 {
- 	#clock-cells = <1>;
- };
- 
-+dispsys: display-system {
-+	compatible = "mediatek,mt2701-dispsys";
-+	mediatek,mmsys = <&mmsys>;
-+}
++		dispsys: display-system {
++			compatible = "mediatek,mt2701-dispsys";
++			mediatek,mmsys = <&mmsys>;
++		}
 +
- ovl0: ovl at 1400c000 {
- 	compatible = "mediatek,mt8173-disp-ovl";
- 	reg = <0 0x1400c000 0 0x1000>;
+ 		mdp_rdma0: rdma at 14001000 {
+ 			compatible = "mediatek,mt8173-mdp-rdma",
+ 				     "mediatek,mt8173-mdp";
 -- 
 2.14.2
