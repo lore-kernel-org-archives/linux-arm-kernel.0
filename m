@@ -1,36 +1,102 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Thu, 19 Oct 2017 16:45:11 +0100
-Subject: [PATCH 0/2] arm/arm64: kvm: Fix issue with branch profiling
-Message-ID: <1508427913-34619-1-git-send-email-julien.thierry@arm.com>
+Date: Thu, 19 Oct 2017 16:45:12 +0100
+Subject: [PATCH 1/2] arm/arm64: kvm: Move initialization completion message
+In-Reply-To: <1508427913-34619-1-git-send-email-julien.thierry@arm.com>
+References: <1508427913-34619-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <1508427913-34619-2-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+KVM is being a bit too optimistic, Hyp mode is said to be initialized
+when Hyp segments have only been mapped.
 
-When enabling branch profiling, a lockup occurs at boot time, after
-displaying: "kvm [1]: Hyp mode initialized successfully"
+Notify KVM's successful initialization only once it is really fully
+initialized.
 
-The issue is caused by the Hyp code getting instrumented and trying to
-access unmapped code or data, which happens when trying to initialize EL2.
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ virt/kvm/arm/arm.c | 31 ++++++++++++++-----------------
+ 1 file changed, 14 insertions(+), 17 deletions(-)
 
-So it also seems like KVM is misleadingly announcing it was initialized and
-yet gets stuck during initialization.
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index b9f68e4..95cba07 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -1326,21 +1326,12 @@ static void teardown_hyp_mode(void)
+ {
+ 	int cpu;
 
-* First patch deals with printing the initialization message once KVM has
-  fully initialized Hyp mode
-* Second patch actually disables branch profiling instrumentation in Hyp
-  code
+-	if (is_kernel_in_hyp_mode())
+-		return;
+-
+ 	free_hyp_pgds();
+ 	for_each_possible_cpu(cpu)
+ 		free_page(per_cpu(kvm_arm_hyp_stack_page, cpu));
+ 	hyp_cpu_pm_exit();
+ }
 
-Cheers,
+-static int init_vhe_mode(void)
+-{
+-	kvm_info("VHE mode initialized successfully\n");
+-	return 0;
+-}
+-
+ /**
+  * Inits Hyp-mode on all online CPUs
+  */
+@@ -1421,8 +1412,6 @@ static int init_hyp_mode(void)
+ 		}
+ 	}
 
-Julien Thierry (2):
-  arm/arm64: kvm: Move initialization completion message
-  arm/arm64: kvm: Disable branch profiling in HYP code
+-	kvm_info("Hyp mode initialized successfully\n");
+-
+ 	return 0;
 
- arch/arm/kvm/hyp/Makefile   |  2 +-
- arch/arm64/kvm/hyp/Makefile |  2 +-
- virt/kvm/arm/arm.c          | 31 ++++++++++++++-----------------
- 3 files changed, 16 insertions(+), 19 deletions(-)
+ out_err:
+@@ -1456,6 +1445,7 @@ int kvm_arch_init(void *opaque)
+ {
+ 	int err;
+ 	int ret, cpu;
++	bool in_hyp_mode;
 
+ 	if (!is_hyp_mode_available()) {
+ 		kvm_err("HYP mode not available\n");
+@@ -1474,21 +1464,28 @@ int kvm_arch_init(void *opaque)
+ 	if (err)
+ 		return err;
+
+-	if (is_kernel_in_hyp_mode())
+-		err = init_vhe_mode();
+-	else
++	in_hyp_mode = is_kernel_in_hyp_mode();
++
++	if (!in_hyp_mode) {
+ 		err = init_hyp_mode();
+-	if (err)
+-		goto out_err;
++		if (err)
++			goto out_err;
++	}
+
+ 	err = init_subsystems();
+ 	if (err)
+ 		goto out_hyp;
+
++	if (in_hyp_mode)
++		kvm_info("VHE mode initialized successfully\n");
++	else
++		kvm_info("Hyp mode initialized successfully\n");
++
+ 	return 0;
+
+ out_hyp:
+-	teardown_hyp_mode();
++	if (!in_hyp_mode)
++		teardown_hyp_mode();
+ out_err:
+ 	teardown_common_resources();
+ 	return err;
 --
 1.9.1
