@@ -1,154 +1,129 @@
 From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Thu, 19 Oct 2017 18:42:07 +0200
-Subject: [PATCH v5 3/3] clk: at91: pmc: Support backup for programmable clocks
-In-Reply-To: <20171019164207.32717-1-romain.izard.pro@gmail.com>
-References: <20171019164207.32717-1-romain.izard.pro@gmail.com>
-Message-ID: <20171019164207.32717-4-romain.izard.pro@gmail.com>
+Date: Thu, 19 Oct 2017 18:44:10 +0200
+Subject: [PATCH v5] pwm: atmel-tcb: Support backup mode
+Message-ID: <20171019164410.423-1-romain.izard.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Romain Izard <romain.izard@mobile-devices.fr>
-
-When an AT91 programmable clock is declared in the device tree, register
-it into the Power Management Controller driver. On entering suspend mode,
-the driver saves and restores the Programmable Clock registers to support
-the backup mode for these clocks.
+Save and restore registers for the PWM on suspend and resume, which
+makes hibernation and backup modes possible.
 
 Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
 Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 ---
-Changes in v2:
-* register PCKs on clock startup
+Changes in v5:
+* extract from the patch series, and send as a standalone patch
 
-Changes in v3:
-* improve comments on hanling 0 in pmc_register_id and pmc_register_pck
-* declare local variables earlier for checkpatch
+ drivers/pwm/pwm-atmel-tcb.c | 63 +++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 61 insertions(+), 2 deletions(-)
 
- drivers/clk/at91/clk-programmable.c |  2 ++
- drivers/clk/at91/pmc.c              | 35 +++++++++++++++++++++++++++++++++++
- drivers/clk/at91/pmc.h              |  2 ++
- 3 files changed, 39 insertions(+)
-
-diff --git a/drivers/clk/at91/clk-programmable.c b/drivers/clk/at91/clk-programmable.c
-index 85a449cf61e3..0e6aab1252fc 100644
---- a/drivers/clk/at91/clk-programmable.c
-+++ b/drivers/clk/at91/clk-programmable.c
-@@ -204,6 +204,8 @@ at91_clk_register_programmable(struct regmap *regmap,
- 	if (ret) {
- 		kfree(prog);
- 		hw = ERR_PTR(ret);
+diff --git a/drivers/pwm/pwm-atmel-tcb.c b/drivers/pwm/pwm-atmel-tcb.c
+index 75db585a2a94..acd3ce8ecf3f 100644
+--- a/drivers/pwm/pwm-atmel-tcb.c
++++ b/drivers/pwm/pwm-atmel-tcb.c
+@@ -37,11 +37,20 @@ struct atmel_tcb_pwm_device {
+ 	unsigned period;		/* PWM period expressed in clk cycles */
+ };
+ 
++struct atmel_tcb_channel {
++	u32 enabled;
++	u32 cmr;
++	u32 ra;
++	u32 rb;
++	u32 rc;
++};
++
+ struct atmel_tcb_pwm_chip {
+ 	struct pwm_chip chip;
+ 	spinlock_t lock;
+ 	struct atmel_tc *tc;
+ 	struct atmel_tcb_pwm_device *pwms[NPWM];
++	struct atmel_tcb_channel bkup[NPWM / 2];
+ };
+ 
+ static inline struct atmel_tcb_pwm_chip *to_tcb_chip(struct pwm_chip *chip)
+@@ -175,12 +184,15 @@ static void atmel_tcb_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 	 * Use software trigger to apply the new setting.
+ 	 * If both PWM devices in this group are disabled we stop the clock.
+ 	 */
+-	if (!(cmr & (ATMEL_TC_ACPC | ATMEL_TC_BCPC)))
++	if (!(cmr & (ATMEL_TC_ACPC | ATMEL_TC_BCPC))) {
+ 		__raw_writel(ATMEL_TC_SWTRG | ATMEL_TC_CLKDIS,
+ 			     regs + ATMEL_TC_REG(group, CCR));
+-	else
++		tcbpwmc->bkup[group].enabled = 1;
 +	} else {
-+		pmc_register_pck(id);
- 	}
+ 		__raw_writel(ATMEL_TC_SWTRG, regs +
+ 			     ATMEL_TC_REG(group, CCR));
++		tcbpwmc->bkup[group].enabled = 0;
++	}
  
- 	return hw;
-diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-index 07dc2861ad3f..1fa27f4ea538 100644
---- a/drivers/clk/at91/pmc.c
-+++ b/drivers/clk/at91/pmc.c
-@@ -22,6 +22,7 @@
- #include "pmc.h"
- 
- #define PMC_MAX_IDS 128
-+#define PMC_MAX_PCKS 8
- 
- int of_at91_get_clk_range(struct device_node *np, const char *propname,
- 			  struct clk_range *range)
-@@ -50,6 +51,7 @@ EXPORT_SYMBOL_GPL(of_at91_get_clk_range);
- static struct regmap *pmcreg;
- 
- static u8 registered_ids[PMC_MAX_IDS];
-+static u8 registered_pcks[PMC_MAX_PCKS];
- 
- static struct
- {
-@@ -66,8 +68,13 @@ static struct
- 	u32 pcr[PMC_MAX_IDS];
- 	u32 audio_pll0;
- 	u32 audio_pll1;
-+	u32 pckr[PMC_MAX_PCKS];
- } pmc_cache;
- 
-+/*
-+ * As Peripheral ID 0 is invalid on AT91 chips, the identifier is stored
-+ * without alteration in the table, and 0 is for unused clocks.
-+ */
- void pmc_register_id(u8 id)
- {
- 	int i;
-@@ -82,9 +89,28 @@ void pmc_register_id(u8 id)
- 	}
+ 	spin_unlock(&tcbpwmc->lock);
  }
- 
-+/*
-+ * As Programmable Clock 0 is valid on AT91 chips, there is an offset
-+ * of 1 between the stored value and the real clock ID.
-+ */
-+void pmc_register_pck(u8 pck)
-+{
-+	int i;
-+
-+	for (i = 0; i < PMC_MAX_PCKS; i++) {
-+		if (registered_pcks[i] == 0) {
-+			registered_pcks[i] = pck + 1;
-+			break;
-+		}
-+		if (registered_pcks[i] == (pck + 1))
-+			break;
-+	}
-+}
-+
- static int pmc_suspend(void)
- {
- 	int i;
-+	u8 num;
- 
- 	regmap_read(pmcreg, AT91_PMC_SCSR, &pmc_cache.scsr);
- 	regmap_read(pmcreg, AT91_PMC_PCSR, &pmc_cache.pcsr0);
-@@ -103,6 +129,10 @@ static int pmc_suspend(void)
- 		regmap_read(pmcreg, AT91_PMC_PCR,
- 			    &pmc_cache.pcr[registered_ids[i]]);
- 	}
-+	for (i = 0; registered_pcks[i]; i++) {
-+		num = registered_pcks[i] - 1;
-+		regmap_read(pmcreg, AT91_PMC_PCKR(num), &pmc_cache.pckr[num]);
-+	}
- 
+@@ -263,6 +275,7 @@ static int atmel_tcb_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 	/* Use software trigger to apply the new setting */
+ 	__raw_writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG,
+ 		     regs + ATMEL_TC_REG(group, CCR));
++	tcbpwmc->bkup[group].enabled = 1;
+ 	spin_unlock(&tcbpwmc->lock);
  	return 0;
  }
-@@ -119,6 +149,7 @@ static bool pmc_ready(unsigned int mask)
- static void pmc_resume(void)
- {
- 	int i;
-+	u8 num;
- 	u32 tmp;
- 	u32 mask = AT91_PMC_MCKRDY | AT91_PMC_LOCKA;
+@@ -445,10 +458,56 @@ static const struct of_device_id atmel_tcb_pwm_dt_ids[] = {
+ };
+ MODULE_DEVICE_TABLE(of, atmel_tcb_pwm_dt_ids);
  
-@@ -143,6 +174,10 @@ static void pmc_resume(void)
- 			     pmc_cache.pcr[registered_ids[i]] |
- 			     AT91_PMC_PCR_CMD);
- 	}
-+	for (i = 0; registered_pcks[i]; i++) {
-+		num = registered_pcks[i] - 1;
-+		regmap_write(pmcreg, AT91_PMC_PCKR(num), pmc_cache.pckr[num]);
++#ifdef CONFIG_PM_SLEEP
++static int atmel_tcb_pwm_suspend(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct atmel_tcb_pwm_chip *tcbpwm = platform_get_drvdata(pdev);
++	void __iomem *base = tcbpwm->tc->regs;
++	int i;
++
++	for (i = 0; i < (NPWM / 2); i++) {
++		struct atmel_tcb_channel *chan = &tcbpwm->bkup[i];
++
++		chan->cmr = readl(base + ATMEL_TC_REG(i, CMR));
++		chan->ra = readl(base + ATMEL_TC_REG(i, RA));
++		chan->rb = readl(base + ATMEL_TC_REG(i, RB));
++		chan->rc = readl(base + ATMEL_TC_REG(i, RC));
 +	}
- 
- 	if (pmc_cache.uckr & AT91_PMC_UPLLEN)
- 		mask |= AT91_PMC_LOCKU;
-diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
-index 858e8ef7e8db..d22b1fa9ecdc 100644
---- a/drivers/clk/at91/pmc.h
-+++ b/drivers/clk/at91/pmc.h
-@@ -31,8 +31,10 @@ int of_at91_get_clk_range(struct device_node *np, const char *propname,
- 
- #ifdef CONFIG_PM
- void pmc_register_id(u8 id);
-+void pmc_register_pck(u8 pck);
- #else
- static inline void pmc_register_id(u8 id) {}
-+static inline void pmc_register_pck(u8 pck) {}
- #endif
- 
- #endif /* __PMC_H_ */
++	return 0;
++}
++
++static int atmel_tcb_pwm_resume(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct atmel_tcb_pwm_chip *tcbpwm = platform_get_drvdata(pdev);
++	void __iomem *base = tcbpwm->tc->regs;
++	int i;
++
++	for (i = 0; i < (NPWM / 2); i++) {
++		struct atmel_tcb_channel *chan = &tcbpwm->bkup[i];
++
++		writel(chan->cmr, base + ATMEL_TC_REG(i, CMR));
++		writel(chan->ra, base + ATMEL_TC_REG(i, RA));
++		writel(chan->rb, base + ATMEL_TC_REG(i, RB));
++		writel(chan->rc, base + ATMEL_TC_REG(i, RC));
++		if (chan->enabled) {
++			writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG,
++				base + ATMEL_TC_REG(i, CCR));
++		}
++	}
++	return 0;
++}
++#endif
++
++static SIMPLE_DEV_PM_OPS(atmel_tcb_pwm_pm_ops, atmel_tcb_pwm_suspend,
++			 atmel_tcb_pwm_resume);
++
+ static struct platform_driver atmel_tcb_pwm_driver = {
+ 	.driver = {
+ 		.name = "atmel-tcb-pwm",
+ 		.of_match_table = atmel_tcb_pwm_dt_ids,
++		.pm = &atmel_tcb_pwm_pm_ops,
+ 	},
+ 	.probe = atmel_tcb_pwm_probe,
+ 	.remove = atmel_tcb_pwm_remove,
 -- 
 2.11.0
