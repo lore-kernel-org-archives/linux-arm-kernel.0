@@ -1,73 +1,44 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 19 Oct 2017 16:10:34 -0500
-Subject: [PATCH] nvmem: meson: use generic compatible
-In-Reply-To: <1508311867.3957.33.camel@baylibre.com>
-References: <20171012152450.12454-1-jbrunet@baylibre.com>
- <CAFBinCBVNEqTk+NUHz62FetLhYagFb5K+g17P_2Xb7sBUfEmdA@mail.gmail.com>
- <1507923553.30658.10.camel@baylibre.com>
- <20171017205204.t4vfvbc2c5nsrnhm@rob-hp-laptop>
- <1508311867.3957.33.camel@baylibre.com>
-Message-ID: <CAL_JsqKV5yGNFXxsPzAgF6_g-bQn8x8ScXVZ=Wgc1=APPL=mMw@mail.gmail.com>
+Date: Thu, 19 Oct 2017 16:18:17 -0500
+Subject: [PATCH] firmware: meson-sm: use generic compatible
+In-Reply-To: <7h8tg7zb6t.fsf@baylibre.com>
+References: <20171012134743.10625-1-jbrunet@baylibre.com>
+ <20171017204959.kfbhn2yxhv2sb5qg@rob-hp-laptop>
+ <7h8tg7zb6t.fsf@baylibre.com>
+Message-ID: <CAL_JsqJ-XAqMA_zjxrJNAtysQsXzmWYUFqLJtKX2wUJ0oebtuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 18, 2017 at 2:31 AM, Jerome Brunet <jbrunet@baylibre.com> wrote:
-> On Tue, 2017-10-17 at 15:52 -0500, Rob Herring wrote:
->> On Fri, Oct 13, 2017 at 09:39:13PM +0200, Jerome Brunet wrote:
->> > On Fri, 2017-10-13 at 21:14 +0200, Martin Blumenstingl wrote:
->> > > Hi Jerome,
->> > >
->> > > On Thu, Oct 12, 2017 at 5:24 PM, Jerome Brunet <jbrunet@baylibre.com>
->> > > wrote:
->> > > > The meson efuse driver seems to be compatible with more SoCs than
->> > > > initially thought. Let's use the most generic compatible he have in
->> > > > DT instead of the gxbb specific one
->> > > >
->> > > > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
->> > > > ---
->> > > >  Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt | 4 ++--
->> > > >  drivers/nvmem/meson-efuse.c                               | 2 +-
->> > > >  2 files changed, 3 insertions(+), 3 deletions(-)
->> > > >
->> > > > diff --git a/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
->> > > > b/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
->> > > > index fafd85bd67a6..0260524292fe 100644
->> > > > --- a/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
->> > > > +++ b/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
->> > > > @@ -1,7 +1,7 @@
->> > > >  = Amlogic eFuse device tree bindings =
->> > > >
->> > > >  Required properties:
->> > > > -- compatible: should be "amlogic,meson-gxbb-efuse"
->> > > > +- compatible: should be "amlogic,meson-gx-efuse"
->>
->> Same comment as for the firmware.
->>
->> > >
->> > > have you checked with the devicetree maintainers how they want the
->> > > documentation to look like in this case?
->> >
->> > You mean "Should we put every compatible existing (in DT) in the
->> > documentation"
->> > From what I've seen, at least in meson drivers, only the matched ones are
->> > listed.
->> >
->> > That's a good question though.
->> > We tend to put soc specific compatible "in case"  we need them later on.
->> > Should
->> > we document those ?
->>
->> Absolutely.
+On Thu, Oct 19, 2017 at 5:25 AM, Kevin Hilman <khilman@baylibre.com> wrote:
+> Rob Herring <robh@kernel.org> writes:
 >
-> My understanding is that this documentation is the documentation of the bindings
-> used by the driver.
+>> On Thu, Oct 12, 2017 at 03:47:43PM +0200, Jerome Brunet wrote:
+>>> The meson secure monitor seems to be compatible with more SoCs than
+>>> initially thought. Let's use the most generic compatible he have in
+>>> DT instead of the gxbb specific one
+>>>
+>>> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+>>> ---
+>>>  Documentation/devicetree/bindings/firmware/meson/meson_sm.txt | 4 ++--
+>>>  drivers/firmware/meson/meson_sm.c                             | 4 ++--
+>>>  2 files changed, 4 insertions(+), 4 deletions(-)
+>>
+>> Seems like a pointless, not backwards compatible change to me.
+>
+> I've verified that it's backwards compatible with existing upstream DTs.
 
-No, the binding doc should be sufficient to validate the dts.
+Perhaps if you all are documenting only what the driver uses, not what
+the dts can have as Jerome said.
 
-> If I understand your point, we should document bindings (compatible in that
-> case) that are in fact not fact by the driver. This means that if someone refer
-> only to the documentation, he might be surprised by the result.
+>> end, it's just a string to match on. Who cares what the string is.
+>
+> As platform maintiner, I very much care what the strings are and I want
+> it to be coherent with the platform generic names, and I want the
+> SoC-specific strings to correspond to the actual SoC names.
 
-How so?
+The most specific compatible should be, absolutely. The fallbacks can
+be anything really. Ideally, they are the compatible string for the
+1st SoC with "the same" compatible IP. Could be another vendor
+entirely even because mergers happen.
 
 Rob
