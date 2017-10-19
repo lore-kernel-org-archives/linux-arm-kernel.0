@@ -1,90 +1,128 @@
 From: james.morse@arm.com (James Morse)
-Date: Thu, 19 Oct 2017 15:57:52 +0100
-Subject: [PATCH v4 06/21] arm64: entry.S: convert el1_sync
+Date: Thu, 19 Oct 2017 15:57:59 +0100
+Subject: [PATCH v4 13/21] arm64: cpufeature: Enable IESB on exception
+ entry/return for firmware-first
 In-Reply-To: <20171019145807.23251-1-james.morse@arm.com>
 References: <20171019145807.23251-1-james.morse@arm.com>
-Message-ID: <20171019145807.23251-7-james.morse@arm.com>
+Message-ID: <20171019145807.23251-14-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-el1_sync unmasks exceptions on a case-by-case basis, debug exceptions
-are unmasked, unless this was a debug exception. IRQs are unmasked
-for instruction and data aborts only if the interupted context had
-irqs unmasked.
+ARM v8.2 has a feature to add implicit error synchronization barriers
+whenever the CPU enters or returns from an exception level. Add code to
+detect this feature and enable the SCTLR_ELx.IESB bit.
 
-Following our 'dai' order, el1_dbg should run with everything masked.
-For the other cases we can inherit whatever we interrupted.
+This feature causes RAS errors that are not yet visible to software to
+become pending SErrors. We expect to have firmware-first RAS support
+so synchronised RAS errors will be take immediately to EL3.
+Any system without firmware-first handling of errors will take the SError
+either immediatly after exception return, or when we unmask SError after
+entry.S's work.
 
-Add a macro inherit_daif to set daif based on the interrupted pstate.
+Platform level RAS support may require additional firmware support.
 
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: James Morse <james.morse@arm.com>
-Reviewed-by: Julien Thierry <julien.thierry@arm.com>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/include/asm/assembler.h |  6 ++++++
- arch/arm64/kernel/entry.S          | 12 ++++--------
- 2 files changed, 10 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 1b0972046a72..abb5abd61ddb 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -48,6 +48,12 @@
- 	msr	daif, \flags
- 	.endm
+---
+Note the sneaky KVM change,
+
+Changes since v3:
+ * removed IESB Kconfig option
+
+ arch/arm64/include/asm/cpucaps.h   |  3 ++-
+ arch/arm64/include/asm/processor.h |  1 +
+ arch/arm64/include/asm/sysreg.h    |  1 +
+ arch/arm64/kernel/cpufeature.c     | 19 +++++++++++++++++++
+ arch/arm64/kvm/hyp-init.S          |  3 +++
+ 5 files changed, 26 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+index 4820d441bfb9..7a2bbbfdff49 100644
+--- a/arch/arm64/include/asm/cpucaps.h
++++ b/arch/arm64/include/asm/cpucaps.h
+@@ -41,7 +41,8 @@
+ #define ARM64_WORKAROUND_CAVIUM_30115		20
+ #define ARM64_HAS_DCPOP				21
+ #define ARM64_HAS_RAS_EXTN			22
++#define ARM64_HAS_IESB				23
  
-+	/* Only on aarch64 pstate, PSR_D_BIT is different for aarch32 */
-+	.macro	inherit_daif, pstate:req, tmp:req
-+	and	\tmp, \pstate, #(PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT)
-+	msr	daif, \tmp
-+	.endm
+-#define ARM64_NCAPS				23
++#define ARM64_NCAPS				24
+ 
+ #endif /* __ASM_CPUCAPS_H */
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index 29adab8138c3..6b72ddc33d06 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -193,5 +193,6 @@ static inline void spin_lock_prefetch(const void *ptr)
+ 
+ int cpu_enable_pan(void *__unused);
+ int cpu_enable_cache_maint_trap(void *__unused);
++int cpu_enable_iesb(void *__unused);
+ 
+ #endif /* __ASM_PROCESSOR_H */
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 64e2a80fd749..4500a70c6a57 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -297,6 +297,7 @@
+ 
+ /* Common SCTLR_ELx flags. */
+ #define SCTLR_ELx_EE    (1 << 25)
++#define SCTLR_ELx_IESB	(1 << 21)
+ #define SCTLR_ELx_I	(1 << 12)
+ #define SCTLR_ELx_SA	(1 << 3)
+ #define SCTLR_ELx_C	(1 << 2)
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 0fc017b55cb1..356a5de51f5e 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -912,6 +912,17 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 		.field_pos = ID_AA64PFR0_RAS_SHIFT,
+ 		.min_field_value = ID_AA64PFR0_RAS_V1,
+ 	},
++	{
++		.desc = "Implicit Error Synchronization Barrier",
++		.capability = ARM64_HAS_IESB,
++		.def_scope = SCOPE_SYSTEM,
++		.matches = has_cpuid_feature,
++		.sys_reg = SYS_ID_AA64MMFR2_EL1,
++		.sign = FTR_UNSIGNED,
++		.field_pos = ID_AA64MMFR2_IESB_SHIFT,
++		.min_field_value = 1,
++		.enable = cpu_enable_iesb,
++	},
+ #endif /* CONFIG_ARM64_RAS_EXTN */
+ 	{},
+ };
+@@ -1321,3 +1332,11 @@ static int __init enable_mrs_emulation(void)
+ }
+ 
+ late_initcall(enable_mrs_emulation);
 +
- /*
-  * Enable and disable interrupts.
-  */
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index f7d7bf9d76e7..bd54115972a4 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -510,11 +510,7 @@ el1_da:
- 	 * Data abort handling
++int cpu_enable_iesb(void *__unused)
++{
++	if (cpus_have_cap(ARM64_HAS_RAS_EXTN))
++		config_sctlr_el1(0, SCTLR_ELx_IESB);
++
++	return 0;
++}
+diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+index 3f9615582377..8983e9473017 100644
+--- a/arch/arm64/kvm/hyp-init.S
++++ b/arch/arm64/kvm/hyp-init.S
+@@ -113,6 +113,9 @@ __do_hyp_init:
  	 */
- 	mrs	x3, far_el1
--	enable_dbg
--	// re-enable interrupts if they were enabled in the aborted context
--	tbnz	x23, #7, 1f			// PSR_I_BIT
--	enable_irq
--1:
-+	inherit_daif	pstate=x23, tmp=x2
- 	clear_address_tag x0, x3
- 	mov	x2, sp				// struct pt_regs
- 	bl	do_mem_abort
-@@ -525,7 +521,7 @@ el1_sp_pc:
- 	 * Stack or PC alignment exception handling
- 	 */
- 	mrs	x0, far_el1
--	enable_dbg
-+	inherit_daif	pstate=x23, tmp=x2
- 	mov	x2, sp
- 	bl	do_sp_pc_abort
- 	ASM_BUG()
-@@ -533,7 +529,7 @@ el1_undef:
- 	/*
- 	 * Undefined instruction
- 	 */
--	enable_dbg
-+	inherit_daif	pstate=x23, tmp=x2
- 	mov	x0, sp
- 	bl	do_undefinstr
- 	ASM_BUG()
-@@ -550,7 +546,7 @@ el1_dbg:
- 	kernel_exit 1
- el1_inv:
- 	// TODO: add support for undefined instructions in kernel mode
--	enable_dbg
-+	inherit_daif	pstate=x23, tmp=x2
- 	mov	x0, sp
- 	mov	x2, x1
- 	mov	x1, #BAD_SYNC
+ 	ldr	x4, =(SCTLR_EL2_RES1 | (SCTLR_ELx_FLAGS & ~SCTLR_ELx_A))
+ CPU_BE(	orr	x4, x4, #SCTLR_ELx_EE)
++alternative_if ARM64_HAS_IESB
++	orr	x4, x4, #SCTLR_ELx_IESB
++alternative_else_nop_endif
+ 	msr	sctlr_el2, x4
+ 	isb
+ 
 -- 
 2.13.3
