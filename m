@@ -1,132 +1,109 @@
 From: james.morse@arm.com (James Morse)
-Date: Thu, 19 Oct 2017 15:57:46 +0100
-Subject: [PATCH v4 00/21] SError rework + RAS&IESB for firmware first support
-Message-ID: <20171019145807.23251-1-james.morse@arm.com>
+Date: Thu, 19 Oct 2017 15:57:49 +0100
+Subject: [PATCH v4 03/21] arm64: Move the async/fiq helpers to explicitly set
+ process context flags
+In-Reply-To: <20171019145807.23251-1-james.morse@arm.com>
+References: <20171019145807.23251-1-james.morse@arm.com>
+Message-ID: <20171019145807.23251-4-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Remove the local_{async,fiq}_{en,dis}able macros as they don't respect
+our newly defined order and are only used to set the flags for process
+context when we bring CPUs online.
 
-The aim of this series is to enable IESB and add ESB-instructions to let us
-kick any pending RAS errors into firmware to be handled by firmware-first.
+Add a helper to do this. The IRQ flag varies as we want it masked on
+the boot CPU until we are ready to handle interrupts.
+The boot CPU unmasks SError during early boot once it can print an error
+message. If we can print an error message about SError, we can do the
+same for FIQ. Debug exceptions are already enabled by __cpu_setup(),
+which has also configured MDSCR_EL1 to disable MDE and KDE.
 
-Not all systems will have this firmware, so these RAS errors will become
-pending SErrors. We should take these as quickly as possible and avoid
-panic()ing for errors where we could have continued.
+Signed-off-by: James Morse <james.morse@arm.com>
+Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 
-This first part of this series reworks the DAIF masking so that SError is
-unmasked unless we are handling a debug exception.
+---
+Changes since v3:
+ * swapped verb/daif word-order.
 
-The last part provides the same minimal handling for SError that interrupt
-KVM. KVM is currently unable to handle SErrors during world-switch, unless
-they occur during a magic single-instruction window, it hyp-panics. I suspect
-this will be easier to fix once the VHE world-switch is further optimised.
+ arch/arm64/include/asm/daifflags.h | 3 +++
+ arch/arm64/include/asm/irqflags.h  | 6 ------
+ arch/arm64/kernel/setup.c          | 8 +++++---
+ arch/arm64/kernel/smp.c            | 3 +--
+ 4 files changed, 9 insertions(+), 11 deletions(-)
 
-KVMs kvm_inject_vabt() needs updating for v8.2 as now we can specify an ESR,
-and all-zeros has a RAS meaning.
-
-KVM's existing 'impdef SError to the guest' behaviour probably needs revisiting.
-These are errors where we don't know what they mean, they may not be
-synchronised by ESB. Today we blame the guest.
-My half-baked suggestion would be to make a virtual SError pending, but then
-exit to user-space to give Qemu the change to quit (for virtual machines that
-don't generate SError), pend an SError with a new Qemu-specific ESR, or blindly
-continue and take KVMs default all-zeros impdef ESR.
-
-Known issues:
- * Synchronous external abort SET severity is not yet considered, all
-   synchronous-external-aborts are still considered fatal.
-
- * KVM-Migration: VDISR_EL2 is exposed to userspace as DISR_EL1, but how should
-   HCR_EL2.VSE or VSESR_EL2 be migrated when the guest has an SError pending but
-   hasn't taken it yet...?
-
- * KVM unmasks SError and IRQ before calling handle_exit, we may be rescheduled
-   while holding an uncontained ESR... (this is currently an improvement on
-   assuming its an impdef error we can blame on the guest)
-    * We need to fix this for APEI's SEI or kernel-first RAS, the guest-exit
-      SError handling will need to move to before kvm_arm_vhe_guest_exit().
-
-
-Changes from v3:
- * Symbol naming around daif flag helpers
- * Removed the IESB kconfig option
- * Moved that nop out of the firing line in the vaxorcism code
- * Added last patch to Trap ERR registers and make them RAZ/WI
-
-
-Comments and contradictions welcome,
-
-James
-
-
-Dongjiu Geng (1):
-  KVM: arm64: Trap RAS error registers and set HCR_EL2's TERR & TEA
-
-James Morse (18):
-  arm64: explicitly mask all exceptions
-  arm64: introduce an order for exceptions
-  arm64: Move the async/fiq helpers to explicitly set process context
-    flags
-  arm64: Mask all exceptions during kernel_exit
-  arm64: entry.S: Remove disable_dbg
-  arm64: entry.S: convert el1_sync
-  arm64: entry.S convert el0_sync
-  arm64: entry.S: convert elX_irq
-  KVM: arm/arm64: mask/unmask daif around VHE guests
-  arm64: kernel: Survive corrected RAS errors notified by SError
-  arm64: cpufeature: Enable IESB on exception entry/return for
-    firmware-first
-  arm64: kernel: Prepare for a DISR user
-  KVM: arm64: Set an impdef ESR for Virtual-SError using VSESR_EL2.
-  KVM: arm64: Save/Restore guest DISR_EL1
-  KVM: arm64: Save ESR_EL2 on guest SError
-  KVM: arm64: Handle RAS SErrors from EL1 on guest exit
-  KVM: arm64: Handle RAS SErrors from EL2 on guest exit
-  KVM: arm64: Take any host SError before entering the guest
-
-Xie XiuQi (2):
-  arm64: entry.S: move SError handling into a C function for future
-    expansion
-  arm64: cpufeature: Detect CPU RAS Extentions
-
- arch/arm64/Kconfig                   | 18 +++++++-
- arch/arm64/include/asm/assembler.h   | 51 ++++++++++++++-------
- arch/arm64/include/asm/barrier.h     |  1 +
- arch/arm64/include/asm/cpucaps.h     |  4 +-
- arch/arm64/include/asm/daifflags.h   | 72 ++++++++++++++++++++++++++++++
- arch/arm64/include/asm/esr.h         | 17 +++++++
- arch/arm64/include/asm/exception.h   | 14 ++++++
- arch/arm64/include/asm/irqflags.h    | 40 ++++++-----------
- arch/arm64/include/asm/kvm_arm.h     |  2 +
- arch/arm64/include/asm/kvm_emulate.h | 17 +++++++
- arch/arm64/include/asm/kvm_host.h    | 16 +++++++
- arch/arm64/include/asm/processor.h   |  2 +
- arch/arm64/include/asm/sysreg.h      | 16 +++++++
- arch/arm64/include/asm/traps.h       | 36 +++++++++++++++
- arch/arm64/kernel/asm-offsets.c      |  1 +
- arch/arm64/kernel/cpufeature.c       | 41 +++++++++++++++++
- arch/arm64/kernel/debug-monitors.c   |  5 ++-
- arch/arm64/kernel/entry.S            | 86 +++++++++++++++++++++---------------
- arch/arm64/kernel/hibernate.c        |  5 ++-
- arch/arm64/kernel/machine_kexec.c    |  4 +-
- arch/arm64/kernel/process.c          |  3 ++
- arch/arm64/kernel/setup.c            |  8 ++--
- arch/arm64/kernel/signal.c           |  8 +++-
- arch/arm64/kernel/smp.c              | 12 ++---
- arch/arm64/kernel/suspend.c          |  7 +--
- arch/arm64/kernel/traps.c            | 64 ++++++++++++++++++++++++++-
- arch/arm64/kvm/handle_exit.c         | 19 +++++++-
- arch/arm64/kvm/hyp-init.S            |  3 ++
- arch/arm64/kvm/hyp/entry.S           | 13 ++++++
- arch/arm64/kvm/hyp/switch.c          | 19 ++++++--
- arch/arm64/kvm/hyp/sysreg-sr.c       |  6 +++
- arch/arm64/kvm/inject_fault.c        | 13 +++++-
- arch/arm64/kvm/sys_regs.c            | 11 +++++
- arch/arm64/mm/proc.S                 | 14 +++---
- virt/kvm/arm/arm.c                   |  4 ++
- 35 files changed, 537 insertions(+), 115 deletions(-)
- create mode 100644 arch/arm64/include/asm/daifflags.h
-
+diff --git a/arch/arm64/include/asm/daifflags.h b/arch/arm64/include/asm/daifflags.h
+index 55e2598a8c4c..22e4c83de5a5 100644
+--- a/arch/arm64/include/asm/daifflags.h
++++ b/arch/arm64/include/asm/daifflags.h
+@@ -18,6 +18,9 @@
+ 
+ #include <linux/irqflags.h>
+ 
++#define DAIF_PROCCTX		0
++#define DAIF_PROCCTX_NOIRQ	PSR_I_BIT
++
+ /* mask/save/unmask/restore all exceptions, including interrupts. */
+ static inline void local_daif_mask(void)
+ {
+diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
+index 9ecdca7011f0..24692edf1a69 100644
+--- a/arch/arm64/include/asm/irqflags.h
++++ b/arch/arm64/include/asm/irqflags.h
+@@ -66,12 +66,6 @@ static inline void arch_local_irq_disable(void)
+ 		: "memory");
+ }
+ 
+-#define local_fiq_enable()	asm("msr	daifclr, #1" : : : "memory")
+-#define local_fiq_disable()	asm("msr	daifset, #1" : : : "memory")
+-
+-#define local_async_enable()	asm("msr	daifclr, #4" : : : "memory")
+-#define local_async_disable()	asm("msr	daifset, #4" : : : "memory")
+-
+ /*
+  * Save the current interrupt enable state.
+  */
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index d4b740538ad5..ad285f024934 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -48,6 +48,7 @@
+ #include <asm/fixmap.h>
+ #include <asm/cpu.h>
+ #include <asm/cputype.h>
++#include <asm/daifflags.h>
+ #include <asm/elf.h>
+ #include <asm/cpufeature.h>
+ #include <asm/cpu_ops.h>
+@@ -262,10 +263,11 @@ void __init setup_arch(char **cmdline_p)
+ 	parse_early_param();
+ 
+ 	/*
+-	 *  Unmask asynchronous aborts after bringing up possible earlycon.
+-	 * (Report possible System Errors once we can report this occurred)
++	 * Unmask asynchronous aborts and fiq after bringing up possible
++	 * earlycon. (Report possible System Errors once we can report this
++	 * occurred).
+ 	 */
+-	local_async_enable();
++	local_daif_restore(DAIF_PROCCTX_NOIRQ);
+ 
+ 	/*
+ 	 * TTBR0 is only used for the identity mapping at this stage. Make it
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 5a407eba01f7..d92e03faa51a 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -272,8 +272,7 @@ asmlinkage void secondary_start_kernel(void)
+ 	set_cpu_online(cpu, true);
+ 	complete(&cpu_running);
+ 
+-	local_irq_enable();
+-	local_async_enable();
++	local_daif_restore(DAIF_PROCCTX);
+ 
+ 	/*
+ 	 * OK, it's off to the idle thread for us
 -- 
 2.13.3
