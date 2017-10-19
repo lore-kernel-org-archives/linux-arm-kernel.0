@@ -1,240 +1,422 @@
-From: opendmb@gmail.com (Doug Berger)
-Date: Thu, 19 Oct 2017 11:39:16 -0700
-Subject: [PATCH 7/7] gpio: brcmstb: implement suspend/resume/shutdown
-In-Reply-To: <20171019090359.GB31645@kessel>
-References: <20170930034057.15166-1-opendmb@gmail.com>
- <20170930034057.15166-8-opendmb@gmail.com> <20171019090359.GB31645@kessel>
-Message-ID: <aa8a2900-22a5-5ec5-2afc-038fc42ea940@gmail.com>
+From: brendanhiggins@google.com (Brendan Higgins)
+Date: Thu, 19 Oct 2017 12:04:36 -0700
+Subject: [PATCH v6 2/3] arm: dts: add Nuvoton NPCM750 device tree
+In-Reply-To: <20170927214213.qjz7qalvvmhpxxmy@rob-hp-laptop>
+References: <20170919224001.22284-1-brendanhiggins@google.com>
+ <20170919224001.22284-3-brendanhiggins@google.com>
+ <20170927214213.qjz7qalvvmhpxxmy@rob-hp-laptop>
+Message-ID: <CAFd5g46mKwhfk2SG+uhB9AmmxnspBrkjKthsy9vcw+HES6COpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/19/2017 02:03 AM, Gregory Fong wrote:
-> Hi Doug,
-> 
-> Nice description of the problem with dealing with a pending disabled
-> wake interrupt and the solution.  A few remarks:
-> 
-> On Fri, Sep 29, 2017 at 08:40:57PM -0700, Doug Berger wrote:
->> diff --git a/drivers/gpio/gpio-brcmstb.c b/drivers/gpio/gpio-brcmstb.c
->> index 752a46ce3589..c964ed71a68d 100644
->> --- a/drivers/gpio/gpio-brcmstb.c
->> +++ b/drivers/gpio/gpio-brcmstb.c
->> @@ -19,17 +19,29 @@
->>  #include <linux/irqdomain.h>
->>  #include <linux/irqchip/chained_irq.h>
->>  #include <linux/interrupt.h>
->> -#include <linux/reboot.h>
->> -
->> -#define GIO_BANK_SIZE           0x20
->> -#define GIO_ODEN(bank)          (((bank) * GIO_BANK_SIZE) + 0x00)
->> -#define GIO_DATA(bank)          (((bank) * GIO_BANK_SIZE) + 0x04)
->> -#define GIO_IODIR(bank)         (((bank) * GIO_BANK_SIZE) + 0x08)
->> -#define GIO_EC(bank)            (((bank) * GIO_BANK_SIZE) + 0x0c)
->> -#define GIO_EI(bank)            (((bank) * GIO_BANK_SIZE) + 0x10)
->> -#define GIO_MASK(bank)          (((bank) * GIO_BANK_SIZE) + 0x14)
->> -#define GIO_LEVEL(bank)         (((bank) * GIO_BANK_SIZE) + 0x18)
->> -#define GIO_STAT(bank)          (((bank) * GIO_BANK_SIZE) + 0x1c)
->> +
->> +enum gio_reg_index {
->> +	GIO_REG_ODEN = 0,
->> +	GIO_REG_DATA,
->> +	GIO_REG_IODIR,
->> +	GIO_REG_EC,
->> +	GIO_REG_EI,
->> +	GIO_REG_MASK,
->> +	GIO_REG_LEVEL,
->> +	GIO_REG_STAT,
->> +	GIO_REG_COUNT
-> 
-> Please change the name or add a comment to make it clear that this is
-> not for an actual register.
-> 
+Sorry for the delay. A couple questions:
 
-Will do.
-
->> +};
->> +
->> [snip]
->> @@ -37,6 +49,8 @@ struct brcmstb_gpio_bank {
->>  	struct gpio_chip gc;
->>  	struct brcmstb_gpio_priv *parent_priv;
->>  	u32 width;
->> +	u32 wake_active;
->> +	u32 regs[GIO_REG_STAT]; /* Don't save and restore GIO_REG_STAT */
-> 
-> Consider naming to make it clearer that this is for save/restore, not
-> some kind of shadow reg implementation or anything like that.
-> 
-
-Will do.
-
->>  };
->>  
->>  struct brcmstb_gpio_priv {
->> @@ -49,7 +63,6 @@ struct brcmstb_gpio_priv {
->>  	int gpio_base;
->>  	int num_gpios;
->>  	int parent_wake_irq;
->> -	struct notifier_block reboot_notifier;
->>  };
->>  
->>  #define MAX_GPIO_PER_BANK       32
->> @@ -65,15 +78,22 @@ brcmstb_gpio_gc_to_priv(struct gpio_chip *gc)
->>  }
->>  
->>  static unsigned long
->> -brcmstb_gpio_get_active_irqs(struct brcmstb_gpio_bank *bank)
->> +__brcmstb_gpio_get_active_irqs(struct brcmstb_gpio_bank *bank)
->>  {
->>  	void __iomem *reg_base = bank->parent_priv->reg_base;
->> +
->> +	return bank->gc.read_reg(reg_base + GIO_STAT(bank->id)) &
->> +	       bank->gc.read_reg(reg_base + GIO_MASK(bank->id));
->> +}
->> +
->> +static unsigned long
->> +brcmstb_gpio_get_active_irqs(struct brcmstb_gpio_bank *bank)
->> +{
->>  	unsigned long status;
->>  	unsigned long flags;
->>  
->>  	spin_lock_irqsave(&bank->gc.bgpio_lock, flags);
->> -	status = bank->gc.read_reg(reg_base + GIO_STAT(bank->id)) &
->> -		 bank->gc.read_reg(reg_base + GIO_MASK(bank->id));
->> +	status = __brcmstb_gpio_get_active_irqs(bank);
->>  	spin_unlock_irqrestore(&bank->gc.bgpio_lock, flags);
->>  
->>  	return status;
->> @@ -209,11 +229,6 @@ static int brcmstb_gpio_priv_set_wake(struct brcmstb_gpio_priv *priv,
->>  {
->>  	int ret = 0;
->>  
->> -	/*
->> -	 * Only enable wake IRQ once for however many hwirqs can wake
->> -	 * since they all use the same wake IRQ.  Mask will be set
->> -	 * up appropriately thanks to IRQCHIP_MASK_ON_SUSPEND flag.
->> -	 */
->>  	if (enable)
->>  		ret = enable_irq_wake(priv->parent_wake_irq);
->>  	else
->> @@ -227,7 +242,17 @@ static int brcmstb_gpio_priv_set_wake(struct brcmstb_gpio_priv *priv,
->>  static int brcmstb_gpio_irq_set_wake(struct irq_data *d, unsigned int enable)
->>  {
->>  	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
->> -	struct brcmstb_gpio_priv *priv = brcmstb_gpio_gc_to_priv(gc);
->> +	struct brcmstb_gpio_bank *bank = gpiochip_get_data(gc);
->> +	struct brcmstb_gpio_priv *priv = bank->parent_priv;
->> +	u32 mask = BIT(brcmstb_gpio_hwirq_to_offset(d->hwirq, bank));
->> +
->> +	/* Do not do anything specific for now, suspend/resume callbacks will
->> +	 * configure the interrupt mask appropriately
->> +	 */
-> 
-> Please fix comment format (this is the network subsystem style).
-> 
-
-Thanks, force of habit ;).
-
+On Wed, Sep 27, 2017 at 2:42 PM, Rob Herring <robh@kernel.org> wrote:
+> On Tue, Sep 19, 2017 at 03:40:00PM -0700, Brendan Higgins wrote:
+>> Add a common device tree for all Nuvoton NPCM750 BMCs and a board
+>> specific device tree for the NPCM750 (Poleg) evaluation board.
 >>
->> [snip] 
->> @@ -508,6 +511,99 @@ static int brcmstb_gpio_irq_setup(struct platform_device *pdev,
->> [...]
->> +static void brcmstb_gpio_shutdown(struct platform_device *pdev)
->> +{
->> +	/* Enable GPIO for S5 cold boot */
->> +	brcmstb_gpio_quiesce(&pdev->dev, 0);
-> 
-> nit: use false instead of 0 (it's a bool).
-> 
-
-Will do.
-
->> +}
+>> Signed-off-by: Brendan Higgins <brendanhiggins@google.com>
+>> Reviewed-by: Tomer Maimon <tmaimon77@gmail.com>
+>> Reviewed-by: Avi Fishman <avifishman70@gmail.com>
+>> Reviewed-by: Joel Stanley <joel@jms.id.au>
+>> Tested-by: Tomer Maimon <tmaimon77@gmail.com>
+>> Tested-by: Avi Fishman <avifishman70@gmail.com>
+>> ---
+>>  .../arm/cpu-enable-method/nuvoton,npcm7xx-smp      |  42 ++++
+>>  .../devicetree/bindings/arm/npcm/npcm.txt          |   6 +
+>>  arch/arm/boot/dts/nuvoton-npcm750-evb.dts          |  48 +++++
+>>  arch/arm/boot/dts/nuvoton-npcm750.dtsi             | 211 +++++++++++++++++++++
+>>  include/dt-bindings/clock/nuvoton,npcm7xx-clks.h   |  39 ++++
+>>  5 files changed, 346 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/cpu-enable-method/nuvoton,npcm7xx-smp
+>>  create mode 100644 Documentation/devicetree/bindings/arm/npcm/npcm.txt
+>>  create mode 100644 arch/arm/boot/dts/nuvoton-npcm750-evb.dts
+>>  create mode 100644 arch/arm/boot/dts/nuvoton-npcm750.dtsi
+>>  create mode 100644 include/dt-bindings/clock/nuvoton,npcm7xx-clks.h
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/cpu-enable-method/nuvoton,npcm7xx-smp b/Documentation/devicetree/bindings/arm/cpu-enable-method/nuvoton,npcm7xx-smp
+>> new file mode 100644
+>> index 000000000000..e81f85b400cf
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/cpu-enable-method/nuvoton,npcm7xx-smp
+>> @@ -0,0 +1,42 @@
+>> +=========================================================
+>> +Secondary CPU enable-method "nuvoton,npcm7xx-smp" binding
+>> +=========================================================
 >> +
->> +#ifdef CONFIG_PM_SLEEP
->> [snip]
->> +static int brcmstb_gpio_resume(struct device *dev)
->> +{
->> +	struct brcmstb_gpio_priv *priv = dev_get_drvdata(dev);
->> +	struct brcmstb_gpio_bank *bank;
->> +	u32 wake_mask = 0;
-> 
-> This isn't really being used as a mask, contrary to appearances.  It's
-> just tracking whether any active IRQs were seen.  Please change to use a
-> bool instead and adjust the name accordingly.
-> 
-
-I see your point, but I believe it is cleaner to use this to consolidate
-the bit masks returned by each __brcmstb_gpio_get_active_irqs() call.
-This allows a single test rather than a test per bank.
-
+>> +To apply to all CPUs, a single "nuvoton,npcm7xx-smp" enable method should be
+>> +defined in the "cpus" node.
 >> +
->> +	list_for_each_entry(bank, &priv->bank_list, node) {
->> +		wake_mask |= __brcmstb_gpio_get_active_irqs(bank);
->> +		brcmstb_gpio_bank_restore(priv, bank);
->> +	}
+>> +Enable method name:  "nuvoton,npcm7xx-smp"
+>> +Compatible machines: "nuvoton,npcm750"
+>> +Compatible CPUs:     "arm,cortex-a9"
+>> +Related properties:  (none)
 >> +
->> +	if (priv->parent_wake_irq && wake_mask)
->> +		pm_wakeup_event(dev, 0);
+>> +Note:
+>> +This enable method needs valid nodes compatible with "arm,cortex-a9-scu" and
+>> +"nuvoton,npcm750-gcr".
 >> +
->> +	/* enable non-wake interrupt */
->> +	if (priv->parent_irq >= 0)
->> +		enable_irq(priv->parent_irq);
+>> +Example:
 >> +
->> +	return 0;
->> +}
+>> +     cpus {
+>> +             #address-cells = <1>;
+>> +             #size-cells = <0>;
+>> +             enable-method = "nuvoton,npcm7xx-smp";
 >> +
->> +#else
->> +#define brcmstb_gpio_suspend	NULL
->> +#define brcmstb_gpio_resume	NULL
->> +#endif /* CONFIG_PM_SLEEP */
+>> +             cpu at 0 {
+>> +                     device_type = "cpu";
+>> +                     compatible = "arm,cortex-a9";
+>> +                     clocks = <&clk NPCM7XX_CLK_CPU>;
+>> +                     clock-names = "clk_cpu";
+>> +                     reg = <0>;
+>> +                     next-level-cache = <&L2>;
+>> +             };
 >> +
->> +static const struct dev_pm_ops brcmstb_gpio_pm_ops = {
->> +	.suspend_noirq	= brcmstb_gpio_suspend,
->> +	.resume_noirq = brcmstb_gpio_resume,
+>> +             cpu at 1 {
+>> +                     device_type = "cpu";
+>> +                     compatible = "arm,cortex-a9";
+>> +                     clocks = <&clk NPCM7XX_CLK_CPU>;
+>> +                     clock-names = "clk_cpu";
+>> +                     reg = <1>;
+>> +                     next-level-cache = <&L2>;
+>> +             };
+>> +     };
+>> +
+>> diff --git a/Documentation/devicetree/bindings/arm/npcm/npcm.txt b/Documentation/devicetree/bindings/arm/npcm/npcm.txt
+>> new file mode 100644
+>> index 000000000000..2d87d9ecea85
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/npcm/npcm.txt
+>> @@ -0,0 +1,6 @@
+>> +NPCM Platforms Device Tree Bindings
+>> +-----------------------------------
+>> +NPCM750 SoC
+>> +Required root node properties:
+>> +     - compatible = "nuvoton,npcm750";
+>> +
+>> diff --git a/arch/arm/boot/dts/nuvoton-npcm750-evb.dts b/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
+>> new file mode 100644
+>> index 000000000000..a0675e584125
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
+>> @@ -0,0 +1,48 @@
+>> +/*
+>> + * DTS file for all NPCM750 SoCs
+>> + *
+>> + * Copyright 2012 Tomer Maimon <tomer.maimon@nuvoton.com>
+>> + *
+>> + * The code contained herein is licensed under the GNU General Public
+>> + * License. You may obtain a copy of the GNU General Public License
+>> + * Version 2 or later at the following locations:
+>> + *
+>> + * http://www.opensource.org/licenses/gpl-license.html
+>> + * http://www.gnu.org/copyleft/gpl.html
+>> + */
+>> +
+>> +/dts-v1/;
+>> +#include "nuvoton-npcm750.dtsi"
+>> +
+>> +/ {
+>> +     model = "Nuvoton npcm750 Development Board (Device Tree)";
+>> +     compatible = "nuvoton,npcm750";
+>> +
+>> +     chosen {
+>> +             stdout-path = &serial3;
+>> +     };
+>> +
+>> +     memory {
+>> +             reg = <0 0x40000000>;
+>> +     };
 >> +};
 >> +
->>  static int brcmstb_gpio_probe(struct platform_device *pdev)
->>  {
->>  	struct device *dev = &pdev->dev;
->> @@ -517,7 +613,7 @@ static int brcmstb_gpio_probe(struct platform_device *pdev)
->>  	struct resource *res;
->>  	struct property *prop;
->>  	const __be32 *p;
->> -	u32 bank_width;
->> +	u32 bank_width, wake_mask = 0;
-> 
-> Same comment on wake_mask as for brcmstb_gpio_resume() above.
-> 
+>> +&watchdog1 {
+>> +     status = "okay";
+>> +};
+>> +
+>> +&serial0 {
+>> +     status = "okay";
+>> +};
+>> +
+>> +&serial1 {
+>> +     status = "okay";
+>> +};
+>> +
+>> +&serial2 {
+>> +     status = "okay";
+>> +};
+>> +
+>> +&serial3 {
+>> +     status = "okay";
+>> +};
+>> diff --git a/arch/arm/boot/dts/nuvoton-npcm750.dtsi b/arch/arm/boot/dts/nuvoton-npcm750.dtsi
+>> new file mode 100644
+>> index 000000000000..5d8a48e44274
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/nuvoton-npcm750.dtsi
+>> @@ -0,0 +1,211 @@
+>> +/*
+>> + * DTSi file for the NPCM750 SoC
+>> + *
+>> + * Copyright 2012 Tomer Maimon <tomer.maimon@nuvoton.com>
+>> + *
+>> + * The code contained herein is licensed under the GNU General Public
+>> + * License. You may obtain a copy of the GNU General Public License
+>> + * Version 2 or later at the following locations:
+>> + *
+>> + * http://www.opensource.org/licenses/gpl-license.html
+>> + * http://www.gnu.org/copyleft/gpl.html
+>> + */
+>> +
+>> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+>> +#include <dt-bindings/clock/nuvoton,npcm7xx-clks.h>
+>> +
+>> +/ {
+>> +     #address-cells = <1>;
+>> +     #size-cells = <1>;
+>> +     interrupt-parent = <&gic>;
+>> +
+>> +     cpus {
+>> +             #address-cells = <1>;
+>> +             #size-cells = <0>;
+>> +             enable-method = "nuvoton,npcm7xx-smp";
+>> +
+>> +             cpu at 0 {
+>> +                     device_type = "cpu";
+>> +                     compatible = "arm,cortex-a9";
+>> +                     clocks = <&clk NPCM7XX_CLK_CPU>;
+>> +                     clock-names = "clk_cpu";
+>> +                     reg = <0>;
+>> +                     next-level-cache = <&l2>;
+>> +             };
+>> +
+>> +             cpu at 1 {
+>> +                     device_type = "cpu";
+>> +                     compatible = "arm,cortex-a9";
+>> +                     clocks = <&clk NPCM7XX_CLK_CPU>;
+>> +                     clock-names = "clk_cpu";
+>> +                     reg = <1>;
+>> +                     next-level-cache = <&l2>;
+>> +             };
+>> +     };
+>> +
+>
+>> +     gcr: gcr at f0800000 {
+>> +             compatible = "nuvoton,npcm750-gcr", "syscon",
+>> +                     "simple-mfd";
+>> +             reg = <0xf0800000 0x1000>;
+>> +     };
+>> +
+>> +     scu: scu at f03fe000 {
+>> +             compatible = "arm,cortex-a9-scu";
+>> +             reg = <0xf03fe000 0x1000>;
+>> +     };
+>> +
+>> +     l2: cache-controller at f03fc000 {
+>> +             compatible = "arm,pl310-cache";
+>> +             reg = <0xf03fc000 0x1000>;
+>> +             interrupts = <0 21 4>;
+>> +             cache-unified;
+>> +             cache-level = <2>;
+>> +             clocks = <&clk NPCM7XX_CLK_AXI>;
+>> +     };
+>> +
+>> +     gic: interrupt-controller at f03ff000 {
+>> +             compatible = "arm,cortex-a9-gic";
+>> +             interrupt-controller;
+>> +             #interrupt-cells = <3>;
+>> +             reg = <0xf03ff000 0x1000>,
+>> +                 <0xf03fe100 0x100>;
+>> +     };
+>> +
+>> +     timer at f03fe600 {
+>> +             compatible = "arm,cortex-a9-twd-timer";
+>> +             reg = <0xf03fe600 0x20>;
+>> +             interrupts = <1 13 0x304>;
+>> +             clocks = <&clk NPCM7XX_CLK_TIMER>;
+>> +     };
+>
+> All these nodes with a memory mapped address should go under a bus node.
+>
+>> +
+>> +     ahb {
+>> +             #address-cells = <1>;
+>> +             #size-cells = <1>;
+>> +             compatible = "simple-bus";
+>> +             interrupt-parent = <&gic>;
+>> +             ranges = <0x80000000 0x80000000 0x40000000
+>> +                       0xc0000000 0xc0000000 0x00002000
+>> +                       0xc0008000 0xc0008000 0x00001000
+>> +                       0xe0800000 0xe0800000 0x00001000
+>> +                       0xe1000000 0xe1000000 0x00001000
+>> +                       0xe8000000 0xe8000000 0x08000000
+>
+> These addresses don't appear to be used. These are coming later? They
+> could be collapsed down into 2 entries.
 
-Same response.
+Yep, the other addresses will be used in later patch sets. This is part of why I
+did not think that it made sense to do address translation here. I thought that
+mapping such a large range of addresses would not make it any easier to read,
+quite the opposite. At least addresses 'mapped' to the original address
+correspond to the datasheet. So I am guessing that is not what you are asking
+me to do.
 
->>  	int num_banks = 0;
->>  	int err;
->>  	static int gpio_base;
->> @@ -617,6 +713,7 @@ static int brcmstb_gpio_probe(struct platform_device *pdev)
->>  		 * Mask all interrupts by default, since wakeup interrupts may
->>  		 * be retained from S5 cold boot
->>  		 */
->> +		wake_mask |= __brcmstb_gpio_get_active_irqs(bank);
->>  		gc->write_reg(reg_base + GIO_MASK(bank->id), 0);
->>  
->>  		err = gpiochip_add_data(gc, bank);
->> @@ -646,6 +743,9 @@ static int brcmstb_gpio_probe(struct platform_device *pdev)
->>  	dev_info(dev, "Registered %d banks (GPIO(s): %d-%d)\n",
->>  			num_banks, priv->gpio_base, gpio_base - 1);
->>  
->> +	if (priv->parent_wake_irq && wake_mask)
->> +		pm_wakeup_event(dev, 0);
-> 
-> Why is this called in probe?
-> 
+Most of the large mappings (on the orders of MB) correspond to memory
+locations mapped on either one of the SPI busses or PCIe busses, which when
+implemented would likely get their own busses under ahb.
 
-This allows proper wakeup accounting when waking from S5.
+Are you asking that I remap just the addresses for controlling SoC devices
+(0xf0xxxxxx), leave the external busses as is, and then remap those within their
+busses when we get to that point?
 
-> Thanks,
-> Gregory
-> 
+I will try to implement what I think you are asking me to do and get a patch out
+later today. Hopefully that will make this discussion easier.
 
-Thanks again for the review.  I will try to get a v2 out next week.
-    Doug
+>
+> <0x80000000 0x80000000 0x40010000>
+> <0xe0800000 0xe0800000 0x0f800000>
+>
+>> +                       /* APB start */
+>> +                       0xf0000000 0xf0000000 0x00005000
+>> +                       0xf0007000 0xf0007000 0x00005000
+>> +                       0xf0010000 0xf0010000 0x00008000
+>> +                       0xf0080000 0xf0080000 0x00010000
+>> +                       0xf009f000 0xf009f000 0x00001000
+>> +                       0xf0100000 0xf0100000 0x00005000
+>> +                       0xf0180000 0xf0180000 0x0000b000
+>> +                       0xf0200000 0xf0200000 0x00002000
+>
+> Not necessary to be so fine grained and shouldn't just be 1:1. So
+> for these just:
+>
+> <0 0xf0000000 0x00900000>
+>
+>
+>> +                       /* APB end */
+>> +                       0xf0800000 0xf0800000 0x000fc000
+>> +                       0xf8000000 0xf8000000 0x02000000
+>> +                       0xfb000000 0xfb000000 0x00002000>;
+>
+>> +
+>> +             clk: clock-controller at f0801000 {
+>> +                     compatible = "nuvoton,npcm750-clk";
+>> +                     #clock-cells = <1>;
+>> +                     reg = <0xf0801000 0x1000>;
+>
+> Then this becomes: 0x801000 0x1000
+>
+>> +                     status = "okay";
+>> +             };
+>> +
+>> +             /* external clock signal rg1refck, supplied by the phy */
+>> +             clk-rg1refck {
+>> +                     compatible = "fixed-clock";
+>> +                     #clock-cells = <0>;
+>> +                     clock-frequency = <125000000>;
+>> +             };
+>> +
+>> +             /* external clock signal rg2refck, supplied by the phy */
+>> +             clk-rg2refck {
+>> +                     compatible = "fixed-clock";
+>> +                     #clock-cells = <0>;
+>> +                     clock-frequency = <125000000>;
+>> +             };
+>> +
+>> +             clk-xin {
+>> +                     compatible = "fixed-clock";
+>> +                     #clock-cells = <0>;
+>> +                     clock-frequency = <50000000>;
+>> +             };
+>
+> These clocks are not on the bus, so move them out of the bus node to the
+> top level.
+>
+>> +
+>> +             apb {
+>> +                     #address-cells = <1>;
+>> +                     #size-cells = <1>;
+>> +                     compatible = "simple-bus";
+>> +                     interrupt-parent = <&gic>;
+>> +                     ranges = <0xf0000000 0xf0000000 0x00005000
+>> +                               0xf0007000 0xf0007000 0x00005000
+>> +                               0xf0010000 0xf0010000 0x00008000
+>> +                               0xf0080000 0xf0080000 0x00010000
+>> +                               0xf009f000 0xf009f000 0x00001000
+>> +                               0xf0100000 0xf0100000 0x00005000
+>> +                               0xf0180000 0xf0180000 0x0000b000
+>> +                               0xf0200000 0xf0200000 0x00002000>;
+>
+> With above changes this can be just: <0 0 0x300000>
+>
+>> +
+>> +                     timer0: timer at f0000000 {
+>> +                             compatible = "nuvoton,npcm750-timer";
+>> +                             interrupts = <0 32 4>;
+>> +                             reg = <0xf0000000 0x1000>;
+>> +                             clocks = <&clk NPCM7XX_CLK_TIMER>;
+>> +                     };
+>> +
+>> +                     watchdog0: watchdog at f0008000 {
+>> +                             compatible = "nuvoton,npcm750-wdt";
+>> +                             interrupts = <0 47 4>;
+>> +                             reg = <0xf0008000 0x1000>;
+>> +                             status = "disabled";
+>> +                             clocks = <&clk NPCM7XX_CLK_TIMER>;
+>> +                     };
+>> +
+>> +                     watchdog1: watchdog at f0009000 {
+>> +                             compatible = "nuvoton,npcm750-wdt";
+>> +                             interrupts = <0 48 4>;
+>> +                             reg = <0xf0009000 0x1000>;
+>> +                             status = "disabled";
+>> +                             clocks = <&clk NPCM7XX_CLK_TIMER>;
+>> +                     };
+>> +
+>> +                     watchdog2: watchdog at f000a000 {
+>> +                             compatible = "nuvoton,npcm750-wdt";
+>> +                             interrupts = <0 49 4>;
+>> +                             reg = <0xf000a000 0x1000>;
+>> +                             status = "disabled";
+>> +                             clocks = <&clk NPCM7XX_CLK_TIMER>;
+>> +                     };
+>> +
+>> +                     serial0: serial0 at f0001000 {
+>
+> Sorry I miss this earlier, but need to drop the 0 in the node names.
+> IOW, should be "serial at f0001000".
+>
+>> +                             compatible = "nuvoton,npcm750-uart";
+>> +                             reg = <0xf0001000 0x1000>;
+>> +                             clocks = <&clk NPCM7XX_CLK_UART_CORE>;
+>> +                             interrupts = <0 2 4>;
+>> +                             status = "disabled";
+>> +                     };
+>> +
+>> +                     serial1: serial1 at f0002000 {
+>> +                             compatible = "nuvoton,npcm750-uart";
+>> +                             reg = <0xf0002000 0x1000>;
+>> +                             clocks = <&clk NPCM7XX_CLK_UART_CORE>;
+>> +                             interrupts = <0 3 4>;
+>> +                             status = "disabled";
+>> +                     };
+>> +
+>> +                     serial2: serial2 at f0003000 {
+>> +                             compatible = "nuvoton,npcm750-uart";
+>> +                             reg = <0xf0003000 0x1000>;
+>> +                             clocks = <&clk NPCM7XX_CLK_UART_CORE>;
+>> +                             interrupts = <0 4 4>;
+>> +                             status = "disabled";
+>> +                     };
+>> +
+>> +                     serial3: serial3 at f0004000 {
+>> +                             compatible = "nuvoton,npcm750-uart";
+>> +                             reg = <0xf0004000 0x1000>;
+>> +                             clocks = <&clk NPCM7XX_CLK_UART_CORE>;
+>> +                             interrupts = <0 5 4>;
+>> +                             status = "disabled";
+>> +                     };
+>> +             };
+>> +     };
+>> +};
+
+Thanks!
