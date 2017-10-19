@@ -1,29 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Oct 2017 22:57:38 +0200
-Subject: [GIT PULL] STM32 defconfig changes for v4.15 #1
-In-Reply-To: <8c7fe79d-ebd3-ee7c-f056-1d3aa225edee@st.com>
-References: <8c7fe79d-ebd3-ee7c-f056-1d3aa225edee@st.com>
-Message-ID: <CAK8P3a3sfq13v8sVox8xiXvHpSyzsvV_4LEYsoNtdfLLhyS7MA@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 19 Oct 2017 16:10:34 -0500
+Subject: [PATCH] nvmem: meson: use generic compatible
+In-Reply-To: <1508311867.3957.33.camel@baylibre.com>
+References: <20171012152450.12454-1-jbrunet@baylibre.com>
+ <CAFBinCBVNEqTk+NUHz62FetLhYagFb5K+g17P_2Xb7sBUfEmdA@mail.gmail.com>
+ <1507923553.30658.10.camel@baylibre.com>
+ <20171017205204.t4vfvbc2c5nsrnhm@rob-hp-laptop>
+ <1508311867.3957.33.camel@baylibre.com>
+Message-ID: <CAL_JsqKV5yGNFXxsPzAgF6_g-bQn8x8ScXVZ=Wgc1=APPL=mMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 12:16 PM, Alexandre Torgue
-<alexandre.torgue@st.com> wrote:
-> ----------------------------------------------------------------
-> STM32 defconfig updates for v4.15, round 1
+On Wed, Oct 18, 2017 at 2:31 AM, Jerome Brunet <jbrunet@baylibre.com> wrote:
+> On Tue, 2017-10-17 at 15:52 -0500, Rob Herring wrote:
+>> On Fri, Oct 13, 2017 at 09:39:13PM +0200, Jerome Brunet wrote:
+>> > On Fri, 2017-10-13 at 21:14 +0200, Martin Blumenstingl wrote:
+>> > > Hi Jerome,
+>> > >
+>> > > On Thu, Oct 12, 2017 at 5:24 PM, Jerome Brunet <jbrunet@baylibre.com>
+>> > > wrote:
+>> > > > The meson efuse driver seems to be compatible with more SoCs than
+>> > > > initially thought. Let's use the most generic compatible he have in
+>> > > > DT instead of the gxbb specific one
+>> > > >
+>> > > > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+>> > > > ---
+>> > > >  Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt | 4 ++--
+>> > > >  drivers/nvmem/meson-efuse.c                               | 2 +-
+>> > > >  2 files changed, 3 insertions(+), 3 deletions(-)
+>> > > >
+>> > > > diff --git a/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
+>> > > > b/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
+>> > > > index fafd85bd67a6..0260524292fe 100644
+>> > > > --- a/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
+>> > > > +++ b/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
+>> > > > @@ -1,7 +1,7 @@
+>> > > >  = Amlogic eFuse device tree bindings =
+>> > > >
+>> > > >  Required properties:
+>> > > > -- compatible: should be "amlogic,meson-gxbb-efuse"
+>> > > > +- compatible: should be "amlogic,meson-gx-efuse"
+>>
+>> Same comment as for the firmware.
+>>
+>> > >
+>> > > have you checked with the devicetree maintainers how they want the
+>> > > documentation to look like in this case?
+>> >
+>> > You mean "Should we put every compatible existing (in DT) in the
+>> > documentation"
+>> > From what I've seen, at least in meson drivers, only the matched ones are
+>> > listed.
+>> >
+>> > That's a good question though.
+>> > We tend to put soc specific compatible "in case"  we need them later on.
+>> > Should
+>> > we document those ?
+>>
+>> Absolutely.
 >
-> Highlights:
-> ----------
->  -Regenerate default configuration
->  -Add DMAMUX support
->  -Add I2C F7 support
->  -Add MDMA support
+> My understanding is that this documentation is the documentation of the bindings
+> used by the driver.
 
-Pulled into next/soc.
+No, the binding doc should be sufficient to validate the dts.
 
-Splitting out the first patch is fine, but there really is no need to have one
-patch per new Kconfig option you enable, it's less work and more readable to
-have a combined patch that explains what the options are and why you need
-all of them.
+> If I understand your point, we should document bindings (compatible in that
+> case) that are in fact not fact by the driver. This means that if someone refer
+> only to the documentation, he might be surprised by the result.
 
-        Arnd
+How so?
+
+Rob
