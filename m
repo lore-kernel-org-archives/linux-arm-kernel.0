@@ -1,29 +1,16 @@
 From: james.morse@arm.com (James Morse)
-Date: Thu, 19 Oct 2017 15:57:50 +0100
-Subject: [PATCH v4 04/21] arm64: Mask all exceptions during kernel_exit
+Date: Thu, 19 Oct 2017 15:57:54 +0100
+Subject: [PATCH v4 08/21] arm64: entry.S: convert elX_irq
 In-Reply-To: <20171019145807.23251-1-james.morse@arm.com>
 References: <20171019145807.23251-1-james.morse@arm.com>
-Message-ID: <20171019145807.23251-5-james.morse@arm.com>
+Message-ID: <20171019145807.23251-9-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To take RAS Exceptions as quickly as possible we need to keep SError
-unmasked as much as possible. We need to mask it during kernel_exit
-as taking an error from this code will overwrite the exception-registers.
+Following our 'dai' order, irqs should be processed with debug and
+serror exceptions unmasked.
 
-Adding a naked 'disable_daif' to kernel_exit causes a performance problem
-for micro-benchmarks that do no real work, (e.g. calling getpid() in a
-loop). This is because the ret_to_user loop has already masked IRQs so
-that the TIF_WORK_MASK thread flags can't change underneath it, adding
-disable_daif is an additional self-synchronising operation.
-
-In the future, the RAS APEI code may need to modify the TIF_WORK_MASK
-flags from an SError, in which case the ret_to_user loop must mask SError
-while it examines the flags.
-
-Disable all exceptions for return to EL1. For return to EL0 get the
-ret_to_user loop to leave all exceptions masked once it has done its
-work, this avoids an extra pstate-write.
+Add a helper to unmask these two, (and fiq for good measure).
 
 Signed-off-by: James Morse <james.morse@arm.com>
 Reviewed-by: Julien Thierry <julien.thierry@arm.com>
@@ -31,95 +18,49 @@ Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 
 ---
 Changes since v3:
-* swapped verb/daif word-order.
+* Added comment against enable_da_f
 
- arch/arm64/kernel/entry.S  | 10 +++++-----
- arch/arm64/kernel/signal.c |  8 ++++++--
- 2 files changed, 11 insertions(+), 7 deletions(-)
+ arch/arm64/include/asm/assembler.h | 5 +++++
+ arch/arm64/kernel/entry.S          | 4 ++--
+ 2 files changed, 7 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index c2a37e2f733c..e4ac505b7b3d 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -54,6 +54,11 @@
+ 	msr	daif, \tmp
+ 	.endm
+ 
++	/* IRQ is the lowest priority flag, unconditionally unmask the rest. */
++	.macro enable_da_f
++	msr	daifclr, #(8 | 4 | 1)
++	.endm
++
+ /*
+  * Enable and disable interrupts.
+  */
 diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index e1c59d4008a8..f7d7bf9d76e7 100644
+index f7dfe5d2b1fb..df085ec003b0 100644
 --- a/arch/arm64/kernel/entry.S
 +++ b/arch/arm64/kernel/entry.S
-@@ -221,6 +221,8 @@ alternative_else_nop_endif
- 
- 	.macro	kernel_exit, el
- 	.if	\el != 0
-+	disable_daif
-+
- 	/* Restore the task's original addr_limit. */
- 	ldr	x20, [sp, #S_ORIG_ADDR_LIMIT]
- 	str	x20, [tsk, #TSK_TI_ADDR_LIMIT]
-@@ -517,8 +519,6 @@ el1_da:
- 	mov	x2, sp				// struct pt_regs
- 	bl	do_mem_abort
- 
--	// disable interrupts before pulling preserved data off the stack
--	disable_irq
- 	kernel_exit 1
- el1_sp_pc:
- 	/*
-@@ -793,7 +793,7 @@ ENDPROC(el0_irq)
-  * and this includes saving x0 back into the kernel stack.
-  */
- ret_fast_syscall:
--	disable_irq				// disable interrupts
-+	disable_daif
- 	str	x0, [sp, #S_X0]			// returned x0
- 	ldr	x1, [tsk, #TSK_TI_FLAGS]	// re-check for syscall tracing
- 	and	x2, x1, #_TIF_SYSCALL_WORK
-@@ -803,7 +803,7 @@ ret_fast_syscall:
- 	enable_step_tsk x1, x2
- 	kernel_exit 0
- ret_fast_syscall_trace:
--	enable_irq				// enable interrupts
-+	enable_daif
- 	b	__sys_trace_return_skipped	// we already saved x0
- 
- /*
-@@ -821,7 +821,7 @@ work_pending:
-  * "slow" syscall return path.
-  */
- ret_to_user:
--	disable_irq				// disable interrupts
-+	disable_daif
- 	ldr	x1, [tsk, #TSK_TI_FLAGS]
- 	and	x2, x1, #_TIF_WORK_MASK
- 	cbnz	x2, work_pending
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index 0bdc96c61bc0..8e6500c9471b 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -31,6 +31,7 @@
- #include <linux/ratelimit.h>
- #include <linux/syscalls.h>
- 
-+#include <asm/daifflags.h>
- #include <asm/debug-monitors.h>
- #include <asm/elf.h>
- #include <asm/cacheflush.h>
-@@ -756,9 +757,12 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
- 		addr_limit_user_check();
- 
- 		if (thread_flags & _TIF_NEED_RESCHED) {
-+			/* Unmask Debug and SError for the next task */
-+			local_daif_restore(DAIF_PROCCTX_NOIRQ);
-+
- 			schedule();
- 		} else {
--			local_irq_enable();
-+			local_daif_restore(DAIF_PROCCTX);
- 
- 			if (thread_flags & _TIF_UPROBE)
- 				uprobe_notify_resume(regs);
-@@ -775,7 +779,7 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
- 				fpsimd_restore_current_state();
- 		}
- 
--		local_irq_disable();
-+		local_daif_mask();
- 		thread_flags = READ_ONCE(current_thread_info()->flags);
- 	} while (thread_flags & _TIF_WORK_MASK);
- }
+@@ -557,7 +557,7 @@ ENDPROC(el1_sync)
+ 	.align	6
+ el1_irq:
+ 	kernel_entry 1
+-	enable_dbg
++	enable_da_f
+ #ifdef CONFIG_TRACE_IRQFLAGS
+ 	bl	trace_hardirqs_off
+ #endif
+@@ -766,7 +766,7 @@ ENDPROC(el0_sync)
+ el0_irq:
+ 	kernel_entry 0
+ el0_irq_naked:
+-	enable_dbg
++	enable_da_f
+ #ifdef CONFIG_TRACE_IRQFLAGS
+ 	bl	trace_hardirqs_off
+ #endif
 -- 
 2.13.3
