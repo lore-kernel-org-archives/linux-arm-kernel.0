@@ -1,160 +1,80 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 19 Oct 2017 18:29:52 +0200
-Subject: [PATCH v3 05/10] arm: dts: mt7623: update pio, usb and crypto
+Date: Thu, 19 Oct 2017 18:31:21 +0200
+Subject: [PATCH v3 06/10] arm: dts: mt7623: add subsystem clock controller
  nodes
-In-Reply-To: <08d722e47b83bd70ed4d3c9a4546a3f70df96de4.1506908511.git.ryder.lee@mediatek.com>
+In-Reply-To: <1a6aba8921584fe465bc2138a3aec10c2637f226.1506908511.git.ryder.lee@mediatek.com>
 References: <cover.1506908511.git.ryder.lee@mediatek.com>
- <08d722e47b83bd70ed4d3c9a4546a3f70df96de4.1506908511.git.ryder.lee@mediatek.com>
-Message-ID: <8c823070-7181-97cc-063e-3ced59c7e17d@gmail.com>
+ <1a6aba8921584fe465bc2138a3aec10c2637f226.1506908511.git.ryder.lee@mediatek.com>
+Message-ID: <a318bdec-e36c-ddd6-93fa-e8646a553b36@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
 On 10/02/2017 03:54 AM, Ryder Lee wrote:
-> This patch updates pio, usb and crypto nodes to make them be consistent
-> with the binding documents.
+> This patch adds missing susbsystem clock controllers nodes for MT7623.
+> (e.g., mmsys, imgsys, vdecsys and bdpsys)
 > 
 > Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 > ---
->  arch/arm/boot/dts/mt7623.dtsi | 26 ++++++++++++++------------
->  1 file changed, 14 insertions(+), 12 deletions(-)
+>  arch/arm/boot/dts/mt7623.dtsi | 32 ++++++++++++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
 > 
 > diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
-> index 381843e..0640fb7 100644
+> index 0640fb7..a877f9a 100644
 > --- a/arch/arm/boot/dts/mt7623.dtsi
 > +++ b/arch/arm/boot/dts/mt7623.dtsi
-> @@ -227,8 +227,7 @@
+> @@ -661,6 +661,30 @@
+>  		status = "disabled";
 >  	};
 >  
->  	pio: pinctrl at 10005000 {
-> -		compatible = "mediatek,mt7623-pinctrl",
-> -			     "mediatek,mt2701-pinctrl";
-> +		compatible = "mediatek,mt7623-pinctrl";
+> +	mmsys: syscon at 14000000 {
+> +		compatible = "mediatek,mt7623-mmsys",
+> +			     "mediatek,mt2701-mmsys",
+> +			     "syscon";
+> +		reg = <0 0x14000000 0 0x1000>;
+> +		#clock-cells = <1>;
+> +	};
 
-Looks good.
+We better wait until we have figured out how to fix the issues we see.
+Please resubmit when that's clear.
 
->  		reg = <0 0x1000b000 0 0x1000>;
->  		mediatek,pctl-regmap = <&syscfg_pctl_a>;
->  		pins-are-numbered;
-> @@ -680,7 +679,7 @@
->  		interrupts = <GIC_SPI 196 IRQ_TYPE_LEVEL_LOW>;
->  		clocks = <&hifsys CLK_HIFSYS_USB0PHY>,
->  			 <&topckgen CLK_TOP_ETHIF_SEL>;
-> -		clock-names = "sys_ck", "free_ck";
-> +		clock-names = "sys_ck", "ref_ck";
+Same holds for patch 8/10
 
-This is already merged. Please rebase.
-
->  		power-domains = <&scpsys MT2701_POWER_DOMAIN_HIF>;
->  		phys = <&u2port0 PHY_TYPE_USB2>, <&u3port0 PHY_TYPE_USB3>;
->  		status = "disabled";
-> @@ -690,8 +689,6 @@
->  		compatible = "mediatek,mt7623-u3phy",
->  			     "mediatek,mt2701-u3phy";
->  		reg = <0 0x1a1c4000 0 0x0700>;
-> -		clocks = <&clk26m>;
-> -		clock-names = "u3phya_ref";
-
-Same here.
-
->  		#address-cells = <2>;
->  		#size-cells = <2>;
->  		ranges;
-> @@ -699,12 +696,16 @@
->  
->  		u2port0: usb-phy at 1a1c4800 {
->  			reg = <0 0x1a1c4800 0 0x0100>;
-> +			clocks = <&topckgen CLK_TOP_USB_PHY48M>;
-> +			clock-names = "ref";
-
-Same here.
-
->  			#phy-cells = <1>;
->  			status = "okay";
->  		};
->  
->  		u3port0: usb-phy at 1a1c4900 {
->  			reg = <0 0x1a1c4900 0 0x0700>;
-> +			clocks = <&clk26m>;
-> +			clock-names = "ref";
-
-Same here.
-
->  			#phy-cells = <1>;
->  			status = "okay";
->  		};
-> @@ -719,7 +720,7 @@
->  		interrupts = <GIC_SPI 197 IRQ_TYPE_LEVEL_LOW>;
->  		clocks = <&hifsys CLK_HIFSYS_USB1PHY>,
->  			 <&topckgen CLK_TOP_ETHIF_SEL>;
-> -		clock-names = "sys_ck", "free_ck";
-> +		clock-names = "sys_ck", "ref_ck";
-
-Same here.
-
->  		power-domains = <&scpsys MT2701_POWER_DOMAIN_HIF>;
->  		phys = <&u2port1 PHY_TYPE_USB2>, <&u3port1 PHY_TYPE_USB3>;
->  		status = "disabled";
-> @@ -729,8 +730,6 @@
->  		compatible = "mediatek,mt7623-u3phy",
->  			     "mediatek,mt2701-u3phy";
->  		reg = <0 0x1a244000 0 0x0700>;
-> -		clocks = <&clk26m>;
-> -		clock-names = "u3phya_ref";
-
-Same here.
-
->  		#address-cells = <2>;
->  		#size-cells = <2>;
->  		ranges;
-> @@ -738,12 +737,16 @@
->  
->  		u2port1: usb-phy at 1a244800 {
->  			reg = <0 0x1a244800 0 0x0100>;
-> +			clocks = <&topckgen CLK_TOP_USB_PHY48M>;
-> +			clock-names = "ref";
-
-Same here.
-
->  			#phy-cells = <1>;
->  			status = "okay";
->  		};
->  
->  		u3port1: usb-phy at 1a244900 {
->  			reg = <0 0x1a244900 0 0x0700>;
-> +			clocks = <&clk26m>;
-> +			clock-names = "ref";
-
-Same here.
-
->  			#phy-cells = <1>;
->  			status = "okay";
->  		};
-> @@ -784,16 +787,15 @@
->  	};
->  
->  	crypto: crypto at 1b240000 {
-> -		compatible = "mediatek,mt7623-crypto";
-> +		compatible = "mediatek,eip97-crypto";
-
-Crypto node is not present in upstream.
-
-Regards,
+Thanks,
 Matthias
 
->  		reg = <0 0x1b240000 0 0x20000>;
->  		interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_LOW>,
->  			     <GIC_SPI 83 IRQ_TYPE_LEVEL_LOW>,
->  			     <GIC_SPI 84 IRQ_TYPE_LEVEL_LOW>,
->  			     <GIC_SPI 91 IRQ_TYPE_LEVEL_LOW>,
->  			     <GIC_SPI 97 IRQ_TYPE_LEVEL_LOW>;
-> -		clocks = <&topckgen CLK_TOP_ETHIF_SEL>,
-> -			 <&ethsys CLK_ETHSYS_CRYPTO>;
-> -		clock-names = "ethif","cryp";
-> +		clocks = <&ethsys CLK_ETHSYS_CRYPTO>;
-> +		clock-names = "cryp";
+> +
+> +	imgsys: syscon at 15000000 {
+> +		compatible = "mediatek,mt7623-imgsys",
+> +			     "mediatek,mt2701-imgsys",
+> +			     "syscon";
+> +		reg = <0 0x15000000 0 0x1000>;
+> +		#clock-cells = <1>;
+> +	};
+> +
+> +	vdecsys: syscon at 16000000 {
+> +		compatible = "mediatek,mt7623-vdecsys",
+> +			     "mediatek,mt2701-vdecsys",
+> +			     "syscon";
+> +		reg = <0 0x16000000 0 0x1000>;
+> +		#clock-cells = <1>;
+> +	};
+> +
+>  	hifsys: syscon at 1a000000 {
+>  		compatible = "mediatek,mt7623-hifsys",
+>  			     "mediatek,mt2701-hifsys",
+> @@ -799,4 +823,12 @@
 >  		power-domains = <&scpsys MT2701_POWER_DOMAIN_ETH>;
 >  		status = "disabled";
 >  	};
+> +
+> +	bdpsys: syscon at 1c000000 {
+> +		compatible = "mediatek,mt7623-bdpsys",
+> +			     "mediatek,mt2701-bdpsys",
+> +			     "syscon";
+> +		reg = <0 0x1c000000 0 0x1000>;
+> +		#clock-cells = <1>;
+> +	};
+>  };
 > 
