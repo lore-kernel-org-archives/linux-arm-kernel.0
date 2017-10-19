@@ -1,16 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Oct 2017 17:44:48 +0200
-Subject: [GIT PULL] Reset controller fixes for v4.14, part 2
-In-Reply-To: <1508405186.7665.3.camel@pengutronix.de>
-References: <1508405186.7665.3.camel@pengutronix.de>
-Message-ID: <CAK8P3a2uo2MT5UADEh7iN-AWPF9EXhCjFSOzb_pf=mRQRRu=wQ@mail.gmail.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Thu, 19 Oct 2017 16:45:11 +0100
+Subject: [PATCH 0/2] arm/arm64: kvm: Fix issue with branch profiling
+Message-ID: <1508427913-34619-1-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 19, 2017 at 11:26 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> Dear arm-soc-maintainers,
->
-> please consider merging this tag for v4.14. It contains a single fix for
-> the socfpga driver on 64-bit systems by removing the assumption that
+Hi,
 
-Pulled into fixes, thanks!
+When enabling branch profiling, a lockup occurs at boot time, after
+displaying: "kvm [1]: Hyp mode initialized successfully"
+
+The issue is caused by the Hyp code getting instrumented and trying to
+access unmapped code or data, which happens when trying to initialize EL2.
+
+So it also seems like KVM is misleadingly announcing it was initialized and
+yet gets stuck during initialization.
+
+* First patch deals with printing the initialization message once KVM has
+  fully initialized Hyp mode
+* Second patch actually disables branch profiling instrumentation in Hyp
+  code
+
+Cheers,
+
+Julien Thierry (2):
+  arm/arm64: kvm: Move initialization completion message
+  arm/arm64: kvm: Disable branch profiling in HYP code
+
+ arch/arm/kvm/hyp/Makefile   |  2 +-
+ arch/arm64/kvm/hyp/Makefile |  2 +-
+ virt/kvm/arm/arm.c          | 31 ++++++++++++++-----------------
+ 3 files changed, 16 insertions(+), 19 deletions(-)
+
+--
+1.9.1
