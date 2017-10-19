@@ -1,67 +1,54 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 19 Oct 2017 16:45:16 +0100
-Subject: [PATCH] coresight: ETM: Add support for ARM Cortex-A73
-Message-ID: <20171019154516.24536-1-suzuki.poulose@arm.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Thu, 19 Oct 2017 16:45:13 +0100
+Subject: [PATCH 2/2] arm/arm64: kvm: Disable branch profiling in HYP code
+In-Reply-To: <1508427913-34619-1-git-send-email-julien.thierry@arm.com>
+References: <1508427913-34619-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <1508427913-34619-3-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ARM Cortex A-73 ETM PIDs to the known ETM ips. While at it
-also add description of the CPU to which the ETM belongs, to make
-it easier to identify the ETM devices.
+When HYP code runs into branch profiling code, it attempts to jump to
+unmapped memory, causing a HYP Panic.
 
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Disable the branch profiling for code designed to run at HYP mode.
+
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: <stable@vger.kernel.org>
 ---
- drivers/hwtracing/coresight/coresight-etm4x.c | 24 +++++++++++++++---------
- 1 file changed, 15 insertions(+), 9 deletions(-)
+ arch/arm/kvm/hyp/Makefile   | 2 +-
+ arch/arm64/kvm/hyp/Makefile | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index cf364a514c12..e84d80b008fc 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -1034,7 +1034,8 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
- 	}
- 
- 	pm_runtime_put(&adev->dev);
--	dev_info(dev, "%s initialized\n", (char *)id->data);
-+	dev_info(dev, "CPU%d: %s initialized\n",
-+			drvdata->cpu, (char *)id->data);
- 
- 	if (boot_enable) {
- 		coresight_enable(drvdata->csdev);
-@@ -1053,20 +1054,25 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
- }
- 
- static const struct amba_id etm4_ids[] = {
--	{       /* ETM 4.0 - Cortex-A53  */
-+	{
- 		.id	= 0x000bb95d,
- 		.mask	= 0x000fffff,
--		.data	= "ETM 4.0",
-+		.data	= "Cortex-A53 ETM v4.0",
- 	},
--	{       /* ETM 4.0 - Cortex-A57 */
-+	{
- 		.id	= 0x000bb95e,
- 		.mask	= 0x000fffff,
--		.data	= "ETM 4.0",
-+		.data	= "Cortex-A57 ETM v4.0",
- 	},
--	{       /* ETM 4.0 - A72, Maia, HiSilicon */
--		.id = 0x000bb95a,
--		.mask = 0x000fffff,
--		.data = "ETM 4.0",
-+	{
-+		.id	= 0x000bb95a,
-+		.mask	= 0x000fffff,
-+		.data	= "Cortex-A72 ETM v4.0",
-+	},
-+	{
-+		.id	= 0x000bb959,
-+		.mask	= 0x000fffff,
-+		.data	= "Cortex-A73 ETM v4.0",
- 	},
- 	{ 0, 0},
- };
--- 
-2.13.6
+diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
+index 8679405..92eab1d 100644
+--- a/arch/arm/kvm/hyp/Makefile
++++ b/arch/arm/kvm/hyp/Makefile
+@@ -2,7 +2,7 @@
+ # Makefile for Kernel-based Virtual Machine module, HYP part
+ #
+
+-ccflags-y += -fno-stack-protector
++ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
+
+ KVM=../../../../virt/kvm
+
+diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+index 14c4e3b..48b0354 100644
+--- a/arch/arm64/kvm/hyp/Makefile
++++ b/arch/arm64/kvm/hyp/Makefile
+@@ -2,7 +2,7 @@
+ # Makefile for Kernel-based Virtual Machine module, HYP part
+ #
+
+-ccflags-y += -fno-stack-protector
++ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
+
+ KVM=../../../../virt/kvm
+
+--
+1.9.1
