@@ -1,48 +1,22 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 19 Oct 2017 13:41:49 +0100
+Date: Thu, 19 Oct 2017 13:43:57 +0100
 Subject: [PATCH 04/11] Define the virtual space of KASan's shadow region
-In-Reply-To: <CAKv+Gu98M9PZk3qm0PYC8nQ3zMvLZmNmOn4=hNdFE7NTBuHbgg@mail.gmail.com>
+In-Reply-To: <B8AC3E80E903784988AB3003E3E97330C005CAC2@dggemm510-mbx.china.huawei.com>
 References: <20171011082227.20546-5-liuwenliang@huawei.com>
  <201710141957.mbxeZJHB%fengguang.wu@intel.com>
  <B8AC3E80E903784988AB3003E3E97330C005B9BF@dggemm510-mbx.china.huawei.com>
  <CAKv+Gu98M9PZk3qm0PYC8nQ3zMvLZmNmOn4=hNdFE7NTBuHbgg@mail.gmail.com>
-Message-ID: <20171019124149.GX20805@n2100.armlinux.org.uk>
+ <B8AC3E80E903784988AB3003E3E97330C005CAC2@dggemm510-mbx.china.huawei.com>
+Message-ID: <20171019124357.GY20805@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 16, 2017 at 01:14:54PM +0100, Ard Biesheuvel wrote:
-> On 16 October 2017 at 12:42, Liuwenliang (Lamb) <liuwenliang@huawei.com> wrote:
-> > On 10/16/2017 07:03 PM, Abbott Liu wrote:
-> >>arch/arm/kernel/entry-armv.S:348: Error: selected processor does not support `movw r1,
-> >   #:lower16:((((0xC0000000-0x01000000)>>3)+((0xC0000000-0x01000000)-(1<<29))))' in ARM mode
-> >>arch/arm/kernel/entry-armv.S:348: Error: selected processor does not support `movt r1,
-> >   #:upper16:((((0xC0000000-0x01000000)>>3)+((0xC0000000-0x01000000)-(1<<29))))' in ARM mode
-> >
-> > Thanks for building test. This error can be solved by following code:
-> > --- a/arch/arm/kernel/entry-armv.S
-> > +++ b/arch/arm/kernel/entry-armv.S
-> > @@ -188,8 +188,7 @@ ENDPROC(__und_invalid)
-> >         get_thread_info tsk
-> >         ldr     r0, [tsk, #TI_ADDR_LIMIT]
-> >  #ifdef CONFIG_KASAN
-> > -   movw r1, #:lower16:TASK_SIZE
-> > -   movt r1, #:upper16:TASK_SIZE
-> > + ldr r1, =TASK_SIZE
-> >  #else
-> >         mov r1, #TASK_SIZE
-> >  #endif
-> 
-> This is unnecessary:
-> 
-> ldr r1, =TASK_SIZE
-> 
-> will be converted to a mov instruction by the assembler if the value
-> of TASK_SIZE fits its 12-bit immediate field.
+On Tue, Oct 17, 2017 at 11:27:19AM +0000, Liuwenliang (Lamb) wrote:
+> ---c0a3b198:       b6e00000        .word   0xb6e00000   //TASK_SIZE:0xb6e00000
 
-It's an 8-bit immediate field for ARM.
-
-What it won't do is expand it to a pair of movw/movt instructions if it
-doesn't fit.
+It's probably going to be better all round to round TASK_SIZE down
+to something that fits in an 8-bit rotated constant anyway (like
+we already guarantee) which would mean this patch is not necessary.
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
