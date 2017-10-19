@@ -1,45 +1,42 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 19 Oct 2017 12:22:07 +0100
-Subject: [PATCH v6 2/6] perf: hisi: Add support for HiSilicon SoC uncore
- PMU driver
-In-Reply-To: <1508411121-125691-3-git-send-email-zhangshaokun@hisilicon.com>
-References: <1508411121-125691-1-git-send-email-zhangshaokun@hisilicon.com>
- <1508411121-125691-3-git-send-email-zhangshaokun@hisilicon.com>
-Message-ID: <20171019112206.gpkwqwvn6mo6z5ry@lakrids.cambridge.arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 19 Oct 2017 13:26:06 +0200
+Subject: [RFC resend] arm64: mt8173: Fix Acer Chromebooks mmsys probe problem
+Message-ID: <20171019112610.13645-1-mbrugger@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 19, 2017 at 07:05:17PM +0800, Shaokun Zhang wrote:
-> This patch adds support HiSilicon SoC uncore PMU driver framework and
-> interfaces.
+In theory the MMSYS device tree identifier is matches twice, by the clk driver 
+and the DRM subsystem. But the kernel only matches the first driver for a 
+device (clk) and discards the second one. This breaks graphics on mt8173 and 
+most probably on mt2701 as well.
 
-> +static bool hisi_validate_event_group(struct perf_event *event)
-> +{
-> +	struct perf_event *sibling, *leader = event->group_leader;
-> +	struct hisi_pmu *hisi_pmu = to_hisi_pmu(event->pmu);
-> +	/* Include count for the event */
-> +	int counters = 1;
-> +
-> +	/*
-> +	 * We must NOT create groups containing mixed PMUs, although
-> +	 * software events are acceptable
-> +	 */
-> +	if (leader->pmu != event->pmu && !is_software_event(leader))
-> +		return false;
-> +
-> +	/* Increment counter for the leader */
-> +	counters++;
+MMSYS in Mediatek SoCs has some registers to control clock gates (which is 
+used in the clk driver) and some registers to enable the differnet blocks of 
+the display subsystem. The kernel uses the binding to load the central 
+comoponent of the distplay subsystem, which in place probes all the other 
+components and enables the present ones in the MMSYS.
 
-Sorry I didn't spot this before, but I believe this should be:
+We found us with the problem, that we need to change and therefor break one 
+of the two bindings, or the DRM one or the clock driver one.
 
-	if (event != leader && !is_software_event(leader))
-		counters++;
+Apart from that the DRM subysystem does access the MMSYS registers via relaxed 
+reads/writes. But the it should to so via regmap, as the registers are shared.
 
-Since the leader can be a SW event, and for the group leader itself,
-event == leader.
+Possible solutions:
+1) We add a new mediatek,mt8173-mmsys-clk node, which lives as a simple-mfd 
+under the actual mmsys node. We change the clock driver to probe on this 
+binding. This would make sense as the clock gate register live completly in 
+the MMSYS configuration registers.
 
-Assuming there aren't any major issues elsewhere, I can fix this up when
-applying the series.
+2) As the nodes of the DRM subsystem just need some of the registers of MMSYS 
+we add a new binding mediatek,mt8173-dispsys which probes the central 
+component of the DRM system. It has only a handle to mt8173-mmsys to access 
+the registerspace via regmap functions.
 
-Thanks,
-Mark.
+In this patchset I implemented 2). Please take into account, that this is a 
+RFC. I had no time to actually test the verison on real HW. Some of the 
+register accesses should be done using regmap_update instead of 
+regmap_read + regmap_write.
+
+This RFC shall only show how solution 2) would look like. We can use it as 
+discussion to see how we circumvent the actual situation.
