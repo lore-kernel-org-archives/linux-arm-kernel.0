@@ -1,63 +1,37 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 19 Oct 2017 16:55:31 +0100
-Subject: [PATCH 1/4] arm64: consistently log ESR and page table
-In-Reply-To: <1508428534-20694-1-git-send-email-will.deacon@arm.com>
-References: <1508428534-20694-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1508428534-20694-2-git-send-email-will.deacon@arm.com>
+Date: Thu, 19 Oct 2017 16:55:30 +0100
+Subject: [PATCH 0/4] arm64: Changes to register and stack dumps
+Message-ID: <1508428534-20694-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Rutland <mark.rutland@arm.com>
+Hi all,
 
-When we take a fault we can't handle, we try to dump some relevant
-information, but we're not consistent about doing so.
+This handful of patches makes some significant changes to how we print
+register/stack dumps and brings us inline with recent changes to x86.
+The main changes are that we no longer print out the 'Exception stack:'
+section and PC/LR values are resolved to a symbol+offset format where
+possible.
 
-In do_mem_abort(), we log the full ESR, but don't dump a page table
-walk. In __do_kernel_fault, we dump an attempted decoding of the ESR
-(but not the ESR itself) along with a page table walk.
+Feedback welcome.
 
-Let's try to make things more consistent by dumping the full ESR in
-mem_abort_decode(), and having do_mem_abort dump a page table walk. The
-existing dump of the ESR in do_mem_abort() is rendered redundant, and
-removed.
+Will
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Julien Thierry <julien.thierry@arm.com>
-Cc: Kristina Martsenko <kristina.martsenko@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/mm/fault.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+--->8
 
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 02d92bdf1c49..eec09c623d8e 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -112,6 +112,7 @@ static void mem_abort_decode(unsigned int esr)
- {
- 	pr_alert("Mem abort info:\n");
- 
-+	pr_alert("  ESR = 0x%08x\n", esr);
- 	pr_alert("  Exception class = %s, IL = %u bits\n",
- 		 esr_get_class_string(esr),
- 		 (esr & ESR_ELx_IL) ? 32 : 16);
-@@ -745,11 +746,13 @@ asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
- 	if (!inf->fn(addr, esr, regs))
- 		return;
- 
--	pr_alert("Unhandled fault: %s (0x%08x) at 0x%016lx\n",
--		 inf->name, esr, addr);
-+	pr_alert("Unhandled fault: %s at 0x%016lx\n",
-+		 inf->name, addr);
- 
- 	mem_abort_decode(esr);
- 
-+	show_pte(addr);
-+
- 	info.si_signo = inf->sig;
- 	info.si_errno = 0;
- 	info.si_code  = inf->code;
+Mark Rutland (1):
+  arm64: consistently log ESR and page table
+
+Will Deacon (3):
+  arm64: traps: Don't print stack or raw PC/LR values in backtraces
+  arm64: traps: Pretty-print pstate in register dumps
+  arm64: uapi: Remove PSR_Q_BIT
+
+ arch/arm64/include/uapi/asm/ptrace.h |  1 -
+ arch/arm64/kernel/process.c          | 24 ++++++++++---
+ arch/arm64/kernel/traps.c            | 65 ++----------------------------------
+ arch/arm64/mm/fault.c                |  7 ++--
+ 4 files changed, 28 insertions(+), 69 deletions(-)
+
 -- 
 2.1.4
