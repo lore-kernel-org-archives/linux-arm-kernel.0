@@ -1,54 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Oct 2017 18:01:17 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC Updates for v4.15
-In-Reply-To: <cover.1506325834.git.horms+renesas@verge.net.au>
-References: <cover.1506325834.git.horms+renesas@verge.net.au>
-Message-ID: <CAK8P3a32rCXame_ERzefy+va+40gL7NB-8Ff6XaqmXsLQpxGZA@mail.gmail.com>
+From: joonas.kylmala@iki.fi (=?UTF-8?Q?Joonas_Kylm=c3=a4l=c3=a4?=)
+Date: Thu, 19 Oct 2017 16:02:00 +0000
+Subject: [linux-sunxi] [PATCH v2 6/8] ARM: dts: sun8i: a83t: Move mmc1
+ pinctrl setting to dtsi file
+In-Reply-To: <CAGb2v64O+eyriHG-FirtPKo6hACfbV9JcJRUUZ+rY1QM2w_r1g@mail.gmail.com>
+References: <20171018083138.14517-1-wens@csie.org>
+ <20171018083138.14517-7-wens@csie.org>
+ <f85a30e2-5a9d-a7ba-0010-6602cabaf83e@riseup.net>
+ <CAGb2v64O+eyriHG-FirtPKo6hACfbV9JcJRUUZ+rY1QM2w_r1g@mail.gmail.com>
+Message-ID: <4a2734fb-71ab-7cd9-2b17-669f2fdf9a2c@riseup.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 25, 2017 at 9:54 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
->
-> Please consider these Renesas ARM based SoC updates for v4.15.
->
->
-> The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
->
->   Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
->
-> are available in the git repository at:
->
->   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v4.15
->
-> for you to fetch changes up to 3fd45a136ff61bb54deab70fb2d534a85e40481f:
->
->   ARM: shmobile: rcar-gen2: Make sure CNTVOFF is initialized on CA7/15 (2017-09-18 08:10:44 +0200)
->
-> ----------------------------------------------------------------
-> Renesas ARM Based SoC Updates for v4.15
->
-> * Prepare to enable SMP on R-Car E2 (r8a7794).
->
->   Geert Uytterhoeven says:
->   "The main hurdle here is that R-Car Gen2 boot loaders do not initialize
->    the arch_timer CNTVOFF register, which thus needs workarounds on Linux.
->
->    - The first patch adds a definition for MON_MODE, as suggested by Marc
->      Zyngier,
->    - The second patch makes sure CNTVOFF is initialized for boot and
->      secondary Cortex-A15 and Cortex-A7 CPU cores, like is already done for
->      the boot Cortex-A7 CPU core.  Without this, the ARM arch timer does
->      not work on secondary CPU cores."
->
->    A follow-up patch to enable SMP in DT on R-Car E2 (r8a7794) is currently
->    deferred unto v4.16 as it depends on the above.
->
-> * Enable low-level debugging support for RZ/G1E (r8a7745).
->
->   Fabrizio Castro says, "RZ/G1E uses SCIF4 for the debug console."
+Chen-Yu Tsai:
+>> Chen-Yu Tsai:
+>>> mmc1 only has 1 possible pinmux setting.
+>>
+>> What if someone is using the MMC with bus width 1 and then using the
+>> remaining 3 pins for something else?
+> 
+> I would very much like to see such a design. Currently the devices
+> we see all follow Allwinner's reference design, with only minor
+> modifications. As such, mmc1 is used exclusively for connecting
+> SDIO-based WiFi modules.
+> 
+> If such a radical(?) design is done, the vendor can always add
+> a "mmc1-1bit-pins" setting and override the default.
 
-Pulled into next/soc, thanks!
+Alright. So could we then make similar patches for other SoCs that have
+the same situation with the MMC pinmuxing? I.e. let's move the pinctrl
+to the dtsi file from the dts files. With H3 SDC0 and SDC1 nodes could
+be moved then to the dtsi. Can't we also move the SDC0 pinctrl in A83T
+to the dtsi file? Though, in order to do that mmc0_cd_pin node needs to
+be added to the A38T dtsi.
 
-       Arnd
+Joonas
