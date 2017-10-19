@@ -1,274 +1,111 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 19 Oct 2017 15:47:08 +0200
-Subject: [PATCH v4 2/2] crypto: stm32 - Support for STM32 CRYP crypto
- module
-In-Reply-To: <0359a8aa-5d91-6284-76cb-44bbd7865a0f@st.com>
-References: <1508403839-14131-1-git-send-email-fabien.dessenne@st.com>
- <1508403839-14131-3-git-send-email-fabien.dessenne@st.com>
- <20171019103454.GA26877@Red> <0359a8aa-5d91-6284-76cb-44bbd7865a0f@st.com>
-Message-ID: <e11bd8d2-da0a-d296-c949-96bb5df5ba54@baylibre.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Thu, 19 Oct 2017 09:24:12 -0500
+Subject: [PATCH v3 1/7] ACPI/PPTT: Add Processor Properties Topology Table
+ parsing
+In-Reply-To: <2605aa54-95f7-4619-e632-0a95a68e5fb0@caviumnetworks.com>
+References: <20171012194856.13844-1-jeremy.linton@arm.com>
+ <20171012194856.13844-2-jeremy.linton@arm.com>
+ <38c63cfd-4c13-9461-0d4a-74b0943be0fd@semihalf.com>
+ <2ce92b90-fc2c-3fff-a3e3-b9517057ab2c@arm.com>
+ <4ee4af4d-d987-33f9-4d55-67bfede3ebfa@caviumnetworks.com>
+ <ed7f2e82-1e9b-9f46-89af-4e638275355d@caviumnetworks.com>
+ <47d8ef93-a3ce-6d40-f8db-2bc7d527ac6f@arm.com>
+ <2605aa54-95f7-4619-e632-0a95a68e5fb0@caviumnetworks.com>
+Message-ID: <b5dc310d-ca95-fd08-5b2e-8bbaeba19533@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/10/2017 15:01, Fabien DESSENNE wrote:
-> Hi Corentin
-> 
-> 
-> Thank you for your comments. I will fix according to them. See also me 
-> answers/questions below
-> 
-> While we are at it, do you plan to deliver a new version of the 
-> crypto_engine update? (I had to remove the AEAD part of this new driver 
-> since it depends on that pending update)
-> 
-> BR
-> 
-> Fabien
-> 
-> 
-> On 19/10/17 12:34, Corentin Labbe wrote:
->> Hello
->>
->> I have some minor comment below
->>
->> On Thu, Oct 19, 2017 at 11:03:59AM +0200, Fabien Dessenne wrote:
->>> This module registers block cipher algorithms that make use of the
->>> STMicroelectronics STM32 crypto "CRYP1" hardware.
->>> The following algorithms are supported:
->>> - aes: ecb, cbc, ctr
->>> - des: ecb, cbc
->>> - tdes: ecb, cbc
->>>
->>> Signed-off-by: Fabien Dessennie <fabien.dessenne@st.com>
->>> ---
->>>   drivers/crypto/stm32/Kconfig      |    9 +
->>>   drivers/crypto/stm32/Makefile     |    3 +-
->>>   drivers/crypto/stm32/stm32-cryp.c | 1188 +++++++++++++++++++++++++++++++++++++
->>>   3 files changed, 1199 insertions(+), 1 deletion(-)
->>>   create mode 100644 drivers/crypto/stm32/stm32-cryp.c
->>>
->>> diff --git a/drivers/crypto/stm32/Kconfig b/drivers/crypto/stm32/Kconfig
->>> index 602332e..61ef00b 100644
->>> --- a/drivers/crypto/stm32/Kconfig
->>> +++ b/drivers/crypto/stm32/Kconfig
->> [...]
->>> +/* Bit [0] encrypt / decrypt */
->>> +#define FLG_ENCRYPT             BIT(0)
->>> +/* Bit [8..1] algo & operation mode */
->>> +#define FLG_AES                 BIT(1)
->>> +#define FLG_DES                 BIT(2)
->>> +#define FLG_TDES                BIT(3)
->>> +#define FLG_ECB                 BIT(4)
->>> +#define FLG_CBC                 BIT(5)
->>> +#define FLG_CTR                 BIT(6)
->>> +/* Mode mask = bits [15..0] */
->>> +#define FLG_MODE_MASK           GENMASK(15, 0)
->>> +
->>> +/* Registers */
->>> +#define CRYP_CR                 0x00000000
->>> +#define CRYP_SR                 0x00000004
->>> +#define CRYP_DIN                0x00000008
->>> +#define CRYP_DOUT               0x0000000C
->>> +#define CRYP_DMACR              0x00000010
->>> +#define CRYP_IMSCR              0x00000014
->>> +#define CRYP_RISR               0x00000018
->>> +#define CRYP_MISR               0x0000001C
->>> +#define CRYP_K0LR               0x00000020
->>> +#define CRYP_K0RR               0x00000024
->>> +#define CRYP_K1LR               0x00000028
->>> +#define CRYP_K1RR               0x0000002C
->>> +#define CRYP_K2LR               0x00000030
->>> +#define CRYP_K2RR               0x00000034
->>> +#define CRYP_K3LR               0x00000038
->>> +#define CRYP_K3RR               0x0000003C
->>> +#define CRYP_IV0LR              0x00000040
->>> +#define CRYP_IV0RR              0x00000044
->>> +#define CRYP_IV1LR              0x00000048
->>> +#define CRYP_IV1RR              0x0000004C
->>> +
->>> +/* Registers values */
->>> +#define CR_DEC_NOT_ENC          0x00000004
->>> +#define CR_TDES_ECB             0x00000000
->>> +#define CR_TDES_CBC             0x00000008
->>> +#define CR_DES_ECB              0x00000010
->>> +#define CR_DES_CBC              0x00000018
->>> +#define CR_AES_ECB              0x00000020
->>> +#define CR_AES_CBC              0x00000028
->>> +#define CR_AES_CTR              0x00000030
->>> +#define CR_AES_KP               0x00000038
->>> +#define CR_AES_UNKNOWN          0xFFFFFFFF
->>> +#define CR_ALGO_MASK            0x00080038
->>> +#define CR_DATA32               0x00000000
->>> +#define CR_DATA16               0x00000040
->>> +#define CR_DATA8                0x00000080
->>> +#define CR_DATA1                0x000000C0
->>> +#define CR_KEY128               0x00000000
->>> +#define CR_KEY192               0x00000100
->>> +#define CR_KEY256               0x00000200
->>> +#define CR_FFLUSH               0x00004000
->>> +#define CR_CRYPEN               0x00008000
->> Why not using BIT(x) ?
-> 
-> Some values are not only 1 bit (then we may use BIT and BITGEN but this 
-> would be less readable), so I prefer to keep this values.
+Hi,
 
-You can use GENMASK and the corresponding FIELD_PREP() and FIELD_GET().
-It avoids manipulating the bits directly.
 
+On 10/19/2017 12:18 AM, Tomasz Nowicki wrote:
+> On 18.10.2017 19:30, Jeremy Linton wrote:
+>> On 10/18/2017 05:24 AM, Tomasz Nowicki wrote:
+>>> On 18.10.2017 07:39, Tomasz Nowicki wrote:
+>>>> On 17.10.2017 17:22, Jeremy Linton wrote:
+>>>>> On 10/17/2017 08:25 AM, Tomasz Nowicki wrote:
+>>>>>> On 12.10.2017 21:48, Jeremy Linton wrote:
+(trimming)
+>>>>>>> +??????????? if (*found != NULL)
+>>>>>>> +??????????????? pr_err("Found duplicate cache level/type unable 
+>>>>>>> to determine uniqueness\n");
+>>>
+>>> Actually I still see this error messages in my dmesg. It is because 
+>>> the following ThunderX2 per-core L1 and L2 cache hierarchy:
+>>>
+>>> Core
+>>> ??------------------
+>>> |????????????????? |
+>>> | L1i -----??????? |
+>>> |???????? |??????? |
+>>> |????????? ----L2? |
+>>> |???????? |??????? |
+>>> | L1d -----??????? |
+>>> |????????????????? |
+>>> ??------------------
+>>>
+>>> In this case we have two paths which lead to L2 cache and hit above 
+>>> case. Is it really error case?
+>>
+>> No, but its not deterministic unless we mark the node, which doesn't 
+>> solve the problem of a table constructed like
+>>
+>> L1i->L2 (unified)
+>> L1d->L2 (unified)
+>>
+>> or various other structures which aren't disallowed by the spec and 
+>> have non-deterministic real world meanings, anymore than constructing 
+>> the table like:
+>>
+>> L1i
+>> Lid->L2(unified)
+>>
+>> which I tend to prefer because with a structuring like that it can be 
+>> deterministic (and in a way actually represents the non-coherent 
+>> behavior of (most?) ARM64 core's i-caches, as could be argued the 
+>> first example if the allocation policies are varied between the L2 
+>> nodes).
+>>
+>> The really ugly bits here happen if you add another layer:
+>>
+>> L1i->L2i-L3
+>> L1d------^
+>>
+>> which is why I made that an error message, not including the fact that 
+>> since the levels aren't tagged the numbering and meaning isn't clear.
+>>
+>> (the L1i in the above example might be better called an L0i to avoid 
+>> throwing off the reset of the hierarchy numbering, also so it could be 
+>> ignored).
+>>
+>> Summary:
+>>
+>> I'm not at all happy with this specification's attempt to leave out 
+>> pieces of information which make parsing things more deterministic. In 
+>> this case I'm happy to demote the message level, but not remove it 
+>> entirely but I do think the obvious case you list shouldn't be the 
+>> default one.
+>>
+>> Lastly:
+>>
+>> I'm assuming the final result is that the table is actually being 
+>> parsed correctly despite the ugly message?
 > 
->> Why not using also directly FLG_XX since CR_XX are arbitray values ? like using instead CR_AES_CBC = FLG_AES | FLG_CBC
-> 
-> The CR_ values are used to write in the registers. FLG_ are arbitraty 
-> values, so we cannot mix them.
-> 
->>
->> [...]
->>> +static inline void stm32_cryp_wait_enable(struct stm32_cryp *cryp)
->>> +{
->>> +	while (stm32_cryp_read(cryp, CRYP_CR) & CR_CRYPEN)
->>> +		cpu_relax();
->>> +}
->> This function is not used, so you could remove it
->>
->>> +
->>> +static inline void stm32_cryp_wait_busy(struct stm32_cryp *cryp)
->>> +{
->>> +	while (stm32_cryp_read(cryp, CRYP_SR) & SR_BUSY)
->>> +		cpu_relax();
->>> +}
->> No timeout ?
->>
->>
->>> +
->>> +static inline void stm32_cryp_wait_output(struct stm32_cryp *cryp)
->>> +{
->>> +	while (!(stm32_cryp_read(cryp, CRYP_SR) & SR_OFNE))
->>> +		cpu_relax();
->>> +}
->> This function is not used, so you could remove it
->>
->> [...]
->>> +static int stm32_cryp_check_aligned(struct scatterlist *sg, size_t total,
->>> +				    size_t align)
->>> +{
->>> +	int len = 0;
->>> +
->>> +	if (!total)
->>> +		return 0;
->>> +
->>> +	if (!IS_ALIGNED(total, align))
->>> +		return -EINVAL;
->>> +
->>> +	while (sg) {
->>> +		if (!IS_ALIGNED(sg->offset, sizeof(u32)))
->>> +			return -1;
->> -1 is not a good return value, prefer any -Exxxx
->>
->>> +
->>> +		if (!IS_ALIGNED(sg->length, align))
->>> +			return -1;
->>> +
->>> +		len += sg->length;
->>> +		sg = sg_next(sg);
->>> +	}
->>> +
->>> +	if (len != total)
->>> +		return -1;
->> [...]
->>> +static int stm32_cryp_copy_sgs(struct stm32_cryp *cryp)
->>> +{
->>> +	void *buf_in, *buf_out;
->>> +	int pages, total_in, total_out;
->>> +
->>> +	if (!stm32_cryp_check_io_aligned(cryp)) {
->>> +		cryp->sgs_copied = 0;
->>> +		return 0;
->>> +	}
->>> +
->>> +	total_in = ALIGN(cryp->total_in, cryp->hw_blocksize);
->>> +	pages = total_in ? get_order(total_in) : 1;
->>> +	buf_in = (void *)__get_free_pages(GFP_ATOMIC, pages);
->>> +
->>> +	total_out = ALIGN(cryp->total_out, cryp->hw_blocksize);
->>> +	pages = total_out ? get_order(total_out) : 1;
->>> +	buf_out = (void *)__get_free_pages(GFP_ATOMIC, pages);
->>> +
->>> +	if (!buf_in || !buf_out) {
->>> +		pr_err("Couldn't allocate pages for unaligned cases.\n");
->> You must use dev_err() instead. without it, it will be hard to know which subsystem said that error message.
->>
->> [...]
->>> +static int stm32_cryp_cra_init(struct crypto_tfm *tfm)
->>> +{
->>> +	tfm->crt_ablkcipher.reqsize = sizeof(struct stm32_cryp_reqctx);
->>> +
->>> +	return 0;
->>> +}
->> You could simply remove this function
-> 
-> I am not sure we can. Here we set reqsize.
-> Most of the other drivers do the same, but maybe this is wrong everywhere.
-> Could you give more details?
-> 
->>
->> [...]
->>> +
->>> +static void stm32_cryp_cra_exit(struct crypto_tfm *tfm)
->>> +{
->>> +}
->>> +
->>> +static int stm32_cryp_crypt(struct ablkcipher_request *req, unsigned long mode)
->>> +{
->>> +	struct stm32_cryp_ctx *ctx = crypto_ablkcipher_ctx(
->>> +			crypto_ablkcipher_reqtfm(req));
->>> +	struct stm32_cryp_reqctx *rctx = ablkcipher_request_ctx(req);
->>> +	struct stm32_cryp *cryp = stm32_cryp_find_dev(ctx);
->>> +
->>> +	if (!cryp)
->>> +		return -ENODEV;
->>> +
->>> +	rctx->mode = mode;
->>> +
->>> +	return crypto_transfer_cipher_request_to_engine(cryp->engine, req);
->>> +}
->>> +
->>> +static int stm32_cryp_setkey(struct crypto_ablkcipher *tfm, const u8 *key,
->>> +			     unsigned int keylen)
->>> +{
->>> +	struct stm32_cryp_ctx *ctx = crypto_ablkcipher_ctx(tfm);
->>> +
->>> +	memcpy(ctx->key, key, keylen);
->>> +	ctx->keylen = keylen;
->> You never zeroize the key after request.
->>
->> [...]
->>> +static const struct of_device_id stm32_dt_ids[] = {
->>> +	{ .compatible = "st,stm32f756-cryp", },
->>> +	{},
->>> +};
->>> +MODULE_DEVICE_TABLE(of, sti_dt_ids);
->>> +
->>> +static int stm32_cryp_probe(struct platform_device *pdev)
->>> +{
->>> +	struct device *dev = &pdev->dev;
->>> +	struct stm32_cryp *cryp;
->>> +	struct resource *res;
->>> +	struct reset_control *rst;
->>> +	const struct of_device_id *match;
->>> +	int irq, ret;
->>> +
->>> +	cryp = devm_kzalloc(dev, sizeof(*cryp), GFP_KERNEL);
->>> +	if (!cryp)
->>> +		return -ENOMEM;
->>> +
->>> +	match = of_match_device(stm32_dt_ids, dev);
->>> +	if (!match)
->>> +		return -ENODEV;
->> I think this test is unnecessary, at least it should be before the devm_kzalloc
->>
->> Regards
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> Indeed, the ThunderX2 PPTT table is being parsed so that topology shown 
+> in lstopo and lscpu is correct.
+
+Great.
+
+Also, I think this is a better change:
+
+      if ((*found != NULL) && (*found != cache))
+          pr_err("Found duplicate cache level/type unable to determine 
+uniqueness\n");
+
+Which if its a duplicate node/type at the given level the message is 
+just suppressed. It will of course still trigger in cases like:
+
+L1d->L2
+l1i->L2
+
+or other odd cases.
