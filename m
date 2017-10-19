@@ -1,24 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Oct 2017 23:52:24 +0200
-Subject: [PATCH v2] ARM: dts: Add TVE200 to the Gemini SoC DTSI
-In-Reply-To: <20171011174519.1769-1-linus.walleij@linaro.org>
-References: <20171011174519.1769-1-linus.walleij@linaro.org>
-Message-ID: <CAK8P3a2sqU-wSJ0hH0BAUQ67VkZh5O6BnkkVEqUOGOuFaPHLDA@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 19 Oct 2017 16:58:21 -0500
+Subject: [PATCH v2 1/5] dt-bindings: iio: at91-sama5d2_adc: add optional
+ dma property
+In-Reply-To: <20171019111417.7rzdnkvtukzzhl2u@piout.net>
+References: <1507703732-29175-1-git-send-email-eugen.hristev@microchip.com>
+ <1507703732-29175-2-git-send-email-eugen.hristev@microchip.com>
+ <20171013215142.vlfhzzzetmc7resq@rob-hp-laptop>
+ <20171019111417.7rzdnkvtukzzhl2u@piout.net>
+Message-ID: <CAL_JsqLPMeF9EtcCO3eZn+7DbyAQcxzNYEpAiFvQoe1=ytpELQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 11, 2017 at 7:45 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> The Faraday TVE200 is present in the Gemini SoC, sometimes
-> under the name "TVC". Add it to the SoC DTSI file along with
-> its resources.
+On Thu, Oct 19, 2017 at 6:14 AM, Alexandre Belloni
+<alexandre.belloni@free-electrons.com> wrote:
+> On 13/10/2017 at 16:51:42 -0500, Rob Herring wrote:
+>> On Wed, Oct 11, 2017 at 09:35:28AM +0300, Eugen Hristev wrote:
+>> > Added property for DMA configuration of the device.
+>> >
+>> > Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+>> > ---
+>> >  Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt | 7 +++++++
+>> >  1 file changed, 7 insertions(+)
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt b/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
+>> > index 552e7a8..5f94d479 100644
+>> > --- a/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
+>> > +++ b/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
+>> > @@ -17,6 +17,11 @@ Required properties:
+>> >    This property uses the IRQ edge types values: IRQ_TYPE_EDGE_RISING ,
+>> >    IRQ_TYPE_EDGE_FALLING or IRQ_TYPE_EDGE_BOTH
+>> >
+>> > +Optional properties:
+>> > +  - dmas: Phandle to dma channel for the ADC.
+>> > +  See ../../dma/dma.txt for details.
+>> > +  - dma-names: Must be "rx" when dmas property is being used.
+>>
+>> -names is pointless when there is only one.
+>>
 >
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ARM SoC folks:
->
-> Please apply this directly to some DT branch. I am not
-> planning any more Gemini DTS patches for v4.15.
+> You didn't reply to the question I had previously about that: What if at
+> some point, we have multiple dmas in the same binding?
 
-Applied to next/dt, thanks!
+Then add dma-names at that point and rx has to be first. If you know
+there's other channels, then add them now. Don't evolve the bindings
+needlessly based on what a driver supports.
 
-     Arnd
+Would another channel make sense here? Maybe multi-channel rx in which
+case your naming wouldn't be setup for that. But "tx" on an ADC?
+
+Rob
