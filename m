@@ -1,69 +1,74 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 19 Oct 2017 13:51:33 +0100
-Subject: [PATCH 06/11] change memory_is_poisoned_16 for aligned error
-In-Reply-To: <B8AC3E80E903784988AB3003E3E97330B2528234@dggemm510-mbs.china.huawei.com>
-References: <20171011082227.20546-1-liuwenliang@huawei.com>
- <20171011082227.20546-7-liuwenliang@huawei.com>
- <20171011162345.f601c29d12c81af85bf38565@linux-foundation.org>
- <CACT4Y+Ym3kq5RZ-4F=f97bvT2pNpzDf0kerf6tebzLOY_crR8Q@mail.gmail.com>
- <B8AC3E80E903784988AB3003E3E97330B2528234@dggemm510-mbs.china.huawei.com>
-Message-ID: <20171019125133.GA20805@n2100.armlinux.org.uk>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 19 Oct 2017 15:53:37 +0300
+Subject: [RFC resend 1/4] dt-bindings: display: mediatek: add drm binding
+In-Reply-To: <20171019112610.13645-2-mbrugger@suse.com>
+References: <20171019112610.13645-1-mbrugger@suse.com>
+ <20171019112610.13645-2-mbrugger@suse.com>
+Message-ID: <8477650.BPhWpTmuMS@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 12, 2017 at 11:27:40AM +0000, Liuwenliang (Lamb) wrote:
-> >> - I don't understand why this is necessary.  memory_is_poisoned_16()
-> >>   already handles unaligned addresses?
-> >>
-> >> - If it's needed on ARM then presumably it will be needed on other
-> >>   architectures, so CONFIG_ARM is insufficiently general.
-> >>
-> >> - If the present memory_is_poisoned_16() indeed doesn't work on ARM,
-> >>   it would be better to generalize/fix it in some fashion rather than
-> >>   creating a new variant of the function.
-> 
-> 
-> >Yes, I think it will be better to fix the current function rather then
-> >have 2 slightly different copies with ifdef's.
-> >Will something along these lines work for arm? 16-byte accesses are
-> >not too common, so it should not be a performance problem. And
-> >probably modern compilers can turn 2 1-byte checks into a 2-byte check
-> >where safe (x86).
-> 
-> >static __always_inline bool memory_is_poisoned_16(unsigned long addr)
-> >{
-> >        u8 *shadow_addr = (u8 *)kasan_mem_to_shadow((void *)addr);
-> >
-> >        if (shadow_addr[0] || shadow_addr[1])
-> >                return true;
-> >        /* Unaligned 16-bytes access maps into 3 shadow bytes. */
-> >        if (unlikely(!IS_ALIGNED(addr, KASAN_SHADOW_SCALE_SIZE)))
-> >                return memory_is_poisoned_1(addr + 15);
-> >        return false;
-> >}
-> 
-> Thanks for Andrew Morton and Dmitry Vyukov's review. 
-> If the parameter addr=0xc0000008, now in function:
-> static __always_inline bool memory_is_poisoned_16(unsigned long addr)
-> {
->  ---     //shadow_addr = (u16 *)(KASAN_OFFSET+0x18000001(=0xc0000008>>3)) is not 
->  ---     // unsigned by 2 bytes.
->         u16 *shadow_addr = (u16 *)kasan_mem_to_shadow((void *)addr); 
-> 
->         /* Unaligned 16-bytes access maps into 3 shadow bytes. */
->         if (unlikely(!IS_ALIGNED(addr, KASAN_SHADOW_SCALE_SIZE)))
->                 return *shadow_addr || memory_is_poisoned_1(addr + 15);
-> ----      //here is going to be error on arm, specially when kernel has not finished yet.
-> ----      //Because the unsigned accessing cause DataAbort Exception which is not
-> ----      //initialized when kernel is starting. 
->         return *shadow_addr;
-> }
-> 
-> I also think it is better to fix this problem. 
+Hi Matthias,
 
-What about using get_unaligned() ?
+Thank you for the patch.
+
+On Thursday, 19 October 2017 14:26:07 EEST Matthias Brugger wrote:
+> DRM subysystem and clock driver shared the same compatible mmsys.
+> This stopped does not work, as only the first driver for a compatible
+> gets probed. We change the comaptible to the new DRM identifier to fix
+> this.
+> 
+> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+> ---
+>  .../devicetree/bindings/display/mediatek/mediatek,disp.txt          | 6 +++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git
+> a/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
+> b/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
+> index 383183a89164..6db652463e64 100644
+> --- a/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
+> +++ b/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
+> @@ -27,6 +27,7 @@
+> Documentation/devicetree/bindings/display/mediatek/mediatek,dpi.txt.
+> 
+>  Required properties (all function blocks):
+>  - compatible: "mediatek,<chip>-disp-<function>", one of
+> +	"mediatek,<chip>-dispsys"    - central component for the DRM system
+>  	"mediatek,<chip>-disp-ovl"   - overlay (4 layers, blending, csc)
+>  	"mediatek,<chip>-disp-rdma"  - read DMA / line buffer
+>  	"mediatek,<chip>-disp-wdma"  - write DMA
+> @@ -71,6 +72,11 @@ mmsys: clock-controller at 14000000 {
+>  	#clock-cells = <1>;
+>  };
+> 
+> +dispsys: display-system {
+> +	compatible = "mediatek,mt2701-dispsys";
+> +	mediatek,mmsys = <&mmsys>;
+> +}
+
+So this node doesn't correspond to an IP core but is meant as a top-level 
+entry point for the operating system. This leads me to three questions.
+
+1. Is there any IP core in the Mediatek display subsystem that could be 
+considered (or at least used) as a top-level entry point ? That would be my 
+preferred solution as I'm not fond of DT nodes not describing hardware.
+
+2. If there's no such IP core, are all the display subsystem IP cores grouped 
+together in one MMIO register range ? If so we could move them as children of 
+this new display system node which, even if doesn't describe an IP core, would 
+describe the way the display IP cores are grouped in the hardware, and would 
+thus be a hardware description.
+
+3. If the answer to the second question is also negative, shouldn't this 
+display system node reference all other display IP DT nodes (through direct 
+phandles and/or OF graph bindings) ?
+
+>  ovl0: ovl at 1400c000 {
+>  	compatible = "mediatek,mt8173-disp-ovl";
+>  	reg = <0 0x1400c000 0 0x1000>;
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Regards,
+
+Laurent Pinchart
