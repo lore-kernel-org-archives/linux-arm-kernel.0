@@ -1,44 +1,26 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 19 Oct 2017 13:14:17 +0200
-Subject: [PATCH v2 1/5] dt-bindings: iio: at91-sama5d2_adc: add optional
- dma property
-In-Reply-To: <20171013215142.vlfhzzzetmc7resq@rob-hp-laptop>
-References: <1507703732-29175-1-git-send-email-eugen.hristev@microchip.com>
- <1507703732-29175-2-git-send-email-eugen.hristev@microchip.com>
- <20171013215142.vlfhzzzetmc7resq@rob-hp-laptop>
-Message-ID: <20171019111417.7rzdnkvtukzzhl2u@piout.net>
+From: jeffy.chen@rock-chips.com (jeffy)
+Date: Thu, 19 Oct 2017 19:19:57 +0800
+Subject: [PATCH v6 1/3] PCI: rockchip: Add support for pcie wake irq
+In-Reply-To: <20171018132936.GP5641@bhelgaas-glaptop.roam.corp.google.com>
+References: <20171013195059.23865-1-jeffy.chen@rock-chips.com>
+ <20171013195059.23865-2-jeffy.chen@rock-chips.com>
+ <20171016200350.GH25517@bhelgaas-glaptop.roam.corp.google.com>
+ <20171018010312.GB65743@google.com>
+ <20171018132936.GP5641@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <59E88A5D.8060309@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/10/2017 at 16:51:42 -0500, Rob Herring wrote:
-> On Wed, Oct 11, 2017 at 09:35:28AM +0300, Eugen Hristev wrote:
-> > Added property for DMA configuration of the device.
-> > 
-> > Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
-> > ---
-> >  Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt | 7 +++++++
-> >  1 file changed, 7 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt b/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
-> > index 552e7a8..5f94d479 100644
-> > --- a/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
-> > +++ b/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
-> > @@ -17,6 +17,11 @@ Required properties:
-> >    This property uses the IRQ edge types values: IRQ_TYPE_EDGE_RISING ,
-> >    IRQ_TYPE_EDGE_FALLING or IRQ_TYPE_EDGE_BOTH
-> >  
-> > +Optional properties:
-> > +  - dmas: Phandle to dma channel for the ADC.
-> > +  See ../../dma/dma.txt for details.
-> > +  - dma-names: Must be "rx" when dmas property is being used.
-> 
-> -names is pointless when there is only one.
-> 
+Hi guys,
 
-You didn't reply to the question I had previously about that: What if at
-some point, we have multiple dmas in the same binding?
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+On 10/18/2017 09:29 PM, Bjorn Helgaas wrote:
+>> >
+>> >I guess it could work to look into pci_create_root_bus(), and
+>> >do something like the following?
+>> >
+>> >	if (IS_ENABLED(CONFIG_OF) && parent && parent->of_node)
+>> >		... do OF parsing for generic features like WAKE# ...
+> That's exactly the sort of thing I was thinking.
+>
+i was looking at that too, but i'm not very clear about how to handle 
+the platform_ops's set_wakeup...
