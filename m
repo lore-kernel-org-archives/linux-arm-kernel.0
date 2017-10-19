@@ -1,24 +1,52 @@
-From: jeffy.chen@rock-chips.com (jeffy)
-Date: Thu, 19 Oct 2017 09:54:40 +0800
-Subject: [RFC PATCH v4 4/8] drm/rockchip: dw_hdmi: Fix error handling path
-In-Reply-To: <20171017181034.tsplfsmq7vi4uhmo@art_vandelay>
-References: <20171017101624.12506-1-jeffy.chen@rock-chips.com>
- <20171017101624.12506-5-jeffy.chen@rock-chips.com>
- <20171017181034.tsplfsmq7vi4uhmo@art_vandelay>
-Message-ID: <59E805E0.50006@rock-chips.com>
+From: weiyi.lu@mediatek.com (Weiyi Lu)
+Date: Thu, 19 Oct 2017 10:48:50 +0800
+Subject: [PATCH v5 9/9] arm: dts: Add power controller device node of MT2712
+In-Reply-To: <1508381330-3700-1-git-send-email-weiyi.lu@mediatek.com>
+References: <1508381330-3700-1-git-send-email-weiyi.lu@mediatek.com>
+Message-ID: <1508381330-3700-10-git-send-email-weiyi.lu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
+add power controller node for MT2712
 
-Thanks for your review.
+Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
+---
+ arch/arm64/boot/dts/mediatek/mt2712e.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-On 10/18/2017 02:10 AM, Sean Paul wrote:
-> On Tue, Oct 17, 2017 at 06:16:20PM +0800, Jeffy Chen wrote:
->> >Add missing clk_disable_unprepare() in bind()'s error handling path.
-> This also isn't disabled in unbind(), is that intentional?
->
-i wasn't able to do that because of dw_hdmi drvdata.
-
-i've modified it as tomasz did for dp bridge, and fixed the unbind() in 
-the next version :)
+diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+index d2ee3cd..fa87f92 100644
+--- a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+@@ -8,6 +8,7 @@
+ #include <dt-bindings/clock/mt2712-clk.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/power/mt2712-power.h>
+ 
+ / {
+ 	compatible = "mediatek,mt2712";
+@@ -147,6 +148,21 @@
+ 		#clock-cells = <1>;
+ 	};
+ 
++	scpsys: scpsys at 10006000 {
++		compatible = "mediatek,mt2712-scpsys", "syscon";
++		#power-domain-cells = <1>;
++		reg = <0 0x10006000 0 0x1000>;
++		clocks = <&topckgen CLK_TOP_MM_SEL>,
++			 <&topckgen CLK_TOP_MFG_SEL>,
++			 <&topckgen CLK_TOP_VENC_SEL>,
++			 <&topckgen CLK_TOP_JPGDEC_SEL>,
++			 <&topckgen CLK_TOP_A1SYS_HP_SEL>,
++			 <&topckgen CLK_TOP_VDEC_SEL>;
++		clock-names = "mm", "mfg", "venc",
++			"jpgdec", "audio", "vdec";
++		infracfg = <&infracfg>;
++	};
++
+ 	uart5: serial at 1000f000 {
+ 		compatible = "mediatek,mt2712-uart",
+ 			     "mediatek,mt6577-uart";
+-- 
+1.9.1
