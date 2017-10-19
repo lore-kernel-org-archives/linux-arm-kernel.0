@@ -1,94 +1,58 @@
 From: olivier.moysan@st.com (Olivier Moysan)
-Date: Thu, 19 Oct 2017 15:03:18 +0200
-Subject: [INTERNAL][PATCH 2/7] ASoC: stm32: sai: Move static settings to DAI
- init
+Date: Thu, 19 Oct 2017 15:03:17 +0200
+Subject: [INTERNAL][PATCH 1/7] ASoC: stm32: Add synchronization to SAI bindings
 In-Reply-To: <1508418203-16840-1-git-send-email-olivier.moysan@st.com>
 References: <1508418203-16840-1-git-send-email-olivier.moysan@st.com>
-Message-ID: <1508418203-16840-3-git-send-email-olivier.moysan@st.com>
+Message-ID: <1508418203-16840-2-git-send-email-olivier.moysan@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Audio interface direction and protocol settings does not change
-at runtime. So, these settings are moved from hw_params
-function to dai_probe and set_fmt.
+Add synchronization configuration to STM32 SAI bindings.
+This patch also adds peripheral clock which is required
+to access synchronization register.
 
-Signed-off-by: olivier moysan <olivier.moysan@st.com>
+Signed-off-by: Olivier Moysan <olivier.moysan@st.com>
 ---
- sound/soc/stm/stm32_sai_sub.c | 23 +++++++++++++----------
- 1 file changed, 13 insertions(+), 10 deletions(-)
+ Documentation/devicetree/bindings/sound/st,stm32-sai.txt | 14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
 
-diff --git a/sound/soc/stm/stm32_sai_sub.c b/sound/soc/stm/stm32_sai_sub.c
-index 90d4396..fdc1891 100644
---- a/sound/soc/stm/stm32_sai_sub.c
-+++ b/sound/soc/stm/stm32_sai_sub.c
-@@ -304,12 +304,15 @@ static int stm32_sai_set_dai_tdm_slot(struct snd_soc_dai *cpu_dai, u32 tx_mask,
- static int stm32_sai_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
- {
- 	struct stm32_sai_sub_data *sai = snd_soc_dai_get_drvdata(cpu_dai);
--	int cr1 = 0, frcr = 0;
--	int cr1_mask = 0, frcr_mask = 0;
-+	int cr1, frcr = 0;
-+	int cr1_mask, frcr_mask = 0;
- 	int ret;
+diff --git a/Documentation/devicetree/bindings/sound/st,stm32-sai.txt b/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
+index f1c5ae5..1f9cd70 100644
+--- a/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
++++ b/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
+@@ -10,13 +10,21 @@ Required properties:
+   - reg: Base address and size of SAI common register set.
+   - clocks: Must contain phandle and clock specifier pairs for each entry
+ 	in clock-names.
+-  - clock-names: Must contain "x8k" and "x11k"
++  - clock-names: Must contain "pclk" "x8k" and "x11k"
++	"pclk": Clock which feeds the peripheral bus interface.
++	        Mandatory for "st,stm32h7-sai" compatible.
++	        Not used for "st,stm32f4-sai" compatible.
+ 	"x8k": SAI parent clock for sampling rates multiple of 8kHz.
+ 	"x11k": SAI parent clock for sampling rates multiple of 11.025kHz.
+   - interrupts: cpu DAI interrupt line shared by SAI sub-blocks
  
- 	dev_dbg(cpu_dai->dev, "fmt %x\n", fmt);
+ Optional properties:
+   - resets: Reference to a reset controller asserting the SAI
++  - st,sync: specify synchronization mode.
++	By default SAI sub-block is in asynchronous mode.
++	This property sets SAI sub-block as slave of another SAI sub-block.
++	Must contain the phandle and index of the sai sub-block providing
++	the synchronization.
  
-+	cr1_mask = SAI_XCR1_PRTCFG_MASK;
-+	cr1 = SAI_XCR1_PRTCFG_SET(SAI_FREE_PROTOCOL);
-+
- 	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
- 	/* SCK active high for all protocols */
- 	case SND_SOC_DAIFMT_I2S:
-@@ -336,7 +339,7 @@ static int stm32_sai_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
- 		return -EINVAL;
- 	}
+ SAI subnodes:
+ Two subnodes corresponding to SAI sub-block instances A et B can be defined.
+@@ -52,8 +60,8 @@ sai1: sai1 at 40015800 {
+ 	#size-cells = <1>;
+ 	ranges = <0 0x40015800 0x400>;
+ 	reg = <0x40015800 0x4>;
+-	clocks = <&rcc PLL1_Q>, <&rcc PLL2_P>;
+-	clock-names = "x8k", "x11k";
++	clocks = <&rcc SAI1_CK>, <&rcc PLL1_Q>, <&rcc PLL2_P>;
++	clock-names = "pclk", "x8k", "x11k";
+ 	interrupts = <87>;
  
--	cr1_mask |= SAI_XCR1_PRTCFG_MASK | SAI_XCR1_CKSTR;
-+	cr1_mask |= SAI_XCR1_CKSTR;
- 	frcr_mask |= SAI_XFRCR_FSPOL | SAI_XFRCR_FSOFF |
- 		     SAI_XFRCR_FSDEF;
- 
-@@ -450,7 +453,7 @@ static int stm32_sai_set_config(struct snd_soc_dai *cpu_dai,
- 			   SAI_XCR2_FFLUSH | SAI_XCR2_FTH_SET(fth));
- 
- 	/* Mode, data format and channel config */
--	cr1 = SAI_XCR1_PRTCFG_SET(SAI_FREE_PROTOCOL);
-+	cr1_mask = SAI_XCR1_DS_MASK;
- 	switch (params_format(params)) {
- 	case SNDRV_PCM_FORMAT_S8:
- 		cr1 |= SAI_XCR1_DS_SET(SAI_DATASIZE_8);
-@@ -465,11 +468,6 @@ static int stm32_sai_set_config(struct snd_soc_dai *cpu_dai,
- 		dev_err(cpu_dai->dev, "Data format not supported");
- 		return -EINVAL;
- 	}
--	cr1_mask = SAI_XCR1_DS_MASK | SAI_XCR1_PRTCFG_MASK;
--
--	cr1_mask |= SAI_XCR1_RX_TX;
--	if (STM_SAI_IS_CAPTURE(sai))
--		cr1 |= SAI_XCR1_RX_TX;
- 
- 	cr1_mask |= SAI_XCR1_MONO;
- 	if ((sai->slots == 2) && (params_channels(params) == 1))
-@@ -725,6 +723,7 @@ static void stm32_sai_shutdown(struct snd_pcm_substream *substream,
- static int stm32_sai_dai_probe(struct snd_soc_dai *cpu_dai)
- {
- 	struct stm32_sai_sub_data *sai = dev_get_drvdata(cpu_dai->dev);
-+	int cr1 = 0, cr1_mask;
- 
- 	sai->dma_params.addr = (dma_addr_t)(sai->phys_addr + STM_SAI_DR_REGX);
- 	sai->dma_params.maxburst = 1;
-@@ -736,7 +735,11 @@ static int stm32_sai_dai_probe(struct snd_soc_dai *cpu_dai)
- 	else
- 		snd_soc_dai_init_dma_data(cpu_dai, NULL, &sai->dma_params);
- 
--	return 0;
-+	cr1_mask = SAI_XCR1_RX_TX;
-+	if (STM_SAI_IS_CAPTURE(sai))
-+		cr1 |= SAI_XCR1_RX_TX;
-+
-+	return regmap_update_bits(sai->regmap, STM_SAI_CR1_REGX, cr1_mask, cr1);
- }
- 
- static const struct snd_soc_dai_ops stm32_sai_pcm_dai_ops = {
+ 	sai1a: audio-controller at 40015804 {
 -- 
 1.9.1
