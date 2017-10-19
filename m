@@ -1,37 +1,29 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Thu, 19 Oct 2017 19:35:40 +0900
-Subject: [PATCH net-next v2 2/2] net: ethernet: socionext: add AVE
- ethernet driver
-In-Reply-To: <CAK7LNARuoK-M9iKyP7JxRgH7naA+teikqZMOHm3f2wykEieqLw@mail.gmail.com>
-References: <20171018192359.243C.4A936039@socionext.com>
- <CAK7LNARuoK-M9iKyP7JxRgH7naA+teikqZMOHm3f2wykEieqLw@mail.gmail.com>
-Message-ID: <20171019193540.0F35.4A936039@socionext.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 19 Oct 2017 12:49:52 +0200
+Subject: [PATCH v2 1/6] arm64: tegra: Add #power-domain-cells for BPMP
+In-Reply-To: <20170905084306.19318-2-mperttunen@nvidia.com>
+References: <20170905084306.19318-1-mperttunen@nvidia.com>
+ <20170905084306.19318-2-mperttunen@nvidia.com>
+Message-ID: <20171019104952.GL9005@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Oct 2017 09:29:03 +0900 <yamada.masahiro@socionext.com> wrote:
-
-> 2017-10-18 19:23 GMT+09:00 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>:
-> > On Mon, 16 Oct 2017 00:08:21 +0900 <yamada.masahiro@socionext.com> wrote:
+On Tue, Sep 05, 2017 at 11:43:01AM +0300, Mikko Perttunen wrote:
+> Add #power-domain-cells for the BPMP node on Tegra186 so that the power
+> domain provider may be used.
 > 
-> >> priv->rst = devm_reset_control_get_optional_shared(dev, NULL);
-> >> if (IS_ERR(priv->rst))
-> >>           return PTR_ERR(priv->rst);
-> >
-> > The clk and reset are optional in the driver.
-> > Referring to your suggested method, I'll fix the part of clk and reset.
-> >
-> 
-> 
-> Why is clk optional?
+> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+> ---
+>  arch/arm64/boot/dts/nvidia/tegra186.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
 
-Indeed. My check point was wrong.
-This clk property should be treated as "required".
+Applied, thanks.
 
-In v2, the clock enabling code moved to ndo_init().
-Although probing the driver succeeds without clk,
-enabling the driver fails clearly.
-
----
-Best Regards,
-Kunihiko Hayashi
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171019/e5362771/attachment.sig>
