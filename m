@@ -1,18 +1,17 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Oct 2017 22:39:55 +0200
-Subject: [PATCH] arm64: Add ThunderX drivers to defconfig
-In-Reply-To: <8d21bb00c687f0f4522f886db5c2836d0b4ca031.1507734829.git.robin.murphy@arm.com>
-References: <8d21bb00c687f0f4522f886db5c2836d0b4ca031.1507734829.git.robin.murphy@arm.com>
-Message-ID: <CAK8P3a08WFk1WKcq2sX06Qr8mXYNhPNghaLXi-eU4-_zD7Gu0w@mail.gmail.com>
+Date: Thu, 19 Oct 2017 22:42:24 +0200
+Subject: [GIT PULL] arm64: defconfig: hisilicon config updates for v4.15
+In-Reply-To: <59E08A1E.9070508@hisilicon.com>
+References: <59E08A1E.9070508@hisilicon.com>
+Message-ID: <CAK8P3a1Ev=w+iS5e0a_QsTHeLbeAa7o5Em74Tf6my=Lv1utfyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 11, 2017 at 5:15 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> ThunderX needs its PCI host drivers to do anything useful, and
-> it's probably helpful to have networking by default too.
+On Fri, Oct 13, 2017 at 11:40 AM, Wei Xu <xuwei5@hisilicon.com> wrote:
 >
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ----------------------------------------------------------------
+> ARM64: hisilicon: defconfig updates for 4.15
+>
+> - Enable DRM_HISI_HIBMC for the D03/D05 board
 
-Applied to next/soc, thanks!
-
-     Arnd
+Pulled into next/soc, thanks!
