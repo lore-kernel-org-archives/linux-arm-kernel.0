@@ -1,41 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Oct 2017 00:54:49 +0200
-Subject: [GIT PULL 2/2] device tree changes for omaps for v4.15 merge
- window
-In-Reply-To: <20171019223601.GK4394@atomide.com>
-References: <pull-1507912705-793554@atomide.com>
- <pull-1507912705-793554@atomide.com-2>
- <CAK8P3a3do=X3E5eO0rbo2CtG5xqoALgcVnCZbT_iFP_rnrHmDw@mail.gmail.com>
- <20171019223601.GK4394@atomide.com>
-Message-ID: <CAK8P3a15xUuFwZ16EZcefyBanXfjL8dsRUpA41a2WP=3EenFUw@mail.gmail.com>
+From: rfranz@cavium.com (Roy Franz)
+Date: Thu, 19 Oct 2017 15:55:49 -0700
+Subject: [PATCH v2] mtd: slram: use memremap() instead of ioremap()
+Message-ID: <20171019225549.11422-1-roy.franz@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 20, 2017 at 12:36 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Arnd Bergmann <arnd@arndb.de> [171019 15:23]:
->> On Fri, Oct 13, 2017 at 6:39 PM, Tony Lindgren <tony@atomide.com> wrote:
->> > From: "Tony Lindgren" <tony@atomide.com>
->> >
->>
->> This is missing a tag description. Can you resend?
->
-> Oops sorry about that, it happens easily when I add tags..
->
-> The description for the signed tag is below.
->
-> Regards,
->
-> Tony
->
-> 8< ----------------------
-> The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
->
->   Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.15/dt-signed
+Convert slram to use memremap() to map the memory it uses to back an MTD
+device, as this is the proper interface for mapping memory. This change
+enables normal memory to be used to back an MTD device on arm64, as arm64
+prevents ioremap() being used on normal memory.
 
-I had just figured it out myself and pulled. Thanks for the quick reply!
+Signed-off-by: Roy Franz <roy.franz@cavium.com>
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Tested-by: David Daney <david.daney@cavium.com>
+---
+Tested on arm64 simulation, using simulator to preload filesystem image into RAM,
+and also tested on x86_64 using video card memory.  This is useful for speeding
+up booting on (very slow) emulation environments by avoiding any processing of
+an initramfs.
+David Daney tested on MIPS64.
 
-       Arnd
+v2: Fix typo in subject line, s/mdt/mtd/
+    added acked-by/tested-by
+
+ drivers/mtd/devices/slram.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/mtd/devices/slram.c b/drivers/mtd/devices/slram.c
+index 8087c36dc693..0ec85f316d24 100644
+--- a/drivers/mtd/devices/slram.c
++++ b/drivers/mtd/devices/slram.c
+@@ -163,8 +163,9 @@ static int register_device(char *name, unsigned long start, unsigned long length
+ 	}
+ 
+ 	if (!(((slram_priv_t *)(*curmtd)->mtdinfo->priv)->start =
+-				ioremap(start, length))) {
+-		E("slram: ioremap failed\n");
++		memremap(start, length,
++			 MEMREMAP_WB | MEMREMAP_WT | MEMREMAP_WC))) {
++		E("slram: memremap failed\n");
+ 		return -EIO;
+ 	}
+ 	((slram_priv_t *)(*curmtd)->mtdinfo->priv)->end =
+@@ -186,7 +187,7 @@ static int register_device(char *name, unsigned long start, unsigned long length
+ 
+ 	if (mtd_device_register((*curmtd)->mtdinfo, NULL, 0))	{
+ 		E("slram: Failed to register new device\n");
+-		iounmap(((slram_priv_t *)(*curmtd)->mtdinfo->priv)->start);
++		memunmap(((slram_priv_t *)(*curmtd)->mtdinfo->priv)->start);
+ 		kfree((*curmtd)->mtdinfo->priv);
+ 		kfree((*curmtd)->mtdinfo);
+ 		return(-EAGAIN);
+@@ -206,7 +207,7 @@ static void unregister_devices(void)
+ 	while (slram_mtdlist) {
+ 		nextitem = slram_mtdlist->next;
+ 		mtd_device_unregister(slram_mtdlist->mtdinfo);
+-		iounmap(((slram_priv_t *)slram_mtdlist->mtdinfo->priv)->start);
++		memunmap(((slram_priv_t *)slram_mtdlist->mtdinfo->priv)->start);
+ 		kfree(slram_mtdlist->mtdinfo->priv);
+ 		kfree(slram_mtdlist->mtdinfo);
+ 		kfree(slram_mtdlist);
+-- 
+2.11.0
