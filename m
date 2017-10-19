@@ -1,22 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Oct 2017 00:28:40 +0200
-Subject: [GIT PULL] Qualcomm Device Tree updates for 4.15
-In-Reply-To: <1508182291-23352-5-git-send-email-andy.gross@linaro.org>
-References: <1508182291-23352-1-git-send-email-andy.gross@linaro.org>
- <1508182291-23352-5-git-send-email-andy.gross@linaro.org>
-Message-ID: <CAK8P3a1RL5JOGgMX21xEHYxbBU_FTajKrf=oc3Spq2wSWYD+9A@mail.gmail.com>
+Date: Fri, 20 Oct 2017 00:44:44 +0200
+Subject: [GIT PULL 2/2] more soc changes for omaps for v4.15 merge window
+In-Reply-To: <pull-1508450284-272943@atomide.com-2>
+References: <pull-1508450284-272943@atomide.com>
+ <pull-1508450284-272943@atomide.com-2>
+Message-ID: <CAK8P3a17tvVSuzarT_M9jrVVsdqNp5CZFgdZz3uhdYK8+R3QqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 16, 2017 at 9:31 PM, Andy Gross <andy.gross@linaro.org> wrote:
-> Qualcomm Device Tree Changes for v4.15
+On Thu, Oct 19, 2017 at 11:59 PM, Tony Lindgren <tony@atomide.com> wrote:
+> Drop omap legacy platform data for IRQ, DMA and IO resources. With the
+> dts files fixed up to contain the necessary data for basic resources, we
+> can drop the related platform data.
 >
-> * Add Support for MSM8974 based Fairphone 2 phone
-> * Add support for MSM8974 based Sony Xperia Z2 Tablet
-> * Add MSM8660 GSBI6/7 nodes
-> * Disable GSBI6 at APQ8064 platform level
-> * Fix phy cells on APQ8064
+> Note that this branch depends on the "omap-for-v4.15/fixes-dt-signed"
+> branch and the patches with dependencies are based on a merge with that
+> branch.
+>
+> These patches first ensure things keep working for the legacy "ti,hwmods"
+> property when we start making it optional, then adds a minimal TI sysc
+> interconnect target device driver to handle the new generic "ti,sysc"
+> compatible property. And then we can finally drop the legacy platform
+> data for IRQ, DMA and IO resources as seen in the diffstats.
 
-Pulled into next/dt, thanks!
+Nice!
+
+Pulled into next/soc, thanks!
 
        Arnd
