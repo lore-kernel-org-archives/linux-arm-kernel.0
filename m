@@ -1,63 +1,31 @@
-From: ore@pengutronix.de (Oleksij Rempel)
-Date: Thu, 19 Oct 2017 12:27:28 +0200
-Subject: [PATCH 2/4] spi: imx: Fix failure path leak on GPIO request error
-In-Reply-To: <20171013195410.30767-2-tpiepho@impinj.com>
-References: <20171013195410.30767-1-tpiepho@impinj.com>
- <20171013195410.30767-2-tpiepho@impinj.com>
-Message-ID: <20171019102728.2h7ebuz4uxocoorq@pengutronix.de>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 19 Oct 2017 12:31:09 +0200
+Subject: [PATCH] ARM64: dts: meson-gxbb-odroidc2: fix usb1 power supply
+Message-ID: <1508409069-6317-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 13, 2017 at 12:54:08PM -0700, Trent Piepho wrote:
-> If the code that requests any chip select GPIOs fails, the cleanup of
-> spi_bitbang_start() by calling spi_bitbang_stop() is not done.
-> 
-> Fix this by moving spi_bitbang_start() to after the code that requets
-> GPIOs.  The GPIOs are dev managed and don't need explicit cleanup.
-> Since spi_bitbang_start() is now the last operation, it doesn't need
-> to be cleaned up in the failure path.
-> 
-> Signed-off-by: Trent Piepho <tpiepho@impinj.com>
-> ---
->  drivers/spi/spi-imx.c | 11 ++++++-----
->  1 file changed, 6 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-> index 07e6250f2dad..fea46cbf458a 100644
-> --- a/drivers/spi/spi-imx.c
-> +++ b/drivers/spi/spi-imx.c
-> @@ -1451,11 +1451,6 @@ static int spi_imx_probe(struct platform_device *pdev)
->  	spi_imx->devtype_data->intctrl(spi_imx, 0);
->  
->  	master->dev.of_node = pdev->dev.of_node;
-> -	ret = spi_bitbang_start(&spi_imx->bitbang);
-> -	if (ret) {
-> -		dev_err(&pdev->dev, "bitbang start failed with %d\n", ret);
-> -		goto out_clk_put;
-> -	}
->  
->  	/* Request GPIO CS lines, if any */
->  	if (master->cs_gpios) {
-> @@ -1473,6 +1468,12 @@ static int spi_imx_probe(struct platform_device *pdev)
->  		}
->  	}
->  
-> +	ret = spi_bitbang_start(&spi_imx->bitbang);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "bitbang start failed with %d\n", ret);
-> +		goto out_clk_put;
-> +	}
-> +
->  	dev_info(&pdev->dev, "probed\n");
->  
->  	clk_disable(spi_imx->clk_ipg);
-> -- 
-> 2.13.6
+Looking at the schematics, the USB Power Supply is shared between the
+two USB interfaces,
+If the usb0 fails to initialize, the second one won't have power.
 
-Reviewed-by: Oleksij Rempel <o.rempel@pengutronix.de>
+Fixes: 5a0803bd5ae2 ("ARM64: dts: meson-gxbb-odroidc2: Enable USB Nodes")
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+index 1deaa53..2e5ed59 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+@@ -301,6 +301,7 @@
+ 
+ &usb1_phy {
+ 	status = "okay";
++	phy-supply = <&usb_otg_pwr>;
+ };
+ 
+ &usb0 {
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+2.7.4
