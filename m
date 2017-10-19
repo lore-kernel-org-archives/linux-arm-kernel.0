@@ -1,62 +1,29 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 19 Oct 2017 16:32:14 +0100
-Subject: [PATCH v6 0/6] Add HiSilicon SoC uncore Performance Monitoring
- Unit driver
-In-Reply-To: <20171019152834.GB30652@arm.com>
-References: <1508411121-125691-1-git-send-email-zhangshaokun@hisilicon.com>
- <20171019122918.mk6wnnwn26krkre4@lakrids.cambridge.arm.com>
- <20171019152834.GB30652@arm.com>
-Message-ID: <20171019153214.kk2j7bozcpyewmqr@lakrids.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 19 Oct 2017 17:35:36 +0200
+Subject: [GIT PULL 1/1] Broadcom devicetree fixes for 4.14
+In-Reply-To: <20171006222014.2704-1-f.fainelli@gmail.com>
+References: <20171006222014.2704-1-f.fainelli@gmail.com>
+Message-ID: <CAK8P3a3-XhQtw+BsZXTC_PYpDxEeqYhkUhpjemLoiGPL8hgTAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 19, 2017 at 04:28:35PM +0100, Will Deacon wrote:
-> On Thu, Oct 19, 2017 at 01:29:18PM +0100, Mark Rutland wrote:
-> > Will, are you happy to queue this?
-> > 
-> > There's a minor fixup [1] needed in patch 2, but otherwise this looks
-> > good to me, and builds cleanly.
-> > 
-> > I've pushed out a branch [2] with that fix folded in, in case that's
-> > easier for you. Otherwise, feel free to pick these up with my Ack.
-> 
-> I'm just running some build tests on these. I also tweaked your fix slightly
-> -- can you check the diff below please?
+On Sat, Oct 7, 2017 at 12:20 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> ----------------------------------------------------------------
+> This pull request contains Broadcom ARM-based SoC Device Tree fixes for 4.14,
+> please pull the following:
+>
+> - Loic fixes the console path on the Raspberry Pi 3 which was not correctly set
+>   and would cause all sorts of confusion between the Bluetooth controller and the
+>   kernel console
 
-That's nicer!
+Sorry for the delay. I've merged it into fixes now to make things work for you,
+though it still seems that there is something wrong with the patch: you now
+have the 'aliases' node in the bcm283x.dtsi, which doesn't seem appropriate.
+There might be different board based on the same chip that don't all expose
+the same uarts at the same physical connectors, and you might have a .dts
+file that overrides those aliases, which gets really messy.
 
-My ack stands with that folded in.
+Please put the aliases list into each .dts file for this platform and make
+sure you list them with the right numbers.
 
-Mark.
-
-> diff --git a/drivers/perf/hisilicon/hisi_uncore_pmu.c b/drivers/perf/hisilicon/hisi_uncore_pmu.c
-> index 2bff43f0736b..c74542af4acf 100644
-> --- a/drivers/perf/hisilicon/hisi_uncore_pmu.c
-> +++ b/drivers/perf/hisilicon/hisi_uncore_pmu.c
-> @@ -69,15 +69,18 @@ static bool hisi_validate_event_group(struct perf_event *event)
->  	/* Include count for the event */
->  	int counters = 1;
->  
-> -	/*
-> -	 * We must NOT create groups containing mixed PMUs, although
-> -	 * software events are acceptable
-> -	 */
-> -	if (leader->pmu != event->pmu && !is_software_event(leader))
-> -		return false;
-> +	if (!is_software_event(leader)) {
-> +		/*
-> +		 * We must NOT create groups containing mixed PMUs, although
-> +		 * software events are acceptable
-> +		 */
-> +		if (leader->pmu != event->pmu)
-> +			return false;
->  
-> -	/* Increment counter for the leader */
-> -	counters++;
-> +		/* Increment counter for the leader */
-> +		if (leader != event)
-> +			counters++;
-> +	}
->  
->  	list_for_each_entry(sibling, &event->group_leader->sibling_list,
->  			    group_entry) {
+     Arnd
