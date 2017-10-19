@@ -1,25 +1,23 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Oct 2017 22:40:39 +0200
-Subject: [PATCH] arm64: defconfig: Enable QCOM_IOMMU
-In-Reply-To: <20171011170006.GQ1165@minitux>
-References: <20171011151925.30909-1-nicolas.dechesne@linaro.org>
- <20171011170006.GQ1165@minitux>
-Message-ID: <CAK8P3a3LODdQUfdrWEms-SaEE-=N4evbsXK9_djBwmsH0FxkNA@mail.gmail.com>
+Date: Thu, 19 Oct 2017 22:55:17 +0200
+Subject: [PATCH] ARM: defconfig: select the right SX150X driver
+In-Reply-To: <20171017093208.5313-1-linus.walleij@linaro.org>
+References: <20171017093208.5313-1-linus.walleij@linaro.org>
+Message-ID: <CAK8P3a3Ftenw7eExxCVRpx-_U3eE2YqdGFjT9kirKUYAOEdpnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 11, 2017 at 7:00 PM, Bjorn Andersson
-<bjorn.andersson@linaro.org> wrote:
-> On Wed 11 Oct 08:19 PDT 2017, Nicolas Dechesne wrote:
+On Tue, Oct 17, 2017 at 11:32 AM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
+> The SX150X GPIO expander has been moved to pin control and
+> its Kconfig symbol has been renamed. We used to have a paper-over
+> thing in Kconfig but it was causing circular dependencies so
+> I have had to kill it off. Select the right driver instead.
 >
->> Enable QCOM IOMMU driver for 'B' family devices, such as APQ8016 found on the
->> Dragonboard 410c. With this change, graphics console and GPU are working
->> fine (using mesa/freedreno for GPU driver).
->>
->> Signed-off-by: Nicolas Dechesne <nicolas.dechesne@linaro.org>
->
-> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ARM SoC folks: please apply this directly for ARM SoC.
 
 Applied to next/soc, thanks!
 
-       Arnd
+     Arnd
