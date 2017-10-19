@@ -1,80 +1,43 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 19 Oct 2017 18:31:21 +0200
-Subject: [PATCH v3 06/10] arm: dts: mt7623: add subsystem clock controller
- nodes
-In-Reply-To: <1a6aba8921584fe465bc2138a3aec10c2637f226.1506908511.git.ryder.lee@mediatek.com>
-References: <cover.1506908511.git.ryder.lee@mediatek.com>
- <1a6aba8921584fe465bc2138a3aec10c2637f226.1506908511.git.ryder.lee@mediatek.com>
-Message-ID: <a318bdec-e36c-ddd6-93fa-e8646a553b36@gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 20 Oct 2017 00:34:30 +0800
+Subject: [linux-sunxi] [PATCH v2 6/8] ARM: dts: sun8i: a83t: Move mmc1
+ pinctrl setting to dtsi file
+In-Reply-To: <4a2734fb-71ab-7cd9-2b17-669f2fdf9a2c@riseup.net>
+References: <20171018083138.14517-1-wens@csie.org>
+ <20171018083138.14517-7-wens@csie.org>
+ <f85a30e2-5a9d-a7ba-0010-6602cabaf83e@riseup.net>
+ <CAGb2v64O+eyriHG-FirtPKo6hACfbV9JcJRUUZ+rY1QM2w_r1g@mail.gmail.com>
+ <4a2734fb-71ab-7cd9-2b17-669f2fdf9a2c@riseup.net>
+Message-ID: <CAGb2v64T=z8RefyEcDHJyrJE9ZCRN=c6zVf25JEqSKvDGUE_Rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Oct 20, 2017 at 12:02 AM, Joonas Kylm?l? <joonas.kylmala@iki.fi> wrote:
+> Chen-Yu Tsai:
+>>> Chen-Yu Tsai:
+>>>> mmc1 only has 1 possible pinmux setting.
+>>>
+>>> What if someone is using the MMC with bus width 1 and then using the
+>>> remaining 3 pins for something else?
+>>
+>> I would very much like to see such a design. Currently the devices
+>> we see all follow Allwinner's reference design, with only minor
+>> modifications. As such, mmc1 is used exclusively for connecting
+>> SDIO-based WiFi modules.
+>>
+>> If such a radical(?) design is done, the vendor can always add
+>> a "mmc1-1bit-pins" setting and override the default.
+>
+> Alright. So could we then make similar patches for other SoCs that have
+> the same situation with the MMC pinmuxing? I.e. let's move the pinctrl
+> to the dtsi file from the dts files. With H3 SDC0 and SDC1 nodes could
+> be moved then to the dtsi. Can't we also move the SDC0 pinctrl in A83T
+> to the dtsi file? Though, in order to do that mmc0_cd_pin node needs to
+> be added to the A38T dtsi.
 
+Yes. We are slowly doing this and other cleanups. This is somewhat
+boring and tedious, and it's not exactly a high priority item. You
+might have noticed Maxime recently sent patches to clean up sun4i
+and sun9i.
 
-On 10/02/2017 03:54 AM, Ryder Lee wrote:
-> This patch adds missing susbsystem clock controllers nodes for MT7623.
-> (e.g., mmsys, imgsys, vdecsys and bdpsys)
-> 
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> ---
->  arch/arm/boot/dts/mt7623.dtsi | 32 ++++++++++++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
-> index 0640fb7..a877f9a 100644
-> --- a/arch/arm/boot/dts/mt7623.dtsi
-> +++ b/arch/arm/boot/dts/mt7623.dtsi
-> @@ -661,6 +661,30 @@
->  		status = "disabled";
->  	};
->  
-> +	mmsys: syscon at 14000000 {
-> +		compatible = "mediatek,mt7623-mmsys",
-> +			     "mediatek,mt2701-mmsys",
-> +			     "syscon";
-> +		reg = <0 0x14000000 0 0x1000>;
-> +		#clock-cells = <1>;
-> +	};
-
-We better wait until we have figured out how to fix the issues we see.
-Please resubmit when that's clear.
-
-Same holds for patch 8/10
-
-Thanks,
-Matthias
-
-> +
-> +	imgsys: syscon at 15000000 {
-> +		compatible = "mediatek,mt7623-imgsys",
-> +			     "mediatek,mt2701-imgsys",
-> +			     "syscon";
-> +		reg = <0 0x15000000 0 0x1000>;
-> +		#clock-cells = <1>;
-> +	};
-> +
-> +	vdecsys: syscon at 16000000 {
-> +		compatible = "mediatek,mt7623-vdecsys",
-> +			     "mediatek,mt2701-vdecsys",
-> +			     "syscon";
-> +		reg = <0 0x16000000 0 0x1000>;
-> +		#clock-cells = <1>;
-> +	};
-> +
->  	hifsys: syscon at 1a000000 {
->  		compatible = "mediatek,mt7623-hifsys",
->  			     "mediatek,mt2701-hifsys",
-> @@ -799,4 +823,12 @@
->  		power-domains = <&scpsys MT2701_POWER_DOMAIN_ETH>;
->  		status = "disabled";
->  	};
-> +
-> +	bdpsys: syscon at 1c000000 {
-> +		compatible = "mediatek,mt7623-bdpsys",
-> +			     "mediatek,mt2701-bdpsys",
-> +			     "syscon";
-> +		reg = <0 0x1c000000 0 0x1000>;
-> +		#clock-cells = <1>;
-> +	};
->  };
-> 
+ChenYu
