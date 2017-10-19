@@ -1,40 +1,30 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 19 Oct 2017 13:01:37 +0100
-Subject: [PATCH 01/11] Initialize the mapping of KASan shadow memory
-In-Reply-To: <31b16c9d-48c7-bc0a-51d1-cc6cf892329b@gmail.com>
+Date: Thu, 19 Oct 2017 13:05:55 +0100
+Subject: [PATCH 02/11] replace memory function
+In-Reply-To: <20171011082227.20546-3-liuwenliang@huawei.com>
 References: <20171011082227.20546-1-liuwenliang@huawei.com>
- <20171011082227.20546-2-liuwenliang@huawei.com>
- <31b16c9d-48c7-bc0a-51d1-cc6cf892329b@gmail.com>
-Message-ID: <20171019120137.GT20805@n2100.armlinux.org.uk>
+ <20171011082227.20546-3-liuwenliang@huawei.com>
+Message-ID: <20171019120555.GU20805@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 12, 2017 at 02:42:49AM +0300, Dmitry Osipenko wrote:
-> On 11.10.2017 11:22, Abbott Liu wrote:
-> > +void __init kasan_map_early_shadow(pgd_t *pgdp)
-> > +{
-> > +	int i;
-> > +	unsigned long start = KASAN_SHADOW_START;
-> > +	unsigned long end = KASAN_SHADOW_END;
-> > +	unsigned long addr;
-> > +	unsigned long next;
-> > +	pgd_t *pgd;
-> > +
-> > +	for (i = 0; i < PTRS_PER_PTE; i++)
-> > +		set_pte_at(&init_mm, KASAN_SHADOW_START + i*PAGE_SIZE,
-> > +			&kasan_zero_pte[i], pfn_pte(
-> > +				virt_to_pfn(kasan_zero_page),
-> > +				__pgprot(_L_PTE_DEFAULT | L_PTE_DIRTY | L_PTE_XN)));
+On Wed, Oct 11, 2017 at 04:22:18PM +0800, Abbott Liu wrote:
+> From: Andrey Ryabinin <a.ryabinin@samsung.com>
 > 
-> Shouldn't all __pgprot's contain L_PTE_MT_WRITETHROUGH ?
+> Functions like memset/memmove/memcpy do a lot of memory accesses.
+> If bad pointer passed to one of these function it is important
+> to catch this. Compiler's instrumentation cannot do this since
+> these functions are written in assembly.
+> 
+> KASan replaces memory functions with manually instrumented variants.
+> Original functions declared as weak symbols so strong definitions
+> in mm/kasan/kasan.c could replace them. Original functions have aliases
+> with '__' prefix in name, so we could call non-instrumented variant
+> if needed.
 
-One of the architecture restrictions is that the cache attributes of
-all aliases should match (but there is a specific workaround that
-permits this, provided that the dis-similar mappings aren't accessed
-without certain intervening instructions.)
-
-Why should it be L_PTE_MT_WRITETHROUGH, and not the same cache
-attributes as the lowmem mapping?
+KASAN in the decompressor makes no sense, so I think you need to
+mark the decompressor compilation as such in this patch so it,
+as a whole, sees no change.
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
