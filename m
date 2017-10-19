@@ -1,302 +1,286 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 19 Oct 2017 18:15:45 +0100
-Subject: [PATCH 09/17] coresight: Convert driver messages to dev_dbg
+Date: Thu, 19 Oct 2017 18:15:42 +0100
+Subject: [PATCH 06/17] coresight: tmc: Make ETR SG table circular
 In-Reply-To: <20171019171553.24056-1-suzuki.poulose@arm.com>
 References: <20171019171553.24056-1-suzuki.poulose@arm.com>
-Message-ID: <20171019171553.24056-10-suzuki.poulose@arm.com>
+Message-ID: <20171019171553.24056-7-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert component enable/disable messages from dev_info to dev_dbg.
-This is required to prevent LOCKDEP splats when operating in perf
-mode where we could be called with locks held to enable a coresight
-path. If someone wants to really see the messages, they can always
-enable it at runtime via dynamic_debug.
+Make the ETR SG table Circular buffer so that we could start
+at any of the SG pages and use the entire buffer for tracing.
+This can be achieved by :
+
+1) Keeping an additional LINK pointer at the very end of the
+SG table, i.e, after the LAST buffer entry, to point back to
+the beginning of the first table. This will allow us to use
+the buffer normally when we start the trace at offset 0 of
+the buffer, as the LAST buffer entry hints the TMC-ETR and
+it automatically wraps to the offset 0.
+
+2) If we want to start at any other ETR SG page aligned offset,
+we could :
+ a) Make the preceding page entry as LAST entry.
+ b) Make the original LAST entry a normal entry.
+ c) Use the table pointer to the "new" start offset as the
+    base of the table address.
+This works as the TMC doesn't mandate that the page table
+base address should be 4K page aligned.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-dynamic-replicator.c | 4 ++--
- drivers/hwtracing/coresight/coresight-etb10.c              | 6 +++---
- drivers/hwtracing/coresight/coresight-etm3x.c              | 4 ++--
- drivers/hwtracing/coresight/coresight-etm4x.c              | 4 ++--
- drivers/hwtracing/coresight/coresight-funnel.c             | 4 ++--
- drivers/hwtracing/coresight/coresight-replicator.c         | 4 ++--
- drivers/hwtracing/coresight/coresight-stm.c                | 4 ++--
- drivers/hwtracing/coresight/coresight-tmc-etf.c            | 8 ++++----
- drivers/hwtracing/coresight/coresight-tmc-etr.c            | 4 ++--
- drivers/hwtracing/coresight/coresight-tmc.c                | 4 ++--
- drivers/hwtracing/coresight/coresight-tpiu.c               | 4 ++--
- 11 files changed, 25 insertions(+), 25 deletions(-)
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 159 +++++++++++++++++++++---
+ 1 file changed, 139 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-index accc2056f7c6..49efa9d90367 100644
---- a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-+++ b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-@@ -64,7 +64,7 @@ static int replicator_enable(struct coresight_device *csdev, int inport,
- 
- 	CS_LOCK(drvdata->base);
- 
--	dev_info(drvdata->dev, "REPLICATOR enabled\n");
-+	dev_dbg(drvdata->dev, "REPLICATOR enabled\n");
- 	return 0;
- }
- 
-@@ -83,7 +83,7 @@ static void replicator_disable(struct coresight_device *csdev, int inport,
- 
- 	CS_LOCK(drvdata->base);
- 
--	dev_info(drvdata->dev, "REPLICATOR disabled\n");
-+	dev_dbg(drvdata->dev, "REPLICATOR disabled\n");
- }
- 
- static const struct coresight_ops_link replicator_link_ops = {
-diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-index d7164ab8e229..757f556975f7 100644
---- a/drivers/hwtracing/coresight/coresight-etb10.c
-+++ b/drivers/hwtracing/coresight/coresight-etb10.c
-@@ -164,7 +164,7 @@ static int etb_enable(struct coresight_device *csdev, u32 mode)
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
- out:
--	dev_info(drvdata->dev, "ETB enabled\n");
-+	dev_dbg(drvdata->dev, "ETB enabled\n");
- 	return 0;
- }
- 
-@@ -270,7 +270,7 @@ static void etb_disable(struct coresight_device *csdev)
- 
- 	local_set(&drvdata->mode, CS_MODE_DISABLED);
- 
--	dev_info(drvdata->dev, "ETB disabled\n");
-+	dev_dbg(drvdata->dev, "ETB disabled\n");
- }
- 
- static void *etb_alloc_buffer(struct coresight_device *csdev, int cpu,
-@@ -513,7 +513,7 @@ static void etb_dump(struct etb_drvdata *drvdata)
- 	}
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
--	dev_info(drvdata->dev, "ETB dumped\n");
-+	dev_dbg(drvdata->dev, "ETB dumped\n");
- }
- 
- static int etb_open(struct inode *inode, struct file *file)
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index e5b1ec57dbde..aa8a2b076ad4 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -510,7 +510,7 @@ static int etm_enable_sysfs(struct coresight_device *csdev)
- 	drvdata->sticky_enable = true;
- 	spin_unlock(&drvdata->spinlock);
- 
--	dev_info(drvdata->dev, "ETM tracing enabled\n");
-+	dev_dbg(drvdata->dev, "ETM tracing enabled\n");
- 	return 0;
- 
- err:
-@@ -613,7 +613,7 @@ static void etm_disable_sysfs(struct coresight_device *csdev)
- 	spin_unlock(&drvdata->spinlock);
- 	cpus_read_unlock();
- 
--	dev_info(drvdata->dev, "ETM tracing disabled\n");
-+	dev_dbg(drvdata->dev, "ETM tracing disabled\n");
- }
- 
- static void etm_disable(struct coresight_device *csdev,
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index e84d80b008fc..c9c73c2f7fd8 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -274,7 +274,7 @@ static int etm4_enable_sysfs(struct coresight_device *csdev)
- 	drvdata->sticky_enable = true;
- 	spin_unlock(&drvdata->spinlock);
- 
--	dev_info(drvdata->dev, "ETM tracing enabled\n");
-+	dev_dbg(drvdata->dev, "ETM tracing enabled\n");
- 	return 0;
- 
- err:
-@@ -387,7 +387,7 @@ static void etm4_disable_sysfs(struct coresight_device *csdev)
- 	spin_unlock(&drvdata->spinlock);
- 	cpus_read_unlock();
- 
--	dev_info(drvdata->dev, "ETM tracing disabled\n");
-+	dev_dbg(drvdata->dev, "ETM tracing disabled\n");
- }
- 
- static void etm4_disable(struct coresight_device *csdev,
-diff --git a/drivers/hwtracing/coresight/coresight-funnel.c b/drivers/hwtracing/coresight/coresight-funnel.c
-index 77642e0e955b..afdf4807c2dc 100644
---- a/drivers/hwtracing/coresight/coresight-funnel.c
-+++ b/drivers/hwtracing/coresight/coresight-funnel.c
-@@ -72,7 +72,7 @@ static int funnel_enable(struct coresight_device *csdev, int inport,
- 
- 	funnel_enable_hw(drvdata, inport);
- 
--	dev_info(drvdata->dev, "FUNNEL inport %d enabled\n", inport);
-+	dev_dbg(drvdata->dev, "FUNNEL inport %d enabled\n", inport);
- 	return 0;
- }
- 
-@@ -96,7 +96,7 @@ static void funnel_disable(struct coresight_device *csdev, int inport,
- 
- 	funnel_disable_hw(drvdata, inport);
- 
--	dev_info(drvdata->dev, "FUNNEL inport %d disabled\n", inport);
-+	dev_dbg(drvdata->dev, "FUNNEL inport %d disabled\n", inport);
- }
- 
- static const struct coresight_ops_link funnel_link_ops = {
-diff --git a/drivers/hwtracing/coresight/coresight-replicator.c b/drivers/hwtracing/coresight/coresight-replicator.c
-index 3756e71cb8f5..4f7781203fd4 100644
---- a/drivers/hwtracing/coresight/coresight-replicator.c
-+++ b/drivers/hwtracing/coresight/coresight-replicator.c
-@@ -42,7 +42,7 @@ static int replicator_enable(struct coresight_device *csdev, int inport,
- {
- 	struct replicator_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
--	dev_info(drvdata->dev, "REPLICATOR enabled\n");
-+	dev_dbg(drvdata->dev, "REPLICATOR enabled\n");
- 	return 0;
- }
- 
-@@ -51,7 +51,7 @@ static void replicator_disable(struct coresight_device *csdev, int inport,
- {
- 	struct replicator_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
--	dev_info(drvdata->dev, "REPLICATOR disabled\n");
-+	dev_dbg(drvdata->dev, "REPLICATOR disabled\n");
- }
- 
- static const struct coresight_ops_link replicator_link_ops = {
-diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
-index 92a780a6df1d..696455891ec4 100644
---- a/drivers/hwtracing/coresight/coresight-stm.c
-+++ b/drivers/hwtracing/coresight/coresight-stm.c
-@@ -218,7 +218,7 @@ static int stm_enable(struct coresight_device *csdev,
- 	stm_enable_hw(drvdata);
- 	spin_unlock(&drvdata->spinlock);
- 
--	dev_info(drvdata->dev, "STM tracing enabled\n");
-+	dev_dbg(drvdata->dev, "STM tracing enabled\n");
- 	return 0;
- }
- 
-@@ -281,7 +281,7 @@ static void stm_disable(struct coresight_device *csdev,
- 		pm_runtime_put(drvdata->dev);
- 
- 		local_set(&drvdata->mode, CS_MODE_DISABLED);
--		dev_info(drvdata->dev, "STM tracing disabled\n");
-+		dev_dbg(drvdata->dev, "STM tracing disabled\n");
- 	}
- }
- 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-index d89bfb3042a2..aa4e8f03ef49 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-@@ -242,7 +242,7 @@ static int tmc_enable_etf_sink(struct coresight_device *csdev, u32 mode)
- 	if (ret)
- 		return ret;
- 
--	dev_info(drvdata->dev, "TMC-ETB/ETF enabled\n");
-+	dev_dbg(drvdata->dev, "TMC-ETB/ETF enabled\n");
- 	return 0;
- }
- 
-@@ -265,7 +265,7 @@ static void tmc_disable_etf_sink(struct coresight_device *csdev)
- 
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
--	dev_info(drvdata->dev, "TMC-ETB/ETF disabled\n");
-+	dev_dbg(drvdata->dev, "TMC-ETB/ETF disabled\n");
- }
- 
- static int tmc_enable_etf_link(struct coresight_device *csdev,
-@@ -284,7 +284,7 @@ static int tmc_enable_etf_link(struct coresight_device *csdev,
- 	drvdata->mode = CS_MODE_SYSFS;
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
--	dev_info(drvdata->dev, "TMC-ETF enabled\n");
-+	dev_dbg(drvdata->dev, "TMC-ETF enabled\n");
- 	return 0;
- }
- 
-@@ -304,7 +304,7 @@ static void tmc_disable_etf_link(struct coresight_device *csdev,
- 	drvdata->mode = CS_MODE_DISABLED;
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
--	dev_info(drvdata->dev, "TMC-ETF disabled\n");
-+	dev_dbg(drvdata->dev, "TMC-ETF disabled\n");
- }
- 
- static void *tmc_alloc_etf_buffer(struct coresight_device *csdev, int cpu,
 diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-index 9e41eeaa5284..f12b7c5f68b2 100644
+index 4424eb67a54c..c171b244e12a 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
 +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-@@ -1142,7 +1142,7 @@ static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev)
- 		tmc_etr_free_sysfs_buf(free_buf);
+@@ -71,36 +71,41 @@ typedef u32 sgte_t;
+  * @sg_table:		Generic SG Table holding the data/table pages.
+  * @hwaddr:		hwaddress used by the TMC, which is the base
+  *			address of the table.
++ * @nr_entries:		Total number of pointers in the table.
++ * @first_entry:	Index to the current "start" of the buffer.
++ * @last_entry:		Index to the last entry of the buffer.
+  */
+ struct etr_sg_table {
+ 	struct tmc_sg_table	*sg_table;
+ 	dma_addr_t		hwaddr;
++	u32			nr_entries;
++	u32			first_entry;
++	u32			last_entry;
+ };
  
- 	if (!ret)
--		dev_info(drvdata->dev, "TMC-ETR enabled\n");
-+		dev_dbg(drvdata->dev, "TMC-ETR enabled\n");
- 
- 	return ret;
+ /*
+  * tmc_etr_sg_table_entries: Total number of table entries required to map
+  * @nr_pages system pages.
+  *
+- * We need to map @nr_pages * ETR_SG_PAGES_PER_SYSPAGE data pages.
++ * We need to map @nr_pages * ETR_SG_PAGES_PER_SYSPAGE data pages and
++ * an additional Link pointer for making it a Circular buffer.
+  * Each TMC page can map (ETR_SG_PTRS_PER_PAGE - 1) buffer pointers,
+  * with the last entry pointing to the page containing the table
+- * entries. If we spill over to a new page for mapping 1 entry,
+- * we could as well replace the link entry of the previous page
+- * with the last entry.
++ * entries. If we fill the last table in full with the pointers, (i.e,
++ * nr_sgpages % (ETR_SG_PTRS_PER_PAGE - 1) == 0, we don't have to allocate
++ * another table and hence skip the Link pointer. Also we could use the
++ * link entry of the last page to make it circular.
+  */
+ static inline unsigned long __attribute_const__
+ tmc_etr_sg_table_entries(int nr_pages)
+ {
+ 	unsigned long nr_sgpages = nr_pages * ETR_SG_PAGES_PER_SYSPAGE;
+ 	unsigned long nr_sglinks = nr_sgpages / (ETR_SG_PTRS_PER_PAGE - 1);
+-	/*
+-	 * If we spill over to a new page for 1 entry, we could as well
+-	 * make it the LAST entry in the previous page, skipping the Link
+-	 * address.
+-	 */
+-	if (nr_sglinks && (nr_sgpages % (ETR_SG_PTRS_PER_PAGE - 1) < 2))
++
++	if (nr_sglinks && !(nr_sgpages % (ETR_SG_PTRS_PER_PAGE - 1)))
+ 		nr_sglinks--;
+-	return nr_sgpages + nr_sglinks;
++	/* Add an entry for the circular link */
++	return nr_sgpages + nr_sglinks + 1;
  }
-@@ -1185,7 +1185,7 @@ static void tmc_disable_etr_sink(struct coresight_device *csdev)
  
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+ /*
+@@ -417,14 +422,21 @@ tmc_sg_daddr_to_vaddr(struct tmc_sg_table *sg_table,
+ /* Dump the given sg_table */
+ static void tmc_etr_sg_table_dump(struct etr_sg_table *etr_table)
+ {
+-	sgte_t *ptr;
++	sgte_t *ptr, *start;
+ 	int i = 0;
+ 	dma_addr_t addr;
+ 	struct tmc_sg_table *sg_table = etr_table->sg_table;
  
--	dev_info(drvdata->dev, "TMC-ETR disabled\n");
-+	dev_dbg(drvdata->dev, "TMC-ETR disabled\n");
+-	ptr = (sgte_t *)tmc_sg_daddr_to_vaddr(sg_table,
++	start = (sgte_t *)tmc_sg_daddr_to_vaddr(sg_table,
+ 					      etr_table->hwaddr, true);
+-	while (ptr) {
++	if (!start) {
++		pr_debug("ERROR: Failed to translate table base: 0x%llx\n",
++					 etr_table->hwaddr);
++		return;
++	}
++
++	ptr = start;
++	do {
+ 		addr = ETR_SG_ADDR(*ptr);
+ 		switch (ETR_SG_ET(*ptr)) {
+ 		case ETR_SG_ET_NORMAL:
+@@ -436,14 +448,17 @@ static void tmc_etr_sg_table_dump(struct etr_sg_table *etr_table)
+ 				 i, ptr, addr);
+ 			ptr = (sgte_t *)tmc_sg_daddr_to_vaddr(sg_table,
+ 							      addr, true);
++			if (!ptr)
++				pr_debug("ERROR: Bad Link 0x%llx\n", addr);
+ 			break;
+ 		case ETR_SG_ET_LAST:
+ 			pr_debug("%05d: ### %p\t:[L] 0x%llx ###\n",
+ 				 i, ptr, addr);
+-			return;
++			ptr++;
++			break;
+ 		}
+ 		i++;
+-	}
++	} while (ptr && ptr != start);
+ 	pr_debug("******* End of Table *****\n");
+ }
+ #endif
+@@ -458,7 +473,7 @@ static void tmc_etr_sg_table_dump(struct etr_sg_table *etr_table)
+ static void tmc_etr_sg_table_populate(struct etr_sg_table *etr_table)
+ {
+ 	dma_addr_t paddr;
+-	int i, type, nr_entries;
++	int i, type;
+ 	int tpidx = 0; /* index to the current system table_page */
+ 	int sgtidx = 0;	/* index to the sg_table within the current syspage */
+ 	int sgtoffset = 0; /* offset to the next entry within the sg_table */
+@@ -469,16 +484,16 @@ static void tmc_etr_sg_table_populate(struct etr_sg_table *etr_table)
+ 	dma_addr_t *table_daddrs = sg_table->table_pages.daddrs;
+ 	dma_addr_t *data_daddrs = sg_table->data_pages.daddrs;
+ 
+-	nr_entries = tmc_etr_sg_table_entries(sg_table->data_pages.nr_pages);
+ 	/*
+ 	 * Use the contiguous virtual address of the table to update entries.
+ 	 */
+ 	ptr = sg_table->table_vaddr;
+ 	/*
+-	 * Fill all the entries, except the last entry to avoid special
++	 * Fill all the entries, except the last two entries (i.e, the last
++	 * buffer and the circular link back to the base) to avoid special
+ 	 * checks within the loop.
+ 	 */
+-	for (i = 0; i < nr_entries - 1; i++) {
++	for (i = 0; i < etr_table->nr_entries - 2; i++) {
+ 		if (sgtoffset == ETR_SG_PTRS_PER_PAGE - 1) {
+ 			/*
+ 			 * Last entry in a sg_table page is a link address to
+@@ -519,6 +534,107 @@ static void tmc_etr_sg_table_populate(struct etr_sg_table *etr_table)
+ 	/* Set up the last entry, which is always a data pointer */
+ 	paddr = data_daddrs[dpidx] + spidx * ETR_SG_PAGE_SIZE;
+ 	*ptr++ = ETR_SG_ENTRY(paddr, ETR_SG_ET_LAST);
++	/* followed by a circular link, back to the start of the table */
++	*ptr++ = ETR_SG_ENTRY(sg_table->table_daddr, ETR_SG_ET_LINK);
++}
++
++/*
++ * tmc_etr_sg_offset_to_table_index : Translate a given data @offset
++ * to the index of the page table "entry". Data pointers always have
++ * a fixed location, with ETR_SG_PTRS_PER_PAGE - 1 entries in an
++ * ETR_SG_PAGE and 1 link entry per (ETR_SG_PTRS_PER_PAGE -1) entries.
++ */
++static inline u32
++tmc_etr_sg_offset_to_table_index(u64 offset)
++{
++	u64 sgpage_idx = offset >> ETR_SG_PAGE_SHIFT;
++
++	return sgpage_idx + sgpage_idx / (ETR_SG_PTRS_PER_PAGE - 1);
++}
++
++/*
++ * tmc_etr_sg_update_type: Update the type of a given entry in the
++ * table to the requested entry. This is only used for data buffers
++ * to toggle the "NORMAL" vs "LAST" buffer entries.
++ */
++static inline void tmc_etr_sg_update_type(sgte_t *entry, u32 type)
++{
++	WARN_ON(ETR_SG_ET(*entry) == ETR_SG_ET_LINK);
++	WARN_ON(!ETR_SG_ET(*entry));
++	*entry &= ~ETR_SG_ET_MASK;
++	*entry |= type;
++}
++
++/*
++ * tmc_etr_sg_table_index_to_daddr: Return the hardware address to the table
++ * entry @index. Use this address to let the table begin @index.
++ */
++static inline dma_addr_t
++tmc_etr_sg_table_index_to_daddr(struct tmc_sg_table *sg_table, u32 index)
++{
++	u32 sys_page_idx = index / ETR_SG_PTRS_PER_SYSPAGE;
++	u32 sys_page_offset = index % ETR_SG_PTRS_PER_SYSPAGE;
++	sgte_t *ptr;
++
++	ptr = (sgte_t *)sg_table->table_pages.daddrs[sys_page_idx];
++	return (dma_addr_t)&ptr[sys_page_offset];
++}
++
++/*
++ * tmc_etr_sg_table_rotate : Rotate the SG circular buffer, moving
++ * the "base" to a requested offset. We do so by :
++ *
++ * 1) Reset the current LAST buffer.
++ * 2) Mark the "previous" buffer in the table to the "base" as LAST.
++ * 3) Update the hwaddr to point to the table pointer for the buffer
++ *    which starts at "base".
++ */
++static int __maybe_unused
++tmc_etr_sg_table_rotate(struct etr_sg_table *etr_table, u64 base_offset)
++{
++	u32 last_entry, first_entry;
++	u64 last_offset;
++	struct tmc_sg_table *sg_table = etr_table->sg_table;
++	sgte_t *table_ptr = sg_table->table_vaddr;
++	ssize_t buf_size = tmc_sg_table_buf_size(sg_table);
++
++	/* Offset should always be SG PAGE_SIZE aligned */
++	if (base_offset & (ETR_SG_PAGE_SIZE - 1)) {
++		pr_debug("unaligned base offset %llx\n", base_offset);
++		return -EINVAL;
++	}
++	/* Make sure the offset is within the range */
++	if (base_offset < 0 || base_offset > buf_size) {
++		base_offset = (base_offset + buf_size) % buf_size;
++		pr_debug("Resetting offset to %llx\n", base_offset);
++	}
++	first_entry = tmc_etr_sg_offset_to_table_index(base_offset);
++	if (first_entry == etr_table->first_entry) {
++		pr_debug("Head is already at %llx, skipping\n", base_offset);
++		return 0;
++	}
++
++	/* Last entry should be the previous one to the new "base" */
++	last_offset = ((base_offset - ETR_SG_PAGE_SIZE) + buf_size) % buf_size;
++	last_entry = tmc_etr_sg_offset_to_table_index(last_offset);
++
++	/* Reset the current Last page to Normal and new Last page to NORMAL */
++	tmc_etr_sg_update_type(&table_ptr[etr_table->last_entry],
++				 ETR_SG_ET_NORMAL);
++	tmc_etr_sg_update_type(&table_ptr[last_entry], ETR_SG_ET_LAST);
++	etr_table->hwaddr = tmc_etr_sg_table_index_to_daddr(sg_table,
++							    first_entry);
++	etr_table->first_entry = first_entry;
++	etr_table->last_entry = last_entry;
++	pr_debug("table rotated to offset %llx-%llx, entries (%d - %d), dba: %llx\n",
++			base_offset, last_offset, first_entry, last_entry,
++			etr_table->hwaddr);
++	/* Sync the table for device */
++	tmc_sg_table_sync_table(sg_table);
++#ifdef ETR_SG_DEBUG
++	tmc_etr_sg_table_dump(etr_table);
++#endif
++	return 0;
  }
  
- static const struct coresight_ops_sink tmc_etr_sink_ops = {
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index 2349b1805694..4939333cc6c7 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -88,7 +88,7 @@ static int tmc_read_prepare(struct tmc_drvdata *drvdata)
+ /*
+@@ -552,6 +668,9 @@ tmc_init_etr_sg_table(struct device *dev, int node,
  	}
  
- 	if (!ret)
--		dev_info(drvdata->dev, "TMC read start\n");
-+		dev_dbg(drvdata->dev, "TMC read start\n");
- 
- 	return ret;
- }
-@@ -110,7 +110,7 @@ static int tmc_read_unprepare(struct tmc_drvdata *drvdata)
- 	}
- 
- 	if (!ret)
--		dev_info(drvdata->dev, "TMC read end\n");
-+		dev_dbg(drvdata->dev, "TMC read end\n");
- 
- 	return ret;
- }
-diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
-index d7a3e453016d..7b105001dc32 100644
---- a/drivers/hwtracing/coresight/coresight-tpiu.c
-+++ b/drivers/hwtracing/coresight/coresight-tpiu.c
-@@ -77,7 +77,7 @@ static int tpiu_enable(struct coresight_device *csdev, u32 mode)
- 
- 	tpiu_enable_hw(drvdata);
- 
--	dev_info(drvdata->dev, "TPIU enabled\n");
-+	dev_dbg(drvdata->dev, "TPIU enabled\n");
- 	return 0;
- }
- 
-@@ -99,7 +99,7 @@ static void tpiu_disable(struct coresight_device *csdev)
- 
- 	tpiu_disable_hw(drvdata);
- 
--	dev_info(drvdata->dev, "TPIU disabled\n");
-+	dev_dbg(drvdata->dev, "TPIU disabled\n");
- }
- 
- static const struct coresight_ops_sink tpiu_sink_ops = {
+ 	etr_table->sg_table = sg_table;
++	etr_table->nr_entries = nr_entries;
++	etr_table->first_entry = 0;
++	etr_table->last_entry = nr_entries - 2;
+ 	/* TMC should use table base address for DBA */
+ 	etr_table->hwaddr = sg_table->table_daddr;
+ 	tmc_etr_sg_table_populate(etr_table);
 -- 
 2.13.6
