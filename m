@@ -1,78 +1,59 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 19 Oct 2017 10:06:49 -0700
-Subject: libbattery was Re: [RFC PATCH 5/5] power: generic-adc-battery:
- Add capacity handling
-In-Reply-To: <152FA5B1-75F9-4F0B-9E05-6277CD83C975@goldelico.com>
-References: <1501620926-22669-1-git-send-email-marek.belisko@open-nandra.com>
- <1501620926-22669-6-git-send-email-marek.belisko@open-nandra.com>
- <20170829101147.debhadzyfrxhkrvt@earth>
- <20170908113231.GJ18365@amd> <20171018122804.GA14376@amd>
- <61BFA8AF-657A-4AD7-A7AC-3E5DC3B7E83D@goldelico.com>
- <20171018132204.GD4394@atomide.com>
- <0C0901E1-23E8-4D04-B3A9-8314809A7A6B@goldelico.com>
- <20171019162416.GE4394@atomide.com>
- <152FA5B1-75F9-4F0B-9E05-6277CD83C975@goldelico.com>
-Message-ID: <20171019170649.GG4394@atomide.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 19 Oct 2017 18:15:37 +0100
+Subject: [PATCH 01/17] coresight etr: Disallow perf mode temporarily
+In-Reply-To: <20171019171553.24056-1-suzuki.poulose@arm.com>
+References: <20171019171553.24056-1-suzuki.poulose@arm.com>
+Message-ID: <20171019171553.24056-2-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* H. Nikolaus Schaller <hns@goldelico.com> [171019 09:57]:
-> Hi Tony,
-> 
-> > Am 19.10.2017 um 18:24 schrieb Tony Lindgren <tony@atomide.com>:
-> > 
-> > * H. Nikolaus Schaller <hns@goldelico.com> [171018 08:49]:
-> >> 
-> >>> Am 18.10.2017 um 15:22 schrieb Tony Lindgren <tony@atomide.com>:
-> >>> 
-> >>> * H. Nikolaus Schaller <hns@goldelico.com> [171018 05:49]:
-> >>>>> Am 18.10.2017 um 14:28 schrieb Pavel Machek <pavel@ucw.cz>:
-> >>>>> 
-> >>>>> So I started something, it is at.
-> >>>>> 
-> >>>>> https://github.com/pavelmachek/libbattery
-> >>>>> 
-> >>>>> My battery on n900 is currently uncalibrated (and charging), still it
-> >>>>> gets some kind of estimation:
-> >>>>> 
-> >>>>> Battery -1 %
-> >>>>> Seconds -1
-> >>>>> State 1
-> >>>>> Voltage 3.88 V
-> >>>>> Battery 63 %
-> >>>>> 
-> >>>>> Of course, there's a lot more work to be done.
-> >>>> 
-> >>>> Nice start but not a solution to our problem.
-> >>>> 
-> >>>> Our problem is that people simply expect that for example https://packages.debian.org/wheezy/xfce/xfce4-battery-plugin
-> >>>> displays the battery percentage.
-> >>> 
-> >>> I think we could make things compatible with various battery apps by
-> >>> having libbattery write back the capacity percentage and time remaining
-> >>> to the kernel driver via sysfs or a dev entry. Then the kernel interface
-> >>> can just display the data to whatever apps.
-> >> 
-> >> Hm. That would be quite difficult to understand and maintain code.
-> > 
-> > How so? The libbattery can do it all, then the kernel drivers needing
-> > that will just display the most recent values to maintain compability
-> > with battery apps.
-> 
-> Well, it looks as if you are thinking about a much more complex solution
-> than I am...
-> 
-> The proposal we are discussing as
-> 
-> [RFC PATCH 5/5] power: generic-adc-battery: Add capacity handling
-> 
-> just reads the current voltage, charging current and uses a (nonlinear)
-> mapping to 0% .. 100%.
+We don't support ETR in perf mode yet. Temporarily fail the
+operation until we add proper support.
 
-Right, I was discussing Pavel's libbattery link posted above. No
-comments on the current patch series. Let's move the libbattery stuff
-to a new thread to avoid confusion.
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 28 ++-----------------------
+ 1 file changed, 2 insertions(+), 26 deletions(-)
 
-Regards,
-
-Tony
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+index 68fbc8f7450e..d0208f01afd9 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+@@ -192,32 +192,8 @@ static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev)
+ 
+ static int tmc_enable_etr_sink_perf(struct coresight_device *csdev)
+ {
+-	int ret = 0;
+-	unsigned long flags;
+-	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+-
+-	spin_lock_irqsave(&drvdata->spinlock, flags);
+-	if (drvdata->reading) {
+-		ret = -EINVAL;
+-		goto out;
+-	}
+-
+-	/*
+-	 * In Perf mode there can be only one writer per sink.  There
+-	 * is also no need to continue if the ETR is already operated
+-	 * from sysFS.
+-	 */
+-	if (drvdata->mode != CS_MODE_DISABLED) {
+-		ret = -EINVAL;
+-		goto out;
+-	}
+-
+-	drvdata->mode = CS_MODE_PERF;
+-	tmc_etr_enable_hw(drvdata);
+-out:
+-	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+-
+-	return ret;
++	/* We don't support perf mode yet ! */
++	return -EINVAL;
+ }
+ 
+ static int tmc_enable_etr_sink(struct coresight_device *csdev, u32 mode)
+-- 
+2.13.6
