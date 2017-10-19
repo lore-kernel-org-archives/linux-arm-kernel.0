@@ -1,59 +1,136 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 19 Oct 2017 16:55:33 +0100
-Subject: [PATCH 3/4] arm64: traps: Pretty-print pstate in register dumps
+Date: Thu, 19 Oct 2017 16:55:32 +0100
+Subject: [PATCH 2/4] arm64: traps: Don't print stack or raw PC/LR values in
+ backtraces
 In-Reply-To: <1508428534-20694-1-git-send-email-will.deacon@arm.com>
 References: <1508428534-20694-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1508428534-20694-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1508428534-20694-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can decode the PSTATE easily enough, so pretty-print it in register
-dumps.
+Printing raw pointer values in backtraces has potential security
+implications and are of questionable value anyway.
+
+This patch follows x86's lead and removes the "Exception stack:" dump
+from kernel backtraces, as well as converting PC/LR values to symbols
+such as "sysrq_handle_crash+0x20/0x30".
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/process.c | 20 +++++++++++++++++++-
- 1 file changed, 19 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/process.c |  8 +++---
+ arch/arm64/kernel/traps.c   | 65 +++------------------------------------------
+ 2 files changed, 6 insertions(+), 67 deletions(-)
 
 diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index c20896b8fb2d..be3cf9cd7dec 100644
+index 2dc0f8482210..c20896b8fb2d 100644
 --- a/arch/arm64/kernel/process.c
 +++ b/arch/arm64/kernel/process.c
-@@ -170,6 +170,23 @@ void machine_restart(char *cmd)
- 	while (1);
- }
- 
-+static void print_pstate(struct pt_regs *regs)
-+{
-+	u64 pstate = regs->pstate;
-+	printk("pstate: %08llx (%c%c%c%c %c%c%c%c %cPAN %cUAO)\n",
-+		pstate,
-+		pstate & PSR_N_BIT ? 'N' : 'n',
-+		pstate & PSR_Z_BIT ? 'Z' : 'z',
-+		pstate & PSR_C_BIT ? 'C' : 'c',
-+		pstate & PSR_V_BIT ? 'V' : 'v',
-+		pstate & PSR_D_BIT ? 'D' : 'd',
-+		pstate & PSR_A_BIT ? 'A' : 'a',
-+		pstate & PSR_I_BIT ? 'I' : 'i',
-+		pstate & PSR_F_BIT ? 'F' : 'f',
-+		pstate & PSR_PAN_BIT ? '+' : '-',
-+		pstate & PSR_UAO_BIT ? '+' : '-');
-+}
-+
- void __show_regs(struct pt_regs *regs)
- {
- 	int i, top_reg;
-@@ -186,9 +203,10 @@ void __show_regs(struct pt_regs *regs)
+@@ -186,11 +186,9 @@ void __show_regs(struct pt_regs *regs)
  	}
  
  	show_regs_print_info(KERN_DEFAULT);
-+	print_pstate(regs);
- 	print_symbol("pc : %s\n", regs->pc);
- 	print_symbol("lr : %s\n", lr);
--	printk("sp : %016llx pstate : %08llx\n", sp, regs->pstate);
-+	printk("sp : %016llx\n", sp);
+-	print_symbol("PC is at %s\n", instruction_pointer(regs));
+-	print_symbol("LR is at %s\n", lr);
+-	printk("pc : [<%016llx>] lr : [<%016llx>] pstate: %08llx\n",
+-	       regs->pc, lr, regs->pstate);
+-	printk("sp : %016llx\n", sp);
++	print_symbol("pc : %s\n", regs->pc);
++	print_symbol("lr : %s\n", lr);
++	printk("sp : %016llx pstate : %08llx\n", sp, regs->pstate);
  
  	i = top_reg;
  
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 5ea4b85aee0e..57794773863c 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -58,55 +58,9 @@ static const char *handler[]= {
+ 
+ int show_unhandled_signals = 1;
+ 
+-/*
+- * Dump out the contents of some kernel memory nicely...
+- */
+-static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
+-		     unsigned long top)
+-{
+-	unsigned long first;
+-	mm_segment_t fs;
+-	int i;
+-
+-	/*
+-	 * We need to switch to kernel mode so that we can use __get_user
+-	 * to safely read from kernel space.
+-	 */
+-	fs = get_fs();
+-	set_fs(KERNEL_DS);
+-
+-	printk("%s%s(0x%016lx to 0x%016lx)\n", lvl, str, bottom, top);
+-
+-	for (first = bottom & ~31; first < top; first += 32) {
+-		unsigned long p;
+-		char str[sizeof(" 12345678") * 8 + 1];
+-
+-		memset(str, ' ', sizeof(str));
+-		str[sizeof(str) - 1] = '\0';
+-
+-		for (p = first, i = 0; i < (32 / 8)
+-					&& p < top; i++, p += 8) {
+-			if (p >= bottom && p < top) {
+-				unsigned long val;
+-
+-				if (__get_user(val, (unsigned long *)p) == 0)
+-					sprintf(str + i * 17, " %016lx", val);
+-				else
+-					sprintf(str + i * 17, " ????????????????");
+-			}
+-		}
+-		printk("%s%04lx:%s\n", lvl, first & 0xffff, str);
+-	}
+-
+-	set_fs(fs);
+-}
+-
+ static void dump_backtrace_entry(unsigned long where)
+ {
+-	/*
+-	 * Note that 'where' can have a physical address, but it's not handled.
+-	 */
+-	print_ip_sym(where);
++	printk(" %pS\n", (void *)where);
+ }
+ 
+ static void __dump_instr(const char *lvl, struct pt_regs *regs)
+@@ -171,10 +125,7 @@ void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+ 
+ 	skip = !!regs;
+ 	printk("Call trace:\n");
+-	while (1) {
+-		unsigned long stack;
+-		int ret;
+-
++	do {
+ 		/* skip until specified stack frame */
+ 		if (!skip) {
+ 			dump_backtrace_entry(frame.pc);
+@@ -189,17 +140,7 @@ void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+ 			 */
+ 			dump_backtrace_entry(regs->pc);
+ 		}
+-		ret = unwind_frame(tsk, &frame);
+-		if (ret < 0)
+-			break;
+-		if (in_entry_text(frame.pc)) {
+-			stack = frame.fp - offsetof(struct pt_regs, stackframe);
+-
+-			if (on_accessible_stack(tsk, stack))
+-				dump_mem("", "Exception stack", stack,
+-					 stack + sizeof(struct pt_regs));
+-		}
+-	}
++	} while (!unwind_frame(tsk, &frame));
+ 
+ 	put_task_stack(tsk);
+ }
 -- 
 2.1.4
