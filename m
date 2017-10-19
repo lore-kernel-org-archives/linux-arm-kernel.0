@@ -1,93 +1,56 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 19 Oct 2017 11:26:38 +0200
-Subject: [GIT PULL] Reset controller changes for v4.15
-Message-ID: <1508405198.7665.4.camel@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 19 Oct 2017 11:30:34 +0200
+Subject: [PATCH] [media] rockchip/rga: annotate PM functions as __maybe_unused
+Message-ID: <20171019093044.531871-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear arm-soc-maintainers,
+The newly added driver has incorrect #ifdef annotations on its
+PM functions, leading to a harmless compile-time warning when
+CONFIG_PM is disabled:
 
-please consider merging this tag for v4.15. It adds ARC AX10x reset
-support, merged from a separate branch for synchronisation with the ARC
-tree, Stratix10 reset support, Meson GX reset level controls, and PXs3
-and ethernet reset controls for Uniphier.
-The socfpga, stm32, (most of) sunxi, and zx2967 drivers are merged into
-a common simple-reset driver.
+drivers/media/platform/rockchip/rga/rga.c:760:13: error: 'rga_disable_clocks' defined but not used [-Werror=unused-function]
+ static void rga_disable_clocks(struct rockchip_rga *rga)
+             ^~~~~~~~~~~~~~~~~~
+drivers/media/platform/rockchip/rga/rga.c:728:12: error: 'rga_enable_clocks' defined but not used [-Werror=unused-function]
 
-regards
-Philipp
+This removes the #ifdef and marks the functions as __maybe_unused,
+so gcc can silently drop all the unused code.
 
-The following changes since commit f450f28e70a2378d9d6ded0932fe480055888cfa:
+Fixes: f7e7b48e6d79 ("[media] rockchip/rga: v4l2 m2m support")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/media/platform/rockchip/rga/rga.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-  reset: socfpga: fix for 64-bit compilation (2017-10-04 10:29:44 +0200)
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/pza/linux.git tags/reset-for-4.15
-
-for you to fetch changes up to 542befbb18056c4fda7b458aa6146a52b2fd389c:
-
-  Merge branch 'reset/arc' into reset/next (2017-10-18 15:59:30 +0200)
-
-----------------------------------------------------------------
-Reset controller changes for v4.15
-
-- add ARC AX10x support,
-  merged from a separate branch that is also included in the ARC tree
-- add Stratix10 support via socfpga
-- unify socfpga, stm32, sunxi, and zx2967 into simple-reset driver
-- add Meson GX reset level control
-- add Uniphier PXs3 and ethernet reset controls
-
-----------------------------------------------------------------
-Dinh Nguyen (1):
-      reset: socfpga: build the reset-socfpga for Stratix10 SOC
-
-Eugeniy Paltsev (1):
-      ARC: reset: introduce AXS10x reset driver
-
-Kunihiko Hayashi (1):
-      reset: uniphier: add ethernet reset control support
-
-Masahiro Yamada (1):
-      reset: uniphier: add PXs3 reset data
-
-Neil Armstrong (2):
-      reset: meson: add level reset support for GX SoC family
-      reset: meson: remove unneeded check in meson_reset_reset
-
-Philipp Zabel (6):
-      reset: add reset-simple to unify socfpga, stm32, sunxi, and zx2967
-      reset: sunxi: use reset-simple driver
-      reset: socfpga: use the reset-simple driver
-      reset: stm32: use the reset-simple driver
-      reset: zx2967: use the reset-simple driver
-      Merge branch 'reset/arc' into reset/next
-
-Sean Wang (1):
-      reset: mediatek: add reset controller dt-bindings required header for MT7622 SoC
-
- .../bindings/reset/snps,axs10x-reset.txt           |  33 ++++
- .../devicetree/bindings/reset/uniphier-reset.txt   |   3 +
- MAINTAINERS                                        |   7 +-
- drivers/reset/Kconfig                              |  30 ++--
- drivers/reset/Makefile                             |   5 +-
- drivers/reset/reset-axs10x.c                       |  83 +++++++++
- drivers/reset/reset-meson.c                        |  65 ++++++-
- drivers/reset/reset-simple.c                       | 186 +++++++++++++++++++++
- drivers/reset/reset-simple.h                       |  45 +++++
- drivers/reset/reset-socfpga.c                      | 157 -----------------
- drivers/reset/reset-stm32.c                        | 108 ------------
- drivers/reset/reset-sunxi.c                        | 104 +-----------
- drivers/reset/reset-uniphier.c                     |  30 ++++
- drivers/reset/reset-zx2967.c                       |  99 -----------
- include/dt-bindings/reset/mt7622-reset.h           |  94 +++++++++++
- 15 files changed, 561 insertions(+), 488 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/reset/snps,axs10x-reset.txt
- create mode 100644 drivers/reset/reset-axs10x.c
- create mode 100644 drivers/reset/reset-simple.c
- create mode 100644 drivers/reset/reset-simple.h
- delete mode 100644 drivers/reset/reset-socfpga.c
- delete mode 100644 drivers/reset/reset-stm32.c
- delete mode 100644 drivers/reset/reset-zx2967.c
- create mode 100644 include/dt-bindings/reset/mt7622-reset.h
+diff --git a/drivers/media/platform/rockchip/rga/rga.c b/drivers/media/platform/rockchip/rga/rga.c
+index e7d1b34baf1c..89296de9cf4a 100644
+--- a/drivers/media/platform/rockchip/rga/rga.c
++++ b/drivers/media/platform/rockchip/rga/rga.c
+@@ -960,8 +960,7 @@ static int rga_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_PM
+-static int rga_runtime_suspend(struct device *dev)
++static int __maybe_unused rga_runtime_suspend(struct device *dev)
+ {
+ 	struct rockchip_rga *rga = dev_get_drvdata(dev);
+ 
+@@ -970,13 +969,12 @@ static int rga_runtime_suspend(struct device *dev)
+ 	return 0;
+ }
+ 
+-static int rga_runtime_resume(struct device *dev)
++static int __maybe_unused rga_runtime_resume(struct device *dev)
+ {
+ 	struct rockchip_rga *rga = dev_get_drvdata(dev);
+ 
+ 	return rga_enable_clocks(rga);
+ }
+-#endif
+ 
+ static const struct dev_pm_ops rga_pm = {
+ 	SET_RUNTIME_PM_OPS(rga_runtime_suspend,
+-- 
+2.9.0
