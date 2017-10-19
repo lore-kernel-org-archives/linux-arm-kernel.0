@@ -1,35 +1,57 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 19 Oct 2017 13:34:53 +0100
-Subject: [PATCH 03/11] arm: Kconfig: enable KASan
-In-Reply-To: <a3902e32-0141-9616-ba3e-9cbbd396b99a@gmail.com>
-References: <20171011082227.20546-1-liuwenliang@huawei.com>
- <20171011082227.20546-4-liuwenliang@huawei.com>
- <a3902e32-0141-9616-ba3e-9cbbd396b99a@gmail.com>
-Message-ID: <20171019123453.GV20805@n2100.armlinux.org.uk>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 19 Oct 2017 14:38:15 +0200
+Subject: [RFC resend 1/4] dt-bindings: display: mediatek: add drm binding
+In-Reply-To: <20171019112610.13645-2-mbrugger@suse.com>
+References: <20171019112610.13645-1-mbrugger@suse.com>
+ <20171019112610.13645-2-mbrugger@suse.com>
+Message-ID: <1508416695.7665.13.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 11, 2017 at 12:15:44PM -0700, Florian Fainelli wrote:
-> On 10/11/2017 01:22 AM, Abbott Liu wrote:
-> > From: Andrey Ryabinin <a.ryabinin@samsung.com>
-> > 
-> > This patch enable kernel address sanitizer for arm.
-> > 
-> > Cc: Andrey Ryabinin <a.ryabinin@samsung.com>
-> > Signed-off-by: Abbott Liu <liuwenliang@huawei.com>
+Hi Matthias,
+
+On Thu, 2017-10-19 at 13:26 +0200, Matthias Brugger wrote:
+> DRM subysystem and clock driver shared the same compatible mmsys.
+> This stopped does not work, as only the first driver for a compatible
+> gets probed. We change the comaptible to the new DRM identifier to fix
+> this.
 > 
-> This needs to be the last patch in the series, otherwise you allow
-> people between patch 3 and 11 to have varying degrees of experience with
-> this patch series depending on their system type (LPAE or not, etc.)
+> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+> ---
+>  .../devicetree/bindings/display/mediatek/mediatek,disp.txt          | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt b/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
+> index 383183a89164..6db652463e64 100644
+> --- a/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
+> +++ b/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
+> @@ -27,6 +27,7 @@ Documentation/devicetree/bindings/display/mediatek/mediatek,dpi.txt.
+>  
+>  Required properties (all function blocks):
+>  - compatible: "mediatek,<chip>-disp-<function>", one of
+> +	"mediatek,<chip>-dispsys"    - central component for the DRM system
+>  	"mediatek,<chip>-disp-ovl"   - overlay (4 layers, blending, csc)
+>  	"mediatek,<chip>-disp-rdma"  - read DMA / line buffer
+>  	"mediatek,<chip>-disp-wdma"  - write DMA
+> @@ -71,6 +72,11 @@ mmsys: clock-controller at 14000000 {
+>  	#clock-cells = <1>;
+>  };
+>  
+> +dispsys: display-system {
 
-As the series stands, if patches 1-3 are applied, and KASAN is enabled,
-there are various constants that end up being undefined, and the kernel
-build will fail.  That is, of course, not acceptable.
+Could we call this node display-subsystem for consistency with i.MX and
+Rockchip device trees?
 
-KASAN must not be available until support for it is functionally
-complete.
+With that change,
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+> +	compatible = "mediatek,mt2701-dispsys";
+> +	mediatek,mmsys = <&mmsys>;
+> +}
+> +
+>  ovl0: ovl at 1400c000 {
+>  	compatible = "mediatek,mt8173-disp-ovl";
+>  	reg = <0 0x1400c000 0 0x1000>;
+
+regards
+Philipp
