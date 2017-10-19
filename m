@@ -1,22 +1,25 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 19 Oct 2017 13:43:57 +0100
-Subject: [PATCH 04/11] Define the virtual space of KASan's shadow region
-In-Reply-To: <B8AC3E80E903784988AB3003E3E97330C005CAC2@dggemm510-mbx.china.huawei.com>
-References: <20171011082227.20546-5-liuwenliang@huawei.com>
- <201710141957.mbxeZJHB%fengguang.wu@intel.com>
- <B8AC3E80E903784988AB3003E3E97330C005B9BF@dggemm510-mbx.china.huawei.com>
- <CAKv+Gu98M9PZk3qm0PYC8nQ3zMvLZmNmOn4=hNdFE7NTBuHbgg@mail.gmail.com>
- <B8AC3E80E903784988AB3003E3E97330C005CAC2@dggemm510-mbx.china.huawei.com>
-Message-ID: <20171019124357.GY20805@n2100.armlinux.org.uk>
+Date: Thu, 19 Oct 2017 13:47:15 +0100
+Subject: [PATCH 05/11] Disable kasan's instrumentation
+In-Reply-To: <20171011082227.20546-6-liuwenliang@huawei.com>
+References: <20171011082227.20546-1-liuwenliang@huawei.com>
+ <20171011082227.20546-6-liuwenliang@huawei.com>
+Message-ID: <20171019124714.GZ20805@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 11:27:19AM +0000, Liuwenliang (Lamb) wrote:
-> ---c0a3b198:       b6e00000        .word   0xb6e00000   //TASK_SIZE:0xb6e00000
+On Wed, Oct 11, 2017 at 04:22:21PM +0800, Abbott Liu wrote:
+> From: Andrey Ryabinin <a.ryabinin@samsung.com>
+> 
+>  To avoid some build and runtime errors, compiler's instrumentation must
+>  be disabled for code not linked with kernel image.
 
-It's probably going to be better all round to round TASK_SIZE down
-to something that fits in an 8-bit rotated constant anyway (like
-we already guarantee) which would mean this patch is not necessary.
+How does that explain the change to unwind.c ?
+
+Does this also disable the string macro changes?
+
+In any case, this should certainly precede patch 4, and very probably
+patch 2.
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
