@@ -1,27 +1,32 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Oct 2017 00:25:39 +0200
-Subject: [GIT PULL 3/4] ARM: dts: exynos: Pull for v4.15
-In-Reply-To: <20171015074825.11338-4-krzk@kernel.org>
-References: <20171015074825.11338-1-krzk@kernel.org>
- <20171015074825.11338-4-krzk@kernel.org>
-Message-ID: <CAK8P3a12VouMLOJywYKec2m+9uW0sDr+VLQQ4Xz0dCTcK1=XKg@mail.gmail.com>
+Date: Fri, 20 Oct 2017 00:26:37 +0200
+Subject: [GIT PULL] ARM: Xilinx Zynq DT patches for v4.15
+In-Reply-To: <de3bd1fb-85b4-81de-d546-7f9fc92ecf16@monstr.eu>
+References: <de3bd1fb-85b4-81de-d546-7f9fc92ecf16@monstr.eu>
+Message-ID: <CAK8P3a38Lie1s01CgbSJLnpfL+pejCSA5aYf_eVS1Oq-Ro9+_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 15, 2017 at 9:48 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> ----------------------------------------------------------------
-> Samsung DTS ARM changes for 4.15
+On Mon, Oct 16, 2017 at 3:08 PM, Michal Simek <monstr@monstr.eu> wrote:
 >
-> 1. Add new board: Hardkernel Odroid HC1.
-> 2. Fix incomplete Odroid-XU3/4 thermal-zones definition leading to
->    possible overheat if first pair of A7+A15 cores is idle but rest of
->    CPUs are busy.
-> 3. Add capacity-dmips-mhz properties for CPUs of octa-core SoCs.
-> 4. Add power button to Odroid XU3/4.
-> 5. Improvements in Gscaler, HDMI and Mixer blocks on Exynos5.
-> 6. Add suspend quirk to DWC3 USB controller to fix enumeration of
->    SuperSpeed devices on Odroid XU4.
-> 7. Add HDMI and MHL to Trats2.
-> 8. Cleanups (redundant properties and nodes).
+> The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+>
+>   Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+>
+> are available in the git repository at:
+>
+>   https://github.com/Xilinx/linux-xlnx.git tags/zynq-dt-for-4.15
+>
+> for you to fetch changes up to 3a42d36c6a2be960d9c7fe1ec7676aa04db572d4:
+>
+>   ARM: dts: zynq: Add generic compatible string for I2C EEPROM
+> (2017-09-20 15:10:40 +0200)
+>
+> ----------------------------------------------------------------
+> arm: Xilinx ZynqMP DT changes for v4.15
+>
+> - Change 24c08 compatible string
 
 Pulled into next/dt, thanks!
+
+      Arnd
