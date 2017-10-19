@@ -1,58 +1,67 @@
 From: olivier.moysan@st.com (Olivier Moysan)
-Date: Thu, 19 Oct 2017 15:03:17 +0200
-Subject: [INTERNAL][PATCH 1/7] ASoC: stm32: Add synchronization to SAI bindings
+Date: Thu, 19 Oct 2017 15:03:19 +0200
+Subject: [INTERNAL][PATCH 3/7] ASoC: stm32: sai: Fix DMA burst size
 In-Reply-To: <1508418203-16840-1-git-send-email-olivier.moysan@st.com>
 References: <1508418203-16840-1-git-send-email-olivier.moysan@st.com>
-Message-ID: <1508418203-16840-2-git-send-email-olivier.moysan@st.com>
+Message-ID: <1508418203-16840-4-git-send-email-olivier.moysan@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add synchronization configuration to STM32 SAI bindings.
-This patch also adds peripheral clock which is required
-to access synchronization register.
+Set best burst size tradeoff for 8, 16, 32 bits transfers.
 
-Signed-off-by: Olivier Moysan <olivier.moysan@st.com>
+Signed-off-by: olivier moysan <olivier.moysan@st.com>
 ---
- Documentation/devicetree/bindings/sound/st,stm32-sai.txt | 14 +++++++++++---
- 1 file changed, 11 insertions(+), 3 deletions(-)
+ sound/soc/stm/stm32_sai_sub.c | 21 +++++++++++++--------
+ 1 file changed, 13 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/sound/st,stm32-sai.txt b/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
-index f1c5ae5..1f9cd70 100644
---- a/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
-+++ b/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
-@@ -10,13 +10,21 @@ Required properties:
-   - reg: Base address and size of SAI common register set.
-   - clocks: Must contain phandle and clock specifier pairs for each entry
- 	in clock-names.
--  - clock-names: Must contain "x8k" and "x11k"
-+  - clock-names: Must contain "pclk" "x8k" and "x11k"
-+	"pclk": Clock which feeds the peripheral bus interface.
-+	        Mandatory for "st,stm32h7-sai" compatible.
-+	        Not used for "st,stm32f4-sai" compatible.
- 	"x8k": SAI parent clock for sampling rates multiple of 8kHz.
- 	"x11k": SAI parent clock for sampling rates multiple of 11.025kHz.
-   - interrupts: cpu DAI interrupt line shared by SAI sub-blocks
+diff --git a/sound/soc/stm/stm32_sai_sub.c b/sound/soc/stm/stm32_sai_sub.c
+index fdc1891..2af397d 100644
+--- a/sound/soc/stm/stm32_sai_sub.c
++++ b/sound/soc/stm/stm32_sai_sub.c
+@@ -445,12 +445,16 @@ static int stm32_sai_set_config(struct snd_soc_dai *cpu_dai,
+ {
+ 	struct stm32_sai_sub_data *sai = snd_soc_dai_get_drvdata(cpu_dai);
+ 	int cr1, cr1_mask, ret;
+-	int fth = STM_SAI_FIFO_TH_HALF;
  
- Optional properties:
-   - resets: Reference to a reset controller asserting the SAI
-+  - st,sync: specify synchronization mode.
-+	By default SAI sub-block is in asynchronous mode.
-+	This property sets SAI sub-block as slave of another SAI sub-block.
-+	Must contain the phandle and index of the sai sub-block providing
-+	the synchronization.
+-	/* FIFO config */
++	/*
++	 * DMA bursts increment is set to 4 words.
++	 * SAI fifo threshold is set to half fifo, to keep enough space
++	 * for DMA incoming bursts.
++	 */
+ 	regmap_update_bits(sai->regmap, STM_SAI_CR2_REGX,
+ 			   SAI_XCR2_FFLUSH | SAI_XCR2_FTH_MASK,
+-			   SAI_XCR2_FFLUSH | SAI_XCR2_FTH_SET(fth));
++			   SAI_XCR2_FFLUSH |
++			   SAI_XCR2_FTH_SET(STM_SAI_FIFO_TH_HALF));
  
- SAI subnodes:
- Two subnodes corresponding to SAI sub-block instances A et B can be defined.
-@@ -52,8 +60,8 @@ sai1: sai1 at 40015800 {
- 	#size-cells = <1>;
- 	ranges = <0 0x40015800 0x400>;
- 	reg = <0x40015800 0x4>;
--	clocks = <&rcc PLL1_Q>, <&rcc PLL2_P>;
--	clock-names = "x8k", "x11k";
-+	clocks = <&rcc SAI1_CK>, <&rcc PLL1_Q>, <&rcc PLL2_P>;
-+	clock-names = "pclk", "x8k", "x11k";
- 	interrupts = <87>;
+ 	/* Mode, data format and channel config */
+ 	cr1_mask = SAI_XCR1_DS_MASK;
+@@ -479,10 +483,6 @@ static int stm32_sai_set_config(struct snd_soc_dai *cpu_dai,
+ 		return ret;
+ 	}
  
- 	sai1a: audio-controller at 40015804 {
+-	/* DMA config */
+-	sai->dma_params.maxburst = STM_SAI_FIFO_SIZE * fth / sizeof(u32);
+-	snd_soc_dai_set_dma_data(cpu_dai, substream, (void *)&sai->dma_params);
+-
+ 	return 0;
+ }
+ 
+@@ -726,7 +726,12 @@ static int stm32_sai_dai_probe(struct snd_soc_dai *cpu_dai)
+ 	int cr1 = 0, cr1_mask;
+ 
+ 	sai->dma_params.addr = (dma_addr_t)(sai->phys_addr + STM_SAI_DR_REGX);
+-	sai->dma_params.maxburst = 1;
++	/*
++	 * DMA supports 4, 8 or 16 burst sizes. Burst size 4 is the best choice,
++	 * as it allows bytes, half-word and words transfers. (See DMA fifos
++	 * constraints).
++	 */
++	sai->dma_params.maxburst = 4;
+ 	/* Buswidth will be set by framework at runtime */
+ 	sai->dma_params.addr_width = DMA_SLAVE_BUSWIDTH_UNDEFINED;
+ 
 -- 
 1.9.1
