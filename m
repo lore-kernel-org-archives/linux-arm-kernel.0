@@ -1,92 +1,132 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 19 Oct 2017 16:54:16 +0200
-Subject: [RFC resend] arm64: mt8173: Fix Acer Chromebooks mmsys probe
- problem
-In-Reply-To: <1683149.BjzMD0lNNQ@avalon>
-References: <20171019112610.13645-1-mbrugger@suse.com>
- <1508418114.7665.16.camel@pengutronix.de> <1683149.BjzMD0lNNQ@avalon>
-Message-ID: <1508424856.7665.22.camel@pengutronix.de>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 19 Oct 2017 15:57:46 +0100
+Subject: [PATCH v4 00/21] SError rework + RAS&IESB for firmware first support
+Message-ID: <20171019145807.23251-1-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+Hello,
 
-On Thu, 2017-10-19 at 16:39 +0300, Laurent Pinchart wrote:
-> Hi Philipp,
-> 
-> On Thursday, 19 October 2017 16:01:54 EEST Philipp Zabel wrote:
-> > On Thu, 2017-10-19 at 13:26 +0200, Matthias Brugger wrote:
-> > > In theory the MMSYS device tree identifier is matches twice, by the clk
-> > > driver and the DRM subsystem. But the kernel only matches the first
-> > > driver for a device (clk) and discards the second one. This breaks
-> > > graphics on mt8173 and most probably on mt2701 as well.
-> > > 
-> > > MMSYS in Mediatek SoCs has some registers to control clock gates (which is
-> > > used in the clk driver) and some registers to enable the differnet blocks
-> > > of the display subsystem. The kernel uses the binding to load the central
-> > > comoponent of the distplay subsystem, which in place probes all the other
-> > > components and enables the present ones in the MMSYS.
-> > > 
-> > > We found us with the problem, that we need to change and therefor break
-> > > one
-> > > of the two bindings, or the DRM one or the clock driver one.
-> > > 
-> > > Apart from that the DRM subysystem does access the MMSYS registers via
-> > > relaxed reads/writes. But the it should to so via regmap, as the
-> > > registers are shared.
-> > > 
-> > > Possible solutions:
-> > > 1) We add a new mediatek,mt8173-mmsys-clk node, which lives as a
-> > > simple-mfd under the actual mmsys node. We change the clock driver to
-> > > probe on this binding. This would make sense as the clock gate register
-> > > live completly in the MMSYS configuration registers.
-> > 
-> > The reason why the drm driver matches against the mmsys node in the
-> > first place is that we wanted to avoid 2).
-> 
-> Why did you want to avoid 2) ?
+The aim of this series is to enable IESB and add ESB-instructions to let us
+kick any pending RAS errors into firmware to be handled by firmware-first.
 
-Because the "display-subsystem" node does not represent a real device,
-it's just there to probe the driver that stitches all the DISP
-components together.
+Not all systems will have this firmware, so these RAS errors will become
+pending SErrors. We should take these as quickly as possible and avoid
+panic()ing for errors where we could have continued.
 
-> > Also, mmsys is not a pure clock controller, as it also contains the
-> > display path configuration in its register space.
-> 
-> Which makes the mmsys related to display, but more in a syscon (combining 
-> clocks and routing, and I assume other miscellaneous features that wouldn't 
-> fit nicely in the other display-related IP cores) way than actually being part 
-> of the display subsystem. Or does mmsys only provide display-related features 
-> ?
+This first part of this series reworks the DAIF masking so that SError is
+unmasked unless we are handling a debug exception.
 
-All devices in the 0x14000000 - 0x14ffffff memory range are part of the
-MMSYS system. That includes the MMSYS control or system configuration
-block at 0x14000000 - 0x14000fff as well as all the related MDP (media
-data path) and DISP (display data path) blocks that follow. The DISP
-blocks are purely display related, while the MDP blocks implement
-implement mem2mem functions like scaling and conversion.
+The last part provides the same minimal handling for SError that interrupt
+KVM. KVM is currently unable to handle SErrors during world-switch, unless
+they occur during a magic single-instruction window, it hyp-panics. I suspect
+this will be easier to fix once the VHE world-switch is further optimised.
 
-> > > 2) As the nodes of the DRM subsystem just need some of the registers of
-> > > MMSYS we add a new binding mediatek,mt8173-dispsys which probes the
-> > > central component of the DRM system. It has only a handle to mt8173-mmsys
-> > > to access the registerspace via regmap functions.
-> > > 
-> > > In this patchset I implemented 2). Please take into account, that this is
-> > > a RFC. I had no time to actually test the verison on real HW. Some of the
-> > > register accesses should be done using regmap_update instead of
-> > > regmap_read + regmap_write.
-> > > 
-> > > This RFC shall only show how solution 2) would look like. We can use it as
-> > > discussion to see how we circumvent the actual situation.
-> > 
-> > Or we could leave the bindings untouched and create one platform device
-> > from the other or even set up the clocks from the drm driver?
-> 
-> Does mmsys provide features (such as clocks) to non-display IP cores ?
+KVMs kvm_inject_vabt() needs updating for v8.2 as now we can specify an ESR,
+and all-zeros has a RAS meaning.
 
-The MMSYS control block provides clocks for the DISP (display data path)
-and MDP (multimedia data path) blocks, as well as the routing between
-them, but not to anything outside of the MMSYS system.
+KVM's existing 'impdef SError to the guest' behaviour probably needs revisiting.
+These are errors where we don't know what they mean, they may not be
+synchronised by ESB. Today we blame the guest.
+My half-baked suggestion would be to make a virtual SError pending, but then
+exit to user-space to give Qemu the change to quit (for virtual machines that
+don't generate SError), pend an SError with a new Qemu-specific ESR, or blindly
+continue and take KVMs default all-zeros impdef ESR.
 
-regards
-Philipp
+Known issues:
+ * Synchronous external abort SET severity is not yet considered, all
+   synchronous-external-aborts are still considered fatal.
+
+ * KVM-Migration: VDISR_EL2 is exposed to userspace as DISR_EL1, but how should
+   HCR_EL2.VSE or VSESR_EL2 be migrated when the guest has an SError pending but
+   hasn't taken it yet...?
+
+ * KVM unmasks SError and IRQ before calling handle_exit, we may be rescheduled
+   while holding an uncontained ESR... (this is currently an improvement on
+   assuming its an impdef error we can blame on the guest)
+    * We need to fix this for APEI's SEI or kernel-first RAS, the guest-exit
+      SError handling will need to move to before kvm_arm_vhe_guest_exit().
+
+
+Changes from v3:
+ * Symbol naming around daif flag helpers
+ * Removed the IESB kconfig option
+ * Moved that nop out of the firing line in the vaxorcism code
+ * Added last patch to Trap ERR registers and make them RAZ/WI
+
+
+Comments and contradictions welcome,
+
+James
+
+
+Dongjiu Geng (1):
+  KVM: arm64: Trap RAS error registers and set HCR_EL2's TERR & TEA
+
+James Morse (18):
+  arm64: explicitly mask all exceptions
+  arm64: introduce an order for exceptions
+  arm64: Move the async/fiq helpers to explicitly set process context
+    flags
+  arm64: Mask all exceptions during kernel_exit
+  arm64: entry.S: Remove disable_dbg
+  arm64: entry.S: convert el1_sync
+  arm64: entry.S convert el0_sync
+  arm64: entry.S: convert elX_irq
+  KVM: arm/arm64: mask/unmask daif around VHE guests
+  arm64: kernel: Survive corrected RAS errors notified by SError
+  arm64: cpufeature: Enable IESB on exception entry/return for
+    firmware-first
+  arm64: kernel: Prepare for a DISR user
+  KVM: arm64: Set an impdef ESR for Virtual-SError using VSESR_EL2.
+  KVM: arm64: Save/Restore guest DISR_EL1
+  KVM: arm64: Save ESR_EL2 on guest SError
+  KVM: arm64: Handle RAS SErrors from EL1 on guest exit
+  KVM: arm64: Handle RAS SErrors from EL2 on guest exit
+  KVM: arm64: Take any host SError before entering the guest
+
+Xie XiuQi (2):
+  arm64: entry.S: move SError handling into a C function for future
+    expansion
+  arm64: cpufeature: Detect CPU RAS Extentions
+
+ arch/arm64/Kconfig                   | 18 +++++++-
+ arch/arm64/include/asm/assembler.h   | 51 ++++++++++++++-------
+ arch/arm64/include/asm/barrier.h     |  1 +
+ arch/arm64/include/asm/cpucaps.h     |  4 +-
+ arch/arm64/include/asm/daifflags.h   | 72 ++++++++++++++++++++++++++++++
+ arch/arm64/include/asm/esr.h         | 17 +++++++
+ arch/arm64/include/asm/exception.h   | 14 ++++++
+ arch/arm64/include/asm/irqflags.h    | 40 ++++++-----------
+ arch/arm64/include/asm/kvm_arm.h     |  2 +
+ arch/arm64/include/asm/kvm_emulate.h | 17 +++++++
+ arch/arm64/include/asm/kvm_host.h    | 16 +++++++
+ arch/arm64/include/asm/processor.h   |  2 +
+ arch/arm64/include/asm/sysreg.h      | 16 +++++++
+ arch/arm64/include/asm/traps.h       | 36 +++++++++++++++
+ arch/arm64/kernel/asm-offsets.c      |  1 +
+ arch/arm64/kernel/cpufeature.c       | 41 +++++++++++++++++
+ arch/arm64/kernel/debug-monitors.c   |  5 ++-
+ arch/arm64/kernel/entry.S            | 86 +++++++++++++++++++++---------------
+ arch/arm64/kernel/hibernate.c        |  5 ++-
+ arch/arm64/kernel/machine_kexec.c    |  4 +-
+ arch/arm64/kernel/process.c          |  3 ++
+ arch/arm64/kernel/setup.c            |  8 ++--
+ arch/arm64/kernel/signal.c           |  8 +++-
+ arch/arm64/kernel/smp.c              | 12 ++---
+ arch/arm64/kernel/suspend.c          |  7 +--
+ arch/arm64/kernel/traps.c            | 64 ++++++++++++++++++++++++++-
+ arch/arm64/kvm/handle_exit.c         | 19 +++++++-
+ arch/arm64/kvm/hyp-init.S            |  3 ++
+ arch/arm64/kvm/hyp/entry.S           | 13 ++++++
+ arch/arm64/kvm/hyp/switch.c          | 19 ++++++--
+ arch/arm64/kvm/hyp/sysreg-sr.c       |  6 +++
+ arch/arm64/kvm/inject_fault.c        | 13 +++++-
+ arch/arm64/kvm/sys_regs.c            | 11 +++++
+ arch/arm64/mm/proc.S                 | 14 +++---
+ virt/kvm/arm/arm.c                   |  4 ++
+ 35 files changed, 537 insertions(+), 115 deletions(-)
+ create mode 100644 arch/arm64/include/asm/daifflags.h
+
+-- 
+2.13.3
