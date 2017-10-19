@@ -1,31 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Oct 2017 00:17:39 +0200
-Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.15
-In-Reply-To: <59E0898A.3050307@hisilicon.com>
-References: <59E0898A.3050307@hisilicon.com>
-Message-ID: <CAK8P3a3F_KPufNV1dNvUcuD2zYT6DvA+nyGBst85XSCkTBirFg@mail.gmail.com>
+Date: Fri, 20 Oct 2017 00:21:08 +0200
+Subject: [GIT PULL 1/2] DaVinci DT updates for v4.15
+In-Reply-To: <20171013140240.18599-1-nsekhar@ti.com>
+References: <20171013140240.18599-1-nsekhar@ti.com>
+Message-ID: <CAK8P3a1-gMtvpjHLKVU5cJM89g_LQN9qCFuNUZzGMj2MDbptcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 13, 2017 at 11:38 AM, Wei Xu <xuwei5@hisilicon.com> wrote:
-> The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
->
->   Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
->
-> are available in the git repository at:
->
->   git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.15
->
-> for you to fetch changes up to a7ab4cb46902cd481d7def6869cf38a1e157f829:
->
->   arm64: dts: Register Hi3660's thermal sensor (2017-10-11 09:51:50 +0100)
+On Fri, Oct 13, 2017 at 4:02 PM, Sekhar Nori <nsekhar@ti.com> wrote:
 >
 > ----------------------------------------------------------------
-> ARM64: DT: Hisilicon SoC DT updates for 4.15
->
-> - Add CoreSight related nodes for hi6220
-> - Add GPIO line names for hikey960
-> - Rectify the GPIO line names of the Poplar board to keep consistency
-> - Add thermal sensor binding doc and dt nodes for hi3660
+> Add support for accessing DSP on DA850 SoC when using
+> device-tree.
 
-Pulled into next/dt, thanks!
+Pulled into next/dt.
+
+> Suman Anna (3):
+>       ARM: dts: da850: Add DSP node
+>       ARM: dts: da850-lcdk: Add and enable CMA reserved pool for DSP
+>       ARM: davinci: da8xx-dt: Add OF_DEV_AUXDATA entry for DSP clock matching
+>
+>  arch/arm/boot/dts/da850-lcdk.dts | 18 ++++++++++++++++++
+>  arch/arm/boot/dts/da850.dtsi     | 12 ++++++++++++
+>  arch/arm/mach-davinci/da8xx-dt.c |  1 +
+
+What is your longterm plan for the clocks? Is anyone working on converting
+that clock driver to properly support DT clocks?
+
+      Arnd
