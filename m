@@ -1,22 +1,19 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Oct 2017 22:52:09 +0200
-Subject: [GIT PULL] ARM: Xilinx Zynq SoC patches for v4.15
-In-Reply-To: <e0070498-8a23-3608-ac27-9da816f0d990@xilinx.com>
-References: <e0070498-8a23-3608-ac27-9da816f0d990@xilinx.com>
-Message-ID: <CAK8P3a0igZxsQSnayZC7p2pVgFEy+aKzzvvOHjWBUa9AKh1Ovg@mail.gmail.com>
+Date: Thu, 19 Oct 2017 22:53:13 +0200
+Subject: [GIT PULL] Qualcomm ARM64 Defconfig updates for 4.15
+In-Reply-To: <1508182291-23352-2-git-send-email-andy.gross@linaro.org>
+References: <1508182291-23352-1-git-send-email-andy.gross@linaro.org>
+ <1508182291-23352-2-git-send-email-andy.gross@linaro.org>
+Message-ID: <CAK8P3a08PzbJXF7HcidBQW8cUcxG=7dH++KwR6b=uJGOR4hhXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 16, 2017 at 2:55 PM, Michal Simek <michal.simek@xilinx.com> wrote:
-> ----------------------------------------------------------------
-> arm: Xilinx Zynq patches for v4.15
+On Mon, Oct 16, 2017 at 9:31 PM, Andy Gross <andy.gross@linaro.org> wrote:
+> Qualcomm ARM64 Based defconfig Updates for v4.15
 >
-> - Remove Soren from reviewer list
+> * Enable QCOM IOMMU
+> * Enable Qualcomm USB options
 
 Pulled into next/soc, thanks!
 
-This would have been a candidate for 4.14 as well, since it's a good idea
-to have an up-to-date maintainer entry for the release, but I guess there
-are not too many patches you get since there is not that much code.
-
-     Arnd
+      Arnd
