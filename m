@@ -1,30 +1,129 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 19 Oct 2017 14:48:28 +0800
-Subject: [linux-sunxi] [PATCH v2 6/8] ARM: dts: sun8i: a83t: Move mmc1
- pinctrl setting to dtsi file
-In-Reply-To: <f85a30e2-5a9d-a7ba-0010-6602cabaf83e@riseup.net>
-References: <20171018083138.14517-1-wens@csie.org>
- <20171018083138.14517-7-wens@csie.org>
- <f85a30e2-5a9d-a7ba-0010-6602cabaf83e@riseup.net>
-Message-ID: <CAGb2v64O+eyriHG-FirtPKo6hACfbV9JcJRUUZ+rY1QM2w_r1g@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 19 Oct 2017 08:57:46 +0200
+Subject: [PATCH v7 02/10] arm: dts: sunxi: Restore EMAC changes
+In-Reply-To: <20171018185049.GA24584@Red>
+References: <20171018114458.17891-1-clabbe.montjoie@gmail.com>
+ <20171018114458.17891-3-clabbe.montjoie@gmail.com>
+ <20171018164450.GE15371@lunn.ch> <20171018185049.GA24584@Red>
+Message-ID: <20171019065745.pzurfghdvfnpxeuc@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 18, 2017 at 11:00 PM, Joonas Kylm?l? <joonas.kylmala@iki.fi> wrote:
-> Hi,
->
-> Chen-Yu Tsai:
->> mmc1 only has 1 possible pinmux setting.
->
-> What if someone is using the MMC with bus width 1 and then using the
-> remaining 3 pins for something else?
+On Wed, Oct 18, 2017 at 08:50:49PM +0200, Corentin Labbe wrote:
+> On Wed, Oct 18, 2017 at 06:44:50PM +0200, Andrew Lunn wrote:
+> > On Wed, Oct 18, 2017 at 01:44:50PM +0200, Corentin Labbe wrote:
+> > > The original dwmac-sun8i DT bindings have some issue on how to handle
+> > > integrated PHY and was reverted in last RC of 4.13.
+> > > But now we have a solution so we need to get back that was reverted.
+> > > 
+> > > This patch restore arm DT about dwmac-sun8i
+> > > This reverts commit fe45174b72ae ("arm: dts: sunxi: Revert EMAC changes")
+> > > 
+> > > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> > > ---
+> > >  arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts |  9 ++++++++
+> > >  arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts   | 19 +++++++++++++++++
+> > >  arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts     | 19 +++++++++++++++++
+> > >  arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts         |  7 ++++++
+> > >  arch/arm/boot/dts/sun8i-h3-orangepi-2.dts         |  8 +++++++
+> > >  arch/arm/boot/dts/sun8i-h3-orangepi-one.dts       |  8 +++++++
+> > >  arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts   |  5 +++++
+> > >  arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts        |  8 +++++++
+> > >  arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts      | 22 +++++++++++++++++++
+> > >  arch/arm/boot/dts/sun8i-h3-orangepi-plus2e.dts    | 16 ++++++++++++++
+> > >  arch/arm/boot/dts/sunxi-h3-h5.dtsi                | 26 +++++++++++++++++++++++
+> > >  11 files changed, 147 insertions(+)
+> > > 
+> > > diff --git a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+> > > index b1502df7b509..6713d0f2b3f4 100644
+> > > --- a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+> > > +++ b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+> > > @@ -56,6 +56,8 @@
+> > >  
+> > >  	aliases {
+> > >  		serial0 = &uart0;
+> > > +		/* ethernet0 is the H3 emac, defined in sun8i-h3.dtsi */
+> > > +		ethernet0 = &emac;
+> > >  		ethernet1 = &xr819;
+> > >  	};
+> > >  
+> > > @@ -102,6 +104,13 @@
+> > >  	status = "okay";
+> > >  };
+> > >  
+> > > +&emac {
+> > > +	phy-handle = <&int_mii_phy>;
+> > > +	phy-mode = "mii";
+> > > +	allwinner,leds-active-low;
+> > > +	status = "okay";
+> > > +};
+> > > +
+> > >  &mmc0 {
+> > >  	pinctrl-names = "default";
+> > >  	pinctrl-0 = <&mmc0_pins_a>;
+> > > diff --git a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+> > > index e1dba9ffa94b..f2292deaa590 100644
+> > > --- a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+> > > +++ b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+> > > @@ -52,6 +52,7 @@
+> > >  	compatible = "sinovoip,bpi-m2-plus", "allwinner,sun8i-h3";
+> > >  
+> > >  	aliases {
+> > > +		ethernet0 = &emac;
+> > >  		serial0 = &uart0;
+> > >  		serial1 = &uart1;
+> > >  	};
+> > > @@ -111,6 +112,24 @@
+> > >  	status = "okay";
+> > >  };
+> > >  
+> > > +&emac {
+> > > +	pinctrl-names = "default";
+> > > +	pinctrl-0 = <&emac_rgmii_pins>;
+> > > +	phy-supply = <&reg_gmac_3v3>;
+> > > +	phy-handle = <&ext_rgmii_phy>;
+> > > +	phy-mode = "rgmii";
+> > > +
+> > > +	allwinner,leds-active-low;
+> > > +	status = "okay";
+> > > +};
+> > > +
+> > 
+> > 
+> > > +&external_mdio {
+> > > +	ext_rgmii_phy: ethernet-phy at 1 {
+> > > +		compatible = "ethernet-phy-ieee802.3-c22";
+> > > +		reg = <0>;
+> > > +	};
+> > > +};
+> > > +
+> > 
+> > Hi Corentin
+> > 
+> > I'm wondering about the order of the patches. Does the external_mdio
+> > node actually exist at this point? Or only later when other patches
+> > are applied?
+> > 
+> 
+> You are right order of patch are wrong, I need to cut this one in two.
+> "Revert?" sunxi-h3-h5.dtsi
+> apply mdiomux
+> "Revert?" all board nodes
 
-I would very much like to see such a design. Currently the devices
-we see all follow Allwinner's reference design, with only minor
-modifications. As such, mmc1 is used exclusively for connecting
-SDIO-based WiFi modules.
+I'm not even sure why you're actually adding them that way. Can't you
+just create the new binding file, support it in the driver, and add
+the matching DT nodes ?
 
-If such a radical(?) design is done, the vendor can always add
-a "mmc1-1bit-pins" setting and override the default.
+Maxime
 
-ChenYu
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171019/4319d4c5/attachment-0001.sig>
