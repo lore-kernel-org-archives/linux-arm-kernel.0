@@ -1,49 +1,58 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 20 Oct 2017 12:28:27 +0200
-Subject: [PATCH 24/31] arm64: dts: r8a77970: Add INTC-EX device node
+Date: Fri, 20 Oct 2017 12:28:29 +0200
+Subject: [PATCH 26/31] arm64: dts: renesas: eagle: add EtherAVB support
 In-Reply-To: <cover.1508495040.git.horms+renesas@verge.net.au>
 References: <cover.1508495040.git.horms+renesas@verge.net.au>
-Message-ID: <c6a7fd98966015df742fe15d5a01827262f4fc41.1508495040.git.horms+renesas@verge.net.au>
+Message-ID: <38525608952ae5793a58c1ef4e447f45593d2ee1.1508495040.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Add a device node for the Interrupt Controller for External Devices
-(INTC-EX) on R-Car V3M, which serves external IRQ pins IRQ[0-5].
+Define the Eagle board  dependent part of the EtherAVB device node.
+Enable DHCP  and NFS root for the kernel booting.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Based  on the original (and large) patch by Vladimir Barinov.
+
+Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77970.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a77970-eagle.dts | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77970.dtsi b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-index aa9032d34189..97e6981938e7 100644
---- a/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-@@ -124,6 +124,22 @@
- 			#power-domain-cells = <1>;
- 		};
+diff --git a/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts b/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
+index a4d1d4f24675..a711e77cc6a5 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
++++ b/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
+@@ -18,10 +18,11 @@
  
-+		intc_ex: interrupt-controller at e61c0000 {
-+			compatible = "renesas,intc-ex-r8a77970", "renesas,irqc";
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			reg = <0 0xe61c0000 0 0x200>;
-+			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 407>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 407>;
-+		};
+ 	aliases {
+ 		serial0 = &scif0;
++		ethernet0 = &avb;
+ 	};
+ 
+ 	chosen {
+-		bootargs = "ignore_loglevel";
++		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
+@@ -43,3 +44,14 @@
+ &scif0 {
+ 	status = "okay";
+ };
 +
- 		prr: chipid at fff00044 {
- 			compatible = "renesas,prr";
- 			reg = <0 0xfff00044 0 4>;
++&avb {
++	renesas,no-ether-link;
++	phy-handle = <&phy0>;
++	status = "okay";
++
++	phy0: ethernet-phy at 0 {
++		rxc-skew-ps = <1500>;
++		reg = <0>;
++	};
++};
 -- 
 2.11.0
