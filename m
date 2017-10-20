@@ -1,160 +1,450 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 20 Oct 2017 16:49:00 +0100
-Subject: [PATCH v2 4/8] KVM: arm/arm64: Limit icache invalidation to prefetch
- aborts
-In-Reply-To: <20171020154904.31427-1-marc.zyngier@arm.com>
-References: <20171020154904.31427-1-marc.zyngier@arm.com>
-Message-ID: <20171020154904.31427-5-marc.zyngier@arm.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Fri, 20 Oct 2017 12:52:26 -0400
+Subject: [PATCH v6 03/10] drm/bridge: analogix: Do not use device's drvdata
+In-Reply-To: <20171019034812.13768-4-jeffy.chen@rock-chips.com>
+References: <20171019034812.13768-1-jeffy.chen@rock-chips.com>
+ <20171019034812.13768-4-jeffy.chen@rock-chips.com>
+Message-ID: <20171020165226.vqoeldcmreuc73le@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We've so far eagerly invalidated the icache, no matter how
-the page was faulted in (data or prefetch abort).
+On Thu, Oct 19, 2017 at 11:48:05AM +0800, Jeffy Chen wrote:
 
-But we can easily track execution by setting the XN bits
-in the S2 page tables, get the prefetch abort at HYP and
-perform the icache invalidation at that time only.
+This patch has somehow lost it's original author. I assume this is not
+intentional.
 
-As for most VMs, the instruction working set is pretty
-small compared to the data set, this is likely to save
-some traffic (specially as the invalidation is broadcast).
+Sean
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/kvm_mmu.h        | 12 ++++++++++++
- arch/arm/include/asm/pgtable.h        |  4 ++--
- arch/arm64/include/asm/kvm_mmu.h      | 12 ++++++++++++
- arch/arm64/include/asm/pgtable-prot.h |  4 ++--
- virt/kvm/arm/mmu.c                    | 19 +++++++++++++++----
- 5 files changed, 43 insertions(+), 8 deletions(-)
+> The driver that instantiates the bridge should own the drvdata, as all
+> driver model callbacks (probe, remove, shutdown, PM ops, etc.) are also
+> owned by its driver struct. Moreover, storing two different pointer
+> types in driver data depending on driver initialization status is barely
+> a good practice and in fact has led to many bugs in this driver.
+> 
+> Let's clean up this mess and change Analogix entry points to simply
+> accept some opaque struct pointer, adjusting their users at the same
+> time to avoid breaking the compilation.
+> 
+> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+> Reviewed-by: Sean Paul <seanpaul@chromium.org>
+> Acked-by: Jingoo Han <jingoohan1@gmail.com>
+> Acked-by: Archit Taneja <architt@codeaurora.org>
+> ---
+> 
+> Changes in v6: None
+> Changes in v5: None
+> 
+>  drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 50 +++++++++-------------
+>  drivers/gpu/drm/exynos/exynos_dp.c                 | 26 ++++++-----
+>  drivers/gpu/drm/rockchip/analogix_dp-rockchip.c    | 49 ++++++++++++---------
+>  include/drm/bridge/analogix_dp.h                   | 19 ++++----
+>  4 files changed, 74 insertions(+), 70 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+> index 5dd3f1cd074a..74d274b6d31d 100644
+> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+> @@ -98,17 +98,15 @@ static int analogix_dp_detect_hpd(struct analogix_dp_device *dp)
+>  	return 0;
+>  }
+>  
+> -int analogix_dp_psr_supported(struct device *dev)
+> +int analogix_dp_psr_supported(struct analogix_dp_device *dp)
+>  {
+> -	struct analogix_dp_device *dp = dev_get_drvdata(dev);
+>  
+>  	return dp->psr_support;
+>  }
+>  EXPORT_SYMBOL_GPL(analogix_dp_psr_supported);
+>  
+> -int analogix_dp_enable_psr(struct device *dev)
+> +int analogix_dp_enable_psr(struct analogix_dp_device *dp)
+>  {
+> -	struct analogix_dp_device *dp = dev_get_drvdata(dev);
+>  	struct edp_vsc_psr psr_vsc;
+>  
+>  	if (!dp->psr_support)
+> @@ -129,9 +127,8 @@ int analogix_dp_enable_psr(struct device *dev)
+>  }
+>  EXPORT_SYMBOL_GPL(analogix_dp_enable_psr);
+>  
+> -int analogix_dp_disable_psr(struct device *dev)
+> +int analogix_dp_disable_psr(struct analogix_dp_device *dp)
+>  {
+> -	struct analogix_dp_device *dp = dev_get_drvdata(dev);
+>  	struct edp_vsc_psr psr_vsc;
+>  	int ret;
+>  
+> @@ -1281,8 +1278,9 @@ static ssize_t analogix_dpaux_transfer(struct drm_dp_aux *aux,
+>  	return analogix_dp_transfer(dp, msg);
+>  }
+>  
+> -int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
+> -		     struct analogix_dp_plat_data *plat_data)
+> +struct analogix_dp_device *
+> +analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
+> +		 struct analogix_dp_plat_data *plat_data)
+>  {
+>  	struct platform_device *pdev = to_platform_device(dev);
+>  	struct analogix_dp_device *dp;
+> @@ -1292,14 +1290,12 @@ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
+>  
+>  	if (!plat_data) {
+>  		dev_err(dev, "Invalided input plat_data\n");
+> -		return -EINVAL;
+> +		return ERR_PTR(-EINVAL);
+>  	}
+>  
+>  	dp = devm_kzalloc(dev, sizeof(struct analogix_dp_device), GFP_KERNEL);
+>  	if (!dp)
+> -		return -ENOMEM;
+> -
+> -	dev_set_drvdata(dev, dp);
+> +		return ERR_PTR(-ENOMEM);
+>  
+>  	dp->dev = &pdev->dev;
+>  	dp->dpms_mode = DRM_MODE_DPMS_OFF;
+> @@ -1316,7 +1312,7 @@ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
+>  
+>  	ret = analogix_dp_dt_parse_pdata(dp);
+>  	if (ret)
+> -		return ret;
+> +		return ERR_PTR(ret);
+>  
+>  	dp->phy = devm_phy_get(dp->dev, "dp");
+>  	if (IS_ERR(dp->phy)) {
+> @@ -1330,14 +1326,14 @@ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
+>  			if (ret == -ENOSYS || ret == -ENODEV)
+>  				dp->phy = NULL;
+>  			else
+> -				return ret;
+> +				return ERR_PTR(ret);
+>  		}
+>  	}
+>  
+>  	dp->clock = devm_clk_get(&pdev->dev, "dp");
+>  	if (IS_ERR(dp->clock)) {
+>  		dev_err(&pdev->dev, "failed to get clock\n");
+> -		return PTR_ERR(dp->clock);
+> +		return ERR_CAST(dp->clock);
+>  	}
+>  
+>  	clk_prepare_enable(dp->clock);
+> @@ -1346,7 +1342,7 @@ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
+>  
+>  	dp->reg_base = devm_ioremap_resource(&pdev->dev, res);
+>  	if (IS_ERR(dp->reg_base))
+> -		return PTR_ERR(dp->reg_base);
+> +		return ERR_CAST(dp->reg_base);
+>  
+>  	dp->force_hpd = of_property_read_bool(dev->of_node, "force-hpd");
+>  
+> @@ -1367,7 +1363,7 @@ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
+>  					    "hpd_gpio");
+>  		if (ret) {
+>  			dev_err(&pdev->dev, "failed to get hpd gpio\n");
+> -			return ret;
+> +			return ERR_PTR(ret);
+>  		}
+>  		dp->irq = gpio_to_irq(dp->hpd_gpio);
+>  		irq_flags = IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING;
+> @@ -1379,7 +1375,7 @@ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
+>  
+>  	if (dp->irq == -ENXIO) {
+>  		dev_err(&pdev->dev, "failed to get irq\n");
+> -		return -ENODEV;
+> +		return ERR_PTR(-ENODEV);
+>  	}
+>  
+>  	pm_runtime_enable(dev);
+> @@ -1420,7 +1416,7 @@ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
+>  	phy_power_off(dp->phy);
+>  	pm_runtime_put(dev);
+>  
+> -	return 0;
+> +	return dp;
+>  
+>  err_disable_pm_runtime:
+>  
+> @@ -1428,15 +1424,12 @@ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
+>  	pm_runtime_put(dev);
+>  	pm_runtime_disable(dev);
+>  
+> -	return ret;
+> +	return ERR_PTR(ret);
+>  }
+>  EXPORT_SYMBOL_GPL(analogix_dp_bind);
+>  
+> -void analogix_dp_unbind(struct device *dev, struct device *master,
+> -			void *data)
+> +void analogix_dp_unbind(struct analogix_dp_device *dp)
+>  {
+> -	struct analogix_dp_device *dp = dev_get_drvdata(dev);
+> -
+>  	analogix_dp_bridge_disable(dp->bridge);
+>  	dp->connector.funcs->destroy(&dp->connector);
+>  	dp->encoder->funcs->destroy(dp->encoder);
+> @@ -1449,16 +1442,14 @@ void analogix_dp_unbind(struct device *dev, struct device *master,
+>  	}
+>  
+>  	drm_dp_aux_unregister(&dp->aux);
+> -	pm_runtime_disable(dev);
+> +	pm_runtime_disable(dp->dev);
+>  	clk_disable_unprepare(dp->clock);
+>  }
+>  EXPORT_SYMBOL_GPL(analogix_dp_unbind);
+>  
+>  #ifdef CONFIG_PM
+> -int analogix_dp_suspend(struct device *dev)
+> +int analogix_dp_suspend(struct analogix_dp_device *dp)
+>  {
+> -	struct analogix_dp_device *dp = dev_get_drvdata(dev);
+> -
+>  	clk_disable_unprepare(dp->clock);
+>  
+>  	if (dp->plat_data->panel) {
+> @@ -1470,9 +1461,8 @@ int analogix_dp_suspend(struct device *dev)
+>  }
+>  EXPORT_SYMBOL_GPL(analogix_dp_suspend);
+>  
+> -int analogix_dp_resume(struct device *dev)
+> +int analogix_dp_resume(struct analogix_dp_device *dp)
+>  {
+> -	struct analogix_dp_device *dp = dev_get_drvdata(dev);
+>  	int ret;
+>  
+>  	ret = clk_prepare_enable(dp->clock);
+> diff --git a/drivers/gpu/drm/exynos/exynos_dp.c b/drivers/gpu/drm/exynos/exynos_dp.c
+> index 39629e7a80b9..f7e5b2c405ed 100644
+> --- a/drivers/gpu/drm/exynos/exynos_dp.c
+> +++ b/drivers/gpu/drm/exynos/exynos_dp.c
+> @@ -41,6 +41,7 @@ struct exynos_dp_device {
+>  	struct device              *dev;
+>  
+>  	struct videomode           vm;
+> +	struct analogix_dp_device *adp;
+>  	struct analogix_dp_plat_data plat_data;
+>  };
+>  
+> @@ -157,13 +158,6 @@ static int exynos_dp_bind(struct device *dev, struct device *master, void *data)
+>  	struct drm_device *drm_dev = data;
+>  	int ret;
+>  
+> -	/*
+> -	 * Just like the probe function said, we don't need the
+> -	 * device drvrate anymore, we should leave the charge to
+> -	 * analogix dp driver, set the device drvdata to NULL.
+> -	 */
+> -	dev_set_drvdata(dev, NULL);
+> -
+>  	dp->dev = dev;
+>  	dp->drm_dev = drm_dev;
+>  
+> @@ -190,13 +184,19 @@ static int exynos_dp_bind(struct device *dev, struct device *master, void *data)
+>  
+>  	dp->plat_data.encoder = encoder;
+>  
+> -	return analogix_dp_bind(dev, dp->drm_dev, &dp->plat_data);
+> +	dp->adp = analogix_dp_bind(dev, dp->drm_dev, &dp->plat_data);
+> +	if (IS_ERR(dp->adp))
+> +		return PTR_ERR(dp->adp);
+> +
+> +	return 0;
+>  }
+>  
+>  static void exynos_dp_unbind(struct device *dev, struct device *master,
+>  			     void *data)
+>  {
+> -	return analogix_dp_unbind(dev, master, data);
+> +	struct exynos_dp_device *dp = dev_get_drvdata(dev);
+> +
+> +	return analogix_dp_unbind(dp->adp);
+>  }
+>  
+>  static const struct component_ops exynos_dp_ops = {
+> @@ -257,12 +257,16 @@ static int exynos_dp_remove(struct platform_device *pdev)
+>  #ifdef CONFIG_PM
+>  static int exynos_dp_suspend(struct device *dev)
+>  {
+> -	return analogix_dp_suspend(dev);
+> +	struct exynos_dp_device *dp = dev_get_drvdata(dev);
+> +
+> +	return analogix_dp_suspend(dp->adp);
+>  }
+>  
+>  static int exynos_dp_resume(struct device *dev)
+>  {
+> -	return analogix_dp_resume(dev);
+> +	struct exynos_dp_device *dp = dev_get_drvdata(dev);
+> +
+> +	return analogix_dp_resume(dp->adp);
+>  }
+>  #endif
+>  
+> diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+> index 8cae5ad926cd..fa0365de31d2 100644
+> --- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+> +++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+> @@ -77,6 +77,7 @@ struct rockchip_dp_device {
+>  
+>  	const struct rockchip_dp_chip_data *data;
+>  
+> +	struct analogix_dp_device *adp;
+>  	struct analogix_dp_plat_data plat_data;
+>  };
+>  
+> @@ -85,7 +86,7 @@ static void analogix_dp_psr_set(struct drm_encoder *encoder, bool enabled)
+>  	struct rockchip_dp_device *dp = to_dp(encoder);
+>  	unsigned long flags;
+>  
+> -	if (!analogix_dp_psr_supported(dp->dev))
+> +	if (!analogix_dp_psr_supported(dp->adp))
+>  		return;
+>  
+>  	DRM_DEV_DEBUG(dp->dev, "%s PSR...\n", enabled ? "Entry" : "Exit");
+> @@ -116,9 +117,9 @@ static void analogix_dp_psr_work(struct work_struct *work)
+>  
+>  	spin_lock_irqsave(&dp->psr_lock, flags);
+>  	if (dp->psr_state == EDP_VSC_PSR_STATE_ACTIVE)
+> -		analogix_dp_enable_psr(dp->dev);
+> +		analogix_dp_enable_psr(dp->adp);
+>  	else
+> -		analogix_dp_disable_psr(dp->dev);
+> +		analogix_dp_disable_psr(dp->adp);
+>  	spin_unlock_irqrestore(&dp->psr_lock, flags);
+>  }
+>  
+> @@ -273,7 +274,6 @@ static int rockchip_dp_of_probe(struct rockchip_dp_device *dp)
+>  {
+>  	struct device *dev = dp->dev;
+>  	struct device_node *np = dev->of_node;
+> -	int ret;
+>  
+>  	dp->grf = syscon_regmap_lookup_by_phandle(np, "rockchip,grf");
+>  	if (IS_ERR(dp->grf)) {
+> @@ -337,13 +337,6 @@ static int rockchip_dp_bind(struct device *dev, struct device *master,
+>  	struct drm_device *drm_dev = data;
+>  	int ret;
+>  
+> -	/*
+> -	 * Just like the probe function said, we don't need the
+> -	 * device drvrate anymore, we should leave the charge to
+> -	 * analogix dp driver, set the device drvdata to NULL.
+> -	 */
+> -	dev_set_drvdata(dev, NULL);
+> -
+>  	dp_data = of_device_get_match_data(dev);
+>  	if (!dp_data)
+>  		return -ENODEV;
+> @@ -370,7 +363,11 @@ static int rockchip_dp_bind(struct device *dev, struct device *master,
+>  
+>  	rockchip_drm_psr_register(&dp->encoder, analogix_dp_psr_set);
+>  
+> -	return analogix_dp_bind(dev, dp->drm_dev, &dp->plat_data);
+> +	dp->adp = analogix_dp_bind(dev, dp->drm_dev, &dp->plat_data);
+> +	if (IS_ERR(dp->adp))
+> +		return PTR_ERR(dp->adp);
+> +
+> +	return 0;
+>  }
+>  
+>  static void rockchip_dp_unbind(struct device *dev, struct device *master,
+> @@ -379,8 +376,7 @@ static void rockchip_dp_unbind(struct device *dev, struct device *master,
+>  	struct rockchip_dp_device *dp = dev_get_drvdata(dev);
+>  
+>  	rockchip_drm_psr_unregister(&dp->encoder);
+> -
+> -	analogix_dp_unbind(dev, master, data);
+> +	analogix_dp_unbind(dp->adp);
+>  }
+>  
+>  static const struct component_ops rockchip_dp_component_ops = {
+> @@ -410,11 +406,6 @@ static int rockchip_dp_probe(struct platform_device *pdev)
+>  	if (ret < 0)
+>  		return ret;
+>  
+> -	/*
+> -	 * We just use the drvdata until driver run into component
+> -	 * add function, and then we would set drvdata to null, so
+> -	 * that analogix dp driver could take charge of the drvdata.
+> -	 */
+>  	platform_set_drvdata(pdev, dp);
+>  
+>  	return component_add(dev, &rockchip_dp_component_ops);
+> @@ -427,10 +418,26 @@ static int rockchip_dp_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> +#ifdef CONFIG_PM_SLEEP
+> +static int rockchip_dp_suspend(struct device *dev)
+> +{
+> +	struct rockchip_dp_device *dp = dev_get_drvdata(dev);
+> +
+> +	return analogix_dp_suspend(dp->adp);
+> +}
+> +
+> +static int rockchip_dp_resume(struct device *dev)
+> +{
+> +	struct rockchip_dp_device *dp = dev_get_drvdata(dev);
+> +
+> +	return analogix_dp_resume(dp->adp);
+> +}
+> +#endif
+> +
+>  static const struct dev_pm_ops rockchip_dp_pm_ops = {
+>  #ifdef CONFIG_PM_SLEEP
+> -	.suspend = analogix_dp_suspend,
+> -	.resume_early = analogix_dp_resume,
+> +	.suspend = rockchip_dp_suspend,
+> +	.resume_early = rockchip_dp_resume,
+>  #endif
+>  };
+>  
+> diff --git a/include/drm/bridge/analogix_dp.h b/include/drm/bridge/analogix_dp.h
+> index c99d6eaef1ac..5518fc75dd6e 100644
+> --- a/include/drm/bridge/analogix_dp.h
+> +++ b/include/drm/bridge/analogix_dp.h
+> @@ -13,6 +13,8 @@
+>  
+>  #include <drm/drm_crtc.h>
+>  
+> +struct analogix_dp_device;
+> +
+>  enum analogix_dp_devtype {
+>  	EXYNOS_DP,
+>  	RK3288_DP,
+> @@ -38,16 +40,17 @@ struct analogix_dp_plat_data {
+>  			 struct drm_connector *);
+>  };
+>  
+> -int analogix_dp_psr_supported(struct device *dev);
+> -int analogix_dp_enable_psr(struct device *dev);
+> -int analogix_dp_disable_psr(struct device *dev);
+> +int analogix_dp_psr_supported(struct analogix_dp_device *dp);
+> +int analogix_dp_enable_psr(struct analogix_dp_device *dp);
+> +int analogix_dp_disable_psr(struct analogix_dp_device *dp);
+>  
+> -int analogix_dp_resume(struct device *dev);
+> -int analogix_dp_suspend(struct device *dev);
+> +int analogix_dp_resume(struct analogix_dp_device *dp);
+> +int analogix_dp_suspend(struct analogix_dp_device *dp);
+>  
+> -int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
+> -		     struct analogix_dp_plat_data *plat_data);
+> -void analogix_dp_unbind(struct device *dev, struct device *master, void *data);
+> +struct analogix_dp_device *
+> +analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
+> +		 struct analogix_dp_plat_data *plat_data);
+> +void analogix_dp_unbind(struct analogix_dp_device *dp);
+>  
+>  int analogix_dp_start_crc(struct drm_connector *connector);
+>  int analogix_dp_stop_crc(struct drm_connector *connector);
+> -- 
+> 2.11.0
+> 
+> 
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index bc8d21e76637..4d7a54cbb3ab 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -85,6 +85,18 @@ static inline pmd_t kvm_s2pmd_mkwrite(pmd_t pmd)
- 	return pmd;
- }
- 
-+static inline pte_t kvm_s2pte_mkexec(pte_t pte)
-+{
-+	pte_val(pte) &= ~L_PTE_XN;
-+	return pte;
-+}
-+
-+static inline pmd_t kvm_s2pmd_mkexec(pmd_t pmd)
-+{
-+	pmd_val(pmd) &= ~PMD_SECT_XN;
-+	return pmd;
-+}
-+
- static inline void kvm_set_s2pte_readonly(pte_t *pte)
- {
- 	pte_val(*pte) = (pte_val(*pte) & ~L_PTE_S2_RDWR) | L_PTE_S2_RDONLY;
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index 1c462381c225..9b6e77b9ab7e 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -102,8 +102,8 @@ extern pgprot_t		pgprot_s2_device;
- #define PAGE_HYP_EXEC		_MOD_PROT(pgprot_kernel, L_PTE_HYP | L_PTE_RDONLY)
- #define PAGE_HYP_RO		_MOD_PROT(pgprot_kernel, L_PTE_HYP | L_PTE_RDONLY | L_PTE_XN)
- #define PAGE_HYP_DEVICE		_MOD_PROT(pgprot_hyp_device, L_PTE_HYP)
--#define PAGE_S2			_MOD_PROT(pgprot_s2, L_PTE_S2_RDONLY)
--#define PAGE_S2_DEVICE		_MOD_PROT(pgprot_s2_device, L_PTE_S2_RDONLY)
-+#define PAGE_S2			_MOD_PROT(pgprot_s2, L_PTE_S2_RDONLY | L_PTE_XN)
-+#define PAGE_S2_DEVICE		_MOD_PROT(pgprot_s2_device, L_PTE_S2_RDONLY | L_PTE_XN)
- 
- #define __PAGE_NONE		__pgprot(_L_PTE_DEFAULT | L_PTE_RDONLY | L_PTE_XN | L_PTE_NONE)
- #define __PAGE_SHARED		__pgprot(_L_PTE_DEFAULT | L_PTE_USER | L_PTE_XN)
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 56b3e03c85e7..1e1b20cb348f 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -173,6 +173,18 @@ static inline pmd_t kvm_s2pmd_mkwrite(pmd_t pmd)
- 	return pmd;
- }
- 
-+static inline pte_t kvm_s2pte_mkexec(pte_t pte)
-+{
-+	pte_val(pte) &= ~PTE_S2_XN;
-+	return pte;
-+}
-+
-+static inline pmd_t kvm_s2pmd_mkexec(pmd_t pmd)
-+{
-+	pmd_val(pmd) &= ~PMD_S2_XN;
-+	return pmd;
-+}
-+
- static inline void kvm_set_s2pte_readonly(pte_t *pte)
- {
- 	pteval_t old_pteval, pteval;
-diff --git a/arch/arm64/include/asm/pgtable-prot.h b/arch/arm64/include/asm/pgtable-prot.h
-index 0a5635fb0ef9..4e12dabd342b 100644
---- a/arch/arm64/include/asm/pgtable-prot.h
-+++ b/arch/arm64/include/asm/pgtable-prot.h
-@@ -60,8 +60,8 @@
- #define PAGE_HYP_RO		__pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY | PTE_HYP_XN)
- #define PAGE_HYP_DEVICE		__pgprot(PROT_DEVICE_nGnRE | PTE_HYP)
- 
--#define PAGE_S2			__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_NORMAL) | PTE_S2_RDONLY)
--#define PAGE_S2_DEVICE		__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_DEVICE_nGnRE) | PTE_S2_RDONLY | PTE_UXN)
-+#define PAGE_S2			__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_NORMAL) | PTE_S2_RDONLY | PTE_S2_XN)
-+#define PAGE_S2_DEVICE		__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_DEVICE_nGnRE) | PTE_S2_RDONLY | PTE_S2_XN)
- 
- #define PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_VALID) | PTE_PROT_NONE | PTE_RDONLY | PTE_PXN | PTE_UXN)
- #define PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_WRITE)
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 2174244f6317..0417c8e2a81c 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -1292,7 +1292,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 			  unsigned long fault_status)
- {
- 	int ret;
--	bool write_fault, writable, hugetlb = false, force_pte = false;
-+	bool write_fault, exec_fault, writable, hugetlb = false, force_pte = false;
- 	unsigned long mmu_seq;
- 	gfn_t gfn = fault_ipa >> PAGE_SHIFT;
- 	struct kvm *kvm = vcpu->kvm;
-@@ -1304,7 +1304,10 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	unsigned long flags = 0;
- 
- 	write_fault = kvm_is_write_fault(vcpu);
--	if (fault_status == FSC_PERM && !write_fault) {
-+	exec_fault = kvm_vcpu_trap_is_iabt(vcpu);
-+	VM_BUG_ON(write_fault && exec_fault);
-+
-+	if (fault_status == FSC_PERM && !write_fault && !exec_fault) {
- 		kvm_err("Unexpected L2 read permission error\n");
- 		return -EFAULT;
- 	}
-@@ -1398,7 +1401,11 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 			kvm_set_pfn_dirty(pfn);
- 		}
- 		clean_dcache_guest_page(vcpu, pfn, PMD_SIZE);
--		invalidate_icache_guest_page(vcpu, pfn, PMD_SIZE);
-+
-+		if (exec_fault) {
-+			new_pmd = kvm_s2pmd_mkexec(new_pmd);
-+			invalidate_icache_guest_page(vcpu, pfn, PMD_SIZE);
-+		}
- 
- 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
- 	} else {
-@@ -1410,7 +1417,11 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 			mark_page_dirty(kvm, gfn);
- 		}
- 		clean_dcache_guest_page(vcpu, pfn, PAGE_SIZE);
--		invalidate_icache_guest_page(vcpu, pfn, PAGE_SIZE);
-+
-+		if (exec_fault) {
-+			new_pte = kvm_s2pte_mkexec(new_pte);
-+			invalidate_icache_guest_page(vcpu, pfn, PAGE_SIZE);
-+		}
- 
- 		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, flags);
- 	}
 -- 
-2.14.1
+Sean Paul, Software Engineer, Google / Chromium OS
