@@ -1,707 +1,292 @@
-From: lukma@denx.de (Lukasz Majewski)
-Date: Fri, 20 Oct 2017 21:44:40 +0200
-Subject: [PATCH v3] ARM: dts: display5: Device tree description of LWN's
- DISPLAY5 board
-Message-ID: <1508528680-29391-1-git-send-email-lukma@denx.de>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Fri, 20 Oct 2017 14:45:57 -0500
+Subject: [PATCH v7 2/3] arm: dts: add Nuvoton NPCM750 device tree
+In-Reply-To: <20171019225050.25410-3-brendanhiggins@google.com>
+References: <20171019225050.25410-1-brendanhiggins@google.com>
+ <20171019225050.25410-3-brendanhiggins@google.com>
+Message-ID: <CAL_JsqJGe85FAOQwt=zJ5jOBoT-F1itnK6kmc9k34FJu=3Z=bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds device tree description of Liebherr's Display5 board.
+On Thu, Oct 19, 2017 at 5:50 PM, Brendan Higgins
+<brendanhiggins@google.com> wrote:
+> Add a common device tree for all Nuvoton NPCM750 BMCs and a board
+> specific device tree for the NPCM750 (Poleg) evaluation board.
+>
+> Signed-off-by: Brendan Higgins <brendanhiggins@google.com>
+> Reviewed-by: Tomer Maimon <tmaimon77@gmail.com>
+> Reviewed-by: Avi Fishman <avifishman70@gmail.com>
+> Reviewed-by: Joel Stanley <joel@jms.id.au>
+> Tested-by: Tomer Maimon <tmaimon77@gmail.com>
+> Tested-by: Avi Fishman <avifishman70@gmail.com>
+> ---
 
-Signed-off-by: Lukasz Majewski <lukma@denx.de>
+[...]
 
----
-Changes for v2:
+> diff --git a/arch/arm/boot/dts/nuvoton-npcm750.dtsi b/arch/arm/boot/dts/nuvoton-npcm750.dtsi
+> new file mode 100644
+> index 000000000000..85506b3cdd39
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/nuvoton-npcm750.dtsi
+> @@ -0,0 +1,198 @@
+> +/*
+> + * DTSi file for the NPCM750 SoC
+> + *
+> + * Copyright 2012 Tomer Maimon <tomer.maimon@nuvoton.com>
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include <dt-bindings/clock/nuvoton,npcm7xx-clks.h>
+> +
+> +/ {
+> +       #address-cells = <1>;
+> +       #size-cells = <1>;
+> +       interrupt-parent = <&gic>;
+> +
+> +       cpus {
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +               enable-method = "nuvoton,npcm7xx-smp";
+> +
+> +               cpu at 0 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a9";
+> +                       clocks = <&clk NPCM7XX_CLK_CPU>;
+> +                       clock-names = "clk_cpu";
+> +                       reg = <0>;
+> +                       next-level-cache = <&l2>;
+> +               };
+> +
+> +               cpu at 1 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a9";
+> +                       clocks = <&clk NPCM7XX_CLK_CPU>;
+> +                       clock-names = "clk_cpu";
+> +                       reg = <1>;
+> +                       next-level-cache = <&l2>;
+> +               };
+> +       };
+> +
+> +/* external clock signal rg1refck, supplied by the phy */
+> +clk-rg1refck {
+> +       compatible = "fixed-clock";
+> +       #clock-cells = <0>;
+> +       clock-frequency = <125000000>;
+> +};
+> +
+> +/* external clock signal rg2refck, supplied by the phy */
+> +clk-rg2refck {
+> +       compatible = "fixed-clock";
+> +       #clock-cells = <0>;
+> +       clock-frequency = <125000000>;
+> +};
+> +
+> +clk-xin {
+> +       compatible = "fixed-clock";
+> +       #clock-cells = <0>;
+> +       clock-frequency = <50000000>;
+> +};
+> +
+> +       soc {
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               compatible = "simple-bus";
+> +               interrupt-parent = <&gic>;
+> +               ranges = <0x0 0xf0000000 0x00900000>;
+> +
+> +               gcr: gcr at f0800000 {
 
-- Postpone adding Mitsubishi display
-- Replace GPL with dual GPL/X11 licenses
-- Remove superfluous "i2s-master" property
-- Replace pinctrl 0x80000000 value (meaning that this ping shall not be
-  configured in Linux) with proper values (set by bootloader)
+Should be gcr at 800000. Build the dtb with W=1 and it will give you
+warnings for this.
 
-Changes for v3:
-- Add "nxp,tfa9879" compatible for sound codec
-- Remove not needed "pinctrl-names"
-- Change the patch topic line
----
- arch/arm/boot/dts/Makefile                         |   1 +
- .../dts/imx6q-display5-tianma-tm070-1280x768.dts   |  51 ++
- arch/arm/boot/dts/imx6q-display5.dtsi              | 597 +++++++++++++++++++++
- 3 files changed, 649 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6q-display5-tianma-tm070-1280x768.dts
- create mode 100644 arch/arm/boot/dts/imx6q-display5.dtsi
+> +                       compatible = "nuvoton,npcm750-gcr", "syscon",
+> +                               "simple-mfd";
+> +                       reg = <0x800000 0x1000>;
+> +               };
+> +
+> +               scu: scu at f03fe000 {
+> +                       compatible = "arm,cortex-a9-scu";
+> +                       reg = <0x3fe000 0x1000>;
+> +               };
+> +
+> +               l2: cache-controller at f03fc000 {
+> +                       compatible = "arm,pl310-cache";
+> +                       reg = <0x3fc000 0x1000>;
+> +                       interrupts = <0 21 4>;
+> +                       cache-unified;
+> +                       cache-level = <2>;
+> +                       clocks = <&clk NPCM7XX_CLK_AXI>;
+> +               };
+> +
+> +               gic: interrupt-controller at f03ff000 {
+> +                       compatible = "arm,cortex-a9-gic";
+> +                       interrupt-controller;
+> +                       #interrupt-cells = <3>;
+> +                       reg = <0x3ff000 0x1000>,
+> +                           <0x3fe100 0x100>;
+> +               };
+> +
+> +               timer at f03fe600 {
+> +                       compatible = "arm,cortex-a9-twd-timer";
+> +                       reg = <0x3fe600 0x20>;
+> +                       interrupts = <1 13 0x304>;
+> +                       clocks = <&clk NPCM7XX_CLK_TIMER>;
+> +               };
+> +       };
+> +
+> +       ahb {
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               compatible = "simple-bus";
+> +               interrupt-parent = <&gic>;
+> +               ranges = <0x80000000 0x80000000 0x40010000
+> +                         0xe0800000 0xe0800000 0x0f800000
+> +                         0x00000000 0xf0000000 0x00900000
+> +                         0xf8000000 0xf8000000 0x02000000
+> +                         0xfb000000 0xfb000000 0x00002000>;
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index faf46ab..d9d0c82 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -407,6 +407,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6q-cm-fx6.dtb \
- 	imx6q-cubox-i.dtb \
- 	imx6q-dfi-fs700-m60.dtb \
-+	imx6q-display5-tianma-tm070-1280x768.dtb \
- 	imx6q-dmo-edmqmx6.dtb \
- 	imx6q-evi.dtb \
- 	imx6q-gk802.dtb \
-diff --git a/arch/arm/boot/dts/imx6q-display5-tianma-tm070-1280x768.dts b/arch/arm/boot/dts/imx6q-display5-tianma-tm070-1280x768.dts
-new file mode 100644
-index 0000000..16658b7
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-display5-tianma-tm070-1280x768.dts
-@@ -0,0 +1,51 @@
-+/*
-+ * Copyright 2017
-+ * Lukasz Majewski, DENX Software Engineering, lukma at denx.de
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is licensed under the terms of the GNU General Public
-+ *     License version 2.  This program is licensed "as is" without
-+ *     any warranty of any kind, whether express or implied.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "imx6q-display5.dtsi"
-+
-+&panel {
-+	compatible = "tianma,tm070jdhg30";
-+};
-+
-+&ldb {
-+	lvds0: lvds-channel at 0 {
-+		fsl,data-mapping = "spwg";
-+		fsl,data-width = <18>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/imx6q-display5.dtsi b/arch/arm/boot/dts/imx6q-display5.dtsi
-new file mode 100644
-index 0000000..48f161c
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-display5.dtsi
-@@ -0,0 +1,597 @@
-+/*
-+ * Copyright 2017
-+ * Lukasz Majewski, DENX Software Engineering, lukma at denx.de
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is licensed under the terms of the GNU General Public
-+ *     License version 2.  This program is licensed "as is" without
-+ *     any warranty of any kind, whether express or implied.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "imx6q.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pwm/pwm.h>
-+#include <dt-bindings/sound/fsl-imx-audmux.h>
-+
-+/ {
-+	model = "Liebherr (LWN) display5 i.MX6 Quad Board";
-+	compatible = "lwn,display5", "fsl,imx6q";
-+
-+	memory {
-+		reg = <0x10000000 0x40000000>;
-+	};
-+
-+	backlight_lvds: backlight {
-+		compatible = "pwm-backlight";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_backlight>;
-+		pwms = <&pwm2 0 5000000 0>;
-+		brightness-levels = <  0   1   2   3   4   5   6   7   8   9
-+				      10  11  12  13  14  15  16  17  18  19
-+				      20  21  22  23  24  25  26  27  28  29
-+				      30  31  32  33  34  35  36  37  38  39
-+				      40  41  42  43  44  45  46  47  48  49
-+				      50  51  52  53  54  55  56  57  58  59
-+				      60  61  62  63  64  65  66  67  68  69
-+				      70  71  72  73  74  75  76  77  78  79
-+				      80  81  82  83  84  85  86  87  88  89
-+				      90  91  92  93  94  95  96  97  98  99
-+				     100 101 102 103 104 105 106 107 108 109
-+				     110 111 112 113 114 115 116 117 118 119
-+				     120 121 122 123 124 125 126 127 128 129
-+				     130 131 132 133 134 135 136 137 138 139
-+				     140 141 142 143 144 145 146 147 148 149
-+				     150 151 152 153 154 155 156 157 158 159
-+				     160 161 162 163 164 165 166 167 168 169
-+				     170 171 172 173 174 175 176 177 178 179
-+				     180 181 182 183 184 185 186 187 188 189
-+				     190 191 192 193 194 195 196 197 198 199
-+				     200 201 202 203 204 205 206 207 208 209
-+				     210 211 212 213 214 215 216 217 218 219
-+				     220 221 222 223 224 225 226 227 228 229
-+				     230 231 232 233 234 235 236 237 238 239
-+				     240 241 242 243 244 245 246 247 248 249
-+				     250 251 252 253 254 255>;
-+		default-brightness-level = <250>;
-+		enable-gpios = <&gpio5 7 GPIO_ACTIVE_HIGH>;
-+	};
-+
-+	reg_lvds: regulator-lvds {
-+		compatible = "regulator-fixed";
-+		regulator-name = "lvds_ppen";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_reg_lvds>;
-+		gpio = <&gpio5 13 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
-+	reg_usbh1_vbus: usb-h1-vbus {
-+		compatible = "regulator-fixed";
-+		gpio = <&gpio3 31 GPIO_ACTIVE_LOW>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_usbh1_vbus>;
-+		regulator-name = "usb_h1_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-enable-ramp-delay = <300000>;
-+	};
-+
-+	sound {
-+		compatible = "simple-audio-card";
-+		label = "tfa9879-mono";
-+
-+		simple-audio-card,dai-link {
-+			/* DAC */
-+			format = "i2s";
-+			bitclock-master = <&dailink_master>;
-+			frame-master = <&dailink_master>;
-+
-+			dailink_master: cpu {
-+			    sound-dai = <&ssi2>;
-+			};
-+			codec {
-+			    sound-dai = <&codec>;
-+			};
-+		};
-+	};
-+
-+	panel: panel-lvds0 {
-+		backlight = <&backlight_lvds>;
-+		power-supply = <&reg_lvds>;
-+
-+		port {
-+			panel_in_lvds0: endpoint {
-+				remote-endpoint = <&lvds0_out>;
-+			};
-+		};
-+	};
-+};
-+
-+&audmux {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_audmux>;
-+	status = "okay";
-+
-+	ssi2 {
-+		fsl,audmux-port = <1>;
-+		fsl,port-config = <
-+			(IMX_AUDMUX_V2_PTCR_SYN |
-+			 IMX_AUDMUX_V2_PTCR_TFSEL(5) |
-+			 IMX_AUDMUX_V2_PTCR_TCSEL(5) |
-+			 IMX_AUDMUX_V2_PTCR_TFSDIR |
-+			 IMX_AUDMUX_V2_PTCR_TCLKDIR)
-+			IMX_AUDMUX_V2_PDCR_RXDSEL(5)
-+		>;
-+	};
-+
-+	aud6 {
-+		fsl,audmux-port = <5>;
-+		fsl,port-config = <
-+			(IMX_AUDMUX_V2_PTCR_RFSEL(8) |
-+			 IMX_AUDMUX_V2_PTCR_RCSEL(8) |
-+			 IMX_AUDMUX_V2_PTCR_TFSEL(1) |
-+			 IMX_AUDMUX_V2_PTCR_TCSEL(1) |
-+			 IMX_AUDMUX_V2_PTCR_RFSDIR |
-+			 IMX_AUDMUX_V2_PTCR_RCLKDIR |
-+			 IMX_AUDMUX_V2_PTCR_TFSDIR |
-+			 IMX_AUDMUX_V2_PTCR_TCLKDIR)
-+			IMX_AUDMUX_V2_PDCR_RXDSEL(1)
-+		>;
-+	};
-+};
-+
-+&ecspi2 {
-+	cs-gpios = <&gpio5 29 GPIO_ACTIVE_LOW>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ecspi2 &pinctrl_ecspi2_cs &pinctrl_ecspi2_flwp>;
-+	status = "okay";
-+
-+	s25fl256s: flash at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "jedec,spi-nor";
-+		spi-max-frequency = <40000000>;
-+		reg = <0>;
-+
-+		partition at 0 {
-+			label = "SPL (spi)";
-+			reg = <0x0 0x20000>;
-+			read-only;
-+		};
-+		partition at 1 {
-+			label = "u-boot (spi)";
-+			reg = <0x20000 0x100000>;
-+			read-only;
-+		};
-+		partition at 2 {
-+			label = "uboot-env (spi)";
-+			reg = <0x120000 0x10000>;
-+		};
-+		partition at 3 {
-+			label = "uboot-envr (spi)";
-+			reg = <0x130000 0x10000>;
-+		};
-+		partition at 4 {
-+			label = "linux-recovery (spi)";
-+			reg = <0x140000 0x800000>;
-+		};
-+		partition at 5 {
-+			label = "swupdate-fitImg (spi)";
-+			reg = <0x940000 0x400000>;
-+		};
-+		partition at 6 {
-+			label = "swupdate-initramfs (spi)";
-+			reg = <0xD40000 0x800000>;
-+		};
-+	};
-+};
-+
-+&ecspi3 {
-+	cs-gpios = <&gpio4 24 GPIO_ACTIVE_LOW>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ecspi3 &pinctrl_ecspi3_cs &pinctrl_ecspi3_flwp>;
-+	status = "okay";
-+};
-+
-+&fec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet>;
-+	phy-handle = <&ethernet_phy0>;
-+	phy-mode = "rgmii-id";
-+	status = "okay";
-+
-+	mdio {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		ethernet_phy0: ethernet-phy at 0 {
-+			compatible = "marvell,88E1510";
-+			device_type = "ethernet-phy";
-+			/* Set LED0 control: */
-+			/* On - Link, Blink - Activity, Off - No Link */
-+			marvell,reg-init = <3 0x10 0 0x1011>;
-+			max-speed = <100>;
-+			reg = <0>;
-+		};
-+	};
-+};
-+
-+&i2c1 {
-+	clock-frequency = <400000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1>;
-+	status = "okay";
-+
-+	codec: tfa9879 at 6C {
-+		#sound-dai-cells = <0>;
-+		compatible = "nxp,tfa9879";
-+		reg = <0x6C>;
-+	};
-+};
-+
-+&i2c2 {
-+	clock-frequency = <400000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c2>;
-+	status = "okay";
-+};
-+
-+&i2c3 {
-+	clock-frequency = <400000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c3>;
-+	status = "okay";
-+
-+	at24 at 50 {
-+		compatible = "atmel,24c256";
-+		pagesize = <64>;
-+		reg = <0x50>;
-+	};
-+
-+	pfuze100: pmic at 08 {
-+		compatible = "fsl,pfuze100";
-+		reg = <0x08>;
-+
-+		regulators {
-+			sw1a_reg: sw1ab {
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <1875000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
-+
-+			sw1c_reg: sw1c {
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <1875000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
-+
-+			sw2_reg: sw2 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3950000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw3a_reg: sw3a {
-+				regulator-min-microvolt = <400000>;
-+				regulator-max-microvolt = <1975000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw3b_reg: sw3b {
-+				regulator-min-microvolt = <400000>;
-+				regulator-max-microvolt = <1975000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw4_reg: sw4 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			swbst_reg: swbst {
-+				regulator-min-microvolt = <5000000>;
-+				regulator-max-microvolt = <5150000>;
-+			};
-+
-+			snvs_reg: vsnvs {
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vref_reg: vrefddr {
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vgen1_reg: vgen1 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <1550000>;
-+			};
-+
-+			vgen2_reg: vgen2 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <1550000>;
-+			};
-+
-+			vgen3_reg: vgen3 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			vgen4_reg: vgen4 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen5_reg: vgen5 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen6_reg: vgen6 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+		};
-+	};
-+};
-+
-+&ldb {
-+	status = "okay";
-+
-+	lvds0: lvds-channel at 0 {
-+		status = "okay";
-+
-+		port at 4 {
-+			reg = <4>;
-+
-+			lvds0_out: endpoint {
-+				remote-endpoint = <&panel_in_lvds0>;
-+			};
-+		};
-+	};
-+};
-+
-+&pwm2 {
-+	#pwm-cells = <3>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm2>;
-+	status = "okay";
-+};
-+
-+&ssi2 {
-+	status = "okay";
-+};
-+
-+&uart4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart4>;
-+	uart-has-rtscts;
-+	status = "okay";
-+};
-+
-+&uart5 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart5>;
-+	status = "okay";
-+};
-+
-+&usbh1 {
-+	vbus-supply = <&reg_usbh1_vbus>;
-+	dr_mode = "host";
-+	status = "okay";
-+};
-+
-+&usdhc4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbh1>;
-+	pinctrl-0 = <&pinctrl_usdhc4>;
-+	bus-width = <8>;
-+	non-removable;
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	pinctrl_audmux: audmuxgrp {
-+		fsl,pins = <
-+			/* I2S OUTPUT AUD6*/
-+			MX6QDL_PAD_DI0_PIN4__AUD6_RXD  0x130b0
-+			MX6QDL_PAD_DI0_PIN2__AUD6_TXD  0x130b0
-+			MX6QDL_PAD_DI0_PIN3__AUD6_TXFS  0x130b0
-+			MX6QDL_PAD_DI0_PIN15__AUD6_TXC  0x130b0
-+		>;
-+	};
-+
-+	pinctrl_backlight: dispgrp {
-+		fsl,pins = <
-+			/* BLEN_OUT */
-+			MX6QDL_PAD_DISP0_DAT13__GPIO5_IO07    0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_ecspi2: ecspi2grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_CSI0_DAT10__ECSPI2_MISO	0x100b1
-+			MX6QDL_PAD_CSI0_DAT9__ECSPI2_MOSI	0x100b1
-+			MX6QDL_PAD_CSI0_DAT8__ECSPI2_SCLK	0x100b1
-+		>;
-+	};
-+
-+	pinctrl_ecspi2_cs: ecspi2csgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_CSI0_DAT11__GPIO5_IO29 0x100b1
-+		>;
-+	};
-+
-+	pinctrl_ecspi2_flwp: ecspi2flwpgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD3_DAT5__GPIO7_IO00 0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_ecspi3: ecspi3grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_DISP0_DAT2__ECSPI3_MISO	0x100b1
-+			MX6QDL_PAD_DISP0_DAT1__ECSPI3_MOSI	0x100b1
-+			MX6QDL_PAD_DISP0_DAT0__ECSPI3_SCLK	0x100b1
-+		>;
-+	};
-+
-+	pinctrl_ecspi3_cs: ecspi3csgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_DISP0_DAT3__GPIO4_IO24 0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_ecspi3_flwp: ecspi3flwpgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_DISP0_DAT6__GPIO4_IO27 0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_enet: enetgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
-+			MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
-+			MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x1b0b0
-+			MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b0b0
-+			MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b0b0
-+			MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b0b0
-+			MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b0b0
-+			MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b0b0
-+			MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x1b0b0
-+			MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
-+			MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x1b0b0
-+			MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x1b0b0
-+			MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0
-+			MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0
-+			MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b0b0
-+			MX6QDL_PAD_GPIO_16__ENET_REF_CLK 0x4001b0a8
-+			MX6QDL_PAD_GPIO_6__ENET_IRQ		0x000b1
-+			MX6QDL_PAD_ENET_RXD0__GPIO1_IO27        0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_i2c1: i2c1grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_D21__I2C1_SCL	0x4001b8b1
-+			MX6QDL_PAD_EIM_D28__I2C1_SDA	0x4001b8b1
-+		>;
-+	};
-+
-+	pinctrl_i2c2: i2c2grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_EB2__I2C2_SCL	0x4001b8b1
-+			MX6QDL_PAD_EIM_D16__I2C2_SDA	0x4001b8b1
-+		>;
-+	};
-+
-+	pinctrl_i2c3: i2c3grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_D17__I2C3_SCL	0x4001b8b1
-+			MX6QDL_PAD_EIM_D18__I2C3_SDA	0x4001b8b1
-+		>;
-+	};
-+
-+	pinctrl_pwm2: pwm2grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_DISP0_DAT9__PWM2_OUT	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_reg_lvds: reqlvdsgrp {
-+		fsl,pins = <
-+			/* LVDS_PPEN_OUT */
-+			MX6QDL_PAD_DISP0_DAT19__GPIO5_IO13      0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_uart4: uart4grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_CSI0_DAT12__UART4_TX_DATA	0x1b0b1
-+			MX6QDL_PAD_CSI0_DAT13__UART4_RX_DATA	0x1b0b1
-+			MX6QDL_PAD_CSI0_DAT16__UART4_RTS_B	0x1b0b1
-+			MX6QDL_PAD_CSI0_DAT17__UART4_CTS_B	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_uart5: uart5grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_CSI0_DAT14__UART5_TX_DATA	0x1b0b1
-+			MX6QDL_PAD_CSI0_DAT15__UART5_RX_DATA    0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_usbh1: usbh1grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_D30__USB_H1_OC  0x030b0
-+		>;
-+	};
-+
-+	pinctrl_usbh1_vbus: usbh1_vbus_grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_D31__GPIO3_IO31 0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_usdhc4: usdhc4grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD4_CMD__SD4_CMD		0x17059
-+			MX6QDL_PAD_SD4_CLK__SD4_CLK		0x10059
-+			MX6QDL_PAD_SD4_DAT0__SD4_DATA0		0x17059
-+			MX6QDL_PAD_SD4_DAT1__SD4_DATA1		0x17059
-+			MX6QDL_PAD_SD4_DAT2__SD4_DATA2		0x17059
-+			MX6QDL_PAD_SD4_DAT3__SD4_DATA3		0x17059
-+			MX6QDL_PAD_SD4_DAT4__SD4_DATA4		0x17059
-+			MX6QDL_PAD_SD4_DAT5__SD4_DATA5		0x17059
-+			MX6QDL_PAD_SD4_DAT6__SD4_DATA6		0x17059
-+			MX6QDL_PAD_SD4_DAT7__SD4_DATA7		0x17059
-+			MX6QDL_PAD_NANDF_ALE__SD4_RESET	0x17059
-+		>;
-+	};
-+};
--- 
-2.1.4
+Just do "ranges;" here if all the translation is at the next level down.
+
+Sorry, it's hard to say exactly what to do without knowing the whole memory map.
+
+> +
+> +               clk: clock-controller at f0801000 {
+
+Seems like this belongs under /soc based on the address.
+
+> +                       compatible = "nuvoton,npcm750-clk";
+> +                       #clock-cells = <1>;
+> +                       reg = <0x801000 0x1000>;
+> +                       status = "okay";
+> +               };
+> +
+> +               apb {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <1>;
+> +                       compatible = "simple-bus";
+> +                       interrupt-parent = <&gic>;
+> +                       ranges = <0x0 0x0 0x00300000>;
+
+And then this would be "<0x0 0xf0000000 0x300000>".
+
+> +
+> +                       timer0: timer at f0000000 {
+> +                               compatible = "nuvoton,npcm750-timer";
+> +                               interrupts = <0 32 4>;
+> +                               reg = <0x0 0x1000>;
+> +                               clocks = <&clk NPCM7XX_CLK_TIMER>;
+> +                       };
+> +
+> +                       watchdog0: watchdog at f0008000 {
+> +                               compatible = "nuvoton,npcm750-wdt";
+> +                               interrupts = <0 47 4>;
+> +                               reg = <0x8000 0x1000>;
+> +                               status = "disabled";
+> +                               clocks = <&clk NPCM7XX_CLK_TIMER>;
+> +                       };
+> +
+> +                       watchdog1: watchdog at f0009000 {
+> +                               compatible = "nuvoton,npcm750-wdt";
+> +                               interrupts = <0 48 4>;
+> +                               reg = <0x9000 0x1000>;
+> +                               status = "disabled";
+> +                               clocks = <&clk NPCM7XX_CLK_TIMER>;
+> +                       };
+> +
+> +                       watchdog2: watchdog at f000a000 {
+> +                               compatible = "nuvoton,npcm750-wdt";
+> +                               interrupts = <0 49 4>;
+> +                               reg = <0xa000 0x1000>;
+> +                               status = "disabled";
+> +                               clocks = <&clk NPCM7XX_CLK_TIMER>;
+> +                       };
+> +
+> +                       serial0: serial at f0001000 {
+> +                               compatible = "nuvoton,npcm750-uart";
+> +                               reg = <0x1000 0x1000>;
+> +                               clocks = <&clk NPCM7XX_CLK_UART_CORE>;
+> +                               interrupts = <0 2 4>;
+> +                               status = "disabled";
+> +                       };
+> +
+> +                       serial1: serial at f0002000 {
+> +                               compatible = "nuvoton,npcm750-uart";
+> +                               reg = <0x2000 0x1000>;
+> +                               clocks = <&clk NPCM7XX_CLK_UART_CORE>;
+> +                               interrupts = <0 3 4>;
+> +                               status = "disabled";
+> +                       };
+> +
+> +                       serial2: serial at f0003000 {
+> +                               compatible = "nuvoton,npcm750-uart";
+> +                               reg = <0x3000 0x1000>;
+> +                               clocks = <&clk NPCM7XX_CLK_UART_CORE>;
+> +                               interrupts = <0 4 4>;
+> +                               status = "disabled";
+> +                       };
+> +
+> +                       serial3: serial at f0004000 {
+> +                               compatible = "nuvoton,npcm750-uart";
+> +                               reg = <0x4000 0x1000>;
+> +                               clocks = <&clk NPCM7XX_CLK_UART_CORE>;
+> +                               interrupts = <0 5 4>;
+> +                               status = "disabled";
+> +                       };
+> +               };
+> +       };
+> +};
+> diff --git a/include/dt-bindings/clock/nuvoton,npcm7xx-clks.h b/include/dt-bindings/clock/nuvoton,npcm7xx-clks.h
+> new file mode 100644
+> index 000000000000..c69d3bbf7e42
+> --- /dev/null
+> +++ b/include/dt-bindings/clock/nuvoton,npcm7xx-clks.h
+> @@ -0,0 +1,39 @@
+> +/*
+> + * Copyright (C) 2016 Nuvoton Technologies,  tali.perry at nuvoton.com
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + */
+> +
+> +#ifndef _DT_BINDINGS_CLK_NPCM7XX_H
+> +#define _DT_BINDINGS_CLK_NPCM7XX_H
+> +
+> +#define NPCM7XX_CLK_PLL0       0
+> +#define NPCM7XX_CLK_PLL1       1
+> +#define NPCM7XX_CLK_PLL2       2
+> +#define NPCM7XX_CLK_GFX                3
+> +#define NPCM7XX_CLK_APB1       4
+> +#define NPCM7XX_CLK_APB2       5
+> +#define NPCM7XX_CLK_APB3       6
+> +#define NPCM7XX_CLK_APB4       7
+> +#define NPCM7XX_CLK_APB5       8
+> +#define NPCM7XX_CLK_MC         9
+> +#define NPCM7XX_CLK_CPU                10
+> +#define NPCM7XX_CLK_SPI0       11
+> +#define NPCM7XX_CLK_SPI3       12
+> +#define NPCM7XX_CLK_SPIX       13
+> +#define NPCM7XX_CLK_UART_CORE  14
+> +#define NPCM7XX_CLK_TIMER      15
+> +#define NPCM7XX_CLK_HOST_UART  16
+> +#define NPCM7XX_CLK_MMC                17
+> +#define NPCM7XX_CLK_SDHC       18
+> +#define NPCM7XX_CLK_ADC                19
+> +#define NPCM7XX_CLK_GFX_MEM    20
+> +#define NPCM7XX_CLK_USB_BRIDGE 21
+> +#define NPCM7XX_CLK_AXI                22
+> +#define NPCM7XX_CLK_AHB                23
+> +#define NPCM7XX_CLK_EMC                24
+> +#define NPCM7XX_CLK_GMAC       25
+> +
+> +#endif
+> --
+> 2.15.0.rc0.271.g36b669edcc-goog
+>
