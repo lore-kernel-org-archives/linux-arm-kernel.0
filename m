@@ -1,140 +1,89 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 20 Oct 2017 16:49:02 +0100
-Subject: [PATCH v2 6/8] KVM: arm/arm64: Preserve Exec permission across R/W
- permission faults
-In-Reply-To: <20171020154904.31427-1-marc.zyngier@arm.com>
-References: <20171020154904.31427-1-marc.zyngier@arm.com>
-Message-ID: <20171020154904.31427-7-marc.zyngier@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 20 Oct 2017 16:58:37 +0100
+Subject: [PATCH 3/4] arm64: traps: Pretty-print pstate in register dumps
+In-Reply-To: <20171019161754.5xnqloqx52sjbtvr@lakrids.cambridge.arm.com>
+References: <1508428534-20694-1-git-send-email-will.deacon@arm.com>
+ <1508428534-20694-4-git-send-email-will.deacon@arm.com>
+ <20171019161754.5xnqloqx52sjbtvr@lakrids.cambridge.arm.com>
+Message-ID: <20171020155836.GB1593@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, we loose the Exec property whenever we take permission
-faults, as we always reconstruct the PTE/PMD from scratch. This
-can be counter productive as we can end-up with the following
-fault sequence:
+On Thu, Oct 19, 2017 at 05:17:55PM +0100, Mark Rutland wrote:
+> On Thu, Oct 19, 2017 at 04:55:33PM +0100, Will Deacon wrote:
+> > We can decode the PSTATE easily enough, so pretty-print it in register
+> > dumps.
+> > 
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm64/kernel/process.c | 20 +++++++++++++++++++-
+> >  1 file changed, 19 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> > index c20896b8fb2d..be3cf9cd7dec 100644
+> > --- a/arch/arm64/kernel/process.c
+> > +++ b/arch/arm64/kernel/process.c
+> > @@ -170,6 +170,23 @@ void machine_restart(char *cmd)
+> >  	while (1);
+> >  }
+> >  
+> > +static void print_pstate(struct pt_regs *regs)
+> > +{
+> > +	u64 pstate = regs->pstate;
+> > +	printk("pstate: %08llx (%c%c%c%c %c%c%c%c %cPAN %cUAO)\n",
+> > +		pstate,
+> > +		pstate & PSR_N_BIT ? 'N' : 'n',
+> > +		pstate & PSR_Z_BIT ? 'Z' : 'z',
+> > +		pstate & PSR_C_BIT ? 'C' : 'c',
+> > +		pstate & PSR_V_BIT ? 'V' : 'v',
+> > +		pstate & PSR_D_BIT ? 'D' : 'd',
+> > +		pstate & PSR_A_BIT ? 'A' : 'a',
+> > +		pstate & PSR_I_BIT ? 'I' : 'i',
+> > +		pstate & PSR_F_BIT ? 'F' : 'f',
+> > +		pstate & PSR_PAN_BIT ? '+' : '-',
+> > +		pstate & PSR_UAO_BIT ? '+' : '-');
+> > +}
+> 
+> Given we use __show_regs for user state, I think we need to check
+> compat_user_mode() regs, and adjust the decoding accordingly.
+> 
+> e.g. AArch32 has an E bit where the D in DAIF is.
 
-	X -> RO -> ROX -> RW -> RWX
+Yes, you're right. There's lots of exciting bits in the AArch32 pstate
+too. I ended up with the diff below.
 
-Instead, we can lookup the existing PTE/PMD and clear the XN bit in the
-new entry if it was already cleared in the old one, leadig to a much
-nicer fault sequence:
+Will
 
-	X -> ROX -> RWX
+--->8
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/kvm_mmu.h   | 10 ++++++++++
- arch/arm64/include/asm/kvm_mmu.h | 10 ++++++++++
- virt/kvm/arm/mmu.c               | 27 +++++++++++++++++++++++++++
- 3 files changed, 47 insertions(+)
-
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 4d7a54cbb3ab..aab64fe52146 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -107,6 +107,11 @@ static inline bool kvm_s2pte_readonly(pte_t *pte)
- 	return (pte_val(*pte) & L_PTE_S2_RDWR) == L_PTE_S2_RDONLY;
- }
- 
-+static inline bool kvm_s2pte_exec(pte_t *pte)
++static void print_pstate(struct pt_regs *regs)
 +{
-+	return !(pte_val(*pte) & L_PTE_XN);
++	u64 pstate = regs->pstate;
++
++	if (compat_user_mode(regs))
++		printk("pstate: %08llx (%c%c%c%c %c %s %s-endian %c%c%c)\n",
++			pstate,
++			pstate & COMPAT_PSR_N_BIT ? 'N' : 'n',
++			pstate & COMPAT_PSR_Z_BIT ? 'Z' : 'z',
++			pstate & COMPAT_PSR_C_BIT ? 'C' : 'c',
++			pstate & COMPAT_PSR_V_BIT ? 'V' : 'v',
++			pstate & COMPAT_PSR_Q_BIT ? 'Q' : 'q',
++			pstate & COMPAT_PSR_T_BIT ? "T32" : "A32",
++			pstate & COMPAT_PSR_E_BIT ? "big" : "little",
++			pstate & COMPAT_PSR_A_BIT ? 'A' : 'a',
++			pstate & COMPAT_PSR_I_BIT ? 'I' : 'i',
++			pstate & COMPAT_PSR_F_BIT ? 'F' : 'f');
++	else
++		printk("pstate: %08llx (%c%c%c%c %c%c%c%c %cPAN %cUAO)\n",
++			pstate,
++			pstate & PSR_N_BIT ? 'N' : 'n',
++			pstate & PSR_Z_BIT ? 'Z' : 'z',
++			pstate & PSR_C_BIT ? 'C' : 'c',
++			pstate & PSR_V_BIT ? 'V' : 'v',
++			pstate & PSR_D_BIT ? 'D' : 'd',
++			pstate & PSR_A_BIT ? 'A' : 'a',
++			pstate & PSR_I_BIT ? 'I' : 'i',
++			pstate & PSR_F_BIT ? 'F' : 'f',
++			pstate & PSR_PAN_BIT ? '+' : '-',
++			pstate & PSR_UAO_BIT ? '+' : '-');
 +}
-+
- static inline void kvm_set_s2pmd_readonly(pmd_t *pmd)
- {
- 	pmd_val(*pmd) = (pmd_val(*pmd) & ~L_PMD_S2_RDWR) | L_PMD_S2_RDONLY;
-@@ -117,6 +122,11 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
- 	return (pmd_val(*pmd) & L_PMD_S2_RDWR) == L_PMD_S2_RDONLY;
- }
- 
-+static inline bool kvm_s2pmd_exec(pmd_t *pmd)
-+{
-+	return !(pmd_val(*pmd) & PMD_SECT_XN);
-+}
-+
- static inline bool kvm_page_empty(void *ptr)
- {
- 	struct page *ptr_page = virt_to_page(ptr);
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 1e1b20cb348f..126abefffe7f 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -203,6 +203,11 @@ static inline bool kvm_s2pte_readonly(pte_t *pte)
- 	return (pte_val(*pte) & PTE_S2_RDWR) == PTE_S2_RDONLY;
- }
- 
-+static inline bool kvm_s2pte_exec(pte_t *pte)
-+{
-+	return !(pte_val(*pte) & PTE_S2_XN);
-+}
-+
- static inline void kvm_set_s2pmd_readonly(pmd_t *pmd)
- {
- 	kvm_set_s2pte_readonly((pte_t *)pmd);
-@@ -213,6 +218,11 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
- 	return kvm_s2pte_readonly((pte_t *)pmd);
- }
- 
-+static inline bool kvm_s2pmd_exec(pmd_t *pmd)
-+{
-+	return !(pmd_val(*pmd) & PMD_S2_XN);
-+}
-+
- static inline bool kvm_page_empty(void *ptr)
- {
- 	struct page *ptr_page = virt_to_page(ptr);
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index f956efbd933d..b83b5a8442bb 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -926,6 +926,25 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
- 	return 0;
- }
- 
-+static bool stage2_is_exec(struct kvm *kvm, phys_addr_t addr)
-+{
-+	pmd_t *pmdp;
-+	pte_t *ptep;
-+
-+	pmdp = stage2_get_pmd(kvm, NULL, addr);
-+	if (!pmdp || pmd_none(*pmdp) || !pmd_present(*pmdp))
-+		return false;
-+
-+	if (pmd_thp_or_huge(*pmdp))
-+		return kvm_s2pmd_exec(pmdp);
-+
-+	ptep = pte_offset_kernel(pmdp, addr);
-+	if (!ptep || pte_none(*ptep) || !pte_present(*ptep))
-+		return false;
-+
-+	return kvm_s2pte_exec(ptep);
-+}
-+
- static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
- 			  phys_addr_t addr, const pte_t *new_pte,
- 			  unsigned long flags)
-@@ -1407,6 +1426,10 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		if (exec_fault) {
- 			new_pmd = kvm_s2pmd_mkexec(new_pmd);
- 			invalidate_icache_guest_page(vcpu, pfn, PMD_SIZE);
-+		} else if (fault_status == FSC_PERM) {
-+			/* Preserve execute if XN was already cleared */
-+			if (stage2_is_exec(kvm, fault_ipa))
-+				new_pmd = kvm_s2pmd_mkexec(new_pmd);
- 		}
- 
- 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
-@@ -1425,6 +1448,10 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		if (exec_fault) {
- 			new_pte = kvm_s2pte_mkexec(new_pte);
- 			invalidate_icache_guest_page(vcpu, pfn, PAGE_SIZE);
-+		} else if (fault_status == FSC_PERM) {
-+			/* Preserve execute if XN was already cleared */
-+			if (stage2_is_exec(kvm, fault_ipa))
-+				new_pte = kvm_s2pte_mkexec(new_pte);
- 		}
- 
- 		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, flags);
--- 
-2.14.1
