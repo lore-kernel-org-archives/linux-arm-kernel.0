@@ -1,36 +1,108 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 20 Oct 2017 18:58:58 +0200
-Subject: [PATCH] pinctrl: rockchip: Add iomux-route switching support for
- rk3288
-In-Reply-To: <68b8765d-3d55-3fdd-e23e-776e978c38bd@xs4all.nl>
-References: <20171013225337.5196-1-phh@phh.me> <2040825.vRYCsv903Y@diego>
- <68b8765d-3d55-3fdd-e23e-776e978c38bd@xs4all.nl>
-Message-ID: <40786265.ZDfztTY44U@diego>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Fri, 20 Oct 2017 13:05:54 -0400
+Subject: [PATCH v6 02/10] drm/rockchip: analogix_dp: Remove unnecessary
+ init code
+In-Reply-To: <88902b60-d096-f828-6d5d-44d44b6f4c50@rock-chips.com>
+References: <20171019034812.13768-1-jeffy.chen@rock-chips.com>
+ <20171019034812.13768-3-jeffy.chen@rock-chips.com>
+ <88902b60-d096-f828-6d5d-44d44b6f4c50@rock-chips.com>
+Message-ID: <20171020170554.uhhctvhx2igwdotw@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 20. Oktober 2017, 09:44:55 CEST schrieb Hans Verkuil:
-> On 20/10/17 09:38, Heiko St?bner wrote:
-> > Hi Hans,
+On Fri, Oct 20, 2017 at 09:48:35AM +0800, Mark yao wrote:
+> On 2017?10?19? 11:48, Jeffy Chen wrote:
+> > Remove unnecessary init code, since we would do it in the power_on()
+> > callback.
 > > 
-> > Am Freitag, 20. Oktober 2017, 09:28:58 CEST schrieb Hans Verkuil:
-> >> On 14/10/17 17:39, Heiko Stuebner wrote:
-> >>> So far only the hdmi cec supports using one of two different pins
-> >>> as source, so add the route switching for it.
-> >>> 
-> >>> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> >> 
-> >> Just tested this on my firefly reload and it works great!
-> >> 
-> >> Tested-by: Hans Verkuil <hans.verkuil@cisco.com>
+> > Also move of parse code to probe().
 > > 
-> > oh cool. I really only wrote this based on the soc manual,
-> > so it actually surprises me, that it works on the first try :-)
+> > Fixes: 9e32e16e9e98 ("drm: rockchip: dp: add rockchip platform dp driver")
+> > Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 > 
-> One note though: I've only tested it on my Firefly Reload. I don't have a
-> regular Firefly, so I can't be certain it works there. Just covering my ass
-> here :-)
+> Looks good for me
+> Acked-by: Mark Yao <mark.yao@rock-chips.com>
 
-Haha ... I guess the only thing I could have messed up would be the
-ordering (valu0 -> gpio0, value1 -> gpio7 ... and reverse), so if it were
-really wrong, you shouldn've have seen any results at all.
+Pushed to -misc-next
+
+Thanks,
+
+Sean
+
+> 
+> > ---
+> > 
+> > Changes in v6: None
+> > Changes in v5: None
+> > 
+> >   drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 27 ++++++-------------------
+> >   1 file changed, 6 insertions(+), 21 deletions(-)
+> > 
+> > diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+> > index 4d3f6ad0abdd..8cae5ad926cd 100644
+> > --- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+> > +++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+> > @@ -269,7 +269,7 @@ static struct drm_encoder_funcs rockchip_dp_encoder_funcs = {
+> >   	.destroy = rockchip_dp_drm_encoder_destroy,
+> >   };
+> > -static int rockchip_dp_init(struct rockchip_dp_device *dp)
+> > +static int rockchip_dp_of_probe(struct rockchip_dp_device *dp)
+> >   {
+> >   	struct device *dev = dp->dev;
+> >   	struct device_node *np = dev->of_node;
+> > @@ -303,19 +303,6 @@ static int rockchip_dp_init(struct rockchip_dp_device *dp)
+> >   		return PTR_ERR(dp->rst);
+> >   	}
+> > -	ret = clk_prepare_enable(dp->pclk);
+> > -	if (ret < 0) {
+> > -		DRM_DEV_ERROR(dp->dev, "failed to enable pclk %d\n", ret);
+> > -		return ret;
+> > -	}
+> > -
+> > -	ret = rockchip_dp_pre_init(dp);
+> > -	if (ret < 0) {
+> > -		DRM_DEV_ERROR(dp->dev, "failed to pre init %d\n", ret);
+> > -		clk_disable_unprepare(dp->pclk);
+> > -		return ret;
+> > -	}
+> > -
+> >   	return 0;
+> >   }
+> > @@ -361,10 +348,6 @@ static int rockchip_dp_bind(struct device *dev, struct device *master,
+> >   	if (!dp_data)
+> >   		return -ENODEV;
+> > -	ret = rockchip_dp_init(dp);
+> > -	if (ret < 0)
+> > -		return ret;
+> > -
+> >   	dp->data = dp_data;
+> >   	dp->drm_dev = drm_dev;
+> > @@ -398,7 +381,6 @@ static void rockchip_dp_unbind(struct device *dev, struct device *master,
+> >   	rockchip_drm_psr_unregister(&dp->encoder);
+> >   	analogix_dp_unbind(dev, master, data);
+> > -	clk_disable_unprepare(dp->pclk);
+> >   }
+> >   static const struct component_ops rockchip_dp_component_ops = {
+> > @@ -414,7 +396,7 @@ static int rockchip_dp_probe(struct platform_device *pdev)
+> >   	int ret;
+> >   	ret = drm_of_find_panel_or_bridge(dev->of_node, 1, 0, &panel, NULL);
+> > -	if (ret)
+> > +	if (ret < 0)
+> >   		return ret;
+> >   	dp = devm_kzalloc(dev, sizeof(*dp), GFP_KERNEL);
+> > @@ -422,9 +404,12 @@ static int rockchip_dp_probe(struct platform_device *pdev)
+> >   		return -ENOMEM;
+> >   	dp->dev = dev;
+> > -
+> >   	dp->plat_data.panel = panel;
+> > +	ret = rockchip_dp_of_probe(dp);
+> > +	if (ret < 0)
+> > +		return ret;
+> > +
+> >   	/*
+> >   	 * We just use the drvdata until driver run into component
+> >   	 * add function, and then we would set drvdata to null, so
+> 
+
+-- 
+Sean Paul, Software Engineer, Google / Chromium OS
