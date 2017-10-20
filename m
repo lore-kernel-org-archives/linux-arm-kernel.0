@@ -1,80 +1,62 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 20 Oct 2017 17:32:28 +0200
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.15 (#1)
-Message-ID: <877evp6dir.fsf@free-electrons.com>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Fri, 20 Oct 2017 15:33:05 +0000
+Subject: [PATCH v6 6/7] KVM: arm64: allow get exception information from
+ userspace
+In-Reply-To: <0184EA26B2509940AA629AE1405DD7F2016BA9E4@DGGEMA503-MBX.china.huawei.com>
+References: <0184EA26B2509940AA629AE1405DD7F2016BA9E4@DGGEMA503-MBX.china.huawei.com>
+Message-ID: <0184EA26B2509940AA629AE1405DD7F2016BAC2B@DGGEMA503-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+> > In the user space, we can check the si_code, if it is "BUS_MCEERR_AR",
+> > we use SEA notification type for the guest; if it is "BUS_MCEERR_AO", we use SEI notification type for the guest.
+> > Because there are only two values for si_code("BUS_MCEERR_AR" and BUS_MCEERR_AO), in which case we can use the GSIV(IRQ)
+> notification type?
+> 
+> This is for Qemu/kvmtool to decide, it depends on what sort of machine they are emulating.
+> 
+> For example, the physical machine's memory-controller may notify the CPU about memory errors by triggering SError trapped to EL3, or
+> with a dedicated FIQ, also routed to EL3. By the time this gets to the host kernel the distinction doesn't matter. The host has handled the
+> error.
+> 
+> For a guest, your memory-controller is effectively the host kernel. It will give you an BUS_MCEERR_AO signal for any guest memory that is
+> affected, and a BUS_MCEERR_AR if the guest directly accesses a page of affected memory.
+> 
+> What Qemu/kvmtool do with this is up to them. If they're emulating a machine with no RAS features, printing an error and exit.
+> 
+> Otherwise BUS_MCEERR_AR could be notified as one of the flavours of IRQ, unless the affected vcpu has interrupts masked, in which case
+> an SEA notification gives you some NMI-like behaviour.
+> 
+> For BUS_MCEERR_AO you could use SEI, IRQ or polled notification. My choice would be IRQ, as you can't know if the guest supports SEI and
+> it would be a shame to kill it with an SError if the affected memory was free. SEA for synchronous errors is still a good choice even if the
+> guest doesn't support it as that memory is still gone so its still a valid guest:Synchronous-external-abort.
+> 
 
-Here is the first pull request for dt64 for mvebu for v4.15.
+CC some huawei's hardware engineers.
 
-Gregory
+Hi James/Marc/Christoffer,
 
-The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+  As we discuss below solution:
+When guest happen SEA/SEI, KVM calls memory_failure() to send an asynchronous SIGBUS signal(BUS_MCEERR_AO) to QEMU, and make this address to poisoned.
+after QEMU receive this BUS_MCEERR_AO, it will record this address to CPER and notify guest. When guest happen stage2 page fault, KVM send a synchronous SIGBUS BUS_MCEERR_AR
+to QEMU, and QEMU also record CPER and immediately inject SEA abort.
 
-  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+But this solution, still have some problems.
 
-are available in the git repository at:
+1. In some situation, For RAS, when happen SEA, hardware cannot provide an error physical address to software instead it can only provide virtual address in FAR_ELx, 
+This is to say, firmware cannot provide physical error address, but provided the virtual address in the FAR_ELx.
+so BIOS cannot record this address to APEI table. In this case, when firmware Jump to hypervisor, hypervisor cannot call memory_failure(), 
+now only the physical address is recorded and valid, APEI driver will call the memory_failure()), 
+in this case, host will not send SIGBUS to QEMU. So guest cannot know there is SEA happen.
+At least there is such issue in Huawei's platform (cannot provide PA for RAS firmware-first, only can provide VA in FAR_ELx)
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.15-1
+2. if there is SEA/SEI, only deliver SIGBUS to notify QEMU. This information is limit.
+ This SIGBUS can only provide an address and si_code(BUS_MCEERR_AO/ BUS_MCEERR_AR), nothing else.
+ if QEMU record CPER and inject SEA/specify ESR, it may needs to know more information.
+For example, if it injects SEA, it needs so setup many registers for guest, such as FAR_EL1. If sets it, it needs to know FAR_EL2.
+ But QEMU cannot know this information to setup it if KVM cannot pass more fault info to QEMU.
+ Of cause, we can identify the guest FAR_El1 register to invalid. But some time, guest needs to know it in the situation that host cannot provide the PA.
 
-for you to fetch changes up to c4e3bf290c3089502ee33e25795075b86fe9a449:
-
-  arm64: dts: marvell: 7040-db: Add the carrier detect pin for SD card on CP (2017-10-12 15:53:47 +0200)
-
-----------------------------------------------------------------
-mvebu dt64 for 4.15 (part 1)
-
-On Armada 7K/8k:
-- Improve network support at SoC and board level
-- Enable watchdog
-- Add UART muxing
-- On 7040 DB: add CD SDIO and NAND support
-- On 8040 DB: add PCIE more ports and SPI1
-
-On Armada 37xx:
- - Fix UART register size
- - Add vmmc regulator for SD on 3720 DB
-
-----------------------------------------------------------------
-Antoine Tenart (8):
-      arm64: dts: marvell: extend the cp110 syscon register area length
-      arm64: dts: marvell: add comphy nodes on cp110 master and slave
-      arm64: dts: marvell: cp110: add PPv2 port interrupts
-      arm64: dts: marvell: 37xx: remove empty line
-      arm64: dts: marvell: mcbin: add comphy references to Ethernet ports
-      arm64: dts: marvell: 7040-db: add comphy reference to Ethernet port
-      arm64: dts: marvell: 7040-db: enable the SFP port
-      arm64: dts: marvell: 8040-db: enable the SFP ports
-
-Baruch Siach (1):
-      arm64: dts: marvell: enable AP806 watchdog
-
-Christine Gharzuzi (1):
-      arm64: dts: marvell: Enable Armada-8040-DB CPS SPI1
-
-Gregory CLEMENT (4):
-      arm64: dts: marvell: armada-3720-db: Add vmmc regulator for SD slot
-      arm64: dts: marvell: add NAND support on the 7040-DB board
-      arm64: dts: marvell: 7040-db: Document the gpio expander
-      arm64: dts: marvell: 7040-db: Add the carrier detect pin for SD card on CP
-
-Thomas Petazzoni (2):
-      arm64: dts: marvell: add UART muxing on Armada 7K/8K
-      arm64: dts: marvell: enable additional PCIe ports on Armada 8040 DB
-
-allen yan (1):
-      arm64: dts: marvell: Fix A37xx UART0 register size
-
- .../devicetree/bindings/serial/mvebu-uart.txt      |  2 +-
- arch/arm64/boot/dts/marvell/armada-3720-db.dts     | 11 ++++
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |  3 +-
- arch/arm64/boot/dts/marvell/armada-7040-db.dts     | 55 +++++++++++++++++++-
- arch/arm64/boot/dts/marvell/armada-70x0.dtsi       | 14 +++++
- arch/arm64/boot/dts/marvell/armada-8040-db.dts     | 57 +++++++++++++++++++++
- arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts  | 11 ++++
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi      | 11 ++++
- .../boot/dts/marvell/armada-cp110-master.dtsi      | 59 +++++++++++++++++++---
- .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 58 ++++++++++++++++++---
- 10 files changed, 261 insertions(+), 20 deletions(-)
+3. For SEI, the address is invalid, so in some platform, firmware will not record this AP. At least in HUAWEI's platform, firmware will not record it.
+  we cannot always think that all platform can record PA for RAS, sometime it may use VA(in FAR_ELx).
+  For SEI, if the address is not recorded, then the memory_failure() will be not called. So guest will not know it happens SEI. 
