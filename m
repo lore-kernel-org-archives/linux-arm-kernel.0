@@ -1,9 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 20 Oct 2017 13:56:00 +0200
-Subject: [GIT PULL 4/7] thermal: tegra: Changes for v4.15-rc1
+Date: Fri, 20 Oct 2017 13:55:58 +0200
+Subject: [GIT PULL 2/7] firmware: tegra: Changes for v4.15-rc1
 In-Reply-To: <20171020115603.9828-1-thierry.reding@gmail.com>
 References: <20171020115603.9828-1-thierry.reding@gmail.com>
-Message-ID: <20171020115603.9828-4-thierry.reding@gmail.com>
+Message-ID: <20171020115603.9828-2-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,49 +15,33 @@ The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.15-thermal
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.15-firmware
 
-for you to fetch changes up to 7afebede62bed77ebae34fc64406984949d2a127:
+for you to fetch changes up to f2381f652266fabfb7a8f5c4b2a05de36cad3a73:
 
-  thermal: Add Tegra BPMP thermal sensor driver (2017-10-19 16:31:47 +0200)
+  firmware: tegra: Add BPMP debugfs support (2017-10-19 16:27:56 +0200)
 
-This pulls in parts of both the tegra-for-4.15-dt-bindings and
-tegra-for-4.15-firmware tags in order to resolve a build time
-dependency.
-
+Thanks,
 Thierry
 
 ----------------------------------------------------------------
-thermal: tegra: Changes for v4.15-rc1
+firmware: tegra: Changes for v4.15-rc1
 
-This contains the Tegra186 BPMP thermal driver. It is used to monitor
-and access several thermal sensors found in the SoC.
+This contains a couple of (non-critical) fixes and improvements for the
+BPMP driver as well as support for debugfs.
 
 ----------------------------------------------------------------
-Mikko Perttunen (4):
-      dt-bindings: Add bindings for nvidia,tegra186-bpmp-thermal
+Mikko Perttunen (2):
       firmware: tegra: Expose tegra_bpmp_mrq_return()
       firmware: tegra: Add stubs when BPMP not enabled
-      thermal: Add Tegra BPMP thermal sensor driver
 
-Thierry Reding (3):
-      dt-bindings: clock: tegra: Add sor1_out clock
-      Merge branch 'for-4.15/dt-bindings' into for-4.15/thermal
-      Merge branch 'for-4.15/firmware' into for-4.15/thermal
-
-Timo Alho (1):
+Timo Alho (2):
       firmware: tegra: Propagate error code to caller
+      firmware: tegra: Add BPMP debugfs support
 
- .../thermal/nvidia,tegra186-bpmp-thermal.txt       |  32 +++
- drivers/firmware/tegra/bpmp.c                      |  27 ++-
- drivers/thermal/Makefile                           |   2 +-
- drivers/thermal/tegra/Kconfig                      |   7 +
- drivers/thermal/tegra/Makefile                     |   3 +-
- drivers/thermal/tegra/tegra-bpmp-thermal.c         | 263 +++++++++++++++++++++
- include/dt-bindings/clock/tegra210-car.h           |   1 +
- .../dt-bindings/thermal/tegra186-bpmp-thermal.h    |  14 ++
- include/soc/tegra/bpmp.h                           |  45 +++-
- 9 files changed, 381 insertions(+), 13 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/thermal/nvidia,tegra186-bpmp-thermal.txt
- create mode 100644 drivers/thermal/tegra/tegra-bpmp-thermal.c
- create mode 100644 include/dt-bindings/thermal/tegra186-bpmp-thermal.h
+ drivers/firmware/tegra/Makefile       |   4 +-
+ drivers/firmware/tegra/bpmp-debugfs.c | 444 ++++++++++++++++++++++++++++++++++
+ drivers/firmware/tegra/bpmp.c         |  31 ++-
+ include/soc/tegra/bpmp.h              |  59 ++++-
+ 4 files changed, 526 insertions(+), 12 deletions(-)
+ create mode 100644 drivers/firmware/tegra/bpmp-debugfs.c
