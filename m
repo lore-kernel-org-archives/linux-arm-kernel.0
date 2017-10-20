@@ -1,109 +1,71 @@
-From: xieyisheng1@huawei.com (Yisheng Xie)
-Date: Fri, 20 Oct 2017 15:00:01 +0800
-Subject: [PATCH v2] iommu/arm-smmu-v3: Avoid ILLEGAL setting of
- STE.S1STALLD and CD.S
-In-Reply-To: <1505997367-51569-1-git-send-email-xieyisheng1@huawei.com>
-References: <1505997367-51569-1-git-send-email-xieyisheng1@huawei.com>
-Message-ID: <7eb1db90-9a30-b70c-c3d1-71bbca41502d@huawei.com>
+From: elena.reshetova@intel.com (Elena Reshetova)
+Date: Fri, 20 Oct 2017 10:23:34 +0300
+Subject: [PATCH 00/15] networking drivers refcount_t conversions
+Message-ID: <1508484229-19706-1-git-send-email-elena.reshetova@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will & Jean,
+Note: these are the last patches related to networking that perform
+conversion of refcounters from atomic_t to refcount_t.
+In contrast to the core network refcounter conversions that
+were merged earlier, these are much more straightforward ones.
 
-Any comment about this version?
+This series, for various networking drivers, replaces atomic_t reference
+counters with the new refcount_t type and API (see include/linux/refcount.h).
+By doing this we prevent intentional or accidental
+underflows or overflows that can led to use-after-free vulnerabilities.
 
-Thanks
-Yisheng Xie
+The patches are fully independent and can be cherry-picked separately.
+Patches are based on top of net-next.
+If there are no objections to the patches, please merge them via respective trees
 
-On 2017/9/21 20:36, Yisheng Xie wrote:
-> According to Spec, it is ILLEGAL to set STE.S1STALLD if STALL_MODEL
-> is not 0b00, which means we should not disable stall mode if stall
-> or terminate mode is not configuable.
-> 
-> Meanwhile, it is also ILLEGAL when STALL_MODEL==0b10 && CD.S==0 which
-> means if stall mode is force we should always set CD.S.
-> 
-> As Jean-Philippe's suggestion, this patch introduce a feature bit
-> ARM_SMMU_FEAT_STALL_FORCE, which means smmu only supports stall force.
-> Therefore, we can avoid the ILLEGAL setting of STE.S1STALLD.by checking
-> ARM_SMMU_FEAT_STALL_FORCE.
-> 
-> This patch keeps the ARM_SMMU_FEAT_STALLS as the meaning of stall supported
-> (force or configuable) to easy to expand the future function, i.e. we can
-> only use ARM_SMMU_FEAT_STALLS to check whether we should register fault
-> handle or enable master can_stall, etc to supporte platform SVM.
-> 
-> The feature bit, STE.S1STALLD and CD.S setting will be like:
-> 
-> STALL_MODEL  FEATURE                                         S1STALLD CD.S
-> 0b00         ARM_SMMU_FEAT_STALLS                                 0b1 0b0
-> 0b01         !ARM_SMMU_FEAT_STALLS && !ARM_SMMU_FEAT_STALL_FORCE  0b0 0b0
-> 0b10         ARM_SMMU_FEAT_STALLS && ARM_SMMU_FEAT_STALL_FORCE    0b0 0b1
-> 
-> after apply this patch.
-> 
-> Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
-> ---
-> v2:
->  * Keep the feature bits backward compatible and add new one at the end
->  * Avoid ILLEGAL of CD.S - both as Jean's suggestion.
-> 
->  drivers/iommu/arm-smmu-v3.c | 15 ++++++++++++---
->  1 file changed, 12 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index e67ba6c..22a6b08 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -316,6 +316,7 @@
->  #define ARM64_TCR_TBI0_MASK		0x1UL
->  
->  #define CTXDESC_CD_0_AA64		(1UL << 41)
-> +#define CTXDESC_CD_0_S			(1UL << 44)
->  #define CTXDESC_CD_0_R			(1UL << 45)
->  #define CTXDESC_CD_0_A			(1UL << 46)
->  #define CTXDESC_CD_0_ASET_SHIFT		47
-> @@ -604,6 +605,7 @@ struct arm_smmu_device {
->  #define ARM_SMMU_FEAT_TRANS_S2		(1 << 10)
->  #define ARM_SMMU_FEAT_STALLS		(1 << 11)
->  #define ARM_SMMU_FEAT_HYP		(1 << 12)
-> +#define ARM_SMMU_FEAT_STALL_FORCE	(1 << 13)
->  	u32				features;
->  
->  #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
-> @@ -996,6 +998,11 @@ static void arm_smmu_write_ctx_desc(struct arm_smmu_device *smmu,
->  	      CTXDESC_CD_0_R | CTXDESC_CD_0_A | CTXDESC_CD_0_ASET_PRIVATE |
->  	      CTXDESC_CD_0_AA64 | (u64)cfg->cd.asid << CTXDESC_CD_0_ASID_SHIFT |
->  	      CTXDESC_CD_0_V;
-> +
-> +	/* STALL_MODEL==0b10 && CD.S==0 is ILLEGAL */
-> +	if (smmu->features & ARM_SMMU_FEAT_STALL_FORCE)
-> +		val |= CTXDESC_CD_0_S;
-> +
->  	cfg->cdptr[0] = cpu_to_le64(val);
->  
->  	val = cfg->cd.ttbr & CTXDESC_CD_1_TTB0_MASK << CTXDESC_CD_1_TTB0_SHIFT;
-> @@ -1112,7 +1119,8 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
->  #endif
->  			 STRTAB_STE_1_STRW_NSEL1 << STRTAB_STE_1_STRW_SHIFT);
->  
-> -		if (smmu->features & ARM_SMMU_FEAT_STALLS)
-> +		if (smmu->features & ARM_SMMU_FEAT_STALLS &&
-> +		   !(smmu->features & ARM_SMMU_FEAT_STALL_FORCE))
->  			dst[1] |= cpu_to_le64(STRTAB_STE_1_S1STALLD);
->  
->  		val |= (ste->s1_cfg->cdptr_dma & STRTAB_STE_0_S1CTXPTR_MASK
-> @@ -2536,9 +2544,10 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
->  			 coherent ? "true" : "false");
->  
->  	switch (reg & IDR0_STALL_MODEL_MASK << IDR0_STALL_MODEL_SHIFT) {
-> -	case IDR0_STALL_MODEL_STALL:
-> -		/* Fallthrough */
->  	case IDR0_STALL_MODEL_FORCE:
-> +		smmu->features |= ARM_SMMU_FEAT_STALL_FORCE;
-> +		/* Fallthrough */
-> +	case IDR0_STALL_MODEL_STALL:
->  		smmu->features |= ARM_SMMU_FEAT_STALLS;
->  	}
->  
-> 
+Elena Reshetova (15):
+  drivers, net, ethernet: convert clip_entry.refcnt from atomic_t to
+    refcount_t
+  drivers, net, ethernet: convert mtk_eth.dma_refcnt from atomic_t to
+    refcount_t
+  drivers, net, mlx4: convert mlx4_cq.refcount from atomic_t to
+    refcount_t
+  drivers, net, mlx4: convert mlx4_qp.refcount from atomic_t to
+    refcount_t
+  drivers, net, mlx4: convert mlx4_srq.refcount from atomic_t to
+    refcount_t
+  drivers, net, mlx5: convert mlx5_cq.refcount from atomic_t to
+    refcount_t
+  drivers, net, mlx5: convert fs_node.refcount from atomic_t to
+    refcount_t
+  drivers, net, hamradio: convert sixpack.refcnt from atomic_t to
+    refcount_t
+  drivers, net: convert masces_rx_sa.refcnt from atomic_t to refcount_t
+  drivers, net: convert masces_rx_sc.refcnt from atomic_t to refcount_t
+  drivers, net: convert masces_tx_sa.refcnt from atomic_t to refcount_t
+  drivers, net, ppp: convert asyncppp.refcnt from atomic_t to refcount_t
+  drivers, net, ppp: convert ppp_file.refcnt from atomic_t to refcount_t
+  drivers, net, ppp: convert syncppp.refcnt from atomic_t to refcount_t
+  drivers, connector: convert cn_callback_entry.refcnt from atomic_t to
+    refcount_t
+
+ drivers/connector/cn_queue.c                      |  4 ++--
+ drivers/connector/connector.c                     |  2 +-
+ drivers/net/ethernet/chelsio/cxgb4/clip_tbl.c     | 13 +++++------
+ drivers/net/ethernet/chelsio/cxgb4/clip_tbl.h     |  4 +++-
+ drivers/net/ethernet/mediatek/mtk_eth_soc.c       |  8 ++++---
+ drivers/net/ethernet/mediatek/mtk_eth_soc.h       |  4 +++-
+ drivers/net/ethernet/mellanox/mlx4/cq.c           |  8 +++----
+ drivers/net/ethernet/mellanox/mlx4/qp.c           |  8 +++----
+ drivers/net/ethernet/mellanox/mlx4/srq.c          |  8 +++----
+ drivers/net/ethernet/mellanox/mlx5/core/cq.c      | 16 ++++++-------
+ drivers/net/ethernet/mellanox/mlx5/core/fs_core.c | 28 +++++++++++------------
+ drivers/net/ethernet/mellanox/mlx5/core/fs_core.h |  3 ++-
+ drivers/net/hamradio/6pack.c                      | 12 +++++-----
+ drivers/net/macsec.c                              | 25 ++++++++++----------
+ drivers/net/ppp/ppp_async.c                       | 10 ++++----
+ drivers/net/ppp/ppp_generic.c                     | 21 +++++++++--------
+ drivers/net/ppp/ppp_synctty.c                     | 11 +++++----
+ include/linux/connector.h                         |  4 ++--
+ include/linux/mlx4/device.h                       |  8 +++----
+ include/linux/mlx5/cq.h                           |  4 ++--
+ 20 files changed, 105 insertions(+), 96 deletions(-)
+
+-- 
+2.7.4
