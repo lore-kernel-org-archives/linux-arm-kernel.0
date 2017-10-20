@@ -1,55 +1,96 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 20 Oct 2017 17:11:54 +0100
-Subject: [GIT PULL] iommu/arm-smmu: Updates for 4.15
-Message-ID: <20171020161154.GA7287@arm.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Fri, 20 Oct 2017 11:14:31 -0500
+Subject: [PATCH v3 6/7] arm64: topology: Enable ACPI/PPTT based CPU
+ topology.
+In-Reply-To: <20171020091428.GA21060@red-moon>
+References: <20171012194856.13844-1-jeremy.linton@arm.com>
+ <20171012194856.13844-7-jeremy.linton@arm.com>
+ <20171019155622.GC18883@red-moon>
+ <6a9836f5-d31c-67fb-b2dd-bc0972ebb1c2@arm.com>
+ <20171020091428.GA21060@red-moon>
+Message-ID: <e2772689-603b-f129-0643-f5d1f5e41a19@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+Hi,
 
-Please pull these ARM SMMU updates for 4.15. The main improvement here is
-that we now drop the command queue lock when waiting for a CMD_SYNC to
-complete on implementations that support MSIs into cacheable memory.
-There are also some minor fixes and cleanups.
+On 10/20/2017 04:14 AM, Lorenzo Pieralisi wrote:
+> On Thu, Oct 19, 2017 at 11:13:27AM -0500, Jeremy Linton wrote:
+>> On 10/19/2017 10:56 AM, Lorenzo Pieralisi wrote:
+>>> On Thu, Oct 12, 2017 at 02:48:55PM -0500, Jeremy Linton wrote:
+>>>> Propagate the topology information from the PPTT tree to the
+>>>> cpu_topology array. We can get the thread id, core_id and
+>>>> cluster_id by assuming certain levels of the PPTT tree correspond
+>>>> to those concepts. The package_id is flagged in the tree and can be
+>>>> found by passing an arbitrary large level to setup_acpi_cpu_topology()
+>>>> which terminates its search when it finds an ACPI node flagged
+>>>> as the physical package. If the tree doesn't contain enough
+>>>> levels to represent all of thread/core/cod/package then the package
+>>>> id will be used for the missing levels.
+>>>>
+>>>> Since server/ACPI machines are more likely to be multisocket and NUMA,
+>>>
+>>> I think this stuff is vague enough already so to start with I would drop
+>>> patch 4 and 5 and stop assuming what machines are more likely to ship
+>>> with ACPI than DT.
+>>>
+>>> I am just saying, for the umpteenth time, that these levels have no
+>>> architectural meaning _whatsoever_, level is a hierarchy concept
+>>> with no architectural meaning attached.
+>>
+>> ?
+>>
+>> Did anyone say anything about that? No, I think the only thing being
+>> guaranteed here is that the kernel's physical_id maps to an ACPI
+>> defined socket. Which seems to be the mindset of pretty much the
+>> entire !arm64 community meaning they are optimizing their software
+>> and the kernel with that concept in mind.
+>>
+>> Are you denying the existence of non-uniformity between threads
+>> running on different physical sockets?
+> 
+> No, I have not explained my POV clearly, apologies.
+> 
+> AFAIK, the kernel currently deals with 2 (3 - if SMT) topology layers.
+> 
+> 1) thread
+> 2) core
+> 3) package
+> 
+> What I wanted to say is, that, to simplify this series, you do not need
+> to introduce the COD topology level, since it is just another arbitrary
+> topology level (ie there is no way you can pinpoint which level
+> corresponds to COD with PPTT - or DT for the sake of this discussion)
+> that would not be used in the kernel (apart from big.LITTLE cpufreq
+> driver and PSCI checker whose usage of topology_physical_package_id() is
+> questionable anyway).
 
-Cheers,
+Oh! But, i'm at a loss as to what to do with those two users if I set 
+the node which has the physical socket flag set, as the "cluster_id" in 
+the topology.
 
-Will
+Granted, this being ACPI I don't expect the cpufreq driver to be active 
+(given CPPC) and the psci checker might be ignored? Even so, its a bit 
+of a misnomer what is actually happening. Are we good with this?
 
---->8
 
-The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+> 
+> PPTT allows you to define what level corresponds to a package, use
+> it to initialize the package topology level (that on ARM internal
+> variables we call cluster) and be done with it.
+> 
+> I do not think that adding another topology level improves anything as
+> far as ACPI topology detection is concerned, you are not able to use it
+> in the scheduler or from userspace to group CPUs anyway.
 
-  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+Correct, and AFAIK after having poked a bit at the scheduler its sort of 
+redundant as the generic cache sharing levels are more useful anyway.
 
-are available in the git repository at:
+> 
+> Does this answer your question ?
+Yes, other than what to do with the two drivers.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/updates
-
-for you to fetch changes up to 8ff0f72371709889349a706e19bb38d9f71b1669:
-
-  iommu/arm-smmu-v3: Use burst-polling for sync completion (2017-10-20 16:55:10 +0100)
-
-----------------------------------------------------------------
-Feng Kan (1):
-      iommu/arm-smmu: Enable bypass transaction caching for ARM SMMU 500
-
-Robin Murphy (6):
-      iommu/arm-smmu: Remove ACPICA workarounds
-      iommu/arm-smmu-v3: Correct COHACC override message
-      iommu/arm-smmu-v3: Specialise CMD_SYNC handling
-      iommu/arm-smmu-v3: Forget about cmdq-sync interrupt
-      iommu/arm-smmu-v3: Use CMD_SYNC completion MSI
-      iommu/arm-smmu-v3: Use burst-polling for sync completion
-
-Will Deacon (3):
-      iommu/arm-smmu-v3: Ensure we sync STE when only changing config field
-      iommu/arm-smmu-v3: Split arm_smmu_cmdq_issue_sync in half
-      iommu/arm-smmu-v3: Consolidate identical timeouts
-
-Yisheng Xie (1):
-      iommu/arm-smmu-v3: Avoid ILLEGAL setting of STE.S1STALLD and CD.S
-
- drivers/iommu/arm-smmu-v3.c | 204 ++++++++++++++++++++++++++++++--------------
- drivers/iommu/arm-smmu.c    |  11 +--
- 2 files changed, 141 insertions(+), 74 deletions(-)
+> 
+> Thanks,
+> Lorenzo
+> 
