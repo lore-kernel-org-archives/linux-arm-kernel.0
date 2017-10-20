@@ -1,10 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 20 Oct 2017 13:56:03 +0200
-Subject: [GIT PULL 7/7] arm64: tegra: Default configuration updates for
- v4.15-rc1
+Date: Fri, 20 Oct 2017 13:55:59 +0200
+Subject: [GIT PULL 3/7] soc/tegra: Changes for v4.15-rc1
 In-Reply-To: <20171020115603.9828-1-thierry.reding@gmail.com>
 References: <20171020115603.9828-1-thierry.reding@gmail.com>
-Message-ID: <20171020115603.9828-7-thierry.reding@gmail.com>
+Message-ID: <20171020115603.9828-3-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,24 +15,33 @@ The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.15-arm64-defconfig
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.15-soc
 
-for you to fetch changes up to a9e6753c1c92ae7d2c0c99b420c5c7dd5ebfc37d:
+for you to fetch changes up to 775dba87f891e99c2f46df17edd5f5359d0883ad:
 
-  arm64: defconfig: Enable Tegra PCI controller (2017-10-19 10:24:16 +0200)
+  soc/tegra: bpmp: Check BPMP response return code (2017-10-19 16:33:57 +0200)
+
+This pulls in a part of the tegra-for-4.15-firmware tag to resolve a
+build time dependency.
 
 Thanks,
 Thierry
 
 ----------------------------------------------------------------
-arm64: tegra: Default configuration updates for v4.15-rc1
+soc/tegra: Changes for v4.15-rc1
 
-This enables the PCI host controller on 64-bit ARM. It is supported and
-enabled via device tree on Tegra210 and Tegra186.
+Contains a fix to the generic power domain driver to properly report
+errors propagated from BPMP.
 
 ----------------------------------------------------------------
-Tuomas Tynkkynen (1):
-      arm64: defconfig: Enable Tegra PCI controller
+Thierry Reding (1):
+      Merge branch 'for-4.15/firmware' into for-4.15/soc
 
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Timo Alho (2):
+      firmware: tegra: Propagate error code to caller
+      soc/tegra: bpmp: Check BPMP response return code
+
+ drivers/firmware/tegra/bpmp.c      | 22 ++++++++++++++++------
+ drivers/soc/tegra/powergate-bpmp.c | 15 +++++++++++++--
+ include/soc/tegra/bpmp.h           |  1 +
+ 3 files changed, 30 insertions(+), 8 deletions(-)
