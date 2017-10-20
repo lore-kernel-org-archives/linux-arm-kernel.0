@@ -1,97 +1,80 @@
-From: elena.reshetova@intel.com (Elena Reshetova)
-Date: Fri, 20 Oct 2017 10:23:49 +0300
-Subject: [PATCH 15/15] drivers,
- connector: convert cn_callback_entry.refcnt from atomic_t to
- refcount_t
-In-Reply-To: <1508484229-19706-1-git-send-email-elena.reshetova@intel.com>
-References: <1508484229-19706-1-git-send-email-elena.reshetova@intel.com>
-Message-ID: <1508484229-19706-16-git-send-email-elena.reshetova@intel.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Fri, 20 Oct 2017 09:28:58 +0200
+Subject: [PATCH] pinctrl: rockchip: Add iomux-route switching support for
+ rk3288
+In-Reply-To: <13020229.tRmotBUImn@phil>
+References: <20171013225337.5196-1-phh@phh.me>
+ <CAJ-oXjQ3e1UHVGq=uV=yAK9Bu=ZoiNZaEbnHyvNtyc15RQQSKg@mail.gmail.com>
+ <2009704.s5LEIeT6xV@phil> <13020229.tRmotBUImn@phil>
+Message-ID: <52d1a9ee-a6c6-5c7f-330f-9b672be9c2c6@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-atomic_t variables are currently used to implement reference
-counters with the following properties:
- - counter is initialized to 1 using atomic_set()
- - a resource is freed upon counter reaching zero
- - once counter reaches zero, its further
-   increments aren't allowed
- - counter schema uses basic atomic operations
-   (set, inc, inc_not_zero, dec_and_test, etc.)
+On 14/10/17 17:39, Heiko Stuebner wrote:
+> So far only the hdmi cec supports using one of two different pins
+> as source, so add the route switching for it.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-Such atomic variables should be converted to a newly provided
-refcount_t type and API that prevents accidental counter overflows
-and underflows. This is important since overflows and underflows
-can lead to use-after-free situation and be exploitable.
+Just tested this on my firefly reload and it works great!
 
-The variable cn_callback_entry.refcnt is used as pure reference counter.
-Convert it to refcount_t and fix up the operations.
+Tested-by: Hans Verkuil <hans.verkuil@cisco.com>
 
-Suggested-by: Kees Cook <keescook@chromium.org>
-Reviewed-by: David Windsor <dwindsor@gmail.com>
-Reviewed-by: Hans Liljestrand <ishkamiel@gmail.com>
-Signed-off-by: Elena Reshetova <elena.reshetova@intel.com>
----
- drivers/connector/cn_queue.c  | 4 ++--
- drivers/connector/connector.c | 2 +-
- include/linux/connector.h     | 4 ++--
- 3 files changed, 5 insertions(+), 5 deletions(-)
+I'll post some dts patches later today to fully bring up the first HDMI
+output on the Firefly Reload.
 
-diff --git a/drivers/connector/cn_queue.c b/drivers/connector/cn_queue.c
-index 1f8bf05..9c54fdf 100644
---- a/drivers/connector/cn_queue.c
-+++ b/drivers/connector/cn_queue.c
-@@ -45,7 +45,7 @@ cn_queue_alloc_callback_entry(struct cn_queue_dev *dev, const char *name,
- 		return NULL;
- 	}
- 
--	atomic_set(&cbq->refcnt, 1);
-+	refcount_set(&cbq->refcnt, 1);
- 
- 	atomic_inc(&dev->refcnt);
- 	cbq->pdev = dev;
-@@ -58,7 +58,7 @@ cn_queue_alloc_callback_entry(struct cn_queue_dev *dev, const char *name,
- 
- void cn_queue_release_callback(struct cn_callback_entry *cbq)
- {
--	if (!atomic_dec_and_test(&cbq->refcnt))
-+	if (!refcount_dec_and_test(&cbq->refcnt))
- 		return;
- 
- 	atomic_dec(&cbq->pdev->refcnt);
-diff --git a/drivers/connector/connector.c b/drivers/connector/connector.c
-index 25693b0..8615594b 100644
---- a/drivers/connector/connector.c
-+++ b/drivers/connector/connector.c
-@@ -157,7 +157,7 @@ static int cn_call_callback(struct sk_buff *skb)
- 	spin_lock_bh(&dev->cbdev->queue_lock);
- 	list_for_each_entry(i, &dev->cbdev->queue_list, callback_entry) {
- 		if (cn_cb_equal(&i->id.id, &msg->id)) {
--			atomic_inc(&i->refcnt);
-+			refcount_inc(&i->refcnt);
- 			cbq = i;
- 			break;
- 		}
-diff --git a/include/linux/connector.h b/include/linux/connector.h
-index f8fe863..032102b 100644
---- a/include/linux/connector.h
-+++ b/include/linux/connector.h
-@@ -22,7 +22,7 @@
- #define __CONNECTOR_H
- 
- 
--#include <linux/atomic.h>
-+#include <linux/refcount.h>
- 
- #include <linux/list.h>
- #include <linux/workqueue.h>
-@@ -49,7 +49,7 @@ struct cn_callback_id {
- 
- struct cn_callback_entry {
- 	struct list_head callback_entry;
--	atomic_t refcnt;
-+	refcount_t refcnt;
- 	struct cn_queue_dev *pdev;
- 
- 	struct cn_callback_id id;
--- 
-2.7.4
+Will you process this patch further to get it mainlined?
+
+Regards,
+
+	Hans
+
+> ---
+> If I didn't mess up any numbering, the pinctrl change should look like
+> the following patch.
+> 
+> Hope that helps
+> Heiko
+> 
+>  drivers/pinctrl/pinctrl-rockchip.c | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
+> index b5cb7858ffdc..8dd49e2e144b 100644
+> --- a/drivers/pinctrl/pinctrl-rockchip.c
+> +++ b/drivers/pinctrl/pinctrl-rockchip.c
+> @@ -884,6 +884,24 @@ static struct rockchip_mux_route_data rk3228_mux_route_data[] = {
+>  	},
+>  };
+>  
+> +static struct rockchip_mux_route_data rk3288_mux_route_data[] = {
+> +	{
+> +		/* edphdmi_cecinoutt1 */
+> +		.bank_num = 7,
+> +		.pin = 16,
+> +		.func = 2,
+> +		.route_offset = 0x264,
+> +		.route_val = BIT(16 + 12) | BIT(12),
+> +	}, {
+> +		/* edphdmi_cecinout */
+> +		.bank_num = 7,
+> +		.pin = 23,
+> +		.func = 4,
+> +		.route_offset = 0x264,
+> +		.route_val = BIT(16 + 12),
+> +	},
+> +};
+> +
+>  static struct rockchip_mux_route_data rk3328_mux_route_data[] = {
+>  	{
+>  		/* uart2dbg_rxm0 */
+> @@ -3391,6 +3409,8 @@ static struct rockchip_pin_ctrl rk3288_pin_ctrl = {
+>  		.type			= RK3288,
+>  		.grf_mux_offset		= 0x0,
+>  		.pmu_mux_offset		= 0x84,
+> +		.iomux_routes		= rk3288_mux_route_data,
+> +		.niomux_routes		= ARRAY_SIZE(rk3288_mux_route_data),
+>  		.pull_calc_reg		= rk3288_calc_pull_reg_and_bit,
+>  		.drv_calc_reg		= rk3288_calc_drv_reg_and_bit,
+>  };
+> 
