@@ -1,46 +1,77 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 20 Oct 2017 13:55:57 +0200
-Subject: [GIT PULL 1/7] dt-bindings: Updates for v4.15-rc1
-Message-ID: <20171020115603.9828-1-thierry.reding@gmail.com>
+From: mihailescu2m@gmail.com (memeka)
+Date: Fri, 20 Oct 2017 23:19:34 +1030
+Subject: [PATCH] ARM: dts: exynos: add cpu perf counters to Exynos54xx boards
+Message-ID: <1508503774-2328-1-git-send-email-mihailescu2m@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+From: Marian Mihailescu <mihailescu2m@gmail.com>
 
-The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+Enable support for ARM Performance Monitoring Units available in Cortex-A7
+and Cortex-A15 CPU cores for Exynos54xx SoCs (5410, 5420 and 5422/5800).
 
-  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+Exynos5410 currently has only Cortex-A7 nodes defined in the device tree,
+so the Cortex-A15 PMU is defined in the exynos5420 device tree file.
 
-are available in the git repository at:
+Tested with perf on Odroid XU4 (Exynos5422):
+armv7_cortex_a7 PMU driver: 5 counters available
+armv7_cortex_a15 PMU driver: 7 counters available
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.15-dt-bindings
+Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Marian Mihailescu <mihailescu2m@gmail.com>
+Signed-off-by: Willy Wolff <willy.mh.wolff@gmail.com>
+---
+ arch/arm/boot/dts/exynos5420.dtsi | 13 +++++++++++++
+ arch/arm/boot/dts/exynos54xx.dtsi | 13 +++++++++++++
+ 2 files changed, 26 insertions(+)
 
-for you to fetch changes up to 3e09b155d58e44e33a699650128f8c6c833cb320:
-
-  dt-bindings: Add bindings for nvidia,tegra186-bpmp-thermal (2017-10-19 16:26:22 +0200)
-
-Thanks,
-Thierry
-
-----------------------------------------------------------------
-dt-bindings: Updates for v4.15-rc1
-
-This contains the addition of a clock alias which will be used to fix
-the implementation of the SOR1 clock.
-
-Also included are the bindings for the Tegra186 BPMP thermal driver, a
-prerequisite for both the driver and device tree changes.
-
-----------------------------------------------------------------
-Mikko Perttunen (1):
-      dt-bindings: Add bindings for nvidia,tegra186-bpmp-thermal
-
-Thierry Reding (1):
-      dt-bindings: clock: tegra: Add sor1_out clock
-
- .../thermal/nvidia,tegra186-bpmp-thermal.txt       | 32 ++++++++++++++++++++++
- include/dt-bindings/clock/tegra210-car.h           |  1 +
- .../dt-bindings/thermal/tegra186-bpmp-thermal.h    | 14 ++++++++++
- 3 files changed, 47 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/thermal/nvidia,tegra186-bpmp-thermal.txt
- create mode 100644 include/dt-bindings/thermal/tegra186-bpmp-thermal.h
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index 02d2f89..468059e 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -695,6 +695,19 @@
+ 			iommus = <&sysmmu_jpeg1>;
+ 		};
+ 
++		arm-a15-pmu {
++			compatible = "arm,cortex-a15-pmu";
++			interrupt-parent = <&combiner>;
++			interrupts = <1 2>,
++				<7 0>,
++				<16 6>,
++				<19 2>;
++			interrupt-affinity = <&cpu4>,
++				<&cpu5>,
++				<&cpu6>,
++				<&cpu7>;
++		};
++
+ 		pmu_system_controller: system-controller at 10040000 {
+ 			compatible = "samsung,exynos5420-pmu", "syscon";
+ 			reg = <0x10040000 0x5000>;
+diff --git a/arch/arm/boot/dts/exynos54xx.dtsi b/arch/arm/boot/dts/exynos54xx.dtsi
+index 8ca4fef..8e007a4 100644
+--- a/arch/arm/boot/dts/exynos54xx.dtsi
++++ b/arch/arm/boot/dts/exynos54xx.dtsi
+@@ -79,6 +79,19 @@
+ 			interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
+ 		};
+ 
++		arm-a7-pmu {
++			compatible = "arm,cortex-a7-pmu";
++			interrupt-parent = <&gic>;
++			interrupts = <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-affinity = <&cpu0>,
++				<&cpu1>,
++				<&cpu2>,
++				<&cpu3>;
++		};
++
+ 		sss: sss at 10830000 {
+ 			compatible = "samsung,exynos4210-secss";
+ 			reg = <0x10830000 0x300>;
+-- 
+2.7.4
