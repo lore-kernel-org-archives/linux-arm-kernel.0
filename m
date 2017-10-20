@@ -1,58 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 20 Oct 2017 10:18:23 +0100
-Subject: v4.14-rc3/arm64 DABT exception in atomic_inc() / __skb_clone()
-In-Reply-To: <CANn89iKj45+zqMt7XqPkCG+8PQwhzjHUBZ0vu-REvZWs1HuqOw@mail.gmail.com>
-References: <EAA60182-6F08-412E-8F8B-FD4B0309A858@gmail.com>
- <CANn89iJgoiY_ky4F_1iE_o6moZXp5e6OcNZZe=B8F-OhWJx8nQ@mail.gmail.com>
- <FF5A6DF1-0E5F-4C7E-A31B-06ED33366039@gmail.com>
- <CANn89iKj45+zqMt7XqPkCG+8PQwhzjHUBZ0vu-REvZWs1HuqOw@mail.gmail.com>
-Message-ID: <20171020091823.GA18282@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 20 Oct 2017 10:22:10 +0100
+Subject: [PATCH v3 6/7] arm64: topology: Enable ACPI/PPTT based CPU
+ topology.
+In-Reply-To: <b6c3fae3-eb6d-e5f2-6887-de1471978897@arm.com>
+References: <20171012194856.13844-1-jeremy.linton@arm.com>
+ <20171012194856.13844-7-jeremy.linton@arm.com>
+ <20171019155622.GC18883@red-moon>
+ <b6c3fae3-eb6d-e5f2-6887-de1471978897@arm.com>
+Message-ID: <20171020092210.GB21060@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 19, 2017 at 10:34:54PM -0700, Eric Dumazet wrote:
-> On Thu, Oct 19, 2017 at 8:13 PM, Wei Wei <dotweiba@gmail.com> wrote:
-> > Code: f9406680 8b010000 91009000 f9800011 (885f7c01)
-> > All code
-> > ========
-> >    0:   80 66 40 f9             andb   $0xf9,0x40(%rsi)
-> >    4:   00 00                   add    %al,(%rax)
-> >    6:   01 8b 00 90 00 91       add    %ecx,-0x6eff7000(%rbx)
-> >    c:   11 00                   adc    %eax,(%rax)
-> >    e:   80 f9 01                cmp    $0x1,%cl
-> >   11:   7c 5f                   jl     0x72
-> >   13:*  88 00                   mov    %al,(%rax)               <-- trapping instruction
-> >   15:   00 00                   add    %al,(%rax)
-> >         ...
+On Thu, Oct 19, 2017 at 11:54:22AM -0500, Jeremy Linton wrote:
+
+[...]
+
+> >>+			cpu_topology[cpu].core_id   = topology_id;
+> >>+			topology_id = setup_acpi_cpu_topology(cpu, 2);
+> >>+			cpu_topology[cpu].cluster_id = topology_id;
+> >>+			topology_id = setup_acpi_cpu_topology(cpu, max_topo);
 > >
-> > Code starting with the faulting instruction
-> > ===========================================
-> >    0:   01 7c 5f 88             add    %edi,-0x78(%rdi,%rbx,2)
-> >    4:   00 00                   add    %al,(%rax)
-> >         ...
-> > ?[ end trace 261e7ac1458ccc0a ]---
-> >
+> >If you want a package id (that's just a package tag to group cores), you
+> >should not use a large level because you know how setup_acpi_cpu_topology()works, you should add an API that allows you to retrieve the package id
+> >(so that you can use th ACPI_PPTT_PHYSICAL_PACKAGE flag consistenly,
+> >whatever it represents).
 > 
-> I thought it was happening on arm64 ?
-> 
-> This is x86_64 disassembly :/
+> I don't think the spec requires the use of PHYSICAL_PACKAGE... Am I
+> misreading it? Which means we need to "pick" a node level to
+> represent the physical package if one doesn't exist...
 
-I guess they forgot the ARCH/CROSS_COMPILE env vars for decodecode. here
-you go:
+The specs define a means to detect if a given PPTT node corresponds to a
+package (I am refraining from stating again that to me that's not clean
+cut what a package is _architecturally_, I think you know my POV by now)
+and that's what you need to use to retrieve a packageid for a given cpu,
+if I understand the aim of the physical package flag.
 
-Code: f9406680 8b010000 91009000 f9800011 (885f7c01)
-All code
-========
-   0:	f9406680 	ldr	x0, [x20,#200]
-   4:	8b010000 	add	x0, x0, x1
-   8:	91009000 	add	x0, x0, #0x24
-   c:	f9800011 	prfm	pstl1strm, [x0]
-  10:*	885f7c01 	ldxr	w1, [x0]		<-- trapping instruction
+Either that or that flag is completely useless.
 
-Code starting with the faulting instruction
-===========================================
-   0:	885f7c01 	ldxr	w1, [x0]
+Lorenzo
 
-so it's faulting on the load part of an atomic rmw.
-
-Will
+ACPI 6.2 - Table 5-151 (page 248)
+Physical package
+-----------------
+Set to 1 if this node of the processor topology represents the boundary
+of a physical package, whether socketed or surface mounted.  Set to 0 if
+this instance of the processor topology does not represent the boundary
+of a physical package.
