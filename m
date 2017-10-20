@@ -1,139 +1,99 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 20 Oct 2017 13:49:34 +0200
-Subject: [PATCH v4 15/20] KVM: arm/arm64: Support EL1 phys timer register
- access in set/get reg
+Date: Fri, 20 Oct 2017 13:49:35 +0200
+Subject: [PATCH v4 16/20] KVM: arm/arm64: Use kvm_arm_timer_set/get_reg for
+ guest register traps
 In-Reply-To: <20171020114939.12554-1-christoffer.dall@linaro.org>
 References: <20171020114939.12554-1-christoffer.dall@linaro.org>
-Message-ID: <20171020114939.12554-16-christoffer.dall@linaro.org>
+Message-ID: <20171020114939.12554-17-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <cdall@linaro.org>
 
-Add suport for the physical timer registers in kvm_arm_timer_set_reg and
-kvm_arm_timer_get_reg so that these functions can be reused to interact
-with the rest of the system.
+When trapping on a guest access to one of the timer registers, we were
+messing with the internals of the timer state from the sysregs handling
+code, and that logic was about to receive more added complexity when
+optimizing the timer handling code.
 
-Note that this paves part of the way for the physical timer state
-save/restore, but we still need to add those registers to
-KVM_GET_REG_LIST before we support migrating the physical timer state.
+Therefore, since we already have timer register access functions (to
+access registers from userspace), reuse those for the timer register
+traps from a VM and let the timer code maintain its own consistency.
 
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
+ arch/arm64/kvm/sys_regs.c | 41 ++++++++++++++---------------------------
+ 1 file changed, 14 insertions(+), 27 deletions(-)
 
-Notes:
-    Changes since v3:
-     - Renamed 'EL1 Physical Timer Registers' to 'Physical Timer EL0 Registers'
-
- arch/arm/include/uapi/asm/kvm.h   |  6 ++++++
- arch/arm64/include/uapi/asm/kvm.h |  6 ++++++
- virt/kvm/arm/arch_timer.c         | 33 +++++++++++++++++++++++++++++++--
- 3 files changed, 43 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-index 5db2d4c6a55f..665c454e50d0 100644
---- a/arch/arm/include/uapi/asm/kvm.h
-+++ b/arch/arm/include/uapi/asm/kvm.h
-@@ -151,6 +151,12 @@ struct kvm_arch_memory_slot {
- 	(__ARM_CP15_REG(op1, 0, crm, 0) | KVM_REG_SIZE_U64)
- #define ARM_CP15_REG64(...) __ARM_CP15_REG64(__VA_ARGS__)
- 
-+/* PL1 Physical Timer Registers */
-+#define KVM_REG_ARM_PTIMER_CTL		ARM_CP15_REG32(0, 14, 2, 1)
-+#define KVM_REG_ARM_PTIMER_CNT		ARM_CP15_REG64(0, 14)
-+#define KVM_REG_ARM_PTIMER_CVAL		ARM_CP15_REG64(2, 14)
-+
-+/* Virtual Timer Registers */
- #define KVM_REG_ARM_TIMER_CTL		ARM_CP15_REG32(0, 14, 3, 1)
- #define KVM_REG_ARM_TIMER_CNT		ARM_CP15_REG64(1, 14)
- #define KVM_REG_ARM_TIMER_CVAL		ARM_CP15_REG64(3, 14)
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index 9f3ca24bbcc6..0004feef7cc2 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -195,6 +195,12 @@ struct kvm_arch_memory_slot {
- 
- #define ARM64_SYS_REG(...) (__ARM64_SYS_REG(__VA_ARGS__) | KVM_REG_SIZE_U64)
- 
-+/* Physical Timer EL0 Registers */
-+#define KVM_REG_ARM_PTIMER_CTL		ARM64_SYS_REG(3, 3, 14, 2, 1)
-+#define KVM_REG_ARM_PTIMER_CVAL		ARM64_SYS_REG(3, 3, 14, 2, 2)
-+#define KVM_REG_ARM_PTIMER_CNT		ARM64_SYS_REG(3, 3, 14, 0, 1)
-+
-+/* EL0 Virtual Timer Registers */
- #define KVM_REG_ARM_TIMER_CTL		ARM64_SYS_REG(3, 3, 14, 3, 1)
- #define KVM_REG_ARM_TIMER_CNT		ARM64_SYS_REG(3, 3, 14, 3, 2)
- #define KVM_REG_ARM_TIMER_CVAL		ARM64_SYS_REG(3, 3, 14, 0, 2)
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index ec685c1f3b78..d1a6fb12121f 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -628,10 +628,11 @@ static void kvm_timer_init_interrupt(void *info)
- int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 2e070d3baf9f..bb0e41b3154e 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -841,13 +841,16 @@ static bool access_cntp_tval(struct kvm_vcpu *vcpu,
+ 		struct sys_reg_params *p,
+ 		const struct sys_reg_desc *r)
  {
- 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
-+	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+-	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+ 	u64 now = kvm_phys_timer_read();
++	u64 cval;
  
- 	switch (regid) {
- 	case KVM_REG_ARM_TIMER_CTL:
--		vtimer->cnt_ctl = value;
-+		vtimer->cnt_ctl = value & ~ARCH_TIMER_CTRL_IT_STAT;
- 		break;
- 	case KVM_REG_ARM_TIMER_CNT:
- 		update_vtimer_cntvoff(vcpu, kvm_phys_timer_read() - value);
-@@ -639,6 +640,13 @@ int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
- 	case KVM_REG_ARM_TIMER_CVAL:
- 		vtimer->cnt_cval = value;
- 		break;
-+	case KVM_REG_ARM_PTIMER_CTL:
-+		ptimer->cnt_ctl = value & ~ARCH_TIMER_CTRL_IT_STAT;
-+		break;
-+	case KVM_REG_ARM_PTIMER_CVAL:
-+		ptimer->cnt_cval = value;
-+		break;
-+
- 	default:
- 		return -1;
- 	}
-@@ -647,17 +655,38 @@ int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
- 	return 0;
+-	if (p->is_write)
+-		ptimer->cnt_cval = p->regval + now;
+-	else
+-		p->regval = ptimer->cnt_cval - now;
++	if (p->is_write) {
++		kvm_arm_timer_set_reg(vcpu, KVM_REG_ARM_PTIMER_CVAL,
++				      p->regval + now);
++	} else {
++		cval = kvm_arm_timer_get_reg(vcpu, KVM_REG_ARM_PTIMER_CVAL);
++		p->regval = cval - now;
++	}
+ 
+ 	return true;
  }
- 
-+static u64 read_timer_ctl(struct arch_timer_context *timer)
-+{
-+	/*
-+	 * Set ISTATUS bit if it's expired.
-+	 * Note that according to ARMv8 ARM Issue A.k, ISTATUS bit is
-+	 * UNKNOWN when ENABLE bit is 0, so we chose to set ISTATUS bit
-+	 * regardless of ENABLE bit for our implementation convenience.
-+	 */
-+	if (!kvm_timer_compute_delta(timer))
-+		return timer->cnt_ctl | ARCH_TIMER_CTRL_IT_STAT;
-+	else
-+		return timer->cnt_ctl;
-+}
-+
- u64 kvm_arm_timer_get_reg(struct kvm_vcpu *vcpu, u64 regid)
+@@ -856,24 +859,10 @@ static bool access_cntp_ctl(struct kvm_vcpu *vcpu,
+ 		struct sys_reg_params *p,
+ 		const struct sys_reg_desc *r)
  {
-+	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
- 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+-	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+-
+-	if (p->is_write) {
+-		/* ISTATUS bit is read-only */
+-		ptimer->cnt_ctl = p->regval & ~ARCH_TIMER_CTRL_IT_STAT;
+-	} else {
+-		u64 now = kvm_phys_timer_read();
+-
+-		p->regval = ptimer->cnt_ctl;
+-		/*
+-		 * Set ISTATUS bit if it's expired.
+-		 * Note that according to ARMv8 ARM Issue A.k, ISTATUS bit is
+-		 * UNKNOWN when ENABLE bit is 0, so we chose to set ISTATUS bit
+-		 * regardless of ENABLE bit for our implementation convenience.
+-		 */
+-		if (ptimer->cnt_cval <= now)
+-			p->regval |= ARCH_TIMER_CTRL_IT_STAT;
+-	}
++	if (p->is_write)
++		kvm_arm_timer_set_reg(vcpu, KVM_REG_ARM_PTIMER_CTL, p->regval);
++	else
++		p->regval = kvm_arm_timer_get_reg(vcpu, KVM_REG_ARM_PTIMER_CTL);
  
- 	switch (regid) {
- 	case KVM_REG_ARM_TIMER_CTL:
--		return vtimer->cnt_ctl;
-+		return read_timer_ctl(vtimer);
- 	case KVM_REG_ARM_TIMER_CNT:
- 		return kvm_phys_timer_read() - vtimer->cntvoff;
- 	case KVM_REG_ARM_TIMER_CVAL:
- 		return vtimer->cnt_cval;
-+	case KVM_REG_ARM_PTIMER_CTL:
-+		return read_timer_ctl(ptimer);
-+	case KVM_REG_ARM_PTIMER_CVAL:
-+		return ptimer->cnt_cval;
-+	case KVM_REG_ARM_PTIMER_CNT:
-+		return kvm_phys_timer_read();
- 	}
- 	return (u64)-1;
+ 	return true;
+ }
+@@ -882,12 +871,10 @@ static bool access_cntp_cval(struct kvm_vcpu *vcpu,
+ 		struct sys_reg_params *p,
+ 		const struct sys_reg_desc *r)
+ {
+-	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+-
+ 	if (p->is_write)
+-		ptimer->cnt_cval = p->regval;
++		kvm_arm_timer_set_reg(vcpu, KVM_REG_ARM_PTIMER_CVAL, p->regval);
+ 	else
+-		p->regval = ptimer->cnt_cval;
++		p->regval = kvm_arm_timer_get_reg(vcpu, KVM_REG_ARM_PTIMER_CVAL);
+ 
+ 	return true;
  }
 -- 
 2.14.2
