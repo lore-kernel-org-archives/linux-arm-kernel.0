@@ -1,91 +1,49 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 20 Oct 2017 17:52:48 -0500
-Subject: [PATCH] PCI: hisi: add PCIe driver support for HiSilicon STB SoCs
-In-Reply-To: <1508043971-23216-1-git-send-email-shawnguo@kernel.org>
-References: <1508043971-23216-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <20171020225248.GV6332@bhelgaas-glaptop.roam.corp.google.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Fri, 20 Oct 2017 15:53:50 -0700
+Subject: [PATCH 0/4] arm64: Changes to register and stack dumps
+In-Reply-To: <1508428534-20694-1-git-send-email-will.deacon@arm.com>
+References: <1508428534-20694-1-git-send-email-will.deacon@arm.com>
+Message-ID: <f3e4cf91-6965-84e9-0e3a-39a1c24ab1ae@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 15, 2017 at 01:06:11PM +0800, Shawn Guo wrote:
-> From: Jianguo Sun <sunjianguo1@huawei.com>
+On 10/19/2017 08:55 AM, Will Deacon wrote:
+> Hi all,
 > 
-> Add PCIe controller driver for HiSilicon STB SoCs,
-> the controller is based on the DesignWare's PCIe core.
+> This handful of patches makes some significant changes to how we print
+> register/stack dumps and brings us inline with recent changes to x86.
+> The main changes are that we no longer print out the 'Exception stack:'
+> section and PC/LR values are resolved to a symbol+offset format where
+> possible.
+> 
+> Feedback welcome.
+> 
 
-s/DesignWare's/DesignWare/
+In very petty complaints, I can no longer just use the PC/LR with
+addr2line. Yes I can use gdb or one of the scripts but that's a
+few more steps when I'm doing debugging on my own. Like I said,
+very minor and overall this is good for both security and alignment.
 
-> Signed-off-by: Jianguo Sun <sunjianguo1@huawei.com>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  .../bindings/pci/hisilicon-histb-pcie.txt          |  66 +++
->  drivers/pci/dwc/Kconfig                            |  10 +
->  drivers/pci/dwc/Makefile                           |   1 +
->  drivers/pci/dwc/pcie-histb.c                       | 469 +++++++++++++++++++++
->  4 files changed, 546 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/hisilicon-histb-pcie.txt
->  create mode 100644 drivers/pci/dwc/pcie-histb.c
+I ran this through several of the LKDTM tests and the backtraces
+looked fine. You're welcome to add
 
-Looks beautiful overall!
+Tested-by: Laura Abbott <labbott@redhat.com>
 
-This needs a MAINTAINERS update so "./scripts/get_maintainer.pl -f" prints
-something useful.
-
-A few minor nits below that I would fix myself, but since you need to
-supply the MAINTAINERS update anyway, I'll let you do it :)
-
-> diff --git a/Documentation/devicetree/bindings/pci/hisilicon-histb-pcie.txt b/Documentation/devicetree/bindings/pci/hisilicon-histb-pcie.txt
-> new file mode 100644
-> index 000000000000..9474ad9bc36c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/hisilicon-histb-pcie.txt
-> @@ -0,0 +1,66 @@
-> +HiSilicon STB PCIe host bridge DT description
-> +
-> +HiSilicon STB PCIe host controller is based on Designware PCI core.
-> +It shares common functions with PCIe Designware core driver and inherits
-> +common properties defined in
-> +Documentation/devicetree/bindings/pci/designware-pcie.txt.
-
-s/Designware/DesignWare/ in English text above (not in filenames,
-function names, etc).
-
-s/PCI/PCIe/
-
-> +static u32 histb_pcie_read_dbi(struct dw_pcie *pci, void __iomem *base,
-> +				u32 reg, size_t size)
-
-These should be lined up exactly ("u32" should line up with "struct"
-above it).  They are currently off by one.  Similarly for
-histb_pcie_write_dbi(), histb_pcie_rd_own_conf(),
-histb_pcie_wr_own_conf().
-
-> +	hipcie->aux_clk = devm_clk_get(dev, "aux");
-> +	if (IS_ERR(hipcie->aux_clk)) {
-> +		dev_err(dev, "Failed to get pcie aux clk\n");
-
-s/pcie/PCIe/ in this message and the ones below.  Also in
-histb_pcie_host_enable() comment.
-
-> +		return PTR_ERR(hipcie->aux_clk);
-> +	}
-> +
-> +	hipcie->pipe_clk = devm_clk_get(dev, "pipe");
-> +	if (IS_ERR(hipcie->pipe_clk)) {
-> +		dev_err(dev, "Failed to get pcie pipe clk\n");
-> +		return PTR_ERR(hipcie->pipe_clk);
-
-> +	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> +		pp->msi_irq = platform_get_irq_byname(pdev, "msi");
-> +		if (pp->msi_irq < 0) {
-> +			dev_err(dev, "Failed to get msi irq\n");
-> +			return pp->msi_irq;
-> +		}
-> +
-> +		ret = devm_request_irq(dev, pp->msi_irq,
-> +				       histb_pcie_msi_irq_handler,
-> +				       IRQF_SHARED, "histb-pcie-msi", pp);
-> +		if (ret) {
-> +			dev_err(dev, "cannot request msi irq\n");
-
-s/msi irq/MSI IRQ/ in the error message.  Also a few lines above.
+> Will
+> 
+> --->8
+> 
+> Mark Rutland (1):
+>   arm64: consistently log ESR and page table
+> 
+> Will Deacon (3):
+>   arm64: traps: Don't print stack or raw PC/LR values in backtraces
+>   arm64: traps: Pretty-print pstate in register dumps
+>   arm64: uapi: Remove PSR_Q_BIT
+> 
+>  arch/arm64/include/uapi/asm/ptrace.h |  1 -
+>  arch/arm64/kernel/process.c          | 24 ++++++++++---
+>  arch/arm64/kernel/traps.c            | 65 ++----------------------------------
+>  arch/arm64/mm/fault.c                |  7 ++--
+>  4 files changed, 28 insertions(+), 69 deletions(-)
+> 
