@@ -1,40 +1,111 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Fri, 20 Oct 2017 17:46:45 +0800
-Subject: [PATCH 1/3] arm: dts: mt7623: update crypto node
-Message-ID: <4cabb9ad6f59b42cc10ba25a9eb0ce68f77d0a43.1508492662.git.ryder.lee@mediatek.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 20 Oct 2017 09:57:50 +0100
+Subject: [PATCH 1/2] arm/arm64: kvm: Move initialization completion message
+In-Reply-To: <1508427913-34619-2-git-send-email-julien.thierry@arm.com>
+References: <1508427913-34619-1-git-send-email-julien.thierry@arm.com>
+ <1508427913-34619-2-git-send-email-julien.thierry@arm.com>
+Message-ID: <d677bf64-c6ac-51c1-0cb9-2b2e2b24bc02@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates compatible string and clocks for the crypto node.
+On 19/10/17 16:45, Julien Thierry wrote:
+> KVM is being a bit too optimistic, Hyp mode is said to be initialized
+> when Hyp segments have only been mapped.
+> 
+> Notify KVM's successful initialization only once it is really fully
+> initialized.
+> 
+> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  virt/kvm/arm/arm.c | 31 ++++++++++++++-----------------
+>  1 file changed, 14 insertions(+), 17 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index b9f68e4..95cba07 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -1326,21 +1326,12 @@ static void teardown_hyp_mode(void)
+>  {
+>  	int cpu;
+> 
+> -	if (is_kernel_in_hyp_mode())
+> -		return;
+> -
+>  	free_hyp_pgds();
+>  	for_each_possible_cpu(cpu)
+>  		free_page(per_cpu(kvm_arm_hyp_stack_page, cpu));
+>  	hyp_cpu_pm_exit();
+>  }
+> 
+> -static int init_vhe_mode(void)
+> -{
+> -	kvm_info("VHE mode initialized successfully\n");
+> -	return 0;
+> -}
+> -
+>  /**
+>   * Inits Hyp-mode on all online CPUs
+>   */
+> @@ -1421,8 +1412,6 @@ static int init_hyp_mode(void)
+>  		}
+>  	}
+> 
+> -	kvm_info("Hyp mode initialized successfully\n");
+> -
+>  	return 0;
+> 
+>  out_err:
+> @@ -1456,6 +1445,7 @@ int kvm_arch_init(void *opaque)
+>  {
+>  	int err;
+>  	int ret, cpu;
+> +	bool in_hyp_mode;
+> 
+>  	if (!is_hyp_mode_available()) {
+>  		kvm_err("HYP mode not available\n");
+> @@ -1474,21 +1464,28 @@ int kvm_arch_init(void *opaque)
+>  	if (err)
+>  		return err;
+> 
+> -	if (is_kernel_in_hyp_mode())
+> -		err = init_vhe_mode();
+> -	else
+> +	in_hyp_mode = is_kernel_in_hyp_mode();
+> +
+> +	if (!in_hyp_mode) {
+>  		err = init_hyp_mode();
+> -	if (err)
+> -		goto out_err;
+> +		if (err)
+> +			goto out_err;
+> +	}
+> 
+>  	err = init_subsystems();
+>  	if (err)
+>  		goto out_hyp;
+> 
+> +	if (in_hyp_mode)
+> +		kvm_info("VHE mode initialized successfully\n");
+> +	else
+> +		kvm_info("Hyp mode initialized successfully\n");
+> +
+>  	return 0;
+> 
+>  out_hyp:
+> -	teardown_hyp_mode();
+> +	if (!in_hyp_mode)
+> +		teardown_hyp_mode();
+>  out_err:
+>  	teardown_common_resources();
+>  	return err;
+> --
+> 1.9.1
+> 
 
-Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
----
- arch/arm/boot/dts/mt7623.dtsi | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
-index d0483f7..6c2c8c8 100644
---- a/arch/arm/boot/dts/mt7623.dtsi
-+++ b/arch/arm/boot/dts/mt7623.dtsi
-@@ -892,16 +892,15 @@
- 	};
- 
- 	crypto: crypto at 1b240000 {
--		compatible = "mediatek,mt7623-crypto";
-+		compatible = "mediatek,eip97-crypto";
- 		reg = <0 0x1b240000 0 0x20000>;
- 		interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_LOW>,
- 			     <GIC_SPI 83 IRQ_TYPE_LEVEL_LOW>,
- 			     <GIC_SPI 84 IRQ_TYPE_LEVEL_LOW>,
- 			     <GIC_SPI 91 IRQ_TYPE_LEVEL_LOW>,
- 			     <GIC_SPI 97 IRQ_TYPE_LEVEL_LOW>;
--		clocks = <&topckgen CLK_TOP_ETHIF_SEL>,
--			 <&ethsys CLK_ETHSYS_CRYPTO>;
--		clock-names = "ethif","cryp";
-+		clocks = <&ethsys CLK_ETHSYS_CRYPTO>;
-+		clock-names = "cryp";
- 		power-domains = <&scpsys MT2701_POWER_DOMAIN_ETH>;
- 		status = "disabled";
- 	};
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
