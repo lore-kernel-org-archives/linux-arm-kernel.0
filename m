@@ -1,10 +1,10 @@
 From: elena.reshetova@intel.com (Elena Reshetova)
-Date: Fri, 20 Oct 2017 10:23:37 +0300
-Subject: [PATCH 03/15] drivers, net,
- mlx4: convert mlx4_cq.refcount from atomic_t to refcount_t
+Date: Fri, 20 Oct 2017 10:23:36 +0300
+Subject: [PATCH 02/15] drivers, net,
+ ethernet: convert mtk_eth.dma_refcnt from atomic_t to refcount_t
 In-Reply-To: <1508484229-19706-1-git-send-email-elena.reshetova@intel.com>
 References: <1508484229-19706-1-git-send-email-elena.reshetova@intel.com>
-Message-ID: <1508484229-19706-4-git-send-email-elena.reshetova@intel.com>
+Message-ID: <1508484229-19706-3-git-send-email-elena.reshetova@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -22,7 +22,7 @@ refcount_t type and API that prevents accidental counter overflows
 and underflows. This is important since overflows and underflows
 can lead to use-after-free situation and be exploitable.
 
-The variable mlx4_cq.refcount is used as pure reference counter.
+The variable mtk_eth.dma_refcnt is used as pure reference counter.
 Convert it to refcount_t and fix up the operations.
 
 Suggested-by: Kees Cook <keescook@chromium.org>
@@ -30,71 +30,65 @@ Reviewed-by: David Windsor <dwindsor@gmail.com>
 Reviewed-by: Hans Liljestrand <ishkamiel@gmail.com>
 Signed-off-by: Elena Reshetova <elena.reshetova@intel.com>
 ---
- drivers/net/ethernet/mellanox/mlx4/cq.c | 8 ++++----
- include/linux/mlx4/device.h             | 4 ++--
- 2 files changed, 6 insertions(+), 6 deletions(-)
+ drivers/net/ethernet/mediatek/mtk_eth_soc.c | 8 +++++---
+ drivers/net/ethernet/mediatek/mtk_eth_soc.h | 4 +++-
+ 2 files changed, 8 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/net/ethernet/mellanox/mlx4/cq.c b/drivers/net/ethernet/mellanox/mlx4/cq.c
-index 72eb50c..d8e9a32 100644
---- a/drivers/net/ethernet/mellanox/mlx4/cq.c
-+++ b/drivers/net/ethernet/mellanox/mlx4/cq.c
-@@ -69,7 +69,7 @@ void mlx4_cq_tasklet_cb(unsigned long data)
- 	list_for_each_entry_safe(mcq, temp, &ctx->process_list, tasklet_ctx.list) {
- 		list_del_init(&mcq->tasklet_ctx.list);
- 		mcq->tasklet_ctx.comp(mcq);
--		if (atomic_dec_and_test(&mcq->refcount))
-+		if (refcount_dec_and_test(&mcq->refcount))
- 			complete(&mcq->free);
- 		if (time_after(jiffies, end))
- 			break;
-@@ -92,7 +92,7 @@ static void mlx4_add_cq_to_tasklet(struct mlx4_cq *cq)
- 	 * still arrive.
- 	 */
- 	if (list_empty_careful(&cq->tasklet_ctx.list)) {
--		atomic_inc(&cq->refcount);
-+		refcount_inc(&cq->refcount);
- 		kick = list_empty(&tasklet_ctx->list);
- 		list_add_tail(&cq->tasklet_ctx.list, &tasklet_ctx->list);
- 		if (kick)
-@@ -344,7 +344,7 @@ int mlx4_cq_alloc(struct mlx4_dev *dev, int nent,
- 	cq->cons_index = 0;
- 	cq->arm_sn     = 1;
- 	cq->uar        = uar;
--	atomic_set(&cq->refcount, 1);
-+	refcount_set(&cq->refcount, 1);
- 	init_completion(&cq->free);
- 	cq->comp = mlx4_add_cq_to_tasklet;
- 	cq->tasklet_ctx.priv =
-@@ -386,7 +386,7 @@ void mlx4_cq_free(struct mlx4_dev *dev, struct mlx4_cq *cq)
- 	    priv->eq_table.eq[MLX4_EQ_ASYNC].irq)
- 		synchronize_irq(priv->eq_table.eq[MLX4_EQ_ASYNC].irq);
+diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.c b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+index 5e81a72..54adfd9 100644
+--- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
++++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+@@ -1817,7 +1817,7 @@ static int mtk_open(struct net_device *dev)
+ 	struct mtk_eth *eth = mac->hw;
  
--	if (atomic_dec_and_test(&cq->refcount))
-+	if (refcount_dec_and_test(&cq->refcount))
- 		complete(&cq->free);
- 	wait_for_completion(&cq->free);
+ 	/* we run 2 netdevs on the same dma ring so we only bring it up once */
+-	if (!atomic_read(&eth->dma_refcnt)) {
++	if (!refcount_read(&eth->dma_refcnt)) {
+ 		int err = mtk_start_dma(eth);
  
-diff --git a/include/linux/mlx4/device.h b/include/linux/mlx4/device.h
-index b0a57e0..daac2e3 100644
---- a/include/linux/mlx4/device.h
-+++ b/include/linux/mlx4/device.h
-@@ -40,7 +40,7 @@
- #include <linux/cpu_rmap.h>
- #include <linux/crash_dump.h>
+ 		if (err)
+@@ -1827,8 +1827,10 @@ static int mtk_open(struct net_device *dev)
+ 		napi_enable(&eth->rx_napi);
+ 		mtk_tx_irq_enable(eth, MTK_TX_DONE_INT);
+ 		mtk_rx_irq_enable(eth, MTK_RX_DONE_INT);
++		refcount_set(&eth->dma_refcnt, 1);
+ 	}
+-	atomic_inc(&eth->dma_refcnt);
++	else
++		refcount_inc(&eth->dma_refcnt);
  
--#include <linux/atomic.h>
+ 	phy_start(dev->phydev);
+ 	netif_start_queue(dev);
+@@ -1868,7 +1870,7 @@ static int mtk_stop(struct net_device *dev)
+ 	phy_stop(dev->phydev);
+ 
+ 	/* only shutdown DMA if this is the last user */
+-	if (!atomic_dec_and_test(&eth->dma_refcnt))
++	if (!refcount_dec_and_test(&eth->dma_refcnt))
+ 		return 0;
+ 
+ 	mtk_tx_irq_disable(eth, MTK_TX_DONE_INT);
+diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.h b/drivers/net/ethernet/mediatek/mtk_eth_soc.h
+index 3d3c24a..a3af466 100644
+--- a/drivers/net/ethernet/mediatek/mtk_eth_soc.h
++++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.h
+@@ -15,6 +15,8 @@
+ #ifndef MTK_ETH_H
+ #define MTK_ETH_H
+ 
 +#include <linux/refcount.h>
- 
- #include <linux/timecounter.h>
- 
-@@ -751,7 +751,7 @@ struct mlx4_cq {
- 	int			cqn;
- 	unsigned		vector;
- 
--	atomic_t		refcount;
-+	refcount_t		refcount;
- 	struct completion	free;
- 	struct {
- 		struct list_head list;
++
+ #define MTK_QDMA_PAGE_SIZE	2048
+ #define	MTK_MAX_RX_LENGTH	1536
+ #define MTK_TX_DMA_BUF_LEN	0x3fff
+@@ -632,7 +634,7 @@ struct mtk_eth {
+ 	struct regmap			*pctl;
+ 	u32				chip_id;
+ 	bool				hwlro;
+-	atomic_t			dma_refcnt;
++	refcount_t			dma_refcnt;
+ 	struct mtk_tx_ring		tx_ring;
+ 	struct mtk_rx_ring		rx_ring[MTK_MAX_RX_RING_NUM];
+ 	struct mtk_rx_ring		rx_ring_qdma;
 -- 
 2.7.4
