@@ -1,50 +1,66 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 20 Oct 2017 12:28:40 +0200
-Subject: [PATCH 13/42] ARM: dts: iwg22d-sodimm: Enable internal PCI
+Date: Fri, 20 Oct 2017 12:28:39 +0200
+Subject: [PATCH 12/42] ARM: dts: r8a7745: Link PCI USB devices to USB PHY
 In-Reply-To: <cover.1508493785.git.horms+renesas@verge.net.au>
 References: <cover.1508493785.git.horms+renesas@verge.net.au>
-Message-ID: <bc058f6f03e47610c994a97ecf3bf8a3ea44efee.1508493785.git.horms+renesas@verge.net.au>
+Message-ID: <c3e35873e37b77581be942b7284e705e997014fc.1508493785.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Biju Das <biju.das@bp.renesas.com>
 
-Enable internal AHB-PCI bridges for the USB EHCI/OHCI controllers
-attached to them.
+Describe the PCI USB devices that are behind the PCI bridges, adding
+necessary links to the USB PHY device.
 
 Signed-off-by: Biju Das <biju.das@bp.renesas.com>
 Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/boot/dts/r8a7745.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
-index 8772c561e3a8..e378e5ecfcac 100644
---- a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
-+++ b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
-@@ -55,6 +55,11 @@
- 		function = "sdhi0";
- 		power-source = <3300>;
- 	};
+diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
+index 17cfa53f3c76..3a50f703601c 100644
+--- a/arch/arm/boot/dts/r8a7745.dtsi
++++ b/arch/arm/boot/dts/r8a7745.dtsi
+@@ -867,6 +867,18 @@
+ 			interrupt-map = <0x0000 0 0 1 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH
+ 					 0x0800 0 0 1 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH
+ 					 0x1000 0 0 2 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
 +
-+	usb1_pins: usb1 {
-+		groups = "usb1";
-+		function = "usb1";
-+	};
- };
++			usb at 1,0 {
++				reg = <0x800 0 0 0 0>;
++				phys = <&usb0 0>;
++				phy-names = "usb";
++			};
++
++			usb at 2,0 {
++				reg = <0x1000 0 0 0 0>;
++				phys = <&usb0 0>;
++				phy-names = "usb";
++			};
+ 		};
  
- &scif4 {
-@@ -92,3 +97,9 @@
- 	cd-gpios = <&gpio6 6 GPIO_ACTIVE_LOW>;
- 	status = "okay";
- };
+ 		pci1: pci at ee0d0000 {
+@@ -890,6 +902,18 @@
+ 			interrupt-map = <0x0000 0 0 1 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH
+ 					 0x0800 0 0 1 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH
+ 					 0x1000 0 0 2 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
 +
-+&pci1 {
-+	status = "okay";
-+	pinctrl-0 = <&usb1_pins>;
-+	pinctrl-names = "default";
-+};
++			usb at 1,0 {
++				reg = <0x10800 0 0 0 0>;
++				phys = <&usb2 0>;
++				phy-names = "usb";
++			};
++
++			usb at 2,0 {
++				reg = <0x11000 0 0 0 0>;
++				phys = <&usb2 0>;
++				phy-names = "usb";
++			};
+ 		};
+ 
+ 		usbphy: usb-phy at e6590100 {
 -- 
 2.11.0
