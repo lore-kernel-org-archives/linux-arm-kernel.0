@@ -1,51 +1,49 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 20 Oct 2017 18:12:36 +0100
-Subject: [PATCH] ARM: compressed: discard ksym/kcrctab input section
-In-Reply-To: <20171020165433.GI20805@n2100.armlinux.org.uk>
-References: <CAKv+Gu_t+oLJKGzy3LxgLZqqYsd9eQiwZRr6dgPbqpsHnQUUxw@mail.gmail.com>
- <874lr4d8gm.fsf@free-electrons.com>
- <20171012094517.GB20805@n2100.armlinux.org.uk>
- <CAKv+Gu_+D+d+5Zi8LRmi3_sHEVx-FLLKHsi9aUUmNB8VvcHANQ@mail.gmail.com>
- <878tg56dtn.fsf@free-electrons.com>
- <CAKv+Gu_q0A+42ht1f4o_SToWSV4OBThV=gtyfBoGYFZyKWNW5Q@mail.gmail.com>
- <20171020161133.GG20805@n2100.armlinux.org.uk>
- <CAKv+Gu9Ygu4UELUbWD8sTzdL8ZQRWPAtQWaM6qTd2GyzuEDN5g@mail.gmail.com>
- <20171020163207.GH20805@n2100.armlinux.org.uk>
- <CAKv+Gu_FqQjXLH6C8+pVyvfWqgL+e2g8geRG+t0kBxt49ObY-Q@mail.gmail.com>
- <20171020165433.GI20805@n2100.armlinux.org.uk>
-Message-ID: <CAKv+Gu9-1cuGgjHmW=nPpRAB7aFPt+60aqC4wFABeu-HAzjJHQ@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sat, 21 Oct 2017 02:16:38 +0900
+Subject: [GIT PULL] ARM: uniphier: fixes for v4.14
+Message-ID: <CAK7LNARdGT2zpbGLgv9fCgn+i96AH1pwNgy3mDJxGxBSiJEJwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 October 2017 at 17:54, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Fri, Oct 20, 2017 at 05:36:08PM +0100, Ard Biesheuvel wrote:
->> Why would you have to choose between these patches? You can simply
->> apply mine as a bug fix, and postpone the le_struct.h discussion for
->> the next cycle.
->
-> It's not a choice between these two patches.  I think we need Arnd's
-> patch, because we know that fixes Romain Izard's problem.  If I apply
-> just your patch, then Gregory stops complaining, and there'll be
-> nothing to remind us of this issue - Romain isn't shouting about it.
-> That's a problem, because it's a real bug that then gets forgotten
-> about.
->
-> Or do we have evidence that your patch fixes Romain Izard's problem
-> as well?  I don't see any such suggestion.
->
+Hi Arnd, Olof,
 
-OK, so you are reluctant to apply patch A which fixes issue X, because
-it will result in you forgetting about patch B that fixes issue Y. I
-am sorry, but that does not make any sense to me.
+Please pull small fixes of ARM UniPhier DT.
+It turned out one clock was missing that is actually
+necessary for EHCI nodes.
 
-> So, let me go back to the dart board... I just don't have the
-> information to be able to make any decision on this, so stop asking
-> me for a decision on something I know nothing about.  Either provide
-> me with some information I can base a decision on, or stop asking
-> for a decision.
->
 
-Nobody is asking you to choose. I am asking you to apply this patch:
-piggydata used to be word aligned, and there is no harm in restoring
-that behavior explicitly.
+
+The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+
+  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
+tags/uniphier-fixes-v4.14
+
+for you to fetch changes up to deaa55196e0cb6eccc3d5374ddd7c47e7ec61da3:
+
+  arm64: dts: uniphier: add STDMAC clock to EHCI nodes (2017-10-21
+01:24:05 +0900)
+
+----------------------------------------------------------------
+UniPhier ARM SoC fixes for v4.14
+
+- Add necessary clock to EHCI node
+
+----------------------------------------------------------------
+Masahiro Yamada (2):
+      ARM: dts: uniphier: add STDMAC clock to EHCI nodes
+      arm64: dts: uniphier: add STDMAC clock to EHCI nodes
+
+ arch/arm/boot/dts/uniphier-ld4.dtsi              | 9 ++++++---
+ arch/arm/boot/dts/uniphier-pro4.dtsi             | 6 ++++--
+ arch/arm/boot/dts/uniphier-sld8.dtsi             | 9 ++++++---
+ arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 9 ++++++---
+ 4 files changed, 22 insertions(+), 11 deletions(-)
+
+
+-- 
+Best Regards
+Masahiro Yamada
