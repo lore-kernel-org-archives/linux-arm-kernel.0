@@ -1,42 +1,38 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 20 Oct 2017 07:37:29 +0200
-Subject: [PATCH] iio: adc: sun4i-gpadc: use of_device_get_match_data
-Message-ID: <20171020053729.23248-1-clabbe.montjoie@gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 20 Oct 2017 11:23:19 +0530
+Subject: [GIT PULL 1/2] DaVinci DT updates for v4.15
+In-Reply-To: <CAK8P3a1-gMtvpjHLKVU5cJM89g_LQN9qCFuNUZzGMj2MDbptcQ@mail.gmail.com>
+References: <20171013140240.18599-1-nsekhar@ti.com>
+ <CAK8P3a1-gMtvpjHLKVU5cJM89g_LQN9qCFuNUZzGMj2MDbptcQ@mail.gmail.com>
+Message-ID: <c967abc0-7dab-9bf1-f497-750f18c04c28@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The usage of of_device_get_match_data reduce the code size a bit.
-Furthermore, it prevents an improbable dereference when
-of_match_device() return NULL.
+Hi Arnd,
 
-Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
----
- drivers/iio/adc/sun4i-gpadc-iio.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+On Friday 20 October 2017 03:51 AM, Arnd Bergmann wrote:
+> On Fri, Oct 13, 2017 at 4:02 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+>>
+>> ----------------------------------------------------------------
+>> Add support for accessing DSP on DA850 SoC when using
+>> device-tree.
+> 
+> Pulled into next/dt.
+> 
+>> Suman Anna (3):
+>>       ARM: dts: da850: Add DSP node
+>>       ARM: dts: da850-lcdk: Add and enable CMA reserved pool for DSP
+>>       ARM: davinci: da8xx-dt: Add OF_DEV_AUXDATA entry for DSP clock matching
+>>
+>>  arch/arm/boot/dts/da850-lcdk.dts | 18 ++++++++++++++++++
+>>  arch/arm/boot/dts/da850.dtsi     | 12 ++++++++++++
+>>  arch/arm/mach-davinci/da8xx-dt.c |  1 +
+> 
+> What is your longterm plan for the clocks? Is anyone working on converting
+> that clock driver to properly support DT clocks?
 
-diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
-index c4e70f1cad79..04d7147e0110 100644
---- a/drivers/iio/adc/sun4i-gpadc-iio.c
-+++ b/drivers/iio/adc/sun4i-gpadc-iio.c
-@@ -501,17 +501,15 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
- 				struct iio_dev *indio_dev)
- {
- 	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
--	const struct of_device_id *of_dev;
- 	struct resource *mem;
- 	void __iomem *base;
- 	int ret;
- 
--	of_dev = of_match_device(sun4i_gpadc_of_id, &pdev->dev);
--	if (!of_dev)
-+	info->data = of_device_get_match_data(&pdev->dev);
-+	if (!info->data)
- 		return -ENODEV;
- 
- 	info->no_irq = true;
--	info->data = (struct gpadc_data *)of_dev->data;
- 	indio_dev->num_channels = ARRAY_SIZE(sun8i_a33_gpadc_channels);
- 	indio_dev->channels = sun8i_a33_gpadc_channels;
- 
--- 
-2.13.6
+Not at the moment. But I am working to get some resources behind this.
+Right now I hope to see this done by mid-next year.
+
+Thanks,
+Sekhar
