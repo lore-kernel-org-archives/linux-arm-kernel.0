@@ -1,40 +1,51 @@
-From: jim2101024@gmail.com (Jim Quinlan)
-Date: Fri, 20 Oct 2017 10:41:56 -0400
-Subject: [PATCH 5/9] PCI: host: brcmstb: add dma-ranges for inbound traffic
-In-Reply-To: <20171020073730.GA12937@lst.de>
-References: <1507761269-7017-1-git-send-email-jim2101024@gmail.com>
- <1507761269-7017-6-git-send-email-jim2101024@gmail.com>
- <589c04cb-061b-a453-3188-79324a02388e@arm.com>
- <20171017081422.GA19475@lst.de>
- <CANCKTBsCB+x2XgrND9AhRtxPkCXfps1nA+YymkZjKHOUZfjSHQ@mail.gmail.com>
- <20171018065316.GA11183@lst.de>
- <CANCKTBv+yiCNsrnx3m+W9wPqC4NdKPZ2p=zLtSa8fX6v1rPcYQ@mail.gmail.com>
- <20171019091644.GA14983@lst.de>
- <CANCKTBuaTD29My77QfOeUmtZfLAmmJXUYe6QvBW+uoH2Kb+tAQ@mail.gmail.com>
- <20171020073730.GA12937@lst.de>
-Message-ID: <CANCKTBsRRkwNMrxWjtgxbyZqT6NOxPX0NHDbnEO2BMjj8oVtpg@mail.gmail.com>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Fri, 20 Oct 2017 17:43:02 +0300
+Subject: [PATCH v3 1/3] interconnect: Add generic on-chip interconnect API
+In-Reply-To: <20170908171830.13813-2-georgi.djakov@linaro.org>
+References: <20170908171830.13813-1-georgi.djakov@linaro.org>
+ <20170908171830.13813-2-georgi.djakov@linaro.org>
+Message-ID: <a7cf55ba-0475-d74c-f759-a24e58ccde47@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 20, 2017 at 3:37 AM, Christoph Hellwig <hch@lst.de> wrote:
-> On Thu, Oct 19, 2017 at 06:47:45PM -0400, Jim Quinlan wrote:
->> The only way to prevent this is to reserve a single page at the end of
->> the first memory region of any pair that are adjacent in physical
->> memory.  A hack, yes, but I don't see an easier way out of this.  Many
->> if not most of our boards do not have adjacent regions and would not
->> need this.
->
-> dma mappings can be much larger than a single page.  For the block
-> world take a look at __blk_segment_map_sg which does the merging
-> of contiguous pages into a single SG segment.  You'd have to override
-> BIOVEC_PHYS_MERGEABLE to prevent this from happening in your supported
-> architectures for the block layer.
+Hi,
 
-I am not sure I understand your comment -- the size of the request
-shouldn't be a factor.  Let's look at your example of the DMA request
-of 3fffff00 to 4000000f (physical memory).  Lets say it is for 15
-pages.  If we block out  the last page [0x3ffff000..0x3fffffff] from
-what is available, there is no 15 page span that can happen across the
-0x40000000 boundary.  For SG, there can be no merge that connects a
-page from one region to another region.  Can you give an example of
-the scenario you are thinking of?
+On 09/08/2017 08:18 PM, Georgi Djakov wrote:
+> This patch introduce a new API to get requirements and configure the
+> interconnect buses across the entire chipset to fit with the current demand.
+> 
+> The API is using a consumer/provider-based model, where the providers are
+> the interconnect buses and the consumers could be various drivers.
+> The consumers request interconnect resources (path) between endpoints and
+> set the desired constraints on this data flow path. The providers receive
+> requests from consumers and aggregate these requests for all master-slave
+> pairs on that path. Then the providers configure each participating in the
+> topology node according to the requested data flow path, physical links and
+> constraints. The topology could be complicated and multi-tiered and is SoC
+> specific.
+> 
+> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+> ---
+>  Documentation/interconnect/interconnect.rst |  93 +++++++
+>  drivers/Kconfig                             |   2 +
+>  drivers/Makefile                            |   1 +
+>  drivers/interconnect/Kconfig                |  10 +
+>  drivers/interconnect/Makefile               |   1 +
+>  drivers/interconnect/interconnect.c         | 382 ++++++++++++++++++++++++++++
+>  include/linux/interconnect-consumer.h       |  73 ++++++
+>  include/linux/interconnect-provider.h       | 119 +++++++++
+>  8 files changed, 681 insertions(+)
+>  create mode 100644 Documentation/interconnect/interconnect.rst
+>  create mode 100644 drivers/interconnect/Kconfig
+>  create mode 100644 drivers/interconnect/Makefile
+>  create mode 100644 drivers/interconnect/interconnect.c
+>  create mode 100644 include/linux/interconnect-consumer.h
+>  create mode 100644 include/linux/interconnect-provider.h
+
+Any comments on this patch?
+
+I am planning to change the prefix that is used for naming for example
+the functions from "interconnect_" to something shorter like icbus_.
+
+Thanks,
+Georgi
