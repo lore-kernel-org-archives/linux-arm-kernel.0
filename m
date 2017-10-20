@@ -1,117 +1,109 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 20 Oct 2017 12:28:35 +0200
-Subject: [PATCH 08/42] ARM: dts: iwg20d-q7-dbcm-ca: Add device trees for
- camera DB
+Date: Fri, 20 Oct 2017 12:28:36 +0200
+Subject: [PATCH 09/42] ARM: dts: r8a7790: add cpu capacity-dmips-mhz
+ information
 In-Reply-To: <cover.1508493785.git.horms+renesas@verge.net.au>
 References: <cover.1508493785.git.horms+renesas@verge.net.au>
-Message-ID: <2ee18841ff649e973d62afc6096b892396a676ef.1508493785.git.horms+renesas@verge.net.au>
+Message-ID: <5bdc81259bb0efd5bd71820ef15757b70beae751.1508493785.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+From: Dietmar Eggemann <dietmar.eggemann@arm.com>
 
-This patch adds a .dtsi that describes the camera daughter board
-and a .dts to describe the HW made of iWave's RZ/G1M SoM, iWave's
-RZ/G1M/G1N Qseven carrier board, and the camera daughter board.
-The camera daughter board .dtsi adds support for ttySC[14].
+The following 'capacity-dmips-mhz' dt property values are used:
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Cortex-A15: 1024, Cortex-A7: 539
+
+They have been derived form the cpu_efficiency values:
+
+Cortex-A15: 3891, Cortex-A7: 2048
+
+by scaling them so that the Cortex-A15s (big cores) use 1024.
+
+The cpu_efficiency values were originally derived from the "Big.LITTLE
+Processing with ARM Cortex?-A15 & Cortex-A7" white paper
+(http://www.cl.cam.ac.uk/~rdm34/big.LITTLE.pdf). Table 1 lists 1.9x
+(3891/2048) as the Cortex-A15 vs Cortex-A7 performance ratio for the
+Dhrystone benchmark.
+
+The following platform is affected once cpu-invariant accounting
+support is re-connected to the task scheduler:
+
+r8a7790-lager
+
+Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/Makefile                      |  1 +
- arch/arm/boot/dts/iwg20d-q7-dbcm-ca.dtsi        | 43 +++++++++++++++++++++++++
- arch/arm/boot/dts/r8a7743-iwg20d-q7-dbcm-ca.dts | 19 +++++++++++
- 3 files changed, 63 insertions(+)
- create mode 100644 arch/arm/boot/dts/iwg20d-q7-dbcm-ca.dtsi
- create mode 100644 arch/arm/boot/dts/r8a7743-iwg20d-q7-dbcm-ca.dts
+ arch/arm/boot/dts/r8a7790.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index e87f311ee9f2..8c34d06cfda0 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -724,6 +724,7 @@ dtb-$(CONFIG_ARCH_RENESAS) += \
- 	r8a73a4-ape6evm.dtb \
- 	r8a7740-armadillo800eva.dtb \
- 	r8a7743-iwg20d-q7.dtb \
-+	r8a7743-iwg20d-q7-dbcm-ca.dtb \
- 	r8a7743-sk-rzg1m.dtb \
- 	r8a7745-iwg22d-sodimm.dtb \
- 	r8a7745-sk-rzg1e.dtb \
-diff --git a/arch/arm/boot/dts/iwg20d-q7-dbcm-ca.dtsi b/arch/arm/boot/dts/iwg20d-q7-dbcm-ca.dtsi
-new file mode 100644
-index 000000000000..31fab5f183a9
---- /dev/null
-+++ b/arch/arm/boot/dts/iwg20d-q7-dbcm-ca.dtsi
-@@ -0,0 +1,43 @@
-+/*
-+ * Device Tree Source for the iWave-RZ-G1M/N Daughter Board Camera Module
-+ *
-+ * Copyright (C) 2017 Renesas Electronics Corp.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+/ {
-+	aliases {
-+		serial1 = &scif1;
-+		serial4 = &hscif1;
-+	};
-+};
-+
-+&hscif1 {
-+	pinctrl-0 = <&hscif1_pins>;
-+	pinctrl-names = "default";
-+
-+	uart-has-rtscts;
-+	status = "okay";
-+};
-+
-+&pfc {
-+	hscif1_pins: hscif1 {
-+		groups = "hscif1_data_c", "hscif1_ctrl_c";
-+		function = "hscif1";
-+	};
-+
-+	scif1_pins: scif1 {
-+		groups = "scif1_data_d";
-+		function = "scif1";
-+	};
-+};
-+
-+&scif1 {
-+	pinctrl-0 = <&scif1_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/r8a7743-iwg20d-q7-dbcm-ca.dts b/arch/arm/boot/dts/r8a7743-iwg20d-q7-dbcm-ca.dts
-new file mode 100644
-index 000000000000..d90eb8464222
---- /dev/null
-+++ b/arch/arm/boot/dts/r8a7743-iwg20d-q7-dbcm-ca.dts
-@@ -0,0 +1,19 @@
-+/*
-+ * Device Tree Source for the iWave-RZ/G1M Qseven board + camera daughter board
-+ *
-+ * Copyright (C) 2017 Renesas Electronics Corp.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+/dts-v1/;
-+#include "r8a7743-iwg20m.dtsi"
-+#include "iwg20d-q7-common.dtsi"
-+#include "iwg20d-q7-dbcm-ca.dtsi"
-+
-+/ {
-+	model = "iW-RainboW-G20D-Q7 RZ/G1M based plus camera daughter board";
-+	compatible = "iwave,g20d", "iwave,g20m", "renesas,r8a7743";
-+};
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 17a48199b7a9..92b7f3bd8b69 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -56,6 +56,7 @@
+ 			clock-latency = <300000>; /* 300 us */
+ 			power-domains = <&sysc R8A7790_PD_CA15_CPU0>;
+ 			next-level-cache = <&L2_CA15>;
++			capacity-dmips-mhz = <1024>;
+ 
+ 			/* kHz - uV - OPPs unknown yet */
+ 			operating-points = <1400000 1000000>,
+@@ -73,6 +74,7 @@
+ 			clock-frequency = <1300000000>;
+ 			power-domains = <&sysc R8A7790_PD_CA15_CPU1>;
+ 			next-level-cache = <&L2_CA15>;
++			capacity-dmips-mhz = <1024>;
+ 		};
+ 
+ 		cpu2: cpu at 2 {
+@@ -82,6 +84,7 @@
+ 			clock-frequency = <1300000000>;
+ 			power-domains = <&sysc R8A7790_PD_CA15_CPU2>;
+ 			next-level-cache = <&L2_CA15>;
++			capacity-dmips-mhz = <1024>;
+ 		};
+ 
+ 		cpu3: cpu at 3 {
+@@ -91,6 +94,7 @@
+ 			clock-frequency = <1300000000>;
+ 			power-domains = <&sysc R8A7790_PD_CA15_CPU3>;
+ 			next-level-cache = <&L2_CA15>;
++			capacity-dmips-mhz = <1024>;
+ 		};
+ 
+ 		cpu4: cpu at 100 {
+@@ -100,6 +104,7 @@
+ 			clock-frequency = <780000000>;
+ 			power-domains = <&sysc R8A7790_PD_CA7_CPU0>;
+ 			next-level-cache = <&L2_CA7>;
++			capacity-dmips-mhz = <539>;
+ 		};
+ 
+ 		cpu5: cpu at 101 {
+@@ -109,6 +114,7 @@
+ 			clock-frequency = <780000000>;
+ 			power-domains = <&sysc R8A7790_PD_CA7_CPU1>;
+ 			next-level-cache = <&L2_CA7>;
++			capacity-dmips-mhz = <539>;
+ 		};
+ 
+ 		cpu6: cpu at 102 {
+@@ -118,6 +124,7 @@
+ 			clock-frequency = <780000000>;
+ 			power-domains = <&sysc R8A7790_PD_CA7_CPU2>;
+ 			next-level-cache = <&L2_CA7>;
++			capacity-dmips-mhz = <539>;
+ 		};
+ 
+ 		cpu7: cpu at 103 {
+@@ -127,6 +134,7 @@
+ 			clock-frequency = <780000000>;
+ 			power-domains = <&sysc R8A7790_PD_CA7_CPU3>;
+ 			next-level-cache = <&L2_CA7>;
++			capacity-dmips-mhz = <539>;
+ 		};
+ 
+ 		L2_CA15: cache-controller-0 {
 -- 
 2.11.0
