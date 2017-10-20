@@ -1,83 +1,44 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 20 Oct 2017 17:42:51 +0100
-Subject: [PATCH v3 6/7] arm64: topology: Enable ACPI/PPTT based CPU
- topology.
-In-Reply-To: <e2772689-603b-f129-0643-f5d1f5e41a19@arm.com>
-References: <20171012194856.13844-1-jeremy.linton@arm.com>
- <20171012194856.13844-7-jeremy.linton@arm.com>
- <20171019155622.GC18883@red-moon>
- <6a9836f5-d31c-67fb-b2dd-bc0972ebb1c2@arm.com>
- <20171020091428.GA21060@red-moon>
- <e2772689-603b-f129-0643-f5d1f5e41a19@arm.com>
-Message-ID: <2114f173-4d89-278b-71f9-3b80457cfa63@arm.com>
+From: gengdj.1984@gmail.com (gengdongjiu)
+Date: Sat, 21 Oct 2017 00:44:57 +0800
+Subject: [PATCH v4 15/21] KVM: arm64: Set an impdef ESR for Virtual-SError
+ using VSESR_EL2.
+In-Reply-To: <20171019145807.23251-16-james.morse@arm.com>
+References: <20171019145807.23251-1-james.morse@arm.com>
+ <20171019145807.23251-16-james.morse@arm.com>
+Message-ID: <CAMj-D2AMy1_SPrLGti9U=oz1JvBDHvRAMsBtw51B3JK0omLyXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+2017-10-19 22:58 GMT+08:00 James Morse <james.morse@arm.com>:
+> Prior to v8.2's RAS Extensions, the HCR_EL2.VSE 'virtual SError' feature
+> generated an SError with an implementation defined ESR_EL1.ISS, because we
+> had no mechanism to specify the ESR value.
+>
+> On Juno this generates an all-zero ESR, the most significant bit 'ISV'
+> is clear indicating the remainder of the ISS field is invalid.
+>
+> With the RAS Extensions we have a mechanism to specify this value, and the
+> most significant bit has a new meaning: 'IDS - Implementation Defined
+> Syndrome'. An all-zero SError ESR now means: 'RAS error: Uncategorized'
+> instead of 'no valid ISS'.
 
+consider again.
 
-On 20/10/17 17:14, Jeremy Linton wrote:
-> Hi,
-> 
-> On 10/20/2017 04:14 AM, Lorenzo Pieralisi wrote:
->> On Thu, Oct 19, 2017 at 11:13:27AM -0500, Jeremy Linton wrote:
->>> On 10/19/2017 10:56 AM, Lorenzo Pieralisi wrote:
->>>> On Thu, Oct 12, 2017 at 02:48:55PM -0500, Jeremy Linton wrote:
->>>>> Propagate the topology information from the PPTT tree to the
->>>>> cpu_topology array. We can get the thread id, core_id and
->>>>> cluster_id by assuming certain levels of the PPTT tree correspond
->>>>> to those concepts. The package_id is flagged in the tree and can be
->>>>> found by passing an arbitrary large level to setup_acpi_cpu_topology()
->>>>> which terminates its search when it finds an ACPI node flagged
->>>>> as the physical package. If the tree doesn't contain enough
->>>>> levels to represent all of thread/core/cod/package then the package
->>>>> id will be used for the missing levels.
->>>>>
->>>>> Since server/ACPI machines are more likely to be multisocket and NUMA,
->>>>
->>>> I think this stuff is vague enough already so to start with I would
->>>> drop
->>>> patch 4 and 5 and stop assuming what machines are more likely to ship
->>>> with ACPI than DT.
->>>>
->>>> I am just saying, for the umpteenth time, that these levels have no
->>>> architectural meaning _whatsoever_, level is a hierarchy concept
->>>> with no architectural meaning attached.
->>>
->>> ?
->>>
->>> Did anyone say anything about that? No, I think the only thing being
->>> guaranteed here is that the kernel's physical_id maps to an ACPI
->>> defined socket. Which seems to be the mindset of pretty much the
->>> entire !arm64 community meaning they are optimizing their software
->>> and the kernel with that concept in mind.
->>>
->>> Are you denying the existence of non-uniformity between threads
->>> running on different physical sockets?
->>
->> No, I have not explained my POV clearly, apologies.
->>
->> AFAIK, the kernel currently deals with 2 (3 - if SMT) topology layers.
->>
->> 1) thread
->> 2) core
->> 3) package
->>
->> What I wanted to say is, that, to simplify this series, you do not need
->> to introduce the COD topology level, since it is just another arbitrary
->> topology level (ie there is no way you can pinpoint which level
->> corresponds to COD with PPTT - or DT for the sake of this discussion)
->> that would not be used in the kernel (apart from big.LITTLE cpufreq
->> driver and PSCI checker whose usage of topology_physical_package_id() is
->> questionable anyway).
+I still consider that it is not better set  "Implementation Defined
+Syndrome" here.
+I know your meaning that An all-zero SError means Uncategorized
+>From the beginning,  our starting point is KVM is the architecture
+related and Qemu/kvmtool is platform related.
+Qemu/kvmtool is the role of host firmware.
+so we let Qemu to create APEI/GHES table and record CPER,
+and also injects SEA/SEI in the Qemu.
 
-Just thinking out loud here.
+About the vsesr_el2 which is used to specify the guest ESR,   also all
+set by Qemu/kvmtool are better.
+including the three cases  even the ESR are  all-zero(uncategorized).
+1. IMPLEMENTATION DEFINED
+2  categorized,
+3  uncategorized,
 
-1. psci_checker.c : it's just used to get groups of cpu's to achieve
-   deeper idle states. It should be easy to get rid of that.
-2. big.LITTLE cpufreq : 2 users, scpi I should be able to do what I did
-   for SCMI and for spc I am thinking if we can hard code it's just used
-   on TC2
-
--- 
-Regards,
-Sudeep
+For this case, Qemu just set the ESR, nothing else, not passing
+RAS-error to userspace.
