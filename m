@@ -1,62 +1,88 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri, 20 Oct 2017 10:14:14 +0200
-Subject: [PATCH 1/2] clk: meson: gxbb: Add VPU and VAPB clockids
-In-Reply-To: <1508168085-19032-2-git-send-email-narmstrong@baylibre.com>
-References: <1508168085-19032-1-git-send-email-narmstrong@baylibre.com>
- <1508168085-19032-2-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1508487254.3616.12.camel@baylibre.com>
+Date: Fri, 20 Oct 2017 10:21:12 +0200
+Subject: [PATCH] nvmem: meson: use generic compatible
+In-Reply-To: <CAL_JsqKV5yGNFXxsPzAgF6_g-bQn8x8ScXVZ=Wgc1=APPL=mMw@mail.gmail.com>
+References: <20171012152450.12454-1-jbrunet@baylibre.com>
+ <CAFBinCBVNEqTk+NUHz62FetLhYagFb5K+g17P_2Xb7sBUfEmdA@mail.gmail.com>
+ <1507923553.30658.10.camel@baylibre.com>
+ <20171017205204.t4vfvbc2c5nsrnhm@rob-hp-laptop>
+ <1508311867.3957.33.camel@baylibre.com>
+ <CAL_JsqKV5yGNFXxsPzAgF6_g-bQn8x8ScXVZ=Wgc1=APPL=mMw@mail.gmail.com>
+Message-ID: <1508487672.3616.18.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-10-16 at 17:34 +0200, Neil Armstrong wrote:
-> Add the clkids for the clocks feeding the Video Processing Unit.
+On Thu, 2017-10-19 at 16:10 -0500, Rob Herring wrote:
+> On Wed, Oct 18, 2017 at 2:31 AM, Jerome Brunet <jbrunet@baylibre.com> wrote:
+> > On Tue, 2017-10-17 at 15:52 -0500, Rob Herring wrote:
+> > > On Fri, Oct 13, 2017 at 09:39:13PM +0200, Jerome Brunet wrote:
+> > > > On Fri, 2017-10-13 at 21:14 +0200, Martin Blumenstingl wrote:
+> > > > > Hi Jerome,
+> > > > > 
+> > > > > On Thu, Oct 12, 2017 at 5:24 PM, Jerome Brunet <jbrunet@baylibre.com>
+> > > > > wrote:
+> > > > > > The meson efuse driver seems to be compatible with more SoCs than
+> > > > > > initially thought. Let's use the most generic compatible he have in
+> > > > > > DT instead of the gxbb specific one
+> > > > > > 
+> > > > > > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> > > > > > ---
+> > > > > >  Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt | 4 ++--
+> > > > > >  drivers/nvmem/meson-efuse.c                               | 2 +-
+> > > > > >  2 files changed, 3 insertions(+), 3 deletions(-)
+> > > > > > 
+> > > > > > diff --git a/Documentation/devicetree/bindings/nvmem/amlogic-
+> > > > > > efuse.txt
+> > > > > > b/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
+> > > > > > index fafd85bd67a6..0260524292fe 100644
+> > > > > > --- a/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
+> > > > > > +++ b/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
+> > > > > > @@ -1,7 +1,7 @@
+> > > > > >  = Amlogic eFuse device tree bindings =
+> > > > > > 
+> > > > > >  Required properties:
+> > > > > > -- compatible: should be "amlogic,meson-gxbb-efuse"
+> > > > > > +- compatible: should be "amlogic,meson-gx-efuse"
+> > > 
+> > > Same comment as for the firmware.
+> > > 
+> > > > > 
+> > > > > have you checked with the devicetree maintainers how they want the
+> > > > > documentation to look like in this case?
+> > > > 
+> > > > You mean "Should we put every compatible existing (in DT) in the
+> > > > documentation"
+> > > > From what I've seen, at least in meson drivers, only the matched ones
+> > > > are
+> > > > listed.
+> > > > 
+> > > > That's a good question though.
+> > > > We tend to put soc specific compatible "in case"  we need them later on.
+> > > > Should
+> > > > we document those ?
+> > > 
+> > > Absolutely.
+> > 
+> > My understanding is that this documentation is the documentation of the
+> > bindings
+> > used by the driver.
+> 
+> No, the binding doc should be sufficient to validate the dts.
+> 
+> > If I understand your point, we should document bindings (compatible in that
+> > case) that are in fact not fact by the driver. This means that if someone
+> > refer
+> > only to the documentation, he might be surprised by the result.
+> 
+> How so?
 
-Acked-by: Jerome Brunet <jbrunet@baylibre.com>
+Compatible not matched.
+If the compatible is documented, I would expect "a driver" to match on it
+
+If we document every compatible used in DTS, some won't be matched.
+
+IMO, the current way (document the driver - the matched bindings) is easier and
+more predictable.
 
 > 
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  drivers/clk/meson/gxbb.h              |  6 +++++-
->  include/dt-bindings/clock/gxbb-clkc.h | 11 +++++++++++
->  2 files changed, 16 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
-> index 5b1d4b3..aee6fbb 100644
-> --- a/drivers/clk/meson/gxbb.h
-> +++ b/drivers/clk/meson/gxbb.h
-> @@ -190,8 +190,12 @@
->  #define CLKID_SD_EMMC_B_CLK0_DIV  121
->  #define CLKID_SD_EMMC_C_CLK0_SEL  123
->  #define CLKID_SD_EMMC_C_CLK0_DIV  124
-> +#define CLKID_VPU_0_DIV		  127
-> +#define CLKID_VPU_1_DIV		  130
-> +#define CLKID_VAPB_0_DIV	  134
-> +#define CLKID_VAPB_1_DIV	  137
->  
-> -#define NR_CLKS			  126
-> +#define NR_CLKS			  141
->  
->  /* include the CLKIDs that have been made part of the DT binding */
->  #include <dt-bindings/clock/gxbb-clkc.h>
-> diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-
-> bindings/clock/gxbb-clkc.h
-> index c04a76d..7c5a6f3 100644
-> --- a/include/dt-bindings/clock/gxbb-clkc.h
-> +++ b/include/dt-bindings/clock/gxbb-clkc.h
-> @@ -113,5 +113,16 @@
->  #define CLKID_SD_EMMC_A_CLK0	119
->  #define CLKID_SD_EMMC_B_CLK0	122
->  #define CLKID_SD_EMMC_C_CLK0	125
-> +#define CLKID_VPU_0_SEL		126
-> +#define CLKID_VPU_0		128
-> +#define CLKID_VPU_1_SEL		129
-> +#define CLKID_VPU_1		131
-> +#define CLKID_VPU		132
-> +#define CLKID_VAPB_0_SEL	133
-> +#define CLKID_VAPB_0		135
-> +#define CLKID_VAPB_1_SEL	136
-> +#define CLKID_VAPB_1		138
-> +#define CLKID_VAPB_SEL		139
-> +#define CLKID_VAPB		140
->  
->  #endif /* __GXBB_CLKC_H */
+> Rob
