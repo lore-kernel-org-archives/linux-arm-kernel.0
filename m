@@ -1,353 +1,116 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 20 Oct 2017 12:28:34 +0200
-Subject: [PATCH 07/42] ARM: dts: iwg20d-q7: Rework DT architecture
-In-Reply-To: <cover.1508493785.git.horms+renesas@verge.net.au>
-References: <cover.1508493785.git.horms+renesas@verge.net.au>
-Message-ID: <4f0b2563c4c0c67fc5b5e2369d5f62f91abc42e7.1508493785.git.horms+renesas@verge.net.au>
+From: elena.reshetova@intel.com (Reshetova, Elena)
+Date: Fri, 20 Oct 2017 10:37:13 +0000
+Subject: [PATCH 02/15] drivers, net, ethernet: convert
+ mtk_eth.dma_refcnt from atomic_t to refcount_t
+In-Reply-To: <1508486927.29850.12.camel@mtkswgap22>
+References: <1508484229-19706-1-git-send-email-elena.reshetova@intel.com>
+ <1508484229-19706-3-git-send-email-elena.reshetova@intel.com>
+ <1508486927.29850.12.camel@mtkswgap22>
+Message-ID: <2236FBA76BA1254E88B949DDB74E612B802B37EE@IRSMSX102.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> On Fri, 2017-10-20 at 10:23 +0300, Elena Reshetova wrote:
+> > atomic_t variables are currently used to implement reference
+> > counters with the following properties:
+> >  - counter is initialized to 1 using atomic_set()
+> >  - a resource is freed upon counter reaching zero
+> >  - once counter reaches zero, its further
+> >    increments aren't allowed
+> >  - counter schema uses basic atomic operations
+> >    (set, inc, inc_not_zero, dec_and_test, etc.)
+> >
+> > Such atomic variables should be converted to a newly provided
+> > refcount_t type and API that prevents accidental counter overflows
+> > and underflows. This is important since overflows and underflows
+> > can lead to use-after-free situation and be exploitable.
+> >
+> > The variable mtk_eth.dma_refcnt is used as pure reference counter.
+> > Convert it to refcount_t and fix up the operations.
+> >
+> > Suggested-by: Kees Cook <keescook@chromium.org>
+> > Reviewed-by: David Windsor <dwindsor@gmail.com>
+> > Reviewed-by: Hans Liljestrand <ishkamiel@gmail.com>
+> > Signed-off-by: Elena Reshetova <elena.reshetova@intel.com>
+> > ---
+> >  drivers/net/ethernet/mediatek/mtk_eth_soc.c | 8 +++++---
+> >  drivers/net/ethernet/mediatek/mtk_eth_soc.h | 4 +++-
+> >  2 files changed, 8 insertions(+), 4 deletions(-)
+> >
+> > diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+> b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+> > index 5e81a72..54adfd9 100644
+> > --- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+> > +++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+> > @@ -1817,7 +1817,7 @@ static int mtk_open(struct net_device *dev)
+> >  	struct mtk_eth *eth = mac->hw;
+> >
+> >  	/* we run 2 netdevs on the same dma ring so we only bring it up once
+> */
+> > -	if (!atomic_read(&eth->dma_refcnt)) {
+> > +	if (!refcount_read(&eth->dma_refcnt)) {
+> >  		int err = mtk_start_dma(eth);
+> >
+> >  		if (err)
+> > @@ -1827,8 +1827,10 @@ static int mtk_open(struct net_device *dev)
+> >  		napi_enable(&eth->rx_napi);
+> >  		mtk_tx_irq_enable(eth, MTK_TX_DONE_INT);
+> >  		mtk_rx_irq_enable(eth, MTK_RX_DONE_INT);
+> > +		refcount_set(&eth->dma_refcnt, 1);
+> 
+> the existing driver seems to have a missing initial atomic_set for the
+> eth->dma_refcnt.
+> 
+> >  	}
+> > -	atomic_inc(&eth->dma_refcnt);
+> > +	else
+> > +		refcount_inc(&eth->dma_refcnt);
+> >
+> 
+> how about add the initial refcount_set into probe handler, and keep
+> logic else unchanged ?
 
-Since the same carrier board may host RZ/G1M and RZ/G1N based
-Systems on Module, the DT architecture for iwg20d-q7 needs
-better decoupling. This patch provides:
-* iwg20d-q7-common.dtsi - its purpose is to define the carrier
-  board definitions, and its content is basically the same
-  as the previous version of r8a7743-iwg20d-q7.dts, only it
-  has no reference to the SoM .dtsi, and that's why the
-  filename doesn't mention the SoC name any more.
-* r8a7743-iwg20d-q7.dts - its new purpose is to put together
-  the SoM .dtsi (r8a7743-iwg20m.dtsi) and the carrier board
-  .dtsi defined by this very patch, along with "model" and
-  "compatible" properties.
-The final DT architecture to describe the board is now:
-r8a7743-iwg20d-q7.dts           # Carrier Board + SoM
-??? r8a7743-iwg20m.dtsi         # SoM
-??? ??? r8a7743.dtsi            # SoC
-??? iwg20d-q7-common.dtsi       # Carrier Board
-and maximizes the reuse of the definitions for the carrier board
-and for the SoM.
+Sure, I guess you mean mtk_probe() function? I can move the refcount_set to be there
+and remove this change. 
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/iwg20d-q7-common.dtsi | 147 ++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/r8a7743-iwg20d-q7.dts | 139 +-----------------------------
- 2 files changed, 149 insertions(+), 137 deletions(-)
- create mode 100644 arch/arm/boot/dts/iwg20d-q7-common.dtsi
+Should I resend the modified patch to you (maybe then two of the ethernet patches)?
 
-diff --git a/arch/arm/boot/dts/iwg20d-q7-common.dtsi b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
-new file mode 100644
-index 000000000000..1c072c0a4888
---- /dev/null
-+++ b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
-@@ -0,0 +1,147 @@
-+/*
-+ * Device Tree Source for the iWave-RZ/G1M/G1N Qseven carrier board
-+ *
-+ * Copyright (C) 2017 Renesas Electronics Corp.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+/ {
-+	aliases {
-+		serial0 = &scif0;
-+		ethernet0 = &avb;
-+	};
-+
-+	chosen {
-+		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	vcc_sdhi1: regulator-vcc-sdhi1 {
-+		compatible = "regulator-fixed";
-+
-+		regulator-name = "SDHI1 Vcc";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+
-+		gpio = <&gpio1 16 GPIO_ACTIVE_LOW>;
-+	};
-+
-+	vccq_sdhi1: regulator-vccq-sdhi1 {
-+		compatible = "regulator-gpio";
-+
-+		regulator-name = "SDHI1 VccQ";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <3300000>;
-+
-+		gpios = <&gpio2 30 GPIO_ACTIVE_LOW>;
-+		gpios-states = <1>;
-+		states = <3300000 1
-+			  1800000 0>;
-+	};
-+};
-+
-+&avb {
-+	pinctrl-0 = <&avb_pins>;
-+	pinctrl-names = "default";
-+
-+	phy-handle = <&phy3>;
-+	phy-mode = "gmii";
-+	renesas,no-ether-link;
-+	status = "okay";
-+
-+	phy3: ethernet-phy at 3 {
-+		reg = <3>;
-+		micrel,led-mode = <1>;
-+	};
-+};
-+
-+&i2c2 {
-+	pinctrl-0 = <&i2c2_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+	clock-frequency = <400000>;
-+
-+	rtc at 68 {
-+		compatible = "ti,bq32000";
-+		reg = <0x68>;
-+	};
-+};
-+
-+&pci0 {
-+	status = "okay";
-+	pinctrl-0 = <&usb0_pins>;
-+	pinctrl-names = "default";
-+};
-+
-+&pci1 {
-+	status = "okay";
-+	pinctrl-0 = <&usb1_pins>;
-+	pinctrl-names = "default";
-+};
-+
-+&pfc {
-+	avb_pins: avb {
-+		groups = "avb_mdio", "avb_gmii";
-+		function = "avb";
-+	};
-+
-+	i2c2_pins: i2c2 {
-+		groups = "i2c2";
-+		function = "i2c2";
-+	};
-+
-+	scif0_pins: scif0 {
-+		groups = "scif0_data_d";
-+		function = "scif0";
-+	};
-+
-+	sdhi1_pins: sd1 {
-+		groups = "sdhi1_data4", "sdhi1_ctrl";
-+		function = "sdhi1";
-+		power-source = <3300>;
-+	};
-+
-+	sdhi1_pins_uhs: sd1_uhs {
-+		groups = "sdhi1_data4", "sdhi1_ctrl";
-+		function = "sdhi1";
-+		power-source = <1800>;
-+	};
-+
-+	usb0_pins: usb0 {
-+		groups = "usb0";
-+		function = "usb0";
-+	};
-+
-+	usb1_pins: usb1 {
-+		groups = "usb1";
-+		function = "usb1";
-+	};
-+};
-+
-+&scif0 {
-+	pinctrl-0 = <&scif0_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+};
-+
-+&sdhi1 {
-+	pinctrl-0 = <&sdhi1_pins>;
-+	pinctrl-1 = <&sdhi1_pins_uhs>;
-+	pinctrl-names = "default", "state_uhs";
-+
-+	vmmc-supply = <&vcc_sdhi1>;
-+	vqmmc-supply = <&vccq_sdhi1>;
-+	cd-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
-+	wp-gpios = <&gpio6 15 GPIO_ACTIVE_HIGH>;
-+	sd-uhs-sdr50;
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-index 0136864bc595..6aa6b7467704 100644
---- a/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-+++ b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-@@ -1,5 +1,5 @@
- /*
-- * Device Tree Source for the iWave-RZG1M Qseven carrier board
-+ * Device Tree Source for the iWave-RZ/G1M Qseven board
-  *
-  * Copyright (C) 2017 Renesas Electronics Corp.
-  *
-@@ -10,144 +10,9 @@
- 
- /dts-v1/;
- #include "r8a7743-iwg20m.dtsi"
-+#include "iwg20d-q7-common.dtsi"
- 
- / {
- 	model = "iWave Systems RainboW-G20D-Qseven board based on RZ/G1M";
- 	compatible = "iwave,g20d", "iwave,g20m", "renesas,r8a7743";
--
--	aliases {
--		serial0 = &scif0;
--		ethernet0 = &avb;
--	};
--
--	chosen {
--		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
--		stdout-path = "serial0:115200n8";
--	};
--
--	vcc_sdhi1: regulator-vcc-sdhi1 {
--		compatible = "regulator-fixed";
--
--		regulator-name = "SDHI1 Vcc";
--		regulator-min-microvolt = <3300000>;
--		regulator-max-microvolt = <3300000>;
--
--		gpio = <&gpio1 16 GPIO_ACTIVE_LOW>;
--	};
--
--	vccq_sdhi1: regulator-vccq-sdhi1 {
--		compatible = "regulator-gpio";
--
--		regulator-name = "SDHI1 VccQ";
--		regulator-min-microvolt = <1800000>;
--		regulator-max-microvolt = <3300000>;
--
--		gpios = <&gpio2 30 GPIO_ACTIVE_LOW>;
--		gpios-states = <1>;
--		states = <3300000 1
--			  1800000 0>;
--	};
--};
--
--&pfc {
--	i2c2_pins: i2c2 {
--		groups = "i2c2";
--		function = "i2c2";
--	};
--
--	scif0_pins: scif0 {
--		groups = "scif0_data_d";
--		function = "scif0";
--	};
--
--	avb_pins: avb {
--		groups = "avb_mdio", "avb_gmii";
--		function = "avb";
--	};
--
--	sdhi1_pins: sd1 {
--		groups = "sdhi1_data4", "sdhi1_ctrl";
--		function = "sdhi1";
--		power-source = <3300>;
--	};
--
--	sdhi1_pins_uhs: sd1_uhs {
--		groups = "sdhi1_data4", "sdhi1_ctrl";
--		function = "sdhi1";
--		power-source = <1800>;
--	};
--
--	usb0_pins: usb0 {
--		groups = "usb0";
--		function = "usb0";
--	};
--
--	usb1_pins: usb1 {
--		groups = "usb1";
--		function = "usb1";
--	};
--};
--
--&scif0 {
--	pinctrl-0 = <&scif0_pins>;
--	pinctrl-names = "default";
--
--	status = "okay";
--};
--
--&avb {
--	pinctrl-0 = <&avb_pins>;
--	pinctrl-names = "default";
--
--	phy-handle = <&phy3>;
--	phy-mode = "gmii";
--	renesas,no-ether-link;
--	status = "okay";
--
--	phy3: ethernet-phy at 3 {
--		reg = <3>;
--		micrel,led-mode = <1>;
--	};
--};
--
--&sdhi1 {
--	pinctrl-0 = <&sdhi1_pins>;
--	pinctrl-1 = <&sdhi1_pins_uhs>;
--	pinctrl-names = "default", "state_uhs";
--
--	vmmc-supply = <&vcc_sdhi1>;
--	vqmmc-supply = <&vccq_sdhi1>;
--	cd-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
--	wp-gpios = <&gpio6 15 GPIO_ACTIVE_HIGH>;
--	sd-uhs-sdr50;
--	status = "okay";
--};
--
--&i2c2 {
--	pinctrl-0 = <&i2c2_pins>;
--	pinctrl-names = "default";
--
--	status = "okay";
--	clock-frequency = <400000>;
--
--	rtc at 68 {
--		compatible = "ti,bq32000";
--		reg = <0x68>;
--	};
--};
--
--&pci0 {
--	status = "okay";
--	pinctrl-0 = <&usb0_pins>;
--	pinctrl-names = "default";
--};
--
--&pci1 {
--	status = "okay";
--	pinctrl-0 = <&usb1_pins>;
--	pinctrl-names = "default";
--};
--
--&usbphy {
--	status = "okay";
- };
--- 
-2.11.0
+Best Regards,
+Elena.
+> 
+> >  	phy_start(dev->phydev);
+> >  	netif_start_queue(dev);
+> > @@ -1868,7 +1870,7 @@ static int mtk_stop(struct net_device *dev)
+> >  	phy_stop(dev->phydev);
+> >
+> >  	/* only shutdown DMA if this is the last user */
+> > -	if (!atomic_dec_and_test(&eth->dma_refcnt))
+> > +	if (!refcount_dec_and_test(&eth->dma_refcnt))
+> >  		return 0;
+> >
+> >  	mtk_tx_irq_disable(eth, MTK_TX_DONE_INT);
+> > diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.h
+> b/drivers/net/ethernet/mediatek/mtk_eth_soc.h
+> > index 3d3c24a..a3af466 100644
+> > --- a/drivers/net/ethernet/mediatek/mtk_eth_soc.h
+> > +++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.h
+> > @@ -15,6 +15,8 @@
+> >  #ifndef MTK_ETH_H
+> >  #define MTK_ETH_H
+> >
+> > +#include <linux/refcount.h>
+> > +
+> >  #define MTK_QDMA_PAGE_SIZE	2048
+> >  #define	MTK_MAX_RX_LENGTH	1536
+> >  #define MTK_TX_DMA_BUF_LEN	0x3fff
+> > @@ -632,7 +634,7 @@ struct mtk_eth {
+> >  	struct regmap			*pctl;
+> >  	u32				chip_id;
+> >  	bool				hwlro;
+> > -	atomic_t			dma_refcnt;
+> > +	refcount_t			dma_refcnt;
+> >  	struct mtk_tx_ring		tx_ring;
+> >  	struct mtk_rx_ring
+> 	rx_ring[MTK_MAX_RX_RING_NUM];
+> >  	struct mtk_rx_ring		rx_ring_qdma;
+> 
