@@ -1,77 +1,43 @@
-From: elena.reshetova@intel.com (Elena Reshetova)
-Date: Fri, 20 Oct 2017 10:23:45 +0300
-Subject: [PATCH 11/15] drivers,
- net: convert masces_tx_sa.refcnt from atomic_t to refcount_t
-In-Reply-To: <1508484229-19706-1-git-send-email-elena.reshetova@intel.com>
-References: <1508484229-19706-1-git-send-email-elena.reshetova@intel.com>
-Message-ID: <1508484229-19706-12-git-send-email-elena.reshetova@intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 20 Oct 2017 09:40:26 +0200
+Subject: [GIT PULL] STM32 defconfig changes for v4.15 #1
+In-Reply-To: <e984aa91-cf82-8823-1cd6-ed0d194bd5ba@st.com>
+References: <8c7fe79d-ebd3-ee7c-f056-1d3aa225edee@st.com>
+ <CAK8P3a3sfq13v8sVox8xiXvHpSyzsvV_4LEYsoNtdfLLhyS7MA@mail.gmail.com>
+ <e984aa91-cf82-8823-1cd6-ed0d194bd5ba@st.com>
+Message-ID: <CAK8P3a3RhiQcgn+4FDrvBtT1as8LhaR0SLnFMwc+j9PPu611ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-atomic_t variables are currently used to implement reference
-counters with the following properties:
- - counter is initialized to 1 using atomic_set()
- - a resource is freed upon counter reaching zero
- - once counter reaches zero, its further
-   increments aren't allowed
- - counter schema uses basic atomic operations
-   (set, inc, inc_not_zero, dec_and_test, etc.)
+On Fri, Oct 20, 2017 at 9:33 AM, Alexandre Torgue
+<alexandre.torgue@st.com> wrote:
+> On 10/19/2017 10:57 PM, Arnd Bergmann wrote:
+>> On Tue, Oct 17, 2017 at 12:16 PM, Alexandre Torgue
+>>
+>> Pulled into next/soc.
+>>
+>> Splitting out the first patch is fine, but there really is no need to have
+>> one
+>> patch per new Kconfig option you enable, it's less work and more readable
+>> to
+>> have a combined patch that explains what the options are and why you need
+>> all of them.
+>>
+>>          Arnd
+>>
+>
+> ok. So you mean I would have to merge "Add DMAMUX support", "Add I2C F7
+> support", "Add MDMA support" in one patch before to submit the pull request
+> ? If yes, it will be done for next PR.
 
-Such atomic variables should be converted to a newly provided
-refcount_t type and API that prevents accidental counter overflows
-and underflows. This is important since overflows and underflows
-can lead to use-after-free situation and be exploitable.
+Right, it's about finding the right balance. Most of the time, splitting up a
+patch into smaller independent units makes sense when you explain
+what each one does, but in cases like this (adding just one config option
+or one DT node), it becomes more readable if you do multiple related
+changes at once.
 
-The variable masces_tx_sa.refcnt is used as pure reference counter.
-Convert it to refcount_t and fix up the operations.
+The best test is usually what you put in the changelog. If you have multiple
+patches with almost-identical descriptions, merge them. If you have one
+patch with a description that talks about unrelated problems, split it up.
 
-Suggested-by: Kees Cook <keescook@chromium.org>
-Reviewed-by: David Windsor <dwindsor@gmail.com>
-Reviewed-by: Hans Liljestrand <ishkamiel@gmail.com>
-Signed-off-by: Elena Reshetova <elena.reshetova@intel.com>
----
- drivers/net/macsec.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/net/macsec.c b/drivers/net/macsec.c
-index e0aeb51..8948b6a 100644
---- a/drivers/net/macsec.c
-+++ b/drivers/net/macsec.c
-@@ -188,7 +188,7 @@ struct macsec_tx_sa {
- 	struct macsec_key key;
- 	spinlock_t lock;
- 	u32 next_pn;
--	atomic_t refcnt;
-+	refcount_t refcnt;
- 	bool active;
- 	struct macsec_tx_sa_stats __percpu *stats;
- 	struct rcu_head rcu;
-@@ -362,7 +362,7 @@ static struct macsec_tx_sa *macsec_txsa_get(struct macsec_tx_sa __rcu *ptr)
- 	if (!sa || !sa->active)
- 		return NULL;
- 
--	if (!atomic_inc_not_zero(&sa->refcnt))
-+	if (!refcount_inc_not_zero(&sa->refcnt))
- 		return NULL;
- 
- 	return sa;
-@@ -379,7 +379,7 @@ static void free_txsa(struct rcu_head *head)
- 
- static void macsec_txsa_put(struct macsec_tx_sa *sa)
- {
--	if (atomic_dec_and_test(&sa->refcnt))
-+	if (refcount_dec_and_test(&sa->refcnt))
- 		call_rcu(&sa->rcu, free_txsa);
- }
- 
-@@ -1437,7 +1437,7 @@ static int init_tx_sa(struct macsec_tx_sa *tx_sa, char *sak, int key_len,
- 	}
- 
- 	tx_sa->active = false;
--	atomic_set(&tx_sa->refcnt, 1);
-+	refcount_set(&tx_sa->refcnt, 1);
- 	spin_lock_init(&tx_sa->lock);
- 
- 	return 0;
--- 
-2.7.4
+       Arnd
