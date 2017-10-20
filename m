@@ -1,17 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Oct 2017 22:37:02 +0200
-Subject: [GIT PULL] omap-gpmc updates for v4.15
-In-Reply-To: <b911ad22-7dad-a9d9-2814-a29937b9be0c@ti.com>
-References: <b911ad22-7dad-a9d9-2814-a29937b9be0c@ti.com>
-Message-ID: <CAK8P3a1Yik0dF-0V=W1hRr+XnLtD6myU1wDHpMwbCLcGgdQ4jg@mail.gmail.com>
+Date: Fri, 20 Oct 2017 22:38:53 +0200
+Subject: [GIT PULL] Reset controller changes for v4.15
+In-Reply-To: <1508405198.7665.4.camel@pengutronix.de>
+References: <1508405198.7665.4.camel@pengutronix.de>
+Message-ID: <CAK8P3a33AWOMuKwFeD+CES0iLyFjnCSXs0uP3RmfSpGr+yy_Ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 2:26 PM, Roger Quadros <rogerq@ti.com> wrote:
-> ----------------------------------------------------------------
-> OMAP-GPMC: driver updates for v4.15
-> * get rid of unused field in platform data structure.
+On Thu, Oct 19, 2017 at 11:26 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> Dear arm-soc-maintainers,
+>
+> please consider merging this tag for v4.15. It adds ARC AX10x reset
+> support, merged from a separate branch for synchronisation with the ARC
+> tree, Stratix10 reset support, Meson GX reset level controls, and PXs3
+> and ethernet reset controls for Uniphier.
+> The socfpga, stm32, (most of) sunxi, and zx2967 drivers are merged into
+> a common simple-reset driver.
 
 Pulled into next/drivers, thanks!
 
-        Arnd
+      Arnd
