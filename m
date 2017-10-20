@@ -1,29 +1,21 @@
-From: xieyisheng1@huawei.com (Yisheng Xie)
-Date: Fri, 20 Oct 2017 17:14:33 +0800
-Subject: [PATCH v2] iommu/arm-smmu-v3: Avoid ILLEGAL setting of
- STE.S1STALLD and CD.S
-In-Reply-To: <20171020083653.GA17938@arm.com>
-References: <1505997367-51569-1-git-send-email-xieyisheng1@huawei.com>
- <7eb1db90-9a30-b70c-c3d1-71bbca41502d@huawei.com>
- <20171020083653.GA17938@arm.com>
-Message-ID: <91ea4c13-c8b9-e3fe-b317-a9696d425039@huawei.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 20 Oct 2017 11:17:47 +0200
+Subject: [PATCH 00/11] arm64: dts: renesas: Use R-Car SDHI Gen[123]
+ fallback compat strings
+In-Reply-To: <20171017060959.16702-1-horms+renesas@verge.net.au>
+References: <20171017060959.16702-1-horms+renesas@verge.net.au>
+Message-ID: <20171020091747.iep6diy3ymp47qip@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Tue, Oct 17, 2017 at 08:09:48AM +0200, Simon Horman wrote:
+> Use recently posted R-Car SDHI Gen 1, 2 and 3 fallback compat strings
+> in the DT of Renesas ARM and arm64 based SoCs.
+> 
+> Based on renesas-devel-20171016-v4.14-rc5
+> 
+> Has a binding documentation but no run-time dependency on
+> "[PATCH v3 0/3] mmc: renesas_sdhi: add R-Car Gen[123] fallback
+> compatibility strings"
 
-On 2017/10/20 16:36, Will Deacon wrote:
-> On Fri, Oct 20, 2017 at 03:00:01PM +0800, Yisheng Xie wrote:
->> Any comment about this version?
-> 
-> I have it queued up and plan to send a pull request to Joerg today for 4.15.
-
-Fine, thanks.
-
-Thanks
-Yisheng Xie
-> 
-> Will
-> 
-> .
-> 
+I have marked these as deferred pending acceptance of the above dependency.
