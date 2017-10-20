@@ -1,48 +1,84 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 20 Oct 2017 10:09:36 +0200
-Subject: [PATCH 7/7] ARM64: dts: meson-gxl: adjust libretech-cc
- gpio-line-names
-In-Reply-To: <20170921171604.27675-1-jbrunet@baylibre.com>
-References: <20170921171604.27675-1-jbrunet@baylibre.com>
-Message-ID: <60881aa5-7249-e7e7-4a3f-64eca2ccd910@baylibre.com>
+Date: Fri, 20 Oct 2017 10:10:42 +0200
+Subject: [PATCH v2] serial: meson: add Magic SysRq support
+In-Reply-To: <20170906135239.29531-1-dlan@gentoo.org>
+References: <20170906135239.29531-1-dlan@gentoo.org>
+Message-ID: <d727b350-7936-2671-45c2-cf32dfda1a2a@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/09/2017 19:16, Jerome Brunet wrote:
-> TEST_N gpio has been moved so the gpio-line-names of the cc
-> must be adjusted accordingly
+Hi Yixun,
+
+On 06/09/2017 15:52, Yixun Lan wrote:
+> This dirver try to implement the Magic SysRq support[1] for
+> Amlogic Inc's meson platfo
+
+Please fix these typos.
+
+> From the hardware perspective, the UART IP can't detect the 'BREAK' command
+> clearly via the status register. Instead, we rely on the combination of
+> 'FRAME_ERR bit && ch == 0', and it works fine.
 > 
-> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> [1] Documentation/admin-guide/sysrq.rst
+> 
+> Signed-off-by: Yixun Lan <dlan@gentoo.org>
+> 
 > ---
->  arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
+> Changes since v1 at [0]:
+> - add changelog & a few more comments
 > 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
-> index 69ca14ac10fa..3e9b9c8b72f0 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
-> @@ -146,7 +146,9 @@
->  			  "7J1 Header Pin12",
->  			  "IR In",
->  			  "9J3 Switch HDMI CEC/7J1 Header Pin11",
-> -			  "7J1 Header Pin13";
-> +			  "7J1 Header Pin13",
-> +			  /* GPIO_TEST_N */
-> +			  "7J1 Header Pin15";
->  };
+> [0] https://patchwork.kernel.org/patch/9728475/
+> ---
+>  drivers/tty/serial/meson_uart.c | 18 ++++++++++++++++--
+>  1 file changed, 16 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/meson_uart.c b/drivers/tty/serial/meson_uart.c
+> index 42e4a4c7597f..3fea24bafd80 100644
+> --- a/drivers/tty/serial/meson_uart.c
+> +++ b/drivers/tty/serial/meson_uart.c
+> @@ -14,6 +14,10 @@
+>   *
+>   */
 >  
->  &pinctrl_periphs {
-> @@ -188,9 +190,7 @@
->  			  "7J1 Header Pin32", "7J1 Header Pin29",
->  			  "7J1 Header Pin31",
->  			  /* Bank GPIOCLK */
-> -			  "7J1 Header Pin7", "",
-> -			  /* GPIO_TEST_N */
-> -			  "7J1 Header Pin15";
-> +			  "7J1 Header Pin7", "";
->  };
+> +#if defined(CONFIG_SERIAL_MESON_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
+> +#define SUPPORT_SYSRQ
+> +#endif
+> +
+>  #include <linux/clk.h>
+>  #include <linux/console.h>
+>  #include <linux/delay.h>
+> @@ -183,12 +187,12 @@ static void meson_receive_chars(struct uart_port *port)
+>  {
+>  	struct tty_port *tport = &port->state->port;
+>  	char flag;
+> -	u32 status, ch, mode;
+> +	u32 ostatus, status, ch, mode;
 >  
->  /* SD card */
+>  	do {
+>  		flag = TTY_NORMAL;
+>  		port->icount.rx++;
+> -		status = readl(port->membase + AML_UART_STATUS);
+> +		ostatus = status = readl(port->membase + AML_UART_STATUS);
+>  
+>  		if (status & AML_UART_ERR) {
+>  			if (status & AML_UART_TX_FIFO_WERR)
+> @@ -216,6 +220,16 @@ static void meson_receive_chars(struct uart_port *port)
+>  		ch = readl(port->membase + AML_UART_RFIFO);
+>  		ch &= 0xff;
+>  
+> +		if ((ostatus & AML_UART_FRAME_ERR) && (ch == 0)) {
+> +			port->icount.brk++;
+> +			flag = TTY_BREAK;
+> +			if (uart_handle_break(port))
+> +				continue;
+> +		}
+> +
+> +		if (uart_handle_sysrq_char(port, ch))
+> +			continue;
+> +
+>  		if ((status & port->ignore_status_mask) == 0)
+>  			tty_insert_flip_char(tport, ch, flag);
+>  
 > 
 
 Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
