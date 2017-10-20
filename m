@@ -1,103 +1,51 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 20 Oct 2017 17:08:37 +0100
-Subject: [PATCH 3/4] arm64: traps: Pretty-print pstate in register dumps
-In-Reply-To: <20171020155836.GB1593@arm.com>
-References: <1508428534-20694-1-git-send-email-will.deacon@arm.com>
- <1508428534-20694-4-git-send-email-will.deacon@arm.com>
- <20171019161754.5xnqloqx52sjbtvr@lakrids.cambridge.arm.com>
- <20171020155836.GB1593@arm.com>
-Message-ID: <20171020160836.7q4n67nhwzizwunp@lakrids.cambridge.arm.com>
+Date: Fri, 20 Oct 2017 17:10:53 +0100
+Subject: [PATCH 0/3] arm64: cpuinfo: make /proc/cpuinfo more human-readable
+In-Reply-To: <abeb1756-3635-2f86-131c-cd904731a308@redhat.com>
+References: <20170926222324.17409-1-ahs3@redhat.com>
+ <20170927103406.GC32150@leverpostej>
+ <CAOZdJXUzo3JrHW1h6W3y3BnVq472NjPpaqTztzEODZnnMyvJRg@mail.gmail.com>
+ <20171013142724.GA5893@leverpostej>
+ <abeb1756-3635-2f86-131c-cd904731a308@redhat.com>
+Message-ID: <20171020161053.ujw3spzizhgu4g7b@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 20, 2017 at 04:58:37PM +0100, Will Deacon wrote:
-> On Thu, Oct 19, 2017 at 05:17:55PM +0100, Mark Rutland wrote:
-> > On Thu, Oct 19, 2017 at 04:55:33PM +0100, Will Deacon wrote:
-> > > We can decode the PSTATE easily enough, so pretty-print it in register
-> > > dumps.
-> > > 
-> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > > ---
-> > >  arch/arm64/kernel/process.c | 20 +++++++++++++++++++-
-> > >  1 file changed, 19 insertions(+), 1 deletion(-)
-> > > 
-> > > diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> > > index c20896b8fb2d..be3cf9cd7dec 100644
-> > > --- a/arch/arm64/kernel/process.c
-> > > +++ b/arch/arm64/kernel/process.c
-> > > @@ -170,6 +170,23 @@ void machine_restart(char *cmd)
-> > >  	while (1);
-> > >  }
-> > >  
-> > > +static void print_pstate(struct pt_regs *regs)
-> > > +{
-> > > +	u64 pstate = regs->pstate;
-> > > +	printk("pstate: %08llx (%c%c%c%c %c%c%c%c %cPAN %cUAO)\n",
-> > > +		pstate,
-> > > +		pstate & PSR_N_BIT ? 'N' : 'n',
-> > > +		pstate & PSR_Z_BIT ? 'Z' : 'z',
-> > > +		pstate & PSR_C_BIT ? 'C' : 'c',
-> > > +		pstate & PSR_V_BIT ? 'V' : 'v',
-> > > +		pstate & PSR_D_BIT ? 'D' : 'd',
-> > > +		pstate & PSR_A_BIT ? 'A' : 'a',
-> > > +		pstate & PSR_I_BIT ? 'I' : 'i',
-> > > +		pstate & PSR_F_BIT ? 'F' : 'f',
-> > > +		pstate & PSR_PAN_BIT ? '+' : '-',
-> > > +		pstate & PSR_UAO_BIT ? '+' : '-');
-> > > +}
+Hi Al,
+
+On Mon, Oct 16, 2017 at 05:43:19PM -0600, Al Stone wrote:
+> On 10/13/2017 08:27 AM, Mark Rutland wrote:
+> > I certainly agree that exposing the information that we have is useful,
+> > as I have stated several times. I'm not NAKing exposing this information
+> > elsewhere.
 > > 
-> > Given we use __show_regs for user state, I think we need to check
-> > compat_user_mode() regs, and adjust the decoding accordingly.
+> > If you want a consistent cross-architecture interface for this
+> > information, then you need to propose a new one. That was we can
+> > actually solve the underlying issues, for all architectures, without
+> > breaking ABI.
 > > 
-> > e.g. AArch32 has an E bit where the D in DAIF is.
+> > I would be *very* interested in such an interface, and would be more
+> > than happy to help.
 > 
-> Yes, you're right. There's lots of exciting bits in the AArch32 pstate
-> too. I ended up with the diff below.
-> 
-> Will
-> 
-> --->8
-> 
-> +static void print_pstate(struct pt_regs *regs)
-> +{
-> +	u64 pstate = regs->pstate;
-> +
-> +	if (compat_user_mode(regs))
-> +		printk("pstate: %08llx (%c%c%c%c %c %s %s-endian %c%c%c)\n",
-> +			pstate,
-> +			pstate & COMPAT_PSR_N_BIT ? 'N' : 'n',
-> +			pstate & COMPAT_PSR_Z_BIT ? 'Z' : 'z',
-> +			pstate & COMPAT_PSR_C_BIT ? 'C' : 'c',
-> +			pstate & COMPAT_PSR_V_BIT ? 'V' : 'v',
-> +			pstate & COMPAT_PSR_Q_BIT ? 'Q' : 'q',
-> +			pstate & COMPAT_PSR_T_BIT ? "T32" : "A32",
-> +			pstate & COMPAT_PSR_E_BIT ? "big" : "little",
+> I'm playing with some patches that do very similar things in sysfs, vs
+> proc.  Is that better :)?
 
-We could say BE/LE for these so as to keep the line short.
+Exposing data under sysfs is certainly better, yes. :)
 
-> +			pstate & COMPAT_PSR_A_BIT ? 'A' : 'a',
-> +			pstate & COMPAT_PSR_I_BIT ? 'I' : 'i',
-> +			pstate & COMPAT_PSR_F_BIT ? 'F' : 'f');
-> +	else
+> Obviously, you'll have to see the patches to
+> properly answer that, but what I'm playing with at present is placing
+> this info in new entries in /sys/devices/cpu and/or /sys/devices/system,
+> and generating some of the content based on what's already in header files
+> (e.g., in cputype.h). 
 
-Given the either side of the if-else is several lines, could we add
-braces for clarity?
+My opposition to MIDR -> string mapping applies regardless of
+location...
 
-> +		printk("pstate: %08llx (%c%c%c%c %c%c%c%c %cPAN %cUAO)\n",
-> +			pstate,
-> +			pstate & PSR_N_BIT ? 'N' : 'n',
-> +			pstate & PSR_Z_BIT ? 'Z' : 'z',
-> +			pstate & PSR_C_BIT ? 'C' : 'c',
-> +			pstate & PSR_V_BIT ? 'V' : 'v',
-> +			pstate & PSR_D_BIT ? 'D' : 'd',
-> +			pstate & PSR_A_BIT ? 'A' : 'a',
-> +			pstate & PSR_I_BIT ? 'I' : 'i',
-> +			pstate & PSR_F_BIT ? 'F' : 'f',
-> +			pstate & PSR_PAN_BIT ? '+' : '-',
-> +			pstate & PSR_UAO_BIT ? '+' : '-');
-> +}
+> The idea of course is to keep this new info from touching any existing
+> info so we don't break compatibility -- does that feel like a better
+> direction, at least?
 
-Otherwise, looks good!
+... but otherwise this sounds good to me!
 
 Thanks,
 Mark.
