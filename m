@@ -1,92 +1,49 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 20 Oct 2017 13:53:11 +0300
-Subject: [PATCH 2/2 v3] drm: bridge: Add THS8134A/B support to dumb VGA DAC
-In-Reply-To: <20171020065941.3877-1-linus.walleij@linaro.org>
-References: <20171020065941.3877-1-linus.walleij@linaro.org>
-Message-ID: <4461777.gksfa5PW48@avalon>
+From: vviswana@codeaurora.org (Vijay Viswanath)
+Date: Fri, 20 Oct 2017 16:24:39 +0530
+Subject: [PATCH v2 4/4] mmc: sdhci-msm: Add sdhci msm register write APIs
+ which wait for pwr irq
+In-Reply-To: <20171014073118.GD1575@tuxbook>
+References: <1506490483-46871-1-git-send-email-vviswana@codeaurora.org>
+ <1506490483-46871-5-git-send-email-vviswana@codeaurora.org>
+ <20171014073118.GD1575@tuxbook>
+Message-ID: <cf405901-e711-4ef9-dffd-1e94a023c4a1@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-Thank you for the patch.
-
-On Friday, 20 October 2017 09:59:41 EEST Linus Walleij wrote:
-> This extends the dumb VGA DAC bridge to handle the THS8134A
-> and THS8134B VGA DACs in addition to those already handled.
+On 10/14/2017 1:01 PM, Bjorn Andersson wrote:
+> On Tue 26 Sep 22:34 PDT 2017, Vijay Viswanath wrote:
 > 
-> The THS8134A, THS8134B and as it turns out also THS8135 need to
-> have data clocked out at the negative edge of the clock pulse,
-> since they clock it into the DAC at the positive edge (so by
-> then it needs to be stable) so we need some extra logic to flag
-> this on the connector to the driver.
+>> diff --git a/drivers/mmc/host/sdhci-msm.c b/drivers/mmc/host/sdhci-msm.c
+> [..]
+>> +	if (!done) {
+>> +		if (!wait_event_timeout(msm_host->pwr_irq_wait,
+>> +				msm_host->pwr_irq_flag,
+>> +				msecs_to_jiffies(MSM_PWR_IRQ_TIMEOUT_MS)))
+>> +			__WARN_printf("%s: pwr_irq for req: (%d) timed out\n",
+>> +					mmc_hostname(host->mmc), req_type);
 > 
-> The semantics of the flag DRM_BUS_FLAG_PIXDATA_NEGEDGE in
-> <drm/drm_connector.h> clearly indicates that this flag tells
-> when to *drive* the data, not when the receiver *reads* it,
-> so the TI variants needs to be handled like this.
+> Bumped my MSM8974AB device to latest linux-next and found this patch; I
+> see this print every five seconds during boot and the eMMC never comes
+> up.
 > 
-> Introduce a variant struct and contain the information there,
-> and add a bit of helpful comments about how this works so
-> people will get it right when adding new DACs or connectiong
-> new display drivers to DACs.
+> Regards,
+> Bjorn
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-> The fact that THS8135 might be working on some systems today
-> is probably due to the fact that the display driver cannot
-> configure when the data is clocked out and the electronics
-> have simply been designed around it so it works anyways.
-> 
-> The phenomenon is very real on the ARM reference designs using
-> PL111 where the hardware can control which edge to push out
-> the data.
-> 
-> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v2->v3:
-> - Move const specifier.
-> - Cut one line of code assigning bus flags.
-> - Preserve the "ti,ths8135" compatible for elder device trees.
-> ChangeLog v1->v2:
-> - Alphabetize includes
-> - Use a u32 with the bus polarity flags and just encode the
->   polarity using the DRM define directly.
-> - Rename vendor_data to vendor_info.
-> - Simplify assignment of the flag as it is just a simple
->   u32 now.
-> - Probe all TI variants on the "ti,ths813x" wildcard for now,
->   we only need to know that the device is in this family to
->   set the clock edge flag right.
-> ---
->  drivers/gpu/drm/bridge/dumb-vga-dac.c | 55 +++++++++++++++++++++++++++++---
->  1 file changed, 51 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/bridge/dumb-vga-dac.c
-> b/drivers/gpu/drm/bridge/dumb-vga-dac.c index 831a606c4706..2622e2f778d1
-> 100644
-> --- a/drivers/gpu/drm/bridge/dumb-vga-dac.c
-> +++ b/drivers/gpu/drm/bridge/dumb-vga-dac.c
 
-[snip]
+Hi Bjorn,
 
-> @@ -55,7 +65,8 @@ static int dumb_vga_get_modes(struct drm_connector
-> *connector) }
-> 
->  	drm_mode_connector_update_edid_property(connector, edid);
-> -	return drm_add_edid_modes(connector, edid);
-> +	connector->display_info.bus_flags |= vga->variant->clk_edge_latch;
-> +	retturn drm_add_edid_modes(connector, edid);
+I couldn't get one 8974 device. I tested the latest linux-next on db410c 
+and its not showing any issue. 8974 is an older msm and has some 
+differences in the controller like your "mmc: sdhci-msm: Enable delay 
+circuit calibration clocks" patch.
 
-Have you compiled this ?
+I am currently going through the programming guide to see what could be 
+the reason. Can you please share the full logs from the device with me 
+so that I can focus my search?
 
->  fallback:
->  	/*
-
-[snip]
-
--- 
-Regards,
-
-Laurent Pinchart
+Thanks,
+Vijay
