@@ -1,52 +1,52 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 20 Oct 2017 12:28:34 +0200
-Subject: [PATCH 31/31] arm64: dts: renesas: salvator-common: add dr_mode
- property for USB2.0 channel 0
-In-Reply-To: <cover.1508495040.git.horms+renesas@verge.net.au>
-References: <cover.1508495040.git.horms+renesas@verge.net.au>
-Message-ID: <e9ce35386b215d3f5d0fbab3cc24b69b8d57d7e6.1508495040.git.horms+renesas@verge.net.au>
+Date: Fri, 20 Oct 2017 12:28:31 +0200
+Subject: [PATCH 04/42] ARM: dts: r8a7791: Use generic node name for VSP1 nodes
+In-Reply-To: <cover.1508493785.git.horms+renesas@verge.net.au>
+References: <cover.1508493785.git.horms+renesas@verge.net.au>
+Message-ID: <18e5500c1510c844d5c3071f06089b638326bc52.1508493785.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Since Salvator-X[S] have a USB2.0 dual-role channel (CN9), this patch
-adds dr_mode property for USB2.0 channel 0 (EHCI/OHCI and HS-USB)
-as "otg".
+Use the preferred generic node name instead of the specific name.
 
-Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/salvator-common.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/r8a7791.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-index c883e46c06ac..2fbb6e3b5dbe 100644
---- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-+++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-@@ -272,6 +272,7 @@
- };
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 5a8a15847076..97bed8253bc3 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -1073,7 +1073,7 @@
+ 		status = "disabled";
+ 	};
  
- &ehci0 {
-+	dr_mode = "otg";
- 	status = "okay";
- };
+-	vsp1 at fe928000 {
++	vsp at fe928000 {
+ 		compatible = "renesas,vsp1";
+ 		reg = <0 0xfe928000 0 0x8000>;
+ 		interrupts = <GIC_SPI 267 IRQ_TYPE_LEVEL_HIGH>;
+@@ -1082,7 +1082,7 @@
+ 		resets = <&cpg 131>;
+ 	};
  
-@@ -284,6 +285,7 @@
- };
+-	vsp1 at fe930000 {
++	vsp at fe930000 {
+ 		compatible = "renesas,vsp1";
+ 		reg = <0 0xfe930000 0 0x8000>;
+ 		interrupts = <GIC_SPI 246 IRQ_TYPE_LEVEL_HIGH>;
+@@ -1091,7 +1091,7 @@
+ 		resets = <&cpg 128>;
+ 	};
  
- &hsusb {
-+	dr_mode = "otg";
- 	status = "okay";
- };
- 
-@@ -346,6 +348,7 @@
- };
- 
- &ohci0 {
-+	dr_mode = "otg";
- 	status = "okay";
- };
- 
+-	vsp1 at fe938000 {
++	vsp at fe938000 {
+ 		compatible = "renesas,vsp1";
+ 		reg = <0 0xfe938000 0 0x8000>;
+ 		interrupts = <GIC_SPI 247 IRQ_TYPE_LEVEL_HIGH>;
 -- 
 2.11.0
