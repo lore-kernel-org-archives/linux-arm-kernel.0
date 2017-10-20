@@ -1,53 +1,70 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 20 Oct 2017 12:29:09 +0200
-Subject: [PATCH 42/42] ARM: dts: r8a7743: Add xhci support to SoC dtsi
-In-Reply-To: <cover.1508493785.git.horms+renesas@verge.net.au>
-References: <cover.1508493785.git.horms+renesas@verge.net.au>
-Message-ID: <b6d3b649441936621c87b79bff8dd436e2397e3c.1508493785.git.horms+renesas@verge.net.au>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 20 Oct 2017 12:00:53 +0100
+Subject: [PATCH 00/17] coresight: perf: TMC ETR backend support
+In-Reply-To: <20171019171553.24056-1-suzuki.poulose@arm.com>
+References: <20171019171553.24056-1-suzuki.poulose@arm.com>
+Message-ID: <4abc56ac-c266-9967-8323-4779d095c521@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+On 19/10/17 18:15, Suzuki K Poulose wrote:
+> The TMC-ETR supports routing the Coresight trace data to the
+> System memory. It supports two different modes in which the memory
+> could be used.
+> 
+> 1) Contiguous memory - The memory is assumed to be physically
+> contiguous.
+> 
+> 2) Scatter Gather list - The memory can be chunks of 4K pages,
+> which are specified in a table of pointers which itself could be
+> multiple 4K size pages.
+> 
+> To avoid the complications of the managing the buffer, this series
+> adds a layer for managing the ETR buffer, which makes the best possibly
+> choice based on what is available. The allocation can be tuned by passing
+> in flags, existing pages (e.g, perf ring buffer) etc.
+> 
+> Towards supporting ETR Scatter Gather mode, we introduce a generic TMC
+> scatter-gather table which can be used to manage the data and table pages.
+> The table can be filled in the format expected by the Scatter-Gather
+> mode.
+> 
+> The TMC ETR-SG mechanism doesn't allow starting the trace at non-zero
+> offset (required by perf). So we make some tricky changes to the table
+> at run time to allow starting at any "Page aligned" offset and then
+> wrap around to the beginning of the buffer with very less overhead.
+> See patches for more description.
+> 
+> The series also improves the way the ETR is controlled by different modes
+> (sysfs vs. perf) by keeping mode specific data. This allows access
+> to the trace data collected in sysfs mode, even when the ETR is
+> operated in perf mode. Also with the transparent management of the
+> buffer and scatter-gather mechanism, we can allow the user to
+> request for larger trace buffers for sysfs mode. This is supported
+> by providing a sysfs file, "buffer_size" which accepts a page aligned
+> size, which will be used by the ETR when allocating a buffer.
+> 
+> Finally, it cleans up the etm perf sink callbacks a little bit and
+> then adds the support for ETR sink. For the ETR, we try our best to
+> use the perf ring buffer as the target hardware buffer, provided :
+>   1) The ETR is dma coherent (since the pages will be shared with
+>      userspace perf tool).
+>   2) The perf is used in snapshot mode (The ETR cannot be stopped
+>      based on the size of the data written hence we could easily
+>      overwrite the buffer. We may be able to fix this in the future)
+>   3) The ETR supports the Scatter-Gather mode.
+> 
+> If we can't use the perf buffers directly, we fallback to using
+> software buffering where we have to copy the trace data back
+> to the perf ring buffer.
+> 
 
-Add node for xhci. Boards DT files will enable it if needed.
+Just to be clear :
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Reviewed-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7743.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+The perf tool doesn't support the perf AUX api for coresight. I have
+used the perf tool from perf-OpenCSD [1] project to control the tracing.
 
-diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
-index 4db4f61be25a..7bbba4a36f31 100644
---- a/arch/arm/boot/dts/r8a7743.dtsi
-+++ b/arch/arm/boot/dts/r8a7743.dtsi
-@@ -932,6 +932,26 @@
- 			status = "disabled";
- 		};
- 
-+		/*
-+		 * pci1 and xhci share the same phy, therefore only one of them
-+		 * can be active at any one time. If both of them are enabled,
-+		 * a race condition will determine who'll control the phy.
-+		 * A firmware file is needed by the xhci driver in order for
-+		 * USB 3.0 to work properly.
-+		 */
-+		xhci: usb at ee000000 {
-+			compatible = "renesas,xhci-r8a7743",
-+				     "renesas,rcar-gen2-xhci";
-+			reg = <0 0xee000000 0 0xc00>;
-+			interrupts = <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 328>;
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			resets = <&cpg 328>;
-+			phys = <&usb2 1>;
-+			phy-names = "usb";
-+			status = "disabled";
-+		};
-+
- 		sdhi0: sd at ee100000 {
- 			compatible = "renesas,sdhi-r8a7743";
- 			reg = <0 0xee100000 0 0x328>;
--- 
-2.11.0
+[1] https://git.linaro.org/people/mathieu.poirier/coresight.git perf-opencsd-4.14-rc1
+
+
+Suzuki
