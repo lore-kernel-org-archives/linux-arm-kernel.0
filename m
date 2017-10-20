@@ -1,17 +1,26 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 20 Oct 2017 09:36:54 +0100
-Subject: [PATCH v2] iommu/arm-smmu-v3: Avoid ILLEGAL setting of
- STE.S1STALLD and CD.S
-In-Reply-To: <7eb1db90-9a30-b70c-c3d1-71bbca41502d@huawei.com>
-References: <1505997367-51569-1-git-send-email-xieyisheng1@huawei.com>
- <7eb1db90-9a30-b70c-c3d1-71bbca41502d@huawei.com>
-Message-ID: <20171020083653.GA17938@arm.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 20 Oct 2017 10:40:52 +0200
+Subject: [PATCH 0/2] clk: meson: gxbb: Add VPU and VAPB clocks
+In-Reply-To: <1508168085-19032-1-git-send-email-narmstrong@baylibre.com>
+References: <1508168085-19032-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1c908eb9-a7ea-b083-d52a-e017f4ca997f@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 20, 2017 at 03:00:01PM +0800, Yisheng Xie wrote:
-> Any comment about this version?
+On 16/10/2017 17:34, Neil Armstrong wrote:
+> This patchset adds the VPU and VAPB clocks used to feed the Amlogic Meson
+> GX SoC Video Processing Unit and it's power domain.
+> 
+> Neil Armstrong (2):
+>   clk: meson: gxbb: Add VPU and VAPB clockids
+>   clk: meson: gxbb: Add VPU and VAPB clocks data
+> 
+>  drivers/clk/meson/gxbb.c              | 292 ++++++++++++++++++++++++++++++++++
+>  drivers/clk/meson/gxbb.h              |   6 +-
+>  include/dt-bindings/clock/gxbb-clkc.h |  11 ++
+>  3 files changed, 308 insertions(+), 1 deletion(-)
+> 
 
-I have it queued up and plan to send a pull request to Joerg today for 4.15.
+Applied to next/headers and next/drivers with removal of CLK_IGNORE_UNUSED for muxes and dividers.
 
-Will
+Neil
