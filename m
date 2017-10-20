@@ -1,65 +1,109 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri, 20 Oct 2017 10:30:53 +0200
-Subject: [PATCH] firmware: meson-sm: use generic compatible
-In-Reply-To: <CAL_JsqJ-XAqMA_zjxrJNAtysQsXzmWYUFqLJtKX2wUJ0oebtuw@mail.gmail.com>
-References: <20171012134743.10625-1-jbrunet@baylibre.com>
- <20171017204959.kfbhn2yxhv2sb5qg@rob-hp-laptop>
- <7h8tg7zb6t.fsf@baylibre.com>
- <CAL_JsqJ-XAqMA_zjxrJNAtysQsXzmWYUFqLJtKX2wUJ0oebtuw@mail.gmail.com>
-Message-ID: <1508488253.3616.28.camel@baylibre.com>
+From: dlan@gentoo.org (Yixun Lan)
+Date: Fri, 20 Oct 2017 16:32:27 +0800
+Subject: [PATCH v2] serial: meson: add Magic SysRq support
+In-Reply-To: <d727b350-7936-2671-45c2-cf32dfda1a2a@baylibre.com>
+References: <20170906135239.29531-1-dlan@gentoo.org>
+ <d727b350-7936-2671-45c2-cf32dfda1a2a@baylibre.com>
+Message-ID: <20171020083227.GA20623@ofmlt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-10-19 at 16:18 -0500, Rob Herring wrote:
-> On Thu, Oct 19, 2017 at 5:25 AM, Kevin Hilman <khilman@baylibre.com> wrote:
-> > Rob Herring <robh@kernel.org> writes:
+Hi Greg-KH
+
+I think you've already accepted this patch (and merged into your git repo)
+
+so, is it possible for you to amend the commit message? or do you want me
+to send a PATCH v3 then?
+
+
+On 10:10 Fri 20 Oct     , Neil Armstrong wrote:
+> Hi Yixun,
+> 
+> On 06/09/2017 15:52, Yixun Lan wrote:
+> > This dirver try to implement the Magic SysRq support[1] for
+> > Amlogic Inc's meson platfo
+> 
+> Please fix these typos.
+> 
+oops, not sure why this line is broken..
+
+s/platfo/platform./
+and should squash next line .
+
+> > From the hardware perspective, the UART IP can't detect the 'BREAK' command
+> > clearly via the status register. Instead, we rely on the combination of
+> > 'FRAME_ERR bit && ch == 0', and it works fine.
 > > 
-> > > On Thu, Oct 12, 2017 at 03:47:43PM +0200, Jerome Brunet wrote:
-> > > > The meson secure monitor seems to be compatible with more SoCs than
-> > > > initially thought. Let's use the most generic compatible he have in
-> > > > DT instead of the gxbb specific one
-> > > > 
-> > > > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> > > > ---
-> > > >  Documentation/devicetree/bindings/firmware/meson/meson_sm.txt | 4 ++--
-> > > >  drivers/firmware/meson/meson_sm.c                             | 4 ++--
-> > > >  2 files changed, 4 insertions(+), 4 deletions(-)
-> > > 
-> > > Seems like a pointless, not backwards compatible change to me.
+> > [1] Documentation/admin-guide/sysrq.rst
 > > 
-> > I've verified that it's backwards compatible with existing upstream DTs.
-> 
-> Perhaps if you all are documenting only what the driver uses, not what
-> the dts can have as Jerome said.
-> 
-> > > end, it's just a string to match on. Who cares what the string is.
+> > Signed-off-by: Yixun Lan <dlan@gentoo.org>
 > > 
-> > As platform maintiner, I very much care what the strings are and I want
-> > it to be coherent with the platform generic names, and I want the
-> > SoC-specific strings to correspond to the actual SoC names.
+> > ---
+> > Changes since v1 at [0]:
+> > - add changelog & a few more comments
+> > 
+> > [0] https://patchwork.kernel.org/patch/9728475/
+> > ---
+> >  drivers/tty/serial/meson_uart.c | 18 ++++++++++++++++--
+> >  1 file changed, 16 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/tty/serial/meson_uart.c b/drivers/tty/serial/meson_uart.c
+> > index 42e4a4c7597f..3fea24bafd80 100644
+> > --- a/drivers/tty/serial/meson_uart.c
+> > +++ b/drivers/tty/serial/meson_uart.c
+> > @@ -14,6 +14,10 @@
+> >   *
+> >   */
+> >  
+> > +#if defined(CONFIG_SERIAL_MESON_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
+> > +#define SUPPORT_SYSRQ
+> > +#endif
+> > +
+> >  #include <linux/clk.h>
+> >  #include <linux/console.h>
+> >  #include <linux/delay.h>
+> > @@ -183,12 +187,12 @@ static void meson_receive_chars(struct uart_port *port)
+> >  {
+> >  	struct tty_port *tport = &port->state->port;
+> >  	char flag;
+> > -	u32 status, ch, mode;
+> > +	u32 ostatus, status, ch, mode;
+> >  
+> >  	do {
+> >  		flag = TTY_NORMAL;
+> >  		port->icount.rx++;
+> > -		status = readl(port->membase + AML_UART_STATUS);
+> > +		ostatus = status = readl(port->membase + AML_UART_STATUS);
+> >  
+> >  		if (status & AML_UART_ERR) {
+> >  			if (status & AML_UART_TX_FIFO_WERR)
+> > @@ -216,6 +220,16 @@ static void meson_receive_chars(struct uart_port *port)
+> >  		ch = readl(port->membase + AML_UART_RFIFO);
+> >  		ch &= 0xff;
+> >  
+> > +		if ((ostatus & AML_UART_FRAME_ERR) && (ch == 0)) {
+> > +			port->icount.brk++;
+> > +			flag = TTY_BREAK;
+> > +			if (uart_handle_break(port))
+> > +				continue;
+> > +		}
+> > +
+> > +		if (uart_handle_sysrq_char(port, ch))
+> > +			continue;
+> > +
+> >  		if ((status & port->ignore_status_mask) == 0)
+> >  			tty_insert_flip_char(tport, ch, flag);
+> >  
+> > 
 > 
-> The most specific compatible should be, absolutely. The fallbacks can
-> be anything really. Ideally, they are the compatible string for the
-> 1st SoC with "the same" compatible IP. Could be another vendor
-> entirely even because mergers happen.
-
-Then what's your problem with these patches again ?
-
-I am just asking the driver to match the generic binding instead of the SoC
-specific, because we are also using it on other SoC, as explain in the patch
-comment. Does not seems that "pointless" to me.
-
-Right now the driver match only on: vendor,soc-one
-in dts, we have compatible = "vendor,family", "vendor,soc-one" 
-
-but it is compatible with soc-two as well.
-to match we would have to put "vendor,soc-one" as well which is a mess
-
-By expressing correctly what the driver is compatible with, "vendor,family"
-we can dts that makes sense for soc-two as well
-compatible = "vendor,family", "vendor,soc-two"
-
-Same goes for the other patches
-
+> Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
 > 
-> Rob
+> _______________________________________________
+> linux-amlogic mailing list
+> linux-amlogic at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-amlogic
+
+-- 
+Yixun Lan (dlan)
+Gentoo Linux Developer
+GPG Key ID AABEFD55
