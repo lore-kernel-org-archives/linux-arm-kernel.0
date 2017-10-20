@@ -1,36 +1,74 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 20 Oct 2017 09:38:54 +0200
-Subject: [PATCH] pinctrl: rockchip: Add iomux-route switching support for
- rk3288
-In-Reply-To: <52d1a9ee-a6c6-5c7f-330f-9b672be9c2c6@xs4all.nl>
-References: <20171013225337.5196-1-phh@phh.me> <13020229.tRmotBUImn@phil>
- <52d1a9ee-a6c6-5c7f-330f-9b672be9c2c6@xs4all.nl>
-Message-ID: <2040825.vRYCsv903Y@diego>
+From: elena.reshetova@intel.com (Elena Reshetova)
+Date: Fri, 20 Oct 2017 10:23:44 +0300
+Subject: [PATCH 10/15] drivers,
+ net: convert masces_rx_sc.refcnt from atomic_t to refcount_t
+In-Reply-To: <1508484229-19706-1-git-send-email-elena.reshetova@intel.com>
+References: <1508484229-19706-1-git-send-email-elena.reshetova@intel.com>
+Message-ID: <1508484229-19706-11-git-send-email-elena.reshetova@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+atomic_t variables are currently used to implement reference
+counters with the following properties:
+ - counter is initialized to 1 using atomic_set()
+ - a resource is freed upon counter reaching zero
+ - once counter reaches zero, its further
+   increments aren't allowed
+ - counter schema uses basic atomic operations
+   (set, inc, inc_not_zero, dec_and_test, etc.)
 
-Am Freitag, 20. Oktober 2017, 09:28:58 CEST schrieb Hans Verkuil:
-> On 14/10/17 17:39, Heiko Stuebner wrote:
-> > So far only the hdmi cec supports using one of two different pins
-> > as source, so add the route switching for it.
-> > 
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> 
-> Just tested this on my firefly reload and it works great!
-> 
-> Tested-by: Hans Verkuil <hans.verkuil@cisco.com>
+Such atomic variables should be converted to a newly provided
+refcount_t type and API that prevents accidental counter overflows
+and underflows. This is important since overflows and underflows
+can lead to use-after-free situation and be exploitable.
 
-oh cool. I really only wrote this based on the soc manual,
-so it actually surprises me, that it works on the first try :-)
+The variable masces_rx_sc.refcnt is used as pure reference counter.
+Convert it to refcount_t and fix up the operations.
 
-> I'll post some dts patches later today to fully bring up the first HDMI
-> output on the Firefly Reload.
-> 
-> Will you process this patch further to get it mainlined?
+Suggested-by: Kees Cook <keescook@chromium.org>
+Reviewed-by: David Windsor <dwindsor@gmail.com>
+Reviewed-by: Hans Liljestrand <ishkamiel@gmail.com>
+Signed-off-by: Elena Reshetova <elena.reshetova@intel.com>
+---
+ drivers/net/macsec.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Yep, I'll do that.
-
-
-Heiko
+diff --git a/drivers/net/macsec.c b/drivers/net/macsec.c
+index 733e1c2..e0aeb51 100644
+--- a/drivers/net/macsec.c
++++ b/drivers/net/macsec.c
+@@ -172,7 +172,7 @@ struct macsec_rx_sc {
+ 	bool active;
+ 	struct macsec_rx_sa __rcu *sa[MACSEC_NUM_AN];
+ 	struct pcpu_rx_sc_stats __percpu *stats;
+-	atomic_t refcnt;
++	refcount_t refcnt;
+ 	struct rcu_head rcu_head;
+ };
+ 
+@@ -331,12 +331,12 @@ static void free_rx_sc_rcu(struct rcu_head *head)
+ 
+ static struct macsec_rx_sc *macsec_rxsc_get(struct macsec_rx_sc *sc)
+ {
+-	return atomic_inc_not_zero(&sc->refcnt) ? sc : NULL;
++	return refcount_inc_not_zero(&sc->refcnt) ? sc : NULL;
+ }
+ 
+ static void macsec_rxsc_put(struct macsec_rx_sc *sc)
+ {
+-	if (atomic_dec_and_test(&sc->refcnt))
++	if (refcount_dec_and_test(&sc->refcnt))
+ 		call_rcu(&sc->rcu_head, free_rx_sc_rcu);
+ }
+ 
+@@ -1411,7 +1411,7 @@ static struct macsec_rx_sc *create_rx_sc(struct net_device *dev, sci_t sci)
+ 
+ 	rx_sc->sci = sci;
+ 	rx_sc->active = true;
+-	atomic_set(&rx_sc->refcnt, 1);
++	refcount_set(&rx_sc->refcnt, 1);
+ 
+ 	secy = &macsec_priv(dev)->secy;
+ 	rcu_assign_pointer(rx_sc->next, secy->rx_sc);
+-- 
+2.7.4
