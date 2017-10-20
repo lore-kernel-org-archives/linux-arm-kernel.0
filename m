@@ -1,47 +1,37 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 20 Oct 2017 13:13:55 +0200
-Subject: [PATCH] arm64: mediatek: cleanup message for platform selection
-In-Reply-To: <82b4e4301bb762af59fd76cfe15f0a5773c78bb3.1508406417.git.sean.wang@mediatek.com>
-References: <82b4e4301bb762af59fd76cfe15f0a5773c78bb3.1508406417.git.sean.wang@mediatek.com>
-Message-ID: <0f9cfd78-17e4-9523-2c6e-1cf0960e6506@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 20 Oct 2017 12:14:08 +0100
+Subject: v4.14-rc3/arm64 DABT exception in atomic_inc() / __skb_clone()
+In-Reply-To: <EAA60182-6F08-412E-8F8B-FD4B0309A858@gmail.com>
+References: <EAA60182-6F08-412E-8F8B-FD4B0309A858@gmail.com>
+Message-ID: <20171020111408.edj24tztxdptte5r@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Oct 19, 2017 at 10:16:08PM -0400, Wei Wei wrote:
+> Hi all,
 
+Hi,
 
-On 10/19/2017 11:52 AM, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
+> I have fuzzed v4.14-rc3 using syzkaller and found a bug similar to that one [1].
+> But the call trace isn?t the same. The atomic_inc() might handle a corrupted 
+> skb_buff.
 > 
-> The latest kernel tree already can support more MediaTek platforms such as
-> MT2712 and MT7622, so additional descriptions for those platforms are added
-> and certain cleanups are also being made here.
+> The logs and config have been uploaded to my github repo [2].
 > 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> ---
+> [1] https://lkml.org/lkml/2017/10/2/216
+> [2] https://github.com/dotweiba/skb_clone_atomic_inc_bug
 
-pushed to the soc branch, thanks.
+These do look very similar to what I was hitting; all appear to be
+misaligned atomics in the same path.
 
->  arch/arm64/Kconfig.platforms | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-> index 6b54ee8..ab69f5f 100644
-> --- a/arch/arm64/Kconfig.platforms
-> +++ b/arch/arm64/Kconfig.platforms
-> @@ -91,12 +91,13 @@ config ARCH_HISI
->  	  This enables support for Hisilicon ARMv8 SoC family
->  
->  config ARCH_MEDIATEK
-> -	bool "Mediatek MT65xx & MT81xx ARMv8 SoC"
-> +	bool "MediaTek SoC Family"
->  	select ARM_GIC
->  	select PINCTRL
->  	select MTK_TIMER
->  	help
-> -	  Support for Mediatek MT65xx & MT81xx ARMv8 SoCs
-> +	  This enables support for MediaTek MT27xx, MT65xx, MT76xx
-> +	  & MT81xx ARMv8 SoCs
->  
->  config ARCH_MESON
->  	bool "Amlogic Platforms"
-> 
+I see that you have some empty repro files in [2]. If you have any
+reproducers, would you mind sharing them?
+
+If any of those are smaller or more reliable than the one I was able to
+generate [3], it might make it more obvious what's going on, and/or make
+it simpler to come up with a plain C reproducer.
+
+Thanks,
+Mark.
+
+[3] https://www.kernel.org/pub/linux/kernel/people/mark/bugs/20171002-skb_clone-misaligned-atomic/syzkaller.repro
