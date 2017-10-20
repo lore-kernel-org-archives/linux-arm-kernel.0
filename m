@@ -1,75 +1,29 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 20 Oct 2017 10:14:28 +0100
-Subject: [PATCH v3 6/7] arm64: topology: Enable ACPI/PPTT based CPU
- topology.
-In-Reply-To: <6a9836f5-d31c-67fb-b2dd-bc0972ebb1c2@arm.com>
-References: <20171012194856.13844-1-jeremy.linton@arm.com>
- <20171012194856.13844-7-jeremy.linton@arm.com>
- <20171019155622.GC18883@red-moon>
- <6a9836f5-d31c-67fb-b2dd-bc0972ebb1c2@arm.com>
-Message-ID: <20171020091428.GA21060@red-moon>
+From: xieyisheng1@huawei.com (Yisheng Xie)
+Date: Fri, 20 Oct 2017 17:14:33 +0800
+Subject: [PATCH v2] iommu/arm-smmu-v3: Avoid ILLEGAL setting of
+ STE.S1STALLD and CD.S
+In-Reply-To: <20171020083653.GA17938@arm.com>
+References: <1505997367-51569-1-git-send-email-xieyisheng1@huawei.com>
+ <7eb1db90-9a30-b70c-c3d1-71bbca41502d@huawei.com>
+ <20171020083653.GA17938@arm.com>
+Message-ID: <91ea4c13-c8b9-e3fe-b317-a9696d425039@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 19, 2017 at 11:13:27AM -0500, Jeremy Linton wrote:
-> On 10/19/2017 10:56 AM, Lorenzo Pieralisi wrote:
-> >On Thu, Oct 12, 2017 at 02:48:55PM -0500, Jeremy Linton wrote:
-> >>Propagate the topology information from the PPTT tree to the
-> >>cpu_topology array. We can get the thread id, core_id and
-> >>cluster_id by assuming certain levels of the PPTT tree correspond
-> >>to those concepts. The package_id is flagged in the tree and can be
-> >>found by passing an arbitrary large level to setup_acpi_cpu_topology()
-> >>which terminates its search when it finds an ACPI node flagged
-> >>as the physical package. If the tree doesn't contain enough
-> >>levels to represent all of thread/core/cod/package then the package
-> >>id will be used for the missing levels.
-> >>
-> >>Since server/ACPI machines are more likely to be multisocket and NUMA,
-> >
-> >I think this stuff is vague enough already so to start with I would drop
-> >patch 4 and 5 and stop assuming what machines are more likely to ship
-> >with ACPI than DT.
-> >
-> >I am just saying, for the umpteenth time, that these levels have no
-> >architectural meaning _whatsoever_, level is a hierarchy concept
-> >with no architectural meaning attached.
+Hi Will,
+
+On 2017/10/20 16:36, Will Deacon wrote:
+> On Fri, Oct 20, 2017 at 03:00:01PM +0800, Yisheng Xie wrote:
+>> Any comment about this version?
 > 
-> ?
+> I have it queued up and plan to send a pull request to Joerg today for 4.15.
+
+Fine, thanks.
+
+Thanks
+Yisheng Xie
 > 
-> Did anyone say anything about that? No, I think the only thing being
-> guaranteed here is that the kernel's physical_id maps to an ACPI
-> defined socket. Which seems to be the mindset of pretty much the
-> entire !arm64 community meaning they are optimizing their software
-> and the kernel with that concept in mind.
+> Will
 > 
-> Are you denying the existence of non-uniformity between threads
-> running on different physical sockets?
-
-No, I have not explained my POV clearly, apologies.
-
-AFAIK, the kernel currently deals with 2 (3 - if SMT) topology layers.
-
-1) thread
-2) core
-3) package
-
-What I wanted to say is, that, to simplify this series, you do not need
-to introduce the COD topology level, since it is just another arbitrary
-topology level (ie there is no way you can pinpoint which level
-corresponds to COD with PPTT - or DT for the sake of this discussion)
-that would not be used in the kernel (apart from big.LITTLE cpufreq
-driver and PSCI checker whose usage of topology_physical_package_id() is
-questionable anyway).
-
-PPTT allows you to define what level corresponds to a package, use
-it to initialize the package topology level (that on ARM internal
-variables we call cluster) and be done with it.
-
-I do not think that adding another topology level improves anything as
-far as ACPI topology detection is concerned, you are not able to use it
-in the scheduler or from userspace to group CPUs anyway.
-
-Does this answer your question ?
-
-Thanks,
-Lorenzo
+> .
+> 
