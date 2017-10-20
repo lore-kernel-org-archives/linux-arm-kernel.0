@@ -1,55 +1,39 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 20 Oct 2017 12:34:17 +0100
-Subject: [RESEND PATCH 2/2] arm/arm64: kvm: Disable branch profiling in HYP
+Date: Fri, 20 Oct 2017 12:34:15 +0100
+Subject: [RESEND PATCH 0/2] arm/arm64: kvm: Disable branch profiling in HYP
  code
-In-Reply-To: <1508499257-10014-1-git-send-email-julien.thierry@arm.com>
-References: <1508499257-10014-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1508499257-10014-3-git-send-email-julien.thierry@arm.com>
+Message-ID: <1508499257-10014-1-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When HYP code runs into branch profiling code, it attempts to jump to
-unmapped memory, causing a HYP Panic.
+[Resending for Christoffer and adding kvmarm to recipients]
 
-Disable the branch profiling for code designed to run at HYP mode.
+Hi,
 
-Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: <stable@vger.kernel.org>
----
- arch/arm/kvm/hyp/Makefile   | 2 +-
- arch/arm64/kvm/hyp/Makefile | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+When enabling branch profiling, a lockup occurs at boot time, after
+displaying: "kvm [1]: Hyp mode initialized successfully"
 
-diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
-index 8679405..92eab1d 100644
---- a/arch/arm/kvm/hyp/Makefile
-+++ b/arch/arm/kvm/hyp/Makefile
-@@ -2,7 +2,7 @@
- # Makefile for Kernel-based Virtual Machine module, HYP part
- #
+The issue is caused by the Hyp code getting instrumented and trying to
+access unmapped code or data, which happens when trying to initialize EL2.
 
--ccflags-y += -fno-stack-protector
-+ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
+So it also seems like KVM is misleadingly announcing it was initialized and
+yet gets stuck during initialization.
 
- KVM=../../../../virt/kvm
+* First patch deals with printing the initialization message once KVM has
+  fully initialized Hyp mode
+* Second patch actually disables branch profiling instrumentation in Hyp
+  code
 
-diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-index 14c4e3b..48b0354 100644
---- a/arch/arm64/kvm/hyp/Makefile
-+++ b/arch/arm64/kvm/hyp/Makefile
-@@ -2,7 +2,7 @@
- # Makefile for Kernel-based Virtual Machine module, HYP part
- #
+Cheers,
 
--ccflags-y += -fno-stack-protector
-+ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
+Julien Thierry (2):
+  arm/arm64: kvm: Move initialization completion message
+  arm/arm64: kvm: Disable branch profiling in HYP code
 
- KVM=../../../../virt/kvm
+ arch/arm/kvm/hyp/Makefile   |  2 +-
+ arch/arm64/kvm/hyp/Makefile |  2 +-
+ virt/kvm/arm/arm.c          | 31 ++++++++++++++-----------------
+ 3 files changed, 16 insertions(+), 19 deletions(-)
 
 --
 1.9.1
