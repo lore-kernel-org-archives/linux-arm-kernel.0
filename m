@@ -1,40 +1,20 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Oct 2017 22:33:34 +0200
-Subject: [GIT PULL] firmware: arm_scpi: updates/cleanups for v4.15
-In-Reply-To: <901d3720-a023-0af9-2b20-b7d7e8528571@arm.com>
-References: <901d3720-a023-0af9-2b20-b7d7e8528571@arm.com>
-Message-ID: <CAK8P3a0Pmcg+_zZNgTYfi_0m8zS=Rq9oqPSypxASKh8E34NKJg@mail.gmail.com>
+Date: Fri, 20 Oct 2017 22:36:02 +0200
+Subject: [GIT PULL] Qualcomm Driver updates for 4.15
+In-Reply-To: <1508182291-23352-4-git-send-email-andy.gross@linaro.org>
+References: <1508182291-23352-1-git-send-email-andy.gross@linaro.org>
+ <1508182291-23352-4-git-send-email-andy.gross@linaro.org>
+Message-ID: <CAK8P3a2_YUJz5UMKZ8rECzreeVHr8UQjhR2HSs85T5X06hypDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 9, 2017 at 7:27 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+On Mon, Oct 16, 2017 at 9:31 PM, Andy Gross <andy.gross@linaro.org> wrote:
+> Qualcomm ARM Based Driver Updates for v4.15
 >
-> The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
->
->   Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git
-> tags/scpi-updates-4.15
->
-> for you to fetch changes up to 430594c1c7f5051f0d99ed9d08d086d20587cdd1:
->
->   firmware: arm_scpi: silence sparse warnings (2017-10-09 10:20:02 +0100)
->
-> ----------------------------------------------------------------
-> ARM SCPI updates/cleanups for v4.15
->
-> 1. Fixes to get rid of sparse warnings
-> 2. Use of FIELD_GET and GENMASK for better subfields handling
-> 3. Make mbox_free_channels device-managed helping in removing
-> unnecessary code
-> 4. Various other cleanups to simplify and improve code readability
+> * Add SCM firmware APIs for download mode and secure IO service
+> * Add SMEM support for cached entries
+> * Add SMEM support for global partition, dynamic item limit, and more hosts
 
-Pulled into next/drivers. I'm a little unsure about the first patch: the
-resource is called "shmem", which suggests that you are dealing
-with memory and should use "memremap()" instead of "ioremap()"
-and readl/writel. Can you clarify what the mapping attributes are
-supposed to be here? Thanks.
+Pulled into next/drivers, thanks!
 
-        Arnd
+      Arnd
