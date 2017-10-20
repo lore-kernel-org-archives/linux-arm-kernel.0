@@ -1,14 +1,26 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 20 Oct 2017 11:33:02 +0200
-Subject: [PATCH] ARM: dts: r8a7745: Add IIC cores to dtsi
-In-Reply-To: <1507910793-13919-1-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1507910793-13919-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <20171020093302.o3jjjgu37gipqelj@verge.net.au>
+From: sebastian.huber@embedded-brains.de (Sebastian Huber)
+Date: Fri, 20 Oct 2017 11:35:18 +0200
+Subject: [PATCH] soc/qbman: Simplify bman_release()
+In-Reply-To: <20170710072859.2616-1-sebastian.huber@embedded-brains.de>
+References: <20170710072859.2616-1-sebastian.huber@embedded-brains.de>
+Message-ID: <f25ecaec-1a78-7b72-1ed0-45d0a818e9bb@embedded-brains.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please include some changelog text here, preferably motivating the change.
+Ping.
 
-On Fri, Oct 13, 2017 at 05:06:33PM +0100, Fabrizio Castro wrote:
-> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+On 10/07/17 09:28, Sebastian Huber wrote:
+> Get the affine portal only once for the complete transaction.
+>
+> Signed-off-by: Sebastian Huber <sebastian.huber@embedded-brains.de>
+
+-- 
+Sebastian Huber, embedded brains GmbH
+
+Address : Dornierstr. 4, D-82178 Puchheim, Germany
+Phone   : +49 89 189 47 41-16
+Fax     : +49 89 189 47 41-09
+E-Mail  : sebastian.huber at embedded-brains.de
+PGP     : Public key available on request.
+
+Diese Nachricht ist keine gesch?ftliche Mitteilung im Sinne des EHUG.
