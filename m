@@ -1,65 +1,75 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 20 Oct 2017 09:59:22 +0100
-Subject: [PATCH 2/2] arm/arm64: kvm: Disable branch profiling in HYP code
-In-Reply-To: <1508427913-34619-3-git-send-email-julien.thierry@arm.com>
-References: <1508427913-34619-1-git-send-email-julien.thierry@arm.com>
- <1508427913-34619-3-git-send-email-julien.thierry@arm.com>
-Message-ID: <a64ed732-0ed0-8163-590c-ec5cb234c6f3@arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 20 Oct 2017 11:03:39 +0200
+Subject: [GIT PULL] Renesas ARM64 Based SoC DT Updates for v4.15
+In-Reply-To: <CAK8P3a0-c+HvugOmrRr+7sbEe8MOw2wz+s=Q899j42vd8jSBPA@mail.gmail.com>
+References: <cover.1506678250.git.horms+renesas@verge.net.au>
+ <CAK8P3a0-c+HvugOmrRr+7sbEe8MOw2wz+s=Q899j42vd8jSBPA@mail.gmail.com>
+Message-ID: <20171020090335.augezvidhxfks26l@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/10/17 16:45, Julien Thierry wrote:
-> When HYP code runs into branch profiling code, it attempts to jump to
-> unmapped memory, causing a HYP Panic.
+On Thu, Oct 19, 2017 at 11:39:45PM +0200, Arnd Bergmann wrote:
+> On Fri, Sep 29, 2017 at 1:52 PM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > ----------------------------------------------------------------
+> > Renesas ARM64 Based SoC DT Updates for v4.15
+> >
+> > * r8a7795 (H3)
+> >   - Use r8a7795-cpg-mssr and r8a7795-sysc bindings
+> >     Hardcoded indicies are replaced with symbols now that they are available
+> >
+> >   - Drop bogus HDMI node name suffixes
+> >     Laurent Pinchart says: Node names should not use numerical suffixes if
+> >     the nodes can be distinguished by unit-address
+> >
+> >   - Update PFC node name to pin-controller
+> >     Shimoda-san says the PFC node name is changed "from e6060000.pfc and
+> >     pfc at e6060000 to e6060000.pin-controller and pin-controller at e6060000
+> >     like other Renesas SoCs."
+> >
+> > * r8a7795 (H3) ES1.0
+> >   - Drop extra zero from XHCI unit address
+> >     This corrects a typo were ee0400000 rather than ee040000 was used
+> >     as the unit address.
+> >
+> > * r8a7796 (M3-W)
+> >   - Add FDP1 instance
+> >     Laurent Pinchart says: The r8a7796 has a single FDP1 instance.
+> >
+> > * r8a7795 (H3) and r8a7796 (M3-W) SoCs
+> >   - Add USB3.0 peripheral device nodes
+> >     Shimoda-san says that this is not enabled on the Salvator-X/XS boards
+> >     for now as:
+> >      + we need a special cable (USB type-A to A cross cable).
+> >      + we can swap the role by renesas_usb3 driver even if we use a normal
+> >         cable and after usb3.0 host is running, but I think it's a special
+> >         use case.
+> >
+> > * r8a7795 (H3) and r8a7796 (M3-W) ULCB boards
+> >   - Enable display output
+> >     Laurent Pinchart says: The DU is already wired up to the HDMI encoder,
+> >     all we need to do is enable it.
+> >
+> > * r8a77995 (D3) Draak board
+> >   - Enable EthernetAVB and , USB2.0 Host and PHY
+> >
+> >   - Add serial console pins.
+> >     This is safe to do now that r8a77995 PFC driver support is present
+> >
+> > * r8a77970 (V3M)
+> >   - Add basic support for SoC and EtherAVB, [H]SCIF and SYS-DMAC nodes
+> >     This is a step towards enabling EtherAVB and [H]SCIF with SYS-DMAC
+> >     in the Eagle board support for which is under review
 > 
-> Disable the branch profiling for code designed to run at HYP mode.
+> Thanks for the detailed changelog!
 > 
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: <stable@vger.kernel.org>
-> ---
->  arch/arm/kvm/hyp/Makefile   | 2 +-
->  arch/arm64/kvm/hyp/Makefile | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
+> > ----------------------------------------------------------------
+> > Geert Uytterhoeven (6):
+> >       arm64: dts: renesas: r8a7795-es1: Drop extra zero from usb unit address
+> >       arm64: dts: renesas: r8a7795: Drop bogus HDMI node names suffixes
+> >       arm64: renesas: Add Renesas R8A77970 Kconfig support
 > 
-> diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
-> index 8679405..92eab1d 100644
-> --- a/arch/arm/kvm/hyp/Makefile
-> +++ b/arch/arm/kvm/hyp/Makefile
-> @@ -2,7 +2,7 @@
->  # Makefile for Kernel-based Virtual Machine module, HYP part
->  #
-> 
-> -ccflags-y += -fno-stack-protector
-> +ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
-> 
->  KVM=../../../../virt/kvm
-> 
-> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-> index 14c4e3b..48b0354 100644
-> --- a/arch/arm64/kvm/hyp/Makefile
-> +++ b/arch/arm64/kvm/hyp/Makefile
-> @@ -2,7 +2,7 @@
->  # Makefile for Kernel-based Virtual Machine module, HYP part
->  #
-> 
-> -ccflags-y += -fno-stack-protector
-> +ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
-> 
->  KVM=../../../../virt/kvm
-> 
-> --
-> 1.9.1
-> 
+> That one last commit doesn't seem to belong in here, but I've pulled
+> it anyway, thanks!
 
-Nice catch.
-
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thanks! I take it you would have prefered this in an soc branch?
