@@ -1,30 +1,49 @@
-From: willemdebruijn.kernel@gmail.com (Willem de Bruijn)
-Date: Fri, 20 Oct 2017 11:39:35 -0400
-Subject: v4.14-rc3/arm64 DABT exception in atomic_inc() / __skb_clone()
-In-Reply-To: <CACT4Y+bjzzCv3LSxK12C1xB8GfR3UYCrX_5phRYJ8fpxh9vcvQ@mail.gmail.com>
-References: <EAA60182-6F08-412E-8F8B-FD4B0309A858@gmail.com>
- <20171020111408.edj24tztxdptte5r@lakrids.cambridge.arm.com>
- <960D71EC-C1E9-4898-ACBE-543FC09483FF@gmail.com>
- <CACT4Y+bjzzCv3LSxK12C1xB8GfR3UYCrX_5phRYJ8fpxh9vcvQ@mail.gmail.com>
-Message-ID: <CAF=yD-K76TMjHiYRTRAnxM-x4LBcUDY+27WX477HW6kG=L_aZw@mail.gmail.com>
+From: marco.franchi@nxp.com (Marco Franchi)
+Date: Fri, 20 Oct 2017 13:48:22 -0200
+Subject: [PATCH v3 1/6] ARM: dts: imx51-apf51dev: Fix 'backlight@bl1' node
+ with unit name and no reg property
+Message-ID: <1508514507-30736-1-git-send-email-marco.franchi@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 20, 2017 at 11:14 AM, Dmitry Vyukov <dvyukov@google.com> wrote:
-> On Fri, Oct 20, 2017 at 4:40 PM, Wei Wei <dotweiba@gmail.com> wrote:
->> Sadly, the syzkaller characterized it as a non-reproducible bug and there were empty
->>  repro files. But if manually executing in VM like this ?./syz-execprog -executor=
->> ./syz-executor -repeat=0 -procs=16 -cover=0 crash-log?, it crashed when executing exactly
->> program 1056 using log0 provided.
->>
->> I failed to generate the C reproducer with syz-repro as it said ?no target compiler?
->> in the final step. I would appreciate if you could give some hints.
->
-> syzkaller tries to use aarch64-linux-gnu-gcc when cross-compiling to arm64:
-> https://github.com/google/syzkaller/blob/master/sys/targets/targets.go#L62
-> Try to install g++-aarch64-linux-gnu.
-> Or how should it be done on your system?
+The following build warning is seen with W=1:
 
-A core dump would also be helpful to root around in and inspect
-what those registers point to. Thanks for posting the various reports
-on github, btw.
+Warning (unit_address_vs_reg): Node /backlight at bl1 has a unit name, but no reg property
+
+Fix this warning by removing '@bl1'from such node and change 'bl1grp' to 
+'backlightgrp', once there is only one backlight in this dts.
+
+Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
+---
+Changes since v2:
+-change message log
+-change backlight-bl1 to backlight
+-change bl1grp to backlightgrp
+-add missed space
+ arch/arm/boot/dts/imx51-apf51dev.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx51-apf51dev.dts b/arch/arm/boot/dts/imx51-apf51dev.dts
+index 2f1a9d2..3e1846a 100644
+--- a/arch/arm/boot/dts/imx51-apf51dev.dts
++++ b/arch/arm/boot/dts/imx51-apf51dev.dts
+@@ -16,7 +16,7 @@
+ 	model = "Armadeus Systems APF51Dev docking/development board";
+ 	compatible = "armadeus,imx51-apf51dev", "armadeus,imx51-apf51", "fsl,imx51";
+ 
+-	backlight at bl1{
++	backlight {
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_backlight>;
+ 		compatible = "gpio-backlight";
+@@ -120,7 +120,7 @@
+ 	pinctrl-0 = <&pinctrl_hog>;
+ 
+ 	imx51-apf51dev {
+-		pinctrl_backlight: bl1grp {
++		pinctrl_backlight: backlightgrp {
+ 			fsl,pins = <
+ 				MX51_PAD_DI1_D1_CS__GPIO3_4 0x1F5
+ 			>;
+-- 
+2.7.4
