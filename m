@@ -1,21 +1,58 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 20 Oct 2017 11:17:47 +0200
-Subject: [PATCH 00/11] arm64: dts: renesas: Use R-Car SDHI Gen[123]
- fallback compat strings
-In-Reply-To: <20171017060959.16702-1-horms+renesas@verge.net.au>
-References: <20171017060959.16702-1-horms+renesas@verge.net.au>
-Message-ID: <20171020091747.iep6diy3ymp47qip@verge.net.au>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 20 Oct 2017 10:18:23 +0100
+Subject: v4.14-rc3/arm64 DABT exception in atomic_inc() / __skb_clone()
+In-Reply-To: <CANn89iKj45+zqMt7XqPkCG+8PQwhzjHUBZ0vu-REvZWs1HuqOw@mail.gmail.com>
+References: <EAA60182-6F08-412E-8F8B-FD4B0309A858@gmail.com>
+ <CANn89iJgoiY_ky4F_1iE_o6moZXp5e6OcNZZe=B8F-OhWJx8nQ@mail.gmail.com>
+ <FF5A6DF1-0E5F-4C7E-A31B-06ED33366039@gmail.com>
+ <CANn89iKj45+zqMt7XqPkCG+8PQwhzjHUBZ0vu-REvZWs1HuqOw@mail.gmail.com>
+Message-ID: <20171020091823.GA18282@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 08:09:48AM +0200, Simon Horman wrote:
-> Use recently posted R-Car SDHI Gen 1, 2 and 3 fallback compat strings
-> in the DT of Renesas ARM and arm64 based SoCs.
+On Thu, Oct 19, 2017 at 10:34:54PM -0700, Eric Dumazet wrote:
+> On Thu, Oct 19, 2017 at 8:13 PM, Wei Wei <dotweiba@gmail.com> wrote:
+> > Code: f9406680 8b010000 91009000 f9800011 (885f7c01)
+> > All code
+> > ========
+> >    0:   80 66 40 f9             andb   $0xf9,0x40(%rsi)
+> >    4:   00 00                   add    %al,(%rax)
+> >    6:   01 8b 00 90 00 91       add    %ecx,-0x6eff7000(%rbx)
+> >    c:   11 00                   adc    %eax,(%rax)
+> >    e:   80 f9 01                cmp    $0x1,%cl
+> >   11:   7c 5f                   jl     0x72
+> >   13:*  88 00                   mov    %al,(%rax)               <-- trapping instruction
+> >   15:   00 00                   add    %al,(%rax)
+> >         ...
+> >
+> > Code starting with the faulting instruction
+> > ===========================================
+> >    0:   01 7c 5f 88             add    %edi,-0x78(%rdi,%rbx,2)
+> >    4:   00 00                   add    %al,(%rax)
+> >         ...
+> > ?[ end trace 261e7ac1458ccc0a ]---
+> >
 > 
-> Based on renesas-devel-20171016-v4.14-rc5
+> I thought it was happening on arm64 ?
 > 
-> Has a binding documentation but no run-time dependency on
-> "[PATCH v3 0/3] mmc: renesas_sdhi: add R-Car Gen[123] fallback
-> compatibility strings"
+> This is x86_64 disassembly :/
 
-I have marked these as deferred pending acceptance of the above dependency.
+I guess they forgot the ARCH/CROSS_COMPILE env vars for decodecode. here
+you go:
+
+Code: f9406680 8b010000 91009000 f9800011 (885f7c01)
+All code
+========
+   0:	f9406680 	ldr	x0, [x20,#200]
+   4:	8b010000 	add	x0, x0, x1
+   8:	91009000 	add	x0, x0, #0x24
+   c:	f9800011 	prfm	pstl1strm, [x0]
+  10:*	885f7c01 	ldxr	w1, [x0]		<-- trapping instruction
+
+Code starting with the faulting instruction
+===========================================
+   0:	885f7c01 	ldxr	w1, [x0]
+
+so it's faulting on the load part of an atomic rmw.
+
+Will
