@@ -1,134 +1,76 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sat, 21 Oct 2017 00:14:28 +0200
-Subject: [PATCH v7 0/6] SMP and CPU hotplug support for Meson8/Meson8b
-In-Reply-To: <7hpoa07yn6.fsf@baylibre.com>
-References: <20170917164523.6970-1-martin.blumenstingl@googlemail.com>
- <CAFBinCCdj8LwXvUSoCPeVfPUTaLVFFyvKZcNceLGvj26Z740DQ@mail.gmail.com>
- <7hpoa07yn6.fsf@baylibre.com>
-Message-ID: <CAFBinCB0YkApefxJCVDmEc0cD3JWv7+ZHE3PY2BjD3tXD6gbEQ@mail.gmail.com>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Fri, 20 Oct 2017 15:17:42 -0700
+Subject: [PATCH 1/1] tty: serial: imx: allow breaks to be received when
+ using dma
+In-Reply-To: <20171020221340.14974-1-troy.kisky@boundarydevices.com>
+References: <20171020221340.14974-1-troy.kisky@boundarydevices.com>
+Message-ID: <a3f0140a-92bb-ed59-ee79-971385634d4d@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russel,
-
-On Fri, Oct 6, 2017 at 11:30 PM, Kevin Hilman <khilman@baylibre.com> wrote:
-> Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
->
->> Hello Russel, Hi Kevin,
->>
->> On Sun, Sep 17, 2017 at 6:45 PM, Martin Blumenstingl
->> <martin.blumenstingl@googlemail.com> wrote:
->>> This patchset adds support for booting the secondary CPU cores (and
->>> taking them offline again) on Amlogic Meson8 and Meson8b SoCs.
->>> It is based on an earlier version from Carlo Caione - this helped me
->>> a lot to get a better understanding of how SMP/CPU hotplug works
->>> (compared to the code found in Amlogic's GPL kernel sources from
->>> year 2015).
->>>
->>> Changes since v6 from [6]:
->>> - rebased on top of v4.14-rc1 (which only corrected some line
->>>   numbers in the SCU patches)
->> it's been two weeks since v6 and since then Linus L?ssing has
->> confirmed that this works fine on his Odroid-C1 as well (many thanks
->> for testing!): [7]
->>
->>> Changes since v5 from [5]:
->>> - dropped dependency on another patch series (for the clock
->>>   controller's embedded reset controller, which is needed to boot
->>>   the secondary CPUs) from the cover-letter as that series is now
->>>   merged
->>> - fix incorrect documentation of scu_cpu_power_enable (thanks to
->>>   Russell King for spotting these). removed the paragraph about
->>>   preemption, cache coherency and interrupts as we're powering on
->>>   a CPU core (the text was copied from the original scu_power_mode
->>>   but simply not adjusted). also changed "Set the executing CPUs"
->>>   to "Set the given (logical) CPU's" as we're not modifying the
->>>   current CPU. this affects only patch #2
->>> - extended the commit message of patch #3 with a short sentence
->>>   about why SCU_CPU_STATUS_MASK was introduced
->>>
->>> Changes since v4 from [4]:
->>> - use __pa_symbol(secondary_startup) instead of
->>>   virt_to_phys(secondary_startup) as suggested by Florian Fainelli
->>>   (affects patch #4)
->>> - (cover-letter) removed dependency on my other patch
->>>   "ARM: dts: meson: add a node which describes the SRAM" [2] as that
->>>   was merged into Kevin's Amlogic repo today
->>> - dropped patch #5 ("clk: meson: meson8b: export the CPU soft reset
->>>   lines") again because the reset controller series exposes the
->>>   preprocessor macros now directly, see [1]
->>> - refreshed the .dts patches so they now include the new header for
->>>   the reset line preprocessor macros
->>>
->>> Changes since v3 from [3]:
->>> - added Rob's ACK to patch #1
->>> - replaced a msleep(10) with usleep_range(10000, 15000) in patch #4
->>> - removed all "pen" code from patch #4 as that code was not needed
->>>   at all (it was left-over while trying to fix Meson8 secondary CPU
->>>   boot - which turned out to have nothing to do with this "pen" code)
->>> - removed all memory barrier operations as they were added based on
->>>   the code in the Amlogic GPL kernel tree (while trying to fix the
->>>   Meson8 secondary CPU boot - just like the "pen" code). Everything
->>>   still works fine with these on my Meson8m2 and Meson8b boards.
->>> - added PATCH #5 as we now have to export the reset identifiers
->>>   (just like we do it with the clock identifiers / preprocessor
->>>   macros) - this is the result of a change in the reset controller
->>>   patch in version 2, see [1]
->>> - use the reset line preprocessor macros (from patch #5) in patches
->>>   #6 and #7
->>>
->>> Changes since v2 from [0]:
->>> - added support for Meson8 (which requires a slightly different
->>>   enable-method)
->>> - implemented CPU hotplug support which allows taking a CPU core
->>>   offline for both, Meson8 and Meson8b
->>> - add a function to smp_scu.c which allows enabling a CPU core from
->>>   a different CPU (previously only the power mode for the current CPU
->>>   could be changed). Without this the CPU cores on Meson8 won't come
->>>   up (Amlogic's vendor GPL kernel sources also enable power through
->>>   SCU as very first step for Meson8b as well)
->>> - add a function to smp_scu.c to get the power status of a CPU core
->>>   (which is needed because the code in .cpu_kill needs to wait until
->>>   the core is actually powered off)
->>> - dropped patch "ARM: DTS: meson8b: Extend L2 cache controller node"
->>>   as it is already applied (for both, Meson8 and Meson8b)
->>> - dropped the patches which implement the reset controller which is
->>>   built into the clock-controller, these are a separate series: [1]
->>> - moved the enable-method property to each CPU node
->>>
->>>
->>> [0] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/390355.html
->>> [1] http://lists.infradead.org/pipermail/linux-amlogic/2017-July/004456.html
->>> [2] http://lists.infradead.org/pipermail/linux-amlogic/2017-July/004282.html
->>> [3] http://lists.infradead.org/pipermail/linux-amlogic/2017-July/004297.html
->>> [4] http://lists.infradead.org/pipermail/linux-amlogic/2017-July/004354.html
->>> [5] http://lists.infradead.org/pipermail/linux-amlogic/2017-July/004460.html
->>> [6] http://lists.infradead.org/pipermail/linux-amlogic/2017-August/004588.html
->>>
->>> Carlo Caione (2):
->>>   dt-bindings: Amlogic: Add Meson8 and Meson8b SMP related documentation
->>>   ARM: dts: meson8b: add support for booting the secondary CPU cores
->>>
->>> Martin Blumenstingl (4):
->>>   ARM: smp_scu: add a helper for powering on a specific CPU
->>>   ARM: smp_scu: allow the platform code to read the SCU CPU status
-could you please have a look at these two patches? it would be great
-if you could give feedback on these, because they are needed for SMP
-support on the Amlogic Meson8 and Meson8b platforms
-
->>>   ARM: meson: Add SMP bringup code for Meson8 and Meson8b
->>>   ARM: dts: meson8: add support for booting the secondary CPU cores
->> @Russel: should Kevin take all patches including the two smp_scu ones?
->> or do you want to take them through your own tree?
->
-> With Russell's ack, I can take the series via the amlogic tree.  But I'm
-> also fine if Russell wants to take the arch/arm/* via his tree, and I
-> will just queue up the DT.
-please also let Kevin know if you would like him to take these patches
-through the amlogic tree
-
-thank you in advance!
+On 10/20/2017 3:13 PM, Troy Kisky wrote:
+> This allows me to login after sending a break when service
+> serial-getty at ttymxc0.service is running
+> 
+> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> ---
+>  drivers/tty/serial/imx.c | 20 +++++++++++++-------
+>  1 file changed, 13 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+> index 506fcd742b47..39033f460a24 100644
+> --- a/drivers/tty/serial/imx.c
+> +++ b/drivers/tty/serial/imx.c
+> @@ -934,7 +934,6 @@ static void dma_rx_callback(void *data)
+>  	status = dmaengine_tx_status(chan, (dma_cookie_t)0, &state);
+>  
+>  	if (status == DMA_ERROR) {
+> -		dev_err(sport->port.dev, "DMA transaction error.\n");
+>  		clear_rx_errors(sport);
+>  		return;
+>  	}
+> @@ -1035,6 +1034,7 @@ static int start_rx_dma(struct imx_port *sport)
+>  
+>  static void clear_rx_errors(struct imx_port *sport)
+>  {
+> +	struct tty_port *port = &sport->port.state->port;
+>  	unsigned int status_usr1, status_usr2;
+>  
+>  	status_usr1 = readl(sport->port.membase + USR1);
+> @@ -1043,12 +1043,18 @@ static void clear_rx_errors(struct imx_port *sport)
+>  	if (status_usr2 & USR2_BRCD) {
+>  		sport->port.icount.brk++;
+>  		writel(USR2_BRCD, sport->port.membase + USR2);
+> -	} else if (status_usr1 & USR1_FRAMERR) {
+> -		sport->port.icount.frame++;
+> -		writel(USR1_FRAMERR, sport->port.membase + USR1);
+> -	} else if (status_usr1 & USR1_PARITYERR) {
+> -		sport->port.icount.parity++;
+> -		writel(USR1_PARITYERR, sport->port.membase + USR1);
+> +		if (tty_insert_flip_char(port, 0, TTY_BREAK) == 0)
+> +			sport->port.icount.buf_overrun++;
+> +		tty_flip_buffer_push(port);
+> +	} else {
+> +		dev_err(sport->port.dev, "DMA transaction error.\n");
+> +		if (status_usr1 & USR1_FRAMERR) {
+> +			sport->port.icount.frame++;
+> +			writel(USR1_FRAMERR, sport->port.membase + USR1);
+> +		} else if (status_usr1 & USR1_PARITYERR) {
+> +			sport->port.icount.parity++;
+> +			writel(USR1_PARITYERR, sport->port.membase + USR1);
+> +		}
+>  	}
+>  
+>  	if (status_usr2 & USR2_ORE) {
+> 
 
 
-Regards
-Martin
+
+Does this need to use
+ 	spin_lock_irqsave(&sport->port.lock, flags);
+
+
+I would have, but dma_rx_callback doesn't.
+
+BR
+Troy
