@@ -1,373 +1,102 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri, 20 Oct 2017 10:02:57 +0200
-Subject: [PATCH 2/2] clk: meson: gxbb: Add VPU and VAPB clocks data
-In-Reply-To: <1508168085-19032-3-git-send-email-narmstrong@baylibre.com>
-References: <1508168085-19032-1-git-send-email-narmstrong@baylibre.com>
- <1508168085-19032-3-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1508486577.3616.11.camel@baylibre.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Fri, 20 Oct 2017 16:08:47 +0800
+Subject: [PATCH 02/15] drivers, net, ethernet: convert
+ mtk_eth.dma_refcnt from atomic_t to refcount_t
+In-Reply-To: <1508484229-19706-3-git-send-email-elena.reshetova@intel.com>
+References: <1508484229-19706-1-git-send-email-elena.reshetova@intel.com>
+ <1508484229-19706-3-git-send-email-elena.reshetova@intel.com>
+Message-ID: <1508486927.29850.12.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-10-16 at 17:34 +0200, Neil Armstrong wrote:
-> The Amlogic Meson GX SoCs needs these two clocks to power up the
-> VPU power domain.
+On Fri, 2017-10-20 at 10:23 +0300, Elena Reshetova wrote:
+> atomic_t variables are currently used to implement reference
+> counters with the following properties:
+>  - counter is initialized to 1 using atomic_set()
+>  - a resource is freed upon counter reaching zero
+>  - once counter reaches zero, its further
+>    increments aren't allowed
+>  - counter schema uses basic atomic operations
+>    (set, inc, inc_not_zero, dec_and_test, etc.)
 > 
-> These two clocks are similar to the MALI clocks by having a glitch-free
-> mux and two similar clocks with gate, divider and muxes.
+> Such atomic variables should be converted to a newly provided
+> refcount_t type and API that prevents accidental counter overflows
+> and underflows. This is important since overflows and underflows
+> can lead to use-after-free situation and be exploitable.
 > 
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> The variable mtk_eth.dma_refcnt is used as pure reference counter.
+> Convert it to refcount_t and fix up the operations.
+> 
+> Suggested-by: Kees Cook <keescook@chromium.org>
+> Reviewed-by: David Windsor <dwindsor@gmail.com>
+> Reviewed-by: Hans Liljestrand <ishkamiel@gmail.com>
+> Signed-off-by: Elena Reshetova <elena.reshetova@intel.com>
 > ---
->  drivers/clk/meson/gxbb.c | 292
-> +++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 292 insertions(+)
+>  drivers/net/ethernet/mediatek/mtk_eth_soc.c | 8 +++++---
+>  drivers/net/ethernet/mediatek/mtk_eth_soc.h | 4 +++-
+>  2 files changed, 8 insertions(+), 4 deletions(-)
 > 
-> diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
-> index b2d1e8e..a713744 100644
-> --- a/drivers/clk/meson/gxbb.c
-> +++ b/drivers/clk/meson/gxbb.c
-> @@ -1131,6 +1131,253 @@ static struct clk_gate gxbb_sd_emmc_c_clk0 = {
->  	},
->  };
+> diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.c b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+> index 5e81a72..54adfd9 100644
+> --- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+> +++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+> @@ -1817,7 +1817,7 @@ static int mtk_open(struct net_device *dev)
+>  	struct mtk_eth *eth = mac->hw;
 >  
-> +/* VPU Clock */
-> +
-> +static u32 mux_table_vpu[] = {0, 1, 2, 3};
-> +static const char * const gxbb_vpu_parent_names[] = {
-> +	"fclk_div4", "fclk_div3", "fclk_div5", "fclk_div7"
-> +};
-> +
-> +static struct clk_mux gxbb_vpu_0_sel = {
-> +	.reg = (void *)HHI_VPU_CLK_CNTL,
-> +	.mask = 0x3,
-> +	.shift = 9,
-> +	.lock = &clk_lock,
-> +	.table = mux_table_vpu,
-> +	.hw.init = &(struct clk_init_data){
-> +		.name = "vpu_0_sel",
-> +		.ops = &clk_mux_ops,
-> +		/*
-> +		 * bits 9:10 selects from 4 possible parents:
-> +		 * fclk_div4, fclk_div3, fclk_div5, fclk_div7,
-> +		 */
-> +		.parent_names = gxbb_vpu_parent_names,
-> +		.num_parents = ARRAY_SIZE(gxbb_vpu_parent_names),
-> +		.flags = CLK_SET_RATE_NO_REPARENT | CLK_IGNORE_UNUSED,
-
-AFAIK, CLK_IGNORE_UNUSED is not useful for generic muxes and dividers since they
-don't implement enable/disbale.
-
-You can drop these.
-With that changed:
-
-Acked-by: Jerome Brunet <jbrunet@baylibre.com>
-
-> +	},
-> +};
-> +
-> +static struct clk_divider gxbb_vpu_0_div = {
-> +	.reg = (void *)HHI_VPU_CLK_CNTL,
-> +	.shift = 0,
-> +	.width = 7,
-> +	.lock = &clk_lock,
-> +	.hw.init = &(struct clk_init_data){
-> +		.name = "vpu_0_div",
-> +		.ops = &clk_divider_ops,
-> +		.parent_names = (const char *[]){ "vpu_0_sel" },
-> +		.num_parents = 1,
-> +		.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED,
-> +	},
-> +};
-> +
-> +static struct clk_gate gxbb_vpu_0 = {
-> +	.reg = (void *)HHI_VPU_CLK_CNTL,
-> +	.bit_idx = 8,
-> +	.lock = &clk_lock,
-> +	.hw.init = &(struct clk_init_data) {
-> +		.name = "vpu_0",
-> +		.ops = &clk_gate_ops,
-> +		.parent_names = (const char *[]){ "vpu_0_div" },
-> +		.num_parents = 1,
-> +		.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED,
-> +	},
-> +};
-> +
-> +static struct clk_mux gxbb_vpu_1_sel = {
-> +	.reg = (void *)HHI_VPU_CLK_CNTL,
-> +	.mask = 0x3,
-> +	.shift = 25,
-> +	.lock = &clk_lock,
-> +	.table = mux_table_vpu,
-> +	.hw.init = &(struct clk_init_data){
-> +		.name = "vpu_1_sel",
-> +		.ops = &clk_mux_ops,
-> +		/*
-> +		 * bits 25:26 selects from 4 possible parents:
-> +		 * fclk_div4, fclk_div3, fclk_div5, fclk_div7,
-> +		 */
-> +		.parent_names = gxbb_vpu_parent_names,
-> +		.num_parents = ARRAY_SIZE(gxbb_vpu_parent_names),
-> +		.flags = CLK_SET_RATE_NO_REPARENT | CLK_IGNORE_UNUSED,
-> +	},
-> +};
-> +
-> +static struct clk_divider gxbb_vpu_1_div = {
-> +	.reg = (void *)HHI_VPU_CLK_CNTL,
-> +	.shift = 16,
-> +	.width = 7,
-> +	.lock = &clk_lock,
-> +	.hw.init = &(struct clk_init_data){
-> +		.name = "vpu_1_div",
-> +		.ops = &clk_divider_ops,
-> +		.parent_names = (const char *[]){ "vpu_1_sel" },
-> +		.num_parents = 1,
-> +		.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED,
-> +	},
-> +};
-> +
-> +static struct clk_gate gxbb_vpu_1 = {
-> +	.reg = (void *)HHI_VPU_CLK_CNTL,
-> +	.bit_idx = 24,
-> +	.lock = &clk_lock,
-> +	.hw.init = &(struct clk_init_data) {
-> +		.name = "vpu_1",
-> +		.ops = &clk_gate_ops,
-> +		.parent_names = (const char *[]){ "vpu_1_div" },
-> +		.num_parents = 1,
-> +		.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED,
-> +	},
-> +};
-> +
-> +static struct clk_mux gxbb_vpu = {
-> +	.reg = (void *)HHI_VPU_CLK_CNTL,
-> +	.mask = 1,
-> +	.shift = 31,
-> +	.lock = &clk_lock,
-> +	.hw.init = &(struct clk_init_data){
-> +		.name = "vpu",
-> +		.ops = &clk_mux_ops,
-> +		/*
-> +		 * bit 31 selects from 2 possible parents:
-> +		 * vpu_0 or vpu_1
-> +		 */
-> +		.parent_names = (const char *[]){ "vpu_0", "vpu_1" },
-> +		.num_parents = 2,
-> +		.flags = CLK_SET_RATE_NO_REPARENT | CLK_IGNORE_UNUSED,
-> +	},
-> +};
-> +
-> +/* VAPB Clock */
-> +
-> +static u32 mux_table_vapb[] = {0, 1, 2, 3};
-> +static const char * const gxbb_vapb_parent_names[] = {
-> +	"fclk_div4", "fclk_div3", "fclk_div5", "fclk_div7"
-> +};
-> +
-> +static struct clk_mux gxbb_vapb_0_sel = {
-> +	.reg = (void *)HHI_VAPBCLK_CNTL,
-> +	.mask = 0x3,
-> +	.shift = 9,
-> +	.lock = &clk_lock,
-> +	.table = mux_table_vapb,
-> +	.hw.init = &(struct clk_init_data){
-> +		.name = "vapb_0_sel",
-> +		.ops = &clk_mux_ops,
-> +		/*
-> +		 * bits 9:10 selects from 4 possible parents:
-> +		 * fclk_div4, fclk_div3, fclk_div5, fclk_div7,
-> +		 */
-> +		.parent_names = gxbb_vapb_parent_names,
-> +		.num_parents = ARRAY_SIZE(gxbb_vapb_parent_names),
-> +		.flags = CLK_SET_RATE_NO_REPARENT | CLK_IGNORE_UNUSED,
-> +	},
-> +};
-> +
-> +static struct clk_divider gxbb_vapb_0_div = {
-> +	.reg = (void *)HHI_VAPBCLK_CNTL,
-> +	.shift = 0,
-> +	.width = 7,
-> +	.lock = &clk_lock,
-> +	.hw.init = &(struct clk_init_data){
-> +		.name = "vapb_0_div",
-> +		.ops = &clk_divider_ops,
-> +		.parent_names = (const char *[]){ "vapb_0_sel" },
-> +		.num_parents = 1,
-> +		.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED,
-> +	},
-> +};
-> +
-> +static struct clk_gate gxbb_vapb_0 = {
-> +	.reg = (void *)HHI_VAPBCLK_CNTL,
-> +	.bit_idx = 8,
-> +	.lock = &clk_lock,
-> +	.hw.init = &(struct clk_init_data) {
-> +		.name = "vapb_0",
-> +		.ops = &clk_gate_ops,
-> +		.parent_names = (const char *[]){ "vapb_0_div" },
-> +		.num_parents = 1,
-> +		.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED,
-> +	},
-> +};
-> +
-> +static struct clk_mux gxbb_vapb_1_sel = {
-> +	.reg = (void *)HHI_VAPBCLK_CNTL,
-> +	.mask = 0x3,
-> +	.shift = 25,
-> +	.lock = &clk_lock,
-> +	.table = mux_table_vapb,
-> +	.hw.init = &(struct clk_init_data){
-> +		.name = "vapb_1_sel",
-> +		.ops = &clk_mux_ops,
-> +		/*
-> +		 * bits 25:26 selects from 4 possible parents:
-> +		 * fclk_div4, fclk_div3, fclk_div5, fclk_div7,
-> +		 */
-> +		.parent_names = gxbb_vapb_parent_names,
-> +		.num_parents = ARRAY_SIZE(gxbb_vapb_parent_names),
-> +		.flags = CLK_SET_RATE_NO_REPARENT | CLK_IGNORE_UNUSED,
-> +	},
-> +};
-> +
-> +static struct clk_divider gxbb_vapb_1_div = {
-> +	.reg = (void *)HHI_VAPBCLK_CNTL,
-> +	.shift = 16,
-> +	.width = 7,
-> +	.lock = &clk_lock,
-> +	.hw.init = &(struct clk_init_data){
-> +		.name = "vapb_1_div",
-> +		.ops = &clk_divider_ops,
-> +		.parent_names = (const char *[]){ "vapb_1_sel" },
-> +		.num_parents = 1,
-> +		.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED,
-> +	},
-> +};
-> +
-> +static struct clk_gate gxbb_vapb_1 = {
-> +	.reg = (void *)HHI_VAPBCLK_CNTL,
-> +	.bit_idx = 24,
-> +	.lock = &clk_lock,
-> +	.hw.init = &(struct clk_init_data) {
-> +		.name = "vapb_1",
-> +		.ops = &clk_gate_ops,
-> +		.parent_names = (const char *[]){ "vapb_1_div" },
-> +		.num_parents = 1,
-> +		.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED,
-> +	},
-> +};
-> +
-> +static struct clk_mux gxbb_vapb_sel = {
-> +	.reg = (void *)HHI_VAPBCLK_CNTL,
-> +	.mask = 1,
-> +	.shift = 31,
-> +	.lock = &clk_lock,
-> +	.hw.init = &(struct clk_init_data){
-> +		.name = "vapb_sel",
-> +		.ops = &clk_mux_ops,
-> +		/*
-> +		 * bit 31 selects from 2 possible parents:
-> +		 * vapb_0 or vapb_1
-> +		 */
-> +		.parent_names = (const char *[]){ "vapb_0", "vapb_1" },
-> +		.num_parents = 2,
-> +		.flags = CLK_SET_RATE_NO_REPARENT | CLK_IGNORE_UNUSED,
-> +	},
-> +};
-> +
-> +static struct clk_gate gxbb_vapb = {
-> +	.reg = (void *)HHI_VAPBCLK_CNTL,
-> +	.bit_idx = 30,
-> +	.lock = &clk_lock,
-> +	.hw.init = &(struct clk_init_data) {
-> +		.name = "vapb",
-> +		.ops = &clk_gate_ops,
-> +		.parent_names = (const char *[]){ "vapb_sel" },
-> +		.num_parents = 1,
-> +		.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED,
-> +	},
-> +};
-> +
->  /* Everything Else (EE) domain gates */
->  static MESON_GATE(gxbb_ddr, HHI_GCLK_MPEG0, 0);
->  static MESON_GATE(gxbb_dos, HHI_GCLK_MPEG0, 1);
-> @@ -1349,6 +1596,21 @@ static struct clk_hw_onecell_data gxbb_hw_onecell_data
-> = {
->  		[CLKID_SD_EMMC_C_CLK0_SEL]  = &gxbb_sd_emmc_c_clk0_sel.hw,
->  		[CLKID_SD_EMMC_C_CLK0_DIV]  = &gxbb_sd_emmc_c_clk0_div.hw,
->  		[CLKID_SD_EMMC_C_CLK0]	    = &gxbb_sd_emmc_c_clk0.hw,
-> +		[CLKID_VPU_0_SEL]	    = &gxbb_vpu_0_sel.hw,
-> +		[CLKID_VPU_0_DIV]	    = &gxbb_vpu_0_div.hw,
-> +		[CLKID_VPU_0]		    = &gxbb_vpu_0.hw,
-> +		[CLKID_VPU_1_SEL]	    = &gxbb_vpu_1_sel.hw,
-> +		[CLKID_VPU_1_DIV]	    = &gxbb_vpu_1_div.hw,
-> +		[CLKID_VPU_1]		    = &gxbb_vpu_1.hw,
-> +		[CLKID_VPU]		    = &gxbb_vpu.hw,
-> +		[CLKID_VAPB_0_SEL]	    = &gxbb_vapb_0_sel.hw,
-> +		[CLKID_VAPB_0_DIV]	    = &gxbb_vapb_0_div.hw,
-> +		[CLKID_VAPB_0]		    = &gxbb_vapb_0.hw,
-> +		[CLKID_VAPB_1_SEL]	    = &gxbb_vapb_1_sel.hw,
-> +		[CLKID_VAPB_1_DIV]	    = &gxbb_vapb_1_div.hw,
-> +		[CLKID_VAPB_1]		    = &gxbb_vapb_1.hw,
-> +		[CLKID_VAPB_SEL]	    = &gxbb_vapb_sel.hw,
-> +		[CLKID_VAPB]		    = &gxbb_vapb.hw,
->  		[NR_CLKS]		    = NULL,
->  	},
->  	.num = NR_CLKS,
-> @@ -1481,6 +1743,21 @@ static struct clk_hw_onecell_data gxl_hw_onecell_data =
-> {
->  		[CLKID_SD_EMMC_C_CLK0_SEL]  = &gxbb_sd_emmc_c_clk0_sel.hw,
->  		[CLKID_SD_EMMC_C_CLK0_DIV]  = &gxbb_sd_emmc_c_clk0_div.hw,
->  		[CLKID_SD_EMMC_C_CLK0]	    = &gxbb_sd_emmc_c_clk0.hw,
-> +		[CLKID_VPU_0_SEL]	    = &gxbb_vpu_0_sel.hw,
-> +		[CLKID_VPU_0_DIV]	    = &gxbb_vpu_0_div.hw,
-> +		[CLKID_VPU_0]		    = &gxbb_vpu_0.hw,
-> +		[CLKID_VPU_1_SEL]	    = &gxbb_vpu_1_sel.hw,
-> +		[CLKID_VPU_1_DIV]	    = &gxbb_vpu_1_div.hw,
-> +		[CLKID_VPU_1]		    = &gxbb_vpu_1.hw,
-> +		[CLKID_VPU]		    = &gxbb_vpu.hw,
-> +		[CLKID_VAPB_0_SEL]	    = &gxbb_vapb_0_sel.hw,
-> +		[CLKID_VAPB_0_DIV]	    = &gxbb_vapb_0_div.hw,
-> +		[CLKID_VAPB_0]		    = &gxbb_vapb_0.hw,
-> +		[CLKID_VAPB_1_SEL]	    = &gxbb_vapb_1_sel.hw,
-> +		[CLKID_VAPB_1_DIV]	    = &gxbb_vapb_1_div.hw,
-> +		[CLKID_VAPB_1]		    = &gxbb_vapb_1.hw,
-> +		[CLKID_VAPB_SEL]	    = &gxbb_vapb_sel.hw,
-> +		[CLKID_VAPB]		    = &gxbb_vapb.hw,
->  		[NR_CLKS]		    = NULL,
->  	},
->  	.num = NR_CLKS,
-> @@ -1600,6 +1877,11 @@ static struct clk_gate *const gxbb_clk_gates[] = {
->  	&gxbb_sd_emmc_a_clk0,
->  	&gxbb_sd_emmc_b_clk0,
->  	&gxbb_sd_emmc_c_clk0,
-> +	&gxbb_vpu_0,
-> +	&gxbb_vpu_1,
-> +	&gxbb_vapb_0,
-> +	&gxbb_vapb_1,
-> +	&gxbb_vapb,
->  };
+>  	/* we run 2 netdevs on the same dma ring so we only bring it up once */
+> -	if (!atomic_read(&eth->dma_refcnt)) {
+> +	if (!refcount_read(&eth->dma_refcnt)) {
+>  		int err = mtk_start_dma(eth);
 >  
->  static struct clk_mux *const gxbb_clk_muxes[] = {
-> @@ -1615,6 +1897,12 @@ static struct clk_mux *const gxbb_clk_muxes[] = {
->  	&gxbb_sd_emmc_a_clk0_sel,
->  	&gxbb_sd_emmc_b_clk0_sel,
->  	&gxbb_sd_emmc_c_clk0_sel,
-> +	&gxbb_vpu_0_sel,
-> +	&gxbb_vpu_1_sel,
-> +	&gxbb_vpu,
-> +	&gxbb_vapb_0_sel,
-> +	&gxbb_vapb_1_sel,
-> +	&gxbb_vapb_sel,
->  };
+>  		if (err)
+> @@ -1827,8 +1827,10 @@ static int mtk_open(struct net_device *dev)
+>  		napi_enable(&eth->rx_napi);
+>  		mtk_tx_irq_enable(eth, MTK_TX_DONE_INT);
+>  		mtk_rx_irq_enable(eth, MTK_RX_DONE_INT);
+> +		refcount_set(&eth->dma_refcnt, 1);
+
+the existing driver seems to have a missing initial atomic_set for the
+eth->dma_refcnt. 
+
+>  	}
+> -	atomic_inc(&eth->dma_refcnt);
+> +	else
+> +		refcount_inc(&eth->dma_refcnt);
 >  
->  static struct clk_divider *const gxbb_clk_dividers[] = {
-> @@ -1627,6 +1915,10 @@ static struct clk_divider *const gxbb_clk_dividers[] =
-> {
->  	&gxbb_sd_emmc_a_clk0_div,
->  	&gxbb_sd_emmc_b_clk0_div,
->  	&gxbb_sd_emmc_c_clk0_div,
-> +	&gxbb_vpu_0_div,
-> +	&gxbb_vpu_1_div,
-> +	&gxbb_vapb_0_div,
-> +	&gxbb_vapb_1_div,
->  };
+
+how about add the initial refcount_set into probe handler, and keep
+logic else unchanged ? 
+
+>  	phy_start(dev->phydev);
+>  	netif_start_queue(dev);
+> @@ -1868,7 +1870,7 @@ static int mtk_stop(struct net_device *dev)
+>  	phy_stop(dev->phydev);
 >  
->  static struct meson_clk_audio_divider *const gxbb_audio_dividers[] = {
+>  	/* only shutdown DMA if this is the last user */
+> -	if (!atomic_dec_and_test(&eth->dma_refcnt))
+> +	if (!refcount_dec_and_test(&eth->dma_refcnt))
+>  		return 0;
+>  
+>  	mtk_tx_irq_disable(eth, MTK_TX_DONE_INT);
+> diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.h b/drivers/net/ethernet/mediatek/mtk_eth_soc.h
+> index 3d3c24a..a3af466 100644
+> --- a/drivers/net/ethernet/mediatek/mtk_eth_soc.h
+> +++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.h
+> @@ -15,6 +15,8 @@
+>  #ifndef MTK_ETH_H
+>  #define MTK_ETH_H
+>  
+> +#include <linux/refcount.h>
+> +
+>  #define MTK_QDMA_PAGE_SIZE	2048
+>  #define	MTK_MAX_RX_LENGTH	1536
+>  #define MTK_TX_DMA_BUF_LEN	0x3fff
+> @@ -632,7 +634,7 @@ struct mtk_eth {
+>  	struct regmap			*pctl;
+>  	u32				chip_id;
+>  	bool				hwlro;
+> -	atomic_t			dma_refcnt;
+> +	refcount_t			dma_refcnt;
+>  	struct mtk_tx_ring		tx_ring;
+>  	struct mtk_rx_ring		rx_ring[MTK_MAX_RX_RING_NUM];
+>  	struct mtk_rx_ring		rx_ring_qdma;
