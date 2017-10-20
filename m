@@ -1,62 +1,91 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Fri, 20 Oct 2017 15:34:53 -0700
-Subject: [PATCH v3 1/3] interconnect: Add generic on-chip interconnect API
-In-Reply-To: <a7cf55ba-0475-d74c-f759-a24e58ccde47@linaro.org>
-References: <20170908171830.13813-1-georgi.djakov@linaro.org>
- <20170908171830.13813-2-georgi.djakov@linaro.org>
- <a7cf55ba-0475-d74c-f759-a24e58ccde47@linaro.org>
-Message-ID: <20171020223452.GD1165@minitux>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 20 Oct 2017 17:52:48 -0500
+Subject: [PATCH] PCI: hisi: add PCIe driver support for HiSilicon STB SoCs
+In-Reply-To: <1508043971-23216-1-git-send-email-shawnguo@kernel.org>
+References: <1508043971-23216-1-git-send-email-shawnguo@kernel.org>
+Message-ID: <20171020225248.GV6332@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 20 Oct 07:43 PDT 2017, Georgi Djakov wrote:
-
-> Hi,
+On Sun, Oct 15, 2017 at 01:06:11PM +0800, Shawn Guo wrote:
+> From: Jianguo Sun <sunjianguo1@huawei.com>
 > 
-> On 09/08/2017 08:18 PM, Georgi Djakov wrote:
-> > This patch introduce a new API to get requirements and configure the
-> > interconnect buses across the entire chipset to fit with the current demand.
-> > 
-> > The API is using a consumer/provider-based model, where the providers are
-> > the interconnect buses and the consumers could be various drivers.
-> > The consumers request interconnect resources (path) between endpoints and
-> > set the desired constraints on this data flow path. The providers receive
-> > requests from consumers and aggregate these requests for all master-slave
-> > pairs on that path. Then the providers configure each participating in the
-> > topology node according to the requested data flow path, physical links and
-> > constraints. The topology could be complicated and multi-tiered and is SoC
-> > specific.
-> > 
-> > Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
-> > ---
-> >  Documentation/interconnect/interconnect.rst |  93 +++++++
-> >  drivers/Kconfig                             |   2 +
-> >  drivers/Makefile                            |   1 +
-> >  drivers/interconnect/Kconfig                |  10 +
-> >  drivers/interconnect/Makefile               |   1 +
-> >  drivers/interconnect/interconnect.c         | 382 ++++++++++++++++++++++++++++
-> >  include/linux/interconnect-consumer.h       |  73 ++++++
-> >  include/linux/interconnect-provider.h       | 119 +++++++++
-> >  8 files changed, 681 insertions(+)
-> >  create mode 100644 Documentation/interconnect/interconnect.rst
-> >  create mode 100644 drivers/interconnect/Kconfig
-> >  create mode 100644 drivers/interconnect/Makefile
-> >  create mode 100644 drivers/interconnect/interconnect.c
-> >  create mode 100644 include/linux/interconnect-consumer.h
-> >  create mode 100644 include/linux/interconnect-provider.h
-> 
-> Any comments on this patch?
-> 
+> Add PCIe controller driver for HiSilicon STB SoCs,
+> the controller is based on the DesignWare's PCIe core.
 
-Sorry, I still haven't found the time to do a proper review of this yet.
+s/DesignWare's/DesignWare/
 
-> I am planning to change the prefix that is used for naming for example
-> the functions from "interconnect_" to something shorter like icbus_.
-> 
+> Signed-off-by: Jianguo Sun <sunjianguo1@huawei.com>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  .../bindings/pci/hisilicon-histb-pcie.txt          |  66 +++
+>  drivers/pci/dwc/Kconfig                            |  10 +
+>  drivers/pci/dwc/Makefile                           |   1 +
+>  drivers/pci/dwc/pcie-histb.c                       | 469 +++++++++++++++++++++
+>  4 files changed, 546 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/hisilicon-histb-pcie.txt
+>  create mode 100644 drivers/pci/dwc/pcie-histb.c
 
-This isn't implementing a bus; if you feel that just ic_ is too short I
-would suggest naming things inter_. (But keep the full name in the file
-names)
+Looks beautiful overall!
 
-Regards,
-Bjorn
+This needs a MAINTAINERS update so "./scripts/get_maintainer.pl -f" prints
+something useful.
+
+A few minor nits below that I would fix myself, but since you need to
+supply the MAINTAINERS update anyway, I'll let you do it :)
+
+> diff --git a/Documentation/devicetree/bindings/pci/hisilicon-histb-pcie.txt b/Documentation/devicetree/bindings/pci/hisilicon-histb-pcie.txt
+> new file mode 100644
+> index 000000000000..9474ad9bc36c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/hisilicon-histb-pcie.txt
+> @@ -0,0 +1,66 @@
+> +HiSilicon STB PCIe host bridge DT description
+> +
+> +HiSilicon STB PCIe host controller is based on Designware PCI core.
+> +It shares common functions with PCIe Designware core driver and inherits
+> +common properties defined in
+> +Documentation/devicetree/bindings/pci/designware-pcie.txt.
+
+s/Designware/DesignWare/ in English text above (not in filenames,
+function names, etc).
+
+s/PCI/PCIe/
+
+> +static u32 histb_pcie_read_dbi(struct dw_pcie *pci, void __iomem *base,
+> +				u32 reg, size_t size)
+
+These should be lined up exactly ("u32" should line up with "struct"
+above it).  They are currently off by one.  Similarly for
+histb_pcie_write_dbi(), histb_pcie_rd_own_conf(),
+histb_pcie_wr_own_conf().
+
+> +	hipcie->aux_clk = devm_clk_get(dev, "aux");
+> +	if (IS_ERR(hipcie->aux_clk)) {
+> +		dev_err(dev, "Failed to get pcie aux clk\n");
+
+s/pcie/PCIe/ in this message and the ones below.  Also in
+histb_pcie_host_enable() comment.
+
+> +		return PTR_ERR(hipcie->aux_clk);
+> +	}
+> +
+> +	hipcie->pipe_clk = devm_clk_get(dev, "pipe");
+> +	if (IS_ERR(hipcie->pipe_clk)) {
+> +		dev_err(dev, "Failed to get pcie pipe clk\n");
+> +		return PTR_ERR(hipcie->pipe_clk);
+
+> +	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+> +		pp->msi_irq = platform_get_irq_byname(pdev, "msi");
+> +		if (pp->msi_irq < 0) {
+> +			dev_err(dev, "Failed to get msi irq\n");
+> +			return pp->msi_irq;
+> +		}
+> +
+> +		ret = devm_request_irq(dev, pp->msi_irq,
+> +				       histb_pcie_msi_irq_handler,
+> +				       IRQF_SHARED, "histb-pcie-msi", pp);
+> +		if (ret) {
+> +			dev_err(dev, "cannot request msi irq\n");
+
+s/msi irq/MSI IRQ/ in the error message.  Also a few lines above.
