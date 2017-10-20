@@ -1,109 +1,80 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 20 Oct 2017 12:28:36 +0200
-Subject: [PATCH 09/42] ARM: dts: r8a7790: add cpu capacity-dmips-mhz
- information
+Date: Fri, 20 Oct 2017 12:28:37 +0200
+Subject: [PATCH 10/42] ARM: dts: r8a7745: Add internal PCI bridge nodes
 In-Reply-To: <cover.1508493785.git.horms+renesas@verge.net.au>
 References: <cover.1508493785.git.horms+renesas@verge.net.au>
-Message-ID: <5bdc81259bb0efd5bd71820ef15757b70beae751.1508493785.git.horms+renesas@verge.net.au>
+Message-ID: <ab290a32925e6f7db9e71546098077b3e72cc617.1508493785.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dietmar Eggemann <dietmar.eggemann@arm.com>
+From: Biju Das <biju.das@bp.renesas.com>
 
-The following 'capacity-dmips-mhz' dt property values are used:
+Add device nodes for the r8a7745 internal PCI bridge devices.
 
-Cortex-A15: 1024, Cortex-A7: 539
-
-They have been derived form the cpu_efficiency values:
-
-Cortex-A15: 3891, Cortex-A7: 2048
-
-by scaling them so that the Cortex-A15s (big cores) use 1024.
-
-The cpu_efficiency values were originally derived from the "Big.LITTLE
-Processing with ARM Cortex?-A15 & Cortex-A7" white paper
-(http://www.cl.cam.ac.uk/~rdm34/big.LITTLE.pdf). Table 1 lists 1.9x
-(3891/2048) as the Cortex-A15 vs Cortex-A7 performance ratio for the
-Dhrystone benchmark.
-
-The following platform is affected once cpu-invariant accounting
-support is re-connected to the task scheduler:
-
-r8a7790-lager
-
-Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/r8a7745.dtsi | 46 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 17a48199b7a9..92b7f3bd8b69 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -56,6 +56,7 @@
- 			clock-latency = <300000>; /* 300 us */
- 			power-domains = <&sysc R8A7790_PD_CA15_CPU0>;
- 			next-level-cache = <&L2_CA15>;
-+			capacity-dmips-mhz = <1024>;
- 
- 			/* kHz - uV - OPPs unknown yet */
- 			operating-points = <1400000 1000000>,
-@@ -73,6 +74,7 @@
- 			clock-frequency = <1300000000>;
- 			power-domains = <&sysc R8A7790_PD_CA15_CPU1>;
- 			next-level-cache = <&L2_CA15>;
-+			capacity-dmips-mhz = <1024>;
+diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
+index 6ba3b8b04edb..b4e9536a84d6 100644
+--- a/arch/arm/boot/dts/r8a7745.dtsi
++++ b/arch/arm/boot/dts/r8a7745.dtsi
+@@ -845,6 +845,52 @@
+ 			resets = <&cpg 311>;
+ 			status = "disabled";
  		};
++
++		pci0: pci at ee090000 {
++			compatible = "renesas,pci-r8a7745",
++				     "renesas,pci-rcar-gen2";
++			device_type = "pci";
++			reg = <0 0xee090000 0 0xc00>,
++			      <0 0xee080000 0 0x1100>;
++			interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 703>;
++			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
++			resets = <&cpg 703>;
++			status = "disabled";
++
++			bus-range = <0 0>;
++			#address-cells = <3>;
++			#size-cells = <2>;
++			#interrupt-cells = <1>;
++			ranges = <0x02000000 0 0xee080000 0 0xee080000 0 0x00010000>;
++			interrupt-map-mask = <0xff00 0 0 0x7>;
++			interrupt-map = <0x0000 0 0 1 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH
++					 0x0800 0 0 1 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH
++					 0x1000 0 0 2 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
++		};
++
++		pci1: pci at ee0d0000 {
++			compatible = "renesas,pci-r8a7745",
++				     "renesas,pci-rcar-gen2";
++			device_type = "pci";
++			reg = <0 0xee0d0000 0 0xc00>,
++			      <0 0xee0c0000 0 0x1100>;
++			interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 703>;
++			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
++			resets = <&cpg 703>;
++			status = "disabled";
++
++			bus-range = <1 1>;
++			#address-cells = <3>;
++			#size-cells = <2>;
++			#interrupt-cells = <1>;
++			ranges = <0x02000000 0 0xee0c0000 0 0xee0c0000 0 0x00010000>;
++			interrupt-map-mask = <0xff00 0 0 0x7>;
++			interrupt-map = <0x0000 0 0 1 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH
++					 0x0800 0 0 1 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH
++					 0x1000 0 0 2 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
++		};
+ 	};
  
- 		cpu2: cpu at 2 {
-@@ -82,6 +84,7 @@
- 			clock-frequency = <1300000000>;
- 			power-domains = <&sysc R8A7790_PD_CA15_CPU2>;
- 			next-level-cache = <&L2_CA15>;
-+			capacity-dmips-mhz = <1024>;
- 		};
- 
- 		cpu3: cpu at 3 {
-@@ -91,6 +94,7 @@
- 			clock-frequency = <1300000000>;
- 			power-domains = <&sysc R8A7790_PD_CA15_CPU3>;
- 			next-level-cache = <&L2_CA15>;
-+			capacity-dmips-mhz = <1024>;
- 		};
- 
- 		cpu4: cpu at 100 {
-@@ -100,6 +104,7 @@
- 			clock-frequency = <780000000>;
- 			power-domains = <&sysc R8A7790_PD_CA7_CPU0>;
- 			next-level-cache = <&L2_CA7>;
-+			capacity-dmips-mhz = <539>;
- 		};
- 
- 		cpu5: cpu at 101 {
-@@ -109,6 +114,7 @@
- 			clock-frequency = <780000000>;
- 			power-domains = <&sysc R8A7790_PD_CA7_CPU1>;
- 			next-level-cache = <&L2_CA7>;
-+			capacity-dmips-mhz = <539>;
- 		};
- 
- 		cpu6: cpu at 102 {
-@@ -118,6 +124,7 @@
- 			clock-frequency = <780000000>;
- 			power-domains = <&sysc R8A7790_PD_CA7_CPU2>;
- 			next-level-cache = <&L2_CA7>;
-+			capacity-dmips-mhz = <539>;
- 		};
- 
- 		cpu7: cpu at 103 {
-@@ -127,6 +134,7 @@
- 			clock-frequency = <780000000>;
- 			power-domains = <&sysc R8A7790_PD_CA7_CPU3>;
- 			next-level-cache = <&L2_CA7>;
-+			capacity-dmips-mhz = <539>;
- 		};
- 
- 		L2_CA15: cache-controller-0 {
+ 	/* External root clock */
 -- 
 2.11.0
