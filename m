@@ -1,102 +1,65 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Fri, 20 Oct 2017 16:08:47 +0800
-Subject: [PATCH 02/15] drivers, net, ethernet: convert
- mtk_eth.dma_refcnt from atomic_t to refcount_t
-In-Reply-To: <1508484229-19706-3-git-send-email-elena.reshetova@intel.com>
-References: <1508484229-19706-1-git-send-email-elena.reshetova@intel.com>
- <1508484229-19706-3-git-send-email-elena.reshetova@intel.com>
-Message-ID: <1508486927.29850.12.camel@mtkswgap22>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 20 Oct 2017 10:08:48 +0200
+Subject: [GIT PULL] Allwinner arm64 DT changes for 4.15
+Message-ID: <20171020080848.fpd3sbotbe3llgpv@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-10-20 at 10:23 +0300, Elena Reshetova wrote:
-> atomic_t variables are currently used to implement reference
-> counters with the following properties:
->  - counter is initialized to 1 using atomic_set()
->  - a resource is freed upon counter reaching zero
->  - once counter reaches zero, its further
->    increments aren't allowed
->  - counter schema uses basic atomic operations
->    (set, inc, inc_not_zero, dec_and_test, etc.)
-> 
-> Such atomic variables should be converted to a newly provided
-> refcount_t type and API that prevents accidental counter overflows
-> and underflows. This is important since overflows and underflows
-> can lead to use-after-free situation and be exploitable.
-> 
-> The variable mtk_eth.dma_refcnt is used as pure reference counter.
-> Convert it to refcount_t and fix up the operations.
-> 
-> Suggested-by: Kees Cook <keescook@chromium.org>
-> Reviewed-by: David Windsor <dwindsor@gmail.com>
-> Reviewed-by: Hans Liljestrand <ishkamiel@gmail.com>
-> Signed-off-by: Elena Reshetova <elena.reshetova@intel.com>
-> ---
->  drivers/net/ethernet/mediatek/mtk_eth_soc.c | 8 +++++---
->  drivers/net/ethernet/mediatek/mtk_eth_soc.h | 4 +++-
->  2 files changed, 8 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.c b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
-> index 5e81a72..54adfd9 100644
-> --- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
-> +++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
-> @@ -1817,7 +1817,7 @@ static int mtk_open(struct net_device *dev)
->  	struct mtk_eth *eth = mac->hw;
->  
->  	/* we run 2 netdevs on the same dma ring so we only bring it up once */
-> -	if (!atomic_read(&eth->dma_refcnt)) {
-> +	if (!refcount_read(&eth->dma_refcnt)) {
->  		int err = mtk_start_dma(eth);
->  
->  		if (err)
-> @@ -1827,8 +1827,10 @@ static int mtk_open(struct net_device *dev)
->  		napi_enable(&eth->rx_napi);
->  		mtk_tx_irq_enable(eth, MTK_TX_DONE_INT);
->  		mtk_rx_irq_enable(eth, MTK_RX_DONE_INT);
-> +		refcount_set(&eth->dma_refcnt, 1);
+Hi,
 
-the existing driver seems to have a missing initial atomic_set for the
-eth->dma_refcnt. 
+Please pull the following changes for the next merge window.
 
->  	}
-> -	atomic_inc(&eth->dma_refcnt);
-> +	else
-> +		refcount_inc(&eth->dma_refcnt);
->  
+Thanks!
+Maxime
 
-how about add the initial refcount_set into probe handler, and keep
-logic else unchanged ? 
+The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 
->  	phy_start(dev->phydev);
->  	netif_start_queue(dev);
-> @@ -1868,7 +1870,7 @@ static int mtk_stop(struct net_device *dev)
->  	phy_stop(dev->phydev);
->  
->  	/* only shutdown DMA if this is the last user */
-> -	if (!atomic_dec_and_test(&eth->dma_refcnt))
-> +	if (!refcount_dec_and_test(&eth->dma_refcnt))
->  		return 0;
->  
->  	mtk_tx_irq_disable(eth, MTK_TX_DONE_INT);
-> diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.h b/drivers/net/ethernet/mediatek/mtk_eth_soc.h
-> index 3d3c24a..a3af466 100644
-> --- a/drivers/net/ethernet/mediatek/mtk_eth_soc.h
-> +++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.h
-> @@ -15,6 +15,8 @@
->  #ifndef MTK_ETH_H
->  #define MTK_ETH_H
->  
-> +#include <linux/refcount.h>
-> +
->  #define MTK_QDMA_PAGE_SIZE	2048
->  #define	MTK_MAX_RX_LENGTH	1536
->  #define MTK_TX_DMA_BUF_LEN	0x3fff
-> @@ -632,7 +634,7 @@ struct mtk_eth {
->  	struct regmap			*pctl;
->  	u32				chip_id;
->  	bool				hwlro;
-> -	atomic_t			dma_refcnt;
-> +	refcount_t			dma_refcnt;
->  	struct mtk_tx_ring		tx_ring;
->  	struct mtk_rx_ring		rx_ring[MTK_MAX_RX_RING_NUM];
->  	struct mtk_rx_ring		rx_ring_qdma;
+  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-dt64-for-4.15
+
+for you to fetch changes up to d25d41827fee2b489518eee99ef156b005c0c01e:
+
+  arm: allwinner: Correct unit name in devicetree binding example (2017-09-28 18:23:50 +0200)
+
+----------------------------------------------------------------
+Allwinner arm64 DT changes for 4.15
+
+Most notable changes:
+  - SPI and DMA support on the a64
+  - New boards: NanoPi NEO Plus2
+
+----------------------------------------------------------------
+Antony Antony (1):
+      arm64: allwinner: h5: add NanoPi NEO Plus2 DT support
+
+Corentin LABBE (2):
+      arm64: allwinner: a64: Fix simple-bus unit address format error
+      arm64: allwinner: a64: Fix node with unit name and no reg property
+
+Stefan Br?ns (4):
+      arm64: allwinner: a64: add SPI nodes
+      arm64: allwinner: a64: Add device node for DMA controller
+      arm64: allwinner: a64: add dma controller references to spi nodes
+      arm: allwinner: Correct unit name in devicetree binding example
+
+ .../devicetree/bindings/dma/sun6i-dma.txt          |   2 +-
+ arch/arm64/boot/dts/allwinner/Makefile             |   1 +
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      |  76 ++++++--
+ .../dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts   | 193 +++++++++++++++++++++
+ 4 files changed, 261 insertions(+), 11 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171020/b42bf09a/attachment.sig>
