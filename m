@@ -1,51 +1,73 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 20 Oct 2017 12:28:08 +0200
-Subject: [PATCH 05/31] arm64: dts: renesas: salvator-common: add pfc node for
- USB3.0 channel 0
+Date: Fri, 20 Oct 2017 12:28:09 +0200
+Subject: [PATCH 06/31] arm64: dts: renesas: r8a77995: add PWM device nodes
 In-Reply-To: <cover.1508495040.git.horms+renesas@verge.net.au>
 References: <cover.1508495040.git.horms+renesas@verge.net.au>
-Message-ID: <73de4b8847892fa7d6fffd14139c5083a3fd1580.1508495040.git.horms+renesas@verge.net.au>
+Message-ID: <d40a434746bf2d6dbcc01bb1a14575c11e933cc3.1508495040.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 
-Since a R-Car Gen3 bootloader enables the PFC of USB3.0 channel 0,
-the USB3.0 host controller works without this setting on the kernel.
-But, this setting should have salvator-common.dtsi. So, this patch
-adds the pfc node for USB3.0 channel 0.
+This patch adds PWM device nodes for r8a77995.
 
 Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/salvator-common.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a77995.dtsi | 40 +++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-index 99d8180c71f7..af434dcd2197 100644
---- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-+++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-@@ -485,6 +485,11 @@
- 			bias-pull-down;
+diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+index 56e42921e879..bcc4d132f827 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+@@ -310,6 +310,46 @@
+ 			status = "disabled";
  		};
- 	};
-+
-+	usb30_pins: usb30 {
-+		groups = "usb30";
-+		function = "usb30";
-+	};
- };
  
- &pwm1 {
-@@ -620,5 +625,8 @@
- };
- 
- &xhci0 {
-+	pinctrl-0 = <&usb30_pins>;
-+	pinctrl-names = "default";
++		pwm0: pwm at e6e30000 {
++			compatible = "renesas,pwm-r8a77995", "renesas,pwm-rcar";
++			reg = <0 0xe6e30000 0 0x8>;
++			#pwm-cells = <2>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
++			resets = <&cpg 523>;
++			status = "disabled";
++		};
 +
- 	status = "okay";
- };
++		pwm1: pwm at e6e31000 {
++			compatible = "renesas,pwm-r8a77995", "renesas,pwm-rcar";
++			reg = <0 0xe6e31000 0 0x8>;
++			#pwm-cells = <2>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
++			resets = <&cpg 523>;
++			status = "disabled";
++		};
++
++		pwm2: pwm at e6e32000 {
++			compatible = "renesas,pwm-r8a77995", "renesas,pwm-rcar";
++			reg = <0 0xe6e32000 0 0x8>;
++			#pwm-cells = <2>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
++			resets = <&cpg 523>;
++			status = "disabled";
++		};
++
++		pwm3: pwm at e6e33000 {
++			compatible = "renesas,pwm-r8a77995", "renesas,pwm-rcar";
++			reg = <0 0xe6e33000 0 0x8>;
++			#pwm-cells = <2>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
++			resets = <&cpg 523>;
++			status = "disabled";
++		};
++
+ 		ehci0: usb at ee080100 {
+ 			compatible = "generic-ehci";
+ 			reg = <0 0xee080100 0 0x100>;
 -- 
 2.11.0
