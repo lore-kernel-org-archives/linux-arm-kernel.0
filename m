@@ -1,28 +1,80 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 20 Oct 2017 13:28:45 -0500
-Subject: [PATCHv2 0/2] PCI: layerscape: add fixes for layerscape-pcie
- errata
-In-Reply-To: <20171012094448.31217-1-Zhiqiang.Hou@nxp.com>
-References: <20171012094448.31217-1-Zhiqiang.Hou@nxp.com>
-Message-ID: <20171020182845.GM6332@bhelgaas-glaptop.roam.corp.google.com>
+From: phh@phh.me (Pierre-Hugues Husson)
+Date: Fri, 20 Oct 2017 21:18:38 +0200
+Subject: [PATCH v2] drm: bridge: synopsys/dw-hdmi: Enable cec clock
+Message-ID: <20171020191838.392-1-phh@phh.me>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 12, 2017 at 05:44:46PM +0800, Zhiqiang Hou wrote:
-> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> 
-> The [1/2] is to fix layerscape PCIe MSI/MSI-X capability errata.
-> The [2/2] is to change the default AXI system error response behavior
-> for PCI Express outbound non-posted requests.
-> 
-> Hou Zhiqiang (1):
->   PCI: Disable MSI for Freescale PCIe RC mode
-> 
-> Minghuan Lian (1):
->   pci/layerscape: change the default error response behavior
-> 
->  drivers/pci/dwc/pci-layerscape.c | 11 +++++++++++
->  drivers/pci/quirks.c             |  8 ++++++++
->  2 files changed, 19 insertions(+)
+The documentation already mentions "cec" optional clock, but
+currently the driver doesn't enable it.
 
-Applied to pci/host-layerscape for v4.15, thanks!
+Changes:
+v2:
+- Separate ENOENT errors from others
+- Propagate other errors (especially -EPROBE_DEFER)
+
+Signed-off-by: Pierre-Hugues Husson <phh@phh.me>
+---
+ drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+
+diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+index bf14214fa464..b31fc95d5fef 100644
+--- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
++++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+@@ -138,6 +138,7 @@ struct dw_hdmi {
+ 	struct device *dev;
+ 	struct clk *isfr_clk;
+ 	struct clk *iahb_clk;
++	struct clk *cec_clk;
+ 	struct dw_hdmi_i2c *i2c;
+ 
+ 	struct hdmi_data_info hdmi_data;
+@@ -2382,6 +2383,27 @@ __dw_hdmi_probe(struct platform_device *pdev,
+ 		goto err_isfr;
+ 	}
+ 
++	hdmi->cec_clk = devm_clk_get(hdmi->dev, "cec");
++	if (PTR_ERR(hdmi->cec_clk) == -ENOENT) {
++		hdmi->cec_clk = NULL;
++	} else if (IS_ERR(hdmi->cec_clk)) {
++		ret = PTR_ERR(hdmi->cec_clk);
++		if (ret != -EPROBE_DEFER) {
++			dev_err(hdmi->dev, "Cannot get HDMI cec clock: %d\n",
++					ret);
++		}
++
++		hdmi->cec_clk = NULL;
++		goto err_iahb;
++	} else {
++		ret = clk_prepare_enable(hdmi->cec_clk);
++		if (ret) {
++			dev_err(hdmi->dev, "Cannot enable HDMI cec clock: %d\n",
++					ret);
++			goto err_iahb;
++		}
++	}
++
+ 	/* Product and revision IDs */
+ 	hdmi->version = (hdmi_readb(hdmi, HDMI_DESIGN_ID) << 8)
+ 		      | (hdmi_readb(hdmi, HDMI_REVISION_ID) << 0);
+@@ -2518,6 +2540,8 @@ __dw_hdmi_probe(struct platform_device *pdev,
+ 		cec_notifier_put(hdmi->cec_notifier);
+ 
+ 	clk_disable_unprepare(hdmi->iahb_clk);
++	if (hdmi->cec_clk)
++		clk_disable_unprepare(hdmi->cec_clk);
+ err_isfr:
+ 	clk_disable_unprepare(hdmi->isfr_clk);
+ err_res:
+@@ -2541,6 +2565,8 @@ static void __dw_hdmi_remove(struct dw_hdmi *hdmi)
+ 
+ 	clk_disable_unprepare(hdmi->iahb_clk);
+ 	clk_disable_unprepare(hdmi->isfr_clk);
++	if (hdmi->cec_clk)
++		clk_disable_unprepare(hdmi->cec_clk);
+ 
+ 	if (hdmi->i2c)
+ 		i2c_del_adapter(&hdmi->i2c->adap);
+-- 
+2.14.1
