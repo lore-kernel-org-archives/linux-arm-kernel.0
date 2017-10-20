@@ -1,50 +1,40 @@
-From: dotweiba@gmail.com (Wei Wei)
-Date: Fri, 20 Oct 2017 10:40:38 -0400
-Subject: v4.14-rc3/arm64 DABT exception in atomic_inc() / __skb_clone()
-In-Reply-To: <20171020111408.edj24tztxdptte5r@lakrids.cambridge.arm.com>
-References: <EAA60182-6F08-412E-8F8B-FD4B0309A858@gmail.com>
- <20171020111408.edj24tztxdptte5r@lakrids.cambridge.arm.com>
-Message-ID: <960D71EC-C1E9-4898-ACBE-543FC09483FF@gmail.com>
+From: jim2101024@gmail.com (Jim Quinlan)
+Date: Fri, 20 Oct 2017 10:41:56 -0400
+Subject: [PATCH 5/9] PCI: host: brcmstb: add dma-ranges for inbound traffic
+In-Reply-To: <20171020073730.GA12937@lst.de>
+References: <1507761269-7017-1-git-send-email-jim2101024@gmail.com>
+ <1507761269-7017-6-git-send-email-jim2101024@gmail.com>
+ <589c04cb-061b-a453-3188-79324a02388e@arm.com>
+ <20171017081422.GA19475@lst.de>
+ <CANCKTBsCB+x2XgrND9AhRtxPkCXfps1nA+YymkZjKHOUZfjSHQ@mail.gmail.com>
+ <20171018065316.GA11183@lst.de>
+ <CANCKTBv+yiCNsrnx3m+W9wPqC4NdKPZ2p=zLtSa8fX6v1rPcYQ@mail.gmail.com>
+ <20171019091644.GA14983@lst.de>
+ <CANCKTBuaTD29My77QfOeUmtZfLAmmJXUYe6QvBW+uoH2Kb+tAQ@mail.gmail.com>
+ <20171020073730.GA12937@lst.de>
+Message-ID: <CANCKTBsRRkwNMrxWjtgxbyZqT6NOxPX0NHDbnEO2BMjj8oVtpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sadly, the syzkaller characterized it as a non-reproducible bug and there were empty
- repro files. But if manually executing in VM like this ?./syz-execprog -executor=
-./syz-executor -repeat=0 -procs=16 -cover=0 crash-log?, it crashed when executing exactly 
-program 1056 using log0 provided.
+On Fri, Oct 20, 2017 at 3:37 AM, Christoph Hellwig <hch@lst.de> wrote:
+> On Thu, Oct 19, 2017 at 06:47:45PM -0400, Jim Quinlan wrote:
+>> The only way to prevent this is to reserve a single page at the end of
+>> the first memory region of any pair that are adjacent in physical
+>> memory.  A hack, yes, but I don't see an easier way out of this.  Many
+>> if not most of our boards do not have adjacent regions and would not
+>> need this.
+>
+> dma mappings can be much larger than a single page.  For the block
+> world take a look at __blk_segment_map_sg which does the merging
+> of contiguous pages into a single SG segment.  You'd have to override
+> BIOVEC_PHYS_MERGEABLE to prevent this from happening in your supported
+> architectures for the block layer.
 
-I failed to generate the C reproducer with syz-repro as it said ?no target compiler?
-in the final step. I would appreciate if you could give some hints.
-
-Thanks,
-Wei
-> On 20 Oct 2017, at 7:14 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> 
-> On Thu, Oct 19, 2017 at 10:16:08PM -0400, Wei Wei wrote:
->> Hi all,
-> 
-> Hi,
-> 
->> I have fuzzed v4.14-rc3 using syzkaller and found a bug similar to that one [1].
->> But the call trace isn?t the same. The atomic_inc() might handle a corrupted 
->> skb_buff.
->> 
->> The logs and config have been uploaded to my github repo [2].
->> 
->> [1] https://lkml.org/lkml/2017/10/2/216
->> [2] https://github.com/dotweiba/skb_clone_atomic_inc_bug
-> 
-> These do look very similar to what I was hitting; all appear to be
-> misaligned atomics in the same path.
-> 
-> I see that you have some empty repro files in [2]. If you have any
-> reproducers, would you mind sharing them?
-> 
-> If any of those are smaller or more reliable than the one I was able to
-> generate [3], it might make it more obvious what's going on, and/or make
-> it simpler to come up with a plain C reproducer.
-> 
-> Thanks,
-> Mark.
-> 
-> [3] https://www.kernel.org/pub/linux/kernel/people/mark/bugs/20171002-skb_clone-misaligned-atomic/syzkaller.repro
+I am not sure I understand your comment -- the size of the request
+shouldn't be a factor.  Let's look at your example of the DMA request
+of 3fffff00 to 4000000f (physical memory).  Lets say it is for 15
+pages.  If we block out  the last page [0x3ffff000..0x3fffffff] from
+what is available, there is no 15 page span that can happen across the
+0x40000000 boundary.  For SG, there can be no merge that connects a
+page from one region to another region.  Can you give an example of
+the scenario you are thinking of?
