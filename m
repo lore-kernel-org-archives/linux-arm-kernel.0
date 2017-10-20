@@ -1,50 +1,75 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 20 Oct 2017 11:12:53 +0200
-Subject: [PATCH 0/7] ARM: dts: renesas: Use R-Car SDHI Gen[12] fallback
- compat strings
-In-Reply-To: <20171018072728.14681-1-horms+renesas@verge.net.au>
-References: <20171018072728.14681-1-horms+renesas@verge.net.au>
-Message-ID: <20171020091253.tvvd3thgrg27svxb@verge.net.au>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 20 Oct 2017 10:14:28 +0100
+Subject: [PATCH v3 6/7] arm64: topology: Enable ACPI/PPTT based CPU
+ topology.
+In-Reply-To: <6a9836f5-d31c-67fb-b2dd-bc0972ebb1c2@arm.com>
+References: <20171012194856.13844-1-jeremy.linton@arm.com>
+ <20171012194856.13844-7-jeremy.linton@arm.com>
+ <20171019155622.GC18883@red-moon>
+ <6a9836f5-d31c-67fb-b2dd-bc0972ebb1c2@arm.com>
+Message-ID: <20171020091428.GA21060@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 18, 2017 at 09:27:21AM +0200, Simon Horman wrote:
-> Use recently posted R-Car Gen 1 and 2 Ether fallback compat strings
-> in the DT of Renesas ARM based SoCs.
+On Thu, Oct 19, 2017 at 11:13:27AM -0500, Jeremy Linton wrote:
+> On 10/19/2017 10:56 AM, Lorenzo Pieralisi wrote:
+> >On Thu, Oct 12, 2017 at 02:48:55PM -0500, Jeremy Linton wrote:
+> >>Propagate the topology information from the PPTT tree to the
+> >>cpu_topology array. We can get the thread id, core_id and
+> >>cluster_id by assuming certain levels of the PPTT tree correspond
+> >>to those concepts. The package_id is flagged in the tree and can be
+> >>found by passing an arbitrary large level to setup_acpi_cpu_topology()
+> >>which terminates its search when it finds an ACPI node flagged
+> >>as the physical package. If the tree doesn't contain enough
+> >>levels to represent all of thread/core/cod/package then the package
+> >>id will be used for the missing levels.
+> >>
+> >>Since server/ACPI machines are more likely to be multisocket and NUMA,
+> >
+> >I think this stuff is vague enough already so to start with I would drop
+> >patch 4 and 5 and stop assuming what machines are more likely to ship
+> >with ACPI than DT.
+> >
+> >I am just saying, for the umpteenth time, that these levels have no
+> >architectural meaning _whatsoever_, level is a hierarchy concept
+> >with no architectural meaning attached.
 > 
-> Based on renesas-devel-20171018-v4.14-rc5
+> ?
 > 
-> Has a binding documentation but no run-time dependency on
-> "[PATCH net-next 0/3] net: sh_eth: add R-Car Gen[12] fallback compatibility
-> strings"
+> Did anyone say anything about that? No, I think the only thing being
+> guaranteed here is that the kernel's physical_id maps to an ACPI
+> defined socket. Which seems to be the mindset of pretty much the
+> entire !arm64 community meaning they are optimizing their software
+> and the kernel with that concept in mind.
+> 
+> Are you denying the existence of non-uniformity between threads
+> running on different physical sockets?
 
-The above dependency has been accepted into net-next.
+No, I have not explained my POV clearly, apologies.
 
-I have applied this series for v4.16 with Geert's review tags.
+AFAIK, the kernel currently deals with 2 (3 - if SMT) topology layers.
 
-> 
-> Simon Horman (7):
->   ARM: dts: r8a7743: Use R-Car Gen2 Ether fallback compat string
->   ARM: dts: r8a7745: Use R-Car Gen2 Ether fallback compat string
+1) thread
+2) core
+3) package
 
-The above used spaces instead of tabs for indentation,
-I fixed this when applying.
+What I wanted to say is, that, to simplify this series, you do not need
+to introduce the COD topology level, since it is just another arbitrary
+topology level (ie there is no way you can pinpoint which level
+corresponds to COD with PPTT - or DT for the sake of this discussion)
+that would not be used in the kernel (apart from big.LITTLE cpufreq
+driver and PSCI checker whose usage of topology_physical_package_id() is
+questionable anyway).
 
->   ARM: dts: r8a7778: Use R-Car Gen1 Ether fallback compat string
->   ARM: dts: r8a7790: Use R-Car Gen2 Ether fallback compat string
->   ARM: dts: r8a7791: Use R-Car Gen2 Ether fallback compat string
->   ARM: dts: r8a7793: Use R-Car Gen2 Ether fallback compat string
->   ARM: dts: r8a7794: Use R-Car Gen2 Ether fallback compat string
-> 
->  arch/arm/boot/dts/r8a7743.dtsi | 3 ++-
->  arch/arm/boot/dts/r8a7745.dtsi | 3 ++-
->  arch/arm/boot/dts/r8a7778.dtsi | 3 ++-
->  arch/arm/boot/dts/r8a7790.dtsi | 3 ++-
->  arch/arm/boot/dts/r8a7791.dtsi | 3 ++-
->  arch/arm/boot/dts/r8a7793.dtsi | 3 ++-
->  arch/arm/boot/dts/r8a7794.dtsi | 3 ++-
->  7 files changed, 14 insertions(+), 7 deletions(-)
-> 
-> -- 
-> 2.11.0
-> 
+PPTT allows you to define what level corresponds to a package, use
+it to initialize the package topology level (that on ARM internal
+variables we call cluster) and be done with it.
+
+I do not think that adding another topology level improves anything as
+far as ACPI topology detection is concerned, you are not able to use it
+in the scheduler or from userspace to group CPUs anyway.
+
+Does this answer your question ?
+
+Thanks,
+Lorenzo
