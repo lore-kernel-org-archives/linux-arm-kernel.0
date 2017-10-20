@@ -1,40 +1,113 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 20 Oct 2017 10:41:29 +0200
-Subject: [GIT PULL] Amlogic clock driver updates for 4.15
-Message-ID: <f83efd53-0600-a4b4-3ee2-089e435a8cb4@baylibre.com>
+Date: Fri, 20 Oct 2017 10:48:38 +0200
+Subject: [PATCH v2] serial: meson: add Magic SysRq support
+In-Reply-To: <20171020083227.GA20623@ofmlt>
+References: <20170906135239.29531-1-dlan@gentoo.org>
+ <d727b350-7936-2671-45c2-cf32dfda1a2a@baylibre.com>
+ <20171020083227.GA20623@ofmlt>
+Message-ID: <a37790aa-3721-76f5-1db8-80568191f98d@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike, Stephen,
+I Yixun,
 
-Below is a request to pull the Amlogic clock driver updates for 4.15.
+On 20/10/2017 10:32, Yixun Lan wrote:
+> Hi Greg-KH
+> 
+> I think you've already accepted this patch (and merged into your git repo)
+> 
+> so, is it possible for you to amend the commit message? or do you want me
+> to send a PATCH v3 then?
 
-Thanks,
+I was not aware greg applied it, no need to amen anything, ignore my tag.
+
 Neil
 
-The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
-
-  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
-
-are available in the git repository at:
-
-  git://github.com/baylibre/clk-meson.git tags/meson-clk-for-4.15
-
-for you to fetch changes up to 762a1f2098b2fd4f84ccdb62d5747fff1ad7f816:
-
-  clk: meson: gxbb: Add VPU and VAPB clocks data (2017-10-20 10:34:49 +0200)
-
-----------------------------------------------------------------
-Amlogic clock changes for 4.15
-
-- Addition of Video Processing Unit VPU and VAPB clocks
-
-----------------------------------------------------------------
-Neil Armstrong (2):
-      clk: meson: gxbb: Add VPU and VAPB clockids
-      clk: meson: gxbb: Add VPU and VAPB clocks data
-
- drivers/clk/meson/gxbb.c              | 292 ++++++++++++++++++++++++++++++++++
- drivers/clk/meson/gxbb.h              |   6 +-
- include/dt-bindings/clock/gxbb-clkc.h |  11 ++
- 3 files changed, 308 insertions(+), 1 deletion(-)
+> 
+> On 10:10 Fri 20 Oct     , Neil Armstrong wrote:
+>> Hi Yixun,
+>>
+>> On 06/09/2017 15:52, Yixun Lan wrote:
+>>> This dirver try to implement the Magic SysRq support[1] for
+>>> Amlogic Inc's meson platfo
+>>
+>> Please fix these typos.
+>>
+> oops, not sure why this line is broken..
+> 
+> s/platfo/platform./
+> and should squash next line .
+> 
+>>> From the hardware perspective, the UART IP can't detect the 'BREAK' command
+>>> clearly via the status register. Instead, we rely on the combination of
+>>> 'FRAME_ERR bit && ch == 0', and it works fine.
+>>>
+>>> [1] Documentation/admin-guide/sysrq.rst
+>>>
+>>> Signed-off-by: Yixun Lan <dlan@gentoo.org>
+>>>
+>>> ---
+>>> Changes since v1 at [0]:
+>>> - add changelog & a few more comments
+>>>
+>>> [0] https://patchwork.kernel.org/patch/9728475/
+>>> ---
+>>>  drivers/tty/serial/meson_uart.c | 18 ++++++++++++++++--
+>>>  1 file changed, 16 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/tty/serial/meson_uart.c b/drivers/tty/serial/meson_uart.c
+>>> index 42e4a4c7597f..3fea24bafd80 100644
+>>> --- a/drivers/tty/serial/meson_uart.c
+>>> +++ b/drivers/tty/serial/meson_uart.c
+>>> @@ -14,6 +14,10 @@
+>>>   *
+>>>   */
+>>>  
+>>> +#if defined(CONFIG_SERIAL_MESON_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
+>>> +#define SUPPORT_SYSRQ
+>>> +#endif
+>>> +
+>>>  #include <linux/clk.h>
+>>>  #include <linux/console.h>
+>>>  #include <linux/delay.h>
+>>> @@ -183,12 +187,12 @@ static void meson_receive_chars(struct uart_port *port)
+>>>  {
+>>>  	struct tty_port *tport = &port->state->port;
+>>>  	char flag;
+>>> -	u32 status, ch, mode;
+>>> +	u32 ostatus, status, ch, mode;
+>>>  
+>>>  	do {
+>>>  		flag = TTY_NORMAL;
+>>>  		port->icount.rx++;
+>>> -		status = readl(port->membase + AML_UART_STATUS);
+>>> +		ostatus = status = readl(port->membase + AML_UART_STATUS);
+>>>  
+>>>  		if (status & AML_UART_ERR) {
+>>>  			if (status & AML_UART_TX_FIFO_WERR)
+>>> @@ -216,6 +220,16 @@ static void meson_receive_chars(struct uart_port *port)
+>>>  		ch = readl(port->membase + AML_UART_RFIFO);
+>>>  		ch &= 0xff;
+>>>  
+>>> +		if ((ostatus & AML_UART_FRAME_ERR) && (ch == 0)) {
+>>> +			port->icount.brk++;
+>>> +			flag = TTY_BREAK;
+>>> +			if (uart_handle_break(port))
+>>> +				continue;
+>>> +		}
+>>> +
+>>> +		if (uart_handle_sysrq_char(port, ch))
+>>> +			continue;
+>>> +
+>>>  		if ((status & port->ignore_status_mask) == 0)
+>>>  			tty_insert_flip_char(tport, ch, flag);
+>>>  
+>>>
+>>
+>> Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+>>
+>> _______________________________________________
+>> linux-amlogic mailing list
+>> linux-amlogic at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-amlogic
+> 
