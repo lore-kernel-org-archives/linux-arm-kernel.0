@@ -1,125 +1,124 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 20 Oct 2017 16:49:03 +0100
-Subject: [PATCH v2 7/8] KVM: arm/arm64: Drop vcpu parameter from guest cache
- maintenance operartions
+Date: Fri, 20 Oct 2017 16:49:04 +0100
+Subject: [PATCH v2 8/8] KVM: arm/arm64: Detangle kvm_mmu.h from kvm_hyp.h
 In-Reply-To: <20171020154904.31427-1-marc.zyngier@arm.com>
 References: <20171020154904.31427-1-marc.zyngier@arm.com>
-Message-ID: <20171020154904.31427-8-marc.zyngier@arm.com>
+Message-ID: <20171020154904.31427-9-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The vcpu parameter isn't used for anything, and gets in the way of
-further cleanups. Let's get rid of it.
+kvm_hyp.h has an odd dependency on kvm_mmu.h, which makes the
+opposite inclusion impossible. Let's start with breaking that
+useless dependency.
 
 Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_mmu.h   |  7 ++-----
- arch/arm64/include/asm/kvm_mmu.h |  7 ++-----
- virt/kvm/arm/mmu.c               | 18 ++++++++----------
- 3 files changed, 12 insertions(+), 20 deletions(-)
+ arch/arm/include/asm/kvm_hyp.h   | 1 -
+ arch/arm/kvm/hyp/switch.c        | 1 +
+ arch/arm/kvm/hyp/tlb.c           | 1 +
+ arch/arm64/include/asm/kvm_hyp.h | 1 -
+ arch/arm64/kvm/hyp/debug-sr.c    | 1 +
+ arch/arm64/kvm/hyp/switch.c      | 1 +
+ arch/arm64/kvm/hyp/tlb.c         | 1 +
+ virt/kvm/arm/hyp/vgic-v2-sr.c    | 1 +
+ 8 files changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index aab64fe52146..bc70a1f0f42d 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -150,9 +150,7 @@ static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
- 	return (vcpu_cp15(vcpu, c1_SCTLR) & 0b101) == 0b101;
- }
+diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
+index ad541f9ecc78..8b29faa119ba 100644
+--- a/arch/arm/include/asm/kvm_hyp.h
++++ b/arch/arm/include/asm/kvm_hyp.h
+@@ -21,7 +21,6 @@
+ #include <linux/compiler.h>
+ #include <linux/kvm_host.h>
+ #include <asm/cp15.h>
+-#include <asm/kvm_mmu.h>
+ #include <asm/vfp.h>
  
--static inline void __clean_dcache_guest_page(struct kvm_vcpu *vcpu,
--					     kvm_pfn_t pfn,
--					     unsigned long size)
-+static inline void __clean_dcache_guest_page(kvm_pfn_t pfn, unsigned long size)
+ #define __hyp_text __section(.hyp.text) notrace
+diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
+index ebd2dd46adf7..67e0a689c4b5 100644
+--- a/arch/arm/kvm/hyp/switch.c
++++ b/arch/arm/kvm/hyp/switch.c
+@@ -18,6 +18,7 @@
+ 
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_hyp.h>
++#include <asm/kvm_mmu.h>
+ 
+ __asm__(".arch_extension     virt");
+ 
+diff --git a/arch/arm/kvm/hyp/tlb.c b/arch/arm/kvm/hyp/tlb.c
+index 6d810af2d9fd..c0edd450e104 100644
+--- a/arch/arm/kvm/hyp/tlb.c
++++ b/arch/arm/kvm/hyp/tlb.c
+@@ -19,6 +19,7 @@
+  */
+ 
+ #include <asm/kvm_hyp.h>
++#include <asm/kvm_mmu.h>
+ 
+ /**
+  * Flush per-VMID TLBs
+diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+index 4572a9b560fa..afbfbe0c12c5 100644
+--- a/arch/arm64/include/asm/kvm_hyp.h
++++ b/arch/arm64/include/asm/kvm_hyp.h
+@@ -20,7 +20,6 @@
+ 
+ #include <linux/compiler.h>
+ #include <linux/kvm_host.h>
+-#include <asm/kvm_mmu.h>
+ #include <asm/sysreg.h>
+ 
+ #define __hyp_text __section(.hyp.text) notrace
+diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
+index f5154ed3da6c..d3a13d57f2c5 100644
+--- a/arch/arm64/kvm/hyp/debug-sr.c
++++ b/arch/arm64/kvm/hyp/debug-sr.c
+@@ -21,6 +21,7 @@
+ #include <asm/debug-monitors.h>
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_hyp.h>
++#include <asm/kvm_mmu.h>
+ 
+ #define read_debug(r,n)		read_sysreg(r##n##_el1)
+ #define write_debug(v,r,n)	write_sysreg(v, r##n##_el1)
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 945e79c641c4..c52f7094122f 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -21,6 +21,7 @@
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_hyp.h>
++#include <asm/kvm_mmu.h>
+ #include <asm/fpsimd.h>
+ 
+ static bool __hyp_text __fpsimd_enabled_nvhe(void)
+diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
+index 73464a96c365..131c7772703c 100644
+--- a/arch/arm64/kvm/hyp/tlb.c
++++ b/arch/arm64/kvm/hyp/tlb.c
+@@ -16,6 +16,7 @@
+  */
+ 
+ #include <asm/kvm_hyp.h>
++#include <asm/kvm_mmu.h>
+ #include <asm/tlbflush.h>
+ 
+ static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm *kvm)
+diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
+index a3f18d362366..77ccd8e2090b 100644
+--- a/virt/kvm/arm/hyp/vgic-v2-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
+@@ -21,6 +21,7 @@
+ 
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_hyp.h>
++#include <asm/kvm_mmu.h>
+ 
+ static void __hyp_text save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
  {
- 	/*
- 	 * Clean the dcache to the Point of Coherency.
-@@ -177,8 +175,7 @@ static inline void __clean_dcache_guest_page(struct kvm_vcpu *vcpu,
- 	}
- }
- 
--static inline void __invalidate_icache_guest_page(struct kvm_vcpu *vcpu,
--						  kvm_pfn_t pfn,
-+static inline void __invalidate_icache_guest_page(kvm_pfn_t pfn,
- 						  unsigned long size)
- {
- 	u32 iclsz;
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 126abefffe7f..06f1f9794679 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -252,17 +252,14 @@ static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
- 	return (vcpu_sys_reg(vcpu, SCTLR_EL1) & 0b101) == 0b101;
- }
- 
--static inline void __clean_dcache_guest_page(struct kvm_vcpu *vcpu,
--					     kvm_pfn_t pfn,
--					     unsigned long size)
-+static inline void __clean_dcache_guest_page(kvm_pfn_t pfn, unsigned long size)
- {
- 	void *va = page_address(pfn_to_page(pfn));
- 
- 	kvm_flush_dcache_to_poc(va, size);
- }
- 
--static inline void __invalidate_icache_guest_page(struct kvm_vcpu *vcpu,
--						  kvm_pfn_t pfn,
-+static inline void __invalidate_icache_guest_page(kvm_pfn_t pfn,
- 						  unsigned long size)
- {
- 	if (icache_is_aliasing()) {
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index b83b5a8442bb..a1ea43fa75cf 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -1276,16 +1276,14 @@ void kvm_arch_mmu_enable_log_dirty_pt_masked(struct kvm *kvm,
- 	kvm_mmu_write_protect_pt_masked(kvm, slot, gfn_offset, mask);
- }
- 
--static void clean_dcache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
--				    unsigned long size)
-+static void clean_dcache_guest_page(kvm_pfn_t pfn, unsigned long size)
- {
--	__clean_dcache_guest_page(vcpu, pfn, size);
-+	__clean_dcache_guest_page(pfn, size);
- }
- 
--static void invalidate_icache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
--					 unsigned long size)
-+static void invalidate_icache_guest_page(kvm_pfn_t pfn, unsigned long size)
- {
--	__invalidate_icache_guest_page(vcpu, pfn, size);
-+	__invalidate_icache_guest_page(pfn, size);
- }
- 
- static void kvm_send_hwpoison_signal(unsigned long address,
-@@ -1421,11 +1419,11 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		}
- 
- 		if (fault_status != FSC_PERM)
--			clean_dcache_guest_page(vcpu, pfn, PMD_SIZE);
-+			clean_dcache_guest_page(pfn, PMD_SIZE);
- 
- 		if (exec_fault) {
- 			new_pmd = kvm_s2pmd_mkexec(new_pmd);
--			invalidate_icache_guest_page(vcpu, pfn, PMD_SIZE);
-+			invalidate_icache_guest_page(pfn, PMD_SIZE);
- 		} else if (fault_status == FSC_PERM) {
- 			/* Preserve execute if XN was already cleared */
- 			if (stage2_is_exec(kvm, fault_ipa))
-@@ -1443,11 +1441,11 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		}
- 
- 		if (fault_status != FSC_PERM)
--			clean_dcache_guest_page(vcpu, pfn, PAGE_SIZE);
-+			clean_dcache_guest_page(pfn, PAGE_SIZE);
- 
- 		if (exec_fault) {
- 			new_pte = kvm_s2pte_mkexec(new_pte);
--			invalidate_icache_guest_page(vcpu, pfn, PAGE_SIZE);
-+			invalidate_icache_guest_page(pfn, PAGE_SIZE);
- 		} else if (fault_status == FSC_PERM) {
- 			/* Preserve execute if XN was already cleared */
- 			if (stage2_is_exec(kvm, fault_ipa))
 -- 
 2.14.1
