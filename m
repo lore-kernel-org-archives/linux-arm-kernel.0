@@ -1,105 +1,291 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 20 Oct 2017 21:22:11 +0100
-Subject: [PATCH] ARM: add a private asm/unaligned.h
-In-Reply-To: <20171020200231.1355569-1-arnd@arndb.de>
-References: <20171020200231.1355569-1-arnd@arndb.de>
-Message-ID: <CAKv+Gu-opWFqrPxEK2zSUp4swBLtPPECecMuSDbRvhQDGvWfWg@mail.gmail.com>
+From: salyzyn@android.com (Mark Salyzyn)
+Date: Fri, 20 Oct 2017 13:22:36 -0700
+Subject: [PATCH] arch64: optimize __memcpy_fromio,
+ __memcpy_toio and __memset_io
+Message-ID: <20171020202327.2592-1-salyzyn@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 October 2017 at 21:01, Arnd Bergmann <arnd@arndb.de> wrote:
-> The asm-generic/unaligned.h header provides two different implementations
-> for accessing unaligned variables: the access_ok.h version used when
-> CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS is set pretends that all pointers
-> are in fact aligned, while the le_struct.h version convinces gcc that the
-> alignment of a pointer is '1', to make it issue the correct load/store
-> instructions depending on the architecture flags.
->
-> On ARMv5 and older, we always use the second version, to let the compiler
-> use byte accesses. On ARMv6 and newer, we currently use the access_ok.h
-> version, so the compiler can use any instruction including stm/ldm and
-> ldrd/strd that will cause an alignment trap. This trap can significantly
-> impact performance when we have to do a lot of fixups and, worse, has
-> led to crashes in the LZ4 decompressor code that does not have a trap
-> handler.
->
-> This adds an ARM specific version of asm/unaligned.h that uses the
-> le_struct.h/be_struct.h implementation unconditionally. This should lead
-> to essentially the same code on ARMv6+ as before, with the exception of
-> using regular load/store instructions instead of the trapping instructions
-> multi-register variants.
->
-> The crash in the LZ4 decompressor code was probably introduced by the
-> patch replacing the LZ4 implementation, commit 4e1a33b105dd ("lib: update
-> LZ4 compressor module"), so linux-4.11 and higher would be affected most.
-> However, we probably want to have this backported to all older stable
-> kernels as well, to help with the performance issues.
->
-> There are two follow-ups that I think we should also work on, but not
-> backport to stable kernels, first to change the asm-generic version of
-> the header to remove the ARM special case, and second to review all
-> other uses of CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS to see if they
-> might be affected by the same problem on ARM.
->
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+__memcpy_fromio and __memcpy_toio functions do not deal well with
+harmonically unaligned addresses unless they can ultimately be
+copied as quads (u64) to and from the destination.  Without a
+harmonically aligned relationship, they perform byte operations
+over the entire buffer.
 
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Added optional paths that perform reads and writes at the best
+alignment possible with source and destination, placing a priority
+on using quads (8 byte transfers) on the io-side.
 
-> ---
-> Untested so far, please verify that this fixes all the known problems
-> with the alignment traps.
-> ---
->  arch/arm/include/asm/Kbuild      |  1 -
->  arch/arm/include/asm/unaligned.h | 27 +++++++++++++++++++++++++++
->  2 files changed, 27 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/include/asm/unaligned.h
->
-> diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
-> index 721ab5ecfb9b..0f2c8a2a8131 100644
-> --- a/arch/arm/include/asm/Kbuild
-> +++ b/arch/arm/include/asm/Kbuild
-> @@ -20,7 +20,6 @@ generic-y += simd.h
->  generic-y += sizes.h
->  generic-y += timex.h
->  generic-y += trace_clock.h
-> -generic-y += unaligned.h
->
->  generated-y += mach-types.h
->  generated-y += unistd-nr.h
-> diff --git a/arch/arm/include/asm/unaligned.h b/arch/arm/include/asm/unaligned.h
-> new file mode 100644
-> index 000000000000..ab905ffcf193
-> --- /dev/null
-> +++ b/arch/arm/include/asm/unaligned.h
-> @@ -0,0 +1,27 @@
-> +#ifndef __ASM_ARM_UNALIGNED_H
-> +#define __ASM_ARM_UNALIGNED_H
-> +
-> +/*
-> + * We generally want to set CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS on ARMv6+,
-> + * but we don't want to use linux/unaligned/access_ok.h since that can lead
-> + * to traps on unaligned stm/ldm or strd/ldrd.
-> + */
-> +#include <asm/byteorder.h>
-> +
-> +#if defined(__LITTLE_ENDIAN)
-> +# include <linux/unaligned/le_struct.h>
-> +# include <linux/unaligned/be_byteshift.h>
-> +# include <linux/unaligned/generic.h>
-> +# define get_unaligned __get_unaligned_le
-> +# define put_unaligned __put_unaligned_le
-> +#elif defined(__BIG_ENDIAN)
-> +# include <linux/unaligned/be_struct.h>
-> +# include <linux/unaligned/le_byteshift.h>
-> +# include <linux/unaligned/generic.h>
-> +# define get_unaligned __get_unaligned_be
-> +# define put_unaligned __put_unaligned_be
-> +#else
-> +# error need to define endianess
-> +#endif
-> +
-> +#endif /* __ASM_ARM_UNALIGNED_H */
-> --
-> 2.9.0
->
+Removed the volatile on the source for __memcpy_toio as it is
+unnecessary.
+
+This change was motivated by performance issues in the pstore driver.
+On a test platform, measuring probe time for pstore, console buffer
+size of 1/4MB and pmsg of 1/2MB, was in the 90-107ms region. Change
+managed to reduce it to worst case 15ms, an improvement in boot time.
+
+Adjusted __memset_io to use the same pattern of access, although it
+does not have a harmonic relationship between two pointers to worry
+about, and thus the benefit is balance and not nearly as dramatic.
+
+Signed-off-by: Mark Salyzyn <salyzyn@android.com>
+Cc: Kees Cook <keescook@chromium.org>
+Cc: Anton Vorontsov <anton@enomsg.org>
+Cc: Tony Luck <tony.luck@intel.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Anton Vorontsov <anton@enomsg.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+
+---
+ arch/arm64/kernel/io.c | 199 ++++++++++++++++++++++++++++++++++++++-----------
+ 1 file changed, 156 insertions(+), 43 deletions(-)
+
+diff --git a/arch/arm64/kernel/io.c b/arch/arm64/kernel/io.c
+index 354be2a872ae..14ef7c8f20ea 100644
+--- a/arch/arm64/kernel/io.c
++++ b/arch/arm64/kernel/io.c
+@@ -20,61 +20,147 @@
+ #include <linux/types.h>
+ #include <linux/io.h>
+ 
++/* if/while helpers assume from, to and count vars accessible in caller */
++
++/* arguments to helpers to ensure proper combinations */
++#define	byte		b, u8
++#define	word		w, u16
++#define	longword	l, u32
++#define	quad		q, u64
++
++/* read helper for unaligned transfers needing intermediate hold and memcpy */
++#define	_do_unaligned_read(op, align_type, width, type) do {	\
++	op(count >= sizeof(type)) {				\
++		type hold = __raw_read##width##(from);		\
++								\
++		memcpy((align_type *)to, &hold, sizeof(type));	\
++		to += sizeof(type);				\
++		from += sizeof(type);				\
++		count -= sizeof(type);				\
++	}							\
++} while (0)
++#define if_unaligned_read(type, x) _do_unaligned_read(if, type, x)
++#define while_unaligned_read(type, x) _do_unaligned_read(while, type, x)
++
++/* read helper for aligned transfers */
++#define	_do_aligned_read(op, width, type) \
++	_do_unaligned_read(op, type, width, type)
++#define if_aligned_read(x) _do_aligned_read(if, x)
++#define while_aligned_read(x) _do_aligned_read(while, x)
++
+ /*
+  * Copy data from IO memory space to "real" memory space.
+  */
++
+ void __memcpy_fromio(void *to, const volatile void __iomem *from, size_t count)
+ {
+-	while (count && (!IS_ALIGNED((unsigned long)from, 8) ||
+-			 !IS_ALIGNED((unsigned long)to, 8))) {
+-		*(u8 *)to = __raw_readb(from);
+-		from++;
+-		to++;
+-		count--;
+-	}
++	if (!IS_ALIGNED((unsigned long)from, sizeof(u16)))
++		if_aligned_read(byte);
+ 
+-	while (count >= 8) {
+-		*(u64 *)to = __raw_readq(from);
+-		from += 8;
+-		to += 8;
+-		count -= 8;
++	if (!IS_ALIGNED((unsigned long)to, sizeof(u16))) {
++		if (!IS_ALIGNED((unsigned long)from, sizeof(u32)))
++			if_unaligned_read(u8, word);
++		if (!IS_ALIGNED((unsigned long)from, sizeof(u64)))
++			if_unaligned_read(u8, longword);
++		while_unaligned_read(u8, quad);
++		if_unaligned_read(u8, longword);
++		if_unaligned_read(u8, word);
++		if_aligned_read(byte);
++		return;
+ 	}
+ 
+-	while (count) {
+-		*(u8 *)to = __raw_readb(from);
+-		from++;
+-		to++;
+-		count--;
++	if (!IS_ALIGNED((unsigned long)from, sizeof(u32)))
++		if_aligned_read(word);
++
++	if (!IS_ALIGNED((unsigned long)to, sizeof(u32))) {
++		if (!IS_ALIGNED((unsigned long)from, sizeof(u64)))
++			if_unaligned_read(u16, longword);
++		while_unaligned_read(u16, quad);
++		if_unaligned_read(u16, longword);
++		if_aligned_read(word);
++		if_aligned_read(byte);
++		return;
+ 	}
++
++	if (!IS_ALIGNED((unsigned long)from, sizeof(u64)))
++		if_aligned_read(longword);
++
++	if (!IS_ALIGNED((unsigned long)to, sizeof(u64)))
++		while_unaligned_read(u32, quad);
++	else
++		while_aligned_read(quad);
++
++	if_aligned_read(longword);
++	if_aligned_read(word);
++	if_aligned_read(byte);
+ }
+ EXPORT_SYMBOL(__memcpy_fromio);
+ 
++/* write helper for unaligned transfers needing intermediate hold and memcpy */
++#define	_do_unaligned_write(op, align_type, width, type) do {	\
++	op(count >= sizeof(type)) {				\
++		type hold;					\
++								\
++		memcpy(&hold, (align_type *)from, sizeof(type));\
++		__raw_write##width##(hold, to);			\
++		to += sizeof(type);				\
++		from += sizeof(type);				\
++		count -= sizeof(type);				\
++	}							\
++} while (0)
++#define if_unaligned_write(type, x) _do_unaligned_write(if, type, x)
++#define while_unaligned_write(type, x) _do_unaligned_write(while, type, x)
++
++/* write helper for aligned transfers */
++#define	_do_aligned_write(op, width, type) \
++	_do_unaligned_write(op, type, width, type)
++#define if_aligned_write(x) _do_aligned_write(if, x)
++#define while_aligned_write(x) _do_aligned_write(while, x)
++
+ /*
+  * Copy data from "real" memory space to IO memory space.
+  */
+ void __memcpy_toio(volatile void __iomem *to, const void *from, size_t count)
+ {
+-	while (count && (!IS_ALIGNED((unsigned long)to, 8) ||
+-			 !IS_ALIGNED((unsigned long)from, 8))) {
+-		__raw_writeb(*(volatile u8 *)from, to);
+-		from++;
+-		to++;
+-		count--;
+-	}
++	if (!IS_ALIGNED((unsigned long)to, sizeof(u16)))
++		if_aligned_write(byte);
+ 
+-	while (count >= 8) {
+-		__raw_writeq(*(volatile u64 *)from, to);
+-		from += 8;
+-		to += 8;
+-		count -= 8;
++	if (!IS_ALIGNED((unsigned long)from, sizeof(u16))) {
++		if (!IS_ALIGNED((unsigned long)to, sizeof(u32)))
++			if_unaligned_write(u8, word);
++		if (!IS_ALIGNED((unsigned long)to, sizeof(u64)))
++			if_unaligned_write(u8, longword);
++		while_unaligned_write(u8, quad);
++		if_unaligned_write(u8, longword);
++		if_unaligned_write(u8, word);
++		if_aligned_write(byte);
++		return;
+ 	}
+ 
+-	while (count) {
+-		__raw_writeb(*(volatile u8 *)from, to);
+-		from++;
+-		to++;
+-		count--;
++	if (!IS_ALIGNED((unsigned long)to, sizeof(u32)))
++		if_aligned_write(word);
++
++	if (!IS_ALIGNED((unsigned long)from, sizeof(u32))) {
++		if (!IS_ALIGNED((unsigned long)to, sizeof(u64)))
++			if_unaligned_write(u16, longword);
++		while_unaligned_write(u16, quad);
++		if_unaligned_write(u16, longword);
++		if_aligned_write(word);
++		if_aligned_write(byte);
++		return;
+ 	}
++
++	if (!IS_ALIGNED((unsigned long)to, sizeof(u64)))
++		if_aligned_write(longword);
++
++	if (!IS_ALIGNED((unsigned long)from, sizeof(u64)))
++		while_unaligned_write(u32, quad);
++	else
++		while_aligned_write(quad);
++
++	if_aligned_write(longword);
++	if_aligned_write(word);
++	if_aligned_write(byte);
+ }
+ EXPORT_SYMBOL(__memcpy_toio);
+ 
+@@ -89,22 +175,49 @@ void __memset_io(volatile void __iomem *dst, int c, size_t count)
+ 	qc |= qc << 16;
+ 	qc |= qc << 32;
+ 
+-	while (count && !IS_ALIGNED((unsigned long)dst, 8)) {
++	if ((count >= sizeof(u8)) &&
++	    !IS_ALIGNED((unsigned long)dst, sizeof(u16))) {
+ 		__raw_writeb(c, dst);
+-		dst++;
+-		count--;
++		dst += sizeof(u8);
++		count -= sizeof(u8);
++	}
++
++	if ((count >= sizeof(u16)) &&
++	    !IS_ALIGNED((unsigned long)dst, sizeof(u32))) {
++		__raw_writew((u16)qc, dst);
++		dst += sizeof(u16);
++		count -= sizeof(u16);
+ 	}
+ 
+-	while (count >= 8) {
++	if ((count >= sizeof(u32)) &&
++	    !IS_ALIGNED((unsigned long)dst, sizeof(u64))) {
++		__raw_writel((u32)qc, dst);
++		dst += sizeof(u32);
++		count -= sizeof(u32);
++	}
++
++	while (count >= sizeof(u64)) {
+ 		__raw_writeq(qc, dst);
+-		dst += 8;
+-		count -= 8;
++		dst += sizeof(u64);
++		count -= sizeof(u64);
++	}
++
++	if (count >= sizeof(u32)) {
++		__raw_writel((u32)qc, dst);
++		dst += sizeof(u32);
++		count -= sizeof(u32);
++	}
++
++	if (count >= sizeof(u16)) {
++		__raw_writew((u16)qc, dst);
++		dst += sizeof(u16);
++		count -= sizeof(u16);
+ 	}
+ 
+-	while (count) {
++	if (count) {
+ 		__raw_writeb(c, dst);
+-		dst++;
+-		count--;
++		dst += sizeof(u8);
++		count -= sizeof(u8);
+ 	}
+ }
+ EXPORT_SYMBOL(__memset_io);
+-- 
+2.15.0.rc0.271.g36b669edcc-goog
