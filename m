@@ -1,62 +1,30 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Fri, 20 Oct 2017 15:33:05 +0000
-Subject: [PATCH v6 6/7] KVM: arm64: allow get exception information from
- userspace
-In-Reply-To: <0184EA26B2509940AA629AE1405DD7F2016BA9E4@DGGEMA503-MBX.china.huawei.com>
-References: <0184EA26B2509940AA629AE1405DD7F2016BA9E4@DGGEMA503-MBX.china.huawei.com>
-Message-ID: <0184EA26B2509940AA629AE1405DD7F2016BAC2B@DGGEMA503-MBX.china.huawei.com>
+From: willemdebruijn.kernel@gmail.com (Willem de Bruijn)
+Date: Fri, 20 Oct 2017 11:39:35 -0400
+Subject: v4.14-rc3/arm64 DABT exception in atomic_inc() / __skb_clone()
+In-Reply-To: <CACT4Y+bjzzCv3LSxK12C1xB8GfR3UYCrX_5phRYJ8fpxh9vcvQ@mail.gmail.com>
+References: <EAA60182-6F08-412E-8F8B-FD4B0309A858@gmail.com>
+ <20171020111408.edj24tztxdptte5r@lakrids.cambridge.arm.com>
+ <960D71EC-C1E9-4898-ACBE-543FC09483FF@gmail.com>
+ <CACT4Y+bjzzCv3LSxK12C1xB8GfR3UYCrX_5phRYJ8fpxh9vcvQ@mail.gmail.com>
+Message-ID: <CAF=yD-K76TMjHiYRTRAnxM-x4LBcUDY+27WX477HW6kG=L_aZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > In the user space, we can check the si_code, if it is "BUS_MCEERR_AR",
-> > we use SEA notification type for the guest; if it is "BUS_MCEERR_AO", we use SEI notification type for the guest.
-> > Because there are only two values for si_code("BUS_MCEERR_AR" and BUS_MCEERR_AO), in which case we can use the GSIV(IRQ)
-> notification type?
-> 
-> This is for Qemu/kvmtool to decide, it depends on what sort of machine they are emulating.
-> 
-> For example, the physical machine's memory-controller may notify the CPU about memory errors by triggering SError trapped to EL3, or
-> with a dedicated FIQ, also routed to EL3. By the time this gets to the host kernel the distinction doesn't matter. The host has handled the
-> error.
-> 
-> For a guest, your memory-controller is effectively the host kernel. It will give you an BUS_MCEERR_AO signal for any guest memory that is
-> affected, and a BUS_MCEERR_AR if the guest directly accesses a page of affected memory.
-> 
-> What Qemu/kvmtool do with this is up to them. If they're emulating a machine with no RAS features, printing an error and exit.
-> 
-> Otherwise BUS_MCEERR_AR could be notified as one of the flavours of IRQ, unless the affected vcpu has interrupts masked, in which case
-> an SEA notification gives you some NMI-like behaviour.
-> 
-> For BUS_MCEERR_AO you could use SEI, IRQ or polled notification. My choice would be IRQ, as you can't know if the guest supports SEI and
-> it would be a shame to kill it with an SError if the affected memory was free. SEA for synchronous errors is still a good choice even if the
-> guest doesn't support it as that memory is still gone so its still a valid guest:Synchronous-external-abort.
-> 
+On Fri, Oct 20, 2017 at 11:14 AM, Dmitry Vyukov <dvyukov@google.com> wrote:
+> On Fri, Oct 20, 2017 at 4:40 PM, Wei Wei <dotweiba@gmail.com> wrote:
+>> Sadly, the syzkaller characterized it as a non-reproducible bug and there were empty
+>>  repro files. But if manually executing in VM like this ?./syz-execprog -executor=
+>> ./syz-executor -repeat=0 -procs=16 -cover=0 crash-log?, it crashed when executing exactly
+>> program 1056 using log0 provided.
+>>
+>> I failed to generate the C reproducer with syz-repro as it said ?no target compiler?
+>> in the final step. I would appreciate if you could give some hints.
+>
+> syzkaller tries to use aarch64-linux-gnu-gcc when cross-compiling to arm64:
+> https://github.com/google/syzkaller/blob/master/sys/targets/targets.go#L62
+> Try to install g++-aarch64-linux-gnu.
+> Or how should it be done on your system?
 
-CC some huawei's hardware engineers.
-
-Hi James/Marc/Christoffer,
-
-  As we discuss below solution:
-When guest happen SEA/SEI, KVM calls memory_failure() to send an asynchronous SIGBUS signal(BUS_MCEERR_AO) to QEMU, and make this address to poisoned.
-after QEMU receive this BUS_MCEERR_AO, it will record this address to CPER and notify guest. When guest happen stage2 page fault, KVM send a synchronous SIGBUS BUS_MCEERR_AR
-to QEMU, and QEMU also record CPER and immediately inject SEA abort.
-
-But this solution, still have some problems.
-
-1. In some situation, For RAS, when happen SEA, hardware cannot provide an error physical address to software instead it can only provide virtual address in FAR_ELx, 
-This is to say, firmware cannot provide physical error address, but provided the virtual address in the FAR_ELx.
-so BIOS cannot record this address to APEI table. In this case, when firmware Jump to hypervisor, hypervisor cannot call memory_failure(), 
-now only the physical address is recorded and valid, APEI driver will call the memory_failure()), 
-in this case, host will not send SIGBUS to QEMU. So guest cannot know there is SEA happen.
-At least there is such issue in Huawei's platform (cannot provide PA for RAS firmware-first, only can provide VA in FAR_ELx)
-
-2. if there is SEA/SEI, only deliver SIGBUS to notify QEMU. This information is limit.
- This SIGBUS can only provide an address and si_code(BUS_MCEERR_AO/ BUS_MCEERR_AR), nothing else.
- if QEMU record CPER and inject SEA/specify ESR, it may needs to know more information.
-For example, if it injects SEA, it needs so setup many registers for guest, such as FAR_EL1. If sets it, it needs to know FAR_EL2.
- But QEMU cannot know this information to setup it if KVM cannot pass more fault info to QEMU.
- Of cause, we can identify the guest FAR_El1 register to invalid. But some time, guest needs to know it in the situation that host cannot provide the PA.
-
-3. For SEI, the address is invalid, so in some platform, firmware will not record this AP. At least in HUAWEI's platform, firmware will not record it.
-  we cannot always think that all platform can record PA for RAS, sometime it may use VA(in FAR_ELx).
-  For SEI, if the address is not recorded, then the memory_failure() will be not called. So guest will not know it happens SEI. 
+A core dump would also be helpful to root around in and inspect
+what those registers point to. Thanks for posting the various reports
+on github, btw.
