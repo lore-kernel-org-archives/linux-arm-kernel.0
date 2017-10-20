@@ -1,54 +1,76 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 20 Oct 2017 13:49:31 +0200
-Subject: [PATCH v4 12/20] genirq: Document vcpu_info usage for percpu_devid
- interrupts
+Date: Fri, 20 Oct 2017 13:49:36 +0200
+Subject: [PATCH v4 17/20] KVM: arm/arm64: Move phys_timer_emulate function
 In-Reply-To: <20171020114939.12554-1-christoffer.dall@linaro.org>
 References: <20171020114939.12554-1-christoffer.dall@linaro.org>
-Message-ID: <20171020114939.12554-13-christoffer.dall@linaro.org>
+Message-ID: <20171020114939.12554-18-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <cdall@linaro.org>
 
-It is currently unclear how to set the VCPU affinity for a percpu_devid
-interrupt , since the Linux irq_data structure describes the state for
-multiple interrupts, one for each physical CPU on the system.  Since
-each such interrupt can be associated with different VCPUs or none at
-all, associating a single VCPU state with such an interrupt does not
-capture the necessary semantics.
+We are about to call phys_timer_emulate() from kvm_timer_update_state()
+and modify phys_timer_emulate() at the same time.  Moving the function
+and modifying it in a single patch makes the diff hard to read, so do
+this separately first.
 
-The implementers of irq_set_affinity are the Intel and AMD IOMMUs, and
-the ARM GIC irqchip.  The Intel and AMD callers do not appear to use
-percpu_devid interrupts, and the ARM GIC implementation only checks the
-pointer against NULL vs. non-NULL.
+No functional change.
 
-Therefore, simply update the function documentation to explain the
-expected use in the context of percpu_devid interrupts, allowing future
-changes or additions to irqchip implementers to do the right thing.
-
-This allows us to set the VCPU affinity for the virtual timer interrupt
-in KVM/ARM, which is a percpu_devid (PPI) interrupt.
-
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- kernel/irq/manage.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ virt/kvm/arm/arch_timer.c | 32 ++++++++++++++++----------------
+ 1 file changed, 16 insertions(+), 16 deletions(-)
 
-diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-index d00132b5c325..38ec7a83bf56 100644
---- a/kernel/irq/manage.c
-+++ b/kernel/irq/manage.c
-@@ -381,7 +381,8 @@ int irq_select_affinity_usr(unsigned int irq)
- /**
-  *	irq_set_vcpu_affinity - Set vcpu affinity for the interrupt
-  *	@irq: interrupt number to set affinity
-- *	@vcpu_info: vCPU specific data
-+ *	@vcpu_info: vCPU specific data or pointer to a percpu array of vCPU
-+ *	            specific data for percpu_devid interrupts
-  *
-  *	This function uses the vCPU specific data to set the vCPU
-  *	affinity for an irq. The vCPU specific data is passed from
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index d1a6fb12121f..7f4f12d48a1a 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -255,6 +255,22 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
+ 	}
+ }
+ 
++/* Schedule the background timer for the emulated timer. */
++static void phys_timer_emulate(struct kvm_vcpu *vcpu,
++			      struct arch_timer_context *timer_ctx)
++{
++	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
++
++	if (kvm_timer_should_fire(timer_ctx))
++		return;
++
++	if (!kvm_timer_irq_can_fire(timer_ctx))
++		return;
++
++	/*  The timer has not yet expired, schedule a background timer */
++	soft_timer_start(&timer->phys_timer, kvm_timer_compute_delta(timer_ctx));
++}
++
+ /*
+  * Check if there was a change in the timer state (should we raise or lower
+  * the line level to the GIC).
+@@ -281,22 +297,6 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
+ 		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
+ }
+ 
+-/* Schedule the background timer for the emulated timer. */
+-static void phys_timer_emulate(struct kvm_vcpu *vcpu,
+-			      struct arch_timer_context *timer_ctx)
+-{
+-	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+-
+-	if (kvm_timer_should_fire(timer_ctx))
+-		return;
+-
+-	if (!kvm_timer_irq_can_fire(timer_ctx))
+-		return;
+-
+-	/*  The timer has not yet expired, schedule a background timer */
+-	soft_timer_start(&timer->phys_timer, kvm_timer_compute_delta(timer_ctx));
+-}
+-
+ static void vtimer_save_state(struct kvm_vcpu *vcpu)
+ {
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
 -- 
 2.14.2
