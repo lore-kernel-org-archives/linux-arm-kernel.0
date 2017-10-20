@@ -1,28 +1,40 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Oct 2017 22:28:49 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC Drivers Updates for v4.15
-In-Reply-To: <cover.1506325468.git.horms+renesas@verge.net.au>
-References: <cover.1506325468.git.horms+renesas@verge.net.au>
-Message-ID: <CAK8P3a1e7TA+HzUhNMe4kd6RTiL4hNbcs98FkZcE886FJ1voag@mail.gmail.com>
+Date: Fri, 20 Oct 2017 22:33:34 +0200
+Subject: [GIT PULL] firmware: arm_scpi: updates/cleanups for v4.15
+In-Reply-To: <901d3720-a023-0af9-2b20-b7d7e8528571@arm.com>
+References: <901d3720-a023-0af9-2b20-b7d7e8528571@arm.com>
+Message-ID: <CAK8P3a0Pmcg+_zZNgTYfi_0m8zS=Rq9oqPSypxASKh8E34NKJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 25, 2017 at 9:53 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Renesas ARM Based SoC Drivers Updates for v4.15
+On Mon, Oct 9, 2017 at 7:27 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
 >
-> Add basic support for R-Car V3M (R8A77970) SoC.
+> The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 >
-> Sergei Shtylyov says:
+>   Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
 >
-> * Add support for R-Car V3M (R8A77970) SoC power areas to the R-Car SYSC
->   driver
+> are available in the git repository at:
 >
-> * Add support for identifying the R-Car V3M (R8A77970) SoC
+>   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git
+> tags/scpi-updates-4.15
 >
-> * Add support for R-Car V3M (R8A77970) to the R-Car RST driver -- this
->   driver is  needed  for the clock driver to work
+> for you to fetch changes up to 430594c1c7f5051f0d99ed9d08d086d20587cdd1:
+>
+>   firmware: arm_scpi: silence sparse warnings (2017-10-09 10:20:02 +0100)
+>
+> ----------------------------------------------------------------
+> ARM SCPI updates/cleanups for v4.15
+>
+> 1. Fixes to get rid of sparse warnings
+> 2. Use of FIELD_GET and GENMASK for better subfields handling
+> 3. Make mbox_free_channels device-managed helping in removing
+> unnecessary code
+> 4. Various other cleanups to simplify and improve code readability
 
-Pulled into next/drivers, thanks!
+Pulled into next/drivers. I'm a little unsure about the first patch: the
+resource is called "shmem", which suggests that you are dealing
+with memory and should use "memremap()" instead of "ioremap()"
+and readl/writel. Can you clarify what the mapping attributes are
+supposed to be here? Thanks.
 
         Arnd
