@@ -1,272 +1,82 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 20 Oct 2017 17:25:19 +0100
-Subject: [PATCH 05/17] coresight: Add support for TMC ETR SG unit
-In-Reply-To: <20171019171553.24056-6-suzuki.poulose@arm.com>
-References: <20171019171553.24056-1-suzuki.poulose@arm.com>
- <20171019171553.24056-6-suzuki.poulose@arm.com>
-Message-ID: <d365437e-3612-c3ef-59ad-f4048daf088e@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 20 Oct 2017 17:27:12 +0100
+Subject: [PATCH v2 2/8] arm: KVM: Add optimized PIPT icache flushing
+In-Reply-To: <20171020154904.31427-3-marc.zyngier@arm.com>
+References: <20171020154904.31427-1-marc.zyngier@arm.com>
+ <20171020154904.31427-3-marc.zyngier@arm.com>
+Message-ID: <20171020162711.2mb2wyw5xqfhkc4o@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
+Hi Marc,
 
-On 19/10/17 18:15, Suzuki K Poulose wrote:
-> This patch adds support for setting up an SG table used by the
-> TMC ETR inbuilt SG unit. The TMC ETR uses 4K page sized tables
-> to hold pointers to the 4K data pages with the last entry in a
-> table pointing to the next table with the entries, by kind of
-> chaining. The 2 LSBs determine the type of the table entry, to
-> one of :
-> 
->   Normal - Points to a 4KB data page.
->   Last   - Points to a 4KB data page, but is the last entry in the
->            page table.
->   Link   - Points to another 4KB table page with pointers to data.
-> 
-> The code takes care of handling the system page size which could
-> be different than 4K. So we could end up putting multiple ETR
-> SG tables in a single system page, vice versa for the data pages.
-> 
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->   drivers/hwtracing/coresight/coresight-tmc-etr.c | 256 ++++++++++++++++++++++++
->   1 file changed, 256 insertions(+)
-> 
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> index 4b9e2b276122..4424eb67a54c 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> @@ -21,6 +21,89 @@
->   #include "coresight-tmc.h"
->   
->   /*
-> + * The TMC ETR SG has a page size of 4K. The SG table contains pointers
-> + * to 4KB buffers. However, the OS may be use PAGE_SIZE different from
-
-nit:
-"the OS may use a PAGE_SIZE different from".
-
-> + * 4K (i.e, 16KB or 64KB). This implies that a single OS page could
-> + * contain more than one SG buffer and tables.
-> + *
-> + * A table entry has the following format:
-> + *
-> + * ---Bit31------------Bit4-------Bit1-----Bit0--
-> + * |     Address[39:12]    | SBZ |  Entry Type  |
-> + * ----------------------------------------------
-> + *
-> + * Address: Bits [39:12] of a physical page address. Bits [11:0] are
-> + *	    always zero.
-> + *
-> + * Entry type:
-> + *	b00 - Reserved.
-> + *	b01 - Last entry in the tables, points to 4K page buffer.
-> + *	b10 - Normal entry, points to 4K page buffer.
-> + *	b11 - Link. The address points to the base of next table.
-> + */
-> +
-> +typedef u32 sgte_t;
-> +
-> +#define ETR_SG_PAGE_SHIFT		12
-> +#define ETR_SG_PAGE_SIZE		(1UL << ETR_SG_PAGE_SHIFT)
-> +#define ETR_SG_PAGES_PER_SYSPAGE	(1UL << \
-> +					 (PAGE_SHIFT - ETR_SG_PAGE_SHIFT))
-
-I think this would be slightly easier to understand if defined as:
-"(PAGE_SIZE / ETR_SG_PAGE_SIZE)".
-
-> +#define ETR_SG_PTRS_PER_PAGE		(ETR_SG_PAGE_SIZE / sizeof(sgte_t))
-> +#define ETR_SG_PTRS_PER_SYSPAGE		(PAGE_SIZE / sizeof(sgte_t))
-> +
-> +#define ETR_SG_ET_MASK			0x3
-> +#define ETR_SG_ET_LAST			0x1
-> +#define ETR_SG_ET_NORMAL		0x2
-> +#define ETR_SG_ET_LINK			0x3
-> +
-> +#define ETR_SG_ADDR_SHIFT		4
-> +
-> +#define ETR_SG_ENTRY(addr, type) \
-> +	(sgte_t)((((addr) >> ETR_SG_PAGE_SHIFT) << ETR_SG_ADDR_SHIFT) | \
-> +		 (type & ETR_SG_ET_MASK))
-> +
-> +#define ETR_SG_ADDR(entry) \
-> +	(((dma_addr_t)(entry) >> ETR_SG_ADDR_SHIFT) << ETR_SG_PAGE_SHIFT)
-> +#define ETR_SG_ET(entry)		((entry) & ETR_SG_ET_MASK)
-> +
-> +/*
-> + * struct etr_sg_table : ETR SG Table
-> + * @sg_table:		Generic SG Table holding the data/table pages.
-> + * @hwaddr:		hwaddress used by the TMC, which is the base
-> + *			address of the table.
-> + */
-> +struct etr_sg_table {
-> +	struct tmc_sg_table	*sg_table;
-> +	dma_addr_t		hwaddr;
-> +};
-> +
-> +/*
-> + * tmc_etr_sg_table_entries: Total number of table entries required to map
-> + * @nr_pages system pages.
-> + *
-> + * We need to map @nr_pages * ETR_SG_PAGES_PER_SYSPAGE data pages.
-> + * Each TMC page can map (ETR_SG_PTRS_PER_PAGE - 1) buffer pointers,
-> + * with the last entry pointing to the page containing the table
-> + * entries. If we spill over to a new page for mapping 1 entry,
-> + * we could as well replace the link entry of the previous page
-> + * with the last entry.
-> + */
-> +static inline unsigned long __attribute_const__
-> +tmc_etr_sg_table_entries(int nr_pages)
-> +{
-> +	unsigned long nr_sgpages = nr_pages * ETR_SG_PAGES_PER_SYSPAGE;
-> +	unsigned long nr_sglinks = nr_sgpages / (ETR_SG_PTRS_PER_PAGE - 1);
+On Fri, Oct 20, 2017 at 04:48:58PM +0100, Marc Zyngier wrote:
+> @@ -181,18 +185,40 @@ static inline void __invalidate_icache_guest_page(struct kvm_vcpu *vcpu,
+>  		return;
+>  	}
+>  
+> -	/* PIPT cache. As for the d-side, use a temporary kernel mapping. */
 > +	/*
-> +	 * If we spill over to a new page for 1 entry, we could as well
-> +	 * make it the LAST entry in the previous page, skipping the Link
-> +	 * address.
+> +	 * CTR IminLine contains Log2 of the number of words in the
+> +	 * cache line, so we can get the number of words as
+> +	 * 2 << (IminLine - 1).  To get the number of bytes, we
+> +	 * multiply by 4 (the number of bytes in a 32-bit word), and
+> +	 * get 4 << (IminLine).
 > +	 */
-> +	if (nr_sglinks && (nr_sgpages % (ETR_SG_PTRS_PER_PAGE - 1) < 2))
-> +		nr_sglinks--;
-> +	return nr_sgpages + nr_sglinks;
-> +}
+> +	iclsz = 4 << (read_cpuid(CPUID_CACHETYPE) & 0xf);
 > +
-> +/*
->    * tmc_pages_get_offset:  Go through all the pages in the tmc_pages
->    * and map @phys_addr to an offset within the buffer.
->    */
-> @@ -307,6 +390,179 @@ ssize_t tmc_sg_table_get_data(struct tmc_sg_table *sg_table,
->   	return len;
->   }
->   
-> +#ifdef ETR_SG_DEBUG
-> +/* Map a dma address to virtual address */
-> +static unsigned long
-> +tmc_sg_daddr_to_vaddr(struct tmc_sg_table *sg_table,
-> +			dma_addr_t addr, bool table)
-> +{
-> +	long offset;
-> +	unsigned long base;
-> +	struct tmc_pages *tmc_pages;
+>  	while (size) {
+>  		void *va = kmap_atomic_pfn(pfn);
+> +		void *end = va + PAGE_SIZE;
+> +		void *addr = va;
+>  
+> -		__cpuc_coherent_user_range((unsigned long)va,
+> -					   (unsigned long)va + PAGE_SIZE);
+> +		do {
+> +			write_sysreg(addr, ICIMVAU);
+> +			addr += iclsz;
+> +		} while (addr < end);
 > +
-> +	if (table) {
-> +		tmc_pages = &sg_table->table_pages;
-> +		base = (unsigned long)sg_table->table_vaddr;
-> +	} else {
-> +		tmc_pages = &sg_table->data_pages;
-> +		base = (unsigned long)sg_table->data_vaddr;
+> +		dsb(ishst);
+
+I believe this needs to be ISH rather than ISHST.
+
+Per, ARM DDI 0487B.b, page G3-4701, "G3.4 AArch32 cache and branch
+predictor support":
+
+    A DSB or DMB instruction intended to ensure the completion of cache
+    maintenance instructions or branch predictor instructions must have
+    an access type of both loads and stores.
+
+> +		isb();
+>  
+>  		size -= PAGE_SIZE;
+>  		pfn++;
+>  
+>  		kunmap_atomic(va);
+>  	}
+> +
+> +	/* Check if we need to invalidate the BTB */
+> +	if ((read_cpuid_ext(CPUID_EXT_MMFR1) >> 28) != 4) {
+> +		write_sysreg(0, BPIALLIS);
+> +		dsb(ishst);
+
+Likewise here.
+
+Otherwise, looks good!
+
+Thanks,
+Mark.
+
+> +		isb();
 > +	}
-> +
-> +	offset = tmc_pages_get_offset(tmc_pages, addr);
-> +	if (offset < 0)
-> +		return 0;
-> +	return base + offset;
-> +}
-> +
-> +/* Dump the given sg_table */
-> +static void tmc_etr_sg_table_dump(struct etr_sg_table *etr_table)
-> +{
-> +	sgte_t *ptr;
-> +	int i = 0;
-> +	dma_addr_t addr;
-> +	struct tmc_sg_table *sg_table = etr_table->sg_table;
-> +
-> +	ptr = (sgte_t *)tmc_sg_daddr_to_vaddr(sg_table,
-> +					      etr_table->hwaddr, true);
-> +	while (ptr) {
-> +		addr = ETR_SG_ADDR(*ptr);
-> +		switch (ETR_SG_ET(*ptr)) {
-> +		case ETR_SG_ET_NORMAL:
-> +			pr_debug("%05d: %p\t:[N] 0x%llx\n", i, ptr, addr);
-> +			ptr++;
-> +			break;
-> +		case ETR_SG_ET_LINK:
-> +			pr_debug("%05d: *** %p\t:{L} 0x%llx ***\n",
-> +				 i, ptr, addr);
-> +			ptr = (sgte_t *)tmc_sg_daddr_to_vaddr(sg_table,
-> +							      addr, true);
-> +			break;
-> +		case ETR_SG_ET_LAST:
-> +			pr_debug("%05d: ### %p\t:[L] 0x%llx ###\n",
-> +				 i, ptr, addr);
-> +			return;
-
-I get this is debug code, but it seems like if ETR_SG_ET(*ptr) is 0 we 
-get stuck in an infinite loop. I guess it is something that supposedly 
-doesn't happen, still I'd prefer having a default case saying the table 
-might be corrupted and either incrementing ptr to try and get more info 
-or breaking out of the loop.
-
-> +		}
-> +		i++;
-> +	}
-> +	pr_debug("******* End of Table *****\n");
-> +}
-> +#endif
-> +
-> +/*
-> + * Populate the SG Table page table entries from table/data
-> + * pages allocated. Each Data page has ETR_SG_PAGES_PER_SYSPAGE SG pages.
-> + * So does a Table page. So we keep track of indices of the tables
-> + * in each system page and move the pointers accordingly.
-> + */
-> +#define INC_IDX_ROUND(idx, size) (idx = (idx + 1) % size)
-
-Needs more parenthesis around idx and size.
-
-> +static void tmc_etr_sg_table_populate(struct etr_sg_table *etr_table)
-> +{
-> +	dma_addr_t paddr;
-> +	int i, type, nr_entries;
-> +	int tpidx = 0; /* index to the current system table_page */
-> +	int sgtidx = 0;	/* index to the sg_table within the current syspage */
-> +	int sgtoffset = 0; /* offset to the next entry within the sg_table */
-
-That's misleading, this seems to be the index of an entry within an 
-ETR_SG_PAGE rather than an offset in bytes.
-
-Maybe ptridx or entryidx would be a better name.
-
-> +	int dpidx = 0; /* index to the current system data_page */
-> +	int spidx = 0; /* index to the SG page within the current data page */
-> +	sgte_t *ptr; /* pointer to the table entry to fill */
-> +	struct tmc_sg_table *sg_table = etr_table->sg_table;
-> +	dma_addr_t *table_daddrs = sg_table->table_pages.daddrs;
-> +	dma_addr_t *data_daddrs = sg_table->data_pages.daddrs;
-> +
-> +	nr_entries = tmc_etr_sg_table_entries(sg_table->data_pages.nr_pages);
-> +	/*
-> +	 * Use the contiguous virtual address of the table to update entries.
-> +	 */
-> +	ptr = sg_table->table_vaddr;
-> +	/*
-> +	 * Fill all the entries, except the last entry to avoid special
-> +	 * checks within the loop.
-> +	 */
-> +	for (i = 0; i < nr_entries - 1; i++) {
-> +		if (sgtoffset == ETR_SG_PTRS_PER_PAGE - 1) {
-> +			/*
-> +			 * Last entry in a sg_table page is a link address to
-> +			 * the next table page. If this sg_table is the last
-> +			 * one in the system page, it links to the first
-> +			 * sg_table in the next system page. Otherwise, it
-> +			 * links to the next sg_table page within the system
-> +			 * page.
-> +			 */
-> +			if (sgtidx == ETR_SG_PAGES_PER_SYSPAGE - 1) {
-> +				paddr = table_daddrs[tpidx + 1];
-> +			} else {
-> +				paddr = table_daddrs[tpidx] +
-> +					(ETR_SG_PAGE_SIZE * (sgtidx + 1));
-> +			}
-> +			type = ETR_SG_ET_LINK;
-> +		} else {
-> +			/*
-> +			 * Update the idices to the data_pages to point to the
-
-nit: indices
-
-Cheers,
-
--- 
-Julien Thierry
+>  }
+>  
+>  static inline void __kvm_flush_dcache_pte(pte_t pte)
+> -- 
+> 2.14.1
+> 
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
