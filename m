@@ -1,20 +1,17 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Oct 2017 22:36:02 +0200
-Subject: [GIT PULL] Qualcomm Driver updates for 4.15
-In-Reply-To: <1508182291-23352-4-git-send-email-andy.gross@linaro.org>
-References: <1508182291-23352-1-git-send-email-andy.gross@linaro.org>
- <1508182291-23352-4-git-send-email-andy.gross@linaro.org>
-Message-ID: <CAK8P3a2_YUJz5UMKZ8rECzreeVHr8UQjhR2HSs85T5X06hypDQ@mail.gmail.com>
+Date: Fri, 20 Oct 2017 22:37:02 +0200
+Subject: [GIT PULL] omap-gpmc updates for v4.15
+In-Reply-To: <b911ad22-7dad-a9d9-2814-a29937b9be0c@ti.com>
+References: <b911ad22-7dad-a9d9-2814-a29937b9be0c@ti.com>
+Message-ID: <CAK8P3a1Yik0dF-0V=W1hRr+XnLtD6myU1wDHpMwbCLcGgdQ4jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 16, 2017 at 9:31 PM, Andy Gross <andy.gross@linaro.org> wrote:
-> Qualcomm ARM Based Driver Updates for v4.15
->
-> * Add SCM firmware APIs for download mode and secure IO service
-> * Add SMEM support for cached entries
-> * Add SMEM support for global partition, dynamic item limit, and more hosts
+On Tue, Oct 17, 2017 at 2:26 PM, Roger Quadros <rogerq@ti.com> wrote:
+> ----------------------------------------------------------------
+> OMAP-GPMC: driver updates for v4.15
+> * get rid of unused field in platform data structure.
 
 Pulled into next/drivers, thanks!
 
-      Arnd
+        Arnd
