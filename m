@@ -1,53 +1,54 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Fri, 20 Oct 2017 09:53:01 +0200
-Subject: [GIT PULL] STM32 defconfig changes for v4.15 #1
-In-Reply-To: <CAK8P3a3RhiQcgn+4FDrvBtT1as8LhaR0SLnFMwc+j9PPu611ow@mail.gmail.com>
-References: <8c7fe79d-ebd3-ee7c-f056-1d3aa225edee@st.com>
- <CAK8P3a3sfq13v8sVox8xiXvHpSyzsvV_4LEYsoNtdfLLhyS7MA@mail.gmail.com>
- <e984aa91-cf82-8823-1cd6-ed0d194bd5ba@st.com>
- <CAK8P3a3RhiQcgn+4FDrvBtT1as8LhaR0SLnFMwc+j9PPu611ow@mail.gmail.com>
-Message-ID: <605279d7-1e39-6589-213b-aef2f0536ec7@st.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 20 Oct 2017 09:59:00 +0200
+Subject: [GIT PULL] Allwinner fixes for 4.14
+Message-ID: <20171020075900.25c4w3ti7ryx4ztp@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Arnd, Olof,
 
+Here are two fixes for the current release.
 
-On 10/20/2017 09:40 AM, Arnd Bergmann wrote:
-> On Fri, Oct 20, 2017 at 9:33 AM, Alexandre Torgue
-> <alexandre.torgue@st.com> wrote:
->> On 10/19/2017 10:57 PM, Arnd Bergmann wrote:
->>> On Tue, Oct 17, 2017 at 12:16 PM, Alexandre Torgue
->>>
->>> Pulled into next/soc.
->>>
->>> Splitting out the first patch is fine, but there really is no need to have
->>> one
->>> patch per new Kconfig option you enable, it's less work and more readable
->>> to
->>> have a combined patch that explains what the options are and why you need
->>> all of them.
->>>
->>>           Arnd
->>>
->>
->> ok. So you mean I would have to merge "Add DMAMUX support", "Add I2C F7
->> support", "Add MDMA support" in one patch before to submit the pull request
->> ? If yes, it will be done for next PR.
-> 
-> Right, it's about finding the right balance. Most of the time, splitting up a
-> patch into smaller independent units makes sense when you explain
-> what each one does, but in cases like this (adding just one config option
-> or one DT node), it becomes more readable if you do multiple related
-> changes at once.
-> 
-> The best test is usually what you put in the changelog. If you have multiple
-> patches with almost-identical descriptions, merge them. If you have one
-> patch with a description that talks about unrelated problems, split it up.
-> 
->         Arnd
-> 
+Thanks!
+Maxime
 
-Ok. Thanks for the tips ;)
+The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 
-Regards
-Alex
+  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-fixes-for-4.14
+
+for you to fetch changes up to a231d2783c332ef3e3ba238e82dbe599ff41ba14:
+
+  ARM: dts: sun6i: Fix endpoint IDs in second display pipeline (2017-09-17 12:03:59 +0200)
+
+----------------------------------------------------------------
+Allwinner fixes for 4.14
+
+Two fixes, one for the A31 DRM binding, and one for a missing regulator on
+the pine MMC controller.
+
+----------------------------------------------------------------
+Chen-Yu Tsai (1):
+      ARM: dts: sun6i: Fix endpoint IDs in second display pipeline
+
+Jagan Teki (1):
+      arm64: allwinner: a64: pine64: Use dcdc1 regulator for mmc0
+
+ arch/arm/boot/dts/sun6i-a31.dtsi                    | 16 ++++++++--------
+ arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts |  9 +--------
+ 2 files changed, 9 insertions(+), 16 deletions(-)
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171020/103e048c/attachment-0001.sig>
