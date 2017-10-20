@@ -1,51 +1,55 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 20 Oct 2017 17:10:53 +0100
-Subject: [PATCH 0/3] arm64: cpuinfo: make /proc/cpuinfo more human-readable
-In-Reply-To: <abeb1756-3635-2f86-131c-cd904731a308@redhat.com>
-References: <20170926222324.17409-1-ahs3@redhat.com>
- <20170927103406.GC32150@leverpostej>
- <CAOZdJXUzo3JrHW1h6W3y3BnVq472NjPpaqTztzEODZnnMyvJRg@mail.gmail.com>
- <20171013142724.GA5893@leverpostej>
- <abeb1756-3635-2f86-131c-cd904731a308@redhat.com>
-Message-ID: <20171020161053.ujw3spzizhgu4g7b@lakrids.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 20 Oct 2017 17:11:54 +0100
+Subject: [GIT PULL] iommu/arm-smmu: Updates for 4.15
+Message-ID: <20171020161154.GA7287@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Al,
+Hi Joerg,
 
-On Mon, Oct 16, 2017 at 05:43:19PM -0600, Al Stone wrote:
-> On 10/13/2017 08:27 AM, Mark Rutland wrote:
-> > I certainly agree that exposing the information that we have is useful,
-> > as I have stated several times. I'm not NAKing exposing this information
-> > elsewhere.
-> > 
-> > If you want a consistent cross-architecture interface for this
-> > information, then you need to propose a new one. That was we can
-> > actually solve the underlying issues, for all architectures, without
-> > breaking ABI.
-> > 
-> > I would be *very* interested in such an interface, and would be more
-> > than happy to help.
-> 
-> I'm playing with some patches that do very similar things in sysfs, vs
-> proc.  Is that better :)?
+Please pull these ARM SMMU updates for 4.15. The main improvement here is
+that we now drop the command queue lock when waiting for a CMD_SYNC to
+complete on implementations that support MSIs into cacheable memory.
+There are also some minor fixes and cleanups.
 
-Exposing data under sysfs is certainly better, yes. :)
+Cheers,
 
-> Obviously, you'll have to see the patches to
-> properly answer that, but what I'm playing with at present is placing
-> this info in new entries in /sys/devices/cpu and/or /sys/devices/system,
-> and generating some of the content based on what's already in header files
-> (e.g., in cputype.h). 
+Will
 
-My opposition to MIDR -> string mapping applies regardless of
-location...
+--->8
 
-> The idea of course is to keep this new info from touching any existing
-> info so we don't break compatibility -- does that feel like a better
-> direction, at least?
+The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 
-... but otherwise this sounds good to me!
+  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
 
-Thanks,
-Mark.
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/updates
+
+for you to fetch changes up to 8ff0f72371709889349a706e19bb38d9f71b1669:
+
+  iommu/arm-smmu-v3: Use burst-polling for sync completion (2017-10-20 16:55:10 +0100)
+
+----------------------------------------------------------------
+Feng Kan (1):
+      iommu/arm-smmu: Enable bypass transaction caching for ARM SMMU 500
+
+Robin Murphy (6):
+      iommu/arm-smmu: Remove ACPICA workarounds
+      iommu/arm-smmu-v3: Correct COHACC override message
+      iommu/arm-smmu-v3: Specialise CMD_SYNC handling
+      iommu/arm-smmu-v3: Forget about cmdq-sync interrupt
+      iommu/arm-smmu-v3: Use CMD_SYNC completion MSI
+      iommu/arm-smmu-v3: Use burst-polling for sync completion
+
+Will Deacon (3):
+      iommu/arm-smmu-v3: Ensure we sync STE when only changing config field
+      iommu/arm-smmu-v3: Split arm_smmu_cmdq_issue_sync in half
+      iommu/arm-smmu-v3: Consolidate identical timeouts
+
+Yisheng Xie (1):
+      iommu/arm-smmu-v3: Avoid ILLEGAL setting of STE.S1STALLD and CD.S
+
+ drivers/iommu/arm-smmu-v3.c | 204 ++++++++++++++++++++++++++++++--------------
+ drivers/iommu/arm-smmu.c    |  11 +--
+ 2 files changed, 141 insertions(+), 74 deletions(-)
