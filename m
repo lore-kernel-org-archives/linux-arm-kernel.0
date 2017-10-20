@@ -1,38 +1,58 @@
-From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Fri, 20 Oct 2017 13:56:36 +0200
-Subject: [PATCH 1/1] tty: serial: imx: disable ageing timer interrupt if
- dma in use
-In-Reply-To: <AM3P101MB01800FAA2029393C5A859629E64A0@AM3P101MB0180.NAMP101.PROD.OUTLOOK.COM>
-References: <20171007014648.6989-1-troy.kisky@boundarydevices.com>
- <AM3P101MB01800FAA2029393C5A859629E64A0@AM3P101MB0180.NAMP101.PROD.OUTLOOK.COM>
-Message-ID: <20171020115636.GB2073@kroah.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 20 Oct 2017 13:56:02 +0200
+Subject: [GIT PULL 6/7] arm64: tegra: Device tree changes for v4.15-rc1
+In-Reply-To: <20171020115603.9828-1-thierry.reding@gmail.com>
+References: <20171020115603.9828-1-thierry.reding@gmail.com>
+Message-ID: <20171020115603.9828-6-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 11, 2017 at 06:22:53AM +0000, Han, Nandor (GE Healthcare) wrote:
-> 
-> 
-> > -----Original Message-----
-> > From: linux-serial-owner at vger.kernel.org [mailto:linux-serial-
-> > owner at vger.kernel.org] On Behalf Of Troy Kisky
-> > Sent: 07 October 2017 04:47
-> > To: gregkh at linuxfoundation.org
-> > Cc: fabio.estevam at nxp.com; l.stach at pengutronix.de; u.kleine-
-> > koenig at pengutronix.de; linux-serial at vger.kernel.org; linux-arm-
-> > kernel at lists.infradead.org; Troy Kisky <troy.kisky@boundarydevices.com>
-> > Subject: EXT: [PATCH 1/1] tty: serial: imx: disable ageing timer interrupt if
-> > dma in use
-> > 
-> > Since commit 4dec2f119e86 ("imx-serial: RX DMA startup latency")
-> > 
-> > the interrupt routine no longer will start rx dma.
-> 
-> I think you have 2 commits here: 
-> - one that disables ageing timer when DMA is in use
-> - one that cleans the leftovers after 4dec2f119e86.
+Hi ARM SoC maintainers,
 
-I agree, Troy, please make a patch series here.
+The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 
-thanks,
+  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
 
-greg k-h
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.15-arm64-dt
+
+for you to fetch changes up to 15274c232131569b9010634a3f4f129c80c027a3:
+
+  arm64: tegra: Add BPMP thermal sensor to Tegra186 (2017-10-19 16:35:50 +0200)
+
+This pulls in a part of the tegra-for-4.15-dt-bindings tag in order to
+resolve a build time dependency.
+
+Thanks,
+Thierry
+
+----------------------------------------------------------------
+arm64: tegra: Device tree changes for v4.15-rc1
+
+Enables host1x, VIC, PCIe and the BPMP thermal sensor on Tegra186.
+
+----------------------------------------------------------------
+Manikanta Maddireddy (2):
+      arm64: tegra: Add PCIe node for Tegra186
+      arm64: tegra: Enable PCIe on Jetson TX2
+
+Mikko Perttunen (5):
+      dt-bindings: Add bindings for nvidia,tegra186-bpmp-thermal
+      arm64: tegra: Add #power-domain-cells for BPMP
+      arm64: tegra: Add host1x on Tegra186
+      arm64: tegra: Add VIC on Tegra186
+      arm64: tegra: Add BPMP thermal sensor to Tegra186
+
+Thierry Reding (2):
+      dt-bindings: clock: tegra: Add sor1_out clock
+      Merge branch 'for-4.15/dt-bindings' into for-4.15/arm64/dt
+
+ .../thermal/nvidia,tegra186-bpmp-thermal.txt       |  32 +++
+ arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts |  24 +++
+ arch/arm64/boot/dts/nvidia/tegra186.dtsi           | 214 +++++++++++++++++++++
+ include/dt-bindings/clock/tegra210-car.h           |   1 +
+ .../dt-bindings/thermal/tegra186-bpmp-thermal.h    |  14 ++
+ 5 files changed, 285 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/nvidia,tegra186-bpmp-thermal.txt
+ create mode 100644 include/dt-bindings/thermal/tegra186-bpmp-thermal.h
