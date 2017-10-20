@@ -1,310 +1,165 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 20 Oct 2017 08:33:48 +0200
-Subject: [PATCH] dmaengine: zynqmp_dma: Add runtime pm support
-In-Reply-To: <fe4665ef-eb00-2189-598f-d36b18fb6f11@xilinx.com>
-References: <1508310126-10926-1-git-send-email-appanad@xilinx.com>
- <fe4665ef-eb00-2189-598f-d36b18fb6f11@xilinx.com>
-Message-ID: <a60f3eb7-137e-346e-7f91-1c27c30cf1b0@xilinx.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 20 Oct 2017 08:59:41 +0200
+Subject: [PATCH 2/2 v3] drm: bridge: Add THS8134A/B support to dumb VGA DAC
+Message-ID: <20171020065941.3877-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.10.2017 08:31, Michal Simek wrote:
-> On 18.10.2017 09:02, Kedareswara rao Appana wrote:
->> This patch adds runtime pm support in the driver.
->>
->> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
->> ---
->>  drivers/dma/xilinx/zynqmp_dma.c | 167 ++++++++++++++++++++++++++++++++--------
->>  1 file changed, 135 insertions(+), 32 deletions(-)
->>
->> diff --git a/drivers/dma/xilinx/zynqmp_dma.c b/drivers/dma/xilinx/zynqmp_dma.c
->> index 1ee1241..dd73831 100644
->> --- a/drivers/dma/xilinx/zynqmp_dma.c
->> +++ b/drivers/dma/xilinx/zynqmp_dma.c
->> @@ -23,6 +23,7 @@
->>  #include <linux/slab.h>
->>  #include <linux/clk.h>
->>  #include <linux/io-64-nonatomic-lo-hi.h>
->> +#include <linux/pm_runtime.h>
->>  
->>  #include "../dmaengine.h"
->>  
->> @@ -138,6 +139,8 @@
->>  #define ZYNQMP_DMA_BUS_WIDTH_64		64
->>  #define ZYNQMP_DMA_BUS_WIDTH_128	128
->>  
->> +#define ZDMA_PM_TIMEOUT			100
->> +
->>  #define ZYNQMP_DMA_DESC_SIZE(chan)	(chan->desc_size)
->>  
->>  #define to_chan(chan)		container_of(chan, struct zynqmp_dma_chan, \
->> @@ -211,8 +214,6 @@ struct zynqmp_dma_desc_sw {
->>   * @bus_width: Bus width
->>   * @src_burst_len: Source burst length
->>   * @dst_burst_len: Dest burst length
->> - * @clk_main: Pointer to main clock
->> - * @clk_apb: Pointer to apb clock
->>   */
->>  struct zynqmp_dma_chan {
->>  	struct zynqmp_dma_device *zdev;
->> @@ -237,8 +238,6 @@ struct zynqmp_dma_chan {
->>  	u32 bus_width;
->>  	u32 src_burst_len;
->>  	u32 dst_burst_len;
->> -	struct clk *clk_main;
->> -	struct clk *clk_apb;
->>  };
->>  
->>  /**
->> @@ -246,11 +245,15 @@ struct zynqmp_dma_chan {
->>   * @dev: Device Structure
->>   * @common: DMA device structure
->>   * @chan: Driver specific DMA channel
->> + * @clk_main: Pointer to main clock
->> + * @clk_apb: Pointer to apb clock
->>   */
->>  struct zynqmp_dma_device {
->>  	struct device *dev;
->>  	struct dma_device common;
->>  	struct zynqmp_dma_chan *chan;
->> +	struct clk *clk_main;
->> +	struct clk *clk_apb;
->>  };
->>  
->>  static inline void zynqmp_dma_writeq(struct zynqmp_dma_chan *chan, u32 reg,
->> @@ -461,7 +464,11 @@ static int zynqmp_dma_alloc_chan_resources(struct dma_chan *dchan)
->>  {
->>  	struct zynqmp_dma_chan *chan = to_chan(dchan);
->>  	struct zynqmp_dma_desc_sw *desc;
->> -	int i;
->> +	int i, ret;
->> +
->> +	ret = pm_runtime_get_sync(chan->dev);
->> +	if (ret < 0)
->> +		return ret;
->>  
->>  	chan->sw_desc_pool = kzalloc(sizeof(*desc) * ZYNQMP_DMA_NUM_DESCS,
->>  				     GFP_KERNEL);
->> @@ -664,6 +671,8 @@ static void zynqmp_dma_free_chan_resources(struct dma_chan *dchan)
->>  		(2 * ZYNQMP_DMA_DESC_SIZE(chan) * ZYNQMP_DMA_NUM_DESCS),
->>  		chan->desc_pool_v, chan->desc_pool_p);
->>  	kfree(chan->sw_desc_pool);
->> +	pm_runtime_mark_last_busy(chan->dev);
->> +	pm_runtime_put_autosuspend(chan->dev);
->>  }
->>  
->>  /**
->> @@ -841,8 +850,6 @@ static void zynqmp_dma_chan_remove(struct zynqmp_dma_chan *chan)
->>  	devm_free_irq(chan->zdev->dev, chan->irq, chan);
->>  	tasklet_kill(&chan->tasklet);
->>  	list_del(&chan->common.device_node);
->> -	clk_disable_unprepare(chan->clk_apb);
->> -	clk_disable_unprepare(chan->clk_main);
->>  }
->>  
->>  /**
->> @@ -907,30 +914,6 @@ static int zynqmp_dma_chan_probe(struct zynqmp_dma_device *zdev,
->>  			       "zynqmp-dma", chan);
->>  	if (err)
->>  		return err;
->> -	chan->clk_main = devm_clk_get(&pdev->dev, "clk_main");
->> -	if (IS_ERR(chan->clk_main)) {
->> -		dev_err(&pdev->dev, "main clock not found.\n");
->> -		return PTR_ERR(chan->clk_main);
->> -	}
->> -
->> -	chan->clk_apb = devm_clk_get(&pdev->dev, "clk_apb");
->> -	if (IS_ERR(chan->clk_apb)) {
->> -		dev_err(&pdev->dev, "apb clock not found.\n");
->> -		return PTR_ERR(chan->clk_apb);
->> -	}
->> -
->> -	err = clk_prepare_enable(chan->clk_main);
->> -	if (err) {
->> -		dev_err(&pdev->dev, "Unable to enable main clock.\n");
->> -		return err;
->> -	}
->> -
->> -	err = clk_prepare_enable(chan->clk_apb);
->> -	if (err) {
->> -		clk_disable_unprepare(chan->clk_main);
->> -		dev_err(&pdev->dev, "Unable to enable apb clock.\n");
->> -		return err;
->> -	}
->>  
->>  	chan->desc_size = sizeof(struct zynqmp_dma_desc_ll);
->>  	chan->idle = true;
->> @@ -953,6 +936,87 @@ static struct dma_chan *of_zynqmp_dma_xlate(struct of_phandle_args *dma_spec,
->>  }
->>  
->>  /**
->> + * zynqmp_dma_suspend - Suspend method for the driver
->> + * @dev:	Address of the device structure
->> + *
->> + * Put the driver into low power mode.
->> + * Return: 0 on success and failure value on error
->> + */
->> +static int __maybe_unused zynqmp_dma_suspend(struct device *dev)
->> +{
->> +	if (!device_may_wakeup(dev))
->> +		return pm_runtime_force_suspend(dev);
->> +
->> +	return 0;
->> +}
->> +
->> +/**
->> + * zynqmp_dma_resume - Resume from suspend
->> + * @dev:	Address of the device structure
->> + *
->> + * Resume operation after suspend.
->> + * Return: 0 on success and failure value on error
->> + */
->> +static int __maybe_unused zynqmp_dma_resume(struct device *dev)
->> +{
->> +	if (!device_may_wakeup(dev))
->> +		return pm_runtime_force_resume(dev);
->> +
->> +	return 0;
->> +}
->> +
->> +/**
->> + * zynqmp_dma_runtime_suspend - Runtime suspend method for the driver
->> + * @dev:	Address of the device structure
->> + *
->> + * Put the driver into low power mode.
->> + * Return: 0 always
->> + */
->> +static int __maybe_unused zynqmp_dma_runtime_suspend(struct device *dev)
->> +{
->> +	struct zynqmp_dma_device *zdev = dev_get_drvdata(dev);
->> +
->> +	clk_disable_unprepare(zdev->clk_main);
->> +	clk_disable_unprepare(zdev->clk_apb);
->> +
->> +	return 0;
->> +}
->> +
->> +/**
->> + * zynqmp_dma_runtime_resume - Runtime suspend method for the driver
->> + * @dev:	Address of the device structure
->> + *
->> + * Put the driver into low power mode.
->> + * Return: 0 always
->> + */
->> +static int __maybe_unused zynqmp_dma_runtime_resume(struct device *dev)
->> +{
->> +	struct zynqmp_dma_device *zdev = dev_get_drvdata(dev);
->> +	int err;
->> +
->> +	err = clk_prepare_enable(zdev->clk_main);
->> +	if (err) {
->> +		dev_err(dev, "Unable to enable main clock.\n");
->> +		return err;
->> +	}
->> +
->> +	err = clk_prepare_enable(zdev->clk_apb);
->> +	if (err) {
->> +		dev_err(dev, "Unable to enable apb clock.\n");
->> +		clk_disable_unprepare(zdev->clk_main);
->> +		return err;
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->> +static const struct dev_pm_ops zynqmp_dma_dev_pm_ops = {
->> +	SET_SYSTEM_SLEEP_PM_OPS(zynqmp_dma_suspend, zynqmp_dma_resume)
->> +	SET_RUNTIME_PM_OPS(zynqmp_dma_runtime_suspend,
->> +			   zynqmp_dma_runtime_resume, NULL)
->> +};
->> +
->> +/**
->>   * zynqmp_dma_probe - Driver probe function
->>   * @pdev: Pointer to the platform_device structure
->>   *
->> @@ -984,12 +1048,39 @@ static int zynqmp_dma_probe(struct platform_device *pdev)
->>  	p->device_config = zynqmp_dma_device_config;
->>  	p->dev = &pdev->dev;
->>  
->> +	zdev->clk_main = devm_clk_get(&pdev->dev, "clk_main");
->> +	if (IS_ERR(zdev->clk_main)) {
->> +		dev_err(&pdev->dev, "main clock not found.\n");
->> +		return PTR_ERR(zdev->clk_main);
->> +	}
->> +
->> +	zdev->clk_apb = devm_clk_get(&pdev->dev, "clk_apb");
->> +	if (IS_ERR(zdev->clk_apb)) {
->> +		dev_err(&pdev->dev, "apb clock not found.\n");
->> +		return PTR_ERR(zdev->clk_apb);
->> +	}
->> +
->> +	ret = clk_prepare_enable(zdev->clk_main);
->> +	if (ret) {
->> +		dev_err(&pdev->dev, "Unable to enable main clock.\n");
->> +		return ret;
->> +	}
->> +
->> +	ret = clk_prepare_enable(zdev->clk_apb);
->> +	if (ret) {
->> +		dev_err(&pdev->dev, "Unable to enable apb clock.\n");
->> +		goto err_disable_clk;
->> +	}
->> +
->>  	platform_set_drvdata(pdev, zdev);
->> +	pm_runtime_set_autosuspend_delay(zdev->dev, ZDMA_PM_TIMEOUT);
->> +	pm_runtime_use_autosuspend(zdev->dev);
->> +	pm_runtime_enable(zdev->dev);
->>  
->>  	ret = zynqmp_dma_chan_probe(zdev, pdev);
->>  	if (ret) {
->>  		dev_err(&pdev->dev, "Probing channel failed\n");
->> -		goto free_chan_resources;
->> +		goto err_disable_pm;
->>  	}
->>  
->>  	p->dst_addr_widths = BIT(zdev->chan->bus_width / 8);
->> @@ -1005,10 +1096,18 @@ static int zynqmp_dma_probe(struct platform_device *pdev)
->>  		goto free_chan_resources;
->>  	}
->>  
->> +	pm_runtime_mark_last_busy(zdev->dev);
->> +	pm_runtime_put_sync_autosuspend(zdev->dev);
->> +
->>  	dev_info(&pdev->dev, "ZynqMP DMA driver Probe success\n");
->>  
->>  	return 0;
->>  
->> +err_disable_clk:
->> +	clk_disable_unprepare(zdev->clk_main);
->> +err_disable_pm:
->> +	clk_disable_unprepare(zdev->clk_apb);
->> +	pm_runtime_disable(zdev->dev);
->>  free_chan_resources:
->>  	zynqmp_dma_chan_remove(zdev->chan);
->>  	return ret;
->> @@ -1028,6 +1127,9 @@ static int zynqmp_dma_remove(struct platform_device *pdev)
->>  	dma_async_device_unregister(&zdev->common);
->>  
->>  	zynqmp_dma_chan_remove(zdev->chan);
->> +	pm_runtime_disable(zdev->dev);
->> +	clk_disable_unprepare(zdev->clk_apb);
->> +	clk_disable_unprepare(zdev->clk_main);
->>  
->>  	return 0;
->>  }
->> @@ -1042,6 +1144,7 @@ static struct platform_driver zynqmp_dma_driver = {
->>  	.driver = {
->>  		.name = "xilinx-zynqmp-dma",
->>  		.of_match_table = zynqmp_dma_of_match,
->> +		.pm = &zynqmp_dma_dev_pm_ops,
->>  	},
->>  	.probe = zynqmp_dma_probe,
->>  	.remove = zynqmp_dma_remove,
->>
-> 
-> CR number?
+This extends the dumb VGA DAC bridge to handle the THS8134A
+and THS8134B VGA DACs in addition to those already handled.
 
-Please ignore this one - I thought it is coming to our soc vendor tree. :-)
+The THS8134A, THS8134B and as it turns out also THS8135 need to
+have data clocked out at the negative edge of the clock pulse,
+since they clock it into the DAC at the positive edge (so by
+then it needs to be stable) so we need some extra logic to flag
+this on the connector to the driver.
 
-Cheers,
-Michal
+The semantics of the flag DRM_BUS_FLAG_PIXDATA_NEGEDGE in
+<drm/drm_connector.h> clearly indicates that this flag tells
+when to *drive* the data, not when the receiver *reads* it,
+so the TI variants needs to be handled like this.
+
+Introduce a variant struct and contain the information there,
+and add a bit of helpful comments about how this works so
+people will get it right when adding new DACs or connectiong
+new display drivers to DACs.
+
+The fact that THS8135 might be working on some systems today
+is probably due to the fact that the display driver cannot
+configure when the data is clocked out and the electronics
+have simply been designed around it so it works anyways.
+
+The phenomenon is very real on the ARM reference designs using
+PL111 where the hardware can control which edge to push out
+the data.
+
+Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v2->v3:
+- Move const specifier.
+- Cut one line of code assigning bus flags.
+- Preserve the "ti,ths8135" compatible for elder device trees.
+ChangeLog v1->v2:
+- Alphabetize includes
+- Use a u32 with the bus polarity flags and just encode the
+  polarity using the DRM define directly.
+- Rename vendor_data to vendor_info.
+- Simplify assignment of the flag as it is just a simple
+  u32 now.
+- Probe all TI variants on the "ti,ths813x" wildcard for now,
+  we only need to know that the device is in this family to
+  set the clock edge flag right.
+---
+ drivers/gpu/drm/bridge/dumb-vga-dac.c | 55 ++++++++++++++++++++++++++++++++---
+ 1 file changed, 51 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/gpu/drm/bridge/dumb-vga-dac.c b/drivers/gpu/drm/bridge/dumb-vga-dac.c
+index 831a606c4706..2622e2f778d1 100644
+--- a/drivers/gpu/drm/bridge/dumb-vga-dac.c
++++ b/drivers/gpu/drm/bridge/dumb-vga-dac.c
+@@ -11,6 +11,7 @@
+  */
+ 
+ #include <linux/module.h>
++#include <linux/of_device.h>
+ #include <linux/of_graph.h>
+ #include <linux/regulator/consumer.h>
+ 
+@@ -19,9 +20,18 @@
+ #include <drm/drm_crtc.h>
+ #include <drm/drm_crtc_helper.h>
+ 
++/**
++ * struct vga_dac_info - characteristics of the DAC
++ * @clk_edge_latch: this defines the clock edge latch for the variant
++ */
++struct vga_dac_info {
++	u32 clk_edge_latch;
++};
++
+ struct dumb_vga {
+ 	struct drm_bridge	bridge;
+ 	struct drm_connector	connector;
++	const struct vga_dac_info *variant;
+ 
+ 	struct i2c_adapter	*ddc;
+ 	struct regulator	*vdd;
+@@ -55,7 +65,8 @@ static int dumb_vga_get_modes(struct drm_connector *connector)
+ 	}
+ 
+ 	drm_mode_connector_update_edid_property(connector, edid);
+-	return drm_add_edid_modes(connector, edid);
++	connector->display_info.bus_flags |= vga->variant->clk_edge_latch;
++	retturn drm_add_edid_modes(connector, edid);
+ 
+ fallback:
+ 	/*
+@@ -67,6 +78,8 @@ static int dumb_vga_get_modes(struct drm_connector *connector)
+ 	/* And prefer a mode pretty much anyone can handle */
+ 	drm_set_preferred_mode(connector, 1024, 768);
+ 
++	connector->display_info.bus_flags |= vga->variant->clk_edge_latch;
++
+ 	return ret;
+ }
+ 
+@@ -183,6 +196,7 @@ static int dumb_vga_probe(struct platform_device *pdev)
+ 	if (!vga)
+ 		return -ENOMEM;
+ 	platform_set_drvdata(pdev, vga);
++	vga->variant = of_device_get_match_data(&pdev->dev);
+ 
+ 	vga->vdd = devm_regulator_get_optional(&pdev->dev, "vdd");
+ 	if (IS_ERR(vga->vdd)) {
+@@ -226,10 +240,43 @@ static int dumb_vga_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct vga_dac_info default_dac_variant = {
++	/*
++	 * These DACs read data on the negative edge. For example in the
++	 * ADV7123 datasheet (revision D, page 8) there is a timing diagram
++	 * making this clear. So consequently we need to latch the data
++	 * on the positive edge.
++	 */
++	.clk_edge_latch = DRM_BUS_FLAG_PIXDATA_POSEDGE,
++};
++
++static const struct vga_dac_info ti_ths_dac_variant = {
++	/*
++	 * The TI DACs read the data on the positive edge of the CLK,
++	 * so consequently we need to latch the data on the negative
++	 * edge.
++	 */
++	.clk_edge_latch = DRM_BUS_FLAG_PIXDATA_NEGEDGE,
++};
++
+ static const struct of_device_id dumb_vga_match[] = {
+-	{ .compatible = "dumb-vga-dac" },
+-	{ .compatible = "adi,adv7123" },
+-	{ .compatible = "ti,ths8135" },
++	{
++		.compatible = "dumb-vga-dac",
++		.data = &default_dac_variant,
++	},
++	{
++		.compatible = "adi,adv7123",
++		.data = &default_dac_variant,
++	},
++	{
++		/* Some trees contain just this compatible and no "ti,ths813x" */
++		.compatible = "ti,ths8135",
++		.data = &ti_ths_dac_variant,
++	},
++	{
++		.compatible = "ti,ths813x",
++		.data = &ti_ths_dac_variant,
++	},
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, dumb_vga_match);
+-- 
+2.13.6
