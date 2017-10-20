@@ -1,89 +1,272 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 Oct 2017 17:11:33 +0100
-Subject: [PATCH] ARM: compressed: discard ksym/kcrctab input section
-In-Reply-To: <CAKv+Gu_q0A+42ht1f4o_SToWSV4OBThV=gtyfBoGYFZyKWNW5Q@mail.gmail.com>
-References: <20170908153143.27279-1-ard.biesheuvel@linaro.org>
- <87d163kt0m.fsf@free-electrons.com>
- <CAKv+Gu_pGeDxK_vD9iGUO486VgLsntMQwVs9wGKa79pkx7paMQ@mail.gmail.com>
- <20171004124320.GP20805@n2100.armlinux.org.uk>
- <CAKv+Gu_t+oLJKGzy3LxgLZqqYsd9eQiwZRr6dgPbqpsHnQUUxw@mail.gmail.com>
- <874lr4d8gm.fsf@free-electrons.com>
- <20171012094517.GB20805@n2100.armlinux.org.uk>
- <CAKv+Gu_+D+d+5Zi8LRmi3_sHEVx-FLLKHsi9aUUmNB8VvcHANQ@mail.gmail.com>
- <878tg56dtn.fsf@free-electrons.com>
- <CAKv+Gu_q0A+42ht1f4o_SToWSV4OBThV=gtyfBoGYFZyKWNW5Q@mail.gmail.com>
-Message-ID: <20171020161133.GG20805@n2100.armlinux.org.uk>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Fri, 20 Oct 2017 17:25:19 +0100
+Subject: [PATCH 05/17] coresight: Add support for TMC ETR SG unit
+In-Reply-To: <20171019171553.24056-6-suzuki.poulose@arm.com>
+References: <20171019171553.24056-1-suzuki.poulose@arm.com>
+ <20171019171553.24056-6-suzuki.poulose@arm.com>
+Message-ID: <d365437e-3612-c3ef-59ad-f4048daf088e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 20, 2017 at 04:28:49PM +0100, Ard Biesheuvel wrote:
-> On 20 October 2017 at 16:25, Gregory CLEMENT
-> <gregory.clement@free-electrons.com> wrote:
-> > Hi Ard,
-> >
-> >  On jeu., oct. 12 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> >
-> >> On 12 October 2017 at 10:45, Russell King - ARM Linux
-> >> <linux@armlinux.org.uk> wrote:
-> >>> On Thu, Oct 12, 2017 at 11:24:57AM +0200, Gregory CLEMENT wrote:
-> >>>> Hi Ard,
-> >>>>
-> >>>> Can we move forward to fix the booting problem ?
-> >>>>
-> >>>> What about amending your commit log with this new information and then
-> >>>> submit it to Russell patch system?
-> >>>
-> >>> Well, I think there's a choice that needs to be made between this
-> >>> approach and Arnd's approach.
-> >>>
-> >>> I'm not all that thrilled with the need to add explicit alignment to
-> >>> data that is inherently a byte stream, and that invariably results in
-> >>> unaligned data words even if you do align the start of it.  That
-> >>> sounds to me very much like a hack rather than a proper solution.
-> >>> So, right now I'm leaning more towards Arnd's solution than Ard's
-> >>> from what's been said in this thread.
-> >>>
-> >>
-> >> I agree that the struct type unaligned accessors are the best choice
-> >> for ARM in any case, given that it will also prevent hitting the
-> >> alignment fixup handler in the kernel unnecessarily.
-> >>
-> >>> However, I don't recall Arnd's patch, it's probably buried deep in
-> >>> my mailbox.
-> >>>
-> >>
-> >> Well, unless you are considering changing the unaligned accessors from
-> >> access_ok.h to le_struct.h as a bugfix, I think we need both patches.
-> >
-> > We will soon reach v4.14-rc6 and the Armada XP and Armada 370 still not
-> > boot. I also didn't see your patch in rmk patch system.
-> >
-> > Waiting for you find a agreement an other option is to remove CONFIG_EFI
-> > from multi_v7_defconfig as I don't really see any armv7 base board using
-> > EFI.
-> >
+Hi Suzuki,
+
+On 19/10/17 18:15, Suzuki K Poulose wrote:
+> This patch adds support for setting up an SG table used by the
+> TMC ETR inbuilt SG unit. The TMC ETR uses 4K page sized tables
+> to hold pointers to the 4K data pages with the last entry in a
+> table pointing to the next table with the entries, by kind of
+> chaining. The 2 LSBs determine the type of the table entry, to
+> one of :
 > 
-> It is up to Russell to decide how he wants to proceed. Russell?
+>   Normal - Points to a 4KB data page.
+>   Last   - Points to a 4KB data page, but is the last entry in the
+>            page table.
+>   Link   - Points to another 4KB table page with pointers to data.
+> 
+> The code takes care of handling the system page size which could
+> be different than 4K. So we could end up putting multiple ETR
+> SG tables in a single system page, vice versa for the data pages.
+> 
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>   drivers/hwtracing/coresight/coresight-tmc-etr.c | 256 ++++++++++++++++++++++++
+>   1 file changed, 256 insertions(+)
+> 
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> index 4b9e2b276122..4424eb67a54c 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> @@ -21,6 +21,89 @@
+>   #include "coresight-tmc.h"
+>   
+>   /*
+> + * The TMC ETR SG has a page size of 4K. The SG table contains pointers
+> + * to 4KB buffers. However, the OS may be use PAGE_SIZE different from
 
-Well, having failed to attract Arnd's attention, I've spent 20 minutes
-searching my mailbox to find it.
+nit:
+"the OS may use a PAGE_SIZE different from".
 
-It turns out that there was never a proper patch from Arnd - it was a
-patch in pastebin.  It's not ARM specific either, it's an asm-generic
-change, for which Arnd is the maintainer for.
+> + * 4K (i.e, 16KB or 64KB). This implies that a single OS page could
+> + * contain more than one SG buffer and tables.
+> + *
+> + * A table entry has the following format:
+> + *
+> + * ---Bit31------------Bit4-------Bit1-----Bit0--
+> + * |     Address[39:12]    | SBZ |  Entry Type  |
+> + * ----------------------------------------------
+> + *
+> + * Address: Bits [39:12] of a physical page address. Bits [11:0] are
+> + *	    always zero.
+> + *
+> + * Entry type:
+> + *	b00 - Reserved.
+> + *	b01 - Last entry in the tables, points to 4K page buffer.
+> + *	b10 - Normal entry, points to 4K page buffer.
+> + *	b11 - Link. The address points to the base of next table.
+> + */
+> +
+> +typedef u32 sgte_t;
+> +
+> +#define ETR_SG_PAGE_SHIFT		12
+> +#define ETR_SG_PAGE_SIZE		(1UL << ETR_SG_PAGE_SHIFT)
+> +#define ETR_SG_PAGES_PER_SYSPAGE	(1UL << \
+> +					 (PAGE_SHIFT - ETR_SG_PAGE_SHIFT))
 
-I've just replied to that old thread and I've included Gregory and some
-PXA folk who are also having alignment problems in the decompressor.  It
-could all be due to this same issue.
+I think this would be slightly easier to understand if defined as:
+"(PAGE_SIZE / ETR_SG_PAGE_SIZE)".
 
-There's also one additional factor that hasn't been considered, and I'm
-scared to point it out, but:
+> +#define ETR_SG_PTRS_PER_PAGE		(ETR_SG_PAGE_SIZE / sizeof(sgte_t))
+> +#define ETR_SG_PTRS_PER_SYSPAGE		(PAGE_SIZE / sizeof(sgte_t))
+> +
+> +#define ETR_SG_ET_MASK			0x3
+> +#define ETR_SG_ET_LAST			0x1
+> +#define ETR_SG_ET_NORMAL		0x2
+> +#define ETR_SG_ET_LINK			0x3
+> +
+> +#define ETR_SG_ADDR_SHIFT		4
+> +
+> +#define ETR_SG_ENTRY(addr, type) \
+> +	(sgte_t)((((addr) >> ETR_SG_PAGE_SHIFT) << ETR_SG_ADDR_SHIFT) | \
+> +		 (type & ETR_SG_ET_MASK))
+> +
+> +#define ETR_SG_ADDR(entry) \
+> +	(((dma_addr_t)(entry) >> ETR_SG_ADDR_SHIFT) << ETR_SG_PAGE_SHIFT)
+> +#define ETR_SG_ET(entry)		((entry) & ETR_SG_ET_MASK)
+> +
+> +/*
+> + * struct etr_sg_table : ETR SG Table
+> + * @sg_table:		Generic SG Table holding the data/table pages.
+> + * @hwaddr:		hwaddress used by the TMC, which is the base
+> + *			address of the table.
+> + */
+> +struct etr_sg_table {
+> +	struct tmc_sg_table	*sg_table;
+> +	dma_addr_t		hwaddr;
+> +};
+> +
+> +/*
+> + * tmc_etr_sg_table_entries: Total number of table entries required to map
+> + * @nr_pages system pages.
+> + *
+> + * We need to map @nr_pages * ETR_SG_PAGES_PER_SYSPAGE data pages.
+> + * Each TMC page can map (ETR_SG_PTRS_PER_PAGE - 1) buffer pointers,
+> + * with the last entry pointing to the page containing the table
+> + * entries. If we spill over to a new page for mapping 1 entry,
+> + * we could as well replace the link entry of the previous page
+> + * with the last entry.
+> + */
+> +static inline unsigned long __attribute_const__
+> +tmc_etr_sg_table_entries(int nr_pages)
+> +{
+> +	unsigned long nr_sgpages = nr_pages * ETR_SG_PAGES_PER_SYSPAGE;
+> +	unsigned long nr_sglinks = nr_sgpages / (ETR_SG_PTRS_PER_PAGE - 1);
+> +	/*
+> +	 * If we spill over to a new page for 1 entry, we could as well
+> +	 * make it the LAST entry in the previous page, skipping the Link
+> +	 * address.
+> +	 */
+> +	if (nr_sglinks && (nr_sgpages % (ETR_SG_PTRS_PER_PAGE - 1) < 2))
+> +		nr_sglinks--;
+> +	return nr_sgpages + nr_sglinks;
+> +}
+> +
+> +/*
+>    * tmc_pages_get_offset:  Go through all the pages in the tmc_pages
+>    * and map @phys_addr to an offset within the buffer.
+>    */
+> @@ -307,6 +390,179 @@ ssize_t tmc_sg_table_get_data(struct tmc_sg_table *sg_table,
+>   	return len;
+>   }
+>   
+> +#ifdef ETR_SG_DEBUG
+> +/* Map a dma address to virtual address */
+> +static unsigned long
+> +tmc_sg_daddr_to_vaddr(struct tmc_sg_table *sg_table,
+> +			dma_addr_t addr, bool table)
+> +{
+> +	long offset;
+> +	unsigned long base;
+> +	struct tmc_pages *tmc_pages;
+> +
+> +	if (table) {
+> +		tmc_pages = &sg_table->table_pages;
+> +		base = (unsigned long)sg_table->table_vaddr;
+> +	} else {
+> +		tmc_pages = &sg_table->data_pages;
+> +		base = (unsigned long)sg_table->data_vaddr;
+> +	}
+> +
+> +	offset = tmc_pages_get_offset(tmc_pages, addr);
+> +	if (offset < 0)
+> +		return 0;
+> +	return base + offset;
+> +}
+> +
+> +/* Dump the given sg_table */
+> +static void tmc_etr_sg_table_dump(struct etr_sg_table *etr_table)
+> +{
+> +	sgte_t *ptr;
+> +	int i = 0;
+> +	dma_addr_t addr;
+> +	struct tmc_sg_table *sg_table = etr_table->sg_table;
+> +
+> +	ptr = (sgte_t *)tmc_sg_daddr_to_vaddr(sg_table,
+> +					      etr_table->hwaddr, true);
+> +	while (ptr) {
+> +		addr = ETR_SG_ADDR(*ptr);
+> +		switch (ETR_SG_ET(*ptr)) {
+> +		case ETR_SG_ET_NORMAL:
+> +			pr_debug("%05d: %p\t:[N] 0x%llx\n", i, ptr, addr);
+> +			ptr++;
+> +			break;
+> +		case ETR_SG_ET_LINK:
+> +			pr_debug("%05d: *** %p\t:{L} 0x%llx ***\n",
+> +				 i, ptr, addr);
+> +			ptr = (sgte_t *)tmc_sg_daddr_to_vaddr(sg_table,
+> +							      addr, true);
+> +			break;
+> +		case ETR_SG_ET_LAST:
+> +			pr_debug("%05d: ### %p\t:[L] 0x%llx ###\n",
+> +				 i, ptr, addr);
+> +			return;
 
-1. Does Arnd's patch fix the PXA problem as well?
+I get this is debug code, but it seems like if ETR_SG_ET(*ptr) is 0 we 
+get stuck in an infinite loop. I guess it is something that supposedly 
+doesn't happen, still I'd prefer having a default case saying the table 
+might be corrupted and either incrementing ptr to try and get more info 
+or breaking out of the loop.
 
-2. What is the performance impact of Arnd's fix?
+> +		}
+> +		i++;
+> +	}
+> +	pr_debug("******* End of Table *****\n");
+> +}
+> +#endif
+> +
+> +/*
+> + * Populate the SG Table page table entries from table/data
+> + * pages allocated. Each Data page has ETR_SG_PAGES_PER_SYSPAGE SG pages.
+> + * So does a Table page. So we keep track of indices of the tables
+> + * in each system page and move the pointers accordingly.
+> + */
+> +#define INC_IDX_ROUND(idx, size) (idx = (idx + 1) % size)
+
+Needs more parenthesis around idx and size.
+
+> +static void tmc_etr_sg_table_populate(struct etr_sg_table *etr_table)
+> +{
+> +	dma_addr_t paddr;
+> +	int i, type, nr_entries;
+> +	int tpidx = 0; /* index to the current system table_page */
+> +	int sgtidx = 0;	/* index to the sg_table within the current syspage */
+> +	int sgtoffset = 0; /* offset to the next entry within the sg_table */
+
+That's misleading, this seems to be the index of an entry within an 
+ETR_SG_PAGE rather than an offset in bytes.
+
+Maybe ptridx or entryidx would be a better name.
+
+> +	int dpidx = 0; /* index to the current system data_page */
+> +	int spidx = 0; /* index to the SG page within the current data page */
+> +	sgte_t *ptr; /* pointer to the table entry to fill */
+> +	struct tmc_sg_table *sg_table = etr_table->sg_table;
+> +	dma_addr_t *table_daddrs = sg_table->table_pages.daddrs;
+> +	dma_addr_t *data_daddrs = sg_table->data_pages.daddrs;
+> +
+> +	nr_entries = tmc_etr_sg_table_entries(sg_table->data_pages.nr_pages);
+> +	/*
+> +	 * Use the contiguous virtual address of the table to update entries.
+> +	 */
+> +	ptr = sg_table->table_vaddr;
+> +	/*
+> +	 * Fill all the entries, except the last entry to avoid special
+> +	 * checks within the loop.
+> +	 */
+> +	for (i = 0; i < nr_entries - 1; i++) {
+> +		if (sgtoffset == ETR_SG_PTRS_PER_PAGE - 1) {
+> +			/*
+> +			 * Last entry in a sg_table page is a link address to
+> +			 * the next table page. If this sg_table is the last
+> +			 * one in the system page, it links to the first
+> +			 * sg_table in the next system page. Otherwise, it
+> +			 * links to the next sg_table page within the system
+> +			 * page.
+> +			 */
+> +			if (sgtidx == ETR_SG_PAGES_PER_SYSPAGE - 1) {
+> +				paddr = table_daddrs[tpidx + 1];
+> +			} else {
+> +				paddr = table_daddrs[tpidx] +
+> +					(ETR_SG_PAGE_SIZE * (sgtidx + 1));
+> +			}
+> +			type = ETR_SG_ET_LINK;
+> +		} else {
+> +			/*
+> +			 * Update the idices to the data_pages to point to the
+
+nit: indices
+
+Cheers,
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Julien Thierry
