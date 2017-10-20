@@ -1,111 +1,31 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 20 Oct 2017 09:57:50 +0100
-Subject: [PATCH 1/2] arm/arm64: kvm: Move initialization completion message
-In-Reply-To: <1508427913-34619-2-git-send-email-julien.thierry@arm.com>
-References: <1508427913-34619-1-git-send-email-julien.thierry@arm.com>
- <1508427913-34619-2-git-send-email-julien.thierry@arm.com>
-Message-ID: <d677bf64-c6ac-51c1-0cb9-2b2e2b24bc02@arm.com>
+From: liwei213@huawei.com (Li Wei)
+Date: Fri, 20 Oct 2017 16:52:54 +0800
+Subject: [PATCH v5 0/5] scsi: ufs: add ufs driver code for Hisilicon Hi3660 SoC
+Message-ID: <20171020085259.8093-1-liwei213@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/10/17 16:45, Julien Thierry wrote:
-> KVM is being a bit too optimistic, Hyp mode is said to be initialized
-> when Hyp segments have only been mapped.
-> 
-> Notify KVM's successful initialization only once it is really fully
-> initialized.
-> 
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  virt/kvm/arm/arm.c | 31 ++++++++++++++-----------------
->  1 file changed, 14 insertions(+), 17 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> index b9f68e4..95cba07 100644
-> --- a/virt/kvm/arm/arm.c
-> +++ b/virt/kvm/arm/arm.c
-> @@ -1326,21 +1326,12 @@ static void teardown_hyp_mode(void)
->  {
->  	int cpu;
-> 
-> -	if (is_kernel_in_hyp_mode())
-> -		return;
-> -
->  	free_hyp_pgds();
->  	for_each_possible_cpu(cpu)
->  		free_page(per_cpu(kvm_arm_hyp_stack_page, cpu));
->  	hyp_cpu_pm_exit();
->  }
-> 
-> -static int init_vhe_mode(void)
-> -{
-> -	kvm_info("VHE mode initialized successfully\n");
-> -	return 0;
-> -}
-> -
->  /**
->   * Inits Hyp-mode on all online CPUs
->   */
-> @@ -1421,8 +1412,6 @@ static int init_hyp_mode(void)
->  		}
->  	}
-> 
-> -	kvm_info("Hyp mode initialized successfully\n");
-> -
->  	return 0;
-> 
->  out_err:
-> @@ -1456,6 +1445,7 @@ int kvm_arch_init(void *opaque)
->  {
->  	int err;
->  	int ret, cpu;
-> +	bool in_hyp_mode;
-> 
->  	if (!is_hyp_mode_available()) {
->  		kvm_err("HYP mode not available\n");
-> @@ -1474,21 +1464,28 @@ int kvm_arch_init(void *opaque)
->  	if (err)
->  		return err;
-> 
-> -	if (is_kernel_in_hyp_mode())
-> -		err = init_vhe_mode();
-> -	else
-> +	in_hyp_mode = is_kernel_in_hyp_mode();
-> +
-> +	if (!in_hyp_mode) {
->  		err = init_hyp_mode();
-> -	if (err)
-> -		goto out_err;
-> +		if (err)
-> +			goto out_err;
-> +	}
-> 
->  	err = init_subsystems();
->  	if (err)
->  		goto out_hyp;
-> 
-> +	if (in_hyp_mode)
-> +		kvm_info("VHE mode initialized successfully\n");
-> +	else
-> +		kvm_info("Hyp mode initialized successfully\n");
-> +
->  	return 0;
-> 
->  out_hyp:
-> -	teardown_hyp_mode();
-> +	if (!in_hyp_mode)
-> +		teardown_hyp_mode();
->  out_err:
->  	teardown_common_resources();
->  	return err;
-> --
-> 1.9.1
-> 
+This patchset adds driver support for UFS for Hi3660 SoC. It is verified on HiKey960 board.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Li Wei (5):
+  scsi: ufs: add Hisilicon ufs driver code
+  dt-bindings: scsi: ufs: add document for hisi-ufs
+  arm64: dts: add ufs dts node
+  arm64: defconfig: enable configs for Hisilicon ufs
+  arm64: defconfig: enable f2fs and squashfs
 
-	M.
+ Documentation/devicetree/bindings/ufs/ufs-hisi.txt |  46 ++
+ arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts  |   5 +
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi          |  19 +
+ arch/arm64/configs/defconfig                       |  11 +
+ drivers/scsi/ufs/Kconfig                           |   9 +
+ drivers/scsi/ufs/Makefile                          |   1 +
+ drivers/scsi/ufs/ufs-hisi.c                        | 625 +++++++++++++++++++++
+ drivers/scsi/ufs/ufs-hisi.h                        | 161 ++++++
+ 8 files changed, 877 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/ufs/ufs-hisi.txt
+ create mode 100644 drivers/scsi/ufs/ufs-hisi.c
+ create mode 100644 drivers/scsi/ufs/ufs-hisi.h
+
 -- 
-Jazz is not dead. It just smells funny...
+2.11.0
