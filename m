@@ -1,128 +1,127 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Oct 2017 23:29:00 +0200
-Subject: [GIT PULL] ARM: SoC fixes for 4.14
-Message-ID: <CAK8P3a06kKXafxcxLCQRCBSt1tMvgkXuBafKoPD=Qvt0r=v8qQ@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 20 Oct 2017 16:39:21 -0500
+Subject: [PATCH 2/9] PCI: host: brcmstb: add DT docs for Brcmstb PCIe
+ device
+In-Reply-To: <20171020172701.GA105780@google.com>
+References: <1507761269-7017-1-git-send-email-jim2101024@gmail.com>
+ <1507761269-7017-3-git-send-email-jim2101024@gmail.com>
+ <20171017202418.ykve2o4zvuwxjdgj@rob-hp-laptop>
+ <CANCKTBt_gUF8qAEuhS1336Uce+WdP_98ApZhv1sxZgJsWGoiGQ@mail.gmail.com>
+ <CAL_JsqLoqB0GF201ofJrjdYH8B-Ca=hGBtE4=VcrBxS7M52mVQ@mail.gmail.com>
+ <9fae640f-a9da-90bf-01d2-c62131611ef9@gmail.com>
+ <20171020172701.GA105780@google.com>
+Message-ID: <CAL_JsqK6qUPJpQUTxuOE9eMP+4C9MpVn94dw-yqiSp8TL0ymBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 8a5776a5f49812d29fe4b2d0a2d71675c3facf3f:
+On Fri, Oct 20, 2017 at 12:27 PM, Brian Norris
+<computersforpeace@gmail.com> wrote:
+> Hi,
+>
+> On Thu, Oct 19, 2017 at 02:58:55PM -0700, Florian Fainelli wrote:
+>> On 10/19/2017 02:49 PM, Rob Herring wrote:
+>> > On Tue, Oct 17, 2017 at 5:42 PM, Jim Quinlan <jim2101024@gmail.com> wrote:
+>> >> On Tue, Oct 17, 2017 at 4:24 PM, Rob Herring <robh@kernel.org> wrote:
+>> >>> This is not the regulator binding. Use the standard binding.
+>> >>>
+>> >> The reason we do it this way is because the PCIe controller does not
+>> >> know or care what the names of the supplies are, or how many there
+>> >> will be.  The list of regulators can be different for each board we
+>> >> support, as these regulators turn on/off the downstream EP device.
+>> >> All the PCIe controller does is turn on/off this list of regulators
+>> >> when booting,resuming/suspending.
+>> >>
+>> >> An alternative would have the node specifying the standard properties
+>> >>
+>> >> xyz-supply = <&xyz_reg>;
+>> >> abc-supply = <&abc_reg>;
+>> >> pdq-supply = <&pdq_reg>;
+>> >> ...
+>> >>
+>> >> and then have this driver search all of the properties in the PCIe
+>> >> node for names matching /-supply$/, and then create a list of phandles
+>> >> from that.  Is that what you would like?
+>> >
+>> > Really, you should have child nodes of the PCIe devices and have the
+>> > supplies in there.
+>>
+>> While that would be technically more correct this poses a number of issues:
+>>
+>> - there is precedence in that area, and you already Acked binding
+>> documents proposing the same thing:
+>>       * Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt (commit
+>> c26ebe98a103479dae9284fe0a86a95af4a5cd46)
+>>       * Documentation/devicetree/bindings/pci/rockchip-pcie.txt (commit
+>> 828bdcfbdb98eeb97facb05fe6c96ba0aed65c4a and before)
+>
+> I can actually speak to the Rockchip binding a bit :)
+>
+> It actually has a mixture of true controller regulators (e.g., the 1.8V
+> and 0.9V regulators power analog portions of the SoC's PCIe logic) and
+> controls for the PCIe endpoints (e.g., 12V). Additionally, some of these
+> have been misused to represent a little of both, since the regulator
+> framework is actually quite flexible ;)
+>
+> That may or may not help, but they are at least partially correct.
+>
+> The Freescale one does look like it's plainly *not* about the root
+> controller.
 
-  Linux 4.14-rc4 (2017-10-08 20:53:29 -0700)
+Maybe not. I don't find that to be obvious reading the binding.
 
-are available in the git repository at:
+> Also, those rails *are* all fairly well defined by the various PCIe
+> electromechanical specifications, so isn't it reasonable to expect that
+> a controller can optionally control power for 1 of each of the standard
+> power types?
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
-tags/armsoc-fixes
+That seems okay. The MMC binding is done that way.
 
-for you to fetch changes up to 6bf99a6cb69f78de0083b76a7c033918f853f580:
+I never said you can't just put things in the host node. That's just
+not an ideal match to the h/w and there's a limit to what makes sense.
 
-  Merge tag 'sunxi-fixes-for-4.14' of
-https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux into fixes
-(2017-10-20 22:24:48 +0200)
+> Or do we really want to represent the flexibility that
+> there can be up to N of each type for N endpoints?
 
-----------------------------------------------------------------
-ARM: SoC fixes for 4.14
+No, then you need to describe the topology.
 
-Here is another set of bugfixes for ARM SoCs, mostly harmless:
+> As a side note: it's also been pretty tough to get the power sequencing
+> requirements represented correctly for some PCIe endpoints. I've tried
+> to make use of this previously, but the series took so long (>1 year and
+> counting!) my team lost interest:
+>
+> [PATCH v16 2/7] power: add power sequence library
+> https://www.spinics.net/lists/linux-usb/msg158452.html
+>
+> It doesn't really solve all of this problem, but it could be worth
+> looking at.
+>
+>> (which may indicate those should also be corrected, at the possible
+>> expense of creating incompatibilities)
+>
+> If a better way is developed, we can always augment the bindings. The
+> current bindings aren't that hard to maintain as "deprecated backups."
+>
+>> - there is a chicken and egg problem, you can't detect the EP without
+>> turning its regulator on, and if you can't create a pci_device, you
+>> certainly won't be able to associate it with an device_node counterpart
+>
+> That's definitely a major problem driving some of the current bindings.
+> We're just not set up to walk the child devices if we can't probe them.
 
- - A boot regression fix on ux500
- - PCIe interrupts on NXP i.MX7 and on Marvell Armada 7K/8K were
-   wired up wrong, in different ways
- - Armada XP support for large memory never worked
- - The socfpga reset controller now builds on 64-bit
- - minor device tree corrections on gemini, mvebu, r-pi 3,
-   rockchip and at91
+It's common to all the probeable buses that still need DT additions.
 
-----------------------------------------------------------------
-Andrey Smirnov (1):
-      ARM: dts: imx7d: Invert legacy PCI irq mapping
+>> - PCIe being dynamic by nature, can you have "wildcard" PCIE EP DT node
+>> that would be guaranteed to match any physically attached PCIE EP which
+>> is discovered by the PCI bus layer (and then back to issue #2)
+>
+> Technically, you *can* walk the DT (i.e., 'device_node's) without having
+> pci_dev's for each yet. Something like of_pci_find_child_device() would
+> do it. But that still seems kind of wonky, and it's currently neither
+> precise enough nor flexible enough for this, I don't think.
 
-Arnd Bergmann (9):
-      arm64: dts: rockchip: fix typo in iommu nodes
-      Merge tag 'arm-soc/for-4.14/devicetree-fixes' of
-http://github.com/Broadcom/stblinux into fixes
-      Merge tag 'at91-fixes2' of
-git://git.kernel.org/.../nferre/linux-at91 into fixes
-      Merge tag 'mvebu-fixes-4.14-2' of
-git://git.infradead.org/linux-mvebu into fixes
-      Merge tag 'imx-fixes-4.14' of
-git://git.kernel.org/.../shawnguo/linux into fixes
-      Merge tag 'v4.14-rockchip-dts64fixes-2' of
-git://git.kernel.org/.../mmind/linux-rockchip into fixes
-      Merge tag 'reset-fixes-for-4.14-2' of
-git://git.pengutronix.de/git/pza/linux into fixes
-      Merge tag 'renesas-fixes-for-v4.14' of
-https://git.kernel.org/.../horms/renesas into fixes
-      Merge tag 'sunxi-fixes-for-4.14' of
-https://git.kernel.org/.../sunxi/linux into fixes
+That's essentially what the generic power seq stuff tries to do. I
+said early on we need some sort of pre-probe hook for drivers. Trying
+to handle things generically only gets you so far. There will always
+be that special case that needs specific handling.
 
-Chen-Yu Tsai (1):
-      ARM: dts: sun6i: Fix endpoint IDs in second display pipeline
-
-Dinh Nguyen (1):
-      reset: socfpga: fix for 64-bit compilation
-
-Eugen Hristev (2):
-      ARM: dts: at91: sama5d2_xplained: enable ADTRG pin
-      ARM: dts: at91: sama5d2: add ADC hw trigger edge type
-
-Florian Fainelli (1):
-      Merge tag 'bcm2835-dt-fixes-2017-10-06' into devicetree/fixes
-
-Jagan Teki (1):
-      arm64: allwinner: a64: pine64: Use dcdc1 regulator for mmc0
-
-Jan Luebbe (1):
-      bus: mbus: fix window size calculation for 4GB windows
-
-Kalyan Kinthada (1):
-      ARM: dts: Fix I2C repeated start issue on Armada-38x
-
-Linus Walleij (1):
-      ARM: dts: fix PCLK name on Gemini and MOXA ART
-
-Loic Poulain (1):
-      ARM: dts: bcm283x: Fix console path on RPi3
-
-Ludovic Desroches (1):
-      ARM: dts: at91: at91-sama5d27_som1: fix PHY ID
-
-Shawn Lin (1):
-      arm64: dts: rockchip: correct vqmmc voltage for rk3399 platforms
-
-Thomas Petazzoni (1):
-      arm64: dts: marvell: fix interrupt-map property for Armada CP110
-PCIe controller
-
-Ulf Hansson (1):
-      ARM: ux500: Fix regression while init PM domains
-
-Ulrich Hecht (1):
-      arm64: dts: salvator-common: add 12V regulator to backlight
-
- arch/arm/boot/dts/armada-38x.dtsi                    |  4 ++--
- arch/arm/boot/dts/at91-sama5d27_som1.dtsi            |  4 ++--
- arch/arm/boot/dts/at91-sama5d2_xplained.dts          | 16 +++++++++++++++-
- arch/arm/boot/dts/bcm2835-rpi-zero-w.dts             |  9 +++------
- arch/arm/boot/dts/bcm2837-rpi-3-b.dts                |  5 +++++
- arch/arm/boot/dts/bcm283x.dtsi                       |  7 ++++++-
- arch/arm/boot/dts/gemini.dtsi                        |  3 ++-
- arch/arm/boot/dts/imx7d.dtsi                         |  8 ++++----
- arch/arm/boot/dts/moxart.dtsi                        |  3 ++-
- arch/arm/boot/dts/sama5d2.dtsi                       |  1 +
- arch/arm/boot/dts/sun6i-a31.dtsi                     | 16 ++++++++--------
- arch/arm/mach-ux500/cpu-db8500.c                     |  4 ++++
- arch/arm/mach-ux500/pm.c                             |  4 ----
- arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts  |  9 +--------
- arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi |  6 +++---
- arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  |  6 +++---
- arch/arm64/boot/dts/renesas/salvator-common.dtsi     | 10 ++++++++++
- arch/arm64/boot/dts/rockchip/rk3328.dtsi             |  2 +-
- arch/arm64/boot/dts/rockchip/rk3368.dtsi             |  2 +-
- arch/arm64/boot/dts/rockchip/rk3399-firefly.dts      |  4 ++--
- arch/arm64/boot/dts/rockchip/rk3399-puma.dtsi        |  4 ++--
- arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi    |  4 ++--
- drivers/bus/mvebu-mbus.c                             |  2 +-
- drivers/reset/reset-socfpga.c                        | 17 ++++++++++-------
- include/linux/mbus.h                                 |  4 ++--
- 25 files changed, 92 insertions(+), 62 deletions(-)
+Rob
