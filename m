@@ -1,10 +1,10 @@
 From: elena.reshetova@intel.com (Elena Reshetova)
-Date: Fri, 20 Oct 2017 10:23:35 +0300
-Subject: [PATCH 01/15] drivers, net,
- ethernet: convert clip_entry.refcnt from atomic_t to refcount_t
+Date: Fri, 20 Oct 2017 10:23:37 +0300
+Subject: [PATCH 03/15] drivers, net,
+ mlx4: convert mlx4_cq.refcount from atomic_t to refcount_t
 In-Reply-To: <1508484229-19706-1-git-send-email-elena.reshetova@intel.com>
 References: <1508484229-19706-1-git-send-email-elena.reshetova@intel.com>
-Message-ID: <1508484229-19706-2-git-send-email-elena.reshetova@intel.com>
+Message-ID: <1508484229-19706-4-git-send-email-elena.reshetova@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -22,7 +22,7 @@ refcount_t type and API that prevents accidental counter overflows
 and underflows. This is important since overflows and underflows
 can lead to use-after-free situation and be exploitable.
 
-The variable clip_entry.refcnt is used as pure reference counter.
+The variable mlx4_cq.refcount is used as pure reference counter.
 Convert it to refcount_t and fix up the operations.
 
 Suggested-by: Kees Cook <keescook@chromium.org>
@@ -30,78 +30,71 @@ Reviewed-by: David Windsor <dwindsor@gmail.com>
 Reviewed-by: Hans Liljestrand <ishkamiel@gmail.com>
 Signed-off-by: Elena Reshetova <elena.reshetova@intel.com>
 ---
- drivers/net/ethernet/chelsio/cxgb4/clip_tbl.c | 13 ++++++-------
- drivers/net/ethernet/chelsio/cxgb4/clip_tbl.h |  4 +++-
- 2 files changed, 9 insertions(+), 8 deletions(-)
+ drivers/net/ethernet/mellanox/mlx4/cq.c | 8 ++++----
+ include/linux/mlx4/device.h             | 4 ++--
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/net/ethernet/chelsio/cxgb4/clip_tbl.c b/drivers/net/ethernet/chelsio/cxgb4/clip_tbl.c
-index 3103ef9..2900390 100644
---- a/drivers/net/ethernet/chelsio/cxgb4/clip_tbl.c
-+++ b/drivers/net/ethernet/chelsio/cxgb4/clip_tbl.c
-@@ -96,7 +96,8 @@ int cxgb4_clip_get(const struct net_device *dev, const u32 *lip, u8 v6)
- 		if (!ret) {
- 			ce = cte;
- 			read_unlock_bh(&ctbl->lock);
--			goto found;
-+			refcount_inc(&ce->refcnt);
-+			return 0;
- 		}
- 	}
- 	read_unlock_bh(&ctbl->lock);
-@@ -108,7 +109,7 @@ int cxgb4_clip_get(const struct net_device *dev, const u32 *lip, u8 v6)
- 		list_del(&ce->list);
- 		INIT_LIST_HEAD(&ce->list);
- 		spin_lock_init(&ce->lock);
--		atomic_set(&ce->refcnt, 0);
-+		refcount_set(&ce->refcnt, 0);
- 		atomic_dec(&ctbl->nfree);
- 		list_add_tail(&ce->list, &ctbl->hash_list[hash]);
- 		if (v6) {
-@@ -138,9 +139,7 @@ int cxgb4_clip_get(const struct net_device *dev, const u32 *lip, u8 v6)
- 		return -ENOMEM;
- 	}
- 	write_unlock_bh(&ctbl->lock);
--found:
--	atomic_inc(&ce->refcnt);
--
-+	refcount_set(&ce->refcnt, 1);
- 	return 0;
- }
- EXPORT_SYMBOL(cxgb4_clip_get);
-@@ -179,7 +178,7 @@ void cxgb4_clip_release(const struct net_device *dev, const u32 *lip, u8 v6)
- found:
- 	write_lock_bh(&ctbl->lock);
- 	spin_lock_bh(&ce->lock);
--	if (atomic_dec_and_test(&ce->refcnt)) {
-+	if (refcount_dec_and_test(&ce->refcnt)) {
- 		list_del(&ce->list);
- 		INIT_LIST_HEAD(&ce->list);
- 		list_add_tail(&ce->list, &ctbl->ce_free_head);
-@@ -266,7 +265,7 @@ int clip_tbl_show(struct seq_file *seq, void *v)
- 			ip[0] = '\0';
- 			sprintf(ip, "%pISc", &ce->addr);
- 			seq_printf(seq, "%-25s   %u\n", ip,
--				   atomic_read(&ce->refcnt));
-+				   refcount_read(&ce->refcnt));
- 		}
- 	}
- 	seq_printf(seq, "Free clip entries : %d\n", atomic_read(&ctbl->nfree));
-diff --git a/drivers/net/ethernet/chelsio/cxgb4/clip_tbl.h b/drivers/net/ethernet/chelsio/cxgb4/clip_tbl.h
-index 35eb43c..a0e0ae1 100644
---- a/drivers/net/ethernet/chelsio/cxgb4/clip_tbl.h
-+++ b/drivers/net/ethernet/chelsio/cxgb4/clip_tbl.h
-@@ -10,9 +10,11 @@
-  *  release for licensing terms and conditions.
-  */
+diff --git a/drivers/net/ethernet/mellanox/mlx4/cq.c b/drivers/net/ethernet/mellanox/mlx4/cq.c
+index 72eb50c..d8e9a32 100644
+--- a/drivers/net/ethernet/mellanox/mlx4/cq.c
++++ b/drivers/net/ethernet/mellanox/mlx4/cq.c
+@@ -69,7 +69,7 @@ void mlx4_cq_tasklet_cb(unsigned long data)
+ 	list_for_each_entry_safe(mcq, temp, &ctx->process_list, tasklet_ctx.list) {
+ 		list_del_init(&mcq->tasklet_ctx.list);
+ 		mcq->tasklet_ctx.comp(mcq);
+-		if (atomic_dec_and_test(&mcq->refcount))
++		if (refcount_dec_and_test(&mcq->refcount))
+ 			complete(&mcq->free);
+ 		if (time_after(jiffies, end))
+ 			break;
+@@ -92,7 +92,7 @@ static void mlx4_add_cq_to_tasklet(struct mlx4_cq *cq)
+ 	 * still arrive.
+ 	 */
+ 	if (list_empty_careful(&cq->tasklet_ctx.list)) {
+-		atomic_inc(&cq->refcount);
++		refcount_inc(&cq->refcount);
+ 		kick = list_empty(&tasklet_ctx->list);
+ 		list_add_tail(&cq->tasklet_ctx.list, &tasklet_ctx->list);
+ 		if (kick)
+@@ -344,7 +344,7 @@ int mlx4_cq_alloc(struct mlx4_dev *dev, int nent,
+ 	cq->cons_index = 0;
+ 	cq->arm_sn     = 1;
+ 	cq->uar        = uar;
+-	atomic_set(&cq->refcount, 1);
++	refcount_set(&cq->refcount, 1);
+ 	init_completion(&cq->free);
+ 	cq->comp = mlx4_add_cq_to_tasklet;
+ 	cq->tasklet_ctx.priv =
+@@ -386,7 +386,7 @@ void mlx4_cq_free(struct mlx4_dev *dev, struct mlx4_cq *cq)
+ 	    priv->eq_table.eq[MLX4_EQ_ASYNC].irq)
+ 		synchronize_irq(priv->eq_table.eq[MLX4_EQ_ASYNC].irq);
  
+-	if (atomic_dec_and_test(&cq->refcount))
++	if (refcount_dec_and_test(&cq->refcount))
+ 		complete(&cq->free);
+ 	wait_for_completion(&cq->free);
+ 
+diff --git a/include/linux/mlx4/device.h b/include/linux/mlx4/device.h
+index b0a57e0..daac2e3 100644
+--- a/include/linux/mlx4/device.h
++++ b/include/linux/mlx4/device.h
+@@ -40,7 +40,7 @@
+ #include <linux/cpu_rmap.h>
+ #include <linux/crash_dump.h>
+ 
+-#include <linux/atomic.h>
 +#include <linux/refcount.h>
-+
- struct clip_entry {
- 	spinlock_t lock;	/* Hold while modifying clip reference */
--	atomic_t refcnt;
-+	refcount_t refcnt;
- 	struct list_head list;
- 	union {
- 		struct sockaddr_in addr;
+ 
+ #include <linux/timecounter.h>
+ 
+@@ -751,7 +751,7 @@ struct mlx4_cq {
+ 	int			cqn;
+ 	unsigned		vector;
+ 
+-	atomic_t		refcount;
++	refcount_t		refcount;
+ 	struct completion	free;
+ 	struct {
+ 		struct list_head list;
 -- 
 2.7.4
