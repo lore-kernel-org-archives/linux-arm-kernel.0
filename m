@@ -1,47 +1,64 @@
-From: jim2101024@gmail.com (Jim Quinlan)
-Date: Fri, 20 Oct 2017 11:27:41 -0400
-Subject: [PATCH 5/9] PCI: host: brcmstb: add dma-ranges for inbound traffic
-In-Reply-To: <20171020145752.GA4694@lst.de>
-References: <1507761269-7017-6-git-send-email-jim2101024@gmail.com>
- <589c04cb-061b-a453-3188-79324a02388e@arm.com> <20171017081422.GA19475@lst.de>
- <CANCKTBsCB+x2XgrND9AhRtxPkCXfps1nA+YymkZjKHOUZfjSHQ@mail.gmail.com>
- <20171018065316.GA11183@lst.de>
- <CANCKTBv+yiCNsrnx3m+W9wPqC4NdKPZ2p=zLtSa8fX6v1rPcYQ@mail.gmail.com>
- <20171019091644.GA14983@lst.de>
- <CANCKTBuaTD29My77QfOeUmtZfLAmmJXUYe6QvBW+uoH2Kb+tAQ@mail.gmail.com>
- <20171020073730.GA12937@lst.de>
- <CANCKTBsRRkwNMrxWjtgxbyZqT6NOxPX0NHDbnEO2BMjj8oVtpg@mail.gmail.com>
- <20171020145752.GA4694@lst.de>
-Message-ID: <CANCKTBtxp9gSdndKAZ7xGA+VozQsn2PX_-9P8A22_5Matbb7-w@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 20 Oct 2017 16:28:49 +0100
+Subject: [PATCH] ARM: compressed: discard ksym/kcrctab input section
+In-Reply-To: <878tg56dtn.fsf@free-electrons.com>
+References: <20170908153143.27279-1-ard.biesheuvel@linaro.org>
+ <87d163kt0m.fsf@free-electrons.com>
+ <CAKv+Gu_pGeDxK_vD9iGUO486VgLsntMQwVs9wGKa79pkx7paMQ@mail.gmail.com>
+ <20171004124320.GP20805@n2100.armlinux.org.uk>
+ <CAKv+Gu_t+oLJKGzy3LxgLZqqYsd9eQiwZRr6dgPbqpsHnQUUxw@mail.gmail.com>
+ <874lr4d8gm.fsf@free-electrons.com>
+ <20171012094517.GB20805@n2100.armlinux.org.uk>
+ <CAKv+Gu_+D+d+5Zi8LRmi3_sHEVx-FLLKHsi9aUUmNB8VvcHANQ@mail.gmail.com>
+ <878tg56dtn.fsf@free-electrons.com>
+Message-ID: <CAKv+Gu_q0A+42ht1f4o_SToWSV4OBThV=gtyfBoGYFZyKWNW5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 20, 2017 at 10:57 AM, Christoph Hellwig <hch@lst.de> wrote:
-> On Fri, Oct 20, 2017 at 10:41:56AM -0400, Jim Quinlan wrote:
->> I am not sure I understand your comment -- the size of the request
->> shouldn't be a factor.  Let's look at your example of the DMA request
->> of 3fffff00 to 4000000f (physical memory).  Lets say it is for 15
->> pages.  If we block out  the last page [0x3ffff000..0x3fffffff] from
->> what is available, there is no 15 page span that can happen across the
->> 0x40000000 boundary.  For SG, there can be no merge that connects a
->> page from one region to another region.  Can you give an example of
->> the scenario you are thinking of?
+On 20 October 2017 at 16:25, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> Hi Ard,
 >
-> What prevents a merge from say the regions of
-> 0....3fffffff and 40000000....7fffffff?
+>  On jeu., oct. 12 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>
+>> On 12 October 2017 at 10:45, Russell King - ARM Linux
+>> <linux@armlinux.org.uk> wrote:
+>>> On Thu, Oct 12, 2017 at 11:24:57AM +0200, Gregory CLEMENT wrote:
+>>>> Hi Ard,
+>>>>
+>>>> Can we move forward to fix the booting problem ?
+>>>>
+>>>> What about amending your commit log with this new information and then
+>>>> submit it to Russell patch system?
+>>>
+>>> Well, I think there's a choice that needs to be made between this
+>>> approach and Arnd's approach.
+>>>
+>>> I'm not all that thrilled with the need to add explicit alignment to
+>>> data that is inherently a byte stream, and that invariably results in
+>>> unaligned data words even if you do align the start of it.  That
+>>> sounds to me very much like a hack rather than a proper solution.
+>>> So, right now I'm leaning more towards Arnd's solution than Ard's
+>>> from what's been said in this thread.
+>>>
+>>
+>> I agree that the struct type unaligned accessors are the best choice
+>> for ARM in any case, given that it will also prevent hitting the
+>> alignment fixup handler in the kernel unnecessarily.
+>>
+>>> However, I don't recall Arnd's patch, it's probably buried deep in
+>>> my mailbox.
+>>>
+>>
+>> Well, unless you are considering changing the unaligned accessors from
+>> access_ok.h to le_struct.h as a bugfix, I think we need both patches.
+>
+> We will soon reach v4.14-rc6 and the Armada XP and Armada 370 still not
+> boot. I also didn't see your patch in rmk patch system.
+>
+> Waiting for you find a agreement an other option is to remove CONFIG_EFI
+> from multi_v7_defconfig as I don't really see any armv7 base board using
+> EFI.
+>
 
-Huh? [0x3ffff000...x3ffffff] is not available to be used. Drawing from
-the original example, we now have to tell Linux that these are now our
-effective memory regions:
-
-      memc0-a@[        0....3fffefff] <=> pci@[        0....3fffefff]
-      memc0-b@[100000000...13fffefff] <=> pci@[ 40000000....7fffefff]
-      memc1-a@[ 40000000....7fffefff] <=> pci@[ 80000000....bfffefff]
-      memc1-b@[300000000...33fffefff] <=> pci@[ c0000000....ffffefff]
-      memc2-a@[ 80000000....bfffefff] <=> pci@[100000000...13fffefff]
-      memc2-b@[c00000000...c3fffffff] <=> pci@[140000000...17fffffff]
-
-This leaves a one-page gap between phsyical memory regions which would
-normally be contiguous. One cannot have a dma alloc that spans any two
-regions.  This is a drastic step, but I don't see an alternative.
-Perhaps  I may be missing what you are saying...
+It is up to Russell to decide how he wants to proceed. Russell?
