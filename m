@@ -1,105 +1,85 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 20 Oct 2017 18:00:06 +0200
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.15 (#1)
-In-Reply-To: <877evp6dir.fsf@free-electrons.com> (Gregory CLEMENT's message of
- "Fri, 20 Oct 2017 17:32:28 +0200")
-References: <877evp6dir.fsf@free-electrons.com>
-Message-ID: <87376d6c8p.fsf@free-electrons.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 20 Oct 2017 17:05:10 +0100
+Subject: HAVE_EFFICIENT_UNALIGNED_ACCESS on ARM32 (was: Alignment issues
+ in zImage with Linux 4.12, LZ4 and GCC5.3)
+In-Reply-To: <CAK8P3a2XjZ6ZfHVu8gbAQ2ncj+GTR30Zj6oKUG8CTH4iswOnTw@mail.gmail.com>
+References: <CAGkQfmOKqFWisiRjkCHBHDwgY5A0HA_+hcLYSeDYaoGQ6CVu6Q@mail.gmail.com>
+ <CAK8P3a3AQ43t2q1MVN9PoqQXZiuXQo1uDcGnRAPCiT66_oDyLg@mail.gmail.com>
+ <CAKv+Gu_6kxidH-4YwuCorJx25WSZDsOdtbZ6MZCv+R4ufzUjrw@mail.gmail.com>
+ <CAK8P3a1xX5RfM1kao7WZBmS=0J=MgNZTH2_c-nSOY+GNmjNsUA@mail.gmail.com>
+ <CAKv+Gu_UO_Td2kkN-2k1LzTWJGXO8vZaZdQkN-xnqsK=K5T20g@mail.gmail.com>
+ <CAK8P3a0ECzB5ahbdmgM7=1NGkOaEc+wzr_EHbuQJij0+nygbLQ@mail.gmail.com>
+ <CAKv+Gu8by5B52L=xD5to2dP1hzVkc9e5p+SwWU5mumdf3VkZnQ@mail.gmail.com>
+ <CAK8P3a2XjZ6ZfHVu8gbAQ2ncj+GTR30Zj6oKUG8CTH4iswOnTw@mail.gmail.com>
+Message-ID: <20171020160509.GF20805@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Sep 08, 2017 at 10:06:28PM +0200, Arnd Bergmann wrote:
+> On Thu, Sep 7, 2017 at 1:31 AM, Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+> > On 7 September 2017 at 00:18, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> On Thu, Sep 7, 2017 at 12:48 AM, Ard Biesheuvel
+> 
+> >> I see lots of unaligned helpers in the lz4 code, is this not what
+> >> we hit?
+> >>
+> >> $ git grep unaligned lib/
+> >> lib/lz4/lz4_compress.c:#include <asm/unaligned.h>
+> >> lib/lz4/lz4_decompress.c:#include <asm/unaligned.h>
+> >> lib/lz4/lz4defs.h:#include <asm/unaligned.h>
+> >> lib/lz4/lz4defs.h:      return get_unaligned((const U16 *)ptr);
+> >> lib/lz4/lz4defs.h:      return get_unaligned((const U32 *)ptr);
+> >> lib/lz4/lz4defs.h:      return get_unaligned((const size_t *)ptr);
+> >> lib/lz4/lz4defs.h:      put_unaligned(value, (U16 *)memPtr);
+> >>
+> >
+> > Yes, you are right. The code I looked at before does cast a char* to a
+> > U32*, but it is in the compression path, so it has nothing to do with
+> > this issue.
+> >
+> > So I agree that access_ok.h is unsuitable for any 32-bit ARM core, and
+> > we should be using the struct version instead. My only remaining
+> > question is why we need access_ok.h in the first place: it is worth a
+> > try to check whether both produce the same code on AArch64.
+> 
+> It's been a while since I looked into this problem, but from my memory,
+> it turned out rather hard to analyze single files after the change, as
+> gcc inlining decisions and register allocation tend to be non-deterministic.
+> However, my conclusion then was that those changes are rather random,
+> usually no effect, sometimes better and sometimes worse by chance,
+> with the only real differences being the few cases we avoid the ldrd/ldm/...
+> instructions.
+> 
+> I have no idea which compiler version I tried back then, so it's very
+> possible that some older compilers actually do produce slightly worse
+> code with the struct version, the question is what the oldest compiler
+> is that we care about enough to investigate. Maybe gcc-4.8?
 
+Arnd,
 
-This email was sent in double because I though I had an issue with the
-first send. Indeed an other email sent 15 min later to the same mailing
-list showed up on the mailing list whereas this one was not there after
-half an hour.
+Gregory Clement has been trying to get traction on an issue over the
+last few weeks, and we've been hoping that you'd respond.  It's related
+to this one, and it results in some platforms being unbootable.  I think
+from what I remember of the discussion, switching to le_struct.h fixes
+the issue there as well.
 
-I don't understand what happened. Sorry for the noise,
+>From what's been said in this thread, it seems like switching to
+le_struct.h is the right solution for ARM irrespective of that anyway.
 
-Gregory
+PXA is also having problems with double-word instructions in the
+decompressor as well, and this might solve it (so adding everyone from
+that thread to the CC list).
 
+So, we have potentially three groups of people that the alignment stuff
+is currently biting.  Do we have a way forward on this subject from you?
 
- 
- On ven., oct. 20 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+Do we need the changes in https://pastebin.com/apPTPXys mentioned
+previously in this thread?
 
-> Hi,
->
-> Here is the first pull request for dt64 for mvebu for v4.15.
->
-> Gregory
->
-> The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
->
->   Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
->
-> are available in the git repository at:
->
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.15-1
->
-> for you to fetch changes up to c4e3bf290c3089502ee33e25795075b86fe9a449:
->
->   arm64: dts: marvell: 7040-db: Add the carrier detect pin for SD card on CP (2017-10-12 15:53:47 +0200)
->
-> ----------------------------------------------------------------
-> mvebu dt64 for 4.15 (part 1)
->
-> On Armada 7K/8k:
-> - Improve network support at SoC and board level
-> - Enable watchdog
-> - Add UART muxing
-> - On 7040 DB: add CD SDIO and NAND support
-> - On 8040 DB: add PCIE more ports and SPI1
->
-> On Armada 37xx:
->  - Fix UART register size
->  - Add vmmc regulator for SD on 3720 DB
->
-> ----------------------------------------------------------------
-> Antoine Tenart (8):
->       arm64: dts: marvell: extend the cp110 syscon register area length
->       arm64: dts: marvell: add comphy nodes on cp110 master and slave
->       arm64: dts: marvell: cp110: add PPv2 port interrupts
->       arm64: dts: marvell: 37xx: remove empty line
->       arm64: dts: marvell: mcbin: add comphy references to Ethernet ports
->       arm64: dts: marvell: 7040-db: add comphy reference to Ethernet port
->       arm64: dts: marvell: 7040-db: enable the SFP port
->       arm64: dts: marvell: 8040-db: enable the SFP ports
->
-> Baruch Siach (1):
->       arm64: dts: marvell: enable AP806 watchdog
->
-> Christine Gharzuzi (1):
->       arm64: dts: marvell: Enable Armada-8040-DB CPS SPI1
->
-> Gregory CLEMENT (4):
->       arm64: dts: marvell: armada-3720-db: Add vmmc regulator for SD slot
->       arm64: dts: marvell: add NAND support on the 7040-DB board
->       arm64: dts: marvell: 7040-db: Document the gpio expander
->       arm64: dts: marvell: 7040-db: Add the carrier detect pin for SD card on CP
->
-> Thomas Petazzoni (2):
->       arm64: dts: marvell: add UART muxing on Armada 7K/8K
->       arm64: dts: marvell: enable additional PCIe ports on Armada 8040 DB
->
-> allen yan (1):
->       arm64: dts: marvell: Fix A37xx UART0 register size
->
->  .../devicetree/bindings/serial/mvebu-uart.txt      |  2 +-
->  arch/arm64/boot/dts/marvell/armada-3720-db.dts     | 11 ++++
->  arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |  3 +-
->  arch/arm64/boot/dts/marvell/armada-7040-db.dts     | 55 +++++++++++++++++++-
->  arch/arm64/boot/dts/marvell/armada-70x0.dtsi       | 14 +++++
->  arch/arm64/boot/dts/marvell/armada-8040-db.dts     | 57 +++++++++++++++++++++
->  arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts  | 11 ++++
->  arch/arm64/boot/dts/marvell/armada-ap806.dtsi      | 11 ++++
->  .../boot/dts/marvell/armada-cp110-master.dtsi      | 59 +++++++++++++++++++---
->  .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 58 ++++++++++++++++++---
->  10 files changed, 261 insertions(+), 20 deletions(-)
+What's the status?
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
