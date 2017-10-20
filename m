@@ -1,60 +1,51 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 20 Oct 2017 12:28:44 +0200
-Subject: [PATCH 17/42] ARM: dts: r8a7743: Add USB-DMAC device nodes
+Date: Fri, 20 Oct 2017 12:28:47 +0200
+Subject: [PATCH 20/42] ARM: dts: gr-peach: Enable ostm0 and ostm1 timers
 In-Reply-To: <cover.1508493785.git.horms+renesas@verge.net.au>
 References: <cover.1508493785.git.horms+renesas@verge.net.au>
-Message-ID: <310861003a0d59cb410538bcdf73a218157a111d.1508493785.git.horms+renesas@verge.net.au>
+Message-ID: <1126e108a3ad8ae92a0532259e3da4b14072355f.1508493785.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Biju Das <biju.das@bp.renesas.com>
+From: Jacopo Mondi <jacopo+renesas@jmondi.org>
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
+Enable ostm0 and ostm1 timers to be used as clock source and clockevent
+source. The timers provides greater accuracy than the already enabled
+mtu2 one.
+
+With these enabled:
+
+clocksource: ostm: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 57352151442 ns
+sched_clock: 32 bits at 33MHz, resolution 30ns, wraps every 64440619504ns
+ostm: used for clocksource
+ostm: used for clock events
+
+Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+Suggested-by: Chris Brandt <chris.brandt@renesas.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7743.dtsi | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ arch/arm/boot/dts/r7s72100-gr-peach.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
-index 080eff9bb3c3..de89295ce63a 100644
---- a/arch/arm/boot/dts/r8a7743.dtsi
-+++ b/arch/arm/boot/dts/r8a7743.dtsi
-@@ -355,6 +355,34 @@
- 			dma-channels = <15>;
- 		};
+diff --git a/arch/arm/boot/dts/r7s72100-gr-peach.dts b/arch/arm/boot/dts/r7s72100-gr-peach.dts
+index eca14e3801ec..779f724b4531 100644
+--- a/arch/arm/boot/dts/r7s72100-gr-peach.dts
++++ b/arch/arm/boot/dts/r7s72100-gr-peach.dts
+@@ -104,6 +104,14 @@
+ 	status = "okay";
+ };
  
-+		usb_dmac0: dma-controller at e65a0000 {
-+			compatible = "renesas,r8a7743-usb-dmac",
-+				     "renesas,usb-dmac";
-+			reg = <0 0xe65a0000 0 0x100>;
-+			interrupts = <GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "ch0", "ch1";
-+			clocks = <&cpg CPG_MOD 330>;
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			resets = <&cpg 330>;
-+			#dma-cells = <1>;
-+			dma-channels = <2>;
-+		};
++&ostm0 {
++	status = "okay";
++};
 +
-+		usb_dmac1: dma-controller at e65b0000 {
-+			compatible = "renesas,r8a7743-usb-dmac",
-+				     "renesas,usb-dmac";
-+			reg = <0 0xe65b0000 0 0x100>;
-+			interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "ch0", "ch1";
-+			clocks = <&cpg CPG_MOD 331>;
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			resets = <&cpg 331>;
-+			#dma-cells = <1>;
-+			dma-channels = <2>;
-+		};
++&ostm1 {
++	status = "okay";
++};
 +
- 		/* The memory map in the User's Manual maps the cores to bus
- 		 *  numbers
- 		 */
+ &scif2 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&scif2_pins>;
 -- 
 2.11.0
