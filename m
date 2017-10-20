@@ -1,40 +1,40 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 20 Oct 2017 13:56:16 +0200 (CEST)
-Subject: [PATCH v4 12/20] genirq: Document vcpu_info usage for percpu_devid
- interrupts
-In-Reply-To: <20171020114939.12554-13-christoffer.dall@linaro.org>
-References: <20171020114939.12554-1-christoffer.dall@linaro.org>
- <20171020114939.12554-13-christoffer.dall@linaro.org>
-Message-ID: <alpine.DEB.2.20.1710201354590.2908@nanos>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 20 Oct 2017 13:56:01 +0200
+Subject: [GIT PULL 5/7] ARM: tegra: Device tree changes for v4.15-rc1
+In-Reply-To: <20171020115603.9828-1-thierry.reding@gmail.com>
+References: <20171020115603.9828-1-thierry.reding@gmail.com>
+Message-ID: <20171020115603.9828-5-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 20 Oct 2017, Christoffer Dall wrote:
+Hi ARM SoC maintainers,
 
-Please Cc lkml when changing genirq core code.
+The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 
-> It is currently unclear how to set the VCPU affinity for a percpu_devid
-> interrupt , since the Linux irq_data structure describes the state for
-> multiple interrupts, one for each physical CPU on the system.  Since
-> each such interrupt can be associated with different VCPUs or none at
-> all, associating a single VCPU state with such an interrupt does not
-> capture the necessary semantics.
-> 
-> The implementers of irq_set_affinity are the Intel and AMD IOMMUs, and
-> the ARM GIC irqchip.  The Intel and AMD callers do not appear to use
-> percpu_devid interrupts, and the ARM GIC implementation only checks the
-> pointer against NULL vs. non-NULL.
-> 
-> Therefore, simply update the function documentation to explain the
-> expected use in the context of percpu_devid interrupts, allowing future
-> changes or additions to irqchip implementers to do the right thing.
-> 
-> This allows us to set the VCPU affinity for the virtual timer interrupt
-> in KVM/ARM, which is a percpu_devid (PPI) interrupt.
+  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
 
-I have a hard time to understand how adding the comment allows you to set
-VCPU affinity ....
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.15-arm-dt
+
+for you to fetch changes up to 33dfb1e18d534c4b7509de2a68ef1baf83d9710f:
+
+  ARM: tegra: Enable CEC support on Jetson TK1 (2017-10-19 11:45:14 +0200)
 
 Thanks,
+Thierry
 
-	tglx
+----------------------------------------------------------------
+ARM: tegra: Device tree changes for v4.15-rc1
+
+Adds support for the CEC controller found on Tegra124 and enables it on
+Tegra K1.
+
+----------------------------------------------------------------
+Hans Verkuil (2):
+      ARM: tegra: Add CEC support for Tegra124
+      ARM: tegra: Enable CEC support on Jetson TK1
+
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts |  4 ++++
+ arch/arm/boot/dts/tegra124.dtsi           | 12 +++++++++++-
+ 2 files changed, 15 insertions(+), 1 deletion(-)
