@@ -1,64 +1,80 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 20 Oct 2017 16:28:49 +0100
-Subject: [PATCH] ARM: compressed: discard ksym/kcrctab input section
-In-Reply-To: <878tg56dtn.fsf@free-electrons.com>
-References: <20170908153143.27279-1-ard.biesheuvel@linaro.org>
- <87d163kt0m.fsf@free-electrons.com>
- <CAKv+Gu_pGeDxK_vD9iGUO486VgLsntMQwVs9wGKa79pkx7paMQ@mail.gmail.com>
- <20171004124320.GP20805@n2100.armlinux.org.uk>
- <CAKv+Gu_t+oLJKGzy3LxgLZqqYsd9eQiwZRr6dgPbqpsHnQUUxw@mail.gmail.com>
- <874lr4d8gm.fsf@free-electrons.com>
- <20171012094517.GB20805@n2100.armlinux.org.uk>
- <CAKv+Gu_+D+d+5Zi8LRmi3_sHEVx-FLLKHsi9aUUmNB8VvcHANQ@mail.gmail.com>
- <878tg56dtn.fsf@free-electrons.com>
-Message-ID: <CAKv+Gu_q0A+42ht1f4o_SToWSV4OBThV=gtyfBoGYFZyKWNW5Q@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 20 Oct 2017 17:32:28 +0200
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.15 (#1)
+Message-ID: <877evp6dir.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 October 2017 at 16:25, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> Hi Ard,
->
->  On jeu., oct. 12 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->
->> On 12 October 2017 at 10:45, Russell King - ARM Linux
->> <linux@armlinux.org.uk> wrote:
->>> On Thu, Oct 12, 2017 at 11:24:57AM +0200, Gregory CLEMENT wrote:
->>>> Hi Ard,
->>>>
->>>> Can we move forward to fix the booting problem ?
->>>>
->>>> What about amending your commit log with this new information and then
->>>> submit it to Russell patch system?
->>>
->>> Well, I think there's a choice that needs to be made between this
->>> approach and Arnd's approach.
->>>
->>> I'm not all that thrilled with the need to add explicit alignment to
->>> data that is inherently a byte stream, and that invariably results in
->>> unaligned data words even if you do align the start of it.  That
->>> sounds to me very much like a hack rather than a proper solution.
->>> So, right now I'm leaning more towards Arnd's solution than Ard's
->>> from what's been said in this thread.
->>>
->>
->> I agree that the struct type unaligned accessors are the best choice
->> for ARM in any case, given that it will also prevent hitting the
->> alignment fixup handler in the kernel unnecessarily.
->>
->>> However, I don't recall Arnd's patch, it's probably buried deep in
->>> my mailbox.
->>>
->>
->> Well, unless you are considering changing the unaligned accessors from
->> access_ok.h to le_struct.h as a bugfix, I think we need both patches.
->
-> We will soon reach v4.14-rc6 and the Armada XP and Armada 370 still not
-> boot. I also didn't see your patch in rmk patch system.
->
-> Waiting for you find a agreement an other option is to remove CONFIG_EFI
-> from multi_v7_defconfig as I don't really see any armv7 base board using
-> EFI.
->
+Hi,
 
-It is up to Russell to decide how he wants to proceed. Russell?
+Here is the first pull request for dt64 for mvebu for v4.15.
+
+Gregory
+
+The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+
+  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.15-1
+
+for you to fetch changes up to c4e3bf290c3089502ee33e25795075b86fe9a449:
+
+  arm64: dts: marvell: 7040-db: Add the carrier detect pin for SD card on CP (2017-10-12 15:53:47 +0200)
+
+----------------------------------------------------------------
+mvebu dt64 for 4.15 (part 1)
+
+On Armada 7K/8k:
+- Improve network support at SoC and board level
+- Enable watchdog
+- Add UART muxing
+- On 7040 DB: add CD SDIO and NAND support
+- On 8040 DB: add PCIE more ports and SPI1
+
+On Armada 37xx:
+ - Fix UART register size
+ - Add vmmc regulator for SD on 3720 DB
+
+----------------------------------------------------------------
+Antoine Tenart (8):
+      arm64: dts: marvell: extend the cp110 syscon register area length
+      arm64: dts: marvell: add comphy nodes on cp110 master and slave
+      arm64: dts: marvell: cp110: add PPv2 port interrupts
+      arm64: dts: marvell: 37xx: remove empty line
+      arm64: dts: marvell: mcbin: add comphy references to Ethernet ports
+      arm64: dts: marvell: 7040-db: add comphy reference to Ethernet port
+      arm64: dts: marvell: 7040-db: enable the SFP port
+      arm64: dts: marvell: 8040-db: enable the SFP ports
+
+Baruch Siach (1):
+      arm64: dts: marvell: enable AP806 watchdog
+
+Christine Gharzuzi (1):
+      arm64: dts: marvell: Enable Armada-8040-DB CPS SPI1
+
+Gregory CLEMENT (4):
+      arm64: dts: marvell: armada-3720-db: Add vmmc regulator for SD slot
+      arm64: dts: marvell: add NAND support on the 7040-DB board
+      arm64: dts: marvell: 7040-db: Document the gpio expander
+      arm64: dts: marvell: 7040-db: Add the carrier detect pin for SD card on CP
+
+Thomas Petazzoni (2):
+      arm64: dts: marvell: add UART muxing on Armada 7K/8K
+      arm64: dts: marvell: enable additional PCIe ports on Armada 8040 DB
+
+allen yan (1):
+      arm64: dts: marvell: Fix A37xx UART0 register size
+
+ .../devicetree/bindings/serial/mvebu-uart.txt      |  2 +-
+ arch/arm64/boot/dts/marvell/armada-3720-db.dts     | 11 ++++
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |  3 +-
+ arch/arm64/boot/dts/marvell/armada-7040-db.dts     | 55 +++++++++++++++++++-
+ arch/arm64/boot/dts/marvell/armada-70x0.dtsi       | 14 +++++
+ arch/arm64/boot/dts/marvell/armada-8040-db.dts     | 57 +++++++++++++++++++++
+ arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts  | 11 ++++
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi      | 11 ++++
+ .../boot/dts/marvell/armada-cp110-master.dtsi      | 59 +++++++++++++++++++---
+ .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 58 ++++++++++++++++++---
+ 10 files changed, 261 insertions(+), 20 deletions(-)
