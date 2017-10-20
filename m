@@ -1,130 +1,92 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 20 Oct 2017 11:40:11 +0100
-Subject: [PATCH v7 1/3] arm: npcm: add basic support for Nuvoton BMCs
-In-Reply-To: <20171019225050.25410-2-brendanhiggins@google.com>
-References: <20171019225050.25410-1-brendanhiggins@google.com>
- <20171019225050.25410-2-brendanhiggins@google.com>
-Message-ID: <83927acd-5daf-04fd-3faf-0b5d2773c1fd@arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 20 Oct 2017 13:53:11 +0300
+Subject: [PATCH 2/2 v3] drm: bridge: Add THS8134A/B support to dumb VGA DAC
+In-Reply-To: <20171020065941.3877-1-linus.walleij@linaro.org>
+References: <20171020065941.3877-1-linus.walleij@linaro.org>
+Message-ID: <4461777.gksfa5PW48@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brendan,
+Hi Linus,
 
-On 19/10/17 23:50, Brendan Higgins wrote:
-> Adds basic support for the Nuvoton NPCM750 BMC.
+Thank you for the patch.
+
+On Friday, 20 October 2017 09:59:41 EEST Linus Walleij wrote:
+> This extends the dumb VGA DAC bridge to handle the THS8134A
+> and THS8134B VGA DACs in addition to those already handled.
 > 
-> Signed-off-by: Brendan Higgins <brendanhiggins@google.com>
-> Reviewed-by: Tomer Maimon <tmaimon77@gmail.com>
-> Reviewed-by: Avi Fishman <avifishman70@gmail.com>
-> Tested-by: Tomer Maimon <tmaimon77@gmail.com>
-> Tested-by: Avi Fishman <avifishman70@gmail.com>
+> The THS8134A, THS8134B and as it turns out also THS8135 need to
+> have data clocked out at the negative edge of the clock pulse,
+> since they clock it into the DAC at the positive edge (so by
+> then it needs to be stable) so we need some extra logic to flag
+> this on the connector to the driver.
+> 
+> The semantics of the flag DRM_BUS_FLAG_PIXDATA_NEGEDGE in
+> <drm/drm_connector.h> clearly indicates that this flag tells
+> when to *drive* the data, not when the receiver *reads* it,
+> so the TI variants needs to be handled like this.
+> 
+> Introduce a variant struct and contain the information there,
+> and add a bit of helpful comments about how this works so
+> people will get it right when adding new DACs or connectiong
+> new display drivers to DACs.
+> 
+> The fact that THS8135 might be working on some systems today
+> is probably due to the fact that the display driver cannot
+> configure when the data is clocked out and the electronics
+> have simply been designed around it so it works anyways.
+> 
+> The phenomenon is very real on the ARM reference designs using
+> PL111 where the hardware can control which edge to push out
+> the data.
+> 
+> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->   arch/arm/Kconfig             |  2 +
->   arch/arm/Makefile            |  1 +
->   arch/arm/mach-npcm/Kconfig   | 48 ++++++++++++++++++++++++
->   arch/arm/mach-npcm/Makefile  |  3 ++
->   arch/arm/mach-npcm/headsmp.S | 17 +++++++++
->   arch/arm/mach-npcm/npcm7xx.c | 34 +++++++++++++++++
->   arch/arm/mach-npcm/platsmp.c | 88 ++++++++++++++++++++++++++++++++++++++++++++
->   7 files changed, 193 insertions(+)
->   create mode 100644 arch/arm/mach-npcm/Kconfig
->   create mode 100644 arch/arm/mach-npcm/Makefile
->   create mode 100644 arch/arm/mach-npcm/headsmp.S
->   create mode 100644 arch/arm/mach-npcm/npcm7xx.c
->   create mode 100644 arch/arm/mach-npcm/platsmp.c
+> ChangeLog v2->v3:
+> - Move const specifier.
+> - Cut one line of code assigning bus flags.
+> - Preserve the "ti,ths8135" compatible for elder device trees.
+> ChangeLog v1->v2:
+> - Alphabetize includes
+> - Use a u32 with the bus polarity flags and just encode the
+>   polarity using the DRM define directly.
+> - Rename vendor_data to vendor_info.
+> - Simplify assignment of the flag as it is just a simple
+>   u32 now.
+> - Probe all TI variants on the "ti,ths813x" wildcard for now,
+>   we only need to know that the device is in this family to
+>   set the clock edge flag right.
+> ---
+>  drivers/gpu/drm/bridge/dumb-vga-dac.c | 55 +++++++++++++++++++++++++++++---
+>  1 file changed, 51 insertions(+), 4 deletions(-)
 > 
+> diff --git a/drivers/gpu/drm/bridge/dumb-vga-dac.c
+> b/drivers/gpu/drm/bridge/dumb-vga-dac.c index 831a606c4706..2622e2f778d1
+> 100644
+> --- a/drivers/gpu/drm/bridge/dumb-vga-dac.c
+> +++ b/drivers/gpu/drm/bridge/dumb-vga-dac.c
 
-[...]
+[snip]
 
-> diff --git a/arch/arm/mach-npcm/platsmp.c b/arch/arm/mach-npcm/platsmp.c
-> new file mode 100644
-> index 000000000000..450e83c3c531
-> --- /dev/null
-> +++ b/arch/arm/mach-npcm/platsmp.c
-> @@ -0,0 +1,88 @@
-> +/*
-> + * Copyright 2017 Google, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#define pr_fmt(fmt) "PLATSMP: " fmt
-> +
-> +#include <linux/delay.h>
-> +#include <linux/device.h>
-> +#include <linux/smp.h>
-> +#include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/of_address.h>
-> +#include <asm/cacheflush.h>
-> +#include <asm/smp.h>
-> +#include <asm/smp_plat.h>
-> +#include <asm/smp_scu.h>
-> +
-> +#define NPCM7XX_SCRPAD_REG 0x13c
-> +
-> +extern void npcm7xx_secondary_startup(void);
-> +
-> +static int npcm7xx_smp_boot_secondary(unsigned int cpu,
-> +				      struct task_struct *idle)
-> +{
-> +	struct device_node *gcr_np;
-> +	void __iomem *gcr_base;
-> +	int ret = 0;
-> +
-> +	gcr_np = of_find_compatible_node(NULL, NULL, "nuvoton,npcm750-gcr");
-> +	if (!gcr_np) {
-> +		pr_err("no gcr device node\n");
-> +		ret = -EFAULT;
-> +		goto out;
-> +	}
-> +	gcr_base = of_iomap(gcr_np, 0);
-> +	if (!gcr_base) {
-> +		pr_err("could not iomap gcr at: 0x%p\n", gcr_base);
+> @@ -55,7 +65,8 @@ static int dumb_vga_get_modes(struct drm_connector
+> *connector) }
+> 
+>  	drm_mode_connector_update_edid_property(connector, edid);
+> -	return drm_add_edid_modes(connector, edid);
+> +	connector->display_info.bus_flags |= vga->variant->clk_edge_latch;
+> +	retturn drm_add_edid_modes(connector, edid);
 
-nit:
- From the condition we know gcr_base is NULL here so we don't get much 
-info from it. Did you intend to print the value of gcr_np instead?
+Have you compiled this ?
 
-> +		ret = -EFAULT;
-> +		goto out;
-> +	}
-> +
-> +	/* give boot ROM kernel start address. */
-> +	iowrite32(__pa_symbol(npcm7xx_secondary_startup), gcr_base +
-> +		  NPCM7XX_SCRPAD_REG);
-> +	/* make sure npcm7xx_secondary_startup is seen by all observers. */
-> +	smp_wmb();
-> +	dsb_sev();
-> +	/* make sure write buffer is drained */
-> +	mb();
-> +
-> +	iounmap(gcr_base);
-> +out:
-> +	return ret;
-> +}
-> +
-> +static void __init npcm7xx_smp_prepare_cpus(unsigned int max_cpus)
-> +{
-> +	struct device_node *scu_np;
-> +	void __iomem *scu_base;
-> +
-> +	scu_np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
-> +	if (!scu_np) {
-> +		pr_err("no scu device node\n");
-> +		return;
-> +	}
-> +	scu_base = of_iomap(scu_np, 0);
-> +	if (!scu_base) {
-> +		pr_err("could not iomap scu at: 0x%p\n", scu_base);
+>  fallback:
+>  	/*
 
-Same comment about scu_base.
-
-Cheers,
+[snip]
 
 -- 
-Julien Thierry
+Regards,
+
+Laurent Pinchart
