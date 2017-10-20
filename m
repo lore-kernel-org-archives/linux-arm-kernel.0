@@ -1,82 +1,152 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Fri, 20 Oct 2017 10:55:42 +0900
-Subject: n900 in next-20170901
-In-Reply-To: <20171019183033.GH4394@atomide.com>
-References: <20170907073038.GA2111@js1304-P5Q-DELUXE>
- <20170907161650.GP5024@atomide.com>
- <20170913075516.GA25036@js1304-P5Q-DELUXE>
- <20170913163126.GS5024@atomide.com>
- <20170915065608.GA8567@js1304-P5Q-DELUXE>
- <20170921172811.GB4394@atomide.com>
- <20170925080806.GA9837@js1304-P5Q-DELUXE>
- <20170925145437.GG4394@atomide.com>
- <20171018082927.GB27595@js1304-P5Q-DELUXE>
- <20171019183033.GH4394@atomide.com>
-Message-ID: <20171020015542.GA10438@js1304-P5Q-DELUXE>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Fri, 20 Oct 2017 09:55:39 +0800
+Subject: [PATCH v3 05/10] arm: dts: mt7623: update pio, usb and crypto
+ nodes
+In-Reply-To: <8c823070-7181-97cc-063e-3ced59c7e17d@gmail.com>
+References: <cover.1506908511.git.ryder.lee@mediatek.com>
+ <08d722e47b83bd70ed4d3c9a4546a3f70df96de4.1506908511.git.ryder.lee@mediatek.com>
+ <8c823070-7181-97cc-063e-3ced59c7e17d@gmail.com>
+Message-ID: <1508464539.13396.6.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 19, 2017 at 11:30:34AM -0700, Tony Lindgren wrote:
-> * Joonsoo Kim <iamjoonsoo.kim@lge.com> [171018 01:27]:
-> > On Mon, Sep 25, 2017 at 07:54:37AM -0700, Tony Lindgren wrote:
-> > > * Joonsoo Kim <iamjoonsoo.kim@lge.com> [170925 01:06]:
-> > > > On Thu, Sep 21, 2017 at 10:28:11AM -0700, Tony Lindgren wrote:
-> > > > > * Joonsoo Kim <iamjoonsoo.kim@lge.com> [170914 23:55]:
-> > > > > > On Wed, Sep 13, 2017 at 09:31:27AM -0700, Tony Lindgren wrote:
-> > > > > > > Yes I disabled CONFIG_HIGHMEM and n900 boots. To disable it,
-> > > > > > > you need to remove it from arch/arm/mach-omap2/Kconfig that
-> > > > > > > selects it if ARCH_OMAP2PLUS_TYPICAL is selected.
-> > > > > > 
-> > > > > > Okay. Problem would be related to address traslation. I'd like to
-> > > > > > check address traslation more. Could you apply following patch and
-> > > > > > test it? And, please send me the dmesg log and your kernel config.
-> > > > > > Please test this with CONFIG_DEBUG_VIRTUAL = n and CONFIG_CMA_DEBUG=y and
-> > > > > > CONFIG_HIGHMEM=y and with kernel bootparam 'ignore_loglevel'.
-> > > > > > 
-> > > > > > It would be really appreciate if you send me two logs for before/after
-> > > > > > commit 9caf25f996e8.
-> > > > > 
-> > > > > Sorry for the delays, I finally got around testing this for you.
-> > > > 
-> > > > No problem! I really appreciate your help!
-> > > > 
-> > > > > Compile with your patch failed for modules with __virt_to_phys_debug
-> > > > > being undefined so I added EXPORT_SYMBOL there. I also enabled DEBUG_LL
-> > > > > and EARLYPRINTK to get output.
-> > > > > 
-> > > > > Below is dmesg output for 9caf25f996e8 + your patch. I'll send you
-> > > > > the full logs separately.
-> > > > 
-> > > > Hmm...there is only one caller for the CMA memory, that is, atomic_pool_init().
-> > > > Could you test one more time with 9caf25f996e8 + following patch?  I'd like to
-> > > > know the actual user for the CMA memory.
-> > > 
-> > > Hmm not getting any stack with that patch after manually applying
-> > > it because of tabs to spaces mangling.
-> > 
-> > Sorry for long delay.
-> > 
-> > Seems like your system doesn't use any CMA memory by CMA API.
-> > 
-> > Could you test one more thing?
-> > This one is to disable CMA memory allocation from the page allocator.
-> > With this, we can be sure that CMA memory isn't used at all.
-> > 
-> > If there is no difference with this patch, that is, the system down,
-> > I think that some initialization step is broken. In this case, please
-> > test following patch.
-> > 
-> > I make a branch in github that all these patch is applied.
-> > Feel free to use it.
-> > 
-> > https://github.com/JoonsooKim/linux/tree/cma-debug4-next-20180901
+Hi
+
+On Thu, 2017-10-19 at 18:29 +0200, Matthias Brugger wrote:
 > 
-> Still not booting, dmesg output of your test branch below.
+> On 10/02/2017 03:54 AM, Ryder Lee wrote:
+> > This patch updates pio, usb and crypto nodes to make them be consistent
+> > with the binding documents.
+> > 
+> > Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> > ---
+> >  arch/arm/boot/dts/mt7623.dtsi | 26 ++++++++++++++------------
+> >  1 file changed, 14 insertions(+), 12 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
+> > index 381843e..0640fb7 100644
+> > --- a/arch/arm/boot/dts/mt7623.dtsi
+> > +++ b/arch/arm/boot/dts/mt7623.dtsi
+> > @@ -227,8 +227,7 @@
+> >  	};
+> >  
+> >  	pio: pinctrl at 10005000 {
+> > -		compatible = "mediatek,mt7623-pinctrl",
+> > -			     "mediatek,mt2701-pinctrl";
+> > +		compatible = "mediatek,mt7623-pinctrl";
+> 
+> Looks good.
+> 
+> >  		reg = <0 0x1000b000 0 0x1000>;
+> >  		mediatek,pctl-regmap = <&syscfg_pctl_a>;
+> >  		pins-are-numbered;
+> > @@ -680,7 +679,7 @@
+> >  		interrupts = <GIC_SPI 196 IRQ_TYPE_LEVEL_LOW>;
+> >  		clocks = <&hifsys CLK_HIFSYS_USB0PHY>,
+> >  			 <&topckgen CLK_TOP_ETHIF_SEL>;
+> > -		clock-names = "sys_ck", "free_ck";
+> > +		clock-names = "sys_ck", "ref_ck";
+> 
+> This is already merged. Please rebase.
 
-Oops... I made a mistak. Could you test with reverting commit
-c977ee2803787363187d6aca9cebdabc793c6531 ("omap: forcibly call
-save_secure_ram_context() for test") in that branch?
-Without reverting it, it doesn't call 'smc' so it always cause a
-hang.
+I didn't see any changes in mt7623.dtsi.
 
-Thanks.
+> >  		power-domains = <&scpsys MT2701_POWER_DOMAIN_HIF>;
+> >  		phys = <&u2port0 PHY_TYPE_USB2>, <&u3port0 PHY_TYPE_USB3>;
+> >  		status = "disabled";
+> > @@ -690,8 +689,6 @@
+> >  		compatible = "mediatek,mt7623-u3phy",
+> >  			     "mediatek,mt2701-u3phy";
+> >  		reg = <0 0x1a1c4000 0 0x0700>;
+> > -		clocks = <&clk26m>;
+> > -		clock-names = "u3phya_ref";
+> 
+> Same here.
+> 
+> >  		#address-cells = <2>;
+> >  		#size-cells = <2>;
+> >  		ranges;
+> > @@ -699,12 +696,16 @@
+> >  
+> >  		u2port0: usb-phy at 1a1c4800 {
+> >  			reg = <0 0x1a1c4800 0 0x0100>;
+> > +			clocks = <&topckgen CLK_TOP_USB_PHY48M>;
+> > +			clock-names = "ref";
+> 
+> Same here.
+> 
+> >  			#phy-cells = <1>;
+> >  			status = "okay";
+> >  		};
+> >  
+> >  		u3port0: usb-phy at 1a1c4900 {
+> >  			reg = <0 0x1a1c4900 0 0x0700>;
+> > +			clocks = <&clk26m>;
+> > +			clock-names = "ref";
+> 
+> Same here.
+> 
+> >  			#phy-cells = <1>;
+> >  			status = "okay";
+> >  		};
+> > @@ -719,7 +720,7 @@
+> >  		interrupts = <GIC_SPI 197 IRQ_TYPE_LEVEL_LOW>;
+> >  		clocks = <&hifsys CLK_HIFSYS_USB1PHY>,
+> >  			 <&topckgen CLK_TOP_ETHIF_SEL>;
+> > -		clock-names = "sys_ck", "free_ck";
+> > +		clock-names = "sys_ck", "ref_ck";
+> 
+> Same here.
+> 
+> >  		power-domains = <&scpsys MT2701_POWER_DOMAIN_HIF>;
+> >  		phys = <&u2port1 PHY_TYPE_USB2>, <&u3port1 PHY_TYPE_USB3>;
+> >  		status = "disabled";
+> > @@ -729,8 +730,6 @@
+> >  		compatible = "mediatek,mt7623-u3phy",
+> >  			     "mediatek,mt2701-u3phy";
+> >  		reg = <0 0x1a244000 0 0x0700>;
+> > -		clocks = <&clk26m>;
+> > -		clock-names = "u3phya_ref";
+> 
+> Same here.
+> 
+> >  		#address-cells = <2>;
+> >  		#size-cells = <2>;
+> >  		ranges;
+> > @@ -738,12 +737,16 @@
+> >  
+> >  		u2port1: usb-phy at 1a244800 {
+> >  			reg = <0 0x1a244800 0 0x0100>;
+> > +			clocks = <&topckgen CLK_TOP_USB_PHY48M>;
+> > +			clock-names = "ref";
+> 
+> Same here.
+> 
+> >  			#phy-cells = <1>;
+> >  			status = "okay";
+> >  		};
+> >  
+> >  		u3port1: usb-phy at 1a244900 {
+> >  			reg = <0 0x1a244900 0 0x0700>;
+> > +			clocks = <&clk26m>;
+> > +			clock-names = "ref";
+> 
+> Same here.
+> 
+> >  			#phy-cells = <1>;
+> >  			status = "okay";
+> >  		};
+> > @@ -784,16 +787,15 @@
+> >  	};
+> >  
+> >  	crypto: crypto at 1b240000 {
+> > -		compatible = "mediatek,mt7623-crypto";
+> > +		compatible = "mediatek,eip97-crypto";
+> 
+> Crypto node is not present in upstream.
+
+Crypto driver is already merged. 
+
+See Documentation/devicetree/bindings/crypto/mediatek-crypto.txt
+
+Thanks
