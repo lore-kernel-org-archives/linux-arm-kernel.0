@@ -1,36 +1,41 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 20 Oct 2017 09:29:04 +0200
-Subject: [PATCH] clk: sunxi: fix build warning
-In-Reply-To: <20171019190948.5754-1-clabbe.montjoie@gmail.com>
-References: <20171019190948.5754-1-clabbe.montjoie@gmail.com>
-Message-ID: <20171020072904.kfmx65lbqd3uw2qh@flea>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Fri, 20 Oct 2017 09:33:33 +0200
+Subject: [GIT PULL] STM32 defconfig changes for v4.15 #1
+In-Reply-To: <CAK8P3a3sfq13v8sVox8xiXvHpSyzsvV_4LEYsoNtdfLLhyS7MA@mail.gmail.com>
+References: <8c7fe79d-ebd3-ee7c-f056-1d3aa225edee@st.com>
+ <CAK8P3a3sfq13v8sVox8xiXvHpSyzsvV_4LEYsoNtdfLLhyS7MA@mail.gmail.com>
+Message-ID: <e984aa91-cf82-8823-1cd6-ed0d194bd5ba@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen, Mike,
+Hi Arnd,
 
-On Thu, Oct 19, 2017 at 09:09:48PM +0200, Corentin Labbe wrote:
-> This patch fix the following build warning:
-> drivers/clk/sunxi/clk-factors.c:279:14: warning: variable 'name' set but not used [-Wunused-but-set-variable]
+On 10/19/2017 10:57 PM, Arnd Bergmann wrote:
+> On Tue, Oct 17, 2017 at 12:16 PM, Alexandre Torgue
+> <alexandre.torgue@st.com> wrote:
+>> ----------------------------------------------------------------
+>> STM32 defconfig updates for v4.15, round 1
+>>
+>> Highlights:
+>> ----------
+>>   -Regenerate default configuration
+>>   -Add DMAMUX support
+>>   -Add I2C F7 support
+>>   -Add MDMA support
 > 
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> Pulled into next/soc.
+> 
+> Splitting out the first patch is fine, but there really is no need to have one
+> patch per new Kconfig option you enable, it's less work and more readable to
+> have a combined patch that explains what the options are and why you need
+> all of them.
+> 
+>          Arnd
+> 
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+ok. So you mean I would have to merge "Add DMAMUX support", "Add I2C F7 
+support", "Add MDMA support" in one patch before to submit the pull 
+request ? If yes, it will be done for next PR.
 
-Can you apply that patch directly? This is the only fix that we're
-supposed to have for 4.14.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171020/cb7c8431/attachment.sig>
+Thanks
+Alex
