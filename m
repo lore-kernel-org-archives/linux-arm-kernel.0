@@ -1,45 +1,14 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Fri, 20 Oct 2017 17:16:49 +0800
-Subject: [RFC resend 3/4] arm64: dts: mt8173: Fix drm subsystem
-In-Reply-To: <20171019112610.13645-4-mbrugger@suse.com>
-References: <20171019112610.13645-1-mbrugger@suse.com>
- <20171019112610.13645-4-mbrugger@suse.com>
-Message-ID: <1508491009.23296.2.camel@mtksdaap41>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 20 Oct 2017 11:33:02 +0200
+Subject: [PATCH] ARM: dts: r8a7745: Add IIC cores to dtsi
+In-Reply-To: <1507910793-13919-1-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1507910793-13919-1-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <20171020093302.o3jjjgu37gipqelj@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Matthias:
+Please include some changelog text here, preferably motivating the change.
 
-On Thu, 2017-10-19 at 13:26 +0200, Matthias Brugger wrote:
-> DRM subysystem and clock driver shared the same compatible mmsys.
-> This stopped does not work, as only the first driver for a compatible
-> gets probed. We change the comaptible to the new DRM identifier to fix
-> this.
-> 
-> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
-> ---
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> index b99a27372965..89db0a3f5950 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> @@ -803,6 +803,11 @@
->  			#clock-cells = <1>;
->  		};
->  
-> +		dispsys: display-system {
-> +			compatible = "mediatek,mt2701-dispsys";
-
-Why do you probe "mediatek,mt2701-dispsys" in mt8173.dtsi?
-
-Regards,
-CK
-
-> +			mediatek,mmsys = <&mmsys>;
-> +		}
-> +
->  		mdp_rdma0: rdma at 14001000 {
->  			compatible = "mediatek,mt8173-mdp-rdma",
->  				     "mediatek,mt8173-mdp";
+On Fri, Oct 13, 2017 at 05:06:33PM +0100, Fabrizio Castro wrote:
+> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
