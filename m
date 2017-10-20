@@ -1,23 +1,82 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Fri, 20 Oct 2017 09:51:16 +0800
-Subject: [PATCH v6 10/10] drm/rockchip: dw_hdmi: Fix error handling path
-In-Reply-To: <20171019034812.13768-11-jeffy.chen@rock-chips.com>
-References: <20171019034812.13768-1-jeffy.chen@rock-chips.com>
- <20171019034812.13768-11-jeffy.chen@rock-chips.com>
-Message-ID: <bd662144-78c8-b448-6dd0-36d68bacca44@rock-chips.com>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Fri, 20 Oct 2017 10:55:42 +0900
+Subject: n900 in next-20170901
+In-Reply-To: <20171019183033.GH4394@atomide.com>
+References: <20170907073038.GA2111@js1304-P5Q-DELUXE>
+ <20170907161650.GP5024@atomide.com>
+ <20170913075516.GA25036@js1304-P5Q-DELUXE>
+ <20170913163126.GS5024@atomide.com>
+ <20170915065608.GA8567@js1304-P5Q-DELUXE>
+ <20170921172811.GB4394@atomide.com>
+ <20170925080806.GA9837@js1304-P5Q-DELUXE>
+ <20170925145437.GG4394@atomide.com>
+ <20171018082927.GB27595@js1304-P5Q-DELUXE>
+ <20171019183033.GH4394@atomide.com>
+Message-ID: <20171020015542.GA10438@js1304-P5Q-DELUXE>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017?10?19? 11:48, Jeffy Chen wrote:
-> Add missing clk_disable_unprepare() in bind()'s error handling path and
-> unbind().
->
-> Also inline clk_prepare_enable() with bind().
->
-> Fixes: 12b9f204e804 ("drm: bridge/dw_hdmi: add rockchip rk3288 support")
-> Signed-off-by: Jeffy Chen<jeffy.chen@rock-chips.com>
+On Thu, Oct 19, 2017 at 11:30:34AM -0700, Tony Lindgren wrote:
+> * Joonsoo Kim <iamjoonsoo.kim@lge.com> [171018 01:27]:
+> > On Mon, Sep 25, 2017 at 07:54:37AM -0700, Tony Lindgren wrote:
+> > > * Joonsoo Kim <iamjoonsoo.kim@lge.com> [170925 01:06]:
+> > > > On Thu, Sep 21, 2017 at 10:28:11AM -0700, Tony Lindgren wrote:
+> > > > > * Joonsoo Kim <iamjoonsoo.kim@lge.com> [170914 23:55]:
+> > > > > > On Wed, Sep 13, 2017 at 09:31:27AM -0700, Tony Lindgren wrote:
+> > > > > > > Yes I disabled CONFIG_HIGHMEM and n900 boots. To disable it,
+> > > > > > > you need to remove it from arch/arm/mach-omap2/Kconfig that
+> > > > > > > selects it if ARCH_OMAP2PLUS_TYPICAL is selected.
+> > > > > > 
+> > > > > > Okay. Problem would be related to address traslation. I'd like to
+> > > > > > check address traslation more. Could you apply following patch and
+> > > > > > test it? And, please send me the dmesg log and your kernel config.
+> > > > > > Please test this with CONFIG_DEBUG_VIRTUAL = n and CONFIG_CMA_DEBUG=y and
+> > > > > > CONFIG_HIGHMEM=y and with kernel bootparam 'ignore_loglevel'.
+> > > > > > 
+> > > > > > It would be really appreciate if you send me two logs for before/after
+> > > > > > commit 9caf25f996e8.
+> > > > > 
+> > > > > Sorry for the delays, I finally got around testing this for you.
+> > > > 
+> > > > No problem! I really appreciate your help!
+> > > > 
+> > > > > Compile with your patch failed for modules with __virt_to_phys_debug
+> > > > > being undefined so I added EXPORT_SYMBOL there. I also enabled DEBUG_LL
+> > > > > and EARLYPRINTK to get output.
+> > > > > 
+> > > > > Below is dmesg output for 9caf25f996e8 + your patch. I'll send you
+> > > > > the full logs separately.
+> > > > 
+> > > > Hmm...there is only one caller for the CMA memory, that is, atomic_pool_init().
+> > > > Could you test one more time with 9caf25f996e8 + following patch?  I'd like to
+> > > > know the actual user for the CMA memory.
+> > > 
+> > > Hmm not getting any stack with that patch after manually applying
+> > > it because of tabs to spaces mangling.
+> > 
+> > Sorry for long delay.
+> > 
+> > Seems like your system doesn't use any CMA memory by CMA API.
+> > 
+> > Could you test one more thing?
+> > This one is to disable CMA memory allocation from the page allocator.
+> > With this, we can be sure that CMA memory isn't used at all.
+> > 
+> > If there is no difference with this patch, that is, the system down,
+> > I think that some initialization step is broken. In this case, please
+> > test following patch.
+> > 
+> > I make a branch in github that all these patch is applied.
+> > Feel free to use it.
+> > 
+> > https://github.com/JoonsooKim/linux/tree/cma-debug4-next-20180901
+> 
+> Still not booting, dmesg output of your test branch below.
 
-Looks good for me
-Acked-by: Mark Yao <mark.yao@rock-chips.com>
+Oops... I made a mistak. Could you test with reverting commit
+c977ee2803787363187d6aca9cebdabc793c6531 ("omap: forcibly call
+save_secure_ram_context() for test") in that branch?
+Without reverting it, it doesn't call 'smc' so it always cause a
+hang.
 
-Mark
+Thanks.
