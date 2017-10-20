@@ -1,103 +1,55 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 20 Oct 2017 12:34:16 +0100
-Subject: [RESEND PATCH 1/2] arm/arm64: kvm: Move initialization completion
- message
+Date: Fri, 20 Oct 2017 12:34:17 +0100
+Subject: [RESEND PATCH 2/2] arm/arm64: kvm: Disable branch profiling in HYP
+ code
 In-Reply-To: <1508499257-10014-1-git-send-email-julien.thierry@arm.com>
 References: <1508499257-10014-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1508499257-10014-2-git-send-email-julien.thierry@arm.com>
+Message-ID: <1508499257-10014-3-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KVM is being a bit too optimistic, Hyp mode is said to be initialized
-when Hyp segments have only been mapped.
+When HYP code runs into branch profiling code, it attempts to jump to
+unmapped memory, causing a HYP Panic.
 
-Notify KVM's successful initialization only once it is really fully
-initialized.
+Disable the branch profiling for code designed to run at HYP mode.
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: <stable@vger.kernel.org>
 ---
- virt/kvm/arm/arm.c | 31 ++++++++++++++-----------------
- 1 file changed, 14 insertions(+), 17 deletions(-)
+ arch/arm/kvm/hyp/Makefile   | 2 +-
+ arch/arm64/kvm/hyp/Makefile | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index b9f68e4..95cba07 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -1326,21 +1326,12 @@ static void teardown_hyp_mode(void)
- {
- 	int cpu;
+diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
+index 8679405..92eab1d 100644
+--- a/arch/arm/kvm/hyp/Makefile
++++ b/arch/arm/kvm/hyp/Makefile
+@@ -2,7 +2,7 @@
+ # Makefile for Kernel-based Virtual Machine module, HYP part
+ #
 
--	if (is_kernel_in_hyp_mode())
--		return;
--
- 	free_hyp_pgds();
- 	for_each_possible_cpu(cpu)
- 		free_page(per_cpu(kvm_arm_hyp_stack_page, cpu));
- 	hyp_cpu_pm_exit();
- }
+-ccflags-y += -fno-stack-protector
++ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
 
--static int init_vhe_mode(void)
--{
--	kvm_info("VHE mode initialized successfully\n");
--	return 0;
--}
--
- /**
-  * Inits Hyp-mode on all online CPUs
-  */
-@@ -1421,8 +1412,6 @@ static int init_hyp_mode(void)
- 		}
- 	}
+ KVM=../../../../virt/kvm
 
--	kvm_info("Hyp mode initialized successfully\n");
--
- 	return 0;
+diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+index 14c4e3b..48b0354 100644
+--- a/arch/arm64/kvm/hyp/Makefile
++++ b/arch/arm64/kvm/hyp/Makefile
+@@ -2,7 +2,7 @@
+ # Makefile for Kernel-based Virtual Machine module, HYP part
+ #
 
- out_err:
-@@ -1456,6 +1445,7 @@ int kvm_arch_init(void *opaque)
- {
- 	int err;
- 	int ret, cpu;
-+	bool in_hyp_mode;
+-ccflags-y += -fno-stack-protector
++ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
 
- 	if (!is_hyp_mode_available()) {
- 		kvm_err("HYP mode not available\n");
-@@ -1474,21 +1464,28 @@ int kvm_arch_init(void *opaque)
- 	if (err)
- 		return err;
+ KVM=../../../../virt/kvm
 
--	if (is_kernel_in_hyp_mode())
--		err = init_vhe_mode();
--	else
-+	in_hyp_mode = is_kernel_in_hyp_mode();
-+
-+	if (!in_hyp_mode) {
- 		err = init_hyp_mode();
--	if (err)
--		goto out_err;
-+		if (err)
-+			goto out_err;
-+	}
-
- 	err = init_subsystems();
- 	if (err)
- 		goto out_hyp;
-
-+	if (in_hyp_mode)
-+		kvm_info("VHE mode initialized successfully\n");
-+	else
-+		kvm_info("Hyp mode initialized successfully\n");
-+
- 	return 0;
-
- out_hyp:
--	teardown_hyp_mode();
-+	if (!in_hyp_mode)
-+		teardown_hyp_mode();
- out_err:
- 	teardown_common_resources();
- 	return err;
 --
 1.9.1
