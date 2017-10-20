@@ -1,103 +1,93 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Fri, 20 Oct 2017 15:17:51 +0200
-Subject: [PATCH] ARM: mvebu: Use common error handling code in
- mvebu_armada_pm_init()
-Message-ID: <1c378b21-f10a-3a3a-fcee-8f0c0214a8fe@users.sourceforge.net>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Fri, 20 Oct 2017 15:31:17 +0200
+Subject: [PATCH v3 1/5] dt-bindings: input: Add Atmel PTC subsystem bindings
+In-Reply-To: <20171020133121.7992-1-ludovic.desroches@microchip.com>
+References: <20171020133121.7992-1-ludovic.desroches@microchip.com>
+Message-ID: <20171020133121.7992-2-ludovic.desroches@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Fri, 20 Oct 2017 14:50:47 +0200
+Add description of the Atmel PTC subsystem bindings.
 
-Adjust jump targets so that a bit of exception handling can be better
-reused at the end of this function.
-
-This issue was detected by using the Coccinelle software.
-
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm/mach-mvebu/pm-board.c | 35 ++++++++++++++++-------------------
- 1 file changed, 16 insertions(+), 19 deletions(-)
+ .../devicetree/bindings/input/atmel,ptc.txt        | 67 ++++++++++++++++++++++
+ 1 file changed, 67 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/atmel,ptc.txt
 
-diff --git a/arch/arm/mach-mvebu/pm-board.c b/arch/arm/mach-mvebu/pm-board.c
-index db17121d7d63..bef248c76951 100644
---- a/arch/arm/mach-mvebu/pm-board.c
-+++ b/arch/arm/mach-mvebu/pm-board.c
-@@ -81,6 +81,7 @@ static int __init mvebu_armada_pm_init(void)
- 	struct device_node *np;
- 	struct device_node *gpio_ctrl_np;
- 	int ret = 0, i;
-+	char *name;
- 
- 	if (!of_machine_is_compatible("marvell,axp-gp"))
- 		return -ENODEV;
-@@ -90,41 +91,32 @@ static int __init mvebu_armada_pm_init(void)
- 		return -ENODEV;
- 
- 	for (i = 0; i < ARMADA_PIC_NR_GPIOS; i++) {
--		char *name;
- 		struct of_phandle_args args;
- 
- 		pic_gpios[i] = of_get_named_gpio(np, "ctrl-gpios", i);
- 		if (pic_gpios[i] < 0) {
- 			ret = -ENODEV;
--			goto out;
-+			goto put_node;
- 		}
- 
- 		name = kasprintf(GFP_KERNEL, "pic-pin%d", i);
- 		if (!name) {
- 			ret = -ENOMEM;
--			goto out;
-+			goto put_node;
- 		}
- 
- 		ret = gpio_request(pic_gpios[i], name);
--		if (ret < 0) {
--			kfree(name);
--			goto out;
--		}
-+		if (ret < 0)
-+			goto free_name;
- 
- 		ret = gpio_direction_output(pic_gpios[i], 0);
--		if (ret < 0) {
--			gpio_free(pic_gpios[i]);
--			kfree(name);
--			goto out;
--		}
-+		if (ret < 0)
-+			goto free_gpio;
- 
- 		ret = of_parse_phandle_with_fixed_args(np, "ctrl-gpios", 2,
- 						       i, &args);
--		if (ret < 0) {
--			gpio_free(pic_gpios[i]);
--			kfree(name);
--			goto out;
--		}
-+		if (ret < 0)
-+			goto free_gpio;
- 
- 		gpio_ctrl_np = args.np;
- 		pic_raw_gpios[i] = args.args[0];
-@@ -135,10 +127,15 @@ static int __init mvebu_armada_pm_init(void)
- 		return -ENOMEM;
- 
- 	mvebu_pm_suspend_init(mvebu_armada_pm_enter);
--
--out:
-+put_node:
- 	of_node_put(np);
- 	return ret;
+diff --git a/Documentation/devicetree/bindings/input/atmel,ptc.txt b/Documentation/devicetree/bindings/input/atmel,ptc.txt
+new file mode 100644
+index 000000000000..a183fd511e04
+--- /dev/null
++++ b/Documentation/devicetree/bindings/input/atmel,ptc.txt
+@@ -0,0 +1,67 @@
++Atmel PTC Subsystem
 +
-+free_gpio:
-+	gpio_free(pic_gpios[i]);
-+free_name:
-+	kfree(name);
-+	goto put_node;
- }
- 
- /*
++The Atmel Peripheral Touch Controller subsystem offers built-in hardware
++for capacitive touch measurement on sensors that function as buttons, sliders
++and wheels.
++
++1) PTC Subsystem node
++
++Required properties:
++- compatible: 		Must be "atmel,sama5d2-ptc"
++- reg: 			Address, length of the shared memory and ppp registers location
++			and length.
++- clocks: 		Phandlers to the clocks.
++- clock-names: 		Must be "ptc_clk", "ptc_int_osc", "slow_clk".
++- #address-cells:	Must be one. The cell is the button or scroller id.
++- #size-cells: 		Must be zero.
++
++Example:
++	ptc at fc060000 {
++		compatible = "atmel,sama5d2-ptc";
++		reg = <0x00800000 0x10000
++		       0xfc060000 0xcf>;
++		interrupts = <58 IRQ_TYPE_LEVEL_HIGH 7>;
++		clocks = <&ptc_clk>, <&main>, <&clk32k>;
++		clock-names = "ptc_clk", "ptc_int_osc", "slow_clk";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		[ child node definitions... ]
++	};
++
++2) Scroller / buttons subnodes
++
++Subnodes describe the kind of sensors the customer want to use. They have to be
++named according to their function: button, slider or wheel.
++
++2.1) Scroller subnodes
++
++Required properties:
++- reg:	Id of the scroller, each id must be different.
++
++Example:
++	slider at 0 {
++		reg = <0>;
++	};
++
++	wheel at 1 {
++		reg = <1>;
++	};
++
++2.2) Button subnodes
++
++Required properties:
++- reg:			Id of node used for the button, each id must be
++			different.
++- linux,keycode: 	Key code of the button.
++
++Example:
++		button at 8 {
++			reg = <8>;
++			linux,keycode = <2>;
++		};
++
++		button at 9 {
++			reg = <9>;
++			linux,keycode = <3>;
++		};
 -- 
-2.14.2
+2.12.2
