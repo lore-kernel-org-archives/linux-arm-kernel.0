@@ -1,138 +1,139 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 20 Oct 2017 13:49:29 +0200
-Subject: [PATCH v4 10/20] KVM: arm/arm64: Use separate timer for phys timer
- emulation
+Date: Fri, 20 Oct 2017 13:49:34 +0200
+Subject: [PATCH v4 15/20] KVM: arm/arm64: Support EL1 phys timer register
+ access in set/get reg
 In-Reply-To: <20171020114939.12554-1-christoffer.dall@linaro.org>
 References: <20171020114939.12554-1-christoffer.dall@linaro.org>
-Message-ID: <20171020114939.12554-11-christoffer.dall@linaro.org>
+Message-ID: <20171020114939.12554-16-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <cdall@linaro.org>
 
-We were using the same hrtimer for emulating the physical timer and for
-making sure a blocking VCPU thread would be eventually woken up.  That
-worked fine in the previous arch timer design, but as we are about to
-actually use the soft timer expire function for the physical timer
-emulation, change the logic to use a dedicated hrtimer.
+Add suport for the physical timer registers in kvm_arm_timer_set_reg and
+kvm_arm_timer_get_reg so that these functions can be reused to interact
+with the rest of the system.
 
-This has the added benefit of not having to cancel any work in the sync
-path, which in turn allows us to run the flush and sync with IRQs
-disabled.
-
-Note that the hrtimer used to program the host kernel's timer to
-generate an exit from the guest when the emulated physical timer fires
-never has to inject any work, and to share the soft_timer_cancel()
-function with the bg_timer, we change the function to only cancel any
-pending work if the pointer to the work struct is not null.
+Note that this paves part of the way for the physical timer state
+save/restore, but we still need to add those registers to
+KVM_GET_REG_LIST before we support migrating the physical timer state.
 
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
 
 Notes:
     Changes since v3:
-     - Check if the work struct pointer is null in soft_timer_cancel()
-     - Moved after we run flush/sync with disabled IRQs to ensure the hrtimer
-       handler doesn't fire.
+     - Renamed 'EL1 Physical Timer Registers' to 'Physical Timer EL0 Registers'
 
- include/kvm/arm_arch_timer.h |  3 +++
- virt/kvm/arm/arch_timer.c    | 21 ++++++++++++++++-----
- 2 files changed, 19 insertions(+), 5 deletions(-)
+ arch/arm/include/uapi/asm/kvm.h   |  6 ++++++
+ arch/arm64/include/uapi/asm/kvm.h |  6 ++++++
+ virt/kvm/arm/arch_timer.c         | 33 +++++++++++++++++++++++++++++++--
+ 3 files changed, 43 insertions(+), 2 deletions(-)
 
-diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-index 0eed5bc9fd5e..184c3ef2df93 100644
---- a/include/kvm/arm_arch_timer.h
-+++ b/include/kvm/arm_arch_timer.h
-@@ -48,6 +48,9 @@ struct arch_timer_cpu {
- 	/* Work queued with the above timer expires */
- 	struct work_struct		expired;
+diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+index 5db2d4c6a55f..665c454e50d0 100644
+--- a/arch/arm/include/uapi/asm/kvm.h
++++ b/arch/arm/include/uapi/asm/kvm.h
+@@ -151,6 +151,12 @@ struct kvm_arch_memory_slot {
+ 	(__ARM_CP15_REG(op1, 0, crm, 0) | KVM_REG_SIZE_U64)
+ #define ARM_CP15_REG64(...) __ARM_CP15_REG64(__VA_ARGS__)
  
-+	/* Physical timer emulation */
-+	struct hrtimer			phys_timer;
++/* PL1 Physical Timer Registers */
++#define KVM_REG_ARM_PTIMER_CTL		ARM_CP15_REG32(0, 14, 2, 1)
++#define KVM_REG_ARM_PTIMER_CNT		ARM_CP15_REG64(0, 14)
++#define KVM_REG_ARM_PTIMER_CVAL		ARM_CP15_REG64(2, 14)
 +
- 	/* Is the timer enabled */
- 	bool			enabled;
- };
++/* Virtual Timer Registers */
+ #define KVM_REG_ARM_TIMER_CTL		ARM_CP15_REG32(0, 14, 3, 1)
+ #define KVM_REG_ARM_TIMER_CNT		ARM_CP15_REG64(1, 14)
+ #define KVM_REG_ARM_TIMER_CVAL		ARM_CP15_REG64(3, 14)
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index 9f3ca24bbcc6..0004feef7cc2 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -195,6 +195,12 @@ struct kvm_arch_memory_slot {
+ 
+ #define ARM64_SYS_REG(...) (__ARM64_SYS_REG(__VA_ARGS__) | KVM_REG_SIZE_U64)
+ 
++/* Physical Timer EL0 Registers */
++#define KVM_REG_ARM_PTIMER_CTL		ARM64_SYS_REG(3, 3, 14, 2, 1)
++#define KVM_REG_ARM_PTIMER_CVAL		ARM64_SYS_REG(3, 3, 14, 2, 2)
++#define KVM_REG_ARM_PTIMER_CNT		ARM64_SYS_REG(3, 3, 14, 0, 1)
++
++/* EL0 Virtual Timer Registers */
+ #define KVM_REG_ARM_TIMER_CTL		ARM64_SYS_REG(3, 3, 14, 3, 1)
+ #define KVM_REG_ARM_TIMER_CNT		ARM64_SYS_REG(3, 3, 14, 3, 2)
+ #define KVM_REG_ARM_TIMER_CVAL		ARM64_SYS_REG(3, 3, 14, 0, 2)
 diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 8ec392850e69..4ad853737c34 100644
+index ec685c1f3b78..d1a6fb12121f 100644
 --- a/virt/kvm/arm/arch_timer.c
 +++ b/virt/kvm/arm/arch_timer.c
-@@ -65,7 +65,8 @@ static void soft_timer_start(struct hrtimer *hrt, u64 ns)
- static void soft_timer_cancel(struct hrtimer *hrt, struct work_struct *work)
+@@ -628,10 +628,11 @@ static void kvm_timer_init_interrupt(void *info)
+ int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
  {
- 	hrtimer_cancel(hrt);
--	cancel_work_sync(work);
-+	if (work)
-+		cancel_work_sync(work);
+ 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
++	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+ 
+ 	switch (regid) {
+ 	case KVM_REG_ARM_TIMER_CTL:
+-		vtimer->cnt_ctl = value;
++		vtimer->cnt_ctl = value & ~ARCH_TIMER_CTRL_IT_STAT;
+ 		break;
+ 	case KVM_REG_ARM_TIMER_CNT:
+ 		update_vtimer_cntvoff(vcpu, kvm_phys_timer_read() - value);
+@@ -639,6 +640,13 @@ int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
+ 	case KVM_REG_ARM_TIMER_CVAL:
+ 		vtimer->cnt_cval = value;
+ 		break;
++	case KVM_REG_ARM_PTIMER_CTL:
++		ptimer->cnt_ctl = value & ~ARCH_TIMER_CTRL_IT_STAT;
++		break;
++	case KVM_REG_ARM_PTIMER_CVAL:
++		ptimer->cnt_cval = value;
++		break;
++
+ 	default:
+ 		return -1;
+ 	}
+@@ -647,17 +655,38 @@ int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
+ 	return 0;
  }
  
- static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
-@@ -172,6 +173,12 @@ static enum hrtimer_restart kvm_bg_timer_expire(struct hrtimer *hrt)
- 	return HRTIMER_NORESTART;
- }
- 
-+static enum hrtimer_restart kvm_phys_timer_expire(struct hrtimer *hrt)
++static u64 read_timer_ctl(struct arch_timer_context *timer)
 +{
-+	WARN(1, "Timer only used to ensure guest exit - unexpected event.");
-+	return HRTIMER_NORESTART;
++	/*
++	 * Set ISTATUS bit if it's expired.
++	 * Note that according to ARMv8 ARM Issue A.k, ISTATUS bit is
++	 * UNKNOWN when ENABLE bit is 0, so we chose to set ISTATUS bit
++	 * regardless of ENABLE bit for our implementation convenience.
++	 */
++	if (!kvm_timer_compute_delta(timer))
++		return timer->cnt_ctl | ARCH_TIMER_CTRL_IT_STAT;
++	else
++		return timer->cnt_ctl;
 +}
 +
- bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx)
+ u64 kvm_arm_timer_get_reg(struct kvm_vcpu *vcpu, u64 regid)
  {
- 	u64 cval, now;
-@@ -249,7 +256,7 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
- }
- 
- /* Schedule the background timer for the emulated timer. */
--static void kvm_timer_emulate(struct kvm_vcpu *vcpu,
-+static void phys_timer_emulate(struct kvm_vcpu *vcpu,
- 			      struct arch_timer_context *timer_ctx)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-@@ -261,7 +268,7 @@ static void kvm_timer_emulate(struct kvm_vcpu *vcpu,
- 		return;
- 
- 	/*  The timer has not yet expired, schedule a background timer */
--	soft_timer_start(&timer->bg_timer, kvm_timer_compute_delta(timer_ctx));
-+	soft_timer_start(&timer->phys_timer, kvm_timer_compute_delta(timer_ctx));
- }
- 
- /*
-@@ -414,7 +421,7 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
- 	kvm_timer_update_state(vcpu);
- 
- 	/* Set the background timer for the physical timer emulation. */
--	kvm_timer_emulate(vcpu, vcpu_ptimer(vcpu));
-+	phys_timer_emulate(vcpu, vcpu_ptimer(vcpu));
- 
- 	if (unlikely(!irqchip_in_kernel(vcpu->kvm)))
- 		kvm_timer_flush_hwstate_user(vcpu);
-@@ -437,7 +444,7 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
- 	 * This is to cancel the background timer for the physical timer
- 	 * emulation if it is set.
- 	 */
--	soft_timer_cancel(&timer->bg_timer, &timer->expired);
-+	soft_timer_cancel(&timer->phys_timer, NULL);
- 
- 	/*
- 	 * The guest could have modified the timer registers or the timer
-@@ -497,6 +504,9 @@ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
- 	hrtimer_init(&timer->bg_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
- 	timer->bg_timer.function = kvm_bg_timer_expire;
- 
-+	hrtimer_init(&timer->phys_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
-+	timer->phys_timer.function = kvm_phys_timer_expire;
-+
- 	vtimer->irq.irq = default_vtimer_irq.irq;
- 	ptimer->irq.irq = default_ptimer_irq.irq;
- }
-@@ -605,6 +615,7 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
++	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
  	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
  
- 	soft_timer_cancel(&timer->bg_timer, &timer->expired);
-+	soft_timer_cancel(&timer->phys_timer, NULL);
- 	kvm_vgic_unmap_phys_irq(vcpu, vtimer->irq.irq);
+ 	switch (regid) {
+ 	case KVM_REG_ARM_TIMER_CTL:
+-		return vtimer->cnt_ctl;
++		return read_timer_ctl(vtimer);
+ 	case KVM_REG_ARM_TIMER_CNT:
+ 		return kvm_phys_timer_read() - vtimer->cntvoff;
+ 	case KVM_REG_ARM_TIMER_CVAL:
+ 		return vtimer->cnt_cval;
++	case KVM_REG_ARM_PTIMER_CTL:
++		return read_timer_ctl(ptimer);
++	case KVM_REG_ARM_PTIMER_CVAL:
++		return ptimer->cnt_cval;
++	case KVM_REG_ARM_PTIMER_CNT:
++		return kvm_phys_timer_read();
+ 	}
+ 	return (u64)-1;
  }
- 
 -- 
 2.14.2
