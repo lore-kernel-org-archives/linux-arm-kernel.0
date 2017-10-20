@@ -1,76 +1,92 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 20 Oct 2017 13:49:36 +0200
-Subject: [PATCH v4 17/20] KVM: arm/arm64: Move phys_timer_emulate function
+Date: Fri, 20 Oct 2017 13:49:38 +0200
+Subject: [PATCH v4 19/20] KVM: arm/arm64: Get rid of kvm_timer_flush_hwstate
 In-Reply-To: <20171020114939.12554-1-christoffer.dall@linaro.org>
 References: <20171020114939.12554-1-christoffer.dall@linaro.org>
-Message-ID: <20171020114939.12554-18-christoffer.dall@linaro.org>
+Message-ID: <20171020114939.12554-20-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <cdall@linaro.org>
 
-We are about to call phys_timer_emulate() from kvm_timer_update_state()
-and modify phys_timer_emulate() at the same time.  Moving the function
-and modifying it in a single patch makes the diff hard to read, so do
-this separately first.
-
-No functional change.
+Now when both the vtimer and the ptimer when using both the in-kernel
+vgic emulation and a userspace IRQ chip are driven by the timer signals
+and at the vcpu load/put boundaries, instead of recomputing the timer
+state at every entry/exit to/from the guest, we can get entirely rid of
+the flush hwstate function.
 
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/arch_timer.c | 32 ++++++++++++++++----------------
- 1 file changed, 16 insertions(+), 16 deletions(-)
+ include/kvm/arm_arch_timer.h |  1 -
+ virt/kvm/arm/arch_timer.c    | 23 -----------------------
+ virt/kvm/arm/arm.c           |  1 -
+ 3 files changed, 25 deletions(-)
 
+diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+index c538f707e1c1..2352f3a4e88b 100644
+--- a/include/kvm/arm_arch_timer.h
++++ b/include/kvm/arm_arch_timer.h
+@@ -66,7 +66,6 @@ int kvm_timer_hyp_init(void);
+ int kvm_timer_enable(struct kvm_vcpu *vcpu);
+ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu);
+ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
+-void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu);
+ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu);
+ bool kvm_timer_should_notify_user(struct kvm_vcpu *vcpu);
+ void kvm_timer_update_run(struct kvm_vcpu *vcpu);
 diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index d1a6fb12121f..7f4f12d48a1a 100644
+index c7499364f2ed..53d9bd4a734f 100644
 --- a/virt/kvm/arm/arch_timer.c
 +++ b/virt/kvm/arm/arch_timer.c
-@@ -255,6 +255,22 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
- 	}
+@@ -305,12 +305,6 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
+ 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+ 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+ 
+-	/*
+-	 * If userspace modified the timer registers via SET_ONE_REG before
+-	 * the vgic was initialized, we mustn't set the vtimer->irq.level value
+-	 * because the guest would never see the interrupt.  Instead wait
+-	 * until we call this function from kvm_timer_flush_hwstate.
+-	 */
+ 	if (unlikely(!timer->enabled))
+ 		return;
+ 
+@@ -489,23 +483,6 @@ bool kvm_timer_should_notify_user(struct kvm_vcpu *vcpu)
+ 	       ptimer->irq.level != plevel;
  }
  
-+/* Schedule the background timer for the emulated timer. */
-+static void phys_timer_emulate(struct kvm_vcpu *vcpu,
-+			      struct arch_timer_context *timer_ctx)
-+{
-+	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-+
-+	if (kvm_timer_should_fire(timer_ctx))
-+		return;
-+
-+	if (!kvm_timer_irq_can_fire(timer_ctx))
-+		return;
-+
-+	/*  The timer has not yet expired, schedule a background timer */
-+	soft_timer_start(&timer->phys_timer, kvm_timer_compute_delta(timer_ctx));
-+}
-+
- /*
-  * Check if there was a change in the timer state (should we raise or lower
-  * the line level to the GIC).
-@@ -281,22 +297,6 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
- 		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
- }
- 
--/* Schedule the background timer for the emulated timer. */
--static void phys_timer_emulate(struct kvm_vcpu *vcpu,
--			      struct arch_timer_context *timer_ctx)
+-/**
+- * kvm_timer_flush_hwstate - prepare timers before running the vcpu
+- * @vcpu: The vcpu pointer
+- *
+- * Check if the virtual timer has expired while we were running in the host,
+- * and inject an interrupt if that was the case, making sure the timer is
+- * masked or disabled on the host so that we keep executing.  Also schedule a
+- * software timer for the physical timer if it is enabled.
+- */
+-void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
 -{
 -	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
 -
--	if (kvm_timer_should_fire(timer_ctx))
+-	if (unlikely(!timer->enabled))
 -		return;
--
--	if (!kvm_timer_irq_can_fire(timer_ctx))
--		return;
--
--	/*  The timer has not yet expired, schedule a background timer */
--	soft_timer_start(&timer->phys_timer, kvm_timer_compute_delta(timer_ctx));
 -}
 -
- static void vtimer_save_state(struct kvm_vcpu *vcpu)
+ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
  {
  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 132d39ae13d2..14c50d142c67 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -656,7 +656,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 
+ 		local_irq_disable();
+ 
+-		kvm_timer_flush_hwstate(vcpu);
+ 		kvm_vgic_flush_hwstate(vcpu);
+ 
+ 		/*
 -- 
 2.14.2
