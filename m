@@ -1,175 +1,103 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 20 Oct 2017 14:54:12 +0200
-Subject: [PATCH v4] drm: bridge: Add THS8134A/B support to dumb VGA DAC
-Message-ID: <20171020125412.25988-1-linus.walleij@linaro.org>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Fri, 20 Oct 2017 15:17:51 +0200
+Subject: [PATCH] ARM: mvebu: Use common error handling code in
+ mvebu_armada_pm_init()
+Message-ID: <1c378b21-f10a-3a3a-fcee-8f0c0214a8fe@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This extends the dumb VGA DAC bridge to handle the THS8134A
-and THS8134B VGA DACs in addition to those already handled.
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Fri, 20 Oct 2017 14:50:47 +0200
 
-The THS8134A, THS8134B and as it turns out also THS8135 need to
-have data clocked out at the negative edge of the clock pulse,
-since they clock it into the DAC at the positive edge (so by
-then it needs to be stable) so we need some extra logic to flag
-this on the connector to the driver.
+Adjust jump targets so that a bit of exception handling can be better
+reused at the end of this function.
 
-The semantics of the flag DRM_BUS_FLAG_PIXDATA_NEGEDGE in
-<drm/drm_connector.h> clearly indicates that this flag tells
-when to *drive* the data, not when the receiver *reads* it,
-so the TI variants needs to be handled like this.
+This issue was detected by using the Coccinelle software.
 
-Introduce a variant struct and contain the information there,
-and add a bit of helpful comments about how this works so
-people will get it right when adding new DACs or connectiong
-new display drivers to DACs.
-
-The fact that THS8135 might be working on some systems today
-is probably due to the fact that the display driver cannot
-configure when the data is clocked out and the electronics
-have simply been designed around it so it works anyways.
-
-The phenomenon is very real on the ARM reference designs using
-PL111 where the hardware can control which edge to push out
-the data.
-
-Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
 ---
-ChangeLog v3->v4:
-- Actually have the code syntactically correct and compiling :(
-  (Kconfig mistake.)
-  (...)
-  AS      usr/initramfs_data.o
-  AR      usr/built-in.o
-  CC      drivers/gpu/drm/bridge/dumb-vga-dac.o
-  AR      drivers/gpu/drm/bridge/built-in.o
-  AR      drivers/gpu/drm/built-in.o
-  AR      drivers/gpu/built-in.o
-  AR      drivers/built-in.o
-  (...)
-ChangeLog v2->v3:
-- Move const specifier.
-- Cut one line of code assigning bus flags.
-- Preserve the "ti,ths8135" compatible for elder device trees.
-ChangeLog v1->v2:
-- Alphabetize includes
-- Use a u32 with the bus polarity flags and just encode the
-  polarity using the DRM define directly.
-- Rename vendor_data to vendor_info.
-- Simplify assignment of the flag as it is just a simple
-  u32 now.
-- Probe all TI variants on the "ti,ths813x" wildcard for now,
-  we only need to know that the device is in this family to
-  set the clock edge flag right.
----
- drivers/gpu/drm/bridge/dumb-vga-dac.c | 53 +++++++++++++++++++++++++++++++++--
- 1 file changed, 50 insertions(+), 3 deletions(-)
+ arch/arm/mach-mvebu/pm-board.c | 35 ++++++++++++++++-------------------
+ 1 file changed, 16 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/gpu/drm/bridge/dumb-vga-dac.c b/drivers/gpu/drm/bridge/dumb-vga-dac.c
-index 831a606c4706..92d1fe93a012 100644
---- a/drivers/gpu/drm/bridge/dumb-vga-dac.c
-+++ b/drivers/gpu/drm/bridge/dumb-vga-dac.c
-@@ -11,6 +11,7 @@
-  */
+diff --git a/arch/arm/mach-mvebu/pm-board.c b/arch/arm/mach-mvebu/pm-board.c
+index db17121d7d63..bef248c76951 100644
+--- a/arch/arm/mach-mvebu/pm-board.c
++++ b/arch/arm/mach-mvebu/pm-board.c
+@@ -81,6 +81,7 @@ static int __init mvebu_armada_pm_init(void)
+ 	struct device_node *np;
+ 	struct device_node *gpio_ctrl_np;
+ 	int ret = 0, i;
++	char *name;
  
- #include <linux/module.h>
-+#include <linux/of_device.h>
- #include <linux/of_graph.h>
- #include <linux/regulator/consumer.h>
+ 	if (!of_machine_is_compatible("marvell,axp-gp"))
+ 		return -ENODEV;
+@@ -90,41 +91,32 @@ static int __init mvebu_armada_pm_init(void)
+ 		return -ENODEV;
  
-@@ -19,9 +20,18 @@
- #include <drm/drm_crtc.h>
- #include <drm/drm_crtc_helper.h>
+ 	for (i = 0; i < ARMADA_PIC_NR_GPIOS; i++) {
+-		char *name;
+ 		struct of_phandle_args args;
  
-+/**
-+ * struct vga_dac_info - characteristics of the DAC
-+ * @clk_edge_latch: this defines the clock edge latch for the variant
-+ */
-+struct vga_dac_info {
-+	u32 clk_edge_latch;
-+};
-+
- struct dumb_vga {
- 	struct drm_bridge	bridge;
- 	struct drm_connector	connector;
-+	const struct vga_dac_info *variant;
+ 		pic_gpios[i] = of_get_named_gpio(np, "ctrl-gpios", i);
+ 		if (pic_gpios[i] < 0) {
+ 			ret = -ENODEV;
+-			goto out;
++			goto put_node;
+ 		}
  
- 	struct i2c_adapter	*ddc;
- 	struct regulator	*vdd;
-@@ -55,6 +65,7 @@ static int dumb_vga_get_modes(struct drm_connector *connector)
- 	}
+ 		name = kasprintf(GFP_KERNEL, "pic-pin%d", i);
+ 		if (!name) {
+ 			ret = -ENOMEM;
+-			goto out;
++			goto put_node;
+ 		}
  
- 	drm_mode_connector_update_edid_property(connector, edid);
-+	connector->display_info.bus_flags |= vga->variant->clk_edge_latch;
- 	return drm_add_edid_modes(connector, edid);
+ 		ret = gpio_request(pic_gpios[i], name);
+-		if (ret < 0) {
+-			kfree(name);
+-			goto out;
+-		}
++		if (ret < 0)
++			goto free_name;
  
- fallback:
-@@ -67,6 +78,8 @@ static int dumb_vga_get_modes(struct drm_connector *connector)
- 	/* And prefer a mode pretty much anyone can handle */
- 	drm_set_preferred_mode(connector, 1024, 768);
+ 		ret = gpio_direction_output(pic_gpios[i], 0);
+-		if (ret < 0) {
+-			gpio_free(pic_gpios[i]);
+-			kfree(name);
+-			goto out;
+-		}
++		if (ret < 0)
++			goto free_gpio;
  
-+	connector->display_info.bus_flags |= vga->variant->clk_edge_latch;
-+
- 	return ret;
- }
+ 		ret = of_parse_phandle_with_fixed_args(np, "ctrl-gpios", 2,
+ 						       i, &args);
+-		if (ret < 0) {
+-			gpio_free(pic_gpios[i]);
+-			kfree(name);
+-			goto out;
+-		}
++		if (ret < 0)
++			goto free_gpio;
  
-@@ -183,6 +196,7 @@ static int dumb_vga_probe(struct platform_device *pdev)
- 	if (!vga)
+ 		gpio_ctrl_np = args.np;
+ 		pic_raw_gpios[i] = args.args[0];
+@@ -135,10 +127,15 @@ static int __init mvebu_armada_pm_init(void)
  		return -ENOMEM;
- 	platform_set_drvdata(pdev, vga);
-+	vga->variant = of_device_get_match_data(&pdev->dev);
  
- 	vga->vdd = devm_regulator_get_optional(&pdev->dev, "vdd");
- 	if (IS_ERR(vga->vdd)) {
-@@ -226,10 +240,43 @@ static int dumb_vga_remove(struct platform_device *pdev)
- 	return 0;
+ 	mvebu_pm_suspend_init(mvebu_armada_pm_enter);
+-
+-out:
++put_node:
+ 	of_node_put(np);
+ 	return ret;
++
++free_gpio:
++	gpio_free(pic_gpios[i]);
++free_name:
++	kfree(name);
++	goto put_node;
  }
  
-+static const struct vga_dac_info default_dac_variant = {
-+	/*
-+	 * These DACs read data on the negative edge. For example in the
-+	 * ADV7123 datasheet (revision D, page 8) there is a timing diagram
-+	 * making this clear. So consequently we need to latch the data
-+	 * on the positive edge.
-+	 */
-+	.clk_edge_latch = DRM_BUS_FLAG_PIXDATA_POSEDGE,
-+};
-+
-+static const struct vga_dac_info ti_ths_dac_variant = {
-+	/*
-+	 * The TI DACs read the data on the positive edge of the CLK,
-+	 * so consequently we need to latch the data on the negative
-+	 * edge.
-+	 */
-+	.clk_edge_latch = DRM_BUS_FLAG_PIXDATA_NEGEDGE,
-+};
-+
- static const struct of_device_id dumb_vga_match[] = {
--	{ .compatible = "dumb-vga-dac" },
--	{ .compatible = "adi,adv7123" },
--	{ .compatible = "ti,ths8135" },
-+	{
-+		.compatible = "dumb-vga-dac",
-+		.data = &default_dac_variant,
-+	},
-+	{
-+		.compatible = "adi,adv7123",
-+		.data = &default_dac_variant,
-+	},
-+	{
-+		/* Some trees contain just this compatible and no "ti,ths813x" */
-+		.compatible = "ti,ths8135",
-+		.data = &ti_ths_dac_variant,
-+	},
-+	{
-+		.compatible = "ti,ths813x",
-+		.data = &ti_ths_dac_variant,
-+	},
- 	{},
- };
- MODULE_DEVICE_TABLE(of, dumb_vga_match);
+ /*
 -- 
-2.13.6
+2.14.2
