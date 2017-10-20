@@ -1,51 +1,103 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 20 Oct 2017 12:28:47 +0200
-Subject: [PATCH 20/42] ARM: dts: gr-peach: Enable ostm0 and ostm1 timers
+Date: Fri, 20 Oct 2017 12:28:49 +0200
+Subject: [PATCH 22/42] ARM: dts: r8a7779: Use R-Car GPIO Gen1 fallback compat
+ string
 In-Reply-To: <cover.1508493785.git.horms+renesas@verge.net.au>
 References: <cover.1508493785.git.horms+renesas@verge.net.au>
-Message-ID: <1126e108a3ad8ae92a0532259e3da4b14072355f.1508493785.git.horms+renesas@verge.net.au>
+Message-ID: <88cb141b84ca665110ef36db76294453b83486df.1508493785.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jacopo Mondi <jacopo+renesas@jmondi.org>
+Use newly added R-Car GPIO Gen1 fallback compat string
+in place of now deprecated non-generation specific
+R-Car GPIO fallback compat string in DT of r8a7779 SoC.
 
-Enable ostm0 and ostm1 timers to be used as clock source and clockevent
-source. The timers provides greater accuracy than the already enabled
-mtu2 one.
+As the driver does not match on "renesas,gpio-r8a7779" there
+are some run-time considerations for this patch:
 
-With these enabled:
+* When a resulting DTB is used with kernels newer than v4.14 this should
+  not have any run-time effect as renesas,rcar-gen1-gpio is matched by the
+  driver since commit dbd1dad2ab8f ("gpio: rcar: add gen[123] fallback
+  compatibility strings")
 
-clocksource: ostm: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 57352151442 ns
-sched_clock: 32 bits at 33MHz, resolution 30ns, wraps every 64440619504ns
-ostm: used for clocksource
-ostm: used for clock events
+* However, when used with older kernels GPIO will be disabled as
+  no compat string match will be made by the driver.
 
-Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-Suggested-by: Chris Brandt <chris.brandt@renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+The regression documented above for the new DTB with old kernel case
+is acceptable in my opinion.
+
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r7s72100-gr-peach.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/r8a7779.dtsi | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r7s72100-gr-peach.dts b/arch/arm/boot/dts/r7s72100-gr-peach.dts
-index eca14e3801ec..779f724b4531 100644
---- a/arch/arm/boot/dts/r7s72100-gr-peach.dts
-+++ b/arch/arm/boot/dts/r7s72100-gr-peach.dts
-@@ -104,6 +104,14 @@
- 	status = "okay";
- };
+diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+index 8ee0b2ca5d39..ccef2cfab6e0 100644
+--- a/arch/arm/boot/dts/r8a7779.dtsi
++++ b/arch/arm/boot/dts/r8a7779.dtsi
+@@ -76,7 +76,7 @@
+ 	};
  
-+&ostm0 {
-+	status = "okay";
-+};
-+
-+&ostm1 {
-+	status = "okay";
-+};
-+
- &scif2 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&scif2_pins>;
+ 	gpio0: gpio at ffc40000 {
+-		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7779", "renesas,rcar-gen1-gpio";
+ 		reg = <0xffc40000 0x2c>;
+ 		interrupts = <GIC_SPI 141 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -87,7 +87,7 @@
+ 	};
+ 
+ 	gpio1: gpio at ffc41000 {
+-		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7779", "renesas,rcar-gen1-gpio";
+ 		reg = <0xffc41000 0x2c>;
+ 		interrupts = <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -98,7 +98,7 @@
+ 	};
+ 
+ 	gpio2: gpio at ffc42000 {
+-		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7779", "renesas,rcar-gen1-gpio";
+ 		reg = <0xffc42000 0x2c>;
+ 		interrupts = <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -109,7 +109,7 @@
+ 	};
+ 
+ 	gpio3: gpio at ffc43000 {
+-		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7779", "renesas,rcar-gen1-gpio";
+ 		reg = <0xffc43000 0x2c>;
+ 		interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -120,7 +120,7 @@
+ 	};
+ 
+ 	gpio4: gpio at ffc44000 {
+-		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7779", "renesas,rcar-gen1-gpio";
+ 		reg = <0xffc44000 0x2c>;
+ 		interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -131,7 +131,7 @@
+ 	};
+ 
+ 	gpio5: gpio at ffc45000 {
+-		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7779", "renesas,rcar-gen1-gpio";
+ 		reg = <0xffc45000 0x2c>;
+ 		interrupts = <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -142,7 +142,7 @@
+ 	};
+ 
+ 	gpio6: gpio at ffc46000 {
+-		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7779", "renesas,rcar-gen1-gpio";
+ 		reg = <0xffc46000 0x2c>;
+ 		interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
 -- 
 2.11.0
