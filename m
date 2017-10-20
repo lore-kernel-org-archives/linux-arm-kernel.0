@@ -1,165 +1,109 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 20 Oct 2017 08:59:41 +0200
-Subject: [PATCH 2/2 v3] drm: bridge: Add THS8134A/B support to dumb VGA DAC
-Message-ID: <20171020065941.3877-1-linus.walleij@linaro.org>
+From: xieyisheng1@huawei.com (Yisheng Xie)
+Date: Fri, 20 Oct 2017 15:00:01 +0800
+Subject: [PATCH v2] iommu/arm-smmu-v3: Avoid ILLEGAL setting of
+ STE.S1STALLD and CD.S
+In-Reply-To: <1505997367-51569-1-git-send-email-xieyisheng1@huawei.com>
+References: <1505997367-51569-1-git-send-email-xieyisheng1@huawei.com>
+Message-ID: <7eb1db90-9a30-b70c-c3d1-71bbca41502d@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This extends the dumb VGA DAC bridge to handle the THS8134A
-and THS8134B VGA DACs in addition to those already handled.
+Hi Will & Jean,
 
-The THS8134A, THS8134B and as it turns out also THS8135 need to
-have data clocked out at the negative edge of the clock pulse,
-since they clock it into the DAC at the positive edge (so by
-then it needs to be stable) so we need some extra logic to flag
-this on the connector to the driver.
+Any comment about this version?
 
-The semantics of the flag DRM_BUS_FLAG_PIXDATA_NEGEDGE in
-<drm/drm_connector.h> clearly indicates that this flag tells
-when to *drive* the data, not when the receiver *reads* it,
-so the TI variants needs to be handled like this.
+Thanks
+Yisheng Xie
 
-Introduce a variant struct and contain the information there,
-and add a bit of helpful comments about how this works so
-people will get it right when adding new DACs or connectiong
-new display drivers to DACs.
-
-The fact that THS8135 might be working on some systems today
-is probably due to the fact that the display driver cannot
-configure when the data is clocked out and the electronics
-have simply been designed around it so it works anyways.
-
-The phenomenon is very real on the ARM reference designs using
-PL111 where the hardware can control which edge to push out
-the data.
-
-Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v2->v3:
-- Move const specifier.
-- Cut one line of code assigning bus flags.
-- Preserve the "ti,ths8135" compatible for elder device trees.
-ChangeLog v1->v2:
-- Alphabetize includes
-- Use a u32 with the bus polarity flags and just encode the
-  polarity using the DRM define directly.
-- Rename vendor_data to vendor_info.
-- Simplify assignment of the flag as it is just a simple
-  u32 now.
-- Probe all TI variants on the "ti,ths813x" wildcard for now,
-  we only need to know that the device is in this family to
-  set the clock edge flag right.
----
- drivers/gpu/drm/bridge/dumb-vga-dac.c | 55 ++++++++++++++++++++++++++++++++---
- 1 file changed, 51 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/gpu/drm/bridge/dumb-vga-dac.c b/drivers/gpu/drm/bridge/dumb-vga-dac.c
-index 831a606c4706..2622e2f778d1 100644
---- a/drivers/gpu/drm/bridge/dumb-vga-dac.c
-+++ b/drivers/gpu/drm/bridge/dumb-vga-dac.c
-@@ -11,6 +11,7 @@
-  */
- 
- #include <linux/module.h>
-+#include <linux/of_device.h>
- #include <linux/of_graph.h>
- #include <linux/regulator/consumer.h>
- 
-@@ -19,9 +20,18 @@
- #include <drm/drm_crtc.h>
- #include <drm/drm_crtc_helper.h>
- 
-+/**
-+ * struct vga_dac_info - characteristics of the DAC
-+ * @clk_edge_latch: this defines the clock edge latch for the variant
-+ */
-+struct vga_dac_info {
-+	u32 clk_edge_latch;
-+};
-+
- struct dumb_vga {
- 	struct drm_bridge	bridge;
- 	struct drm_connector	connector;
-+	const struct vga_dac_info *variant;
- 
- 	struct i2c_adapter	*ddc;
- 	struct regulator	*vdd;
-@@ -55,7 +65,8 @@ static int dumb_vga_get_modes(struct drm_connector *connector)
- 	}
- 
- 	drm_mode_connector_update_edid_property(connector, edid);
--	return drm_add_edid_modes(connector, edid);
-+	connector->display_info.bus_flags |= vga->variant->clk_edge_latch;
-+	retturn drm_add_edid_modes(connector, edid);
- 
- fallback:
- 	/*
-@@ -67,6 +78,8 @@ static int dumb_vga_get_modes(struct drm_connector *connector)
- 	/* And prefer a mode pretty much anyone can handle */
- 	drm_set_preferred_mode(connector, 1024, 768);
- 
-+	connector->display_info.bus_flags |= vga->variant->clk_edge_latch;
-+
- 	return ret;
- }
- 
-@@ -183,6 +196,7 @@ static int dumb_vga_probe(struct platform_device *pdev)
- 	if (!vga)
- 		return -ENOMEM;
- 	platform_set_drvdata(pdev, vga);
-+	vga->variant = of_device_get_match_data(&pdev->dev);
- 
- 	vga->vdd = devm_regulator_get_optional(&pdev->dev, "vdd");
- 	if (IS_ERR(vga->vdd)) {
-@@ -226,10 +240,43 @@ static int dumb_vga_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct vga_dac_info default_dac_variant = {
-+	/*
-+	 * These DACs read data on the negative edge. For example in the
-+	 * ADV7123 datasheet (revision D, page 8) there is a timing diagram
-+	 * making this clear. So consequently we need to latch the data
-+	 * on the positive edge.
-+	 */
-+	.clk_edge_latch = DRM_BUS_FLAG_PIXDATA_POSEDGE,
-+};
-+
-+static const struct vga_dac_info ti_ths_dac_variant = {
-+	/*
-+	 * The TI DACs read the data on the positive edge of the CLK,
-+	 * so consequently we need to latch the data on the negative
-+	 * edge.
-+	 */
-+	.clk_edge_latch = DRM_BUS_FLAG_PIXDATA_NEGEDGE,
-+};
-+
- static const struct of_device_id dumb_vga_match[] = {
--	{ .compatible = "dumb-vga-dac" },
--	{ .compatible = "adi,adv7123" },
--	{ .compatible = "ti,ths8135" },
-+	{
-+		.compatible = "dumb-vga-dac",
-+		.data = &default_dac_variant,
-+	},
-+	{
-+		.compatible = "adi,adv7123",
-+		.data = &default_dac_variant,
-+	},
-+	{
-+		/* Some trees contain just this compatible and no "ti,ths813x" */
-+		.compatible = "ti,ths8135",
-+		.data = &ti_ths_dac_variant,
-+	},
-+	{
-+		.compatible = "ti,ths813x",
-+		.data = &ti_ths_dac_variant,
-+	},
- 	{},
- };
- MODULE_DEVICE_TABLE(of, dumb_vga_match);
--- 
-2.13.6
+On 2017/9/21 20:36, Yisheng Xie wrote:
+> According to Spec, it is ILLEGAL to set STE.S1STALLD if STALL_MODEL
+> is not 0b00, which means we should not disable stall mode if stall
+> or terminate mode is not configuable.
+> 
+> Meanwhile, it is also ILLEGAL when STALL_MODEL==0b10 && CD.S==0 which
+> means if stall mode is force we should always set CD.S.
+> 
+> As Jean-Philippe's suggestion, this patch introduce a feature bit
+> ARM_SMMU_FEAT_STALL_FORCE, which means smmu only supports stall force.
+> Therefore, we can avoid the ILLEGAL setting of STE.S1STALLD.by checking
+> ARM_SMMU_FEAT_STALL_FORCE.
+> 
+> This patch keeps the ARM_SMMU_FEAT_STALLS as the meaning of stall supported
+> (force or configuable) to easy to expand the future function, i.e. we can
+> only use ARM_SMMU_FEAT_STALLS to check whether we should register fault
+> handle or enable master can_stall, etc to supporte platform SVM.
+> 
+> The feature bit, STE.S1STALLD and CD.S setting will be like:
+> 
+> STALL_MODEL  FEATURE                                         S1STALLD CD.S
+> 0b00         ARM_SMMU_FEAT_STALLS                                 0b1 0b0
+> 0b01         !ARM_SMMU_FEAT_STALLS && !ARM_SMMU_FEAT_STALL_FORCE  0b0 0b0
+> 0b10         ARM_SMMU_FEAT_STALLS && ARM_SMMU_FEAT_STALL_FORCE    0b0 0b1
+> 
+> after apply this patch.
+> 
+> Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
+> ---
+> v2:
+>  * Keep the feature bits backward compatible and add new one at the end
+>  * Avoid ILLEGAL of CD.S - both as Jean's suggestion.
+> 
+>  drivers/iommu/arm-smmu-v3.c | 15 ++++++++++++---
+>  1 file changed, 12 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index e67ba6c..22a6b08 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -316,6 +316,7 @@
+>  #define ARM64_TCR_TBI0_MASK		0x1UL
+>  
+>  #define CTXDESC_CD_0_AA64		(1UL << 41)
+> +#define CTXDESC_CD_0_S			(1UL << 44)
+>  #define CTXDESC_CD_0_R			(1UL << 45)
+>  #define CTXDESC_CD_0_A			(1UL << 46)
+>  #define CTXDESC_CD_0_ASET_SHIFT		47
+> @@ -604,6 +605,7 @@ struct arm_smmu_device {
+>  #define ARM_SMMU_FEAT_TRANS_S2		(1 << 10)
+>  #define ARM_SMMU_FEAT_STALLS		(1 << 11)
+>  #define ARM_SMMU_FEAT_HYP		(1 << 12)
+> +#define ARM_SMMU_FEAT_STALL_FORCE	(1 << 13)
+>  	u32				features;
+>  
+>  #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
+> @@ -996,6 +998,11 @@ static void arm_smmu_write_ctx_desc(struct arm_smmu_device *smmu,
+>  	      CTXDESC_CD_0_R | CTXDESC_CD_0_A | CTXDESC_CD_0_ASET_PRIVATE |
+>  	      CTXDESC_CD_0_AA64 | (u64)cfg->cd.asid << CTXDESC_CD_0_ASID_SHIFT |
+>  	      CTXDESC_CD_0_V;
+> +
+> +	/* STALL_MODEL==0b10 && CD.S==0 is ILLEGAL */
+> +	if (smmu->features & ARM_SMMU_FEAT_STALL_FORCE)
+> +		val |= CTXDESC_CD_0_S;
+> +
+>  	cfg->cdptr[0] = cpu_to_le64(val);
+>  
+>  	val = cfg->cd.ttbr & CTXDESC_CD_1_TTB0_MASK << CTXDESC_CD_1_TTB0_SHIFT;
+> @@ -1112,7 +1119,8 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
+>  #endif
+>  			 STRTAB_STE_1_STRW_NSEL1 << STRTAB_STE_1_STRW_SHIFT);
+>  
+> -		if (smmu->features & ARM_SMMU_FEAT_STALLS)
+> +		if (smmu->features & ARM_SMMU_FEAT_STALLS &&
+> +		   !(smmu->features & ARM_SMMU_FEAT_STALL_FORCE))
+>  			dst[1] |= cpu_to_le64(STRTAB_STE_1_S1STALLD);
+>  
+>  		val |= (ste->s1_cfg->cdptr_dma & STRTAB_STE_0_S1CTXPTR_MASK
+> @@ -2536,9 +2544,10 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
+>  			 coherent ? "true" : "false");
+>  
+>  	switch (reg & IDR0_STALL_MODEL_MASK << IDR0_STALL_MODEL_SHIFT) {
+> -	case IDR0_STALL_MODEL_STALL:
+> -		/* Fallthrough */
+>  	case IDR0_STALL_MODEL_FORCE:
+> +		smmu->features |= ARM_SMMU_FEAT_STALL_FORCE;
+> +		/* Fallthrough */
+> +	case IDR0_STALL_MODEL_STALL:
+>  		smmu->features |= ARM_SMMU_FEAT_STALLS;
+>  	}
+>  
+> 
