@@ -1,41 +1,29 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Fri, 20 Oct 2017 09:33:33 +0200
-Subject: [GIT PULL] STM32 defconfig changes for v4.15 #1
-In-Reply-To: <CAK8P3a3sfq13v8sVox8xiXvHpSyzsvV_4LEYsoNtdfLLhyS7MA@mail.gmail.com>
-References: <8c7fe79d-ebd3-ee7c-f056-1d3aa225edee@st.com>
- <CAK8P3a3sfq13v8sVox8xiXvHpSyzsvV_4LEYsoNtdfLLhyS7MA@mail.gmail.com>
-Message-ID: <e984aa91-cf82-8823-1cd6-ed0d194bd5ba@st.com>
+From: hch@lst.de (Christoph Hellwig)
+Date: Fri, 20 Oct 2017 09:37:30 +0200
+Subject: [PATCH 5/9] PCI: host: brcmstb: add dma-ranges for inbound traffic
+In-Reply-To: <CANCKTBuaTD29My77QfOeUmtZfLAmmJXUYe6QvBW+uoH2Kb+tAQ@mail.gmail.com>
+References: <1507761269-7017-1-git-send-email-jim2101024@gmail.com>
+ <1507761269-7017-6-git-send-email-jim2101024@gmail.com>
+ <589c04cb-061b-a453-3188-79324a02388e@arm.com>
+ <20171017081422.GA19475@lst.de>
+ <CANCKTBsCB+x2XgrND9AhRtxPkCXfps1nA+YymkZjKHOUZfjSHQ@mail.gmail.com>
+ <20171018065316.GA11183@lst.de>
+ <CANCKTBv+yiCNsrnx3m+W9wPqC4NdKPZ2p=zLtSa8fX6v1rPcYQ@mail.gmail.com>
+ <20171019091644.GA14983@lst.de>
+ <CANCKTBuaTD29My77QfOeUmtZfLAmmJXUYe6QvBW+uoH2Kb+tAQ@mail.gmail.com>
+Message-ID: <20171020073730.GA12937@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Thu, Oct 19, 2017 at 06:47:45PM -0400, Jim Quinlan wrote:
+> The only way to prevent this is to reserve a single page at the end of
+> the first memory region of any pair that are adjacent in physical
+> memory.  A hack, yes, but I don't see an easier way out of this.  Many
+> if not most of our boards do not have adjacent regions and would not
+> need this.
 
-On 10/19/2017 10:57 PM, Arnd Bergmann wrote:
-> On Tue, Oct 17, 2017 at 12:16 PM, Alexandre Torgue
-> <alexandre.torgue@st.com> wrote:
->> ----------------------------------------------------------------
->> STM32 defconfig updates for v4.15, round 1
->>
->> Highlights:
->> ----------
->>   -Regenerate default configuration
->>   -Add DMAMUX support
->>   -Add I2C F7 support
->>   -Add MDMA support
-> 
-> Pulled into next/soc.
-> 
-> Splitting out the first patch is fine, but there really is no need to have one
-> patch per new Kconfig option you enable, it's less work and more readable to
-> have a combined patch that explains what the options are and why you need
-> all of them.
-> 
->          Arnd
-> 
-
-ok. So you mean I would have to merge "Add DMAMUX support", "Add I2C F7 
-support", "Add MDMA support" in one patch before to submit the pull 
-request ? If yes, it will be done for next PR.
-
-Thanks
-Alex
+dma mappings can be much larger than a single page.  For the block
+world take a look at __blk_segment_map_sg which does the merging
+of contiguous pages into a single SG segment.  You'd have to override
+BIOVEC_PHYS_MERGEABLE to prevent this from happening in your supported
+architectures for the block layer.
