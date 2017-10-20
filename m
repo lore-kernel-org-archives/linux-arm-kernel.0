@@ -1,43 +1,36 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 Oct 2017 17:54:33 +0100
-Subject: [PATCH] ARM: compressed: discard ksym/kcrctab input section
-In-Reply-To: <CAKv+Gu_FqQjXLH6C8+pVyvfWqgL+e2g8geRG+t0kBxt49ObY-Q@mail.gmail.com>
-References: <CAKv+Gu_t+oLJKGzy3LxgLZqqYsd9eQiwZRr6dgPbqpsHnQUUxw@mail.gmail.com>
- <874lr4d8gm.fsf@free-electrons.com>
- <20171012094517.GB20805@n2100.armlinux.org.uk>
- <CAKv+Gu_+D+d+5Zi8LRmi3_sHEVx-FLLKHsi9aUUmNB8VvcHANQ@mail.gmail.com>
- <878tg56dtn.fsf@free-electrons.com>
- <CAKv+Gu_q0A+42ht1f4o_SToWSV4OBThV=gtyfBoGYFZyKWNW5Q@mail.gmail.com>
- <20171020161133.GG20805@n2100.armlinux.org.uk>
- <CAKv+Gu9Ygu4UELUbWD8sTzdL8ZQRWPAtQWaM6qTd2GyzuEDN5g@mail.gmail.com>
- <20171020163207.GH20805@n2100.armlinux.org.uk>
- <CAKv+Gu_FqQjXLH6C8+pVyvfWqgL+e2g8geRG+t0kBxt49ObY-Q@mail.gmail.com>
-Message-ID: <20171020165433.GI20805@n2100.armlinux.org.uk>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 20 Oct 2017 18:58:58 +0200
+Subject: [PATCH] pinctrl: rockchip: Add iomux-route switching support for
+ rk3288
+In-Reply-To: <68b8765d-3d55-3fdd-e23e-776e978c38bd@xs4all.nl>
+References: <20171013225337.5196-1-phh@phh.me> <2040825.vRYCsv903Y@diego>
+ <68b8765d-3d55-3fdd-e23e-776e978c38bd@xs4all.nl>
+Message-ID: <40786265.ZDfztTY44U@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 20, 2017 at 05:36:08PM +0100, Ard Biesheuvel wrote:
-> Why would you have to choose between these patches? You can simply
-> apply mine as a bug fix, and postpone the le_struct.h discussion for
-> the next cycle.
+Am Freitag, 20. Oktober 2017, 09:44:55 CEST schrieb Hans Verkuil:
+> On 20/10/17 09:38, Heiko St?bner wrote:
+> > Hi Hans,
+> > 
+> > Am Freitag, 20. Oktober 2017, 09:28:58 CEST schrieb Hans Verkuil:
+> >> On 14/10/17 17:39, Heiko Stuebner wrote:
+> >>> So far only the hdmi cec supports using one of two different pins
+> >>> as source, so add the route switching for it.
+> >>> 
+> >>> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> >> 
+> >> Just tested this on my firefly reload and it works great!
+> >> 
+> >> Tested-by: Hans Verkuil <hans.verkuil@cisco.com>
+> > 
+> > oh cool. I really only wrote this based on the soc manual,
+> > so it actually surprises me, that it works on the first try :-)
+> 
+> One note though: I've only tested it on my Firefly Reload. I don't have a
+> regular Firefly, so I can't be certain it works there. Just covering my ass
+> here :-)
 
-It's not a choice between these two patches.  I think we need Arnd's
-patch, because we know that fixes Romain Izard's problem.  If I apply
-just your patch, then Gregory stops complaining, and there'll be
-nothing to remind us of this issue - Romain isn't shouting about it.
-That's a problem, because it's a real bug that then gets forgotten
-about.
-
-Or do we have evidence that your patch fixes Romain Izard's problem
-as well?  I don't see any such suggestion.
-
-So, let me go back to the dart board... I just don't have the
-information to be able to make any decision on this, so stop asking
-me for a decision on something I know nothing about.  Either provide
-me with some information I can base a decision on, or stop asking
-for a decision.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Haha ... I guess the only thing I could have messed up would be the
+ordering (valu0 -> gpio0, value1 -> gpio7 ... and reverse), so if it were
+really wrong, you shouldn've have seen any results at all.
