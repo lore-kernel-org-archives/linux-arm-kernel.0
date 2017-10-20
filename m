@@ -1,21 +1,74 @@
-From: jeffy.chen@rock-chips.com (jeffy)
-Date: Sat, 21 Oct 2017 07:14:39 +0800
-Subject: [PATCH v6 03/10] drm/bridge: analogix: Do not use device's drvdata
-In-Reply-To: <20171020165226.vqoeldcmreuc73le@art_vandelay>
-References: <20171019034812.13768-1-jeffy.chen@rock-chips.com>
- <20171019034812.13768-4-jeffy.chen@rock-chips.com>
- <20171020165226.vqoeldcmreuc73le@art_vandelay>
-Message-ID: <59EA835F.3090508@rock-chips.com>
+From: ahs3@redhat.com (Al Stone)
+Date: Fri, 20 Oct 2017 17:26:19 -0600
+Subject: [PATCH 0/3] arm64: cpuinfo: make /proc/cpuinfo more human-readable
+In-Reply-To: <20171020161053.ujw3spzizhgu4g7b@lakrids.cambridge.arm.com>
+References: <20170926222324.17409-1-ahs3@redhat.com>
+ <20170927103406.GC32150@leverpostej>
+ <CAOZdJXUzo3JrHW1h6W3y3BnVq472NjPpaqTztzEODZnnMyvJRg@mail.gmail.com>
+ <20171013142724.GA5893@leverpostej>
+ <abeb1756-3635-2f86-131c-cd904731a308@redhat.com>
+ <20171020161053.ujw3spzizhgu4g7b@lakrids.cambridge.arm.com>
+Message-ID: <89947f32-0833-fb67-6bba-02bcac8ef01c@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
+On 10/20/2017 10:10 AM, Mark Rutland wrote:
+> Hi Al,
+> 
+> On Mon, Oct 16, 2017 at 05:43:19PM -0600, Al Stone wrote:
+>> On 10/13/2017 08:27 AM, Mark Rutland wrote:
+>>> I certainly agree that exposing the information that we have is useful,
+>>> as I have stated several times. I'm not NAKing exposing this information
+>>> elsewhere.
+>>>
+>>> If you want a consistent cross-architecture interface for this
+>>> information, then you need to propose a new one. That was we can
+>>> actually solve the underlying issues, for all architectures, without
+>>> breaking ABI.
+>>>
+>>> I would be *very* interested in such an interface, and would be more
+>>> than happy to help.
+>>
+>> I'm playing with some patches that do very similar things in sysfs, vs
+>> proc.  Is that better :)?
+> 
+> Exposing data under sysfs is certainly better, yes. :)
+> 
+>> Obviously, you'll have to see the patches to
+>> properly answer that, but what I'm playing with at present is placing
+>> this info in new entries in /sys/devices/cpu and/or /sys/devices/system,
+>> and generating some of the content based on what's already in header files
+>> (e.g., in cputype.h). 
+> 
+> My opposition to MIDR -> string mapping applies regardless of
+> location...
 
-On 10/21/2017 12:52 AM, Sean Paul wrote:
-> On Thu, Oct 19, 2017 at 11:48:05AM +0800, Jeffy Chen wrote:
->
-> This patch has somehow lost it's original author. I assume this is not
-> intentional.
+Harumph.  This is the one thing I get asked for most often, however (second most
+is frequency).  It turns out humans are not nearly as good at indexed lookups as
+computers, hence the requests.
 
-oops, sorry, guess i used some wrongly command during the rebasing... 
-will fix that.
+Whatever the root of the opposition is, it needs to get fixed.  My fear is that
+if it doesn't get fixed in the firmware or the kernel, it will get fixed in some
+far messier, less controllable way somewhere else (more likely several somewhere
+elses) and just exacerbate the problem.
+
+>> The idea of course is to keep this new info from touching any existing
+>> info so we don't break compatibility -- does that feel like a better
+>> direction, at least?
+> 
+> ... but otherwise this sounds good to me!
+> 
+> Thanks,
+> Mark.
+> 
+
+
+-- 
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Red Hat, Inc.
+ahs3 at redhat.com
+-----------------------------------
