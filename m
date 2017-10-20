@@ -1,76 +1,40 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Fri, 20 Oct 2017 15:17:42 -0700
-Subject: [PATCH 1/1] tty: serial: imx: allow breaks to be received when
- using dma
-In-Reply-To: <20171020221340.14974-1-troy.kisky@boundarydevices.com>
-References: <20171020221340.14974-1-troy.kisky@boundarydevices.com>
-Message-ID: <a3f0140a-92bb-ed59-ee79-971385634d4d@boundarydevices.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Sat, 21 Oct 2017 00:04:49 +0200
+Subject: [PATCH v2 4/4] ARM: dts: meson: add the efuse node
+In-Reply-To: <20171002232804.20042-5-martin.blumenstingl@googlemail.com>
+References: <20171002232804.20042-1-martin.blumenstingl@googlemail.com>
+ <20171002232804.20042-5-martin.blumenstingl@googlemail.com>
+Message-ID: <CAFBinCAtcWERQbH4Q8XRYMyYctwWEj0bX+Ud5oRyhOuOiYjqew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/20/2017 3:13 PM, Troy Kisky wrote:
-> This allows me to login after sending a break when service
-> serial-getty at ttymxc0.service is running
-> 
-> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+Hi Kevin,
+
+On Tue, Oct 3, 2017 at 1:28 AM, Martin Blumenstingl
+<martin.blumenstingl@googlemail.com> wrote:
+> Meson6, Meson8 and Meson8b use a similar IP block which has access to
+> 512 bytes of efuse data.
+> During SoC manufacturing some calibration settings for the CVBS
+> connector and the internal temperature sensor are written to this efuse.
+> On some boards it additionally stores for example the MAC addresses.
+>
+> The efuse is enabled on Meson8 and Meson8b but kept disabled on Meson6
+> since we do not have a clock driver there (which is required to read
+> data from the efuse).
+>
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 > ---
->  drivers/tty/serial/imx.c | 20 +++++++++++++-------
->  1 file changed, 13 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-> index 506fcd742b47..39033f460a24 100644
-> --- a/drivers/tty/serial/imx.c
-> +++ b/drivers/tty/serial/imx.c
-> @@ -934,7 +934,6 @@ static void dma_rx_callback(void *data)
->  	status = dmaengine_tx_status(chan, (dma_cookie_t)0, &state);
->  
->  	if (status == DMA_ERROR) {
-> -		dev_err(sport->port.dev, "DMA transaction error.\n");
->  		clear_rx_errors(sport);
->  		return;
->  	}
-> @@ -1035,6 +1034,7 @@ static int start_rx_dma(struct imx_port *sport)
->  
->  static void clear_rx_errors(struct imx_port *sport)
->  {
-> +	struct tty_port *port = &sport->port.state->port;
->  	unsigned int status_usr1, status_usr2;
->  
->  	status_usr1 = readl(sport->port.membase + USR1);
-> @@ -1043,12 +1043,18 @@ static void clear_rx_errors(struct imx_port *sport)
->  	if (status_usr2 & USR2_BRCD) {
->  		sport->port.icount.brk++;
->  		writel(USR2_BRCD, sport->port.membase + USR2);
-> -	} else if (status_usr1 & USR1_FRAMERR) {
-> -		sport->port.icount.frame++;
-> -		writel(USR1_FRAMERR, sport->port.membase + USR1);
-> -	} else if (status_usr1 & USR1_PARITYERR) {
-> -		sport->port.icount.parity++;
-> -		writel(USR1_PARITYERR, sport->port.membase + USR1);
-> +		if (tty_insert_flip_char(port, 0, TTY_BREAK) == 0)
-> +			sport->port.icount.buf_overrun++;
-> +		tty_flip_buffer_push(port);
-> +	} else {
-> +		dev_err(sport->port.dev, "DMA transaction error.\n");
-> +		if (status_usr1 & USR1_FRAMERR) {
-> +			sport->port.icount.frame++;
-> +			writel(USR1_FRAMERR, sport->port.membase + USR1);
-> +		} else if (status_usr1 & USR1_PARITYERR) {
-> +			sport->port.icount.parity++;
-> +			writel(USR1_PARITYERR, sport->port.membase + USR1);
-> +		}
->  	}
->  
->  	if (status_usr2 & USR2_ORE) {
-> 
+>  arch/arm/boot/dts/meson.dtsi   | 15 +++++++++++++++
+>  arch/arm/boot/dts/meson6.dtsi  |  3 +++
+>  arch/arm/boot/dts/meson8.dtsi  |  6 ++++++
+>  arch/arm/boot/dts/meson8b.dtsi |  7 +++++++
+>  4 files changed, 31 insertions(+)
+the dt-binding documentation and driver were queued for v4.15 today.
+could you please have a look at this patch and queue it for v4.15 as
+well (if everything is fine)?
+
+[snip]
 
 
-
-Does this need to use
- 	spin_lock_irqsave(&sport->port.lock, flags);
-
-
-I would have, but dma_rx_callback doesn't.
-
-BR
-Troy
+thank you!
+Martin
