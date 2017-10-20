@@ -1,274 +1,602 @@
-From: gengdj.1984@gmail.com (gengdongjiu)
-Date: Fri, 20 Oct 2017 22:25:11 +0800
-Subject: [PATCH v7 1/4] arm64: kvm: route synchronous external abort
- exceptions to EL2
-In-Reply-To: <59E78DAC.1090107@arm.com>
-References: <1508249689-10350-1-git-send-email-gengdongjiu@huawei.com>
- <1508249689-10350-2-git-send-email-gengdongjiu@huawei.com>
- <59E78DAC.1090107@arm.com>
-Message-ID: <CAMj-D2CidM6m3Vm27h90NwQM+OWAeu-jYUQmgmkqMuN-bezFJA@mail.gmail.com>
+From: oleksandrs@mellanox.com (Oleksandr Shamray)
+Date: Fri, 20 Oct 2017 14:34:00 +0000
+Subject: [patch v9 1/4] drivers: jtag: Add JTAG core driver
+In-Reply-To: <20171020115512.GA2073@kroah.com>
+References: <1505985932-27568-1-git-send-email-oleksandrs@mellanox.com>
+ <1505985932-27568-2-git-send-email-oleksandrs@mellanox.com>
+ <20171020115512.GA2073@kroah.com>
+Message-ID: <AM4PR0501MB21940531802FC14EDE8C3F75B1430@AM4PR0501MB2194.eurprd05.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi james,
-  Thanks for the mail and sorry for my late response.
+Hi Greg.
+
+> -----Original Message-----
+> From: Greg KH [mailto:gregkh at linuxfoundation.org]
+> Sent: Friday, October 20, 2017 2:55 PM
+> To: Oleksandr Shamray <oleksandrs@mellanox.com>
+> Cc: arnd at arndb.de; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; devicetree at vger.kernel.org;
+> openbmc at lists.ozlabs.org; joel at jms.id.au; jiri at resnulli.us;
+> tklauser at distanz.ch; linux-serial at vger.kernel.org; mec at shout.net; Vadim
+> Pasternak <vadimp@mellanox.com>; system-sw-low-level <system-sw-low-
+> level at mellanox.com>; robh+dt at kernel.org; openocd-devel-
+> owner at lists.sourceforge.net; linux-api at vger.kernel.org;
+> davem at davemloft.net; mchehab at kernel.org; Jiri Pirko <jiri@mellanox.com>
+> Subject: Re: [patch v9 1/4] drivers: jtag: Add JTAG core driver
+> 
+> On Thu, Sep 21, 2017 at 12:25:29PM +0300, Oleksandr Shamray wrote:
+> > +struct jtag {
+> > +	struct device *dev;
+> > +	struct cdev cdev;
+> 
+> Why are you using a cdev here and not just a normal misc device? 
+
+What the benefits to use misc instead of cdev?
+
+> I forgot if this is what you were doing before, sorry...
+> 
+> > +	int id;
+> > +	atomic_t open;
+> 
+> Why do you need this?
+
+This counter used to avoid open at the same time by 2 or more users.
+> 
+> > +	const struct jtag_ops *ops;
+> > +	unsigned long priv[0] __aligned(ARCH_DMA_MINALIGN);
+> 
+> Huh?  Why is this needed to be dma aligned?  Why not just use the private
+> pointer in struct device?
+> 
+
+It is critical?
+
+> > +};
+> > +
+> > +static dev_t jtag_devt;
+> > +static DEFINE_IDA(jtag_ida);
+> > +
+> > +void *jtag_priv(struct jtag *jtag)
+> > +{
+> > +	return jtag->priv;
+> > +}
+> > +EXPORT_SYMBOL_GPL(jtag_priv);
+> > +
+> > +static u8 *jtag_copy_from_user(__u64 udata, unsigned long bit_size) {
+> > +	unsigned long size;
+> > +	void *kdata;
+> > +
+> > +	size = DIV_ROUND_UP(bit_size, BITS_PER_BYTE);
+> > +	kdata = memdup_user(u64_to_user_ptr(udata), size);
+> 
+> You only use this once, why not just open-code it?
+
+I think it makes code more understandable.
+
+> 
+> > +
+> > +	return kdata;
+> > +}
+> > +
+> > +static unsigned long jtag_copy_to_user(__u64 udata, u8 *kdata,
+> > +				       unsigned long bit_size)
+> > +{
+> > +	unsigned long size;
+> > +
+> > +	size = DIV_ROUND_UP(bit_size, BITS_PER_BYTE);
+> > +
+> > +	return copy_to_user(u64_to_user_ptr(udata), (void *)(kdata), size);
+> 
+> Same here, making this a separate function seems odd.
+
+Same, I think it makes code more understandable.
+
+> 
+> > +}
+> > +
+> > +static struct class jtag_class = {
+> > +	.name = "jtag",
+> > +	.owner = THIS_MODULE,
+> > +};
+> > +
+> > +static int jtag_run_test_idle_op(struct jtag *jtag,
+> > +				 struct jtag_run_test_idle *idle) {
+> > +	if (jtag->ops->idle)
+> > +		return jtag->ops->idle(jtag, idle);
+> > +	else
+> > +		return -EOPNOTSUPP;
+> 
+> Why is this a function?  Why not just do this work in the ioctl?
+
+Agree. I will move it just to ioctl function body.
+
+> 
+> > +}
+> > +
+> > +static int jtag_xfer_op(struct jtag *jtag, struct jtag_xfer *xfer, u8
+> > +*data) {
+> > +	if (jtag->ops->xfer)
+> > +		return jtag->ops->xfer(jtag, xfer, data);
+> > +	else
+> > +		return -EOPNOTSUPP;
+> 
+> Same here, doesn't need to be a function.
+
+Agree.
+
+> 
+> > +}
+> > +
+> > +static long jtag_ioctl(struct file *file, unsigned int cmd, unsigned
+> > +long arg) {
+> > +	struct jtag *jtag = file->private_data;
+> > +	struct jtag_run_test_idle idle;
+> > +	struct jtag_xfer xfer;
+> > +	u8 *xfer_data;
+> > +	u32 value;
+> > +	int err;
+> > +
+> > +	switch (cmd) {
+> > +	case JTAG_GIOCFREQ:
+> > +		if (jtag->ops->freq_get)
+> > +			err = jtag->ops->freq_get(jtag, &value);
+> > +		else
+> > +			err = -EOPNOTSUPP;
+> > +		if (err)
+> > +			break;
+> > +
+> > +		err = put_user(value, (__u32 *)arg);
+> > +		break;
+> 
+> Are you sure the return value of put_user is correct here?  Shouldn't you return
+> -EFAULT if err is not 0?
+
+Yes, thanks for point of this.
+
+> 
+> > +
+> > +	case JTAG_SIOCFREQ:
+> > +		err = get_user(value, (__u32 *)arg);
+> > +
+> 
+> why a blank line?
+
+Will remove
+
+> 
+> > +		if (value == 0)
+> > +			err = -EINVAL;
+> 
+> Check err first.
+
+Ok.
+
+> 
+> > +		if (err)
+> > +			break;
+> 
+> And set it properly, again err should be -EFAULT, right?
+
+Right ?0
+
+> 
+> > +
+> > +		if (jtag->ops->freq_set)
+> > +			err = jtag->ops->freq_set(jtag, value);
+> > +		else
+> > +			err = -EOPNOTSUPP;
+> > +		break;
+> > +
+> > +	case JTAG_IOCRUNTEST:
+> > +		if (copy_from_user(&idle, (void *)arg,
+> > +				   sizeof(struct jtag_run_test_idle)))
+> > +			return -ENOMEM;
+> > +		err = jtag_run_test_idle_op(jtag, &idle);
+> 
+> Who validates the structure fields?  Is that up to the individual jtag driver?  Why
+> not do it in the core correctly so that it only has to be done in one place and you
+> do not have to audit every individual driver?
+
+Input parameters validated by jtag  platform driver. I think it not critical.
+
+> 
+> > +		break;
+> > +
+> > +	case JTAG_IOCXFER:
+> > +		if (copy_from_user(&xfer, (void *)arg,
+> > +				   sizeof(struct jtag_xfer)))
+> > +			return -EFAULT;
+> > +
+> > +		if (xfer.length >= JTAG_MAX_XFER_DATA_LEN)
+> > +			return -EFAULT;
+> > +
+> > +		xfer_data = jtag_copy_from_user(xfer.tdio, xfer.length);
+> > +		if (!xfer_data)
+> > +			return -ENOMEM;
+> 
+> Are you sure that's the correct error value?
+
+I think yes, but what you suggest?
+
+> 
+> > +
+> > +		err = jtag_xfer_op(jtag, &xfer, xfer_data);
+> > +		if (jtag_copy_to_user(xfer.tdio, xfer_data, xfer.length)) {
+> > +			kfree(xfer_data);
+> > +			return -EFAULT;
+> > +		}
+> > +
+> > +		kfree(xfer_data);
+> > +		if (copy_to_user((void *)arg, &xfer, sizeof(struct jtag_xfer)))
+> > +			return -EFAULT;
+> > +		break;
+> > +
+> > +	case JTAG_GIOCSTATUS:
+> > +		if (jtag->ops->status_get)
+> > +			err = jtag->ops->status_get(jtag, &value);
+> > +		else
+> > +			err = -EOPNOTSUPP;
+> > +		if (err)
+> > +			break;
+> > +
+> > +		err = put_user(value, (__u32 *)arg);
+> 
+> Same put_user err issue here.
+
+Yes.
+
+> 
+> > +		break;
+> > +
+> > +	default:
+> > +		return -EINVAL;
+> > +	}
+> > +	return err;
+> > +}
+> > +
+> > +#ifdef CONFIG_COMPAT
+> > +static long jtag_ioctl_compat(struct file *file, unsigned int cmd,
+> > +			      unsigned long arg)
+> > +{
+> > +	return jtag_ioctl(file, cmd, (unsigned long)compat_ptr(arg)); }
+> > +#endif
+> 
+> Why do you need a compat callback for a new ioctl?  Create your structures
+> properly and this should not be needed, right?
 
 
-2017-10-19 1:21 GMT+08:00, James Morse <james.morse@arm.com>:
-> Hi Dongjiu Geng,
->
-> On 17/10/17 15:14, Dongjiu Geng wrote:
->> ARMv8.2 adds a new bit HCR_EL2.TEA which controls to
->> route synchronous external aborts to EL2, and adds a
->> trap control bit HCR_EL2.TERR which controls to
->> trap all Non-secure EL1&0 error record accesses to EL2.
->
-> The bulk of this patch is about trap-and-emulating these ERR registers, but
-> that's not reflected in the title:
->> KVM: arm64: Emulate RAS error registers and set HCR_EL2's TERR & TEA
->
->
->> This patch enables the two bits for the guest OS.
->> when an synchronous abort is generated in the guest OS,
->> it will trap to EL3 firmware, EL3 firmware will check the
->
-> *buzz*
-> This depends on SCR_EL3.EA, which this patch doesn't touch and the
-> normal-world
-> can't even know about. This is what your system does, the commit message
-> should
-> be about the change to Linux.
->
-> (I've said this before)
+I does this because Arnd (arndbergmann at gmail.com) writed in review (On Wed, Aug 2, 2017 at 3:18 PM)
 
-Thanks for the point out, I make this series in a hurry(you are
-waiting this patch), forget to check again your comments before.
+[..]
+> +       .unlocked_ioctl = jtag_ioctl,
+> +       .open           = jtag_open,
+> +       .release        = jtag_release,
+> +};
 
->
->
->> HCR_EL2.TEA value to decide to jump to hypervisor or host
->> OS. Enabling HCR_EL2.TERR makes error record access
->> from guest trap to EL2.
->>
->> Add some minimal emulation for RAS-Error-Record registers.
->> In the emulation, ERRIDR_EL1 and ERRSELR_EL1 are zero.
->> Then, the others ERX* registers are RAZ/WI.
->
->> diff --git a/arch/arm64/include/asm/kvm_emulate.h
->> b/arch/arm64/include/asm/kvm_emulate.h
->> index fe39e68..47983db 100644
->> --- a/arch/arm64/include/asm/kvm_emulate.h
->> +++ b/arch/arm64/include/asm/kvm_emulate.h
->> @@ -47,6 +47,13 @@ static inline void vcpu_reset_hcr(struct kvm_vcpu
->> *vcpu)
->>  	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
->>  	if (is_kernel_in_hyp_mode())
->>  		vcpu->arch.hcr_el2 |= HCR_E2H;
->> +	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN)) {
->
-> This ARM64_HAS_RAS_EXTN isn't in mainline, nor is it added by your series.
-> I
-> know where it comes from, but other reviewers may not. If you have
-> dependencies
-> on another series, please call them out in the cover letter.
-
-yes, thanks for the point out.
-
->
-> This is the first cpus_have_const_cap() user in this header file, it
-> probably needs:
-> #include <asm/cpufeature.h>
-
-OK
-
->
->
->> +		/* route synchronous external abort exceptions to EL2 */
->> +		vcpu->arch.hcr_el2 |= HCR_TEA;
->> +		/* trap error record accesses */
->> +		vcpu->arch.hcr_el2 |= HCR_TERR;
->> +	}
->> +
->>  	if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features))
->>  		vcpu->arch.hcr_el2 &= ~HCR_RW;
->>  }
->> diff --git a/arch/arm64/include/asm/kvm_host.h
->> b/arch/arm64/include/asm/kvm_host.h
->> index d686300..af55b3bc 100644
->> --- a/arch/arm64/include/asm/kvm_host.h
->> +++ b/arch/arm64/include/asm/kvm_host.h
->> @@ -105,6 +105,8 @@ enum vcpu_sysreg {
->>  	TTBR1_EL1,	/* Translation Table Base Register 1 */
->>  	TCR_EL1,	/* Translation Control Register */
->>  	ESR_EL1,	/* Exception Syndrome Register */
->
->> +	ERRIDR_EL1,     /* Error Record ID Register */
->
-> Page 39 of [0]: 'ERRIDR_EL1 is a 64-bit read-only ...'.
-
-yes, it is read-only.
-
->
->
->> +	ERRSELR_EL1,    /* Error Record Select Register */
->
-> We're emulating these as RAZ/WI, do we really need to allocate
-> vcpu->arch.ctxt.sys_regs space for them? If we always return 0 for ERRIDR,
-> then
-> we don't need to keep ERRSELR as 'the value read back [..] is UNKNOWN'.
-
-https://lists.cs.columbia.edu/pipermail/kvmarm/2017-September/027176.html
-
-" 'If ERRSELR_EL1.SEL is
-[>=]  ERRIDR_EL1.NUM' that makes the ERX* registers RAZ/WI"
-
-This is because I want to make above simulation as you suggested, if
-want to make above simulation, it needs set "vcpu->arch.ctxt.sys_regs"
-to 0, instead of reading from system register.
-
-so need a space to store it
-
->
-> I think we only need space for these once their value needs to be migrated,
-> user-space doesn't need to know they exist until then.
->
->
->>  	AFSR0_EL1,	/* Auxiliary Fault Status Register 0 */
->>  	AFSR1_EL1,	/* Auxiliary Fault Status Register 1 */
->>  	FAR_EL1,	/* Fault Address Register */
->
->> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
->> index 2e070d3..a74617b 100644
->> --- a/arch/arm64/kvm/sys_regs.c
->> +++ b/arch/arm64/kvm/sys_regs.c
->> @@ -775,6 +775,36 @@ static bool access_pmovs(struct kvm_vcpu *vcpu,
->> struct sys_reg_params *p,
->>  	return true;
->>  }
->>
->> +static bool access_error_reg(struct kvm_vcpu *vcpu, struct sys_reg_params
->> *p,
->> +			 const struct sys_reg_desc *r)
->> +{
->> +	/* accessing ERRIDR_EL1 */
->> +	if (r->CRm == 3 && r->Op2 == 0) {
->> +		if (p->is_write)
->> +			vcpu_sys_reg(vcpu, ERRIDR_EL1) = 0;
->
-> As above, this register is read-only.
-
-yes, it is my mistake.
-
->
->
->> +		return trap_raz_wi(vcpu, p, r);
->
-> If we can get rid of the vcpu storage this just becomes trap_raz_wi() .
-
-yes
-
->
->
->> +	}
->> +
->> +	/* accessing ERRSELR_EL1 */
->> +	if (r->CRm == 3 && r->Op2 == 1) {
->> +		if (p->is_write)
->> +			vcpu_sys_reg(vcpu, ERRSELR_EL1) = 0;
->> +
->> +		return trap_raz_wi(vcpu, p, r);
->> +	}
->
-> Same here.
->
->
->> +
->> +	/*
->> +	 * If ERRSELR_EL1.SEL is greater than or equal to ERRIDR_EL1.NUM,
->> +	 * the ERX* registers are RAZ/WI.
->> +	 */
->> +	if ((vcpu_sys_reg(vcpu, ERRSELR_EL1) & 0xff) >=
->> +			(vcpu_sys_reg(vcpu, ERRIDR_EL1) && 0xff))
->> +		return trap_raz_wi(vcpu, p, r);
->
-> The trick here is ERRIDR_EL1 is read only, KVM can choose how many records
-> it
-> emulates. Let's pick zero:
-
-yes, if it is read only, just pick zero.
+add a compat_ioctl pointer here, after ensuring that all ioctl commands are compatible between 32-bit and 64-bit user space.
+[..]
 
 
->> Zero indicates no records can be accessed through the Error Record System
->> registers.
->
-> Which lets us collapse this entire function down to trap_raz_wi().
->
->
-> I agree we will need this code once we need to allow user-space to populate
-> values for these registers. (and I bet no-one will want to do that until we
-> get
-> kernel-first support)
->
+> 
+> > +
+> > +static int jtag_open(struct inode *inode, struct file *file) {
+> > +	struct jtag *jtag = container_of(inode->i_cdev, struct jtag, cdev);
+> > +
+> > +	if (atomic_read(&jtag->open)) {
+> > +		dev_info(NULL, "jtag already opened\n");
+> > +		return -EBUSY;
+> 
+> Why do you care if multiple opens can happen?
 
-yes.
+Jtag HW not support to using with multiple requests from different users. So we prohibit this.
 
->
->> +	return true;
->> +}
->> +
->>  static bool access_pmswinc(struct kvm_vcpu *vcpu, struct sys_reg_params
->> *p,
->>  			   const struct sys_reg_desc *r)
->>  {
->> @@ -953,6 +983,16 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->>  	{ SYS_DESC(SYS_AFSR0_EL1), access_vm_reg, reset_unknown, AFSR0_EL1 },
->>  	{ SYS_DESC(SYS_AFSR1_EL1), access_vm_reg, reset_unknown, AFSR1_EL1 },
->>  	{ SYS_DESC(SYS_ESR_EL1), access_vm_reg, reset_unknown, ESR_EL1 },
->> +
->> +	{ SYS_DESC(SYS_ERRIDR_EL1), access_error_reg, reset_val, ERRIDR_EL1, 0
->> },
->> +	{ SYS_DESC(SYS_ERRSELR_EL1), access_error_reg, reset_val, ERRSELR_EL1, 0
->> },
->> +	{ SYS_DESC(SYS_ERXFR_EL1), access_error_reg },
->> +	{ SYS_DESC(SYS_ERXCTLR_EL1), access_error_reg },
->> +	{ SYS_DESC(SYS_ERXSTATUS_EL1), access_error_reg },
->> +	{ SYS_DESC(SYS_ERXADDR_EL1), access_error_reg },
->> +	{ SYS_DESC(SYS_ERXMISC0_EL1), access_error_reg },
->> +	{ SYS_DESC(SYS_ERXMISC1_EL1), access_error_reg },
->
-> Why can't we just make all these trap_raz_wi()?
+> 
+> > +	}
+> > +
+> > +	atomic_inc(&jtag->open);
+> 
+> Oh look, you just raced with two different people opening at the same time :(
+> 
+> An atomic value is never a replacement for a lock, sorry.
+> 
+> > +	file->private_data = jtag;
+> > +	return 0;
+> > +}
+> > +
+> > +static int jtag_release(struct inode *inode, struct file *file) {
+> > +	struct jtag *jtag = file->private_data;
+> > +
+> > +	atomic_dec(&jtag->open);
+> 
+> Again, not needed.
+> 
+> > +	return 0;
+> > +}
+> > +
+> > +static const struct file_operations jtag_fops = {
+> > +	.owner		= THIS_MODULE,
+> > +	.open		= jtag_open,
+> > +	.release	= jtag_release,
+> > +	.llseek		= noop_llseek,
+> > +	.unlocked_ioctl = jtag_ioctl,
+> > +#ifdef CONFIG_COMPAT
+> > +	.compat_ioctl	= jtag_ioctl_compat,
+> > +#endif
+> > +};
+> > +
+> > +struct jtag *jtag_alloc(size_t priv_size, const struct jtag_ops *ops)
+> > +{
+> > +	struct jtag *jtag;
+> > +
+> > +	jtag = kzalloc(sizeof(*jtag) + round_up(priv_size,
+> ARCH_DMA_MINALIGN),
+> > +		       GFP_KERNEL);
+> > +	if (!jtag)
+> > +		return NULL;
+> > +
+> > +	jtag->ops = ops;
+> > +	return jtag;
+> > +}
+> > +EXPORT_SYMBOL_GPL(jtag_alloc);
+> 
+> register should allocate and register the device, why pass a structure back that
+> the caller then has to do something else with to use it?
+> 
 
-https://lists.cs.columbia.edu/pipermail/kvmarm/2017-September/027176.html
+Before registration we need to initialize JTAG device HW registers and fill private data with HW specific parameters.
+And is I see in other Linux drivers it is a common way to separate allocation device and register it
 
-you ever have below suggestion, so use a function "access_error_reg" to do it.
-'If ERRSELR_EL1.SEL is
-[>=]  ERRIDR_EL1.NUM' that makes the ERX* registers RAZ/WI too.
+> > +
+> > +void jtag_free(struct jtag *jtag)
+> > +{
+> > +	kfree(jtag);
+> > +}
+> > +EXPORT_SYMBOL_GPL(jtag_free);
+> > +
+> > +int jtag_register(struct jtag *jtag)
+> > +{
+> > +	int id;
+> > +	int err;
+> > +
+> > +	id = ida_simple_get(&jtag_ida, 0, 0, GFP_KERNEL);
+> > +	if (id < 0)
+> > +		return id;
+> > +
+> > +	jtag->id = id;
+> > +	cdev_init(&jtag->cdev, &jtag_fops);
+> > +	jtag->cdev.owner = THIS_MODULE;
+> > +	err = cdev_add(&jtag->cdev, MKDEV(MAJOR(jtag_devt), jtag->id), 1);
+> > +	if (err)
+> > +		goto err_cdev;
+> 
+> misc device would be so much simpler and easier here :(
+> 
+> 
+> > +
+> > +	/* Register this jtag device with the driver core */
+> > +	jtag->dev = device_create(&jtag_class, NULL,
+> MKDEV(MAJOR(jtag_devt),
+> > +							   jtag->id),
+> > +				  NULL, "jtag%d", jtag->id);
+> > +	if (!jtag->dev)
+> > +		goto err_device_create;
+> > +
+> > +	atomic_set(&jtag->open, 0);
+> > +	dev_set_drvdata(jtag->dev, jtag);
+> > +	return err;
+> > +
+> > +err_device_create:
+> > +	cdev_del(&jtag->cdev);
+> > +err_cdev:
+> > +	ida_simple_remove(&jtag_ida, id);
+> > +	return err;
+> > +}
+> > +EXPORT_SYMBOL_GPL(jtag_register);
+> > +
+> > +void jtag_unregister(struct jtag *jtag) {
+> > +	struct device *dev = jtag->dev;
+> > +
+> > +	cdev_del(&jtag->cdev);
+> > +	device_unregister(dev);
+> > +	ida_simple_remove(&jtag_ida, jtag->id); }
+> > +EXPORT_SYMBOL_GPL(jtag_unregister);
+> > +
+> > +static int __init jtag_init(void)
+> > +{
+> > +	int err;
+> > +
+> > +	err = alloc_chrdev_region(&jtag_devt, JTAG_FIRST_MINOR,
+> > +				  JTAG_MAX_DEVICES, "jtag");
+> > +	if (err)
+> > +		return err;
+> > +
+> > +	err = class_register(&jtag_class);
+> > +	if (err)
+> > +		unregister_chrdev_region(jtag_devt, JTAG_MAX_DEVICES);
+> > +
+> > +	return err;
+> > +}
+> > +
+> > +static void __exit jtag_exit(void)
+> > +{
+> > +	class_unregister(&jtag_class);
+> > +	unregister_chrdev_region(jtag_devt, JTAG_MAX_DEVICES);
+> 
+> Your idr leaked memory :(
+> 
 
-make all  to  trap_raz_wi() is simple.
+Yes I will add ida_destroy() here.
+> 
+> 
+> > +}
+> > +
+> > +module_init(jtag_init);
+> > +module_exit(jtag_exit);
+> > +
+> > +MODULE_AUTHOR("Oleksandr Shamray <oleksandrs@mellanox.com>");
+> > +MODULE_DESCRIPTION("Generic jtag support"); MODULE_LICENSE("GPL
+> v2");
+> > diff --git a/include/linux/jtag.h b/include/linux/jtag.h new file mode
+> > 100644 index 0000000..c016fed
+> > --- /dev/null
+> > +++ b/include/linux/jtag.h
+> > @@ -0,0 +1,48 @@
+> > +/*
+> > + * drivers/jtag/jtag.c
+> > + *
+> > + * Copyright (c) 2017 Mellanox Technologies. All rights reserved.
+> > + * Copyright (c) 2017 Oleksandr Shamray <oleksandrs@mellanox.com>
+> > + *
+> > + * Released under the GPLv2 only.
+> > + * SPDX-License-Identifier: GPL-2.0
+> > + */
+> > +
+> > +#ifndef __JTAG_H
+> > +#define __JTAG_H
+> > +
+> > +#include <uapi/linux/jtag.h>
+> > +
+> > +#ifndef ARCH_DMA_MINALIGN
+> > +#define ARCH_DMA_MINALIGN 1
+> > +#endif
+> > +
+> > +#define jtag_u64_to_ptr(arg) ((void *)(uintptr_t)arg)
+> > +
+> > +#define JTAG_MAX_XFER_DATA_LEN 65535
+> > +
+> > +struct jtag;
+> > +/**
+> > + * struct jtag_ops - callbacks for jtag control functions:
+> > + *
+> > + * @freq_get: get frequency function. Filled by device driver
+> > + * @freq_set: set frequency function. Filled by device driver
+> > + * @status_get: set status function. Filled by device driver
+> > + * @idle: set JTAG to idle state function. Filled by device driver
+> > + * @xfer: send JTAG xfer function. Filled by device driver  */ struct
+> > +jtag_ops {
+> > +	int (*freq_get)(struct jtag *jtag, u32 *freq);
+> > +	int (*freq_set)(struct jtag *jtag, u32 freq);
+> > +	int (*status_get)(struct jtag *jtag, u32 *state);
+> > +	int (*idle)(struct jtag *jtag, struct jtag_run_test_idle *idle);
+> > +	int (*xfer)(struct jtag *jtag, struct jtag_xfer *xfer); };
+> > +
+> > +void *jtag_priv(struct jtag *jtag);
+> > +int jtag_register(struct jtag *jtag); void jtag_unregister(struct
+> > +jtag *jtag); struct jtag *jtag_alloc(size_t priv_size, const struct
+> > +jtag_ops *ops); void jtag_free(struct jtag *jtag);
+> > +
+> > +#endif /* __JTAG_H */
+> > diff --git a/include/uapi/linux/jtag.h b/include/uapi/linux/jtag.h new
+> > file mode 100644 index 0000000..180bf22
+> > --- /dev/null
+> > +++ b/include/uapi/linux/jtag.h
+> > @@ -0,0 +1,115 @@
+> > +/*
+> > + * JTAG class driver
+> > + *
+> > + * Copyright (c) 2017 Mellanox Technologies. All rights reserved.
+> > + * Copyright (c) 2017 Oleksandr Shamray <oleksandrs@mellanox.com>
+> > + *
+> > + * Released under the GPLv2/BSD.
+> > + * SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause  */
+> > +
+> > +#ifndef __UAPI_LINUX_JTAG_H
+> > +#define __UAPI_LINUX_JTAG_H
+> > +
+> > +/**
+> > + * enum jtag_xfer_mode:
+> > + *
+> > + * @JTAG_XFER_HW_MODE: hardware mode transfer
+> > + * @JTAG_XFER_SW_MODE: software mode transfer  */ enum
+> jtag_xfer_mode
+> > +{
+> > +	JTAG_XFER_HW_MODE,
+> > +	JTAG_XFER_SW_MODE,
+> > +};
+> > +
+> > +/**
+> > + * enum jtag_endstate:
+> > + *
+> > + * @JTAG_STATE_IDLE: JTAG state machine IDLE state
+> > + * @JTAG_STATE_PAUSEIR: JTAG state machine PAUSE_IR state
+> > + * @JTAG_STATE_PAUSEDR: JTAG state machine PAUSE_DR state  */ enum
+> > +jtag_endstate {
+> > +	JTAG_STATE_IDLE,
+> > +	JTAG_STATE_PAUSEIR,
+> > +	JTAG_STATE_PAUSEDR,
+> > +};
+> > +
+> > +/**
+> > + * enum jtag_xfer_type:
+> > + *
+> > + * @JTAG_SIR_XFER: SIR transfer
+> > + * @JTAG_SDR_XFER: SDR transfer
+> > + */
+> > +enum jtag_xfer_type {
+> > +	JTAG_SIR_XFER,
+> > +	JTAG_SDR_XFER,
+> > +};
+> > +
+> > +/**
+> > + * enum jtag_xfer_direction:
+> > + *
+> > + * @JTAG_READ_XFER: read transfer
+> > + * @JTAG_WRITE_XFER: write transfer
+> > + */
+> > +enum jtag_xfer_direction {
+> > +	JTAG_READ_XFER,
+> > +	JTAG_WRITE_XFER,
+> > +};
+> > +
+> > +/**
+> > + * struct jtag_run_test_idle - forces JTAG state machine to
+> > + * RUN_TEST/IDLE state
+> > + *
+> > + * @mode: access mode
+> > + * @reset: 0 - run IDLE/PAUSE from current state
+> > + *         1 - go through TEST_LOGIC/RESET state before  IDLE/PAUSE
+> > + * @end: completion flag
+> > + * @tck: clock counter
+> > + *
+> > + * Structure represents interface to JTAG device for jtag idle
+> > + * execution.
+> > + */
+> > +struct jtag_run_test_idle {
+> > +	__u8	mode;
+> > +	__u8	reset;
+> > +	__u8	endstate;
+> > +	__u8	tck;
+> > +};
+> > +
+> > +/**
+> > + * struct jtag_xfer - jtag xfer:
+> > + *
+> > + * @mode: access mode
+> > + * @type: transfer type
+> > + * @direction: xfer direction
+> > + * @length: xfer bits len
+> > + * @tdio : xfer data array
+> > + * @endir: xfer end state
+> > + *
+> > + * Structure represents interface to Aspeed JTAG device for jtag sdr
+> > +xfer
+> > + * execution.
+> > + */
+> > +struct jtag_xfer {
+> > +	__u8	mode;
+> > +	__u8	type;
+> > +	__u8	direction;
+> > +	__u8	endstate;
+> > +	__u32	length;
+> > +	__u64	tdio;
+> 
+> I don't see anything odd here that requires a compat ioctl callback, do you?
+> 
+> thanks,
+> 
+> greg k-h
 
->
->
->>  	{ SYS_DESC(SYS_FAR_EL1), access_vm_reg, reset_unknown, FAR_EL1 },
->>  	{ SYS_DESC(SYS_PAR_EL1), NULL, reset_unknown, PAR_EL1 },
->
->
-> I'll make these changes and then repost this as part of the RAS+IESB series
-> it
-> depends on.
+Thanks for your review.
 
-Ok,  thanks
-
->
->
-> Thanks!
->
-> James
->
->
-> [0]
-> https://static.docs.arm.com/ddi0587/a/RAS%20Extension-release%20candidate_march_29.pdf
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
->
+Oleksandr S.
