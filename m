@@ -1,37 +1,68 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 21 Oct 2017 17:50:22 +0100
-Subject: [PATCH] iio: adc: stm32: add tim15 trigger
-In-Reply-To: <1508326767-24215-1-git-send-email-fabrice.gasnier@st.com>
-References: <1508326767-24215-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20171021175022.791d4836@archlinux>
+Date: Sat, 21 Oct 2017 17:55:40 +0100
+Subject: [PATCH] iio: adc: stm32: add check on clock rate
+In-Reply-To: <1508326812-24297-1-git-send-email-fabrice.gasnier@st.com>
+References: <1508326812-24297-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20171021175540.075a1722@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Oct 2017 13:39:27 +0200
+On Wed, 18 Oct 2017 13:40:12 +0200
 Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
 
-> Add TIM15_TRGO trigger that is now supported on STM32H7.
+> Add check on STM32 ADC clock rate to report an explicit error.
+> This may avoid division by 0 later in stm32-adc driver.
 > 
 > Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-Applied to the togreg branch of iio.git and pushed out as
-testing for the autobuilders to play with it.
+I've applied this via the slow path for the next merge window as you haven't
+explicitly highlighted it as a fix.  If you want it to go through for stable
+etc then let me know...
+
+I have no idea if this can be triggered in sensibly configured system or not!
 
 Thanks,
 
 Jonathan
+
 > ---
->  drivers/iio/adc/stm32-adc.c | 1 +
->  1 file changed, 1 insertion(+)
+>  drivers/iio/adc/stm32-adc-core.c | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
 > 
-> diff --git a/drivers/iio/adc/stm32-adc.c b/drivers/iio/adc/stm32-adc.c
-> index cc7ca50..4725756 100644
-> --- a/drivers/iio/adc/stm32-adc.c
-> +++ b/drivers/iio/adc/stm32-adc.c
-> @@ -501,6 +501,7 @@ struct stm32_adc_info {
->  	{ TIM2_TRGO, STM32_EXT11 },
->  	{ TIM4_TRGO, STM32_EXT12 },
->  	{ TIM6_TRGO, STM32_EXT13 },
-> +	{ TIM15_TRGO, STM32_EXT14 },
->  	{ TIM3_CH4, STM32_EXT15 },
->  	{ LPTIM1_OUT, STM32_EXT18 },
->  	{ LPTIM2_OUT, STM32_EXT19 },
+> diff --git a/drivers/iio/adc/stm32-adc-core.c b/drivers/iio/adc/stm32-adc-core.c
+> index 804198e..6aefef9 100644
+> --- a/drivers/iio/adc/stm32-adc-core.c
+> +++ b/drivers/iio/adc/stm32-adc-core.c
+> @@ -139,6 +139,11 @@ static int stm32f4_adc_clk_sel(struct platform_device *pdev,
+>  	}
+>  
+>  	rate = clk_get_rate(priv->aclk);
+> +	if (!rate) {
+> +		dev_err(&pdev->dev, "Invalid clock rate: 0\n");
+> +		return -EINVAL;
+> +	}
+> +
+>  	for (i = 0; i < ARRAY_SIZE(stm32f4_pclk_div); i++) {
+>  		if ((rate / stm32f4_pclk_div[i]) <= STM32F4_ADC_MAX_CLK_RATE)
+>  			break;
+> @@ -216,6 +221,10 @@ static int stm32h7_adc_clk_sel(struct platform_device *pdev,
+>  		 * From spec: PLL output musn't exceed max rate
+>  		 */
+>  		rate = clk_get_rate(priv->aclk);
+> +		if (!rate) {
+> +			dev_err(&pdev->dev, "Invalid adc clock rate: 0\n");
+> +			return -EINVAL;
+> +		}
+>  
+>  		for (i = 0; i < ARRAY_SIZE(stm32h7_adc_ckmodes_spec); i++) {
+>  			ckmode = stm32h7_adc_ckmodes_spec[i].ckmode;
+> @@ -232,6 +241,10 @@ static int stm32h7_adc_clk_sel(struct platform_device *pdev,
+>  
+>  	/* Synchronous clock modes (e.g. ckmode is 1, 2 or 3) */
+>  	rate = clk_get_rate(priv->bclk);
+> +	if (!rate) {
+> +		dev_err(&pdev->dev, "Invalid bus clock rate: 0\n");
+> +		return -EINVAL;
+> +	}
+>  
+>  	for (i = 0; i < ARRAY_SIZE(stm32h7_adc_ckmodes_spec); i++) {
+>  		ckmode = stm32h7_adc_ckmodes_spec[i].ckmode;
