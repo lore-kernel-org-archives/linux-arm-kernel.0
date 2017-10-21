@@ -1,45 +1,53 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Sat, 21 Oct 2017 19:45:13 +0200
-Subject: [PATCH] watchdog: sunxi_wdt: use of_device_get_match_data
-Message-ID: <20171021174513.1653-1-clabbe.montjoie@gmail.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 21 Oct 2017 18:49:00 +0100
+Subject: [PATCH] iio: adc: sun4i-gpadc: use of_device_get_match_data
+In-Reply-To: <20171020053729.23248-1-clabbe.montjoie@gmail.com>
+References: <20171020053729.23248-1-clabbe.montjoie@gmail.com>
+Message-ID: <20171021184900.7e3e42d0@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The usage of of_device_get_match_data reduce the code size a bit.
-Furthermore, it prevents an improbable dereference when
-of_match_device() return NULL.
+On Fri, 20 Oct 2017 07:37:29 +0200
+Corentin Labbe <clabbe.montjoie@gmail.com> wrote:
 
-Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
----
- drivers/watchdog/sunxi_wdt.c | 7 ++-----
- 1 file changed, 2 insertions(+), 5 deletions(-)
+> The usage of of_device_get_match_data reduce the code size a bit.
+> Furthermore, it prevents an improbable dereference when
+> of_match_device() return NULL.
+> 
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+Nice little tidy up - thanks.
 
-diff --git a/drivers/watchdog/sunxi_wdt.c b/drivers/watchdog/sunxi_wdt.c
-index 9728fa32c357..802e31b1416d 100644
---- a/drivers/watchdog/sunxi_wdt.c
-+++ b/drivers/watchdog/sunxi_wdt.c
-@@ -234,7 +234,6 @@ MODULE_DEVICE_TABLE(of, sunxi_wdt_dt_ids);
- static int sunxi_wdt_probe(struct platform_device *pdev)
- {
- 	struct sunxi_wdt_dev *sunxi_wdt;
--	const struct of_device_id *device;
- 	struct resource *res;
- 	int err;
- 
-@@ -242,12 +241,10 @@ static int sunxi_wdt_probe(struct platform_device *pdev)
- 	if (!sunxi_wdt)
- 		return -EINVAL;
- 
--	device = of_match_device(sunxi_wdt_dt_ids, &pdev->dev);
--	if (!device)
-+	sunxi_wdt->wdt_regs = of_device_get_match_data(&pdev->dev);
-+	if (!sunxi_wdt->wdt_regs)
- 		return -ENODEV;
- 
--	sunxi_wdt->wdt_regs = device->data;
--
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	sunxi_wdt->wdt_base = devm_ioremap_resource(&pdev->dev, res);
- 	if (IS_ERR(sunxi_wdt->wdt_base))
--- 
-2.13.6
+Applied to the togreg branch of iio.git and pushed out as testing
+for the autobuilders to play with it.
+
+Thanks,
+
+Jonathan
+> ---
+>  drivers/iio/adc/sun4i-gpadc-iio.c | 6 ++----
+>  1 file changed, 2 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
+> index c4e70f1cad79..04d7147e0110 100644
+> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
+> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
+> @@ -501,17 +501,15 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
+>  				struct iio_dev *indio_dev)
+>  {
+>  	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
+> -	const struct of_device_id *of_dev;
+>  	struct resource *mem;
+>  	void __iomem *base;
+>  	int ret;
+>  
+> -	of_dev = of_match_device(sun4i_gpadc_of_id, &pdev->dev);
+> -	if (!of_dev)
+> +	info->data = of_device_get_match_data(&pdev->dev);
+> +	if (!info->data)
+>  		return -ENODEV;
+>  
+>  	info->no_irq = true;
+> -	info->data = (struct gpadc_data *)of_dev->data;
+>  	indio_dev->num_channels = ARRAY_SIZE(sun8i_a33_gpadc_channels);
+>  	indio_dev->channels = sun8i_a33_gpadc_channels;
+>  
