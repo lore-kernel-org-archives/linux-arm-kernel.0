@@ -1,9 +1,9 @@
 From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Fri, 20 Oct 2017 18:22:46 -0700
-Subject: [GIT PULL 3/3] Keystone SOC update for 4.15
+Date: Fri, 20 Oct 2017 18:22:45 -0700
+Subject: [GIT PULL 2/3] ARM: Keystone config update for 4.15
 In-Reply-To: <1508548966-7350-1-git-send-email-santosh.shilimkar@oracle.com>
 References: <1508548966-7350-1-git-send-email-santosh.shilimkar@oracle.com>
-Message-ID: <1508548966-7350-3-git-send-email-santosh.shilimkar@oracle.com>
+Message-ID: <1508548966-7350-2-git-send-email-santosh.shilimkar@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,18 +13,18 @@ The following changes since commit e19b205be43d11bff638cad4487008c48d21c103:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone_soc_drivers_4.15
+  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone_config_4.15
 
-for you to fetch changes up to 595f3a9de5815d38198136491fa50a8ee1700b7d:
+for you to fetch changes up to fc88a0631ed0f5b1862d42fb8f2455bf3d18744b:
 
-  ti_sci: Use %pS printk format for direct addresses (2017-10-09 09:54:14 -0700)
-
-----------------------------------------------------------------
-Keystone SOC for 4.15
+  ARM: configs: keystone: Enable TIECAP PWM driver (2017-10-09 09:43:32 -0700)
 
 ----------------------------------------------------------------
-Helge Deller (1):
-      ti_sci: Use %pS printk format for direct addresses
+ARM: Enable PWM driver config
 
- drivers/firmware/ti_sci.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+----------------------------------------------------------------
+Vignesh R (1):
+      ARM: configs: keystone: Enable TIECAP PWM driver
+
+ arch/arm/configs/keystone_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
