@@ -1,76 +1,60 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Sat, 21 Oct 2017 17:30:16 +0200
-Subject: [PATCH v4 12/20] genirq: Document vcpu_info usage for
- percpu_devid interrupts
-In-Reply-To: <alpine.DEB.2.20.1710211653180.5790@nanos>
-References: <20171020114939.12554-1-christoffer.dall@linaro.org>
- <20171020114939.12554-13-christoffer.dall@linaro.org>
- <alpine.DEB.2.20.1710201354590.2908@nanos>
- <20171021142923.GA12618@cbox>
- <alpine.DEB.2.20.1710211653180.5790@nanos>
-Message-ID: <20171021153016.GG12618@cbox>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Sat, 21 Oct 2017 11:47:53 -0400
+Subject: [RFCv2 PATCH 05/36] iommu/process: Bind and unbind process to and
+ from devices
+In-Reply-To: <20171006133203.22803-6-jean-philippe.brucker@arm.com>
+References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
+ <20171006133203.22803-6-jean-philippe.brucker@arm.com>
+Message-ID: <683a518d-0e22-c855-2416-2e097ec3291d@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 21, 2017 at 04:55:01PM +0200, Thomas Gleixner wrote:
-> On Sat, 21 Oct 2017, Christoffer Dall wrote:
-> 
-> > On Fri, Oct 20, 2017 at 01:56:16PM +0200, Thomas Gleixner wrote:
-> > > On Fri, 20 Oct 2017, Christoffer Dall wrote:
-> > > 
-> > > Please Cc lkml when changing genirq core code.
-> > > 
-> > 
-> > ok, will do so in the future.
-> > 
-> > > > It is currently unclear how to set the VCPU affinity for a percpu_devid
-> > > > interrupt , since the Linux irq_data structure describes the state for
-> > > > multiple interrupts, one for each physical CPU on the system.  Since
-> > > > each such interrupt can be associated with different VCPUs or none at
-> > > > all, associating a single VCPU state with such an interrupt does not
-> > > > capture the necessary semantics.
-> > > > 
-> > > > The implementers of irq_set_affinity are the Intel and AMD IOMMUs, and
-> > > > the ARM GIC irqchip.  The Intel and AMD callers do not appear to use
-> > > > percpu_devid interrupts, and the ARM GIC implementation only checks the
-> > > > pointer against NULL vs. non-NULL.
-> > > > 
-> > > > Therefore, simply update the function documentation to explain the
-> > > > expected use in the context of percpu_devid interrupts, allowing future
-> > > > changes or additions to irqchip implementers to do the right thing.
-> > > > 
-> > > > This allows us to set the VCPU affinity for the virtual timer interrupt
-> > > > in KVM/ARM, which is a percpu_devid (PPI) interrupt.
-> > > 
-> > > I have a hard time to understand how adding the comment allows you to set
-> > > VCPU affinity ....
-> > > 
-> > 
-> > Obviously everything already works without adding the comment, however
-> > it is not entirely clear how to use the vcpu_into for percpu_devid
-> > interrupts, and this patch aims to make that clear, as it is the first
-> > user of irq_set_vcpu_affinity for a percpu_devid interrupt which
-> > actually uses the vcpu_info pointer.
-> > 
-> > Would you rather that we did not update the documentation or what do you
-> > suggest?
-> 
-> Documentation is welcome of course. I just want a changelog which is not
-> misleading. i.e. it says:
-> 
->    Update the function documentation .....
-> 
->    This allow us to set ....
-> 
-> Which reads like: Updating the documentation allows us to set ...
+Just some improvement suggestions.
 
-Ah, your comment was regarding the commit message.  That's a fair point.
-How about:
+On 10/6/2017 9:31 AM, Jean-Philippe Brucker wrote:
+> +	spin_lock(&iommu_process_lock);
+> +	idr_for_each_entry(&iommu_process_idr, process, i) {
+> +		if (process->pid != pid)
+> +			continue;
+if you see this construct a lot, this could be a for_each_iommu_process.
 
-  This documents the use of the vcpu_info parameter for percpu_devid
-  interrupts when setting the VCPU affinity for the virtual timer interrupt
-  in KVM/ARM.
+> +
+> +		if (!iommu_process_get_locked(process)) {
+> +			/* Process is defunct, create a new one */
+> +			process = NULL;
+> +			break;
+> +		}
+> +
+> +		/* Great, is it also bound to this domain? */
+> +		list_for_each_entry(cur_context, &process->domains,
+> +				    process_head) {
+> +			if (cur_context->domain != domain)
+> +				continue;
+if you see this construct a lot, this could be a for_each_iommu_process_domain.
 
+> +
+> +			context = cur_context;
+> +			*pasid = process->pasid;
+> +
+> +			/* Splendid, tell the driver and increase the ref */
+> +			err = iommu_process_attach_locked(context, dev);
+> +			if (err)
+> +				iommu_process_put_locked(process);
+> +
+> +			break;
+> +		}
+> +		break;
+> +	}
+> +	spin_unlock(&iommu_process_lock);
+> +	put_pid(pid);
+> +
+> +	if (context)
+> +		return err;
 
-Thanks,
--Christoffer
+I think you should make the section above a independent function and return here when the
+context is found.
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
