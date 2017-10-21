@@ -1,68 +1,32 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sat, 21 Oct 2017 16:55:01 +0200 (CEST)
-Subject: [PATCH v4 12/20] genirq: Document vcpu_info usage for percpu_devid
- interrupts
-In-Reply-To: <20171021142923.GA12618@cbox>
-References: <20171020114939.12554-1-christoffer.dall@linaro.org>
- <20171020114939.12554-13-christoffer.dall@linaro.org>
- <alpine.DEB.2.20.1710201354590.2908@nanos> <20171021142923.GA12618@cbox>
-Message-ID: <alpine.DEB.2.20.1710211653180.5790@nanos>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Sat, 21 Oct 2017 17:04:29 +0200
+Subject: [RESEND PATCH 0/2] arm/arm64: kvm: Disable branch profiling in
+ HYP code
+In-Reply-To: <1508499257-10014-1-git-send-email-julien.thierry@arm.com>
+References: <1508499257-10014-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <20171021150429.GC12618@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 21 Oct 2017, Christoffer Dall wrote:
-
-> On Fri, Oct 20, 2017 at 01:56:16PM +0200, Thomas Gleixner wrote:
-> > On Fri, 20 Oct 2017, Christoffer Dall wrote:
-> > 
-> > Please Cc lkml when changing genirq core code.
-> > 
+On Fri, Oct 20, 2017 at 12:34:15PM +0100, Julien Thierry wrote:
+> [Resending for Christoffer and adding kvmarm to recipients]
 > 
-> ok, will do so in the future.
+> Hi,
 > 
-> > > It is currently unclear how to set the VCPU affinity for a percpu_devid
-> > > interrupt , since the Linux irq_data structure describes the state for
-> > > multiple interrupts, one for each physical CPU on the system.  Since
-> > > each such interrupt can be associated with different VCPUs or none at
-> > > all, associating a single VCPU state with such an interrupt does not
-> > > capture the necessary semantics.
-> > > 
-> > > The implementers of irq_set_affinity are the Intel and AMD IOMMUs, and
-> > > the ARM GIC irqchip.  The Intel and AMD callers do not appear to use
-> > > percpu_devid interrupts, and the ARM GIC implementation only checks the
-> > > pointer against NULL vs. non-NULL.
-> > > 
-> > > Therefore, simply update the function documentation to explain the
-> > > expected use in the context of percpu_devid interrupts, allowing future
-> > > changes or additions to irqchip implementers to do the right thing.
-> > > 
-> > > This allows us to set the VCPU affinity for the virtual timer interrupt
-> > > in KVM/ARM, which is a percpu_devid (PPI) interrupt.
-> > 
-> > I have a hard time to understand how adding the comment allows you to set
-> > VCPU affinity ....
-> > 
+> When enabling branch profiling, a lockup occurs at boot time, after
+> displaying: "kvm [1]: Hyp mode initialized successfully"
 > 
-> Obviously everything already works without adding the comment, however
-> it is not entirely clear how to use the vcpu_into for percpu_devid
-> interrupts, and this patch aims to make that clear, as it is the first
-> user of irq_set_vcpu_affinity for a percpu_devid interrupt which
-> actually uses the vcpu_info pointer.
+> The issue is caused by the Hyp code getting instrumented and trying to
+> access unmapped code or data, which happens when trying to initialize EL2.
 > 
-> Would you rather that we did not update the documentation or what do you
-> suggest?
+> So it also seems like KVM is misleadingly announcing it was initialized and
+> yet gets stuck during initialization.
+> 
+> * First patch deals with printing the initialization message once KVM has
+>   fully initialized Hyp mode
+> * Second patch actually disables branch profiling instrumentation in Hyp
+>   code
 
-Documentation is welcome of course. I just want a changelog which is not
-misleading. i.e. it says:
+Applied, thanks.
 
-   Update the function documentation .....
-
-   This allow us to set ....
-
-Which reads like: Updating the documentation allows us to set ...
-
-See?
-
-Thanks,
-
-	tglx
+-Christoffer
