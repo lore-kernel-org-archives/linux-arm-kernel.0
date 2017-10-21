@@ -1,166 +1,69 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sat, 21 Oct 2017 20:45:45 +0200
-Subject: [PATCH] KVM: arm/arm64: Allow usercopy to vcpu->arch.ctxt and arm64
- debug
-In-Reply-To: <20171020232525.7387-1-pbonzini@redhat.com>
-References: <20171020232525.7387-1-pbonzini@redhat.com>
-Message-ID: <20171021184545.2497-1-christoffer.dall@linaro.org>
+From: jic23@jic23.retrosnub.co.uk (Jonathan Cameron)
+Date: Sat, 21 Oct 2017 20:23:27 +0100
+Subject: [PATCH 1/3] dt-bindings: iio: adc: stm32: add support for diff
+ channels
+In-Reply-To: <20171021185401.529f2eb2@archlinux>
+References: <1508246145-19417-1-git-send-email-fabrice.gasnier@st.com>
+ <1508246145-19417-2-git-send-email-fabrice.gasnier@st.com>
+ <20171021185401.529f2eb2@archlinux>
+Message-ID: <20171021202327.51dd2855@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We do direct useraccess copying to the kvm_cpu_context structure
-embedded in the kvm_vcpu_arch structure, and to the vcpu debug register
-state.  Everything else (timer, PMU, vgic) goes through a temporary
-indirection.
+On Sat, 21 Oct 2017 18:54:01 +0100
+Jonathan Cameron <jic23@kernel.org> wrote:
 
-Fixing all accesses to kvm_cpu_context is massively invasive, and we'd
-like to avoid that, so we tell kvm_init_usercopy to whitelist accesses
-to out context structure.
+> On Tue, 17 Oct 2017 15:15:43 +0200
+> Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
+> 
+> > STM32H7 ADC channels may be configured either as single-ended or
+> > differential.
+> > Add 'st,adc-diff-channels' property to support differential channels.
+> > Differential channels are defined as a pair of positive and negative
+> > inputs: vinp & vinn.
+> > 
+> > Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>  
+> Hmm. Fair enough.  Sometimes we support both types of channels
+> and leave it to userspace, but in many cases that makes little sense
+> - particularly if like I think is going on here, we aren't combining channels
+> that can be separately read but rather the negative pin is simply unused
+> when we are in single channel mode... (did I understand that right?)
+I clearly didn't understand.  This is same as other devices
+in that we are picking a pair from the channels that can otherwise be
+used as single end channels. (I think). 
 
-The debug system register accesses on arm64 are modified to work through
-an indirection instead.
-
-Cc: kernel-hardening at lists.openwall.com
-Cc: Kees Cook <keescook@chromium.org>
-Cc: Paolo Bonzini <pbonzini@redhat.com>
-Cc: Radim Kr?m?? <rkrcmar@redhat.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
-This fixes KVM/ARM on today's linux next with CONFIG_HARDENED_USERCOPY.
-
-The patch is based on linux-next plus Paolo's x86 patch which introduces
-kvm_init_usercopy.  Not sure how this needs to get merged, but it would
-potentially make sense for Paolo to put together a set of the patches
-needed for this.
+For this binding I think I'd like to see an example added showing how
+this works...
 
 Thanks,
--Christoffer
 
- arch/arm64/kvm/sys_regs.c | 36 ++++++++++++++++++++----------------
- virt/kvm/arm/arm.c        |  5 ++++-
- 2 files changed, 24 insertions(+), 17 deletions(-)
-
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 2e070d3baf9f..cdf47a9108fe 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -293,19 +293,20 @@ static bool trap_bvr(struct kvm_vcpu *vcpu,
- static int set_bvr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
- 		const struct kvm_one_reg *reg, void __user *uaddr)
- {
--	__u64 *r = &vcpu->arch.vcpu_debug_state.dbg_bvr[rd->reg];
-+	__u64 r;
- 
--	if (copy_from_user(r, uaddr, KVM_REG_SIZE(reg->id)) != 0)
-+	if (copy_from_user(&r, uaddr, KVM_REG_SIZE(reg->id)) != 0)
- 		return -EFAULT;
-+	vcpu->arch.vcpu_debug_state.dbg_bvr[rd->reg] = r;
- 	return 0;
- }
- 
- static int get_bvr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
- 	const struct kvm_one_reg *reg, void __user *uaddr)
- {
--	__u64 *r = &vcpu->arch.vcpu_debug_state.dbg_bvr[rd->reg];
-+	__u64 r = vcpu->arch.vcpu_debug_state.dbg_bvr[rd->reg];
- 
--	if (copy_to_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
-+	if (copy_to_user(uaddr, &r, KVM_REG_SIZE(reg->id)) != 0)
- 		return -EFAULT;
- 	return 0;
- }
-@@ -335,10 +336,11 @@ static bool trap_bcr(struct kvm_vcpu *vcpu,
- static int set_bcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
- 		const struct kvm_one_reg *reg, void __user *uaddr)
- {
--	__u64 *r = &vcpu->arch.vcpu_debug_state.dbg_bcr[rd->reg];
-+	__u64 r;
- 
--	if (copy_from_user(r, uaddr, KVM_REG_SIZE(reg->id)) != 0)
-+	if (copy_from_user(&r, uaddr, KVM_REG_SIZE(reg->id)) != 0)
- 		return -EFAULT;
-+	vcpu->arch.vcpu_debug_state.dbg_bcr[rd->reg] = r;
- 
- 	return 0;
- }
-@@ -346,9 +348,9 @@ static int set_bcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
- static int get_bcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
- 	const struct kvm_one_reg *reg, void __user *uaddr)
- {
--	__u64 *r = &vcpu->arch.vcpu_debug_state.dbg_bcr[rd->reg];
-+	__u64 r = vcpu->arch.vcpu_debug_state.dbg_bcr[rd->reg];
- 
--	if (copy_to_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
-+	if (copy_to_user(uaddr, &r, KVM_REG_SIZE(reg->id)) != 0)
- 		return -EFAULT;
- 	return 0;
- }
-@@ -379,19 +381,20 @@ static bool trap_wvr(struct kvm_vcpu *vcpu,
- static int set_wvr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
- 		const struct kvm_one_reg *reg, void __user *uaddr)
- {
--	__u64 *r = &vcpu->arch.vcpu_debug_state.dbg_wvr[rd->reg];
-+	__u64 r;
- 
--	if (copy_from_user(r, uaddr, KVM_REG_SIZE(reg->id)) != 0)
-+	if (copy_from_user(&r, uaddr, KVM_REG_SIZE(reg->id)) != 0)
- 		return -EFAULT;
-+	vcpu->arch.vcpu_debug_state.dbg_wvr[rd->reg] = r;
- 	return 0;
- }
- 
- static int get_wvr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
- 	const struct kvm_one_reg *reg, void __user *uaddr)
- {
--	__u64 *r = &vcpu->arch.vcpu_debug_state.dbg_wvr[rd->reg];
-+	__u64 r = vcpu->arch.vcpu_debug_state.dbg_wvr[rd->reg];
- 
--	if (copy_to_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
-+	if (copy_to_user(uaddr, &r, KVM_REG_SIZE(reg->id)) != 0)
- 		return -EFAULT;
- 	return 0;
- }
-@@ -421,19 +424,20 @@ static bool trap_wcr(struct kvm_vcpu *vcpu,
- static int set_wcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
- 		const struct kvm_one_reg *reg, void __user *uaddr)
- {
--	__u64 *r = &vcpu->arch.vcpu_debug_state.dbg_wcr[rd->reg];
-+	__u64 r;
- 
--	if (copy_from_user(r, uaddr, KVM_REG_SIZE(reg->id)) != 0)
-+	if (copy_from_user(&r, uaddr, KVM_REG_SIZE(reg->id)) != 0)
- 		return -EFAULT;
-+	vcpu->arch.vcpu_debug_state.dbg_wcr[rd->reg] = r;
- 	return 0;
- }
- 
- static int get_wcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
- 	const struct kvm_one_reg *reg, void __user *uaddr)
- {
--	__u64 *r = &vcpu->arch.vcpu_debug_state.dbg_wcr[rd->reg];
-+	__u64 r = vcpu->arch.vcpu_debug_state.dbg_wcr[rd->reg];
- 
--	if (copy_to_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
-+	if (copy_to_user(uaddr, &r, KVM_REG_SIZE(reg->id)) != 0)
- 		return -EFAULT;
- 	return 0;
- }
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index b9f68e4add71..639e388678ff 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -1502,7 +1502,10 @@ void kvm_arch_exit(void)
- 
- static int arm_init(void)
- {
--	int rc = kvm_init(NULL, sizeof(struct kvm_vcpu), 0, THIS_MODULE);
-+	int rc = kvm_init_usercopy(NULL, sizeof(struct kvm_vcpu), 0,
-+				   offsetof(struct kvm_vcpu_arch, ctxt),
-+				   sizeof_field(struct kvm_vcpu_arch, ctxt),
-+				   THIS_MODULE);
- 	return rc;
- }
- 
--- 
-2.14.2
+Jonathan
+> 
+> Jonathan
+> 
+> > ---
+> >  Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt | 6 ++++++
+> >  1 file changed, 6 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+> > index 48bfcaa3..c3c8de1 100644
+> > --- a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+> > +++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+> > @@ -62,6 +62,12 @@ Required properties:
+> >  - st,adc-channels: List of single-ended channels muxed for this ADC.
+> >    It can have up to 16 channels on stm32f4 or 20 channels on stm32h7, numbered
+> >    from 0 to 15 or 19 (resp. for in0..in15 or in0..in19).
+> > +- st,adc-diff-channels: List of differential channels muxed for this ADC.
+> > +  Depending on part used, some channels can be configured as differential
+> > +  instead of single-ended (e.g. stm32h7). List here positive and negative
+> > +  inputs pairs as <vinp vinn>, <vinp vinn>,... vinp and vinn are numbered
+> > +  from 0 to 19 on stm32h7)
+> > +  Note: At least one of "st,adc-channels" or "st,adc-diff-channels" is required.
+> >  - #io-channel-cells = <1>: See the IIO bindings section "IIO consumers" in
+> >    Documentation/devicetree/bindings/iio/iio-bindings.txt
+> >    
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
