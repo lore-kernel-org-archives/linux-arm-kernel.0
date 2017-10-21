@@ -1,76 +1,95 @@
-From: mihailescu2m@gmail.com (Marian Mihailescu)
-Date: Sat, 21 Oct 2017 17:54:31 +1030
-Subject: [PATCH] ARM: dts: exynos: add cpu perf counters to Exynos54xx
- boards
-In-Reply-To: <e2b87fe2-bc04-242d-8f4f-9cd21743e3aa@arm.com>
-References: <CAM3PiRxi8sxf6T990K8rd7UsOLd2D5TaLciF=c_wF=9gmpLKYg@mail.gmail.com>
- <e2b87fe2-bc04-242d-8f4f-9cd21743e3aa@arm.com>
-Message-ID: <CAM3PiRyEdXX26aBfuS=3rQK3k7ovR=HeeoF8Qcz0Dt-zdiXuww@mail.gmail.com>
+From: mbrugger@suse.com (Matthias Brugger)
+Date: Sat, 21 Oct 2017 09:56:12 +0200
+Subject: [PATCH] ARM: compressed: discard ksym/kcrctab input section
+In-Reply-To: <20170908153143.27279-1-ard.biesheuvel@linaro.org>
+References: <20170908153143.27279-1-ard.biesheuvel@linaro.org>
+Message-ID: <33486b3e-8221-92b0-7e18-859be7d0a74b@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On 09/08/2017 05:31 PM, Ard Biesheuvel wrote:
+> As it turns out, building the ARM kernel with EFI support pulls in
+> a couple of sections that we don't really need in the decompressor.
+> This is due to the fact the the UEFI stub uses sort() to sort the UEFI
+> memory map, which is an exported symbol pulled in from lib/sort.c.
+> 
+> Before commit e4bae4d0b5f3 ("arm/efi: Split zImage code and data into
+> separate PE/COFF sections"), this resulted in the following layout
+> for the decompressor ELF binary.
+> 
+>   [Nr] Name              Type     Addr     Off    Size   ES Flg Lk Inf Al
+>   [ 0]                   NULL     00000000 000000 000000 00      0   0  0
+>   [ 1] .text             PROGBITS 00000000 010000 009b3c 00  AX  0   0 512
+>   [ 2] .rodata           PROGBITS 00009b3c 019b3c 001684 00   A  0   0  4
+>   [ 3] __ksymtab_strings PROGBITS 0000b1c0 01b1c0 000005 00   A  0   0  1
+>   [ 4] .data             PROGBITS 0000b1c8 01b1c8 000020 00  WA  0   0  8
+>   [ 5] ___ksymtab+sort   PROGBITS 0000b1e8 01b1e8 000008 00  WA  0   0  4
+>   [ 6] .piggydata        PROGBITS 0000b1f0 01b1f0 77ac38 00   A  0   0  1
+>   [ 7] .got.plt          PROGBITS 00785e28 795e28 00000c 04  WA  0   0  4
+>   [ 8] .got              PROGBITS 00785e34 795e34 000028 00  WA  0   0  4
+>   [ 9] .pad              PROGBITS 00785e5c 795e5c 000004 00  WA  0   0  1
+>   [10] .bss              NOBITS   00785e60 795e60 00001c 00  WA  0   0  4
+>   [11] .stack            NOBITS   00785e80 795e60 001000 00  WA  0   0  1
+> 
+> Commit e4bae4d0b5f3 made some changes to the linker script to allow the
+> UEFI firmware to map the decompressor with strict R-X/RW- permissions
+> before invoking it. Unfortunately, this turns out to break the boot on
+> some systems, because the linker now also moves the ksymtab/kcrctab
+> sections around, resulting in .piggydata to appear misaligned.
+> 
+>   [Nr] Name              Type     Addr     Off    Size   ES Flg Lk Inf Al
+>   [ 0]                   NULL     00000000 000000 000000 00      0   0  0
+>   [ 1] .text             PROGBITS 00000000 010000 00a93c 00  AX  0   0 4096
+>   [ 2] .rodata           PROGBITS 0000a93c 01a93c 001684 00   A  0   0  4
+>   [ 3] __ksymtab_strings PROGBITS 0000bfc0 01bfc0 000005 00   A  0   0  1
+>   [ 4] .piggydata        PROGBITS 0000bfc5 01bfc5 77ac47 00   A  0   0  1
+>   [ 5] .got.plt          PROGBITS 00786c0c 796c0c 00000c 04  WA  0   0  4
+>   [ 6] .got              PROGBITS 00786c18 796c18 000028 00  WA  0   0  4
+>   [ 7] .pad              PROGBITS 00786c40 796c40 000008 00  WA  0   0  1
+>   [ 8] .data             PROGBITS 00787000 797000 000200 00  WA  0   0 4096
+>   [ 9] ___ksymtab+sort   PROGBITS 00787200 797200 000008 00  WA  0   0  4
+>   [10] .bss              NOBITS   00787208 797208 00001c 00  WA  0   0  4
+>   [11] .stack            NOBITS   00787228 797208 001000 00  WA  0   0  1
+> 
+> So let's align piggydata explicitly, and discard these sections from the
+> binary.
+> 
+> Cc: Russell King <linux@armlinux.org.uk>
+> Fixes: e4bae4d0b5f3 ("arm/efi: Split zImage code and data into separate ...")
+> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm/boot/compressed/piggy.S       | 1 +
+>  arch/arm/boot/compressed/vmlinux.lds.S | 1 +
+>  2 files changed, 2 insertions(+)
+> 
 
-Apologies, I did not really check which cluster is described for the
-5410 (since 5422 boots from the A7).
+This fixes the boot regression on bananapi-r2.
+Thanks! Feel free to add:
 
-Should I define both pmu nodes (w/o interrupt affinity) in the
-exynos54xx,dtsi, and set the status property to "disabled"?
-And then add the interrupt affinity to the SoC variant, and enable
-them as required...
+Tested-by: Matthias Brugger <mbrugger@suse.com>
 
-The problem that I see however is that, while 5410 is easy to deal
-with (it has the cpus defined in exynos5420.dtsi for all boards), 542x
-variants have the cpus included in the board dts. So there would be
-the same pmu nodes with interrupt affinity copied in all 542x and 5800
-boards dts (and there are several of them), instead of being included
-in exynos542x.dtsi...
-
-Any thoughts about this?
-
-Thanks,
-Marian
-
-Either I've been missing something or nothing has been going on. (K. E. Gordon)
-
-
-On Sat, Oct 21, 2017 at 2:45 AM, Robin Murphy <robin.murphy@arm.com> wrote:
-> On 20/10/17 13:09, Marian Mihailescu wrote:
->> Hi,
->>
->> This patch enables support for ARM Performance Monitoring Units
->> available in Cortex-A7
->> and Cortex-A15 CPU cores for Exynos54xx SoCs (5410, 5420 and 5422/5800).
->>
->> Exynos5410 currently has only Cortex-A7 nodes defined in the device tree,
->> so the Cortex-A15 PMU is defined in the exynos5420 device tree file.
->
-> Huh? 5410 only has the *A15* cluster described (and for whatever reason
-> mainline cannot bring up the A7 cluster even if you do add it).
->
-> Also*, the interrupt affinity properties are bogus as presented - those
-> will need to be delegated to the SoC-variant-specific dtsi files in the
-> same manner as the "cpus" nodes, to cope with the different CPU numberings.
->
-> Robin.
->
-> *I'd like to have made this comment inline in the patch, but I can't :(
->
->> Tested with perf on Odroid XU4 (Exynos5422):
->> armv7_cortex_a7 PMU driver: 5 counters available
->> armv7_cortex_a15 PMU driver: 7 counters available
->>
->> Regards,
->> Marian
->>
->> --
->> Either I've been missing something or nothing has been going on. (K. E. Gordon)
->>
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
+> diff --git a/arch/arm/boot/compressed/piggy.S b/arch/arm/boot/compressed/piggy.S
+> index f72088495f43..5d52c556dd32 100644
+> --- a/arch/arm/boot/compressed/piggy.S
+> +++ b/arch/arm/boot/compressed/piggy.S
+> @@ -1,5 +1,6 @@
+>  	.section .piggydata,#alloc
+>  	.globl	input_data
+> +	.align	2
+>  input_data:
+>  	.incbin	"arch/arm/boot/compressed/piggy_data"
+>  	.globl	input_data_end
+> diff --git a/arch/arm/boot/compressed/vmlinux.lds.S b/arch/arm/boot/compressed/vmlinux.lds.S
+> index 7a4c59154361..5c5265be4605 100644
+> --- a/arch/arm/boot/compressed/vmlinux.lds.S
+> +++ b/arch/arm/boot/compressed/vmlinux.lds.S
+> @@ -29,6 +29,7 @@ SECTIONS
+>       * of the text/got segments.
+>       */
+>      *(.data)
+> +    *(*ksymtab* *kcrctab*)
+>    }
+>  
+>    . = TEXT_START;
+> 
