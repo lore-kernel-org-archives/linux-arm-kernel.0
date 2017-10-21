@@ -1,159 +1,37 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 20 Oct 2017 19:32:47 -0400
-Subject: [RFCv2 PATCH 01/36] iommu: Keep track of processes and PASIDs
-In-Reply-To: <20171006133203.22803-2-jean-philippe.brucker@arm.com>
-References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
- <20171006133203.22803-2-jean-philippe.brucker@arm.com>
-Message-ID: <29100eb4-ab8a-a10e-f23b-356658d9a925@codeaurora.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 20 Oct 2017 17:16:32 -0700
+Subject: [GIT PULL 1/5] Broadcom soc changes for 4.15 (part 2)
+Message-ID: <20171021001636.17662-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-few nits below.
+The following changes since commit c14963521502b237a6817aceda6f3379296db75c:
 
-> +/*
-> + * Allocate a iommu_process structure for the given task.
-> + *
-> + * Ideally we shouldn't need the domain parameter, since iommu_process is
-> + * system-wide, but we use it to retrieve the driver's allocation ops and a
-> + * PASID range.
-> + */
-> +static struct iommu_process *
-> +iommu_process_alloc(struct iommu_domain *domain, struct task_struct *task)
-> +{
-> +	int err;
-> +	int pasid;
-> +	struct iommu_process *process;
-> +
-> +	if (WARN_ON(!domain->ops->process_alloc || !domain->ops->process_free))
-> +		return ERR_PTR(-ENODEV);
-> +
-> +	process = domain->ops->process_alloc(task);
-> +	if (IS_ERR(process))
-> +		return process;
-> +	if (!process)
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	process->pid		= get_task_pid(task, PIDTYPE_PID);
-> +	process->release	= domain->ops->process_free;
-> +	INIT_LIST_HEAD(&process->domains);
-> +	kref_init(&process->kref);
-> +
-nit, I think you should place this check right after the pid assignment.
+  ARM: brcmstb: Add appropriate ARM_BE8() macros for swapping (2017-09-25 11:56:04 -0700)
 
-> +	if (!process->pid) {
-> +		err = -EINVAL;
-> +		goto err_free_process;
-> +	}
-> +
-> +	idr_preload(GFP_KERNEL);
-> +	spin_lock(&iommu_process_lock);
-> +	pasid = idr_alloc_cyclic(&iommu_process_idr, process, domain->min_pasid,
-> +				 domain->max_pasid + 1, GFP_ATOMIC);
-> +	process->pasid = pasid;
-> +	spin_unlock(&iommu_process_lock);
-> +	idr_preload_end();
-> +
+are available in the git repository at:
 
-nit, You can maybe return here if pasid is not negative.
+  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.15/soc-part2
 
-> +	if (pasid < 0) {
-> +		err = pasid;
-> +		goto err_put_pid;
-> +	}
-> +
-> +	return process;
-> +
-> +err_put_pid:
-> +	put_pid(process->pid);
-> +
-> +err_free_process:
-> +	domain->ops->process_free(process);
-> +
-> +	return ERR_PTR(err);
-> +}
-> +
-> +static void iommu_process_release(struct kref *kref)
-> +{
-> +	struct iommu_process *process;
-> +	void (*release)(struct iommu_process *);
-> +
-> +	assert_spin_locked(&iommu_process_lock);
-> +
-> +	process = container_of(kref, struct iommu_process, kref);
+for you to fetch changes up to fa1e581d02d293d4d52c6950dc083484babe09f2:
 
-if we are concerned about things going wrong (assert above), we should
-also add some pointer check here (WARN) for process and release pointers as well.
+  ARM: debug: Add Hurricane 2 UART2 debug addresses (2017-10-12 11:32:16 -0700)
 
-> +	release = process->release;
-> +
-> +	WARN_ON(!list_empty(&process->domains));
-> +
-> +	idr_remove(&iommu_process_idr, process->pasid);
-> +	put_pid(process->pid);
-> +	release(process);
-> +}
-> +
-> +/*
-> + * Returns non-zero if a reference to the process was successfully taken.
-> + * Returns zero if the process is being freed and should not be used.
-> + */
-> +static int iommu_process_get_locked(struct iommu_process *process)
-> +{
-> +	assert_spin_locked(&iommu_process_lock);
-> +
-> +	if (process)
-> +		return kref_get_unless_zero(&process->kref);
-> +
-> +	return 0;
-> +}
-> +
-> +static void iommu_process_put_locked(struct iommu_process *process)
-> +{
-> +	assert_spin_locked(&iommu_process_lock);
-> +
-> +	kref_put(&process->kref, iommu_process_release);
-> +}
-> +
-> +static int iommu_process_attach(struct iommu_domain *domain, struct device *dev,
-> +				struct iommu_process *process)
-> +{
-> +	int err;
-> +	int pasid = process->pasid;
-> +	struct iommu_context *context;
-> +
-> +	if (WARN_ON(!domain->ops->process_attach || !domain->ops->process_detach))
-> +		return -ENODEV;
-> +
-> +	if (pasid > domain->max_pasid || pasid < domain->min_pasid)
-> +		return -ENOSPC;
-> +
-> +	context = kzalloc(sizeof(*context), GFP_KERNEL);
-> +	if (!context)
-> +		return -ENOMEM;
-> +
+----------------------------------------------------------------
+This pull request contains Broadcom ARM-based SoC changes for 4.15 (second
+part), please pull the following:
 
-devm_kzalloc maybe?
+- Florian adds support for the Broadcom Hurricane 2 SoC machine entry point
+  and defines the debug UART address for use with earlyprintk/DEBUG_LL
 
-> +	context->process	= process;
-> +	context->domain		= domain;
-> +	refcount_set(&context->ref, 1);
-> +
-> +	spin_lock(&iommu_process_lock);
-> +	err = domain->ops->process_attach(domain, dev, process, true);
-> +	if (err) {
-> +		kfree(context);
-> +		spin_unlock(&iommu_process_lock);
-> +		return err;
-> +	}
-> +
-> +	list_add(&context->process_head, &process->domains);
-> +	list_add(&context->domain_head, &domain->processes);
-> +	spin_unlock(&iommu_process_lock);
-> +
-> +	return 0;
-> +}
+----------------------------------------------------------------
+Florian Fainelli (2):
+      ARM: bcm: Add support for Broadcom Hurricane 2 SoC
+      ARM: debug: Add Hurricane 2 UART2 debug addresses
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+ arch/arm/Kconfig.debug      | 10 +++++++++-
+ arch/arm/mach-bcm/Kconfig   |  9 +++++++++
+ arch/arm/mach-bcm/Makefile  |  3 +++
+ arch/arm/mach-bcm/bcm_hr2.c | 25 +++++++++++++++++++++++++
+ 4 files changed, 46 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-bcm/bcm_hr2.c
