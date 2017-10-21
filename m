@@ -1,53 +1,50 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 21 Oct 2017 18:49:00 +0100
-Subject: [PATCH] iio: adc: sun4i-gpadc: use of_device_get_match_data
-In-Reply-To: <20171020053729.23248-1-clabbe.montjoie@gmail.com>
-References: <20171020053729.23248-1-clabbe.montjoie@gmail.com>
-Message-ID: <20171021184900.7e3e42d0@archlinux>
+Date: Sat, 21 Oct 2017 18:54:01 +0100
+Subject: [PATCH 1/3] dt-bindings: iio: adc: stm32: add support for diff
+ channels
+In-Reply-To: <1508246145-19417-2-git-send-email-fabrice.gasnier@st.com>
+References: <1508246145-19417-1-git-send-email-fabrice.gasnier@st.com>
+ <1508246145-19417-2-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20171021185401.529f2eb2@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 20 Oct 2017 07:37:29 +0200
-Corentin Labbe <clabbe.montjoie@gmail.com> wrote:
+On Tue, 17 Oct 2017 15:15:43 +0200
+Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
 
-> The usage of of_device_get_match_data reduce the code size a bit.
-> Furthermore, it prevents an improbable dereference when
-> of_match_device() return NULL.
+> STM32H7 ADC channels may be configured either as single-ended or
+> differential.
+> Add 'st,adc-diff-channels' property to support differential channels.
+> Differential channels are defined as a pair of positive and negative
+> inputs: vinp & vinn.
 > 
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-Nice little tidy up - thanks.
-
-Applied to the togreg branch of iio.git and pushed out as testing
-for the autobuilders to play with it.
-
-Thanks,
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Hmm. Fair enough.  Sometimes we support both types of channels
+and leave it to userspace, but in many cases that makes little sense
+- particularly if like I think is going on here, we aren't combining channels
+that can be separately read but rather the negative pin is simply unused
+when we are in single channel mode... (did I understand that right?)
 
 Jonathan
+
 > ---
->  drivers/iio/adc/sun4i-gpadc-iio.c | 6 ++----
->  1 file changed, 2 insertions(+), 4 deletions(-)
+>  Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
-> index c4e70f1cad79..04d7147e0110 100644
-> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
-> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
-> @@ -501,17 +501,15 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
->  				struct iio_dev *indio_dev)
->  {
->  	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
-> -	const struct of_device_id *of_dev;
->  	struct resource *mem;
->  	void __iomem *base;
->  	int ret;
->  
-> -	of_dev = of_match_device(sun4i_gpadc_of_id, &pdev->dev);
-> -	if (!of_dev)
-> +	info->data = of_device_get_match_data(&pdev->dev);
-> +	if (!info->data)
->  		return -ENODEV;
->  
->  	info->no_irq = true;
-> -	info->data = (struct gpadc_data *)of_dev->data;
->  	indio_dev->num_channels = ARRAY_SIZE(sun8i_a33_gpadc_channels);
->  	indio_dev->channels = sun8i_a33_gpadc_channels;
+> diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+> index 48bfcaa3..c3c8de1 100644
+> --- a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+> +++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+> @@ -62,6 +62,12 @@ Required properties:
+>  - st,adc-channels: List of single-ended channels muxed for this ADC.
+>    It can have up to 16 channels on stm32f4 or 20 channels on stm32h7, numbered
+>    from 0 to 15 or 19 (resp. for in0..in15 or in0..in19).
+> +- st,adc-diff-channels: List of differential channels muxed for this ADC.
+> +  Depending on part used, some channels can be configured as differential
+> +  instead of single-ended (e.g. stm32h7). List here positive and negative
+> +  inputs pairs as <vinp vinn>, <vinp vinn>,... vinp and vinn are numbered
+> +  from 0 to 19 on stm32h7)
+> +  Note: At least one of "st,adc-channels" or "st,adc-diff-channels" is required.
+>  - #io-channel-cells = <1>: See the IIO bindings section "IIO consumers" in
+>    Documentation/devicetree/bindings/iio/iio-bindings.txt
 >  
