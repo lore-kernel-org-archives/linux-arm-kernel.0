@@ -1,68 +1,49 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 21 Oct 2017 17:55:40 +0100
-Subject: [PATCH] iio: adc: stm32: add check on clock rate
-In-Reply-To: <1508326812-24297-1-git-send-email-fabrice.gasnier@st.com>
-References: <1508326812-24297-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20171021175540.075a1722@archlinux>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Sat, 21 Oct 2017 19:38:12 +0200
+Subject: [PATCH] pwm: sunxi: use of_device_get_match_data
+Message-ID: <20171021173812.30102-1-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Oct 2017 13:40:12 +0200
-Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
+The usage of of_device_get_match_data reduce the code size a bit.
+Furthermore, it prevents an improbable dereference when
+of_match_device() return NULL.
 
-> Add check on STM32 ADC clock rate to report an explicit error.
-> This may avoid division by 0 later in stm32-adc driver.
-> 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-I've applied this via the slow path for the next merge window as you haven't
-explicitly highlighted it as a fix.  If you want it to go through for stable
-etc then let me know...
+Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+---
+ drivers/pwm/pwm-sun4i.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-I have no idea if this can be triggered in sensibly configured system or not!
-
-Thanks,
-
-Jonathan
-
-> ---
->  drivers/iio/adc/stm32-adc-core.c | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> diff --git a/drivers/iio/adc/stm32-adc-core.c b/drivers/iio/adc/stm32-adc-core.c
-> index 804198e..6aefef9 100644
-> --- a/drivers/iio/adc/stm32-adc-core.c
-> +++ b/drivers/iio/adc/stm32-adc-core.c
-> @@ -139,6 +139,11 @@ static int stm32f4_adc_clk_sel(struct platform_device *pdev,
->  	}
->  
->  	rate = clk_get_rate(priv->aclk);
-> +	if (!rate) {
-> +		dev_err(&pdev->dev, "Invalid clock rate: 0\n");
-> +		return -EINVAL;
-> +	}
-> +
->  	for (i = 0; i < ARRAY_SIZE(stm32f4_pclk_div); i++) {
->  		if ((rate / stm32f4_pclk_div[i]) <= STM32F4_ADC_MAX_CLK_RATE)
->  			break;
-> @@ -216,6 +221,10 @@ static int stm32h7_adc_clk_sel(struct platform_device *pdev,
->  		 * From spec: PLL output musn't exceed max rate
->  		 */
->  		rate = clk_get_rate(priv->aclk);
-> +		if (!rate) {
-> +			dev_err(&pdev->dev, "Invalid adc clock rate: 0\n");
-> +			return -EINVAL;
-> +		}
->  
->  		for (i = 0; i < ARRAY_SIZE(stm32h7_adc_ckmodes_spec); i++) {
->  			ckmode = stm32h7_adc_ckmodes_spec[i].ckmode;
-> @@ -232,6 +241,10 @@ static int stm32h7_adc_clk_sel(struct platform_device *pdev,
->  
->  	/* Synchronous clock modes (e.g. ckmode is 1, 2 or 3) */
->  	rate = clk_get_rate(priv->bclk);
-> +	if (!rate) {
-> +		dev_err(&pdev->dev, "Invalid bus clock rate: 0\n");
-> +		return -EINVAL;
-> +	}
->  
->  	for (i = 0; i < ARRAY_SIZE(stm32h7_adc_ckmodes_spec); i++) {
->  		ckmode = stm32h7_adc_ckmodes_spec[i].ckmode;
+diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
+index 6d23f1d1c9b7..334199c58f1d 100644
+--- a/drivers/pwm/pwm-sun4i.c
++++ b/drivers/pwm/pwm-sun4i.c
+@@ -368,14 +368,15 @@ static int sun4i_pwm_probe(struct platform_device *pdev)
+ 	struct sun4i_pwm_chip *pwm;
+ 	struct resource *res;
+ 	int ret;
+-	const struct of_device_id *match;
+-
+-	match = of_match_device(sun4i_pwm_dt_ids, &pdev->dev);
+ 
+ 	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
+ 	if (!pwm)
+ 		return -ENOMEM;
+ 
++	pwm->data = of_device_get_match_data(&pdev->dev);
++	if (!pwm->data)
++		return -ENODEV;
++
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	pwm->base = devm_ioremap_resource(&pdev->dev, res);
+ 	if (IS_ERR(pwm->base))
+@@ -385,7 +386,6 @@ static int sun4i_pwm_probe(struct platform_device *pdev)
+ 	if (IS_ERR(pwm->clk))
+ 		return PTR_ERR(pwm->clk);
+ 
+-	pwm->data = match->data;
+ 	pwm->chip.dev = &pdev->dev;
+ 	pwm->chip.ops = &sun4i_pwm_ops;
+ 	pwm->chip.base = -1;
+-- 
+2.13.6
