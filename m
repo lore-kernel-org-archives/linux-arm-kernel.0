@@ -1,39 +1,51 @@
-From: gregory.0xf0@gmail.com (Gregory Fong)
-Date: Fri, 20 Oct 2017 17:54:16 -0700
-Subject: [PATCH 7/7] gpio: brcmstb: implement suspend/resume/shutdown
-In-Reply-To: <aa8a2900-22a5-5ec5-2afc-038fc42ea940@gmail.com>
-References: <20170930034057.15166-1-opendmb@gmail.com>
- <20170930034057.15166-8-opendmb@gmail.com>
- <20171019090359.GB31645@kessel>
- <aa8a2900-22a5-5ec5-2afc-038fc42ea940@gmail.com>
-Message-ID: <CADtm3G5utU_-6+FMqnxN0LYJggLhSe7Q6V5LbwchLQLe5zVing@mail.gmail.com>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Fri, 20 Oct 2017 18:22:44 -0700
+Subject: [GIT PULL 1/3] ARM: Keystone DTS update for 4.15
+Message-ID: <1508548966-7350-1-git-send-email-santosh.shilimkar@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 19, 2017 at 11:39 AM, Doug Berger <opendmb@gmail.com> wrote:
->>> +static int brcmstb_gpio_resume(struct device *dev)
->>> +{
->>> +    struct brcmstb_gpio_priv *priv = dev_get_drvdata(dev);
->>> +    struct brcmstb_gpio_bank *bank;
->>> +    u32 wake_mask = 0;
->>
->> This isn't really being used as a mask, contrary to appearances.  It's
->> just tracking whether any active IRQs were seen.  Please change to use a
->> bool instead and adjust the name accordingly.
->>
->
-> I see your point, but I believe it is cleaner to use this to consolidate
-> the bit masks returned by each __brcmstb_gpio_get_active_irqs() call.
-> This allows a single test rather than a test per bank.
+The following changes since commit e19b205be43d11bff638cad4487008c48d21c103:
 
-What about something like this?
+  Linux 4.14-rc2 (2017-09-24 16:38:56 -0700)
 
-bool need_wakeup_event = false;
+are available in the git repository at:
 
-list_for_each_entry(bank, &priv->bank_list, node) {
-        need_wakeup_event |= !!__brcmstb_gpio_get_active_irqs(bank);
-        brcmstb_gpio_bank_restore(priv, bank);
-}
+  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone_dts_for_4.15
 
-if (priv->parent_wake_irq && need_wakeup_event)
-        pm_wakeup_event(dev, 0);
+for you to fetch changes up to 1efed4072c5992ede080987e6d83dfead6af126a:
+
+  ARM: dts: keystone-k2g-evm: add bindings for SPI NOR flash (2017-10-10 09:42:56 -0700)
+
+----------------------------------------------------------------
+ARM: Keystone DTS update for 4.15
+
+- McASP support for K2G EVM
+- I2C support for K2G EVM
+- USB support for K2G EVM
+- SPI & SPI NOR flash support for K2G EVM
+- ECAP PWM support for K2G EVM
+
+----------------------------------------------------------------
+Murali Karicheri (2):
+      ARM: dts: keystone-k2g-evm: Add I2C EEPROM DT entry
+      ARM: dts: keystone-k2g-evm: add bindings for SPI NOR flash
+
+Peter Ujfalusi (1):
+      ARM: dts: keystone-k2g: Add McASP nodes
+
+Roger Quadros (1):
+      ARM: dts: k2g-evm: Enable USB 0 and 1
+
+Vignesh R (2):
+      ARM: dts: keystone-k2g: Add ECAP PWM DT nodes
+      ARM: dts: keystone-k2g-evm: Enable PWM ECAP0
+
+Vitaly Andrianov (3):
+      ARM: dts: keystone-k2g: Add I2C nodes
+      ARM: dts: k2g: Add USB instances
+      ARM: dts: keystone-k2g: Add SPI nodes
+
+ arch/arm/boot/dts/keystone-k2g-evm.dts |  93 +++++++++++++++
+ arch/arm/boot/dts/keystone-k2g.dtsi    | 208 +++++++++++++++++++++++++++++++++
+ 2 files changed, 301 insertions(+)
