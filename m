@@ -1,60 +1,37 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sat, 21 Oct 2017 11:47:53 -0400
-Subject: [RFCv2 PATCH 05/36] iommu/process: Bind and unbind process to and
- from devices
-In-Reply-To: <20171006133203.22803-6-jean-philippe.brucker@arm.com>
-References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
- <20171006133203.22803-6-jean-philippe.brucker@arm.com>
-Message-ID: <683a518d-0e22-c855-2416-2e097ec3291d@codeaurora.org>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 21 Oct 2017 17:50:22 +0100
+Subject: [PATCH] iio: adc: stm32: add tim15 trigger
+In-Reply-To: <1508326767-24215-1-git-send-email-fabrice.gasnier@st.com>
+References: <1508326767-24215-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20171021175022.791d4836@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just some improvement suggestions.
+On Wed, 18 Oct 2017 13:39:27 +0200
+Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
 
-On 10/6/2017 9:31 AM, Jean-Philippe Brucker wrote:
-> +	spin_lock(&iommu_process_lock);
-> +	idr_for_each_entry(&iommu_process_idr, process, i) {
-> +		if (process->pid != pid)
-> +			continue;
-if you see this construct a lot, this could be a for_each_iommu_process.
+> Add TIM15_TRGO trigger that is now supported on STM32H7.
+> 
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Applied to the togreg branch of iio.git and pushed out as
+testing for the autobuilders to play with it.
 
-> +
-> +		if (!iommu_process_get_locked(process)) {
-> +			/* Process is defunct, create a new one */
-> +			process = NULL;
-> +			break;
-> +		}
-> +
-> +		/* Great, is it also bound to this domain? */
-> +		list_for_each_entry(cur_context, &process->domains,
-> +				    process_head) {
-> +			if (cur_context->domain != domain)
-> +				continue;
-if you see this construct a lot, this could be a for_each_iommu_process_domain.
+Thanks,
 
-> +
-> +			context = cur_context;
-> +			*pasid = process->pasid;
-> +
-> +			/* Splendid, tell the driver and increase the ref */
-> +			err = iommu_process_attach_locked(context, dev);
-> +			if (err)
-> +				iommu_process_put_locked(process);
-> +
-> +			break;
-> +		}
-> +		break;
-> +	}
-> +	spin_unlock(&iommu_process_lock);
-> +	put_pid(pid);
-> +
-> +	if (context)
-> +		return err;
-
-I think you should make the section above a independent function and return here when the
-context is found.
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Jonathan
+> ---
+>  drivers/iio/adc/stm32-adc.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/iio/adc/stm32-adc.c b/drivers/iio/adc/stm32-adc.c
+> index cc7ca50..4725756 100644
+> --- a/drivers/iio/adc/stm32-adc.c
+> +++ b/drivers/iio/adc/stm32-adc.c
+> @@ -501,6 +501,7 @@ struct stm32_adc_info {
+>  	{ TIM2_TRGO, STM32_EXT11 },
+>  	{ TIM4_TRGO, STM32_EXT12 },
+>  	{ TIM6_TRGO, STM32_EXT13 },
+> +	{ TIM15_TRGO, STM32_EXT14 },
+>  	{ TIM3_CH4, STM32_EXT15 },
+>  	{ LPTIM1_OUT, STM32_EXT18 },
+>  	{ LPTIM2_OUT, STM32_EXT19 },
