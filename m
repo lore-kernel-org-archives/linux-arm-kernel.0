@@ -1,45 +1,31 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 20 Oct 2017 17:16:36 -0700
-Subject: [GIT PULL 5/5] Broadcom drivers changes for 4.15 (part 2)
-In-Reply-To: <20171021001636.17662-1-f.fainelli@gmail.com>
-References: <20171021001636.17662-1-f.fainelli@gmail.com>
-Message-ID: <20171021001636.17662-5-f.fainelli@gmail.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Fri, 20 Oct 2017 20:50:42 -0400
+Subject: [PATCH 0/3] arm64: cpuinfo: make /proc/cpuinfo more human-readable
+In-Reply-To: <d544f5a8-e6b2-f645-23cc-0d1466f49bf8@redhat.com>
+References: <20170926222324.17409-1-ahs3@redhat.com>
+ <20170927103406.GC32150@leverpostej>
+ <CAOZdJXUzo3JrHW1h6W3y3BnVq472NjPpaqTztzEODZnnMyvJRg@mail.gmail.com>
+ <20171013142724.GA5893@leverpostej>
+ <abeb1756-3635-2f86-131c-cd904731a308@redhat.com>
+ <20171020161053.ujw3spzizhgu4g7b@lakrids.cambridge.arm.com>
+ <d544f5a8-e6b2-f645-23cc-0d1466f49bf8@redhat.com>
+Message-ID: <626f32d8-c6df-7c25-0391-f912be5665cf@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 0e9b11413262ef3d64273e15f7631d9836c53c1a:
+On 10/20/2017 01:24 PM, Jon Masters wrote:
 
-  soc bcm: brcmstb: Add support for S2/S3/S5 suspend states (MIPS) (2017-09-25 11:47:14 -0700)
+> 1). The first thing people do when they get an Arm server is to cat
+> /proc/cpuinfo. They then come complaining that it's not like x86. They
+> can't get the output their looking for and this results in bug filing,
+> and countless hours on phone calls discussing over and over again.
+> Worse, there are some parts of the stack that really need this.
 
-are available in the git repository at:
+Within 6 hours of sending this, I get a ping about this week's "Works On
+Arm" newsletter and...people reporting bugs with not getting CPU
+capabilities in /proc/cpuinfo. This madness is going to end. Soon.
 
-  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.15/drivers-part2
+Jon.
 
-for you to fetch changes up to 04c3767f10809797331cda78808d9163939081e1:
-
-  clk: bcm: Add Broadcom Hurricane 2 clock support (2017-10-12 11:31:46 -0700)
-
-----------------------------------------------------------------
-This pull request contains Broadcom ARM/ARM64/MIPS SoCs changes for 4.15
-(second part), please pull the following:
-
-- Markus updates the Broadcom STB DPFE driver to avoid loading the firmware when
-  unnecessary to accomodate for specific platform restrictions
-
-- Florian adds support for the Broadcom Hurricane 2 SoC iProc PLL clock needed
-  to get the proper CPU clock frequency
-
-----------------------------------------------------------------
-Florian Fainelli (1):
-      clk: bcm: Add Broadcom Hurricane 2 clock support
-
-Markus Mayer (2):
-      memory: brcmstb: dpfe: introduce is_dcpu_enabled()
-      memory: brcmstb: dpfe: skip downloading firmware when possible
-
- drivers/clk/bcm/Kconfig       |  9 +++++++++
- drivers/clk/bcm/Makefile      |  1 +
- drivers/clk/bcm/clk-hr2.c     | 27 +++++++++++++++++++++++++++
- drivers/memory/brcmstb_dpfe.c | 37 +++++++++++++++++++++++++++++--------
- 4 files changed, 66 insertions(+), 8 deletions(-)
- create mode 100644 drivers/clk/bcm/clk-hr2.c
+-- 
+Computer Architect | Sent from my Fedora powered laptop
