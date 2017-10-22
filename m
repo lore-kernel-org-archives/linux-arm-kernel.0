@@ -1,68 +1,49 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Sun, 22 Oct 2017 10:31:18 -0700
-Subject: [5/5,v2] watchdog: ftwdt010: Add restart support
-In-Reply-To: <20171016205427.4297-5-linus.walleij@linaro.org>
-References: <20171016205427.4297-5-linus.walleij@linaro.org>
-Message-ID: <20171022173118.GA17800@roeck-us.net>
+Date: Sun, 22 Oct 2017 10:44:16 -0700
+Subject: watchdog: sunxi_wdt: use of_device_get_match_data
+In-Reply-To: <20171021174513.1653-1-clabbe.montjoie@gmail.com>
+References: <20171021174513.1653-1-clabbe.montjoie@gmail.com>
+Message-ID: <20171022174416.GA21100@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 16, 2017 at 10:54:27PM +0200, Linus Walleij wrote:
-> This enables the Faraday FTWDT010 to restart the system,
-> if need be. Set the restart priority for the watchdog to
-> 128.
+On Sat, Oct 21, 2017 at 07:45:13PM +0200, Corentin Labbe wrote:
+> The usage of of_device_get_match_data reduce the code size a bit.
+> Furthermore, it prevents an improbable dereference when
+> of_match_device() return NULL.
 > 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 
 Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 
 > ---
-> ChangeLog v1->v2:
-> - Rebased, no changes.
-> ---
->  drivers/watchdog/ftwdt010_wdt.c | 18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
+>  drivers/watchdog/sunxi_wdt.c | 7 ++-----
+>  1 file changed, 2 insertions(+), 5 deletions(-)
 > 
-> diff --git a/drivers/watchdog/ftwdt010_wdt.c b/drivers/watchdog/ftwdt010_wdt.c
-> index 21c3ac7f557a..0be7c2db642d 100644
-> --- a/drivers/watchdog/ftwdt010_wdt.c
-> +++ b/drivers/watchdog/ftwdt010_wdt.c
-> @@ -56,6 +56,22 @@ struct ftwdt010_wdt *to_ftwdt010_wdt(struct watchdog_device *wdd)
->  	return container_of(wdd, struct ftwdt010_wdt, wdd);
->  }
->  
-> +static int ftwdt010_wdt_restart(struct watchdog_device *wdd,
-> +				unsigned long action, void *data)
-> +{
-> +	struct ftwdt010_wdt *gwdt = to_ftwdt010_wdt(wdd);
-> +	u32 enable;
-> +
-> +	writel(1, gwdt->base + FTWDT010_WDLOAD);
-> +	writel(WDRESTART_MAGIC, gwdt->base + FTWDT010_WDRESTART);
-> +	enable = WDCR_SYS_RST | WDCR_ENABLE;
-> +	if (gwdt->use_extclk)
-> +		enable |= WDCR_EXTCLK;
-> +	writel(enable, gwdt->base + FTWDT010_WDCR);
-> +
-> +	return 0;
-> +}
-> +
->  static int ftwdt010_wdt_start(struct watchdog_device *wdd)
+> diff --git a/drivers/watchdog/sunxi_wdt.c b/drivers/watchdog/sunxi_wdt.c
+> index 9728fa32c357..802e31b1416d 100644
+> --- a/drivers/watchdog/sunxi_wdt.c
+> +++ b/drivers/watchdog/sunxi_wdt.c
+> @@ -234,7 +234,6 @@ MODULE_DEVICE_TABLE(of, sunxi_wdt_dt_ids);
+>  static int sunxi_wdt_probe(struct platform_device *pdev)
 >  {
->  	struct ftwdt010_wdt *gwdt = to_ftwdt010_wdt(wdd);
-> @@ -118,6 +134,7 @@ static const struct watchdog_ops ftwdt010_wdt_ops = {
->  	.stop		= ftwdt010_wdt_stop,
->  	.ping		= ftwdt010_wdt_ping,
->  	.set_timeout	= ftwdt010_wdt_set_timeout,
-> +	.restart	= ftwdt010_wdt_restart,
->  	.owner		= THIS_MODULE,
->  };
+>  	struct sunxi_wdt_dev *sunxi_wdt;
+> -	const struct of_device_id *device;
+>  	struct resource *res;
+>  	int err;
 >  
-> @@ -190,6 +207,7 @@ static int ftwdt010_wdt_probe(struct platform_device *pdev)
->  	 */
->  	gwdt->wdd.timeout = 13U;
->  	watchdog_init_timeout(&gwdt->wdd, 0, dev);
-> +	watchdog_set_restart_priority(&gwdt->wdd, 128);
+> @@ -242,12 +241,10 @@ static int sunxi_wdt_probe(struct platform_device *pdev)
+>  	if (!sunxi_wdt)
+>  		return -EINVAL;
 >  
->  	reg = readw(gwdt->base + FTWDT010_WDCR);
->  	if (reg & WDCR_ENABLE) {
+> -	device = of_match_device(sunxi_wdt_dt_ids, &pdev->dev);
+> -	if (!device)
+> +	sunxi_wdt->wdt_regs = of_device_get_match_data(&pdev->dev);
+> +	if (!sunxi_wdt->wdt_regs)
+>  		return -ENODEV;
+>  
+> -	sunxi_wdt->wdt_regs = device->data;
+> -
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	sunxi_wdt->wdt_base = devm_ioremap_resource(&pdev->dev, res);
+>  	if (IS_ERR(sunxi_wdt->wdt_base))
