@@ -1,59 +1,29 @@
-From: guochun.mao@mediatek.com (Guochun Mao)
-Date: Sun, 22 Oct 2017 18:30:53 +0800
-Subject: [PATCH v1 1/2] dt-bindings: mtd: add new compatible strings and
- improve description
-In-Reply-To: <1507691713.14979.2.camel@mhfsdcap03>
-References: <1505997906-30921-1-git-send-email-guochun.mao@mediatek.com>
- <1505997906-30921-2-git-send-email-guochun.mao@mediatek.com>
- <1507691713.14979.2.camel@mhfsdcap03>
-Message-ID: <1508668253.14979.5.camel@mhfsdcap03>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Sun, 22 Oct 2017 03:31:43 -0700
+Subject: [GIT PULL] Amlogic defconfig updatest for v4.15
+Message-ID: <7hwp3nqxrk.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Cyrille, Marek,
+The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 
-Gentle ping...
+  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
 
+are available in the git repository at:
 
-On Wed, 2017-10-11 at 11:15 +0800, Guochun Mao wrote:
-> gentle ping...
-> 
-> On Thu, 2017-09-21 at 20:45 +0800, Guochun Mao wrote:
-> > Add "mediatak,mt2712-nor" and "mediatek,mt7622-nor"
-> > for nor flash node's compatible strings.
-> > Explicate the fallback compatible.
-> > 
-> > Acked-by: Rob Herring <robh@kernel.org>
-> > Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
-> > ---
-> >  .../devicetree/bindings/mtd/mtk-quadspi.txt        |   15 +++++++++------
-> >  1 file changed, 9 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-> > index 840f940..56d3668 100644
-> > --- a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-> > +++ b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-> > @@ -1,13 +1,16 @@
-> >  * Serial NOR flash controller for MTK MT81xx (and similar)
-> >  
-> >  Required properties:
-> > -- compatible: 	  The possible values are:
-> > -		  "mediatek,mt2701-nor"
-> > -		  "mediatek,mt7623-nor"
-> > +- compatible: 	  For mt8173, compatible should be "mediatek,mt8173-nor",
-> > +		  and it's the fallback compatible for other Soc.
-> > +		  For every other SoC, should contain both the SoC-specific compatible
-> > +		  string and "mediatek,mt8173-nor".
-> > +		  The possible values are:
-> > +		  "mediatek,mt2701-nor", "mediatek,mt8173-nor"
-> > +		  "mediatek,mt2712-nor", "mediatek,mt8173-nor"
-> > +		  "mediatek,mt7622-nor", "mediatek,mt8173-nor"
-> > +		  "mediatek,mt7623-nor", "mediatek,mt8173-nor"
-> >  		  "mediatek,mt8173-nor"
-> > -		  For mt8173, compatible should be "mediatek,mt8173-nor".
-> > -		  For every other SoC, should contain both the SoC-specific compatible string
-> > -		  and "mediatek,mt8173-nor".
-> >  - reg: 		  physical base address and length of the controller's register
-> >  - clocks: 	  the phandle of the clocks needed by the nor controller
-> >  - clock-names: 	  the names of the clocks
-> 
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-defconfig
+
+for you to fetch changes up to fce107aea2cbea0d3bc6d170ba6ce14111661a1b:
+
+  ARM: multi_v7_defconfig: enable the Meson MX SDIO/MMC controller (2017-10-11 17:19:18 -0700)
+
+----------------------------------------------------------------
+Amlogic: defconfig updates for v4.15
+- enable SDIO/MMC controller
+
+----------------------------------------------------------------
+Martin Blumenstingl (1):
+      ARM: multi_v7_defconfig: enable the Meson MX SDIO/MMC controller
+
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
