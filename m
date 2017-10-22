@@ -1,42 +1,59 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Sun, 22 Oct 2017 05:19:58 -0500
-Subject: [GIT PULL] Qualcomm Driver updates for 4.15 Part 2
-Message-ID: <1508667598-5069-1-git-send-email-andy.gross@linaro.org>
+From: guochun.mao@mediatek.com (Guochun Mao)
+Date: Sun, 22 Oct 2017 18:30:53 +0800
+Subject: [PATCH v1 1/2] dt-bindings: mtd: add new compatible strings and
+ improve description
+In-Reply-To: <1507691713.14979.2.camel@mhfsdcap03>
+References: <1505997906-30921-1-git-send-email-guochun.mao@mediatek.com>
+ <1505997906-30921-2-git-send-email-guochun.mao@mediatek.com>
+ <1507691713.14979.2.camel@mhfsdcap03>
+Message-ID: <1508668253.14979.5.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 8c1b7dc9ba2294c6dbd1870a3d2e534bfda3047a:
+Hi Cyrille, Marek,
 
-  firmware: qcom: scm: Expose download-mode control (2017-10-11 23:48:27 -0500)
+Gentle ping...
 
-are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-drivers-for-4.15-2
-
-for you to fetch changes up to d1de6d6c639b7827c42c4750b8101ed1049e1c72:
-
-  soc: qcom: Remote filesystem memory driver (2017-10-22 05:06:34 -0500)
-
-----------------------------------------------------------------
-Qualcomm ARM Based Driver Updates for v4.15 Part 2
-
-* Add Qualcomm Remote Filesystem Memory driver
-* Add OF linkage for RMTFS
-
-----------------------------------------------------------------
-Bjorn Andersson (4):
-      of/platform: Generalize /reserved-memory handling
-      of: reserved_mem: Accessor for acquiring reserved_mem
-      dt-binding: soc: qcom: Add binding for rmtfs memory
-      soc: qcom: Remote filesystem memory driver
-
- .../bindings/reserved-memory/qcom,rmtfs-mem.txt    |  51 ++++
- drivers/of/of_reserved_mem.c                       |  26 ++
- drivers/of/platform.c                              |  19 +-
- drivers/soc/qcom/Kconfig                           |  11 +
- drivers/soc/qcom/Makefile                          |   1 +
- drivers/soc/qcom/rmtfs_mem.c                       | 271 +++++++++++++++++++++
- include/linux/of_reserved_mem.h                    |   5 +
- 7 files changed, 376 insertions(+), 8 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/reserved-memory/qcom,rmtfs-mem.txt
- create mode 100644 drivers/soc/qcom/rmtfs_mem.c
+On Wed, 2017-10-11 at 11:15 +0800, Guochun Mao wrote:
+> gentle ping...
+> 
+> On Thu, 2017-09-21 at 20:45 +0800, Guochun Mao wrote:
+> > Add "mediatak,mt2712-nor" and "mediatek,mt7622-nor"
+> > for nor flash node's compatible strings.
+> > Explicate the fallback compatible.
+> > 
+> > Acked-by: Rob Herring <robh@kernel.org>
+> > Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
+> > ---
+> >  .../devicetree/bindings/mtd/mtk-quadspi.txt        |   15 +++++++++------
+> >  1 file changed, 9 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
+> > index 840f940..56d3668 100644
+> > --- a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
+> > +++ b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
+> > @@ -1,13 +1,16 @@
+> >  * Serial NOR flash controller for MTK MT81xx (and similar)
+> >  
+> >  Required properties:
+> > -- compatible: 	  The possible values are:
+> > -		  "mediatek,mt2701-nor"
+> > -		  "mediatek,mt7623-nor"
+> > +- compatible: 	  For mt8173, compatible should be "mediatek,mt8173-nor",
+> > +		  and it's the fallback compatible for other Soc.
+> > +		  For every other SoC, should contain both the SoC-specific compatible
+> > +		  string and "mediatek,mt8173-nor".
+> > +		  The possible values are:
+> > +		  "mediatek,mt2701-nor", "mediatek,mt8173-nor"
+> > +		  "mediatek,mt2712-nor", "mediatek,mt8173-nor"
+> > +		  "mediatek,mt7622-nor", "mediatek,mt8173-nor"
+> > +		  "mediatek,mt7623-nor", "mediatek,mt8173-nor"
+> >  		  "mediatek,mt8173-nor"
+> > -		  For mt8173, compatible should be "mediatek,mt8173-nor".
+> > -		  For every other SoC, should contain both the SoC-specific compatible string
+> > -		  and "mediatek,mt8173-nor".
+> >  - reg: 		  physical base address and length of the controller's register
+> >  - clocks: 	  the phandle of the clocks needed by the nor controller
+> >  - clock-names: 	  the names of the clocks
+> 
