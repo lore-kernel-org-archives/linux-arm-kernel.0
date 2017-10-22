@@ -1,39 +1,74 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 22 Oct 2017 20:49:56 +0200
-Subject: [PATCH v2 3/3] tty: serial: imx: remove imx_disable_rx_int
-In-Reply-To: <15ff545c-5aaf-4f03-3672-2c1702f78316@boundarydevices.com>
-References: <20171020212021.13065-1-troy.kisky@boundarydevices.com>
- <20171020212021.13065-3-troy.kisky@boundarydevices.com>
- <15ff545c-5aaf-4f03-3672-2c1702f78316@boundarydevices.com>
-Message-ID: <20171022184956.exmjlpcbzkvlp7xg@pengutronix.de>
+From: plaes@plaes.org (Priit Laes)
+Date: Sun, 22 Oct 2017 18:52:42 +0000
+Subject: [PATCH 15/23] drm/sun4i: Add LVDS support
+In-Reply-To: <6e313d0b31dca3f47583668eb755d934a1ab515e.1508231063.git-series.maxime.ripard@free-electrons.com>
+References: <cover.fe3d65d1ee05a55224d26e7d113388c428592b26.1508231063.git-series.maxime.ripard@free-electrons.com>
+ <6e313d0b31dca3f47583668eb755d934a1ab515e.1508231063.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <20171022185241.GA11292@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Fri, Oct 20, 2017 at 02:25:11PM -0700, Troy Kisky wrote:
-> On 10/20/2017 2:20 PM, Troy Kisky wrote:
-> > Since imx_disable_rx_int is only called by imx_startup,
-> > let's integrate it into that function.
-> > 
-> > Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
-> > ---
-> > v2: new patch
-> > ---
-> >  drivers/tty/serial/imx.c | 39 ++++++++++-----------------------------
-> >  1 file changed, 10 insertions(+), 29 deletions(-)
+On Tue, Oct 17, 2017 at 11:06:22AM +0200, Maxime Ripard wrote:
+> The TCON supports the LVDS interface to output to a panel or a bridge.
+> Let's add support for it.
 > 
-> While testing this series, I noticed that sending a break on the serial port caused
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/gpu/drm/sun4i/Makefile     |   1 +-
+>  drivers/gpu/drm/sun4i/sun4i_lvds.c | 183 ++++++++++++++++++++++++++++-
+>  drivers/gpu/drm/sun4i/sun4i_lvds.h |  18 +++-
+>  drivers/gpu/drm/sun4i/sun4i_tcon.c | 193 +++++++++++++++++++++++++++++-
+>  drivers/gpu/drm/sun4i/sun4i_tcon.h |  25 ++++-
+>  5 files changed, 419 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/gpu/drm/sun4i/sun4i_lvds.c
+>  create mode 100644 drivers/gpu/drm/sun4i/sun4i_lvds.h
 > 
-> imx-uart 2020000.serial: DMA transaction error.
-> 
-> Is that normal ?
 
-I remember that J?rgen (added to To explictly) hit this or a similar
-problem before, maybe he can commen?
+[...]
 
-Best regards
-Uwe
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> index 3efa1ab045cd..6a20a467ee6d 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+
+[...]
+> @@ -698,6 +858,26 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
+>  		return ret;
+>  	}
+>  
+> +	/*
+> +	 * This can only be made optional since we've had DT nodes
+> +	 * without the LVDS reset properties.
+> +	 *
+> +	 * If the property is missing, just disable LVDS, and print a
+> +	 * warning.
+> +	 */
+> +	tcon->lvds_rst = devm_reset_control_get_optional(dev, "lvds");
+> +	if (IS_ERR(tcon->lvds_rst)) {
+> +		dev_err(dev, "Couldn't get our reset line\n");
+> +		return PTR_ERR(tcon->lvds_rst);
+> +	} else if (tcon->lvds_rst) {
+> +		has_lvds = true;
+> +		reset_control_reset(tcon->lvds_rst);
+> +	} else {
+> +		has_lvds = false;
+> +		dev_warn(dev,
+> +			 "Missing LVDS reset property, you should consider upgrading your DT\n");
+
+This will generate annoying warning for tcon1 on A10/A20.
+
+> +	}
+> +
+>  	ret = sun4i_tcon_init_clocks(dev, tcon);
+>  	if (ret) {
+>  		dev_err(dev, "Couldn't init our TCON clocks\n");
+> @@ -729,7 +909,18 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
+>  		goto err_free_clocks;
+>  	}
+>  
+> -	ret = sun4i_rgb_init(drm, tcon);
+> +	/*
+> +	 * If we have an LVDS panel connected to the TCON, we should
+> +	 * just probe the LVDS connector. Otherwise, just probe RGB as
+> +	 * we used to.
+> +	 */
