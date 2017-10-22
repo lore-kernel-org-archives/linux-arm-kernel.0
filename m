@@ -1,95 +1,67 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Sun, 22 Oct 2017 03:41:25 -0700
-Subject: [GIT PULL] Amlogic 64-bit DT updates for v4.15
-Message-ID: <7hefpvqxbe.fsf@baylibre.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sun, 22 Oct 2017 12:01:13 +0100
+Subject: [PATCH] ARM: Fix zImage file size not aligned with
+ CONFIG_EFI_STUB enabled
+In-Reply-To: <20171018050108.10352-1-jeffy.chen@rock-chips.com>
+References: <20171018050108.10352-1-jeffy.chen@rock-chips.com>
+Message-ID: <CAKv+Gu9ReBC+rLxaD-+Mp+aWRDfsYECAeOZo9CYU3big2nPw0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+On 18 October 2017 at 06:01, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
+> The zImage file size should be aligned.
+>
+> Fixes: e4bae4d0b5f3 ("arm/efi: Split zImage code and data into separate PE/COFF sections")
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> ---
+>
+>  arch/arm/boot/compressed/vmlinux.lds.S | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/boot/compressed/vmlinux.lds.S b/arch/arm/boot/compressed/vmlinux.lds.S
+> index b38dcef90756..1636fa259577 100644
+> --- a/arch/arm/boot/compressed/vmlinux.lds.S
+> +++ b/arch/arm/boot/compressed/vmlinux.lds.S
+> @@ -70,10 +70,6 @@ SECTIONS
+>    .got                 : { *(.got) }
+>    _got_end = .;
+>
+> -  /* ensure the zImage file size is always a multiple of 64 bits */
+> -  /* (without a dummy byte, ld just ignores the empty section) */
+> -  .pad                 : { BYTE(0); . = ALIGN(8); }
+> -
+>  #ifdef CONFIG_EFI_STUB
+>    .data : ALIGN(4096) {
+>      __pecoff_data_start = .;
+> @@ -93,6 +89,10 @@ SECTIONS
+>    __pecoff_data_rawsize = . - ADDR(.data);
+>  #endif
+>
+> +  /* ensure the zImage file size is always a multiple of 64 bits */
+> +  /* (without a dummy byte, ld just ignores the empty section) */
+> +  .pad                 : { BYTE(0); . = ALIGN(8); }
+> +
+>    _edata = .;
+>
+>    _magic_sig = ZIMAGE_MAGIC(0x016f2818);
+> --
+> 2.11.0
+>
 
-Note that this PR is against v4.14-rc4 because of dependencies on some
-Amlogic DT64 changes that missed next/late and ended up going in as
-fixes and landed in -rc4.
+This is not the right fix. If CONFIG_EFI_STUB is enabled, the zImage
+filesize should be rounded up to 512 bytes not 8 bytes. The '. =
+ALIGN(512);' in the .data section appears to ensure that, but for some
+reason, that appears not to be working.
 
-Kevin
+Could you share the output of
 
+$ readelf -S arch/arm/boot/compressed/vmlinux
 
-The following changes since commit 8a5776a5f49812d29fe4b2d0a2d71675c3facf3f:
+please? And could you please check whether this patch
 
-  Linux 4.14-rc4 (2017-10-08 20:53:29 -0700)
+https://marc.info/?l=linux-arm-kernel&m=150488477807353
 
-are available in the git repository at:
+fixes the issue for you?
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64
-
-for you to fetch changes up to 9d59b708500fcb62d28e15b8c6333be620984d8b:
-
-  arm64: dts: meson-axg: add initial A113D SoC DT support (2017-10-19 03:17:07 -0700)
-
-----------------------------------------------------------------
-Amlogic 64-bit platforms: DT updates for v4.15
-- new SoC support: A113D
-- new boards: Tronsmart Vega S96, Khadas vim2
-- reserved memory fixups
-- gpio-names cleanups
-- MMC cleanups, enable high-speed modes
-- misc cleanups
-
-----------------------------------------------------------------
-Jerome Brunet (10):
-      ARM64: dts: meson-gxl-libretech-cc: enable saradc
-      ARM64: dts: meson-gxl-libretech-cc: enable internal phy leds
-      ARM: dts: meson8: remove gpio offset
-      ARM64: dts: meson-gx: remove gpio offset
-      ARM64: dts: meson-gx: adjust gpio-ranges for TEST_N
-      ARM64: dts: meson-gxbb: adjust nanopi-k2 gpio-line-names
-      ARM64: dts: meson-gxbb: adjust odroid-c2 gpio-line-names
-      ARM64: dts: meson-gxl: adjust kvim gpio-line-names
-      ARM64: dts: meson-gxl: adjust libretech-cc gpio-line-names
-      ARM64: dts: meson-gxm: enable HS400 on the vim2
-
-Neil Armstrong (7):
-      ARM64: dts: meson-gxl: Take eMMC data strobe out of eMMC pins
-      ARM64: dts: meson-gxm: Add support for Khadas VIM2
-      ARM64: dts: meson-gxm: Add Vega S96 board
-      dt-bindings: arm: amlogic: Add Tronsmart Vega S96 binding
-      ARM64: dts: meson-gxl: Add alternate ARM Trusted Firmware reserved memory zone
-      ARM64: dts: meson-gx: remove unnecessary clocks properties
-      ARM64: dts: meson-gx: remove unnecessary uart compatible
-
-Peter Korsgaard (1):
-      ARM64: dts: meson-gxbb-nexbox-a95x: Enable USB Nodes
-
-Yixun Lan (2):
-      dt-bindings: arm: amlogic: Add Meson AXG binding
-      arm64: dts: meson-axg: add initial A113D SoC DT support
-
- Documentation/devicetree/bindings/arm/amlogic.txt              |   8 ++
- arch/arm/boot/dts/meson8.dtsi                                  |   2 +-
- arch/arm/boot/dts/meson8b.dtsi                                 |   2 +-
- arch/arm64/boot/dts/amlogic/Makefile                           |   3 +
- arch/arm64/boot/dts/amlogic/meson-axg-s400.dts                 |  22 ++++++
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi                     | 204 +++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi            |   2 +-
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi                      |  13 ++--
- arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts           |  12 +--
- arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts         |  31 +++++++-
- arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts            |  12 +--
- arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi               |   2 +-
- arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi           |   2 +-
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi                    |  12 ++-
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts |   2 +-
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts     |   8 +-
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts   |  27 +++++--
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts    |   2 +-
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi          |   2 +-
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi                     |  20 ++++-
- arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts          | 400 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts            |   2 +-
- arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts             |   2 +-
- arch/arm64/boot/dts/amlogic/meson-gxm-vega-s96.dts             |  38 ++++++++++
- 24 files changed, 784 insertions(+), 46 deletions(-)
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-axg.dtsi
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxm-vega-s96.dts
+Thanks,
+Ard.
