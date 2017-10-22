@@ -1,93 +1,85 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun, 22 Oct 2017 15:14:57 +0100
-Subject: [PATCH] efi/libstub: arm: omit sorting of the UEFI memory map
-Message-ID: <20171022141457.28769-1-ard.biesheuvel@linaro.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sun, 22 Oct 2017 10:11:04 -0700
+Subject: [1/5,v2] watchdog: gemini/ftwdt010: rename DT bindings
+In-Reply-To: <20171016205427.4297-1-linus.walleij@linaro.org>
+References: <20171016205427.4297-1-linus.walleij@linaro.org>
+Message-ID: <20171022171104.GA7322@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM shares its EFI stub implementation with arm64, which has some
-special handling in the virtual remapping code to
-a) make sure that we can map everything even if the OS executes
-   with 64k page size, and
-b) make sure that adjacent regions with the same attributes are not
-   reordered or moved apart in memory.
+On Mon, Oct 16, 2017 at 10:54:23PM +0200, Linus Walleij wrote:
+> The device tree bindings are in two copies and also should be
+> consolidated into a single Faraday Technology FTWDT010
+> binding since we uncovered that this IP part is a standard
+> IP from Faraday.
+> 
+> Cc: devicetree at vger.kernel.org
+> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-The latter is a workaround for a 'feature' that was shortly recommended
-by UEFI spec v2.5, but deprecated shortly after, due to the fact that
-it broke many OS installers, including non-Linux ones, and it was never
-widely implemented for ARM systems. Before implementing b), the arm64
-code simply rounded up all regions to 64 KB granularity, but given that
-that results in moving adjacent regions apart, it had to be refined when
-b) was implemented.
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 
-The adjacency check requires a sort() pass, due to the fact that the
-UEFI spec does not mandate any ordering, and the inclusion of the
-lib/sort.c code into the ARM EFI stub is causing some trouble with
-the decompressor build due to the fact that its EXPORT_SYMBOL() call
-triggers the creation of ksymtab/kcrctab sections.
-
-So let's simply do away with the adjacency check for ARM, and simply put
-all UEFI runtime regions together if they have the same memory attributes.
-This is guaranteed to work, given that ARM only supports 4 KB pages,
-and allows us to remove the sort() call entirely.
-
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- drivers/firmware/efi/libstub/Makefile   | 6 +++---
- drivers/firmware/efi/libstub/arm-stub.c | 7 +++++--
- 2 files changed, 8 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
-index dedf9bde44db..f3e8431565ea 100644
---- a/drivers/firmware/efi/libstub/Makefile
-+++ b/drivers/firmware/efi/libstub/Makefile
-@@ -33,13 +33,14 @@ lib-y				:= efi-stub-helper.o gop.o secureboot.o
- lib-$(CONFIG_RESET_ATTACK_MITIGATION) += tpm.o
- 
- # include the stub's generic dependencies from lib/ when building for ARM/arm64
--arm-deps := fdt_rw.c fdt_ro.c fdt_wip.c fdt.c fdt_empty_tree.c fdt_sw.c sort.c
-+arm-deps-y := fdt_rw.c fdt_ro.c fdt_wip.c fdt.c fdt_empty_tree.c fdt_sw.c
-+arm-deps-$(CONFIG_ARM64) += sort.c
- 
- $(obj)/lib-%.o: $(srctree)/lib/%.c FORCE
- 	$(call if_changed_rule,cc_o_c)
- 
- lib-$(CONFIG_EFI_ARMSTUB)	+= arm-stub.o fdt.o string.o random.o \
--				   $(patsubst %.c,lib-%.o,$(arm-deps))
-+				   $(patsubst %.c,lib-%.o,$(arm-deps-y))
- 
- lib-$(CONFIG_ARM)		+= arm32-stub.o
- lib-$(CONFIG_ARM64)		+= arm64-stub.o
-@@ -90,5 +91,4 @@ quiet_cmd_stubcopy = STUBCPY $@
- # explicitly by the decompressor linker script.
- #
- STUBCOPY_FLAGS-$(CONFIG_ARM)	+= --rename-section .data=.data.efistub
--STUBCOPY_RM-$(CONFIG_ARM)	+= -R ___ksymtab+sort -R ___kcrctab+sort
- STUBCOPY_RELOC-$(CONFIG_ARM)	:= R_ARM_ABS
-diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
-index 1cb2d1c070c3..3061e4057483 100644
---- a/drivers/firmware/efi/libstub/arm-stub.c
-+++ b/drivers/firmware/efi/libstub/arm-stub.c
-@@ -349,7 +349,9 @@ void efi_get_virtmap(efi_memory_desc_t *memory_map, unsigned long map_size,
- 	 * The easiest way to find adjacent regions is to sort the memory map
- 	 * before traversing it.
- 	 */
--	sort(memory_map, map_size / desc_size, desc_size, cmp_mem_desc, NULL);
-+	if (IS_ENABLED(CONFIG_ARM64))
-+		sort(memory_map, map_size / desc_size, desc_size, cmp_mem_desc,
-+		     NULL);
- 
- 	for (l = 0; l < map_size; l += desc_size, prev = in) {
- 		u64 paddr, size;
-@@ -366,7 +368,8 @@ void efi_get_virtmap(efi_memory_desc_t *memory_map, unsigned long map_size,
- 		 * a 4k page size kernel to kexec a 64k page size kernel and
- 		 * vice versa.
- 		 */
--		if (!regions_are_adjacent(prev, in) ||
-+		if ((IS_ENABLED(CONFIG_ARM64) &&
-+		     !regions_are_adjacent(prev, in)) ||
- 		    !regions_have_compatible_memory_type_attrs(prev, in)) {
- 
- 			paddr = round_down(in->phys_addr, SZ_64K);
--- 
-2.11.0
+> ---
+> ChangeLog v1->v2:
+> - Collect Rob's ACK.
+> ---
+>  .../bindings/watchdog/cortina,gemini-watchdog.txt       | 17 -----------------
+>  ...{cortina,gemin-watchdog.txt => faraday,ftwdt010.txt} | 11 ++++++++---
+>  2 files changed, 8 insertions(+), 20 deletions(-)
+>  delete mode 100644 Documentation/devicetree/bindings/watchdog/cortina,gemini-watchdog.txt
+>  rename Documentation/devicetree/bindings/watchdog/{cortina,gemin-watchdog.txt => faraday,ftwdt010.txt} (55%)
+> 
+> diff --git a/Documentation/devicetree/bindings/watchdog/cortina,gemini-watchdog.txt b/Documentation/devicetree/bindings/watchdog/cortina,gemini-watchdog.txt
+> deleted file mode 100644
+> index bc4b865d178b..000000000000
+> --- a/Documentation/devicetree/bindings/watchdog/cortina,gemini-watchdog.txt
+> +++ /dev/null
+> @@ -1,17 +0,0 @@
+> -Cortina Systems Gemini SoC Watchdog
+> -
+> -Required properties:
+> -- compatible : must be "cortina,gemini-watchdog"
+> -- reg : shall contain base register location and length
+> -- interrupts : shall contain the interrupt for the watchdog
+> -
+> -Optional properties:
+> -- timeout-sec : the default watchdog timeout in seconds.
+> -
+> -Example:
+> -
+> -watchdog at 41000000 {
+> -	compatible = "cortina,gemini-watchdog";
+> -	reg = <0x41000000 0x1000>;
+> -	interrupts = <3 IRQ_TYPE_LEVEL_HIGH>;
+> -};
+> diff --git a/Documentation/devicetree/bindings/watchdog/cortina,gemin-watchdog.txt b/Documentation/devicetree/bindings/watchdog/faraday,ftwdt010.txt
+> similarity index 55%
+> rename from Documentation/devicetree/bindings/watchdog/cortina,gemin-watchdog.txt
+> rename to Documentation/devicetree/bindings/watchdog/faraday,ftwdt010.txt
+> index bc4b865d178b..9ecdb502e605 100644
+> --- a/Documentation/devicetree/bindings/watchdog/cortina,gemin-watchdog.txt
+> +++ b/Documentation/devicetree/bindings/watchdog/faraday,ftwdt010.txt
+> @@ -1,7 +1,12 @@
+> -Cortina Systems Gemini SoC Watchdog
+> +Faraday Technology FTWDT010 watchdog
+> +
+> +This is an IP part from Faraday Technology found in the Gemini
+> +SoCs and others.
+>  
+>  Required properties:
+> -- compatible : must be "cortina,gemini-watchdog"
+> +- compatible : must be one of
+> +  "faraday,ftwdt010"
+> +  "cortina,gemini-watchdog", "faraday,ftwdt010"
+>  - reg : shall contain base register location and length
+>  - interrupts : shall contain the interrupt for the watchdog
+>  
+> @@ -11,7 +16,7 @@ Optional properties:
+>  Example:
+>  
+>  watchdog at 41000000 {
+> -	compatible = "cortina,gemini-watchdog";
+> +	compatible = "faraday,ftwdt010";
+>  	reg = <0x41000000 0x1000>;
+>  	interrupts = <3 IRQ_TYPE_LEVEL_HIGH>;
+>  };
