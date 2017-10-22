@@ -1,48 +1,47 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Sun, 22 Oct 2017 09:26:59 +0200
-Subject: [PATCH v5 2/2] crypto: stm32 - Support for STM32 CRYP crypto
- module
-In-Reply-To: <1508425830-13565-3-git-send-email-fabien.dessenne@st.com>
-References: <1508425830-13565-1-git-send-email-fabien.dessenne@st.com>
- <1508425830-13565-3-git-send-email-fabien.dessenne@st.com>
-Message-ID: <20171022072659.GB8489@Red>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Sun, 22 Oct 2017 09:36:32 +0200
+Subject: Camera support, Prague next week, sdlcam
+In-Reply-To: <20171021220026.GA26881@amd>
+References: <1487074823-28274-2-git-send-email-sakari.ailus@linux.intel.com>
+ <20170414232332.63850d7b@vento.lan>
+ <20170416091209.GB7456@valkosipuli.retiisi.org.uk>
+ <20170419105118.72b8e284@vento.lan> <20170424093059.GA20427@amd>
+ <20170424103802.00d3b554@vento.lan> <20170424212914.GA20780@amd>
+ <20170424224724.5bb52382@vento.lan> <20170426105300.GA857@amd>
+ <20170426082608.7dd52fbf@vento.lan> <20171021220026.GA26881@amd>
+Message-ID: <f85cab54-30cf-0774-7376-abced86842af@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 19, 2017 at 05:10:30PM +0200, Fabien Dessenne wrote:
-> This module registers block cipher algorithms that make use of the
-> STMicroelectronics STM32 crypto "CRYP1" hardware.
-> The following algorithms are supported:
-> - aes: ecb, cbc, ctr
-> - des: ecb, cbc
-> - tdes: ecb, cbc
+On 22/10/17 00:00, Pavel Machek wrote:
+> Hi!
 > 
-> Signed-off-by: Fabien Dessenne <fabien.dessenne@st.com>
-> ---
->  drivers/crypto/stm32/Kconfig      |    9 +
->  drivers/crypto/stm32/Makefile     |    3 +-
->  drivers/crypto/stm32/stm32-cryp.c | 1172 +++++++++++++++++++++++++++++++++++++
->  3 files changed, 1183 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/crypto/stm32/stm32-cryp.c
+> I'd still like to get some reasonable support for cellphone camera in
+> Linux.
 > 
-> diff --git a/drivers/crypto/stm32/Kconfig b/drivers/crypto/stm32/Kconfig
-> +static void stm32_cryp_irq_write_block(struct stm32_cryp *cryp)
-> +{
-> +	unsigned int i, j;
-> +	u32 *src;
-> +	u8 d8[4];
-> +
-> +	src = sg_virt(cryp->in_sg) + _walked_in;
-> +
-> +	for (i = 0; i < cryp->hw_blocksize / sizeof(u32); i++) {
-> +		if (likely(cryp->total_in >= sizeof(u32))) {
-> +			/* Write a full u32 */
-> +			stm32_cryp_write(cryp, CRYP_DIN, *src);
+> IMO first reasonable step is to merge sdlcam, then we can implement
+> autofocus, improve autogain... and rest of the boring stuff. Ouch and
+> media graph support would be nice. Currently, _nothing_ works with
+> media graph device, such as N900.
 
-Hello
+Can you post your latest rebased patch for sdlcam for v4l-utils?
 
-Try also to test your driver with userspace via AF_ALG (libkcapi is a good start).
-It should probably crash here.
-I have do the same on my first sunxi-ss driver and you should use kmap().
+I'll do a review and will likely merge it for you. Yes, I've changed my
+mind on that.
 
-Regards
+> 
+> I'll talk about the issues at ELCE in few days:
+> 
+> https://osseu17.sched.com/event/ByYH/cheap-complex-cameras-pavel-machek-denx-software-engineering-gmbh
+> 
+> Will someone else be there? Is there some place where v4l people meet?
+
+Why don't we discuss this Tuesday morning at 9am? I have no interest in the
+keynotes on that day, so those who are interested can get together.
+
+I'll be at your presentation tomorrow and we can discuss a bit during
+the following coffee break if time permits.
+
+Regards,
+
+	Hans
