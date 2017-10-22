@@ -1,48 +1,192 @@
-From: dotweiba@gmail.com (Wei Wei)
-Date: Sat, 21 Oct 2017 21:56:49 -0400
-Subject: v4.14-rc3/arm64 DABT exception in atomic_inc() / __skb_clone()
-In-Reply-To: <CAF=yD-K76TMjHiYRTRAnxM-x4LBcUDY+27WX477HW6kG=L_aZw@mail.gmail.com>
-References: <EAA60182-6F08-412E-8F8B-FD4B0309A858@gmail.com>
- <20171020111408.edj24tztxdptte5r@lakrids.cambridge.arm.com>
- <960D71EC-C1E9-4898-ACBE-543FC09483FF@gmail.com>
- <CACT4Y+bjzzCv3LSxK12C1xB8GfR3UYCrX_5phRYJ8fpxh9vcvQ@mail.gmail.com>
- <CAF=yD-K76TMjHiYRTRAnxM-x4LBcUDY+27WX477HW6kG=L_aZw@mail.gmail.com>
-Message-ID: <D2AD6D5B-3A05-48E7-A999-DECAB18A4649@gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Sat, 21 Oct 2017 20:06:10 -0700
+Subject: [PATCH] KVM: arm/arm64: Allow usercopy to vcpu->arch.ctxt and
+ arm64 debug
+In-Reply-To: <20171021184545.2497-1-christoffer.dall@linaro.org>
+References: <20171020232525.7387-1-pbonzini@redhat.com>
+ <20171021184545.2497-1-christoffer.dall@linaro.org>
+Message-ID: <CAGXu5jKJ2jPz2540ZLCwmcdVZxrgnhVPHs0uumiJm2o0ZgpVag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have uploaded the VM core dump [1]. And I don?t know if these logs are helpful in the case of 
-failing to get the C reproducer currently.
+On Sat, Oct 21, 2017 at 11:45 AM, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> We do direct useraccess copying to the kvm_cpu_context structure
+> embedded in the kvm_vcpu_arch structure, and to the vcpu debug register
+> state.  Everything else (timer, PMU, vgic) goes through a temporary
+> indirection.
 
-[1] https://github.com/dotweiba/skb_clone_atomic_inc_bug/blob/master/vmcore.gz
+Are these copies done with a dynamic size? The normal way these get
+whitelisted is via builtin_const sizes on the copy. Looking at
+KVM_REG_SIZE(), though, it seems that would be a dynamic calculation.
 
-2017/10/21 20:24:32 reproducing crash 'unable to handle kernel paging request in __skb_clone': testing program (duration=24s, {Threaded:true Collide:true Repeat:true Procs:8 Sandb
-ox:setuid Fault:false FaultCall:-1 FaultNth:0 EnableTun:true UseTmpDir:true HandleSegv:true WaitRepeat:true Debug:false Repro:true}): mmap-socket$inet_tcp-bind$inet-sendto$inet-se
-ndto$inet-syz_emit_ethernet
-2017/10/21 20:24:49 reproducing crash 'unable to handle kernel paging request in __skb_clone': program crashed: unable to handle kernel paging request in __skb_clone
-2017/10/21 20:24:49 reproducing crash 'unable to handle kernel paging request in __skb_clone': extracting C reproducer
-2017/10/21 20:24:49 reproducing crash 'unable to handle kernel paging request in __skb_clone': reproducing took 1h47m5.070207729s
-2017/10/21 20:24:49 reproduction failed: no target compiler
+> Fixing all accesses to kvm_cpu_context is massively invasive, and we'd
+> like to avoid that, so we tell kvm_init_usercopy to whitelist accesses
+> to out context structure.
+>
+> The debug system register accesses on arm64 are modified to work through
+> an indirection instead.
+>
+> Cc: kernel-hardening at lists.openwall.com
+> Cc: Kees Cook <keescook@chromium.org>
+> Cc: Paolo Bonzini <pbonzini@redhat.com>
+> Cc: Radim Kr?m?? <rkrcmar@redhat.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+> This fixes KVM/ARM on today's linux next with CONFIG_HARDENED_USERCOPY.
+>
+> The patch is based on linux-next plus Paolo's x86 patch which introduces
+> kvm_init_usercopy.  Not sure how this needs to get merged, but it would
+> potentially make sense for Paolo to put together a set of the patches
+> needed for this.
 
-Thanks,
-Wei
-> On 20 Oct 2017, at 11:39 AM, Willem de Bruijn <willemdebruijn.kernel@gmail.com> wrote:
-> 
-> On Fri, Oct 20, 2017 at 11:14 AM, Dmitry Vyukov <dvyukov@google.com> wrote:
->> On Fri, Oct 20, 2017 at 4:40 PM, Wei Wei <dotweiba@gmail.com> wrote:
->>> Sadly, the syzkaller characterized it as a non-reproducible bug and there were empty
->>> repro files. But if manually executing in VM like this ?./syz-execprog -executor=
->>> ./syz-executor -repeat=0 -procs=16 -cover=0 crash-log?, it crashed when executing exactly
->>> program 1056 using log0 provided.
->>> 
->>> I failed to generate the C reproducer with syz-repro as it said ?no target compiler?
->>> in the final step. I would appreciate if you could give some hints.
->> 
->> syzkaller tries to use aarch64-linux-gnu-gcc when cross-compiling to arm64:
->> https://github.com/google/syzkaller/blob/master/sys/targets/targets.go#L62
->> Try to install g++-aarch64-linux-gnu.
->> Or how should it be done on your system?
-> 
-> A core dump would also be helpful to root around in and inspect
-> what those registers point to. Thanks for posting the various reports
-> on github, btw.
+I was planning to carry Paolo's patches, and I can take this one too.
+If this poses a problem, then I could just do a two-phase commit of
+the whitelisting code, leaving the very last commit (which enables the
+defense for anything not yet whitelisted), until the KVM trees land.
+
+What's preferred?
+
+Thanks for looking at this!
+
+-Kees
+
+>
+> Thanks,
+> -Christoffer
+>
+>  arch/arm64/kvm/sys_regs.c | 36 ++++++++++++++++++++----------------
+>  virt/kvm/arm/arm.c        |  5 ++++-
+>  2 files changed, 24 insertions(+), 17 deletions(-)
+>
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index 2e070d3baf9f..cdf47a9108fe 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -293,19 +293,20 @@ static bool trap_bvr(struct kvm_vcpu *vcpu,
+>  static int set_bvr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+>                 const struct kvm_one_reg *reg, void __user *uaddr)
+>  {
+> -       __u64 *r = &vcpu->arch.vcpu_debug_state.dbg_bvr[rd->reg];
+> +       __u64 r;
+>
+> -       if (copy_from_user(r, uaddr, KVM_REG_SIZE(reg->id)) != 0)
+> +       if (copy_from_user(&r, uaddr, KVM_REG_SIZE(reg->id)) != 0)
+>                 return -EFAULT;
+> +       vcpu->arch.vcpu_debug_state.dbg_bvr[rd->reg] = r;
+>         return 0;
+>  }
+>
+>  static int get_bvr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+>         const struct kvm_one_reg *reg, void __user *uaddr)
+>  {
+> -       __u64 *r = &vcpu->arch.vcpu_debug_state.dbg_bvr[rd->reg];
+> +       __u64 r = vcpu->arch.vcpu_debug_state.dbg_bvr[rd->reg];
+>
+> -       if (copy_to_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
+> +       if (copy_to_user(uaddr, &r, KVM_REG_SIZE(reg->id)) != 0)
+>                 return -EFAULT;
+>         return 0;
+>  }
+> @@ -335,10 +336,11 @@ static bool trap_bcr(struct kvm_vcpu *vcpu,
+>  static int set_bcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+>                 const struct kvm_one_reg *reg, void __user *uaddr)
+>  {
+> -       __u64 *r = &vcpu->arch.vcpu_debug_state.dbg_bcr[rd->reg];
+> +       __u64 r;
+>
+> -       if (copy_from_user(r, uaddr, KVM_REG_SIZE(reg->id)) != 0)
+> +       if (copy_from_user(&r, uaddr, KVM_REG_SIZE(reg->id)) != 0)
+>                 return -EFAULT;
+> +       vcpu->arch.vcpu_debug_state.dbg_bcr[rd->reg] = r;
+>
+>         return 0;
+>  }
+> @@ -346,9 +348,9 @@ static int set_bcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+>  static int get_bcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+>         const struct kvm_one_reg *reg, void __user *uaddr)
+>  {
+> -       __u64 *r = &vcpu->arch.vcpu_debug_state.dbg_bcr[rd->reg];
+> +       __u64 r = vcpu->arch.vcpu_debug_state.dbg_bcr[rd->reg];
+>
+> -       if (copy_to_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
+> +       if (copy_to_user(uaddr, &r, KVM_REG_SIZE(reg->id)) != 0)
+>                 return -EFAULT;
+>         return 0;
+>  }
+> @@ -379,19 +381,20 @@ static bool trap_wvr(struct kvm_vcpu *vcpu,
+>  static int set_wvr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+>                 const struct kvm_one_reg *reg, void __user *uaddr)
+>  {
+> -       __u64 *r = &vcpu->arch.vcpu_debug_state.dbg_wvr[rd->reg];
+> +       __u64 r;
+>
+> -       if (copy_from_user(r, uaddr, KVM_REG_SIZE(reg->id)) != 0)
+> +       if (copy_from_user(&r, uaddr, KVM_REG_SIZE(reg->id)) != 0)
+>                 return -EFAULT;
+> +       vcpu->arch.vcpu_debug_state.dbg_wvr[rd->reg] = r;
+>         return 0;
+>  }
+>
+>  static int get_wvr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+>         const struct kvm_one_reg *reg, void __user *uaddr)
+>  {
+> -       __u64 *r = &vcpu->arch.vcpu_debug_state.dbg_wvr[rd->reg];
+> +       __u64 r = vcpu->arch.vcpu_debug_state.dbg_wvr[rd->reg];
+>
+> -       if (copy_to_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
+> +       if (copy_to_user(uaddr, &r, KVM_REG_SIZE(reg->id)) != 0)
+>                 return -EFAULT;
+>         return 0;
+>  }
+> @@ -421,19 +424,20 @@ static bool trap_wcr(struct kvm_vcpu *vcpu,
+>  static int set_wcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+>                 const struct kvm_one_reg *reg, void __user *uaddr)
+>  {
+> -       __u64 *r = &vcpu->arch.vcpu_debug_state.dbg_wcr[rd->reg];
+> +       __u64 r;
+>
+> -       if (copy_from_user(r, uaddr, KVM_REG_SIZE(reg->id)) != 0)
+> +       if (copy_from_user(&r, uaddr, KVM_REG_SIZE(reg->id)) != 0)
+>                 return -EFAULT;
+> +       vcpu->arch.vcpu_debug_state.dbg_wcr[rd->reg] = r;
+>         return 0;
+>  }
+>
+>  static int get_wcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+>         const struct kvm_one_reg *reg, void __user *uaddr)
+>  {
+> -       __u64 *r = &vcpu->arch.vcpu_debug_state.dbg_wcr[rd->reg];
+> +       __u64 r = vcpu->arch.vcpu_debug_state.dbg_wcr[rd->reg];
+>
+> -       if (copy_to_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
+> +       if (copy_to_user(uaddr, &r, KVM_REG_SIZE(reg->id)) != 0)
+>                 return -EFAULT;
+>         return 0;
+>  }
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index b9f68e4add71..639e388678ff 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -1502,7 +1502,10 @@ void kvm_arch_exit(void)
+>
+>  static int arm_init(void)
+>  {
+> -       int rc = kvm_init(NULL, sizeof(struct kvm_vcpu), 0, THIS_MODULE);
+> +       int rc = kvm_init_usercopy(NULL, sizeof(struct kvm_vcpu), 0,
+> +                                  offsetof(struct kvm_vcpu_arch, ctxt),
+> +                                  sizeof_field(struct kvm_vcpu_arch, ctxt),
+> +                                  THIS_MODULE);
+>         return rc;
+>  }
+>
+> --
+> 2.14.2
+>
+
+
+
+-- 
+Kees Cook
+Pixel Security
