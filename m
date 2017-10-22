@@ -1,49 +1,39 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sun, 22 Oct 2017 10:44:16 -0700
-Subject: watchdog: sunxi_wdt: use of_device_get_match_data
-In-Reply-To: <20171021174513.1653-1-clabbe.montjoie@gmail.com>
-References: <20171021174513.1653-1-clabbe.montjoie@gmail.com>
-Message-ID: <20171022174416.GA21100@roeck-us.net>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sun, 22 Oct 2017 20:49:56 +0200
+Subject: [PATCH v2 3/3] tty: serial: imx: remove imx_disable_rx_int
+In-Reply-To: <15ff545c-5aaf-4f03-3672-2c1702f78316@boundarydevices.com>
+References: <20171020212021.13065-1-troy.kisky@boundarydevices.com>
+ <20171020212021.13065-3-troy.kisky@boundarydevices.com>
+ <15ff545c-5aaf-4f03-3672-2c1702f78316@boundarydevices.com>
+Message-ID: <20171022184956.exmjlpcbzkvlp7xg@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 21, 2017 at 07:45:13PM +0200, Corentin Labbe wrote:
-> The usage of of_device_get_match_data reduce the code size a bit.
-> Furthermore, it prevents an improbable dereference when
-> of_match_device() return NULL.
-> 
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+Hello,
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-
-> ---
->  drivers/watchdog/sunxi_wdt.c | 7 ++-----
->  1 file changed, 2 insertions(+), 5 deletions(-)
+On Fri, Oct 20, 2017 at 02:25:11PM -0700, Troy Kisky wrote:
+> On 10/20/2017 2:20 PM, Troy Kisky wrote:
+> > Since imx_disable_rx_int is only called by imx_startup,
+> > let's integrate it into that function.
+> > 
+> > Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> > ---
+> > v2: new patch
+> > ---
+> >  drivers/tty/serial/imx.c | 39 ++++++++++-----------------------------
+> >  1 file changed, 10 insertions(+), 29 deletions(-)
 > 
-> diff --git a/drivers/watchdog/sunxi_wdt.c b/drivers/watchdog/sunxi_wdt.c
-> index 9728fa32c357..802e31b1416d 100644
-> --- a/drivers/watchdog/sunxi_wdt.c
-> +++ b/drivers/watchdog/sunxi_wdt.c
-> @@ -234,7 +234,6 @@ MODULE_DEVICE_TABLE(of, sunxi_wdt_dt_ids);
->  static int sunxi_wdt_probe(struct platform_device *pdev)
->  {
->  	struct sunxi_wdt_dev *sunxi_wdt;
-> -	const struct of_device_id *device;
->  	struct resource *res;
->  	int err;
->  
-> @@ -242,12 +241,10 @@ static int sunxi_wdt_probe(struct platform_device *pdev)
->  	if (!sunxi_wdt)
->  		return -EINVAL;
->  
-> -	device = of_match_device(sunxi_wdt_dt_ids, &pdev->dev);
-> -	if (!device)
-> +	sunxi_wdt->wdt_regs = of_device_get_match_data(&pdev->dev);
-> +	if (!sunxi_wdt->wdt_regs)
->  		return -ENODEV;
->  
-> -	sunxi_wdt->wdt_regs = device->data;
-> -
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	sunxi_wdt->wdt_base = devm_ioremap_resource(&pdev->dev, res);
->  	if (IS_ERR(sunxi_wdt->wdt_base))
+> While testing this series, I noticed that sending a break on the serial port caused
+> 
+> imx-uart 2020000.serial: DMA transaction error.
+> 
+> Is that normal ?
+
+I remember that J?rgen (added to To explictly) hit this or a similar
+problem before, maybe he can commen?
+
+Best regards
+Uwe
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
