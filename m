@@ -1,35 +1,87 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 23 Oct 2017 09:11:16 +0800
-Subject: [GIT PULL] updates to soc/fsl drivers for v4.14
-In-Reply-To: <AM4PR0401MB1699CA477F157A2C7618492D8F430@AM4PR0401MB1699.eurprd04.prod.outlook.com>
-References: <1506109046-11527-1-git-send-email-leoyang.li@nxp.com>
- <CAK8P3a3cyiOgFXAyADH==L=0P621ucp3Xy0F3kBezV5EW9WdDQ@mail.gmail.com>
- <AM4PR0401MB1699CA477F157A2C7618492D8F430@AM4PR0401MB1699.eurprd04.prod.outlook.com>
-Message-ID: <20171023011115.GF8700@dragon>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 23 Oct 2017 10:17:07 +0900
+Subject: [PATCH] devfreq/exynos-bus: Use common error handling code in
+ exynos_bus_target()
+In-Reply-To: <4a407cd6-020c-1750-019a-6c0ceb40e245@users.sourceforge.net>
+References: <CGME20171022134057epcas4p43e6f37b8994c28f6ef240536349811a8@epcas4p4.samsung.com>
+ <4a407cd6-020c-1750-019a-6c0ceb40e245@users.sourceforge.net>
+Message-ID: <59ED4313.701@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leo,
+Hi Markus,
 
-On Fri, Oct 20, 2017 at 10:04:07PM +0000, Leo Li wrote:
-> > - We should come to an agreement on how we do these in the future.
-> >   Usually I expect any Freescale/NXP/ARM changes to come through the
-> >   i.MX maintainers (Shawn and Sascha), not directly from other developers.
-> >   There is usually some degree of coordination required between the
-> >   SoC drivers and the DT files and platform code, so it's really best to
-> >   have someone be aware of all the components, and I prefer to have
-> >   a smaller number of people sending me pull requests. If you already
-> >   talked to Shawn about it and he prefers you to send the pull request
-> >   to us directly, that's fine too, but please at least keep him on Cc.
+As I already commented on your other patch related to extcon-max14577,
+this patch might remove the redundant error message. But, it makes
+the code more complicated in side of readability. I prefer existing code.
+
+On 2017? 10? 22? 22:40, SF Markus Elfring wrote:
+> From: Markus Elfring <elfring@users.sourceforge.net>
+> Date: Sun, 22 Oct 2017 15:33:06 +0200
 > 
-> I would like to share some more background information on this.  The microcontroller business(produces i.mx product line) and the networking business(produces qoriq product line) are completely two different business units within Freescale/NXP.  There are separate hardware design teams and software development teams due to the different targeting markets.  The hardware design are almost completely different.  Historically, the microcontroller product line focused on m68k and armv7 architectures while the networking product line focused on PowerPC architecture and recently moved to ARMv8 architecture.  There are surely some IP sharing but only on basic peripheral devices such as i2c, usb and etc.   But due to the different targeting markets most of the peripheral devices are very different.  For example this DPAA framework, network interfaces and a lot of other accelerators will never be used in the i.mx products.  On the core architecture side we are working on SBSA compliance hardware and SBBA compliance software with UEFI and ACPI in the picture, which would be a overkill for microcontrollers.    In my opinion, the differences between i.MX and QorIQ products could be even bigger than the difference between QorIQ products and some server focused ARMv8 SoCs from other vendors.  The synergy for combining these two will be very limited.
+> Adjust jump targets so that a bit of exception handling can be better
+> reused at the end of this function.
+> 
+> This issue was detected by using the Coccinelle software.
+> 
+> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+> ---
+>  drivers/devfreq/exynos-bus.c | 21 ++++++++++-----------
+>  1 file changed, 10 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/devfreq/exynos-bus.c b/drivers/devfreq/exynos-bus.c
+> index 49f68929e024..e38d456b2d7d 100644
+> --- a/drivers/devfreq/exynos-bus.c
+> +++ b/drivers/devfreq/exynos-bus.c
+> @@ -124,34 +124,33 @@ static int exynos_bus_target(struct device *dev, unsigned long *freq, u32 flags)
+>  
+>  	if (old_freq < new_freq) {
+>  		ret = regulator_set_voltage_tol(bus->regulator, new_volt, tol);
+> -		if (ret < 0) {
+> -			dev_err(bus->dev, "failed to set voltage\n");
+> -			goto out;
+> -		}
+> +		if (ret < 0)
+> +			goto report_failure;
+>  	}
+>  
+>  	ret = clk_set_rate(bus->clk, new_freq);
+>  	if (ret < 0) {
+>  		dev_err(dev, "failed to change clock of bus\n");
+>  		clk_set_rate(bus->clk, old_freq);
+> -		goto out;
+> +		goto unlock;
+>  	}
+>  
+>  	if (old_freq > new_freq) {
+>  		ret = regulator_set_voltage_tol(bus->regulator, new_volt, tol);
+> -		if (ret < 0) {
+> -			dev_err(bus->dev, "failed to set voltage\n");
+> -			goto out;
+> -		}
+> +		if (ret < 0)
+> +			goto report_failure;
+>  	}
+>  	bus->curr_freq = new_freq;
+>  
+>  	dev_dbg(dev, "Set the frequency of bus (%luHz -> %luHz, %luHz)\n",
+>  			old_freq, new_freq, clk_get_rate(bus->clk));
+> -out:
+> +unlock:
+>  	mutex_unlock(&bus->lock);
+> -
+>  	return ret;
+> +
+> +report_failure:
+> +	dev_err(bus->dev, "failed to set voltage\n");
+> +	goto unlock;
+>  }
+>  
+>  static int exynos_bus_get_dev_status(struct device *dev,
 > 
 
-I'm fine with you send drivers/soc/fsl changes to Arnd directly, since
-we already have separate folders (drivers/soc/imx vs. drivers/soc/fsl)
-for i.MX and QorIQ.  But as Arnd suggested, please keep me on copy, so
-that I can be aware of the changes which might be somehow related to
-arch/arm64/boot/dts/freescale/ changes that I'm currently taking care
-of.  Thanks.
 
-Shawn
+-- 
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
