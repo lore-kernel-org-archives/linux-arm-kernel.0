@@ -1,48 +1,58 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 23 Oct 2017 10:03:28 +0100
-Subject: [PATCH] efi/libstub: arm: don't randomize runtime regions when
- CONFIG_HIBERNATION=y
-Message-ID: <20171023090328.6701-1-ard.biesheuvel@linaro.org>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Mon, 23 Oct 2017 09:06:03 +0000
+Subject: [PATCH 5/9] PCI: host: brcmstb: add dma-ranges for inbound traffic
+In-Reply-To: <CANCKTBtxp9gSdndKAZ7xGA+VozQsn2PX_-9P8A22_5Matbb7-w@mail.gmail.com>
+References: <1507761269-7017-6-git-send-email-jim2101024@gmail.com>
+ <589c04cb-061b-a453-3188-79324a02388e@arm.com>
+ <20171017081422.GA19475@lst.de>
+ <CANCKTBsCB+x2XgrND9AhRtxPkCXfps1nA+YymkZjKHOUZfjSHQ@mail.gmail.com>
+ <20171018065316.GA11183@lst.de>
+ <CANCKTBv+yiCNsrnx3m+W9wPqC4NdKPZ2p=zLtSa8fX6v1rPcYQ@mail.gmail.com>
+ <20171019091644.GA14983@lst.de>
+ <CANCKTBuaTD29My77QfOeUmtZfLAmmJXUYe6QvBW+uoH2Kb+tAQ@mail.gmail.com>
+ <20171020073730.GA12937@lst.de>
+ <CANCKTBsRRkwNMrxWjtgxbyZqT6NOxPX0NHDbnEO2BMjj8oVtpg@mail.gmail.com>
+ <20171020145752.GA4694@lst.de>
+ <CANCKTBtxp9gSdndKAZ7xGA+VozQsn2PX_-9P8A22_5Matbb7-w@mail.gmail.com>
+Message-ID: <063D6719AE5E284EB5DD2968C1650D6DD009F05A@AcuExch.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit
+From: Jim Quinlan
+> Sent: 20 October 2017 16:28
+> On Fri, Oct 20, 2017 at 10:57 AM, Christoph Hellwig <hch@lst.de> wrote:
+> > On Fri, Oct 20, 2017 at 10:41:56AM -0400, Jim Quinlan wrote:
+> >> I am not sure I understand your comment -- the size of the request
+> >> shouldn't be a factor.  Let's look at your example of the DMA request
+> >> of 3fffff00 to 4000000f (physical memory).  Lets say it is for 15
+> >> pages.  If we block out  the last page [0x3ffff000..0x3fffffff] from
+> >> what is available, there is no 15 page span that can happen across the
+> >> 0x40000000 boundary.  For SG, there can be no merge that connects a
+> >> page from one region to another region.  Can you give an example of
+> >> the scenario you are thinking of?
+> >
+> > What prevents a merge from say the regions of
+> > 0....3fffffff and 40000000....7fffffff?
+> 
+> Huh? [0x3ffff000...x3ffffff] is not available to be used. Drawing from
+> the original example, we now have to tell Linux that these are now our
+> effective memory regions:
+> 
+>       memc0-a@[        0....3fffefff] <=> pci@[        0....3fffefff]
+>       memc0-b@[100000000...13fffefff] <=> pci@[ 40000000....7fffefff]
+>       memc1-a@[ 40000000....7fffefff] <=> pci@[ 80000000....bfffefff]
+>       memc1-b@[300000000...33fffefff] <=> pci@[ c0000000....ffffefff]
+>       memc2-a@[ 80000000....bfffefff] <=> pci@[100000000...13fffefff]
+>       memc2-b@[c00000000...c3fffffff] <=> pci@[140000000...17fffffff]
+> 
+> This leaves a one-page gap between phsyical memory regions which would
+> normally be contiguous. One cannot have a dma alloc that spans any two
+> regions.  This is a drastic step, but I don't see an alternative.
+> Perhaps  I may be missing what you are saying...
 
-  e69176d68d26 ef/libstub/arm/arm64: Randomize the base of the UEFI rt services region
+Isn't this all unnecessary?
+Both kmalloc() and dma_alloc() are constrained to allocate memory
+that doesn't cross an address boundary that is larger than the size.
+So if you allocate 16k it won't cross a 16k physical address boundary.
 
-implemented randomization of the virtual mapping that the OS chooses for
-the UEFI runtime services. This was motivated by the fact that UEFI usually
-does not bother to specify any permission restrictions for those regions,
-making them prime real estate for exploitation now that the OS is getting
-more and more careful not to leave any R+W+X mapped regions lying around.
-
-However, this randomization breaks assumptions in the resume from
-hibernation code, which expects all memory regions populated by UEFI to
-remain in the same place, including their virtual mapping into the OS
-memory space. While this assumption may not be entirely reasonable in the
-first place, breaking it deliberately does not make a lot of sense either.
-So let's refrain from this randomization pass if CONFIG_HIBERNATION=y.
-
-Cc: James Morse <james.morse@arm.com>
-Cc: Matt Fleming <matt@codeblueprint.co.uk>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- drivers/firmware/efi/libstub/arm-stub.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
-index 3061e4057483..01a9d78ee415 100644
---- a/drivers/firmware/efi/libstub/arm-stub.c
-+++ b/drivers/firmware/efi/libstub/arm-stub.c
-@@ -238,7 +238,8 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
- 
- 	efi_random_get_seed(sys_table);
- 
--	if (!nokaslr()) {
-+	/* hibernation expects the runtime regions to stay in the same place */
-+	if (!IS_ENABLED(CONFIG_HIBERNATION) && !nokaslr()) {
- 		/*
- 		 * Randomize the base of the UEFI runtime services region.
- 		 * Preserve the 2 MB alignment of the region by taking a
--- 
-2.11.0
+	David
