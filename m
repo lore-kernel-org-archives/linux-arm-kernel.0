@@ -1,7 +1,7 @@
 From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Mon, 23 Oct 2017 14:35:38 +0200
+Date: Mon, 23 Oct 2017 14:36:26 +0200
 Subject: [PATCH] ARM: dts: imx28-tx28: fix interrupt flags
-Message-ID: <1508762138-17476-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1508762186-17522-1-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
