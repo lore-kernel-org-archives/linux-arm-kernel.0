@@ -1,44 +1,103 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Mon, 23 Oct 2017 17:06:14 -0400 (EDT)
-Subject: R: Re: [PATCH] KVM: arm/arm64: Allow usercopy to vcpu->arch.ctxt
- and arm64 debug
-In-Reply-To: <CAGXu5jKoLP8jN4ZtRQnFpy6RWK1JJTa7eBuA2p9huBfh11bWvg@mail.gmail.com>
-References: <20171020232525.7387-1-pbonzini@redhat.com>
- <20171021184545.2497-1-christoffer.dall@linaro.org>
- <CAGXu5jKJ2jPz2540ZLCwmcdVZxrgnhVPHs0uumiJm2o0ZgpVag@mail.gmail.com>
- <20171022074418.GA3805@cbox>
- <d2a7dcec-060b-6279-1c1d-a18b3eedb394@redhat.com>
- <CAGXu5jKoLP8jN4ZtRQnFpy6RWK1JJTa7eBuA2p9huBfh11bWvg@mail.gmail.com>
-Message-ID: <1024881182.14288556.1508792774084.JavaMail.zimbra@redhat.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 23 Oct 2017 23:08:30 +0200
+Subject: [PATCH] efi/libstub: arm: omit sorting of the UEFI memory map
+In-Reply-To: <20171022141457.28769-1-ard.biesheuvel@linaro.org>
+References: <20171022141457.28769-1-ard.biesheuvel@linaro.org>
+Message-ID: <bbc69676-427e-0524-71b7-053f897e09c3@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Ard,
 
------ Kees Cook <keescook@chromium.org> ha scritto:
-> On Mon, Oct 23, 2017 at 7:14 AM, Paolo Bonzini <pbonzini@redhat.com> wrote:
-> > On 22/10/2017 09:44, Christoffer Dall wrote:
-> >> However, I think it's much clearer if I
-> >> rewrite these to use get_user() and put_user().  v2 incoming.
-> >
-> > I'd actually prefer if you all do a trivial conversion to
-> > kvm_init_usercopy to begin with.  In fact, we could just change the
-> > default from "0, 0" to "0, sizeof (kvm_arch_vcpu)" in kvm_init.  Any
-> > other change can be applied after the patches are merged to Linus's
-> > tree, especially with KVM Forum and the merge window both coming soon.
-> >
-> > I'll send a v2 myself later this week.
+On 10/22/2017 04:14 PM, Ard Biesheuvel wrote:
+> ARM shares its EFI stub implementation with arm64, which has some
+> special handling in the virtual remapping code to
+> a) make sure that we can map everything even if the OS executes
+>    with 64k page size, and
+> b) make sure that adjacent regions with the same attributes are not
+>    reordered or moved apart in memory.
 > 
-> Okay, which patches would you like me to carry in the usercopy
-> whitelisting tree for the coming merge window?
-
-v2 of mine, which shall come in the next couple of days.
-
-Paolo
-
-
+> The latter is a workaround for a 'feature' that was shortly recommended
+> by UEFI spec v2.5, but deprecated shortly after, due to the fact that
+> it broke many OS installers, including non-Linux ones, and it was never
+> widely implemented for ARM systems. Before implementing b), the arm64
+> code simply rounded up all regions to 64 KB granularity, but given that
+> that results in moving adjacent regions apart, it had to be refined when
+> b) was implemented.
 > 
-> -Kees
+> The adjacency check requires a sort() pass, due to the fact that the
+> UEFI spec does not mandate any ordering, and the inclusion of the
+> lib/sort.c code into the ARM EFI stub is causing some trouble with
+> the decompressor build due to the fact that its EXPORT_SYMBOL() call
+> triggers the creation of ksymtab/kcrctab sections.
 > 
-> -- 
-> Kees Cook
-> Pixel Security
+> So let's simply do away with the adjacency check for ARM, and simply put
+> all UEFI runtime regions together if they have the same memory attributes.
+> This is guaranteed to work, given that ARM only supports 4 KB pages,
+> and allows us to remove the sort() call entirely.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+
+Tested-by: Matthias Brugger <matthias.bgg@gmail.com>
+
+This fixes my boot regression.
+Thanks a lot!
+
+>  drivers/firmware/efi/libstub/Makefile   | 6 +++---
+>  drivers/firmware/efi/libstub/arm-stub.c | 7 +++++--
+>  2 files changed, 8 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
+> index dedf9bde44db..f3e8431565ea 100644
+> --- a/drivers/firmware/efi/libstub/Makefile
+> +++ b/drivers/firmware/efi/libstub/Makefile
+> @@ -33,13 +33,14 @@ lib-y				:= efi-stub-helper.o gop.o secureboot.o
+>  lib-$(CONFIG_RESET_ATTACK_MITIGATION) += tpm.o
+>  
+>  # include the stub's generic dependencies from lib/ when building for ARM/arm64
+> -arm-deps := fdt_rw.c fdt_ro.c fdt_wip.c fdt.c fdt_empty_tree.c fdt_sw.c sort.c
+> +arm-deps-y := fdt_rw.c fdt_ro.c fdt_wip.c fdt.c fdt_empty_tree.c fdt_sw.c
+> +arm-deps-$(CONFIG_ARM64) += sort.c
+>  
+>  $(obj)/lib-%.o: $(srctree)/lib/%.c FORCE
+>  	$(call if_changed_rule,cc_o_c)
+>  
+>  lib-$(CONFIG_EFI_ARMSTUB)	+= arm-stub.o fdt.o string.o random.o \
+> -				   $(patsubst %.c,lib-%.o,$(arm-deps))
+> +				   $(patsubst %.c,lib-%.o,$(arm-deps-y))
+>  
+>  lib-$(CONFIG_ARM)		+= arm32-stub.o
+>  lib-$(CONFIG_ARM64)		+= arm64-stub.o
+> @@ -90,5 +91,4 @@ quiet_cmd_stubcopy = STUBCPY $@
+>  # explicitly by the decompressor linker script.
+>  #
+>  STUBCOPY_FLAGS-$(CONFIG_ARM)	+= --rename-section .data=.data.efistub
+> -STUBCOPY_RM-$(CONFIG_ARM)	+= -R ___ksymtab+sort -R ___kcrctab+sort
+>  STUBCOPY_RELOC-$(CONFIG_ARM)	:= R_ARM_ABS
+> diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
+> index 1cb2d1c070c3..3061e4057483 100644
+> --- a/drivers/firmware/efi/libstub/arm-stub.c
+> +++ b/drivers/firmware/efi/libstub/arm-stub.c
+> @@ -349,7 +349,9 @@ void efi_get_virtmap(efi_memory_desc_t *memory_map, unsigned long map_size,
+>  	 * The easiest way to find adjacent regions is to sort the memory map
+>  	 * before traversing it.
+>  	 */
+> -	sort(memory_map, map_size / desc_size, desc_size, cmp_mem_desc, NULL);
+> +	if (IS_ENABLED(CONFIG_ARM64))
+> +		sort(memory_map, map_size / desc_size, desc_size, cmp_mem_desc,
+> +		     NULL);
+>  
+>  	for (l = 0; l < map_size; l += desc_size, prev = in) {
+>  		u64 paddr, size;
+> @@ -366,7 +368,8 @@ void efi_get_virtmap(efi_memory_desc_t *memory_map, unsigned long map_size,
+>  		 * a 4k page size kernel to kexec a 64k page size kernel and
+>  		 * vice versa.
+>  		 */
+> -		if (!regions_are_adjacent(prev, in) ||
+> +		if ((IS_ENABLED(CONFIG_ARM64) &&
+> +		     !regions_are_adjacent(prev, in)) ||
+>  		    !regions_have_compatible_memory_type_attrs(prev, in)) {
+>  
+>  			paddr = round_down(in->phys_addr, SZ_64K);
+> 
