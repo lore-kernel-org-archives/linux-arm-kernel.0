@@ -1,44 +1,28 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Mon, 23 Oct 2017 13:25:36 +0000
-Subject: [PATCH] ARM: dts: iwg20d-q7: Add support for ttySC3
-References: <1507539981-4193-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <CAMuHMdUprE7QuXF_sX47JyrvuZXhXnQFufy4OHeJ5ExwwoogKw@mail.gmail.com>
-Message-ID: <TY1PR06MB0895D27B9C7F2D3B3113654EC0460@TY1PR06MB0895.apcprd06.prod.outlook.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Mon, 23 Oct 2017 16:14:35 +0200
+Subject: [PATCH] KVM: arm/arm64: Allow usercopy to vcpu->arch.ctxt and
+ arm64 debug
+In-Reply-To: <20171022074418.GA3805@cbox>
+References: <20171020232525.7387-1-pbonzini@redhat.com>
+ <20171021184545.2497-1-christoffer.dall@linaro.org>
+ <CAGXu5jKJ2jPz2540ZLCwmcdVZxrgnhVPHs0uumiJm2o0ZgpVag@mail.gmail.com>
+ <20171022074418.GA3805@cbox>
+Message-ID: <d2a7dcec-060b-6279-1c1d-a18b3eedb394@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Geert,
+On 22/10/2017 09:44, Christoffer Dall wrote:
+> However, I think it's much clearer if I
+> rewrite these to use get_user() and put_user().  v2 incoming.
 
-> >
-> > > --- a/arch/arm/boot/dts/iwg20d-q7-common.dtsi
-> > > +++ b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
-> > > @@ -11,6 +11,7 @@
-> > >  / {
-> > >         aliases {
-> > >                 serial0 = &scif0;
-> > > +               serial3 = &scifb1;
-> >
-> > Given this port is not labeled "serial3", but called "data uart", you may want
-> > to add a comment to avoid confusion:
->
-> It's a little bit confusing, isn't it? The lines related to such interface are named as UART0_x on the carrier board schematic, the section
-> of the schematic that contains the header is named "data uart header", and the board documentation names it explicitly as "UART 3 -
-> /dev/ttySC3 (SCIFB1)".
->
-> I don't think there is anything we can do to make this easier for the user really, is there? :D
-> If we decide to add a comment to serial 3, I guess we need to be consistent and add comments for the other serial interfaces too.
-> If you still prefer having a comment there I'll send a v2 and patch(es) for adding comments to the other interfaces, just let me know.
+I'd actually prefer if you all do a trivial conversion to
+kvm_init_usercopy to begin with.  In fact, we could just change the
+default from "0, 0" to "0, sizeof (kvm_arch_vcpu)" in kvm_init.  Any
+other change can be applied after the patches are merged to Linus's
+tree, especially with KVM Forum and the merge window both coming soon.
 
-Any thoughts about this?
+I'll send a v2 myself later this week.
 
-Thanks,
-Fab
+Thanks all,
 
->
-> Thanks,
-> Fab
->
-
-
-
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+Paolo
