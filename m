@@ -1,118 +1,107 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 24 Oct 2017 00:21:37 +0900
-Subject: [PATCH] arm64: dts: uniphier: add eMMC hardware reset provider node
-Message-ID: <1508772097-18752-1-git-send-email-yamada.masahiro@socionext.com>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 23 Oct 2017 16:26:39 +0100
+Subject: [PATCH v4 15/21] KVM: arm64: Set an impdef ESR for Virtual-SError
+ using VSESR_EL2.
+In-Reply-To: <CAMj-D2AMy1_SPrLGti9U=oz1JvBDHvRAMsBtw51B3JK0omLyXg@mail.gmail.com>
+References: <20171019145807.23251-1-james.morse@arm.com>
+ <20171019145807.23251-16-james.morse@arm.com>
+ <CAMj-D2AMy1_SPrLGti9U=oz1JvBDHvRAMsBtw51B3JK0omLyXg@mail.gmail.com>
+Message-ID: <59EE0A2F.8050703@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add mmc-pwrseq-emmc node to perform standard eMMC hardware reset
-procedure.
+Hi gengdongjiu,
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+On 20/10/17 17:44, gengdongjiu wrote:
+> 2017-10-19 22:58 GMT+08:00 James Morse <james.morse@arm.com>:
+>> Prior to v8.2's RAS Extensions, the HCR_EL2.VSE 'virtual SError' feature
+>> generated an SError with an implementation defined ESR_EL1.ISS, because we
+>> had no mechanism to specify the ESR value.
+>>
+>> On Juno this generates an all-zero ESR, the most significant bit 'ISV'
+>> is clear indicating the remainder of the ISS field is invalid.
+>>
+>> With the RAS Extensions we have a mechanism to specify this value, and the
+>> most significant bit has a new meaning: 'IDS - Implementation Defined
+>> Syndrome'. An all-zero SError ESR now means: 'RAS error: Uncategorized'
+>> instead of 'no valid ISS'.
+> 
+> consider again.
 
- arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 8 ++++++++
- arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 7 +++++++
- arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi | 8 ++++++++
- 3 files changed, 23 insertions(+)
+> I still consider that it is not better set  "Implementation Defined
+> Syndrome" here.
 
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-index 5fde6f5..e8bd39c 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-@@ -7,6 +7,8 @@
-  * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-  */
- 
-+#include <dt-bindings/gpio/gpio.h>
-+
- /memreserve/ 0x80000000 0x02000000;
- 
- / {
-@@ -96,6 +98,11 @@
- 		};
- 	};
- 
-+	emmc_pwrseq: emmc-pwrseq {
-+		compatible = "mmc-pwrseq-emmc";
-+		reset-gpios = <&gpio 26 GPIO_ACTIVE_LOW>;
-+	};
-+
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupts = <1 13 4>,
-@@ -310,6 +317,7 @@
- 			bus-width = <8>;
- 			mmc-ddr-1_8v;
- 			mmc-hs200-1_8v;
-+			mmc-pwrseq = <&emmc_pwrseq>;
- 			cdns,phy-input-delay-legacy = <4>;
- 			cdns,phy-input-delay-mmc-highspeed = <2>;
- 			cdns,phy-input-delay-mmc-ddr = <3>;
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-index aae64d2..e7e9826 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-@@ -7,6 +7,7 @@
-  * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-  */
- 
-+#include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/thermal/thermal.h>
- 
- /memreserve/ 0x80000000 0x02000000;
-@@ -169,6 +170,11 @@
- 		};
- 	};
- 
-+	emmc_pwrseq: emmc-pwrseq {
-+		compatible = "mmc-pwrseq-emmc";
-+		reset-gpios = <&gpio 26 GPIO_ACTIVE_LOW>;
-+	};
-+
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupts = <1 13 4>,
-@@ -416,6 +422,7 @@
- 			bus-width = <8>;
- 			mmc-ddr-1_8v;
- 			mmc-hs200-1_8v;
-+			mmc-pwrseq = <&emmc_pwrseq>;
- 			cdns,phy-input-delay-legacy = <4>;
- 			cdns,phy-input-delay-mmc-highspeed = <2>;
- 			cdns,phy-input-delay-mmc-ddr = <3>;
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi b/arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi
-index 7e990e3..6297a2d 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi
-+++ b/arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi
-@@ -7,6 +7,8 @@
-  * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-  */
- 
-+#include <dt-bindings/gpio/gpio.h>
-+
- /memreserve/ 0x80000000 0x02000000;
- 
- / {
-@@ -124,6 +126,11 @@
- 		};
- 	};
- 
-+	emmc_pwrseq: emmc-pwrseq {
-+		compatible = "mmc-pwrseq-emmc";
-+		reset-gpios = <&gpio 47 GPIO_ACTIVE_LOW>;
-+	};
-+
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupts = <1 13 4>,
-@@ -317,6 +324,7 @@
- 			bus-width = <8>;
- 			mmc-ddr-1_8v;
- 			mmc-hs200-1_8v;
-+			mmc-pwrseq = <&emmc_pwrseq>;
- 			cdns,phy-input-delay-legacy = <4>;
- 			cdns,phy-input-delay-mmc-highspeed = <2>;
- 			cdns,phy-input-delay-mmc-ddr = <3>;
--- 
-2.7.4
+Do you agree KVM does this today?
+ddb3d07cfe90 ("arm64: KVM: Inject a Virtual SError if it was pending")
+
+All I've changed here is that you don't get a RAS error passed into the guest.
+Its either deemed non-blocking and ignored, or we kick the guest with an impdef
+SError.
+
+To do any better we need kernel first support, or a firmware first notification.
+
+
+> I know your meaning that An all-zero SError means Uncategorized
+
+Uncategorized RAS error. RAS errors should be handled by the host, we should not
+inject them into the guest on a path like this.
+
+Which impdef ESR would you like to use, and why does it matter?
+
+
+> From the beginning,  our starting point is KVM is the architecture
+> related and Qemu/kvmtool is platform related.
+> Qemu/kvmtool is the role of host firmware.
+> so we let Qemu to create APEI/GHES table and record CPER,
+
+> and also injects SEA/SEI in the Qemu.
+
+For RAS events it generated all by itself, or was notified by the kernel using
+signals.
+
+This is not one of those cases. But that's fine as we aren't injecting a RAS error.
+
+
+> About the vsesr_el2 which is used to specify the guest ESR,   also all
+> set by Qemu/kvmtool are better.
+> including the three cases  even the ESR are  all-zero(uncategorized).
+> 1. IMPLEMENTATION DEFINED
+> 2  categorized,
+> 3  uncategorized,
+
+I can't work out what you're saying here.
+
+If you're suggesting Qemu should set a default 'unknown' ESR for use when KVM
+doesn't know what to do, and SError is pretty much its only option:
+
+Why would Qemu set anything other than impdef:all-zeros?
+
+The only use would be to fake this back into a RAS error. Qemu isn't involved
+here so this can't be used to emulate NOTIFY_SEI without the kernel support. We
+don't have support for emulating the RAS ERR registers either, so this can't be
+used to emulate kernel first.
+
+
+If you're suggesting Qemu should specify a set of ESR values for the different
+cases where KVM doesn't know what do: this would be an early shortcut that burns
+us in the future, these things are going to be changed. This is too specific to
+KVMs internals:
+
+When we add NOTIFY_SEI support, we will call out of this KVM code and APEI
+should 'claim' any SError that arrived with CPER records.
+
+I expect this code to change dramatically if/when we add kernel first support.
+
+
+The KVM patches on the end of this series are just the minimum needed to enable
+IESB and keep the status quo for all other behaviour. And this is just so we can
+tackle the other bits of support that depends on the cpufeature without
+reposting all the same code.
+
+
+
+James
+
+
+> For this case, Qemu just set the ESR, nothing else, not passing
+> RAS-error to userspace.
