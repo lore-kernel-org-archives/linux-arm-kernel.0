@@ -1,51 +1,39 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 23 Oct 2017 10:00:01 +0100
-Subject: [GIT PULL] firmware: arm_scpi: updates/cleanups for v4.15
-In-Reply-To: <CAK8P3a0Pmcg+_zZNgTYfi_0m8zS=Rq9oqPSypxASKh8E34NKJg@mail.gmail.com>
-References: <901d3720-a023-0af9-2b20-b7d7e8528571@arm.com>
- <CAK8P3a0Pmcg+_zZNgTYfi_0m8zS=Rq9oqPSypxASKh8E34NKJg@mail.gmail.com>
-Message-ID: <a0b4576b-3249-a783-ef92-9c394f27edb8@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 23 Oct 2017 10:03:49 +0100
+Subject: [PATCH 0/4] arm64: Changes to register and stack dumps
+In-Reply-To: <f3e4cf91-6965-84e9-0e3a-39a1c24ab1ae@redhat.com>
+References: <1508428534-20694-1-git-send-email-will.deacon@arm.com>
+ <f3e4cf91-6965-84e9-0e3a-39a1c24ab1ae@redhat.com>
+Message-ID: <20171023090348.GA29937@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 20/10/17 21:33, Arnd Bergmann wrote:
-> On Mon, Oct 9, 2017 at 7:27 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>
->> The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
->>
->>   Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
->>
->> are available in the git repository at:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git
->> tags/scpi-updates-4.15
->>
->> for you to fetch changes up to 430594c1c7f5051f0d99ed9d08d086d20587cdd1:
->>
->>   firmware: arm_scpi: silence sparse warnings (2017-10-09 10:20:02 +0100)
->>
->> ----------------------------------------------------------------
->> ARM SCPI updates/cleanups for v4.15
->>
->> 1. Fixes to get rid of sparse warnings
->> 2. Use of FIELD_GET and GENMASK for better subfields handling
->> 3. Make mbox_free_channels device-managed helping in removing
->> unnecessary code
->> 4. Various other cleanups to simplify and improve code readability
+On Fri, Oct 20, 2017 at 03:53:50PM -0700, Laura Abbott wrote:
+> On 10/19/2017 08:55 AM, Will Deacon wrote:
+> > This handful of patches makes some significant changes to how we print
+> > register/stack dumps and brings us inline with recent changes to x86.
+> > The main changes are that we no longer print out the 'Exception stack:'
+> > section and PC/LR values are resolved to a symbol+offset format where
+> > possible.
+> > 
+> > Feedback welcome.
+> > 
 > 
-> Pulled into next/drivers. I'm a little unsure about the first patch: the
-> resource is called "shmem", which suggests that you are dealing
-> with memory and should use "memremap()" instead of "ioremap()"
-> and readl/writel. Can you clarify what the mapping attributes are
-> supposed to be here? Thanks.
+> In very petty complaints, I can no longer just use the PC/LR with
+> addr2line. Yes I can use gdb or one of the scripts but that's a
+> few more steps when I'm doing debugging on my own. Like I said,
+> very minor and overall this is good for both security and alignment.
 
-This is the shared memory carved out of SRAM. Since it's shared with
-remote processor it's prefer to have device ordering and uncached.
-drivers/misc/sram.c does have ioremap, the shmem used here is reserved
-region from SRAM. Let me know if this sounds fine.
+Understood. scripts/faddr2line seems to do a reasonable job, but I agree
+that it's a little annoying that you have to do some pointer arithmetic
+if you want to e.g. locate disassembly in objdump. Setting KALLSYMS=n will
+give you the addresses if you *really* want them.
 
--- 
-Regards,
-Sudeep
+> I ran this through several of the LKDTM tests and the backtraces
+> looked fine. You're welcome to add
+> 
+> Tested-by: Laura Abbott <labbott@redhat.com>
+
+Thanks, Laura.
+
+Will
