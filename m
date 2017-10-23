@@ -1,101 +1,50 @@
-From: jeffy.chen@rock-chips.com (jeffy)
-Date: Mon, 23 Oct 2017 11:28:00 +0800
-Subject: [PATCH] efi/libstub: arm: omit sorting of the UEFI memory map
-In-Reply-To: <20171022141457.28769-1-ard.biesheuvel@linaro.org>
-References: <20171022141457.28769-1-ard.biesheuvel@linaro.org>
-Message-ID: <59ED61C0.50602@rock-chips.com>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Mon, 23 Oct 2017 11:48:57 +0800
+Subject: [PATCH v2] ARM: Remove .pad section when CONFIG_EFI_STUB enabled
+Message-ID: <20171023034857.19435-1-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+Currently we are using the .pad section to ensure the zImage file size
+aligned to 8 bytes.
 
-this patch fixes the zImage file size not aligned issue i meet, thanks:)
+But that is not needed when CONFIG_EFI_STUB enabled, as it would
+followed by a 512 bytes aligned .data section.
 
-Tested-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
 
-On 10/22/2017 10:14 PM, Ard Biesheuvel wrote:
-> ARM shares its EFI stub implementation with arm64, which has some
-> special handling in the virtual remapping code to
-> a) make sure that we can map everything even if the OS executes
->     with 64k page size, and
-> b) make sure that adjacent regions with the same attributes are not
->     reordered or moved apart in memory.
->
-> The latter is a workaround for a 'feature' that was shortly recommended
-> by UEFI spec v2.5, but deprecated shortly after, due to the fact that
-> it broke many OS installers, including non-Linux ones, and it was never
-> widely implemented for ARM systems. Before implementing b), the arm64
-> code simply rounded up all regions to 64 KB granularity, but given that
-> that results in moving adjacent regions apart, it had to be refined when
-> b) was implemented.
->
-> The adjacency check requires a sort() pass, due to the fact that the
-> UEFI spec does not mandate any ordering, and the inclusion of the
-> lib/sort.c code into the ARM EFI stub is causing some trouble with
-> the decompressor build due to the fact that its EXPORT_SYMBOL() call
-> triggers the creation of ksymtab/kcrctab sections.
->
-> So let's simply do away with the adjacency check for ARM, and simply put
-> all UEFI runtime regions together if they have the same memory attributes.
-> This is guaranteed to work, given that ARM only supports 4 KB pages,
-> and allows us to remove the sort() call entirely.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->   drivers/firmware/efi/libstub/Makefile   | 6 +++---
->   drivers/firmware/efi/libstub/arm-stub.c | 7 +++++--
->   2 files changed, 8 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
-> index dedf9bde44db..f3e8431565ea 100644
-> --- a/drivers/firmware/efi/libstub/Makefile
-> +++ b/drivers/firmware/efi/libstub/Makefile
-> @@ -33,13 +33,14 @@ lib-y				:= efi-stub-helper.o gop.o secureboot.o
->   lib-$(CONFIG_RESET_ATTACK_MITIGATION) += tpm.o
->
->   # include the stub's generic dependencies from lib/ when building for ARM/arm64
-> -arm-deps := fdt_rw.c fdt_ro.c fdt_wip.c fdt.c fdt_empty_tree.c fdt_sw.c sort.c
-> +arm-deps-y := fdt_rw.c fdt_ro.c fdt_wip.c fdt.c fdt_empty_tree.c fdt_sw.c
-> +arm-deps-$(CONFIG_ARM64) += sort.c
->
->   $(obj)/lib-%.o: $(srctree)/lib/%.c FORCE
->   	$(call if_changed_rule,cc_o_c)
->
->   lib-$(CONFIG_EFI_ARMSTUB)	+= arm-stub.o fdt.o string.o random.o \
-> -				   $(patsubst %.c,lib-%.o,$(arm-deps))
-> +				   $(patsubst %.c,lib-%.o,$(arm-deps-y))
->
->   lib-$(CONFIG_ARM)		+= arm32-stub.o
->   lib-$(CONFIG_ARM64)		+= arm64-stub.o
-> @@ -90,5 +91,4 @@ quiet_cmd_stubcopy = STUBCPY $@
->   # explicitly by the decompressor linker script.
->   #
->   STUBCOPY_FLAGS-$(CONFIG_ARM)	+= --rename-section .data=.data.efistub
-> -STUBCOPY_RM-$(CONFIG_ARM)	+= -R ___ksymtab+sort -R ___kcrctab+sort
->   STUBCOPY_RELOC-$(CONFIG_ARM)	:= R_ARM_ABS
-> diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
-> index 1cb2d1c070c3..3061e4057483 100644
-> --- a/drivers/firmware/efi/libstub/arm-stub.c
-> +++ b/drivers/firmware/efi/libstub/arm-stub.c
-> @@ -349,7 +349,9 @@ void efi_get_virtmap(efi_memory_desc_t *memory_map, unsigned long map_size,
->   	 * The easiest way to find adjacent regions is to sort the memory map
->   	 * before traversing it.
->   	 */
-> -	sort(memory_map, map_size / desc_size, desc_size, cmp_mem_desc, NULL);
-> +	if (IS_ENABLED(CONFIG_ARM64))
-> +		sort(memory_map, map_size / desc_size, desc_size, cmp_mem_desc,
-> +		     NULL);
->
->   	for (l = 0; l < map_size; l += desc_size, prev = in) {
->   		u64 paddr, size;
-> @@ -366,7 +368,8 @@ void efi_get_virtmap(efi_memory_desc_t *memory_map, unsigned long map_size,
->   		 * a 4k page size kernel to kexec a 64k page size kernel and
->   		 * vice versa.
->   		 */
-> -		if (!regions_are_adjacent(prev, in) ||
-> +		if ((IS_ENABLED(CONFIG_ARM64) &&
-> +		     !regions_are_adjacent(prev, in)) ||
->   		    !regions_have_compatible_memory_type_attrs(prev, in)) {
->
->   			paddr = round_down(in->phys_addr, SZ_64K);
->
+Changes in v2:
+Remove .pad section when CONFIG_EFI_STUB enabled as Russell King <linux@armlinux.org.uk> suggested.
+
+ arch/arm/boot/compressed/vmlinux.lds.S | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/boot/compressed/vmlinux.lds.S b/arch/arm/boot/compressed/vmlinux.lds.S
+index b38dcef90756..394b2bf5d28a 100644
+--- a/arch/arm/boot/compressed/vmlinux.lds.S
++++ b/arch/arm/boot/compressed/vmlinux.lds.S
+@@ -70,10 +70,6 @@ SECTIONS
+   .got			: { *(.got) }
+   _got_end = .;
+ 
+-  /* ensure the zImage file size is always a multiple of 64 bits */
+-  /* (without a dummy byte, ld just ignores the empty section) */
+-  .pad			: { BYTE(0); . = ALIGN(8); }
+-
+ #ifdef CONFIG_EFI_STUB
+   .data : ALIGN(4096) {
+     __pecoff_data_start = .;
+@@ -91,6 +87,10 @@ SECTIONS
+     . = ALIGN(512);
+   }
+   __pecoff_data_rawsize = . - ADDR(.data);
++#else
++  /* ensure the zImage file size is always a multiple of 64 bits */
++  /* (without a dummy byte, ld just ignores the empty section) */
++  .pad			: { BYTE(0); . = ALIGN(8); }
+ #endif
+ 
+   _edata = .;
+-- 
+2.11.0
