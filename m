@@ -1,23 +1,43 @@
 From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Mon, 23 Oct 2017 13:19:35 +0000
-Subject: [PATCH] ARM: dts: r8a7745: Add IIC cores to dtsi
-In-Reply-To: <20171020093302.o3jjjgu37gipqelj@verge.net.au>
-References: <1507910793-13919-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <20171020093302.o3jjjgu37gipqelj@verge.net.au>
-Message-ID: <TY1PR06MB0895D20B307ECD9862727533C0460@TY1PR06MB0895.apcprd06.prod.outlook.com>
+Date: Mon, 23 Oct 2017 13:25:36 +0000
+Subject: [PATCH] ARM: dts: iwg20d-q7: Add support for ttySC3
+References: <1507539981-4193-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <CAMuHMdUprE7QuXF_sX47JyrvuZXhXnQFufy4OHeJ5ExwwoogKw@mail.gmail.com>
+Message-ID: <TY1PR06MB0895D27B9C7F2D3B3113654EC0460@TY1PR06MB0895.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Please include some changelog text here, preferably motivating the change.
+Hello Geert,
 
-Will do.
+> >
+> > > --- a/arch/arm/boot/dts/iwg20d-q7-common.dtsi
+> > > +++ b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
+> > > @@ -11,6 +11,7 @@
+> > >  / {
+> > >         aliases {
+> > >                 serial0 = &scif0;
+> > > +               serial3 = &scifb1;
+> >
+> > Given this port is not labeled "serial3", but called "data uart", you may want
+> > to add a comment to avoid confusion:
+>
+> It's a little bit confusing, isn't it? The lines related to such interface are named as UART0_x on the carrier board schematic, the section
+> of the schematic that contains the header is named "data uart header", and the board documentation names it explicitly as "UART 3 -
+> /dev/ttySC3 (SCIFB1)".
+>
+> I don't think there is anything we can do to make this easier for the user really, is there? :D
+> If we decide to add a comment to serial 3, I guess we need to be consistent and add comments for the other serial interfaces too.
+> If you still prefer having a comment there I'll send a v2 and patch(es) for adding comments to the other interfaces, just let me know.
 
+Any thoughts about this?
+
+Thanks,
 Fab
 
 >
-> On Fri, Oct 13, 2017 at 05:06:33PM +0100, Fabrizio Castro wrote:
-> > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> > Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+> Thanks,
+> Fab
+>
 
 
 
