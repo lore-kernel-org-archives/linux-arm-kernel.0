@@ -1,80 +1,48 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Sun, 22 Oct 2017 19:58:30 -0700
-Subject: [PATCH v3 1/3] interconnect: Add generic on-chip interconnect API
-In-Reply-To: <20171020223452.GD1165@minitux>
-References: <20170908171830.13813-1-georgi.djakov@linaro.org>
- <20170908171830.13813-2-georgi.djakov@linaro.org>
- <a7cf55ba-0475-d74c-f759-a24e58ccde47@linaro.org>
- <20171020223452.GD1165@minitux>
-Message-ID: <CAEG3pNAbf3hLchrYK+s9RwZ3zF3srkqdbvqPSBMOoGV65TguLQ@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 23 Oct 2017 11:04:38 +0800
+Subject: [PATCH] PCI: hisi: add PCIe driver support for HiSilicon STB SoCs
+In-Reply-To: <20171020225248.GV6332@bhelgaas-glaptop.roam.corp.google.com>
+References: <1508043971-23216-1-git-send-email-shawnguo@kernel.org>
+ <20171020225248.GV6332@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20171023030437.GH8700@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi Bjorn,
 
-On Fri, Oct 20, 2017 at 3:34 PM, Bjorn Andersson
-<bjorn.andersson@linaro.org> wrote:
-> On Fri 20 Oct 07:43 PDT 2017, Georgi Djakov wrote:
->
->> Hi,
->>
->> On 09/08/2017 08:18 PM, Georgi Djakov wrote:
->> > This patch introduce a new API to get requirements and configure the
->> > interconnect buses across the entire chipset to fit with the current demand.
->> >
->> > The API is using a consumer/provider-based model, where the providers are
->> > the interconnect buses and the consumers could be various drivers.
->> > The consumers request interconnect resources (path) between endpoints and
->> > set the desired constraints on this data flow path. The providers receive
->> > requests from consumers and aggregate these requests for all master-slave
->> > pairs on that path. Then the providers configure each participating in the
->> > topology node according to the requested data flow path, physical links and
->> > constraints. The topology could be complicated and multi-tiered and is SoC
->> > specific.
->> >
->> > Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
->> > ---
->> >  Documentation/interconnect/interconnect.rst |  93 +++++++
->> >  drivers/Kconfig                             |   2 +
->> >  drivers/Makefile                            |   1 +
->> >  drivers/interconnect/Kconfig                |  10 +
->> >  drivers/interconnect/Makefile               |   1 +
->> >  drivers/interconnect/interconnect.c         | 382 ++++++++++++++++++++++++++++
->> >  include/linux/interconnect-consumer.h       |  73 ++++++
->> >  include/linux/interconnect-provider.h       | 119 +++++++++
->> >  8 files changed, 681 insertions(+)
->> >  create mode 100644 Documentation/interconnect/interconnect.rst
->> >  create mode 100644 drivers/interconnect/Kconfig
->> >  create mode 100644 drivers/interconnect/Makefile
->> >  create mode 100644 drivers/interconnect/interconnect.c
->> >  create mode 100644 include/linux/interconnect-consumer.h
->> >  create mode 100644 include/linux/interconnect-provider.h
->>
->> Any comments on this patch?
->>
->
-> Sorry, I still haven't found the time to do a proper review of this yet.
+Thanks for taking time to look at the patch.
 
-Same.
+On Fri, Oct 20, 2017 at 05:52:48PM -0500, Bjorn Helgaas wrote:
+> On Sun, Oct 15, 2017 at 01:06:11PM +0800, Shawn Guo wrote:
+> > From: Jianguo Sun <sunjianguo1@huawei.com>
+> > 
+> > Add PCIe controller driver for HiSilicon STB SoCs,
+> > the controller is based on the DesignWare's PCIe core.
+> 
+> s/DesignWare's/DesignWare/
+> 
+> > Signed-off-by: Jianguo Sun <sunjianguo1@huawei.com>
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> >  .../bindings/pci/hisilicon-histb-pcie.txt          |  66 +++
+> >  drivers/pci/dwc/Kconfig                            |  10 +
+> >  drivers/pci/dwc/Makefile                           |   1 +
+> >  drivers/pci/dwc/pcie-histb.c                       | 469 +++++++++++++++++++++
+> >  4 files changed, 546 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/pci/hisilicon-histb-pcie.txt
+> >  create mode 100644 drivers/pci/dwc/pcie-histb.c
+> 
+> Looks beautiful overall!
+> 
+> This needs a MAINTAINERS update so "./scripts/get_maintainer.pl -f" prints
+> something useful.
 
->
->> I am planning to change the prefix that is used for naming for example
->> the functions from "interconnect_" to something shorter like icbus_.
->>
->
-> This isn't implementing a bus; if you feel that just ic_ is too short I
-> would suggest naming things inter_. (But keep the full name in the file
-> names)
+Okay, I will add a MAINTAINERS entry for this driver.
 
-Not trying to bikeshed too much, but how about icc_ for "interconnect
-controller"? No idea if that is a hash collision with other in-kernel
-apis.
+> A few minor nits below that I would fix myself, but since you need to
+> supply the MAINTAINERS update anyway, I'll let you do it :)
 
-Just "ic_" looks to me like "integrated circuit".
+Thanks for all the suggestions.  We fixed them all, and the code does
+look nicer.
 
-Regards,
-Mike
-
->
-> Regards,
-> Bjorn
+Shawn
