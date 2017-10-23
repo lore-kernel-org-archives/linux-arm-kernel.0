@@ -1,173 +1,157 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 23 Oct 2017 14:31:51 +0900
-Subject: [PATCH v2] extcon: Split out extcon header file for consumer
- and provider device
-In-Reply-To: <fc19204f-c3a8-eccc-98df-e08aa27934fe@ti.com>
-References: <CGME20171010101758epcas2p3b3f379076f5be5e81edee2bd00354c28@epcas2p3.samsung.com>
- <1507630671-23536-1-git-send-email-cw00.choi@samsung.com>
- <59DEE429.2000608@samsung.com> <59E6B90F.8000808@samsung.com>
- <fc19204f-c3a8-eccc-98df-e08aa27934fe@ti.com>
-Message-ID: <59ED7EC7.3030204@samsung.com>
+From: prabhakar.kushwaha@nxp.com (Prabhakar Kushwaha)
+Date: Mon, 23 Oct 2017 05:37:02 +0000
+Subject: kdump: need help with kexec -p
+In-Reply-To: <HE1PR04MB12415392027297293D5FC07E97480@HE1PR04MB1241.eurprd04.prod.outlook.com>
+References: <HE1PR04MB12416F54193B1A61BC0652ED974A0@HE1PR04MB1241.eurprd04.prod.outlook.com>
+ <59DF54B3.1050404@arm.com>
+ <HE1PR04MB124165F8510E983992B11EC797480@HE1PR04MB1241.eurprd04.prod.outlook.com>
+ <59E095E1.5090706@arm.com>
+ <HE1PR04MB12415392027297293D5FC07E97480@HE1PR04MB1241.eurprd04.prod.outlook.com>
+Message-ID: <HE1PR04MB12413AEF2BF54623027FD22A97460@HE1PR04MB1241.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear all,
-
-I got the reviews from all maintainers related to this patch.
-So, I make the immutable branch on extcon.git and then send
-the pull request in order to prevent the possible merge conflict.
-
-Best Regards,
-Chanwoo Choi
-Samsung Electronics
+Hi James,
 
 
-The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
-
-  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/chanwoo/extcon.git ib-extcon-v4.15
-
-for you to fetch changes up to 176aa36012135d172394a928a03fb03dfecd83f9:
-
-  extcon: Split out extcon header file for consumer and provider device (2017-10-23 14:07:58 +0900)
-
-----------------------------------------------------------------
-Chanwoo Choi (1):
-      extcon: Split out extcon header file for consumer and provider device
-
- drivers/extcon/extcon-adc-jack.c              |   2 +-
- drivers/extcon/extcon-arizona.c               |   2 +-
- drivers/extcon/extcon-axp288.c                |   2 +-
- drivers/extcon/extcon-gpio.c                  |   2 +-
- drivers/extcon/extcon-intel-cht-wc.c          |   2 +-
- drivers/extcon/extcon-intel-int3496.c         |   2 +-
- drivers/extcon/extcon-max14577.c              |   2 +-
- drivers/extcon/extcon-max3355.c               |   2 +-
- drivers/extcon/extcon-max77693.c              |   2 +-
- drivers/extcon/extcon-max77843.c              |   2 +-
- drivers/extcon/extcon-max8997.c               |   2 +-
- drivers/extcon/extcon-qcom-spmi-misc.c        |   2 +-
- drivers/extcon/extcon-rt8973a.c               |   2 +-
- drivers/extcon/extcon-sm5502.c                |   2 +-
- drivers/extcon/extcon-usb-gpio.c              |   2 +-
- drivers/extcon/extcon-usbc-cros-ec.c          |   2 +-
- drivers/extcon/extcon.h                       |   2 +-
- drivers/phy/allwinner/phy-sun4i-usb.c         |   2 +-
- drivers/phy/broadcom/phy-bcm-ns2-usbdrd.c     |   2 +-
- drivers/phy/renesas/phy-rcar-gen3-usb2.c      |   2 +-
- drivers/phy/rockchip/phy-rockchip-inno-usb2.c |   2 +-
- drivers/power/supply/qcom_smbb.c              |   2 +-
- drivers/usb/gadget/udc/renesas_usb3.c         |   2 +-
- drivers/usb/phy/phy-tahvo.c                   |   2 +-
- include/linux/extcon-provider.h               | 142 ++++++++++++++++++++++++++
- include/linux/extcon.h                        | 109 +-------------------
- include/linux/mfd/palmas.h                    |   2 +-
- 27 files changed, 172 insertions(+), 129 deletions(-)
- create mode 100644 include/linux/extcon-provider.h
-
-
-On 2017? 10? 23? 14:05, Kishon Vijay Abraham I wrote:
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org]
+> On Behalf Of Prabhakar Kushwaha
+> Sent: Friday, October 13, 2017 4:54 PM
+> To: James Morse <james.morse@arm.com>; takahiro.akashi at linaro.org
+> Cc: Poonam Aggrwal <poonam.aggrwal@nxp.com>; Scott Wood
+> <oss@buserror.net>; Abhimanyu Saini <abhimanyu.saini@nxp.com>; linux-arm-
+> kernel at lists.infradead.org
+> Subject: RE: kdump: need help with kexec -p
 > 
 > 
-> On Wednesday 18 October 2017 07:44 AM, Chanwoo Choi wrote:
->> Gently Ping.
->>
->> Dear Kishon,
->>
->> Could you please review this patch for 'drivers/phy/*'?
+> > -----Original Message-----
+> > From: James Morse [mailto:james.morse at arm.com]
+> > Sent: Friday, October 13, 2017 4:01 PM
+> > To: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>;
+> > takahiro.akashi at linaro.org
+> > Cc: linux-arm-kernel at lists.infradead.org; Poonam Aggrwal
+> > <poonam.aggrwal@nxp.com>; Scott Wood <oss@buserror.net>; Abhimanyu
+> > Saini <abhimanyu.saini@nxp.com>
+> > Subject: Re: kdump: need help with kexec -p
+> >
+> > Hi Prabhakar,
+> >
+> > On 13/10/17 10:41, Prabhakar Kushwaha wrote:
+> > >> On 11/10/17 10:11, Prabhakar Kushwaha wrote:
+> > >>> We are facing some issues while using  kexec -p on ARM64 NXP platforms.
+> > >>>
+> > >>> 1) After calling kexec -p, if immediately "panic" is triggered the crash kernel
+> > >>> does not boot. If we run few commands and wait for atleast (20-30 secs),
+> > >> before
+> > >>> triggering the panic, the crash kernel boots.
+> > >>
+> > >> What kernel version do you see this on?
+> > > linux-linaro-lsk-v4.4  (f3b1dec5e8f2b4d17442a79bcb1f15953056519d)
+> > >
+> > >> Can you log the kernel output in each
+> > >> case, (do you get a 'bye' message even when the new kernel doesn't boot).
+> >
+> > > Yes I get 'bye' message in all cases.
+> >
+> > Okay, so this means you get out of the old kernel. No further output means its
+> > stuck either in purgatory or the new kernel before we manage to output
+> > anything.
+> >
+> > Are you using earlycon?
 > 
-> sorry for the delay.. here it is
+> Yes, we are using earlycon
 > 
-> Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
->>
->> Regards,
->> Chanwoo Choi
->>
->> On 2017? 10? 12? 12:40, Chanwoo Choi wrote:
->>> Dear Kishon,
->>>
->>> Could you please review this patch?
->>> After that, I'll make the immutable brand and then send the pull request
->>> for power_supply, mfd, phy, usb and extcon framework.
->>>
->>> On 2017? 10? 10? 19:17, Chanwoo Choi wrote:
->>>> The extcon has two type of extcon devices as following.
->>>> - 'extcon provider deivce' adds new extcon device and detect the
->>>>    state/properties of external connector. Also, it notifies the
->>>>    state/properties to the extcon consumer device.
->>>> - 'extcon consumer device' gets the change state/properties
->>>>    from extcon provider device.
->>>> Prior to that, include/linux/extcon.h contains all exported API for
->>>> both provider and consumer device driver. To clarify the meaning of
->>>> header file and to remove the wrong use-case on consumer device,
->>>> this patch separates into extcon.h and extcon-provider.h.
->>>>
->>>> [Description for include/linux/{extcon.h|extcon-provider.h}]
->>>> - extcon.h includes the extcon API and data structure for extcon consumer
->>>>   device driver. This header file contains the following APIs:
->>>>   : Register/unregister the notifier to catch the change of extcon device
->>>>   : Get the extcon device instance
->>>>   : Get the extcon device name
->>>>   : Get the state of each external connector
->>>>   : Get the property value of each external connector
->>>>   : Get the property capability of each external connector
->>>>
->>>> - extcon-provider.h includes the extcon API and data structure for extcon
->>>>   provider device driver. This header file contains the following APIs:
->>>>   : Include 'include/linux/extcon.h'
->>>>   : Allocate the memory for extcon device instance
->>>>   : Register/unregister extcon device
->>>>   : Set the state of each external connector
->>>>   : Set the property value of each external connector
->>>>   : Set the property capability of each external connector
->>>>
->>>> Cc: Felipe Balbi <balbi@kernel.org>
->>>> Cc: Kishon Vijay Abraham I <kishon@ti.com>
->>>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->>>> Acked-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
->>>> Acked-by: Chen-Yu Tsai <wens@csie.org>
->>>> Acked-by: Charles Keepax <ckeepax@opensource.cirrus.com>
->>>> Acked-by: Lee Jones <lee.jones@linaro.org>
->>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->>>> ---
->>>> Changes from v1:
->>>> - Don't touch drivers/usb/renesas_usbhs/common.h.
->>>> - Add acked-by from Sebastian Reichel (for drivers/power/supply/)
->>>> - Add acked-by from Chen-Yu Tsai (for phy-sun4i-usb.c & extcon-axp288.c)
->>>> - Add acked-by from Charles Keepax (for drivers/extcon/extcon-arizona.c)
->>>> - Add acked-by from Lee Jones (fo include/linux/mfd/palmas.h)
->>>>
->>>>  drivers/extcon/extcon-adc-jack.c              |   2 +-
->>>>  drivers/extcon/extcon-arizona.c               |   2 +-
->>>>  drivers/extcon/extcon-axp288.c                |   2 +-
->>>>  drivers/extcon/extcon-gpio.c                  |   2 +-
->>>>  drivers/extcon/extcon-intel-cht-wc.c          |   2 +-
->>>>  drivers/extcon/extcon-intel-int3496.c         |   2 +-
->>>>  drivers/extcon/extcon-max14577.c              |   2 +-
->>>>  drivers/extcon/extcon-max3355.c               |   2 +-
->>>>  drivers/extcon/extcon-max77693.c              |   2 +-
->>>>  drivers/extcon/extcon-max77843.c              |   2 +-
->>>>  drivers/extcon/extcon-max8997.c               |   2 +-
->>>>  drivers/extcon/extcon-qcom-spmi-misc.c        |   2 +-
->>>>  drivers/extcon/extcon-rt8973a.c               |   2 +-
->>>>  drivers/extcon/extcon-sm5502.c                |   2 +-
->>>>  drivers/extcon/extcon-usb-gpio.c              |   2 +-
->>>>  drivers/extcon/extcon-usbc-cros-ec.c          |   2 +-
->>>>  drivers/extcon/extcon.h                       |   2 +-
->>>>  drivers/phy/allwinner/phy-sun4i-usb.c         |   2 +-
->>>>  drivers/phy/broadcom/phy-bcm-ns2-usbdrd.c     |   2 +-
->>>>  drivers/phy/renesas/phy-rcar-gen3-usb2.c      |   2 +-
->>>>  drivers/phy/rockchip/phy-rockchip-inno-usb2.c |   2 +-
->>>>  drivers/power/supply/qcom_smbb.c              |   2 +-
->>>>  drivers/usb/gadget/udc/renesas_usb3.c         |   2 +-
->>>>  drivers/usb/phy/phy-tahvo.c                   |   2 +-
->>>>  include/linux/extcon-provider.h               | 142 ++++++++++++++++++++++++++
->>>>  include/linux/extcon.h                        | 109 +-------------------
->>>>  include/linux/mfd/palmas.h                    |   2 +-
->>>>  27 files changed, 172 insertions(+), 129 deletions(-)
->>>>  create mode 100644 include/linux/extcon-provider.h
+> Bootargs for kexec:  kexec_pk -p ./Image_lsk --append="console=ttyS0,115200
+> root=/dev/ram0 earlycon=uart8250,mmio,0x21c0500 maxcpus=1" --initrd="./fsl-
+> image-core-ls1043ardb.ext2.gz"
+> 
+> 
+> >
+> >
+> > >>> 2) We do not see the issue ("1" ), when we do umount -a, before calling the
+> > >> panic
+> > >>> after kexec-p.
+> > >>
+> > >> What filesystems (ext4, nfs etc) do you have mounted, and which ones does
+> > >> 'umount -a' get rid of?
+> >
+> > My theory here was that some writeback thread was causing kdump to block..
+> >
+> >
+> > > root at ls1043ardb:~# mkdir temp; mount -t ext4 /dev/mmcblk0p3 temp/
+> > > [   27.786681] EXT4-fs (mmcblk0p3): mounted filesystem with ordered data
+> > mode. Opts: (null)
+> > > root at ls1043ardb:~# cat /proc/mounts
+> > > /dev/root / ext4 rw,relatime,block_validity,delalloc,barrier,user_xattr,acl 0 0
+> > > devtmpfs /dev devtmpfs rw,relatime,mode=0755 0 0
+> > > proc /proc proc rw,relatime 0 0
+> > > sysfs /sys sysfs rw,relatime 0 0
+> > > debugfs /sys/kernel/debug debugfs rw,relatime 0 0
+> > > devpts /dev/pts devpts rw,relatime,gid=5,mode=620,ptmxmode=000 0 0
+> > > /dev/mmcblk0p3 /home/root/temp ext4 rw,relatime,data=ordered 0 0
+> > >
+> > > root at ls1043ardb:~# umount -a
+> > > umount: /dev: target is busy
+> > >         (In some cases useful info about processes that
+> > >          use the device is found by lsof(8) or fuser(1).)
+> > > umount: /: target is busy
+> > >         (In some cases useful info about processes that
+> > >          use the device is found by lsof(8) or fuser(1).)
+> > >
+> > > root at ls1043ardb:~# cat /proc/mounts
+> > > /dev/root / ext4 rw,relatime,block_validity,delalloc,barrier,user_xattr,acl 0 0
+> > > devtmpfs /dev devtmpfs rw,relatime,mode=0755 0 0
+> > > proc /proc proc rw,relatime 0 0
+> > > sysfs /sys sysfs rw,relatime 0 0
+> > > devpts /dev/pts devpts rw,relatime,gid=5,mode=620,ptmxmode=000 0 0
+> > > root at ls1043ardb:~#
+> > >
+> > >
+> > >> Where are these filesystems stored?
+> > >>
+> > >
+> > > We are using ramdisk.
+> > >
+> > > Bootargs: ttyS0,115200 root=/dev/ram0
+> earlycon=uart8250,mmio,0x21c0500
+> > crashkernel=512M loglevel=8 ramdisk_size=0x20000000
+> >
+> > Okay, so in your (1) doesn't-boot case the mmc driver is still in use, and may
+> > have dirty data to write back.
+> >
+> > This fits with your 'wait 20 seconds and it works'. (you can check this theroy
+> > by increasing /proc/sys/vm/dirty_writeback_centisecs to something more than
+> > 20seconds should break this).
+> >
+> 
+> It was already 3000 centisecs. We increased to 6000 but still no success.
+> 
+> 
+> > Your case (2), after 'umount -a' your mmc driver is no longer in use, any dirty
+> > data will have been written back. This case works.
+> >
+> > (Is it the driver or the data causing the problem? You could try 'mount -o
+> > remount,ro' on the mmc filesystems)
+> >
+> 
+> No  success with this.
+> 
+> We tried below command also, but no luck. "Logs" are at bottom of mail.
+> mount -t ext4 -o ro /dev/mmcblk0p3 temp/
+> 
+> 
 
-[snip]
+After further analysis, it is figured out to be a data cache flush issue.   
+
+After trying below patch(suggested by Takahiro). This problem looks to be resolved for now. 
+
+===
+commit 9b492cf58077
+Author: Xunlei Pang <xlpang@redhat.com>
+Date:   Mon May 23 16:24:10 2016 -0700
+
+    kexec: introduce a protection mechanism for the crashkernel reserved memory
+===
+
+--prabhakar
