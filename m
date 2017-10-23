@@ -1,173 +1,217 @@
 From: weiyi.lu@mediatek.com (Weiyi Lu)
-Date: Mon, 23 Oct 2017 12:10:35 +0800
-Subject: [PATCH v6 4/9] arm: dts: mt2712: Add clock controller device nodes
+Date: Mon, 23 Oct 2017 12:10:37 +0800
+Subject: [PATCH v6 6/9] soc: mediatek: extend bus protection API
 In-Reply-To: <1508731840-4231-1-git-send-email-weiyi.lu@mediatek.com>
 References: <1508731840-4231-1-git-send-email-weiyi.lu@mediatek.com>
-Message-ID: <1508731840-4231-5-git-send-email-weiyi.lu@mediatek.com>
+Message-ID: <1508731840-4231-7-git-send-email-weiyi.lu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clock controller nodes for MT2712, include topckgen, infracfg,
-pericfg, mcucfg and apmixedsys. This patch also add six oscillators that
-provide clocks for MT2712.
+MT2712 add "set/clear" bus control register to each control register set
+instead of providing only one "enable" control register, we could avoid
+the read-modify-write racing by declaring "bus_prot_reg_update" as "false"
+in scp_soc_data or declaring as "true" to use the legacy update method.
+By improving the mtk-infracfg bus protection implementation to
+support set/clear bus protection control method by IC configuration.
 
 Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
 ---
- arch/arm64/boot/dts/mediatek/mt2712e.dtsi | 115 ++++++++++++++++++++++++++++++
- 1 file changed, 115 insertions(+)
+ drivers/soc/mediatek/mtk-infracfg.c   | 26 ++++++++++++++++++++++----
+ drivers/soc/mediatek/mtk-scpsys.c     | 28 ++++++++++++++++++++--------
+ include/linux/soc/mediatek/infracfg.h |  7 ++++---
+ 3 files changed, 46 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-index 57d0396..d2ee3cd 100644
---- a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-@@ -5,6 +5,7 @@
-  * SPDX-License-Identifier: (GPL-2.0 OR MIT)
+diff --git a/drivers/soc/mediatek/mtk-infracfg.c b/drivers/soc/mediatek/mtk-infracfg.c
+index dba3055..8c310de 100644
+--- a/drivers/soc/mediatek/mtk-infracfg.c
++++ b/drivers/soc/mediatek/mtk-infracfg.c
+@@ -19,23 +19,33 @@
+ 
+ #define INFRA_TOPAXI_PROTECTEN		0x0220
+ #define INFRA_TOPAXI_PROTECTSTA1	0x0228
++#define INFRA_TOPAXI_PROTECTEN_SET	0x0260
++#define INFRA_TOPAXI_PROTECTEN_CLR	0x0264
+ 
+ /**
+  * mtk_infracfg_set_bus_protection - enable bus protection
+  * @regmap: The infracfg regmap
+  * @mask: The mask containing the protection bits to be enabled.
++ * @reg_update: The boolean flag determines to set the protection bits
++ *              by regmap_update_bits with enable register(PROTECTEN) or
++ *              by regmap_write with set register(PROTECTEN_SET).
+  *
+  * This function enables the bus protection bits for disabled power
+  * domains so that the system does not hang when some unit accesses the
+  * bus while in power down.
   */
+-int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask)
++int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask,
++		bool reg_update)
+ {
+ 	unsigned long expired;
+ 	u32 val;
+ 	int ret;
  
-+#include <dt-bindings/clock/mt2712-clk.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
+-	regmap_update_bits(infracfg, INFRA_TOPAXI_PROTECTEN, mask, mask);
++	if (reg_update)
++		regmap_update_bits(infracfg, INFRA_TOPAXI_PROTECTEN, mask,
++				mask);
++	else
++		regmap_write(infracfg, INFRA_TOPAXI_PROTECTEN_SET, mask);
  
-@@ -73,6 +74,48 @@
- 		#clock-cells = <0>;
- 	};
+ 	expired = jiffies + HZ;
  
-+	clk26m: oscillator at 0 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <26000000>;
-+		clock-output-names = "clk26m";
-+	};
+@@ -59,16 +69,24 @@ int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask)
+  * mtk_infracfg_clear_bus_protection - disable bus protection
+  * @regmap: The infracfg regmap
+  * @mask: The mask containing the protection bits to be disabled.
++ * @reg_update: The boolean flag determines to clear the protection bits
++ *              by regmap_update_bits with enable register(PROTECTEN) or
++ *              by regmap_write with clear register(PROTECTEN_CLR).
+  *
+  * This function disables the bus protection bits previously enabled with
+  * mtk_infracfg_set_bus_protection.
+  */
+-int mtk_infracfg_clear_bus_protection(struct regmap *infracfg, u32 mask)
 +
-+	clk32k: oscillator at 1 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <32768>;
-+		clock-output-names = "clk32k";
-+	};
-+
-+	clkfpc: oscillator at 2 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <50000000>;
-+		clock-output-names = "clkfpc";
-+	};
-+
-+	clkaud_ext_i_0: oscillator at 3 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <6500000>;
-+		clock-output-names = "clkaud_ext_i_0";
-+	};
-+
-+	clkaud_ext_i_1: oscillator at 4 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <196608000>;
-+		clock-output-names = "clkaud_ext_i_1";
-+	};
-+
-+	clkaud_ext_i_2: oscillator at 5 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <180633600>;
-+		clock-output-names = "clkaud_ext_i_2";
-+	};
-+
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupt-parent = <&gic>;
-@@ -86,6 +129,24 @@
- 			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>;
- 	};
++int mtk_infracfg_clear_bus_protection(struct regmap *infracfg, u32 mask,
++		bool reg_update)
+ {
+ 	unsigned long expired;
+ 	int ret;
  
-+	topckgen: syscon at 10000000 {
-+		compatible = "mediatek,mt2712-topckgen", "syscon";
-+		reg = <0 0x10000000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	infracfg: syscon at 10001000 {
-+		compatible = "mediatek,mt2712-infracfg", "syscon";
-+		reg = <0 0x10001000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	pericfg: syscon at 10003000 {
-+		compatible = "mediatek,mt2712-pericfg", "syscon";
-+		reg = <0 0x10003000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
- 	uart5: serial at 1000f000 {
- 		compatible = "mediatek,mt2712-uart",
- 			     "mediatek,mt6577-uart";
-@@ -96,6 +157,18 @@
- 		status = "disabled";
- 	};
+-	regmap_update_bits(infracfg, INFRA_TOPAXI_PROTECTEN, mask, 0);
++	if (reg_update)
++		regmap_update_bits(infracfg, INFRA_TOPAXI_PROTECTEN, mask, 0);
++	else
++		regmap_write(infracfg, INFRA_TOPAXI_PROTECTEN_CLR, mask);
  
-+	apmixedsys: syscon at 10209000 {
-+		compatible = "mediatek,mt2712-apmixedsys", "syscon";
-+		reg = <0 0x10209000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	mcucfg: syscon at 10220000 {
-+		compatible = "mediatek,mt2712-mcucfg", "syscon";
-+		reg = <0 0x10220000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
- 	sysirq: interrupt-controller at 10220a80 {
- 		compatible = "mediatek,mt2712-sysirq",
- 			     "mediatek,mt6577-sysirq";
-@@ -167,5 +240,47 @@
- 		clock-names = "baud", "bus";
- 		status = "disabled";
- 	};
-+
-+	mfgcfg: syscon at 13000000 {
-+		compatible = "mediatek,mt2712-mfgcfg", "syscon";
-+		reg = <0 0x13000000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	mmsys: syscon at 14000000 {
-+		compatible = "mediatek,mt2712-mmsys", "syscon";
-+		reg = <0 0x14000000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	imgsys: syscon at 15000000 {
-+		compatible = "mediatek,mt2712-imgsys", "syscon";
-+		reg = <0 0x15000000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	bdpsys: syscon at 15010000 {
-+		compatible = "mediatek,mt2712-bdpsys", "syscon";
-+		reg = <0 0x15010000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	vdecsys: syscon at 16000000 {
-+		compatible = "mediatek,mt2712-vdecsys", "syscon";
-+		reg = <0 0x16000000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	vencsys: syscon at 18000000 {
-+		compatible = "mediatek,mt2712-vencsys", "syscon";
-+		reg = <0 0x18000000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	jpgdecsys: syscon at 19000000 {
-+		compatible = "mediatek,mt2712-jpgdecsys", "syscon";
-+		reg = <0 0x19000000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
+ 	expired = jiffies + HZ;
+ 
+diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+index e1ce8b1..ba552de 100644
+--- a/drivers/soc/mediatek/mtk-scpsys.c
++++ b/drivers/soc/mediatek/mtk-scpsys.c
+@@ -134,6 +134,7 @@ struct scp {
+ 	void __iomem *base;
+ 	struct regmap *infracfg;
+ 	struct scp_ctrl_reg ctrl_reg;
++	bool bus_prot_reg_update;
  };
  
+ struct scp_subdomain {
+@@ -147,6 +148,7 @@ struct scp_soc_data {
+ 	const struct scp_subdomain *subdomains;
+ 	int num_subdomains;
+ 	const struct scp_ctrl_reg regs;
++	bool bus_prot_reg_update;
+ };
+ 
+ static int scpsys_domain_is_on(struct scp_domain *scpd)
+@@ -254,7 +256,8 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
+ 
+ 	if (scpd->data->bus_prot_mask) {
+ 		ret = mtk_infracfg_clear_bus_protection(scp->infracfg,
+-				scpd->data->bus_prot_mask);
++				scpd->data->bus_prot_mask,
++				scp->bus_prot_reg_update);
+ 		if (ret)
+ 			goto err_pwr_ack;
+ 	}
+@@ -289,7 +292,8 @@ static int scpsys_power_off(struct generic_pm_domain *genpd)
+ 
+ 	if (scpd->data->bus_prot_mask) {
+ 		ret = mtk_infracfg_set_bus_protection(scp->infracfg,
+-				scpd->data->bus_prot_mask);
++				scpd->data->bus_prot_mask,
++				scp->bus_prot_reg_update);
+ 		if (ret)
+ 			goto out;
+ 	}
+@@ -382,7 +386,8 @@ static void init_clks(struct platform_device *pdev, struct clk **clk)
+ 
+ static struct scp *init_scp(struct platform_device *pdev,
+ 			const struct scp_domain_data *scp_domain_data, int num,
+-			const struct scp_ctrl_reg *scp_ctrl_reg)
++			const struct scp_ctrl_reg *scp_ctrl_reg,
++			bool bus_prot_reg_update)
+ {
+ 	struct genpd_onecell_data *pd_data;
+ 	struct resource *res;
+@@ -397,6 +402,8 @@ static struct scp *init_scp(struct platform_device *pdev,
+ 	scp->ctrl_reg.pwr_sta_offs = scp_ctrl_reg->pwr_sta_offs;
+ 	scp->ctrl_reg.pwr_sta2nd_offs = scp_ctrl_reg->pwr_sta2nd_offs;
+ 
++	scp->bus_prot_reg_update = bus_prot_reg_update;
++
+ 	scp->dev = &pdev->dev;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+@@ -816,7 +823,8 @@ static void mtk_register_power_domains(struct platform_device *pdev,
+ 	.regs = {
+ 		.pwr_sta_offs = SPM_PWR_STATUS,
+ 		.pwr_sta2nd_offs = SPM_PWR_STATUS_2ND
+-	}
++	},
++	.bus_prot_reg_update = true,
+ };
+ 
+ static const struct scp_soc_data mt6797_data = {
+@@ -827,7 +835,8 @@ static void mtk_register_power_domains(struct platform_device *pdev,
+ 	.regs = {
+ 		.pwr_sta_offs = SPM_PWR_STATUS_MT6797,
+ 		.pwr_sta2nd_offs = SPM_PWR_STATUS_2ND_MT6797
+-	}
++	},
++	.bus_prot_reg_update = true,
+ };
+ 
+ static const struct scp_soc_data mt7622_data = {
+@@ -836,7 +845,8 @@ static void mtk_register_power_domains(struct platform_device *pdev,
+ 	.regs = {
+ 		.pwr_sta_offs = SPM_PWR_STATUS,
+ 		.pwr_sta2nd_offs = SPM_PWR_STATUS_2ND
+-	}
++	},
++	.bus_prot_reg_update = true,
+ };
+ 
+ static const struct scp_soc_data mt8173_data = {
+@@ -847,7 +857,8 @@ static void mtk_register_power_domains(struct platform_device *pdev,
+ 	.regs = {
+ 		.pwr_sta_offs = SPM_PWR_STATUS,
+ 		.pwr_sta2nd_offs = SPM_PWR_STATUS_2ND
+-	}
++	},
++	.bus_prot_reg_update = true,
+ };
+ 
+ /*
+@@ -884,7 +895,8 @@ static int scpsys_probe(struct platform_device *pdev)
+ 	match = of_match_device(of_scpsys_match_tbl, &pdev->dev);
+ 	soc = (const struct scp_soc_data *)match->data;
+ 
+-	scp = init_scp(pdev, soc->domains, soc->num_domains, &soc->regs);
++	scp = init_scp(pdev, soc->domains, soc->num_domains, &soc->regs,
++			soc->bus_prot_reg_update);
+ 	if (IS_ERR(scp))
+ 		return PTR_ERR(scp);
+ 
+diff --git a/include/linux/soc/mediatek/infracfg.h b/include/linux/soc/mediatek/infracfg.h
+index a0182ec..67baca2 100644
+--- a/include/linux/soc/mediatek/infracfg.h
++++ b/include/linux/soc/mediatek/infracfg.h
+@@ -27,7 +27,8 @@
+ #define MT7622_TOP_AXI_PROT_EN_WB		(BIT(2) | BIT(6) | \
+ 						 BIT(7) | BIT(8))
+ 
+-int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask);
+-int mtk_infracfg_clear_bus_protection(struct regmap *infracfg, u32 mask);
+-
++int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask,
++		bool reg_update);
++int mtk_infracfg_clear_bus_protection(struct regmap *infracfg, u32 mask,
++		bool reg_update);
+ #endif /* __SOC_MEDIATEK_INFRACFG_H */
 -- 
 1.9.1
