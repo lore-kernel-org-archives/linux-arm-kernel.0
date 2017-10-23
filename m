@@ -1,50 +1,47 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Mon, 23 Oct 2017 11:48:57 +0800
-Subject: [PATCH v2] ARM: Remove .pad section when CONFIG_EFI_STUB enabled
-Message-ID: <20171023034857.19435-1-jeffy.chen@rock-chips.com>
+From: weiyi.lu@mediatek.com (Weiyi Lu)
+Date: Mon, 23 Oct 2017 12:10:38 +0800
+Subject: [PATCH v6 7/9] soc: mediatek: add dependent clock jpgdec/audio for
+ scpsys
+In-Reply-To: <1508731840-4231-1-git-send-email-weiyi.lu@mediatek.com>
+References: <1508731840-4231-1-git-send-email-weiyi.lu@mediatek.com>
+Message-ID: <1508731840-4231-8-git-send-email-weiyi.lu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we are using the .pad section to ensure the zImage file size
-aligned to 8 bytes.
+There are dependent clock jpgdec/audio in scpsys on MT2712,
+and will exist three dependent clocks on MT2712 VDEC.
 
-But that is not needed when CONFIG_EFI_STUB enabled, as it would
-followed by a 512 bytes aligned .data section.
-
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
 ---
+ drivers/soc/mediatek/mtk-scpsys.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-Changes in v2:
-Remove .pad section when CONFIG_EFI_STUB enabled as Russell King <linux@armlinux.org.uk> suggested.
-
- arch/arm/boot/compressed/vmlinux.lds.S | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/boot/compressed/vmlinux.lds.S b/arch/arm/boot/compressed/vmlinux.lds.S
-index b38dcef90756..394b2bf5d28a 100644
---- a/arch/arm/boot/compressed/vmlinux.lds.S
-+++ b/arch/arm/boot/compressed/vmlinux.lds.S
-@@ -70,10 +70,6 @@ SECTIONS
-   .got			: { *(.got) }
-   _got_end = .;
+diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+index ba552de..7e7e4ec 100644
+--- a/drivers/soc/mediatek/mtk-scpsys.c
++++ b/drivers/soc/mediatek/mtk-scpsys.c
+@@ -84,6 +84,8 @@ enum clk_id {
+ 	CLK_ETHIF,
+ 	CLK_VDEC,
+ 	CLK_HIFSEL,
++	CLK_JPGDEC,
++	CLK_AUDIO,
+ 	CLK_MAX,
+ };
  
--  /* ensure the zImage file size is always a multiple of 64 bits */
--  /* (without a dummy byte, ld just ignores the empty section) */
--  .pad			: { BYTE(0); . = ALIGN(8); }
--
- #ifdef CONFIG_EFI_STUB
-   .data : ALIGN(4096) {
-     __pecoff_data_start = .;
-@@ -91,6 +87,10 @@ SECTIONS
-     . = ALIGN(512);
-   }
-   __pecoff_data_rawsize = . - ADDR(.data);
-+#else
-+  /* ensure the zImage file size is always a multiple of 64 bits */
-+  /* (without a dummy byte, ld just ignores the empty section) */
-+  .pad			: { BYTE(0); . = ALIGN(8); }
- #endif
+@@ -96,10 +98,12 @@ enum clk_id {
+ 	"ethif",
+ 	"vdec",
+ 	"hif_sel",
++	"jpgdec",
++	"audio",
+ 	NULL,
+ };
  
-   _edata = .;
+-#define MAX_CLKS	2
++#define MAX_CLKS	3
+ 
+ struct scp_domain_data {
+ 	const char *name;
 -- 
-2.11.0
+1.9.1
