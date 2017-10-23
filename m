@@ -1,68 +1,75 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 23 Oct 2017 23:29:54 +0100
-Subject: [PATCH] ARM: compressed: discard ksym/kcrctab input section
-In-Reply-To: <c633c2ad-0344-385f-273a-a2eb9a39d7e3@gmail.com>
-References: <20170908153143.27279-1-ard.biesheuvel@linaro.org>
- <33486b3e-8221-92b0-7e18-859be7d0a74b@suse.com>
- <CAKv+Gu-8PEPuWH=bT_wD0MYDw67RY3gQudW2mLO-QeBYqQesyw@mail.gmail.com>
- <c633c2ad-0344-385f-273a-a2eb9a39d7e3@gmail.com>
-Message-ID: <20171023222954.GY20805@n2100.armlinux.org.uk>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 23 Oct 2017 17:32:09 -0500
+Subject: [PATCH] phy: add inno-usb2-phy driver for hi3798cv200 SoC
+In-Reply-To: <1508078958-16966-1-git-send-email-shawnguo@kernel.org>
+References: <1508078958-16966-1-git-send-email-shawnguo@kernel.org>
+Message-ID: <20171023223209.snq2xw3thjjwybmh@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 23, 2017 at 11:32:11PM +0200, Matthias Brugger wrote:
-> For the record, gcc7 has a alignment problem which was fixed for PR82445 [1].
+On Sun, Oct 15, 2017 at 10:49:18PM +0800, Shawn Guo wrote:
+> From: Pengcheng Li <lpc.li@hisilicon.com>
 > 
-> I tried to boot with the aforementioned patch from Arnd and the fixed
-> gcc, but that didn't help.
+> It adds inno-usb2-phy driver for hi3798cv200 SoC USB 2.0 support.  One
+> inno-usb2-phy device can support up to two PHY ports.  While there is
+> device level reference clock and power reset to be controlled, each PHY
+> port has its own utmi reset that needs to assert/de-assert as needed.
+> 
+> Hi3798cv200 needs to access PHY port0 register via particular peripheral
+> syscon controller register to control PHY, like turning on PHY clock.
+> 
+> Signed-off-by: Pengcheng Li <lpc.li@hisilicon.com>
+> Signed-off-by: Jiancheng Xue <xuejiancheng@hisilicon.com>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  .../devicetree/bindings/phy/phy-hisi-inno-usb2.txt |  31 +++
+>  drivers/phy/hisilicon/Kconfig                      |  10 +
+>  drivers/phy/hisilicon/Makefile                     |   1 +
+>  drivers/phy/hisilicon/phy-hisi-inno-usb2.c         | 223 +++++++++++++++++++++
+>  4 files changed, 265 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/phy/phy-hisi-inno-usb2.txt
+>  create mode 100644 drivers/phy/hisilicon/phy-hisi-inno-usb2.c
+> 
+> diff --git a/Documentation/devicetree/bindings/phy/phy-hisi-inno-usb2.txt b/Documentation/devicetree/bindings/phy/phy-hisi-inno-usb2.txt
+> new file mode 100644
+> index 000000000000..4ef7af24a703
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/phy/phy-hisi-inno-usb2.txt
+> @@ -0,0 +1,31 @@
+> +HiSilicon INNO USB2 PHY
+> +
+> +Required properties:
+> +- compatible: Should be one of the following strings:
+> +	"hisilicon,inno-usb2-phy",
+> +	"hisilicon,hi3798cv200-usb2-phy".
+> +- #phy-cells: Should be 1. The specifier is the index of the PHY port to
+> +  reference.
+> +- hisilicon,peripheral-syscon: The phandle of syscon used to control PHY,
+> +  followed by a integer cell which defines the syscon register offset used
+> +  to talk to PHY.
 
-That's because we have two entirely separate problems here, both leading
-to the same "it doesn't boot" outcome.
+Same comments as combophy.
 
-1. We have additional bytes in the zImage file after _edata, which
-   means that appending a dtb using the usual "cat" method doesn't
-   work.  We look for the appended dtb at _edata.
+> +- clocks: The phandle and clock specifier pair for reference clock utmi_refclk.
 
-2. Misaligned loads in the decompressor causing faults.
+'clk' part of the name is redundant.
 
-While removing "sort" and the ksymtab sections appears to fix the
-problem, it does so by removing the troublesome sections.  However,
-what it's actually highlighting is that we have more fundamental
-issues here.
-
-Additional sections that are not mentioned in the linker script
-will be passed through by the linker to the output file, and can
-result in exactly the same issue.  So, a patch that discards the
-current sections doesn't really fix the issue, it papers it over.
-I also feel that removing the "sort" code from the EFI stub also
-papers over the problem.  Both of those remove the /current/ cause
-of a more fundamental problem without addressing that fundamental
-problem.
-
-I'm not saying we shouldn't discard the sections, I'm saying we
-need to do more to detect the fundamental problem, rather than
-hiding it.
-
-That fundamental problem is that we allow the build to succeed
-when the results of the build are obviously incorrect.  I've
-proposed a patch that causes the copy of vmlinux to zImage to
-fail if the zImage size does not match the expected size of the
-binary image.
-
-We should also eliminate the reason for (2), which is what Arnds
-patch addresses.
-
-So, in total, I think we need three patches:
-
-1. Arnds patch to fix the alignment issues.
-2. My patch to detect wrong zImage size.
-3. A patch to discard troublesome sections.
-
-Optionally, removal of the sort code from the EFI stub is an
-orthogonal issue - the sort code is merely the vehicle by which
-the real problems have been found.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+> +- resets: The list of phandle and reset specifier pairs for each reset signal
+> +  in reset-names.
+> +- reset-names: Should contain "power_on", "utmi0" and "utmi1". The "utmi1"
+> +  should exist only if the device has two PHY port.
+> +
+> +Refer to phy/phy-bindings.txt for the generic PHY binding properties
+> +
+> +Example:
+> +
+> +	usb2_phy1: usb2-phy1 {
+> +		compatible = "hisilicon,hi3798cv200-usb2-phy";
+> +		#phy-cells = <1>;
+> +		hisilicon,peripheral-syscon = <&peri_ctrl 0x120>;
+> +		clocks = <&crg HISTB_USB2_PHY1_REF_CLK>;
+> +		resets = <&crg 0xbc 4>,
+> +			 <&crg 0xbc 8>,
+> +			 <&crg 0xbc 9>;
+> +		reset-names = "power_on", "utmi0", "utmi1";
+> +	};
