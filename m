@@ -1,39 +1,30 @@
-From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Mon, 23 Oct 2017 14:36:26 +0200
-Subject: [PATCH] ARM: dts: imx28-tx28: fix interrupt flags
-Message-ID: <1508762186-17522-1-git-send-email-LW@KARO-electronics.de>
+From: tudor.ambarus@microchip.com (Tudor Ambarus)
+Date: Mon, 23 Oct 2017 15:38:59 +0300
+Subject: Kernel panic when using ccm(aes) with the Atmel AES HW accelerator
+In-Reply-To: <CAGkQfmP6Kq4DEBbGU7AW71PjbUJ2acdJF5PVDm6VqZkUaaoEzA@mail.gmail.com>
+References: <CAGkQfmP6Kq4DEBbGU7AW71PjbUJ2acdJF5PVDm6VqZkUaaoEzA@mail.gmail.com>
+Message-ID: <39a43561-e0e6-a3b7-e2c0-bd7e6bf1be47@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some interrupts properties are given '0' as the flags argument.
-Change them to use the appropriate interrupt flags.
+Hi, Romain,
 
-Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
----
- arch/arm/boot/dts/imx28-tx28.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+On 10/18/2017 04:32 PM, Romain Izard wrote:
+> my fix also led to a
+> systematic oops when running the ccm(aes) test case.
 
-diff --git a/arch/arm/boot/dts/imx28-tx28.dts b/arch/arm/boot/dts/imx28-tx28.dts
-index 211e67d..52d99b4 100644
---- a/arch/arm/boot/dts/imx28-tx28.dts
-+++ b/arch/arm/boot/dts/imx28-tx28.dts
-@@ -329,7 +329,7 @@
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&tx28_pca9554_pins>;
- 		interrupt-parent = <&gpio3>;
--		interrupts = <28 0>;
-+		interrupts = <28 IRQ_TYPE_NONE>;
- 		gpio-controller;
- 		#gpio-cells = <2>;
- 		interrupt-controller;
-@@ -353,7 +353,7 @@
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&tx28_tsc2007_pins>;
- 		interrupt-parent = <&gpio3>;
--		interrupts = <20 0>;
-+		interrupts = <20 IRQ_TYPE_EDGE_FALLING>;
- 		pendown-gpio = <&gpio3 20 GPIO_ACTIVE_LOW>;
- 		ti,x-plate-ohms = /bits/ 16 <660>;
- 	};
--- 
-2.1.4
+The NULL deference appears because of a memory corruption issue.
+
+atmel-aes does not implement ccm(aes), so the algorithm will be in the
+following form: ccm_base(atmel-ctr-aes,cbcmac(aes-generic)).
+
+ccm auth uses the first byte of the IV as length and eventually will
+memset memory to zero based on that length (see set_msg_len()). CTR
+overwrites the iv with the last ciphertext block and the length will be
+wrong.
+
+I will propose a fix, but I'm taking my time to better understand why
+CTR requires to overwrite the iv with the last ciphertext block.
+
+Cheers,
+ta
