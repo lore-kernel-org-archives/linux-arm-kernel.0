@@ -1,60 +1,103 @@
-From: Bart.VanAssche@wdc.com (Bart Van Assche)
-Date: Mon, 23 Oct 2017 21:08:36 +0000
-Subject: [bug report] regression bisected to "block: Make most
- scsi_req_init() calls implicit"
-In-Reply-To: <20171023154129.iik3ic36i5fi7sqs@xps13.dannf>
-References: <20171020225420.utvoqmtwit2isalc@xps13.dannf>
- <1508542254.3029.24.camel@wdc.com>
- <20171023154129.iik3ic36i5fi7sqs@xps13.dannf>
-Message-ID: <1508792914.2634.6.camel@wdc.com>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Mon, 23 Oct 2017 23:12:39 +0200
+Subject: [PATCH v5] atmel_flexcom: Support backup mode
+In-Reply-To: <CAGkQfmMK_a5+zyyoHZsnfvNuxmNLeM0t40MrbPMMwKcNXDZTFA@mail.gmail.com>
+References: <20171019164443.487-1-romain.izard.pro@gmail.com>
+ <20171023160600.kcjy4ejdllllu62y@dell> <20171023160726.ufs37iyuicirwk4f@dell>
+ <CAGkQfmMK_a5+zyyoHZsnfvNuxmNLeM0t40MrbPMMwKcNXDZTFA@mail.gmail.com>
+Message-ID: <eb14f0e6-b3c5-dbd2-ccc9-066045896a55@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-10-23 at 09:41 -0600, dann frazier wrote:
-> (gdb) list *(sg_io+0x120)
-> 0xffff0000084e71a8 is in sg_io (./include/linux/uaccess.h:113).
-> 108	static inline unsigned long
-> 109	_copy_from_user(void *to, const void __user *from, unsigned long n)
-> 110	{
-> 111		unsigned long res = n;
-> 112		might_fault();
-> 113		if (likely(access_ok(VERIFY_READ, from, n))) {
-> 114			kasan_check_write(to, n);
-> 115			res = raw_copy_from_user(to, from, n);
-> 116		}
-> 117		if (unlikely(res))
+On 23/10/2017 at 19:03, Romain Izard wrote:
+> 2017-10-23 18:07 GMT+02:00 Lee Jones <lee.jones@linaro.org>:
+>> On Mon, 23 Oct 2017, Lee Jones wrote:
+>>> On Thu, 19 Oct 2017, Romain Izard wrote:
+>>>
+>>>> The controller used by a flexcom module is configured at boot, and left
+>>>> alone after this. As the configuration will be lost after backup mode,
+>>>> restore the state of the flexcom driver on resume.
+>>>>
+>>>> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+>>>> Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+>>>> Tested-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+>>>> ---
+>>>> Changes in v5:
+>>>> * extract from the patch series, and send as a standalone patch
+>>>>
+>>>>  drivers/mfd/atmel-flexcom.c | 65 ++++++++++++++++++++++++++++++++++-----------
+>>>>  1 file changed, 50 insertions(+), 15 deletions(-)
+>>>>
+>>>> diff --git a/drivers/mfd/atmel-flexcom.c b/drivers/mfd/atmel-flexcom.c
+>>>> index 064bde9cff5a..ef1235c4a179 100644
+>>>> --- a/drivers/mfd/atmel-flexcom.c
+>>>> +++ b/drivers/mfd/atmel-flexcom.c
+>>>> @@ -39,34 +39,44 @@
+>>>>  #define FLEX_MR_OPMODE(opmode)     (((opmode) << FLEX_MR_OPMODE_OFFSET) &  \
+>>>>                              FLEX_MR_OPMODE_MASK)
+>>>>
+>>>> +struct atmel_flexcom {
+>>>> +   void __iomem *base;
+>>>> +   u32 opmode;
+>>>> +   struct clk *clk;
+>>>> +};
+>>>>
+>>>>  static int atmel_flexcom_probe(struct platform_device *pdev)
+>>>>  {
+>>>>     struct device_node *np = pdev->dev.of_node;
+>>>> -   struct clk *clk;
+>>>>     struct resource *res;
+>>>> -   void __iomem *base;
+>>>> -   u32 opmode;
+>>>> +   struct atmel_flexcom *afc;
+>>>
+>>> Nit: I'd prefer if you call this 'ddata'.
+>>>
+>>> But the concept and implementation is fine, so if you're going to
+>>> change it please do so and apply my:
+>>>
+>>> Acked-by: Lee Jones <lee.jones@linaro.org>
+>>
+>> Also, 'back-up mode' isn't really a thing is it?
+>>
+>> How about "Reinstall state on resume" or similar?
+>>
+> 
+> The expression comes from the SAMA5D2's datasheet.
+> 
+> Other Atmel chips use a different single suspend mode with Linux, where
+> the SoC remains completely powered with a slow clock. The registers are
+> preserved in this mode, so there is no need for a specific suspend and
+> resume code.
+> 
+> The SoC can also be powered down, but the CPU is reset and only a small
+> part is powered with a backup battery to maintain a valid RTC and a
+> small internal SRAM.
+> 
+> In the SAMA5D2, the mode with only the backup power supply has been
+> extended to isolate the memory I/O lines, making it possible to keep the
+> external SDRAM memory in self-refresh. This mode has a lower consumption
+> compared to the slow clock mode, but it has a higher wakeup latency, and
+> needs specific software support in the bootloader and the kernel.
+> 
+> As a result, the "backup mode" expression is used to contrast with the
+> "slow clock" expression when describing the different suspend modes
+> supported by the chip.
 
-Hello Dann,
+aka: Ultra Low Power modes (ULP0 and ULP1).
 
-Would it be possible to check whether the patch below is sufficient to fix this?
+> But if you think that it is necessary, I can reword the commit.
 
-Thanks,
+Thanks for the whole explanation Romain.
 
-Bart.
+Yes we have such a wording in our documents and we used some kind of
+"Backup mode", "Backup+Self-Refresh (B+SR or B+S-R)", "Backup and DDR in
+Self-refresh" or "suspend-to-mem" wording for our patches. I take
+advantage of this discussion to list all them here, for the record ;-)
 
+So, I have the feeling that together with the commit message itself, we
+can go with this wording.
 
-diff --git a/drivers/block/virtio_blk.c b/drivers/block/virtio_blk.c
-index 34e17ee799be..15e11a519801 100644
---- a/drivers/block/virtio_blk.c
-+++ b/drivers/block/virtio_blk.c
-@@ -597,6 +597,7 @@ static const struct blk_mq_ops virtio_mq_ops = {
- 	.queue_rq	= virtio_queue_rq,
- 	.complete	= virtblk_request_done,
- 	.init_request	= virtblk_init_request,
-+	.initialize_rq_fn = scsi_initialize_rq,
- 	.map_queues	= virtblk_map_queues,
- };
- 
-diff --git a/drivers/scsi/sg.c b/drivers/scsi/sg.c
-index 0419c2298eab..14096f67eebb 100644
---- a/drivers/scsi/sg.c
-+++ b/drivers/scsi/sg.c
-@@ -1722,6 +1722,8 @@ sg_start_req(Sg_request *srp, unsigned char *cmd)
- 	}
- 	req = scsi_req(rq);
- 
-+	WARN_ON_ONCE(!req->cmd);
-+
- 	if (hp->cmd_len > BLK_MAX_CDB)
- 		req->cmd = long_cmdp;
- 	memcpy(req->cmd, cmd, hp->cmd_len);
+Best regards,
+-- 
+Nicolas Ferre
