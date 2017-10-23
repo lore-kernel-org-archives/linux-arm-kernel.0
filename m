@@ -1,39 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 23 Oct 2017 10:03:49 +0100
-Subject: [PATCH 0/4] arm64: Changes to register and stack dumps
-In-Reply-To: <f3e4cf91-6965-84e9-0e3a-39a1c24ab1ae@redhat.com>
-References: <1508428534-20694-1-git-send-email-will.deacon@arm.com>
- <f3e4cf91-6965-84e9-0e3a-39a1c24ab1ae@redhat.com>
-Message-ID: <20171023090348.GA29937@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 23 Oct 2017 10:03:28 +0100
+Subject: [PATCH] efi/libstub: arm: don't randomize runtime regions when
+ CONFIG_HIBERNATION=y
+Message-ID: <20171023090328.6701-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 20, 2017 at 03:53:50PM -0700, Laura Abbott wrote:
-> On 10/19/2017 08:55 AM, Will Deacon wrote:
-> > This handful of patches makes some significant changes to how we print
-> > register/stack dumps and brings us inline with recent changes to x86.
-> > The main changes are that we no longer print out the 'Exception stack:'
-> > section and PC/LR values are resolved to a symbol+offset format where
-> > possible.
-> > 
-> > Feedback welcome.
-> > 
-> 
-> In very petty complaints, I can no longer just use the PC/LR with
-> addr2line. Yes I can use gdb or one of the scripts but that's a
-> few more steps when I'm doing debugging on my own. Like I said,
-> very minor and overall this is good for both security and alignment.
+Commit
 
-Understood. scripts/faddr2line seems to do a reasonable job, but I agree
-that it's a little annoying that you have to do some pointer arithmetic
-if you want to e.g. locate disassembly in objdump. Setting KALLSYMS=n will
-give you the addresses if you *really* want them.
+  e69176d68d26 ef/libstub/arm/arm64: Randomize the base of the UEFI rt services region
 
-> I ran this through several of the LKDTM tests and the backtraces
-> looked fine. You're welcome to add
-> 
-> Tested-by: Laura Abbott <labbott@redhat.com>
+implemented randomization of the virtual mapping that the OS chooses for
+the UEFI runtime services. This was motivated by the fact that UEFI usually
+does not bother to specify any permission restrictions for those regions,
+making them prime real estate for exploitation now that the OS is getting
+more and more careful not to leave any R+W+X mapped regions lying around.
 
-Thanks, Laura.
+However, this randomization breaks assumptions in the resume from
+hibernation code, which expects all memory regions populated by UEFI to
+remain in the same place, including their virtual mapping into the OS
+memory space. While this assumption may not be entirely reasonable in the
+first place, breaking it deliberately does not make a lot of sense either.
+So let's refrain from this randomization pass if CONFIG_HIBERNATION=y.
 
-Will
+Cc: James Morse <james.morse@arm.com>
+Cc: Matt Fleming <matt@codeblueprint.co.uk>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ drivers/firmware/efi/libstub/arm-stub.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
+index 3061e4057483..01a9d78ee415 100644
+--- a/drivers/firmware/efi/libstub/arm-stub.c
++++ b/drivers/firmware/efi/libstub/arm-stub.c
+@@ -238,7 +238,8 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
+ 
+ 	efi_random_get_seed(sys_table);
+ 
+-	if (!nokaslr()) {
++	/* hibernation expects the runtime regions to stay in the same place */
++	if (!IS_ENABLED(CONFIG_HIBERNATION) && !nokaslr()) {
+ 		/*
+ 		 * Randomize the base of the UEFI runtime services region.
+ 		 * Preserve the 2 MB alignment of the region by taking a
+-- 
+2.11.0
