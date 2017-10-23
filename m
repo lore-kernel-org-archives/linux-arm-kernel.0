@@ -1,21 +1,18 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 23 Oct 2017 08:39:01 +0800
-Subject: [PATCH v3 1/6] ARM: dts: imx51-apf51dev: Fix 'backlight@bl1'
- node with unit name and no reg property
-In-Reply-To: <1508514507-30736-1-git-send-email-marco.franchi@nxp.com>
-References: <1508514507-30736-1-git-send-email-marco.franchi@nxp.com>
-Message-ID: <20171023003900.GD8700@dragon>
+Date: Mon, 23 Oct 2017 08:55:16 +0800
+Subject: [PATCH v4] ARM: dts: display5: Device tree description of LWN's
+ DISPLAY5 board
+In-Reply-To: <1508623555-29791-1-git-send-email-lukma@denx.de>
+References: <1508528680-29391-1-git-send-email-lukma@denx.de>
+ <1508623555-29791-1-git-send-email-lukma@denx.de>
+Message-ID: <20171023005515.GE8700@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 20, 2017 at 01:48:22PM -0200, Marco Franchi wrote:
-> The following build warning is seen with W=1:
+On Sun, Oct 22, 2017 at 12:05:55AM +0200, Lukasz Majewski wrote:
+> This commit adds device tree description of Liebherr's Display5 board.
 > 
-> Warning (unit_address_vs_reg): Node /backlight at bl1 has a unit name, but no reg property
-> 
-> Fix this warning by removing '@bl1'from such node and change 'bl1grp' to 
-> 'backlightgrp', once there is only one backlight in this dts.
-> 
-> Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
+> Signed-off-by: Lukasz Majewski <lukma@denx.de>
+> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-Applied #1 ~ #5, thanks.
+Applied, thanks.
