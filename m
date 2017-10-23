@@ -1,217 +1,184 @@
 From: weiyi.lu@mediatek.com (Weiyi Lu)
-Date: Mon, 23 Oct 2017 12:10:37 +0800
-Subject: [PATCH v6 6/9] soc: mediatek: extend bus protection API
+Date: Mon, 23 Oct 2017 12:10:39 +0800
+Subject: [PATCH v6 8/9] soc: mediatek: add MT2712 scpsys support
 In-Reply-To: <1508731840-4231-1-git-send-email-weiyi.lu@mediatek.com>
 References: <1508731840-4231-1-git-send-email-weiyi.lu@mediatek.com>
-Message-ID: <1508731840-4231-7-git-send-email-weiyi.lu@mediatek.com>
+Message-ID: <1508731840-4231-9-git-send-email-weiyi.lu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MT2712 add "set/clear" bus control register to each control register set
-instead of providing only one "enable" control register, we could avoid
-the read-modify-write racing by declaring "bus_prot_reg_update" as "false"
-in scp_soc_data or declaring as "true" to use the legacy update method.
-By improving the mtk-infracfg bus protection implementation to
-support set/clear bus protection control method by IC configuration.
+add scpsys driver for MT2712
 
 Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
 ---
- drivers/soc/mediatek/mtk-infracfg.c   | 26 ++++++++++++++++++++++----
- drivers/soc/mediatek/mtk-scpsys.c     | 28 ++++++++++++++++++++--------
- include/linux/soc/mediatek/infracfg.h |  7 ++++---
- 3 files changed, 46 insertions(+), 15 deletions(-)
+ drivers/soc/mediatek/mtk-scpsys.c | 106 +++++++++++++++++++++++++++++++++++---
+ 1 file changed, 100 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/soc/mediatek/mtk-infracfg.c b/drivers/soc/mediatek/mtk-infracfg.c
-index dba3055..8c310de 100644
---- a/drivers/soc/mediatek/mtk-infracfg.c
-+++ b/drivers/soc/mediatek/mtk-infracfg.c
-@@ -19,23 +19,33 @@
- 
- #define INFRA_TOPAXI_PROTECTEN		0x0220
- #define INFRA_TOPAXI_PROTECTSTA1	0x0228
-+#define INFRA_TOPAXI_PROTECTEN_SET	0x0260
-+#define INFRA_TOPAXI_PROTECTEN_CLR	0x0264
- 
- /**
-  * mtk_infracfg_set_bus_protection - enable bus protection
-  * @regmap: The infracfg regmap
-  * @mask: The mask containing the protection bits to be enabled.
-+ * @reg_update: The boolean flag determines to set the protection bits
-+ *              by regmap_update_bits with enable register(PROTECTEN) or
-+ *              by regmap_write with set register(PROTECTEN_SET).
-  *
-  * This function enables the bus protection bits for disabled power
-  * domains so that the system does not hang when some unit accesses the
-  * bus while in power down.
-  */
--int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask)
-+int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask,
-+		bool reg_update)
- {
- 	unsigned long expired;
- 	u32 val;
- 	int ret;
- 
--	regmap_update_bits(infracfg, INFRA_TOPAXI_PROTECTEN, mask, mask);
-+	if (reg_update)
-+		regmap_update_bits(infracfg, INFRA_TOPAXI_PROTECTEN, mask,
-+				mask);
-+	else
-+		regmap_write(infracfg, INFRA_TOPAXI_PROTECTEN_SET, mask);
- 
- 	expired = jiffies + HZ;
- 
-@@ -59,16 +69,24 @@ int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask)
-  * mtk_infracfg_clear_bus_protection - disable bus protection
-  * @regmap: The infracfg regmap
-  * @mask: The mask containing the protection bits to be disabled.
-+ * @reg_update: The boolean flag determines to clear the protection bits
-+ *              by regmap_update_bits with enable register(PROTECTEN) or
-+ *              by regmap_write with clear register(PROTECTEN_CLR).
-  *
-  * This function disables the bus protection bits previously enabled with
-  * mtk_infracfg_set_bus_protection.
-  */
--int mtk_infracfg_clear_bus_protection(struct regmap *infracfg, u32 mask)
-+
-+int mtk_infracfg_clear_bus_protection(struct regmap *infracfg, u32 mask,
-+		bool reg_update)
- {
- 	unsigned long expired;
- 	int ret;
- 
--	regmap_update_bits(infracfg, INFRA_TOPAXI_PROTECTEN, mask, 0);
-+	if (reg_update)
-+		regmap_update_bits(infracfg, INFRA_TOPAXI_PROTECTEN, mask, 0);
-+	else
-+		regmap_write(infracfg, INFRA_TOPAXI_PROTECTEN_CLR, mask);
- 
- 	expired = jiffies + HZ;
- 
 diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-index e1ce8b1..ba552de 100644
+index 7e7e4ec..2a0c3a7 100644
 --- a/drivers/soc/mediatek/mtk-scpsys.c
 +++ b/drivers/soc/mediatek/mtk-scpsys.c
-@@ -134,6 +134,7 @@ struct scp {
- 	void __iomem *base;
- 	struct regmap *infracfg;
- 	struct scp_ctrl_reg ctrl_reg;
-+	bool bus_prot_reg_update;
- };
+@@ -21,6 +21,7 @@
+ #include <linux/soc/mediatek/infracfg.h>
  
- struct scp_subdomain {
-@@ -147,6 +148,7 @@ struct scp_soc_data {
- 	const struct scp_subdomain *subdomains;
- 	int num_subdomains;
- 	const struct scp_ctrl_reg regs;
-+	bool bus_prot_reg_update;
- };
+ #include <dt-bindings/power/mt2701-power.h>
++#include <dt-bindings/power/mt2712-power.h>
+ #include <dt-bindings/power/mt6797-power.h>
+ #include <dt-bindings/power/mt7622-power.h>
+ #include <dt-bindings/power/mt8173-power.h>
+@@ -32,7 +33,7 @@
+ #define SPM_DIS_PWR_CON			0x023c
+ #define SPM_CONN_PWR_CON		0x0280
+ #define SPM_VEN2_PWR_CON		0x0298
+-#define SPM_AUDIO_PWR_CON		0x029c	/* MT8173 */
++#define SPM_AUDIO_PWR_CON		0x029c	/* MT8173, MT2712 */
+ #define SPM_BDP_PWR_CON			0x029c	/* MT2701 */
+ #define SPM_ETH_PWR_CON			0x02a0
+ #define SPM_HIF_PWR_CON			0x02a4
+@@ -40,12 +41,12 @@
+ #define SPM_MFG_2D_PWR_CON		0x02c0
+ #define SPM_MFG_ASYNC_PWR_CON		0x02c4
+ #define SPM_USB_PWR_CON			0x02cc
++#define SPM_USB2_PWR_CON		0x02d4	/* MT2712 */
+ #define SPM_ETHSYS_PWR_CON		0x02e0	/* MT7622 */
+ #define SPM_HIF0_PWR_CON		0x02e4	/* MT7622 */
+ #define SPM_HIF1_PWR_CON		0x02e8	/* MT7622 */
+ #define SPM_WB_PWR_CON			0x02ec	/* MT7622 */
  
- static int scpsys_domain_is_on(struct scp_domain *scpd)
-@@ -254,7 +256,8 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
+-
+ #define SPM_PWR_STATUS			0x060c
+ #define SPM_PWR_STATUS_2ND		0x0610
  
- 	if (scpd->data->bus_prot_mask) {
- 		ret = mtk_infracfg_clear_bus_protection(scp->infracfg,
--				scpd->data->bus_prot_mask);
-+				scpd->data->bus_prot_mask,
-+				scp->bus_prot_reg_update);
- 		if (ret)
- 			goto err_pwr_ack;
- 	}
-@@ -289,7 +292,8 @@ static int scpsys_power_off(struct generic_pm_domain *genpd)
- 
- 	if (scpd->data->bus_prot_mask) {
- 		ret = mtk_infracfg_set_bus_protection(scp->infracfg,
--				scpd->data->bus_prot_mask);
-+				scpd->data->bus_prot_mask,
-+				scp->bus_prot_reg_update);
- 		if (ret)
- 			goto out;
- 	}
-@@ -382,7 +386,8 @@ static void init_clks(struct platform_device *pdev, struct clk **clk)
- 
- static struct scp *init_scp(struct platform_device *pdev,
- 			const struct scp_domain_data *scp_domain_data, int num,
--			const struct scp_ctrl_reg *scp_ctrl_reg)
-+			const struct scp_ctrl_reg *scp_ctrl_reg,
-+			bool bus_prot_reg_update)
- {
- 	struct genpd_onecell_data *pd_data;
- 	struct resource *res;
-@@ -397,6 +402,8 @@ static struct scp *init_scp(struct platform_device *pdev,
- 	scp->ctrl_reg.pwr_sta_offs = scp_ctrl_reg->pwr_sta_offs;
- 	scp->ctrl_reg.pwr_sta2nd_offs = scp_ctrl_reg->pwr_sta2nd_offs;
- 
-+	scp->bus_prot_reg_update = bus_prot_reg_update;
-+
- 	scp->dev = &pdev->dev;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-@@ -816,7 +823,8 @@ static void mtk_register_power_domains(struct platform_device *pdev,
- 	.regs = {
- 		.pwr_sta_offs = SPM_PWR_STATUS,
- 		.pwr_sta2nd_offs = SPM_PWR_STATUS_2ND
--	}
-+	},
-+	.bus_prot_reg_update = true,
- };
- 
- static const struct scp_soc_data mt6797_data = {
-@@ -827,7 +835,8 @@ static void mtk_register_power_domains(struct platform_device *pdev,
- 	.regs = {
- 		.pwr_sta_offs = SPM_PWR_STATUS_MT6797,
- 		.pwr_sta2nd_offs = SPM_PWR_STATUS_2ND_MT6797
--	}
-+	},
-+	.bus_prot_reg_update = true,
- };
- 
- static const struct scp_soc_data mt7622_data = {
-@@ -836,7 +845,8 @@ static void mtk_register_power_domains(struct platform_device *pdev,
- 	.regs = {
- 		.pwr_sta_offs = SPM_PWR_STATUS,
- 		.pwr_sta2nd_offs = SPM_PWR_STATUS_2ND
--	}
-+	},
-+	.bus_prot_reg_update = true,
- };
- 
- static const struct scp_soc_data mt8173_data = {
-@@ -847,7 +857,8 @@ static void mtk_register_power_domains(struct platform_device *pdev,
- 	.regs = {
- 		.pwr_sta_offs = SPM_PWR_STATUS,
- 		.pwr_sta2nd_offs = SPM_PWR_STATUS_2ND
--	}
-+	},
-+	.bus_prot_reg_update = true,
+@@ -64,12 +65,13 @@
+ #define PWR_STATUS_ETH			BIT(15)
+ #define PWR_STATUS_HIF			BIT(16)
+ #define PWR_STATUS_IFR_MSC		BIT(17)
++#define PWR_STATUS_USB2			BIT(19)	/* MT2712 */
+ #define PWR_STATUS_VENC_LT		BIT(20)
+ #define PWR_STATUS_VENC			BIT(21)
+-#define PWR_STATUS_MFG_2D		BIT(22)
+-#define PWR_STATUS_MFG_ASYNC		BIT(23)
+-#define PWR_STATUS_AUDIO		BIT(24)
+-#define PWR_STATUS_USB			BIT(25)
++#define PWR_STATUS_MFG_2D		BIT(22)	/* MT8173 */
++#define PWR_STATUS_MFG_ASYNC		BIT(23)	/* MT8173 */
++#define PWR_STATUS_AUDIO		BIT(24)	/* MT8173, MT2712 */
++#define PWR_STATUS_USB			BIT(25)	/* MT8173, MT2712 */
+ #define PWR_STATUS_ETHSYS		BIT(24)	/* MT7622 */
+ #define PWR_STATUS_HIF0			BIT(25)	/* MT7622 */
+ #define PWR_STATUS_HIF1			BIT(26)	/* MT7622 */
+@@ -602,6 +604,85 @@ static void mtk_register_power_domains(struct platform_device *pdev,
  };
  
  /*
-@@ -884,7 +895,8 @@ static int scpsys_probe(struct platform_device *pdev)
- 	match = of_match_device(of_scpsys_match_tbl, &pdev->dev);
- 	soc = (const struct scp_soc_data *)match->data;
++ * MT2712 power domain support
++ */
++static const struct scp_domain_data scp_domain_data_mt2712[] = {
++	[MT2712_POWER_DOMAIN_MM] = {
++		.name = "mm",
++		.sta_mask = PWR_STATUS_DISP,
++		.ctl_offs = SPM_DIS_PWR_CON,
++		.sram_pdn_bits = GENMASK(8, 8),
++		.sram_pdn_ack_bits = GENMASK(12, 12),
++		.clk_id = {CLK_MM},
++		.active_wakeup = true,
++	},
++	[MT2712_POWER_DOMAIN_VDEC] = {
++		.name = "vdec",
++		.sta_mask = PWR_STATUS_VDEC,
++		.ctl_offs = SPM_VDE_PWR_CON,
++		.sram_pdn_bits = GENMASK(8, 8),
++		.sram_pdn_ack_bits = GENMASK(12, 12),
++		.clk_id = {CLK_MM, CLK_VDEC},
++		.active_wakeup = true,
++	},
++	[MT2712_POWER_DOMAIN_VENC] = {
++		.name = "venc",
++		.sta_mask = PWR_STATUS_VENC,
++		.ctl_offs = SPM_VEN_PWR_CON,
++		.sram_pdn_bits = GENMASK(11, 8),
++		.sram_pdn_ack_bits = GENMASK(15, 12),
++		.clk_id = {CLK_MM, CLK_VENC, CLK_JPGDEC},
++		.active_wakeup = true,
++	},
++	[MT2712_POWER_DOMAIN_ISP] = {
++		.name = "isp",
++		.sta_mask = PWR_STATUS_ISP,
++		.ctl_offs = SPM_ISP_PWR_CON,
++		.sram_pdn_bits = GENMASK(11, 8),
++		.sram_pdn_ack_bits = GENMASK(13, 12),
++		.clk_id = {CLK_MM},
++		.active_wakeup = true,
++	},
++	[MT2712_POWER_DOMAIN_AUDIO] = {
++		.name = "audio",
++		.sta_mask = PWR_STATUS_AUDIO,
++		.ctl_offs = SPM_AUDIO_PWR_CON,
++		.sram_pdn_bits = GENMASK(11, 8),
++		.sram_pdn_ack_bits = GENMASK(15, 12),
++		.clk_id = {CLK_AUDIO},
++		.active_wakeup = true,
++	},
++	[MT2712_POWER_DOMAIN_USB] = {
++		.name = "usb",
++		.sta_mask = PWR_STATUS_USB,
++		.ctl_offs = SPM_USB_PWR_CON,
++		.sram_pdn_bits = GENMASK(10, 8),
++		.sram_pdn_ack_bits = GENMASK(14, 12),
++		.clk_id = {CLK_NONE},
++		.active_wakeup = true,
++	},
++	[MT2712_POWER_DOMAIN_USB2] = {
++		.name = "usb2",
++		.sta_mask = PWR_STATUS_USB2,
++		.ctl_offs = SPM_USB2_PWR_CON,
++		.sram_pdn_bits = GENMASK(10, 8),
++		.sram_pdn_ack_bits = GENMASK(14, 12),
++		.clk_id = {CLK_NONE},
++		.active_wakeup = true,
++	},
++	[MT2712_POWER_DOMAIN_MFG] = {
++		.name = "mfg",
++		.sta_mask = PWR_STATUS_MFG,
++		.ctl_offs = SPM_MFG_PWR_CON,
++		.sram_pdn_bits = GENMASK(11, 8),
++		.sram_pdn_ack_bits = GENMASK(19, 16),
++		.clk_id = {CLK_MFG},
++		.bus_prot_mask = BIT(14) | BIT(21) | BIT(23),
++		.active_wakeup = true,
++	},
++};
++
++/*
+  * MT6797 power domain support
+  */
  
--	scp = init_scp(pdev, soc->domains, soc->num_domains, &soc->regs);
-+	scp = init_scp(pdev, soc->domains, soc->num_domains, &soc->regs,
-+			soc->bus_prot_reg_update);
- 	if (IS_ERR(scp))
- 		return PTR_ERR(scp);
+@@ -831,6 +912,16 @@ static void mtk_register_power_domains(struct platform_device *pdev,
+ 	.bus_prot_reg_update = true,
+ };
  
-diff --git a/include/linux/soc/mediatek/infracfg.h b/include/linux/soc/mediatek/infracfg.h
-index a0182ec..67baca2 100644
---- a/include/linux/soc/mediatek/infracfg.h
-+++ b/include/linux/soc/mediatek/infracfg.h
-@@ -27,7 +27,8 @@
- #define MT7622_TOP_AXI_PROT_EN_WB		(BIT(2) | BIT(6) | \
- 						 BIT(7) | BIT(8))
- 
--int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask);
--int mtk_infracfg_clear_bus_protection(struct regmap *infracfg, u32 mask);
--
-+int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask,
-+		bool reg_update);
-+int mtk_infracfg_clear_bus_protection(struct regmap *infracfg, u32 mask,
-+		bool reg_update);
- #endif /* __SOC_MEDIATEK_INFRACFG_H */
++static const struct scp_soc_data mt2712_data = {
++	.domains = scp_domain_data_mt2712,
++	.num_domains = ARRAY_SIZE(scp_domain_data_mt2712),
++	.regs = {
++		.pwr_sta_offs = SPM_PWR_STATUS,
++		.pwr_sta2nd_offs = SPM_PWR_STATUS_2ND
++	},
++	.bus_prot_reg_update = false,
++};
++
+ static const struct scp_soc_data mt6797_data = {
+ 	.domains = scp_domain_data_mt6797,
+ 	.num_domains = ARRAY_SIZE(scp_domain_data_mt6797),
+@@ -874,6 +965,9 @@ static void mtk_register_power_domains(struct platform_device *pdev,
+ 		.compatible = "mediatek,mt2701-scpsys",
+ 		.data = &mt2701_data,
+ 	}, {
++		.compatible = "mediatek,mt2712-scpsys",
++		.data = &mt2712_data,
++	}, {
+ 		.compatible = "mediatek,mt6797-scpsys",
+ 		.data = &mt6797_data,
+ 	}, {
 -- 
 1.9.1
