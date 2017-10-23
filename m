@@ -1,84 +1,56 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Mon, 23 Oct 2017 18:08:39 +0100
-Subject: [RFC PATCH] arm64/sve: ABI change: Zero SVE regs on syscall entry
-In-Reply-To: <1508758664-24186-2-git-send-email-Dave.Martin@arm.com>
-References: <1508758664-24186-1-git-send-email-Dave.Martin@arm.com>
- <1508758664-24186-2-git-send-email-Dave.Martin@arm.com>
-Message-ID: <87tvypiyg8.fsf@linaro.org>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Mon, 23 Oct 2017 18:09:21 +0100
+Subject: [PATCH v2 0/9] r8a7745/iwg22d DT rework + serial + HS-USB + IIC
+Message-ID: <1508778570-28795-1-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This series brings under the same roof a few patches that needed a v2
+and that are related to either r8a7745 or iwg22d, with the goal of making
+the merge process as smooth as possible.
 
-Dave Martin <Dave.Martin@arm.com> writes:
+Patches [1-4] define a new DT architecture for the iW-RainboW-G22D SODIMM
+Development Platform to include the configuration with the HDMI daughter
+board and to define the serial interfaces.
 
-> As currently documented, no guarantee is made about what a user
-> task sees in the SVE registers after a syscall, except that V0-V31
-> (corresponding to Z0-Z31 bits [127:0]) are preserved.
->
-> The actual kernel behaviour currently implemented is that the SVE
-> registers are zeroed if a context switch or signal delivery occurs
-> during a syscall.  After a fork() or clone(), the SVE registers
-> of the child task are zeroed also.  The SVE registers are otherwise
-> preserved.  Flexibility is retained in the ABI about the exact
-> criteria for the decision.
->
-> There are some potential problems with this approach.
->
-> Syscall impact
-> --------------
->
-> Will, Catalin and Mark have expressed concerns about the risk of
-> creating de facto ABI here: in scenarios or workloads where a
-> context switch never occurs or is very unlikely, userspace may
-> learn to rely on preservation of the SVE registers across certain
-> syscalls.
+Patches [5-8] add USB function support to the r8a7745 SoC and to the
+iwg22d board. The patches providing the definition of compatible strings:
+* "renesas,r8a7745-usb-dmac", and
+* "renesas,usbhs-r8a7745"
+(on which these USB patches depend on) have been accepted by the
+respective maintainers already, but it will take a little bit for the
+definitions to appear on a renesas-devel tag. For reference:
+https://patchwork.kernel.org/patch/9990063/
+https://patchwork.kernel.org/patch/9987411/
+https://patchwork.kernel.org/patch/9990113/
 
-I think this is a reasonable concern but are there any equivalent cases
-in the rest of the kernel? Is this new territory for Linux as these
-super large registers are introduced?
+Patch 9 adds IIC cores to the r8a7745 SoC.
 
-> It is difficult to assess the impact of this: the syscall ABI is
-> not a general-purpose interface, since it is usually hidden behind
-> libc wrappers: direct invocation of SVC is discouraged.  However,
-> specialised runtimes, statically linked programs and binary blobs
-> may bake in direct syscalls that make bad assumptions.
->
-> Conversely, the relative cost of zeroing the SVE regs to mitigate
-> against this also cannot be well characterised until SVE hardware
-> exists.
->
-> ptrace impact
-> -------------
->
-> The current implementation can discard and zero the SVE registers
-> at any point during a syscall, including before, after or between
-> ptrace traps inside a single syscall.  This means that setting the
-> SVE registers through PTRACE_SETREGSET will often not do what the
-> user expects: the new register values are only guaranteed to
-> survive as far as userspace if set from an asynchronous
-> signal-delivery-stop (e.g., breakpoint, SEGV or asynchronous signal
-> delivered outside syscall context).
->
-> This is consistent with the currently documented SVE user ABI, but
-> likely to be surprising for a debugger user, since setting most
-> registers of a tracee doesn't behave in this way.
->
-> This patch
-> ----------
->
-> The common syscall entry path is modified to forcibly discard SVE,
-> and the discard logic elsewhere is removed.
->
-> This means that there is a mandatory additional trap to the kernel
-> when a user task tries to use SVE again after a syscall.  This can
-> be expensive for programs that use SVE heavily around syscalls, but
-> can be optimised later.
+The patches of this series apply smoothly on top of tag:
+"renesas-devel-20171018-v4.14-rc5".
 
-Won't it impact every restart from syscall? It's a shame you have to
-trap when I suspect most first accesses after a syscall are likely to be
-either restoring the caller-saved values which assume the value is
-trashed anyway. Adding gettimeofday() or write(stdout) while debugging
-is going to kill performance.
+Best regards,
+Fab
 
---
-Alex Benn?e
+Biju Das (4):
+  ARM: dts: r8a7745: Add HS-USB device node
+  ARM: dts: r8a7745: Add USB-DMAC device nodes
+  ARM: dts: r8a7745: Enable DMA for HSUSB
+  ARM: dts: iwg22d-sodimm: Enable HS-USB
+
+Fabrizio Castro (5):
+  ARM: dts: iwg22d: Use /dev/ttySC3 as debug console
+  ARM: dts: iwg22d: Add /dev/ttySC5 support
+  ARM: dts: iwg22d-sodimm-dbhd-ca: Add device tree for HDMI DB
+  ARM: dts: iwg22d-sodimm: sort dt nodes
+  ARM: dts: r8a7745: Add IIC cores to dtsi
+
+ arch/arm/boot/dts/Makefile                         |  1 +
+ .../arm/boot/dts/r8a7745-iwg22d-sodimm-dbhd-ca.dts | 61 +++++++++++++++
+ arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts        | 87 ++++++++++++++--------
+ arch/arm/boot/dts/r8a7745.dtsi                     | 81 ++++++++++++++++++++
+ 4 files changed, 199 insertions(+), 31 deletions(-)
+ create mode 100644 arch/arm/boot/dts/r8a7745-iwg22d-sodimm-dbhd-ca.dts
+
+-- 
+2.7.4
