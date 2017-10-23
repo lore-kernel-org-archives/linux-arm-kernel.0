@@ -1,100 +1,40 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 23 Oct 2017 10:29:56 +0100
-Subject: [PATCH] ARM: compressed: discard ksym/kcrctab input section
-In-Reply-To: <2b3af288-51b1-561a-a1a9-f5f42f7ca1c4@gmail.com>
-References: <20170908153143.27279-1-ard.biesheuvel@linaro.org>
- <33486b3e-8221-92b0-7e18-859be7d0a74b@suse.com>
- <CAKv+Gu-8PEPuWH=bT_wD0MYDw67RY3gQudW2mLO-QeBYqQesyw@mail.gmail.com>
- <2b3af288-51b1-561a-a1a9-f5f42f7ca1c4@gmail.com>
-Message-ID: <20171023092956.GN20805@n2100.armlinux.org.uk>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 23 Oct 2017 10:33:03 +0100
+Subject: kdump: need help with kexec -p
+In-Reply-To: <HE1PR04MB12413AEF2BF54623027FD22A97460@HE1PR04MB1241.eurprd04.prod.outlook.com>
+References: <HE1PR04MB12416F54193B1A61BC0652ED974A0@HE1PR04MB1241.eurprd04.prod.outlook.com>
+ <59DF54B3.1050404@arm.com>
+ <HE1PR04MB124165F8510E983992B11EC797480@HE1PR04MB1241.eurprd04.prod.outlook.com>
+ <59E095E1.5090706@arm.com>
+ <HE1PR04MB12415392027297293D5FC07E97480@HE1PR04MB1241.eurprd04.prod.outlook.com>
+ <HE1PR04MB12413AEF2BF54623027FD22A97460@HE1PR04MB1241.eurprd04.prod.outlook.com>
+Message-ID: <59EDB74F.4070302@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 23, 2017 at 12:00:46AM +0200, Matthias Brugger wrote:
-> Hi Ard,
+Hi Prabhakar, Akashi,
+
+On 23/10/17 06:37, Prabhakar Kushwaha wrote:
+> After further analysis, it is figured out to be a data cache flush issue.   
 > 
-> On 10/21/2017 10:14 AM, Ard Biesheuvel wrote:
-> > On 21 October 2017 at 08:56, Matthias Brugger <mbrugger@suse.com> wrote:
-> >> On 09/08/2017 05:31 PM, Ard Biesheuvel wrote:
-> >>> As it turns out, building the ARM kernel with EFI support pulls in
-> >>> a couple of sections that we don't really need in the decompressor.
-> >>> This is due to the fact the the UEFI stub uses sort() to sort the UEFI
-> >>> memory map, which is an exported symbol pulled in from lib/sort.c.
-> >>>
-> >>> Before commit e4bae4d0b5f3 ("arm/efi: Split zImage code and data into
-> >>> separate PE/COFF sections"), this resulted in the following layout
-> >>> for the decompressor ELF binary.
-> >>>
-> >>>   [Nr] Name              Type     Addr     Off    Size   ES Flg Lk Inf Al
-> >>>   [ 0]                   NULL     00000000 000000 000000 00      0   0  0
-> >>>   [ 1] .text             PROGBITS 00000000 010000 009b3c 00  AX  0   0 512
-> >>>   [ 2] .rodata           PROGBITS 00009b3c 019b3c 001684 00   A  0   0  4
-> >>>   [ 3] __ksymtab_strings PROGBITS 0000b1c0 01b1c0 000005 00   A  0   0  1
-> >>>   [ 4] .data             PROGBITS 0000b1c8 01b1c8 000020 00  WA  0   0  8
-> >>>   [ 5] ___ksymtab+sort   PROGBITS 0000b1e8 01b1e8 000008 00  WA  0   0  4
-> >>>   [ 6] .piggydata        PROGBITS 0000b1f0 01b1f0 77ac38 00   A  0   0  1
-> >>>   [ 7] .got.plt          PROGBITS 00785e28 795e28 00000c 04  WA  0   0  4
-> >>>   [ 8] .got              PROGBITS 00785e34 795e34 000028 00  WA  0   0  4
-> >>>   [ 9] .pad              PROGBITS 00785e5c 795e5c 000004 00  WA  0   0  1
-> >>>   [10] .bss              NOBITS   00785e60 795e60 00001c 00  WA  0   0  4
-> >>>   [11] .stack            NOBITS   00785e80 795e60 001000 00  WA  0   0  1
-> >>>
-> >>> Commit e4bae4d0b5f3 made some changes to the linker script to allow the
-> >>> UEFI firmware to map the decompressor with strict R-X/RW- permissions
-> >>> before invoking it. Unfortunately, this turns out to break the boot on
-> >>> some systems, because the linker now also moves the ksymtab/kcrctab
-> >>> sections around, resulting in .piggydata to appear misaligned.
-> >>>
-> >>>   [Nr] Name              Type     Addr     Off    Size   ES Flg Lk Inf Al
-> >>>   [ 0]                   NULL     00000000 000000 000000 00      0   0  0
-> >>>   [ 1] .text             PROGBITS 00000000 010000 00a93c 00  AX  0   0 4096
-> >>>   [ 2] .rodata           PROGBITS 0000a93c 01a93c 001684 00   A  0   0  4
-> >>>   [ 3] __ksymtab_strings PROGBITS 0000bfc0 01bfc0 000005 00   A  0   0  1
-> >>>   [ 4] .piggydata        PROGBITS 0000bfc5 01bfc5 77ac47 00   A  0   0  1
-> >>>   [ 5] .got.plt          PROGBITS 00786c0c 796c0c 00000c 04  WA  0   0  4
-> >>>   [ 6] .got              PROGBITS 00786c18 796c18 000028 00  WA  0   0  4
-> >>>   [ 7] .pad              PROGBITS 00786c40 796c40 000008 00  WA  0   0  1
-> >>>   [ 8] .data             PROGBITS 00787000 797000 000200 00  WA  0   0 4096
-> >>>   [ 9] ___ksymtab+sort   PROGBITS 00787200 797200 000008 00  WA  0   0  4
-> >>>   [10] .bss              NOBITS   00787208 797208 00001c 00  WA  0   0  4
-> >>>   [11] .stack            NOBITS   00787228 797208 001000 00  WA  0   0  1
-> >>>
-> >>> So let's align piggydata explicitly, and discard these sections from the
-> >>> binary.
-> >>>
-> >>> Cc: Russell King <linux@armlinux.org.uk>
-> >>> Fixes: e4bae4d0b5f3 ("arm/efi: Split zImage code and data into separate ...")
-> >>> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> >>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >>> ---
-> >>>  arch/arm/boot/compressed/piggy.S       | 1 +
-> >>>  arch/arm/boot/compressed/vmlinux.lds.S | 1 +
-> >>>  2 files changed, 2 insertions(+)
-> >>>
-> >>
-> >> This fixes the boot regression on bananapi-r2.
-> >> Thanks! Feel free to add:
-> >>
-> >> Tested-by: Matthias Brugger <mbrugger@suse.com>
-> >>
-> > 
-> > Thanks for confirming Matthias. Could you please check whether this
-> > patch from Arnd
-> > 
-> > https://marc.info/?l=linux-kernel&m=150852980119217&w=2
-> > 
-> > fixes the issue as well? (after reverting this one)
-> > 
+> After trying below patch(suggested by Takahiro). This problem looks to be resolved for now. 
 > 
-> After only applying this patch on top of v4.14-rc5 I was not able to boot.
+> ===
+> commit 9b492cf58077
+> Author: Xunlei Pang <xlpang@redhat.com>
+> Date:   Mon May 23 16:24:10 2016 -0700
+> 
+>     kexec: introduce a protection mechanism for the crashkernel reserved memory
+> ===
 
-Which decompression method are you using?
+/me winces.
 
-What does objdump -h arch/arm/boot/vmlinux say?
+Yes, without the protection mechanism the code will still compile, and still
+work, but be missing the kexec_segment_flush() calls.
 
-Thanks.
+This is the problem with backporting stuff. Glad you got it fixed!
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+
+Thanks,
+
+James
