@@ -1,70 +1,313 @@
-From: leoyang.li@nxp.com (Leo Li)
-Date: Mon, 23 Oct 2017 16:26:36 +0000
-Subject: [GIT PULL] updates to soc/fsl drivers for v4.14
-In-Reply-To: <20171023011115.GF8700@dragon>
-References: <1506109046-11527-1-git-send-email-leoyang.li@nxp.com>
- <CAK8P3a3cyiOgFXAyADH==L=0P621ucp3Xy0F3kBezV5EW9WdDQ@mail.gmail.com>
- <AM4PR0401MB1699CA477F157A2C7618492D8F430@AM4PR0401MB1699.eurprd04.prod.outlook.com>
- <20171023011115.GF8700@dragon>
-Message-ID: <AM4PR0401MB1699A6593368BD9657F714A38F460@AM4PR0401MB1699.eurprd04.prod.outlook.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 24 Oct 2017 01:42:29 +0900
+Subject: [PATCH 2/2] arm64: dts: uniphier: add resets properties
+In-Reply-To: <1508776949-4995-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1508776949-4995-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1508776949-4995-2-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add resets properties to all nodes that have reset lines.
 
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: Sunday, October 22, 2017 8:11 PM
-> To: Leo Li <leoyang.li@nxp.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>; Madalin-cristian Bucur
-> <madalin.bucur@nxp.com>; Catalin Marinas <catalin.marinas@arm.com>; Roy
-> Pledge <roy.pledge@nxp.com>; arm-soc <arm@kernel.org>; Sascha Hauer
-> <kernel@pengutronix.de>; Fabio Estevam <fabio.estevam@nxp.com>; Linux
-> ARM <linux-arm-kernel@lists.infradead.org>
-> Subject: Re: [GIT PULL] updates to soc/fsl drivers for v4.14
-> 
-> Hi Leo,
-> 
-> On Fri, Oct 20, 2017 at 10:04:07PM +0000, Leo Li wrote:
-> > > - We should come to an agreement on how we do these in the future.
-> > >   Usually I expect any Freescale/NXP/ARM changes to come through the
-> > >   i.MX maintainers (Shawn and Sascha), not directly from other developers.
-> > >   There is usually some degree of coordination required between the
-> > >   SoC drivers and the DT files and platform code, so it's really best to
-> > >   have someone be aware of all the components, and I prefer to have
-> > >   a smaller number of people sending me pull requests. If you already
-> > >   talked to Shawn about it and he prefers you to send the pull request
-> > >   to us directly, that's fine too, but please at least keep him on Cc.
-> >
-> > I would like to share some more background information on this.  The
-> microcontroller business(produces i.mx product line) and the networking
-> business(produces qoriq product line) are completely two different business
-> units within Freescale/NXP.  There are separate hardware design teams and
-> software development teams due to the different targeting markets.  The
-> hardware design are almost completely different.  Historically, the
-> microcontroller product line focused on m68k and armv7 architectures while the
-> networking product line focused on PowerPC architecture and recently moved
-> to ARMv8 architecture.  There are surely some IP sharing but only on basic
-> peripheral devices such as i2c, usb and etc.   But due to the different targeting
-> markets most of the peripheral devices are very different.  For example this
-> DPAA framework, network interfaces and a lot of other accelerators will never
-> be used in the i.mx products.  On the core architecture side we are working on
-> SBSA compliance hardware and SBBA compliance software with UEFI and ACPI
-> in the picture, which would be a overkill for microcontrollers.    In my opinion,
-> the differences between i.MX and QorIQ products could be even bigger than the
-> difference between QorIQ products and some server focused ARMv8 SoCs from
-> other vendors.  The synergy for combining these two will be very limited.
-> >
-> 
-> I'm fine with you send drivers/soc/fsl changes to Arnd directly, since we already
-> have separate folders (drivers/soc/imx vs. drivers/soc/fsl) for i.MX and QorIQ.
-> But as Arnd suggested, please keep me on copy, so that I can be aware of the
-> changes which might be somehow related to arch/arm64/boot/dts/freescale/
-> changes that I'm currently taking care of.  Thanks.
+ arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 12 ++++++++++++
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 12 ++++++++++++
+ arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi | 11 +++++++++++
+ 3 files changed, 35 insertions(+)
 
-Hi Shawn,
-
-Sure.  I will keep you copied.  Thanks for the understanding.
-
-Regards,
-Leo
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
+index 0ae316e..1c63d0a 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
+@@ -125,6 +125,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_uart0>;
+ 			clocks = <&peri_clk 0>;
++			resets = <&peri_rst 0>;
+ 		};
+ 
+ 		serial1: serial at 54006900 {
+@@ -135,6 +136,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_uart1>;
+ 			clocks = <&peri_clk 1>;
++			resets = <&peri_rst 1>;
+ 		};
+ 
+ 		serial2: serial at 54006a00 {
+@@ -145,6 +147,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_uart2>;
+ 			clocks = <&peri_clk 2>;
++			resets = <&peri_rst 2>;
+ 		};
+ 
+ 		serial3: serial at 54006b00 {
+@@ -155,6 +158,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_uart3>;
+ 			clocks = <&peri_clk 3>;
++			resets = <&peri_rst 3>;
+ 		};
+ 
+ 		gpio: gpio at 55000000 {
+@@ -203,6 +207,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_i2c0>;
+ 			clocks = <&peri_clk 4>;
++			resets = <&peri_rst 4>;
+ 			clock-frequency = <100000>;
+ 		};
+ 
+@@ -216,6 +221,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_i2c1>;
+ 			clocks = <&peri_clk 5>;
++			resets = <&peri_rst 5>;
+ 			clock-frequency = <100000>;
+ 		};
+ 
+@@ -226,6 +232,7 @@
+ 			#size-cells = <0>;
+ 			interrupts = <0 43 4>;
+ 			clocks = <&peri_clk 6>;
++			resets = <&peri_rst 6>;
+ 			clock-frequency = <400000>;
+ 		};
+ 
+@@ -239,6 +246,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_i2c3>;
+ 			clocks = <&peri_clk 7>;
++			resets = <&peri_rst 7>;
+ 			clock-frequency = <100000>;
+ 		};
+ 
+@@ -252,6 +260,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_i2c4>;
+ 			clocks = <&peri_clk 8>;
++			resets = <&peri_rst 8>;
+ 			clock-frequency = <100000>;
+ 		};
+ 
+@@ -262,6 +271,7 @@
+ 			#size-cells = <0>;
+ 			interrupts = <0 25 4>;
+ 			clocks = <&peri_clk 9>;
++			resets = <&peri_rst 9>;
+ 			clock-frequency = <400000>;
+ 		};
+ 
+@@ -314,6 +324,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_emmc>;
+ 			clocks = <&sys_clk 4>;
++			resets = <&sys_rst 4>;
+ 			bus-width = <8>;
+ 			mmc-ddr-1_8v;
+ 			mmc-hs200-1_8v;
+@@ -454,6 +465,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_nand>;
+ 			clocks = <&sys_clk 2>;
++			resets = <&sys_rst 2>;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+index 23ea35f..5c81070 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+@@ -231,6 +231,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_uart0>;
+ 			clocks = <&peri_clk 0>;
++			resets = <&peri_rst 0>;
+ 		};
+ 
+ 		serial1: serial at 54006900 {
+@@ -241,6 +242,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_uart1>;
+ 			clocks = <&peri_clk 1>;
++			resets = <&peri_rst 1>;
+ 		};
+ 
+ 		serial2: serial at 54006a00 {
+@@ -251,6 +253,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_uart2>;
+ 			clocks = <&peri_clk 2>;
++			resets = <&peri_rst 2>;
+ 		};
+ 
+ 		serial3: serial at 54006b00 {
+@@ -261,6 +264,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_uart3>;
+ 			clocks = <&peri_clk 3>;
++			resets = <&peri_rst 3>;
+ 		};
+ 
+ 		gpio: gpio at 55000000 {
+@@ -303,6 +307,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_i2c0>;
+ 			clocks = <&peri_clk 4>;
++			resets = <&peri_rst 4>;
+ 			clock-frequency = <100000>;
+ 		};
+ 
+@@ -316,6 +321,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_i2c1>;
+ 			clocks = <&peri_clk 5>;
++			resets = <&peri_rst 5>;
+ 			clock-frequency = <100000>;
+ 		};
+ 
+@@ -326,6 +332,7 @@
+ 			#size-cells = <0>;
+ 			interrupts = <0 43 4>;
+ 			clocks = <&peri_clk 6>;
++			resets = <&peri_rst 6>;
+ 			clock-frequency = <400000>;
+ 		};
+ 
+@@ -339,6 +346,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_i2c3>;
+ 			clocks = <&peri_clk 7>;
++			resets = <&peri_rst 7>;
+ 			clock-frequency = <100000>;
+ 		};
+ 
+@@ -352,6 +360,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_i2c4>;
+ 			clocks = <&peri_clk 8>;
++			resets = <&peri_rst 8>;
+ 			clock-frequency = <100000>;
+ 		};
+ 
+@@ -362,6 +371,7 @@
+ 			#size-cells = <0>;
+ 			interrupts = <0 25 4>;
+ 			clocks = <&peri_clk 9>;
++			resets = <&peri_rst 9>;
+ 			clock-frequency = <400000>;
+ 		};
+ 
+@@ -419,6 +429,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_emmc>;
+ 			clocks = <&sys_clk 4>;
++			resets = <&sys_rst 4>;
+ 			bus-width = <8>;
+ 			mmc-ddr-1_8v;
+ 			mmc-hs200-1_8v;
+@@ -510,6 +521,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_nand>;
+ 			clocks = <&sys_clk 2>;
++			resets = <&sys_rst 2>;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi b/arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi
+index f55b14b..48e7331 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi
+@@ -153,6 +153,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_uart0>;
+ 			clocks = <&peri_clk 0>;
++			resets = <&peri_rst 0>;
+ 		};
+ 
+ 		serial1: serial at 54006900 {
+@@ -163,6 +164,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_uart1>;
+ 			clocks = <&peri_clk 1>;
++			resets = <&peri_rst 1>;
+ 		};
+ 
+ 		serial2: serial at 54006a00 {
+@@ -173,6 +175,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_uart2>;
+ 			clocks = <&peri_clk 2>;
++			resets = <&peri_rst 2>;
+ 		};
+ 
+ 		serial3: serial at 54006b00 {
+@@ -183,6 +186,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_uart3>;
+ 			clocks = <&peri_clk 3>;
++			resets = <&peri_rst 3>;
+ 		};
+ 
+ 		gpio: gpio at 55000000 {
+@@ -214,6 +218,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_i2c0>;
+ 			clocks = <&peri_clk 4>;
++			resets = <&peri_rst 4>;
+ 			clock-frequency = <100000>;
+ 		};
+ 
+@@ -227,6 +232,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_i2c1>;
+ 			clocks = <&peri_clk 5>;
++			resets = <&peri_rst 5>;
+ 			clock-frequency = <100000>;
+ 		};
+ 
+@@ -240,6 +246,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_i2c2>;
+ 			clocks = <&peri_clk 6>;
++			resets = <&peri_rst 6>;
+ 			clock-frequency = <100000>;
+ 		};
+ 
+@@ -253,6 +260,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_i2c3>;
+ 			clocks = <&peri_clk 7>;
++			resets = <&peri_rst 7>;
+ 			clock-frequency = <100000>;
+ 		};
+ 
+@@ -264,6 +272,7 @@
+ 			#size-cells = <0>;
+ 			interrupts = <0 26 4>;
+ 			clocks = <&peri_clk 10>;
++			resets = <&peri_rst 10>;
+ 			clock-frequency = <400000>;
+ 		};
+ 
+@@ -321,6 +330,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_emmc>;
+ 			clocks = <&sys_clk 4>;
++			resets = <&sys_rst 4>;
+ 			bus-width = <8>;
+ 			mmc-ddr-1_8v;
+ 			mmc-hs200-1_8v;
+@@ -405,6 +415,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_nand>;
+ 			clocks = <&sys_clk 2>;
++			resets = <&sys_rst 2>;
+ 		};
+ 	};
+ };
+-- 
+2.7.4
