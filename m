@@ -1,34 +1,23 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 23 Oct 2017 12:40:58 -0700
-Subject: [PATCH] KVM: arm/arm64: Allow usercopy to vcpu->arch.ctxt and
- arm64 debug
-In-Reply-To: <d2a7dcec-060b-6279-1c1d-a18b3eedb394@redhat.com>
-References: <20171020232525.7387-1-pbonzini@redhat.com>
- <20171021184545.2497-1-christoffer.dall@linaro.org>
- <CAGXu5jKJ2jPz2540ZLCwmcdVZxrgnhVPHs0uumiJm2o0ZgpVag@mail.gmail.com>
- <20171022074418.GA3805@cbox> <d2a7dcec-060b-6279-1c1d-a18b3eedb394@redhat.com>
-Message-ID: <CAGXu5jKoLP8jN4ZtRQnFpy6RWK1JJTa7eBuA2p9huBfh11bWvg@mail.gmail.com>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Mon, 23 Oct 2017 23:15:57 +0300
+Subject: Camera support, Prague next week, sdlcam
+In-Reply-To: <40C85971-7DDE-4FB0-AB90-C52CA864C0D4@xs4all.nl>
+References: <20170424093059.GA20427@amd> <20170424103802.00d3b554@vento.lan>
+ <20170424212914.GA20780@amd> <20170424224724.5bb52382@vento.lan>
+ <20170426105300.GA857@amd> <20170426082608.7dd52fbf@vento.lan>
+ <20171021220026.GA26881@amd>
+ <f85cab54-30cf-0774-7376-abced86842af@xs4all.nl>
+ <20171023185414.GA2258@amd>
+ <40C85971-7DDE-4FB0-AB90-C52CA864C0D4@xs4all.nl>
+Message-ID: <20171023201557.hecu4e6o3ynp5hmv@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 23, 2017 at 7:14 AM, Paolo Bonzini <pbonzini@redhat.com> wrote:
-> On 22/10/2017 09:44, Christoffer Dall wrote:
->> However, I think it's much clearer if I
->> rewrite these to use get_user() and put_user().  v2 incoming.
->
-> I'd actually prefer if you all do a trivial conversion to
-> kvm_init_usercopy to begin with.  In fact, we could just change the
-> default from "0, 0" to "0, sizeof (kvm_arch_vcpu)" in kvm_init.  Any
-> other change can be applied after the patches are merged to Linus's
-> tree, especially with KVM Forum and the merge window both coming soon.
->
-> I'll send a v2 myself later this week.
+On Mon, Oct 23, 2017 at 09:24:24PM +0200, Hans Verkuil wrote:
+> Sounds good. That's the elevators on level LL by the way.
 
-Okay, which patches would you like me to carry in the usercopy
-whitelisting tree for the coming merge window?
-
--Kees
+I'll be there, too!
 
 -- 
-Kees Cook
-Pixel Security
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi
