@@ -1,215 +1,115 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Mon, 23 Oct 2017 11:58:41 +0200
-Subject: [PATCH v7 5/6] clocksource: stm32: add clocksource support
-In-Reply-To: <1508752722-4489-1-git-send-email-benjamin.gaignard@linaro.org>
-References: <1508752722-4489-1-git-send-email-benjamin.gaignard@linaro.org>
-Message-ID: <1508752722-4489-6-git-send-email-benjamin.gaignard@linaro.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 23 Oct 2017 13:23:27 +0300
+Subject: [RFC resend] arm64: mt8173: Fix Acer Chromebooks mmsys probe
+ problem
+In-Reply-To: <1508424856.7665.22.camel@pengutronix.de>
+References: <20171019112610.13645-1-mbrugger@suse.com>
+ <1683149.BjzMD0lNNQ@avalon> <1508424856.7665.22.camel@pengutronix.de>
+Message-ID: <1696751.sPjEUm9ynR@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The stm32 timer hardware is currently only used as a clock event device,
-but it can be utilized as a clocksource as well.
+Hi Philipp,
 
-Implement this by enabling the free running counter in the hardware block
-and converting the clock event part from a count down event timer to a
-comparator based timer.
+On Thursday, 19 October 2017 17:54:16 EEST Philipp Zabel wrote:
+> On Thu, 2017-10-19 at 16:39 +0300, Laurent Pinchart wrote:
+> > On Thursday, 19 October 2017 16:01:54 EEST Philipp Zabel wrote:
+> >> On Thu, 2017-10-19 at 13:26 +0200, Matthias Brugger wrote:
+> >>> In theory the MMSYS device tree identifier is matches twice, by the
+> >>> clk driver and the DRM subsystem. But the kernel only matches the
+> >>> first driver for a device (clk) and discards the second one. This
+> >>> breaks graphics on mt8173 and most probably on mt2701 as well.
+> >>> 
+> >>> MMSYS in Mediatek SoCs has some registers to control clock gates
+> >>> (which is used in the clk driver) and some registers to enable the
+> >>> differnet blocks of the display subsystem. The kernel uses the binding
+> >>> to load the central comoponent of the distplay subsystem, which in
+> >>> place probes all the other components and enables the present ones in
+> >>> the MMSYS.
+> >>> 
+> >>> We found us with the problem, that we need to change and therefor
+> >>> break one of the two bindings, or the DRM one or the clock driver one.
+> >>> 
+> >>> Apart from that the DRM subysystem does access the MMSYS registers via
+> >>> relaxed reads/writes. But the it should to so via regmap, as the
+> >>> registers are shared.
+> >>> 
+> >>> Possible solutions:
+> >>> 1) We add a new mediatek,mt8173-mmsys-clk node, which lives as a
+> >>> simple-mfd under the actual mmsys node. We change the clock driver to
+> >>> probe on this binding. This would make sense as the clock gate
+> >>> register live completly in the MMSYS configuration registers.
+> >> 
+> >> The reason why the drm driver matches against the mmsys node in the
+> >> first place is that we wanted to avoid 2).
+> > 
+> > Why did you want to avoid 2) ?
+> 
+> Because the "display-subsystem" node does not represent a real device,
+> it's just there to probe the driver that stitches all the DISP components
+> together.
 
-Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
----
- drivers/clocksource/timer-stm32.c | 115 ++++++++++++++++++++++++++++----------
- 1 file changed, 87 insertions(+), 28 deletions(-)
+I'm not a big supported of such DT nodes for "logical" devices either. When 
+possible I prefer describing the relationship between display IP cores using 
+OF graph DT bindings.
 
-diff --git a/drivers/clocksource/timer-stm32.c b/drivers/clocksource/timer-stm32.c
-index d8e5636..b00987f 100644
---- a/drivers/clocksource/timer-stm32.c
-+++ b/drivers/clocksource/timer-stm32.c
-@@ -16,6 +16,8 @@
- #include <linux/of_irq.h>
- #include <linux/clk.h>
- #include <linux/reset.h>
-+#include <linux/sched_clock.h>
-+#include <linux/slab.h>
- 
- #include "timer-of.h"
- 
-@@ -23,16 +25,16 @@
- #define TIM_DIER	0x0c
- #define TIM_SR		0x10
- #define TIM_EGR		0x14
-+#define TIM_CNT		0x24
- #define TIM_PSC		0x28
- #define TIM_ARR		0x2c
-+#define TIM_CCR1	0x34
- 
- #define TIM_CR1_CEN	BIT(0)
--#define TIM_CR1_OPM	BIT(3)
-+#define TIM_CR1_UDIS	BIT(1)
- #define TIM_CR1_ARPE	BIT(7)
- 
--#define TIM_DIER_UIE	BIT(0)
--
--#define TIM_SR_UIF	BIT(0)
-+#define TIM_DIER_CC1IE	BIT(1)
- 
- #define TIM_EGR_UG	BIT(0)
- 
-@@ -42,28 +44,44 @@ static int stm32_clock_event_shutdown(struct clock_event_device *evt)
- {
- 	struct timer_of *to = to_timer_of(evt);
- 
--	writel_relaxed(0, timer_of_base(to) + TIM_CR1);
-+	writel_relaxed(0, timer_of_base(to) + TIM_DIER);
-+
- 	return 0;
- }
- 
--static int stm32_clock_event_set_periodic(struct clock_event_device *evt)
-+static int stm32_clock_event_set_next_event(unsigned long evt,
-+					    struct clock_event_device *clkevt)
- {
--	struct timer_of *to = to_timer_of(evt);
-+	struct timer_of *to = to_timer_of(clkevt);
-+	unsigned long now, next;
- 
--	writel_relaxed(timer_of_period(to), timer_of_base(to) + TIM_ARR);
--	writel_relaxed(TIM_CR1_ARPE | TIM_CR1_CEN, timer_of_base(to) + TIM_CR1);
-+	next = readl_relaxed(timer_of_base(to) + TIM_CNT) + evt;
-+	writel_relaxed(next, timer_of_base(to) + TIM_CCR1);
-+	now = readl_relaxed(timer_of_base(to) + TIM_CNT);
-+
-+	if (next - now > evt)
-+		return -ETIME;
-+
-+	writel_relaxed(TIM_DIER_CC1IE, timer_of_base(to) + TIM_DIER);
- 
- 	return 0;
- }
- 
--static int stm32_clock_event_set_next_event(unsigned long evt,
--					    struct clock_event_device *clkevt)
-+static int stm32_clock_event_set_periodic(struct clock_event_device *evt)
- {
--	struct timer_of *to = to_timer_of(clkevt);
-+	struct timer_of *to = to_timer_of(evt);
- 
--	writel_relaxed(evt, timer_of_base(to) + TIM_ARR);
--	writel_relaxed(TIM_CR1_ARPE | TIM_CR1_OPM | TIM_CR1_CEN,
--		       timer_of_base(to) + TIM_CR1);
-+	return stm32_clock_event_set_next_event(timer_of_period(to), evt);
-+}
-+
-+static int stm32_clock_event_set_oneshot(struct clock_event_device *evt)
-+{
-+	struct timer_of *to = to_timer_of(evt);
-+	unsigned long val;
-+
-+	val = readl_relaxed(timer_of_base(to) + TIM_CNT);
-+	writel_relaxed(val, timer_of_base(to) + TIM_CCR1);
-+	writel_relaxed(TIM_DIER_CC1IE, timer_of_base(to) + TIM_DIER);
- 
- 	return 0;
- }
-@@ -75,12 +93,57 @@ static irqreturn_t stm32_clock_event_handler(int irq, void *dev_id)
- 
- 	writel_relaxed(0, timer_of_base(to) + TIM_SR);
- 
-+	if (clockevent_state_periodic(evt))
-+		stm32_clock_event_set_periodic(evt);
-+	else
-+		stm32_clock_event_shutdown(evt);
-+
- 	evt->event_handler(evt);
- 
- 	return IRQ_HANDLED;
- }
- 
--static int __init stm32_clockevent_init(struct device_node *node)
-+static void __init stm32_clockevent_init(struct timer_of *to)
-+{
-+	writel_relaxed(0, timer_of_base(to) + TIM_DIER);
-+	writel_relaxed(0, timer_of_base(to) + TIM_SR);
-+
-+	clockevents_config_and_register(&to->clkevt,
-+					timer_of_rate(to), MIN_DELTA, ~0U);
-+}
-+
-+static void __iomem *stm32_timer_cnt __read_mostly;
-+static u64 notrace stm32_read_sched_clock(void)
-+{
-+	return readl_relaxed(stm32_timer_cnt);
-+}
-+
-+static int __init stm32_clocksource_init(struct timer_of *to)
-+{
-+	writel_relaxed(~0U, timer_of_base(to) + TIM_ARR);
-+	writel_relaxed(0, timer_of_base(to) + TIM_PSC);
-+
-+	writel_relaxed(0, timer_of_base(to) + TIM_SR);
-+	writel_relaxed(0, timer_of_base(to) + TIM_DIER);
-+	writel_relaxed(TIM_CR1_ARPE | TIM_CR1_UDIS,
-+		       timer_of_base(to) + TIM_CR1);
-+
-+	/* Make sure that registers are updated */
-+	writel_relaxed(TIM_EGR_UG, timer_of_base(to) + TIM_EGR);
-+
-+	/* Enable controller */
-+	writel_relaxed(TIM_CR1_ARPE | TIM_CR1_UDIS | TIM_CR1_CEN,
-+		       timer_of_base(to) + TIM_CR1);
-+
-+	stm32_timer_cnt = timer_of_base(to) + TIM_CNT;
-+	sched_clock_register(stm32_read_sched_clock, 32, timer_of_rate(to));
-+
-+	return clocksource_mmio_init(stm32_timer_cnt, "stm32_timer",
-+				     timer_of_rate(to), 250, 32,
-+				     clocksource_mmio_readl_up);
-+}
-+
-+static int __init stm32_timer_init(struct device_node *node)
- {
- 	struct reset_control *rstc;
- 	unsigned long max_arr;
-@@ -92,12 +155,13 @@ static int __init stm32_clockevent_init(struct device_node *node)
- 		return -ENOMEM;
- 
- 	to->flags = TIMER_OF_IRQ | TIMER_OF_CLOCK | TIMER_OF_BASE;
-+
- 	to->clkevt.name = "stm32_clockevent";
- 	to->clkevt.rating = 200;
--	to->clkevt.features = CLOCK_EVT_FEAT_PERIODIC;
-+	to->clkevt.features = CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC;
- 	to->clkevt.set_state_shutdown = stm32_clock_event_shutdown;
- 	to->clkevt.set_state_periodic = stm32_clock_event_set_periodic;
--	to->clkevt.set_state_oneshot = stm32_clock_event_shutdown;
-+	to->clkevt.set_state_oneshot = stm32_clock_event_set_oneshot;
- 	to->clkevt.tick_resume = stm32_clock_event_shutdown;
- 	to->clkevt.set_next_event = stm32_clock_event_set_next_event;
- 
-@@ -122,16 +186,11 @@ static int __init stm32_clockevent_init(struct device_node *node)
- 		goto deinit;
- 	}
- 
--	writel_relaxed(0, timer_of_base(to) + TIM_ARR);
--
--	writel_relaxed(0, timer_of_base(to) + TIM_PSC);
--	writel_relaxed(TIM_EGR_UG, timer_of_base(to) + TIM_EGR);
--	writel_relaxed(TIM_DIER_UIE, timer_of_base(to) + TIM_DIER);
--	writel_relaxed(0, timer_of_base(to) + TIM_SR);
-+	ret = stm32_clocksource_init(to);
-+	if (ret)
-+		goto deinit;
- 
--	clockevents_config_and_register(&to->clkevt,
--					timer_of_period(to),
--					MIN_DELTA, ~0U);
-+	stm32_clockevent_init(to);
- 
- 	return 0;
- 
-@@ -143,4 +202,4 @@ static int __init stm32_clockevent_init(struct device_node *node)
- 	return ret;
- }
- 
--TIMER_OF_DECLARE(stm32, "st,stm32-timer", stm32_clockevent_init);
-+TIMER_OF_DECLARE(stm32, "st,stm32-timer", stm32_timer_init);
+In some cases (and I don't know if the Mediatek display is one of them) there 
+is no single IP core that can be considered as a master from a display point 
+of view. This is inconvenient for device drivers as there's no clear place for 
+an entry point. I could thus be convinced to accept DT bindings for a logical 
+display DT node when there's really no other good choice.
+
+> >> Also, mmsys is not a pure clock controller, as it also contains the
+> >> display path configuration in its register space.
+> > 
+> > Which makes the mmsys related to display, but more in a syscon (combining
+> > clocks and routing, and I assume other miscellaneous features that
+> > wouldn't fit nicely in the other display-related IP cores) way than
+> > actually being part of the display subsystem. Or does mmsys only provide
+> > display-related features ?
+> 
+> All devices in the 0x14000000 - 0x14ffffff memory range are part of the
+> MMSYS system. That includes the MMSYS control or system configuration
+> block at 0x14000000 - 0x14000fff as well as all the related MDP (media
+> data path) and DISP (display data path) blocks that follow. The DISP
+> blocks are purely display related, while the MDP blocks implement
+> implement mem2mem functions like scaling and conversion.
+
+Without more information about the hardware it's hard to tell whether the DT 
+nodes for the DISP and MDP IP cores should be children of the MMSYS DT node or 
+not. In any case, it looks like the MMSYS is a syscon that provides 
+miscellaneous functions not fitting anywhere else.
+
+On simple solution, which shouldn't require DT changes, would be to merge the 
+MMSYS clock driver into the mediatek DRM driver, and register the MMSYS clocks 
+at probe time instead of using CLK_OF_DECLARE.
+
+Another option would be to handle MMSYS as an MFD. That shouldn't require DT 
+changes either.
+
+> >>> 2) As the nodes of the DRM subsystem just need some of the registers
+> >>> of MMSYS we add a new binding mediatek,mt8173-dispsys which probes the
+> >>> central component of the DRM system. It has only a handle to mt8173-
+> >>> mmsys to access the registerspace via regmap functions.
+> >>> 
+> >>> In this patchset I implemented 2). Please take into account, that this
+> >>> is a RFC. I had no time to actually test the verison on real HW. Some
+> >>> of the register accesses should be done using regmap_update instead of
+> >>> regmap_read + regmap_write.
+> >>> 
+> >>> This RFC shall only show how solution 2) would look like. We can use
+> >>> it as discussion to see how we circumvent the actual situation.
+> >> 
+> >> Or we could leave the bindings untouched and create one platform device
+> >> from the other or even set up the clocks from the drm driver?
+> > 
+> > Does mmsys provide features (such as clocks) to non-display IP cores ?
+> 
+> The MMSYS control block provides clocks for the DISP (display data path)
+> and MDP (multimedia data path) blocks, as well as the routing between
+> them, but not to anything outside of the MMSYS system.
+
 -- 
-2.7.4
+Regards,
+
+Laurent Pinchart
