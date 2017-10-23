@@ -1,30 +1,54 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 23 Oct 2017 16:49:07 +0200
-Subject: [PATCH] KVM: arm/arm64: Allow usercopy to vcpu->arch.ctxt and
- arm64 debug
-In-Reply-To: <d2a7dcec-060b-6279-1c1d-a18b3eedb394@redhat.com>
-References: <20171020232525.7387-1-pbonzini@redhat.com>
- <20171021184545.2497-1-christoffer.dall@linaro.org>
- <CAGXu5jKJ2jPz2540ZLCwmcdVZxrgnhVPHs0uumiJm2o0ZgpVag@mail.gmail.com>
- <20171022074418.GA3805@cbox> <d2a7dcec-060b-6279-1c1d-a18b3eedb394@redhat.com>
-Message-ID: <CAMJs5B-VhREFk4qH+5we7JFtkx6CsKF+xN8mFg+2zSyc-DARYQ@mail.gmail.com>
+From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
+Date: Mon, 23 Oct 2017 16:56:40 +0200
+Subject: [PATCH] ARM: dts: imx53-tx53: fix interrupt flags
+Message-ID: <1508770600-28496-1-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 23, 2017 at 4:14 PM, Paolo Bonzini <pbonzini@redhat.com> wrote:
-> On 22/10/2017 09:44, Christoffer Dall wrote:
->> However, I think it's much clearer if I
->> rewrite these to use get_user() and put_user().  v2 incoming.
->
-> I'd actually prefer if you all do a trivial conversion to
-> kvm_init_usercopy to begin with.  In fact, we could just change the
-> default from "0, 0" to "0, sizeof (kvm_arch_vcpu)" in kvm_init.  Any
-> other change can be applied after the patches are merged to Linus's
-> tree, especially with KVM Forum and the merge window both coming soon.
->
-In that case, expect no further action from me on this one until the
-patches have landed and I can resend my patch, unless you specifically
-tell me otherwise.
+Some interrupts properties are given '0' as the flags argument or no
+flags argument at all.
+Change them to use the appropriate interrupt flags.
 
-Thanks,
--Christoffer
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+---
+ arch/arm/boot/dts/imx53-tx53-x03x.dts | 2 +-
+ arch/arm/boot/dts/imx53-tx53.dtsi     | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx53-tx53-x03x.dts b/arch/arm/boot/dts/imx53-tx53-x03x.dts
+index aa9ae84..eb5b452 100644
+--- a/arch/arm/boot/dts/imx53-tx53-x03x.dts
++++ b/arch/arm/boot/dts/imx53-tx53-x03x.dts
+@@ -254,7 +254,7 @@
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_tsc2007>;
+ 		interrupt-parent = <&gpio3>;
+-		interrupts = <26 0>;
++		interrupts = <26 IRQ_TYPE_EDGE_FALLING>;
+ 		gpios = <&gpio3 26 GPIO_ACTIVE_LOW>;
+ 		ti,x-plate-ohms = <660>;
+ 		wakeup-source;
+diff --git a/arch/arm/boot/dts/imx53-tx53.dtsi b/arch/arm/boot/dts/imx53-tx53.dtsi
+index 8e10c47..71b58b6 100644
+--- a/arch/arm/boot/dts/imx53-tx53.dtsi
++++ b/arch/arm/boot/dts/imx53-tx53.dtsi
+@@ -227,7 +227,7 @@
+ 
+ 	phy0: ethernet-phy at 0 {
+ 		interrupt-parent = <&gpio2>;
+-		interrupts = <4>;
++		interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
+ 		device_type = "ethernet-phy";
+ 	};
+ };
+@@ -247,7 +247,7 @@
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_ds1339>;
+ 		interrupt-parent = <&gpio4>;
+-		interrupts = <20 0>;
++		interrupts = <20 IRQ_TYPE_EDGE_FALLING>;
+ 		trickle-resistor-ohms = <250>;
+ 		trickle-diode-disable;
+ 	};
+-- 
+2.1.4
