@@ -1,48 +1,29 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 23 Oct 2017 17:36:48 -0400
-Subject: [PATCH] PCI: rework error checking in the reset path
-Message-ID: <1508794608-15310-1-git-send-email-okaya@codeaurora.org>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 23 Oct 2017 16:58:39 -0500
+Subject: [PATCH v8 01/10] dt-bindings: net: Restore sun8i dwmac binding
+In-Reply-To: <20171023185626.31793-2-clabbe.montjoie@gmail.com>
+References: <20171023185626.31793-1-clabbe.montjoie@gmail.com>
+ <20171023185626.31793-2-clabbe.montjoie@gmail.com>
+Message-ID: <20171023215839.3brzm4nhptkkdbwq@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The return codes from various reset types are not consistent. The code is
-assuming that all reset types will return -ENOTTY when things go wrong.
-Instead of relying on negative error status, let's bail out if the
-operation is successful instead.
+On Mon, Oct 23, 2017 at 08:56:17PM +0200, Corentin Labbe wrote:
+> The original dwmac-sun8i DT bindings have some issue on how to handle
+> integrated PHY and was reverted in last RC of 4.13.
+> But now we have a solution so we need to get back that was reverted.
+> 
+> This patch restore dt-bindings documentation about dwmac-sun8i
+> This reverts commit 8aa33ec2f481 ("dt-bindings: net: Revert sun8i dwmac binding")
+> 
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> ---
+>  .../devicetree/bindings/net/dwmac-sun8i.txt        | 84 ++++++++++++++++++++++
+>  1 file changed, 84 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/net/dwmac-sun8i.txt
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/pci/pci.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+Please add acks when posting new versions.
 
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 6078dfc..a753e07 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -4200,20 +4200,20 @@ int __pci_reset_function_locked(struct pci_dev *dev)
- 	might_sleep();
- 
- 	rc = pci_dev_specific_reset(dev, 0);
--	if (rc != -ENOTTY)
-+	if (!rc)
- 		return rc;
- 	if (pcie_has_flr(dev)) {
- 		pcie_flr(dev);
- 		return 0;
- 	}
- 	rc = pci_af_flr(dev, 0);
--	if (rc != -ENOTTY)
-+	if (!rc)
- 		return rc;
- 	rc = pci_pm_reset(dev, 0);
--	if (rc != -ENOTTY)
-+	if (!rc)
- 		return rc;
- 	rc = pci_dev_reset_slot_function(dev, 0);
--	if (rc != -ENOTTY)
-+	if (!rc)
- 		return rc;
- 	return pci_parent_bus_reset(dev, 0);
- }
--- 
-1.9.1
+Acked-by: Rob Herring <robh@kernel.org> 
+
+Rob
