@@ -1,89 +1,84 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Mon, 23 Oct 2017 19:03:08 +0200
-Subject: [PATCH v5] atmel_flexcom: Support backup mode
-In-Reply-To: <20171023160726.ufs37iyuicirwk4f@dell>
-References: <20171019164443.487-1-romain.izard.pro@gmail.com>
- <20171023160600.kcjy4ejdllllu62y@dell> <20171023160726.ufs37iyuicirwk4f@dell>
-Message-ID: <CAGkQfmMK_a5+zyyoHZsnfvNuxmNLeM0t40MrbPMMwKcNXDZTFA@mail.gmail.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Mon, 23 Oct 2017 18:08:39 +0100
+Subject: [RFC PATCH] arm64/sve: ABI change: Zero SVE regs on syscall entry
+In-Reply-To: <1508758664-24186-2-git-send-email-Dave.Martin@arm.com>
+References: <1508758664-24186-1-git-send-email-Dave.Martin@arm.com>
+ <1508758664-24186-2-git-send-email-Dave.Martin@arm.com>
+Message-ID: <87tvypiyg8.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-10-23 18:07 GMT+02:00 Lee Jones <lee.jones@linaro.org>:
-> On Mon, 23 Oct 2017, Lee Jones wrote:
->> On Thu, 19 Oct 2017, Romain Izard wrote:
->>
->> > The controller used by a flexcom module is configured at boot, and left
->> > alone after this. As the configuration will be lost after backup mode,
->> > restore the state of the flexcom driver on resume.
->> >
->> > Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
->> > Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
->> > Tested-by: Nicolas Ferre <nicolas.ferre@microchip.com>
->> > ---
->> > Changes in v5:
->> > * extract from the patch series, and send as a standalone patch
->> >
->> >  drivers/mfd/atmel-flexcom.c | 65 ++++++++++++++++++++++++++++++++++-----------
->> >  1 file changed, 50 insertions(+), 15 deletions(-)
->> >
->> > diff --git a/drivers/mfd/atmel-flexcom.c b/drivers/mfd/atmel-flexcom.c
->> > index 064bde9cff5a..ef1235c4a179 100644
->> > --- a/drivers/mfd/atmel-flexcom.c
->> > +++ b/drivers/mfd/atmel-flexcom.c
->> > @@ -39,34 +39,44 @@
->> >  #define FLEX_MR_OPMODE(opmode)     (((opmode) << FLEX_MR_OPMODE_OFFSET) &  \
->> >                              FLEX_MR_OPMODE_MASK)
->> >
->> > +struct atmel_flexcom {
->> > +   void __iomem *base;
->> > +   u32 opmode;
->> > +   struct clk *clk;
->> > +};
->> >
->> >  static int atmel_flexcom_probe(struct platform_device *pdev)
->> >  {
->> >     struct device_node *np = pdev->dev.of_node;
->> > -   struct clk *clk;
->> >     struct resource *res;
->> > -   void __iomem *base;
->> > -   u32 opmode;
->> > +   struct atmel_flexcom *afc;
->>
->> Nit: I'd prefer if you call this 'ddata'.
->>
->> But the concept and implementation is fine, so if you're going to
->> change it please do so and apply my:
->>
->> Acked-by: Lee Jones <lee.jones@linaro.org>
+
+Dave Martin <Dave.Martin@arm.com> writes:
+
+> As currently documented, no guarantee is made about what a user
+> task sees in the SVE registers after a syscall, except that V0-V31
+> (corresponding to Z0-Z31 bits [127:0]) are preserved.
 >
-> Also, 'back-up mode' isn't really a thing is it?
+> The actual kernel behaviour currently implemented is that the SVE
+> registers are zeroed if a context switch or signal delivery occurs
+> during a syscall.  After a fork() or clone(), the SVE registers
+> of the child task are zeroed also.  The SVE registers are otherwise
+> preserved.  Flexibility is retained in the ABI about the exact
+> criteria for the decision.
 >
-> How about "Reinstall state on resume" or similar?
+> There are some potential problems with this approach.
 >
+> Syscall impact
+> --------------
+>
+> Will, Catalin and Mark have expressed concerns about the risk of
+> creating de facto ABI here: in scenarios or workloads where a
+> context switch never occurs or is very unlikely, userspace may
+> learn to rely on preservation of the SVE registers across certain
+> syscalls.
 
-The expression comes from the SAMA5D2's datasheet.
+I think this is a reasonable concern but are there any equivalent cases
+in the rest of the kernel? Is this new territory for Linux as these
+super large registers are introduced?
 
-Other Atmel chips use a different single suspend mode with Linux, where
-the SoC remains completely powered with a slow clock. The registers are
-preserved in this mode, so there is no need for a specific suspend and
-resume code.
+> It is difficult to assess the impact of this: the syscall ABI is
+> not a general-purpose interface, since it is usually hidden behind
+> libc wrappers: direct invocation of SVC is discouraged.  However,
+> specialised runtimes, statically linked programs and binary blobs
+> may bake in direct syscalls that make bad assumptions.
+>
+> Conversely, the relative cost of zeroing the SVE regs to mitigate
+> against this also cannot be well characterised until SVE hardware
+> exists.
+>
+> ptrace impact
+> -------------
+>
+> The current implementation can discard and zero the SVE registers
+> at any point during a syscall, including before, after or between
+> ptrace traps inside a single syscall.  This means that setting the
+> SVE registers through PTRACE_SETREGSET will often not do what the
+> user expects: the new register values are only guaranteed to
+> survive as far as userspace if set from an asynchronous
+> signal-delivery-stop (e.g., breakpoint, SEGV or asynchronous signal
+> delivered outside syscall context).
+>
+> This is consistent with the currently documented SVE user ABI, but
+> likely to be surprising for a debugger user, since setting most
+> registers of a tracee doesn't behave in this way.
+>
+> This patch
+> ----------
+>
+> The common syscall entry path is modified to forcibly discard SVE,
+> and the discard logic elsewhere is removed.
+>
+> This means that there is a mandatory additional trap to the kernel
+> when a user task tries to use SVE again after a syscall.  This can
+> be expensive for programs that use SVE heavily around syscalls, but
+> can be optimised later.
 
-The SoC can also be powered down, but the CPU is reset and only a small
-part is powered with a backup battery to maintain a valid RTC and a
-small internal SRAM.
+Won't it impact every restart from syscall? It's a shame you have to
+trap when I suspect most first accesses after a syscall are likely to be
+either restoring the caller-saved values which assume the value is
+trashed anyway. Adding gettimeofday() or write(stdout) while debugging
+is going to kill performance.
 
-In the SAMA5D2, the mode with only the backup power supply has been
-extended to isolate the memory I/O lines, making it possible to keep the
-external SDRAM memory in self-refresh. This mode has a lower consumption
-compared to the slow clock mode, but it has a higher wakeup latency, and
-needs specific software support in the bootloader and the kernel.
-
-As a result, the "backup mode" expression is used to contrast with the
-"slow clock" expression when describing the different suspend modes
-supported by the chip.
-
-But if you think that it is necessary, I can reword the commit.
-
-Best regards,
--- 
-Romain Izard
+--
+Alex Benn?e
