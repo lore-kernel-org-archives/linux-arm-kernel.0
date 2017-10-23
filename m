@@ -1,142 +1,151 @@
-From: zhi.mao@mediatek.com (Zhi Mao)
-Date: Mon, 23 Oct 2017 19:57:08 +0800
-Subject: [PATCH v5 1/1] pwm: mediatek: add MT2712/MT7622 support
-Message-ID: <1508759828-22974-1-git-send-email-zhi.mao@mediatek.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 23 Oct 2017 13:05:23 +0100
+Subject: [PATCH v2 1/8] arm64: KVM: Add invalidate_icache_range helper
+In-Reply-To: <20171020154904.31427-2-marc.zyngier@arm.com>
+References: <20171020154904.31427-1-marc.zyngier@arm.com>
+ <20171020154904.31427-2-marc.zyngier@arm.com>
+Message-ID: <20171023120522.GD31263@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support to MT2712 and MT7622.
-Due to register offset address of pwm7 for MT2712 is not fixed 0x40,
-add mtk_pwm_reg_offset array for pwm register offset.
-Add NULL pointer checking for "pc->data".
+Hi Marc,
 
-Signed-off-by: Zhi Mao <zhi.mao@mediatek.com>
----
- drivers/pwm/pwm-mediatek.c |   53 ++++++++++++++++++++++++++++++++++++--------
- 1 file changed, 44 insertions(+), 9 deletions(-)
+On Fri, Oct 20, 2017 at 04:48:57PM +0100, Marc Zyngier wrote:
+> We currently tightly couple dcache clean with icache invalidation,
+> but KVM could do without the initial flush to PoU, as we've
+> already flushed things to PoC.
+> 
+> Let's introduce invalidate_icache_range which is limited to
+> invalidating the icache from the linear mapping (and thus
+> has none of the userspace fault handling complexity), and
+> wire it in KVM instead of flush_icache_range.
+> 
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/include/asm/assembler.h  | 26 ++++++++++++++++++++++++++
+>  arch/arm64/include/asm/cacheflush.h |  8 ++++++++
+>  arch/arm64/include/asm/kvm_mmu.h    |  4 ++--
+>  arch/arm64/mm/cache.S               | 26 ++++++++++++++++----------
+>  4 files changed, 52 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+> index d58a6253c6ab..efdbecc8f2ef 100644
+> --- a/arch/arm64/include/asm/assembler.h
+> +++ b/arch/arm64/include/asm/assembler.h
+> @@ -374,6 +374,32 @@ alternative_endif
+>  	dsb	\domain
+>  	.endm
+>  
+> +/*
+> + * Macro to perform an instruction cache maintenance for the interval
+> + * [start, end)
+> + *
+> + * 	start, end:	virtual addresses describing the region
+> + *	label:		A label to branch to on user fault, none if
+> + *			only used on a kernel address
+> + * 	Corrupts:	tmp1, tmp2
+> + */
+> +	.macro invalidate_icache_by_line start, end, tmp1, tmp2, label=none
+> +	icache_line_size \tmp1, \tmp2
+> +	sub	\tmp2, \tmp1, #1
+> +	bic	\tmp2, \start, \tmp2
+> +9997:
+> +	.if	(\label == none)
+> +	ic	ivau, \tmp2			// invalidate I line PoU
+> +	.else
+> +USER(\label, ic	ivau, \tmp2)			// invalidate I line PoU
+> +	.endif
+> +	add	\tmp2, \tmp2, \tmp1
+> +	cmp	\tmp2, \end
+> +	b.lo	9997b
+> +	dsb	ish
+> +	isb
+> +	.endm
 
-diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
-index 1d78ab1..867cc74 100644
---- a/drivers/pwm/pwm-mediatek.c
-+++ b/drivers/pwm/pwm-mediatek.c
-@@ -16,6 +16,7 @@
- #include <linux/module.h>
- #include <linux/clk.h>
- #include <linux/of.h>
-+#include <linux/of_device.h>
- #include <linux/platform_device.h>
- #include <linux/pwm.h>
- #include <linux/slab.h>
-@@ -40,11 +41,19 @@ enum {
- 	MTK_CLK_PWM3,
- 	MTK_CLK_PWM4,
- 	MTK_CLK_PWM5,
-+	MTK_CLK_PWM6,
-+	MTK_CLK_PWM7,
-+	MTK_CLK_PWM8,
- 	MTK_CLK_MAX,
- };
- 
--static const char * const mtk_pwm_clk_name[] = {
--	"main", "top", "pwm1", "pwm2", "pwm3", "pwm4", "pwm5"
-+static const char * const mtk_pwm_clk_name[MTK_CLK_MAX] = {
-+	"main", "top", "pwm1", "pwm2", "pwm3", "pwm4", "pwm5", "pwm6", "pwm7",
-+	"pwm8"
-+};
-+
-+struct mtk_pwm_platform_data {
-+	unsigned int num_pwms;
- };
- 
- /**
-@@ -57,6 +66,11 @@ struct mtk_pwm_chip {
- 	struct pwm_chip chip;
- 	void __iomem *regs;
- 	struct clk *clks[MTK_CLK_MAX];
-+	const struct mtk_pwm_platform_data *data;
-+};
-+
-+static const unsigned int mtk_pwm_reg_offset[] = {
-+	0x0010, 0x0050, 0x0090, 0x00d0, 0x0110, 0x0150, 0x0190, 0x0220
- };
- 
- static inline struct mtk_pwm_chip *to_mtk_pwm_chip(struct pwm_chip *chip)
-@@ -103,14 +117,14 @@ static void mtk_pwm_clk_disable(struct pwm_chip *chip, struct pwm_device *pwm)
- static inline u32 mtk_pwm_readl(struct mtk_pwm_chip *chip, unsigned int num,
- 				unsigned int offset)
- {
--	return readl(chip->regs + 0x10 + (num * 0x40) + offset);
-+	return readl(chip->regs + mtk_pwm_reg_offset[num] + offset);
- }
- 
- static inline void mtk_pwm_writel(struct mtk_pwm_chip *chip,
- 				  unsigned int num, unsigned int offset,
- 				  u32 value)
- {
--	writel(value, chip->regs + 0x10 + (num * 0x40) + offset);
-+	writel(value, chip->regs + mtk_pwm_reg_offset[num] + offset);
- }
- 
- static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-@@ -194,15 +208,22 @@ static int mtk_pwm_probe(struct platform_device *pdev)
- 	if (!pc)
- 		return -ENOMEM;
- 
-+	pc->data = of_device_get_match_data(&pdev->dev);
-+	if (pc->data == NULL)
-+		return -EINVAL;
-+
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	pc->regs = devm_ioremap_resource(&pdev->dev, res);
- 	if (IS_ERR(pc->regs))
- 		return PTR_ERR(pc->regs);
- 
--	for (i = 0; i < MTK_CLK_MAX; i++) {
-+	for (i = 0; i < pc->data->num_pwms + 2; i++) {
- 		pc->clks[i] = devm_clk_get(&pdev->dev, mtk_pwm_clk_name[i]);
--		if (IS_ERR(pc->clks[i]))
-+		if (IS_ERR(pc->clks[i])) {
-+			dev_err(&pdev->dev, "clock: %s fail: %ld\n",
-+				mtk_pwm_clk_name[i], PTR_ERR(pc->clks[i]));
- 			return PTR_ERR(pc->clks[i]);
-+		}
- 	}
- 
- 	platform_set_drvdata(pdev, pc);
-@@ -210,7 +231,7 @@ static int mtk_pwm_probe(struct platform_device *pdev)
- 	pc->chip.dev = &pdev->dev;
- 	pc->chip.ops = &mtk_pwm_ops;
- 	pc->chip.base = -1;
--	pc->chip.npwm = 5;
-+	pc->chip.npwm = pc->data->num_pwms;
- 
- 	ret = pwmchip_add(&pc->chip);
- 	if (ret < 0) {
-@@ -228,9 +249,23 @@ static int mtk_pwm_remove(struct platform_device *pdev)
- 	return pwmchip_remove(&pc->chip);
- }
- 
-+static const struct mtk_pwm_platform_data mt2712_pwm_data = {
-+	.num_pwms = 8,
-+};
-+
-+static const struct mtk_pwm_platform_data mt7622_pwm_data = {
-+	.num_pwms = 6,
-+};
-+
-+static const struct mtk_pwm_platform_data mt7623_pwm_data = {
-+	.num_pwms = 5,
-+};
-+
- static const struct of_device_id mtk_pwm_of_match[] = {
--	{ .compatible = "mediatek,mt7623-pwm" },
--	{ }
-+	{ .compatible = "mediatek,mt2712-pwm", .data = &mt2712_pwm_data },
-+	{ .compatible = "mediatek,mt7622-pwm", .data = &mt7622_pwm_data },
-+	{ .compatible = "mediatek,mt7623-pwm", .data = &mt7623_pwm_data },
-+	{ },
- };
- MODULE_DEVICE_TABLE(of, mtk_pwm_of_match);
- 
--- 
-1.7.9.5
+Code looks fine to me, but I'd like to drop the \label == none case. See
+below.
+
+>  /*
+>   * reset_pmuserenr_el0 - reset PMUSERENR_EL0 if PMUv3 present
+>   */
+> diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+> index 76d1cc85d5b1..ad56406944c6 100644
+> --- a/arch/arm64/include/asm/cacheflush.h
+> +++ b/arch/arm64/include/asm/cacheflush.h
+> @@ -52,6 +52,13 @@
+>   *		- start  - virtual start address
+>   *		- end    - virtual end address
+>   *
+> + *	invalidate_icache_range(start, end)
+> + *
+> + *		Invalidate the I-cache in the region described by start, end.
+> + *		Linear mapping only!
+> + *		- start  - virtual start address
+> + *		- end    - virtual end address
+> + *
+>   *	__flush_cache_user_range(start, end)
+>   *
+>   *		Ensure coherency between the I-cache and the D-cache in the
+> @@ -66,6 +73,7 @@
+>   *		- size   - region size
+>   */
+>  extern void flush_icache_range(unsigned long start, unsigned long end);
+> +extern void invalidate_icache_range(unsigned long start, unsigned long end);
+>  extern void __flush_dcache_area(void *addr, size_t len);
+>  extern void __inval_dcache_area(void *addr, size_t len);
+>  extern void __clean_dcache_area_poc(void *addr, size_t len);
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index 8034b96fb3a4..56b3e03c85e7 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -250,8 +250,8 @@ static inline void __invalidate_icache_guest_page(struct kvm_vcpu *vcpu,
+>  		/* PIPT or VPIPT at EL2 (see comment in __kvm_tlb_flush_vmid_ipa) */
+>  		void *va = page_address(pfn_to_page(pfn));
+>  
+> -		flush_icache_range((unsigned long)va,
+> -				   (unsigned long)va + size);
+> +		invalidate_icache_range((unsigned long)va,
+> +					(unsigned long)va + size);
+>  	}
+>  }
+>  
+> diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+> index 7f1dbe962cf5..8e71d237f85e 100644
+> --- a/arch/arm64/mm/cache.S
+> +++ b/arch/arm64/mm/cache.S
+> @@ -60,16 +60,7 @@ user_alt 9f, "dc cvau, x4",  "dc civac, x4",  ARM64_WORKAROUND_CLEAN_CACHE
+>  	b.lo	1b
+>  	dsb	ish
+>  
+> -	icache_line_size x2, x3
+> -	sub	x3, x2, #1
+> -	bic	x4, x0, x3
+> -1:
+> -USER(9f, ic	ivau, x4	)		// invalidate I line PoU
+> -	add	x4, x4, x2
+> -	cmp	x4, x1
+> -	b.lo	1b
+> -	dsb	ish
+> -	isb
+> +	invalidate_icache_by_line x0, x1, x2, x3, 9f
+>  	mov	x0, #0
+>  1:
+>  	uaccess_ttbr0_disable x1
+> @@ -80,6 +71,21 @@ USER(9f, ic	ivau, x4	)		// invalidate I line PoU
+>  ENDPROC(flush_icache_range)
+>  ENDPROC(__flush_cache_user_range)
+>  
+> +/*
+> + *	invalidate_icache_range(start,end)
+> + *
+> + *	Ensure that the I cache is invalid within specified region. This
+> + *	assumes that this is done on the linear mapping. Do not use it
+> + *	on a userspace range, as this may fault horribly.
+
+I'm still not sure why we're not hooking up the user fault handling here.
+In the worst case, we'd end up returning -EFAULT if we got passed a
+faulting user address and there's already precedence for this with e.g.
+flush_icache_range.
+
+Will
