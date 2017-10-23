@@ -1,78 +1,134 @@
 From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Mon, 23 Oct 2017 18:09:30 +0100
-Subject: [PATCH v2 9/9] ARM: dts: r8a7745: Add IIC cores to dtsi
+Date: Mon, 23 Oct 2017 18:09:25 +0100
+Subject: [PATCH v2 4/9] ARM: dts: iwg22d-sodimm: sort dt nodes
 In-Reply-To: <1508778570-28795-1-git-send-email-fabrizio.castro@bp.renesas.com>
 References: <1508778570-28795-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <1508778570-28795-10-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <1508778570-28795-5-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add iic0 and iic1 nodes to SoC dtsi. Also, define aliases i2c6
-and i2c7. Board specific DT files will enable the interfaces
-if needed.
+Improve the layout of r8a7745-iwg22d-sodimm.dts by sorting the
+nodes alphabetically.
 
 Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
 ---
 Changes in v2:
-* added changelog
+* rebased
 
- arch/arm/boot/dts/r8a7745.dtsi | 36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+ arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts | 62 ++++++++++++++---------------
+ 1 file changed, 31 insertions(+), 31 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
-index 6c9a0d6..d0b9212 100644
---- a/arch/arm/boot/dts/r8a7745.dtsi
-+++ b/arch/arm/boot/dts/r8a7745.dtsi
-@@ -25,6 +25,8 @@
- 		i2c3 = &i2c3;
- 		i2c4 = &i2c4;
- 		i2c5 = &i2c5;
-+		i2c6 = &iic0;
-+		i2c7 = &iic1;
- 		spi0 = &qspi;
- 		spi1 = &msiof0;
- 		spi2 = &msiof1;
-@@ -752,6 +754,40 @@
- 			status = "disabled";
- 		};
+diff --git a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
+index 82587d7..3eb4f83 100644
+--- a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
++++ b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
+@@ -16,9 +16,9 @@
+ 	compatible = "iwave,g22d", "iwave,g22m", "renesas,r8a7745";
  
-+		iic0: i2c at e6500000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "renesas,iic-r8a7745",
-+				     "renesas,rcar-gen2-iic",
-+				     "renesas,rmobile-iic";
-+			reg = <0 0xe6500000 0 0x425>;
-+			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 318>;
-+			dmas = <&dmac0 0x61>, <&dmac0 0x62>,
-+			       <&dmac1 0x61>, <&dmac1 0x62>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 318>;
-+			status = "disabled";
-+		};
+ 	aliases {
++		ethernet0 = &avb;
+ 		serial3 = &scif4;
+ 		serial5 = &hscif1;
+-		ethernet0 = &avb;
+ 	};
+ 
+ 	chosen {
+@@ -40,6 +40,25 @@
+ 	};
+ };
+ 
++&avb {
++	pinctrl-0 = <&avb_pins>;
++	pinctrl-names = "default";
 +
-+		iic1: i2c at e6510000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "renesas,iic-r8a7745",
-+				     "renesas,rcar-gen2-iic",
-+				     "renesas,rmobile-iic";
-+			reg = <0 0xe6510000 0 0x425>;
-+			interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 323>;
-+			dmas = <&dmac0 0x65>, <&dmac0 0x66>,
-+			       <&dmac1 0x65>, <&dmac1 0x66>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 323>;
-+			status = "disabled";
-+		};
++	phy-handle = <&phy3>;
++	phy-mode = "gmii";
++	renesas,no-ether-link;
++	status = "okay";
 +
- 		mmcif0: mmc at ee200000 {
- 			compatible = "renesas,mmcif-r8a7745",
- 				     "renesas,sh-mmcif";
++	phy3: ethernet-phy at 3 {
++	/*
++	 * On some older versions of the platform (before R4.0) the phy address
++	 * may be 1 or 3. The address is fixed to 3 for R4.0 onwards.
++	 */
++		reg = <3>;
++		micrel,led-mode = <1>;
++	};
++};
++
+ &hscif1 {
+ 	pinctrl-0 = <&hscif1_pins>;
+ 	pinctrl-names = "default";
+@@ -48,7 +67,18 @@
+ 	status = "okay";
+ };
+ 
++&pci1 {
++	status = "okay";
++	pinctrl-0 = <&usb1_pins>;
++	pinctrl-names = "default";
++};
++
+ &pfc {
++	avb_pins: avb {
++		groups = "avb_mdio", "avb_gmii";
++		function = "avb";
++	};
++
+ 	hscif1_pins: hscif1 {
+ 		groups = "hscif1_data", "hscif1_ctrl";
+ 		function = "hscif1";
+@@ -59,11 +89,6 @@
+ 		function = "scif4";
+ 	};
+ 
+-	avb_pins: avb {
+-		groups = "avb_mdio", "avb_gmii";
+-		function = "avb";
+-	};
+-
+ 	sdhi0_pins: sd0 {
+ 		groups = "sdhi0_data4", "sdhi0_ctrl";
+ 		function = "sdhi0";
+@@ -83,25 +108,6 @@
+ 	status = "okay";
+ };
+ 
+-&avb {
+-	pinctrl-0 = <&avb_pins>;
+-	pinctrl-names = "default";
+-
+-	phy-handle = <&phy3>;
+-	phy-mode = "gmii";
+-	renesas,no-ether-link;
+-	status = "okay";
+-
+-	phy3: ethernet-phy at 3 {
+-	/*
+-	 * On some older versions of the platform (before R4.0) the phy address
+-	 * may be 1 or 3. The address is fixed to 3 for R4.0 onwards.
+-	 */
+-		reg = <3>;
+-		micrel,led-mode = <1>;
+-	};
+-};
+-
+ &sdhi0 {
+ 	pinctrl-0 = <&sdhi0_pins>;
+ 	pinctrl-names = "default";
+@@ -112,12 +118,6 @@
+ 	status = "okay";
+ };
+ 
+-&pci1 {
+-	status = "okay";
+-	pinctrl-0 = <&usb1_pins>;
+-	pinctrl-names = "default";
+-};
+-
+ &usbphy {
+ 	status = "okay";
+ };
 -- 
 2.7.4
