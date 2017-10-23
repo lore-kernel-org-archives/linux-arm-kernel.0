@@ -1,63 +1,40 @@
-From: Brian.McFarland@harman.com (McFarland, Brian)
-Date: Mon, 23 Oct 2017 18:07:51 +0000
-Subject: A case for ZONE_DMA32 (or similar) on LPAE?
-Message-ID: <4c9a447c06cf47cdb5b07d3774ea7e5d@HICGWSMB03.ad.harman.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 23 Oct 2017 20:54:49 +0200
+Subject: Camera support, Prague next week, sdlcam
+In-Reply-To: <f85cab54-30cf-0774-7376-abced86842af@xs4all.nl>
+References: <20170416091209.GB7456@valkosipuli.retiisi.org.uk>
+ <20170419105118.72b8e284@vento.lan> <20170424093059.GA20427@amd>
+ <20170424103802.00d3b554@vento.lan> <20170424212914.GA20780@amd>
+ <20170424224724.5bb52382@vento.lan> <20170426105300.GA857@amd>
+ <20170426082608.7dd52fbf@vento.lan> <20171021220026.GA26881@amd>
+ <f85cab54-30cf-0774-7376-abced86842af@xs4all.nl>
+Message-ID: <20171023185414.GA2258@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using the TI's 6AM.1.3 release for DRA7x I have an oom-killer problem that only occurs with LPAE enabled.
+Hi!
 
-That is to say - I have a baseline system runs without oom-killer on a non-LPAE kernel, but recently enabled LPAE to allow access to 4GB of RAM (my baseline HW 2G). When doing so, I see oom-killer issues early and often.
+> > I'll talk about the issues at ELCE in few days:
+> > 
+> > https://osseu17.sched.com/event/ByYH/cheap-complex-cameras-pavel-machek-denx-software-engineering-gmbh
+> > 
+> > Will someone else be there? Is there some place where v4l people meet?
+> 
+> Why don't we discuss this Tuesday morning at 9am? I have no interest in the
+> keynotes on that day, so those who are interested can get together.
 
-I believe I've narrowed down the problem to  an issue with the SGX/PowerVR driver, pvrsrvkm (open source-ish but built out-of-tree).  When LPAE is disabled, the driver allocates using GFP_HIGHMEM because all memory is "32-bit safe", making it accessible to the SGX core. 
+Ok, what about 9:30am? The place near the elevators where we were
+talking last time?
 
-When LPAE is enabled, instead the driver uses GFP_DMA32, which on arch's where the zone does not exists - falls back to ZONE_NORMAL or ZONE_DMA, which are constricted to the first approx 768MB.  
-
-So you enable LPAE to access more RAM and in effect limit the amount of RAM accessible by this driver from 2GB total down to just 768MB.  There is another 1.3GB that gets lumped into highmem that *could* be used, but there's no zone for that and as far as I can tell, no other plan in the kernel to allocate memory with the constraint of being outside lowmem but still 32-bit addressable.
-
-To test the theory that this the root cause of my problem, I forced the driver to use GFP_HIGHMEM even on LPAE then used devicetree fixups in u-boot to limit memory kernel is made aware of to 2GB, forcing it to be 32-bit accessible.  With this configuration I am unable to reproduce the oom-killer issue at all.
-
-TI has a patch that sets dma_zone_size to SZ_2G in the machine_desc, but that doesn't appear to do anything useful.  On LPAE we only have 2 zones with non-zero memory size: ZONE_DMA and ZONE_HIGHMEM.  ZONE_DMA's size is set in a round-about way to arm_lowmem_limit. ZONE_NORMAL is set to size 0.
-
-This all leads me to believe I need another zone.  A zone that spans from arm_lowmem_limit to the end of 32-bit space, which in the case of dra7x is nominally about 1.3GB.
-
-This appears to be the general idea behind ZONE_DMA32 but the zone has comes in & out of multiple arch's and I cannot find any clear information on the exact intention of said zone.  It used to be on arm64 but was since removed. As far as I can tell, no one ever used it on arm32+LPAE.
-
-Is this "hole" in the mm design for ARM+LPAE? Or just a strange edge case no one else cares about?  Any suggestions would be greatly appreciated.
-
-Source for the driver in question is available here:
-
-	https://git.ti.com/android-sdk/device-ti-proprietary-open/blobs/master/jacinto6/sgx_src/eurasia_km/services4/srvkm/env/linux/mm.c
-
-Selected excerpts:
-
-/* Decide whether or not DevMem allocs need __GFP_DMA32 */
-#ifndef SGX_FEATURE_36BIT_MMU
-#       ifdef CONFIG_ZONE_DMA
-#               if defined CONFIG_X86_PAE || defined CONFIG_ARM_LPAE || defined CONFIG_64BIT
-#                       define PVR_USE_DMA32_FOR_DEVMEM_ALLOCS
-#               endif
-#       endif
-#endif
-
-...
-
-#if defined(PVR_USE_DMA32_FOR_DEVMEM_ALLOCS)
-        gfp_mask |= __GFP_DMA32;
-#else
-        gfp_mask |= __GFP_HIGHMEM;
-#endif
-
-        /* Allocate virtually contiguous pages */
-    pvRet = __vmalloc(uiBytes, gfp_mask, PGProtFlags);
-
-...
-
-
-#if defined(PVR_USE_DMA32_FOR_DEVMEM_ALLOCS)
-        gfp_mask |= __GFP_DMA32;
-#else
-        gfp_mask |= __GFP_HIGHMEM;
-#endif
-
-        psPage = alloc_pages(gfp_mask, 0);
+And.... sorry for late reply.
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171023/00ab004f/attachment.sig>
