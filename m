@@ -1,134 +1,63 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Mon, 23 Oct 2017 18:09:25 +0100
-Subject: [PATCH v2 4/9] ARM: dts: iwg22d-sodimm: sort dt nodes
-In-Reply-To: <1508778570-28795-1-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1508778570-28795-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <1508778570-28795-5-git-send-email-fabrizio.castro@bp.renesas.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 24 Oct 2017 02:36:54 +0900
+Subject: [GIT PULL] ARM: dts: uniphier: UniPhier DT updates for v4.15
+Message-ID: <CAK7LNAS+o7zCL_Yf7YXeqFMs2uNwTQ5O06+mmzeJqwsgzJzXMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Improve the layout of r8a7745-iwg22d-sodimm.dts by sorting the
-nodes alphabetically.
+Hi Arnd, Olof,
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
----
-Changes in v2:
-* rebased
+Here are UniPhier DT (32bit) updates for the v4.15 merge window.
+Please pull!
 
- arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts | 62 ++++++++++++++---------------
- 1 file changed, 31 insertions(+), 31 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
-index 82587d7..3eb4f83 100644
---- a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
-+++ b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
-@@ -16,9 +16,9 @@
- 	compatible = "iwave,g22d", "iwave,g22m", "renesas,r8a7745";
- 
- 	aliases {
-+		ethernet0 = &avb;
- 		serial3 = &scif4;
- 		serial5 = &hscif1;
--		ethernet0 = &avb;
- 	};
- 
- 	chosen {
-@@ -40,6 +40,25 @@
- 	};
- };
- 
-+&avb {
-+	pinctrl-0 = <&avb_pins>;
-+	pinctrl-names = "default";
-+
-+	phy-handle = <&phy3>;
-+	phy-mode = "gmii";
-+	renesas,no-ether-link;
-+	status = "okay";
-+
-+	phy3: ethernet-phy at 3 {
-+	/*
-+	 * On some older versions of the platform (before R4.0) the phy address
-+	 * may be 1 or 3. The address is fixed to 3 for R4.0 onwards.
-+	 */
-+		reg = <3>;
-+		micrel,led-mode = <1>;
-+	};
-+};
-+
- &hscif1 {
- 	pinctrl-0 = <&hscif1_pins>;
- 	pinctrl-names = "default";
-@@ -48,7 +67,18 @@
- 	status = "okay";
- };
- 
-+&pci1 {
-+	status = "okay";
-+	pinctrl-0 = <&usb1_pins>;
-+	pinctrl-names = "default";
-+};
-+
- &pfc {
-+	avb_pins: avb {
-+		groups = "avb_mdio", "avb_gmii";
-+		function = "avb";
-+	};
-+
- 	hscif1_pins: hscif1 {
- 		groups = "hscif1_data", "hscif1_ctrl";
- 		function = "hscif1";
-@@ -59,11 +89,6 @@
- 		function = "scif4";
- 	};
- 
--	avb_pins: avb {
--		groups = "avb_mdio", "avb_gmii";
--		function = "avb";
--	};
--
- 	sdhi0_pins: sd0 {
- 		groups = "sdhi0_data4", "sdhi0_ctrl";
- 		function = "sdhi0";
-@@ -83,25 +108,6 @@
- 	status = "okay";
- };
- 
--&avb {
--	pinctrl-0 = <&avb_pins>;
--	pinctrl-names = "default";
--
--	phy-handle = <&phy3>;
--	phy-mode = "gmii";
--	renesas,no-ether-link;
--	status = "okay";
--
--	phy3: ethernet-phy at 3 {
--	/*
--	 * On some older versions of the platform (before R4.0) the phy address
--	 * may be 1 or 3. The address is fixed to 3 for R4.0 onwards.
--	 */
--		reg = <3>;
--		micrel,led-mode = <1>;
--	};
--};
--
- &sdhi0 {
- 	pinctrl-0 = <&sdhi0_pins>;
- 	pinctrl-names = "default";
-@@ -112,12 +118,6 @@
- 	status = "okay";
- };
- 
--&pci1 {
--	status = "okay";
--	pinctrl-0 = <&usb1_pins>;
--	pinctrl-names = "default";
--};
--
- &usbphy {
- 	status = "okay";
- };
+
+The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+
+  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
+tags/uniphier-dt-v4.15
+
+for you to fetch changes up to a1763a82a3e5896fa39b9e4e7b9f42c8f39390ae:
+
+  ARM: dts: uniphier: add resets properties (2017-10-24 02:12:48 +0900)
+
+----------------------------------------------------------------
+UniPhier ARM SoC DT updates for v4.15
+
+- add thermal monitor and thermal zone nodes
+- fix W=2 warnings
+- add GPIO controller nodes and related properties
+- add resets properties
+
+----------------------------------------------------------------
+Kunihiko Hayashi (1):
+      ARM: dts: uniphier: add nodes of thermal monitor and thermal zone for PXs2
+
+Masahiro Yamada (5):
+      ARM: dts: uniphier: fix W=2 build warnings
+      ARM: dts: uniphier: add GPIO controller nodes
+      ARM: dts: uniphier: route on-board device IRQ to GPIO controller
+      ARM: dts: uniphier: add GPIO hog definition
+      ARM: dts: uniphier: add resets properties
+
+ arch/arm/boot/dts/uniphier-ld4-ref.dts       | 10 ++-
+ arch/arm/boot/dts/uniphier-ld4.dtsi          | 25 +++++-
+ arch/arm/boot/dts/uniphier-ld6b-ref.dts      | 10 ++-
+ arch/arm/boot/dts/uniphier-pinctrl.dtsi      | 46 +++++-----
+ arch/arm/boot/dts/uniphier-pro4-ref.dts      | 10 ++-
+ arch/arm/boot/dts/uniphier-pro4.dtsi         | 27 +++++-
+ arch/arm/boot/dts/uniphier-pro5.dtsi         | 29 ++++++-
+ arch/arm/boot/dts/uniphier-pxs2.dtsi         | 80 ++++++++++++++++--
+ arch/arm/boot/dts/uniphier-sld8-ref.dts      | 10 ++-
+ arch/arm/boot/dts/uniphier-sld8.dtsi         | 29 ++++++-
+ arch/arm/boot/dts/uniphier-support-card.dtsi |  3 +-
+ 11 files changed, 240 insertions(+), 39 deletions(-)
+
+
 -- 
-2.7.4
+Best Regards
+Masahiro Yamada
