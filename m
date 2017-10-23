@@ -1,23 +1,27 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Mon, 23 Oct 2017 11:10:29 +0200
-Subject: ARM: mvebu: Use common error handling code in
- mvebu_armada_pm_init()
-In-Reply-To: <20171023085718.lga7auriq7paw2hv@mwanda>
-References: <1c378b21-f10a-3a3a-fcee-8f0c0214a8fe@users.sourceforge.net>
- <20171023085718.lga7auriq7paw2hv@mwanda>
-Message-ID: <44577789-a2e8-4c1a-9abc-a34a17ae2e22@users.sourceforge.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 23 Oct 2017 09:33:00 +0100
+Subject: linux-next: build failure after merge of the keystone tree
+In-Reply-To: <3ed1f18a-204c-961a-9d81-b36e00d4aaf5@oracle.com>
+References: <20171010071924.ddxkylkwq44qh47q@sirena.co.uk>
+ <3ed1f18a-204c-961a-9d81-b36e00d4aaf5@oracle.com>
+Message-ID: <20171023083300.hucjzjcqflgrbqd4@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The error handling in mvebu_armada_pm_init() is incomplete
+On Sun, Oct 22, 2017 at 08:23:19PM -0700, santosh.shilimkar at oracle.com wrote:
+> On 10/10/17 12:19 AM, Mark Brown wrote:
 
-How would you like to extend it?
+> >     a6f244505915f ("ARM: dts: keystone-k2g-evm: Add I2C EEPROM DT entry")
 
+> > I've used the keystone tree from yesterday.
 
-> and this patch just smudges it around without fixing anything.
+> I fixed this next day but forgot to reply to you Mark.
 
-How does this kind of feedback fit to information from the section
-?7) Centralized exiting of functions? in the document ?coding-style.rst??
-
-Regards,
-Markus
+That's fine, so long as it's fixed no worries on my side!
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171023/88588e09/attachment.sig>
