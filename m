@@ -1,154 +1,120 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 23 Oct 2017 10:32:12 +0900
-Subject: [PATCH v5 7/7] PM / devfreq: Define the constant governor name
-In-Reply-To: <1508722332-10628-1-git-send-email-cw00.choi@samsung.com>
-References: <1508722332-10628-1-git-send-email-cw00.choi@samsung.com>
- <CGME20171023013216epcas2p4be3855bdb37dbaf4b5b9b9fdd6f65289@epcas2p4.samsung.com>
-Message-ID: <1508722332-10628-8-git-send-email-cw00.choi@samsung.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Mon, 23 Oct 2017 09:42:58 +0800
+Subject: [RFC resend] arm64: mt8173: Fix Acer Chromebooks mmsys probe
+ problem
+In-Reply-To: <1508424856.7665.22.camel@pengutronix.de>
+References: <20171019112610.13645-1-mbrugger@suse.com>
+ <1508418114.7665.16.camel@pengutronix.de> <1683149.BjzMD0lNNQ@avalon>
+ <1508424856.7665.22.camel@pengutronix.de>
+Message-ID: <1508722978.1108.16.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prior to that, the devfreq device uses the governor name when adding
-the itself. In order to prevent the mistake used the wrong governor name,
-this patch defines the governor name as a constant and then uses them
-instead of using the string directly.
+Hi,
 
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Krzysztof Kozlowski <krzk@kernel.org>
-Cc: linux-samsung-soc at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- drivers/devfreq/exynos-bus.c              | 5 +++--
- drivers/devfreq/governor_passive.c        | 2 +-
- drivers/devfreq/governor_performance.c    | 2 +-
- drivers/devfreq/governor_powersave.c      | 2 +-
- drivers/devfreq/governor_simpleondemand.c | 2 +-
- drivers/devfreq/governor_userspace.c      | 2 +-
- drivers/devfreq/rk3399_dmc.c              | 2 +-
- include/linux/devfreq.h                   | 7 +++++++
- 8 files changed, 16 insertions(+), 8 deletions(-)
+On Thu, 2017-10-19 at 16:54 +0200, Philipp Zabel wrote:
+> Hi Laurent,
+> 
+> On Thu, 2017-10-19 at 16:39 +0300, Laurent Pinchart wrote:
+> > Hi Philipp,
+> > 
+> > On Thursday, 19 October 2017 16:01:54 EEST Philipp Zabel wrote:
+> > > On Thu, 2017-10-19 at 13:26 +0200, Matthias Brugger wrote:
+> > > > In theory the MMSYS device tree identifier is matches twice, by the clk
+> > > > driver and the DRM subsystem. But the kernel only matches the first
+> > > > driver for a device (clk) and discards the second one. This breaks
+> > > > graphics on mt8173 and most probably on mt2701 as well.
+> > > > 
+> > > > MMSYS in Mediatek SoCs has some registers to control clock gates (which is
+> > > > used in the clk driver) and some registers to enable the differnet blocks
+> > > > of the display subsystem. The kernel uses the binding to load the central
+> > > > comoponent of the distplay subsystem, which in place probes all the other
+> > > > components and enables the present ones in the MMSYS.
+> > > > 
+> > > > We found us with the problem, that we need to change and therefor break
+> > > > one
+> > > > of the two bindings, or the DRM one or the clock driver one.
+> > > > 
+> > > > Apart from that the DRM subysystem does access the MMSYS registers via
+> > > > relaxed reads/writes. But the it should to so via regmap, as the
+> > > > registers are shared.
+> > > > 
+> > > > Possible solutions:
+> > > > 1) We add a new mediatek,mt8173-mmsys-clk node, which lives as a
+> > > > simple-mfd under the actual mmsys node. We change the clock driver to
+> > > > probe on this binding. This would make sense as the clock gate register
+> > > > live completly in the MMSYS configuration registers.
+> > > 
+> > > The reason why the drm driver matches against the mmsys node in the
+> > > first place is that we wanted to avoid 2).
+> > 
+> > Why did you want to avoid 2) ?
+> 
+> Because the "display-subsystem" node does not represent a real device,
+> it's just there to probe the driver that stitches all the DISP
+> components together.
+> 
+> > > Also, mmsys is not a pure clock controller, as it also contains the
+> > > display path configuration in its register space.
+> > 
+> > Which makes the mmsys related to display, but more in a syscon (combining 
+> > clocks and routing, and I assume other miscellaneous features that wouldn't 
+> > fit nicely in the other display-related IP cores) way than actually being part 
+> > of the display subsystem. Or does mmsys only provide display-related features 
+> > ?
+> 
+> All devices in the 0x14000000 - 0x14ffffff memory range are part of the
+> MMSYS system. That includes the MMSYS control or system configuration
+> block at 0x14000000 - 0x14000fff as well as all the related MDP (media
+> data path) and DISP (display data path) blocks that follow. The DISP
+> blocks are purely display related, while the MDP blocks implement
+> implement mem2mem functions like scaling and conversion.
+> 
+> > > > 2) As the nodes of the DRM subsystem just need some of the registers of
+> > > > MMSYS we add a new binding mediatek,mt8173-dispsys which probes the
+> > > > central component of the DRM system. It has only a handle to mt8173-mmsys
+> > > > to access the registerspace via regmap functions.
+> > > > 
+> > > > In this patchset I implemented 2). Please take into account, that this is
+> > > > a RFC. I had no time to actually test the verison on real HW. Some of the
+> > > > register accesses should be done using regmap_update instead of
+> > > > regmap_read + regmap_write.
+> > > > 
+> > > > This RFC shall only show how solution 2) would look like. We can use it as
+> > > > discussion to see how we circumvent the actual situation.
+> > > 
+> > > Or we could leave the bindings untouched and create one platform device
+> > > from the other or even set up the clocks from the drm driver?
+> > 
+> > Does mmsys provide features (such as clocks) to non-display IP cores ?
+> 
+> The MMSYS control block provides clocks for the DISP (display data path)
+> and MDP (multimedia data path) blocks, as well as the routing between
+> them, but not to anything outside of the MMSYS system.
 
-diff --git a/drivers/devfreq/exynos-bus.c b/drivers/devfreq/exynos-bus.c
-index 49f68929e024..c25658b26598 100644
---- a/drivers/devfreq/exynos-bus.c
-+++ b/drivers/devfreq/exynos-bus.c
-@@ -436,7 +436,8 @@ static int exynos_bus_probe(struct platform_device *pdev)
- 	ondemand_data->downdifferential = 5;
- 
- 	/* Add devfreq device to monitor and handle the exynos bus */
--	bus->devfreq = devm_devfreq_add_device(dev, profile, "simple_ondemand",
-+	bus->devfreq = devm_devfreq_add_device(dev, profile,
-+						DEVFREQ_GOV_SIMPLE_ONDEMAND,
- 						ondemand_data);
- 	if (IS_ERR(bus->devfreq)) {
- 		dev_err(dev, "failed to add devfreq device\n");
-@@ -488,7 +489,7 @@ static int exynos_bus_probe(struct platform_device *pdev)
- 	passive_data->parent = parent_devfreq;
- 
- 	/* Add devfreq device for exynos bus with passive governor */
--	bus->devfreq = devm_devfreq_add_device(dev, profile, "passive",
-+	bus->devfreq = devm_devfreq_add_device(dev, profile, DEVFREQ_GOV_PASSIVE,
- 						passive_data);
- 	if (IS_ERR(bus->devfreq)) {
- 		dev_err(dev,
-diff --git a/drivers/devfreq/governor_passive.c b/drivers/devfreq/governor_passive.c
-index 673ad8cc9a1d..3bc29acbd54e 100644
---- a/drivers/devfreq/governor_passive.c
-+++ b/drivers/devfreq/governor_passive.c
-@@ -183,7 +183,7 @@ static int devfreq_passive_event_handler(struct devfreq *devfreq,
- }
- 
- static struct devfreq_governor devfreq_passive = {
--	.name = "passive",
-+	.name = DEVFREQ_GOV_PASSIVE,
- 	.immutable = 1,
- 	.get_target_freq = devfreq_passive_get_target_freq,
- 	.event_handler = devfreq_passive_event_handler,
-diff --git a/drivers/devfreq/governor_performance.c b/drivers/devfreq/governor_performance.c
-index c72f942f30a8..4d23ecfbd948 100644
---- a/drivers/devfreq/governor_performance.c
-+++ b/drivers/devfreq/governor_performance.c
-@@ -42,7 +42,7 @@ static int devfreq_performance_handler(struct devfreq *devfreq,
- }
- 
- static struct devfreq_governor devfreq_performance = {
--	.name = "performance",
-+	.name = DEVFREQ_GOV_PERFORMANCE,
- 	.get_target_freq = devfreq_performance_func,
- 	.event_handler = devfreq_performance_handler,
- };
-diff --git a/drivers/devfreq/governor_powersave.c b/drivers/devfreq/governor_powersave.c
-index 0c6bed567e6d..0c42f23249ef 100644
---- a/drivers/devfreq/governor_powersave.c
-+++ b/drivers/devfreq/governor_powersave.c
-@@ -39,7 +39,7 @@ static int devfreq_powersave_handler(struct devfreq *devfreq,
- }
- 
- static struct devfreq_governor devfreq_powersave = {
--	.name = "powersave",
-+	.name = DEVFREQ_GOV_POWERSAVE,
- 	.get_target_freq = devfreq_powersave_func,
- 	.event_handler = devfreq_powersave_handler,
- };
-diff --git a/drivers/devfreq/governor_simpleondemand.c b/drivers/devfreq/governor_simpleondemand.c
-index ae72ba5e78df..28e0f2de7100 100644
---- a/drivers/devfreq/governor_simpleondemand.c
-+++ b/drivers/devfreq/governor_simpleondemand.c
-@@ -125,7 +125,7 @@ static int devfreq_simple_ondemand_handler(struct devfreq *devfreq,
- }
- 
- static struct devfreq_governor devfreq_simple_ondemand = {
--	.name = "simple_ondemand",
-+	.name = DEVFREQ_GOV_SIMPLE_ONDEMAND,
- 	.get_target_freq = devfreq_simple_ondemand_func,
- 	.event_handler = devfreq_simple_ondemand_handler,
- };
-diff --git a/drivers/devfreq/governor_userspace.c b/drivers/devfreq/governor_userspace.c
-index 77028c27593c..080607c3f34d 100644
---- a/drivers/devfreq/governor_userspace.c
-+++ b/drivers/devfreq/governor_userspace.c
-@@ -87,7 +87,7 @@ static ssize_t show_freq(struct device *dev, struct device_attribute *attr,
- 	NULL,
- };
- static const struct attribute_group dev_attr_group = {
--	.name	= "userspace",
-+	.name	= DEVFREQ_GOV_USERSPACE,
- 	.attrs	= dev_entries,
- };
- 
-diff --git a/drivers/devfreq/rk3399_dmc.c b/drivers/devfreq/rk3399_dmc.c
-index 1b89ebbad02c..5dfbfa3cc878 100644
---- a/drivers/devfreq/rk3399_dmc.c
-+++ b/drivers/devfreq/rk3399_dmc.c
-@@ -431,7 +431,7 @@ static int rk3399_dmcfreq_probe(struct platform_device *pdev)
- 
- 	data->devfreq = devm_devfreq_add_device(dev,
- 					   &rk3399_devfreq_dmc_profile,
--					   "simple_ondemand",
-+					   DEVFREQ_GOV_SIMPLE_ONDEMAND,
- 					   &data->ondemand_data);
- 	if (IS_ERR(data->devfreq))
- 		return PTR_ERR(data->devfreq);
-diff --git a/include/linux/devfreq.h b/include/linux/devfreq.h
-index 19520625ea94..3aae5b3af87c 100644
---- a/include/linux/devfreq.h
-+++ b/include/linux/devfreq.h
-@@ -19,6 +19,13 @@
- 
- #define DEVFREQ_NAME_LEN 16
- 
-+/* DEVFREQ governor name */
-+#define DEVFREQ_GOV_SIMPLE_ONDEMAND	"simple_ondemand"
-+#define DEVFREQ_GOV_PERFORMANCE		"performance"
-+#define DEVFREQ_GOV_POWERSAVE		"powersave"
-+#define DEVFREQ_GOV_USERSPACE		"userspace"
-+#define DEVFREQ_GOV_PASSIVE		"passive"
-+
- /* DEVFREQ notifier interface */
- #define DEVFREQ_TRANSITION_NOTIFIER	(0)
- 
--- 
-1.9.1
+According to register table of mediatek x20 mmsys [1] and Philipp's
+statement, I think mmsys is neither clock-controller nor display
+controller. It's a combination of multiple function. The four major
+function is display's clock-control, mdp's clock-control, display's
+routing, and mdp's routing. So we have two choice:
+
+1) Centralize these multiple function control inside mmsys device: This
+means there is only a mmsys device which contains function of
+clock-control, display, and mdp.
+
+2) Separate these multiple function to different device: mmsys is the
+major device which owns the register resource but does nothing. The
+function is controlled by three virtual device: mmsys-clock-controller,
+display-controller, and mdp-controller.
+
+I prefer 2) because these function seems independent. 
+
+Regards,
+CK
+
+[1]
+https://www.96boards.org/documentation/ConsumerEdition/MediaTekX20/AdditionalDocs/
+
+> 
+> regards
+> Philipp
