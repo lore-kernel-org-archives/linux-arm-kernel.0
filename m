@@ -1,138 +1,102 @@
-From: elena.reshetova@intel.com (Reshetova, Elena)
-Date: Mon, 23 Oct 2017 06:37:09 +0000
-Subject: [PATCH 02/15] drivers, net, ethernet: convert
- mtk_eth.dma_refcnt from atomic_t to refcount_t
-In-Reply-To: <1508645199.29850.16.camel@mtkswgap22>
-References: <1508484229-19706-1-git-send-email-elena.reshetova@intel.com>
- <1508484229-19706-3-git-send-email-elena.reshetova@intel.com>
- <1508486927.29850.12.camel@mtkswgap22>
- <2236FBA76BA1254E88B949DDB74E612B802B37EE@IRSMSX102.ger.corp.intel.com>
- <1508645199.29850.16.camel@mtkswgap22>
-Message-ID: <2236FBA76BA1254E88B949DDB74E612B802B41DE@IRSMSX102.ger.corp.intel.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Mon, 23 Oct 2017 10:06:27 +0200
+Subject: [PATCH 1/3] dt-bindings: iio: adc: stm32: add support for diff
+ channels
+In-Reply-To: <20171021202327.51dd2855@archlinux>
+References: <1508246145-19417-1-git-send-email-fabrice.gasnier@st.com>
+ <1508246145-19417-2-git-send-email-fabrice.gasnier@st.com>
+ <20171021185401.529f2eb2@archlinux> <20171021202327.51dd2855@archlinux>
+Message-ID: <0726f676-0440-afbe-f275-ec7fdaa29c9f@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Fri, 2017-10-20 at 10:37 +0000, Reshetova, Elena wrote:
-> > > On Fri, 2017-10-20 at 10:23 +0300, Elena Reshetova wrote:
-> > > > atomic_t variables are currently used to implement reference
-> > > > counters with the following properties:
-> > > >  - counter is initialized to 1 using atomic_set()
-> > > >  - a resource is freed upon counter reaching zero
-> > > >  - once counter reaches zero, its further
-> > > >    increments aren't allowed
-> > > >  - counter schema uses basic atomic operations
-> > > >    (set, inc, inc_not_zero, dec_and_test, etc.)
-> > > >
-> > > > Such atomic variables should be converted to a newly provided
-> > > > refcount_t type and API that prevents accidental counter overflows
-> > > > and underflows. This is important since overflows and underflows
-> > > > can lead to use-after-free situation and be exploitable.
-> > > >
-> > > > The variable mtk_eth.dma_refcnt is used as pure reference counter.
-> > > > Convert it to refcount_t and fix up the operations.
-> > > >
-> > > > Suggested-by: Kees Cook <keescook@chromium.org>
-> > > > Reviewed-by: David Windsor <dwindsor@gmail.com>
-> > > > Reviewed-by: Hans Liljestrand <ishkamiel@gmail.com>
-> > > > Signed-off-by: Elena Reshetova <elena.reshetova@intel.com>
-> > > > ---
-> > > >  drivers/net/ethernet/mediatek/mtk_eth_soc.c | 8 +++++---
-> > > >  drivers/net/ethernet/mediatek/mtk_eth_soc.h | 4 +++-
-> > > >  2 files changed, 8 insertions(+), 4 deletions(-)
-> > > >
-> > > > diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
-> > > b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
-> > > > index 5e81a72..54adfd9 100644
-> > > > --- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
-> > > > +++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
-> > > > @@ -1817,7 +1817,7 @@ static int mtk_open(struct net_device *dev)
-> > > >  	struct mtk_eth *eth = mac->hw;
-> > > >
-> > > >  	/* we run 2 netdevs on the same dma ring so we only bring it up once
-> > > */
-> > > > -	if (!atomic_read(&eth->dma_refcnt)) {
-> > > > +	if (!refcount_read(&eth->dma_refcnt)) {
-> > > >  		int err = mtk_start_dma(eth);
-> > > >
-> > > >  		if (err)
-> > > > @@ -1827,8 +1827,10 @@ static int mtk_open(struct net_device *dev)
-> > > >  		napi_enable(&eth->rx_napi);
-> > > >  		mtk_tx_irq_enable(eth, MTK_TX_DONE_INT);
-> > > >  		mtk_rx_irq_enable(eth, MTK_RX_DONE_INT);
-> > > > +		refcount_set(&eth->dma_refcnt, 1);
-> > >
-> > > the existing driver seems to have a missing initial atomic_set for the
-> > > eth->dma_refcnt.
-> > >
-> > > >  	}
-> > > > -	atomic_inc(&eth->dma_refcnt);
-> > > > +	else
-> > > > +		refcount_inc(&eth->dma_refcnt);
-> > > >
-> > >
-> > > how about add the initial refcount_set into probe handler, and keep
-> > > logic else unchanged ?
-> >
-> > Sure, I guess you mean mtk_probe() function? I can move the refcount_set to be
-> there
-> > and remove this change.
-> >
-> > Should I resend the modified patch to you (maybe then two of the ethernet
-> patches)?
-> >
-> > Best Regards,
-> > Elena.
+On 10/21/2017 09:23 PM, Jonathan Cameron wrote:
+> On Sat, 21 Oct 2017 18:54:01 +0100
+> Jonathan Cameron <jic23@kernel.org> wrote:
 > 
-> The entire series has been applies to net-next, I think I can make the
-> follow-ups patches relative to your work.
+>> On Tue, 17 Oct 2017 15:15:43 +0200
+>> Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
+>>
+>>> STM32H7 ADC channels may be configured either as single-ended or
+>>> differential.
+>>> Add 'st,adc-diff-channels' property to support differential channels.
+>>> Differential channels are defined as a pair of positive and negative
+>>> inputs: vinp & vinn.
+>>>
+>>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>  
+>> Hmm. Fair enough.  Sometimes we support both types of channels
+>> and leave it to userspace, but in many cases that makes little sense
+>> - particularly if like I think is going on here, we aren't combining channels
+>> that can be separately read but rather the negative pin is simply unused
+>> when we are in single channel mode... (did I understand that right?)
+> I clearly didn't understand.  This is same as other devices
+> in that we are picking a pair from the channels that can otherwise be
+> used as single end channels. (I think). 
+
+Hi Jonathan,
+
+Indeed, we're picking a pair from the channels that can be used as
+single channels otherwise.
+Also, it doesn't makes sense to leave the choice to userspace: when
+these channels are used in differential mode, both input should be
+biased. This is quite dependent on hardware (board), not really a
+runtime choice.
+Hope this clarifies ?
+
 > 
-> 	Sean
+> For this binding I think I'd like to see an example added showing how
+> this works...
 
-Yes, I just noticed that David took them all. 
-Sure, if you want to send the follow up yourself, I certainly would not mind, 
-I still have many of these recount patches for different parts of kernel :)
+You're right, I should have added that. Please let me know if I can add
+bellow example in v2:
 
-Thank you!
+Example to setup differential channels 1, 2 & 3 (with resp. 0, 6 & 7
+negative inputs):
+	adc: adc at 40022000 {
+		compatible = "st,stm32h7-adc-core";
+		...
+		adc1: adc at 0 {
+			compatible = "st,stm32h7-adc";
+			...
+			st,adc-diff-channels = <1 0>, <2 6>, <3 7>;
+		};
+	};
 
+Thanks for reviewing,
 Best Regards,
-Elena.
+Fabrice
+
 > 
-> > >
-> > > >  	phy_start(dev->phydev);
-> > > >  	netif_start_queue(dev);
-> > > > @@ -1868,7 +1870,7 @@ static int mtk_stop(struct net_device *dev)
-> > > >  	phy_stop(dev->phydev);
-> > > >
-> > > >  	/* only shutdown DMA if this is the last user */
-> > > > -	if (!atomic_dec_and_test(&eth->dma_refcnt))
-> > > > +	if (!refcount_dec_and_test(&eth->dma_refcnt))
-> > > >  		return 0;
-> > > >
-> > > >  	mtk_tx_irq_disable(eth, MTK_TX_DONE_INT);
-> > > > diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.h
-> > > b/drivers/net/ethernet/mediatek/mtk_eth_soc.h
-> > > > index 3d3c24a..a3af466 100644
-> > > > --- a/drivers/net/ethernet/mediatek/mtk_eth_soc.h
-> > > > +++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.h
-> > > > @@ -15,6 +15,8 @@
-> > > >  #ifndef MTK_ETH_H
-> > > >  #define MTK_ETH_H
-> > > >
-> > > > +#include <linux/refcount.h>
-> > > > +
-> > > >  #define MTK_QDMA_PAGE_SIZE	2048
-> > > >  #define	MTK_MAX_RX_LENGTH	1536
-> > > >  #define MTK_TX_DMA_BUF_LEN	0x3fff
-> > > > @@ -632,7 +634,7 @@ struct mtk_eth {
-> > > >  	struct regmap			*pctl;
-> > > >  	u32				chip_id;
-> > > >  	bool				hwlro;
-> > > > -	atomic_t			dma_refcnt;
-> > > > +	refcount_t			dma_refcnt;
-> > > >  	struct mtk_tx_ring		tx_ring;
-> > > >  	struct mtk_rx_ring
-> > > 	rx_ring[MTK_MAX_RX_RING_NUM];
-> > > >  	struct mtk_rx_ring		rx_ring_qdma;
-> > >
-> >
+> Thanks,
+> 
+> Jonathan
+>>
+>> Jonathan
+>>
+>>> ---
+>>>  Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt | 6 ++++++
+>>>  1 file changed, 6 insertions(+)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+>>> index 48bfcaa3..c3c8de1 100644
+>>> --- a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+>>> +++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+>>> @@ -62,6 +62,12 @@ Required properties:
+>>>  - st,adc-channels: List of single-ended channels muxed for this ADC.
+>>>    It can have up to 16 channels on stm32f4 or 20 channels on stm32h7, numbered
+>>>    from 0 to 15 or 19 (resp. for in0..in15 or in0..in19).
+>>> +- st,adc-diff-channels: List of differential channels muxed for this ADC.
+>>> +  Depending on part used, some channels can be configured as differential
+>>> +  instead of single-ended (e.g. stm32h7). List here positive and negative
+>>> +  inputs pairs as <vinp vinn>, <vinp vinn>,... vinp and vinn are numbered
+>>> +  from 0 to 19 on stm32h7)
+>>> +  Note: At least one of "st,adc-channels" or "st,adc-diff-channels" is required.
+>>>  - #io-channel-cells = <1>: See the IIO bindings section "IIO consumers" in
+>>>    Documentation/devicetree/bindings/iio/iio-bindings.txt
+>>>    
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
