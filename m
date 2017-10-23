@@ -1,142 +1,163 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 23 Oct 2017 10:13:24 +0200
-Subject: [PATCH] firmware: meson-sm: use generic compatible
-In-Reply-To: <CAL_JsqKON3mKrkjg1gR-JjM_YarWMdGRURTx39MVgC=beCKz3g@mail.gmail.com>
-References: <20171012134743.10625-1-jbrunet@baylibre.com>
- <20171017204959.kfbhn2yxhv2sb5qg@rob-hp-laptop>
- <7h8tg7zb6t.fsf@baylibre.com>
- <CAL_JsqJ-XAqMA_zjxrJNAtysQsXzmWYUFqLJtKX2wUJ0oebtuw@mail.gmail.com>
- <1508488253.3616.28.camel@baylibre.com>
- <CAL_JsqKON3mKrkjg1gR-JjM_YarWMdGRURTx39MVgC=beCKz3g@mail.gmail.com>
-Message-ID: <1508746404.3587.26.camel@baylibre.com>
+From: Claudiu.Beznea@microchip.com (m18063)
+Date: Mon, 23 Oct 2017 11:22:10 +0300
+Subject: [PATCH v4 1/1] pwm: mediatek: add MT2712/MT7622 support
+In-Reply-To: <1503367755-6519-2-git-send-email-zhi.mao@mediatek.com>
+References: <1503367755-6519-1-git-send-email-zhi.mao@mediatek.com>
+ <1503367755-6519-2-git-send-email-zhi.mao@mediatek.com>
+Message-ID: <78c6789f-6f9c-f075-b773-dcf90c2a42da@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-10-20 at 14:34 -0500, Rob Herring wrote:
-> On Fri, Oct 20, 2017 at 3:30 AM, Jerome Brunet <jbrunet@baylibre.com> wrote:
-> > On Thu, 2017-10-19 at 16:18 -0500, Rob Herring wrote:
-> > > On Thu, Oct 19, 2017 at 5:25 AM, Kevin Hilman <khilman@baylibre.com>
-> > > wrote:
-> > > > Rob Herring <robh@kernel.org> writes:
-> > > > 
-> > > > > On Thu, Oct 12, 2017 at 03:47:43PM +0200, Jerome Brunet wrote:
-> > > > > > The meson secure monitor seems to be compatible with more SoCs than
-> > > > > > initially thought. Let's use the most generic compatible he have in
-> > > > > > DT instead of the gxbb specific one
-> > > > > > 
-> > > > > > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> > > > > > ---
-> > > > > >  Documentation/devicetree/bindings/firmware/meson/meson_sm.txt | 4
-> > > > > > ++--
-> > > > > >  drivers/firmware/meson/meson_sm.c                             | 4
-> > > > > > ++--
-> > > > > >  2 files changed, 4 insertions(+), 4 deletions(-)
-> > > > > 
-> > > > > Seems like a pointless, not backwards compatible change to me.
-> > > > 
-> > > > I've verified that it's backwards compatible with existing upstream DTs.
-> > > 
-> > > Perhaps if you all are documenting only what the driver uses, not what
-> > > the dts can have as Jerome said.
-> > > 
-> > > > > end, it's just a string to match on. Who cares what the string is.
-> > > > 
-> > > > As platform maintiner, I very much care what the strings are and I want
-> > > > it to be coherent with the platform generic names, and I want the
-> > > > SoC-specific strings to correspond to the actual SoC names.
-> > > 
-> > > The most specific compatible should be, absolutely. The fallbacks can
-> > > be anything really. Ideally, they are the compatible string for the
-> > > 1st SoC with "the same" compatible IP. Could be another vendor
-> > > entirely even because mergers happen.
-> > 
-> > Then what's your problem with these patches again ?
-> 
-> Removal of the SoC specific compatible and breaking compatibility.
-> Kevin says compatibility is not broken, but it obviously it based on
-> the example and the driver change. So that can only mean your dts file
-> doesn't match the example.
+Hi Zhi,
 
-I believe it does, but I suppose I have missed something.
+I have few comments regarding your patch. Please see them below.
 
-Currently the driver only matches on:
-.compatible = "amlogic,meson-gxbb-sm" (drivers/firmware/meson_sm.c)
+Thanks,
+Claudiu
 
-The only device-tree file using it is 
-meson-gx.dtsi: compatible = "amlogic,meson-gx-sm", "amlogic,meson-gxbb-sm";
+On 22.08.2017 05:09, Zhi Mao wrote:
+> Add support to MT2712 and MT7622.
+> Due to register offset address of pwm7 for MT2712 is not fixed 0x40,
+> add mtk_pwm_reg_offset array for pwm register offset.
+> 
+> Signed-off-by: Zhi Mao <zhi.mao@mediatek.com>
+> ---
+>  drivers/pwm/pwm-mediatek.c |   51 ++++++++++++++++++++++++++++++++++++--------
+>  1 file changed, 42 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
+> index 1d78ab1..ccd86e7 100644
+> --- a/drivers/pwm/pwm-mediatek.c
+> +++ b/drivers/pwm/pwm-mediatek.c
+> @@ -16,6 +16,7 @@
+>  #include <linux/module.h>
+>  #include <linux/clk.h>
+>  #include <linux/of.h>
+> +#include <linux/of_device.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/pwm.h>
+>  #include <linux/slab.h>
+> @@ -40,11 +41,19 @@ enum {
+>  	MTK_CLK_PWM3,
+>  	MTK_CLK_PWM4,
+>  	MTK_CLK_PWM5,
+> +	MTK_CLK_PWM6,
+> +	MTK_CLK_PWM7,
+> +	MTK_CLK_PWM8,
+>  	MTK_CLK_MAX,
+>  };
+>  
+> -static const char * const mtk_pwm_clk_name[] = {
+> -	"main", "top", "pwm1", "pwm2", "pwm3", "pwm4", "pwm5"
+> +static const char * const mtk_pwm_clk_name[MTK_CLK_MAX] = {
+> +	"main", "top", "pwm1", "pwm2", "pwm3", "pwm4", "pwm5", "pwm6", "pwm7",
+> +	"pwm8"
+> +};
+> +
+> +struct mtk_pwm_platform_data {
+> +	unsigned int num_pwms;
+>  };
+>  
+>  /**
+> @@ -57,6 +66,11 @@ struct mtk_pwm_chip {
+>  	struct pwm_chip chip;
+>  	void __iomem *regs;
+>  	struct clk *clks[MTK_CLK_MAX];
+> +	const struct mtk_pwm_platform_data *data;
+I think you can remove this member since you only use it to initialize chip.npwm,
+in probe function, just before platform_set_drvdata().
 
-So:
-1) yes the order is backward (thx for pointing this out)
-2) by changing the compatible matched by the driver from "amlogic,meson-gxbb-sm" 
-to "amlogic,meson-gx-sm", I don't think I am breaking anything. Feel free to
-point out why this is wrong because I don't get it. 
+	pc->chip.npwm = pc->data->pwm_nums;
 
-> 
-> > I am just asking the driver to match the generic binding instead of the SoC
-> > specific, because we are also using it on other SoC, as explain in the patch
-> > comment. Does not seems that "pointless" to me.
-> > 
-> > Right now the driver match only on: vendor,soc-one
-> > in dts, we have compatible = "vendor,family", "vendor,soc-one"
-> 
-> That's backwards if I understand this right. It should be most
-> specific first, but that's a separate issue.
-> 
-> > but it is compatible with soc-two as well.
-> > to match we would have to put "vendor,soc-one" as well which is a mess
-> 
-> Why? That's how DT works and every other platform follows. Either you have:
-> 
-> "vendor,soc-one", "vendor,family"
-> "vendor,soc-two", "vendor,family"
-> 
-> or
-> 
-> "vendor,soc-one"
-> "vendor,soc-two", "vendor,soc-one"
-> 
-> The latter is how DT has existed and worked for 20+ years. The former
-> is what we allow because for some reason people have such an aversion
-> to saying soc2 is compatible with soc1.
-> 
-> Either one is fine, but the documentation must be clear what the
-> constraints are for the dts file. For example, "vendor,soc-two" or
-> "vendor,family" alone are not valid. There's plenty of examples to
+	platform_set_drvdata(pdev, pc);
+> +};
+> +
+> +static const unsigned int mtk_pwm_reg_offset[] = {
+> +	0x0010, 0x0050, 0x0090, 0x00d0, 0x0110, 0x0150, 0x0190, 0x0220
+>  };
+>  
+>  static inline struct mtk_pwm_chip *to_mtk_pwm_chip(struct pwm_chip *chip)
+> @@ -103,14 +117,14 @@ static void mtk_pwm_clk_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+>  static inline u32 mtk_pwm_readl(struct mtk_pwm_chip *chip, unsigned int num,
+>  				unsigned int offset)
+>  {
+> -	return readl(chip->regs + 0x10 + (num * 0x40) + offset);
+> +	return readl(chip->regs + mtk_pwm_reg_offset[num] + offset);
+>  }
+>  
+>  static inline void mtk_pwm_writel(struct mtk_pwm_chip *chip,
+>  				  unsigned int num, unsigned int offset,
+>  				  u32 value)
+>  {
+> -	writel(value, chip->regs + 0x10 + (num * 0x40) + offset);
+> +	writel(value, chip->regs + mtk_pwm_reg_offset[num] + offset);
+>  }
+>  
+>  static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+> @@ -194,15 +208,20 @@ static int mtk_pwm_probe(struct platform_device *pdev)
+>  	if (!pc)
+>  		return -ENOMEM;
+>  
+> +	pc->data = of_device_get_match_data(&pdev->dev);
+You forgot to check pc->data == NULL (in case device tree inputs are not provided)
+and you may use here a stack allocated variable to store the number of PWMs returned
+by of_device_get_match_data(). This is used only for pc->chip.npwm, and anyway, if
+any, you could get that information from chip.npwm.
+You could also check here the number of PWMs returned via of_device_get_match_data()
+to avoid waiting for pwmchip_add() to fail (e.g. if number of PWMs is zero, the
+pwmchip_add() will fail).
 
-except that the DT file where it is used is a soc family dtsi.
-meson-gx.dtsi is the common DT for gxbb and gxl family. Wouldn't it make sense 
-to have the SoC generic compatible alone here ? and override it in the SoC DT if
-necessary ? 
-
-> follow. Renesas is one using "vendor,family" extensively.
+> +
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	pc->regs = devm_ioremap_resource(&pdev->dev, res);
+>  	if (IS_ERR(pc->regs))
+>  		return PTR_ERR(pc->regs);
+>  
+> -	for (i = 0; i < MTK_CLK_MAX; i++) {
+> +	for (i = 0; i < pc->data->num_pwms + 2; i++) {
+>  		pc->clks[i] = devm_clk_get(&pdev->dev, mtk_pwm_clk_name[i]);
+> -		if (IS_ERR(pc->clks[i]))
+> +		if (IS_ERR(pc->clks[i])) {
+> +			dev_err(&pdev->dev, "clock: %s fail: %ld\n",
+> +				mtk_pwm_clk_name[i], PTR_ERR(pc->clks[i]));
+>  			return PTR_ERR(pc->clks[i]);
+> +		}
+>  	}
+>  
+>  	platform_set_drvdata(pdev, pc);
+> @@ -210,7 +229,7 @@ static int mtk_pwm_probe(struct platform_device *pdev)
+>  	pc->chip.dev = &pdev->dev;
+>  	pc->chip.ops = &mtk_pwm_ops;
+>  	pc->chip.base = -1;
+> -	pc->chip.npwm = 5;
+> +	pc->chip.npwm = pc->data->num_pwms;
+>  
+>  	ret = pwmchip_add(&pc->chip);
+>  	if (ret < 0) {
+> @@ -228,9 +247,23 @@ static int mtk_pwm_remove(struct platform_device *pdev)
+>  	return pwmchip_remove(&pc->chip);
+>  }
+>  
+> +static const struct mtk_pwm_platform_data mt2712_pwm_data = {
+> +	.num_pwms = 8,
+> +};
+> +
+> +static const struct mtk_pwm_platform_data mt7622_pwm_data = {
+> +	.num_pwms = 6,
+> +};
+> +
+> +static const struct mtk_pwm_platform_data mt7623_pwm_data = {
+> +	.num_pwms = 5,
+> +};
+> +
+>  static const struct of_device_id mtk_pwm_of_match[] = {
+> -	{ .compatible = "mediatek,mt7623-pwm" },
+> -	{ }
+> +	{ .compatible = "mediatek,mt2712-pwm", .data = &mt2712_pwm_data },
+> +	{ .compatible = "mediatek,mt7622-pwm", .data = &mt7622_pwm_data },
+> +	{ .compatible = "mediatek,mt7623-pwm", .data = &mt7623_pwm_data },
+> +	{ },
+>  };
+>  MODULE_DEVICE_TABLE(of, mtk_pwm_of_match);
+>  
 > 
-> > By expressing correctly what the driver is compatible with, "vendor,family"
-> > we can dts that makes sense for soc-two as well
-> > compatible = "vendor,family", "vendor,soc-two"
-
-Honestly, I don't care which of the 2 solutions we take. The important thing for
-me is to eliminate the confusion introduced by the generic-compatible being here
-and useless. The driver is indeed generic, but the related compatible is not
-matched. This makes no sense.
-
-So either:
-* we use "vendor,soc-one", "vendor,family" model: I believe this what I'm trying
- to do here. For this, we need to match the soc generic compatible in the
-driver.
-
-* we use the "vendor,soc-two", "vendor,soc-one" model : The driver keeps on
-matching the SoC specific compatible. We won't ever match the generic one with
-this model, what is the point of keeping it around in DT ? Should we remove it ?
-
-Maybe the later is better, it would end up just being a removal of an
-undocumented property from DT.
-
-> 
-> Binding docs may live in the kernel, but they are separate from
-> drivers. They describe the constraints of the dts files. There's no
-> reason to document what the driver wants because I can read the driver
-> source. I can't say the same thing about the dts file. The dts may not
-> come from the kernel and one dts file is not all possible options for
-> a given binding.
-> 
-> Rob
