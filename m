@@ -1,24 +1,21 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Mon, 23 Oct 2017 07:53:07 +0200
-Subject: devfreq/exynos-bus: Use common error handling code in
- exynos_bus_target()
-In-Reply-To: <59ED4313.701@samsung.com>
-References: <CGME20171022134057epcas4p43e6f37b8994c28f6ef240536349811a8@epcas4p4.samsung.com>
- <4a407cd6-020c-1750-019a-6c0ceb40e245@users.sourceforge.net>
- <59ED4313.701@samsung.com>
-Message-ID: <e84ea128-d69e-7c77-db3a-44622457f347@users.sourceforge.net>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 23 Oct 2017 11:36:15 +0530
+Subject: [PATCH 0/4] Few more SBA RAID driver improvements
+In-Reply-To: <1507008180-27171-1-git-send-email-anup.patel@broadcom.com>
+References: <1507008180-27171-1-git-send-email-anup.patel@broadcom.com>
+Message-ID: <20171023060615.GC936@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> As I already commented on your other patch related to extcon-max14577,
-> this patch might remove the redundant error message.
+On Tue, Oct 03, 2017 at 10:52:56AM +0530, Anup Patel wrote:
+> This patchset does few more improvements to Broadcom SBA RAID
+> driver.
+> 
+> The patches are based on Linux-4.14-rc3 and can also be found
+> at sba-raid-imp2-v1 branch of:
+> https://github.com/Broadcom/arm64-linux.git
 
-I hope that more software improvements can be achieved in this design direction.
+Applied, thanks
 
-
-> But, it makes the code more complicated in side of readability. I prefer existing code.
-
-I prefer to avoid duplicated code a bit more.
-
-Regards,
-Markus
+-- 
+~Vinod
