@@ -1,143 +1,101 @@
 From: jeffy.chen@rock-chips.com (jeffy)
-Date: Mon, 23 Oct 2017 11:26:49 +0800
-Subject: [PATCH] ARM: Fix zImage file size not aligned with CONFIG_EFI_STUB
- enabled
-In-Reply-To: <CAKv+Gu9cgt0sjW_pnaXN6J8j8BXAb7z+gLhDY3oMaKwK5vcO-Q@mail.gmail.com>
-References: <20171018050108.10352-1-jeffy.chen@rock-chips.com>
- <CAKv+Gu9ReBC+rLxaD-+Mp+aWRDfsYECAeOZo9CYU3big2nPw0w@mail.gmail.com>
- <20171022124757.GL20805@n2100.armlinux.org.uk>
- <CAKv+Gu9cgt0sjW_pnaXN6J8j8BXAb7z+gLhDY3oMaKwK5vcO-Q@mail.gmail.com>
-Message-ID: <59ED6179.5020301@rock-chips.com>
+Date: Mon, 23 Oct 2017 11:28:00 +0800
+Subject: [PATCH] efi/libstub: arm: omit sorting of the UEFI memory map
+In-Reply-To: <20171022141457.28769-1-ard.biesheuvel@linaro.org>
+References: <20171022141457.28769-1-ard.biesheuvel@linaro.org>
+Message-ID: <59ED61C0.50602@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Ard,
 
-On 10/22/2017 09:01 PM, Ard Biesheuvel wrote:
-> On 22 October 2017 at 13:47, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
->> On Sun, Oct 22, 2017 at 12:01:13PM +0100, Ard Biesheuvel wrote:
->>> On 18 October 2017 at 06:01, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
->>>> The zImage file size should be aligned.
->>>>
->>>> Fixes: e4bae4d0b5f3 ("arm/efi: Split zImage code and data into separate PE/COFF sections")
->>>> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
->>>> ---
->>>>
->>>>   arch/arm/boot/compressed/vmlinux.lds.S | 8 ++++----
->>>>   1 file changed, 4 insertions(+), 4 deletions(-)
->>>>
->>>> diff --git a/arch/arm/boot/compressed/vmlinux.lds.S b/arch/arm/boot/compressed/vmlinux.lds.S
->>>> index b38dcef90756..1636fa259577 100644
->>>> --- a/arch/arm/boot/compressed/vmlinux.lds.S
->>>> +++ b/arch/arm/boot/compressed/vmlinux.lds.S
->>>> @@ -70,10 +70,6 @@ SECTIONS
->>>>     .got                 : { *(.got) }
->>>>     _got_end = .;
->>>>
->>>> -  /* ensure the zImage file size is always a multiple of 64 bits */
->>>> -  /* (without a dummy byte, ld just ignores the empty section) */
->>>> -  .pad                 : { BYTE(0); . = ALIGN(8); }
->>>> -
->>>>   #ifdef CONFIG_EFI_STUB
->>>>     .data : ALIGN(4096) {
->>>>       __pecoff_data_start = .;
->>>> @@ -93,6 +89,10 @@ SECTIONS
->>>>     __pecoff_data_rawsize = . - ADDR(.data);
->>>>   #endif
->>>>
->>>> +  /* ensure the zImage file size is always a multiple of 64 bits */
->>>> +  /* (without a dummy byte, ld just ignores the empty section) */
->>>> +  .pad                 : { BYTE(0); . = ALIGN(8); }
->>>> +
->>>>     _edata = .;
->>>>
->>>>     _magic_sig = ZIMAGE_MAGIC(0x016f2818);
->>>> --
->>>> 2.11.0
->>>>
->>>
->>> This is not the right fix. If CONFIG_EFI_STUB is enabled, the zImage
->>> filesize should be rounded up to 512 bytes not 8 bytes. The '. =
->>> ALIGN(512);' in the .data section appears to ensure that, but for some
->>> reason, that appears not to be working.
->>
->> Actually, the existing .pad section is totally and utterly bogus when
->> EFI is enabled:
->>
->>    . = ALIGN(4);
->>    _etext = .;
->>
->>    .got.plt              : { *(.got.plt) }
->>    _got_start = .;
->>    .got                  : { *(.got) }
->>    _got_end = .;
->>
->> The .got.plt and .got are always word-based.  This is then followed by
->> .pad, which does nothing but pad out to a multiple of 64 bit:
->>
->>    /* ensure the zImage file size is always a multiple of 64 bits */
->>    /* (without a dummy byte, ld just ignores the empty section) */
->>    .pad                  : { BYTE(0); . = ALIGN(8); }
->>
->> So this may add zero or 4 bytes of padding.
->>
->> This is then followed by the EFI data:
->>
->>    .data : ALIGN(4096) {
->>    ...
->>      . = ALIGN(512);
->>    }
->>
->> which is aligned to 4K but aligns the end of itself to 512.
->>
->> So, we have the end of .got aligned to 4, followed by .pad that tries to
->> align to 8, followed by an optional .data section.  This is pointless.
->>
->> A sane patch would be to choose between the EFI .data section and the
->> .pad section.  So, it should be:
->>
->> #ifdef CONFIG_EFI_STUB
->>     .data : ALIGN(4096) {
->>     ...
->>       . = ALIGN(512);
->>     }
->> #else
->>     .pad                 : { BYTE(0); . = ALIGN(8); }
->> #endif
->>
->
-> Agreed, the .pad section has no point for EFI_STUB=y. However, it
-> seems this symptom is caused by the same issues I am trying to address
-> here
->
-> https://marc.info/?l=linux-arm-kernel&m=150488477807353
->
-> which is that we have __ksymtab_xxx sections that we should discard,
-> because the linker will otherwise emit them /after/ .data or .pad.
-> This is caused by the use of lib/sort.c in the EFI stub, which
-> contains an EXPORT_SYMBOL().
+this patch fixes the zImage file size not aligned issue i meet, thanks:)
 
-hmm, right, didn't notice the data is already aligned...
-so it's indeed caused by the ksym:
+Tested-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 
-   [ 9] .data             PROGBITS        006ce000 6d6000 000200 00  WA 
-  0   0 4096
-   [10] ___ksymtab+sort   PROGBITS        006ce200 6d6200 000008 00  WA 
-  0   0  4
-   [11] .bss              NOBITS          006ce208 6d6208 00001c 00  WA 
-  0   0  4
-
-
-and both of your old([PATCH] ARM: compressed: discard ksym/kcrctab input 
-section) and new([PATCH] efi/libstub: arm: omit sorting of the UEFI 
-memory map) patches fix the issue i meet, thanks:)
-
+On 10/22/2017 10:14 PM, Ard Biesheuvel wrote:
+> ARM shares its EFI stub implementation with arm64, which has some
+> special handling in the virtual remapping code to
+> a) make sure that we can map everything even if the OS executes
+>     with 64k page size, and
+> b) make sure that adjacent regions with the same attributes are not
+>     reordered or moved apart in memory.
 >
-> Would you perhaps prefer that I clone sort.c into its own .c file
-> specifically for the EFI stub? (under drivers/firmware/efi/libstub)
-> That should get rid of these spurious sections and thus the
-> misalignments and/or movements that are causing all of these issues.
+> The latter is a workaround for a 'feature' that was shortly recommended
+> by UEFI spec v2.5, but deprecated shortly after, due to the fact that
+> it broke many OS installers, including non-Linux ones, and it was never
+> widely implemented for ARM systems. Before implementing b), the arm64
+> code simply rounded up all regions to 64 KB granularity, but given that
+> that results in moving adjacent regions apart, it had to be refined when
+> b) was implemented.
 >
+> The adjacency check requires a sort() pass, due to the fact that the
+> UEFI spec does not mandate any ordering, and the inclusion of the
+> lib/sort.c code into the ARM EFI stub is causing some trouble with
+> the decompressor build due to the fact that its EXPORT_SYMBOL() call
+> triggers the creation of ksymtab/kcrctab sections.
 >
+> So let's simply do away with the adjacency check for ARM, and simply put
+> all UEFI runtime regions together if they have the same memory attributes.
+> This is guaranteed to work, given that ARM only supports 4 KB pages,
+> and allows us to remove the sort() call entirely.
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>   drivers/firmware/efi/libstub/Makefile   | 6 +++---
+>   drivers/firmware/efi/libstub/arm-stub.c | 7 +++++--
+>   2 files changed, 8 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
+> index dedf9bde44db..f3e8431565ea 100644
+> --- a/drivers/firmware/efi/libstub/Makefile
+> +++ b/drivers/firmware/efi/libstub/Makefile
+> @@ -33,13 +33,14 @@ lib-y				:= efi-stub-helper.o gop.o secureboot.o
+>   lib-$(CONFIG_RESET_ATTACK_MITIGATION) += tpm.o
+>
+>   # include the stub's generic dependencies from lib/ when building for ARM/arm64
+> -arm-deps := fdt_rw.c fdt_ro.c fdt_wip.c fdt.c fdt_empty_tree.c fdt_sw.c sort.c
+> +arm-deps-y := fdt_rw.c fdt_ro.c fdt_wip.c fdt.c fdt_empty_tree.c fdt_sw.c
+> +arm-deps-$(CONFIG_ARM64) += sort.c
+>
+>   $(obj)/lib-%.o: $(srctree)/lib/%.c FORCE
+>   	$(call if_changed_rule,cc_o_c)
+>
+>   lib-$(CONFIG_EFI_ARMSTUB)	+= arm-stub.o fdt.o string.o random.o \
+> -				   $(patsubst %.c,lib-%.o,$(arm-deps))
+> +				   $(patsubst %.c,lib-%.o,$(arm-deps-y))
+>
+>   lib-$(CONFIG_ARM)		+= arm32-stub.o
+>   lib-$(CONFIG_ARM64)		+= arm64-stub.o
+> @@ -90,5 +91,4 @@ quiet_cmd_stubcopy = STUBCPY $@
+>   # explicitly by the decompressor linker script.
+>   #
+>   STUBCOPY_FLAGS-$(CONFIG_ARM)	+= --rename-section .data=.data.efistub
+> -STUBCOPY_RM-$(CONFIG_ARM)	+= -R ___ksymtab+sort -R ___kcrctab+sort
+>   STUBCOPY_RELOC-$(CONFIG_ARM)	:= R_ARM_ABS
+> diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
+> index 1cb2d1c070c3..3061e4057483 100644
+> --- a/drivers/firmware/efi/libstub/arm-stub.c
+> +++ b/drivers/firmware/efi/libstub/arm-stub.c
+> @@ -349,7 +349,9 @@ void efi_get_virtmap(efi_memory_desc_t *memory_map, unsigned long map_size,
+>   	 * The easiest way to find adjacent regions is to sort the memory map
+>   	 * before traversing it.
+>   	 */
+> -	sort(memory_map, map_size / desc_size, desc_size, cmp_mem_desc, NULL);
+> +	if (IS_ENABLED(CONFIG_ARM64))
+> +		sort(memory_map, map_size / desc_size, desc_size, cmp_mem_desc,
+> +		     NULL);
+>
+>   	for (l = 0; l < map_size; l += desc_size, prev = in) {
+>   		u64 paddr, size;
+> @@ -366,7 +368,8 @@ void efi_get_virtmap(efi_memory_desc_t *memory_map, unsigned long map_size,
+>   		 * a 4k page size kernel to kexec a 64k page size kernel and
+>   		 * vice versa.
+>   		 */
+> -		if (!regions_are_adjacent(prev, in) ||
+> +		if ((IS_ENABLED(CONFIG_ARM64) &&
+> +		     !regions_are_adjacent(prev, in)) ||
+>   		    !regions_have_compatible_memory_type_attrs(prev, in)) {
+>
+>   			paddr = round_down(in->phys_addr, SZ_64K);
 >
