@@ -1,519 +1,238 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 23 Oct 2017 14:49:34 +0200
-Subject: [PATCH v4] drm: exynos: Add driver for HDMI audio interface
-References: <CGME20171023124951epcas2p48e8961d79c7a772aaed5897410839c49@epcas2p4.samsung.com>
-Message-ID: <20171023124934.11453-1-s.nawrocki@samsung.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 23 Oct 2017 13:37:09 +0100
+Subject: [PATCH v2 1/8] arm64: KVM: Add invalidate_icache_range helper
+In-Reply-To: <20171023120522.GD31263@arm.com> (Will Deacon's message of "Mon,
+ 23 Oct 2017 13:05:23 +0100")
+References: <20171020154904.31427-1-marc.zyngier@arm.com>
+ <20171020154904.31427-2-marc.zyngier@arm.com>
+ <20171023120522.GD31263@arm.com>
+Message-ID: <86po9ehwga.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The hdmi-codec interface added in this patch is required to properly
-support HDMI audio. Currently the audio part of the SoC internal
-HDMI transmitter is configured with fixed values, which makes HDMI
-audio working by chance, only on boards having an external audio
-codec connected in parallel with the HDMI audio transmitter's input
-I2S interface.
+On Mon, Oct 23 2017 at  1:05:23 pm BST, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Marc,
+>
+> On Fri, Oct 20, 2017 at 04:48:57PM +0100, Marc Zyngier wrote:
+>> We currently tightly couple dcache clean with icache invalidation,
+>> but KVM could do without the initial flush to PoU, as we've
+>> already flushed things to PoC.
+>> 
+>> Let's introduce invalidate_icache_range which is limited to
+>> invalidating the icache from the linear mapping (and thus
+>> has none of the userspace fault handling complexity), and
+>> wire it in KVM instead of flush_icache_range.
+>> 
+>> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/include/asm/assembler.h  | 26 ++++++++++++++++++++++++++
+>>  arch/arm64/include/asm/cacheflush.h |  8 ++++++++
+>>  arch/arm64/include/asm/kvm_mmu.h    |  4 ++--
+>>  arch/arm64/mm/cache.S               | 26 ++++++++++++++++----------
+>>  4 files changed, 52 insertions(+), 12 deletions(-)
+>> 
+>> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+>> index d58a6253c6ab..efdbecc8f2ef 100644
+>> --- a/arch/arm64/include/asm/assembler.h
+>> +++ b/arch/arm64/include/asm/assembler.h
+>> @@ -374,6 +374,32 @@ alternative_endif
+>>  	dsb	\domain
+>>  	.endm
+>>  
+>> +/*
+>> + * Macro to perform an instruction cache maintenance for the interval
+>> + * [start, end)
+>> + *
+>> + * 	start, end:	virtual addresses describing the region
+>> + *	label:		A label to branch to on user fault, none if
+>> + *			only used on a kernel address
+>> + * 	Corrupts:	tmp1, tmp2
+>> + */
+>> +	.macro invalidate_icache_by_line start, end, tmp1, tmp2, label=none
+>> +	icache_line_size \tmp1, \tmp2
+>> +	sub	\tmp2, \tmp1, #1
+>> +	bic	\tmp2, \start, \tmp2
+>> +9997:
+>> +	.if	(\label == none)
+>> +	ic	ivau, \tmp2			// invalidate I line PoU
+>> +	.else
+>> +USER(\label, ic	ivau, \tmp2)			// invalidate I line PoU
+>> +	.endif
+>> +	add	\tmp2, \tmp2, \tmp1
+>> +	cmp	\tmp2, \end
+>> +	b.lo	9997b
+>> +	dsb	ish
+>> +	isb
+>> +	.endm
+>
+> Code looks fine to me, but I'd like to drop the \label == none case. See
+> below.
+>
+>>  /*
+>>   * reset_pmuserenr_el0 - reset PMUSERENR_EL0 if PMUv3 present
+>>   */
+>> diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+>> index 76d1cc85d5b1..ad56406944c6 100644
+>> --- a/arch/arm64/include/asm/cacheflush.h
+>> +++ b/arch/arm64/include/asm/cacheflush.h
+>> @@ -52,6 +52,13 @@
+>>   *		- start  - virtual start address
+>>   *		- end    - virtual end address
+>>   *
+>> + *	invalidate_icache_range(start, end)
+>> + *
+>> + *		Invalidate the I-cache in the region described by start, end.
+>> + *		Linear mapping only!
+>> + *		- start  - virtual start address
+>> + *		- end    - virtual end address
+>> + *
+>>   *	__flush_cache_user_range(start, end)
+>>   *
+>>   *		Ensure coherency between the I-cache and the D-cache in the
+>> @@ -66,6 +73,7 @@
+>>   *		- size   - region size
+>>   */
+>>  extern void flush_icache_range(unsigned long start, unsigned long end);
+>> +extern void invalidate_icache_range(unsigned long start, unsigned long end);
+>>  extern void __flush_dcache_area(void *addr, size_t len);
+>>  extern void __inval_dcache_area(void *addr, size_t len);
+>>  extern void __clean_dcache_area_poc(void *addr, size_t len);
+>> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+>> index 8034b96fb3a4..56b3e03c85e7 100644
+>> --- a/arch/arm64/include/asm/kvm_mmu.h
+>> +++ b/arch/arm64/include/asm/kvm_mmu.h
+>> @@ -250,8 +250,8 @@ static inline void __invalidate_icache_guest_page(struct kvm_vcpu *vcpu,
+>>  		/* PIPT or VPIPT at EL2 (see comment in __kvm_tlb_flush_vmid_ipa) */
+>>  		void *va = page_address(pfn_to_page(pfn));
+>>  
+>> -		flush_icache_range((unsigned long)va,
+>> -				   (unsigned long)va + size);
+>> +		invalidate_icache_range((unsigned long)va,
+>> +					(unsigned long)va + size);
+>>  	}
+>>  }
+>>  
+>> diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+>> index 7f1dbe962cf5..8e71d237f85e 100644
+>> --- a/arch/arm64/mm/cache.S
+>> +++ b/arch/arm64/mm/cache.S
+>> @@ -60,16 +60,7 @@ user_alt 9f, "dc cvau, x4",  "dc civac, x4",  ARM64_WORKAROUND_CLEAN_CACHE
+>>  	b.lo	1b
+>>  	dsb	ish
+>>  
+>> -	icache_line_size x2, x3
+>> -	sub	x3, x2, #1
+>> -	bic	x4, x0, x3
+>> -1:
+>> -USER(9f, ic	ivau, x4	)		// invalidate I line PoU
+>> -	add	x4, x4, x2
+>> -	cmp	x4, x1
+>> -	b.lo	1b
+>> -	dsb	ish
+>> -	isb
+>> +	invalidate_icache_by_line x0, x1, x2, x3, 9f
+>>  	mov	x0, #0
+>>  1:
+>>  	uaccess_ttbr0_disable x1
+>> @@ -80,6 +71,21 @@ USER(9f, ic	ivau, x4	)		// invalidate I line PoU
+>>  ENDPROC(flush_icache_range)
+>>  ENDPROC(__flush_cache_user_range)
+>>  
+>> +/*
+>> + *	invalidate_icache_range(start,end)
+>> + *
+>> + *	Ensure that the I cache is invalid within specified region. This
+>> + *	assumes that this is done on the linear mapping. Do not use it
+>> + *	on a userspace range, as this may fault horribly.
+>
+> I'm still not sure why we're not hooking up the user fault handling here.
+> In the worst case, we'd end up returning -EFAULT if we got passed a
+> faulting user address and there's already precedence for this with e.g.
+> flush_icache_range.
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+Fair enough. Confusingly, flush_icache_range is declared as returning
+void... I'll cook a separate patch addressing this. How about the
+following on top of that patch:
 
----
-Changes since v3:
- - removed unregister_audio_device() function, added missing
-   audio platform device unregistration in probe(),
- - 'enable' field in struct hdmi_audio replace with 'mute',
- - audio infoframe initialization moved from the bind()
-   callback to probe().
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index efdbecc8f2ef..27093cf2b91f 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -379,20 +379,15 @@ alternative_endif
+  * [start, end)
+  *
+  * 	start, end:	virtual addresses describing the region
+- *	label:		A label to branch to on user fault, none if
+- *			only used on a kernel address
++ *	label:		A label to branch to on user fault.
+  * 	Corrupts:	tmp1, tmp2
+  */
+-	.macro invalidate_icache_by_line start, end, tmp1, tmp2, label=none
++	.macro invalidate_icache_by_line start, end, tmp1, tmp2, label
+ 	icache_line_size \tmp1, \tmp2
+ 	sub	\tmp2, \tmp1, #1
+ 	bic	\tmp2, \start, \tmp2
+ 9997:
+-	.if	(\label == none)
+-	ic	ivau, \tmp2			// invalidate I line PoU
+-	.else
+ USER(\label, ic	ivau, \tmp2)			// invalidate I line PoU
+-	.endif
+ 	add	\tmp2, \tmp2, \tmp1
+ 	cmp	\tmp2, \end
+ 	b.lo	9997b
+diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+index ad56406944c6..e671e73c6453 100644
+--- a/arch/arm64/include/asm/cacheflush.h
++++ b/arch/arm64/include/asm/cacheflush.h
+@@ -55,7 +55,6 @@
+  *	invalidate_icache_range(start, end)
+  *
+  *		Invalidate the I-cache in the region described by start, end.
+- *		Linear mapping only!
+  *		- start  - virtual start address
+  *		- end    - virtual end address
+  *
+@@ -73,7 +72,7 @@
+  *		- size   - region size
+  */
+ extern void flush_icache_range(unsigned long start, unsigned long end);
+-extern void invalidate_icache_range(unsigned long start, unsigned long end);
++extern int  invalidate_icache_range(unsigned long start, unsigned long end);
+ extern void __flush_dcache_area(void *addr, size_t len);
+ extern void __inval_dcache_area(void *addr, size_t len);
+ extern void __clean_dcache_area_poc(void *addr, size_t len);
+diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+index 8e71d237f85e..a89f23610b7e 100644
+--- a/arch/arm64/mm/cache.S
++++ b/arch/arm64/mm/cache.S
+@@ -74,15 +74,17 @@ ENDPROC(__flush_cache_user_range)
+ /*
+  *	invalidate_icache_range(start,end)
+  *
+- *	Ensure that the I cache is invalid within specified region. This
+- *	assumes that this is done on the linear mapping. Do not use it
+- *	on a userspace range, as this may fault horribly.
++ *	Ensure that the I cache is invalid within specified region.
+  *
+  *	- start   - virtual start address of region
+  *	- end     - virtual end address of region
+  */
+ ENTRY(invalidate_icache_range)
+-	invalidate_icache_by_line x0, x1, x2, x3
++	invalidate_icache_by_line x0, x1, x2, x3, 1f
++	mov	x0, xzr
++	ret
++1:
++	mov	x0, #-EFAULT
+ 	ret
+ ENDPROC(invalidate_icache_range)
+ 
+Does this address your concerns?
 
-Changes since v2:
- - u8 replaced with bool type,
- - the  HDMI codec iec.status data used directly for setting up
-   the HDMI controller registers rather than using hard coded
-   constants,
- - constants used for configuring the HDMI_AUI_CON register
-   instead of plain numbers,
- - if/IS_ERR/return replaced with PTR_ERR_OR_ZERO().
+Thanks,
 
-Changes since v1:
- - rebased onto v4.14-rc1 and adapted locking
-
-Changes since RFC version:
- - fixed hdmi-codec locking issue
- - added a comment documenting struct hdmi_contex::mutex
----
- drivers/gpu/drm/exynos/Kconfig       |   1 +
- drivers/gpu/drm/exynos/exynos_hdmi.c | 250 ++++++++++++++++++++++++++---------
- drivers/gpu/drm/exynos/regs-hdmi.h   |   8 +-
- 3 files changed, 194 insertions(+), 65 deletions(-)
-
-diff --git a/drivers/gpu/drm/exynos/Kconfig b/drivers/gpu/drm/exynos/Kconfig
-index 305dc3d4ff77..5a7c9d8abd6b 100644
---- a/drivers/gpu/drm/exynos/Kconfig
-+++ b/drivers/gpu/drm/exynos/Kconfig
-@@ -3,6 +3,7 @@ config DRM_EXYNOS
- 	depends on OF && DRM && (ARCH_S3C64XX || ARCH_EXYNOS || ARCH_MULTIPLATFORM)
- 	select DRM_KMS_HELPER
- 	select VIDEOMODE_HELPERS
-+	select SND_SOC_HDMI_CODEC if SND_SOC
- 	help
- 	  Choose this option if you have a Samsung SoC EXYNOS chipset.
- 	  If M is selected the module will be called exynosdrm.
-diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
-index 1309b1c9e074..82d1b7e2febe 100644
---- a/drivers/gpu/drm/exynos/exynos_hdmi.c
-+++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
-@@ -40,7 +40,7 @@
- #include <linux/component.h>
- #include <linux/mfd/syscon.h>
- #include <linux/regmap.h>
--
-+#include <sound/hdmi-codec.h>
- #include <drm/exynos_drm.h>
-
- #include <media/cec-notifier.h>
-@@ -111,12 +111,18 @@ struct hdmi_driver_data {
- 	struct string_array_spec clk_muxes;
- };
-
-+struct hdmi_audio {
-+	struct platform_device		*pdev;
-+	struct hdmi_audio_infoframe	infoframe;
-+	struct hdmi_codec_params	params;
-+	bool				mute;
-+};
-+
- struct hdmi_context {
- 	struct drm_encoder		encoder;
- 	struct device			*dev;
- 	struct drm_device		*drm_dev;
- 	struct drm_connector		connector;
--	bool				powered;
- 	bool				dvi_mode;
- 	struct delayed_work		hotplug_work;
- 	struct cec_notifier		*notifier;
-@@ -136,6 +142,11 @@ struct hdmi_context {
- 	struct regulator		*reg_hdmi_en;
- 	struct exynos_drm_clk		phy_clk;
- 	struct drm_bridge		*bridge;
-+
-+	/* mutex protecting subsequent fields below */
-+	struct mutex			mutex;
-+	struct hdmi_audio		audio;
-+	bool				powered;
- };
-
- static inline struct hdmi_context *encoder_to_hdmi(struct drm_encoder *e)
-@@ -776,6 +787,22 @@ static int hdmi_clk_set_parents(struct hdmi_context *hdata, bool to_phy)
- 	return ret;
- }
-
-+static int hdmi_audio_infoframe_apply(struct hdmi_context *hdata)
-+{
-+	struct hdmi_audio_infoframe *infoframe = &hdata->audio.infoframe;
-+	u8 buf[HDMI_INFOFRAME_SIZE(AUDIO)];
-+	int len;
-+
-+	len = hdmi_audio_infoframe_pack(infoframe, buf, sizeof(buf));
-+	if (len < 0)
-+		return len;
-+
-+	hdmi_reg_writeb(hdata, HDMI_AUI_CON, HDMI_AUI_CON_EVERY_VSYNC);
-+	hdmi_reg_write_buf(hdata, HDMI_AUI_HEADER0, buf, len);
-+
-+	return 0;
-+}
-+
- static void hdmi_reg_infoframes(struct hdmi_context *hdata)
- {
- 	struct drm_display_mode *m = &hdata->encoder.crtc->state->mode;
-@@ -812,15 +839,7 @@ static void hdmi_reg_infoframes(struct hdmi_context *hdata)
- 		hdmi_reg_write_buf(hdata, HDMI_VSI_DATA(0), buf + 3, ret - 3);
- 	}
-
--	ret = hdmi_audio_infoframe_init(&frm.audio);
--	if (!ret) {
--		frm.audio.channels = 2;
--		ret = hdmi_audio_infoframe_pack(&frm.audio, buf, sizeof(buf));
--	}
--	if (ret > 0) {
--		hdmi_reg_writeb(hdata, HDMI_AUI_CON, HDMI_AUI_CON_EVERY_VSYNC);
--		hdmi_reg_write_buf(hdata, HDMI_AUI_HEADER0, buf, ret);
--	}
-+	hdmi_audio_infoframe_apply(hdata);
- }
-
- static enum drm_connector_status hdmi_detect(struct drm_connector *connector,
-@@ -1010,23 +1029,18 @@ static void hdmi_reg_acr(struct hdmi_context *hdata, u32 freq)
- 	hdmi_reg_writeb(hdata, HDMI_ACR_CON, 4);
- }
-
--static void hdmi_audio_init(struct hdmi_context *hdata)
-+static void hdmi_audio_config(struct hdmi_context *hdata)
- {
--	u32 sample_rate, bits_per_sample;
--	u32 data_num, bit_ch, sample_frq;
--	u32 val;
--
--	sample_rate = 44100;
--	bits_per_sample = 16;
-+	u32 bit_ch = 1;
-+	u32 data_num, val;
-+	int i;
-
--	switch (bits_per_sample) {
-+	switch (hdata->audio.params.sample_width) {
- 	case 20:
- 		data_num = 2;
--		bit_ch = 1;
- 		break;
- 	case 24:
- 		data_num = 3;
--		bit_ch = 1;
- 		break;
- 	default:
- 		data_num = 1;
-@@ -1034,7 +1048,7 @@ static void hdmi_audio_init(struct hdmi_context *hdata)
- 		break;
- 	}
-
--	hdmi_reg_acr(hdata, sample_rate);
-+	hdmi_reg_acr(hdata, hdata->audio.params.sample_rate);
-
- 	hdmi_reg_writeb(hdata, HDMI_I2S_MUX_CON, HDMI_I2S_IN_DISABLE
- 				| HDMI_I2S_AUD_I2S | HDMI_I2S_CUV_I2S_ENABLE
-@@ -1044,12 +1058,6 @@ static void hdmi_audio_init(struct hdmi_context *hdata)
- 			| HDMI_I2S_CH1_EN | HDMI_I2S_CH2_EN);
-
- 	hdmi_reg_writeb(hdata, HDMI_I2S_MUX_CUV, HDMI_I2S_CUV_RL_EN);
--
--	sample_frq = (sample_rate == 44100) ? 0 :
--			(sample_rate == 48000) ? 2 :
--			(sample_rate == 32000) ? 3 :
--			(sample_rate == 96000) ? 0xa : 0x0;
--
- 	hdmi_reg_writeb(hdata, HDMI_I2S_CLK_CON, HDMI_I2S_CLK_DIS);
- 	hdmi_reg_writeb(hdata, HDMI_I2S_CLK_CON, HDMI_I2S_CLK_EN);
-
-@@ -1073,31 +1081,24 @@ static void hdmi_audio_init(struct hdmi_context *hdata)
- 			| HDMI_I2S_SET_SDATA_BIT(data_num)
- 			| HDMI_I2S_BASIC_FORMAT);
-
--	/* Configure register related to CUV information */
--	hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST_0, HDMI_I2S_CH_STATUS_MODE_0
--			| HDMI_I2S_2AUD_CH_WITHOUT_PREEMPH
--			| HDMI_I2S_COPYRIGHT
--			| HDMI_I2S_LINEAR_PCM
--			| HDMI_I2S_CONSUMER_FORMAT);
--	hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST_1, HDMI_I2S_CD_PLAYER);
--	hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST_2, HDMI_I2S_SET_SOURCE_NUM(0));
--	hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST_3, HDMI_I2S_CLK_ACCUR_LEVEL_2
--			| HDMI_I2S_SET_SMP_FREQ(sample_frq));
--	hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST_4,
--			HDMI_I2S_ORG_SMP_FREQ_44_1
--			| HDMI_I2S_WORD_LEN_MAX24_24BITS
--			| HDMI_I2S_WORD_LEN_MAX_24BITS);
-+	/* Configuration of the audio channel status registers */
-+	for (i = 0; i < HDMI_I2S_CH_ST_MAXNUM; i++)
-+		hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST(i),
-+				hdata->audio.params.iec.status[i]);
-
- 	hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST_CON, HDMI_I2S_CH_STATUS_RELOAD);
- }
-
--static void hdmi_audio_control(struct hdmi_context *hdata, bool onoff)
-+static void hdmi_audio_control(struct hdmi_context *hdata)
- {
-+	bool enable = !hdata->audio.mute;
-+
- 	if (hdata->dvi_mode)
- 		return;
-
--	hdmi_reg_writeb(hdata, HDMI_AUI_CON, onoff ? 2 : 0);
--	hdmi_reg_writemask(hdata, HDMI_CON_0, onoff ?
-+	hdmi_reg_writeb(hdata, HDMI_AUI_CON, enable ?
-+			HDMI_AVI_CON_EVERY_VSYNC : HDMI_AUI_CON_NO_TRAN);
-+	hdmi_reg_writemask(hdata, HDMI_CON_0, enable ?
- 			HDMI_ASP_EN : HDMI_ASP_DIS, HDMI_ASP_MASK);
- }
-
-@@ -1428,13 +1429,14 @@ static void hdmiphy_conf_apply(struct hdmi_context *hdata)
- 	hdmiphy_wait_for_pll(hdata);
- }
-
-+/* Should be called with hdata->mutex mutex held */
- static void hdmi_conf_apply(struct hdmi_context *hdata)
- {
- 	hdmi_start(hdata, false);
- 	hdmi_conf_init(hdata);
--	hdmi_audio_init(hdata);
-+	hdmi_audio_config(hdata);
- 	hdmi_mode_apply(hdata);
--	hdmi_audio_control(hdata, true);
-+	hdmi_audio_control(hdata);
- }
-
- static void hdmi_set_refclk(struct hdmi_context *hdata, bool on)
-@@ -1446,6 +1448,7 @@ static void hdmi_set_refclk(struct hdmi_context *hdata, bool on)
- 			   SYSREG_HDMI_REFCLK_INT_CLK, on ? ~0 : 0);
- }
-
-+/* Should be called with hdata->mutex mutex held. */
- static void hdmiphy_enable(struct hdmi_context *hdata)
- {
- 	if (hdata->powered)
-@@ -1468,6 +1471,7 @@ static void hdmiphy_enable(struct hdmi_context *hdata)
- 	hdata->powered = true;
- }
-
-+/* Should be called with hdata->mutex mutex held. */
- static void hdmiphy_disable(struct hdmi_context *hdata)
- {
- 	if (!hdata->powered)
-@@ -1493,28 +1497,38 @@ static void hdmi_enable(struct drm_encoder *encoder)
- {
- 	struct hdmi_context *hdata = encoder_to_hdmi(encoder);
-
-+	mutex_lock(&hdata->mutex);
-+
- 	hdmiphy_enable(hdata);
- 	hdmi_conf_apply(hdata);
-+
-+	mutex_unlock(&hdata->mutex);
- }
-
- static void hdmi_disable(struct drm_encoder *encoder)
- {
- 	struct hdmi_context *hdata = encoder_to_hdmi(encoder);
-
--	if (!hdata->powered)
-+	mutex_lock(&hdata->mutex);
-+
-+	if (hdata->powered) {
-+		/*
-+		 * The SFRs of VP and Mixer are updated by Vertical Sync of
-+		 * Timing generator which is a part of HDMI so the sequence
-+		 * to disable TV Subsystem should be as following,
-+		 *	VP -> Mixer -> HDMI
-+		 *
-+		 * To achieve such sequence HDMI is disabled together with
-+		 * HDMI PHY, via pipe clock callback.
-+		 */
-+		mutex_unlock(&hdata->mutex);
-+		cancel_delayed_work(&hdata->hotplug_work);
-+		cec_notifier_set_phys_addr(hdata->notifier,
-+					   CEC_PHYS_ADDR_INVALID);
- 		return;
-+	}
-
--	/*
--	 * The SFRs of VP and Mixer are updated by Vertical Sync of
--	 * Timing generator which is a part of HDMI so the sequence
--	 * to disable TV Subsystem should be as following,
--	 *	VP -> Mixer -> HDMI
--	 *
--	 * To achieve such sequence HDMI is disabled together with HDMI PHY, via
--	 * pipe clock callback.
--	 */
--	cancel_delayed_work(&hdata->hotplug_work);
--	cec_notifier_set_phys_addr(hdata->notifier, CEC_PHYS_ADDR_INVALID);
-+	mutex_unlock(&hdata->mutex);
- }
-
- static const struct drm_encoder_helper_funcs exynos_hdmi_encoder_helper_funcs = {
-@@ -1527,6 +1541,99 @@ static const struct drm_encoder_funcs exynos_hdmi_encoder_funcs = {
- 	.destroy = drm_encoder_cleanup,
- };
-
-+static void hdmi_audio_shutdown(struct device *dev, void *data)
-+{
-+	struct hdmi_context *hdata = dev_get_drvdata(dev);
-+
-+	mutex_lock(&hdata->mutex);
-+
-+	hdata->audio.mute = true;
-+
-+	if (hdata->powered)
-+		hdmi_audio_control(hdata);
-+
-+	mutex_unlock(&hdata->mutex);
-+}
-+
-+static int hdmi_audio_hw_params(struct device *dev, void *data,
-+				struct hdmi_codec_daifmt *daifmt,
-+				struct hdmi_codec_params *params)
-+{
-+	struct hdmi_context *hdata = dev_get_drvdata(dev);
-+
-+	if (daifmt->fmt != HDMI_I2S || daifmt->bit_clk_inv ||
-+	    daifmt->frame_clk_inv || daifmt->bit_clk_master ||
-+	    daifmt->frame_clk_master) {
-+		dev_err(dev, "%s: Bad flags %d %d %d %d\n", __func__,
-+			daifmt->bit_clk_inv, daifmt->frame_clk_inv,
-+			daifmt->bit_clk_master,
-+			daifmt->frame_clk_master);
-+		return -EINVAL;
-+	}
-+
-+	mutex_lock(&hdata->mutex);
-+
-+	hdata->audio.params = *params;
-+
-+	if (hdata->powered) {
-+		hdmi_audio_config(hdata);
-+		hdmi_audio_infoframe_apply(hdata);
-+	}
-+
-+	mutex_unlock(&hdata->mutex);
-+
-+	return 0;
-+}
-+
-+static int hdmi_audio_digital_mute(struct device *dev, void *data, bool mute)
-+{
-+	struct hdmi_context *hdata = dev_get_drvdata(dev);
-+
-+	mutex_lock(&hdata->mutex);
-+
-+	hdata->audio.mute = mute;
-+
-+	if (hdata->powered)
-+		hdmi_audio_control(hdata);
-+
-+	mutex_unlock(&hdata->mutex);
-+
-+	return 0;
-+}
-+
-+static int hdmi_audio_get_eld(struct device *dev, void *data, uint8_t *buf,
-+			      size_t len)
-+{
-+	struct hdmi_context *hdata = dev_get_drvdata(dev);
-+	struct drm_connector *connector = &hdata->connector;
-+
-+	memcpy(buf, connector->eld, min(sizeof(connector->eld), len));
-+
-+	return 0;
-+}
-+
-+static const struct hdmi_codec_ops audio_codec_ops = {
-+	.hw_params = hdmi_audio_hw_params,
-+	.audio_shutdown = hdmi_audio_shutdown,
-+	.digital_mute = hdmi_audio_digital_mute,
-+	.get_eld = hdmi_audio_get_eld,
-+};
-+
-+static int hdmi_register_audio_device(struct hdmi_context *hdata)
-+{
-+	struct hdmi_codec_pdata codec_data = {
-+		.ops = &audio_codec_ops,
-+		.max_i2s_channels = 6,
-+		.i2s = 1,
-+	};
-+
-+	hdata->audio.pdev = platform_device_register_data(
-+		hdata->dev, HDMI_CODEC_DRV_NAME, PLATFORM_DEVID_AUTO,
-+		&codec_data, sizeof(codec_data));
-+
-+	return PTR_ERR_OR_ZERO(hdata->audio.pdev);
-+}
-+
- static void hdmi_hotplug_work_func(struct work_struct *work)
- {
- 	struct hdmi_context *hdata;
-@@ -1602,11 +1709,14 @@ static void hdmiphy_clk_enable(struct exynos_drm_clk *clk, bool enable)
- {
- 	struct hdmi_context *hdata = container_of(clk, struct hdmi_context,
- 						  phy_clk);
-+	mutex_lock(&hdata->mutex);
-
- 	if (enable)
- 		hdmiphy_enable(hdata);
- 	else
- 		hdmiphy_disable(hdata);
-+
-+	mutex_unlock(&hdata->mutex);
- }
-
- static int hdmi_bridge_init(struct hdmi_context *hdata)
-@@ -1817,6 +1927,7 @@ static int hdmi_get_phy_io(struct hdmi_context *hdata)
-
- static int hdmi_probe(struct platform_device *pdev)
- {
-+	struct hdmi_audio_infoframe *audio_infoframe;
- 	struct device *dev = &pdev->dev;
- 	struct hdmi_context *hdata;
- 	struct resource *res;
-@@ -1832,6 +1943,8 @@ static int hdmi_probe(struct platform_device *pdev)
-
- 	hdata->dev = dev;
-
-+	mutex_init(&hdata->mutex);
-+
- 	ret = hdmi_resources_init(hdata);
- 	if (ret) {
- 		if (ret != -EPROBE_DEFER)
-@@ -1891,12 +2004,26 @@ static int hdmi_probe(struct platform_device *pdev)
-
- 	pm_runtime_enable(dev);
-
--	ret = component_add(&pdev->dev, &hdmi_component_ops);
-+	audio_infoframe = &hdata->audio.infoframe;
-+	hdmi_audio_infoframe_init(audio_infoframe);
-+	audio_infoframe->coding_type = HDMI_AUDIO_CODING_TYPE_STREAM;
-+	audio_infoframe->sample_size = HDMI_AUDIO_SAMPLE_SIZE_STREAM;
-+	audio_infoframe->sample_frequency = HDMI_AUDIO_SAMPLE_FREQUENCY_STREAM;
-+	audio_infoframe->channels = 2;
-+
-+	ret = hdmi_register_audio_device(hdata);
- 	if (ret)
- 		goto err_notifier_put;
-
-+	ret = component_add(&pdev->dev, &hdmi_component_ops);
-+	if (ret)
-+		goto err_unregister_audio;
-+
- 	return ret;
-
-+err_unregister_audio:
-+	platform_device_unregister(hdata->audio.pdev);
-+
- err_notifier_put:
- 	cec_notifier_put(hdata->notifier);
- 	pm_runtime_disable(dev);
-@@ -1920,6 +2047,7 @@ static int hdmi_remove(struct platform_device *pdev)
- 	cec_notifier_set_phys_addr(hdata->notifier, CEC_PHYS_ADDR_INVALID);
-
- 	component_del(&pdev->dev, &hdmi_component_ops);
-+	platform_device_unregister(hdata->audio.pdev);
-
- 	cec_notifier_put(hdata->notifier);
- 	pm_runtime_disable(&pdev->dev);
-@@ -1935,6 +2063,8 @@ static int hdmi_remove(struct platform_device *pdev)
-
- 	put_device(&hdata->ddc_adpt->dev);
-
-+	mutex_destroy(&hdata->mutex);
-+
- 	return 0;
- }
-
-diff --git a/drivers/gpu/drm/exynos/regs-hdmi.h b/drivers/gpu/drm/exynos/regs-hdmi.h
-index a0507dc18d9e..04be0f7e8193 100644
---- a/drivers/gpu/drm/exynos/regs-hdmi.h
-+++ b/drivers/gpu/drm/exynos/regs-hdmi.h
-@@ -419,11 +419,9 @@
- #define HDMI_I2S_DSD_CON		HDMI_I2S_BASE(0x01c)
- #define HDMI_I2S_MUX_CON		HDMI_I2S_BASE(0x020)
- #define HDMI_I2S_CH_ST_CON		HDMI_I2S_BASE(0x024)
--#define HDMI_I2S_CH_ST_0		HDMI_I2S_BASE(0x028)
--#define HDMI_I2S_CH_ST_1		HDMI_I2S_BASE(0x02c)
--#define HDMI_I2S_CH_ST_2		HDMI_I2S_BASE(0x030)
--#define HDMI_I2S_CH_ST_3		HDMI_I2S_BASE(0x034)
--#define HDMI_I2S_CH_ST_4		HDMI_I2S_BASE(0x038)
-+/* n must be within range 0...(HDMI_I2S_CH_ST_MAXNUM - 1) */
-+#define HDMI_I2S_CH_ST_MAXNUM		5
-+#define HDMI_I2S_CH_ST(n)		HDMI_I2S_BASE(0x028 + 4 * (n))
- #define HDMI_I2S_CH_ST_SH_0		HDMI_I2S_BASE(0x03c)
- #define HDMI_I2S_CH_ST_SH_1		HDMI_I2S_BASE(0x040)
- #define HDMI_I2S_CH_ST_SH_2		HDMI_I2S_BASE(0x044)
---
-2.13.0
+	M.
+-- 
+Jazz is not dead. It just smells funny.
