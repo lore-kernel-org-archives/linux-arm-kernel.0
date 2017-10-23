@@ -1,96 +1,30 @@
-From: pure.logic@nexus-software.ie (Bryan O'Donoghue)
-Date: Mon, 23 Oct 2017 15:34:47 +0100
-Subject: [PATCH v4 4/7] nvmem: imx-ocotp: Move i.MX6 write clock setup to
- dedicated function
-In-Reply-To: <1508769290-2646-1-git-send-email-pure.logic@nexus-software.ie>
-References: <1508769290-2646-1-git-send-email-pure.logic@nexus-software.ie>
-Message-ID: <1508769290-2646-5-git-send-email-pure.logic@nexus-software.ie>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Mon, 23 Oct 2017 16:49:07 +0200
+Subject: [PATCH] KVM: arm/arm64: Allow usercopy to vcpu->arch.ctxt and
+ arm64 debug
+In-Reply-To: <d2a7dcec-060b-6279-1c1d-a18b3eedb394@redhat.com>
+References: <20171020232525.7387-1-pbonzini@redhat.com>
+ <20171021184545.2497-1-christoffer.dall@linaro.org>
+ <CAGXu5jKJ2jPz2540ZLCwmcdVZxrgnhVPHs0uumiJm2o0ZgpVag@mail.gmail.com>
+ <20171022074418.GA3805@cbox> <d2a7dcec-060b-6279-1c1d-a18b3eedb394@redhat.com>
+Message-ID: <CAMJs5B-VhREFk4qH+5we7JFtkx6CsKF+xN8mFg+2zSyc-DARYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX7S/D has a different set of timing requirements, as a pre-cursor to
-adding the i.MX7 timing parameters, move the i.MX6 stuff to a dedicated
-function.
+On Mon, Oct 23, 2017 at 4:14 PM, Paolo Bonzini <pbonzini@redhat.com> wrote:
+> On 22/10/2017 09:44, Christoffer Dall wrote:
+>> However, I think it's much clearer if I
+>> rewrite these to use get_user() and put_user().  v2 incoming.
+>
+> I'd actually prefer if you all do a trivial conversion to
+> kvm_init_usercopy to begin with.  In fact, we could just change the
+> default from "0, 0" to "0, sizeof (kvm_arch_vcpu)" in kvm_init.  Any
+> other change can be applied after the patches are merged to Linus's
+> tree, especially with KVM Forum and the merge window both coming soon.
+>
+In that case, expect no further action from me on this one until the
+patches have landed and I can resend my patch, unless you specifically
+tell me otherwise.
 
-Fixes: 0642bac7da42 ("nvmem: imx-ocotp: add write support")
-
-Signed-off-by: Bryan O'Donoghue <pure.logic@nexus-software.ie>
-Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- drivers/nvmem/imx-ocotp.c | 47 +++++++++++++++++++++++++++--------------------
- 1 file changed, 27 insertions(+), 20 deletions(-)
-
-diff --git a/drivers/nvmem/imx-ocotp.c b/drivers/nvmem/imx-ocotp.c
-index e10a0da..93d3cb5 100644
---- a/drivers/nvmem/imx-ocotp.c
-+++ b/drivers/nvmem/imx-ocotp.c
-@@ -168,6 +168,31 @@ static int imx_ocotp_read(void *context, unsigned int offset,
- 	return ret;
- }
- 
-+static void imx_ocotp_set_imx6_timing(struct ocotp_priv *priv)
-+{
-+	unsigned long clk_rate = 0;
-+	unsigned long strobe_read, relax, strobe_prog;
-+	u32 timing = 0;
-+
-+	/* 47.3.1.3.1
-+	 * Program HW_OCOTP_TIMING[STROBE_PROG] and HW_OCOTP_TIMING[RELAX]
-+	 * fields with timing values to match the current frequency of the
-+	 * ipg_clk. OTP writes will work at maximum bus frequencies as long
-+	 * as the HW_OCOTP_TIMING parameters are set correctly.
-+	 */
-+	clk_rate = clk_get_rate(priv->clk);
-+
-+	relax = clk_rate / (1000000000 / DEF_RELAX) - 1;
-+	strobe_prog = clk_rate / (1000000000 / 10000) + 2 * (DEF_RELAX + 1) - 1;
-+	strobe_read = clk_rate / (1000000000 / 40) + 2 * (DEF_RELAX + 1) - 1;
-+
-+	timing = strobe_prog & 0x00000FFF;
-+	timing |= (relax       << 12) & 0x0000F000;
-+	timing |= (strobe_read << 16) & 0x003F0000;
-+
-+	writel(timing, priv->base + IMX_OCOTP_ADDR_TIMING);
-+}
-+
- static int imx_ocotp_write(void *context, unsigned int offset, void *val,
- 			   size_t bytes)
- {
-@@ -175,9 +200,6 @@ static int imx_ocotp_write(void *context, unsigned int offset, void *val,
- 	u32 *buf = val;
- 	int ret;
- 
--	unsigned long clk_rate = 0;
--	unsigned long strobe_read, relax, strobe_prog;
--	u32 timing = 0;
- 	u32 ctrl;
- 	u8 waddr;
- 	u8 word = 0;
-@@ -196,23 +218,8 @@ static int imx_ocotp_write(void *context, unsigned int offset, void *val,
- 		return ret;
- 	}
- 
--	/* 47.3.1.3.1
--	 * Program HW_OCOTP_TIMING[STROBE_PROG] and HW_OCOTP_TIMING[RELAX]
--	 * fields with timing values to match the current frequency of the
--	 * ipg_clk. OTP writes will work at maximum bus frequencies as long
--	 * as the HW_OCOTP_TIMING parameters are set correctly.
--	 */
--	clk_rate = clk_get_rate(priv->clk);
--
--	relax = clk_rate / (1000000000 / DEF_RELAX) - 1;
--	strobe_prog = clk_rate / (1000000000 / 10000) + 2 * (DEF_RELAX + 1) - 1;
--	strobe_read = clk_rate / (1000000000 / 40) + 2 * (DEF_RELAX + 1) - 1;
--
--	timing = strobe_prog & 0x00000FFF;
--	timing |= (relax       << 12) & 0x0000F000;
--	timing |= (strobe_read << 16) & 0x003F0000;
--
--	writel(timing, priv->base + IMX_OCOTP_ADDR_TIMING);
-+	/* Setup the write timing values */
-+	imx_ocotp_set_imx6_timing(priv);
- 
- 	/* 47.3.1.3.2
- 	 * Check that HW_OCOTP_CTRL[BUSY] and HW_OCOTP_CTRL[ERROR] are clear.
--- 
-2.7.4
+Thanks,
+-Christoffer
