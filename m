@@ -1,80 +1,28 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 23 Oct 2017 00:12:33 +0200
-Subject: [GIT PULL] Mediatek: soc driver updates for v4.15
-In-Reply-To: <1ebc2f2d-033e-e8d6-86c8-32a67ebd55b7@gmail.com>
-References: <1ebc2f2d-033e-e8d6-86c8-32a67ebd55b7@gmail.com>
-Message-ID: <73c28655-6ba7-682b-3b84-b058055ab539@gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 23 Oct 2017 08:20:28 +0800
+Subject: [PATCH 3/4] ARM: dts: imx28-tx28: fix interrupt flags and use
+ interrupts-extended property
+In-Reply-To: <20171018084059.022d8116@karo-electronics.de>
+References: <1507719939-27250-1-git-send-email-LW@KARO-electronics.de>
+ <1507719939-27250-4-git-send-email-LW@KARO-electronics.de>
+ <20171016071726.gyzvalxzk4o3jsuz@pengutronix.de>
+ <20171016105632.709e653c@karo-electronics.de>
+ <20171018021331.GC18810@dragon>
+ <20171018084059.022d8116@karo-electronics.de>
+Message-ID: <20171023002026.GA8700@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I forgot to add the mailing list in CC for the pull request below.
+On Wed, Oct 18, 2017 at 08:40:59AM +0200, Lothar Wa?mann wrote:
+> > So should I drop all interrupts-extended patches from you?
+> >
+> Yes, please. Since this patch, and the corresponding patch for tx53
+> also fixed the interrupt flags, I will send new patches to only fix
+> the interrupt flags.
 
-Matthias
+Okay, the following two got dropped from imx/dt branch.
 
--------- Forwarded Message --------
-Subject: [GIT PULL] Mediatek: soc driver updates for v4.15
-Date: Mon, 23 Oct 2017 00:10:44 +0200
-From: Matthias Brugger <matthias.bgg@gmail.com>
-To: arm at kernel.org
-CC: chenglin.xu at mediatek.com, Jean Delvare <jdelvare@suse.de>, Sean Wang
-<sean.wang@mediatek.com>, Thomas Meyer <thomas@m3y3r.de>
+ARM: dts: imx28-tx28: fix interrupt flags and use interrupts-extended property
+ARM: dts: imx53-tx53: fix interrupt flags and use interrupts-extended property
 
-Hi Arnd and Olof,
-
-Please pull the following patches.
-
-Thanks a lot,
-Matthias
-
----
-The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
-
-  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
-
-are available in the git repository at:
-
-  https://github.com/mbgg/linux-mediatek.git tags/v4.14-next-soc
-
-for you to fetch changes up to f32fbbadaf4470e8bac27f6d87bd27441df7167f:
-
-  soc: mediatek: pwrap: fix fatal compiler error (2017-10-21 10:23:28 +0200)
-
-----------------------------------------------------------------
-- add 32 bit read/write support to pwrap
-- add mt7622 support to pwrap
-- test build all mediatek soc drivers
-- fix compiler issues
-- clean up Kconfig description
-
-----------------------------------------------------------------
-Chenglin Xu (1):
-      soc: mediatek: pwrap: add support for MT7622 SoC
-
-Jean Delvare (1):
-      soc: Allow test-building of MediaTek drivers
-
-Matthias Brugger (2):
-      soc: mediatek: pwrap: fix compiler errors
-      soc: mediatek: pwrap: fix fatal compiler error
-
-Sean Wang (9):
-      soc: mediatek: pwrap: fixup warnings from coding style
-      dt-bindings: arm: mediatek: add MT7622 string to the PMIC wrapper doc
-      soc: mediatek: pwrap: add pwrap_read32 for reading in 32-bit mode
-      soc: mediatek: pwrap: add pwrap_write32 for writing in 32-bit mode
-      soc: mediatek: pwrap: refactor pwrap_init for the various PMIC types
-      soc: mediatek: pwrap: add MediaTek MT6380 as one slave of pwrap
-      soc: mediatek: pwrap: add common way for setup CS timing extenstion
-      soc: mediatek: place Kconfig for all SoC drivers under menu
-      arm64: mediatek: cleanup message for platform selection
-
-Thomas Meyer (1):
-      ARM: mediatek: Cocci spatch "of_table"
-
- .../devicetree/bindings/soc/mediatek/pwrap.txt     |   6 +-
- arch/arm/mach-mediatek/platsmp.c                   |   2 +
- arch/arm64/Kconfig.platforms                       |   5 +-
- drivers/soc/Makefile                               |   2 +-
- drivers/soc/mediatek/Kconfig                       |   8 +-
- drivers/soc/mediatek/mtk-pmic-wrap.c               | 511 +++++++++++++++++----
- 6 files changed, 447 insertions(+), 87 deletions(-)
+Shawn
