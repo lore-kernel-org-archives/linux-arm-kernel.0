@@ -1,68 +1,155 @@
 From: pure.logic@nexus-software.ie (Bryan O'Donoghue)
-Date: Mon, 23 Oct 2017 15:34:43 +0100
-Subject: [PATCH v4 0/7] Fix i.MX7D OCOTP write support
-Message-ID: <1508769290-2646-1-git-send-email-pure.logic@nexus-software.ie>
+Date: Mon, 23 Oct 2017 15:34:46 +0100
+Subject: [PATCH v4 3/7] nvmem: imx-ocotp: Add support for banked OTP addressing
+In-Reply-To: <1508769290-2646-1-git-send-email-pure.logic@nexus-software.ie>
+References: <1508769290-2646-1-git-send-email-pure.logic@nexus-software.ie>
+Message-ID: <1508769290-2646-4-git-send-email-pure.logic@nexus-software.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-V4:
-- Made one struct entry for each SoC - Philipp
-- Re-ordered write routine for i.MX7 to come first - Philipp
-- Updated comment re: i.MX7 for clarity - BOD
-- Added comment to 1000ns timing defintion - Philipp
-- Moved to u64 calculations in timing function - Philipp
-- Added Reviewed-by: as indicated by Philipp
+The i.MX7S/D takes the bank address in the CTRLn.ADDR field and the data
+value in one of the DATAx {0, 1, 2, 3} register fields. The current write
+routine is based on writing the CTRLn.ADDR field and writing a single DATA
+register only.
 
-V3:
-- Fix compile bug caused by a rebase typo - kbuild test robot
+Fixes: 0642bac7da42 ("nvmem: imx-ocotp: add write support")
 
-V2:
-- Added Reviewed-by and Acked-by as indicated by Philipp
-- octp_params -> ocotp_params Philipp Zabel
-- Added whitespace to aggregate initaliser - Philipp Zabel
-- Dropped (void*) cast to data - Philipp Zabel
-- Made use of of_device_get_match_data - Philipp Zabel
-- Got rid of params->banked - Philipp Zabel
-- Changed regs_per_bank to bank_address_words
-  makes the intent of the parameter clearer - Bryan O'Donoghue
+Signed-off-by: Bryan O'Donoghue <pure.logic@nexus-software.ie>
+Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ drivers/nvmem/imx-ocotp.c | 68 ++++++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 64 insertions(+), 4 deletions(-)
 
-V1:
-(Resend: I may have missed Philip Zabel on the first send - apologies if
-that is the case Philip.)
-
-The current OCOTP driver added support for i.MX7 read access and then added
-support for i.MX6 write access. Between the two commits the fact that the
-added write routine was only appropriate for i.MX6 was missed.
-
-As a result its certain that attempting to write i.MX7 OTP fuses on Linux
-would fail as the destination address on i.MX7 is different to i.MX6.
-
-Without the update to the i.MX7 setup and hold timings it's not clear that
-a write operation would actually do any writing which means the bad
-addressing on i.MX7 might not actually destroy the wrong OTP fuses, it
-probably would just fail to do anything, understandably I haven't
-experimented with knowingly bad values for one-time-programmable fuses.
-
-This series fixes the gap by:
-
-1. Switching off OTP writing for i.MX7
-2. Adding in support for the i.MX7 way of doing things
-3. Switching OTP write support back on for i.MX7
-
-There's an additional small fix for the naming of the module then to
-indicate it works for i.MX7 as well as for i.MX6.
-
-Bryan O'Donoghue (7):
-  nvmem: imx-ocotp: Restrict OTP write to IMX6 processors
-  nvmem: imx-ocotp: Pass parameters via a struct
-  nvmem: imx-ocotp: Add support for banked OTP addressing
-  nvmem: imx-ocotp: Move i.MX6 write clock setup to dedicated function
-  nvmem: imx-ocotp: Add i.MX7D timing write clock setup support
-  nvmem: imx-ocotp: Enable i.MX7D OTP write support
-  nvmem: imx-ocotp: Update module description
-
- drivers/nvmem/imx-ocotp.c | 192 +++++++++++++++++++++++++++++++++++++---------
- 1 file changed, 156 insertions(+), 36 deletions(-)
-
+diff --git a/drivers/nvmem/imx-ocotp.c b/drivers/nvmem/imx-ocotp.c
+index b035e47..e10a0da 100644
+--- a/drivers/nvmem/imx-ocotp.c
++++ b/drivers/nvmem/imx-ocotp.c
+@@ -40,7 +40,10 @@
+ #define IMX_OCOTP_ADDR_CTRL_SET		0x0004
+ #define IMX_OCOTP_ADDR_CTRL_CLR		0x0008
+ #define IMX_OCOTP_ADDR_TIMING		0x0010
+-#define IMX_OCOTP_ADDR_DATA		0x0020
++#define IMX_OCOTP_ADDR_DATA0		0x0020
++#define IMX_OCOTP_ADDR_DATA1		0x0030
++#define IMX_OCOTP_ADDR_DATA2		0x0040
++#define IMX_OCOTP_ADDR_DATA3		0x0050
+ 
+ #define IMX_OCOTP_BM_CTRL_ADDR		0x0000007F
+ #define IMX_OCOTP_BM_CTRL_BUSY		0x00000100
+@@ -55,6 +58,7 @@ static DEFINE_MUTEX(ocotp_mutex);
+ 
+ struct ocotp_params {
+ 	unsigned int nregs;
++	unsigned int bank_address_words;
+ };
+ 
+ struct ocotp_priv {
+@@ -176,6 +180,7 @@ static int imx_ocotp_write(void *context, unsigned int offset, void *val,
+ 	u32 timing = 0;
+ 	u32 ctrl;
+ 	u8 waddr;
++	u8 word = 0;
+ 
+ 	/* allow only writing one complete OTP word at a time */
+ 	if ((bytes != priv->config->word_size) ||
+@@ -228,8 +233,23 @@ static int imx_ocotp_write(void *context, unsigned int offset, void *val,
+ 	 * description. Both the unlock code and address can be written in the
+ 	 * same operation.
+ 	 */
+-	/* OTP write/read address specifies one of 128 word address locations */
+-	waddr = offset / 4;
++	if (priv->params->bank_address_words != 0) {
++		/*
++		 * In banked/i.MX7 mode the OTP register bank goes into waddr
++		 * see i.MX 7Solo Applications Processor Reference Manual, Rev.
++		 * 0.1 section 6.4.3.1
++		 */
++		offset = offset / priv->config->word_size;
++		waddr = offset / priv->params->bank_address_words;
++		word  = offset & (priv->params->bank_address_words - 1);
++	} else {
++		/*
++		 * Non-banked i.MX6 mode.
++		 * OTP write/read address specifies one of 128 word address
++		 * locations
++		 */
++		waddr = offset / 4;
++	}
+ 
+ 	ctrl = readl(priv->base + IMX_OCOTP_ADDR_CTRL);
+ 	ctrl &= ~IMX_OCOTP_BM_CTRL_ADDR;
+@@ -255,8 +275,43 @@ static int imx_ocotp_write(void *context, unsigned int offset, void *val,
+ 	 * shift right (with zero fill). This shifting is required to program
+ 	 * the OTP serially. During the write operation, HW_OCOTP_DATA cannot be
+ 	 * modified.
++	 * Note: on i.MX7 there are four data fields to write for banked write
++	 *       with the fuse blowing operation only taking place after data0
++	 *	 has been written. This is why data0 must always be the last
++	 *	 register written.
+ 	 */
+-	writel(*buf, priv->base + IMX_OCOTP_ADDR_DATA);
++	if (priv->params->bank_address_words != 0) {
++		/* Banked/i.MX7 mode */
++		switch (word) {
++		case 0:
++			writel(0, priv->base + IMX_OCOTP_ADDR_DATA1);
++			writel(0, priv->base + IMX_OCOTP_ADDR_DATA2);
++			writel(0, priv->base + IMX_OCOTP_ADDR_DATA3);
++			writel(*buf, priv->base + IMX_OCOTP_ADDR_DATA0);
++			break;
++		case 1:
++			writel(*buf, priv->base + IMX_OCOTP_ADDR_DATA1);
++			writel(0, priv->base + IMX_OCOTP_ADDR_DATA2);
++			writel(0, priv->base + IMX_OCOTP_ADDR_DATA3);
++			writel(0, priv->base + IMX_OCOTP_ADDR_DATA0);
++			break;
++		case 2:
++			writel(0, priv->base + IMX_OCOTP_ADDR_DATA1);
++			writel(*buf, priv->base + IMX_OCOTP_ADDR_DATA2);
++			writel(0, priv->base + IMX_OCOTP_ADDR_DATA3);
++			writel(0, priv->base + IMX_OCOTP_ADDR_DATA0);
++			break;
++		case 3:
++			writel(0, priv->base + IMX_OCOTP_ADDR_DATA1);
++			writel(0, priv->base + IMX_OCOTP_ADDR_DATA2);
++			writel(*buf, priv->base + IMX_OCOTP_ADDR_DATA3);
++			writel(0, priv->base + IMX_OCOTP_ADDR_DATA0);
++			break;
++		}
++	} else {
++		/* Non-banked i.MX6 mode */
++		writel(*buf, priv->base + IMX_OCOTP_ADDR_DATA0);
++	}
+ 
+ 	/* 47.4.1.4.5
+ 	 * Once complete, the controller will clear BUSY. A write request to a
+@@ -314,22 +369,27 @@ static struct nvmem_config imx_ocotp_nvmem_config = {
+ 
+ static const struct ocotp_params imx6q_params = {
+ 	.nregs = 128,
++	.bank_address_words = 0,
+ };
+ 
+ static const struct ocotp_params imx6sl_params = {
+ 	.nregs = 64,
++	.bank_address_words = 0,
+ };
+ 
+ static const struct ocotp_params imx6sx_params = {
+ 	.nregs = 128,
++	.bank_address_words = 0,
+ };
+ 
+ static const struct ocotp_params imx6ul_params = {
+ 	.nregs = 128,
++	.bank_address_words = 0,
+ };
+ 
+ static const struct ocotp_params imx7d_params = {
+ 	.nregs = 64,
++	.bank_address_words = 4,
+ };
+ 
+ static const struct of_device_id imx_ocotp_dt_ids[] = {
 -- 
 2.7.4
