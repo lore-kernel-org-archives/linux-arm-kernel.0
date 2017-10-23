@@ -1,48 +1,31 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 23 Oct 2017 11:04:38 +0800
-Subject: [PATCH] PCI: hisi: add PCIe driver support for HiSilicon STB SoCs
-In-Reply-To: <20171020225248.GV6332@bhelgaas-glaptop.roam.corp.google.com>
-References: <1508043971-23216-1-git-send-email-shawnguo@kernel.org>
- <20171020225248.GV6332@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20171023030437.GH8700@dragon>
+From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
+Date: Sun, 22 Oct 2017 20:23:19 -0700
+Subject: linux-next: build failure after merge of the keystone tree
+In-Reply-To: <20171010071924.ddxkylkwq44qh47q@sirena.co.uk>
+References: <20171010071924.ddxkylkwq44qh47q@sirena.co.uk>
+Message-ID: <3ed1f18a-204c-961a-9d81-b36e00d4aaf5@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
-
-Thanks for taking time to look at the patch.
-
-On Fri, Oct 20, 2017 at 05:52:48PM -0500, Bjorn Helgaas wrote:
-> On Sun, Oct 15, 2017 at 01:06:11PM +0800, Shawn Guo wrote:
-> > From: Jianguo Sun <sunjianguo1@huawei.com>
-> > 
-> > Add PCIe controller driver for HiSilicon STB SoCs,
-> > the controller is based on the DesignWare's PCIe core.
+On 10/10/17 12:19 AM, Mark Brown wrote:
+> Hi Santosh,
 > 
-> s/DesignWare's/DesignWare/
+> After merging the keystone tree, today's linux-next build
+> (multi_v7_defconfig) failed like this:
 > 
-> > Signed-off-by: Jianguo Sun <sunjianguo1@huawei.com>
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > ---
-> >  .../bindings/pci/hisilicon-histb-pcie.txt          |  66 +++
-> >  drivers/pci/dwc/Kconfig                            |  10 +
-> >  drivers/pci/dwc/Makefile                           |   1 +
-> >  drivers/pci/dwc/pcie-histb.c                       | 469 +++++++++++++++++++++
-> >  4 files changed, 546 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/pci/hisilicon-histb-pcie.txt
-> >  create mode 100644 drivers/pci/dwc/pcie-histb.c
+>    DTC     arch/arm/boot/dts/keystone-k2g-evm.dtb
+> Error: /home/broonie/tmpfs/next/arch/arm/boot/dts/keystone-k2g-evm.dts:150.1-15 syntax error
+> FATAL ERROR: Unable to parse input tree
+> scripts/Makefile.lib:316: recipe for target 'arch/arm/boot/dts/keystone-k2g-evm.dtb' failed
+> make[2]: *** [arch/arm/boot/dts/keystone-k2g-evm.dtb] Error 1
 > 
-> Looks beautiful overall!
+> Caused by commit
 > 
-> This needs a MAINTAINERS update so "./scripts/get_maintainer.pl -f" prints
-> something useful.
+>     a6f244505915f ("ARM: dts: keystone-k2g-evm: Add I2C EEPROM DT entry")
+> 
+> I've used the keystone tree from yesterday.
+> 
+I fixed this next day but forgot to reply to you Mark.
 
-Okay, I will add a MAINTAINERS entry for this driver.
-
-> A few minor nits below that I would fix myself, but since you need to
-> supply the MAINTAINERS update anyway, I'll let you do it :)
-
-Thanks for all the suggestions.  We fixed them all, and the code does
-look nicer.
-
-Shawn
+Regards,
+Santosh
