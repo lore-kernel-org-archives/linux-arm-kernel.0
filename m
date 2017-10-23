@@ -1,21 +1,37 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 23 Oct 2017 17:44:47 -0500
-Subject: [PATCH 1/4] dt-bindings: display: amlogic, meson-vpu: Add
- optional power domain property
-In-Reply-To: <1508227664-11171-2-git-send-email-narmstrong@baylibre.com>
+Date: Mon, 23 Oct 2017 17:46:25 -0500
+Subject: [PATCH 2/4] dt-bindings: display: amlogic, meson-dw-hdmi: Add
+ optional HDMI 5V regulator
+In-Reply-To: <1508227664-11171-3-git-send-email-narmstrong@baylibre.com>
 References: <1508227664-11171-1-git-send-email-narmstrong@baylibre.com>
- <1508227664-11171-2-git-send-email-narmstrong@baylibre.com>
-Message-ID: <20171023224447.3elnyvq7j44l55id@rob-hp-laptop>
+ <1508227664-11171-3-git-send-email-narmstrong@baylibre.com>
+Message-ID: <20171023224625.oiswnpgmxzhg7aep@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 10:07:41AM +0200, Neil Armstrong wrote:
-> The Video Processing Unit power domain was setup by the Vendor U-Boot,
-> add support for an optional Power Domain phandle to setup it from the kernel.
+On Tue, Oct 17, 2017 at 10:07:42AM +0200, Neil Armstrong wrote:
+> On reference boards and derivatives, the HDMI Logic is powered by an external
+> 5V regulator.
+> This regulator was set by the Vendor U-Boot, add optional support for it.
 > 
 > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 > ---
->  Documentation/devicetree/bindings/display/amlogic,meson-vpu.txt | 4 ++++
+>  Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt | 4 ++++
 >  1 file changed, 4 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt b/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
+> index 7f040ed..bf4a180 100644
+> --- a/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
+> +++ b/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
+> @@ -48,6 +48,10 @@ Required properties:
+>    Documentation/devicetree/bindings/reset/reset.txt,
+>    the reset-names should be "hdmitx_apb", "hdmitx", "hdmitx_phy"
+>  
+> +Optional properties:
+> +- hdmi-supply: Optional phandle to an external 5V regulator to power the HDMI
+> +  logic, as described in the file ../regulator/regulator.txt
 
-Acked-by: Rob Herring <robh@kernel.org> 
+5V into a modern SoC sounds strange. Is this really for the chip or for 
+5V to the connector? The latter should be in the connector node.
+
+Rob
