@@ -1,160 +1,173 @@
-From: zhi.mao@mediatek.com (Zhi Mao)
-Date: Mon, 23 Oct 2017 13:27:28 +0800
-Subject: [PATCH v4 1/1] pwm: mediatek: add MT2712/MT7622 support
-In-Reply-To: <1505897312.28692.2.camel@mhfsdcap03>
-References: <1503367755-6519-1-git-send-email-zhi.mao@mediatek.com>
- <1503367755-6519-2-git-send-email-zhi.mao@mediatek.com>
- <1505897312.28692.2.camel@mhfsdcap03>
-Message-ID: <1508736448.12324.3.camel@mhfsdcap03>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 23 Oct 2017 14:31:51 +0900
+Subject: [PATCH v2] extcon: Split out extcon header file for consumer
+ and provider device
+In-Reply-To: <fc19204f-c3a8-eccc-98df-e08aa27934fe@ti.com>
+References: <CGME20171010101758epcas2p3b3f379076f5be5e81edee2bd00354c28@epcas2p3.samsung.com>
+ <1507630671-23536-1-git-send-email-cw00.choi@samsung.com>
+ <59DEE429.2000608@samsung.com> <59E6B90F.8000808@samsung.com>
+ <fc19204f-c3a8-eccc-98df-e08aa27934fe@ti.com>
+Message-ID: <59ED7EC7.3030204@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+Dear all,
 
-Just have a ping on this issue.
+I got the reviews from all maintainers related to this patch.
+So, I make the immutable branch on extcon.git and then send
+the pull request in order to prevent the possible merge conflict.
 
-Regards,
-Zhi
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
 
-On Wed, 2017-09-20 at 16:48 +0800, Zhi Mao wrote:
-> Hi Thierry,
+
+The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+
+  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/chanwoo/extcon.git ib-extcon-v4.15
+
+for you to fetch changes up to 176aa36012135d172394a928a03fb03dfecd83f9:
+
+  extcon: Split out extcon header file for consumer and provider device (2017-10-23 14:07:58 +0900)
+
+----------------------------------------------------------------
+Chanwoo Choi (1):
+      extcon: Split out extcon header file for consumer and provider device
+
+ drivers/extcon/extcon-adc-jack.c              |   2 +-
+ drivers/extcon/extcon-arizona.c               |   2 +-
+ drivers/extcon/extcon-axp288.c                |   2 +-
+ drivers/extcon/extcon-gpio.c                  |   2 +-
+ drivers/extcon/extcon-intel-cht-wc.c          |   2 +-
+ drivers/extcon/extcon-intel-int3496.c         |   2 +-
+ drivers/extcon/extcon-max14577.c              |   2 +-
+ drivers/extcon/extcon-max3355.c               |   2 +-
+ drivers/extcon/extcon-max77693.c              |   2 +-
+ drivers/extcon/extcon-max77843.c              |   2 +-
+ drivers/extcon/extcon-max8997.c               |   2 +-
+ drivers/extcon/extcon-qcom-spmi-misc.c        |   2 +-
+ drivers/extcon/extcon-rt8973a.c               |   2 +-
+ drivers/extcon/extcon-sm5502.c                |   2 +-
+ drivers/extcon/extcon-usb-gpio.c              |   2 +-
+ drivers/extcon/extcon-usbc-cros-ec.c          |   2 +-
+ drivers/extcon/extcon.h                       |   2 +-
+ drivers/phy/allwinner/phy-sun4i-usb.c         |   2 +-
+ drivers/phy/broadcom/phy-bcm-ns2-usbdrd.c     |   2 +-
+ drivers/phy/renesas/phy-rcar-gen3-usb2.c      |   2 +-
+ drivers/phy/rockchip/phy-rockchip-inno-usb2.c |   2 +-
+ drivers/power/supply/qcom_smbb.c              |   2 +-
+ drivers/usb/gadget/udc/renesas_usb3.c         |   2 +-
+ drivers/usb/phy/phy-tahvo.c                   |   2 +-
+ include/linux/extcon-provider.h               | 142 ++++++++++++++++++++++++++
+ include/linux/extcon.h                        | 109 +-------------------
+ include/linux/mfd/palmas.h                    |   2 +-
+ 27 files changed, 172 insertions(+), 129 deletions(-)
+ create mode 100644 include/linux/extcon-provider.h
+
+
+On 2017? 10? 23? 14:05, Kishon Vijay Abraham I wrote:
 > 
-> Just a gentle ping on this issue.
-> Would you please have a review to this patch?
 > 
-> Regards,
-> Zhi
+> On Wednesday 18 October 2017 07:44 AM, Chanwoo Choi wrote:
+>> Gently Ping.
+>>
+>> Dear Kishon,
+>>
+>> Could you please review this patch for 'drivers/phy/*'?
 > 
+> sorry for the delay.. here it is
 > 
-> On Tue, 2017-08-22 at 10:09 +0800, Zhi Mao wrote:
-> > Add support to MT2712 and MT7622.
-> > Due to register offset address of pwm7 for MT2712 is not fixed 0x40,
-> > add mtk_pwm_reg_offset array for pwm register offset.
-> > 
-> > Signed-off-by: Zhi Mao <zhi.mao@mediatek.com>
-> > ---
-> >  drivers/pwm/pwm-mediatek.c |   51 ++++++++++++++++++++++++++++++++++++--------
-> >  1 file changed, 42 insertions(+), 9 deletions(-)
-> > 
-> > diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
-> > index 1d78ab1..ccd86e7 100644
-> > --- a/drivers/pwm/pwm-mediatek.c
-> > +++ b/drivers/pwm/pwm-mediatek.c
-> > @@ -16,6 +16,7 @@
-> >  #include <linux/module.h>
-> >  #include <linux/clk.h>
-> >  #include <linux/of.h>
-> > +#include <linux/of_device.h>
-> >  #include <linux/platform_device.h>
-> >  #include <linux/pwm.h>
-> >  #include <linux/slab.h>
-> > @@ -40,11 +41,19 @@ enum {
-> >  	MTK_CLK_PWM3,
-> >  	MTK_CLK_PWM4,
-> >  	MTK_CLK_PWM5,
-> > +	MTK_CLK_PWM6,
-> > +	MTK_CLK_PWM7,
-> > +	MTK_CLK_PWM8,
-> >  	MTK_CLK_MAX,
-> >  };
-> >  
-> > -static const char * const mtk_pwm_clk_name[] = {
-> > -	"main", "top", "pwm1", "pwm2", "pwm3", "pwm4", "pwm5"
-> > +static const char * const mtk_pwm_clk_name[MTK_CLK_MAX] = {
-> > +	"main", "top", "pwm1", "pwm2", "pwm3", "pwm4", "pwm5", "pwm6", "pwm7",
-> > +	"pwm8"
-> > +};
-> > +
-> > +struct mtk_pwm_platform_data {
-> > +	unsigned int num_pwms;
-> >  };
-> >  
-> >  /**
-> > @@ -57,6 +66,11 @@ struct mtk_pwm_chip {
-> >  	struct pwm_chip chip;
-> >  	void __iomem *regs;
-> >  	struct clk *clks[MTK_CLK_MAX];
-> > +	const struct mtk_pwm_platform_data *data;
-> > +};
-> > +
-> > +static const unsigned int mtk_pwm_reg_offset[] = {
-> > +	0x0010, 0x0050, 0x0090, 0x00d0, 0x0110, 0x0150, 0x0190, 0x0220
-> >  };
-> >  
-> >  static inline struct mtk_pwm_chip *to_mtk_pwm_chip(struct pwm_chip *chip)
-> > @@ -103,14 +117,14 @@ static void mtk_pwm_clk_disable(struct pwm_chip *chip, struct pwm_device *pwm)
-> >  static inline u32 mtk_pwm_readl(struct mtk_pwm_chip *chip, unsigned int num,
-> >  				unsigned int offset)
-> >  {
-> > -	return readl(chip->regs + 0x10 + (num * 0x40) + offset);
-> > +	return readl(chip->regs + mtk_pwm_reg_offset[num] + offset);
-> >  }
-> >  
-> >  static inline void mtk_pwm_writel(struct mtk_pwm_chip *chip,
-> >  				  unsigned int num, unsigned int offset,
-> >  				  u32 value)
-> >  {
-> > -	writel(value, chip->regs + 0x10 + (num * 0x40) + offset);
-> > +	writel(value, chip->regs + mtk_pwm_reg_offset[num] + offset);
-> >  }
-> >  
-> >  static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-> > @@ -194,15 +208,20 @@ static int mtk_pwm_probe(struct platform_device *pdev)
-> >  	if (!pc)
-> >  		return -ENOMEM;
-> >  
-> > +	pc->data = of_device_get_match_data(&pdev->dev);
-> > +
-> >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> >  	pc->regs = devm_ioremap_resource(&pdev->dev, res);
-> >  	if (IS_ERR(pc->regs))
-> >  		return PTR_ERR(pc->regs);
-> >  
-> > -	for (i = 0; i < MTK_CLK_MAX; i++) {
-> > +	for (i = 0; i < pc->data->num_pwms + 2; i++) {
-> >  		pc->clks[i] = devm_clk_get(&pdev->dev, mtk_pwm_clk_name[i]);
-> > -		if (IS_ERR(pc->clks[i]))
-> > +		if (IS_ERR(pc->clks[i])) {
-> > +			dev_err(&pdev->dev, "clock: %s fail: %ld\n",
-> > +				mtk_pwm_clk_name[i], PTR_ERR(pc->clks[i]));
-> >  			return PTR_ERR(pc->clks[i]);
-> > +		}
-> >  	}
-> >  
-> >  	platform_set_drvdata(pdev, pc);
-> > @@ -210,7 +229,7 @@ static int mtk_pwm_probe(struct platform_device *pdev)
-> >  	pc->chip.dev = &pdev->dev;
-> >  	pc->chip.ops = &mtk_pwm_ops;
-> >  	pc->chip.base = -1;
-> > -	pc->chip.npwm = 5;
-> > +	pc->chip.npwm = pc->data->num_pwms;
-> >  
-> >  	ret = pwmchip_add(&pc->chip);
-> >  	if (ret < 0) {
-> > @@ -228,9 +247,23 @@ static int mtk_pwm_remove(struct platform_device *pdev)
-> >  	return pwmchip_remove(&pc->chip);
-> >  }
-> >  
-> > +static const struct mtk_pwm_platform_data mt2712_pwm_data = {
-> > +	.num_pwms = 8,
-> > +};
-> > +
-> > +static const struct mtk_pwm_platform_data mt7622_pwm_data = {
-> > +	.num_pwms = 6,
-> > +};
-> > +
-> > +static const struct mtk_pwm_platform_data mt7623_pwm_data = {
-> > +	.num_pwms = 5,
-> > +};
-> > +
-> >  static const struct of_device_id mtk_pwm_of_match[] = {
-> > -	{ .compatible = "mediatek,mt7623-pwm" },
-> > -	{ }
-> > +	{ .compatible = "mediatek,mt2712-pwm", .data = &mt2712_pwm_data },
-> > +	{ .compatible = "mediatek,mt7622-pwm", .data = &mt7622_pwm_data },
-> > +	{ .compatible = "mediatek,mt7623-pwm", .data = &mt7623_pwm_data },
-> > +	{ },
-> >  };
-> >  MODULE_DEVICE_TABLE(of, mtk_pwm_of_match);
-> >  
-> 
+> Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>
+>> Regards,
+>> Chanwoo Choi
+>>
+>> On 2017? 10? 12? 12:40, Chanwoo Choi wrote:
+>>> Dear Kishon,
+>>>
+>>> Could you please review this patch?
+>>> After that, I'll make the immutable brand and then send the pull request
+>>> for power_supply, mfd, phy, usb and extcon framework.
+>>>
+>>> On 2017? 10? 10? 19:17, Chanwoo Choi wrote:
+>>>> The extcon has two type of extcon devices as following.
+>>>> - 'extcon provider deivce' adds new extcon device and detect the
+>>>>    state/properties of external connector. Also, it notifies the
+>>>>    state/properties to the extcon consumer device.
+>>>> - 'extcon consumer device' gets the change state/properties
+>>>>    from extcon provider device.
+>>>> Prior to that, include/linux/extcon.h contains all exported API for
+>>>> both provider and consumer device driver. To clarify the meaning of
+>>>> header file and to remove the wrong use-case on consumer device,
+>>>> this patch separates into extcon.h and extcon-provider.h.
+>>>>
+>>>> [Description for include/linux/{extcon.h|extcon-provider.h}]
+>>>> - extcon.h includes the extcon API and data structure for extcon consumer
+>>>>   device driver. This header file contains the following APIs:
+>>>>   : Register/unregister the notifier to catch the change of extcon device
+>>>>   : Get the extcon device instance
+>>>>   : Get the extcon device name
+>>>>   : Get the state of each external connector
+>>>>   : Get the property value of each external connector
+>>>>   : Get the property capability of each external connector
+>>>>
+>>>> - extcon-provider.h includes the extcon API and data structure for extcon
+>>>>   provider device driver. This header file contains the following APIs:
+>>>>   : Include 'include/linux/extcon.h'
+>>>>   : Allocate the memory for extcon device instance
+>>>>   : Register/unregister extcon device
+>>>>   : Set the state of each external connector
+>>>>   : Set the property value of each external connector
+>>>>   : Set the property capability of each external connector
+>>>>
+>>>> Cc: Felipe Balbi <balbi@kernel.org>
+>>>> Cc: Kishon Vijay Abraham I <kishon@ti.com>
+>>>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>>>> Acked-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
+>>>> Acked-by: Chen-Yu Tsai <wens@csie.org>
+>>>> Acked-by: Charles Keepax <ckeepax@opensource.cirrus.com>
+>>>> Acked-by: Lee Jones <lee.jones@linaro.org>
+>>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>>> ---
+>>>> Changes from v1:
+>>>> - Don't touch drivers/usb/renesas_usbhs/common.h.
+>>>> - Add acked-by from Sebastian Reichel (for drivers/power/supply/)
+>>>> - Add acked-by from Chen-Yu Tsai (for phy-sun4i-usb.c & extcon-axp288.c)
+>>>> - Add acked-by from Charles Keepax (for drivers/extcon/extcon-arizona.c)
+>>>> - Add acked-by from Lee Jones (fo include/linux/mfd/palmas.h)
+>>>>
+>>>>  drivers/extcon/extcon-adc-jack.c              |   2 +-
+>>>>  drivers/extcon/extcon-arizona.c               |   2 +-
+>>>>  drivers/extcon/extcon-axp288.c                |   2 +-
+>>>>  drivers/extcon/extcon-gpio.c                  |   2 +-
+>>>>  drivers/extcon/extcon-intel-cht-wc.c          |   2 +-
+>>>>  drivers/extcon/extcon-intel-int3496.c         |   2 +-
+>>>>  drivers/extcon/extcon-max14577.c              |   2 +-
+>>>>  drivers/extcon/extcon-max3355.c               |   2 +-
+>>>>  drivers/extcon/extcon-max77693.c              |   2 +-
+>>>>  drivers/extcon/extcon-max77843.c              |   2 +-
+>>>>  drivers/extcon/extcon-max8997.c               |   2 +-
+>>>>  drivers/extcon/extcon-qcom-spmi-misc.c        |   2 +-
+>>>>  drivers/extcon/extcon-rt8973a.c               |   2 +-
+>>>>  drivers/extcon/extcon-sm5502.c                |   2 +-
+>>>>  drivers/extcon/extcon-usb-gpio.c              |   2 +-
+>>>>  drivers/extcon/extcon-usbc-cros-ec.c          |   2 +-
+>>>>  drivers/extcon/extcon.h                       |   2 +-
+>>>>  drivers/phy/allwinner/phy-sun4i-usb.c         |   2 +-
+>>>>  drivers/phy/broadcom/phy-bcm-ns2-usbdrd.c     |   2 +-
+>>>>  drivers/phy/renesas/phy-rcar-gen3-usb2.c      |   2 +-
+>>>>  drivers/phy/rockchip/phy-rockchip-inno-usb2.c |   2 +-
+>>>>  drivers/power/supply/qcom_smbb.c              |   2 +-
+>>>>  drivers/usb/gadget/udc/renesas_usb3.c         |   2 +-
+>>>>  drivers/usb/phy/phy-tahvo.c                   |   2 +-
+>>>>  include/linux/extcon-provider.h               | 142 ++++++++++++++++++++++++++
+>>>>  include/linux/extcon.h                        | 109 +-------------------
+>>>>  include/linux/mfd/palmas.h                    |   2 +-
+>>>>  27 files changed, 172 insertions(+), 129 deletions(-)
+>>>>  create mode 100644 include/linux/extcon-provider.h
+
+[snip]
