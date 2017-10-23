@@ -1,111 +1,177 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 23 Oct 2017 23:17:35 +0200
-Subject: [PATCH] ARM: compressed: discard ksym/kcrctab input section
-In-Reply-To: <20171023114825.GV20805@n2100.armlinux.org.uk>
-References: <20170908153143.27279-1-ard.biesheuvel@linaro.org>
- <33486b3e-8221-92b0-7e18-859be7d0a74b@suse.com>
- <CAKv+Gu-8PEPuWH=bT_wD0MYDw67RY3gQudW2mLO-QeBYqQesyw@mail.gmail.com>
- <2b3af288-51b1-561a-a1a9-f5f42f7ca1c4@gmail.com>
- <20171023092956.GN20805@n2100.armlinux.org.uk>
- <20171023114825.GV20805@n2100.armlinux.org.uk>
-Message-ID: <4950796f-efdc-337a-bbbb-f09213eb54ce@gmail.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Mon, 23 Oct 2017 16:26:33 -0500
+Subject: [PATCH v3 6/7] arm64: topology: Enable ACPI/PPTT based CPU
+ topology.
+In-Reply-To: <e4781c4d-005a-aa6f-6a48-2cec3eb04da2@codeaurora.org>
+References: <20171012194856.13844-1-jeremy.linton@arm.com>
+ <20171012194856.13844-7-jeremy.linton@arm.com>
+ <20171019155622.GC18883@red-moon>
+ <6a9836f5-d31c-67fb-b2dd-bc0972ebb1c2@arm.com>
+ <20171020091428.GA21060@red-moon>
+ <e2772689-603b-f129-0643-f5d1f5e41a19@arm.com>
+ <e4781c4d-005a-aa6f-6a48-2cec3eb04da2@codeaurora.org>
+Message-ID: <47a192d0-33e8-4159-ed32-910d5ad7a743@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-
-On 10/23/2017 01:48 PM, Russell King - ARM Linux wrote:
-> On Mon, Oct 23, 2017 at 10:29:56AM +0100, Russell King - ARM Linux wrote:
->> On Mon, Oct 23, 2017 at 12:00:46AM +0200, Matthias Brugger wrote:
->>> Hi Ard,
->>>
->>> On 10/21/2017 10:14 AM, Ard Biesheuvel wrote:
->>>> On 21 October 2017 at 08:56, Matthias Brugger <mbrugger@suse.com> wrote:
->>>>> On 09/08/2017 05:31 PM, Ard Biesheuvel wrote:
->>>>>> As it turns out, building the ARM kernel with EFI support pulls in
->>>>>> a couple of sections that we don't really need in the decompressor.
->>>>>> This is due to the fact the the UEFI stub uses sort() to sort the UEFI
->>>>>> memory map, which is an exported symbol pulled in from lib/sort.c.
->>>>>>
->>>>>> Before commit e4bae4d0b5f3 ("arm/efi: Split zImage code and data into
->>>>>> separate PE/COFF sections"), this resulted in the following layout
->>>>>> for the decompressor ELF binary.
->>>>>>
->>>>>>   [Nr] Name              Type     Addr     Off    Size   ES Flg Lk Inf Al
->>>>>>   [ 0]                   NULL     00000000 000000 000000 00      0   0  0
->>>>>>   [ 1] .text             PROGBITS 00000000 010000 009b3c 00  AX  0   0 512
->>>>>>   [ 2] .rodata           PROGBITS 00009b3c 019b3c 001684 00   A  0   0  4
->>>>>>   [ 3] __ksymtab_strings PROGBITS 0000b1c0 01b1c0 000005 00   A  0   0  1
->>>>>>   [ 4] .data             PROGBITS 0000b1c8 01b1c8 000020 00  WA  0   0  8
->>>>>>   [ 5] ___ksymtab+sort   PROGBITS 0000b1e8 01b1e8 000008 00  WA  0   0  4
->>>>>>   [ 6] .piggydata        PROGBITS 0000b1f0 01b1f0 77ac38 00   A  0   0  1
->>>>>>   [ 7] .got.plt          PROGBITS 00785e28 795e28 00000c 04  WA  0   0  4
->>>>>>   [ 8] .got              PROGBITS 00785e34 795e34 000028 00  WA  0   0  4
->>>>>>   [ 9] .pad              PROGBITS 00785e5c 795e5c 000004 00  WA  0   0  1
->>>>>>   [10] .bss              NOBITS   00785e60 795e60 00001c 00  WA  0   0  4
->>>>>>   [11] .stack            NOBITS   00785e80 795e60 001000 00  WA  0   0  1
->>>>>>
->>>>>> Commit e4bae4d0b5f3 made some changes to the linker script to allow the
->>>>>> UEFI firmware to map the decompressor with strict R-X/RW- permissions
->>>>>> before invoking it. Unfortunately, this turns out to break the boot on
->>>>>> some systems, because the linker now also moves the ksymtab/kcrctab
->>>>>> sections around, resulting in .piggydata to appear misaligned.
->>>>>>
->>>>>>   [Nr] Name              Type     Addr     Off    Size   ES Flg Lk Inf Al
->>>>>>   [ 0]                   NULL     00000000 000000 000000 00      0   0  0
->>>>>>   [ 1] .text             PROGBITS 00000000 010000 00a93c 00  AX  0   0 4096
->>>>>>   [ 2] .rodata           PROGBITS 0000a93c 01a93c 001684 00   A  0   0  4
->>>>>>   [ 3] __ksymtab_strings PROGBITS 0000bfc0 01bfc0 000005 00   A  0   0  1
->>>>>>   [ 4] .piggydata        PROGBITS 0000bfc5 01bfc5 77ac47 00   A  0   0  1
->>>>>>   [ 5] .got.plt          PROGBITS 00786c0c 796c0c 00000c 04  WA  0   0  4
->>>>>>   [ 6] .got              PROGBITS 00786c18 796c18 000028 00  WA  0   0  4
->>>>>>   [ 7] .pad              PROGBITS 00786c40 796c40 000008 00  WA  0   0  1
->>>>>>   [ 8] .data             PROGBITS 00787000 797000 000200 00  WA  0   0 4096
->>>>>>   [ 9] ___ksymtab+sort   PROGBITS 00787200 797200 000008 00  WA  0   0  4
->>>>>>   [10] .bss              NOBITS   00787208 797208 00001c 00  WA  0   0  4
->>>>>>   [11] .stack            NOBITS   00787228 797208 001000 00  WA  0   0  1
->>>>>>
->>>>>> So let's align piggydata explicitly, and discard these sections from the
->>>>>> binary.
->>>>>>
->>>>>> Cc: Russell King <linux@armlinux.org.uk>
->>>>>> Fixes: e4bae4d0b5f3 ("arm/efi: Split zImage code and data into separate ...")
->>>>>> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->>>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>>>> ---
->>>>>>  arch/arm/boot/compressed/piggy.S       | 1 +
->>>>>>  arch/arm/boot/compressed/vmlinux.lds.S | 1 +
->>>>>>  2 files changed, 2 insertions(+)
->>>>>>
->>>>>
->>>>> This fixes the boot regression on bananapi-r2.
->>>>> Thanks! Feel free to add:
->>>>>
->>>>> Tested-by: Matthias Brugger <mbrugger@suse.com>
->>>>>
->>>>
->>>> Thanks for confirming Matthias. Could you please check whether this
->>>> patch from Arnd
->>>>
->>>> https://marc.info/?l=linux-kernel&m=150852980119217&w=2
->>>>
->>>> fixes the issue as well? (after reverting this one)
->>>>
->>>
->>> After only applying this patch on top of v4.14-rc5 I was not able to boot.
+On 10/20/2017 02:55 PM, Jeffrey Hugo wrote:
+> On 10/20/2017 10:14 AM, Jeremy Linton wrote:
+>> Hi,
 >>
->> Which decompression method are you using?
+>> On 10/20/2017 04:14 AM, Lorenzo Pieralisi wrote:
+>>> On Thu, Oct 19, 2017 at 11:13:27AM -0500, Jeremy Linton wrote:
+>>>> On 10/19/2017 10:56 AM, Lorenzo Pieralisi wrote:
+>>>>> On Thu, Oct 12, 2017 at 02:48:55PM -0500, Jeremy Linton wrote:
+>>>>>> Propagate the topology information from the PPTT tree to the
+>>>>>> cpu_topology array. We can get the thread id, core_id and
+>>>>>> cluster_id by assuming certain levels of the PPTT tree correspond
+>>>>>> to those concepts. The package_id is flagged in the tree and can be
+>>>>>> found by passing an arbitrary large level to 
+>>>>>> setup_acpi_cpu_topology()
+>>>>>> which terminates its search when it finds an ACPI node flagged
+>>>>>> as the physical package. If the tree doesn't contain enough
+>>>>>> levels to represent all of thread/core/cod/package then the package
+>>>>>> id will be used for the missing levels.
+>>>>>>
+>>>>>> Since server/ACPI machines are more likely to be multisocket and 
+>>>>>> NUMA,
+>>>>>
+>>>>> I think this stuff is vague enough already so to start with I would 
+>>>>> drop
+>>>>> patch 4 and 5 and stop assuming what machines are more likely to ship
+>>>>> with ACPI than DT.
+>>>>>
+>>>>> I am just saying, for the umpteenth time, that these levels have no
+>>>>> architectural meaning _whatsoever_, level is a hierarchy concept
+>>>>> with no architectural meaning attached.
+>>>>
+>>>> ?
+>>>>
+>>>> Did anyone say anything about that? No, I think the only thing being
+>>>> guaranteed here is that the kernel's physical_id maps to an ACPI
+>>>> defined socket. Which seems to be the mindset of pretty much the
+>>>> entire !arm64 community meaning they are optimizing their software
+>>>> and the kernel with that concept in mind.
+>>>>
+>>>> Are you denying the existence of non-uniformity between threads
+>>>> running on different physical sockets?
+>>>
+>>> No, I have not explained my POV clearly, apologies.
+>>>
+>>> AFAIK, the kernel currently deals with 2 (3 - if SMT) topology layers.
+>>>
+>>> 1) thread
+>>> 2) core
+>>> 3) package
+>>>
+>>> What I wanted to say is, that, to simplify this series, you do not need
+>>> to introduce the COD topology level, since it is just another arbitrary
+>>> topology level (ie there is no way you can pinpoint which level
+>>> corresponds to COD with PPTT - or DT for the sake of this discussion)
+>>> that would not be used in the kernel (apart from big.LITTLE cpufreq
+>>> driver and PSCI checker whose usage of topology_physical_package_id() is
+>>> questionable anyway).
 >>
->> What does objdump -h arch/arm/boot/vmlinux say?
+>> Oh! But, i'm at a loss as to what to do with those two users if I set 
+>> the node which has the physical socket flag set, as the "cluster_id" 
+>> in the topology.
+>>
+>> Granted, this being ACPI I don't expect the cpufreq driver to be 
+>> active (given CPPC) and the psci checker might be ignored? Even so, 
+>> its a bit of a misnomer what is actually happening. Are we good with 
+>> this?
+>>
+>>
+>>>
+>>> PPTT allows you to define what level corresponds to a package, use
+>>> it to initialize the package topology level (that on ARM internal
+>>> variables we call cluster) and be done with it.
+>>>
+>>> I do not think that adding another topology level improves anything as
+>>> far as ACPI topology detection is concerned, you are not able to use it
+>>> in the scheduler or from userspace to group CPUs anyway.
+>>
+>> Correct, and AFAIK after having poked a bit at the scheduler its sort 
+>> of redundant as the generic cache sharing levels are more useful anyway.
 > 
-> Oh, and one more question: are you appending a dtb to your zImage (and
-> if so, why are you doing that, that's supposed to be for obsolete boot
-> loaders only.)
+> What do you mean, it can't be used?? We expect a followup series which 
+> uses PPTT to define scheduling domains/groups.
 > 
+> The scheduler supports 4 types of levels, with an arbitrary number of 
+> instances of each - NUMA, DIE (package, usually not used with NUMA), MC 
+> (multicore, typically cores which share resources like cache), SMT 
+> (threads).
 
-Yes, I apply a dtb to my zImage. I do that because the board has no support on
-mainline u-boot right now and I do kernel enablement on the board. Support in
-u-boot is no priority ATM.
+It turns out to be pretty easy to map individual PPTT "levels" to MC 
+layers simply by creating a custom sched_domain_topology_level and 
+populating it with an equal number of MC layers. The only thing that 
+changes is the "mask" portion of each entry.
 
-Regards,
-Matthias
+Whether that is good/bad vs just using a topology like:
+
+static struct sched_domain_topology_level arm64_topology[] = {
+#ifdef CONFIG_SCHED_SMT
+        { cpu_smt_mask, cpu_smt_flags, SD_INIT_NAME(SMT) },
+#endif
+        { cpu_cluster_mask, cpu_core_flags, SD_INIT_NAME(CLU) },
+#ifdef CONFIG_SCHED_MC
+        { cpu_coregroup_mask, cpu_core_flags, SD_INIT_NAME(MC) },
+#endif
+        { cpu_cpu_mask, SD_INIT_NAME(DIE) },
+        { NULL, },
+};
+
+and using it on successful ACPI/PPTT parse, along with a new 
+cpu_cluster_mask isn't clear to me either. Particularly, if one goes in 
+and starts changing the "cpu_core_flags" for starters to the cpu_smt_flags.
+
+
+But as mentioned I think this is a follow on patch which meshes with 
+patches 4/5 here.
+
+
+
+> 
+> Our particular platform has a single socket/package, with multiple 
+> "clusters", each cluster consisting of multiple cores that share caches. 
+>  ?We represent all of this in PPTT, and expect it to be used.? Leaf 
+> nodes are cores.? The level above is the cluster.? The top level is the 
+> package.? We expect eventually (and understand that Jeremy is not 
+> tackling this with his current series) that clusters get represented MC 
+> so that migrated processes prefer their cache-shared siblings, and the 
+> entire package is represented by DIE.
+> 
+> This will have to come from PPTT since you can't use core_siblings to 
+> derive this.? Additionally, if we had multiple layers of clustering, we 
+> would expect each layer to be represented by MC.? Topology.c has none of 
+> this support today.
+> 
+> PPTT can refer to SLIT/SRAT to determine if a hirearchy level 
+> corresponds to the "Cluster-on-Die" concept of other architectures 
+> (which end up as NUMA nodes in NUMA scheduling domains).
+> 
+> What PPTT will have to do is parse the tree(s), determine what each 
+> level is - SMT, MC, NUMA, DIE - and then use set_sched_topology() so 
+> that the scheduler can build up groups/domains appropriately.
+> 
+> 
+> Jeremy, we've tested v3 on our platform.? The topology part works as 
+> expected, we no longer see lstopo reporting sockets where there are 
+> none, but the scheduling groups are broken (expected).? Caches still 
+> don't work right (no sizes reported, and the sched caches are not 
+> attributed to the cores).? We will likely have additional comments as we 
+> delve into it.
+>>
+>>>
+>>> Does this answer your question ?
+>> Yes, other than what to do with the two drivers.
+>>
+>>>
+>>> Thanks,
+>>> Lorenzo
+>>>
+>>
+> 
+> 
