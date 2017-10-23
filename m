@@ -1,69 +1,80 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Mon, 23 Oct 2017 10:31:44 +0800
-Subject: [PATCH v6 01/12] mmc: dt-bindings: Add reg/source_cg/latch-ck
- for Mediatek MMC bindings
-In-Reply-To: <1508118399-21828-2-git-send-email-chaotian.jing@mediatek.com>
-References: <1508118399-21828-1-git-send-email-chaotian.jing@mediatek.com>
- <1508118399-21828-2-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <1508725904.19789.19.camel@mhfsdcap03>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Sun, 22 Oct 2017 19:58:30 -0700
+Subject: [PATCH v3 1/3] interconnect: Add generic on-chip interconnect API
+In-Reply-To: <20171020223452.GD1165@minitux>
+References: <20170908171830.13813-1-georgi.djakov@linaro.org>
+ <20170908171830.13813-2-georgi.djakov@linaro.org>
+ <a7cf55ba-0475-d74c-f759-a24e58ccde47@linaro.org>
+ <20171020223452.GD1165@minitux>
+Message-ID: <CAEG3pNAbf3hLchrYK+s9RwZ3zF3srkqdbvqPSBMOoGV65TguLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob & Ulf,
+Hi all,
 
-Gentle ping...
-Any other comments about this series of patch ?
-On Mon, 2017-10-16 at 09:46 +0800, Chaotian Jing wrote:
-> Change the comptiable for support of multi-platform
-> Make compatible explicit, as MMC host of mt8173 has difference with
-> mt8135(mt8173 supports hs400 and hs400_tune),so that need separate
-> mt8173/mt8135 compatible name.
-> Add description for reg
-> Add description for source_cg
-> Add description for mediatek,latch-ck
-> Note that source_cg and mediatek,latch-ck are optional for some projects,
-> eg, MT2701 do not have source_cg, and MT2712 do not need
-> mediatek,latch-ck
-> 
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> ---
->  Documentation/devicetree/bindings/mmc/mtk-sd.txt | 18 +++++++++++++++---
->  1 file changed, 15 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> index 4182ea3..72d2a73 100644
-> --- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> +++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> @@ -7,10 +7,18 @@ This file documents differences between the core properties in mmc.txt
->  and the properties used by the msdc driver.
->  
->  Required properties:
-> -- compatible: Should be "mediatek,mt8173-mmc","mediatek,mt8135-mmc"
-> +- compatible: value should be either of the following.
-> +	"mediatek,mt8135-mmc": for mmc host ip compatible with mt8135
-> +	"mediatek,mt8173-mmc": for mmc host ip compatible with mt8173
-> +	"mediatek,mt2701-mmc": for mmc host ip compatible with mt2701
-> +	"mediatek,mt2712-mmc": for mmc host ip compatible with mt2712
-> +- reg: physical base address of the controller and length
->  - interrupts: Should contain MSDC interrupt number
-> -- clocks: MSDC source clock, HCLK
-> -- clock-names: "source", "hclk"
-> +- clocks: Should contain phandle for the clock feeding the MMC controller
-> +- clock-names: Should contain the following:
-> +	"source" - source clock (required)
-> +	"hclk" - HCLK which used for host (required)
-> +	"source_cg" - independent source clock gate (required for MT2712)
->  - pinctrl-names: should be "default", "state_uhs"
->  - pinctrl-0: should contain default/high speed pin ctrl
->  - pinctrl-1: should contain uhs mode pin ctrl
-> @@ -30,6 +38,10 @@ Optional properties:
->  - mediatek,hs400-cmd-resp-sel-rising:  HS400 command response sample selection
->  				       If present,HS400 command responses are sampled on rising edges.
->  				       If not present,HS400 command responses are sampled on falling edges.
-> +- mediatek,latch-ck: Some SoCs do not support enhance_rx, need set correct latch-ck to avoid data crc
-> +		     error caused by stop clock(fifo full)
-> +		     Valid range = [0:0x7]. if not present, default value is 0.
-> +		     applied to compatible "mediatek,mt2701-mmc".
->  
->  Examples:
->  mmc0: mmc at 11230000 {
+On Fri, Oct 20, 2017 at 3:34 PM, Bjorn Andersson
+<bjorn.andersson@linaro.org> wrote:
+> On Fri 20 Oct 07:43 PDT 2017, Georgi Djakov wrote:
+>
+>> Hi,
+>>
+>> On 09/08/2017 08:18 PM, Georgi Djakov wrote:
+>> > This patch introduce a new API to get requirements and configure the
+>> > interconnect buses across the entire chipset to fit with the current demand.
+>> >
+>> > The API is using a consumer/provider-based model, where the providers are
+>> > the interconnect buses and the consumers could be various drivers.
+>> > The consumers request interconnect resources (path) between endpoints and
+>> > set the desired constraints on this data flow path. The providers receive
+>> > requests from consumers and aggregate these requests for all master-slave
+>> > pairs on that path. Then the providers configure each participating in the
+>> > topology node according to the requested data flow path, physical links and
+>> > constraints. The topology could be complicated and multi-tiered and is SoC
+>> > specific.
+>> >
+>> > Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+>> > ---
+>> >  Documentation/interconnect/interconnect.rst |  93 +++++++
+>> >  drivers/Kconfig                             |   2 +
+>> >  drivers/Makefile                            |   1 +
+>> >  drivers/interconnect/Kconfig                |  10 +
+>> >  drivers/interconnect/Makefile               |   1 +
+>> >  drivers/interconnect/interconnect.c         | 382 ++++++++++++++++++++++++++++
+>> >  include/linux/interconnect-consumer.h       |  73 ++++++
+>> >  include/linux/interconnect-provider.h       | 119 +++++++++
+>> >  8 files changed, 681 insertions(+)
+>> >  create mode 100644 Documentation/interconnect/interconnect.rst
+>> >  create mode 100644 drivers/interconnect/Kconfig
+>> >  create mode 100644 drivers/interconnect/Makefile
+>> >  create mode 100644 drivers/interconnect/interconnect.c
+>> >  create mode 100644 include/linux/interconnect-consumer.h
+>> >  create mode 100644 include/linux/interconnect-provider.h
+>>
+>> Any comments on this patch?
+>>
+>
+> Sorry, I still haven't found the time to do a proper review of this yet.
+
+Same.
+
+>
+>> I am planning to change the prefix that is used for naming for example
+>> the functions from "interconnect_" to something shorter like icbus_.
+>>
+>
+> This isn't implementing a bus; if you feel that just ic_ is too short I
+> would suggest naming things inter_. (But keep the full name in the file
+> names)
+
+Not trying to bikeshed too much, but how about icc_ for "interconnect
+controller"? No idea if that is a hash collision with other in-kernel
+apis.
+
+Just "ic_" looks to me like "integrated circuit".
+
+Regards,
+Mike
+
+>
+> Regards,
+> Bjorn
