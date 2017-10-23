@@ -1,39 +1,60 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 23 Oct 2017 23:19:28 +0100
-Subject: [PATCH] ARM: compressed: discard ksym/kcrctab input section
-In-Reply-To: <4950796f-efdc-337a-bbbb-f09213eb54ce@gmail.com>
-References: <20170908153143.27279-1-ard.biesheuvel@linaro.org>
- <33486b3e-8221-92b0-7e18-859be7d0a74b@suse.com>
- <CAKv+Gu-8PEPuWH=bT_wD0MYDw67RY3gQudW2mLO-QeBYqQesyw@mail.gmail.com>
- <2b3af288-51b1-561a-a1a9-f5f42f7ca1c4@gmail.com>
- <20171023092956.GN20805@n2100.armlinux.org.uk>
- <20171023114825.GV20805@n2100.armlinux.org.uk>
- <4950796f-efdc-337a-bbbb-f09213eb54ce@gmail.com>
-Message-ID: <20171023221928.GX20805@n2100.armlinux.org.uk>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 23 Oct 2017 17:28:50 -0500
+Subject: [PATCH] phy: add combo phy driver for HiSilicon STB SoCs
+In-Reply-To: <1508042882-20922-1-git-send-email-shawnguo@kernel.org>
+References: <1508042882-20922-1-git-send-email-shawnguo@kernel.org>
+Message-ID: <20171023222850.ecavz6jm2mnoplea@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 23, 2017 at 11:17:35PM +0200, Matthias Brugger wrote:
-> Yes, I apply a dtb to my zImage. I do that because the board has no support on
-> mainline u-boot right now and I do kernel enablement on the board. Support in
-> u-boot is no priority ATM.
+On Sun, Oct 15, 2017 at 12:48:02PM +0800, Shawn Guo wrote:
+> From: Jianguo Sun <sunjianguo1@huawei.com>
+> 
+> Add combo phy driver for HiSilicon STB SoCs. This phy can be
+> used as pcie-phy, sata-phy or usb-phy.
+> 
+> Signed-off-by: Jianguo Sun <sunjianguo1@huawei.com>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  .../bindings/phy/phy-hi3798cv200-combphy.txt       |  21 ++
 
-Right, so the reason your system isn't booting is because of the
-additional section in the zImage, which causes additional bytes
-after _edata.
+Please split bindings to separate patch especially for new ones.
 
-That causes the appending of the dtb to be in the wrong place,
-so it doesn't get found.
+>  drivers/phy/Makefile                               |   1 +
+>  drivers/phy/hisilicon/Kconfig                      |   9 +
+>  drivers/phy/hisilicon/Makefile                     |   1 +
+>  drivers/phy/hisilicon/phy-histb-combphy.c          | 236 +++++++++++++++++++++
+>  5 files changed, 268 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/phy/phy-hi3798cv200-combphy.txt
+>  create mode 100644 drivers/phy/hisilicon/phy-histb-combphy.c
+> 
+> diff --git a/Documentation/devicetree/bindings/phy/phy-hi3798cv200-combphy.txt b/Documentation/devicetree/bindings/phy/phy-hi3798cv200-combphy.txt
+> new file mode 100644
+> index 000000000000..c7121cdcaed9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/phy/phy-hi3798cv200-combphy.txt
+> @@ -0,0 +1,21 @@
+> +HiSilicon STB PCIE/SATA/USB3 PHY
+> +
+> +Properties:
+> +- compatible: Should be "hisilicon,hi3798cv200-combphy"
+> +- #phy-cells: Should be 1.  The cell number is used to select the phy mode:
+> +	0: PCIe mode
+> +	1: USB 3.0 mode
+> +	2: SATA mode
+> +- clocks: The phandle to clock provider and clock specifier pair.
+> +- resets: The phandle to reset controller and reset specifier pair.
+> +- hisilicon,peripheral-syscon: The phandle to the peripheral controller.
 
-With Arnd's patch applied, if you do:
+Could just be a child of the syscon instead?
 
-dd if=arch/arm/boot/zImage bs=1 count=$(( $(stat -c %s arch/arm/boot/zImage) - 8)) of=zImg
-cat zImg $dtb > zImg.boot
-
-and then try booting zImg.boot instead, that should work, and
-would prove my point.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+> +
+> +Example:
+> +
+> +combphy1: phy {
+> +	compatible = "hisilicon,hi3798cv200-combphy";
+> +	#phy-cells = <1>;
+> +	clocks = <&crg HISTB_COMBPHY1_CLK>;
+> +	resets = <&crg 0x188 12>;
+> +	hisilicon,peripheral-syscon = <&peri_ctrl>;
+> +};
