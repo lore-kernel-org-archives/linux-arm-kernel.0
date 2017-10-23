@@ -1,121 +1,40 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon, 23 Oct 2017 14:00:07 +0100
-Subject: [RFCv2 PATCH 00/36] Process management for IOMMU + SVM for SMMUv3
-In-Reply-To: <20171012152803.GA3027@jcrouse-lnx.qualcomm.com>
-References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
- <0c6778d8-741f-0db7-fe3c-df88a75ebbb2@huawei.com>
- <0fecd29e-eaf7-9503-b087-7bfbc251da88@arm.com>
- <c6b7fb4b-4f2b-0d81-8bb5-8fa6b62aca3a@huawei.com>
- <8a1e090d-22e8-0295-a53f-bc3b5b7d7971@arm.com>
- <20171012152803.GA3027@jcrouse-lnx.qualcomm.com>
-Message-ID: <8539601d-ef7a-8dd0-2fc7-51240c292678@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 23 Oct 2017 14:05:05 +0100
+Subject: [PATCH] arm64: Fix flush_icache_range prototype
+In-Reply-To: <20171023125414.10758-1-marc.zyngier@arm.com>
+References: <20171023125414.10758-1-marc.zyngier@arm.com>
+Message-ID: <20171023130504.GF31263@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jordan,
-
-[Lots of IOMMU people have been dropped from Cc, I've tried to add them back]
-
-On 12/10/17 16:28, Jordan Crouse wrote:
-> On Thu, Oct 12, 2017 at 01:55:32PM +0100, Jean-Philippe Brucker wrote:
->> On 12/10/17 13:05, Yisheng Xie wrote:
->> [...]
->>>>>> * An iommu_process can be bound to multiple domains, and a domain can have
->>>>>>   multiple iommu_process.
->>>>> when bind a task to device, can we create a single domain for it? I am thinking
->>>>> about process management without shared PT(for some device only support PASID
->>>>> without pri ability), it seems hard to expand if a domain have multiple iommu_process?
->>>>> Do you have any idea about this?
->>>>
->>>> A device always has to be in a domain, as far as I know. Not supporting
->>>> PRI forces you to pin down all user mappings (or just the ones you use for
->>>> DMA) but you should sill be able to share PT. Now if you don't support
->>>> shared PT either, but only PASID, then you'll have to use io-pgtable and a
->>>> new map/unmap API on an iommu_process. I don't understand your concern
->>>> though, how would the link between process and domains prevent this use-case?
->>>>
->>> So you mean that if an iommu_process bind to multiple devices it should create
->>> multiple io-pgtables? or just share the same io-pgtable?
->>
->> I don't know to be honest, I haven't thought much about the io-pgtable
->> case, I'm all about sharing the mm :)
->>
->> It really depends on what the user (GPU driver I assume) wants. I think
->> that if you're not sharing an mm with the device, then you're trying to
->> hide parts of the process to the device, so you'd also want the
->> flexibility of having different io-pgtables between devices. Different
->> devices accessing isolated parts of the process requires separate io-pgtables.
+On Mon, Oct 23, 2017 at 01:54:14PM +0100, Marc Zyngier wrote:
+> flush_icache_range can return -EFAULT, and yet its prototype
+> has void as a return type. Fix it by aligning it to that of
+> __flush_cache_user_range.
 > 
-> In our specific Snapdragon use case the GPU is the only entity that cares about
-> process specific io-pgtables.  Everything else (display, video, camera) is happy
-> using a global io-ptgable.  The reasoning is that the GPU is programmable from
-> user space and can be easily used to copy data whereas the other use cases have
-> mostly fixed functions.
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/include/asm/cacheflush.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Even if different devices did want to have a process specific io-pgtable I doubt
-> we would share them.  Every device uses the IOMMU differently and the magic
-> needed to share a io-pgtable between (for example) a GPU and a DSP would be
-> prohibitively complicated.
-> 
-> Jordan
+> diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+> index 76d1cc85d5b1..377fa6b5d67f 100644
+> --- a/arch/arm64/include/asm/cacheflush.h
+> +++ b/arch/arm64/include/asm/cacheflush.h
+> @@ -65,7 +65,7 @@
+>   *		- kaddr  - page address
+>   *		- size   - region size
+>   */
+> -extern void flush_icache_range(unsigned long start, unsigned long end);
+> +extern long flush_icache_range(unsigned long start, unsigned long end);
 
+Oh blimey, I hadn't realised that. However, this is used in the core code,
+which expects a void return type and I'd like to avoid the risk of compiler
+warnings complaining that the returned value is not used. I don't think
+there's a problem with leaving this as void, since the PCS already says
+that x0 is caller saved and this is out-of-line asm.
 
+It just means that we silently handle userspace addresses, rather than
+trigger a panic in the absence of software-PAN.
 
-More context here:
-https://www.mail-archive.com/iommu at lists.linux-foundation.org/msg20368.html
-
-So to summarize the Snapdragon case, if I understand correctly you need
-two additional features:
-
-(1) A way to create process address spaces, that are not bound to an mm
-but to a separate io-pgtable. And a way to map/unmap these contexts.
-
-(2) A way to obtain the PGD in order to program it into the GPU. And also
-the ASID I suppose? What about TCR and MAIR?
-
-For (1), I can see some value in isolating process contexts with
-io-pgtable without going all the way and sharing the mm. The IOVA=VA
-use-case feels a bit weak. But it does provide better isolation than
-dma_map/unmap, if the GPU is in charge of PASIDs then two processes that
-execute code on the GPU cannot access each others' DMA buffers. Maybe
-other users will want that feature (but they really should be using bind_mm!).
-
-In next version I'm going to replace iommu_process_bind by something like
-iommu_sva_bind_mm, which reduces the scope of the API I'm introducing and
-doesn't fit your case anymore. What you need is a shortcut into the PASID
-allocator, a way to allocate a private PASID with io-pgtables instead of
-one backed by an mm. Something like:
-
-iommu_sva_alloc_pasid(domain, dev) -> pasid
-iommu_sva_map(pasid, iova, size, flags)
-iommu_sva_unmap(pasid, iova, size)
-iommu_sva_free_pasid(domain, pasid)
-
-Then for (2) the GPU is tightly integrated into the SMMU and can switch
-contexts. I might be wrong but I don't see this case becoming standard as
-new implementations move to PASIDs, we shouldn't spend too much time
-making it generic. But to make it fit into the PASID API, how about the
-following.
-
-We provide a backdoor to the GPU driver, allowing it to register PASID ops
-into SMMUv2 driver:
-
-struct smmuv2_pasid_ops {
-	int (*install_pasid)(struct iommu_domain, int pasid, ttbr, asid
-			     and whatnot);
-	void (*remove_pasid)(struct iommu_domain, int pasid);
-}
-
-On PASID-capable IOMMUs, iommu_sva_alloc_pasid would install a context
-descriptor into the PASID tables (owned by the IOMMU), pointing to the
-io-pgtable. As SMMUv2 doesn't support PASID, iommu_sva_alloc_pasid
-wouldn't actually install a context descriptor but instead call back into
-the GPU driver with install_pasid. The GPU can then do its thing, call
-sva_map/unmap, and switch contexts.
-
-The good thing is that (1) and (2) are separate, so you get the same
-callbacks if you're using iommu_sva_bind_mm instead of the private pasid
-thing.
-
-Thanks,
-Jean
+Will
