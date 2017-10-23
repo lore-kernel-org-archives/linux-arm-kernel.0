@@ -1,108 +1,78 @@
 From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Mon, 23 Oct 2017 18:09:24 +0100
-Subject: [PATCH v2 3/9] ARM: dts: iwg22d-sodimm-dbhd-ca: Add device tree for
- HDMI DB
+Date: Mon, 23 Oct 2017 18:09:30 +0100
+Subject: [PATCH v2 9/9] ARM: dts: r8a7745: Add IIC cores to dtsi
 In-Reply-To: <1508778570-28795-1-git-send-email-fabrizio.castro@bp.renesas.com>
 References: <1508778570-28795-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <1508778570-28795-4-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <1508778570-28795-10-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add file r8a7745-iwg22d-sodimm-dbhd-ca.dts to provide support for
-iW-RainboW-G22D with HDMI daughter board plugged in.
-
-The interfaces defined in the new .dts file are: scif1, scif5,
-and hscif2.
+Add iic0 and iic1 nodes to SoC dtsi. Also, define aliases i2c6
+and i2c7. Board specific DT files will enable the interfaces
+if needed.
 
 Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
+Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
 ---
 Changes in v2:
-* none
+* added changelog
 
- arch/arm/boot/dts/Makefile                         |  1 +
- .../arm/boot/dts/r8a7745-iwg22d-sodimm-dbhd-ca.dts | 61 ++++++++++++++++++++++
- 2 files changed, 62 insertions(+)
- create mode 100644 arch/arm/boot/dts/r8a7745-iwg22d-sodimm-dbhd-ca.dts
+ arch/arm/boot/dts/r8a7745.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 8c34d06..e27b194 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -727,6 +727,7 @@ dtb-$(CONFIG_ARCH_RENESAS) += \
- 	r8a7743-iwg20d-q7-dbcm-ca.dtb \
- 	r8a7743-sk-rzg1m.dtb \
- 	r8a7745-iwg22d-sodimm.dtb \
-+	r8a7745-iwg22d-sodimm-dbhd-ca.dtb \
- 	r8a7745-sk-rzg1e.dtb \
- 	r8a7778-bockw.dtb \
- 	r8a7779-marzen.dtb \
-diff --git a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm-dbhd-ca.dts b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm-dbhd-ca.dts
-new file mode 100644
-index 0000000..f925388
---- /dev/null
-+++ b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm-dbhd-ca.dts
-@@ -0,0 +1,61 @@
-+/*
-+ * Device Tree Source for the iWave-RZG1E SODIMM carrier board + HDMI daughter
-+ * board
-+ *
-+ * Copyright (C) 2017 Renesas Electronics Corp.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
+diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
+index 6c9a0d6..d0b9212 100644
+--- a/arch/arm/boot/dts/r8a7745.dtsi
++++ b/arch/arm/boot/dts/r8a7745.dtsi
+@@ -25,6 +25,8 @@
+ 		i2c3 = &i2c3;
+ 		i2c4 = &i2c4;
+ 		i2c5 = &i2c5;
++		i2c6 = &iic0;
++		i2c7 = &iic1;
+ 		spi0 = &qspi;
+ 		spi1 = &msiof0;
+ 		spi2 = &msiof1;
+@@ -752,6 +754,40 @@
+ 			status = "disabled";
+ 		};
+ 
++		iic0: i2c at e6500000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,iic-r8a7745",
++				     "renesas,rcar-gen2-iic",
++				     "renesas,rmobile-iic";
++			reg = <0 0xe6500000 0 0x425>;
++			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 318>;
++			dmas = <&dmac0 0x61>, <&dmac0 0x62>,
++			       <&dmac1 0x61>, <&dmac1 0x62>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
++			resets = <&cpg 318>;
++			status = "disabled";
++		};
 +
-+#include "r8a7745-iwg22d-sodimm.dts"
++		iic1: i2c at e6510000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,iic-r8a7745",
++				     "renesas,rcar-gen2-iic",
++				     "renesas,rmobile-iic";
++			reg = <0 0xe6510000 0 0x425>;
++			interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 323>;
++			dmas = <&dmac0 0x65>, <&dmac0 0x66>,
++			       <&dmac1 0x65>, <&dmac1 0x66>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
++			resets = <&cpg 323>;
++			status = "disabled";
++		};
 +
-+/ {
-+	model = "iWave RainboW-G22D-SODIMM RZ/G1E based board with HDMI add-on";
-+	compatible = "iwave,g22d", "iwave,g22m", "renesas,r8a7745";
-+
-+	aliases {
-+		serial0 = &scif1;
-+		serial4 = &scif5;
-+		serial6 = &hscif2;
-+	};
-+};
-+
-+&hscif2 {
-+	pinctrl-0 = <&hscif2_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+};
-+
-+&pfc {
-+	hscif2_pins: hscif2 {
-+		groups = "hscif2_data";
-+		function = "hscif2";
-+	};
-+
-+	scif1_pins: scif1 {
-+		groups = "scif1_data";
-+		function = "scif1";
-+	};
-+
-+	scif5_pins: scif5 {
-+		groups = "scif5_data_d";
-+		function = "scif5";
-+	};
-+};
-+
-+&scif1 {
-+	pinctrl-0 = <&scif1_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+};
-+
-+&scif5 {
-+	pinctrl-0 = <&scif5_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+};
+ 		mmcif0: mmc at ee200000 {
+ 			compatible = "renesas,mmcif-r8a7745",
+ 				     "renesas,sh-mmcif";
 -- 
 2.7.4
