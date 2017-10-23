@@ -1,13 +1,13 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 24 Oct 2017 02:36:54 +0900
-Subject: [GIT PULL] ARM: dts: uniphier: UniPhier DT updates for v4.15
-Message-ID: <CAK7LNAS+o7zCL_Yf7YXeqFMs2uNwTQ5O06+mmzeJqwsgzJzXMQ@mail.gmail.com>
+Date: Tue, 24 Oct 2017 02:40:51 +0900
+Subject: [GIT PULL] arm64: dts: uniphier: UniPhier DT updates (64bit) for v4.15
+Message-ID: <CAK7LNARKAivEyNYDMO7GKjTnnsVFk3TtsCZ_yDWLrEf80G-WOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd, Olof,
 
-Here are UniPhier DT (32bit) updates for the v4.15 merge window.
+Here are UniPhier DT (64bit) updates for the v4.15 merge window.
 Please pull!
 
 
@@ -19,43 +19,45 @@ The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 are available in the git repository at:
 
   git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
-tags/uniphier-dt-v4.15
+tags/uniphier-dt64-v4.15
 
-for you to fetch changes up to a1763a82a3e5896fa39b9e4e7b9f42c8f39390ae:
+for you to fetch changes up to 76c48e1ecaf34eccaf1bddc462159e82be3d609a:
 
-  ARM: dts: uniphier: add resets properties (2017-10-24 02:12:48 +0900)
+  arm64: dts: uniphier: add resets properties (2017-10-24 02:12:57 +0900)
 
 ----------------------------------------------------------------
-UniPhier ARM SoC DT updates for v4.15
+UniPhier ARM64 SoC DT updates for v4.15
 
 - add thermal monitor and thermal zone nodes
+- add efuse nodes
 - fix W=2 warnings
 - add GPIO controller nodes and related properties
 - add resets properties
 
 ----------------------------------------------------------------
+Keiji Hayashibara (1):
+      arm64: dts: uniphier: add efuse node for LD11, LD20, and PXs3
+
 Kunihiko Hayashi (1):
-      ARM: dts: uniphier: add nodes of thermal monitor and thermal zone for PXs2
+      arm64: dts: uniphier: add nodes of thermal monitor and thermal
+zone for LD20
 
-Masahiro Yamada (5):
-      ARM: dts: uniphier: fix W=2 build warnings
-      ARM: dts: uniphier: add GPIO controller nodes
-      ARM: dts: uniphier: route on-board device IRQ to GPIO controller
-      ARM: dts: uniphier: add GPIO hog definition
-      ARM: dts: uniphier: add resets properties
+Masahiro Yamada (7):
+      arm64: dts: uniphier: enable NAND for PXs3 reference board
+      arm64: dts: uniphier: fix W=2 build warnings
+      arm64: dts: uniphier: add GPIO controller nodes
+      arm64: dts: uniphier: route on-board device IRQ to GPIO controller
+      arm64: dts: uniphier: add GPIO hog definition
+      arm64: dts: uniphier: add eMMC hardware reset provider node
+      arm64: dts: uniphier: add resets properties
 
- arch/arm/boot/dts/uniphier-ld4-ref.dts       | 10 ++-
- arch/arm/boot/dts/uniphier-ld4.dtsi          | 25 +++++-
- arch/arm/boot/dts/uniphier-ld6b-ref.dts      | 10 ++-
- arch/arm/boot/dts/uniphier-pinctrl.dtsi      | 46 +++++-----
- arch/arm/boot/dts/uniphier-pro4-ref.dts      | 10 ++-
- arch/arm/boot/dts/uniphier-pro4.dtsi         | 27 +++++-
- arch/arm/boot/dts/uniphier-pro5.dtsi         | 29 ++++++-
- arch/arm/boot/dts/uniphier-pxs2.dtsi         | 80 ++++++++++++++++--
- arch/arm/boot/dts/uniphier-sld8-ref.dts      | 10 ++-
- arch/arm/boot/dts/uniphier-sld8.dtsi         | 29 ++++++-
- arch/arm/boot/dts/uniphier-support-card.dtsi |  3 +-
- 11 files changed, 240 insertions(+), 39 deletions(-)
+ arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts |  11 ++-
+ arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi    |  65 ++++++++++++-
+ arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts |  11 ++-
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi    | 105 ++++++++++++++++++++-
+ arch/arm64/boot/dts/socionext/uniphier-pxs3-ref.dts |   4 +
+ arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi    |  58 +++++++++++-
+ 6 files changed, 248 insertions(+), 6 deletions(-)
 
 
 -- 
