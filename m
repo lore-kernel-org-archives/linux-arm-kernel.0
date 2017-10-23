@@ -1,66 +1,124 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 23 Oct 2017 17:07:26 +0100
-Subject: [PATCH v5] atmel_flexcom: Support backup mode
-In-Reply-To: <20171023160600.kcjy4ejdllllu62y@dell>
-References: <20171019164443.487-1-romain.izard.pro@gmail.com>
- <20171023160600.kcjy4ejdllllu62y@dell>
-Message-ID: <20171023160726.ufs37iyuicirwk4f@dell>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 23 Oct 2017 17:11:14 +0100
+Subject: [PATCH v3 1/9] KVM: arm/arm64: Detangle kvm_mmu.h from kvm_hyp.h
+In-Reply-To: <20171023161122.15291-1-marc.zyngier@arm.com>
+References: <20171023161122.15291-1-marc.zyngier@arm.com>
+Message-ID: <20171023161122.15291-2-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 23 Oct 2017, Lee Jones wrote:
-> On Thu, 19 Oct 2017, Romain Izard wrote:
-> 
-> > The controller used by a flexcom module is configured at boot, and left
-> > alone after this. As the configuration will be lost after backup mode,
-> > restore the state of the flexcom driver on resume.
-> > 
-> > Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
-> > Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-> > Tested-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-> > ---
-> > Changes in v5:
-> > * extract from the patch series, and send as a standalone patch
-> > 
-> >  drivers/mfd/atmel-flexcom.c | 65 ++++++++++++++++++++++++++++++++++-----------
-> >  1 file changed, 50 insertions(+), 15 deletions(-)
-> > 
-> > diff --git a/drivers/mfd/atmel-flexcom.c b/drivers/mfd/atmel-flexcom.c
-> > index 064bde9cff5a..ef1235c4a179 100644
-> > --- a/drivers/mfd/atmel-flexcom.c
-> > +++ b/drivers/mfd/atmel-flexcom.c
-> > @@ -39,34 +39,44 @@
-> >  #define FLEX_MR_OPMODE(opmode)	(((opmode) << FLEX_MR_OPMODE_OFFSET) &	\
-> >  				 FLEX_MR_OPMODE_MASK)
-> >  
-> > +struct atmel_flexcom {
-> > +	void __iomem *base;
-> > +	u32 opmode;
-> > +	struct clk *clk;
-> > +};
-> >  
-> >  static int atmel_flexcom_probe(struct platform_device *pdev)
-> >  {
-> >  	struct device_node *np = pdev->dev.of_node;
-> > -	struct clk *clk;
-> >  	struct resource *res;
-> > -	void __iomem *base;
-> > -	u32 opmode;
-> > +	struct atmel_flexcom *afc;
-> 
-> Nit: I'd prefer if you call this 'ddata'.
-> 
-> But the concept and implementation is fine, so if you're going to
-> change it please do so and apply my:
-> 
-> Acked-by: Lee Jones <lee.jones@linaro.org>
+kvm_hyp.h has an odd dependency on kvm_mmu.h, which makes the
+opposite inclusion impossible. Let's start with breaking that
+useless dependency.
 
-Also, 'back-up mode' isn't really a thing is it?
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/include/asm/kvm_hyp.h   | 1 -
+ arch/arm/kvm/hyp/switch.c        | 1 +
+ arch/arm/kvm/hyp/tlb.c           | 1 +
+ arch/arm64/include/asm/kvm_hyp.h | 1 -
+ arch/arm64/kvm/hyp/debug-sr.c    | 1 +
+ arch/arm64/kvm/hyp/switch.c      | 1 +
+ arch/arm64/kvm/hyp/tlb.c         | 1 +
+ virt/kvm/arm/hyp/vgic-v2-sr.c    | 1 +
+ 8 files changed, 6 insertions(+), 2 deletions(-)
 
-How about "Reinstall state on resume" or similar?
-
+diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
+index 14b5903f0224..04e5077cbcb6 100644
+--- a/arch/arm/include/asm/kvm_hyp.h
++++ b/arch/arm/include/asm/kvm_hyp.h
+@@ -21,7 +21,6 @@
+ #include <linux/compiler.h>
+ #include <linux/kvm_host.h>
+ #include <asm/cp15.h>
+-#include <asm/kvm_mmu.h>
+ #include <asm/vfp.h>
+ 
+ #define __hyp_text __section(.hyp.text) notrace
+diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
+index ebd2dd46adf7..67e0a689c4b5 100644
+--- a/arch/arm/kvm/hyp/switch.c
++++ b/arch/arm/kvm/hyp/switch.c
+@@ -18,6 +18,7 @@
+ 
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_hyp.h>
++#include <asm/kvm_mmu.h>
+ 
+ __asm__(".arch_extension     virt");
+ 
+diff --git a/arch/arm/kvm/hyp/tlb.c b/arch/arm/kvm/hyp/tlb.c
+index 6d810af2d9fd..c0edd450e104 100644
+--- a/arch/arm/kvm/hyp/tlb.c
++++ b/arch/arm/kvm/hyp/tlb.c
+@@ -19,6 +19,7 @@
+  */
+ 
+ #include <asm/kvm_hyp.h>
++#include <asm/kvm_mmu.h>
+ 
+ /**
+  * Flush per-VMID TLBs
+diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+index 4572a9b560fa..afbfbe0c12c5 100644
+--- a/arch/arm64/include/asm/kvm_hyp.h
++++ b/arch/arm64/include/asm/kvm_hyp.h
+@@ -20,7 +20,6 @@
+ 
+ #include <linux/compiler.h>
+ #include <linux/kvm_host.h>
+-#include <asm/kvm_mmu.h>
+ #include <asm/sysreg.h>
+ 
+ #define __hyp_text __section(.hyp.text) notrace
+diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
+index f5154ed3da6c..d3a13d57f2c5 100644
+--- a/arch/arm64/kvm/hyp/debug-sr.c
++++ b/arch/arm64/kvm/hyp/debug-sr.c
+@@ -21,6 +21,7 @@
+ #include <asm/debug-monitors.h>
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_hyp.h>
++#include <asm/kvm_mmu.h>
+ 
+ #define read_debug(r,n)		read_sysreg(r##n##_el1)
+ #define write_debug(v,r,n)	write_sysreg(v, r##n##_el1)
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 945e79c641c4..c52f7094122f 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -21,6 +21,7 @@
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_hyp.h>
++#include <asm/kvm_mmu.h>
+ #include <asm/fpsimd.h>
+ 
+ static bool __hyp_text __fpsimd_enabled_nvhe(void)
+diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
+index 73464a96c365..131c7772703c 100644
+--- a/arch/arm64/kvm/hyp/tlb.c
++++ b/arch/arm64/kvm/hyp/tlb.c
+@@ -16,6 +16,7 @@
+  */
+ 
+ #include <asm/kvm_hyp.h>
++#include <asm/kvm_mmu.h>
+ #include <asm/tlbflush.h>
+ 
+ static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm *kvm)
+diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
+index a3f18d362366..77ccd8e2090b 100644
+--- a/virt/kvm/arm/hyp/vgic-v2-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
+@@ -21,6 +21,7 @@
+ 
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_hyp.h>
++#include <asm/kvm_mmu.h>
+ 
+ static void __hyp_text save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
+ {
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.11.0
