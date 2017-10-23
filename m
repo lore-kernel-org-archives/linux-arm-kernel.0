@@ -1,339 +1,101 @@
-From: salyzyn@android.com (Mark Salyzyn)
-Date: Mon, 23 Oct 2017 08:44:39 -0700
-Subject: [PATCH] arch64: optimize __memcpy_fromio, __memcpy_toio and
- __memset_io
-In-Reply-To: <a599aeb7-fe9d-57ee-96c5-637a60e9ab10@arm.com>
-References: <20171020202327.2592-1-salyzyn@android.com>
- <a599aeb7-fe9d-57ee-96c5-637a60e9ab10@arm.com>
-Message-ID: <9490a51d-9971-9655-0bad-e9359f7c9e48@android.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 23 Oct 2017 16:49:36 +0100
+Subject: [PATCH v3 0/9] arm/arm64: KVM: limit icache invalidation to prefetch
+ aborts
+Message-ID: <20171023154945.14654-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/23/2017 04:45 AM, Robin Murphy wrote:
-> Hi Mark,
->
-> On 20/10/17 21:22, Mark Salyzyn wrote:
->> __memcpy_fromio and __memcpy_toio functions do not deal well with
->> harmonically unaligned addresses unless they can ultimately be
->> copied as quads (u64) to and from the destination.  Without a
->> harmonically aligned relationship, they perform byte operations
->> over the entire buffer.
->>
->> Added optional paths that perform reads and writes at the best
->> alignment possible with source and destination, placing a priority
->> on using quads (8 byte transfers) on the io-side.
->>
->> Removed the volatile on the source for __memcpy_toio as it is
->> unnecessary.
->>
->> This change was motivated by performance issues in the pstore driver.
->> On a test platform, measuring probe time for pstore, console buffer
->> size of 1/4MB and pmsg of 1/2MB, was in the 90-107ms region. Change
->> managed to reduce it to worst case 15ms, an improvement in boot time.
-> Is ~90ms really worth this level of complexity? My hunch is that just
-> avoiding the pathological large-byte-copy case accounts for most of the
-> benefit, and optimisation beyond that has severely diminishing returns.
-The additional code looked like it saved us another 12ms (worst case) by 
-providing the compiler on-going clues to the alignment expected by the 
-pointers (to memcpy). You are right, that is a diminishing return for so 
-much complexity.
->
->> Adjusted __memset_io to use the same pattern of access, although it
->> does not have a harmonic relationship between two pointers to worry
->> about, and thus the benefit is balance and not nearly as dramatic.
->>
->> Signed-off-by: Mark Salyzyn <salyzyn@android.com>
->> Cc: Kees Cook <keescook@chromium.org>
->> Cc: Anton Vorontsov <anton@enomsg.org>
->> Cc: Tony Luck <tony.luck@intel.com>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Anton Vorontsov <anton@enomsg.org>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-kernel at vger.kernel.org
->>
->> ---
->>   arch/arm64/kernel/io.c | 199 ++++++++++++++++++++++++++++++++++++++-----------
->>   1 file changed, 156 insertions(+), 43 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/io.c b/arch/arm64/kernel/io.c
->> index 354be2a872ae..14ef7c8f20ea 100644
->> --- a/arch/arm64/kernel/io.c
->> +++ b/arch/arm64/kernel/io.c
->> @@ -20,61 +20,147 @@
->>   #include <linux/types.h>
->>   #include <linux/io.h>
->>   
->> +/* if/while helpers assume from, to and count vars accessible in caller */
->> +
->> +/* arguments to helpers to ensure proper combinations */
->> +#define	byte		b, u8
->> +#define	word		w, u16
->> +#define	longword	l, u32
->> +#define	quad		q, u64
->> +
->> +/* read helper for unaligned transfers needing intermediate hold and memcpy */
->> +#define	_do_unaligned_read(op, align_type, width, type) do {	\
->> +	op(count >= sizeof(type)) {				\
->> +		type hold = __raw_read##width##(from);		\
->> +								\
->> +		memcpy((align_type *)to, &hold, sizeof(type));	\
->> +		to += sizeof(type);				\
->> +		from += sizeof(type);				\
->> +		count -= sizeof(type);				\
->> +	}							\
->> +} while (0)
->> +#define if_unaligned_read(type, x) _do_unaligned_read(if, type, x)
->> +#define while_unaligned_read(type, x) _do_unaligned_read(while, type, x)
->> +
->> +/* read helper for aligned transfers */
->> +#define	_do_aligned_read(op, width, type) \
->> +	_do_unaligned_read(op, type, width, type)
->> +#define if_aligned_read(x) _do_aligned_read(if, x)
->> +#define while_aligned_read(x) _do_aligned_read(while, x)
-> Yuck. That's an unreadable code construction kit if ever I saw one.
+It was recently reported that on a VM restore, we seem to spend a
+disproportionate amount of time invalidation the icache. This is
+partially due to some HW behaviour, but also because we're being a bit
+dumb and are invalidating the icache for every page we map at S2, even
+if that on a data access.
 
-Granted, I struggled with this. Inline the code was considerably uglier, 
-but the point may be moot given your next comment.
->
->> +
->>   /*
->>    * Copy data from IO memory space to "real" memory space.
->>    */
->> +
->>   void __memcpy_fromio(void *to, const volatile void __iomem *from, size_t count)
->>   {
->> -	while (count && (!IS_ALIGNED((unsigned long)from, 8) ||
->> -			 !IS_ALIGNED((unsigned long)to, 8))) {
-> AFAICS, just getting rid of this one line should suffice - we shouldn't
-> need to care about the alignment of the destination pointer since normal
-> memory can handle unaligned Dword stores with mostly no penalty. This
-> appears to have been inherited from PowerPC without any obvious
-> justification.
-Tried that _first_, dropping !IS_ALIGNED((unsigned long)to, 8) from the 
-logic, this got us down to 27us.
+The slightly better way of doing this is to mark the pages XN at S2,
+and wait for the the guest to execute something in that page, at which
+point we perform the invalidation. As it is likely that there is a lot
+less instruction than data, we win (or so we hope).
 
-I can accept that.
->
->> -		*(u8 *)to = __raw_readb(from);
->> -		from++;
->> -		to++;
->> -		count--;
->> -	}
->> +	if (!IS_ALIGNED((unsigned long)from, sizeof(u16)))
->> +		if_aligned_read(byte);
->>   
->> -	while (count >= 8) {
->> -		*(u64 *)to = __raw_readq(from);
->> -		from += 8;
->> -		to += 8;
->> -		count -= 8;
->> +	if (!IS_ALIGNED((unsigned long)to, sizeof(u16))) {
->> +		if (!IS_ALIGNED((unsigned long)from, sizeof(u32)))
->> +			if_unaligned_read(u8, word);
->> +		if (!IS_ALIGNED((unsigned long)from, sizeof(u64)))
->> +			if_unaligned_read(u8, longword);
->> +		while_unaligned_read(u8, quad);
->> +		if_unaligned_read(u8, longword);
->> +		if_unaligned_read(u8, word);
->> +		if_aligned_read(byte);
->> +		return;
-> Yup, I have absolutely no idea what that does. The fact that it returns
-> early implies that we have an explosion of duplicated code below,
-> though. I can't help wondering whether the I-cache and BTB footprint of
-> this bad boy ends up canceling out much of the gain from reduced
-> load/store bandwidth.
+We also take this opportunity to drop the extra dcache clean to the
+PoU which is pretty useless, as we already clean all the way to the
+PoC...
 
-Optimizer dealt with the duplicated code handily. But then again, moot 
-point given your above comment :-)
->
->>   	}
->>   
->> -	while (count) {
->> -		*(u8 *)to = __raw_readb(from);
->> -		from++;
->> -		to++;
->> -		count--;
->> +	if (!IS_ALIGNED((unsigned long)from, sizeof(u32)))
->> +		if_aligned_read(word);
->> +
->> +	if (!IS_ALIGNED((unsigned long)to, sizeof(u32))) {
->> +		if (!IS_ALIGNED((unsigned long)from, sizeof(u64)))
->> +			if_unaligned_read(u16, longword);
->> +		while_unaligned_read(u16, quad);
->> +		if_unaligned_read(u16, longword);
->> +		if_aligned_read(word);
->> +		if_aligned_read(byte);
->> +		return;
->>   	}
->> +
->> +	if (!IS_ALIGNED((unsigned long)from, sizeof(u64)))
->> +		if_aligned_read(longword);
->> +
->> +	if (!IS_ALIGNED((unsigned long)to, sizeof(u64)))
->> +		while_unaligned_read(u32, quad);
->> +	else
->> +		while_aligned_read(quad);
->> +
->> +	if_aligned_read(longword);
->> +	if_aligned_read(word);
->> +	if_aligned_read(byte);
->>   }
->>   EXPORT_SYMBOL(__memcpy_fromio);
->>   
->> +/* write helper for unaligned transfers needing intermediate hold and memcpy */
->> +#define	_do_unaligned_write(op, align_type, width, type) do {	\
->> +	op(count >= sizeof(type)) {				\
->> +		type hold;					\
->> +								\
->> +		memcpy(&hold, (align_type *)from, sizeof(type));\
->> +		__raw_write##width##(hold, to);			\
->> +		to += sizeof(type);				\
->> +		from += sizeof(type);				\
->> +		count -= sizeof(type);				\
->> +	}							\
->> +} while (0)
->> +#define if_unaligned_write(type, x) _do_unaligned_write(if, type, x)
->> +#define while_unaligned_write(type, x) _do_unaligned_write(while, type, x)
->> +
->> +/* write helper for aligned transfers */
->> +#define	_do_aligned_write(op, width, type) \
->> +	_do_unaligned_write(op, type, width, type)
->> +#define if_aligned_write(x) _do_aligned_write(if, x)
->> +#define while_aligned_write(x) _do_aligned_write(while, x)
->> +
->>   /*
->>    * Copy data from "real" memory space to IO memory space.
->>    */
->>   void __memcpy_toio(volatile void __iomem *to, const void *from, size_t count)
->>   {
->> -	while (count && (!IS_ALIGNED((unsigned long)to, 8) ||
->> -			 !IS_ALIGNED((unsigned long)from, 8))) {
-> Similarly here. We're cool with unaligned Dword loads, so aligning the
-> iomem pointer should be enough.
->
->> -		__raw_writeb(*(volatile u8 *)from, to);
->> -		from++;
->> -		to++;
->> -		count--;
->> -	}
->> +	if (!IS_ALIGNED((unsigned long)to, sizeof(u16)))
->> +		if_aligned_write(byte);
->>   
->> -	while (count >= 8) {
->> -		__raw_writeq(*(volatile u64 *)from, to);
->> -		from += 8;
->> -		to += 8;
->> -		count -= 8;
->> +	if (!IS_ALIGNED((unsigned long)from, sizeof(u16))) {
->> +		if (!IS_ALIGNED((unsigned long)to, sizeof(u32)))
->> +			if_unaligned_write(u8, word);
->> +		if (!IS_ALIGNED((unsigned long)to, sizeof(u64)))
->> +			if_unaligned_write(u8, longword);
->> +		while_unaligned_write(u8, quad);
->> +		if_unaligned_write(u8, longword);
->> +		if_unaligned_write(u8, word);
->> +		if_aligned_write(byte);
->> +		return;
->>   	}
->>   
->> -	while (count) {
->> -		__raw_writeb(*(volatile u8 *)from, to);
->> -		from++;
->> -		to++;
->> -		count--;
->> +	if (!IS_ALIGNED((unsigned long)to, sizeof(u32)))
->> +		if_aligned_write(word);
->> +
->> +	if (!IS_ALIGNED((unsigned long)from, sizeof(u32))) {
->> +		if (!IS_ALIGNED((unsigned long)to, sizeof(u64)))
->> +			if_unaligned_write(u16, longword);
->> +		while_unaligned_write(u16, quad);
->> +		if_unaligned_write(u16, longword);
->> +		if_aligned_write(word);
->> +		if_aligned_write(byte);
->> +		return;
->>   	}
->> +
->> +	if (!IS_ALIGNED((unsigned long)to, sizeof(u64)))
->> +		if_aligned_write(longword);
->> +
->> +	if (!IS_ALIGNED((unsigned long)from, sizeof(u64)))
->> +		while_unaligned_write(u32, quad);
->> +	else
->> +		while_aligned_write(quad);
->> +
->> +	if_aligned_write(longword);
->> +	if_aligned_write(word);
->> +	if_aligned_write(byte);
->>   }
->>   EXPORT_SYMBOL(__memcpy_toio);
->>   
->> @@ -89,22 +175,49 @@ void __memset_io(volatile void __iomem *dst, int c, size_t count)
->>   	qc |= qc << 16;
->>   	qc |= qc << 32;
->>   
->> -	while (count && !IS_ALIGNED((unsigned long)dst, 8)) {
->> +	if ((count >= sizeof(u8)) &&
->> +	    !IS_ALIGNED((unsigned long)dst, sizeof(u16))) {
->>   		__raw_writeb(c, dst);
->> -		dst++;
->> -		count--;
->> +		dst += sizeof(u8);
->> +		count -= sizeof(u8);
->> +	}
->> +
->> +	if ((count >= sizeof(u16)) &&
->> +	    !IS_ALIGNED((unsigned long)dst, sizeof(u32))) {
->> +		__raw_writew((u16)qc, dst);
->> +		dst += sizeof(u16);
->> +		count -= sizeof(u16);
->>   	}
->>   
->> -	while (count >= 8) {
->> +	if ((count >= sizeof(u32)) &&
->> +	    !IS_ALIGNED((unsigned long)dst, sizeof(u64))) {
->> +		__raw_writel((u32)qc, dst);
->> +		dst += sizeof(u32);
->> +		count -= sizeof(u32);
->> +	}
->> +
->> +	while (count >= sizeof(u64)) {
->>   		__raw_writeq(qc, dst);
->> -		dst += 8;
->> -		count -= 8;
->> +		dst += sizeof(u64);
->> +		count -= sizeof(u64);
->> +	}
->> +
->> +	if (count >= sizeof(u32)) {
->> +		__raw_writel((u32)qc, dst);
->> +		dst += sizeof(u32);
->> +		count -= sizeof(u32);
->> +	}
->> +
->> +	if (count >= sizeof(u16)) {
->> +		__raw_writew((u16)qc, dst);
->> +		dst += sizeof(u16);
->> +		count -= sizeof(u16);
->>   	}
->>   
->> -	while (count) {
->> +	if (count) {
->>   		__raw_writeb(c, dst);
->> -		dst++;
->> -		count--;
->> +		dst += sizeof(u8);
->> +		count -= sizeof(u8);
->>   	}
-> In the absolute worst case, this saves all of 8 iomem accesses, and
-> given how few callers of memset_io() there are anyway it really doesn't
-> seem worth the bother.
-Agreed, I had predicted that there would be pushback on implementing the 
-same pattern of access here so that all code would be matchy-matchy. I 
-could not measure any significant difference in performance in any case.
->
-> Robin.
-Thanks
+Running a bare metal test that touches 1GB of memory (using a 4kB
+stride) leads to the following results on Seattle:
 
--- Mark
+4.13:
+do_fault_read.bin:       0.565885992 seconds time elapsed
+do_fault_write.bin:       0.738296337 seconds time elapsed
+do_fault_read_write.bin:       1.241812231 seconds time elapsed
+
+4.14-rc3+patches:
+do_fault_read.bin:       0.244961803 seconds time elapsed
+do_fault_write.bin:       0.422740092 seconds time elapsed
+do_fault_read_write.bin:       0.643402470 seconds time elapsed
+
+We're almost halving the time of something that more or less looks
+like a restore operation. Some larger systems will show much bigger
+benefits as they become less impacted by the icache invalidation
+(which is broadcast in the inner shareable domain). I've tried to
+measure the impact on a VM boot in order to assess the impact of
+taking an extra permission fault, but found that any difference was
+simply noise.                                                                   
+
+I've also given it a test run on both Cubietruck and Jetson-TK1.
+
+Tests are archived here:
+https://git.kernel.org/pub/scm/linux/kernel/git/maz/kvm-ws-tests.git/
+
+I'd value some additional test results on HW I don't have access to.
+
+* From v2:
+  - Brought back the "detangling" patch that allows 32bit ARM to still
+    compile...
+  - Let arm64 icache invalidation deal with userspace addresses
+
+* From v1:
+  - Some function renaming (coherent->clean/invalidate)
+  - Made the arm64 icache invalidation a macro that's now used in
+    two places
+  - Fixed BTB flushing on 32bit
+  - Added stage2_is_exec as a predicate for XN being absent from the
+    entry
+  - Dropped patch #10 which was both useless and broken, and patch #9
+    that thus became useless
+  - Tried to measure the impact on kernel boot time and failed to see
+    any difference
+
+Marc Zyngier (9):
+  KVM: arm/arm64: Detangle kvm_mmu.h from kvm_hyp.h
+  KVM: arm/arm64: Split dcache/icache flushing
+  arm64: KVM: Add invalidate_icache_range helper
+  arm: KVM: Add optimized PIPT icache flushing
+  arm64: KVM: PTE/PMD S2 XN bit definition
+  KVM: arm/arm64: Limit icache invalidation to prefetch aborts
+  KVM: arm/arm64: Only clean the dcache on translation fault
+  KVM: arm/arm64: Preserve Exec permission across R/W permission faults
+  KVM: arm/arm64: Drop vcpu parameter from guest cache maintenance
+    operartions
+
+ arch/arm/include/asm/kvm_hyp.h         |  3 +-
+ arch/arm/include/asm/kvm_mmu.h         | 99 ++++++++++++++++++++++++++++------
+ arch/arm/include/asm/pgtable.h         |  4 +-
+ arch/arm/kvm/hyp/switch.c              |  1 +
+ arch/arm/kvm/hyp/tlb.c                 |  1 +
+ arch/arm64/include/asm/assembler.h     | 21 ++++++++
+ arch/arm64/include/asm/cacheflush.h    |  7 +++
+ arch/arm64/include/asm/kvm_hyp.h       |  1 -
+ arch/arm64/include/asm/kvm_mmu.h       | 36 +++++++++++--
+ arch/arm64/include/asm/pgtable-hwdef.h |  2 +
+ arch/arm64/include/asm/pgtable-prot.h  |  4 +-
+ arch/arm64/kvm/hyp/debug-sr.c          |  1 +
+ arch/arm64/kvm/hyp/switch.c            |  1 +
+ arch/arm64/kvm/hyp/tlb.c               |  1 +
+ arch/arm64/mm/cache.S                  | 32 +++++++----
+ virt/kvm/arm/hyp/vgic-v2-sr.c          |  1 +
+ virt/kvm/arm/mmu.c                     | 64 +++++++++++++++++++---
+ 17 files changed, 236 insertions(+), 43 deletions(-)
+
+-- 
+2.11.0
