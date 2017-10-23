@@ -1,39 +1,60 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 23 Oct 2017 16:59:54 +0100
-Subject: [RESEND][PATCH 1/4] of: platform: populate /firmware/ node from
- of_platform_default_populate_init()
-In-Reply-To: <CAL_JsqJYNXoZbN4zydkkZHWYxJuH4ObYJGgz2L7++kMgTWC1vg@mail.gmail.com>
-References: <1506595562-10592-1-git-send-email-sudeep.holla@arm.com>
- <1506595562-10592-2-git-send-email-sudeep.holla@arm.com>
- <CAL_JsqJYNXoZbN4zydkkZHWYxJuH4ObYJGgz2L7++kMgTWC1vg@mail.gmail.com>
-Message-ID: <52ed3abb-6b05-89c9-5ab4-31b37ffa1db9@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 23 Oct 2017 17:06:00 +0100
+Subject: [PATCH v5] atmel_flexcom: Support backup mode
+In-Reply-To: <20171019164443.487-1-romain.izard.pro@gmail.com>
+References: <20171019164443.487-1-romain.izard.pro@gmail.com>
+Message-ID: <20171023160600.kcjy4ejdllllu62y@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Thu, 19 Oct 2017, Romain Izard wrote:
 
-On 17/10/17 14:02, Rob Herring wrote:
-> On Thu, Sep 28, 2017 at 5:45 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> Since "/firmware" does not have its own "compatible" property as it's
->> just collection of nodes representing firmware interface, it's sub-nodes
->> are not populated during system initialization.
->>
->> Currently different firmware drivers search the /firmware/ node and
->> populate the sub-node devices selectively. Instead we can populate
->> the /firmware/ node during init to avoid more drivers continuing to
->> populate the devices selectively.
->>
->> To generalize the solution this patch populates the /firmware/ node
->> explicitly from of_platform_default_populate_init().
->>
+> The controller used by a flexcom module is configured at boot, and left
+> alone after this. As the configuration will be lost after backup mode,
+> restore the state of the flexcom driver on resume.
+> 
+> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+> Tested-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+> ---
+> Changes in v5:
+> * extract from the patch series, and send as a standalone patch
+> 
+>  drivers/mfd/atmel-flexcom.c | 65 ++++++++++++++++++++++++++++++++++-----------
+>  1 file changed, 50 insertions(+), 15 deletions(-)
+> 
+> diff --git a/drivers/mfd/atmel-flexcom.c b/drivers/mfd/atmel-flexcom.c
+> index 064bde9cff5a..ef1235c4a179 100644
+> --- a/drivers/mfd/atmel-flexcom.c
+> +++ b/drivers/mfd/atmel-flexcom.c
+> @@ -39,34 +39,44 @@
+>  #define FLEX_MR_OPMODE(opmode)	(((opmode) << FLEX_MR_OPMODE_OFFSET) &	\
+>  				 FLEX_MR_OPMODE_MASK)
+>  
+> +struct atmel_flexcom {
+> +	void __iomem *base;
+> +	u32 opmode;
+> +	struct clk *clk;
+> +};
+>  
+>  static int atmel_flexcom_probe(struct platform_device *pdev)
+>  {
+>  	struct device_node *np = pdev->dev.of_node;
+> -	struct clk *clk;
+>  	struct resource *res;
+> -	void __iomem *base;
+> -	u32 opmode;
+> +	struct atmel_flexcom *afc;
 
-You had concernsin the past and I mentioned that firmware interface to
-user-space *has* to continue in /sys/firmware, but he platform_device
-management is internal to kernel.
+Nit: I'd prefer if you call this 'ddata'.
 
-Can we proceed with this change at-least for qcom and meson firmware
-which are platform device already ? I can drop optee related changes.
+But the concept and implementation is fine, so if you're going to
+change it please do so and apply my:
+
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
 -- 
-Regards,
-Sudeep
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
