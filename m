@@ -1,78 +1,48 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 23 Oct 2017 09:55:06 +0800
-Subject: [PATCH] phy: add combo phy driver for HiSilicon STB SoCs
-In-Reply-To: <066fef03-7c21-fe7c-218a-fdec446500da@ti.com>
-References: <1508042882-20922-1-git-send-email-shawnguo@kernel.org>
- <066fef03-7c21-fe7c-218a-fdec446500da@ti.com>
-Message-ID: <20171023015504.GG8700@dragon>
+Date: Mon, 23 Oct 2017 10:08:37 +0800
+Subject: [PATCH] phy: add inno-usb2-phy driver for hi3798cv200 SoC
+In-Reply-To: <68cd23ae-544d-a60a-14a9-347b7aaf76bf@ti.com>
+References: <1508078958-16966-1-git-send-email-shawnguo@kernel.org>
+ <68cd23ae-544d-a60a-14a9-347b7aaf76bf@ti.com>
+Message-ID: <20171023020836.GA16644@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
-
-Thanks for taking time to review the patch.
-
-This combo phy support PCIe and USB3 on HiSilicon STB SoC.  We will
-address all your comments and add USB3 support in the new version.
-
-On Wed, Oct 18, 2017 at 06:13:31PM +0530, Kishon Vijay Abraham I wrote:
-> > diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-> > index 3a52dcb09566..11754b293fb4 100644
-> > --- a/drivers/phy/Makefile
-> > +++ b/drivers/phy/Makefile
-> > @@ -6,6 +6,7 @@ obj-$(CONFIG_GENERIC_PHY)		+= phy-core.o
-> >  obj-$(CONFIG_PHY_LPC18XX_USB_OTG)	+= phy-lpc18xx-usb-otg.o
-> >  obj-$(CONFIG_PHY_XGENE)			+= phy-xgene.o
-> >  obj-$(CONFIG_PHY_PISTACHIO_USB)		+= phy-pistachio-usb.o
-> > +
+On Wed, Oct 18, 2017 at 06:08:01PM +0530, Kishon Vijay Abraham I wrote:
+> > +	usb2_phy1: usb2-phy1 {
+> > +		compatible = "hisilicon,hi3798cv200-usb2-phy";
+> > +		#phy-cells = <1>;
+> > +		hisilicon,peripheral-syscon = <&peri_ctrl 0x120>;
+> > +		clocks = <&crg HISTB_USB2_PHY1_REF_CLK>;
+> > +		resets = <&crg 0xbc 4>,
+> > +			 <&crg 0xbc 8>,
+> > +			 <&crg 0xbc 9>;
+> > +		reset-names = "power_on", "utmi0", "utmi1";
+> > +	};
 > 
-> spurious blank space..
+> please send the devicetree binding documentation as a separate patch.
 
-Left from rebasing the change to latest kernel.  Fixed.  Thanks.
-
-> >  obj-$(CONFIG_ARCH_SUNXI)		+= allwinner/
-> >  obj-$(CONFIG_ARCH_MESON)		+= amlogic/
-> >  obj-$(CONFIG_LANTIQ)			+= lantiq/
+Yes, I should have done that.
 
 <snip>
 
-> > +static struct phy *histb_combphy_xlate(struct device *dev,
-> > +				       struct of_phandle_args *args)
+> > +static int hisi_inno_phy_exit(struct phy *phy)
 > > +{
-> > +	struct histb_combphy_priv *priv = dev_get_drvdata(dev);
+> > +	struct hisi_inno_phy_port *port = phy_get_drvdata(phy);
+> > +	struct hisi_inno_phy_priv *priv = dev_get_drvdata(port->dev);
 > > +
-> > +	if (args->args_count < 1) {
-> > +		dev_err(dev, "DT did not pass correct no of args\n");
-> > +		return ERR_PTR(-ENODEV);
-> > +	}
-> > +
-> > +	priv->mode = args->args[0];
-> > +
-> > +	if (priv->mode > COMBPHY_MODE_SATA) {
-> 
-> this should use generic bindings from include/dt-bindings/phy/phy.h.
-
-Great.  Thanks for the info.  Will use it.
-
-> > +		dev_err(dev, "DT did not pass correct phy mode\n");
-> > +		return ERR_PTR(-ENODEV);
-> > +	}
-> > +
-> > +	return priv->phy;
-> > +}
-
-<snip>
-
-> > +	phy_provider = devm_of_phy_provider_register(dev, histb_combphy_xlate);
-> > +	if (IS_ERR(phy_provider)) {
-> > +		dev_err(dev, "failed to register phy provider\n");
-> > +		return PTR_ERR(phy_provider);
-> > +	}
+> > +	reset_control_assert(port->utmi_rst);
+> > +	reset_control_assert(priv->por_rst);
+> > +	clk_disable_unprepare(priv->ref_clk);
 > > +
 > > +	return 0;
+> > +}
+> > +
+> > +static const struct phy_ops hisi_inno_phy_ops = {
+> > +	.init = hisi_inno_phy_start,
 > 
-> return PTR_ERR_OR_ZERO(phy_provider) instead?
+> in order to make it identical you can just end it with *_init().
 
-Yes.  Thanks for the suggestion.
+Yes, good suggestion.
 
 Shawn
