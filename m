@@ -1,106 +1,125 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 23 Oct 2017 17:11:17 +0100
-Subject: [PATCH v3 4/9] arm: KVM: Add optimized PIPT icache flushing
+Date: Mon, 23 Oct 2017 17:11:22 +0100
+Subject: [PATCH v3 9/9] KVM: arm/arm64: Drop vcpu parameter from guest cache
+ maintenance operartions
 In-Reply-To: <20171023161122.15291-1-marc.zyngier@arm.com>
 References: <20171023161122.15291-1-marc.zyngier@arm.com>
-Message-ID: <20171023161122.15291-5-marc.zyngier@arm.com>
+Message-ID: <20171023161122.15291-10-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Calling __cpuc_coherent_user_range to invalidate the icache on
-a PIPT icache machine has some pointless overhead, as it starts
-by cleaning the dcache to the PoU, while we're guaranteed to
-have already cleaned it to the PoC.
+The vcpu parameter isn't used for anything, and gets in the way of
+further cleanups. Let's get rid of it.
 
-As KVM is the only user of such a feature, let's implement some
-ad-hoc cache flushing in kvm_mmu.h. Should it become useful to
-other subsystems, it can be moved to a more global location.
-
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_hyp.h |  2 ++
- arch/arm/include/asm/kvm_mmu.h | 32 +++++++++++++++++++++++++++++---
- 2 files changed, 31 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h   |  7 ++-----
+ arch/arm64/include/asm/kvm_mmu.h |  7 ++-----
+ virt/kvm/arm/mmu.c               | 18 ++++++++----------
+ 3 files changed, 12 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
-index 04e5077cbcb6..8b29faa119ba 100644
---- a/arch/arm/include/asm/kvm_hyp.h
-+++ b/arch/arm/include/asm/kvm_hyp.h
-@@ -68,6 +68,8 @@
- #define HIFAR		__ACCESS_CP15(c6, 4, c0, 2)
- #define HPFAR		__ACCESS_CP15(c6, 4, c0, 4)
- #define ICIALLUIS	__ACCESS_CP15(c7, 0, c1, 0)
-+#define BPIALLIS	__ACCESS_CP15(c7, 0, c1, 6)
-+#define ICIMVAU		__ACCESS_CP15(c7, 0, c5, 1)
- #define ATS1CPR		__ACCESS_CP15(c7, 0, c8, 0)
- #define TLBIALLIS	__ACCESS_CP15(c8, 0, c3, 0)
- #define TLBIALL		__ACCESS_CP15(c8, 0, c7, 0)
 diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 9fa4b2520974..bc8d21e76637 100644
+index aab64fe52146..bc70a1f0f42d 100644
 --- a/arch/arm/include/asm/kvm_mmu.h
 +++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -37,6 +37,8 @@
- 
- #include <linux/highmem.h>
- #include <asm/cacheflush.h>
-+#include <asm/cputype.h>
-+#include <asm/kvm_hyp.h>
- #include <asm/pgalloc.h>
- #include <asm/stage2_pgtable.h>
- 
-@@ -157,6 +159,8 @@ static inline void __invalidate_icache_guest_page(struct kvm_vcpu *vcpu,
- 						  kvm_pfn_t pfn,
- 						  unsigned long size)
- {
-+	u32 iclsz;
-+
- 	/*
- 	 * If we are going to insert an instruction page and the icache is
- 	 * either VIPT or PIPT, there is a potential problem where the host
-@@ -181,18 +185,40 @@ static inline void __invalidate_icache_guest_page(struct kvm_vcpu *vcpu,
- 		return;
- 	}
- 
--	/* PIPT cache. As for the d-side, use a temporary kernel mapping. */
-+	/*
-+	 * CTR IminLine contains Log2 of the number of words in the
-+	 * cache line, so we can get the number of words as
-+	 * 2 << (IminLine - 1).  To get the number of bytes, we
-+	 * multiply by 4 (the number of bytes in a 32-bit word), and
-+	 * get 4 << (IminLine).
-+	 */
-+	iclsz = 4 << (read_cpuid(CPUID_CACHETYPE) & 0xf);
-+
- 	while (size) {
- 		void *va = kmap_atomic_pfn(pfn);
-+		void *end = va + PAGE_SIZE;
-+		void *addr = va;
- 
--		__cpuc_coherent_user_range((unsigned long)va,
--					   (unsigned long)va + PAGE_SIZE);
-+		do {
-+			write_sysreg(addr, ICIMVAU);
-+			addr += iclsz;
-+		} while (addr < end);
-+
-+		dsb(ishst);
-+		isb();
- 
- 		size -= PAGE_SIZE;
- 		pfn++;
- 
- 		kunmap_atomic(va);
- 	}
-+
-+	/* Check if we need to invalidate the BTB */
-+	if ((read_cpuid_ext(CPUID_EXT_MMFR1) >> 28) != 4) {
-+		write_sysreg(0, BPIALLIS);
-+		dsb(ishst);
-+		isb();
-+	}
+@@ -150,9 +150,7 @@ static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
+ 	return (vcpu_cp15(vcpu, c1_SCTLR) & 0b101) == 0b101;
  }
  
- static inline void __kvm_flush_dcache_pte(pte_t pte)
+-static inline void __clean_dcache_guest_page(struct kvm_vcpu *vcpu,
+-					     kvm_pfn_t pfn,
+-					     unsigned long size)
++static inline void __clean_dcache_guest_page(kvm_pfn_t pfn, unsigned long size)
+ {
+ 	/*
+ 	 * Clean the dcache to the Point of Coherency.
+@@ -177,8 +175,7 @@ static inline void __clean_dcache_guest_page(struct kvm_vcpu *vcpu,
+ 	}
+ }
+ 
+-static inline void __invalidate_icache_guest_page(struct kvm_vcpu *vcpu,
+-						  kvm_pfn_t pfn,
++static inline void __invalidate_icache_guest_page(kvm_pfn_t pfn,
+ 						  unsigned long size)
+ {
+ 	u32 iclsz;
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 126abefffe7f..06f1f9794679 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -252,17 +252,14 @@ static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
+ 	return (vcpu_sys_reg(vcpu, SCTLR_EL1) & 0b101) == 0b101;
+ }
+ 
+-static inline void __clean_dcache_guest_page(struct kvm_vcpu *vcpu,
+-					     kvm_pfn_t pfn,
+-					     unsigned long size)
++static inline void __clean_dcache_guest_page(kvm_pfn_t pfn, unsigned long size)
+ {
+ 	void *va = page_address(pfn_to_page(pfn));
+ 
+ 	kvm_flush_dcache_to_poc(va, size);
+ }
+ 
+-static inline void __invalidate_icache_guest_page(struct kvm_vcpu *vcpu,
+-						  kvm_pfn_t pfn,
++static inline void __invalidate_icache_guest_page(kvm_pfn_t pfn,
+ 						  unsigned long size)
+ {
+ 	if (icache_is_aliasing()) {
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index b83b5a8442bb..a1ea43fa75cf 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1276,16 +1276,14 @@ void kvm_arch_mmu_enable_log_dirty_pt_masked(struct kvm *kvm,
+ 	kvm_mmu_write_protect_pt_masked(kvm, slot, gfn_offset, mask);
+ }
+ 
+-static void clean_dcache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
+-				    unsigned long size)
++static void clean_dcache_guest_page(kvm_pfn_t pfn, unsigned long size)
+ {
+-	__clean_dcache_guest_page(vcpu, pfn, size);
++	__clean_dcache_guest_page(pfn, size);
+ }
+ 
+-static void invalidate_icache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
+-					 unsigned long size)
++static void invalidate_icache_guest_page(kvm_pfn_t pfn, unsigned long size)
+ {
+-	__invalidate_icache_guest_page(vcpu, pfn, size);
++	__invalidate_icache_guest_page(pfn, size);
+ }
+ 
+ static void kvm_send_hwpoison_signal(unsigned long address,
+@@ -1421,11 +1419,11 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		}
+ 
+ 		if (fault_status != FSC_PERM)
+-			clean_dcache_guest_page(vcpu, pfn, PMD_SIZE);
++			clean_dcache_guest_page(pfn, PMD_SIZE);
+ 
+ 		if (exec_fault) {
+ 			new_pmd = kvm_s2pmd_mkexec(new_pmd);
+-			invalidate_icache_guest_page(vcpu, pfn, PMD_SIZE);
++			invalidate_icache_guest_page(pfn, PMD_SIZE);
+ 		} else if (fault_status == FSC_PERM) {
+ 			/* Preserve execute if XN was already cleared */
+ 			if (stage2_is_exec(kvm, fault_ipa))
+@@ -1443,11 +1441,11 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		}
+ 
+ 		if (fault_status != FSC_PERM)
+-			clean_dcache_guest_page(vcpu, pfn, PAGE_SIZE);
++			clean_dcache_guest_page(pfn, PAGE_SIZE);
+ 
+ 		if (exec_fault) {
+ 			new_pte = kvm_s2pte_mkexec(new_pte);
+-			invalidate_icache_guest_page(vcpu, pfn, PAGE_SIZE);
++			invalidate_icache_guest_page(pfn, PAGE_SIZE);
+ 		} else if (fault_status == FSC_PERM) {
+ 			/* Preserve execute if XN was already cleared */
+ 			if (stage2_is_exec(kvm, fault_ipa))
 -- 
 2.11.0
