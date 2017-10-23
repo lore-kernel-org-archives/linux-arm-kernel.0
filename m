@@ -1,33 +1,73 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon, 23 Oct 2017 13:17:07 +0100
-Subject: [RFCv2 PATCH 01/36] iommu: Keep track of processes and PASIDs
-In-Reply-To: <A2975661238FB949B60364EF0F2C257439AFD88A@SHSMSX104.ccr.corp.intel.com>
-References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
- <20171006133203.22803-2-jean-philippe.brucker@arm.com>
- <A2975661238FB949B60364EF0F2C257439AFD88A@SHSMSX104.ccr.corp.intel.com>
-Message-ID: <7aaf9851-9546-f34d-1496-cbeea404abbd@arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 23 Oct 2017 14:20:41 +0200
+Subject: [PATCH v3] drm: exynos: Add driver for HDMI audio interface
+In-Reply-To: <59ED4584.5030608@samsung.com>
+References: <CGME20170926141814epcas1p1923ab779847932395bf2c2899291dfcd@epcas1p1.samsung.com>
+ <1506435469-10591-1-git-send-email-s.nawrocki@samsung.com>
+ <59ED4584.5030608@samsung.com>
+Message-ID: <0b112664-d462-ebeb-b8e1-58e270833d2f@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/10/17 12:04, Liu, Yi L wrote:
->> +	idr_preload(GFP_KERNEL);
->> +	spin_lock(&iommu_process_lock);
->> +	pasid = idr_alloc_cyclic(&iommu_process_idr, process, domain->min_pasid,
->> +				 domain->max_pasid + 1, GFP_ATOMIC);
->> +	process->pasid = pasid;
+On 10/23/2017 03:27 AM, Inki Dae wrote:
+
+>> +static int hdmi_audio_digital_mute(struct device *dev, void *data, bool mute)
+>> +{
+>> +	struct hdmi_context *hdata = dev_get_drvdata(dev);
+>> +
+>> +	mutex_lock(&hdata->mutex);
+>> +
+>> +	hdata->audio.enable = !mute;
 > 
-> [Liu, Yi L] If I'm understanding well, here is managing the pasid allocation in iommu
-> layer instead of vendor iommu driver? Is there strong reason here? I think pasid
-> management may be better within vendor iommu driver as pasid management
-> could differ from vendor to vendor.
+> Wouldn't it be better to keep 'mute' instead of 'enable'? 'hdata->audio.enable' 
+is used by only hdmi_adio_control function and whether hdmi is power on or nis already checked by 'hdata->powered'
+Yes, makes sense, I'll change it.
+ 
+>> +
+>> +	if (hdata->powered)
+>> +		hdmi_audio_control(hdata);
+>> +
+>> +	mutex_unlock(&hdata->mutex);
+>> +
+>> +	return 0;
+>> +}
 
-But that's the thing, we're trying to abstract PASID and process
-management to have it in the core, because there shouldn't be many
-differences from vendor to vendor. This way we have the allocation code in
-one place and vendor drivers don't have to copy paste it from other drivers.
 
-It's just a global number within a range, so I don't think vendors will
-have many different ways of designing it.
+>> +static void hdmi_unregister_audio_device(struct hdmi_context *hdata)
+>> +{
+>> +	platform_device_unregister(hdata->audio.pdev);
+>> +}
+> 
+> This function is unnecessary wrapper. You can use platform_device_unregister(hdata->audio.pdev) at probe callback.
+> And you would need to unregister audio device at remove callback.
 
-Thanks,
-Jean
+Fixed in v4.
+
+>>  static int hdmi_bridge_init(struct hdmi_context *hdata)
+>> @@ -1697,6 +1812,7 @@ static int hdmi_bind(struct device *dev, struct device *master, void *data)
+>>  	struct drm_device *drm_dev = data;
+>>  	struct hdmi_context *hdata = dev_get_drvdata(dev);
+>>  	struct drm_encoder *encoder = &hdata->encoder;
+>> +	struct hdmi_audio_infoframe *audio_infoframe = &hdata->audio.infoframe;
+>>  	struct exynos_drm_crtc *crtc;
+>>  	int ret;
+>>
+>> @@ -1704,6 +1820,12 @@ static int hdmi_bind(struct device *dev, struct device *master, void *data)
+>>
+>>  	hdata->phy_clk.enable = hdmiphy_clk_enable;
+>>
+>> +	hdmi_audio_infoframe_init(audio_infoframe);
+>> +	audio_infoframe->coding_type = HDMI_AUDIO_CODING_TYPE_STREAM;
+>> +	audio_infoframe->sample_size = HDMI_AUDIO_SAMPLE_SIZE_STREAM;
+>> +	audio_infoframe->sample_frequency = HDMI_AUDIO_SAMPLE_FREQUENCY_STREAM;
+>> +	audio_infoframe->channels = 2;
+> 
+> Audio device is registered at probe callback so it would be better to move above code into probe callback.
+> I coudln't see initializing audio infoframe should be done here.
+
+Yes, it makes more sense indeed to have this initialization in probe().
+
+Thanks for your review.
+
+Regards,
+Sylwester
