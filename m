@@ -1,22 +1,21 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 23 Oct 2017 17:39:18 -0500
-Subject: [PATCH 4/5] dt-bindings: arm: realtek: Document RTD1296 and
- Synology DS418
-In-Reply-To: <20171016040150.23400-5-afaerber@suse.de>
-References: <20171016040150.23400-1-afaerber@suse.de>
- <20171016040150.23400-5-afaerber@suse.de>
-Message-ID: <20171023223918.ufxrvcd4333dfj5a@rob-hp-laptop>
+Date: Mon, 23 Oct 2017 17:43:55 -0500
+Subject: [PATCH v4 1/3] dt-bindings: nvmem: add description for UniPhier
+ eFuse
+In-Reply-To: <1508217631-19365-2-git-send-email-hayashibara.keiji@socionext.com>
+References: <1508217631-19365-1-git-send-email-hayashibara.keiji@socionext.com>
+ <1508217631-19365-2-git-send-email-hayashibara.keiji@socionext.com>
+Message-ID: <20171023224355.omzlvqqrsdnl4suj@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 16, 2017 at 06:01:49AM +0200, Andreas F?rber wrote:
-> Define compatible strings for Realtek RTD1296 SoC and Synology
-> DiskStation DS418 NAS.
+On Tue, Oct 17, 2017 at 02:20:29PM +0900, Keiji Hayashibara wrote:
+> Add uniphier-efuse dt-bindings documentation.
 > 
-> Cc: info at synology.com
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
 > ---
->  Documentation/devicetree/bindings/arm/realtek.txt | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
+>  .../devicetree/bindings/nvmem/uniphier-efuse.txt   | 49 ++++++++++++++++++++++
+>  1 file changed, 49 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt
 
 Acked-by: Rob Herring <robh@kernel.org> 
