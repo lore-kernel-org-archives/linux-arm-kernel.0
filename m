@@ -1,59 +1,60 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Tue, 24 Oct 2017 10:50:50 +0200
-Subject: [PATCH 2/3] drm/exynos/gem: Use common error handling code in
- exynos_drm_gem_init()
-In-Reply-To: <7d4cdb43-432c-c67a-5d3f-c37bd604f539@users.sourceforge.net>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 24 Oct 2017 10:51:09 +0200
+Subject: [PATCH 1/3] drm/exynos/dsi: Use common error handling code in
+ exynos_dsi_enable()
+In-Reply-To: <9028478a-a00d-6fcd-0286-b8daefa8c912@users.sourceforge.net>
 References: <7d4cdb43-432c-c67a-5d3f-c37bd604f539@users.sourceforge.net>
-Message-ID: <887019f4-4325-5b19-018a-32169e09462a@users.sourceforge.net>
+ <9028478a-a00d-6fcd-0286-b8daefa8c912@users.sourceforge.net>
+Message-ID: <CAJKOXPc_QQ-QKkPWQoxj0LjeJsG2BjhP6X0X9m8YQEo=qTnOvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Tue, 24 Oct 2017 09:50:54 +0200
+On Tue, Oct 24, 2017 at 10:49 AM, SF Markus Elfring
+<elfring@users.sourceforge.net> wrote:
+> From: Markus Elfring <elfring@users.sourceforge.net>
+> Date: Tue, 24 Oct 2017 09:32:18 +0200
+>
+> Add a jump target so that a bit of exception handling can be better reused
+> at the end of this function.
+>
+> This issue was detected by using the Coccinelle software.
+>
+> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+> ---
+>  drivers/gpu/drm/exynos/exynos_drm_dsi.c | 10 ++++++----
+>  1 file changed, 6 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+> index 7904ffa9abfb..ba5fb49c5491 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+> @@ -1389,8 +1389,7 @@ static void exynos_dsi_enable(struct drm_encoder *encoder)
+>         ret = drm_panel_prepare(dsi->panel);
+>         if (ret < 0) {
+>                 dsi->state &= ~DSIM_STATE_ENABLED;
+> -               pm_runtime_put_sync(dsi->dev);
+> -               return;
+> +               goto put_sync;
+>         }
+>
+>         exynos_dsi_set_display_mode(dsi);
+> @@ -1401,11 +1400,14 @@ static void exynos_dsi_enable(struct drm_encoder *encoder)
+>                 dsi->state &= ~DSIM_STATE_ENABLED;
+>                 exynos_dsi_set_display_enable(dsi, false);
+>                 drm_panel_unprepare(dsi->panel);
+> -               pm_runtime_put_sync(dsi->dev);
+> -               return;
+> +               goto put_sync;
+>         }
+>
+>         dsi->state |= DSIM_STATE_VIDOUT_AVAILABLE;
+> +       return;
+> +
+> +put_sync:
+> +       pm_runtime_put_sync(dsi->dev);
+>  }
 
-Adjust jump targets so that a bit of exception handling can be better
-reused at the end of this function.
+No, this does not simplify the code. Stop using coccinelle.
 
-This issue was detected by using the Coccinelle software.
-
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- drivers/gpu/drm/exynos/exynos_drm_gem.c | 16 +++++++++-------
- 1 file changed, 9 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_gem.c b/drivers/gpu/drm/exynos/exynos_drm_gem.c
-index 077de014d610..1b3c9324cdd5 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_gem.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_gem.c
-@@ -208,20 +208,22 @@ static struct exynos_drm_gem *exynos_drm_gem_init(struct drm_device *dev,
- 	ret = drm_gem_object_init(dev, obj, size);
- 	if (ret < 0) {
- 		DRM_ERROR("failed to initialize gem object\n");
--		kfree(exynos_gem);
--		return ERR_PTR(ret);
-+		goto free_gem;
- 	}
- 
- 	ret = drm_gem_create_mmap_offset(obj);
--	if (ret < 0) {
--		drm_gem_object_release(obj);
--		kfree(exynos_gem);
--		return ERR_PTR(ret);
--	}
-+	if (ret < 0)
-+		goto release_object;
- 
- 	DRM_DEBUG_KMS("created file object = %pK\n", obj->filp);
- 
- 	return exynos_gem;
-+
-+release_object:
-+	drm_gem_object_release(obj);
-+free_gem:
-+	kfree(exynos_gem);
-+	return ERR_PTR(ret);
- }
- 
- struct exynos_drm_gem *exynos_drm_gem_create(struct drm_device *dev,
--- 
-2.14.2
+BR,
+Krzysztof
