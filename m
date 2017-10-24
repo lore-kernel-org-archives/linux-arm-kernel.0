@@ -1,27 +1,27 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 24 Oct 2017 14:35:35 +0100
-Subject: [RFC 1/3] perf tool: Introduce arch-specific supplemental perf
- open strerror capability
-In-Reply-To: <20171024030404.ec366ec2d9c38910ccd84ba5@arm.com>
-References: <20171024030404.ec366ec2d9c38910ccd84ba5@arm.com>
-Message-ID: <20171024133535.GC13445@arm.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 24 Oct 2017 15:37:33 +0200
+Subject: [PATCH v2 4/4] arm64: dts: rockchip: add efuse for RK3368 SoCs
+In-Reply-To: <20170904085119.25981-5-romain.perier@collabora.com>
+References: <20170904085119.25981-1-romain.perier@collabora.com>
+ <20170904085119.25981-5-romain.perier@collabora.com>
+Message-ID: <5744497.0PmpLyO0rR@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 24, 2017 at 03:04:04AM -0500, Kim Phillips wrote:
-> Introduce new tools/perf/arch/*/util/evsel.c:perf_evsel__suppl_strerror()
-> so each arch can start to customize usability for its h/w PMU drivers.
+Am Montag, 4. September 2017, 10:51:19 CEST schrieb Romain Perier:
+> This adds the definition for eFuse that is found on RK3368 SoCs with the
+> corresponding data cells.
 > 
-> Signed-off-by: Kim Phillips <kim.phillips@arm.com>
-> ---
->  tools/perf/arch/x86/util/Build   |  1 +
->  tools/perf/arch/x86/util/evsel.c | 24 ++++++++++++++++++++++++
->  tools/perf/util/evsel.c          | 21 +++++++++++++++------
->  tools/perf/util/evsel.h          |  2 ++
->  4 files changed, 42 insertions(+), 6 deletions(-)
->  create mode 100644 tools/perf/arch/x86/util/evsel.c
+> Signed-off-by: Romain Perier <romain.perier@collabora.com>
 
-This looks sensible to me, although it's difficult to justify all of the
-parameters to perf_evsel__suppl_strerror judging by this patch alone.
+applied for 4.15 after the following changes
+- moved efuse node to its correct position (determined by register address)
+- use correct clock-id as added by patch1 (efuse256 without the underscore)
+- added the #address- and #size-cells properties for the subnodes
+  to make dtc happy
 
-Will
+Please pay a bit more attention for future patches.
+
+
+Thanks
+Heiko
