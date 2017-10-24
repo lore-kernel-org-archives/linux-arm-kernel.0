@@ -1,46 +1,34 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 24 Oct 2017 10:34:32 +0200
-Subject: [PATCH/RFC 4/5] regulator: bd9571mwv: Add support for backup mode
-In-Reply-To: <CAMuHMdWnJwMk5DrnAQebKB23X2WJGPQ2m-0OX8-AC2QYguTQ5w@mail.gmail.com>
-References: <1507649178-31473-1-git-send-email-geert+renesas@glider.be>
- <1507649178-31473-5-git-send-email-geert+renesas@glider.be>
- <20171018110238.hjv7huiievhr5obs@sirena.co.uk>
- <CAMuHMdU2PpiSftwnqHjb8uFpu5Huw7hpedk4cSzDY-eeKio_Dw@mail.gmail.com>
- <20171018112419.3eqz34epcshxas3f@sirena.co.uk>
- <CAMuHMdWnJwMk5DrnAQebKB23X2WJGPQ2m-0OX8-AC2QYguTQ5w@mail.gmail.com>
-Message-ID: <20171024083432.j3xqepkvprbvg2p4@sirena.org.uk>
+From: andrea.adami@gmail.com (Andrea Adami)
+Date: Tue, 24 Oct 2017 10:34:59 +0200
+Subject: ARM: pxa/corgi: armv5te kernel 4.12 fails to decompress compiled
+ with gcc7
+In-Reply-To: <d994b39f-32bc-e073-ac11-8189ab3d250f@gmail.com>
+References: <87a83zsiid.fsf@belgarion.home>
+ <CAAQYJAtEmJMc766kUx+bhFCNQKmwK53nSDNL0nFz-9UXSUO5CQ@mail.gmail.com>
+ <20171014215042.kfrhb2kjhm7wb7vb@darkstar.musicnaut.iki.fi>
+ <87mv4txuid.fsf@belgarion.home>
+ <20171015104640.hazujjkbqyik7fgg@darkstar.musicnaut.iki.fi>
+ <f1631768-b26e-62ae-db1f-65686cd0c4de@gmail.com>
+ <CAAQYJAsmOr2qnykO=rWH1N43q3+d27aHMAyXHTXMYpPQ1=9ikA@mail.gmail.com>
+ <26e751ec-7fc7-475a-5603-2fac4e0700cb@gmail.com>
+ <CAAQYJAuxMHGiyMCFqryYa6QGrXd1JHZnTG60VSGnG6hu9zhitA@mail.gmail.com>
+ <443102ff-9793-a938-1392-9baca727cb98@gmail.com>
+ <20171018104432.GR20805@n2100.armlinux.org.uk>
+ <d994b39f-32bc-e073-ac11-8189ab3d250f@gmail.com>
+Message-ID: <CAAQYJAu0u9ofdjDGFfrPcw7DJQVk8S1iyt2rTsSAOOBZUXFctw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 18, 2017 at 01:28:30PM +0200, Geert Uytterhoeven wrote:
-> On Wed, Oct 18, 2017 at 1:24 PM, Mark Brown <broonie@kernel.org> wrote:
+Hi,
 
-> >> Hence you cannot enable wakeup mode while suspending, as the proper
-> >> system suspend/resume procedure is:
-> >>   1. Enable backup mode in the PMIC,
-> >>   2. Switch ACC off (no-op as backup mode has been enabled),
-> >>   3. Suspend to RAM (PSCI suspend) => system suspends,
-> >>   4. Switch ACC on => system wakes up.
-> >> If you would combine steps 1 and 3, you can no longer do step 2 in between.
+good news!
 
-> >> Yes, it's complicated :-(
+The patch found in the other thread [1] does fix the issue.
+Kernel 4.13 is booting now on corgi: I'll test 4.4 as countercheck.
 
-> > I'm confused, I thought this was a physical switch but that's talking
-> > about this as something software controlled (at least in step 2)?
+Regards
+Andrea
 
-> The ACC switch is a physical switch.
-> Steps 1 and 3 are performed by software running on the board's SoC.
-> Steps 2 and 4 are performed by the external user (human or remote board
-> farm control hookup).
 
-That's horrible.  There's still the question about potentially using the
-existing wakeup file to manage if the device is a wakeup source but
-otherwise I guess the only other thing that'd make sense would be just
-having a property in the DT.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171024/f8b6ad3b/attachment.sig>
+[1]
+https://patchwork.kernel.org/patch/9944519/
