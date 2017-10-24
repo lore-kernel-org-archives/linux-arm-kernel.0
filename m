@@ -1,11 +1,11 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 24 Oct 2017 11:34:21 -0500
+Date: Tue, 24 Oct 2017 11:34:44 -0500
 Subject: [PATCH 05/10] drm/sun4i: Add support for A20 display pipeline
  components
 In-Reply-To: <20171017121807.2994-6-wens@csie.org>
 References: <20171017121807.2994-1-wens@csie.org>
  <20171017121807.2994-6-wens@csie.org>
-Message-ID: <20171024163421.wfbk5jlm2g5xmr55@rob-hp-laptop>
+Message-ID: <20171024163444.fzb5qbkv36rojhsv@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -32,5 +32,3 @@ On Tue, Oct 17, 2017 at 08:18:02PM +0800, Chen-Yu Tsai wrote:
 >  4 files changed, 22 insertions(+)
 
 Acked-by: Rob Herring <robh@kernel.org>
-
-In the future, please put all these DT changes in a separate patch.
