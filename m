@@ -1,83 +1,46 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 24 Oct 2017 01:26:21 -0700
-Subject: [PATCH] staging: vc04_services: Convert timers to use timer_setup()
-Message-ID: <20171024082621.GA18529@beast>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 24 Oct 2017 10:34:32 +0200
+Subject: [PATCH/RFC 4/5] regulator: bd9571mwv: Add support for backup mode
+In-Reply-To: <CAMuHMdWnJwMk5DrnAQebKB23X2WJGPQ2m-0OX8-AC2QYguTQ5w@mail.gmail.com>
+References: <1507649178-31473-1-git-send-email-geert+renesas@glider.be>
+ <1507649178-31473-5-git-send-email-geert+renesas@glider.be>
+ <20171018110238.hjv7huiievhr5obs@sirena.co.uk>
+ <CAMuHMdU2PpiSftwnqHjb8uFpu5Huw7hpedk4cSzDY-eeKio_Dw@mail.gmail.com>
+ <20171018112419.3eqz34epcshxas3f@sirena.co.uk>
+ <CAMuHMdWnJwMk5DrnAQebKB23X2WJGPQ2m-0OX8-AC2QYguTQ5w@mail.gmail.com>
+Message-ID: <20171024083432.j3xqepkvprbvg2p4@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for unconditionally passing the struct timer_list pointer to
-all timer callbacks, switch to using the new timer_setup() and from_timer()
-to pass the timer pointer explicitly.
+On Wed, Oct 18, 2017 at 01:28:30PM +0200, Geert Uytterhoeven wrote:
+> On Wed, Oct 18, 2017 at 1:24 PM, Mark Brown <broonie@kernel.org> wrote:
 
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Eric Anholt <eric@anholt.net>
-Cc: Stefan Wahren <stefan.wahren@i2se.com>
-Cc: Michael Zoran <mzoran@crowfest.net>
-Cc: Keerthi Reddy <keerthigd4990@gmail.com>
-Cc: linux-rpi-kernel at lists.infradead.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: devel at driverdev.osuosl.org
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
- .../staging/vc04_services/interface/vchiq_arm/vchiq_arm.c   | 13 +++++++------
- .../staging/vc04_services/interface/vchiq_arm/vchiq_arm.h   |  1 +
- 2 files changed, 8 insertions(+), 6 deletions(-)
+> >> Hence you cannot enable wakeup mode while suspending, as the proper
+> >> system suspend/resume procedure is:
+> >>   1. Enable backup mode in the PMIC,
+> >>   2. Switch ACC off (no-op as backup mode has been enabled),
+> >>   3. Suspend to RAM (PSCI suspend) => system suspends,
+> >>   4. Switch ACC on => system wakes up.
+> >> If you would combine steps 1 and 3, you can no longer do step 2 in between.
 
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-index 6fcc62603580..6d16cc036c0c 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-@@ -109,7 +109,7 @@ static const char *const resume_state_names[] = {
-  * requested */
- #define FORCE_SUSPEND_TIMEOUT_MS 200
- 
--static void suspend_timer_callback(unsigned long context);
-+static void suspend_timer_callback(struct timer_list *t);
- 
- typedef struct user_service_struct {
- 	VCHIQ_SERVICE_T *service;
-@@ -2184,8 +2184,9 @@ vchiq_arm_init_state(VCHIQ_STATE_T *state, VCHIQ_ARM_STATE_T *arm_state)
- 
- 		arm_state->suspend_timer_timeout = SUSPEND_TIMER_TIMEOUT_MS;
- 		arm_state->suspend_timer_running = 0;
--		setup_timer(&arm_state->suspend_timer, suspend_timer_callback,
--			    (unsigned long)(state));
-+		arm_state->state = state;
-+		timer_setup(&arm_state->suspend_timer, suspend_timer_callback,
-+			    0);
- 
- 		arm_state->first_connect = 0;
- 
-@@ -3017,10 +3018,10 @@ vchiq_instance_set_trace(VCHIQ_INSTANCE_T instance, int trace)
- 	instance->trace = (trace != 0);
- }
- 
--static void suspend_timer_callback(unsigned long context)
-+static void suspend_timer_callback(struct timer_list *t)
- {
--	VCHIQ_STATE_T *state = (VCHIQ_STATE_T *)context;
--	VCHIQ_ARM_STATE_T *arm_state = vchiq_platform_get_arm_state(state);
-+	VCHIQ_ARM_STATE_T *arm_state = from_timer(arm_state, t, suspend_timer);
-+	VCHIQ_STATE_T *state = arm_state->state;
- 
- 	if (!arm_state)
- 		goto out;
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.h b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.h
-index a4cc0db899be..40bb0c63b1a9 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.h
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.h
-@@ -83,6 +83,7 @@ typedef struct vchiq_arm_state_struct {
- 
- 	unsigned int wake_address;
- 
-+	VCHIQ_STATE_T *state;
- 	struct timer_list suspend_timer;
- 	int suspend_timer_timeout;
- 	int suspend_timer_running;
--- 
-2.7.4
+> >> Yes, it's complicated :-(
 
+> > I'm confused, I thought this was a physical switch but that's talking
+> > about this as something software controlled (at least in step 2)?
 
--- 
-Kees Cook
-Pixel Security
+> The ACC switch is a physical switch.
+> Steps 1 and 3 are performed by software running on the board's SoC.
+> Steps 2 and 4 are performed by the external user (human or remote board
+> farm control hookup).
+
+That's horrible.  There's still the question about potentially using the
+existing wakeup file to manage if the device is a wakeup source but
+otherwise I guess the only other thing that'd make sense would be just
+having a property in the DT.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171024/f8b6ad3b/attachment.sig>
