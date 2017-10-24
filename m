@@ -1,75 +1,37 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 24 Oct 2017 10:26:33 +0100
-Subject: [PATCH] ARM: Fix zImage file size not aligned with
- CONFIG_EFI_STUB enabled
-In-Reply-To: <20171024092229.GA20805@n2100.armlinux.org.uk>
-References: <20171022124757.GL20805@n2100.armlinux.org.uk>
- <CAKv+Gu9cgt0sjW_pnaXN6J8j8BXAb7z+gLhDY3oMaKwK5vcO-Q@mail.gmail.com>
- <59ED6179.5020301@rock-chips.com>
- <20171023085006.GM20805@n2100.armlinux.org.uk>
- <59EDC34C.40109@rock-chips.com> <20171023105046.GT20805@n2100.armlinux.org.uk>
- <20171023114549.GU20805@n2100.armlinux.org.uk>
- <CAKv+Gu_R+OfHMxcZEJML4Pm54DyOji6S42LihMgi6+vxi9LOAQ@mail.gmail.com>
- <20171024090953.GZ20805@n2100.armlinux.org.uk>
- <CAKv+Gu_t=7uZ91MbVUqNfTcxX+3HKPF1+ZjS2-2Mn-Wq6D9H6Q@mail.gmail.com>
- <20171024092229.GA20805@n2100.armlinux.org.uk>
-Message-ID: <CAKv+Gu-7r0ojZEOuvBFNRbxRfh8PwfLE_98XX4RQVAa1bNPOKA@mail.gmail.com>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Tue, 24 Oct 2017 11:30:05 +0200
+Subject: Kernel panic when using ccm(aes) with the Atmel AES HW accelerator
+In-Reply-To: <20171024032036.GA28462@gondor.apana.org.au>
+References: <CAGkQfmP6Kq4DEBbGU7AW71PjbUJ2acdJF5PVDm6VqZkUaaoEzA@mail.gmail.com>
+ <39a43561-e0e6-a3b7-e2c0-bd7e6bf1be47@microchip.com>
+ <20171024032036.GA28462@gondor.apana.org.au>
+Message-ID: <CAGkQfmP5JPswyBBYJt_m1R-MPJdHMEC_pMG=3b-4RTm3Fi_G8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 October 2017 at 10:22, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Tue, Oct 24, 2017 at 10:13:09AM +0100, Ard Biesheuvel wrote:
->> On 24 October 2017 at 10:09, Russell King - ARM Linux
->> <linux@armlinux.org.uk> wrote:
->> > The question is: do we want to know when additional sections get
->> > emitted into the binary?
+2017-10-24 5:20 GMT+02:00 Herbert Xu <herbert@gondor.apana.org.au>:
+> On Mon, Oct 23, 2017 at 03:38:59PM +0300, Tudor Ambarus wrote:
 >>
->> Well, we need to know whether the size of zImage is a multiple of 512
->> bytes. We could check that separately by adding the following as well
->>
->> #ifdef CONFIG_EFI_STUB
->> ASSERT((_edata % 512 == 0), "zImage file size is not a multiple of 512 bytes")
+>> I will propose a fix, but I'm taking my time to better understand why
+>> CTR requires to overwrite the iv with the last ciphertext block.
 >
-> ASSERT((_edata - _text) % 512 == 0, "EFI zImage file size is not a multiple of 512 bytes")
->
-> This would only catch them when EFI is enabled, which doesn't give very
-> good build coverage.  I still prefer my solution over adding the assert
-> and a section for _edata - my solution catches it with EFI disabled as
-> well.
->
-> A variant on that would be this, which should catch additional sections
-> for EFI and non-EFI:
->
-> diff --git a/arch/arm/boot/compressed/vmlinux.lds.S b/arch/arm/boot/compressed/vmlinux.lds.S
-> index b38dcef90756..9d0c5d80979a 100644
-> --- a/arch/arm/boot/compressed/vmlinux.lds.S
-> +++ b/arch/arm/boot/compressed/vmlinux.lds.S
-> @@ -95,6 +95,10 @@ SECTIONS
->
->    _edata = .;
->
-> +  .image_end (NOLOAD) : {
-> +    _image_end = .;
-> +  }
-> +
->    _magic_sig = ZIMAGE_MAGIC(0x016f2818);
->    _magic_start = ZIMAGE_MAGIC(_start);
->    _magic_end = ZIMAGE_MAGIC(_edata);
-> @@ -119,3 +123,5 @@ SECTIONS
->    .stab.indexstr 0     : { *(.stab.indexstr) }
->    .comment 0           : { *(.comment) }
->  }
-> +
-> +ASSERT(image_end == end, "zImage file size is incorrect")
+> That's an API requirement.  So we should fix ccm.
 >
 
-I take it you mean
+Where is the documentation for this API requirement?
 
-_image_end == _edata
+I tried to find it in the kernel, but I only found a few comments in the
+commit messages or in the implementations, but not an explicit
+requirement.
 
-here? That works for me:
+Moreover, as it seems to be a common mistake in the crypto accelerators,
+I believe that the algorithms' self-test should also check the IV at the
+end of a request.
 
-Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+In the decryption case, the code should probably be shared for most
+implementations: we need to save the input data before decryption in
+case of in-place decoding, and restore it into the IV buffer before
+returning to the caller.
 
-(with CONFIG_EFI enabled)
+-- 
+Romain Izard
