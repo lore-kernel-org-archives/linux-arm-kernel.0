@@ -1,42 +1,40 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Tue, 24 Oct 2017 19:57:14 +0200
-Subject: [PATCH v9 10/10] net: stmmac: sun8i: Restore the compatibles
+Date: Tue, 24 Oct 2017 19:57:12 +0200
+Subject: [PATCH v9 08/10] net: stmmac: snps,
+ dwmac-mdio MDIOs are automatically registered
 In-Reply-To: <20171024175714.15840-1-clabbe.montjoie@gmail.com>
 References: <20171024175714.15840-1-clabbe.montjoie@gmail.com>
-Message-ID: <20171024175714.15840-11-clabbe.montjoie@gmail.com>
+Message-ID: <20171024175714.15840-9-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The original dwmac-sun8i DT bindings have some issue on how to handle
-integrated PHY and was reverted in last RC of 4.13.
-But now we have a solution so we need to get back that was reverted.
+stmmac bindings docs said that its mdio node must have
+compatible = "snps,dwmac-mdio";
+Since dwmac-sun8i does not have any good reasons to not doing it, all
+their MDIO node must have it.
 
-This patch restore compatibles about dwmac-sun8i
-This reverts commit ad4540cc5aa3 ("net: stmmac: sun8i: Remove the compatibles")
+Since these compatible is automatically registered, dwmac-sun8i compatible
+does not need to be in need_mdio_ids.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-index b3eb344bb158..e5ff734d4f9b 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-@@ -1072,6 +1072,14 @@ return ret;
- }
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+index 8a280b48e3a9..9e616da0745d 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+@@ -311,10 +311,6 @@ static int stmmac_dt_phy(struct plat_stmmacenet_data *plat,
+ 	bool mdio = true;
+ 	static const struct of_device_id need_mdio_ids[] = {
+ 		{ .compatible = "snps,dwc-qos-ethernet-4.10" },
+-		{ .compatible = "allwinner,sun8i-a83t-emac" },
+-		{ .compatible = "allwinner,sun8i-h3-emac" },
+-		{ .compatible = "allwinner,sun8i-v3s-emac" },
+-		{ .compatible = "allwinner,sun50i-a64-emac" },
+ 		{},
+ 	};
  
- static const struct of_device_id sun8i_dwmac_match[] = {
-+	{ .compatible = "allwinner,sun8i-h3-emac",
-+		.data = &emac_variant_h3 },
-+	{ .compatible = "allwinner,sun8i-v3s-emac",
-+		.data = &emac_variant_v3s },
-+	{ .compatible = "allwinner,sun8i-a83t-emac",
-+		.data = &emac_variant_a83t },
-+	{ .compatible = "allwinner,sun50i-a64-emac",
-+		.data = &emac_variant_a64 },
- 	{ }
- };
- MODULE_DEVICE_TABLE(of, sun8i_dwmac_match);
 -- 
 2.13.6
