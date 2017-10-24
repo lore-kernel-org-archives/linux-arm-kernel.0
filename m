@@ -1,87 +1,203 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 24 Oct 2017 18:05:23 +0100
-Subject: [PATCH] arm64/sve: ABI change: Zero SVE regs on syscall entry
-In-Reply-To: <20171024163524.mxn5puf3fmajrjbr@armageddon.cambridge.arm.com>
-References: <1508859966-7671-1-git-send-email-Dave.Martin@arm.com>
- <20171024163524.mxn5puf3fmajrjbr@armageddon.cambridge.arm.com>
-Message-ID: <20171024170523.GG19485@e103592.cambridge.arm.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 24 Oct 2017 10:05:43 -0700
+Subject: [PATCH] Input: touchscreen: Convert timers to use timer_setup()
+In-Reply-To: <20171024141858.GA78061@beast>
+References: <20171024141858.GA78061@beast>
+Message-ID: <20171024170543.rsb7rcmfomjvhx6b@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 24, 2017 at 05:35:25PM +0100, Catalin Marinas wrote:
-> On Tue, Oct 24, 2017 at 04:46:06PM +0100, Dave P Martin wrote:
-> > diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> > index 6718780..fbc0eb5 100644
-> > --- a/arch/arm64/kernel/entry.S
-> > +++ b/arch/arm64/kernel/entry.S
-> > @@ -660,6 +660,7 @@ el0_svc_compat:
-> >  	/*
-> >  	 * AArch32 syscall handling
-> >  	 */
-> > +	ldr	x16, [tsk, #TSK_TI_FLAGS]	// load thread flags
-> >  	adrp	stbl, compat_sys_call_table	// load compat syscall table pointer
-> >  	mov	wscno, w7			// syscall number in w7 (r7)
-> >  	mov     wsc_nr, #__NR_compat_syscalls
-> > @@ -847,16 +848,35 @@ ENDPROC(ret_to_user)
-> >   */
-> >  	.align	6
-> >  el0_svc:
-> > +	ldr	x16, [tsk, #TSK_TI_FLAGS]	// load thread flags
-> >  	adrp	stbl, sys_call_table		// load syscall table pointer
-> >  	mov	wscno, w8			// syscall number in w8
-> >  	mov	wsc_nr, #__NR_syscalls
-> > +
-> > +#ifdef CONFIG_ARM64_SVE
-> > +alternative_if_not ARM64_SVE
-> > +	b	el0_svc_naked
-> > +alternative_else
-> > +	tbz	x16, #_TIF_SVE, el0_svc_naked	// Skip unless TIF_SVE set:
-
-This goes out of range btw due to the limited range of tbz and the
-fact that this is assembled into the alternatives section instead of
-.text.  So I changed to:
-
-alternative_else
-	tst	x16, #TIF_SVE
-alternative_endif
-	b.eq	el0_svc_naked
-
-
-There's nothing more useful to put info the _else slot that I could
-see.
-
-> > +alternative_endif
-> > +	bic	x16, x16, #_TIF_SVE		// discard SVE state
-> > +	str	x16, [tsk, #TSK_TI_FLAGS]
-> > +
-> > +	// task_fpsimd_load() won't be called to update CPACR
-> > +	// unless TIF_FOREIGN_FPSTATE is set, which only happens if a
-> > +	// context switch of kernel_neon_begin() gets in the way.
+On Tue, Oct 24, 2017 at 07:18:58AM -0700, Kees Cook wrote:
+> In preparation for unconditionally passing the struct timer_list pointer to
+> all timer callbacks, switch to using the new timer_setup() and from_timer()
+> to pass the timer pointer explicitly.
 > 
-> s/of/or/
+> Cc: Michael Hennerich <michael.hennerich@analog.com>
+> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> Cc: Ferruh Yigit <fery@cypress.com>
+> Cc: Wan ZongShun <mcuos.com@gmail.com>
+> Cc: Guenter Roeck <linux@roeck-us.net>
+> Cc: linux-input at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Kees Cook <keescook@chromium.org>
+> ---
 
-Oops, thanks
+Applied...
 
-> 
-> > +	// So, ensure that CPACR is correct for the fast-path case:
-> > +	mrs	x9, cpacr_el1
-> > +	bic	x9, x9, #CPACR_EL1_ZEN_EL0EN	// disable SVE for el0
-> > +	msr	cpacr_el1, x9			// synchronised by eret to el0
-> > +#endif
-> 
-> Just a nitpick, I'd like multi-line asm comments to still follow the C
-> style:
-> 
-> 	/*
-> 	 * ...
-> 	 */
+>  drivers/input/touchscreen/ad7877.c       |  6 +++---
 
-Will do.
+With the exception of this that I already had a patch for.
 
+>  drivers/input/touchscreen/ad7879.c       |  6 +++---
+>  drivers/input/touchscreen/atmel-wm97xx.c | 10 ++++++----
+>  drivers/input/touchscreen/cyttsp4_core.c |  7 +++----
+>  drivers/input/touchscreen/tsc200x-core.c |  6 +++---
+>  drivers/input/touchscreen/w90p910_ts.c   |  7 +++----
+>  6 files changed, 21 insertions(+), 21 deletions(-)
 > 
-> Otherwise,
+> diff --git a/drivers/input/touchscreen/ad7877.c b/drivers/input/touchscreen/ad7877.c
+> index 9c250ae780d9..0381c7809d1b 100644
+> --- a/drivers/input/touchscreen/ad7877.c
+> +++ b/drivers/input/touchscreen/ad7877.c
+> @@ -385,9 +385,9 @@ static inline void ad7877_ts_event_release(struct ad7877 *ts)
+>  	input_sync(input_dev);
+>  }
+>  
+> -static void ad7877_timer(unsigned long handle)
+> +static void ad7877_timer(struct timer_list *t)
+>  {
+> -	struct ad7877 *ts = (void *)handle;
+> +	struct ad7877 *ts = from_timer(ts, t, timer);
+>  	unsigned long flags;
+>  
+>  	spin_lock_irqsave(&ts->lock, flags);
+> @@ -718,7 +718,7 @@ static int ad7877_probe(struct spi_device *spi)
+>  	ts->spi = spi;
+>  	ts->input = input_dev;
+>  
+> -	setup_timer(&ts->timer, ad7877_timer, (unsigned long) ts);
+> +	timer_setup(&ts->timer, ad7877_timer, 0);
+>  	mutex_init(&ts->mutex);
+>  	spin_lock_init(&ts->lock);
+>  
+> diff --git a/drivers/input/touchscreen/ad7879.c b/drivers/input/touchscreen/ad7879.c
+> index 7d74a0ae2c94..6bad23ee47a1 100644
+> --- a/drivers/input/touchscreen/ad7879.c
+> +++ b/drivers/input/touchscreen/ad7879.c
+> @@ -237,9 +237,9 @@ static void ad7879_ts_event_release(struct ad7879 *ts)
+>  	input_sync(input_dev);
+>  }
+>  
+> -static void ad7879_timer(unsigned long handle)
+> +static void ad7879_timer(struct timer_list *t)
+>  {
+> -	struct ad7879 *ts = (void *)handle;
+> +	struct ad7879 *ts = from_timer(ts, t, timer);
+>  
+>  	ad7879_ts_event_release(ts);
+>  }
+> @@ -570,7 +570,7 @@ int ad7879_probe(struct device *dev, struct regmap *regmap,
+>  	ts->irq = irq;
+>  	ts->regmap = regmap;
+>  
+> -	setup_timer(&ts->timer, ad7879_timer, (unsigned long) ts);
+> +	timer_setup(&ts->timer, ad7879_timer, 0);
+>  	snprintf(ts->phys, sizeof(ts->phys), "%s/input0", dev_name(dev));
+>  
+>  	input_dev->name = "AD7879 Touchscreen";
+> diff --git a/drivers/input/touchscreen/atmel-wm97xx.c b/drivers/input/touchscreen/atmel-wm97xx.c
+> index 8cf0b2be2df4..9140a43cfe20 100644
+> --- a/drivers/input/touchscreen/atmel-wm97xx.c
+> +++ b/drivers/input/touchscreen/atmel-wm97xx.c
+> @@ -208,9 +208,12 @@ static void atmel_wm97xx_acc_pen_up(struct wm97xx *wm)
+>  	}
+>  }
+>  
+> -static void atmel_wm97xx_pen_timer(unsigned long data)
+> +static void atmel_wm97xx_pen_timer(struct timer_list *t)
+>  {
+> -	atmel_wm97xx_acc_pen_up((struct wm97xx *)data);
+> +	struct atmel_wm97xx *atmel_wm97xx = from_timer(atmel_wm97xx, t,
+> +						       pen_timer);
+> +
+> +	atmel_wm97xx_acc_pen_up(atmel_wm97xx->wm);
+>  }
+>  
+>  static int atmel_wm97xx_acc_startup(struct wm97xx *wm)
+> @@ -348,8 +351,7 @@ static int __init atmel_wm97xx_probe(struct platform_device *pdev)
+>  	atmel_wm97xx->gpio_pen	= atmel_gpio_line;
+>  	atmel_wm97xx->gpio_irq	= gpio_to_irq(atmel_wm97xx->gpio_pen);
+>  
+> -	setup_timer(&atmel_wm97xx->pen_timer, atmel_wm97xx_pen_timer,
+> -			(unsigned long)wm);
+> +	timer_setup(&atmel_wm97xx->pen_timer, atmel_wm97xx_pen_timer, 0);
+>  
+>  	ret = request_irq(atmel_wm97xx->ac97c_irq,
+>  			  atmel_wm97xx_channel_b_interrupt,
+> diff --git a/drivers/input/touchscreen/cyttsp4_core.c b/drivers/input/touchscreen/cyttsp4_core.c
+> index beaf61ce775b..e7710397e0ad 100644
+> --- a/drivers/input/touchscreen/cyttsp4_core.c
+> +++ b/drivers/input/touchscreen/cyttsp4_core.c
+> @@ -1237,9 +1237,9 @@ static void cyttsp4_stop_wd_timer(struct cyttsp4 *cd)
+>  	del_timer_sync(&cd->watchdog_timer);
+>  }
+>  
+> -static void cyttsp4_watchdog_timer(unsigned long handle)
+> +static void cyttsp4_watchdog_timer(struct timer_list *t)
+>  {
+> -	struct cyttsp4 *cd = (struct cyttsp4 *)handle;
+> +	struct cyttsp4 *cd = from_timer(cd, t, watchdog_timer);
+>  
+>  	dev_vdbg(cd->dev, "%s: Watchdog timer triggered\n", __func__);
+>  
+> @@ -2074,8 +2074,7 @@ struct cyttsp4 *cyttsp4_probe(const struct cyttsp4_bus_ops *ops,
+>  	}
+>  
+>  	/* Setup watchdog timer */
+> -	setup_timer(&cd->watchdog_timer, cyttsp4_watchdog_timer,
+> -		(unsigned long)cd);
+> +	timer_setup(&cd->watchdog_timer, cyttsp4_watchdog_timer, 0);
+>  
+>  	/*
+>  	 * call startup directly to ensure that the device
+> diff --git a/drivers/input/touchscreen/tsc200x-core.c b/drivers/input/touchscreen/tsc200x-core.c
+> index 88ea5e1b72ae..542db26d7fd0 100644
+> --- a/drivers/input/touchscreen/tsc200x-core.c
+> +++ b/drivers/input/touchscreen/tsc200x-core.c
+> @@ -202,9 +202,9 @@ static irqreturn_t tsc200x_irq_thread(int irq, void *_ts)
+>  	return IRQ_HANDLED;
+>  }
+>  
+> -static void tsc200x_penup_timer(unsigned long data)
+> +static void tsc200x_penup_timer(struct timer_list *t)
+>  {
+> -	struct tsc200x *ts = (struct tsc200x *)data;
+> +	struct tsc200x *ts = from_timer(ts, t, penup_timer);
+>  	unsigned long flags;
+>  
+>  	spin_lock_irqsave(&ts->lock, flags);
+> @@ -506,7 +506,7 @@ int tsc200x_probe(struct device *dev, int irq, const struct input_id *tsc_id,
+>  	mutex_init(&ts->mutex);
+>  
+>  	spin_lock_init(&ts->lock);
+> -	setup_timer(&ts->penup_timer, tsc200x_penup_timer, (unsigned long)ts);
+> +	timer_setup(&ts->penup_timer, tsc200x_penup_timer, 0);
+>  
+>  	INIT_DELAYED_WORK(&ts->esd_work, tsc200x_esd_work);
+>  
+> diff --git a/drivers/input/touchscreen/w90p910_ts.c b/drivers/input/touchscreen/w90p910_ts.c
+> index da6004e97753..638c1d78ca3a 100644
+> --- a/drivers/input/touchscreen/w90p910_ts.c
+> +++ b/drivers/input/touchscreen/w90p910_ts.c
+> @@ -146,9 +146,9 @@ static irqreturn_t w90p910_ts_interrupt(int irq, void *dev_id)
+>  	return IRQ_HANDLED;
+>  }
+>  
+> -static void w90p910_check_pen_up(unsigned long data)
+> +static void w90p910_check_pen_up(struct timer_list *t)
+>  {
+> -	struct w90p910_ts *w90p910_ts = (struct w90p910_ts *) data;
+> +	struct w90p910_ts *w90p910_ts = from_timer(w90p910_ts, t, timer);
+>  	unsigned long flags;
+>  
+>  	spin_lock_irqsave(&w90p910_ts->lock, flags);
+> @@ -232,8 +232,7 @@ static int w90x900ts_probe(struct platform_device *pdev)
+>  	w90p910_ts->input = input_dev;
+>  	w90p910_ts->state = TS_IDLE;
+>  	spin_lock_init(&w90p910_ts->lock);
+> -	setup_timer(&w90p910_ts->timer, w90p910_check_pen_up,
+> -		    (unsigned long)w90p910_ts);
+> +	timer_setup(&w90p910_ts->timer, w90p910_check_pen_up, 0);
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	if (!res) {
+> -- 
+> 2.7.4
 > 
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> 
+> -- 
+> Kees Cook
+> Pixel Security
 
-Thanks
----Dave
+-- 
+Dmitry
