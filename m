@@ -1,32 +1,69 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Tue, 24 Oct 2017 15:38:49 +0100
-Subject: [PATCH v3 1/2] arm64: Use existing defines for mdscr
-In-Reply-To: <20171024142802.GB14568@arm.com>
-References: <1507815783-39929-1-git-send-email-julien.thierry@arm.com>
- <1507815783-39929-2-git-send-email-julien.thierry@arm.com>
- <20171024142802.GB14568@arm.com>
-Message-ID: <8ee680a0-c9aa-4710-22af-aefa042e3291@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 24 Oct 2017 15:46:10 +0100
+Subject: [RESEND PATCH 1/2] irqdesc: Add function to identify
+ percpu_devid irqs
+In-Reply-To: <20171013174422.GA6050@leverpostej>
+References: <1507894005-53778-1-git-send-email-julien.thierry@arm.com>
+ <1507894005-53778-2-git-send-email-julien.thierry@arm.com>
+ <20171013174422.GA6050@leverpostej>
+Message-ID: <20171024144610.GC14568@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Thomas,
 
+I was hoping to merge this one via arm64 since it now has Marc's
+Reviewed-by, but I'd really like your Ack on it too, if you don't mind.
 
-On 24/10/17 15:28, Will Deacon wrote:
-> On Thu, Oct 12, 2017 at 02:43:02PM +0100, Julien Thierry wrote:
->> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
->> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
->> Acked-by: Mark Rutland <mark.rutland@arm.com>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> ---
->>   arch/arm64/include/asm/assembler.h | 5 +++--
->>   1 file changed, 3 insertions(+), 2 deletions(-)
-> 
-> If you write a commit message, then I'll merge this.
-
-Ok, I'll do that once I have a definitive version for the second patch.
+Could you take a look, please?
 
 Thanks,
 
--- 
-Julien Thierry
+Will
+
+On Fri, Oct 13, 2017 at 06:44:23PM +0100, Mark Rutland wrote:
+> Would you be happy for this patch to be taken via the arm64 tree?
+> 
+> The next patch [1] makes use of this in the arm_pmu driver, and we're
+> likely to have some other changes there shortly.
+> 
+> Thanks,
+> Mark
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-October/536532.html
+> 
+> On Fri, Oct 13, 2017 at 12:26:44PM +0100, Julien Thierry wrote:
+> > irq_is_percpu indicates whether an irq should only target a single cpu.
+> > PERCPU_DEVID flag indicates that an irq can be configured differently on
+> > each cpu it can target.
+> > 
+> > Provide a function to check whether an irq is PERCPU_DEVID.
+> > 
+> > Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> >  include/linux/irqdesc.h | 8 ++++++++
+> >  1 file changed, 8 insertions(+)
+> > 
+> > diff --git a/include/linux/irqdesc.h b/include/linux/irqdesc.h
+> > index 3e90a09..93960cf 100644
+> > --- a/include/linux/irqdesc.h
+> > +++ b/include/linux/irqdesc.h
+> > @@ -244,6 +244,14 @@ static inline int irq_is_percpu(unsigned int irq)
+> >  	return desc->status_use_accessors & IRQ_PER_CPU;
+> >  }
+> > 
+> > +static inline int irq_is_percpu_devid(unsigned int irq)
+> > +{
+> > +	struct irq_desc *desc;
+> > +
+> > +	desc = irq_to_desc(irq);
+> > +	return desc->status_use_accessors & IRQ_PER_CPU_DEVID;
+> > +}
+> > +
+> >  static inline void
+> >  irq_set_lockdep_class(unsigned int irq, struct lock_class_key *class)
+> >  {
+> > --
+> > 1.9.1
