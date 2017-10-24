@@ -1,87 +1,44 @@
 From: opendmb@gmail.com (Doug Berger)
-Date: Tue, 24 Oct 2017 12:54:48 -0700
-Subject: [PATCH v2 4/7] gpio: brcmstb: switch to handle_level_irq flow
+Date: Tue, 24 Oct 2017 12:54:49 -0700
+Subject: [PATCH v2 5/7] gpio: brcmstb: correct the configuration of level
+ interrupts
 In-Reply-To: <20171024195451.30535-1-opendmb@gmail.com>
 References: <20171024195451.30535-1-opendmb@gmail.com>
-Message-ID: <20171024195451.30535-5-opendmb@gmail.com>
+Message-ID: <20171024195451.30535-6-opendmb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reading and writing the gpio bank status register each time a pending
-interrupt bit is serviced could cause new pending bits to be cleared
-without servicing the associated interrupts.
-
-By using the handle_level_irq flow instead of the handle_simple_irq
-flow we get proper handling of interrupt masking as well as acking
-of interrupts.  The irq_ack method is added to support this.
+This commit corrects a bug when configuring the GPIO hardware for
+IRQ_TYPE_LEVEL_LOW and IRQ_TYPE_LEVEL_HIGH interrupt types. The
+hardware is now correctly configured to support those types.
 
 Fixes: 19a7b6940b78 ("gpio: brcmstb: Add interrupt and wakeup source support")
 Signed-off-by: Doug Berger <opendmb@gmail.com>
 Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 Acked-by: Gregory Fong <gregory.0xf0@gmail.com>
 ---
- drivers/gpio/gpio-brcmstb.c | 18 ++++++++++++------
- 1 file changed, 12 insertions(+), 6 deletions(-)
+ drivers/gpio/gpio-brcmstb.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/gpio/gpio-brcmstb.c b/drivers/gpio/gpio-brcmstb.c
-index fd8c0412f8af..513de4936a25 100644
+index 513de4936a25..183863902f7f 100644
 --- a/drivers/gpio/gpio-brcmstb.c
 +++ b/drivers/gpio/gpio-brcmstb.c
-@@ -114,6 +114,16 @@ static void brcmstb_gpio_irq_unmask(struct irq_data *d)
- 	brcmstb_gpio_set_imask(bank, d->hwirq, true);
- }
+@@ -137,13 +137,13 @@ static int brcmstb_gpio_irq_set_type(struct irq_data *d, unsigned int type)
  
-+static void brcmstb_gpio_irq_ack(struct irq_data *d)
-+{
-+	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
-+	struct brcmstb_gpio_bank *bank = gpiochip_get_data(gc);
-+	struct brcmstb_gpio_priv *priv = bank->parent_priv;
-+	u32 mask = BIT(d->hwirq);
-+
-+	gc->write_reg(priv->reg_base + GIO_STAT(bank->id), mask);
-+}
-+
- static int brcmstb_gpio_irq_set_type(struct irq_data *d, unsigned int type)
- {
- 	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
-@@ -217,21 +227,16 @@ static void brcmstb_gpio_irq_bank_handler(struct brcmstb_gpio_bank *bank)
- {
- 	struct brcmstb_gpio_priv *priv = bank->parent_priv;
- 	struct irq_domain *irq_domain = bank->gc.irqdomain;
--	void __iomem *reg_base = priv->reg_base;
- 	unsigned long status;
- 
- 	while ((status = brcmstb_gpio_get_active_irqs(bank))) {
- 		int bit;
- 
- 		for_each_set_bit(bit, &status, 32) {
--			u32 stat = bank->gc.read_reg(reg_base +
--						      GIO_STAT(bank->id));
- 			if (bit >= bank->width)
- 				dev_warn(&priv->pdev->dev,
- 					 "IRQ for invalid GPIO (bank=%d, offset=%d)\n",
- 					 bank->id, bit);
--			bank->gc.write_reg(reg_base + GIO_STAT(bank->id),
--					    stat | BIT(bit));
- 			generic_handle_irq(irq_find_mapping(irq_domain, bit));
- 		}
- 	}
-@@ -354,6 +359,7 @@ static int brcmstb_gpio_irq_setup(struct platform_device *pdev,
- 	bank->irq_chip.name = dev_name(dev);
- 	bank->irq_chip.irq_mask = brcmstb_gpio_irq_mask;
- 	bank->irq_chip.irq_unmask = brcmstb_gpio_irq_unmask;
-+	bank->irq_chip.irq_ack = brcmstb_gpio_irq_ack;
- 	bank->irq_chip.irq_set_type = brcmstb_gpio_irq_set_type;
- 
- 	/* Ensures that all non-wakeup IRQs are disabled at suspend */
-@@ -394,7 +400,7 @@ static int brcmstb_gpio_irq_setup(struct platform_device *pdev,
- 		bank->irq_chip.irq_set_wake = brcmstb_gpio_irq_set_wake;
- 
- 	err = gpiochip_irqchip_add(&bank->gc, &bank->irq_chip, 0,
--				   handle_simple_irq, IRQ_TYPE_NONE);
-+				   handle_level_irq, IRQ_TYPE_NONE);
- 	if (err)
- 		return err;
- 	gpiochip_set_chained_irqchip(&bank->gc, &bank->irq_chip,
+ 	switch (type) {
+ 	case IRQ_TYPE_LEVEL_LOW:
+-		level = 0;
++		level = mask;
+ 		edge_config = 0;
+ 		edge_insensitive = 0;
+ 		break;
+ 	case IRQ_TYPE_LEVEL_HIGH:
+ 		level = mask;
+-		edge_config = 0;
++		edge_config = mask;
+ 		edge_insensitive = 0;
+ 		break;
+ 	case IRQ_TYPE_EDGE_FALLING:
 -- 
 2.14.1
