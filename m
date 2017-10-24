@@ -1,39 +1,47 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Tue, 24 Oct 2017 03:42:51 -0500
-Subject: [PATCH v5 6/7] drivers/perf: Add support for ARMv8.2
- Statistical Profiling Extension
-In-Reply-To: <20171002183524.ab23b255b6d03331bb36f75a@arm.com>
-References: <1506607791-8621-1-git-send-email-will.deacon@arm.com>
- <1506607791-8621-7-git-send-email-will.deacon@arm.com>
- <20170929171940.2aa33d00463b1e9c987aea15@arm.com>
- <20171002141405.GC12847@arm.com> <20171002164930.GB2121@redhat.com>
- <20171002183524.ab23b255b6d03331bb36f75a@arm.com>
-Message-ID: <20171024034251.81e01386b8074683a40d31e1@arm.com>
+From: andrea.adami@gmail.com (Andrea Adami)
+Date: Tue, 24 Oct 2017 10:43:32 +0200
+Subject: ARM: pxa/corgi: armv5te kernel 4.12 fails to decompress compiled
+ with gcc7
+In-Reply-To: <CAAQYJAu0u9ofdjDGFfrPcw7DJQVk8S1iyt2rTsSAOOBZUXFctw@mail.gmail.com>
+References: <87a83zsiid.fsf@belgarion.home>
+ <CAAQYJAtEmJMc766kUx+bhFCNQKmwK53nSDNL0nFz-9UXSUO5CQ@mail.gmail.com>
+ <20171014215042.kfrhb2kjhm7wb7vb@darkstar.musicnaut.iki.fi>
+ <87mv4txuid.fsf@belgarion.home>
+ <20171015104640.hazujjkbqyik7fgg@darkstar.musicnaut.iki.fi>
+ <f1631768-b26e-62ae-db1f-65686cd0c4de@gmail.com>
+ <CAAQYJAsmOr2qnykO=rWH1N43q3+d27aHMAyXHTXMYpPQ1=9ikA@mail.gmail.com>
+ <26e751ec-7fc7-475a-5603-2fac4e0700cb@gmail.com>
+ <CAAQYJAuxMHGiyMCFqryYa6QGrXd1JHZnTG60VSGnG6hu9zhitA@mail.gmail.com>
+ <443102ff-9793-a938-1392-9baca727cb98@gmail.com>
+ <20171018104432.GR20805@n2100.armlinux.org.uk>
+ <d994b39f-32bc-e073-ac11-8189ab3d250f@gmail.com>
+ <CAAQYJAu0u9ofdjDGFfrPcw7DJQVk8S1iyt2rTsSAOOBZUXFctw@mail.gmail.com>
+Message-ID: <CAAQYJAtfbUERyvsewGNp1vgMM2MT6dNGWstL6UsfhLFLJDavMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2 Oct 2017 18:35:24 -0500
-Kim Phillips <kim.phillips@arm.com> wrote:
+On Tue, Oct 24, 2017 at 10:34 AM, Andrea Adami <andrea.adami@gmail.com> wrote:
+> Hi,
+>
+> good news!
+>
+> The patch found in the other thread [1] does fix the issue.
+> Kernel 4.13 is booting now on corgi: I'll test 4.4 as countercheck.
+>
+> Regards
+> Andrea
+>
+>
+> [1]
+> https://patchwork.kernel.org/patch/9944519/
 
-> On Mon, 2 Oct 2017 13:49:30 -0300
-> Arnaldo Carvalho de Melo <acme@redhat.com> wrote:
-> > I'm all for more informative messages, and if you guys agree on how to
-> > provide the info in a way that combined with logic in evsel.c, I'd say
-> > do what Will suggested, post a patch series and include usage examples,
-> > before and after.
-> 
-> I'll figure out how to get the PMU in evsel.c's strerror fn, and give it
-> another shot.  I don't think it'll be a big problem for the SPE driver
-> itself, it's just some of the other drivers have long lists of reasons
-> to return -EXXXX, and I don't think evsel.c's strerror fn should be
-> able to handle all that.
 
-See this example for the arm-ccn driver:
+Maybe it is unclear, it was a gcc7 bug finally,
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2017-October/538924.html
+https://github.com/gcc-mirror/gcc/commit/f59996b56aaa1c1d62a16cbb4010775b624cbde0
 
-Please follow up on that thread.
 
-Thanks,
+No other patches have been applied.
 
-Kim
+Regards
+Andrea
