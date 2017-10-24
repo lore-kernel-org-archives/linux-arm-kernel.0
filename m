@@ -1,72 +1,58 @@
-From: rafal@milecki.pl (=?UTF-8?Q?Rafa=C5=82_Mi=C5=82ecki?=)
-Date: Tue, 24 Oct 2017 07:46:53 +0200
-Subject: [PATCH 2/3] drivers: phy: broadcom: Add driver for Cygnus USB phy
- controller
-In-Reply-To: <1508819822-29956-3-git-send-email-raveendra.padasalagi@broadcom.com>
-References: <1508819822-29956-1-git-send-email-raveendra.padasalagi@broadcom.com>
- <1508819822-29956-3-git-send-email-raveendra.padasalagi@broadcom.com>
-Message-ID: <e1b26a08cc999ddfabd0e1fedd5d772d@milecki.pl>
+From: sw0312.kim@samsung.com (Seung-Woo Kim)
+Date: Tue, 24 Oct 2017 14:55:59 +0900
+Subject: [PATCH] arm: ubsan: select ARCH_HAS_UBSAN_SANITIZE_ALL
+References: <CGME20171024055601epcas2p34a22b2b1fb3f1f71ed875125d87a47c4@epcas2p3.samsung.com>
+Message-ID: <1508824559-6588-1-git-send-email-sw0312.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-10-24 06:37, Raveendra Padasalagi wrote:
-> Add driver for Broadcom's USB phy controller's used in Cygnus
-> familyof SoC. Cygnus has three USB phy controller's, port 0,
-> port 1 provides USB host functionality and port 2 can be configured
-> for host/device role.
-> 
-> Configuration of host/device role for port 2 is achieved based on
-> the extcon events, the driver registers to extcon framework to get
-> appropriate connect events for Host/Device cables connect/disconnect
-> states based on VBUS and ID interrupts.
+Select ARCH_HAS_UBSAN_SANITIZE_ALL from arm confiuration to enable UBSAN
+on arm.
 
-Minor issues commented inline.
+Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
+---
+ arch/arm/Kconfig                  |    1 +
+ arch/arm/boot/compressed/Makefile |    2 ++
+ arch/arm/vdso/Makefile            |    2 ++
+ 3 files changed, 5 insertions(+), 0 deletions(-)
 
-
-> +#define USB2_IDM_IDM_IO_CONTROL_DIRECT_OFFSET		0x0408
-> +#define USB2_IDM_IDM_IO_CONTROL_DIRECT_CLK_ENABLE	BIT(0)
-
-Here you define reg bits using BIT(n).
-
-
-> +#define SUSPEND_OVERRIDE_0				13
-> +#define SUSPEND_OVERRIDE_1				14
-> +#define SUSPEND_OVERRIDE_2				15
-> +#define USB2_IDM_IDM_RESET_CONTROL_OFFSET		0x0800
-> +#define USB2_IDM_IDM_RESET_CONTROL__RESET		0
-
-And here without BIT(n). Either is fine but it may be better to be
-consistent about it.
-
-
-> +static int cygnus_phy_probe(struct platform_device *pdev)
-> +{
-> +	struct resource *res;
-> +	struct cygnus_phy_driver *phy_driver;
-> +	struct phy_provider *phy_provider;
-> +	int i, ret;
-> +	u32 reg_val;
-> +	struct device *dev = &pdev->dev;
-> +	struct device_node *node = dev->of_node;
-> +
-> +	/* allocate memory for each phy instance */
-> +	phy_driver = devm_kzalloc(dev, sizeof(struct cygnus_phy_driver),
-> +				  GFP_KERNEL);
-> +	if (!phy_driver)
-> +		return -ENOMEM;
-> +
-> +	phy_driver->num_phys = of_get_child_count(node);
-> +
-> +	if (phy_driver->num_phys == 0) {
-> +		dev_err(dev, "PHY no child node\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	phy_driver->instances = devm_kcalloc(dev, phy_driver->num_phys,
-> +					     sizeof(struct cygnus_phy_instance),
-> +					     GFP_KERNEL);
-
-I don't think kcalloc is safe here. E.g. In cygnus_phy_shutdown you
-iterate over all instances reading the .power value. If
-cygnus_phy_shutdown gets called before having each instance powered up,
-you'll read random memory as .power value.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 7888c98..5eb3c89 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -11,6 +11,7 @@ config ARM
+ 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+ 	select ARCH_HAVE_CUSTOM_GPIO_H
+ 	select ARCH_HAS_GCOV_PROFILE_ALL
++	select ARCH_HAS_UBSAN_SANITIZE_ALL
+ 	select ARCH_MIGHT_HAVE_PC_PARPORT
+ 	select ARCH_OPTIONAL_KERNEL_RWX if ARCH_HAS_STRICT_KERNEL_RWX
+ 	select ARCH_OPTIONAL_KERNEL_RWX_DEFAULT if CPU_V7
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index d50430c..8f06ab2 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -24,6 +24,8 @@ endif
+ 
+ GCOV_PROFILE		:= n
+ 
++UBSAN_SANITIZE		:= n
++
+ #
+ # Architecture dependencies
+ #
+diff --git a/arch/arm/vdso/Makefile b/arch/arm/vdso/Makefile
+index 59a8fa7..e343700 100644
+--- a/arch/arm/vdso/Makefile
++++ b/arch/arm/vdso/Makefile
+@@ -29,6 +29,8 @@ CFLAGS_vgettimeofday.o = -O2
+ # Disable gcov profiling for VDSO code
+ GCOV_PROFILE := n
+ 
++UBSAN_SANITIZE := n
++
+ # Force dependency
+ $(obj)/vdso.o : $(obj)/vdso.so
+ 
+-- 
+1.7.4.1
