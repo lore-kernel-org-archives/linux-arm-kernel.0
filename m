@@ -1,18 +1,49 @@
-From: patch-notifications@ellerman.id.au (Michael Ellerman)
-Date: Tue, 24 Oct 2017 19:07:45 +1100 (AEDT)
-Subject: [v3, 4/6] powerpc: dts: acadia: DT fix
- s/#interrupts-parent/#interrupt-parent/
-In-Reply-To: <1496407129-13527-5-git-send-email-geert+renesas@glider.be>
-Message-ID: <3yLm8y0fFdz9sBZ@ozlabs.org>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 24 Oct 2017 10:09:15 +0200
+Subject: [PATCH 2/4] dt-bindings: display: amlogic, meson-dw-hdmi: Add
+ optional HDMI 5V regulator
+In-Reply-To: <20171023224625.oiswnpgmxzhg7aep@rob-hp-laptop>
+References: <1508227664-11171-1-git-send-email-narmstrong@baylibre.com>
+ <1508227664-11171-3-git-send-email-narmstrong@baylibre.com>
+ <20171023224625.oiswnpgmxzhg7aep@rob-hp-laptop>
+Message-ID: <9b69d42b-ffc5-32cf-1509-ec8e74fc3825@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-06-02 at 12:38:47 UTC, Geert Uytterhoeven wrote:
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Acked-by: Rob Herring <robh@kernel.org>
+On 24/10/2017 00:46, Rob Herring wrote:
+> On Tue, Oct 17, 2017 at 10:07:42AM +0200, Neil Armstrong wrote:
+>> On reference boards and derivatives, the HDMI Logic is powered by an external
+>> 5V regulator.
+>> This regulator was set by the Vendor U-Boot, add optional support for it.
+>>
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> ---
+>>  Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt | 4 ++++
+>>  1 file changed, 4 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt b/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
+>> index 7f040ed..bf4a180 100644
+>> --- a/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
+>> +++ b/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
+>> @@ -48,6 +48,10 @@ Required properties:
+>>    Documentation/devicetree/bindings/reset/reset.txt,
+>>    the reset-names should be "hdmitx_apb", "hdmitx", "hdmitx_phy"
+>>  
+>> +Optional properties:
+>> +- hdmi-supply: Optional phandle to an external 5V regulator to power the HDMI
+>> +  logic, as described in the file ../regulator/regulator.txt
+> 
+> 5V into a modern SoC sounds strange. Is this really for the chip or for 
+> 5V to the connector? The latter should be in the connector node.
+> 
+> Rob
+> 
 
-Applied to powerpc next, thanks.
+Hi Rob,
 
-https://git.kernel.org/powerpc/c/3d2d4339cc326c427638daa67e264d
+The chip does not get the 5V but multiple derived voltages, but depends on the 5V regulator to
+enable this power supply for the connector and to the hdmi io bank.
 
-cheers
+So in my opinion it's not related to the connector but to the HDMI logic.
+
+Neil
