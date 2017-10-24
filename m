@@ -1,41 +1,54 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Tue, 24 Oct 2017 19:06:16 +0200
-Subject: [PATCH v2] clk: sunxi: fix build warning
-Message-ID: <20171024170616.24889-1-clabbe.montjoie@gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 24 Oct 2017 18:34:02 +0100
+Subject: [PATCH v4 11/13] firmware: arm_sdei: add support for CPU private
+ events
+In-Reply-To: <20171018171959.GJ21820@arm.com>
+References: <20171017174432.1684-1-james.morse@arm.com>
+ <20171017174432.1684-12-james.morse@arm.com> <20171018171959.GJ21820@arm.com>
+Message-ID: <59EF798A.9000609@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fix the following build warning:
-drivers/clk/sunxi/clk-factors.c:279:14: warning: variable 'name' set but not used [-Wunused-but-set-variable]
+Hi Will,
 
-Fixes: 4cbeaebb8af1 ("clk: sunxi: factors: Add unregister function")
+On 18/10/17 18:19, Will Deacon wrote:
+> On Tue, Oct 17, 2017 at 06:44:30PM +0100, James Morse wrote:
+>> Private SDE events are per-cpu, and need to be registered and enabled
+>> on each CPU.
+>>
+>> Hide this detail from the caller by adapting our {,un}register and
+>> {en,dis}able calls to send an IPI to each CPU if the event is private.
+>>
+>> CPU private events are unregistered when the CPU is powered-off, and
+>> re-registered when the CPU is brought back online. This saves bringing
+>> secondary cores back online to call private_reset() on shutdown, kexec
+>> and resume from hibernate.
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
----
-Changes since v1:
-- added Ack and fixes tags
+>> diff --git a/drivers/firmware/arm_sdei.c b/drivers/firmware/arm_sdei.c
+>> index 28e4c4cbb16d..5598d9ba8b5d 100644
+>> --- a/drivers/firmware/arm_sdei.c
+>> +++ b/drivers/firmware/arm_sdei.c
+>> @@ -610,6 +813,7 @@ static int sdei_device_freeze(struct device *dev)
+>>  {
+>>  	int err;
+>>  
+>> +	frozen = true;
+>>  	err = sdei_event_unregister_all();
 
- drivers/clk/sunxi/clk-factors.c | 2 --
- 1 file changed, 2 deletions(-)
+> Are the release semantics from spin_unlock in sdei_event_unregister_all
+> sufficient for the ordering guarantees you need?
 
-diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
-index dfe5e3e32d28..856fef65433b 100644
---- a/drivers/clk/sunxi/clk-factors.c
-+++ b/drivers/clk/sunxi/clk-factors.c
-@@ -276,13 +276,11 @@ void sunxi_factors_unregister(struct device_node *node, struct clk *clk)
- {
- 	struct clk_hw *hw = __clk_get_hw(clk);
- 	struct clk_factors *factors;
--	const char *name;
- 
- 	if (!hw)
- 		return;
- 
- 	factors = to_clk_factors(hw);
--	name = clk_hw_get_name(hw);
- 
- 	of_clk_del_provider(node);
- 	/* TODO: The composite clock stuff will leak a bit here. */
--- 
-2.13.6
+... ordering ...
+
+The hotplug notifiers don't touch that lock, so at the first level: no.
+
+It looks like I was relying on the cpu-hotplug code using stop-machine for its
+work, and the spinlocks changing the pre-empt count for this to work. Which is
+not something I want to debug if it changes!
+
+I'll post a patch changing this bool to a more sensible atomic type.
+
+
+Thanks,
+
+James
