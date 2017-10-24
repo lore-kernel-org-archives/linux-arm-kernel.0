@@ -1,98 +1,136 @@
-From: net147@gmail.com (Jonathan Liu)
-Date: Tue, 24 Oct 2017 13:12:18 +1100
-Subject: [14/23] drm/sun4i: Create minimal multipliers and dividers
-In-Reply-To: <1234a449a08131a74a3f4851f45458fa9b84ab5e.1508231063.git-series.maxime.ripard@free-electrons.com>
-References: <1234a449a08131a74a3f4851f45458fa9b84ab5e.1508231063.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CANwerB0qxAhXbzAd0iheP4W+AXkbdsqOvrXdurPkHG8Y5bWSJA@mail.gmail.com>
+From: mihailescu2m@gmail.com (memeka)
+Date: Tue, 24 Oct 2017 12:59:56 +1030
+Subject: [PATCH v2] ARM: dts: exynos: add cpu perf counters to Exynos54xx
+ boards
+Message-ID: <1508812196-14478-1-git-send-email-mihailescu2m@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Enable support for ARM Performance Monitoring Units available in Cortex-A7
+and Cortex-A15 CPU cores for Exynos54xx SoCs (5410, 5420 and 5422/5800).
 
-On 17 October 2017 at 20:06, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The various outputs the TCON can provide have different constraints on the
-> dotclock divider. Let's make them configurable by the various mode_set
-> functions.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  drivers/gpu/drm/sun4i/sun4i_dotclock.c | 10 +++++++---
->  drivers/gpu/drm/sun4i/sun4i_tcon.c     |  2 ++
->  drivers/gpu/drm/sun4i/sun4i_tcon.h     |  2 ++
->  3 files changed, 11 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_dotclock.c b/drivers/gpu/drm/sun4i/sun4i_dotclock.c
-> index d401156490f3..023f39bda633 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_dotclock.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_dotclock.c
-> @@ -17,8 +17,9 @@
->  #include "sun4i_dotclock.h"
->
->  struct sun4i_dclk {
-> -       struct clk_hw   hw;
-> -       struct regmap   *regmap;
-> +       struct clk_hw           hw;
-> +       struct regmap           *regmap;
-> +       struct sun4i_tcon       *tcon;
->  };
->
->  static inline struct sun4i_dclk *hw_to_dclk(struct clk_hw *hw)
-> @@ -73,11 +74,13 @@ static unsigned long sun4i_dclk_recalc_rate(struct clk_hw *hw,
->  static long sun4i_dclk_round_rate(struct clk_hw *hw, unsigned long rate,
->                                   unsigned long *parent_rate)
->  {
-> +       struct sun4i_dclk *dclk = hw_to_dclk(hw);
-> +       struct sun4i_tcon *tcon = dclk->tcon;
->         unsigned long best_parent = 0;
->         u8 best_div = 1;
->         int i;
->
-> -       for (i = 6; i <= 127; i++) {
-> +       for (i = tcon->dclk_min_div; i <= tcon->dclk_max_div; i++) {
->                 unsigned long ideal = rate * i;
->                 unsigned long rounded;
->
-> @@ -167,6 +170,7 @@ int sun4i_dclk_create(struct device *dev, struct sun4i_tcon *tcon)
->         dclk = devm_kzalloc(dev, sizeof(*dclk), GFP_KERNEL);
->         if (!dclk)
->                 return -ENOMEM;
-> +       dclk->tcon = tcon;
->
->         init.name = clk_name;
->         init.ops = &sun4i_dclk_ops;
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> index f69bcdf11cb8..3efa1ab045cd 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> @@ -177,6 +177,8 @@ static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
->         u8 clk_delay;
->         u32 val = 0;
->
-> +       tcon->dclk_min_div = 6;
-> +       tcon->dclk_max_div = 127;
->         sun4i_tcon0_mode_set_common(tcon, mode);
->
->         /* Adjust clock delay */
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-> index f61bf6d83b4a..4141fbd97ddf 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
-> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-> @@ -169,6 +169,8 @@ struct sun4i_tcon {
->
->         /* Pixel clock */
->         struct clk                      *dclk;
-> +       u8                              dclk_max_div;
-> +       u8                              dclk_min_div;
->
->         /* Reset control */
->         struct reset_control            *lcd_rst;
+The PMUs interrupts are defined in the common exynos54xx.dtsi device tree,
+but the PMUs are enabled and have their interrupt CPU affinity defined
+next to each SoC's cpus node.
 
-I have 4.3" RGB LCD enabled on sun7i-a20-olinuxino-lime and hdmi
-disabled. After applying this patch the LCD no longer turns on.
-If I add some debug statements to sun4i_dclk_recalc_rate, it shows
-tcon->dclk_min_div and tcon->dclk_max_div are both 0.
+Tested with perf on Odroid XU4 (Exynos5422):
+armv7_cortex_a7 PMU driver: 5 counters available
+armv7_cortex_a15 PMU driver: 7 counters available
 
-Regards,
-Jonathan
+Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Marian Mihailescu <mihailescu2m@gmail.com>
+Signed-off-by: Willy Wolff <willy.mh.wolff@gmail.com>
+
+---
+Changes since v1:
+ - both Cortex-A7 and Cortex-A15 PMUs are now defined in exynos54xx.dtsi
+ - CPU affinity is defined for each SoC *after* the cpus node entry
+ - PMUs are disabled in exynos54xx.dtsi and enabled for each SoC
+ - cpus labels have been fixed in the interrupt-affinity property for
+   Exynos5410 and Exynos5420 SoCs
+
+---
+ arch/arm/boot/dts/exynos5410.dtsi      |  8 ++++++++
+ arch/arm/boot/dts/exynos5420-cpus.dtsi | 16 ++++++++++++++++
+ arch/arm/boot/dts/exynos5422-cpus.dtsi | 16 ++++++++++++++++
+ arch/arm/boot/dts/exynos54xx.dtsi      | 20 ++++++++++++++++++++
+ 4 files changed, 60 insertions(+)
+
+diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
+index 7eab4bc..f42b04b 100644
+--- a/arch/arm/boot/dts/exynos5410.dtsi
++++ b/arch/arm/boot/dts/exynos5410.dtsi
+@@ -428,4 +428,12 @@
+ 	samsung,syscon-phandle = <&pmu_system_controller>;
+ };
+ 
++&arm_a15_pmu {
++	interrupt-affinity = <&cpu0>,
++		<&cpu1>,
++		<&cpu2>,
++		<&cpu3>;
++	status = "okay";
++};
++
+ #include "exynos5410-pinctrl.dtsi"
+diff --git a/arch/arm/boot/dts/exynos5420-cpus.dtsi b/arch/arm/boot/dts/exynos5420-cpus.dtsi
+index 5c052d7..518b7d8 100644
+--- a/arch/arm/boot/dts/exynos5420-cpus.dtsi
++++ b/arch/arm/boot/dts/exynos5420-cpus.dtsi
+@@ -124,3 +124,19 @@
+ 		};
+ 	};
+ };
++
++&arm_a7_pmu {
++	interrupt-affinity = <&cpu4>,
++		<&cpu5>,
++		<&cpu4>,
++		<&cpu5>;
++	status = "okay";
++};
++
++&arm_a15_pmu {
++	interrupt-affinity = <&cpu0>,
++		<&cpu1>,
++		<&cpu2>,
++		<&cpu3>;
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/exynos5422-cpus.dtsi b/arch/arm/boot/dts/exynos5422-cpus.dtsi
+index ab4c718..92676be 100644
+--- a/arch/arm/boot/dts/exynos5422-cpus.dtsi
++++ b/arch/arm/boot/dts/exynos5422-cpus.dtsi
+@@ -131,3 +131,19 @@
+ 		};
+ 	};
+ };
++
++&arm_a7_pmu {
++	interrupt-affinity = <&cpu0>,
++		<&cpu1>,
++		<&cpu2>,
++		<&cpu3>;
++	status = "okay";
++};
++
++&arm_a15_pmu {
++	interrupt-affinity = <&cpu4>,
++		<&cpu5>,
++		<&cpu6>,
++		<&cpu7>;
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/exynos54xx.dtsi b/arch/arm/boot/dts/exynos54xx.dtsi
+index 8ca4fef..f0bd27d 100644
+--- a/arch/arm/boot/dts/exynos54xx.dtsi
++++ b/arch/arm/boot/dts/exynos54xx.dtsi
+@@ -79,6 +79,26 @@
+ 			interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
+ 		};
+ 
++		arm_a7_pmu: arm-a7-pmu {
++			compatible = "arm,cortex-a7-pmu";
++			interrupt-parent = <&gic>;
++			interrupts = <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++		};
++
++		arm_a15_pmu: arm-a15-pmu {
++			compatible = "arm,cortex-a15-pmu";
++			interrupt-parent = <&combiner>;
++			interrupts = <1 2>,
++				<7 0>,
++				<16 6>,
++				<19 2>;
++			status = "disabled";
++		};
++
+ 		sss: sss at 10830000 {
+ 			compatible = "samsung,exynos4210-secss";
+ 			reg = <0x10830000 0x300>;
+-- 
+2.7.4
