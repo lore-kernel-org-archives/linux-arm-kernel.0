@@ -1,115 +1,100 @@
-From: andrea.adami@gmail.com (Andrea Adami)
-Date: Tue, 24 Oct 2017 10:36:51 +0200
-Subject: [PATCH] ARM: compressed: discard ksym/kcrctab input section
-In-Reply-To: <c633c2ad-0344-385f-273a-a2eb9a39d7e3@gmail.com>
-References: <20170908153143.27279-1-ard.biesheuvel@linaro.org>
- <33486b3e-8221-92b0-7e18-859be7d0a74b@suse.com>
- <CAKv+Gu-8PEPuWH=bT_wD0MYDw67RY3gQudW2mLO-QeBYqQesyw@mail.gmail.com>
- <c633c2ad-0344-385f-273a-a2eb9a39d7e3@gmail.com>
-Message-ID: <CAAQYJAtoW3HtdZP3iGkEf7N+iWLoqEL5HzFb-jvLMVt4SoiEtg@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 24 Oct 2017 09:37:42 +0100
+Subject: [PATCH v5] atmel_flexcom: Support backup mode
+In-Reply-To: <CAGkQfmMK_a5+zyyoHZsnfvNuxmNLeM0t40MrbPMMwKcNXDZTFA@mail.gmail.com>
+References: <20171019164443.487-1-romain.izard.pro@gmail.com>
+ <20171023160600.kcjy4ejdllllu62y@dell>
+ <20171023160726.ufs37iyuicirwk4f@dell>
+ <CAGkQfmMK_a5+zyyoHZsnfvNuxmNLeM0t40MrbPMMwKcNXDZTFA@mail.gmail.com>
+Message-ID: <20171024083742.j7zlfj2drd4nzetm@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 23, 2017 at 11:32 PM, Matthias Brugger
-<matthias.bgg@gmail.com> wrote:
->
->
-> On 10/21/2017 10:14 AM, Ard Biesheuvel wrote:
->> On 21 October 2017 at 08:56, Matthias Brugger <mbrugger@suse.com> wrote:
->>> On 09/08/2017 05:31 PM, Ard Biesheuvel wrote:
->>>> As it turns out, building the ARM kernel with EFI support pulls in
->>>> a couple of sections that we don't really need in the decompressor.
->>>> This is due to the fact the the UEFI stub uses sort() to sort the UEFI
->>>> memory map, which is an exported symbol pulled in from lib/sort.c.
->>>>
->>>> Before commit e4bae4d0b5f3 ("arm/efi: Split zImage code and data into
->>>> separate PE/COFF sections"), this resulted in the following layout
->>>> for the decompressor ELF binary.
->>>>
->>>>   [Nr] Name              Type     Addr     Off    Size   ES Flg Lk Inf Al
->>>>   [ 0]                   NULL     00000000 000000 000000 00      0   0  0
->>>>   [ 1] .text             PROGBITS 00000000 010000 009b3c 00  AX  0   0 512
->>>>   [ 2] .rodata           PROGBITS 00009b3c 019b3c 001684 00   A  0   0  4
->>>>   [ 3] __ksymtab_strings PROGBITS 0000b1c0 01b1c0 000005 00   A  0   0  1
->>>>   [ 4] .data             PROGBITS 0000b1c8 01b1c8 000020 00  WA  0   0  8
->>>>   [ 5] ___ksymtab+sort   PROGBITS 0000b1e8 01b1e8 000008 00  WA  0   0  4
->>>>   [ 6] .piggydata        PROGBITS 0000b1f0 01b1f0 77ac38 00   A  0   0  1
->>>>   [ 7] .got.plt          PROGBITS 00785e28 795e28 00000c 04  WA  0   0  4
->>>>   [ 8] .got              PROGBITS 00785e34 795e34 000028 00  WA  0   0  4
->>>>   [ 9] .pad              PROGBITS 00785e5c 795e5c 000004 00  WA  0   0  1
->>>>   [10] .bss              NOBITS   00785e60 795e60 00001c 00  WA  0   0  4
->>>>   [11] .stack            NOBITS   00785e80 795e60 001000 00  WA  0   0  1
->>>>
->>>> Commit e4bae4d0b5f3 made some changes to the linker script to allow the
->>>> UEFI firmware to map the decompressor with strict R-X/RW- permissions
->>>> before invoking it. Unfortunately, this turns out to break the boot on
->>>> some systems, because the linker now also moves the ksymtab/kcrctab
->>>> sections around, resulting in .piggydata to appear misaligned.
->>>>
->>>>   [Nr] Name              Type     Addr     Off    Size   ES Flg Lk Inf Al
->>>>   [ 0]                   NULL     00000000 000000 000000 00      0   0  0
->>>>   [ 1] .text             PROGBITS 00000000 010000 00a93c 00  AX  0   0 4096
->>>>   [ 2] .rodata           PROGBITS 0000a93c 01a93c 001684 00   A  0   0  4
->>>>   [ 3] __ksymtab_strings PROGBITS 0000bfc0 01bfc0 000005 00   A  0   0  1
->>>>   [ 4] .piggydata        PROGBITS 0000bfc5 01bfc5 77ac47 00   A  0   0  1
->>>>   [ 5] .got.plt          PROGBITS 00786c0c 796c0c 00000c 04  WA  0   0  4
->>>>   [ 6] .got              PROGBITS 00786c18 796c18 000028 00  WA  0   0  4
->>>>   [ 7] .pad              PROGBITS 00786c40 796c40 000008 00  WA  0   0  1
->>>>   [ 8] .data             PROGBITS 00787000 797000 000200 00  WA  0   0 4096
->>>>   [ 9] ___ksymtab+sort   PROGBITS 00787200 797200 000008 00  WA  0   0  4
->>>>   [10] .bss              NOBITS   00787208 797208 00001c 00  WA  0   0  4
->>>>   [11] .stack            NOBITS   00787228 797208 001000 00  WA  0   0  1
->>>>
->>>> So let's align piggydata explicitly, and discard these sections from the
->>>> binary.
->>>>
->>>> Cc: Russell King <linux@armlinux.org.uk>
->>>> Fixes: e4bae4d0b5f3 ("arm/efi: Split zImage code and data into separate ...")
->>>> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>> ---
->>>>  arch/arm/boot/compressed/piggy.S       | 1 +
->>>>  arch/arm/boot/compressed/vmlinux.lds.S | 1 +
->>>>  2 files changed, 2 insertions(+)
->>>>
->>>
->>> This fixes the boot regression on bananapi-r2.
->>> Thanks! Feel free to add:
->>>
->>> Tested-by: Matthias Brugger <mbrugger@suse.com>
->>>
->>
->> Thanks for confirming Matthias. Could you please check whether this
->> patch from Arnd
->>
->> https://marc.info/?l=linux-kernel&m=150852980119217&w=2
->>
->> fixes the issue as well? (after reverting this one)
->>
->
-> For the record, gcc7 has a alignment problem which was fixed for PR82445 [1].
->
+On Mon, 23 Oct 2017, Romain Izard wrote:
 
-This fixes the decompressor error on pxa [1].
-Thanks for the pointer!
+> 2017-10-23 18:07 GMT+02:00 Lee Jones <lee.jones@linaro.org>:
+> > On Mon, 23 Oct 2017, Lee Jones wrote:
+> >> On Thu, 19 Oct 2017, Romain Izard wrote:
+> >>
+> >> > The controller used by a flexcom module is configured at boot, and left
+> >> > alone after this. As the configuration will be lost after backup mode,
+> >> > restore the state of the flexcom driver on resume.
+> >> >
+> >> > Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+> >> > Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+> >> > Tested-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+> >> > ---
+> >> > Changes in v5:
+> >> > * extract from the patch series, and send as a standalone patch
+> >> >
+> >> >  drivers/mfd/atmel-flexcom.c | 65 ++++++++++++++++++++++++++++++++++-----------
+> >> >  1 file changed, 50 insertions(+), 15 deletions(-)
+> >> >
+> >> > diff --git a/drivers/mfd/atmel-flexcom.c b/drivers/mfd/atmel-flexcom.c
+> >> > index 064bde9cff5a..ef1235c4a179 100644
+> >> > --- a/drivers/mfd/atmel-flexcom.c
+> >> > +++ b/drivers/mfd/atmel-flexcom.c
+> >> > @@ -39,34 +39,44 @@
+> >> >  #define FLEX_MR_OPMODE(opmode)     (((opmode) << FLEX_MR_OPMODE_OFFSET) &  \
+> >> >                              FLEX_MR_OPMODE_MASK)
+> >> >
+> >> > +struct atmel_flexcom {
+> >> > +   void __iomem *base;
+> >> > +   u32 opmode;
+> >> > +   struct clk *clk;
+> >> > +};
+> >> >
+> >> >  static int atmel_flexcom_probe(struct platform_device *pdev)
+> >> >  {
+> >> >     struct device_node *np = pdev->dev.of_node;
+> >> > -   struct clk *clk;
+> >> >     struct resource *res;
+> >> > -   void __iomem *base;
+> >> > -   u32 opmode;
+> >> > +   struct atmel_flexcom *afc;
+> >>
+> >> Nit: I'd prefer if you call this 'ddata'.
+> >>
+> >> But the concept and implementation is fine, so if you're going to
+> >> change it please do so and apply my:
+> >>
+> >> Acked-by: Lee Jones <lee.jones@linaro.org>
+> >
+> > Also, 'back-up mode' isn't really a thing is it?
+> >
+> > How about "Reinstall state on resume" or similar?
+> >
+> 
+> The expression comes from the SAMA5D2's datasheet.
+> 
+> Other Atmel chips use a different single suspend mode with Linux, where
+> the SoC remains completely powered with a slow clock. The registers are
+> preserved in this mode, so there is no need for a specific suspend and
+> resume code.
+> 
+> The SoC can also be powered down, but the CPU is reset and only a small
+> part is powered with a backup battery to maintain a valid RTC and a
+> small internal SRAM.
+> 
+> In the SAMA5D2, the mode with only the backup power supply has been
+> extended to isolate the memory I/O lines, making it possible to keep the
+> external SDRAM memory in self-refresh. This mode has a lower consumption
+> compared to the slow clock mode, but it has a higher wakeup latency, and
+> needs specific software support in the bootloader and the kernel.
+> 
+> As a result, the "backup mode" expression is used to contrast with the
+> "slow clock" expression when describing the different suspend modes
+> supported by the chip.
+> 
+> But if you think that it is necessary, I can reword the commit.
 
-Cheers
-Andrea
+No, no need.  Thanks for the excellent explanation.
 
-[1] https://www.spinics.net/lists/arm-kernel/msg594654.html
+It might be worth you providing a succinct description of the
+datasheet's meaning of "back-up mode" though.
 
-
-
-> I tried to boot with the aforementioned patch from Arnd and the fixed gcc, but
-> that didn't help.
->
-> Regards,
-> Matthias
->
-> [1]
-> https://github.com/gcc-mirror/gcc/commit/f59996b56aaa1c1d62a16cbb4010775b624cbde0
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
