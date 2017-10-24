@@ -1,62 +1,24 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 24 Oct 2017 17:35:25 +0100
-Subject: [PATCH] arm64/sve: ABI change: Zero SVE regs on syscall entry
-In-Reply-To: <1508859966-7671-1-git-send-email-Dave.Martin@arm.com>
-References: <1508859966-7671-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20171024163524.mxn5puf3fmajrjbr@armageddon.cambridge.arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 24 Oct 2017 11:36:00 -0500
+Subject: [PATCH 06/10] clk: sunxi-ng: sun4i: Export video PLLs
+In-Reply-To: <20171017121807.2994-7-wens@csie.org>
+References: <20171017121807.2994-1-wens@csie.org>
+ <20171017121807.2994-7-wens@csie.org>
+Message-ID: <20171024163600.2bk2kocrwh3eiji5@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 24, 2017 at 04:46:06PM +0100, Dave P Martin wrote:
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 6718780..fbc0eb5 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -660,6 +660,7 @@ el0_svc_compat:
->  	/*
->  	 * AArch32 syscall handling
->  	 */
-> +	ldr	x16, [tsk, #TSK_TI_FLAGS]	// load thread flags
->  	adrp	stbl, compat_sys_call_table	// load compat syscall table pointer
->  	mov	wscno, w7			// syscall number in w7 (r7)
->  	mov     wsc_nr, #__NR_compat_syscalls
-> @@ -847,16 +848,35 @@ ENDPROC(ret_to_user)
->   */
->  	.align	6
->  el0_svc:
-> +	ldr	x16, [tsk, #TSK_TI_FLAGS]	// load thread flags
->  	adrp	stbl, sys_call_table		// load syscall table pointer
->  	mov	wscno, w8			// syscall number in w8
->  	mov	wsc_nr, #__NR_syscalls
-> +
-> +#ifdef CONFIG_ARM64_SVE
-> +alternative_if_not ARM64_SVE
-> +	b	el0_svc_naked
-> +alternative_else
-> +	tbz	x16, #_TIF_SVE, el0_svc_naked	// Skip unless TIF_SVE set:
-> +alternative_endif
-> +	bic	x16, x16, #_TIF_SVE		// discard SVE state
-> +	str	x16, [tsk, #TSK_TI_FLAGS]
-> +
-> +	// task_fpsimd_load() won't be called to update CPACR
-> +	// unless TIF_FOREIGN_FPSTATE is set, which only happens if a
-> +	// context switch of kernel_neon_begin() gets in the way.
+On Tue, Oct 17, 2017 at 08:18:03PM +0800, Chen-Yu Tsai wrote:
+> From: Jonathan Liu <net147@gmail.com>
+> 
+> The video PLLs are used directly by the HDMI controller. Export them so
+> that we can use them in our DT node.
+> 
+> Signed-off-by: Jonathan Liu <net147@gmail.com>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  drivers/clk/sunxi-ng/ccu-sun4i-a10.h      | 4 ++--
+>  include/dt-bindings/clock/sun4i-a10-ccu.h | 2 ++
+>  2 files changed, 4 insertions(+), 2 deletions(-)
 
-s/of/or/
-
-> +	// So, ensure that CPACR is correct for the fast-path case:
-> +	mrs	x9, cpacr_el1
-> +	bic	x9, x9, #CPACR_EL1_ZEN_EL0EN	// disable SVE for el0
-> +	msr	cpacr_el1, x9			// synchronised by eret to el0
-> +#endif
-
-Just a nitpick, I'd like multi-line asm comments to still follow the C
-style:
-
-	/*
-	 * ...
-	 */
-
-Otherwise,
-
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Rob Herring <robh@kernel.org>
