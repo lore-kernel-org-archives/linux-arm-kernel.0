@@ -1,55 +1,56 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 24 Oct 2017 10:49:46 -0500
-Subject: [PATCH 2/4] dt-bindings: display: amlogic, meson-dw-hdmi: Add
- optional HDMI 5V regulator
-In-Reply-To: <9b69d42b-ffc5-32cf-1509-ec8e74fc3825@baylibre.com>
-References: <1508227664-11171-1-git-send-email-narmstrong@baylibre.com>
- <1508227664-11171-3-git-send-email-narmstrong@baylibre.com>
- <20171023224625.oiswnpgmxzhg7aep@rob-hp-laptop>
- <9b69d42b-ffc5-32cf-1509-ec8e74fc3825@baylibre.com>
-Message-ID: <20171024154946.inxmue2duubsbfzx@rob-hp-laptop>
+Date: Tue, 24 Oct 2017 11:01:02 -0500
+Subject: [PATCH 02/10] drm/sun4i: tcon: Add support for A10 TCON
+In-Reply-To: <20171017121807.2994-3-wens@csie.org>
+References: <20171017121807.2994-1-wens@csie.org>
+ <20171017121807.2994-3-wens@csie.org>
+Message-ID: <20171024160102.fjonpvkykyijxmow@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 24, 2017 at 10:09:15AM +0200, Neil Armstrong wrote:
-> On 24/10/2017 00:46, Rob Herring wrote:
-> > On Tue, Oct 17, 2017 at 10:07:42AM +0200, Neil Armstrong wrote:
-> >> On reference boards and derivatives, the HDMI Logic is powered by an external
-> >> 5V regulator.
-> >> This regulator was set by the Vendor U-Boot, add optional support for it.
-> >>
-> >> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> >> ---
-> >>  Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt | 4 ++++
-> >>  1 file changed, 4 insertions(+)
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt b/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
-> >> index 7f040ed..bf4a180 100644
-> >> --- a/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
-> >> +++ b/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
-> >> @@ -48,6 +48,10 @@ Required properties:
-> >>    Documentation/devicetree/bindings/reset/reset.txt,
-> >>    the reset-names should be "hdmitx_apb", "hdmitx", "hdmitx_phy"
-> >>  
-> >> +Optional properties:
-> >> +- hdmi-supply: Optional phandle to an external 5V regulator to power the HDMI
-> >> +  logic, as described in the file ../regulator/regulator.txt
-> > 
-> > 5V into a modern SoC sounds strange. Is this really for the chip or for 
-> > 5V to the connector? The latter should be in the connector node.
-> > 
-> > Rob
-> > 
+On Tue, Oct 17, 2017 at 08:17:59PM +0800, Chen-Yu Tsai wrote:
+> From: Jonathan Liu <net147@gmail.com>
 > 
-> Hi Rob,
+> The A10 has two TCONs that are similar to the ones found on other SoCs.
+> Like the A31, TCON0 has a register used to mux the TCON outputs to the
+> downstream encoders. The bit fields are slightly different.
 > 
-> The chip does not get the 5V but multiple derived voltages, but depends on the 5V regulator to
-> enable this power supply for the connector and to the hdmi io bank.
+> Signed-off-by: Jonathan Liu <net147@gmail.com>
+> [wens at csie.org: Reworked for A10 and fixed up commit message]
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  .../bindings/display/sunxi/sun4i-drm.txt           |  1 +
+>  drivers/gpu/drm/sun4i/sun4i_drv.c                  |  3 ++-
+>  drivers/gpu/drm/sun4i/sun4i_tcon.c                 | 30 ++++++++++++++++++++++
+>  3 files changed, 33 insertions(+), 1 deletion(-)
 > 
-> So in my opinion it's not related to the connector but to the HDMI logic.
+> diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> index 46df3b78ae9e..b2c08af73a95 100644
+> --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> @@ -86,6 +86,7 @@ The TCON acts as a timing controller for RGB, LVDS and TV interfaces.
+>  
+>  Required properties:
+>   - compatible: value must be either:
+> +   * allwinner,sun4i-a10-tcon
+>     * allwinner,sun5i-a13-tcon
+>     * allwinner,sun6i-a31-tcon
+>     * allwinner,sun6i-a31s-tcon
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+> index b5879d4620d8..b8089ac6feef 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_drv.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+> @@ -184,7 +184,8 @@ static bool sun4i_drv_node_is_frontend(struct device_node *node)
+>  
+>  static bool sun4i_drv_node_is_tcon(struct device_node *node)
+>  {
+> -	return of_device_is_compatible(node, "allwinner,sun5i-a13-tcon") ||
+> +	return of_device_is_compatible(node, "allwinner,sun4i-a10-tcon") ||
+> +		of_device_is_compatible(node, "allwinner,sun5i-a13-tcon") ||
 
-But you just said it is for the connector too.
+This would be better written with of_match_node. Since there's already a 
+match table in sun4i_tcon.c, it would be better to use it.
 
-In any case, if it is for the HDMI i/o, then
+Otherwise,
 
 Acked-by: Rob Herring <robh@kernel.org>
