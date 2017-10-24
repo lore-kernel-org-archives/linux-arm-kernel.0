@@ -1,84 +1,83 @@
 From: opendmb@gmail.com (Doug Berger)
-Date: Tue, 24 Oct 2017 12:54:47 -0700
-Subject: [PATCH v2 3/7] gpio: brcmstb: release the bgpio lock during irq
- handlers
+Date: Tue, 24 Oct 2017 12:54:46 -0700
+Subject: [PATCH v2 2/7] gpio: brcmstb: allow all instances to be wakeup sources
 In-Reply-To: <20171024195451.30535-1-opendmb@gmail.com>
 References: <20171024195451.30535-1-opendmb@gmail.com>
-Message-ID: <20171024195451.30535-4-opendmb@gmail.com>
+Message-ID: <20171024195451.30535-3-opendmb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The basic memory-mapped GPIO controller lock must be released
-before calling the registered GPIO interrupt handlers to allow
-the interrupt handlers to access the hardware.
+This commit allows a wakeup parent interrupt to be shared between
+instances.
 
-Examples of why a GPIO interrupt handler might want to access
-the GPIO hardware include an interrupt that is configured to
-trigger on rising and falling edges that needs to read the
-current level of the input to know how to respond, or an
-interrupt that causes a change in a GPIO output in the same
-bank. If the lock is not released before enterring the handler
-the hardware accesses will deadlock when they attempt to grab
-the lock.
-
-Since the lock is only needed to protect the calculation of
-unmasked pending interrupts create a dedicated function to
-perform this and hide the complexity.
+It also removes the redundant can_wake member of the private data
+structure by using whether the parent_wake_irq has been defined to
+indicate that the GPIO device can wake.
 
 Fixes: 19a7b6940b78 ("gpio: brcmstb: Add interrupt and wakeup source support")
 Signed-off-by: Doug Berger <opendmb@gmail.com>
 Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 Acked-by: Gregory Fong <gregory.0xf0@gmail.com>
 ---
- drivers/gpio/gpio-brcmstb.c | 21 ++++++++++++++++-----
- 1 file changed, 16 insertions(+), 5 deletions(-)
+ drivers/gpio/gpio-brcmstb.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/gpio/gpio-brcmstb.c b/drivers/gpio/gpio-brcmstb.c
-index 2031b73e066c..fd8c0412f8af 100644
+index 9b8fcca7ad17..2031b73e066c 100644
 --- a/drivers/gpio/gpio-brcmstb.c
 +++ b/drivers/gpio/gpio-brcmstb.c
-@@ -63,6 +63,21 @@ brcmstb_gpio_gc_to_priv(struct gpio_chip *gc)
- 	return bank->parent_priv;
- }
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (C) 2015 Broadcom Corporation
++ * Copyright (C) 2015-2017 Broadcom
+  *
+  * This program is free software; you can redistribute it and/or
+  * modify it under the terms of the GNU General Public License as
+@@ -47,7 +47,6 @@ struct brcmstb_gpio_priv {
+ 	struct platform_device *pdev;
+ 	int parent_irq;
+ 	int gpio_base;
+-	bool can_wake;
+ 	int parent_wake_irq;
+ 	struct notifier_block reboot_notifier;
+ };
+@@ -349,10 +348,11 @@ static int brcmstb_gpio_irq_setup(struct platform_device *pdev,
+ 	/* Ensures that all non-wakeup IRQs are disabled at suspend */
+ 	bank->irq_chip.flags = IRQCHIP_MASK_ON_SUSPEND;
  
-+static unsigned long
-+brcmstb_gpio_get_active_irqs(struct brcmstb_gpio_bank *bank)
-+{
-+	void __iomem *reg_base = bank->parent_priv->reg_base;
-+	unsigned long status;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&bank->gc.bgpio_lock, flags);
-+	status = bank->gc.read_reg(reg_base + GIO_STAT(bank->id)) &
-+		 bank->gc.read_reg(reg_base + GIO_MASK(bank->id));
-+	spin_unlock_irqrestore(&bank->gc.bgpio_lock, flags);
-+
-+	return status;
-+}
-+
- static void brcmstb_gpio_set_imask(struct brcmstb_gpio_bank *bank,
- 		unsigned int offset, bool enable)
- {
-@@ -204,11 +219,8 @@ static void brcmstb_gpio_irq_bank_handler(struct brcmstb_gpio_bank *bank)
- 	struct irq_domain *irq_domain = bank->gc.irqdomain;
- 	void __iomem *reg_base = priv->reg_base;
- 	unsigned long status;
--	unsigned long flags;
+-	if (IS_ENABLED(CONFIG_PM_SLEEP) && !priv->can_wake &&
++	if (IS_ENABLED(CONFIG_PM_SLEEP) && !priv->parent_wake_irq &&
+ 			of_property_read_bool(np, "wakeup-source")) {
+ 		priv->parent_wake_irq = platform_get_irq(pdev, 1);
+ 		if (priv->parent_wake_irq < 0) {
++			priv->parent_wake_irq = 0;
+ 			dev_warn(dev,
+ 				"Couldn't get wake IRQ - GPIOs will not be able to wake from sleep");
+ 		} else {
+@@ -364,8 +364,9 @@ static int brcmstb_gpio_irq_setup(struct platform_device *pdev,
+ 			device_set_wakeup_capable(dev, true);
+ 			device_wakeup_enable(dev);
+ 			err = devm_request_irq(dev, priv->parent_wake_irq,
+-					brcmstb_gpio_wake_irq_handler, 0,
+-					"brcmstb-gpio-wake", priv);
++					       brcmstb_gpio_wake_irq_handler,
++					       IRQF_SHARED,
++					       "brcmstb-gpio-wake", priv);
  
--	spin_lock_irqsave(&bank->gc.bgpio_lock, flags);
--	while ((status = bank->gc.read_reg(reg_base + GIO_STAT(bank->id)) &
--			 bank->gc.read_reg(reg_base + GIO_MASK(bank->id)))) {
-+	while ((status = brcmstb_gpio_get_active_irqs(bank))) {
- 		int bit;
- 
- 		for_each_set_bit(bit, &status, 32) {
-@@ -223,7 +235,6 @@ static void brcmstb_gpio_irq_bank_handler(struct brcmstb_gpio_bank *bank)
- 			generic_handle_irq(irq_find_mapping(irq_domain, bit));
+ 			if (err < 0) {
+ 				dev_err(dev, "Couldn't request wake IRQ");
+@@ -375,11 +376,10 @@ static int brcmstb_gpio_irq_setup(struct platform_device *pdev,
+ 			priv->reboot_notifier.notifier_call =
+ 				brcmstb_gpio_reboot;
+ 			register_reboot_notifier(&priv->reboot_notifier);
+-			priv->can_wake = true;
  		}
  	}
--	spin_unlock_irqrestore(&bank->gc.bgpio_lock, flags);
- }
  
- /* Each UPG GIO block has one IRQ for all banks */
+-	if (priv->can_wake)
++	if (priv->parent_wake_irq)
+ 		bank->irq_chip.irq_set_wake = brcmstb_gpio_irq_set_wake;
+ 
+ 	err = gpiochip_irqchip_add(&bank->gc, &bank->irq_chip, 0,
 -- 
 2.14.1
