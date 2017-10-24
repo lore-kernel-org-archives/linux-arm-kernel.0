@@ -1,49 +1,39 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 24 Oct 2017 01:38:30 -0700
-Subject: [PATCH v5 0/9] Mediatek MT2712 clock and scpsys support
-In-Reply-To: <e67f2b01-552b-e9b3-6c38-141e3063439d@gmail.com>
-References: <1508381330-3700-1-git-send-email-weiyi.lu@mediatek.com>
- <e67f2b01-552b-e9b3-6c38-141e3063439d@gmail.com>
-Message-ID: <20171024083830.GD15990@codeaurora.org>
+From: kim.phillips@arm.com (Kim Phillips)
+Date: Tue, 24 Oct 2017 03:42:51 -0500
+Subject: [PATCH v5 6/7] drivers/perf: Add support for ARMv8.2
+ Statistical Profiling Extension
+In-Reply-To: <20171002183524.ab23b255b6d03331bb36f75a@arm.com>
+References: <1506607791-8621-1-git-send-email-will.deacon@arm.com>
+ <1506607791-8621-7-git-send-email-will.deacon@arm.com>
+ <20170929171940.2aa33d00463b1e9c987aea15@arm.com>
+ <20171002141405.GC12847@arm.com> <20171002164930.GB2121@redhat.com>
+ <20171002183524.ab23b255b6d03331bb36f75a@arm.com>
+Message-ID: <20171024034251.81e01386b8074683a40d31e1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/19, Matthias Brugger wrote:
-> 
-> 
-> On 10/19/2017 04:48 AM, Weiyi Lu wrote:
-> > This series is based on v4.14-rc1 and composed of
-> > clock control (PATCH 1-4) and scpsys control (PATCH 5-9)
-> > 
-> > changes since v4:
-> > - Refine scpsys and infracfg for bus protection by passing 
-> >   a boolean flag to determine the register update method.
-> > 
-> > changes since v3:
-> > - Rebase to v4.14-rc1.
-> > 
-> > changes since v2:
-> > - ensure the clocks used by clocksource driver are registered
-> >   before clocksource init() by using CLK_OF_DECLARE()
-> > - correct the frequency of clk32k/clkrtc_ext/clkrtc_int
-> > 
-> > changes since v1:
-> > - Rebase to v4.13-next-soc.
-> > - Refine scpsys and infracfg for bus protection.
-> > 
-> > Weiyi Lu (9):
-> >   dt-bindings: ARM: Mediatek: Document bindings for MT2712
-> >   clk: mediatek: Add dt-bindings for MT2712 clocks
-> >   clk: mediatek: Add MT2712 clock support
-> 
-> Stephen, Mike: are you ok with the patches 1-3 of this series?
-> 
-> If so, then I will take the rest through my tree.
-> 
+On Mon, 2 Oct 2017 18:35:24 -0500
+Kim Phillips <kim.phillips@arm.com> wrote:
 
-Do you need a branch for headers? I'm see there's a v6 so I'll
-review that one.
+> On Mon, 2 Oct 2017 13:49:30 -0300
+> Arnaldo Carvalho de Melo <acme@redhat.com> wrote:
+> > I'm all for more informative messages, and if you guys agree on how to
+> > provide the info in a way that combined with logic in evsel.c, I'd say
+> > do what Will suggested, post a patch series and include usage examples,
+> > before and after.
+> 
+> I'll figure out how to get the PMU in evsel.c's strerror fn, and give it
+> another shot.  I don't think it'll be a big problem for the SPE driver
+> itself, it's just some of the other drivers have long lists of reasons
+> to return -EXXXX, and I don't think evsel.c's strerror fn should be
+> able to handle all that.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+See this example for the arm-ccn driver:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2017-October/538924.html
+
+Please follow up on that thread.
+
+Thanks,
+
+Kim
