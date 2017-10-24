@@ -1,116 +1,75 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 24 Oct 2017 10:44:00 +0100
-Subject: [PATCH] ARM: Fix zImage file size not aligned with
- CONFIG_EFI_STUB enabled
-In-Reply-To: <20171024093814.GB20805@n2100.armlinux.org.uk>
-References: <20171023085006.GM20805@n2100.armlinux.org.uk>
- <59EDC34C.40109@rock-chips.com>
- <20171023105046.GT20805@n2100.armlinux.org.uk>
- <20171023114549.GU20805@n2100.armlinux.org.uk>
- <CAKv+Gu_R+OfHMxcZEJML4Pm54DyOji6S42LihMgi6+vxi9LOAQ@mail.gmail.com>
- <20171024090953.GZ20805@n2100.armlinux.org.uk>
- <CAKv+Gu_t=7uZ91MbVUqNfTcxX+3HKPF1+ZjS2-2Mn-Wq6D9H6Q@mail.gmail.com>
- <20171024092229.GA20805@n2100.armlinux.org.uk>
- <CAKv+Gu-7r0ojZEOuvBFNRbxRfh8PwfLE_98XX4RQVAa1bNPOKA@mail.gmail.com>
- <CAKv+Gu9sxn-sRQxYuWY8EH7KTEDEkq7t=k-JveB81ft5-dCo1Q@mail.gmail.com>
- <20171024093814.GB20805@n2100.armlinux.org.uk>
-Message-ID: <CAKv+Gu_XBDaOnOQSz12ZWnTaa1gjHO5zH0Gk3TpPo8+-F_wAxg@mail.gmail.com>
+From: yinbo.zhu@nxp.com (yinbo.zhu at nxp.com)
+Date: Tue, 24 Oct 2017 17:31:18 +0800
+Subject: [PATCH v3] arm64: dts: ls1088a: Add USB support
+Message-ID: <20171024093118.31238-1-yinbo.zhu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 October 2017 at 10:38, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Tue, Oct 24, 2017 at 10:30:41AM +0100, Ard Biesheuvel wrote:
->> On 24 October 2017 at 10:26, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> > On 24 October 2017 at 10:22, Russell King - ARM Linux
->> > <linux@armlinux.org.uk> wrote:
->> >> On Tue, Oct 24, 2017 at 10:13:09AM +0100, Ard Biesheuvel wrote:
->> >>> On 24 October 2017 at 10:09, Russell King - ARM Linux
->> >>> <linux@armlinux.org.uk> wrote:
->> >>> > The question is: do we want to know when additional sections get
->> >>> > emitted into the binary?
->> >>>
->> >>> Well, we need to know whether the size of zImage is a multiple of 512
->> >>> bytes. We could check that separately by adding the following as well
->> >>>
->> >>> #ifdef CONFIG_EFI_STUB
->> >>> ASSERT((_edata % 512 == 0), "zImage file size is not a multiple of 512 bytes")
->> >>
->> >> ASSERT((_edata - _text) % 512 == 0, "EFI zImage file size is not a multiple of 512 bytes")
->> >>
->> >> This would only catch them when EFI is enabled, which doesn't give very
->> >> good build coverage.  I still prefer my solution over adding the assert
->> >> and a section for _edata - my solution catches it with EFI disabled as
->> >> well.
->> >>
->> >> A variant on that would be this, which should catch additional sections
->> >> for EFI and non-EFI:
->> >>
->> >> diff --git a/arch/arm/boot/compressed/vmlinux.lds.S b/arch/arm/boot/compressed/vmlinux.lds.S
->> >> index b38dcef90756..9d0c5d80979a 100644
->> >> --- a/arch/arm/boot/compressed/vmlinux.lds.S
->> >> +++ b/arch/arm/boot/compressed/vmlinux.lds.S
->> >> @@ -95,6 +95,10 @@ SECTIONS
->> >>
->> >>    _edata = .;
->> >>
->> >> +  .image_end (NOLOAD) : {
->> >> +    _image_end = .;
->> >> +  }
->> >> +
->> >>    _magic_sig = ZIMAGE_MAGIC(0x016f2818);
->> >>    _magic_start = ZIMAGE_MAGIC(_start);
->> >>    _magic_end = ZIMAGE_MAGIC(_edata);
->> >> @@ -119,3 +123,5 @@ SECTIONS
->> >>    .stab.indexstr 0     : { *(.stab.indexstr) }
->> >>    .comment 0           : { *(.comment) }
->> >>  }
->> >> +
->> >> +ASSERT(image_end == end, "zImage file size is incorrect")
->> >>
->> >
->> > I take it you mean
->> >
->> > _image_end == _edata
->> >
->> > here? That works for me:
->> >
->> > Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> >
->> > (with CONFIG_EFI enabled)
->>
->>
->> BTW you could simplify that to
->>
->> diff --git a/arch/arm/boot/compressed/vmlinux.lds.S
->> b/arch/arm/boot/compressed/vmlinux.lds.S
->> index 7a4c59154361..204d4580a04f 100644
->> --- a/arch/arm/boot/compressed/vmlinux.lds.S
->> +++ b/arch/arm/boot/compressed/vmlinux.lds.S
->> @@ -85,6 +85,10 @@ SECTIONS
->>
->>    _edata = .;
->>
->> +  .image_end (NOLOAD) : {
->> +    ASSERT(. == _edata, "zImage file size is incorrect");
->> +  }
->
-> Yep.  Okay, so now we have a patch from Arnd to fix the alignment problem
-> (so don't need alignment of the piggydata), and we have a patch to catch
-> the additional sections.  That leaves a patch to sort out the additional
-> sections.
->
-> Do you have any preference - I'd prefer one that I can merge along with
-> these changes?  One way forward would be to temporarily add the /DISCARD/
-> for the ksym sections, which can then be removed once your sort() removal
-> gets added to the EFI trees.
->
+From: "yinbo.zhu" <yinbo.zhu@nxp.com>
 
-Well, I can respin that patch to only discard the ksymtab/kcrctab
-sections (and drop the alignment of piggydata), but I'd prefer to make
-it permanent if you don't mind. I still intend to remove the sort()
-call, given that ARM doesn't need it, but it seems more future proof
-to me to always discard those sections, and if we end up incorporating
-more core kernel code into the EFI stub, we won't need to revisit this
-(although I am not aware of any reasons why we would be doing that in
-the near future)
+Fix the issue that usb is not detected on ls1088ardb
+
+Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
+Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
+---
+
+Change in v3:
+		- Change status from "enable" to "disabled" then enable it on dts file. 
+		- Add the version history.
+
+ arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts |  8 ++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi    | 20 ++++++++++++++++++++
+ 2 files changed, 28 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
+index 213abb72de93..6c3c3bc4b681 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
+@@ -118,6 +118,14 @@
+ 	status = "okay";
+ };
+ 
++&usb0 {
++	status = "okay";
++};
++
++&usb1 {
++	status = "okay";
++};
++
+ &esdhc {
+ 	status = "okay";
+ };
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+index c144d06a6e33..c23fede8cf5d 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+@@ -359,6 +359,26 @@
+ 			status = "disabled";
+ 		};
+ 
++		usb0: usb3 at 3100000 {
++			compatible = "snps,dwc3";
++			reg = <0x0 0x3100000 0x0 0x10000>;
++			interrupts = <0 80 IRQ_TYPE_LEVEL_HIGH>;
++			dr_mode = "host";
++			snps,quirk-frame-length-adjustment = <0x20>;
++			snps,dis_rxdet_inp3_quirk;
++			status = "disabled";
++		};
++
++		usb1: usb3 at 3110000 {
++			compatible = "snps,dwc3";
++			reg = <0x0 0x3110000 0x0 0x10000>;
++			interrupts = <0 81 IRQ_TYPE_LEVEL_HIGH>;
++			dr_mode = "host";
++			snps,quirk-frame-length-adjustment = <0x20>;
++			snps,dis_rxdet_inp3_quirk;
++			status = "disabled";
++		};
++
+ 		sata: sata at 3200000 {
+ 			compatible = "fsl,ls1088a-ahci";
+ 			reg = <0x0 0x3200000 0x0 0x10000>,
+-- 
+2.14.1
