@@ -1,67 +1,99 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 24 Oct 2017 10:13:09 +0100
-Subject: [PATCH] ARM: Fix zImage file size not aligned with
- CONFIG_EFI_STUB enabled
-In-Reply-To: <20171024090953.GZ20805@n2100.armlinux.org.uk>
-References: <20171018050108.10352-1-jeffy.chen@rock-chips.com>
- <CAKv+Gu9ReBC+rLxaD-+Mp+aWRDfsYECAeOZo9CYU3big2nPw0w@mail.gmail.com>
- <20171022124757.GL20805@n2100.armlinux.org.uk>
- <CAKv+Gu9cgt0sjW_pnaXN6J8j8BXAb7z+gLhDY3oMaKwK5vcO-Q@mail.gmail.com>
- <59ED6179.5020301@rock-chips.com>
- <20171023085006.GM20805@n2100.armlinux.org.uk>
- <59EDC34C.40109@rock-chips.com> <20171023105046.GT20805@n2100.armlinux.org.uk>
- <20171023114549.GU20805@n2100.armlinux.org.uk>
- <CAKv+Gu_R+OfHMxcZEJML4Pm54DyOji6S42LihMgi6+vxi9LOAQ@mail.gmail.com>
- <20171024090953.GZ20805@n2100.armlinux.org.uk>
-Message-ID: <CAKv+Gu_t=7uZ91MbVUqNfTcxX+3HKPF1+ZjS2-2Mn-Wq6D9H6Q@mail.gmail.com>
+From: yinbo.zhu@nxp.com (Yinbo Zhu)
+Date: Tue, 24 Oct 2017 09:14:34 +0000
+Subject: [PATCH v2] arm64: dts: ls1088a: Add USB support
+In-Reply-To: <20170922065454.GF26358@dragon>
+References: <20170913091009.21448-1-yinbo.zhu@nxp.com>
+ <20170922065454.GF26358@dragon>
+Message-ID: <VI1PR04MB1262D160BA8625330E32CAF9E9470@VI1PR04MB1262.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 October 2017 at 10:09, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Tue, Oct 24, 2017 at 09:09:52AM +0100, Ard Biesheuvel wrote:
->> The following patch appears to fix the issue as well:
->>
->> diff --git a/arch/arm/boot/compressed/vmlinux.lds.S
->> b/arch/arm/boot/compressed/vmlinux.lds.S
->> index 7a4c59154361..0e0f504e256e 100644
->> --- a/arch/arm/boot/compressed/vmlinux.lds.S
->> +++ b/arch/arm/boot/compressed/vmlinux.lds.S
->> @@ -83,7 +83,9 @@ SECTIONS
->>    __pecoff_data_rawsize = . - ADDR(.data);
->>  #endif
->>
->> -  _edata = .;
->> +  .edata (NOLOAD) : {
->> +    _edata = .;
->> +  }
->>
->>    _magic_sig = ZIMAGE_MAGIC(0x016f2818);
->>    _magic_start = ZIMAGE_MAGIC(_start);
->>
->> because the NOLOAD triggers the linker to emit all PROGBITS sections
->> before _edata, including unknown ones.
->>
->> E.g., in my binary, it gives me
->>
->> 00798020 D __pecoff_data_end
->> 00798200 d __ksymtab_sort
->> 00798208 B __bss_start
->> 00798208 D _edata
->
-> The question is: do we want to know when additional sections get
-> emitted into the binary?
->
 
-Well, we need to know whether the size of zImage is a multiple of 512
-bytes. We could check that separately by adding the following as well
+-----Original Message-----
+From: Shawn Guo [mailto:shawnguo at kernel.org] 
+Sent: Friday, September 22, 2017 2:55 PM
+To: Yinbo Zhu <yinbo.zhu@nxp.com>
+Cc: Rob Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>; Catalin Marinas ) <catalin.marinas@arm.com>; Will Deacon ) <will.deacon@arm.com>; Harninder Rai <harninder.rai@nxp.com>; Raghav Dogra <raghav.dogra@nxp.com>; Ashish Kumar <ashish.kumar@nxp.com>; Andy Tang <andy.tang@nxp.com>; open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS <devicetree@vger.kernel.org>; linux-arm-kernel at lists.infradead.org; open list <linux-kernel@vger.kernel.org>
+Subject: Re: [PATCH v2] arm64: dts: ls1088a: Add USB support
 
-#ifdef CONFIG_EFI_STUB
-ASSERT((_edata % 512 == 0), "zImage file size is not a multiple of 512 bytes")
-#endif
+On Wed, Sep 13, 2017 at 05:10:09PM +0800, yinbo.zhu at nxp.com wrote:
+> From: "yinbo.zhu" <yinbo.zhu@nxp.com>
+> 
+> Fix the issue that usb is not detected on ls1088ardb
 
-> You've already said that for EFI, you need the size of the binary
-> to be a multiple of 512, so I guess the answer to that is "yes".
->
+It's not really about fixing issue but adding support.
 
-Indeed.
+The patch had been tested on upstream 4.14 code, it can fix the issue. 
+> 
+> Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
+> Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
+> ---
+
+You should better have a version history here to tell what's changed between version.
+
+I will add a version history on next v3 patch
+
+>  arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts |  8 ++++++++
+>  arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi    | 20 ++++++++++++++++++++
+>  2 files changed, 28 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts 
+> b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
+> index 213abb72de93..6c3c3bc4b681 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
+> @@ -118,6 +118,14 @@
+>  	status = "okay";
+>  };
+>  
+> +&usb0 {
+> +	status = "okay";
+> +};
+> +
+> +&usb1 {
+> +	status = "okay";
+> +};
+> +
+>  &esdhc {
+
+Please sort these labeled nodes alphabetically.
+
+Shawn
+
+>  	status = "okay";
+>  };
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi 
+> b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+> index c144d06a6e33..c23fede8cf5d 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+> @@ -359,6 +359,26 @@
+>  			status = "disabled";
+>  		};
+>  
+> +		usb0: usb3 at 3100000 {
+> +			compatible = "snps,dwc3";
+> +			reg = <0x0 0x3100000 0x0 0x10000>;
+> +			interrupts = <0 80 IRQ_TYPE_LEVEL_HIGH>;
+> +			dr_mode = "host";
+> +			snps,quirk-frame-length-adjustment = <0x20>;
+> +			snps,dis_rxdet_inp3_quirk;
+> +			status = "disabled";
+> +		};
+> +
+> +		usb1: usb3 at 3110000 {
+> +			compatible = "snps,dwc3";
+> +			reg = <0x0 0x3110000 0x0 0x10000>;
+> +			interrupts = <0 81 IRQ_TYPE_LEVEL_HIGH>;
+> +			dr_mode = "host";
+> +			snps,quirk-frame-length-adjustment = <0x20>;
+> +			snps,dis_rxdet_inp3_quirk;
+> +			status = "disabled";
+> +		};
+> +
+>  		sata: sata at 3200000 {
+>  			compatible = "fsl,ls1088a-ahci";
+>  			reg = <0x0 0x3200000 0x0 0x10000>,
+> --
+> 2.14.1
+> 
