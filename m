@@ -1,145 +1,104 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 24 Oct 2017 12:38:05 +0100
-Subject: [RFC PATCH] arm64/sve: ABI change: Zero SVE regs on syscall entry
-In-Reply-To: <87tvypiyg8.fsf@linaro.org>
-References: <1508758664-24186-1-git-send-email-Dave.Martin@arm.com>
- <1508758664-24186-2-git-send-email-Dave.Martin@arm.com>
- <87tvypiyg8.fsf@linaro.org>
-Message-ID: <20171024113805.GF19485@e103592.cambridge.arm.com>
+From: radoslaw.pietrzyk@gmail.com (=?UTF-8?Q?Rados=C5=82aw_Pietrzyk?=)
+Date: Tue, 24 Oct 2017 13:45:43 +0200
+Subject: [PATCH] i2c: stm32: Fixes multibyte transfer for STM32F4 I2C
+ controller
+In-Reply-To: <b24d9699-a88d-6a83-ceaf-140ea8b4db97@st.com>
+References: <1507722788-31224-1-git-send-email-radoslaw.pietrzyk@gmail.com>
+ <990c3275-35b3-68da-453c-d1a80e867df7@st.com>
+ <CAFvLkMS6+o3D88Rj23of56KtjonwFAVD_aEP3eWaA2H=U5WP4Q@mail.gmail.com>
+ <2d892fec-0496-8a6f-51c9-439b933d9975@st.com>
+ <CAFvLkMS9Q801biCBYp+fJeiOo22zr436Td43PH3GG8E6diSL3A@mail.gmail.com>
+ <b24d9699-a88d-6a83-ceaf-140ea8b4db97@st.com>
+Message-ID: <CAFvLkMTsgxpjoGRgq7J0NFkT=YsOTYL6smkVhOPcfD=26Hzutg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Richard, can you comment below on likely code generation choices in the
-compiler?]
+I'm afraid that didn't help and the problem still exists even with
+those patches applied.
 
-On Mon, Oct 23, 2017 at 06:08:39PM +0100, Alex Benn?e wrote:
-> 
-> Dave Martin <Dave.Martin@arm.com> writes:
-> 
-> > As currently documented, no guarantee is made about what a user
-> > task sees in the SVE registers after a syscall, except that V0-V31
-> > (corresponding to Z0-Z31 bits [127:0]) are preserved.
-> >
-> > The actual kernel behaviour currently implemented is that the SVE
-> > registers are zeroed if a context switch or signal delivery occurs
-> > during a syscall.  After a fork() or clone(), the SVE registers
-> > of the child task are zeroed also.  The SVE registers are otherwise
-> > preserved.  Flexibility is retained in the ABI about the exact
-> > criteria for the decision.
-> >
-> > There are some potential problems with this approach.
-> >
-> > Syscall impact
-> > --------------
-> >
-> > Will, Catalin and Mark have expressed concerns about the risk of
-> > creating de facto ABI here: in scenarios or workloads where a
-> > context switch never occurs or is very unlikely, userspace may
-> > learn to rely on preservation of the SVE registers across certain
-> > syscalls.
-> 
-> I think this is a reasonable concern but are there any equivalent cases
-> in the rest of the kernel? Is this new territory for Linux as these
-> super large registers are introduced?
-
-Not that I know of.
-
-My implementation is influenced by the SVE register set size (which is
-up to > 4 times the size of any other in mainline that I know of), and
-the lack of architectural commitment to now growing the size further
-in the future.
-
-> > It is difficult to assess the impact of this: the syscall ABI is
-> > not a general-purpose interface, since it is usually hidden behind
-> > libc wrappers: direct invocation of SVC is discouraged.  However,
-> > specialised runtimes, statically linked programs and binary blobs
-> > may bake in direct syscalls that make bad assumptions.
-> >
-> > Conversely, the relative cost of zeroing the SVE regs to mitigate
-> > against this also cannot be well characterised until SVE hardware
-> > exists.
-> >
-> > ptrace impact
-> > -------------
-> >
-> > The current implementation can discard and zero the SVE registers
-> > at any point during a syscall, including before, after or between
-> > ptrace traps inside a single syscall.  This means that setting the
-> > SVE registers through PTRACE_SETREGSET will often not do what the
-> > user expects: the new register values are only guaranteed to
-> > survive as far as userspace if set from an asynchronous
-> > signal-delivery-stop (e.g., breakpoint, SEGV or asynchronous signal
-> > delivered outside syscall context).
-> >
-> > This is consistent with the currently documented SVE user ABI, but
-> > likely to be surprising for a debugger user, since setting most
-> > registers of a tracee doesn't behave in this way.
-> >
-> > This patch
-> > ----------
-> >
-> > The common syscall entry path is modified to forcibly discard SVE,
-> > and the discard logic elsewhere is removed.
-> >
-> > This means that there is a mandatory additional trap to the kernel
-> > when a user task tries to use SVE again after a syscall.  This can
-> > be expensive for programs that use SVE heavily around syscalls, but
-> > can be optimised later.
-> 
-> Won't it impact every restart from syscall? It's a shame you have to
-
-Only if SVE is used.
-
-The average extra cost is going to be proportional to rate of execution
-of syscall...syscall intervals where SVE is used, so
-
-	for (;;) {
-		syscall();
-		crunch_huge_data()
-	}
-
-might cause up to 20 extra SVE traps per second if crunch_huge_data()
-takes 50ms say; whereas
-
-	for (;;) {
-		syscall();
-		crunch_trivial_data();
-	}
-
-would cause up to 100000 extra SVE traps per second if
-crunch_trivial_data() takes 10us.  That's much worse.
-
-
-I think the worst realistic case here is use of gcc -mfpu=sve (or
-whatever the option would be called).  In that case though, the
-compiler _should_ consider the caller-saveness of the SVE regs when
-computing cost tradeoffs for code generation around external function
-calls -- this may hide much of the penalty in practice.
-
-
-It's easy to write a worst-case microbenchmark though, and people will
-inevitably do that sooner or later...
-
-> trap when I suspect most first accesses after a syscall are likely to be
-> either restoring the caller-saved values which assume the value is
-> trashed anyway.
-
-So, this was may main argument: in practice the SVE regs will never be
-live at syscall entry.  If they were, the caller would have needed to
-save them off anyway.
-
-> Adding gettimeofday() or write(stdout) while debugging
-> is going to kill performance.
-
-Sure, but adding a syscall inside your core loop is going to kill
-performance anyway.  (gettimeofday() calls the vdso, so that won't
-hit this issue).
-
-
-Note, we don't really need to take a trap after every syscall: that's my
-current implementation, but I will optimise later zero the regs in-place
-and avoid the extra trap for this situation.  This should be much
-cheaper than the current do_sve_acc() path.
-
-Cheers
----Dave
+2017-10-17 16:35 GMT+02:00 Pierre Yves MORDRET <pierre-yves.mordret@st.com>:
+>
+>
+> On 10/17/2017 03:51 PM, Rados?aw Pietrzyk wrote:
+>> I can try of course but it means that any IRQ delay may cause the same
+>> problem so the question is whether the driver should be vulnerable to
+>> such use cases.
+>>
+>
+> I may or ... may or not. If those patches don't find effectiveness at your side
+> I will have to look at it closer.
+> Nonetheless I prefer to start from something more stable in term of clock before
+> investigating further.
+>
+> Please let me know
+>
+> Regards
+>> 2017-10-17 15:18 GMT+02:00 Pierre Yves MORDRET <pierre-yves.mordret@st.com>:
+>>>
+>>>
+>>> On 10/12/2017 11:55 AM, Rados?aw Pietrzyk wrote:
+>>>> It looks like there is a use case when IRQ handler is delayed a bit
+>>>> and the logic in the driver does not work. What is the real root cause
+>>>> I don't know.
+>>>>
+>>>
+>>> As far as I know on this STM32 F4 platform there is some trouble with timer
+>>> events that may have bad influences on scheduling. Some tasks could be delayed
+>>> for some reasons.
+>>> It would be great if the following patches below could help in your matter
+>>> https://patchwork.kernel.org/patch/9980961/
+>>> https://patchwork.kernel.org/patch/9980963/
+>>> https://patchwork.kernel.org/patch/9980965/
+>>> https://patchwork.kernel.org/patch/9980967/
+>>>
+>>> Would you mind to test those ?
+>>> Thanks
+>>>
+>>>> 2017-10-12 11:31 GMT+02:00 Pierre Yves MORDRET <pierre-yves.mordret@st.com>:
+>>>>>
+>>>>>
+>>>>> On 10/11/2017 01:53 PM, Radoslaw Pietrzyk wrote:
+>>>>>>       Do not read data on RXNE but on BTF only due to HW
+>>>>>>       synchronisation problems and NACKing read data too early.
+>>>>>>       It was found during testing of stmpe811 touchscreen driver.
+>>>>>>
+>>>>>
+>>>>> Would you mind to explain what is behind "hw sync issue" you've seen ?
+>>>>>
+>>>>>> Signed-off-by: Radoslaw Pietrzyk <radoslaw.pietrzyk@gmail.com>
+>>>>>> ---
+>>>>>>  drivers/i2c/busses/i2c-stm32f4.c | 11 +----------
+>>>>>>  1 file changed, 1 insertion(+), 10 deletions(-)
+>>>>>>
+>>>>>> diff --git a/drivers/i2c/busses/i2c-stm32f4.c b/drivers/i2c/busses/i2c-stm32f4.c
+>>>>>> index 4ec1084..86bcf4c 100644
+>>>>>> --- a/drivers/i2c/busses/i2c-stm32f4.c
+>>>>>> +++ b/drivers/i2c/busses/i2c-stm32f4.c
+>>>>>> @@ -409,16 +409,9 @@ static void stm32f4_i2c_handle_read(struct stm32f4_i2c_dev *i2c_dev)
+>>>>>>        * So, here we just disable buffer interrupt in order to avoid another
+>>>>>>        * system preemption due to RX not empty event.
+>>>>>>        */
+>>>>>> -     case 2:
+>>>>>> -     case 3:
+>>>>>> +     default:
+>>>>>>               stm32f4_i2c_clr_bits(reg, STM32F4_I2C_CR2_ITBUFEN);
+>>>>>>               break;
+>>>>>> -     /*
+>>>>>> -      * For N byte reception with N > 3 we directly read data register
+>>>>>> -      * until N-2 data.
+>>>>>> -      */
+>>>>>> -     default:
+>>>>>> -             stm32f4_i2c_read_msg(i2c_dev);
+>>>>>>       }
+>>>>>>  }
+>>>>>>
+>>>>>> @@ -470,8 +463,6 @@ static void stm32f4_i2c_handle_rx_done(struct stm32f4_i2c_dev *i2c_dev)
+>>>>>>                */
+>>>>>>               reg = i2c_dev->base + STM32F4_I2C_CR1;
+>>>>>>               stm32f4_i2c_clr_bits(reg, STM32F4_I2C_CR1_ACK);
+>>>>>> -             stm32f4_i2c_read_msg(i2c_dev);
+>>>>>> -             break;
+>>>>>>       default:
+>>>>>>               stm32f4_i2c_read_msg(i2c_dev);
+>>>>>>       }
+>>>>>>
