@@ -1,191 +1,138 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 24 Oct 2017 07:18:58 -0700
-Subject: [PATCH] Input: touchscreen: Convert timers to use timer_setup()
-Message-ID: <20171024141858.GA78061@beast>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 24 Oct 2017 15:27:02 +0100
+Subject: [PATCH v3 2/2] arm64: Fix single stepping in kernel traps
+In-Reply-To: <1507815783-39929-3-git-send-email-julien.thierry@arm.com>
+References: <1507815783-39929-1-git-send-email-julien.thierry@arm.com>
+ <1507815783-39929-3-git-send-email-julien.thierry@arm.com>
+Message-ID: <20171024142701.GA14568@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for unconditionally passing the struct timer_list pointer to
-all timer callbacks, switch to using the new timer_setup() and from_timer()
-to pass the timer pointer explicitly.
+Hi Julien,
 
-Cc: Michael Hennerich <michael.hennerich@analog.com>
-Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-Cc: Ferruh Yigit <fery@cypress.com>
-Cc: Wan ZongShun <mcuos.com@gmail.com>
-Cc: Guenter Roeck <linux@roeck-us.net>
-Cc: linux-input at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
- drivers/input/touchscreen/ad7877.c       |  6 +++---
- drivers/input/touchscreen/ad7879.c       |  6 +++---
- drivers/input/touchscreen/atmel-wm97xx.c | 10 ++++++----
- drivers/input/touchscreen/cyttsp4_core.c |  7 +++----
- drivers/input/touchscreen/tsc200x-core.c |  6 +++---
- drivers/input/touchscreen/w90p910_ts.c   |  7 +++----
- 6 files changed, 21 insertions(+), 21 deletions(-)
+On Thu, Oct 12, 2017 at 02:43:03PM +0100, Julien Thierry wrote:
+> Software Step exception is missing after stepping a trapped instruction.
+> 
+> Ensure SPSR.SS gets set to 0 after emulating/skipping a trapped instruction
+> before doing ERET.
 
-diff --git a/drivers/input/touchscreen/ad7877.c b/drivers/input/touchscreen/ad7877.c
-index 9c250ae780d9..0381c7809d1b 100644
---- a/drivers/input/touchscreen/ad7877.c
-+++ b/drivers/input/touchscreen/ad7877.c
-@@ -385,9 +385,9 @@ static inline void ad7877_ts_event_release(struct ad7877 *ts)
- 	input_sync(input_dev);
- }
- 
--static void ad7877_timer(unsigned long handle)
-+static void ad7877_timer(struct timer_list *t)
- {
--	struct ad7877 *ts = (void *)handle;
-+	struct ad7877 *ts = from_timer(ts, t, timer);
- 	unsigned long flags;
- 
- 	spin_lock_irqsave(&ts->lock, flags);
-@@ -718,7 +718,7 @@ static int ad7877_probe(struct spi_device *spi)
- 	ts->spi = spi;
- 	ts->input = input_dev;
- 
--	setup_timer(&ts->timer, ad7877_timer, (unsigned long) ts);
-+	timer_setup(&ts->timer, ad7877_timer, 0);
- 	mutex_init(&ts->mutex);
- 	spin_lock_init(&ts->lock);
- 
-diff --git a/drivers/input/touchscreen/ad7879.c b/drivers/input/touchscreen/ad7879.c
-index 7d74a0ae2c94..6bad23ee47a1 100644
---- a/drivers/input/touchscreen/ad7879.c
-+++ b/drivers/input/touchscreen/ad7879.c
-@@ -237,9 +237,9 @@ static void ad7879_ts_event_release(struct ad7879 *ts)
- 	input_sync(input_dev);
- }
- 
--static void ad7879_timer(unsigned long handle)
-+static void ad7879_timer(struct timer_list *t)
- {
--	struct ad7879 *ts = (void *)handle;
-+	struct ad7879 *ts = from_timer(ts, t, timer);
- 
- 	ad7879_ts_event_release(ts);
- }
-@@ -570,7 +570,7 @@ int ad7879_probe(struct device *dev, struct regmap *regmap,
- 	ts->irq = irq;
- 	ts->regmap = regmap;
- 
--	setup_timer(&ts->timer, ad7879_timer, (unsigned long) ts);
-+	timer_setup(&ts->timer, ad7879_timer, 0);
- 	snprintf(ts->phys, sizeof(ts->phys), "%s/input0", dev_name(dev));
- 
- 	input_dev->name = "AD7879 Touchscreen";
-diff --git a/drivers/input/touchscreen/atmel-wm97xx.c b/drivers/input/touchscreen/atmel-wm97xx.c
-index 8cf0b2be2df4..9140a43cfe20 100644
---- a/drivers/input/touchscreen/atmel-wm97xx.c
-+++ b/drivers/input/touchscreen/atmel-wm97xx.c
-@@ -208,9 +208,12 @@ static void atmel_wm97xx_acc_pen_up(struct wm97xx *wm)
- 	}
- }
- 
--static void atmel_wm97xx_pen_timer(unsigned long data)
-+static void atmel_wm97xx_pen_timer(struct timer_list *t)
- {
--	atmel_wm97xx_acc_pen_up((struct wm97xx *)data);
-+	struct atmel_wm97xx *atmel_wm97xx = from_timer(atmel_wm97xx, t,
-+						       pen_timer);
-+
-+	atmel_wm97xx_acc_pen_up(atmel_wm97xx->wm);
- }
- 
- static int atmel_wm97xx_acc_startup(struct wm97xx *wm)
-@@ -348,8 +351,7 @@ static int __init atmel_wm97xx_probe(struct platform_device *pdev)
- 	atmel_wm97xx->gpio_pen	= atmel_gpio_line;
- 	atmel_wm97xx->gpio_irq	= gpio_to_irq(atmel_wm97xx->gpio_pen);
- 
--	setup_timer(&atmel_wm97xx->pen_timer, atmel_wm97xx_pen_timer,
--			(unsigned long)wm);
-+	timer_setup(&atmel_wm97xx->pen_timer, atmel_wm97xx_pen_timer, 0);
- 
- 	ret = request_irq(atmel_wm97xx->ac97c_irq,
- 			  atmel_wm97xx_channel_b_interrupt,
-diff --git a/drivers/input/touchscreen/cyttsp4_core.c b/drivers/input/touchscreen/cyttsp4_core.c
-index beaf61ce775b..e7710397e0ad 100644
---- a/drivers/input/touchscreen/cyttsp4_core.c
-+++ b/drivers/input/touchscreen/cyttsp4_core.c
-@@ -1237,9 +1237,9 @@ static void cyttsp4_stop_wd_timer(struct cyttsp4 *cd)
- 	del_timer_sync(&cd->watchdog_timer);
- }
- 
--static void cyttsp4_watchdog_timer(unsigned long handle)
-+static void cyttsp4_watchdog_timer(struct timer_list *t)
- {
--	struct cyttsp4 *cd = (struct cyttsp4 *)handle;
-+	struct cyttsp4 *cd = from_timer(cd, t, watchdog_timer);
- 
- 	dev_vdbg(cd->dev, "%s: Watchdog timer triggered\n", __func__);
- 
-@@ -2074,8 +2074,7 @@ struct cyttsp4 *cyttsp4_probe(const struct cyttsp4_bus_ops *ops,
- 	}
- 
- 	/* Setup watchdog timer */
--	setup_timer(&cd->watchdog_timer, cyttsp4_watchdog_timer,
--		(unsigned long)cd);
-+	timer_setup(&cd->watchdog_timer, cyttsp4_watchdog_timer, 0);
- 
- 	/*
- 	 * call startup directly to ensure that the device
-diff --git a/drivers/input/touchscreen/tsc200x-core.c b/drivers/input/touchscreen/tsc200x-core.c
-index 88ea5e1b72ae..542db26d7fd0 100644
---- a/drivers/input/touchscreen/tsc200x-core.c
-+++ b/drivers/input/touchscreen/tsc200x-core.c
-@@ -202,9 +202,9 @@ static irqreturn_t tsc200x_irq_thread(int irq, void *_ts)
- 	return IRQ_HANDLED;
- }
- 
--static void tsc200x_penup_timer(unsigned long data)
-+static void tsc200x_penup_timer(struct timer_list *t)
- {
--	struct tsc200x *ts = (struct tsc200x *)data;
-+	struct tsc200x *ts = from_timer(ts, t, penup_timer);
- 	unsigned long flags;
- 
- 	spin_lock_irqsave(&ts->lock, flags);
-@@ -506,7 +506,7 @@ int tsc200x_probe(struct device *dev, int irq, const struct input_id *tsc_id,
- 	mutex_init(&ts->mutex);
- 
- 	spin_lock_init(&ts->lock);
--	setup_timer(&ts->penup_timer, tsc200x_penup_timer, (unsigned long)ts);
-+	timer_setup(&ts->penup_timer, tsc200x_penup_timer, 0);
- 
- 	INIT_DELAYED_WORK(&ts->esd_work, tsc200x_esd_work);
- 
-diff --git a/drivers/input/touchscreen/w90p910_ts.c b/drivers/input/touchscreen/w90p910_ts.c
-index da6004e97753..638c1d78ca3a 100644
---- a/drivers/input/touchscreen/w90p910_ts.c
-+++ b/drivers/input/touchscreen/w90p910_ts.c
-@@ -146,9 +146,9 @@ static irqreturn_t w90p910_ts_interrupt(int irq, void *dev_id)
- 	return IRQ_HANDLED;
- }
- 
--static void w90p910_check_pen_up(unsigned long data)
-+static void w90p910_check_pen_up(struct timer_list *t)
- {
--	struct w90p910_ts *w90p910_ts = (struct w90p910_ts *) data;
-+	struct w90p910_ts *w90p910_ts = from_timer(w90p910_ts, t, timer);
- 	unsigned long flags;
- 
- 	spin_lock_irqsave(&w90p910_ts->lock, flags);
-@@ -232,8 +232,7 @@ static int w90x900ts_probe(struct platform_device *pdev)
- 	w90p910_ts->input = input_dev;
- 	w90p910_ts->state = TS_IDLE;
- 	spin_lock_init(&w90p910_ts->lock);
--	setup_timer(&w90p910_ts->timer, w90p910_check_pen_up,
--		    (unsigned long)w90p910_ts);
-+	timer_setup(&w90p910_ts->timer, w90p910_check_pen_up, 0);
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!res) {
--- 
-2.7.4
+Curious, but how did you spot this?
 
+> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> ---
+>  arch/arm64/include/asm/insn.h        |  5 +++++
+>  arch/arm64/include/asm/traps.h       |  6 ++++++
+>  arch/arm64/kernel/armv8_deprecated.c |  8 ++++----
+>  arch/arm64/kernel/cpufeature.c       |  2 +-
+>  arch/arm64/kernel/traps.c            | 21 ++++++++++++++++-----
+>  5 files changed, 32 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+> index 4214c38..de5e31a 100644
+> --- a/arch/arm64/include/asm/insn.h
+> +++ b/arch/arm64/include/asm/insn.h
+> @@ -22,6 +22,11 @@
+> 
+>  /* A64 instructions are always 32 bits. */
+>  #define	AARCH64_INSN_SIZE		4
+> +#define	AARCH32_INSN_SIZE		4
+> +
+> +/* Thumb/Thumb2 instruction sizes */
+> +#define	AARCH32_T32_INSN_SIZE		4
+> +#define	AARCH32_T16_INSN_SIZE		2
 
--- 
-Kees Cook
-Pixel Security
+The naming here is a bit misleading, since T32 is an instruction set
+consisting of both 32-bit and 16-bit instructions. For now, you might just
+be better off having the caller pass in an immediate directly rather than
+add these confusing #defines.
+
+>  #ifndef __ASSEMBLY__
+>  /*
+> diff --git a/arch/arm64/include/asm/traps.h b/arch/arm64/include/asm/traps.h
+> index d131501..67b971e 100644
+> --- a/arch/arm64/include/asm/traps.h
+> +++ b/arch/arm64/include/asm/traps.h
+> @@ -37,6 +37,12 @@ struct undef_hook {
+> 
+>  void arm64_notify_segfault(struct pt_regs *regs, unsigned long addr);
+> 
+> +/*
+> + * Move regs->pc to next instruction and do necessary setup before it
+> + * is executed.
+> + */
+> +void arm64_setup_next_instr(struct pt_regs *regs, unsigned long size);
+> +
+>  static inline int __in_irqentry_text(unsigned long ptr)
+>  {
+>  	return ptr >= (unsigned long)&__irqentry_text_start &&
+> diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
+> index d06fbe4..2808e56 100644
+> --- a/arch/arm64/kernel/armv8_deprecated.c
+> +++ b/arch/arm64/kernel/armv8_deprecated.c
+> @@ -431,7 +431,7 @@ static int swp_handler(struct pt_regs *regs, u32 instr)
+>  	pr_warn_ratelimited("\"%s\" (%ld) uses obsolete SWP{B} instruction at 0x%llx\n",
+>  			current->comm, (unsigned long)current->pid, regs->pc);
+> 
+> -	regs->pc += 4;
+> +	arm64_setup_next_instr(regs, AARCH32_INSN_SIZE);
+>  	return 0;
+> 
+>  fault:
+> @@ -512,7 +512,7 @@ static int cp15barrier_handler(struct pt_regs *regs, u32 instr)
+>  	pr_warn_ratelimited("\"%s\" (%ld) uses deprecated CP15 Barrier instruction at 0x%llx\n",
+>  			current->comm, (unsigned long)current->pid, regs->pc);
+> 
+> -	regs->pc += 4;
+> +	arm64_setup_next_instr(regs, AARCH32_INSN_SIZE);
+>  	return 0;
+>  }
+> 
+> @@ -586,14 +586,14 @@ static int compat_setend_handler(struct pt_regs *regs, u32 big_endian)
+>  static int a32_setend_handler(struct pt_regs *regs, u32 instr)
+>  {
+>  	int rc = compat_setend_handler(regs, (instr >> 9) & 1);
+> -	regs->pc += 4;
+> +	arm64_setup_next_instr(regs, AARCH32_INSN_SIZE);
+>  	return rc;
+>  }
+> 
+>  static int t16_setend_handler(struct pt_regs *regs, u32 instr)
+>  {
+>  	int rc = compat_setend_handler(regs, (instr >> 3) & 1);
+> -	regs->pc += 2;
+> +	arm64_setup_next_instr(regs, AARCH32_T16_INSN_SIZE);
+>  	return rc;
+>  }
+> 
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index 21e2c95..235834e 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -1287,7 +1287,7 @@ static int emulate_mrs(struct pt_regs *regs, u32 insn)
+>  	if (!rc) {
+>  		dst = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RT, insn);
+>  		pt_regs_write_reg(regs, dst, val);
+> -		regs->pc += 4;
+> +		arm64_setup_next_instr(regs, AARCH64_INSN_SIZE);
+>  	}
+> 
+>  	return rc;
+> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+> index 5ea4b85..f93b33f 100644
+> --- a/arch/arm64/kernel/traps.c
+> +++ b/arch/arm64/kernel/traps.c
+> @@ -293,6 +293,17 @@ void arm64_notify_die(const char *str, struct pt_regs *regs,
+>  	}
+>  }
+> 
+> +void arm64_setup_next_instr(struct pt_regs *regs, unsigned long size)
+> +{
+
+This strikes me as a pretty broadly named function to be exposing like this.
+How about: arm64_skip_faulting_instruction instead?
+
+Will
