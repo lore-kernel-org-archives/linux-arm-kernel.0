@@ -1,75 +1,58 @@
-From: yinbo.zhu@nxp.com (yinbo.zhu at nxp.com)
-Date: Tue, 24 Oct 2017 17:31:18 +0800
-Subject: [PATCH v3] arm64: dts: ls1088a: Add USB support
-Message-ID: <20171024093118.31238-1-yinbo.zhu@nxp.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 24 Oct 2017 10:54:44 +0100
+Subject: [PATCH] ARM: Fix zImage file size not aligned with
+ CONFIG_EFI_STUB enabled
+In-Reply-To: <CAKv+Gu_XBDaOnOQSz12ZWnTaa1gjHO5zH0Gk3TpPo8+-F_wAxg@mail.gmail.com>
+References: <20171023105046.GT20805@n2100.armlinux.org.uk>
+ <20171023114549.GU20805@n2100.armlinux.org.uk>
+ <CAKv+Gu_R+OfHMxcZEJML4Pm54DyOji6S42LihMgi6+vxi9LOAQ@mail.gmail.com>
+ <20171024090953.GZ20805@n2100.armlinux.org.uk>
+ <CAKv+Gu_t=7uZ91MbVUqNfTcxX+3HKPF1+ZjS2-2Mn-Wq6D9H6Q@mail.gmail.com>
+ <20171024092229.GA20805@n2100.armlinux.org.uk>
+ <CAKv+Gu-7r0ojZEOuvBFNRbxRfh8PwfLE_98XX4RQVAa1bNPOKA@mail.gmail.com>
+ <CAKv+Gu9sxn-sRQxYuWY8EH7KTEDEkq7t=k-JveB81ft5-dCo1Q@mail.gmail.com>
+ <20171024093814.GB20805@n2100.armlinux.org.uk>
+ <CAKv+Gu_XBDaOnOQSz12ZWnTaa1gjHO5zH0Gk3TpPo8+-F_wAxg@mail.gmail.com>
+Message-ID: <20171024095443.GC20805@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "yinbo.zhu" <yinbo.zhu@nxp.com>
+On Tue, Oct 24, 2017 at 10:44:00AM +0100, Ard Biesheuvel wrote:
+> On 24 October 2017 at 10:38, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+> > Do you have any preference - I'd prefer one that I can merge along with
+> > these changes?  One way forward would be to temporarily add the /DISCARD/
+> > for the ksym sections, which can then be removed once your sort() removal
+> > gets added to the EFI trees.
+> >
+> 
+> Well, I can respin that patch to only discard the ksymtab/kcrctab
+> sections (and drop the alignment of piggydata), but I'd prefer to make
+> it permanent if you don't mind. I still intend to remove the sort()
+> call, given that ARM doesn't need it, but it seems more future proof
+> to me to always discard those sections, and if we end up incorporating
+> more core kernel code into the EFI stub, we won't need to revisit this
+> (although I am not aware of any reasons why we would be doing that in
+> the near future)
 
-Fix the issue that usb is not detected on ls1088ardb
+I don't think it's future-proof.  The decompressor is a particularly
+special environment due to its runtime relocation support, where we
+(eg) don't really support initialised pointers in the .data section.
+Stuffing code from other parts of the kernel into the decompressor
+isn't going to work reliably, and I'd much rather discourage the
+practice.
 
-Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
-Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
----
+Hence, there's really no reason to keep that discard, and I'd much
+rather have the build fail if the sections re-appear as a pointer
+towards something not being correct.
 
-Change in v3:
-		- Change status from "enable" to "disabled" then enable it on dts file. 
-		- Add the version history.
+A solution to this would be to link the decompressor ELF with -r
+and wrap that up in a mini-linker, but I suspect that will need
+quite a re-write because of the self-relocation that the image
+does if it detects overlap between itself and the destination for
+the decompressed kernel image.
 
- arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts |  8 ++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi    | 20 ++++++++++++++++++++
- 2 files changed, 28 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-index 213abb72de93..6c3c3bc4b681 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-@@ -118,6 +118,14 @@
- 	status = "okay";
- };
- 
-+&usb0 {
-+	status = "okay";
-+};
-+
-+&usb1 {
-+	status = "okay";
-+};
-+
- &esdhc {
- 	status = "okay";
- };
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-index c144d06a6e33..c23fede8cf5d 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-@@ -359,6 +359,26 @@
- 			status = "disabled";
- 		};
- 
-+		usb0: usb3 at 3100000 {
-+			compatible = "snps,dwc3";
-+			reg = <0x0 0x3100000 0x0 0x10000>;
-+			interrupts = <0 80 IRQ_TYPE_LEVEL_HIGH>;
-+			dr_mode = "host";
-+			snps,quirk-frame-length-adjustment = <0x20>;
-+			snps,dis_rxdet_inp3_quirk;
-+			status = "disabled";
-+		};
-+
-+		usb1: usb3 at 3110000 {
-+			compatible = "snps,dwc3";
-+			reg = <0x0 0x3110000 0x0 0x10000>;
-+			interrupts = <0 81 IRQ_TYPE_LEVEL_HIGH>;
-+			dr_mode = "host";
-+			snps,quirk-frame-length-adjustment = <0x20>;
-+			snps,dis_rxdet_inp3_quirk;
-+			status = "disabled";
-+		};
-+
- 		sata: sata at 3200000 {
- 			compatible = "fsl,ls1088a-ahci";
- 			reg = <0x0 0x3200000 0x0 0x10000>,
 -- 
-2.14.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
