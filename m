@@ -1,60 +1,84 @@
 From: opendmb@gmail.com (Doug Berger)
-Date: Tue, 24 Oct 2017 12:54:45 -0700
-Subject: [PATCH v2 1/7] gpio: brcmstb: Do not use gc->pin2mask()
+Date: Tue, 24 Oct 2017 12:54:47 -0700
+Subject: [PATCH v2 3/7] gpio: brcmstb: release the bgpio lock during irq
+ handlers
 In-Reply-To: <20171024195451.30535-1-opendmb@gmail.com>
 References: <20171024195451.30535-1-opendmb@gmail.com>
-Message-ID: <20171024195451.30535-2-opendmb@gmail.com>
+Message-ID: <20171024195451.30535-4-opendmb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+The basic memory-mapped GPIO controller lock must be released
+before calling the registered GPIO interrupt handlers to allow
+the interrupt handlers to access the hardware.
 
-The pin2mask() accessor only shuffles BIT ORDER in big endian systems,
-i.e. the bitstuffing is swizzled big endian so "bit 0" is bit 7 or
-bit 15 or bit 31 or so.
+Examples of why a GPIO interrupt handler might want to access
+the GPIO hardware include an interrupt that is configured to
+trigger on rising and falling edges that needs to read the
+current level of the input to know how to respond, or an
+interrupt that causes a change in a GPIO output in the same
+bank. If the lock is not released before enterring the handler
+the hardware accesses will deadlock when they attempt to grab
+the lock.
 
-The brcmstb only uses big endian BYTE ORDER which will be taken car of
-by the ->write_reg() callback.
+Since the lock is only needed to protect the calculation of
+unmasked pending interrupts create a dedicated function to
+perform this and hide the complexity.
 
-Just use BIT(offset) to assign the bit.
-
-Cc: Gregory Fong <gregory.0xf0@gmail.com>
-Cc: Florian Fainelli <f.fainelli@gmail.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Fixes: 19a7b6940b78 ("gpio: brcmstb: Add interrupt and wakeup source support")
+Signed-off-by: Doug Berger <opendmb@gmail.com>
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+Acked-by: Gregory Fong <gregory.0xf0@gmail.com>
 ---
- drivers/gpio/gpio-brcmstb.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/gpio/gpio-brcmstb.c | 21 ++++++++++++++++-----
+ 1 file changed, 16 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/gpio/gpio-brcmstb.c b/drivers/gpio/gpio-brcmstb.c
-index 27e92e57adae..9b8fcca7ad17 100644
+index 2031b73e066c..fd8c0412f8af 100644
 --- a/drivers/gpio/gpio-brcmstb.c
 +++ b/drivers/gpio/gpio-brcmstb.c
-@@ -20,6 +20,7 @@
- #include <linux/irqchip/chained_irq.h>
- #include <linux/interrupt.h>
- #include <linux/reboot.h>
-+#include <linux/bitops.h>
- 
- #define GIO_BANK_SIZE           0x20
- #define GIO_ODEN(bank)          (((bank) * GIO_BANK_SIZE) + 0x00)
-@@ -68,16 +69,15 @@ static void brcmstb_gpio_set_imask(struct brcmstb_gpio_bank *bank,
- {
- 	struct gpio_chip *gc = &bank->gc;
- 	struct brcmstb_gpio_priv *priv = bank->parent_priv;
--	u32 mask = gc->pin2mask(gc, offset);
- 	u32 imask;
- 	unsigned long flags;
- 
- 	spin_lock_irqsave(&gc->bgpio_lock, flags);
- 	imask = gc->read_reg(priv->reg_base + GIO_MASK(bank->id));
- 	if (enable)
--		imask |= mask;
-+		imask |= BIT(offset);
- 	else
--		imask &= ~mask;
-+		imask &= ~BIT(offset);
- 	gc->write_reg(priv->reg_base + GIO_MASK(bank->id), imask);
- 	spin_unlock_irqrestore(&gc->bgpio_lock, flags);
+@@ -63,6 +63,21 @@ brcmstb_gpio_gc_to_priv(struct gpio_chip *gc)
+ 	return bank->parent_priv;
  }
+ 
++static unsigned long
++brcmstb_gpio_get_active_irqs(struct brcmstb_gpio_bank *bank)
++{
++	void __iomem *reg_base = bank->parent_priv->reg_base;
++	unsigned long status;
++	unsigned long flags;
++
++	spin_lock_irqsave(&bank->gc.bgpio_lock, flags);
++	status = bank->gc.read_reg(reg_base + GIO_STAT(bank->id)) &
++		 bank->gc.read_reg(reg_base + GIO_MASK(bank->id));
++	spin_unlock_irqrestore(&bank->gc.bgpio_lock, flags);
++
++	return status;
++}
++
+ static void brcmstb_gpio_set_imask(struct brcmstb_gpio_bank *bank,
+ 		unsigned int offset, bool enable)
+ {
+@@ -204,11 +219,8 @@ static void brcmstb_gpio_irq_bank_handler(struct brcmstb_gpio_bank *bank)
+ 	struct irq_domain *irq_domain = bank->gc.irqdomain;
+ 	void __iomem *reg_base = priv->reg_base;
+ 	unsigned long status;
+-	unsigned long flags;
+ 
+-	spin_lock_irqsave(&bank->gc.bgpio_lock, flags);
+-	while ((status = bank->gc.read_reg(reg_base + GIO_STAT(bank->id)) &
+-			 bank->gc.read_reg(reg_base + GIO_MASK(bank->id)))) {
++	while ((status = brcmstb_gpio_get_active_irqs(bank))) {
+ 		int bit;
+ 
+ 		for_each_set_bit(bit, &status, 32) {
+@@ -223,7 +235,6 @@ static void brcmstb_gpio_irq_bank_handler(struct brcmstb_gpio_bank *bank)
+ 			generic_handle_irq(irq_find_mapping(irq_domain, bit));
+ 		}
+ 	}
+-	spin_unlock_irqrestore(&bank->gc.bgpio_lock, flags);
+ }
+ 
+ /* Each UPG GIO block has one IRQ for all banks */
 -- 
 2.14.1
