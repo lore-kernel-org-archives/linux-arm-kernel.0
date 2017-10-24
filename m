@@ -1,26 +1,46 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 24 Oct 2017 11:37:11 -0500
-Subject: [PATCH v3 4/5] dt-bindings: interrupt-controller: Document RTD1195
-In-Reply-To: <20171017124708.6242-5-afaerber@suse.de>
-References: <20171017124708.6242-1-afaerber@suse.de>
- <20171017124708.6242-5-afaerber@suse.de>
-Message-ID: <20171024163711.lkdbcimqcxlmh4li@rob-hp-laptop>
+Date: Tue, 24 Oct 2017 11:41:38 -0500
+Subject: [PATCH 1/3] dt-bindings: iio: adc: stm32: add support for diff
+ channels
+In-Reply-To: <1508246145-19417-2-git-send-email-fabrice.gasnier@st.com>
+References: <1508246145-19417-1-git-send-email-fabrice.gasnier@st.com>
+ <1508246145-19417-2-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20171024164138.arnjrlw4pmk5xaqy@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 02:47:06PM +0200, Andreas F?rber wrote:
-> Add compatible strings for Realtek RTD1195.
+On Tue, Oct 17, 2017 at 03:15:43PM +0200, Fabrice Gasnier wrote:
+> STM32H7 ADC channels may be configured either as single-ended or
+> differential.
+> Add 'st,adc-diff-channels' property to support differential channels.
+> Differential channels are defined as a pair of positive and negative
+> inputs: vinp & vinn.
 > 
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 > ---
->  v3: New
+>  Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+> index 48bfcaa3..c3c8de1 100644
+> --- a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+> +++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+> @@ -62,6 +62,12 @@ Required properties:
+>  - st,adc-channels: List of single-ended channels muxed for this ADC.
+>    It can have up to 16 channels on stm32f4 or 20 channels on stm32h7, numbered
+>    from 0 to 15 or 19 (resp. for in0..in15 or in0..in19).
+> +- st,adc-diff-channels: List of differential channels muxed for this ADC.
+> +  Depending on part used, some channels can be configured as differential
+> +  instead of single-ended (e.g. stm32h7). List here positive and negative
+> +  inputs pairs as <vinp vinn>, <vinp vinn>,... vinp and vinn are numbered
+> +  from 0 to 19 on stm32h7)
+> +  Note: At least one of "st,adc-channels" or "st,adc-diff-channels" is required.
+
+Wouldn't both present be invalid?
+
+>  - #io-channel-cells = <1>: See the IIO bindings section "IIO consumers" in
+>    Documentation/devicetree/bindings/iio/iio-bindings.txt
 >  
->  Could be squashed into 1/5 if acked.
-
-Yes.
-
-Acked-by: Rob Herring <robh@kernel.org>
-
->  
->  .../devicetree/bindings/interrupt-controller/realtek,rtd119x-mux.txt    | 2 ++
->  1 file changed, 2 insertions(+)
+> -- 
+> 1.9.1
+> 
