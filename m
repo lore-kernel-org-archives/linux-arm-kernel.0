@@ -1,227 +1,122 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Tue, 24 Oct 2017 15:58:26 +0800
-Subject: [PATCH v6 02/12] mmc: mediatek: add support of mt2701/mt2712
-In-Reply-To: <1508118399-21828-3-git-send-email-chaotian.jing@mediatek.com>
-References: <1508118399-21828-1-git-send-email-chaotian.jing@mediatek.com>
- <1508118399-21828-3-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <1508831906.29850.42.camel@mtkswgap22>
+From: kim.phillips@arm.com (Kim Phillips)
+Date: Tue, 24 Oct 2017 03:04:04 -0500
+Subject: [RFC 1/3] perf tool: Introduce arch-specific supplemental perf open
+ strerror capability
+Message-ID: <20171024030404.ec366ec2d9c38910ccd84ba5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, 
+Introduce new tools/perf/arch/*/util/evsel.c:perf_evsel__suppl_strerror()
+so each arch can start to customize usability for its h/w PMU drivers.
 
-I've tested those patches on the bpi-r2 board [1] and so far they work
-fine correctly. The below are some tests using lmdd on the board.
+Signed-off-by: Kim Phillips <kim.phillips@arm.com>
+---
+ tools/perf/arch/x86/util/Build   |  1 +
+ tools/perf/arch/x86/util/evsel.c | 24 ++++++++++++++++++++++++
+ tools/perf/util/evsel.c          | 21 +++++++++++++++------
+ tools/perf/util/evsel.h          |  2 ++
+ 4 files changed, 42 insertions(+), 6 deletions(-)
+ create mode 100644 tools/perf/arch/x86/util/evsel.c
 
-a. emmc with high-speed mode
-
-reading
-# lmdd of=internal if=/dev/mmcblk0p3 count=100000  fsync=1
-819.2000 MB in 34.5092 secs, 23.7386 MB/sec
-
-writing
-# lmdd if=internal of=/dev/mmcblk0p3 count=100000  fsync=1
-819.2000 MB in 42.9084 secs, 19.0918 MB/sec
-
-b. sd card with Apacer 16G, high-speed speed
-
-reading
-# lmdd of=internal if=/dev/mmcblk1p1 count=100000  fsync=1             
-819.2000 MB in 36.8891 secs, 22.2071 MB/sec
-
-writing
-# lmdd if=internal of=/dev/mmcblk1p1 count=100000  fsync=1
-819.2000 MB in 81.7611 secs, 10.0194 MB/sec
-                                                                                                       
-Since mmc on mt7623 is almost identical to to mt2701, once the whole
-series is being applied, I will change all nodes in dts with mt7623 to
-use mt2701-mmc fallbacks instead of mt8135-mmc ones.
-
-Tested-by: Sean Wang <sean.wang@mediatek.com>
-
-[1] http://forum.banana-pi.org/c/Banana-Pi-BPI-R2
-
-
-On Mon, 2017-10-16 at 09:46 +0800, Chaotian Jing wrote:
-> mt2701/mt2712 has 12bit clock div, which is not compatible with
-> mt8135/mt8173. and, some additional features will be added in
-> mt2701/mt2712, so that need distinguish it by comatibale name.
-> 
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> ---
->  drivers/mmc/host/mtk-sd.c | 82 +++++++++++++++++++++++++++++++++++++++--------
->  1 file changed, 69 insertions(+), 13 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-> index 267f7ab..643c795 100644
-> --- a/drivers/mmc/host/mtk-sd.c
-> +++ b/drivers/mmc/host/mtk-sd.c
-> @@ -95,6 +95,9 @@
->  #define MSDC_CFG_CKDIV          (0xff << 8)	/* RW */
->  #define MSDC_CFG_CKMOD          (0x3 << 16)	/* RW */
->  #define MSDC_CFG_HS400_CK_MODE  (0x1 << 18)	/* RW */
-> +#define MSDC_CFG_HS400_CK_MODE_EXTRA  (0x1 << 22)	/* RW */
-> +#define MSDC_CFG_CKDIV_EXTRA    (0xfff << 8)	/* RW */
-> +#define MSDC_CFG_CKMOD_EXTRA    (0x3 << 20)	/* RW */
->  
->  /* MSDC_IOCON mask */
->  #define MSDC_IOCON_SDR104CKS    (0x1 << 0)	/* RW */
-> @@ -295,6 +298,10 @@ struct msdc_save_para {
->  	u32 emmc50_cfg0;
->  };
->  
-> +struct mtk_mmc_compatible {
-> +	u8 clk_div_bits;
-> +};
-> +
->  struct msdc_tune_para {
->  	u32 iocon;
->  	u32 pad_tune;
-> @@ -309,6 +316,7 @@ struct msdc_delay_phase {
->  
->  struct msdc_host {
->  	struct device *dev;
-> +	const struct mtk_mmc_compatible *dev_comp;
->  	struct mmc_host *mmc;	/* mmc structure */
->  	int cmd_rsp;
->  
-> @@ -350,6 +358,31 @@ struct msdc_host {
->  	struct msdc_tune_para saved_tune_para; /* tune result of CMD21/CMD19 */
->  };
->  
-> +static const struct mtk_mmc_compatible mt8135_compat = {
-> +	.clk_div_bits = 8,
-> +};
-> +
-> +static const struct mtk_mmc_compatible mt8173_compat = {
-> +	.clk_div_bits = 8,
-> +};
-> +
-> +static const struct mtk_mmc_compatible mt2701_compat = {
-> +	.clk_div_bits = 12,
-> +};
-> +
-> +static const struct mtk_mmc_compatible mt2712_compat = {
-> +	.clk_div_bits = 12,
-> +};
-> +
-> +static const struct of_device_id msdc_of_ids[] = {
-> +	{ .compatible = "mediatek,mt8135-mmc", .data = &mt8135_compat},
-> +	{ .compatible = "mediatek,mt8173-mmc", .data = &mt8173_compat},
-> +	{ .compatible = "mediatek,mt2701-mmc", .data = &mt2701_compat},
-> +	{ .compatible = "mediatek,mt2712-mmc", .data = &mt2712_compat},
-> +	{}
-> +};
-> +MODULE_DEVICE_TABLE(of, msdc_of_ids);
-> +
->  static void sdr_set_bits(void __iomem *reg, u32 bs)
->  {
->  	u32 val = readl(reg);
-> @@ -509,7 +542,12 @@ static void msdc_set_timeout(struct msdc_host *host, u32 ns, u32 clks)
->  		timeout = (ns + clk_ns - 1) / clk_ns + clks;
->  		/* in 1048576 sclk cycle unit */
->  		timeout = (timeout + (0x1 << 20) - 1) >> 20;
-> -		sdr_get_field(host->base + MSDC_CFG, MSDC_CFG_CKMOD, &mode);
-> +		if (host->dev_comp->clk_div_bits == 8)
-> +			sdr_get_field(host->base + MSDC_CFG,
-> +				      MSDC_CFG_CKMOD, &mode);
-> +		else
-> +			sdr_get_field(host->base + MSDC_CFG,
-> +				      MSDC_CFG_CKMOD_EXTRA, &mode);
->  		/*DDR mode will double the clk cycles for data timeout */
->  		timeout = mode >= 2 ? timeout * 2 : timeout;
->  		timeout = timeout > 1 ? timeout - 1 : 0;
-> @@ -548,7 +586,11 @@ static void msdc_set_mclk(struct msdc_host *host, unsigned char timing, u32 hz)
->  
->  	flags = readl(host->base + MSDC_INTEN);
->  	sdr_clr_bits(host->base + MSDC_INTEN, flags);
-> -	sdr_clr_bits(host->base + MSDC_CFG, MSDC_CFG_HS400_CK_MODE);
-> +	if (host->dev_comp->clk_div_bits == 8)
-> +		sdr_clr_bits(host->base + MSDC_CFG, MSDC_CFG_HS400_CK_MODE);
-> +	else
-> +		sdr_clr_bits(host->base + MSDC_CFG,
-> +			     MSDC_CFG_HS400_CK_MODE_EXTRA);
->  	if (timing == MMC_TIMING_UHS_DDR50 ||
->  	    timing == MMC_TIMING_MMC_DDR52 ||
->  	    timing == MMC_TIMING_MMC_HS400) {
-> @@ -568,8 +610,12 @@ static void msdc_set_mclk(struct msdc_host *host, unsigned char timing, u32 hz)
->  
->  		if (timing == MMC_TIMING_MMC_HS400 &&
->  		    hz >= (host->src_clk_freq >> 1)) {
-> -			sdr_set_bits(host->base + MSDC_CFG,
-> -				     MSDC_CFG_HS400_CK_MODE);
-> +			if (host->dev_comp->clk_div_bits == 8)
-> +				sdr_set_bits(host->base + MSDC_CFG,
-> +					     MSDC_CFG_HS400_CK_MODE);
-> +			else
-> +				sdr_set_bits(host->base + MSDC_CFG,
-> +					     MSDC_CFG_HS400_CK_MODE_EXTRA);
->  			sclk = host->src_clk_freq >> 1;
->  			div = 0; /* div is ignore when bit18 is set */
->  		}
-> @@ -587,8 +633,15 @@ static void msdc_set_mclk(struct msdc_host *host, unsigned char timing, u32 hz)
->  			sclk = (host->src_clk_freq >> 2) / div;
->  		}
->  	}
-> -	sdr_set_field(host->base + MSDC_CFG, MSDC_CFG_CKMOD | MSDC_CFG_CKDIV,
-> -		      (mode << 8) | div);
-> +	if (host->dev_comp->clk_div_bits == 8)
-> +		sdr_set_field(host->base + MSDC_CFG,
-> +			      MSDC_CFG_CKMOD | MSDC_CFG_CKDIV,
-> +			      (mode << 8) | div);
-> +	else
-> +		sdr_set_field(host->base + MSDC_CFG,
-> +			      MSDC_CFG_CKMOD_EXTRA | MSDC_CFG_CKDIV_EXTRA,
-> +			      (mode << 12) | div);
-> +
->  	sdr_set_bits(host->base + MSDC_CFG, MSDC_CFG_CKPDN);
->  	while (!(readl(host->base + MSDC_CFG) & MSDC_CFG_CKSTB))
->  		cpu_relax();
-> @@ -1617,12 +1670,17 @@ static int msdc_drv_probe(struct platform_device *pdev)
->  	struct mmc_host *mmc;
->  	struct msdc_host *host;
->  	struct resource *res;
-> +	const struct of_device_id *of_id;
->  	int ret;
->  
->  	if (!pdev->dev.of_node) {
->  		dev_err(&pdev->dev, "No DT found\n");
->  		return -EINVAL;
->  	}
-> +
-> +	of_id = of_match_node(msdc_of_ids, pdev->dev.of_node);
-> +	if (!of_id)
-> +		return -EINVAL;
->  	/* Allocate MMC host for this device */
->  	mmc = mmc_alloc_host(sizeof(struct msdc_host), &pdev->dev);
->  	if (!mmc)
-> @@ -1686,11 +1744,15 @@ static int msdc_drv_probe(struct platform_device *pdev)
->  	msdc_of_property_parse(pdev, host);
->  
->  	host->dev = &pdev->dev;
-> +	host->dev_comp = of_id->data;
->  	host->mmc = mmc;
->  	host->src_clk_freq = clk_get_rate(host->src_clk);
->  	/* Set host parameters to mmc */
->  	mmc->ops = &mt_msdc_ops;
-> -	mmc->f_min = DIV_ROUND_UP(host->src_clk_freq, 4 * 255);
-> +	if (host->dev_comp->clk_div_bits == 8)
-> +		mmc->f_min = DIV_ROUND_UP(host->src_clk_freq, 4 * 255);
-> +	else
-> +		mmc->f_min = DIV_ROUND_UP(host->src_clk_freq, 4 * 4095);
->  
->  	mmc->caps |= MMC_CAP_ERASE | MMC_CAP_CMD23;
->  	/* MMC core transfer sizes tunable parameters */
-> @@ -1839,12 +1901,6 @@ static int msdc_runtime_resume(struct device *dev)
->  	SET_RUNTIME_PM_OPS(msdc_runtime_suspend, msdc_runtime_resume, NULL)
->  };
->  
-> -static const struct of_device_id msdc_of_ids[] = {
-> -	{   .compatible = "mediatek,mt8135-mmc", },
-> -	{}
-> -};
-> -MODULE_DEVICE_TABLE(of, msdc_of_ids);
-> -
->  static struct platform_driver mt_msdc_driver = {
->  	.probe = msdc_drv_probe,
->  	.remove = msdc_drv_remove,
+diff --git a/tools/perf/arch/x86/util/Build b/tools/perf/arch/x86/util/Build
+index f95e6f46ef0d..90ae9358ec21 100644
+--- a/tools/perf/arch/x86/util/Build
++++ b/tools/perf/arch/x86/util/Build
+@@ -4,6 +4,7 @@ libperf-y += pmu.o
+ libperf-y += kvm-stat.o
+ libperf-y += perf_regs.o
+ libperf-y += group.o
++libperf-y += evsel.o
+ 
+ libperf-$(CONFIG_DWARF) += dwarf-regs.o
+ libperf-$(CONFIG_BPF_PROLOGUE) += dwarf-regs.o
+diff --git a/tools/perf/arch/x86/util/evsel.c b/tools/perf/arch/x86/util/evsel.c
+new file mode 100644
+index 000000000000..95c623c0119f
+--- /dev/null
++++ b/tools/perf/arch/x86/util/evsel.c
+@@ -0,0 +1,24 @@
++#include <string.h>
++
++#include <linux/perf_event.h>
++#include <linux/err.h>
++
++#include "../../util/evsel.h"
++
++int perf_evsel__suppl_strerror(struct perf_evsel *evsel,
++			       struct target *target __maybe_unused,
++			       int err, char *msg, size_t size)
++{
++	switch (err) {
++	case EOPNOTSUPP:
++		if (evsel->attr.type == PERF_TYPE_HARDWARE)
++			return scnprintf(msg, size, "%s",
++	"No hardware sampling interrupt available.\n"
++	"No APIC? If so then you can boot the kernel with the \"lapic\" boot parameter to force-enable it.");
++		break;
++	default:
++		break;
++	}
++
++	return 0;
++}
+diff --git a/tools/perf/util/evsel.c b/tools/perf/util/evsel.c
+index 3ec0aed0bdcb..a6aa18e3a0c2 100644
+--- a/tools/perf/util/evsel.c
++++ b/tools/perf/util/evsel.c
+@@ -2686,12 +2686,27 @@ static bool find_process(const char *name)
+ 	return ret ? false : true;
+ }
+ 
++int __weak perf_evsel__suppl_strerror(struct perf_evsel *evsel __maybe_unused,
++				      struct target *target __maybe_unused,
++				      int err __maybe_unused,
++				      char *msg __maybe_unused,
++				      size_t size __maybe_unused)
++{
++	return 0;
++}
++
+ int perf_evsel__open_strerror(struct perf_evsel *evsel, struct target *target,
+ 			      int err, char *msg, size_t size)
+ {
+ 	char sbuf[STRERR_BUFSIZE];
+ 	int printed = 0;
+ 
++	printed = perf_evsel__suppl_strerror(evsel, target, err, msg, size);
++	if (printed > 0) {
++		msg += printed;
++		size -= printed;
++	}
++
+ 	switch (err) {
+ 	case EPERM:
+ 	case EACCES:
+@@ -2745,12 +2760,6 @@ int perf_evsel__open_strerror(struct perf_evsel *evsel, struct target *target,
+ 		if (evsel->attr.precise_ip)
+ 			return scnprintf(msg, size, "%s",
+ 	"\'precise\' request may not be supported. Try removing 'p' modifier.");
+-#if defined(__i386__) || defined(__x86_64__)
+-		if (evsel->attr.type == PERF_TYPE_HARDWARE)
+-			return scnprintf(msg, size, "%s",
+-	"No hardware sampling interrupt available.\n"
+-	"No APIC? If so then you can boot the kernel with the \"lapic\" boot parameter to force-enable it.");
+-#endif
+ 		break;
+ 	case EBUSY:
+ 		if (find_process("oprofiled"))
+diff --git a/tools/perf/util/evsel.h b/tools/perf/util/evsel.h
+index 77bd310eb0cb..aef759c178aa 100644
+--- a/tools/perf/util/evsel.h
++++ b/tools/perf/util/evsel.h
+@@ -416,6 +416,8 @@ bool perf_evsel__fallback(struct perf_evsel *evsel, int err,
+ 			  char *msg, size_t msgsize);
+ int perf_evsel__open_strerror(struct perf_evsel *evsel, struct target *target,
+ 			      int err, char *msg, size_t size);
++int perf_evsel__suppl_strerror(struct perf_evsel *evsel, struct target *target,
++			       int err, char *msg, size_t size);
+ 
+ static inline int perf_evsel__group_idx(struct perf_evsel *evsel)
+ {
+-- 
+2.14.2
