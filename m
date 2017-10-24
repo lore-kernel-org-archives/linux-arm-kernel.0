@@ -1,375 +1,645 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 24 Oct 2017 12:16:32 -0700
-Subject: [PATCH v5 5/6] input: Add MediaTek PMIC keys support
-In-Reply-To: <1508837852.4057.6.camel@mhfsdcap03>
-References: <1506509048-19032-1-git-send-email-chen.zhong@mediatek.com>
- <1506509048-19032-6-git-send-email-chen.zhong@mediatek.com>
- <20171024054409.6qbuzenzymkkjdth@dtor-ws>
- <1508837852.4057.6.camel@mhfsdcap03>
-Message-ID: <20171024191632.ywzv4uxm24ewuu6u@dtor-ws>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 24 Oct 2017 14:53:48 -0500
+Subject: [PATCH v2] PCI: hisi: add PCIe driver support for HiSilicon STB
+ SoCs
+In-Reply-To: <1508757470-22631-1-git-send-email-shawnguo@kernel.org>
+References: <1508757470-22631-1-git-send-email-shawnguo@kernel.org>
+Message-ID: <20171024195348.GC21840@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 24, 2017 at 05:37:32PM +0800, Chen Zhong wrote:
-> On Mon, 2017-10-23 at 22:44 -0700, Dmitry Torokhov wrote:
-> > On Wed, Sep 27, 2017 at 06:44:07PM +0800, Chen Zhong wrote:
-> > > This patch add support to handle MediaTek PMIC MT6397/MT6323 key
-> > > interrupts including pwrkey and homekey, also add setting for
-> > > long press key shutdown behavior.
-> > > 
-> > > Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
-> > > ---
-> > >  drivers/input/keyboard/Kconfig         |    9 +
-> > >  drivers/input/keyboard/Makefile        |    1 +
-> > >  drivers/input/keyboard/mtk-pmic-keys.c |  341 ++++++++++++++++++++++++++++++++
-> > >  3 files changed, 351 insertions(+)
-> > >  create mode 100644 drivers/input/keyboard/mtk-pmic-keys.c
-> > > 
-> > > diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
-> > > index 4c4ab1c..bd4e20a 100644
-> > > --- a/drivers/input/keyboard/Kconfig
-> > > +++ b/drivers/input/keyboard/Kconfig
-> > > @@ -756,4 +756,13 @@ config KEYBOARD_BCM
-> > >  	  To compile this driver as a module, choose M here: the
-> > >  	  module will be called bcm-keypad.
-> > >  
-> > > +config KEYBOARD_MTK_PMIC
-> > > +	tristate "MediaTek PMIC keys support"
-> > > +	depends on MFD_MT6397
-> > > +	help
-> > > +	  Say Y here if you want to use the pmic keys (powerkey/homekey).
-> > > +
-> > > +	  To compile this driver as a module, choose M here: the
-> > > +	  module will be called pmic-keys.
-> > > +
-> > >  endif
-> > > diff --git a/drivers/input/keyboard/Makefile b/drivers/input/keyboard/Makefile
-> > > index d2338ba..20c0b98 100644
-> > > --- a/drivers/input/keyboard/Makefile
-> > > +++ b/drivers/input/keyboard/Makefile
-> > > @@ -40,6 +40,7 @@ obj-$(CONFIG_KEYBOARD_MATRIX)		+= matrix_keypad.o
-> > >  obj-$(CONFIG_KEYBOARD_MAX7359)		+= max7359_keypad.o
-> > >  obj-$(CONFIG_KEYBOARD_MCS)		+= mcs_touchkey.o
-> > >  obj-$(CONFIG_KEYBOARD_MPR121)		+= mpr121_touchkey.o
-> > > +obj-$(CONFIG_KEYBOARD_MTK_PMIC) 	+= mtk-pmic-keys.o
-> > >  obj-$(CONFIG_KEYBOARD_NEWTON)		+= newtonkbd.o
-> > >  obj-$(CONFIG_KEYBOARD_NOMADIK)		+= nomadik-ske-keypad.o
-> > >  obj-$(CONFIG_KEYBOARD_NSPIRE)		+= nspire-keypad.o
-> > > diff --git a/drivers/input/keyboard/mtk-pmic-keys.c b/drivers/input/keyboard/mtk-pmic-keys.c
-> > > new file mode 100644
-> > > index 0000000..529fd95
-> > > --- /dev/null
-> > > +++ b/drivers/input/keyboard/mtk-pmic-keys.c
-> > > @@ -0,0 +1,341 @@
-> > > +/*
-> > > + * Copyright (C) 2017 MediaTek, Inc.
-> > > + *
-> > > + * Author: Chen Zhong <chen.zhong@mediatek.com>
-> > > + *
-> > > + * This software is licensed under the terms of the GNU General Public
-> > > + * License version 2, as published by the Free Software Foundation, and
-> > > + * may be copied, distributed, and modified under those terms.
-> > > + *
-> > > + * This program is distributed in the hope that it will be useful,
-> > > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > > + * GNU General Public License for more details.
-> > > + *
-> > > + */
-> > > +
-> > > +#include <linux/module.h>
-> > > +#include <linux/kernel.h>
-> > > +#include <linux/input.h>
-> > > +#include <linux/interrupt.h>
-> > > +#include <linux/platform_device.h>
-> > > +#include <linux/kernel.h>
-> > > +#include <linux/of.h>
-> > > +#include <linux/of_device.h>
-> > > +#include <linux/regmap.h>
-> > > +#include <linux/mfd/mt6323/registers.h>
-> > > +#include <linux/mfd/mt6397/registers.h>
-> > > +#include <linux/mfd/mt6397/core.h>
-> > > +
-> > > +#define MTK_PMIC_PWRKEY_RST_EN_MASK	0x1
-> > > +#define MTK_PMIC_PWRKEY_RST_EN_SHIFT	6
-> > > +#define MTK_PMIC_HOMEKEY_RST_EN_MASK	0x1
-> > > +#define MTK_PMIC_HOMEKEY_RST_EN_SHIFT	5
-> > > +#define MTK_PMIC_RST_DU_MASK		0x3
-> > > +#define MTK_PMIC_RST_DU_SHIFT		8
-> > > +
-> > > +#define MTK_PMIC_PWRKEY_RST		\
-> > > +	(MTK_PMIC_PWRKEY_RST_EN_MASK << MTK_PMIC_PWRKEY_RST_EN_SHIFT)
-> > > +#define MTK_PMIC_HOMEKEY_RST		\
-> > > +	(MTK_PMIC_HOMEKEY_RST_EN_MASK << MTK_PMIC_HOMEKEY_RST_EN_SHIFT)
-> > > +
-> > > +#define MTK_PMIC_PWRKEY_INDEX	0
-> > > +#define MTK_PMIC_HOMEKEY_INDEX	1
-> > > +#define MTK_PMIC_MAX_KEY_COUNT	2
-> > > +
-> > > +struct mtk_pmic_keys_regs {
-> > > +	u32 deb_reg;
-> > > +	u32 deb_mask;
-> > > +	u32 intsel_reg;
-> > > +	u32 intsel_mask;
-> > > +};
-> > > +
-> > > +#define MTK_PMIC_KEYS_REGS(_deb_reg, _deb_mask,		\
-> > > +	_intsel_reg, _intsel_mask)			\
-> > > +{							\
-> > > +	.deb_reg		= _deb_reg,		\
-> > > +	.deb_mask		= _deb_mask,		\
-> > > +	.intsel_reg		= _intsel_reg,		\
-> > > +	.intsel_mask		= _intsel_mask,		\
-> > > +}
-> > > +
-> > > +struct mtk_pmic_regs {
-> > > +	const struct mtk_pmic_keys_regs keys_regs[MTK_PMIC_MAX_KEY_COUNT];
-> > > +	u32 pmic_rst_reg;
-> > > +};
-> > > +
-> > > +static const struct mtk_pmic_regs mt6397_regs = {
-> > > +	.keys_regs[MTK_PMIC_PWRKEY_INDEX] =
-> > > +		MTK_PMIC_KEYS_REGS(MT6397_CHRSTATUS,
-> > > +		0x8, MT6397_INT_RSV, 0x10),
-> > > +	.keys_regs[MTK_PMIC_HOMEKEY_INDEX] =
-> > > +		MTK_PMIC_KEYS_REGS(MT6397_OCSTATUS2,
-> > > +		0x10, MT6397_INT_RSV, 0x8),
-> > > +	.pmic_rst_reg = MT6397_TOP_RST_MISC,
-> > > +};
-> > > +
-> > > +static const struct mtk_pmic_regs mt6323_regs = {
-> > > +	.keys_regs[MTK_PMIC_PWRKEY_INDEX] =
-> > > +		MTK_PMIC_KEYS_REGS(MT6323_CHRSTATUS,
-> > > +		0x2, MT6323_INT_MISC_CON, 0x10),
-> > > +	.keys_regs[MTK_PMIC_HOMEKEY_INDEX] =
-> > > +		MTK_PMIC_KEYS_REGS(MT6323_CHRSTATUS,
-> > > +		0x4, MT6323_INT_MISC_CON, 0x8),
-> > > +	.pmic_rst_reg = MT6323_TOP_RST_MISC,
-> > > +};
-> > > +
-> > > +struct mtk_pmic_keys_info {
-> > > +	struct mtk_pmic_keys *keys;
-> > > +	const struct mtk_pmic_keys_regs *regs;
-> > > +	unsigned int keycode;
-> > > +	int irq;
-> > > +	bool wakeup:1;
-> > > +};
-> > > +
-> > > +struct mtk_pmic_keys {
-> > > +	struct input_dev *input_dev;
-> > > +	struct device *dev;
-> > > +	struct regmap *regmap;
-> > > +	struct mtk_pmic_keys_info keys[MTK_PMIC_MAX_KEY_COUNT];
-> > > +};
-> > > +
-> > > +enum mtk_pmic_keys_lp_mode {
-> > > +	LP_DISABLE,
-> > > +	LP_ONEKEY,
-> > > +	LP_TWOKEY,
-> > > +};
-> > > +
-> > > +static void mtk_pmic_keys_lp_reset_setup(struct mtk_pmic_keys *keys,
-> > > +		u32 pmic_rst_reg)
-> > > +{
-> > > +	int ret;
-> > > +	u32 long_press_mode, long_press_debounce;
-> > > +
-> > > +	ret = of_property_read_u32(keys->dev->of_node,
-> > > +		"power-off-time-sec", &long_press_debounce);
-> > > +	if (ret)
-> > > +		long_press_debounce = 0;
-> > > +
-> > > +	regmap_update_bits(keys->regmap, pmic_rst_reg,
-> > > +			   MTK_PMIC_RST_DU_MASK << MTK_PMIC_RST_DU_SHIFT,
-> > > +			   long_press_debounce << MTK_PMIC_RST_DU_SHIFT);
-> > > +
-> > > +	ret = of_property_read_u32(keys->dev->of_node,
-> > > +		"mediatek,long-press-mode", &long_press_mode);
-> > > +	if (ret)
-> > > +		long_press_mode = LP_DISABLE;
-> > > +
-> > > +	switch (long_press_mode) {
-> > > +	case LP_ONEKEY:
-> > > +		regmap_update_bits(keys->regmap, pmic_rst_reg,
-> > > +				   MTK_PMIC_PWRKEY_RST,
-> > > +				   MTK_PMIC_PWRKEY_RST);
-> > > +		regmap_update_bits(keys->regmap, pmic_rst_reg,
-> > > +				   MTK_PMIC_HOMEKEY_RST,
-> > > +				   0);
-> > > +		break;
-> > > +	case LP_TWOKEY:
-> > > +		regmap_update_bits(keys->regmap, pmic_rst_reg,
-> > > +				   MTK_PMIC_PWRKEY_RST,
-> > > +				   MTK_PMIC_PWRKEY_RST);
-> > > +		regmap_update_bits(keys->regmap, pmic_rst_reg,
-> > > +				   MTK_PMIC_HOMEKEY_RST,
-> > > +				   MTK_PMIC_HOMEKEY_RST);
-> > > +		break;
-> > > +	case LP_DISABLE:
-> > > +		regmap_update_bits(keys->regmap, pmic_rst_reg,
-> > > +				   MTK_PMIC_PWRKEY_RST,
-> > > +				   0);
-> > > +		regmap_update_bits(keys->regmap, pmic_rst_reg,
-> > > +				   MTK_PMIC_HOMEKEY_RST,
-> > > +				   0);
-> > > +		break;
-> > > +	default:
-> > > +		break;
-> > > +	}
-> > > +}
-> > > +
-> > > +static irqreturn_t mtk_pmic_keys_irq_handler_thread(int irq, void *data)
-> > > +{
-> > > +	struct mtk_pmic_keys_info *info = data;
-> > > +	u32 key_deb, pressed;
-> > > +
-> > > +	regmap_read(info->keys->regmap, info->regs->deb_reg, &key_deb);
-> > > +
-> > > +	key_deb &= info->regs->deb_mask;
-> > > +
-> > > +	pressed = !key_deb;
-> > > +
-> > > +	input_report_key(info->keys->input_dev, info->keycode, pressed);
-> > > +	input_sync(info->keys->input_dev);
-> > > +
-> > > +	dev_dbg(info->keys->dev, "(%s) key =%d using PMIC\n",
-> > > +		 pressed ? "pressed" : "released", info->keycode);
-> > > +
-> > > +	return IRQ_HANDLED;
-> > > +}
-> > > +
-> > > +static int mtk_pmic_key_setup(struct mtk_pmic_keys *keys,
-> > > +		struct mtk_pmic_keys_info *info)
-> > > +{
-> > > +	int ret;
-> > > +
-> > > +	info->keys = keys;
-> > > +
-> > > +	ret = regmap_update_bits(keys->regmap, info->regs->intsel_reg,
-> > > +				 info->regs->intsel_mask,
-> > > +				 info->regs->intsel_mask);
-> > > +	if (ret < 0)
-> > > +		return ret;
-> > > +
-> > > +	ret = devm_request_threaded_irq(keys->dev, info->irq, NULL,
-> > > +					mtk_pmic_keys_irq_handler_thread,
-> > > +					IRQF_ONESHOT | IRQF_TRIGGER_HIGH,
-> > > +					"mtk-pmic-keys", info);
-> > > +	if (ret) {
-> > > +		dev_err(keys->dev, "Failed to request IRQ: %d: %d\n",
-> > > +			info->irq, ret);
-> > > +		return ret;
-> > > +	}
-> > > +
-> > > +	input_set_capability(keys->input_dev, EV_KEY, info->keycode);
-> > > +
-> > > +	return 0;
-> > > +}
-> > > +
-> > > +#ifdef CONFIG_PM_SLEEP
-> > > +static int mtk_pmic_keys_suspend(struct device *dev)
-> > 
-> > Please use __maybe_unused annotation instead of #ifdef guard.
-> > 
-> > > +{
-> > > +	struct mtk_pmic_keys *keys = dev_get_drvdata(dev);
-> > > +	int index;
-> > > +
-> > > +	for (index = 0; index < MTK_PMIC_MAX_KEY_COUNT; index++) {
-> > > +		if (keys->keys[index].wakeup)
-> > > +			enable_irq_wake(keys->keys[index].irq);
-> > > +	}
-> > > +
-> > > +	return 0;
-> > > +}
-> > > +
-> > > +static int mtk_pmic_keys_resume(struct device *dev)
-> > 
-> > __maybe_unused here as well.
-> > 
-> > > +{
-> > > +	struct mtk_pmic_keys *keys = dev_get_drvdata(dev);
-> > > +	int index;
-> > > +
-> > > +	for (index = 0; index < MTK_PMIC_MAX_KEY_COUNT; index++) {
-> > > +		if (keys->keys[index].wakeup)
-> > > +			disable_irq_wake(keys->keys[index].irq);
-> > > +	}
-> > > +
-> > > +	return 0;
-> > > +}
-> > > +#endif
-> > > +
-> > > +static SIMPLE_DEV_PM_OPS(mtk_pmic_keys_pm_ops, mtk_pmic_keys_suspend,
-> > > +			mtk_pmic_keys_resume);
-> > > +
-> > > +static const struct of_device_id of_mtk_pmic_keys_match_tbl[] = {
-> > > +	{
-> > > +		.compatible = "mediatek,mt6397-keys",
-> > > +		.data = &mt6397_regs,
-> > > +	}, {
-> > > +		.compatible = "mediatek,mt6323-keys",
-> > > +		.data = &mt6323_regs,
-> > > +	}, {
-> > > +		/* sentinel */
-> > > +	}
-> > > +};
-> > > +MODULE_DEVICE_TABLE(of, of_mtk_pmic_keys_match_tbl);
-> > > +
-> > > +static int mtk_pmic_keys_probe(struct platform_device *pdev)
-> > > +{
-> > > +	int error, index = 0;
-> > > +	unsigned int keycount;
-> > > +	struct mt6397_chip *pmic_chip = dev_get_drvdata(pdev->dev.parent);
-> > > +	struct device_node *node = pdev->dev.of_node, *child;
-> > > +	struct mtk_pmic_keys *keys;
-> > > +	const struct mtk_pmic_regs *mtk_pmic_regs;
-> > > +	struct input_dev *input_dev;
-> > > +	const struct of_device_id *of_id =
-> > > +		of_match_device(of_mtk_pmic_keys_match_tbl, &pdev->dev);
-> > > +
-> > > +	keys = devm_kzalloc(&pdev->dev, sizeof(*keys), GFP_KERNEL);
-> > > +	if (!keys)
-> > > +		return -ENOMEM;
-> > > +
-> > > +	keys->dev = &pdev->dev;
-> > > +	keys->regmap = pmic_chip->regmap;
-> > > +	mtk_pmic_regs = of_id->data;
-> > > +
-> > > +	keys->input_dev = input_dev = devm_input_allocate_device(keys->dev);
-> > > +	if (!input_dev) {
-> > > +		dev_err(keys->dev, "input allocate device fail.\n");
-> > > +		return -ENOMEM;
-> > > +	}
-> > > +
-> > > +	input_dev->name = "mtk-pmic-keys";
-> > > +	input_dev->id.bustype = BUS_HOST;
-> > > +	input_dev->id.vendor = 0x0001;
-> > > +	input_dev->id.product = 0x0001;
-> > > +	input_dev->id.version = 0x0001;
-> > > +
-> > > +	keycount = device_get_child_node_count(keys->dev);
-> > 
-> > Since you are using of_* API everywhere else I'd rather we used
-> > of_get_available_child_count() here.
-> > 
-> > 
-> > Once these 2 issues are fixed please feel free to add 
-> > 
-> > Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> > 
-> > I assume it will all go though MFD tree, right?
+On Mon, Oct 23, 2017 at 07:17:50PM +0800, Shawn Guo wrote:
+> From: Jianguo Sun <sunjianguo1@huawei.com>
 > 
-> I will fix these 2 issues and send the new version.
+> Add PCIe controller driver for HiSilicon STB SoCs,
+> the controller is based on the DesignWare PCIe core.
 > 
-> Since patch 2,3,4,5 of this series are all for input driver, could you
-> help to merge them with the new version later?
+> Signed-off-by: Jianguo Sun <sunjianguo1@huawei.com>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-Even though they applicable to the input component they do touch MFD
-domain... Lee, how do you want to proceed here so we do not hold up the
-patch series for too long?
+Applied to pci/host-hisi for v4.15, thanks!
 
-Thanks.
-
--- 
-Dmitry
+> ---
+> Changes for v2:
+>  - Add a MAINTAINERS entry for the driver.
+>  - Unify the spell of DesignWare and PCIe in text and messages.
+>  - Use "MSI IRQ" in message output.
+>  - Fix the indentation of function parameters on newline.
+>  - Fix interrupt-map for legacy interrupts in bindings example.
+> 
+>  .../bindings/pci/hisilicon-histb-pcie.txt          |  68 +++
+>  MAINTAINERS                                        |   8 +
+>  drivers/pci/dwc/Kconfig                            |  10 +
+>  drivers/pci/dwc/Makefile                           |   1 +
+>  drivers/pci/dwc/pcie-histb.c                       | 469 +++++++++++++++++++++
+>  5 files changed, 556 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/hisilicon-histb-pcie.txt
+>  create mode 100644 drivers/pci/dwc/pcie-histb.c
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/hisilicon-histb-pcie.txt b/Documentation/devicetree/bindings/pci/hisilicon-histb-pcie.txt
+> new file mode 100644
+> index 000000000000..e4d79d03214b
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/hisilicon-histb-pcie.txt
+> @@ -0,0 +1,68 @@
+> +HiSilicon STB PCIe host bridge DT description
+> +
+> +HiSilicon STB PCIe host controller is based on DesignWare PCIe core.
+> +It shares common functions with PCIe DesignWare core driver and inherits
+> +common properties defined in
+> +Documentation/devicetree/bindings/pci/designware-pcie.txt.
+> +
+> +Additional properties are described here:
+> +
+> +Required properties
+> +- compatible: Should be one of the following strings:
+> +		"hisilicon,hi3798cv200-pcie"
+> +- reg: Should contain sysctl, rc_dbi, config registers location and length.
+> +- reg-names: Must include the following entries:
+> +  "control": control registers of PCIe controller;
+> +  "rc-dbi": configuration space of PCIe controller;
+> +  "config": configuration transaction space of PCIe controller.
+> +- bus-range: PCI bus numbers covered.
+> +- interrupts: MSI interrupt.
+> +- interrupt-names: Must include "msi" entries.
+> +- clocks: List of phandle and clock specifier pairs as listed in clock-names
+> +  property.
+> +- clock-name: Must include the following entries:
+> +  "aux": auxiliary gate clock;
+> +  "pipe": pipe gate clock;
+> +  "sys": sys gate clock;
+> +  "bus": bus gate clock.
+> +- resets: List of phandle and reset specifier pairs as listed in reset-names
+> +  property.
+> +- reset-names: Must include the following entries:
+> +  "soft": soft reset;
+> +  "sys": sys reset;
+> +  "bus": bus reset.
+> +
+> +Optional properties:
+> +- reset-gpios: The gpio to generate PCIe PERST# assert and deassert signal.
+> +- phys: List of phandle and phy mode specifier, should be 0.
+> +- phy-names: Must be "phy".
+> +
+> +Example:
+> +	pcie at f9860000 {
+> +		compatible = "hisilicon,hi3798cv200-pcie";
+> +		reg = <0xf9860000 0x1000>,
+> +		      <0xf0000000 0x2000>,
+> +		      <0xf2000000 0x01000000>;
+> +		reg-names = "control", "rc-dbi", "config";
+> +		#address-cells = <3>;
+> +		#size-cells = <2>;
+> +		device_type = "pci";
+> +		bus-range = <0 15>;
+> +		num-lanes = <1>;
+> +		ranges=<0x81000000 0 0 0xf4000000 0 0x00010000
+> +			0x82000000 0 0xf3000000 0xf3000000 0 0x01000000>;
+> +		interrupts = <GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH>;
+> +		interrupt-names = "msi";
+> +		#interrupt-cells = <1>;
+> +		interrupt-map-mask = <0 0 0 0>;
+> +		interrupt-map = <0 0 0 0 &gic GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&crg PCIE_AUX_CLK>,
+> +			 <&crg PCIE_PIPE_CLK>,
+> +			 <&crg PCIE_SYS_CLK>,
+> +			 <&crg PCIE_BUS_CLK>;
+> +		clock-names = "aux", "pipe", "sys", "bus";
+> +		resets = <&crg 0x18c 6>, <&crg 0x18c 5>, <&crg 0x18c 4>;
+> +		reset-names = "soft", "sys", "bus";
+> +		phys = <&combphy1 PHY_TYPE_PCIE>;
+> +		phy-names = "phy";
+> +	};
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index a74227ad082e..2520bf02bc12 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -10487,6 +10487,14 @@ S:	Maintained
+>  F:	Documentation/devicetree/bindings/pci/pcie-kirin.txt
+>  F:	drivers/pci/dwc/pcie-kirin.c
+>  
+> +PCIE DRIVER FOR HISILICON STB
+> +M:	Jianguo Sun <sunjianguo1@huawei.com>
+> +M:	Shawn Guo <shawn.guo@linaro.org>
+> +L:	linux-pci at vger.kernel.org
+> +S:	Maintained
+> +F:	Documentation/devicetree/bindings/pci/hisilicon-histb-pcie.txt
+> +F:	drivers/pci/dwc/pcie-histb.c
+> +
+>  PCIE DRIVER FOR MEDIATEK
+>  M:	Ryder Lee <ryder.lee@mediatek.com>
+>  L:	linux-pci at vger.kernel.org
+> diff --git a/drivers/pci/dwc/Kconfig b/drivers/pci/dwc/Kconfig
+> index 22ec82fcdea2..113e09440f85 100644
+> --- a/drivers/pci/dwc/Kconfig
+> +++ b/drivers/pci/dwc/Kconfig
+> @@ -169,4 +169,14 @@ config PCIE_KIRIN
+>  	  Say Y here if you want PCIe controller support
+>  	  on HiSilicon Kirin series SoCs.
+>  
+> +config PCIE_HISI_STB
+> +	bool "HiSilicon STB SoCs PCIe controllers"
+> +	depends on ARCH_HISI
+> +	depends on PCI
+> +	depends on PCI_MSI_IRQ_DOMAIN
+> +	select PCIEPORTBUS
+> +	select PCIE_DW_HOST
+> +	help
+> +          Say Y here if you want PCIe controller support on HiSilicon STB SoCs
+> +
+>  endmenu
+> diff --git a/drivers/pci/dwc/Makefile b/drivers/pci/dwc/Makefile
+> index c61be9738cce..54f56f6e9236 100644
+> --- a/drivers/pci/dwc/Makefile
+> +++ b/drivers/pci/dwc/Makefile
+> @@ -14,6 +14,7 @@ obj-$(CONFIG_PCIE_QCOM) += pcie-qcom.o
+>  obj-$(CONFIG_PCIE_ARMADA_8K) += pcie-armada8k.o
+>  obj-$(CONFIG_PCIE_ARTPEC6) += pcie-artpec6.o
+>  obj-$(CONFIG_PCIE_KIRIN) += pcie-kirin.o
+> +obj-$(CONFIG_PCIE_HISI_STB) += pcie-histb.o
+>  
+>  # The following drivers are for devices that use the generic ACPI
+>  # pci_root.c driver but don't support standard ECAM config access.
+> diff --git a/drivers/pci/dwc/pcie-histb.c b/drivers/pci/dwc/pcie-histb.c
+> new file mode 100644
+> index 000000000000..d41ed01e3415
+> --- /dev/null
+> +++ b/drivers/pci/dwc/pcie-histb.c
+> @@ -0,0 +1,469 @@
+> +/*
+> + * PCIe host controller driver for HiSilicon STB SoCs
+> + *
+> + * Copyright (C) 2016-2017 HiSilicon Co., Ltd. http://www.hisilicon.com
+> + *
+> + * Authors: Ruqiang Ju <juruqiang@hisilicon.com>
+> + *          Jianguo Sun <sunjianguo1@huawei.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_gpio.h>
+> +#include <linux/pci.h>
+> +#include <linux/phy/phy.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/resource.h>
+> +#include <linux/reset.h>
+> +
+> +#include "pcie-designware.h"
+> +
+> +#define to_histb_pcie(x)	dev_get_drvdata((x)->dev)
+> +
+> +#define PCIE_SYS_CTRL0			0x0000
+> +#define PCIE_SYS_CTRL1			0x0004
+> +#define PCIE_SYS_CTRL7			0x001C
+> +#define PCIE_SYS_CTRL13			0x0034
+> +#define PCIE_SYS_CTRL15			0x003c
+> +#define PCIE_SYS_CTRL16			0x0040
+> +#define PCIE_SYS_CTRL17			0x0044
+> +
+> +#define PCIE_SYS_STAT0			0x0100
+> +#define PCIE_SYS_STAT4			0x0110
+> +
+> +#define PCIE_RDLH_LINK_UP		BIT(5)
+> +#define PCIE_XMLH_LINK_UP		BIT(15)
+> +#define PCIE_ELBI_SLV_DBI_ENABLE	BIT(21)
+> +#define PCIE_APP_LTSSM_ENABLE		BIT(11)
+> +
+> +#define PCIE_DEVICE_TYPE_MASK		GENMASK(31, 28)
+> +#define PCIE_WM_EP			0
+> +#define PCIE_WM_LEGACY			BIT(1)
+> +#define PCIE_WM_RC			BIT(30)
+> +
+> +#define PCIE_LTSSM_STATE_MASK		GENMASK(5, 0)
+> +#define PCIE_LTSSM_STATE_ACTIVE		0x11
+> +
+> +struct histb_pcie {
+> +	struct dw_pcie *pci;
+> +	struct clk *aux_clk;
+> +	struct clk *pipe_clk;
+> +	struct clk *sys_clk;
+> +	struct clk *bus_clk;
+> +	struct phy *phy;
+> +	struct reset_control *soft_reset;
+> +	struct reset_control *sys_reset;
+> +	struct reset_control *bus_reset;
+> +	void __iomem *ctrl;
+> +	int reset_gpio;
+> +};
+> +
+> +static u32 histb_pcie_readl(struct histb_pcie *histb_pcie, u32 reg)
+> +{
+> +	return readl(histb_pcie->ctrl + reg);
+> +}
+> +
+> +static void histb_pcie_writel(struct histb_pcie *histb_pcie, u32 reg, u32 val)
+> +{
+> +	writel(val, histb_pcie->ctrl + reg);
+> +}
+> +
+> +static void histb_pcie_dbi_w_mode(struct pcie_port *pp, bool enable)
+> +{
+> +	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+> +	struct histb_pcie *hipcie = to_histb_pcie(pci);
+> +	u32 val;
+> +
+> +	val = histb_pcie_readl(hipcie, PCIE_SYS_CTRL0);
+> +	if (enable)
+> +		val |= PCIE_ELBI_SLV_DBI_ENABLE;
+> +	else
+> +		val &= ~PCIE_ELBI_SLV_DBI_ENABLE;
+> +	histb_pcie_writel(hipcie, PCIE_SYS_CTRL0, val);
+> +}
+> +
+> +static void histb_pcie_dbi_r_mode(struct pcie_port *pp, bool enable)
+> +{
+> +	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+> +	struct histb_pcie *hipcie = to_histb_pcie(pci);
+> +	u32 val;
+> +
+> +	val = histb_pcie_readl(hipcie, PCIE_SYS_CTRL1);
+> +	if (enable)
+> +		val |= PCIE_ELBI_SLV_DBI_ENABLE;
+> +	else
+> +		val &= ~PCIE_ELBI_SLV_DBI_ENABLE;
+> +	histb_pcie_writel(hipcie, PCIE_SYS_CTRL1, val);
+> +}
+> +
+> +static u32 histb_pcie_read_dbi(struct dw_pcie *pci, void __iomem *base,
+> +			       u32 reg, size_t size)
+> +{
+> +	u32 val;
+> +
+> +	histb_pcie_dbi_r_mode(&pci->pp, true);
+> +	dw_pcie_read(base + reg, size, &val);
+> +	histb_pcie_dbi_r_mode(&pci->pp, false);
+> +
+> +	return val;
+> +}
+> +
+> +static void histb_pcie_write_dbi(struct dw_pcie *pci, void __iomem *base,
+> +				 u32 reg, size_t size, u32 val)
+> +{
+> +	histb_pcie_dbi_w_mode(&pci->pp, true);
+> +	dw_pcie_write(base + reg, size, val);
+> +	histb_pcie_dbi_w_mode(&pci->pp, false);
+> +}
+> +
+> +static int histb_pcie_rd_own_conf(struct pcie_port *pp, int where,
+> +				  int size, u32 *val)
+> +{
+> +	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+> +	int ret;
+> +
+> +	histb_pcie_dbi_r_mode(pp, true);
+> +	ret = dw_pcie_read(pci->dbi_base + where, size, val);
+> +	histb_pcie_dbi_r_mode(pp, false);
+> +
+> +	return ret;
+> +}
+> +
+> +static int histb_pcie_wr_own_conf(struct pcie_port *pp, int where,
+> +				  int size, u32 val)
+> +{
+> +	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+> +	int ret;
+> +
+> +	histb_pcie_dbi_w_mode(pp, true);
+> +	ret = dw_pcie_write(pci->dbi_base + where, size, val);
+> +	histb_pcie_dbi_w_mode(pp, false);
+> +
+> +	return ret;
+> +}
+> +
+> +static int histb_pcie_link_up(struct dw_pcie *pci)
+> +{
+> +	struct histb_pcie *hipcie = to_histb_pcie(pci);
+> +	u32 regval;
+> +	u32 status;
+> +
+> +	regval = histb_pcie_readl(hipcie, PCIE_SYS_STAT0);
+> +	status = histb_pcie_readl(hipcie, PCIE_SYS_STAT4);
+> +	status &= PCIE_LTSSM_STATE_MASK;
+> +	if ((regval & PCIE_XMLH_LINK_UP) && (regval & PCIE_RDLH_LINK_UP) &&
+> +	    (status == PCIE_LTSSM_STATE_ACTIVE))
+> +		return 1;
+> +
+> +	return 0;
+> +}
+> +
+> +static int histb_pcie_establish_link(struct pcie_port *pp)
+> +{
+> +	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+> +	struct histb_pcie *hipcie = to_histb_pcie(pci);
+> +	u32 regval;
+> +
+> +	if (dw_pcie_link_up(pci)) {
+> +		dev_info(pci->dev, "Link already up\n");
+> +		return 0;
+> +	}
+> +
+> +	/* PCIe RC work mode */
+> +	regval = histb_pcie_readl(hipcie, PCIE_SYS_CTRL0);
+> +	regval &= ~PCIE_DEVICE_TYPE_MASK;
+> +	regval |= PCIE_WM_RC;
+> +	histb_pcie_writel(hipcie, PCIE_SYS_CTRL0, regval);
+> +
+> +	/* setup root complex */
+> +	dw_pcie_setup_rc(pp);
+> +
+> +	/* assert LTSSM enable */
+> +	regval = histb_pcie_readl(hipcie, PCIE_SYS_CTRL7);
+> +	regval |= PCIE_APP_LTSSM_ENABLE;
+> +	histb_pcie_writel(hipcie, PCIE_SYS_CTRL7, regval);
+> +
+> +	return dw_pcie_wait_for_link(pci);
+> +}
+> +
+> +static int histb_pcie_host_init(struct pcie_port *pp)
+> +{
+> +	histb_pcie_establish_link(pp);
+> +
+> +	if (IS_ENABLED(CONFIG_PCI_MSI))
+> +		dw_pcie_msi_init(pp);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct dw_pcie_host_ops histb_pcie_host_ops = {
+> +	.rd_own_conf = histb_pcie_rd_own_conf,
+> +	.wr_own_conf = histb_pcie_wr_own_conf,
+> +	.host_init = histb_pcie_host_init,
+> +};
+> +
+> +static irqreturn_t histb_pcie_msi_irq_handler(int irq, void *arg)
+> +{
+> +	struct pcie_port *pp = arg;
+> +
+> +	return dw_handle_msi_irq(pp);
+> +}
+> +
+> +static void histb_pcie_host_disable(struct histb_pcie *hipcie)
+> +{
+> +	reset_control_assert(hipcie->soft_reset);
+> +	reset_control_assert(hipcie->sys_reset);
+> +	reset_control_assert(hipcie->bus_reset);
+> +
+> +	clk_disable_unprepare(hipcie->aux_clk);
+> +	clk_disable_unprepare(hipcie->pipe_clk);
+> +	clk_disable_unprepare(hipcie->sys_clk);
+> +	clk_disable_unprepare(hipcie->bus_clk);
+> +
+> +	if (gpio_is_valid(hipcie->reset_gpio))
+> +		gpio_set_value_cansleep(hipcie->reset_gpio, 0);
+> +}
+> +
+> +static int histb_pcie_host_enable(struct pcie_port *pp)
+> +{
+> +	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+> +	struct histb_pcie *hipcie = to_histb_pcie(pci);
+> +	struct device *dev = pci->dev;
+> +	int ret;
+> +
+> +	/* power on PCIe device if have */
+> +	if (gpio_is_valid(hipcie->reset_gpio))
+> +		gpio_set_value_cansleep(hipcie->reset_gpio, 1);
+> +
+> +	ret = clk_prepare_enable(hipcie->bus_clk);
+> +	if (ret) {
+> +		dev_err(dev, "cannot prepare/enable bus clk\n");
+> +		goto err_bus_clk;
+> +	}
+> +
+> +	ret = clk_prepare_enable(hipcie->sys_clk);
+> +	if (ret) {
+> +		dev_err(dev, "cannot prepare/enable sys clk\n");
+> +		goto err_sys_clk;
+> +	}
+> +
+> +	ret = clk_prepare_enable(hipcie->pipe_clk);
+> +	if (ret) {
+> +		dev_err(dev, "cannot prepare/enable pipe clk\n");
+> +		goto err_pipe_clk;
+> +	}
+> +
+> +	ret = clk_prepare_enable(hipcie->aux_clk);
+> +	if (ret) {
+> +		dev_err(dev, "cannot prepare/enable aux clk\n");
+> +		goto err_aux_clk;
+> +	}
+> +
+> +	reset_control_assert(hipcie->soft_reset);
+> +	reset_control_deassert(hipcie->soft_reset);
+> +
+> +	reset_control_assert(hipcie->sys_reset);
+> +	reset_control_deassert(hipcie->sys_reset);
+> +
+> +	reset_control_assert(hipcie->bus_reset);
+> +	reset_control_deassert(hipcie->bus_reset);
+> +
+> +	return 0;
+> +
+> +err_aux_clk:
+> +	clk_disable_unprepare(hipcie->aux_clk);
+> +err_pipe_clk:
+> +	clk_disable_unprepare(hipcie->pipe_clk);
+> +err_sys_clk:
+> +	clk_disable_unprepare(hipcie->sys_clk);
+> +err_bus_clk:
+> +	clk_disable_unprepare(hipcie->bus_clk);
+> +
+> +	return ret;
+> +}
+> +
+> +static const struct dw_pcie_ops dw_pcie_ops = {
+> +	.read_dbi = histb_pcie_read_dbi,
+> +	.write_dbi = histb_pcie_write_dbi,
+> +	.link_up = histb_pcie_link_up,
+> +};
+> +
+> +static int histb_pcie_probe(struct platform_device *pdev)
+> +{
+> +	struct histb_pcie *hipcie;
+> +	struct dw_pcie *pci;
+> +	struct pcie_port *pp;
+> +	struct resource *res;
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct device *dev = &pdev->dev;
+> +	enum of_gpio_flags of_flags;
+> +	unsigned long flag = GPIOF_DIR_OUT;
+> +	int ret;
+> +
+> +	hipcie = devm_kzalloc(dev, sizeof(*hipcie), GFP_KERNEL);
+> +	if (!hipcie)
+> +		return -ENOMEM;
+> +
+> +	pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
+> +	if (!pci)
+> +		return -ENOMEM;
+> +
+> +	hipcie->pci = pci;
+> +	pp = &pci->pp;
+> +	pci->dev = dev;
+> +	pci->ops = &dw_pcie_ops;
+> +
+> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "control");
+> +	hipcie->ctrl = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(hipcie->ctrl)) {
+> +		dev_err(dev, "cannot get control reg base\n");
+> +		return PTR_ERR(hipcie->ctrl);
+> +	}
+> +
+> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "rc-dbi");
+> +	pci->dbi_base = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(pci->dbi_base)) {
+> +		dev_err(dev, "cannot get rc-dbi base\n");
+> +		return PTR_ERR(pci->dbi_base);
+> +	}
+> +
+> +	hipcie->reset_gpio = of_get_named_gpio_flags(np,
+> +				"reset-gpios", 0, &of_flags);
+> +	if (of_flags & OF_GPIO_ACTIVE_LOW)
+> +		flag |= GPIOF_ACTIVE_LOW;
+> +	if (gpio_is_valid(hipcie->reset_gpio)) {
+> +		ret = devm_gpio_request_one(dev, hipcie->reset_gpio,
+> +				flag, "PCIe device power control");
+> +		if (ret) {
+> +			dev_err(dev, "unable to request gpio\n");
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	hipcie->aux_clk = devm_clk_get(dev, "aux");
+> +	if (IS_ERR(hipcie->aux_clk)) {
+> +		dev_err(dev, "Failed to get PCIe aux clk\n");
+> +		return PTR_ERR(hipcie->aux_clk);
+> +	}
+> +
+> +	hipcie->pipe_clk = devm_clk_get(dev, "pipe");
+> +	if (IS_ERR(hipcie->pipe_clk)) {
+> +		dev_err(dev, "Failed to get PCIe pipe clk\n");
+> +		return PTR_ERR(hipcie->pipe_clk);
+> +	}
+> +
+> +	hipcie->sys_clk = devm_clk_get(dev, "sys");
+> +	if (IS_ERR(hipcie->sys_clk)) {
+> +		dev_err(dev, "Failed to get PCIEe sys clk\n");
+> +		return PTR_ERR(hipcie->sys_clk);
+> +	}
+> +
+> +	hipcie->bus_clk = devm_clk_get(dev, "bus");
+> +	if (IS_ERR(hipcie->bus_clk)) {
+> +		dev_err(dev, "Failed to get PCIe bus clk\n");
+> +		return PTR_ERR(hipcie->bus_clk);
+> +	}
+> +
+> +	hipcie->soft_reset = devm_reset_control_get(dev, "soft");
+> +	if (IS_ERR(hipcie->soft_reset)) {
+> +		dev_err(dev, "couldn't get soft reset\n");
+> +		return PTR_ERR(hipcie->soft_reset);
+> +	}
+> +
+> +	hipcie->sys_reset = devm_reset_control_get(dev, "sys");
+> +	if (IS_ERR(hipcie->sys_reset)) {
+> +		dev_err(dev, "couldn't get sys reset\n");
+> +		return PTR_ERR(hipcie->sys_reset);
+> +	}
+> +
+> +	hipcie->bus_reset = devm_reset_control_get(dev, "bus");
+> +	if (IS_ERR(hipcie->bus_reset)) {
+> +		dev_err(dev, "couldn't get bus reset\n");
+> +		return PTR_ERR(hipcie->bus_reset);
+> +	}
+> +
+> +	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+> +		pp->msi_irq = platform_get_irq_byname(pdev, "msi");
+> +		if (pp->msi_irq < 0) {
+> +			dev_err(dev, "Failed to get MSI IRQ\n");
+> +			return pp->msi_irq;
+> +		}
+> +
+> +		ret = devm_request_irq(dev, pp->msi_irq,
+> +				       histb_pcie_msi_irq_handler,
+> +				       IRQF_SHARED, "histb-pcie-msi", pp);
+> +		if (ret) {
+> +			dev_err(dev, "cannot request MSI IRQ\n");
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	hipcie->phy = devm_phy_get(dev, "phy");
+> +	if (IS_ERR(hipcie->phy)) {
+> +		dev_info(dev, "no pcie-phy found\n");
+> +		hipcie->phy = NULL;
+> +		/* fall through here!
+> +		 * if no pcie-phy found, phy init
+> +		 * should be done under boot!
+> +		 */
+> +	} else {
+> +		phy_init(hipcie->phy);
+> +	}
+> +
+> +	pp->root_bus_nr = -1;
+> +	pp->ops = &histb_pcie_host_ops;
+> +
+> +	platform_set_drvdata(pdev, hipcie);
+> +
+> +	ret = histb_pcie_host_enable(pp);
+> +	if (ret) {
+> +		dev_err(dev, "failed to enable host\n");
+> +		return ret;
+> +	}
+> +
+> +	ret = dw_pcie_host_init(pp);
+> +	if (ret) {
+> +		dev_err(dev, "failed to initialize host\n");
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int histb_pcie_remove(struct platform_device *pdev)
+> +{
+> +	struct histb_pcie *hipcie = platform_get_drvdata(pdev);
+> +
+> +	histb_pcie_host_disable(hipcie);
+> +
+> +	if (hipcie->phy)
+> +		phy_exit(hipcie->phy);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id histb_pcie_of_match[] = {
+> +	{ .compatible = "hisilicon,hi3798cv200-pcie", },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, histb_pcie_of_match);
+> +
+> +static struct platform_driver histb_pcie_platform_driver = {
+> +	.probe	= histb_pcie_probe,
+> +	.remove	= histb_pcie_remove,
+> +	.driver = {
+> +		.name = "histb-pcie",
+> +		.of_match_table = histb_pcie_of_match,
+> +	},
+> +};
+> +module_platform_driver(histb_pcie_platform_driver);
+> +
+> +MODULE_DESCRIPTION("HiSilicon STB PCIe host controller driver");
+> +MODULE_LICENSE("GPL v2");
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
