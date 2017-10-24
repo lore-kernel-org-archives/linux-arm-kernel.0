@@ -1,58 +1,68 @@
-From: sw0312.kim@samsung.com (Seung-Woo Kim)
-Date: Tue, 24 Oct 2017 14:55:59 +0900
-Subject: [PATCH] arm: ubsan: select ARCH_HAS_UBSAN_SANITIZE_ALL
-References: <CGME20171024055601epcas2p34a22b2b1fb3f1f71ed875125d87a47c4@epcas2p3.samsung.com>
-Message-ID: <1508824559-6588-1-git-send-email-sw0312.kim@samsung.com>
+From: chenyu56@huawei.com (Yu Chen)
+Date: Tue, 24 Oct 2017 14:06:08 +0800
+Subject: [RFC 1/3] USB: Add document for usb of Hikey960
+In-Reply-To: <20171024060610.10712-1-chenyu56@huawei.com>
+References: <20171024060610.10712-1-chenyu56@huawei.com>
+Message-ID: <20171024060610.10712-2-chenyu56@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Select ARCH_HAS_UBSAN_SANITIZE_ALL from arm confiuration to enable UBSAN
-on arm.
+DT bindings for usb of Hikey960.
 
-Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
+Signed-off-by: Yu Chen <chenyu56@huawei.com>
+Signed-off-by: Ning Fan <fanning4@hisilicon.com>
+Signed-off-by: Di Yang <yangdi10@hisilicon.com>
+Signed-off-by: Rui Li <lirui39@hisilicon.com>
+
 ---
- arch/arm/Kconfig                  |    1 +
- arch/arm/boot/compressed/Makefile |    2 ++
- arch/arm/vdso/Makefile            |    2 ++
- 3 files changed, 5 insertions(+), 0 deletions(-)
+ .../devicetree/bindings/usb/hisilicon-usb.txt      | 38 ++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/usb/hisilicon-usb.txt
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 7888c98..5eb3c89 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -11,6 +11,7 @@ config ARM
- 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
- 	select ARCH_HAVE_CUSTOM_GPIO_H
- 	select ARCH_HAS_GCOV_PROFILE_ALL
-+	select ARCH_HAS_UBSAN_SANITIZE_ALL
- 	select ARCH_MIGHT_HAVE_PC_PARPORT
- 	select ARCH_OPTIONAL_KERNEL_RWX if ARCH_HAS_STRICT_KERNEL_RWX
- 	select ARCH_OPTIONAL_KERNEL_RWX_DEFAULT if CPU_V7
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index d50430c..8f06ab2 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -24,6 +24,8 @@ endif
- 
- GCOV_PROFILE		:= n
- 
-+UBSAN_SANITIZE		:= n
+diff --git a/Documentation/devicetree/bindings/usb/hisilicon-usb.txt b/Documentation/devicetree/bindings/usb/hisilicon-usb.txt
+new file mode 100644
+index 000000000000..dc4c460885d6
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/hisilicon-usb.txt
+@@ -0,0 +1,38 @@
++* HISILICON USB HUB
 +
- #
- # Architecture dependencies
- #
-diff --git a/arch/arm/vdso/Makefile b/arch/arm/vdso/Makefile
-index 59a8fa7..e343700 100644
---- a/arch/arm/vdso/Makefile
-+++ b/arch/arm/vdso/Makefile
-@@ -29,6 +29,8 @@ CFLAGS_vgettimeofday.o = -O2
- # Disable gcov profiling for VDSO code
- GCOV_PROFILE := n
- 
-+UBSAN_SANITIZE := n
++Required properties:
++- compatible: One of the specific types :"hisilicon,hi3660-dwc3",
++			"hisilicon,gpio_hubv1","hisilicon,gpio_hubv2"
 +
- # Force dependency
- $(obj)/vdso.o : $(obj)/vdso.so
- 
++Optional properties of devices using ISP1301:
++- transceiver: phandle of isp1301 - this helps the ISP1301 driver to find the
++               ISP1301 instance associated with the respective USB driver
++
++Example:
++
++	hisi_usb at ff200000 {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		compatible = "hisilicon,hi3660-dwc3";
++		reg = <0x0 0xff200000 0x0 0x1000
++			 0x0 0xff100000 0x0 0x100000>;
++		ranges;
++		bc_again_flag = <0>;
++
++		clocks = <&crg_ctrl HI3660_CLK_ABB_USB>,
++			 <&crg_ctrl HI3660_ACLK_GATE_USB3OTG>;
++		clock-names = "clk_usb3phy_ref", "aclk_usb3otg";
++		eye_diagram_param = <0x1c466e3>;
++		eye_diagram_host_param = <0x1c466e3>;
++		usb3_phy_cr_param = <0xb80>;
++		usb3_phy_host_cr_param = <0x980>;
++		usb3_phy_tx_vboost_lvl = <0x5>;
++
++		dwc3 at ff100000 {
++			compatible = "snps,dwc3";
++			reg = <0x0 0xff100000 0x0 0x100000>;
++			interrupts = <0 159 4>, <0 161 4>;
++			dr_mode = "otg";
++			maximum-speed = "super-speed";
++		};
++	};
+\ No newline at end of file
 -- 
-1.7.4.1
+2.11.GIT
