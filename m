@@ -1,201 +1,43 @@
-From: dietmar.eggemann@arm.com (Dietmar Eggemann)
-Date: Tue, 24 Oct 2017 11:27:17 +0100
-Subject: [PATCH v3 1/2] arm: topology: remove cpu_efficiency
-In-Reply-To: <20171024102718.16113-1-dietmar.eggemann@arm.com>
-References: <20171024102718.16113-1-dietmar.eggemann@arm.com>
-Message-ID: <20171024102718.16113-2-dietmar.eggemann@arm.com>
+From: chenyu56@huawei.com (Chen Yu)
+Date: Tue, 24 Oct 2017 18:41:02 +0800
+Subject: [RFC 2/3] USB: dwc3: Modify dwc3 code for support usb of Hikey960
+In-Reply-To: <bbf80ebf-13c6-b589-6b38-6b09ce4119bb@huawei.com>
+References: <20171024060610.10712-1-chenyu56@huawei.com>
+ <20171024060610.10712-3-chenyu56@huawei.com> <87a80hgdgf.fsf@linux.intel.com>
+ <bbf80ebf-13c6-b589-6b38-6b09ce4119bb@huawei.com>
+Message-ID: <3afa825f-f851-e7df-bfa0-db5daa5d31fd@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the 'cpu_efficiency/clock-frequency dt property' based solution
-to set cpu capacity which was only working for Cortex-A15/A7 arm
-big.LITTLE systems.
 
-I.e. the 'capacity-dmips-mhz' based solution is now the only one. It is
-shared between arm and arm64 and works for every big.LITTLE system no
-matter which core types it consists of.
+Hi, Felipe
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Vincent Guittot <vincent.guittot@linaro.org>
-Cc: Juri Lelli <juri.lelli@gmail.com>
-Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
----
- arch/arm/kernel/topology.c | 132 ++-------------------------------------------
- 1 file changed, 4 insertions(+), 128 deletions(-)
 
-diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-index 24ac3cab411d..15cc131ae387 100644
---- a/arch/arm/kernel/topology.c
-+++ b/arch/arm/kernel/topology.c
-@@ -30,69 +30,11 @@
- #include <asm/cputype.h>
- #include <asm/topology.h>
- 
--/*
-- * cpu capacity scale management
-- */
--
--/*
-- * cpu capacity table
-- * This per cpu data structure describes the relative capacity of each core.
-- * On a heteregenous system, cores don't have the same computation capacity
-- * and we reflect that difference in the cpu_capacity field so the scheduler
-- * can take this difference into account during load balance. A per cpu
-- * structure is preferred because each CPU updates its own cpu_capacity field
-- * during the load balance except for idle cores. One idle core is selected
-- * to run the rebalance_domains for all idle cores and the cpu_capacity can be
-- * updated during this sequence.
-- */
--
- #ifdef CONFIG_OF
--struct cpu_efficiency {
--	const char *compatible;
--	unsigned long efficiency;
--};
--
--/*
-- * Table of relative efficiency of each processors
-- * The efficiency value must fit in 20bit and the final
-- * cpu_scale value must be in the range
-- *   0 < cpu_scale < 3*SCHED_CAPACITY_SCALE/2
-- * in order to return@most 1 when DIV_ROUND_CLOSEST
-- * is used to compute the capacity of a CPU.
-- * Processors that are not defined in the table,
-- * use the default SCHED_CAPACITY_SCALE value for cpu_scale.
-- */
--static const struct cpu_efficiency table_efficiency[] = {
--	{"arm,cortex-a15", 3891},
--	{"arm,cortex-a7",  2048},
--	{NULL, },
--};
--
--static unsigned long *__cpu_capacity;
--#define cpu_capacity(cpu)	__cpu_capacity[cpu]
--
--static unsigned long middle_capacity = 1;
--static bool cap_from_dt = true;
--
--/*
-- * Iterate all CPUs' descriptor in DT and compute the efficiency
-- * (as per table_efficiency). Also calculate a middle efficiency
-- * as close as possible to  (max{eff_i} - min{eff_i}) / 2
-- * This is later used to scale the cpu_capacity field such that an
-- * 'average' CPU is of middle capacity. Also see the comments near
-- * table_efficiency[] and update_cpu_capacity().
-- */
- static void __init parse_dt_topology(void)
- {
--	const struct cpu_efficiency *cpu_eff;
--	struct device_node *cn = NULL;
--	unsigned long min_capacity = ULONG_MAX;
--	unsigned long max_capacity = 0;
--	unsigned long capacity = 0;
--	int cpu = 0;
--
--	__cpu_capacity = kcalloc(nr_cpu_ids, sizeof(*__cpu_capacity),
--				 GFP_NOWAIT);
-+	struct device_node *cn;
-+	int cpu;
- 
- 	cn = of_find_node_by_path("/cpus");
- 	if (!cn) {
-@@ -101,9 +43,6 @@ static void __init parse_dt_topology(void)
- 	}
- 
- 	for_each_possible_cpu(cpu) {
--		const u32 *rate;
--		int len;
--
- 		/* too early to use cpu->of_node */
- 		cn = of_get_cpu_node(cpu, NULL);
- 		if (!cn) {
-@@ -111,76 +50,15 @@ static void __init parse_dt_topology(void)
- 			continue;
- 		}
- 
--		if (topology_parse_cpu_capacity(cn, cpu)) {
-+		if (topology_parse_cpu_capacity(cn, cpu))
- 			of_node_put(cn);
--			continue;
--		}
--
--		cap_from_dt = false;
--
--		for (cpu_eff = table_efficiency; cpu_eff->compatible; cpu_eff++)
--			if (of_device_is_compatible(cn, cpu_eff->compatible))
--				break;
--
--		if (cpu_eff->compatible == NULL)
--			continue;
--
--		rate = of_get_property(cn, "clock-frequency", &len);
--		if (!rate || len != 4) {
--			pr_err("%pOF missing clock-frequency property\n", cn);
--			continue;
--		}
--
--		capacity = ((be32_to_cpup(rate)) >> 20) * cpu_eff->efficiency;
--
--		/* Save min capacity of the system */
--		if (capacity < min_capacity)
--			min_capacity = capacity;
--
--		/* Save max capacity of the system */
--		if (capacity > max_capacity)
--			max_capacity = capacity;
--
--		cpu_capacity(cpu) = capacity;
- 	}
- 
--	/* If min and max capacities are equals, we bypass the update of the
--	 * cpu_scale because all CPUs have the same capacity. Otherwise, we
--	 * compute a middle_capacity factor that will ensure that the capacity
--	 * of an 'average' CPU of the system will be as close as possible to
--	 * SCHED_CAPACITY_SCALE, which is the default value, but with the
--	 * constraint explained near table_efficiency[].
--	 */
--	if (4*max_capacity < (3*(max_capacity + min_capacity)))
--		middle_capacity = (min_capacity + max_capacity)
--				>> (SCHED_CAPACITY_SHIFT+1);
--	else
--		middle_capacity = ((max_capacity / 3)
--				>> (SCHED_CAPACITY_SHIFT-1)) + 1;
--
--	if (cap_from_dt)
--		topology_normalize_cpu_scale();
--}
--
--/*
-- * Look for a customed capacity of a CPU in the cpu_capacity table during the
-- * boot. The update of all CPUs is in O(n^2) for heteregeneous system but the
-- * function returns directly for SMP system.
-- */
--static void update_cpu_capacity(unsigned int cpu)
--{
--	if (!cpu_capacity(cpu) || cap_from_dt)
--		return;
--
--	topology_set_cpu_scale(cpu, cpu_capacity(cpu) / middle_capacity);
--
--	pr_info("CPU%u: update cpu_capacity %lu\n",
--		cpu, topology_get_cpu_scale(NULL, cpu));
-+	topology_normalize_cpu_scale();
- }
- 
- #else
- static inline void parse_dt_topology(void) {}
--static inline void update_cpu_capacity(unsigned int cpuid) {}
- #endif
- 
-  /*
-@@ -276,8 +154,6 @@ void store_cpu_topology(unsigned int cpuid)
- 
- 	update_siblings_masks(cpuid);
- 
--	update_cpu_capacity(cpuid);
--
- 	pr_info("CPU%u: thread %d, cpu %d, socket %d, mpidr %x\n",
- 		cpuid, cpu_topology[cpuid].thread_id,
- 		cpu_topology[cpuid].core_id,
--- 
-2.11.0
+ On 2017/10/24 16:25, Felipe Balbi wrote:
+> Hi,
+>
+> Yu Chen <chenyu56@huawei.com> writes:
+>> > The usb controller of Kirin960 is DesignWare Cores SuperSpeed USB 3.0 Controller.
+>> > The patch modifies dwc3 for support Kirin960 and adds codes for a USB Hub on board Hikey960.
+>> >
+>> > Signed-off-by: Yu Chen 
+> <chenyu56@huawei.com>
+> > Signed-off-by: Ning Fan <fanning4@hisilicon.com>
+> > Signed-off-by: Di Yang <yangdi10@hisilicon.com>
+> > Signed-off-by: Rui Li <lirui39@hisilicon.com>
+> I think Linaro, recently, added support for chargers to mainline. You
+> should use what they did.
+>
+> I'm gonna stop here. There's no way I'm going through this much code in
+> a single patch. Specially since 90% of it is either completely
+> unnecessary or should be done using already-existing generic APIs.
+>
+> Sorry, no cookie today.
+
+ Thanks a lot for your comments!
+ These codes have been tested on Hikey960 board and work well. But indeed the codes can be simplified and
+ made comply with already-existing architecture.
+ We will work on these codes according to your reviews and make parted patch next time.
+
+ Thanks,
+ Yu Chen
