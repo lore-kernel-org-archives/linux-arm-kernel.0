@@ -1,38 +1,58 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 24 Oct 2017 12:53:38 +0100
-Subject: [PATCH 1/1] arm/stacktrace: stop unwinding after an invalid
- address.
-In-Reply-To: <1508845602-33508-1-git-send-email-maninder1.s@samsung.com>
-References: <CGME20171024114852epcas5p199ffd8d75fc57e46d46025e12180c156@epcas5p1.samsung.com>
- <1508845602-33508-1-git-send-email-maninder1.s@samsung.com>
-Message-ID: <20171024115338.GF20805@n2100.armlinux.org.uk>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 24 Oct 2017 20:20:44 +0800
+Subject: [GIT PULL 3/4] Freescale arm64 device tree updates for 4.15
+In-Reply-To: <1508847645-9191-1-git-send-email-shawnguo@kernel.org>
+References: <1508847645-9191-1-git-send-email-shawnguo@kernel.org>
+Message-ID: <1508847645-9191-3-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 24, 2017 at 05:16:42PM +0530, Maninder Singh wrote:
-> This patch stops unwinding backtrace in case of below 2 cases.
-> 
-> (Issue observed while porting stackdepot on ARM, duplicate
-> entries created in stackdepot
-> reference patch for workaround in stackdepot:-
-> https://lkml.org/lkml/2017/10/11/353
-> ).
-> 
-> 1. If address belongs to irq/exception code, ignore it.
-> save_stack+0x40/0xec
->  __set_page_owner+0x2c/0x64
-> ....
-> ....
->  __handle_domain_irq+0x9c/0x130
->  gic_handle_irq+0x40/0x80
->  __irq_usr+0x4c/0x60
->  0xb6507818
-> ^^^^^^^
+The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 
-However, we _do_ want to trace through an IRQ taken in SVC mode, but you
-completely remove all that code.  So, not taking this patch, sorry.
+  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-dt64-4.15
+
+for you to fetch changes up to e54b911fd859acfc2b00e03223aed7afdbd1a539:
+
+  arm64: dts: update the DPAA QBMan nodes (2017-10-13 14:52:40 +0800)
+
+----------------------------------------------------------------
+Freescale arm64 device tree updates for 4.15:
+ - Add GICv3 ITS node and PCIe devcies for LS1088A support.
+ - Enable PCIe support for LS2088A SoC.
+ - Add OP-TEE support for various Layerscape SoCs, LS1012A, LS1043A,
+   LS1046A, LS1088A and LS208XA.
+ - Update DPAA QBMan nodes to use constant defines in the interrupt
+   description.
+ - Add DSPI device to support SPI-NOR on LS1012A based boards.
+
+----------------------------------------------------------------
+Hou Zhiqiang (3):
+      arm64: dts: ls2088a: add pcie support
+      arm64: dts: ls1088a: add gicv3 ITS DT node
+      arm64: dts: ls1088a: add PCIe controller DT nodes
+
+Madalin Bucur (1):
+      arm64: dts: update the DPAA QBMan nodes
+
+Sumit Garg (1):
+      arm64: dts: ls: Add optee node
+
+Yuan Yao (3):
+      arm64: dts: ls1012a: add the DTS node for DSPI support
+      dt-bindings: spi: Add fsl,ls1012a-dspi compatible string
+      dt-bindings: mtd: add sst25wf040b and en25s64 to sip-nor list
+
+ .../devicetree/bindings/mtd/jedec,spi-nor.txt      |  2 +
+ .../devicetree/bindings/spi/spi-fsl-dspi.txt       |  1 +
+ arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts  | 33 ++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi     | 20 +++++
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi     | 11 ++-
+ arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi     | 11 ++-
+ arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi     | 88 ++++++++++++++++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi     |  4 +
+ arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi     |  7 ++
+ 9 files changed, 173 insertions(+), 4 deletions(-)
