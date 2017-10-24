@@ -1,141 +1,88 @@
-From: cyrille.pitchen@wedev4u.fr (Cyrille Pitchen)
-Date: Wed, 25 Oct 2017 00:03:30 +0200
-Subject: [PATCH v1 2/2] mtd: mtk-nor: add suspend/resume support
-In-Reply-To: <1505997906-30921-3-git-send-email-guochun.mao@mediatek.com>
-References: <1505997906-30921-1-git-send-email-guochun.mao@mediatek.com>
- <1505997906-30921-3-git-send-email-guochun.mao@mediatek.com>
-Message-ID: <f501c5bd-7df0-015d-cf1d-5e650249b568@wedev4u.fr>
+From: pku.leo@gmail.com (Yang Li)
+Date: Tue, 24 Oct 2017 17:26:37 -0500
+Subject: [PATCH v3] arm64: dts: ls1088a: Add USB support
+In-Reply-To: <20171024093118.31238-1-yinbo.zhu@nxp.com>
+References: <20171024093118.31238-1-yinbo.zhu@nxp.com>
+Message-ID: <CADRPPNS8+APXQRcmHqn9YDHKbyE49gH3yoQjrsOQfYrMykeizg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 21/09/2017 ? 14:45, Guochun Mao a ?crit?:
-> Abstract functions of clock setting, to avoid duplicated code,
-> these functions been used in new feature.
-> Implement suspend/resume functions.
-> 
-> Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
+On Tue, Oct 24, 2017 at 4:31 AM,  <yinbo.zhu@nxp.com> wrote:
+> From: "yinbo.zhu" <yinbo.zhu@nxp.com>
+>
+> Fix the issue that usb is not detected on ls1088ardb
 
-Applied to the spi-nor/next branch of l2-mtd
+You can only fix issue for a function after the function has been
+added previously.  So like Shawn commented, this patch is about adding
+the USB support instead of fixing an issue.
 
-Thanks!
-
+>
+> Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
+> Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
 > ---
->  drivers/mtd/spi-nor/mtk-quadspi.c |   70 ++++++++++++++++++++++++++++++-------
->  1 file changed, 58 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/mtd/spi-nor/mtk-quadspi.c b/drivers/mtd/spi-nor/mtk-quadspi.c
-> index c258c7a..abe455c 100644
-> --- a/drivers/mtd/spi-nor/mtk-quadspi.c
-> +++ b/drivers/mtd/spi-nor/mtk-quadspi.c
-> @@ -404,6 +404,29 @@ static int mt8173_nor_write_reg(struct spi_nor *nor, u8 opcode, u8 *buf,
->  	return ret;
->  }
->  
-> +static void mt8173_nor_disable_clk(struct mt8173_nor *mt8173_nor)
-> +{
-> +	clk_disable_unprepare(mt8173_nor->spi_clk);
-> +	clk_disable_unprepare(mt8173_nor->nor_clk);
-> +}
-> +
-> +static int mt8173_nor_enable_clk(struct mt8173_nor *mt8173_nor)
-> +{
-> +	int ret;
-> +
-> +	ret = clk_prepare_enable(mt8173_nor->spi_clk);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = clk_prepare_enable(mt8173_nor->nor_clk);
-> +	if (ret) {
-> +		clk_disable_unprepare(mt8173_nor->spi_clk);
-> +		return ret;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->  static int mtk_nor_init(struct mt8173_nor *mt8173_nor,
->  			struct device_node *flash_node)
->  {
-> @@ -468,15 +491,11 @@ static int mtk_nor_drv_probe(struct platform_device *pdev)
->  		return PTR_ERR(mt8173_nor->nor_clk);
->  
->  	mt8173_nor->dev = &pdev->dev;
-> -	ret = clk_prepare_enable(mt8173_nor->spi_clk);
-> +
-> +	ret = mt8173_nor_enable_clk(mt8173_nor);
->  	if (ret)
->  		return ret;
->  
-> -	ret = clk_prepare_enable(mt8173_nor->nor_clk);
-> -	if (ret) {
-> -		clk_disable_unprepare(mt8173_nor->spi_clk);
-> -		return ret;
-> -	}
->  	/* only support one attached flash */
->  	flash_np = of_get_next_available_child(pdev->dev.of_node, NULL);
->  	if (!flash_np) {
-> @@ -487,10 +506,9 @@ static int mtk_nor_drv_probe(struct platform_device *pdev)
->  	ret = mtk_nor_init(mt8173_nor, flash_np);
->  
->  nor_free:
-> -	if (ret) {
-> -		clk_disable_unprepare(mt8173_nor->spi_clk);
-> -		clk_disable_unprepare(mt8173_nor->nor_clk);
-> -	}
-> +	if (ret)
-> +		mt8173_nor_disable_clk(mt8173_nor);
-> +
->  	return ret;
->  }
->  
-> @@ -498,11 +516,38 @@ static int mtk_nor_drv_remove(struct platform_device *pdev)
->  {
->  	struct mt8173_nor *mt8173_nor = platform_get_drvdata(pdev);
->  
-> -	clk_disable_unprepare(mt8173_nor->spi_clk);
-> -	clk_disable_unprepare(mt8173_nor->nor_clk);
-> +	mt8173_nor_disable_clk(mt8173_nor);
-> +
-> +	return 0;
-> +}
-> +
-> +#ifdef CONFIG_PM_SLEEP
-> +static int mtk_nor_suspend(struct device *dev)
-> +{
-> +	struct mt8173_nor *mt8173_nor = dev_get_drvdata(dev);
-> +
-> +	mt8173_nor_disable_clk(mt8173_nor);
-> +
->  	return 0;
->  }
->  
-> +static int mtk_nor_resume(struct device *dev)
-> +{
-> +	struct mt8173_nor *mt8173_nor = dev_get_drvdata(dev);
-> +
-> +	return mt8173_nor_enable_clk(mt8173_nor);
-> +}
-> +
-> +static const struct dev_pm_ops mtk_nor_dev_pm_ops = {
-> +	.suspend = mtk_nor_suspend,
-> +	.resume = mtk_nor_resume,
+>
+> Change in v3:
+>                 - Change status from "enable" to "disabled" then enable it on dts file.
+>                 - Add the version history.
+>
+>  arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts |  8 ++++++++
+>  arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi    | 20 ++++++++++++++++++++
+>  2 files changed, 28 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
+> index 213abb72de93..6c3c3bc4b681 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
+> @@ -118,6 +118,14 @@
+>         status = "okay";
+>  };
+>
+> +&usb0 {
+> +       status = "okay";
 > +};
 > +
-> +#define MTK_NOR_DEV_PM_OPS	(&mtk_nor_dev_pm_ops)
-> +#else
-> +#define MTK_NOR_DEV_PM_OPS	NULL
-> +#endif
+> +&usb1 {
+> +       status = "okay";
+> +};
 > +
->  static const struct of_device_id mtk_nor_of_ids[] = {
->  	{ .compatible = "mediatek,mt8173-nor"},
->  	{ /* sentinel */ }
-> @@ -514,6 +559,7 @@ static int mtk_nor_drv_remove(struct platform_device *pdev)
->  	.remove = mtk_nor_drv_remove,
->  	.driver = {
->  		.name = "mtk-nor",
-> +		.pm = MTK_NOR_DEV_PM_OPS,
->  		.of_match_table = mtk_nor_of_ids,
->  	},
+>  &esdhc {
+>         status = "okay";
 >  };
-> 
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+> index c144d06a6e33..c23fede8cf5d 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+> @@ -359,6 +359,26 @@
+>                         status = "disabled";
+>                 };
+>
+> +               usb0: usb3 at 3100000 {
+> +                       compatible = "snps,dwc3";
+> +                       reg = <0x0 0x3100000 0x0 0x10000>;
+> +                       interrupts = <0 80 IRQ_TYPE_LEVEL_HIGH>;
+> +                       dr_mode = "host";
+> +                       snps,quirk-frame-length-adjustment = <0x20>;
+> +                       snps,dis_rxdet_inp3_quirk;
+> +                       status = "disabled";
+> +               };
+> +
+> +               usb1: usb3 at 3110000 {
+> +                       compatible = "snps,dwc3";
+> +                       reg = <0x0 0x3110000 0x0 0x10000>;
+> +                       interrupts = <0 81 IRQ_TYPE_LEVEL_HIGH>;
+> +                       dr_mode = "host";
+> +                       snps,quirk-frame-length-adjustment = <0x20>;
+> +                       snps,dis_rxdet_inp3_quirk;
+> +                       status = "disabled";
+> +               };
+> +
+>                 sata: sata at 3200000 {
+>                         compatible = "fsl,ls1088a-ahci";
+>                         reg = <0x0 0x3200000 0x0 0x10000>,
+> --
+> 2.14.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
