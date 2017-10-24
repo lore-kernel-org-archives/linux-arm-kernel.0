@@ -1,136 +1,80 @@
-From: mihailescu2m@gmail.com (memeka)
-Date: Tue, 24 Oct 2017 12:59:56 +1030
-Subject: [PATCH v2] ARM: dts: exynos: add cpu perf counters to Exynos54xx
- boards
-Message-ID: <1508812196-14478-1-git-send-email-mihailescu2m@gmail.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Tue, 24 Oct 2017 11:08:59 +0800
+Subject: [PATCH] phy: phy-mtk-tphy: use auto instead of force to bypass utmi
+ signals
+Message-ID: <f08880e993f05761f0171b83812e940d30a54b05.1508814463.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable support for ARM Performance Monitoring Units available in Cortex-A7
-and Cortex-A15 CPU cores for Exynos54xx SoCs (5410, 5420 and 5422/5800).
+When system is running, if usb2 phy is forced to bypass utmi signals,
+all PLL will be turned off, and it can't detect device connection
+anymore, so replace force mode with auto mode which can bypass utmi
+signals automatically if no device attached for normal flow.
+But keep the force mode to fix RX sensitivity degradation issue.
 
-The PMUs interrupts are defined in the common exynos54xx.dtsi device tree,
-but the PMUs are enabled and have their interrupt CPU affinity defined
-next to each SoC's cpus node.
-
-Tested with perf on Odroid XU4 (Exynos5422):
-armv7_cortex_a7 PMU driver: 5 counters available
-armv7_cortex_a15 PMU driver: 7 counters available
-
-Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Marian Mihailescu <mihailescu2m@gmail.com>
-Signed-off-by: Willy Wolff <willy.mh.wolff@gmail.com>
-
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
-Changes since v1:
- - both Cortex-A7 and Cortex-A15 PMUs are now defined in exynos54xx.dtsi
- - CPU affinity is defined for each SoC *after* the cpus node entry
- - PMUs are disabled in exynos54xx.dtsi and enabled for each SoC
- - cpus labels have been fixed in the interrupt-affinity property for
-   Exynos5410 and Exynos5420 SoCs
+ drivers/phy/mediatek/phy-mtk-tphy.c |   19 +++++++------------
+ 1 file changed, 7 insertions(+), 12 deletions(-)
 
----
- arch/arm/boot/dts/exynos5410.dtsi      |  8 ++++++++
- arch/arm/boot/dts/exynos5420-cpus.dtsi | 16 ++++++++++++++++
- arch/arm/boot/dts/exynos5422-cpus.dtsi | 16 ++++++++++++++++
- arch/arm/boot/dts/exynos54xx.dtsi      | 20 ++++++++++++++++++++
- 4 files changed, 60 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
-index 7eab4bc..f42b04b 100644
---- a/arch/arm/boot/dts/exynos5410.dtsi
-+++ b/arch/arm/boot/dts/exynos5410.dtsi
-@@ -428,4 +428,12 @@
- 	samsung,syscon-phandle = <&pmu_system_controller>;
- };
+diff --git a/drivers/phy/mediatek/phy-mtk-tphy.c b/drivers/phy/mediatek/phy-mtk-tphy.c
+index 402385f..54cc44b 100644
+--- a/drivers/phy/mediatek/phy-mtk-tphy.c
++++ b/drivers/phy/mediatek/phy-mtk-tphy.c
+@@ -440,9 +440,9 @@ static void u2_phy_instance_init(struct mtk_tphy *tphy,
+ 	u32 index = instance->index;
+ 	u32 tmp;
  
-+&arm_a15_pmu {
-+	interrupt-affinity = <&cpu0>,
-+		<&cpu1>,
-+		<&cpu2>,
-+		<&cpu3>;
-+	status = "okay";
-+};
-+
- #include "exynos5410-pinctrl.dtsi"
-diff --git a/arch/arm/boot/dts/exynos5420-cpus.dtsi b/arch/arm/boot/dts/exynos5420-cpus.dtsi
-index 5c052d7..518b7d8 100644
---- a/arch/arm/boot/dts/exynos5420-cpus.dtsi
-+++ b/arch/arm/boot/dts/exynos5420-cpus.dtsi
-@@ -124,3 +124,19 @@
- 		};
- 	};
- };
-+
-+&arm_a7_pmu {
-+	interrupt-affinity = <&cpu4>,
-+		<&cpu5>,
-+		<&cpu4>,
-+		<&cpu5>;
-+	status = "okay";
-+};
-+
-+&arm_a15_pmu {
-+	interrupt-affinity = <&cpu0>,
-+		<&cpu1>,
-+		<&cpu2>,
-+		<&cpu3>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/exynos5422-cpus.dtsi b/arch/arm/boot/dts/exynos5422-cpus.dtsi
-index ab4c718..92676be 100644
---- a/arch/arm/boot/dts/exynos5422-cpus.dtsi
-+++ b/arch/arm/boot/dts/exynos5422-cpus.dtsi
-@@ -131,3 +131,19 @@
- 		};
- 	};
- };
-+
-+&arm_a7_pmu {
-+	interrupt-affinity = <&cpu0>,
-+		<&cpu1>,
-+		<&cpu2>,
-+		<&cpu3>;
-+	status = "okay";
-+};
-+
-+&arm_a15_pmu {
-+	interrupt-affinity = <&cpu4>,
-+		<&cpu5>,
-+		<&cpu6>,
-+		<&cpu7>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/exynos54xx.dtsi b/arch/arm/boot/dts/exynos54xx.dtsi
-index 8ca4fef..f0bd27d 100644
---- a/arch/arm/boot/dts/exynos54xx.dtsi
-+++ b/arch/arm/boot/dts/exynos54xx.dtsi
-@@ -79,6 +79,26 @@
- 			interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
- 		};
+-	/* switch to USB function. (system register, force ip into usb mode) */
++	/* switch to USB function, and enable usb pll */
+ 	tmp = readl(com + U3P_U2PHYDTM0);
+-	tmp &= ~P2C_FORCE_UART_EN;
++	tmp &= ~(P2C_FORCE_UART_EN | P2C_FORCE_SUSPENDM);
+ 	tmp |= P2C_RG_XCVRSEL_VAL(1) | P2C_RG_DATAIN_VAL(0);
+ 	writel(tmp, com + U3P_U2PHYDTM0);
  
-+		arm_a7_pmu: arm-a7-pmu {
-+			compatible = "arm,cortex-a7-pmu";
-+			interrupt-parent = <&gic>;
-+			interrupts = <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
-+				<GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>,
-+				<GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>,
-+				<GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
+@@ -502,10 +502,8 @@ static void u2_phy_instance_power_on(struct mtk_tphy *tphy,
+ 	u32 index = instance->index;
+ 	u32 tmp;
+ 
+-	/* (force_suspendm=0) (let suspendm=1, enable usb 480MHz pll) */
+ 	tmp = readl(com + U3P_U2PHYDTM0);
+-	tmp &= ~(P2C_FORCE_SUSPENDM | P2C_RG_XCVRSEL);
+-	tmp &= ~(P2C_RG_DATAIN | P2C_DTM0_PART_MASK);
++	tmp &= ~(P2C_RG_XCVRSEL | P2C_RG_DATAIN | P2C_DTM0_PART_MASK);
+ 	writel(tmp, com + U3P_U2PHYDTM0);
+ 
+ 	/* OTG Enable */
+@@ -540,7 +538,6 @@ static void u2_phy_instance_power_off(struct mtk_tphy *tphy,
+ 
+ 	tmp = readl(com + U3P_U2PHYDTM0);
+ 	tmp &= ~(P2C_RG_XCVRSEL | P2C_RG_DATAIN);
+-	tmp |= P2C_FORCE_SUSPENDM;
+ 	writel(tmp, com + U3P_U2PHYDTM0);
+ 
+ 	/* OTG Disable */
+@@ -548,18 +545,16 @@ static void u2_phy_instance_power_off(struct mtk_tphy *tphy,
+ 	tmp &= ~PA6_RG_U2_OTG_VBUSCMP_EN;
+ 	writel(tmp, com + U3P_USBPHYACR6);
+ 
+-	/* let suspendm=0, set utmi into analog power down */
+-	tmp = readl(com + U3P_U2PHYDTM0);
+-	tmp &= ~P2C_RG_SUSPENDM;
+-	writel(tmp, com + U3P_U2PHYDTM0);
+-	udelay(1);
+-
+ 	tmp = readl(com + U3P_U2PHYDTM1);
+ 	tmp &= ~(P2C_RG_VBUSVALID | P2C_RG_AVALID);
+ 	tmp |= P2C_RG_SESSEND;
+ 	writel(tmp, com + U3P_U2PHYDTM1);
+ 
+ 	if (tphy->pdata->avoid_rx_sen_degradation && index) {
++		tmp = readl(com + U3P_U2PHYDTM0);
++		tmp &= ~(P2C_RG_SUSPENDM | P2C_FORCE_SUSPENDM);
++		writel(tmp, com + U3P_U2PHYDTM0);
 +
-+		arm_a15_pmu: arm-a15-pmu {
-+			compatible = "arm,cortex-a15-pmu";
-+			interrupt-parent = <&combiner>;
-+			interrupts = <1 2>,
-+				<7 0>,
-+				<16 6>,
-+				<19 2>;
-+			status = "disabled";
-+		};
-+
- 		sss: sss at 10830000 {
- 			compatible = "samsung,exynos4210-secss";
- 			reg = <0x10830000 0x300>;
+ 		tmp = readl(com + U3D_U2PHYDCR0);
+ 		tmp &= ~P2C_RG_SIF_U2PLL_FORCE_ON;
+ 		writel(tmp, com + U3D_U2PHYDCR0);
 -- 
-2.7.4
+1.7.9.5
