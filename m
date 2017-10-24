@@ -1,34 +1,62 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 24 Oct 2017 11:34:44 -0500
-Subject: [PATCH 05/10] drm/sun4i: Add support for A20 display pipeline
- components
-In-Reply-To: <20171017121807.2994-6-wens@csie.org>
-References: <20171017121807.2994-1-wens@csie.org>
- <20171017121807.2994-6-wens@csie.org>
-Message-ID: <20171024163444.fzb5qbkv36rojhsv@rob-hp-laptop>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 24 Oct 2017 17:35:25 +0100
+Subject: [PATCH] arm64/sve: ABI change: Zero SVE regs on syscall entry
+In-Reply-To: <1508859966-7671-1-git-send-email-Dave.Martin@arm.com>
+References: <1508859966-7671-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20171024163524.mxn5puf3fmajrjbr@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 08:18:02PM +0800, Chen-Yu Tsai wrote:
-> From: Jonathan Liu <net147@gmail.com>
-> 
-> The A20 display pipeline has 2 frontends, 2 backends, and 2 TCONs.
-> This patch adds support (or a compatible string in the frontend's
-> case) for these components.
-> 
-> The TCONs support directly outputting to CPU/RGB/LVDS LCD panels,
-> or it can output to HDMI via an on-chip HDMI controller, or
-> CVBS/YPbPr/VGA signals via on-chip TV encoders. These additional
-> encoders are not covered in this patch.
-> 
-> Signed-off-by: Jonathan Liu <net147@gmail.com>
-> [wens at csie.org: Expand commit message]
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 4 ++++
->  drivers/gpu/drm/sun4i/sun4i_backend.c                         | 8 ++++++++
->  drivers/gpu/drm/sun4i/sun4i_drv.c                             | 3 +++
->  drivers/gpu/drm/sun4i/sun4i_tcon.c                            | 7 +++++++
->  4 files changed, 22 insertions(+)
+On Tue, Oct 24, 2017 at 04:46:06PM +0100, Dave P Martin wrote:
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 6718780..fbc0eb5 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -660,6 +660,7 @@ el0_svc_compat:
+>  	/*
+>  	 * AArch32 syscall handling
+>  	 */
+> +	ldr	x16, [tsk, #TSK_TI_FLAGS]	// load thread flags
+>  	adrp	stbl, compat_sys_call_table	// load compat syscall table pointer
+>  	mov	wscno, w7			// syscall number in w7 (r7)
+>  	mov     wsc_nr, #__NR_compat_syscalls
+> @@ -847,16 +848,35 @@ ENDPROC(ret_to_user)
+>   */
+>  	.align	6
+>  el0_svc:
+> +	ldr	x16, [tsk, #TSK_TI_FLAGS]	// load thread flags
+>  	adrp	stbl, sys_call_table		// load syscall table pointer
+>  	mov	wscno, w8			// syscall number in w8
+>  	mov	wsc_nr, #__NR_syscalls
+> +
+> +#ifdef CONFIG_ARM64_SVE
+> +alternative_if_not ARM64_SVE
+> +	b	el0_svc_naked
+> +alternative_else
+> +	tbz	x16, #_TIF_SVE, el0_svc_naked	// Skip unless TIF_SVE set:
+> +alternative_endif
+> +	bic	x16, x16, #_TIF_SVE		// discard SVE state
+> +	str	x16, [tsk, #TSK_TI_FLAGS]
+> +
+> +	// task_fpsimd_load() won't be called to update CPACR
+> +	// unless TIF_FOREIGN_FPSTATE is set, which only happens if a
+> +	// context switch of kernel_neon_begin() gets in the way.
 
-Acked-by: Rob Herring <robh@kernel.org>
+s/of/or/
+
+> +	// So, ensure that CPACR is correct for the fast-path case:
+> +	mrs	x9, cpacr_el1
+> +	bic	x9, x9, #CPACR_EL1_ZEN_EL0EN	// disable SVE for el0
+> +	msr	cpacr_el1, x9			// synchronised by eret to el0
+> +#endif
+
+Just a nitpick, I'd like multi-line asm comments to still follow the C
+style:
+
+	/*
+	 * ...
+	 */
+
+Otherwise,
+
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
