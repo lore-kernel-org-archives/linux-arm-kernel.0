@@ -1,9 +1,7 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 24 Oct 2017 20:20:44 +0800
-Subject: [GIT PULL 3/4] Freescale arm64 device tree updates for 4.15
-In-Reply-To: <1508847645-9191-1-git-send-email-shawnguo@kernel.org>
-References: <1508847645-9191-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <1508847645-9191-3-git-send-email-shawnguo@kernel.org>
+Date: Tue, 24 Oct 2017 20:20:42 +0800
+Subject: [GIT PULL 1/4] i.MX SoC changes for 4.15
+Message-ID: <1508847645-9191-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,46 +11,44 @@ The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-dt64-4.15
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-soc-4.15
 
-for you to fetch changes up to e54b911fd859acfc2b00e03223aed7afdbd1a539:
+for you to fetch changes up to 8e2b04b019c824186548eadd70243dbb97a1675b:
 
-  arm64: dts: update the DPAA QBMan nodes (2017-10-13 14:52:40 +0800)
-
-----------------------------------------------------------------
-Freescale arm64 device tree updates for 4.15:
- - Add GICv3 ITS node and PCIe devcies for LS1088A support.
- - Enable PCIe support for LS2088A SoC.
- - Add OP-TEE support for various Layerscape SoCs, LS1012A, LS1043A,
-   LS1046A, LS1088A and LS208XA.
- - Update DPAA QBMan nodes to use constant defines in the interrupt
-   description.
- - Add DSPI device to support SPI-NOR on LS1012A based boards.
+  cpufreq: imx6q: Move speed grading check to cpufreq driver (2017-10-18 10:08:21 +0800)
 
 ----------------------------------------------------------------
-Hou Zhiqiang (3):
-      arm64: dts: ls2088a: add pcie support
-      arm64: dts: ls1088a: add gicv3 ITS DT node
-      arm64: dts: ls1088a: add PCIe controller DT nodes
+i.MX SoC changes for 4.15:
+ - A series from Marco Franchi from to clean up build warnings see with
+   W=1 in arch/arm/mach-imx/.
+ - Move i.MX6 speed grading check from i.MX platform code to cpufreq
+   driver.  The patch is suggested by cpufreq folks to go through
+   arm-soc tree.
+ - Enable cpuidle support on i.MX6DL starting from IMX_CHIP_REVISION_1_1.
+ - Constify platform_suspend_ops for MXS platform.
 
-Madalin Bucur (1):
-      arm64: dts: update the DPAA QBMan nodes
+----------------------------------------------------------------
+Arvind Yadav (1):
+      ARM: mxs: constify platform_suspend_ops
 
-Sumit Garg (1):
-      arm64: dts: ls: Add optee node
+Fabio Estevam (1):
+      cpufreq: imx6q: Move speed grading check to cpufreq driver
 
-Yuan Yao (3):
-      arm64: dts: ls1012a: add the DTS node for DSPI support
-      dt-bindings: spi: Add fsl,ls1012a-dspi compatible string
-      dt-bindings: mtd: add sst25wf040b and en25s64 to sip-nor list
+Leonard Crestez (1):
+      ARM: imx: Enable cpuidle for i.MX6DL starting at 1.1
 
- .../devicetree/bindings/mtd/jedec,spi-nor.txt      |  2 +
- .../devicetree/bindings/spi/spi-fsl-dspi.txt       |  1 +
- arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts  | 33 ++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi     | 20 +++++
- arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi     | 11 ++-
- arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi     | 11 ++-
- arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi     | 88 ++++++++++++++++++++++
- arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi     |  4 +
- arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi     |  7 ++
- 9 files changed, 173 insertions(+), 4 deletions(-)
+Marco Franchi (4):
+      ARM: imx: imx31moboard: Include "board-mx31moboard.h" header file
+      ARM: imx: 3ds-debugboard: Include "3ds_debugboard.h" header file
+      ARM: imx: cpuidle-imx5: Include "cpuidle.h" header file
+      ARM: imx: mach-mx31lite: Make mx31lite_map_io static
+
+ arch/arm/mach-imx/3ds_debugboard.c       |  2 +-
+ arch/arm/mach-imx/cpuidle-imx5.c         |  1 +
+ arch/arm/mach-imx/mach-imx6q.c           | 97 +++-----------------------------
+ arch/arm/mach-imx/mach-mx31lite.c        |  2 +-
+ arch/arm/mach-imx/mx31moboard-devboard.c |  1 +
+ arch/arm/mach-imx/mx31moboard-marxbot.c  |  1 +
+ arch/arm/mach-mxs/pm.c                   |  2 +-
+ drivers/cpufreq/imx6q-cpufreq.c          | 85 +++++++++++++++++++++-------
+ 8 files changed, 79 insertions(+), 112 deletions(-)
