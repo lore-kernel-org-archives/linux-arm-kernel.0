@@ -1,46 +1,104 @@
 From: dietmar.eggemann@arm.com (Dietmar Eggemann)
-Date: Tue, 24 Oct 2017 11:27:18 +0100
-Subject: [PATCH v3 2/2] arm: topology: add missing of_node_put() for cpu
- device node
-In-Reply-To: <20171024102718.16113-1-dietmar.eggemann@arm.com>
-References: <20171024102718.16113-1-dietmar.eggemann@arm.com>
-Message-ID: <20171024102718.16113-3-dietmar.eggemann@arm.com>
+Date: Tue, 24 Oct 2017 11:27:16 +0100
+Subject: [PATCH v3 0/2] arm: remove cpu_efficiency
+Message-ID: <20171024102718.16113-1-dietmar.eggemann@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the missing of_node_put() for of_find_node_by_path() and
-of_get_cpu_node() in parse_dt_topology().
+v2: review results [1]:
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Vincent Guittot <vincent.guittot@linaro.org>
-Cc: Juri Lelli <juri.lelli@gmail.com>
-Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
----
- arch/arm/kernel/topology.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+Vincent pointed out that there are missing of_node_put() calls for cpu
+device node in parse_dt_topology(). Added them with an extra patch.
 
-diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-index 15cc131ae387..81ec42333489 100644
---- a/arch/arm/kernel/topology.c
-+++ b/arch/arm/kernel/topology.c
-@@ -41,6 +41,7 @@ static void __init parse_dt_topology(void)
- 		pr_err("No CPU information found in DT\n");
- 		return;
- 	}
-+	of_node_put(cn);
- 
- 	for_each_possible_cpu(cpu) {
- 		/* too early to use cpu->of_node */
-@@ -50,8 +51,8 @@ static void __init parse_dt_topology(void)
- 			continue;
- 		}
- 
--		if (topology_parse_cpu_capacity(cn, cpu))
--			of_node_put(cn);
-+		topology_parse_cpu_capacity(cn, cpu);
-+		of_node_put(cn);
- 	}
- 
- 	topology_normalize_cpu_scale();
+v1: review results [2]:
+
+Vincent pointed out that there is a superfluous continue statement in
+parse_dt_topology(). Got rid of it.
+Krzysztof Kozlowski took the exynos and Simon Horman the renesas related
+dt bits into their for-next (v4.15) branches.
+
+***
+
+For Cortex-A15/A7 arm big.LITTLE systems there are currently two ways to
+set the cpu capacity.
+
+The first one (commit 06073ee26775 "ARM: 8621/3: parse cpu
+capacity-dmips-mhz from DT") is based on dt 'cpu capacity-dmips-mhz'
+bindings and the appropriate dt parsing code in
+drivers/base/arch_topology.c. It further takes differences in maximum
+cpu frequency values into consideration, normalizes the maximum cpu
+capacity to SCHED_CAPACITY_SCALE (1024) and scales all the cpus
+accordingly.
+
+  cpu capacity = (capacity-dmips-mhz * max cpu frequency) / 
+                 (max capacity-dmips-mhz * max (max cpu frequency)
+
+This solution is shared between arm and arm64 and works for other
+combinations of big and little cpus (besides Cortex-A15/A7) as well.
+
+The second one (commit 339ca09d7ada "ARM: 7463/1: topology: Update
+cpu_power according to DT information" is based on the 'struct
+cpu_efficiency table_efficiency[]' and the dt parsing code in
+arch/arm/kernel/topology.c. It further requires a clock-frequency
+property per cpu node, calculates a so called middle frequency for an
+average cpu in the system which is as close as possible to
+SCHED_CAPACITY_SCALE (1024) and uses this to compute the cpu capacity
+values.
+
+  cpu capacity = (cpu efficiency * clock frequency) / middle capacity
+
+This solution only works for Cortex-A15/A7 arm big.LITTLE systems.
+
+The aim of this patch is to have only one solution for all arm and arm64
+big.LITTLE platforms.
+
+(1) Therefore, it removes the code for the 'cpu_efficiency/
+    clock-frequency dt property' (second) solution.
+
+(2) Moreover, it will also assure that the highest original cpu capacity
+    (rq->cpu_capacity_orig) in a non-smt system is SCHED_CAPACITY_SCALE
+    (1024).
+
+(3) And finally, another advantage is the dynamic detection of the max
+    cpu frequency which comes with the first solution instead of the
+    static clock-frequency dt property value.
+
+Currently, the arm dt parsing code in parse_dt_topology() checks if the
+dt uses the capacity-dmips-mhz property. If this is the case it uses
+the first, otherwise the second solution. This patch removes the code
+for the second solution from arch/arm/kernel/topology.c.
+
+With the dt related patches for exynos and renesas now in the
+appropriated for-next branches for v4.15 there are no Cortex-A15/A7 arm
+big.LITTLE systems left relying on the 'cpu_efficiency/clock-frequency
+dt property' based solution anymore.
+
+This patch has been tested on TC2 and Samsung Chromebook 2 13"
+(peach-pi, Exynos 5800).
+
+[1] https://marc.info/?l=linux-kernel&m=150781686132670&w=2
+[2] https://marc.info/?l=linux-kernel&m=150410411807050&w=2
+
+Changes v2->v3:
+
+  - Rebase on top of v4.14-rc6
+  - Added missing of_node_put() for cpu device node [02/02]
+
+Changes v1->v2:
+
+  - Rebase on top of v4.14-rc4
+  - Remove superfluous continue statement in parse_dt_topology()
+    [01/04]
+  - Remove 'cpu capacity scale management' and 'cpu capacity table'
+    related comments [01/04]
+  - Remove dt related patches [02-04/04]
+
+Dietmar Eggemann (2):
+  arm: topology: remove cpu_efficiency
+  arm: topology: add missing of_node_put() for cpu device node
+
+ arch/arm/kernel/topology.c | 135 ++-------------------------------------------
+ 1 file changed, 6 insertions(+), 129 deletions(-)
+
 -- 
 2.11.0
