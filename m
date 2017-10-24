@@ -1,30 +1,33 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 24 Oct 2017 13:46:54 -0500
-Subject: [PATCH v7 10/10] of: mdio: Prevent of_mdiobus_register from
- scanning mdio-mux nodes
-In-Reply-To: <20171018114458.17891-11-clabbe.montjoie@gmail.com>
-References: <20171018114458.17891-1-clabbe.montjoie@gmail.com>
- <20171018114458.17891-11-clabbe.montjoie@gmail.com>
-Message-ID: <20171024184654.ggfrsrjd3nobku5n@rob-hp-laptop>
+From: jim2101024@gmail.com (Jim Quinlan)
+Date: Tue, 24 Oct 2017 14:15:49 -0400
+Subject: [PATCH 8/8] MIPS: BMIPS: enable PCI
+In-Reply-To: <1508868949-16652-1-git-send-email-jim2101024@gmail.com>
+References: <1508868949-16652-1-git-send-email-jim2101024@gmail.com>
+Message-ID: <1508868949-16652-9-git-send-email-jim2101024@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 18, 2017 at 01:44:58PM +0200, Corentin Labbe wrote:
-> Each child node of an MDIO node is scanned as a PHY when calling
-> of_mdiobus_register() givint the following result:
-> [   18.175379] mdio_bus stmmac-0: /soc/ethernet at 1c30000/mdio/mdio-mux has invalid PHY address
-> [   18.175408] mdio_bus stmmac-0: scan phy mdio-mux at address 0
-> [   18.175450] mdio_bus stmmac-0: scan phy mdio-mux at address 1
-> [...]
-> [   18.176420] mdio_bus stmmac-0: scan phy mdio-mux at address 30
-> [   18.176452] mdio_bus stmmac-0: scan phy mdio-mux at address 31
-> 
-> Since mdio-mux nodes are not PHY, this patch a way to to not scan
-> them.
+Adds the Kconfig hooks to enable the Broadcom STB PCIe root complex
+driver for Broadcom MIPS systems.
 
-This can be dropped now, right?
-> 
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> ---
->  drivers/of/of_mdio.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
+Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
+---
+ arch/mips/Kconfig | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/mips/Kconfig b/arch/mips/Kconfig
+index cb7fcc4..83ba54d 100644
+--- a/arch/mips/Kconfig
++++ b/arch/mips/Kconfig
+@@ -209,6 +209,9 @@ config BMIPS_GENERIC
+ 	select BOOT_RAW
+ 	select NO_EXCEPT_FILL
+ 	select USE_OF
++	select HW_HAS_PCI
++	select PCI_DRIVERS_GENERIC
++	select PCI
+ 	select CEVT_R4K
+ 	select CSRC_R4K
+ 	select SYNC_R4K
+-- 
+1.9.0.138.g2de3478
