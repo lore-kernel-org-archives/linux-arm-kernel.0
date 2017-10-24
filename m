@@ -1,114 +1,74 @@
-From: jim2101024@gmail.com (Jim Quinlan)
-Date: Tue, 24 Oct 2017 14:15:48 -0400
-Subject: [PATCH 7/8] MIPS: BMIPS: add PCI bindings for 7425, 7435
-In-Reply-To: <1508868949-16652-1-git-send-email-jim2101024@gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 24 Oct 2017 11:57:03 -0700
+Subject: [PATCH 6/8] PCI: host: brcmstb: add MSI capability
+In-Reply-To: <1508868949-16652-7-git-send-email-jim2101024@gmail.com>
 References: <1508868949-16652-1-git-send-email-jim2101024@gmail.com>
-Message-ID: <1508868949-16652-8-git-send-email-jim2101024@gmail.com>
+ <1508868949-16652-7-git-send-email-jim2101024@gmail.com>
+Message-ID: <5406ab92-c1da-f6fa-083d-82d1027130ea@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds the PCIe nodes for the Broadcom STB PCIe root complex.
+Hi Jim,
 
-Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
----
- arch/mips/boot/dts/brcm/bcm7425.dtsi     | 25 +++++++++++++++++++++++++
- arch/mips/boot/dts/brcm/bcm7435.dtsi     | 26 ++++++++++++++++++++++++++
- arch/mips/boot/dts/brcm/bcm97425svmb.dts |  4 ++++
- arch/mips/boot/dts/brcm/bcm97435svmb.dts |  4 ++++
- 4 files changed, 59 insertions(+)
+On 10/24/2017 11:15 AM, Jim Quinlan wrote:
+> This commit adds MSI to the Broadcom STB PCIe host controller. It does
+> not add MSIX since that functionality is not in the HW.  The MSI
+> controller is physically located within the PCIe block, however, there
+> is no reason why the MSI controller could not be moved elsewhere in
+> the future.
+> 
+> Since the internal Brcmstb MSI controller is intertwined with the PCIe
+> controller, it is not its own platform device but rather part of the
+> PCIe platform device.
+> 
+> Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
+> ---
+>  drivers/pci/host/Kconfig           |  12 ++
+>  drivers/pci/host/Makefile          |   1 +
+>  drivers/pci/host/pci-brcmstb-msi.c | 318 +++++++++++++++++++++++++++++++++++++
+>  drivers/pci/host/pci-brcmstb.c     |  72 +++++++--
+>  drivers/pci/host/pci-brcmstb.h     |  26 +++
+>  5 files changed, 419 insertions(+), 10 deletions(-)
+>  create mode 100644 drivers/pci/host/pci-brcmstb-msi.c
+> 
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index b9b4f11..54aa5d2 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -228,4 +228,16 @@ config PCI_BRCMSTB
+>  	default ARCH_BRCMSTB || BMIPS_GENERIC
+>  	help
+>  	  Adds support for Broadcom Settop Box PCIe host controller.
+> +	  To compile this driver as a module, choose m here.
+> +
+> +config PCI_BRCMSTB_MSI
+> +	bool "Broadcom Brcmstb PCIe MSI support"
+> +	depends on ARCH_BRCMSTB || BMIPS_GENERIC
 
-diff --git a/arch/mips/boot/dts/brcm/bcm7425.dtsi b/arch/mips/boot/dts/brcm/bcm7425.dtsi
-index f56fb25..2c416f6 100644
---- a/arch/mips/boot/dts/brcm/bcm7425.dtsi
-+++ b/arch/mips/boot/dts/brcm/bcm7425.dtsi
-@@ -494,4 +494,29 @@
- 			status = "disabled";
- 		};
- 	};
-+
-+	pcie: pcie at 10410000 {
-+		reg = <0x10410000 0x830c>;
-+		compatible = "brcm,bcm7425-pcie", "brcm,pci-plat-dev";
-+		interrupts = <37>, <37>;
-+		interrupt-names = "pcie", "msi";
-+		interrupt-parent = <&periph_intc>;
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		linux,pci-domain = <0>;
-+		brcm,ssc;
-+		msi-controller;
-+		#interrupt-cells = <1>;
-+		/* 4x128mb windows */
-+		ranges = <0x2000000 0x0 0xd0000000 0xd0000000 0 0x08000000>,
-+			 <0x2000000 0x0 0xd8000000 0xd8000000 0 0x08000000>,
-+			 <0x2000000 0x0 0xe0000000 0xe0000000 0 0x08000000>,
-+			 <0x2000000 0x0 0xe8000000 0xe8000000 0 0x08000000>;
-+		interrupt-map-mask = <0 0 0 7>;
-+		interrupt-map = <0 0 0 1 &periph_intc 33
-+				 0 0 0 2 &periph_intc 34
-+				 0 0 0 3 &periph_intc 35
-+				 0 0 0 4 &periph_intc 36>;
-+	};
-+
- };
-diff --git a/arch/mips/boot/dts/brcm/bcm7435.dtsi b/arch/mips/boot/dts/brcm/bcm7435.dtsi
-index f2cead2..2f869e5 100644
---- a/arch/mips/boot/dts/brcm/bcm7435.dtsi
-+++ b/arch/mips/boot/dts/brcm/bcm7435.dtsi
-@@ -509,4 +509,30 @@
- 			status = "disabled";
- 		};
- 	};
-+
-+	pcie: pcie at 10410000 {
-+		reg = <0x10410000 0x930c>;
-+		interrupts = <0x27>, <0x27>;
-+		interrupt-names = "pcie", "msi";
-+		interrupt-parent = <&periph_intc>;
-+		compatible = "brcm,bcm7435-pcie", "brcm,pci-plat-dev";
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		linux,pci-domain = <0>;
-+		brcm,ssc;
-+		msi-controller;
-+		#interrupt-cells = <1>;
-+		/* 4x128mb windows */
-+		ranges = <0x2000000 0x0 0xd0000000 0xd0000000 0 0x08000000>,
-+			 <0x2000000 0x0 0xd8000000 0xd8000000 0 0x08000000>,
-+			 <0x2000000 0x0 0xe0000000 0xe0000000 0 0x08000000>,
-+			 <0x2000000 0x0 0xe8000000 0xe8000000 0 0x08000000>;
-+		interrupt-map-mask = <0 0 0 7>;
-+		interrupt-map = <0 0 0 1 &periph_intc 35
-+				 0 0 0 2 &periph_intc 36
-+				 0 0 0 3 &periph_intc 37
-+				 0 0 0 4 &periph_intc 38>;
-+		status = "disabled";
-+	};
-+
- };
-diff --git a/arch/mips/boot/dts/brcm/bcm97425svmb.dts b/arch/mips/boot/dts/brcm/bcm97425svmb.dts
-index 73aa006..3a87ac5 100644
---- a/arch/mips/boot/dts/brcm/bcm97425svmb.dts
-+++ b/arch/mips/boot/dts/brcm/bcm97425svmb.dts
-@@ -143,3 +143,7 @@
- &mspi {
- 	status = "okay";
- };
-+
-+&pcie {
-+	status = "okay";
-+};
-diff --git a/arch/mips/boot/dts/brcm/bcm97435svmb.dts b/arch/mips/boot/dts/brcm/bcm97435svmb.dts
-index 0a915f3..456d024 100644
---- a/arch/mips/boot/dts/brcm/bcm97435svmb.dts
-+++ b/arch/mips/boot/dts/brcm/bcm97435svmb.dts
-@@ -119,3 +119,7 @@
- &mspi {
- 	status = "okay";
- };
-+
-+&pcie {
-+	status = "okay";
-+};
+This could probably be depends on PCI_BRCMSTB, which would imply these
+two conditions. PCI_BRCMSTB_MSI on its own is probably not very useful
+without the parent RC driver.
+
+> +	depends on OF
+> +	depends on PCI_MSI
+> +	default PCI_BRCMSTB
+> +	help
+> +	  Say Y here if you want to enable MSI support for Broadcom's iProc
+> +	  PCIe controller
+> +
+>  endmenu
+> diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
+> index c283321..1026d6f 100644
+> --- a/drivers/pci/host/Makefile
+> +++ b/drivers/pci/host/Makefile
+> @@ -23,6 +23,7 @@ obj-$(CONFIG_PCIE_TANGO_SMP8759) += pcie-tango.o
+>  obj-$(CONFIG_VMD) += vmd.o
+>  obj-$(CONFIG_PCI_BRCMSTB) += brcmstb-pci.o
+>  brcmstb-pci-objs := pci-brcmstb.o pci-brcmstb-dma.o
+> +obj-$(CONFIG_PCI_BRCMSTB_MSI) += pci-brcmstb-msi.o
+
+Should we combine this file with the brcmstb-pci.o? There is probably no
+functional difference, except that pci-brcmstb-msi.ko needs to be loaded
+first, right?
 -- 
-1.9.0.138.g2de3478
+Florian
