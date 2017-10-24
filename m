@@ -1,67 +1,41 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 24 Oct 2017 16:28:12 +0200
-Subject: [PATCH v2] drm: bridge: synopsys/dw-hdmi: Enable cec clock
-In-Reply-To: <20171020191838.392-1-phh@phh.me>
-References: <20171020191838.392-1-phh@phh.me>
-Message-ID: <2960167.0GRUE104rh@phil>
+From: dietmar.eggemann@arm.com (Dietmar Eggemann)
+Date: Tue, 24 Oct 2017 15:31:54 +0100
+Subject: [PATCH v3 0/2] arm: remove cpu_efficiency
+In-Reply-To: <20171024105227.GD20805@n2100.armlinux.org.uk>
+References: <20171024102718.16113-1-dietmar.eggemann@arm.com>
+ <20171024105227.GD20805@n2100.armlinux.org.uk>
+Message-ID: <316592bf-5aa4-3847-79cd-3a26adbb1231@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pierre,
+Hi Russel,
 
-Am Freitag, 20. Oktober 2017, 21:18:38 CEST schrieb Pierre-Hugues Husson:
-> The documentation already mentions "cec" optional clock, but
-> currently the driver doesn't enable it.
+Thanks for the review!
+
+On 24/10/17 11:52, Russell King - ARM Linux wrote:
+> On Tue, Oct 24, 2017 at 11:27:16AM +0100, Dietmar Eggemann wrote:
+>> With the dt related patches for exynos and renesas now in the
+>> appropriated for-next branches for v4.15 there are no Cortex-A15/A7 arm
+>> big.LITTLE systems left relying on the 'cpu_efficiency/clock-frequency
+>> dt property' based solution anymore.
 > 
-> Changes:
-> v2:
-> - Separate ENOENT errors from others
-> - Propagate other errors (especially -EPROBE_DEFER)
-> 
-> Signed-off-by: Pierre-Hugues Husson <phh@phh.me>
-> ---
+> This is way too early to remove support for something that has been
+> in place since 2012.  As you've just shown, people are using it with
+> DT files today.  We don't know how long people will persist using
+> older files, and we don't know whether there are DT files out in the
+> wild that we don't know about.
 
-it looks like you might be missing some important people in your recipient list.
-get_maintainer.pl shows me:
-- Archit Taneja <architt@codeaurora.org> (maintainer:DRM DRIVERS FOR BRIDGE CHIPS)
-- Andrzej Hajda <a.hajda@samsung.com> (maintainer:DRM DRIVERS FOR BRIDGE CHIPS)
-- dri-devel at lists.freedesktop.org (open list:DRM DRIVERS)
+Understood. But do we really care about out of tree dt files?
 
-So these should definitly be included in your recipients, as they're the
-ones that will apply your patch :-)
+In case the mentioned exynos and renesas Cortex-A15/A7 platforms change
+to using 'capacity-dmips-mhz' in v4.15 there shouldn't be any
+Cortex-A15/A7 platforms in mainline left using the cpu_efficiency
+solution anymore.
 
-One further nit below.
+> Our general rule is that we maintain compatibility for older DT.
 
+OK.
 
->  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> index bf14214fa464..b31fc95d5fef 100644
-> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> @@ -138,6 +138,7 @@ struct dw_hdmi {
->  	struct device *dev;
->  	struct clk *isfr_clk;
->  	struct clk *iahb_clk;
-> +	struct clk *cec_clk;
->  	struct dw_hdmi_i2c *i2c;
->  
->  	struct hdmi_data_info hdmi_data;
-> @@ -2382,6 +2383,27 @@ __dw_hdmi_probe(struct platform_device *pdev,
->  		goto err_isfr;
->  	}
->  
-> +	hdmi->cec_clk = devm_clk_get(hdmi->dev, "cec");
-> +	if (PTR_ERR(hdmi->cec_clk) == -ENOENT) {
-> +		hdmi->cec_clk = NULL;
-> +	} else if (IS_ERR(hdmi->cec_clk)) {
-> +		ret = PTR_ERR(hdmi->cec_clk);
-> +		if (ret != -EPROBE_DEFER) {
-> +			dev_err(hdmi->dev, "Cannot get HDMI cec clock: %d\n",
-> +					ret);
-> +		}
+> NAK.
 
-braces around the single dev_err are not necessary.
-
-Heiko
+Then I still send out [2/2] separately.
