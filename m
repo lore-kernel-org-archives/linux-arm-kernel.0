@@ -1,393 +1,175 @@
-From: opendmb@gmail.com (Doug Berger)
-Date: Tue, 24 Oct 2017 12:54:50 -0700
-Subject: [PATCH v2 6/7] gpio: brcmstb: consolidate interrupt domains
-In-Reply-To: <20171024195451.30535-1-opendmb@gmail.com>
-References: <20171024195451.30535-1-opendmb@gmail.com>
-Message-ID: <20171024195451.30535-7-opendmb@gmail.com>
+From: richard.sandiford@arm.com (Richard Sandiford)
+Date: Tue, 24 Oct 2017 21:30:55 +0100
+Subject: [RFC PATCH] arm64/sve: ABI change: Zero SVE regs on syscall entry
+In-Reply-To: <20171024113805.GF19485@e103592.cambridge.arm.com> (Dave Martin's
+ message of "Tue, 24 Oct 2017 12:38:05 +0100")
+References: <1508758664-24186-1-git-send-email-Dave.Martin@arm.com>
+ <1508758664-24186-2-git-send-email-Dave.Martin@arm.com>
+ <87tvypiyg8.fsf@linaro.org>
+ <20171024113805.GF19485@e103592.cambridge.arm.com>
+Message-ID: <87y3o09tkw.fsf@e105548-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPIOLIB IRQ chip helpers were very appealing, but badly broke
-the 1:1 mapping between a GPIO controller's device_node and its
-interrupt domain.
+Hi,
 
-When another device-tree node references a GPIO device as its
-interrupt parent, the irq_create_of_mapping() function looks for
-the irq domain of the GPIO device and since all bank irq domains
-reference the same GPIO device node it always resolves to the irq
-domain of the first bank regardless of which bank the number of
-the GPIO should resolve. This domain can only map hwirq numbers
-0-31 so interrupts on GPIO above that can't be mapped by the
-device-tree.
+Dave Martin <Dave.Martin@arm.com> writes:
+> [Richard, can you comment below on likely code generation choices in the
+> compiler?]
+>
+> On Mon, Oct 23, 2017 at 06:08:39PM +0100, Alex Benn?e wrote:
+>> 
+>> Dave Martin <Dave.Martin@arm.com> writes:
+>> 
+>> > As currently documented, no guarantee is made about what a user
+>> > task sees in the SVE registers after a syscall, except that V0-V31
+>> > (corresponding to Z0-Z31 bits [127:0]) are preserved.
+>> >
+>> > The actual kernel behaviour currently implemented is that the SVE
+>> > registers are zeroed if a context switch or signal delivery occurs
+>> > during a syscall.  After a fork() or clone(), the SVE registers
+>> > of the child task are zeroed also.  The SVE registers are otherwise
+>> > preserved.  Flexibility is retained in the ABI about the exact
+>> > criteria for the decision.
+>> >
+>> > There are some potential problems with this approach.
+>> >
+>> > Syscall impact
+>> > --------------
+>> >
+>> > Will, Catalin and Mark have expressed concerns about the risk of
+>> > creating de facto ABI here: in scenarios or workloads where a
+>> > context switch never occurs or is very unlikely, userspace may
+>> > learn to rely on preservation of the SVE registers across certain
+>> > syscalls.
+>> 
+>> I think this is a reasonable concern but are there any equivalent cases
+>> in the rest of the kernel? Is this new territory for Linux as these
+>> super large registers are introduced?
+>
+> Not that I know of.
+>
+> My implementation is influenced by the SVE register set size (which is
+> up to > 4 times the size of any other in mainline that I know of), and
+> the lack of architectural commitment to now growing the size further
+> in the future.
+>
+>> > It is difficult to assess the impact of this: the syscall ABI is
+>> > not a general-purpose interface, since it is usually hidden behind
+>> > libc wrappers: direct invocation of SVC is discouraged.  However,
+>> > specialised runtimes, statically linked programs and binary blobs
+>> > may bake in direct syscalls that make bad assumptions.
 
-This commit effectively reverts the patch from Gregory Fong [1]
-that was accepted upstream and replaces it with a consolidated
-irq domain implementation with one larger interrupt domain per
-GPIO controller instance spanning multiple GPIO banks based on
-an earlier patch [2] also submitted by Gregory Fong.
+I can see this could be a concern in principle, but do we have a feel
+for how common these direct uses of SVC are?
 
-[1] https://patchwork.kernel.org/patch/6921561/
-[2] https://patchwork.kernel.org/patch/6347811/
+I think the uses via libc wrappers should be OK, since the SVE PCS says
+that all SVE state is clobbered by normal function calls.  I think we
+can be relatively confident that the compilers implement this correctly,
+since it's the natural extension of the base AArch64 PCS (which only
+preserves the low 64 bits of V8-V15).
 
-Fixes: 19a7b6940b78 ("gpio: brcmstb: Add interrupt and wakeup source support")
-Signed-off-by: Doug Berger <opendmb@gmail.com>
----
- drivers/gpio/Kconfig        |   2 +-
- drivers/gpio/gpio-brcmstb.c | 188 ++++++++++++++++++++++++++++++++++----------
- 2 files changed, 146 insertions(+), 44 deletions(-)
+Perhaps one concern would be LTO, since we then rely on the syscall asm
+statement having the correct clobber lists.  And at the moment there's
+no syntax for saying that a register R is clobbered above X bits.
+(Alan's working on a GCC patch that could be reused for this if necessary.)
 
-diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index 3f80f167ed56..373adab79e4c 100644
---- a/drivers/gpio/Kconfig
-+++ b/drivers/gpio/Kconfig
-@@ -139,7 +139,7 @@ config GPIO_BRCMSTB
- 	default y if (ARCH_BRCMSTB || BMIPS_GENERIC)
- 	depends on OF_GPIO && (ARCH_BRCMSTB || BMIPS_GENERIC || COMPILE_TEST)
- 	select GPIO_GENERIC
--	select GPIOLIB_IRQCHIP
-+	select IRQ_DOMAIN
- 	help
- 	  Say yes here to enable GPIO support for Broadcom STB (BCM7XXX) SoCs.
- 
-diff --git a/drivers/gpio/gpio-brcmstb.c b/drivers/gpio/gpio-brcmstb.c
-index 183863902f7f..9a8c603625a3 100644
---- a/drivers/gpio/gpio-brcmstb.c
-+++ b/drivers/gpio/gpio-brcmstb.c
-@@ -38,20 +38,22 @@ struct brcmstb_gpio_bank {
- 	struct gpio_chip gc;
- 	struct brcmstb_gpio_priv *parent_priv;
- 	u32 width;
--	struct irq_chip irq_chip;
- };
- 
- struct brcmstb_gpio_priv {
- 	struct list_head bank_list;
- 	void __iomem *reg_base;
- 	struct platform_device *pdev;
-+	struct irq_domain *irq_domain;
-+	struct irq_chip irq_chip;
- 	int parent_irq;
- 	int gpio_base;
-+	int num_gpios;
- 	int parent_wake_irq;
- 	struct notifier_block reboot_notifier;
- };
- 
--#define MAX_GPIO_PER_BANK           32
-+#define MAX_GPIO_PER_BANK       32
- #define GPIO_BANK(gpio)         ((gpio) >> 5)
- /* assumes MAX_GPIO_PER_BANK is a multiple of 2 */
- #define GPIO_BIT(gpio)          ((gpio) & (MAX_GPIO_PER_BANK - 1))
-@@ -78,24 +80,42 @@ brcmstb_gpio_get_active_irqs(struct brcmstb_gpio_bank *bank)
- 	return status;
- }
- 
-+static int brcmstb_gpio_hwirq_to_offset(irq_hw_number_t hwirq,
-+					struct brcmstb_gpio_bank *bank)
-+{
-+	return hwirq - (bank->gc.base - bank->parent_priv->gpio_base);
-+}
-+
- static void brcmstb_gpio_set_imask(struct brcmstb_gpio_bank *bank,
--		unsigned int offset, bool enable)
-+		unsigned int hwirq, bool enable)
- {
- 	struct gpio_chip *gc = &bank->gc;
- 	struct brcmstb_gpio_priv *priv = bank->parent_priv;
-+	u32 mask = BIT(brcmstb_gpio_hwirq_to_offset(hwirq, bank));
- 	u32 imask;
- 	unsigned long flags;
- 
- 	spin_lock_irqsave(&gc->bgpio_lock, flags);
- 	imask = gc->read_reg(priv->reg_base + GIO_MASK(bank->id));
- 	if (enable)
--		imask |= BIT(offset);
-+		imask |= mask;
- 	else
--		imask &= ~BIT(offset);
-+		imask &= ~mask;
- 	gc->write_reg(priv->reg_base + GIO_MASK(bank->id), imask);
- 	spin_unlock_irqrestore(&gc->bgpio_lock, flags);
- }
- 
-+static int brcmstb_gpio_to_irq(struct gpio_chip *gc, unsigned offset)
-+{
-+	struct brcmstb_gpio_priv *priv = brcmstb_gpio_gc_to_priv(gc);
-+	/* gc_offset is relative to this gpio_chip; want real offset */
-+	int hwirq = offset + (gc->base - priv->gpio_base);
-+
-+	if (hwirq >= priv->num_gpios)
-+		return -ENXIO;
-+	return irq_create_mapping(priv->irq_domain, hwirq);
-+}
-+
- /* -------------------- IRQ chip functions -------------------- */
- 
- static void brcmstb_gpio_irq_mask(struct irq_data *d)
-@@ -119,7 +139,7 @@ static void brcmstb_gpio_irq_ack(struct irq_data *d)
- 	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
- 	struct brcmstb_gpio_bank *bank = gpiochip_get_data(gc);
- 	struct brcmstb_gpio_priv *priv = bank->parent_priv;
--	u32 mask = BIT(d->hwirq);
-+	u32 mask = BIT(brcmstb_gpio_hwirq_to_offset(d->hwirq, bank));
- 
- 	gc->write_reg(priv->reg_base + GIO_STAT(bank->id), mask);
- }
-@@ -129,7 +149,7 @@ static int brcmstb_gpio_irq_set_type(struct irq_data *d, unsigned int type)
- 	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
- 	struct brcmstb_gpio_bank *bank = gpiochip_get_data(gc);
- 	struct brcmstb_gpio_priv *priv = bank->parent_priv;
--	u32 mask = BIT(d->hwirq);
-+	u32 mask = BIT(brcmstb_gpio_hwirq_to_offset(d->hwirq, bank));
- 	u32 edge_insensitive, iedge_insensitive;
- 	u32 edge_config, iedge_config;
- 	u32 level, ilevel;
-@@ -226,18 +246,20 @@ static irqreturn_t brcmstb_gpio_wake_irq_handler(int irq, void *data)
- static void brcmstb_gpio_irq_bank_handler(struct brcmstb_gpio_bank *bank)
- {
- 	struct brcmstb_gpio_priv *priv = bank->parent_priv;
--	struct irq_domain *irq_domain = bank->gc.irqdomain;
-+	struct irq_domain *domain = priv->irq_domain;
-+	int hwbase = bank->gc.base - priv->gpio_base;
- 	unsigned long status;
- 
- 	while ((status = brcmstb_gpio_get_active_irqs(bank))) {
--		int bit;
-+		unsigned int irq, offset;
- 
--		for_each_set_bit(bit, &status, 32) {
--			if (bit >= bank->width)
-+		for_each_set_bit(offset, &status, 32) {
-+			if (offset >= bank->width)
- 				dev_warn(&priv->pdev->dev,
- 					 "IRQ for invalid GPIO (bank=%d, offset=%d)\n",
--					 bank->id, bit);
--			generic_handle_irq(irq_find_mapping(irq_domain, bit));
-+					 bank->id, offset);
-+			irq = irq_linear_revmap(domain, hwbase + offset);
-+			generic_handle_irq(irq);
- 		}
- 	}
- }
-@@ -245,8 +267,7 @@ static void brcmstb_gpio_irq_bank_handler(struct brcmstb_gpio_bank *bank)
- /* Each UPG GIO block has one IRQ for all banks */
- static void brcmstb_gpio_irq_handler(struct irq_desc *desc)
- {
--	struct gpio_chip *gc = irq_desc_get_handler_data(desc);
--	struct brcmstb_gpio_priv *priv = brcmstb_gpio_gc_to_priv(gc);
-+	struct brcmstb_gpio_priv *priv = irq_desc_get_handler_data(desc);
- 	struct irq_chip *chip = irq_desc_get_chip(desc);
- 	struct brcmstb_gpio_bank *bank;
- 
-@@ -272,6 +293,63 @@ static int brcmstb_gpio_reboot(struct notifier_block *nb,
- 	return NOTIFY_DONE;
- }
- 
-+static struct brcmstb_gpio_bank *brcmstb_gpio_hwirq_to_bank(
-+		struct brcmstb_gpio_priv *priv, irq_hw_number_t hwirq)
-+{
-+	struct brcmstb_gpio_bank *bank;
-+	int i = 0;
-+
-+	/* banks are in descending order */
-+	list_for_each_entry_reverse(bank, &priv->bank_list, node) {
-+		i += bank->gc.ngpio;
-+		if (hwirq < i)
-+			return bank;
-+	}
-+	return NULL;
-+}
-+
-+/*
-+ * This lock class tells lockdep that GPIO irqs are in a different
-+ * category than their parents, so it won't report false recursion.
-+ */
-+static struct lock_class_key brcmstb_gpio_irq_lock_class;
-+
-+
-+static int brcmstb_gpio_irq_map(struct irq_domain *d, unsigned int irq,
-+		irq_hw_number_t hwirq)
-+{
-+	struct brcmstb_gpio_priv *priv = d->host_data;
-+	struct brcmstb_gpio_bank *bank =
-+		brcmstb_gpio_hwirq_to_bank(priv, hwirq);
-+	struct platform_device *pdev = priv->pdev;
-+	int ret;
-+
-+	if (!bank)
-+		return -EINVAL;
-+
-+	dev_dbg(&pdev->dev, "Mapping irq %d for gpio line %d (bank %d)\n",
-+		irq, (int)hwirq, bank->id);
-+	ret = irq_set_chip_data(irq, &bank->gc);
-+	if (ret < 0)
-+		return ret;
-+	irq_set_lockdep_class(irq, &brcmstb_gpio_irq_lock_class);
-+	irq_set_chip_and_handler(irq, &priv->irq_chip, handle_level_irq);
-+	irq_set_noprobe(irq);
-+	return 0;
-+}
-+
-+static void brcmstb_gpio_irq_unmap(struct irq_domain *d, unsigned int irq)
-+{
-+	irq_set_chip_and_handler(irq, NULL, NULL);
-+	irq_set_chip_data(irq, NULL);
-+}
-+
-+static const struct irq_domain_ops brcmstb_gpio_irq_domain_ops = {
-+	.map = brcmstb_gpio_irq_map,
-+	.unmap = brcmstb_gpio_irq_unmap,
-+	.xlate = irq_domain_xlate_twocell,
-+};
-+
- /* Make sure that the number of banks matches up between properties */
- static int brcmstb_gpio_sanity_check_banks(struct device *dev,
- 		struct device_node *np, struct resource *res)
-@@ -293,13 +371,25 @@ static int brcmstb_gpio_remove(struct platform_device *pdev)
- {
- 	struct brcmstb_gpio_priv *priv = platform_get_drvdata(pdev);
- 	struct brcmstb_gpio_bank *bank;
--	int ret = 0;
-+	int offset, ret = 0, virq;
- 
- 	if (!priv) {
- 		dev_err(&pdev->dev, "called %s without drvdata!\n", __func__);
- 		return -EFAULT;
- 	}
- 
-+	if (priv->parent_irq > 0)
-+		irq_set_chained_handler_and_data(priv->parent_irq, NULL, NULL);
-+
-+	/* Remove all IRQ mappings and delete the domain */
-+	if (priv->irq_domain) {
-+		for (offset = 0; offset < priv->num_gpios; offset++) {
-+			virq = irq_find_mapping(priv->irq_domain, offset);
-+			irq_dispose_mapping(virq);
-+		}
-+		irq_domain_remove(priv->irq_domain);
-+	}
-+
- 	/*
- 	 * You can lose return values below, but we report all errors, and it's
- 	 * more important to actually perform all of the steps.
-@@ -347,26 +437,24 @@ static int brcmstb_gpio_of_xlate(struct gpio_chip *gc,
- 	return offset;
- }
- 
--/* Before calling, must have bank->parent_irq set and gpiochip registered */
-+/* priv->parent_irq and priv->num_gpios must be set before calling */
- static int brcmstb_gpio_irq_setup(struct platform_device *pdev,
--		struct brcmstb_gpio_bank *bank)
-+		struct brcmstb_gpio_priv *priv)
- {
--	struct brcmstb_gpio_priv *priv = bank->parent_priv;
- 	struct device *dev = &pdev->dev;
- 	struct device_node *np = dev->of_node;
- 	int err;
- 
--	bank->irq_chip.name = dev_name(dev);
--	bank->irq_chip.irq_mask = brcmstb_gpio_irq_mask;
--	bank->irq_chip.irq_unmask = brcmstb_gpio_irq_unmask;
--	bank->irq_chip.irq_ack = brcmstb_gpio_irq_ack;
--	bank->irq_chip.irq_set_type = brcmstb_gpio_irq_set_type;
--
--	/* Ensures that all non-wakeup IRQs are disabled at suspend */
--	bank->irq_chip.flags = IRQCHIP_MASK_ON_SUSPEND;
-+	priv->irq_domain =
-+		irq_domain_add_linear(np, priv->num_gpios,
-+				      &brcmstb_gpio_irq_domain_ops,
-+				      priv);
-+	if (!priv->irq_domain) {
-+		dev_err(dev, "Couldn't allocate IRQ domain\n");
-+		return -ENXIO;
-+	}
- 
--	if (IS_ENABLED(CONFIG_PM_SLEEP) && !priv->parent_wake_irq &&
--			of_property_read_bool(np, "wakeup-source")) {
-+	if (of_property_read_bool(np, "wakeup-source")) {
- 		priv->parent_wake_irq = platform_get_irq(pdev, 1);
- 		if (priv->parent_wake_irq < 0) {
- 			priv->parent_wake_irq = 0;
-@@ -387,7 +475,7 @@ static int brcmstb_gpio_irq_setup(struct platform_device *pdev,
- 
- 			if (err < 0) {
- 				dev_err(dev, "Couldn't request wake IRQ");
--				return err;
-+				goto out_free_domain;
- 			}
- 
- 			priv->reboot_notifier.notifier_call =
-@@ -396,17 +484,28 @@ static int brcmstb_gpio_irq_setup(struct platform_device *pdev,
- 		}
- 	}
- 
-+	priv->irq_chip.name = dev_name(dev);
-+	priv->irq_chip.irq_disable = brcmstb_gpio_irq_mask;
-+	priv->irq_chip.irq_mask = brcmstb_gpio_irq_mask;
-+	priv->irq_chip.irq_unmask = brcmstb_gpio_irq_unmask;
-+	priv->irq_chip.irq_ack = brcmstb_gpio_irq_ack;
-+	priv->irq_chip.irq_set_type = brcmstb_gpio_irq_set_type;
-+
-+	/* Ensures that all non-wakeup IRQs are disabled at suspend */
-+	priv->irq_chip.flags = IRQCHIP_MASK_ON_SUSPEND;
-+
- 	if (priv->parent_wake_irq)
--		bank->irq_chip.irq_set_wake = brcmstb_gpio_irq_set_wake;
-+		priv->irq_chip.irq_set_wake = brcmstb_gpio_irq_set_wake;
- 
--	err = gpiochip_irqchip_add(&bank->gc, &bank->irq_chip, 0,
--				   handle_level_irq, IRQ_TYPE_NONE);
--	if (err)
--		return err;
--	gpiochip_set_chained_irqchip(&bank->gc, &bank->irq_chip,
--			priv->parent_irq, brcmstb_gpio_irq_handler);
-+	irq_set_chained_handler_and_data(priv->parent_irq,
-+					 brcmstb_gpio_irq_handler, priv);
- 
- 	return 0;
-+
-+out_free_domain:
-+	irq_domain_remove(priv->irq_domain);
-+
-+	return err;
- }
- 
- static int brcmstb_gpio_probe(struct platform_device *pdev)
-@@ -511,6 +610,8 @@ static int brcmstb_gpio_probe(struct platform_device *pdev)
- 		gc->of_xlate = brcmstb_gpio_of_xlate;
- 		/* not all ngpio lines are valid, will use bank width later */
- 		gc->ngpio = MAX_GPIO_PER_BANK;
-+		if (priv->parent_irq > 0)
-+			gc->to_irq = brcmstb_gpio_to_irq;
- 
- 		/*
- 		 * Mask all interrupts by default, since wakeup interrupts may
-@@ -526,12 +627,6 @@ static int brcmstb_gpio_probe(struct platform_device *pdev)
- 		}
- 		gpio_base += gc->ngpio;
- 
--		if (priv->parent_irq > 0) {
--			err = brcmstb_gpio_irq_setup(pdev, bank);
--			if (err)
--				goto fail;
--		}
--
- 		dev_dbg(dev, "bank=%d, base=%d, ngpio=%d, width=%d\n", bank->id,
- 			gc->base, gc->ngpio, bank->width);
- 
-@@ -541,6 +636,13 @@ static int brcmstb_gpio_probe(struct platform_device *pdev)
- 		num_banks++;
- 	}
- 
-+	priv->num_gpios = gpio_base - priv->gpio_base;
-+	if (priv->parent_irq > 0) {
-+		err = brcmstb_gpio_irq_setup(pdev, priv);
-+		if (err)
-+			goto fail;
-+	}
-+
- 	dev_info(dev, "Registered %d banks (GPIO(s): %d-%d)\n",
- 			num_banks, priv->gpio_base, gpio_base - 1);
- 
--- 
-2.14.1
+>> > Conversely, the relative cost of zeroing the SVE regs to mitigate
+>> > against this also cannot be well characterised until SVE hardware
+>> > exists.
+>> >
+>> > ptrace impact
+>> > -------------
+>> >
+>> > The current implementation can discard and zero the SVE registers
+>> > at any point during a syscall, including before, after or between
+>> > ptrace traps inside a single syscall.  This means that setting the
+>> > SVE registers through PTRACE_SETREGSET will often not do what the
+>> > user expects: the new register values are only guaranteed to
+>> > survive as far as userspace if set from an asynchronous
+>> > signal-delivery-stop (e.g., breakpoint, SEGV or asynchronous signal
+>> > delivered outside syscall context).
+>> >
+>> > This is consistent with the currently documented SVE user ABI, but
+>> > likely to be surprising for a debugger user, since setting most
+>> > registers of a tracee doesn't behave in this way.
+>> >
+>> > This patch
+>> > ----------
+>> >
+>> > The common syscall entry path is modified to forcibly discard SVE,
+>> > and the discard logic elsewhere is removed.
+>> >
+>> > This means that there is a mandatory additional trap to the kernel
+>> > when a user task tries to use SVE again after a syscall.  This can
+>> > be expensive for programs that use SVE heavily around syscalls, but
+>> > can be optimised later.
+>> 
+>> Won't it impact every restart from syscall? It's a shame you have to
+>
+> Only if SVE is used.
+>
+> The average extra cost is going to be proportional to rate of execution
+> of syscall...syscall intervals where SVE is used, so
+>
+> 	for (;;) {
+> 		syscall();
+> 		crunch_huge_data()
+> 	}
+>
+> might cause up to 20 extra SVE traps per second if crunch_huge_data()
+> takes 50ms say; whereas
+>
+> 	for (;;) {
+> 		syscall();
+> 		crunch_trivial_data();
+> 	}
+>
+> would cause up to 100000 extra SVE traps per second if
+> crunch_trivial_data() takes 10us.  That's much worse.
+>
+>
+> I think the worst realistic case here is use of gcc -mfpu=sve (or
+> whatever the option would be called).  In that case though, the
+> compiler _should_ consider the caller-saveness of the SVE regs when
+> computing cost tradeoffs for code generation around external function
+> calls -- this may hide much of the penalty in practice.
+
+I'm not sure I'm really answering the point, sorry, but one of the
+advantages of SVE is that it can vectorise code with very little extra
+overhead.  We'd therefore tend to vectorise any loop we can, even if it
+only iterates a few times.  (This doesn't necessarily happen as much as
+it should yet.)
+
+The compiler should certainly consider the cost of saving and restoring
+data around function calls, but in the cases I've seen so far, it's
+rarely natural for SVE state to be live across a call.  Spilling around
+calls tends to come from the compiler hoisting invariants too far,
+such as hoisting a PTRUE outside the for(;;) loop in your example.
+That's an optimisation bug that I've tried to fix for GCC.
+
+But as I understand it, the cost the compiler would need to consider
+here isn't the cost of saving and restoring SVE state around a call,
+but that (at least with the trap implementation) using SVE for a short
+time between two function calls can be expensive if those functions
+happen to use syscalls.  Probably more expensive than not using
+SVE in the first place.
+
+I think it would be very difficult for the compiler to know when
+that's a concern.  Without LTO, most function calls are just black
+boxes.  Also, using SVE for a leaf function could turn out to be
+espensive if the caller of that leaf function uses syscalls either side,
+which is something the compiler wouldn't necessarily be able to see.
+So there's a danger we could get into the mindset of "don't use SVE
+for small loops".
+
+Of course, none of this matters if the automatic selection between traps
+and explicit zeroing makes the cost negligble (compared to the overhead
+of the syscall itself).
+
+Not sure that was any help, sorry :-)
+
+[...]
+
+Thanks,
+Richard
