@@ -1,57 +1,47 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 25 Oct 2017 10:38:03 +0200
-Subject: [PATCH v5 0/9] Mediatek MT2712 clock and scpsys support
-In-Reply-To: <20171024083830.GD15990@codeaurora.org>
-References: <1508381330-3700-1-git-send-email-weiyi.lu@mediatek.com>
- <e67f2b01-552b-e9b3-6c38-141e3063439d@gmail.com>
- <20171024083830.GD15990@codeaurora.org>
-Message-ID: <d8e00869-f6ff-9209-f630-abcb6815e225@gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 25 Oct 2017 16:44:07 +0800
+Subject: [PATCH v3 0/2] Add Combo PHY driver for HiSilicon STB SoCs
+Message-ID: <1508921049-16208-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Shawn Guo <shawn.guo@linaro.org>
 
+It adds device tree bindings and driver support for Combo PHY device
+which can be found on HiSilicon STB SoCs.
 
-On 10/24/2017 10:38 AM, Stephen Boyd wrote:
-> On 10/19, Matthias Brugger wrote:
->>
->>
->> On 10/19/2017 04:48 AM, Weiyi Lu wrote:
->>> This series is based on v4.14-rc1 and composed of
->>> clock control (PATCH 1-4) and scpsys control (PATCH 5-9)
->>>
->>> changes since v4:
->>> - Refine scpsys and infracfg for bus protection by passing 
->>>   a boolean flag to determine the register update method.
->>>
->>> changes since v3:
->>> - Rebase to v4.14-rc1.
->>>
->>> changes since v2:
->>> - ensure the clocks used by clocksource driver are registered
->>>   before clocksource init() by using CLK_OF_DECLARE()
->>> - correct the frequency of clk32k/clkrtc_ext/clkrtc_int
->>>
->>> changes since v1:
->>> - Rebase to v4.13-next-soc.
->>> - Refine scpsys and infracfg for bus protection.
->>>
->>> Weiyi Lu (9):
->>>   dt-bindings: ARM: Mediatek: Document bindings for MT2712
->>>   clk: mediatek: Add dt-bindings for MT2712 clocks
->>>   clk: mediatek: Add MT2712 clock support
->>
->> Stephen, Mike: are you ok with the patches 1-3 of this series?
->>
->> If so, then I will take the rest through my tree.
->>
-> 
-> Do you need a branch for headers? I'm see there's a v6 so I'll
-> review that one.
-> 
+Changes for v3:
+ - Make combphy device be child of peripheral controller and use 'reg'
+   property for mapping combphy configuration registers.
+ - Kill "hisilicon,peripheral-syscon" property, since parent node is
+   just the syscon controller now.
+ - Check combphy id to handle the quirk that combphy0 can not configure
+   mode but always works in USB3 mode.
+ - Unify phy .init and .exit hooks for different combphy instances and
+   work modes, as the only quirk we need to handle is that combphy0 can
+   only work in USB3 mode.
+ - Better naming for clock and reset, 'ref' to 'ref_clk', 'por' to
+   'por_rst'.
 
-If you plan to merge them to v4.15 then no, otherwise that would be helpfull.
+Changes for v2:
+ - Move DT bindings into a separate patch.
+ - Drop the spurious newline from drivers/phy/Makefile.
+ - Use the phy type defines in dt-bindings/phy/phy.h.
+ - Use PTR_ERR_OR_ZERO() for checking return from
+   devm_of_phy_provider_register().
+ - Add USB3 phy support.
 
-AFAIK no changes between v5 and v6.
+Jianguo Sun (2):
+  dt-bindings: add bindings doc for hi3798cv200 combphy
+  phy: add combo phy driver for HiSilicon STB SoCs
 
-Thanks!
-Matthias
+ .../bindings/phy/phy-hi3798cv200-combphy.txt       |  50 ++++
+ drivers/phy/hisilicon/Kconfig                      |   9 +
+ drivers/phy/hisilicon/Makefile                     |   1 +
+ drivers/phy/hisilicon/phy-histb-combphy.c          | 253 +++++++++++++++++++++
+ 4 files changed, 313 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-hi3798cv200-combphy.txt
+ create mode 100644 drivers/phy/hisilicon/phy-histb-combphy.c
+
+-- 
+1.9.1
