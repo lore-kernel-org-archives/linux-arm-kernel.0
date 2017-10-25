@@ -1,34 +1,57 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 25 Oct 2017 22:34:59 +0200
-Subject: 4.13 (and probably all recent) kernels refuse to boot on one Nokia
- N950, work or another
-Message-ID: <20171025203459.GA22035@amd>
+From: leoyang.li@nxp.com (Li Yang)
+Date: Wed, 25 Oct 2017 16:00:36 -0500
+Subject: [RESEND PATCH] ARM: dts: ls1021a: Add support for QSPI with
+ ls1021a SoC
+In-Reply-To: <20170912064925.24571-1-sz.lin@moxa.com>
+References: <20170912064925.24571-1-sz.lin@moxa.com>
+Message-ID: <CADRPPNREzRzzW-VRpm6P3y8_sYwvm_c13n6vjgQZP24fxO9uKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Tue, Sep 12, 2017 at 1:49 AM, SZ Lin <sz.lin@moxa.com> wrote:
+> Add QSPI node support, and this function is disabled by default
+> This setting could be overwritten in board-level definitions
 
-...hardware should be identical. 3.5.3-nemo kernel seems to work on
-both. 4.13-rc2 with display and clock patches boots on phone "S", but
-does not on phone "P"; nothing nothing is received on serial port.
+Adding Shawn Guo.
 
-There is some difference in the bootloaders: S's bootloader provides
-lots of debug info, P's is silent. R&D settings do _not_ have
-influence on bootloader. We know P's serial works, as 3.5.3 kernel
-prints "Uncompressing linux...booting" there.
+>
+> Signed-off-by: SZ Lin <sz.lin@moxa.com>
 
-I'll need to return "S" phone and serial cable tommorow. If you have
-any ideas, let me know.
+Acked-by: Li Yang <leoyang.li@nxp.com>
 
-Best regards,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171025/e2e4eedf/attachment.sig>
+> ---
+>  arch/arm/boot/dts/ls1021a.dtsi | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+> index 7bb9df2c1460..9da876e47810 100644
+> --- a/arch/arm/boot/dts/ls1021a.dtsi
+> +++ b/arch/arm/boot/dts/ls1021a.dtsi
+> @@ -154,6 +154,20 @@
+>                         big-endian;
+>                 };
+>
+> +               qspi: quadspi at 1550000 {
+> +                       compatible = "fsl,ls1021a-qspi";
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +                       reg = <0x0 0x1550000 0x0 0x10000>,
+> +                             <0x0 0x40000000 0x0 0x40000000>;
+> +                       reg-names = "QuadSPI", "QuadSPI-memory";
+> +                       interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>;
+> +                       clock-names = "qspi_en", "qspi";
+> +                       clocks = <&clockgen 4 1>, <&clockgen 4 1>;
+> +                       big-endian;
+> +                       status = "disabled";
+> +               };
+> +
+>                 esdhc: esdhc at 1560000 {
+>                         compatible = "fsl,esdhc";
+>                         reg = <0x0 0x1560000 0x0 0x10000>;
+> --
+> 2.14.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
