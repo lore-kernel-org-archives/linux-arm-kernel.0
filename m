@@ -1,82 +1,45 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 25 Oct 2017 16:58:23 +0200
-Subject: [PATCH] ARM: dts: mvebu: pl310-cache disable double-linefill
-Message-ID: <20171025145823.29262-1-gregory.clement@free-electrons.com>
+From: jim2101024@gmail.com (Jim Quinlan)
+Date: Wed, 25 Oct 2017 11:00:32 -0400
+Subject: [PATCH 1/8] SOC: brcmstb: add memory API
+In-Reply-To: <a83617d0-8506-7fe4-2870-d9dbd9ffdb3f@gmail.com>
+References: <1508868949-16652-1-git-send-email-jim2101024@gmail.com>
+ <1508868949-16652-2-git-send-email-jim2101024@gmail.com>
+ <a83617d0-8506-7fe4-2870-d9dbd9ffdb3f@gmail.com>
+Message-ID: <CANCKTBtLxAv9tmfi+92n+bYVq6x_ts0YzhH2YZ_jLnc+Dadc7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yan Markman <ymarkman@marvell.com>
+On Tue, Oct 24, 2017 at 8:23 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> Hi Jim,
+>
+> On 10/24/2017 11:15 AM, Jim Quinlan wrote:
+>> +#elif defined(CONFIG_MIPS)
+>> +int brcmstb_memory_phys_addr_to_memc(phys_addr_t pa)
+>> +{
+>> +     /* The logic here is fairly simple and hardcoded: if pa <= 0x5000_0000,
+>> +      * then this is MEMC0, else MEMC1.
+>> +      *
+>> +      * For systems with 2GB on MEMC0, MEMC1 starts at 9000_0000, with 1GB
+>> +      * on MEMC0, MEMC1 starts at 6000_0000.
+>> +      */
+>> +     if (pa >= 0x50000000ULL)
+>> +             return 1;
+>> +     else
+>> +             return 0;
+>> +}
+>> +#endif
+>
+> We may be missing an EXPORT_SYMBOL_GPL(brcmstb_memory_phys_to_addr_memc)
+> here?
+>
+> Thanks!
+> --
+> Florian
 
-Under heavy system stress mvebu SoC using Cortex A9 sporadically
-encountered instability issues.
+Hi Florian,
 
-The "double linefill" feature of L2 cache was identified as causing
-dependency between read and write which lead to the deadlock.
+I removed that EXPORT_SYMBOL_GPL() because this particular call is not
+directly invoked PCIe RC driver.  It is indirectly invoked by
+brcmstb_memory_memc_size(), which is exported.
 
-Especially, it was the cause of deadlock seen under heavy PCIe traffic,
-as this dependency violates PCIE overtaking rule.
-
-Fixes: c8f5a878e554 ("ARM: mvebu: use DT properties to fine-tune the L2 configuration")
-Cc: stable at vger.kernel.org
-Signed-off-by: Yan Markman <ymarkman@marvell.com>
-Signed-off-by: Igal Liberman <igall@marvell.com>
-Signed-off-by: Nadav Haklai <nadavh@marvell.com>
-[gregory.clement at free-electrons.com: reformulate commit log, add Armada
-375 and add Fixes tag]
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/boot/dts/armada-375.dtsi | 4 ++--
- arch/arm/boot/dts/armada-38x.dtsi | 4 ++--
- arch/arm/boot/dts/armada-39x.dtsi | 4 ++--
- 3 files changed, 6 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-index 7225c7ce9a8d..2cb1bcd30976 100644
---- a/arch/arm/boot/dts/armada-375.dtsi
-+++ b/arch/arm/boot/dts/armada-375.dtsi
-@@ -178,9 +178,9 @@
- 				reg = <0x8000 0x1000>;
- 				cache-unified;
- 				cache-level = <2>;
--				arm,double-linefill-incr = <1>;
-+				arm,double-linefill-incr = <0>;
- 				arm,double-linefill-wrap = <0>;
--				arm,double-linefill = <1>;
-+				arm,double-linefill = <0>;
- 				prefetch-data = <1>;
- 			};
- 
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index 7ff0811e61db..05e241fb91ad 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -143,9 +143,9 @@
- 				reg = <0x8000 0x1000>;
- 				cache-unified;
- 				cache-level = <2>;
--				arm,double-linefill-incr = <1>;
-+				arm,double-linefill-incr = <0>;
- 				arm,double-linefill-wrap = <0>;
--				arm,double-linefill = <1>;
-+				arm,double-linefill = <0>;
- 				prefetch-data = <1>;
- 			};
- 
-diff --git a/arch/arm/boot/dts/armada-39x.dtsi b/arch/arm/boot/dts/armada-39x.dtsi
-index ea657071e278..5218bd2a248d 100644
---- a/arch/arm/boot/dts/armada-39x.dtsi
-+++ b/arch/arm/boot/dts/armada-39x.dtsi
-@@ -111,9 +111,9 @@
- 				reg = <0x8000 0x1000>;
- 				cache-unified;
- 				cache-level = <2>;
--				arm,double-linefill-incr = <1>;
-+				arm,double-linefill-incr = <0>;
- 				arm,double-linefill-wrap = <0>;
--				arm,double-linefill = <1>;
-+				arm,double-linefill = <0>;
- 				prefetch-data = <1>;
- 			};
- 
--- 
-2.14.2
+Thanks, Jim
