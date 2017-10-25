@@ -1,45 +1,33 @@
-From: jim2101024@gmail.com (Jim Quinlan)
-Date: Wed, 25 Oct 2017 11:00:32 -0400
-Subject: [PATCH 1/8] SOC: brcmstb: add memory API
-In-Reply-To: <a83617d0-8506-7fe4-2870-d9dbd9ffdb3f@gmail.com>
-References: <1508868949-16652-1-git-send-email-jim2101024@gmail.com>
- <1508868949-16652-2-git-send-email-jim2101024@gmail.com>
- <a83617d0-8506-7fe4-2870-d9dbd9ffdb3f@gmail.com>
-Message-ID: <CANCKTBtLxAv9tmfi+92n+bYVq6x_ts0YzhH2YZ_jLnc+Dadc7g@mail.gmail.com>
+From: elder@linaro.org (Alex Elder)
+Date: Wed, 25 Oct 2017 10:12:02 -0500
+Subject: [PATCH 0/3] arm64: remove some unused defconfig options
+In-Reply-To: <20171025070253.GD28555@hector>
+References: <20171020172021.8119-1-elder@linaro.org>
+ <20171025002019.GC30645@codeaurora.org> <20171025070253.GD28555@hector>
+Message-ID: <50fc14c8-9272-4c88-6625-7cbf1af09879@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 24, 2017 at 8:23 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> Hi Jim,
->
-> On 10/24/2017 11:15 AM, Jim Quinlan wrote:
->> +#elif defined(CONFIG_MIPS)
->> +int brcmstb_memory_phys_addr_to_memc(phys_addr_t pa)
->> +{
->> +     /* The logic here is fairly simple and hardcoded: if pa <= 0x5000_0000,
->> +      * then this is MEMC0, else MEMC1.
->> +      *
->> +      * For systems with 2GB on MEMC0, MEMC1 starts at 9000_0000, with 1GB
->> +      * on MEMC0, MEMC1 starts at 6000_0000.
->> +      */
->> +     if (pa >= 0x50000000ULL)
->> +             return 1;
->> +     else
->> +             return 0;
->> +}
->> +#endif
->
-> We may be missing an EXPORT_SYMBOL_GPL(brcmstb_memory_phys_to_addr_memc)
-> here?
->
-> Thanks!
-> --
-> Florian
+On 10/25/2017 02:02 AM, Andy Gross wrote:
+> On Tue, Oct 24, 2017 at 05:20:20PM -0700, Stephen Boyd wrote:
+>> On 10/20, Alex Elder wrote:
+>>> This series deletes three config options related to USB on Qualcomm
+>>> SoCs from the arm64 "defconfig", along with the code that they
+>>> enable.  The code is no longer needed by any Qualcomm hardware.  
+>>>
+>>> 					-Alex
+>>>
+>>> Alex Elder (3):
+>>>   arm64: defconfig: remove CONFIG_USB_EHCI_MSM
+>>>   arm64: defconfig: remove CONFIG_USB_MSM_OTG
+>>>   arm64: defconfig: remove CONFIG_USB_QCOM_8X16_PHY
+>>
+>> As I said off-list, I would split this into defconfig for arm-soc
+>> and drivers/usb for usb subsystem to pick up.
+> 
+> I agree with splitting.  But carry my ACKs when you do.
 
-Hi Florian,
+I will.  And I'll send two series, one for defconfig and
+one for the drivers.  Thanks.
 
-I removed that EXPORT_SYMBOL_GPL() because this particular call is not
-directly invoked PCIe RC driver.  It is indirectly invoked by
-brcmstb_memory_memc_size(), which is exported.
-
-Thanks, Jim
+					-Alex
