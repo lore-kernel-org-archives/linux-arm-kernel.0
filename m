@@ -1,29 +1,28 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 25 Oct 2017 14:47:03 +0100
-Subject: [PATCH v4 06/20] KVM: arm/arm64: Check that system supports split
- eoi/deactivate
-In-Reply-To: <20171020114939.12554-7-christoffer.dall@linaro.org> (Christoffer
- Dall's message of "Fri, 20 Oct 2017 13:49:25 +0200")
+Date: Wed, 25 Oct 2017 14:49:14 +0100
+Subject: [PATCH v4 07/20] KVM: arm/arm64: Make timer_arm and timer_disarm
+ helpers more generic
+In-Reply-To: <20171020114939.12554-8-christoffer.dall@linaro.org> (Christoffer
+ Dall's message of "Fri, 20 Oct 2017 13:49:26 +0200")
 References: <20171020114939.12554-1-christoffer.dall@linaro.org>
- <20171020114939.12554-7-christoffer.dall@linaro.org>
-Message-ID: <86fua7cpbc.fsf@arm.com>
+ <20171020114939.12554-8-christoffer.dall@linaro.org>
+Message-ID: <86bmkvcp7p.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 20 2017 at  1:49:25 pm BST, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+On Fri, Oct 20 2017 at  1:49:26 pm BST, Christoffer Dall <christoffer.dall@linaro.org> wrote:
 > From: Christoffer Dall <cdall@linaro.org>
 >
-> Some systems without proper firmware and/or hardware description data
-> don't support the split EOI and deactivate operation.
+> We are about to add an additional soft timer to the arch timer state for
+> a VCPU and would like to be able to reuse the functions to program and
+> cancel a timer, so we make them slightly more generic and rename to make
+> it more clear that these functions work on soft timers and not the
+> hardware resource that this code is managing.
 >
-> On such systems, we cannot leave the physical interrupt active after the
-> timer handler on the host has run, so we cannot support KVM with an
-> in-kernel GIC with the timer changes we are about to introduce.
+> The armed flag on the timer state is only used to assert a condition,
+> and we don't rely on this assertion in any meaningful way, so we can
+> simply get rid of this flack and slightly reduce complexity.
 >
-> This patch makes sure that trying to initialize the KVM GIC code will
-> fail on such systems.
->
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
 > Signed-off-by: Christoffer Dall <cdall@linaro.org>
 
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
