@@ -1,73 +1,105 @@
 From: kim.phillips@arm.com (Kim Phillips)
-Date: Tue, 24 Oct 2017 19:47:05 -0500
-Subject: [RFC 2/3] perf tool: stat: say more about why event is not
- supported by the kernel
-In-Reply-To: <20171024133530.GB13445@arm.com>
-References: <20171024030408.d29c81d6134bf63df18ae618@arm.com>
- <20171024133530.GB13445@arm.com>
-Message-ID: <20171024194705.31c1af9508fa0c3195ab359e@arm.com>
+Date: Tue, 24 Oct 2017 20:05:00 -0500
+Subject: [RFC 3/3] perf tool: arm-ccn: add a supplemental strerror function
+In-Reply-To: <20171024133518.GA13445@arm.com>
+References: <20171024030415.9baa5157e506892a757bf8c7@arm.com>
+ <20171024133518.GA13445@arm.com>
+Message-ID: <20171024200500.619cef54ad276b2d680b613d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 24 Oct 2017 14:35:30 +0100
+On Tue, 24 Oct 2017 14:35:19 +0100
 Will Deacon <will.deacon@arm.com> wrote:
 
-> On Tue, Oct 24, 2017 at 03:04:08AM -0500, Kim Phillips wrote:
-> > +++ b/tools/perf/builtin-stat.c
-> > @@ -625,9 +625,13 @@ static int __run_perf_stat(int argc, const char **argv)
-> >  			if (errno == EINVAL || errno == ENOSYS ||
-> >  			    errno == ENOENT || errno == EOPNOTSUPP ||
-> >  			    errno == ENXIO) {
-> > -				if (verbose > 0)
-> > +				if (verbose > 0) {
-> >  					ui__warning("%s event is not supported by the kernel.\n",
-> >  						    perf_evsel__name(counter));
-> > +					perf_evsel__open_strerror(counter, &target,
-> > +								  errno, msg, sizeof(msg));
-> > +					ui__error("%s\n", msg);
-> > +				}
+> On Tue, Oct 24, 2017 at 03:04:15AM -0500, Kim Phillips wrote:
+> > Use the Arm CCN driver as an example of how to try to improve
+> > upon its existing dmesg error output, and duplicate error string
+> > generation logic in the perf tool.
 > 
-> Hmm, perf_evsel__open_strerror can already get called a few lines later, so
+> [...]
+> 
+> > Comments?  Is this really that much better than the existing dmesg that
+> > the user is already being pointed to by the perf tool?
+> 
+> Having never used the CCN PMU, I can't speak to the usefulness of this
+> change, but I can say that I think this needs to be PMU-specific rather than
+> arch-specific. The CCN driver can, for example, be built for 32-bit ARM
+> systems but the directory structure here doesn't reflect that.
 
-That's in the case when perf decides to fully abort, whereas this
-change allows users to know why perf stat output lists '<not
-supported>' instead of having a count figure next to the event requested:
+Sure, but the gist of this RFC is to determine whether it useful to
+users of the CCN PMU, and other hard-to-use PMUs.
+
+In the very last example provided, one can see that how referring the
+user to dmesg will be helpful, because only the kernel driver knows the
+node/xp vs topology enough to validate the user request.
 
 BEFORE THIS SERIES:
 
-# ./oldperf stat -v -e ccn/cycles/ku sleep 1
+>From the perf tool, we get:
+
 Warning:
-ccn/cycles/ku event is not supported by the kernel.
-failed to read counter ccn/cycles/ku
+ccn/xp_watchpoint,xp=3,vc=5,port=9,dir=1,cmp_l=0,cmp_h=1,mask=0/ event is not supported by the kernel.
 
- Performance counter stats for 'system wide':
+>From dmesg, we get:
 
-   <not supported>      ccn/cycles/ku                                               
+[16561.872725] arm-ccn e8000000.ccn: Invalid vc 5 for node/XP 3!
 
-       1.002756731 seconds time elapsed
+AFTER THIS SERIES (amended to only strerror_arch output):
 
-AFTER THIS SERIES (amended to show only strerror_arch output):
+The tool gives us:
 
-The tool itself tells the user the event can't exclude execution
-levels, rather than the user having to refer to dmesg:
-
-# ./newperf stat -v -e ccn/cycles/ku sleep 1
 Warning:
-ccn/cycles/ku: Can't exclude execution levels!
-failed to read counter ccn/cycles/ku
+ccn/xp_watchpoint,xp=3,vc=5,port=9,dir=1,cmp_l=0,cmp_h=1,mask=0/: Invalid MN / XP / node ID, or node type, or node/XP port / vc or event, or mixed PMU group. See dmesg for details
 
- Performance counter stats for 'system wide':
+So the usefulness of this series is still debatable - at least for CCN
+- given the tool already points the user to dmesg.
 
-   <not supported>      ccn/cycles/ku                                               
+> > +	switch (err) {
+> > +	case EOPNOTSUPP:
+> > +		if (attr->sample_period)
+> > +			return scnprintf(msg, size, "%s: Sampling not supported, try 'perf stat'\n", evname);
+> 
+> ... and then the existing code prints:
+> 
+> 	"PMU Hardware doesn't support sampling/overflow-interrupts."
+> 
+> so why do we need both?
 
-       1.002935620 seconds time elapsed
+We don't; just didn't want to tread too hard on the common code on this
+first RFC, but you (and acme) are right: this should default back to
+the generic/shared strerror (and be removed from here).
 
-> I don't think this change is right. It looks like the intention here is that
-> we can push ahead skipping unsupported events unless they are the leader of
-> a populated group. If this isn't working as intended, then it looks like we
-> need a helper to identify unsupported events instead.
+> > +		if (target__has_task(target))
+> > +			return scnprintf(msg, size, "%s: Can't provide per-task data!\n", evname);
+> 
+> Isn't this the case for all uncore PMUs? If so, could we predicate this
+> additionally on evsel->system_wide and print this in the shared error
+> handler?
 
-I could be wrong, but I think it's working as intended:  this patch
-just adds more user-visible resolution into the event opening errors.
+That actually should have been !target__has_cpu, since the driver
+checks for event->cpu < 0.
+
+hmm, I can't find a way to get that message out of the driver (on
+dmesg).  E.g., --per-thread invocations are being caught by the perf
+front end parser...but, yes, this probably should be removed from the
+custom CCN strerror code.
+
+> > +		break;
+> > +	case EINVAL:
+> > +		if ((attr->sample_type & PERF_SAMPLE_BRANCH_STACK) ||
+> > +			attr->exclude_user ||
+> > +			attr->exclude_kernel || attr->exclude_hv ||
+> > +			attr->exclude_idle || attr->exclude_host ||
+> > +			attr->exclude_guest)
+> > +			return scnprintf(msg, size, "%s: Can't exclude execution levels!\n", evname);
+> 
+> A better way to do this might be to identify some common failure modes,
+> e.g. unable to support some of the exclude_* fields in perf_event_attr,
+> then have an optional per-PMU callback which returns a bool to say
+> whether or not the error is because of that.
+
+Not sure exactly what that would look like for this context, but
+tools/perf/util/evsel.c:perf_evsel__fallback() gets called after the
+event open fails and already contains some of that logic...
 
 Kim
