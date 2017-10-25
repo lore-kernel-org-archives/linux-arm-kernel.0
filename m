@@ -1,40 +1,33 @@
-From: willemdebruijn.kernel@gmail.com (Willem de Bruijn)
-Date: Wed, 25 Oct 2017 14:49:33 -0400
-Subject: v4.14-rc3/arm64 DABT exception in atomic_inc() / __skb_clone()
-In-Reply-To: <CAF=yD-JFjjA=2T7HermH2GygfHinyW+ZC5v+Di7M4V_Fg5paHg@mail.gmail.com>
-References: <EAA60182-6F08-412E-8F8B-FD4B0309A858@gmail.com>
- <20171020111408.edj24tztxdptte5r@lakrids.cambridge.arm.com>
- <960D71EC-C1E9-4898-ACBE-543FC09483FF@gmail.com>
- <CACT4Y+bjzzCv3LSxK12C1xB8GfR3UYCrX_5phRYJ8fpxh9vcvQ@mail.gmail.com>
- <CAF=yD-K76TMjHiYRTRAnxM-x4LBcUDY+27WX477HW6kG=L_aZw@mail.gmail.com>
- <D2AD6D5B-3A05-48E7-A999-DECAB18A4649@gmail.com>
- <CAF=yD-JFjjA=2T7HermH2GygfHinyW+ZC5v+Di7M4V_Fg5paHg@mail.gmail.com>
-Message-ID: <CAF=yD-Lw2E7T12sA-dgMK5kn=L0TLGQE+v68s1X8HMHLq9hGBA@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 25 Oct 2017 15:01:02 -0400
+Subject: [PATCH] PCI: turn off PCIe services during shutdown
+Message-ID: <1508958063-6947-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 25, 2017 at 2:24 PM, Willem de Bruijn
-<willemdebruijn.kernel@gmail.com> wrote:
-> On Sat, Oct 21, 2017 at 9:56 PM, Wei Wei <dotweiba@gmail.com> wrote:
->> I have uploaded the VM core dump [1]. And I don?t know if these logs are helpful in the case of
->> failing to get the C reproducer currently.
->>
->> [1] https://github.com/dotweiba/skb_clone_atomic_inc_bug/blob/master/vmcore.gz
->
-> Thanks. So this would be the atomic_inc on shb_shinfo(skb)->dataref, which
-> matches the __ll_sc_atomic_add in Mark's trace.
->
-> Debugging with crash shows 0xffff800071bb3180 and 0xffff800071bb2c80
-> to be valid skbuffs of len 40, no sk, both pointing to the same head.
->
-> That is indeed unaligned:  head = 0xffff8000327c80c9 "", end = 256, giving
-> skb_shared_info at 0xffff8000327c81c9 and  &skb_shared_info(skb)->dataref
-> at 0xffff8000327c81c9 + 36 == 0xffff8000327c81ed
+Some of the PCIe services such as AER are being left enabled during
+shutdown. This might cause spurious AER errors while SOC is being
+powered down.
 
->From skb->dev and netdev_priv, the tun device has flags 0x1002 ==
-IFF_TAP | IFF_NO_PI. This kernel precedes the recent support for
-IFF_NAPI and IFF_NAPI_FRAGS. The allocation most likely happened
-in tun_build_skb from current->task_frag. It would be a previous
-allocation that left alloc_frag->offset unaligned. But perhaps this code
-needs to perform alignment before setting skb->head. At least on
-platforms where atomic on dataref must be aligned.
+Let's clean up the PCIe services gracefully during shutdown to clear
+these false positives.
+
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/pci/pcie/portdrv_pci.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/pci/pcie/portdrv_pci.c b/drivers/pci/pcie/portdrv_pci.c
+index 083276e..b350d12 100644
+--- a/drivers/pci/pcie/portdrv_pci.c
++++ b/drivers/pci/pcie/portdrv_pci.c
+@@ -246,6 +246,7 @@ static void pcie_portdrv_err_resume(struct pci_dev *dev)
+ 
+ 	.probe		= pcie_portdrv_probe,
+ 	.remove		= pcie_portdrv_remove,
++	.shutdown	= pcie_portdrv_remove,
+ 
+ 	.err_handler	= &pcie_portdrv_err_handler,
+ 
+-- 
+1.9.1
