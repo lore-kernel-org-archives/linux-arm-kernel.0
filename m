@@ -1,96 +1,180 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Wed, 25 Oct 2017 10:05:12 +0200
-Subject: [PATCH 1/3] dt-bindings: iio: adc: stm32: add support for diff
- channels
-In-Reply-To: <D8F820CC-9AC1-4C78-9237-C43A47D3328F@jic23.retrosnub.co.uk>
-References: <1508246145-19417-1-git-send-email-fabrice.gasnier@st.com>
- <1508246145-19417-2-git-send-email-fabrice.gasnier@st.com>
- <20171024164138.arnjrlw4pmk5xaqy@rob-hp-laptop>
- <D8F820CC-9AC1-4C78-9237-C43A47D3328F@jic23.retrosnub.co.uk>
-Message-ID: <f8fdf585-d967-fa32-ba00-af73cb4cf282@st.com>
+From: Claudiu.Beznea@microchip.com (Claudiu Beznea)
+Date: Wed, 25 Oct 2017 11:34:41 +0300
+Subject: [PATCH v6 1/1] pwm: mediatek: add MT2712/MT7622 support
+In-Reply-To: <1508914504-19253-1-git-send-email-zhi.mao@mediatek.com>
+References: <1508914504-19253-1-git-send-email-zhi.mao@mediatek.com>
+Message-ID: <ee597df8-3d59-2dfb-b34f-db9685ab763d@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/24/2017 08:42 PM, Jonathan Cameron wrote:
-> 
-> 
-> On 24 October 2017 17:41:38 BST, Rob Herring <robh@kernel.org> wrote:
->> On Tue, Oct 17, 2017 at 03:15:43PM +0200, Fabrice Gasnier wrote:
->>> STM32H7 ADC channels may be configured either as single-ended or
->>> differential.
->>> Add 'st,adc-diff-channels' property to support differential channels.
->>> Differential channels are defined as a pair of positive and negative
->>> inputs: vinp & vinn.
->>>
->>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
->>> ---
->>>  Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt | 6
->> ++++++
->>>  1 file changed, 6 insertions(+)
->>>
->>> diff --git
->> a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
->> b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
->>> index 48bfcaa3..c3c8de1 100644
->>> --- a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
->>> +++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
->>> @@ -62,6 +62,12 @@ Required properties:
->>>  - st,adc-channels: List of single-ended channels muxed for this ADC.
->>>    It can have up to 16 channels on stm32f4 or 20 channels on
->> stm32h7, numbered
->>>    from 0 to 15 or 19 (resp. for in0..in15 or in0..in19).
->>> +- st,adc-diff-channels: List of differential channels muxed for this
->> ADC.
->>> +  Depending on part used, some channels can be configured as
->> differential
->>> +  instead of single-ended (e.g. stm32h7). List here positive and
->> negative
->>> +  inputs pairs as <vinp vinn>, <vinp vinn>,... vinp and vinn are
->> numbered
->>> +  from 0 to 19 on stm32h7)
->>> +  Note: At least one of "st,adc-channels" or "st,adc-diff-channels"
->> is required.
->>
->> Wouldn't both present be invalid?
->>
-> 
-Hi Rob, Jonathan,
+Hi Zhi,
 
-> Probably invalid to have a number in both but some channels in each would be fine.
-
-Yes, both properties can be used together. Some channels can be used as
-single-ended and some other ones as differential (mixed). But channels
-can't be configured both as single-ended and differential (invalid).
-
-I'll mention this in the note, and also update differential channels
-example:
-
-Example to setup:
-- channel 1 as single-ended
-- channels 2 & 3 as differential (with resp. 6 & 7 negative inputs)
-
-	adc: adc at 40022000 {
-		compatible = "st,stm32h7-adc-core";
-		...
-		adc1: adc at 0 {
-			compatible = "st,stm32h7-adc";
-			...
-			st,adc-channels = <1>;
-			st,adc-diff-channels = <2 6>, <3 7>;
-		};
-	};
-
-I will send V2 with these updates.
+I added few cosmetic things below. 
 
 Thanks,
-Best Regards,
-Fabrice
+Claudiu
+
+On 25.10.2017 09:55, Zhi Mao wrote:
+> Add support to MT2712 and MT7622.
+> Due to register offset address of pwm7 for MT2712 is not fixed 0x40,
+> add mtk_pwm_reg_offset array for pwm register offset.
+
+> Add NULL pointer checking for "data",
+> and remove "struct mtk_pwm_platform_data" member from "mtk_pwm_chip".
+This could go to changes history (see below)
 > 
->>>  - #io-channel-cells = <1>: See the IIO bindings section "IIO
->> consumers" in
->>>    Documentation/devicetree/bindings/iio/iio-bindings.txt
->>>  
->>> -- 
->>> 1.9.1
->>>
+Remove this extra line.
+> 
+> Signed-off-by: Zhi Mao <zhi.mao@mediatek.com>
+> ---
+As a general practice you should add here (after the line: ---) changes history
+(these will be ignored by git if placed here), e.g.:
+Changes in v6:
+- this and that
+
+Changes in v5:
+- this and that
+
+...
+
+Changes in v2:
+- this and that
+
+Other than this it is OK from my point of view. After fixing the things I mentioned,
+you can add my:
+Reviewed-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+
+>  drivers/pwm/pwm-mediatek.c |   53 ++++++++++++++++++++++++++++++++++++--------
+>  1 file changed, 44 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
+> index 1d78ab1..cdd4d31 100644
+> --- a/drivers/pwm/pwm-mediatek.c
+> +++ b/drivers/pwm/pwm-mediatek.c
+> @@ -16,6 +16,7 @@
+>  #include <linux/module.h>
+>  #include <linux/clk.h>
+>  #include <linux/of.h>
+> +#include <linux/of_device.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/pwm.h>
+>  #include <linux/slab.h>
+> @@ -40,11 +41,19 @@ enum {
+>  	MTK_CLK_PWM3,
+>  	MTK_CLK_PWM4,
+>  	MTK_CLK_PWM5,
+> +	MTK_CLK_PWM6,
+> +	MTK_CLK_PWM7,
+> +	MTK_CLK_PWM8,
+>  	MTK_CLK_MAX,
+>  };
+>  
+> -static const char * const mtk_pwm_clk_name[] = {
+> -	"main", "top", "pwm1", "pwm2", "pwm3", "pwm4", "pwm5"
+> +static const char * const mtk_pwm_clk_name[MTK_CLK_MAX] = {
+> +	"main", "top", "pwm1", "pwm2", "pwm3", "pwm4", "pwm5", "pwm6", "pwm7",
+> +	"pwm8"
+> +};
+> +
+> +struct mtk_pwm_platform_data {
+> +	unsigned int num_pwms;
+>  };
+>  
+>  /**
+> @@ -59,6 +68,10 @@ struct mtk_pwm_chip {
+>  	struct clk *clks[MTK_CLK_MAX];
+>  };
+>  
+> +static const unsigned int mtk_pwm_reg_offset[] = {
+> +	0x0010, 0x0050, 0x0090, 0x00d0, 0x0110, 0x0150, 0x0190, 0x0220
+> +};
+> +
+>  static inline struct mtk_pwm_chip *to_mtk_pwm_chip(struct pwm_chip *chip)
+>  {
+>  	return container_of(chip, struct mtk_pwm_chip, chip);
+> @@ -103,14 +116,14 @@ static void mtk_pwm_clk_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+>  static inline u32 mtk_pwm_readl(struct mtk_pwm_chip *chip, unsigned int num,
+>  				unsigned int offset)
+>  {
+> -	return readl(chip->regs + 0x10 + (num * 0x40) + offset);
+> +	return readl(chip->regs + mtk_pwm_reg_offset[num] + offset);
+>  }
+>  
+>  static inline void mtk_pwm_writel(struct mtk_pwm_chip *chip,
+>  				  unsigned int num, unsigned int offset,
+>  				  u32 value)
+>  {
+> -	writel(value, chip->regs + 0x10 + (num * 0x40) + offset);
+> +	writel(value, chip->regs + mtk_pwm_reg_offset[num] + offset);
+>  }
+>  
+>  static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+> @@ -185,6 +198,7 @@ static void mtk_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+>  
+>  static int mtk_pwm_probe(struct platform_device *pdev)
+>  {
+> +	const struct mtk_pwm_platform_data *data;
+>  	struct mtk_pwm_chip *pc;
+>  	struct resource *res;
+>  	unsigned int i;
+> @@ -194,15 +208,22 @@ static int mtk_pwm_probe(struct platform_device *pdev)
+>  	if (!pc)
+>  		return -ENOMEM;
+>  
+> +	data = of_device_get_match_data(&pdev->dev);
+> +	if (data == NULL)
+> +		return -EINVAL;
+> +
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	pc->regs = devm_ioremap_resource(&pdev->dev, res);
+>  	if (IS_ERR(pc->regs))
+>  		return PTR_ERR(pc->regs);
+>  
+> -	for (i = 0; i < MTK_CLK_MAX; i++) {
+> +	for (i = 0; i < data->num_pwms + 2; i++) {
+>  		pc->clks[i] = devm_clk_get(&pdev->dev, mtk_pwm_clk_name[i]);
+> -		if (IS_ERR(pc->clks[i]))
+> +		if (IS_ERR(pc->clks[i])) {
+> +			dev_err(&pdev->dev, "clock: %s fail: %ld\n",
+> +				mtk_pwm_clk_name[i], PTR_ERR(pc->clks[i]));
+>  			return PTR_ERR(pc->clks[i]);
+> +		}
+>  	}
+>  
+>  	platform_set_drvdata(pdev, pc);
+> @@ -210,7 +231,7 @@ static int mtk_pwm_probe(struct platform_device *pdev)
+>  	pc->chip.dev = &pdev->dev;
+>  	pc->chip.ops = &mtk_pwm_ops;
+>  	pc->chip.base = -1;
+> -	pc->chip.npwm = 5;
+> +	pc->chip.npwm = data->num_pwms;
+>  
+>  	ret = pwmchip_add(&pc->chip);
+>  	if (ret < 0) {
+> @@ -228,9 +249,23 @@ static int mtk_pwm_remove(struct platform_device *pdev)
+>  	return pwmchip_remove(&pc->chip);
+>  }
+>  
+> +static const struct mtk_pwm_platform_data mt2712_pwm_data = {
+> +	.num_pwms = 8,
+> +};
+> +
+> +static const struct mtk_pwm_platform_data mt7622_pwm_data = {
+> +	.num_pwms = 6,
+> +};
+> +
+> +static const struct mtk_pwm_platform_data mt7623_pwm_data = {
+> +	.num_pwms = 5,
+> +};
+> +
+>  static const struct of_device_id mtk_pwm_of_match[] = {
+> -	{ .compatible = "mediatek,mt7623-pwm" },
+> -	{ }
+> +	{ .compatible = "mediatek,mt2712-pwm", .data = &mt2712_pwm_data },
+> +	{ .compatible = "mediatek,mt7622-pwm", .data = &mt7622_pwm_data },
+> +	{ .compatible = "mediatek,mt7623-pwm", .data = &mt7623_pwm_data },
+> +	{ },
+>  };
+>  MODULE_DEVICE_TABLE(of, mtk_pwm_of_match);
+>  
 > 
