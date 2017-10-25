@@ -1,49 +1,83 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Wed, 25 Oct 2017 17:26:31 +0200
-Subject: "BUG: scheduling while atomic" in atmel-aes on Linux v4.14-rc6
-Message-ID: <CAGkQfmNKbSwue13zPh2K1F_kLkpm1_AhsAHK4spRFA0xMvU5PA@mail.gmail.com>
+From: jim2101024@gmail.com (Jim Quinlan)
+Date: Wed, 25 Oct 2017 11:28:07 -0400
+Subject: [PATCH 6/8] PCI: host: brcmstb: add MSI capability
+In-Reply-To: <5406ab92-c1da-f6fa-083d-82d1027130ea@gmail.com>
+References: <1508868949-16652-1-git-send-email-jim2101024@gmail.com>
+ <1508868949-16652-7-git-send-email-jim2101024@gmail.com>
+ <5406ab92-c1da-f6fa-083d-82d1027130ea@gmail.com>
+Message-ID: <CANCKTBvAqu-godc03BiAt+9hxAoWABLVCtBzaA9ZWLJgXnQ3Fg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Oct 24, 2017 at 2:57 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> Hi Jim,
+>
+> On 10/24/2017 11:15 AM, Jim Quinlan wrote:
+>> This commit adds MSI to the Broadcom STB PCIe host controller. It does
+>> not add MSIX since that functionality is not in the HW.  The MSI
+>> controller is physically located within the PCIe block, however, there
+>> is no reason why the MSI controller could not be moved elsewhere in
+>> the future.
+>>
+>> Since the internal Brcmstb MSI controller is intertwined with the PCIe
+>> controller, it is not its own platform device but rather part of the
+>> PCIe platform device.
+>>
+>> Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
+>> ---
+>>  drivers/pci/host/Kconfig           |  12 ++
+>>  drivers/pci/host/Makefile          |   1 +
+>>  drivers/pci/host/pci-brcmstb-msi.c | 318 +++++++++++++++++++++++++++++++++++++
+>>  drivers/pci/host/pci-brcmstb.c     |  72 +++++++--
+>>  drivers/pci/host/pci-brcmstb.h     |  26 +++
+>>  5 files changed, 419 insertions(+), 10 deletions(-)
+>>  create mode 100644 drivers/pci/host/pci-brcmstb-msi.c
+>>
+>> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+>> index b9b4f11..54aa5d2 100644
+>> --- a/drivers/pci/host/Kconfig
+>> +++ b/drivers/pci/host/Kconfig
+>> @@ -228,4 +228,16 @@ config PCI_BRCMSTB
+>>       default ARCH_BRCMSTB || BMIPS_GENERIC
+>>       help
+>>         Adds support for Broadcom Settop Box PCIe host controller.
+>> +       To compile this driver as a module, choose m here.
+>> +
+>> +config PCI_BRCMSTB_MSI
+>> +     bool "Broadcom Brcmstb PCIe MSI support"
+>> +     depends on ARCH_BRCMSTB || BMIPS_GENERIC
+>
+> This could probably be depends on PCI_BRCMSTB, which would imply these
+> two conditions. PCI_BRCMSTB_MSI on its own is probably not very useful
+> without the parent RC driver.
+>
+>> +     depends on OF
+>> +     depends on PCI_MSI
+>> +     default PCI_BRCMSTB
+>> +     help
+>> +       Say Y here if you want to enable MSI support for Broadcom's iProc
+>> +       PCIe controller
+>> +
+>>  endmenu
+>> diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
+>> index c283321..1026d6f 100644
+>> --- a/drivers/pci/host/Makefile
+>> +++ b/drivers/pci/host/Makefile
+>> @@ -23,6 +23,7 @@ obj-$(CONFIG_PCIE_TANGO_SMP8759) += pcie-tango.o
+>>  obj-$(CONFIG_VMD) += vmd.o
+>>  obj-$(CONFIG_PCI_BRCMSTB) += brcmstb-pci.o
+>>  brcmstb-pci-objs := pci-brcmstb.o pci-brcmstb-dma.o
+>> +obj-$(CONFIG_PCI_BRCMSTB_MSI) += pci-brcmstb-msi.o
+>
+> Should we combine this file with the brcmstb-pci.o? There is probably no
+> functional difference, except that pci-brcmstb-msi.ko needs to be loaded
+> first, right?
+> --
+> Florian
 
-While running the kcapi test suite on a SAMA5D2 Xplained board with a
-v4.14-rc6 kernel, I encountered the following error:
-
-# kcapi -x 9 -e -c "cbc(aes)" -i 00000000000000000000000000000000 -k 00000000000
-0000000000000000000000000000000000000 -p 1b077a6af4b7f98229de786d7516b639
-BUG: scheduling while atomic: kcapi/926/0x00000100
-CPU: 0 PID: 926 Comm: kcapi Not tainted 4.14.0-rc6 #2
-Hardware name: Atmel SAMA5
-[<c010caac>] (unwind_backtrace) from [<c010a9d8>] (show_stack+0x10/0x14)
-[<c010a9d8>] (show_stack) from [<c013a914>] (__schedule_bug+0x60/0x80)
-[<c013a914>] (__schedule_bug) from [<c074ac70>] (__schedule+0x368/0x3fc)
-[<c074ac70>] (__schedule) from [<c074ad74>] (schedule+0x40/0xa0)
-[<c074ad74>] (schedule) from [<c05cb96c>] (__lock_sock+0x78/0xb0)
-[<c05cb96c>] (__lock_sock) from [<c05cddd0>] (lock_sock_nested+0x48/0x50)
-[<c05cddd0>] (lock_sock_nested) from [<c030eec8>] (af_alg_async_cb+0x20/0x80)
-[<c030eec8>] (af_alg_async_cb) from [<c0573b70>]
-(atmel_aes_transfer_complete+0x38/0x68)
-[<c0573b70>] (atmel_aes_transfer_complete) from [<c0121258>]
-(tasklet_action+0x68/0xb4)
-[<c0121258>] (tasklet_action) from [<c010158c>] (__do_softirq+0xc4/0x250)
-[<c010158c>] (__do_softirq) from [<c01215f0>] (irq_exit+0xfc/0x130)
-[<c01215f0>] (irq_exit) from [<c014a208>] (__handle_domain_irq+0x58/0xa8)
-[<c014a208>] (__handle_domain_irq) from [<c010b60c>] (__irq_svc+0x6c/0x90)
-[<c010b60c>] (__irq_svc) from [<c0310280>] (skcipher_recvmsg+0x2d8/0x318)
-[<c0310280>] (skcipher_recvmsg) from [<c05c8794>] (sock_read_iter+0x88/0xc8)
-[<c05c8794>] (sock_read_iter) from [<c01f1940>]
-(aio_read.constprop.3+0xcc/0x178)
-[<c01f1940>] (aio_read.constprop.3) from [<c01f2968>]
-(SyS_io_submit+0x540/0x644)
-[<c01f2968>] (SyS_io_submit) from [<c0107480>] (ret_fast_syscall+0x0/0x48)
-
-After bisecting, I determined that it appeared during the 4.14 merge
-window, with the following commit:
-
-e870456d8e7c crypto: algif_skcipher - overhaul memory management
-
-
-Best regards,
--- 
-Romain Izard
+If you look at the pci/host/Kconfig you will see that other drivers
+also have a separate MSI config (eg iproc, altera, xgene) so there is
+precedent.  The reason that pci-brcmstb-msi.c is its own file is
+because it depends on an irq function that is not exported.  That is
+why CONFIG_PCI_BRCMSTB_MSI is bool, and CONFIG_PCI_BRCMSTB is
+tristate.  -- Jim
