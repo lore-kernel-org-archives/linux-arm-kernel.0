@@ -1,71 +1,29 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Wed, 25 Oct 2017 16:54:00 +0200
-Subject: [PATCH v4 07/26] KVM: arm/arm64: GICv4: Add property field and
- per-VM predicate
-In-Reply-To: <20171006153401.5481-8-marc.zyngier@arm.com>
-References: <20171006153401.5481-1-marc.zyngier@arm.com>
- <20171006153401.5481-8-marc.zyngier@arm.com>
-Message-ID: <20171025145400.GJ91785@lvm>
+From: tj@kernel.org (Tejun Heo)
+Date: Wed, 25 Oct 2017 07:54:50 -0700
+Subject: [PATCH] ata: fixes kernel crash while tracing
+ ata_eh_link_autopsy event
+In-Reply-To: <1508926976-11467-1-git-send-email-rsahu@apm.com>
+References: <1508926976-11467-1-git-send-email-rsahu@apm.com>
+Message-ID: <20171025145450.GA59538@devbig577.frc2.facebook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 06, 2017 at 04:33:42PM +0100, Marc Zyngier wrote:
-> Add a new has_gicv4 field in the global VGIC state that indicates
-> whether the HW is GICv4 capable, as a per-VM predicate indicating
-> if there is a possibility for a VM to support direct injection
-> (the above being true and the VM having an ITS).
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Hello,
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+On Wed, Oct 25, 2017 at 03:52:56PM +0530, Rameshwar Prasad Sahu wrote:
+> @@ -288,8 +289,8 @@
+>  	),
+> 
+>  	TP_fast_assign(
+> -		__entry->ata_port	= dev->link->ap->print_id;
+> -		__entry->ata_dev	= dev->link->pmp + dev->devno;
+> +		__entry->ata_port	= link->ap->print_id;
+> +		__entry->ata_dev	= link->pmp + link->device->devno;
 
-> ---
->  include/kvm/arm_vgic.h           | 3 +++
->  virt/kvm/arm/vgic/vgic-mmio-v3.c | 5 +++++
->  virt/kvm/arm/vgic/vgic.h         | 2 ++
->  3 files changed, 10 insertions(+)
-> 
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index 53f631bdec75..ba9fb450aa1b 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -73,6 +73,9 @@ struct vgic_global {
->  	/* Only needed for the legacy KVM_CREATE_IRQCHIP */
->  	bool			can_emulate_gicv2;
->  
-> +	/* Hardware has GICv4? */
-> +	bool			has_gicv4;
-> +
->  	/* GIC system register CPU interface */
->  	struct static_key_false gicv3_cpuif;
->  
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> index 408ef06638fc..f87fd17b2eb9 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> @@ -54,6 +54,11 @@ bool vgic_has_its(struct kvm *kvm)
->  	return dist->has_its;
->  }
->  
-> +bool vgic_supports_direct_msis(struct kvm *kvm)
-> +{
-> +	return kvm_vgic_global_state.has_gicv4 && vgic_has_its(kvm);
-> +}
-> +
->  static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
->  					    gpa_t addr, unsigned int len)
->  {
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index 31b70326b966..e67ccb6a6250 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -240,4 +240,6 @@ int vgic_its_resolve_lpi(struct kvm *kvm, struct vgic_its *its,
->  			 u32 devid, u32 eventid, struct vgic_irq **irq);
->  struct vgic_its *vgic_msi_to_its(struct kvm *kvm, struct kvm_msi *msi);
->  
-> +bool vgic_supports_direct_msis(struct kvm *kvm);
-> +
->  #endif
-> -- 
-> 2.14.1
-> 
+The above is wrong if there are multiple devices on the link.  It
+probably should take both link and dev and use dev iff it's not NULL.
+
+Thanks.
+
+-- 
+tejun
