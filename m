@@ -1,69 +1,54 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 25 Oct 2017 12:32:37 +0200
-Subject: [PATCH RESEND] phy: rcar-gen2: Add r8a7743/5 support
-In-Reply-To: <87211738-8d65-32c0-fb6b-dc2cd395016a@ti.com>
-References: <1507544543-28654-1-git-send-email-biju.das@bp.renesas.com>
- <bcfa1e90-c497-ee29-687d-9f9a04ce2d4b@ti.com>
- <87211738-8d65-32c0-fb6b-dc2cd395016a@ti.com>
-Message-ID: <CAMuHMdUWtJvYsW3gaCr=Wh-tEauO6E=ue95MK0DXYJFb7c-OJw@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 25 Oct 2017 03:51:58 -0700
+Subject: [PATCH] drivers/net: nuvoton: Convert timers to use timer_setup()
+Message-ID: <20171025105158.GA146575@beast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi KIshon,
+In preparation for unconditionally passing the struct timer_list pointer to
+all timer callbacks, switch to using the new timer_setup() and from_timer()
+to pass the timer pointer explicitly.
 
-On Wed, Oct 25, 2017 at 12:30 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> On Wednesday 18 October 2017 05:10 PM, Kishon Vijay Abraham I wrote:
->> On Monday 09 October 2017 03:52 PM, Biju Das wrote:
->>> Add USB PHY support for r8a7743/5 SoC. Renesas RZ/G1[ME] (R8A7743/5)
->>> USB PHY is identical to the R-Car Gen2 family.
->>>
->>> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
->>> Acked-by: Simon Horman <horms+renesas@verge.net.au>
->>> Acked-by: Rob Herring <robh@kernel.org>
->>> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
->>
->> merged, thanks!
->
-> just realized $subject is misleading since this is only dt-binding patch. Do
-> you plan to send the driver patch too?
+Cc: Wan ZongShun <mcuos.com@gmail.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: netdev at vger.kernel.org
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+ drivers/net/ethernet/nuvoton/w90p910_ether.c | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
 
-There's no need to update the driver, as it matches against the generic fallback
-compatible value "renesas,rcar-gen2-usb-phy".
+diff --git a/drivers/net/ethernet/nuvoton/w90p910_ether.c b/drivers/net/ethernet/nuvoton/w90p910_ether.c
+index 4a67c55aa9f1..052b3d2c07a1 100644
+--- a/drivers/net/ethernet/nuvoton/w90p910_ether.c
++++ b/drivers/net/ethernet/nuvoton/w90p910_ether.c
+@@ -253,10 +253,10 @@ static void update_linkspeed(struct net_device *dev)
+ 	netif_carrier_on(dev);
+ }
+ 
+-static void w90p910_check_link(unsigned long dev_id)
++static void w90p910_check_link(struct timer_list *t)
+ {
+-	struct net_device *dev = (struct net_device *) dev_id;
+-	struct w90p910_ether *ether = netdev_priv(dev);
++	struct w90p910_ether *ether = from_timer(ether, t, check_timer);
++	struct net_device *dev = ether->mii.dev;
+ 
+ 	update_linkspeed(dev);
+ 	mod_timer(&ether->check_timer, jiffies + msecs_to_jiffies(1000));
+@@ -957,8 +957,7 @@ static int w90p910_ether_setup(struct net_device *dev)
+ 	ether->mii.mdio_read = w90p910_mdio_read;
+ 	ether->mii.mdio_write = w90p910_mdio_write;
+ 
+-	setup_timer(&ether->check_timer, w90p910_check_link,
+-						(unsigned long)dev);
++	timer_setup(&ether->check_timer, w90p910_check_link, 0);
+ 
+ 	return 0;
+ }
+-- 
+2.7.4
 
->>> ---
->>> This patch is tested against Linux next tag next-20170929.
->>>
->>>  Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt | 7 +++++--
->>>  1 file changed, 5 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt b/Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt
->>> index 91da947..eeb9e18 100644
->>> --- a/Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt
->>> +++ b/Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt
->>> @@ -4,10 +4,13 @@ This file provides information on what the device node for the R-Car generation
->>>  2 USB PHY contains.
->>>
->>>  Required properties:
->>> -- compatible: "renesas,usb-phy-r8a7790" if the device is a part of R8A7790 SoC.
->>> +- compatible: "renesas,usb-phy-r8a7743" if the device is a part of R8A7743 SoC.
->>> +          "renesas,usb-phy-r8a7745" if the device is a part of R8A7745 SoC.
->>> +          "renesas,usb-phy-r8a7790" if the device is a part of R8A7790 SoC.
->>>            "renesas,usb-phy-r8a7791" if the device is a part of R8A7791 SoC.
->>>            "renesas,usb-phy-r8a7794" if the device is a part of R8A7794 SoC.
->>> -          "renesas,rcar-gen2-usb-phy" for a generic R-Car Gen2 compatible device.
->>> +          "renesas,rcar-gen2-usb-phy" for a generic R-Car Gen2 or
->>> +                                      RZ/G1 compatible device.
->>>
->>>            When compatible with the generic version, nodes must list the
->>>            SoC-specific version corresponding to the platform first
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Kees Cook
+Pixel Security
