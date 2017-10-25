@@ -1,83 +1,37 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Wed, 25 Oct 2017 15:05:52 +0200
-Subject: [PATCH] I2C-S3C2410: Use common error handling code in
- s3c24xx_i2c_probe()
-Message-ID: <32c82282-ee0a-137f-4913-310b194b60f3@users.sourceforge.net>
+From: chen.zhong@mediatek.com (Chen Zhong)
+Date: Wed, 25 Oct 2017 21:16:00 +0800
+Subject: [PATCH v6 2/6] dt-bindings: input: Add common keyboard document
+ bindings
+In-Reply-To: <1508937364-30054-1-git-send-email-chen.zhong@mediatek.com>
+References: <1508937364-30054-1-git-send-email-chen.zhong@mediatek.com>
+Message-ID: <1508937364-30054-3-git-send-email-chen.zhong@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Wed, 25 Oct 2017 15:00:35 +0200
+This patch adds the device tree binding documentation for common
+keyboard.
 
-Add a jump target so that a bit of exception handling can be better reused
-at the end of this function.
-
-This issue was detected by using the Coccinelle software.
-
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
 ---
- drivers/i2c/busses/i2c-s3c2410.c | 19 +++++++++----------
- 1 file changed, 9 insertions(+), 10 deletions(-)
+ Documentation/devicetree/bindings/input/keys.txt |    8 ++++++++
+ 1 file changed, 8 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/keys.txt
 
-diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-index 5d97510ee48b..304a6d492c8c 100644
---- a/drivers/i2c/busses/i2c-s3c2410.c
-+++ b/drivers/i2c/busses/i2c-s3c2410.c
-@@ -1168,8 +1168,7 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
- 	clk_disable(i2c->clk);
- 	if (ret != 0) {
- 		dev_err(&pdev->dev, "I2C controller init failed\n");
--		clk_unprepare(i2c->clk);
--		return ret;
-+		goto unprepare_clock;
- 	}
- 
- 	/*
-@@ -1180,24 +1179,21 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
- 		i2c->irq = ret = platform_get_irq(pdev, 0);
- 		if (ret <= 0) {
- 			dev_err(&pdev->dev, "cannot find IRQ\n");
--			clk_unprepare(i2c->clk);
--			return ret;
-+			goto unprepare_clock;
- 		}
- 
- 		ret = devm_request_irq(&pdev->dev, i2c->irq, s3c24xx_i2c_irq,
- 				       0, dev_name(&pdev->dev), i2c);
- 		if (ret != 0) {
- 			dev_err(&pdev->dev, "cannot claim IRQ %d\n", i2c->irq);
--			clk_unprepare(i2c->clk);
--			return ret;
-+			goto unprepare_clock;
- 		}
- 	}
- 
- 	ret = s3c24xx_i2c_register_cpufreq(i2c);
- 	if (ret < 0) {
- 		dev_err(&pdev->dev, "failed to register cpufreq notifier\n");
--		clk_unprepare(i2c->clk);
--		return ret;
-+		goto unprepare_clock;
- 	}
- 
- 	/*
-@@ -1217,12 +1213,15 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
- 	if (ret < 0) {
- 		pm_runtime_disable(&pdev->dev);
- 		s3c24xx_i2c_deregister_cpufreq(i2c);
--		clk_unprepare(i2c->clk);
--		return ret;
-+		goto unprepare_clock;
- 	}
- 
- 	dev_info(&pdev->dev, "%s: S3C I2C adapter\n", dev_name(&i2c->adap.dev));
- 	return 0;
+diff --git a/Documentation/devicetree/bindings/input/keys.txt b/Documentation/devicetree/bindings/input/keys.txt
+new file mode 100644
+index 0000000..a0ea7eb
+--- /dev/null
++++ b/Documentation/devicetree/bindings/input/keys.txt
+@@ -0,0 +1,8 @@
++General Keys Properties:
 +
-+unprepare_clock:
-+	clk_unprepare(i2c->clk);
-+	return ret;
- }
- 
- static int s3c24xx_i2c_remove(struct platform_device *pdev)
++Optional properties for Keys:
++- power-off-time-sec: Duration in seconds which the key should be kept
++ 	pressed for device to power off automatically. Device with key pressed
++ 	shutdown feature can specify this property.
++- linux,keycodes: Specifies the numeric keycode values to be used for
++	reporting key presses.
+\ No newline at end of file
 -- 
-2.14.3
+1.7.9.5
