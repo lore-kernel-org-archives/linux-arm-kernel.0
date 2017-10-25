@@ -1,83 +1,57 @@
-From: jim2101024@gmail.com (Jim Quinlan)
-Date: Wed, 25 Oct 2017 11:28:07 -0400
-Subject: [PATCH 6/8] PCI: host: brcmstb: add MSI capability
-In-Reply-To: <5406ab92-c1da-f6fa-083d-82d1027130ea@gmail.com>
-References: <1508868949-16652-1-git-send-email-jim2101024@gmail.com>
- <1508868949-16652-7-git-send-email-jim2101024@gmail.com>
- <5406ab92-c1da-f6fa-083d-82d1027130ea@gmail.com>
-Message-ID: <CANCKTBvAqu-godc03BiAt+9hxAoWABLVCtBzaA9ZWLJgXnQ3Fg@mail.gmail.com>
+From: marco.franchi@nxp.com (Marco Franchi)
+Date: Wed, 25 Oct 2017 13:40:42 -0200
+Subject: [PATCH v4] ARM: dts: imx53-tx53: Fix 'ethernet-phy@0' node with unit
+ name and no reg property
+Message-ID: <1508946042-17671-1-git-send-email-marco.franchi@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 24, 2017 at 2:57 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> Hi Jim,
->
-> On 10/24/2017 11:15 AM, Jim Quinlan wrote:
->> This commit adds MSI to the Broadcom STB PCIe host controller. It does
->> not add MSIX since that functionality is not in the HW.  The MSI
->> controller is physically located within the PCIe block, however, there
->> is no reason why the MSI controller could not be moved elsewhere in
->> the future.
->>
->> Since the internal Brcmstb MSI controller is intertwined with the PCIe
->> controller, it is not its own platform device but rather part of the
->> PCIe platform device.
->>
->> Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
->> ---
->>  drivers/pci/host/Kconfig           |  12 ++
->>  drivers/pci/host/Makefile          |   1 +
->>  drivers/pci/host/pci-brcmstb-msi.c | 318 +++++++++++++++++++++++++++++++++++++
->>  drivers/pci/host/pci-brcmstb.c     |  72 +++++++--
->>  drivers/pci/host/pci-brcmstb.h     |  26 +++
->>  5 files changed, 419 insertions(+), 10 deletions(-)
->>  create mode 100644 drivers/pci/host/pci-brcmstb-msi.c
->>
->> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
->> index b9b4f11..54aa5d2 100644
->> --- a/drivers/pci/host/Kconfig
->> +++ b/drivers/pci/host/Kconfig
->> @@ -228,4 +228,16 @@ config PCI_BRCMSTB
->>       default ARCH_BRCMSTB || BMIPS_GENERIC
->>       help
->>         Adds support for Broadcom Settop Box PCIe host controller.
->> +       To compile this driver as a module, choose m here.
->> +
->> +config PCI_BRCMSTB_MSI
->> +     bool "Broadcom Brcmstb PCIe MSI support"
->> +     depends on ARCH_BRCMSTB || BMIPS_GENERIC
->
-> This could probably be depends on PCI_BRCMSTB, which would imply these
-> two conditions. PCI_BRCMSTB_MSI on its own is probably not very useful
-> without the parent RC driver.
->
->> +     depends on OF
->> +     depends on PCI_MSI
->> +     default PCI_BRCMSTB
->> +     help
->> +       Say Y here if you want to enable MSI support for Broadcom's iProc
->> +       PCIe controller
->> +
->>  endmenu
->> diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
->> index c283321..1026d6f 100644
->> --- a/drivers/pci/host/Makefile
->> +++ b/drivers/pci/host/Makefile
->> @@ -23,6 +23,7 @@ obj-$(CONFIG_PCIE_TANGO_SMP8759) += pcie-tango.o
->>  obj-$(CONFIG_VMD) += vmd.o
->>  obj-$(CONFIG_PCI_BRCMSTB) += brcmstb-pci.o
->>  brcmstb-pci-objs := pci-brcmstb.o pci-brcmstb-dma.o
->> +obj-$(CONFIG_PCI_BRCMSTB_MSI) += pci-brcmstb-msi.o
->
-> Should we combine this file with the brcmstb-pci.o? There is probably no
-> functional difference, except that pci-brcmstb-msi.ko needs to be loaded
-> first, right?
-> --
-> Florian
+The following build warning is seen with W=1:
 
-If you look at the pci/host/Kconfig you will see that other drivers
-also have a separate MSI config (eg iproc, altera, xgene) so there is
-precedent.  The reason that pci-brcmstb-msi.c is its own file is
-because it depends on an irq function that is not exported.  That is
-why CONFIG_PCI_BRCMSTB_MSI is bool, and CONFIG_PCI_BRCMSTB is
-tristate.  -- Jim
+Warning (unit_address_vs_reg): Node /soc/aips at 60000000/ethernet at 63fec000/ethernet-phy at 0 has a unit name, but no reg property
+
+Fix this warning by adding reg property from such node and, consequently, 
+by adding the 'address-cells' and 'size-cells' values to the fec node to 
+avoid the warnings below:
+
+Warning (reg_format): "reg" property in /soc/aips at 60000000/ethernet at 63fec000/ethernet-phy at 0 has invalid length (4 bytes) (#address-cells == 2, #size-cells == 1)
+Warning (avoid_default_addr_size): Relying on default #address-cells value for /soc/aips at 60000000/ethernet at 63fec000/ethernet-phy at 0
+Warning (avoid_default_addr_size): Relying on default #size-cells value for /soc/aips at 60000000/ethernet at 63fec000/ethernet-phy at 0
+
+Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
+---
+Change since v3:
+-remove from a group of patches
+-add 'address-cells' and 'size-cells' values to the fec node
+-change message log
+ arch/arm/boot/dts/imx53-tx53.dtsi | 1 +
+ arch/arm/boot/dts/imx53.dtsi      | 2 ++
+ 2 files changed, 3 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx53-tx53.dtsi b/arch/arm/boot/dts/imx53-tx53.dtsi
+index 71b58b6..655d51a 100644
+--- a/arch/arm/boot/dts/imx53-tx53.dtsi
++++ b/arch/arm/boot/dts/imx53-tx53.dtsi
+@@ -226,6 +226,7 @@
+ 	status = "okay";
+ 
+ 	phy0: ethernet-phy at 0 {
++		reg = <0>;
+ 		interrupt-parent = <&gpio2>;
+ 		interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
+ 		device_type = "ethernet-phy";
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index c937949..be487b1 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -770,6 +770,8 @@
+ 			};
+ 
+ 			fec: ethernet at 63fec000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				compatible = "fsl,imx53-fec", "fsl,imx25-fec";
+ 				reg = <0x63fec000 0x4000>;
+ 				interrupts = <87>;
+-- 
+2.7.4
