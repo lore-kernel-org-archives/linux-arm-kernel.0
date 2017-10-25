@@ -1,63 +1,66 @@
-From: ji.zhang@mediatek.com (Ji.Zhang)
-Date: Wed, 25 Oct 2017 17:17:30 +0800
-Subject: [PATCH] arm: fix text section corruption
-In-Reply-To: <1506050119-2670-1-git-send-email-ji.zhang@mediatek.com>
-References: <1506050119-2670-1-git-send-email-ji.zhang@mediatek.com>
-Message-ID: <1508923050.26492.1.camel@mtksdccf07>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Wed, 25 Oct 2017 11:27:43 +0200
+Subject: [PATCH v2 1/3] dt-bindings: iio: adc: stm32: add support for diff
+ channels
+In-Reply-To: <1508923665-2274-1-git-send-email-fabrice.gasnier@st.com>
+References: <1508923665-2274-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1508923665-2274-2-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear All sirs,
+STM32H7 ADC channels may be configured either as single-ended or
+differential.
+Add 'st,adc-diff-channels' property to support differential channels.
+Differential channels are defined as a pair of positive and negative
+inputs: vinp & vinn.
 
-Is there any suggestion for this patch?
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+---
+Changes in v2:
+- Add differential channels example
+- Add a note on mixed single-ended / differential channels
+---
+ .../devicetree/bindings/iio/adc/st,stm32-adc.txt   | 24 ++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-Since we have found that this issue can be reproduced with high repeat
-ratio by some fuzzer tests, we strongly suggest it can be fixed in next
-kernel version.
-
-Thanks a lot.
-
-Ji
-
-On Fri, 2017-09-22 at 11:15 +0800, Ji Zhang wrote:
-> When CONFIG_CPU_SW_DOMAIN_PAN is enabled, there are 9 registers being
-> pushed into stack in save_regs, but in fixup it still consider there are
-> 8 registers in stack, which is the case of CONFIG_CPU_SW_DOMAIN_PAN
-> disabled.
-> When fixup being executed, -EFAULT will be written to the text section.
-> 
-> In fixup:
-> mov	r4, #-EFAULT
-> /*
->  * When CONFIG_CPU_SW_DOMAIN_PAN enabled, r5 will load the value stored by
->  * lr in save_regs, which is the address of instruction in text section.
->  */
-> ldr	r5, [sp,#8*4]	@err_ptr
-> /*
->  * This will write -EFAULT(0xfffffff2) to r5, which points to text section
->  * now, and when function returns, it will use 0xfffffff2 as an
->  * instruction, then undefined instruction occurs.
->  */
-> str	r4, [r5]
-> 
-> Signed-off-by: Ji Zhang <ji.zhang@mediatek.com>
-> ---
->  arch/arm/lib/csumpartialcopyuser.S | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/lib/csumpartialcopyuser.S b/arch/arm/lib/csumpartialcopyuser.S
-> index 1712f13..b83fdc0 100644
-> --- a/arch/arm/lib/csumpartialcopyuser.S
-> +++ b/arch/arm/lib/csumpartialcopyuser.S
-> @@ -85,7 +85,11 @@
->  		.pushsection .text.fixup,"ax"
->  		.align	4
->  9001:		mov	r4, #-EFAULT
-> +#ifdef CONFIG_CPU_SW_DOMAIN_PAN
-> +		ldr	r5, [sp, #9*4]		@ *err_ptr
-> +#else
->  		ldr	r5, [sp, #8*4]		@ *err_ptr
-> +#endif
->  		str	r4, [r5]
->  		ldmia	sp, {r1, r2}		@ retrieve dst, len
->  		add	r2, r2, r1
+diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+index 48bfcaa3..e8bb824 100644
+--- a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
++++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+@@ -62,6 +62,15 @@ Required properties:
+ - st,adc-channels: List of single-ended channels muxed for this ADC.
+   It can have up to 16 channels on stm32f4 or 20 channels on stm32h7, numbered
+   from 0 to 15 or 19 (resp. for in0..in15 or in0..in19).
++- st,adc-diff-channels: List of differential channels muxed for this ADC.
++  Depending on part used, some channels can be configured as differential
++  instead of single-ended (e.g. stm32h7). List here positive and negative
++  inputs pairs as <vinp vinn>, <vinp vinn>,... vinp and vinn are numbered
++  from 0 to 19 on stm32h7)
++  Note: At least one of "st,adc-channels" or "st,adc-diff-channels" is required.
++  Both properties can be used together. Some channels can be used as
++  single-ended and some other ones as differential (mixed). But channels
++  can't be configured both as single-ended and differential (invalid).
+ - #io-channel-cells = <1>: See the IIO bindings section "IIO consumers" in
+   Documentation/devicetree/bindings/iio/iio-bindings.txt
+ 
+@@ -111,3 +120,18 @@ Example:
+ 		...
+ 		other adc child nodes follow...
+ 	};
++
++Example to setup:
++- channel 1 as single-ended
++- channels 2 & 3 as differential (with resp. 6 & 7 negative inputs)
++
++	adc: adc at 40022000 {
++		compatible = "st,stm32h7-adc-core";
++		...
++		adc1: adc at 0 {
++			compatible = "st,stm32h7-adc";
++			...
++			st,adc-channels = <1>;
++			st,adc-diff-channels = <2 6>, <3 7>;
++		};
++	};
+-- 
+1.9.1
