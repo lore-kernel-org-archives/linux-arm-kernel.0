@@ -1,159 +1,107 @@
-From: zhi.mao@mediatek.com (Zhi Mao)
-Date: Wed, 25 Oct 2017 18:11:01 +0800
-Subject: [PATCH v7 1/1] pwm: mediatek: add MT2712/MT7622 support
-Message-ID: <1508926261-25015-1-git-send-email-zhi.mao@mediatek.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 25 Oct 2017 03:18:42 -0700
+Subject: [PATCH] drivers/crypto: Convert timers to use timer_setup()
+Message-ID: <20171025101842.GA145495@beast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support to MT2712 and MT7622.
-Due to register offset address of pwm7 for MT2712 is not fixed 0x40,
-add mtk_pwm_reg_offset array for pwm register offset.
+In preparation for unconditionally passing the struct timer_list pointer to
+all timer callbacks, switch to using the new timer_setup() and from_timer()
+to pass the timer pointer explicitly.
 
-Reviewed-by: Claudiu Beznea <claudiu.beznea@microchip.com>
-Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
-Signed-off-by: Zhi Mao <zhi.mao@mediatek.com>
+Cc: Herbert Xu <herbert@gondor.apana.org.au>
+Cc: Jesper Nilsson <jesper.nilsson@axis.com>
+Cc: Lars Persson <lars.persson@axis.com>
+Cc: Niklas Cassel <niklas.cassel@axis.com>
+Cc: "David S. Miller" <davem@davemloft.net>
+Cc: Jamie Iles <jamie@jamieiles.com>
+Cc: linux-arm-kernel at axis.com
+Cc: linux-crypto at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Kees Cook <keescook@chromium.org>
 ---
-changee in v7:
-- adjust the commit message
+ drivers/crypto/axis/artpec6_crypto.c | 6 +++---
+ drivers/crypto/mv_cesa.c             | 4 ++--
+ drivers/crypto/picoxcell_crypto.c    | 7 +++----
+ 3 files changed, 8 insertions(+), 9 deletions(-)
 
-Changes in v6:
-- remove "struct mtk_pwm_platform_data" member from "mtk_pwm_chip". 
-
-Changes in v5:
-- Add NULL pointer checking for "data"
-
- drivers/pwm/pwm-mediatek.c |   53 ++++++++++++++++++++++++++++++++++++--------
- 1 file changed, 44 insertions(+), 9 deletions(-)
-
-diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
-index 1d78ab1..cdd4d31 100644
---- a/drivers/pwm/pwm-mediatek.c
-+++ b/drivers/pwm/pwm-mediatek.c
-@@ -16,6 +16,7 @@
- #include <linux/module.h>
- #include <linux/clk.h>
- #include <linux/of.h>
-+#include <linux/of_device.h>
- #include <linux/platform_device.h>
- #include <linux/pwm.h>
- #include <linux/slab.h>
-@@ -40,11 +41,19 @@ enum {
- 	MTK_CLK_PWM3,
- 	MTK_CLK_PWM4,
- 	MTK_CLK_PWM5,
-+	MTK_CLK_PWM6,
-+	MTK_CLK_PWM7,
-+	MTK_CLK_PWM8,
- 	MTK_CLK_MAX,
- };
- 
--static const char * const mtk_pwm_clk_name[] = {
--	"main", "top", "pwm1", "pwm2", "pwm3", "pwm4", "pwm5"
-+static const char * const mtk_pwm_clk_name[MTK_CLK_MAX] = {
-+	"main", "top", "pwm1", "pwm2", "pwm3", "pwm4", "pwm5", "pwm6", "pwm7",
-+	"pwm8"
-+};
-+
-+struct mtk_pwm_platform_data {
-+	unsigned int num_pwms;
- };
- 
- /**
-@@ -59,6 +68,10 @@ struct mtk_pwm_chip {
- 	struct clk *clks[MTK_CLK_MAX];
- };
- 
-+static const unsigned int mtk_pwm_reg_offset[] = {
-+	0x0010, 0x0050, 0x0090, 0x00d0, 0x0110, 0x0150, 0x0190, 0x0220
-+};
-+
- static inline struct mtk_pwm_chip *to_mtk_pwm_chip(struct pwm_chip *chip)
- {
- 	return container_of(chip, struct mtk_pwm_chip, chip);
-@@ -103,14 +116,14 @@ static void mtk_pwm_clk_disable(struct pwm_chip *chip, struct pwm_device *pwm)
- static inline u32 mtk_pwm_readl(struct mtk_pwm_chip *chip, unsigned int num,
- 				unsigned int offset)
- {
--	return readl(chip->regs + 0x10 + (num * 0x40) + offset);
-+	return readl(chip->regs + mtk_pwm_reg_offset[num] + offset);
+diff --git a/drivers/crypto/axis/artpec6_crypto.c b/drivers/crypto/axis/artpec6_crypto.c
+index 0f9754e07719..456278440863 100644
+--- a/drivers/crypto/axis/artpec6_crypto.c
++++ b/drivers/crypto/axis/artpec6_crypto.c
+@@ -2072,9 +2072,9 @@ static void artpec6_crypto_process_queue(struct artpec6_crypto *ac)
+ 		del_timer(&ac->timer);
  }
  
- static inline void mtk_pwm_writel(struct mtk_pwm_chip *chip,
- 				  unsigned int num, unsigned int offset,
- 				  u32 value)
+-static void artpec6_crypto_timeout(unsigned long data)
++static void artpec6_crypto_timeout(struct timer_list *t)
  {
--	writel(value, chip->regs + 0x10 + (num * 0x40) + offset);
-+	writel(value, chip->regs + mtk_pwm_reg_offset[num] + offset);
- }
+-	struct artpec6_crypto *ac = (struct artpec6_crypto *) data;
++	struct artpec6_crypto *ac = from_timer(ac, t, timer);
  
- static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-@@ -185,6 +198,7 @@ static void mtk_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 	dev_info_ratelimited(artpec6_crypto_dev, "timeout\n");
  
- static int mtk_pwm_probe(struct platform_device *pdev)
- {
-+	const struct mtk_pwm_platform_data *data;
- 	struct mtk_pwm_chip *pc;
- 	struct resource *res;
- 	unsigned int i;
-@@ -194,15 +208,22 @@ static int mtk_pwm_probe(struct platform_device *pdev)
- 	if (!pc)
- 		return -ENOMEM;
+@@ -3063,7 +3063,7 @@ static int artpec6_crypto_probe(struct platform_device *pdev)
+ 	spin_lock_init(&ac->queue_lock);
+ 	INIT_LIST_HEAD(&ac->queue);
+ 	INIT_LIST_HEAD(&ac->pending);
+-	setup_timer(&ac->timer, artpec6_crypto_timeout, (unsigned long) ac);
++	timer_setup(&ac->timer, artpec6_crypto_timeout, 0);
  
-+	data = of_device_get_match_data(&pdev->dev);
-+	if (data == NULL)
-+		return -EINVAL;
-+
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	pc->regs = devm_ioremap_resource(&pdev->dev, res);
- 	if (IS_ERR(pc->regs))
- 		return PTR_ERR(pc->regs);
+ 	ac->base = base;
  
--	for (i = 0; i < MTK_CLK_MAX; i++) {
-+	for (i = 0; i < data->num_pwms + 2; i++) {
- 		pc->clks[i] = devm_clk_get(&pdev->dev, mtk_pwm_clk_name[i]);
--		if (IS_ERR(pc->clks[i]))
-+		if (IS_ERR(pc->clks[i])) {
-+			dev_err(&pdev->dev, "clock: %s fail: %ld\n",
-+				mtk_pwm_clk_name[i], PTR_ERR(pc->clks[i]));
- 			return PTR_ERR(pc->clks[i]);
-+		}
- 	}
- 
- 	platform_set_drvdata(pdev, pc);
-@@ -210,7 +231,7 @@ static int mtk_pwm_probe(struct platform_device *pdev)
- 	pc->chip.dev = &pdev->dev;
- 	pc->chip.ops = &mtk_pwm_ops;
- 	pc->chip.base = -1;
--	pc->chip.npwm = 5;
-+	pc->chip.npwm = data->num_pwms;
- 
- 	ret = pwmchip_add(&pc->chip);
- 	if (ret < 0) {
-@@ -228,9 +249,23 @@ static int mtk_pwm_remove(struct platform_device *pdev)
- 	return pwmchip_remove(&pc->chip);
- }
- 
-+static const struct mtk_pwm_platform_data mt2712_pwm_data = {
-+	.num_pwms = 8,
-+};
-+
-+static const struct mtk_pwm_platform_data mt7622_pwm_data = {
-+	.num_pwms = 6,
-+};
-+
-+static const struct mtk_pwm_platform_data mt7623_pwm_data = {
-+	.num_pwms = 5,
-+};
-+
- static const struct of_device_id mtk_pwm_of_match[] = {
--	{ .compatible = "mediatek,mt7623-pwm" },
--	{ }
-+	{ .compatible = "mediatek,mt2712-pwm", .data = &mt2712_pwm_data },
-+	{ .compatible = "mediatek,mt7622-pwm", .data = &mt7622_pwm_data },
-+	{ .compatible = "mediatek,mt7623-pwm", .data = &mt7623_pwm_data },
-+	{ },
+diff --git a/drivers/crypto/mv_cesa.c b/drivers/crypto/mv_cesa.c
+index c3883b49f56e..6a8275f017a8 100644
+--- a/drivers/crypto/mv_cesa.c
++++ b/drivers/crypto/mv_cesa.c
+@@ -149,7 +149,7 @@ struct mv_req_hash_ctx {
+ 	int count_add;
  };
- MODULE_DEVICE_TABLE(of, mtk_pwm_of_match);
  
+-static void mv_completion_timer_callback(unsigned long unused)
++static void mv_completion_timer_callback(struct timer_list *unused)
+ {
+ 	int active = readl(cpg->reg + SEC_ACCEL_CMD) & SEC_CMD_EN_SEC_ACCL0;
+ 
+@@ -167,7 +167,7 @@ static void mv_completion_timer_callback(unsigned long unused)
+ 
+ static void mv_setup_timer(void)
+ {
+-	setup_timer(&cpg->completion_timer, &mv_completion_timer_callback, 0);
++	timer_setup(&cpg->completion_timer, mv_completion_timer_callback, 0);
+ 	mod_timer(&cpg->completion_timer,
+ 			jiffies + msecs_to_jiffies(MV_CESA_EXPIRE));
+ }
+diff --git a/drivers/crypto/picoxcell_crypto.c b/drivers/crypto/picoxcell_crypto.c
+index b6f14844702e..5a6dc53b2b9d 100644
+--- a/drivers/crypto/picoxcell_crypto.c
++++ b/drivers/crypto/picoxcell_crypto.c
+@@ -1125,9 +1125,9 @@ static irqreturn_t spacc_spacc_irq(int irq, void *dev)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static void spacc_packet_timeout(unsigned long data)
++static void spacc_packet_timeout(struct timer_list *t)
+ {
+-	struct spacc_engine *engine = (struct spacc_engine *)data;
++	struct spacc_engine *engine = from_timer(engine, t, packet_timeout);
+ 
+ 	spacc_process_done(engine);
+ }
+@@ -1714,8 +1714,7 @@ static int spacc_probe(struct platform_device *pdev)
+ 	writel(SPA_IRQ_EN_STAT_EN | SPA_IRQ_EN_GLBL_EN,
+ 	       engine->regs + SPA_IRQ_EN_REG_OFFSET);
+ 
+-	setup_timer(&engine->packet_timeout, spacc_packet_timeout,
+-		    (unsigned long)engine);
++	timer_setup(&engine->packet_timeout, spacc_packet_timeout, 0);
+ 
+ 	INIT_LIST_HEAD(&engine->pending);
+ 	INIT_LIST_HEAD(&engine->completed);
 -- 
-1.7.9.5
+2.7.4
+
+
+-- 
+Kees Cook
+Pixel Security
