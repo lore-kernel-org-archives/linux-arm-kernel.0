@@ -1,148 +1,145 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 25 Oct 2017 15:16:19 -0500
-Subject: [PATCH 6/8] PCI: host: brcmstb: add MSI capability
-In-Reply-To: <3c0219a5-6b4d-b7e4-c2a4-83eba18ae06a@broadcom.com>
-References: <1508868949-16652-1-git-send-email-jim2101024@gmail.com>
- <1508868949-16652-7-git-send-email-jim2101024@gmail.com>
- <5406ab92-c1da-f6fa-083d-82d1027130ea@gmail.com>
- <CANCKTBvAqu-godc03BiAt+9hxAoWABLVCtBzaA9ZWLJgXnQ3Fg@mail.gmail.com>
- <20171025172310.GN21840@bhelgaas-glaptop.roam.corp.google.com>
- <3c0219a5-6b4d-b7e4-c2a4-83eba18ae06a@broadcom.com>
-Message-ID: <20171025201619.GO21840@bhelgaas-glaptop.roam.corp.google.com>
+From: jcrouse@codeaurora.org (Jordan Crouse)
+Date: Wed, 25 Oct 2017 14:20:15 -0600
+Subject: [RFCv2 PATCH 00/36] Process management for IOMMU + SVM for SMMUv3
+In-Reply-To: <8539601d-ef7a-8dd0-2fc7-51240c292678@arm.com>
+References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
+ <0c6778d8-741f-0db7-fe3c-df88a75ebbb2@huawei.com>
+ <0fecd29e-eaf7-9503-b087-7bfbc251da88@arm.com>
+ <c6b7fb4b-4f2b-0d81-8bb5-8fa6b62aca3a@huawei.com>
+ <8a1e090d-22e8-0295-a53f-bc3b5b7d7971@arm.com>
+ <20171012152803.GA3027@jcrouse-lnx.qualcomm.com>
+ <8539601d-ef7a-8dd0-2fc7-51240c292678@arm.com>
+Message-ID: <20171025202015.GA6159@jcrouse-lnx.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 25, 2017 at 11:40:47AM -0700, Scott Branden wrote:
-> Hi Bjorn,
+On Mon, Oct 23, 2017 at 02:00:07PM +0100, Jean-Philippe Brucker wrote:
+> Hi Jordan,
+> 
+> [Lots of IOMMU people have been dropped from Cc, I've tried to add them back]
+> 
+> On 12/10/17 16:28, Jordan Crouse wrote:
+> > On Thu, Oct 12, 2017 at 01:55:32PM +0100, Jean-Philippe Brucker wrote:
+> >> On 12/10/17 13:05, Yisheng Xie wrote:
+> >> [...]
+> >>>>>> * An iommu_process can be bound to multiple domains, and a domain can have
+> >>>>>>   multiple iommu_process.
+> >>>>> when bind a task to device, can we create a single domain for it? I am thinking
+> >>>>> about process management without shared PT(for some device only support PASID
+> >>>>> without pri ability), it seems hard to expand if a domain have multiple iommu_process?
+> >>>>> Do you have any idea about this?
+> >>>>
+> >>>> A device always has to be in a domain, as far as I know. Not supporting
+> >>>> PRI forces you to pin down all user mappings (or just the ones you use for
+> >>>> DMA) but you should sill be able to share PT. Now if you don't support
+> >>>> shared PT either, but only PASID, then you'll have to use io-pgtable and a
+> >>>> new map/unmap API on an iommu_process. I don't understand your concern
+> >>>> though, how would the link between process and domains prevent this use-case?
+> >>>>
+> >>> So you mean that if an iommu_process bind to multiple devices it should create
+> >>> multiple io-pgtables? or just share the same io-pgtable?
+> >>
+> >> I don't know to be honest, I haven't thought much about the io-pgtable
+> >> case, I'm all about sharing the mm :)
+> >>
+> >> It really depends on what the user (GPU driver I assume) wants. I think
+> >> that if you're not sharing an mm with the device, then you're trying to
+> >> hide parts of the process to the device, so you'd also want the
+> >> flexibility of having different io-pgtables between devices. Different
+> >> devices accessing isolated parts of the process requires separate io-pgtables.
+> > 
+> > In our specific Snapdragon use case the GPU is the only entity that cares about
+> > process specific io-pgtables.  Everything else (display, video, camera) is happy
+> > using a global io-ptgable.  The reasoning is that the GPU is programmable from
+> > user space and can be easily used to copy data whereas the other use cases have
+> > mostly fixed functions.
+> > 
+> > Even if different devices did want to have a process specific io-pgtable I doubt
+> > we would share them.  Every device uses the IOMMU differently and the magic
+> > needed to share a io-pgtable between (for example) a GPU and a DSP would be
+> > prohibitively complicated.
+> > 
+> > Jordan
 > 
 > 
-> On 17-10-25 10:23 AM, Bjorn Helgaas wrote:
-> >[+cc Ray, Scott, Jon]
-> >
-> >On Wed, Oct 25, 2017 at 11:28:07AM -0400, Jim Quinlan wrote:
-> >>On Tue, Oct 24, 2017 at 2:57 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> >>>Hi Jim,
-> >>>
-> >>>On 10/24/2017 11:15 AM, Jim Quinlan wrote:
-> >>>>This commit adds MSI to the Broadcom STB PCIe host controller. It does
-> >>>>not add MSIX since that functionality is not in the HW.  The MSI
-> >>>>controller is physically located within the PCIe block, however, there
-> >>>>is no reason why the MSI controller could not be moved elsewhere in
-> >>>>the future.
-> >>>>
-> >>>>Since the internal Brcmstb MSI controller is intertwined with the PCIe
-> >>>>controller, it is not its own platform device but rather part of the
-> >>>>PCIe platform device.
-> >>>>
-> >>>>Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
-> >>>>---
-> >>>>  drivers/pci/host/Kconfig           |  12 ++
-> >>>>  drivers/pci/host/Makefile          |   1 +
-> >>>>  drivers/pci/host/pci-brcmstb-msi.c | 318 +++++++++++++++++++++++++++++++++++++
-> >>>>  drivers/pci/host/pci-brcmstb.c     |  72 +++++++--
-> >>>>  drivers/pci/host/pci-brcmstb.h     |  26 +++
-> >>>>  5 files changed, 419 insertions(+), 10 deletions(-)
-> >>>>  create mode 100644 drivers/pci/host/pci-brcmstb-msi.c
-> >>>>
-> >>>>diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-> >>>>index b9b4f11..54aa5d2 100644
-> >>>>--- a/drivers/pci/host/Kconfig
-> >>>>+++ b/drivers/pci/host/Kconfig
-> >>>>@@ -228,4 +228,16 @@ config PCI_BRCMSTB
-> >>>>       default ARCH_BRCMSTB || BMIPS_GENERIC
-> >>>>       help
-> >>>>         Adds support for Broadcom Settop Box PCIe host controller.
-> >>>>+       To compile this driver as a module, choose m here.
-> >>>>+
-> >>>>+config PCI_BRCMSTB_MSI
-> >>>>+     bool "Broadcom Brcmstb PCIe MSI support"
-> >>>>+     depends on ARCH_BRCMSTB || BMIPS_GENERIC
-> >>>This could probably be depends on PCI_BRCMSTB, which would imply these
-> >>>two conditions. PCI_BRCMSTB_MSI on its own is probably not very useful
-> >>>without the parent RC driver.
-> >>>
-> >>>>+     depends on OF
-> >>>>+     depends on PCI_MSI
-> >>>>+     default PCI_BRCMSTB
-> >>>>+     help
-> >>>>+       Say Y here if you want to enable MSI support for Broadcom's iProc
-> >>>>+       PCIe controller
-> >>>>+
-> >>>>  endmenu
-> >>>>diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
-> >>>>index c283321..1026d6f 100644
-> >>>>--- a/drivers/pci/host/Makefile
-> >>>>+++ b/drivers/pci/host/Makefile
-> >>>>@@ -23,6 +23,7 @@ obj-$(CONFIG_PCIE_TANGO_SMP8759) += pcie-tango.o
-> >>>>  obj-$(CONFIG_VMD) += vmd.o
-> >>>>  obj-$(CONFIG_PCI_BRCMSTB) += brcmstb-pci.o
-> >>>>  brcmstb-pci-objs := pci-brcmstb.o pci-brcmstb-dma.o
-> >>>>+obj-$(CONFIG_PCI_BRCMSTB_MSI) += pci-brcmstb-msi.o
-> >>>Should we combine this file with the brcmstb-pci.o? There is probably no
-> >>>functional difference, except that pci-brcmstb-msi.ko needs to be loaded
-> >>>first, right?
-> >>>--
-> >>>Florian
-> >>If you look at the pci/host/Kconfig you will see that other drivers
-> >>also have a separate MSI config (eg iproc, altera, xgene) so there is
-> >>precedent.  The reason that pci-brcmstb-msi.c is its own file is
-> >>because it depends on an irq function that is not exported.  That is
-> >>why CONFIG_PCI_BRCMSTB_MSI is bool, and CONFIG_PCI_BRCMSTB is
-> >>tristate.  -- Jim
-> >There is precedent, but that doesn't mean I like it :)
-> >I would strongly prefer one file per driver when possible.
-> >
-> >Take iproc for example.  iproc-msi.c is enabled by a Kconfig bool.  It
-> >contains a bunch of code with the only external entry points being
-> >iproc_msi_init() and iproc_msi_exit().  These are only called via
-> >iproc_pcie_bcma_probe() or iproc_pcie_pltfm_probe(), both of which are
-> >tristate.  So iproc-msi.c is only compiled if CONFIG_IPROC_BCMA or
-> >CONFIG_IPROC_PLATFORM are enabled, but all that text is loaded even if
-> >neither module is loaded, which seems suboptimal.
-> >
-> >I don't care if you have several config options to enable the BCMA
-> >probe and the platform probe (although these could probably be
-> >replaced in the code by a simple "#ifdef CONFIG_BCMA" and "#ifdef
-> >CONFIG_OF"), and making CONFIG_PCIE_IPROC tristate so it can be a
-> >module makes sense.  But I think it would be better to put all the
-> >code in one file instead of five, and probably remove
-> >CONFIG_PCIE_IPROC_MSI.  Maybe this requires exporting some IRQ
-> >function that currently isn't exported.  But that seems like a simpler
-> >solution than what we currently have.
-> Placing pcie-iproc-bcma.c in its own file is useful in being able to
-> read the code that is actually used.  BCMA is really unnecessary if
-> a few platforms stopped using BCMA and declared everything via
-> devicetree or ACPI.  Same with pcie-iproc-platform.c.  Both keep the
-> mess out of pcie-iproc.c.
+> 
+> More context here:
+> https://www.mail-archive.com/iommu at lists.linux-foundation.org/msg20368.html
+> 
+> So to summarize the Snapdragon case, if I understand correctly you need
+> two additional features:
+> 
+> (1) A way to create process address spaces, that are not bound to an mm
+> but to a separate io-pgtable. And a way to map/unmap these contexts.
 
-Maybe.  Both pcie-iproc-bcma.c and pcie-iproc-platform.c are small
-(280 lines combined) relative to pcie-iproc.c + pcie-iproc-msi.c (2150
-lines combined), and keeping them separate requires pcie-iproc.h,
-which could otherwise be folded into pcie-iproc.c.  So I'm still a
-little skeptical.  You think of combining them as a mess, but I think
-of it as a big convenience because I could see all the iproc-related
-code in one place :)
+Correct.
 
-> It looks like pcie-iproc-msi.c followed existing pci drivers in
-> place.  So if msi was cleaned up through the entire pci drivers then
-> yes it would make sense to remove CONFIG_PCIE_IPROC_MSI and combine
-> code in pcie-iproc.c.  But I think leaving the bcma and platform
-> code in their own files makes it easier for us to work with the code
-> rather than placing unused code in ifdefs in the same file.
+> (2) A way to obtain the PGD in order to program it into the GPU. And also
+> the ASID I suppose? What about TCR and MAIR?
+>
+PGD and ASID.  Not the TCR and MAIR, at least not in the current iteration.
 
-But I do object *more* to putting MSI in a separate file, especially
-given the fact that all PCIe devices that generate interrupts must
-support MSI.  So any reasonable PCIe root complex must also support
-MSI, and I don't really see the benefit of configuring and building it
-separately.
+> For (1), I can see some value in isolating process contexts with
+> io-pgtable without going all the way and sharing the mm. The IOVA=VA
+> use-case feels a bit weak. But it does provide better isolation than
+> dma_map/unmap, if the GPU is in charge of PASIDs then two processes that
+> execute code on the GPU cannot access each others' DMA buffers. Maybe
+> other users will want that feature (but they really should be using bind_mm!).
 
-Anyway, iproc is already in the tree, and we *could* maybe change
-something eventually.
+That is exactly the use case.  A real-world attach vector in the mobile GPU
+world is a malicious app that knows that knows that if have a banking app
+active and copies the surfaces or at the very least scribbles over everything
+and is very rude.
 
-The question we need to decide now is about how brcmstb should be
-structured.  Somebody mentioned an IRQ function that would have to be
-exported for the brcmstb main driver & MSI pieces to be combined.  I
-don't know what specifically that is, but I thought maybe iproc had
-the same issue.
+> In next version I'm going to replace iommu_process_bind by something like
+> iommu_sva_bind_mm, which reduces the scope of the API I'm introducing and
+> doesn't fit your case anymore. What you need is a shortcut into the PASID
+> allocator, a way to allocate a private PASID with io-pgtables instead of
+> one backed by an mm. Something like:
+> 
+> iommu_sva_alloc_pasid(domain, dev) -> pasid
+> iommu_sva_map(pasid, iova, size, flags)
+> iommu_sva_unmap(pasid, iova, size)
+> iommu_sva_free_pasid(domain, pasid)
 
-Bjorn
+Yep, that matches up with my thinking.
+
+> Then for (2) the GPU is tightly integrated into the SMMU and can switch
+> contexts. I might be wrong but I don't see this case becoming standard as
+> new implementations move to PASIDs, we shouldn't spend too much time
+> making it generic.
+
+Agreed. This is rather specific use case.
+
+> But to make it fit into the PASID API, how about the following.
+
+
+> We provide a backdoor to the GPU driver, allowing it to register PASID ops
+> into SMMUv2 driver:
+> 
+> struct smmuv2_pasid_ops {
+> 	int (*install_pasid)(struct iommu_domain, int pasid, ttbr, asid
+> 			     and whatnot);
+> 	void (*remove_pasid)(struct iommu_domain, int pasid);
+> }
+> 
+> On PASID-capable IOMMUs, iommu_sva_alloc_pasid would install a context
+> descriptor into the PASID tables (owned by the IOMMU), pointing to the
+> io-pgtable. As SMMUv2 doesn't support PASID, iommu_sva_alloc_pasid
+> wouldn't actually install a context descriptor but instead call back into
+> the GPU driver with install_pasid. The GPU can then do its thing, call
+> sva_map/unmap, and switch contexts.
+> 
+> The good thing is that (1) and (2) are separate, so you get the same
+> callbacks if you're using iommu_sva_bind_mm instead of the private pasid
+> thing.
+
+This sounds ideal. It seems to scratch all the right itches that we have. 
+
+Thanks for thinking about this use case. I appreciate your time.
+
+Jordan
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
