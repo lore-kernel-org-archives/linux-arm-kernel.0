@@ -1,54 +1,51 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 25 Oct 2017 03:51:58 -0700
-Subject: [PATCH] drivers/net: nuvoton: Convert timers to use timer_setup()
-Message-ID: <20171025105158.GA146575@beast>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 25 Oct 2017 16:50:46 +0530
+Subject: [PATCHv4 2/2] phy: exynos5-usbdrd: Calibrate LOS levels for
+ exynos5420/5800
+In-Reply-To: <1507550451-21324-3-git-send-email-andrzej.p@samsung.com>
+References: <6de8a17a-745b-0fa2-c39d-cdeb28fc9489@ti.com>
+ <1507550451-21324-1-git-send-email-andrzej.p@samsung.com>
+ <CGME20171009120101eucas1p1066709725b5c6ca66961b85268480702@eucas1p1.samsung.com>
+ <1507550451-21324-3-git-send-email-andrzej.p@samsung.com>
+Message-ID: <fca01b97-eea1-cc6f-9c12-fa8d9e55d980@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for unconditionally passing the struct timer_list pointer to
-all timer callbacks, switch to using the new timer_setup() and from_timer()
-to pass the timer pointer explicitly.
+Felipe,
 
-Cc: Wan ZongShun <mcuos.com@gmail.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: netdev at vger.kernel.org
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
- drivers/net/ethernet/nuvoton/w90p910_ether.c | 9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
+On Monday 09 October 2017 05:30 PM, Andrzej Pietrasiewicz wrote:
+> From: Vivek Gautam <gautam.vivek@samsung.com>
+> 
+> Adding phy calibration sequence for USB 3.0 DRD PHY present on
+> Exynos5420/5800 systems.
+> This calibration facilitates setting certain PHY parameters viz.
+> the Loss-of-Signal (LOS) Detector Threshold Level, as well as
+> Tx-Vboost-Level for Super-Speed operations.
+> Additionally we also set proper time to wait for RxDetect measurement,
+> for desired PHY reference clock, so as to solve issue with enumeration
+> of few USB 3.0 devices, like Samsung SUM-TSB16S 3.0 USB drive
+> on the controller.
+> 
+> We are using CR_port for this purpose to send required data
+> to override the LOS values.
+> 
+> On testing with USB 3.0 devices on USB 3.0 port present on
+> SMDK5420, and peach-pit boards should see following message:
+> usb 2-1: new SuperSpeed USB device number 2 using xhci-hcd
+> 
+> and without this patch, should see below shown message:
+> usb 1-1: new high-speed USB device number 2 using xhci-hcd
+> 
+> [Also removed unnecessary extra lines in the register macro definitions]
+> 
+> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> [adapted to use phy_calibrate as entry point]
+> Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
+> ---
+>  drivers/phy/samsung/phy-exynos5-usbdrd.c | 183 +++++++++++++++++++++++++++++++
+>  drivers/usb/dwc3/core.c                  |   7 +-
 
-diff --git a/drivers/net/ethernet/nuvoton/w90p910_ether.c b/drivers/net/ethernet/nuvoton/w90p910_ether.c
-index 4a67c55aa9f1..052b3d2c07a1 100644
---- a/drivers/net/ethernet/nuvoton/w90p910_ether.c
-+++ b/drivers/net/ethernet/nuvoton/w90p910_ether.c
-@@ -253,10 +253,10 @@ static void update_linkspeed(struct net_device *dev)
- 	netif_carrier_on(dev);
- }
- 
--static void w90p910_check_link(unsigned long dev_id)
-+static void w90p910_check_link(struct timer_list *t)
- {
--	struct net_device *dev = (struct net_device *) dev_id;
--	struct w90p910_ether *ether = netdev_priv(dev);
-+	struct w90p910_ether *ether = from_timer(ether, t, check_timer);
-+	struct net_device *dev = ether->mii.dev;
- 
- 	update_linkspeed(dev);
- 	mod_timer(&ether->check_timer, jiffies + msecs_to_jiffies(1000));
-@@ -957,8 +957,7 @@ static int w90p910_ether_setup(struct net_device *dev)
- 	ether->mii.mdio_read = w90p910_mdio_read;
- 	ether->mii.mdio_write = w90p910_mdio_write;
- 
--	setup_timer(&ether->check_timer, w90p910_check_link,
--						(unsigned long)dev);
-+	timer_setup(&ether->check_timer, w90p910_check_link, 0);
- 
- 	return 0;
- }
--- 
-2.7.4
+are you okay with this patch?
 
-
--- 
-Kees Cook
-Pixel Security
+Thanks
+Kishon
