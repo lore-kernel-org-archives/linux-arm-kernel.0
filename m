@@ -1,79 +1,312 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 25 Oct 2017 16:44:08 +0800
-Subject: [PATCH v3 1/2] dt-bindings: add bindings doc for hi3798cv200 combphy
+Date: Wed, 25 Oct 2017 16:44:09 +0800
+Subject: [PATCH v3 2/2] phy: add combo phy driver for HiSilicon STB SoCs
 In-Reply-To: <1508921049-16208-1-git-send-email-shawnguo@kernel.org>
 References: <1508921049-16208-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <1508921049-16208-2-git-send-email-shawnguo@kernel.org>
+Message-ID: <1508921049-16208-3-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jianguo Sun <sunjianguo1@huawei.com>
 
-It adds the device tree bindings for PCIE/SATA/USB3 combo PHY found on
-HiSilicon STB SoCs.
+Add combo phy driver for HiSilicon STB SoCs. This phy can be
+used as pcie-phy, sata-phy or usb-phy.
 
 Signed-off-by: Jianguo Sun <sunjianguo1@huawei.com>
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- .../bindings/phy/phy-hi3798cv200-combphy.txt       | 50 ++++++++++++++++++++++
- 1 file changed, 50 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/phy-hi3798cv200-combphy.txt
+ drivers/phy/hisilicon/Kconfig             |   9 ++
+ drivers/phy/hisilicon/Makefile            |   1 +
+ drivers/phy/hisilicon/phy-histb-combphy.c | 253 ++++++++++++++++++++++++++++++
+ 3 files changed, 263 insertions(+)
+ create mode 100644 drivers/phy/hisilicon/phy-histb-combphy.c
 
-diff --git a/Documentation/devicetree/bindings/phy/phy-hi3798cv200-combphy.txt b/Documentation/devicetree/bindings/phy/phy-hi3798cv200-combphy.txt
+diff --git a/drivers/phy/hisilicon/Kconfig b/drivers/phy/hisilicon/Kconfig
+index 6164c4cd0f65..d9afe2b12827 100644
+--- a/drivers/phy/hisilicon/Kconfig
++++ b/drivers/phy/hisilicon/Kconfig
+@@ -11,6 +11,15 @@ config PHY_HI6220_USB
+ 
+ 	  To compile this driver as a module, choose M here.
+ 
++config PHY_HISTB_COMBPHY
++	tristate "HiSilicon STB SoCs COMBPHY support"
++	depends on (ARCH_HISI && ARM64) || COMPILE_TEST
++	select GENERIC_PHY
++	select MFD_SYSCON
++	help
++	  Enable this to support the HISILICON STB SoCs COMBPHY.
++	  If unsure, say N.
++
+ config PHY_HIX5HD2_SATA
+ 	tristate "HIX5HD2 SATA PHY Driver"
+ 	depends on ARCH_HIX5HD2 && OF && HAS_IOMEM
+diff --git a/drivers/phy/hisilicon/Makefile b/drivers/phy/hisilicon/Makefile
+index 541b348187a8..5e8e2dfa8c37 100644
+--- a/drivers/phy/hisilicon/Makefile
++++ b/drivers/phy/hisilicon/Makefile
+@@ -1,2 +1,3 @@
+ obj-$(CONFIG_PHY_HI6220_USB)		+= phy-hi6220-usb.o
++obj-$(CONFIG_PHY_HISTB_COMBPHY)		+= phy-histb-combphy.o
+ obj-$(CONFIG_PHY_HIX5HD2_SATA)		+= phy-hix5hd2-sata.o
+diff --git a/drivers/phy/hisilicon/phy-histb-combphy.c b/drivers/phy/hisilicon/phy-histb-combphy.c
 new file mode 100644
-index 000000000000..b4041e33a804
+index 000000000000..24c39c199a97
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/phy-hi3798cv200-combphy.txt
-@@ -0,0 +1,50 @@
-+HiSilicon STB PCIE/SATA/USB3 PHY
++++ b/drivers/phy/hisilicon/phy-histb-combphy.c
+@@ -0,0 +1,253 @@
++/*
++ * COMBPHY driver for HiSilicon STB SoCs
++ *
++ * Copyright (C) 2016-2017 HiSilicon Co., Ltd. http://www.hisilicon.com
++ *
++ * Authors: Jianguo Sun <sunjianguo1@huawei.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
-+Required properties:
-+- compatible: Should be "hisilicon,hi3798cv200-combphy"
-+- reg: Should be the address space for COMBPHY configuration and state
-+  registers in peripheral controller, e.g. PERI_COMBPHY0_CFG and
-+  PERI_COMBPHY0_STATE for COMBPHY0 Hi3798cv200 SoC.
-+- #phy-cells: Should be 1.  The cell number is used to select the phy mode
-+  as defined in <dt-bindings/phy/phy.h>.
-+- clocks: The phandle to clock provider and clock specifier pair.
-+- resets: The phandle to reset controller and reset specifier pair.
++#include <linux/clk.h>
++#include <linux/delay.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/mfd/syscon.h>
++#include <linux/module.h>
++#include <linux/of_device.h>
++#include <linux/phy/phy.h>
++#include <linux/regmap.h>
++#include <linux/reset.h>
++#include <dt-bindings/phy/phy.h>
 +
-+Refer to phy/phy-bindings.txt for the generic PHY binding properties
++#define PERI_CTRL			0x8
++#define COMBPHY1_MODE_MASK		GENMASK(12, 11)
++#define COMBPHY1_MODE_SHIFT		11
++#define COMBPHY_MODE_PCIE		0
++#define COMBPHY_MODE_USB3		1
++#define COMBPHY_MODE_SATA		2
 +
-+Note:
-+- The device node should be a child of peripheral controller that contains
-+  COMBPHY configuration/state and PERI_CTRL register used to select PHY mode.
-+- The combphy devices should have aliases defined.
++#define COMBPHY_CFG_REG			0x0
++#define COMBPHY_BYPASS_CODEC		BIT(31)
++#define COMBPHY_TEST_WRITE		BIT(24)
++#define COMBPHY_TEST_DATA_SHIFT		20
++#define COMBPHY_TEST_DATA_MASK		GENMASK(23, 20)
++#define COMBPHY_TEST_ADDR_SHIFT		12
++#define COMBPHY_TEST_ADDR_MASK		GENMASK(16, 12)
++#define COMBPHY_CLKREF_OUT_OEN		BIT(0)
 +
-+Example:
-+
-+aliases {
-+	combphy0 = &combphy0;
-+	combphy1 = &combphy1;
++struct histb_combphy_priv {
++	void __iomem *mmio;
++	struct regmap *syscon;
++	struct reset_control *por_rst;
++	struct clk *ref_clk;
++	struct phy *phy;
++	int phy_mode;
++	int phy_id;
 +};
 +
-+peri_ctrl: peri_ctrl at 8a20000 {
-+	compatible = "hisilicon,hi3798cv200-perictrl", "syscon",
-+		     "simple-mfd";
-+	reg = <0x8a20000 0x1000>;
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	ranges = <0x0 0x8a20000 0x1000>;
++static void nano_register_write(struct histb_combphy_priv *priv,
++				u32 addr, u32 data)
++{
++	void __iomem *reg = priv->mmio + COMBPHY_CFG_REG;
++	u32 val;
 +
-+	combphy0: phy at 850 {
-+		compatible = "hisilicon,hi3798cv200-combphy";
-+		reg = <0x850 0x8>;
-+		#phy-cells = <1>;
-+		clocks = <&crg HISTB_COMBPHY0_CLK>;
-+		resets = <&crg 0x188 4>;
-+	};
++	/* Set up address and data for the write */
++	val = readl(reg);
++	val &= ~COMBPHY_TEST_ADDR_MASK;
++	val |= addr << COMBPHY_TEST_ADDR_SHIFT;
++	val &= ~COMBPHY_TEST_DATA_MASK;
++	val |= data << COMBPHY_TEST_DATA_SHIFT;
++	writel(val, reg);
 +
-+	combphy1: phy at 858 {
-+		compatible = "hisilicon,hi3798cv200-combphy";
-+		reg = <0x858 0x8>;
-+		#phy-cells = <1>;
-+		clocks = <&crg HISTB_COMBPHY1_CLK>;
-+		resets = <&crg 0x188 12>;
-+	};
++	/* Flip strobe control to trigger the write */
++	val &= ~COMBPHY_TEST_WRITE;
++	writel(val, reg);
++	val |= COMBPHY_TEST_WRITE;
++	writel(val, reg);
++}
++
++static int histb_combphy_set_mode(struct histb_combphy_priv *priv)
++{
++	struct regmap *syscon = priv->syscon;
++	u32 mode;
++
++	switch (priv->phy_mode) {
++	case PHY_TYPE_SATA:
++		mode = COMBPHY_MODE_SATA;
++		break;
++	case PHY_TYPE_PCIE:
++		mode = COMBPHY_MODE_PCIE;
++		break;
++	case PHY_TYPE_USB3:
++		mode = COMBPHY_MODE_USB3;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return regmap_update_bits(syscon, PERI_CTRL, COMBPHY1_MODE_MASK,
++				  mode << COMBPHY1_MODE_SHIFT);
++}
++
++static int histb_combphy_init(struct phy *phy)
++{
++	struct histb_combphy_priv *priv = phy_get_drvdata(phy);
++	u32 val;
++	int ret;
++
++	/* PHY0 doesn't support mode setting */
++	if (priv->phy_id != 0) {
++		ret = histb_combphy_set_mode(priv);
++		if (ret)
++			return ret;
++	}
++
++	/* Clear bypass bit to enable encoding/decoding */
++	val = readl(priv->mmio + COMBPHY_CFG_REG);
++	val &= ~COMBPHY_BYPASS_CODEC;
++	writel(val, priv->mmio + COMBPHY_CFG_REG);
++
++	ret = clk_prepare_enable(priv->ref_clk);
++	if (ret)
++		return ret;
++
++	reset_control_deassert(priv->por_rst);
++
++	/* Enable EP clock */
++	val = readl(priv->mmio + COMBPHY_CFG_REG);
++	val |= COMBPHY_CLKREF_OUT_OEN;
++	writel(val, priv->mmio + COMBPHY_CFG_REG);
++
++	/* Need to wait for EP clock stable */
++	mdelay(5);
++
++	/* Configure nano phy registers as suggested by vendor */
++	nano_register_write(priv, 0x1, 0x8);
++	nano_register_write(priv, 0xc, 0x9);
++	nano_register_write(priv, 0x1a, 0x4);
++
++	return 0;
++}
++
++static int histb_combphy_exit(struct phy *phy)
++{
++	struct histb_combphy_priv *priv = phy_get_drvdata(phy);
++	u32 val;
++
++	/* Disable EP clock */
++	val = readl(priv->mmio + COMBPHY_CFG_REG);
++	val &= ~COMBPHY_CLKREF_OUT_OEN;
++	writel(val, priv->mmio + COMBPHY_CFG_REG);
++
++	reset_control_assert(priv->por_rst);
++	clk_disable_unprepare(priv->ref_clk);
++
++	return 0;
++}
++
++static const struct phy_ops histb_combphy_ops = {
++	.init = histb_combphy_init,
++	.exit = histb_combphy_exit,
++	.owner = THIS_MODULE,
 +};
++
++static struct phy *histb_combphy_xlate(struct device *dev,
++				       struct of_phandle_args *args)
++{
++	struct histb_combphy_priv *priv = dev_get_drvdata(dev);
++
++	if (args->args_count < 1) {
++		dev_err(dev, "invalid number of arguments\n");
++		return ERR_PTR(-EINVAL);
++	}
++
++	priv->phy_mode = args->args[0];
++
++	if (priv->phy_mode < PHY_TYPE_SATA || priv->phy_mode > PHY_TYPE_USB3) {
++		dev_err(dev, "invalid phy mode argument\n");
++		return ERR_PTR(-EINVAL);
++	}
++
++	if (priv->phy_id == 0 && priv->phy_mode != PHY_TYPE_USB3) {
++		dev_err(dev, "PHY0 works in USB3 mode only\n");
++		return ERR_PTR(-EINVAL);
++	}
++
++	return priv->phy;
++}
++
++static int histb_combphy_probe(struct platform_device *pdev)
++{
++	struct phy_provider *phy_provider;
++	struct device *dev = &pdev->dev;
++	struct histb_combphy_priv *priv;
++	struct device_node *np = dev->of_node;
++	struct resource *res;
++	int ret;
++
++	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	priv->mmio = devm_ioremap_resource(dev, res);
++	if (IS_ERR(priv->mmio)) {
++		ret = PTR_ERR(priv->mmio);
++		return ret;
++	}
++
++	priv->syscon = syscon_node_to_regmap(np->parent);
++	if (IS_ERR(priv->syscon)) {
++		dev_err(dev, "failed to find peri_ctrl syscon regmap\n");
++		return PTR_ERR(priv->syscon);
++	}
++
++	priv->phy_id = of_alias_get_id(np, "combphy");
++	if (priv->phy_id < 0)
++		priv->phy_id = 0;
++
++	priv->ref_clk = devm_clk_get(dev, NULL);
++	if (IS_ERR(priv->ref_clk)) {
++		dev_err(dev, "failed to find ref clock\n");
++		return PTR_ERR(priv->ref_clk);
++	}
++
++	priv->por_rst = devm_reset_control_get(dev, NULL);
++	if (IS_ERR(priv->por_rst)) {
++		dev_err(dev, "failed to get poweron reset\n");
++		return PTR_ERR(priv->por_rst);
++	}
++
++	priv->phy = devm_phy_create(dev, NULL, &histb_combphy_ops);
++	if (IS_ERR(priv->phy)) {
++		dev_err(dev, "failed to create combphy\n");
++		return PTR_ERR(priv->phy);
++	}
++
++	dev_set_drvdata(dev, priv);
++	phy_set_drvdata(priv->phy, priv);
++
++	phy_provider = devm_of_phy_provider_register(dev, histb_combphy_xlate);
++	return PTR_ERR_OR_ZERO(phy_provider);
++}
++
++static const struct of_device_id histb_combphy_of_match[] = {
++	{ .compatible = "hisilicon,hi3798cv200-combphy" },
++	{ },
++};
++MODULE_DEVICE_TABLE(of, histb_combphy_of_match);
++
++static struct platform_driver histb_combphy_driver = {
++	.probe	= histb_combphy_probe,
++	.driver = {
++		.name = "combphy",
++		.of_match_table = histb_combphy_of_match,
++	},
++};
++module_platform_driver(histb_combphy_driver);
++
++MODULE_DESCRIPTION("HiSilicon STB COMBPHY driver");
++MODULE_LICENSE("GPL v2");
 -- 
 1.9.1
