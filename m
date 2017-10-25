@@ -1,75 +1,63 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 25 Oct 2017 23:11:28 +0200
-Subject: [PATCH v6 03/12] arm64: dts: mt8173: remove "mediatek, mt8135-mmc"
- from mmc nodes
-In-Reply-To: <1508118399-21828-4-git-send-email-chaotian.jing@mediatek.com>
-References: <1508118399-21828-1-git-send-email-chaotian.jing@mediatek.com>
- <1508118399-21828-4-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <CAPDyKFrRVT8YFXvy3Wuf_jga5oourScOdas34U=YkeLRzHoWMg@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 25 Oct 2017 14:22:45 -0700
+Subject: usb: dwc2: NMI watchdog: BUG: soft lockup - CPU#0 stuck for 146s
+In-Reply-To: <CAODwPW8qtw0qVxUGJUNt2H8TTCOEvn6G9qbUBi6_MKWgeAwcaQ@mail.gmail.com>
+References: <172093673.40121.1492427140661@email.1und1.de>
+ <CAD=FV=WJBTUcMPw8OgQT_jhz0H8AsH=YqWMR7LtudUKrF5-XOA@mail.gmail.com>
+ <79b9b35b-0600-771f-4cd2-9e03c5ba3a25@i2se.com>
+ <186569458.91967.1492547106553@email.1und1.de>
+ <CAD=FV=VHkJFrsJDmMytbUw=WjKQaGZ-8Ewfy5bPCA82AWS4O2Q@mail.gmail.com>
+ <212870399.174480.1492633502649@email.1und1.de>
+ <87mvbaykn1.fsf@eliezer.anholt.net>
+ <1998517910.54108.1492894253010@email.1und1.de>
+ <2127594073.298820.1493143869792@email.1und1.de>
+ <316369012.317772.1494274928708@email.1und1.de>
+ <20170510163150.GK30445@localhost>
+ <CAD=FV=VUaqtR2t04wodRJ33bqHo5DPke7zsvqBMYqZ5imX5+=A@mail.gmail.com>
+ <446301756.220218.1494678481761@email.1und1.de>
+ <CAODwPW8qtw0qVxUGJUNt2H8TTCOEvn6G9qbUBi6_MKWgeAwcaQ@mail.gmail.com>
+Message-ID: <CAD=FV=VTkCXe-ke=1jssVXJgmuo__f4Ls3OPjrwW122Ws-qiNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 October 2017 at 03:46, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> devicetree bindings has been updated to support multi-platforms,
-> so that each platform has its owns compatible name.
-> And, this compatible name may used in driver to distinguish with
-> other platform.
->
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+Hi,
 
-Matthias, do you intend to pick this? Else I can do it with your ack...
+On Mon, Oct 16, 2017 at 1:49 PM, Julius Werner <jwerner@chromium.org> wrote:
+>> d9a14b00 339317035 C Ii:1:004:1 -32:1 0
+>> d9a14b00 339317049 S Ii:1:004:1 -115:1 10 <
+>> d9a14b00 339318040 C Ii:1:004:1 -32:1 0
+>> d9a14b00 339318057 S Ii:1:004:1 -115:1 10 <
+>> d9a14b00 339319042 C Ii:1:004:1 -32:1 0
+>> d9a14b00 339319056 S Ii:1:004:1 -115:1 10 <
+>> d9a14b00 339329551 C Ii:1:004:1 -32:1 0
+>> d9a14b00 339329571 S Ii:1:004:1 -115:1 10 <
+>> d9a14b00 339330586 C Ii:1:004:1 -32:1 0
+>> d9a14b00 339330601 S Ii:1:004:1 -115:1 10 <
+>> d9a14b00 339331035 C Ii:1:004:1 -32:1 0
+>
+> Sorry for necromancing an old thread, but I just happened to read
+> through this and thought someone might care:
+>
+> If I read that right, the usbmon output shows that the interrupt
+> endpoint is stalled (keeps returning -EPIPE). A STALL is a special
+> device-side USB condition that tells the host something is wrong and
+> will persist until cleared manually. It seems that the driver isn't
+> prepared for this (see
+> drivers/usb/serial/pl2303.c#pl2303_read_int_callback) and just keeps
+> resubmitting the URB, so it will stall again as fast as the endpoint
+> allows it to. This may be the reason why you get so many transfers
+> that it overwhelms the CPU.
+>
+> A fix would be to catch -EPIPE in that function and handle it
+> explicitly (with either a CLEAR_STALL to the endpoint or a full USB
+> reset... would have to look at the documentation for PL2303 to see
+> what the stall actually means and how you're supposed to treat it).
 
-Kind regards
-Uffe
+To further comment on this old thread, I just posted another patch at
+<https://patchwork.kernel.org/patch/10027237/> that could also make
+pl2303 less able to bring dwc2-based controllers to a screeching halt.
+I added many of the people who had taken part in this thread, but if
+you were just lurking here then hopefully you can dig it up and try it
+out.
 
-> ---
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 12 ++++--------
->  1 file changed, 4 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> index b99a273..26396ef 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> @@ -682,8 +682,7 @@
->                 };
->
->                 mmc0: mmc at 11230000 {
-> -                       compatible = "mediatek,mt8173-mmc",
-> -                                    "mediatek,mt8135-mmc";
-> +                       compatible = "mediatek,mt8173-mmc";
->                         reg = <0 0x11230000 0 0x1000>;
->                         interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_LOW>;
->                         clocks = <&pericfg CLK_PERI_MSDC30_0>,
-> @@ -693,8 +692,7 @@
->                 };
->
->                 mmc1: mmc at 11240000 {
-> -                       compatible = "mediatek,mt8173-mmc",
-> -                                    "mediatek,mt8135-mmc";
-> +                       compatible = "mediatek,mt8173-mmc";
->                         reg = <0 0x11240000 0 0x1000>;
->                         interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_LOW>;
->                         clocks = <&pericfg CLK_PERI_MSDC30_1>,
-> @@ -704,8 +702,7 @@
->                 };
->
->                 mmc2: mmc at 11250000 {
-> -                       compatible = "mediatek,mt8173-mmc",
-> -                                    "mediatek,mt8135-mmc";
-> +                       compatible = "mediatek,mt8173-mmc";
->                         reg = <0 0x11250000 0 0x1000>;
->                         interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_LOW>;
->                         clocks = <&pericfg CLK_PERI_MSDC30_2>,
-> @@ -715,8 +712,7 @@
->                 };
->
->                 mmc3: mmc at 11260000 {
-> -                       compatible = "mediatek,mt8173-mmc",
-> -                                    "mediatek,mt8135-mmc";
-> +                       compatible = "mediatek,mt8173-mmc";
->                         reg = <0 0x11260000 0 0x1000>;
->                         interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_LOW>;
->                         clocks = <&pericfg CLK_PERI_MSDC30_3>,
-> --
-> 1.8.1.1.dirty
->
+-Doug
