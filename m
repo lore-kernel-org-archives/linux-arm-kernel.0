@@ -1,29 +1,82 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Wed, 25 Oct 2017 07:54:50 -0700
-Subject: [PATCH] ata: fixes kernel crash while tracing
- ata_eh_link_autopsy event
-In-Reply-To: <1508926976-11467-1-git-send-email-rsahu@apm.com>
-References: <1508926976-11467-1-git-send-email-rsahu@apm.com>
-Message-ID: <20171025145450.GA59538@devbig577.frc2.facebook.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 25 Oct 2017 16:58:23 +0200
+Subject: [PATCH] ARM: dts: mvebu: pl310-cache disable double-linefill
+Message-ID: <20171025145823.29262-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Yan Markman <ymarkman@marvell.com>
 
-On Wed, Oct 25, 2017 at 03:52:56PM +0530, Rameshwar Prasad Sahu wrote:
-> @@ -288,8 +289,8 @@
->  	),
-> 
->  	TP_fast_assign(
-> -		__entry->ata_port	= dev->link->ap->print_id;
-> -		__entry->ata_dev	= dev->link->pmp + dev->devno;
-> +		__entry->ata_port	= link->ap->print_id;
-> +		__entry->ata_dev	= link->pmp + link->device->devno;
+Under heavy system stress mvebu SoC using Cortex A9 sporadically
+encountered instability issues.
 
-The above is wrong if there are multiple devices on the link.  It
-probably should take both link and dev and use dev iff it's not NULL.
+The "double linefill" feature of L2 cache was identified as causing
+dependency between read and write which lead to the deadlock.
 
-Thanks.
+Especially, it was the cause of deadlock seen under heavy PCIe traffic,
+as this dependency violates PCIE overtaking rule.
 
+Fixes: c8f5a878e554 ("ARM: mvebu: use DT properties to fine-tune the L2 configuration")
+Cc: stable at vger.kernel.org
+Signed-off-by: Yan Markman <ymarkman@marvell.com>
+Signed-off-by: Igal Liberman <igall@marvell.com>
+Signed-off-by: Nadav Haklai <nadavh@marvell.com>
+[gregory.clement at free-electrons.com: reformulate commit log, add Armada
+375 and add Fixes tag]
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-375.dtsi | 4 ++--
+ arch/arm/boot/dts/armada-38x.dtsi | 4 ++--
+ arch/arm/boot/dts/armada-39x.dtsi | 4 ++--
+ 3 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+index 7225c7ce9a8d..2cb1bcd30976 100644
+--- a/arch/arm/boot/dts/armada-375.dtsi
++++ b/arch/arm/boot/dts/armada-375.dtsi
+@@ -178,9 +178,9 @@
+ 				reg = <0x8000 0x1000>;
+ 				cache-unified;
+ 				cache-level = <2>;
+-				arm,double-linefill-incr = <1>;
++				arm,double-linefill-incr = <0>;
+ 				arm,double-linefill-wrap = <0>;
+-				arm,double-linefill = <1>;
++				arm,double-linefill = <0>;
+ 				prefetch-data = <1>;
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+index 7ff0811e61db..05e241fb91ad 100644
+--- a/arch/arm/boot/dts/armada-38x.dtsi
++++ b/arch/arm/boot/dts/armada-38x.dtsi
+@@ -143,9 +143,9 @@
+ 				reg = <0x8000 0x1000>;
+ 				cache-unified;
+ 				cache-level = <2>;
+-				arm,double-linefill-incr = <1>;
++				arm,double-linefill-incr = <0>;
+ 				arm,double-linefill-wrap = <0>;
+-				arm,double-linefill = <1>;
++				arm,double-linefill = <0>;
+ 				prefetch-data = <1>;
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/armada-39x.dtsi b/arch/arm/boot/dts/armada-39x.dtsi
+index ea657071e278..5218bd2a248d 100644
+--- a/arch/arm/boot/dts/armada-39x.dtsi
++++ b/arch/arm/boot/dts/armada-39x.dtsi
+@@ -111,9 +111,9 @@
+ 				reg = <0x8000 0x1000>;
+ 				cache-unified;
+ 				cache-level = <2>;
+-				arm,double-linefill-incr = <1>;
++				arm,double-linefill-incr = <0>;
+ 				arm,double-linefill-wrap = <0>;
+-				arm,double-linefill = <1>;
++				arm,double-linefill = <0>;
+ 				prefetch-data = <1>;
+ 			};
+ 
 -- 
-tejun
+2.14.2
