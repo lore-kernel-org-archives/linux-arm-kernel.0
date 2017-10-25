@@ -1,70 +1,262 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 25 Oct 2017 16:45:37 +0100
-Subject: [1/2] drivers: firmware: psci: Add psci_is_available()
-In-Reply-To: <1507708982-12336-2-git-send-email-geert+renesas@glider.be>
-References: <1507708982-12336-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <20171025154537.GA7829@red-moon>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Wed, 25 Oct 2017 17:46:19 +0200
+Subject: [PATCH v4 08/26] KVM: arm/arm64: GICv4: Add init/teardown of the
+ per-VM vPE irq domain
+In-Reply-To: <20171006153401.5481-9-marc.zyngier@arm.com>
+References: <20171006153401.5481-1-marc.zyngier@arm.com>
+ <20171006153401.5481-9-marc.zyngier@arm.com>
+Message-ID: <20171025154619.GK91785@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 11, 2017 at 10:03:01AM +0200, Geert Uytterhoeven wrote:
-> PSCI support may be disabled at build time (by configuration) or at
-> run-time (PSCI firmware not present).  While CONFIG_ARM_PSCI_FW can be
-> used to check for build time enablement, there is currently no simple
-> way to check if PSCI is actually available and used.
+On Fri, Oct 06, 2017 at 04:33:43PM +0100, Marc Zyngier wrote:
+> In order to control the GICv4 view of virtual CPUs, we rely
+> on an irqdomain allocated for that purpose. Let's add a couple
+> of helpers to that effect.
 > 
-> Hence add a helper function to check if PSCI is available.
-
-Hi Geert,
-
-excuse us the delay in responding. I think it would be better if the
-check just carries out a DT/ACPI matching check rather than being based
-on PSCI ops initialization but before doing that I would like first to
-understand what this function can be actually used for (ie I do not
-think the usage in the PSCI checker is relevant to this discussion).
-
-Thanks,
-Lorenzo
-
-> This is useful for e.g. drivers that are used on platforms with and
-> without PSCI.  Such drivers may need to take provisions for proper
-> operation when PSCI is used, and/or to implement functionality that is
-> usually provided by PSCI.
+> At the same time, the vgic data structures gain new fields to
+> track all this... erm... wonderful stuff.
 > 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> The way we hook into the vgic init is slightly convoluted. We
+> need the vgic to be initialized (in order to guarantee that
+> the number of vcpus is now fixed), and we must have a vITS
+> (otherwise this is all very pointless). So we end-up calling
+> the init from both vgic_init and vgic_its_create.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  drivers/firmware/psci.c | 5 +++++
->  include/linux/psci.h    | 2 ++
->  2 files changed, 7 insertions(+)
+>  arch/arm/kvm/Makefile         |  1 +
+>  arch/arm64/kvm/Makefile       |  1 +
+>  include/kvm/arm_vgic.h        | 19 ++++++++++
+>  virt/kvm/arm/vgic/vgic-init.c |  9 +++++
+>  virt/kvm/arm/vgic/vgic-its.c  |  8 +++++
+>  virt/kvm/arm/vgic/vgic-v4.c   | 83 +++++++++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic.h      |  2 ++
+>  7 files changed, 123 insertions(+)
+>  create mode 100644 virt/kvm/arm/vgic/vgic-v4.c
 > 
-> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-> index da469c972b503f83..a3a11e2d8ffffaaa 100644
-> --- a/drivers/firmware/psci.c
-> +++ b/drivers/firmware/psci.c
-> @@ -670,6 +670,11 @@ int __init psci_dt_init(void)
->  	return init_fn(np);
+> diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
+> index d9beee652d36..0a1dd2cdb928 100644
+> --- a/arch/arm/kvm/Makefile
+> +++ b/arch/arm/kvm/Makefile
+> @@ -31,6 +31,7 @@ obj-y += $(KVM)/arm/vgic/vgic-init.o
+>  obj-y += $(KVM)/arm/vgic/vgic-irqfd.o
+>  obj-y += $(KVM)/arm/vgic/vgic-v2.o
+>  obj-y += $(KVM)/arm/vgic/vgic-v3.o
+> +obj-y += $(KVM)/arm/vgic/vgic-v4.o
+>  obj-y += $(KVM)/arm/vgic/vgic-mmio.o
+>  obj-y += $(KVM)/arm/vgic/vgic-mmio-v2.o
+>  obj-y += $(KVM)/arm/vgic/vgic-mmio-v3.o
+> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+> index 5d9810086c25..c30fd388ef80 100644
+> --- a/arch/arm64/kvm/Makefile
+> +++ b/arch/arm64/kvm/Makefile
+> @@ -26,6 +26,7 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-init.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-irqfd.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-v2.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-v3.o
+> +kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-v4.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v2.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v3.o
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index ba9fb450aa1b..7eeb6c2a2f9c 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -26,6 +26,8 @@
+>  #include <linux/list.h>
+>  #include <linux/jump_label.h>
+>  
+> +#include <linux/irqchip/arm-gic-v4.h>
+> +
+>  #define VGIC_V3_MAX_CPUS	255
+>  #define VGIC_V2_MAX_CPUS	8
+>  #define VGIC_NR_IRQS_LEGACY     256
+> @@ -236,6 +238,15 @@ struct vgic_dist {
+>  
+>  	/* used by vgic-debug */
+>  	struct vgic_state_iter *iter;
+> +
+> +	/*
+> +	 * GICv4 ITS per-VM data, containing the IRQ domain, the VPE
+> +	 * array, the property table pointer as well as allocation
+> +	 * data. This essentially ties the Linux IRQ core and ITS
+> +	 * together, and avoids leaking KVM's data structures anywhere
+> +	 * else.
+> +	 */
+> +	struct its_vm		its_vm;
+>  };
+>  
+>  struct vgic_v2_cpu_if {
+> @@ -254,6 +265,14 @@ struct vgic_v3_cpu_if {
+>  	u32		vgic_ap0r[4];
+>  	u32		vgic_ap1r[4];
+>  	u64		vgic_lr[VGIC_V3_MAX_LRS];
+> +
+> +	/*
+> +	 * GICv4 ITS per-VPE data, containing the doorbell IRQ, the
+> +	 * pending table pointer, the its_vm pointer and a few other
+> +	 * HW specific things. As for the its_vm structure, this is
+> +	 * linking the Linux IRQ subsystem and the ITS together.
+> +	 */
+> +	struct its_vpe	its_vpe;
+>  };
+>  
+>  struct vgic_cpu {
+> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+> index 5801261f3add..c2749387615b 100644
+> --- a/virt/kvm/arm/vgic/vgic-init.c
+> +++ b/virt/kvm/arm/vgic/vgic-init.c
+> @@ -285,6 +285,12 @@ int vgic_init(struct kvm *kvm)
+>  	if (ret)
+>  		goto out;
+>  
+> +	if (vgic_has_its(kvm) && vgic_supports_direct_msis(kvm)) {
+
+vgic_supports_direct_msis() already checks vgic_has_its(), so you can
+drop that check here.
+
+> +		ret = vgic_v4_init(kvm);
+> +		if (ret)
+> +			goto out;
+> +	}
+> +
+>  	kvm_for_each_vcpu(i, vcpu, kvm)
+>  		kvm_vgic_vcpu_enable(vcpu);
+>  
+> @@ -320,6 +326,9 @@ static void kvm_vgic_dist_destroy(struct kvm *kvm)
+>  
+>  	kfree(dist->spis);
+>  	dist->nr_spis = 0;
+> +
+> +	if (vgic_supports_direct_msis(kvm))
+> +		vgic_v4_teardown(kvm);
 >  }
 >  
-> +bool psci_is_available(void)
+>  void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index 8ee03f1e89fc..89768d2b6a91 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -1603,6 +1603,14 @@ static int vgic_its_create(struct kvm_device *dev, u32 type)
+>  	if (!its)
+>  		return -ENOMEM;
+>  
+> +	if (vgic_initialized(dev->kvm)) {
+> +		int ret = vgic_v4_init(dev->kvm);
+> +		if (ret) {
+> +			kfree(its);
+> +			return ret;
+> +		}
+> +	}
+> +	
+>  	mutex_init(&its->its_lock);
+>  	mutex_init(&its->cmd_lock);
+>  
+> diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
+> new file mode 100644
+> index 000000000000..c794f0cef09e
+> --- /dev/null
+> +++ b/virt/kvm/arm/vgic/vgic-v4.c
+> @@ -0,0 +1,83 @@
+> +/*
+> + * Copyright (C) 2017 ARM Ltd.
+> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/interrupt.h>
+> +#include <linux/irqdomain.h>
+> +#include <linux/kvm_host.h>
+> +
+> +#include "vgic.h"
+> +
+> +/**
+> + * vgic_v4_init - Initialize the GICv4 data structures
+> + * @kvm:	Pointer to the VM being initialized
+> + *
+> + * We may be called each time a vITS is created, or when the
+> + * vgic is initialized. This relies on kvm->lock to be
+> + * held. In both cases, the number of vcpus should now be
+> + * fixed.
+> + */
+> +int vgic_v4_init(struct kvm *kvm)
 > +{
-> +	return psci_ops.cpu_off && psci_ops.cpu_on && psci_ops.cpu_suspend;
+> +	struct vgic_dist *dist = &kvm->arch.vgic;
+> +	struct kvm_vcpu *vcpu;
+> +	int i, nr_vcpus, ret;
+> +
+> +	if (dist->its_vm.vpes)
+> +		return 0;
+> +
+> +	nr_vcpus = atomic_read(&kvm->online_vcpus);
+> +
+> +	dist->its_vm.vpes = kzalloc(sizeof(*dist->its_vm.vpes) * nr_vcpus,
+> +				    GFP_KERNEL);
+> +	if (!dist->its_vm.vpes)
+> +		return -ENOMEM;
+> +
+> +	dist->its_vm.nr_vpes = nr_vcpus;
+> +
+> +	kvm_for_each_vcpu(i, vcpu, kvm)
+> +		dist->its_vm.vpes[i] = &vcpu->arch.vgic_cpu.vgic_v3.its_vpe;
+> +
+> +	ret = its_alloc_vcpu_irqs(&dist->its_vm);
+> +	if (ret < 0) {
+> +		kvm_err("VPE IRQ allocation failure\n");
+> +		kfree(dist->its_vm.vpes);
+> +		dist->its_vm.nr_vpes = 0;
+> +		dist->its_vm.vpes = NULL;
+> +		return ret;
+> +	}
+> +
+> +	return ret;
 > +}
 > +
->  #ifdef CONFIG_ACPI
->  /*
->   * We use PSCI 0.2+ when ACPI is deployed on ARM64 and it's
-> diff --git a/include/linux/psci.h b/include/linux/psci.h
-> index bdea1cb5e1db142b..2bdee325aeb80cf6 100644
-> --- a/include/linux/psci.h
-> +++ b/include/linux/psci.h
-> @@ -39,8 +39,10 @@ extern struct psci_operations psci_ops;
+> +/**
+> + * vgic_v4_teardown - Free the GICv4 data structures
+> + * @kvm:	Pointer to the VM being destroyed
+> + *
+> + * Relies on kvm->lock to be held.
+> + */
+> +void vgic_v4_teardown(struct kvm *kvm)
+> +{
+> +	struct its_vm *its_vm = &kvm->arch.vgic.its_vm;
+> +
+> +	if (!its_vm->vpes)
+> +		return;
+> +
+> +	its_free_vcpu_irqs(its_vm);
+> +	kfree(its_vm->vpes);
+> +	its_vm->nr_vpes = 0;
+> +	its_vm->vpes = NULL;
+> +}
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> index e67ccb6a6250..c4105f613f57 100644
+> --- a/virt/kvm/arm/vgic/vgic.h
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -241,5 +241,7 @@ int vgic_its_resolve_lpi(struct kvm *kvm, struct vgic_its *its,
+>  struct vgic_its *vgic_msi_to_its(struct kvm *kvm, struct kvm_msi *msi);
 >  
->  #if defined(CONFIG_ARM_PSCI_FW)
->  int __init psci_dt_init(void);
-> +bool psci_is_available(void);
->  #else
->  static inline int psci_dt_init(void) { return 0; }
-> +static inline bool psci_is_available(void) { return false; }
+>  bool vgic_supports_direct_msis(struct kvm *kvm);
+> +int vgic_v4_init(struct kvm *kvm);
+> +void vgic_v4_teardown(struct kvm *kvm);
+>  
 >  #endif
->  
->  #if defined(CONFIG_ARM_PSCI_FW) && defined(CONFIG_ACPI)
+> -- 
+> 2.14.1
+> 
+Otherwise:
+
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
