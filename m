@@ -1,39 +1,23 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 25 Oct 2017 17:42:24 -0400
-Subject: [PATCH] PCI: rework error checking in the reset path
-In-Reply-To: <20171025232805.163ccaad@t450s.home>
-References: <1508794608-15310-1-git-send-email-okaya@codeaurora.org>
- <20171025134511.GL21840@bhelgaas-glaptop.roam.corp.google.com>
- <20171025232805.163ccaad@t450s.home>
-Message-ID: <47146df8-b4e1-595d-9664-3830d770eecf@codeaurora.org>
+From: elder@linaro.org (Alex Elder)
+Date: Wed, 25 Oct 2017 16:53:31 -0500
+Subject: [PATCH 0/3] arm64: defconfig: remove some Qualcomm USB options
+Message-ID: <20171025215334.19004-1-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/25/2017 5:28 PM, Alex Williamson wrote:
->> Previously, we only tried the next reset method if one method failed
->> with -ENOTTY.  With this patch, we'll try the next reset method if one
->> method fails for any reason, not just -ENOTTY.
-> Hmm, I thought the return codes were pretty consistent.  -ENOTTY means
-> that the reset callback doesn't handle the device, move on.  Many
-> ioctls use the same return code to indicate an unknown ioctl.  This
-> allows us to differentiate success vs error vs unhandled.  In the code
-> below we lose the ability to, for instance, have a device specific
-> reset that returns -EINVAL to prevent the PCI core for triggering
-> further reset mechanisms which might be broken on the device.  So, I
-> don't see that this patch specifically fixes anything, but it does
-> remove what seems like useful functionality...  I'd veto it.  Thanks,
-> 
+This series deletes three config options related to USB on Qualcomm
+SoCs from the arm64 "defconfig".  The code enabled by the options is
+no longer needed by any Qualcomm hardware.  
 
-OK, It was not obvious how the EINVAL and ENOTTY used by code inspection.
+					-Alex
 
-Thank your very much for the clarification. I'm dropping the patch unless
-Bjorn has another idea.
+Alex Elder (3):
+  arm64: defconfig: remove CONFIG_USB_EHCI_MSM
+  arm64: defconfig: remove CONFIG_USB_MSM_OTG
+  arm64: defconfig: remove CONFIG_USB_QCOM_8X16_PHY
 
-> Alex
->  
-
+ arch/arm64/configs/defconfig | 3 ---
+ 1 file changed, 3 deletions(-)
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.11.0
