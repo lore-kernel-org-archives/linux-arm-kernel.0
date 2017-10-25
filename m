@@ -1,38 +1,47 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 25 Oct 2017 14:59:13 +0100
-Subject: [PATCH v4 10/20] KVM: arm/arm64: Use separate timer for phys
- timer emulation
-In-Reply-To: <20171020114939.12554-11-christoffer.dall@linaro.org>
- (Christoffer Dall's message of "Fri, 20 Oct 2017 13:49:29 +0200")
-References: <20171020114939.12554-1-christoffer.dall@linaro.org>
- <20171020114939.12554-11-christoffer.dall@linaro.org>
-Message-ID: <867evjcor2.fsf@arm.com>
+From: szabolcs.nagy@arm.com (Szabolcs Nagy)
+Date: Wed, 25 Oct 2017 15:33:32 +0100
+Subject: [RFC PATCH] arm64/sve: ABI change: Zero SVE regs on syscall entry
+In-Reply-To: <20171025125727.GH19485@e103592.cambridge.arm.com>
+References: <1508758664-24186-1-git-send-email-Dave.Martin@arm.com>
+ <1508758664-24186-2-git-send-email-Dave.Martin@arm.com>
+ <87tvypiyg8.fsf@linaro.org>
+ <20171024113805.GF19485@e103592.cambridge.arm.com>
+ <87y3o09tkw.fsf@e105548-lin.cambridge.arm.com>
+ <20171025125727.GH19485@e103592.cambridge.arm.com>
+Message-ID: <59F0A0BC.1090606@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 20 2017 at  1:49:29 pm BST, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> From: Christoffer Dall <cdall@linaro.org>
+On 25/10/17 13:57, Dave Martin wrote:
+> On Tue, Oct 24, 2017 at 09:30:55PM +0100, Richard Sandiford wrote:
+>> I think the uses via libc wrappers should be OK, since the SVE PCS says
+>> that all SVE state is clobbered by normal function calls.  I think we
+>> can be relatively confident that the compilers implement this correctly,
+>> since it's the natural extension of the base AArch64 PCS (which only
+>> preserves the low 64 bits of V8-V15).
+>>
+>> Perhaps one concern would be LTO, since we then rely on the syscall asm
+>> statement having the correct clobber lists.  And at the moment there's
+>> no syntax for saying that a register R is clobbered above X bits.
+>> (Alan's working on a GCC patch that could be reused for this if necessary.)
 >
-> We were using the same hrtimer for emulating the physical timer and for
-> making sure a blocking VCPU thread would be eventually woken up.  That
-> worked fine in the previous arch timer design, but as we are about to
-> actually use the soft timer expire function for the physical timer
-> emulation, change the logic to use a dedicated hrtimer.
+> I wonder whether the lack of a precise clobber will discourage people
+> from writing a correct clobber list for SVCs -- the kernel guarantees to
+> preserve V0-V31, so listing z0-z31 as clobbered would resulting
+> unnecessary spilling of V8-V15[63:0] around SVC (as required by the
+> ARMv8 base PCS).
 >
-> This has the added benefit of not having to cancel any work in the sync
-> path, which in turn allows us to run the flush and sync with IRQs
-> disabled.
->
-> Note that the hrtimer used to program the host kernel's timer to
-> generate an exit from the guest when the emulated physical timer fires
-> never has to inject any work, and to share the soft_timer_cancel()
-> function with the bg_timer, we change the function to only cancel any
-> pending work if the pointer to the work struct is not null.
->
-> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+> If SVC is always in out-of-line asm though, this isn't an issue.  I'm
+> not sure what glibc does.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+glibc assumes that the libc code is not lto'd.
 
-	M.
--- 
-Jazz is not dead. It just smells funny.
+it has syscall asm files as well as inline asm with svc,
+the later does not have magic sve clobber, but it should
+not matter as long as no sve is used in glibc.
+
+gcc runtimes (libstdc++, libgomp, libitm,..) have some
+raw syscalls (mainly futex) but on aarch64 it's a call
+to syscall() in libc, not inline asm.
+
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
