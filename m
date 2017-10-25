@@ -1,134 +1,110 @@
-From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Wed, 25 Oct 2017 19:11:05 +0200
-Subject: [PATCH v2 9/9] ARM: dts: stm32: add support of exti on stm32h743
- pinctrl
-In-Reply-To: <1508951465-17152-1-git-send-email-ludovic.Barre@st.com>
-References: <1508951465-17152-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1508951465-17152-10-git-send-email-ludovic.Barre@st.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 25 Oct 2017 12:23:10 -0500
+Subject: [PATCH 6/8] PCI: host: brcmstb: add MSI capability
+In-Reply-To: <CANCKTBvAqu-godc03BiAt+9hxAoWABLVCtBzaA9ZWLJgXnQ3Fg@mail.gmail.com>
+References: <1508868949-16652-1-git-send-email-jim2101024@gmail.com>
+ <1508868949-16652-7-git-send-email-jim2101024@gmail.com>
+ <5406ab92-c1da-f6fa-083d-82d1027130ea@gmail.com>
+ <CANCKTBvAqu-godc03BiAt+9hxAoWABLVCtBzaA9ZWLJgXnQ3Fg@mail.gmail.com>
+Message-ID: <20171025172310.GN21840@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Barre <ludovic.barre@st.com>
+[+cc Ray, Scott, Jon]
 
-This patch adds support of external interrupt (exti) on
-all gpio ports of stm32h743.
+On Wed, Oct 25, 2017 at 11:28:07AM -0400, Jim Quinlan wrote:
+> On Tue, Oct 24, 2017 at 2:57 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> > Hi Jim,
+> >
+> > On 10/24/2017 11:15 AM, Jim Quinlan wrote:
+> >> This commit adds MSI to the Broadcom STB PCIe host controller. It does
+> >> not add MSIX since that functionality is not in the HW.  The MSI
+> >> controller is physically located within the PCIe block, however, there
+> >> is no reason why the MSI controller could not be moved elsewhere in
+> >> the future.
+> >>
+> >> Since the internal Brcmstb MSI controller is intertwined with the PCIe
+> >> controller, it is not its own platform device but rather part of the
+> >> PCIe platform device.
+> >>
+> >> Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
+> >> ---
+> >>  drivers/pci/host/Kconfig           |  12 ++
+> >>  drivers/pci/host/Makefile          |   1 +
+> >>  drivers/pci/host/pci-brcmstb-msi.c | 318 +++++++++++++++++++++++++++++++++++++
+> >>  drivers/pci/host/pci-brcmstb.c     |  72 +++++++--
+> >>  drivers/pci/host/pci-brcmstb.h     |  26 +++
+> >>  5 files changed, 419 insertions(+), 10 deletions(-)
+> >>  create mode 100644 drivers/pci/host/pci-brcmstb-msi.c
+> >>
+> >> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> >> index b9b4f11..54aa5d2 100644
+> >> --- a/drivers/pci/host/Kconfig
+> >> +++ b/drivers/pci/host/Kconfig
+> >> @@ -228,4 +228,16 @@ config PCI_BRCMSTB
+> >>       default ARCH_BRCMSTB || BMIPS_GENERIC
+> >>       help
+> >>         Adds support for Broadcom Settop Box PCIe host controller.
+> >> +       To compile this driver as a module, choose m here.
+> >> +
+> >> +config PCI_BRCMSTB_MSI
+> >> +     bool "Broadcom Brcmstb PCIe MSI support"
+> >> +     depends on ARCH_BRCMSTB || BMIPS_GENERIC
+> >
+> > This could probably be depends on PCI_BRCMSTB, which would imply these
+> > two conditions. PCI_BRCMSTB_MSI on its own is probably not very useful
+> > without the parent RC driver.
+> >
+> >> +     depends on OF
+> >> +     depends on PCI_MSI
+> >> +     default PCI_BRCMSTB
+> >> +     help
+> >> +       Say Y here if you want to enable MSI support for Broadcom's iProc
+> >> +       PCIe controller
+> >> +
+> >>  endmenu
+> >> diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
+> >> index c283321..1026d6f 100644
+> >> --- a/drivers/pci/host/Makefile
+> >> +++ b/drivers/pci/host/Makefile
+> >> @@ -23,6 +23,7 @@ obj-$(CONFIG_PCIE_TANGO_SMP8759) += pcie-tango.o
+> >>  obj-$(CONFIG_VMD) += vmd.o
+> >>  obj-$(CONFIG_PCI_BRCMSTB) += brcmstb-pci.o
+> >>  brcmstb-pci-objs := pci-brcmstb.o pci-brcmstb-dma.o
+> >> +obj-$(CONFIG_PCI_BRCMSTB_MSI) += pci-brcmstb-msi.o
+> >
+> > Should we combine this file with the brcmstb-pci.o? There is probably no
+> > functional difference, except that pci-brcmstb-msi.ko needs to be loaded
+> > first, right?
+> > --
+> > Florian
+> 
+> If you look at the pci/host/Kconfig you will see that other drivers
+> also have a separate MSI config (eg iproc, altera, xgene) so there is
+> precedent.  The reason that pci-brcmstb-msi.c is its own file is
+> because it depends on an irq function that is not exported.  That is
+> why CONFIG_PCI_BRCMSTB_MSI is bool, and CONFIG_PCI_BRCMSTB is
+> tristate.  -- Jim
 
-Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
----
- arch/arm/boot/dts/stm32h743-pinctrl.dtsi | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+There is precedent, but that doesn't mean I like it :)
+I would strongly prefer one file per driver when possible.
 
-diff --git a/arch/arm/boot/dts/stm32h743-pinctrl.dtsi b/arch/arm/boot/dts/stm32h743-pinctrl.dtsi
-index 76bbd65..df0b441 100644
---- a/arch/arm/boot/dts/stm32h743-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stm32h743-pinctrl.dtsi
-@@ -49,6 +49,8 @@
- 			#size-cells = <1>;
- 			compatible = "st,stm32h743-pinctrl";
- 			ranges = <0 0x58020000 0x3000>;
-+			interrupt-parent = <&exti>;
-+			st,syscfg = <&syscfg 0x8>;
- 			pins-are-numbered;
- 
- 			gpioa: gpio at 58020000 {
-@@ -57,6 +59,8 @@
- 				reg = <0x0 0x400>;
- 				clocks = <&timer_clk>;
- 				st,bank-name = "GPIOA";
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
- 			};
- 
- 			gpiob: gpio at 58020400 {
-@@ -65,6 +69,8 @@
- 				reg = <0x400 0x400>;
- 				clocks = <&timer_clk>;
- 				st,bank-name = "GPIOB";
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
- 			};
- 
- 			gpioc: gpio at 58020800 {
-@@ -73,6 +79,8 @@
- 				reg = <0x800 0x400>;
- 				clocks = <&timer_clk>;
- 				st,bank-name = "GPIOC";
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
- 			};
- 
- 			gpiod: gpio at 58020c00 {
-@@ -81,6 +89,8 @@
- 				reg = <0xc00 0x400>;
- 				clocks = <&timer_clk>;
- 				st,bank-name = "GPIOD";
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
- 			};
- 
- 			gpioe: gpio at 58021000 {
-@@ -89,6 +99,8 @@
- 				reg = <0x1000 0x400>;
- 				clocks = <&timer_clk>;
- 				st,bank-name = "GPIOE";
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
- 			};
- 
- 			gpiof: gpio at 58021400 {
-@@ -97,6 +109,8 @@
- 				reg = <0x1400 0x400>;
- 				clocks = <&timer_clk>;
- 				st,bank-name = "GPIOF";
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
- 			};
- 
- 			gpiog: gpio at 58021800 {
-@@ -105,6 +119,8 @@
- 				reg = <0x1800 0x400>;
- 				clocks = <&timer_clk>;
- 				st,bank-name = "GPIOG";
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
- 			};
- 
- 			gpioh: gpio at 58021c00 {
-@@ -113,6 +129,8 @@
- 				reg = <0x1c00 0x400>;
- 				clocks = <&timer_clk>;
- 				st,bank-name = "GPIOH";
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
- 			};
- 
- 			gpioi: gpio at 58022000 {
-@@ -121,6 +139,8 @@
- 				reg = <0x2000 0x400>;
- 				clocks = <&timer_clk>;
- 				st,bank-name = "GPIOI";
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
- 			};
- 
- 			gpioj: gpio at 58022400 {
-@@ -129,6 +149,8 @@
- 				reg = <0x2400 0x400>;
- 				clocks = <&timer_clk>;
- 				st,bank-name = "GPIOJ";
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
- 			};
- 
- 			gpiok: gpio at 58022800 {
-@@ -137,6 +159,8 @@
- 				reg = <0x2800 0x400>;
- 				clocks = <&timer_clk>;
- 				st,bank-name = "GPIOK";
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
- 			};
- 
- 			usart1_pins: usart1 at 0 {
--- 
-2.7.4
+Take iproc for example.  iproc-msi.c is enabled by a Kconfig bool.  It
+contains a bunch of code with the only external entry points being
+iproc_msi_init() and iproc_msi_exit().  These are only called via
+iproc_pcie_bcma_probe() or iproc_pcie_pltfm_probe(), both of which are
+tristate.  So iproc-msi.c is only compiled if CONFIG_IPROC_BCMA or
+CONFIG_IPROC_PLATFORM are enabled, but all that text is loaded even if
+neither module is loaded, which seems suboptimal.
+
+I don't care if you have several config options to enable the BCMA
+probe and the platform probe (although these could probably be
+replaced in the code by a simple "#ifdef CONFIG_BCMA" and "#ifdef
+CONFIG_OF"), and making CONFIG_PCIE_IPROC tristate so it can be a
+module makes sense.  But I think it would be better to put all the
+code in one file instead of five, and probably remove
+CONFIG_PCIE_IPROC_MSI.  Maybe this requires exporting some IRQ
+function that currently isn't exported.  But that seems like a simpler
+solution than what we currently have.
+
+Bjorn
