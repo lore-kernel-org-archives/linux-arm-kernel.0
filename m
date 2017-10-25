@@ -1,63 +1,60 @@
-From: rsahu@apm.com (Rameshwar Prasad Sahu)
-Date: Wed, 25 Oct 2017 15:52:56 +0530
-Subject: [PATCH] ata: fixes kernel crash while tracing ata_eh_link_autopsy
- event
-Message-ID: <1508926976-11467-1-git-send-email-rsahu@apm.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 25 Oct 2017 16:00:10 +0530
+Subject: [PATCH RESEND] phy: rcar-gen2: Add r8a7743/5 support
+In-Reply-To: <bcfa1e90-c497-ee29-687d-9f9a04ce2d4b@ti.com>
+References: <1507544543-28654-1-git-send-email-biju.das@bp.renesas.com>
+ <bcfa1e90-c497-ee29-687d-9f9a04ce2d4b@ti.com>
+Message-ID: <87211738-8d65-32c0-fb6b-dc2cd395016a@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When tracing ata link error event, the kernel crashes when the disk is
-removed due to NULL pointer access by trace_ata_eh_link_autopsy API.
-This occurs as the dev is NULL when the disk disappeared. Given that
-the trace routine requires only the link info, pass the link info instead
-of passing dev pointer to fix this kernel crash.
 
-Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
----
- drivers/ata/libata-eh.c       |    2 +-
- include/trace/events/libata.h |    9 +++++----
- 2 files changed, 6 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/ata/libata-eh.c b/drivers/ata/libata-eh.c
-index e4effef..ab50e7d 100644
---- a/drivers/ata/libata-eh.c
-+++ b/drivers/ata/libata-eh.c
-@@ -2265,7 +2265,7 @@ static void ata_eh_link_autopsy(struct ata_link *link)
- 			eflags |= ATA_EFLAG_DUBIOUS_XFER;
- 		ehc->i.action |= ata_eh_speed_down(dev, eflags, all_err_mask);
- 	}
--	trace_ata_eh_link_autopsy(dev, ehc->i.action, all_err_mask);
-+	trace_ata_eh_link_autopsy(link, ehc->i.action, all_err_mask);
- 	DPRINTK("EXIT\n");
- }
+On Wednesday 18 October 2017 05:10 PM, Kishon Vijay Abraham I wrote:
+> 
+> 
+> On Monday 09 October 2017 03:52 PM, Biju Das wrote:
+>> Add USB PHY support for r8a7743/5 SoC. Renesas RZ/G1[ME] (R8A7743/5)
+>> USB PHY is identical to the R-Car Gen2 family.
+>>
+>> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+>> Acked-by: Simon Horman <horms+renesas@verge.net.au>
+>> Acked-by: Rob Herring <robh@kernel.org>
+>> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> 
+> merged, thanks!
 
-diff --git a/include/trace/events/libata.h b/include/trace/events/libata.h
-index 2fbbf99..eff035e 100644
---- a/include/trace/events/libata.h
-+++ b/include/trace/events/libata.h
-@@ -276,9 +276,10 @@
+just realized $subject is misleading since this is only dt-binding patch. Do
+you plan to send the driver patch too?
 
- TRACE_EVENT(ata_eh_link_autopsy,
-
--	TP_PROTO(struct ata_device *dev, unsigned int eh_action, unsigned int eh_err_mask),
-+	TP_PROTO(struct ata_link *link, unsigned int eh_action,
-+		 unsigned int eh_err_mask),
-
--	TP_ARGS(dev, eh_action, eh_err_mask),
-+	TP_ARGS(link, eh_action, eh_err_mask),
-
- 	TP_STRUCT__entry(
- 		__field( unsigned int,	ata_port )
-@@ -288,8 +289,8 @@
- 	),
-
- 	TP_fast_assign(
--		__entry->ata_port	= dev->link->ap->print_id;
--		__entry->ata_dev	= dev->link->pmp + dev->devno;
-+		__entry->ata_port	= link->ap->print_id;
-+		__entry->ata_dev	= link->pmp + link->device->devno;
- 		__entry->eh_action	= eh_action;
- 		__entry->eh_err_mask	= eh_err_mask;
- 	),
---
-1.7.1
+Thanks
+Kishon
+> 
+> -Kishon
+>> ---
+>> This patch is tested against Linux next tag next-20170929.
+>>
+>>  Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt | 7 +++++--
+>>  1 file changed, 5 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt b/Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt
+>> index 91da947..eeb9e18 100644
+>> --- a/Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt
+>> +++ b/Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt
+>> @@ -4,10 +4,13 @@ This file provides information on what the device node for the R-Car generation
+>>  2 USB PHY contains.
+>>  
+>>  Required properties:
+>> -- compatible: "renesas,usb-phy-r8a7790" if the device is a part of R8A7790 SoC.
+>> +- compatible: "renesas,usb-phy-r8a7743" if the device is a part of R8A7743 SoC.
+>> +	      "renesas,usb-phy-r8a7745" if the device is a part of R8A7745 SoC.
+>> +	      "renesas,usb-phy-r8a7790" if the device is a part of R8A7790 SoC.
+>>  	      "renesas,usb-phy-r8a7791" if the device is a part of R8A7791 SoC.
+>>  	      "renesas,usb-phy-r8a7794" if the device is a part of R8A7794 SoC.
+>> -	      "renesas,rcar-gen2-usb-phy" for a generic R-Car Gen2 compatible device.
+>> +	      "renesas,rcar-gen2-usb-phy" for a generic R-Car Gen2 or
+>> +					  RZ/G1 compatible device.
+>>  
+>>  	      When compatible with the generic version, nodes must list the
+>>  	      SoC-specific version corresponding to the platform first
+>>
