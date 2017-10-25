@@ -1,47 +1,79 @@
-From: szabolcs.nagy@arm.com (Szabolcs Nagy)
-Date: Wed, 25 Oct 2017 15:33:32 +0100
-Subject: [RFC PATCH] arm64/sve: ABI change: Zero SVE regs on syscall entry
-In-Reply-To: <20171025125727.GH19485@e103592.cambridge.arm.com>
-References: <1508758664-24186-1-git-send-email-Dave.Martin@arm.com>
- <1508758664-24186-2-git-send-email-Dave.Martin@arm.com>
- <87tvypiyg8.fsf@linaro.org>
- <20171024113805.GF19485@e103592.cambridge.arm.com>
- <87y3o09tkw.fsf@e105548-lin.cambridge.arm.com>
- <20171025125727.GH19485@e103592.cambridge.arm.com>
-Message-ID: <59F0A0BC.1090606@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 25 Oct 2017 15:36:21 +0100
+Subject: [PATCH v4 14/20] KVM: arm/arm64: Avoid timer save/restore in vcpu
+ entry/exit
+In-Reply-To: <20171020114939.12554-15-christoffer.dall@linaro.org>
+ (Christoffer Dall's message of "Fri, 20 Oct 2017 13:49:33 +0200")
+References: <20171020114939.12554-1-christoffer.dall@linaro.org>
+ <20171020114939.12554-15-christoffer.dall@linaro.org>
+Message-ID: <863767cn16.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/10/17 13:57, Dave Martin wrote:
-> On Tue, Oct 24, 2017 at 09:30:55PM +0100, Richard Sandiford wrote:
->> I think the uses via libc wrappers should be OK, since the SVE PCS says
->> that all SVE state is clobbered by normal function calls.  I think we
->> can be relatively confident that the compilers implement this correctly,
->> since it's the natural extension of the base AArch64 PCS (which only
->> preserves the low 64 bits of V8-V15).
->>
->> Perhaps one concern would be LTO, since we then rely on the syscall asm
->> statement having the correct clobber lists.  And at the moment there's
->> no syntax for saying that a register R is clobbered above X bits.
->> (Alan's working on a GCC patch that could be reused for this if necessary.)
+On Fri, Oct 20 2017 at  1:49:33 pm BST, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> From: Christoffer Dall <cdall@linaro.org>
 >
-> I wonder whether the lack of a precise clobber will discourage people
-> from writing a correct clobber list for SVCs -- the kernel guarantees to
-> preserve V0-V31, so listing z0-z31 as clobbered would resulting
-> unnecessary spilling of V8-V15[63:0] around SVC (as required by the
-> ARMv8 base PCS).
+> We don't need to save and restore the hardware timer state and examine
+> if it generates interrupts on on every entry/exit to the guest.  The
+> timer hardware is perfectly capable of telling us when it has expired
+> by signaling interrupts.
 >
-> If SVC is always in out-of-line asm though, this isn't an issue.  I'm
-> not sure what glibc does.
+> When taking a vtimer interrupt in the host, we don't want to mess with
+> the timer configuration, we just want to forward the physical interrupt
+> to the guest as a virtual interrupt.  We can use the split priority drop
+> and deactivate feature of the GIC to do this, which leaves an EOI'ed
+> interrupt active on the physical distributor, making sure we don't keep
+> taking timer interrupts which would prevent the guest from running.  We
+> can then forward the physical interrupt to the VM using the HW bit in
+> the LR of the GIC, like we do already, which lets the guest directly
+> deactivate both the physical and virtual timer simultaneously, allowing
+> the timer hardware to exit the VM and generate a new physical interrupt
+> when the timer output is again asserted later on.
+>
+> We do need to capture this state when migrating VCPUs between physical
+> CPUs, however, which we use the vcpu put/load functions for, which are
+> called through preempt notifiers whenever the thread is scheduled away
+> from the CPU or called directly if we return from the ioctl to
+> userspace.
+>
+> One caveat is that we have to save and restore the timer state in both
+> kvm_timer_vcpu_[put/load] and kvm_timer_[schedule/unschedule], because
+> we can have the following flows:
+>
+>   1. kvm_vcpu_block
+>   2. kvm_timer_schedule
+>   3. schedule
+>   4. kvm_timer_vcpu_put (preempt notifier)
+>   5. schedule (vcpu thread gets scheduled back)
+>   6. kvm_timer_vcpu_load (preempt notifier)
+>   7. kvm_timer_unschedule
+>
+> And a version where we don't actually call schedule:
+>
+>   1. kvm_vcpu_block
+>   2. kvm_timer_schedule
+>   7. kvm_timer_unschedule
+>
+> Since kvm_timer_[schedule/unschedule] may not be followed by put/load,
+> but put/load also may be called independently, we call the timer
+> save/restore functions from both paths.  Since they rely on the loaded
+> flag to never save/restore when unnecessary, this doesn't cause any
+> harm, and we ensure that all invokations of either set of functions work
+> as intended.
+>
+> An added benefit beyond not having to read and write the timer sysregs
+> on every entry and exit is that we no longer have to actively write the
+> active state to the physical distributor, because we configured the
+> irq for the vtimer to only get a priority drop when handling the
+> interrupt in the GIC driver (we called irq_set_vcpu_affinity()), and
+> the interrupt stays active after firing on the host.
+>
+> Signed-off-by: Christoffer Dall <cdall@linaro.org>
 
-glibc assumes that the libc code is not lto'd.
+That was a pretty interesting read! :-)
 
-it has syscall asm files as well as inline asm with svc,
-the later does not have magic sve clobber, but it should
-not matter as long as no sve is used in glibc.
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-gcc runtimes (libstdc++, libgomp, libitm,..) have some
-raw syscalls (mainly futex) but on aarch64 it's a call
-to syscall() in libc, not inline asm.
-
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+	M.
+-- 
+Jazz is not dead. It just smells funny.
