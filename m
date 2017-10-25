@@ -1,46 +1,24 @@
-From: chen.zhong@mediatek.com (Chen Zhong)
-Date: Wed, 25 Oct 2017 21:16:02 +0800
-Subject: [PATCH v6 4/6] dt-bindings: mfd: Add bindings for the keys as subnode
- of PMIC
-In-Reply-To: <1508937364-30054-1-git-send-email-chen.zhong@mediatek.com>
-References: <1508937364-30054-1-git-send-email-chen.zhong@mediatek.com>
-Message-ID: <1508937364-30054-5-git-send-email-chen.zhong@mediatek.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 25 Oct 2017 14:41:16 +0100
+Subject: [PATCH v4 02/20] arm64: Implement arch_counter_get_cntpct to read
+ the physical counter
+In-Reply-To: <20171020114939.12554-3-christoffer.dall@linaro.org> (Christoffer
+ Dall's message of "Fri, 20 Oct 2017 13:49:21 +0200")
+References: <20171020114939.12554-1-christoffer.dall@linaro.org>
+ <20171020114939.12554-3-christoffer.dall@linaro.org>
+Message-ID: <86she7cpkz.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation for device tree bindings for keys support
-as the subnode of MT6397/MT6323 PMIC.
+On Fri, Oct 20 2017 at  1:49:21 pm BST, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> As we are about to use the physical counter on arm64 systems that have
+> KVM support, implement arch_counter_get_cntpct() and the associated
+> errata workaround functionality for stable timer reads.
+>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-Acked-by: Rob Herring <robh@kernel.org>
-Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
----
- Documentation/devicetree/bindings/mfd/mt6397.txt |    6 ++++++
- 1 file changed, 6 insertions(+)
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-diff --git a/Documentation/devicetree/bindings/mfd/mt6397.txt b/Documentation/devicetree/bindings/mfd/mt6397.txt
-index 522a3bb..d1df77f 100644
---- a/Documentation/devicetree/bindings/mfd/mt6397.txt
-+++ b/Documentation/devicetree/bindings/mfd/mt6397.txt
-@@ -7,6 +7,7 @@ MT6397/MT6323 is a multifunction device with the following sub modules:
- - GPIO
- - Clock
- - LED
-+- Keys
- 
- It is interfaced to host controller using SPI interface by a proprietary hardware
- called PMIC wrapper or pwrap. MT6397/MT6323 MFD is a child device of pwrap.
-@@ -40,6 +41,11 @@ Optional subnodes:
- 		- compatible: "mediatek,mt6323-led"
- 	see Documentation/devicetree/bindings/leds/leds-mt6323.txt
- 
-+- keys
-+	Required properties:
-+		- compatible: "mediatek,mt6397-keys" or "mediatek,mt6323-keys"
-+	see Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
-+
- Example:
- 	pwrap: pwrap at 1000f000 {
- 		compatible = "mediatek,mt8135-pwrap";
+	M.
 -- 
-1.7.9.5
+Jazz is not dead. It just smells funny.
