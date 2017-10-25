@@ -1,57 +1,70 @@
-From: marco.franchi@nxp.com (Marco Franchi)
-Date: Wed, 25 Oct 2017 13:40:42 -0200
-Subject: [PATCH v4] ARM: dts: imx53-tx53: Fix 'ethernet-phy@0' node with unit
- name and no reg property
-Message-ID: <1508946042-17671-1-git-send-email-marco.franchi@nxp.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 25 Oct 2017 16:45:37 +0100
+Subject: [1/2] drivers: firmware: psci: Add psci_is_available()
+In-Reply-To: <1507708982-12336-2-git-send-email-geert+renesas@glider.be>
+References: <1507708982-12336-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <20171025154537.GA7829@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following build warning is seen with W=1:
+On Wed, Oct 11, 2017 at 10:03:01AM +0200, Geert Uytterhoeven wrote:
+> PSCI support may be disabled at build time (by configuration) or at
+> run-time (PSCI firmware not present).  While CONFIG_ARM_PSCI_FW can be
+> used to check for build time enablement, there is currently no simple
+> way to check if PSCI is actually available and used.
+> 
+> Hence add a helper function to check if PSCI is available.
 
-Warning (unit_address_vs_reg): Node /soc/aips at 60000000/ethernet at 63fec000/ethernet-phy at 0 has a unit name, but no reg property
+Hi Geert,
 
-Fix this warning by adding reg property from such node and, consequently, 
-by adding the 'address-cells' and 'size-cells' values to the fec node to 
-avoid the warnings below:
+excuse us the delay in responding. I think it would be better if the
+check just carries out a DT/ACPI matching check rather than being based
+on PSCI ops initialization but before doing that I would like first to
+understand what this function can be actually used for (ie I do not
+think the usage in the PSCI checker is relevant to this discussion).
 
-Warning (reg_format): "reg" property in /soc/aips at 60000000/ethernet at 63fec000/ethernet-phy at 0 has invalid length (4 bytes) (#address-cells == 2, #size-cells == 1)
-Warning (avoid_default_addr_size): Relying on default #address-cells value for /soc/aips at 60000000/ethernet at 63fec000/ethernet-phy at 0
-Warning (avoid_default_addr_size): Relying on default #size-cells value for /soc/aips at 60000000/ethernet at 63fec000/ethernet-phy at 0
+Thanks,
+Lorenzo
 
-Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
----
-Change since v3:
--remove from a group of patches
--add 'address-cells' and 'size-cells' values to the fec node
--change message log
- arch/arm/boot/dts/imx53-tx53.dtsi | 1 +
- arch/arm/boot/dts/imx53.dtsi      | 2 ++
- 2 files changed, 3 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx53-tx53.dtsi b/arch/arm/boot/dts/imx53-tx53.dtsi
-index 71b58b6..655d51a 100644
---- a/arch/arm/boot/dts/imx53-tx53.dtsi
-+++ b/arch/arm/boot/dts/imx53-tx53.dtsi
-@@ -226,6 +226,7 @@
- 	status = "okay";
- 
- 	phy0: ethernet-phy at 0 {
-+		reg = <0>;
- 		interrupt-parent = <&gpio2>;
- 		interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
- 		device_type = "ethernet-phy";
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index c937949..be487b1 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -770,6 +770,8 @@
- 			};
- 
- 			fec: ethernet at 63fec000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				compatible = "fsl,imx53-fec", "fsl,imx25-fec";
- 				reg = <0x63fec000 0x4000>;
- 				interrupts = <87>;
--- 
-2.7.4
+> This is useful for e.g. drivers that are used on platforms with and
+> without PSCI.  Such drivers may need to take provisions for proper
+> operation when PSCI is used, and/or to implement functionality that is
+> usually provided by PSCI.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+>  drivers/firmware/psci.c | 5 +++++
+>  include/linux/psci.h    | 2 ++
+>  2 files changed, 7 insertions(+)
+> 
+> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+> index da469c972b503f83..a3a11e2d8ffffaaa 100644
+> --- a/drivers/firmware/psci.c
+> +++ b/drivers/firmware/psci.c
+> @@ -670,6 +670,11 @@ int __init psci_dt_init(void)
+>  	return init_fn(np);
+>  }
+>  
+> +bool psci_is_available(void)
+> +{
+> +	return psci_ops.cpu_off && psci_ops.cpu_on && psci_ops.cpu_suspend;
+> +}
+> +
+>  #ifdef CONFIG_ACPI
+>  /*
+>   * We use PSCI 0.2+ when ACPI is deployed on ARM64 and it's
+> diff --git a/include/linux/psci.h b/include/linux/psci.h
+> index bdea1cb5e1db142b..2bdee325aeb80cf6 100644
+> --- a/include/linux/psci.h
+> +++ b/include/linux/psci.h
+> @@ -39,8 +39,10 @@ extern struct psci_operations psci_ops;
+>  
+>  #if defined(CONFIG_ARM_PSCI_FW)
+>  int __init psci_dt_init(void);
+> +bool psci_is_available(void);
+>  #else
+>  static inline int psci_dt_init(void) { return 0; }
+> +static inline bool psci_is_available(void) { return false; }
+>  #endif
+>  
+>  #if defined(CONFIG_ARM_PSCI_FW) && defined(CONFIG_ACPI)
