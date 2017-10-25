@@ -1,20 +1,27 @@
 From: andy.gross@linaro.org (Andy Gross)
-Date: Wed, 25 Oct 2017 09:01:37 +0200
-Subject: [PATCH 3/3] arm64: defconfig: remove CONFIG_USB_QCOM_8X16_PHY
-In-Reply-To: <20171020172021.8119-4-elder@linaro.org>
+Date: Wed, 25 Oct 2017 09:02:53 +0200
+Subject: [PATCH 0/3] arm64: remove some unused defconfig options
+In-Reply-To: <20171025002019.GC30645@codeaurora.org>
 References: <20171020172021.8119-1-elder@linaro.org>
- <20171020172021.8119-4-elder@linaro.org>
-Message-ID: <20171025070137.GC28555@hector>
+ <20171025002019.GC30645@codeaurora.org>
+Message-ID: <20171025070253.GD28555@hector>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 20, 2017 at 12:20:21PM -0500, Alex Elder wrote:
-> No Qualcomm SoC requires the "phy-qcom-8x16-usb.c" USB phy driver
-> support any more.  Remove the code, and remove the config option
-> from the arm64 defconfig.
+On Tue, Oct 24, 2017 at 05:20:20PM -0700, Stephen Boyd wrote:
+> On 10/20, Alex Elder wrote:
+> > This series deletes three config options related to USB on Qualcomm
+> > SoCs from the arm64 "defconfig", along with the code that they
+> > enable.  The code is no longer needed by any Qualcomm hardware.  
+> > 
+> > 					-Alex
+> > 
+> > Alex Elder (3):
+> >   arm64: defconfig: remove CONFIG_USB_EHCI_MSM
+> >   arm64: defconfig: remove CONFIG_USB_MSM_OTG
+> >   arm64: defconfig: remove CONFIG_USB_QCOM_8X16_PHY
 > 
-> Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
-> Signed-off-by: Alex Elder <elder@linaro.org>
-> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+> As I said off-list, I would split this into defconfig for arm-soc
+> and drivers/usb for usb subsystem to pick up.
 
-Acked-by: Andy Gross <andy.gross@linaro.org>
+I agree with splitting.  But carry my ACKs when you do.
