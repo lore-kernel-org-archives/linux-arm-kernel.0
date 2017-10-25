@@ -1,64 +1,214 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 25 Oct 2017 15:43:21 +0100
-Subject: [PATCH v4 10/13] firmware: arm_sdei: Add support for CPU and
- system power states
-In-Reply-To: <59EF799B.4040802@arm.com>
-References: <20171017174432.1684-1-james.morse@arm.com>
- <20171017174432.1684-11-james.morse@arm.com>
- <20171018171747.GI21820@arm.com> <59EF799B.4040802@arm.com>
-Message-ID: <20171025144320.GC17881@arm.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Wed, 25 Oct 2017 16:44:43 +0200
+Subject: [PATCH v4 02/26] KVM: arm/arm64: vgic: restructure
+ kvm_vgic_(un)map_phys_irq
+In-Reply-To: <20171006153401.5481-3-marc.zyngier@arm.com>
+References: <20171006153401.5481-1-marc.zyngier@arm.com>
+ <20171006153401.5481-3-marc.zyngier@arm.com>
+Message-ID: <20171025144443.GH91785@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 24, 2017 at 06:34:19PM +0100, James Morse wrote:
-> Hi Will,
+On Fri, Oct 06, 2017 at 04:33:37PM +0100, Marc Zyngier wrote:
+> From: Eric Auger <eric.auger@redhat.com>
 > 
-> On 18/10/17 18:17, Will Deacon wrote:
-> > On Tue, Oct 17, 2017 at 06:44:29PM +0100, James Morse wrote:
-> >> When a CPU enters an idle lower-power state or is powering off, we
-> >> need to mask SDE events so that no events can be delivered while we
-> >> are messing with the MMU as the registered entry points won't be valid.
-> >>
-> >> If the system reboots, we want to unregister all events and mask the CPUs.
-> >> For kexec this allows us to hand a clean slate to the next kernel
-> >> instead of relying on it to call sdei_{private,system}_data_reset().
-> >>
-> >> For hibernate we unregister all events and re-register them on restore,
-> >> in case we restored with the SDE code loaded at a different address.
-> >> (e.g. KASLR).
-> >>
-> >> Add all the notifiers necessary to do this. We only support shared events
-> >> so all events are left registered and enabled over CPU hotplug.
+> We want to reuse the core of the map/unmap functions for IRQ
+> forwarding. Let's move the computation of the hwirq in
+> kvm_vgic_map_phys_irq and pass the linux IRQ as parameter.
+> the host_irq is added to struct vgic_irq.
 > 
-> >>  static void sdei_smccc_smc(unsigned long function_id,
-> >>  			   unsigned long arg0, unsigned long arg1,
-> >>  			   unsigned long arg2, unsigned long arg3,
-> >> @@ -544,9 +742,36 @@ static int sdei_probe(struct platform_device *pdev)
-> >>  		return 0;
-> >>  	}
-> >>  
-> >> +	err = cpuhp_setup_state_nocalls(CPUHP_AP_ARM_SDEI_STARTING, "SDEI",
-> >> +				&sdei_cpuhp_up, &sdei_cpuhp_down);
-> >> +	if (err) {
-> >> +		pr_warn("Failed to register CPU hotplug notifier...\n");
-> >> +		return err;
-> >> +	}
-> > 
-> > What prevents CPU hotplug events coming in here?
+> We introduce kvm_vgic_map/unmap_irq which take a struct vgic_irq
+> handle as a parameter.
 > 
-> Nothing, but what would trigger them? This is after the arch code has brought up
-> secondaries, but before user space is running.
 
-But as we recently discovered (ae2e972dae3c), userspace can be running
-really early due to an initrd and I don't think that necessarily rules out
-hotplug operations.
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-> No events are registered by this point, so all that could go wrong is a
-> freshly-arrived CPU is unmasked, then this probe method fails and assumes it
-> left cores masked. If you think its possible I can post a patch to bolt it down
-> some more.
+Marc,
+  I need a signed-off-by from you on this patch.
 
-If the race is benign, could you avoid using the _nocalls registration
-function and drop the subsequent IPI?
+Thanks,
+-Christoffer
 
-Will
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> ---
+>  include/kvm/arm_vgic.h    |  8 ++++---
+>  virt/kvm/arm/arch_timer.c | 24 +------------------
+>  virt/kvm/arm/vgic/vgic.c  | 60 +++++++++++++++++++++++++++++++++++------------
+>  3 files changed, 51 insertions(+), 41 deletions(-)
+> 
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index 34dba516ef24..53f631bdec75 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -116,6 +116,7 @@ struct vgic_irq {
+>  	bool hw;			/* Tied to HW IRQ */
+>  	struct kref refcount;		/* Used for LPIs */
+>  	u32 hwintid;			/* HW INTID number */
+> +	unsigned int host_irq;		/* linux irq corresponding to hwintid */
+>  	union {
+>  		u8 targets;			/* GICv2 target VCPUs mask */
+>  		u32 mpidr;			/* GICv3 target VCPU */
+> @@ -307,9 +308,10 @@ void kvm_vgic_init_cpu_hardware(void);
+>  
+>  int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+>  			bool level, void *owner);
+> -int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, u32 virt_irq, u32 phys_irq);
+> -int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq);
+> -bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
+> +int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
+> +			  u32 vintid);
+> +int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int vintid);
+> +bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int vintid);
+>  
+>  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+>  
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index 8e89d63005c7..b24e2f7b363a 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -647,9 +647,6 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
+>  {
+>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+>  	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+> -	struct irq_desc *desc;
+> -	struct irq_data *data;
+> -	int phys_irq;
+>  	int ret;
+>  
+>  	if (timer->enabled)
+> @@ -667,26 +664,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
+>  		return -EINVAL;
+>  	}
+>  
+> -	/*
+> -	 * Find the physical IRQ number corresponding to the host_vtimer_irq
+> -	 */
+> -	desc = irq_to_desc(host_vtimer_irq);
+> -	if (!desc) {
+> -		kvm_err("%s: no interrupt descriptor\n", __func__);
+> -		return -EINVAL;
+> -	}
+> -
+> -	data = irq_desc_get_irq_data(desc);
+> -	while (data->parent_data)
+> -		data = data->parent_data;
+> -
+> -	phys_irq = data->hwirq;
+> -
+> -	/*
+> -	 * Tell the VGIC that the virtual interrupt is tied to a
+> -	 * physical interrupt. We do that once per VCPU.
+> -	 */
+> -	ret = kvm_vgic_map_phys_irq(vcpu, vtimer->irq.irq, phys_irq);
+> +	ret = kvm_vgic_map_phys_irq(vcpu, host_vtimer_irq, vtimer->irq.irq);
+>  	if (ret)
+>  		return ret;
+>  
+> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+> index fed717e07938..9d557efd1f7d 100644
+> --- a/virt/kvm/arm/vgic/vgic.c
+> +++ b/virt/kvm/arm/vgic/vgic.c
+> @@ -17,6 +17,8 @@
+>  #include <linux/kvm.h>
+>  #include <linux/kvm_host.h>
+>  #include <linux/list_sort.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/irq.h>
+>  
+>  #include "vgic.h"
+>  
+> @@ -403,38 +405,66 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+>  	return 0;
+>  }
+>  
+> -int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, u32 virt_irq, u32 phys_irq)
+> +/* @irq->irq_lock must be held */
+> +static int kvm_vgic_map_irq(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
+> +			    unsigned int host_irq)
+>  {
+> -	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
+> +	struct irq_desc *desc;
+> +	struct irq_data *data;
+>  
+> -	BUG_ON(!irq);
+> -
+> -	spin_lock(&irq->irq_lock);
+> +	/*
+> +	 * Find the physical IRQ number corresponding to @host_irq
+> +	 */
+> +	desc = irq_to_desc(host_irq);
+> +	if (!desc) {
+> +		kvm_err("%s: no interrupt descriptor\n", __func__);
+> +		return -EINVAL;
+> +	}
+> +	data = irq_desc_get_irq_data(desc);
+> +	while (data->parent_data)
+> +		data = data->parent_data;
+>  
+>  	irq->hw = true;
+> -	irq->hwintid = phys_irq;
+> +	irq->host_irq = host_irq;
+> +	irq->hwintid = data->hwirq;
+> +	return 0;
+> +}
+> +
+> +/* @irq->irq_lock must be held */
+> +static inline void kvm_vgic_unmap_irq(struct vgic_irq *irq)
+> +{
+> +	irq->hw = false;
+> +	irq->hwintid = 0;
+> +}
+> +
+> +int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
+> +			  u32 vintid)
+> +{
+> +	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
+> +	int ret;
+>  
+> +	BUG_ON(!irq);
+> +
+> +	spin_lock(&irq->irq_lock);
+> +	ret = kvm_vgic_map_irq(vcpu, irq, host_irq);
+>  	spin_unlock(&irq->irq_lock);
+>  	vgic_put_irq(vcpu->kvm, irq);
+>  
+> -	return 0;
+> +	return ret;
+>  }
+>  
+> -int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq)
+> +int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int vintid)
+>  {
+>  	struct vgic_irq *irq;
+>  
+>  	if (!vgic_initialized(vcpu->kvm))
+>  		return -EAGAIN;
+>  
+> -	irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
+> +	irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
+>  	BUG_ON(!irq);
+>  
+>  	spin_lock(&irq->irq_lock);
+> -
+> -	irq->hw = false;
+> -	irq->hwintid = 0;
+> -
+> +	kvm_vgic_unmap_irq(irq);
+>  	spin_unlock(&irq->irq_lock);
+>  	vgic_put_irq(vcpu->kvm, irq);
+>  
+> @@ -772,9 +802,9 @@ void vgic_kick_vcpus(struct kvm *kvm)
+>  	}
+>  }
+>  
+> -bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq)
+> +bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int vintid)
+>  {
+> -	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
+> +	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
+>  	bool map_is_active;
+>  
+>  	spin_lock(&irq->irq_lock);
+> -- 
+> 2.14.1
+> 
