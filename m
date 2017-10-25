@@ -1,71 +1,63 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 25 Oct 2017 03:21:24 -0700
-Subject: [PATCH] ARM: footbridge: Convert timers to use timer_setup()
-Message-ID: <20171025102124.GA145647@beast>
+From: rsahu@apm.com (Rameshwar Prasad Sahu)
+Date: Wed, 25 Oct 2017 15:52:56 +0530
+Subject: [PATCH] ata: fixes kernel crash while tracing ata_eh_link_autopsy
+ event
+Message-ID: <1508926976-11467-1-git-send-email-rsahu@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for unconditionally passing the struct timer_list pointer to
-all timer callbacks, switch to using the new timer_setup() and from_timer()
-to pass the timer pointer explicitly.
+When tracing ata link error event, the kernel crashes when the disk is
+removed due to NULL pointer access by trace_ata_eh_link_autopsy API.
+This occurs as the dev is NULL when the disk disappeared. Given that
+the trace routine requires only the link info, pass the link info instead
+of passing dev pointer to fix this kernel crash.
 
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Kees Cook <keescook@chromium.org>
+Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
 ---
- arch/arm/mach-footbridge/dc21285.c | 26 ++++++++------------------
- 1 file changed, 8 insertions(+), 18 deletions(-)
+ drivers/ata/libata-eh.c       |    2 +-
+ include/trace/events/libata.h |    9 +++++----
+ 2 files changed, 6 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-footbridge/dc21285.c b/arch/arm/mach-footbridge/dc21285.c
-index 96a3d73ef4bf..8407e4a07c77 100644
---- a/arch/arm/mach-footbridge/dc21285.c
-+++ b/arch/arm/mach-footbridge/dc21285.c
-@@ -136,19 +136,14 @@ struct pci_ops dc21285_ops = {
- static struct timer_list serr_timer;
- static struct timer_list perr_timer;
- 
--static void dc21285_enable_error(unsigned long __data)
-+static void dc21285_enable_error(struct timer_list *timer)
- {
--	switch (__data) {
--	case IRQ_PCI_SERR:
--		del_timer(&serr_timer);
--		break;
--
--	case IRQ_PCI_PERR:
--		del_timer(&perr_timer);
--		break;
--	}
-+	del_timer(timer);
- 
--	enable_irq(__data);
-+	if (timer == &serr_timer)
-+		enable_irq(IRQ_PCI_SERR)
-+	else if (timer == &perr_timer)
-+		enable_irq(IRQ_PCI_PERR);
- }
- 
- /*
-@@ -323,13 +318,8 @@ void __init dc21285_preinit(void)
- 		*CSR_PCICMD = (*CSR_PCICMD & 0xffff) | PCICMD_ERROR_BITS;
+diff --git a/drivers/ata/libata-eh.c b/drivers/ata/libata-eh.c
+index e4effef..ab50e7d 100644
+--- a/drivers/ata/libata-eh.c
++++ b/drivers/ata/libata-eh.c
+@@ -2265,7 +2265,7 @@ static void ata_eh_link_autopsy(struct ata_link *link)
+ 			eflags |= ATA_EFLAG_DUBIOUS_XFER;
+ 		ehc->i.action |= ata_eh_speed_down(dev, eflags, all_err_mask);
  	}
- 
--	init_timer(&serr_timer);
--	init_timer(&perr_timer);
--
--	serr_timer.data = IRQ_PCI_SERR;
--	serr_timer.function = dc21285_enable_error;
--	perr_timer.data = IRQ_PCI_PERR;
--	perr_timer.function = dc21285_enable_error;
-+	timer_setup(&serr_timer, dc21285_enable_error, 0);
-+	timer_setup(&perr_timer, dc21285_enable_error, 0);
- 
- 	/*
- 	 * We don't care if these fail.
--- 
-2.7.4
+-	trace_ata_eh_link_autopsy(dev, ehc->i.action, all_err_mask);
++	trace_ata_eh_link_autopsy(link, ehc->i.action, all_err_mask);
+ 	DPRINTK("EXIT\n");
+ }
 
+diff --git a/include/trace/events/libata.h b/include/trace/events/libata.h
+index 2fbbf99..eff035e 100644
+--- a/include/trace/events/libata.h
++++ b/include/trace/events/libata.h
+@@ -276,9 +276,10 @@
 
--- 
-Kees Cook
-Pixel Security
+ TRACE_EVENT(ata_eh_link_autopsy,
+
+-	TP_PROTO(struct ata_device *dev, unsigned int eh_action, unsigned int eh_err_mask),
++	TP_PROTO(struct ata_link *link, unsigned int eh_action,
++		 unsigned int eh_err_mask),
+
+-	TP_ARGS(dev, eh_action, eh_err_mask),
++	TP_ARGS(link, eh_action, eh_err_mask),
+
+ 	TP_STRUCT__entry(
+ 		__field( unsigned int,	ata_port )
+@@ -288,8 +289,8 @@
+ 	),
+
+ 	TP_fast_assign(
+-		__entry->ata_port	= dev->link->ap->print_id;
+-		__entry->ata_dev	= dev->link->pmp + dev->devno;
++		__entry->ata_port	= link->ap->print_id;
++		__entry->ata_dev	= link->pmp + link->device->devno;
+ 		__entry->eh_action	= eh_action;
+ 		__entry->eh_err_mask	= eh_err_mask;
+ 	),
+--
+1.7.1
