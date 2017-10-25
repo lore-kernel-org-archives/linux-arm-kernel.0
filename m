@@ -1,120 +1,59 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 25 Oct 2017 18:42:55 +0100
-Subject: [PATCH v6 6/7] KVM: arm64: allow get exception information from
- userspace
-In-Reply-To: <0184EA26B2509940AA629AE1405DD7F2016BAC2B@DGGEMA503-MBX.china.huawei.com>
-References: <0184EA26B2509940AA629AE1405DD7F2016BA9E4@DGGEMA503-MBX.china.huawei.com>
- <0184EA26B2509940AA629AE1405DD7F2016BAC2B@DGGEMA503-MBX.china.huawei.com>
-Message-ID: <59F0CD1F.9070201@arm.com>
+From: ashok.raj@intel.com (Raj, Ashok)
+Date: Wed, 25 Oct 2017 11:05:47 -0700
+Subject: [RFCv2 PATCH 01/36] iommu: Keep track of processes and PASIDs
+In-Reply-To: <7aaf9851-9546-f34d-1496-cbeea404abbd@arm.com>
+References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
+ <20171006133203.22803-2-jean-philippe.brucker@arm.com>
+ <A2975661238FB949B60364EF0F2C257439AFD88A@SHSMSX104.ccr.corp.intel.com>
+ <7aaf9851-9546-f34d-1496-cbeea404abbd@arm.com>
+Message-ID: <20171025180546.GA12356@otc-nc-03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi gengdongjiu,
+Hi Jean
 
-On 20/10/17 16:33, gengdongjiu wrote:
-> As we discuss below solution:
-> When guest happen SEA/SEI, KVM calls memory_failure() to send an asynchronous SIGBUS
-> signal(BUS_MCEERR_AO) to QEMU, and make this address to poisoned.
-> after QEMU receive this BUS_MCEERR_AO, it will record this address to CPER and notify guest.
-> When guest happen stage2 page fault, KVM send a synchronous SIGBUS
-> BUS_MCEERR_AR to QEMU, and QEMU also record CPER and immediately inject SEA abort.
+On Mon, Oct 23, 2017 at 01:17:07PM +0100, Jean-Philippe Brucker wrote:
+> On 23/10/17 12:04, Liu, Yi L wrote:
+> >> +	idr_preload(GFP_KERNEL);
+> >> +	spin_lock(&iommu_process_lock);
+> >> +	pasid = idr_alloc_cyclic(&iommu_process_idr, process, domain->min_pasid,
+> >> +				 domain->max_pasid + 1, GFP_ATOMIC);
+> >> +	process->pasid = pasid;
+> > 
+> > [Liu, Yi L] If I'm understanding well, here is managing the pasid allocation in iommu
+> > layer instead of vendor iommu driver? Is there strong reason here? I think pasid
+> > management may be better within vendor iommu driver as pasid management
+> > could differ from vendor to vendor.
 > 
-> But this solution, still have some problems.
+> But that's the thing, we're trying to abstract PASID and process
+> management to have it in the core, because there shouldn't be many
+> differences from vendor to vendor. This way we have the allocation code in
+> one place and vendor drivers don't have to copy paste it from other drivers.
+
+I think this makes sense for the native case and also in the vIOMMU
+if the PASID tables and allocation are completely managed by the guest.
+
+If the vIOMMU requires any co-ordination in how the PASID's are allocated
+for guest devices there might need to be some control on how these are 
+allocated that ultimately need to be managed by VMM/Physical IOMMU. For 
+instance if the PASID space is sparse for e.g
+
+if we make the PASID allocation as one of the ops, the IOMMU implementation
+will choose the default function, or if it choose a differnt mechanism it would
+have that flexibility.
+
+Does this make sense?
+
+Cheers,
+Ashok
+
 > 
-> 1. In some situation, For RAS, when happen SEA, hardware cannot provide an error physical
-> address
-
-Eh? For any RAS error you should get a physical address in ERR<n>ADDR.
-
-When you get an external abort due to RAS you can scan these nodes to find which
-one generated the error and collect the component information.
-Doing this in firmware is better because firmware knows the SoC topology, so it
-can skip the nodes it knows won't be relevant to an error on this CPU.
-
-
-> to software instead it can only provide virtual address in FAR_ELx, 
-> This is to say, firmware cannot provide physical error address, but provided the virtual
-> address in the FAR_ELx. so BIOS cannot record this address to APEI table. In
-
-Nit: APEI table, you mean recorded as CPER records in a buffer pointed to by a
-GHES's ErrorStatusAddress. APEI tables aren't parsed post boot.
-
-
-> this case, when firmware Jump to hypervisor, hypervisor cannot call
-> memory_failure(), now only the physical address is recorded and valid, APEI
-> driver will call the memory_failure()), in this case, host will not send SIGBUS
-> to QEMU. So guest cannot know there is SEA happen.
-> At least there is such issue in Huawei's platform (cannot provide PA for RAS firmware-first,
-> only can provide VA in FAR_ELx)
-
-This isn't a KVM problem.
-
-It looks like both of UEFI's 'Table 275. Memory Error Record' and 'Table 276.
-Memory Error Record 2' require a physical address. You can't describe a memory
-error without one.
-
-Is this really a memory error?, or some other component, say, a virtually
-indexed cache.
-
-
-> 2. if there is SEA/SEI, only deliver SIGBUS to notify QEMU. This information is limit.
-> This SIGBUS can only provide an address and si_code(BUS_MCEERR_AO/ BUS_MCEERR_AR), nothing else.
-> if QEMU record CPER and inject SEA/specify ESR, it may needs to know more information.
-> For example, if it injects SEA, it needs so setup many registers for guest, such as 
-> FAR_EL1. If sets it, it needs to know FAR_EL2.
-
-Linux is given CPER records describing a memory error using NOTIFY_IRQ. It
-delivers BUS_MCEERR_AO to Qemu. What value does FAR_EL2 have?
-
-Even for 'AR' from KVM, we already know Marc is against exposing EL2 registers. [0]
-
-
-> But QEMU cannot know this information to setup it if KVM cannot pass more fault info to QEMU.
-> Of cause, we can identify the guest FAR_El1 register to invalid. But some time, guest needs to
-> know it in the situation that host cannot provide the PA.
-
-When is this? You can get the IPA from the si_addr and Qemu's memory layout. The
-IPA goes in the CPER records allowing you to emulate firmware first.
-The IPA goes in the ERR<n>ADDR register (once we have emulation support for it),
-covering the kernel first case.
-
-What's left? Neither: You can generate an external abort using DFSC=0b010000 and
-set FnV to tell it you don't have a virtual stage1 address.
-
-
-A better argument is that user-space needs to know if BUS_MCEERR_AR triggered by
-KVM's stage2 was an instruction or data abort so it can make this the correct
-flavour of Synchronous External Abort.
-
-I agree this bit needs exposing (but only for exits due to BUS_MCEERR_AR
-triggered by KVM at stage2), and maybe KVM could include a little more
-information to allow the full range of external-abort ESRs to be used.
-
-
-
-> 3. For SEI, the address is invalid, 
-
-You mean FAR_ELx?
-
-
-> so in some platform, firmware will not record this AP.
-
-For any RAS error you should get a physical address in ERR<n>ADDR.
-
-
-> At least in HUAWEI's platform, firmware will not record it. we cannot always
-> think that all platform can record PA for RAS, sometime it may use
-> VA(in FAR_ELx).
-
-What component do you see this happen with?
-
-
-> For SEI, if the address is not recorded, then the
-> memory_failure() will be not called. So guest will not know it happens SEI.
-
-
-Thanks,
-
-James
-
-[0] https://lkml.org/lkml/2017/8/7/612
+> It's just a global number within a range, so I don't think vendors will
+> have many different ways of designing it.
+> 
+> Thanks,
+> Jean
+> 
+> 
+> 
+> 
