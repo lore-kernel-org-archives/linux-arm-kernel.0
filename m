@@ -1,77 +1,37 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 25 Oct 2017 18:01:01 +0100
-Subject: [PATCH v4 17/26] KVM: arm/arm64: GICv4: Propagate VLPI properties
- at map time
-In-Reply-To: <20171025164827.GO91785@lvm> (Christoffer Dall's message of "Wed,
- 25 Oct 2017 18:48:27 +0200")
-References: <20171006153401.5481-1-marc.zyngier@arm.com>
- <20171006153401.5481-18-marc.zyngier@arm.com>
- <20171025164827.GO91785@lvm>
-Message-ID: <86tvynb1rm.fsf@arm.com>
+From: ludovic.Barre@st.com (Ludovic Barre)
+Date: Wed, 25 Oct 2017 19:10:59 +0200
+Subject: [PATCH v2 3/9] dt-bindings: interrupt-controllers: add compatible
+ string for stm32h7
+In-Reply-To: <1508951465-17152-1-git-send-email-ludovic.Barre@st.com>
+References: <1508951465-17152-1-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1508951465-17152-4-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 25 2017 at  6:48:27 pm BST, Christoffer Dall <cdall@linaro.org> wrote:
-> On Fri, Oct 06, 2017 at 04:33:52PM +0100, Marc Zyngier wrote:
->> When the VLPI gets mapped, it must inherit the configuration of
->> the LPI configured at the vITS level. For that purpose, let's make
->> update_lpi_config globally available and call it just after
->> having performed the VLPI map operation.
->> 
->> Acked-by: Christoffer Dall <cdall@linaro.org>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  virt/kvm/arm/vgic/vgic-its.c | 6 ++----
->>  virt/kvm/arm/vgic/vgic-v4.c  | 2 ++
->>  virt/kvm/arm/vgic/vgic.h     | 2 ++
->>  3 files changed, 6 insertions(+), 4 deletions(-)
->> 
->> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->> index eb72eb027060..f434748439ee 100644
->> --- a/virt/kvm/arm/vgic/vgic-its.c
->> +++ b/virt/kvm/arm/vgic/vgic-its.c
->> @@ -37,8 +37,6 @@
->>  static int vgic_its_save_tables_v0(struct vgic_its *its);
->>  static int vgic_its_restore_tables_v0(struct vgic_its *its);
->>  static int vgic_its_commit_v0(struct vgic_its *its);
->> -static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
->> -			     struct kvm_vcpu *filter_vcpu, bool needs_inv);
->>  
->>  /*
->>   * Creates a new (reference to a) struct vgic_irq for a given LPI.
->> @@ -272,8 +270,8 @@ static struct its_collection *find_collection(struct vgic_its *its, int coll_id)
->>   * If filter_vcpu is not NULL, applies only if the IRQ is targeting this
->>   * VCPU. Unconditionally applies if filter_vcpu is NULL.
->>   */
->> -static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
->> -			     struct kvm_vcpu *filter_vcpu, bool needs_inv)
->> +int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
->> +		      struct kvm_vcpu *filter_vcpu, bool needs_inv)
->>  {
->>  	u64 propbase = GICR_PROPBASER_ADDRESS(kvm->arch.vgic.propbaser);
->>  	u8 prop;
->> diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
->> index ba1dd3162eba..b79a0450bb1c 100644
->> --- a/virt/kvm/arm/vgic/vgic-v4.c
->> +++ b/virt/kvm/arm/vgic/vgic-v4.c
->> @@ -147,6 +147,8 @@ int kvm_vgic_v4_set_forwarding(struct kvm *kvm, int virq,
->>  	irq->hw		= true;
->>  	irq->host_irq	= virq;
->>  
->> +	/* Force the property update and invalidate */
->> +	update_lpi_config(kvm, irq, NULL, true);
->
-> Actually, when re-reading this patch, this looks weird to me.
->
-> I think this needs to either be done as part of the map, or before the
-> map, to prevent for example a disabled interrupt from the guest'ss PoV
-> to fire when it doesn't expect it.
+From: Ludovic Barre <ludovic.barre@st.com>
 
-Indeed, that's a good point. I don't really like making it part of the
-VLPI mapping, as this is an ITS thing (and the property update is more a
-redistributor concept), but moving it it before the map is probably the
-best thing to do. Thanks for pointing this out!
+This patch updates stm32-exti documentation with stm32h7-exti
+compatible string.
 
-	M.
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+---
+ .../devicetree/bindings/interrupt-controller/st,stm32-exti.txt        | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/st,stm32-exti.txt b/Documentation/devicetree/bindings/interrupt-controller/st,stm32-exti.txt
+index 6e7703d..edf03f0 100644
+--- a/Documentation/devicetree/bindings/interrupt-controller/st,stm32-exti.txt
++++ b/Documentation/devicetree/bindings/interrupt-controller/st,stm32-exti.txt
+@@ -2,7 +2,9 @@ STM32 External Interrupt Controller
+ 
+ Required properties:
+ 
+-- compatible: Should be "st,stm32-exti"
++- compatible: Should be:
++    "st,stm32-exti"
++    "st,stm32h7-exti"
+ - reg: Specifies base physical address and size of the registers
+ - interrupt-controller: Indentifies the node as an interrupt controller
+ - #interrupt-cells: Specifies the number of cells to encode an interrupt
 -- 
-Jazz is not dead. It just smells funny.
+2.7.4
