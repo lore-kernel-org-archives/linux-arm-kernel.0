@@ -1,83 +1,35 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Wed, 25 Oct 2017 23:28:05 +0200
-Subject: [PATCH] PCI: rework error checking in the reset path
-In-Reply-To: <20171025134511.GL21840@bhelgaas-glaptop.roam.corp.google.com>
-References: <1508794608-15310-1-git-send-email-okaya@codeaurora.org>
- <20171025134511.GL21840@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20171025232805.163ccaad@t450s.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 25 Oct 2017 14:28:07 -0700
+Subject: 4.13 (and probably all recent) kernels refuse to boot on one
+ Nokia N950, work or another
+In-Reply-To: <20171025203459.GA22035@amd>
+References: <20171025203459.GA22035@amd>
+Message-ID: <20171025212806.GA21504@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Oct 2017 08:45:11 -0500
-Bjorn Helgaas <helgaas@kernel.org> wrote:
-
-> [+cc Alex]
+* Pavel Machek <pavel@ucw.cz> [171025 13:36]:
+> Hi!
 > 
-> On Mon, Oct 23, 2017 at 05:36:48PM -0400, Sinan Kaya wrote:
-> > The return codes from various reset types are not consistent. The code is
-> > assuming that all reset types will return -ENOTTY when things go wrong.
-> > Instead of relying on negative error status, let's bail out if the
-> > operation is successful instead.  
+> ...hardware should be identical. 3.5.3-nemo kernel seems to work on
+> both. 4.13-rc2 with display and clock patches boots on phone "S", but
+> does not on phone "P"; nothing nothing is received on serial port.
 > 
-> I like this (no surprise since I suggested something similar at
-> http://lkml.kernel.org/r/20171011210057.GU25517 at bhelgaas-glaptop.roam.corp.google.com),
-> but I'd like Alex's opinion before merging it.
+> There is some difference in the bootloaders: S's bootloader provides
+> lots of debug info, P's is silent. R&D settings do _not_ have
+> influence on bootloader. We know P's serial works, as 3.5.3 kernel
+> prints "Uncompressing linux...booting" there.
 > 
-> Previously, we only tried the next reset method if one method failed
-> with -ENOTTY.  With this patch, we'll try the next reset method if one
-> method fails for any reason, not just -ENOTTY.
+> I'll need to return "S" phone and serial cable tommorow. If you have
+> any ideas, let me know.
 
-Hmm, I thought the return codes were pretty consistent.  -ENOTTY means
-that the reset callback doesn't handle the device, move on.  Many
-ioctls use the same return code to indicate an unknown ioctl.  This
-allows us to differentiate success vs error vs unhandled.  In the code
-below we lose the ability to, for instance, have a device specific
-reset that returns -EINVAL to prevent the PCI core for triggering
-further reset mechanisms which might be broken on the device.  So, I
-don't see that this patch specifically fixes anything, but it does
-remove what seems like useful functionality...  I'd veto it.  Thanks,
+If you get nothing out of the uart, chances are the pins are
+not muxed for the uart in nolo and maybe kernel dts is missing the
+pinctrl entries for uart?
 
-Alex
- 
-> > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> > ---
-> >  drivers/pci/pci.c | 8 ++++----
-> >  1 file changed, 4 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> > index 6078dfc..a753e07 100644
-> > --- a/drivers/pci/pci.c
-> > +++ b/drivers/pci/pci.c
-> > @@ -4200,20 +4200,20 @@ int __pci_reset_function_locked(struct pci_dev *dev)
-> >  	might_sleep();
-> >  
-> >  	rc = pci_dev_specific_reset(dev, 0);
-> > -	if (rc != -ENOTTY)
-> > +	if (!rc)
-> >  		return rc;
-> >  	if (pcie_has_flr(dev)) {
-> >  		pcie_flr(dev);
-> >  		return 0;
-> >  	}
-> >  	rc = pci_af_flr(dev, 0);
-> > -	if (rc != -ENOTTY)
-> > +	if (!rc)
-> >  		return rc;
-> >  	rc = pci_pm_reset(dev, 0);
-> > -	if (rc != -ENOTTY)
-> > +	if (!rc)
-> >  		return rc;
-> >  	rc = pci_dev_reset_slot_function(dev, 0);
-> > -	if (rc != -ENOTTY)
-> > +	if (!rc)
-> >  		return rc;
-> >  	return pci_parent_bus_reset(dev, 0);
-> >  }
-> > -- 
-> > 1.9.1
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel  
+Also try booting with mem=512M at 0x80000000 or 256M or 768M. Maybe the
+memory is different size or partially broken?
+
+Regards,
+
+Tony
