@@ -1,24 +1,65 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Wed, 25 Oct 2017 16:26:20 +0300
-Subject: [PATCH] I2C-S3C2410: Use common error handling code in
- s3c24xx_i2c_probe()
-In-Reply-To: <32c82282-ee0a-137f-4913-310b194b60f3@users.sourceforge.net>
-References: <32c82282-ee0a-137f-4913-310b194b60f3@users.sourceforge.net>
-Message-ID: <20171025132620.l7scp2eachnarpzt@mwanda>
+From: chen.zhong@mediatek.com (Chen Zhong)
+Date: Wed, 25 Oct 2017 21:15:59 +0800
+Subject: [PATCH v6 1/6] mfd: mt6397: create irq mappings in mfd core driver
+In-Reply-To: <1508937364-30054-1-git-send-email-chen.zhong@mediatek.com>
+References: <1508937364-30054-1-git-send-email-chen.zhong@mediatek.com>
+Message-ID: <1508937364-30054-2-git-send-email-chen.zhong@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> @@ -1180,24 +1179,21 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
->  		i2c->irq = ret = platform_get_irq(pdev, 0);
->  		if (ret <= 0) {
+The core driver should create and manage irq mappings instead of
+leaf drivers. This patch change to pass irq domain to
+devm_mfd_add_devices() and it will create mapping for irq resources
+automatically. And remove irq mapping in rtc driver since this has
+been done in core driver.
 
-Not related to this patch, but the comparison here should be < 0.  Or
-otherwise we should set an error code.  The bug was introduced in commit
-e0d1ec97853f ("i2c-s3c2410: Change IRQ to be plain integer.").
+Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
+---
+ drivers/mfd/mt6397-core.c |    4 ++--
+ drivers/rtc/rtc-mt6397.c  |    7 +++----
+ 2 files changed, 5 insertions(+), 6 deletions(-)
 
->  			dev_err(&pdev->dev, "cannot find IRQ\n");
-> -			clk_unprepare(i2c->clk);
-> -			return ret;
-
-regards,
-dan carpenter
+diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
+index 04a601f..6546d7f 100644
+--- a/drivers/mfd/mt6397-core.c
++++ b/drivers/mfd/mt6397-core.c
+@@ -289,7 +289,7 @@ static int mt6397_probe(struct platform_device *pdev)
+ 
+ 		ret = devm_mfd_add_devices(&pdev->dev, -1, mt6323_devs,
+ 					   ARRAY_SIZE(mt6323_devs), NULL,
+-					   0, NULL);
++					   0, pmic->irq_domain);
+ 		break;
+ 
+ 	case MT6397_CID_CODE:
+@@ -304,7 +304,7 @@ static int mt6397_probe(struct platform_device *pdev)
+ 
+ 		ret = devm_mfd_add_devices(&pdev->dev, -1, mt6397_devs,
+ 					   ARRAY_SIZE(mt6397_devs), NULL,
+-					   0, NULL);
++					   0, pmic->irq_domain);
+ 		break;
+ 
+ 	default:
+diff --git a/drivers/rtc/rtc-mt6397.c b/drivers/rtc/rtc-mt6397.c
+index 1a61fa5..385f830 100644
+--- a/drivers/rtc/rtc-mt6397.c
++++ b/drivers/rtc/rtc-mt6397.c
+@@ -322,10 +322,9 @@ static int mtk_rtc_probe(struct platform_device *pdev)
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	rtc->addr_base = res->start;
+ 
+-	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+-	rtc->irq = irq_create_mapping(mt6397_chip->irq_domain, res->start);
+-	if (rtc->irq <= 0)
+-		return -EINVAL;
++	rtc->irq = platform_get_irq(pdev, 0);
++	if (rtc->irq < 0)
++		return rtc->irq;
+ 
+ 	rtc->regmap = mt6397_chip->regmap;
+ 	rtc->dev = &pdev->dev;
+-- 
+1.7.9.5
