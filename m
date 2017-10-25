@@ -1,35 +1,19 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 25 Oct 2017 14:28:07 -0700
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Thu, 26 Oct 2017 00:34:12 +0300
 Subject: 4.13 (and probably all recent) kernels refuse to boot on one
  Nokia N950, work or another
-In-Reply-To: <20171025203459.GA22035@amd>
-References: <20171025203459.GA22035@amd>
-Message-ID: <20171025212806.GA21504@atomide.com>
+In-Reply-To: <20171025212806.GA21504@atomide.com>
+References: <20171025203459.GA22035@amd> <20171025212806.GA21504@atomide.com>
+Message-ID: <20171025213412.utdt46bh3tzrumcy@darkstar.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [171025 13:36]:
-> Hi!
-> 
-> ...hardware should be identical. 3.5.3-nemo kernel seems to work on
-> both. 4.13-rc2 with display and clock patches boots on phone "S", but
-> does not on phone "P"; nothing nothing is received on serial port.
-> 
-> There is some difference in the bootloaders: S's bootloader provides
-> lots of debug info, P's is silent. R&D settings do _not_ have
-> influence on bootloader. We know P's serial works, as 3.5.3 kernel
-> prints "Uncompressing linux...booting" there.
-> 
-> I'll need to return "S" phone and serial cable tommorow. If you have
-> any ideas, let me know.
+Hi,
 
-If you get nothing out of the uart, chances are the pins are
-not muxed for the uart in nolo and maybe kernel dts is missing the
-pinctrl entries for uart?
+On Wed, Oct 25, 2017 at 02:28:07PM -0700, Tony Lindgren wrote:
+> Also try booting with mem=512M at 0x80000000 or 256M or 768M. Maybe the
+> memory is different size or partially broken?
 
-Also try booting with mem=512M at 0x80000000 or 256M or 768M. Maybe the
-memory is different size or partially broken?
+Yeah, some early N950s may have only 512 MB.
 
-Regards,
-
-Tony
+A.
