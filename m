@@ -1,7 +1,7 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Wed, 25 Oct 2017 03:18:42 -0700
-Subject: [PATCH] drivers/crypto: Convert timers to use timer_setup()
-Message-ID: <20171025101842.GA145495@beast>
+Date: Wed, 25 Oct 2017 03:21:24 -0700
+Subject: [PATCH] ARM: footbridge: Convert timers to use timer_setup()
+Message-ID: <20171025102124.GA145647@beast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -9,95 +9,59 @@ In preparation for unconditionally passing the struct timer_list pointer to
 all timer callbacks, switch to using the new timer_setup() and from_timer()
 to pass the timer pointer explicitly.
 
-Cc: Herbert Xu <herbert@gondor.apana.org.au>
-Cc: Jesper Nilsson <jesper.nilsson@axis.com>
-Cc: Lars Persson <lars.persson@axis.com>
-Cc: Niklas Cassel <niklas.cassel@axis.com>
-Cc: "David S. Miller" <davem@davemloft.net>
-Cc: Jamie Iles <jamie@jamieiles.com>
-Cc: linux-arm-kernel at axis.com
-Cc: linux-crypto at vger.kernel.org
+Cc: Russell King <linux@armlinux.org.uk>
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Kees Cook <keescook@chromium.org>
 ---
- drivers/crypto/axis/artpec6_crypto.c | 6 +++---
- drivers/crypto/mv_cesa.c             | 4 ++--
- drivers/crypto/picoxcell_crypto.c    | 7 +++----
- 3 files changed, 8 insertions(+), 9 deletions(-)
+ arch/arm/mach-footbridge/dc21285.c | 26 ++++++++------------------
+ 1 file changed, 8 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/crypto/axis/artpec6_crypto.c b/drivers/crypto/axis/artpec6_crypto.c
-index 0f9754e07719..456278440863 100644
---- a/drivers/crypto/axis/artpec6_crypto.c
-+++ b/drivers/crypto/axis/artpec6_crypto.c
-@@ -2072,9 +2072,9 @@ static void artpec6_crypto_process_queue(struct artpec6_crypto *ac)
- 		del_timer(&ac->timer);
+diff --git a/arch/arm/mach-footbridge/dc21285.c b/arch/arm/mach-footbridge/dc21285.c
+index 96a3d73ef4bf..8407e4a07c77 100644
+--- a/arch/arm/mach-footbridge/dc21285.c
++++ b/arch/arm/mach-footbridge/dc21285.c
+@@ -136,19 +136,14 @@ struct pci_ops dc21285_ops = {
+ static struct timer_list serr_timer;
+ static struct timer_list perr_timer;
+ 
+-static void dc21285_enable_error(unsigned long __data)
++static void dc21285_enable_error(struct timer_list *timer)
+ {
+-	switch (__data) {
+-	case IRQ_PCI_SERR:
+-		del_timer(&serr_timer);
+-		break;
+-
+-	case IRQ_PCI_PERR:
+-		del_timer(&perr_timer);
+-		break;
+-	}
++	del_timer(timer);
+ 
+-	enable_irq(__data);
++	if (timer == &serr_timer)
++		enable_irq(IRQ_PCI_SERR)
++	else if (timer == &perr_timer)
++		enable_irq(IRQ_PCI_PERR);
  }
  
--static void artpec6_crypto_timeout(unsigned long data)
-+static void artpec6_crypto_timeout(struct timer_list *t)
- {
--	struct artpec6_crypto *ac = (struct artpec6_crypto *) data;
-+	struct artpec6_crypto *ac = from_timer(ac, t, timer);
+ /*
+@@ -323,13 +318,8 @@ void __init dc21285_preinit(void)
+ 		*CSR_PCICMD = (*CSR_PCICMD & 0xffff) | PCICMD_ERROR_BITS;
+ 	}
  
- 	dev_info_ratelimited(artpec6_crypto_dev, "timeout\n");
+-	init_timer(&serr_timer);
+-	init_timer(&perr_timer);
+-
+-	serr_timer.data = IRQ_PCI_SERR;
+-	serr_timer.function = dc21285_enable_error;
+-	perr_timer.data = IRQ_PCI_PERR;
+-	perr_timer.function = dc21285_enable_error;
++	timer_setup(&serr_timer, dc21285_enable_error, 0);
++	timer_setup(&perr_timer, dc21285_enable_error, 0);
  
-@@ -3063,7 +3063,7 @@ static int artpec6_crypto_probe(struct platform_device *pdev)
- 	spin_lock_init(&ac->queue_lock);
- 	INIT_LIST_HEAD(&ac->queue);
- 	INIT_LIST_HEAD(&ac->pending);
--	setup_timer(&ac->timer, artpec6_crypto_timeout, (unsigned long) ac);
-+	timer_setup(&ac->timer, artpec6_crypto_timeout, 0);
- 
- 	ac->base = base;
- 
-diff --git a/drivers/crypto/mv_cesa.c b/drivers/crypto/mv_cesa.c
-index c3883b49f56e..6a8275f017a8 100644
---- a/drivers/crypto/mv_cesa.c
-+++ b/drivers/crypto/mv_cesa.c
-@@ -149,7 +149,7 @@ struct mv_req_hash_ctx {
- 	int count_add;
- };
- 
--static void mv_completion_timer_callback(unsigned long unused)
-+static void mv_completion_timer_callback(struct timer_list *unused)
- {
- 	int active = readl(cpg->reg + SEC_ACCEL_CMD) & SEC_CMD_EN_SEC_ACCL0;
- 
-@@ -167,7 +167,7 @@ static void mv_completion_timer_callback(unsigned long unused)
- 
- static void mv_setup_timer(void)
- {
--	setup_timer(&cpg->completion_timer, &mv_completion_timer_callback, 0);
-+	timer_setup(&cpg->completion_timer, mv_completion_timer_callback, 0);
- 	mod_timer(&cpg->completion_timer,
- 			jiffies + msecs_to_jiffies(MV_CESA_EXPIRE));
- }
-diff --git a/drivers/crypto/picoxcell_crypto.c b/drivers/crypto/picoxcell_crypto.c
-index b6f14844702e..5a6dc53b2b9d 100644
---- a/drivers/crypto/picoxcell_crypto.c
-+++ b/drivers/crypto/picoxcell_crypto.c
-@@ -1125,9 +1125,9 @@ static irqreturn_t spacc_spacc_irq(int irq, void *dev)
- 	return IRQ_HANDLED;
- }
- 
--static void spacc_packet_timeout(unsigned long data)
-+static void spacc_packet_timeout(struct timer_list *t)
- {
--	struct spacc_engine *engine = (struct spacc_engine *)data;
-+	struct spacc_engine *engine = from_timer(engine, t, packet_timeout);
- 
- 	spacc_process_done(engine);
- }
-@@ -1714,8 +1714,7 @@ static int spacc_probe(struct platform_device *pdev)
- 	writel(SPA_IRQ_EN_STAT_EN | SPA_IRQ_EN_GLBL_EN,
- 	       engine->regs + SPA_IRQ_EN_REG_OFFSET);
- 
--	setup_timer(&engine->packet_timeout, spacc_packet_timeout,
--		    (unsigned long)engine);
-+	timer_setup(&engine->packet_timeout, spacc_packet_timeout, 0);
- 
- 	INIT_LIST_HEAD(&engine->pending);
- 	INIT_LIST_HEAD(&engine->completed);
+ 	/*
+ 	 * We don't care if these fail.
 -- 
 2.7.4
 
