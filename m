@@ -1,42 +1,47 @@
 From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Wed, 25 Oct 2017 19:10:56 +0200
-Subject: [PATCH v2 0/9] irqchip: stm32: add stm32h7 support
-Message-ID: <1508951465-17152-1-git-send-email-ludovic.Barre@st.com>
+Date: Wed, 25 Oct 2017 19:11:02 +0200
+Subject: [PATCH v2 6/9] irqchip: stm32: move the wakeup on interrupt mask
+In-Reply-To: <1508951465-17152-1-git-send-email-ludovic.Barre@st.com>
+References: <1508951465-17152-1-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1508951465-17152-7-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Barre <ludovic.barre@st.com>
 
-This series adds:
--Management of multi-bank of external interrupts
-stm32h7 has up to 96 inputs (3 banks of  32 inputs).
--Fix initial value after cold/hot boot (wakeup issue).
+Move irq_set_wake on interrupt mask, needed to wake up from
+low power mode as the event mask is not able to do so.
 
-Changes v2:
--Remove irq_mask and adds const on struct stm32_exti_bank
--Add wrapper functions pending and ack
--Replace BITS_PER_LONG by IRQS_PER_BANK
--Fill commit message on
-"ARM: dts: stm32: add support of exti on stm32h743"
--Add system config bank for stm32h7
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+---
+ drivers/irqchip/irq-stm32-exti.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-Ludovic Barre (9):
-  irqchip: stm32: select GENERIC_IRQ_CHIP
-  irqchip: stm32: add multi-bank management
-  dt-bindings: interrupt-controllers: add compatible string for stm32h7
-  irqchip: stm32: add stm32h7 support
-  irqchip: stm32: fix initial values
-  irqchip: stm32: move the wakeup on interrupt mask
-  ARM: dts: stm32: add exti support for stm32h743
-  ARM: dts: stm32: add system config bank node for stm32h743
-  ARM: dts: stm32: add support of exti on stm32h743 pinctrl
-
- .../interrupt-controller/st,stm32-exti.txt         |   4 +-
- arch/arm/boot/dts/stm32h743-pinctrl.dtsi           |  24 +++
- arch/arm/boot/dts/stm32h743.dtsi                   |  13 ++
- drivers/irqchip/Kconfig                            |   1 +
- drivers/irqchip/irq-stm32-exti.c                   | 208 ++++++++++++++++-----
- 5 files changed, 200 insertions(+), 50 deletions(-)
-
+diff --git a/drivers/irqchip/irq-stm32-exti.c b/drivers/irqchip/irq-stm32-exti.c
+index 9715d57..3e4ee25 100644
+--- a/drivers/irqchip/irq-stm32-exti.c
++++ b/drivers/irqchip/irq-stm32-exti.c
+@@ -156,16 +156,16 @@ static int stm32_irq_set_wake(struct irq_data *data, unsigned int on)
+ 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(data);
+ 	const struct stm32_exti_bank *stm32_bank = gc->private;
+ 	int pin = data->hwirq % IRQS_PER_BANK;
+-	u32 emr;
++	u32 imr;
+ 
+ 	irq_gc_lock(gc);
+ 
+-	emr = irq_reg_readl(gc, stm32_bank->emr_ofst);
++	imr = irq_reg_readl(gc, stm32_bank->imr_ofst);
+ 	if (on)
+-		emr |= BIT(pin);
++		imr |= BIT(pin);
+ 	else
+-		emr &= ~BIT(pin);
+-	irq_reg_writel(gc, emr, stm32_bank->emr_ofst);
++		imr &= ~BIT(pin);
++	irq_reg_writel(gc, imr, stm32_bank->imr_ofst);
+ 
+ 	irq_gc_unlock(gc);
+ 
 -- 
 2.7.4
