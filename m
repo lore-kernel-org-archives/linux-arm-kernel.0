@@ -1,27 +1,41 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 25 Oct 2017 14:36:32 +0200
-Subject: [PATCH 1/2] ARM: dts: sun8i: h3-h5: Move pinctrl of mmc0 from
- dts to dtsi
-In-Reply-To: <20171022091957.24614-2-joonas.kylmala@iki.fi>
-References: <20171022091957.24614-1-joonas.kylmala@iki.fi>
- <20171022091957.24614-2-joonas.kylmala@iki.fi>
-Message-ID: <20171025123632.3jfjcztztm2qowrp@flea>
+Date: Wed, 25 Oct 2017 14:40:27 +0200
+Subject: [PATCH v2 0/3] pinctrl: sunxi: Start to enforce the strict mode
+In-Reply-To: <cover.3e8ef5cb08d0164375d7644df0548e5f39b0fe66.1507582414.git-series.maxime.ripard@free-electrons.com>
+References: <cover.3e8ef5cb08d0164375d7644df0548e5f39b0fe66.1507582414.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <20171025124027.oosswpymrwkvcvxx@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 22, 2017 at 12:19:56PM +0300, Joonas Kylm?l? wrote:
-> Most of the boards use the mmc0 pins and their attributes defined in
-> mmc0_pins_a and mmc0_cd_pin. Let's default to those by moving the
-> pinctrl attributes to the dtsi file. This makes it easier to modify
-> device trees in the future as there is only one place to change the
-> pinctrl attributes.
-> 
-> As a side effect this patch also adds the detect pin of Orange Pi
-> Zero's mmc0 under pinctrl as it should have been there right from the
-> beginning.
+Hi Linus,
 
-We're actually in the process of removing those gpio pinctrl
-nodes. Could you make that while you're at it?
+On Mon, Oct 09, 2017 at 10:53:36PM +0200, Maxime Ripard wrote:
+> Hi,
+> 
+> Here is an attempt to enable pinctrl's strict mode on our pinctrl drivers.
+> Indeed, our controllers should have had that mode enabled since its
+> introduction.
+> 
+> However, there's a number of issues with old device trees that prevent from
+> just enabling it for all the devices. There's basically two of them:
+> 
+>   - Most of our old DTs have a pinctrl node for GPIOs, which will result in
+>     an error when the driver is going to request the gpio because it would
+>     already be requested automatically by pinctrl. We cannot break those.
+> 
+>   - Some of these GPIOs also need to change their pin configuration to add
+>     a bias or change the current output, and there isn't a migration path.
+> 
+> Let's just keep the old behaviour for the old SoCs, and enforce it on the
+> new one, and enabled it by default so that the situation at least doesn't
+> get worse.
+> 
+> This has been tested on an A83t (strict on) and an H3 (strict off) board.
+
+Did you have some time to look at this?
+
+The earlier we merge it the better, so ideally I'd really like to get
+this into 4.15.
 
 Thanks!
 Maxime
@@ -36,4 +50,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171025/66ef3291/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171025/b282be95/attachment.sig>
