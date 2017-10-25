@@ -1,27 +1,17 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Wed, 25 Oct 2017 09:02:53 +0200
-Subject: [PATCH 0/3] arm64: remove some unused defconfig options
-In-Reply-To: <20171025002019.GC30645@codeaurora.org>
-References: <20171020172021.8119-1-elder@linaro.org>
- <20171025002019.GC30645@codeaurora.org>
-Message-ID: <20171025070253.GD28555@hector>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 25 Oct 2017 15:16:50 +0800
+Subject: [PATCH v2 1/2] ARM: dts: sun8i: a711: Add regulator support
+In-Reply-To: <d359767ec98f4740a416a3eb322a691830aa37a8.1508790064.git-series.maxime.ripard@free-electrons.com>
+References: <d359767ec98f4740a416a3eb322a691830aa37a8.1508790064.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v65aFX_VO-0X84jB6eb9ex7iJCE6Rfe1t5xTb7n88xS7Jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 24, 2017 at 05:20:20PM -0700, Stephen Boyd wrote:
-> On 10/20, Alex Elder wrote:
-> > This series deletes three config options related to USB on Qualcomm
-> > SoCs from the arm64 "defconfig", along with the code that they
-> > enable.  The code is no longer needed by any Qualcomm hardware.  
-> > 
-> > 					-Alex
-> > 
-> > Alex Elder (3):
-> >   arm64: defconfig: remove CONFIG_USB_EHCI_MSM
-> >   arm64: defconfig: remove CONFIG_USB_MSM_OTG
-> >   arm64: defconfig: remove CONFIG_USB_QCOM_8X16_PHY
-> 
-> As I said off-list, I would split this into defconfig for arm-soc
-> and drivers/usb for usb subsystem to pick up.
+On Tue, Oct 24, 2017 at 4:21 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The TBS A711 is using an AXP813 PMIC. Let's add all the regulators for that
+> board, and migrate the current, dumb, regulators to the actual ones.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-I agree with splitting.  But carry my ACKs when you do.
+Acked-by: Chen-Yu Tsai <wens@csie.org>
