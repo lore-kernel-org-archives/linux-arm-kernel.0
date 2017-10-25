@@ -1,59 +1,29 @@
-From: ashok.raj@intel.com (Raj, Ashok)
-Date: Wed, 25 Oct 2017 11:05:47 -0700
-Subject: [RFCv2 PATCH 01/36] iommu: Keep track of processes and PASIDs
-In-Reply-To: <7aaf9851-9546-f34d-1496-cbeea404abbd@arm.com>
-References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
- <20171006133203.22803-2-jean-philippe.brucker@arm.com>
- <A2975661238FB949B60364EF0F2C257439AFD88A@SHSMSX104.ccr.corp.intel.com>
- <7aaf9851-9546-f34d-1496-cbeea404abbd@arm.com>
-Message-ID: <20171025180546.GA12356@otc-nc-03>
+From: willemdebruijn.kernel@gmail.com (Willem de Bruijn)
+Date: Wed, 25 Oct 2017 14:24:02 -0400
+Subject: v4.14-rc3/arm64 DABT exception in atomic_inc() / __skb_clone()
+In-Reply-To: <D2AD6D5B-3A05-48E7-A999-DECAB18A4649@gmail.com>
+References: <EAA60182-6F08-412E-8F8B-FD4B0309A858@gmail.com>
+ <20171020111408.edj24tztxdptte5r@lakrids.cambridge.arm.com>
+ <960D71EC-C1E9-4898-ACBE-543FC09483FF@gmail.com>
+ <CACT4Y+bjzzCv3LSxK12C1xB8GfR3UYCrX_5phRYJ8fpxh9vcvQ@mail.gmail.com>
+ <CAF=yD-K76TMjHiYRTRAnxM-x4LBcUDY+27WX477HW6kG=L_aZw@mail.gmail.com>
+ <D2AD6D5B-3A05-48E7-A999-DECAB18A4649@gmail.com>
+Message-ID: <CAF=yD-JFjjA=2T7HermH2GygfHinyW+ZC5v+Di7M4V_Fg5paHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean
+On Sat, Oct 21, 2017 at 9:56 PM, Wei Wei <dotweiba@gmail.com> wrote:
+> I have uploaded the VM core dump [1]. And I don?t know if these logs are helpful in the case of
+> failing to get the C reproducer currently.
+>
+> [1] https://github.com/dotweiba/skb_clone_atomic_inc_bug/blob/master/vmcore.gz
 
-On Mon, Oct 23, 2017 at 01:17:07PM +0100, Jean-Philippe Brucker wrote:
-> On 23/10/17 12:04, Liu, Yi L wrote:
-> >> +	idr_preload(GFP_KERNEL);
-> >> +	spin_lock(&iommu_process_lock);
-> >> +	pasid = idr_alloc_cyclic(&iommu_process_idr, process, domain->min_pasid,
-> >> +				 domain->max_pasid + 1, GFP_ATOMIC);
-> >> +	process->pasid = pasid;
-> > 
-> > [Liu, Yi L] If I'm understanding well, here is managing the pasid allocation in iommu
-> > layer instead of vendor iommu driver? Is there strong reason here? I think pasid
-> > management may be better within vendor iommu driver as pasid management
-> > could differ from vendor to vendor.
-> 
-> But that's the thing, we're trying to abstract PASID and process
-> management to have it in the core, because there shouldn't be many
-> differences from vendor to vendor. This way we have the allocation code in
-> one place and vendor drivers don't have to copy paste it from other drivers.
+Thanks. So this would be the atomic_inc on shb_shinfo(skb)->dataref, which
+matches the __ll_sc_atomic_add in Mark's trace.
 
-I think this makes sense for the native case and also in the vIOMMU
-if the PASID tables and allocation are completely managed by the guest.
+Debugging with crash shows 0xffff800071bb3180 and 0xffff800071bb2c80
+to be valid skbuffs of len 40, no sk, both pointing to the same head.
 
-If the vIOMMU requires any co-ordination in how the PASID's are allocated
-for guest devices there might need to be some control on how these are 
-allocated that ultimately need to be managed by VMM/Physical IOMMU. For 
-instance if the PASID space is sparse for e.g
-
-if we make the PASID allocation as one of the ops, the IOMMU implementation
-will choose the default function, or if it choose a differnt mechanism it would
-have that flexibility.
-
-Does this make sense?
-
-Cheers,
-Ashok
-
-> 
-> It's just a global number within a range, so I don't think vendors will
-> have many different ways of designing it.
-> 
-> Thanks,
-> Jean
-> 
-> 
-> 
-> 
+That is indeed unaligned:  head = 0xffff8000327c80c9 "", end = 256, giving
+skb_shared_info at 0xffff8000327c81c9 and  &skb_shared_info(skb)->dataref
+at 0xffff8000327c81c9 + 36 == 0xffff8000327c81ed
