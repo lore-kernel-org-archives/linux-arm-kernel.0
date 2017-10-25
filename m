@@ -1,68 +1,54 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 25 Oct 2017 10:37:21 +0200
-Subject: [PATCH v7 1/6] timer: add timer_of_exit function
-In-Reply-To: <1508752722-4489-2-git-send-email-benjamin.gaignard@linaro.org>
-References: <1508752722-4489-1-git-send-email-benjamin.gaignard@linaro.org>
- <1508752722-4489-2-git-send-email-benjamin.gaignard@linaro.org>
-Message-ID: <b3234794-0a72-02d9-9d29-f58effbb7356@linaro.org>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Wed, 25 Oct 2017 10:04:32 +0100
+Subject: [PATCH v4 1/2] arm64: Use existing defines for mdscr
+In-Reply-To: <1508922273-55794-1-git-send-email-julien.thierry@arm.com>
+References: <1508922273-55794-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <1508922273-55794-2-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/10/2017 11:58, Benjamin Gaignard wrote:
-> Add this exit function to be able to undo what have been done
-> in timer_of_init().
-> 
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+Literal values are being used to set single stepping in mdscr from assembly
+code. There are already existing defines representing those values, use
+those instead of the literal values.
 
-I will take this one for 4.15
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/assembler.h | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-Thanks
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index d58a625..3128a9c 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -25,6 +25,7 @@
 
-  -- Daniel
-
-> ---
->  drivers/clocksource/timer-of.c | 12 ++++++++++++
->  drivers/clocksource/timer-of.h |  3 +++
->  2 files changed, 15 insertions(+)
-> 
-> diff --git a/drivers/clocksource/timer-of.c b/drivers/clocksource/timer-of.c
-> index c79122d..7c64a5c1 100644
-> --- a/drivers/clocksource/timer-of.c
-> +++ b/drivers/clocksource/timer-of.c
-> @@ -176,3 +176,15 @@ int __init timer_of_init(struct device_node *np, struct timer_of *to)
->  		timer_base_exit(&to->of_base);
->  	return ret;
->  }
-> +
-> +void timer_of_exit(struct timer_of *to)
-> +{
-> +	if (to->flags & TIMER_OF_IRQ)
-> +		timer_irq_exit(&to->of_irq);
-> +
-> +	if (to->flags & TIMER_OF_CLOCK)
-> +		timer_clk_exit(&to->of_clk);
-> +
-> +	if (to->flags & TIMER_OF_BASE)
-> +		timer_base_exit(&to->of_base);
-> +}
-> diff --git a/drivers/clocksource/timer-of.h b/drivers/clocksource/timer-of.h
-> index e0d7272..44f57e0 100644
-> --- a/drivers/clocksource/timer-of.h
-> +++ b/drivers/clocksource/timer-of.h
-> @@ -66,4 +66,7 @@ static inline unsigned long timer_of_period(struct timer_of *to)
->  
->  extern int __init timer_of_init(struct device_node *np,
->  				struct timer_of *to);
-> +
-> +extern void timer_of_exit(struct timer_of *to);
-> +
->  #endif
-> 
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+ #include <asm/asm-offsets.h>
+ #include <asm/cpufeature.h>
++#include <asm/debug-monitors.h>
+ #include <asm/mmu_context.h>
+ #include <asm/page.h>
+ #include <asm/pgtable-hwdef.h>
+@@ -65,7 +66,7 @@
+ 	.macro	disable_step_tsk, flgs, tmp
+ 	tbz	\flgs, #TIF_SINGLESTEP, 9990f
+ 	mrs	\tmp, mdscr_el1
+-	bic	\tmp, \tmp, #1
++	bic	\tmp, \tmp, #DBG_MDSCR_SS
+ 	msr	mdscr_el1, \tmp
+ 	isb	// Synchronise with enable_dbg
+ 9990:
+@@ -75,7 +76,7 @@
+ 	tbz	\flgs, #TIF_SINGLESTEP, 9990f
+ 	disable_dbg
+ 	mrs	\tmp, mdscr_el1
+-	orr	\tmp, \tmp, #1
++	orr	\tmp, \tmp, #DBG_MDSCR_SS
+ 	msr	mdscr_el1, \tmp
+ 9990:
+ 	.endm
+--
+1.9.1
