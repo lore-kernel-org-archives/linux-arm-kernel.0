@@ -1,204 +1,241 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Tue, 24 Oct 2017 20:23:00 -0500
-Subject: [RFC 1/3] perf tool: Introduce arch-specific supplemental perf
- open strerror capability
-In-Reply-To: <20171024142744.GE2512@redhat.com>
-References: <20171024030404.ec366ec2d9c38910ccd84ba5@arm.com>
- <20171024142744.GE2512@redhat.com>
-Message-ID: <20171024202300.de189fde683c939966a6646c@arm.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 25 Oct 2017 11:52:45 +0900
+Subject: [PATCH net-next v3 2/2] net: ethernet: socionext: add AVE
+ ethernet driver
+In-Reply-To: <1508893679-11727-3-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1508893679-11727-1-git-send-email-hayashi.kunihiko@socionext.com>
+ <1508893679-11727-3-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <CAK7LNAQZn046gGUkQUV3j_v=Te+Hawqy_6R3+Yff_F0gwRs02Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 24 Oct 2017 12:27:44 -0200
-Arnaldo Carvalho de Melo <acme@redhat.com> wrote:
+2017-10-25 10:07 GMT+09:00 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>:
 
-> Em Tue, Oct 24, 2017 at 03:04:04AM -0500, Kim Phillips escreveu:
-> > Introduce new tools/perf/arch/*/util/evsel.c:perf_evsel__suppl_strerror()
-> 
-> The naming... suppl for what? for the open operation? strerror() methods
-> are associated with another method, one for which it can use context
-> like who is the user asking for that operation, procfs/sysfs knobs,
-> hardware, etc, so we need to have CLASS__METHOD_strerror()
-> 
-> In this case, CLASS == perf_evsel, METHOD = open, so, if you want to
-> have something that is _arch_ specific, we could use something like:
-> 
-> int __weak perf_evsel__open_strerror_arch(struct perf_evsel *evsel __maybe_unused,
-> 					  struct target *target __maybe_unused,
-> 					  int err __maybe_unused,
-> 					  char *msg __maybe_unused,
-> 					  size_t size __maybe_unused)
-> {
-> 	return 0;
-> }
-> 
-> But then you're calling it _before_ the existing switch (err), humm...
-> I.e. it will add stuff before the string that will be formatted later...
-> The messages may end up being conflicting, I wonder if the model
-> wouldn't be better as: ask the arch specific if it wants to override
-> that specific error with something, if not, fallback to the existing
-> perf_evsel__open_strerror() code, that could be moved to be
-> __perf_evsel__open_strerror() and called by the arch specific code.
-> 
-> Thoughts?
+> +
+> +/* Descriptor Control Register Group */
+> +#define AVE_DESCC      0x300   /* Descriptor Control */
+> +#define AVE_TXDC       0x304   /* TX Descriptor Configuration */
+> +#define AVE_RXDC0      0x308   /* RX Descriptor Ring0 Configuration */
+> +#define AVE_IIRQC      0x34c   /* Interval IRQ Control */
+> +
+> +/* Packet Filter Register Group */
+> +#define AVE_PKTF_BASE          0x800   /* PF Base Address */
+> +#define AVE_PFMBYTE_BASE       0xd00   /* PF Mask Byte Base Address */
+> +#define AVE_PFMBIT_BASE                0xe00   /* PF Mask Bit Base Address */
+> +#define AVE_PFSEL_BASE         0xf00   /* PF Selector Base Address */
+> +#define AVE_PFEN               0xffc   /* Packet Filter Enable */
+> +#define AVE_PKTF(ent)          (AVE_PKTF_BASE + (ent) * 0x40)
+> +#define AVE_PFMBYTE(ent)       (AVE_PFMBYTE_BASE + (ent) * 8)
+> +#define AVE_PFMBIT(ent)                (AVE_PFMBIT_BASE + (ent) * 4)
+> +#define AVE_PFSEL(ent)         (AVE_PFSEL_BASE + (ent) * 4)
+> +
+> +/* 64bit descriptor memory */
+> +#define AVE_DESC_SIZE_64       12      /* Descriptor Size */
+> +
+> +#define AVE_TXDM_64            0x1000  /* Tx Descriptor Memory */
+> +#define AVE_RXDM_64            0x1c00  /* Rx Descriptor Memory */
+> +
+> +#define AVE_TXDM_SIZE_64       0x0ba0  /* Tx Descriptor Memory Size 3KB */
+> +#define AVE_RXDM_SIZE_64       0x6000  /* Rx Descriptor Memory Size 24KB */
+> +
+> +/* 32bit descriptor memory */
+> +#define AVE_DESC_SIZE_32       8       /* Descriptor Size */
+> +
+> +#define AVE_TXDM_32            0x1000  /* Tx Descriptor Memory */
+> +#define AVE_RXDM_32            0x1800  /* Rx Descriptor Memory */
+> +
+> +#define AVE_TXDM_SIZE_32       0x07c0  /* Tx Descriptor Memory Size 2KB */
+> +#define AVE_RXDM_SIZE_32       0x4000  /* Rx Descriptor Memory Size 16KB */
+> +
+> +/* RMII Bridge Register Group */
+> +#define AVE_RSTCTRL            0x8028  /* Reset control */
+> +#define AVE_RSTCTRL_RMIIRST    BIT(16)
+> +#define AVE_LINKSEL            0x8034  /* Link speed setting */
+> +#define AVE_LINKSEL_100M       BIT(0)
+> +
+> +/* AVE_GRR */
+> +#define AVE_GRR_RXFFR          BIT(5)  /* Reset RxFIFO */
+> +#define AVE_GRR_PHYRST         BIT(4)  /* Reset external PHY */
+> +#define AVE_GRR_GRST           BIT(0)  /* Reset all MAC */
+> +
+> +/* AVE_GISR (common with GIMR) */
+> +#define AVE_GI_PHY             BIT(24) /* PHY interrupt */
+> +#define AVE_GI_TX              BIT(16) /* Tx complete */
+> +#define AVE_GI_RXERR           BIT(8)  /* Receive frame more than max size */
+> +#define AVE_GI_RXOVF           BIT(7)  /* Overflow at the RxFIFO */
+> +#define AVE_GI_RXDROP          BIT(6)  /* Drop packet */
+> +#define AVE_GI_RXIINT          BIT(5)  /* Interval interrupt */
+> +
+> +/* AVE_TXCR */
+> +#define AVE_TXCR_FLOCTR                BIT(18) /* Flow control */
+> +#define AVE_TXCR_TXSPD_1G      BIT(17)
+> +#define AVE_TXCR_TXSPD_100     BIT(16)
+> +
+> +/* AVE_RXCR */
+> +#define AVE_RXCR_RXEN          BIT(30) /* Rx enable */
+> +#define AVE_RXCR_FDUPEN                BIT(22) /* Interface mode */
+> +#define AVE_RXCR_FLOCTR                BIT(21) /* Flow control */
+> +#define AVE_RXCR_AFEN          BIT(19) /* MAC address filter */
+> +#define AVE_RXCR_DRPEN         BIT(18) /* Drop pause frame */
+> +#define AVE_RXCR_MPSIZ_MASK    GENMASK(10, 0)
+> +
+> +/* AVE_MDIOCTR */
+> +#define AVE_MDIOCTR_RREQ       BIT(3)  /* Read request */
+> +#define AVE_MDIOCTR_WREQ       BIT(2)  /* Write request */
 
-Thanks for your good feedback, yes, very good idea, fully agreed and
-implemented - see below.
 
-Thanks,
+BIT() is descending.
 
-Kim
 
->From 6877c8703c0eb186370ed20eee0dfc4ba53980da Mon Sep 17 00:00:00 2001
-From: Kim Phillips <kim.phillips@arm.com>
-Date: Tue, 24 Oct 2017 03:04:04 -0500
-Subject: [PATCH] perf tool: Introduce arch-specific perf open strerror
- capability
 
-Introduce new tools/perf/arch/*/util/evsel.c:perf_evsel__strerror_arch()
-so each arch can start to customize usability for its h/w PMU drivers.
+> +/* AVE_MDIOSR */
+> +#define AVE_MDIOSR_STS         BIT(0)  /* access status */
+> +
+> +/* AVE_DESCC */
+> +#define AVE_DESCC_TD           BIT(0)  /* Enable Tx descriptor */
+> +#define AVE_DESCC_RDSTP                BIT(4)  /* Pause Rx descriptor */
+> +#define AVE_DESCC_RD0          BIT(8)  /* Enable Rx descriptor Ring0 */
+> +#define AVE_DESCC_STATUS_MASK  GENMASK(31, 16)
 
-v2:
 
-Addressed ACME's comments:
+BIT() is ascending.
 
-- Renamed perf_evsel__suppl_strerror() perf_evsel__open_strerror_arch()
-  ['suppl' was for supplementary, from D. Howell's prior submission:
-   "[06/27] Provide supplementary error message facility [ver #5]"].
+Please be consistent.
 
-- Changed the logic such that if arch version - called first - doesn't put
-  anything in the string, then call the existing, generic
-  __perf_evsel__open_strerror() (renamed from perf_evsel__open_strerror()).
-  Otherwise, only the string returned from the arch version is emitted.
-  All references to 'supplemental' dropped as a consequence.
 
-Also tried addressing Will's comments:
 
-- Looked at possibly reducing the number of parameters, but since both evsel
-  and target elements are used to evaluate the condition the error occurred in,
-  and err, msg, and size are required for basic strerror functioning, they all
-  got to stay.
 
-Signed-off-by: Kim Phillips <kim.phillips@arm.com>
----
- tools/perf/arch/x86/util/Build   |  1 +
- tools/perf/arch/x86/util/evsel.c | 24 ++++++++++++++++++++++++
- tools/perf/util/evsel.c          | 32 ++++++++++++++++++++++++--------
- tools/perf/util/evsel.h          |  2 ++
- 4 files changed, 51 insertions(+), 8 deletions(-)
- create mode 100644 tools/perf/arch/x86/util/evsel.c
 
-diff --git a/tools/perf/arch/x86/util/Build b/tools/perf/arch/x86/util/Build
-index f95e6f46ef0d..90ae9358ec21 100644
---- a/tools/perf/arch/x86/util/Build
-+++ b/tools/perf/arch/x86/util/Build
-@@ -4,6 +4,7 @@ libperf-y += pmu.o
- libperf-y += kvm-stat.o
- libperf-y += perf_regs.o
- libperf-y += group.o
-+libperf-y += evsel.o
- 
- libperf-$(CONFIG_DWARF) += dwarf-regs.o
- libperf-$(CONFIG_BPF_PROLOGUE) += dwarf-regs.o
-diff --git a/tools/perf/arch/x86/util/evsel.c b/tools/perf/arch/x86/util/evsel.c
-new file mode 100644
-index 000000000000..20a8ebc83657
---- /dev/null
-+++ b/tools/perf/arch/x86/util/evsel.c
-@@ -0,0 +1,24 @@
-+#include <string.h>
-+
-+#include <linux/perf_event.h>
-+#include <linux/err.h>
-+
-+#include "../../util/evsel.h"
-+
-+int perf_evsel__open_strerror_arch(struct perf_evsel *evsel,
-+				   struct target *target __maybe_unused,
-+				   int err, char *msg, size_t size)
-+{
-+	switch (err) {
-+	case EOPNOTSUPP:
-+		if (evsel->attr.type == PERF_TYPE_HARDWARE)
-+			return scnprintf(msg, size, "%s",
-+	"No hardware sampling interrupt available.\n"
-+	"No APIC? If so then you can boot the kernel with the \"lapic\" boot parameter to force-enable it.");
-+		break;
-+	default:
-+		break;
-+	}
-+
-+	return 0;
-+}
-diff --git a/tools/perf/util/evsel.c b/tools/perf/util/evsel.c
-index 3ec0aed0bdcb..0f53450cfc7b 100644
---- a/tools/perf/util/evsel.c
-+++ b/tools/perf/util/evsel.c
-@@ -2686,8 +2686,18 @@ static bool find_process(const char *name)
- 	return ret ? false : true;
- }
- 
--int perf_evsel__open_strerror(struct perf_evsel *evsel, struct target *target,
--			      int err, char *msg, size_t size)
-+int __weak perf_evsel__open_strerror_arch(struct perf_evsel *evsel __maybe_unused,
-+					  struct target *target __maybe_unused,
-+					  int err __maybe_unused,
-+					  char *msg __maybe_unused,
-+					  size_t size __maybe_unused)
-+{
-+	return 0;
-+}
-+
-+static int __perf_evsel__open_strerror(struct perf_evsel *evsel,
-+				       struct target *target,
-+				       int err, char *msg, size_t size)
- {
- 	char sbuf[STRERR_BUFSIZE];
- 	int printed = 0;
-@@ -2745,12 +2755,6 @@ int perf_evsel__open_strerror(struct perf_evsel *evsel, struct target *target,
- 		if (evsel->attr.precise_ip)
- 			return scnprintf(msg, size, "%s",
- 	"\'precise\' request may not be supported. Try removing 'p' modifier.");
--#if defined(__i386__) || defined(__x86_64__)
--		if (evsel->attr.type == PERF_TYPE_HARDWARE)
--			return scnprintf(msg, size, "%s",
--	"No hardware sampling interrupt available.\n"
--	"No APIC? If so then you can boot the kernel with the \"lapic\" boot parameter to force-enable it.");
--#endif
- 		break;
- 	case EBUSY:
- 		if (find_process("oprofiled"))
-@@ -2778,6 +2782,18 @@ int perf_evsel__open_strerror(struct perf_evsel *evsel, struct target *target,
- 			 perf_evsel__name(evsel));
- }
- 
-+int perf_evsel__open_strerror(struct perf_evsel *evsel, struct target *target,
-+			      int err, char *msg, size_t size)
-+{
-+	int printed;
-+
-+	printed = perf_evsel__open_strerror_arch(evsel, target, err, msg, size);
-+	if (printed)
-+		return printed;
-+
-+	return __perf_evsel__open_strerror(evsel, target, err, msg, size);
-+}
-+
- char *perf_evsel__env_arch(struct perf_evsel *evsel)
- {
- 	if (evsel && evsel->evlist && evsel->evlist->env)
-diff --git a/tools/perf/util/evsel.h b/tools/perf/util/evsel.h
-index 77bd310eb0cb..a3822174ac0f 100644
---- a/tools/perf/util/evsel.h
-+++ b/tools/perf/util/evsel.h
-@@ -416,6 +416,8 @@ bool perf_evsel__fallback(struct perf_evsel *evsel, int err,
- 			  char *msg, size_t msgsize);
- int perf_evsel__open_strerror(struct perf_evsel *evsel, struct target *target,
- 			      int err, char *msg, size_t size);
-+int perf_evsel__open_strerror_arch(struct perf_evsel *evsel, struct target *target,
-+			       int err, char *msg, size_t size);
- 
- static inline int perf_evsel__group_idx(struct perf_evsel *evsel)
- {
+
+> +
+> +static void ave_wdesc_addr(struct net_device *ndev, enum desc_id id,
+> +                          int entry, dma_addr_t paddr)
+> +{
+> +       struct ave_private *priv = netdev_priv(ndev);
+> +
+> +       ave_wdesc(ndev, id, entry, AVE_DESC_OFS_ADDRL, lower_32_bits(paddr));
+> +       if (IS_DESC_64BIT(priv))
+> +               ave_wdesc(ndev, id,
+> +                         entry, AVE_DESC_OFS_ADDRU, upper_32_bits(paddr));
+> +       else if ((u64)paddr > (u64)U32_MAX)
+> +               netdev_warn(ndev, "DMA address exceeds the address space\n");
+> +}
+
+Yuk!
+Why don't you use dma_set_mask() instead of this?
+
+
+
+
+> +
+> +static int ave_mdio_busywait(struct net_device *ndev)
+> +{
+> +       int ret = 0, loop = 100;
+> +       u32 mdiosr;
+> +
+> +       /* wait until completion */
+> +       while (--loop) {
+> +               mdiosr = ave_r32(ndev, AVE_MDIOSR);
+> +               if (!(mdiosr & AVE_MDIOSR_STS))
+> +                       break;
+> +
+> +               usleep_range(10, 20);
+> +       }
+> +
+> +       if (!loop) {
+> +               netdev_err(ndev,
+> +                          "failed to read from MDIO (status:0x%08x)\n",
+> +                          mdiosr);
+> +               ret = -ETIMEDOUT;
+> +       }
+> +
+> +       return ret;
+> +}
+
+
+The whole of this function can be replaced with
+readl_poll_timeout() unless you stick to ave_r32.
+
+
+I do not understand why you are such a big fan of
+driver-specific accessors like ave_r32/ave_w32.
+
+
+
+> +static int ave_mdiobus_read(struct mii_bus *bus, int phyid, int regnum)
+> +{
+> +       struct net_device *ndev = bus->priv;
+> +       u32 mdioctl;
+> +       int ret;
+> +
+> +       /* write address */
+> +       ave_w32(ndev, AVE_MDIOAR, (phyid << 8) | regnum);
+> +
+> +       /* read request */
+> +       mdioctl = ave_r32(ndev, AVE_MDIOCTR);
+> +       ave_w32(ndev, AVE_MDIOCTR,
+> +               (mdioctl | AVE_MDIOCTR_RREQ) & ~AVE_MDIOCTR_WREQ);
+> +
+> +       ret = ave_mdio_busywait(ndev);
+> +       if (ret) {
+> +               netdev_err(ndev, "phy-%d reg-%x read failed\n",
+> +                          phyid, regnum);
+> +               return ret;
+> +       }
+> +
+> +       return ave_r32(ndev, AVE_MDIORDR) & GENMASK(15, 0);
+> +}
+> +
+> +static int ave_mdiobus_write(struct mii_bus *bus,
+> +                            int phyid, int regnum, u16 val)
+> +{
+> +       struct net_device *ndev = bus->priv;
+> +       u32 mdioctl;
+> +       int ret;
+> +
+> +       /* write address */
+> +       ave_w32(ndev, AVE_MDIOAR, (phyid << 8) | regnum);
+> +
+> +       /* write data */
+> +       ave_w32(ndev, AVE_MDIOWDR, val);
+> +
+> +       /* write request */
+> +       mdioctl = ave_r32(ndev, AVE_MDIOCTR);
+> +       ave_w32(ndev, AVE_MDIOCTR,
+> +               (mdioctl | AVE_MDIOCTR_WREQ) & ~AVE_MDIOCTR_RREQ);
+> +
+> +       ret = ave_mdio_busywait(ndev);
+> +       if (ret)
+> +               netdev_err(ndev, "phy-%d reg-%x write failed\n",
+> +                          phyid, regnum);
+> +
+> +       return ret;
+> +}
+> +
+> +static dma_addr_t ave_dma_map(struct net_device *ndev, struct ave_desc *desc,
+> +                             void *ptr, size_t len,
+> +                             enum dma_data_direction dir)
+> +{
+> +       dma_addr_t paddr;
+> +
+> +       paddr = dma_map_single(ndev->dev.parent, ptr, len, dir);
+> +       if (unlikely(dma_mapping_error(ndev->dev.parent, paddr))) {
+> +               paddr = (dma_addr_t)-ENOMEM;
+
+Yuk!
+
+Re-write the code.
+
+
+> +       } else {
+> +               desc->skbs_dma = paddr;
+> +               desc->skbs_dmalen = len;
+> +       }
+> +
+> +       return paddr;
+> +}
+
+
 -- 
-2.14.2
+Best Regards
+Masahiro Yamada
