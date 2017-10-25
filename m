@@ -1,35 +1,78 @@
-From: elder@linaro.org (Alex Elder)
-Date: Wed, 25 Oct 2017 16:53:34 -0500
-Subject: [PATCH 3/3] arm64: defconfig: remove CONFIG_USB_QCOM_8X16_PHY
-In-Reply-To: <20171025215334.19004-1-elder@linaro.org>
-References: <20171025215334.19004-1-elder@linaro.org>
-Message-ID: <20171025215334.19004-4-elder@linaro.org>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 25 Oct 2017 17:10:46 -0500
+Subject: [PATCH] PCI: rework error checking in the reset path
+In-Reply-To: <20171025232805.163ccaad@t450s.home>
+References: <1508794608-15310-1-git-send-email-okaya@codeaurora.org>
+ <20171025134511.GL21840@bhelgaas-glaptop.roam.corp.google.com>
+ <20171025232805.163ccaad@t450s.home>
+Message-ID: <20171025221046.GA25858@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No Qualcomm SoC requires the "phy-qcom-8x16-usb.c" USB phy driver
-support any more.  Remove the code, and remove the config option
-from the arm64 defconfig.
+On Wed, Oct 25, 2017 at 11:28:05PM +0200, Alex Williamson wrote:
+> On Wed, 25 Oct 2017 08:45:11 -0500
+> Bjorn Helgaas <helgaas@kernel.org> wrote:
+> 
+> > [+cc Alex]
+> > 
+> > On Mon, Oct 23, 2017 at 05:36:48PM -0400, Sinan Kaya wrote:
+> > > The return codes from various reset types are not consistent. The code is
+> > > assuming that all reset types will return -ENOTTY when things go wrong.
+> > > Instead of relying on negative error status, let's bail out if the
+> > > operation is successful instead.  
+> > 
+> > I like this (no surprise since I suggested something similar at
+> > http://lkml.kernel.org/r/20171011210057.GU25517 at bhelgaas-glaptop.roam.corp.google.com),
+> > but I'd like Alex's opinion before merging it.
+> > 
+> > Previously, we only tried the next reset method if one method failed
+> > with -ENOTTY.  With this patch, we'll try the next reset method if one
+> > method fails for any reason, not just -ENOTTY.
+> 
+> Hmm, I thought the return codes were pretty consistent.  -ENOTTY means
+> that the reset callback doesn't handle the device, move on.  Many
+> ioctls use the same return code to indicate an unknown ioctl.  This
+> allows us to differentiate success vs error vs unhandled.  In the code
+> below we lose the ability to, for instance, have a device specific
+> reset that returns -EINVAL to prevent the PCI core for triggering
+> further reset mechanisms which might be broken on the device.  So, I
+> don't see that this patch specifically fixes anything, but it does
+> remove what seems like useful functionality...  I'd veto it.  Thanks,
 
-Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
-Signed-off-by: Alex Elder <elder@linaro.org>
-Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-Acked-by: Andy Gross <andy.gross@linaro.org>
----
- arch/arm64/configs/defconfig | 1 -
- 1 file changed, 1 deletion(-)
+I didn't understand the  intention of -EINVAL vs -ENOTTY, so
+that might be a reasonable argument.  The knowledge about mechanisms
+being broken on a specific device seems like it would belong in
+pci_dev_specific_reset() and not really applicable to other methods,
+though.
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 85ca53f59c3e..22ca89e58d9d 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -425,7 +425,6 @@ CONFIG_USB_CHIPIDEA_HOST=y
- CONFIG_USB_ISP1760=y
- CONFIG_USB_HSIC_USB3503=y
- CONFIG_NOP_USB_XCEIV=y
--CONFIG_USB_QCOM_8X16_PHY=y
- CONFIG_USB_ULPI=y
- CONFIG_USB_GADGET=y
- CONFIG_USB_RENESAS_USBHS_UDC=m
--- 
-2.11.0
+But I'm not sure the current usage makes a lot of sense.  The only
+places I found that return an error other than -ENOTTY are
+reset_ivb_igd() and pci_pm_reset().  In reset_ivb_igd(), we return
+-ENOMEM if an ioremap() fails.  That's not a case of "other reset
+mechanisms are broken and we shouldn't try them."
+
+pci_pm_reset() returns -EINVAL if the device is not in D0.  Maybe it
+makes sense to not try any other reset methods in that case, but I
+really don't know.
+
+If we leave it as-is, maybe a comment like the following would be
+useful.
+
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index f0d68066c726..2c98f309bc8a 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -4170,6 +4170,13 @@ int __pci_reset_function_locked(struct pci_dev *dev)
+ 
+ 	might_sleep();
+ 
++	/*
++	 * Reset method return values:
++	 *   0:		    Device was successfully reset
++	 *   -ENOTTY:	    Method doesn't support resetting this device;
++	 *		    try the next method
++	 *   anything else: Reset failed; don't try any other mechanisms
++	 */
+ 	rc = pci_dev_specific_reset(dev, 0);
+ 	if (rc != -ENOTTY)
+ 		return rc;
