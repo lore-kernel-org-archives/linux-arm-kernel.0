@@ -1,70 +1,92 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 25 Oct 2017 18:47:08 +0200
-Subject: [PATCH 0/9] Enable dw-mmc multi-card support
-In-Reply-To: <AM2PR05MB07537D50A18D391CD2295D84A1430@AM2PR05MB0753.eurprd05.prod.outlook.com>
-References: <cover.1507315433.git.lsun@mellanox.com>
- <8e433531-8f67-d575-635e-c6ced29f6804@rock-chips.com>
- <CGME20171017155217epcas3p4de2f27b921ce77234a2d3e46e4b17473@epcas3p4.samsung.com>
- <AM2PR05MB07533A822C7CCBA7111FD58FA14C0@AM2PR05MB0753.eurprd05.prod.outlook.com>
- <f71d94dc-7277-8675-c21e-9c2ec77174e7@samsung.com>
- <AM2PR05MB07537D50A18D391CD2295D84A1430@AM2PR05MB0753.eurprd05.prod.outlook.com>
-Message-ID: <CAPDyKFo9jt6V01WWGEXuB7QFz6_-Gqiuzcujh3R-VO2A052DTA@mail.gmail.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Wed, 25 Oct 2017 18:48:27 +0200
+Subject: [PATCH v4 17/26] KVM: arm/arm64: GICv4: Propagate VLPI
+ properties at map time
+In-Reply-To: <20171006153401.5481-18-marc.zyngier@arm.com>
+References: <20171006153401.5481-1-marc.zyngier@arm.com>
+ <20171006153401.5481-18-marc.zyngier@arm.com>
+Message-ID: <20171025164827.GO91785@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Liming,
+On Fri, Oct 06, 2017 at 04:33:52PM +0100, Marc Zyngier wrote:
+> When the VLPI gets mapped, it must inherit the configuration of
+> the LPI configured at the vITS level. For that purpose, let's make
+> update_lpi_config globally available and call it just after
+> having performed the VLPI map operation.
+> 
+> Acked-by: Christoffer Dall <cdall@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  virt/kvm/arm/vgic/vgic-its.c | 6 ++----
+>  virt/kvm/arm/vgic/vgic-v4.c  | 2 ++
+>  virt/kvm/arm/vgic/vgic.h     | 2 ++
+>  3 files changed, 6 insertions(+), 4 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index eb72eb027060..f434748439ee 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -37,8 +37,6 @@
+>  static int vgic_its_save_tables_v0(struct vgic_its *its);
+>  static int vgic_its_restore_tables_v0(struct vgic_its *its);
+>  static int vgic_its_commit_v0(struct vgic_its *its);
+> -static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
+> -			     struct kvm_vcpu *filter_vcpu, bool needs_inv);
+>  
+>  /*
+>   * Creates a new (reference to a) struct vgic_irq for a given LPI.
+> @@ -272,8 +270,8 @@ static struct its_collection *find_collection(struct vgic_its *its, int coll_id)
+>   * If filter_vcpu is not NULL, applies only if the IRQ is targeting this
+>   * VCPU. Unconditionally applies if filter_vcpu is NULL.
+>   */
+> -static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
+> -			     struct kvm_vcpu *filter_vcpu, bool needs_inv)
+> +int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
+> +		      struct kvm_vcpu *filter_vcpu, bool needs_inv)
+>  {
+>  	u64 propbase = GICR_PROPBASER_ADDRESS(kvm->arch.vgic.propbaser);
+>  	u8 prop;
+> diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
+> index ba1dd3162eba..b79a0450bb1c 100644
+> --- a/virt/kvm/arm/vgic/vgic-v4.c
+> +++ b/virt/kvm/arm/vgic/vgic-v4.c
+> @@ -147,6 +147,8 @@ int kvm_vgic_v4_set_forwarding(struct kvm *kvm, int virq,
+>  	irq->hw		= true;
+>  	irq->host_irq	= virq;
+>  
+> +	/* Force the property update and invalidate */
+> +	update_lpi_config(kvm, irq, NULL, true);
 
-Sorry for jumping into the discussion like this.
+Actually, when re-reading this patch, this looks weird to me.
 
-[...]
+I think this needs to either be done as part of the map, or before the
+map, to prevent for example a disabled interrupt from the guest'ss PoV
+to fire when it doesn't expect it.
 
->> >> This series of commits enables the multi-card support for the dw-mmc
->> >> controller. It includes two parts as below.
->> >>
->> >> The first part (patches 1-7) reverts the series of recent commits
->> >> that removed the multi-card support with comments saying there was no
->> >> such use case in the real world. Actually this feature is being used
->> >> in Mellanox Bluefield SoC and has been requested by customers.
->> >
->> > Hrm.... it's so unlucky that your patchset comes a little late. As your patch 8
->> and 9 said, you need them to fix problem for multi-card support, so definitely
->> there was no such use case, and even the code was buggy to support it right?
->> That makes the code hard to read and maintain, so we decide to remove it.
+Thanks,
+-Christoffer
 
-Unfortunate patch 8 and 9 does *not* solve the fundamental problem
-with multiple slots. You can't solve it without involving the mmc
-core, as explained in earlier discussions [1].
-
->>
->> Hmm..
->> Well, if i missed your reply for my removing patch, it's my fault..but i didn't
->> see any reply..
->> At that time, we didn't see any usage and also now...
->
-> [Liming] It is definitely not anybody's fault. My apology that I should have made it very clear.
-> This is a new SoC which uses two eMMC cards. This feature has been requested by customer.
-> We made it working with patches, then realized that the support for the 2nd card was removed recently from upstream kernel.
-> To avoid reinventing the wheel, a better approach appears to bring back the changes.
->
->>
-
-Having multiple slots of eMMC:s, attached to one single mmc
-controller, is really a terrible idea, even if one could get it to
-somewhat work.
-
-To deal with multiple slots from the mmc core point of view, we would
-need to introduce  a kind of "bus slot lock", which needs to be taken
-whenever the core access any of the registered two mmc hosts.
-
-However, that then means that the upper block device layers can no
-longer perform proper I/O scheduling of requests to the eMMC cards. In
-other words, requests on one eMMC device can then starve requests
-reaching the other eMMC device. It all falls apart.
-
-Perhaps that is a limitation you think is okay to live with, but I am
-really not so sure it's worth adding "multiple slot" support.
-
-[...]
-
-Kind regards
-Uffe
+>  out:
+>  	mutex_unlock(&its->its_lock);
+>  	return ret;
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> index c4105f613f57..1bd2e28ac097 100644
+> --- a/virt/kvm/arm/vgic/vgic.h
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -239,6 +239,8 @@ static inline int vgic_v3_max_apr_idx(struct kvm_vcpu *vcpu)
+>  int vgic_its_resolve_lpi(struct kvm *kvm, struct vgic_its *its,
+>  			 u32 devid, u32 eventid, struct vgic_irq **irq);
+>  struct vgic_its *vgic_msi_to_its(struct kvm *kvm, struct kvm_msi *msi);
+> +int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
+> +		      struct kvm_vcpu *filter_vcpu, bool needs_inv);
+>  
+>  bool vgic_supports_direct_msis(struct kvm *kvm);
+>  int vgic_v4_init(struct kvm *kvm);
+> -- 
+> 2.14.1
+> 
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
