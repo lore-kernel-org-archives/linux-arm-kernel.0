@@ -1,51 +1,39 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 25 Oct 2017 16:50:46 +0530
-Subject: [PATCHv4 2/2] phy: exynos5-usbdrd: Calibrate LOS levels for
- exynos5420/5800
-In-Reply-To: <1507550451-21324-3-git-send-email-andrzej.p@samsung.com>
-References: <6de8a17a-745b-0fa2-c39d-cdeb28fc9489@ti.com>
- <1507550451-21324-1-git-send-email-andrzej.p@samsung.com>
- <CGME20171009120101eucas1p1066709725b5c6ca66961b85268480702@eucas1p1.samsung.com>
- <1507550451-21324-3-git-send-email-andrzej.p@samsung.com>
-Message-ID: <fca01b97-eea1-cc6f-9c12-fa8d9e55d980@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 25 Oct 2017 14:36:32 +0200
+Subject: [PATCH 1/2] ARM: dts: sun8i: h3-h5: Move pinctrl of mmc0 from
+ dts to dtsi
+In-Reply-To: <20171022091957.24614-2-joonas.kylmala@iki.fi>
+References: <20171022091957.24614-1-joonas.kylmala@iki.fi>
+ <20171022091957.24614-2-joonas.kylmala@iki.fi>
+Message-ID: <20171025123632.3jfjcztztm2qowrp@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Felipe,
+On Sun, Oct 22, 2017 at 12:19:56PM +0300, Joonas Kylm?l? wrote:
+> Most of the boards use the mmc0 pins and their attributes defined in
+> mmc0_pins_a and mmc0_cd_pin. Let's default to those by moving the
+> pinctrl attributes to the dtsi file. This makes it easier to modify
+> device trees in the future as there is only one place to change the
+> pinctrl attributes.
+> 
+> As a side effect this patch also adds the detect pin of Orange Pi
+> Zero's mmc0 under pinctrl as it should have been there right from the
+> beginning.
 
-On Monday 09 October 2017 05:30 PM, Andrzej Pietrasiewicz wrote:
-> From: Vivek Gautam <gautam.vivek@samsung.com>
-> 
-> Adding phy calibration sequence for USB 3.0 DRD PHY present on
-> Exynos5420/5800 systems.
-> This calibration facilitates setting certain PHY parameters viz.
-> the Loss-of-Signal (LOS) Detector Threshold Level, as well as
-> Tx-Vboost-Level for Super-Speed operations.
-> Additionally we also set proper time to wait for RxDetect measurement,
-> for desired PHY reference clock, so as to solve issue with enumeration
-> of few USB 3.0 devices, like Samsung SUM-TSB16S 3.0 USB drive
-> on the controller.
-> 
-> We are using CR_port for this purpose to send required data
-> to override the LOS values.
-> 
-> On testing with USB 3.0 devices on USB 3.0 port present on
-> SMDK5420, and peach-pit boards should see following message:
-> usb 2-1: new SuperSpeed USB device number 2 using xhci-hcd
-> 
-> and without this patch, should see below shown message:
-> usb 1-1: new high-speed USB device number 2 using xhci-hcd
-> 
-> [Also removed unnecessary extra lines in the register macro definitions]
-> 
-> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-> [adapted to use phy_calibrate as entry point]
-> Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
-> ---
->  drivers/phy/samsung/phy-exynos5-usbdrd.c | 183 +++++++++++++++++++++++++++++++
->  drivers/usb/dwc3/core.c                  |   7 +-
+We're actually in the process of removing those gpio pinctrl
+nodes. Could you make that while you're at it?
 
-are you okay with this patch?
+Thanks!
+Maxime
 
-Thanks
-Kishon
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171025/66ef3291/attachment.sig>
