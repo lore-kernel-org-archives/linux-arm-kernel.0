@@ -1,105 +1,76 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Tue, 24 Oct 2017 20:05:00 -0500
-Subject: [RFC 3/3] perf tool: arm-ccn: add a supplemental strerror function
-In-Reply-To: <20171024133518.GA13445@arm.com>
-References: <20171024030415.9baa5157e506892a757bf8c7@arm.com>
- <20171024133518.GA13445@arm.com>
-Message-ID: <20171024200500.619cef54ad276b2d680b613d@arm.com>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Wed, 25 Oct 2017 10:07:58 +0900
+Subject: [PATCH net-next v3 1/2] dt-bindings: net: add DT bindings for
+ Socionext UniPhier AVE
+In-Reply-To: <1508893679-11727-1-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1508893679-11727-1-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <1508893679-11727-2-git-send-email-hayashi.kunihiko@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 24 Oct 2017 14:35:19 +0100
-Will Deacon <will.deacon@arm.com> wrote:
+DT bindings for the AVE ethernet controller found on Socionext's
+UniPhier platforms.
 
-> On Tue, Oct 24, 2017 at 03:04:15AM -0500, Kim Phillips wrote:
-> > Use the Arm CCN driver as an example of how to try to improve
-> > upon its existing dmesg error output, and duplicate error string
-> > generation logic in the perf tool.
-> 
-> [...]
-> 
-> > Comments?  Is this really that much better than the existing dmesg that
-> > the user is already being pointed to by the perf tool?
-> 
-> Having never used the CCN PMU, I can't speak to the usefulness of this
-> change, but I can say that I think this needs to be PMU-specific rather than
-> arch-specific. The CCN driver can, for example, be built for 32-bit ARM
-> systems but the directory structure here doesn't reflect that.
+Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+---
+ .../bindings/net/socionext,uniphier-ave4.txt       | 48 ++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
 
-Sure, but the gist of this RFC is to determine whether it useful to
-users of the CCN PMU, and other hard-to-use PMUs.
-
-In the very last example provided, one can see that how referring the
-user to dmesg will be helpful, because only the kernel driver knows the
-node/xp vs topology enough to validate the user request.
-
-BEFORE THIS SERIES:
-
->From the perf tool, we get:
-
-Warning:
-ccn/xp_watchpoint,xp=3,vc=5,port=9,dir=1,cmp_l=0,cmp_h=1,mask=0/ event is not supported by the kernel.
-
->From dmesg, we get:
-
-[16561.872725] arm-ccn e8000000.ccn: Invalid vc 5 for node/XP 3!
-
-AFTER THIS SERIES (amended to only strerror_arch output):
-
-The tool gives us:
-
-Warning:
-ccn/xp_watchpoint,xp=3,vc=5,port=9,dir=1,cmp_l=0,cmp_h=1,mask=0/: Invalid MN / XP / node ID, or node type, or node/XP port / vc or event, or mixed PMU group. See dmesg for details
-
-So the usefulness of this series is still debatable - at least for CCN
-- given the tool already points the user to dmesg.
-
-> > +	switch (err) {
-> > +	case EOPNOTSUPP:
-> > +		if (attr->sample_period)
-> > +			return scnprintf(msg, size, "%s: Sampling not supported, try 'perf stat'\n", evname);
-> 
-> ... and then the existing code prints:
-> 
-> 	"PMU Hardware doesn't support sampling/overflow-interrupts."
-> 
-> so why do we need both?
-
-We don't; just didn't want to tread too hard on the common code on this
-first RFC, but you (and acme) are right: this should default back to
-the generic/shared strerror (and be removed from here).
-
-> > +		if (target__has_task(target))
-> > +			return scnprintf(msg, size, "%s: Can't provide per-task data!\n", evname);
-> 
-> Isn't this the case for all uncore PMUs? If so, could we predicate this
-> additionally on evsel->system_wide and print this in the shared error
-> handler?
-
-That actually should have been !target__has_cpu, since the driver
-checks for event->cpu < 0.
-
-hmm, I can't find a way to get that message out of the driver (on
-dmesg).  E.g., --per-thread invocations are being caught by the perf
-front end parser...but, yes, this probably should be removed from the
-custom CCN strerror code.
-
-> > +		break;
-> > +	case EINVAL:
-> > +		if ((attr->sample_type & PERF_SAMPLE_BRANCH_STACK) ||
-> > +			attr->exclude_user ||
-> > +			attr->exclude_kernel || attr->exclude_hv ||
-> > +			attr->exclude_idle || attr->exclude_host ||
-> > +			attr->exclude_guest)
-> > +			return scnprintf(msg, size, "%s: Can't exclude execution levels!\n", evname);
-> 
-> A better way to do this might be to identify some common failure modes,
-> e.g. unable to support some of the exclude_* fields in perf_event_attr,
-> then have an optional per-PMU callback which returns a bool to say
-> whether or not the error is because of that.
-
-Not sure exactly what that would look like for this context, but
-tools/perf/util/evsel.c:perf_evsel__fallback() gets called after the
-event open fails and already contains some of that logic...
-
-Kim
+diff --git a/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt b/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
+new file mode 100644
+index 0000000..4b7eca8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
+@@ -0,0 +1,48 @@
++* Socionext AVE ethernet controller
++
++This describes the devicetree bindings for AVE ethernet controller
++implemented on Socionext UniPhier SoCs.
++
++Required properties:
++ - compatible: Should be
++	- "socionext,uniphier-pro4-ave4" : for Pro4 SoC
++	- "socionext,uniphier-pxs2-ave4" : for PXs2 SoC
++	- "socionext,uniphier-ld11-ave4" : for LD11 SoC
++	- "socionext,uniphier-ld20-ave4" : for LD20 SoC
++ - reg: Address where registers are mapped and size of region.
++ - interrupts: Should contain the MAC interrupt.
++ - phy-mode: See ethernet.txt in the same directory. Allow to choose
++	"rgmii", "rmii", or "mii" according to the PHY.
++ - phy-handle: Should point to the external phy device.
++	See ethernet.txt file in the same directory.
++ - clocks: A phandle to the clock for the MAC.
++
++Optional properties:
++ - resets: A phandle to the reset control for the MAC.
++ - local-mac-address: See ethernet.txt in the same directory.
++
++Required subnode:
++ - mdio: Device tree subnode with the following required properties:
++	- #address-cells: Must be <1>.
++	- #size-cells: Must be <0>.
++	- reg: phy ID number, usually a small integer.
++
++Example:
++
++	ether: ethernet at 65000000 {
++		compatible = "socionext,uniphier-ld20-ave4";
++		reg = <0x65000000 0x8500>;
++		interrupts = <0 66 4>;
++		phy-mode = "rgmii";
++		phy-handle = <&ethphy>;
++		clocks = <&sys_clk 6>;
++		resets = <&sys_rst 6>;
++		local-mac-address = [00 00 00 00 00 00];
++		mdio {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			ethphy: ethphy at 1 {
++				reg = <1>;
++			};
++		};
++	};
+-- 
+2.7.4
