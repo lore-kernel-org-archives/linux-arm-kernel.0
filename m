@@ -1,76 +1,78 @@
 From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Wed, 25 Oct 2017 10:07:58 +0900
-Subject: [PATCH net-next v3 1/2] dt-bindings: net: add DT bindings for
- Socionext UniPhier AVE
-In-Reply-To: <1508893679-11727-1-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1508893679-11727-1-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <1508893679-11727-2-git-send-email-hayashi.kunihiko@socionext.com>
+Date: Wed, 25 Oct 2017 10:07:57 +0900
+Subject: [PATCH net-next v3 0/2] add UniPhier AVE ethernet support
+Message-ID: <1508893679-11727-1-git-send-email-hayashi.kunihiko@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT bindings for the AVE ethernet controller found on Socionext's
-UniPhier platforms.
+This series adds support for Socionext AVE ethernet controller implemented
+on UniPhier SoCs. This driver supports RGMII/RMII modes.
 
-Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
----
- .../bindings/net/socionext,uniphier-ave4.txt       | 48 ++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
+v1: http://www.spinics.net/lists/netdev/msg454292.html
+v2: http://www.spinics.net/lists/netdev/msg460109.html
+
+The PHY patch included in v1 has already separated in:
+http://www.spinics.net/lists/netdev/msg454595.html
+
+Changes since v2:
+- replace clk_get() with devm_clk_get()
+- replace reset_control_get() with devm_reset_control_get_optional_shared()
+- add error return when the error occurs on the above *_get functions
+- sort soc data and compatible strings
+- remove clearly obvious comments
+- modify dt-bindings document consistent with these modifications
+
+Changes since v1:
+- add/remove devicetree properties and sub-node
+  - remove "internal-phy-interrupt" and "desc-bits" property
+  - add SoC data structures based on compatible strings
+  - add node operation to apply "mdio" sub-node
+- add support for features
+  - add support for {get,set}_pauseparam and pause frame operations
+  - add support for ndo_get_stats64 instead of ndo_get_stats
+- replace with desiable functions
+  - replace check for valid phy_mode with phy_interface{_mode}_is_rgmii()
+  - replace phy attach message with phy_attached_info()
+  - replace 32bit operation with {upper,lower}_32_bits() on ave_wdesc_addr()
+  - replace nway_reset and get_link with generic functions
+- move operations to proper functions
+  - move phy_start_aneg() to ndo_open,
+    and remove unnecessary PHY interrupt operations
+    See http://www.spinics.net/lists/netdev/msg454590.html
+  - move irq initialization and descriptor memory allocation to ndo_open
+  - move initialization of reset and clock and mdiobus to ndo_init
+- fix skbuffer operations
+  - fix skb alignment operations and add Rx buffer adjustment for descriptor
+    See http://www.spinics.net/lists/netdev/msg456014.html
+  - add error returns when dma_map_single() failed 
+- clean up code structures
+  - clean up wait-loop and wake-queue conditions
+  - add ave_wdesc_addr() and offset definitions
+  - add ave_macaddr_init() to clean up mac-address operation
+  - fix checking whether Tx entry is not enough
+  - fix supported features of phydev
+  - add necessary free/disable operations
+  - add phydev check on ave_{get,set}_wol()
+  - remove netif_carrier functions, phydev initializer, and Tx budget check
+- change obsolate codes
+  - replace ndev->{base_addr,irq} with the members of ave_private
+- rename goto labels and mask definitions, and remove unused codes
+
+Kunihiko Hayashi (2):
+  dt-bindings: net: add DT bindings for Socionext UniPhier AVE
+  net: ethernet: socionext: add AVE ethernet driver
+
+ .../bindings/net/socionext,uniphier-ave4.txt       |   48 +
+ drivers/net/ethernet/Kconfig                       |    1 +
+ drivers/net/ethernet/Makefile                      |    1 +
+ drivers/net/ethernet/socionext/Kconfig             |   22 +
+ drivers/net/ethernet/socionext/Makefile            |    4 +
+ drivers/net/ethernet/socionext/sni_ave.c           | 1746 ++++++++++++++++++++
+ 6 files changed, 1822 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
+ create mode 100644 drivers/net/ethernet/socionext/Kconfig
+ create mode 100644 drivers/net/ethernet/socionext/Makefile
+ create mode 100644 drivers/net/ethernet/socionext/sni_ave.c
 
-diff --git a/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt b/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
-new file mode 100644
-index 0000000..4b7eca8
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
-@@ -0,0 +1,48 @@
-+* Socionext AVE ethernet controller
-+
-+This describes the devicetree bindings for AVE ethernet controller
-+implemented on Socionext UniPhier SoCs.
-+
-+Required properties:
-+ - compatible: Should be
-+	- "socionext,uniphier-pro4-ave4" : for Pro4 SoC
-+	- "socionext,uniphier-pxs2-ave4" : for PXs2 SoC
-+	- "socionext,uniphier-ld11-ave4" : for LD11 SoC
-+	- "socionext,uniphier-ld20-ave4" : for LD20 SoC
-+ - reg: Address where registers are mapped and size of region.
-+ - interrupts: Should contain the MAC interrupt.
-+ - phy-mode: See ethernet.txt in the same directory. Allow to choose
-+	"rgmii", "rmii", or "mii" according to the PHY.
-+ - phy-handle: Should point to the external phy device.
-+	See ethernet.txt file in the same directory.
-+ - clocks: A phandle to the clock for the MAC.
-+
-+Optional properties:
-+ - resets: A phandle to the reset control for the MAC.
-+ - local-mac-address: See ethernet.txt in the same directory.
-+
-+Required subnode:
-+ - mdio: Device tree subnode with the following required properties:
-+	- #address-cells: Must be <1>.
-+	- #size-cells: Must be <0>.
-+	- reg: phy ID number, usually a small integer.
-+
-+Example:
-+
-+	ether: ethernet at 65000000 {
-+		compatible = "socionext,uniphier-ld20-ave4";
-+		reg = <0x65000000 0x8500>;
-+		interrupts = <0 66 4>;
-+		phy-mode = "rgmii";
-+		phy-handle = <&ethphy>;
-+		clocks = <&sys_clk 6>;
-+		resets = <&sys_rst 6>;
-+		local-mac-address = [00 00 00 00 00 00];
-+		mdio {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			ethphy: ethphy at 1 {
-+				reg = <1>;
-+			};
-+		};
-+	};
 -- 
 2.7.4
