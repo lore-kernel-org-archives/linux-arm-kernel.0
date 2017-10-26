@@ -1,41 +1,56 @@
-From: joonas.kylmala@iki.fi (=?UTF-8?Q?Joonas_Kylm=c3=a4l=c3=a4?=)
-Date: Thu, 26 Oct 2017 15:06:00 +0000
-Subject: Fwd: Re: [PATCH 1/2] ARM: dts: sun8i: h3-h5: Move pinctrl of mmc0
- from dts to dtsi
-In-Reply-To: <5e5c4079-c150-2047-bdc2-e9cee5c2dfa1@iki.fi>
-References: <5e5c4079-c150-2047-bdc2-e9cee5c2dfa1@iki.fi>
-Message-ID: <98468b0f-5562-783b-dda5-9c90f1749ab7@riseup.net>
+From: ludovic.Barre@st.com (Ludovic Barre)
+Date: Thu, 26 Oct 2017 17:12:33 +0200
+Subject: [PATCH v2 1/3] mtd: spi-nor: stm32-quadspi: Fix uninitialized error
+ return code
+In-Reply-To: <1509030755-19044-1-git-send-email-ludovic.Barre@st.com>
+References: <1509030755-19044-1-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1509030755-19044-2-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Geert Uytterhoeven <geert@linux-m68k.org>
 
-I accidentally forgot to CC this mailing list for the message so here it is.
+With gcc 4.1.2:
 
-Joonas
+    drivers/mtd/spi-nor/stm32-quadspi.c: In function ?stm32_qspi_tx_poll?:
+    drivers/mtd/spi-nor/stm32-quadspi.c:230: warning: ?ret? may be used uninitialized in this function
 
--------- Forwarded Message --------
-Subject: Re: [PATCH 1/2] ARM: dts: sun8i: h3-h5: Move pinctrl of mmc0
-from dts to dtsi
-Date: Thu, 26 Oct 2017 14:57:00 +0000
-From: Joonas Kylm?l? <joonas.kylmala@iki.fi>
-To: Maxime Ripard <maxime.ripard@free-electrons.com>
-CC: Chen-Yu Tsai <wens@csie.org>, linux-sunxi at googlegroups.com, Icenowy
-Zheng <icenowy@aosc.io>
+Indeed, if stm32_qspi_cmd.len is zero, ret will be uninitialized.
+This length is passed from outside the driver using the
+spi_nor.{read,write}{,_reg}() callbacks.
 
-Maxime Ripard:
-> On Sun, Oct 22, 2017 at 12:19:56PM +0300, Joonas Kylm?l? wrote:
->> Most of the boards use the mmc0 pins and their attributes defined in
->> mmc0_pins_a and mmc0_cd_pin. Let's default to those by moving the
->> pinctrl attributes to the dtsi file. This makes it easier to modify
->> device trees in the future as there is only one place to change the
->> pinctrl attributes.
->>
->> As a side effect this patch also adds the detect pin of Orange Pi
->> Zero's mmc0 under pinctrl as it should have been there right from the
->> beginning.
-> 
-> We're actually in the process of removing those gpio pinctrl
-> nodes. Could you make that while you're at it?
+Several functions in drivers/mtd/spi-nor/spi-nor.c (e.g. write_enable(),
+write_disable(), and erase_chip()) call spi_nor.write_reg() with a zero
+length.
 
-Sure. We are assuming that the bootloader will do the pin configuration?
+Fix this by returning an explicit zero on success.
+
+Fixes: 0d43d7ab277a048c ("mtd: spi-nor: add driver for STM32 quad spi flash controller")
+Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Acked-by: Ludovic Barre <ludovic.barre@st.com>
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+---
+ drivers/mtd/spi-nor/stm32-quadspi.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/mtd/spi-nor/stm32-quadspi.c b/drivers/mtd/spi-nor/stm32-quadspi.c
+index 86c0931..ad6a3e1 100644
+--- a/drivers/mtd/spi-nor/stm32-quadspi.c
++++ b/drivers/mtd/spi-nor/stm32-quadspi.c
+@@ -240,12 +240,12 @@ static int stm32_qspi_tx_poll(struct stm32_qspi *qspi,
+ 						 STM32_QSPI_FIFO_TIMEOUT_US);
+ 		if (ret) {
+ 			dev_err(qspi->dev, "fifo timeout (stat:%#x)\n", sr);
+-			break;
++			return ret;
+ 		}
+ 		tx_fifo(buf++, qspi->io_base + QUADSPI_DR);
+ 	}
+ 
+-	return ret;
++	return 0;
+ }
+ 
+ static int stm32_qspi_tx_mm(struct stm32_qspi *qspi,
+-- 
+2.7.4
