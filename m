@@ -1,133 +1,80 @@
-From: tudor.ambarus@microchip.com (Tudor Ambarus)
-Date: Thu, 26 Oct 2017 15:34:56 +0300
-Subject: Kernel panic when using ccm(aes) with the Atmel AES HW accelerator
-In-Reply-To: <CAGkQfmP6Kq4DEBbGU7AW71PjbUJ2acdJF5PVDm6VqZkUaaoEzA@mail.gmail.com>
-References: <CAGkQfmP6Kq4DEBbGU7AW71PjbUJ2acdJF5PVDm6VqZkUaaoEzA@mail.gmail.com>
-Message-ID: <4e822b84-2d5a-1b9d-a36b-faf04fcbfcf8@microchip.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Thu, 26 Oct 2017 20:50:26 +0800
+Subject: [PATCH 1/3] phy: phy-mtk-tphy: use auto instead of force to bypass
+ utmi signals
+Message-ID: <f08880e993f05761f0171b83812e940d30a54b05.1509022149.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Romain,
+When system is running, if usb2 phy is forced to bypass utmi signals,
+all PLL will be turned off, and it can't detect device connection
+anymore, so replace force mode with auto mode which can bypass utmi
+signals automatically if no device attached for normal flow.
+But keep the force mode to fix RX sensitivity degradation issue.
 
-On 10/18/2017 04:32 PM, Romain Izard wrote:
-> diff --git a/drivers/crypto/atmel-aes.c b/drivers/crypto/atmel-aes.c
-> index 29e20c37f3a6..f3eabe1f1490 100644
-> --- a/drivers/crypto/atmel-aes.c
-> +++ b/drivers/crypto/atmel-aes.c
-> @@ -80,6 +80,7 @@
->   #define AES_FLAGS_BUSY         BIT(3)
->   #define AES_FLAGS_DUMP_REG     BIT(4)
->   #define AES_FLAGS_OWN_SHA      BIT(5)
-> +#define AES_FLAGS_CIPHERTAIL   BIT(6)
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+---
+ drivers/phy/mediatek/phy-mtk-tphy.c |   19 +++++++------------
+ 1 file changed, 7 insertions(+), 12 deletions(-)
 
-not really needed, see below.
-
-> 
->   #define AES_FLAGS_PERSISTENT   (AES_FLAGS_INIT | AES_FLAGS_BUSY)
-> 
-> @@ -156,6 +157,7 @@ struct atmel_aes_authenc_ctx {
-> 
->   struct atmel_aes_reqctx {
->          unsigned long           mode;
-> +       u32                     ciphertail[AES_BLOCK_SIZE / sizeof(u32)];
-How about renaming this variable to "lastc"? Ci, i=1..n is the usual
-notation for the ciphertext blocks.
-
-The assumption that the last ciphertext block is of AES_BLOCK_SIZE size
-is correct, this driver is meant just for AES.
-
->   };
-> 
->   #ifdef CONFIG_CRYPTO_DEV_ATMEL_AUTHENC
-> @@ -496,6 +498,11 @@ static void atmel_aes_authenc_complete(struct
-> atmel_aes_dev *dd, int err);
-> 
->   static inline int atmel_aes_complete(struct atmel_aes_dev *dd, int err)
->   {
-> +       struct ablkcipher_request *req = ablkcipher_request_cast(dd->areq);
-> +       struct crypto_ablkcipher *ablkcipher = crypto_ablkcipher_reqtfm(req);
-> +       struct atmel_aes_reqctx *rctx = ablkcipher_request_ctx(req);
-> +       int ivsize = crypto_ablkcipher_ivsize(ablkcipher);
-> +
->   #ifdef CONFIG_CRYPTO_DEV_ATMEL_AUTHENC
->          atmel_aes_authenc_complete(dd, err);
->   #endif
-> @@ -503,6 +510,17 @@ static inline int atmel_aes_complete(struct
-> atmel_aes_dev *dd, int err)
->          clk_disable(dd->iclk);
->          dd->flags &= ~AES_FLAGS_BUSY;
-> 
-> +       if (rctx->mode & AES_FLAGS_CIPHERTAIL) {
-> +               if (rctx->mode & AES_FLAGS_ENCRYPT) {
-> +                       scatterwalk_map_and_copy(req->info, req->dst,
-> +                                                req->nbytes - ivsize,
-> +                                                ivsize, 0);
-> +               } else {
-> +                       memcpy(req->info, rctx->ciphertail, ivsize);
-
-why don't we make the same assumption and replace ivsize with
-AES_BLOCK_SIZE? Is there any chance that req->info was allocated with
-less than AES_BLOCK_SIZE size?
-
-> +                       memset(rctx->ciphertail, 0, ivsize);
-
-memset to zero is not necessary.
-
-> +               }
-> +       }
-> +
->          if (dd->is_async)
->                  dd->areq->complete(dd->areq, err);
-> 
-> @@ -1071,11 +1089,13 @@ static int atmel_aes_ctr_start(struct atmel_aes_dev *dd)
-> 
->   static int atmel_aes_crypt(struct ablkcipher_request *req, unsigned long mode)
->   {
-> +       struct crypto_ablkcipher *ablkcipher;
->          struct atmel_aes_base_ctx *ctx;
->          struct atmel_aes_reqctx *rctx;
->          struct atmel_aes_dev *dd;
-> 
-> -       ctx = crypto_ablkcipher_ctx(crypto_ablkcipher_reqtfm(req));
-> +       ablkcipher = crypto_ablkcipher_reqtfm(req);
-> +       ctx = crypto_ablkcipher_ctx(ablkcipher);
-
-you can initialize these variables at declaration.
-
->          switch (mode & AES_FLAGS_OPMODE_MASK) {
->          case AES_FLAGS_CFB8:
->                  ctx->block_size = CFB8_BLOCK_SIZE;
-> @@ -1103,7 +1123,15 @@ static int atmel_aes_crypt(struct
-> ablkcipher_request *req, unsigned long mode)
->                  return -ENODEV;
-> 
->          rctx = ablkcipher_request_ctx(req);
-
-while here, please initialize this at declaration.
-
-Also, this one:
-'''
-         dd = atmel_aes_find_dev(ctx);
-         if (!dd)
-                 return -ENODEV;
-
-'''
-should be moved at the beginning of the function. If an initialization
-might fail, let's check it as soon as we can, so that we don't waste
-resources.
-
-> -       rctx->mode = mode;
-> +
-> +       if (!(mode & AES_FLAGS_ENCRYPT)) {
-> +               int ivsize = crypto_ablkcipher_ivsize(ablkcipher);
-> +
-> +               scatterwalk_map_and_copy(rctx->ciphertail, req->src,
-> +                               (req->nbytes - ivsize), ivsize, 0);
-> +       }
-> +       rctx->mode = mode | AES_FLAGS_CIPHERTAIL;
-
-saving the last ciphertext block is a requirement for skcipher. This
-flag is redundant, there's no need to use it.
-
-Thank you, Romain!
-ta
+diff --git a/drivers/phy/mediatek/phy-mtk-tphy.c b/drivers/phy/mediatek/phy-mtk-tphy.c
+index 402385f..54cc44b 100644
+--- a/drivers/phy/mediatek/phy-mtk-tphy.c
++++ b/drivers/phy/mediatek/phy-mtk-tphy.c
+@@ -440,9 +440,9 @@ static void u2_phy_instance_init(struct mtk_tphy *tphy,
+ 	u32 index = instance->index;
+ 	u32 tmp;
+ 
+-	/* switch to USB function. (system register, force ip into usb mode) */
++	/* switch to USB function, and enable usb pll */
+ 	tmp = readl(com + U3P_U2PHYDTM0);
+-	tmp &= ~P2C_FORCE_UART_EN;
++	tmp &= ~(P2C_FORCE_UART_EN | P2C_FORCE_SUSPENDM);
+ 	tmp |= P2C_RG_XCVRSEL_VAL(1) | P2C_RG_DATAIN_VAL(0);
+ 	writel(tmp, com + U3P_U2PHYDTM0);
+ 
+@@ -502,10 +502,8 @@ static void u2_phy_instance_power_on(struct mtk_tphy *tphy,
+ 	u32 index = instance->index;
+ 	u32 tmp;
+ 
+-	/* (force_suspendm=0) (let suspendm=1, enable usb 480MHz pll) */
+ 	tmp = readl(com + U3P_U2PHYDTM0);
+-	tmp &= ~(P2C_FORCE_SUSPENDM | P2C_RG_XCVRSEL);
+-	tmp &= ~(P2C_RG_DATAIN | P2C_DTM0_PART_MASK);
++	tmp &= ~(P2C_RG_XCVRSEL | P2C_RG_DATAIN | P2C_DTM0_PART_MASK);
+ 	writel(tmp, com + U3P_U2PHYDTM0);
+ 
+ 	/* OTG Enable */
+@@ -540,7 +538,6 @@ static void u2_phy_instance_power_off(struct mtk_tphy *tphy,
+ 
+ 	tmp = readl(com + U3P_U2PHYDTM0);
+ 	tmp &= ~(P2C_RG_XCVRSEL | P2C_RG_DATAIN);
+-	tmp |= P2C_FORCE_SUSPENDM;
+ 	writel(tmp, com + U3P_U2PHYDTM0);
+ 
+ 	/* OTG Disable */
+@@ -548,18 +545,16 @@ static void u2_phy_instance_power_off(struct mtk_tphy *tphy,
+ 	tmp &= ~PA6_RG_U2_OTG_VBUSCMP_EN;
+ 	writel(tmp, com + U3P_USBPHYACR6);
+ 
+-	/* let suspendm=0, set utmi into analog power down */
+-	tmp = readl(com + U3P_U2PHYDTM0);
+-	tmp &= ~P2C_RG_SUSPENDM;
+-	writel(tmp, com + U3P_U2PHYDTM0);
+-	udelay(1);
+-
+ 	tmp = readl(com + U3P_U2PHYDTM1);
+ 	tmp &= ~(P2C_RG_VBUSVALID | P2C_RG_AVALID);
+ 	tmp |= P2C_RG_SESSEND;
+ 	writel(tmp, com + U3P_U2PHYDTM1);
+ 
+ 	if (tphy->pdata->avoid_rx_sen_degradation && index) {
++		tmp = readl(com + U3P_U2PHYDTM0);
++		tmp &= ~(P2C_RG_SUSPENDM | P2C_FORCE_SUSPENDM);
++		writel(tmp, com + U3P_U2PHYDTM0);
++
+ 		tmp = readl(com + U3D_U2PHYDCR0);
+ 		tmp &= ~P2C_RG_SIF_U2PLL_FORCE_ON;
+ 		writel(tmp, com + U3D_U2PHYDCR0);
+-- 
+1.7.9.5
