@@ -1,18 +1,59 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 26 Oct 2017 08:33:07 +0530
-Subject: [PATCH 0/2] cpufreq: arm_big_little: make function arguments and
- structures const
-In-Reply-To: <1508410755-13666-1-git-send-email-bhumirks@gmail.com>
-References: <1508410755-13666-1-git-send-email-bhumirks@gmail.com>
-Message-ID: <20171026030307.GA4240@vireshk-i7>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Thu, 26 Oct 2017 13:48:29 +0900
+Subject: n900 in next-20170901
+In-Reply-To: <20171025173137.GQ4394@atomide.com>
+References: <20170915065608.GA8567@js1304-P5Q-DELUXE>
+ <20170921172811.GB4394@atomide.com>
+ <20170925080806.GA9837@js1304-P5Q-DELUXE>
+ <20170925145437.GG4394@atomide.com>
+ <20171018082927.GB27595@js1304-P5Q-DELUXE>
+ <20171019183033.GH4394@atomide.com>
+ <20171020015542.GA10438@js1304-P5Q-DELUXE>
+ <20171020173146.GN4394@atomide.com>
+ <20171023045342.GA23082@js1304-P5Q-DELUXE>
+ <20171025173137.GQ4394@atomide.com>
+Message-ID: <20171026044829.GB11791@js1304-P5Q-DELUXE>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19-10-17, 12:59, Bhumika Goyal wrote:
-> Make some function arguments as const. After this change make the 
-> cpufreq_arm_bL_ops structures const.
+On Wed, Oct 25, 2017 at 10:31:38AM -0700, Tony Lindgren wrote:
+> * Joonsoo Kim <iamjoonsoo.kim@lge.com> [171022 21:51]:
+> > On Fri, Oct 20, 2017 at 10:31:47AM -0700, Tony Lindgren wrote:
+> > > * Joonsoo Kim <iamjoonsoo.kim@lge.com> [171019 18:53]:
+> > > > Oops... I made a mistak. Could you test with reverting commit
+> > > > c977ee2803787363187d6aca9cebdabc793c6531 ("omap: forcibly call
+> > > > save_secure_ram_context() for test") in that branch?
+> > > > Without reverting it, it doesn't call 'smc' so it always cause a
+> > > > hang.
+> > > 
+> > > Oops I should have noticed that one. Here you go with commit
+> > > c977ee280378 reverted. Still not booting.
+> > 
+> > Still very thanks to you. :)
+> 
+> No problem, sorry for the delay in testing this one.
+> 
+> > Okay. Could you test my updated branch? In there, I also disable
+> > atomic_pool initialization and disable to remap the CMA area in order
+> > to completely make any operation on CMA area as no-op.
+> > 
+> > And, it enables memblock_debug to check how memblock region is
+> > allocated.
+> > 
+> > https://github.com/JoonsooKim/linux/tree/cma-debug4-next-20180901
+> 
+> Great, this branch boots on n900! Early parts of the dmesg attached
+> below.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Sound good. Perhaps, problem is due to the cache management. With my
+patchset, direct mapping for CMA area is cleared in
+dma_contiguous_remap() if CONFIG_HIGHMEM. I guess that proper cache
+operation is required there.
 
--- 
-viresh
+Could you test my newly updated branch again? I re-enable
+dma_contiguous_remap() to clear direct mapping for CMA area and add
+proper(?) cache operation although I'm not the expert on that area.
+
+https://github.com/JoonsooKim/linux/tree/cma-debug4-next-20180901
+
+Thanks.
