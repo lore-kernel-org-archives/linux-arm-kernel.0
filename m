@@ -1,69 +1,149 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Thu, 26 Oct 2017 11:31:15 +0200
-Subject: 4.13 (and probably all recent) kernels refuse to boot on one
- Nokia N950, work or another
-In-Reply-To: <20171026091325.GA26929@amd>
-References: <20171025203459.GA22035@amd> <20171025212806.GA21504@atomide.com>
- <20171026091325.GA26929@amd>
-Message-ID: <20171026093115.4bc6ctxjx72ng7ld@earth>
+From: gengdongjiu@huawei.com (Dongjiu Geng)
+Date: Thu, 26 Oct 2017 18:07:01 +0800
+Subject: [PATCH v2] KVM: arm/arm64: Fix external abort type matching
+Message-ID: <1509012421-8772-1-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+For this matching, current code using the {I,D}FSC
+range to match kvm_vcpu_trap_get_fault_type() return
+value, but kvm_vcpu_trap_get_fault_type() only return
+the part {I,D}FSC instead of whole, so fix this issue
 
-On Thu, Oct 26, 2017 at 11:13:26AM +0200, Pavel Machek wrote:
-> On Wed 2017-10-25 14:28:07, Tony Lindgren wrote:
-> > * Pavel Machek <pavel@ucw.cz> [171025 13:36]:
-> > > Hi!
-> > > 
-> > > ...hardware should be identical. 3.5.3-nemo kernel seems to work on
-> > > both. 4.13-rc2 with display and clock patches boots on phone "S", but
-> > > does not on phone "P"; nothing nothing is received on serial port.
-> > > 
-> > > There is some difference in the bootloaders: S's bootloader provides
-> > > lots of debug info, P's is silent. R&D settings do _not_ have
-> > > influence on bootloader. We know P's serial works, as 3.5.3 kernel
-> > > prints "Uncompressing linux...booting" there.
-> > > 
-> > > I'll need to return "S" phone and serial cable tommorow. If you have
-> > > any ideas, let me know.
-> > 
-> > If you get nothing out of the uart, chances are the pins are
-> > not muxed for the uart in nolo and maybe kernel dts is missing the
-> > pinctrl entries for uart?
-> > 
-> > Also try booting with mem=512M at 0x80000000 or 256M or 768M. Maybe the
-> > memory is different size or partially broken?
-> 
-> Uhuh. It looks like "P" nokia really wants initrd, otherwise it will
-> not boot.
-> 
-> I got "uncompressing Linux 4.13" on serial console now, debug LEDs
-> blinking, and if I use a flashlight, I see output on the screen, too.
-> 
-> (What do I need to do to get the backlight working?)
+Value       Type
+0x10        FSC_SEA
+0x14        FSC_SEA_TTW0 FSC_SEA_TTW1 FSC_SEA_TTW2 FSC_SEA_TTW3
+0x18        FSC_SECC
+0x1c        FSC_SECC_TTW0 FSC_SECC_TTW1 FSC_SECC_TTW2 FSC_SECC_TTW3
 
-Glad you got it working :) For backlight you can add this
-in drivers/gpu/drm/omapdrm/displays/panel-dsi-cm.c:
+CC: James Morse <james.morse@arm.com>
+CC: Tyler Baicar <tbaicar@codeaurora.org>
+Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
 
-add the following code at the end of dsicm_probe:
+---
+As shown below code:
 
------------------------------------------------------------
-mutex_unlock(&ddata->lock);
-mutex_lock(&ddata->lock);
-ddata->in->ops.dsi->bus_lock(ddata->in);
-r = dsicm_wake_up(ddata);
-if (!r)
-    r = dsicm_dcs_write_1(ddata, DCS_BRIGHTNESS, 100);
-ddata->in->ops.dsi->bus_unlock(ddata->in);
-mutex_unlock(&ddata->lock);
------------------------------------------------------------
+The kvm_vcpu_trap_get_fault_type() only return {I,D}FSC bit[5]:bit[2], not
+the whole {I,D}FSC, but FSC_SEA_TTWx and FSC_SECC_TTWx are the whole {I,D}FSC
+value.
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171026/8e17bd8b/attachment.sig>
+static inline u8 kvm_vcpu_trap_get_fault_type(const struct kvm_vcpu *vcpu)
+{
+    return kvm_vcpu_get_hsr(vcpu) & ESR_ELx_FSC_TYPE;
+}
+
+static inline bool kvm_vcpu_dabt_isextabt(const struct kvm_vcpu *vcpu)
+{
+    switch (kvm_vcpu_trap_get_fault_type(vcpu)) {
+    case FSC_SEA:
+    case FSC_SEA_TTW0:
+    case FSC_SEA_TTW1:
+    case FSC_SEA_TTW2:
+    case FSC_SEA_TTW3:
+    case FSC_SECC:
+    case FSC_SECC_TTW0:
+    case FSC_SECC_TTW1:
+    case FSC_SECC_TTW2:
+    case FSC_SECC_TTW3:
+        return true;
+    default:
+        return false;
+    }
+}
+---
+ arch/arm/include/asm/kvm_arm.h       | 10 ++--------
+ arch/arm/include/asm/kvm_emulate.h   | 10 ++--------
+ arch/arm64/include/asm/kvm_arm.h     | 10 ++--------
+ arch/arm64/include/asm/kvm_emulate.h | 10 ++--------
+ 4 files changed, 8 insertions(+), 32 deletions(-)
+
+diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
+index c878145..b4b155c 100644
+--- a/arch/arm/include/asm/kvm_arm.h
++++ b/arch/arm/include/asm/kvm_arm.h
+@@ -188,15 +188,9 @@
+ #define FSC_ACCESS	(0x08)
+ #define FSC_PERM	(0x0c)
+ #define FSC_SEA		(0x10)
+-#define FSC_SEA_TTW0	(0x14)
+-#define FSC_SEA_TTW1	(0x15)
+-#define FSC_SEA_TTW2	(0x16)
+-#define FSC_SEA_TTW3	(0x17)
++#define FSC_SEA_TTW	(0x14)
+ #define FSC_SECC	(0x18)
+-#define FSC_SECC_TTW0	(0x1c)
+-#define FSC_SECC_TTW1	(0x1d)
+-#define FSC_SECC_TTW2	(0x1e)
+-#define FSC_SECC_TTW3	(0x1f)
++#define FSC_SECC_TTW	(0x1c)
+ 
+ /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
+ #define HPFAR_MASK	(~0xf)
+diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+index 98089ff..aed8279 100644
+--- a/arch/arm/include/asm/kvm_emulate.h
++++ b/arch/arm/include/asm/kvm_emulate.h
+@@ -205,15 +205,9 @@ static inline bool kvm_vcpu_dabt_isextabt(struct kvm_vcpu *vcpu)
+ {
+ 	switch (kvm_vcpu_trap_get_fault_type(vcpu)) {
+ 	case FSC_SEA:
+-	case FSC_SEA_TTW0:
+-	case FSC_SEA_TTW1:
+-	case FSC_SEA_TTW2:
+-	case FSC_SEA_TTW3:
++	case FSC_SEA_TTW:
+ 	case FSC_SECC:
+-	case FSC_SECC_TTW0:
+-	case FSC_SECC_TTW1:
+-	case FSC_SECC_TTW2:
+-	case FSC_SECC_TTW3:
++	case FSC_SECC_TTW:
+ 		return true;
+ 	default:
+ 		return false;
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index 61d694c..c0f1798 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -205,15 +205,9 @@
+ #define FSC_ACCESS	ESR_ELx_FSC_ACCESS
+ #define FSC_PERM	ESR_ELx_FSC_PERM
+ #define FSC_SEA		ESR_ELx_FSC_EXTABT
+-#define FSC_SEA_TTW0	(0x14)
+-#define FSC_SEA_TTW1	(0x15)
+-#define FSC_SEA_TTW2	(0x16)
+-#define FSC_SEA_TTW3	(0x17)
++#define FSC_SEA_TTW	(0x14)
+ #define FSC_SECC	(0x18)
+-#define FSC_SECC_TTW0	(0x1c)
+-#define FSC_SECC_TTW1	(0x1d)
+-#define FSC_SECC_TTW2	(0x1e)
+-#define FSC_SECC_TTW3	(0x1f)
++#define FSC_SECC_TTW	(0x1c)
+ 
+ /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
+ #define HPFAR_MASK	(~UL(0xf))
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index e5df3fc..5cde311 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -239,15 +239,9 @@ static inline bool kvm_vcpu_dabt_isextabt(const struct kvm_vcpu *vcpu)
+ {
+ 	switch (kvm_vcpu_trap_get_fault_type(vcpu)) {
+ 	case FSC_SEA:
+-	case FSC_SEA_TTW0:
+-	case FSC_SEA_TTW1:
+-	case FSC_SEA_TTW2:
+-	case FSC_SEA_TTW3:
++	case FSC_SEA_TTW:
+ 	case FSC_SECC:
+-	case FSC_SECC_TTW0:
+-	case FSC_SECC_TTW1:
+-	case FSC_SECC_TTW2:
+-	case FSC_SECC_TTW3:
++	case FSC_SECC_TTW:
+ 		return true;
+ 	default:
+ 		return false;
+-- 
+1.9.1
