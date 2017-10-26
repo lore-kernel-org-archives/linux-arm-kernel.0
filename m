@@ -1,62 +1,82 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 26 Oct 2017 16:10:54 -0200
-Subject: [PATCH v5] ARM: dts: imx53-tx53: Fix 'ethernet-phy@0' node with
- unit name and no reg property
-In-Reply-To: <1509031514-30602-1-git-send-email-marco.franchi@nxp.com>
-References: <1509031514-30602-1-git-send-email-marco.franchi@nxp.com>
-Message-ID: <CAOMZO5ALw3VKkX_rQCfBVNQ1q5Y8a12R3Dn42NyPAn3Te0e6OQ@mail.gmail.com>
+From: phh@phh.me (Pierre-Hugues Husson)
+Date: Thu, 26 Oct 2017 20:19:42 +0200
+Subject: [PATCH v3] drm: bridge: synopsys/dw-hdmi: Enable cec clock
+Message-ID: <20171026181942.9516-1-phh@phh.me>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 26, 2017 at 1:25 PM, Marco Franchi <marco.franchi@nxp.com> wrote:
-> The following build warning is seen with W=1:
->
-> Warning (unit_address_vs_reg): Node /soc/aips at 60000000/ethernet at 63fec000/ethernet-phy at 0 has a unit name, but no reg property
->
-> Fix this warning by adding reg property from such node and, consequently,
-> includes a mdio node into the fec node, with the 'address-cells' and
-> 'size-cells' to avoid these other following warnings:
->
-> Warning (reg_format): "reg" property in /soc/aips at 60000000/ethernet at 63fec000/ethernet-phy at 0 has invalid length (4 bytes) (#address-cells == 2, #size-cells == 1)
-> Warning (avoid_default_addr_size): Relying on default #address-cells value for /soc/aips at 60000000/ethernet at 63fec000/ethernet-phy at 0
-> Warning (avoid_default_addr_size): Relying on default #size-cells value for /soc/aips at 60000000/ethernet at 63fec000/ethernet-phy at 0
->
-> Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
+The documentation already mentions "cec" optional clock, but
+currently the driver doesn't enable it.
 
-Lothar, could you please test it?
+Changes:
+v3:
+- Drop useless braces
 
-> ---
-> Change since v4:
-> -pass the 'address-cells' and 'size-cells' values using a mdio node
-> -change message log
->  arch/arm/boot/dts/imx53-tx53.dtsi | 14 ++++++++++----
->  1 file changed, 10 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/imx53-tx53.dtsi b/arch/arm/boot/dts/imx53-tx53.dtsi
-> index 71b58b6..a22e461 100644
-> --- a/arch/arm/boot/dts/imx53-tx53.dtsi
-> +++ b/arch/arm/boot/dts/imx53-tx53.dtsi
-> @@ -225,10 +225,16 @@
->         mac-address = [000000000000]; /* placeholder; will be overwritten by bootloader */
->         status = "okay";
->
-> -       phy0: ethernet-phy at 0 {
-> -               interrupt-parent = <&gpio2>;
-> -               interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
-> -               device_type = "ethernet-phy";
-> +       mdio {
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +
-> +               phy0: ethernet-phy at 0 {
-> +                       reg = <0>;
-> +                       interrupt-parent = <&gpio2>;
-> +                       interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
-> +                       device_type = "ethernet-phy";
-> +               };
->         };
->  };
->
-> --
-> 2.7.4
->
+v2:
+- Separate ENOENT errors from others
+- Propagate other errors (especially -EPROBE_DEFER)
+
+Signed-off-by: Pierre-Hugues Husson <phh@phh.me>
+---
+ drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+
+diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+index bf14214fa464..d82b9747a979 100644
+--- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
++++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+@@ -138,6 +138,7 @@ struct dw_hdmi {
+ 	struct device *dev;
+ 	struct clk *isfr_clk;
+ 	struct clk *iahb_clk;
++	struct clk *cec_clk;
+ 	struct dw_hdmi_i2c *i2c;
+ 
+ 	struct hdmi_data_info hdmi_data;
+@@ -2382,6 +2383,26 @@ __dw_hdmi_probe(struct platform_device *pdev,
+ 		goto err_isfr;
+ 	}
+ 
++	hdmi->cec_clk = devm_clk_get(hdmi->dev, "cec");
++	if (PTR_ERR(hdmi->cec_clk) == -ENOENT) {
++		hdmi->cec_clk = NULL;
++	} else if (IS_ERR(hdmi->cec_clk)) {
++		ret = PTR_ERR(hdmi->cec_clk);
++		if (ret != -EPROBE_DEFER)
++			dev_err(hdmi->dev, "Cannot get HDMI cec clock: %d\n",
++					ret);
++
++		hdmi->cec_clk = NULL;
++		goto err_iahb;
++	} else {
++		ret = clk_prepare_enable(hdmi->cec_clk);
++		if (ret) {
++			dev_err(hdmi->dev, "Cannot enable HDMI cec clock: %d\n",
++					ret);
++			goto err_iahb;
++		}
++	}
++
+ 	/* Product and revision IDs */
+ 	hdmi->version = (hdmi_readb(hdmi, HDMI_DESIGN_ID) << 8)
+ 		      | (hdmi_readb(hdmi, HDMI_REVISION_ID) << 0);
+@@ -2518,6 +2539,8 @@ __dw_hdmi_probe(struct platform_device *pdev,
+ 		cec_notifier_put(hdmi->cec_notifier);
+ 
+ 	clk_disable_unprepare(hdmi->iahb_clk);
++	if (hdmi->cec_clk)
++		clk_disable_unprepare(hdmi->cec_clk);
+ err_isfr:
+ 	clk_disable_unprepare(hdmi->isfr_clk);
+ err_res:
+@@ -2541,6 +2564,8 @@ static void __dw_hdmi_remove(struct dw_hdmi *hdmi)
+ 
+ 	clk_disable_unprepare(hdmi->iahb_clk);
+ 	clk_disable_unprepare(hdmi->isfr_clk);
++	if (hdmi->cec_clk)
++		clk_disable_unprepare(hdmi->cec_clk);
+ 
+ 	if (hdmi->i2c)
+ 		i2c_del_adapter(&hdmi->i2c->adap);
+-- 
+2.14.2
