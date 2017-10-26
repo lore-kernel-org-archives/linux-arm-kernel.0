@@ -1,61 +1,75 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Wed, 25 Oct 2017 21:22:10 -0500
-Subject: [RFC 1/3] perf tool: Introduce arch-specific supplemental perf
- open strerror capability
-In-Reply-To: <20171024202300.de189fde683c939966a6646c@arm.com>
-References: <20171024030404.ec366ec2d9c38910ccd84ba5@arm.com>
- <20171024142744.GE2512@redhat.com>
- <20171024202300.de189fde683c939966a6646c@arm.com>
-Message-ID: <20171025212210.fae60dcd543bafc312583ad3@arm.com>
+From: yinbo.zhu@nxp.com (yinbo.zhu at nxp.com)
+Date: Thu, 26 Oct 2017 10:05:52 +0800
+Subject: [PATCH v4] arm64: dts: ls1088a: Add USB support
+Message-ID: <20171026020552.42153-1-yinbo.zhu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 24 Oct 2017 20:23:00 -0500
-Kim Phillips <kim.phillips@arm.com> wrote:
+From: "yinbo.zhu" <yinbo.zhu@nxp.com>
 
-> On Tue, 24 Oct 2017 12:27:44 -0200
-> Arnaldo Carvalho de Melo <acme@redhat.com> wrote:
-> 
-> > Em Tue, Oct 24, 2017 at 03:04:04AM -0500, Kim Phillips escreveu:
-> > > Introduce new tools/perf/arch/*/util/evsel.c:perf_evsel__suppl_strerror()
-<snip>
-> > But then you're calling it _before_ the existing switch (err), humm...
-> > I.e. it will add stuff before the string that will be formatted later...
-> > The messages may end up being conflicting, I wonder if the model
-> > wouldn't be better as: ask the arch specific if it wants to override
-> > that specific error with something, if not, fallback to the existing
-> > perf_evsel__open_strerror() code, that could be moved to be
-> > __perf_evsel__open_strerror() and called by the arch specific code.
-> > 
-> > Thoughts?
-> 
-> Thanks for your good feedback, yes, very good idea, fully agreed and
-> implemented - see below.
+Add USB support on ls1088ardb
 
-I take this back:  There's no way for the tool to tell whether it was
-the PMU driver that croaked on the perf_event_open, or whether it was
-due to another part of the syscall returning an error code.
+Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
+Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
+---
+Change in v4:
+                - Change status from "enable" to "disabled" then enable it on dts file.
+                - Add the version history.
+		- Update the subject.
 
-WRT the CCN strerror code being able to tell whether it was the CCN
-driver that did it, technically it could scan the event for strings
-like 'vc=', but it still wouldn't be sure.
+ arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts |  8 ++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi    | 20 ++++++++++++++++++++
+ 2 files changed, 28 insertions(+)
 
-In the below example, the error being erroneously reported is the
-default EINVAL case in the CCN strerror ("Invalid MN..."):
-
-$ sudo ./perf stat -vv -e ccn/cycles/  -p 1330
-ccn/cycles/: Invalid MN / XP / node ID, or node type, or node/XP port / vc or event, or mixed PMU group. See dmesg for details
-
-^Cfailed to read counter ccn/cycles/
-
- Performance counter stats for process id '1330':
-
-   <not supported>      ccn/cycles/                                                 
-
-       2.343102253 seconds time elapsed
-
-...and nothing was emitted in dmesg by the driver.
-
-Any other ideas?
-
-Kim
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
+index 0f6fcda36b9e..a84b49ec76ec 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
+@@ -118,6 +118,14 @@
+ 	status = "okay";
+ };
+ 
++&usb0 {
++	status = "okay";
++};
++
++&usb1 {
++	status = "okay";
++};
++
+ &esdhc {
+ 	status = "okay";
+ };
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+index 33797b373674..64968def0890 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+@@ -385,6 +385,26 @@
+ 			status = "disabled";
+ 		};
+ 
++		usb0: usb3 at 3100000 {
++			compatible = "snps,dwc3";
++			reg = <0x0 0x3100000 0x0 0x10000>;
++			interrupts = <0 80 IRQ_TYPE_LEVEL_HIGH>;
++			dr_mode = "host";
++			snps,quirk-frame-length-adjustment = <0x20>;
++			snps,dis_rxdet_inp3_quirk;
++			status = "disabled";
++		};
++
++		usb1: usb3 at 3110000 {
++			compatible = "snps,dwc3";
++			reg = <0x0 0x3110000 0x0 0x10000>;
++			interrupts = <0 81 IRQ_TYPE_LEVEL_HIGH>;
++			dr_mode = "host";
++			snps,quirk-frame-length-adjustment = <0x20>;
++			snps,dis_rxdet_inp3_quirk;
++			status = "disabled";
++		};
++
+ 		sata: sata at 3200000 {
+ 			compatible = "fsl,ls1088a-ahci";
+ 			reg = <0x0 0x3200000 0x0 0x10000>,
+-- 
+2.14.1
