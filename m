@@ -1,59 +1,35 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Thu, 26 Oct 2017 13:48:29 +0900
-Subject: n900 in next-20170901
-In-Reply-To: <20171025173137.GQ4394@atomide.com>
-References: <20170915065608.GA8567@js1304-P5Q-DELUXE>
- <20170921172811.GB4394@atomide.com>
- <20170925080806.GA9837@js1304-P5Q-DELUXE>
- <20170925145437.GG4394@atomide.com>
- <20171018082927.GB27595@js1304-P5Q-DELUXE>
- <20171019183033.GH4394@atomide.com>
- <20171020015542.GA10438@js1304-P5Q-DELUXE>
- <20171020173146.GN4394@atomide.com>
- <20171023045342.GA23082@js1304-P5Q-DELUXE>
- <20171025173137.GQ4394@atomide.com>
-Message-ID: <20171026044829.GB11791@js1304-P5Q-DELUXE>
+From: jasowang@redhat.com (Jason Wang)
+Date: Thu, 26 Oct 2017 13:38:59 +0800
+Subject: v4.14-rc3/arm64 DABT exception in atomic_inc() / __skb_clone()
+In-Reply-To: <CANn89iL-tcPUVDREwXCUR4hxVTBCP2HYJLzPGUGMTh5dpe0C6Q@mail.gmail.com>
+References: <EAA60182-6F08-412E-8F8B-FD4B0309A858@gmail.com>
+ <20171020111408.edj24tztxdptte5r@lakrids.cambridge.arm.com>
+ <960D71EC-C1E9-4898-ACBE-543FC09483FF@gmail.com>
+ <CACT4Y+bjzzCv3LSxK12C1xB8GfR3UYCrX_5phRYJ8fpxh9vcvQ@mail.gmail.com>
+ <CAF=yD-K76TMjHiYRTRAnxM-x4LBcUDY+27WX477HW6kG=L_aZw@mail.gmail.com>
+ <D2AD6D5B-3A05-48E7-A999-DECAB18A4649@gmail.com>
+ <CAF=yD-JFjjA=2T7HermH2GygfHinyW+ZC5v+Di7M4V_Fg5paHg@mail.gmail.com>
+ <CAF=yD-Lw2E7T12sA-dgMK5kn=L0TLGQE+v68s1X8HMHLq9hGBA@mail.gmail.com>
+ <CANn89iL-tcPUVDREwXCUR4hxVTBCP2HYJLzPGUGMTh5dpe0C6Q@mail.gmail.com>
+Message-ID: <7d13751a-5a7b-ff67-5f00-92e27861b24a@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 25, 2017 at 10:31:38AM -0700, Tony Lindgren wrote:
-> * Joonsoo Kim <iamjoonsoo.kim@lge.com> [171022 21:51]:
-> > On Fri, Oct 20, 2017 at 10:31:47AM -0700, Tony Lindgren wrote:
-> > > * Joonsoo Kim <iamjoonsoo.kim@lge.com> [171019 18:53]:
-> > > > Oops... I made a mistak. Could you test with reverting commit
-> > > > c977ee2803787363187d6aca9cebdabc793c6531 ("omap: forcibly call
-> > > > save_secure_ram_context() for test") in that branch?
-> > > > Without reverting it, it doesn't call 'smc' so it always cause a
-> > > > hang.
-> > > 
-> > > Oops I should have noticed that one. Here you go with commit
-> > > c977ee280378 reverted. Still not booting.
-> > 
-> > Still very thanks to you. :)
-> 
-> No problem, sorry for the delay in testing this one.
-> 
-> > Okay. Could you test my updated branch? In there, I also disable
-> > atomic_pool initialization and disable to remap the CMA area in order
-> > to completely make any operation on CMA area as no-op.
-> > 
-> > And, it enables memblock_debug to check how memblock region is
-> > allocated.
-> > 
-> > https://github.com/JoonsooKim/linux/tree/cma-debug4-next-20180901
-> 
-> Great, this branch boots on n900! Early parts of the dmesg attached
-> below.
 
-Sound good. Perhaps, problem is due to the cache management. With my
-patchset, direct mapping for CMA area is cleared in
-dma_contiguous_remap() if CONFIG_HIGHMEM. I guess that proper cache
-operation is required there.
 
-Could you test my newly updated branch again? I re-enable
-dma_contiguous_remap() to clear direct mapping for CMA area and add
-proper(?) cache operation although I'm not the expert on that area.
+On 2017?10?26? 03:01, Eric Dumazet wrote:
+> On Wed, Oct 25, 2017 at 11:49 AM, Willem de Bruijn
+> <willemdebruijn.kernel@gmail.com> wrote:
+>
+>>  From skb->dev and netdev_priv, the tun device has flags 0x1002 ==
+>> IFF_TAP | IFF_NO_PI. This kernel precedes the recent support for
+>> IFF_NAPI and IFF_NAPI_FRAGS. The allocation most likely happened
+>> in tun_build_skb from current->task_frag. It would be a previous
+>> allocation that left alloc_frag->offset unaligned. But perhaps this code
+>> needs to perform alignment before setting skb->head. At least on
+>> platforms where atomic on dataref must be aligned.
+> +1
+>
+> Bug added in commit 66ccbc9c87c2 ("tap: use build_skb() for small packet")
 
-https://github.com/JoonsooKim/linux/tree/cma-debug4-next-20180901
-
-Thanks.
+Thanks, will post a patch.
