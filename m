@@ -1,45 +1,46 @@
-From: philippe.cornu@st.com (Philippe Cornu)
-Date: Thu, 26 Oct 2017 18:12:36 +0200
-Subject: [PATCH] dt-bindings: display: stm32: add pixel clock mandatory
- property
-Message-ID: <1509034356-23885-1-git-send-email-philippe.cornu@st.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 26 Oct 2017 18:28:07 +0200
+Subject: 4.13 (and probably all recent) kernels refuse to boot on one
+ Nokia N950, work or another
+In-Reply-To: <20171026120130.dicanunwcdmjntnb@earth>
+References: <20171025203459.GA22035@amd> <20171025212806.GA21504@atomide.com>
+ <20171026091325.GA26929@amd>
+ <20171026093115.4bc6ctxjx72ng7ld@earth>
+ <20171026095734.GA10141@amd>
+ <20171026120130.dicanunwcdmjntnb@earth>
+Message-ID: <20171026162807.GA20639@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the DPI/RGB input pixel clock in mandatory properties
-because it really offers a better preciseness for timing
-computations.
-Note: Fix also the DSI panel example where "ref" & "pclk"
-clocks were swapped.
+Hi!
 
-Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
----
- Documentation/devicetree/bindings/display/st,stm32-ltdc.txt | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+> > > Glad you got it working :) For backlight you can add this
+> > > in drivers/gpu/drm/omapdrm/displays/panel-dsi-cm.c:
+> > > 
+> > > add the following code at the end of dsicm_probe:
+> > 
+> > You did not actually include code to paste into panel-dsi-cm, can you
+> > try a again?
+> 
+> I added it directly below and you quoted it. I guess you mistook it
+> for a signature or something :)
 
-diff --git a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
-index 0292522..99823fb 100644
---- a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
-+++ b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
-@@ -28,6 +28,7 @@ Mandatory properties specific to STM32 DSI:
- - #size-cells: Should be <0>.
- - compatible: "st,stm32-dsi".
- - clock-names:
-+  - DPI/RGB input pixel clock string name, must be "px_clk".
-   - phy pll reference clock string name, must be "ref".
- - resets: see [5].
- - reset-names: see [5].
-@@ -97,8 +98,9 @@ Example 2: DSI panel
- 			#size-cells = <0>;
- 			compatible = "st,stm32-dsi";
- 			reg = <0x40016c00 0x800>;
--			clocks = <&rcc 1 CLK_F469_DSI>, <&clk_hse>;
--			clock-names = "ref", "pclk";
-+			clocks = <&rcc 1 CLK_F469_DSI>, <&rcc 1 CLK_LCD>,
-+				 <&clk_hse>;
-+			clock-names = "pclk", "px_clk", "ref";
- 			resets = <&rcc STM32F4_APB2_RESET(DSI)>;
- 			reset-names = "apb";
+Ahha. Two semicolons confused me, and I thought you were talking about
+two different files. My fault. Let me try...
+
+And.. If I catch the bus, I should be at cca 20:15 at the Hilton. We
+can meet at the seats where we were hacking...?
+
+									Pavel
  
+
 -- 
-1.9.1
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171026/194ab3c9/attachment.sig>
