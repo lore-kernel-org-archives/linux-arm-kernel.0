@@ -1,102 +1,63 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Thu, 26 Oct 2017 17:32:01 +0200
-Subject: [PATCH v4 26/26] KVM: arm/arm64: GICv4: Theory of operations
-In-Reply-To: <20171006153401.5481-27-marc.zyngier@arm.com>
-References: <20171006153401.5481-1-marc.zyngier@arm.com>
- <20171006153401.5481-27-marc.zyngier@arm.com>
-Message-ID: <20171026153201.GF2166@lvm>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Thu, 26 Oct 2017 17:32:15 +0200
+Subject: [INTERNAL][PATCH 4/7] ASoC: stm32: sai: fix stop management in isr
+In-Reply-To: <1508418203-16840-5-git-send-email-olivier.moysan@st.com>
+References: <1508418203-16840-1-git-send-email-olivier.moysan@st.com>
+ <1508418203-16840-5-git-send-email-olivier.moysan@st.com>
+Message-ID: <s5hmv4ekjr4.wl-tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 06, 2017 at 04:34:01PM +0100, Marc Zyngier wrote:
-> Yet another braindump so I can free some cells...
+On Thu, 19 Oct 2017 15:03:20 +0200,
+Olivier Moysan wrote:
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-
+> Add check on substream validity.
+> 
+> Signed-off-by: Olivier Moysan <olivier.moysan@st.com>
 > ---
->  virt/kvm/arm/vgic/vgic-v4.c | 67 +++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 67 insertions(+)
+>  sound/soc/stm/stm32_sai_sub.c | 12 ++++++++----
+>  1 file changed, 8 insertions(+), 4 deletions(-)
 > 
-> diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
-> index 68a2ef6df161..b87806fea554 100644
-> --- a/virt/kvm/arm/vgic/vgic-v4.c
-> +++ b/virt/kvm/arm/vgic/vgic-v4.c
-> @@ -22,6 +22,73 @@
->  
->  #include "vgic.h"
->  
-> +/*
-> + * How KVM uses GICv4 (insert rude comments here):
-> + *
-> + * The vgic-v4 layer acts as a bridge between several entities:
-> + * - The GICv4 ITS representation offered by the ITS driver
-> + * - VFIO, which is in charge of the PCI endpoint
-> + * - The virtual ITS, which is the only thing the guest sees
-> + *
-> + * The configuration of VLPIs is triggered by a callback from VFIO,
-> + * instructing KVM that a PCI device has been configured to deliver
-> + * MSIs to a vITS.
-> + *
-> + * kvm_vgic_v4_set_forwarding() is thus called with the routing entry,
-> + * and this is used to find the corresponding vITS data structures
-> + * (ITS instance, device, event and irq) using a process that is
-> + * extremely similar to the injection of an MSI.
-> + *
-> + * At this stage, we can link the guest's view of an LPI (uniquely
-> + * identified by the routing entry) and the host irq, using the GICv4
-> + * driver mapping operation. Should the mapping succeed, we've then
-> + * successfully upgraded the guest's LPI to a VLPI. We can then start
-> + * with updating GICv4's view of the property table and generating an
-> + * INValidation in order to kickstart the delivery of this VLPI to the
-> + * guest directly, without software intervention. Well, almost.
-> + *
-> + * When the PCI endpoint is deconfigured, this operation is reversed
-> + * with VFIO calling kvm_vgic_v4_unset_forwarding().
-> + *
-> + * Once the VLPI has been mapped, it needs to follow any change the
-> + * guest performs on its LPI through the vITS. For that, a number of
-> + * command handlers have hooks to communicate these changes to the HW:
-> + * - Any invalidation triggers a call to its_prop_update_vlpi()
-> + * - The INT command results in a irq_set_irqchip_state(), which
-> + *   generates an INT on the corresponding VLPI.
-> + * - The CLEAR command results in a irq_set_irqchip_state(), which
-> + *   generates an CLEAR on the corresponding VLPI.
-> + * - DISCARD translates into an unmap, similar to a call to
-> + *   kvm_vgic_v4_unset_forwarding().
-> + * - MOVI is translated by an update of the existing mapping, changing
-> + *   the target vcpu, resulting in a VMOVI being generated.
-> + * - MOVALL is translated by a string of mapping updates (similar to
-> + *   the handling of MOVI). MOVALL is horrible.
-> + *
-> + * Note that a DISCARD/MAPTI sequence emitted from the guest without
-> + * reprogramming the PCI endpoint after MAPTI does not result in a
-> + * VLPI being mapped, as there is no callback from VFIO (the guest
-> + * will get the interrupt via the normal SW injection). Fixing this is
-> + * not trivial, and requires some horrible messing with the VFIO
-> + * internals. Not fun. Don't do that.
-> + *
-> + * Then there is the scheduling. Each time a vcpu is about to run on a
-> + * physical CPU, KVM must tell the corresponding redistributor about
-> + * it. And if we've migrated our vcpu from one CPU to another, we must
-> + * tell the ITS (so that the messages reach the right redistributor).
-> + * This is done in two steps: first issue a irq_set_affinity() on the
-> + * irq corresponding to the vcpu, then call its_schedule_vpe(). You
-> + * must be in a non-preemptible context. On exit, another call to
-> + * its_schedule_vpe() tells the redistributor that we're done with the
-> + * vcpu.
-> + *
-> + * Finally, the doorbell handling: Each vcpu is allocated an interrupt
-> + * which will fire each time a VLPI is made pending whilst the vcpu is
-> + * not running. Each time the vcpu gets blocked, the doorbell
-> + * interrupt gets enabled. When the vcpu is unblocked (for whatever
-> + * reason), the doorbell interrupt is disabled.
-> + */
-> +
->  static irqreturn_t vgic_v4_doorbell_handler(int irq, void *info)
+> diff --git a/sound/soc/stm/stm32_sai_sub.c b/sound/soc/stm/stm32_sai_sub.c
+> index 2af397d..815ef10 100644
+> --- a/sound/soc/stm/stm32_sai_sub.c
+> +++ b/sound/soc/stm/stm32_sai_sub.c
+> @@ -184,7 +184,6 @@ static bool stm32_sai_sub_writeable_reg(struct device *dev, unsigned int reg)
+>  static irqreturn_t stm32_sai_isr(int irq, void *devid)
 >  {
->  	struct kvm_vcpu *vcpu = info;
-> -- 
-> 2.14.1
-> 
+>  	struct stm32_sai_sub_data *sai = (struct stm32_sai_sub_data *)devid;
+> -	struct snd_pcm_substream *substream = sai->substream;
+>  	struct platform_device *pdev = sai->pdev;
+>  	unsigned int sr, imr, flags;
+>  	snd_pcm_state_t status = SNDRV_PCM_STATE_RUNNING;
+> @@ -199,6 +198,11 @@ static irqreturn_t stm32_sai_isr(int irq, void *devid)
+>  	regmap_update_bits(sai->regmap, STM_SAI_CLRFR_REGX, SAI_XCLRFR_MASK,
+>  			   SAI_XCLRFR_MASK);
+>  
+> +	if (!sai->substream) {
+> +		dev_err(&pdev->dev, "Device stopped. Spurious IRQ 0x%x\n", sr);
+> +		return IRQ_NONE;
+> +	}
+> +
+>  	if (flags & SAI_XIMR_OVRUDRIE) {
+>  		dev_err(&pdev->dev, "IRQ %s\n",
+>  			STM_SAI_IS_PLAYBACK(sai) ? "underrun" : "overrun");
+> @@ -227,9 +231,9 @@ static irqreturn_t stm32_sai_isr(int irq, void *devid)
+>  	}
+>  
+>  	if (status != SNDRV_PCM_STATE_RUNNING) {
+> -		snd_pcm_stream_lock(substream);
+> -		snd_pcm_stop(substream, SNDRV_PCM_STATE_XRUN);
+> -		snd_pcm_stream_unlock(substream);
+> +		snd_pcm_stream_lock(sai->substream);
+> +		snd_pcm_stop(sai->substream, SNDRV_PCM_STATE_XRUN);
+> +		snd_pcm_stream_unlock(sai->substream);
+
+Actually changing to sai->substream opens a race, so this chunk is a
+bad move, at least.  We have no protection of sai->substream in this
+context, thus it can hit a NULL dereference...
+
+
+thanks,
+
+Takashi
