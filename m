@@ -1,147 +1,38 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Thu, 26 Oct 2017 20:50:28 +0800
-Subject: [PATCH 3/3] phy: phy-mtk-tphy: fix alignment warning
-In-Reply-To: <f08880e993f05761f0171b83812e940d30a54b05.1509022149.git.chunfeng.yun@mediatek.com>
-References: <f08880e993f05761f0171b83812e940d30a54b05.1509022149.git.chunfeng.yun@mediatek.com>
-Message-ID: <964f480553791aab43299a8ac06cc44a9430eea2.1509022150.git.chunfeng.yun@mediatek.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 26 Oct 2017 14:05:12 +0100
+Subject: [PATCH v4 02/26] KVM: arm/arm64: vgic: restructure
+ kvm_vgic_(un)map_phys_irq
+In-Reply-To: <20171025144443.GH91785@lvm> (Christoffer Dall's message of "Wed,
+ 25 Oct 2017 16:44:43 +0200")
+References: <20171006153401.5481-1-marc.zyngier@arm.com>
+ <20171006153401.5481-3-marc.zyngier@arm.com>
+ <20171025144443.GH91785@lvm>
+Message-ID: <86lgjyawl3.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix alignment warning by checkpatch.pl with --strict
+On Wed, Oct 25 2017 at  4:44:43 pm BST, Christoffer Dall <cdall@linaro.org> wrote:
+> On Fri, Oct 06, 2017 at 04:33:37PM +0100, Marc Zyngier wrote:
+>> From: Eric Auger <eric.auger@redhat.com>
+>> 
+>> We want to reuse the core of the map/unmap functions for IRQ
+>> forwarding. Let's move the computation of the hwirq in
+>> kvm_vgic_map_phys_irq and pass the linux IRQ as parameter.
+>> the host_irq is added to struct vgic_irq.
+>> 
+>> We introduce kvm_vgic_map/unmap_irq which take a struct vgic_irq
+>> handle as a parameter.
+>> 
+>
+> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+>
+> Marc,
+>   I need a signed-off-by from you on this patch.
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- drivers/phy/mediatek/Kconfig        |    8 ++++----
- drivers/phy/mediatek/phy-mtk-tphy.c |   24 ++++++++++++------------
- 2 files changed, 16 insertions(+), 16 deletions(-)
+Ah, my bad. I'll fix that for the next round (real soon now...)
 
-diff --git a/drivers/phy/mediatek/Kconfig b/drivers/phy/mediatek/Kconfig
-index 88ab4e2..fb4bcd9 100644
---- a/drivers/phy/mediatek/Kconfig
-+++ b/drivers/phy/mediatek/Kconfig
-@@ -8,7 +8,7 @@ config PHY_MTK_TPHY
-     help
-       Say 'Y' here to add support for MediaTek T-PHY driver,
-       it supports multiple usb2.0, usb3.0 ports, PCIe and
--	  SATA, and meanwhile supports two version T-PHY which have
--	  different banks layout, the T-PHY with shared banks between
--	  multi-ports is first version, otherwise is second veriosn,
--	  so you can easily distinguish them by banks layout.
-+      SATA, and meanwhile supports two version T-PHY which have
-+      different banks layout, the T-PHY with shared banks between
-+      multi-ports is first version, otherwise is second veriosn,
-+      so you can easily distinguish them by banks layout.
-diff --git a/drivers/phy/mediatek/phy-mtk-tphy.c b/drivers/phy/mediatek/phy-mtk-tphy.c
-index cdd33bf..02b00b7 100644
---- a/drivers/phy/mediatek/phy-mtk-tphy.c
-+++ b/drivers/phy/mediatek/phy-mtk-tphy.c
-@@ -309,7 +309,7 @@ struct mtk_tphy {
- };
- 
- static void hs_slew_rate_calibrate(struct mtk_tphy *tphy,
--	struct mtk_phy_instance *instance)
-+				   struct mtk_phy_instance *instance)
- {
- 	struct u2phy_banks *u2_banks = &instance->u2_banks;
- 	void __iomem *fmreg = u2_banks->fmreg;
-@@ -384,7 +384,7 @@ static void hs_slew_rate_calibrate(struct mtk_tphy *tphy,
- }
- 
- static void u3_phy_instance_init(struct mtk_tphy *tphy,
--	struct mtk_phy_instance *instance)
-+				 struct mtk_phy_instance *instance)
- {
- 	struct u3phy_banks *u3_banks = &instance->u3_banks;
- 	u32 tmp;
-@@ -434,7 +434,7 @@ static void u3_phy_instance_init(struct mtk_tphy *tphy,
- }
- 
- static void u2_phy_instance_init(struct mtk_tphy *tphy,
--	struct mtk_phy_instance *instance)
-+				 struct mtk_phy_instance *instance)
- {
- 	struct u2phy_banks *u2_banks = &instance->u2_banks;
- 	void __iomem *com = u2_banks->com;
-@@ -496,7 +496,7 @@ static void u2_phy_instance_init(struct mtk_tphy *tphy,
- }
- 
- static void u2_phy_instance_power_on(struct mtk_tphy *tphy,
--	struct mtk_phy_instance *instance)
-+				     struct mtk_phy_instance *instance)
- {
- 	struct u2phy_banks *u2_banks = &instance->u2_banks;
- 	void __iomem *com = u2_banks->com;
-@@ -530,7 +530,7 @@ static void u2_phy_instance_power_on(struct mtk_tphy *tphy,
- }
- 
- static void u2_phy_instance_power_off(struct mtk_tphy *tphy,
--	struct mtk_phy_instance *instance)
-+				      struct mtk_phy_instance *instance)
- {
- 	struct u2phy_banks *u2_banks = &instance->u2_banks;
- 	void __iomem *com = u2_banks->com;
-@@ -565,7 +565,7 @@ static void u2_phy_instance_power_off(struct mtk_tphy *tphy,
- }
- 
- static void u2_phy_instance_exit(struct mtk_tphy *tphy,
--	struct mtk_phy_instance *instance)
-+				 struct mtk_phy_instance *instance)
- {
- 	struct u2phy_banks *u2_banks = &instance->u2_banks;
- 	void __iomem *com = u2_banks->com;
-@@ -609,7 +609,7 @@ static void u2_phy_instance_set_mode(struct mtk_tphy *tphy,
- }
- 
- static void pcie_phy_instance_init(struct mtk_tphy *tphy,
--	struct mtk_phy_instance *instance)
-+				   struct mtk_phy_instance *instance)
- {
- 	struct u3phy_banks *u3_banks = &instance->u3_banks;
- 	u32 tmp;
-@@ -682,7 +682,7 @@ static void pcie_phy_instance_init(struct mtk_tphy *tphy,
- }
- 
- static void pcie_phy_instance_power_on(struct mtk_tphy *tphy,
--	struct mtk_phy_instance *instance)
-+				       struct mtk_phy_instance *instance)
- {
- 	struct u3phy_banks *bank = &instance->u3_banks;
- 	u32 tmp;
-@@ -698,7 +698,7 @@ static void pcie_phy_instance_power_on(struct mtk_tphy *tphy,
- }
- 
- static void pcie_phy_instance_power_off(struct mtk_tphy *tphy,
--	struct mtk_phy_instance *instance)
-+					struct mtk_phy_instance *instance)
- 
- {
- 	struct u3phy_banks *bank = &instance->u3_banks;
-@@ -714,7 +714,7 @@ static void pcie_phy_instance_power_off(struct mtk_tphy *tphy,
- }
- 
- static void sata_phy_instance_init(struct mtk_tphy *tphy,
--	struct mtk_phy_instance *instance)
-+				   struct mtk_phy_instance *instance)
- {
- 	struct u3phy_banks *u3_banks = &instance->u3_banks;
- 	void __iomem *phyd = u3_banks->phyd;
-@@ -916,7 +916,7 @@ static int mtk_phy_set_mode(struct phy *phy, enum phy_mode mode)
- }
- 
- static struct phy *mtk_phy_xlate(struct device *dev,
--					struct of_phandle_args *args)
-+				 struct of_phandle_args *args)
- {
- 	struct mtk_tphy *tphy = dev_get_drvdata(dev);
- 	struct mtk_phy_instance *instance = NULL;
-@@ -1015,7 +1015,7 @@ static int mtk_tphy_probe(struct platform_device *pdev)
- 
- 	tphy->nphys = of_get_child_count(np);
- 	tphy->phys = devm_kcalloc(dev, tphy->nphys,
--				       sizeof(*tphy->phys), GFP_KERNEL);
-+				  sizeof(*tphy->phys), GFP_KERNEL);
- 	if (!tphy->phys)
- 		return -ENOMEM;
- 
+Thanks,
+
+	M.
 -- 
-1.7.9.5
+Jazz is not dead. It just smells funny.
