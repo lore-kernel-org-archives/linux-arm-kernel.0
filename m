@@ -1,56 +1,34 @@
 From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Thu, 26 Oct 2017 17:12:33 +0200
-Subject: [PATCH v2 1/3] mtd: spi-nor: stm32-quadspi: Fix uninitialized error
- return code
-In-Reply-To: <1509030755-19044-1-git-send-email-ludovic.Barre@st.com>
-References: <1509030755-19044-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1509030755-19044-2-git-send-email-ludovic.Barre@st.com>
+Date: Thu, 26 Oct 2017 17:12:32 +0200
+Subject: [PATCH v2 0/3] mtd: spi-nor: stm32-quadspi: fixes
+Message-ID: <1509030755-19044-1-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert@linux-m68k.org>
+From: Ludovic Barre <ludovic.barre@st.com>
 
-With gcc 4.1.2:
+This series adds:
+-Fix: to avoid compilation warning with older compiler
+versions such as gcc-4.6.
+This topic has been discussed on 2 threads with Geert and Arnd
+https://lkml.org/lkml/2017/9/15/70
+https://www.spinics.net/lists/arm-kernel/msg606269.html
+-Fix: abort prefetching in memory-mapped mode as soon prefetching
+could exceed nor size (not done by fsize limit)
+-Change license text and Copyright
 
-    drivers/mtd/spi-nor/stm32-quadspi.c: In function ?stm32_qspi_tx_poll?:
-    drivers/mtd/spi-nor/stm32-quadspi.c:230: warning: ?ret? may be used uninitialized in this function
+Changes v2:
+with the right Cyrille's email (wedev4u.fr)
 
-Indeed, if stm32_qspi_cmd.len is zero, ret will be uninitialized.
-This length is passed from outside the driver using the
-spi_nor.{read,write}{,_reg}() callbacks.
+Geert Uytterhoeven (1):
+  mtd: spi-nor: stm32-quadspi: Fix uninitialized error return code
 
-Several functions in drivers/mtd/spi-nor/spi-nor.c (e.g. write_enable(),
-write_disable(), and erase_chip()) call spi_nor.write_reg() with a zero
-length.
+Ludovic Barre (2):
+  mtd: spi-nor: stm32-quadspi: fix prefetching outside fsize
+  mtd: spi-nor: stm32-quadspi: change license text
 
-Fix this by returning an explicit zero on success.
+ drivers/mtd/spi-nor/stm32-quadspi.c | 35 +++++++++++++++++++++++++++++------
+ 1 file changed, 29 insertions(+), 6 deletions(-)
 
-Fixes: 0d43d7ab277a048c ("mtd: spi-nor: add driver for STM32 quad spi flash controller")
-Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
-Acked-by: Ludovic Barre <ludovic.barre@st.com>
-Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
----
- drivers/mtd/spi-nor/stm32-quadspi.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/mtd/spi-nor/stm32-quadspi.c b/drivers/mtd/spi-nor/stm32-quadspi.c
-index 86c0931..ad6a3e1 100644
---- a/drivers/mtd/spi-nor/stm32-quadspi.c
-+++ b/drivers/mtd/spi-nor/stm32-quadspi.c
-@@ -240,12 +240,12 @@ static int stm32_qspi_tx_poll(struct stm32_qspi *qspi,
- 						 STM32_QSPI_FIFO_TIMEOUT_US);
- 		if (ret) {
- 			dev_err(qspi->dev, "fifo timeout (stat:%#x)\n", sr);
--			break;
-+			return ret;
- 		}
- 		tx_fifo(buf++, qspi->io_base + QUADSPI_DR);
- 	}
- 
--	return ret;
-+	return 0;
- }
- 
- static int stm32_qspi_tx_mm(struct stm32_qspi *qspi,
 -- 
 2.7.4
