@@ -1,56 +1,83 @@
-From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Thu, 26 Oct 2017 13:54:52 +0200
-Subject: [PATCH 1/3] mtd: spi-nor: stm32-quadspi: Fix uninitialized error
- return code
-In-Reply-To: <1509018894-15111-1-git-send-email-ludovic.Barre@st.com>
-References: <1509018894-15111-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1509018894-15111-2-git-send-email-ludovic.Barre@st.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Thu, 26 Oct 2017 14:01:30 +0200
+Subject: 4.13 (and probably all recent) kernels refuse to boot on one
+ Nokia N950, work or another
+In-Reply-To: <20171026095734.GA10141@amd>
+References: <20171025203459.GA22035@amd> <20171025212806.GA21504@atomide.com>
+ <20171026091325.GA26929@amd>
+ <20171026093115.4bc6ctxjx72ng7ld@earth>
+ <20171026095734.GA10141@amd>
+Message-ID: <20171026120130.dicanunwcdmjntnb@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert@linux-m68k.org>
+Hi,
 
-With gcc 4.1.2:
+On Thu, Oct 26, 2017 at 11:57:34AM +0200, Pavel Machek wrote:
+> On Thu 2017-10-26 11:31:15, Sebastian Reichel wrote:
+> > Hi,
+> > 
+> > On Thu, Oct 26, 2017 at 11:13:26AM +0200, Pavel Machek wrote:
+> > > On Wed 2017-10-25 14:28:07, Tony Lindgren wrote:
+> > > > * Pavel Machek <pavel@ucw.cz> [171025 13:36]:
+> > > > > Hi!
+> > > > > 
+> > > > > ...hardware should be identical. 3.5.3-nemo kernel seems to work on
+> > > > > both. 4.13-rc2 with display and clock patches boots on phone "S", but
+> > > > > does not on phone "P"; nothing nothing is received on serial port.
+> > > > > 
+> > > > > There is some difference in the bootloaders: S's bootloader provides
+> > > > > lots of debug info, P's is silent. R&D settings do _not_ have
+> > > > > influence on bootloader. We know P's serial works, as 3.5.3 kernel
+> > > > > prints "Uncompressing linux...booting" there.
+> > > > > 
+> > > > > I'll need to return "S" phone and serial cable tommorow. If you have
+> > > > > any ideas, let me know.
+> > > > 
+> > > > If you get nothing out of the uart, chances are the pins are
+> > > > not muxed for the uart in nolo and maybe kernel dts is missing the
+> > > > pinctrl entries for uart?
+> > > > 
+> > > > Also try booting with mem=512M at 0x80000000 or 256M or 768M. Maybe the
+> > > > memory is different size or partially broken?
+> > > 
+> > > Uhuh. It looks like "P" nokia really wants initrd, otherwise it will
+> > > not boot.
+> > > 
+> > > I got "uncompressing Linux 4.13" on serial console now, debug LEDs
+> > > blinking, and if I use a flashlight, I see output on the screen, too.
+> > > 
+> > > (What do I need to do to get the backlight working?)
+> > 
+> > Glad you got it working :) For backlight you can add this
+> > in drivers/gpu/drm/omapdrm/displays/panel-dsi-cm.c:
+> > 
+> > add the following code at the end of dsicm_probe:
+> 
+> You did not actually include code to paste into panel-dsi-cm, can you
+> try a again?
 
-    drivers/mtd/spi-nor/stm32-quadspi.c: In function ?stm32_qspi_tx_poll?:
-    drivers/mtd/spi-nor/stm32-quadspi.c:230: warning: ?ret? may be used uninitialized in this function
+I added it directly below and you quoted it. I guess you mistook it
+for a signature or something :)
 
-Indeed, if stm32_qspi_cmd.len is zero, ret will be uninitialized.
-This length is passed from outside the driver using the
-spi_nor.{read,write}{,_reg}() callbacks.
+-- Sebastian
 
-Several functions in drivers/mtd/spi-nor/spi-nor.c (e.g. write_enable(),
-write_disable(), and erase_chip()) call spi_nor.write_reg() with a zero
-length.
-
-Fix this by returning an explicit zero on success.
-
-Fixes: 0d43d7ab277a048c ("mtd: spi-nor: add driver for STM32 quad spi flash controller")
-Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
-Acked-by: Ludovic Barre <ludovic.barre@st.com>
-Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
----
- drivers/mtd/spi-nor/stm32-quadspi.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/mtd/spi-nor/stm32-quadspi.c b/drivers/mtd/spi-nor/stm32-quadspi.c
-index 86c0931..ad6a3e1 100644
---- a/drivers/mtd/spi-nor/stm32-quadspi.c
-+++ b/drivers/mtd/spi-nor/stm32-quadspi.c
-@@ -240,12 +240,12 @@ static int stm32_qspi_tx_poll(struct stm32_qspi *qspi,
- 						 STM32_QSPI_FIFO_TIMEOUT_US);
- 		if (ret) {
- 			dev_err(qspi->dev, "fifo timeout (stat:%#x)\n", sr);
--			break;
-+			return ret;
- 		}
- 		tx_fifo(buf++, qspi->io_base + QUADSPI_DR);
- 	}
- 
--	return ret;
-+	return 0;
- }
- 
- static int stm32_qspi_tx_mm(struct stm32_qspi *qspi,
--- 
-2.7.4
+> > -----------------------------------------------------------
+> > mutex_unlock(&ddata->lock);
+> > mutex_lock(&ddata->lock);
+> > ddata->in->ops.dsi->bus_lock(ddata->in);
+> > r = dsicm_wake_up(ddata);
+> > if (!r)
+> >     r = dsicm_dcs_write_1(ddata, DCS_BRIGHTNESS, 100);
+> > ddata->in->ops.dsi->bus_unlock(ddata->in);
+> > mutex_unlock(&ddata->lock);
+> > -----------------------------------------------------------
+> > 
+> > -- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171026/127e3e97/attachment-0001.sig>
