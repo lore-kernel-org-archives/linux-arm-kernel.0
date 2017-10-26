@@ -1,102 +1,97 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 26 Oct 2017 17:42:31 +0200
-Subject: [PATCH] ARM: dts: mvebu: pl310-cache disable double-linefill
-In-Reply-To: <20171025145823.29262-1-gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Wed, 25 Oct 2017 16:58:23 +0200")
-References: <20171025145823.29262-1-gregory.clement@free-electrons.com>
-Message-ID: <87h8ul5314.fsf@free-electrons.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Thu, 26 Oct 2017 17:31:28 +0200
+Subject: [PATCH v4 25/26] KVM: arm/arm64: GICv4: Prevent heterogenous
+ systems from using GICv4
+In-Reply-To: <20171006153401.5481-26-marc.zyngier@arm.com>
+References: <20171006153401.5481-1-marc.zyngier@arm.com>
+ <20171006153401.5481-26-marc.zyngier@arm.com>
+Message-ID: <20171026153128.GE2166@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On mer., oct. 25 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+On Fri, Oct 06, 2017 at 04:34:00PM +0100, Marc Zyngier wrote:
+> The GICv4 architecture doesn't prevent CPUs implementing GICv4 to
+> cohabit with CPUs limited to GICv3 in the same system.
+> 
+> This is mad (the scheduler would have to be made aware of the v4
+> capability), and we're certainly not going to support this any
+> time soon. So let's check that all online CPUs are GICv4 capable,
+> and disable the functionnality if not.
+> 
 
-> From: Yan Markman <ymarkman@marvell.com>
->
-> Under heavy system stress mvebu SoC using Cortex A9 sporadically
-> encountered instability issues.
->
-> The "double linefill" feature of L2 cache was identified as causing
-> dependency between read and write which lead to the deadlock.
->
-> Especially, it was the cause of deadlock seen under heavy PCIe traffic,
-> as this dependency violates PCIE overtaking rule.
->
-> Fixes: c8f5a878e554 ("ARM: mvebu: use DT properties to fine-tune the L2 configuration")
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Yan Markman <ymarkman@marvell.com>
-> Signed-off-by: Igal Liberman <igall@marvell.com>
-> Signed-off-by: Nadav Haklai <nadavh@marvell.com>
-> [gregory.clement at free-electrons.com: reformulate commit log, add Armada
-> 375 and add Fixes tag]
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-Applied on mvebu/fixes
-
-Gregory
-
-
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  arch/arm/boot/dts/armada-375.dtsi | 4 ++--
->  arch/arm/boot/dts/armada-38x.dtsi | 4 ++--
->  arch/arm/boot/dts/armada-39x.dtsi | 4 ++--
->  3 files changed, 6 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-> index 7225c7ce9a8d..2cb1bcd30976 100644
-> --- a/arch/arm/boot/dts/armada-375.dtsi
-> +++ b/arch/arm/boot/dts/armada-375.dtsi
-> @@ -178,9 +178,9 @@
->  				reg = <0x8000 0x1000>;
->  				cache-unified;
->  				cache-level = <2>;
-> -				arm,double-linefill-incr = <1>;
-> +				arm,double-linefill-incr = <0>;
->  				arm,double-linefill-wrap = <0>;
-> -				arm,double-linefill = <1>;
-> +				arm,double-linefill = <0>;
->  				prefetch-data = <1>;
->  			};
+>  include/linux/irqchip/arm-gic-v3.h |  2 ++
+>  virt/kvm/arm/vgic/vgic-v3.c        | 27 +++++++++++++++++++++++++--
+>  2 files changed, 27 insertions(+), 2 deletions(-)
+> 
+> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+> index 1ea576c8126f..dfa4a51643d6 100644
+> --- a/include/linux/irqchip/arm-gic-v3.h
+> +++ b/include/linux/irqchip/arm-gic-v3.h
+> @@ -532,6 +532,8 @@
+>  #define ICH_VTR_SEIS_MASK		(1 << ICH_VTR_SEIS_SHIFT)
+>  #define ICH_VTR_A3V_SHIFT		21
+>  #define ICH_VTR_A3V_MASK		(1 << ICH_VTR_A3V_SHIFT)
+> +#define ICH_VTR_nV4_SHIFT		20
+> +#define ICH_VTR_nV4_MASK		(1 << ICH_VTR_nV4_SHIFT)
 >  
-> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-> index 7ff0811e61db..05e241fb91ad 100644
-> --- a/arch/arm/boot/dts/armada-38x.dtsi
-> +++ b/arch/arm/boot/dts/armada-38x.dtsi
-> @@ -143,9 +143,9 @@
->  				reg = <0x8000 0x1000>;
->  				cache-unified;
->  				cache-level = <2>;
-> -				arm,double-linefill-incr = <1>;
-> +				arm,double-linefill-incr = <0>;
->  				arm,double-linefill-wrap = <0>;
-> -				arm,double-linefill = <1>;
-> +				arm,double-linefill = <0>;
->  				prefetch-data = <1>;
->  			};
+>  #define ICC_IAR1_EL1_SPURIOUS		0x3ff
 >  
-> diff --git a/arch/arm/boot/dts/armada-39x.dtsi b/arch/arm/boot/dts/armada-39x.dtsi
-> index ea657071e278..5218bd2a248d 100644
-> --- a/arch/arm/boot/dts/armada-39x.dtsi
-> +++ b/arch/arm/boot/dts/armada-39x.dtsi
-> @@ -111,9 +111,9 @@
->  				reg = <0x8000 0x1000>;
->  				cache-unified;
->  				cache-level = <2>;
-> -				arm,double-linefill-incr = <1>;
-> +				arm,double-linefill-incr = <0>;
->  				arm,double-linefill-wrap = <0>;
-> -				arm,double-linefill = <1>;
-> +				arm,double-linefill = <0>;
->  				prefetch-data = <1>;
->  			};
+> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+> index 405733678c2f..da99df50a818 100644
+> --- a/virt/kvm/arm/vgic/vgic-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-v3.c
+> @@ -466,9 +466,19 @@ static int __init early_gicv4_enable(char *buf)
+>  }
+>  early_param("kvm-arm.vgic_v4_enable", early_gicv4_enable);
 >  
+> +static void vgic_check_v4_cpuif(void *param)
+> +{
+> +	u32 ich_vtr_el2 = kvm_call_hyp(__vgic_v3_get_ich_vtr_el2);
+> +	bool *v4 = param;
+> +
+> +	*v4 = !(ich_vtr_el2 & ICH_VTR_nV4_MASK);
+> +	if (!*v4)
+> +		kvm_info("CPU%d is not GICv4 capable\n", smp_processor_id());
+> +}
+> +
+>  /**
+>   * vgic_v3_probe - probe for a GICv3 compatible interrupt controller in DT
+> - * @node:	pointer to the DT node
+> + * @info:	pointer to the firmware-agnostic GIC information
+>   *
+>   * Returns 0 if a GICv3 has been found, returns an error code otherwise
+>   */
+> @@ -485,8 +495,21 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
+>  	kvm_vgic_global_state.can_emulate_gicv2 = false;
+>  	kvm_vgic_global_state.ich_vtr_el2 = ich_vtr_el2;
+>  
+> -	/* GICv4 support? */
+> +	/*
+> +	 * GICv4 support? We need to check on all CPUs in case of some
+> +	 * extremely creative form of big-little brain damage...
+> +	 */
+>  	if (info->has_v4) {
+> +		int cpu;
+> +
+> +		for_each_online_cpu(cpu) {
+> +			bool enable;
+> +
+> +			smp_call_function_single(cpu, vgic_check_v4_cpuif,
+> +						 &enable, 1);
+> +			gicv4_enable = gicv4_enable && enable;
+> +		}
+> +
+>  		kvm_vgic_global_state.has_gicv4 = gicv4_enable;
+>  		kvm_info("GICv4 support %sabled\n",
+>  			 gicv4_enable ? "en" : "dis");
 > -- 
-> 2.14.2
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> 2.14.1
+> 
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
