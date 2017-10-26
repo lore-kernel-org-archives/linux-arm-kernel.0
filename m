@@ -1,23 +1,31 @@
-From: philippe.cornu@st.com (Philippe Cornu)
-Date: Thu, 26 Oct 2017 13:48:07 +0200
-Subject: [PATCH v1 0/2] drm/stm: ltdc: add a 2nd endpoint
-Message-ID: <1509018489-19641-1-git-send-email-philippe.cornu@st.com>
+From: ludovic.Barre@st.com (Ludovic Barre)
+Date: Thu, 26 Oct 2017 13:54:51 +0200
+Subject: [PATCH  0/3] mtd: spi-nor: stm32-quadspi: fixes
+Message-ID: <1509018894-15111-1-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Version 1:
-- Initial commit
+From: Ludovic Barre <ludovic.barre@st.com>
 
-The purpose of this set of patches is to offer the possibility
-to use up to 2 endpoints for the ltdc dpi video port.
+This series adds:
+-Fix: to avoid compilation warning with older compiler
+versions such as gcc-4.6.
+This topic has been discussed on 2 threads with Geert and Arnd
+https://lkml.org/lkml/2017/9/15/70
+https://www.spinics.net/lists/arm-kernel/msg606269.html
+-Fix: abort prefetching in memory-mapped mode as soon prefetching
+could exceed nor size (not done by fsize limit)
+-Change license text and Copyright
 
-Philippe Cornu (2):
-  dt-bindings: display: stm32: add a 2nd endpoint
-  drm/stm: ltdc: add a 2nd endpoint
+Geert Uytterhoeven (1):
+  mtd: spi-nor: stm32-quadspi: Fix uninitialized error return code
 
- .../devicetree/bindings/display/st,stm32-ltdc.txt  |  6 +-
- drivers/gpu/drm/stm/ltdc.c                         | 64 +++++++++++++++-------
- 2 files changed, 50 insertions(+), 20 deletions(-)
+Ludovic Barre (2):
+  mtd: spi-nor: stm32-quadspi: fix prefetching outside fsize
+  mtd: spi-nor: stm32-quadspi: change license text
+
+ drivers/mtd/spi-nor/stm32-quadspi.c | 35 +++++++++++++++++++++++++++++------
+ 1 file changed, 29 insertions(+), 6 deletions(-)
 
 -- 
-1.9.1
+2.7.4
