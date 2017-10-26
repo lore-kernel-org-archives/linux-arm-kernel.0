@@ -1,42 +1,31 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 26 Oct 2017 14:50:05 +0100
-Subject: [PATCH] ARM64: dts: meson-gxl: Add alternate ARM Trusted
- Firmware reserved memory zone
-In-Reply-To: <1507735392-20005-1-git-send-email-narmstrong@baylibre.com>
-References: <1507735392-20005-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <20171026135005.GB16787@arm.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Thu, 26 Oct 2017 14:54:29 +0100
+Subject: [PATCH] drivers/crypto: Convert timers to use timer_setup()
+In-Reply-To: <20171025101842.GA145495@beast>
+References: <20171025101842.GA145495@beast>
+Message-ID: <20171026135429.sk3s6ama2na7bvim@ash>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 11, 2017 at 05:23:12PM +0200, Neil Armstrong wrote:
-> This year, Amlogic updated the ARM Trusted Firmware reserved memory mapping
-> for Meson GXL SoCs and products sold since May 2017 uses this alternate
-> reserved memory mapping.
-> But products had been sold using the previous mapping.
+On Wed, Oct 25, 2017 at 03:18:42AM -0700, Kees Cook wrote:
+> In preparation for unconditionally passing the struct timer_list pointer to
+> all timer callbacks, switch to using the new timer_setup() and from_timer()
+> to pass the timer pointer explicitly.
 > 
-> This issue has been explained in [1] and a dynamic solution is yet to be
-> found to avoid loosing another 3Mbytes of reservable memory.
-> 
-> In the meantime, this patch adds this alternate memory zone only for
-> the GXL and GXM SoCs since GXBB based new products stopped earlier.
-> 
-> [1] http://lists.infradead.org/pipermail/linux-amlogic/2017-October/004860.html
-> 
-> Fixes: bba8e3f42736 ("ARM64: dts: meson-gx: Add firmware reserved memory zones")
-> Reported-by: Jerome Brunet <jbrunet@baylibre.com>
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> Cc: Herbert Xu <herbert@gondor.apana.org.au>
+> Cc: Jesper Nilsson <jesper.nilsson@axis.com>
+> Cc: Lars Persson <lars.persson@axis.com>
+> Cc: Niklas Cassel <niklas.cassel@axis.com>
+> Cc: "David S. Miller" <davem@davemloft.net>
+> Cc: Jamie Iles <jamie@jamieiles.com>
+> Cc: linux-arm-kernel at axis.com
+> Cc: linux-crypto at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Kees Cook <keescook@chromium.org>
 > ---
->  arch/arm64/boot/dts/amlogic/meson-gxl.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
 
-Thanks. Without this patch, memtest dies early on at physical address
-0x05100000 due to an SError. With the patch, things work well, so:
+Acked-by: Jamie Iles <jamie@jamieiles.com>
 
-Acked-by: Will Deacon <will.deacon@arm.com>
-Tested-by: Will Deacon <will.deacon@arm.com>
+Thanks,
 
-Please also CC stable, because random SErrors under load aren't much fun ;)
-
-Cheers,
-
-Will
+Jamie
