@@ -1,73 +1,53 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 26 Oct 2017 10:09:40 +0100
-Subject: [RFC PATCH 0/2] arm64: optional paranoid __{get,put}_user checks
-Message-ID: <20171026090942.7041-1-mark.rutland@arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 26 Oct 2017 11:13:26 +0200
+Subject: 4.13 (and probably all recent) kernels refuse to boot on one
+ Nokia N950, work or another
+In-Reply-To: <20171025212806.GA21504@atomide.com>
+References: <20171025203459.GA22035@amd> <20171025212806.GA21504@atomide.com>
+Message-ID: <20171026091325.GA26929@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed 2017-10-25 14:28:07, Tony Lindgren wrote:
+> * Pavel Machek <pavel@ucw.cz> [171025 13:36]:
+> > Hi!
+> > 
+> > ...hardware should be identical. 3.5.3-nemo kernel seems to work on
+> > both. 4.13-rc2 with display and clock patches boots on phone "S", but
+> > does not on phone "P"; nothing nothing is received on serial port.
+> > 
+> > There is some difference in the bootloaders: S's bootloader provides
+> > lots of debug info, P's is silent. R&D settings do _not_ have
+> > influence on bootloader. We know P's serial works, as 3.5.3 kernel
+> > prints "Uncompressing linux...booting" there.
+> > 
+> > I'll need to return "S" phone and serial cable tommorow. If you have
+> > any ideas, let me know.
+> 
+> If you get nothing out of the uart, chances are the pins are
+> not muxed for the uart in nolo and maybe kernel dts is missing the
+> pinctrl entries for uart?
+> 
+> Also try booting with mem=512M at 0x80000000 or 256M or 768M. Maybe the
+> memory is different size or partially broken?
 
-In Prague, Kees mentioned that it would be nice to have a mechanism to
-catch bad __{get,put}_user uses, such as the recent CVE-2017-5123 [1,2]
-issue with unsafe_put_user() in waitid().
+Uhuh. It looks like "P" nokia really wants initrd, otherwise it will
+not boot.
 
-These patches allow an optional access_ok() check to be dropped in
-arm64's __{get,put}_user() primitives. These will then BUG() if a bad
-user pointer is passed (which should only happen in the absence of an
-earlier access_ok() check).
+I got "uncompressing Linux 4.13" on serial console now, debug LEDs
+blinking, and if I use a flashlight, I see output on the screen, too.
 
-The first patch rewrites the arm64 access_ok() check in C. This gives
-the compiler the visibility it needs to elide redundant access_ok()
-checks, so in the common case:
+(What do I need to do to get the backlight working?)
 
-  get_user()
-    access_ok()
-    __get_user()
-      BUG_ON(!access_ok())
-      <uaccess asm>
-
-... the compiler can determine that the second access_ok() must return
-true, and can elide it along with the BUG_ON(), leaving:
-
-  get_user()
-    access_ok()
-      __get_user()
-        <uaccess asm>
-
-... and thus this sanity check can have no cost in the common case.
-
-The compiler doesn't always have the visibility to do this (e.g. if the
-two access_ok() checks are in different compilation units), but it seems
-to manage to do this most of the time -- In testing with v4.14-rc5
-defconfig this only increases the total Image size by 4KiB.
-
-I had a go at turning this into a BUILD_BUG_ON(), to see if we could
-catch this issue at compile time. However, my GCC wasn't able to remove
-the BUILD_BUG() from some {get,put}_user cases. Maybe we can fix that,
-or maybe we can have some static analysis catch this at build time.
-
-It's entirely possible that I've made some catastrophic mistake in these
-patches; I've only build-tested them so far, and I don't currently have
-access to hardware to test on.
-
-I also haven't yet modified __copy_{to,from}_user and friends along
-similar lines, so this is incomplete. If there aren't any major
-objections to this approach, I can fold those in for the next spin.
-
-Thanks,
-Mark.
-
-[1] https://lwn.net/Articles/736348/
-[2] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=96ca579a1ecc943b75beba58bebb0356f6cc4b51
-
-
-Mark Rutland (2):
-  arm64: write __range_ok() in C
-  arm64: allow paranoid __{get,put}user
-
- arch/arm64/Kconfig               |  9 +++++++++
- arch/arm64/include/asm/uaccess.h | 27 +++++++++++++++++++--------
- 2 files changed, 28 insertions(+), 8 deletions(-)
-
+Best regards,
+									Pavel
 -- 
-2.11.0
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171026/23ad0bd2/attachment.sig>
