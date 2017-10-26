@@ -1,110 +1,129 @@
-From: ndesaulniers@google.com (Nick Desaulniers)
-Date: Thu, 26 Oct 2017 13:29:07 -0700
-Subject: [PATCH] arm64: prevent regressions in compressed kernel image size
- when upgrading to binutils 2.27
-Message-ID: <20171026202907.91852-1-ndesaulniers@google.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 26 Oct 2017 21:41:15 +0100
+Subject: [PATCH] arm64: prevent regressions in compressed kernel image
+ size when upgrading to binutils 2.27
+In-Reply-To: <20171026202907.91852-1-ndesaulniers@google.com>
+References: <20171026202907.91852-1-ndesaulniers@google.com>
+Message-ID: <CAKv+Gu80ub1PnibzBtjPSOusHD-6oj4A=7ZeuW5VTv3aDQrdnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Upon upgrading to binutils 2.27, we found that our lz4 compressed kernel
-images were significantly larger, resulting is 10ms boot time regressions.
+On 26 October 2017 at 21:29, Nick Desaulniers <ndesaulniers@google.com> wrote:
+> Upon upgrading to binutils 2.27, we found that our lz4 compressed kernel
+> images were significantly larger, resulting is 10ms boot time regressions.
+>
+> As noted by Rahul:
+> "aarch64 binaries uses RELA relocations, where each relocation entry
+> includes an addend value. This is similar to x86_64.  On x86_64, the
+> addend values are also stored at the relocation offset for relative
+> relocations. This is an optimization: in the case where code does not
+> need to be relocated, the loader can simply skip processing relative
+> relocations.  In binutils-2.25, both bfd and gold linkers did this for
+> x86_64, but only the gold linker did this for aarch64.  The kernel build
+> here is using the bfd linker, which stored zeroes at the relocation
+> offsets for relative relocations.  Since a set of zeroes compresses
+> better than a set of non-zero addend values, this behavior was resulting
+> in much better lz4 compression.
+>
+> The bfd linker in binutils-2.27 is now storing the actual addend values
+> at the relocation offsets. The behavior is now consistent with what it
+> does for x86_64 and what gold linker does for both architectures.  The
+> change happened in this upstream commit:
+> https://sourceware.org/git/?p=binutils-gdb.git;a=commit;h=1f56df9d0d5ad89806c24e71f296576d82344613
+> Since a bunch of zeroes got replaced by non-zero addend values, we see
+> the side effect of lz4 compressed image being a bit bigger.
+>
+> To get the old behavior from the bfd linker, "--no-apply-dynamic-relocs"
+> flag can be used:
+> $ LDFLAGS="--no-apply-dynamic-relocs" ./build/build.sh
+> With this flag, the compressed image size is back to what it was with
+> binutils-2.25.
+>
+> If the kernel is using ASLR, there aren't additional runtime costs to
+> --no-apply-dynamic-relocs, as the relocations will need to be applied
+> again anyway after the kernel is relocated to a random address.
+>
+> If the kernel is not using ASLR, then presumably the current default
+> behavior of the linker is better. Since the static linker performed the
+> dynamic relocs, and the kernel is not moved to a different address at
+> load time, it can skip applying the relocations all over again."
+>
+> Some measurements:
+>
+> $ ld -v
+> GNU ld (binutils-2.25-f3d35cf6) 2.25.51.20141117
+>                     ^
+> $ ls -l vmlinux
+> -rwxr-x--- 1 ndesaulniers eng 300652760 Oct 26 11:57 vmlinux
+> $ ls -l Image.lz4-dtb
+> -rw-r----- 1 ndesaulniers eng 16932627 Oct 26 11:57 Image.lz4-dtb
+>
+> $ ld -v
+> GNU ld (binutils-2.27-53dd00a1) 2.27.0.20170315
+>                     ^
+> pre patch:
+> $ ls -l vmlinux
+> -rwxr-x--- 1 ndesaulniers eng 300376208 Oct 26 11:43 vmlinux
+> $ ls -l Image.lz4-dtb
+> -rw-r----- 1 ndesaulniers eng 18159474 Oct 26 11:43 Image.lz4-dtb
+>
+> post patch:
+> $ ls -l vmlinux
+> -rwxr-x--- 1 ndesaulniers eng 300376208 Oct 26 12:06 vmlinux
+> $ ls -l Image.lz4-dtb
+> -rw-r----- 1 ndesaulniers eng 16932466 Oct 26 12:06 Image.lz4-dtb
+>
+> 10ms boot time savings isn't anything to get excited about, but users of
+> arm64+lz4+bfd-2.27 should not have to pay a penalty for no runtime
+> improvement.
+>
+> Reported-by: Gopinath Elanchezhian <gelanchezhian@google.com>
+> Reported-by: Sindhuri Pentyala <spentyala@google.com>
+> Reported-by: Wei Wang <wvw@google.com>
+> Suggested-by: Rahul Chaudhry <rahulchaudhry@google.com>
+> Suggested-by: Siqi Lin <siqilin@google.com>
+> Suggested-by: Stephen Hines <srhines@google.com>
+> Signed-off-by: Nick Desaulniers <ndesaulniers@google.com>
+> ---
+> * Question to reviewers: should I be using $(and ..., ...) here rather
+>   than double equals block? grep turns up no hits in the kernel for
+>   an example.
+>
+>  arch/arm64/Makefile | 6 ++++++
+>  1 file changed, 6 insertions(+)
+>
+> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+> index 939b310913cf..eed3b8bdc089 100644
+> --- a/arch/arm64/Makefile
+> +++ b/arch/arm64/Makefile
+> @@ -18,6 +18,12 @@ ifneq ($(CONFIG_RELOCATABLE),)
+>  LDFLAGS_vmlinux                += -pie -shared -Bsymbolic
+>  endif
+>
+> +ifeq ($(CONFIG_KERNEL_LZ4), y)
+> +ifeq ($(CONFIG_RANDOMIZE_BASE), y)
+> +LDFLAGS_vmlinux                += $(call ld-option, --no-apply-dynamic-relocs)
+> +endif
+> +endif
+> +
 
-As noted by Rahul:
-"aarch64 binaries uses RELA relocations, where each relocation entry
-includes an addend value. This is similar to x86_64.  On x86_64, the
-addend values are also stored at the relocation offset for relative
-relocations. This is an optimization: in the case where code does not
-need to be relocated, the loader can simply skip processing relative
-relocations.  In binutils-2.25, both bfd and gold linkers did this for
-x86_64, but only the gold linker did this for aarch64.  The kernel build
-here is using the bfd linker, which stored zeroes at the relocation
-offsets for relative relocations.  Since a set of zeroes compresses
-better than a set of non-zero addend values, this behavior was resulting
-in much better lz4 compression.
+Since we will need to support bfd ld < 2.27 for a while to come, and
+given that we cannot test in the code whether the relocation targets
+are seeded with the correct values, I propose we simply drop the outer
+ifeq here, and  stick with the old behavior unconditionally. Once
+we're ready to drop support for <2.27 binutils, we can revisit this if
+desired.
 
-The bfd linker in binutils-2.27 is now storing the actual addend values
-at the relocation offsets. The behavior is now consistent with what it
-does for x86_64 and what gold linker does for both architectures.  The
-change happened in this upstream commit:
-https://sourceware.org/git/?p=binutils-gdb.git;a=commit;h=1f56df9d0d5ad89806c24e71f296576d82344613
-Since a bunch of zeroes got replaced by non-zero addend values, we see
-the side effect of lz4 compressed image being a bit bigger.
+Also, you should be using CONFIG_RELOCATABLE not CONFIG_RANDOMIZE_BASE,.
 
-To get the old behavior from the bfd linker, "--no-apply-dynamic-relocs"
-flag can be used:
-$ LDFLAGS="--no-apply-dynamic-relocs" ./build/build.sh
-With this flag, the compressed image size is back to what it was with
-binutils-2.25.
-
-If the kernel is using ASLR, there aren't additional runtime costs to
---no-apply-dynamic-relocs, as the relocations will need to be applied
-again anyway after the kernel is relocated to a random address.
-
-If the kernel is not using ASLR, then presumably the current default
-behavior of the linker is better. Since the static linker performed the
-dynamic relocs, and the kernel is not moved to a different address at
-load time, it can skip applying the relocations all over again."
-
-Some measurements:
-
-$ ld -v
-GNU ld (binutils-2.25-f3d35cf6) 2.25.51.20141117
-                    ^
-$ ls -l vmlinux
--rwxr-x--- 1 ndesaulniers eng 300652760 Oct 26 11:57 vmlinux
-$ ls -l Image.lz4-dtb
--rw-r----- 1 ndesaulniers eng 16932627 Oct 26 11:57 Image.lz4-dtb
-
-$ ld -v
-GNU ld (binutils-2.27-53dd00a1) 2.27.0.20170315
-                    ^
-pre patch:
-$ ls -l vmlinux
--rwxr-x--- 1 ndesaulniers eng 300376208 Oct 26 11:43 vmlinux
-$ ls -l Image.lz4-dtb
--rw-r----- 1 ndesaulniers eng 18159474 Oct 26 11:43 Image.lz4-dtb
-
-post patch:
-$ ls -l vmlinux
--rwxr-x--- 1 ndesaulniers eng 300376208 Oct 26 12:06 vmlinux
-$ ls -l Image.lz4-dtb
--rw-r----- 1 ndesaulniers eng 16932466 Oct 26 12:06 Image.lz4-dtb
-
-10ms boot time savings isn't anything to get excited about, but users of
-arm64+lz4+bfd-2.27 should not have to pay a penalty for no runtime
-improvement.
-
-Reported-by: Gopinath Elanchezhian <gelanchezhian@google.com>
-Reported-by: Sindhuri Pentyala <spentyala@google.com>
-Reported-by: Wei Wang <wvw@google.com>
-Suggested-by: Rahul Chaudhry <rahulchaudhry@google.com>
-Suggested-by: Siqi Lin <siqilin@google.com>
-Suggested-by: Stephen Hines <srhines@google.com>
-Signed-off-by: Nick Desaulniers <ndesaulniers@google.com>
----
-* Question to reviewers: should I be using $(and ..., ...) here rather
-  than double equals block? grep turns up no hits in the kernel for
-  an example.
-
- arch/arm64/Makefile | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 939b310913cf..eed3b8bdc089 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -18,6 +18,12 @@ ifneq ($(CONFIG_RELOCATABLE),)
- LDFLAGS_vmlinux		+= -pie -shared -Bsymbolic
- endif
- 
-+ifeq ($(CONFIG_KERNEL_LZ4), y)
-+ifeq ($(CONFIG_RANDOMIZE_BASE), y)
-+LDFLAGS_vmlinux		+= $(call ld-option, --no-apply-dynamic-relocs)
-+endif
-+endif
-+
- ifeq ($(CONFIG_ARM64_ERRATUM_843419),y)
-   ifeq ($(call ld-option, --fix-cortex-a53-843419),)
- $(warning ld does not support --fix-cortex-a53-843419; kernel may be susceptible to erratum)
--- 
-2.15.0.rc2.357.g7e34df9404-goog
+>  ifeq ($(CONFIG_ARM64_ERRATUM_843419),y)
+>    ifeq ($(call ld-option, --fix-cortex-a53-843419),)
+>  $(warning ld does not support --fix-cortex-a53-843419; kernel may be susceptible to erratum)
+> --
+> 2.15.0.rc2.357.g7e34df9404-goog
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
