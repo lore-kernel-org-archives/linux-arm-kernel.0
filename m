@@ -1,38 +1,64 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 26 Oct 2017 14:05:12 +0100
-Subject: [PATCH v4 02/26] KVM: arm/arm64: vgic: restructure
- kvm_vgic_(un)map_phys_irq
-In-Reply-To: <20171025144443.GH91785@lvm> (Christoffer Dall's message of "Wed,
- 25 Oct 2017 16:44:43 +0200")
-References: <20171006153401.5481-1-marc.zyngier@arm.com>
- <20171006153401.5481-3-marc.zyngier@arm.com>
- <20171025144443.GH91785@lvm>
-Message-ID: <86lgjyawl3.fsf@arm.com>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Thu, 26 Oct 2017 21:28:33 +0800
+Subject: [RFC PATCH v8 0/7] PCI: rockchip: Move PCIe WAKE# handling into pci
+ core
+Message-ID: <20171026132840.20946-1-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 25 2017 at  4:44:43 pm BST, Christoffer Dall <cdall@linaro.org> wrote:
-> On Fri, Oct 06, 2017 at 04:33:37PM +0100, Marc Zyngier wrote:
->> From: Eric Auger <eric.auger@redhat.com>
->> 
->> We want to reuse the core of the map/unmap functions for IRQ
->> forwarding. Let's move the computation of the hwirq in
->> kvm_vgic_map_phys_irq and pass the linux IRQ as parameter.
->> the host_irq is added to struct vgic_irq.
->> 
->> We introduce kvm_vgic_map/unmap_irq which take a struct vgic_irq
->> handle as a parameter.
->> 
->
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
->
-> Marc,
->   I need a signed-off-by from you on this patch.
 
-Ah, my bad. I'll fix that for the next round (real soon now...)
+Currently we are handling wake irq in mrvl wifi driver. Move it into
+pci core.
 
-Thanks,
+Tested on my chromebook bob(with cros 4.4 kernel and mrvl wifi).
 
-	M.
+
+Changes in v8:
+Add optional "pci", and rewrite commit message.
+Rewrite the commit message.
+Add pci-of.c and use platform_pm_ops to handle the PCIe WAKE# signal.
+
+Changes in v7:
+Move PCIE_WAKE handling into pci core.
+
+Changes in v6:
+Fix device_init_wake error handling, and add some comments.
+
+Changes in v5:
+Move to pci.txt
+Use "wakeup" instead of "wake"
+Rebase.
+
+Changes in v3:
+Fix error handling.
+
+Changes in v2:
+Use dev_pm_set_dedicated_wake_irq.
+
+Jeffy Chen (7):
+  dt-bindings: PCI: Add definition of PCIe WAKE# irq and PCI irq
+  mwifiex: Disable wakeup irq handling for pcie
+  arm64: dts: rockchip: Handle PCIe WAKE# signal in pcie driver for Gru
+  of/irq: Adjust of pci irq parsing for multiple interrupts
+  PCI: Make pci_platform_pm_ops's callbacks optional
+  PCI / PM: Move acpi wakeup code to pci core
+  PCI / PM: Add support for the PCIe WAKE# signal for OF
+
+ Documentation/devicetree/bindings/pci/pci.txt |   3 +
+ arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi  |  15 +--
+ drivers/net/wireless/marvell/mwifiex/main.c   |   4 +
+ drivers/of/of_pci_irq.c                       |  13 ++-
+ drivers/pci/Makefile                          |   2 +-
+ drivers/pci/pci-acpi.c                        | 121 +++++++++++------------
+ drivers/pci/pci-driver.c                      |   9 ++
+ drivers/pci/pci-of.c                          | 136 ++++++++++++++++++++++++++
+ drivers/pci/pci.c                             | 112 +++++++++++++++++----
+ drivers/pci/pci.h                             |  31 ++++--
+ drivers/pci/probe.c                           |  12 ++-
+ drivers/pci/remove.c                          |   2 +
+ include/linux/pci.h                           |   2 +
+ 13 files changed, 365 insertions(+), 97 deletions(-)
+ create mode 100644 drivers/pci/pci-of.c
+
 -- 
-Jazz is not dead. It just smells funny.
+2.11.0
