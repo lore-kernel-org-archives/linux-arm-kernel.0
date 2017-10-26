@@ -1,35 +1,29 @@
-From: jasowang@redhat.com (Jason Wang)
-Date: Thu, 26 Oct 2017 13:38:59 +0800
-Subject: v4.14-rc3/arm64 DABT exception in atomic_inc() / __skb_clone()
-In-Reply-To: <CANn89iL-tcPUVDREwXCUR4hxVTBCP2HYJLzPGUGMTh5dpe0C6Q@mail.gmail.com>
-References: <EAA60182-6F08-412E-8F8B-FD4B0309A858@gmail.com>
- <20171020111408.edj24tztxdptte5r@lakrids.cambridge.arm.com>
- <960D71EC-C1E9-4898-ACBE-543FC09483FF@gmail.com>
- <CACT4Y+bjzzCv3LSxK12C1xB8GfR3UYCrX_5phRYJ8fpxh9vcvQ@mail.gmail.com>
- <CAF=yD-K76TMjHiYRTRAnxM-x4LBcUDY+27WX477HW6kG=L_aZw@mail.gmail.com>
- <D2AD6D5B-3A05-48E7-A999-DECAB18A4649@gmail.com>
- <CAF=yD-JFjjA=2T7HermH2GygfHinyW+ZC5v+Di7M4V_Fg5paHg@mail.gmail.com>
- <CAF=yD-Lw2E7T12sA-dgMK5kn=L0TLGQE+v68s1X8HMHLq9hGBA@mail.gmail.com>
- <CANn89iL-tcPUVDREwXCUR4hxVTBCP2HYJLzPGUGMTh5dpe0C6Q@mail.gmail.com>
-Message-ID: <7d13751a-5a7b-ff67-5f00-92e27861b24a@redhat.com>
+From: filip.matijevic.pz@gmail.com (=?UTF-8?Q?Filip_Matijevi=c4=87?=)
+Date: Thu, 26 Oct 2017 08:25:02 +0200
+Subject: 4.13 (and probably all recent) kernels refuse to boot on one
+ Nokia N950, work or another
+In-Reply-To: <20171025203459.GA22035@amd>
+References: <20171025203459.GA22035@amd>
+Message-ID: <3dbb966f-c279-2c57-d3c2-98ca7c04accd@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Pavel,
 
+On 10/25/2017 10:34 PM, Pavel Machek wrote:
+> 3.5.3-nemo kernel seems to work
 
-On 2017?10?26? 03:01, Eric Dumazet wrote:
-> On Wed, Oct 25, 2017 at 11:49 AM, Willem de Bruijn
-> <willemdebruijn.kernel@gmail.com> wrote:
->
->>  From skb->dev and netdev_priv, the tun device has flags 0x1002 ==
->> IFF_TAP | IFF_NO_PI. This kernel precedes the recent support for
->> IFF_NAPI and IFF_NAPI_FRAGS. The allocation most likely happened
->> in tun_build_skb from current->task_frag. It would be a previous
->> allocation that left alloc_frag->offset unaligned. But perhaps this code
->> needs to perform alignment before setting skb->head. At least on
->> platforms where atomic on dataref must be aligned.
-> +1
->
-> Bug added in commit 66ccbc9c87c2 ("tap: use build_skb() for small packet")
+I did take a quick look at the board-rm680.c since there are some
+conditional statements with regards to system revision but I didn't
+notice anything that might prevent it from booting.
 
-Thanks, will post a patch.
+> If you have
+> any ideas, let me know.
+
+Last time I couldn't get output on serial I used CONFIG_DEBUG_LL,
+CONFIG_DEBUG_OMAP3UART3, CONFIG_EARLY_PRINTK... and ignore_loglevel
+earlyprintk kernel params to get output early enough - I guess you
+already tried that.
+
+Regards,
+Filip
