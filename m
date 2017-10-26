@@ -1,119 +1,53 @@
-From: ndesaulniers@google.com (Nick Desaulniers)
-Date: Thu, 26 Oct 2017 14:43:56 -0700
-Subject: [PATCH v2] arm64: prevent regressions in compressed kernel image size
- when upgrading to binutils 2.27
-In-Reply-To: <CAKwvOd=4=GOPUSYUzwkXHV2xhTzUnEpbw4c_PmFiqZBjbV80jA@mail.gmail.com>
-References: <CAKwvOd=4=GOPUSYUzwkXHV2xhTzUnEpbw4c_PmFiqZBjbV80jA@mail.gmail.com>
-Message-ID: <20171026214356.26963-1-ndesaulniers@google.com>
+From: siqilin@google.com (Siqi Lin)
+Date: Thu, 26 Oct 2017 14:51:51 -0700
+Subject: [PATCH] arm64: prevent regressions in compressed kernel image
+ size when upgrading to binutils 2.27
+In-Reply-To: <CAKwvOdmZgzBneocuhhLs5YRwZv3JUvnSJSPi5pFCZbrkdNzc5w@mail.gmail.com>
+References: <20171026202907.91852-1-ndesaulniers@google.com>
+ <CAKv+Gu80ub1PnibzBtjPSOusHD-6oj4A=7ZeuW5VTv3aDQrdnQ@mail.gmail.com>
+ <CAKwvOd=4=GOPUSYUzwkXHV2xhTzUnEpbw4c_PmFiqZBjbV80jA@mail.gmail.com>
+ <CAKwvOdnemSgO1Jp9B1ANhnNfu8f2xAh+wJiaLQVSAREdck3cCA@mail.gmail.com>
+ <CAFrQcG_znedMpcvXQkcDZ96ti66y9H8AEfcqVjgnZMwW1ViRdg@mail.gmail.com>
+ <CAKwvOdmZgzBneocuhhLs5YRwZv3JUvnSJSPi5pFCZbrkdNzc5w@mail.gmail.com>
+Message-ID: <CAFrQcG_VRr40JG3GeS3nYqQW0kQpkiMk-tOLg8zR064cmEwTZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Upon upgrading to binutils 2.27, we found that our lz4 compressed kernel
-images were significantly larger, resulting is 10ms boot time regressions.
+On Thu, Oct 26, 2017 at 2:23 PM, Nick Desaulniers
+<ndesaulniers@google.com> wrote:
+>
+> On Thu, Oct 26, 2017 at 2:17 PM, Siqi Lin <siqilin@google.com> wrote:
+> > I'm OK with sticking with the <2.27 binutils behavior. The gzip data is:
+>
+> That's what this patch does; goes back to the <2.27 behavior for 2.27+.
+>
+> > binutils 2.25:
+> > Image 41467904
+> > Image.gz 13395151
+> > binutils 2.27:
+> > Image 41467392
+> > Image.gz 14114953
+> >
+> > gzipped kernel increased by 0.69 MiB.
+>
+> That's without this patch applied?  With it applied, what are the
+> stats (for gzip)?
+>
 
-As noted by Rahul:
-"aarch64 binaries uses RELA relocations, where each relocation entry
-includes an addend value. This is similar to x86_64.  On x86_64, the
-addend values are also stored at the relocation offset for relative
-relocations. This is an optimization: in the case where code does not
-need to be relocated, the loader can simply skip processing relative
-relocations.  In binutils-2.25, both bfd and gold linkers did this for
-x86_64, but only the gold linker did this for aarch64.  The kernel build
-here is using the bfd linker, which stored zeroes at the relocation
-offsets for relative relocations.  Since a set of zeroes compresses
-better than a set of non-zero addend values, this behavior was resulting
-in much better lz4 compression.
+binutils 2.27 with this patch (with --no-apply-dynamic-relocs):
+Image 41535488
+Image.gz 13404067
 
-The bfd linker in binutils-2.27 is now storing the actual addend values
-at the relocation offsets. The behavior is now consistent with what it
-does for x86_64 and what gold linker does for both architectures.  The
-change happened in this upstream commit:
-https://sourceware.org/git/?p=binutils-gdb.git;a=commit;h=1f56df9d0d5ad89806c24e71f296576d82344613
-Since a bunch of zeroes got replaced by non-zero addend values, we see
-the side effect of lz4 compressed image being a bit bigger.
+binutils 2.27 without this patch (without --no-apply-dynamic-relocs):
+Image 41535488
+Image.gz 14125516
 
-To get the old behavior from the bfd linker, "--no-apply-dynamic-relocs"
-flag can be used:
-$ LDFLAGS="--no-apply-dynamic-relocs" ./build/build.sh
-With this flag, the compressed image size is back to what it was with
-binutils-2.25.
+The 2.27 gzipped size with this patch is about the same as 2.25.
 
-If the kernel is using ASLR, there aren't additional runtime costs to
---no-apply-dynamic-relocs, as the relocations will need to be applied
-again anyway after the kernel is relocated to a random address.
-
-If the kernel is not using ASLR, then presumably the current default
-behavior of the linker is better. Since the static linker performed the
-dynamic relocs, and the kernel is not moved to a different address at
-load time, it can skip applying the relocations all over again."
-
-Some measurements:
-
-$ ld -v
-GNU ld (binutils-2.25-f3d35cf6) 2.25.51.20141117
-                    ^
-$ ls -l vmlinux
--rwxr-x--- 1 ndesaulniers eng 300652760 Oct 26 11:57 vmlinux
-$ ls -l Image.lz4-dtb
--rw-r----- 1 ndesaulniers eng 16932627 Oct 26 11:57 Image.lz4-dtb
-
-$ ld -v
-GNU ld (binutils-2.27-53dd00a1) 2.27.0.20170315
-                    ^
-pre patch:
-$ ls -l vmlinux
--rwxr-x--- 1 ndesaulniers eng 300376208 Oct 26 11:43 vmlinux
-$ ls -l Image.lz4-dtb
--rw-r----- 1 ndesaulniers eng 18159474 Oct 26 11:43 Image.lz4-dtb
-
-post patch:
-$ ls -l vmlinux
--rwxr-x--- 1 ndesaulniers eng 300376208 Oct 26 12:06 vmlinux
-$ ls -l Image.lz4-dtb
--rw-r----- 1 ndesaulniers eng 16932466 Oct 26 12:06 Image.lz4-dtb
-
-We've also verified gzip improves by 0.69 MB.
-
-Any compression scheme should be able to get better results from the
-longer runs of zeros, not just GZIP and LZ4.
-
-10ms boot time savings isn't anything to get excited about, but users of
-arm64+compression+bfd-2.27 should not have to pay a boot time penalty for no
-runtime improvement.
-
-Reported-by: Gopinath Elanchezhian <gelanchezhian@google.com>
-Reported-by: Sindhuri Pentyala <spentyala@google.com>
-Reported-by: Wei Wang <wvw@google.com>
-Suggested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Suggested-by: Rahul Chaudhry <rahulchaudhry@google.com>
-Suggested-by: Siqi Lin <siqilin@google.com>
-Suggested-by: Stephen Hines <srhines@google.com>
-Signed-off-by: Nick Desaulniers <ndesaulniers@google.com>
----
-Changes since v1:
-* dropped LZ4 only outer conditional, per Ard.
-* changed inner conditional for all RELOCATABLE, not just
-  RANDOMIZE_BASE, per Ard.
-* updated commit message with findings for gzip.
-* added Ard to suggested by line in commit message.
-
- arch/arm64/Makefile | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 939b310913cf..9f47d4276a21 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -18,6 +18,10 @@ ifneq ($(CONFIG_RELOCATABLE),)
- LDFLAGS_vmlinux		+= -pie -shared -Bsymbolic
- endif
- 
-+ifeq ($(CONFIG_RELOCATABLE), y)
-+LDFLAGS_vmlinux		+= $(call ld-option, --no-apply-dynamic-relocs)
-+endif
-+
- ifeq ($(CONFIG_ARM64_ERRATUM_843419),y)
-   ifeq ($(call ld-option, --fix-cortex-a53-843419),)
- $(warning ld does not support --fix-cortex-a53-843419; kernel may be susceptible to erratum)
--- 
-2.15.0.rc2.357.g7e34df9404-goog
+> > The one special case I see is !CONFIG_RELOCATABLE and compression is
+> > used, where there's a tradeoff between compressed image size and the
+> > benefit of dynamic relocs.
+>
+> if !CONFIG_RELOCATABLE, then this patch (well v2 which will use
+> CONFIG_RELOCATABLE rather than CONFIG_RANDOMIZE_BASE) doesn't do
+> anything.
