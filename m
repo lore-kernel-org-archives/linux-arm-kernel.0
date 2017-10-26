@@ -1,46 +1,61 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 26 Oct 2017 18:28:07 +0200
-Subject: 4.13 (and probably all recent) kernels refuse to boot on one
- Nokia N950, work or another
-In-Reply-To: <20171026120130.dicanunwcdmjntnb@earth>
-References: <20171025203459.GA22035@amd> <20171025212806.GA21504@atomide.com>
- <20171026091325.GA26929@amd>
- <20171026093115.4bc6ctxjx72ng7ld@earth>
- <20171026095734.GA10141@amd>
- <20171026120130.dicanunwcdmjntnb@earth>
-Message-ID: <20171026162807.GA20639@amd>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 26 Oct 2017 09:55:50 -0700
+Subject: [PATCH v5 0/2] thermal: add brcmstb AVS TMON driver
+In-Reply-To: <20170926212800.4879-1-code@mmayer.net>
+References: <20170926212800.4879-1-code@mmayer.net>
+Message-ID: <9f6b61ee-7f53-f158-2642-15212db92781@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > > Glad you got it working :) For backlight you can add this
-> > > in drivers/gpu/drm/omapdrm/displays/panel-dsi-cm.c:
-> > > 
-> > > add the following code at the end of dsicm_probe:
-> > 
-> > You did not actually include code to paste into panel-dsi-cm, can you
-> > try a again?
+On 09/26/2017 02:27 PM, Markus Mayer wrote:
+> From: Markus Mayer <mmayer@broadcom.com>
 > 
-> I added it directly below and you quoted it. I guess you mistook it
-> for a signature or something :)
+> This series adds the brcmstb AVS TMON driver.
+> 
+> The driver was originally written by Brian Norris.
 
-Ahha. Two semicolons confused me, and I thought you were talking about
-two different files. My fault. Let me try...
+Rui, Eduardo, what's going on here? Can either one of you merge this
+driver or are we going to miss another merge window?
 
-And.. If I catch the bus, I should be at cca 20:15 at the Hilton. We
-can meet at the seats where we were hacking...?
 
-									Pavel
- 
+
+> 
+> Changes since v4:
+> - disable trip points properly when needed; there was code left-over
+>   from an older iteration of this driver that used long ints, which
+>   resulted in code that was incorrect now that we are using ints
+> - rebased on v4.14-rc1
+> - patches 3 & 4 (turning on CONFIG_BRCMSTB_THERMAL for arm/arm64) are no
+>   longer part of the series, because they were already picked up for 4.14
+> 
+> Changes since v3:
+> - Rebased on v4.13-rc3 to resolve conflicts in the MAINTAINERS file
+> 
+> Changes since v2:
+> - replaced calls to pr_debug() with calls to dev_dbg() [PATCH 2/4 only]
+> - all other patches are unchanged from v2
+> 
+> Changes since v1:
+> - Fixed wording in binding document
+> - Fixed lincensing to consistently mention GPL v2
+> - Use thermal_zone_get_slope() and thermal_zone_get_offset()
+> - Some minor clean-ups
+> 
+> Brian Norris (2):
+>   Documentation: devicetree: add binding for Broadcom STB AVS TMON
+>   thermal: add brcmstb AVS TMON driver
+> 
+>  .../devicetree/bindings/thermal/brcm,avs-tmon.txt  |  20 ++
+>  MAINTAINERS                                        |   8 +
+>  drivers/thermal/Kconfig                            |   2 +-
+>  drivers/thermal/broadcom/Kconfig                   |   7 +
+>  drivers/thermal/broadcom/Makefile                  |   1 +
+>  drivers/thermal/broadcom/brcmstb_thermal.c         | 387 +++++++++++++++++++++
+>  6 files changed, 424 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/thermal/brcm,avs-tmon.txt
+>  create mode 100644 drivers/thermal/broadcom/brcmstb_thermal.c
+> 
+
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171026/194ab3c9/attachment.sig>
+Florian
