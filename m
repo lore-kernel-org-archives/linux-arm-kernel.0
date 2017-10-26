@@ -1,99 +1,61 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Thu, 26 Oct 2017 00:34:07 +0200
-Subject: [PATCH] PCI: rework error checking in the reset path
-In-Reply-To: <20171025221046.GA25858@bhelgaas-glaptop.roam.corp.google.com>
-References: <1508794608-15310-1-git-send-email-okaya@codeaurora.org>
- <20171025134511.GL21840@bhelgaas-glaptop.roam.corp.google.com>
- <20171025232805.163ccaad@t450s.home>
- <20171025221046.GA25858@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20171026003407.29d3f400@t450s.home>
+From: kim.phillips@arm.com (Kim Phillips)
+Date: Wed, 25 Oct 2017 21:22:10 -0500
+Subject: [RFC 1/3] perf tool: Introduce arch-specific supplemental perf
+ open strerror capability
+In-Reply-To: <20171024202300.de189fde683c939966a6646c@arm.com>
+References: <20171024030404.ec366ec2d9c38910ccd84ba5@arm.com>
+ <20171024142744.GE2512@redhat.com>
+ <20171024202300.de189fde683c939966a6646c@arm.com>
+Message-ID: <20171025212210.fae60dcd543bafc312583ad3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Oct 2017 17:10:46 -0500
-Bjorn Helgaas <helgaas@kernel.org> wrote:
+On Tue, 24 Oct 2017 20:23:00 -0500
+Kim Phillips <kim.phillips@arm.com> wrote:
 
-> On Wed, Oct 25, 2017 at 11:28:05PM +0200, Alex Williamson wrote:
-> > On Wed, 25 Oct 2017 08:45:11 -0500
-> > Bjorn Helgaas <helgaas@kernel.org> wrote:
-> >   
-> > > [+cc Alex]
-> > > 
-> > > On Mon, Oct 23, 2017 at 05:36:48PM -0400, Sinan Kaya wrote:  
-> > > > The return codes from various reset types are not consistent. The code is
-> > > > assuming that all reset types will return -ENOTTY when things go wrong.
-> > > > Instead of relying on negative error status, let's bail out if the
-> > > > operation is successful instead.    
-> > > 
-> > > I like this (no surprise since I suggested something similar at
-> > > http://lkml.kernel.org/r/20171011210057.GU25517 at bhelgaas-glaptop.roam.corp.google.com),
-> > > but I'd like Alex's opinion before merging it.
-> > > 
-> > > Previously, we only tried the next reset method if one method failed
-> > > with -ENOTTY.  With this patch, we'll try the next reset method if one
-> > > method fails for any reason, not just -ENOTTY.  
+> On Tue, 24 Oct 2017 12:27:44 -0200
+> Arnaldo Carvalho de Melo <acme@redhat.com> wrote:
+> 
+> > Em Tue, Oct 24, 2017 at 03:04:04AM -0500, Kim Phillips escreveu:
+> > > Introduce new tools/perf/arch/*/util/evsel.c:perf_evsel__suppl_strerror()
+<snip>
+> > But then you're calling it _before_ the existing switch (err), humm...
+> > I.e. it will add stuff before the string that will be formatted later...
+> > The messages may end up being conflicting, I wonder if the model
+> > wouldn't be better as: ask the arch specific if it wants to override
+> > that specific error with something, if not, fallback to the existing
+> > perf_evsel__open_strerror() code, that could be moved to be
+> > __perf_evsel__open_strerror() and called by the arch specific code.
 > > 
-> > Hmm, I thought the return codes were pretty consistent.  -ENOTTY means
-> > that the reset callback doesn't handle the device, move on.  Many
-> > ioctls use the same return code to indicate an unknown ioctl.  This
-> > allows us to differentiate success vs error vs unhandled.  In the code
-> > below we lose the ability to, for instance, have a device specific
-> > reset that returns -EINVAL to prevent the PCI core for triggering
-> > further reset mechanisms which might be broken on the device.  So, I
-> > don't see that this patch specifically fixes anything, but it does
-> > remove what seems like useful functionality...  I'd veto it.  Thanks,  
+> > Thoughts?
 > 
-> I didn't understand the  intention of -EINVAL vs -ENOTTY, so
-> that might be a reasonable argument.  The knowledge about mechanisms
-> being broken on a specific device seems like it would belong in
-> pci_dev_specific_reset() and not really applicable to other methods,
-> though.
-> 
-> But I'm not sure the current usage makes a lot of sense.  The only
-> places I found that return an error other than -ENOTTY are
-> reset_ivb_igd() and pci_pm_reset().  In reset_ivb_igd(), we return
-> -ENOMEM if an ioremap() fails.  That's not a case of "other reset
-> mechanisms are broken and we shouldn't try them."
+> Thanks for your good feedback, yes, very good idea, fully agreed and
+> implemented - see below.
 
-Well, by the fact that we have a device specific reset here, we can
-probably deduce that the standard reset mechanisms do not work or are
-undesirable for some reason.  Therefore if we cannot perform the
-necessary ioremap in this case, it's probably better to stop and return
-error.
+I take this back:  There's no way for the tool to tell whether it was
+the PMU driver that croaked on the perf_event_open, or whether it was
+due to another part of the syscall returning an error code.
 
-> pci_pm_reset() returns -EINVAL if the device is not in D0.  Maybe it
-> makes sense to not try any other reset methods in that case, but I
-> really don't know.
+WRT the CCN strerror code being able to tell whether it was the CCN
+driver that did it, technically it could scan the event for strings
+like 'vc=', but it still wouldn't be sure.
 
-Yeah, that one could probably be re-worked since it's a standard reset
-mechanism.  I wonder if the logic here is to avoid a bus reset for a
-device that reports NoSoftRst- but is simply in the wrong state for it.
- 
-> If we leave it as-is, maybe a comment like the following would be
-> useful.
-> 
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index f0d68066c726..2c98f309bc8a 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -4170,6 +4170,13 @@ int __pci_reset_function_locked(struct pci_dev *dev)
->  
->  	might_sleep();
->  
-> +	/*
-> +	 * Reset method return values:
-> +	 *   0:		    Device was successfully reset
-> +	 *   -ENOTTY:	    Method doesn't support resetting this device;
-> +	 *		    try the next method
-> +	 *   anything else: Reset failed; don't try any other mechanisms
-> +	 */
->  	rc = pci_dev_specific_reset(dev, 0);
->  	if (rc != -ENOTTY)
->  		return rc;
+In the below example, the error being erroneously reported is the
+default EINVAL case in the CCN strerror ("Invalid MN..."):
 
-Yep, that's helpful.  The standard reset mechanisms also use the
--ENOTTY convention, but maybe don't have the same authority to indicate
-whether to abort or move on to the next method as device specific
-resets.  Thanks,
+$ sudo ./perf stat -vv -e ccn/cycles/  -p 1330
+ccn/cycles/: Invalid MN / XP / node ID, or node type, or node/XP port / vc or event, or mixed PMU group. See dmesg for details
 
-Alex
+^Cfailed to read counter ccn/cycles/
+
+ Performance counter stats for process id '1330':
+
+   <not supported>      ccn/cycles/                                                 
+
+       2.343102253 seconds time elapsed
+
+...and nothing was emitted in dmesg by the driver.
+
+Any other ideas?
+
+Kim
