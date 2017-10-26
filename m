@@ -1,25 +1,83 @@
-From: batnnubv@gmail.com (Don Baton)
-Date: Thu, 26 Oct 2017 12:56:30 +0300
-Subject: [PATCH v9 04/10] arm: dts: sunxi: h3/h5: represent the mdio
- switch used by sun8i-h3-emac
-In-Reply-To: <20171026095411.GJ20299@lunn.ch>
-References: <20171024175714.15840-1-clabbe.montjoie@gmail.com>
- <20171024175714.15840-5-clabbe.montjoie@gmail.com>
- <20171026095411.GJ20299@lunn.ch>
-Message-ID: <CACY=2cmXHQYqMdugEjrAb9gv-7pQ9mSuN4LADdyb=kPyhGnsXA@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 26 Oct 2017 11:57:34 +0200
+Subject: 4.13 (and probably all recent) kernels refuse to boot on one
+ Nokia N950, work or another
+In-Reply-To: <20171026093115.4bc6ctxjx72ng7ld@earth>
+References: <20171025203459.GA22035@amd> <20171025212806.GA21504@atomide.com>
+ <20171026091325.GA26929@amd>
+ <20171026093115.4bc6ctxjx72ng7ld@earth>
+Message-ID: <20171026095734.GA10141@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-10-26 12:54 GMT+03:00, Andrew Lunn <andrew@lunn.ch>:
-> On Tue, Oct 24, 2017 at 07:57:08PM +0200, Corentin Labbe wrote:
->> Since dwmac-sun8i could use either an integrated PHY or an external PHY
->> (which could be at same MDIO address), we need to represent this
->> selection
->> by a MDIO switch.
->>
->> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
->
-> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
->
->     Andrew
->
+On Thu 2017-10-26 11:31:15, Sebastian Reichel wrote:
+> Hi,
+> 
+> On Thu, Oct 26, 2017 at 11:13:26AM +0200, Pavel Machek wrote:
+> > On Wed 2017-10-25 14:28:07, Tony Lindgren wrote:
+> > > * Pavel Machek <pavel@ucw.cz> [171025 13:36]:
+> > > > Hi!
+> > > > 
+> > > > ...hardware should be identical. 3.5.3-nemo kernel seems to work on
+> > > > both. 4.13-rc2 with display and clock patches boots on phone "S", but
+> > > > does not on phone "P"; nothing nothing is received on serial port.
+> > > > 
+> > > > There is some difference in the bootloaders: S's bootloader provides
+> > > > lots of debug info, P's is silent. R&D settings do _not_ have
+> > > > influence on bootloader. We know P's serial works, as 3.5.3 kernel
+> > > > prints "Uncompressing linux...booting" there.
+> > > > 
+> > > > I'll need to return "S" phone and serial cable tommorow. If you have
+> > > > any ideas, let me know.
+> > > 
+> > > If you get nothing out of the uart, chances are the pins are
+> > > not muxed for the uart in nolo and maybe kernel dts is missing the
+> > > pinctrl entries for uart?
+> > > 
+> > > Also try booting with mem=512M at 0x80000000 or 256M or 768M. Maybe the
+> > > memory is different size or partially broken?
+> > 
+> > Uhuh. It looks like "P" nokia really wants initrd, otherwise it will
+> > not boot.
+> > 
+> > I got "uncompressing Linux 4.13" on serial console now, debug LEDs
+> > blinking, and if I use a flashlight, I see output on the screen, too.
+> > 
+> > (What do I need to do to get the backlight working?)
+> 
+> Glad you got it working :) For backlight you can add this
+> in drivers/gpu/drm/omapdrm/displays/panel-dsi-cm.c:
+> 
+> add the following code at the end of dsicm_probe:
+
+You did not actually include code to paste into panel-dsi-cm, can you
+try a again?
+
+Thanks a lot,
+								Pavel
+
+> -----------------------------------------------------------
+> mutex_unlock(&ddata->lock);
+> mutex_lock(&ddata->lock);
+> ddata->in->ops.dsi->bus_lock(ddata->in);
+> r = dsicm_wake_up(ddata);
+> if (!r)
+>     r = dsicm_dcs_write_1(ddata, DCS_BRIGHTNESS, 100);
+> ddata->in->ops.dsi->bus_unlock(ddata->in);
+> mutex_unlock(&ddata->lock);
+> -----------------------------------------------------------
+> 
+> -- Sebastian
+
+
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171026/745d2ebf/attachment.sig>
