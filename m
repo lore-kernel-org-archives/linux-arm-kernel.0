@@ -1,43 +1,45 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Thu, 26 Oct 2017 21:33:31 +0530
-Subject: [PATCH] ARM: multi_v7_defconfig: Select RPMSG_VIRTIO as module
-In-Reply-To: <1507222198-5052-1-git-send-email-anup@brainfault.org>
-References: <1507222198-5052-1-git-send-email-anup@brainfault.org>
-Message-ID: <CAAhSdy0weSJCp1CtcEG-V+iPD3o88W5gZzTBaU38PpHGEtaS8A@mail.gmail.com>
+From: philippe.cornu@st.com (Philippe Cornu)
+Date: Thu, 26 Oct 2017 18:12:36 +0200
+Subject: [PATCH] dt-bindings: display: stm32: add pixel clock mandatory
+ property
+Message-ID: <1509034356-23885-1-git-send-email-philippe.cornu@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 5, 2017 at 10:19 PM, Anup Patel <anup@brainfault.org> wrote:
-> The RPMSG_VIRTIO is now user selectable option so we explicitly
-> select it in multi_v7_defconfig. Till now RPMSG_VIRTIO was
-> selected by ST_REMOTEPROC=m in multi_v7_defconfig.
->
-> Signed-off-by: Anup Patel <anup@brainfault.org>
-> ---
->  arch/arm/configs/multi_v7_defconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 0cacdbf..5e689e0 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -849,6 +849,7 @@ CONFIG_TEGRA_IOMMU_GART=y
->  CONFIG_TEGRA_IOMMU_SMMU=y
->  CONFIG_REMOTEPROC=m
->  CONFIG_ST_REMOTEPROC=m
-> +CONFIG_RPMSG_VIRTIO=m
->  CONFIG_PM_DEVFREQ=y
->  CONFIG_ARM_TEGRA_DEVFREQ=m
->  CONFIG_MEMORY=y
-> --
-> 2.7.4
->
+Add the DPI/RGB input pixel clock in mandatory properties
+because it really offers a better preciseness for timing
+computations.
+Note: Fix also the DSI panel example where "ref" & "pclk"
+clocks were swapped.
 
-Hi Arnd/Olof,
+Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
+---
+ Documentation/devicetree/bindings/display/st,stm32-ltdc.txt | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-Please have a look at this patch.
-
-This is a follow-up patch for https://patchwork.kernel.org/patch/9987567/
-
-Regards,
-Anup
+diff --git a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+index 0292522..99823fb 100644
+--- a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
++++ b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+@@ -28,6 +28,7 @@ Mandatory properties specific to STM32 DSI:
+ - #size-cells: Should be <0>.
+ - compatible: "st,stm32-dsi".
+ - clock-names:
++  - DPI/RGB input pixel clock string name, must be "px_clk".
+   - phy pll reference clock string name, must be "ref".
+ - resets: see [5].
+ - reset-names: see [5].
+@@ -97,8 +98,9 @@ Example 2: DSI panel
+ 			#size-cells = <0>;
+ 			compatible = "st,stm32-dsi";
+ 			reg = <0x40016c00 0x800>;
+-			clocks = <&rcc 1 CLK_F469_DSI>, <&clk_hse>;
+-			clock-names = "ref", "pclk";
++			clocks = <&rcc 1 CLK_F469_DSI>, <&rcc 1 CLK_LCD>,
++				 <&clk_hse>;
++			clock-names = "pclk", "px_clk", "ref";
+ 			resets = <&rcc STM32F4_APB2_RESET(DSI)>;
+ 			reset-names = "apb";
+ 
+-- 
+1.9.1
