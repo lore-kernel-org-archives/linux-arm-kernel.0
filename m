@@ -1,33 +1,115 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Thu, 26 Oct 2017 15:24:29 +0000
-Subject: v4.14-rc3/arm64 DABT exception in atomic_inc() / __skb_clone()
-In-Reply-To: <CAF=yD-Lw2E7T12sA-dgMK5kn=L0TLGQE+v68s1X8HMHLq9hGBA@mail.gmail.com>
-References: <EAA60182-6F08-412E-8F8B-FD4B0309A858@gmail.com>
- <20171020111408.edj24tztxdptte5r@lakrids.cambridge.arm.com>
- <960D71EC-C1E9-4898-ACBE-543FC09483FF@gmail.com>
- <CACT4Y+bjzzCv3LSxK12C1xB8GfR3UYCrX_5phRYJ8fpxh9vcvQ@mail.gmail.com>
- <CAF=yD-K76TMjHiYRTRAnxM-x4LBcUDY+27WX477HW6kG=L_aZw@mail.gmail.com>
- <D2AD6D5B-3A05-48E7-A999-DECAB18A4649@gmail.com>
- <CAF=yD-JFjjA=2T7HermH2GygfHinyW+ZC5v+Di7M4V_Fg5paHg@mail.gmail.com>
- <CAF=yD-Lw2E7T12sA-dgMK5kn=L0TLGQE+v68s1X8HMHLq9hGBA@mail.gmail.com>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6DD00A59B0@AcuExch.aculab.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Thu, 26 Oct 2017 17:24:45 +0200
+Subject: [PATCH v4 21/26] KVM: arm/arm64: GICv4: Hook vPE scheduling into
+ vgic flush/sync
+In-Reply-To: <20171006153401.5481-22-marc.zyngier@arm.com>
+References: <20171006153401.5481-1-marc.zyngier@arm.com>
+ <20171006153401.5481-22-marc.zyngier@arm.com>
+Message-ID: <20171026152445.GB2166@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Willem de Bruijn
-> Sent: 25 October 2017 19:50
-...
-> From skb->dev and netdev_priv, the tun device has flags 0x1002 ==
-> IFF_TAP | IFF_NO_PI. This kernel precedes the recent support for
-> IFF_NAPI and IFF_NAPI_FRAGS. The allocation most likely happened
-> in tun_build_skb from current->task_frag. It would be a previous
-> allocation that left alloc_frag->offset unaligned. But perhaps this code
-> needs to perform alignment before setting skb->head.
->
-> At least on platforms where atomic on dataref must be aligned.
+On Fri, Oct 06, 2017 at 04:33:56PM +0100, Marc Zyngier wrote:
+> The redistributor needs to be told which vPE is about to be run,
+> and tells us whether there is any pending VLPI on exit.
+> 
+> Let's add the scheduling calls to the vgic flush/sync functions,
+> allowing the VLPIs to be delivered to the guest.
+> 
 
-Isn't that true of almost everything?
-I'm not even sure x86 always (ever?) manages locked cycles on
-misaligned addresses.
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-	David
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  virt/kvm/arm/vgic/vgic-v4.c | 39 +++++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic.c    |  4 ++++
+>  virt/kvm/arm/vgic/vgic.h    |  2 ++
+>  3 files changed, 45 insertions(+)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
+> index 5ee69aec990a..68a2ef6df161 100644
+> --- a/virt/kvm/arm/vgic/vgic-v4.c
+> +++ b/virt/kvm/arm/vgic/vgic-v4.c
+> @@ -130,6 +130,45 @@ void vgic_v4_teardown(struct kvm *kvm)
+>  	its_vm->vpes = NULL;
+>  }
+>  
+> +int vgic_v4_sync_hwstate(struct kvm_vcpu *vcpu)
+> +{
+> +	if (!vgic_supports_direct_msis(vcpu->kvm))
+> +		return 0;
+> +
+> +	return its_schedule_vpe(&vcpu->arch.vgic_cpu.vgic_v3.its_vpe, false);
+> +}
+> +
+> +int vgic_v4_flush_hwstate(struct kvm_vcpu *vcpu)
+> +{
+> +	int irq = vcpu->arch.vgic_cpu.vgic_v3.its_vpe.irq;
+> +	int err;
+> +
+> +	if (!vgic_supports_direct_msis(vcpu->kvm))
+> +		return 0;
+> +
+> +	/*
+> +	 * Before making the VPE resident, make sure the redistributor
+> +	 * corresponding to our current CPU expects us here. See the
+> +	 * doc in drivers/irqchip/irq-gic-v4.c to understand how this
+> +	 * turns into a VMOVP command at the ITS level.
+> +	 */
+> +	err = irq_set_affinity(irq, cpumask_of(smp_processor_id()));
+> +	if (err)
+> +		return err;
+> +
+> +	err = its_schedule_vpe(&vcpu->arch.vgic_cpu.vgic_v3.its_vpe, true);
+> +	if (err)
+> +		return err;
+> +
+> +	/*
+> +	 * Now that the VPE is resident, let's get rid of a potential
+> +	 * doorbell interrupt that would still be pending.
+> +	 */
+> +	err = irq_set_irqchip_state(irq, IRQCHIP_STATE_PENDING, false);
+> +
+> +	return err;
+> +}
+> +
+>  static struct vgic_its *vgic_get_its(struct kvm *kvm,
+>  				     struct kvm_kernel_irq_routing_entry *irq_entry)
+>  {
+> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+> index 0691a2250949..71ca0ff1b35a 100644
+> --- a/virt/kvm/arm/vgic/vgic.c
+> +++ b/virt/kvm/arm/vgic/vgic.c
+> @@ -709,6 +709,8 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+>  {
+>  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+>  
+> +	WARN_ON(vgic_v4_sync_hwstate(vcpu));
+> +
+>  	/* An empty ap_list_head implies used_lrs == 0 */
+>  	if (list_empty(&vcpu->arch.vgic_cpu.ap_list_head))
+>  		return;
+> @@ -721,6 +723,8 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+>  /* Flush our emulation state into the GIC hardware before entering the guest. */
+>  void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+>  {
+> +	WARN_ON(vgic_v4_flush_hwstate(vcpu));
+> +
+>  	/*
+>  	 * If there are no virtual interrupts active or pending for this
+>  	 * VCPU, then there is no work to do and we can bail out without
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> index 1bd2e28ac097..1c65750892d7 100644
+> --- a/virt/kvm/arm/vgic/vgic.h
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -245,5 +245,7 @@ int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
+>  bool vgic_supports_direct_msis(struct kvm *kvm);
+>  int vgic_v4_init(struct kvm *kvm);
+>  void vgic_v4_teardown(struct kvm *kvm);
+> +int vgic_v4_sync_hwstate(struct kvm_vcpu *vcpu);
+> +int vgic_v4_flush_hwstate(struct kvm_vcpu *vcpu);
+>  
+>  #endif
+> -- 
+> 2.14.1
+> 
