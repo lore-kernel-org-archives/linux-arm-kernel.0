@@ -1,115 +1,55 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Thu, 26 Oct 2017 17:24:45 +0200
-Subject: [PATCH v4 21/26] KVM: arm/arm64: GICv4: Hook vPE scheduling into
- vgic flush/sync
-In-Reply-To: <20171006153401.5481-22-marc.zyngier@arm.com>
-References: <20171006153401.5481-1-marc.zyngier@arm.com>
- <20171006153401.5481-22-marc.zyngier@arm.com>
-Message-ID: <20171026152445.GB2166@lvm>
+From: marco.franchi@nxp.com (Marco Franchi)
+Date: Thu, 26 Oct 2017 13:25:14 -0200
+Subject: [PATCH v5] ARM: dts: imx53-tx53: Fix 'ethernet-phy@0' node with unit
+ name and no reg property
+Message-ID: <1509031514-30602-1-git-send-email-marco.franchi@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 06, 2017 at 04:33:56PM +0100, Marc Zyngier wrote:
-> The redistributor needs to be told which vPE is about to be run,
-> and tells us whether there is any pending VLPI on exit.
-> 
-> Let's add the scheduling calls to the vgic flush/sync functions,
-> allowing the VLPIs to be delivered to the guest.
-> 
+The following build warning is seen with W=1:
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Warning (unit_address_vs_reg): Node /soc/aips at 60000000/ethernet at 63fec000/ethernet-phy at 0 has a unit name, but no reg property
 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  virt/kvm/arm/vgic/vgic-v4.c | 39 +++++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic.c    |  4 ++++
->  virt/kvm/arm/vgic/vgic.h    |  2 ++
->  3 files changed, 45 insertions(+)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
-> index 5ee69aec990a..68a2ef6df161 100644
-> --- a/virt/kvm/arm/vgic/vgic-v4.c
-> +++ b/virt/kvm/arm/vgic/vgic-v4.c
-> @@ -130,6 +130,45 @@ void vgic_v4_teardown(struct kvm *kvm)
->  	its_vm->vpes = NULL;
->  }
->  
-> +int vgic_v4_sync_hwstate(struct kvm_vcpu *vcpu)
-> +{
-> +	if (!vgic_supports_direct_msis(vcpu->kvm))
-> +		return 0;
-> +
-> +	return its_schedule_vpe(&vcpu->arch.vgic_cpu.vgic_v3.its_vpe, false);
-> +}
-> +
-> +int vgic_v4_flush_hwstate(struct kvm_vcpu *vcpu)
-> +{
-> +	int irq = vcpu->arch.vgic_cpu.vgic_v3.its_vpe.irq;
-> +	int err;
-> +
-> +	if (!vgic_supports_direct_msis(vcpu->kvm))
-> +		return 0;
-> +
-> +	/*
-> +	 * Before making the VPE resident, make sure the redistributor
-> +	 * corresponding to our current CPU expects us here. See the
-> +	 * doc in drivers/irqchip/irq-gic-v4.c to understand how this
-> +	 * turns into a VMOVP command at the ITS level.
-> +	 */
-> +	err = irq_set_affinity(irq, cpumask_of(smp_processor_id()));
-> +	if (err)
-> +		return err;
-> +
-> +	err = its_schedule_vpe(&vcpu->arch.vgic_cpu.vgic_v3.its_vpe, true);
-> +	if (err)
-> +		return err;
-> +
-> +	/*
-> +	 * Now that the VPE is resident, let's get rid of a potential
-> +	 * doorbell interrupt that would still be pending.
-> +	 */
-> +	err = irq_set_irqchip_state(irq, IRQCHIP_STATE_PENDING, false);
-> +
-> +	return err;
-> +}
-> +
->  static struct vgic_its *vgic_get_its(struct kvm *kvm,
->  				     struct kvm_kernel_irq_routing_entry *irq_entry)
->  {
-> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-> index 0691a2250949..71ca0ff1b35a 100644
-> --- a/virt/kvm/arm/vgic/vgic.c
-> +++ b/virt/kvm/arm/vgic/vgic.c
-> @@ -709,6 +709,8 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
->  {
->  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
->  
-> +	WARN_ON(vgic_v4_sync_hwstate(vcpu));
-> +
->  	/* An empty ap_list_head implies used_lrs == 0 */
->  	if (list_empty(&vcpu->arch.vgic_cpu.ap_list_head))
->  		return;
-> @@ -721,6 +723,8 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
->  /* Flush our emulation state into the GIC hardware before entering the guest. */
->  void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
->  {
-> +	WARN_ON(vgic_v4_flush_hwstate(vcpu));
-> +
->  	/*
->  	 * If there are no virtual interrupts active or pending for this
->  	 * VCPU, then there is no work to do and we can bail out without
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index 1bd2e28ac097..1c65750892d7 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -245,5 +245,7 @@ int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
->  bool vgic_supports_direct_msis(struct kvm *kvm);
->  int vgic_v4_init(struct kvm *kvm);
->  void vgic_v4_teardown(struct kvm *kvm);
-> +int vgic_v4_sync_hwstate(struct kvm_vcpu *vcpu);
-> +int vgic_v4_flush_hwstate(struct kvm_vcpu *vcpu);
->  
->  #endif
-> -- 
-> 2.14.1
-> 
+Fix this warning by adding reg property from such node and, consequently, 
+includes a mdio node into the fec node, with the 'address-cells' and 
+'size-cells' to avoid these other following warnings:
+
+Warning (reg_format): "reg" property in /soc/aips at 60000000/ethernet at 63fec000/ethernet-phy at 0 has invalid length (4 bytes) (#address-cells == 2, #size-cells == 1)
+Warning (avoid_default_addr_size): Relying on default #address-cells value for /soc/aips at 60000000/ethernet at 63fec000/ethernet-phy at 0
+Warning (avoid_default_addr_size): Relying on default #size-cells value for /soc/aips at 60000000/ethernet at 63fec000/ethernet-phy at 0
+
+Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
+---
+Change since v4:
+-pass the 'address-cells' and 'size-cells' values using a mdio node
+-change message log
+ arch/arm/boot/dts/imx53-tx53.dtsi | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx53-tx53.dtsi b/arch/arm/boot/dts/imx53-tx53.dtsi
+index 71b58b6..a22e461 100644
+--- a/arch/arm/boot/dts/imx53-tx53.dtsi
++++ b/arch/arm/boot/dts/imx53-tx53.dtsi
+@@ -225,10 +225,16 @@
+ 	mac-address = [000000000000]; /* placeholder; will be overwritten by bootloader */
+ 	status = "okay";
+ 
+-	phy0: ethernet-phy at 0 {
+-		interrupt-parent = <&gpio2>;
+-		interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
+-		device_type = "ethernet-phy";
++	mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		phy0: ethernet-phy at 0 {
++			reg = <0>;
++			interrupt-parent = <&gpio2>;
++			interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
++			device_type = "ethernet-phy";
++		};
+ 	};
+ };
+ 
+-- 
+2.7.4
