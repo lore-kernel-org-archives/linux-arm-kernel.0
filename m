@@ -1,63 +1,102 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Thu, 26 Oct 2017 17:32:15 +0200
-Subject: [INTERNAL][PATCH 4/7] ASoC: stm32: sai: fix stop management in isr
-In-Reply-To: <1508418203-16840-5-git-send-email-olivier.moysan@st.com>
-References: <1508418203-16840-1-git-send-email-olivier.moysan@st.com>
- <1508418203-16840-5-git-send-email-olivier.moysan@st.com>
-Message-ID: <s5hmv4ekjr4.wl-tiwai@suse.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 26 Oct 2017 17:42:31 +0200
+Subject: [PATCH] ARM: dts: mvebu: pl310-cache disable double-linefill
+In-Reply-To: <20171025145823.29262-1-gregory.clement@free-electrons.com>
+ (Gregory CLEMENT's message of "Wed, 25 Oct 2017 16:58:23 +0200")
+References: <20171025145823.29262-1-gregory.clement@free-electrons.com>
+Message-ID: <87h8ul5314.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Oct 2017 15:03:20 +0200,
-Olivier Moysan wrote:
-> 
-> Add check on substream validity.
-> 
-> Signed-off-by: Olivier Moysan <olivier.moysan@st.com>
+Hi,
+ 
+ On mer., oct. 25 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+
+> From: Yan Markman <ymarkman@marvell.com>
+>
+> Under heavy system stress mvebu SoC using Cortex A9 sporadically
+> encountered instability issues.
+>
+> The "double linefill" feature of L2 cache was identified as causing
+> dependency between read and write which lead to the deadlock.
+>
+> Especially, it was the cause of deadlock seen under heavy PCIe traffic,
+> as this dependency violates PCIE overtaking rule.
+>
+> Fixes: c8f5a878e554 ("ARM: mvebu: use DT properties to fine-tune the L2 configuration")
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Yan Markman <ymarkman@marvell.com>
+> Signed-off-by: Igal Liberman <igall@marvell.com>
+> Signed-off-by: Nadav Haklai <nadavh@marvell.com>
+> [gregory.clement at free-electrons.com: reformulate commit log, add Armada
+> 375 and add Fixes tag]
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+Applied on mvebu/fixes
+
+Gregory
+
+
 > ---
->  sound/soc/stm/stm32_sai_sub.c | 12 ++++++++----
->  1 file changed, 8 insertions(+), 4 deletions(-)
-> 
-> diff --git a/sound/soc/stm/stm32_sai_sub.c b/sound/soc/stm/stm32_sai_sub.c
-> index 2af397d..815ef10 100644
-> --- a/sound/soc/stm/stm32_sai_sub.c
-> +++ b/sound/soc/stm/stm32_sai_sub.c
-> @@ -184,7 +184,6 @@ static bool stm32_sai_sub_writeable_reg(struct device *dev, unsigned int reg)
->  static irqreturn_t stm32_sai_isr(int irq, void *devid)
->  {
->  	struct stm32_sai_sub_data *sai = (struct stm32_sai_sub_data *)devid;
-> -	struct snd_pcm_substream *substream = sai->substream;
->  	struct platform_device *pdev = sai->pdev;
->  	unsigned int sr, imr, flags;
->  	snd_pcm_state_t status = SNDRV_PCM_STATE_RUNNING;
-> @@ -199,6 +198,11 @@ static irqreturn_t stm32_sai_isr(int irq, void *devid)
->  	regmap_update_bits(sai->regmap, STM_SAI_CLRFR_REGX, SAI_XCLRFR_MASK,
->  			   SAI_XCLRFR_MASK);
+>  arch/arm/boot/dts/armada-375.dtsi | 4 ++--
+>  arch/arm/boot/dts/armada-38x.dtsi | 4 ++--
+>  arch/arm/boot/dts/armada-39x.dtsi | 4 ++--
+>  3 files changed, 6 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+> index 7225c7ce9a8d..2cb1bcd30976 100644
+> --- a/arch/arm/boot/dts/armada-375.dtsi
+> +++ b/arch/arm/boot/dts/armada-375.dtsi
+> @@ -178,9 +178,9 @@
+>  				reg = <0x8000 0x1000>;
+>  				cache-unified;
+>  				cache-level = <2>;
+> -				arm,double-linefill-incr = <1>;
+> +				arm,double-linefill-incr = <0>;
+>  				arm,double-linefill-wrap = <0>;
+> -				arm,double-linefill = <1>;
+> +				arm,double-linefill = <0>;
+>  				prefetch-data = <1>;
+>  			};
 >  
-> +	if (!sai->substream) {
-> +		dev_err(&pdev->dev, "Device stopped. Spurious IRQ 0x%x\n", sr);
-> +		return IRQ_NONE;
-> +	}
-> +
->  	if (flags & SAI_XIMR_OVRUDRIE) {
->  		dev_err(&pdev->dev, "IRQ %s\n",
->  			STM_SAI_IS_PLAYBACK(sai) ? "underrun" : "overrun");
-> @@ -227,9 +231,9 @@ static irqreturn_t stm32_sai_isr(int irq, void *devid)
->  	}
+> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+> index 7ff0811e61db..05e241fb91ad 100644
+> --- a/arch/arm/boot/dts/armada-38x.dtsi
+> +++ b/arch/arm/boot/dts/armada-38x.dtsi
+> @@ -143,9 +143,9 @@
+>  				reg = <0x8000 0x1000>;
+>  				cache-unified;
+>  				cache-level = <2>;
+> -				arm,double-linefill-incr = <1>;
+> +				arm,double-linefill-incr = <0>;
+>  				arm,double-linefill-wrap = <0>;
+> -				arm,double-linefill = <1>;
+> +				arm,double-linefill = <0>;
+>  				prefetch-data = <1>;
+>  			};
 >  
->  	if (status != SNDRV_PCM_STATE_RUNNING) {
-> -		snd_pcm_stream_lock(substream);
-> -		snd_pcm_stop(substream, SNDRV_PCM_STATE_XRUN);
-> -		snd_pcm_stream_unlock(substream);
-> +		snd_pcm_stream_lock(sai->substream);
-> +		snd_pcm_stop(sai->substream, SNDRV_PCM_STATE_XRUN);
-> +		snd_pcm_stream_unlock(sai->substream);
+> diff --git a/arch/arm/boot/dts/armada-39x.dtsi b/arch/arm/boot/dts/armada-39x.dtsi
+> index ea657071e278..5218bd2a248d 100644
+> --- a/arch/arm/boot/dts/armada-39x.dtsi
+> +++ b/arch/arm/boot/dts/armada-39x.dtsi
+> @@ -111,9 +111,9 @@
+>  				reg = <0x8000 0x1000>;
+>  				cache-unified;
+>  				cache-level = <2>;
+> -				arm,double-linefill-incr = <1>;
+> +				arm,double-linefill-incr = <0>;
+>  				arm,double-linefill-wrap = <0>;
+> -				arm,double-linefill = <1>;
+> +				arm,double-linefill = <0>;
+>  				prefetch-data = <1>;
+>  			};
+>  
+> -- 
+> 2.14.2
+>
 
-Actually changing to sai->substream opens a race, so this chunk is a
-bad move, at least.  We have no protection of sai->substream in this
-context, thus it can hit a NULL dereference...
-
-
-thanks,
-
-Takashi
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
