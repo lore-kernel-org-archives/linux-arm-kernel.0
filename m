@@ -1,92 +1,59 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 Oct 2017 16:27:43 +0100
-Subject: [PATCH] ARM: add a private asm/unaligned.h
-In-Reply-To: <87wp3g39es.fsf@free-electrons.com>
-References: <20171020200231.1355569-1-arnd@arndb.de>
- <87wp3g39es.fsf@free-electrons.com>
-Message-ID: <20171027152743.GJ20805@n2100.armlinux.org.uk>
+Date: Fri, 27 Oct 2017 16:28:50 +0100
+Subject: [PATCH] efi/libstub: arm: omit sorting of the UEFI memory map
+In-Reply-To: <fe35c87c-8fd0-b33f-3a6f-2bd759726667@suse.com>
+References: <20171022141457.28769-1-ard.biesheuvel@linaro.org>
+ <fe35c87c-8fd0-b33f-3a6f-2bd759726667@suse.com>
+Message-ID: <20171027152850.GK20805@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 27, 2017 at 05:19:55PM +0200, Gregory CLEMENT wrote:
-> Hi Arnd,
->  
->  On ven., oct. 20 2017, Arnd Bergmann <arnd@arndb.de> wrote:
+On Fri, Oct 27, 2017 at 05:12:58PM +0200, Matthias Brugger wrote:
+> Hi Ard,
 > 
-> > The asm-generic/unaligned.h header provides two different implementations
-> > for accessing unaligned variables: the access_ok.h version used when
-> > CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS is set pretends that all pointers
-> > are in fact aligned, while the le_struct.h version convinces gcc that the
-> > alignment of a pointer is '1', to make it issue the correct load/store
-> > instructions depending on the architecture flags.
-> >
-> > On ARMv5 and older, we always use the second version, to let the compiler
-> > use byte accesses. On ARMv6 and newer, we currently use the access_ok.h
-> > version, so the compiler can use any instruction including stm/ldm and
-> > ldrd/strd that will cause an alignment trap. This trap can significantly
-> > impact performance when we have to do a lot of fixups and, worse, has
-> > led to crashes in the LZ4 decompressor code that does not have a trap
-> > handler.
-> >
-> > This adds an ARM specific version of asm/unaligned.h that uses the
-> > le_struct.h/be_struct.h implementation unconditionally. This should lead
-> > to essentially the same code on ARMv6+ as before, with the exception of
-> > using regular load/store instructions instead of the trapping instructions
-> > multi-register variants.
-> >
-> > The crash in the LZ4 decompressor code was probably introduced by the
-> > patch replacing the LZ4 implementation, commit 4e1a33b105dd ("lib: update
-> > LZ4 compressor module"), so linux-4.11 and higher would be affected most.
-> > However, we probably want to have this backported to all older stable
-> > kernels as well, to help with the performance issues.
-> >
-> > There are two follow-ups that I think we should also work on, but not
-> > backport to stable kernels, first to change the asm-generic version of
-> > the header to remove the ARM special case, and second to review all
-> > other uses of CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS to see if they
-> > might be affected by the same problem on ARM.
-> >
-> > Cc: stable at vger.kernel.org
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> On 10/22/2017 04:14 PM, Ard Biesheuvel wrote:
+> > ARM shares its EFI stub implementation with arm64, which has some
+> > special handling in the virtual remapping code to
+> > a) make sure that we can map everything even if the OS executes
+> >    with 64k page size, and
+> > b) make sure that adjacent regions with the same attributes are not
+> >    reordered or moved apart in memory.
+> > 
+> > The latter is a workaround for a 'feature' that was shortly recommended
+> > by UEFI spec v2.5, but deprecated shortly after, due to the fact that
+> > it broke many OS installers, including non-Linux ones, and it was never
+> > widely implemented for ARM systems. Before implementing b), the arm64
+> > code simply rounded up all regions to 64 KB granularity, but given that
+> > that results in moving adjacent regions apart, it had to be refined when
+> > b) was implemented.
+> > 
+> > The adjacency check requires a sort() pass, due to the fact that the
+> > UEFI spec does not mandate any ordering, and the inclusion of the
+> > lib/sort.c code into the ARM EFI stub is causing some trouble with
+> > the decompressor build due to the fact that its EXPORT_SYMBOL() call
+> > triggers the creation of ksymtab/kcrctab sections.
+> > 
+> > So let's simply do away with the adjacency check for ARM, and simply put
+> > all UEFI runtime regions together if they have the same memory attributes.
+> > This is guaranteed to work, given that ARM only supports 4 KB pages,
+> > and allows us to remove the sort() call entirely.
+> > 
+> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > > ---
-> > Untested so far, please verify that this fixes all the known problems
-> > with the alignment traps.
+> >  drivers/firmware/efi/libstub/Makefile   | 6 +++---
+> >  drivers/firmware/efi/libstub/arm-stub.c | 7 +++++--
+> >  2 files changed, 8 insertions(+), 5 deletions(-)
+> > 
 > 
-> I think Russell already find this conclusion but this patch didn't solve
-> my boot issue with dtb append.
+> I thought I already provided my tag, but just in case:
+> This fixes the boot problems I had on the bananapi-r2.
 > 
-> I tested this patch onto a v4.14-rc6.
-> 
-> Then at least with the patch from Ard: "efi/libstub: arm: omit sorting
-> of the UEFI memory map", it didn't prevent booting.
+> Tested-by: Matthias Brugger <matthias.bgg@gmail.com>
 
-There's three things wrong, all of which I have patches to address:
+Please test my "fixes" branch - that has all three patches merged.
 
-1. The decompressor code reading the image data sometimes issues unaligned
-   reads.  Some compilers get this wrong and cause an abort.  Arnds patch
-   addresses this.
-
-2. Additional sections can appear in the zImage binary which adds extra
-   bytes on the end of the image.  Concatenating the zImage with the
-   extra bytes onto a DTB is the same thing as doing this:
-
-	cat zImage extrabytes foo.dtb > image
-
-   and the decompressor tolerates no additional bytes between the
-   _official_ end of the zImage and the DTB.  I've added a patch which
-   detects this situation and fails the kernel build when it happens.
-
-3. Ard's patch "efi/libstub: arm: omit sorting of the UEFI memory map"
-   gets rid of the additional sections that (a) change the alignment
-   of the compressed data, and (b) add additional unexpected bytes on
-   the end of zImage.
-
-So, merely applying Ard's patch will appear to fix the problem, but leave
-the actual underlying issues - so next time we have an additional section
-appear in the zImage, we'd go through all this pain again.
-
-These other patches are required to either make the decompressor tolerant
-or catch the problem cases while they're still in the developer's tree.
+We don't have linux-next running at the moment, so folk need to be
+manually fetching the appropriate git trees for testing.
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
