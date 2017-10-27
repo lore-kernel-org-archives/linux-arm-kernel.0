@@ -1,73 +1,128 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Fri, 27 Oct 2017 15:17:36 +0800
-Subject: [RFC PATCH v9 4/7] arm64: dts: rockchip: Move PCIe WAKE# irq to pcie
- driver for Gru
-In-Reply-To: <20171027071739.21927-1-jeffy.chen@rock-chips.com>
-References: <20171027071739.21927-1-jeffy.chen@rock-chips.com>
-Message-ID: <20171027071739.21927-5-jeffy.chen@rock-chips.com>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Fri, 27 Oct 2017 15:21:39 +0800
+Subject: [PATCH v6 6/7] KVM: arm64: allow get exception information from
+ userspace
+In-Reply-To: <59F0CD1F.9070201@arm.com>
+References: <0184EA26B2509940AA629AE1405DD7F2016BA9E4@DGGEMA503-MBX.china.huawei.com>
+ <0184EA26B2509940AA629AE1405DD7F2016BAC2B@DGGEMA503-MBX.china.huawei.com>
+ <59F0CD1F.9070201@arm.com>
+Message-ID: <900d0b35-e0dc-1e9d-b62a-bc587136f918@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we are handling PCIe WAKE# irq in mrvl wifi driver.
+James,
+  Thanks for the comment.
 
-Move it to rockchip pcie driver since we are going to handle it in the
-pci core.
+On 2017/10/26 1:42, James Morse wrote:
+> Hi gengdongjiu,
+> 
+> On 20/10/17 16:33, gengdongjiu wrote:
+>> As we discuss below solution:
+>> When guest happen SEA/SEI, KVM calls memory_failure() to send an asynchronous SIGBUS
+>> signal(BUS_MCEERR_AO) to QEMU, and make this address to poisoned.
+>> after QEMU receive this BUS_MCEERR_AO, it will record this address to CPER and notify guest.
+>> When guest happen stage2 page fault, KVM send a synchronous SIGBUS
+>> BUS_MCEERR_AR to QEMU, and QEMU also record CPER and immediately inject SEA abort.
+>>
+>> But this solution, still have some problems.
+>>
+>> 1. In some situation, For RAS, when happen SEA, hardware cannot provide an error physical
+>> address
+> 
+> Eh? For any RAS error you should get a physical address in ERR<n>ADDR.
+> 
+> When you get an external abort due to RAS you can scan these nodes to find which
+> one generated the error and collect the component information.
+> Doing this in firmware is better because firmware knows the SoC topology, so it
+> can skip the nodes it knows won't be relevant to an error on this CPU.
 
-Also avoid this irq been considered as the PCI interrupt pin in the
-of_irq_parse_pci().
+Thanks for you suggestion.
+After discussed this issue internally in our side,  I think this should be our firmware issue.
+Not a common issue.
+so let us ignore the issue that hardware does not record physical error address.
 
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
----
 
-Changes in v9:
-Rewrite the commit message.
+> 
+> 
+>> to software instead it can only provide virtual address in FAR_ELx, 
+>> This is to say, firmware cannot provide physical error address, but provided the virtual
+>> address in the FAR_ELx. so BIOS cannot record this address to APEI table. In
+> 
+> Nit: APEI table, you mean recorded as CPER records in a buffer pointed to by a
+> GHES's ErrorStatusAddress. APEI tables aren't parsed post boot.
+> 
+> 
+>> this case, when firmware Jump to hypervisor, hypervisor cannot call
+>> memory_failure(), now only the physical address is recorded and valid, APEI
+>> driver will call the memory_failure()), in this case, host will not send SIGBUS
+>> to QEMU. So guest cannot know there is SEA happen.
+>> At least there is such issue in Huawei's platform (cannot provide PA for RAS firmware-first,
+>> only can provide VA in FAR_ELx)
+> 
+> This isn't a KVM problem.
+> 
+> It looks like both of UEFI's 'Table 275. Memory Error Record' and 'Table 276.
+> Memory Error Record 2' require a physical address. You can't describe a memory
+> error without one.
+> 
+> Is this really a memory error?, or some other component, say, a virtually
+> indexed cache.
 
-Changes in v8:
-Rewrite the commit message.
+When happen SEA, if the {D,I}FSC is 0b0101xx which is SEA on translation table walk or hardware update of translation
+table, it means the page table itself happen issue, not the target address error.
+For this case, even firmware can report a error page table physical address, but memory_memory()
+can not recognize this address because the page table address is not belong to any task include Qemu,
+so memory_failure() will not deliver SIGBUS. Of course, this is memory address.
+I ever make a  experiment, if a APP's page table itself generated SEA, memory_failure() will consider it
+as unknown issue. please see below log, I think this should be a common issue. so in KVM code, I plan to separately
+handle the page table error of SEA if the {D,I}FSC is 0b0101xx, and not call memory_failure(), what do you think about that?
+only the memory access SEA call memory_failure().
 
-Changes in v7: None
-Changes in v6: None
-Changes in v5:
-Use "wakeup" instead of "wake"
+[   25.482904] {1}[Hardware Error]: Hardware error from APEI Generic Hardware Error Source: 7
+[   25.484862] {1}[Hardware Error]: event severity: recoverable
+[   25.486192] {1}[Hardware Error]:  Error 0, type: recoverable
+[   25.487519] {1}[Hardware Error]:   section_type: memory error
+[   25.490169] {1}[Hardware Error]:   physical_address: 0x000000007ce81000
+[   25.491718] {1}[Hardware Error]:   error_type: 3, multi-bit ECC
+[   25.501178] Memory failure: 0x7ce81: Unknown page state
+[   25.501181] Memory failure: 0x7ce81: unknown page still referenced by 1 users
+[   25.501183] Memory failure: 0x7ce81: recovery action for unknown page: Failed
 
-Changes in v3: None
-Changes in v2: None
 
- arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi | 15 +++++++++------
- 1 file changed, 9 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-index 5772c52fbfd3..8e37da69f693 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-@@ -708,7 +708,15 @@ ap_i2c_audio: &i2c8 {
- 
- 	ep-gpios = <&gpio2 27 GPIO_ACTIVE_HIGH>;
- 	pinctrl-names = "default";
--	pinctrl-0 = <&pcie_clkreqn_cpm>, <&wifi_perst_l>;
-+	pinctrl-0 = <&pcie_clkreqn_cpm>, <&wlan_host_wake_l>, <&wifi_perst_l>;
-+
-+	interrupts-extended = <&gic GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH 0>,
-+			      <&gic GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH 0>,
-+			      <&gic GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH 0>,
-+			      <&gpio0 8 IRQ_TYPE_LEVEL_LOW>;
-+	interrupt-names = "sys", "legacy", "client", "wakeup";
-+	/delete-property/ interrupts;
-+
- 	vpcie3v3-supply = <&pp3300_wifi_bt>;
- 	vpcie1v8-supply = <&wlan_pd_n>; /* HACK: see &wlan_pd_n */
- 	vpcie0v9-supply = <&pp900_pcie>;
-@@ -723,11 +731,6 @@ ap_i2c_audio: &i2c8 {
- 			compatible = "pci1b4b,2b42";
- 			reg = <0x83010000 0x0 0x00000000 0x0 0x00100000
- 			       0x83010000 0x0 0x00100000 0x0 0x00100000>;
--			interrupt-parent = <&gpio0>;
--			interrupts = <8 IRQ_TYPE_LEVEL_LOW>;
--			pinctrl-names = "default";
--			pinctrl-0 = <&wlan_host_wake_l>;
--			wakeup-source;
- 		};
- 	};
- };
--- 
-2.11.0
+> 
+> 
+[cut]
+> 
+> 
+> 
+>> 3. For SEI, the address is invalid, 
+> 
+> You mean FAR_ELx?
+
+I mean the physical address. Because SEI is asynchronous, so usually firmware will not record this address,
+If not record this address, the memory_failure() will be not called, then SIGBUS will not be sent, then guest will
+not know there is SEI happen, so for this case may be we should also inject a virtual SError to avoid the issue that
+physical address is not record.
+
+
+> 
+> 
+>> so in some platform, firmware will not record this AP.
+> 
+> For any RAS error you should get a physical address in ERR<n>ADDR.
+how about the address is not accurate?
+For SEI, even we can get a physical address from ERR<n>ADDR, but this address is not accurate.
+so firmware will make it as invalid or not record it.
+
+
+> 
+> 
+> Thanks,
+> 
+> James
+> 
+> [0] https://lkml.org/lkml/2017/8/7/612
+> 
+> .
+> 
