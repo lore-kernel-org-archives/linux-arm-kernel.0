@@ -1,87 +1,60 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 27 Oct 2017 15:28:46 +0100
-Subject: [PATCH v5 17/26] KVM: arm/arm64: GICv4: Handle INVALL applied to a vPE
+Date: Fri, 27 Oct 2017 15:28:52 +0100
+Subject: [PATCH v5 23/26] KVM: arm/arm64: GICv4: Prevent a VM using GICv4 from
+ being saved
 In-Reply-To: <20171027142855.21584-1-marc.zyngier@arm.com>
 References: <20171027142855.21584-1-marc.zyngier@arm.com>
-Message-ID: <20171027142855.21584-18-marc.zyngier@arm.com>
+Message-ID: <20171027142855.21584-24-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since when updating the properties one LPI at a time, there is no
-need to perform an INV each time we read one. Instead, we rely
-on the final VINVALL that gets sent to the ITS to do the work.
+The GICv4 architecture doesn't make it easy for save/restore to
+work, as it doesn't give any guarantee that the pending state
+is written into the pending table.
 
-Acked-by: Christoffer Dall <cdall@linaro.org>
+So let's not take any chance, and let's return an error if
+we encounter any LPI that has the HW bit set. In order for
+userspace to distinguish this error from other failure modes,
+use -EACCES as an error code.
+
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-its.c | 15 +++++++++------
- 1 file changed, 9 insertions(+), 6 deletions(-)
+ Documentation/virtual/kvm/devices/arm-vgic-its.txt | 2 ++
+ virt/kvm/arm/vgic/vgic-its.c                       | 9 +++++++++
+ 2 files changed, 11 insertions(+)
 
+diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+index eb06beb75960..1eec7bcb2d52 100644
+--- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
++++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+@@ -60,6 +60,8 @@ Groups:
+     -EINVAL: Inconsistent restored data
+     -EFAULT: Invalid guest ram access
+     -EBUSY:  One or more VCPUS are running
++    -EACCES: The virtual ITS is backed by a physical GICv4 ITS, and the
++    	     state is not available
+ 
+   KVM_DEV_ARM_VGIC_GRP_ITS_REGS
+   Attributes:
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 2e77c7c83942..eb72eb027060 100644
+index eb72eb027060..2710834d0920 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -38,7 +38,7 @@ static int vgic_its_save_tables_v0(struct vgic_its *its);
- static int vgic_its_restore_tables_v0(struct vgic_its *its);
- static int vgic_its_commit_v0(struct vgic_its *its);
- static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
--			     struct kvm_vcpu *filter_vcpu);
-+			     struct kvm_vcpu *filter_vcpu, bool needs_inv);
+@@ -1989,6 +1989,15 @@ static int vgic_its_save_itt(struct vgic_its *its, struct its_device *device)
+ 	list_for_each_entry(ite, &device->itt_head, ite_list) {
+ 		gpa_t gpa = base + ite->event_id * ite_esz;
  
- /*
-  * Creates a new (reference to a) struct vgic_irq for a given LPI.
-@@ -106,7 +106,7 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid,
- 	 * However we only have those structs for mapped IRQs, so we read in
- 	 * the respective config data from memory here upon mapping the LPI.
- 	 */
--	ret = update_lpi_config(kvm, irq, NULL);
-+	ret = update_lpi_config(kvm, irq, NULL, false);
- 	if (ret)
- 		return ERR_PTR(ret);
- 
-@@ -273,7 +273,7 @@ static struct its_collection *find_collection(struct vgic_its *its, int coll_id)
-  * VCPU. Unconditionally applies if filter_vcpu is NULL.
-  */
- static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
--			     struct kvm_vcpu *filter_vcpu)
-+			     struct kvm_vcpu *filter_vcpu, bool needs_inv)
- {
- 	u64 propbase = GICR_PROPBASER_ADDRESS(kvm->arch.vgic.propbaser);
- 	u8 prop;
-@@ -297,7 +297,7 @@ static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
- 	}
- 
- 	if (irq->hw)
--		return its_prop_update_vlpi(irq->host_irq, prop, true);
-+		return its_prop_update_vlpi(irq->host_irq, prop, needs_inv);
- 
- 	return 0;
- }
-@@ -1096,7 +1096,7 @@ static int vgic_its_cmd_handle_inv(struct kvm *kvm, struct vgic_its *its,
- 	if (!ite)
- 		return E_ITS_INV_UNMAPPED_INTERRUPT;
- 
--	return update_lpi_config(kvm, ite->irq, NULL);
-+	return update_lpi_config(kvm, ite->irq, NULL, true);
- }
- 
- /*
-@@ -1131,12 +1131,15 @@ static int vgic_its_cmd_handle_invall(struct kvm *kvm, struct vgic_its *its,
- 		irq = vgic_get_irq(kvm, NULL, intids[i]);
- 		if (!irq)
- 			continue;
--		update_lpi_config(kvm, irq, vcpu);
-+		update_lpi_config(kvm, irq, vcpu, false);
- 		vgic_put_irq(kvm, irq);
- 	}
- 
- 	kfree(intids);
- 
-+	if (vcpu->arch.vgic_cpu.vgic_v3.its_vpe.its_vm)
-+		its_invall_vpe(&vcpu->arch.vgic_cpu.vgic_v3.its_vpe);
++		/*
++		 * If an LPI carries the HW bit, this means that this
++		 * interrupt is controlled by GICv4, and we do not
++		 * have direct access to that state. Let's simply fail
++		 * the save operation...
++		 */
++		if (ite->irq->hw)
++			return -EACCES;
 +
- 	return 0;
- }
- 
+ 		ret = vgic_its_save_ite(its, device, ite, gpa, ite_esz);
+ 		if (ret)
+ 			return ret;
 -- 
 2.11.0
