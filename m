@@ -1,64 +1,74 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Fri, 27 Oct 2017 14:41:36 +0200
-Subject: [PATCH v5 0/5] media: atmel-isc: Rework the format list and clock
- provider
-In-Reply-To: <20171027032132.16418-1-wenyou.yang@microchip.com>
-References: <20171027032132.16418-1-wenyou.yang@microchip.com>
-Message-ID: <c7344ea2-dd71-8f42-1a11-188eb843c787@xs4all.nl>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 27 Oct 2017 13:45:51 +0100
+Subject: [PATCH v4 11/28] arm64/sve: Core task context handling
+In-Reply-To: <1509101470-7881-12-git-send-email-Dave.Martin@arm.com>
+References: <1509101470-7881-1-git-send-email-Dave.Martin@arm.com>
+ <1509101470-7881-12-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20171027124550.hul2skr5uxxwidbr@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wenyou,
+On Fri, Oct 27, 2017 at 11:50:53AM +0100, Dave P Martin wrote:
+> This patch adds the core support for switching and managing the SVE
+> architectural state of user tasks.
+> 
+> Calls to the existing FPSIMD low-level save/restore functions are
+> factored out as new functions task_fpsimd_{save,load}(), since SVE
+> now dynamically may or may not need to be handled at these points
+> depending on the kernel configuration, hardware features discovered
+> at boot, and the runtime state of the task.  To make these
+> decisions as fast as possible, const cpucaps are used where
+> feasible, via the system_supports_sve() helper.
+> 
+> The SVE registers are only tracked for threads that have explicitly
+> used SVE, indicated by the new thread flag TIF_SVE.  Otherwise, the
+> FPSIMD view of the architectural state is stored in
+> thread.fpsimd_state as usual.
+> 
+> When in use, the SVE registers are not stored directly in
+> thread_struct due to their potentially large and variable size.
+> Because the task_struct slab allocator must be configured very
+> early during kernel boot, it is also tricky to configure it
+> correctly to match the maximum vector length provided by the
+> hardware, since this depends on examining secondary CPUs as well as
+> the primary.  Instead, a pointer sve_state in thread_struct points
+> to a dynamically allocated buffer containing the SVE register data,
+> and code is added to allocate and free this buffer at appropriate
+> times.
+> 
+> TIF_SVE is set when taking an SVE access trap from userspace, if
+> suitable hardware support has been detected.  This enables SVE for
+> the thread: a subsequent return to userspace will disable the trap
+> accordingly.  If such a trap is taken without sufficient system-
+> wide hardware support, SIGILL is sent to the thread instead as if
+> an undefined instruction had been executed: this may happen if
+> userspace tries to use SVE in a system where not all CPUs support
+> it for example.
+> 
+> The kernel will clear TIF_SVE and disable SVE for the thread
+> whenever an explicit syscall is made by userspace.  For backwards
+> compatibility reasons and conformance with the spirit of the base
+> AArch64 procedure call standard, the subset of the SVE register
+> state that aliases the FPSIMD registers is still preserved across a
+> syscall even if this happens.  The remainder of the SVE register
+> state logically becomes zero at syscall entry, though the actual
+> zeroing work is currently deferred until the thread next tries to
+> use SVE, causing another trap to the kernel.  This implementation
+> is suboptimal: in the future, the fastpath case may be optimised
+> to zero the registers in-place and leave SVE enabled for the task,
+> where beneficial.
+> 
+> TIF_SVE is also cleared in the following slowpath cases, which are
+> taken as reasonable hints that the task may no longer use SVE:
+>  * exec
+>  * fork and clone
+> 
+> Code is added to sync data between thread.fpsimd_state and
+> thread.sve_state whenever enabling/disabling SVE, in a manner
+> consistent with the SVE architectural programmer's model.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Alex Benn?e <alex.bennee@linaro.org>
 
-Unfortunately the v4 patch series was just merged instead of v5. Can you make a new
-patch applying just the v4 -> v5 changes?
-
-Thanks!
-
-	Hans
-
-On 10/27/2017 05:21 AM, Wenyou Yang wrote:
-> To improve the readability of code, rework the format list table,
-> split the format array into two. Meanwhile, fix the issue of the
-> clock provider operation and the pm runtime support.
-> 
-> Changes in v5:
->  - Fix the clock ID which enters the runtime suspend should be
->    ISC_ISPCK, instead of ISC_MCK for clk_prepare/clk_unprepare().
->  - Fix the clock ID to ISC_ISPCK, instead of ISC_MCK for
->    isc_clk_is_enabled().
-> 
-> Changes in v4:
->  - Call pm_runtime_get_sync() and pm_runtime_put_sync() in ->prepare
->    and ->unprepare callback.
->  - Move pm_runtime_enable() call from the complete callback to the
->    end of probe.
->  - Call pm_runtime_get_sync() and pm_runtime_put_sync() in
->    ->is_enabled() callbacks.
->  - Call clk_disable_unprepare() in ->remove callback.
-> 
-> Changes in v3:
->  - Fix the wrong used spinlock.
->  - s/_/- on the subject.
->  - Add a new flag for Raw Bayer format to remove MAX_RAW_FMT_INDEX define.
->  - Add the comments for define of the format flag.
->  - Rebase media_tree/master.
-> 
-> Changes in v2:
->  - Add the new patch to remove the unnecessary member from
->    isc_subdev_entity struct.
->  - Rebase on the patch set,
->         [PATCH 0/6] [media] Atmel: Adjustments for seven function implementations
->         https://www.mail-archive.com/linux-media at vger.kernel.org/msg118342.html
-> 
-> Wenyou Yang (5):
->   media: atmel-isc: Add spin lock for clock enable ops
->   media: atmel-isc: Add prepare and unprepare ops
->   media: atmel-isc: Enable the clocks during probe
->   media: atmel-isc: Remove unnecessary member
->   media: atmel-isc: Rework the format list
-> 
->  drivers/media/platform/atmel/atmel-isc-regs.h |   1 +
->  drivers/media/platform/atmel/atmel-isc.c      | 629 ++++++++++++++++++++------
->  2 files changed, 498 insertions(+), 132 deletions(-)
-> 
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
