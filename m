@@ -1,53 +1,84 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 27 Oct 2017 15:28:42 +0100
-Subject: [PATCH v5 13/26] KVM: arm/arm64: GICv4: Propagate affinity changes to
- the physical ITS
+Date: Fri, 27 Oct 2017 15:28:49 +0100
+Subject: [PATCH v5 20/26] KVM: arm/arm64: GICv4: Use the doorbell interrupt as
+ an unblocking source
 In-Reply-To: <20171027142855.21584-1-marc.zyngier@arm.com>
 References: <20171027142855.21584-1-marc.zyngier@arm.com>
-Message-ID: <20171027142855.21584-14-marc.zyngier@arm.com>
+Message-ID: <20171027142855.21584-21-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the guest issues an affinity change, we need to tell the physical
-ITS that we're now targetting a new vcpu.  This is done by extracting
-the current mapping, updating the target, and reapplying the mapping.
+The doorbell interrupt is only useful if the vcpu is blocked on WFI.
+In all other cases, recieving a doorbell interrupt is just a waste
+of cycles.
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+So let's only enable the doorbell if a vcpu is getting blocked,
+and disable it when it is unblocked. This is very similar to
+what we're doing for the background timer.
+
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-its.c | 16 +++++++++++++++-
- 1 file changed, 15 insertions(+), 1 deletion(-)
+ include/kvm/arm_vgic.h      |  3 +++
+ virt/kvm/arm/arm.c          |  2 ++
+ virt/kvm/arm/vgic/vgic-v4.c | 18 ++++++++++++++++++
+ 3 files changed, 23 insertions(+)
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index c9b1c0967426..42ffb9084bb7 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -337,11 +337,25 @@ static int vgic_copy_lpi_list(struct kvm_vcpu *vcpu, u32 **intid_ptr)
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 2f750c770bf2..8c896540a72c 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -381,4 +381,7 @@ int kvm_vgic_v4_set_forwarding(struct kvm *kvm, int irq,
+ int kvm_vgic_v4_unset_forwarding(struct kvm *kvm, int irq,
+ 				 struct kvm_kernel_irq_routing_entry *irq_entry);
  
- static int update_affinity(struct vgic_irq *irq, struct kvm_vcpu *vcpu)
++void kvm_vgic_v4_enable_doorbell(struct kvm_vcpu *vcpu);
++void kvm_vgic_v4_disable_doorbell(struct kvm_vcpu *vcpu);
++
+ #endif /* __KVM_ARM_VGIC_H */
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 8388c1cc23f6..092a4ec03e57 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -316,11 +316,13 @@ int kvm_cpu_has_pending_timer(struct kvm_vcpu *vcpu)
+ void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu)
  {
-+	int ret = 0;
-+
- 	spin_lock(&irq->irq_lock);
- 	irq->target_vcpu = vcpu;
- 	spin_unlock(&irq->irq_lock);
- 
--	return 0;
-+	if (irq->hw) {
-+		struct its_vlpi_map map;
-+
-+		ret = its_get_vlpi(irq->host_irq, &map);
-+		if (ret)
-+			return ret;
-+
-+		map.vpe = &vcpu->arch.vgic_cpu.vgic_v3.its_vpe;
-+
-+		ret = its_map_vlpi(irq->host_irq, &map);
-+	}
-+
-+	return ret;
+ 	kvm_timer_schedule(vcpu);
++	kvm_vgic_v4_enable_doorbell(vcpu);
  }
  
- /*
+ void kvm_arch_vcpu_unblocking(struct kvm_vcpu *vcpu)
+ {
+ 	kvm_timer_unschedule(vcpu);
++	kvm_vgic_v4_disable_doorbell(vcpu);
+ }
+ 
+ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
+diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
+index ea898af1a7a9..1a2f2fcdfa67 100644
+--- a/virt/kvm/arm/vgic/vgic-v4.c
++++ b/virt/kvm/arm/vgic/vgic-v4.c
+@@ -237,3 +237,21 @@ int kvm_vgic_v4_unset_forwarding(struct kvm *kvm, int virq,
+ 	mutex_unlock(&its->its_lock);
+ 	return ret;
+ }
++
++void kvm_vgic_v4_enable_doorbell(struct kvm_vcpu *vcpu)
++{
++	if (vgic_supports_direct_msis(vcpu->kvm)) {
++		int irq = vcpu->arch.vgic_cpu.vgic_v3.its_vpe.irq;
++		if (irq)
++			enable_irq(irq);
++	}
++}
++
++void kvm_vgic_v4_disable_doorbell(struct kvm_vcpu *vcpu)
++{
++	if (vgic_supports_direct_msis(vcpu->kvm)) {
++		int irq = vcpu->arch.vgic_cpu.vgic_v3.its_vpe.irq;
++		if (irq)
++			disable_irq(irq);
++	}
++}
 -- 
 2.11.0
