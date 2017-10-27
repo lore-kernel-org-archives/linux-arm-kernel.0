@@ -1,98 +1,125 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Sat, 28 Oct 2017 02:20:46 +0800
-Subject: [xlnx:master 1076/1076] drivers/edac/synopsys_edac.c:820:54:
- warning: 'col_shift' may be used uninitialized in this function
-Message-ID: <201710280244.p2C7rWXq%fengguang.wu@intel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 27 Oct 2017 19:28:32 +0100
+Subject: [PATCH v2] KVM: arm/arm64: Fix external abort type matching
+In-Reply-To: <0184EA26B2509940AA629AE1405DD7F2016E999C@DGGEMA503-MBS.china.huawei.com>
+ (gengdongjiu@huawei.com's message of "Fri, 27 Oct 2017 15:43:26
+ +0000")
+References: <0184EA26B2509940AA629AE1405DD7F2016E999C@DGGEMA503-MBS.china.huawei.com>
+Message-ID: <86a80ca1in.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/Xilinx/linux-xlnx master
-head:   a5aa440aa346ae898994f288dc67396485ac61f2
-commit: a5aa440aa346ae898994f288dc67396485ac61f2 [1076/1076] edac: synopsys: fix incorrect macro defines
-config: arm-allmodconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout a5aa440aa346ae898994f288dc67396485ac61f2
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+On Fri, Oct 27 2017 at  3:43:26 pm GMT, gengdongjiu <gengdongjiu@huawei.com> wrote:
+>> 
+>> On Thu, Oct 26 2017 at  6:07:01 pm BST, Dongjiu Geng <gengdongjiu@huawei.com> wrote:
+>> > For this matching, current code using the {I,D}FSC range to match
+>> > kvm_vcpu_trap_get_fault_type() return value, but
+>> > kvm_vcpu_trap_get_fault_type() only return the part {I,D}FSC instead
+>> > of whole, so fix this issue
+>> >
+>> > Value       Type
+>> > 0x10        FSC_SEA
+>> > 0x14        FSC_SEA_TTW0 FSC_SEA_TTW1 FSC_SEA_TTW2 FSC_SEA_TTW3
+>> > 0x18        FSC_SECC
+>> > 0x1c        FSC_SECC_TTW0 FSC_SECC_TTW1 FSC_SECC_TTW2 FSC_SECC_TTW3
+>> >
+>> > CC: James Morse <james.morse@arm.com>
+>> > CC: Tyler Baicar <tbaicar@codeaurora.org>
+>> > Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
 
-Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
-http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
+[...]
 
-All warnings (new ones prefixed by >>):
+>> > diff --git a/arch/arm64/include/asm/kvm_arm.h
+>> > b/arch/arm64/include/asm/kvm_arm.h
+>> > index 61d694c..c0f1798 100644
+>> > --- a/arch/arm64/include/asm/kvm_arm.h
+>> > +++ b/arch/arm64/include/asm/kvm_arm.h
+>> > @@ -205,15 +205,9 @@
+>> >  #define FSC_ACCESS	ESR_ELx_FSC_ACCESS
+>> >  #define FSC_PERM	ESR_ELx_FSC_PERM
+>> >  #define FSC_SEA		ESR_ELx_FSC_EXTABT
+>> > -#define FSC_SEA_TTW0	(0x14)
+>> > -#define FSC_SEA_TTW1	(0x15)
+>> > -#define FSC_SEA_TTW2	(0x16)
+>> > -#define FSC_SEA_TTW3	(0x17)
+>> > +#define FSC_SEA_TTW	(0x14)
+>> >  #define FSC_SECC	(0x18)
+>> > -#define FSC_SECC_TTW0	(0x1c)
+>> > -#define FSC_SECC_TTW1	(0x1d)
+>> > -#define FSC_SECC_TTW2	(0x1e)
+>> > -#define FSC_SECC_TTW3	(0x1f)
+>> > +#define FSC_SECC_TTW	(0x1c)
+>> >
+>> >  /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
+>> >  #define HPFAR_MASK	(~UL(0xf))
+>> > diff --git a/arch/arm64/include/asm/kvm_emulate.h
+>> > b/arch/arm64/include/asm/kvm_emulate.h
+>> > index e5df3fc..5cde311 100644
+>> > --- a/arch/arm64/include/asm/kvm_emulate.h
+>> > +++ b/arch/arm64/include/asm/kvm_emulate.h
+>> > @@ -239,15 +239,9 @@ static inline bool kvm_vcpu_dabt_isextabt(const
+>> > struct kvm_vcpu *vcpu)  {
+>> >  	switch (kvm_vcpu_trap_get_fault_type(vcpu)) {
+>> >  	case FSC_SEA:
+>> > -	case FSC_SEA_TTW0:
+>> > -	case FSC_SEA_TTW1:
+>> > -	case FSC_SEA_TTW2:
+>> > -	case FSC_SEA_TTW3:
+>> > +	case FSC_SEA_TTW:
+>> >  	case FSC_SECC:
+>> > -	case FSC_SECC_TTW0:
+>> > -	case FSC_SECC_TTW1:
+>> > -	case FSC_SECC_TTW2:
+>> > -	case FSC_SECC_TTW3:
+>> > +	case FSC_SECC_TTW:
+>> >  		return true;
+>> >  	default:
+>> >  		return false;
+>> 
+>> What is the bug you're fixing? From what I can tell, you're simply
+>> removing valuable symbols from the kernel, and inventing another one
+>> that doesn't exist in the architecture.
+>
+> Marc, I mean the "kvm_vcpu_trap_get_fault_type(vcpu))" return the
+> value of fault type which is not the syndrome value {D,I}FSC.
+> the case sentence matches the syndrome value instead of fault type.
+> So the two are not match, I mean here has issue.
+> So the FSC_SECC_TTW1/ FSC_SECC_TTW2/ FSC_SECC_TTW3 and FSC_SECC_TTW1/
+> FSC_SECC_TTW2/ FSC_SECC_TTW3 are dead code.
+>
+> Below value are syndrome {D,I}FSC value, which is not fault type.
+> FSC_SECC_TTW0:
+> FSC_SECC_TTW1
+> FSC_SECC_TTW2:
+> FSC_SECC_TTW3:
+> FSC_SEA_TTW1:
+> FSC_SEA_TTW2
+> FSC_SEA_TTW3:
+>
+> kvm_vcpu_trap_get_fault_type() will clear the low two bits to zero. So
+> I use FSC_SEA_TTW represent "Synchronous external abort on translation
+> table walk"
 
-   drivers/edac/synopsys_edac.c: In function 'synps_edac_mc_inject_data_error_store':
->> drivers/edac/synopsys_edac.c:820:54: warning: 'col_shift' may be used uninitialized in this function [-Wmaybe-uninitialized]
-     int col, row, bank, bankgrp, regval, shift_val = 0, col_shift;
-                                                         ^~~~~~~~~
+I understand that, and I certainly not keen on adding another "fault
+type" for this.
 
-vim +/col_shift +820 drivers/edac/synopsys_edac.c
+> As we can see the Translation fault type "FSC_FAULT", which does not
+> define the "FSC_FAULT0" "FSC_FAULT1" "FSC_FAULT2" "FSC_FAULT3".
+> Because the fault type " FSC_FAULT " include the four cases. 
 
-71fe2847 Naga Sureshkumar Relli 2016-04-01  807  
-71fe2847 Naga Sureshkumar Relli 2016-04-01  808  /**
-71fe2847 Naga Sureshkumar Relli 2016-04-01  809   * ddr4_poison_setup - update poison registers
-71fe2847 Naga Sureshkumar Relli 2016-04-01  810   * @dttype:		Device structure variable
-71fe2847 Naga Sureshkumar Relli 2016-04-01  811   * @device_config:	Device configuration
-71fe2847 Naga Sureshkumar Relli 2016-04-01  812   * @priv:		Pointer to synps_edac_priv struct
-71fe2847 Naga Sureshkumar Relli 2016-04-01  813   *
-71fe2847 Naga Sureshkumar Relli 2016-04-01  814   * Update poison registers as per ddr4 mapping
-71fe2847 Naga Sureshkumar Relli 2016-04-01  815   * Return: none.
-71fe2847 Naga Sureshkumar Relli 2016-04-01  816   */
-71fe2847 Naga Sureshkumar Relli 2016-04-01  817  static void ddr4_poison_setup(enum dev_type dttype, int device_config,
-71fe2847 Naga Sureshkumar Relli 2016-04-01  818  				struct synps_edac_priv *priv)
-71fe2847 Naga Sureshkumar Relli 2016-04-01  819  {
-71fe2847 Naga Sureshkumar Relli 2016-04-01 @820  	int col, row, bank, bankgrp, regval, shift_val = 0, col_shift;
-71fe2847 Naga Sureshkumar Relli 2016-04-01  821  
-71fe2847 Naga Sureshkumar Relli 2016-04-01  822  	/* Check the Configuration of the device */
-71fe2847 Naga Sureshkumar Relli 2016-04-01  823  	if (device_config & DDRC_MSTR_DEV_CONFIG_X8_MASK) {
-71fe2847 Naga Sureshkumar Relli 2016-04-01  824  		/* For Full Dq bus */
-71fe2847 Naga Sureshkumar Relli 2016-04-01  825  		if (dttype == DEV_X8)
-71fe2847 Naga Sureshkumar Relli 2016-04-01  826  			shift_val = 0;
-71fe2847 Naga Sureshkumar Relli 2016-04-01  827  		/* For Half Dq bus */
-71fe2847 Naga Sureshkumar Relli 2016-04-01  828  		else if (dttype == DEV_X4)
-71fe2847 Naga Sureshkumar Relli 2016-04-01  829  			shift_val = 1;
-71fe2847 Naga Sureshkumar Relli 2016-04-01  830  		col_shift = 0;
-71fe2847 Naga Sureshkumar Relli 2016-04-01  831  	} else if (device_config & DDRC_MSTR_DEV_CONFIG_X16_MASK) {
-71fe2847 Naga Sureshkumar Relli 2016-04-01  832  		if (dttype == DEV_X8)
-71fe2847 Naga Sureshkumar Relli 2016-04-01  833  			shift_val = 1;
-71fe2847 Naga Sureshkumar Relli 2016-04-01  834  		else if (dttype == DEV_X4)
-71fe2847 Naga Sureshkumar Relli 2016-04-01  835  			shift_val = 2;
-71fe2847 Naga Sureshkumar Relli 2016-04-01  836  		col_shift = 1;
-71fe2847 Naga Sureshkumar Relli 2016-04-01  837  	}
-71fe2847 Naga Sureshkumar Relli 2016-04-01  838  
-71fe2847 Naga Sureshkumar Relli 2016-04-01  839  	col = (priv->poison_addr >> (DDR4_COL_SHIFT -
-71fe2847 Naga Sureshkumar Relli 2016-04-01  840  				(shift_val - col_shift))) &
-71fe2847 Naga Sureshkumar Relli 2016-04-01  841  				DDR4_COL_MASK;
-71fe2847 Naga Sureshkumar Relli 2016-04-01  842  	row = priv->poison_addr >> (DDR4_ROW_SHIFT - shift_val);
-71fe2847 Naga Sureshkumar Relli 2016-04-01  843  	row &= DDR4_ROW_MASK;
-71fe2847 Naga Sureshkumar Relli 2016-04-01  844  	bank = priv->poison_addr >> (DDR4_BANK_SHIFT - shift_val);
-71fe2847 Naga Sureshkumar Relli 2016-04-01  845  	bank &= DDR4_BANK_MASK;
-71fe2847 Naga Sureshkumar Relli 2016-04-01  846  	bankgrp = (priv->poison_addr >> (DDR4_BANKGRP_SHIFT -
-71fe2847 Naga Sureshkumar Relli 2016-04-01  847  				(shift_val - col_shift))) &
-71fe2847 Naga Sureshkumar Relli 2016-04-01  848  				DDR4_BANKGRP_MASK;
-71fe2847 Naga Sureshkumar Relli 2016-04-01  849  
-71fe2847 Naga Sureshkumar Relli 2016-04-01  850  	writel(col, priv->baseaddr + ECC_POISON0_OFST);
-71fe2847 Naga Sureshkumar Relli 2016-04-01  851  	regval = (bankgrp << ECC_POISON1_BANKGRP_SHIFT) |
-71fe2847 Naga Sureshkumar Relli 2016-04-01  852  		 (bank << ECC_POISON1_BANKNR_SHIFT) | row;
-71fe2847 Naga Sureshkumar Relli 2016-04-01  853  	writel(regval, priv->baseaddr + ECC_POISON1_OFST);
-71fe2847 Naga Sureshkumar Relli 2016-04-01  854  }
-71fe2847 Naga Sureshkumar Relli 2016-04-01  855  
+Indeed, and I'm still not convinced this is the best thing we have in
+the code.
 
-:::::: The code at line 820 was first introduced by commit
-:::::: 71fe2847779d339690834a384ea2792d9047ee09 edac: synopsys: Add ecc error injection support
+> static inline u8 kvm_vcpu_trap_get_fault(const struct kvm_vcpu *vcpu)
+> {
+> 	return kvm_vcpu_get_hsr(vcpu) & 0x3f;
+> }
 
-:::::: TO: Naga Sureshkumar Relli <naga.sureshkumar.relli@xilinx.com>
-:::::: CC: Michal Simek <michal.simek@xilinx.com>
+Here you go. This should give you a pretty good idea of how to provide a
+proper fix.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 59883 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171028/398dcad1/attachment-0001.gz>
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
