@@ -1,76 +1,165 @@
-From: philippe.cornu@st.com (Philippe CORNU)
-Date: Fri, 27 Oct 2017 14:52:21 +0000
-Subject: [PATCH] dt-bindings: display: stm32: add pixel clock mandatory
- property
-In-Reply-To: <20171027143815.evbb7rqkgqiol7yo@rob-hp-laptop>
-References: <1509034356-23885-1-git-send-email-philippe.cornu@st.com>
- <20171027143815.evbb7rqkgqiol7yo@rob-hp-laptop>
-Message-ID: <e7f46e2c-2cd9-bdd4-221a-109cdc9852b1@st.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 27 Oct 2017 15:55:06 +0100
+Subject: [PATCH v2] KVM: arm/arm64: Fix external abort type matching
+In-Reply-To: <1509012421-8772-1-git-send-email-gengdongjiu@huawei.com>
+ (Dongjiu Geng's message of "Thu, 26 Oct 2017 18:07:01 +0800")
+References: <1509012421-8772-1-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <86efpoabed.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Thu, Oct 26 2017 at  6:07:01 pm BST, Dongjiu Geng <gengdongjiu@huawei.com> wrote:
+> For this matching, current code using the {I,D}FSC
+> range to match kvm_vcpu_trap_get_fault_type() return
+> value, but kvm_vcpu_trap_get_fault_type() only return
+> the part {I,D}FSC instead of whole, so fix this issue
+>
+> Value       Type
+> 0x10        FSC_SEA
+> 0x14        FSC_SEA_TTW0 FSC_SEA_TTW1 FSC_SEA_TTW2 FSC_SEA_TTW3
+> 0x18        FSC_SECC
+> 0x1c        FSC_SECC_TTW0 FSC_SECC_TTW1 FSC_SECC_TTW2 FSC_SECC_TTW3
+>
+> CC: James Morse <james.morse@arm.com>
+> CC: Tyler Baicar <tbaicar@codeaurora.org>
+> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+>
+> ---
+> As shown below code:
+>
+> The kvm_vcpu_trap_get_fault_type() only return {I,D}FSC bit[5]:bit[2], not
+> the whole {I,D}FSC, but FSC_SEA_TTWx and FSC_SECC_TTWx are the whole {I,D}FSC
+> value.
+>
+> static inline u8 kvm_vcpu_trap_get_fault_type(const struct kvm_vcpu *vcpu)
+> {
+>     return kvm_vcpu_get_hsr(vcpu) & ESR_ELx_FSC_TYPE;
+> }
+>
+> static inline bool kvm_vcpu_dabt_isextabt(const struct kvm_vcpu *vcpu)
+> {
+>     switch (kvm_vcpu_trap_get_fault_type(vcpu)) {
+>     case FSC_SEA:
+>     case FSC_SEA_TTW0:
+>     case FSC_SEA_TTW1:
+>     case FSC_SEA_TTW2:
+>     case FSC_SEA_TTW3:
+>     case FSC_SECC:
+>     case FSC_SECC_TTW0:
+>     case FSC_SECC_TTW1:
+>     case FSC_SECC_TTW2:
+>     case FSC_SECC_TTW3:
+>         return true;
+>     default:
+>         return false;
+>     }
+> }
+> ---
+>  arch/arm/include/asm/kvm_arm.h       | 10 ++--------
+>  arch/arm/include/asm/kvm_emulate.h   | 10 ++--------
+>  arch/arm64/include/asm/kvm_arm.h     | 10 ++--------
+>  arch/arm64/include/asm/kvm_emulate.h | 10 ++--------
+>  4 files changed, 8 insertions(+), 32 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
+> index c878145..b4b155c 100644
+> --- a/arch/arm/include/asm/kvm_arm.h
+> +++ b/arch/arm/include/asm/kvm_arm.h
+> @@ -188,15 +188,9 @@
+>  #define FSC_ACCESS	(0x08)
+>  #define FSC_PERM	(0x0c)
+>  #define FSC_SEA		(0x10)
+> -#define FSC_SEA_TTW0	(0x14)
+> -#define FSC_SEA_TTW1	(0x15)
+> -#define FSC_SEA_TTW2	(0x16)
+> -#define FSC_SEA_TTW3	(0x17)
+> +#define FSC_SEA_TTW	(0x14)
+>  #define FSC_SECC	(0x18)
+> -#define FSC_SECC_TTW0	(0x1c)
+> -#define FSC_SECC_TTW1	(0x1d)
+> -#define FSC_SECC_TTW2	(0x1e)
+> -#define FSC_SECC_TTW3	(0x1f)
+> +#define FSC_SECC_TTW	(0x1c)
+>  
+>  /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
+>  #define HPFAR_MASK	(~0xf)
+> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+> index 98089ff..aed8279 100644
+> --- a/arch/arm/include/asm/kvm_emulate.h
+> +++ b/arch/arm/include/asm/kvm_emulate.h
+> @@ -205,15 +205,9 @@ static inline bool kvm_vcpu_dabt_isextabt(struct kvm_vcpu *vcpu)
+>  {
+>  	switch (kvm_vcpu_trap_get_fault_type(vcpu)) {
+>  	case FSC_SEA:
+> -	case FSC_SEA_TTW0:
+> -	case FSC_SEA_TTW1:
+> -	case FSC_SEA_TTW2:
+> -	case FSC_SEA_TTW3:
+> +	case FSC_SEA_TTW:
+>  	case FSC_SECC:
+> -	case FSC_SECC_TTW0:
+> -	case FSC_SECC_TTW1:
+> -	case FSC_SECC_TTW2:
+> -	case FSC_SECC_TTW3:
+> +	case FSC_SECC_TTW:
+>  		return true;
+>  	default:
+>  		return false;
+> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> index 61d694c..c0f1798 100644
+> --- a/arch/arm64/include/asm/kvm_arm.h
+> +++ b/arch/arm64/include/asm/kvm_arm.h
+> @@ -205,15 +205,9 @@
+>  #define FSC_ACCESS	ESR_ELx_FSC_ACCESS
+>  #define FSC_PERM	ESR_ELx_FSC_PERM
+>  #define FSC_SEA		ESR_ELx_FSC_EXTABT
+> -#define FSC_SEA_TTW0	(0x14)
+> -#define FSC_SEA_TTW1	(0x15)
+> -#define FSC_SEA_TTW2	(0x16)
+> -#define FSC_SEA_TTW3	(0x17)
+> +#define FSC_SEA_TTW	(0x14)
+>  #define FSC_SECC	(0x18)
+> -#define FSC_SECC_TTW0	(0x1c)
+> -#define FSC_SECC_TTW1	(0x1d)
+> -#define FSC_SECC_TTW2	(0x1e)
+> -#define FSC_SECC_TTW3	(0x1f)
+> +#define FSC_SECC_TTW	(0x1c)
+>  
+>  /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
+>  #define HPFAR_MASK	(~UL(0xf))
+> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+> index e5df3fc..5cde311 100644
+> --- a/arch/arm64/include/asm/kvm_emulate.h
+> +++ b/arch/arm64/include/asm/kvm_emulate.h
+> @@ -239,15 +239,9 @@ static inline bool kvm_vcpu_dabt_isextabt(const struct kvm_vcpu *vcpu)
+>  {
+>  	switch (kvm_vcpu_trap_get_fault_type(vcpu)) {
+>  	case FSC_SEA:
+> -	case FSC_SEA_TTW0:
+> -	case FSC_SEA_TTW1:
+> -	case FSC_SEA_TTW2:
+> -	case FSC_SEA_TTW3:
+> +	case FSC_SEA_TTW:
+>  	case FSC_SECC:
+> -	case FSC_SECC_TTW0:
+> -	case FSC_SECC_TTW1:
+> -	case FSC_SECC_TTW2:
+> -	case FSC_SECC_TTW3:
+> +	case FSC_SECC_TTW:
+>  		return true;
+>  	default:
+>  		return false;
 
-On 10/27/2017 04:38 PM, Rob Herring wrote:
-> On Thu, Oct 26, 2017 at 06:12:36PM +0200, Philippe Cornu wrote:
->> Add the DPI/RGB input pixel clock in mandatory properties
->> because it really offers a better preciseness for timing
->> computations.
->> Note: Fix also the DSI panel example where "ref" & "pclk"
->> clocks were swapped.
->>
->> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
->> ---
->>   Documentation/devicetree/bindings/display/st,stm32-ltdc.txt | 6 ++++--
->>   1 file changed, 4 insertions(+), 2 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
->> index 0292522..99823fb 100644
->> --- a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
->> +++ b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
->> @@ -28,6 +28,7 @@ Mandatory properties specific to STM32 DSI:
->>   - #size-cells: Should be <0>.
->>   - compatible: "st,stm32-dsi".
->>   - clock-names:
->> +  - DPI/RGB input pixel clock string name, must be "px_clk".
->>     - phy pll reference clock string name, must be "ref".
-> 
-> Where's pclk?
+What is the bug you're fixing? From what I can tell, you're simply
+removing valuable symbols from the kernel, and inventing another one
+that doesn't exist in the architecture.
 
-pclk is described in the generic part 
-(Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt) as 
-mandatory.
+If you were instead adding an accessor for the full fault syndrome, then
+that would be a useful addition. But as it is, this patch looks
+completely pointless.
 
-In st,stm32-ltdc.txt (specific part), I have documented that "For all 
-mandatory properties & nodes, please refer to the related documentation 
-in [5]".
+Thanks,
 
-Do you think it is clear enough?
-
-> 
-> The new clock should be last to be backwards compatible.
-> 
-
-ok.
-
-Many thanks for your review and your support,
-
-Philippe :-)
-
->>   - resets: see [5].
->>   - reset-names: see [5].
->> @@ -97,8 +98,9 @@ Example 2: DSI panel
->>   			#size-cells = <0>;
->>   			compatible = "st,stm32-dsi";
->>   			reg = <0x40016c00 0x800>;
->> -			clocks = <&rcc 1 CLK_F469_DSI>, <&clk_hse>;
->> -			clock-names = "ref", "pclk";
->> +			clocks = <&rcc 1 CLK_F469_DSI>, <&rcc 1 CLK_LCD>,
->> +				 <&clk_hse>;
->> +			clock-names = "pclk", "px_clk", "ref";
->>   			resets = <&rcc STM32F4_APB2_RESET(DSI)>;
->>   			reset-names = "apb";
->>   
->> -- 
->> 1.9.1
->>
+	M.
+-- 
+Jazz is not dead. It just smells funny.
