@@ -1,59 +1,35 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 27 Oct 2017 14:57:36 +0200
-Subject: [PATCH] pinctrl: armada-37xx: Add edge both type gpio irq support
-In-Reply-To: <20171019133828.GC6615@lunn.ch> (Andrew Lunn's message of "Thu,
- 19 Oct 2017 15:38:28 +0200")
-References: <20171019131003.9684-1-gregory.clement@free-electrons.com>
- <20171019133828.GC6615@lunn.ch>
-Message-ID: <87a80c4ukf.fsf@free-electrons.com>
+From: filip.matijevic.pz@gmail.com (=?UTF-8?Q?Filip_Matijevi=c4=87?=)
+Date: Fri, 27 Oct 2017 14:58:16 +0200
+Subject: 4.13 (and probably all recent) kernels refuse to boot on one
+ Nokia N950, work or another
+In-Reply-To: <20171027101905.GA4287@amd>
+References: <20171025203459.GA22035@amd> <20171025212806.GA21504@atomide.com>
+ <20171026091325.GA26929@amd>
+ <20171026093115.4bc6ctxjx72ng7ld@earth>
+ <20171026095734.GA10141@amd> <20171026120130.dicanunwcdmjntnb@earth>
+ <20171027101905.GA4287@amd>
+Message-ID: <65ad0b63-cfae-f7ac-f916-32fd0c7c540a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
- 
- On jeu., oct. 19 2017, Andrew Lunn <andrew@lunn.ch> wrote:
 
-> On Thu, Oct 19, 2017 at 03:10:03PM +0200, Gregory CLEMENT wrote:
->> From: Ken Ma <make@marvell.com>
->> 
->> Current edge both type gpio irqs which need to swap polarity in each
->> interrupt are not supported, this patch adds edge both type gpio irq
->> support.
->
-> So is the assumption here that you can handle the interrupt and flip
-> the edge, faster than it takes the signal to change?
->
-> If the software is too slow, you loose the following edge? And you
-> might loose the edge after that as well, since the software will at
-> some point handle the interrupt and reconfigure the edge, potentially
-> for the wrong edge?
->
-> Or am i missing something which makes this race free?
+> If someone knows how to fix the backlight, it would still be useful.
 
-To put more context, this patch is just the port of what is currently
-done in gpio-mvebu.c.
+In panel-dsi-cm.c it's set to maximum with
 
-I needed this support for the SD detect pin and didn't have any issue
-because it was not an intensive use at all.
+dsicm_dcs_write_1(ddata, DCS_BRIGHTNESS, 0xff);
 
-Going back to your concern, yes if the interrupt frequency is too high
-we might loose 2 events. But the same things could happen with a single
-edge, we can still miss an event.  But I agree that with the "both edge"
-mode then we will loose 2 events instead of one.
+Sebastian suggested the same but used 100 instead of 0xff, which might
+be a bit too low. You can also add msleep(1000) after
 
-It is the problem for the edge interrupt in general. So as soon as you
-use edge interrupt you must be ready to loose some interrupt.
+dsicm_dcs_write_0(ddata, MIPI_DCS_SET_DISPLAY_ON);
 
-In the end I don't think it is a problem.
+to see if brightness gets overwritten, the whole display goes into sleep
+mode, is turned off or similar somewhere down the line.
 
-Gregory
+I'm still unable to make N9 panel to cooperate (despite having "the
+right" clocks and able to send image to panel with
+MIPI_DCS_WRITE_MEMORY_START/MIPI_DCS_READ_MEMORY_CONTINUE) so I hope
+you'll have more luck than me!
 
-
->
->    Andrew
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Filip
