@@ -1,39 +1,63 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Fri, 27 Oct 2017 10:50:23 +0530
-Subject: [PATCH 0/5] Few more FlexRM driver improvements
-In-Reply-To: <1507008112-27117-1-git-send-email-anup.patel@broadcom.com>
-References: <1507008112-27117-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <CAALAos-dgnk_3Tt9+12g_JMg1OD2JmA-2_sHXrsFd_8KM=gV8Q@mail.gmail.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Fri, 27 Oct 2017 07:21:13 +0200
+Subject: [PATCH v3 1/7] ACPI/PPTT: Add Processor Properties Topology Table
+ parsing
+In-Reply-To: <49421fa9-c3ac-c81b-ed2d-a113f676edd8@huawei.com>
+References: <20171012194856.13844-1-jeremy.linton@arm.com>
+ <20171012194856.13844-2-jeremy.linton@arm.com>
+ <38c63cfd-4c13-9461-0d4a-74b0943be0fd@semihalf.com>
+ <2ce92b90-fc2c-3fff-a3e3-b9517057ab2c@arm.com>
+ <4ee4af4d-d987-33f9-4d55-67bfede3ebfa@caviumnetworks.com>
+ <ed7f2e82-1e9b-9f46-89af-4e638275355d@caviumnetworks.com>
+ <47d8ef93-a3ce-6d40-f8db-2bc7d527ac6f@arm.com>
+ <2605aa54-95f7-4619-e632-0a95a68e5fb0@caviumnetworks.com>
+ <49421fa9-c3ac-c81b-ed2d-a113f676edd8@huawei.com>
+Message-ID: <e4f9e8f1-c200-7350-79af-7f3e9e5c3106@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 3, 2017 at 10:51 AM, Anup Patel <anup.patel@broadcom.com> wrote:
-> This patchset does few more improvements to Broadcom FlexRM mailbox
-> driver.
->
-> The patches are based on Linux-4.14-rc3 and can also be found at
-> flexrm-imp2-v1 branch of:
-> https://github.com/Broadcom/arm64-linux.git
->
-> Anup Patel (4):
->   mailbox: bcm-flexrm-mailbox: Fix FlexRM ring flush sequence
->   mailbox: bcm-flexrm-mailbox: Print ring number in errors and warnings
->   mailbox: bcm-flexrm-mailbox: Use common GPL comment header
->   mailbox: Build Broadcom FlexRM driver as loadable module for iProc
->     SOCs
->
-> Scott Branden (1):
->   mailbox: bcm-flexrm-mailbox: add depends on ARCH_BCM_IPROC
->
->  drivers/mailbox/Kconfig              |  3 +-
->  drivers/mailbox/bcm-flexrm-mailbox.c | 66 ++++++++++++++++++++++++++----------
->  2 files changed, 51 insertions(+), 18 deletions(-)
->
-> --
-> 2.7.4
->
+Hi John,
 
-Ping ??
+On 19.10.2017 12:25, John Garry wrote:
+> On 19/10/2017 06:18, Tomasz Nowicki wrote:
+>>>
+>>> Summary:
+>>>
+>>> I'm not at all happy with this specification's attempt to leave out
+>>> pieces of information which make parsing things more deterministic. In
+>>> this case I'm happy to demote the message level, but not remove it
+>>> entirely but I do think the obvious case you list shouldn't be the
+>>> default one.
+>>>
+>>> Lastly:
+>>>
+>>> I'm assuming the final result is that the table is actually being
+>>> parsed correctly despite the ugly message?
+>>
+>> Indeed, the ThunderX2 PPTT table is being parsed so that topology shown
+>> in lstopo and lscpu is correct.
+> 
+> Hi Tomasz,
+> 
+> Can you share the lscpu output? Does it have cluster info? I did not 
+> think that lscpu has a concept of clustering.
+> 
+> I would say that the per-cpu cluster index sysfs entry needs be added to 
+> drivers/base/arch_topology.c (and other appropiate code under 
+> GENERIC_ARCH_TOPOLOGY) to support this.
 
-Regards,
-Anup
+Here is what I get:
+
+tn at val2-11 [~]$ lscpu -ap
+# The following is the parsable format, which can be fed to other
+# programs. Each different item in every column has an unique ID
+# starting from zero.
+# CPU,Core,Socket,Node,,L1d,L1i,L2,L3
+[...]
+1,0,0,0,,0,0,0,0
+[...]
+
+so yes, no cluster info.
+
+Thanks,
+Tomasz
