@@ -1,56 +1,71 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Fri, 27 Oct 2017 16:45:58 +0000
-Subject: [PATCH v10 0/9] LPC: legacy ISA I/O support
-In-Reply-To: <1509120687-7352-1-git-send-email-gabriele.paoloni@huawei.com>
-References: <1509120687-7352-1-git-send-email-gabriele.paoloni@huawei.com>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6DD00A6F5C@AcuExch.aculab.com>
+From: mbrugger@suse.com (Matthias Brugger)
+Date: Fri, 27 Oct 2017 18:29:32 +0200
+Subject: [PATCH] efi/libstub: arm: omit sorting of the UEFI memory map
+In-Reply-To: <20171027152850.GK20805@n2100.armlinux.org.uk>
+References: <20171022141457.28769-1-ard.biesheuvel@linaro.org>
+ <fe35c87c-8fd0-b33f-3a6f-2bd759726667@suse.com>
+ <20171027152850.GK20805@n2100.armlinux.org.uk>
+Message-ID: <11f81ea5-4f75-28ca-9204-b4a893ad4b63@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gabriele Paoloni
-> Sent: 27 October 2017 17:11
-> This patchset supports the IPMI-bt device attached to the Low-Pin-Count
-> interface implemented on Hisilicon Hip06/Hip07 SoC.
->                         -----------
->                         | LPC host|
->                         |         |
->                         -----------
->                              |
->                 _____________V_______________LPC
->                   |                       |
->                   V                       V
->                                      ------------
->                                      |  BT(ipmi)|
->                                      ------------
+
+
+On 10/27/2017 05:28 PM, Russell King - ARM Linux wrote:
+> On Fri, Oct 27, 2017 at 05:12:58PM +0200, Matthias Brugger wrote:
+>> Hi Ard,
+>>
+>> On 10/22/2017 04:14 PM, Ard Biesheuvel wrote:
+>>> ARM shares its EFI stub implementation with arm64, which has some
+>>> special handling in the virtual remapping code to
+>>> a) make sure that we can map everything even if the OS executes
+>>>    with 64k page size, and
+>>> b) make sure that adjacent regions with the same attributes are not
+>>>    reordered or moved apart in memory.
+>>>
+>>> The latter is a workaround for a 'feature' that was shortly recommended
+>>> by UEFI spec v2.5, but deprecated shortly after, due to the fact that
+>>> it broke many OS installers, including non-Linux ones, and it was never
+>>> widely implemented for ARM systems. Before implementing b), the arm64
+>>> code simply rounded up all regions to 64 KB granularity, but given that
+>>> that results in moving adjacent regions apart, it had to be refined when
+>>> b) was implemented.
+>>>
+>>> The adjacency check requires a sort() pass, due to the fact that the
+>>> UEFI spec does not mandate any ordering, and the inclusion of the
+>>> lib/sort.c code into the ARM EFI stub is causing some trouble with
+>>> the decompressor build due to the fact that its EXPORT_SYMBOL() call
+>>> triggers the creation of ksymtab/kcrctab sections.
+>>>
+>>> So let's simply do away with the adjacency check for ARM, and simply put
+>>> all UEFI runtime regions together if they have the same memory attributes.
+>>> This is guaranteed to work, given that ARM only supports 4 KB pages,
+>>> and allows us to remove the sort() call entirely.
+>>>
+>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>> ---
+>>>  drivers/firmware/efi/libstub/Makefile   | 6 +++---
+>>>  drivers/firmware/efi/libstub/arm-stub.c | 7 +++++--
+>>>  2 files changed, 8 insertions(+), 5 deletions(-)
+>>>
+>>
+>> I thought I already provided my tag, but just in case:
+>> This fixes the boot problems I had on the bananapi-r2.
+>>
+>> Tested-by: Matthias Brugger <matthias.bgg@gmail.com>
 > 
-> When master accesses those peripherals beneath the Hip06/Hip07 LPC, a specific
-> LPC driver is needed to make LPC host generate the standard LPC I/O cycles with
-> the target peripherals'I/O port addresses. But on curent arm64 world, there is
-> no real I/O accesses. All the I/O operations through in/out accessors are based
-> on MMIO ranges; on Hip06/Hip07 LPC the I/O accesses are performed through driver
-> specific accessors rather than MMIO.
-> To solve this issue and keep the relevant existing peripherals' drivers untouched,
-> this patchset:
->    - introduces a generic I/O space management framework, LIBIO, to support I/O
->      operations on host controllers operating either on MMIO buses or on buses
->      requiring specific driver I/O accessors;
->    - redefines the in/out accessors to provide a unified interface for both MMIO
->      and driver specific I/O operations. Using LIBIO, th call of in/out() from
->      the host children drivers, such as ipmi-si, will be redirected to the
->      corresponding device-specific I/O hooks to perform the I/O accesses.
+> Please test my "fixes" branch - that has all three patches merged.
 > 
->  Based on this patch-set, all the I/O accesses to Hip06/Hip07 LPC peripherals can
->  be supported without any changes on the existing ipmi-si driver.
+> We don't have linux-next running at the moment, so folk need to be
+> manually fetching the appropriate git trees for testing.
+> 
 
-FWIW my thoughts on this are WTF!
+I gave your branch a shot, feel free to add my:
 
-Looks to me horribly over complicated and over generalised.
+Tested-by: Matthias Brugger <mbrugger@suse.com>
 
-Surely is it could be done the same way that x86 does IO cycles?
-So you encode the information into the 'address' the driver passes
-to ioread16() (etc) to allow it to do either a normal bus cycle or
-the indirect cycle onto the external bus.
+Especially for commit
+4c2b35b71ea3 ARM: verify size of zImage
 
-So you have one kernel option that makes these real functions.
-
-	David
+Regards,
+Matthias
