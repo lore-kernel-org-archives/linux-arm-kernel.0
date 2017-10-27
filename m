@@ -1,56 +1,72 @@
 From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Fri, 27 Oct 2017 11:48:42 +0200
-Subject: [PATCH RESEND v6 0/6] provide power off support for iMX6 with
- external PMIC
-Message-ID: <20171027094848.28365-1-o.rempel@pengutronix.de>
+Date: Fri, 27 Oct 2017 11:48:44 +0200
+Subject: [PATCH v6 2/6] ARM: imx6: register pm_power_off handler if "fsl,
+ pmic-stby-poweroff" is set
+In-Reply-To: <20171027094848.28365-1-o.rempel@pengutronix.de>
+References: <20171027094848.28365-1-o.rempel@pengutronix.de>
+Message-ID: <20171027094848.28365-3-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Last version of this patch set was send at 20 Jun 2017, this is a rebase against
-kernel v4.14-rc6. Probably this set got lost. If I forgot to address some comments,
-please point me.
+One of the Freescale recommended sequences for power off with external
+PMIC is the following:
+...
+3.  SoC is programming PMIC for power off when standby is asserted.
+4.  In CCM STOP mode, Standby is asserted, PMIC gates SoC supplies.
 
-This patch series is providing power off support for Freescale/NXP iMX6 based
-boards with external power management integrated circuit (PMIC).
+See:
+http://www.nxp.com/assets/documents/data/en/reference-manuals/IMX6DQRM.pdf
+page 5083
 
-changes:
-v6:
- - rename imx6_pm_poweroff to imx6_pm_stby_poweroff
- - fix "MPIC_STBY_REQ" typo in the comment.
+This patch implements step 4. of this sequence.
 
-v5:
- - remove useless includes from pm-imx6.c patch
- - add Acked-by to "regulator: pfuze100: add fsl,pmic-stby-poweroff property"
-   patch
+Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+---
+ arch/arm/mach-imx/pm-imx6.c | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-v4:
- - update comment in "regulator: pfuze100: add fsl,pmic-stby-poweroff ..."
-   patch
- - add Acked-by to "ARM: imx6q: provide documentation for new ..."
-   patch
-
-v3:
- - set pm_power_off_prepare = NULL on .remove.
- - documentation and spelling fixes.
- - use %pf instead of lookup_symbol_name.
-
-Oleksij Rempel (6):
-  ARM: imx6q: provide documentation for new fsl,pmic-stby-poweroff
-    property
-  ARM: imx6: register pm_power_off handler if "fsl,pmic-stby-poweroff"
-    is set
-  kernel/reboot.c: export pm_power_off_prepare
-  regulator: pfuze100: add fsl,pmic-stby-poweroff property
-  regulator: pfuze100-regulator: provide pm_power_off_prepare handler
-  ARM: dts: imx6: RIoTboard provide standby on power off option
-
- .../devicetree/bindings/clock/imx6q-clock.txt      |  8 ++
- .../devicetree/bindings/regulator/pfuze100.txt     |  7 ++
- arch/arm/boot/dts/imx6dl-riotboard.dts             |  5 ++
- arch/arm/mach-imx/pm-imx6.c                        | 25 ++++++
- drivers/regulator/pfuze100-regulator.c             | 92 ++++++++++++++++++++++
- kernel/reboot.c                                    |  1 +
- 6 files changed, 138 insertions(+)
-
+diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
+index ecdf071653d4..24689260a2a5 100644
+--- a/arch/arm/mach-imx/pm-imx6.c
++++ b/arch/arm/mach-imx/pm-imx6.c
+@@ -604,6 +604,28 @@ static void __init imx6_pm_common_init(const struct imx6_pm_socdata
+ 				   IMX6Q_GPR1_GINT);
+ }
+ 
++static void imx6_pm_stby_poweroff(void)
++{
++	imx6_set_lpm(STOP_POWER_OFF);
++	cpu_suspend(0, imx6q_suspend_finish);
++
++	mdelay(1000);
++
++	pr_emerg("Unable to poweroff system\n");
++}
++
++static int imx6_pm_stby_poweroff_probe(void)
++{
++	if (pm_power_off) {
++		pr_warn("%s: pm_power_off already claimed  %p %pf!\n",
++			__func__, pm_power_off, pm_power_off);
++		return -EBUSY;
++	}
++
++	pm_power_off = imx6_pm_stby_poweroff;
++	return 0;
++}
++
+ void __init imx6_pm_ccm_init(const char *ccm_compat)
+ {
+ 	struct device_node *np;
+@@ -620,6 +642,9 @@ void __init imx6_pm_ccm_init(const char *ccm_compat)
+ 	val = readl_relaxed(ccm_base + CLPCR);
+ 	val &= ~BM_CLPCR_LPM;
+ 	writel_relaxed(val, ccm_base + CLPCR);
++
++	if (of_property_read_bool(np, "fsl,pmic-stby-poweroff"))
++		imx6_pm_stby_poweroff_probe();
+ }
+ 
+ void __init imx6q_pm_init(void)
 -- 
 2.11.0
