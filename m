@@ -1,838 +1,1492 @@
-From: salyzyn@android.com (Mark Salyzyn)
-Date: Fri, 27 Oct 2017 15:26:39 -0700
-Subject: [PATCH v3 09/12] arm: vdso: move vgettimeofday.c to lib/vdso/
-Message-ID: <20171027222657.58241-1-salyzyn@android.com>
+From: kim.phillips@arm.com (Kim Phillips)
+Date: Fri, 27 Oct 2017 18:37:43 -0500
+Subject: [PATCH v3 1/2] perf tools: Add ARM Statistical Profiling Extensions
+ (SPE) support
+Message-ID: <20171027183743.2cf92a6a88721a2bc0cbc704@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Declare arch/arm/vdso/vgettimeofday.c to be a candidate for a global
-implementation of the vdso timer calls.  The hope is that new
-architectures can take advantage of the current unification of
-arm and arm64 implementations.
+'perf record' and 'perf report --dump-raw-trace' supported in this
+release.
 
-We urge future efforts to merge their implementations into the
-global vgettimeofday.c file and thus provide functional parity.
+Example usage:
 
-Signed-off-by: Mark Salyzyn <salyzyn@android.com>
-Cc: James Morse <james.morse@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Andy Lutomirski <luto@amacapital.net>
-Cc: Dmitry Safonov <dsafonov@virtuozzo.com>
-Cc: John Stultz <john.stultz@linaro.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Laura Abbott <labbott@redhat.com>
-Cc: Kees Cook <keescook@chromium.org>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Andy Gross <andy.gross@linaro.org>
-Cc: Kevin Brodsky <kevin.brodsky@arm.com>
-Cc: Andrew Pinski <apinski@cavium.com>
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
+$ ./perf record -e arm_spe_0/ts_enable=1,pa_enable=1/ \
+		dd if=/dev/zero of=/dev/null count=10000
 
-v3:
-- added this change
-- move arch/arm/vdso/vgettimeofday.c to lib/vdso/vgettimeofday.c
-- adjust vgettimeofday.c to be a better global candidate, switch to using
-  ARCH_PROVIDES_TIMER and __arch_counter_get() as more generic.
+perf report --dump-raw-trace
 
+Note that the perf.data file is portable, so the report can be run on
+another architecture host if necessary.
+
+Output will contain raw SPE data and its textual representation, such
+as:
+
+0x550 [0x30]: PERF_RECORD_AUXTRACE size: 0xc408  offset: 0  ref: 0x30005619  idx: 3  tid: 2109  cpu: 3
+.
+. ... ARM SPE data: size 50184 bytes
+.  00000000:  49 00                                           LD
+.  00000002:  b2 00 9c 7b 7a 00 80 ff ff                      VA 0xffff80007a7b9c00
+.  0000000b:  9a 00 00                                        LAT 0 XLAT
+.  0000000e:  42 16                                           EV RETIRED L1D-ACCESS TLB-ACCESS
+.  00000010:  b0 b0 c9 15 08 00 00 ff ff                      PC 0xff00000815c9b0 el3 ns=1
+.  00000019:  98 00 00                                        LAT 0 TOT
+.  0000001c:  71 00 20 fa fd 16 00 00 00                      TS 98750308352
+.  00000025:  49 01                                           ST
+.  00000027:  b2 60 bc 0c 0f 00 00 ff ff                      VA 0xffff00000f0cbc60
+.  00000030:  9a 00 00                                        LAT 0 XLAT
+.  00000033:  42 16                                           EV RETIRED L1D-ACCESS TLB-ACCESS
+.  00000035:  b0 48 cc 15 08 00 00 ff ff                      PC 0xff00000815cc48 el3 ns=1
+.  0000003e:  98 00 00                                        LAT 0 TOT
+.  00000041:  71 00 20 fa fd 16 00 00 00                      TS 98750308352
+.  0000004a:  48 00                                           INSN-OTHER
+.  0000004c:  42 02                                           EV RETIRED
+.  0000004e:  b0 ac 47 0c 08 00 00 ff ff                      PC 0xff0000080c47ac el3 ns=1
+.  00000057:  98 00 00                                        LAT 0 TOT
+.  0000005a:  71 00 20 fa fd 16 00 00 00                      TS 98750308352
+.  00000063:  49 00                                           LD
+.  00000065:  b2 18 48 e5 7a 00 80 ff ff                      VA 0xffff80007ae54818
+.  0000006e:  9a 00 00                                        LAT 0 XLAT
+.  00000071:  42 16                                           EV RETIRED L1D-ACCESS TLB-ACCESS
+.  00000073:  b0 08 f8 15 08 00 00 ff ff                      PC 0xff00000815f808 el3 ns=1
+.  0000007c:  98 00 00                                        LAT 0 TOT
+.  0000007f:  71 00 20 fa fd 16 00 00 00                      TS 98750308352
+...
+
+Other release notes:
+
+- applies to acme's perf/{core,urgent} branches, likely elsewhere
+
+- Report is self-contained within the tool.  Record requires Will's SPE
+  driver:
+
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2017-October/536221.html
+
+- the intel-bts implementation was used as a starting point; its
+  min/default/max buffer sizes and power of 2 pages granularity need to be
+  revisited for ARM SPE
+
+- multiple SPE clusters/domains not supported
+
+- snapshot support (record -S), and conversion to native perf events
+  (e.g., via 'perf inject --itrace'), are also not supported
+
+- technically both cs-etm and spe can be used simultaneously, however
+  disabled for simplicity in this release
+
+Signed-off-by: Kim Phillips <kim.phillips@arm.com>
 ---
- arch/arm/vdso/compiler.h      |   6 +-
- arch/arm/vdso/vgettimeofday.c | 344 +----------------------------------------
- lib/vdso/compiler.h           |  24 +++
- lib/vdso/datapage.h           |  24 +++
- lib/vdso/vgettimeofday.c      | 345 ++++++++++++++++++++++++++++++++++++++++++
- 5 files changed, 399 insertions(+), 344 deletions(-)
- create mode 100644 lib/vdso/compiler.h
- create mode 100644 lib/vdso/datapage.h
- create mode 100644 lib/vdso/vgettimeofday.c
+v3: trying to address comments from v2:
 
-diff --git a/arch/arm/vdso/compiler.h b/arch/arm/vdso/compiler.h
-index ef1d664fb4fa..f55962d8a683 100644
---- a/arch/arm/vdso/compiler.h
-+++ b/arch/arm/vdso/compiler.h
-@@ -32,6 +32,10 @@
- #error This code depends on AEABI system call conventions
+- despite adding a find_all_arm_spe_pmus() function to scan for all
+  arm_spe_<n> device instances, in order to ensure auxtrace_record__init
+  successfully matches the evsel type with the correct arm_spe_pmu type,
+  I am still having trouble running in multi-SPE PPI (heterogeneous)
+  environments (mmap fails with EOPNOTSUPP, as does running with
+  --per-thread on homogeneous systems).
+
+- arm_spe_reference: use gettime instead of direct cntvct register access
+
+- spe-decoder: add a comment for why SPE_EVENTS code sets packet->index.
+
+- added arm_spe_pmu_default_config that accesses the driver
+  caps/min_interval and sets the default sampling period to it.  This way
+  users don't have to specify -c explicitly.  Also set is_uncore to false.
+
+- set more sampling bits in the arm_spe and its tracking evsel.  Still
+  unsure if too liberal, and not sure whether it needs another context
+  switch tracking evsel.  Comments welcome!
+
+v2: mostly addressing Mark Rutland's comments as much as possible without his
+feedback to my feedback:
+
+- decoder refactored with a get_payload, not extended to with-ext_len ones like
+  get_addr,  named the constants
+
+- 0x-ified %x output formats, but decided to not sign extend the addresses in
+  the raw dump, rather do so if necessary in the synthesis stage:
+  SPE implementations differ in this area, and raw dump should reflect that.
+
+- CPU mask / new record behaviour bisected to commit e3ba76deef23064 "perf
+  tools: Force uncore events to system wide monitoring".  Waiting to hear back
+  on why driver can't do system wide monitoring, even across PPIs, by e.g.,
+  sharing the SPE interrupts in one handler (SPE's don't differ in this record
+  regard).
+
+- addressed off-list comment from M. Williams:
+  "Instruction Type" packet was renamed as "Operation Type".
+   so in the spe packet decoder: INSN_TYPE -> OP_TYPE
+
+- do_get_packet fixed to handle excessive, successive PADding from a new source
+  of raw SPE data, so instead of:
+
+	.  000011ae:  00                                              PAD
+	.  000011af:  00                                              PAD
+	.  000011b0:  00                                              PAD
+	.  000011b1:  00                                              PAD
+	.  000011b2:  00                                              PAD
+	.  000011b3:  00                                              PAD
+	.  000011b4:  00                                              PAD
+	.  000011b5:  00                                              PAD
+	.  000011b6:  00                                              PAD
+
+  we now get:
+
+	.  000011ae:  00 00 00 00 00 00 00 00 00                      PAD
+
+- fixed 52 00 00 decoded with an empty events clause, adding 'EV' for all events
+  clauses now.  parser writers can detect for empty event clauses by finding
+  nothing after it.
+
+ tools/perf/arch/arm/util/auxtrace.c   |  75 +++++-
+ tools/perf/arch/arm/util/pmu.c        |   5 +-
+ tools/perf/arch/arm64/util/Build      |   3 +-
+ tools/perf/arch/arm64/util/arm-spe.c  | 235 +++++++++++++++++
+ tools/perf/util/Build                 |   2 +
+ tools/perf/util/arm-spe-pkt-decoder.c | 472 ++++++++++++++++++++++++++++++++++
+ tools/perf/util/arm-spe-pkt-decoder.h |  52 ++++
+ tools/perf/util/arm-spe.c             | 318 +++++++++++++++++++++++
+ tools/perf/util/arm-spe.h             |  42 +++
+ tools/perf/util/auxtrace.c            |   3 +
+ tools/perf/util/auxtrace.h            |   1 +
+ 11 files changed, 1200 insertions(+), 8 deletions(-)
+ create mode 100644 tools/perf/arch/arm64/util/arm-spe.c
+ create mode 100644 tools/perf/util/arm-spe-pkt-decoder.c
+ create mode 100644 tools/perf/util/arm-spe-pkt-decoder.h
+ create mode 100644 tools/perf/util/arm-spe.c
+ create mode 100644 tools/perf/util/arm-spe.h
+
+diff --git a/tools/perf/arch/arm/util/auxtrace.c b/tools/perf/arch/arm/util/auxtrace.c
+index 8edf2cb71564..8e7c1ad18224 100644
+--- a/tools/perf/arch/arm/util/auxtrace.c
++++ b/tools/perf/arch/arm/util/auxtrace.c
+@@ -22,6 +22,42 @@
+ #include "../../util/evlist.h"
+ #include "../../util/pmu.h"
+ #include "cs-etm.h"
++#include "arm-spe.h"
++
++static struct perf_pmu **find_all_arm_spe_pmus(int *nr_spes, int *err)
++{
++	struct perf_pmu **arm_spe_pmus = NULL;
++	int ret, i, nr_cpus = sysconf(_SC_NPROCESSORS_CONF);
++	/* arm_spe_xxxxxxxxx\0 */
++	char arm_spe_pmu_name[sizeof(ARM_SPE_PMU_NAME) + 10];
++
++	arm_spe_pmus = zalloc(sizeof(struct perf_pmu *) * nr_cpus);
++	if (!arm_spe_pmus) {
++		pr_err("spes alloc failed\n");
++		*err = -ENOMEM;
++		return NULL;
++	}
++
++	for (i = 0; i < nr_cpus; i++) {
++		ret = sprintf(arm_spe_pmu_name, "%s%d", ARM_SPE_PMU_NAME, i);
++		if (ret < 0) {
++			pr_err("sprintf failed\n");
++			*err = -ENOMEM;
++			return NULL;
++		}
++
++		arm_spe_pmus[*nr_spes] = perf_pmu__find(arm_spe_pmu_name);
++		if (arm_spe_pmus[*nr_spes]) {
++			pr_debug2("%s %d: arm_spe_pmu %d type %d name %s\n",
++				 __func__, __LINE__, *nr_spes,
++				 arm_spe_pmus[*nr_spes]->type,
++				 arm_spe_pmus[*nr_spes]->name);
++			(*nr_spes)++;
++		}
++	}
++
++	return arm_spe_pmus;
++}
+ 
+ struct auxtrace_record
+ *auxtrace_record__init(struct perf_evlist *evlist, int *err)
+@@ -29,22 +65,49 @@ struct auxtrace_record
+ 	struct perf_pmu	*cs_etm_pmu;
+ 	struct perf_evsel *evsel;
+ 	bool found_etm = false;
++	bool found_spe = false;
++	static struct perf_pmu **arm_spe_pmus = NULL;
++	static int nr_spes = 0;
++	int i;
++
++	if (!evlist)
++		return NULL;
+ 
+ 	cs_etm_pmu = perf_pmu__find(CORESIGHT_ETM_PMU_NAME);
+ 
+-	if (evlist) {
+-		evlist__for_each_entry(evlist, evsel) {
+-			if (cs_etm_pmu &&
+-			    evsel->attr.type == cs_etm_pmu->type)
+-				found_etm = true;
++	if (!arm_spe_pmus)
++		arm_spe_pmus = find_all_arm_spe_pmus(&nr_spes, err);
++
++	evlist__for_each_entry(evlist, evsel) {
++		if (cs_etm_pmu &&
++		    evsel->attr.type == cs_etm_pmu->type)
++			found_etm = true;
++
++		if (!nr_spes)
++			continue;
++
++		for (i = 0; i < nr_spes; i++) {
++			if (evsel->attr.type == arm_spe_pmus[i]->type) {
++				found_spe = true;
++				break;
++			}
+ 		}
+ 	}
+ 
++	if (found_etm && found_spe) {
++		pr_err("Concurrent ARM Coresight ETM and SPE operation not currently supported\n");
++		*err = -EOPNOTSUPP;
++		return NULL;
++	}
++
+ 	if (found_etm)
+ 		return cs_etm_record_init(err);
+ 
++	if (found_spe)
++		return arm_spe_recording_init(err, arm_spe_pmus[i]);
++
+ 	/*
+-	 * Clear 'err' even if we haven't found a cs_etm event - that way perf
++	 * Clear 'err' even if we haven't found an event - that way perf
+ 	 * record can still be used even if tracers aren't present.  The NULL
+ 	 * return value will take care of telling the infrastructure HW tracing
+ 	 * isn't available.
+diff --git a/tools/perf/arch/arm/util/pmu.c b/tools/perf/arch/arm/util/pmu.c
+index 98d67399a0d6..4c06a25ae6b1 100644
+--- a/tools/perf/arch/arm/util/pmu.c
++++ b/tools/perf/arch/arm/util/pmu.c
+@@ -20,6 +20,7 @@
+ #include <linux/perf_event.h>
+ 
+ #include "cs-etm.h"
++#include "arm-spe.h"
+ #include "../../util/pmu.h"
+ 
+ struct perf_event_attr
+@@ -30,7 +31,9 @@ struct perf_event_attr
+ 		/* add ETM default config here */
+ 		pmu->selectable = true;
+ 		pmu->set_drv_config = cs_etm_set_drv_config;
+-	}
++	} else
++		if (strstarts(pmu->name, ARM_SPE_PMU_NAME))
++			return arm_spe_pmu_default_config(pmu);
  #endif
- 
-+#ifdef CONFIG_ARM_ARCH_TIMER
-+#define ARCH_PROVIDES_TIMER
-+#endif
-+
- #define DEFINE_FALLBACK(name, type_arg1, name_arg1, type_arg2, name_arg2) \
- static notrace long name##_fallback(type_arg1 _##name_arg1,		  \
- 				    type_arg2 _##name_arg2)		  \
-@@ -50,7 +54,7 @@ static notrace long name##_fallback(type_arg1 _##name_arg1,		  \
- 	return ret;							  \
+ 	return NULL;
  }
+diff --git a/tools/perf/arch/arm64/util/Build b/tools/perf/arch/arm64/util/Build
+index 8dee4aa31a68..a80a53f89cf2 100644
+--- a/tools/perf/arch/arm64/util/Build
++++ b/tools/perf/arch/arm64/util/Build
+@@ -5,4 +5,5 @@ libperf-$(CONFIG_LOCAL_LIBUNWIND) += unwind-libunwind.o
  
--#define __arch_counter_get_cntvct() arch_counter_get_cntvct()
-+#define __arch_counter_get() arch_counter_get_cntvct()
- 
- /* Avoid unresolved references emitted by GCC */
- 
-diff --git a/arch/arm/vdso/vgettimeofday.c b/arch/arm/vdso/vgettimeofday.c
-index 841e7fd74a1b..4b241fe60d17 100644
---- a/arch/arm/vdso/vgettimeofday.c
-+++ b/arch/arm/vdso/vgettimeofday.c
-@@ -1,345 +1,3 @@
--/*
-- * Userspace implementations of gettimeofday() and friends.
-- *
-- * Copyright (C) 2017 Cavium, Inc.
-- * Copyright (C) 2015 Mentor Graphics Corporation
-- * Copyright (C) 2012 ARM Limited
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-- *
-- * Author: Will Deacon <will.deacon@arm.com>
-- * Rewriten from arch64 version into C by: Andrew Pinski <apinski@cavium.com>
-- * Reworked and rebased over arm version by: Mark Salyzyn <salyzyn@android.com>
-- */
--
--#include <asm/barrier.h>
--#include <linux/time.h>
--#include <linux/hrtimer.h>
--
- #include "compiler.h"
- #include "datapage.h"
--
--DEFINE_FALLBACK(gettimeofday, struct timeval *, tv, struct timezone *, tz)
--DEFINE_FALLBACK(clock_gettime, clockid_t, clock, struct timespec *, ts)
--DEFINE_FALLBACK(clock_getres, clockid_t, clock, struct timespec *, ts)
--
--static notrace u32 vdso_read_begin(const struct vdso_data *vd)
--{
--	u32 seq;
--
--	do {
--		seq = READ_ONCE(vd->tb_seq_count);
--
--		if ((seq & 1) == 0)
--			break;
--
--		cpu_relax();
--	} while (true);
--
--	smp_rmb(); /* Pairs with second smp_wmb in update_vsyscall */
--	return seq;
--}
--
--static notrace int vdso_read_retry(const struct vdso_data *vd, u32 start)
--{
--	u32 seq;
--
--	smp_rmb(); /* Pairs with first smp_wmb in update_vsyscall */
--	seq = READ_ONCE(vd->tb_seq_count);
--	return seq != start;
--}
--
--static notrace int do_realtime_coarse(const struct vdso_data *vd,
--				      struct timespec *ts)
--{
--	u32 seq;
--
--	do {
--		seq = vdso_read_begin(vd);
--
--		ts->tv_sec = vd->xtime_coarse_sec;
--		ts->tv_nsec = vd->xtime_coarse_nsec;
--
--	} while (vdso_read_retry(vd, seq));
--
--	return 0;
--}
--
--static notrace int do_monotonic_coarse(const struct vdso_data *vd,
--				       struct timespec *ts)
--{
--	struct timespec tomono;
--	u32 seq;
--
--	do {
--		seq = vdso_read_begin(vd);
--
--		ts->tv_sec = vd->xtime_coarse_sec;
--		ts->tv_nsec = vd->xtime_coarse_nsec;
--
--		tomono.tv_sec = vd->wtm_clock_sec;
--		tomono.tv_nsec = vd->wtm_clock_nsec;
--
--	} while (vdso_read_retry(vd, seq));
--
--	ts->tv_sec += tomono.tv_sec;
--	timespec_add_ns(ts, tomono.tv_nsec);
--
--	return 0;
--}
--
--#ifdef CONFIG_ARM_ARCH_TIMER
--
--/*
-- * Returns the clock delta, in nanoseconds left-shifted by the clock
-- * shift.
-- */
--static __always_inline notrace u64 get_clock_shifted_nsec(const u64 cycle_last,
--							  const u32 mult,
--							  const u64 mask)
--{
--	u64 res;
--
--	/* Read the virtual counter. */
--	res = __arch_counter_get_cntvct();
--
--	res = res - cycle_last;
--
--	res &= mask;
--	return res * mult;
--}
--
--/* Code size doesn't matter (vdso is 4k/16k/64k anyway) and this is faster. */
--static __always_inline notrace int do_realtime(const struct vdso_data *vd,
--					       struct timespec *ts)
--{
--	u32 seq, mult, shift;
--	u64 nsec, cycle_last;
--#ifdef ARCH_CLOCK_FIXED_MASK
--	static const u64 mask = ARCH_CLOCK_FIXED_MASK;
--#else
--	u64 mask;
--#endif
--
--	typeof(((struct vdso_data *)vd)->xtime_clock_sec) sec;
--
--	do {
--		seq = vdso_read_begin(vd);
--
--		if (vd->use_syscall)
--			return -1;
--
--		cycle_last = vd->cs_cycle_last;
--
--		mult = vd->cs_mono_mult;
--		shift = vd->cs_shift;
--#ifndef ARCH_CLOCK_FIXED_MASK
--		mask = vd->cs_mask;
--#endif
--
--		sec = vd->xtime_clock_sec;
--		nsec = vd->xtime_clock_snsec;
--
--	} while (unlikely(vdso_read_retry(vd, seq)));
--
--	nsec += get_clock_shifted_nsec(cycle_last, mult, mask);
--	nsec >>= shift;
--	/* open coding timespec_add_ns to save a ts->tv_nsec = 0 */
--	ts->tv_sec = sec + __iter_div_u64_rem(nsec, NSEC_PER_SEC, &nsec);
--	ts->tv_nsec = nsec;
--
--	return 0;
--}
--
--static __always_inline notrace int do_monotonic(const struct vdso_data *vd,
--						struct timespec *ts)
--{
--	u32 seq, mult, shift;
--	u64 nsec, cycle_last;
--#ifdef ARCH_CLOCK_FIXED_MASK
--	static const u64 mask = ARCH_CLOCK_FIXED_MASK;
--#else
--	u64 mask;
--#endif
--
--	typeof(((struct vdso_data *)vd)->wtm_clock_nsec) wtm_nsec;
--	typeof(ts->tv_sec) sec;
--
--	do {
--		seq = vdso_read_begin(vd);
--
--		if (vd->use_syscall)
--			return -1;
--
--		cycle_last = vd->cs_cycle_last;
--
--		mult = vd->cs_mono_mult;
--		shift = vd->cs_shift;
--#ifndef ARCH_CLOCK_FIXED_MASK
--		mask = vd->cs_mask;
--#endif
--
--		sec = vd->xtime_clock_sec;
--		nsec = vd->xtime_clock_snsec;
--
--		sec += vd->wtm_clock_sec;
--		wtm_nsec = vd->wtm_clock_nsec;
--
--	} while (unlikely(vdso_read_retry(vd, seq)));
--
--	nsec += get_clock_shifted_nsec(cycle_last, mult, mask);
--	nsec >>= shift;
--	nsec += wtm_nsec;
--	/* open coding timespec_add_ns to save a ts->tv_nsec = 0 */
--	ts->tv_sec = sec + __iter_div_u64_rem(nsec, NSEC_PER_SEC, &nsec);
--	ts->tv_nsec = nsec;
--
--	return 0;
--}
--
--static __always_inline notrace int do_monotonic_raw(const struct vdso_data *vd,
--						    struct timespec *ts)
--{
--	u32 seq, mult, shift;
--	u64 nsec, cycle_last;
--#ifdef ARCH_CLOCK_FIXED_MASK
--	static const u64 mask = ARCH_CLOCK_FIXED_MASK;
--#else
--	u64 mask;
--#endif
--
--	typeof(((struct vdso_data *)vd)->raw_time_sec) sec;
--
--	do {
--		seq = vdso_read_begin(vd);
--
--		if (vd->use_syscall)
--			return -1;
--
--		cycle_last = vd->cs_cycle_last;
--
--		mult = vd->cs_raw_mult;
--		shift = vd->cs_shift;
--#ifndef ARCH_CLOCK_FIXED_MASK
--		mask = vd->cs_mask;
--#endif
--
--		sec = vd->raw_time_sec;
--		nsec = vd->raw_time_nsec;
--
--	} while (unlikely(vdso_read_retry(vd, seq)));
--
--	nsec += get_clock_shifted_nsec(cycle_last, mult, mask);
--	nsec >>= shift;
--	/* open coding timespec_add_ns to save a ts->tv_nsec = 0 */
--	ts->tv_sec = sec + __iter_div_u64_rem(nsec, NSEC_PER_SEC, &nsec);
--	ts->tv_nsec = nsec;
--
--	return 0;
--}
--
--#else /* CONFIG_ARM_ARCH_TIMER */
--
--static notrace int do_realtime(const struct vdso_data *vd, struct timespec *ts)
--{
--	return -1;
--}
--
--static notrace int do_monotonic(const struct vdso_data *vd, struct timespec *ts)
--{
--	return -1;
--}
--
--static notrace int do_monotonic_raw(const struct vdso_data *vd,
--				    struct timespec *ts)
--{
--	return -1;
--}
--
--#endif /* CONFIG_ARM_ARCH_TIMER */
--
--notrace int __vdso_clock_gettime(clockid_t clock, struct timespec *ts)
--{
--	const struct vdso_data *vd = __get_datapage();
--
--	switch (clock) {
--	case CLOCK_REALTIME_COARSE:
--		do_realtime_coarse(vd, ts);
--		break;
--	case CLOCK_MONOTONIC_COARSE:
--		do_monotonic_coarse(vd, ts);
--		break;
--	case CLOCK_REALTIME:
--		if (do_realtime(vd, ts))
--			goto fallback;
--		break;
--	case CLOCK_MONOTONIC:
--		if (do_monotonic(vd, ts))
--			goto fallback;
--		break;
--	case CLOCK_MONOTONIC_RAW:
--		if (do_monotonic_raw(vd, ts))
--			goto fallback;
--		break;
--	default:
--		goto fallback;
--	}
--
--	return 0;
--fallback:
--	return clock_gettime_fallback(clock, ts);
--}
--
--notrace int __vdso_gettimeofday(struct timeval *tv, struct timezone *tz)
--{
--	const struct vdso_data *vd = __get_datapage();
--
--	if (likely(tv != NULL)) {
--		struct timespec ts;
--
--		if (do_realtime(vd, &ts))
--			return gettimeofday_fallback(tv, tz);
--
--		tv->tv_sec = ts.tv_sec;
--		tv->tv_usec = ts.tv_nsec / 1000;
--	}
--
--	if (unlikely(tz != NULL)) {
--		tz->tz_minuteswest = vd->tz_minuteswest;
--		tz->tz_dsttime = vd->tz_dsttime;
--	}
--
--	return 0;
--}
--
--int __vdso_clock_getres(clockid_t clock_id, struct timespec *res)
--{
--	typeof(res->tv_nsec) nsec;
--
--	if (clock_id == CLOCK_REALTIME ||
--	    clock_id == CLOCK_MONOTONIC ||
--	    clock_id == CLOCK_MONOTONIC_RAW)
--		nsec = MONOTONIC_RES_NSEC;
--	else if (clock_id == CLOCK_REALTIME_COARSE ||
--		 clock_id == CLOCK_MONOTONIC_COARSE)
--		nsec = LOW_RES_NSEC;
--	else
--		return clock_getres_fallback(clock_id, res);
--
--	if (likely(res != NULL)) {
--		res->tv_sec = 0;
--		res->tv_nsec = nsec;
--	}
--
--	return 0;
--}
-+#include "../../../lib/vdso/vgettimeofday.c"
-diff --git a/lib/vdso/compiler.h b/lib/vdso/compiler.h
+ libperf-$(CONFIG_AUXTRACE) += ../../arm/util/pmu.o \
+ 			      ../../arm/util/auxtrace.o \
+-			      ../../arm/util/cs-etm.o
++			      ../../arm/util/cs-etm.o \
++			      arm-spe.o
+diff --git a/tools/perf/arch/arm64/util/arm-spe.c b/tools/perf/arch/arm64/util/arm-spe.c
 new file mode 100644
-index 000000000000..0e618b73e064
+index 000000000000..ef576b52c850
 --- /dev/null
-+++ b/lib/vdso/compiler.h
-@@ -0,0 +1,24 @@
++++ b/tools/perf/arch/arm64/util/arm-spe.c
+@@ -0,0 +1,235 @@
 +/*
-+ * Userspace implementations of fallback calls
++ * ARM Statistical Profiling Extensions (SPE) support
++ * Copyright (c) 2017, ARM Ltd.
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
 + *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
 + *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#ifndef __VDSO_COMPILER_H
-+#define __VDSO_COMPILER_H
++#include <linux/kernel.h>
++#include <linux/types.h>
++#include <linux/bitops.h>
++#include <linux/log2.h>
++#include <time.h>
 +
-+#error	"vdso: Provide architectural overrides such as ARCH_PROVIDES_TIMER,"
-+#error	"      DEFINE_FALLBACK and __arch_counter_get or any overrides. eg:"
-+#error	"      vdso entry points or compilation time helpers."
++#include "../../util/cpumap.h"
++#include "../../util/evsel.h"
++#include "../../util/evlist.h"
++#include "../../util/session.h"
++#include "../../util/util.h"
++#include "../../util/pmu.h"
++#include "../../util/debug.h"
++#include "../../util/tsc.h"
++#include "../../util/auxtrace.h"
++#include "../../util/arm-spe.h"
 +
-+#endif /* __VDSO_COMPILER_H */
-diff --git a/lib/vdso/datapage.h b/lib/vdso/datapage.h
-new file mode 100644
-index 000000000000..df4427e42d51
---- /dev/null
-+++ b/lib/vdso/datapage.h
-@@ -0,0 +1,24 @@
-+/*
-+ * Userspace implementations of __get_datapage
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
++#define KiB(x) ((x) * 1024)
++#define MiB(x) ((x) * 1024 * 1024)
 +
-+#ifndef __VDSO_DATAPAGE_H
-+#define __VDSO_DATAPAGE_H
++struct arm_spe_recording {
++	struct auxtrace_record		itr;
++	struct perf_pmu			*arm_spe_pmu;
++	struct perf_evlist		*evlist;
++};
 +
-+#error	"vdso: Provide a user space architecture specific definition or"
-+#error	"prototype for struct vdso_data *__get_datapage(void).  Also define"
-+#error	"ARCH_CLOCK_FIXED_MASK if not provided by cs_mask."
-+
-+#endif /* __VDSO_DATAPAGE_H */
-diff --git a/lib/vdso/vgettimeofday.c b/lib/vdso/vgettimeofday.c
-new file mode 100644
-index 000000000000..2cafd732c65f
---- /dev/null
-+++ b/lib/vdso/vgettimeofday.c
-@@ -0,0 +1,345 @@
-+/*
-+ * Userspace implementations of gettimeofday() and friends.
-+ *
-+ * Copyright (C) 2017 Cavium, Inc.
-+ * Copyright (C) 2015 Mentor Graphics Corporation
-+ * Copyright (C) 2012 ARM Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ * Author: Will Deacon <will.deacon@arm.com>
-+ * Rewriten from arch64 version into C by: Andrew Pinski <apinski@cavium.com>
-+ * Reworked and rebased over arm version by: Mark Salyzyn <salyzyn@android.com>
-+ */
-+
-+#include <asm/barrier.h>
-+#include <linux/time.h>
-+#include <linux/hrtimer.h>
-+
-+#include "compiler.h"
-+#include "datapage.h"
-+
-+DEFINE_FALLBACK(gettimeofday, struct timeval *, tv, struct timezone *, tz)
-+DEFINE_FALLBACK(clock_gettime, clockid_t, clock, struct timespec *, ts)
-+DEFINE_FALLBACK(clock_getres, clockid_t, clock, struct timespec *, ts)
-+
-+static notrace u32 vdso_read_begin(const struct vdso_data *vd)
++static size_t
++arm_spe_info_priv_size(struct auxtrace_record *itr __maybe_unused,
++		       struct perf_evlist *evlist __maybe_unused)
 +{
-+	u32 seq;
-+
-+	do {
-+		seq = READ_ONCE(vd->tb_seq_count);
-+
-+		if ((seq & 1) == 0)
-+			break;
-+
-+		cpu_relax();
-+	} while (true);
-+
-+	smp_rmb(); /* Pairs with second smp_wmb in update_vsyscall */
-+	return seq;
++	return ARM_SPE_AUXTRACE_PRIV_SIZE;
 +}
 +
-+static notrace int vdso_read_retry(const struct vdso_data *vd, u32 start)
++static int arm_spe_info_fill(struct auxtrace_record *itr,
++			     struct perf_session *session,
++			     struct auxtrace_info_event *auxtrace_info,
++			     size_t priv_size)
 +{
-+	u32 seq;
++	struct arm_spe_recording *sper =
++			container_of(itr, struct arm_spe_recording, itr);
++	struct perf_pmu *arm_spe_pmu = sper->arm_spe_pmu;
 +
-+	smp_rmb(); /* Pairs with first smp_wmb in update_vsyscall */
-+	seq = READ_ONCE(vd->tb_seq_count);
-+	return seq != start;
-+}
++	if (priv_size != ARM_SPE_AUXTRACE_PRIV_SIZE)
++		return -EINVAL;
 +
-+static notrace int do_realtime_coarse(const struct vdso_data *vd,
-+				      struct timespec *ts)
-+{
-+	u32 seq;
++	if (!session->evlist->nr_mmaps)
++		return -EINVAL;
 +
-+	do {
-+		seq = vdso_read_begin(vd);
-+
-+		ts->tv_sec = vd->xtime_coarse_sec;
-+		ts->tv_nsec = vd->xtime_coarse_nsec;
-+
-+	} while (vdso_read_retry(vd, seq));
++	auxtrace_info->type = PERF_AUXTRACE_ARM_SPE;
++	auxtrace_info->priv[ARM_SPE_PMU_TYPE] = arm_spe_pmu->type;
 +
 +	return 0;
 +}
 +
-+static notrace int do_monotonic_coarse(const struct vdso_data *vd,
-+				       struct timespec *ts)
++static int arm_spe_recording_options(struct auxtrace_record *itr,
++				     struct perf_evlist *evlist,
++				     struct record_opts *opts)
 +{
-+	struct timespec tomono;
-+	u32 seq;
++	struct arm_spe_recording *sper =
++			container_of(itr, struct arm_spe_recording, itr);
++	struct perf_pmu *arm_spe_pmu = sper->arm_spe_pmu;
++	struct perf_evsel *evsel, *arm_spe_evsel = NULL;
++	bool privileged = geteuid() == 0 || perf_event_paranoid() < 0;
++	struct perf_evsel *tracking_evsel;
++	int err;
 +
-+	do {
-+		seq = vdso_read_begin(vd);
++	sper->evlist = evlist;
 +
-+		ts->tv_sec = vd->xtime_coarse_sec;
-+		ts->tv_nsec = vd->xtime_coarse_nsec;
-+
-+		tomono.tv_sec = vd->wtm_clock_sec;
-+		tomono.tv_nsec = vd->wtm_clock_nsec;
-+
-+	} while (vdso_read_retry(vd, seq));
-+
-+	ts->tv_sec += tomono.tv_sec;
-+	timespec_add_ns(ts, tomono.tv_nsec);
-+
-+	return 0;
-+}
-+
-+#ifdef ARCH_PROVIDES_TIMER
-+
-+/*
-+ * Returns the clock delta, in nanoseconds left-shifted by the clock
-+ * shift.
-+ */
-+static __always_inline notrace u64 get_clock_shifted_nsec(const u64 cycle_last,
-+							  const u32 mult,
-+							  const u64 mask)
-+{
-+	u64 res;
-+
-+	/* Read the virtual counter. */
-+	res = __arch_counter_get();
-+
-+	res = res - cycle_last;
-+
-+	res &= mask;
-+	return res * mult;
-+}
-+
-+/* Code size doesn't matter (vdso is 4k/16k/64k anyway) and this is faster. */
-+static __always_inline notrace int do_realtime(const struct vdso_data *vd,
-+					       struct timespec *ts)
-+{
-+	u32 seq, mult, shift;
-+	u64 nsec, cycle_last;
-+#ifdef ARCH_CLOCK_FIXED_MASK
-+	static const u64 mask = ARCH_CLOCK_FIXED_MASK;
-+#else
-+	u64 mask;
-+#endif
-+
-+	typeof(((struct vdso_data *)vd)->xtime_clock_sec) sec;
-+
-+	do {
-+		seq = vdso_read_begin(vd);
-+
-+		if (vd->use_syscall)
-+			return -1;
-+
-+		cycle_last = vd->cs_cycle_last;
-+
-+		mult = vd->cs_mono_mult;
-+		shift = vd->cs_shift;
-+#ifndef ARCH_CLOCK_FIXED_MASK
-+		mask = vd->cs_mask;
-+#endif
-+
-+		sec = vd->xtime_clock_sec;
-+		nsec = vd->xtime_clock_snsec;
-+
-+	} while (unlikely(vdso_read_retry(vd, seq)));
-+
-+	nsec += get_clock_shifted_nsec(cycle_last, mult, mask);
-+	nsec >>= shift;
-+	/* open coding timespec_add_ns to save a ts->tv_nsec = 0 */
-+	ts->tv_sec = sec + __iter_div_u64_rem(nsec, NSEC_PER_SEC, &nsec);
-+	ts->tv_nsec = nsec;
-+
-+	return 0;
-+}
-+
-+static __always_inline notrace int do_monotonic(const struct vdso_data *vd,
-+						struct timespec *ts)
-+{
-+	u32 seq, mult, shift;
-+	u64 nsec, cycle_last;
-+#ifdef ARCH_CLOCK_FIXED_MASK
-+	static const u64 mask = ARCH_CLOCK_FIXED_MASK;
-+#else
-+	u64 mask;
-+#endif
-+
-+	typeof(((struct vdso_data *)vd)->wtm_clock_nsec) wtm_nsec;
-+	typeof(ts->tv_sec) sec;
-+
-+	do {
-+		seq = vdso_read_begin(vd);
-+
-+		if (vd->use_syscall)
-+			return -1;
-+
-+		cycle_last = vd->cs_cycle_last;
-+
-+		mult = vd->cs_mono_mult;
-+		shift = vd->cs_shift;
-+#ifndef ARCH_CLOCK_FIXED_MASK
-+		mask = vd->cs_mask;
-+#endif
-+
-+		sec = vd->xtime_clock_sec;
-+		nsec = vd->xtime_clock_snsec;
-+
-+		sec += vd->wtm_clock_sec;
-+		wtm_nsec = vd->wtm_clock_nsec;
-+
-+	} while (unlikely(vdso_read_retry(vd, seq)));
-+
-+	nsec += get_clock_shifted_nsec(cycle_last, mult, mask);
-+	nsec >>= shift;
-+	nsec += wtm_nsec;
-+	/* open coding timespec_add_ns to save a ts->tv_nsec = 0 */
-+	ts->tv_sec = sec + __iter_div_u64_rem(nsec, NSEC_PER_SEC, &nsec);
-+	ts->tv_nsec = nsec;
-+
-+	return 0;
-+}
-+
-+static __always_inline notrace int do_monotonic_raw(const struct vdso_data *vd,
-+						    struct timespec *ts)
-+{
-+	u32 seq, mult, shift;
-+	u64 nsec, cycle_last;
-+#ifdef ARCH_CLOCK_FIXED_MASK
-+	static const u64 mask = ARCH_CLOCK_FIXED_MASK;
-+#else
-+	u64 mask;
-+#endif
-+
-+	typeof(((struct vdso_data *)vd)->raw_time_sec) sec;
-+
-+	do {
-+		seq = vdso_read_begin(vd);
-+
-+		if (vd->use_syscall)
-+			return -1;
-+
-+		cycle_last = vd->cs_cycle_last;
-+
-+		mult = vd->cs_raw_mult;
-+		shift = vd->cs_shift;
-+#ifndef ARCH_CLOCK_FIXED_MASK
-+		mask = vd->cs_mask;
-+#endif
-+
-+		sec = vd->raw_time_sec;
-+		nsec = vd->raw_time_nsec;
-+
-+	} while (unlikely(vdso_read_retry(vd, seq)));
-+
-+	nsec += get_clock_shifted_nsec(cycle_last, mult, mask);
-+	nsec >>= shift;
-+	/* open coding timespec_add_ns to save a ts->tv_nsec = 0 */
-+	ts->tv_sec = sec + __iter_div_u64_rem(nsec, NSEC_PER_SEC, &nsec);
-+	ts->tv_nsec = nsec;
-+
-+	return 0;
-+}
-+
-+#else /* ARCH_PROVIDES_TIMER */
-+
-+static notrace int do_realtime(const struct vdso_data *vd, struct timespec *ts)
-+{
-+	return -1;
-+}
-+
-+static notrace int do_monotonic(const struct vdso_data *vd, struct timespec *ts)
-+{
-+	return -1;
-+}
-+
-+static notrace int do_monotonic_raw(const struct vdso_data *vd,
-+				    struct timespec *ts)
-+{
-+	return -1;
-+}
-+
-+#endif /* ARCH_PROVIDES_TIMER */
-+
-+notrace int __vdso_clock_gettime(clockid_t clock, struct timespec *ts)
-+{
-+	const struct vdso_data *vd = __get_datapage();
-+
-+	switch (clock) {
-+	case CLOCK_REALTIME_COARSE:
-+		do_realtime_coarse(vd, ts);
-+		break;
-+	case CLOCK_MONOTONIC_COARSE:
-+		do_monotonic_coarse(vd, ts);
-+		break;
-+	case CLOCK_REALTIME:
-+		if (do_realtime(vd, ts))
-+			goto fallback;
-+		break;
-+	case CLOCK_MONOTONIC:
-+		if (do_monotonic(vd, ts))
-+			goto fallback;
-+		break;
-+	case CLOCK_MONOTONIC_RAW:
-+		if (do_monotonic_raw(vd, ts))
-+			goto fallback;
-+		break;
-+	default:
-+		goto fallback;
++	evlist__for_each_entry(evlist, evsel) {
++		if (evsel->attr.type == arm_spe_pmu->type) {
++			if (arm_spe_evsel) {
++				pr_err("There may be only one " ARM_SPE_PMU_NAME "x event\n");
++				return -EINVAL;
++			}
++			evsel->attr.freq = 0;
++			evsel->attr.sample_period = 1;
++			arm_spe_evsel = evsel;
++			opts->full_auxtrace = true;
++		}
 +	}
 +
-+	return 0;
-+fallback:
-+	return clock_gettime_fallback(clock, ts);
-+}
++	if (!opts->full_auxtrace)
++		return 0;
 +
-+notrace int __vdso_gettimeofday(struct timeval *tv, struct timezone *tz)
-+{
-+	const struct vdso_data *vd = __get_datapage();
-+
-+	if (likely(tv != NULL)) {
-+		struct timespec ts;
-+
-+		if (do_realtime(vd, &ts))
-+			return gettimeofday_fallback(tv, tz);
-+
-+		tv->tv_sec = ts.tv_sec;
-+		tv->tv_usec = ts.tv_nsec / 1000;
++	/* We are in full trace mode but '-m,xyz' wasn't specified */
++	if (opts->full_auxtrace && !opts->auxtrace_mmap_pages) {
++		if (privileged) {
++			opts->auxtrace_mmap_pages = MiB(4) / page_size;
++		} else {
++			opts->auxtrace_mmap_pages = KiB(128) / page_size;
++			if (opts->mmap_pages == UINT_MAX)
++				opts->mmap_pages = KiB(256) / page_size;
++		}
 +	}
 +
-+	if (unlikely(tz != NULL)) {
-+		tz->tz_minuteswest = vd->tz_minuteswest;
-+		tz->tz_dsttime = vd->tz_dsttime;
++	/* Validate auxtrace_mmap_pages */
++	if (opts->auxtrace_mmap_pages) {
++		size_t sz = opts->auxtrace_mmap_pages * (size_t)page_size;
++		size_t min_sz = KiB(8);
++
++		if (sz < min_sz || !is_power_of_2(sz)) {
++			pr_err("Invalid mmap size for ARM SPE: must be@least %zuKiB and a power of 2\n",
++			       min_sz / 1024);
++			return -EINVAL;
++		}
 +	}
++
++
++	/*
++	 * To obtain the auxtrace buffer file descriptor, the auxtrace event
++	 * must come first.
++	 */
++	perf_evlist__to_front(evlist, arm_spe_evsel);
++
++	perf_evsel__set_sample_bit(arm_spe_evsel, CPU);
++	perf_evsel__set_sample_bit(arm_spe_evsel, TIME);
++	perf_evsel__set_sample_bit(arm_spe_evsel, TID);
++
++	/* Add dummy event to keep tracking */
++	err = parse_events(evlist, "dummy:u", NULL);
++	if (err)
++		return err;
++
++	tracking_evsel = perf_evlist__last(evlist);
++	perf_evlist__set_tracking_event(evlist, tracking_evsel);
++
++	tracking_evsel->attr.freq = 0;
++	tracking_evsel->attr.sample_period = 1;
++	perf_evsel__set_sample_bit(tracking_evsel, TIME);
++	perf_evsel__set_sample_bit(tracking_evsel, CPU);
++	perf_evsel__reset_sample_bit(tracking_evsel, BRANCH_STACK);
 +
 +	return 0;
 +}
 +
-+int __vdso_clock_getres(clockid_t clock_id, struct timespec *res)
++static u64 arm_spe_reference(struct auxtrace_record *itr __maybe_unused)
 +{
-+	typeof(res->tv_nsec) nsec;
++	struct timespec ts;
 +
-+	if (clock_id == CLOCK_REALTIME ||
-+	    clock_id == CLOCK_MONOTONIC ||
-+	    clock_id == CLOCK_MONOTONIC_RAW)
-+		nsec = MONOTONIC_RES_NSEC;
-+	else if (clock_id == CLOCK_REALTIME_COARSE ||
-+		 clock_id == CLOCK_MONOTONIC_COARSE)
-+		nsec = LOW_RES_NSEC;
++	clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
++
++	return ts.tv_sec ^ ts.tv_nsec;
++}
++
++static void arm_spe_recording_free(struct auxtrace_record *itr)
++{
++	struct arm_spe_recording *sper =
++			container_of(itr, struct arm_spe_recording, itr);
++
++	free(sper);
++}
++
++static int arm_spe_read_finish(struct auxtrace_record *itr, int idx)
++{
++	struct arm_spe_recording *sper =
++			container_of(itr, struct arm_spe_recording, itr);
++	struct perf_evsel *evsel;
++
++	evlist__for_each_entry(sper->evlist, evsel) {
++		if (evsel->attr.type == sper->arm_spe_pmu->type)
++			return perf_evlist__enable_event_idx(sper->evlist,
++							     evsel, idx);
++	}
++	return -EINVAL;
++}
++
++struct auxtrace_record *arm_spe_recording_init(int *err,
++					       struct perf_pmu *arm_spe_pmu)
++{
++	struct arm_spe_recording *sper;
++
++	if (!arm_spe_pmu) {
++		*err = -ENODEV;
++		return NULL;
++	}
++
++	sper = zalloc(sizeof(struct arm_spe_recording));
++	if (!sper) {
++		*err = -ENOMEM;
++		return NULL;
++	}
++
++	sper->arm_spe_pmu = arm_spe_pmu;
++	sper->itr.recording_options = arm_spe_recording_options;
++	sper->itr.info_priv_size = arm_spe_info_priv_size;
++	sper->itr.info_fill = arm_spe_info_fill;
++	sper->itr.free = arm_spe_recording_free;
++	sper->itr.reference = arm_spe_reference;
++	sper->itr.read_finish = arm_spe_read_finish;
++	sper->itr.alignment = 0;
++
++	return &sper->itr;
++}
++
++struct perf_event_attr
++*arm_spe_pmu_default_config(struct perf_pmu *arm_spe_pmu)
++{
++	struct perf_event_attr *attr;
++
++	attr = zalloc(sizeof(struct perf_event_attr));
++	if (!attr) {
++		pr_err("arm_spe default config cannot allocate a perf_event_attr\n");
++		return NULL;
++	}
++
++	/*
++	 * If kernel driver doesn't advertise a minimum,
++	 * use max allowable by PMSIDR_EL1.INTERVAL
++	 */
++	if (perf_pmu__scan_file(arm_spe_pmu, "caps/min_interval", "%llu",
++				  &attr->sample_period) != 1) {
++		pr_debug("arm_spe driver doesn't advertise a min. interval. Using 4096\n");
++		attr->sample_period = 4096;
++	}
++
++	arm_spe_pmu->selectable = true;
++	arm_spe_pmu->is_uncore = false;
++
++	return attr;
++}
+diff --git a/tools/perf/util/Build b/tools/perf/util/Build
+index 94518c1bf8b6..e6cb696359a2 100644
+--- a/tools/perf/util/Build
++++ b/tools/perf/util/Build
+@@ -83,6 +83,8 @@ libperf-$(CONFIG_AUXTRACE) += auxtrace.o
+ libperf-$(CONFIG_AUXTRACE) += intel-pt-decoder/
+ libperf-$(CONFIG_AUXTRACE) += intel-pt.o
+ libperf-$(CONFIG_AUXTRACE) += intel-bts.o
++libperf-$(CONFIG_AUXTRACE) += arm-spe.o
++libperf-$(CONFIG_AUXTRACE) += arm-spe-pkt-decoder.o
+ libperf-y += parse-branch-options.o
+ libperf-y += dump-insn.o
+ libperf-y += parse-regs-options.o
+diff --git a/tools/perf/util/arm-spe-pkt-decoder.c b/tools/perf/util/arm-spe-pkt-decoder.c
+new file mode 100644
+index 000000000000..833dad42988a
+--- /dev/null
++++ b/tools/perf/util/arm-spe-pkt-decoder.c
+@@ -0,0 +1,472 @@
++/*
++ * ARM Statistical Profiling Extensions (SPE) support
++ * Copyright (c) 2017, ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ */
++
++#include <stdio.h>
++#include <string.h>
++#include <endian.h>
++#include <byteswap.h>
++
++#include "arm-spe-pkt-decoder.h"
++
++#define BIT(n)		(1ULL << (n))
++
++#define NS_FLAG		BIT(63)
++#define EL_FLAG		(BIT(62) | BIT(61))
++
++#define SPE_HEADER0_PAD			0x0
++#define SPE_HEADER0_END			0x1
++#define SPE_HEADER0_ADDRESS		0x30 /* address packet (short) */
++#define SPE_HEADER0_ADDRESS_MASK	0x38
++#define SPE_HEADER0_COUNTER		0x18 /* counter packet (short) */
++#define SPE_HEADER0_COUNTER_MASK	0x38
++#define SPE_HEADER0_TIMESTAMP		0x71
++#define SPE_HEADER0_TIMESTAMP		0x71
++#define SPE_HEADER0_EVENTS		0x2
++#define SPE_HEADER0_EVENTS_MASK		0xf
++#define SPE_HEADER0_SOURCE		0x3
++#define SPE_HEADER0_SOURCE_MASK		0xf
++#define SPE_HEADER0_CONTEXT		0x24
++#define SPE_HEADER0_CONTEXT_MASK	0x3c
++#define SPE_HEADER0_OP_TYPE		0x8
++#define SPE_HEADER0_OP_TYPE_MASK	0x3c
++#define SPE_HEADER1_ALIGNMENT		0x0
++#define SPE_HEADER1_ADDRESS		0xb0 /* address packet (extended) */
++#define SPE_HEADER1_ADDRESS_MASK	0xf8
++#define SPE_HEADER1_COUNTER		0x98 /* counter packet (extended) */
++#define SPE_HEADER1_COUNTER_MASK	0xf8
++
++#if __BYTE_ORDER == __BIG_ENDIAN
++#define le16_to_cpu bswap_16
++#define le32_to_cpu bswap_32
++#define le64_to_cpu bswap_64
++#define memcpy_le64(d, s, n) do { \
++	memcpy((d), (s), (n));    \
++	*(d) = le64_to_cpu(*(d)); \
++} while (0)
++#else
++#define le16_to_cpu
++#define le32_to_cpu
++#define le64_to_cpu
++#define memcpy_le64 memcpy
++#endif
++
++static const char * const arm_spe_packet_name[] = {
++	[ARM_SPE_PAD]		= "PAD",
++	[ARM_SPE_END]		= "END",
++	[ARM_SPE_TIMESTAMP]	= "TS",
++	[ARM_SPE_ADDRESS]	= "ADDR",
++	[ARM_SPE_COUNTER]	= "LAT",
++	[ARM_SPE_CONTEXT]	= "CONTEXT",
++	[ARM_SPE_OP_TYPE]	= "OP-TYPE",
++	[ARM_SPE_EVENTS]	= "EVENTS",
++	[ARM_SPE_DATA_SOURCE]	= "DATA-SOURCE",
++};
++
++const char *arm_spe_pkt_name(enum arm_spe_pkt_type type)
++{
++	return arm_spe_packet_name[type];
++}
++
++/* return ARM SPE payload size from its encoding,
++ * which is in bits 5:4 of the byte.
++ * 00 : byte
++ * 01 : halfword (2)
++ * 10 : word (4)
++ * 11 : doubleword (8)
++ */
++static int payloadlen(unsigned char byte)
++{
++	return 1 << ((byte & 0x30) >> 4);
++}
++
++static int arm_spe_get_payload(const unsigned char *buf, size_t len,
++			       struct arm_spe_pkt *packet)
++{
++	size_t payload_len = payloadlen(buf[0]);
++
++	if (len < 1 + payload_len)
++		return ARM_SPE_NEED_MORE_BYTES;
++
++	buf++;
++
++	switch (payload_len) {
++	case 1: packet->payload = *(uint8_t *)buf; break;
++	case 2: packet->payload = le16_to_cpu(*(uint16_t *)buf); break;
++	case 4: packet->payload = le32_to_cpu(*(uint32_t *)buf); break;
++	case 8: packet->payload = le64_to_cpu(*(uint64_t *)buf); break;
++	default: return ARM_SPE_BAD_PACKET;
++	}
++
++	return 1 + payload_len;
++}
++
++static int arm_spe_get_pad(struct arm_spe_pkt *packet)
++{
++	packet->type = ARM_SPE_PAD;
++	return 1;
++}
++
++static int arm_spe_get_alignment(const unsigned char *buf, size_t len,
++				 struct arm_spe_pkt *packet)
++{
++	unsigned int alignment = 1 << ((buf[0] & 0xf) + 1);
++
++	if (len < alignment)
++		return ARM_SPE_NEED_MORE_BYTES;
++
++	packet->type = ARM_SPE_PAD;
++	return alignment - (((uint64_t)buf) & (alignment - 1));
++}
++
++static int arm_spe_get_end(struct arm_spe_pkt *packet)
++{
++	packet->type = ARM_SPE_END;
++	return 1;
++}
++
++static int arm_spe_get_timestamp(const unsigned char *buf, size_t len,
++				 struct arm_spe_pkt *packet)
++{
++	packet->type = ARM_SPE_TIMESTAMP;
++	return arm_spe_get_payload(buf, len, packet);
++}
++
++static int arm_spe_get_events(const unsigned char *buf, size_t len,
++			      struct arm_spe_pkt *packet)
++{
++	int ret = arm_spe_get_payload(buf, len, packet);
++
++	packet->type = ARM_SPE_EVENTS;
++
++	/* we use index to identify Events with a less number of
++	 * comparisons in arm_spe_pkt_desc(): E.g., the LLC-ACCESS,
++	 * LLC-REFILL, and REMOTE-ACCESS events are identified iff
++	 * index > 1.
++	 */
++	packet->index = ret - 1;
++
++	return ret;
++}
++
++static int arm_spe_get_data_source(const unsigned char *buf, size_t len,
++				   struct arm_spe_pkt *packet)
++{
++	packet->type = ARM_SPE_DATA_SOURCE;
++	return arm_spe_get_payload(buf, len, packet);
++}
++
++static int arm_spe_get_context(const unsigned char *buf, size_t len,
++			       struct arm_spe_pkt *packet)
++{
++	packet->type = ARM_SPE_CONTEXT;
++	packet->index = buf[0] & 0x3;
++
++	return arm_spe_get_payload(buf, len, packet);
++}
++
++static int arm_spe_get_op_type(const unsigned char *buf, size_t len,
++			       struct arm_spe_pkt *packet)
++{
++	packet->type = ARM_SPE_OP_TYPE;
++	packet->index = buf[0] & 0x3;
++	return arm_spe_get_payload(buf, len, packet);
++}
++
++static int arm_spe_get_counter(const unsigned char *buf, size_t len,
++			       const unsigned char ext_hdr, struct arm_spe_pkt *packet)
++{
++	if (len < 2)
++		return ARM_SPE_NEED_MORE_BYTES;
++
++	packet->type = ARM_SPE_COUNTER;
++	if (ext_hdr)
++		packet->index = ((buf[0] & 0x3) << 3) | (buf[1] & 0x7);
 +	else
-+		return clock_getres_fallback(clock_id, res);
++		packet->index = buf[0] & 0x7;
 +
-+	if (likely(res != NULL)) {
-+		res->tv_sec = 0;
-+		res->tv_nsec = nsec;
++	packet->payload = le16_to_cpu(*(uint16_t *)(buf + 1));
++
++	return 1 + ext_hdr + 2;
++}
++
++static int arm_spe_get_addr(const unsigned char *buf, size_t len,
++			    const unsigned char ext_hdr, struct arm_spe_pkt *packet)
++{
++	if (len < 8)
++		return ARM_SPE_NEED_MORE_BYTES;
++
++	packet->type = ARM_SPE_ADDRESS;
++	if (ext_hdr)
++		packet->index = ((buf[0] & 0x3) << 3) | (buf[1] & 0x7);
++	else
++		packet->index = buf[0] & 0x7;
++
++	memcpy_le64(&packet->payload, buf + 1, 8);
++
++	return 1 + ext_hdr + 8;
++}
++
++static int arm_spe_do_get_packet(const unsigned char *buf, size_t len,
++				 struct arm_spe_pkt *packet)
++{
++	unsigned int byte;
++
++	memset(packet, 0, sizeof(struct arm_spe_pkt));
++
++	if (!len)
++		return ARM_SPE_NEED_MORE_BYTES;
++
++	byte = buf[0];
++	if (byte == SPE_HEADER0_PAD)
++		return arm_spe_get_pad(packet);
++	else if (byte == SPE_HEADER0_END) /* no timestamp at end of record */
++		return arm_spe_get_end(packet);
++	else if (byte & 0xc0 /* 0y11xxxxxx */) {
++		if (byte & 0x80) {
++			if ((byte & SPE_HEADER0_ADDRESS_MASK) == SPE_HEADER0_ADDRESS)
++				return arm_spe_get_addr(buf, len, 0, packet);
++			if ((byte & SPE_HEADER0_COUNTER_MASK) == SPE_HEADER0_COUNTER)
++				return arm_spe_get_counter(buf, len, 0, packet);
++		} else
++			if (byte == SPE_HEADER0_TIMESTAMP)
++				return arm_spe_get_timestamp(buf, len, packet);
++			else if ((byte & SPE_HEADER0_EVENTS_MASK) == SPE_HEADER0_EVENTS)
++				return arm_spe_get_events(buf, len, packet);
++			else if ((byte & SPE_HEADER0_SOURCE_MASK) == SPE_HEADER0_SOURCE)
++				return arm_spe_get_data_source(buf, len, packet);
++			else if ((byte & SPE_HEADER0_CONTEXT_MASK) == SPE_HEADER0_CONTEXT)
++				return arm_spe_get_context(buf, len, packet);
++			else if ((byte & SPE_HEADER0_OP_TYPE_MASK) == SPE_HEADER0_OP_TYPE)
++				return arm_spe_get_op_type(buf, len, packet);
++	} else if ((byte & 0xe0) == 0x20 /* 0y001xxxxx */) {
++		/* 16-bit header */ 
++		byte = buf[1];
++		if (byte == SPE_HEADER1_ALIGNMENT)
++			return arm_spe_get_alignment(buf, len, packet);
++		else if ((byte & SPE_HEADER1_ADDRESS_MASK) == SPE_HEADER1_ADDRESS)
++			return arm_spe_get_addr(buf, len, 1, packet);
++		else if ((byte & SPE_HEADER1_COUNTER_MASK) == SPE_HEADER1_COUNTER)
++			return arm_spe_get_counter(buf, len, 1, packet);
++	}
++
++	return ARM_SPE_BAD_PACKET;
++}
++
++int arm_spe_get_packet(const unsigned char *buf, size_t len,
++		       struct arm_spe_pkt *packet)
++{
++	int ret;
++
++	ret = arm_spe_do_get_packet(buf, len, packet);
++	/* put multiple consecutive PADs on the same line, up to
++	 * the fixed-width output format of 16 bytes per line.
++	 */
++	if (ret > 0 && packet->type == ARM_SPE_PAD) {
++		while (ret < 16 && len > (size_t)ret && !buf[ret])
++			ret += 1;
++	}
++	return ret;
++}
++
++int arm_spe_pkt_desc(const struct arm_spe_pkt *packet, char *buf,
++		     size_t buf_len)
++{
++	int ret, ns, el, index = packet->index;
++	unsigned long long payload = packet->payload;
++	const char *name = arm_spe_pkt_name(packet->type);
++
++	switch (packet->type) {
++	case ARM_SPE_BAD:
++	case ARM_SPE_PAD:
++	case ARM_SPE_END:
++		return snprintf(buf, buf_len, "%s", name);
++	case ARM_SPE_EVENTS: {
++		size_t blen = buf_len;
++
++		ret = 0;
++		ret = snprintf(buf, buf_len, "EV");
++		buf += ret;
++		blen -= ret;
++		if (payload & 0x1) {
++			ret = snprintf(buf, buf_len, " EXCEPTION-GEN");
++			buf += ret;
++			blen -= ret;
++		}
++		if (payload & 0x2) {
++			ret = snprintf(buf, buf_len, " RETIRED");
++			buf += ret;
++			blen -= ret;
++		}
++		if (payload & 0x4) {
++			ret = snprintf(buf, buf_len, " L1D-ACCESS");
++			buf += ret;
++			blen -= ret;
++		}
++		if (payload & 0x8) {
++			ret = snprintf(buf, buf_len, " L1D-REFILL");
++			buf += ret;
++			blen -= ret;
++		}
++		if (payload & 0x10) {
++			ret = snprintf(buf, buf_len, " TLB-ACCESS");
++			buf += ret;
++			blen -= ret;
++		}
++		if (payload & 0x20) {
++			ret = snprintf(buf, buf_len, " TLB-REFILL");
++			buf += ret;
++			blen -= ret;
++		}
++		if (payload & 0x40) {
++			ret = snprintf(buf, buf_len, " NOT-TAKEN");
++			buf += ret;
++			blen -= ret;
++		}
++		if (payload & 0x80) {
++			ret = snprintf(buf, buf_len, " MISPRED");
++			buf += ret;
++			blen -= ret;
++		}
++		if (index > 1) {
++			if (payload & 0x100) {
++				ret = snprintf(buf, buf_len, " LLC-ACCESS");
++				buf += ret;
++				blen -= ret;
++			}
++			if (payload & 0x200) {
++				ret = snprintf(buf, buf_len, " LLC-REFILL");
++				buf += ret;
++				blen -= ret;
++			}
++			if (payload & 0x400) {
++				ret = snprintf(buf, buf_len, " REMOTE-ACCESS");
++				buf += ret;
++				blen -= ret;
++			}
++		}
++		if (ret < 0)
++			return ret;
++		blen -= ret;
++		return buf_len - blen;
++	}
++	case ARM_SPE_OP_TYPE:
++		switch (index) {
++		case 0:	return snprintf(buf, buf_len, "%s", payload & 0x1 ?
++					"COND-SELECT" : "INSN-OTHER");
++		case 1:	{
++			size_t blen = buf_len;
++
++			if (payload & 0x1)
++				ret = snprintf(buf, buf_len, "ST");
++			else
++				ret = snprintf(buf, buf_len, "LD");
++			buf += ret;
++			blen -= ret;
++			if (payload & 0x2) {
++				if (payload & 0x4) {
++					ret = snprintf(buf, buf_len, " AT");
++					buf += ret;
++					blen -= ret;
++				}
++				if (payload & 0x8) {
++					ret = snprintf(buf, buf_len, " EXCL");
++					buf += ret;
++					blen -= ret;
++				}
++				if (payload & 0x10) {
++					ret = snprintf(buf, buf_len, " AR");
++					buf += ret;
++					blen -= ret;
++				}
++			} else if (payload & 0x4) {
++				ret = snprintf(buf, buf_len, " SIMD-FP");
++				buf += ret;
++				blen -= ret;
++			}
++			if (ret < 0)
++				return ret;
++			blen -= ret;
++			return buf_len - blen;
++		}
++		case 2:	{
++			size_t blen = buf_len;
++
++			ret = snprintf(buf, buf_len, "B");
++			buf += ret;
++			blen -= ret;
++			if (payload & 0x1) {
++				ret = snprintf(buf, buf_len, " COND");
++				buf += ret;
++				blen -= ret;
++			}
++			if (payload & 0x2) {
++				ret = snprintf(buf, buf_len, " IND");
++				buf += ret;
++				blen -= ret;
++			}
++			if (ret < 0)
++				return ret;
++			blen -= ret;
++			return buf_len - blen;
++			}
++		default: return 0;
++		}
++	case ARM_SPE_DATA_SOURCE:
++	case ARM_SPE_TIMESTAMP:
++		return snprintf(buf, buf_len, "%s %lld", name, payload);
++	case ARM_SPE_ADDRESS:
++		switch (index) {
++		case 0:
++		case 1: ns = !!(packet->payload & NS_FLAG);
++			el = (packet->payload & EL_FLAG) >> 61;
++			payload &= ~(0xffULL << 56);
++			return snprintf(buf, buf_len, "%s 0x%llx el%d ns=%d",
++				        (index == 1) ? "TGT" : "PC", payload, el, ns);
++		case 2:	return snprintf(buf, buf_len, "VA 0x%llx", payload);
++		case 3:	ns = !!(packet->payload & NS_FLAG);
++			payload &= ~(0xffULL << 56);
++			return snprintf(buf, buf_len, "PA 0x%llx ns=%d",
++					payload, ns);
++		default: return 0;
++		}
++	case ARM_SPE_CONTEXT:
++		return snprintf(buf, buf_len, "%s 0x%lx el%d", name,
++				(unsigned long)payload, index + 1);
++	case ARM_SPE_COUNTER: {
++		size_t blen = buf_len;
++
++		ret = snprintf(buf, buf_len, "%s %d ", name,
++			       (unsigned short)payload);
++		buf += ret;
++		blen -= ret;
++		switch (index) {
++		case 0:	ret = snprintf(buf, buf_len, "TOT"); break;
++		case 1:	ret = snprintf(buf, buf_len, "ISSUE"); break;
++		case 2:	ret = snprintf(buf, buf_len, "XLAT"); break;
++		default: ret = 0;
++		}
++		if (ret < 0)
++			return ret;
++		blen -= ret;
++		return buf_len - blen;
++	}
++	default:
++		break;
++	}
++
++	return snprintf(buf, buf_len, "%s 0x%llx (%d)",
++			name, payload, packet->index);
++}
++
+diff --git a/tools/perf/util/arm-spe-pkt-decoder.h b/tools/perf/util/arm-spe-pkt-decoder.h
+new file mode 100644
+index 000000000000..f146f4143447
+--- /dev/null
++++ b/tools/perf/util/arm-spe-pkt-decoder.h
+@@ -0,0 +1,52 @@
++/*
++ * ARM Statistical Profiling Extensions (SPE) support
++ * Copyright (c) 2017, ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ */
++
++#ifndef INCLUDE__ARM_SPE_PKT_DECODER_H__
++#define INCLUDE__ARM_SPE_PKT_DECODER_H__
++
++#include <stddef.h>
++#include <stdint.h>
++
++#define ARM_SPE_PKT_DESC_MAX		256
++
++#define ARM_SPE_NEED_MORE_BYTES		-1
++#define ARM_SPE_BAD_PACKET		-2
++
++enum arm_spe_pkt_type {
++	ARM_SPE_BAD,
++	ARM_SPE_PAD,
++	ARM_SPE_END,
++	ARM_SPE_TIMESTAMP,
++	ARM_SPE_ADDRESS,
++	ARM_SPE_COUNTER,
++	ARM_SPE_CONTEXT,
++	ARM_SPE_OP_TYPE,
++	ARM_SPE_EVENTS,
++	ARM_SPE_DATA_SOURCE,
++};
++
++struct arm_spe_pkt {
++	enum arm_spe_pkt_type	type;
++	unsigned char		index;
++	uint64_t		payload;
++};
++
++const char *arm_spe_pkt_name(enum arm_spe_pkt_type);
++
++int arm_spe_get_packet(const unsigned char *buf, size_t len,
++		       struct arm_spe_pkt *packet);
++
++int arm_spe_pkt_desc(const struct arm_spe_pkt *packet, char *buf, size_t len);
++#endif
+diff --git a/tools/perf/util/arm-spe.c b/tools/perf/util/arm-spe.c
+new file mode 100644
+index 000000000000..f3eccd73b54a
+--- /dev/null
++++ b/tools/perf/util/arm-spe.c
+@@ -0,0 +1,318 @@
++/*
++ * ARM Statistical Profiling Extensions (SPE) support
++ * Copyright (c) 2017, ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ */
++
++#include <endian.h>
++#include <errno.h>
++#include <byteswap.h>
++#include <inttypes.h>
++#include <linux/kernel.h>
++#include <linux/types.h>
++#include <linux/bitops.h>
++#include <linux/log2.h>
++
++#include "cpumap.h"
++#include "color.h"
++#include "evsel.h"
++#include "evlist.h"
++#include "machine.h"
++#include "session.h"
++#include "util.h"
++#include "thread.h"
++#include "debug.h"
++#include "auxtrace.h"
++#include "arm-spe.h"
++#include "arm-spe-pkt-decoder.h"
++
++struct arm_spe {
++	struct auxtrace			auxtrace;
++	struct auxtrace_queues		queues;
++	struct auxtrace_heap		heap;
++	u32				auxtrace_type;
++	struct perf_session		*session;
++	struct machine			*machine;
++	u32				pmu_type;
++};
++
++struct arm_spe_queue {
++	struct arm_spe		*spe;
++	unsigned int		queue_nr;
++	struct auxtrace_buffer	*buffer;
++	bool			on_heap;
++	bool			done;
++	pid_t			pid;
++	pid_t			tid;
++	int			cpu;
++};
++
++static void arm_spe_dump(struct arm_spe *spe __maybe_unused,
++			   unsigned char *buf, size_t len)
++{
++	struct arm_spe_pkt packet;
++	size_t pos = 0;
++	int ret, pkt_len, i;
++	char desc[ARM_SPE_PKT_DESC_MAX];
++	const char *color = PERF_COLOR_BLUE;
++
++	color_fprintf(stdout, color,
++		      ". ... ARM SPE data: size %zu bytes\n",
++		      len);
++
++	while (len) {
++		ret = arm_spe_get_packet(buf, len, &packet);
++		if (ret > 0)
++			pkt_len = ret;
++		else
++			pkt_len = 1;
++		printf(".");
++		color_fprintf(stdout, color, "  %08x: ", pos);
++		for (i = 0; i < pkt_len; i++)
++			color_fprintf(stdout, color, " %02x", buf[i]);
++		for (; i < 16; i++)
++			color_fprintf(stdout, color, "   ");
++		if (ret > 0) {
++			ret = arm_spe_pkt_desc(&packet, desc,
++					       ARM_SPE_PKT_DESC_MAX);
++			if (ret > 0)
++				color_fprintf(stdout, color, " %s\n", desc);
++		} else {
++			color_fprintf(stdout, color, " Bad packet!\n");
++		}
++		pos += pkt_len;
++		buf += pkt_len;
++		len -= pkt_len;
++	}
++}
++
++static void arm_spe_dump_event(struct arm_spe *spe, unsigned char *buf,
++				 size_t len)
++{
++	printf(".\n");
++	arm_spe_dump(spe, buf, len);
++}
++
++static struct arm_spe_queue *arm_spe_alloc_queue(struct arm_spe *spe,
++						     unsigned int queue_nr)
++{
++	struct arm_spe_queue *speq;
++
++	speq = zalloc(sizeof(struct arm_spe_queue));
++	if (!speq)
++		return NULL;
++
++	speq->spe = spe;
++	speq->queue_nr = queue_nr;
++	speq->pid = -1;
++	speq->tid = -1;
++	speq->cpu = -1;
++
++	return speq;
++}
++
++static int arm_spe_setup_queue(struct arm_spe *spe,
++				 struct auxtrace_queue *queue,
++				 unsigned int queue_nr)
++{
++	struct arm_spe_queue *speq = queue->priv;
++
++	if (list_empty(&queue->head))
++		return 0;
++
++	if (!speq) {
++		speq = arm_spe_alloc_queue(spe, queue_nr);
++		if (!speq)
++			return -ENOMEM;
++		queue->priv = speq;
++
++		if (queue->cpu != -1)
++			speq->cpu = queue->cpu;
++		speq->tid = queue->tid;
++	}
++
++	if (!speq->on_heap && !speq->buffer) {
++		int ret;
++
++		speq->buffer = auxtrace_buffer__next(queue, NULL);
++		if (!speq->buffer)
++			return 0;
++
++		ret = auxtrace_heap__add(&spe->heap, queue_nr,
++					 speq->buffer->reference);
++		if (ret)
++			return ret;
++		speq->on_heap = true;
 +	}
 +
 +	return 0;
 +}
++
++static int arm_spe_setup_queues(struct arm_spe *spe)
++{
++	unsigned int i;
++	int ret;
++
++	for (i = 0; i < spe->queues.nr_queues; i++) {
++		ret = arm_spe_setup_queue(spe, &spe->queues.queue_array[i],
++					    i);
++		if (ret)
++			return ret;
++	}
++	return 0;
++}
++
++static inline int arm_spe_update_queues(struct arm_spe *spe)
++{
++	if (spe->queues.new_data) {
++		spe->queues.new_data = false;
++		return arm_spe_setup_queues(spe);
++	}
++	return 0;
++}
++
++static int arm_spe_process_event(struct perf_session *session __maybe_unused,
++				   union perf_event *event __maybe_unused,
++				   struct perf_sample *sample __maybe_unused,
++				   struct perf_tool *tool __maybe_unused)
++{
++	return 0;
++}
++
++static int arm_spe_process_auxtrace_event(struct perf_session *session,
++					    union perf_event *event,
++					    struct perf_tool *tool __maybe_unused)
++{
++	struct arm_spe *spe = container_of(session->auxtrace, struct arm_spe,
++					     auxtrace);
++	struct auxtrace_buffer *buffer;
++	off_t data_offset;
++	int fd = perf_data_file__fd(session->file);
++	int err;
++
++	if (perf_data_file__is_pipe(session->file)) {
++		data_offset = 0;
++	} else {
++		data_offset = lseek(fd, 0, SEEK_CUR);
++		if (data_offset == -1)
++			return -errno;
++	}
++
++	err = auxtrace_queues__add_event(&spe->queues, session, event,
++					 data_offset, &buffer);
++	if (err)
++		return err;
++
++	/* Dump here now we have copied a piped trace out of the pipe */
++	if (dump_trace) {
++		if (auxtrace_buffer__get_data(buffer, fd)) {
++			arm_spe_dump_event(spe, buffer->data,
++					     buffer->size);
++			auxtrace_buffer__put_data(buffer);
++		}
++	}
++
++	return 0;
++}
++
++static int arm_spe_flush(struct perf_session *session __maybe_unused,
++			   struct perf_tool *tool __maybe_unused)
++{
++	return 0;
++}
++
++static void arm_spe_free_queue(void *priv)
++{
++	struct arm_spe_queue *speq = priv;
++
++	if (!speq)
++		return;
++	free(speq);
++}
++
++static void arm_spe_free_events(struct perf_session *session)
++{
++	struct arm_spe *spe = container_of(session->auxtrace, struct arm_spe,
++					     auxtrace);
++	struct auxtrace_queues *queues = &spe->queues;
++	unsigned int i;
++
++	for (i = 0; i < queues->nr_queues; i++) {
++		arm_spe_free_queue(queues->queue_array[i].priv);
++		queues->queue_array[i].priv = NULL;
++	}
++	auxtrace_queues__free(queues);
++}
++
++static void arm_spe_free(struct perf_session *session)
++{
++	struct arm_spe *spe = container_of(session->auxtrace, struct arm_spe,
++					     auxtrace);
++
++	auxtrace_heap__free(&spe->heap);
++	arm_spe_free_events(session);
++	session->auxtrace = NULL;
++	free(spe);
++}
++
++static const char * const arm_spe_info_fmts[] = {
++	[ARM_SPE_PMU_TYPE]		= "  PMU Type           %"PRId64"\n",
++};
++
++static void arm_spe_print_info(u64 *arr)
++{
++	if (!dump_trace)
++		return;
++
++	fprintf(stdout, arm_spe_info_fmts[ARM_SPE_PMU_TYPE], arr[ARM_SPE_PMU_TYPE]);
++}
++
++int arm_spe_process_auxtrace_info(union perf_event *event,
++				    struct perf_session *session)
++{
++	struct auxtrace_info_event *auxtrace_info = &event->auxtrace_info;
++	size_t min_sz = sizeof(u64) * ARM_SPE_PMU_TYPE;
++	struct arm_spe *spe;
++	int err;
++
++	if (auxtrace_info->header.size < sizeof(struct auxtrace_info_event) +
++					min_sz)
++		return -EINVAL;
++
++	spe = zalloc(sizeof(struct arm_spe));
++	if (!spe)
++		return -ENOMEM;
++
++	err = auxtrace_queues__init(&spe->queues);
++	if (err)
++		goto err_free;
++
++	spe->session = session;
++	spe->machine = &session->machines.host; /* No kvm support */
++	spe->auxtrace_type = auxtrace_info->type;
++	spe->pmu_type = auxtrace_info->priv[ARM_SPE_PMU_TYPE];
++
++	spe->auxtrace.process_event = arm_spe_process_event;
++	spe->auxtrace.process_auxtrace_event = arm_spe_process_auxtrace_event;
++	spe->auxtrace.flush_events = arm_spe_flush;
++	spe->auxtrace.free_events = arm_spe_free_events;
++	spe->auxtrace.free = arm_spe_free;
++	session->auxtrace = &spe->auxtrace;
++
++	arm_spe_print_info(&auxtrace_info->priv[0]);
++
++	return 0;
++
++err_free:
++	free(spe);
++	return err;
++}
+diff --git a/tools/perf/util/arm-spe.h b/tools/perf/util/arm-spe.h
+new file mode 100644
+index 000000000000..80752b20d850
+--- /dev/null
++++ b/tools/perf/util/arm-spe.h
+@@ -0,0 +1,42 @@
++/*
++ * ARM Statistical Profiling Extensions (SPE) support
++ * Copyright (c) 2017, ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ */
++
++#ifndef INCLUDE__PERF_ARM_SPE_H__
++#define INCLUDE__PERF_ARM_SPE_H__
++
++#define ARM_SPE_PMU_NAME "arm_spe_"
++
++enum {
++	ARM_SPE_PMU_TYPE,
++	ARM_SPE_PER_CPU_MMAPS,
++	ARM_SPE_AUXTRACE_PRIV_MAX,
++};
++
++#define ARM_SPE_AUXTRACE_PRIV_SIZE (ARM_SPE_AUXTRACE_PRIV_MAX * sizeof(u64))
++
++struct auxtrace_record;
++struct perf_tool;
++union perf_event;
++struct perf_session;
++struct perf_pmu;
++
++struct auxtrace_record *arm_spe_recording_init(int *err,
++					       struct perf_pmu *arm_spe_pmu);
++
++int arm_spe_process_auxtrace_info(union perf_event *event,
++				  struct perf_session *session);
++
++struct perf_event_attr *arm_spe_pmu_default_config(struct perf_pmu *arm_spe_pmu);
++#endif
+diff --git a/tools/perf/util/auxtrace.c b/tools/perf/util/auxtrace.c
+index 5547457566a7..92da3981a761 100644
+--- a/tools/perf/util/auxtrace.c
++++ b/tools/perf/util/auxtrace.c
+@@ -57,6 +57,7 @@
+ 
+ #include "intel-pt.h"
+ #include "intel-bts.h"
++#include "arm-spe.h"
+ 
+ #include "sane_ctype.h"
+ #include "symbol/kallsyms.h"
+@@ -913,6 +914,8 @@ int perf_event__process_auxtrace_info(struct perf_tool *tool __maybe_unused,
+ 		return intel_pt_process_auxtrace_info(event, session);
+ 	case PERF_AUXTRACE_INTEL_BTS:
+ 		return intel_bts_process_auxtrace_info(event, session);
++	case PERF_AUXTRACE_ARM_SPE:
++		return arm_spe_process_auxtrace_info(event, session);
+ 	case PERF_AUXTRACE_CS_ETM:
+ 	case PERF_AUXTRACE_UNKNOWN:
+ 	default:
+diff --git a/tools/perf/util/auxtrace.h b/tools/perf/util/auxtrace.h
+index 33b5e6cdf38c..fa1c8deffac4 100644
+--- a/tools/perf/util/auxtrace.h
++++ b/tools/perf/util/auxtrace.h
+@@ -43,6 +43,7 @@ enum auxtrace_type {
+ 	PERF_AUXTRACE_INTEL_PT,
+ 	PERF_AUXTRACE_INTEL_BTS,
+ 	PERF_AUXTRACE_CS_ETM,
++	PERF_AUXTRACE_ARM_SPE,
+ };
+ 
+ enum itrace_period_type {
 -- 
-2.15.0.rc2.357.g7e34df9404-goog
+2.14.2
