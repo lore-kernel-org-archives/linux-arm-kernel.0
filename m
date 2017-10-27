@@ -1,31 +1,65 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Fri, 27 Oct 2017 14:26:14 +0800
-Subject: [PATCH v4 19/21] KVM: arm64: Handle RAS SErrors from EL2 on guest
- exit
-In-Reply-To: <20171019145807.23251-20-james.morse@arm.com>
-References: <20171019145807.23251-1-james.morse@arm.com>
- <20171019145807.23251-20-james.morse@arm.com>
-Message-ID: <6c0eaa5b-32a5-5562-2322-7dffb698d27d@huawei.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 27 Oct 2017 07:57:12 +0100
+Subject: [PATCH v4 25/26] KVM: arm/arm64: GICv4: Prevent heterogenous
+ systems from using GICv4
+In-Reply-To: <20171026154839.ebtmqzcy7jjyejul@salmiak> (Mark Rutland's message
+ of "Thu, 26 Oct 2017 16:48:39 +0100")
+References: <20171006153401.5481-1-marc.zyngier@arm.com>
+ <20171006153401.5481-26-marc.zyngier@arm.com>
+ <20171026154839.ebtmqzcy7jjyejul@salmiak>
+Message-ID: <868tfxaxiv.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Oct 26 2017 at  4:48:39 pm BST, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi,
+>
+> On Fri, Oct 06, 2017 at 04:34:00PM +0100, Marc Zyngier wrote:
+>> The GICv4 architecture doesn't prevent CPUs implementing GICv4 to
+>> cohabit with CPUs limited to GICv3 in the same system.
+>> 
+>> This is mad (the scheduler would have to be made aware of the v4
+>> capability), and we're certainly not going to support this any
+>> time soon. So let's check that all online CPUs are GICv4 capable,
+>> and disable the functionnality if not.
+>
+> I just spotted this because of Christoffer's review; apologies for the late
+> drive-by comment...
+>
+>> @@ -485,8 +495,21 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
+>>  	kvm_vgic_global_state.can_emulate_gicv2 = false;
+>>  	kvm_vgic_global_state.ich_vtr_el2 = ich_vtr_el2;
+>>  
+>> -	/* GICv4 support? */
+>> +	/*
+>> +	 * GICv4 support? We need to check on all CPUs in case of some
+>> +	 * extremely creative form of big-little brain damage...
+>> +	 */
+>>  	if (info->has_v4) {
+>> +		int cpu;
+>> +
+>> +		for_each_online_cpu(cpu) {
+>> +			bool enable;
+>> +
+>> +			smp_call_function_single(cpu, vgic_check_v4_cpuif,
+>> +						 &enable, 1);
+>> +			gicv4_enable = gicv4_enable && enable;
+>> +		}
+>
+> With maxcpus=N on the command line, CPUs can be brought online late, so we
+> might need this in a hotplug callback (and/or in the arm64 cpufeature
+> framework) to handle that case.
 
+I'm afraid that won't be enough. If the CPU is brought up once we've
+already started a VM, we're screwed, as we cannot retroactively decide
+to drop GICv4 on the floor and nuke the guest. Or did you have something
+more radical in mind? Panic?
 
-On 2017/10/19 22:58, James Morse wrote:
-> +alternative_if ARM64_HAS_RAS_EXTN
-> +	// If we have the RAS extensions we can consume a pending error
-> +	// without an unmask-SError and isb.
-> +	esb
-> +	mrs_s	x2, SYS_DISR_EL1
-I do not think you can get the right value when esb produce a SError. when
-SError happen, it will take to EL3 firmware immediately. so the disr_el1 will not record
-the error and value is 0.
+Maybe this approach is not the right one, in which case I'm happy to
+drop this patch and implement something else.
 
-> +	str	x2, [x1, #(VCPU_FAULT_DISR - VCPU_CONTEXT)]
-> +	cbz	x2, 1f
-why will jump to 1, if there is not SError, also "ret"?
+Thanks,
 
-> +	msr_s	SYS_DISR_EL1, xzr
-> +	orr	x0, x0, #(1<<ARM_EXIT_WITH_SERROR_BIT)
-> +1:	ret
-> +alternative_else
+	M.
+-- 
+Jazz is not dead. It just smells funny.
