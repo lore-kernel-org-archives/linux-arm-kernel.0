@@ -1,95 +1,59 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 27 Oct 2017 22:27:43 +0200
-Subject: Backlight on Nokia N900 was Re: 4.13 (and probably all recent)
- kernels refuse to boot on one Nokia N950, work or another
-In-Reply-To: <20171026093115.4bc6ctxjx72ng7ld@earth>
-References: <20171025203459.GA22035@amd> <20171025212806.GA21504@atomide.com>
- <20171026091325.GA26929@amd>
- <20171026093115.4bc6ctxjx72ng7ld@earth>
-Message-ID: <20171027202743.GA17874@amd>
+From: salyzyn@android.com (Mark Salyzyn)
+Date: Fri, 27 Oct 2017 15:23:48 -0700
+Subject: [PATCH v3 0/12] arm+arm64: vdso unification to lib/vdso/
+Message-ID: <20171027222353.56875-1-salyzyn@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > I got "uncompressing Linux 4.13" on serial console now, debug LEDs
-> > blinking, and if I use a flashlight, I see output on the screen, too.
-> > 
-> > (What do I need to do to get the backlight working?)
-> 
-> Glad you got it working :) For backlight you can add this
-> in drivers/gpu/drm/omapdrm/displays/panel-dsi-cm.c:
-> 
-> add the following code at the end of dsicm_probe:
-> 
-> -----------------------------------------------------------
-> mutex_unlock(&ddata->lock);
-> mutex_lock(&ddata->lock);
-> ddata->in->ops.dsi->bus_lock(ddata->in);
-> r = dsicm_wake_up(ddata);
-> if (!r)
->     r = dsicm_dcs_write_1(ddata, DCS_BRIGHTNESS, 100);
-> ddata->in->ops.dsi->bus_unlock(ddata->in);
-> mutex_unlock(&ddata->lock);
-> -----------------------------------------------------------
-
-Ok, I tried that, and did not help. I also tried removing first
-mutex_unlock(), since that's unbalanced and strange. Did not work. So
-I commented it out with #if 0, and tried more hacks, but no luck :-(.
-
-(I still see the display.. but no backlight so reading it is
-.. difficult.)
-
-Best regards,
-								Pavel
-
-diff --git a/drivers/gpu/drm/omapdrm/displays/panel-dsi-cm.c b/drivers/gpu/drm/omapdrm/displays/panel-dsi-cm.c
-index 8f74633..c0bbb42 100644
---- a/drivers/gpu/drm/omapdrm/displays/panel-dsi-cm.c
-+++ b/drivers/gpu/drm/omapdrm/displays/panel-dsi-cm.c
-@@ -668,6 +668,7 @@ static int dsicm_power_on(struct panel_drv_data *ddata)
- 		goto err;
- 
- 	r = dsicm_dcs_write_1(ddata, DCS_BRIGHTNESS, 0xff);
-+	mdelay(1000);
- 	if (r)
- 		goto err;
- 
-@@ -703,6 +704,8 @@ static int dsicm_power_on(struct panel_drv_data *ddata)
- 
- 	in->ops.dsi->enable_hs(in, ddata->channel, true);
- 
-+	r = dsicm_dcs_write_1(ddata, DCS_BRIGHTNESS, 0xff);
-+
- 	return 0;
- err:
- 	dev_err(&ddata->pdev->dev, "error while enabling panel, issuing HW reset\n");
-@@ -1396,6 +1399,15 @@ static int dsicm_probe(struct platform_device *pdev)
- 		goto err_bl;
- 	}
- 
-+#if 0	
-+	mutex_lock(&ddata->lock);
-+	ddata->in->ops.dsi->bus_lock(ddata->in);
-+	r = dsicm_wake_up(ddata);
-+	if (!r)
-+		r = dsicm_dcs_write_1(ddata, DCS_BRIGHTNESS, 100);
-+	ddata->in->ops.dsi->bus_unlock(ddata->in);
-+	mutex_unlock(&ddata->lock);
-+#endif
- 	return 0;
- 
- err_bl:
+Take an effort to recode the arm64 vdso code from assembler to C
+previously submitted by Andrew Pinski <apinski@cavium.com>, rework
+it for use in both arm and arm64, overlapping any optimizations
+for each architecture. But instead of landing it in arm64, land the
+result into lib/vdso and unify both implementations to simplify
+future maintenance. This will act as the basis for implementing
+arm64 vdso32 in the future.
 
 
+apinski at cavium.com made the following claims in the original patch:
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171027/ed7485d3/attachment.sig>
+This allows the compiler to optimize the divide by 1000 and remove
+the other divides.
+
+On ThunderX, gettimeofday improves by 32%.  On ThunderX 2,
+gettimeofday improves by 18%.
+
+Note I noticed a bug in the old implementation of __kernel_clock_getres;
+it was checking only the lower 32bits of the pointer; this would work
+for most cases but could fail in a few.
+
+
+Signed-off-by: Mark Salyzyn <salyzyn@android.com>
+Cc: James Morse <james.morse@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Andy Lutomirski <luto@amacapital.net>
+Cc: Dmitry Safonov <dsafonov@virtuozzo.com>
+Cc: John Stultz <john.stultz@linaro.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Laura Abbott <labbott@redhat.com>
+Cc: Kees Cook <keescook@chromium.org>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Andy Gross <andy.gross@linaro.org>
+Cc: Kevin Brodsky <kevin.brodsky@arm.com>
+Cc: Andrew Pinski <apinski@cavium.com>
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+
+v2:
+- split first CL into 7 pieces, there were cosmetic adjustments.
+- make sure profiling is turned off.
+- kept quiet_cmd_vdsoas.
+
+v3:
+- changed are a result of private email review comments
+- rebase
+- move arch/arm/vdso/vgettimeofday.c to lib/vdso/vgettimeofday.c
+- adjust vgettimeofday.c to be a better global candidate, switch to using
+  ARCH_PROVIDES_TIMER and __arch_counter_get() as more generic.
+- do not expose gettimeofday if arch does not support user space timer
