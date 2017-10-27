@@ -1,74 +1,54 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Fri, 27 Oct 2017 15:26:09 +0800
-Subject: [RFC PATCH v10 4/7] arm64: dts: rockchip: Move PCIe WAKE# irq to pcie
- driver for Gru
-In-Reply-To: <20171027072612.26565-1-jeffy.chen@rock-chips.com>
-References: <20171027072612.26565-1-jeffy.chen@rock-chips.com>
-Message-ID: <20171027072612.26565-5-jeffy.chen@rock-chips.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 27 Oct 2017 08:37:28 +0100
+Subject: [PATCH v4 25/26] KVM: arm/arm64: GICv4: Prevent heterogenous
+ systems from using GICv4
+In-Reply-To: <868tfxaxiv.fsf@arm.com>
+References: <20171006153401.5481-1-marc.zyngier@arm.com>
+ <20171006153401.5481-26-marc.zyngier@arm.com>
+ <20171026154839.ebtmqzcy7jjyejul@salmiak> <868tfxaxiv.fsf@arm.com>
+Message-ID: <20171027073728.taejncafoehkfzuc@salmiak>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we are handling PCIe WAKE# irq in mrvl wifi driver.
+On Fri, Oct 27, 2017 at 07:57:12AM +0100, Marc Zyngier wrote:
+> On Thu, Oct 26 2017 at  4:48:39 pm BST, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Fri, Oct 06, 2017 at 04:34:00PM +0100, Marc Zyngier wrote:
 
-Move it to rockchip pcie driver since we are going to handle it in the
-pci core.
+> >> @@ -485,8 +495,21 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
+> >>  	kvm_vgic_global_state.can_emulate_gicv2 = false;
+> >>  	kvm_vgic_global_state.ich_vtr_el2 = ich_vtr_el2;
+> >>  
+> >> -	/* GICv4 support? */
+> >> +	/*
+> >> +	 * GICv4 support? We need to check on all CPUs in case of some
+> >> +	 * extremely creative form of big-little brain damage...
+> >> +	 */
+> >>  	if (info->has_v4) {
+> >> +		int cpu;
+> >> +
+> >> +		for_each_online_cpu(cpu) {
+> >> +			bool enable;
+> >> +
+> >> +			smp_call_function_single(cpu, vgic_check_v4_cpuif,
+> >> +						 &enable, 1);
+> >> +			gicv4_enable = gicv4_enable && enable;
+> >> +		}
+> >
+> > With maxcpus=N on the command line, CPUs can be brought online late, so we
+> > might need this in a hotplug callback (and/or in the arm64 cpufeature
+> > framework) to handle that case.
+> 
+> I'm afraid that won't be enough. If the CPU is brought up once we've
+> already started a VM, we're screwed, as we cannot retroactively decide
+> to drop GICv4 on the floor and nuke the guest. Or did you have something
+> more radical in mind? Panic?
 
-Also avoid this irq been considered as the PCI interrupt pin in the
-of_irq_parse_pci().
+If you teach the arm64 cpufeature framework about this, it can abort bringing a
+!GICv4 CPU online late.
 
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
----
+It already handles onlining a !FP CPU if all boot CPUs had FP, for example.
 
-Changes in v10: None
-Changes in v9:
-Rewrite the commit message.
+See verify_local_cpu_features() in arch/arm64/kernel/cpufeature.c.
 
-Changes in v8:
-Rewrite the commit message.
-
-Changes in v7: None
-Changes in v6: None
-Changes in v5:
-Use "wakeup" instead of "wake"
-
-Changes in v3: None
-Changes in v2: None
-
- arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi | 15 +++++++++------
- 1 file changed, 9 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-index 5772c52fbfd3..8e37da69f693 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-@@ -708,7 +708,15 @@ ap_i2c_audio: &i2c8 {
- 
- 	ep-gpios = <&gpio2 27 GPIO_ACTIVE_HIGH>;
- 	pinctrl-names = "default";
--	pinctrl-0 = <&pcie_clkreqn_cpm>, <&wifi_perst_l>;
-+	pinctrl-0 = <&pcie_clkreqn_cpm>, <&wlan_host_wake_l>, <&wifi_perst_l>;
-+
-+	interrupts-extended = <&gic GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH 0>,
-+			      <&gic GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH 0>,
-+			      <&gic GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH 0>,
-+			      <&gpio0 8 IRQ_TYPE_LEVEL_LOW>;
-+	interrupt-names = "sys", "legacy", "client", "wakeup";
-+	/delete-property/ interrupts;
-+
- 	vpcie3v3-supply = <&pp3300_wifi_bt>;
- 	vpcie1v8-supply = <&wlan_pd_n>; /* HACK: see &wlan_pd_n */
- 	vpcie0v9-supply = <&pp900_pcie>;
-@@ -723,11 +731,6 @@ ap_i2c_audio: &i2c8 {
- 			compatible = "pci1b4b,2b42";
- 			reg = <0x83010000 0x0 0x00000000 0x0 0x00100000
- 			       0x83010000 0x0 0x00100000 0x0 0x00100000>;
--			interrupt-parent = <&gpio0>;
--			interrupts = <8 IRQ_TYPE_LEVEL_LOW>;
--			pinctrl-names = "default";
--			pinctrl-0 = <&wlan_host_wake_l>;
--			wakeup-source;
- 		};
- 	};
- };
--- 
-2.11.0
+Thanks,
+Mark.
