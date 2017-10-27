@@ -1,37 +1,45 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 27 Oct 2017 17:11:14 +0200
-Subject: [PATCH v9 06/10] arm64: dts: allwinner: Restore EMAC changes
-In-Reply-To: <20171024175714.15840-7-clabbe.montjoie@gmail.com>
-References: <20171024175714.15840-1-clabbe.montjoie@gmail.com>
- <20171024175714.15840-7-clabbe.montjoie@gmail.com>
-Message-ID: <20171027151114.ax2yhf75lbho2js5@flea>
+Date: Fri, 27 Oct 2017 17:13:34 +0200
+Subject: [PATCH 1/2] dt-bindings: add binding for A64 DE2 CCU with SRAM
+ section
+In-Reply-To: <b8c770bdc7a0541b8d1179598d814b75@aosc.io>
+References: <20171014122925.13220-1-icenowy@aosc.io>
+ <20171016091136.b4rnckh2tfi26shx@flea.lan>
+ <d62ac8b8ff9073b886ceaa9ce54e6903@aosc.io>
+ <20171016120912.lxu7rikhffxsu5o4@flea.lan>
+ <b8c770bdc7a0541b8d1179598d814b75@aosc.io>
+Message-ID: <20171027151334.c3b7yqoiexgwopsf@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 24, 2017 at 07:57:10PM +0200, Corentin Labbe wrote:
-> The original dwmac-sun8i DT bindings have some issue on how to handle
-> integrated PHY and was reverted in last RC of 4.13.
-> But now we have a solution so we need to get back that was reverted.
+On Fri, Oct 27, 2017 at 10:33:29PM +0800, icenowy at aosc.io wrote:
+> ? 2017-10-16 20:09?Maxime Ripard ???
+> > On Mon, Oct 16, 2017 at 05:41:10PM +0800, icenowy at aosc.io wrote:
+> > > ? 2017-10-16 17:11?Maxime Ripard ???
+> > > > On Sat, Oct 14, 2017 at 08:29:24PM +0800, Icenowy Zheng wrote:
+> > > > > A64's Display Engine 2.0 needs a section of SRAM (SRAM C) to be
+> > > > > claimed.
+> > > >
+> > > > Why?
+> > > 
+> > > Allwinner didn't document this, but if the SRAM is not claimed, the
+> > > DE2 MMIO zone is totally not accessible.
+> > 
+> > Not accessible how? It generates an abort when you access it? It
+> > returns 0?
+> > 
+> > > It seems that Allwinner uses the SRAM C in the DE2 internally.
+> > 
+> > Then shouldn't it be tied to all the DE2 devices then? So mixers
+> > too. Either way, this should be mentionned in your commit logs. How
+> > you're fixing things is much less interesting than why you're doing
+> > them. You can tell how you're doing them from your code already.
 > 
-> This patch restore arm64 DT about dwmac-sun8i
-> This reverts commit 87e1f5e8bb4b ("arm64: dts: allwinner: Revert EMAC changes")
-> 
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> ---
->  .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts   | 16 ++++++++++++++++
->  .../boot/dts/allwinner/sun50i-a64-pine64-plus.dts    | 15 +++++++++++++++
->  arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts  | 17 +++++++++++++++++
->  .../dts/allwinner/sun50i-a64-sopine-baseboard.dts    | 16 ++++++++++++++++
->  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi        | 20 ++++++++++++++++++++
->  .../boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts     | 17 +++++++++++++++++
->  .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts    | 17 +++++++++++++++++
->  .../boot/dts/allwinner/sun50i-h5-orangepi-prime.dts  | 17 +++++++++++++++++
->  8 files changed, 135 insertions(+)
+> Yes I checked and when the SRAM is not claimed any part in DE2 memory
+> zone can't be accessed.
 
-Can you split the changes between the A64 and the H5? It's going to be
-difficult to merge otherwise.
-
-(You also forgot to add Florian's Acked-by on your whole serie).
+Then all the nodes that depend on it should have it, and the bindings
+should be modified appropriately.
 
 Maxime
 
@@ -45,4 +53,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171027/15e5886e/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171027/59cf5cc0/attachment.sig>
