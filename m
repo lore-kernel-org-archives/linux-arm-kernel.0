@@ -1,130 +1,186 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 27 Oct 2017 11:51:03 +0100
-Subject: [PATCH v4 21/28] arm64/sve: Add sysctl to set the default vector
- length for new processes
+Date: Fri, 27 Oct 2017 11:51:09 +0100
+Subject: [RFC PATCH v4 27/28] arm64: signal: Report signal frame size to
+ userspace via auxv
 In-Reply-To: <1509101470-7881-1-git-send-email-Dave.Martin@arm.com>
 References: <1509101470-7881-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1509101470-7881-22-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1509101470-7881-28-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because of the effect of SVE on the size of the signal frame, the
-default vector length used for new processes involves a tradeoff
-between performance of SVE-enabled software on the one hand, and
-reliability of non-SVE-aware software on the other hand.
+Stateful CPU architecture extensions may require the signal frame
+to grow to a size that exceeds the arch's MINSIGSTKSZ #define.
+However, changing this #define is an ABI break.
 
-For this reason, the best choice depends on the repertoire of
-userspace software in use and is thus best left up to distro
-maintainers, sysadmins and developers.
+To allow userspace the option of determining the signal frame size
+in a more forwards-compatible way, this patch adds a new auxv entry
+tagged with AT_MINSIGSTKSZ, which provides the maximum signal frame
+size that the process can observe during its lifetime.
 
-If CONFIG_SYSCTL and CONFIG_PROC_SYSCTL are enabled, this patch
-exposes the default vector length in
-/proc/sys/abi/sve_default_vector_length, where boot scripts or the
-adventurous can poke it.
+If AT_MINSIGSTKSZ is absent from the aux vector, the caller can
+assume that the MINSIGSTKSZ #define is sufficient.  This allows for
+a consistent interface with older kernels that do not provide
+AT_MINSIGSTKSZ.
 
-In common with other arm64 ABI sysctls, this control is currently
-global: setting it requires CAP_SYS_ADMIN in the root user
-namespace, but the value set is effective for subsequent execs in
-all namespaces.  The control only affects _new_ processes, however:
-changing it does not affect the vector length of any existing
-process.
+The idea is that libc could expose this via sysconf() or some
+similar mechanism.
 
-The intended usage model is that if userspace is known to be fully
-SVE-tolerant (or a developer is curious to find out) then this
-parameter can be cranked up during system startup.
+There is deliberately no AT_SIGSTKSZ.  The kernel knows nothing
+about userspace's own stack overheads and should not pretend to
+know.
+
+For arm64:
+
+The primary motivation for this interface is the Scalable Vector
+Extension, which can require at least 4KB or so of extra space
+in the signal frame for the largest hardware implementations.
+
+To determine the correct value, a "Christmas tree" mode (via the
+add_all argument) is added to setup_sigframe_layout(), to simulate
+addition of all possible records to the signal frame at maximum
+possible size.
+
+If this procedure goes wrong somehow, resulting in a stupidly large
+frame layout and hence failure of sigframe_alloc() to allocate a
+record to the frame, then this is indicative of a kernel bug: the
+kernel's internal SIGFRAME_MAXSZ is supposed to sanity-check
+against generting frames that we consider _impossibly_ large.  In
+this case, SIGSTKSZ is returned as a "reasonable guess that is at
+least bigger than MINSIGSTKSZ" and we WARN().
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/kernel/fpsimd.c | 62 +++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 61 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/elf.h         |  5 +++++
+ arch/arm64/include/asm/processor.h   |  3 +++
+ arch/arm64/include/uapi/asm/auxvec.h |  3 ++-
+ arch/arm64/kernel/signal.c           | 39 +++++++++++++++++++++++++++++++-----
+ 4 files changed, 44 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 7465622..f9d3287 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -35,6 +35,7 @@
- #include <linux/sched/signal.h>
- #include <linux/signal.h>
- #include <linux/slab.h>
-+#include <linux/sysctl.h>
+diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+index fac1c4d..771c7a8 100644
+--- a/arch/arm64/include/asm/elf.h
++++ b/arch/arm64/include/asm/elf.h
+@@ -24,6 +24,10 @@
+ #include <asm/ptrace.h>
+ #include <asm/user.h>
  
- #include <asm/fpsimd.h>
- #include <asm/cputype.h>
-@@ -333,6 +334,65 @@ static unsigned int find_supported_vector_length(unsigned int vl)
- 	return sve_vl_from_vq(bit_to_vq(bit));
++#ifndef __ASSEMBLY__
++#include <asm/processor.h> /* for get_minsigstksz(), used by ARCH_DLINFO */
++#endif
++
+ /*
+  * AArch64 static relocation types.
+  */
+@@ -148,6 +152,7 @@ typedef struct user_fpsimd_state elf_fpregset_t;
+ do {									\
+ 	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
+ 		    (elf_addr_t)current->mm->context.vdso);		\
++	NEW_AUX_ENT(AT_MINSIGSTKSZ, get_minsigstksz());			\
+ } while (0)
+ 
+ #define ARCH_HAS_SETUP_ADDITIONAL_PAGES
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index 023cacb..055b06d 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -217,6 +217,9 @@ static inline void spin_lock_prefetch(const void *ptr)
+ int cpu_enable_pan(void *__unused);
+ int cpu_enable_cache_maint_trap(void *__unused);
+ 
++/* User signal frame size discovery: */
++int get_minsigstksz(void);
++
+ /* Userspace interface for PR_SVE_{SET,GET}_VL prctl()s: */
+ #define SVE_SET_VL(arg)	sve_set_current_vl(arg)
+ #define SVE_GET_VL()	sve_get_current_vl()
+diff --git a/arch/arm64/include/uapi/asm/auxvec.h b/arch/arm64/include/uapi/asm/auxvec.h
+index 4cf0c17..1d45b28 100644
+--- a/arch/arm64/include/uapi/asm/auxvec.h
++++ b/arch/arm64/include/uapi/asm/auxvec.h
+@@ -18,7 +18,8 @@
+ 
+ /* vDSO location */
+ #define AT_SYSINFO_EHDR	33
++#define AT_MINSIGSTKSZ	34	/* stack needed for signal delivery */
+ 
+-#define AT_VECTOR_SIZE_ARCH 1 /* entries in ARCH_DLINFO */
++#define AT_VECTOR_SIZE_ARCH 2 /* entries in ARCH_DLINFO */
+ 
+ #endif
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index 79bc55a..ecae147 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -567,8 +567,15 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
+ 	return 0;
  }
  
-+#ifdef CONFIG_SYSCTL
+-/* Determine the layout of optional records in the signal frame */
+-static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
++/*
++ * Determine the layout of optional records in the signal frame
++ *
++ * add_all: if true, lays out the biggest possible signal frame for
++ *	this task; otherwise, generates a layout for the current state
++ *	of the task.
++ */
++static int setup_sigframe_layout(struct rt_sigframe_user_layout *user,
++				 bool add_all)
+ {
+ 	int err;
+ 
+@@ -578,7 +585,7 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
+ 		return err;
+ 
+ 	/* fault information, if valid */
+-	if (current->thread.fault_code) {
++	if (add_all || current->thread.fault_code) {
+ 		err = sigframe_alloc(user, &user->esr_offset,
+ 				     sizeof(struct esr_context));
+ 		if (err)
+@@ -600,7 +607,6 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
+ 	return sigframe_alloc_end(user);
+ }
+ 
+-
+ static int setup_sigframe(struct rt_sigframe_user_layout *user,
+ 			  struct pt_regs *regs, sigset_t *set)
+ {
+@@ -698,7 +704,7 @@ static int get_sigframe(struct rt_sigframe_user_layout *user,
+ 	int err;
+ 
+ 	init_user_layout(user);
+-	err = setup_sigframe_layout(user);
++	err = setup_sigframe_layout(user, false);
+ 	if (err)
+ 		return err;
+ 
+@@ -930,3 +936,26 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
+ 		thread_flags = READ_ONCE(current_thread_info()->flags);
+ 	} while (thread_flags & _TIF_WORK_MASK);
+ }
 +
-+static int sve_proc_do_default_vl(struct ctl_table *table, int write,
-+				  void __user *buffer, size_t *lenp,
-+				  loff_t *ppos)
++/*
++ * Determine the stack space required for guaranteed signal devliery.
++ * This function is used to populate AT_MINSIGSTKSZ at process startup.
++ */
++int get_minsigstksz(void)
 +{
-+	int ret;
-+	int vl = sve_default_vl;
-+	struct ctl_table tmp_table = {
-+		.data = &vl,
-+		.maxlen = sizeof(vl),
-+	};
++	struct rt_sigframe_user_layout user;
++	int err;
 +
-+	ret = proc_dointvec(&tmp_table, write, buffer, lenp, ppos);
-+	if (ret || !write)
-+		return ret;
++	init_user_layout(&user);
++	err = setup_sigframe_layout(&user, true);
 +
-+	/* Writing -1 has the special meaning "set to max": */
-+	if (vl == -1) {
-+		/* Fail safe if sve_max_vl wasn't initialised */
-+		if (WARN_ON(!sve_vl_valid(sve_max_vl)))
-+			vl = SVE_VL_MIN;
-+		else
-+			vl = sve_max_vl;
++	if (err) {
++		WARN_ON(1);
 +
-+		goto chosen;
++		return SIGSTKSZ;
++	} else {
++		return sigframe_size(&user) +
++			round_up(sizeof(struct frame_record), 16) +
++			16; /* max alignment padding */
 +	}
-+
-+	if (!sve_vl_valid(vl))
-+		return -EINVAL;
-+
-+	vl = find_supported_vector_length(vl);
-+chosen:
-+	sve_default_vl = vl;
-+	return 0;
 +}
-+
-+static struct ctl_table sve_default_vl_table[] = {
-+	{
-+		.procname	= "sve_default_vector_length",
-+		.mode		= 0644,
-+		.proc_handler	= sve_proc_do_default_vl,
-+	},
-+	{ }
-+};
-+
-+static int __init sve_sysctl_init(void)
-+{
-+	if (system_supports_sve())
-+		if (!register_sysctl("abi", sve_default_vl_table))
-+			return -EINVAL;
-+
-+	return 0;
-+}
-+
-+#else /* ! CONFIG_SYSCTL */
-+static int __init sve_sysctl_init(void) { return 0; }
-+#endif /* ! CONFIG_SYSCTL */
-+
- #define ZREG(sve_state, vq, n) ((char *)(sve_state) +		\
- 	(SVE_SIG_ZREG_OFFSET(vq, n) - SVE_SIG_REGS_OFFSET))
- 
-@@ -1207,6 +1267,6 @@ static int __init fpsimd_init(void)
- 	if (!(elf_hwcap & HWCAP_ASIMD))
- 		pr_notice("Advanced SIMD is not implemented\n");
- 
--	return 0;
-+	return sve_sysctl_init();
- }
- core_initcall(fpsimd_init);
 -- 
 2.1.4
