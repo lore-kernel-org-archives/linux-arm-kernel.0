@@ -1,54 +1,24 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 27 Oct 2017 09:38:15 -0500
-Subject: [PATCH] dt-bindings: display: stm32: add pixel clock mandatory
- property
-In-Reply-To: <1509034356-23885-1-git-send-email-philippe.cornu@st.com>
-References: <1509034356-23885-1-git-send-email-philippe.cornu@st.com>
-Message-ID: <20171027143815.evbb7rqkgqiol7yo@rob-hp-laptop>
+Date: Fri, 27 Oct 2017 09:38:09 -0500
+Subject: [PATCH v1 1/2] dt-bindings: display: stm32: add a 2nd endpoint
+In-Reply-To: <1509018489-19641-2-git-send-email-philippe.cornu@st.com>
+References: <1509018489-19641-1-git-send-email-philippe.cornu@st.com>
+ <1509018489-19641-2-git-send-email-philippe.cornu@st.com>
+Message-ID: <20171027143809.ughycmycxmsrwwyp@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 26, 2017 at 06:12:36PM +0200, Philippe Cornu wrote:
-> Add the DPI/RGB input pixel clock in mandatory properties
-> because it really offers a better preciseness for timing
-> computations.
-> Note: Fix also the DSI panel example where "ref" & "pclk"
-> clocks were swapped.
+On Thu, Oct 26, 2017 at 01:48:08PM +0200, Philippe Cornu wrote:
+> ltdc can have up to 2 endpoints:
+>  - dpi external gpios: for rgb panels or external bridge ICs.
+>  - dpi internal ios: connected internally to dsi.
+> 
+> Note: Refer to the reference manual to know if the dsi is
+> present on your device.
 > 
 > Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
 > ---
->  Documentation/devicetree/bindings/display/st,stm32-ltdc.txt | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
-> index 0292522..99823fb 100644
-> --- a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
-> +++ b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
-> @@ -28,6 +28,7 @@ Mandatory properties specific to STM32 DSI:
->  - #size-cells: Should be <0>.
->  - compatible: "st,stm32-dsi".
->  - clock-names:
-> +  - DPI/RGB input pixel clock string name, must be "px_clk".
->    - phy pll reference clock string name, must be "ref".
+>  Documentation/devicetree/bindings/display/st,stm32-ltdc.txt | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
 
-Where's pclk?
-
-The new clock should be last to be backwards compatible.
-
->  - resets: see [5].
->  - reset-names: see [5].
-> @@ -97,8 +98,9 @@ Example 2: DSI panel
->  			#size-cells = <0>;
->  			compatible = "st,stm32-dsi";
->  			reg = <0x40016c00 0x800>;
-> -			clocks = <&rcc 1 CLK_F469_DSI>, <&clk_hse>;
-> -			clock-names = "ref", "pclk";
-> +			clocks = <&rcc 1 CLK_F469_DSI>, <&rcc 1 CLK_LCD>,
-> +				 <&clk_hse>;
-> +			clock-names = "pclk", "px_clk", "ref";
->  			resets = <&rcc STM32F4_APB2_RESET(DSI)>;
->  			reset-names = "apb";
->  
-> -- 
-> 1.9.1
-> 
+Acked-by: Rob Herring <robh@kernel.org>
