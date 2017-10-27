@@ -1,46 +1,79 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Fri, 27 Oct 2017 10:34:34 +0200
-Subject: [PATCH v5 13/20] KVM: arm/arm64: Set VCPU affinity for virt timer irq
+Date: Fri, 27 Oct 2017 10:34:27 +0200
+Subject: [PATCH v5 06/20] KVM: arm/arm64: Check that system supports split
+ eoi/deactivate
 In-Reply-To: <1509093281-15225-1-git-send-email-cdall@linaro.org>
 References: <1509093281-15225-1-git-send-email-cdall@linaro.org>
-Message-ID: <1509093281-15225-14-git-send-email-cdall@linaro.org>
+Message-ID: <1509093281-15225-7-git-send-email-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we are about to take physical interrupts for the virtual timer on the
-host but want to leave those active while running the VM (and let the VM
-deactivate them), we need to set the vtimer PPI affinity accordingly.
+Some systems without proper firmware and/or hardware description data
+don't support the split EOI and deactivate operation.
 
+On such systems, we cannot leave the physical interrupt active after the
+timer handler on the host has run, so we cannot support KVM with an
+in-kernel GIC with the timer changes we are about to introduce.
+
+This patch makes sure that trying to initialize the KVM GIC code will
+fail on such systems.
+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/arch_timer.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/irqchip/irq-gic-v3.c | 8 ++++++--
+ drivers/irqchip/irq-gic.c    | 6 ++++--
+ 2 files changed, 10 insertions(+), 4 deletions(-)
 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 93c8973..eac1b3d 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -649,11 +649,20 @@ int kvm_timer_hyp_init(void)
- 		return err;
- 	}
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index b5df99c..854334a 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -1228,7 +1228,9 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
+ 		goto out_unmap_rdist;
  
-+	err = irq_set_vcpu_affinity(host_vtimer_irq, kvm_get_running_vcpus());
-+	if (err) {
-+		kvm_err("kvm_arch_timer: error setting vcpu affinity\n");
-+		goto out_free_irq;
-+	}
+ 	gic_populate_ppi_partitions(node);
+-	gic_of_setup_kvm_info(node);
 +
- 	kvm_info("virtual timer IRQ%d\n", host_vtimer_irq);
++	if (static_key_true(&supports_deactivate))
++		gic_of_setup_kvm_info(node);
+ 	return 0;
  
- 	cpuhp_setup_state(CPUHP_AP_KVM_ARM_TIMER_STARTING,
- 			  "kvm/arm/timer:starting", kvm_timer_starting_cpu,
- 			  kvm_timer_dying_cpu);
-+	return 0;
-+out_free_irq:
-+	free_percpu_irq(host_vtimer_irq, kvm_get_running_vcpus());
- 	return err;
+ out_unmap_rdist:
+@@ -1517,7 +1519,9 @@ gic_acpi_init(struct acpi_subtable_header *header, const unsigned long end)
+ 		goto out_fwhandle_free;
+ 
+ 	acpi_set_irq_model(ACPI_IRQ_MODEL_GIC, domain_handle);
+-	gic_acpi_setup_kvm_info();
++
++	if (static_key_true(&supports_deactivate))
++		gic_acpi_setup_kvm_info();
+ 
+ 	return 0;
+ 
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index f641e8e..121af5c 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -1420,7 +1420,8 @@ static void __init gic_of_setup_kvm_info(struct device_node *node)
+ 	if (ret)
+ 		return;
+ 
+-	gic_set_kvm_info(&gic_v2_kvm_info);
++	if (static_key_true(&supports_deactivate))
++		gic_set_kvm_info(&gic_v2_kvm_info);
  }
  
+ int __init
+@@ -1652,7 +1653,8 @@ static int __init gic_v2_acpi_init(struct acpi_subtable_header *header,
+ 	if (IS_ENABLED(CONFIG_ARM_GIC_V2M))
+ 		gicv2m_init(NULL, gic_data[0].domain);
+ 
+-	gic_acpi_setup_kvm_info();
++	if (static_key_true(&supports_deactivate))
++		gic_acpi_setup_kvm_info();
+ 
+ 	return 0;
+ }
 -- 
 2.7.4
