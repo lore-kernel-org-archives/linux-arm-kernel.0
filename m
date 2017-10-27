@@ -1,23 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 27 Oct 2017 14:06:40 +0100
-Subject: [PATCH v4 26/28] arm64/sve: Add documentation
-In-Reply-To: <1509101470-7881-27-git-send-email-Dave.Martin@arm.com>
-References: <1509101470-7881-1-git-send-email-Dave.Martin@arm.com>
- <1509101470-7881-27-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20171027130640.ahryxhljc3q6mda3@armageddon.cambridge.arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 27 Oct 2017 14:08:16 +0100
+Subject: [PATCH] iommu/arm-smmu-v3: Warn about missing IRQs
+Message-ID: <f03a7c9f0be2f0af461b61d18fff3c931da77ebb.1509109598.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 27, 2017 at 11:51:08AM +0100, Dave P Martin wrote:
-> This patch adds basic documentation of the user/kernel interface
-> provided by the for SVE.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Cc: Alan Hayward <alan.hayward@arm.com>
-> Cc: Alex Benn?e <alex.bennee@linaro.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Michael Kerrisk <mtk.manpages@gmail.com>
-> Cc: Szabolcs Nagy <szabolcs.nagy@arm.com>
-> Cc: linux-api at vger.kernel.org
+It is annoyingly non-obvious when DMA transactions silently go missing
+due to undetected SMMU faults. Help skip the first few debugging steps
+in those situations by making it clear when we have neither wired IRQs
+nor MSIs with which to raise error conditions.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/iommu/arm-smmu-v3.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index e67ba6c40faf..1a374c5c9507 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -2263,6 +2263,8 @@ static void arm_smmu_setup_unique_irqs(struct arm_smmu_device *smmu)
+ 						"arm-smmu-v3-evtq", smmu);
+ 		if (ret < 0)
+ 			dev_warn(smmu->dev, "failed to enable evtq irq\n");
++	} else {
++		dev_warn(smmu->dev, "no evtq irq - events will not be reported!\n");
+ 	}
+ 
+ 	irq = smmu->cmdq.q.irq;
+@@ -2280,6 +2282,8 @@ static void arm_smmu_setup_unique_irqs(struct arm_smmu_device *smmu)
+ 				       0, "arm-smmu-v3-gerror", smmu);
+ 		if (ret < 0)
+ 			dev_warn(smmu->dev, "failed to enable gerror irq\n");
++	} else {
++		dev_warn(smmu->dev, "no gerr irq - errors will not be reported!\n");
+ 	}
+ 
+ 	if (smmu->features & ARM_SMMU_FEAT_PRI) {
+-- 
+2.13.4.dirty
