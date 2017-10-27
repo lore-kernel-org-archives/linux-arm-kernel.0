@@ -1,170 +1,99 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Fri, 27 Oct 2017 14:02:06 +0200
-Subject: Kernel panic when using ccm(aes) with the Atmel AES HW accelerator
-In-Reply-To: <4e822b84-2d5a-1b9d-a36b-faf04fcbfcf8@microchip.com>
-References: <CAGkQfmP6Kq4DEBbGU7AW71PjbUJ2acdJF5PVDm6VqZkUaaoEzA@mail.gmail.com>
- <4e822b84-2d5a-1b9d-a36b-faf04fcbfcf8@microchip.com>
-Message-ID: <CAGkQfmPzH6j_+ta2T64xV-mGU5Mb1C4dTqgz2KtiPY79rN+dHw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 27 Oct 2017 11:46:00 +0100
+Subject: [PATCH v2 2/3] mailbox: Add support for Hi3660 mailbox
+In-Reply-To: <1509084904-2505-3-git-send-email-zhongkaihua@huawei.com>
+References: <1509084904-2505-1-git-send-email-zhongkaihua@huawei.com>
+ <1509084904-2505-3-git-send-email-zhongkaihua@huawei.com>
+Message-ID: <20171027104559.em5n5ogro46ethmq@salmiak>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-10-26 14:34 GMT+02:00 Tudor Ambarus <tudor.ambarus@microchip.com>:
-> Hi, Romain,
->
-> On 10/18/2017 04:32 PM, Romain Izard wrote:
->>
->> diff --git a/drivers/crypto/atmel-aes.c b/drivers/crypto/atmel-aes.c
->> index 29e20c37f3a6..f3eabe1f1490 100644
->> --- a/drivers/crypto/atmel-aes.c
->> +++ b/drivers/crypto/atmel-aes.c
->> @@ -80,6 +80,7 @@
->>   #define AES_FLAGS_BUSY         BIT(3)
->>   #define AES_FLAGS_DUMP_REG     BIT(4)
->>   #define AES_FLAGS_OWN_SHA      BIT(5)
->> +#define AES_FLAGS_CIPHERTAIL   BIT(6)
->
->
-> not really needed, see below.
->
->>
->>   #define AES_FLAGS_PERSISTENT   (AES_FLAGS_INIT | AES_FLAGS_BUSY)
->>
->> @@ -156,6 +157,7 @@ struct atmel_aes_authenc_ctx {
->>
->>   struct atmel_aes_reqctx {
->>          unsigned long           mode;
->> +       u32                     ciphertail[AES_BLOCK_SIZE / sizeof(u32)];
->
-> How about renaming this variable to "lastc"? Ci, i=1..n is the usual
-> notation for the ciphertext blocks.
->
-OK
+On Fri, Oct 27, 2017 at 02:15:03PM +0800, Kaihua Zhong wrote:
+> Hi3660 mailbox controller is used to send message within multiple
+> processors, MCU, HIFI, etc.  It supports 32 mailbox channels and every
+> channel can only be used for single transferring direction.  Once the
+> channel is enabled, it needs to specify the destination interrupt and
+> acknowledge interrupt, these two interrupt vectors are used to create
+> the connection between the mailbox and interrupt controllers.
+> 
+> The application processor (or from point of view of kernel) is not the
+> only one master which can launch the data transferring, other
+> processors or MCU/DSP also can kick off the data transferring.  So this
+> driver implements a locking mechanism to support exclusive accessing.
 
+... and that locking mechanism is what precisely?
 
-> The assumption that the last ciphertext block is of AES_BLOCK_SIZE size
-> is correct, this driver is meant just for AES.
->
->>   };
->>
->>   #ifdef CONFIG_CRYPTO_DEV_ATMEL_AUTHENC
->> @@ -496,6 +498,11 @@ static void atmel_aes_authenc_complete(struct
->> atmel_aes_dev *dd, int err);
->>
->>   static inline int atmel_aes_complete(struct atmel_aes_dev *dd, int err)
->>   {
->> +       struct ablkcipher_request *req =
->> ablkcipher_request_cast(dd->areq);
->> +       struct crypto_ablkcipher *ablkcipher =
->> crypto_ablkcipher_reqtfm(req);
->> +       struct atmel_aes_reqctx *rctx = ablkcipher_request_ctx(req);
->> +       int ivsize = crypto_ablkcipher_ivsize(ablkcipher);
->> +
->>   #ifdef CONFIG_CRYPTO_DEV_ATMEL_AUTHENC
->>          atmel_aes_authenc_complete(dd, err);
->>   #endif
->> @@ -503,6 +510,17 @@ static inline int atmel_aes_complete(struct
->> atmel_aes_dev *dd, int err)
->>          clk_disable(dd->iclk);
->>          dd->flags &= ~AES_FLAGS_BUSY;
->>
->> +       if (rctx->mode & AES_FLAGS_CIPHERTAIL) {
->> +               if (rctx->mode & AES_FLAGS_ENCRYPT) {
->> +                       scatterwalk_map_and_copy(req->info, req->dst,
->> +                                                req->nbytes - ivsize,
->> +                                                ivsize, 0);
->> +               } else {
->> +                       memcpy(req->info, rctx->ciphertail, ivsize);
->
->
-> why don't we make the same assumption and replace ivsize with
-> AES_BLOCK_SIZE? Is there any chance that req->info was allocated with
-> less than AES_BLOCK_SIZE size?
->
-I do not really know. I'm just getting used to the crypto framework, and the
-fact that the iv buffer size is implicit...
+Where is the protocol defined?
 
->> +                       memset(rctx->ciphertail, 0, ivsize);
->
->
-> memset to zero is not necessary.
->
-OK
+> +static int hi3660_mbox_check_state(struct mbox_chan *chan)
+> +{
+> +	unsigned long ch = (unsigned long)chan->con_priv;
+> +	struct hi3660_mbox *mbox = to_hi3660_mbox(chan);
+> +	struct hi3660_mbox_dev *mdev = &mbox->mdev[ch];
+> +	void __iomem *base = MBOX_BASE(mbox, ch);
+> +	unsigned long val;
+> +	unsigned int state, ret;
+> +
+> +	/* Mailbox is idle so directly bail out */
+> +	state = readl_relaxed(base + MBOX_MODE_REG);
+> +	if (state & MBOX_STATE_IDLE)
+> +		return 0;
+> +
+> +	/* Wait for acknowledge from remote */
+> +	ret = readx_poll_timeout_atomic(readl_relaxed, base + MBOX_MODE_REG,
+> +			val, (val & MBOX_STATE_ACK), 1000, 300000);
+> +	if (ret) {
+> +		dev_err(mbox->dev, "%s: timeout for receiving ack\n", __func__);
+> +		return ret;
+> +	}
+> +
+> +	/* Ensure channel is released */
+> +	writel_relaxed(0xffffffff, base + MBOX_IMASK_REG);
+> +	writel_relaxed(BIT(mdev->ack_irq), base + MBOX_SRC_REG);
+> +	__asm__ volatile ("sev");
+> +	return 0;
+> +}
 
->> +               }
->> +       }
->> +
->>          if (dd->is_async)
->>                  dd->areq->complete(dd->areq, err);
->>
->> @@ -1071,11 +1089,13 @@ static int atmel_aes_ctr_start(struct
->> atmel_aes_dev *dd)
->>
->>   static int atmel_aes_crypt(struct ablkcipher_request *req, unsigned long
->> mode)
->>   {
->> +       struct crypto_ablkcipher *ablkcipher;
->>          struct atmel_aes_base_ctx *ctx;
->>          struct atmel_aes_reqctx *rctx;
->>          struct atmel_aes_dev *dd;
->>
->> -       ctx = crypto_ablkcipher_ctx(crypto_ablkcipher_reqtfm(req));
->> +       ablkcipher = crypto_ablkcipher_reqtfm(req);
->> +       ctx = crypto_ablkcipher_ctx(ablkcipher);
->
->
-> you can initialize these variables at declaration.
->
-OK
+Drivers really shouldn't be using SEV directly (even if via the sev() macro)...
 
->>          switch (mode & AES_FLAGS_OPMODE_MASK) {
->>          case AES_FLAGS_CFB8:
->>                  ctx->block_size = CFB8_BLOCK_SIZE;
->> @@ -1103,7 +1123,15 @@ static int atmel_aes_crypt(struct
->> ablkcipher_request *req, unsigned long mode)
->>                  return -ENODEV;
->>
->>          rctx = ablkcipher_request_ctx(req);
->
->
-> while here, please initialize this at declaration.
->
-> Also, this one:
-> '''
->         dd = atmel_aes_find_dev(ctx);
->         if (!dd)
->                 return -ENODEV;
->
-> '''
-> should be moved at the beginning of the function. If an initialization
-> might fail, let's check it as soon as we can, so that we don't waste
-> resources.
->
-Most of these initializations are in fact structure casts.
+This SEV isn't ordered w.r.t. anything, and it's unclear what ordering you
+need, so this simply does not work.
 
->> -       rctx->mode = mode;
->> +
->> +       if (!(mode & AES_FLAGS_ENCRYPT)) {
->> +               int ivsize = crypto_ablkcipher_ivsize(ablkcipher);
->> +
->> +               scatterwalk_map_and_copy(rctx->ciphertail, req->src,
->> +                               (req->nbytes - ivsize), ivsize, 0);
->> +       }
->> +       rctx->mode = mode | AES_FLAGS_CIPHERTAIL;
->
->
-> saving the last ciphertext block is a requirement for skcipher. This
-> flag is redundant, there's no need to use it.
->
+> +static int hi3660_mbox_acquire_channel(struct mbox_chan *chan)
+> +{
+> +	unsigned long ch = (unsigned long)chan->con_priv;
+> +	struct hi3660_mbox *mbox = to_hi3660_mbox(chan);
+> +	struct hi3660_mbox_dev *mdev = &mbox->mdev[ch];
+> +	void __iomem *base = MBOX_BASE(mbox, ch);
+> +	unsigned int val = 0, retry = 10;
+> +
+> +	/*
+> +	 * Hardware locking for exclusive accessing within CPUs
+> +	 * without exclusive monitor mechanism.
+> +	 */
+> +	do {
+> +		val = readl_relaxed(base + MBOX_MODE_REG);
+> +		if (!(val & MBOX_STATE_IDLE)) {
+> +			__asm__ volatile ("wfe");
 
-The idea regarding the ciphertail flag was because atmel_aes_complete
-is used by for regular block crypto (ecb, cbc, ctr, etc.) but also for
-aead transfers in gcm and authenc cases, which triggered panics in
-my code.
+... and likewise for WFE / wfe().
 
-I now realize that casting the areq value to an ablkcipher_req is wrong,
-as it can also be an aead_request. The ciphertail flag somehow worked
-around this issue, but I need to rewrite the patch to take this into account.
+> +			continue;
+> +		}
+> +
+> +		/* Check if channel has be acquired */
+> +		writel_relaxed(BIT(mdev->ack_irq), base + MBOX_SRC_REG);
+> +		val = readl_relaxed(base + MBOX_SRC_REG) & BIT(mdev->ack_irq);
+> +		if (val)
+> +			break;
+> +
+> +	} while (retry--);
+> +
+> +	return (val) ? 0 : -ETIMEDOUT;
+> +}
 
-Best regards,
--- 
-Romain Izard
+Please elaborate on how this synchronisation mechanism is expected to work, and
+why it is necessary in the first place.
+
+Thanks,
+Mark.
