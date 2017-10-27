@@ -1,160 +1,130 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Fri, 27 Oct 2017 10:34:22 +0200
-Subject: [PATCH v5 01/20] irqchip/gic: Deal with broken firmware exposing only
- 4kB of GICv2 CPU interface
+Date: Fri, 27 Oct 2017 10:34:23 +0200
+Subject: [PATCH v5 02/20] arm64: Implement arch_counter_get_cntpct to read the
+ physical counter
 In-Reply-To: <1509093281-15225-1-git-send-email-cdall@linaro.org>
 References: <1509093281-15225-1-git-send-email-cdall@linaro.org>
-Message-ID: <1509093281-15225-2-git-send-email-cdall@linaro.org>
+Message-ID: <1509093281-15225-3-git-send-email-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
-There is a lot of broken firmware out there that don't really
-expose the information the kernel requires when it comes with dealing
-with GICv2:
+As we are about to use the physical counter on arm64 systems that have
+KVM support, implement arch_counter_get_cntpct() and the associated
+errata workaround functionality for stable timer reads.
 
-(1) Firmware that only describes the first 4kB of GICv2
-(2) Firmware that describe 128kB of CPU interface, while
-    the usable portion of the address space is between
-    60 and 68kB
-
-So far, we only deal with (2). But we have platforms exhibiting
-behaviour (1), resulting in two sub-cases:
-(a) The GIC is occupying 8kB, as required by the GICv2 architecture
-(b) It is actually spread 128kB, and this is likely to be a version
-    of (2)
-
-This patch tries to work around both (a) and (b) by poking at
-the outside of the described memory region, and try to work out
-what is actually there. This is of course unsafe, and should
-only be enabled if there is no way to otherwise fix the DT provided
-by the firmware (we provide a "irqchip.gicv2_force_probe" option
-to that effect).
-
-Note that for the time being, we restrict ourselves to GICv2
-implementations provided by ARM, since there I have no knowledge
-of an alternative implementations. This could be relaxed if such
-an implementation comes to light on a broken platform.
-
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <cdall@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- Documentation/admin-guide/kernel-parameters.txt |  7 +++
- drivers/irqchip/irq-gic.c                       | 71 +++++++++++++++++++++----
- 2 files changed, 69 insertions(+), 9 deletions(-)
+ arch/arm64/include/asm/arch_timer.h  |  8 +++-----
+ drivers/clocksource/arm_arch_timer.c | 23 +++++++++++++++++++++++
+ 2 files changed, 26 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-index 0549662..3daa0a5 100644
---- a/Documentation/admin-guide/kernel-parameters.txt
-+++ b/Documentation/admin-guide/kernel-parameters.txt
-@@ -1713,6 +1713,13 @@
- 	irqaffinity=	[SMP] Set the default irq affinity mask
- 			The argument is a cpu list, as described above.
+diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+index a652ce0..04275de 100644
+--- a/arch/arm64/include/asm/arch_timer.h
++++ b/arch/arm64/include/asm/arch_timer.h
+@@ -52,6 +52,7 @@ struct arch_timer_erratum_workaround {
+ 	const char *desc;
+ 	u32 (*read_cntp_tval_el0)(void);
+ 	u32 (*read_cntv_tval_el0)(void);
++	u64 (*read_cntpct_el0)(void);
+ 	u64 (*read_cntvct_el0)(void);
+ 	int (*set_next_event_phys)(unsigned long, struct clock_event_device *);
+ 	int (*set_next_event_virt)(unsigned long, struct clock_event_device *);
+@@ -148,11 +149,8 @@ static inline void arch_timer_set_cntkctl(u32 cntkctl)
  
-+	irqchip.gicv2_force_probe=
-+			[ARM, ARM64]
-+			Format: <bool>
-+			Force the kernel to look for the second 4kB page
-+			of a GICv2 controller even if the memory range
-+			exposed by the device tree is too small.
-+
- 	irqfixup	[HW]
- 			When an interrupt is not handled search all handlers
- 			for it. Intended to get systems with badly broken
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 651d726..f641e8e 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -1256,6 +1256,19 @@ static void gic_teardown(struct gic_chip_data *gic)
- 
- #ifdef CONFIG_OF
- static int gic_cnt __initdata;
-+static bool gicv2_force_probe;
-+
-+static int __init gicv2_force_probe_cfg(char *buf)
-+{
-+	return strtobool(buf, &gicv2_force_probe);
-+}
-+early_param("irqchip.gicv2_force_probe", gicv2_force_probe_cfg);
-+
-+static bool gic_check_gicv2(void __iomem *base)
-+{
-+	u32 val = readl_relaxed(base + GIC_CPU_IDENT);
-+	return (val & 0xff0fff) == 0x02043B;
-+}
- 
- static bool gic_check_eoimode(struct device_node *node, void __iomem **base)
+ static inline u64 arch_counter_get_cntpct(void)
  {
-@@ -1265,20 +1278,60 @@ static bool gic_check_eoimode(struct device_node *node, void __iomem **base)
+-	/*
+-	 * AArch64 kernel and user space mandate the use of CNTVCT.
+-	 */
+-	BUG();
+-	return 0;
++	isb();
++	return arch_timer_reg_read_stable(cntpct_el0);
+ }
  
- 	if (!is_hyp_mode_available())
- 		return false;
--	if (resource_size(&cpuif_res) < SZ_8K)
--		return false;
--	if (resource_size(&cpuif_res) == SZ_128K) {
--		u32 val_low, val_high;
-+	if (resource_size(&cpuif_res) < SZ_8K) {
-+		void __iomem *alt;
-+		/*
-+		 * Check for a stupid firmware that only exposes the
-+		 * first page of a GICv2.
-+		 */
-+		if (!gic_check_gicv2(*base))
-+			return false;
+ static inline u64 arch_counter_get_cntvct(void)
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index fd4b7f6..ff8f8a1 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -217,6 +217,11 @@ static u32 notrace fsl_a008585_read_cntv_tval_el0(void)
+ 	return __fsl_a008585_read_reg(cntv_tval_el0);
+ }
  
-+		if (!gicv2_force_probe) {
-+			pr_warn("GIC: GICv2 detected, but range too small and irqchip.gicv2_force_probe not set\n");
-+			return false;
-+		}
++static u64 notrace fsl_a008585_read_cntpct_el0(void)
++{
++	return __fsl_a008585_read_reg(cntpct_el0);
++}
 +
-+		alt = ioremap(cpuif_res.start, SZ_8K);
-+		if (!alt)
-+			return false;
-+		if (!gic_check_gicv2(alt + SZ_4K)) {
-+			/*
-+			 * The first page was that of a GICv2, and
-+			 * the second was *something*. Let's trust it
-+			 * to be a GICv2, and update the mapping.
-+			 */
-+			pr_warn("GIC: GICv2 at %pa, but range is too small (broken DT?), assuming 8kB\n",
-+				&cpuif_res.start);
-+			iounmap(*base);
-+			*base = alt;
-+			return true;
-+		}
-+
-+		/*
-+		 * We detected *two* initial GICv2 pages in a
-+		 * row. Could be a GICv2 aliased over two 64kB
-+		 * pages. Update the resource, map the iospace, and
-+		 * pray.
-+		 */
-+		iounmap(alt);
-+		alt = ioremap(cpuif_res.start, SZ_128K);
-+		if (!alt)
-+			return false;
-+		pr_warn("GIC: Aliased GICv2@%pa, trying to find the canonical range over 128kB\n",
-+			&cpuif_res.start);
-+		cpuif_res.end = cpuif_res.start + SZ_128K -1;
-+		iounmap(*base);
-+		*base = alt;
-+	}
-+	if (resource_size(&cpuif_res) == SZ_128K) {
- 		/*
--		 * Verify that we have the first 4kB of a GIC400
-+		 * Verify that we have the first 4kB of a GICv2
- 		 * aliased over the first 64kB by checking the
- 		 * GICC_IIDR register on both ends.
- 		 */
--		val_low = readl_relaxed(*base + GIC_CPU_IDENT);
--		val_high = readl_relaxed(*base + GIC_CPU_IDENT + 0xf000);
--		if ((val_low & 0xffff0fff) != 0x0202043B ||
--		    val_low != val_high)
-+		if (!gic_check_gicv2(*base) ||
-+		    !gic_check_gicv2(*base + 0xf000))
- 			return false;
+ static u64 notrace fsl_a008585_read_cntvct_el0(void)
+ {
+ 	return __fsl_a008585_read_reg(cntvct_el0);
+@@ -258,6 +263,11 @@ static u32 notrace hisi_161010101_read_cntv_tval_el0(void)
+ 	return __hisi_161010101_read_reg(cntv_tval_el0);
+ }
  
- 		/*
++static u64 notrace hisi_161010101_read_cntpct_el0(void)
++{
++	return __hisi_161010101_read_reg(cntpct_el0);
++}
++
+ static u64 notrace hisi_161010101_read_cntvct_el0(void)
+ {
+ 	return __hisi_161010101_read_reg(cntvct_el0);
+@@ -288,6 +298,15 @@ static struct ate_acpi_oem_info hisi_161010101_oem_info[] = {
+ #endif
+ 
+ #ifdef CONFIG_ARM64_ERRATUM_858921
++static u64 notrace arm64_858921_read_cntpct_el0(void)
++{
++	u64 old, new;
++
++	old = read_sysreg(cntpct_el0);
++	new = read_sysreg(cntpct_el0);
++	return (((old ^ new) >> 32) & 1) ? old : new;
++}
++
+ static u64 notrace arm64_858921_read_cntvct_el0(void)
+ {
+ 	u64 old, new;
+@@ -346,6 +365,7 @@ static const struct arch_timer_erratum_workaround ool_workarounds[] = {
+ 		.desc = "Freescale erratum a005858",
+ 		.read_cntp_tval_el0 = fsl_a008585_read_cntp_tval_el0,
+ 		.read_cntv_tval_el0 = fsl_a008585_read_cntv_tval_el0,
++		.read_cntpct_el0 = fsl_a008585_read_cntpct_el0,
+ 		.read_cntvct_el0 = fsl_a008585_read_cntvct_el0,
+ 		.set_next_event_phys = erratum_set_next_event_tval_phys,
+ 		.set_next_event_virt = erratum_set_next_event_tval_virt,
+@@ -358,6 +378,7 @@ static const struct arch_timer_erratum_workaround ool_workarounds[] = {
+ 		.desc = "HiSilicon erratum 161010101",
+ 		.read_cntp_tval_el0 = hisi_161010101_read_cntp_tval_el0,
+ 		.read_cntv_tval_el0 = hisi_161010101_read_cntv_tval_el0,
++		.read_cntpct_el0 = hisi_161010101_read_cntpct_el0,
+ 		.read_cntvct_el0 = hisi_161010101_read_cntvct_el0,
+ 		.set_next_event_phys = erratum_set_next_event_tval_phys,
+ 		.set_next_event_virt = erratum_set_next_event_tval_virt,
+@@ -368,6 +389,7 @@ static const struct arch_timer_erratum_workaround ool_workarounds[] = {
+ 		.desc = "HiSilicon erratum 161010101",
+ 		.read_cntp_tval_el0 = hisi_161010101_read_cntp_tval_el0,
+ 		.read_cntv_tval_el0 = hisi_161010101_read_cntv_tval_el0,
++		.read_cntpct_el0 = hisi_161010101_read_cntpct_el0,
+ 		.read_cntvct_el0 = hisi_161010101_read_cntvct_el0,
+ 		.set_next_event_phys = erratum_set_next_event_tval_phys,
+ 		.set_next_event_virt = erratum_set_next_event_tval_virt,
+@@ -378,6 +400,7 @@ static const struct arch_timer_erratum_workaround ool_workarounds[] = {
+ 		.match_type = ate_match_local_cap_id,
+ 		.id = (void *)ARM64_WORKAROUND_858921,
+ 		.desc = "ARM erratum 858921",
++		.read_cntpct_el0 = arm64_858921_read_cntpct_el0,
+ 		.read_cntvct_el0 = arm64_858921_read_cntvct_el0,
+ 	},
+ #endif
 -- 
 2.7.4
