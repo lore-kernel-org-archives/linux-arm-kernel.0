@@ -1,71 +1,49 @@
-From: mbrugger@suse.com (Matthias Brugger)
-Date: Fri, 27 Oct 2017 18:29:32 +0200
-Subject: [PATCH] efi/libstub: arm: omit sorting of the UEFI memory map
-In-Reply-To: <20171027152850.GK20805@n2100.armlinux.org.uk>
-References: <20171022141457.28769-1-ard.biesheuvel@linaro.org>
- <fe35c87c-8fd0-b33f-3a6f-2bd759726667@suse.com>
- <20171027152850.GK20805@n2100.armlinux.org.uk>
-Message-ID: <11f81ea5-4f75-28ca-9204-b4a893ad4b63@suse.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Oct 2017 17:52:16 +0100
+Subject: [PATCH] iommu/arm-smmu-v3: Warn about missing IRQs
+In-Reply-To: <f03a7c9f0be2f0af461b61d18fff3c931da77ebb.1509109598.git.robin.murphy@arm.com>
+References: <f03a7c9f0be2f0af461b61d18fff3c931da77ebb.1509109598.git.robin.murphy@arm.com>
+Message-ID: <20171027165215.GA28642@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 10/27/2017 05:28 PM, Russell King - ARM Linux wrote:
-> On Fri, Oct 27, 2017 at 05:12:58PM +0200, Matthias Brugger wrote:
->> Hi Ard,
->>
->> On 10/22/2017 04:14 PM, Ard Biesheuvel wrote:
->>> ARM shares its EFI stub implementation with arm64, which has some
->>> special handling in the virtual remapping code to
->>> a) make sure that we can map everything even if the OS executes
->>>    with 64k page size, and
->>> b) make sure that adjacent regions with the same attributes are not
->>>    reordered or moved apart in memory.
->>>
->>> The latter is a workaround for a 'feature' that was shortly recommended
->>> by UEFI spec v2.5, but deprecated shortly after, due to the fact that
->>> it broke many OS installers, including non-Linux ones, and it was never
->>> widely implemented for ARM systems. Before implementing b), the arm64
->>> code simply rounded up all regions to 64 KB granularity, but given that
->>> that results in moving adjacent regions apart, it had to be refined when
->>> b) was implemented.
->>>
->>> The adjacency check requires a sort() pass, due to the fact that the
->>> UEFI spec does not mandate any ordering, and the inclusion of the
->>> lib/sort.c code into the ARM EFI stub is causing some trouble with
->>> the decompressor build due to the fact that its EXPORT_SYMBOL() call
->>> triggers the creation of ksymtab/kcrctab sections.
->>>
->>> So let's simply do away with the adjacency check for ARM, and simply put
->>> all UEFI runtime regions together if they have the same memory attributes.
->>> This is guaranteed to work, given that ARM only supports 4 KB pages,
->>> and allows us to remove the sort() call entirely.
->>>
->>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>> ---
->>>  drivers/firmware/efi/libstub/Makefile   | 6 +++---
->>>  drivers/firmware/efi/libstub/arm-stub.c | 7 +++++--
->>>  2 files changed, 8 insertions(+), 5 deletions(-)
->>>
->>
->> I thought I already provided my tag, but just in case:
->> This fixes the boot problems I had on the bananapi-r2.
->>
->> Tested-by: Matthias Brugger <matthias.bgg@gmail.com>
+On Fri, Oct 27, 2017 at 02:08:16PM +0100, Robin Murphy wrote:
+> It is annoyingly non-obvious when DMA transactions silently go missing
+> due to undetected SMMU faults. Help skip the first few debugging steps
+> in those situations by making it clear when we have neither wired IRQs
+> nor MSIs with which to raise error conditions.
 > 
-> Please test my "fixes" branch - that has all three patches merged.
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  drivers/iommu/arm-smmu-v3.c | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
-> We don't have linux-next running at the moment, so folk need to be
-> manually fetching the appropriate git trees for testing.
-> 
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index e67ba6c40faf..1a374c5c9507 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -2263,6 +2263,8 @@ static void arm_smmu_setup_unique_irqs(struct arm_smmu_device *smmu)
+>  						"arm-smmu-v3-evtq", smmu);
+>  		if (ret < 0)
+>  			dev_warn(smmu->dev, "failed to enable evtq irq\n");
+> +	} else {
+> +		dev_warn(smmu->dev, "no evtq irq - events will not be reported!\n");
+>  	}
+>  
+>  	irq = smmu->cmdq.q.irq;
+> @@ -2280,6 +2282,8 @@ static void arm_smmu_setup_unique_irqs(struct arm_smmu_device *smmu)
+>  				       0, "arm-smmu-v3-gerror", smmu);
+>  		if (ret < 0)
+>  			dev_warn(smmu->dev, "failed to enable gerror irq\n");
+> +	} else {
+> +		dev_warn(smmu->dev, "no gerr irq - errors will not be reported!\n");
+>  	}
+>  
+>  	if (smmu->features & ARM_SMMU_FEAT_PRI) {
 
-I gave your branch a shot, feel free to add my:
+Can we also print something similar for the PRIQ when we detect that PRI is
+supported, please? Whilst I agree that event and gerror are the critical
+ones, I'm not sure how a PCIe device behaves if its PRI requests are
+ignored, but this might help to debug it.
 
-Tested-by: Matthias Brugger <mbrugger@suse.com>
-
-Especially for commit
-4c2b35b71ea3 ARM: verify size of zImage
-
-Regards,
-Matthias
+Will
