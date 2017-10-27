@@ -1,71 +1,130 @@
-From: mbrugger@suse.com (Matthias Brugger)
-Date: Fri, 27 Oct 2017 18:30:00 +0200
-Subject: [PATCH] efi/libstub: arm: omit sorting of the UEFI memory map
-In-Reply-To: <20171027152850.GK20805@n2100.armlinux.org.uk>
-References: <20171022141457.28769-1-ard.biesheuvel@linaro.org>
- <fe35c87c-8fd0-b33f-3a6f-2bd759726667@suse.com>
- <20171027152850.GK20805@n2100.armlinux.org.uk>
-Message-ID: <6f9788e9-a0a4-0678-1dcc-4c99d2b0a52a@suse.com>
+From: ndesaulniers@google.com (Nick Desaulniers)
+Date: Fri, 27 Oct 2017 09:33:41 -0700
+Subject: [PATCH v3] arm64: prevent regressions in compressed kernel image size
+ when upgrading to binutils 2.27
+In-Reply-To: <CAKv+Gu8wqH5fyievpcFi0P+JxEkA38cROzptN3zdCD0zCPcppg@mail.gmail.com>
+References: <CAKv+Gu8wqH5fyievpcFi0P+JxEkA38cROzptN3zdCD0zCPcppg@mail.gmail.com>
+Message-ID: <20171027163341.57550-1-ndesaulniers@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Upon upgrading to binutils 2.27, we found that our lz4 and gzip
+compressed kernel images were significantly larger, resulting is 10ms
+boot time regressions.
 
+As noted by Rahul:
+"aarch64 binaries uses RELA relocations, where each relocation entry
+includes an addend value. This is similar to x86_64.  On x86_64, the
+addend values are also stored at the relocation offset for relative
+relocations. This is an optimization: in the case where code does not
+need to be relocated, the loader can simply skip processing relative
+relocations.  In binutils-2.25, both bfd and gold linkers did this for
+x86_64, but only the gold linker did this for aarch64.  The kernel build
+here is using the bfd linker, which stored zeroes at the relocation
+offsets for relative relocations.  Since a set of zeroes compresses
+better than a set of non-zero addend values, this behavior was resulting
+in much better lz4 compression.
 
-On 10/27/2017 05:28 PM, Russell King - ARM Linux wrote:
-> On Fri, Oct 27, 2017 at 05:12:58PM +0200, Matthias Brugger wrote:
->> Hi Ard,
->>
->> On 10/22/2017 04:14 PM, Ard Biesheuvel wrote:
->>> ARM shares its EFI stub implementation with arm64, which has some
->>> special handling in the virtual remapping code to
->>> a) make sure that we can map everything even if the OS executes
->>>    with 64k page size, and
->>> b) make sure that adjacent regions with the same attributes are not
->>>    reordered or moved apart in memory.
->>>
->>> The latter is a workaround for a 'feature' that was shortly recommended
->>> by UEFI spec v2.5, but deprecated shortly after, due to the fact that
->>> it broke many OS installers, including non-Linux ones, and it was never
->>> widely implemented for ARM systems. Before implementing b), the arm64
->>> code simply rounded up all regions to 64 KB granularity, but given that
->>> that results in moving adjacent regions apart, it had to be refined when
->>> b) was implemented.
->>>
->>> The adjacency check requires a sort() pass, due to the fact that the
->>> UEFI spec does not mandate any ordering, and the inclusion of the
->>> lib/sort.c code into the ARM EFI stub is causing some trouble with
->>> the decompressor build due to the fact that its EXPORT_SYMBOL() call
->>> triggers the creation of ksymtab/kcrctab sections.
->>>
->>> So let's simply do away with the adjacency check for ARM, and simply put
->>> all UEFI runtime regions together if they have the same memory attributes.
->>> This is guaranteed to work, given that ARM only supports 4 KB pages,
->>> and allows us to remove the sort() call entirely.
->>>
->>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>> ---
->>>  drivers/firmware/efi/libstub/Makefile   | 6 +++---
->>>  drivers/firmware/efi/libstub/arm-stub.c | 7 +++++--
->>>  2 files changed, 8 insertions(+), 5 deletions(-)
->>>
->>
->> I thought I already provided my tag, but just in case:
->> This fixes the boot problems I had on the bananapi-r2.
->>
->> Tested-by: Matthias Brugger <matthias.bgg@gmail.com>
-> 
-> Please test my "fixes" branch - that has all three patches merged.
-> 
-> We don't have linux-next running at the moment, so folk need to be
-> manually fetching the appropriate git trees for testing.
-> 
+The bfd linker in binutils-2.27 is now storing the actual addend values
+at the relocation offsets. The behavior is now consistent with what it
+does for x86_64 and what gold linker does for both architectures.  The
+change happened in this upstream commit:
+https://sourceware.org/git/?p=binutils-gdb.git;a=commit;h=1f56df9d0d5ad89806c24e71f296576d82344613
+Since a bunch of zeroes got replaced by non-zero addend values, we see
+the side effect of lz4 compressed image being a bit bigger.
 
-I gave your branch a shot, feel free to add my:
+To get the old behavior from the bfd linker, "--no-apply-dynamic-relocs"
+flag can be used:
+$ LDFLAGS="--no-apply-dynamic-relocs" make
+With this flag, the compressed image size is back to what it was with
+binutils-2.25.
 
-Tested-by: Matthias Brugger <mbrugger@suse.com>
+If the kernel is using ASLR, there aren't additional runtime costs to
+--no-apply-dynamic-relocs, as the relocations will need to be applied
+again anyway after the kernel is relocated to a random address.
 
-Especially for commit
-4c2b35b71ea3 ARM: verify size of zImage
+If the kernel is not using ASLR, then presumably the current default
+behavior of the linker is better. Since the static linker performed the
+dynamic relocs, and the kernel is not moved to a different address at
+load time, it can skip applying the relocations all over again."
 
-Regards,
-Matthias
+Some measurements:
+
+$ ld -v
+GNU ld (binutils-2.25-f3d35cf6) 2.25.51.20141117
+                    ^
+$ ls -l vmlinux
+-rwxr-x--- 1 ndesaulniers eng 300652760 Oct 26 11:57 vmlinux
+$ ls -l Image.lz4-dtb
+-rw-r----- 1 ndesaulniers eng 16932627 Oct 26 11:57 Image.lz4-dtb
+
+$ ld -v
+GNU ld (binutils-2.27-53dd00a1) 2.27.0.20170315
+                    ^
+pre patch:
+$ ls -l vmlinux
+-rwxr-x--- 1 ndesaulniers eng 300376208 Oct 26 11:43 vmlinux
+$ ls -l Image.lz4-dtb
+-rw-r----- 1 ndesaulniers eng 18159474 Oct 26 11:43 Image.lz4-dtb
+
+post patch:
+$ ls -l vmlinux
+-rwxr-x--- 1 ndesaulniers eng 300376208 Oct 26 12:06 vmlinux
+$ ls -l Image.lz4-dtb
+-rw-r----- 1 ndesaulniers eng 16932466 Oct 26 12:06 Image.lz4-dtb
+
+By Siqi's measurement w/ gzip:
+binutils 2.27 with this patch (with --no-apply-dynamic-relocs):
+Image 41535488
+Image.gz 13404067
+
+binutils 2.27 without this patch (without --no-apply-dynamic-relocs):
+Image 41535488
+Image.gz 14125516
+
+Any compression scheme should be able to get better results from the
+longer runs of zeros, not just GZIP and LZ4.
+
+10ms boot time savings isn't anything to get excited about, but users of
+arm64+compression+bfd-2.27 should not have to pay a penalty for no
+runtime improvement.
+
+Reported-by: Gopinath Elanchezhian <gelanchezhian@google.com>
+Reported-by: Sindhuri Pentyala <spentyala@google.com>
+Reported-by: Wei Wang <wvw@google.com>
+Suggested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Suggested-by: Rahul Chaudhry <rahulchaudhry@google.com>
+Suggested-by: Siqi Lin <siqilin@google.com>
+Suggested-by: Stephen Hines <srhines@google.com>
+Signed-off-by: Nick Desaulniers <ndesaulniers@google.com>
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+Changes since v2:
+* Combine this this LDFLAGS_vmlinux append to previous block, per Ard.
+* Add Siqi's measurements to commit message.
+* Change the conditional to check if set rather than if not empty, since
+  this is similar to the rest of the Makefile, and more readable IMO,
+  though that's subjective. That part can be reverted if we don't want to
+  steal blame.
+
+ arch/arm64/Makefile | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 939b310913cf..669378099dbe 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -14,8 +14,9 @@ LDFLAGS_vmlinux	:=-p --no-undefined -X
+ CPPFLAGS_vmlinux.lds = -DTEXT_OFFSET=$(TEXT_OFFSET)
+ GZFLAGS		:=-9
+ 
+-ifneq ($(CONFIG_RELOCATABLE),)
+-LDFLAGS_vmlinux		+= -pie -shared -Bsymbolic
++ifeq ($(CONFIG_RELOCATABLE), y)
++LDFLAGS_vmlinux		+= -pie -shared -Bsymbolic \
++			$(call ld-option, --no-apply-dynamic-relocs)
+ endif
+ 
+ ifeq ($(CONFIG_ARM64_ERRATUM_843419),y)
+-- 
+2.15.0.rc2.357.g7e34df9404-goog
