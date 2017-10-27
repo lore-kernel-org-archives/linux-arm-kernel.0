@@ -1,48 +1,71 @@
-From: itaru.kitayama@riken.jp (Itaru Kitayama)
-Date: Fri, 27 Oct 2017 19:16:19 +0900
-Subject: v4.14-rc3 kernel issue
-In-Reply-To: <20171027072435.hqgoacedozwcxs7f@salmiak>
-References: <cc5b77ca-45a1-a7a4-08c9-8aa62c4f53c6@riken.jp>
- <20171027072435.hqgoacedozwcxs7f@salmiak>
-Message-ID: <303f6300-ecf4-89fe-0462-349f0dbd5918@riken.jp>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 27 Oct 2017 12:19:05 +0200
+Subject: 4.13 (and probably all recent) kernels refuse to boot on one
+ Nokia N950, work or another
+In-Reply-To: <20171026120130.dicanunwcdmjntnb@earth>
+References: <20171025203459.GA22035@amd> <20171025212806.GA21504@atomide.com>
+ <20171026091325.GA26929@amd>
+ <20171026093115.4bc6ctxjx72ng7ld@earth>
+ <20171026095734.GA10141@amd>
+ <20171026120130.dicanunwcdmjntnb@earth>
+Message-ID: <20171027101905.GA4287@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v4.16.0-rc6 boots up fine and no BUG is seen so far.
+Hi!
 
-Itaru
-  
-On 2017/10/27 16:24, Mark Rutland wrote:
-> On Fri, Oct 27, 2017 at 01:12:21PM +0900, Itaru Kitayama wrote:
->> Hi,
-> 
-> Hi,
-> 
->> I've seen this on a guest on KVM. Observed this after system booted, not
->> special commands were issued.
->>
->> [   82.124767] ==================================================================
->> [   82.129867] BUG: KASAN: slab-out-of-bounds in pud_huge+0x24/0x48
->> [   82.133893] Read of size 8 at addr ffff8000c43f79e8 by task kworker/u96:1/373
->> [   82.138675]
->> [   82.139709] CPU: 35 PID: 373 Comm: kworker/u96:1 Not tainted 4.14.0-rc3-dev+ #8
->> [   82.144616] Hardware name: QEMU KVM Virtual Machine, BIOS 0.0.0 02/06/2015
->> [   82.149292] usercopy: kernel memory overwrite attempt detected to ffff8000c43f7610 (thread_stack) (8 bytes)
->> [   82.156031] ------------[ cut here ]------------
->> [   82.159139] kernel BUG at mm/usercopy.c:72!
->> [   82.161972] Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
->>   [   82.165650] Modules linked in: ip6t_rpfilter ip6t_REJECT nf_reject_ipv6 xt_conntrack ip_set nfnetlink ebtable_nat ebtable_broute bridge stp llc ip6table_nat nf_conntrack_ipv6 nf_defrag_ipv6 nf_nat_ipv6 ip6table_mangle ip6table_raw ip6table_security iptable_nat nf_conntrack_ipv4 nf_defrag_ipv4 nf_nat_ipv4 nf_nat nf_conntrack iptable_mangle iptable_raw iptable_security ebtable_filter ebtables ip6table_filter ip6_tables sunrpc vfat fat crc32_ce crct10dif_ce ghash_ce virtio_net button xfs libcrc32c virtio_console virtio_scsi virtio_pci qemu_fw_cfg virtio_mmio virtio_ring virtio
->> [   82.199893] CPU: 35 PID: 373 Comm: kworker/u96:1 Not tainted 4.14.0-rc3-dev+ #8
->> [   82.204806] Hardware name: QEMU KVM Virtual Machine, BIOS 0.0.0 02/06/2015
->> [   82.209408] usercopy: kernel memory overwrite attempt detected to ffff8000c43f6d10 (thread_stack) (8 bytes)
->> [   82.215969] ------------[ cut here ]------------
->> [   82.219070] kernel BUG at mm/usercopy.c:72!
-> 
-> I see that you have both KASAN and HARDENED_USERCOPY enabled. Could you share
-> your .config?
-> 
-> Do you see the same behaviour with v4.14-rc6?
-> 
-> Thanks,
-> Mark
-> 
+So I got it to work; here are my notes from debugging. I put them on
+https://elinux.org/N950 , too.
+
+If someone knows how to fix the backlight, it would still be useful.
+
+Best regards,
+								Pavel
+								
+
+Run your kernels with something like:
+
+# power off your phone
+sudo ../maemo/0xffff/src/0xFFFF -l -m kernel:arch/arm/boot/$IMG -b
+# plug in the phone.
+Your usually get an error here:
+
+Waiting for ASIC ID...
+Error: Invalid size of ASIC ID
+Error: Reading ASIC ID failed
+Error: No device detected
+^C
+
+Hit ^c, and restart 0xFFFF. You should get
+
+Sending image...
+  100% [#################################################################]
+Done
+
+now.
+
+You should get /!\ Warning! screen now. Some bootloader versions way
+for ~10 seconds, some don't. Some bootloader versions power off
+immediately if you attempt to supply command line arguments.
+
+Watch the screen. It will go dark. If it blinks, it is a good
+sign. You may want to check with flashlight, maybe there's almost
+invisible text there.
+
+Ignore the notification LED. It seems to blink even without kernel involvement.
+
+Keyboard "debug enabled" LED can be used for debugging.
+
+
+
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171027/9a0f765d/attachment-0001.sig>
