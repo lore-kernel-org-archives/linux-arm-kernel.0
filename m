@@ -1,360 +1,176 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 27 Oct 2017 11:40:59 +0100
-Subject: [PATCH v2 2/3] mailbox: Add support for Hi3660 mailbox
-In-Reply-To: <1509084904-2505-3-git-send-email-zhongkaihua@huawei.com>
-References: <1509084904-2505-1-git-send-email-zhongkaihua@huawei.com>
- <1509084904-2505-3-git-send-email-zhongkaihua@huawei.com>
-Message-ID: <90d25374-cc83-7f75-eb38-766f0cdb9c53@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 27 Oct 2017 11:50:43 +0100
+Subject: [PATCH v4 01/28] regset: Add support for dynamically sized regsets
+In-Reply-To: <1509101470-7881-1-git-send-email-Dave.Martin@arm.com>
+References: <1509101470-7881-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1509101470-7881-2-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kaihua,
+Currently the regset API doesn't allow for the possibility that
+regsets (or at least, the amount of meaningful data in a regset)
+may change in size.
 
-On 27/10/17 07:15, Kaihua Zhong wrote:
-> Hi3660 mailbox controller is used to send message within multiple
-> processors, MCU, HIFI, etc.  It supports 32 mailbox channels and every
-> channel can only be used for single transferring direction.  Once the
-> channel is enabled, it needs to specify the destination interrupt and
-> acknowledge interrupt, these two interrupt vectors are used to create
-> the connection between the mailbox and interrupt controllers.
-> 
-> The application processor (or from point of view of kernel) is not the
-> only one master which can launch the data transferring, other
-> processors or MCU/DSP also can kick off the data transferring.  So this
-> driver implements a locking mechanism to support exclusive accessing.
-> 
-> The data transferring supports two modes, one is named as "automatic
-> acknowledge" mode so after send message the kernel doesn't need to wait
-> for acknowledge from remote and directly return; there have another mode
-> is to rely on handling interrupt for acknowledge.
-> 
-> This commit is for initial version driver, which only supports
-> "automatic acknowledge" mode to support CPU clock, which is the only
-> one consumer to use mailbox and has been verified.  Later may enhance
-> this driver for interrupt mode (e.g. for supporting HIFI).
-> 
-> Cc: John Stultz <john.stultz@linaro.org>
-> Cc: Guodong Xu <guodong.xu@linaro.org>
-> Cc: Haojian Zhuang <haojian.zhuang@linaro.org>
-> Cc: Niranjan Yadla <nyadla@cadence.com>
-> Cc: Raj Pawate <pawateb@cadence.com>
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> Signed-off-by: Ruyi Wang <wangruyi@huawei.com>
-> Signed-off-by: Kaihua Zhong <zhongkaihua@huawei.com>
-> Signed-off-by: Kevin Wang <kevin.wangtao@hisilicon.com>
-> ---
->   drivers/mailbox/Kconfig          |   8 +
->   drivers/mailbox/Makefile         |   2 +
->   drivers/mailbox/hi3660-mailbox.c | 331 +++++++++++++++++++++++++++++++++++++++
->   3 files changed, 341 insertions(+)
->   create mode 100644 drivers/mailbox/hi3660-mailbox.c
-> 
-> diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
-> index c5731e5..4b5d6e9 100644
-> --- a/drivers/mailbox/Kconfig
-> +++ b/drivers/mailbox/Kconfig
-> @@ -108,6 +108,14 @@ config TI_MESSAGE_MANAGER
->   	  multiple processors within the SoC. Select this driver if your
->   	  platform has support for the hardware block.
->   
-> +config HI3660_MBOX
-> +	tristate "Hi3660 Mailbox"
-> +	depends on ARCH_HISI && OF
-> +	help
-> +	  An implementation of the hi3660 mailbox. It is used to send message
-> +	  between application processors and other processors/MCU/DSP. Select
-> +	  Y here if you want to use Hi3660 mailbox controller.
-> +
->   config HI6220_MBOX
->   	tristate "Hi6220 Mailbox"
->   	depends on ARCH_HISI
-> diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
-> index d54e412..7d1bd51 100644
-> --- a/drivers/mailbox/Makefile
-> +++ b/drivers/mailbox/Makefile
-> @@ -26,6 +26,8 @@ obj-$(CONFIG_TI_MESSAGE_MANAGER) += ti-msgmgr.o
->   
->   obj-$(CONFIG_XGENE_SLIMPRO_MBOX) += mailbox-xgene-slimpro.o
->   
-> +obj-$(CONFIG_HI3660_MBOX)	+= hi3660-mailbox.o
-> +
->   obj-$(CONFIG_HI6220_MBOX)	+= hi6220-mailbox.o
->   
->   obj-$(CONFIG_BCM_PDC_MBOX)	+= bcm-pdc-mailbox.o
-> diff --git a/drivers/mailbox/hi3660-mailbox.c b/drivers/mailbox/hi3660-mailbox.c
-> new file mode 100644
-> index 0000000..67df8f8
-> --- /dev/null
-> +++ b/drivers/mailbox/hi3660-mailbox.c
-> @@ -0,0 +1,331 @@
-> +/*
-> + * Hisilicon's Hi3660 mailbox controller driver
-> + *
-> + * Copyright (c) 2017 Hisilicon Limited.
-> + * Copyright (c) 2017 Linaro Limited.
-> + *
-> + * Author: Leo Yan <leo.yan@linaro.org>
-> + *
-> + * This program is free software: you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation, version 2 of the License.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + */
-> +
-> +#include <linux/bitops.h>
-> +#include <linux/delay.h>
-> +#include <linux/device.h>
-> +#include <linux/err.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/iopoll.h>
-> +#include <linux/mailbox_controller.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/slab.h>
-> +
-> +#include "mailbox.h"
-> +
-> +#define MBOX_CHAN_MAX			32
-> +
-> +#define MBOX_RX				(0x0)
-> +#define MBOX_TX				(0x1)
-> +
-> +#define MBOX_BASE(mbox, ch)		((mbox)->base + ((ch) * 0x40))
-> +#define MBOX_SRC_REG			(0x00)
-> +#define MBOX_DST_REG			(0x04)
-> +#define MBOX_DCLR_REG			(0x08)
-> +#define MBOX_DSTAT_REG			(0x0c)
-> +#define MBOX_MODE_REG			(0x10)
-> +#define MBOX_IMASK_REG			(0x14)
-> +#define MBOX_ICLR_REG			(0x18)
-> +#define MBOX_SEND_REG			(0x1c)
-> +#define MBOX_DATA_REG			(0x20)
-> +
-> +#define MBOX_IPC_LOCK_REG		(0xa00)
-> +#define MBOX_IPC_UNLOCK			(0x1acce551)
-> +
-> +#define MBOX_AUTOMATIC_ACK		(1)
-> +
-> +#define MBOX_STATE_IDLE			BIT(4)
-> +#define MBOX_STATE_ACK			BIT(7)
-> +
-> +#define MBOX_MSG_LEN			8
-> +
-> +/**
-> + * Hi3660 mailbox channel device data
-> + *
-> + * A channel can be used for TX or RX, it can trigger remote
-> + * processor interrupt to notify remote processor and can receive
-> + * interrupt if has incoming message.
-> + *
-> + * @dst_irq:	Interrupt vector for remote processor
-> + * @ack_irq:	Interrupt vector for local processor
-> + */
-> +struct hi3660_mbox_dev {
-> +	unsigned int dst_irq;
-> +	unsigned int ack_irq;
-> +};
-> +
-> +/**
-> + * Hi3660 mailbox controller data
-> + *
-> + * Mailbox controller includes 32 channels and can allocate
-> + * channel for message transferring.
-> + *
-> + * @dev:	Device to which it is attached
-> + * @base:	Base address of the register mapping region
-> + * @chan:	Representation of channels in mailbox controller
-> + * @mdev:	Representation of channel device data
-> + * @controller:	Representation of a communication channel controller
-> + */
-> +struct hi3660_mbox {
-> +	struct device *dev;
-> +	void __iomem *base;
-> +	struct mbox_chan chan[MBOX_CHAN_MAX];
-> +	struct hi3660_mbox_dev mdev[MBOX_CHAN_MAX];
-> +	struct mbox_controller controller;
-> +};
-> +
-> +static inline struct hi3660_mbox *to_hi3660_mbox(struct mbox_chan *chan)
-> +{
-> +	return container_of(chan->mbox, struct hi3660_mbox, controller);
-> +}
-> +
-> +static int hi3660_mbox_check_state(struct mbox_chan *chan)
-> +{
-> +	unsigned long ch = (unsigned long)chan->con_priv;
-> +	struct hi3660_mbox *mbox = to_hi3660_mbox(chan);
-> +	struct hi3660_mbox_dev *mdev = &mbox->mdev[ch];
-> +	void __iomem *base = MBOX_BASE(mbox, ch);
-> +	unsigned long val;
-> +	unsigned int state, ret;
-> +
-> +	/* Mailbox is idle so directly bail out */
-> +	state = readl_relaxed(base + MBOX_MODE_REG);
-> +	if (state & MBOX_STATE_IDLE)
-> +		return 0;
-> +
-> +	/* Wait for acknowledge from remote */
-> +	ret = readx_poll_timeout_atomic(readl_relaxed, base + MBOX_MODE_REG,
-> +			val, (val & MBOX_STATE_ACK), 1000, 300000);
-> +	if (ret) {
-> +		dev_err(mbox->dev, "%s: timeout for receiving ack\n", __func__);
-> +		return ret;
-> +	}
-> +
-> +	/* Ensure channel is released */
-> +	writel_relaxed(0xffffffff, base + MBOX_IMASK_REG);
-> +	writel_relaxed(BIT(mdev->ack_irq), base + MBOX_SRC_REG);
-> +	__asm__ volatile ("sev");
+In particular, this results in useless padding being added to
+coredumps if a regset's current size is smaller than its
+theoretical maximum size.
 
-There is an existing sev() macro for this.
+This patch adds a get_size() function to struct user_regset.
+Individual regset implementations can implement this function to
+return the current size of the regset data.  A regset_size()
+function is added to provide callers with an abstract interface for
+determining the size of a regset without needing to know whether
+the regset is dynamically sized or not.
 
-> +	return 0;
-> +}
-> +
-> +static int hi3660_mbox_unlock(struct mbox_chan *chan)
-> +{
-> +	struct hi3660_mbox *mbox = to_hi3660_mbox(chan);
-> +	unsigned int val, retry = 3;
-> +
-> +	do {
-> +		writel_relaxed(MBOX_IPC_UNLOCK, mbox->base + MBOX_IPC_LOCK_REG);
-> +
-> +		val = readl_relaxed(mbox->base + MBOX_IPC_LOCK_REG);
-> +		if (!val)
-> +			break;
-> +
-> +		udelay(10);
-> +	} while (retry--);
-> +
-> +	return (!val) ? 0 : -ETIMEDOUT;
-> +}
-> +
-> +static int hi3660_mbox_acquire_channel(struct mbox_chan *chan)
-> +{
-> +	unsigned long ch = (unsigned long)chan->con_priv;
-> +	struct hi3660_mbox *mbox = to_hi3660_mbox(chan);
-> +	struct hi3660_mbox_dev *mdev = &mbox->mdev[ch];
-> +	void __iomem *base = MBOX_BASE(mbox, ch);
-> +	unsigned int val = 0, retry = 10;
-> +
-> +	/*
-> +	 * Hardware locking for exclusive accessing within CPUs
-> +	 * without exclusive monitor mechanism.
-> +	 */
-> +	do {
-> +		val = readl_relaxed(base + MBOX_MODE_REG);
-> +		if (!(val & MBOX_STATE_IDLE)) {
-> +			__asm__ volatile ("wfe");
-> +			continue;
+The only affected user of this interface is the ELF coredump code:
+This patch ports ELF coredump to dump regsets with their actual
+size in the coredump.  This has no effect except for new regsets
+that are dynamically sized and provide a get_size() implementation.
 
-So this is going to "wfe" when retry == 0 and the continue statement 
-will take us out of the loop?
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Oleg Nesterov <oleg@redhat.com>
+Cc: Alexander Viro <viro@zeniv.linux.org.uk>
+---
+ fs/binfmt_elf.c        |  6 ++---
+ include/linux/regset.h | 67 ++++++++++++++++++++++++++++++++++++++++++++------
+ 2 files changed, 63 insertions(+), 10 deletions(-)
 
-Also, there is a wfe() macro for arm and arm64 which could be used here.
-
-> +		}
-> +
-> +		/* Check if channel has be acquired */
-> +		writel_relaxed(BIT(mdev->ack_irq), base + MBOX_SRC_REG);
-> +		val = readl_relaxed(base + MBOX_SRC_REG) & BIT(mdev->ack_irq);
-> +		if (val)
-> +			break;
-> +
-> +	} while (retry--);
-> +
-> +	return (val) ? 0 : -ETIMEDOUT;
-
-If timeout occurs while waiting for the MBOX to be idle, val will hold 
-the last value from MBOX_MODE_REG, and if this can be different than 0, 
-this will hide the fact it timed out.
-
-Maybe the following would be more appropriate:
-
-return (retry >= 0) ? 0 : -ETIMEDOUT;
-
-Also, your do {} while loops for the timeouts falsely give the 
-impression we do "retry" attempts when we actually do "retry + 1" 
-attempts (but I guess it doesn't make a big difference from the 
-functional point of view).
-
-> +}
-> +
-> +static int hi3660_mbox_send(struct mbox_chan *chan, u32 *msg)
-> +{
-> +	unsigned long ch = (unsigned long)chan->con_priv;
-> +	struct hi3660_mbox *mbox = to_hi3660_mbox(chan);
-> +	struct hi3660_mbox_dev *mdev = &mbox->mdev[ch];
-> +	void __iomem *base = MBOX_BASE(mbox, ch);
-> +	unsigned int i;
-> +
-> +	/* Clear mask for destination interrupt */
-> +	writel_relaxed(~BIT(mdev->dst_irq), base + MBOX_IMASK_REG);
-> +
-> +	/* Config destination for interrupt vector */
-> +	writel_relaxed(BIT(mdev->dst_irq), base + MBOX_DST_REG);
-> +
-> +	/* Automatic acknowledge mode */
-> +	writel_relaxed(MBOX_AUTOMATIC_ACK, base + MBOX_MODE_REG);
-> +
-> +	/* Fill message data */
-> +	for (i = 0; i < MBOX_MSG_LEN; i++)
-> +		writel_relaxed(msg[i], base + MBOX_DATA_REG + i * 4);
-> +
-> +	/* Trigger data transferring */
-> +	writel_relaxed(BIT(mdev->ack_irq), base + MBOX_SEND_REG);
-> +	return 0;
-> +}
-> +
-> +static int hi3660_mbox_send_data(struct mbox_chan *chan, void *msg)
-> +{
-> +	struct hi3660_mbox *mbox = to_hi3660_mbox(chan);
-> +	int err;
-> +
-> +	err = hi3660_mbox_check_state(chan);
-> +	if (err) {
-> +		dev_err(mbox->dev, "checking state failed\n");
-> +		return err;
-> +	}
-> +
-> +	err = hi3660_mbox_unlock(chan);
-> +	if (err) {
-> +		dev_err(mbox->dev, "unlocking mailbox failed\n");
-> +		return err;
-> +	}
-> +
-> +	err = hi3660_mbox_acquire_channel(chan);
-> +	if (err) {
-> +		dev_err(mbox->dev, "acquiring channel failed\n");
-> +		return err;
-> +	}
-> +
-> +	return hi3660_mbox_send(chan, msg);
-> +}
-> +
-> +static struct mbox_chan_ops hi3660_mbox_ops = {
-> +	.send_data    = hi3660_mbox_send_data,
-> +};
-> +
-> +static struct mbox_chan *hi3660_mbox_xlate(struct mbox_controller *controller,
-> +					   const struct of_phandle_args *spec)
-> +{
-> +	struct hi3660_mbox *mbox = dev_get_drvdata(controller->dev);
-
-nit:
-In to_hi3660_mbox, you use the fact that the mbox_controller structure 
-is part of hi3660_mbox and use container of to retrieve hi3660_mbox.
-
-I think it would be nice to be consistent about this, either use 
-container_of or dev drvdata, but not both.
-
-Cheers,
-
+diff --git a/fs/binfmt_elf.c b/fs/binfmt_elf.c
+index 73b01e4..35aa03f 100644
+--- a/fs/binfmt_elf.c
++++ b/fs/binfmt_elf.c
+@@ -1699,7 +1699,7 @@ static int fill_thread_core_info(struct elf_thread_core_info *t,
+ 				 long signr, size_t *total)
+ {
+ 	unsigned int i;
+-	unsigned int regset_size = view->regsets[0].n * view->regsets[0].size;
++	unsigned int size = regset_size(t->task, &view->regsets[0]);
+ 
+ 	/*
+ 	 * NT_PRSTATUS is the one special case, because the regset data
+@@ -1708,7 +1708,7 @@ static int fill_thread_core_info(struct elf_thread_core_info *t,
+ 	 * We assume that regset 0 is NT_PRSTATUS.
+ 	 */
+ 	fill_prstatus(&t->prstatus, t->task, signr);
+-	(void) view->regsets[0].get(t->task, &view->regsets[0], 0, regset_size,
++	(void) view->regsets[0].get(t->task, &view->regsets[0], 0, size,
+ 				    &t->prstatus.pr_reg, NULL);
+ 
+ 	fill_note(&t->notes[0], "CORE", NT_PRSTATUS,
+@@ -1728,7 +1728,7 @@ static int fill_thread_core_info(struct elf_thread_core_info *t,
+ 		if (regset->core_note_type && regset->get &&
+ 		    (!regset->active || regset->active(t->task, regset))) {
+ 			int ret;
+-			size_t size = regset->n * regset->size;
++			size_t size = regset_size(t->task, regset);
+ 			void *data = kmalloc(size, GFP_KERNEL);
+ 			if (unlikely(!data))
+ 				return 0;
+diff --git a/include/linux/regset.h b/include/linux/regset.h
+index 8e0c9fe..494ceda 100644
+--- a/include/linux/regset.h
++++ b/include/linux/regset.h
+@@ -107,6 +107,28 @@ typedef int user_regset_writeback_fn(struct task_struct *target,
+ 				     int immediate);
+ 
+ /**
++ * user_regset_get_size_fn - type of @get_size function in &struct user_regset
++ * @target:	thread being examined
++ * @regset:	regset being examined
++ *
++ * This call is optional; usually the pointer is %NULL.
++ *
++ * When provided, this function must return the current size of regset
++ * data, as observed by the @get function in &struct user_regset.  The
++ * value returned must be a multiple of @size.  The returned size is
++ * required to be valid only until the next time (if any) @regset is
++ * modified for @target.
++ *
++ * This function is intended for dynamically sized regsets.  A regset
++ * that is statically sized does not need to implement it.
++ *
++ * This function should not be called directly: instead, callers should
++ * call regset_size() to determine the current size of a regset.
++ */
++typedef unsigned int user_regset_get_size_fn(struct task_struct *target,
++					     const struct user_regset *regset);
++
++/**
+  * struct user_regset - accessible thread CPU state
+  * @n:			Number of slots (registers).
+  * @size:		Size in bytes of a slot (register).
+@@ -117,19 +139,33 @@ typedef int user_regset_writeback_fn(struct task_struct *target,
+  * @set:		Function to store values.
+  * @active:		Function to report if regset is active, or %NULL.
+  * @writeback:		Function to write data back to user memory, or %NULL.
++ * @get_size:		Function to return the regset's size, or %NULL.
+  *
+  * This data structure describes a machine resource we call a register set.
+  * This is part of the state of an individual thread, not necessarily
+  * actual CPU registers per se.  A register set consists of a number of
+  * similar slots, given by @n.  Each slot is @size bytes, and aligned to
+- * @align bytes (which is at least @size).
++ * @align bytes (which is at least @size).  For dynamically-sized
++ * regsets, @n must contain the maximum possible number of slots for the
++ * regset, and @get_size must point to a function that returns the
++ * current regset size.
+  *
+- * These functions must be called only on the current thread or on a
+- * thread that is in %TASK_STOPPED or %TASK_TRACED state, that we are
+- * guaranteed will not be woken up and return to user mode, and that we
+- * have called wait_task_inactive() on.  (The target thread always might
+- * wake up for SIGKILL while these functions are working, in which case
+- * that thread's user_regset state might be scrambled.)
++ * Callers that need to know only the current size of the regset and do
++ * not care about its internal structure should call regset_size()
++ * instead of inspecting @n or calling @get_size.
++ *
++ * For backward compatibility, the @get and @set methods must pad to, or
++ * accept, @n * @size bytes, even if the current regset size is smaller.
++ * The precise semantics of these operations depend on the regset being
++ * accessed.
++ *
++ * The functions to which &struct user_regset members point must be
++ * called only on the current thread or on a thread that is in
++ * %TASK_STOPPED or %TASK_TRACED state, that we are guaranteed will not
++ * be woken up and return to user mode, and that we have called
++ * wait_task_inactive() on.  (The target thread always might wake up for
++ * SIGKILL while these functions are working, in which case that
++ * thread's user_regset state might be scrambled.)
+  *
+  * The @pos argument must be aligned according to @align; the @count
+  * argument must be a multiple of @size.  These functions are not
+@@ -156,6 +192,7 @@ struct user_regset {
+ 	user_regset_set_fn		*set;
+ 	user_regset_active_fn		*active;
+ 	user_regset_writeback_fn	*writeback;
++	user_regset_get_size_fn		*get_size;
+ 	unsigned int			n;
+ 	unsigned int 			size;
+ 	unsigned int 			align;
+@@ -371,5 +408,21 @@ static inline int copy_regset_from_user(struct task_struct *target,
+ 	return regset->set(target, regset, offset, size, NULL, data);
+ }
+ 
++/**
++ * regset_size - determine the current size of a regset
++ * @target:	thread to be examined
++ * @regset:	regset to be examined
++ *
++ * Note that the returned size is valid only until the next time
++ * (if any) @regset is modified for @target.
++ */
++static inline unsigned int regset_size(struct task_struct *target,
++				       const struct user_regset *regset)
++{
++	if (!regset->get_size)
++		return regset->n * regset->size;
++	else
++		return regset->get_size(target, regset);
++}
+ 
+ #endif	/* <linux/regset.h> */
 -- 
-Julien Thierry
+2.1.4
