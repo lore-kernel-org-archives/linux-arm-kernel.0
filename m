@@ -1,103 +1,48 @@
-From: mbrugger@suse.com (Matthias Brugger)
-Date: Fri, 27 Oct 2017 17:12:58 +0200
-Subject: [PATCH] efi/libstub: arm: omit sorting of the UEFI memory map
-In-Reply-To: <20171022141457.28769-1-ard.biesheuvel@linaro.org>
-References: <20171022141457.28769-1-ard.biesheuvel@linaro.org>
-Message-ID: <fe35c87c-8fd0-b33f-3a6f-2bd759726667@suse.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 27 Oct 2017 17:11:14 +0200
+Subject: [PATCH v9 06/10] arm64: dts: allwinner: Restore EMAC changes
+In-Reply-To: <20171024175714.15840-7-clabbe.montjoie@gmail.com>
+References: <20171024175714.15840-1-clabbe.montjoie@gmail.com>
+ <20171024175714.15840-7-clabbe.montjoie@gmail.com>
+Message-ID: <20171027151114.ax2yhf75lbho2js5@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
-
-On 10/22/2017 04:14 PM, Ard Biesheuvel wrote:
-> ARM shares its EFI stub implementation with arm64, which has some
-> special handling in the virtual remapping code to
-> a) make sure that we can map everything even if the OS executes
->    with 64k page size, and
-> b) make sure that adjacent regions with the same attributes are not
->    reordered or moved apart in memory.
+On Tue, Oct 24, 2017 at 07:57:10PM +0200, Corentin Labbe wrote:
+> The original dwmac-sun8i DT bindings have some issue on how to handle
+> integrated PHY and was reverted in last RC of 4.13.
+> But now we have a solution so we need to get back that was reverted.
 > 
-> The latter is a workaround for a 'feature' that was shortly recommended
-> by UEFI spec v2.5, but deprecated shortly after, due to the fact that
-> it broke many OS installers, including non-Linux ones, and it was never
-> widely implemented for ARM systems. Before implementing b), the arm64
-> code simply rounded up all regions to 64 KB granularity, but given that
-> that results in moving adjacent regions apart, it had to be refined when
-> b) was implemented.
+> This patch restore arm64 DT about dwmac-sun8i
+> This reverts commit 87e1f5e8bb4b ("arm64: dts: allwinner: Revert EMAC changes")
 > 
-> The adjacency check requires a sort() pass, due to the fact that the
-> UEFI spec does not mandate any ordering, and the inclusion of the
-> lib/sort.c code into the ARM EFI stub is causing some trouble with
-> the decompressor build due to the fact that its EXPORT_SYMBOL() call
-> triggers the creation of ksymtab/kcrctab sections.
-> 
-> So let's simply do away with the adjacency check for ARM, and simply put
-> all UEFI runtime regions together if they have the same memory attributes.
-> This is guaranteed to work, given that ARM only supports 4 KB pages,
-> and allows us to remove the sort() call entirely.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 > ---
->  drivers/firmware/efi/libstub/Makefile   | 6 +++---
->  drivers/firmware/efi/libstub/arm-stub.c | 7 +++++--
->  2 files changed, 8 insertions(+), 5 deletions(-)
-> 
+>  .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts   | 16 ++++++++++++++++
+>  .../boot/dts/allwinner/sun50i-a64-pine64-plus.dts    | 15 +++++++++++++++
+>  arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts  | 17 +++++++++++++++++
+>  .../dts/allwinner/sun50i-a64-sopine-baseboard.dts    | 16 ++++++++++++++++
+>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi        | 20 ++++++++++++++++++++
+>  .../boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts     | 17 +++++++++++++++++
+>  .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts    | 17 +++++++++++++++++
+>  .../boot/dts/allwinner/sun50i-h5-orangepi-prime.dts  | 17 +++++++++++++++++
+>  8 files changed, 135 insertions(+)
 
-I thought I already provided my tag, but just in case:
-This fixes the boot problems I had on the bananapi-r2.
+Can you split the changes between the A64 and the H5? It's going to be
+difficult to merge otherwise.
 
-Tested-by: Matthias Brugger <matthias.bgg@gmail.com>
+(You also forgot to add Florian's Acked-by on your whole serie).
 
-> diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
-> index dedf9bde44db..f3e8431565ea 100644
-> --- a/drivers/firmware/efi/libstub/Makefile
-> +++ b/drivers/firmware/efi/libstub/Makefile
-> @@ -33,13 +33,14 @@ lib-y				:= efi-stub-helper.o gop.o secureboot.o
->  lib-$(CONFIG_RESET_ATTACK_MITIGATION) += tpm.o
->  
->  # include the stub's generic dependencies from lib/ when building for ARM/arm64
-> -arm-deps := fdt_rw.c fdt_ro.c fdt_wip.c fdt.c fdt_empty_tree.c fdt_sw.c sort.c
-> +arm-deps-y := fdt_rw.c fdt_ro.c fdt_wip.c fdt.c fdt_empty_tree.c fdt_sw.c
-> +arm-deps-$(CONFIG_ARM64) += sort.c
->  
->  $(obj)/lib-%.o: $(srctree)/lib/%.c FORCE
->  	$(call if_changed_rule,cc_o_c)
->  
->  lib-$(CONFIG_EFI_ARMSTUB)	+= arm-stub.o fdt.o string.o random.o \
-> -				   $(patsubst %.c,lib-%.o,$(arm-deps))
-> +				   $(patsubst %.c,lib-%.o,$(arm-deps-y))
->  
->  lib-$(CONFIG_ARM)		+= arm32-stub.o
->  lib-$(CONFIG_ARM64)		+= arm64-stub.o
-> @@ -90,5 +91,4 @@ quiet_cmd_stubcopy = STUBCPY $@
->  # explicitly by the decompressor linker script.
->  #
->  STUBCOPY_FLAGS-$(CONFIG_ARM)	+= --rename-section .data=.data.efistub
-> -STUBCOPY_RM-$(CONFIG_ARM)	+= -R ___ksymtab+sort -R ___kcrctab+sort
->  STUBCOPY_RELOC-$(CONFIG_ARM)	:= R_ARM_ABS
-> diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
-> index 1cb2d1c070c3..3061e4057483 100644
-> --- a/drivers/firmware/efi/libstub/arm-stub.c
-> +++ b/drivers/firmware/efi/libstub/arm-stub.c
-> @@ -349,7 +349,9 @@ void efi_get_virtmap(efi_memory_desc_t *memory_map, unsigned long map_size,
->  	 * The easiest way to find adjacent regions is to sort the memory map
->  	 * before traversing it.
->  	 */
-> -	sort(memory_map, map_size / desc_size, desc_size, cmp_mem_desc, NULL);
-> +	if (IS_ENABLED(CONFIG_ARM64))
-> +		sort(memory_map, map_size / desc_size, desc_size, cmp_mem_desc,
-> +		     NULL);
->  
->  	for (l = 0; l < map_size; l += desc_size, prev = in) {
->  		u64 paddr, size;
-> @@ -366,7 +368,8 @@ void efi_get_virtmap(efi_memory_desc_t *memory_map, unsigned long map_size,
->  		 * a 4k page size kernel to kexec a 64k page size kernel and
->  		 * vice versa.
->  		 */
-> -		if (!regions_are_adjacent(prev, in) ||
-> +		if ((IS_ENABLED(CONFIG_ARM64) &&
-> +		     !regions_are_adjacent(prev, in)) ||
->  		    !regions_have_compatible_memory_type_attrs(prev, in)) {
->  
->  			paddr = round_down(in->phys_addr, SZ_64K);
-> 
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171027/15e5886e/attachment.sig>
