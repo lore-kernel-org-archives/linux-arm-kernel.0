@@ -1,65 +1,49 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 27 Oct 2017 15:28:53 +0100
-Subject: [PATCH v5 24/26] KVM: arm/arm64: GICv4: Prevent userspace from
- changing doorbell affinity
-In-Reply-To: <20171027142855.21584-1-marc.zyngier@arm.com>
-References: <20171027142855.21584-1-marc.zyngier@arm.com>
-Message-ID: <20171027142855.21584-25-marc.zyngier@arm.com>
+From: icenowy@aosc.io (icenowy at aosc.io)
+Date: Fri, 27 Oct 2017 22:33:29 +0800
+Subject: [PATCH 1/2] dt-bindings: add binding for A64 DE2 CCU with SRAM
+ section
+In-Reply-To: <20171016120912.lxu7rikhffxsu5o4@flea.lan>
+References: <20171014122925.13220-1-icenowy@aosc.io>
+ <20171016091136.b4rnckh2tfi26shx@flea.lan>
+ <d62ac8b8ff9073b886ceaa9ce54e6903@aosc.io>
+ <20171016120912.lxu7rikhffxsu5o4@flea.lan>
+Message-ID: <b8c770bdc7a0541b8d1179598d814b75@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We so far allocate the doorbell interrupts without taking any
-special measure regarding the affinity of these interrupts. We
-simply move them around as required when the vcpu gets scheduled
-on a different CPU.
+? 2017-10-16 20:09?Maxime Ripard ???
+> On Mon, Oct 16, 2017 at 05:41:10PM +0800, icenowy at aosc.io wrote:
+>> ? 2017-10-16 17:11?Maxime Ripard ???
+>> > On Sat, Oct 14, 2017 at 08:29:24PM +0800, Icenowy Zheng wrote:
+>> > > A64's Display Engine 2.0 needs a section of SRAM (SRAM C) to be
+>> > > claimed.
+>> >
+>> > Why?
+>> 
+>> Allwinner didn't document this, but if the SRAM is not claimed, the
+>> DE2 MMIO zone is totally not accessible.
+> 
+> Not accessible how? It generates an abort when you access it? It
+> returns 0?
+> 
+>> It seems that Allwinner uses the SRAM C in the DE2 internally.
+> 
+> Then shouldn't it be tied to all the DE2 devices then? So mixers
+> too. Either way, this should be mentionned in your commit logs. How
+> you're fixing things is much less interesting than why you're doing
+> them. You can tell how you're doing them from your code already.
 
-But that's counting without userspace (and the evil irqbalance) that
-can try and move the VPE interrupt around, causing the ITS code
-to emit VMOVP commands and remap the doorbell to another redistributor.
-Worse, this can happen while the vcpu is running, causing all kind
-of trouble if the VPE is already resident, and we end-up in UNPRED
-territory.
+Yes I checked and when the SRAM is not claimed any part in DE2 memory
+zone can't be accessed.
 
-So let's take a definitive action and prevent userspace from messing
-with us. This is just a matter of adding IRQ_NO_BALANCING to the
-set of flags we already have, letting the kernel in sole control
-of the affinity.
+Should I also add the code that claims the SRAM in the mixer code? Or
+just place the device tree property is enough? (As the mixers depend
+on the DE2 CCU) Or just ignore this?
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- virt/kvm/arm/vgic/vgic-v4.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
-
-diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
-index d7fe610bb1f5..d10e18eabd3b 100644
---- a/virt/kvm/arm/vgic/vgic-v4.c
-+++ b/virt/kvm/arm/vgic/vgic-v4.c
-@@ -23,6 +23,8 @@
- 
- #include "vgic.h"
- 
-+#define DB_IRQ_FLAGS	(IRQ_NOAUTOEN | IRQ_DISABLE_UNLAZY | IRQ_NO_BALANCING)
-+
- static irqreturn_t vgic_v4_doorbell_handler(int irq, void *info)
- {
- 	struct kvm_vcpu *vcpu = info;
-@@ -83,7 +85,7 @@ int vgic_v4_init(struct kvm *kvm)
- 		 * doorbell could kick us out of the guest too
- 		 * early...
- 		 */
--		irq_set_status_flags(irq, IRQ_NOAUTOEN | IRQ_DISABLE_UNLAZY);
-+		irq_set_status_flags(irq, DB_IRQ_FLAGS);
- 		ret = request_irq(irq, vgic_v4_doorbell_handler,
- 				  0, "vcpu", vcpu);
- 		if (ret) {
-@@ -121,7 +123,7 @@ void vgic_v4_teardown(struct kvm *kvm)
- 		struct kvm_vcpu *vcpu = kvm_get_vcpu(kvm, i);
- 		int irq = its_vm->vpes[i]->irq;
- 
--		irq_clear_status_flags(irq, IRQ_NOAUTOEN | IRQ_DISABLE_UNLAZY);
-+		irq_clear_status_flags(irq, DB_IRQ_FLAGS);
- 		free_irq(irq, vcpu);
- 	}
- 
--- 
-2.11.0
+> 
+> Maxime
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
