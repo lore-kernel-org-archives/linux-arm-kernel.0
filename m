@@ -1,47 +1,27 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Fri, 27 Oct 2017 12:07:51 +0800
-Subject: [PATCH 0/4] Add SimpleFB support for Allwinner H3 SoC
-In-Reply-To: <20170911155529.62891-1-icenowy@aosc.io>
-References: <20170911155529.62891-1-icenowy@aosc.io>
-Message-ID: <239eed81945193af3af465c7ef0008ca@aosc.io>
+From: itaru.kitayama@riken.jp (Itaru Kitayama)
+Date: Fri, 27 Oct 2017 13:12:21 +0900
+Subject: v4.14-rc3 kernel issue
+Message-ID: <cc5b77ca-45a1-a7a4-08c9-8aa62c4f53c6@riken.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-09-11 23:55?Icenowy Zheng ???
-> This patchset adds devicetree-side support of SimpleFB on Allwinner H3
-> SoC.
-> 
-> The DE2 CCU is initialized and used by the SimpleFB node, in order to
-> furtherly coexist with the DRM code.
-> 
-> The first patch adds pipelines for DE2 displays in simplefb-sunxi
-> device tree binding.
-> 
-> The second patch adds DE2 CCU device node for H3 SoC, and the skeleton
-> of the node enters the H3/H5 common DTSI; the H5 support is splited
-> into the third patch, as they will enter different tree.
-> 
-> The fourth patch finally adds simplefb nodes, using the
-> pipeline strings introduced in the first patch.
-> 
-> Icenowy Zheng (4):
->   dt-bindings: simplefb-sunxi: add pipelines for DE2
->   ARM: sun8i: h3/h5: add DE2 CCU device node for H3
->   arm64: allwinner: h5: add compatible string for DE2 CCU
->   ARM: sunxi: h3/h5: add simplefb nodes
+Hi,
+I've seen this on a guest on KVM. Observed this after system booted, not
+special commands were issued.
 
-Maxime,
-as the U-Boot side is applied to u-boot-video, could you take a look at 
-this
-patchset?
-
-Thanks!
-Icenowy
-
-> 
->  .../bindings/display/simple-framebuffer-sunxi.txt  |  4 ++
->  arch/arm/boot/dts/sun8i-h3.dtsi                    |  4 ++
->  arch/arm/boot/dts/sunxi-h3-h5.dtsi                 | 43 
-> ++++++++++++++++++++++
->  arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi       |  4 ++
->  4 files changed, 55 insertions(+)
+[   82.124767] ==================================================================
+[   82.129867] BUG: KASAN: slab-out-of-bounds in pud_huge+0x24/0x48
+[   82.133893] Read of size 8 at addr ffff8000c43f79e8 by task kworker/u96:1/373
+[   82.138675]
+[   82.139709] CPU: 35 PID: 373 Comm: kworker/u96:1 Not tainted 4.14.0-rc3-dev+ #8
+[   82.144616] Hardware name: QEMU KVM Virtual Machine, BIOS 0.0.0 02/06/2015
+[   82.149292] usercopy: kernel memory overwrite attempt detected to ffff8000c43f7610 (thread_stack) (8 bytes)
+[   82.156031] ------------[ cut here ]------------
+[   82.159139] kernel BUG at mm/usercopy.c:72!
+[   82.161972] Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
+  [   82.165650] Modules linked in: ip6t_rpfilter ip6t_REJECT nf_reject_ipv6 xt_conntrack ip_set nfnetlink ebtable_nat ebtable_broute bridge stp llc ip6table_nat nf_conntrack_ipv6 nf_defrag_ipv6 nf_nat_ipv6 ip6table_mangle ip6table_raw ip6table_security iptable_nat nf_conntrack_ipv4 nf_defrag_ipv4 nf_nat_ipv4 nf_nat nf_conntrack iptable_mangle iptable_raw iptable_security ebtable_filter ebtables ip6table_filter ip6_tables sunrpc vfat fat crc32_ce crct10dif_ce ghash_ce virtio_net button xfs libcrc32c virtio_console virtio_scsi virtio_pci qemu_fw_cfg virtio_mmio virtio_ring virtio
+[   82.199893] CPU: 35 PID: 373 Comm: kworker/u96:1 Not tainted 4.14.0-rc3-dev+ #8
+[   82.204806] Hardware name: QEMU KVM Virtual Machine, BIOS 0.0.0 02/06/2015
+[   82.209408] usercopy: kernel memory overwrite attempt detected to ffff8000c43f6d10 (thread_stack) (8 bytes)
+[   82.215969] ------------[ cut here ]------------
+[   82.219070] kernel BUG at mm/usercopy.c:72!
