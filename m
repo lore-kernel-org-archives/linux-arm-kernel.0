@@ -1,56 +1,38 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 27 Oct 2017 17:13:34 +0200
-Subject: [PATCH 1/2] dt-bindings: add binding for A64 DE2 CCU with SRAM
- section
-In-Reply-To: <b8c770bdc7a0541b8d1179598d814b75@aosc.io>
-References: <20171014122925.13220-1-icenowy@aosc.io>
- <20171016091136.b4rnckh2tfi26shx@flea.lan>
- <d62ac8b8ff9073b886ceaa9ce54e6903@aosc.io>
- <20171016120912.lxu7rikhffxsu5o4@flea.lan>
- <b8c770bdc7a0541b8d1179598d814b75@aosc.io>
-Message-ID: <20171027151334.c3b7yqoiexgwopsf@flea>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Fri, 27 Oct 2017 23:06:54 +0800
+Subject: [PATCH v2 06/10] arm64: allwinner: h5: add compatible string for DE2
+ CCU
+In-Reply-To: <20171027150658.18509-1-icenowy@aosc.io>
+References: <20171027150658.18509-1-icenowy@aosc.io>
+Message-ID: <20171027150658.18509-7-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 27, 2017 at 10:33:29PM +0800, icenowy at aosc.io wrote:
-> ? 2017-10-16 20:09?Maxime Ripard ???
-> > On Mon, Oct 16, 2017 at 05:41:10PM +0800, icenowy at aosc.io wrote:
-> > > ? 2017-10-16 17:11?Maxime Ripard ???
-> > > > On Sat, Oct 14, 2017 at 08:29:24PM +0800, Icenowy Zheng wrote:
-> > > > > A64's Display Engine 2.0 needs a section of SRAM (SRAM C) to be
-> > > > > claimed.
-> > > >
-> > > > Why?
-> > > 
-> > > Allwinner didn't document this, but if the SRAM is not claimed, the
-> > > DE2 MMIO zone is totally not accessible.
-> > 
-> > Not accessible how? It generates an abort when you access it? It
-> > returns 0?
-> > 
-> > > It seems that Allwinner uses the SRAM C in the DE2 internally.
-> > 
-> > Then shouldn't it be tied to all the DE2 devices then? So mixers
-> > too. Either way, this should be mentionned in your commit logs. How
-> > you're fixing things is much less interesting than why you're doing
-> > them. You can tell how you're doing them from your code already.
-> 
-> Yes I checked and when the SRAM is not claimed any part in DE2 memory
-> zone can't be accessed.
+The DE2 CCU on Allwinner H5 SoC has a slightly different behavior than
+the one on H3, so the compatible string is not set in the common DTSI
+file.
 
-Then all the nodes that depend on it should have it, and the bindings
-should be modified appropriately.
+Add the compatible string of H5 DE2 CCU in H5 DTSI file.
 
-Maxime
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
+index d9a720bff05d..e237c05cfdb4 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
+@@ -98,6 +98,10 @@
+ 	compatible = "allwinner,sun50i-h5-ccu";
+ };
+ 
++&display_clocks {
++	compatible = "allwinner,sun50i-h5-de2-clk";
++};
++
+ &mmc0 {
+ 	compatible = "allwinner,sun50i-h5-mmc",
+ 		     "allwinner,sun50i-a64-mmc";
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171027/59cf5cc0/attachment.sig>
+2.13.6
