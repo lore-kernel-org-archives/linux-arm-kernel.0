@@ -1,106 +1,42 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Fri, 27 Oct 2017 23:02:51 +0800
-Subject: [PATCH v2 1/3] dt-bindings: mailbox: Introduce Hi3660 controller
- binding
-In-Reply-To: <20171027143844.uxhl3vbzacvv3z4j@rob-hp-laptop>
-References: <1509084904-2505-1-git-send-email-zhongkaihua@huawei.com>
- <1509084904-2505-2-git-send-email-zhongkaihua@huawei.com>
- <20171027143844.uxhl3vbzacvv3z4j@rob-hp-laptop>
-Message-ID: <20171027150251.GE29281@leoy-linaro>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Fri, 27 Oct 2017 23:06:48 +0800
+Subject: [PATCH v2 00/10] Allwinner H3/H5/A64(DE2) SimpleFB support
+Message-ID: <20171027150658.18509-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 27, 2017 at 09:38:44AM -0500, Rob Herring wrote:
-> On Fri, Oct 27, 2017 at 02:15:02PM +0800, Kaihua Zhong wrote:
-> > From: Leo Yan <leo.yan@linaro.org>
-> > 
-> > Introduce a binding for the Hi3660 mailbox controller, the mailbox is
-> > used within application processor (AP), communication processor (CP),
-> > HIFI and MCU, etc.
-> > 
-> > Cc: John Stultz <john.stultz@linaro.org>
-> > Cc: Guodong Xu <guodong.xu@linaro.org>
-> > Cc: Haojian Zhuang <haojian.zhuang@linaro.org>
-> > Cc: Niranjan Yadla <nyadla@cadence.com>
-> > Cc: Raj Pawate <pawateb@cadence.com>
-> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> > ---
-> >  .../bindings/mailbox/hisilicon,hi3660-mailbox.txt  | 52 ++++++++++++++++++++++
-> >  1 file changed, 52 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/mailbox/hisilicon,hi3660-mailbox.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/mailbox/hisilicon,hi3660-mailbox.txt b/Documentation/devicetree/bindings/mailbox/hisilicon,hi3660-mailbox.txt
-> > new file mode 100644
-> > index 0000000..8a8d7e1
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/mailbox/hisilicon,hi3660-mailbox.txt
-> > @@ -0,0 +1,52 @@
-> > +Hisilicon Hi3660 Mailbox Driver
-> 
-> Bindings are for h/w, not drivers.
+This patchset adds support for the SimpleFB on Allwinner SoCs with
+"Display Engine 2.0".
 
-Thanks for reviewing, Rob.
+PATCH 1 to PATCH 3 are DE2 CCU fixes for H3/H5 SoCs.
 
-Will fix for this and below comments.
+PATCH 4 adds the pipeline strings for DE2 SimpleFB.
 
-> > +
-> > +Hisilicon Hi3660 mailbox controller supports up to 32 channels.  Messages
-> > +are passed between processors, including application & communication
-> > +processors, MCU, HIFI, etc.  Each channel is unidirectional and accessed
-> > +by using MMIO registers; it supports maximum to 8 words message.
-> > +
-> > +Controller
-> > +----------
-> > +
-> > +Required properties:
-> > +- compatible:		: Shall be "hisilicon,hi3660-mbox"
-> > +- reg:			: Offset and length of the device's register set
-> > +- #mbox-cells:		: Must be 3
-> > +			  <&phandle channel dst_irq ack_irq>
-> > +			    phandle	: Label name of controller
-> > +			    channel	: Channel number
-> > +			    dst_irq	: Remote interrupt vector
-> > +			    ack_irq	: Local interrupt vector
-> > +
-> > +- interrupts:		: Contains the two IRQ lines for mailbox.
-> > +
-> > +Example:
-> > +
-> > +mailbox: mailbox at e896b000 {
-> > +	compatible = "hisilicon,hi3660-mbox";
-> > +	reg = <0x0 0xe896b000 0x0 0x1000>;
-> > +	interrupts = <0x0 0xc0 0x4>,
-> > +		     <0x0 0xc1 0x4>;
-> > +	#mbox-cells = <3>;
-> > +};
-> > +
-> > +Client
-> > +------
-> > +
-> > +Required properties:
-> > +- compatible		: See the client docs
-> > +- mboxes		: Standard property to specify a Mailbox (See ./mailbox.txt)
-> > +			  Cells must match 'mbox-cells' (See Controller docs above)
-> > +
-> > +Optional properties
-> > +- mbox-names		: Name given to channels seen in the 'mboxes' property.
-> > +
-> > +Example:
-> > +
-> > +stub_clock: stub_clock {
-> 
-> clock at e896b500
-> 
-> > +	compatible = "hisilicon,hi3660-stub-clk";
-> > +	reg = <0x0 0xe896b500 0x0 0x0100>;
-> > +	#clock-cells = <1>;
-> > +	mbox-names = "mbox-tx";
-> 
-> Don't need -names when there is only one. Plus "mbox-" part is 
-> redundant.
-> 
-> > +	mboxes = <&mailbox 13 3 0>;
-> > +};
-> > -- 
-> > 1.9.1
-> > 
+PATCH 5 to 7 adds necessary device tree nodes (DE2 CCU and SimpleFB)
+for H3/H5 SoCs.
+
+PATCH 8 to 10 are for Allwinner A64 SoC to enable SimpleFB.
+
+Icenowy Zheng (10):
+  dt-bindings: fix the binding of Allwinner DE2 CCU of A83T and H3
+  clk: sunxi-ng: add support for Allwinner H3 DE2 CCU
+  clk: sunxi-ng: fix the A64/H5 clock description of DE2 CCU
+  dt-bindings: simplefb-sunxi: add pipelines for DE2
+  ARM: sun8i: h3/h5: add DE2 CCU device node for H3
+  arm64: allwinner: h5: add compatible string for DE2 CCU
+  ARM: sunxi: h3/h5: add simplefb nodes
+  dt-bindings: add binding for A64 DE2 CCU SRAM
+  arm64: allwinner: a64: add DE2 CCU for A64 SoC
+  arm64: allwinner: a64: add simplefb for A64 SoC
+
+ .../devicetree/bindings/clock/sun8i-de2.txt        | 10 +++-
+ .../bindings/display/simple-framebuffer-sunxi.txt  |  4 ++
+ arch/arm/boot/dts/sun8i-h3.dtsi                    |  4 ++
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi                 | 43 ++++++++++++++
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      | 65 ++++++++++++++++++++++
+ arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi       |  4 ++
+ drivers/clk/sunxi-ng/ccu-sun8i-de2.c               | 53 +++++++++++++++++-
+ 7 files changed, 178 insertions(+), 5 deletions(-)
+
+-- 
+2.13.6
