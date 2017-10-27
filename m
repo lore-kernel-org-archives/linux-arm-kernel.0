@@ -1,228 +1,98 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Fri, 27 Oct 2017 18:52:50 +0100
-Subject: [PATCH v4 20/28] arm64/sve: Add prctl controls for userspace
- vector length management
-In-Reply-To: <1509101470-7881-21-git-send-email-Dave.Martin@arm.com>
-References: <1509101470-7881-1-git-send-email-Dave.Martin@arm.com>
- <1509101470-7881-21-git-send-email-Dave.Martin@arm.com>
-Message-ID: <87r2toiikt.fsf@linaro.org>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Sat, 28 Oct 2017 02:20:46 +0800
+Subject: [xlnx:master 1076/1076] drivers/edac/synopsys_edac.c:820:54:
+ warning: 'col_shift' may be used uninitialized in this function
+Message-ID: <201710280244.p2C7rWXq%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   a5aa440aa346ae898994f288dc67396485ac61f2
+commit: a5aa440aa346ae898994f288dc67396485ac61f2 [1076/1076] edac: synopsys: fix incorrect macro defines
+config: arm-allmodconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout a5aa440aa346ae898994f288dc67396485ac61f2
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Dave Martin <Dave.Martin@arm.com> writes:
+Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
+http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
 
-> This patch adds two arm64-specific prctls, to permit userspace to
-> control its vector length:
->
->  * PR_SVE_SET_VL: set the thread's SVE vector length and vector
->    length inheritance mode.
->
->  * PR_SVE_GET_VL: get the same information.
->
-> Although these prctls resemble instruction set features in the SVE
-> architecture, they provide additional control: the vector length
-> inheritance mode is Linux-specific and nothing to do with the
-> architecture, and the architecture does not permit EL0 to set its
-> own vector length directly.  Both can be used in portable tools
-> without requiring the use of SVE instructions.
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Alex Benn?e <alex.bennee@linaro.org>
+All warnings (new ones prefixed by >>):
 
-FYI there is a minor conflict applying this on current master.
+   drivers/edac/synopsys_edac.c: In function 'synps_edac_mc_inject_data_error_store':
+>> drivers/edac/synopsys_edac.c:820:54: warning: 'col_shift' may be used uninitialized in this function [-Wmaybe-uninitialized]
+     int col, row, bank, bankgrp, regval, shift_val = 0, col_shift;
+                                                         ^~~~~~~~~
 
->
-> ---
->
-> **Dropped at v3** Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-> due to non-trivial changes/fixes after v2.
->
-> Changes since v3
-> ----------------
->
-> Requested by Catalin Marinas:
->
->  * Replace static __maybe_unused functions with static inlines.
->
->    (Retaining Catalin's Reviewed-by with his approval.)
-> ---
->  arch/arm64/include/asm/fpsimd.h    | 14 +++++++++++
->  arch/arm64/include/asm/processor.h |  4 +++
->  arch/arm64/kernel/fpsimd.c         | 50 ++++++++++++++++++++++++++++++++++++++
->  include/uapi/linux/prctl.h         |  4 +++
->  kernel/sys.c                       | 12 +++++++++
->  5 files changed, 84 insertions(+)
->
-> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-> index d754e5a..b868412 100644
-> --- a/arch/arm64/include/asm/fpsimd.h
-> +++ b/arch/arm64/include/asm/fpsimd.h
-> @@ -17,6 +17,7 @@
->  #define __ASM_FP_H
->
->  #include <asm/ptrace.h>
-> +#include <asm/errno.h>
->
->  #ifndef __ASSEMBLY__
->
-> @@ -98,6 +99,9 @@ extern void sve_sync_from_fpsimd_zeropad(struct task_struct *task);
->  extern int sve_set_vector_length(struct task_struct *task,
->  				 unsigned long vl, unsigned long flags);
->
-> +extern int sve_set_current_vl(unsigned long arg);
-> +extern int sve_get_current_vl(void);
-> +
->  /*
->   * Probing and setup functions.
->   * Calls to these functions must be serialised with one another.
-> @@ -114,6 +118,16 @@ static inline void fpsimd_release_task(struct task_struct *task) { }
->  static inline void sve_sync_to_fpsimd(struct task_struct *task) { }
->  static inline void sve_sync_from_fpsimd_zeropad(struct task_struct *task) { }
->
-> +static inline int sve_set_current_vl(unsigned long arg)
-> +{
-> +	return -EINVAL;
-> +}
-> +
-> +static inline int sve_get_current_vl(void)
-> +{
-> +	return -EINVAL;
-> +}
-> +
->  static inline void sve_init_vq_map(void) { }
->  static inline void sve_update_vq_map(void) { }
->  static inline int sve_verify_vq_map(void) { return 0; }
-> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-> index c6fddb0..023cacb 100644
-> --- a/arch/arm64/include/asm/processor.h
-> +++ b/arch/arm64/include/asm/processor.h
-> @@ -217,5 +217,9 @@ static inline void spin_lock_prefetch(const void *ptr)
->  int cpu_enable_pan(void *__unused);
->  int cpu_enable_cache_maint_trap(void *__unused);
->
-> +/* Userspace interface for PR_SVE_{SET,GET}_VL prctl()s: */
-> +#define SVE_SET_VL(arg)	sve_set_current_vl(arg)
-> +#define SVE_GET_VL()	sve_get_current_vl()
-> +
->  #endif /* __ASSEMBLY__ */
->  #endif /* __ASM_PROCESSOR_H */
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index a47ce44..7465622 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -28,6 +28,7 @@
->  #include <linux/irqflags.h>
->  #include <linux/init.h>
->  #include <linux/percpu.h>
-> +#include <linux/prctl.h>
->  #include <linux/preempt.h>
->  #include <linux/prctl.h>
->  #include <linux/ptrace.h>
-> @@ -557,6 +558,55 @@ int sve_set_vector_length(struct task_struct *task,
->  }
->
->  /*
-> + * Encode the current vector length and flags for return.
-> + * This is only required for prctl(): ptrace has separate fields
-> + *
-> + * flags are as for sve_set_vector_length().
-> + */
-> +static int sve_prctl_status(unsigned long flags)
-> +{
-> +	int ret;
-> +
-> +	if (flags & PR_SVE_SET_VL_ONEXEC)
-> +		ret = current->thread.sve_vl_onexec;
-> +	else
-> +		ret = current->thread.sve_vl;
-> +
-> +	if (test_thread_flag(TIF_SVE_VL_INHERIT))
-> +		ret |= PR_SVE_VL_INHERIT;
-> +
-> +	return ret;
-> +}
-> +
-> +/* PR_SVE_SET_VL */
-> +int sve_set_current_vl(unsigned long arg)
-> +{
-> +	unsigned long vl, flags;
-> +	int ret;
-> +
-> +	vl = arg & PR_SVE_VL_LEN_MASK;
-> +	flags = arg & ~vl;
-> +
-> +	if (!system_supports_sve())
-> +		return -EINVAL;
-> +
-> +	ret = sve_set_vector_length(current, vl, flags);
-> +	if (ret)
-> +		return ret;
-> +
-> +	return sve_prctl_status(flags);
-> +}
-> +
-> +/* PR_SVE_GET_VL */
-> +int sve_get_current_vl(void)
-> +{
-> +	if (!system_supports_sve())
-> +		return -EINVAL;
-> +
-> +	return sve_prctl_status(0);
-> +}
-> +
-> +/*
->   * Bitmap for temporary storage of the per-CPU set of supported vector lengths
->   * during secondary boot.
->   */
-> diff --git a/include/uapi/linux/prctl.h b/include/uapi/linux/prctl.h
-> index 1b64901..1ef9370 100644
-> --- a/include/uapi/linux/prctl.h
-> +++ b/include/uapi/linux/prctl.h
-> @@ -198,7 +198,11 @@ struct prctl_mm_map {
->  # define PR_CAP_AMBIENT_CLEAR_ALL	4
->
->  /* arm64 Scalable Vector Extension controls */
-> +/* Flag values must be kept in sync with ptrace NT_ARM_SVE interface */
-> +#define PR_SVE_SET_VL			48	/* set task vector length */
->  # define PR_SVE_SET_VL_ONEXEC		(1 << 18) /* defer effect until exec */
-> +#define PR_SVE_GET_VL			49	/* get task vector length */
-> +/* Bits common to PR_SVE_SET_VL and PR_SVE_GET_VL */
->  # define PR_SVE_VL_LEN_MASK		0xffff
->  # define PR_SVE_VL_INHERIT		(1 << 17) /* inherit across exec */
->
-> diff --git a/kernel/sys.c b/kernel/sys.c
-> index 9aebc29..c541916 100644
-> --- a/kernel/sys.c
-> +++ b/kernel/sys.c
-> @@ -110,6 +110,12 @@
->  #ifndef SET_FP_MODE
->  # define SET_FP_MODE(a,b)	(-EINVAL)
->  #endif
-> +#ifndef SVE_SET_VL
-> +# define SVE_SET_VL(a)		(-EINVAL)
-> +#endif
-> +#ifndef SVE_GET_VL
-> +# define SVE_GET_VL()		(-EINVAL)
-> +#endif
->
->  /*
->   * this is where the system-wide overflow UID and GID are defined, for
-> @@ -2385,6 +2391,12 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
->  	case PR_GET_FP_MODE:
->  		error = GET_FP_MODE(me);
->  		break;
-> +	case PR_SVE_SET_VL:
-> +		error = SVE_SET_VL(arg2);
-> +		break;
-> +	case PR_SVE_GET_VL:
-> +		error = SVE_GET_VL();
-> +		break;
->  	default:
->  		error = -EINVAL;
->  		break;
+vim +/col_shift +820 drivers/edac/synopsys_edac.c
 
+71fe2847 Naga Sureshkumar Relli 2016-04-01  807  
+71fe2847 Naga Sureshkumar Relli 2016-04-01  808  /**
+71fe2847 Naga Sureshkumar Relli 2016-04-01  809   * ddr4_poison_setup - update poison registers
+71fe2847 Naga Sureshkumar Relli 2016-04-01  810   * @dttype:		Device structure variable
+71fe2847 Naga Sureshkumar Relli 2016-04-01  811   * @device_config:	Device configuration
+71fe2847 Naga Sureshkumar Relli 2016-04-01  812   * @priv:		Pointer to synps_edac_priv struct
+71fe2847 Naga Sureshkumar Relli 2016-04-01  813   *
+71fe2847 Naga Sureshkumar Relli 2016-04-01  814   * Update poison registers as per ddr4 mapping
+71fe2847 Naga Sureshkumar Relli 2016-04-01  815   * Return: none.
+71fe2847 Naga Sureshkumar Relli 2016-04-01  816   */
+71fe2847 Naga Sureshkumar Relli 2016-04-01  817  static void ddr4_poison_setup(enum dev_type dttype, int device_config,
+71fe2847 Naga Sureshkumar Relli 2016-04-01  818  				struct synps_edac_priv *priv)
+71fe2847 Naga Sureshkumar Relli 2016-04-01  819  {
+71fe2847 Naga Sureshkumar Relli 2016-04-01 @820  	int col, row, bank, bankgrp, regval, shift_val = 0, col_shift;
+71fe2847 Naga Sureshkumar Relli 2016-04-01  821  
+71fe2847 Naga Sureshkumar Relli 2016-04-01  822  	/* Check the Configuration of the device */
+71fe2847 Naga Sureshkumar Relli 2016-04-01  823  	if (device_config & DDRC_MSTR_DEV_CONFIG_X8_MASK) {
+71fe2847 Naga Sureshkumar Relli 2016-04-01  824  		/* For Full Dq bus */
+71fe2847 Naga Sureshkumar Relli 2016-04-01  825  		if (dttype == DEV_X8)
+71fe2847 Naga Sureshkumar Relli 2016-04-01  826  			shift_val = 0;
+71fe2847 Naga Sureshkumar Relli 2016-04-01  827  		/* For Half Dq bus */
+71fe2847 Naga Sureshkumar Relli 2016-04-01  828  		else if (dttype == DEV_X4)
+71fe2847 Naga Sureshkumar Relli 2016-04-01  829  			shift_val = 1;
+71fe2847 Naga Sureshkumar Relli 2016-04-01  830  		col_shift = 0;
+71fe2847 Naga Sureshkumar Relli 2016-04-01  831  	} else if (device_config & DDRC_MSTR_DEV_CONFIG_X16_MASK) {
+71fe2847 Naga Sureshkumar Relli 2016-04-01  832  		if (dttype == DEV_X8)
+71fe2847 Naga Sureshkumar Relli 2016-04-01  833  			shift_val = 1;
+71fe2847 Naga Sureshkumar Relli 2016-04-01  834  		else if (dttype == DEV_X4)
+71fe2847 Naga Sureshkumar Relli 2016-04-01  835  			shift_val = 2;
+71fe2847 Naga Sureshkumar Relli 2016-04-01  836  		col_shift = 1;
+71fe2847 Naga Sureshkumar Relli 2016-04-01  837  	}
+71fe2847 Naga Sureshkumar Relli 2016-04-01  838  
+71fe2847 Naga Sureshkumar Relli 2016-04-01  839  	col = (priv->poison_addr >> (DDR4_COL_SHIFT -
+71fe2847 Naga Sureshkumar Relli 2016-04-01  840  				(shift_val - col_shift))) &
+71fe2847 Naga Sureshkumar Relli 2016-04-01  841  				DDR4_COL_MASK;
+71fe2847 Naga Sureshkumar Relli 2016-04-01  842  	row = priv->poison_addr >> (DDR4_ROW_SHIFT - shift_val);
+71fe2847 Naga Sureshkumar Relli 2016-04-01  843  	row &= DDR4_ROW_MASK;
+71fe2847 Naga Sureshkumar Relli 2016-04-01  844  	bank = priv->poison_addr >> (DDR4_BANK_SHIFT - shift_val);
+71fe2847 Naga Sureshkumar Relli 2016-04-01  845  	bank &= DDR4_BANK_MASK;
+71fe2847 Naga Sureshkumar Relli 2016-04-01  846  	bankgrp = (priv->poison_addr >> (DDR4_BANKGRP_SHIFT -
+71fe2847 Naga Sureshkumar Relli 2016-04-01  847  				(shift_val - col_shift))) &
+71fe2847 Naga Sureshkumar Relli 2016-04-01  848  				DDR4_BANKGRP_MASK;
+71fe2847 Naga Sureshkumar Relli 2016-04-01  849  
+71fe2847 Naga Sureshkumar Relli 2016-04-01  850  	writel(col, priv->baseaddr + ECC_POISON0_OFST);
+71fe2847 Naga Sureshkumar Relli 2016-04-01  851  	regval = (bankgrp << ECC_POISON1_BANKGRP_SHIFT) |
+71fe2847 Naga Sureshkumar Relli 2016-04-01  852  		 (bank << ECC_POISON1_BANKNR_SHIFT) | row;
+71fe2847 Naga Sureshkumar Relli 2016-04-01  853  	writel(regval, priv->baseaddr + ECC_POISON1_OFST);
+71fe2847 Naga Sureshkumar Relli 2016-04-01  854  }
+71fe2847 Naga Sureshkumar Relli 2016-04-01  855  
 
---
-Alex Benn?e
+:::::: The code at line 820 was first introduced by commit
+:::::: 71fe2847779d339690834a384ea2792d9047ee09 edac: synopsys: Add ecc error injection support
+
+:::::: TO: Naga Sureshkumar Relli <naga.sureshkumar.relli@xilinx.com>
+:::::: CC: Michal Simek <michal.simek@xilinx.com>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 59883 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171028/398dcad1/attachment-0001.gz>
