@@ -1,141 +1,230 @@
-From: aford173@gmail.com (Adam Ford)
-Date: Fri, 27 Oct 2017 05:55:31 -0500
-Subject: [PATCH 0/4] TI Bluetooth serdev support
-In-Reply-To: <CAL_Jsq+wJfepPRbpL-_BWtD2Nyviy0q2UW9s7MrNr392W8D0cA@mail.gmail.com>
-References: <20170405183005.20570-1-robh@kernel.org>
- <CAHCN7xJUxZm1qKAxT0kaK6qoDg+HWOJK7sTH-q9za4HJuUwe8Q@mail.gmail.com>
- <20170430160430.rmyuo6sdrkrjxjg6@earth>
- <CAHCN7x+Mq=b6RN-ezU0400W=H=D7DR+Es1FHtT4GyozpVd8ALA@mail.gmail.com>
- <CAL_JsqKBAPUPRtn+pEtz8B8pCrA=45RkEq6X_0i_HYoWsVmtyw@mail.gmail.com>
- <20170509044837.oje2tfodytyuuuur@sapphire.tkos.co.il>
- <CAL_Jsq+wJfepPRbpL-_BWtD2Nyviy0q2UW9s7MrNr392W8D0cA@mail.gmail.com>
-Message-ID: <CAHCN7xKNWa2yrquvYg41CtTWa7aqETNx_08SPgsxv6QC4GK_Rw@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 27 Oct 2017 11:50:49 +0100
+Subject: [PATCH v4 07/28] arm64/sve: Low-level SVE architectural state
+ manipulation functions
+In-Reply-To: <1509101470-7881-1-git-send-email-Dave.Martin@arm.com>
+References: <1509101470-7881-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1509101470-7881-8-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 9, 2017 at 9:14 AM, Rob Herring <robh@kernel.org> wrote:
-> On Mon, May 8, 2017 at 11:48 PM, Baruch Siach <baruch@tkos.co.il> wrote:
->> Hi Rob,
->>
->> On Mon, May 08, 2017 at 04:12:16PM -0500, Rob Herring wrote:
->>> On Fri, May 5, 2017 at 9:51 AM, Adam Ford <aford173@gmail.com> wrote:
->>> > On Sun, Apr 30, 2017 at 11:04 AM, Sebastian Reichel <sre@kernel.org> wrote:
->>> >> On Sun, Apr 30, 2017 at 10:14:20AM -0500, Adam Ford wrote:
->>> >>> On Wed, Apr 5, 2017 at 1:30 PM, Rob Herring <robh@kernel.org> wrote:
->>> >>> > This series adds serdev support to the HCI LL protocol used on TI BT
->>> >>> > modules and enables support on HiKey board with with the WL1835 module.
->>> >>> > With this the custom TI UIM daemon and btattach are no longer needed.
->>> >>>
->>> >>> Without UIM daemon, what instruction do you use to load the BT firmware?
->>> >>>
->>> >>> I was thinking 'hciattach' but I was having trouble.  I was hoping you
->>> >>> might have some insight.
->>> >>>
->>> >>>  hciattach -t 30 -s 115200 /dev/ttymxc1 texas 3000000 flow  Just
->>> >>> returns a timeout.
->>> >>>
->>> >>> I modified my i.MX6 device tree per the binding documentation and
->>> >>> setup the regulators and enable GPIO pins.
->>> >>
->>> >> If you configured everything correctly no userspace interaction is
->>> >> required. The driver should request the firmware automatically once
->>> >> you power up the bluetooth device.
->>> >>
->>> >> Apart from DT changes make sure, that the following options are
->>> >> enabled and check dmesg for any hints.
->>> >>
->>> >> CONFIG_SERIAL_DEV_BUS
->>> >> CONFIG_SERIAL_DEV_CTRL_TTYPORT
->>> >> CONFIG_BT_HCIUART
->>> >> CONFIG_BT_HCIUART_LL
->>> >
->>> > I have enabled those flags, and I have updated my device tree.
->>> > I am testing this on an OMAP3630 (DM3730) board with a WL1283.  I am
->>> > getting a lot of timeout errors.  I tested this against the original
->>> > implemention I had in pdata-quirks.c using the ti-st driver, uim & and
->>> > the btwilink driver.
->>> >
->>> > I pulled in some of the newer patches to enable the wl1283-st, but I
->>> > am obviously missing something.
->>> >
->>> > I   58.717651] Bluetooth: hci0: Reading TI version information failed
->>> > (-110)
->>> > [   58.724853] Bluetooth: hci0: download firmware failed, retrying...
->>> > [   60.957641] Bluetooth: hci0 command 0x1001 tx timeout
->>> > [   68.957641] Bluetooth: hci0: Reading TI version information failed
->>> > (-110)
->>> > [   68.964843] Bluetooth: hci0: download firmware failed, retrying...
->>> > [   69.132171] Bluetooth: Unknown HCI packet type 06
->>> > [   69.138244] Bluetooth: Unknown HCI packet type 0c
->>> > [   69.143249] Bluetooth: Unknown HCI packet type 40
->>> > [   69.148498] Bluetooth: Unknown HCI packet type 20
->>> > [   69.153533] Bluetooth: Data length is too large
->>> > [   69.158569] Bluetooth: Unknown HCI packet type a0
->>> > [   69.163574] Bluetooth: Unknown HCI packet type 00
->>> > [   69.168731] Bluetooth: Unknown HCI packet type 00
->>> > [   69.173736] Bluetooth: Unknown HCI packet type 34
->>> > [   69.178924] Bluetooth: Unknown HCI packet type 91
->>> > [   71.197631] Bluetooth: hci0 command 0x1001 tx timeout
->>> > [   79.197662] Bluetooth: hci0: Reading TI version information failed (-110)
->>>
->>> There's a bug in serdev_device_write(), so if you have that function
->>> you need either the fix I sent or the patch to make
->>> serdev_device_writebuf atomic again. Both are on the linux-serial
->>> list, but not in any tree yet.
->>
->> You refer to the patches below, right?
->>
->>   [PATCH] tty: serdev: fix serdev_device_write return value,
->>   http://www.spinics.net/lists/linux-serial/msg26117.html
->>
->>   [PATCH] serdev: Restore serdev_device_write_buf for atomic context,
->>   http://www.spinics.net/lists/linux-serial/msg26113.html
->
-> Yes, either one will fix the issue.
+Manipulating the SVE architectural state, including the vector and
+predicate registers, first-fault register and the vector length,
+requires the use of dedicated instructions added by SVE.
 
-I am finally getting back to testing these on my DM3730 board, since
-it appears most of the patches appear upstream.  I am having trouble
-remembering how to load this.
+This patch adds suitable assembly functions for saving and
+restoring the SVE registers and querying the vector length.
+Setting of the vector length is done as part of register restore.
 
-# modprobe hci_uart
-[   31.639892] Bluetooth: Core ver 2.22
-[   31.643890] NET: Registered protocol family 31
-[   31.648559] Bluetooth: HCI device and connection manager initialized
-[   31.655975] Bluetooth: HCI socket layer initialized
-[   31.661315] Bluetooth: L2CAP socket layer initialized
-[   31.667175] Bluetooth: SCO socket layer initialized
-[   31.700408] Bluetooth: HCI UART driver ver 2.3
-[   31.705108] Bluetooth: HCI UART protocol H4 registered
-[   31.710632] Bluetooth: HCI UART protocol BCSP registered
-[   31.716217] Bluetooth: HCI UART protocol Three-wire (H5) registered
-#
+Since people building kernels may not all get an SVE-enabled
+toolchain for a while, this patch uses macros that generate
+explicit opcodes in place of assembler mnemonics.
 
-Unfortunately, any attempt to access the HCI device (ie hciconfig up
-hci0) fail.
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/include/asm/fpsimd.h       |   5 ++
+ arch/arm64/include/asm/fpsimdmacros.h | 148 ++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/entry-fpsimd.S      |  17 ++++
+ 3 files changed, 170 insertions(+)
 
-I have those configs enabled:
-CONFIG_SERIAL_DEV_BUS
-CONFIG_SERIAL_DEV_CTRL_TTYPORT
-CONFIG_BT_HCIUART
-CONFIG_BT_HCIUART_LL
-
-I can see that sysfs shows new files appear:
-
-/sys/class/bluetooth
-/sys/firmware/devicetree/base/ocp at 68000000/serial at 4806c000/bluetooth
-/sys/firmware/devicetree/base/ocp at 68000000/serial at 4806c000/bluetooth/compatible
-/sys/firmware/devicetree/base/ocp at 68000000/serial at 4806c000/bluetooth/enable-gpios
-/sys/firmware/devicetree/base/ocp at 68000000/serial at 4806c000/bluetooth/name
-
-(and more)
-So it appears to me like it has loaded, and I don't see any errors during load.
-
-Since this worked under pdata quirks and the older shared transport
-driver and UIM, I'm sure it's software and not hardware.  I just can't
-figure out what I am missing.
-
-thanks
-
-adam
->
-> Rob
+diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+index 410c481..026a7c7 100644
+--- a/arch/arm64/include/asm/fpsimd.h
++++ b/arch/arm64/include/asm/fpsimd.h
+@@ -67,6 +67,11 @@ extern void fpsimd_update_current_state(struct fpsimd_state *state);
+ 
+ extern void fpsimd_flush_task_state(struct task_struct *target);
+ 
++extern void sve_save_state(void *state, u32 *pfpsr);
++extern void sve_load_state(void const *state, u32 const *pfpsr,
++			   unsigned long vq_minus_1);
++extern unsigned int sve_get_vl(void);
++
+ /* For use by EFI runtime services calls only */
+ extern void __efi_fpsimd_begin(void);
+ extern void __efi_fpsimd_end(void);
+diff --git a/arch/arm64/include/asm/fpsimdmacros.h b/arch/arm64/include/asm/fpsimdmacros.h
+index 0f5fdd3..e050d76 100644
+--- a/arch/arm64/include/asm/fpsimdmacros.h
++++ b/arch/arm64/include/asm/fpsimdmacros.h
+@@ -75,3 +75,151 @@
+ 	ldr	w\tmpnr, [\state, #16 * 2 + 4]
+ 	fpsimd_restore_fpcr x\tmpnr, \state
+ .endm
++
++/* Sanity-check macros to help avoid encoding garbage instructions */
++
++.macro _check_general_reg nr
++	.if (\nr) < 0 || (\nr) > 30
++		.error "Bad register number \nr."
++	.endif
++.endm
++
++.macro _sve_check_zreg znr
++	.if (\znr) < 0 || (\znr) > 31
++		.error "Bad Scalable Vector Extension vector register number \znr."
++	.endif
++.endm
++
++.macro _sve_check_preg pnr
++	.if (\pnr) < 0 || (\pnr) > 15
++		.error "Bad Scalable Vector Extension predicate register number \pnr."
++	.endif
++.endm
++
++.macro _check_num n, min, max
++	.if (\n) < (\min) || (\n) > (\max)
++		.error "Number \n out of range [\min,\max]"
++	.endif
++.endm
++
++/* SVE instruction encodings for non-SVE-capable assemblers */
++
++/* STR (vector): STR Z\nz, [X\nxbase, #\offset, MUL VL] */
++.macro _sve_str_v nz, nxbase, offset=0
++	_sve_check_zreg \nz
++	_check_general_reg \nxbase
++	_check_num (\offset), -0x100, 0xff
++	.inst	0xe5804000			\
++		| (\nz)				\
++		| ((\nxbase) << 5)		\
++		| (((\offset) & 7) << 10)	\
++		| (((\offset) & 0x1f8) << 13)
++.endm
++
++/* LDR (vector): LDR Z\nz, [X\nxbase, #\offset, MUL VL] */
++.macro _sve_ldr_v nz, nxbase, offset=0
++	_sve_check_zreg \nz
++	_check_general_reg \nxbase
++	_check_num (\offset), -0x100, 0xff
++	.inst	0x85804000			\
++		| (\nz)				\
++		| ((\nxbase) << 5)		\
++		| (((\offset) & 7) << 10)	\
++		| (((\offset) & 0x1f8) << 13)
++.endm
++
++/* STR (predicate): STR P\np, [X\nxbase, #\offset, MUL VL] */
++.macro _sve_str_p np, nxbase, offset=0
++	_sve_check_preg \np
++	_check_general_reg \nxbase
++	_check_num (\offset), -0x100, 0xff
++	.inst	0xe5800000			\
++		| (\np)				\
++		| ((\nxbase) << 5)		\
++		| (((\offset) & 7) << 10)	\
++		| (((\offset) & 0x1f8) << 13)
++.endm
++
++/* LDR (predicate): LDR P\np, [X\nxbase, #\offset, MUL VL] */
++.macro _sve_ldr_p np, nxbase, offset=0
++	_sve_check_preg \np
++	_check_general_reg \nxbase
++	_check_num (\offset), -0x100, 0xff
++	.inst	0x85800000			\
++		| (\np)				\
++		| ((\nxbase) << 5)		\
++		| (((\offset) & 7) << 10)	\
++		| (((\offset) & 0x1f8) << 13)
++.endm
++
++/* RDVL X\nx, #\imm */
++.macro _sve_rdvl nx, imm
++	_check_general_reg \nx
++	_check_num (\imm), -0x20, 0x1f
++	.inst	0x04bf5000			\
++		| (\nx)				\
++		| (((\imm) & 0x3f) << 5)
++.endm
++
++/* RDFFR (unpredicated): RDFFR P\np.B */
++.macro _sve_rdffr np
++	_sve_check_preg \np
++	.inst	0x2519f000			\
++		| (\np)
++.endm
++
++/* WRFFR P\np.B */
++.macro _sve_wrffr np
++	_sve_check_preg \np
++	.inst	0x25289000			\
++		| ((\np) << 5)
++.endm
++
++.macro __for from:req, to:req
++	.if (\from) == (\to)
++		_for__body \from
++	.else
++		__for \from, (\from) + ((\to) - (\from)) / 2
++		__for (\from) + ((\to) - (\from)) / 2 + 1, \to
++	.endif
++.endm
++
++.macro _for var:req, from:req, to:req, insn:vararg
++	.macro _for__body \var:req
++		\insn
++	.endm
++
++	__for \from, \to
++
++	.purgem _for__body
++.endm
++
++.macro sve_save nxbase, xpfpsr, nxtmp
++ _for n, 0, 31,	_sve_str_v	\n, \nxbase, \n - 34
++ _for n, 0, 15,	_sve_str_p	\n, \nxbase, \n - 16
++		_sve_rdffr	0
++		_sve_str_p	0, \nxbase
++		_sve_ldr_p	0, \nxbase, -16
++
++		mrs		x\nxtmp, fpsr
++		str		w\nxtmp, [\xpfpsr]
++		mrs		x\nxtmp, fpcr
++		str		w\nxtmp, [\xpfpsr, #4]
++.endm
++
++.macro sve_load nxbase, xpfpsr, xvqminus1, nxtmp
++		mrs_s		x\nxtmp, SYS_ZCR_EL1
++		bic		x\nxtmp, x\nxtmp, ZCR_ELx_LEN_MASK
++		orr		x\nxtmp, x\nxtmp, \xvqminus1
++		msr_s		SYS_ZCR_EL1, x\nxtmp	// self-synchronising
++
++ _for n, 0, 31,	_sve_ldr_v	\n, \nxbase, \n - 34
++		_sve_ldr_p	0, \nxbase
++		_sve_wrffr	0
++ _for n, 0, 15,	_sve_ldr_p	\n, \nxbase, \n - 16
++
++		ldr		w\nxtmp, [\xpfpsr]
++		msr		fpsr, x\nxtmp
++		ldr		w\nxtmp, [\xpfpsr, #4]
++		msr		fpcr, x\nxtmp
++.endm
+diff --git a/arch/arm64/kernel/entry-fpsimd.S b/arch/arm64/kernel/entry-fpsimd.S
+index 6a27cd6..73f17bf 100644
+--- a/arch/arm64/kernel/entry-fpsimd.S
++++ b/arch/arm64/kernel/entry-fpsimd.S
+@@ -41,3 +41,20 @@ ENTRY(fpsimd_load_state)
+ 	fpsimd_restore x0, 8
+ 	ret
+ ENDPROC(fpsimd_load_state)
++
++#ifdef CONFIG_ARM64_SVE
++ENTRY(sve_save_state)
++	sve_save 0, x1, 2
++	ret
++ENDPROC(sve_save_state)
++
++ENTRY(sve_load_state)
++	sve_load 0, x1, x2, 3
++	ret
++ENDPROC(sve_load_state)
++
++ENTRY(sve_get_vl)
++	_sve_rdvl	0, 1
++	ret
++ENDPROC(sve_get_vl)
++#endif /* CONFIG_ARM64_SVE */
+-- 
+2.1.4
