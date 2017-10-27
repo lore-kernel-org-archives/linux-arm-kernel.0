@@ -1,61 +1,85 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 Oct 2017 16:28:50 +0100
-Subject: [PATCH] efi/libstub: arm: omit sorting of the UEFI memory map
-In-Reply-To: <fe35c87c-8fd0-b33f-3a6f-2bd759726667@suse.com>
-References: <20171022141457.28769-1-ard.biesheuvel@linaro.org>
- <fe35c87c-8fd0-b33f-3a6f-2bd759726667@suse.com>
-Message-ID: <20171027152850.GK20805@n2100.armlinux.org.uk>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Fri, 27 Oct 2017 17:37:27 +0200
+Subject: [PATCH] mfd: ab8500-debugfs: Use common error handling code in
+ ab8500_print_modem_registers()
+Message-ID: <7af3098c-21fd-aa16-237f-0359d312cac7@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 27, 2017 at 05:12:58PM +0200, Matthias Brugger wrote:
-> Hi Ard,
-> 
-> On 10/22/2017 04:14 PM, Ard Biesheuvel wrote:
-> > ARM shares its EFI stub implementation with arm64, which has some
-> > special handling in the virtual remapping code to
-> > a) make sure that we can map everything even if the OS executes
-> >    with 64k page size, and
-> > b) make sure that adjacent regions with the same attributes are not
-> >    reordered or moved apart in memory.
-> > 
-> > The latter is a workaround for a 'feature' that was shortly recommended
-> > by UEFI spec v2.5, but deprecated shortly after, due to the fact that
-> > it broke many OS installers, including non-Linux ones, and it was never
-> > widely implemented for ARM systems. Before implementing b), the arm64
-> > code simply rounded up all regions to 64 KB granularity, but given that
-> > that results in moving adjacent regions apart, it had to be refined when
-> > b) was implemented.
-> > 
-> > The adjacency check requires a sort() pass, due to the fact that the
-> > UEFI spec does not mandate any ordering, and the inclusion of the
-> > lib/sort.c code into the ARM EFI stub is causing some trouble with
-> > the decompressor build due to the fact that its EXPORT_SYMBOL() call
-> > triggers the creation of ksymtab/kcrctab sections.
-> > 
-> > So let's simply do away with the adjacency check for ARM, and simply put
-> > all UEFI runtime regions together if they have the same memory attributes.
-> > This is guaranteed to work, given that ARM only supports 4 KB pages,
-> > and allows us to remove the sort() call entirely.
-> > 
-> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > ---
-> >  drivers/firmware/efi/libstub/Makefile   | 6 +++---
-> >  drivers/firmware/efi/libstub/arm-stub.c | 7 +++++--
-> >  2 files changed, 8 insertions(+), 5 deletions(-)
-> > 
-> 
-> I thought I already provided my tag, but just in case:
-> This fixes the boot problems I had on the bananapi-r2.
-> 
-> Tested-by: Matthias Brugger <matthias.bgg@gmail.com>
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Fri, 27 Oct 2017 17:20:45 +0200
 
-Please test my "fixes" branch - that has all three patches merged.
+Add jump targets so that two error messages are stored only once
+at the end of this function implementation.
 
-We don't have linux-next running at the moment, so folk need to be
-manually fetching the appropriate git trees for testing.
+This issue was detected by using the Coccinelle software.
 
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ drivers/mfd/ab8500-debugfs.c | 35 +++++++++++++++++++----------------
+ 1 file changed, 19 insertions(+), 16 deletions(-)
+
+diff --git a/drivers/mfd/ab8500-debugfs.c b/drivers/mfd/ab8500-debugfs.c
+index c1c815241e02..37f39b2a1aa1 100644
+--- a/drivers/mfd/ab8500-debugfs.c
++++ b/drivers/mfd/ab8500-debugfs.c
+@@ -1620,18 +1620,15 @@ static int ab8500_print_modem_registers(struct seq_file *s, void *p)
+ 
+ 	err = abx500_get_register_interruptible(dev,
+ 		AB8500_REGU_CTRL1, AB8500_SUPPLY_CONTROL_REG, &orig_value);
+-	if (err < 0) {
+-		dev_err(dev, "ab->read fail %d\n", err);
+-		return err;
+-	}
++	if (err < 0)
++		goto report_read_failure;
++
+ 	/* Config 1 will allow APE side to read SIM registers */
+ 	err = abx500_set_register_interruptible(dev,
+ 		AB8500_REGU_CTRL1, AB8500_SUPPLY_CONTROL_REG,
+ 		AB8500_SUPPLY_CONTROL_CONFIG_1);
+-	if (err < 0) {
+-		dev_err(dev, "ab->write fail %d\n", err);
+-		return err;
+-	}
++	if (err < 0)
++		goto report_write_failure;
+ 
+ 	seq_printf(s, " bank 0x%02X:\n", bank);
+ 
+@@ -1641,19 +1638,25 @@ static int ab8500_print_modem_registers(struct seq_file *s, void *p)
+ 	for (reg = AB8500_FIRST_SIM_REG; reg <= last_sim_reg; reg++) {
+ 		err = abx500_get_register_interruptible(dev,
+ 			bank, reg, &value);
+-		if (err < 0) {
+-			dev_err(dev, "ab->read fail %d\n", err);
+-			return err;
+-		}
++		if (err < 0)
++			goto report_read_failure;
++
+ 		seq_printf(s, "  [0x%02X/0x%02X]: 0x%02X\n", bank, reg, value);
+ 	}
+ 	err = abx500_set_register_interruptible(dev,
+ 		AB8500_REGU_CTRL1, AB8500_SUPPLY_CONTROL_REG, orig_value);
+-	if (err < 0) {
+-		dev_err(dev, "ab->write fail %d\n", err);
+-		return err;
+-	}
++	if (err < 0)
++		goto report_write_failure;
++
+ 	return 0;
++
++report_read_failure:
++	dev_err(dev, "ab->read fail %d\n", err);
++	return err;
++
++report_write_failure:
++	dev_err(dev, "ab->write fail %d\n", err);
++	return err;
+ }
+ 
+ static int ab8500_modem_open(struct inode *inode, struct file *file)
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.14.3
