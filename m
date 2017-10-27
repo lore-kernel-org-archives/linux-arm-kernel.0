@@ -1,50 +1,87 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 27 Oct 2017 15:28:51 +0100
-Subject: [PATCH v5 22/26] KVM: arm/arm64: GICv4: Enable virtual cpuif if VLPIs
- can be delivered
+Date: Fri, 27 Oct 2017 15:28:46 +0100
+Subject: [PATCH v5 17/26] KVM: arm/arm64: GICv4: Handle INVALL applied to a vPE
 In-Reply-To: <20171027142855.21584-1-marc.zyngier@arm.com>
 References: <20171027142855.21584-1-marc.zyngier@arm.com>
-Message-ID: <20171027142855.21584-23-marc.zyngier@arm.com>
+Message-ID: <20171027142855.21584-18-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order for VLPIs to be delivered to the guest, we must make
-sure that the cpuif is always enabled, irrespective of the
-presence of virtual interrupt in the LRs.
+Since when updating the properties one LPI at a time, there is no
+need to perform an INV each time we read one. Instead, we rely
+on the final VINVALL that gets sent to the ITS to do the work.
 
 Acked-by: Christoffer Dall <cdall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/hyp/vgic-v3-sr.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ virt/kvm/arm/vgic/vgic-its.c | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
 
-diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-index 91728faa13fd..f5c3d6d7019e 100644
---- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-@@ -258,7 +258,8 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 			cpu_if->vgic_ap1r[0] = __vgic_v3_read_ap1rn(0);
- 		}
- 	} else {
--		if (static_branch_unlikely(&vgic_v3_cpuif_trap))
-+		if (static_branch_unlikely(&vgic_v3_cpuif_trap) ||
-+		    cpu_if->its_vpe.its_vm)
- 			write_gicreg(0, ICH_HCR_EL2);
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 2e77c7c83942..eb72eb027060 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -38,7 +38,7 @@ static int vgic_its_save_tables_v0(struct vgic_its *its);
+ static int vgic_its_restore_tables_v0(struct vgic_its *its);
+ static int vgic_its_commit_v0(struct vgic_its *its);
+ static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
+-			     struct kvm_vcpu *filter_vcpu);
++			     struct kvm_vcpu *filter_vcpu, bool needs_inv);
  
- 		cpu_if->vgic_elrsr = 0xffff;
-@@ -337,9 +338,11 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
- 		/*
- 		 * If we need to trap system registers, we must write
- 		 * ICH_HCR_EL2 anyway, even if no interrupts are being
--		 * injected,
-+		 * injected. Same thing if GICv4 is used, as VLPI
-+		 * delivery is gated by ICH_HCR_EL2.En.
- 		 */
--		if (static_branch_unlikely(&vgic_v3_cpuif_trap))
-+		if (static_branch_unlikely(&vgic_v3_cpuif_trap) ||
-+		    cpu_if->its_vpe.its_vm)
- 			write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
+ /*
+  * Creates a new (reference to a) struct vgic_irq for a given LPI.
+@@ -106,7 +106,7 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid,
+ 	 * However we only have those structs for mapped IRQs, so we read in
+ 	 * the respective config data from memory here upon mapping the LPI.
+ 	 */
+-	ret = update_lpi_config(kvm, irq, NULL);
++	ret = update_lpi_config(kvm, irq, NULL, false);
+ 	if (ret)
+ 		return ERR_PTR(ret);
+ 
+@@ -273,7 +273,7 @@ static struct its_collection *find_collection(struct vgic_its *its, int coll_id)
+  * VCPU. Unconditionally applies if filter_vcpu is NULL.
+  */
+ static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
+-			     struct kvm_vcpu *filter_vcpu)
++			     struct kvm_vcpu *filter_vcpu, bool needs_inv)
+ {
+ 	u64 propbase = GICR_PROPBASER_ADDRESS(kvm->arch.vgic.propbaser);
+ 	u8 prop;
+@@ -297,7 +297,7 @@ static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
  	}
+ 
+ 	if (irq->hw)
+-		return its_prop_update_vlpi(irq->host_irq, prop, true);
++		return its_prop_update_vlpi(irq->host_irq, prop, needs_inv);
+ 
+ 	return 0;
+ }
+@@ -1096,7 +1096,7 @@ static int vgic_its_cmd_handle_inv(struct kvm *kvm, struct vgic_its *its,
+ 	if (!ite)
+ 		return E_ITS_INV_UNMAPPED_INTERRUPT;
+ 
+-	return update_lpi_config(kvm, ite->irq, NULL);
++	return update_lpi_config(kvm, ite->irq, NULL, true);
+ }
+ 
+ /*
+@@ -1131,12 +1131,15 @@ static int vgic_its_cmd_handle_invall(struct kvm *kvm, struct vgic_its *its,
+ 		irq = vgic_get_irq(kvm, NULL, intids[i]);
+ 		if (!irq)
+ 			continue;
+-		update_lpi_config(kvm, irq, vcpu);
++		update_lpi_config(kvm, irq, vcpu, false);
+ 		vgic_put_irq(kvm, irq);
+ 	}
+ 
+ 	kfree(intids);
+ 
++	if (vcpu->arch.vgic_cpu.vgic_v3.its_vpe.its_vm)
++		its_invall_vpe(&vcpu->arch.vgic_cpu.vgic_v3.its_vpe);
++
+ 	return 0;
+ }
  
 -- 
 2.11.0
