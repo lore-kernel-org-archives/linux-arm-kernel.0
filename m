@@ -1,85 +1,69 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Fri, 27 Oct 2017 16:01:07 +0800
-Subject: [PATCH 2/4] ARM: sun8i: h3/h5: add DE2 CCU device node for H3
-In-Reply-To: <20170911155529.62891-3-icenowy@aosc.io>
-References: <20170911155529.62891-1-icenowy@aosc.io>
- <20170911155529.62891-3-icenowy@aosc.io>
-Message-ID: <0bf125256b4b7d42a2573ae122a52b33@aosc.io>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 27 Oct 2017 09:04:21 +0100
+Subject: [PATCH v4 25/26] KVM: arm/arm64: GICv4: Prevent heterogenous
+ systems from using GICv4
+In-Reply-To: <86r2tp9g2s.fsf@arm.com>
+References: <20171006153401.5481-1-marc.zyngier@arm.com>
+ <20171006153401.5481-26-marc.zyngier@arm.com>
+ <20171026154839.ebtmqzcy7jjyejul@salmiak> <868tfxaxiv.fsf@arm.com>
+ <20171027073728.taejncafoehkfzuc@salmiak> <86r2tp9g2s.fsf@arm.com>
+Message-ID: <20171027080421.m3ruegg6liflcvro@salmiak>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-09-11 23:55?Icenowy Zheng ???
-> The DE2 in H3/H5 has a clock control unit in it, and the behavior is
-> slightly different between H3 and H5.
+On Fri, Oct 27, 2017 at 08:59:23AM +0100, Marc Zyngier wrote:
+> On Fri, Oct 27 2017 at  8:37:28 am BST, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Fri, Oct 27, 2017 at 07:57:12AM +0100, Marc Zyngier wrote:
+> >> On Thu, Oct 26 2017 at  4:48:39 pm BST, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> > On Fri, Oct 06, 2017 at 04:34:00PM +0100, Marc Zyngier wrote:
+> >
+> >> >> @@ -485,8 +495,21 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
+> >> >>  	kvm_vgic_global_state.can_emulate_gicv2 = false;
+> >> >>  	kvm_vgic_global_state.ich_vtr_el2 = ich_vtr_el2;
+> >> >>  
+> >> >> -	/* GICv4 support? */
+> >> >> +	/*
+> >> >> +	 * GICv4 support? We need to check on all CPUs in case of some
+> >> >> +	 * extremely creative form of big-little brain damage...
+> >> >> +	 */
+> >> >>  	if (info->has_v4) {
+> >> >> +		int cpu;
+> >> >> +
+> >> >> +		for_each_online_cpu(cpu) {
+> >> >> +			bool enable;
+> >> >> +
+> >> >> +			smp_call_function_single(cpu, vgic_check_v4_cpuif,
+> >> >> +						 &enable, 1);
+> >> >> +			gicv4_enable = gicv4_enable && enable;
+> >> >> +		}
+> >> >
+> >> > With maxcpus=N on the command line, CPUs can be brought online late, so we
+> >> > might need this in a hotplug callback (and/or in the arm64 cpufeature
+> >> > framework) to handle that case.
+> >> 
+> >> I'm afraid that won't be enough. If the CPU is brought up once we've
+> >> already started a VM, we're screwed, as we cannot retroactively decide
+> >> to drop GICv4 on the floor and nuke the guest. Or did you have something
+> >> more radical in mind? Panic?
+> >
+> > If you teach the arm64 cpufeature framework about this, it can abort bringing a
+> > !GICv4 CPU online late.
 > 
-> Add the common parts in H3/H5 DTSI, and add the compatible string in H3
-> DTSI.
+> You wish.
 > 
-> The compatible string of H5 DE2 CCU will be added in a separated patch.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  arch/arm/boot/dts/sun8i-h3.dtsi    |  4 ++++
->  arch/arm/boot/dts/sunxi-h3-h5.dtsi | 14 ++++++++++++++
->  2 files changed, 18 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi 
-> b/arch/arm/boot/dts/sun8i-h3.dtsi
-> index b36f9f423c39..a8a1db79f362 100644
-> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-> @@ -85,6 +85,10 @@
->  	compatible = "allwinner,sun8i-h3-ccu";
->  };
-> 
-> +&display_clocks {
-> +	compatible = "allwinner,sun8i-a83t-de2-clk";
+> There is all kind of difficulties with that. This requires checking an
+> EL2 register (ICH_VTR_EL2) when we've not initialised KVM yet (so no HYP
+> call facility). We could make it an additional hyp-stub feature, but
+> that feels pretty involved.
 
-Sorry, this compatible is wrong.
+Aargh; I'd assumed we could probe this from EL1 somewhow.
 
-Please wait for my new version of this patchset to add a
-allwinner,sun8i-h3-de2-clk and use it.
+> Effectively, GICv4 support having it supported on the redistributors,
+> the ITSs, and the CPUs. The cpufeature framework only addresses the
+> first one. So unless the solution encompasses all the elements in the
+> chain, any checking feels pretty pointless.
 
-(A83T doesn't have DE mod clk, but H3 has)
+Sure thing. :/
 
-> +};
-> +
->  &mmc0 {
->  	compatible = "allwinner,sun7i-a20-mmc";
->  	clocks = <&ccu CLK_BUS_MMC0>,
-> diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-> b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-> index 11240a8313c2..76a4cbc99bdb 100644
-> --- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-> +++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-> @@ -40,9 +40,11 @@
->   *     OTHER DEALINGS IN THE SOFTWARE.
->   */
-> 
-> +#include <dt-bindings/clock/sun8i-de2.h>
->  #include <dt-bindings/clock/sun8i-h3-ccu.h>
->  #include <dt-bindings/clock/sun8i-r-ccu.h>
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
-> +#include <dt-bindings/reset/sun8i-de2.h>
->  #include <dt-bindings/reset/sun8i-h3-ccu.h>
->  #include <dt-bindings/reset/sun8i-r-ccu.h>
-> 
-> @@ -85,6 +87,18 @@
->  		#size-cells = <1>;
->  		ranges;
-> 
-> +		display_clocks: clock at 1000000 {
-> +			/* compatible is in per SoC .dtsi file */
-> +			reg = <0x01000000 0x100000>;
-> +			clocks = <&ccu CLK_DE>,
-> +				 <&ccu CLK_BUS_DE>;
-> +			clock-names = "mod",
-> +				      "bus";
-> +			resets = <&ccu RST_BUS_DE>;
-> +			#clock-cells = <1>;
-> +			#reset-cells = <1>;
-> +		};
-> +
->  		syscon: syscon at 1c00000 {
->  			compatible = "allwinner,sun8i-h3-system-controller",
->  				"syscon";
+Thanks,
+Mark.
