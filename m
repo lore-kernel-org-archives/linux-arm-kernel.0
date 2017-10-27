@@ -1,24 +1,23 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 27 Oct 2017 09:38:09 -0500
-Subject: [PATCH v1 1/2] dt-bindings: display: stm32: add a 2nd endpoint
-In-Reply-To: <1509018489-19641-2-git-send-email-philippe.cornu@st.com>
-References: <1509018489-19641-1-git-send-email-philippe.cornu@st.com>
- <1509018489-19641-2-git-send-email-philippe.cornu@st.com>
-Message-ID: <20171027143809.ughycmycxmsrwwyp@rob-hp-laptop>
+Date: Fri, 27 Oct 2017 09:37:54 -0500
+Subject: [PATCH v2 3/9] dt-bindings: interrupt-controllers: add
+ compatible string for stm32h7
+In-Reply-To: <1508951465-17152-4-git-send-email-ludovic.Barre@st.com>
+References: <1508951465-17152-1-git-send-email-ludovic.Barre@st.com>
+ <1508951465-17152-4-git-send-email-ludovic.Barre@st.com>
+Message-ID: <20171027143754.fct2m3kk5cjc2c7o@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 26, 2017 at 01:48:08PM +0200, Philippe Cornu wrote:
-> ltdc can have up to 2 endpoints:
->  - dpi external gpios: for rgb panels or external bridge ICs.
->  - dpi internal ios: connected internally to dsi.
+On Wed, Oct 25, 2017 at 07:10:59PM +0200, Ludovic Barre wrote:
+> From: Ludovic Barre <ludovic.barre@st.com>
 > 
-> Note: Refer to the reference manual to know if the dsi is
-> present on your device.
+> This patch updates stm32-exti documentation with stm32h7-exti
+> compatible string.
 > 
-> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
+> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 > ---
->  Documentation/devicetree/bindings/display/st,stm32-ltdc.txt | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
+>  .../devicetree/bindings/interrupt-controller/st,stm32-exti.txt        | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
 
 Acked-by: Rob Herring <robh@kernel.org>
