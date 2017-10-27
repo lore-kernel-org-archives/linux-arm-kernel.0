@@ -1,251 +1,83 @@
-From: ludovic.barre@st.com (Ludovic BARRE)
-Date: Fri, 27 Oct 2017 10:10:55 +0200
-Subject: [PATCH v2 2/9] irqchip: stm32: add multi-bank management
-In-Reply-To: <04dffa3d-d38d-2bf5-a2e9-a4b549419e67@arm.com>
-References: <1508951465-17152-1-git-send-email-ludovic.Barre@st.com>
- <1508951465-17152-3-git-send-email-ludovic.Barre@st.com>
- <04dffa3d-d38d-2bf5-a2e9-a4b549419e67@arm.com>
-Message-ID: <86841672-be73-7730-55b3-dffcd1bf3313@st.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 27 Oct 2017 09:31:12 +0100
+Subject: [PATCH v4 25/26] KVM: arm/arm64: GICv4: Prevent heterogenous
+ systems from using GICv4
+In-Reply-To: <20171027080421.m3ruegg6liflcvro@salmiak> (Mark Rutland's message
+ of "Fri, 27 Oct 2017 09:04:21 +0100")
+References: <20171006153401.5481-1-marc.zyngier@arm.com>
+ <20171006153401.5481-26-marc.zyngier@arm.com>
+ <20171026154839.ebtmqzcy7jjyejul@salmiak> <868tfxaxiv.fsf@arm.com>
+ <20171027073728.taejncafoehkfzuc@salmiak> <86r2tp9g2s.fsf@arm.com>
+ <20171027080421.m3ruegg6liflcvro@salmiak>
+Message-ID: <86mv4d9elr.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julien
+On Fri, Oct 27 2017 at  9:04:21 am BST, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Fri, Oct 27, 2017 at 08:59:23AM +0100, Marc Zyngier wrote:
+>> On Fri, Oct 27 2017 at  8:37:28 am BST, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > On Fri, Oct 27, 2017 at 07:57:12AM +0100, Marc Zyngier wrote:
+>> >> On Thu, Oct 26 2017 at  4:48:39 pm BST, Mark Rutland <mark.rutland@arm.com> wrote:
+>> >> > On Fri, Oct 06, 2017 at 04:34:00PM +0100, Marc Zyngier wrote:
+>> >
+>> >> >> @@ -485,8 +495,21 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
+>> >> >>  	kvm_vgic_global_state.can_emulate_gicv2 = false;
+>> >> >>  	kvm_vgic_global_state.ich_vtr_el2 = ich_vtr_el2;
+>> >> >>  
+>> >> >> -	/* GICv4 support? */
+>> >> >> +	/*
+>> >> >> +	 * GICv4 support? We need to check on all CPUs in case of some
+>> >> >> +	 * extremely creative form of big-little brain damage...
+>> >> >> +	 */
+>> >> >>  	if (info->has_v4) {
+>> >> >> +		int cpu;
+>> >> >> +
+>> >> >> +		for_each_online_cpu(cpu) {
+>> >> >> +			bool enable;
+>> >> >> +
+>> >> >> +			smp_call_function_single(cpu, vgic_check_v4_cpuif,
+>> >> >> +						 &enable, 1);
+>> >> >> +			gicv4_enable = gicv4_enable && enable;
+>> >> >> +		}
+>> >> >
+>> >> > With maxcpus=N on the command line, CPUs can be brought online late, so we
+>> >> > might need this in a hotplug callback (and/or in the arm64 cpufeature
+>> >> > framework) to handle that case.
+>> >> 
+>> >> I'm afraid that won't be enough. If the CPU is brought up once we've
+>> >> already started a VM, we're screwed, as we cannot retroactively decide
+>> >> to drop GICv4 on the floor and nuke the guest. Or did you have something
+>> >> more radical in mind? Panic?
+>> >
+>> > If you teach the arm64 cpufeature framework about this, it can abort bringing a
+>> > !GICv4 CPU online late.
+>> 
+>> You wish.
+>> 
+>> There is all kind of difficulties with that. This requires checking an
+>> EL2 register (ICH_VTR_EL2) when we've not initialised KVM yet (so no HYP
+>> call facility). We could make it an additional hyp-stub feature, but
+>> that feels pretty involved.
+>
+> Aargh; I'd assumed we could probe this from EL1 somewhow.
+>
+>> Effectively, GICv4 support having it supported on the redistributors,
+>> the ITSs, and the CPUs. The cpufeature framework only addresses the
+>> first one. So unless the solution encompasses all the elements in the
+>> chain, any checking feels pretty pointless.
+>
+> Sure thing. :/
 
-thank for your review
+How are we taking this further?
 
-On 10/26/2017 04:36 PM, Julien Thierry wrote:
-> Hi Ludovic,
-> 
-> On 25/10/17 18:10, Ludovic Barre wrote:
->> From: Ludovic Barre <ludovic.barre@st.com>
->>
->> -Prepare to manage multi-bank of external interrupts
->> (N banks of 32 inputs).
->> -Prepare to manage registers offsets by compatible
->> (registers offsets could be different follow per stm32 platform).
->>
->> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
->> ---
->> ? drivers/irqchip/irq-stm32-exti.c | 151 
->> +++++++++++++++++++++++++++------------
->> ? 1 file changed, 105 insertions(+), 46 deletions(-)
->>
->> diff --git a/drivers/irqchip/irq-stm32-exti.c 
->> b/drivers/irqchip/irq-stm32-exti.c
->> index 45363ff..6b4109b 100644
->> --- a/drivers/irqchip/irq-stm32-exti.c
->> +++ b/drivers/irqchip/irq-stm32-exti.c
->> @@ -14,27 +14,66 @@
->> ? #include <linux/of_address.h>
->> ? #include <linux/of_irq.h>
->> -#define EXTI_IMR??? 0x0
->> -#define EXTI_EMR??? 0x4
->> -#define EXTI_RTSR??? 0x8
->> -#define EXTI_FTSR??? 0xc
->> -#define EXTI_SWIER??? 0x10
->> -#define EXTI_PR??????? 0x14
->> +#define IRQS_PER_BANK 32
->> +
->> +struct stm32_exti_bank {
->> +??? u32 imr_ofst;
->> +??? u32 emr_ofst;
->> +??? u32 rtsr_ofst;
->> +??? u32 ftsr_ofst;
->> +??? u32 swier_ofst;
->> +??? u32 pr_ofst;
->> +};
->> +
->> +static const struct stm32_exti_bank stm32f4xx_exti_b1 = {
->> +??? .imr_ofst??? = 0x00,
->> +??? .emr_ofst??? = 0x04,
->> +??? .rtsr_ofst??? = 0x08,
->> +??? .ftsr_ofst??? = 0x0C,
->> +??? .swier_ofst??? = 0x10,
->> +??? .pr_ofst??? = 0x14,
->> +};
->> +
->> +static const struct stm32_exti_bank *stm32f4xx_exti_banks[] = {
->> +??? &stm32f4xx_exti_b1,
->> +};
->> +
->> +static unsigned long stm32_exti_pending(struct irq_chip_generic *gc)
->> +{
->> +??? const struct stm32_exti_bank *stm32_bank = gc->private;
->> +
->> +??? return irq_reg_readl(gc, stm32_bank->pr_ofst);
->> +}
->> +
->> +static void stm32_exti_irq_ack(struct irq_chip_generic *gc, u32 mask)
->> +{
->> +??? const struct stm32_exti_bank *stm32_bank = gc->private;
->> +
->> +??? irq_reg_writel(gc, mask, stm32_bank->pr_ofst);
->> +}
->> ? static void stm32_irq_handler(struct irq_desc *desc)
->> ? {
->> ????? struct irq_domain *domain = irq_desc_get_handler_data(desc);
->> -??? struct irq_chip_generic *gc = domain->gc->gc[0];
->> ????? struct irq_chip *chip = irq_desc_get_chip(desc);
->> +??? unsigned int virq, nbanks = domain->gc->num_chips;
->> +??? struct irq_chip_generic *gc;
->> +??? const struct stm32_exti_bank *stm32_bank;
->> ????? unsigned long pending;
->> -??? int n;
->> +??? int n, i, irq_base = 0;
->> ????? chained_irq_enter(chip, desc);
->> -??? while ((pending = irq_reg_readl(gc, EXTI_PR))) {
->> -??????? for_each_set_bit(n, &pending, BITS_PER_LONG) {
->> -??????????? generic_handle_irq(irq_find_mapping(domain, n));
->> -??????????? irq_reg_writel(gc, BIT(n), EXTI_PR);
->> +??? for (i = 0; i < nbanks; i++, irq_base += IRQS_PER_BANK) {
->> +??????? gc = irq_get_domain_generic_chip(domain, irq_base);
->> +??????? stm32_bank = gc->private;
->> +
->> +??????? while ((pending = stm32_exti_pending(gc))) {
->> +??????????? for_each_set_bit(n, &pending, IRQS_PER_BANK) {
->> +??????????????? virq = irq_find_mapping(domain, irq_base + n);
->> +??????????????? generic_handle_irq(virq);
->> +??????????????? stm32_exti_irq_ack(gc, BIT(n));
->> +??????????? }
->> ????????? }
->> ????? }
->> @@ -44,13 +83,14 @@ static void stm32_irq_handler(struct irq_desc *desc)
->> ? static int stm32_irq_set_type(struct irq_data *data, unsigned int type)
->> ? {
->> ????? struct irq_chip_generic *gc = irq_data_get_irq_chip_data(data);
->> -??? int pin = data->hwirq;
->> +??? const struct stm32_exti_bank *stm32_bank = gc->private;
->> +??? int pin = data->hwirq % IRQS_PER_BANK;
->> ????? u32 rtsr, ftsr;
->> ????? irq_gc_lock(gc);
->> -??? rtsr = irq_reg_readl(gc, EXTI_RTSR);
->> -??? ftsr = irq_reg_readl(gc, EXTI_FTSR);
->> +??? rtsr = irq_reg_readl(gc, stm32_bank->rtsr_ofst);
->> +??? ftsr = irq_reg_readl(gc, stm32_bank->ftsr_ofst);
->> ????? switch (type) {
->> ????? case IRQ_TYPE_EDGE_RISING:
->> @@ -70,8 +110,8 @@ static int stm32_irq_set_type(struct irq_data 
->> *data, unsigned int type)
->> ????????? return -EINVAL;
->> ????? }
->> -??? irq_reg_writel(gc, rtsr, EXTI_RTSR);
->> -??? irq_reg_writel(gc, ftsr, EXTI_FTSR);
->> +??? irq_reg_writel(gc, rtsr, stm32_bank->rtsr_ofst);
->> +??? irq_reg_writel(gc, ftsr, stm32_bank->ftsr_ofst);
->> ????? irq_gc_unlock(gc);
->> @@ -81,17 +121,18 @@ static int stm32_irq_set_type(struct irq_data 
->> *data, unsigned int type)
->> ? static int stm32_irq_set_wake(struct irq_data *data, unsigned int on)
->> ? {
->> ????? struct irq_chip_generic *gc = irq_data_get_irq_chip_data(data);
->> -??? int pin = data->hwirq;
->> +??? const struct stm32_exti_bank *stm32_bank = gc->private;
->> +??? int pin = data->hwirq % IRQS_PER_BANK;
->> ????? u32 emr;
->> ????? irq_gc_lock(gc);
->> -??? emr = irq_reg_readl(gc, EXTI_EMR);
->> +??? emr = irq_reg_readl(gc, stm32_bank->emr_ofst);
->> ????? if (on)
->> ????????? emr |= BIT(pin);
->> ????? else
->> ????????? emr &= ~BIT(pin);
->> -??? irq_reg_writel(gc, emr, EXTI_EMR);
->> +??? irq_reg_writel(gc, emr, stm32_bank->emr_ofst);
->> ????? irq_gc_unlock(gc);
->> @@ -101,11 +142,12 @@ static int stm32_irq_set_wake(struct irq_data 
->> *data, unsigned int on)
->> ? static int stm32_exti_alloc(struct irq_domain *d, unsigned int virq,
->> ????????????????? unsigned int nr_irqs, void *data)
->> ? {
->> -??? struct irq_chip_generic *gc = d->gc->gc[0];
->> +??? struct irq_chip_generic *gc;
->> ????? struct irq_fwspec *fwspec = data;
->> ????? irq_hw_number_t hwirq;
->> ????? hwirq = fwspec->param[0];
->> +??? gc = irq_get_domain_generic_chip(d, hwirq);
->> ????? irq_map_generic_chip(d, virq, hwirq);
->> ????? irq_domain_set_info(d, virq, hwirq, &gc->chip_types->chip, gc,
->> @@ -129,8 +171,9 @@ struct irq_domain_ops irq_exti_domain_ops = {
->> ????? .free??? = stm32_exti_free,
->> ? };
->> -static int __init stm32_exti_init(struct device_node *node,
->> -????????????????? struct device_node *parent)
->> +static int
->> +__init stm32_exti_init(const struct stm32_exti_bank **stm32_exti_banks,
->> +?????????????? int bank_nr, struct device_node *node)
->> ? {
->> ????? unsigned int clr = IRQ_NOREQUEST | IRQ_NOPROBE | IRQ_NOAUTOEN;
->> ????? int nr_irqs, nr_exti, ret, i;
->> @@ -144,23 +187,16 @@ static int __init stm32_exti_init(struct 
->> device_node *node,
->> ????????? return -ENOMEM;
->> ????? }
->> -??? /* Determine number of irqs supported */
->> -??? writel_relaxed(~0UL, base + EXTI_RTSR);
->> -??? nr_exti = fls(readl_relaxed(base + EXTI_RTSR));
->> -??? writel_relaxed(0, base + EXTI_RTSR);
->> -
->> -??? pr_info("%pOF: %d External IRQs detected\n", node, nr_exti);
->> -
->> -??? domain = irq_domain_add_linear(node, nr_exti,
->> +??? domain = irq_domain_add_linear(node, bank_nr * IRQS_PER_BANK,
->> ???????????????????????? &irq_exti_domain_ops, NULL);
->> ????? if (!domain) {
->> ????????? pr_err("%s: Could not register interrupt domain.\n",
->> -??????????????? node->name);
->> +?????????????? node->name);
->> ????????? ret = -ENOMEM;
->> ????????? goto out_unmap;
->> ????? }
->> -??? ret = irq_alloc_domain_generic_chips(domain, nr_exti, 1, "exti",
->> +??? ret = irq_alloc_domain_generic_chips(domain, IRQS_PER_BANK, 1, 
->> "exti",
->> ?????????????????????????? handle_edge_irq, clr, 0, 0);
->> ????? if (ret) {
->> ????????? pr_err("%pOF: Could not allocate generic interrupt chip.\n",
->> @@ -168,18 +204,34 @@ static int __init stm32_exti_init(struct 
->> device_node *node,
->> ????????? goto out_free_domain;
->> ????? }
->> -??? gc = domain->gc->gc[0];
->> -??? gc->reg_base???????????????????????? = base;
->> -??? gc->chip_types->type?????????????? = IRQ_TYPE_EDGE_BOTH;
->> -??? gc->chip_types->chip.name????????? = gc->chip_types[0].chip.name;
->> -??? gc->chip_types->chip.irq_ack?????? = irq_gc_ack_set_bit;
->> -??? gc->chip_types->chip.irq_mask????? = irq_gc_mask_clr_bit;
->> -??? gc->chip_types->chip.irq_unmask??? = irq_gc_mask_set_bit;
->> -??? gc->chip_types->chip.irq_set_type? = stm32_irq_set_type;
->> -??? gc->chip_types->chip.irq_set_wake? = stm32_irq_set_wake;
->> -??? gc->chip_types->regs.ack?????????? = EXTI_PR;
->> -??? gc->chip_types->regs.mask????????? = EXTI_IMR;
->> -??? gc->chip_types->handler??????????? = handle_edge_irq;
->> +??? for (i = 0; i < bank_nr; i++) {
->> +??????? const struct stm32_exti_bank *stm32_bank = stm32_exti_banks[i];
->> +??????? u32 irqs_mask;
->> +
->> +??????? gc = irq_get_domain_generic_chip(domain, i * IRQS_PER_BANK);
->> +
->> +??????? gc->reg_base = base;
->> +??????? gc->chip_types->type = IRQ_TYPE_EDGE_BOTH;
->> +??????? gc->chip_types->chip.name = gc->chip_types[0].chip.name;
-> 
-> I might be missing something, but what is the point of this line?
-indeed these 2 lines:
-  gc->chip_types->chip.name = gc->chip_types[0].chip.name
-  gc->chip_types->handler = handle_edge_irq;
+I can drop this altogether (after all, you will get what you deserve if
+you design a broken system). The alternative would be to add a hotplug
+notifier here, and spit out a warning if we're going to be in
+trouble. We still run into the risk of messing with a VM that's already
+been started before the non-v4 CPU.
 
-are not needed, it's done in irq_alloc_domain_generic_chips
-> 
->> +??????? gc->chip_types->chip.irq_ack = irq_gc_ack_set_bit;
->> +??????? gc->chip_types->chip.irq_mask = irq_gc_mask_clr_bit;
->> +??????? gc->chip_types->chip.irq_unmask = irq_gc_mask_set_bit;
->> +??????? gc->chip_types->chip.irq_set_type = stm32_irq_set_type;
->> +??????? gc->chip_types->chip.irq_set_wake = stm32_irq_set_wake;
->> +??????? gc->chip_types->regs.ack = stm32_bank->pr_ofst;
->> +??????? gc->chip_types->regs.mask = stm32_bank->imr_ofst;
->> +??????? gc->chip_types->handler = handle_edge_irq;
-> 
-> I believe this is already done by irq_alloc_domain_generic_chips.
-> 
-> Thanks,
-> 
+Thoughts anyone?
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
