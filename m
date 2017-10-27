@@ -1,42 +1,31 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 Oct 2017 11:04:45 +0100
-Subject: [PATCH] drivers/pcmcia: Convert timers to use timer_setup()
-In-Reply-To: <20171024102331.GA69696@beast>
-References: <20171024102331.GA69696@beast>
-Message-ID: <20171027100445.GI20805@n2100.armlinux.org.uk>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Fri, 27 Oct 2017 13:08:24 +0300
+Subject: [PATCH] [media] rockchip/rga: annotate PM functions as
+ __maybe_unused
+In-Reply-To: <20171019093044.531871-1-arnd@arndb.de>
+References: <20171019093044.531871-1-arnd@arndb.de>
+Message-ID: <20171027100823.ao3hytbe4kdfossy@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 24, 2017 at 03:23:31AM -0700, Kees Cook wrote:
-> In preparation for unconditionally passing the struct timer_list pointer to
-> all timer callbacks, switch to using the new timer_setup() and from_timer()
-> to pass the timer pointer explicitly.
+On Thu, Oct 19, 2017 at 11:30:34AM +0200, Arnd Bergmann wrote:
+> The newly added driver has incorrect #ifdef annotations on its
+> PM functions, leading to a harmless compile-time warning when
+> CONFIG_PM is disabled:
 > 
-> Cc: Florian Fainelli <f.fainelli@gmail.com>
-> Cc: bcm-kernel-feedback-list at broadcom.com
-> Cc: David Howells <dhowells@redhat.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: linux-pcmcia at lists.infradead.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Kees Cook <keescook@chromium.org>
-> ---
->  drivers/pcmcia/bcm63xx_pcmcia.c | 6 +++---
->  drivers/pcmcia/bfin_cf_pcmcia.c | 6 +++---
->  drivers/pcmcia/i82365.c         | 6 ++----
->  drivers/pcmcia/omap_cf.c        | 8 ++++----
->  drivers/pcmcia/pd6729.c         | 7 +++----
->  drivers/pcmcia/soc_common.c     | 7 +++----
->  drivers/pcmcia/tcic.c           | 8 +++-----
->  drivers/pcmcia/yenta_socket.c   | 7 +++----
->  8 files changed, 24 insertions(+), 31 deletions(-)
+> drivers/media/platform/rockchip/rga/rga.c:760:13: error: 'rga_disable_clocks' defined but not used [-Werror=unused-function]
+>  static void rga_disable_clocks(struct rockchip_rga *rga)
+>              ^~~~~~~~~~~~~~~~~~
+> drivers/media/platform/rockchip/rga/rga.c:728:12: error: 'rga_enable_clocks' defined but not used [-Werror=unused-function]
+> 
+> This removes the #ifdef and marks the functions as __maybe_unused,
+> so gcc can silently drop all the unused code.
+> 
+> Fixes: f7e7b48e6d79 ("[media] rockchip/rga: v4l2 m2m support")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-For soc_common.c:
-
-Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
-
-Thanks.
+Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi
