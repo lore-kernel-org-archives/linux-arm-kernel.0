@@ -1,75 +1,74 @@
 From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Fri, 27 Oct 2017 15:26:05 +0800
-Subject: [RFC PATCH v10 0/7] PCI: rockchip: Move PCIe WAKE# handling into pci
- core
-Message-ID: <20171027072612.26565-1-jeffy.chen@rock-chips.com>
+Date: Fri, 27 Oct 2017 15:26:09 +0800
+Subject: [RFC PATCH v10 4/7] arm64: dts: rockchip: Move PCIe WAKE# irq to pcie
+ driver for Gru
+In-Reply-To: <20171027072612.26565-1-jeffy.chen@rock-chips.com>
+References: <20171027072612.26565-1-jeffy.chen@rock-chips.com>
+Message-ID: <20171027072612.26565-5-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Currently we are handling PCIe WAKE# irq in mrvl wifi driver.
 
-Currently we are handling wake irq in mrvl wifi driver. Move it into
+Move it to rockchip pcie driver since we are going to handle it in the
 pci core.
 
-Tested on my chromebook bob(with cros 4.4 kernel and mrvl wifi).
+Also avoid this irq been considered as the PCI interrupt pin in the
+of_irq_parse_pci().
 
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
 
-Changes in v10:
-Use device_set_wakeup_capable() instead of device_set_wakeup_enable(),
-since dedicated wakeirq will be lost in device_set_wakeup_enable(false).
-
+Changes in v10: None
 Changes in v9:
-Add section for PCI devices and rewrite the commit message.
 Rewrite the commit message.
-Fix check error in .cleanup().
-Move dedicated wakeirq setup to setup() callback and use
-device_set_wakeup_enable() to enable/disable.
 
 Changes in v8:
-Add optional "pci", and rewrite commit message.
 Rewrite the commit message.
-Add pci-of.c and use platform_pm_ops to handle the PCIe WAKE# signal.
 
-Changes in v7:
-Move PCIE_WAKE handling into pci core.
-
-Changes in v6:
-Fix device_init_wake error handling, and add some comments.
-
+Changes in v7: None
+Changes in v6: None
 Changes in v5:
-Move to pci.txt
 Use "wakeup" instead of "wake"
-Rebase.
 
-Changes in v3:
-Fix error handling.
+Changes in v3: None
+Changes in v2: None
 
-Changes in v2:
-Use dev_pm_set_dedicated_wake_irq.
+ arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
 
-Jeffy Chen (7):
-  dt-bindings: PCI: Add definition of PCIe WAKE# irq and PCI irq
-  of/irq: Adjust of_pci_irq parsing for multiple interrupts
-  mwifiex: Disable wakeup irq handling for pcie
-  arm64: dts: rockchip: Move PCIe WAKE# irq to pcie driver for Gru
-  PCI: Make pci_platform_pm_ops's callbacks optional
-  PCI / PM: Move acpi wakeup code to pci core
-  PCI / PM: Add support for the PCIe WAKE# signal for OF
-
- Documentation/devicetree/bindings/pci/pci.txt |   8 ++
- arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi  |  15 +--
- drivers/net/wireless/marvell/mwifiex/main.c   |   4 +
- drivers/of/of_pci_irq.c                       |  13 ++-
- drivers/pci/Makefile                          |   2 +-
- drivers/pci/pci-acpi.c                        | 121 ++++++++++++------------
- drivers/pci/pci-driver.c                      |   9 ++
- drivers/pci/pci-of.c                          | 127 ++++++++++++++++++++++++++
- drivers/pci/pci.c                             | 112 +++++++++++++++++++----
- drivers/pci/pci.h                             |  31 +++++--
- drivers/pci/probe.c                           |  12 ++-
- drivers/pci/remove.c                          |   2 +
- include/linux/pci.h                           |   2 +
- 13 files changed, 361 insertions(+), 97 deletions(-)
- create mode 100644 drivers/pci/pci-of.c
-
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+index 5772c52fbfd3..8e37da69f693 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+@@ -708,7 +708,15 @@ ap_i2c_audio: &i2c8 {
+ 
+ 	ep-gpios = <&gpio2 27 GPIO_ACTIVE_HIGH>;
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&pcie_clkreqn_cpm>, <&wifi_perst_l>;
++	pinctrl-0 = <&pcie_clkreqn_cpm>, <&wlan_host_wake_l>, <&wifi_perst_l>;
++
++	interrupts-extended = <&gic GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH 0>,
++			      <&gic GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH 0>,
++			      <&gic GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH 0>,
++			      <&gpio0 8 IRQ_TYPE_LEVEL_LOW>;
++	interrupt-names = "sys", "legacy", "client", "wakeup";
++	/delete-property/ interrupts;
++
+ 	vpcie3v3-supply = <&pp3300_wifi_bt>;
+ 	vpcie1v8-supply = <&wlan_pd_n>; /* HACK: see &wlan_pd_n */
+ 	vpcie0v9-supply = <&pp900_pcie>;
+@@ -723,11 +731,6 @@ ap_i2c_audio: &i2c8 {
+ 			compatible = "pci1b4b,2b42";
+ 			reg = <0x83010000 0x0 0x00000000 0x0 0x00100000
+ 			       0x83010000 0x0 0x00100000 0x0 0x00100000>;
+-			interrupt-parent = <&gpio0>;
+-			interrupts = <8 IRQ_TYPE_LEVEL_LOW>;
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&wlan_host_wake_l>;
+-			wakeup-source;
+ 		};
+ 	};
+ };
 -- 
 2.11.0
