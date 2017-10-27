@@ -1,77 +1,44 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 27 Oct 2017 11:50:46 +0100
-Subject: [PATCH v4 04/28] arm64: Port deprecated instruction emulation to new
- sysctl interface
+Date: Fri, 27 Oct 2017 11:50:45 +0100
+Subject: [PATCH v4 03/28] arm64: efi: Add missing Kconfig dependency on
+ KERNEL_MODE_NEON
 In-Reply-To: <1509101470-7881-1-git-send-email-Dave.Martin@arm.com>
 References: <1509101470-7881-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1509101470-7881-5-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1509101470-7881-4-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, armv8_deprected.c takes charge of the "abi" sysctl
-directory, which makes life difficult for other code that wants to
-register sysctls in the same directory.
+The EFI runtime services ABI permits calls to EFI to clobber
+certain FPSIMD/NEON registers, as per the AArch64 procedure call
+standard.
 
-There is a "new" [1] sysctl registration interface that removes the
-need to define ctl_tables for parent directories explicitly, which
-is ideal here.
+Saving/restoring the clobbered registers around such calls needs
+KERNEL_MODE_NEON, but the dependency is missing from Kconfig.
 
-This patch ports register_insn_emulation_sysctl() over to the
-register_sysctl() interface and removes the redundant ctl_table for
-"abi".
+This patch adds the missing dependency.
+
+This will aid bisection of the patches implementing support for the
+ARM Scalable Vector Extension (SVE).
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-
-[1] fea478d4101a (sysctl: Add register_sysctl for normal sysctl
-users)
-The commit message notes an intent to port users of the
-pre-existing interfaces over to register_sysctl(), though the
-number of users of the new interface currently appears negligible.
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/armv8_deprecated.c | 15 +++------------
- 1 file changed, 3 insertions(+), 12 deletions(-)
+ arch/arm64/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
-index a4dc115..c33b5e4 100644
---- a/arch/arm64/kernel/armv8_deprecated.c
-+++ b/arch/arm64/kernel/armv8_deprecated.c
-@@ -228,15 +228,7 @@ static int emulation_proc_handler(struct ctl_table *table, int write,
- 	return ret;
- }
- 
--static struct ctl_table ctl_abi[] = {
--	{
--		.procname = "abi",
--		.mode = 0555,
--	},
--	{ }
--};
--
--static void __init register_insn_emulation_sysctl(struct ctl_table *table)
-+static void __init register_insn_emulation_sysctl(void)
- {
- 	unsigned long flags;
- 	int i = 0;
-@@ -262,8 +254,7 @@ static void __init register_insn_emulation_sysctl(struct ctl_table *table)
- 	}
- 	raw_spin_unlock_irqrestore(&insn_emulation_lock, flags);
- 
--	table->child = insns_sysctl;
--	register_sysctl_table(table);
-+	register_sysctl("abi", insns_sysctl);
- }
- 
- /*
-@@ -644,7 +635,7 @@ static int __init armv8_deprecated_init(void)
- 	cpuhp_setup_state_nocalls(CPUHP_AP_ARM64_ISNDEP_STARTING,
- 				  "arm64/isndep:starting",
- 				  run_all_insn_set_hw_mode, NULL);
--	register_insn_emulation_sysctl(ctl_abi);
-+	register_insn_emulation_sysctl();
- 
- 	return 0;
- }
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 05aa592..5cfb79d 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -1064,6 +1064,7 @@ config EFI_STUB
+ config EFI
+ 	bool "UEFI runtime support"
+ 	depends on OF && !CPU_BIG_ENDIAN
++	depends on KERNEL_MODE_NEON
+ 	select LIBFDT
+ 	select UCS2_STRING
+ 	select EFI_PARAMS_FROM_FDT
 -- 
 2.1.4
