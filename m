@@ -1,55 +1,88 @@
-From: gregory.0xf0@gmail.com (Gregory Fong)
-Date: Thu, 26 Oct 2017 16:51:55 -0700
-Subject: [PATCH v2 7/7] gpio: brcmstb: implement suspend/resume/shutdown
-In-Reply-To: <20171024195451.30535-8-opendmb@gmail.com>
-References: <20171024195451.30535-1-opendmb@gmail.com>
- <20171024195451.30535-8-opendmb@gmail.com>
-Message-ID: <CADtm3G6vOqTbcxKWhbuWXrTsz-85cdfHwnM4KwS3Y9iPFPjQBg@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 26 Oct 2017 20:08:46 -0500
+Subject: [PATCH v4 2/5] dt-bindings: scsi: ufs: add document for hisi-ufs
+In-Reply-To: <20171020085045.7737-3-liwei213@huawei.com>
+References: <20171020085045.7737-1-liwei213@huawei.com>
+ <20171020085045.7737-3-liwei213@huawei.com>
+Message-ID: <20171027010846.iiybapc24qpotyyv@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 24, 2017 at 12:54 PM, Doug Berger <opendmb@gmail.com> wrote:
-> This commit corrects problems with the previous wake implementation
-> by implementing suspend and resume power management operations and
-> the driver shutdown operation.
->
-> Wake masks are used to keep track of which GPIO should wake the
-> device.  On suspend the GPIO state is saved and the possible wakeup
-> sources are explicitly unmasked in the hardware. Non-wakeup sources
-> are explicitly masked so IRQCHIP_MASK_ON_SUSPEND is no longer
-> necessary.  The saved state of the GPIO is restored upon resume.
-> It is important not to write to the GPIO status register since this
-> has the effect of clearing bits.  The status register is explicitly
-> removed from the register save and restore to ensure this.
->
-> The shutdown operation allows the hardware to be put into the same
-> quiesced state as the suspend operation and removes the need for
-> the reboot notifier.
->
-> Unfortunately, there appears to be some confusion about whether
-> a pending disabled wake interrupt should wake the system. If a wake
-> capable interrupt is disabled using the default "lazy disable"
-> behavior and it is triggered before the suspend_device_irq call
-> the interrupt hardware will be acknowledged by mask_ack_irq and the
-> IRQS_PENDING flag is added to its state. However, the IRQS_PENDING
-> flag of wake interrupts is not checked to prevent the transition to
-> suspend and the hardware has been acked which prevents its wakeup.
-> If the lazy disabled interrupt is triggered after the call to
-> suspend_device_irqs then the wakeup logic will abort the suspend.
-> The irq_disable method is defined by this GPIO driver to prevent
-> lazy disable so that the pending hardware state remains asserted
-> allowing the hardware to wake and providing a consistent behavior.
->
-> In addition, the IRQ_DISABLE_UNLAZY flag is set for the non-wake
-> parent interrupt as a convenience to prevent the need to add code
-> to the brcmstb_gpio_irq_handler to support "lazy disable" of the
-> non-wake parent interrupt when it is disabled during suspend and
-> resume. Chained interrupt parents are not normally disabled, but
-> these GPIO devices have different parent interrupts for wake and
-> non-wake handling. It is convenient to mask the non-wake parent
-> when suspending to preserve the hardware state for proper wakeup
-> accounting when the driver is resumed.
->
-> Signed-off-by: Doug Berger <opendmb@gmail.com>
+On Fri, Oct 20, 2017 at 04:50:42PM +0800, Li Wei wrote:
+> add ufs node document for Hisilicon.
+> 
+> Signed-off-by: Li Wei <liwei213@huawei.com>
+> ---
+>  Documentation/devicetree/bindings/ufs/ufs-hisi.txt | 47 ++++++++++++++++++++++
+>  1 file changed, 47 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/ufs/ufs-hisi.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/ufs/ufs-hisi.txt b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
+> new file mode 100644
+> index 000000000000..ee114a65143d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
+> @@ -0,0 +1,47 @@
+> +* Hisilicon Universal Flash Storage (UFS) Host Controller
+> +
+> +UFS nodes are defined to describe on-chip UFS hardware macro.
+> +Each UFS Host Controller should have its own node.
+> +
+> +Required properties:
+> +- compatible        : compatible list, contains one of the following -
+> +			"hisilicon,hi3660-ufs" for hisi ufs host controller
+> +			 present on Hi3660 chipset.
+> +- reg               : should contain UFS register address space & UFS SYS CTRL register address,
+> +- interrupt-parent  : interrupt device
+> +- interrupts        : interrupt number
+> +- clocks	        : List of phandle and clock specifier pairs
+> +- clock-names       : List of clock input name strings sorted in the same
+> +		      order as the clocks property. "clk_ref", "clk_phy" is optional
+> +- resets            : reset node register, one reset the clk and the other reset the controller
+> +- reset-names       : describe reset node register
+> +
+> +Optional properties for board device:
+> +- reset-gpio			: specifies to reset devices
 
-Acked-by: Gregory Fong <gregory.0xf0@gmail.com>
+reset-gpios is the preferred form.
+
+> +
+> +Example:
+> +
+> +	ufs: ufs at ff3b0000 {
+> +		compatible = "hisilicon,hi3660-ufs", "jedec,ufs-1.1";
+> +		/* 0: HCI standard */
+> +		/* 1: UFS SYS CTRL */
+> +		reg = <0x0 0xff3b0000 0x0 0x1000>,
+> +			<0x0 0xff3b1000 0x0 0x1000>;
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&crg_ctrl HI3660_CLK_GATE_UFSIO_REF>,
+> +			<&crg_ctrl HI3660_CLK_GATE_UFSPHY_CFG>;
+> +		clock-names = "clk_ref", "clk_phy";
+> +		freq-table-hz = <0 0>, <0 0>;
+
+Not documented.
+
+> +		/* offset: 0x84; bit: 12 */
+> +		/* offset: 0x84; bit: 7  */
+> +		resets = <&crg_rst 0x84 12>,
+> +			<&crg_rst 0x84 7>;
+> +		reset-names = "rst", "assert";
+> +	};
+> +
+> +	&ufs {
+
+Don't show the SoC/Board split in examples. That's just convention, not 
+part of the binding.
+
+> +		reset-gpio = <&gpio18 1 0>;
+> +		status = "okay";
+
+Plus it's wrong because the default is okay.
+
+> +	};
+> +
+> -- 
+> 2.11.0
+> 
