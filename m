@@ -1,41 +1,59 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 27 Oct 2017 14:08:16 +0100
-Subject: [PATCH] iommu/arm-smmu-v3: Warn about missing IRQs
-Message-ID: <f03a7c9f0be2f0af461b61d18fff3c931da77ebb.1509109598.git.robin.murphy@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 27 Oct 2017 14:56:10 +0100
+Subject: [PATCH v4 23/26] KVM: arm/arm64: GICv4: Prevent a VM using GICv4
+ from being saved
+In-Reply-To: <20171026152828.GD2166@lvm> (Christoffer Dall's message of "Thu,
+ 26 Oct 2017 17:28:28 +0200")
+References: <20171006153401.5481-1-marc.zyngier@arm.com>
+ <20171006153401.5481-24-marc.zyngier@arm.com>
+ <20171026152828.GD2166@lvm>
+Message-ID: <86inf0ae4l.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is annoyingly non-obvious when DMA transactions silently go missing
-due to undetected SMMU faults. Help skip the first few debugging steps
-in those situations by making it clear when we have neither wired IRQs
-nor MSIs with which to raise error conditions.
+On Thu, Oct 26 2017 at  5:28:28 pm BST, Christoffer Dall <cdall@linaro.org> wrote:
+> On Fri, Oct 06, 2017 at 04:33:58PM +0100, Marc Zyngier wrote:
+>> The GICv4 architecture doesn't make it easy for save/restore to
+>> work, as it doesn't give any guarantee that the pending state
+>> is written into the pending table.
+>> 
+>> So let's not take any chance, and let's return an error if
+>> we encounter any LPI that has the HW bit set.
+>> 
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  virt/kvm/arm/vgic/vgic-its.c | 9 +++++++++
+>>  1 file changed, 9 insertions(+)
+>> 
+>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>> index f434748439ee..01aa4d9d405e 100644
+>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>> @@ -1987,6 +1987,15 @@ static int vgic_its_save_itt(struct vgic_its *its, struct its_device *device)
+>>  	list_for_each_entry(ite, &device->itt_head, ite_list) {
+>>  		gpa_t gpa = base + ite->event_id * ite_esz;
+>>  
+>> +		/*
+>> +		 * If an LPI carries the HW bit, this means that this
+>> +		 * interrupt is controlled by GICv4, and we do not
+>> +		 * have direct access to that state. Let's simply fail
+>> +		 * the save operation...
+>> +		 */
+>> +		if (ite->irq->hw)
+>> +			return -EINVAL;
+>
+> Will this conflict with other error messages, and will QEMU have a
+> reasonable way to tell the user what's going on?
+>
+> Perhaps we shoul document the return code in the ITS device doc and
+> choose something unique, like -EBUSY?
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/iommu/arm-smmu-v3.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Yup. I've now switched to -EACCES, which is probably the least horrible
+among the error codes we're not using yet. I've also amended the
+documentation to that effect.
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index e67ba6c40faf..1a374c5c9507 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -2263,6 +2263,8 @@ static void arm_smmu_setup_unique_irqs(struct arm_smmu_device *smmu)
- 						"arm-smmu-v3-evtq", smmu);
- 		if (ret < 0)
- 			dev_warn(smmu->dev, "failed to enable evtq irq\n");
-+	} else {
-+		dev_warn(smmu->dev, "no evtq irq - events will not be reported!\n");
- 	}
- 
- 	irq = smmu->cmdq.q.irq;
-@@ -2280,6 +2282,8 @@ static void arm_smmu_setup_unique_irqs(struct arm_smmu_device *smmu)
- 				       0, "arm-smmu-v3-gerror", smmu);
- 		if (ret < 0)
- 			dev_warn(smmu->dev, "failed to enable gerror irq\n");
-+	} else {
-+		dev_warn(smmu->dev, "no gerr irq - errors will not be reported!\n");
- 	}
- 
- 	if (smmu->features & ARM_SMMU_FEAT_PRI) {
+Thanks,
+
+	M.
 -- 
-2.13.4.dirty
+Jazz is not dead. It just smells funny.
