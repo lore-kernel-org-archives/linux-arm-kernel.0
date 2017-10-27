@@ -1,230 +1,80 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 27 Oct 2017 11:50:49 +0100
-Subject: [PATCH v4 07/28] arm64/sve: Low-level SVE architectural state
- manipulation functions
+Date: Fri, 27 Oct 2017 11:50:57 +0100
+Subject: [PATCH v4 15/28] arm64: cpufeature: Move sys_caps_initialised
+ declarations
 In-Reply-To: <1509101470-7881-1-git-send-email-Dave.Martin@arm.com>
 References: <1509101470-7881-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1509101470-7881-8-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1509101470-7881-16-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Manipulating the SVE architectural state, including the vector and
-predicate registers, first-fault register and the vector length,
-requires the use of dedicated instructions added by SVE.
+update_cpu_features() currently cannot tell whether it is being
+called during early or late secondary boot.  This doesn't
+desperately matter for anything it currently does.
 
-This patch adds suitable assembly functions for saving and
-restoring the SVE registers and querying the vector length.
-Setting of the vector length is done as part of register restore.
+However, SVE will need to know here whether the set of available
+vector lengths is known or still to be determined when booting a
+CPU, so that it can be updated appropriately.
 
-Since people building kernels may not all get an SVE-enabled
-toolchain for a while, this patch uses macros that generate
-explicit opcodes in place of assembler mnemonics.
+This patch simply moves the sys_caps_initialised stuff to the top
+of the file so that it can be used more widely.  There doesn't seem
+to be a more obvious place to put it.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/include/asm/fpsimd.h       |   5 ++
- arch/arm64/include/asm/fpsimdmacros.h | 148 ++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/entry-fpsimd.S      |  17 ++++
- 3 files changed, 170 insertions(+)
+ arch/arm64/kernel/cpufeature.c | 30 +++++++++++++++---------------
+ 1 file changed, 15 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index 410c481..026a7c7 100644
---- a/arch/arm64/include/asm/fpsimd.h
-+++ b/arch/arm64/include/asm/fpsimd.h
-@@ -67,6 +67,11 @@ extern void fpsimd_update_current_state(struct fpsimd_state *state);
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index a011a5a..e226799 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -51,6 +51,21 @@ unsigned int compat_elf_hwcap2 __read_mostly;
+ DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+ EXPORT_SYMBOL(cpu_hwcaps);
  
- extern void fpsimd_flush_task_state(struct task_struct *target);
++/*
++ * Flag to indicate if we have computed the system wide
++ * capabilities based on the boot time active CPUs. This
++ * will be used to determine if a new booting CPU should
++ * go through the verification process to make sure that it
++ * supports the system capabilities, without using a hotplug
++ * notifier.
++ */
++static bool sys_caps_initialised;
++
++static inline void set_sys_caps_initialised(void)
++{
++	sys_caps_initialised = true;
++}
++
+ static int dump_cpu_hwcaps(struct notifier_block *self, unsigned long v, void *p)
+ {
+ 	/* file-wide pr_fmt adds "CPU features: " prefix */
+@@ -1050,21 +1065,6 @@ void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
+ }
  
-+extern void sve_save_state(void *state, u32 *pfpsr);
-+extern void sve_load_state(void const *state, u32 const *pfpsr,
-+			   unsigned long vq_minus_1);
-+extern unsigned int sve_get_vl(void);
-+
- /* For use by EFI runtime services calls only */
- extern void __efi_fpsimd_begin(void);
- extern void __efi_fpsimd_end(void);
-diff --git a/arch/arm64/include/asm/fpsimdmacros.h b/arch/arm64/include/asm/fpsimdmacros.h
-index 0f5fdd3..e050d76 100644
---- a/arch/arm64/include/asm/fpsimdmacros.h
-+++ b/arch/arm64/include/asm/fpsimdmacros.h
-@@ -75,3 +75,151 @@
- 	ldr	w\tmpnr, [\state, #16 * 2 + 4]
- 	fpsimd_restore_fpcr x\tmpnr, \state
- .endm
-+
-+/* Sanity-check macros to help avoid encoding garbage instructions */
-+
-+.macro _check_general_reg nr
-+	.if (\nr) < 0 || (\nr) > 30
-+		.error "Bad register number \nr."
-+	.endif
-+.endm
-+
-+.macro _sve_check_zreg znr
-+	.if (\znr) < 0 || (\znr) > 31
-+		.error "Bad Scalable Vector Extension vector register number \znr."
-+	.endif
-+.endm
-+
-+.macro _sve_check_preg pnr
-+	.if (\pnr) < 0 || (\pnr) > 15
-+		.error "Bad Scalable Vector Extension predicate register number \pnr."
-+	.endif
-+.endm
-+
-+.macro _check_num n, min, max
-+	.if (\n) < (\min) || (\n) > (\max)
-+		.error "Number \n out of range [\min,\max]"
-+	.endif
-+.endm
-+
-+/* SVE instruction encodings for non-SVE-capable assemblers */
-+
-+/* STR (vector): STR Z\nz, [X\nxbase, #\offset, MUL VL] */
-+.macro _sve_str_v nz, nxbase, offset=0
-+	_sve_check_zreg \nz
-+	_check_general_reg \nxbase
-+	_check_num (\offset), -0x100, 0xff
-+	.inst	0xe5804000			\
-+		| (\nz)				\
-+		| ((\nxbase) << 5)		\
-+		| (((\offset) & 7) << 10)	\
-+		| (((\offset) & 0x1f8) << 13)
-+.endm
-+
-+/* LDR (vector): LDR Z\nz, [X\nxbase, #\offset, MUL VL] */
-+.macro _sve_ldr_v nz, nxbase, offset=0
-+	_sve_check_zreg \nz
-+	_check_general_reg \nxbase
-+	_check_num (\offset), -0x100, 0xff
-+	.inst	0x85804000			\
-+		| (\nz)				\
-+		| ((\nxbase) << 5)		\
-+		| (((\offset) & 7) << 10)	\
-+		| (((\offset) & 0x1f8) << 13)
-+.endm
-+
-+/* STR (predicate): STR P\np, [X\nxbase, #\offset, MUL VL] */
-+.macro _sve_str_p np, nxbase, offset=0
-+	_sve_check_preg \np
-+	_check_general_reg \nxbase
-+	_check_num (\offset), -0x100, 0xff
-+	.inst	0xe5800000			\
-+		| (\np)				\
-+		| ((\nxbase) << 5)		\
-+		| (((\offset) & 7) << 10)	\
-+		| (((\offset) & 0x1f8) << 13)
-+.endm
-+
-+/* LDR (predicate): LDR P\np, [X\nxbase, #\offset, MUL VL] */
-+.macro _sve_ldr_p np, nxbase, offset=0
-+	_sve_check_preg \np
-+	_check_general_reg \nxbase
-+	_check_num (\offset), -0x100, 0xff
-+	.inst	0x85800000			\
-+		| (\np)				\
-+		| ((\nxbase) << 5)		\
-+		| (((\offset) & 7) << 10)	\
-+		| (((\offset) & 0x1f8) << 13)
-+.endm
-+
-+/* RDVL X\nx, #\imm */
-+.macro _sve_rdvl nx, imm
-+	_check_general_reg \nx
-+	_check_num (\imm), -0x20, 0x1f
-+	.inst	0x04bf5000			\
-+		| (\nx)				\
-+		| (((\imm) & 0x3f) << 5)
-+.endm
-+
-+/* RDFFR (unpredicated): RDFFR P\np.B */
-+.macro _sve_rdffr np
-+	_sve_check_preg \np
-+	.inst	0x2519f000			\
-+		| (\np)
-+.endm
-+
-+/* WRFFR P\np.B */
-+.macro _sve_wrffr np
-+	_sve_check_preg \np
-+	.inst	0x25289000			\
-+		| ((\np) << 5)
-+.endm
-+
-+.macro __for from:req, to:req
-+	.if (\from) == (\to)
-+		_for__body \from
-+	.else
-+		__for \from, (\from) + ((\to) - (\from)) / 2
-+		__for (\from) + ((\to) - (\from)) / 2 + 1, \to
-+	.endif
-+.endm
-+
-+.macro _for var:req, from:req, to:req, insn:vararg
-+	.macro _for__body \var:req
-+		\insn
-+	.endm
-+
-+	__for \from, \to
-+
-+	.purgem _for__body
-+.endm
-+
-+.macro sve_save nxbase, xpfpsr, nxtmp
-+ _for n, 0, 31,	_sve_str_v	\n, \nxbase, \n - 34
-+ _for n, 0, 15,	_sve_str_p	\n, \nxbase, \n - 16
-+		_sve_rdffr	0
-+		_sve_str_p	0, \nxbase
-+		_sve_ldr_p	0, \nxbase, -16
-+
-+		mrs		x\nxtmp, fpsr
-+		str		w\nxtmp, [\xpfpsr]
-+		mrs		x\nxtmp, fpcr
-+		str		w\nxtmp, [\xpfpsr, #4]
-+.endm
-+
-+.macro sve_load nxbase, xpfpsr, xvqminus1, nxtmp
-+		mrs_s		x\nxtmp, SYS_ZCR_EL1
-+		bic		x\nxtmp, x\nxtmp, ZCR_ELx_LEN_MASK
-+		orr		x\nxtmp, x\nxtmp, \xvqminus1
-+		msr_s		SYS_ZCR_EL1, x\nxtmp	// self-synchronising
-+
-+ _for n, 0, 31,	_sve_ldr_v	\n, \nxbase, \n - 34
-+		_sve_ldr_p	0, \nxbase
-+		_sve_wrffr	0
-+ _for n, 0, 15,	_sve_ldr_p	\n, \nxbase, \n - 16
-+
-+		ldr		w\nxtmp, [\xpfpsr]
-+		msr		fpsr, x\nxtmp
-+		ldr		w\nxtmp, [\xpfpsr, #4]
-+		msr		fpcr, x\nxtmp
-+.endm
-diff --git a/arch/arm64/kernel/entry-fpsimd.S b/arch/arm64/kernel/entry-fpsimd.S
-index 6a27cd6..73f17bf 100644
---- a/arch/arm64/kernel/entry-fpsimd.S
-+++ b/arch/arm64/kernel/entry-fpsimd.S
-@@ -41,3 +41,20 @@ ENTRY(fpsimd_load_state)
- 	fpsimd_restore x0, 8
- 	ret
- ENDPROC(fpsimd_load_state)
-+
-+#ifdef CONFIG_ARM64_SVE
-+ENTRY(sve_save_state)
-+	sve_save 0, x1, 2
-+	ret
-+ENDPROC(sve_save_state)
-+
-+ENTRY(sve_load_state)
-+	sve_load 0, x1, x2, 3
-+	ret
-+ENDPROC(sve_load_state)
-+
-+ENTRY(sve_get_vl)
-+	_sve_rdvl	0, 1
-+	ret
-+ENDPROC(sve_get_vl)
-+#endif /* CONFIG_ARM64_SVE */
+ /*
+- * Flag to indicate if we have computed the system wide
+- * capabilities based on the boot time active CPUs. This
+- * will be used to determine if a new booting CPU should
+- * go through the verification process to make sure that it
+- * supports the system capabilities, without using a hotplug
+- * notifier.
+- */
+-static bool sys_caps_initialised;
+-
+-static inline void set_sys_caps_initialised(void)
+-{
+-	sys_caps_initialised = true;
+-}
+-
+-/*
+  * Check for CPU features that are used in early boot
+  * based on the Boot CPU value.
+  */
 -- 
 2.1.4
