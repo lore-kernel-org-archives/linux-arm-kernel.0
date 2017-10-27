@@ -1,39 +1,56 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Fri, 27 Oct 2017 09:44:19 -0700
-Subject: [PATCH v10 6/9] LPC: Support the LPC host on Hip06/Hip07 with DT
- bindings
-In-Reply-To: <1509120687-7352-7-git-send-email-gabriele.paoloni@huawei.com>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Fri, 27 Oct 2017 16:45:58 +0000
+Subject: [PATCH v10 0/9] LPC: legacy ISA I/O support
+In-Reply-To: <1509120687-7352-1-git-send-email-gabriele.paoloni@huawei.com>
 References: <1509120687-7352-1-git-send-email-gabriele.paoloni@huawei.com>
- <1509120687-7352-7-git-send-email-gabriele.paoloni@huawei.com>
-Message-ID: <de9f0362-6f2d-2f73-a23a-af248a9b1963@infradead.org>
+Message-ID: <063D6719AE5E284EB5DD2968C1650D6DD00A6F5C@AcuExch.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/27/17 09:11, Gabriele Paoloni wrote:
-> diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-> index 2408ea3..358eed3 100644
-> --- a/drivers/bus/Kconfig
-> +++ b/drivers/bus/Kconfig
-> @@ -64,6 +64,15 @@ config BRCMSTB_GISB_ARB
->  	  arbiter. This driver provides timeout and target abort error handling
->  	  and internal bus master decoding.
->  
-> +config HISILICON_LPC
-> +	bool "Support for ISA I/O space on Hisilicon Hip0X"
-> +	depends on (ARM64 && (ARCH_HISI || COMPILE_TEST))
-> +	select LOGIC_PIO
-> +	select INDIRECT_PIO
-> +	help
-> +	  Driver needed for some legacy ISA devices attached to Low-Pin-Count
-> +	  on Hisilicon Hip0X SoC.
-> +
->  config IMX_WEIM
->  	bool "Freescale EIM DRIVER"
->  	depends on ARCH_MXC
+From: Gabriele Paoloni
+> Sent: 27 October 2017 17:11
+> This patchset supports the IPMI-bt device attached to the Low-Pin-Count
+> interface implemented on Hisilicon Hip06/Hip07 SoC.
+>                         -----------
+>                         | LPC host|
+>                         |         |
+>                         -----------
+>                              |
+>                 _____________V_______________LPC
+>                   |                       |
+>                   V                       V
+>                                      ------------
+>                                      |  BT(ipmi)|
+>                                      ------------
+> 
+> When master accesses those peripherals beneath the Hip06/Hip07 LPC, a specific
+> LPC driver is needed to make LPC host generate the standard LPC I/O cycles with
+> the target peripherals'I/O port addresses. But on curent arm64 world, there is
+> no real I/O accesses. All the I/O operations through in/out accessors are based
+> on MMIO ranges; on Hip06/Hip07 LPC the I/O accesses are performed through driver
+> specific accessors rather than MMIO.
+> To solve this issue and keep the relevant existing peripherals' drivers untouched,
+> this patchset:
+>    - introduces a generic I/O space management framework, LIBIO, to support I/O
+>      operations on host controllers operating either on MMIO buses or on buses
+>      requiring specific driver I/O accessors;
+>    - redefines the in/out accessors to provide a unified interface for both MMIO
+>      and driver specific I/O operations. Using LIBIO, th call of in/out() from
+>      the host children drivers, such as ipmi-si, will be redirected to the
+>      corresponding device-specific I/O hooks to perform the I/O accesses.
+> 
+>  Based on this patch-set, all the I/O accesses to Hip06/Hip07 LPC peripherals can
+>  be supported without any changes on the existing ipmi-si driver.
 
-Hi,
+FWIW my thoughts on this are WTF!
 
-Why bool? why not tristate?
+Looks to me horribly over complicated and over generalised.
 
--- 
-~Randy
+Surely is it could be done the same way that x86 does IO cycles?
+So you encode the information into the 'address' the driver passes
+to ioread16() (etc) to allow it to do either a normal bus cycle or
+the indirect cycle onto the external bus.
+
+So you have one kernel option that makes these real functions.
+
+	David
