@@ -1,37 +1,56 @@
 From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Fri, 27 Oct 2017 11:48:43 +0200
-Subject: [PATCH v6 1/6] ARM: imx6q: provide documentation for new fsl,
- pmic-stby-poweroff property
-In-Reply-To: <20171027094848.28365-1-o.rempel@pengutronix.de>
-References: <20171027094848.28365-1-o.rempel@pengutronix.de>
-Message-ID: <20171027094848.28365-2-o.rempel@pengutronix.de>
+Date: Fri, 27 Oct 2017 11:48:42 +0200
+Subject: [PATCH RESEND v6 0/6] provide power off support for iMX6 with
+ external PMIC
+Message-ID: <20171027094848.28365-1-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-Acked-by: Rob Herring <robh@kernel.org>
----
- Documentation/devicetree/bindings/clock/imx6q-clock.txt | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Last version of this patch set was send at 20 Jun 2017, this is a rebase against
+kernel v4.14-rc6. Probably this set got lost. If I forgot to address some comments,
+please point me.
 
-diff --git a/Documentation/devicetree/bindings/clock/imx6q-clock.txt b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-index aa0a4d423ef5..9fed9dfe4a23 100644
---- a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-@@ -6,6 +6,14 @@ Required properties:
- - interrupts: Should contain CCM interrupt
- - #clock-cells: Should be <1>
- 
-+Optional properties:
-+- fsl,pmic-stby-poweroff: Configure CCM to assert PMIC_STBY_REQ signal
-+  on power off.
-+  Use this property if the SoC should be powered off by external power
-+  management IC (PMIC) triggered via PMIC_STBY_REQ signal.
-+  Boards that are designed to initiate poweroff on PMIC_ON_REQ signal should
-+  be using "syscon-poweroff" driver instead.
-+
- The clock consumer should specify the desired clock by having the clock
- ID in its "clocks" phandle cell.  See include/dt-bindings/clock/imx6qdl-clock.h
- for the full list of i.MX6 Quad and DualLite clock IDs.
+This patch series is providing power off support for Freescale/NXP iMX6 based
+boards with external power management integrated circuit (PMIC).
+
+changes:
+v6:
+ - rename imx6_pm_poweroff to imx6_pm_stby_poweroff
+ - fix "MPIC_STBY_REQ" typo in the comment.
+
+v5:
+ - remove useless includes from pm-imx6.c patch
+ - add Acked-by to "regulator: pfuze100: add fsl,pmic-stby-poweroff property"
+   patch
+
+v4:
+ - update comment in "regulator: pfuze100: add fsl,pmic-stby-poweroff ..."
+   patch
+ - add Acked-by to "ARM: imx6q: provide documentation for new ..."
+   patch
+
+v3:
+ - set pm_power_off_prepare = NULL on .remove.
+ - documentation and spelling fixes.
+ - use %pf instead of lookup_symbol_name.
+
+Oleksij Rempel (6):
+  ARM: imx6q: provide documentation for new fsl,pmic-stby-poweroff
+    property
+  ARM: imx6: register pm_power_off handler if "fsl,pmic-stby-poweroff"
+    is set
+  kernel/reboot.c: export pm_power_off_prepare
+  regulator: pfuze100: add fsl,pmic-stby-poweroff property
+  regulator: pfuze100-regulator: provide pm_power_off_prepare handler
+  ARM: dts: imx6: RIoTboard provide standby on power off option
+
+ .../devicetree/bindings/clock/imx6q-clock.txt      |  8 ++
+ .../devicetree/bindings/regulator/pfuze100.txt     |  7 ++
+ arch/arm/boot/dts/imx6dl-riotboard.dts             |  5 ++
+ arch/arm/mach-imx/pm-imx6.c                        | 25 ++++++
+ drivers/regulator/pfuze100-regulator.c             | 92 ++++++++++++++++++++++
+ kernel/reboot.c                                    |  1 +
+ 6 files changed, 138 insertions(+)
+
 -- 
 2.11.0
