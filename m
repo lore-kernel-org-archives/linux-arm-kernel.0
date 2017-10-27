@@ -1,22 +1,21 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 27 Oct 2017 12:10:02 +0900 (KST)
-Subject: [PATCH] drivers/net: nuvoton: Convert timers to use timer_setup()
-In-Reply-To: <20171025105158.GA146575@beast>
-References: <20171025105158.GA146575@beast>
-Message-ID: <20171027.121002.2042844769656745749.davem@davemloft.net>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 26 Oct 2017 22:23:11 -0500
+Subject: [PATCH v6 2/9] clk: mediatek: Add dt-bindings for MT2712 clocks
+In-Reply-To: <1508731840-4231-3-git-send-email-weiyi.lu@mediatek.com>
+References: <1508731840-4231-1-git-send-email-weiyi.lu@mediatek.com>
+ <1508731840-4231-3-git-send-email-weiyi.lu@mediatek.com>
+Message-ID: <20171027032311.2am3x3fbrdxwr5oj@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kees Cook <keescook@chromium.org>
-Date: Wed, 25 Oct 2017 03:51:58 -0700
-
-> In preparation for unconditionally passing the struct timer_list pointer to
-> all timer callbacks, switch to using the new timer_setup() and from_timer()
-> to pass the timer pointer explicitly.
+On Mon, Oct 23, 2017 at 12:10:33PM +0800, Weiyi Lu wrote:
+> Add MT2712 clock dt-bindings, include topckgen, apmixedsys,
+> infracfg, pericfg, mcucfg and subsystem clocks.
 > 
-> Cc: Wan ZongShun <mcuos.com@gmail.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: netdev at vger.kernel.org
-> Signed-off-by: Kees Cook <keescook@chromium.org>
+> Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
+> ---
+>  include/dt-bindings/clock/mt2712-clk.h | 427 +++++++++++++++++++++++++++++++++
+>  1 file changed, 427 insertions(+)
+>  create mode 100644 include/dt-bindings/clock/mt2712-clk.h
 
-Applied.
+Acked-by: Rob Herring <robh@kernel.org>
