@@ -1,71 +1,70 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 27 Oct 2017 11:51:06 +0100
-Subject: [PATCH v4 24/28] arm64/sve: KVM: Hide SVE from CPU features exposed
- to guests
-In-Reply-To: <1509101470-7881-1-git-send-email-Dave.Martin@arm.com>
-References: <1509101470-7881-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1509101470-7881-25-git-send-email-Dave.Martin@arm.com>
+From: ore@pengutronix.de (Oleksij Rempel)
+Date: Fri, 27 Oct 2017 13:14:04 +0200
+Subject: [PATCH v2 3/4] spi: imx: Don't require platform data chipselect
+ array
+In-Reply-To: <20171027010841.28624-4-tpiepho@impinj.com>
+References: <20171027010841.28624-1-tpiepho@impinj.com>
+ <20171027010841.28624-4-tpiepho@impinj.com>
+Message-ID: <20171027111404.nibuwyakef6bvjvn@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KVM guests cannot currently use SVE, because SVE is always
-configured to trap to EL2.
+Hi Trent,
 
-However, a guest that sees SVE reported as present in
-ID_AA64PFR0_EL1 may legitimately expect that SVE works and try to
-use it.  Instead of working, the guest will receive an injected
-undef exception, which may cause the guest to oops or go into a
-spin.
+On Thu, Oct 26, 2017 at 06:08:40PM -0700, Trent Piepho wrote:
+> If the array is not present, assume all chip selects are native.  This
+> is the standard behavior for SPI masters configured via the device
+> tree and the behavior of this driver as well when it is configured via
+> device tree.
+> 
+> This reduces platform data vs DT differences and allows most of the
+> platform data based boards to remove their chip select arrays.
+> 
+> CC: Shawn Guo <shawnguo@kernel.org>
+> CC: Sascha Hauer <kernel@pengutronix.de>
+> CC: Fabio Estevam <fabio.estevam@nxp.com>
+> CC: Mark Brown <broonie@kernel.org>
+> Signed-off-by: Trent Piepho <tpiepho@impinj.com>
+> ---
+>  drivers/spi/spi-imx.c | 5 ++---
+>  1 file changed, 2 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+> index fea46cbf458a..535378ebab18 100644
+> --- a/drivers/spi/spi-imx.c
+> +++ b/drivers/spi/spi-imx.c
+> @@ -1362,8 +1362,7 @@ static int spi_imx_probe(struct platform_device *pdev)
+>  	spi_imx->devtype_data = of_id ? of_id->data :
+>  		(struct spi_imx_devtype_data *)pdev->id_entry->driver_data;
+>  
+> -	if (mxc_platform_info) {
+> -		master->num_chipselect = mxc_platform_info->num_chipselect;
+> +	if (mxc_platform_info && master->num_chipselect) {
 
-To avoid misleading the guest into believing that SVE will work,
-this patch masks out the SVE field from ID_AA64PFR0_EL1 when a
-guest attempts to read this register.  No support is explicitly
-added for ID_AA64ZFR0_EL1 either, so that is still emulated as
-reading as zero, which is consistent with SVE not being
-implemented.
+after spi_alloc_master(), master->num_chipselect should be always 1.
+This check makes no sense for me. Probably you wonted to use
+mxc_platform_info->num_chipselect instead?
 
-This is a temporary measure, and will be removed in a later series
-when full KVM support for SVE is implemented.
+>  		master->cs_gpios = devm_kzalloc(&master->dev,
+>  			sizeof(int) * master->num_chipselect, GFP_KERNEL);
+>  		if (!master->cs_gpios)
+> @@ -1371,7 +1370,7 @@ static int spi_imx_probe(struct platform_device *pdev)
+>  
+>  		for (i = 0; i < master->num_chipselect; i++)
+>  			master->cs_gpios[i] = mxc_platform_info->chipselect[i];
+> - 	}
+> +	}
+>  
+>  	spi_imx->bitbang.chipselect = spi_imx_chipselect;
+>  	spi_imx->bitbang.setup_transfer = spi_imx_setupxfer;
+> -- 
+> 2.14.3
+> 
+> 
+> 
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm64/kvm/sys_regs.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index b1f7552..a0ee9b0 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -23,6 +23,7 @@
- #include <linux/bsearch.h>
- #include <linux/kvm_host.h>
- #include <linux/mm.h>
-+#include <linux/printk.h>
- #include <linux/uaccess.h>
- 
- #include <asm/cacheflush.h>
-@@ -897,8 +898,17 @@ static u64 read_id_reg(struct sys_reg_desc const *r, bool raz)
- {
- 	u32 id = sys_reg((u32)r->Op0, (u32)r->Op1,
- 			 (u32)r->CRn, (u32)r->CRm, (u32)r->Op2);
-+	u64 val = raz ? 0 : read_sanitised_ftr_reg(id);
- 
--	return raz ? 0 : read_sanitised_ftr_reg(id);
-+	if (id == SYS_ID_AA64PFR0_EL1) {
-+		if (val & (0xfUL << ID_AA64PFR0_SVE_SHIFT))
-+			pr_err_once("kvm [%i]: SVE unsupported for guests, suppressing\n",
-+				    task_pid_nr(current));
-+
-+		val &= ~(0xfUL << ID_AA64PFR0_SVE_SHIFT);
-+	}
-+
-+	return val;
- }
- 
- /* cpufeature ID register access trap handlers */
 -- 
-2.1.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
