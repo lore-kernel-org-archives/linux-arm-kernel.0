@@ -1,57 +1,77 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 27 Oct 2017 11:50:52 +0100
-Subject: [PATCH v4 10/28] arm64/sve: Low-level CPU setup
+Date: Fri, 27 Oct 2017 11:50:46 +0100
+Subject: [PATCH v4 04/28] arm64: Port deprecated instruction emulation to new
+ sysctl interface
 In-Reply-To: <1509101470-7881-1-git-send-email-Dave.Martin@arm.com>
 References: <1509101470-7881-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1509101470-7881-11-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1509101470-7881-5-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To enable the kernel to use SVE, SVE traps from EL1 to EL2 must be
-disabled.  To take maximum advantage of the hardware, the full
-available vector length also needs to be enabled for EL1 by
-programming ZCR_EL2.LEN.  (The kernel will program ZCR_EL1.LEN as
-required, but this cannot override the limit set by ZCR_EL2.)
+Currently, armv8_deprected.c takes charge of the "abi" sysctl
+directory, which makes life difficult for other code that wants to
+register sysctls in the same directory.
 
-This patch makes the appropriate changes to the EL2 early setup
-code.
+There is a "new" [1] sysctl registration interface that removes the
+need to define ctl_tables for parent directories explicitly, which
+is ideal here.
+
+This patch ports register_insn_emulation_sysctl() over to the
+register_sysctl() interface and removes the redundant ctl_table for
+"abi".
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Alex Benn?e <alex.bennee@linaro.org>
 
+[1] fea478d4101a (sysctl: Add register_sysctl for normal sysctl
+users)
+The commit message notes an intent to port users of the
+pre-existing interfaces over to register_sysctl(), though the
+number of users of the new interface currently appears negligible.
 ---
+ arch/arm64/kernel/armv8_deprecated.c | 15 +++------------
+ 1 file changed, 3 insertions(+), 12 deletions(-)
 
-**Dropped at v3** Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-(Due to significant changes to the logic.)
----
- arch/arm64/kernel/head.S | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index cfa90a4..67e86a0 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -524,8 +524,19 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
- 	mov	x0, #0x33ff
- 	msr	cptr_el2, x0			// Disable copro. traps to EL2
+diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
+index a4dc115..c33b5e4 100644
+--- a/arch/arm64/kernel/armv8_deprecated.c
++++ b/arch/arm64/kernel/armv8_deprecated.c
+@@ -228,15 +228,7 @@ static int emulation_proc_handler(struct ctl_table *table, int write,
+ 	return ret;
+ }
  
-+	/* SVE register access */
-+	mrs	x1, id_aa64pfr0_el1
-+	ubfx	x1, x1, #ID_AA64PFR0_SVE_SHIFT, #4
-+	cbz	x1, 7f
-+
-+	bic	x0, x0, #CPTR_EL2_TZ		// Also disable SVE traps
-+	msr	cptr_el2, x0			// Disable copro. traps to EL2
-+	isb
-+	mov	x1, #ZCR_ELx_LEN_MASK		// SVE: Enable full vector
-+	msr_s	SYS_ZCR_EL2, x1			// length for EL1.
-+
- 	/* Hypervisor stub */
--	adr_l	x0, __hyp_stub_vectors
-+7:	adr_l	x0, __hyp_stub_vectors
- 	msr	vbar_el2, x0
+-static struct ctl_table ctl_abi[] = {
+-	{
+-		.procname = "abi",
+-		.mode = 0555,
+-	},
+-	{ }
+-};
+-
+-static void __init register_insn_emulation_sysctl(struct ctl_table *table)
++static void __init register_insn_emulation_sysctl(void)
+ {
+ 	unsigned long flags;
+ 	int i = 0;
+@@ -262,8 +254,7 @@ static void __init register_insn_emulation_sysctl(struct ctl_table *table)
+ 	}
+ 	raw_spin_unlock_irqrestore(&insn_emulation_lock, flags);
  
- 	/* spsr */
+-	table->child = insns_sysctl;
+-	register_sysctl_table(table);
++	register_sysctl("abi", insns_sysctl);
+ }
+ 
+ /*
+@@ -644,7 +635,7 @@ static int __init armv8_deprecated_init(void)
+ 	cpuhp_setup_state_nocalls(CPUHP_AP_ARM64_ISNDEP_STARTING,
+ 				  "arm64/isndep:starting",
+ 				  run_all_insn_set_hw_mode, NULL);
+-	register_insn_emulation_sysctl(ctl_abi);
++	register_insn_emulation_sysctl();
+ 
+ 	return 0;
+ }
 -- 
 2.1.4
