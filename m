@@ -1,97 +1,36 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 27 Oct 2017 15:28:55 +0100
-Subject: [PATCH v5 26/26] KVM: arm/arm64: GICv4: Theory of operations
+Date: Fri, 27 Oct 2017 15:28:43 +0100
+Subject: [PATCH v5 14/26] KVM: arm/arm64: GICv4: Handle CLEAR applied to a VLPI
 In-Reply-To: <20171027142855.21584-1-marc.zyngier@arm.com>
 References: <20171027142855.21584-1-marc.zyngier@arm.com>
-Message-ID: <20171027142855.21584-27-marc.zyngier@arm.com>
+Message-ID: <20171027142855.21584-15-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yet another braindump so I can free some cells...
+Handling CLEAR is pretty easy. Just ask the ITS driver to clear
+the corresponding pending bit (which will turn into a CLEAR
+command on the physical side).
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Christoffer Dall <cdall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-v4.c | 67 +++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 67 insertions(+)
+ virt/kvm/arm/vgic/vgic-its.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
-index d10e18eabd3b..e367d65a0ebe 100644
---- a/virt/kvm/arm/vgic/vgic-v4.c
-+++ b/virt/kvm/arm/vgic/vgic-v4.c
-@@ -23,6 +23,73 @@
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 42ffb9084bb7..5778b50911e8 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -1070,6 +1070,10 @@ static int vgic_its_cmd_handle_clear(struct kvm *kvm, struct vgic_its *its,
  
- #include "vgic.h"
+ 	ite->irq->pending_latch = false;
  
-+/*
-+ * How KVM uses GICv4 (insert rude comments here):
-+ *
-+ * The vgic-v4 layer acts as a bridge between several entities:
-+ * - The GICv4 ITS representation offered by the ITS driver
-+ * - VFIO, which is in charge of the PCI endpoint
-+ * - The virtual ITS, which is the only thing the guest sees
-+ *
-+ * The configuration of VLPIs is triggered by a callback from VFIO,
-+ * instructing KVM that a PCI device has been configured to deliver
-+ * MSIs to a vITS.
-+ *
-+ * kvm_vgic_v4_set_forwarding() is thus called with the routing entry,
-+ * and this is used to find the corresponding vITS data structures
-+ * (ITS instance, device, event and irq) using a process that is
-+ * extremely similar to the injection of an MSI.
-+ *
-+ * At this stage, we can link the guest's view of an LPI (uniquely
-+ * identified by the routing entry) and the host irq, using the GICv4
-+ * driver mapping operation. Should the mapping succeed, we've then
-+ * successfully upgraded the guest's LPI to a VLPI. We can then start
-+ * with updating GICv4's view of the property table and generating an
-+ * INValidation in order to kickstart the delivery of this VLPI to the
-+ * guest directly, without software intervention. Well, almost.
-+ *
-+ * When the PCI endpoint is deconfigured, this operation is reversed
-+ * with VFIO calling kvm_vgic_v4_unset_forwarding().
-+ *
-+ * Once the VLPI has been mapped, it needs to follow any change the
-+ * guest performs on its LPI through the vITS. For that, a number of
-+ * command handlers have hooks to communicate these changes to the HW:
-+ * - Any invalidation triggers a call to its_prop_update_vlpi()
-+ * - The INT command results in a irq_set_irqchip_state(), which
-+ *   generates an INT on the corresponding VLPI.
-+ * - The CLEAR command results in a irq_set_irqchip_state(), which
-+ *   generates an CLEAR on the corresponding VLPI.
-+ * - DISCARD translates into an unmap, similar to a call to
-+ *   kvm_vgic_v4_unset_forwarding().
-+ * - MOVI is translated by an update of the existing mapping, changing
-+ *   the target vcpu, resulting in a VMOVI being generated.
-+ * - MOVALL is translated by a string of mapping updates (similar to
-+ *   the handling of MOVI). MOVALL is horrible.
-+ *
-+ * Note that a DISCARD/MAPTI sequence emitted from the guest without
-+ * reprogramming the PCI endpoint after MAPTI does not result in a
-+ * VLPI being mapped, as there is no callback from VFIO (the guest
-+ * will get the interrupt via the normal SW injection). Fixing this is
-+ * not trivial, and requires some horrible messing with the VFIO
-+ * internals. Not fun. Don't do that.
-+ *
-+ * Then there is the scheduling. Each time a vcpu is about to run on a
-+ * physical CPU, KVM must tell the corresponding redistributor about
-+ * it. And if we've migrated our vcpu from one CPU to another, we must
-+ * tell the ITS (so that the messages reach the right redistributor).
-+ * This is done in two steps: first issue a irq_set_affinity() on the
-+ * irq corresponding to the vcpu, then call its_schedule_vpe(). You
-+ * must be in a non-preemptible context. On exit, another call to
-+ * its_schedule_vpe() tells the redistributor that we're done with the
-+ * vcpu.
-+ *
-+ * Finally, the doorbell handling: Each vcpu is allocated an interrupt
-+ * which will fire each time a VLPI is made pending whilst the vcpu is
-+ * not running. Each time the vcpu gets blocked, the doorbell
-+ * interrupt gets enabled. When the vcpu is unblocked (for whatever
-+ * reason), the doorbell interrupt is disabled.
-+ */
++	if (ite->irq->hw)
++		return irq_set_irqchip_state(ite->irq->host_irq,
++					     IRQCHIP_STATE_PENDING, false);
 +
- #define DB_IRQ_FLAGS	(IRQ_NOAUTOEN | IRQ_DISABLE_UNLAZY | IRQ_NO_BALANCING)
+ 	return 0;
+ }
  
- static irqreturn_t vgic_v4_doorbell_handler(int irq, void *info)
 -- 
 2.11.0
