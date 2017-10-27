@@ -1,80 +1,94 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 27 Oct 2017 11:50:57 +0100
-Subject: [PATCH v4 15/28] arm64: cpufeature: Move sys_caps_initialised
- declarations
+Date: Fri, 27 Oct 2017 11:50:54 +0100
+Subject: [PATCH v4 12/28] arm64/sve: Support vector length resetting for new
+ processes
 In-Reply-To: <1509101470-7881-1-git-send-email-Dave.Martin@arm.com>
 References: <1509101470-7881-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1509101470-7881-16-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1509101470-7881-13-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-update_cpu_features() currently cannot tell whether it is being
-called during early or late secondary boot.  This doesn't
-desperately matter for anything it currently does.
+It's desirable to be able to reset the vector length to some sane
+default for new processes, since the new binary and its libraries
+may or may not be SVE-aware.
 
-However, SVE will need to know here whether the set of available
-vector lengths is known or still to be determined when booting a
-CPU, so that it can be updated appropriately.
-
-This patch simply moves the sys_caps_initialised stuff to the top
-of the file so that it can be used more widely.  There doesn't seem
-to be a more obvious place to put it.
+This patch tracks the desired post-exec vector length (if any) in a
+new thread member sve_vl_onexec, and adds a new thread flag
+TIF_SVE_VL_INHERIT to control whether to inherit or reset the
+vector length.  Currently these are inactive.  Subsequent patches
+will provide the capability to configure them.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/kernel/cpufeature.c | 30 +++++++++++++++---------------
- 1 file changed, 15 insertions(+), 15 deletions(-)
+ arch/arm64/include/asm/processor.h   |  1 +
+ arch/arm64/include/asm/thread_info.h |  1 +
+ arch/arm64/kernel/fpsimd.c           | 16 ++++++++++++----
+ 3 files changed, 14 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index a011a5a..e226799 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -51,6 +51,21 @@ unsigned int compat_elf_hwcap2 __read_mostly;
- DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
- EXPORT_SYMBOL(cpu_hwcaps);
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index e2f575d..c6fddb0 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -107,6 +107,7 @@ struct thread_struct {
+ 	struct fpsimd_state	fpsimd_state;
+ 	void			*sve_state;	/* SVE registers, if any */
+ 	unsigned int		sve_vl;		/* SVE vector length */
++	unsigned int		sve_vl_onexec;	/* SVE vl after next exec */
+ 	unsigned long		fault_address;	/* fault info */
+ 	unsigned long		fault_code;	/* ESR_EL1 value */
+ 	struct debug_info	debug;		/* debugging */
+diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+index 92b7b48..eb43128 100644
+--- a/arch/arm64/include/asm/thread_info.h
++++ b/arch/arm64/include/asm/thread_info.h
+@@ -95,6 +95,7 @@ void arch_release_task_struct(struct task_struct *tsk);
+ #define TIF_SINGLESTEP		21
+ #define TIF_32BIT		22	/* 32bit process */
+ #define TIF_SVE			23	/* Scalable Vector Extension in use */
++#define TIF_SVE_VL_INHERIT	24	/* Inherit sve_vl_onexec across exec */
  
-+/*
-+ * Flag to indicate if we have computed the system wide
-+ * capabilities based on the boot time active CPUs. This
-+ * will be used to determine if a new booting CPU should
-+ * go through the verification process to make sure that it
-+ * supports the system capabilities, without using a hotplug
-+ * notifier.
-+ */
-+static bool sys_caps_initialised;
-+
-+static inline void set_sys_caps_initialised(void)
-+{
-+	sys_caps_initialised = true;
-+}
-+
- static int dump_cpu_hwcaps(struct notifier_block *self, unsigned long v, void *p)
- {
- 	/* file-wide pr_fmt adds "CPU features: " prefix */
-@@ -1050,21 +1065,6 @@ void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
- }
- 
- /*
-- * Flag to indicate if we have computed the system wide
-- * capabilities based on the boot time active CPUs. This
-- * will be used to determine if a new booting CPU should
-- * go through the verification process to make sure that it
-- * supports the system capabilities, without using a hotplug
-- * notifier.
-- */
--static bool sys_caps_initialised;
--
--static inline void set_sys_caps_initialised(void)
--{
--	sys_caps_initialised = true;
--}
--
--/*
-  * Check for CPU features that are used in early boot
-  * based on the Boot CPU value.
+ #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
+ #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 0b15a594..2b691d1 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -109,6 +109,9 @@
   */
+ static DEFINE_PER_CPU(struct fpsimd_state *, fpsimd_last_state);
+ 
++/* Default VL for tasks that don't set it explicitly: */
++static int sve_default_vl = SVE_VL_MIN;
++
+ /*
+  * Call __sve_free() directly only if you know task can't be scheduled
+  * or preempted.
+@@ -472,15 +475,20 @@ void fpsimd_flush_thread(void)
+ 		 * If a bug causes this to go wrong, we make some noise and
+ 		 * try to fudge thread.sve_vl to a safe value here.
+ 		 */
+-		vl = current->thread.sve_vl;
+-
+-		if (vl == 0)
+-			vl = SVE_VL_MIN;
++		vl = current->thread.sve_vl_onexec ?
++			current->thread.sve_vl_onexec : sve_default_vl;
+ 
+ 		if (WARN_ON(!sve_vl_valid(vl)))
+ 			vl = SVE_VL_MIN;
+ 
+ 		current->thread.sve_vl = vl;
++
++		/*
++		 * If the task is not set to inherit, ensure that the vector
++		 * length will be reset by a subsequent exec:
++		 */
++		if (!test_thread_flag(TIF_SVE_VL_INHERIT))
++			current->thread.sve_vl_onexec = 0;
+ 	}
+ 
+ 	set_thread_flag(TIF_FOREIGN_FPSTATE);
 -- 
 2.1.4
