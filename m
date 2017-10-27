@@ -1,49 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 27 Oct 2017 07:47:52 +0000
-Subject: [GIT PULL] updates to soc/fsl drivers for v4.14
-In-Reply-To: <20171023011115.GF8700@dragon>
-References: <1506109046-11527-1-git-send-email-leoyang.li@nxp.com>
- <CAK8P3a3cyiOgFXAyADH==L=0P621ucp3Xy0F3kBezV5EW9WdDQ@mail.gmail.com>
- <AM4PR0401MB1699CA477F157A2C7618492D8F430@AM4PR0401MB1699.eurprd04.prod.outlook.com>
- <20171023011115.GF8700@dragon>
-Message-ID: <CAK8P3a3ePm25vEnTTLpKAwj_GZf3Hc-VivTJZCvhsH0ivwTMaQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 27 Oct 2017 08:59:23 +0100
+Subject: [PATCH v4 25/26] KVM: arm/arm64: GICv4: Prevent heterogenous
+ systems from using GICv4
+In-Reply-To: <20171027073728.taejncafoehkfzuc@salmiak> (Mark Rutland's message
+ of "Fri, 27 Oct 2017 08:37:28 +0100")
+References: <20171006153401.5481-1-marc.zyngier@arm.com>
+ <20171006153401.5481-26-marc.zyngier@arm.com>
+ <20171026154839.ebtmqzcy7jjyejul@salmiak> <868tfxaxiv.fsf@arm.com>
+ <20171027073728.taejncafoehkfzuc@salmiak>
+Message-ID: <86r2tp9g2s.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 23, 2017 at 1:11 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> Hi Leo,
+On Fri, Oct 27 2017 at  8:37:28 am BST, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Fri, Oct 27, 2017 at 07:57:12AM +0100, Marc Zyngier wrote:
+>> On Thu, Oct 26 2017 at  4:48:39 pm BST, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > On Fri, Oct 06, 2017 at 04:34:00PM +0100, Marc Zyngier wrote:
 >
-> On Fri, Oct 20, 2017 at 10:04:07PM +0000, Leo Li wrote:
->> > - We should come to an agreement on how we do these in the future.
->> >   Usually I expect any Freescale/NXP/ARM changes to come through the
->> >   i.MX maintainers (Shawn and Sascha), not directly from other developers.
->> >   There is usually some degree of coordination required between the
->> >   SoC drivers and the DT files and platform code, so it's really best to
->> >   have someone be aware of all the components, and I prefer to have
->> >   a smaller number of people sending me pull requests. If you already
->> >   talked to Shawn about it and he prefers you to send the pull request
->> >   to us directly, that's fine too, but please at least keep him on Cc.
->>
->> I would like to share some more background information on this.  The microcontroller business(produces i.mx product line) and the networking business(produces qoriq product line) are completely two different business units within Freescale/NXP.  There are separate hardware design teams and software development teams due to the different targeting markets.  The hardware design are almost completely different.  Historically, the microcontroller product line focused on m68k and armv7 architectures while the networking product line focused on PowerPC architecture and recently moved to ARMv8 architecture.  There are surely some IP sharing but only on basic peripheral devices such as i2c, usb and etc.   But due to the different targeting markets most of the peripheral devices are very different.  For example this DPAA framework, network interfaces and a lot of other accelerators will never be used in the i.mx products.  On the core architecture side we are working on SBSA compliance hardware and SBBA compliance software with UEFI and ACPI in the picture, which would be a overkill for microcontrollers.    In my opinion, the differences between i.MX and QorIQ products could be even bigger than the difference between QorIQ products and some server focused ARMv8 SoCs from other vendors.  The synergy for combining these two will be very limited.
+>> >> @@ -485,8 +495,21 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
+>> >>  	kvm_vgic_global_state.can_emulate_gicv2 = false;
+>> >>  	kvm_vgic_global_state.ich_vtr_el2 = ich_vtr_el2;
+>> >>  
+>> >> -	/* GICv4 support? */
+>> >> +	/*
+>> >> +	 * GICv4 support? We need to check on all CPUs in case of some
+>> >> +	 * extremely creative form of big-little brain damage...
+>> >> +	 */
+>> >>  	if (info->has_v4) {
+>> >> +		int cpu;
+>> >> +
+>> >> +		for_each_online_cpu(cpu) {
+>> >> +			bool enable;
+>> >> +
+>> >> +			smp_call_function_single(cpu, vgic_check_v4_cpuif,
+>> >> +						 &enable, 1);
+>> >> +			gicv4_enable = gicv4_enable && enable;
+>> >> +		}
+>> >
+>> > With maxcpus=N on the command line, CPUs can be brought online late, so we
+>> > might need this in a hotplug callback (and/or in the arm64 cpufeature
+>> > framework) to handle that case.
+>> 
+>> I'm afraid that won't be enough. If the CPU is brought up once we've
+>> already started a VM, we're screwed, as we cannot retroactively decide
+>> to drop GICv4 on the floor and nuke the guest. Or did you have something
+>> more radical in mind? Panic?
+>
+> If you teach the arm64 cpufeature framework about this, it can abort bringing a
+> !GICv4 CPU online late.
 
-I'm obviously aware of your product lines and the differences, it was just
-a bit surprising to get the pull request from you after we had earlier agreed
-that Shawn would help you handle the pull requests for all NXP products,
-as he did with the changes to arch/arm/ (LS1021A) and arch/arm64 for
-various Layerscape products we support (LS1012a, LS1043a, LS1088a,
-and LS2XXXa so far).
+You wish.
 
-Again, this is mostly about clear communication about what I should
-expect and when things change, as long as everybody is ok with the way
-we do it.
+There is all kind of difficulties with that. This requires checking an
+EL2 register (ICH_VTR_EL2) when we've not initialised KVM yet (so no HYP
+call facility). We could make it an additional hyp-stub feature, but
+that feels pretty involved.
 
-> I'm fine with you send drivers/soc/fsl changes to Arnd directly, since
-> we already have separate folders (drivers/soc/imx vs. drivers/soc/fsl)
-> for i.MX and QorIQ.  But as Arnd suggested, please keep me on copy, so
-> that I can be aware of the changes which might be somehow related to
-> arch/arm64/boot/dts/freescale/ changes that I'm currently taking care
-> of.  Thanks.
+Effectively, GICv4 support having it supported on the redistributors,
+the ITSs, and the CPUs. The cpufeature framework only addresses the
+first one. So unless the solution encompasses all the elements in the
+chain, any checking feels pretty pointless.
 
-Sounds good to me, thanks.
+Thanks,
 
-      Arnd
+	M.
+-- 
+Jazz is not dead. It just smells funny.
