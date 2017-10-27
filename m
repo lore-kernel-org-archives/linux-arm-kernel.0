@@ -1,76 +1,76 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 27 Oct 2017 15:28:54 +0100
-Subject: [PATCH v5 25/26] KVM: arm/arm64: GICv4: Enable VLPI support
-In-Reply-To: <20171027142855.21584-1-marc.zyngier@arm.com>
-References: <20171027142855.21584-1-marc.zyngier@arm.com>
-Message-ID: <20171027142855.21584-26-marc.zyngier@arm.com>
+From: philippe.cornu@st.com (Philippe CORNU)
+Date: Fri, 27 Oct 2017 14:52:21 +0000
+Subject: [PATCH] dt-bindings: display: stm32: add pixel clock mandatory
+ property
+In-Reply-To: <20171027143815.evbb7rqkgqiol7yo@rob-hp-laptop>
+References: <1509034356-23885-1-git-send-email-philippe.cornu@st.com>
+ <20171027143815.evbb7rqkgqiol7yo@rob-hp-laptop>
+Message-ID: <e7f46e2c-2cd9-bdd4-221a-109cdc9852b1@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All it takes is the has_v4 flag to be set in gic_kvm_info
-as well as "kvm-arm.vgic_v4_enable=1" being passed on the
-command line for GICv4 to be enabled in KVM.
+Hi Rob,
 
-Acked-by: Christoffer Dall <cdall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- Documentation/admin-guide/kernel-parameters.txt |  4 ++++
- virt/kvm/arm/vgic/vgic-v3.c                     | 14 ++++++++++++++
- 2 files changed, 18 insertions(+)
+On 10/27/2017 04:38 PM, Rob Herring wrote:
+> On Thu, Oct 26, 2017 at 06:12:36PM +0200, Philippe Cornu wrote:
+>> Add the DPI/RGB input pixel clock in mandatory properties
+>> because it really offers a better preciseness for timing
+>> computations.
+>> Note: Fix also the DSI panel example where "ref" & "pclk"
+>> clocks were swapped.
+>>
+>> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
+>> ---
+>>   Documentation/devicetree/bindings/display/st,stm32-ltdc.txt | 6 ++++--
+>>   1 file changed, 4 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+>> index 0292522..99823fb 100644
+>> --- a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+>> +++ b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+>> @@ -28,6 +28,7 @@ Mandatory properties specific to STM32 DSI:
+>>   - #size-cells: Should be <0>.
+>>   - compatible: "st,stm32-dsi".
+>>   - clock-names:
+>> +  - DPI/RGB input pixel clock string name, must be "px_clk".
+>>     - phy pll reference clock string name, must be "ref".
+> 
+> Where's pclk?
 
-diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-index 05496622b4ef..93c8fff399eb 100644
---- a/Documentation/admin-guide/kernel-parameters.txt
-+++ b/Documentation/admin-guide/kernel-parameters.txt
-@@ -1874,6 +1874,10 @@
- 			[KVM,ARM] Trap guest accesses to GICv3 common
- 			system registers
- 
-+	kvm-arm.vgic_v4_enable=
-+			[KVM,ARM] Allow use of GICv4 for direct injection of
-+			LPIs.
-+
- 	kvm-intel.ept=	[KVM,Intel] Disable extended page tables
- 			(virtualized MMU) support on capable Intel chips.
- 			Default is 1 (enabled)
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 96ea597db0e7..405733678c2f 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -24,6 +24,7 @@
- static bool group0_trap;
- static bool group1_trap;
- static bool common_trap;
-+static bool gicv4_enable;
- 
- void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
- {
-@@ -459,6 +460,12 @@ static int __init early_common_trap_cfg(char *buf)
- }
- early_param("kvm-arm.vgic_v3_common_trap", early_common_trap_cfg);
- 
-+static int __init early_gicv4_enable(char *buf)
-+{
-+	return strtobool(buf, &gicv4_enable);
-+}
-+early_param("kvm-arm.vgic_v4_enable", early_gicv4_enable);
-+
- /**
-  * vgic_v3_probe - probe for a GICv3 compatible interrupt controller in DT
-  * @node:	pointer to the DT node
-@@ -478,6 +485,13 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
- 	kvm_vgic_global_state.can_emulate_gicv2 = false;
- 	kvm_vgic_global_state.ich_vtr_el2 = ich_vtr_el2;
- 
-+	/* GICv4 support? */
-+	if (info->has_v4) {
-+		kvm_vgic_global_state.has_gicv4 = gicv4_enable;
-+		kvm_info("GICv4 support %sabled\n",
-+			 gicv4_enable ? "en" : "dis");
-+	}
-+
- 	if (!info->vcpu.start) {
- 		kvm_info("GICv3: no GICV resource entry\n");
- 		kvm_vgic_global_state.vcpu_base = 0;
--- 
-2.11.0
+pclk is described in the generic part 
+(Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt) as 
+mandatory.
+
+In st,stm32-ltdc.txt (specific part), I have documented that "For all 
+mandatory properties & nodes, please refer to the related documentation 
+in [5]".
+
+Do you think it is clear enough?
+
+> 
+> The new clock should be last to be backwards compatible.
+> 
+
+ok.
+
+Many thanks for your review and your support,
+
+Philippe :-)
+
+>>   - resets: see [5].
+>>   - reset-names: see [5].
+>> @@ -97,8 +98,9 @@ Example 2: DSI panel
+>>   			#size-cells = <0>;
+>>   			compatible = "st,stm32-dsi";
+>>   			reg = <0x40016c00 0x800>;
+>> -			clocks = <&rcc 1 CLK_F469_DSI>, <&clk_hse>;
+>> -			clock-names = "ref", "pclk";
+>> +			clocks = <&rcc 1 CLK_F469_DSI>, <&rcc 1 CLK_LCD>,
+>> +				 <&clk_hse>;
+>> +			clock-names = "pclk", "px_clk", "ref";
+>>   			resets = <&rcc STM32F4_APB2_RESET(DSI)>;
+>>   			reset-names = "apb";
+>>   
+>> -- 
+>> 1.9.1
+>>
