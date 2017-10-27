@@ -1,59 +1,96 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 27 Oct 2017 14:56:10 +0100
-Subject: [PATCH v4 23/26] KVM: arm/arm64: GICv4: Prevent a VM using GICv4
- from being saved
-In-Reply-To: <20171026152828.GD2166@lvm> (Christoffer Dall's message of "Thu,
- 26 Oct 2017 17:28:28 +0200")
-References: <20171006153401.5481-1-marc.zyngier@arm.com>
- <20171006153401.5481-24-marc.zyngier@arm.com>
- <20171026152828.GD2166@lvm>
-Message-ID: <86inf0ae4l.fsf@arm.com>
+Date: Fri, 27 Oct 2017 15:28:30 +0100
+Subject: [PATCH v5 01/26] irqchip/gic-v3-its: Setup VLPI properties at map time
+In-Reply-To: <20171027142855.21584-1-marc.zyngier@arm.com>
+References: <20171027142855.21584-1-marc.zyngier@arm.com>
+Message-ID: <20171027142855.21584-2-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 26 2017 at  5:28:28 pm BST, Christoffer Dall <cdall@linaro.org> wrote:
-> On Fri, Oct 06, 2017 at 04:33:58PM +0100, Marc Zyngier wrote:
->> The GICv4 architecture doesn't make it easy for save/restore to
->> work, as it doesn't give any guarantee that the pending state
->> is written into the pending table.
->> 
->> So let's not take any chance, and let's return an error if
->> we encounter any LPI that has the HW bit set.
->> 
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  virt/kvm/arm/vgic/vgic-its.c | 9 +++++++++
->>  1 file changed, 9 insertions(+)
->> 
->> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->> index f434748439ee..01aa4d9d405e 100644
->> --- a/virt/kvm/arm/vgic/vgic-its.c
->> +++ b/virt/kvm/arm/vgic/vgic-its.c
->> @@ -1987,6 +1987,15 @@ static int vgic_its_save_itt(struct vgic_its *its, struct its_device *device)
->>  	list_for_each_entry(ite, &device->itt_head, ite_list) {
->>  		gpa_t gpa = base + ite->event_id * ite_esz;
->>  
->> +		/*
->> +		 * If an LPI carries the HW bit, this means that this
->> +		 * interrupt is controlled by GICv4, and we do not
->> +		 * have direct access to that state. Let's simply fail
->> +		 * the save operation...
->> +		 */
->> +		if (ite->irq->hw)
->> +			return -EINVAL;
->
-> Will this conflict with other error messages, and will QEMU have a
-> reasonable way to tell the user what's going on?
->
-> Perhaps we shoul document the return code in the ITS device doc and
-> choose something unique, like -EBUSY?
+So far, we require the hypervisor to update the VLPI properties
+once the the VLPI mapping has been established. While this
+makes it easy for the ITS driver, it creates a window where
+an incoming interrupt can be delivered with an unknown set
+of properties. Not very nice.
 
-Yup. I've now switched to -EACCES, which is probably the least horrible
-among the error codes we're not using yet. I've also amended the
-documentation to that effect.
+Instead, let's add a "properties" field to the mapping structure,
+and use that to configure the VLPI before it actually gets mapped.
 
-Thanks,
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/irqchip/irq-gic-v3-its.c   | 19 +++++++++++++++++--
+ include/linux/irqchip/arm-gic-v4.h |  2 ++
+ 2 files changed, 19 insertions(+), 2 deletions(-)
 
-	M.
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 85f47ef4f1f7..2c4074c97454 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -1006,9 +1006,15 @@ static void lpi_write_config(struct irq_data *d, u8 clr, u8 set)
+ 	if (irqd_is_forwarded_to_vcpu(d)) {
+ 		struct its_device *its_dev = irq_data_get_irq_chip_data(d);
+ 		u32 event = its_get_event_id(d);
++		struct its_vlpi_map *map;
+ 
+ 		prop_page = its_dev->event_map.vm->vprop_page;
+-		hwirq = its_dev->event_map.vlpi_maps[event].vintid;
++		map = &its_dev->event_map.vlpi_maps[event];
++		hwirq = map->vintid;
++
++		/* Remember the updated property */
++		map->properties &= ~clr;
++		map->properties |= set | LPI_PROP_GROUP1;
+ 	} else {
+ 		prop_page = gic_rdists->prop_page;
+ 		hwirq = d->hwirq;
+@@ -1018,6 +1024,7 @@ static void lpi_write_config(struct irq_data *d, u8 clr, u8 set)
+ 	*cfg &= ~clr;
+ 	*cfg |= set | LPI_PROP_GROUP1;
+ 
++
+ 	/*
+ 	 * Make the above write visible to the redistributors.
+ 	 * And yes, we're flushing exactly: One. Single. Byte.
+@@ -1238,12 +1245,20 @@ static int its_vlpi_map(struct irq_data *d, struct its_cmd_info *info)
+ 		/* Ensure all the VPEs are mapped on this ITS */
+ 		its_map_vm(its_dev->its, info->map->vm);
+ 
++		/*
++		 * Flag the interrupt as forwarded so that we can
++		 * start poking the virtual property table.
++		 */
++		irqd_set_forwarded_to_vcpu(d);
++
++		/* Write out the property to the prop table */
++		lpi_write_config(d, 0xff, info->map->properties);
++
+ 		/* Drop the physical mapping */
+ 		its_send_discard(its_dev, event);
+ 
+ 		/* and install the virtual one */
+ 		its_send_vmapti(its_dev, event);
+-		irqd_set_forwarded_to_vcpu(d);
+ 
+ 		/* Increment the number of VLPIs */
+ 		its_dev->event_map.nr_vlpis++;
+diff --git a/include/linux/irqchip/arm-gic-v4.h b/include/linux/irqchip/arm-gic-v4.h
+index 43cde15f221b..447da8ca2156 100644
+--- a/include/linux/irqchip/arm-gic-v4.h
++++ b/include/linux/irqchip/arm-gic-v4.h
+@@ -71,12 +71,14 @@ struct its_vpe {
+  * @vm:		Pointer to the GICv4 notion of a VM
+  * @vpe:	Pointer to the GICv4 notion of a virtual CPU (VPE)
+  * @vintid:	Virtual LPI number
++ * @properties:	Priority and enable bits (as written in the prop table)
+  * @db_enabled:	Is the VPE doorbell to be generated?
+  */
+ struct its_vlpi_map {
+ 	struct its_vm		*vm;
+ 	struct its_vpe		*vpe;
+ 	u32			vintid;
++	u8			properties;
+ 	bool			db_enabled;
+ };
+ 
 -- 
-Jazz is not dead. It just smells funny.
+2.11.0
