@@ -1,130 +1,39 @@
-From: ndesaulniers@google.com (Nick Desaulniers)
-Date: Fri, 27 Oct 2017 09:33:41 -0700
-Subject: [PATCH v3] arm64: prevent regressions in compressed kernel image size
- when upgrading to binutils 2.27
-In-Reply-To: <CAKv+Gu8wqH5fyievpcFi0P+JxEkA38cROzptN3zdCD0zCPcppg@mail.gmail.com>
-References: <CAKv+Gu8wqH5fyievpcFi0P+JxEkA38cROzptN3zdCD0zCPcppg@mail.gmail.com>
-Message-ID: <20171027163341.57550-1-ndesaulniers@google.com>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Fri, 27 Oct 2017 09:44:19 -0700
+Subject: [PATCH v10 6/9] LPC: Support the LPC host on Hip06/Hip07 with DT
+ bindings
+In-Reply-To: <1509120687-7352-7-git-send-email-gabriele.paoloni@huawei.com>
+References: <1509120687-7352-1-git-send-email-gabriele.paoloni@huawei.com>
+ <1509120687-7352-7-git-send-email-gabriele.paoloni@huawei.com>
+Message-ID: <de9f0362-6f2d-2f73-a23a-af248a9b1963@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Upon upgrading to binutils 2.27, we found that our lz4 and gzip
-compressed kernel images were significantly larger, resulting is 10ms
-boot time regressions.
+On 10/27/17 09:11, Gabriele Paoloni wrote:
+> diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+> index 2408ea3..358eed3 100644
+> --- a/drivers/bus/Kconfig
+> +++ b/drivers/bus/Kconfig
+> @@ -64,6 +64,15 @@ config BRCMSTB_GISB_ARB
+>  	  arbiter. This driver provides timeout and target abort error handling
+>  	  and internal bus master decoding.
+>  
+> +config HISILICON_LPC
+> +	bool "Support for ISA I/O space on Hisilicon Hip0X"
+> +	depends on (ARM64 && (ARCH_HISI || COMPILE_TEST))
+> +	select LOGIC_PIO
+> +	select INDIRECT_PIO
+> +	help
+> +	  Driver needed for some legacy ISA devices attached to Low-Pin-Count
+> +	  on Hisilicon Hip0X SoC.
+> +
+>  config IMX_WEIM
+>  	bool "Freescale EIM DRIVER"
+>  	depends on ARCH_MXC
 
-As noted by Rahul:
-"aarch64 binaries uses RELA relocations, where each relocation entry
-includes an addend value. This is similar to x86_64.  On x86_64, the
-addend values are also stored at the relocation offset for relative
-relocations. This is an optimization: in the case where code does not
-need to be relocated, the loader can simply skip processing relative
-relocations.  In binutils-2.25, both bfd and gold linkers did this for
-x86_64, but only the gold linker did this for aarch64.  The kernel build
-here is using the bfd linker, which stored zeroes at the relocation
-offsets for relative relocations.  Since a set of zeroes compresses
-better than a set of non-zero addend values, this behavior was resulting
-in much better lz4 compression.
+Hi,
 
-The bfd linker in binutils-2.27 is now storing the actual addend values
-at the relocation offsets. The behavior is now consistent with what it
-does for x86_64 and what gold linker does for both architectures.  The
-change happened in this upstream commit:
-https://sourceware.org/git/?p=binutils-gdb.git;a=commit;h=1f56df9d0d5ad89806c24e71f296576d82344613
-Since a bunch of zeroes got replaced by non-zero addend values, we see
-the side effect of lz4 compressed image being a bit bigger.
+Why bool? why not tristate?
 
-To get the old behavior from the bfd linker, "--no-apply-dynamic-relocs"
-flag can be used:
-$ LDFLAGS="--no-apply-dynamic-relocs" make
-With this flag, the compressed image size is back to what it was with
-binutils-2.25.
-
-If the kernel is using ASLR, there aren't additional runtime costs to
---no-apply-dynamic-relocs, as the relocations will need to be applied
-again anyway after the kernel is relocated to a random address.
-
-If the kernel is not using ASLR, then presumably the current default
-behavior of the linker is better. Since the static linker performed the
-dynamic relocs, and the kernel is not moved to a different address at
-load time, it can skip applying the relocations all over again."
-
-Some measurements:
-
-$ ld -v
-GNU ld (binutils-2.25-f3d35cf6) 2.25.51.20141117
-                    ^
-$ ls -l vmlinux
--rwxr-x--- 1 ndesaulniers eng 300652760 Oct 26 11:57 vmlinux
-$ ls -l Image.lz4-dtb
--rw-r----- 1 ndesaulniers eng 16932627 Oct 26 11:57 Image.lz4-dtb
-
-$ ld -v
-GNU ld (binutils-2.27-53dd00a1) 2.27.0.20170315
-                    ^
-pre patch:
-$ ls -l vmlinux
--rwxr-x--- 1 ndesaulniers eng 300376208 Oct 26 11:43 vmlinux
-$ ls -l Image.lz4-dtb
--rw-r----- 1 ndesaulniers eng 18159474 Oct 26 11:43 Image.lz4-dtb
-
-post patch:
-$ ls -l vmlinux
--rwxr-x--- 1 ndesaulniers eng 300376208 Oct 26 12:06 vmlinux
-$ ls -l Image.lz4-dtb
--rw-r----- 1 ndesaulniers eng 16932466 Oct 26 12:06 Image.lz4-dtb
-
-By Siqi's measurement w/ gzip:
-binutils 2.27 with this patch (with --no-apply-dynamic-relocs):
-Image 41535488
-Image.gz 13404067
-
-binutils 2.27 without this patch (without --no-apply-dynamic-relocs):
-Image 41535488
-Image.gz 14125516
-
-Any compression scheme should be able to get better results from the
-longer runs of zeros, not just GZIP and LZ4.
-
-10ms boot time savings isn't anything to get excited about, but users of
-arm64+compression+bfd-2.27 should not have to pay a penalty for no
-runtime improvement.
-
-Reported-by: Gopinath Elanchezhian <gelanchezhian@google.com>
-Reported-by: Sindhuri Pentyala <spentyala@google.com>
-Reported-by: Wei Wang <wvw@google.com>
-Suggested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Suggested-by: Rahul Chaudhry <rahulchaudhry@google.com>
-Suggested-by: Siqi Lin <siqilin@google.com>
-Suggested-by: Stephen Hines <srhines@google.com>
-Signed-off-by: Nick Desaulniers <ndesaulniers@google.com>
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-Changes since v2:
-* Combine this this LDFLAGS_vmlinux append to previous block, per Ard.
-* Add Siqi's measurements to commit message.
-* Change the conditional to check if set rather than if not empty, since
-  this is similar to the rest of the Makefile, and more readable IMO,
-  though that's subjective. That part can be reverted if we don't want to
-  steal blame.
-
- arch/arm64/Makefile | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 939b310913cf..669378099dbe 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -14,8 +14,9 @@ LDFLAGS_vmlinux	:=-p --no-undefined -X
- CPPFLAGS_vmlinux.lds = -DTEXT_OFFSET=$(TEXT_OFFSET)
- GZFLAGS		:=-9
- 
--ifneq ($(CONFIG_RELOCATABLE),)
--LDFLAGS_vmlinux		+= -pie -shared -Bsymbolic
-+ifeq ($(CONFIG_RELOCATABLE), y)
-+LDFLAGS_vmlinux		+= -pie -shared -Bsymbolic \
-+			$(call ld-option, --no-apply-dynamic-relocs)
- endif
- 
- ifeq ($(CONFIG_ARM64_ERRATUM_843419),y)
 -- 
-2.15.0.rc2.357.g7e34df9404-goog
+~Randy
