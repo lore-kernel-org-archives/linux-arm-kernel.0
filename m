@@ -1,27 +1,41 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 27 Oct 2017 11:53:24 +0100
-Subject: [PATCH v5 02/20] arm64: Implement arch_counter_get_cntpct to
- read the physical counter
-In-Reply-To: <1509093281-15225-3-git-send-email-cdall@linaro.org>
+Date: Fri, 27 Oct 2017 11:53:42 +0100
+Subject: [PATCH v5 03/20] arm64: Use physical counter for in-kernel reads
+ when booted in EL2
+In-Reply-To: <1509093281-15225-4-git-send-email-cdall@linaro.org>
 References: <1509093281-15225-1-git-send-email-cdall@linaro.org>
- <1509093281-15225-3-git-send-email-cdall@linaro.org>
-Message-ID: <20171027105323.hvbewckytr5gbpph@armageddon.cambridge.arm.com>
+ <1509093281-15225-4-git-send-email-cdall@linaro.org>
+Message-ID: <20171027105341.rpomiwsospi76o4k@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 27, 2017 at 10:34:23AM +0200, Christoffer Dall wrote:
-> From: Christoffer Dall <christoffer.dall@linaro.org>
+On Fri, Oct 27, 2017 at 10:34:24AM +0200, Christoffer Dall wrote:
+> Using the physical counter allows KVM to retain the offset between the
+> virtual and physical counter as long as it is actively running a VCPU.
 > 
-> As we are about to use the physical counter on arm64 systems that have
-> KVM support, implement arch_counter_get_cntpct() and the associated
-> errata workaround functionality for stable timer reads.
+> As soon as a VCPU is released, another thread is scheduled or we start
+> running userspace applications, we reset the offset to 0, so that
+> userspace accessing the virtual timer can still read the virtual counter
+> and get the same view of time as the kernel.
+> 
+> This opens up potential improvements for KVM performance, but we have to
+> make a few adjustments to preserve system consistency.
+> 
+> Currently get_cycles() is hardwired to arch_counter_get_cntvct() on
+> arm64, but as we move to using the physical timer for the in-kernel
+> time-keeping on systems that boot in EL2, we should use the same counter
+> for get_cycles() as for other in-kernel timekeeping operations.
+> 
+> Similarly, implementations of arch_timer_set_next_event_phys() is
+> modified to use the counter specific to the timer being programmed.
+> 
+> VHE kernels or kernels continuing to use the virtual timer are
+> unaffected.
 > 
 > Cc: Catalin Marinas <catalin.marinas@arm.com>
 > Cc: Will Deacon <will.deacon@arm.com>
 > Cc: Mark Rutland <mark.rutland@arm.com>
 > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-
-Just in case you need an ack for the arch/arm64/ hunks:
+> Signed-off-by: Christoffer Dall <cdall@linaro.org>
 
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
