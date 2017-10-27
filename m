@@ -1,66 +1,68 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 27 Oct 2017 15:28:37 +0100
-Subject: [PATCH v5 08/26] KVM: arm/arm64: GICv4: Add property field and per-VM
- predicate
+Date: Fri, 27 Oct 2017 15:28:36 +0100
+Subject: [PATCH v5 07/26] KVM: arm/arm64: vITS: Add a helper to update the
+ affinity of an LPI
 In-Reply-To: <20171027142855.21584-1-marc.zyngier@arm.com>
 References: <20171027142855.21584-1-marc.zyngier@arm.com>
-Message-ID: <20171027142855.21584-9-marc.zyngier@arm.com>
+Message-ID: <20171027142855.21584-8-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new has_gicv4 field in the global VGIC state that indicates
-whether the HW is GICv4 capable, as a per-VM predicate indicating
-if there is a possibility for a VM to support direct injection
-(the above being true and the VM having an ITS).
+In order help integrating the vITS code with GICv4, let's add
+a new helper that deals with updating the affinity of an LPI,
+which will later be augmented with super duper extra GICv4
+goodness.
 
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/kvm/arm_vgic.h           | 3 +++
- virt/kvm/arm/vgic/vgic-mmio-v3.c | 5 +++++
- virt/kvm/arm/vgic/vgic.h         | 2 ++
- 3 files changed, 10 insertions(+)
+ virt/kvm/arm/vgic/vgic-its.c | 20 +++++++++++---------
+ 1 file changed, 11 insertions(+), 9 deletions(-)
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 53f631bdec75..ba9fb450aa1b 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -73,6 +73,9 @@ struct vgic_global {
- 	/* Only needed for the legacy KVM_CREATE_IRQCHIP */
- 	bool			can_emulate_gicv2;
- 
-+	/* Hardware has GICv4? */
-+	bool			has_gicv4;
-+
- 	/* GIC system register CPU interface */
- 	struct static_key_false gicv3_cpuif;
- 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-index 408ef06638fc..f87fd17b2eb9 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-@@ -54,6 +54,11 @@ bool vgic_has_its(struct kvm *kvm)
- 	return dist->has_its;
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 475dffd0a44c..8ee03f1e89fc 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -335,6 +335,15 @@ static int vgic_copy_lpi_list(struct kvm_vcpu *vcpu, u32 **intid_ptr)
+ 	return i;
  }
  
-+bool vgic_supports_direct_msis(struct kvm *kvm)
++static int update_affinity(struct vgic_irq *irq, struct kvm_vcpu *vcpu)
 +{
-+	return kvm_vgic_global_state.has_gicv4 && vgic_has_its(kvm);
++	spin_lock(&irq->irq_lock);
++	irq->target_vcpu = vcpu;
++	spin_unlock(&irq->irq_lock);
++
++	return 0;
 +}
 +
- static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
- 					    gpa_t addr, unsigned int len)
- {
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 31b70326b966..e67ccb6a6250 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -240,4 +240,6 @@ int vgic_its_resolve_lpi(struct kvm *kvm, struct vgic_its *its,
- 			 u32 devid, u32 eventid, struct vgic_irq **irq);
- struct vgic_its *vgic_msi_to_its(struct kvm *kvm, struct kvm_msi *msi);
+ /*
+  * Promotes the ITS view of affinity of an ITTE (which redistributor this LPI
+  * is targeting) to the VGIC's view, which deals with target VCPUs.
+@@ -349,10 +358,7 @@ static void update_affinity_ite(struct kvm *kvm, struct its_ite *ite)
+ 		return;
  
-+bool vgic_supports_direct_msis(struct kvm *kvm);
-+
- #endif
+ 	vcpu = kvm_get_vcpu(kvm, ite->collection->target_addr);
+-
+-	spin_lock(&ite->irq->irq_lock);
+-	ite->irq->target_vcpu = vcpu;
+-	spin_unlock(&ite->irq->irq_lock);
++	update_affinity(ite->irq, vcpu);
+ }
+ 
+ /*
+@@ -693,11 +699,7 @@ static int vgic_its_cmd_handle_movi(struct kvm *kvm, struct vgic_its *its,
+ 	ite->collection = collection;
+ 	vcpu = kvm_get_vcpu(kvm, collection->target_addr);
+ 
+-	spin_lock(&ite->irq->irq_lock);
+-	ite->irq->target_vcpu = vcpu;
+-	spin_unlock(&ite->irq->irq_lock);
+-
+-	return 0;
++	return update_affinity(ite->irq, vcpu);
+ }
+ 
+ /*
 -- 
 2.11.0
