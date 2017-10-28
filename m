@@ -1,35 +1,65 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sat, 28 Oct 2017 09:47:30 +0100
-Subject: [RFC PATCH 0/2] arm64: optional paranoid __{get,put}_user checks
-In-Reply-To: <20171027154113.GA13737@arm.com>
-References: <20171026090942.7041-1-mark.rutland@arm.com>
- <20171027154113.GA13737@arm.com>
-Message-ID: <20171028084729.GL20805@n2100.armlinux.org.uk>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sat, 28 Oct 2017 11:07:30 +0200
+Subject: [RFC PATCH v10 0/7] PCI: rockchip: Move PCIe WAKE# handling into
+ pci core
+In-Reply-To: <20171027072612.26565-1-jeffy.chen@rock-chips.com>
+References: <20171027072612.26565-1-jeffy.chen@rock-chips.com>
+Message-ID: <1872710.P2f02irZl9@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 27, 2017 at 04:41:13PM +0100, Will Deacon wrote:
-> Probably a stupid question, but why not just move the access_ok check
-> into __{get,put}_user and remove it from {get,put}_user? We can also
-> then move the uaccess_{enable,disable}_not_uao calls out from the __
-> variants so that we can implement user_access_{begin,end}.
+On Friday, October 27, 2017 9:26:05 AM CEST Jeffy Chen wrote:
+> 
+> Currently we are handling wake irq in mrvl wifi driver. Move it into
+> pci core.
+> 
+> Tested on my chromebook bob(with cros 4.4 kernel and mrvl wifi).
+> 
+> 
+> Changes in v10:
+> Use device_set_wakeup_capable() instead of device_set_wakeup_enable(),
+> since dedicated wakeirq will be lost in device_set_wakeup_enable(false).
+> 
+> Changes in v9:
+> Add section for PCI devices and rewrite the commit message.
+> Rewrite the commit message.
+> Fix check error in .cleanup().
+> Move dedicated wakeirq setup to setup() callback and use
+> device_set_wakeup_enable() to enable/disable.
+> 
+> Changes in v8:
+> Add optional "pci", and rewrite commit message.
+> Rewrite the commit message.
+> Add pci-of.c and use platform_pm_ops to handle the PCIe WAKE# signal.
+> 
+> Changes in v7:
+> Move PCIE_WAKE handling into pci core.
+> 
+> Changes in v6:
+> Fix device_init_wake error handling, and add some comments.
+> 
+> Changes in v5:
+> Move to pci.txt
+> Use "wakeup" instead of "wake"
+> Rebase.
+> 
+> Changes in v3:
+> Fix error handling.
+> 
+> Changes in v2:
+> Use dev_pm_set_dedicated_wake_irq.
+> 
+> Jeffy Chen (7):
+>   dt-bindings: PCI: Add definition of PCIe WAKE# irq and PCI irq
+>   of/irq: Adjust of_pci_irq parsing for multiple interrupts
+>   mwifiex: Disable wakeup irq handling for pcie
+>   arm64: dts: rockchip: Move PCIe WAKE# irq to pcie driver for Gru
+>   PCI: Make pci_platform_pm_ops's callbacks optional
+>   PCI / PM: Move acpi wakeup code to pci core
+>   PCI / PM: Add support for the PCIe WAKE# signal for OF
 
-The intent of __{get,put}_user() is to have a fast accessor compared
-to {get,put}_user() which does all the full checks.
+Overall, I don't quite like the direction this is going into, but I need to
+have a deeper look.  Which may take some time, so please bear with me.
 
-However, with the uaccess stuff we have now by default, I don't think
-it makes much sense - maybe we're better off using copy_{to,from}_user()
-in those code paths and fixing up the struct in kernel space rather than
-__{get,put}_user()?
-
-I suspect that if we do have the full checks in __{get,put}_user() that
-makes the case stronger for doing that - and maybe killing the __
-accessors entirely.
-
-Take a look at kernel/signal.c to see a typical usage of the __
-accessors.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Thanks,
+Rafael
