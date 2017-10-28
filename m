@@ -1,121 +1,289 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 28 Oct 2017 15:37:18 +0200
-Subject: [PATCH 3/4] pinctrl: gemini: Use generic DT parser
+Date: Sat, 28 Oct 2017 15:37:19 +0200
+Subject: [PATCH 4/4] pinctrl: gemini: Implement clock skew/delay config
 In-Reply-To: <20171028133719.27528-1-linus.walleij@linaro.org>
 References: <20171028133719.27528-1-linus.walleij@linaro.org>
-Message-ID: <20171028133719.27528-3-linus.walleij@linaro.org>
+Message-ID: <20171028133719.27528-4-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can just use the generic Device Tree parser code
-in this driver and save some code.
+This enabled pin config on the Gemini driver and implements
+pin skew/delay so that the ethernet pins clocking can be
+properly configured.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/pinctrl/Kconfig          |  1 +
- drivers/pinctrl/pinctrl-gemini.c | 66 +++-------------------------------------
- 2 files changed, 5 insertions(+), 62 deletions(-)
+ .../bindings/pinctrl/cortina,gemini-pinctrl.txt    |  10 +-
+ drivers/pinctrl/pinctrl-gemini.c                   | 178 ++++++++++++++++++++-
+ 2 files changed, 182 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-index 1778cf4f81c7..98b2d5dcbda7 100644
---- a/drivers/pinctrl/Kconfig
-+++ b/drivers/pinctrl/Kconfig
-@@ -151,6 +151,7 @@ config PINCTRL_GEMINI
- 	depends on ARCH_GEMINI
- 	default ARCH_GEMINI
- 	select PINMUX
-+	select GENERIC_PINCONF
- 	select MFD_SYSCON
+diff --git a/Documentation/devicetree/bindings/pinctrl/cortina,gemini-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/cortina,gemini-pinctrl.txt
+index 61466c58faae..d857b67fab72 100644
+--- a/Documentation/devicetree/bindings/pinctrl/cortina,gemini-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/cortina,gemini-pinctrl.txt
+@@ -9,8 +9,14 @@ The pin controller node must be a subnode of the system controller node.
+ Required properties:
+ - compatible: "cortina,gemini-pinctrl"
  
- config PINCTRL_MCP23S08
+-Subnodes of the pin controller contain pin control multiplexing set-up.
+-Please refer to pinctrl-bindings.txt for generic pin multiplexing nodes.
++Subnodes of the pin controller contain pin control multiplexing set-up
++and pin configuration of individual pins.
++
++Please refer to pinctrl-bindings.txt for generic pin multiplexing nodes
++and generic pin config nodes.
++
++Supported configurations:
++- skew-delay is supported on the Ethernet pins
+ 
+ Example:
+ 
 diff --git a/drivers/pinctrl/pinctrl-gemini.c b/drivers/pinctrl/pinctrl-gemini.c
-index 7ffd768c0e02..18fb5ff8a442 100644
+index 18fb5ff8a442..bd6133f06759 100644
 --- a/drivers/pinctrl/pinctrl-gemini.c
 +++ b/drivers/pinctrl/pinctrl-gemini.c
-@@ -13,6 +13,8 @@
- #include <linux/pinctrl/machine.h>
- #include <linux/pinctrl/pinctrl.h>
- #include <linux/pinctrl/pinmux.h>
-+#include <linux/pinctrl/pinconf.h>
-+#include <linux/pinctrl/pinconf-generic.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
- #include <linux/regmap.h>
-@@ -1918,73 +1920,13 @@ static void gemini_pin_dbg_show(struct pinctrl_dev *pctldev, struct seq_file *s,
- 	seq_printf(s, " " DRIVER_NAME);
- }
+@@ -24,6 +24,19 @@
+ #define DRIVER_NAME "pinctrl-gemini"
  
--static int gemini_pinctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
--					    struct device_node *np,
--					    struct pinctrl_map **map,
--					    unsigned int *reserved_maps,
--					    unsigned int *num_maps)
--{
--	int ret;
--	const char *function = NULL;
--	const char *group;
--	struct property *prop;
--
--	ret = of_property_read_string(np, "function", &function);
--	if (ret < 0)
--		return ret;
--
--	ret = of_property_count_strings(np, "groups");
--	if (ret < 0)
--		return ret;
--
--	ret = pinctrl_utils_reserve_map(pctldev, map, reserved_maps,
--					num_maps, ret);
--	if (ret < 0)
--		return ret;
--
--	of_property_for_each_string(np, "groups", prop, group) {
--		ret = pinctrl_utils_add_map_mux(pctldev, map, reserved_maps,
--						num_maps, group, function);
--		if (ret < 0)
--			return ret;
--		pr_debug("ADDED FUNCTION %s <-> GROUP %s\n",
--			 function, group);
--	}
--
--	return 0;
--}
--
--static int gemini_pinctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
--				struct device_node *np_config,
--				struct pinctrl_map **map,
--				unsigned int *num_maps)
--{
--	unsigned int reserved_maps = 0;
--	struct device_node *np;
--	int ret;
--
--	*map = NULL;
--	*num_maps = 0;
--
--	for_each_child_of_node(np_config, np) {
--		ret = gemini_pinctrl_dt_subnode_to_map(pctldev, np, map,
--					&reserved_maps, num_maps);
--		if (ret < 0) {
--			pinctrl_utils_free_map(pctldev, *map, *num_maps);
--			return ret;
--		}
--	}
--
--	return 0;
--};
--
- static const struct pinctrl_ops gemini_pctrl_ops = {
- 	.get_groups_count = gemini_get_groups_count,
- 	.get_group_name = gemini_get_group_name,
- 	.get_group_pins = gemini_get_group_pins,
- 	.pin_dbg_show = gemini_pin_dbg_show,
--	.dt_node_to_map = gemini_pinctrl_dt_node_to_map,
--	.dt_free_map = pinctrl_utils_free_map,
-+	.dt_node_to_map = pinconf_generic_dt_node_to_map_group,
-+	.dt_free_map = pinconf_generic_dt_free_map,
+ /**
++ * struct gemini_pin_conf - information about configuring a pin
++ * @pin: the pin number
++ * @reg: config register
++ * @mask: the bits affecting the configuration of the pin
++ */
++struct gemini_pin_conf {
++	unsigned int pin;
++	u32 reg;
++	u32 mask;
++};
++
++/**
++ * struct gemini_pmx - state holder for the gemini pin controller
+  * @dev: a pointer back to containing device
+  * @virtbase: the offset to the controller in virtual memory
+  * @map: regmap to access registers
+@@ -31,6 +44,8 @@
+  * @is_3516: whether the SoC/package is the 3516 variant
+  * @flash_pin: whether the flash pin (extended pins for parallel
+  * flash) is set
++ * @confs: pin config information
++ * @nconfs: number of pin config information items
+  */
+ struct gemini_pmx {
+ 	struct device *dev;
+@@ -39,6 +54,8 @@ struct gemini_pmx {
+ 	bool is_3512;
+ 	bool is_3516;
+ 	bool flash_pin;
++	const struct gemini_pin_conf *confs;
++	unsigned int nconfs;
  };
  
  /**
+@@ -59,6 +76,13 @@ struct gemini_pin_group {
+ 	u32 value;
+ };
+ 
++/* Some straight-forward control registers */
++#define GLOBAL_WORD_ID		0x00
++#define GLOBAL_STATUS		0x04
++#define GLOBAL_STATUS_FLPIN	BIT(20)
++#define GLOBAL_GMAC_CTRL_SKEW	0x1c
++#define GLOBAL_GMAC0_DATA_SKEW	0x20
++#define GLOBAL_GMAC1_DATA_SKEW	0x24
+ /*
+  * Global Miscellaneous Control Register
+  * This register controls all Gemini pad/pin multiplexing
+@@ -71,9 +95,6 @@ struct gemini_pin_group {
+  *   DISABLED again. So you select a flash configuration once, and then
+  *   you are stuck with it.
+  */
+-#define GLOBAL_WORD_ID		0x00
+-#define GLOBAL_STATUS		0x04
+-#define GLOBAL_STATUS_FLPIN	BIT(20)
+ #define GLOBAL_MISC_CTRL	0x30
+ #define TVC_CLK_PAD_ENABLE	BIT(20)
+ #define PCI_CLK_PAD_ENABLE	BIT(17)
+@@ -1925,7 +1946,7 @@ static const struct pinctrl_ops gemini_pctrl_ops = {
+ 	.get_group_name = gemini_get_group_name,
+ 	.get_group_pins = gemini_get_group_pins,
+ 	.pin_dbg_show = gemini_pin_dbg_show,
+-	.dt_node_to_map = pinconf_generic_dt_node_to_map_group,
++	.dt_node_to_map = pinconf_generic_dt_node_to_map_all,
+ 	.dt_free_map = pinconf_generic_dt_free_map,
+ };
+ 
+@@ -2203,10 +2224,155 @@ static const struct pinmux_ops gemini_pmx_ops = {
+ 	.set_mux = gemini_pmx_set_mux,
+ };
+ 
++#define GEMINI_CFGPIN(_n, _r, _lb, _hb) {	\
++	.pin = _n,				\
++	.reg = _r,				\
++	.mask = GENMASK(_hb, _lb)		\
++}
++
++static const struct gemini_pin_conf gemini_confs_3512[] = {
++	GEMINI_CFGPIN(259, GLOBAL_GMAC_CTRL_SKEW, 0, 3), /* GMAC0 RXDV */
++	GEMINI_CFGPIN(277, GLOBAL_GMAC_CTRL_SKEW, 4, 7), /* GMAC0 RXC */
++	GEMINI_CFGPIN(241, GLOBAL_GMAC_CTRL_SKEW, 8, 11), /* GMAC0 TXEN */
++	GEMINI_CFGPIN(312, GLOBAL_GMAC_CTRL_SKEW, 12, 15), /* GMAC0 TXC */
++	GEMINI_CFGPIN(298, GLOBAL_GMAC_CTRL_SKEW, 16, 19), /* GMAC1 RXDV */
++	GEMINI_CFGPIN(280, GLOBAL_GMAC_CTRL_SKEW, 20, 23), /* GMAC1 RXC */
++	GEMINI_CFGPIN(316, GLOBAL_GMAC_CTRL_SKEW, 24, 27), /* GMAC1 TXEN */
++	GEMINI_CFGPIN(243, GLOBAL_GMAC_CTRL_SKEW, 28, 31), /* GMAC1 TXC */
++	GEMINI_CFGPIN(295, GLOBAL_GMAC0_DATA_SKEW, 0, 3), /* GMAC0 RXD0 */
++	GEMINI_CFGPIN(313, GLOBAL_GMAC0_DATA_SKEW, 4, 7), /* GMAC0 RXD1 */
++	GEMINI_CFGPIN(242, GLOBAL_GMAC0_DATA_SKEW, 8, 11), /* GMAC0 RXD2 */
++	GEMINI_CFGPIN(260, GLOBAL_GMAC0_DATA_SKEW, 12, 15), /* GMAC0 RXD3 */
++	GEMINI_CFGPIN(294, GLOBAL_GMAC0_DATA_SKEW, 16, 19), /* GMAC0 TXD0 */
++	GEMINI_CFGPIN(276, GLOBAL_GMAC0_DATA_SKEW, 20, 23), /* GMAC0 TXD1 */
++	GEMINI_CFGPIN(258, GLOBAL_GMAC0_DATA_SKEW, 24, 27), /* GMAC0 TXD2 */
++	GEMINI_CFGPIN(240, GLOBAL_GMAC0_DATA_SKEW, 28, 31), /* GMAC0 TXD3 */
++	GEMINI_CFGPIN(262, GLOBAL_GMAC1_DATA_SKEW, 0, 3), /* GMAC1 RXD0 */
++	GEMINI_CFGPIN(244, GLOBAL_GMAC1_DATA_SKEW, 4, 7), /* GMAC1 RXD1 */
++	GEMINI_CFGPIN(317, GLOBAL_GMAC1_DATA_SKEW, 8, 11), /* GMAC1 RXD2 */
++	GEMINI_CFGPIN(299, GLOBAL_GMAC1_DATA_SKEW, 12, 15), /* GMAC1 RXD3 */
++	GEMINI_CFGPIN(261, GLOBAL_GMAC1_DATA_SKEW, 16, 19), /* GMAC1 TXD0 */
++	GEMINI_CFGPIN(279, GLOBAL_GMAC1_DATA_SKEW, 20, 23), /* GMAC1 TXD1 */
++	GEMINI_CFGPIN(297, GLOBAL_GMAC1_DATA_SKEW, 24, 27), /* GMAC1 TXD2 */
++	GEMINI_CFGPIN(315, GLOBAL_GMAC1_DATA_SKEW, 28, 31), /* GMAC1 TXD3 */
++};
++
++static const struct gemini_pin_conf gemini_confs_3516[] = {
++	GEMINI_CFGPIN(347, GLOBAL_GMAC_CTRL_SKEW, 0, 3), /* GMAC0 RXDV */
++	GEMINI_CFGPIN(386, GLOBAL_GMAC_CTRL_SKEW, 4, 7), /* GMAC0 RXC */
++	GEMINI_CFGPIN(307, GLOBAL_GMAC_CTRL_SKEW, 8, 11), /* GMAC0 TXEN */
++	GEMINI_CFGPIN(327, GLOBAL_GMAC_CTRL_SKEW, 12, 15), /* GMAC0 TXC */
++	GEMINI_CFGPIN(309, GLOBAL_GMAC_CTRL_SKEW, 16, 19), /* GMAC1 RXDV */
++	GEMINI_CFGPIN(390, GLOBAL_GMAC_CTRL_SKEW, 20, 23), /* GMAC1 RXC */
++	GEMINI_CFGPIN(370, GLOBAL_GMAC_CTRL_SKEW, 24, 27), /* GMAC1 TXEN */
++	GEMINI_CFGPIN(350, GLOBAL_GMAC_CTRL_SKEW, 28, 31), /* GMAC1 TXC */
++	GEMINI_CFGPIN(367, GLOBAL_GMAC0_DATA_SKEW, 0, 3), /* GMAC0 RXD0 */
++	GEMINI_CFGPIN(348, GLOBAL_GMAC0_DATA_SKEW, 4, 7), /* GMAC0 RXD1 */
++	GEMINI_CFGPIN(387, GLOBAL_GMAC0_DATA_SKEW, 8, 11), /* GMAC0 RXD2 */
++	GEMINI_CFGPIN(328, GLOBAL_GMAC0_DATA_SKEW, 12, 15), /* GMAC0 RXD3 */
++	GEMINI_CFGPIN(306, GLOBAL_GMAC0_DATA_SKEW, 16, 19), /* GMAC0 TXD0 */
++	GEMINI_CFGPIN(325, GLOBAL_GMAC0_DATA_SKEW, 20, 23), /* GMAC0 TXD1 */
++	GEMINI_CFGPIN(346, GLOBAL_GMAC0_DATA_SKEW, 24, 27), /* GMAC0 TXD2 */
++	GEMINI_CFGPIN(326, GLOBAL_GMAC0_DATA_SKEW, 28, 31), /* GMAC0 TXD3 */
++	GEMINI_CFGPIN(391, GLOBAL_GMAC1_DATA_SKEW, 0, 3), /* GMAC1 RXD0 */
++	GEMINI_CFGPIN(351, GLOBAL_GMAC1_DATA_SKEW, 4, 7), /* GMAC1 RXD1 */
++	GEMINI_CFGPIN(310, GLOBAL_GMAC1_DATA_SKEW, 8, 11), /* GMAC1 RXD2 */
++	GEMINI_CFGPIN(371, GLOBAL_GMAC1_DATA_SKEW, 12, 15), /* GMAC1 RXD3 */
++	GEMINI_CFGPIN(329, GLOBAL_GMAC1_DATA_SKEW, 16, 19), /* GMAC1 TXD0 */
++	GEMINI_CFGPIN(389, GLOBAL_GMAC1_DATA_SKEW, 20, 23), /* GMAC1 TXD1 */
++	GEMINI_CFGPIN(369, GLOBAL_GMAC1_DATA_SKEW, 24, 27), /* GMAC1 TXD2 */
++	GEMINI_CFGPIN(308, GLOBAL_GMAC1_DATA_SKEW, 28, 31), /* GMAC1 TXD3 */
++};
++
++static const struct gemini_pin_conf *gemini_get_pin_conf(struct gemini_pmx *pmx,
++							 unsigned int pin)
++{
++	const struct gemini_pin_conf *retconf;
++	int i;
++
++	for (i = 0; i < pmx->nconfs; i++) {
++		retconf = &gemini_confs_3516[i];
++		if (retconf->pin == pin)
++			return retconf;
++	}
++	return NULL;
++}
++
++static int gemini_pinconf_get(struct pinctrl_dev *pctldev, unsigned int pin,
++			      unsigned long *config)
++{
++	struct gemini_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
++	enum pin_config_param param = pinconf_to_config_param(*config);
++	const struct gemini_pin_conf *conf;
++	u32 val;
++
++	switch (param) {
++	case PIN_CONFIG_SKEW_DELAY:
++		conf = gemini_get_pin_conf(pmx, pin);
++		if (!conf)
++			return -ENOTSUPP;
++		regmap_read(pmx->map, conf->reg, &val);
++		val &= conf->mask;
++		val >>= (ffs(conf->mask) - 1);
++		*config = pinconf_to_config_packed(PIN_CONFIG_SKEW_DELAY, val);
++		break;
++	default:
++		return -ENOTSUPP;
++	}
++
++	return 0;
++}
++
++static int gemini_pinconf_set(struct pinctrl_dev *pctldev, unsigned int pin,
++			      unsigned long *configs, unsigned int num_configs)
++{
++	struct gemini_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
++	const struct gemini_pin_conf *conf;
++	enum pin_config_param param;
++	u32 arg;
++	int ret = 0;
++	int i;
++
++	for (i = 0; i < num_configs; i++) {
++		param = pinconf_to_config_param(configs[i]);
++		arg = pinconf_to_config_argument(configs[i]);
++
++		switch (param) {
++		case PIN_CONFIG_SKEW_DELAY:
++			if (arg > 0xf)
++				return -EINVAL;
++			conf = gemini_get_pin_conf(pmx, pin);
++			if (!conf) {
++				dev_err(pmx->dev,
++					"invalid pin for skew delay %d\n", pin);
++				return -ENOTSUPP;
++			}
++			arg <<= (ffs(conf->mask) - 1);
++			dev_dbg(pmx->dev,
++				"set pin %d to skew delay mask %08x, val %08x\n",
++				pin, conf->mask, arg);
++			regmap_update_bits(pmx->map, conf->reg, conf->mask, arg);
++			break;
++		default:
++			dev_err(pmx->dev, "Invalid config param %04x\n", param);
++			return -ENOTSUPP;
++		}
++	}
++
++	return ret;
++}
++
++static const struct pinconf_ops gemini_pinconf_ops = {
++	.pin_config_get = gemini_pinconf_get,
++	.pin_config_set = gemini_pinconf_set,
++	.is_generic = true,
++};
++
+ static struct pinctrl_desc gemini_pmx_desc = {
+ 	.name = DRIVER_NAME,
+ 	.pctlops = &gemini_pctrl_ops,
+ 	.pmxops = &gemini_pmx_ops,
++	.confops = &gemini_pinconf_ops,
+ 	.owner = THIS_MODULE,
+ };
+ 
+@@ -2249,11 +2415,15 @@ static int gemini_pmx_probe(struct platform_device *pdev)
+ 	val &= 0xffff;
+ 	if (val == 0x3512) {
+ 		pmx->is_3512 = true;
++		pmx->confs = gemini_confs_3512;
++		pmx->nconfs = ARRAY_SIZE(gemini_confs_3512);
+ 		gemini_pmx_desc.pins = gemini_3512_pins;
+ 		gemini_pmx_desc.npins = ARRAY_SIZE(gemini_3512_pins);
+ 		dev_info(dev, "detected 3512 chip variant\n");
+ 	} else if (val == 0x3516) {
+ 		pmx->is_3516 = true;
++		pmx->confs = gemini_confs_3516;
++		pmx->nconfs = ARRAY_SIZE(gemini_confs_3516);
+ 		gemini_pmx_desc.pins = gemini_3516_pins;
+ 		gemini_pmx_desc.npins = ARRAY_SIZE(gemini_3516_pins);
+ 		dev_info(dev, "detected 3516 chip variant\n");
 -- 
 2.13.6
