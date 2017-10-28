@@ -1,86 +1,31 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Sat, 28 Oct 2017 18:40:17 +0200
-Subject: [RESEND PATCH v2 2/2] dt-bindings: power: add amlogic meson power
- domain bindings
-In-Reply-To: <1509208817-30632-1-git-send-email-narmstrong@baylibre.com>
-References: <1509208817-30632-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1509208817-30632-3-git-send-email-narmstrong@baylibre.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sat, 28 Oct 2017 09:54:07 -0700
+Subject: [PATCH v2 1/7] gpio: brcmstb: Do not use gc->pin2mask()
+In-Reply-To: <20171024195451.30535-2-opendmb@gmail.com>
+References: <20171024195451.30535-1-opendmb@gmail.com>
+ <20171024195451.30535-2-opendmb@gmail.com>
+Message-ID: <914591ef-f6b6-8e9b-a3cc-b7ac82391fd6@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- .../bindings/power/amlogic,meson-gx-pwrc.txt       | 61 ++++++++++++++++++++++
- 1 file changed, 61 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/power/amlogic,meson-gx-pwrc.txt
 
-diff --git a/Documentation/devicetree/bindings/power/amlogic,meson-gx-pwrc.txt b/Documentation/devicetree/bindings/power/amlogic,meson-gx-pwrc.txt
-new file mode 100644
-index 0000000..95ec49a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/power/amlogic,meson-gx-pwrc.txt
-@@ -0,0 +1,61 @@
-+Amlogic Meson Power Controller
-+==============================
-+
-+The Amlogic Meson SoCs embeds an internal Power domain controller.
-+
-+VPU Power Domain
-+----------------
-+
-+The Video Processing Unit power domain is controlled by this power controller,
-+but the domain requires some external resources to meet the correct power
-+sequences.
-+The bindings must respect the power domain bindings as described in the file
-+power_domain.txt
-+
-+Device Tree Bindings:
-+---------------------
-+
-+Required properties:
-+- compatible: should be "amlogic,meson-gx-pwrc-vpu" for the Meson GX SoCs
-+- #power-domain-cells: should be 0
-+- amlogic,hhi-sysctrl: phandle to the HHI sysctrl node
-+- resets: phandles to the reset lines needed for this power demain sequence
-+	as described in ../reset/reset.txt
-+- clocks: from common clock binding: handle to VPU and VAPB clocks
-+- clock-names: from common clock binding: must contain "vpu", "vapb"
-+	corresponding to entry in the clocks property.
-+
-+Parent node should have the following properties :
-+- compatible: "amlogic,meson-gx-ao-sysctrl", "syscon", "simple-mfd"
-+- reg: base address and size of the AO system control register space.
-+
-+Example:
-+-------
-+
-+ao_sysctrl: sys-ctrl at 0 {
-+	compatible = "amlogic,meson-gx-ao-sysctrl", "syscon", "simple-mfd";
-+	reg =  <0x0 0x0 0x0 0x100>;
-+
-+	pwrc_vpu: power-controller-vpu {
-+		compatible = "amlogic,meson-gx-pwrc-vpu";
-+		#power-domain-cells = <0>;
-+		amlogic,hhi-sysctrl = <&sysctrl>;
-+		resets = <&reset RESET_VIU>,
-+			 <&reset RESET_VENC>,
-+			 <&reset RESET_VCBUS>,
-+			 <&reset RESET_BT656>,
-+			 <&reset RESET_DVIN_RESET>,
-+			 <&reset RESET_RDMA>,
-+			 <&reset RESET_VENCI>,
-+			 <&reset RESET_VENCP>,
-+		 	 <&reset RESET_VDAC>,
-+		 	 <&reset RESET_VDI6>,
-+		 	 <&reset RESET_VENCL>,
-+			 <&reset RESET_VID_LOCK>;
-+		clocks = <&clkc CLKID_VPU>,
-+			 <&clkc CLKID_VAPB>;
-+		clock-names = "vpu", "vapb";
-+	};
-+};
-+
-+
+
+On 10/24/2017 12:54 PM, Doug Berger wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> The pin2mask() accessor only shuffles BIT ORDER in big endian systems,
+> i.e. the bitstuffing is swizzled big endian so "bit 0" is bit 7 or
+> bit 15 or bit 31 or so.
+> 
+> The brcmstb only uses big endian BYTE ORDER which will be taken car of
+> by the ->write_reg() callback.
+> 
+> Just use BIT(offset) to assign the bit.
+> 
+> Cc: Gregory Fong <gregory.0xf0@gmail.com>
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 -- 
-2.7.4
+Florian
