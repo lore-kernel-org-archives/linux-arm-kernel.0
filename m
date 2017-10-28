@@ -1,48 +1,41 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Sat, 28 Oct 2017 17:05:09 +0100
-Subject: [PATCH v4 20/28] arm64/sve: Add prctl controls for userspace
- vector length management
-In-Reply-To: <87r2toiikt.fsf@linaro.org>
-References: <1509101470-7881-1-git-send-email-Dave.Martin@arm.com>
- <1509101470-7881-21-git-send-email-Dave.Martin@arm.com>
- <87r2toiikt.fsf@linaro.org>
-Message-ID: <20171028160506.GI19485@e103592.cambridge.arm.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Sat, 28 Oct 2017 18:36:21 +0200
+Subject: [RESEND PATCH v2 0/2] soc: amlogic: add support for Meson GX VPU
+ Domains
+Message-ID: <1509208583-30349-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 27, 2017 at 06:52:50PM +0100, Alex Benn?e wrote:
-> 
-> Dave Martin <Dave.Martin@arm.com> writes:
-> 
-> > This patch adds two arm64-specific prctls, to permit userspace to
-> > control its vector length:
-> >
-> >  * PR_SVE_SET_VL: set the thread's SVE vector length and vector
-> >    length inheritance mode.
-> >
-> >  * PR_SVE_GET_VL: get the same information.
-> >
-> > Although these prctls resemble instruction set features in the SVE
-> > architecture, they provide additional control: the vector length
-> > inheritance mode is Linux-specific and nothing to do with the
-> > architecture, and the architecture does not permit EL0 to set its
-> > own vector length directly.  Both can be used in portable tools
-> > without requiring the use of SVE instructions.
-> >
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Alex Benn?e <alex.bennee@linaro.org>
-> 
-> FYI there is a minor conflict applying this on current master.
+[Resent with linux-pm in CC]
 
-There are some trivial conflicts with one or two patches that already
-went into arm64/for-next/core, so I based on that for this posting, not
-torvalds/master.
+On the Amlogic Gx SoCs (GXBB, GXL & GXM), the VPU power domain is initialized
+by the vendor U-Boot code, but running mainline U-boot has been possible
+on these SoCs. But lacking such init made the system lock at kernel boot.
 
-There's a note in the cover letter giving the precise commit I based
-on, though the branch doesn't seem to have moved yet since I posted.
+This patchset adds the Video Processing Unit power domain driver to enable
+the same power-on and power-down sequences and was designed to allow booting
+with the power domain already initialized or not.
 
-Otherwise, I don't see any conflict -- can you give details?
+This driver has been tested on :
+- Odroid-C2 (GXBB) with Vendor and Mainline U-Boot
+- P212 (GXL) with Vendor and Mainline U-Boot
+- Khadas Vim (GXL) with Vendor U-Boot
+- Khadas Vim2 with (GXM) Vendor U-Boot
 
-Cheers
----Dave
+Changes since v1:
+- fixed bindings compatible string
+
+Neil Armstrong (2):
+  soc: amlogic: add Meson GX VPU Domains driver
+  dt-bindings: power: add amlogic meson power domain bindings
+
+ .../bindings/power/amlogic,meson-gx-pwrc.txt       |  61 ++++++
+ drivers/soc/amlogic/Kconfig                        |  10 +
+ drivers/soc/amlogic/Makefile                       |   1 +
+ drivers/soc/amlogic/meson-gx-pwrc-vpu.c            | 234 +++++++++++++++++++++
+ 4 files changed, 306 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/power/amlogic,meson-gx-pwrc.txt
+ create mode 100644 drivers/soc/amlogic/meson-gx-pwrc-vpu.c
+
+-- 
+2.7.4
