@@ -1,148 +1,60 @@
-From: aford173@gmail.com (Adam Ford)
-Date: Sat, 28 Oct 2017 06:33:58 -0500
-Subject: [PATCH 0/4] TI Bluetooth serdev support
-In-Reply-To: <CAHCN7xKNWa2yrquvYg41CtTWa7aqETNx_08SPgsxv6QC4GK_Rw@mail.gmail.com>
-References: <20170405183005.20570-1-robh@kernel.org>
- <CAHCN7xJUxZm1qKAxT0kaK6qoDg+HWOJK7sTH-q9za4HJuUwe8Q@mail.gmail.com>
- <20170430160430.rmyuo6sdrkrjxjg6@earth>
- <CAHCN7x+Mq=b6RN-ezU0400W=H=D7DR+Es1FHtT4GyozpVd8ALA@mail.gmail.com>
- <CAL_JsqKBAPUPRtn+pEtz8B8pCrA=45RkEq6X_0i_HYoWsVmtyw@mail.gmail.com>
- <20170509044837.oje2tfodytyuuuur@sapphire.tkos.co.il>
- <CAL_Jsq+wJfepPRbpL-_BWtD2Nyviy0q2UW9s7MrNr392W8D0cA@mail.gmail.com>
- <CAHCN7xKNWa2yrquvYg41CtTWa7aqETNx_08SPgsxv6QC4GK_Rw@mail.gmail.com>
-Message-ID: <CAHCN7xKTqJ4ZkvUg_4xHYPF+bvjXT=zGbYFP_DKii0S3WQeKew@mail.gmail.com>
+From: christina.jacob.koikara@gmail.com (Christina Jacob)
+Date: Sat, 28 Oct 2017 19:07:32 +0530
+Subject: [PATCH v2] xdp: Sample xdp program implementing ip forward
+In-Reply-To: <d73a1229-7bb2-873c-932e-61430847ba3a@caviumnetworks.com>
+References: <1507620532-25804-1-git-send-email-Christina.Jacob@cavium.com>
+ <1507620532-25804-2-git-send-email-Christina.Jacob@cavium.com>
+ <20171010101921.30136d48@shemminger-XPS-13-9360>
+ <d73a1229-7bb2-873c-932e-61430847ba3a@caviumnetworks.com>
+Message-ID: <CAGSfdSi5z=LQf=AKKripUGVDgi-JXb5CgW-iuy0Xg4Z1aUMQhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 27, 2017 at 5:55 AM, Adam Ford <aford173@gmail.com> wrote:
-> On Tue, May 9, 2017 at 9:14 AM, Rob Herring <robh@kernel.org> wrote:
->> On Mon, May 8, 2017 at 11:48 PM, Baruch Siach <baruch@tkos.co.il> wrote:
->>> Hi Rob,
->>>
->>> On Mon, May 08, 2017 at 04:12:16PM -0500, Rob Herring wrote:
->>>> On Fri, May 5, 2017 at 9:51 AM, Adam Ford <aford173@gmail.com> wrote:
->>>> > On Sun, Apr 30, 2017 at 11:04 AM, Sebastian Reichel <sre@kernel.org> wrote:
->>>> >> On Sun, Apr 30, 2017 at 10:14:20AM -0500, Adam Ford wrote:
->>>> >>> On Wed, Apr 5, 2017 at 1:30 PM, Rob Herring <robh@kernel.org> wrote:
->>>> >>> > This series adds serdev support to the HCI LL protocol used on TI BT
->>>> >>> > modules and enables support on HiKey board with with the WL1835 module.
->>>> >>> > With this the custom TI UIM daemon and btattach are no longer needed.
->>>> >>>
->>>> >>> Without UIM daemon, what instruction do you use to load the BT firmware?
->>>> >>>
->>>> >>> I was thinking 'hciattach' but I was having trouble.  I was hoping you
->>>> >>> might have some insight.
->>>> >>>
->>>> >>>  hciattach -t 30 -s 115200 /dev/ttymxc1 texas 3000000 flow  Just
->>>> >>> returns a timeout.
->>>> >>>
->>>> >>> I modified my i.MX6 device tree per the binding documentation and
->>>> >>> setup the regulators and enable GPIO pins.
->>>> >>
->>>> >> If you configured everything correctly no userspace interaction is
->>>> >> required. The driver should request the firmware automatically once
->>>> >> you power up the bluetooth device.
->>>> >>
->>>> >> Apart from DT changes make sure, that the following options are
->>>> >> enabled and check dmesg for any hints.
->>>> >>
->>>> >> CONFIG_SERIAL_DEV_BUS
->>>> >> CONFIG_SERIAL_DEV_CTRL_TTYPORT
->>>> >> CONFIG_BT_HCIUART
->>>> >> CONFIG_BT_HCIUART_LL
->>>> >
->>>> > I have enabled those flags, and I have updated my device tree.
->>>> > I am testing this on an OMAP3630 (DM3730) board with a WL1283.  I am
->>>> > getting a lot of timeout errors.  I tested this against the original
->>>> > implemention I had in pdata-quirks.c using the ti-st driver, uim & and
->>>> > the btwilink driver.
->>>> >
->>>> > I pulled in some of the newer patches to enable the wl1283-st, but I
->>>> > am obviously missing something.
->>>> >
->>>> > I   58.717651] Bluetooth: hci0: Reading TI version information failed
->>>> > (-110)
->>>> > [   58.724853] Bluetooth: hci0: download firmware failed, retrying...
->>>> > [   60.957641] Bluetooth: hci0 command 0x1001 tx timeout
->>>> > [   68.957641] Bluetooth: hci0: Reading TI version information failed
->>>> > (-110)
->>>> > [   68.964843] Bluetooth: hci0: download firmware failed, retrying...
->>>> > [   69.132171] Bluetooth: Unknown HCI packet type 06
->>>> > [   69.138244] Bluetooth: Unknown HCI packet type 0c
->>>> > [   69.143249] Bluetooth: Unknown HCI packet type 40
->>>> > [   69.148498] Bluetooth: Unknown HCI packet type 20
->>>> > [   69.153533] Bluetooth: Data length is too large
->>>> > [   69.158569] Bluetooth: Unknown HCI packet type a0
->>>> > [   69.163574] Bluetooth: Unknown HCI packet type 00
->>>> > [   69.168731] Bluetooth: Unknown HCI packet type 00
->>>> > [   69.173736] Bluetooth: Unknown HCI packet type 34
->>>> > [   69.178924] Bluetooth: Unknown HCI packet type 91
->>>> > [   71.197631] Bluetooth: hci0 command 0x1001 tx timeout
->>>> > [   79.197662] Bluetooth: hci0: Reading TI version information failed (-110)
->>>>
->>>> There's a bug in serdev_device_write(), so if you have that function
->>>> you need either the fix I sent or the patch to make
->>>> serdev_device_writebuf atomic again. Both are on the linux-serial
->>>> list, but not in any tree yet.
->>>
->>> You refer to the patches below, right?
->>>
->>>   [PATCH] tty: serdev: fix serdev_device_write return value,
->>>   http://www.spinics.net/lists/linux-serial/msg26117.html
->>>
->>>   [PATCH] serdev: Restore serdev_device_write_buf for atomic context,
->>>   http://www.spinics.net/lists/linux-serial/msg26113.html
+On Wed, Oct 11, 2017 at 3:07 AM, David Daney <ddaney@caviumnetworks.com> wrote:
+> On 10/10/2017 10:19 AM, Stephen Hemminger wrote:
 >>
->> Yes, either one will fix the issue.
->
-> I am finally getting back to testing these on my DM3730 board, since
-> it appears most of the patches appear upstream.  I am having trouble
-> remembering how to load this.
->
-> # modprobe hci_uart
-> [   31.639892] Bluetooth: Core ver 2.22
-> [   31.643890] NET: Registered protocol family 31
-> [   31.648559] Bluetooth: HCI device and connection manager initialized
-> [   31.655975] Bluetooth: HCI socket layer initialized
-> [   31.661315] Bluetooth: L2CAP socket layer initialized
-> [   31.667175] Bluetooth: SCO socket layer initialized
-> [   31.700408] Bluetooth: HCI UART driver ver 2.3
-> [   31.705108] Bluetooth: HCI UART protocol H4 registered
-> [   31.710632] Bluetooth: HCI UART protocol BCSP registered
-> [   31.716217] Bluetooth: HCI UART protocol Three-wire (H5) registered
-> #
->
-> Unfortunately, any attempt to access the HCI device (ie hciconfig up
-> hci0) fail.
->
-> I have those configs enabled:
-> CONFIG_SERIAL_DEV_BUS
-> CONFIG_SERIAL_DEV_CTRL_TTYPORT
-> CONFIG_BT_HCIUART
-> CONFIG_BT_HCIUART_LL
->
-> I can see that sysfs shows new files appear:
->
-> /sys/class/bluetooth
-> /sys/firmware/devicetree/base/ocp at 68000000/serial at 4806c000/bluetooth
-> /sys/firmware/devicetree/base/ocp at 68000000/serial at 4806c000/bluetooth/compatible
-> /sys/firmware/devicetree/base/ocp at 68000000/serial at 4806c000/bluetooth/enable-gpios
-> /sys/firmware/devicetree/base/ocp at 68000000/serial at 4806c000/bluetooth/name
->
-> (and more)
-> So it appears to me like it has loaded, and I don't see any errors during load.
->
-> Since this worked under pdata quirks and the older shared transport
-> driver and UIM, I'm sure it's software and not hardware.  I just can't
-> figure out what I am missing.
->
-
-Nevermind. Sorry for the noise, I got past this part.  I had a typo in
-my device tree.
-
-
-> thanks
->
-> adam
+>> On Tue, 10 Oct 2017 12:58:52 +0530
+>> Christina Jacob <christina.jacob.koikara@gmail.com> wrote:
 >>
->> Rob
+>>> +/* Get the mac address of the interface given interface name */
+>>> +static long *getmac(char *iface)
+>>> +{
+>>> +       int fd;
+>>> +       struct ifreq ifr;
+>>> +       long *mac = NULL;
+>>> +
+>>> +       fd = socket(AF_INET, SOCK_DGRAM, 0);
+>>> +       ifr.ifr_addr.sa_family = AF_INET;
+>>> +       strncpy(ifr.ifr_name, iface, IFNAMSIZ - 1);
+>>> +       ioctl(fd, SIOCGIFHWADDR, &ifr);
+>>> +       mac = (long *)ifr.ifr_hwaddr.sa_data;
+>>> +       close(fd);
+>>> +       return mac;
+>>
+>>
+>> Always check return value of ioctl.
+>> You are assuming sizeof(long) > 6 bytes.
+>> Also the byte order.
+>
+>
+>
+> Also:
+>
+> Returning the address of a local variable (ifr.ifr_hwaddr.sa_data), and then
+> dereferencing it outside of the function is not correct.
+>
+> The casting of the char sa_data[] to a long * may cause alignment faults on
+> some architectures.  The may also be endinaness issues depending on how the
+> data are manipulated if you pack all those chars into a long.
+>
+> If we think that a MAC address is char[6], then it may be best to define the
+> data structures as such and manipulate it as an array instead of trying to
+> pack it into a long.
+
+How do I feed the MAC address to xdp.data ? Is it ok to do a manual
+leftshift + biwise and  for the purpose?
+
+>
+> Keep working on this though, this program will surely be useful.
+>
+> David Daney
