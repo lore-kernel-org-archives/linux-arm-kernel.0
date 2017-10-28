@@ -1,60 +1,45 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sat, 28 Oct 2017 09:58:27 -0700
-Subject: [PATCH v2 7/7] gpio: brcmstb: implement suspend/resume/shutdown
-In-Reply-To: <20171024195451.30535-8-opendmb@gmail.com>
-References: <20171024195451.30535-1-opendmb@gmail.com>
- <20171024195451.30535-8-opendmb@gmail.com>
-Message-ID: <a77ad531-f90f-bffb-ef07-2228e44affb8@gmail.com>
+From: tobetter@gmail.com (tobetter at gmail.com)
+Date: Sat, 28 Oct 2017 13:32:48 -0400
+Subject: [PATCH] ARM: dts: exynos: fix property values of LDO15/17 for
+ ODROID-XU3/4
+Message-ID: <20171028173329.15368-1-tobetter@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Dongjin Kim <tobetter@gmail.com>
 
+Looking at the schematic, LDO15 and LDO17 are tied as a power source of a
+builtin network chipset. The voltage on LDO15 is corrected to 3.3V and the
+name of LDO17 is corrected to "vdd_ldo17".
 
-On 10/24/2017 12:54 PM, Doug Berger wrote:
-> This commit corrects problems with the previous wake implementation
-> by implementing suspend and resume power management operations and
-> the driver shutdown operation.
-> 
-> Wake masks are used to keep track of which GPIO should wake the
-> device.  On suspend the GPIO state is saved and the possible wakeup
-> sources are explicitly unmasked in the hardware. Non-wakeup sources
-> are explicitly masked so IRQCHIP_MASK_ON_SUSPEND is no longer
-> necessary.  The saved state of the GPIO is restored upon resume.
-> It is important not to write to the GPIO status register since this
-> has the effect of clearing bits.  The status register is explicitly
-> removed from the register save and restore to ensure this.
-> 
-> The shutdown operation allows the hardware to be put into the same
-> quiesced state as the suspend operation and removes the need for
-> the reboot notifier.
-> 
-> Unfortunately, there appears to be some confusion about whether
-> a pending disabled wake interrupt should wake the system. If a wake
-> capable interrupt is disabled using the default "lazy disable"
-> behavior and it is triggered before the suspend_device_irq call
-> the interrupt hardware will be acknowledged by mask_ack_irq and the
-> IRQS_PENDING flag is added to its state. However, the IRQS_PENDING
-> flag of wake interrupts is not checked to prevent the transition to
-> suspend and the hardware has been acked which prevents its wakeup.
-> If the lazy disabled interrupt is triggered after the call to
-> suspend_device_irqs then the wakeup logic will abort the suspend.
-> The irq_disable method is defined by this GPIO driver to prevent
-> lazy disable so that the pending hardware state remains asserted
-> allowing the hardware to wake and providing a consistent behavior.
-> 
-> In addition, the IRQ_DISABLE_UNLAZY flag is set for the non-wake
-> parent interrupt as a convenience to prevent the need to add code
-> to the brcmstb_gpio_irq_handler to support "lazy disable" of the
-> non-wake parent interrupt when it is disabled during suspend and
-> resume. Chained interrupt parents are not normally disabled, but
-> these GPIO devices have different parent interrupts for wake and
-> non-wake handling. It is convenient to mask the non-wake parent
-> when suspending to preserve the hardware state for proper wakeup
-> accounting when the driver is resumed.
-> 
-> Signed-off-by: Doug Berger <opendmb@gmail.com>
+Signed-off-by: Dongjin Kim <tobetter@gmail.com>
+---
+ arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+index a183b56283f8..68780569371d 100644
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+@@ -372,8 +372,8 @@
+ 
+ 			ldo15_reg: LDO15 {
+ 				regulator-name = "vdd_ldo15";
+-				regulator-min-microvolt = <3100000>;
+-				regulator-max-microvolt = <3100000>;
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
+ 				regulator-always-on;
+ 			};
+ 
+@@ -385,7 +385,7 @@
+ 			};
+ 
+ 			ldo17_reg: LDO17 {
+-				regulator-name = "tsp_avdd";
++				regulator-name = "vdd_ldo17";
+ 				regulator-min-microvolt = <3300000>;
+ 				regulator-max-microvolt = <3300000>;
+ 				regulator-always-on;
 -- 
--- 
-Florian
+2.11.0
