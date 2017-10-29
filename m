@@ -1,35 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sun, 29 Oct 2017 01:12:32 +0000
-Subject: [PATCH v3] KVM: arm/arm64: fix the incompatible matching for
- external abort
-In-Reply-To: <1509173159-30579-1-git-send-email-gengdongjiu@huawei.com>
- (Dongjiu Geng's message of "Sat, 28 Oct 2017 14:45:59 +0800")
-References: <1509173159-30579-1-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <861slmaha7.fsf@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sun, 29 Oct 2017 02:48:56 +0100
+Subject: [PATCH v5 21/20] arm/arm64: KVM: Load the timer state when enabling
+ the timer
+In-Reply-To: <1509093281-15225-1-git-send-email-cdall@linaro.org>
+References: <1509093281-15225-1-git-send-email-cdall@linaro.org>
+Message-ID: <1509241736-99913-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 28 2017 at  2:45:59 pm BST, Dongjiu Geng <gengdongjiu@huawei.com> wrote:
-> For this matching, switch expression uses fault type which is
-> not {I,D}FSC value, but the case expression uses {I,D}FSC,
-> they are incompatible. So change the switch expression to
-> use {I,D}FSC.
+After being lazy with saving/restoring the timer state, we defer that
+work to vcpu_load and vcpu_put, which ensure that the timer state is
+loaded on the hardware timers whenever the VCPU runs.
 
-I'm sorry, but I can't manage to parse this commit message. How about
-something like this?
+Unfortunately, we are failing to do that the first time vcpu_load()
+runs, because the timer has not yet been enabled at that time.  As long
+as the initialized timer state matches what happens to be in the
+hardware (a disabled timer, because we never leave the timer screaming),
+this does not show up as a problem, but is nevertheless incorrect.
 
-"kvm_vcpu_dabt_isextabt() tries to match a full fault syndrome, but
- calls kvm_vcpu_trap_get_fault_type() that only returns the fault class,
- thus reducing the scope of the check. This doesn't cause any observable
- bug yet as we end-up matching a closely related syndrome for which we
- return the same value.
+The solution is simple; disable preemption while setting the timer to be
+enabled, and call the timer load function when first enabling the timer.
 
- Using kvm_vcpu_trap_get_fault() instead fixes it for good"
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ virt/kvm/arm/arch_timer.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Otherwise:
-
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 2035cf2..4db54ff 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -861,7 +861,11 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
+ 		return ret;
+ 
+ no_vgic:
++	preempt_disable();
+ 	timer->enabled = 1;
++	kvm_timer_vcpu_load_vgic(vcpu);
++	preempt_enable();
++
+ 	return 0;
+ }
+ 
 -- 
-Jazz is not dead. It just smells funny.
+2.7.4
