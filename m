@@ -1,352 +1,200 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Sun, 29 Oct 2017 19:18:56 +0530
-Subject: [PATCH V4 08/12] boot_constraint: Manage deferrable constraints
+Date: Sun, 29 Oct 2017 19:18:58 +0530
+Subject: [PATCH V4 10/12] boot_constraint: Add support for Hisilicon platforms
 In-Reply-To: <cover.1509284255.git.viresh.kumar@linaro.org>
 References: <cover.1509284255.git.viresh.kumar@linaro.org>
-Message-ID: <88c7a0a6421d267c118f501ea1e920b04649002d.1509284255.git.viresh.kumar@linaro.org>
+Message-ID: <facf1c5838468c8440240e2828a8e4982003a6f6.1509284255.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is possible that some of the resources aren't available at the time
-constraints are getting set and the boot constraints core will return
--EPROBE_DEFER for them. In order to retry adding the constraints at a
-later point of time (after the resource is added and before any of its
-users come up), this patch proposes two things:
+This adds boot constraint support for Hisilicon platforms. Currently
+only one use case is supported: earlycon. One of the UART is enabled by
+the bootloader and is used for early console in the kernel. The boot
+constraint core handles it properly and removes constraints once the
+serial device is probed by its driver.
 
-- Each constraint is represented by a virtual platform device, so that
-  it is re-probed again until the time all the dependencies aren't met.
-  The platform device is removed along with the constraint, with help of
-  the free_resources() callback.
+This is tested on hi6220-hikey 96board.
 
-- Enable early defer probing support by calling
-  driver_enable_deferred_probe(), so that the core retries probing
-  deferred devices every time any device is bound to a driver. This
-  makes sure that the constraint is set before any of the users of the
-  resources come up.
-
-This is tested on ARM64 Hikey board where probe was deferred for a
-device.
-
-Tested-by: Rajendra Nayak <rnayak@codeaurora.org>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/base/dd.c                         |  12 ++
- drivers/boot_constraints/Makefile         |   2 +-
- drivers/boot_constraints/deferrable_dev.c | 235 ++++++++++++++++++++++++++++++
- include/linux/boot_constraint.h           |  14 ++
- 4 files changed, 262 insertions(+), 1 deletion(-)
- create mode 100644 drivers/boot_constraints/deferrable_dev.c
+ arch/arm64/Kconfig.platforms      |   1 +
+ drivers/boot_constraints/Makefile |   2 +
+ drivers/boot_constraints/hikey.c  | 145 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 148 insertions(+)
+ create mode 100644 drivers/boot_constraints/hikey.c
 
-diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-index 4eec27fe2b2b..19eff5d08b9a 100644
---- a/drivers/base/dd.c
-+++ b/drivers/base/dd.c
-@@ -228,6 +228,18 @@ void device_unblock_probing(void)
- 	driver_deferred_probe_trigger();
- }
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 6b54ee8c1262..265df4a088ab 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -87,6 +87,7 @@ config ARCH_HISI
+ 	select ARM_TIMER_SP804
+ 	select HISILICON_IRQ_MBIGEN if PCI
+ 	select PINCTRL
++	select DEV_BOOT_CONSTRAINTS
+ 	help
+ 	  This enables support for Hisilicon ARMv8 SoC family
  
-+/**
-+ * driver_enable_deferred_probe() - Enable probing of deferred devices
-+ *
-+ * We don't want to get in the way when the bulk of drivers are getting probed
-+ * and so deferred probe is disabled in the beginning. Enable it now because we
-+ * need it.
-+ */
-+void driver_enable_deferred_probe(void)
-+{
-+	driver_deferred_probe_enable = true;
-+}
-+
- /**
-  * deferred_probe_initcall() - Enable probing of deferred devices
-  *
 diff --git a/drivers/boot_constraints/Makefile b/drivers/boot_constraints/Makefile
-index b7ade1a7afb5..a765094623a3 100644
+index 0d4f88bb767c..43c89d2458e9 100644
 --- a/drivers/boot_constraints/Makefile
 +++ b/drivers/boot_constraints/Makefile
-@@ -1,3 +1,3 @@
+@@ -1,3 +1,5 @@
  # Makefile for device boot constraints
  
--obj-y := clk.o core.o pm.o supply.o
-+obj-y := clk.o deferrable_dev.o core.o pm.o supply.o
-diff --git a/drivers/boot_constraints/deferrable_dev.c b/drivers/boot_constraints/deferrable_dev.c
+ obj-y := clk.o deferrable_dev.o core.o pm.o serial.o supply.o
++
++obj-$(CONFIG_ARCH_HISI)			+= hikey.o
+diff --git a/drivers/boot_constraints/hikey.c b/drivers/boot_constraints/hikey.c
 new file mode 100644
-index 000000000000..04056f317aff
+index 000000000000..5f69f9451d93
 --- /dev/null
-+++ b/drivers/boot_constraints/deferrable_dev.c
-@@ -0,0 +1,235 @@
++++ b/drivers/boot_constraints/hikey.c
+@@ -0,0 +1,145 @@
 +/*
++ * This takes care of Hisilicon boot time device constraints, normally set by
++ * the Bootloader.
++ *
 + * Copyright (C) 2017 Linaro.
 + * Viresh Kumar <viresh.kumar@linaro.org>
 + *
 + * This file is released under the GPLv2.
 + */
 +
-+#define pr_fmt(fmt) "Boot Constraints: " fmt
-+
-+#include <linux/amba/bus.h>
-+#include <linux/err.h>
-+#include <linux/idr.h>
++#include <linux/boot_constraint.h>
++#include <linux/init.h>
++#include <linux/kernel.h>
 +#include <linux/of.h>
-+#include <linux/of_platform.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
 +
-+#include "core.h"
-+
-+static DEFINE_IDA(pdev_index);
-+
-+void driver_enable_deferred_probe(void);
-+
-+struct boot_constraint_pdata {
-+	struct device *dev;
-+	struct dev_boot_constraint constraint;
-+	int probe_failed;
-+	int index;
++struct hikey_machine_constraints {
++	struct dev_boot_constraint_of *dev_constraints;
++	unsigned int count;
 +};
 +
-+static void boot_constraint_remove(void *data)
-+{
-+	struct platform_device *pdev = data;
-+	struct boot_constraint_pdata *pdata = dev_get_platdata(&pdev->dev);
++static struct dev_boot_constraint_clk_info uart_iclk_info = {
++	.name = "uartclk",
++};
 +
-+	ida_simple_remove(&pdev_index, pdata->index);
-+	kfree(pdata->constraint.data);
-+	platform_device_unregister(pdev);
++static struct dev_boot_constraint_clk_info uart_pclk_info = {
++	.name = "apb_pclk",
++};
++
++static struct dev_boot_constraint hikey3660_uart_constraints[] = {
++	{
++		.type = DEV_BOOT_CONSTRAINT_CLK,
++		.data = &uart_iclk_info,
++	}, {
++		.type = DEV_BOOT_CONSTRAINT_CLK,
++		.data = &uart_pclk_info,
++	},
++};
++
++static const char * const uarts_hikey3660[] = {
++	"serial at fff32000",	/* UART 6 */
++};
++
++static struct dev_boot_constraint_of hikey3660_dev_constraints[] = {
++	{
++		.compat = "arm,pl011",
++		.constraints = hikey3660_uart_constraints,
++		.count = ARRAY_SIZE(hikey3660_uart_constraints),
++
++		.dev_names = uarts_hikey3660,
++		.dev_names_count = ARRAY_SIZE(uarts_hikey3660),
++	},
++};
++
++static struct hikey_machine_constraints hikey3660_constraints = {
++	.dev_constraints = hikey3660_dev_constraints,
++	.count = ARRAY_SIZE(hikey3660_dev_constraints),
++};
++
++static const char * const uarts_hikey6220[] = {
++	"uart at f7113000",	/* UART 3 */
++};
++
++static struct dev_boot_constraint_of hikey6220_dev_constraints[] = {
++	{
++		.compat = "arm,pl011",
++		.constraints = hikey3660_uart_constraints,
++		.count = ARRAY_SIZE(hikey3660_uart_constraints),
++
++		.dev_names = uarts_hikey6220,
++		.dev_names_count = ARRAY_SIZE(uarts_hikey6220),
++	},
++};
++
++static struct hikey_machine_constraints hikey6220_constraints = {
++	.dev_constraints = hikey6220_dev_constraints,
++	.count = ARRAY_SIZE(hikey6220_dev_constraints),
++};
++
++static struct dev_boot_constraint hikey3798cv200_uart_constraints[] = {
++	{
++		.type = DEV_BOOT_CONSTRAINT_CLK,
++		.data = &uart_pclk_info,
++	},
++};
++
++static const char * const uarts_hikey3798cv200[] = {
++	"serial at 8b00000",	/* UART 0 */
++};
++
++static struct dev_boot_constraint_of hikey3798cv200_dev_constraints[] = {
++	{
++		.compat = "arm,pl011",
++		.constraints = hikey3798cv200_uart_constraints,
++		.count = ARRAY_SIZE(hikey3798cv200_uart_constraints),
++
++		.dev_names = uarts_hikey3798cv200,
++		.dev_names_count = ARRAY_SIZE(uarts_hikey3798cv200),
++	},
++};
++
++static struct hikey_machine_constraints hikey3798cv200_constraints = {
++	.dev_constraints = hikey3798cv200_dev_constraints,
++	.count = ARRAY_SIZE(hikey3798cv200_dev_constraints),
++};
++
++static const struct of_device_id machines[] __initconst = {
++	{ .compatible = "hisilicon,hi3660", .data = &hikey3660_constraints },
++	{ .compatible = "hisilicon,hi3798cv200", .data = &hikey3798cv200_constraints },
++	{ .compatible = "hisilicon,hi6220", .data = &hikey6220_constraints },
++	{ }
++};
++
++static int __init hikey_constraints_init(void)
++{
++	const struct hikey_machine_constraints *constraints;
++	const struct of_device_id *match;
++	struct device_node *np;
++
++	if (!boot_constraint_earlycon_enabled())
++		return 0;
++
++	np = of_find_node_by_path("/");
++	if (!np)
++		return -ENODEV;
++
++	match = of_match_node(machines, np);
++	of_node_put(np);
++
++	if (!match)
++		return 0;
++
++	constraints = match->data;
++	BUG_ON(!constraints);
++
++	dev_boot_constraint_add_deferrable_of(constraints->dev_constraints,
++					      constraints->count);
++
++	return 0;
 +}
 +
 +/*
-+ * A platform device is added for each and every constraint, to handle
-+ * -EPROBE_DEFER properly.
++ * The amba-pl011 driver registers itself from arch_initcall level. Setup the
++ * serial boot constraints before that in order not to miss any boot messages.
 + */
-+static int boot_constraint_probe(struct platform_device *pdev)
-+{
-+	struct boot_constraint_pdata *pdata = dev_get_platdata(&pdev->dev);
-+	struct dev_boot_constraint_info info;
-+	int ret;
-+
-+	if (WARN_ON(!pdata))
-+		return -EINVAL;
-+
-+	info.constraint = pdata->constraint;
-+	info.free_resources = boot_constraint_remove;
-+	info.free_resources_data = pdev;
-+
-+	ret = dev_boot_constraint_add(pdata->dev, &info);
-+	if (ret) {
-+		if (ret == -EPROBE_DEFER)
-+			driver_enable_deferred_probe();
-+		else
-+			pdata->probe_failed = ret;
-+	}
-+
-+	return ret;
-+}
-+
-+static struct platform_driver boot_constraint_driver = {
-+	.driver = {
-+		.name = "boot-constraints-dev",
-+	},
-+	.probe = boot_constraint_probe,
-+};
-+
-+static int __init boot_constraint_init(void)
-+{
-+	return platform_driver_register(&boot_constraint_driver);
-+}
-+core_initcall(boot_constraint_init);
-+
-+static int boot_constraint_add_dev(struct device *dev,
-+				   struct dev_boot_constraint *constraint)
-+{
-+	struct boot_constraint_pdata pdata = {
-+		.dev = dev,
-+		.constraint.type = constraint->type,
-+	};
-+	struct platform_device *pdev;
-+	struct boot_constraint_pdata *pdev_pdata;
-+	int size, ret;
-+
-+	switch (constraint->type) {
-+	case DEV_BOOT_CONSTRAINT_CLK:
-+		size = sizeof(struct dev_boot_constraint_clk_info);
-+		break;
-+	case DEV_BOOT_CONSTRAINT_PM:
-+		size = 0;
-+		break;
-+	case DEV_BOOT_CONSTRAINT_SUPPLY:
-+		size = sizeof(struct dev_boot_constraint_supply_info);
-+		break;
-+	default:
-+		dev_err(dev, "%s: Constraint type (%d) not supported\n",
-+			__func__, constraint->type);
-+		return -EINVAL;
-+	}
-+
-+	/* Will be freed from boot_constraint_remove() */
-+	pdata.constraint.data = kmemdup(constraint->data, size, GFP_KERNEL);
-+	if (!pdata.constraint.data)
-+		return -ENOMEM;
-+
-+	ret = ida_simple_get(&pdev_index, 0, 256, GFP_KERNEL);
-+	if (ret < 0) {
-+		dev_err(dev, "failed to allocate index (%d)\n", ret);
-+		goto free;
-+	}
-+
-+	pdata.index = ret;
-+
-+	pdev = platform_device_register_data(NULL, "boot-constraints-dev", ret,
-+					     &pdata, sizeof(pdata));
-+	if (IS_ERR(pdev)) {
-+		dev_err(dev, "%s: Failed to create pdev (%ld)\n", __func__,
-+			PTR_ERR(pdev));
-+		ret = PTR_ERR(pdev);
-+		goto ida_remove;
-+	}
-+
-+	/* Release resources if probe has failed */
-+	pdev_pdata = dev_get_platdata(&pdev->dev);
-+	if (pdev_pdata->probe_failed) {
-+		ret = pdev_pdata->probe_failed;
-+		goto remove_pdev;
-+	}
-+
-+	return 0;
-+
-+remove_pdev:
-+	platform_device_unregister(pdev);
-+ida_remove:
-+	ida_simple_remove(&pdev_index, pdata.index);
-+free:
-+	kfree(pdata.constraint.data);
-+
-+	return ret;
-+}
-+
-+static int dev_boot_constraint_add_deferrable(struct device *dev,
-+			struct dev_boot_constraint *constraints, int count)
-+{
-+	int ret, i;
-+
-+	for (i = 0; i < count; i++) {
-+		ret = boot_constraint_add_dev(dev, &constraints[i]);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+/* This only creates platform devices for now */
-+static void add_deferrable_of_single(struct device_node *np,
-+				     struct dev_boot_constraint *constraints,
-+				     int count)
-+{
-+	struct device *dev;
-+	int ret;
-+
-+	if (!of_device_is_available(np))
-+		return;
-+
-+	ret = of_platform_bus_create(np, NULL, NULL, NULL, false);
-+	if (ret)
-+		return;
-+
-+	if (of_device_is_compatible(np, "arm,primecell")) {
-+		struct amba_device *adev = of_find_amba_device_by_node(np);
-+
-+		if (!adev) {
-+			pr_err("Failed to find amba dev: %s\n", np->full_name);
-+			return;
-+		}
-+		dev = &adev->dev;
-+	} else {
-+		struct platform_device *pdev = of_find_device_by_node(np);
-+
-+		if (!pdev) {
-+			pr_err("Failed to find pdev: %s\n", np->full_name);
-+			return;
-+		}
-+		dev = &pdev->dev;
-+	}
-+
-+	ret = dev_boot_constraint_add_deferrable(dev, constraints, count);
-+	if (ret)
-+		dev_err(dev, "Failed to add boot constraint (%d)\n", ret);
-+}
-+
-+/* Not all compatible device nodes may have boot constraints */
-+static bool node_has_boot_constraints(struct device_node *np,
-+				      struct dev_boot_constraint_of *oconst)
-+{
-+	int i;
-+
-+	if (!oconst->dev_names)
-+		return true;
-+
-+	for (i = 0; i < oconst->dev_names_count; i++) {
-+		if (!strcmp(oconst->dev_names[i], kbasename(np->full_name)))
-+			return true;
-+	}
-+
-+	return false;
-+}
-+
-+void dev_boot_constraint_add_deferrable_of(struct dev_boot_constraint_of *oconst,
-+					   int count)
-+{
-+	struct device_node *np;
-+	int i;
-+
-+	for (i = 0; i < count; i++) {
-+		for_each_compatible_node(np, NULL, oconst[i].compat) {
-+			if (!node_has_boot_constraints(np, &oconst[i]))
-+				continue;
-+
-+			add_deferrable_of_single(np, oconst[i].constraints,
-+						 oconst[i].count);
-+		}
-+	}
-+}
-+EXPORT_SYMBOL_GPL(dev_boot_constraint_add_deferrable_of);
-diff --git a/include/linux/boot_constraint.h b/include/linux/boot_constraint.h
-index 637fe9d65536..c110b36e490f 100644
---- a/include/linux/boot_constraint.h
-+++ b/include/linux/boot_constraint.h
-@@ -35,6 +35,15 @@ struct dev_boot_constraint {
- 	void *data;
- };
- 
-+struct dev_boot_constraint_of {
-+	const char *compat;
-+	struct dev_boot_constraint *constraints;
-+	unsigned int count;
-+
-+	const char **dev_names;
-+	unsigned int dev_names_count;
-+};
-+
- struct dev_boot_constraint_info {
- 	struct dev_boot_constraint constraint;
- 
-@@ -47,12 +56,17 @@ struct dev_boot_constraint_info {
- int dev_boot_constraint_add(struct device *dev,
- 			    struct dev_boot_constraint_info *info);
- void dev_boot_constraints_remove(struct device *dev);
-+void dev_boot_constraint_add_deferrable_of(struct dev_boot_constraint_of *oconst,
-+					   int count);
- #else
- static inline
- int dev_boot_constraint_add(struct device *dev,
- 			    struct dev_boot_constraint_info *info)
- { return -EINVAL; }
- static inline void dev_boot_constraints_remove(struct device *dev) {}
-+void dev_boot_constraint_add_deferrable_of(struct dev_boot_constraint_of *oconst,
-+					   int count)
-+{ }
- #endif /* CONFIG_DEV_BOOT_CONSTRAINTS */
- 
- #endif /* _LINUX_BOOT_CONSTRAINT_H */
++postcore_initcall_sync(hikey_constraints_init);
 -- 
 2.15.0.rc1.236.g92ea95045093
