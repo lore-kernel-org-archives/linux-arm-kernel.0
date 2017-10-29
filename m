@@ -1,74 +1,63 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Sun, 29 Oct 2017 15:59:03 +0100
-Subject: [RESEND PATCH v2 1/2] soc: amlogic: add Meson GX VPU Domains
- driver
-In-Reply-To: <1509208817-30632-2-git-send-email-narmstrong@baylibre.com> (Neil
- Armstrong's message of "Sat, 28 Oct 2017 18:40:16 +0200")
-References: <1509208817-30632-1-git-send-email-narmstrong@baylibre.com>
- <1509208817-30632-2-git-send-email-narmstrong@baylibre.com>
-Message-ID: <7h60ayvw3s.fsf@baylibre.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 29 Oct 2017 16:02:41 +0100
+Subject: [PATCH v4] drm: bridge: Add THS8134A/B support to dumb VGA DAC
+In-Reply-To: <13720071.DIiUQShqpX@avalon>
+References: <20171020125412.25988-1-linus.walleij@linaro.org>
+ <13720071.DIiUQShqpX@avalon>
+Message-ID: <CACRpkdZgWRGWUURoBygXY5a=rbAxyhRKz9j0w5o_hGv5woKS7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Neil,
+On Tue, Oct 24, 2017 at 10:45 AM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
 
-Neil Armstrong <narmstrong@baylibre.com> writes:
-
-> The Video Processing Unit needs a specific Power Domain powering scheme
-> this driver handles this as a PM Power Domain driver.
+>> +static const struct vga_dac_info default_dac_variant = {
+>> +     /*
+>> +      * These DACs read data on the negative edge. For example in the
+>> +      * ADV7123 datasheet (revision D, page 8) there is a timing diagram
+>> +      * making this clear. So consequently we need to latch the data
+>> +      * on the positive edge.
+>> +      */
+>> +     .clk_edge_latch = DRM_BUS_FLAG_PIXDATA_POSEDGE,
 >
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> I've checked the datasheet (sorry for not having done so before), and the
+> timing diagram on page 8 of revision D shows to me that data is sampled on the
+> rising edge of the clock, not the falling edge.
+>
+> I've checked the schematics of the Renesas boards that use the ADV7123 and
+> they route the clock directly from the SoC to the DAC without any inverter or
+> other logic on the signal. The R-Car DU driver currently outputs data on the
+> rising edge of the clock. However, the DU has an internal delay of 8.5ns
+> between the rising clock edge and the data output, which is smaller than the
+> 0.2ns setup time of the ADV7123. That's why the current code works on Renesas
+> boards, and likely why it also works with the existing users of the THS8135.
 
-[...]
+Aha! Clever. So apparently the ARM PL111 is not delaying the signals
+and that is why I see the annoying flicker on these designs so they need to
+be set up differently.
 
-> +static inline
-> +struct meson_gx_pwrc_vpu *genpd_to_pd(struct generic_pm_domain *d)
-> +{
-> +	return container_of(d, struct meson_gx_pwrc_vpu, genpd);
-> +}
-> +
-> +static int meson_gx_pwrc_vpu_power_off(struct generic_pm_domain *genpd)
-> +{
-> +	struct meson_gx_pwrc_vpu *pd = genpd_to_pd(genpd);
-> +	int i;
-> +
-> +	regmap_update_bits(pd->regmap_ao, AO_RTI_GEN_PWR_SLEEP0,
-> +			   GEN_PWR_VPU_HDMI_ISO, GEN_PWR_VPU_HDMI_ISO);
-> +	udelay(20);
+> DRM_BUS_FLAG_PIXDATA_POSEDGE is the right value for my use cases, but it
+> doesn't match how the ADV7123 operates.
 
-Some minor nits/questions.  I know the vendor code does it this way,
-but...
+So if we apply the current patch, I just add some FIXME comments about the
+situation above, then things work for everyone, is that reasonable?
 
-> +	/* Power Down Memories */
-> +	for (i = 0; i < 32; i += 2) {
-> +		regmap_update_bits(pd->regmap_hhi, HHI_VPU_MEM_PD_REG0,
-> +				   0x2 << i, 0x3 << i);
-> +		udelay(5);
-> +	}
+> The more I think about it the more I believe that the
+> DRM_BUS_FLAG_PIXDATA_POSEDGE and DRM_BUS_FLAG_PIXDATA_NEGEDGE flags are not
+> the right way to pass information between bridges and display controllers.
+> Reporting the sampling edge and the setup + hold window would allow the
+> display engine driver to compute its output parameters, instead of trying to
+> infer in the bridge driver how the display engine operates.
 
-several of these bits are marked "reserved" in the datasheet.  Have you tried
-without writing to the reserved bits?
+This sounds true. And relates to the other problem I have with
+making the display driver pick up information from the bridge.
 
-> +	for (i = 0; i < 32; i += 2) {
-> +		regmap_update_bits(pd->regmap_hhi, HHI_VPU_MEM_PD_REG1,
-> +				   0x2 << i, 0x3 << i);
-> +		udelay(5);
-> +	}
+We simply need a good information container to pass information
+from the bridge to the display driver, I guess?
 
-ditto
+I'm a bit insecure on how to deal with this though. I'm happy to hack
+something up if I can just get a grip on where to put it and how
+the DRI people want their things.
 
-> +	for (i = 8; i < 16; i++) {
-> +		regmap_update_bits(pd->regmap_hhi, HHI_MEM_PD_REG0,
-> +				   BIT(i), BIT(i));
-> +		udelay(5);
-> +	}
-
-Do these really have to be written one bit at a time?
-
-I'm actually OK to merge things like this, since it also captures the
-sequences used by the vendor kernel, but I'm just curious if you did any
-of the other experiments.
-
-If you can try those experiments, we can take them as follow-on patches.
-
-Kevin
+Yours,
+Linus Walleij
