@@ -1,35 +1,40 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Sun, 29 Oct 2017 09:44:09 -0700
-Subject: [GIT PULL] Amlogic driver updates for v4.15, round 2
-Message-ID: <7htvyhq4yu.fsf@baylibre.com>
+Date: Sun, 29 Oct 2017 09:45:58 -0700
+Subject: [GIT PULL] Amlogic 32-bit DT updates for v4.15, round 2
+Message-ID: <7hpo95q4vt.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 5e68c0fc8df8a588b15cd469b27b8b5dbfadc6c3:
+The following changes since commit 88b1b18ffeae1d65e22ec24040545a84c3ace352:
 
-  soc: amlogic: Add Meson6/Meson8/Meson8b/Meson8m2 SoC Information driver (2017-10-06 15:36:17 -0700)
+  ARM: dts: meson: add the SDIO MMC controller (2017-10-11 17:18:25 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-drivers-2
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt-2
 
-for you to fetch changes up to 8fca9e95243128961357577ba394ec1d4bd8c92c:
+for you to fetch changes up to 2cb51a8ddd69dbd9e6b3d19dfdacd4ebfdd166a8:
 
-  dt-bindings: power: add amlogic meson power domain bindings (2017-10-29 08:15:09 -0700)
-
-----------------------------------------------------------------
-Amlogic drivers for v4.15, round 2
-- add PM domain driver for GX VPU
+  ARM: dts: meson: add the efuse node (2017-10-29 09:00:38 -0700)
 
 ----------------------------------------------------------------
-Neil Armstrong (2):
-      soc: amlogic: add Meson GX VPU Domains driver
-      dt-bindings: power: add amlogic meson power domain bindings
+Amlogic 32-bit DT updates for v4.15, round 2
+- enable new GPIO IRQ controller
+- add efuse node
 
- Documentation/devicetree/bindings/power/amlogic,meson-gx-pwrc.txt |  61 ++++++++++++++++++++++
- drivers/soc/amlogic/Kconfig                                       |  10 ++++
- drivers/soc/amlogic/Makefile                                      |   1 +
- drivers/soc/amlogic/meson-gx-pwrc-vpu.c                           | 234 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 306 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/power/amlogic,meson-gx-pwrc.txt
- create mode 100644 drivers/soc/amlogic/meson-gx-pwrc-vpu.c
+----------------------------------------------------------------
+Carlo Caione (1):
+      ARM: dts: meson8b: add support for booting the secondary CPU cores
+
+Jerome Brunet (1):
+      ARM: dts: meson8b: enable gpio interrupt controller
+
+Martin Blumenstingl (2):
+      ARM: dts: meson8: add support for booting the secondary CPU cores
+      ARM: dts: meson: add the efuse node
+
+ arch/arm/boot/dts/meson.dtsi   | 24 ++++++++++++++++++++++++
+ arch/arm/boot/dts/meson6.dtsi  |  3 +++
+ arch/arm/boot/dts/meson8.dtsi  | 27 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/meson8b.dtsi | 34 ++++++++++++++++++++++++++++++++++
+ 4 files changed, 88 insertions(+)
