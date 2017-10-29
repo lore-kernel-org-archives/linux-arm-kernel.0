@@ -1,42 +1,66 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Sun, 29 Oct 2017 09:50:58 -0700
-Subject: [GIT PULL] Amlogic 64-bit DT updates for v4.15, round 2
-Message-ID: <7hlgjtq4nh.fsf@baylibre.com>
+From: cyrille.pitchen@wedev4u.fr (Cyrille Pitchen)
+Date: Sun, 29 Oct 2017 18:50:46 +0100
+Subject: [PATCH v2 1/3] mtd: spi-nor: stm32-quadspi: Fix uninitialized
+ error return code
+In-Reply-To: <1509030755-19044-2-git-send-email-ludovic.Barre@st.com>
+References: <1509030755-19044-1-git-send-email-ludovic.Barre@st.com>
+ <1509030755-19044-2-git-send-email-ludovic.Barre@st.com>
+Message-ID: <ed1ca205-830e-3f5b-e251-8d863a512eda@wedev4u.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 9d59b708500fcb62d28e15b8c6333be620984d8b:
+Hi Ludovic,
 
-  arm64: dts: meson-axg: add initial A113D SoC DT support (2017-10-19 03:17:07 -0700)
+Le 26/10/2017 ? 17:12, Ludovic Barre a ?crit?:
+> From: Geert Uytterhoeven <geert@linux-m68k.org>
+> 
+> With gcc 4.1.2:
+> 
+>     drivers/mtd/spi-nor/stm32-quadspi.c: In function ?stm32_qspi_tx_poll?:
+>     drivers/mtd/spi-nor/stm32-quadspi.c:230: warning: ?ret? may be used uninitialized in this function
+> 
+> Indeed, if stm32_qspi_cmd.len is zero, ret will be uninitialized.
+> This length is passed from outside the driver using the
+> spi_nor.{read,write}{,_reg}() callbacks.
+> 
+> Several functions in drivers/mtd/spi-nor/spi-nor.c (e.g. write_enable(),
+> write_disable(), and erase_chip()) call spi_nor.write_reg() with a zero
+> length.
+> 
+> Fix this by returning an explicit zero on success.
+> 
+> Fixes: 0d43d7ab277a048c ("mtd: spi-nor: add driver for STM32 quad spi flash controller")
+> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> Acked-by: Ludovic Barre <ludovic.barre@st.com>
+> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+I removed your "Signed-off" because I think this is a mistake but kept
+your "Acked-by" tag.
 
-are available in the git repository at:
+Applied to the spi-nor/next branch of l2-mtd.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-2
+Thanks!
 
-for you to fetch changes up to b94d22d94ad226eeea3b6ec4579fb4bf8a199e5c:
-
-  ARM64: dts: meson-gx: add external PHY interrupt on some platforms (2017-10-29 08:44:04 -0700)
-
-----------------------------------------------------------------
-Amlogic 64-bit DT updates for v4.15, round 2
-- add support for new GPIO IRQ driver
-
-----------------------------------------------------------------
-Jerome Brunet (3):
-      ARM64: meson: enable MESON_IRQ_GPIO in Kconfig
-      ARM64: dts: meson-gx: add gpio interrupt controller
-      ARM64: dts: meson-gx: add external PHY interrupt on some platforms
-
-Neil Armstrong (1):
-      ARM64: dts: meson-gxbb-odroidc2: fix usb1 power supply
-
- arch/arm64/Kconfig.platforms                         | 1 +
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi            | 9 +++++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts | 2 ++
- arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts  | 3 +++
- arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts      | 2 ++
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi          | 6 ++++++
- arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts | 2 ++
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi           | 6 ++++++
- arch/arm64/boot/dts/amlogic/meson-gxm-q200.dts       | 2 ++
- 9 files changed, 33 insertions(+)
+> ---
+>  drivers/mtd/spi-nor/stm32-quadspi.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mtd/spi-nor/stm32-quadspi.c b/drivers/mtd/spi-nor/stm32-quadspi.c
+> index 86c0931..ad6a3e1 100644
+> --- a/drivers/mtd/spi-nor/stm32-quadspi.c
+> +++ b/drivers/mtd/spi-nor/stm32-quadspi.c
+> @@ -240,12 +240,12 @@ static int stm32_qspi_tx_poll(struct stm32_qspi *qspi,
+>  						 STM32_QSPI_FIFO_TIMEOUT_US);
+>  		if (ret) {
+>  			dev_err(qspi->dev, "fifo timeout (stat:%#x)\n", sr);
+> -			break;
+> +			return ret;
+>  		}
+>  		tx_fifo(buf++, qspi->io_base + QUADSPI_DR);
+>  	}
+>  
+> -	return ret;
+> +	return 0;
+>  }
+>  
+>  static int stm32_qspi_tx_mm(struct stm32_qspi *qspi,
+> 
