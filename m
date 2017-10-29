@@ -1,29 +1,35 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 28 Oct 2017 23:23:10 +0200 (CEST)
-Subject: [PATCH] staging: vc04_services: Convert timers to use
- timer_setup()
-In-Reply-To: <20171024082621.GA18529@beast>
-References: <20171024082621.GA18529@beast>
-Message-ID: <1430097289.60229.1509225790053@email.1und1.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sun, 29 Oct 2017 01:12:32 +0000
+Subject: [PATCH v3] KVM: arm/arm64: fix the incompatible matching for
+ external abort
+In-Reply-To: <1509173159-30579-1-git-send-email-gengdongjiu@huawei.com>
+ (Dongjiu Geng's message of "Sat, 28 Oct 2017 14:45:59 +0800")
+References: <1509173159-30579-1-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <861slmaha7.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, Oct 28 2017 at  2:45:59 pm BST, Dongjiu Geng <gengdongjiu@huawei.com> wrote:
+> For this matching, switch expression uses fault type which is
+> not {I,D}FSC value, but the case expression uses {I,D}FSC,
+> they are incompatible. So change the switch expression to
+> use {I,D}FSC.
 
-> Kees Cook <keescook@chromium.org> hat am 24. Oktober 2017 um 10:26 geschrieben:
-> 
-> 
-> In preparation for unconditionally passing the struct timer_list pointer to
-> all timer callbacks, switch to using the new timer_setup() and from_timer()
-> to pass the timer pointer explicitly.
-> 
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Eric Anholt <eric@anholt.net>
-> Cc: Stefan Wahren <stefan.wahren@i2se.com>
-> Cc: Michael Zoran <mzoran@crowfest.net>
-> Cc: Keerthi Reddy <keerthigd4990@gmail.com>
-> Cc: linux-rpi-kernel at lists.infradead.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: devel at driverdev.osuosl.org
-> Signed-off-by: Kees Cook <keescook@chromium.org>
+I'm sorry, but I can't manage to parse this commit message. How about
+something like this?
 
-Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
+"kvm_vcpu_dabt_isextabt() tries to match a full fault syndrome, but
+ calls kvm_vcpu_trap_get_fault_type() that only returns the fault class,
+ thus reducing the scope of the check. This doesn't cause any observable
+ bug yet as we end-up matching a closely related syndrome for which we
+ return the same value.
+
+ Using kvm_vcpu_trap_get_fault() instead fixes it for good"
+
+Otherwise:
+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
