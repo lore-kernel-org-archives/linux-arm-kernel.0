@@ -1,34 +1,59 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 29 Oct 2017 21:34:00 +0100
-Subject: [PATCH] i2c: pxa: move header file out of deprecated i2c folder
-In-Reply-To: <20171029175257.dfmf5642zfszoxe3@ninjato> (Wolfram Sang's message
- of "Sun, 29 Oct 2017 18:52:57 +0100")
-References: <20170814164303.2383-1-wsa@the-dreams.de>
- <87d15qlq6z.fsf@belgarion.home>
- <20171029175257.dfmf5642zfszoxe3@ninjato>
-Message-ID: <87y3ntlmmf.fsf@belgarion.home>
+From: smueller@chronox.de (Stephan =?ISO-8859-1?Q?M=FCller?=)
+Date: Sun, 29 Oct 2017 21:39:30 +0100
+Subject: [PATCH] crypto: AF_ALG - remove locking in async callback
+In-Reply-To: <CAGkQfmNKbSwue13zPh2K1F_kLkpm1_AhsAHK4spRFA0xMvU5PA@mail.gmail.com>
+References: <CAGkQfmNKbSwue13zPh2K1F_kLkpm1_AhsAHK4spRFA0xMvU5PA@mail.gmail.com>
+Message-ID: <5260911.ZuXsrgFD2R@positron.chronox.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wolfram Sang <wsa@the-dreams.de> writes:
+Am Mittwoch, 25. Oktober 2017, 17:26:31 CET schrieb Romain Izard:
 
-Hi Wolfram,
+Hi Romain,
 
-> Wouldn't it be even cleaner if patch 1 & 2 above would be swapped? First
-> move the chunk, then rename the file?
-Yeah sure.
+the patch below should cover the issue you see. Would you mind testing it?
 
-> And is there a branch I should base this on? Currently, I am thinking of
-> basing this patch on for-next and then submit it around rc1 time.
->
-> Does that make sense to you?
-Yeah that's good. I usually make my pull requests around -rc5, that gives enough
-time to review and test on my side.
+Thanks
+Stephan
 
-As for the base, for-next is exactly pxa/for-next as no patches are pending, so
-go ahead and base your work on it please.
+---8<---
 
-Cheers.
+The code paths protected by the socket-lock do not use or modify the
+socket in a non-atomic fashion. The actions pertaining the socket do not
+even need to be handled as an atomic operation. Thus, the socket-lock
+can be safely ignored.
 
+This fixes a bug regarding scheduling in atomic as the callback function
+may be invoked in interrupt context.
+
+Fixes: 2d97591ef43d0 ("crypto: af_alg - consolidation of duplicate code")
+Reported-by: Romain Izard <romain.izard.pro@gmail.com>
+Signed-off-by: Stephan Mueller <smueller@chronox.de>
+---
+ crypto/af_alg.c | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/crypto/af_alg.c b/crypto/af_alg.c
+index 337cf382718e..a41f08642eee 100644
+--- a/crypto/af_alg.c
++++ b/crypto/af_alg.c
+@@ -1063,8 +1063,6 @@ void af_alg_async_cb(struct crypto_async_request *_req, int err)
+ 	struct kiocb *iocb = areq->iocb;
+ 	unsigned int resultlen;
+ 
+-	lock_sock(sk);
+-
+ 	/* Buffer size written by crypto operation. */
+ 	resultlen = areq->outlen;
+ 
+@@ -1073,8 +1071,6 @@ void af_alg_async_cb(struct crypto_async_request *_req, int err)
+ 	__sock_put(sk);
+ 
+ 	iocb->ki_complete(iocb, err ? err : resultlen, 0);
+-
+-	release_sock(sk);
+ }
+ EXPORT_SYMBOL_GPL(af_alg_async_cb);
+ 
 -- 
-Robert
+2.13.6
