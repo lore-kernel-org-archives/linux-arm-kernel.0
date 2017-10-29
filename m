@@ -1,73 +1,111 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Sun, 29 Oct 2017 19:18:49 +0530
-Subject: [PATCH V4 01/12] of: platform: Add of_find_amba_device_by_node()
+Date: Sun, 29 Oct 2017 19:18:54 +0530
+Subject: [PATCH V4 06/12] boot_constraint: Add support for PM constraints
 In-Reply-To: <cover.1509284255.git.viresh.kumar@linaro.org>
 References: <cover.1509284255.git.viresh.kumar@linaro.org>
-Message-ID: <80731ad75f52781bf1d5fb1a1a211ee59b4a2ffb.1509284255.git.viresh.kumar@linaro.org>
+Message-ID: <000268f9c5b06354333a18dbe26fc8b052231ed8.1509284255.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_find_device_by_node() works only with platform devices. Lets create
-one for amba devices as well.
+This patch adds the PM constraint type.
 
-Cc: Frank Rowand <frowand.list@gmail.com>
-Cc: devicetree at vger.kernel.org
+The constraint is set by attaching the power domain for the device,
+which will also enable the power domain. This guarantees that the power
+domain doesn't get shut down while being used.
+
+We don't need to detach the power domain to remove the constraint as the
+domain is attached only once, from here or before driver probe.
+
+Tested-by: Rajendra Nayak <rnayak@codeaurora.org>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/of/platform.c       | 20 ++++++++++++++++++++
- include/linux/of_platform.h |  9 +++++++++
- 2 files changed, 29 insertions(+)
+ drivers/boot_constraints/Makefile |  2 +-
+ drivers/boot_constraints/core.c   |  4 ++++
+ drivers/boot_constraints/core.h   |  3 +++
+ drivers/boot_constraints/pm.c     | 24 ++++++++++++++++++++++++
+ include/linux/boot_constraint.h   |  1 +
+ 5 files changed, 33 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/boot_constraints/pm.c
 
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index ac15d0e3d27d..b38a8e5908a3 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -60,6 +60,26 @@ struct platform_device *of_find_device_by_node(struct device_node *np)
- }
- EXPORT_SYMBOL(of_find_device_by_node);
+diff --git a/drivers/boot_constraints/Makefile b/drivers/boot_constraints/Makefile
+index 3424379fd1e4..b7ade1a7afb5 100644
+--- a/drivers/boot_constraints/Makefile
++++ b/drivers/boot_constraints/Makefile
+@@ -1,3 +1,3 @@
+ # Makefile for device boot constraints
  
-+#ifdef CONFIG_ARM_AMBA
-+/**
-+ * of_find_amba_device_by_node - Find the amba_device associated with a node
-+ * @np: Pointer to device tree node
+-obj-y := clk.o core.o supply.o
++obj-y := clk.o core.o pm.o supply.o
+diff --git a/drivers/boot_constraints/core.c b/drivers/boot_constraints/core.c
+index 9213e56e8078..f4d3520ddb04 100644
+--- a/drivers/boot_constraints/core.c
++++ b/drivers/boot_constraints/core.c
+@@ -98,6 +98,10 @@ static struct constraint *constraint_allocate(struct constraint_dev *cdev,
+ 		add = constraint_clk_add;
+ 		remove = constraint_clk_remove;
+ 		break;
++	case DEV_BOOT_CONSTRAINT_PM:
++		add = constraint_pm_add;
++		remove = constraint_pm_remove;
++		break;
+ 	case DEV_BOOT_CONSTRAINT_SUPPLY:
+ 		add = constraint_supply_add;
+ 		remove = constraint_supply_remove;
+diff --git a/drivers/boot_constraints/core.h b/drivers/boot_constraints/core.h
+index 4f28ac2ef691..a051c3d7c8ab 100644
+--- a/drivers/boot_constraints/core.h
++++ b/drivers/boot_constraints/core.h
+@@ -33,6 +33,9 @@ struct constraint {
+ int constraint_clk_add(struct constraint *constraint, void *data);
+ void constraint_clk_remove(struct constraint *constraint);
+ 
++int constraint_pm_add(struct constraint *constraint, void *data);
++void constraint_pm_remove(struct constraint *constraint);
++
+ int constraint_supply_add(struct constraint *constraint, void *data);
+ void constraint_supply_remove(struct constraint *constraint);
+ 
+diff --git a/drivers/boot_constraints/pm.c b/drivers/boot_constraints/pm.c
+new file mode 100644
+index 000000000000..edba5eca5093
+--- /dev/null
++++ b/drivers/boot_constraints/pm.c
+@@ -0,0 +1,24 @@
++/*
++ * Copyright (C) 2017 Linaro.
++ * Viresh Kumar <viresh.kumar@linaro.org>
 + *
-+ * Takes a reference to the embedded struct device which needs to be dropped
-+ * after use.
-+ *
-+ * Returns amba_device pointer, or NULL if not found
++ * This file is released under the GPLv2.
 + */
-+struct amba_device *of_find_amba_device_by_node(struct device_node *np)
++
++#define pr_fmt(fmt) "PM Boot Constraints: " fmt
++
++#include <linux/pm_domain.h>
++
++#include "core.h"
++
++int constraint_pm_add(struct constraint *constraint, void *data)
 +{
-+	struct device *dev;
++	struct device *dev = constraint->cdev->dev;
 +
-+	dev = bus_find_device(&amba_bustype, NULL, np, of_dev_node_match);
-+	return dev ? to_amba_device(dev) : NULL;
++	return dev_pm_domain_attach(dev, true);
 +}
-+EXPORT_SYMBOL(of_find_amba_device_by_node);
-+#endif
 +
- #ifdef CONFIG_OF_ADDRESS
- /*
-  * The following routines scan a subtree and registers a device for
-diff --git a/include/linux/of_platform.h b/include/linux/of_platform.h
-index 8a561e08bc9e..fbf8a6443885 100644
---- a/include/linux/of_platform.h
-+++ b/include/linux/of_platform.h
-@@ -61,6 +61,15 @@ static inline struct platform_device *of_find_device_by_node(struct device_node
- }
- #endif
++void constraint_pm_remove(struct constraint *constraint)
++{
++	/* Nothing to do for now */
++}
+diff --git a/include/linux/boot_constraint.h b/include/linux/boot_constraint.h
+index a74b261a4ee4..637fe9d65536 100644
+--- a/include/linux/boot_constraint.h
++++ b/include/linux/boot_constraint.h
+@@ -16,6 +16,7 @@ struct device;
  
-+#if defined(CONFIG_OF) && defined(CONFIG_ARM_AMBA)
-+extern struct amba_device *of_find_amba_device_by_node(struct device_node *np);
-+#else
-+static inline struct amba_device *of_find_amba_device_by_node(struct device_node *np)
-+{
-+	return NULL;
-+}
-+#endif
-+
- #ifdef CONFIG_OF_ADDRESS
- /* Platform drivers register/unregister */
- extern struct platform_device *of_device_alloc(struct device_node *np,
+ enum dev_boot_constraint_type {
+ 	DEV_BOOT_CONSTRAINT_CLK,
++	DEV_BOOT_CONSTRAINT_PM,
+ 	DEV_BOOT_CONSTRAINT_SUPPLY,
+ };
+ 
 -- 
 2.15.0.rc1.236.g92ea95045093
