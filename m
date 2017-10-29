@@ -1,119 +1,56 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sun, 29 Oct 2017 22:20:30 +0100
-Subject: [PATCH 13/17] clocksource/drivers/arm_arch_timer: Validate CNTFRQ
- after enabling frame
+Date: Sun, 29 Oct 2017 22:20:31 +0100
+Subject: [PATCH 14/17] clocksource/drivers/arm_arch_timer: Fix DEFINE_PER_CPU
+ expansion
 In-Reply-To: <1509312035-17368-1-git-send-email-daniel.lezcano@linaro.org>
 References: <c4d8b83b-b884-415b-8c92-b195de1dae7f@linaro.org>
  <1509312035-17368-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1509312035-17368-13-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1509312035-17368-14-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+From: Mark Rutland <mark.rutland@arm.com>
 
-The ACPI GTDT code validates the CNTFRQ field of each MMIO timer
-frame against the CNTFRQ system register of the current CPU, to
-ensure that they are equal, which is mandated by the architecture.
+Our ctags mangling script can't handle newlines inside of a
+DEFINE_PER_CPU(), leading to an annoying message whenever tags are
+built:
 
-However, reading the CNTFRQ field of a frame is not possible until
-the RFRQ bit in the frame's CNTACRn register is set, and doing so
-before that willl produce the following error:
+  ctags: Warning: drivers/clocksource/arm_arch_timer.c:302: null expansion of name pattern "\1"
 
-  arch_timer: [Firmware Bug]: CNTFRQ mismatch: frame @ 0x00000000e0be0000: (0x00000000), CPU: (0x0ee6b280)
-  arch_timer: Disabling MMIO timers due to CNTFRQ mismatch
-  arch_timer: Failed to initialize memory-mapped timer.
+This was dealt with elsewhere in commit:
 
-The reason is that the CNTFRQ field is RES0 if access is not enabled.
+  25528213fe9f75f4 ("tags: Fix DEFINE_PER_CPU expansions")
 
-So move the validation of CNTFRQ into the loop that iterates over the
-timers to find the best frame, but defer it until after we have selected
-the best frame, which should also have enabled the RFRQ bit.
+... by ensuring each DEFINE_PER_CPU() was contained on a single line,
+even where this would violate the usual code style (checkpatch warnings
+and all).
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Let's do the same for the arch timer driver, and get rid of the
+distraction.
+
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/arm_arch_timer.c | 38 ++++++++++++++++++++----------------
- 1 file changed, 21 insertions(+), 17 deletions(-)
+ drivers/clocksource/arm_arch_timer.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
 diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index fd4b7f6..14e2419 100644
+index 14e2419..0ecf5be 100644
 --- a/drivers/clocksource/arm_arch_timer.c
 +++ b/drivers/clocksource/arm_arch_timer.c
-@@ -1268,10 +1268,6 @@ arch_timer_mem_find_best_frame(struct arch_timer_mem *timer_mem)
+@@ -299,8 +299,7 @@ static u64 notrace arm64_858921_read_cntvct_el0(void)
+ #endif
  
- 	iounmap(cntctlbase);
+ #ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
+-DEFINE_PER_CPU(const struct arch_timer_erratum_workaround *,
+-	       timer_unstable_counter_workaround);
++DEFINE_PER_CPU(const struct arch_timer_erratum_workaround *, timer_unstable_counter_workaround);
+ EXPORT_SYMBOL_GPL(timer_unstable_counter_workaround);
  
--	if (!best_frame)
--		pr_err("Unable to find a suitable frame in timer @ %pa\n",
--			&timer_mem->cntctlbase);
--
- 	return best_frame;
- }
- 
-@@ -1372,6 +1368,8 @@ static int __init arch_timer_mem_of_init(struct device_node *np)
- 
- 	frame = arch_timer_mem_find_best_frame(timer_mem);
- 	if (!frame) {
-+		pr_err("Unable to find a suitable frame in timer @ %pa\n",
-+			&timer_mem->cntctlbase);
- 		ret = -EINVAL;
- 		goto out;
- 	}
-@@ -1420,7 +1418,7 @@ arch_timer_mem_verify_cntfrq(struct arch_timer_mem *timer_mem)
- static int __init arch_timer_mem_acpi_init(int platform_timer_count)
- {
- 	struct arch_timer_mem *timers, *timer;
--	struct arch_timer_mem_frame *frame;
-+	struct arch_timer_mem_frame *frame, *best_frame = NULL;
- 	int timer_count, i, ret = 0;
- 
- 	timers = kcalloc(platform_timer_count, sizeof(*timers),
-@@ -1432,14 +1430,6 @@ static int __init arch_timer_mem_acpi_init(int platform_timer_count)
- 	if (ret || !timer_count)
- 		goto out;
- 
--	for (i = 0; i < timer_count; i++) {
--		ret = arch_timer_mem_verify_cntfrq(&timers[i]);
--		if (ret) {
--			pr_err("Disabling MMIO timers due to CNTFRQ mismatch\n");
--			goto out;
--		}
--	}
--
- 	/*
- 	 * While unlikely, it's theoretically possible that none of the frames
- 	 * in a timer expose the combination of feature we want.
-@@ -1448,12 +1438,26 @@ static int __init arch_timer_mem_acpi_init(int platform_timer_count)
- 		timer = &timers[i];
- 
- 		frame = arch_timer_mem_find_best_frame(timer);
--		if (frame)
--			break;
-+		if (!best_frame)
-+			best_frame = frame;
-+
-+		ret = arch_timer_mem_verify_cntfrq(timer);
-+		if (ret) {
-+			pr_err("Disabling MMIO timers due to CNTFRQ mismatch\n");
-+			goto out;
-+		}
-+
-+		if (!best_frame) /* implies !frame */
-+			/*
-+			 * Only complain about missing suitable frames if we
-+			 * haven't already found one in a previous iteration.
-+			 */
-+			pr_err("Unable to find a suitable frame in timer @ %pa\n",
-+				&timer->cntctlbase);
- 	}
- 
--	if (frame)
--		ret = arch_timer_mem_frame_register(frame);
-+	if (best_frame)
-+		ret = arch_timer_mem_frame_register(best_frame);
- out:
- 	kfree(timers);
- 	return ret;
+ DEFINE_STATIC_KEY_FALSE(arch_timer_read_ool_enabled);
 -- 
 2.7.4
