@@ -1,26 +1,38 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Sun, 29 Oct 2017 16:24:45 +0100
-Subject: [PATCH 00/11] arm64: dts: renesas: Use R-Car SDHI Gen[123]
- fallback compat strings
-In-Reply-To: <20171020091747.iep6diy3ymp47qip@verge.net.au>
-References: <20171017060959.16702-1-horms+renesas@verge.net.au>
- <20171020091747.iep6diy3ymp47qip@verge.net.au>
-Message-ID: <20171029152444.32xci4jtwlqsqpck@verge.net.au>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Sun, 29 Oct 2017 16:31:55 +0100
+Subject: [PATCH v7 0/6] SMP and CPU hotplug support for Meson8/Meson8b
+In-Reply-To: <20170917164523.6970-1-martin.blumenstingl@googlemail.com>
+ (Martin Blumenstingl's message of "Sun, 17 Sep 2017 18:45:17 +0200")
+References: <20170917164523.6970-1-martin.blumenstingl@googlemail.com>
+Message-ID: <7hwp3eug0k.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 20, 2017 at 11:17:47AM +0200, Simon Horman wrote:
-> On Tue, Oct 17, 2017 at 08:09:48AM +0200, Simon Horman wrote:
-> > Use recently posted R-Car SDHI Gen 1, 2 and 3 fallback compat strings
-> > in the DT of Renesas ARM and arm64 based SoCs.
-> > 
-> > Based on renesas-devel-20171016-v4.14-rc5
-> > 
-> > Has a binding documentation but no run-time dependency on
-> > "[PATCH v3 0/3] mmc: renesas_sdhi: add R-Car Gen[123] fallback
-> > compatibility strings"
-> 
-> I have marked these as deferred pending acceptance of the above dependency.
+Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
 
-The dependency has subsequently been accepted and I have applied this
-series.
+> This patchset adds support for booting the secondary CPU cores (and
+> taking them offline again) on Amlogic Meson8 and Meson8b SoCs.
+> It is based on an earlier version from Carlo Caione - this helped me
+> a lot to get a better understanding of how SMP/CPU hotplug works
+> (compared to the code found in Amlogic's GPL kernel sources from
+> year 2015).
+
+[...]
+
+> Carlo Caione (2):
+>   dt-bindings: Amlogic: Add Meson8 and Meson8b SMP related documentation
+>   ARM: dts: meson8b: add support for booting the secondary CPU cores
+
+Applied to v4.15/dt...
+
+> Martin Blumenstingl (4):
+>   ARM: smp_scu: add a helper for powering on a specific CPU
+>   ARM: smp_scu: allow the platform code to read the SCU CPU status
+>   ARM: meson: Add SMP bringup code for Meson8 and Meson8b
+>   ARM: dts: meson8: add support for booting the secondary CPU cores
+
+Applied to v4.15/soc with Russell's ack.
+
+Thanks,
+
+Kevin
