@@ -1,59 +1,47 @@
-From: smueller@chronox.de (Stephan =?ISO-8859-1?Q?M=FCller?=)
-Date: Sun, 29 Oct 2017 21:39:30 +0100
-Subject: [PATCH] crypto: AF_ALG - remove locking in async callback
-In-Reply-To: <CAGkQfmNKbSwue13zPh2K1F_kLkpm1_AhsAHK4spRFA0xMvU5PA@mail.gmail.com>
-References: <CAGkQfmNKbSwue13zPh2K1F_kLkpm1_AhsAHK4spRFA0xMvU5PA@mail.gmail.com>
-Message-ID: <5260911.ZuXsrgFD2R@positron.chronox.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Sun, 29 Oct 2017 22:20:26 +0100
+Subject: [PATCH 09/17] clocksource/drivers/owl: pr_err() strings should end
+ with newlines
+In-Reply-To: <1509312035-17368-1-git-send-email-daniel.lezcano@linaro.org>
+References: <c4d8b83b-b884-415b-8c92-b195de1dae7f@linaro.org>
+ <1509312035-17368-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1509312035-17368-9-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 25. Oktober 2017, 17:26:31 CET schrieb Romain Izard:
+From: Arvind Yadav <arvind.yadav.cs@gmail.com>
 
-Hi Romain,
+pr_err() messages should end with a new-line to avoid other messages being
+concatenated.
 
-the patch below should cover the issue you see. Would you mind testing it?
-
-Thanks
-Stephan
-
----8<---
-
-The code paths protected by the socket-lock do not use or modify the
-socket in a non-atomic fashion. The actions pertaining the socket do not
-even need to be handled as an atomic operation. Thus, the socket-lock
-can be safely ignored.
-
-This fixes a bug regarding scheduling in atomic as the callback function
-may be invoked in interrupt context.
-
-Fixes: 2d97591ef43d0 ("crypto: af_alg - consolidation of duplicate code")
-Reported-by: Romain Izard <romain.izard.pro@gmail.com>
-Signed-off-by: Stephan Mueller <smueller@chronox.de>
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+Reviewed-by: Andreas F?rber <afaerber@suse.de>
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- crypto/af_alg.c | 4 ----
- 1 file changed, 4 deletions(-)
+ drivers/clocksource/owl-timer.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/crypto/af_alg.c b/crypto/af_alg.c
-index 337cf382718e..a41f08642eee 100644
---- a/crypto/af_alg.c
-+++ b/crypto/af_alg.c
-@@ -1063,8 +1063,6 @@ void af_alg_async_cb(struct crypto_async_request *_req, int err)
- 	struct kiocb *iocb = areq->iocb;
- 	unsigned int resultlen;
+diff --git a/drivers/clocksource/owl-timer.c b/drivers/clocksource/owl-timer.c
+index d19c53c..c686305 100644
+--- a/drivers/clocksource/owl-timer.c
++++ b/drivers/clocksource/owl-timer.c
+@@ -125,7 +125,7 @@ static int __init owl_timer_init(struct device_node *node)
  
--	lock_sock(sk);
--
- 	/* Buffer size written by crypto operation. */
- 	resultlen = areq->outlen;
+ 	owl_timer_base = of_io_request_and_map(node, 0, "owl-timer");
+ 	if (IS_ERR(owl_timer_base)) {
+-		pr_err("Can't map timer registers");
++		pr_err("Can't map timer registers\n");
+ 		return PTR_ERR(owl_timer_base);
+ 	}
  
-@@ -1073,8 +1071,6 @@ void af_alg_async_cb(struct crypto_async_request *_req, int err)
- 	__sock_put(sk);
+@@ -134,7 +134,7 @@ static int __init owl_timer_init(struct device_node *node)
  
- 	iocb->ki_complete(iocb, err ? err : resultlen, 0);
--
--	release_sock(sk);
- }
- EXPORT_SYMBOL_GPL(af_alg_async_cb);
+ 	timer1_irq = of_irq_get_byname(node, "timer1");
+ 	if (timer1_irq <= 0) {
+-		pr_err("Can't parse timer1 IRQ");
++		pr_err("Can't parse timer1 IRQ\n");
+ 		return -EINVAL;
+ 	}
  
 -- 
-2.13.6
+2.7.4
