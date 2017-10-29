@@ -1,38 +1,48 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Sun, 29 Oct 2017 16:31:55 +0100
-Subject: [PATCH v7 0/6] SMP and CPU hotplug support for Meson8/Meson8b
-In-Reply-To: <20170917164523.6970-1-martin.blumenstingl@googlemail.com>
- (Martin Blumenstingl's message of "Sun, 17 Sep 2017 18:45:17 +0200")
-References: <20170917164523.6970-1-martin.blumenstingl@googlemail.com>
-Message-ID: <7hwp3eug0k.fsf@baylibre.com>
+Date: Sun, 29 Oct 2017 09:43:08 -0700
+Subject: [GIT PULL] Amlogic SoC updates for v4.15
+Message-ID: <7hy3ntq50j.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
+The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 
-> This patchset adds support for booting the secondary CPU cores (and
-> taking them offline again) on Amlogic Meson8 and Meson8b SoCs.
-> It is based on an earlier version from Carlo Caione - this helped me
-> a lot to get a better understanding of how SMP/CPU hotplug works
-> (compared to the code found in Amlogic's GPL kernel sources from
-> year 2015).
+  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
 
-[...]
+are available in the git repository at:
 
-> Carlo Caione (2):
->   dt-bindings: Amlogic: Add Meson8 and Meson8b SMP related documentation
->   ARM: dts: meson8b: add support for booting the secondary CPU cores
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-soc
 
-Applied to v4.15/dt...
+for you to fetch changes up to dea54268f3925d05e75b9c6dec487a6515dc0ed5:
 
-> Martin Blumenstingl (4):
->   ARM: smp_scu: add a helper for powering on a specific CPU
->   ARM: smp_scu: allow the platform code to read the SCU CPU status
->   ARM: meson: Add SMP bringup code for Meson8 and Meson8b
->   ARM: dts: meson8: add support for booting the secondary CPU cores
+  ARM: meson: enable MESON_IRQ_GPIO in Kconfig for meson8b (2017-10-29 08:40:08 -0700)
 
-Applied to v4.15/soc with Russell's ack.
+----------------------------------------------------------------
+Amlogic SoC updates for v4.15
+- add SMP support to Meson8/8b
 
-Thanks,
+----------------------------------------------------------------
+Carlo Caione (1):
+      dt-bindings: Amlogic: Add Meson8 and Meson8b SMP related documentation
 
-Kevin
+Jerome Brunet (1):
+      ARM: meson: enable MESON_IRQ_GPIO in Kconfig for meson8b
+
+Martin Blumenstingl (3):
+      ARM: smp_scu: add a helper for powering on a specific CPU
+      ARM: smp_scu: allow the platform code to read the SCU CPU status
+      ARM: meson: Add SMP bringup code for Meson8 and Meson8b
+
+ Documentation/devicetree/bindings/arm/amlogic/pmu.txt      |  18 ++++
+ Documentation/devicetree/bindings/arm/amlogic/smp-sram.txt |  32 +++++++
+ Documentation/devicetree/bindings/arm/cpus.txt             |   2 +
+ arch/arm/Makefile                                          |   1 +
+ arch/arm/include/asm/smp_scu.h                             |  12 +++
+ arch/arm/kernel/smp_scu.c                                  |  43 +++++++--
+ arch/arm/mach-meson/Kconfig                                |   2 +
+ arch/arm/mach-meson/Makefile                               |   1 +
+ arch/arm/mach-meson/platsmp.c                              | 440 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 9 files changed, 545 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/amlogic/pmu.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/amlogic/smp-sram.txt
+ create mode 100644 arch/arm/mach-meson/platsmp.c
