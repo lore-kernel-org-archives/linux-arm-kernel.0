@@ -1,35 +1,26 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Sun, 29 Oct 2017 16:12:04 +0100
-Subject: [PATCH v2 0/9] r8a7745/iwg22d DT rework + serial + HS-USB + IIC
-In-Reply-To: <1508778570-28795-1-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1508778570-28795-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <20171029151204.n2dem6j7t6o6ayhf@verge.net.au>
+Date: Sun, 29 Oct 2017 16:24:45 +0100
+Subject: [PATCH 00/11] arm64: dts: renesas: Use R-Car SDHI Gen[123]
+ fallback compat strings
+In-Reply-To: <20171020091747.iep6diy3ymp47qip@verge.net.au>
+References: <20171017060959.16702-1-horms+renesas@verge.net.au>
+ <20171020091747.iep6diy3ymp47qip@verge.net.au>
+Message-ID: <20171029152444.32xci4jtwlqsqpck@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 23, 2017 at 06:09:21PM +0100, Fabrizio Castro wrote:
-> This series brings under the same roof a few patches that needed a v2
-> and that are related to either r8a7745 or iwg22d, with the goal of making
-> the merge process as smooth as possible.
+On Fri, Oct 20, 2017 at 11:17:47AM +0200, Simon Horman wrote:
+> On Tue, Oct 17, 2017 at 08:09:48AM +0200, Simon Horman wrote:
+> > Use recently posted R-Car SDHI Gen 1, 2 and 3 fallback compat strings
+> > in the DT of Renesas ARM and arm64 based SoCs.
+> > 
+> > Based on renesas-devel-20171016-v4.14-rc5
+> > 
+> > Has a binding documentation but no run-time dependency on
+> > "[PATCH v3 0/3] mmc: renesas_sdhi: add R-Car Gen[123] fallback
+> > compatibility strings"
 > 
-> Patches [1-4] define a new DT architecture for the iW-RainboW-G22D SODIMM
-> Development Platform to include the configuration with the HDMI daughter
-> board and to define the serial interfaces.
-> 
-> Patches [5-8] add USB function support to the r8a7745 SoC and to the
-> iwg22d board. The patches providing the definition of compatible strings:
-> * "renesas,r8a7745-usb-dmac", and
-> * "renesas,usbhs-r8a7745"
-> (on which these USB patches depend on) have been accepted by the
-> respective maintainers already, but it will take a little bit for the
-> definitions to appear on a renesas-devel tag. For reference:
-> https://patchwork.kernel.org/patch/9990063/
-> https://patchwork.kernel.org/patch/9987411/
-> https://patchwork.kernel.org/patch/9990113/
-> 
-> Patch 9 adds IIC cores to the r8a7745 SoC.
-> 
-> The patches of this series apply smoothly on top of tag:
-> "renesas-devel-20171018-v4.14-rc5".
+> I have marked these as deferred pending acceptance of the above dependency.
 
-Thanks, applied.
+The dependency has subsequently been accepted and I have applied this
+series.
