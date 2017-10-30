@@ -1,74 +1,54 @@
-From: oleksandrs@mellanox.com (Oleksandr Shamray)
-Date: Mon, 30 Oct 2017 14:12:07 +0200
-Subject: [patch v10 3/4] Documentation: jtag: Add bindings for Aspeed SoC 24xx
- and 25xx families JTAG master driver
-In-Reply-To: <1509365528-28803-1-git-send-email-oleksandrs@mellanox.com>
-References: <1509365528-28803-1-git-send-email-oleksandrs@mellanox.com>
-Message-ID: <1509365528-28803-4-git-send-email-oleksandrs@mellanox.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 30 Oct 2017 12:14:02 +0000
+Subject: [PATCH v2] iommu/arm-smmu-v3: Warn about missing IRQs
+Message-ID: <3bb431bfe78553db82a0e267263ac58781a2dd25.1509364684.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It has been tested on Mellanox system with BMC equipped with
-Aspeed 2520 SoC for programming CPLD devices.
+It is annoyingly non-obvious when DMA transactions silently go missing
+due to undetected SMMU faults. Help skip the first few debugging steps
+in those situations by making it clear when we have neither wired IRQs
+nor MSIs with which to raise error conditions.
 
-Signed-off-by: Oleksandr Shamray <oleksandrs@mellanox.com>
-Signed-off-by: Jiri Pirko <jiri@mellanox.com>
-Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
-v9->v10
-v8->v9
-v7->v8
-Comments pointed by pointed by Joel Stanley <joel.stan@gmail.com>
-- Change compatible string to ast2400 and ast2000
 
-V6->v7
-Comments pointed by Tobias Klauser <tklauser@distanz.ch>
- - Fix spell "Doccumentation" -> "Documentation"
+v2: Cover PRI for completeness, even if the "broken" vs. "does nothing"
+    distinction doesn't matter much at the moment.
 
-v5->v6
-Comments pointed by Tobias Klauser <tklauser@distanz.ch>
-- Small nit: s/documentation/Documentation/
+ drivers/iommu/arm-smmu-v3.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-v4->v5
-
-V3->v4
-Comments pointed by Rob Herring <robh@kernel.org>
-- delete unnecessary "status" and "reg-shift" descriptions in
-  bndings file
-
-v2->v3
-Comments pointed by Rob Herring <robh@kernel.org>
-- split Aspeed jtag driver and binding to sepatrate patches
-- delete unnecessary "status" and "reg-shift" descriptions in
-  bndings file
----
- .../devicetree/bindings/jtag/aspeed-jtag.txt       |   18 ++++++++++++++++++
- 1 files changed, 18 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/jtag/aspeed-jtag.txt
-
-diff --git a/Documentation/devicetree/bindings/jtag/aspeed-jtag.txt b/Documentation/devicetree/bindings/jtag/aspeed-jtag.txt
-new file mode 100644
-index 0000000..8cfc610
---- /dev/null
-+++ b/Documentation/devicetree/bindings/jtag/aspeed-jtag.txt
-@@ -0,0 +1,18 @@
-+Aspeed JTAG driver for ast2400 and ast2500 SoC
-+
-+Required properties:
-+- compatible:		Should be one of
-+      - "aspeed,ast2400-jtag"
-+      - "aspeed,ast2500-jtag"
-+- reg			contains the offset and length of the JTAG memory
-+			region
-+- clocks		root clock of bus, should reference the APB clock
-+- interrupts		should contain JTAG controller interrupt
-+
-+Example:
-+jtag: jtag at 1e6e4000 {
-+	compatible = "aspeed,ast2500-jtag";
-+	reg = <0x1e6e4000 0x1c>;
-+	clocks = <&clk_apb>;
-+	interrupts = <43>;
-+};
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index e67ba6c40faf..343025a39478 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -2263,6 +2263,8 @@ static void arm_smmu_setup_unique_irqs(struct arm_smmu_device *smmu)
+ 						"arm-smmu-v3-evtq", smmu);
+ 		if (ret < 0)
+ 			dev_warn(smmu->dev, "failed to enable evtq irq\n");
++	} else {
++		dev_warn(smmu->dev, "no evtq irq - events will not be reported!\n");
+ 	}
+ 
+ 	irq = smmu->cmdq.q.irq;
+@@ -2280,6 +2282,8 @@ static void arm_smmu_setup_unique_irqs(struct arm_smmu_device *smmu)
+ 				       0, "arm-smmu-v3-gerror", smmu);
+ 		if (ret < 0)
+ 			dev_warn(smmu->dev, "failed to enable gerror irq\n");
++	} else {
++		dev_warn(smmu->dev, "no gerr irq - errors will not be reported!\n");
+ 	}
+ 
+ 	if (smmu->features & ARM_SMMU_FEAT_PRI) {
+@@ -2293,6 +2297,8 @@ static void arm_smmu_setup_unique_irqs(struct arm_smmu_device *smmu)
+ 			if (ret < 0)
+ 				dev_warn(smmu->dev,
+ 					 "failed to enable priq irq\n");
++		} else {
++			dev_warn(smmu->dev, "no priq irq - PRI will be broken\n");
+ 		}
+ 	}
+ }
 -- 
-1.7.1
+2.13.4.dirty
