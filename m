@@ -1,30 +1,65 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 30 Oct 2017 16:40:07 +0100
-Subject: [RESEND PATCH v2 1/2] soc: amlogic: add Meson GX VPU Domains
- driver
-In-Reply-To: <1509208583-30349-2-git-send-email-narmstrong@baylibre.com>
-References: <1509208583-30349-1-git-send-email-narmstrong@baylibre.com>
- <1509208583-30349-2-git-send-email-narmstrong@baylibre.com>
-Message-ID: <CAPDyKFpCf50XRowGe3X5KpmhKrb99NTxOUQtz4RN4aemAVAJCA@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 31 Oct 2017 00:41:57 +0900
+Subject: [PATCH 1/3] arm/kbuild: replace {C, LD}FLAGS_MODULE with KBUILD_{C,
+ LD}FLAGS_MODULE
+In-Reply-To: <1507533107-2069-1-git-send-email-caoj.fnst@cn.fujitsu.com>
+References: <1507533107-2069-1-git-send-email-caoj.fnst@cn.fujitsu.com>
+Message-ID: <CAK7LNARj0Lp-pNdcmfTgadZrO6rzazXmdG2xqeL0Pt1pbRWcWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Neil,
+2017-10-09 16:11 GMT+09:00 Cao jin <caoj.fnst@cn.fujitsu.com>:
+> As kbuild document & commit 6588169d51 says: KBUILD_{C,LD}FLAGS_MODULE are
+> used to add arch-specific options for $(CC) and $(LD). From commandline,
+> {C,LD}FLAGS_MODULE shall be used.
+> Doesn't have any functional change, but just follow kbuild rules.
+>
+> Signed-off-by: Cao jin <caoj.fnst@cn.fujitsu.com>
+> CC: Russell King <linux@armlinux.org.uk>
+> CC: linux-arm-kernel at lists.infradead.org
 
-[...]
+Applied to linux-kbuild.  Thanks!
 
-> +
-> +       pm_genpd_init(&vpu_hdmi_pd.genpd, &simple_qos_governor,
-> +                     meson_gx_pwrc_vpu_get_power(&vpu_hdmi_pd));
-> +
 
-This means that you may initialize the genpd in powered on state.
+> ---
+>  arch/arm/Makefile | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index 47d3a1a..a945b1f 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -16,11 +16,11 @@ LDFLAGS             :=
+>  LDFLAGS_vmlinux        :=-p --no-undefined -X --pic-veneer
+>  ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
+>  LDFLAGS_vmlinux        += --be8
+> -LDFLAGS_MODULE += --be8
+> +KBUILD_LDFLAGS_MODULE  += --be8
+>  endif
+>
+>  ifeq ($(CONFIG_ARM_MODULE_PLTS),y)
+> -LDFLAGS_MODULE += -T $(srctree)/arch/arm/kernel/module.lds
+> +KBUILD_LDFLAGS_MODULE  += -T $(srctree)/arch/arm/kernel/module.lds
+>  endif
+>
+>  GZFLAGS                :=-9
+> @@ -120,7 +120,7 @@ CFLAGS_ISA  :=-mthumb $(AFLAGS_AUTOIT) $(AFLAGS_NOWARN)
+>  AFLAGS_ISA     :=$(CFLAGS_ISA) -Wa$(comma)-mthumb
+>  # Work around buggy relocation from gas if requested:
+>  ifeq ($(CONFIG_THUMB2_AVOID_R_ARM_THM_JUMP11),y)
+> -CFLAGS_MODULE  +=-fno-optimize-sibling-calls
+> +KBUILD_CFLAGS_MODULE   +=-fno-optimize-sibling-calls
+>  endif
+>  else
+>  CFLAGS_ISA     :=$(call cc-option,-marm,)
+> --
+> 2.1.0
+>
+>
+>
 
-For that scenario, I think you will hit a clock unprepare/disable
-in-balance issue when genpd calls your ->power_off() callback, simply
-because you didn't call clk_prepare_enable() for the clocks first.
 
-[...]
 
-Kind regards
-Uffe
+-- 
+Best Regards
+Masahiro Yamada
