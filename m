@@ -1,45 +1,23 @@
-From: wenyou.yang@microchip.com (Wenyou Yang)
-Date: Mon, 30 Oct 2017 09:44:32 +0800
-Subject: [PATCH v3 3/3] MAINTAINERS: Add a new entry of the ov7740 driver
-In-Reply-To: <20171030014432.24025-1-wenyou.yang@microchip.com>
-References: <20171030014432.24025-1-wenyou.yang@microchip.com>
-Message-ID: <20171030014432.24025-4-wenyou.yang@microchip.com>
+From: jeffy.chen@rock-chips.com (jeffy)
+Date: Mon, 30 Oct 2017 10:15:28 +0800
+Subject: [RFC PATCH v10 0/7] PCI: rockchip: Move PCIe WAKE# handling into
+ pci core
+In-Reply-To: <1872710.P2f02irZl9@aspire.rjw.lan>
+References: <20171027072612.26565-1-jeffy.chen@rock-chips.com>
+ <1872710.P2f02irZl9@aspire.rjw.lan>
+Message-ID: <59F68B40.8050506@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new entry of the ov7740 sensor driver to the MAINTAINERS file.
+Hi Rafael,
 
-Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
----
+thanks for your reply.
 
-Changes in v3:
- - Put the MAINTAINERS change to a separate patch.
+On 10/28/2017 05:07 PM, Rafael J. Wysocki wrote:
+> Overall, I don't quite like the direction this is going into, but I need to
+> have a deeper look.  Which may take some time, so please bear with me.
+>
+ok, i'll wait for your comments, thanks :)
 
-Changes in v2:
- - Split off the bindings into a separate patch.
- - Add a new entry to the MAINTAINERS file.
-
- MAINTAINERS | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index adbf69306e9e..42b93599a0af 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -9973,6 +9973,14 @@ S:	Maintained
- F:	drivers/media/i2c/ov7670.c
- F:	Documentation/devicetree/bindings/media/i2c/ov7670.txt
- 
-+OMNIVISION OV7740 SENSOR DRIVER
-+M:	Wenyou Yang <wenyou.yang@microchip.com>
-+L:	linux-media at vger.kernel.org
-+T:	git git://linuxtv.org/media_tree.git
-+S:	Maintained
-+F:	drivers/media/i2c/ov7740.c
-+F:	Documentation/devicetree/bindings/media/i2c/ov7740.txt
-+
- ONENAND FLASH DRIVER
- M:	Kyungmin Park <kyungmin.park@samsung.com>
- L:	linux-mtd at lists.infradead.org
--- 
-2.13.0
+> Thanks,
+> Rafael
