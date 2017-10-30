@@ -1,59 +1,46 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 30 Oct 2017 08:33:22 +0100
-Subject: [PATCH v4] KVM: arm/arm64: fix the incompatible matching for
- external abort
-In-Reply-To: <1509343518-27137-1-git-send-email-gengdongjiu@huawei.com>
-References: <1509343518-27137-1-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <20171030073322.GR2166@lvm>
+From: yinbo.zhu@nxp.com (yinbo.zhu at nxp.com)
+Date: Mon, 30 Oct 2017 15:18:58 +0800
+Subject: [PATCH 1/2] mmc: sdhci-of-esdhc: Workaround for reducing the maximum
+ speed on ls1021atwr
+Message-ID: <20171030071858.46132-1-yinbo.zhu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 30, 2017 at 02:05:18PM +0800, Dongjiu Geng wrote:
-> kvm_vcpu_dabt_isextabt() tries to match a full fault syndrome, but
-> calls kvm_vcpu_trap_get_fault_type() that only returns the fault class,
-> thus reducing the scope of the check. This doesn't cause any observable
-> bug yet as we end-up matching a closely related syndrome for which we
-> return the same value.
-> 
-> Using kvm_vcpu_trap_get_fault() instead fixes it for good.
-> 
-> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+From: "yinbo.zhu" <yinbo.zhu@nxp.com>
 
-Applied, thanks.
--Christoffer
+In SDHC high speed AC timing, the tshivkh parameter
+is defined as input setup times:SDHC_CMD, SDHC_DATx,
+to SDHC_CLK. The value of the tshivkh should be 2.5 ns
+considering the round trip delay, board/data skew.
+However, because of this erratum, it needs
+at least 4.1 ns.
 
-> ---
->  arch/arm/include/asm/kvm_emulate.h   | 2 +-
->  arch/arm64/include/asm/kvm_emulate.h | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-> index 98089ff..7571b4e 100644
-> --- a/arch/arm/include/asm/kvm_emulate.h
-> +++ b/arch/arm/include/asm/kvm_emulate.h
-> @@ -203,7 +203,7 @@ static inline u8 kvm_vcpu_trap_get_fault_type(struct kvm_vcpu *vcpu)
->  
->  static inline bool kvm_vcpu_dabt_isextabt(struct kvm_vcpu *vcpu)
->  {
-> -	switch (kvm_vcpu_trap_get_fault_type(vcpu)) {
-> +	switch (kvm_vcpu_trap_get_fault(vcpu)) {
->  	case FSC_SEA:
->  	case FSC_SEA_TTW0:
->  	case FSC_SEA_TTW1:
-> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-> index e5df3fc..8c918c5 100644
-> --- a/arch/arm64/include/asm/kvm_emulate.h
-> +++ b/arch/arm64/include/asm/kvm_emulate.h
-> @@ -237,7 +237,7 @@ static inline u8 kvm_vcpu_trap_get_fault_type(const struct kvm_vcpu *vcpu)
->  
->  static inline bool kvm_vcpu_dabt_isextabt(const struct kvm_vcpu *vcpu)
->  {
-> -	switch (kvm_vcpu_trap_get_fault_type(vcpu)) {
-> +	switch (kvm_vcpu_trap_get_fault(vcpu)) {
->  	case FSC_SEA:
->  	case FSC_SEA_TTW0:
->  	case FSC_SEA_TTW1:
-> -- 
-> 1.9.1
-> 
+eSDHC cannot run at the maximum clock speed for the
+high speed mode, or there is a limit on the length
+of the trace on the board for data, command, and
+clock lines of the SDHC.
+
+Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
+---
+ drivers/mmc/host/sdhci-of-esdhc.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
+index d96a057a7db8..aa360ff1fc35 100644
+--- a/drivers/mmc/host/sdhci-of-esdhc.c
++++ b/drivers/mmc/host/sdhci-of-esdhc.c
+@@ -498,6 +498,12 @@ static void esdhc_of_set_clock(struct sdhci_host *host, unsigned int clock)
+ 			clock -= 5000000;
+ 	}
+ 
++	/* Workaround to reduce the clock frequency for ls1021a esdhc */
++	if (of_find_compatible_node(NULL, NULL, "fsl,ls1021a")) {
++		if (clock == 50000000)
++			clock = 46500000;
++	}
++
+ 	temp = sdhci_readl(host, ESDHC_SYSTEM_CONTROL);
+ 	temp &= ~(ESDHC_CLOCK_SDCLKEN | ESDHC_CLOCK_IPGEN | ESDHC_CLOCK_HCKEN |
+ 		  ESDHC_CLOCK_PEREN | ESDHC_CLOCK_MASK);
+-- 
+2.14.1
