@@ -1,45 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 Oct 2017 16:09:43 +0100
-Subject: [PATCH] ARM: add a private asm/unaligned.h
-In-Reply-To: <20171027152743.GJ20805@n2100.armlinux.org.uk>
-References: <20171020200231.1355569-1-arnd@arndb.de>
- <87wp3g39es.fsf@free-electrons.com>
- <20171027152743.GJ20805@n2100.armlinux.org.uk>
-Message-ID: <CAK8P3a0_-YOvPUqZTb+LoU+wCBhy=zCxmk4HProPJY+udbri9Q@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 30 Oct 2017 23:15:55 +0800
+Subject: [PATCH v5 1/3] dt-bindings: hisilicon: add doc for Hi3798CV200
+ peripheral controller
+In-Reply-To: <1509376557-7187-1-git-send-email-shawnguo@kernel.org>
+References: <1509376557-7187-1-git-send-email-shawnguo@kernel.org>
+Message-ID: <1509376557-7187-2-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 27, 2017 at 5:27 PM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
+From: Shawn Guo <shawn.guo@linaro.org>
 
->
-> There's three things wrong, all of which I have patches to address:
->
-> 1. The decompressor code reading the image data sometimes issues unaligned
->    reads.  Some compilers get this wrong and cause an abort.  Arnds patch
->    addresses this.
->
-> 2. Additional sections can appear in the zImage binary which adds extra
->    bytes on the end of the image.  Concatenating the zImage with the
->    extra bytes onto a DTB is the same thing as doing this:
->
->         cat zImage extrabytes foo.dtb > image
->
->    and the decompressor tolerates no additional bytes between the
->    _official_ end of the zImage and the DTB.  I've added a patch which
->    detects this situation and fails the kernel build when it happens.
->
-> 3. Ard's patch "efi/libstub: arm: omit sorting of the UEFI memory map"
->    gets rid of the additional sections that (a) change the alignment
->    of the compressed data, and (b) add additional unexpected bytes on
->    the end of zImage.
+It adds bindings doc for Hi3798CV200 peripheral controller.
 
-It's possible that we still need yet another patch to address the gcc bug that
-Alex Graf found, i.e. https://gcc.gnu.org/bugzilla/show_bug.cgi?id=82445
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ .../bindings/arm/hisilicon/hisilicon.txt           | 23 ++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-Without the latest gcc, we might still get into a situation in which we get
-an unaligned strd when compiling for armv5te or armv6 with gcc-7.[012].
-As someone mentioned in the bug report, that problem doesn't seem
-to happen with gcc-6 or -mtune=xscale, or with gcc-7 -march=armv7-a.
-
-       Arnd
+diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+index 7111fbc82a4e..199cd36fe1ba 100644
+--- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
++++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+@@ -75,6 +75,29 @@ Example:
+ 	};
+ 
+ -----------------------------------------------------------------------
++Hisilicon Hi3798CV200 Peripheral Controller
++
++The Hi3798CV200 Peripheral Controller controls peripherals, queries
++their status, and configures some functions of peripherals.
++
++Required properties:
++- compatible: Should contain "hisilicon,hi3798cv200-perictrl", "syscon"
++  and "simple-mfd".
++- reg: Register address and size of Peripheral Controller.
++- #address-cells: Should be 1.
++- #size-cells: Should be 1.
++
++Examples:
++
++	perictrl: peripheral-controller at 8a20000 {
++		compatible = "hisilicon,hi3798cv200-perictrl", "syscon",
++			     "simple-mfd";
++		reg = <0x8a20000 0x1000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++	};
++
++-----------------------------------------------------------------------
+ Hisilicon Hi6220 system controller
+ 
+ Required properties:
+-- 
+1.9.1
