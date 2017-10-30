@@ -1,35 +1,68 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Oct 2017 17:13:53 +0000
-Subject: [PATCH] ARM: add a private asm/unaligned.h
-In-Reply-To: <CAK8P3a37pQZPzLbh_qCtDqz0=Ends+nnV3-Y1KJKZVxiRErFfQ@mail.gmail.com>
-References: <20171020200231.1355569-1-arnd@arndb.de>
- <87wp3g39es.fsf@free-electrons.com>
- <20171027152743.GJ20805@n2100.armlinux.org.uk>
- <CAK8P3a0_-YOvPUqZTb+LoU+wCBhy=zCxmk4HProPJY+udbri9Q@mail.gmail.com>
- <20171030155029.GP20805@n2100.armlinux.org.uk>
- <CAK8P3a37pQZPzLbh_qCtDqz0=Ends+nnV3-Y1KJKZVxiRErFfQ@mail.gmail.com>
-Message-ID: <20171030171353.GD27404@n2100.armlinux.org.uk>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Mon, 30 Oct 2017 18:15:32 +0100
+Subject: [PATCH] crypto: AF_ALG - remove locking in async callback
+In-Reply-To: <5260911.ZuXsrgFD2R@positron.chronox.de>
+References: <CAGkQfmNKbSwue13zPh2K1F_kLkpm1_AhsAHK4spRFA0xMvU5PA@mail.gmail.com>
+ <5260911.ZuXsrgFD2R@positron.chronox.de>
+Message-ID: <CAGkQfmO+c6m-1v9ztV-G68JXSupD+pMv0czpoieg0a5PyLQ_dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 30, 2017 at 06:01:44PM +0100, Arnd Bergmann wrote:
-> Right, either fail the build or use the workaround from the gcc bugzilla,
-> passing -fno-store-merging to the broken compilers avoids the problem
-> reliably at the cost of slightly worse code. For the decompressor, we might
-> also get away with passing -march=armv5t (not armv5te), which has
-> experimentally been found to avoid the problem and produce better code
-> than "-march=armv6 -fno-store-merging" as it avoids the strd instruction
-> but not other store merging.
+2017-10-29 21:39 GMT+01:00 Stephan M?ller <smueller@chronox.de>:
+> Am Mittwoch, 25. Oktober 2017, 17:26:31 CET schrieb Romain Izard:
+>
+> Hi Romain,
+>
+> the patch below should cover the issue you see. Would you mind testing it?
+>
+> Thanks
+> Stephan
+>
+> ---8<---
+>
+> The code paths protected by the socket-lock do not use or modify the
+> socket in a non-atomic fashion. The actions pertaining the socket do not
+> even need to be handled as an atomic operation. Thus, the socket-lock
+> can be safely ignored.
+>
+> This fixes a bug regarding scheduling in atomic as the callback function
+> may be invoked in interrupt context.
+>
+> Fixes: 2d97591ef43d0 ("crypto: af_alg - consolidation of duplicate code")
+> Reported-by: Romain Izard <romain.izard.pro@gmail.com>
+> Signed-off-by: Stephan Mueller <smueller@chronox.de>
 
-Depends how important the compilers are...
+Tested-by: Romain Izard <romain.izard.pro@gmail.com>
 
-We currently refuse to build using these compilers:
+The issue observed with atmel-aes is not reproduced anymore.
 
-gcc = 3.x where x < 3
-gcc = 4.x where x < 3 if unwinding is enabled
-gcc = 4.8.x where x < 3
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync@8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+> ---
+>  crypto/af_alg.c | 4 ----
+>  1 file changed, 4 deletions(-)
+>
+> diff --git a/crypto/af_alg.c b/crypto/af_alg.c
+> index 337cf382718e..a41f08642eee 100644
+> --- a/crypto/af_alg.c
+> +++ b/crypto/af_alg.c
+> @@ -1063,8 +1063,6 @@ void af_alg_async_cb(struct crypto_async_request *_req, int err)
+>         struct kiocb *iocb = areq->iocb;
+>         unsigned int resultlen;
+>
+> -       lock_sock(sk);
+> -
+>         /* Buffer size written by crypto operation. */
+>         resultlen = areq->outlen;
+>
+> @@ -1073,8 +1071,6 @@ void af_alg_async_cb(struct crypto_async_request *_req, int err)
+>         __sock_put(sk);
+>
+>         iocb->ki_complete(iocb, err ? err : resultlen, 0);
+> -
+> -       release_sock(sk);
+>  }
+>  EXPORT_SYMBOL_GPL(af_alg_async_cb);
+>
+> --
+> 2.13.6
+>
+>
