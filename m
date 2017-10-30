@@ -1,24 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 Oct 2017 14:40:00 +0100
-Subject: [GIT PULL 3/4] Freescale arm64 device tree updates for 4.15
-In-Reply-To: <1508847645-9191-3-git-send-email-shawnguo@kernel.org>
-References: <1508847645-9191-1-git-send-email-shawnguo@kernel.org>
- <1508847645-9191-3-git-send-email-shawnguo@kernel.org>
-Message-ID: <CAK8P3a2FPBo_BWi6X4oNJ3L2umfRTKMuak=0=T2yq5MeKNasxw@mail.gmail.com>
+Date: Mon, 30 Oct 2017 14:41:11 +0100
+Subject: [GIT PULL] Amlogic 64-bit DT updates for v4.15, round 2
+In-Reply-To: <7hlgjtq4nh.fsf@baylibre.com>
+References: <7hlgjtq4nh.fsf@baylibre.com>
+Message-ID: <CAK8P3a0P5BuwS-EG_q5bRVF45_0PiNxh-f2A+UMYcCL_vxyx9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 24, 2017 at 2:20 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+On Sun, Oct 29, 2017 at 5:50 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+> The following changes since commit 9d59b708500fcb62d28e15b8c6333be620984d8b:
+>
+>   arm64: dts: meson-axg: add initial A113D SoC DT support (2017-10-19 03:17:07 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-2
+>
+> for you to fetch changes up to b94d22d94ad226eeea3b6ec4579fb4bf8a199e5c:
+>
+>   ARM64: dts: meson-gx: add external PHY interrupt on some platforms (2017-10-29 08:44:04 -0700)
+>
 > ----------------------------------------------------------------
-> Freescale arm64 device tree updates for 4.15:
->  - Add GICv3 ITS node and PCIe devcies for LS1088A support.
->  - Enable PCIe support for LS2088A SoC.
->  - Add OP-TEE support for various Layerscape SoCs, LS1012A, LS1043A,
->    LS1046A, LS1088A and LS208XA.
->  - Update DPAA QBMan nodes to use constant defines in the interrupt
->    description.
->  - Add DSPI device to support SPI-NOR on LS1012A based boards.
+> Amlogic 64-bit DT updates for v4.15, round 2
+> - add support for new GPIO IRQ driver
 
 Pulled into next/dt, thanks!
 
-       Arnd
+    Arnd
