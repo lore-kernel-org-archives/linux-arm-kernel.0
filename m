@@ -1,59 +1,163 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 30 Oct 2017 07:48:16 +0100
-Subject: [PATCH v4 23/26] KVM: arm/arm64: GICv4: Prevent a VM using GICv4
- from being saved
-In-Reply-To: <86inf0ae4l.fsf@arm.com>
-References: <20171006153401.5481-1-marc.zyngier@arm.com>
- <20171006153401.5481-24-marc.zyngier@arm.com>
- <20171026152828.GD2166@lvm> <86inf0ae4l.fsf@arm.com>
-Message-ID: <20171030064816.GO2166@lvm>
+From: joel@jms.id.au (Joel Stanley)
+Date: Mon, 30 Oct 2017 16:32:50 +1030
+Subject: [PATCH v5 5/5] clk: aspeed: Add reset controller
+In-Reply-To: <20171030060250.701-1-joel@jms.id.au>
+References: <20171030060250.701-1-joel@jms.id.au>
+Message-ID: <20171030060250.701-6-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 27, 2017 at 02:56:10PM +0100, Marc Zyngier wrote:
-> On Thu, Oct 26 2017 at  5:28:28 pm BST, Christoffer Dall <cdall@linaro.org> wrote:
-> > On Fri, Oct 06, 2017 at 04:33:58PM +0100, Marc Zyngier wrote:
-> >> The GICv4 architecture doesn't make it easy for save/restore to
-> >> work, as it doesn't give any guarantee that the pending state
-> >> is written into the pending table.
-> >> 
-> >> So let's not take any chance, and let's return an error if
-> >> we encounter any LPI that has the HW bit set.
-> >> 
-> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >> ---
-> >>  virt/kvm/arm/vgic/vgic-its.c | 9 +++++++++
-> >>  1 file changed, 9 insertions(+)
-> >> 
-> >> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> >> index f434748439ee..01aa4d9d405e 100644
-> >> --- a/virt/kvm/arm/vgic/vgic-its.c
-> >> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> >> @@ -1987,6 +1987,15 @@ static int vgic_its_save_itt(struct vgic_its *its, struct its_device *device)
-> >>  	list_for_each_entry(ite, &device->itt_head, ite_list) {
-> >>  		gpa_t gpa = base + ite->event_id * ite_esz;
-> >>  
-> >> +		/*
-> >> +		 * If an LPI carries the HW bit, this means that this
-> >> +		 * interrupt is controlled by GICv4, and we do not
-> >> +		 * have direct access to that state. Let's simply fail
-> >> +		 * the save operation...
-> >> +		 */
-> >> +		if (ite->irq->hw)
-> >> +			return -EINVAL;
-> >
-> > Will this conflict with other error messages, and will QEMU have a
-> > reasonable way to tell the user what's going on?
-> >
-> > Perhaps we shoul document the return code in the ITS device doc and
-> > choose something unique, like -EBUSY?
-> 
-> Yup. I've now switched to -EACCES, which is probably the least horrible
-> among the error codes we're not using yet. I've also amended the
-> documentation to that effect.
-> 
+There are some resets that are not associated with gates. These are
+represented by a reset controller.
 
-Sounds good.  -EJUSTANUMBER.
+Reviewed-by: Andrew Jeffery <andrew@aj.id.au>
+Signed-off-by: Joel Stanley <joel@jms.id.au>
+---
+v5:
+  - Add Andrew's Reviewed-by
+v3:
+  - Add named initalisers for the reset defines
+  - Add define for ADC
+---
+ drivers/clk/clk-aspeed.c                 | 82 +++++++++++++++++++++++++++++++-
+ include/dt-bindings/clock/aspeed-clock.h | 10 ++++
+ 2 files changed, 91 insertions(+), 1 deletion(-)
 
-Thanks,
--Christoffer
+diff --git a/drivers/clk/clk-aspeed.c b/drivers/clk/clk-aspeed.c
+index df5bc57a6ee2..d91e86c70e0c 100644
+--- a/drivers/clk/clk-aspeed.c
++++ b/drivers/clk/clk-aspeed.c
+@@ -17,6 +17,7 @@
+ #include <linux/of_device.h>
+ #include <linux/platform_device.h>
+ #include <linux/regmap.h>
++#include <linux/reset-controller.h>
+ #include <linux/slab.h>
+ #include <linux/spinlock.h>
+ 
+@@ -275,6 +276,68 @@ static const struct clk_ops aspeed_clk_gate_ops = {
+ 	.is_enabled = aspeed_clk_is_enabled,
+ };
+ 
++/**
++ * struct aspeed_reset - Aspeed reset controller
++ * @map: regmap to access the containing system controller
++ * @rcdev: reset controller device
++ */
++struct aspeed_reset {
++	struct regmap			*map;
++	struct reset_controller_dev	rcdev;
++};
++
++#define to_aspeed_reset(p) container_of((p), struct aspeed_reset, rcdev)
++
++static const u8 aspeed_resets[] = {
++	[ASPEED_RESET_XDMA]	= 25,
++	[ASPEED_RESET_MCTP]	= 24,
++	[ASPEED_RESET_ADC]	= 23,
++	[ASPEED_RESET_JTAG_MASTER] = 22,
++	[ASPEED_RESET_MIC]	= 18,
++	[ASPEED_RESET_PWM]	=  9,
++	[ASPEED_RESET_PCIVGA]	=  8,
++	[ASPEED_RESET_I2C]	=  2,
++	[ASPEED_RESET_AHB]	=  1,
++};
++
++static int aspeed_reset_deassert(struct reset_controller_dev *rcdev,
++				 unsigned long id)
++{
++	struct aspeed_reset *ar = to_aspeed_reset(rcdev);
++	u32 rst = BIT(aspeed_resets[id]);
++
++	return regmap_update_bits(ar->map, ASPEED_RESET_CTRL, rst, 0);
++}
++
++static int aspeed_reset_assert(struct reset_controller_dev *rcdev,
++			       unsigned long id)
++{
++	struct aspeed_reset *ar = to_aspeed_reset(rcdev);
++	u32 rst = BIT(aspeed_resets[id]);
++
++	return regmap_update_bits(ar->map, ASPEED_RESET_CTRL, rst, rst);
++}
++
++static int aspeed_reset_status(struct reset_controller_dev *rcdev,
++			       unsigned long id)
++{
++	struct aspeed_reset *ar = to_aspeed_reset(rcdev);
++	u32 val, rst = BIT(aspeed_resets[id]);
++	int ret;
++
++	ret = regmap_read(ar->map, ASPEED_RESET_CTRL, &val);
++	if (ret)
++		return ret;
++
++	return !!(val & rst);
++}
++
++static const struct reset_control_ops aspeed_reset_ops = {
++	.assert = aspeed_reset_assert,
++	.deassert = aspeed_reset_deassert,
++	.status = aspeed_reset_status,
++};
++
+ static struct clk_hw *aspeed_clk_hw_register_gate(struct device *dev,
+ 		const char *name, const char *parent_name, unsigned long flags,
+ 		struct regmap *map, u8 clock_idx, u8 reset_idx,
+@@ -316,10 +379,11 @@ static int aspeed_clk_probe(struct platform_device *pdev)
+ {
+ 	const struct aspeed_clk_soc_data *soc_data;
+ 	struct device *dev = &pdev->dev;
++	struct aspeed_reset *ar;
+ 	struct regmap *map;
+ 	struct clk_hw *hw;
+ 	u32 val, rate;
+-	int i;
++	int i, ret;
+ 
+ 	map = syscon_node_to_regmap(dev->of_node);
+ 	if (IS_ERR(map)) {
+@@ -327,6 +391,22 @@ static int aspeed_clk_probe(struct platform_device *pdev)
+ 		return PTR_ERR(map);
+ 	}
+ 
++	ar = devm_kzalloc(dev, sizeof(*ar), GFP_KERNEL);
++	if (!ar)
++		return -ENOMEM;
++
++	ar->map = map;
++	ar->rcdev.owner = THIS_MODULE;
++	ar->rcdev.nr_resets = ARRAY_SIZE(aspeed_resets);
++	ar->rcdev.ops = &aspeed_reset_ops;
++	ar->rcdev.of_node = dev->of_node;
++
++	ret = devm_reset_controller_register(dev, &ar->rcdev);
++	if (ret) {
++		dev_err(dev, "could not register reset controller\n");
++		return ret;
++	}
++
+ 	/* SoC generations share common layouts but have different divisors */
+ 	soc_data = of_device_get_match_data(dev);
+ 	if (!soc_data) {
+diff --git a/include/dt-bindings/clock/aspeed-clock.h b/include/dt-bindings/clock/aspeed-clock.h
+index 4a99421d77c8..8e19646d8025 100644
+--- a/include/dt-bindings/clock/aspeed-clock.h
++++ b/include/dt-bindings/clock/aspeed-clock.h
+@@ -39,4 +39,14 @@
+ 
+ #define ASPEED_NUM_CLKS			35
+ 
++#define ASPEED_RESET_XDMA		0
++#define ASPEED_RESET_MCTP		1
++#define ASPEED_RESET_ADC		2
++#define ASPEED_RESET_JTAG_MASTER	3
++#define ASPEED_RESET_MIC		4
++#define ASPEED_RESET_PWM		5
++#define ASPEED_RESET_PCIVGA		6
++#define ASPEED_RESET_I2C		7
++#define ASPEED_RESET_AHB		8
++
+ #endif
+-- 
+2.14.1
