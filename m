@@ -1,21 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 Oct 2017 13:44:45 +0100
-Subject: [GIT PULL] ARM: dts: uniphier: UniPhier DT updates for v4.15
-In-Reply-To: <CAK7LNAS+o7zCL_Yf7YXeqFMs2uNwTQ5O06+mmzeJqwsgzJzXMQ@mail.gmail.com>
-References: <CAK7LNAS+o7zCL_Yf7YXeqFMs2uNwTQ5O06+mmzeJqwsgzJzXMQ@mail.gmail.com>
-Message-ID: <CAK8P3a2jWc2pJT--Y1aksshc55s3GFZE5Lm=4YiS1sHtQYmLrg@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 30 Oct 2017 13:46:47 +0100
+Subject: [GIT PULL] ARM: at91: DT for 4.15
+In-Reply-To: <CAK8P3a0ZGHFmMG5Z9Xaa2WfPMTdgN7yAAj7tGH_f__Q5LAwiWw@mail.gmail.com>
+References: <20171022195820.hxpzeunexwao26l2@piout.net>
+ <CAK8P3a0ZGHFmMG5Z9Xaa2WfPMTdgN7yAAj7tGH_f__Q5LAwiWw@mail.gmail.com>
+Message-ID: <20171030124647.ovlshhuusv6aov4q@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 23, 2017 at 7:36 PM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> UniPhier ARM SoC DT updates for v4.15
->
-> - add thermal monitor and thermal zone nodes
-> - fix W=2 warnings
-> - add GPIO controller nodes and related properties
-> - add resets properties
+On 30/10/2017 at 13:38:04 +0100, Arnd Bergmann wrote:
+> On Sun, Oct 22, 2017 at 9:58 PM, Alexandre Belloni
+> <alexandre.belloni@free-electrons.com> wrote:
+> >
+> > Wenyou Yang (1):
+> >       ARM: dts: at91: sama5d2_xplained: Add charger node
+> >
+> 
+> Can you clarify this patch? It looks like an incompatible binding change.
+> 
 
-Pulled into next/dt, thanks!
+Sort of but not exactly. The DT made it to the mainline but not the
+driver (it was working with a driver in the atmel vendor tree though).
+When the driver was upstreamed, the binding changed and now we simply
+switch to the correct upstream binding.
 
-       Arnd
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
