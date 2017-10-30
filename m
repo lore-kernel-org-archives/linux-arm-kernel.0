@@ -1,46 +1,35 @@
 From: yinbo.zhu@nxp.com (yinbo.zhu at nxp.com)
-Date: Mon, 30 Oct 2017 16:00:20 +0800
-Subject: [PATCH 1/2] mmc: sdhci-of-esdhc: Workaround for reducing the maximum
- speed on ls1021atwr
-Message-ID: <20171030080020.7780-1-yinbo.zhu@nxp.com>
+Date: Mon, 30 Oct 2017 16:08:00 +0800
+Subject: [PATCH] ARM: dts: ls1021a: Enable the esdhc
+Message-ID: <20171030080800.7984-1-yinbo.zhu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "yinbo.zhu" <yinbo.zhu@nxp.com>
 
-In SDHC high speed AC timing, the tshivkh parameter
-is defined as input setup times:SDHC_CMD, SDHC_DATx,
-to SDHC_CLK. The value of the tshivkh should be 2.5 ns
-considering the round trip delay, board/data skew.
-However, because of this erratum, it needs
-at least 4.1 ns.
-
-eSDHC cannot run at the maximum clock speed for the
-high speed mode, or there is a limit on the length
-of the trace on the board for data, command, and
-clock lines of the SDHC.
+Ls1021a esdhc had been enabled in uboot,
+but it had not been enabled it in kernel,
+So set the esdhc's status to "okay".
 
 Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
 ---
- drivers/mmc/host/sdhci-of-esdhc.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/ls1021a-twr.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
-index d96a057a7db8..aa360ff1fc35 100644
---- a/drivers/mmc/host/sdhci-of-esdhc.c
-+++ b/drivers/mmc/host/sdhci-of-esdhc.c
-@@ -498,6 +498,12 @@ static void esdhc_of_set_clock(struct sdhci_host *host, unsigned int clock)
- 			clock -= 5000000;
- 	}
+diff --git a/arch/arm/boot/dts/ls1021a-twr.dts b/arch/arm/boot/dts/ls1021a-twr.dts
+index a8b148ad1dd2..f7946f40d35d 100644
+--- a/arch/arm/boot/dts/ls1021a-twr.dts
++++ b/arch/arm/boot/dts/ls1021a-twr.dts
+@@ -228,6 +228,10 @@
+ 	};
+ };
  
-+	/* Workaround to reduce the clock frequency for ls1021a esdhc */
-+	if (of_find_compatible_node(NULL, NULL, "fsl,ls1021a")) {
-+		if (clock == 50000000)
-+			clock = 46500000;
-+	}
++&esdhc {
++        status = "okay";
++};
 +
- 	temp = sdhci_readl(host, ESDHC_SYSTEM_CONTROL);
- 	temp &= ~(ESDHC_CLOCK_SDCLKEN | ESDHC_CLOCK_IPGEN | ESDHC_CLOCK_HCKEN |
- 		  ESDHC_CLOCK_PEREN | ESDHC_CLOCK_MASK);
+ &sai1 {
+ 	status = "okay";
+ };
 -- 
 2.14.1
