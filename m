@@ -1,25 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 Oct 2017 10:40:39 +0100
-Subject: [GIT PULL] ARM: mvebu: arm64 for v4.15 (#1)
-In-Reply-To: <87efpx6eoq.fsf@free-electrons.com>
-References: <87efpx6eoq.fsf@free-electrons.com>
-Message-ID: <CAK8P3a2LkRXP1SM4GVM+-qB4SbY08WjdBbRtPe6MrX9RyRmLjw@mail.gmail.com>
+From: amit.kucheria@verdurent.com (Amit Kucheria)
+Date: Mon, 30 Oct 2017 15:16:33 +0530
+Subject: [PATCH 0/3] arm64: defconfig: remove some Qualcomm USB options
+In-Reply-To: <20171025215334.19004-1-elder@linaro.org>
+References: <20171025215334.19004-1-elder@linaro.org>
+Message-ID: <CAHLCerNhFafnBHXOvfjc-EAds+WCx=Eom9fx2GqMhM+X3R+v9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 20, 2017 at 5:07 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> Hi,
+On Thu, Oct 26, 2017 at 3:23 AM, Alex Elder <elder@linaro.org> wrote:
+> This series deletes three config options related to USB on Qualcomm
+> SoCs from the arm64 "defconfig".  The code enabled by the options is
+> no longer needed by any Qualcomm hardware.
 >
-> Here is the first pull request for arm64 for mvebu for v4.15.
->
-> ----------------------------------------------------------------
-> mvebu arm64 for 4.15 (part 1)
->
-> For Armada 7K/8K, enable NAND, RTC, comphy and 10G PHY in the
-> defconfig
->
+>                                         -Alex
 
-Pulled into next/soc, thanks!
 
-     Arnd
+Shouldn't we remove the driver code too in the case that no HW actually uses it?
+
+> Alex Elder (3):
+>   arm64: defconfig: remove CONFIG_USB_EHCI_MSM
+>   arm64: defconfig: remove CONFIG_USB_MSM_OTG
+>   arm64: defconfig: remove CONFIG_USB_QCOM_8X16_PHY
+>
+>  arch/arm64/configs/defconfig | 3 ---
+>  1 file changed, 3 deletions(-)
