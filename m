@@ -1,30 +1,52 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 30 Oct 2017 13:46:47 +0100
-Subject: [GIT PULL] ARM: at91: DT for 4.15
-In-Reply-To: <CAK8P3a0ZGHFmMG5Z9Xaa2WfPMTdgN7yAAj7tGH_f__Q5LAwiWw@mail.gmail.com>
-References: <20171022195820.hxpzeunexwao26l2@piout.net>
- <CAK8P3a0ZGHFmMG5Z9Xaa2WfPMTdgN7yAAj7tGH_f__Q5LAwiWw@mail.gmail.com>
-Message-ID: <20171030124647.ovlshhuusv6aov4q@piout.net>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 30 Oct 2017 14:03:06 +0100
+Subject: [PATCH] tty: amba-pl011: Report AUTOCTS capability to framework
+Message-ID: <1509368586-26662-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/10/2017 at 13:38:04 +0100, Arnd Bergmann wrote:
-> On Sun, Oct 22, 2017 at 9:58 PM, Alexandre Belloni
-> <alexandre.belloni@free-electrons.com> wrote:
-> >
-> > Wenyou Yang (1):
-> >       ARM: dts: at91: sama5d2_xplained: Add charger node
-> >
-> 
-> Can you clarify this patch? It looks like an incompatible binding change.
-> 
+From: Phil Elwell <phil@raspberrypi.org>
 
-Sort of but not exactly. The DT made it to the mainline but not the
-driver (it was working with a driver in the atmel vendor tree though).
-When the driver was upstreamed, the binding changed and now we simply
-switch to the correct upstream binding.
+The PL011 has full hardware RTS/CTS support which is enabled by
+the driver when flow control is requested. However, it doesn't
+notify the UART framework of the fact, causing the software CTS
+support to be enabled at the same time.
 
+Software CTS triggers the sending of another batch of characters
+when CTS becomes asserted. The pl011 interrupt handler processes
+the CTIS bit before TXIS, which can cause some characters to be
+sent between the time that the TXIS bit first becomes asserted
+and the time it is handled by a call to px011_tx_chars. This
+would be fine were it not for the optimisation in pl011_tx_char
+that assumes the FIFO is half-empty if called from the interrupt
+handler and skips the checking of the FIFO status register before
+sending each character, leading to data loss if the FIFO is more
+than half-full.
+
+Prevent the data loss and improve efficiency by indicating the
+AUTOCTS support.
+
+Signed-off-by: Phil Elwell <phil@raspberrypi.org>
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ drivers/tty/serial/amba-pl011.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 111e6a9..00019b8 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -2029,9 +2029,11 @@ pl011_set_termios(struct uart_port *port, struct ktermios *termios,
+ 
+ 		old_cr |= UART011_CR_CTSEN;
+ 		uap->autorts = true;
++		port->status |= UPSTAT_AUTOCTS;
+ 	} else {
+ 		old_cr &= ~(UART011_CR_CTSEN | UART011_CR_RTSEN);
+ 		uap->autorts = false;
++		port->status &= ~UPSTAT_AUTOCTS;
+ 	}
+ 
+ 	if (uap->vendor->oversampling) {
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.7.4
