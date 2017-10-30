@@ -1,44 +1,105 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 30 Oct 2017 03:56:01 +0100
-Subject: [PULL 6/8] KVM: arm/arm64: vgic-its: Fix
- vgic_its_restore_collection_table returned value
+Date: Mon, 30 Oct 2017 03:55:58 +0100
+Subject: [PULL 3/8] arm/arm64: kvm: Move initialization completion message
 In-Reply-To: <20171030025603.23550-1-christoffer.dall@linaro.org>
 References: <20171030025603.23550-1-christoffer.dall@linaro.org>
-Message-ID: <20171030025603.23550-7-christoffer.dall@linaro.org>
+Message-ID: <20171030025603.23550-4-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Auger <eric.auger@redhat.com>
+From: Julien Thierry <julien.thierry@arm.com>
 
-vgic_its_restore_cte returns +1 if the collection table entry
-is valid and properly decoded. As a consequence, if the
-collection table is fully filled with valid data that are
-decoded without error, vgic_its_restore_collection_table()
-returns +1. This is wrong.
+KVM is being a bit too optimistic, Hyp mode is said to be initialized
+when Hyp segments have only been mapped.
 
-Let's return 0 in that case.
+Notify KVM's successful initialization only once it is really fully
+initialized.
 
-Fixes: ea1ad53e1e31a3 (KVM: arm64: vgic-its: Collection table save/restore)
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic-its.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ virt/kvm/arm/arm.c | 31 ++++++++++++++-----------------
+ 1 file changed, 14 insertions(+), 17 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 76685f4c6261..6a715a6ec64e 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -2264,6 +2264,10 @@ static int vgic_its_restore_collection_table(struct vgic_its *its)
- 		gpa += cte_esz;
- 		read += cte_esz;
- 	}
-+
-+	if (ret > 0)
-+		return 0;
-+
- 	return ret;
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index b9f68e4add71..95cba0799828 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -1326,21 +1326,12 @@ static void teardown_hyp_mode(void)
+ {
+ 	int cpu;
+ 
+-	if (is_kernel_in_hyp_mode())
+-		return;
+-
+ 	free_hyp_pgds();
+ 	for_each_possible_cpu(cpu)
+ 		free_page(per_cpu(kvm_arm_hyp_stack_page, cpu));
+ 	hyp_cpu_pm_exit();
  }
  
+-static int init_vhe_mode(void)
+-{
+-	kvm_info("VHE mode initialized successfully\n");
+-	return 0;
+-}
+-
+ /**
+  * Inits Hyp-mode on all online CPUs
+  */
+@@ -1421,8 +1412,6 @@ static int init_hyp_mode(void)
+ 		}
+ 	}
+ 
+-	kvm_info("Hyp mode initialized successfully\n");
+-
+ 	return 0;
+ 
+ out_err:
+@@ -1456,6 +1445,7 @@ int kvm_arch_init(void *opaque)
+ {
+ 	int err;
+ 	int ret, cpu;
++	bool in_hyp_mode;
+ 
+ 	if (!is_hyp_mode_available()) {
+ 		kvm_err("HYP mode not available\n");
+@@ -1474,21 +1464,28 @@ int kvm_arch_init(void *opaque)
+ 	if (err)
+ 		return err;
+ 
+-	if (is_kernel_in_hyp_mode())
+-		err = init_vhe_mode();
+-	else
++	in_hyp_mode = is_kernel_in_hyp_mode();
++
++	if (!in_hyp_mode) {
+ 		err = init_hyp_mode();
+-	if (err)
+-		goto out_err;
++		if (err)
++			goto out_err;
++	}
+ 
+ 	err = init_subsystems();
+ 	if (err)
+ 		goto out_hyp;
+ 
++	if (in_hyp_mode)
++		kvm_info("VHE mode initialized successfully\n");
++	else
++		kvm_info("Hyp mode initialized successfully\n");
++
+ 	return 0;
+ 
+ out_hyp:
+-	teardown_hyp_mode();
++	if (!in_hyp_mode)
++		teardown_hyp_mode();
+ out_err:
+ 	teardown_common_resources();
+ 	return err;
 -- 
 2.14.2
