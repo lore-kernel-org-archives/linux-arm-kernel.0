@@ -1,105 +1,102 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 30 Oct 2017 03:55:58 +0100
-Subject: [PULL 3/8] arm/arm64: kvm: Move initialization completion message
+Date: Mon, 30 Oct 2017 03:55:57 +0100
+Subject: [PULL 2/8] arm/arm64: KVM: set right LR register value for 32 bit
+ guest when inject abort
 In-Reply-To: <20171030025603.23550-1-christoffer.dall@linaro.org>
 References: <20171030025603.23550-1-christoffer.dall@linaro.org>
-Message-ID: <20171030025603.23550-4-christoffer.dall@linaro.org>
+Message-ID: <20171030025603.23550-3-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julien Thierry <julien.thierry@arm.com>
+From: Dongjiu Geng <gengdongjiu@huawei.com>
 
-KVM is being a bit too optimistic, Hyp mode is said to be initialized
-when Hyp segments have only been mapped.
+When a exception is trapped to EL2, hardware uses  ELR_ELx to hold
+the current fault instruction address. If KVM wants to inject a
+abort to 32 bit guest, it needs to set the LR register for the
+guest to emulate this abort happened in the guest. Because ARM32
+architecture is pipelined execution, so the LR value has an offset to
+the fault instruction address.
 
-Notify KVM's successful initialization only once it is really fully
-initialized.
+The offsets applied to Link value for exceptions as shown below,
+which should be added for the ARM32 link register(LR).
 
-Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Table taken from ARMv8 ARM DDI0487B-B, table G1-10:
+Exception			Offset, for PE state of:
+				A32 	  T32
+Undefined Instruction 		+4 	  +2
+Prefetch Abort 			+4 	  +4
+Data Abort 			+8 	  +8
+IRQ or FIQ 			+4 	  +4
+
+  [ Removed unused variables in inject_abt to avoid compile warnings.
+    -- Christoffer ]
+
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+Tested-by: Haibin Zhang <zhanghaibin7@huawei.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- virt/kvm/arm/arm.c | 31 ++++++++++++++-----------------
- 1 file changed, 14 insertions(+), 17 deletions(-)
+ arch/arm/kvm/emulate.c        |  6 ++----
+ arch/arm64/kvm/inject_fault.c | 16 +++++++++++++++-
+ 2 files changed, 17 insertions(+), 5 deletions(-)
 
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index b9f68e4add71..95cba0799828 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -1326,21 +1326,12 @@ static void teardown_hyp_mode(void)
- {
- 	int cpu;
+diff --git a/arch/arm/kvm/emulate.c b/arch/arm/kvm/emulate.c
+index 0064b86a2c87..30a13647c54c 100644
+--- a/arch/arm/kvm/emulate.c
++++ b/arch/arm/kvm/emulate.c
+@@ -227,7 +227,7 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
+ 	u32 return_offset = (is_thumb) ? 2 : 4;
  
--	if (is_kernel_in_hyp_mode())
--		return;
--
- 	free_hyp_pgds();
- 	for_each_possible_cpu(cpu)
- 		free_page(per_cpu(kvm_arm_hyp_stack_page, cpu));
- 	hyp_cpu_pm_exit();
- }
+ 	kvm_update_psr(vcpu, UND_MODE);
+-	*vcpu_reg(vcpu, 14) = *vcpu_pc(vcpu) - return_offset;
++	*vcpu_reg(vcpu, 14) = *vcpu_pc(vcpu) + return_offset;
  
--static int init_vhe_mode(void)
--{
--	kvm_info("VHE mode initialized successfully\n");
--	return 0;
--}
--
- /**
-  * Inits Hyp-mode on all online CPUs
+ 	/* Branch to exception vector */
+ 	*vcpu_pc(vcpu) = exc_vector_base(vcpu) + vect_offset;
+@@ -239,10 +239,8 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
   */
-@@ -1421,8 +1412,6 @@ static int init_hyp_mode(void)
- 		}
- 	}
- 
--	kvm_info("Hyp mode initialized successfully\n");
--
- 	return 0;
- 
- out_err:
-@@ -1456,6 +1445,7 @@ int kvm_arch_init(void *opaque)
+ static void inject_abt(struct kvm_vcpu *vcpu, bool is_pabt, unsigned long addr)
  {
- 	int err;
- 	int ret, cpu;
-+	bool in_hyp_mode;
+-	unsigned long cpsr = *vcpu_cpsr(vcpu);
+-	bool is_thumb = (cpsr & PSR_T_BIT);
+ 	u32 vect_offset;
+-	u32 return_offset = (is_thumb) ? 4 : 0;
++	u32 return_offset = (is_pabt) ? 4 : 8;
+ 	bool is_lpae;
  
- 	if (!is_hyp_mode_available()) {
- 		kvm_err("HYP mode not available\n");
-@@ -1474,21 +1464,28 @@ int kvm_arch_init(void *opaque)
- 	if (err)
- 		return err;
+ 	kvm_update_psr(vcpu, ABT_MODE);
+diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
+index da6a8cfa54a0..3556715a774e 100644
+--- a/arch/arm64/kvm/inject_fault.c
++++ b/arch/arm64/kvm/inject_fault.c
+@@ -33,12 +33,26 @@
+ #define LOWER_EL_AArch64_VECTOR		0x400
+ #define LOWER_EL_AArch32_VECTOR		0x600
  
--	if (is_kernel_in_hyp_mode())
--		err = init_vhe_mode();
--	else
-+	in_hyp_mode = is_kernel_in_hyp_mode();
++/*
++ * Table taken from ARMv8 ARM DDI0487B-B, table G1-10.
++ */
++static const u8 return_offsets[8][2] = {
++	[0] = { 0, 0 },		/* Reset, unused */
++	[1] = { 4, 2 },		/* Undefined */
++	[2] = { 0, 0 },		/* SVC, unused */
++	[3] = { 4, 4 },		/* Prefetch abort */
++	[4] = { 8, 8 },		/* Data abort */
++	[5] = { 0, 0 },		/* HVC, unused */
++	[6] = { 4, 4 },		/* IRQ, unused */
++	[7] = { 4, 4 },		/* FIQ, unused */
++};
 +
-+	if (!in_hyp_mode) {
- 		err = init_hyp_mode();
--	if (err)
--		goto out_err;
-+		if (err)
-+			goto out_err;
-+	}
+ static void prepare_fault32(struct kvm_vcpu *vcpu, u32 mode, u32 vect_offset)
+ {
+ 	unsigned long cpsr;
+ 	unsigned long new_spsr_value = *vcpu_cpsr(vcpu);
+ 	bool is_thumb = (new_spsr_value & COMPAT_PSR_T_BIT);
+-	u32 return_offset = (is_thumb) ? 4 : 0;
++	u32 return_offset = return_offsets[vect_offset >> 2][is_thumb];
+ 	u32 sctlr = vcpu_cp15(vcpu, c1_SCTLR);
  
- 	err = init_subsystems();
- 	if (err)
- 		goto out_hyp;
- 
-+	if (in_hyp_mode)
-+		kvm_info("VHE mode initialized successfully\n");
-+	else
-+		kvm_info("Hyp mode initialized successfully\n");
-+
- 	return 0;
- 
- out_hyp:
--	teardown_hyp_mode();
-+	if (!in_hyp_mode)
-+		teardown_hyp_mode();
- out_err:
- 	teardown_common_resources();
- 	return err;
+ 	cpsr = mode | COMPAT_PSR_I_BIT;
 -- 
 2.14.2
