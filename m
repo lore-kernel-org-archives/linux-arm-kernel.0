@@ -1,348 +1,82 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 30 Oct 2017 23:15:57 +0800
-Subject: [PATCH v5 3/3] phy: add combo phy driver for HiSilicon STB SoCs
-In-Reply-To: <1509376557-7187-1-git-send-email-shawnguo@kernel.org>
-References: <1509376557-7187-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <1509376557-7187-4-git-send-email-shawnguo@kernel.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 30 Oct 2017 15:20:11 +0000
+Subject: [PATCH] ARM: add a private asm/unaligned.h
+In-Reply-To: <8760aw3c5p.fsf@free-electrons.com>
+References: <20171020200231.1355569-1-arnd@arndb.de>
+ <87wp3g39es.fsf@free-electrons.com>
+ <20171027152743.GJ20805@n2100.armlinux.org.uk>
+ <87k1zc3fxp.fsf@free-electrons.com>
+ <CAKv+Gu95RR3SBb1dydKVVeQQ5+Ui56TcWLfNh=rfmw8_Ty=F7g@mail.gmail.com>
+ <87a8083cc2.fsf@free-electrons.com>
+ <CAKv+Gu9=xLfyM7ZkK4vNmMkhL2fJnvZmOv-dNNzesk9myadCCA@mail.gmail.com>
+ <8760aw3c5p.fsf@free-electrons.com>
+Message-ID: <CAKv+Gu-9pQjBb0YXADRT87qpFb6ttT3tLGBnGNgZj3B1VDRN6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jianguo Sun <sunjianguo1@huawei.com>
+On 30 October 2017 at 15:09, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> Hi Ard,
+>
+>  On lun., oct. 30 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>
+>> On 30 October 2017 at 15:05, Gregory CLEMENT
+>> <gregory.clement@free-electrons.com> wrote:
+>>> Hi Ard,
+>>>
+>>>  On lun., oct. 30 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>>
+>> ...
+>>>>
+>>>> Could you please share the output of 'readelf -S' for those vmlinux
+>>>> decompressor images?
+>>>
+>>> Here it is:
+>>>
+>>> In the meantime I also used an arm-linux-gnueabihf- in case it could be
+>>> related to the toolchain, I had te same issue and here it is the readelf
+>>> output:
+>>> arm-linux-gnueabi-readelf -S ../build/vmlinux
+>>
+>> Actually, I meant the 'vmlinux' file in arch/arm/boot/compressed, not
+>> the main one.
+>
+> Here it is then:
+>
+> arm-linux-gnueabi-readelf -S ../build/arch/arm/boot/compressed/vmlinux
+> There are 22 section headers, starting at offset 0x4b3e14:
+>
+> Section Headers:
+>   [Nr] Name              Type            Addr     Off    Size   ES Flg Lk Inf Al
+>   [ 0]                   NULL            00000000 000000 000000 00      0   0  0
+>   [ 1] .text             PROGBITS        00000000 010000 005ef8 00  AX  0   0 32
+>   [ 2] .rodata           PROGBITS        00005ef8 015ef8 000d4c 00   A  0   0  4
+>   [ 3] .piggydata        PROGBITS        00006c44 016c44 48a33a 00   A  0   0  1
+>   [ 4] .got.plt          PROGBITS        00490f80 4a0f80 00000c 04  WA  0   0  4
+>   [ 5] .got              PROGBITS        00490f8c 4a0f8c 000028 00  WA  0   0  4
+>   [ 6] .pad              PROGBITS        00490fb4 4a0fb4 000004 00  WA  0   0  1
+>   [ 7] .bss              NOBITS          00490fb8 4a0fb8 00001c 00  WA  0   0  4
+>   [ 8] .stack            NOBITS          00490fd8 4a0fb8 001000 00  WA  0   0  1
+>   [ 9] .comment          PROGBITS        00000000 4a0fb8 00001c 01  MS  0   0  1
+>   [10] .ARM.attributes   ARM_ATTRIBUTES  00000000 4a0fd4 00002d 00      0   0  1
+>   [11] .debug_line       PROGBITS        00000000 4a1001 00281b 00      0   0  1
+>   [12] .debug_info       PROGBITS        00000000 4a381c 0066cb 00      0   0  1
+>   [13] .debug_abbrev     PROGBITS        00000000 4a9ee7 0013ea 00      0   0  1
+>   [14] .debug_aranges    PROGBITS        00000000 4ab2d8 0001a8 00      0   0  8
+>   [15] .debug_str        PROGBITS        00000000 4ab480 0019b4 01  MS  0   0  1
+>   [16] .debug_ranges     PROGBITS        00000000 4ace38 000640 00      0   0  8
+>   [17] .debug_frame      PROGBITS        00000000 4ad478 001010 00      0   0  4
+>   [18] .debug_loc        PROGBITS        00000000 4ae488 003643 00      0   0  1
+>   [19] .symtab           SYMTAB          00000000 4b1acc 0015b0 10     20 225  4
+>   [20] .strtab           STRTAB          00000000 4b307c 000cc5 00      0   0  1
+>   [21] .shstrtab         STRTAB          00000000 4b3d41 0000d2 00      0   0  1
+> Key to Flags:
+>   W (write), A (alloc), X (execute), M (merge), S (strings), I (info),
+>   L (link order), O (extra OS processing required), G (group), T (TLS),
+>   C (compressed), x (unknown), o (OS specific), E (exclude),
+>   y (purecode), p (processor specific)
+>
 
-Add combo phy driver for HiSilicon STB SoCs. This phy can be
-used as pcie-phy, sata-phy or usb-phy.
+And this is from the build the build that generated the linker assert?
 
-Signed-off-by: Jianguo Sun <sunjianguo1@huawei.com>
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/phy/hisilicon/Kconfig             |   9 +
- drivers/phy/hisilicon/Makefile            |   1 +
- drivers/phy/hisilicon/phy-histb-combphy.c | 289 ++++++++++++++++++++++++++++++
- 3 files changed, 299 insertions(+)
- create mode 100644 drivers/phy/hisilicon/phy-histb-combphy.c
-
-diff --git a/drivers/phy/hisilicon/Kconfig b/drivers/phy/hisilicon/Kconfig
-index 6164c4cd0f65..d9afe2b12827 100644
---- a/drivers/phy/hisilicon/Kconfig
-+++ b/drivers/phy/hisilicon/Kconfig
-@@ -11,6 +11,15 @@ config PHY_HI6220_USB
- 
- 	  To compile this driver as a module, choose M here.
- 
-+config PHY_HISTB_COMBPHY
-+	tristate "HiSilicon STB SoCs COMBPHY support"
-+	depends on (ARCH_HISI && ARM64) || COMPILE_TEST
-+	select GENERIC_PHY
-+	select MFD_SYSCON
-+	help
-+	  Enable this to support the HISILICON STB SoCs COMBPHY.
-+	  If unsure, say N.
-+
- config PHY_HIX5HD2_SATA
- 	tristate "HIX5HD2 SATA PHY Driver"
- 	depends on ARCH_HIX5HD2 && OF && HAS_IOMEM
-diff --git a/drivers/phy/hisilicon/Makefile b/drivers/phy/hisilicon/Makefile
-index 541b348187a8..5e8e2dfa8c37 100644
---- a/drivers/phy/hisilicon/Makefile
-+++ b/drivers/phy/hisilicon/Makefile
-@@ -1,2 +1,3 @@
- obj-$(CONFIG_PHY_HI6220_USB)		+= phy-hi6220-usb.o
-+obj-$(CONFIG_PHY_HISTB_COMBPHY)		+= phy-histb-combphy.o
- obj-$(CONFIG_PHY_HIX5HD2_SATA)		+= phy-hix5hd2-sata.o
-diff --git a/drivers/phy/hisilicon/phy-histb-combphy.c b/drivers/phy/hisilicon/phy-histb-combphy.c
-new file mode 100644
-index 000000000000..5777b3120017
---- /dev/null
-+++ b/drivers/phy/hisilicon/phy-histb-combphy.c
-@@ -0,0 +1,289 @@
-+/*
-+ * COMBPHY driver for HiSilicon STB SoCs
-+ *
-+ * Copyright (C) 2016-2017 HiSilicon Co., Ltd. http://www.hisilicon.com
-+ *
-+ * Authors: Jianguo Sun <sunjianguo1@huawei.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/module.h>
-+#include <linux/of_device.h>
-+#include <linux/phy/phy.h>
-+#include <linux/regmap.h>
-+#include <linux/reset.h>
-+#include <dt-bindings/phy/phy.h>
-+
-+#define COMBPHY_MODE_PCIE		0
-+#define COMBPHY_MODE_USB3		1
-+#define COMBPHY_MODE_SATA		2
-+
-+#define COMBPHY_CFG_REG			0x0
-+#define COMBPHY_BYPASS_CODEC		BIT(31)
-+#define COMBPHY_TEST_WRITE		BIT(24)
-+#define COMBPHY_TEST_DATA_SHIFT		20
-+#define COMBPHY_TEST_DATA_MASK		GENMASK(23, 20)
-+#define COMBPHY_TEST_ADDR_SHIFT		12
-+#define COMBPHY_TEST_ADDR_MASK		GENMASK(16, 12)
-+#define COMBPHY_CLKREF_OUT_OEN		BIT(0)
-+
-+struct histb_combphy_mode {
-+	int fixed;
-+	int select;
-+	u32 reg;
-+	u32 shift;
-+	u32 mask;
-+};
-+
-+struct histb_combphy_priv {
-+	void __iomem *mmio;
-+	struct regmap *syscon;
-+	struct reset_control *por_rst;
-+	struct clk *ref_clk;
-+	struct phy *phy;
-+	struct histb_combphy_mode mode;
-+};
-+
-+static void nano_register_write(struct histb_combphy_priv *priv,
-+				u32 addr, u32 data)
-+{
-+	void __iomem *reg = priv->mmio + COMBPHY_CFG_REG;
-+	u32 val;
-+
-+	/* Set up address and data for the write */
-+	val = readl(reg);
-+	val &= ~COMBPHY_TEST_ADDR_MASK;
-+	val |= addr << COMBPHY_TEST_ADDR_SHIFT;
-+	val &= ~COMBPHY_TEST_DATA_MASK;
-+	val |= data << COMBPHY_TEST_DATA_SHIFT;
-+	writel(val, reg);
-+
-+	/* Flip strobe control to trigger the write */
-+	val &= ~COMBPHY_TEST_WRITE;
-+	writel(val, reg);
-+	val |= COMBPHY_TEST_WRITE;
-+	writel(val, reg);
-+}
-+
-+static int is_mode_fixed(struct histb_combphy_mode *mode)
-+{
-+	return (mode->fixed != PHY_NONE) ? true : false;
-+}
-+
-+static int histb_combphy_set_mode(struct histb_combphy_priv *priv)
-+{
-+	struct histb_combphy_mode *mode = &priv->mode;
-+	struct regmap *syscon = priv->syscon;
-+	u32 hw_sel;
-+
-+	if (is_mode_fixed(mode))
-+		return 0;
-+
-+	switch (mode->select) {
-+	case PHY_TYPE_SATA:
-+		hw_sel = COMBPHY_MODE_SATA;
-+		break;
-+	case PHY_TYPE_PCIE:
-+		hw_sel = COMBPHY_MODE_PCIE;
-+		break;
-+	case PHY_TYPE_USB3:
-+		hw_sel = COMBPHY_MODE_USB3;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	return regmap_update_bits(syscon, mode->reg, mode->mask,
-+				  hw_sel << mode->shift);
-+}
-+
-+static int histb_combphy_init(struct phy *phy)
-+{
-+	struct histb_combphy_priv *priv = phy_get_drvdata(phy);
-+	u32 val;
-+	int ret;
-+
-+	ret = histb_combphy_set_mode(priv);
-+	if (ret)
-+		return ret;
-+
-+	/* Clear bypass bit to enable encoding/decoding */
-+	val = readl(priv->mmio + COMBPHY_CFG_REG);
-+	val &= ~COMBPHY_BYPASS_CODEC;
-+	writel(val, priv->mmio + COMBPHY_CFG_REG);
-+
-+	ret = clk_prepare_enable(priv->ref_clk);
-+	if (ret)
-+		return ret;
-+
-+	reset_control_deassert(priv->por_rst);
-+
-+	/* Enable EP clock */
-+	val = readl(priv->mmio + COMBPHY_CFG_REG);
-+	val |= COMBPHY_CLKREF_OUT_OEN;
-+	writel(val, priv->mmio + COMBPHY_CFG_REG);
-+
-+	/* Need to wait for EP clock stable */
-+	mdelay(5);
-+
-+	/* Configure nano phy registers as suggested by vendor */
-+	nano_register_write(priv, 0x1, 0x8);
-+	nano_register_write(priv, 0xc, 0x9);
-+	nano_register_write(priv, 0x1a, 0x4);
-+
-+	return 0;
-+}
-+
-+static int histb_combphy_exit(struct phy *phy)
-+{
-+	struct histb_combphy_priv *priv = phy_get_drvdata(phy);
-+	u32 val;
-+
-+	/* Disable EP clock */
-+	val = readl(priv->mmio + COMBPHY_CFG_REG);
-+	val &= ~COMBPHY_CLKREF_OUT_OEN;
-+	writel(val, priv->mmio + COMBPHY_CFG_REG);
-+
-+	reset_control_assert(priv->por_rst);
-+	clk_disable_unprepare(priv->ref_clk);
-+
-+	return 0;
-+}
-+
-+static const struct phy_ops histb_combphy_ops = {
-+	.init = histb_combphy_init,
-+	.exit = histb_combphy_exit,
-+	.owner = THIS_MODULE,
-+};
-+
-+static struct phy *histb_combphy_xlate(struct device *dev,
-+				       struct of_phandle_args *args)
-+{
-+	struct histb_combphy_priv *priv = dev_get_drvdata(dev);
-+	struct histb_combphy_mode *mode = &priv->mode;
-+
-+	if (args->args_count < 1) {
-+		dev_err(dev, "invalid number of arguments\n");
-+		return ERR_PTR(-EINVAL);
-+	}
-+
-+	mode->select = args->args[0];
-+
-+	if (mode->select < PHY_TYPE_SATA || mode->select > PHY_TYPE_USB3) {
-+		dev_err(dev, "invalid phy mode select argument\n");
-+		return ERR_PTR(-EINVAL);
-+	}
-+
-+	if (is_mode_fixed(mode) && mode->select != mode->fixed) {
-+		dev_err(dev, "mode select %d mismatch fixed phy mode %d\n",
-+			mode->select, mode->fixed);
-+		return ERR_PTR(-EINVAL);
-+	}
-+
-+	return priv->phy;
-+}
-+
-+static int histb_combphy_probe(struct platform_device *pdev)
-+{
-+	struct phy_provider *phy_provider;
-+	struct device *dev = &pdev->dev;
-+	struct histb_combphy_priv *priv;
-+	struct device_node *np = dev->of_node;
-+	struct histb_combphy_mode *mode;
-+	struct resource *res;
-+	u32 vals[3];
-+	int ret;
-+
-+	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	priv->mmio = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(priv->mmio)) {
-+		ret = PTR_ERR(priv->mmio);
-+		return ret;
-+	}
-+
-+	priv->syscon = syscon_node_to_regmap(np->parent);
-+	if (IS_ERR(priv->syscon)) {
-+		dev_err(dev, "failed to find peri_ctrl syscon regmap\n");
-+		return PTR_ERR(priv->syscon);
-+	}
-+
-+	mode = &priv->mode;
-+	mode->fixed = PHY_NONE;
-+
-+	ret = of_property_read_u32(np, "hisilicon,fixed-mode", &mode->fixed);
-+	if (ret == 0)
-+		dev_dbg(dev, "found fixed phy mode %d\n", mode->fixed);
-+
-+	ret = of_property_read_u32_array(np, "hisilicon,mode-select-bits",
-+					 vals, ARRAY_SIZE(vals));
-+	if (ret == 0) {
-+		if (is_mode_fixed(mode)) {
-+			dev_err(dev, "found select bits for fixed mode phy\n");
-+			return -EINVAL;
-+		}
-+
-+		mode->reg = vals[0];
-+		mode->shift = vals[1];
-+		mode->mask = vals[2];
-+		dev_dbg(dev, "found mode select bits\n");
-+	} else {
-+		if (!is_mode_fixed(mode)) {
-+			dev_err(dev, "no valid select bits found for non-fixed phy\n");
-+			return -ENODEV;
-+		}
-+	}
-+
-+	priv->ref_clk = devm_clk_get(dev, NULL);
-+	if (IS_ERR(priv->ref_clk)) {
-+		dev_err(dev, "failed to find ref clock\n");
-+		return PTR_ERR(priv->ref_clk);
-+	}
-+
-+	priv->por_rst = devm_reset_control_get(dev, NULL);
-+	if (IS_ERR(priv->por_rst)) {
-+		dev_err(dev, "failed to get poweron reset\n");
-+		return PTR_ERR(priv->por_rst);
-+	}
-+
-+	priv->phy = devm_phy_create(dev, NULL, &histb_combphy_ops);
-+	if (IS_ERR(priv->phy)) {
-+		dev_err(dev, "failed to create combphy\n");
-+		return PTR_ERR(priv->phy);
-+	}
-+
-+	dev_set_drvdata(dev, priv);
-+	phy_set_drvdata(priv->phy, priv);
-+
-+	phy_provider = devm_of_phy_provider_register(dev, histb_combphy_xlate);
-+	return PTR_ERR_OR_ZERO(phy_provider);
-+}
-+
-+static const struct of_device_id histb_combphy_of_match[] = {
-+	{ .compatible = "hisilicon,hi3798cv200-combphy" },
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(of, histb_combphy_of_match);
-+
-+static struct platform_driver histb_combphy_driver = {
-+	.probe	= histb_combphy_probe,
-+	.driver = {
-+		.name = "combphy",
-+		.of_match_table = histb_combphy_of_match,
-+	},
-+};
-+module_platform_driver(histb_combphy_driver);
-+
-+MODULE_DESCRIPTION("HiSilicon STB COMBPHY driver");
-+MODULE_LICENSE("GPL v2");
--- 
-1.9.1
+Could you check the value of _edata in the output of 'nm vmlinux' please?
