@@ -1,80 +1,46 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 30 Oct 2017 16:46:13 +0100
-Subject: [PATCH v2 16/16] arm64: dts: marvell: armada-3720-espressobin:
- fill UART nodes
-In-Reply-To: <20171013090200.31034-17-miquel.raynal@free-electrons.com>
- (Miquel Raynal's message of "Fri, 13 Oct 2017 11:02:00 +0200")
-References: <20171013090200.31034-1-miquel.raynal@free-electrons.com>
- <20171013090200.31034-17-miquel.raynal@free-electrons.com>
-Message-ID: <87fua01vwa.fsf@free-electrons.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 30 Oct 2017 15:48:56 +0000
+Subject: [PATCH] ARM: add a private asm/unaligned.h
+In-Reply-To: <87k1zc3fxp.fsf@free-electrons.com>
+References: <20171020200231.1355569-1-arnd@arndb.de>
+ <87wp3g39es.fsf@free-electrons.com>
+ <20171027152743.GJ20805@n2100.armlinux.org.uk>
+ <87k1zc3fxp.fsf@free-electrons.com>
+Message-ID: <20171030154855.GO20805@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Miquel,
- 
- On ven., oct. 13 2017, Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
+On Mon, Oct 30, 2017 at 02:48:02PM +0100, Gregory CLEMENT wrote:
+> Hi Russell,
+> 
+> So I tested the branch fixes in your git tree.
+> 
+> After doing a "make multi_v7_defconfig; make zImage", I got the message
+> "arm-linux-gnueabi-ld: error: zImage file size is incorrect" you added
+> in the commit "ARM: verify size of zImage".
+> 
+> It is the same with mvebu_v7_defconfig, so I wonder wich with
+> configuration this patch was tested ?
 
-> Fill ESPRESSObin uart0 node with pinctrl information like in the
-> Armada-3720-DB device tree (which uses the same node).
->
-> Also explain how to enable the second UART port available on the
-> headers. This second port is not enabled by default because both
-> headers are dedicated to expose general purpose pins and remapping
-> some of them to use the second UART would break existing users.
->
-> Suggested-by: L?szl? ?SHIN <laszlo@ashin.hu>
-> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+I heard a similar report from Olof when his autobuilder produced 100%
+failure.  I tried one of the same defconfig's that Olof tried here,
+and didn't see the failure.  It passes my build tests here, and it
+also passes kernelci's build tests too.
 
-Applied on mvebu/dt64
+So, I _think_ it's got something to do with the toolchain versions
+being used, but at the moment I'm just guessing.  I've no real idea,
+because I've no idea what's causing the failure at the moment.
 
-Thanks,
+Olof said that he'd send me one of the build trees, but I'm still
+waiting.
 
-Gregory
-
-> ---
->
-> Changes since v1: comment about UART1 node.
->
->  arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
-> index 2ce52ba74f73..bdfb5553ddb5 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
-> +++ b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
-> @@ -98,9 +98,21 @@
->  
->  /* Exported on the micro USB connector J5 through an FTDI */
->  &uart0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart1_pins>;
->  	status = "okay";
->  };
->  
-> +/*
-> + * Connector J17 and J18 expose a number of different features. Some pins are
-> + * multiplexed. This is the case for instance for the following features:
-> + * - UART1 (pin 24 = RX, pin 26 = TX). See armada-3720-db.dts for an example of
-> + *   how to enable it. Beware that the signals are 1.8V TTL.
-> + * - I2C
-> + * - SPI
-> + * - MMC
-> + */
-> +
->  /* J7 */
->  &usb3 {
->  	status = "okay";
-> -- 
-> 2.11.0
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+What I need is a tarball of the objects from arch/arm/boot/compressed
+to work out what's going on - when grabbing that, it may be a good
+idea to first disable the assert in the linker script, so that the
+resulting "vmlinux" in that directory remains for analysis.  Or...
+someone else needs to work out what's going on and report back.
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
