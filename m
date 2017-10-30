@@ -1,64 +1,84 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Mon, 30 Oct 2017 16:12:13 +0000
-Subject: [PATCH v4 20/28] arm64/sve: Add prctl controls for userspace
- vector length management
-In-Reply-To: <20171028160506.GI19485@e103592.cambridge.arm.com>
-References: <1509101470-7881-1-git-send-email-Dave.Martin@arm.com>
- <1509101470-7881-21-git-send-email-Dave.Martin@arm.com>
- <87r2toiikt.fsf@linaro.org>
- <20171028160506.GI19485@e103592.cambridge.arm.com>
-Message-ID: <87fua07gyq.fsf@linaro.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 30 Oct 2017 16:12:08 +0000
+Subject: [PATCH] ARM: add a private asm/unaligned.h
+In-Reply-To: <87bmko1v6f.fsf@free-electrons.com>
+References: <20171020200231.1355569-1-arnd@arndb.de>
+ <87wp3g39es.fsf@free-electrons.com>
+ <20171027152743.GJ20805@n2100.armlinux.org.uk>
+ <87k1zc3fxp.fsf@free-electrons.com>
+ <20171030154855.GO20805@n2100.armlinux.org.uk>
+ <87bmko1v6f.fsf@free-electrons.com>
+Message-ID: <20171030161207.GS20805@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Oct 30, 2017 at 05:01:44PM +0100, Gregory CLEMENT wrote:
+> Hi Russell King,
+>  
+>  On lun., oct. 30 2017, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+> 
+> > On Mon, Oct 30, 2017 at 02:48:02PM +0100, Gregory CLEMENT wrote:
+> >> Hi Russell,
+> >> 
+> >> So I tested the branch fixes in your git tree.
+> >> 
+> >> After doing a "make multi_v7_defconfig; make zImage", I got the message
+> >> "arm-linux-gnueabi-ld: error: zImage file size is incorrect" you added
+> >> in the commit "ARM: verify size of zImage".
+> >> 
+> >> It is the same with mvebu_v7_defconfig, so I wonder wich with
+> >> configuration this patch was tested ?
+> >
+> > I heard a similar report from Olof when his autobuilder produced 100%
+> > failure.  I tried one of the same defconfig's that Olof tried here,
+> > and didn't see the failure.  It passes my build tests here, and it
+> > also passes kernelci's build tests too.
+> >
+> > So, I _think_ it's got something to do with the toolchain versions
+> > being used, but at the moment I'm just guessing.  I've no real idea,
+> > because I've no idea what's causing the failure at the moment.
+> >
+> > Olof said that he'd send me one of the build trees, but I'm still
+> > waiting.
+> >
+> > What I need is a tarball of the objects from arch/arm/boot/compressed
+> > to work out what's going on - when grabbing that, it may be a good
+> 
+> I've just attached this tarball to this email. It might be rejected by
+> the mailing list, but as you are also in the "To" field you should
+> receive it.
+> 
+> Actually the archive is the full content of arch/arm/boot/compressed
+> from my build directory and I removed vmlinux and all the piggy files to
+> have a small archive.
+> 
+> If they are also needed then I can provide an url for it.
 
-Dave Martin <Dave.Martin@arm.com> writes:
+Thanks.
 
-> On Fri, Oct 27, 2017 at 06:52:50PM +0100, Alex Benn?e wrote:
->>
->> Dave Martin <Dave.Martin@arm.com> writes:
->>
->> > This patch adds two arm64-specific prctls, to permit userspace to
->> > control its vector length:
->> >
->> >  * PR_SVE_SET_VL: set the thread's SVE vector length and vector
->> >    length inheritance mode.
->> >
->> >  * PR_SVE_GET_VL: get the same information.
->> >
->> > Although these prctls resemble instruction set features in the SVE
->> > architecture, they provide additional control: the vector length
->> > inheritance mode is Linux-specific and nothing to do with the
->> > architecture, and the architecture does not permit EL0 to set its
->> > own vector length directly.  Both can be used in portable tools
->> > without requiring the use of SVE instructions.
->> >
->> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
->> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
->> > Cc: Alex Benn?e <alex.bennee@linaro.org>
->>
->> FYI there is a minor conflict applying this on current master.
->
-> There are some trivial conflicts with one or two patches that already
-> went into arm64/for-next/core, so I based on that for this posting, not
-> torvalds/master.
->
-> There's a note in the cover letter giving the precise commit I based
-> on, though the branch doesn't seem to have moved yet since I posted.
+Unfortunately, I can't reproduce the issue using your objects and my
+linker.
 
-Ahh probably those. It was only a few header file shuffles. I was
-rushing to apply before my flight back I failed to note the change in
-base commit.
+If I modify your vmlinux.lds to add the assert in, and then link using:
 
->
-> Otherwise, I don't see any conflict -- can you give details?
+$ arm-linux-ld -o vmlinux -T vmlinux.lds *.o --defsym _kernel_bss_size=0 \
+  --defsym input_data_end=0 --defsym input_data=0
 
-Only that #endif _ASM_ had been dropped from the header file.
+Then it links successfully.  If I objcopy that:
 
->
-> Cheers
-> ---Dave
+$ arm-linux-objcopy -O binary -R .comment -S vmlinux zImage
+$ vdir zImage
+-rwxrwxr-x 1 rmk rmk 27784 Oct 30 16:10 zImage
+$ arm-linux-nm vmlinux |grep _edata
+00006c88 D _edata
+$ echo $((0x6c88))
+27784
 
+So it all looks sane here.  So my hunch is that whatever's going wrong,
+it's going wrong at the final link, which means I need the vmlinux as
+generated by your toolchain.
 
---
-Alex Benn?e
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
