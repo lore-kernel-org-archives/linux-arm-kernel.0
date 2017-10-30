@@ -1,124 +1,59 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Mon, 30 Oct 2017 19:35:35 +0100
-Subject: [PATCH v9 02/10] dt-bindings: net: dwmac-sun8i: update
- documentation about integrated PHY
-In-Reply-To: <20171027125621.mlcapjhttyw2j5sy@rob-hp-laptop>
-References: <20171024175714.15840-1-clabbe.montjoie@gmail.com>
- <20171024175714.15840-3-clabbe.montjoie@gmail.com>
- <20171027125621.mlcapjhttyw2j5sy@rob-hp-laptop>
-Message-ID: <20171030183535.GA16723@Red>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Mon, 30 Oct 2017 19:36:40 +0100
+Subject: [PATCH] pinctrl: sirf: Use common error handling code in
+ sirfsoc_dt_node_to_map()
+Message-ID: <80911d4b-d819-335c-106e-70d7672e645b@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 27, 2017 at 09:37:10AM -0500, Rob Herring wrote:
-> On Tue, Oct 24, 2017 at 07:57:06PM +0200, Corentin Labbe wrote:
-> > This patch add documentation about the MDIO switch used on sun8i-h3-emac
-> > for integrated PHY.
-> > 
-> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> > ---
-> >  .../devicetree/bindings/net/dwmac-sun8i.txt        | 145 +++++++++++++++++++--
-> >  1 file changed, 133 insertions(+), 12 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
-> > index 725f3b187886..2600ce9ad3cc 100644
-> > --- a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
-> > +++ b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
-> > @@ -4,18 +4,18 @@ This device is a platform glue layer for stmmac.
-> >  Please see stmmac.txt for the other unchanged properties.
-> >  
-> >  Required properties:
-> > -- compatible: should be one of the following string:
-> > +- compatible: must be one of the following string:
-> >  		"allwinner,sun8i-a83t-emac"
-> >  		"allwinner,sun8i-h3-emac"
-> >  		"allwinner,sun8i-v3s-emac"
-> >  		"allwinner,sun50i-a64-emac"
-> >  - reg: address and length of the register for the device.
-> >  - interrupts: interrupt for the device
-> > -- interrupt-names: should be "macirq"
-> > +- interrupt-names: must be "macirq"
-> >  - clocks: A phandle to the reference clock for this device
-> > -- clock-names: should be "stmmaceth"
-> > +- clock-names: must be "stmmaceth"
-> >  - resets: A phandle to the reset control for this device
-> > -- reset-names: should be "stmmaceth"
-> > +- reset-names: must be "stmmaceth"
-> >  - phy-mode: See ethernet.txt
-> >  - phy-handle: See ethernet.txt
-> >  - #address-cells: shall be 1
-> > @@ -39,23 +39,42 @@ Optional properties for the following compatibles:
-> >  - allwinner,leds-active-low: EPHY LEDs are active low
-> >  
-> >  Required child node of emac:
-> > -- mdio bus node: should be named mdio
-> > +- mdio bus node: with compatible "snps,dwmac-mdio"
-> 
-> It should still be named mdio.
-> 
-> >  
-> >  Required properties of the mdio node:
-> >  - #address-cells: shall be 1
-> >  - #size-cells: shall be 0
-> >  
-> > -The device node referenced by "phy" or "phy-handle" should be a child node
-> > +The device node referenced by "phy" or "phy-handle" must be a child node
-> >  of the mdio node. See phy.txt for the generic PHY bindings.
-> >  
-> > -Required properties of the phy node with the following compatibles:
-> > +The following compatibles require that the emac node have a mdio-mux child
-> > +node called "mdio-mux":
-> > +  - "allwinner,sun8i-h3-emac"
-> > +  - "allwinner,sun8i-v3s-emac":
-> > +Required properties for the mdio-mux node:
-> > +  - compatible = "allwinner,sun8i-h3-mdio-mux"
-> > +  - mdio-parent-bus: a phandle to EMAC mdio
-> > +  - one child mdio for the integrated mdio with the compatible
-> > +    "allwinner,sun8i-h3-mdio-internal"
-> > +  - one child mdio for the external mdio if present (V3s have none)
-> > +Required properties for the mdio-mux children node:
-> > +  - reg: 1 for internal MDIO bus, 2 for external MDIO bus
-> > +
-> > +The following compatibles require a PHY node representing the integrated
-> > +PHY, under the integrated MDIO bus node if an mdio-mux node is used:
-> >    - "allwinner,sun8i-h3-emac",
-> >    - "allwinner,sun8i-v3s-emac":
-> > +
-> > +Additional information regarding generic multiplexer properties can be found
-> > +at Documentation/devicetree/bindings/net/mdio-mux.txt
-> > +
-> > +Required properties of the integrated phy node:
-> >  - clocks: a phandle to the reference clock for the EPHY
-> >  - resets: a phandle to the reset control for the EPHY
-> > +- Must be a child of the integrated mdio
-> >  
-> > -Example:
-> > -
-> > +Example with integrated PHY:
-> >  emac: ethernet at 1c0b000 {
-> >  	compatible = "allwinner,sun8i-h3-emac";
-> >  	syscon = <&syscon>;
-> > @@ -72,13 +91,115 @@ emac: ethernet at 1c0b000 {
-> >  	phy-handle = <&int_mii_phy>;
-> >  	phy-mode = "mii";
-> >  	allwinner,leds-active-low;
-> > +
-> > +	mdio0: mdio {
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +		compatible = "snps,dwmac-mdio";
-> > +	};
-> > +
-> > +	mdio-mux {
-> > +		compatible = "mdio-mux", "allwinner,sun8i-h3-mdio-mux";
-> 
-> Drop mdio-mux.
-> 
-> With those fixed,
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Mon, 30 Oct 2017 19:26:56 +0100
 
-Will change what you ask.
+Add a jump target so that a bit of exception handling can be better reused
+at the end of this function.
 
-Thanks
-Regards
+This issue was detected by using the Coccinelle software.
+
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ drivers/pinctrl/sirf/pinctrl-sirf.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/pinctrl/sirf/pinctrl-sirf.c b/drivers/pinctrl/sirf/pinctrl-sirf.c
+index d64add0b84cc..5ec2f37f5180 100644
+--- a/drivers/pinctrl/sirf/pinctrl-sirf.c
++++ b/drivers/pinctrl/sirf/pinctrl-sirf.c
+@@ -89,16 +89,12 @@ static int sirfsoc_dt_node_to_map(struct pinctrl_dev *pctldev,
+ 	/* calculate number of maps required */
+ 	for_each_child_of_node(np_config, np) {
+ 		ret = of_property_read_string(np, "sirf,function", &function);
+-		if (ret < 0) {
+-			of_node_put(np);
+-			return ret;
+-		}
++		if (ret < 0)
++			goto put_node;
+ 
+ 		ret = of_property_count_strings(np, "sirf,pins");
+-		if (ret < 0) {
+-			of_node_put(np);
+-			return ret;
+-		}
++		if (ret < 0)
++			goto put_node;
+ 
+ 		count += ret;
+ 	}
+@@ -125,6 +121,10 @@ static int sirfsoc_dt_node_to_map(struct pinctrl_dev *pctldev,
+ 	*num_maps = count;
+ 
+ 	return 0;
++
++put_node:
++	of_node_put(np);
++	return ret;
+ }
+ 
+ static void sirfsoc_dt_free_map(struct pinctrl_dev *pctldev,
+-- 
+2.14.3
