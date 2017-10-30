@@ -1,26 +1,23 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 Oct 2017 12:04:21 +0100
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for
- v4.15
-In-Reply-To: <cover.1508493785.git.horms+renesas@verge.net.au>
-References: <cover.1508493785.git.horms+renesas@verge.net.au>
-Message-ID: <CAK8P3a2h=P-ozgMoCFXPEJBpUtHEwOLMv7dqULUar48gHor3Ew@mail.gmail.com>
+Date: Mon, 30 Oct 2017 12:06:03 +0100
+Subject: [GIT PULL 1/7] dt-bindings: Updates for v4.15-rc1
+In-Reply-To: <20171020115603.9828-1-thierry.reding@gmail.com>
+References: <20171020115603.9828-1-thierry.reding@gmail.com>
+Message-ID: <CAK8P3a2YUXZZOZwk8tFOGsUHi9DD+CxNjsMi+xbDCLLV8fhAuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 20, 2017 at 12:29 PM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Fri, Oct 20, 2017 at 1:55 PM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+> ----------------------------------------------------------------
+> dt-bindings: Updates for v4.15-rc1
 >
-> Please consider these second round of Renesas ARM based SoC DT updates for
-> v4.15.
+> This contains the addition of a clock alias which will be used to fix
+> the implementation of the SOR1 clock.
 >
-> This pull request is based on the previous round of
-> such requests, tagged as renesas-dt-for-v4.15,
-> which you have already pulled.
->
-
+> Also included are the bindings for the Tegra186 BPMP thermal driver, a
+> prerequisite for both the driver and device tree changes.
 
 Pulled into next/dt, thanks!
 
-       Arnd
+     Arnd
