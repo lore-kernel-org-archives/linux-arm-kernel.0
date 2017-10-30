@@ -1,44 +1,61 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 30 Oct 2017 22:51:52 +0800
-Subject: [PATCH v4 1/2] dt-bindings: add bindings doc for hi3798cv200
- combphy
-In-Reply-To: <20171027142606.zilypg7tuxwy3fj2@rob-hp-laptop>
-References: <1509073651-23730-1-git-send-email-shawnguo@kernel.org>
- <1509073651-23730-2-git-send-email-shawnguo@kernel.org>
- <20171027142606.zilypg7tuxwy3fj2@rob-hp-laptop>
-Message-ID: <20171030145150.GB6270@dragon>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 30 Oct 2017 23:53:21 +0900
+Subject: [GIT PULL] arm64: dts: uniphier: UniPhier DT updates (64bit) for
+ v4.15
+In-Reply-To: <CAK8P3a3oKP-5hgZ+zBZGBgHV8YdCnKpif8-nArsKqVydsajWxw@mail.gmail.com>
+References: <CAK7LNARKAivEyNYDMO7GKjTnnsVFk3TtsCZ_yDWLrEf80G-WOQ@mail.gmail.com>
+ <CAK8P3a3oKP-5hgZ+zBZGBgHV8YdCnKpif8-nArsKqVydsajWxw@mail.gmail.com>
+Message-ID: <CAK7LNAQS0AozzbmG5--m9_Ed_wfmYPgLgWJrF-oJSBG6W5SQWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 27, 2017 at 09:38:30AM -0500, Rob Herring wrote:
-> On Fri, Oct 27, 2017 at 11:07:30AM +0800, Shawn Guo wrote:
-> > From: Jianguo Sun <sunjianguo1@huawei.com>
-> > 
-> > It adds the device tree bindings for PCIE/SATA/USB3 combo PHY found on
-> > HiSilicon STB SoCs.
-> > 
-> > Signed-off-by: Jianguo Sun <sunjianguo1@huawei.com>
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > ---
-> >  .../bindings/phy/phy-hi3798cv200-combphy.txt       | 57 ++++++++++++++++++++++
-> >  1 file changed, 57 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/phy/phy-hi3798cv200-combphy.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/phy/phy-hi3798cv200-combphy.txt b/Documentation/devicetree/bindings/phy/phy-hi3798cv200-combphy.txt
-> > new file mode 100644
-> > index 000000000000..efb6cd5eae04
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/phy/phy-hi3798cv200-combphy.txt
-> > @@ -0,0 +1,57 @@
-> > +HiSilicon STB PCIE/SATA/USB3 PHY
-> 
-> Please add a reference to the parent node binding.
-> 
-> With that,
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
+Hi Arnd,
 
-Just noticed that we do not have a bindings doc for the parent
-peripheral controller yet.  I will add a new patch for that in v5.
+2017-10-30 22:24 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> On Mon, Oct 23, 2017 at 7:40 PM, Masahiro Yamada
+> <yamada.masahiro@socionext.com> wrote:
+>
+>> UniPhier ARM64 SoC DT updates for v4.15
+>>
+>> - add thermal monitor and thermal zone nodes
+>> - add efuse nodes
+>> - fix W=2 warnings
+>> - add GPIO controller nodes and related properties
+>> - add resets properties
+>
+> I noticed too late that your "ARM32 SoC DT" branch broke ARM64 (I
+> don't normally test
+> architectures that are not touched by a new branch. What happened here
+> is that commit
+> 2bef7ca3798f ("ARM: dts: uniphier: route on-board device IRQ to GPIO
+> controller")
+> added a reference to the non-existing "gpio" label, causing a build error:
+>
+> arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dtb: ERROR
+> (phandle_references): Reference to non-existent node or label "gpio"
+>
+> Since merging the ARM64 branch fixes the problem, I decided it's not
+> worth the trouble
+> of reverting the original merge, but please be careful to avoid build
+> problems like this
+> in the future.
+>
+> The changes otherwise look all good, so I've pulled this into next/dt as well.
+>
 
-Shawn
+My bad - sorry about this.
+
+Actually, some base boards and expansion boards are
+shared between arm and arm64 by cross-arch reference.
+So, touching one branch could affect the other.
+
+If it had not been too late, I would have been happy to resend the PR.
+
+I will be careful next time.
+
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
