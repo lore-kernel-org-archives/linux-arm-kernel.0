@@ -1,79 +1,46 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 Oct 2017 18:01:44 +0100
-Subject: [PATCH] ARM: add a private asm/unaligned.h
-In-Reply-To: <20171030155029.GP20805@n2100.armlinux.org.uk>
-References: <20171020200231.1355569-1-arnd@arndb.de>
- <87wp3g39es.fsf@free-electrons.com>
- <20171027152743.GJ20805@n2100.armlinux.org.uk>
- <CAK8P3a0_-YOvPUqZTb+LoU+wCBhy=zCxmk4HProPJY+udbri9Q@mail.gmail.com>
- <20171030155029.GP20805@n2100.armlinux.org.uk>
-Message-ID: <CAK8P3a37pQZPzLbh_qCtDqz0=Ends+nnV3-Y1KJKZVxiRErFfQ@mail.gmail.com>
+Date: Mon, 30 Oct 2017 18:04:12 +0100
+Subject: [GIT PULL 2/3] ARM: Keystone config update for 4.15
+In-Reply-To: <68f47a4e-ba33-ff33-3c73-9b104284f1a8@oracle.com>
+References: <1508548966-7350-1-git-send-email-santosh.shilimkar@oracle.com>
+ <1508548966-7350-2-git-send-email-santosh.shilimkar@oracle.com>
+ <CAK8P3a1BU6U_c+a0nTp7QM2-AR6qh-3T+RaGQX4mLvUU8Lg62Q@mail.gmail.com>
+ <68f47a4e-ba33-ff33-3c73-9b104284f1a8@oracle.com>
+Message-ID: <CAK8P3a21yh17EGnh5+hL46TVyoOn0HN1zUoJNVxsMYGfOCUntQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 30, 2017 at 4:50 PM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Mon, Oct 30, 2017 at 04:09:43PM +0100, Arnd Bergmann wrote:
->> On Fri, Oct 27, 2017 at 5:27 PM, Russell King - ARM Linux
->> <linux@armlinux.org.uk> wrote:
+On Mon, Oct 30, 2017 at 4:28 PM, Santosh Shilimkar
+<santosh.shilimkar@oracle.com> wrote:
+> On 10/30/2017 3:01 AM, Arnd Bergmann wrote:
 >>
->> >
->> > There's three things wrong, all of which I have patches to address:
->> >
->> > 1. The decompressor code reading the image data sometimes issues unaligned
->> >    reads.  Some compilers get this wrong and cause an abort.  Arnds patch
->> >    addresses this.
->> >
->> > 2. Additional sections can appear in the zImage binary which adds extra
->> >    bytes on the end of the image.  Concatenating the zImage with the
->> >    extra bytes onto a DTB is the same thing as doing this:
->> >
->> >         cat zImage extrabytes foo.dtb > image
->> >
->> >    and the decompressor tolerates no additional bytes between the
->> >    _official_ end of the zImage and the DTB.  I've added a patch which
->> >    detects this situation and fails the kernel build when it happens.
->> >
->> > 3. Ard's patch "efi/libstub: arm: omit sorting of the UEFI memory map"
->> >    gets rid of the additional sections that (a) change the alignment
->> >    of the compressed data, and (b) add additional unexpected bytes on
->> >    the end of zImage.
+>> On Sat, Oct 21, 2017 at 3:22 AM, Santosh Shilimkar
+>> <santosh.shilimkar@oracle.com> wrote:
+>>>
+>>> The following changes since commit
+>>> e19b205be43d11bff638cad4487008c48d21c103:
+>>>
+>>>    Linux 4.14-rc2 (2017-09-24 16:38:56 -0700)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>
+>>> git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
+>>> tags/keystone_config_4.15
+>>>
+>>> for you to fetch changes up to fc88a0631ed0f5b1862d42fb8f2455bf3d18744b:
+>>>
+>>>    ARM: configs: keystone: Enable TIECAP PWM driver (2017-10-09 09:43:32
+>>> -0700)
 >>
->> It's possible that we still need yet another patch to address the gcc bug that
->> Alex Graf found, i.e. https://gcc.gnu.org/bugzilla/show_bug.cgi?id=82445
 >>
->> Without the latest gcc, we might still get into a situation in which we get
->> an unaligned strd when compiling for armv5te or armv6 with gcc-7.[012].
->> As someone mentioned in the bug report, that problem doesn't seem
->> to happen with gcc-6 or -mtune=xscale, or with gcc-7 -march=armv7-a.
->
-> There is another solution which we've used in the past - we could detect
-> these compiler versions and refuse to build with the broken compilers.
+>> Pulled into next/soc. Should this also be enabled in multi_v7_defconfig?
+>>
+> Sure !!
 
-Right, either fail the build or use the workaround from the gcc bugzilla,
-passing -fno-store-merging to the broken compilers avoids the problem
-reliably at the cost of slightly worse code. For the decompressor, we might
-also get away with passing -march=armv5t (not armv5te), which has
-experimentally been found to avoid the problem and produce better code
-than "-march=armv6 -fno-store-merging" as it avoids the strd instruction
-but not other store merging.
+Can you send a patch for that then? Ideally, you could go through all options
+that are enabled in keystone_defconfig but not multi_v7_defconfig and see
+if we want to enable them too (as modules if possible). Feel free to just send
+a single patch describing what you found rather than a pull request.
 
-For normal kernel access (after the decompressor), relying on the fixup
-in the kernel is probably good enough, we already have problems with
-a couple of functiosn that check for
-CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS before doing
-accesses that can result in ldm/stm on any compiler.
-
-I'm still trying to figure out exactly what architectures and gcc versions
-are affected, the gcc-6 branch contains a fix for the problem but I
-have not been able to reproduce it on that version or earlier. However,
-I have now reproduced an strd with gcc-7.1 on this code on all
-architectures that support strd, with this test case from the gcc testsuite:
-
-void foo(int a, int b, int* p)
-{
-  p[1] = a;
-  p[2] = b;
-}
-
-       Arnd
+      Arnd
