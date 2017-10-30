@@ -1,63 +1,41 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 30 Oct 2017 03:56:02 +0100
-Subject: [PULL 7/8] KVM: arm/arm64: vgic-its: Check CBASER/BASER validity
- before enabling the ITS
-In-Reply-To: <20171030025603.23550-1-christoffer.dall@linaro.org>
-References: <20171030025603.23550-1-christoffer.dall@linaro.org>
-Message-ID: <20171030025603.23550-8-christoffer.dall@linaro.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 30 Oct 2017 09:07:38 +0530
+Subject: [PATCH V4 07/12] boot_constraint: Add debugfs support
+In-Reply-To: <a553696c-0963-aab0-5750-467a9a42696d@infradead.org>
+References: <cover.1509284255.git.viresh.kumar@linaro.org>
+ <a796de9a338d7d0876faa3ec99f5cb49315c893c.1509284255.git.viresh.kumar@linaro.org>
+ <a553696c-0963-aab0-5750-467a9a42696d@infradead.org>
+Message-ID: <20171030033738.GG4240@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Auger <eric.auger@redhat.com>
+On 29-10-17, 08:09, Randy Dunlap wrote:
+> On 10/29/17 06:48, Viresh Kumar wrote:
+> > This patch adds debugfs support for boot constraints. This is how it
+> > looks for a "vmmc-supply" constraint for the MMC device.
+> > 
+> > Tested-by: Rajendra Nayak <rnayak@codeaurora.org>
+> > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> > ---
+> >  drivers/boot_constraints/clk.c    |  3 ++
+> >  drivers/boot_constraints/core.c   | 60 +++++++++++++++++++++++++++++++++++++++
+> >  drivers/boot_constraints/core.h   |  6 ++++
+> >  drivers/boot_constraints/pm.c     | 11 +++++--
+> >  drivers/boot_constraints/supply.c |  9 ++++++
+> >  5 files changed, 87 insertions(+), 2 deletions(-)
+> 
+> Hi,
+> Does this build OK when CONFIG_DEBUG_FS is not enabled?
+> 
+> I didn't see any depends on or select DEBUG_FS or any use of
+> CONFIG_DEBUG_FS in any Makefile.
 
-The spec says it is UNPREDICTABLE to enable the ITS
-if any of the following conditions are true:
+As soon as I saw your reply, it looked like I have seen this email
+earlier. :)
 
-- GITS_CBASER.Valid == 0.
-- GITS_BASER<n>.Valid == 0, for any GITS_BASER<n> register
-  where the Type field indicates Device.
-- GITS_BASER<n>.Valid == 0, for any GITS_BASER<n> register
-  where the Type field indicates Interrupt Collection and
-  GITS_TYPER.HCC == 0.
+https://marc.info/?l=linux-kernel&m=149866480929111&w=2
 
-In that case, let's keep the ITS disabled.
+And yes, it builds just fine as all the dummy helpers are in place.
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Reported-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- virt/kvm/arm/vgic/vgic-its.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 6a715a6ec64e..e69ef7d27fde 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -1466,6 +1466,16 @@ static void vgic_mmio_write_its_ctlr(struct kvm *kvm, struct vgic_its *its,
- {
- 	mutex_lock(&its->cmd_lock);
- 
-+	/*
-+	 * It is UNPREDICTABLE to enable the ITS if any of the CBASER or
-+	 * device/collection BASER are invalid
-+	 */
-+	if (!its->enabled && (val & GITS_CTLR_ENABLE) &&
-+		(!(its->baser_device_table & GITS_BASER_VALID) ||
-+		 !(its->baser_coll_table & GITS_BASER_VALID) ||
-+		 !(its->cbaser & GITS_CBASER_VALID)))
-+		goto out;
-+
- 	its->enabled = !!(val & GITS_CTLR_ENABLE);
- 
- 	/*
-@@ -1474,6 +1484,7 @@ static void vgic_mmio_write_its_ctlr(struct kvm *kvm, struct vgic_its *its,
- 	 */
- 	vgic_its_process_commands(kvm, its);
- 
-+out:
- 	mutex_unlock(&its->cmd_lock);
- }
- 
 -- 
-2.14.2
+viresh
