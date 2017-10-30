@@ -1,109 +1,76 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 30 Oct 2017 17:24:34 +0100
-Subject: [PATCH] ARM: add a private asm/unaligned.h
-In-Reply-To: <20171030161207.GS20805@n2100.armlinux.org.uk> (Russell King's
- message of "Mon, 30 Oct 2017 16:12:08 +0000")
-References: <20171020200231.1355569-1-arnd@arndb.de>
- <87wp3g39es.fsf@free-electrons.com>
- <20171027152743.GJ20805@n2100.armlinux.org.uk>
- <87k1zc3fxp.fsf@free-electrons.com>
- <20171030154855.GO20805@n2100.armlinux.org.uk>
- <87bmko1v6f.fsf@free-electrons.com>
- <20171030161207.GS20805@n2100.armlinux.org.uk>
-Message-ID: <8737601u4d.fsf@free-electrons.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 30 Oct 2017 10:25:05 -0600
+Subject: [PATCH] coresight: ETM: Add support for ARM Cortex-A73
+In-Reply-To: <20171019154516.24536-1-suzuki.poulose@arm.com>
+References: <20171019154516.24536-1-suzuki.poulose@arm.com>
+Message-ID: <CANLsYkypAftQxWeqEhT8wCbbVbpP3AVv-Z=46cxWBvRqQvKPFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell King,
- 
- On lun., oct. 30 2017, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+On 19 October 2017 at 09:45, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+> Add ARM Cortex A-73 ETM PIDs to the known ETM ips. While at it
+> also add description of the CPU to which the ETM belongs, to make
+> it easier to identify the ETM devices.
+>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  drivers/hwtracing/coresight/coresight-etm4x.c | 24 +++++++++++++++---------
+>  1 file changed, 15 insertions(+), 9 deletions(-)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+> index cf364a514c12..e84d80b008fc 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm4x.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+> @@ -1034,7 +1034,8 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
+>         }
+>
+>         pm_runtime_put(&adev->dev);
+> -       dev_info(dev, "%s initialized\n", (char *)id->data);
+> +       dev_info(dev, "CPU%d: %s initialized\n",
+> +                       drvdata->cpu, (char *)id->data);
+>
+>         if (boot_enable) {
+>                 coresight_enable(drvdata->csdev);
+> @@ -1053,20 +1054,25 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
+>  }
+>
+>  static const struct amba_id etm4_ids[] = {
+> -       {       /* ETM 4.0 - Cortex-A53  */
+> +       {
+>                 .id     = 0x000bb95d,
+>                 .mask   = 0x000fffff,
+> -               .data   = "ETM 4.0",
+> +               .data   = "Cortex-A53 ETM v4.0",
+>         },
+> -       {       /* ETM 4.0 - Cortex-A57 */
+> +       {
+>                 .id     = 0x000bb95e,
+>                 .mask   = 0x000fffff,
+> -               .data   = "ETM 4.0",
+> +               .data   = "Cortex-A57 ETM v4.0",
+>         },
+> -       {       /* ETM 4.0 - A72, Maia, HiSilicon */
+> -               .id = 0x000bb95a,
+> -               .mask = 0x000fffff,
+> -               .data = "ETM 4.0",
+> +       {
+> +               .id     = 0x000bb95a,
+> +               .mask   = 0x000fffff,
+> +               .data   = "Cortex-A72 ETM v4.0",
+> +       },
+> +       {
+> +               .id     = 0x000bb959,
+> +               .mask   = 0x000fffff,
+> +               .data   = "Cortex-A73 ETM v4.0",
+>         },
+>         { 0, 0},
+>  };
 
-> On Mon, Oct 30, 2017 at 05:01:44PM +0100, Gregory CLEMENT wrote:
->> Hi Russell King,
->>  
->>  On lun., oct. 30 2017, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
->> 
->> > On Mon, Oct 30, 2017 at 02:48:02PM +0100, Gregory CLEMENT wrote:
->> >> Hi Russell,
->> >> 
->> >> So I tested the branch fixes in your git tree.
->> >> 
->> >> After doing a "make multi_v7_defconfig; make zImage", I got the message
->> >> "arm-linux-gnueabi-ld: error: zImage file size is incorrect" you added
->> >> in the commit "ARM: verify size of zImage".
->> >> 
->> >> It is the same with mvebu_v7_defconfig, so I wonder wich with
->> >> configuration this patch was tested ?
->> >
->> > I heard a similar report from Olof when his autobuilder produced 100%
->> > failure.  I tried one of the same defconfig's that Olof tried here,
->> > and didn't see the failure.  It passes my build tests here, and it
->> > also passes kernelci's build tests too.
->> >
->> > So, I _think_ it's got something to do with the toolchain versions
->> > being used, but at the moment I'm just guessing.  I've no real idea,
->> > because I've no idea what's causing the failure at the moment.
->> >
->> > Olof said that he'd send me one of the build trees, but I'm still
->> > waiting.
->> >
->> > What I need is a tarball of the objects from arch/arm/boot/compressed
->> > to work out what's going on - when grabbing that, it may be a good
->> 
->> I've just attached this tarball to this email. It might be rejected by
->> the mailing list, but as you are also in the "To" field you should
->> receive it.
->> 
->> Actually the archive is the full content of arch/arm/boot/compressed
->> from my build directory and I removed vmlinux and all the piggy files to
->> have a small archive.
->> 
->> If they are also needed then I can provide an url for it.
->
-> Thanks.
->
-> Unfortunately, I can't reproduce the issue using your objects and my
-> linker.
->
-> If I modify your vmlinux.lds to add the assert in, and then link using:
->
-> $ arm-linux-ld -o vmlinux -T vmlinux.lds *.o --defsym _kernel_bss_size=0 \
->   --defsym input_data_end=0 --defsym input_data=0
->
-> Then it links successfully.  If I objcopy that:
->
-> $ arm-linux-objcopy -O binary -R .comment -S vmlinux zImage
-> $ vdir zImage
-> -rwxrwxr-x 1 rmk rmk 27784 Oct 30 16:10 zImage
-> $ arm-linux-nm vmlinux |grep _edata
-> 00006c88 D _edata
-> $ echo $((0x6c88))
-> 27784
->
-> So it all looks sane here.  So my hunch is that whatever's going wrong,
-> it's going wrong at the final link, which means I need the vmlinux as
-> generated by your toolchain.
+Applied, thanks for fixing that.
 
-Here you will find all the objects included the vmlinux:
+Mathieu
 
-http://free-electrons.com/~gregory/pub/compressed.tgz
-
-Gregory
-
-
+> --
+> 2.13.6
 >
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-> According to speedtest.net: 8.21Mbps down 510kbps up
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
