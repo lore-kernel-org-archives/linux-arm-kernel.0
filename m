@@ -1,21 +1,38 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 30 Oct 2017 14:18:14 +0000
-Subject: [PATCH v3 0/12] arm+arm64: vdso unification to lib/vdso/
-In-Reply-To: <20171027222353.56875-1-salyzyn@android.com>
-References: <20171027222353.56875-1-salyzyn@android.com>
-Message-ID: <20171030141813.nozm5bgumb5qp2ol@lakrids.cambridge.arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 30 Oct 2017 15:27:09 +0100
+Subject: [GIT PULL] ARM: mvebu: fixes for v4.14 (#3)
+Message-ID: <87efpk3e4i.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Fri, Oct 27, 2017 at 03:23:48PM -0700, Mark Salyzyn wrote:
-> Note I noticed a bug in the old implementation of __kernel_clock_getres;
-> it was checking only the lower 32bits of the pointer; this would work
-> for most cases but could fail in a few.
+Here is the third pull request for fixes for mvebu for v4.14.
 
-Sorry if this is a stupid question, but do you mean from a prior version
-of this series, or the one in the kernel today?
+Gregory
 
-Thanks,
-Mark.
+The following changes since commit 2bbbd96357ce76cc45ec722c00f654aa7b189112:
+
+  bus: mbus: fix window size calculation for 4GB windows (2017-10-12 15:01:30 +0200)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.14-3
+
+for you to fetch changes up to cda80a82ac3e89309706c027ada6ab232be1d640:
+
+  ARM: dts: mvebu: pl310-cache disable double-linefill (2017-10-26 17:41:26 +0200)
+
+----------------------------------------------------------------
+mvebu fixes for 4.14 (part 3)
+
+Fixing an old stability issue on Cortex A9 based mvebu SoC
+
+----------------------------------------------------------------
+Yan Markman (1):
+      ARM: dts: mvebu: pl310-cache disable double-linefill
+
+ arch/arm/boot/dts/armada-375.dtsi | 4 ++--
+ arch/arm/boot/dts/armada-38x.dtsi | 4 ++--
+ arch/arm/boot/dts/armada-39x.dtsi | 4 ++--
+ 3 files changed, 6 insertions(+), 6 deletions(-)
