@@ -1,30 +1,33 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 30 Oct 2017 17:55:54 +0100
-Subject: [GIT PULL] Amlogic 64-bit DT updates for v4.15
-In-Reply-To: <CAK8P3a0cO19miC8VU6mZ_L2FLpvfCpYPpseHViUJkSB-O1hWqw@mail.gmail.com>
- (Arnd Bergmann's message of "Mon, 30 Oct 2017 14:36:36 +0100")
-References: <7hefpvqxbe.fsf@baylibre.com>
- <CAK8P3a0cO19miC8VU6mZ_L2FLpvfCpYPpseHViUJkSB-O1hWqw@mail.gmail.com>
-Message-ID: <7hshe0tw11.fsf@baylibre.com>
+Date: Mon, 30 Oct 2017 17:56:33 +0100
+Subject: [RESEND PATCH v2 1/2] soc: amlogic: add Meson GX VPU Domains
+ driver
+In-Reply-To: <CAPDyKFpCf50XRowGe3X5KpmhKrb99NTxOUQtz4RN4aemAVAJCA@mail.gmail.com>
+ (Ulf Hansson's message of "Mon, 30 Oct 2017 16:40:07 +0100")
+References: <1509208583-30349-1-git-send-email-narmstrong@baylibre.com>
+ <1509208583-30349-2-git-send-email-narmstrong@baylibre.com>
+ <CAPDyKFpCf50XRowGe3X5KpmhKrb99NTxOUQtz4RN4aemAVAJCA@mail.gmail.com>
+Message-ID: <7ho9ootvzy.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+Ulf Hansson <ulf.hansson@linaro.org> writes:
 
-> On Sun, Oct 22, 2017 at 12:41 PM, Kevin Hilman <khilman@baylibre.com> wrote:
->> Amlogic 64-bit platforms: DT updates for v4.15
->> - new SoC support: A113D
->> - new boards: Tronsmart Vega S96, Khadas vim2
->> - reserved memory fixups
->> - gpio-names cleanups
->> - MMC cleanups, enable high-speed modes
->> - misc cleanups
+> Hi Neil,
 >
-> I've had to 's/secmon at 05000000/secmon at 5000000/g' to avoid re-introducing
-> warnings that Rob had previously fixed, otherwise looks good, so I
-> pulled it into
-> next/dt with that fixup as an 'evil merge'. Thanks,
+> [...]
+>
+>> +
+>> +       pm_genpd_init(&vpu_hdmi_pd.genpd, &simple_qos_governor,
+>> +                     meson_gx_pwrc_vpu_get_power(&vpu_hdmi_pd));
+>> +
+>
+> This means that you may initialize the genpd in powered on state.
+>
+> For that scenario, I think you will hit a clock unprepare/disable
+> in-balance issue when genpd calls your ->power_off() callback, simply
+> because you didn't call clk_prepare_enable() for the clocks first.
 
-Oops, sorry to miss that one and thanks for the fixup.
+Yup, in my testing, I definitely hit this.
 
 Kevin
