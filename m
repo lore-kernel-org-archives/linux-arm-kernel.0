@@ -1,42 +1,42 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 Oct 2017 10:15:09 +0100
-Subject: [GIT PULL] updates to soc/fsl drivers for v4.14
-In-Reply-To: <AM4PR0401MB16998510F0829600808638A08F5A0@AM4PR0401MB1699.eurprd04.prod.outlook.com>
-References: <1506109046-11527-1-git-send-email-leoyang.li@nxp.com>
- <CAK8P3a3cyiOgFXAyADH==L=0P621ucp3Xy0F3kBezV5EW9WdDQ@mail.gmail.com>
- <AM4PR0401MB1699CA477F157A2C7618492D8F430@AM4PR0401MB1699.eurprd04.prod.outlook.com>
- <20171023011115.GF8700@dragon>
- <CAK8P3a3ePm25vEnTTLpKAwj_GZf3Hc-VivTJZCvhsH0ivwTMaQ@mail.gmail.com>
- <AM4PR0401MB16998510F0829600808638A08F5A0@AM4PR0401MB1699.eurprd04.prod.outlook.com>
-Message-ID: <CAK8P3a2RoLsOgtb=RG-T-iMt8F=9fVq4DibLZAD97us6=VUvgg@mail.gmail.com>
+Date: Mon, 30 Oct 2017 10:17:54 +0100
+Subject: [PATCH] drivers/firmware: psci_checker: Add missing
+ destroy_timer_on_stack()
+In-Reply-To: <1508857353-3602-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1508857353-3602-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <CAK8P3a1A_Nf=xzPwnW7SCaOumr7Mv5Y7kXCd=b=+-nNdAdG6GA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 27, 2017 at 7:33 PM, Leo Li <leoyang.li@nxp.com> wrote:
-
->> I'm obviously aware of your product lines and the differences, it was just a bit
->> surprising to get the pull request from you after we had earlier agreed that
->> Shawn would help you handle the pull requests for all NXP products, as he did
->> with the changes to arch/arm/ (LS1021A) and arch/arm64 for various
->> Layerscape products we support (LS1012a, LS1043a, LS1088a, and LS2XXXa so
->> far).
+On Tue, Oct 24, 2017 at 5:02 PM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> The PSCI checker suspend_test_thread() function (ie executed for the
+> suspend test) requires an on-stack timer to carry out the test it
+> executes; it sets it up through the setup_timer_on_stack() API.
 >
-> My understanding of the previous agreement was that it only covers device tree
-> patches which doesn't need too much detail knowledge of the device itself as long
-> as it follows the existing bindings; while the drivers for on-chip devices are still
-> handled by us (previously Scott Wood) as it requires a lot more knowledge about
-> the device internal.
+> setup_timer_on_stack() requires its counterpart destroy_timer_on_stack()
+> to be called when the timer is disposed of but the PSCI checker code is
+> currently missing that call, leaving the timer object in an incosistent
+> state when the PSCI checker stops the thread executing the suspend
+> test.
+>
+> Add the missing destroy_timer_on_stack() call to fix the omission.
+>
+> Fixes: ea8b1c4a6019 ("drivers: psci: PSCI checker module")
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Reported-by: Kees Cook <keescook@chromium.org>
+> Cc: Kees Cook <keescook@chromium.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
 
-We probably just didn't make it clear enough and were making different
-assumptions.
-With the other platforms in arm-soc, I always get all changes
-concerning one platform
-from a single person, who will then make sure things get merged in the correct
-order.
+Hi Lorenzo,
 
-OTOH, having two separate downstream maintainers does have an advantage that it
-makes it harder to run into incompatible DT binding changes, as each
-tree will get
-more testing by itself.
+You addressed the patch 'To: arm at kernel.org', but I'm not entirely
+sure what to do with it, it would be nice to be a little more explicit whether
+you want us to apply the patch directly or just review it, and which trees
+you want it to get merged into.
 
-        Arnd
+As you are fixing a regression against v4.10, I would assume you want
+it merged into v4.14 with a 'cc: stable' tag to have it backported into v4.13,
+correct?
+
+      Arnd
