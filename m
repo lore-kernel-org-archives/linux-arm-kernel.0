@@ -1,48 +1,297 @@
-From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
-Date: Mon, 30 Oct 2017 10:37:09 -0700
-Subject: [GIT PULL 2/3] ARM: Keystone config update for 4.15
-In-Reply-To: <CAK8P3a21yh17EGnh5+hL46TVyoOn0HN1zUoJNVxsMYGfOCUntQ@mail.gmail.com>
-References: <1508548966-7350-1-git-send-email-santosh.shilimkar@oracle.com>
- <1508548966-7350-2-git-send-email-santosh.shilimkar@oracle.com>
- <CAK8P3a1BU6U_c+a0nTp7QM2-AR6qh-3T+RaGQX4mLvUU8Lg62Q@mail.gmail.com>
- <68f47a4e-ba33-ff33-3c73-9b104284f1a8@oracle.com>
- <CAK8P3a21yh17EGnh5+hL46TVyoOn0HN1zUoJNVxsMYGfOCUntQ@mail.gmail.com>
-Message-ID: <fc8c61fb-42b2-5db5-b45a-22e8246a4577@oracle.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 30 Oct 2017 18:15:10 +0000
+Subject: [RFC PATCH] drivers/irqchip: add support for Socionext Synquacer EXIU
+ controller
+Message-ID: <20171030181510.10022-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/30/17 10:04 AM, Arnd Bergmann wrote:
-> On Mon, Oct 30, 2017 at 4:28 PM, Santosh Shilimkar
-> <santosh.shilimkar@oracle.com> wrote:
->> On 10/30/2017 3:01 AM, Arnd Bergmann wrote:
->>>
->>> On Sat, Oct 21, 2017 at 3:22 AM, Santosh Shilimkar
->>> <santosh.shilimkar@oracle.com> wrote:
->>>>
->>>> The following changes since commit
->>>> e19b205be43d11bff638cad4487008c48d21c103:
->>>>
->>>>     Linux 4.14-rc2 (2017-09-24 16:38:56 -0700)
->>>>
->>>> are available in the git repository at:
->>>>
->>>>
->>>> git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
->>>> tags/keystone_config_4.15
->>>>
->>>> for you to fetch changes up to fc88a0631ed0f5b1862d42fb8f2455bf3d18744b:
->>>>
->>>>     ARM: configs: keystone: Enable TIECAP PWM driver (2017-10-09 09:43:32
->>>> -0700)
->>>
->>>
->>> Pulled into next/soc. Should this also be enabled in multi_v7_defconfig?
->>>
->> Sure !!
-> 
-> Can you send a patch for that then? Ideally, you could go through all options
-> that are enabled in keystone_defconfig but not multi_v7_defconfig and see
-> if we want to enable them too (as modules if possible). Feel free to just send
-> a single patch describing what you found rather than a pull request.
-> 
-Will do.
+The Socionext Synquacer SoC has an external interrupt unit (EXIU)
+that forwards a block of 32 input lines to 32 adjacent GICv3 SPIs.
+
+The EXIU has per-interrupt level/edge and polarity controls, and
+mask bits that keep the outgoing lines de-asserted, even though
+the controller may still latch occurring interrupt conditions while
+the line is masked.
+
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+
+If this doesn't look to insane, I will follow up with a DT binding
+as well.
+
+    exiu: exiu at 510c0000 {
+        compatible = "socionext,sc2a11-exiu";
+        reg = <0x0 0x510c0000 0x0 0x20>;
+        interrupt-controller;
+        interrupt-parent = <&gic>;
+        #interrupt-cells = <3>;
+        spi-base = <112>;
+    };
+
+ arch/arm64/Kconfig.platforms   |   3 +
+ drivers/irqchip/Makefile       |   1 +
+ drivers/irqchip/irq-sni-exiu.c | 230 ++++++++++++++++++++
+ 3 files changed, 234 insertions(+)
+
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 6b54ee8c1262..d0fc6c2a32e7 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -161,6 +161,9 @@ config ARCH_SEATTLE
+ config ARCH_SHMOBILE
+ 	bool
+ 
++config ARCH_SYNQUACER
++	bool "Socionext Synquacer SoC Family"
++
+ config ARCH_RENESAS
+ 	bool "Renesas SoC Platforms"
+ 	select ARCH_SHMOBILE
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index 845abc107ad5..f6825aa30098 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -79,3 +79,4 @@ obj-$(CONFIG_ARCH_ASPEED)		+= irq-aspeed-vic.o irq-aspeed-i2c-ic.o
+ obj-$(CONFIG_STM32_EXTI) 		+= irq-stm32-exti.o
+ obj-$(CONFIG_QCOM_IRQ_COMBINER)		+= qcom-irq-combiner.o
+ obj-$(CONFIG_IRQ_UNIPHIER_AIDET)	+= irq-uniphier-aidet.o
++obj-$(CONFIG_ARCH_SYNQUACER)		+= irq-sni-exiu.c
+diff --git a/drivers/irqchip/irq-sni-exiu.c b/drivers/irqchip/irq-sni-exiu.c
+new file mode 100644
+index 000000000000..0ab812523a11
+--- /dev/null
++++ b/drivers/irqchip/irq-sni-exiu.c
+@@ -0,0 +1,230 @@
++/*
++ * Driver for Socionext External Interrupt Unit (EXIU)
++ *
++ * Copyright (c) 2017 Linaro, Ltd. <ard.biesheuvel@linaro.org>
++ *
++ * Based on irq-tegra.c:
++ *   Copyright (C) 2011 Google, Inc.
++ *   Copyright (C) 2010,2013, NVIDIA Corporation
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/irqchip.h>
++#include <linux/irqdomain.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++
++#define NUM_IRQS	32
++
++#define EIMASK		0x00
++#define EISRCSEL	0x04
++#define EIREQSTA	0x08
++#define EIRAWREQSTA	0x0C
++#define EIREQCLR	0x10
++#define EILVL		0x14
++#define EIEDG		0x18
++#define EISIR		0x1C
++
++struct exiu_irq_data {
++	void __iomem	*base;
++	u32		spi_base;
++};
++
++static void exiu_irq_eoi(struct irq_data *d)
++{
++	struct exiu_irq_data *data = irq_data_get_irq_chip_data(d);
++
++	writel(BIT(d->hwirq), data->base + EIREQCLR);
++	irq_chip_eoi_parent(d);
++}
++
++static void exiu_irq_mask(struct irq_data *d)
++{
++	struct exiu_irq_data *data = irq_data_get_irq_chip_data(d);
++	u32 val;
++
++	val = readl_relaxed(data->base + EIMASK) | BIT(d->hwirq);
++	writel_relaxed(val, data->base + EIMASK);
++	irq_chip_mask_parent(d);
++}
++
++static void exiu_irq_unmask(struct irq_data *d)
++{
++	struct exiu_irq_data *data = irq_data_get_irq_chip_data(d);
++	u32 val;
++
++	val = readl_relaxed(data->base + EIMASK) & ~BIT(d->hwirq);
++	writel_relaxed(val, data->base + EIMASK);
++	irq_chip_unmask_parent(d);
++}
++
++static void exiu_irq_enable(struct irq_data *d)
++{
++	struct exiu_irq_data *data = irq_data_get_irq_chip_data(d);
++	u32 val;
++
++	/* clear interrupts that were latched while disabled */
++	writel_relaxed(BIT(d->hwirq), data->base + EIREQCLR);
++
++	val = readl_relaxed(data->base + EIMASK) & ~BIT(d->hwirq);
++	writel_relaxed(val, data->base + EIMASK);
++	irq_chip_enable_parent(d);
++}
++
++static int exiu_irq_set_type(struct irq_data *d, unsigned int type)
++{
++	struct exiu_irq_data *data = irq_data_get_irq_chip_data(d);
++	u32 val;
++
++	val = readl_relaxed(data->base + EILVL);
++	if (type == IRQ_TYPE_EDGE_RISING || type == IRQ_TYPE_LEVEL_HIGH)
++		val |= BIT(d->hwirq);
++	else
++		val &= ~BIT(d->hwirq);
++	writel_relaxed(val, data->base + EILVL);
++
++	val = readl_relaxed(data->base + EIEDG);
++	if (type == IRQ_TYPE_LEVEL_LOW || type == IRQ_TYPE_LEVEL_HIGH)
++		val &= ~BIT(d->hwirq);
++	else
++		val |= BIT(d->hwirq);
++	writel_relaxed(val, data->base + EIEDG);
++
++	writel_relaxed(BIT(d->hwirq), data->base + EIREQCLR);
++
++	return irq_chip_set_type_parent(d, IRQ_TYPE_LEVEL_HIGH);
++}
++
++static struct irq_chip exiu_irq_chip = {
++	.name			= "EXIU",
++	.irq_eoi		= exiu_irq_eoi,
++	.irq_enable		= exiu_irq_enable,
++	.irq_mask		= exiu_irq_mask,
++	.irq_unmask		= exiu_irq_unmask,
++	.irq_set_type		= exiu_irq_set_type,
++	.irq_set_affinity	= irq_chip_set_affinity_parent,
++	.flags			= IRQCHIP_SET_TYPE_MASKED |
++				  IRQCHIP_SKIP_SET_WAKE |
++				  IRQCHIP_EOI_THREADED |
++				  IRQCHIP_MASK_ON_SUSPEND,
++};
++
++static int exiu_domain_translate(struct irq_domain *domain,
++				 struct irq_fwspec *fwspec,
++				 unsigned long *hwirq,
++				 unsigned int *type)
++{
++	struct exiu_irq_data *info = domain->host_data;
++
++	if (is_of_node(fwspec->fwnode)) {
++		if (fwspec->param_count != 3)
++			return -EINVAL;
++
++		if (fwspec->param[0] != GIC_SPI)
++			return -EINVAL; /* No PPI should point to this domain */
++
++		*hwirq = fwspec->param[1] - info->spi_base;
++		*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
++		return 0;
++	}
++	return -EINVAL;
++}
++
++static int exiu_domain_alloc(struct irq_domain *domain, unsigned int virq,
++			     unsigned int nr_irqs, void *data)
++{
++	struct irq_fwspec *fwspec = data;
++	struct irq_fwspec parent_fwspec;
++	struct exiu_irq_data *info = domain->host_data;
++	irq_hw_number_t hwirq;
++	unsigned int i;
++
++	if (fwspec->param_count != 3)
++		return -EINVAL;	/* Not GIC compliant */
++	if (fwspec->param[0] != GIC_SPI)
++		return -EINVAL;	/* No PPI should point to this domain */
++
++	hwirq = fwspec->param[1] - info->spi_base;
++	for (i = 0; i < nr_irqs; i++)
++		irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
++					      &exiu_irq_chip, info);
++
++	parent_fwspec = *fwspec;
++	parent_fwspec.fwnode = domain->parent->fwnode;
++	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs,
++					    &parent_fwspec);
++}
++
++static const struct irq_domain_ops exiu_domain_ops = {
++	.translate	= exiu_domain_translate,
++	.alloc		= exiu_domain_alloc,
++	.free		= irq_domain_free_irqs_common,
++};
++
++static int __init exiu_init(struct device_node *node,
++			    struct device_node *parent)
++{
++	struct irq_domain *parent_domain, *domain;
++	struct exiu_irq_data *data;
++	int err;
++
++	if (!parent) {
++		pr_err("%pOF: no parent, giving up\n", node);
++		return -ENODEV;
++	}
++
++	parent_domain = irq_find_host(parent);
++	if (!parent_domain) {
++		pr_err("%pOF: unable to obtain parent domain\n", node);
++		return -ENXIO;
++	}
++
++	data = kzalloc(sizeof(*data), GFP_KERNEL);
++	if (!data)
++		return -ENOMEM;
++
++	if (of_property_read_u32(node, "spi-base", &data->spi_base)) {
++		pr_err("%pOF: failed to parse 'spi-base' property\n", node);
++		err = -ENODEV;
++		goto out_free;
++	}
++
++	data->base = of_iomap(node, 0);
++	if (IS_ERR(data->base)) {
++		err = PTR_ERR(data->base);
++		goto out_free;
++	}
++
++	/* clear and mask all interrupts */
++	writel_relaxed(0xFFFFFFFF, data->base + EIREQCLR);
++	writel_relaxed(0xFFFFFFFF, data->base + EIMASK);
++
++	domain = irq_domain_add_hierarchy(parent_domain, 0, NUM_IRQS, node,
++					  &exiu_domain_ops, data);
++	if (!domain) {
++		pr_err("%pOF: failed to allocated domain\n", node);
++		err = -ENOMEM;
++		goto out_unmap;
++	}
++
++	pr_info("%pOF: %d interrupts forwarded to %pOF\n", node, NUM_IRQS,
++		parent);
++
++	return 0;
++
++out_unmap:
++	iounmap(data->base);
++out_free:
++	kfree(data);
++	return err;
++}
++IRQCHIP_DECLARE(exiu, "socionext,sc2a11-exiu", exiu_init);
+-- 
+2.11.0
