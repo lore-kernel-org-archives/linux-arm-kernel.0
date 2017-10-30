@@ -1,38 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 Oct 2017 14:51:13 +0100
-Subject: linux-next: manual merge of the sunxi tree with the arm-soc tree
-In-Reply-To: <20171030122200.z5sj2riar4vfoiwo@sirena.co.uk>
-References: <20171030122200.z5sj2riar4vfoiwo@sirena.co.uk>
-Message-ID: <CAK8P3a12bGTr1-royZZeuu69kD+59MhVZeJJ-8iVviGg33hA-w@mail.gmail.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 30 Oct 2017 13:55:20 +0000
+Subject: Tegra baseline test results for v4.14-rc7
+Message-ID: <8b7ad42d-869c-cb94-4d41-9cdcf164a6f5@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 30, 2017 at 1:22 PM, Mark Brown <broonie@kernel.org> wrote:
-> Hi all,
->
-> Today's linux-next merge of the sunxi tree got a conflict in:
->
->    arch/arm/boot/dts/sunxi-h3-h5.dtsi
->    arch/arm/boot/dts/sun7i-a20.dtsi
->    arch/arm/boot/dts/sun6i-a31.dtsi
->    arch/arm/boot/dts/sun4i-a10.dtsi
->
-> between commit:
->
->    8dccafaa281aa1 ("arm: dts: fix unit-address leading 0s")
->
-> from the arm-soc tree and various commits from the sunxi tree.
->
-> I fixed it up (see below) and can carry the fix as necessary. This
-> is now fixed as far as linux-next is concerned, but any non trivial
-> conflicts should be mentioned to your upstream maintainer when your tree
-> is submitted for merging.  You may also want to consider cooperating
-> with the maintainer of the conflicting tree to minimise any particularly
-> complex conflicts.
+Here are some basic Tegra test results for Linux v4.14-rc7.
+Logs and other details at:
 
-Thanks!
+    https://nvtb.github.io//linux/test_v4.14-rc7/20171030063104/
 
-I think I did the same merge when I pulled in the sunxi/dt branch
-today, so it should be resolved next time.
 
-      Arnd
+Test summary
+------------
+
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000, tegra210-smaug
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.14-rc6 (bb176f67090ca54869fc1262c913aa69d2ede070)):
+   text     data      bss    total  kernel
+  +4024      +20        0    +4044  defconfig
+   +712        0        0     +712  multi_v7_defconfig
+  +1048     +128        0    +1176  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.14-rc6 (bb176f67090ca54869fc1262c913aa69d2ede070))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
+        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+
+--
+nvpublic
