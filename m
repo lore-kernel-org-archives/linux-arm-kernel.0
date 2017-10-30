@@ -1,85 +1,87 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 30 Oct 2017 14:08:18 +0000
-Subject: [PATCH v3] arm64: prevent regressions in compressed kernel image
- size when upgrading to binutils 2.27
-In-Reply-To: <CAKv+Gu8s7Q-xBWvTgpvQh4NpiW89=W+0meknVX+w3MaZvsyrrQ@mail.gmail.com>
-References: <CAKv+Gu8wqH5fyievpcFi0P+JxEkA38cROzptN3zdCD0zCPcppg@mail.gmail.com>
- <20171027163341.57550-1-ndesaulniers@google.com>
- <20171030130834.GK4404@arm.com>
- <CAKv+Gu8dWLPDSbWXFFG2WVCXtxuG8VT-CyBHJG9=rt9SugpviQ@mail.gmail.com>
- <20171030131251.GM4404@arm.com>
- <CAKv+Gu8s7Q-xBWvTgpvQh4NpiW89=W+0meknVX+w3MaZvsyrrQ@mail.gmail.com>
-Message-ID: <20171030140818.GN4404@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 30 Oct 2017 14:10:05 +0000
+Subject: [PATCH v3 04/12] arm: vdso: enforce monotonic and realtime as
+ inline
+In-Reply-To: <20171027222531.57223-1-salyzyn@android.com>
+References: <20171027222531.57223-1-salyzyn@android.com>
+Message-ID: <20171030141004.n54obxkbmtfbzmra@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 30, 2017 at 01:35:49PM +0000, Ard Biesheuvel wrote:
-> On 30 October 2017 at 13:12, Will Deacon <will.deacon@arm.com> wrote:
-> > On Mon, Oct 30, 2017 at 01:11:23PM +0000, Ard Biesheuvel wrote:
-> >> On 30 October 2017 at 13:08, Will Deacon <will.deacon@arm.com> wrote:
-> >> > On Fri, Oct 27, 2017 at 09:33:41AM -0700, Nick Desaulniers wrote:
-> >> >> Upon upgrading to binutils 2.27, we found that our lz4 and gzip
-> >> >> compressed kernel images were significantly larger, resulting is 10ms
-> >> >> boot time regressions.
-> >> >>
-> >> >> As noted by Rahul:
-> >> >> "aarch64 binaries uses RELA relocations, where each relocation entry
-> >> >> includes an addend value. This is similar to x86_64.  On x86_64, the
-> >> >> addend values are also stored at the relocation offset for relative
-> >> >> relocations. This is an optimization: in the case where code does not
-> >> >> need to be relocated, the loader can simply skip processing relative
-> >> >> relocations.  In binutils-2.25, both bfd and gold linkers did this for
-> >> >> x86_64, but only the gold linker did this for aarch64.  The kernel build
-> >> >> here is using the bfd linker, which stored zeroes at the relocation
-> >> >> offsets for relative relocations.  Since a set of zeroes compresses
-> >> >> better than a set of non-zero addend values, this behavior was resulting
-> >> >> in much better lz4 compression.
-> >> >>
-> >> >> The bfd linker in binutils-2.27 is now storing the actual addend values
-> >> >> at the relocation offsets. The behavior is now consistent with what it
-> >> >> does for x86_64 and what gold linker does for both architectures.  The
-> >> >> change happened in this upstream commit:
-> >> >> https://sourceware.org/git/?p=binutils-gdb.git;a=commit;h=1f56df9d0d5ad89806c24e71f296576d82344613
-> >> >> Since a bunch of zeroes got replaced by non-zero addend values, we see
-> >> >> the side effect of lz4 compressed image being a bit bigger.
-> >> >>
-> >> >> To get the old behavior from the bfd linker, "--no-apply-dynamic-relocs"
-> >> >> flag can be used:
-> >> >> $ LDFLAGS="--no-apply-dynamic-relocs" make
-> >> >> With this flag, the compressed image size is back to what it was with
-> >> >> binutils-2.25.
-> >> >>
-> >> >> If the kernel is using ASLR, there aren't additional runtime costs to
-> >> >> --no-apply-dynamic-relocs, as the relocations will need to be applied
-> >> >> again anyway after the kernel is relocated to a random address.
-> >> >>
-> >> >> If the kernel is not using ASLR, then presumably the current default
-> >> >> behavior of the linker is better. Since the static linker performed the
-> >> >> dynamic relocs, and the kernel is not moved to a different address at
-> >> >> load time, it can skip applying the relocations all over again."
-> >> >
-> >> > Do you have any numbers booting an uncompressed kernel Image without ASLR
-> >> > to see if skipping the relocs makes a measurable difference there?
-> >> >
-> >>
-> >> Do you mean built with ASLR support but executing at the offset it was
-> >> linked at?
-> >
-> > Yeah, sorry for being vague. Basically, the case where the relocs have all
-> > been resolved statically. In other words: what do we lose by disabling this
-> > optimisation?
-> >
+On Fri, Oct 27, 2017 at 03:25:28PM -0700, Mark Salyzyn wrote:
+> Ensure monotonic and realtime are inline, small price to pay for
+> high volume common request.
+
+Does this make a noticeable difference on any workload?
+
+What does this do to the binary size?
+
+Thanks,
+Mark.
+
 > 
-> The code does not deal with that at all, currently: given that this is
-> new behavior in 2.27, the relocs are processed unconditionally,
-> regardless of whether the image is loaded at its default base or not.
-
-Ah yeah, of course. Doesn't that make it impossible to exploit this
-optimisation unless you can somehow guarantee that binutils has done
-the relocs at link time? I guess you could check for non-zero entries at
-the relocation offsets, but you still end up iterating.
-
-Anyway, I'll take the patch but I don't understand how the binutils change
-is intended to be used.
-
-Will
+> Signed-off-by: Mark Salyzyn <salyzyn@android.com>
+> Cc: James Morse <james.morse@arm.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Andy Lutomirski <luto@amacapital.net>
+> Cc: Dmitry Safonov <dsafonov@virtuozzo.com>
+> Cc: John Stultz <john.stultz@linaro.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Laura Abbott <labbott@redhat.com>
+> Cc: Kees Cook <keescook@chromium.org>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Andy Gross <andy.gross@linaro.org>
+> Cc: Kevin Brodsky <kevin.brodsky@arm.com>
+> Cc: Andrew Pinski <apinski@cavium.com>
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> 
+> v2:
+> - split first CL into 4 of 7 pieces
+> 
+> v3:
+> - rebase (unchanged)
+> 
+> ---
+>  arch/arm/vdso/vgettimeofday.c | 9 ++++++---
+>  1 file changed, 6 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/vdso/vgettimeofday.c b/arch/arm/vdso/vgettimeofday.c
+> index 5f596911bd53..71003a1997c4 100644
+> --- a/arch/arm/vdso/vgettimeofday.c
+> +++ b/arch/arm/vdso/vgettimeofday.c
+> @@ -99,7 +99,7 @@ static notrace int do_monotonic_coarse(const struct vdso_data *vd,
+>  
+>  #ifdef CONFIG_ARM_ARCH_TIMER
+>  
+> -static notrace u64 get_ns(const struct vdso_data *vd)
+> +static __always_inline notrace u64 get_ns(const struct vdso_data *vd)
+>  {
+>  	u64 cycle_delta;
+>  	u64 cycle_now;
+> @@ -115,7 +115,9 @@ static notrace u64 get_ns(const struct vdso_data *vd)
+>  	return nsec;
+>  }
+>  
+> -static notrace int do_realtime(const struct vdso_data *vd, struct timespec *ts)
+> +/* Code size doesn't matter (vdso is 4k/16k/64k anyway) and this is faster. */
+> +static __always_inline notrace int do_realtime(const struct vdso_data *vd,
+> +					       struct timespec *ts)
+>  {
+>  	u64 nsecs;
+>  	u32 seq;
+> @@ -137,7 +139,8 @@ static notrace int do_realtime(const struct vdso_data *vd, struct timespec *ts)
+>  	return 0;
+>  }
+>  
+> -static notrace int do_monotonic(const struct vdso_data *vd, struct timespec *ts)
+> +static __always_inline notrace int do_monotonic(const struct vdso_data *vd,
+> +						struct timespec *ts)
+>  {
+>  	struct timespec tomono;
+>  	u64 nsecs;
+> -- 
+> 2.15.0.rc2.357.g7e34df9404-goog
+> 
