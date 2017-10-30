@@ -1,65 +1,59 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 31 Oct 2017 00:41:57 +0900
-Subject: [PATCH 1/3] arm/kbuild: replace {C, LD}FLAGS_MODULE with KBUILD_{C,
- LD}FLAGS_MODULE
-In-Reply-To: <1507533107-2069-1-git-send-email-caoj.fnst@cn.fujitsu.com>
-References: <1507533107-2069-1-git-send-email-caoj.fnst@cn.fujitsu.com>
-Message-ID: <CAK7LNARj0Lp-pNdcmfTgadZrO6rzazXmdG2xqeL0Pt1pbRWcWw@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 30 Oct 2017 16:45:36 +0100
+Subject: [PATCH v2 13/16] arm64: dts: marvell: armada-37xx: add UART clock
+In-Reply-To: <20171013090200.31034-14-miquel.raynal@free-electrons.com>
+ (Miquel Raynal's message of "Fri, 13 Oct 2017 11:01:57 +0200")
+References: <20171013090200.31034-1-miquel.raynal@free-electrons.com>
+ <20171013090200.31034-14-miquel.raynal@free-electrons.com>
+Message-ID: <87she01vxb.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-10-09 16:11 GMT+09:00 Cao jin <caoj.fnst@cn.fujitsu.com>:
-> As kbuild document & commit 6588169d51 says: KBUILD_{C,LD}FLAGS_MODULE are
-> used to add arch-specific options for $(CC) and $(LD). From commandline,
-> {C,LD}FLAGS_MODULE shall be used.
-> Doesn't have any functional change, but just follow kbuild rules.
+Hi Miquel,
+ 
+ On ven., oct. 13 2017, Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
+
+> Add the missing clock property to armada-3700 UART node.
 >
-> Signed-off-by: Cao jin <caoj.fnst@cn.fujitsu.com>
-> CC: Russell King <linux@armlinux.org.uk>
-> CC: linux-arm-kernel at lists.infradead.org
+> This clock will be used to derive the prescaler value to comply with
+> the requested baudrate.
+>
+> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Applied to linux-kbuild.  Thanks!
+Applied on mvebu/dt64
 
+Thanks,
+
+Gregory
 
 > ---
->  arch/arm/Makefile | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+>  arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
 >
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index 47d3a1a..a945b1f 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -16,11 +16,11 @@ LDFLAGS             :=
->  LDFLAGS_vmlinux        :=-p --no-undefined -X --pic-veneer
->  ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
->  LDFLAGS_vmlinux        += --be8
-> -LDFLAGS_MODULE += --be8
-> +KBUILD_LDFLAGS_MODULE  += --be8
->  endif
->
->  ifeq ($(CONFIG_ARM_MODULE_PLTS),y)
-> -LDFLAGS_MODULE += -T $(srctree)/arch/arm/kernel/module.lds
-> +KBUILD_LDFLAGS_MODULE  += -T $(srctree)/arch/arm/kernel/module.lds
->  endif
->
->  GZFLAGS                :=-9
-> @@ -120,7 +120,7 @@ CFLAGS_ISA  :=-mthumb $(AFLAGS_AUTOIT) $(AFLAGS_NOWARN)
->  AFLAGS_ISA     :=$(CFLAGS_ISA) -Wa$(comma)-mthumb
->  # Work around buggy relocation from gas if requested:
->  ifeq ($(CONFIG_THUMB2_AVOID_R_ARM_THM_JUMP11),y)
-> -CFLAGS_MODULE  +=-fno-optimize-sibling-calls
-> +KBUILD_CFLAGS_MODULE   +=-fno-optimize-sibling-calls
->  endif
->  else
->  CFLAGS_ISA     :=$(call cc-option,-marm,)
-> --
-> 2.1.0
+> diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+> index b554cdaf5e53..a36d667f770e 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+> @@ -135,6 +135,7 @@
+>  			uart0: serial at 12000 {
+>  				compatible = "marvell,armada-3700-uart";
+>  				reg = <0x12000 0x200>;
+> +				clocks = <&xtalclk>;
+>  				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
+>  				status = "disabled";
+>  			};
+> -- 
+> 2.11.0
 >
 >
->
-
-
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-Best Regards
-Masahiro Yamada
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
