@@ -1,71 +1,49 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 30 Oct 2017 13:55:20 +0000
-Subject: Tegra baseline test results for v4.14-rc7
-Message-ID: <8b7ad42d-869c-cb94-4d41-9cdcf164a6f5@nvidia.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 30 Oct 2017 14:07:55 +0000
+Subject: [PATCH v3 03/12] arm: vdso: inline assembler operations to
+ compiler.h
+In-Reply-To: <20171027222518.57161-1-salyzyn@android.com>
+References: <20171027222518.57161-1-salyzyn@android.com>
+Message-ID: <20171030140755.clqmqnyyunodoors@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.14-rc7.
-Logs and other details at:
+Hi,
 
-    https://nvtb.github.io//linux/test_v4.14-rc7/20171030063104/
+On Fri, Oct 27, 2017 at 03:25:10PM -0700, Mark Salyzyn wrote:
+> Move compiler-specific code to a local compiler.h file. CONFIG_AEABI
+> dependency check. System call fallback functions standardized into
+> a DEFINE_FALLBACK macro. Accept that __arch_counter_get_cntvct()
+> is the API for aarch64. 
 
+This reads like a stream-of-conciousness, and it's difficult to figure
+out which bits are intent and which bits are simply a summary of the
+diff.
 
-Test summary
-------------
+It would be really helpful to have a sentence or two at the start
+explaining the high level idea, and why things must change.
 
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+For instance, it's really not clear to me what you mean by:
 
-Build: Image:
-    Pass: ( 1/ 1): defconfig
+  Accept that __arch_counter_get_cntvct() is the API for aarch64.
 
-Boot to userspace: defconfig:
-    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
-		   tegra210-p2371-0000, tegra210-smaug
+... and whether using a #define for this is the best approach.
 
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+>From a scan of v4.14-rc7, there is no __arch_counter_get_cntvct() in the
+tree, so I'm very confused here.
 
-Boot to userspace: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+[...]
 
-PM: System suspend: multi_v7_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+> +#define __arch_counter_get_cntvct() arch_counter_get_cntvct()
 
-PM: System suspend: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+> @@ -127,7 +105,7 @@ static notrace u64 get_ns(const struct vdso_data *vd)
+>  	u64 cycle_now;
+>  	u64 nsec;
+>  
+> -	cycle_now = arch_counter_get_cntvct();
+> +	cycle_now = __arch_counter_get_cntvct();
 
+... and it's difficult to see what the point of these changes is.
 
-vmlinux object size
-(delta in bytes from test_v4.14-rc6 (bb176f67090ca54869fc1262c913aa69d2ede070)):
-   text     data      bss    total  kernel
-  +4024      +20        0    +4044  defconfig
-   +712        0        0     +712  multi_v7_defconfig
-  +1048     +128        0    +1176  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.14-rc6 (bb176f67090ca54869fc1262c913aa69d2ede070))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
-        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
-        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
-        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
-        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
-        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
-
---
-nvpublic
+Thanks,
+Mark.
