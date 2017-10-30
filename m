@@ -1,818 +1,488 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 30 Oct 2017 15:58:42 +0900
-Subject: [PATCH 2/3] drivers: phy: broadcom: Add driver for Cygnus USB
- phy controller
-In-Reply-To: <CAAFb_vqiA6fdqKjxLFVg705TFiO6rspbS8E3-Opqzw=09TMB_A@mail.gmail.com>
-References: <1508819822-29956-1-git-send-email-raveendra.padasalagi@broadcom.com>
- <1508819822-29956-3-git-send-email-raveendra.padasalagi@broadcom.com>
- <CGME20171027083627epcas4p30080cde5f056ea7f3bbda6718a49651a@epcas4p3.samsung.com>
- <bc03bbcf-c487-9da6-a138-136a36537626@ti.com> <59F66BF9.7040806@samsung.com>
- <CAAFb_vqiA6fdqKjxLFVg705TFiO6rspbS8E3-Opqzw=09TMB_A@mail.gmail.com>
-Message-ID: <59F6CDA2.5070505@samsung.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Mon, 30 Oct 2017 08:28:10 +0100
+Subject: [PATCH] KVM: arm/arm64: Unify 32bit fault injection
+In-Reply-To: <20171029021809.26913-1-marc.zyngier@arm.com>
+References: <20171029021809.26913-1-marc.zyngier@arm.com>
+Message-ID: <20171030072810.GQ2166@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sun, Oct 29, 2017 at 02:18:09AM +0000, Marc Zyngier wrote:
+> Both arm and arm64 implementations are capable of injecting
+> fauls, and yet have completely divergent implementations,
 
-On 2017? 10? 30? 14:02, Raveendra Padasalagi wrote:
-> Hi Chanwoo,
-> 
-> On Mon, Oct 30, 2017 at 5:32 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
->> Hi,
->>
->> On 2017? 10? 27? 17:35, Kishon Vijay Abraham I wrote:
->>> +Chanwoo, for reviewing extcon
->>>
->>> Hi.
->>>
->>> On Tuesday 24 October 2017 10:07 AM, Raveendra Padasalagi wrote:
->>>> Add driver for Broadcom's USB phy controller's used in Cygnus
->>>> familyof SoC. Cygnus has three USB phy controller's, port 0,
->>>> port 1 provides USB host functionality and port 2 can be configured
->>>> for host/device role.
->>>>
->>>> Configuration of host/device role for port 2 is achieved based on
->>>> the extcon events, the driver registers to extcon framework to get
->>>> appropriate connect events for Host/Device cables connect/disconnect
->>>> states based on VBUS and ID interrupts.
->>>>
->>>> Signed-off-by: Raveendra Padasalagi <raveendra.padasalagi@broadcom.com>
->>>> ---
->>>>  drivers/phy/broadcom/Kconfig              |  14 +
->>>>  drivers/phy/broadcom/Makefile             |   1 +
->>>>  drivers/phy/broadcom/phy-bcm-cygnus-usb.c | 672 ++++++++++++++++++++++++++++++
->>>>  3 files changed, 687 insertions(+)
->>>>  create mode 100644 drivers/phy/broadcom/phy-bcm-cygnus-usb.c
->>>>
->>>> diff --git a/drivers/phy/broadcom/Kconfig b/drivers/phy/broadcom/Kconfig
->>>> index 64fc59c..3179daf 100644
->>>> --- a/drivers/phy/broadcom/Kconfig
->>>> +++ b/drivers/phy/broadcom/Kconfig
->>>> @@ -1,6 +1,20 @@
->>>>  #
->>>>  # Phy drivers for Broadcom platforms
->>>>  #
->>>> +config PHY_BCM_CYGNUS_USB
->>>> +    tristate "Broadcom Cygnus USB PHY support"
->>>> +    depends on OF
->>>> +    depends on ARCH_BCM_CYGNUS || COMPILE_TEST
->>>> +    select GENERIC_PHY
->>>> +    select EXTCON_USB_GPIO
->>
->> IMO, it is not good to add the dependency to the specific device driver.
->> Instead, you better to depend on the EXTCON framework (select EXTCON)
->> such as 'select GENERIC_PHY'.
-> 
-> GENERIC_PHY dependency is anyway needed and it's added as dependency.
-> Let me add "depends on EXTCON" instead of "select EXTCON"
+  faults
 
-I think that 'select EXTCON' is enough. Actually, EXTCON is not
-a upper framework of this device driver. This device driver uses
-the EXTCON API as the additional feature.
+> leading to different bugs and reduced maintainability.
+> 
+> Let's get elect the arm64 version as the canonical one
 
-If user enables 'PHY_BCM_CYGNUS_USB', CONFG_EXTCON is enabled.
-I think it is enough.
+get elect?
 
+> and move it into aarch32.c, which is common to both
+> architectures.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+> 
+> Notes:
+>     This is likely to generate a conflict when merged in mainline,
+>     as it deletes code that got fixed in the meantime. The resolution
+>     of that conflict is pretty trivial though.
+> 
+>  arch/arm/include/asm/kvm_emulate.h   |  36 ++++++++-
+>  arch/arm/kvm/emulate.c               | 139 -----------------------------------
+>  arch/arm64/include/asm/kvm_emulate.h |   3 +
+>  arch/arm64/kvm/inject_fault.c        |  74 +------------------
+>  virt/kvm/arm/aarch32.c               |  98 ++++++++++++++++++++++--
+>  5 files changed, 132 insertions(+), 218 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+> index 98089ffd91bb..dcae3970148d 100644
+> --- a/arch/arm/include/asm/kvm_emulate.h
+> +++ b/arch/arm/include/asm/kvm_emulate.h
+> @@ -25,7 +25,22 @@
+>  #include <asm/kvm_arm.h>
+>  #include <asm/cputype.h>
+>  
+> +/* arm64 compatibility macros */
+> +#define COMPAT_PSR_MODE_ABT	ABT_MODE
+> +#define COMPAT_PSR_MODE_UND	UND_MODE
+> +#define COMPAT_PSR_T_BIT	PSR_T_BIT
+> +#define COMPAT_PSR_I_BIT	PSR_I_BIT
+> +#define COMPAT_PSR_A_BIT	PSR_A_BIT
+> +#define COMPAT_PSR_E_BIT	PSR_E_BIT
+> +#define COMPAT_PSR_IT_MASK	PSR_IT_MASK
+> +
+>  unsigned long *vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num);
+> +
+> +static inline unsigned long *vcpu_reg32(struct kvm_vcpu *vcpu, u8 reg_num)
+> +{
+> +	return vcpu_reg(vcpu, reg_num);
+> +}
+> +
+>  unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu);
+>  
+>  static inline unsigned long vcpu_get_reg(struct kvm_vcpu *vcpu,
+> @@ -42,10 +57,25 @@ static inline void vcpu_set_reg(struct kvm_vcpu *vcpu, u8 reg_num,
+>  
+>  bool kvm_condition_valid32(const struct kvm_vcpu *vcpu);
+>  void kvm_skip_instr32(struct kvm_vcpu *vcpu, bool is_wide_instr);
+> -void kvm_inject_undefined(struct kvm_vcpu *vcpu);
+> +void kvm_inject_undef32(struct kvm_vcpu *vcpu);
+> +void kvm_inject_dabt32(struct kvm_vcpu *vcpu, unsigned long addr);
+> +void kvm_inject_pabt32(struct kvm_vcpu *vcpu, unsigned long addr);
+>  void kvm_inject_vabt(struct kvm_vcpu *vcpu);
+> -void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
+> -void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
+> +
+> +static inline void kvm_inject_undefined(struct kvm_vcpu *vcpu)
+> +{
+> +	kvm_inject_undef32(vcpu);
+> +}
+> +
+> +static inline void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr)
+> +{
+> +	kvm_inject_dabt32(vcpu, addr);
+> +}
+> +
+> +static inline void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr)
+> +{
+> +	kvm_inject_pabt32(vcpu, addr);
+> +}
+>  
+>  static inline bool kvm_condition_valid(const struct kvm_vcpu *vcpu)
+>  {
+> diff --git a/arch/arm/kvm/emulate.c b/arch/arm/kvm/emulate.c
+> index 0064b86a2c87..cdff963f133a 100644
+> --- a/arch/arm/kvm/emulate.c
+> +++ b/arch/arm/kvm/emulate.c
+> @@ -165,145 +165,6 @@ unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu)
+>   * Inject exceptions into the guest
+>   */
+>  
+> -static u32 exc_vector_base(struct kvm_vcpu *vcpu)
+> -{
+> -	u32 sctlr = vcpu_cp15(vcpu, c1_SCTLR);
+> -	u32 vbar = vcpu_cp15(vcpu, c12_VBAR);
+> -
+> -	if (sctlr & SCTLR_V)
+> -		return 0xffff0000;
+> -	else /* always have security exceptions */
+> -		return vbar;
+> -}
+> -
+> -/*
+> - * Switch to an exception mode, updating both CPSR and SPSR. Follow
+> - * the logic described in AArch32.EnterMode() from the ARMv8 ARM.
+> - */
+> -static void kvm_update_psr(struct kvm_vcpu *vcpu, unsigned long mode)
+> -{
+> -	unsigned long cpsr = *vcpu_cpsr(vcpu);
+> -	u32 sctlr = vcpu_cp15(vcpu, c1_SCTLR);
+> -
+> -	*vcpu_cpsr(vcpu) = (cpsr & ~MODE_MASK) | mode;
+> -
+> -	switch (mode) {
+> -	case FIQ_MODE:
+> -		*vcpu_cpsr(vcpu) |= PSR_F_BIT;
+> -		/* Fall through */
+> -	case ABT_MODE:
+> -	case IRQ_MODE:
+> -		*vcpu_cpsr(vcpu) |= PSR_A_BIT;
+> -		/* Fall through */
+> -	default:
+> -		*vcpu_cpsr(vcpu) |= PSR_I_BIT;
+> -	}
+> -
+> -	*vcpu_cpsr(vcpu) &= ~(PSR_IT_MASK | PSR_J_BIT | PSR_E_BIT | PSR_T_BIT);
+> -
+> -	if (sctlr & SCTLR_TE)
+> -		*vcpu_cpsr(vcpu) |= PSR_T_BIT;
+> -	if (sctlr & SCTLR_EE)
+> -		*vcpu_cpsr(vcpu) |= PSR_E_BIT;
+> -
+> -	/* Note: These now point to the mode banked copies */
+> -	*vcpu_spsr(vcpu) = cpsr;
+> -}
+> -
+> -/**
+> - * kvm_inject_undefined - inject an undefined exception into the guest
+> - * @vcpu: The VCPU to receive the undefined exception
+> - *
+> - * It is assumed that this code is called from the VCPU thread and that the
+> - * VCPU therefore is not currently executing guest code.
+> - *
+> - * Modelled after TakeUndefInstrException() pseudocode.
+> - */
+> -void kvm_inject_undefined(struct kvm_vcpu *vcpu)
+> -{
+> -	unsigned long cpsr = *vcpu_cpsr(vcpu);
+> -	bool is_thumb = (cpsr & PSR_T_BIT);
+> -	u32 vect_offset = 4;
+> -	u32 return_offset = (is_thumb) ? 2 : 4;
+> -
+> -	kvm_update_psr(vcpu, UND_MODE);
+> -	*vcpu_reg(vcpu, 14) = *vcpu_pc(vcpu) - return_offset;
+> -
+> -	/* Branch to exception vector */
+> -	*vcpu_pc(vcpu) = exc_vector_base(vcpu) + vect_offset;
+> -}
+> -
+> -/*
+> - * Modelled after TakeDataAbortException() and TakePrefetchAbortException
+> - * pseudocode.
+> - */
+> -static void inject_abt(struct kvm_vcpu *vcpu, bool is_pabt, unsigned long addr)
+> -{
+> -	unsigned long cpsr = *vcpu_cpsr(vcpu);
+> -	bool is_thumb = (cpsr & PSR_T_BIT);
+> -	u32 vect_offset;
+> -	u32 return_offset = (is_thumb) ? 4 : 0;
+> -	bool is_lpae;
+> -
+> -	kvm_update_psr(vcpu, ABT_MODE);
+> -	*vcpu_reg(vcpu, 14) = *vcpu_pc(vcpu) + return_offset;
+> -
+> -	if (is_pabt)
+> -		vect_offset = 12;
+> -	else
+> -		vect_offset = 16;
+> -
+> -	/* Branch to exception vector */
+> -	*vcpu_pc(vcpu) = exc_vector_base(vcpu) + vect_offset;
+> -
+> -	if (is_pabt) {
+> -		/* Set IFAR and IFSR */
+> -		vcpu_cp15(vcpu, c6_IFAR) = addr;
+> -		is_lpae = (vcpu_cp15(vcpu, c2_TTBCR) >> 31);
+> -		/* Always give debug fault for now - should give guest a clue */
+> -		if (is_lpae)
+> -			vcpu_cp15(vcpu, c5_IFSR) = 1 << 9 | 0x22;
+> -		else
+> -			vcpu_cp15(vcpu, c5_IFSR) = 2;
+> -	} else { /* !iabt */
+> -		/* Set DFAR and DFSR */
+> -		vcpu_cp15(vcpu, c6_DFAR) = addr;
+> -		is_lpae = (vcpu_cp15(vcpu, c2_TTBCR) >> 31);
+> -		/* Always give debug fault for now - should give guest a clue */
+> -		if (is_lpae)
+> -			vcpu_cp15(vcpu, c5_DFSR) = 1 << 9 | 0x22;
+> -		else
+> -			vcpu_cp15(vcpu, c5_DFSR) = 2;
+> -	}
+> -
+> -}
+> -
+> -/**
+> - * kvm_inject_dabt - inject a data abort into the guest
+> - * @vcpu: The VCPU to receive the undefined exception
+> - * @addr: The address to report in the DFAR
+> - *
+> - * It is assumed that this code is called from the VCPU thread and that the
+> - * VCPU therefore is not currently executing guest code.
+> - */
+> -void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr)
+> -{
+> -	inject_abt(vcpu, false, addr);
+> -}
+> -
+> -/**
+> - * kvm_inject_pabt - inject a prefetch abort into the guest
+> - * @vcpu: The VCPU to receive the undefined exception
+> - * @addr: The address to report in the DFAR
+> - *
+> - * It is assumed that this code is called from the VCPU thread and that the
+> - * VCPU therefore is not currently executing guest code.
+> - */
+> -void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr)
+> -{
+> -	inject_abt(vcpu, true, addr);
+> -}
+> -
+>  /**
+>   * kvm_inject_vabt - inject an async abort / SError into the guest
+>   * @vcpu: The VCPU to receive the exception
+> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+> index e5df3fce0008..bf61da0ef82b 100644
+> --- a/arch/arm64/include/asm/kvm_emulate.h
+> +++ b/arch/arm64/include/asm/kvm_emulate.h
+> @@ -41,6 +41,9 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu);
+>  void kvm_inject_vabt(struct kvm_vcpu *vcpu);
+>  void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
+>  void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
+> +void kvm_inject_undef32(struct kvm_vcpu *vcpu);
+> +void kvm_inject_dabt32(struct kvm_vcpu *vcpu, unsigned long addr);
+> +void kvm_inject_pabt32(struct kvm_vcpu *vcpu, unsigned long addr);
+>  
+>  static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
+>  {
+> diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
+> index da6a8cfa54a0..8ecbcb40e317 100644
+> --- a/arch/arm64/kvm/inject_fault.c
+> +++ b/arch/arm64/kvm/inject_fault.c
+> @@ -33,74 +33,6 @@
+>  #define LOWER_EL_AArch64_VECTOR		0x400
+>  #define LOWER_EL_AArch32_VECTOR		0x600
+>  
+> -static void prepare_fault32(struct kvm_vcpu *vcpu, u32 mode, u32 vect_offset)
+> -{
+> -	unsigned long cpsr;
+> -	unsigned long new_spsr_value = *vcpu_cpsr(vcpu);
+> -	bool is_thumb = (new_spsr_value & COMPAT_PSR_T_BIT);
+> -	u32 return_offset = (is_thumb) ? 4 : 0;
+> -	u32 sctlr = vcpu_cp15(vcpu, c1_SCTLR);
+> -
+> -	cpsr = mode | COMPAT_PSR_I_BIT;
+> -
+> -	if (sctlr & (1 << 30))
+> -		cpsr |= COMPAT_PSR_T_BIT;
+> -	if (sctlr & (1 << 25))
+> -		cpsr |= COMPAT_PSR_E_BIT;
+> -
+> -	*vcpu_cpsr(vcpu) = cpsr;
+> -
+> -	/* Note: These now point to the banked copies */
+> -	*vcpu_spsr(vcpu) = new_spsr_value;
+> -	*vcpu_reg32(vcpu, 14) = *vcpu_pc(vcpu) + return_offset;
+> -
+> -	/* Branch to exception vector */
+> -	if (sctlr & (1 << 13))
+> -		vect_offset += 0xffff0000;
+> -	else /* always have security exceptions */
+> -		vect_offset += vcpu_cp15(vcpu, c12_VBAR);
+> -
+> -	*vcpu_pc(vcpu) = vect_offset;
+> -}
+> -
+> -static void inject_undef32(struct kvm_vcpu *vcpu)
+> -{
+> -	prepare_fault32(vcpu, COMPAT_PSR_MODE_UND, 4);
+> -}
+> -
+> -/*
+> - * Modelled after TakeDataAbortException() and TakePrefetchAbortException
+> - * pseudocode.
+> - */
+> -static void inject_abt32(struct kvm_vcpu *vcpu, bool is_pabt,
+> -			 unsigned long addr)
+> -{
+> -	u32 vect_offset;
+> -	u32 *far, *fsr;
+> -	bool is_lpae;
+> -
+> -	if (is_pabt) {
+> -		vect_offset = 12;
+> -		far = &vcpu_cp15(vcpu, c6_IFAR);
+> -		fsr = &vcpu_cp15(vcpu, c5_IFSR);
+> -	} else { /* !iabt */
+> -		vect_offset = 16;
+> -		far = &vcpu_cp15(vcpu, c6_DFAR);
+> -		fsr = &vcpu_cp15(vcpu, c5_DFSR);
+> -	}
+> -
+> -	prepare_fault32(vcpu, COMPAT_PSR_MODE_ABT | COMPAT_PSR_A_BIT, vect_offset);
+> -
+> -	*far = addr;
+> -
+> -	/* Give the guest an IMPLEMENTATION DEFINED exception */
+> -	is_lpae = (vcpu_cp15(vcpu, c2_TTBCR) >> 31);
+> -	if (is_lpae)
+> -		*fsr = 1 << 9 | 0x34;
+> -	else
+> -		*fsr = 0x14;
+> -}
+> -
+>  enum exception_type {
+>  	except_type_sync	= 0,
+>  	except_type_irq		= 0x80,
+> @@ -197,7 +129,7 @@ static void inject_undef64(struct kvm_vcpu *vcpu)
+>  void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr)
+>  {
+>  	if (!(vcpu->arch.hcr_el2 & HCR_RW))
+> -		inject_abt32(vcpu, false, addr);
+> +		kvm_inject_dabt32(vcpu, addr);
+>  	else
+>  		inject_abt64(vcpu, false, addr);
+>  }
+> @@ -213,7 +145,7 @@ void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr)
+>  void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr)
+>  {
+>  	if (!(vcpu->arch.hcr_el2 & HCR_RW))
+> -		inject_abt32(vcpu, true, addr);
+> +		kvm_inject_pabt32(vcpu, addr);
+>  	else
+>  		inject_abt64(vcpu, true, addr);
+>  }
+> @@ -227,7 +159,7 @@ void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr)
+>  void kvm_inject_undefined(struct kvm_vcpu *vcpu)
+>  {
+>  	if (!(vcpu->arch.hcr_el2 & HCR_RW))
+> -		inject_undef32(vcpu);
+> +		kvm_inject_undef32(vcpu);
+>  	else
+>  		inject_undef64(vcpu);
+>  }
+> diff --git a/virt/kvm/arm/aarch32.c b/virt/kvm/arm/aarch32.c
+> index 79c7c357804b..d8d266db06d9 100644
+> --- a/virt/kvm/arm/aarch32.c
+> +++ b/virt/kvm/arm/aarch32.c
+> @@ -25,11 +25,6 @@
+>  #include <asm/kvm_emulate.h>
+>  #include <asm/kvm_hyp.h>
+>  
+> -#ifndef CONFIG_ARM64
+> -#define COMPAT_PSR_T_BIT	PSR_T_BIT
+> -#define COMPAT_PSR_IT_MASK	PSR_IT_MASK
+> -#endif
+> -
+>  /*
+>   * stolen from arch/arm/kernel/opcodes.c
+>   *
+> @@ -150,3 +145,96 @@ void __hyp_text kvm_skip_instr32(struct kvm_vcpu *vcpu, bool is_wide_instr)
+>  		*vcpu_pc(vcpu) += 4;
+>  	kvm_adjust_itstate(vcpu);
+>  }
+> +
+> +/*
+> + * Table taken from ARMv8 ARM DDI0487B-B, table G1-10.
+> + */
+> +static const u8 return_offsets[8][2] = {
+> +	[0] = { 0, 0 },		/* Reset, unused */
+> +	[1] = { 4, 2 },		/* Undefined */
+> +	[2] = { 0, 0 },		/* SVC, unused */
+> +	[3] = { 4, 4 },		/* Prefetch abort */
+> +	[4] = { 8, 8 },		/* Data abort */
+> +	[5] = { 0, 0 },		/* HVC, unused */
+> +	[6] = { 4, 4 },		/* IRQ, unused */
+> +	[7] = { 4, 4 },		/* FIQ, unused */
+> +};
+> +
+> +static void prepare_fault32(struct kvm_vcpu *vcpu, u32 mode, u32 vect_offset)
+> +{
+> +	unsigned long cpsr;
+> +	unsigned long new_spsr_value = *vcpu_cpsr(vcpu);
+> +	bool is_thumb = (new_spsr_value & COMPAT_PSR_T_BIT);
+> +	u32 return_offset = return_offsets[vect_offset >> 2][is_thumb];
+> +	u32 sctlr = vcpu_cp15(vcpu, c1_SCTLR);
+> +
+> +	cpsr = mode | COMPAT_PSR_I_BIT;
+> +
+> +	if (sctlr & (1 << 30))
+> +		cpsr |= COMPAT_PSR_T_BIT;
+> +	if (sctlr & (1 << 25))
+> +		cpsr |= COMPAT_PSR_E_BIT;
+> +
+> +	*vcpu_cpsr(vcpu) = cpsr;
+> +
+> +	/* Note: These now point to the banked copies */
+> +	*vcpu_spsr(vcpu) = new_spsr_value;
+> +	*vcpu_reg32(vcpu, 14) = *vcpu_pc(vcpu) + return_offset;
+> +
+> +	/* Branch to exception vector */
+> +	if (sctlr & (1 << 13))
+> +		vect_offset += 0xffff0000;
+> +	else /* always have security exceptions */
+> +		vect_offset += vcpu_cp15(vcpu, c12_VBAR);
+> +
+> +	*vcpu_pc(vcpu) = vect_offset;
+> +}
+> +
+> +void kvm_inject_undef32(struct kvm_vcpu *vcpu)
+> +{
+> +	prepare_fault32(vcpu, COMPAT_PSR_MODE_UND, 4);
+> +}
+> +
+> +/*
+> + * Modelled after TakeDataAbortException() and TakePrefetchAbortException
+> + * pseudocode.
+> + */
+> +static void inject_abt32(struct kvm_vcpu *vcpu, bool is_pabt,
+> +			 unsigned long addr)
+> +{
+> +	u32 vect_offset;
+> +	u32 *far, *fsr;
+> +	bool is_lpae;
+> +
+> +	if (is_pabt) {
+> +		vect_offset = 12;
+> +		far = &vcpu_cp15(vcpu, c6_IFAR);
+> +		fsr = &vcpu_cp15(vcpu, c5_IFSR);
+> +	} else { /* !iabt */
+> +		vect_offset = 16;
+> +		far = &vcpu_cp15(vcpu, c6_DFAR);
+> +		fsr = &vcpu_cp15(vcpu, c5_DFSR);
+> +	}
+> +
+> +	prepare_fault32(vcpu, COMPAT_PSR_MODE_ABT | COMPAT_PSR_A_BIT, vect_offset);
+> +
+> +	*far = addr;
+> +
+> +	/* Give the guest an IMPLEMENTATION DEFINED exception */
+> +	is_lpae = (vcpu_cp15(vcpu, c2_TTBCR) >> 31);
+> +	if (is_lpae)
+> +		*fsr = 1 << 9 | 0x34;
+> +	else
+> +		*fsr = 0x14;
+> +}
+> +
+> +void kvm_inject_dabt32(struct kvm_vcpu *vcpu, unsigned long addr)
+> +{
+> +	inject_abt32(vcpu, false, addr);
+> +}
+> +
+> +void kvm_inject_pabt32(struct kvm_vcpu *vcpu, unsigned long addr)
+> +{
+> +	inject_abt32(vcpu, true, addr);
+> +}
+> +
 
-> 
->>>
->>> Didn't this throw up a warning for selecting config without caring for the
->>> dependency?
->>>
->>>> +    default ARCH_BCM_CYGNUS
->>>> +    help
->>>> +      Enable this to support three USB PHY's present in Broadcom's
->>>> +      Cygnus chip.
->>>> +
->>>> +      The phys are capable of supporting host mode on all ports and
->>>> +      device mode for port 2.
->>>> +
->>>>  config PHY_CYGNUS_PCIE
->>>>      tristate "Broadcom Cygnus PCIe PHY driver"
->>>>      depends on OF && (ARCH_BCM_CYGNUS || COMPILE_TEST)
->>>> diff --git a/drivers/phy/broadcom/Makefile b/drivers/phy/broadcom/Makefile
->>>> index 4eb82ec..3dec23c 100644
->>>> --- a/drivers/phy/broadcom/Makefile
->>>> +++ b/drivers/phy/broadcom/Makefile
->>>> @@ -1,4 +1,5 @@
->>>>  obj-$(CONFIG_PHY_CYGNUS_PCIE)               += phy-bcm-cygnus-pcie.o
->>>> +obj-$(CONFIG_PHY_BCM_CYGNUS_USB)    += phy-bcm-cygnus-usb.o
->>>>  obj-$(CONFIG_BCM_KONA_USB2_PHY)             += phy-bcm-kona-usb2.o
->>>>  obj-$(CONFIG_PHY_BCM_NS_USB2)               += phy-bcm-ns-usb2.o
->>>>  obj-$(CONFIG_PHY_BCM_NS_USB3)               += phy-bcm-ns-usb3.o
->>>> diff --git a/drivers/phy/broadcom/phy-bcm-cygnus-usb.c b/drivers/phy/broadcom/phy-bcm-cygnus-usb.c
->>>> new file mode 100644
->>>> index 0000000..ef2a94c
->>>> --- /dev/null
->>>> +++ b/drivers/phy/broadcom/phy-bcm-cygnus-usb.c
->>>> @@ -0,0 +1,672 @@
->>>> +/*
->>>> + * Copyright 2017 Broadcom
->>>> + *
->>>> + * This program is free software; you can redistribute it and/or modify
->>>> + * it under the terms of the GNU General Public License, version 2, as
->>>> + * published by the Free Software Foundation (the "GPL").
->>>> + *
->>>> + * This program is distributed in the hope that it will be useful, but
->>>> + * WITHOUT ANY WARRANTY; without even the implied warranty of
->>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
->>>> + * General Public License version 2 (GPLv2) for more details.
->>>> + *
->>>> + * You should have received a copy of the GNU General Public License
->>>> + * version 2 (GPLv2) along with this source code.
->>>> + */
->>>> +
->>>> +#include <linux/module.h>
->>>> +#include <linux/platform_device.h>
->>>> +#include <linux/io.h>
->>>> +#include <linux/of.h>
->>>> +#include <linux/of_address.h>
->>>> +#include <linux/phy/phy.h>
->>>> +#include <linux/delay.h>
->>>> +#include <linux/regulator/consumer.h>
->>>> +#include <linux/extcon.h>
->>>> +#include <linux/gpio.h>
->>>> +#include <linux/gpio/consumer.h>
->>>> +#include <linux/interrupt.h>
->>>> +
->>>> +#define CDRU_USBPHY_CLK_RST_SEL_OFFSET                      0x0
->>>> +#define CDRU_USBPHY2_HOST_DEV_SEL_OFFSET            0x4
->>>> +#define CDRU_USB_DEV_SUSPEND_RESUME_CTRL_OFFSET             0x5C
->>>> +#define CDRU_USBPHY_P0_STATUS_OFFSET                        0x1C
->>>> +#define CDRU_USBPHY_P1_STATUS_OFFSET                        0x34
->>>> +#define CDRU_USBPHY_P2_STATUS_OFFSET                        0x4C
->>>
->>> Looks like it has 2 different blocks; CDRU and CMRU. Having a comment for each
->>> of the block will help.
->>>> +#define CRMU_USB_PHY_AON_CTRL_OFFSET                        0x0
->>>> +
->>>> +#define CDRU_USBPHY_USBPHY_ILDO_ON_FLAG                     BIT(1)
->>>> +#define CDRU_USBPHY_USBPHY_PLL_LOCK                 BIT(0)
->>>> +#define CDRU_USB_DEV_SUSPEND_RESUME_CTRL_DISABLE    BIT(0)
->>>> +
->>>> +#define PHY2_DEV_HOST_CTRL_SEL_DEVICE                       0
->>>> +#define PHY2_DEV_HOST_CTRL_SEL_HOST                 1
->>>> +#define PHY2_DEV_HOST_CTRL_SEL_IDLE                 2
->>>> +#define CRMU_USBPHY_P0_AFE_CORERDY_VDDC                     BIT(1)
->>>> +#define CRMU_USBPHY_P0_RESETB                               BIT(2)
->>>> +#define CRMU_USBPHY_P1_AFE_CORERDY_VDDC                     BIT(9)
->>>> +#define CRMU_USBPHY_P1_RESETB                               BIT(10)
->>>> +#define CRMU_USBPHY_P2_AFE_CORERDY_VDDC                     BIT(17)
->>>> +#define CRMU_USBPHY_P2_RESETB                               BIT(18)
->>>> +
->>>> +#define USB2_IDM_IDM_IO_CONTROL_DIRECT_OFFSET               0x0408
->>>> +#define USB2_IDM_IDM_IO_CONTROL_DIRECT_CLK_ENABLE   BIT(0)
->>>> +#define SUSPEND_OVERRIDE_0                          13
->>>> +#define SUSPEND_OVERRIDE_1                          14
->>>> +#define SUSPEND_OVERRIDE_2                          15
->>>> +#define USB2_IDM_IDM_RESET_CONTROL_OFFSET           0x0800
->>>> +#define USB2_IDM_IDM_RESET_CONTROL__RESET           0
->>>> +#define USB2D_IDM_IDM_IO_SS_CLEAR_NAK_NEMPTY_EN_I   BIT(24)
->>>> +
->>>> +#define PLL_LOCK_RETRY_COUNT                                1000
->>>> +#define MAX_REGULATOR_NAME_LEN                              25
->>>> +#define DUAL_ROLE_PHY                                       2
->>>> +
->>>> +#define USBPHY_WQ_DELAY_MS          msecs_to_jiffies(500)
->>>> +#define USB2_SEL_DEVICE                     0
->>>> +#define USB2_SEL_HOST                       1
->>>> +#define USB2_SEL_IDLE                       2
->>>> +#define USB_CONNECTED                       1
->>>> +#define USB_DISCONNECTED            0
->>>> +#define MAX_NUM_PHYS                        3
->>>> +
->>>> +static const int status_reg[] = {CDRU_USBPHY_P0_STATUS_OFFSET,
->>>> +                            CDRU_USBPHY_P1_STATUS_OFFSET,
->>>> +                            CDRU_USBPHY_P2_STATUS_OFFSET};
->>>> +
->>>> +struct cygnus_phy_instance;
->>>> +
->>>> +struct cygnus_phy_driver {
->>>> +    void __iomem *cdru_usbphy_regs;
->>>> +    void __iomem *crmu_usbphy_aon_ctrl_regs;
->>>> +    void __iomem *usb2h_idm_regs;
->>>> +    void __iomem *usb2d_idm_regs;
->>>> +    int num_phys;
->>>> +    bool idm_host_enabled;
->>>> +    struct cygnus_phy_instance *instances;
->>>> +    int phyto_src_clk;
->>>> +    struct platform_device *pdev;
->>>> +};
->>>> +
->>>> +struct cygnus_phy_instance {
->>>> +    struct cygnus_phy_driver *driver;
->>>> +    struct phy *generic_phy;
->>>> +    int port;
->>>> +    int new_state;          /* 1 - Host, 0 - device, 2 - idle*/
->>>> +    bool power;             /* 1 - powered_on 0 - powered off */
->>>> +    struct regulator *vbus_supply;
->>>> +    spinlock_t lock;
->>>> +    struct extcon_dev *edev;
->>>> +    struct notifier_block   device_nb;
->>>> +    struct notifier_block   host_nb;
->>>> +};
->>>> +
->>>> +static const unsigned int usb_extcon_cable[] = {
->>>> +    EXTCON_USB,
->>>> +    EXTCON_USB_HOST,
->>>> +    EXTCON_NONE,
->>>> +};
->>
->> The usb_extcon_cable[] is not used in this driver.
->> Please remove it. This array is required on the extcon
->> provider driver. But, in this case, it is consumer driver.
-> 
-> Ok, Thanks. I will fix it in the next version of the patch.
->>>> +
->>>> +static inline int phy_pll_lock_stat(u32 usb_reg, int bit_mask,
->>>> +                                struct cygnus_phy_driver *phy_driver)
->>>> +{
->>>> +    /* Wait for the PLL lock status */
->>>> +    int retry = PLL_LOCK_RETRY_COUNT;
->>>> +    u32 reg_val;
->>>> +
->>>> +    do {
->>>> +            udelay(1);
->>>> +            reg_val = readl(phy_driver->cdru_usbphy_regs +
->>>> +                            usb_reg);
->>>> +            if (reg_val & bit_mask)
->>>> +                    return 0;
->>>> +    } while (--retry > 0);
->>>> +
->>>> +    return -EBUSY;
->>>> +}
->>>> +
->>>> +static struct phy *cygnus_phy_xlate(struct device *dev,
->>>> +                                struct of_phandle_args *args)
->>>> +{
->>>> +    struct cygnus_phy_driver *phy_driver = dev_get_drvdata(dev);
->>>> +    struct cygnus_phy_instance *instance_ptr;
->>>> +
->>>> +    if (!phy_driver)
->>>> +            return ERR_PTR(-EINVAL);
->>>> +
->>>> +    if (WARN_ON(args->args[0] >= phy_driver->num_phys))
->>>> +            return ERR_PTR(-ENODEV);
->>>> +
->>>> +    if (WARN_ON(args->args_count < 1))
->>>> +            return ERR_PTR(-EINVAL);
->>>> +
->>>> +    instance_ptr = &phy_driver->instances[args->args[0]];
->>>
->>> if the PHY consumer driver points the PHY sub-node, then of_xlate provided in
->>> phy core could be used instead of the custom xlate.
->>>> +    if (instance_ptr->port > phy_driver->phyto_src_clk)
->>>> +            phy_driver->phyto_src_clk = instance_ptr->port;
->>>> +
->>>> +    if (instance_ptr->port == DUAL_ROLE_PHY)
->>>> +            goto ret_p2;
->>>> +    phy_driver->instances[instance_ptr->port].new_state =
->>>> +                                            PHY2_DEV_HOST_CTRL_SEL_HOST;
->>>> +
->>>> +ret_p2:
->>>> +    return phy_driver->instances[instance_ptr->port].generic_phy;
->>>> +}
->>>> +
->>>> +static void cygnus_usbp2_dev_clock_init(struct phy *generic_phy, bool enable)
->>>> +{
->>>> +    u32 reg_val;
->>>> +    struct cygnus_phy_instance *instance_ptr = phy_get_drvdata(generic_phy);
->>>> +    struct cygnus_phy_driver *phy_driver = instance_ptr->driver;
->>>> +
->>>> +    reg_val = readl(phy_driver->usb2d_idm_regs +
->>>> +                    USB2_IDM_IDM_IO_CONTROL_DIRECT_OFFSET);
->>>> +
->>>> +    if (enable)
->>>> +            reg_val |= USB2_IDM_IDM_IO_CONTROL_DIRECT_CLK_ENABLE;
->>>> +    else
->>>> +            reg_val &= ~USB2_IDM_IDM_IO_CONTROL_DIRECT_CLK_ENABLE;
->>>> +
->>>> +    writel(reg_val, phy_driver->usb2d_idm_regs +
->>>> +            USB2_IDM_IDM_IO_CONTROL_DIRECT_OFFSET);
->>>> +
->>>> +    reg_val = readl(phy_driver->usb2d_idm_regs +
->>>> +                    USB2_IDM_IDM_RESET_CONTROL_OFFSET);
->>>> +
->>>> +    if (enable)
->>>> +            reg_val &= ~BIT(USB2_IDM_IDM_RESET_CONTROL__RESET);
->>>> +    else
->>>> +            reg_val |= BIT(USB2_IDM_IDM_RESET_CONTROL__RESET);
->>>> +
->>>> +    writel(reg_val, phy_driver->usb2d_idm_regs +
->>>> +            USB2_IDM_IDM_RESET_CONTROL_OFFSET);
->>>> +}
->>>> +
->>>> +static void cygnus_phy_clk_reset_src_switch(struct phy *generic_phy,
->>>> +                                        u32 src_phy)
->>>> +{
->>>> +    u32 reg_val;
->>>> +    struct cygnus_phy_instance *instance_ptr = phy_get_drvdata(generic_phy);
->>>> +    struct cygnus_phy_driver *phy_driver = instance_ptr->driver;
->>>> +
->>>> +    writel(src_phy, phy_driver->cdru_usbphy_regs +
->>>> +            CDRU_USBPHY_CLK_RST_SEL_OFFSET);
->>>> +
->>>> +    /* Force the clock/reset source phy to not suspend */
->>>> +    reg_val = readl(phy_driver->usb2h_idm_regs +
->>>> +                    USB2_IDM_IDM_IO_CONTROL_DIRECT_OFFSET);
->>>> +    reg_val &= ~(BIT(SUSPEND_OVERRIDE_0) |
->>>> +                    BIT(SUSPEND_OVERRIDE_1) |
->>>> +                    BIT(SUSPEND_OVERRIDE_2));
->>>> +    reg_val |= BIT(SUSPEND_OVERRIDE_0 + src_phy);
->>>> +
->>>> +    writel(reg_val, phy_driver->usb2h_idm_regs +
->>>> +            USB2_IDM_IDM_IO_CONTROL_DIRECT_OFFSET);
->>>> +}
->>>> +
->>>> +static void cygnus_phy_dual_role_init(struct cygnus_phy_instance *instance_ptr)
->>>> +{
->>>> +    u32 reg_val;
->>>> +    struct cygnus_phy_driver *phy_driver = instance_ptr->driver;
->>>> +
->>>> +    if (instance_ptr->new_state == PHY2_DEV_HOST_CTRL_SEL_HOST) {
->>>> +            writel(PHY2_DEV_HOST_CTRL_SEL_HOST,
->>>> +                    phy_driver->cdru_usbphy_regs +
->>>> +                    CDRU_USBPHY2_HOST_DEV_SEL_OFFSET);
->>>
->>> If you add a return here, the below block can be placed outside the else block.
->>>> +    } else {
->>>> +            /*
->>>> +             * Disable suspend/resume signals to device controller
->>>> +             * when a port is in device mode
->>>> +             */
->>>> +            writel(PHY2_DEV_HOST_CTRL_SEL_DEVICE,
->>>> +                    phy_driver->cdru_usbphy_regs +
->>>> +                    CDRU_USBPHY2_HOST_DEV_SEL_OFFSET);
->>>> +            reg_val = readl(phy_driver->cdru_usbphy_regs +
->>>> +                            CDRU_USB_DEV_SUSPEND_RESUME_CTRL_OFFSET);
->>>> +            reg_val |= CDRU_USB_DEV_SUSPEND_RESUME_CTRL_DISABLE;
->>>> +            writel(reg_val, phy_driver->cdru_usbphy_regs +
->>>> +                            CDRU_USB_DEV_SUSPEND_RESUME_CTRL_OFFSET);
->>>> +    }
->>>> +}
->>>> +
->>>> +static int cygnus_phy_init(struct phy *generic_phy)
->>>> +{
->>>> +    struct cygnus_phy_instance *instance_ptr = phy_get_drvdata(generic_phy);
->>>> +
->>>> +    if (instance_ptr->port == DUAL_ROLE_PHY)
->>>> +            cygnus_phy_dual_role_init(instance_ptr);
->>>> +
->>>> +    return 0;
->>>> +}
->>>> +
->>>> +static int cygnus_phy_shutdown(struct phy *generic_phy)
->>>> +{
->>>> +    u32 reg_val;
->>>> +    int i, ret;
->>>> +    unsigned long flags;
->>>> +    bool power_off_flag = true;
->>>> +    struct cygnus_phy_instance *instance_ptr = phy_get_drvdata(generic_phy);
->>>> +    struct cygnus_phy_driver *phy_driver = instance_ptr->driver;
->>>> +
->>>> +    if (instance_ptr->vbus_supply) {
->>>
->>> phy core supports phy-supply generic property which can be handled by phy-core.
->>>> +            ret = regulator_disable(instance_ptr->vbus_supply);
->>>> +            if (ret) {
->>>> +                    dev_err(&generic_phy->dev,
->>>> +                                    "Failed to disable regulator\n");
->>>> +                    return ret;
->>>> +            }
->>>> +    }
->>>> +
->>>> +    spin_lock_irqsave(&instance_ptr->lock, flags);
->>>> +
->>>> +    /* power down the phy */
->>>> +    reg_val = readl(phy_driver->crmu_usbphy_aon_ctrl_regs +
->>>> +                    CRMU_USB_PHY_AON_CTRL_OFFSET);
->>>> +    if (instance_ptr->port == 0) {
->>>> +            reg_val &= ~CRMU_USBPHY_P0_AFE_CORERDY_VDDC;
->>>> +            reg_val &= ~CRMU_USBPHY_P0_RESETB;
->>>> +    } else if (instance_ptr->port == 1) {
->>>> +            reg_val &= ~CRMU_USBPHY_P1_AFE_CORERDY_VDDC;
->>>> +            reg_val &= ~CRMU_USBPHY_P1_RESETB;
->>>> +    } else if (instance_ptr->port == 2) {
->>>> +            reg_val &= ~CRMU_USBPHY_P2_AFE_CORERDY_VDDC;
->>>> +            reg_val &= ~CRMU_USBPHY_P2_RESETB;
->>>> +    }
->>>> +    writel(reg_val, phy_driver->crmu_usbphy_aon_ctrl_regs +
->>>> +            CRMU_USB_PHY_AON_CTRL_OFFSET);
->>>> +
->>>> +    instance_ptr->power = false;
->>>> +
->>>> +    /* Determine whether all the phy's are powered off */
->>>> +    for (i = 0; i < phy_driver->num_phys; i++) {
->>>> +            if (phy_driver->instances[i].power == true) {
->>>> +                    power_off_flag = false;
->>>> +                    break;
->>>> +            }
->>>> +    }
->>>> +
->>>> +    /* Disable clock to USB device and keep the USB device in reset */
->>>> +    if (instance_ptr->port == DUAL_ROLE_PHY)
->>>> +            cygnus_usbp2_dev_clock_init(instance_ptr->generic_phy,
->>>> +                                        false);
->>>> +
->>>> +    /*
->>>> +     * Put the host controller into reset state and
->>>> +     * disable clock if all the phy's are powered off
->>>> +     */
->>>> +    if (power_off_flag) {
->>>> +            reg_val = readl(phy_driver->usb2h_idm_regs +
->>>> +                    USB2_IDM_IDM_IO_CONTROL_DIRECT_OFFSET);
->>>> +            reg_val &= ~USB2_IDM_IDM_IO_CONTROL_DIRECT_CLK_ENABLE;
->>>> +            writel(reg_val, phy_driver->usb2h_idm_regs +
->>>> +                            USB2_IDM_IDM_IO_CONTROL_DIRECT_OFFSET);
->>>> +
->>>> +            reg_val = readl(phy_driver->usb2h_idm_regs +
->>>> +                             USB2_IDM_IDM_RESET_CONTROL_OFFSET);
->>>> +            reg_val |= BIT(USB2_IDM_IDM_RESET_CONTROL__RESET);
->>>> +            writel(reg_val, phy_driver->usb2h_idm_regs +
->>>> +                            USB2_IDM_IDM_RESET_CONTROL_OFFSET);
->>>> +            phy_driver->idm_host_enabled = false;
->>>> +    }
->>>> +    spin_unlock_irqrestore(&instance_ptr->lock, flags);
->>>> +    return 0;
->>>> +}
->>>> +
->>>> +static int cygnus_phy_poweron(struct phy *generic_phy)
->>>> +{
->>>> +    int ret;
->>>> +    unsigned long flags;
->>>> +    u32 reg_val;
->>>> +    struct cygnus_phy_instance *instance_ptr = phy_get_drvdata(generic_phy);
->>>> +    struct cygnus_phy_driver *phy_driver = instance_ptr->driver;
->>>> +    u32 extcon_event = instance_ptr->new_state;
->>>> +
->>>> +    /*
->>>> +     * Switch on the regulator only if in HOST mode
->>>> +     */
->>>> +    if (instance_ptr->vbus_supply) {
->>>> +            ret = regulator_enable(instance_ptr->vbus_supply);
->>>> +            if (ret) {
->>>> +                    dev_err(&generic_phy->dev,
->>>> +                            "Failed to enable regulator\n");
->>>> +                    goto err_shutdown;
->>>> +            }
->>>> +    }
->>>> +
->>>> +    spin_lock_irqsave(&instance_ptr->lock, flags);
->>>> +    /* Bring the AFE block out of reset to start powering up the PHY */
->>>> +    reg_val = readl(phy_driver->crmu_usbphy_aon_ctrl_regs +
->>>> +                    CRMU_USB_PHY_AON_CTRL_OFFSET);
->>>> +    if (instance_ptr->port == 0)
->>>> +            reg_val |= CRMU_USBPHY_P0_AFE_CORERDY_VDDC;
->>>> +    else if (instance_ptr->port == 1)
->>>> +            reg_val |= CRMU_USBPHY_P1_AFE_CORERDY_VDDC;
->>>> +    else if (instance_ptr->port == 2)
->>>> +            reg_val |= CRMU_USBPHY_P2_AFE_CORERDY_VDDC;
->>>> +    writel(reg_val, phy_driver->crmu_usbphy_aon_ctrl_regs +
->>>> +            CRMU_USB_PHY_AON_CTRL_OFFSET);
->>>> +
->>>> +    /* Check for power on and PLL lock */
->>>> +    ret = phy_pll_lock_stat(status_reg[instance_ptr->port],
->>>> +                            CDRU_USBPHY_USBPHY_ILDO_ON_FLAG, phy_driver);
->>>> +    if (ret < 0) {
->>>> +            dev_err(&generic_phy->dev,
->>>> +                    "Timed out waiting for USBPHY_ILDO_ON_FLAG on port %d",
->>>> +                    instance_ptr->port);
->>>> +            spin_unlock_irqrestore(&instance_ptr->lock, flags);
->>>> +            goto err_shutdown;
->>>> +    }
->>>> +    ret = phy_pll_lock_stat(status_reg[instance_ptr->port],
->>>> +                            CDRU_USBPHY_USBPHY_PLL_LOCK, phy_driver);
->>>> +    if (ret < 0) {
->>>> +            dev_err(&generic_phy->dev,
->>>> +                    "Timed out waiting for USBPHY_PLL_LOCK on port %d",
->>>> +                    instance_ptr->port);
->>>> +            spin_unlock_irqrestore(&instance_ptr->lock, flags);
->>>> +            goto err_shutdown;
->>>> +    }
->>>> +
->>>> +    instance_ptr->power = true;
->>>> +
->>>> +    /* Enable clock to USB device and take the USB device out of reset */
->>>> +    if (instance_ptr->port == DUAL_ROLE_PHY)
->>>> +            cygnus_usbp2_dev_clock_init(instance_ptr->generic_phy, true);
->>>> +
->>>> +    /* Set clock source provider to be the last powered on phy */
->>>> +    if (instance_ptr->port == phy_driver->phyto_src_clk)
->>>> +            cygnus_phy_clk_reset_src_switch(generic_phy,
->>>> +                            instance_ptr->port);
->>>> +
->>>> +    if (phy_driver->idm_host_enabled != true &&
->>>> +            extcon_event == PHY2_DEV_HOST_CTRL_SEL_HOST) {
->>>> +            /* Enable clock to USB host and take the host out of reset */
->>>> +            reg_val = readl(phy_driver->usb2h_idm_regs +
->>>> +                            USB2_IDM_IDM_IO_CONTROL_DIRECT_OFFSET);
->>>> +            reg_val |= USB2_IDM_IDM_IO_CONTROL_DIRECT_CLK_ENABLE;
->>>> +            writel(reg_val, phy_driver->usb2h_idm_regs +
->>>> +                            USB2_IDM_IDM_IO_CONTROL_DIRECT_OFFSET);
->>>> +
->>>> +            reg_val = readl(phy_driver->usb2h_idm_regs +
->>>> +                            USB2_IDM_IDM_RESET_CONTROL_OFFSET);
->>>> +            reg_val &= ~BIT(USB2_IDM_IDM_RESET_CONTROL__RESET);
->>>> +            writel(reg_val, phy_driver->usb2h_idm_regs +
->>>> +                             USB2_IDM_IDM_RESET_CONTROL_OFFSET);
->>>> +            phy_driver->idm_host_enabled = true;
->>>> +    }
->>>> +    spin_unlock_irqrestore(&instance_ptr->lock, flags);
->>>> +
->>>> +    return 0;
->>>> +err_shutdown:
->>>> +    cygnus_phy_shutdown(generic_phy);
->>>> +    return ret;
->>>> +}
->>>> +
->>>> +static int usbd_connect_notify(struct notifier_block *self,
->>>> +                           unsigned long event, void *ptr)
->>>> +{
->>>> +    struct cygnus_phy_instance *instance_ptr = container_of(self,
->>>> +                                    struct cygnus_phy_instance, device_nb);
->>>> +
->>>> +    if (event) {
->>>> +            instance_ptr->new_state = PHY2_DEV_HOST_CTRL_SEL_DEVICE;
->>>> +            cygnus_phy_dual_role_init(instance_ptr);
->>>> +    }
+trailing whitespace.
 
-I have a question. This function handles when event is 1. It means
-that this function handles the attached state. Is it right
-that you don't consider the detached state?
-
->>>> +
->>>> +    return NOTIFY_OK;
->>>> +}
->>>> +
->>>> +static int usbh_connect_notify(struct notifier_block *self,
->>>> +                           unsigned long event, void *ptr)
->>>> +{
->>>> +    struct cygnus_phy_instance *instance_ptr = container_of(self,
->>>> +                                    struct cygnus_phy_instance, host_nb);
->>>> +    if (event) {
->>>> +            instance_ptr->new_state = PHY2_DEV_HOST_CTRL_SEL_HOST;
->>>> +            cygnus_phy_dual_role_init(instance_ptr);
->>>> +    }
-
-ditto.
-
->>>> +
->>>> +    return NOTIFY_OK;
->>>> +}
->>>> +
->>>> +static int cygnus_register_extcon_notifiers(
->>>> +                            struct cygnus_phy_instance *instance_ptr)
->>>> +{
->>>> +    int ret = 0;
->>>> +    struct device *dev = &instance_ptr->generic_phy->dev;
->>>> +
->>>> +    if (of_property_read_bool(dev->of_node, "extcon")) {
->>>> +            instance_ptr->edev = extcon_get_edev_by_phandle(dev, 0);
->>>> +            if (IS_ERR(instance_ptr->edev)) {
->>>> +                    if (PTR_ERR(instance_ptr->edev) == -EPROBE_DEFER)
->>>> +                            return -EPROBE_DEFER;
->>>> +                    ret = PTR_ERR(instance_ptr->edev);
->>>> +                    goto err;
->>>> +            }
->>>> +
->>>> +            instance_ptr->device_nb.notifier_call = usbd_connect_notify;
->>>> +            ret = extcon_register_notifier(instance_ptr->edev, EXTCON_USB,
->>>> +                                            &instance_ptr->device_nb);
->>
->> You better to use devm_extcon_register_notifier
->> because you didn't handle the unregister operation in this patch.
-> 
-> Ok, I will fix it in the next version of the patch.
-> 
->>>> +            if (ret < 0) {
->>>> +                    dev_err(dev, "Can't register extcon device\n");
->>
->> IMO, "can't register extcon notfiier' is more correct
->> instead of 'extcon device' expression.
-> 
-> Ok, I will fix it in the next version of the patch.
-> 
->>>> +                    goto err;
->>>> +            }
->>>> +
->>>> +            if (extcon_get_state(instance_ptr->edev, EXTCON_USB) == true) {
->>>> +                    instance_ptr->new_state = PHY2_DEV_HOST_CTRL_SEL_DEVICE;
->>>> +                    cygnus_phy_dual_role_init(instance_ptr);
->>>> +            }
->>>> +
->>>> +            instance_ptr->host_nb.notifier_call = usbh_connect_notify;
->>>> +            ret = extcon_register_notifier(instance_ptr->edev,
->>
->> ditto. (devm_extcon_register_notifier)
-> 
-> Ok, I will fix it in the next version of the patch.
-> 
->>>> +                                            EXTCON_USB_HOST,
->>>> +                                            &instance_ptr->host_nb);
->>>> +            if (ret < 0) {
->>>> +                    dev_err(dev, "Can't register extcon device\n");
->>
->> ditto.
-> 
-> Ok, I will fix it in the next version of the patch.
-> 
->>>> +                    goto err;
->>>> +            }
->>>> +
->>>> +            if (extcon_get_state(instance_ptr->edev, EXTCON_USB_HOST)
->>>> +                                    == true) {
->>>> +                    instance_ptr->new_state = PHY2_DEV_HOST_CTRL_SEL_HOST;
->>>> +                    cygnus_phy_dual_role_init(instance_ptr);
->>>> +            }
->>>> +    } else {
->>>> +            dev_err(dev, "Extcon device handle not found\n");
->>>> +            return -EINVAL;
->>
->> I'm not sure about this error. Because it depend on how to
->> develope the device driver. Each device driver can decide whether
->> the extcon is necessary or optional.
-> 
-> In our case extcon is necessary because all of our SoC's will have
-> dual role phy.
-> So decided to return -EINVAL.
-> 
->>>> +    }
->>>> +
->>>> +    return 0;
->>>> +err:
->>>> +    return ret;
->>>> +}
->>>> +
->>>> +static const struct phy_ops ops = {
->>>> +    .init           = cygnus_phy_init,
->>>> +    .power_on       = cygnus_phy_poweron,
->>>> +    .power_off      = cygnus_phy_shutdown,
->>>
->>>  missing .owner
->>>> +};
->>>> +
->>>> +static int cygnus_phy_instance_create(struct cygnus_phy_driver *phy_driver)
->>>> +{
->>>> +    struct device_node *child;
->>>> +    char *vbus_name;
->>>> +    struct platform_device *pdev = phy_driver->pdev;
->>>> +    struct device *dev = &pdev->dev;
->>>> +    struct device_node *node = dev->of_node;
->>>> +    struct cygnus_phy_instance *instance_ptr;
->>>> +    unsigned int id, ret;
->>>> +
->>>> +    for_each_available_child_of_node(node, child) {
->>>> +            if (of_property_read_u32(child, "reg", &id)) {
->>>> +                    dev_err(dev, "missing reg property for %s\n",
->>>> +                            child->name);
->>>> +                    ret = -EINVAL;
->>>> +                    goto put_child;
->>>> +            }
->>>> +
->>>> +            if (id >= MAX_NUM_PHYS) {
->>>> +                    dev_err(dev, "invalid PHY id: %u\n", id);
->>>> +                    ret = -EINVAL;
->>>> +                    goto put_child;
->>>> +            }
->>>> +
->>>> +            instance_ptr = &phy_driver->instances[id];
->>>> +            instance_ptr->driver = phy_driver;
->>>> +            instance_ptr->port = id;
->>>> +            spin_lock_init(&instance_ptr->lock);
->>>> +
->>>> +            if (instance_ptr->generic_phy) {
->>>> +                    dev_err(dev, "duplicated PHY id: %u\n", id);
->>>> +                    ret = -EINVAL;
->>>> +                    goto put_child;
->>>> +            }
->>>> +
->>>> +            instance_ptr->generic_phy =
->>>> +                            devm_phy_create(dev, child, &ops);
->>>> +            if (IS_ERR(instance_ptr->generic_phy)) {
->>>> +                    dev_err(dev, "Failed to create usb phy %d", id);
->>>> +                    ret = PTR_ERR(instance_ptr->generic_phy);
->>>> +                    goto put_child;
->>>> +            }
->>>> +
->>>> +            vbus_name = devm_kzalloc(&instance_ptr->generic_phy->dev,
->>>> +                                    MAX_REGULATOR_NAME_LEN,
->>>> +                                    GFP_KERNEL);
->>>> +            if (!vbus_name) {
->>>> +                    ret = -ENOMEM;
->>>> +                    goto put_child;
->>>> +            }
->>>> +
->>>> +            /* regulator use is optional */
->>>> +            sprintf(vbus_name, "vbus-p%d", id);
->>>> +            instance_ptr->vbus_supply =
->>>> +                    devm_regulator_get(&instance_ptr->generic_phy->dev,
->>>> +                                    vbus_name);
->>>> +            if (IS_ERR(instance_ptr->vbus_supply))
->>>> +                    instance_ptr->vbus_supply = NULL;
->>>> +            devm_kfree(&instance_ptr->generic_phy->dev, vbus_name);
->>>> +            phy_set_drvdata(instance_ptr->generic_phy, instance_ptr);
->>>> +    }
->>>> +
->>>> +    return 0;
->>>> +
->>>> +put_child:
->>>> +    of_node_put(child);
->>>> +    return ret;
->>>> +}
->>>> +
->>>> +static int cygnus_phy_probe(struct platform_device *pdev)
->>>> +{
->>>> +    struct resource *res;
->>>> +    struct cygnus_phy_driver *phy_driver;
->>>> +    struct phy_provider *phy_provider;
->>>> +    int i, ret;
->>>> +    u32 reg_val;
->>>> +    struct device *dev = &pdev->dev;
->>>> +    struct device_node *node = dev->of_node;
->>>> +
->>>> +    /* allocate memory for each phy instance */
->>>> +    phy_driver = devm_kzalloc(dev, sizeof(struct cygnus_phy_driver),
->>>> +                              GFP_KERNEL);
->>>> +    if (!phy_driver)
->>>> +            return -ENOMEM;
->>>> +
->>>> +    phy_driver->num_phys = of_get_child_count(node);
->>>> +
->>>> +    if (phy_driver->num_phys == 0) {
->>>> +            dev_err(dev, "PHY no child node\n");
->>>> +            return -ENODEV;
->>>> +    }
->>>> +
->>>> +    phy_driver->instances = devm_kcalloc(dev, phy_driver->num_phys,
->>>> +                                         sizeof(struct cygnus_phy_instance),
->>>> +                                         GFP_KERNEL);
->>>> +    phy_driver->pdev = pdev;
->>>> +    platform_set_drvdata(pdev, phy_driver);
->>>> +
->>>> +    ret = cygnus_phy_instance_create(phy_driver);
->>>> +    if (ret)
->>>> +            return ret;
->>>> +
->>>> +    res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
->>>> +                                       "crmu-usbphy-aon-ctrl");
->>>> +    phy_driver->crmu_usbphy_aon_ctrl_regs = devm_ioremap_resource(dev, res);
->>>> +    if (IS_ERR(phy_driver->crmu_usbphy_aon_ctrl_regs))
->>>> +            return PTR_ERR(phy_driver->crmu_usbphy_aon_ctrl_regs);
->>>> +
->>>> +    res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
->>>> +                                       "cdru-usbphy");
->>>> +    phy_driver->cdru_usbphy_regs = devm_ioremap_resource(dev, res);
->>>> +    if (IS_ERR(phy_driver->cdru_usbphy_regs))
->>>> +            return PTR_ERR(phy_driver->cdru_usbphy_regs);
->>>> +
->>>> +    res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "usb2h-idm");
->>>> +    phy_driver->usb2h_idm_regs = devm_ioremap_resource(dev, res);
->>>> +    if (IS_ERR(phy_driver->usb2h_idm_regs))
->>>> +            return PTR_ERR(phy_driver->usb2h_idm_regs);
->>>> +
->>>> +    res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "usb2d-idm");
->>>> +    phy_driver->usb2d_idm_regs = devm_ioremap_resource(dev, res);
->>>> +    if (IS_ERR(phy_driver->usb2d_idm_regs))
->>>> +            return PTR_ERR(phy_driver->usb2d_idm_regs);
->>>> +
->>>> +    reg_val = readl(phy_driver->usb2d_idm_regs);
->>>> +    writel((reg_val | USB2D_IDM_IDM_IO_SS_CLEAR_NAK_NEMPTY_EN_I),
->>>> +               phy_driver->usb2d_idm_regs);
->>>> +    phy_driver->idm_host_enabled = false;
->>>> +
->>>> +    /*
->>>> +     * Shutdown all ports. They can be powered up as
->>>> +     * required
->>>> +     */
->>>> +    reg_val = readl(phy_driver->crmu_usbphy_aon_ctrl_regs +
->>>> +                    CRMU_USB_PHY_AON_CTRL_OFFSET);
->>>> +    reg_val &= ~CRMU_USBPHY_P0_AFE_CORERDY_VDDC;
->>>> +    reg_val &= ~CRMU_USBPHY_P0_RESETB;
->>>> +    reg_val &= ~CRMU_USBPHY_P1_AFE_CORERDY_VDDC;
->>>> +    reg_val &= ~CRMU_USBPHY_P1_RESETB;
->>>> +    reg_val &= ~CRMU_USBPHY_P2_AFE_CORERDY_VDDC;
->>>> +    reg_val &= ~CRMU_USBPHY_P2_RESETB;
->>>> +    writel(reg_val, phy_driver->crmu_usbphy_aon_ctrl_regs +
->>>> +            CRMU_USB_PHY_AON_CTRL_OFFSET);
->>>
->>> move the above to a separate function to make probe a lot cleaner.
->>>
->>> Thanks
->>> Kishon
->>>
->>>
->>>
->>
->> --
->> Best Regards,
->> Chanwoo Choi
->> Samsung Electronics
-> 
-> 
+> -- 
+> 2.11.0
 > 
 
+I've fixed up the nits while applying the patch:
 
--- 
-Best Regards,
-Chanwoo Choi
-Samsung Electronics
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
