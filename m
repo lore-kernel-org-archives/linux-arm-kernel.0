@@ -1,149 +1,102 @@
-From: mihailescu2m@gmail.com (Marian Mihailescu)
-Date: Mon, 30 Oct 2017 20:04:12 +1030
-Subject: [PATCH v2] ARM: dts: exynos: add cpu perf counters to Exynos54xx
- boards
-In-Reply-To: <1508812196-14478-1-git-send-email-mihailescu2m@gmail.com>
-References: <1508812196-14478-1-git-send-email-mihailescu2m@gmail.com>
-Message-ID: <CAM3PiRwqS21a-z6L0yqM0stUSnbKY9pdWKGJfpnyePQ3AZJqdw@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 30 Oct 2017 18:35:19 +0900
+Subject: [PATCH 1/2] usb: ehci-platform: use reset array API
+Message-ID: <1509356120-21473-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Generic drivers like this need to control arbitrary numbers of reset
+lines.  Instead of hard-coding the maximum number of resets, use the
+reset array API.  It can manage a bunch of resets behind the scene.
 
-Can I get feedback on this last patch?
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-Thanks,
-Marian
-Either I've been missing something or nothing has been going on. (K. E. Gordon)
+ drivers/usb/host/ehci-platform.c | 33 +++++++++++----------------------
+ 1 file changed, 11 insertions(+), 22 deletions(-)
 
-
-On Tue, Oct 24, 2017 at 12:59 PM, memeka <mihailescu2m@gmail.com> wrote:
-> Enable support for ARM Performance Monitoring Units available in Cortex-A7
-> and Cortex-A15 CPU cores for Exynos54xx SoCs (5410, 5420 and 5422/5800).
->
-> The PMUs interrupts are defined in the common exynos54xx.dtsi device tree,
-> but the PMUs are enabled and have their interrupt CPU affinity defined
-> next to each SoC's cpus node.
->
-> Tested with perf on Odroid XU4 (Exynos5422):
-> armv7_cortex_a7 PMU driver: 5 counters available
-> armv7_cortex_a15 PMU driver: 7 counters available
->
-> Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Marian Mihailescu <mihailescu2m@gmail.com>
-> Signed-off-by: Willy Wolff <willy.mh.wolff@gmail.com>
->
-> ---
-> Changes since v1:
->  - both Cortex-A7 and Cortex-A15 PMUs are now defined in exynos54xx.dtsi
->  - CPU affinity is defined for each SoC *after* the cpus node entry
->  - PMUs are disabled in exynos54xx.dtsi and enabled for each SoC
->  - cpus labels have been fixed in the interrupt-affinity property for
->    Exynos5410 and Exynos5420 SoCs
->
-> ---
->  arch/arm/boot/dts/exynos5410.dtsi      |  8 ++++++++
->  arch/arm/boot/dts/exynos5420-cpus.dtsi | 16 ++++++++++++++++
->  arch/arm/boot/dts/exynos5422-cpus.dtsi | 16 ++++++++++++++++
->  arch/arm/boot/dts/exynos54xx.dtsi      | 20 ++++++++++++++++++++
->  4 files changed, 60 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
-> index 7eab4bc..f42b04b 100644
-> --- a/arch/arm/boot/dts/exynos5410.dtsi
-> +++ b/arch/arm/boot/dts/exynos5410.dtsi
-> @@ -428,4 +428,12 @@
->         samsung,syscon-phandle = <&pmu_system_controller>;
->  };
->
-> +&arm_a15_pmu {
-> +       interrupt-affinity = <&cpu0>,
-> +               <&cpu1>,
-> +               <&cpu2>,
-> +               <&cpu3>;
-> +       status = "okay";
-> +};
-> +
->  #include "exynos5410-pinctrl.dtsi"
-> diff --git a/arch/arm/boot/dts/exynos5420-cpus.dtsi b/arch/arm/boot/dts/exynos5420-cpus.dtsi
-> index 5c052d7..518b7d8 100644
-> --- a/arch/arm/boot/dts/exynos5420-cpus.dtsi
-> +++ b/arch/arm/boot/dts/exynos5420-cpus.dtsi
-> @@ -124,3 +124,19 @@
->                 };
->         };
->  };
-> +
-> +&arm_a7_pmu {
-> +       interrupt-affinity = <&cpu4>,
-> +               <&cpu5>,
-> +               <&cpu4>,
-> +               <&cpu5>;
-> +       status = "okay";
-> +};
-> +
-> +&arm_a15_pmu {
-> +       interrupt-affinity = <&cpu0>,
-> +               <&cpu1>,
-> +               <&cpu2>,
-> +               <&cpu3>;
-> +       status = "okay";
-> +};
-> diff --git a/arch/arm/boot/dts/exynos5422-cpus.dtsi b/arch/arm/boot/dts/exynos5422-cpus.dtsi
-> index ab4c718..92676be 100644
-> --- a/arch/arm/boot/dts/exynos5422-cpus.dtsi
-> +++ b/arch/arm/boot/dts/exynos5422-cpus.dtsi
-> @@ -131,3 +131,19 @@
->                 };
->         };
->  };
-> +
-> +&arm_a7_pmu {
-> +       interrupt-affinity = <&cpu0>,
-> +               <&cpu1>,
-> +               <&cpu2>,
-> +               <&cpu3>;
-> +       status = "okay";
-> +};
-> +
-> +&arm_a15_pmu {
-> +       interrupt-affinity = <&cpu4>,
-> +               <&cpu5>,
-> +               <&cpu6>,
-> +               <&cpu7>;
-> +       status = "okay";
-> +};
-> diff --git a/arch/arm/boot/dts/exynos54xx.dtsi b/arch/arm/boot/dts/exynos54xx.dtsi
-> index 8ca4fef..f0bd27d 100644
-> --- a/arch/arm/boot/dts/exynos54xx.dtsi
-> +++ b/arch/arm/boot/dts/exynos54xx.dtsi
-> @@ -79,6 +79,26 @@
->                         interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
->                 };
->
-> +               arm_a7_pmu: arm-a7-pmu {
-> +                       compatible = "arm,cortex-a7-pmu";
-> +                       interrupt-parent = <&gic>;
-> +                       interrupts = <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
-> +                               <GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>,
-> +                               <GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>,
-> +                               <GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>;
-> +                       status = "disabled";
-> +               };
-> +
-> +               arm_a15_pmu: arm-a15-pmu {
-> +                       compatible = "arm,cortex-a15-pmu";
-> +                       interrupt-parent = <&combiner>;
-> +                       interrupts = <1 2>,
-> +                               <7 0>,
-> +                               <16 6>,
-> +                               <19 2>;
-> +                       status = "disabled";
-> +               };
-> +
->                 sss: sss at 10830000 {
->                         compatible = "samsung,exynos4210-secss";
->                         reg = <0x10830000 0x300>;
-> --
-> 2.7.4
->
+diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
+index f1908ea..64fd643 100644
+--- a/drivers/usb/host/ehci-platform.c
++++ b/drivers/usb/host/ehci-platform.c
+@@ -40,12 +40,11 @@
+ 
+ #define DRIVER_DESC "EHCI generic platform driver"
+ #define EHCI_MAX_CLKS 4
+-#define EHCI_MAX_RSTS 4
+ #define hcd_to_ehci_priv(h) ((struct ehci_platform_priv *)hcd_to_ehci(h)->priv)
+ 
+ struct ehci_platform_priv {
+ 	struct clk *clks[EHCI_MAX_CLKS];
+-	struct reset_control *rsts[EHCI_MAX_RSTS];
++	struct reset_control *rsts;
+ 	struct phy **phys;
+ 	int num_phys;
+ 	bool reset_on_resume;
+@@ -151,7 +150,7 @@ static int ehci_platform_probe(struct platform_device *dev)
+ 	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
+ 	struct ehci_platform_priv *priv;
+ 	struct ehci_hcd *ehci;
+-	int err, irq, phy_num, clk = 0, rst;
++	int err, irq, phy_num, clk = 0;
+ 
+ 	if (usb_disabled())
+ 		return -ENODEV;
+@@ -239,21 +238,13 @@ static int ehci_platform_probe(struct platform_device *dev)
+ 		}
+ 	}
+ 
+-	for (rst = 0; rst < EHCI_MAX_RSTS; rst++) {
+-		priv->rsts[rst] = devm_reset_control_get_shared_by_index(
+-					&dev->dev, rst);
+-		if (IS_ERR(priv->rsts[rst])) {
+-			err = PTR_ERR(priv->rsts[rst]);
+-			if (err == -EPROBE_DEFER)
+-				goto err_reset;
+-			priv->rsts[rst] = NULL;
+-			break;
+-		}
++	priv->rsts = devm_reset_control_array_get_optional_shared(&dev->dev);
++	if (IS_ERR(priv->rsts))
++		return PTR_ERR(priv->rsts);
+ 
+-		err = reset_control_deassert(priv->rsts[rst]);
+-		if (err)
+-			goto err_reset;
+-	}
++	err = reset_control_deassert(priv->rsts);
++	if (err)
++		goto err_put_clks;
+ 
+ 	if (pdata->big_endian_desc)
+ 		ehci->big_endian_desc = 1;
+@@ -310,8 +301,7 @@ static int ehci_platform_probe(struct platform_device *dev)
+ 	if (pdata->power_off)
+ 		pdata->power_off(dev);
+ err_reset:
+-	while (--rst >= 0)
+-		reset_control_assert(priv->rsts[rst]);
++	reset_control_assert(priv->rsts);
+ err_put_clks:
+ 	while (--clk >= 0)
+ 		clk_put(priv->clks[clk]);
+@@ -329,15 +319,14 @@ static int ehci_platform_remove(struct platform_device *dev)
+ 	struct usb_hcd *hcd = platform_get_drvdata(dev);
+ 	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
+ 	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
+-	int clk, rst;
++	int clk;
+ 
+ 	usb_remove_hcd(hcd);
+ 
+ 	if (pdata->power_off)
+ 		pdata->power_off(dev);
+ 
+-	for (rst = 0; rst < EHCI_MAX_RSTS && priv->rsts[rst]; rst++)
+-		reset_control_assert(priv->rsts[rst]);
++	reset_control_assert(priv->rsts);
+ 
+ 	for (clk = 0; clk < EHCI_MAX_CLKS && priv->clks[clk]; clk++)
+ 		clk_put(priv->clks[clk]);
+-- 
+2.7.4
