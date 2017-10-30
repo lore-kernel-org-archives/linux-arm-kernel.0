@@ -1,102 +1,57 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 30 Oct 2017 03:55:57 +0100
-Subject: [PULL 2/8] arm/arm64: KVM: set right LR register value for 32 bit
- guest when inject abort
+Date: Mon, 30 Oct 2017 03:55:59 +0100
+Subject: [PULL 4/8] arm/arm64: kvm: Disable branch profiling in HYP code
 In-Reply-To: <20171030025603.23550-1-christoffer.dall@linaro.org>
 References: <20171030025603.23550-1-christoffer.dall@linaro.org>
-Message-ID: <20171030025603.23550-3-christoffer.dall@linaro.org>
+Message-ID: <20171030025603.23550-5-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dongjiu Geng <gengdongjiu@huawei.com>
+From: Julien Thierry <julien.thierry@arm.com>
 
-When a exception is trapped to EL2, hardware uses  ELR_ELx to hold
-the current fault instruction address. If KVM wants to inject a
-abort to 32 bit guest, it needs to set the LR register for the
-guest to emulate this abort happened in the guest. Because ARM32
-architecture is pipelined execution, so the LR value has an offset to
-the fault instruction address.
+When HYP code runs into branch profiling code, it attempts to jump to
+unmapped memory, causing a HYP Panic.
 
-The offsets applied to Link value for exceptions as shown below,
-which should be added for the ARM32 link register(LR).
+Disable the branch profiling for code designed to run at HYP mode.
 
-Table taken from ARMv8 ARM DDI0487B-B, table G1-10:
-Exception			Offset, for PE state of:
-				A32 	  T32
-Undefined Instruction 		+4 	  +2
-Prefetch Abort 			+4 	  +4
-Data Abort 			+8 	  +8
-IRQ or FIQ 			+4 	  +4
-
-  [ Removed unused variables in inject_abt to avoid compile warnings.
-    -- Christoffer ]
-
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
 Cc: <stable@vger.kernel.org>
-Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
-Tested-by: Haibin Zhang <zhanghaibin7@huawei.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <cdall@linaro.org>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/emulate.c        |  6 ++----
- arch/arm64/kvm/inject_fault.c | 16 +++++++++++++++-
- 2 files changed, 17 insertions(+), 5 deletions(-)
+ arch/arm/kvm/hyp/Makefile   | 2 +-
+ arch/arm64/kvm/hyp/Makefile | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/kvm/emulate.c b/arch/arm/kvm/emulate.c
-index 0064b86a2c87..30a13647c54c 100644
---- a/arch/arm/kvm/emulate.c
-+++ b/arch/arm/kvm/emulate.c
-@@ -227,7 +227,7 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
- 	u32 return_offset = (is_thumb) ? 2 : 4;
+diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
+index 8679405b0b2b..92eab1d51785 100644
+--- a/arch/arm/kvm/hyp/Makefile
++++ b/arch/arm/kvm/hyp/Makefile
+@@ -2,7 +2,7 @@
+ # Makefile for Kernel-based Virtual Machine module, HYP part
+ #
  
- 	kvm_update_psr(vcpu, UND_MODE);
--	*vcpu_reg(vcpu, 14) = *vcpu_pc(vcpu) - return_offset;
-+	*vcpu_reg(vcpu, 14) = *vcpu_pc(vcpu) + return_offset;
+-ccflags-y += -fno-stack-protector
++ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
  
- 	/* Branch to exception vector */
- 	*vcpu_pc(vcpu) = exc_vector_base(vcpu) + vect_offset;
-@@ -239,10 +239,8 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
-  */
- static void inject_abt(struct kvm_vcpu *vcpu, bool is_pabt, unsigned long addr)
- {
--	unsigned long cpsr = *vcpu_cpsr(vcpu);
--	bool is_thumb = (cpsr & PSR_T_BIT);
- 	u32 vect_offset;
--	u32 return_offset = (is_thumb) ? 4 : 0;
-+	u32 return_offset = (is_pabt) ? 4 : 8;
- 	bool is_lpae;
+ KVM=../../../../virt/kvm
  
- 	kvm_update_psr(vcpu, ABT_MODE);
-diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
-index da6a8cfa54a0..3556715a774e 100644
---- a/arch/arm64/kvm/inject_fault.c
-+++ b/arch/arm64/kvm/inject_fault.c
-@@ -33,12 +33,26 @@
- #define LOWER_EL_AArch64_VECTOR		0x400
- #define LOWER_EL_AArch32_VECTOR		0x600
+diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+index 14c4e3b14bcb..48b03547a969 100644
+--- a/arch/arm64/kvm/hyp/Makefile
++++ b/arch/arm64/kvm/hyp/Makefile
+@@ -2,7 +2,7 @@
+ # Makefile for Kernel-based Virtual Machine module, HYP part
+ #
  
-+/*
-+ * Table taken from ARMv8 ARM DDI0487B-B, table G1-10.
-+ */
-+static const u8 return_offsets[8][2] = {
-+	[0] = { 0, 0 },		/* Reset, unused */
-+	[1] = { 4, 2 },		/* Undefined */
-+	[2] = { 0, 0 },		/* SVC, unused */
-+	[3] = { 4, 4 },		/* Prefetch abort */
-+	[4] = { 8, 8 },		/* Data abort */
-+	[5] = { 0, 0 },		/* HVC, unused */
-+	[6] = { 4, 4 },		/* IRQ, unused */
-+	[7] = { 4, 4 },		/* FIQ, unused */
-+};
-+
- static void prepare_fault32(struct kvm_vcpu *vcpu, u32 mode, u32 vect_offset)
- {
- 	unsigned long cpsr;
- 	unsigned long new_spsr_value = *vcpu_cpsr(vcpu);
- 	bool is_thumb = (new_spsr_value & COMPAT_PSR_T_BIT);
--	u32 return_offset = (is_thumb) ? 4 : 0;
-+	u32 return_offset = return_offsets[vect_offset >> 2][is_thumb];
- 	u32 sctlr = vcpu_cp15(vcpu, c1_SCTLR);
+-ccflags-y += -fno-stack-protector
++ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
  
- 	cpsr = mode | COMPAT_PSR_I_BIT;
+ KVM=../../../../virt/kvm
+ 
 -- 
 2.14.2
