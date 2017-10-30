@@ -1,46 +1,97 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 Oct 2017 18:04:12 +0100
-Subject: [GIT PULL 2/3] ARM: Keystone config update for 4.15
-In-Reply-To: <68f47a4e-ba33-ff33-3c73-9b104284f1a8@oracle.com>
-References: <1508548966-7350-1-git-send-email-santosh.shilimkar@oracle.com>
- <1508548966-7350-2-git-send-email-santosh.shilimkar@oracle.com>
- <CAK8P3a1BU6U_c+a0nTp7QM2-AR6qh-3T+RaGQX4mLvUU8Lg62Q@mail.gmail.com>
- <68f47a4e-ba33-ff33-3c73-9b104284f1a8@oracle.com>
-Message-ID: <CAK8P3a21yh17EGnh5+hL46TVyoOn0HN1zUoJNVxsMYGfOCUntQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 30 Oct 2017 10:10:37 -0700
+Subject: [bug report] ARM: OMAP2+: Populate legacy resources for dma and
+ smartreflex
+In-Reply-To: <20171027225048.GG21504@atomide.com>
+References: <20171027064440.i5zf4fwsdj3phwuy@mwanda>
+ <20171027225048.GG21504@atomide.com>
+Message-ID: <20171030171037.GB7339@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 30, 2017 at 4:28 PM, Santosh Shilimkar
-<santosh.shilimkar@oracle.com> wrote:
-> On 10/30/2017 3:01 AM, Arnd Bergmann wrote:
->>
->> On Sat, Oct 21, 2017 at 3:22 AM, Santosh Shilimkar
->> <santosh.shilimkar@oracle.com> wrote:
->>>
->>> The following changes since commit
->>> e19b205be43d11bff638cad4487008c48d21c103:
->>>
->>>    Linux 4.14-rc2 (2017-09-24 16:38:56 -0700)
->>>
->>> are available in the git repository at:
->>>
->>>
->>> git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
->>> tags/keystone_config_4.15
->>>
->>> for you to fetch changes up to fc88a0631ed0f5b1862d42fb8f2455bf3d18744b:
->>>
->>>    ARM: configs: keystone: Enable TIECAP PWM driver (2017-10-09 09:43:32
->>> -0700)
->>
->>
->> Pulled into next/soc. Should this also be enabled in multi_v7_defconfig?
->>
-> Sure !!
+* Tony Lindgren <tony@atomide.com> [171027 22:52]:
+> * Dan Carpenter <dan.carpenter@oracle.com> [171026 23:46]:
+> > Hello Tony Lindgren,
+> > 
+> > This is a semi-automatic email about new static checker warnings.
+> > 
+> > The patch d85a2d61432a: "ARM: OMAP2+: Populate legacy resources for 
+> > dma and smartreflex" from Oct 10, 2017, leads to the following Smatch 
+> > complaint:
+> > 
+> > arch/arm/mach-omap2/omap_device.c:453 omap_device_copy_resources()
+> > 	 error: we previously assumed 'oh' could be null (see line 394)
+> > 
+> > arch/arm/mach-omap2/omap_device.c
+> >    393	
+> >    394		if (!oh || !oh->od || !oh->od->pdev) {
+> >                     ^^^
+> > Patch adds check for NULL.
+> > 
+> >    395			error = -EINVAL;
+> >    396			goto error;
+> >    397		}
+> >    398	
+> > 
+> > [ snip ]
+> > 
+> >    448	
+> >    449	free:
+> >    450		kfree(res);
+> >    451	
+> >    452	error:
+> >    453		WARN(error, "%s: %s device %s failed: %i\n",
+> >    454		     __func__, oh->name, dev_name(&pdev->dev),
+> >                                ^^^^^^^^
+> > and the patch adds a dereference.
+> > 
+> >    455		     error);
+> 
+> Thanks, looks like we should just return early there. I'll send
+> a fix for this.
 
-Can you send a patch for that then? Ideally, you could go through all options
-that are enabled in keystone_defconfig but not multi_v7_defconfig and see
-if we want to enable them too (as modules if possible). Feel free to just send
-a single patch describing what you found rather than a pull request.
+And here's the patch to fix it.
 
-      Arnd
+Regards,
+
+Tony
+
+8< -------------------------
+>From tony Mon Sep 17 00:00:00 2001
+From: Tony Lindgren <tony@atomide.com>
+Date: Mon, 30 Oct 2017 10:01:39 -0700
+Subject: [PATCH] ARM: OMAP2+: Fix smatch found issue for omap_device
+
+The patch d85a2d61432a: "ARM: OMAP2+: Populate legacy resources for
+dma and smartreflex" from Oct 10, 2017, leads to the following Smatch
+complaint:
+
+arch/arm/mach-omap2/omap_device.c:453 omap_device_copy_resources()
+         error: we previously assumed 'oh' could be null (see line 394)
+
+Fixes: d85a2d61432a: ("ARM: OMAP2+: Populate legacy resources for dma
+and smartreflex")
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/omap_device.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+--- a/arch/arm/mach-omap2/omap_device.c
++++ b/arch/arm/mach-omap2/omap_device.c
+@@ -391,10 +391,8 @@ omap_device_copy_resources(struct omap_hwmod *oh,
+ 	const char *name;
+ 	int error, irq = 0;
+ 
+-	if (!oh || !oh->od || !oh->od->pdev) {
+-		error = -EINVAL;
+-		goto error;
+-	}
++	if (!oh || !oh->od || !oh->od->pdev)
++		return -EINVAL;
+ 
+ 	np = oh->od->pdev->dev.of_node;
+ 	if (!np) {
+-- 
+2.14.3
