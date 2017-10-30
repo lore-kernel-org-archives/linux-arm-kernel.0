@@ -1,91 +1,80 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 30 Oct 2017 15:44:17 +0000
-Subject: [PATCH v4 15/21] KVM: arm64: Set an impdef ESR for Virtual-SError
- using VSESR_EL2.
-In-Reply-To: <20171030105140.GU2166@lvm>
-References: <20171019145807.23251-1-james.morse@arm.com>
- <20171019145807.23251-16-james.morse@arm.com> <20171030075951.GT2166@lvm>
- <20171030105140.GU2166@lvm>
-Message-ID: <59F748D1.4030507@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 30 Oct 2017 16:46:13 +0100
+Subject: [PATCH v2 16/16] arm64: dts: marvell: armada-3720-espressobin:
+ fill UART nodes
+In-Reply-To: <20171013090200.31034-17-miquel.raynal@free-electrons.com>
+ (Miquel Raynal's message of "Fri, 13 Oct 2017 11:02:00 +0200")
+References: <20171013090200.31034-1-miquel.raynal@free-electrons.com>
+ <20171013090200.31034-17-miquel.raynal@free-electrons.com>
+Message-ID: <87fua01vwa.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+Hi Miquel,
+ 
+ On ven., oct. 13 2017, Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
 
-On 30/10/17 10:51, Christoffer Dall wrote:
-> On Mon, Oct 30, 2017 at 08:59:51AM +0100, Christoffer Dall wrote:
->> On Thu, Oct 19, 2017 at 03:58:01PM +0100, James Morse wrote:
->>> Prior to v8.2's RAS Extensions, the HCR_EL2.VSE 'virtual SError' feature
->>> generated an SError with an implementation defined ESR_EL1.ISS, because we
->>> had no mechanism to specify the ESR value.
->>>
->>> On Juno this generates an all-zero ESR, the most significant bit 'ISV'
->>> is clear indicating the remainder of the ISS field is invalid.
->>>
->>> With the RAS Extensions we have a mechanism to specify this value, and the
->>> most significant bit has a new meaning: 'IDS - Implementation Defined
->>> Syndrome'. An all-zero SError ESR now means: 'RAS error: Uncategorized'
->>> instead of 'no valid ISS'.
->>>
->>> Add KVM support for the VSESR_EL2 register to specify an ESR value when
->>> HCR_EL2.VSE generates a virtual SError. Change kvm_inject_vabt() to
->>> specify an implementation-defined value.
->>>
->>> We only need to restore the VSESR_EL2 value when HCR_EL2.VSE is set, KVM
->>> save/restores this bit during __deactivate_traps() and hardware clears the
->>> bit once the guest has consumed the virtual-SError.
->>>
->>> Future patches may add an API (or KVM CAP) to pend a virtual SError with
->>> a specified ESR.
+> Fill ESPRESSObin uart0 node with pinctrl information like in the
+> Armada-3720-DB device tree (which uses the same node).
+>
+> Also explain how to enable the second UART port available on the
+> headers. This second port is not enabled by default because both
+> headers are dedicated to expose general purpose pins and remapping
+> some of them to use the second UART would break existing users.
+>
+> Suggested-by: L?szl? ?SHIN <laszlo@ashin.hu>
+> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 
-
->>> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
->>> index 945e79c641c4..af37658223a0 100644
->>> --- a/arch/arm64/kvm/hyp/switch.c
->>> +++ b/arch/arm64/kvm/hyp/switch.c
->>> @@ -86,6 +86,10 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
->>>  		isb();
->>>  	}
->>>  	write_sysreg(val, hcr_el2);
->>> +
->>> +	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN) && (val & HCR_VSE))
->>> +		write_sysreg_s(vcpu->arch.vsesr_el2, SYS_VSESR_EL2);
->>> +
-
->> Just a heads up: If my optimization work gets merged, that will
->> eventually move stuff like this in to load/put hooks for system
->> registers, but I can deal with this easily, also adding a direct write
->> in pend_guest_serror when moving the logic around.
-
-Sure. This would always be called when the vcpu is loaded, so yes it should end
-up as a direct write to the system register.
-
-
->> However, if we start architecting something more complex, it would be
->> good to keep in mind how to maintain minimum work on the switching path
->> after we've optimized the hypervisor.
-
-I think gengdongjiu's trick of only restoring VSESR if HCR_EL2.VSE is set is the
-best we can do here. (Hence the Celebrate-Contribution tag).
-
-For VDISR_EL2 we can probably only save/restore it if its non-zero. On most
-systems it will never be touched so the cost is testing that whenever we exit
-the guest/unload the vcpu.
-
-
-> Actually, after thinking about this, if the guest can only see this via
-> the ESR if we set the HCR_EL2.VSE, wouldn't it make sense to just set
-> this value in pend_guest_serror, and if we're on a non-VHE system --
-> assuming that's something we want to support with this 8.2 feature
-> -- we jump to EL2 and back to set the value?
-
-It thought this was the 'eventually ... direct write' above.
-Once your load/put hooks are merged? Yes, just write it straight to the CPU
-register and set the guests HCR_EL2.VSE.
-
-Now? Wouldn't this get lost if we reschedule onto another cpu...
-
+Applied on mvebu/dt64
 
 Thanks,
 
-James
+Gregory
+
+> ---
+>
+> Changes since v1: comment about UART1 node.
+>
+>  arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+> index 2ce52ba74f73..bdfb5553ddb5 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+> +++ b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+> @@ -98,9 +98,21 @@
+>  
+>  /* Exported on the micro USB connector J5 through an FTDI */
+>  &uart0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart1_pins>;
+>  	status = "okay";
+>  };
+>  
+> +/*
+> + * Connector J17 and J18 expose a number of different features. Some pins are
+> + * multiplexed. This is the case for instance for the following features:
+> + * - UART1 (pin 24 = RX, pin 26 = TX). See armada-3720-db.dts for an example of
+> + *   how to enable it. Beware that the signals are 1.8V TTL.
+> + * - I2C
+> + * - SPI
+> + * - MMC
+> + */
+> +
+>  /* J7 */
+>  &usb3 {
+>  	status = "okay";
+> -- 
+> 2.11.0
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
