@@ -1,50 +1,124 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 30 Oct 2017 18:15:51 +0000
-Subject: linux-next: manual merge of the spi-nor tree with the imx-mxs tree
-Message-ID: <20171030181551.skcvt4mr4br7rtn2@sirena.co.uk>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Mon, 30 Oct 2017 19:35:35 +0100
+Subject: [PATCH v9 02/10] dt-bindings: net: dwmac-sun8i: update
+ documentation about integrated PHY
+In-Reply-To: <20171027125621.mlcapjhttyw2j5sy@rob-hp-laptop>
+References: <20171024175714.15840-1-clabbe.montjoie@gmail.com>
+ <20171024175714.15840-3-clabbe.montjoie@gmail.com>
+ <20171027125621.mlcapjhttyw2j5sy@rob-hp-laptop>
+Message-ID: <20171030183535.GA16723@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Cyrille,
+On Fri, Oct 27, 2017 at 09:37:10AM -0500, Rob Herring wrote:
+> On Tue, Oct 24, 2017 at 07:57:06PM +0200, Corentin Labbe wrote:
+> > This patch add documentation about the MDIO switch used on sun8i-h3-emac
+> > for integrated PHY.
+> > 
+> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> > ---
+> >  .../devicetree/bindings/net/dwmac-sun8i.txt        | 145 +++++++++++++++++++--
+> >  1 file changed, 133 insertions(+), 12 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+> > index 725f3b187886..2600ce9ad3cc 100644
+> > --- a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+> > +++ b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+> > @@ -4,18 +4,18 @@ This device is a platform glue layer for stmmac.
+> >  Please see stmmac.txt for the other unchanged properties.
+> >  
+> >  Required properties:
+> > -- compatible: should be one of the following string:
+> > +- compatible: must be one of the following string:
+> >  		"allwinner,sun8i-a83t-emac"
+> >  		"allwinner,sun8i-h3-emac"
+> >  		"allwinner,sun8i-v3s-emac"
+> >  		"allwinner,sun50i-a64-emac"
+> >  - reg: address and length of the register for the device.
+> >  - interrupts: interrupt for the device
+> > -- interrupt-names: should be "macirq"
+> > +- interrupt-names: must be "macirq"
+> >  - clocks: A phandle to the reference clock for this device
+> > -- clock-names: should be "stmmaceth"
+> > +- clock-names: must be "stmmaceth"
+> >  - resets: A phandle to the reset control for this device
+> > -- reset-names: should be "stmmaceth"
+> > +- reset-names: must be "stmmaceth"
+> >  - phy-mode: See ethernet.txt
+> >  - phy-handle: See ethernet.txt
+> >  - #address-cells: shall be 1
+> > @@ -39,23 +39,42 @@ Optional properties for the following compatibles:
+> >  - allwinner,leds-active-low: EPHY LEDs are active low
+> >  
+> >  Required child node of emac:
+> > -- mdio bus node: should be named mdio
+> > +- mdio bus node: with compatible "snps,dwmac-mdio"
+> 
+> It should still be named mdio.
+> 
+> >  
+> >  Required properties of the mdio node:
+> >  - #address-cells: shall be 1
+> >  - #size-cells: shall be 0
+> >  
+> > -The device node referenced by "phy" or "phy-handle" should be a child node
+> > +The device node referenced by "phy" or "phy-handle" must be a child node
+> >  of the mdio node. See phy.txt for the generic PHY bindings.
+> >  
+> > -Required properties of the phy node with the following compatibles:
+> > +The following compatibles require that the emac node have a mdio-mux child
+> > +node called "mdio-mux":
+> > +  - "allwinner,sun8i-h3-emac"
+> > +  - "allwinner,sun8i-v3s-emac":
+> > +Required properties for the mdio-mux node:
+> > +  - compatible = "allwinner,sun8i-h3-mdio-mux"
+> > +  - mdio-parent-bus: a phandle to EMAC mdio
+> > +  - one child mdio for the integrated mdio with the compatible
+> > +    "allwinner,sun8i-h3-mdio-internal"
+> > +  - one child mdio for the external mdio if present (V3s have none)
+> > +Required properties for the mdio-mux children node:
+> > +  - reg: 1 for internal MDIO bus, 2 for external MDIO bus
+> > +
+> > +The following compatibles require a PHY node representing the integrated
+> > +PHY, under the integrated MDIO bus node if an mdio-mux node is used:
+> >    - "allwinner,sun8i-h3-emac",
+> >    - "allwinner,sun8i-v3s-emac":
+> > +
+> > +Additional information regarding generic multiplexer properties can be found
+> > +at Documentation/devicetree/bindings/net/mdio-mux.txt
+> > +
+> > +Required properties of the integrated phy node:
+> >  - clocks: a phandle to the reference clock for the EPHY
+> >  - resets: a phandle to the reset control for the EPHY
+> > +- Must be a child of the integrated mdio
+> >  
+> > -Example:
+> > -
+> > +Example with integrated PHY:
+> >  emac: ethernet at 1c0b000 {
+> >  	compatible = "allwinner,sun8i-h3-emac";
+> >  	syscon = <&syscon>;
+> > @@ -72,13 +91,115 @@ emac: ethernet at 1c0b000 {
+> >  	phy-handle = <&int_mii_phy>;
+> >  	phy-mode = "mii";
+> >  	allwinner,leds-active-low;
+> > +
+> > +	mdio0: mdio {
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +		compatible = "snps,dwmac-mdio";
+> > +	};
+> > +
+> > +	mdio-mux {
+> > +		compatible = "mdio-mux", "allwinner,sun8i-h3-mdio-mux";
+> 
+> Drop mdio-mux.
+> 
+> With those fixed,
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
 
-Today's linux-next merge of the spi-nor tree got a conflict in:
+Will change what you ask.
 
-  Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
-
-between commit:
-
-  b07815d4eaf65 ("dt-bindings: mtd: add sst25wf040b and en25s64 to sip-nor list")
-
-from the imx-mxs tree and commit:
-
-   282e45dc64d1 ("mtd: spi-nor: Add support for mr25h128")
-
-from the spi-nor tree.
-
-I fixed it up (see below) and can carry the fix as necessary. This
-is now fixed as far as linux-next is concerned, but any non trivial
-conflicts should be mentioned to your upstream maintainer when your tree
-is submitted for merging.  You may also want to consider cooperating
-with the maintainer of the conflicting tree to minimise any particularly
-complex conflicts.
-
-diff --cc Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
-index 4cab5d85cf6f,956bb046e599..000000000000
---- a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
-+++ b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
-@@@ -13,7 -13,7 +13,8 @@@ Required properties
-                   at25df321a
-                   at25df641
-                   at26df081a
- +                 en25s64
-+                  mr25h128
-                   mr25h256
-                   mr25h10
-                   mr25h40
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171030/7ca0a49b/attachment-0001.sig>
+Thanks
+Regards
