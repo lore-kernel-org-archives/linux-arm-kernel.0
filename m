@@ -1,229 +1,161 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Mon, 30 Oct 2017 15:50:02 -0500
-Subject: [PATCH 4/4] [v3] pinctrl: qcom: qdf2xxx: add support for new ACPI HID
- QCOM8002
-In-Reply-To: <1509396602-1936-1-git-send-email-timur@codeaurora.org>
-References: <1509396602-1936-1-git-send-email-timur@codeaurora.org>
-Message-ID: <1509396602-1936-5-git-send-email-timur@codeaurora.org>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 30 Oct 2017 21:50:58 +0100
+Subject: [PATCH v2] ARM: dts: exynos: add cpu perf counters to Exynos54xx
+ boards
+In-Reply-To: <1508812196-14478-1-git-send-email-mihailescu2m@gmail.com>
+References: <1508812196-14478-1-git-send-email-mihailescu2m@gmail.com>
+Message-ID: <20171030205058.xvonrcy4sliltu5c@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Newer versions of the firmware for the Qualcomm Datacenter Technologies
-QDF2400 restricts access to a subset of the GPIOs on the TLMM.  To
-prevent older kernels from accidentally accessing the restricted GPIOs,
-we change the ACPI HID for the TLMM block from QCOM8001 to QCOM8002,
-and introduce a new property "gpios".  This property is an array of
-specific GPIOs that are accessible.  When an older kernel boots on
-newer (restricted) firmware, it will fail to probe.
+On Tue, Oct 24, 2017 at 12:59:56PM +1030, memeka wrote:
+> Enable support for ARM Performance Monitoring Units available in Cortex-A7
+> and Cortex-A15 CPU cores for Exynos54xx SoCs (5410, 5420 and 5422/5800).
+> 
+> The PMUs interrupts are defined in the common exynos54xx.dtsi device tree,
+> but the PMUs are enabled and have their interrupt CPU affinity defined
+> next to each SoC's cpus node.
+> 
+> Tested with perf on Odroid XU4 (Exynos5422):
+> armv7_cortex_a7 PMU driver: 5 counters available
+> armv7_cortex_a15 PMU driver: 7 counters available
+> 
+> Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Marian Mihailescu <mihailescu2m@gmail.com>
+> Signed-off-by: Willy Wolff <willy.mh.wolff@gmail.com>
+> 
+> ---
+> Changes since v1:
+>  - both Cortex-A7 and Cortex-A15 PMUs are now defined in exynos54xx.dtsi
+>  - CPU affinity is defined for each SoC *after* the cpus node entry
+>  - PMUs are disabled in exynos54xx.dtsi and enabled for each SoC
+>  - cpus labels have been fixed in the interrupt-affinity property for
+>    Exynos5410 and Exynos5420 SoCs
+> 
+> ---
+>  arch/arm/boot/dts/exynos5410.dtsi      |  8 ++++++++
+>  arch/arm/boot/dts/exynos5420-cpus.dtsi | 16 ++++++++++++++++
+>  arch/arm/boot/dts/exynos5422-cpus.dtsi | 16 ++++++++++++++++
+>  arch/arm/boot/dts/exynos54xx.dtsi      | 20 ++++++++++++++++++++
+>  4 files changed, 60 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
+> index 7eab4bc..f42b04b 100644
+> --- a/arch/arm/boot/dts/exynos5410.dtsi
+> +++ b/arch/arm/boot/dts/exynos5410.dtsi
+> @@ -428,4 +428,12 @@
+>  	samsung,syscon-phandle = <&pmu_system_controller>;
+>  };
+>  
+> +&arm_a15_pmu {
 
-To implement the sparse GPIO map, we register all of the GPIOs, but set
-the pin count for the unavailable GPIOs to zero.  The pinctrl-msm
-driver will block those unavailable GPIOs from being accessed.
+Please put it in alphabetical order (against existing overridings by
+labels).
 
-To allow newer kernels to support older firmware, the driver retains
-support for QCOM8001.
+> +	interrupt-affinity = <&cpu0>,
+> +		<&cpu1>,
 
-Signed-off-by: Timur Tabi <timur@codeaurora.org>
----
- drivers/pinctrl/qcom/pinctrl-qdf2xxx.c | 145 +++++++++++++++++++++++++--------
- 1 file changed, 109 insertions(+), 36 deletions(-)
+Please align with <&cpiu0> before. Makes code easier to read.
 
-diff --git a/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c b/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
-index bb3ce5c3e18b..37f746f6eb8c 100644
---- a/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
-+++ b/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
-@@ -38,68 +38,147 @@
- /* maximum size of each gpio name (enough room for "gpioXXX" + null) */
- #define NAME_SIZE	8
- 
-+enum {
-+	QDF2XXX_V1,
-+	QDF2XXX_V2,
-+};
-+
-+static const struct acpi_device_id qdf2xxx_acpi_ids[] = {
-+	{"QCOM8001", QDF2XXX_V1},
-+	{"QCOM8002", QDF2XXX_V2},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(acpi, qdf2xxx_acpi_ids);
-+
- static int qdf2xxx_pinctrl_probe(struct platform_device *pdev)
- {
-+	const struct acpi_device_id *id =
-+		acpi_match_device(qdf2xxx_acpi_ids, &pdev->dev);
- 	struct pinctrl_pin_desc *pins;
- 	struct msm_pingroup *groups;
- 	char (*names)[NAME_SIZE];
- 	unsigned int i;
- 	u32 num_gpios;
-+	unsigned int avail_gpios; /* The number of GPIOs we support */
-+	u16 *gpios; /* An array of supported GPIOs */
- 	int ret;
- 
- 	/* Query the number of GPIOs from ACPI */
- 	ret = device_property_read_u32(&pdev->dev, "num-gpios", &num_gpios);
- 	if (ret < 0) {
--		dev_warn(&pdev->dev, "missing num-gpios property\n");
-+		dev_err(&pdev->dev, "missing 'num-gpios' property\n");
- 		return ret;
- 	}
--
- 	if (!num_gpios || num_gpios > MAX_GPIOS) {
--		dev_warn(&pdev->dev, "invalid num-gpios property\n");
-+		dev_err(&pdev->dev, "invalid 'num-gpios' property\n");
- 		return -ENODEV;
- 	}
- 
-+	/*
-+	 * The QCOM8001 HID contains only the number of GPIOs, and assumes
-+	 * that all of them are available. avail_gpios is the same as num_gpios.
-+	 *
-+	 * The QCOM8002 HID introduces the 'gpios' DSD, which lists
-+	 * specific GPIOs that the driver is allowed to access.
-+	 *
-+	 * The make the common code simpler, in both cases we create an
-+	 * array of GPIOs that are accessible.  So for QCOM8001, that would
-+	 * be all of the GPIOs.
-+	 */
-+	if (id->driver_data == QDF2XXX_V1) {
-+		avail_gpios = num_gpios;
-+
-+		gpios = devm_kcalloc(&pdev->dev, avail_gpios, sizeof(gpios[0]),
-+				     GFP_KERNEL);
-+		if (!gpios)
-+			return -ENOMEM;
-+
-+		for (i = 0; i < avail_gpios; i++)
-+			gpios[i] = i;
-+	} else {
-+		/* The number of GPIOs in the approved list */
-+		ret = device_property_read_u16_array(&pdev->dev, "gpios",
-+						     NULL, 0);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev, "missing 'num-gpios' property\n");
-+			return ret;
-+		}
-+		if (!ret || ret > MAX_GPIOS) {
-+			dev_err(&pdev->dev, "invalid 'num-gpios' property\n");
-+			return -ENODEV;
-+		}
-+		avail_gpios = ret;
-+
-+		gpios = devm_kcalloc(&pdev->dev, avail_gpios, sizeof(gpios[0]),
-+				     GFP_KERNEL);
-+		if (!gpios)
-+			return -ENOMEM;
-+
-+		ret = device_property_read_u16_array(&pdev->dev, "gpios", gpios,
-+						     avail_gpios);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev, "could not read list of GPIOs\n");
-+			return ret;
-+		}
-+
-+		/*
-+		 * Because we have a specific list of GPIOs, the GPIO map
-+		 * is 'sparse'.
-+		 */
-+		qdf2xxx_pinctrl.sparse = true;
-+	}
-+
- 	pins = devm_kcalloc(&pdev->dev, num_gpios,
- 		sizeof(struct pinctrl_pin_desc), GFP_KERNEL);
- 	groups = devm_kcalloc(&pdev->dev, num_gpios,
- 		sizeof(struct msm_pingroup), GFP_KERNEL);
--	names = devm_kcalloc(&pdev->dev, num_gpios, NAME_SIZE, GFP_KERNEL);
-+	names = devm_kcalloc(&pdev->dev, avail_gpios, NAME_SIZE, GFP_KERNEL);
- 
- 	if (!pins || !groups || !names)
- 		return -ENOMEM;
- 
-+	/*
-+	 * Initialize the array.  GPIOs not listed in the 'gpios' array
-+	 * still need a number, but nothing else.
-+	 */
- 	for (i = 0; i < num_gpios; i++) {
--		snprintf(names[i], NAME_SIZE, "gpio%u", i);
--
- 		pins[i].number = i;
--		pins[i].name = names[i];
--
--		groups[i].npins = 1;
--		groups[i].name = names[i];
- 		groups[i].pins = &pins[i].number;
-+	}
- 
--		groups[i].ctl_reg = 0x10000 * i;
--		groups[i].io_reg = 0x04 + 0x10000 * i;
--		groups[i].intr_cfg_reg = 0x08 + 0x10000 * i;
--		groups[i].intr_status_reg = 0x0c + 0x10000 * i;
--		groups[i].intr_target_reg = 0x08 + 0x10000 * i;
--
--		groups[i].mux_bit = 2;
--		groups[i].pull_bit = 0;
--		groups[i].drv_bit = 6;
--		groups[i].oe_bit = 9;
--		groups[i].in_bit = 0;
--		groups[i].out_bit = 1;
--		groups[i].intr_enable_bit = 0;
--		groups[i].intr_status_bit = 0;
--		groups[i].intr_target_bit = 5;
--		groups[i].intr_target_kpss_val = 1;
--		groups[i].intr_raw_status_bit = 4;
--		groups[i].intr_polarity_bit = 1;
--		groups[i].intr_detection_bit = 2;
--		groups[i].intr_detection_width = 2;
-+	/* Populate the entries that are meant to be exposes as GPIOs. */
-+	for (i = 0; i < avail_gpios; i++) {
-+		unsigned int gpio = gpios[i];
-+
-+		groups[gpio].npins = 1;
-+		snprintf(names[i], NAME_SIZE, "gpio%u", gpio);
-+		pins[gpio].name = names[i];
-+		groups[gpio].name = names[i];
-+
-+		groups[gpio].ctl_reg = 0x10000 * gpio;
-+		groups[gpio].io_reg = 0x04 + 0x10000 * gpio;
-+		groups[gpio].intr_cfg_reg = 0x08 + 0x10000 * gpio;
-+		groups[gpio].intr_status_reg = 0x0c + 0x10000 * gpio;
-+		groups[gpio].intr_target_reg = 0x08 + 0x10000 * gpio;
-+
-+		groups[gpio].mux_bit = 2;
-+		groups[gpio].pull_bit = 0;
-+		groups[gpio].drv_bit = 6;
-+		groups[gpio].oe_bit = 9;
-+		groups[gpio].in_bit = 0;
-+		groups[gpio].out_bit = 1;
-+		groups[gpio].intr_enable_bit = 0;
-+		groups[gpio].intr_status_bit = 0;
-+		groups[gpio].intr_target_bit = 5;
-+		groups[gpio].intr_target_kpss_val = 1;
-+		groups[gpio].intr_raw_status_bit = 4;
-+		groups[gpio].intr_polarity_bit = 1;
-+		groups[gpio].intr_detection_bit = 2;
-+		groups[gpio].intr_detection_width = 2;
- 	}
- 
-+	devm_kfree(&pdev->dev, gpios);
-+
- 	qdf2xxx_pinctrl.pins = pins;
- 	qdf2xxx_pinctrl.groups = groups;
- 	qdf2xxx_pinctrl.npins = num_gpios;
-@@ -109,12 +188,6 @@ static int qdf2xxx_pinctrl_probe(struct platform_device *pdev)
- 	return msm_pinctrl_probe(pdev, &qdf2xxx_pinctrl);
- }
- 
--static const struct acpi_device_id qdf2xxx_acpi_ids[] = {
--	{"QCOM8001"},
--	{},
--};
--MODULE_DEVICE_TABLE(acpi, qdf2xxx_acpi_ids);
--
- static struct platform_driver qdf2xxx_pinctrl_driver = {
- 	.driver = {
- 		.name = "qdf2xxx-pinctrl",
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+> +		<&cpu2>,
+> +		<&cpu3>;
+> +	status = "okay";
+> +};
+
+> +
+>  #include "exynos5410-pinctrl.dtsi"
+> diff --git a/arch/arm/boot/dts/exynos5420-cpus.dtsi b/arch/arm/boot/dts/exynos5420-cpus.dtsi
+> index 5c052d7..518b7d8 100644
+> --- a/arch/arm/boot/dts/exynos5420-cpus.dtsi
+> +++ b/arch/arm/boot/dts/exynos5420-cpus.dtsi
+> @@ -124,3 +124,19 @@
+>  		};
+>  	};
+>  };
+> +
+> +&arm_a7_pmu {
+
+Ditto - order and alignment of continuation of lines.
+
+> +	interrupt-affinity = <&cpu4>,
+> +		<&cpu5>,
+> +		<&cpu4>,
+> +		<&cpu5>;
+
+cpu6 and cpu7?
+
+> +	status = "okay";
+> +};
+> +
+> +&arm_a15_pmu {
+> +	interrupt-affinity = <&cpu0>,
+> +		<&cpu1>,
+> +		<&cpu2>,
+> +		<&cpu3>;
+> +	status = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/exynos5422-cpus.dtsi b/arch/arm/boot/dts/exynos5422-cpus.dtsi
+> index ab4c718..92676be 100644
+> --- a/arch/arm/boot/dts/exynos5422-cpus.dtsi
+> +++ b/arch/arm/boot/dts/exynos5422-cpus.dtsi
+> @@ -131,3 +131,19 @@
+>  		};
+>  	};
+>  };
+> +
+> +&arm_a7_pmu {
+> +	interrupt-affinity = <&cpu0>,
+> +		<&cpu1>,
+> +		<&cpu2>,
+> +		<&cpu3>;
+> +	status = "okay";
+> +};
+> +
+> +&arm_a15_pmu {
+> +	interrupt-affinity = <&cpu4>,
+> +		<&cpu5>,
+> +		<&cpu6>,
+> +		<&cpu7>;
+> +	status = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/exynos54xx.dtsi b/arch/arm/boot/dts/exynos54xx.dtsi
+> index 8ca4fef..f0bd27d 100644
+> --- a/arch/arm/boot/dts/exynos54xx.dtsi
+> +++ b/arch/arm/boot/dts/exynos54xx.dtsi
+> @@ -79,6 +79,26 @@
+>  			interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
+>  		};
+>  
+> +		arm_a7_pmu: arm-a7-pmu {
+> +			compatible = "arm,cortex-a7-pmu";
+> +			interrupt-parent = <&gic>;
+> +			interrupts = <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
+> +				<GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>,
+> +				<GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>,
+> +				<GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>;
+
+Lines alignment.
+
+Best regards,
+Krzysztof
+
+
+> +			status = "disabled";
+> +		};
+> +
+> +		arm_a15_pmu: arm-a15-pmu {
+> +			compatible = "arm,cortex-a15-pmu";
+> +			interrupt-parent = <&combiner>;
+> +			interrupts = <1 2>,
+> +				<7 0>,
+> +				<16 6>,
+> +				<19 2>;
+> +			status = "disabled";
+> +		};
+> +
+>  		sss: sss at 10830000 {
+>  			compatible = "samsung,exynos4210-secss";
+>  			reg = <0x10830000 0x300>;
+> -- 
+> 2.7.4
+> 
