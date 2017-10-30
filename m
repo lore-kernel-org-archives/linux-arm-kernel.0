@@ -1,23 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 Oct 2017 11:26:07 +0100
-Subject: [GIT PULL] Amlogic SoC updates for v4.15
-In-Reply-To: <7hy3ntq50j.fsf@baylibre.com>
-References: <7hy3ntq50j.fsf@baylibre.com>
-Message-ID: <CAK8P3a1fLbzp4xzFyTEO1w4vu=X=wwSV74_WBXiuYqTeF1P5ng@mail.gmail.com>
+From: icenowy@aosc.io (icenowy at aosc.io)
+Date: Mon, 30 Oct 2017 18:44:08 +0800
+Subject: [PATCH v2 00/10] Allwinner H3/H5/A64(DE2) SimpleFB support
+In-Reply-To: <20171027150658.18509-1-icenowy@aosc.io>
+References: <20171027150658.18509-1-icenowy@aosc.io>
+Message-ID: <8eba6f36657bee32e60adb6356c15649@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 29, 2017 at 5:43 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+? 2017-10-27 23:06?Icenowy Zheng ???
+> This patchset adds support for the SimpleFB on Allwinner SoCs with
+> "Display Engine 2.0".
+> 
+> PATCH 1 to PATCH 3 are DE2 CCU fixes for H3/H5 SoCs.
+> 
+> PATCH 4 adds the pipeline strings for DE2 SimpleFB.
+> 
+> PATCH 5 to 7 adds necessary device tree nodes (DE2 CCU and SimpleFB)
+> for H3/H5 SoCs.
+> 
+> PATCH 8 to 10 are for Allwinner A64 SoC to enable SimpleFB.
+> 
+> Icenowy Zheng (10):
+>   dt-bindings: fix the binding of Allwinner DE2 CCU of A83T and H3
+>   clk: sunxi-ng: add support for Allwinner H3 DE2 CCU
+>   clk: sunxi-ng: fix the A64/H5 clock description of DE2 CCU
+>   dt-bindings: simplefb-sunxi: add pipelines for DE2
+>   ARM: sun8i: h3/h5: add DE2 CCU device node for H3
+>   arm64: allwinner: h5: add compatible string for DE2 CCU
+>   ARM: sunxi: h3/h5: add simplefb nodes
+>   dt-bindings: add binding for A64 DE2 CCU SRAM
 
-> ----------------------------------------------------------------
-> Amlogic SoC updates for v4.15
-> - add SMP support to Meson8/8b
+Sorry, but don't apply the following patches for two
+reasons:
+- the implementation of SRAM claiming in DE2 CCU is
+   forgotten to be sent;
+- the patch that adds DE2 CCU have an error.
 
-Pulled into next/soc. For my understanding, could you clarify what
-this line is needed for on meson?
-
-+textofs-$(CONFIG_ARCH_MESON) := 0x00208000
-
-Thanks,
-
-    Arnd
+>   arm64: allwinner: a64: add DE2 CCU for A64 SoC
+>   arm64: allwinner: a64: add simplefb for A64 SoC
+> 
+>  .../devicetree/bindings/clock/sun8i-de2.txt        | 10 +++-
+>  .../bindings/display/simple-framebuffer-sunxi.txt  |  4 ++
+>  arch/arm/boot/dts/sun8i-h3.dtsi                    |  4 ++
+>  arch/arm/boot/dts/sunxi-h3-h5.dtsi                 | 43 ++++++++++++++
+>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      | 65 
+> ++++++++++++++++++++++
+>  arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi       |  4 ++
+>  drivers/clk/sunxi-ng/ccu-sun8i-de2.c               | 53 
+> +++++++++++++++++-
+>  7 files changed, 178 insertions(+), 5 deletions(-)
