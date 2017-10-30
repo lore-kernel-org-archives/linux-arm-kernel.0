@@ -1,23 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 Oct 2017 12:06:03 +0100
-Subject: [GIT PULL 1/7] dt-bindings: Updates for v4.15-rc1
-In-Reply-To: <20171020115603.9828-1-thierry.reding@gmail.com>
-References: <20171020115603.9828-1-thierry.reding@gmail.com>
-Message-ID: <CAK8P3a2YUXZZOZwk8tFOGsUHi9DD+CxNjsMi+xbDCLLV8fhAuw@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 30 Oct 2017 12:12:49 +0100
+Subject: [GIT PULL] Amlogic SoC updates for v4.15
+In-Reply-To: <CAK8P3a1fLbzp4xzFyTEO1w4vu=X=wwSV74_WBXiuYqTeF1P5ng@mail.gmail.com>
+ (Arnd Bergmann's message of "Mon, 30 Oct 2017 11:26:07 +0100")
+References: <7hy3ntq50j.fsf@baylibre.com>
+ <CAK8P3a1fLbzp4xzFyTEO1w4vu=X=wwSV74_WBXiuYqTeF1P5ng@mail.gmail.com>
+Message-ID: <7hy3nsubwu.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 20, 2017 at 1:55 PM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> ----------------------------------------------------------------
-> dt-bindings: Updates for v4.15-rc1
->
-> This contains the addition of a clock alias which will be used to fix
-> the implementation of the SOR1 clock.
->
-> Also included are the bindings for the Tegra186 BPMP thermal driver, a
-> prerequisite for both the driver and device tree changes.
+[ + Martin ]
+Arnd Bergmann <arnd@arndb.de> writes:
 
-Pulled into next/dt, thanks!
+> On Sun, Oct 29, 2017 at 5:43 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+>
+>> ----------------------------------------------------------------
+>> Amlogic SoC updates for v4.15
+>> - add SMP support to Meson8/8b
+>
+> Pulled into next/soc. For my understanding, could you clarify what
+> this line is needed for on meson?
+>
+> +textofs-$(CONFIG_ARCH_MESON) := 0x00208000
 
-     Arnd
+I belive this is due to the first 2M being reserved for secure memory
+on some Meson8 SoCs, but maybe Martin can add more clarification if
+needed.
+
+Kevin
