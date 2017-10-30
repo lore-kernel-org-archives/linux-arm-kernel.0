@@ -1,163 +1,75 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Mon, 30 Oct 2017 16:32:50 +1030
-Subject: [PATCH v5 5/5] clk: aspeed: Add reset controller
-In-Reply-To: <20171030060250.701-1-joel@jms.id.au>
-References: <20171030060250.701-1-joel@jms.id.au>
-Message-ID: <20171030060250.701-6-joel@jms.id.au>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Mon, 30 Oct 2017 07:51:39 +0100
+Subject: [PATCH v5 24/26] KVM: arm/arm64: GICv4: Prevent userspace from
+ changing doorbell affinity
+In-Reply-To: <20171027142855.21584-25-marc.zyngier@arm.com>
+References: <20171027142855.21584-1-marc.zyngier@arm.com>
+ <20171027142855.21584-25-marc.zyngier@arm.com>
+Message-ID: <20171030065139.GP2166@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are some resets that are not associated with gates. These are
-represented by a reset controller.
+On Fri, Oct 27, 2017 at 03:28:53PM +0100, Marc Zyngier wrote:
+> We so far allocate the doorbell interrupts without taking any
+> special measure regarding the affinity of these interrupts. We
+> simply move them around as required when the vcpu gets scheduled
+> on a different CPU.
+> 
+> But that's counting without userspace (and the evil irqbalance) that
+> can try and move the VPE interrupt around, causing the ITS code
+> to emit VMOVP commands and remap the doorbell to another redistributor.
+> Worse, this can happen while the vcpu is running, causing all kind
+> of trouble if the VPE is already resident, and we end-up in UNPRED
+> territory.
+> 
+> So let's take a definitive action and prevent userspace from messing
+> with us. This is just a matter of adding IRQ_NO_BALANCING to the
+> set of flags we already have, letting the kernel in sole control
+> of the affinity.
+> 
 
-Reviewed-by: Andrew Jeffery <andrew@aj.id.au>
-Signed-off-by: Joel Stanley <joel@jms.id.au>
----
-v5:
-  - Add Andrew's Reviewed-by
-v3:
-  - Add named initalisers for the reset defines
-  - Add define for ADC
----
- drivers/clk/clk-aspeed.c                 | 82 +++++++++++++++++++++++++++++++-
- include/dt-bindings/clock/aspeed-clock.h | 10 ++++
- 2 files changed, 91 insertions(+), 1 deletion(-)
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-diff --git a/drivers/clk/clk-aspeed.c b/drivers/clk/clk-aspeed.c
-index df5bc57a6ee2..d91e86c70e0c 100644
---- a/drivers/clk/clk-aspeed.c
-+++ b/drivers/clk/clk-aspeed.c
-@@ -17,6 +17,7 @@
- #include <linux/of_device.h>
- #include <linux/platform_device.h>
- #include <linux/regmap.h>
-+#include <linux/reset-controller.h>
- #include <linux/slab.h>
- #include <linux/spinlock.h>
- 
-@@ -275,6 +276,68 @@ static const struct clk_ops aspeed_clk_gate_ops = {
- 	.is_enabled = aspeed_clk_is_enabled,
- };
- 
-+/**
-+ * struct aspeed_reset - Aspeed reset controller
-+ * @map: regmap to access the containing system controller
-+ * @rcdev: reset controller device
-+ */
-+struct aspeed_reset {
-+	struct regmap			*map;
-+	struct reset_controller_dev	rcdev;
-+};
-+
-+#define to_aspeed_reset(p) container_of((p), struct aspeed_reset, rcdev)
-+
-+static const u8 aspeed_resets[] = {
-+	[ASPEED_RESET_XDMA]	= 25,
-+	[ASPEED_RESET_MCTP]	= 24,
-+	[ASPEED_RESET_ADC]	= 23,
-+	[ASPEED_RESET_JTAG_MASTER] = 22,
-+	[ASPEED_RESET_MIC]	= 18,
-+	[ASPEED_RESET_PWM]	=  9,
-+	[ASPEED_RESET_PCIVGA]	=  8,
-+	[ASPEED_RESET_I2C]	=  2,
-+	[ASPEED_RESET_AHB]	=  1,
-+};
-+
-+static int aspeed_reset_deassert(struct reset_controller_dev *rcdev,
-+				 unsigned long id)
-+{
-+	struct aspeed_reset *ar = to_aspeed_reset(rcdev);
-+	u32 rst = BIT(aspeed_resets[id]);
-+
-+	return regmap_update_bits(ar->map, ASPEED_RESET_CTRL, rst, 0);
-+}
-+
-+static int aspeed_reset_assert(struct reset_controller_dev *rcdev,
-+			       unsigned long id)
-+{
-+	struct aspeed_reset *ar = to_aspeed_reset(rcdev);
-+	u32 rst = BIT(aspeed_resets[id]);
-+
-+	return regmap_update_bits(ar->map, ASPEED_RESET_CTRL, rst, rst);
-+}
-+
-+static int aspeed_reset_status(struct reset_controller_dev *rcdev,
-+			       unsigned long id)
-+{
-+	struct aspeed_reset *ar = to_aspeed_reset(rcdev);
-+	u32 val, rst = BIT(aspeed_resets[id]);
-+	int ret;
-+
-+	ret = regmap_read(ar->map, ASPEED_RESET_CTRL, &val);
-+	if (ret)
-+		return ret;
-+
-+	return !!(val & rst);
-+}
-+
-+static const struct reset_control_ops aspeed_reset_ops = {
-+	.assert = aspeed_reset_assert,
-+	.deassert = aspeed_reset_deassert,
-+	.status = aspeed_reset_status,
-+};
-+
- static struct clk_hw *aspeed_clk_hw_register_gate(struct device *dev,
- 		const char *name, const char *parent_name, unsigned long flags,
- 		struct regmap *map, u8 clock_idx, u8 reset_idx,
-@@ -316,10 +379,11 @@ static int aspeed_clk_probe(struct platform_device *pdev)
- {
- 	const struct aspeed_clk_soc_data *soc_data;
- 	struct device *dev = &pdev->dev;
-+	struct aspeed_reset *ar;
- 	struct regmap *map;
- 	struct clk_hw *hw;
- 	u32 val, rate;
--	int i;
-+	int i, ret;
- 
- 	map = syscon_node_to_regmap(dev->of_node);
- 	if (IS_ERR(map)) {
-@@ -327,6 +391,22 @@ static int aspeed_clk_probe(struct platform_device *pdev)
- 		return PTR_ERR(map);
- 	}
- 
-+	ar = devm_kzalloc(dev, sizeof(*ar), GFP_KERNEL);
-+	if (!ar)
-+		return -ENOMEM;
-+
-+	ar->map = map;
-+	ar->rcdev.owner = THIS_MODULE;
-+	ar->rcdev.nr_resets = ARRAY_SIZE(aspeed_resets);
-+	ar->rcdev.ops = &aspeed_reset_ops;
-+	ar->rcdev.of_node = dev->of_node;
-+
-+	ret = devm_reset_controller_register(dev, &ar->rcdev);
-+	if (ret) {
-+		dev_err(dev, "could not register reset controller\n");
-+		return ret;
-+	}
-+
- 	/* SoC generations share common layouts but have different divisors */
- 	soc_data = of_device_get_match_data(dev);
- 	if (!soc_data) {
-diff --git a/include/dt-bindings/clock/aspeed-clock.h b/include/dt-bindings/clock/aspeed-clock.h
-index 4a99421d77c8..8e19646d8025 100644
---- a/include/dt-bindings/clock/aspeed-clock.h
-+++ b/include/dt-bindings/clock/aspeed-clock.h
-@@ -39,4 +39,14 @@
- 
- #define ASPEED_NUM_CLKS			35
- 
-+#define ASPEED_RESET_XDMA		0
-+#define ASPEED_RESET_MCTP		1
-+#define ASPEED_RESET_ADC		2
-+#define ASPEED_RESET_JTAG_MASTER	3
-+#define ASPEED_RESET_MIC		4
-+#define ASPEED_RESET_PWM		5
-+#define ASPEED_RESET_PCIVGA		6
-+#define ASPEED_RESET_I2C		7
-+#define ASPEED_RESET_AHB		8
-+
- #endif
--- 
-2.14.1
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  virt/kvm/arm/vgic/vgic-v4.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
+> index d7fe610bb1f5..d10e18eabd3b 100644
+> --- a/virt/kvm/arm/vgic/vgic-v4.c
+> +++ b/virt/kvm/arm/vgic/vgic-v4.c
+> @@ -23,6 +23,8 @@
+>  
+>  #include "vgic.h"
+>  
+> +#define DB_IRQ_FLAGS	(IRQ_NOAUTOEN | IRQ_DISABLE_UNLAZY | IRQ_NO_BALANCING)
+> +
+>  static irqreturn_t vgic_v4_doorbell_handler(int irq, void *info)
+>  {
+>  	struct kvm_vcpu *vcpu = info;
+> @@ -83,7 +85,7 @@ int vgic_v4_init(struct kvm *kvm)
+>  		 * doorbell could kick us out of the guest too
+>  		 * early...
+>  		 */
+> -		irq_set_status_flags(irq, IRQ_NOAUTOEN | IRQ_DISABLE_UNLAZY);
+> +		irq_set_status_flags(irq, DB_IRQ_FLAGS);
+>  		ret = request_irq(irq, vgic_v4_doorbell_handler,
+>  				  0, "vcpu", vcpu);
+>  		if (ret) {
+> @@ -121,7 +123,7 @@ void vgic_v4_teardown(struct kvm *kvm)
+>  		struct kvm_vcpu *vcpu = kvm_get_vcpu(kvm, i);
+>  		int irq = its_vm->vpes[i]->irq;
+>  
+> -		irq_clear_status_flags(irq, IRQ_NOAUTOEN | IRQ_DISABLE_UNLAZY);
+> +		irq_clear_status_flags(irq, DB_IRQ_FLAGS);
+>  		free_irq(irq, vcpu);
+>  	}
+>  
+> -- 
+> 2.11.0
+> 
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
