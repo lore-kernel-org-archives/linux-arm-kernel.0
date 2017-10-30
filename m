@@ -1,35 +1,22 @@
-From: yinbo.zhu@nxp.com (yinbo.zhu at nxp.com)
-Date: Mon, 30 Oct 2017 16:08:00 +0800
-Subject: [PATCH] ARM: dts: ls1021a: Enable the esdhc
-Message-ID: <20171030080800.7984-1-yinbo.zhu@nxp.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 30 Oct 2017 09:27:59 +0100
+Subject: [PATCH] ARM64: dts: meson-gxbb-odroidc2: fix usb1 power supply
+In-Reply-To: <1508409069-6317-1-git-send-email-narmstrong@baylibre.com> (Neil
+ Armstrong's message of "Thu, 19 Oct 2017 12:31:09 +0200")
+References: <1508409069-6317-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <7hshe1ujjk.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "yinbo.zhu" <yinbo.zhu@nxp.com>
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-Ls1021a esdhc had been enabled in uboot,
-but it had not been enabled it in kernel,
-So set the esdhc's status to "okay".
+> Looking at the schematics, the USB Power Supply is shared between the
+> two USB interfaces,
+> If the usb0 fails to initialize, the second one won't have power.
+>
+> Fixes: 5a0803bd5ae2 ("ARM64: dts: meson-gxbb-odroidc2: Enable USB Nodes")
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 
-Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
----
- arch/arm/boot/dts/ls1021a-twr.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+Applied to v4.15/dt64,
 
-diff --git a/arch/arm/boot/dts/ls1021a-twr.dts b/arch/arm/boot/dts/ls1021a-twr.dts
-index a8b148ad1dd2..f7946f40d35d 100644
---- a/arch/arm/boot/dts/ls1021a-twr.dts
-+++ b/arch/arm/boot/dts/ls1021a-twr.dts
-@@ -228,6 +228,10 @@
- 	};
- };
- 
-+&esdhc {
-+        status = "okay";
-+};
-+
- &sai1 {
- 	status = "okay";
- };
--- 
-2.14.1
+Kevin
