@@ -1,37 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 30 Oct 2017 09:41:13 -0700
-Subject: [GIT PULL 1/2] omap defconfig changes for v4.15 merge window
-Message-ID: <pull-1509381562-551838@atomide.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 30 Oct 2017 17:47:46 +0100
+Subject: [RESEND PATCH v2 1/2] soc: amlogic: add Meson GX VPU Domains
+ driver
+In-Reply-To: <CAPDyKFpCf50XRowGe3X5KpmhKrb99NTxOUQtz4RN4aemAVAJCA@mail.gmail.com>
+References: <1509208583-30349-1-git-send-email-narmstrong@baylibre.com>
+ <1509208583-30349-2-git-send-email-narmstrong@baylibre.com>
+ <CAPDyKFpCf50XRowGe3X5KpmhKrb99NTxOUQtz4RN4aemAVAJCA@mail.gmail.com>
+Message-ID: <4f236610-22d5-b3ef-a5a7-1aba579a0791@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Tony Lindgren" <tony@atomide.com>
+On 30/10/2017 16:40, Ulf Hansson wrote:
+> Hi Neil,
+> 
+> [...]
+> 
+>> +
+>> +       pm_genpd_init(&vpu_hdmi_pd.genpd, &simple_qos_governor,
+>> +                     meson_gx_pwrc_vpu_get_power(&vpu_hdmi_pd));
+>> +
+> 
+> This means that you may initialize the genpd in powered on state.
+> 
+> For that scenario, I think you will hit a clock unprepare/disable
+> in-balance issue when genpd calls your ->power_off() callback, simply
+> because you didn't call clk_prepare_enable() for the clocks first.
+> 
+> [...]
+> 
+> Kind regards
+> Uffe
+> 
 
-The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+Hi,
 
-  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+I added a "powered" attribute to trace if power-on was done by the driver, but I only protected the shutdown call.... I should indeed protect it in the power_off call instead.
 
-are available in the Git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.15/defconfig-signed
-
-for you to fetch changes up to 5b2f8c83250b3f699757249424b2e77ad50750c3:
-
-  ARM: omap2plus: Run make savedefconfig again to save some space (2017-10-25 09:50:51 -0700)
-
-----------------------------------------------------------------
-Few omap2plus_defconfig changes for v4.15 merge window to enable NEON
-based crypto and droid 4 USB PHY. Also let's run savedefconfig again
-to save a bit of space and make it easier for people to send patches
-against omap2plus_defconfig.
-
-----------------------------------------------------------------
-Ard Biesheuvel (1):
-      ARM: omap2plus_defconfig: enable NEON based crypto
-
-Tony Lindgren (2):
-      ARM: omap2plus_defconfig: Enable droid 4 USB PHY
-      ARM: omap2plus: Run make savedefconfig again to save some space
-
- arch/arm/configs/omap2plus_defconfig | 27 +++++++++++++++------------
- 1 file changed, 15 insertions(+), 12 deletions(-)
+Neil
