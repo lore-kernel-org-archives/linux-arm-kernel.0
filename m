@@ -1,51 +1,67 @@
-From: gengdongjiu@huawei.com (Dongjiu Geng)
-Date: Mon, 30 Oct 2017 14:05:18 +0800
-Subject: [PATCH v4] KVM: arm/arm64: fix the incompatible matching for external
- abort
-Message-ID: <1509343518-27137-1-git-send-email-gengdongjiu@huawei.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Mon, 30 Oct 2017 16:32:45 +1030
+Subject: [PATCH v5 0/5] clk: Add Aspeed clock driver
+Message-ID: <20171030060250.701-1-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kvm_vcpu_dabt_isextabt() tries to match a full fault syndrome, but
-calls kvm_vcpu_trap_get_fault_type() that only returns the fault class,
-thus reducing the scope of the check. This doesn't cause any observable
-bug yet as we end-up matching a closely related syndrome for which we
-return the same value.
+This driver supports the ast2500, ast2400 (and derivative) BMC SoCs from
+Aspeed.
 
-Using kvm_vcpu_trap_get_fault() instead fixes it for good.
+This is v5. See patches for detailed changelogs.
 
-Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/kvm_emulate.h   | 2 +-
- arch/arm64/include/asm/kvm_emulate.h | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+v5: Address review from Andrew
+v4: Address review from Andrew and Stephen. 
+v3: Address review from Andrew and has seen more testing on hardware
+v2: split the driver out into a series of patches to make them easier to
+review.
 
-diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-index 98089ff..7571b4e 100644
---- a/arch/arm/include/asm/kvm_emulate.h
-+++ b/arch/arm/include/asm/kvm_emulate.h
-@@ -203,7 +203,7 @@ static inline u8 kvm_vcpu_trap_get_fault_type(struct kvm_vcpu *vcpu)
- 
- static inline bool kvm_vcpu_dabt_isextabt(struct kvm_vcpu *vcpu)
- {
--	switch (kvm_vcpu_trap_get_fault_type(vcpu)) {
-+	switch (kvm_vcpu_trap_get_fault(vcpu)) {
- 	case FSC_SEA:
- 	case FSC_SEA_TTW0:
- 	case FSC_SEA_TTW1:
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index e5df3fc..8c918c5 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -237,7 +237,7 @@ static inline u8 kvm_vcpu_trap_get_fault_type(const struct kvm_vcpu *vcpu)
- 
- static inline bool kvm_vcpu_dabt_isextabt(const struct kvm_vcpu *vcpu)
- {
--	switch (kvm_vcpu_trap_get_fault_type(vcpu)) {
-+	switch (kvm_vcpu_trap_get_fault(vcpu)) {
- 	case FSC_SEA:
- 	case FSC_SEA_TTW0:
- 	case FSC_SEA_TTW1:
+All of the important clocks are supported, with most non-essential ones
+also implemented where information is available. I am working with
+Aspeed to clear up some of the missing information, including the
+missing parent-sibling relationships.
+
+We need to know the rate of the apb clock in order to correctly program
+the clocksource driver, so the apb and it's parents are created in the
+CLK_OF_DECLARE_DRIVER callback.
+
+The rest of the clocks are created at normal driver probe time. I
+followed the Gemini driver's lead with using the regmap where I could,
+but also having a pointer to the base address for use with the common
+clock callbacks.
+
+The driver borrows from the clk_gate common clock infrastructure, but modifies
+it in order to support the clock gate and reset pair that most of the clocks
+have. This pair must be reset-ungated-released, with appropriate delays,
+according to the datasheet.
+
+The first patch introduces the core clock registration parts, and describes
+the clocks. The second creates the core clocks, giving the system enough to
+boot (but without uart). Next come the non-core clocks, and finally the reset
+controller that is used for the few cocks that don't have a gate to go with their
+reset pair.
+
+Please review!
+
+Cheers,
+
+Joel
+
+
+Joel Stanley (5):
+  clk: Add clock driver for ASPEED BMC SoCs
+  clk: aspeed: Register core clocks
+  clk: aspeed: Add platform driver and register PLLs
+  clk: aspeed: Register gated clocks
+  clk: aspeed: Add reset controller
+
+ drivers/clk/Kconfig                      |  12 +
+ drivers/clk/Makefile                     |   1 +
+ drivers/clk/clk-aspeed.c                 | 666 +++++++++++++++++++++++++++++++
+ include/dt-bindings/clock/aspeed-clock.h |  52 +++
+ 4 files changed, 731 insertions(+)
+ create mode 100644 drivers/clk/clk-aspeed.c
+ create mode 100644 include/dt-bindings/clock/aspeed-clock.h
+
 -- 
-1.9.1
+2.14.1
