@@ -1,61 +1,98 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 30 Oct 2017 23:53:21 +0900
-Subject: [GIT PULL] arm64: dts: uniphier: UniPhier DT updates (64bit) for
- v4.15
-In-Reply-To: <CAK8P3a3oKP-5hgZ+zBZGBgHV8YdCnKpif8-nArsKqVydsajWxw@mail.gmail.com>
-References: <CAK7LNARKAivEyNYDMO7GKjTnnsVFk3TtsCZ_yDWLrEf80G-WOQ@mail.gmail.com>
- <CAK8P3a3oKP-5hgZ+zBZGBgHV8YdCnKpif8-nArsKqVydsajWxw@mail.gmail.com>
-Message-ID: <CAK7LNAQS0AozzbmG5--m9_Ed_wfmYPgLgWJrF-oJSBG6W5SQWA@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 30 Oct 2017 14:55:57 +0000
+Subject: [PATCH] ARM: add a private asm/unaligned.h
+In-Reply-To: <87k1zc3fxp.fsf@free-electrons.com>
+References: <20171020200231.1355569-1-arnd@arndb.de>
+ <87wp3g39es.fsf@free-electrons.com>
+ <20171027152743.GJ20805@n2100.armlinux.org.uk>
+ <87k1zc3fxp.fsf@free-electrons.com>
+Message-ID: <CAKv+Gu95RR3SBb1dydKVVeQQ5+Ui56TcWLfNh=rfmw8_Ty=F7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-2017-10-30 22:24 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
-> On Mon, Oct 23, 2017 at 7:40 PM, Masahiro Yamada
-> <yamada.masahiro@socionext.com> wrote:
+On 30 October 2017 at 13:48, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> Hi Russell,
 >
->> UniPhier ARM64 SoC DT updates for v4.15
+>  On ven., oct. 27 2017, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+>
+>> On Fri, Oct 27, 2017 at 05:19:55PM +0200, Gregory CLEMENT wrote:
+>>> Hi Arnd,
+>>>
+>>>  On ven., oct. 20 2017, Arnd Bergmann <arnd@arndb.de> wrote:
+>>>
+>>> > The asm-generic/unaligned.h header provides two different implementations
+>>> > for accessing unaligned variables: the access_ok.h version used when
+>>> > CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS is set pretends that all pointers
+>>> > are in fact aligned, while the le_struct.h version convinces gcc that the
+>>> > alignment of a pointer is '1', to make it issue the correct load/store
+>>> > instructions depending on the architecture flags.
+>>> >
+>>> > On ARMv5 and older, we always use the second version, to let the compiler
+>>> > use byte accesses. On ARMv6 and newer, we currently use the access_ok.h
+>>> > version, so the compiler can use any instruction including stm/ldm and
+>>> > ldrd/strd that will cause an alignment trap. This trap can significantly
+>>> > impact performance when we have to do a lot of fixups and, worse, has
+>>> > led to crashes in the LZ4 decompressor code that does not have a trap
+>>> > handler.
+>>> >
+>>> > This adds an ARM specific version of asm/unaligned.h that uses the
+>>> > le_struct.h/be_struct.h implementation unconditionally. This should lead
+>>> > to essentially the same code on ARMv6+ as before, with the exception of
+>>> > using regular load/store instructions instead of the trapping instructions
+>>> > multi-register variants.
+>>> >
+>>> > The crash in the LZ4 decompressor code was probably introduced by the
+>>> > patch replacing the LZ4 implementation, commit 4e1a33b105dd ("lib: update
+>>> > LZ4 compressor module"), so linux-4.11 and higher would be affected most.
+>>> > However, we probably want to have this backported to all older stable
+>>> > kernels as well, to help with the performance issues.
+>>> >
+>>> > There are two follow-ups that I think we should also work on, but not
+>>> > backport to stable kernels, first to change the asm-generic version of
+>>> > the header to remove the ARM special case, and second to review all
+>>> > other uses of CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS to see if they
+>>> > might be affected by the same problem on ARM.
+>>> >
+>>> > Cc: stable at vger.kernel.org
+>>> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>>> > ---
+>>> > Untested so far, please verify that this fixes all the known problems
+>>> > with the alignment traps.
+>>>
+>>> I think Russell already find this conclusion but this patch didn't solve
+>>> my boot issue with dtb append.
+>>>
+>>> I tested this patch onto a v4.14-rc6.
+>>>
+>>> Then at least with the patch from Ard: "efi/libstub: arm: omit sorting
+>>> of the UEFI memory map", it didn't prevent booting.
 >>
->> - add thermal monitor and thermal zone nodes
->> - add efuse nodes
->> - fix W=2 warnings
->> - add GPIO controller nodes and related properties
->> - add resets properties
+>> There's three things wrong, all of which I have patches to address:
+>>
+>> 1. The decompressor code reading the image data sometimes issues unaligned
+>>    reads.  Some compilers get this wrong and cause an abort.  Arnds patch
+>>    addresses this.
+>>
+>> 2. Additional sections can appear in the zImage binary which adds extra
+>>    bytes on the end of the image.  Concatenating the zImage with the
+>>    extra bytes onto a DTB is the same thing as doing this:
+>>
+>>       cat zImage extrabytes foo.dtb > image
+>>
+>>    and the decompressor tolerates no additional bytes between the
+>>    _official_ end of the zImage and the DTB.  I've added a patch which
+>>    detects this situation and fails the kernel build when it happens.
 >
-> I noticed too late that your "ARM32 SoC DT" branch broke ARM64 (I
-> don't normally test
-> architectures that are not touched by a new branch. What happened here
-> is that commit
-> 2bef7ca3798f ("ARM: dts: uniphier: route on-board device IRQ to GPIO
-> controller")
-> added a reference to the non-existing "gpio" label, causing a build error:
+> So I tested the branch fixes in your git tree.
 >
-> arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dtb: ERROR
-> (phandle_references): Reference to non-existent node or label "gpio"
+> After doing a "make multi_v7_defconfig; make zImage", I got the message
+> "arm-linux-gnueabi-ld: error: zImage file size is incorrect" you added
+> in the commit "ARM: verify size of zImage".
 >
-> Since merging the ARM64 branch fixes the problem, I decided it's not
-> worth the trouble
-> of reverting the original merge, but please be careful to avoid build
-> problems like this
-> in the future.
->
-> The changes otherwise look all good, so I've pulled this into next/dt as well.
+> It is the same with mvebu_v7_defconfig, so I wonder wich with
+> configuration this patch was tested ?
 >
 
-My bad - sorry about this.
-
-Actually, some base boards and expansion boards are
-shared between arm and arm64 by cross-arch reference.
-So, touching one branch could affect the other.
-
-If it had not been too late, I would have been happy to resend the PR.
-
-I will be careful next time.
-
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+Could you please share the output of 'readelf -S' for those vmlinux
+decompressor images?
