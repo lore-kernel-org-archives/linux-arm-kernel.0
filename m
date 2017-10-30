@@ -1,26 +1,23 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 Oct 2017 11:22:41 +0100
-Subject: [GIT PULL 1/4] i.MX SoC changes for 4.15
-In-Reply-To: <1508847645-9191-1-git-send-email-shawnguo@kernel.org>
-References: <1508847645-9191-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <CAK8P3a0SO85aWR+zZFHTrET5QMVbi7oGCjiLUEQXootuv4BLfg@mail.gmail.com>
+Date: Mon, 30 Oct 2017 11:26:07 +0100
+Subject: [GIT PULL] Amlogic SoC updates for v4.15
+In-Reply-To: <7hy3ntq50j.fsf@baylibre.com>
+References: <7hy3ntq50j.fsf@baylibre.com>
+Message-ID: <CAK8P3a1fLbzp4xzFyTEO1w4vu=X=wwSV74_WBXiuYqTeF1P5ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 24, 2017 at 2:20 PM, Shawn Guo <shawnguo@kernel.org> wrote:
-> The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
->
+On Sun, Oct 29, 2017 at 5:43 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+
 > ----------------------------------------------------------------
-> i.MX SoC changes for 4.15:
->  - A series from Marco Franchi from to clean up build warnings see with
->    W=1 in arch/arm/mach-imx/.
->  - Move i.MX6 speed grading check from i.MX platform code to cpufreq
->    driver.  The patch is suggested by cpufreq folks to go through
->    arm-soc tree.
->  - Enable cpuidle support on i.MX6DL starting from IMX_CHIP_REVISION_1_1.
->  - Constify platform_suspend_ops for MXS platform.
->
+> Amlogic SoC updates for v4.15
+> - add SMP support to Meson8/8b
 
-Pulled into next/soc, thanks!
+Pulled into next/soc. For my understanding, could you clarify what
+this line is needed for on meson?
 
-     Arnd
++textofs-$(CONFIG_ARCH_MESON) := 0x00208000
+
+Thanks,
+
+    Arnd
