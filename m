@@ -1,47 +1,46 @@
 From: yinbo.zhu@nxp.com (yinbo.zhu at nxp.com)
-Date: Mon, 30 Oct 2017 15:58:52 +0800
-Subject: [PATCH] mmc: sdhci-of-esdhc: fix eMMC couldn't work after kexec
-Message-ID: <20171030075852.7695-1-yinbo.zhu@nxp.com>
+Date: Mon, 30 Oct 2017 16:00:20 +0800
+Subject: [PATCH 1/2] mmc: sdhci-of-esdhc: Workaround for reducing the maximum
+ speed on ls1021atwr
+Message-ID: <20171030080020.7780-1-yinbo.zhu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "yinbo.zhu" <yinbo.zhu@nxp.com>
 
-The bit TB_EN in tuning block control register
-(TBCTL) is not reset by software reset for all.
-So must clear it before initialize eSDHC again.
+In SDHC high speed AC timing, the tshivkh parameter
+is defined as input setup times:SDHC_CMD, SDHC_DATx,
+to SDHC_CLK. The value of the tshivkh should be 2.5 ns
+considering the round trip delay, board/data skew.
+However, because of this erratum, it needs
+at least 4.1 ns.
+
+eSDHC cannot run at the maximum clock speed for the
+high speed mode, or there is a limit on the length
+of the trace on the board for data, command, and
+clock lines of the SDHC.
 
 Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
 ---
- drivers/mmc/host/sdhci-esdhc.h    | 1 +
- drivers/mmc/host/sdhci-of-esdhc.c | 3 +++
- 2 files changed, 4 insertions(+)
+ drivers/mmc/host/sdhci-of-esdhc.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/mmc/host/sdhci-esdhc.h b/drivers/mmc/host/sdhci-esdhc.h
-index 98898a309a36..800ffb3794ef 100644
---- a/drivers/mmc/host/sdhci-esdhc.h
-+++ b/drivers/mmc/host/sdhci-esdhc.h
-@@ -59,6 +59,7 @@
- /* Tuning Block Control Register */
- #define ESDHC_TBCTL			0x120
- #define ESDHC_TB_EN			0x00000004
-+#define ESDHC_TB_DIS			(0x1 << 2)
- 
- /* Control Register for DMA transfer */
- #define ESDHC_DMA_SYSCTL		0x40c
 diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
-index 4b0f375bdfd8..77ac9dee32a2 100644
+index d96a057a7db8..aa360ff1fc35 100644
 --- a/drivers/mmc/host/sdhci-of-esdhc.c
 +++ b/drivers/mmc/host/sdhci-of-esdhc.c
-@@ -784,6 +784,9 @@ static void esdhc_init(struct platform_device *pdev, struct sdhci_host *host)
- 	pltfm_host = sdhci_priv(host);
- 	esdhc = sdhci_pltfm_priv(pltfm_host);
+@@ -498,6 +498,12 @@ static void esdhc_of_set_clock(struct sdhci_host *host, unsigned int clock)
+ 			clock -= 5000000;
+ 	}
  
-+	val = sdhci_readl(host, ESDHC_TBCTL);
-+	val &= ~ESDHC_TB_DIS;
-+	sdhci_writel(host, val, ESDHC_TBCTL);
- 	host_ver = sdhci_readw(host, SDHCI_HOST_VERSION);
- 	esdhc->vendor_ver = (host_ver & SDHCI_VENDOR_VER_MASK) >>
- 			     SDHCI_VENDOR_VER_SHIFT;
++	/* Workaround to reduce the clock frequency for ls1021a esdhc */
++	if (of_find_compatible_node(NULL, NULL, "fsl,ls1021a")) {
++		if (clock == 50000000)
++			clock = 46500000;
++	}
++
+ 	temp = sdhci_readl(host, ESDHC_SYSTEM_CONTROL);
+ 	temp &= ~(ESDHC_CLOCK_SDCLKEN | ESDHC_CLOCK_IPGEN | ESDHC_CLOCK_HCKEN |
+ 		  ESDHC_CLOCK_PEREN | ESDHC_CLOCK_MASK);
 -- 
 2.14.1
