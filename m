@@ -1,46 +1,98 @@
-From: yinbo.zhu@nxp.com (yinbo.zhu at nxp.com)
-Date: Mon, 30 Oct 2017 15:18:58 +0800
-Subject: [PATCH 1/2] mmc: sdhci-of-esdhc: Workaround for reducing the maximum
- speed on ls1021atwr
-Message-ID: <20171030071858.46132-1-yinbo.zhu@nxp.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Mon, 30 Oct 2017 08:40:19 +0100
+Subject: [PATCH v4 09/21] KVM: arm/arm64: mask/unmask daif around VHE
+ guests
+In-Reply-To: <20171019145807.23251-10-james.morse@arm.com>
+References: <20171019145807.23251-1-james.morse@arm.com>
+ <20171019145807.23251-10-james.morse@arm.com>
+Message-ID: <20171030074019.GS2166@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "yinbo.zhu" <yinbo.zhu@nxp.com>
+On Thu, Oct 19, 2017 at 03:57:55PM +0100, James Morse wrote:
+> Non-VHE systems take an exception to EL2 in order to world-switch into the
+> guest. When returning from the guest KVM implicitly restores the DAIF
+> flags when it returns to the kernel at EL1.
+> 
+> With VHE none of this exception-level jumping happens, so KVMs
+> world-switch code is exposed to the host kernel's DAIF values, and KVM
+> spills the guest-exit DAIF values back into the host kernel.
+> On entry to a guest we have Debug and SError exceptions unmasked, KVM
+> has switched VBAR but isn't prepared to handle these. On guest exit
+> Debug exceptions are left disabled once we return to the host and will
+> stay this way until we enter user space.
+> 
+> Add a helper to mask/unmask DAIF around VHE guests. The unmask can only
+> happen after the hosts VBAR value has been synchronised by the isb in
+> __vhe_hyp_call (via kvm_call_hyp()). Masking could be as late as
+> setting KVMs VBAR value, but is kept here for symmetry.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
+> 
 
-In SDHC high speed AC timing, the tshivkh parameter
-is defined as input setup times:SDHC_CMD, SDHC_DATx,
-to SDHC_CLK. The value of the tshivkh should be 2.5 ns
-considering the round trip delay, board/data skew.
-However, because of this erratum, it needs
-at least 4.1 ns.
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-eSDHC cannot run at the maximum clock speed for the
-high speed mode, or there is a limit on the length
-of the trace on the board for data, command, and
-clock lines of the SDHC.
+> ---
+> Give me a kick if you want this reworked as a fix (which will then
+> conflict with this series), or a backportable version.
 
-Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
----
- drivers/mmc/host/sdhci-of-esdhc.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+I don't know of any real-world issues where some more graceful handling
+of SErrors would make sense on older kernels, so I'm fine with just
+merging this together with this series.
 
-diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
-index d96a057a7db8..aa360ff1fc35 100644
---- a/drivers/mmc/host/sdhci-of-esdhc.c
-+++ b/drivers/mmc/host/sdhci-of-esdhc.c
-@@ -498,6 +498,12 @@ static void esdhc_of_set_clock(struct sdhci_host *host, unsigned int clock)
- 			clock -= 5000000;
- 	}
- 
-+	/* Workaround to reduce the clock frequency for ls1021a esdhc */
-+	if (of_find_compatible_node(NULL, NULL, "fsl,ls1021a")) {
-+		if (clock == 50000000)
-+			clock = 46500000;
-+	}
-+
- 	temp = sdhci_readl(host, ESDHC_SYSTEM_CONTROL);
- 	temp &= ~(ESDHC_CLOCK_SDCLKEN | ESDHC_CLOCK_IPGEN | ESDHC_CLOCK_HCKEN |
- 		  ESDHC_CLOCK_PEREN | ESDHC_CLOCK_MASK);
--- 
-2.14.1
+Thanks,
+-Christoffer
+
+
+> 
+>  arch/arm64/include/asm/kvm_host.h | 10 ++++++++++
+>  virt/kvm/arm/arm.c                |  4 ++++
+>  2 files changed, 14 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index e923b58606e2..a0e2f7962401 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -25,6 +25,7 @@
+>  #include <linux/types.h>
+>  #include <linux/kvm_types.h>
+>  #include <asm/cpufeature.h>
+> +#include <asm/daifflags.h>
+>  #include <asm/kvm.h>
+>  #include <asm/kvm_asm.h>
+>  #include <asm/kvm_mmio.h>
+> @@ -384,4 +385,13 @@ static inline void __cpu_init_stage2(void)
+>  		  "PARange is %d bits, unsupported configuration!", parange);
+>  }
+>  
+> +static inline void kvm_arm_vhe_guest_enter(void)
+> +{
+> +	local_daif_mask();
+> +}
+> +
+> +static inline void kvm_arm_vhe_guest_exit(void)
+> +{
+> +	local_daif_restore(DAIF_PROCCTX_NOIRQ);
+> +}
+>  #endif /* __ARM64_KVM_HOST_H__ */
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index b9f68e4add71..665529924b34 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -698,9 +698,13 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  		 */
+>  		trace_kvm_entry(*vcpu_pc(vcpu));
+>  		guest_enter_irqoff();
+> +		if (has_vhe())
+> +			kvm_arm_vhe_guest_enter();
+>  
+>  		ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);
+>  
+> +		if (has_vhe())
+> +			kvm_arm_vhe_guest_exit();
+>  		vcpu->mode = OUTSIDE_GUEST_MODE;
+>  		vcpu->stat.exits++;
+>  		/*
+> -- 
+> 2.13.3
+> 
