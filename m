@@ -1,20 +1,19 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 Oct 2017 10:21:15 +0100
-Subject: [GIT PULL] ARM: uniphier: fixes for v4.14
-In-Reply-To: <CAK7LNARdGT2zpbGLgv9fCgn+i96AH1pwNgy3mDJxGxBSiJEJwQ@mail.gmail.com>
-References: <CAK7LNARdGT2zpbGLgv9fCgn+i96AH1pwNgy3mDJxGxBSiJEJwQ@mail.gmail.com>
-Message-ID: <CAK8P3a0_=yB-tJ7A9Y8mLhfCkt9xs3E8Jeoc00PgQRnyiMg5sA@mail.gmail.com>
+Date: Mon, 30 Oct 2017 10:31:43 +0100
+Subject: [GIT PULL] Allwinner core changes for 4.15
+In-Reply-To: <20171020074720.7kut3q3j5bzt6esd@flea>
+References: <20171020074720.7kut3q3j5bzt6esd@flea>
+Message-ID: <CAK8P3a2pH1NuzSxFfMSS17ZisvWB6fe+2z1_1ngL0KyX8D2zaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 20, 2017 at 7:16 PM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> Hi Arnd, Olof,
+On Fri, Oct 20, 2017 at 9:47 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Allwinner core changes for 4.15
 >
-> Please pull small fixes of ARM UniPhier DT.
-> It turned out one clock was missing that is actually
-> necessary for EHCI nodes.
+> A bunch of patches for the sunxi documentation and mach-sunxi. The most
+> notable feature is the introduction of the R40 support.
 
-Pulled into fixes, thanks!
+Pulled into next/soc, thanks!
 
-      Arnd
+       Arnd
