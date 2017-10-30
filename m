@@ -1,65 +1,26 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 30 Oct 2017 16:17:22 +0000
-Subject: [PATCH v4 20/28] arm64/sve: Add prctl controls for userspace
- vector length management
-In-Reply-To: <87fua07gyq.fsf@linaro.org>
-References: <1509101470-7881-1-git-send-email-Dave.Martin@arm.com>
- <1509101470-7881-21-git-send-email-Dave.Martin@arm.com>
- <87r2toiikt.fsf@linaro.org>
- <20171028160506.GI19485@e103592.cambridge.arm.com>
- <87fua07gyq.fsf@linaro.org>
-Message-ID: <20171030161709.GJ19485@e103592.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 30 Oct 2017 09:19:50 -0700
+Subject: [PATCH 0/2] ARM: OMAP3: fix boot regression for N9
+In-Reply-To: <1509354664-27694-1-git-send-email-t-kristo@ti.com>
+References: <1509354664-27694-1-git-send-email-t-kristo@ti.com>
+Message-ID: <20171030161950.GA7339@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 30, 2017 at 04:12:13PM +0000, Alex Benn?e wrote:
+* Tero Kristo <t-kristo@ti.com> [171030 02:13]:
+> Hi,
 > 
-> Dave Martin <Dave.Martin@arm.com> writes:
-> 
-> > On Fri, Oct 27, 2017 at 06:52:50PM +0100, Alex Benn?e wrote:
-> >>
-> >> Dave Martin <Dave.Martin@arm.com> writes:
-> >>
-> >> > This patch adds two arm64-specific prctls, to permit userspace to
-> >> > control its vector length:
-> >> >
-> >> >  * PR_SVE_SET_VL: set the thread's SVE vector length and vector
-> >> >    length inheritance mode.
-> >> >
-> >> >  * PR_SVE_GET_VL: get the same information.
-> >> >
-> >> > Although these prctls resemble instruction set features in the SVE
-> >> > architecture, they provide additional control: the vector length
-> >> > inheritance mode is Linux-specific and nothing to do with the
-> >> > architecture, and the architecture does not permit EL0 to set its
-> >> > own vector length directly.  Both can be used in portable tools
-> >> > without requiring the use of SVE instructions.
-> >> >
-> >> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> >> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> >> > Cc: Alex Benn?e <alex.bennee@linaro.org>
-> >>
-> >> FYI there is a minor conflict applying this on current master.
-> >
-> > There are some trivial conflicts with one or two patches that already
-> > went into arm64/for-next/core, so I based on that for this posting, not
-> > torvalds/master.
-> >
-> > There's a note in the cover letter giving the precise commit I based
-> > on, though the branch doesn't seem to have moved yet since I posted.
-> 
-> Ahh probably those. It was only a few header file shuffles. I was
-> rushing to apply before my flight back I failed to note the change in
-> base commit.
-> 
-> >
-> > Otherwise, I don't see any conflict -- can you give details?
-> 
-> Only that #endif _ASM_ had been dropped from the header file.
+> N9 boot is apparently broken with mainline, caused by some recent
+> changes to TI clock drivers. The reason for failing boot is effectively
+> missing hwmod data piece for MMC3, so add this in place. The CM
+> related fix is also needed to properly handle idlest functionality
+> on OMAP3; currently this is mostly masked but will cause issues in
+> some places.
 
-The #ifndef __ASSEMBLY__ ... #endif is added by another in-flight patch,
-so it depends on whether that patch (from arm64/for-next/core) is already
-applied.
+Thanks applying both into omap-for-v4.14/fixes. If these don't make
+it to v4.14, these can always be requested for stable releases as
+needed as specified in Documentation/process/stable-kernel-rules.rst.
 
-Cheers
----Dave
+Regards,
+
+Tony
