@@ -1,43 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 Oct 2017 14:24:23 +0100
-Subject: [GIT PULL] arm64: dts: uniphier: UniPhier DT updates (64bit) for
- v4.15
-In-Reply-To: <CAK7LNARKAivEyNYDMO7GKjTnnsVFk3TtsCZ_yDWLrEf80G-WOQ@mail.gmail.com>
-References: <CAK7LNARKAivEyNYDMO7GKjTnnsVFk3TtsCZ_yDWLrEf80G-WOQ@mail.gmail.com>
-Message-ID: <CAK8P3a3oKP-5hgZ+zBZGBgHV8YdCnKpif8-nArsKqVydsajWxw@mail.gmail.com>
+Date: Mon, 30 Oct 2017 14:12:34 +0100
+Subject: [GIT PULL] Amlogic 32-bit DT updates for v4.15, round 2
+In-Reply-To: <7hpo95q4vt.fsf@baylibre.com>
+References: <7hpo95q4vt.fsf@baylibre.com>
+Message-ID: <CAK8P3a3jH-8VhXdVNGVOFm9A81vM_wQz_XpTykDscAZkoZejCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 23, 2017 at 7:40 PM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-
-> UniPhier ARM64 SoC DT updates for v4.15
+On Sun, Oct 29, 2017 at 5:45 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+> The following changes since commit 88b1b18ffeae1d65e22ec24040545a84c3ace352:
 >
-> - add thermal monitor and thermal zone nodes
-> - add efuse nodes
-> - fix W=2 warnings
-> - add GPIO controller nodes and related properties
-> - add resets properties
+>   ARM: dts: meson: add the SDIO MMC controller (2017-10-11 17:18:25 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt-2
+>
+> for you to fetch changes up to 2cb51a8ddd69dbd9e6b3d19dfdacd4ebfdd166a8:
+>
+>   ARM: dts: meson: add the efuse node (2017-10-29 09:00:38 -0700)
+>
+> ----------------------------------------------------------------
+> Amlogic 32-bit DT updates for v4.15, round 2
+> - enable new GPIO IRQ controller
+> - add efuse node
 
-I noticed too late that your "ARM32 SoC DT" branch broke ARM64 (I
-don't normally test
-architectures that are not touched by a new branch. What happened here
-is that commit
-2bef7ca3798f ("ARM: dts: uniphier: route on-board device IRQ to GPIO
-controller")
-added a reference to the non-existing "gpio" label, causing a build error:
+Pulled into next/dt, thanks!
 
-arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dtb: ERROR
-(phandle_references): Reference to non-existent node or label "gpio"
-
-Since merging the ARM64 branch fixes the problem, I decided it's not
-worth the trouble
-of reverting the original merge, but please be careful to avoid build
-problems like this
-in the future.
-
-The changes otherwise look all good, so I've pulled this into next/dt as well.
-
-Thanks,
-
-        Arnd
+       Arnd
