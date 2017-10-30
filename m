@@ -1,44 +1,51 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Oct 2017 15:48:56 +0000
+Date: Mon, 30 Oct 2017 15:50:30 +0000
 Subject: [PATCH] ARM: add a private asm/unaligned.h
-In-Reply-To: <87k1zc3fxp.fsf@free-electrons.com>
+In-Reply-To: <CAK8P3a0_-YOvPUqZTb+LoU+wCBhy=zCxmk4HProPJY+udbri9Q@mail.gmail.com>
 References: <20171020200231.1355569-1-arnd@arndb.de>
  <87wp3g39es.fsf@free-electrons.com>
  <20171027152743.GJ20805@n2100.armlinux.org.uk>
- <87k1zc3fxp.fsf@free-electrons.com>
-Message-ID: <20171030154855.GO20805@n2100.armlinux.org.uk>
+ <CAK8P3a0_-YOvPUqZTb+LoU+wCBhy=zCxmk4HProPJY+udbri9Q@mail.gmail.com>
+Message-ID: <20171030155029.GP20805@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 30, 2017 at 02:48:02PM +0100, Gregory CLEMENT wrote:
-> Hi Russell,
+On Mon, Oct 30, 2017 at 04:09:43PM +0100, Arnd Bergmann wrote:
+> On Fri, Oct 27, 2017 at 5:27 PM, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
 > 
-> So I tested the branch fixes in your git tree.
+> >
+> > There's three things wrong, all of which I have patches to address:
+> >
+> > 1. The decompressor code reading the image data sometimes issues unaligned
+> >    reads.  Some compilers get this wrong and cause an abort.  Arnds patch
+> >    addresses this.
+> >
+> > 2. Additional sections can appear in the zImage binary which adds extra
+> >    bytes on the end of the image.  Concatenating the zImage with the
+> >    extra bytes onto a DTB is the same thing as doing this:
+> >
+> >         cat zImage extrabytes foo.dtb > image
+> >
+> >    and the decompressor tolerates no additional bytes between the
+> >    _official_ end of the zImage and the DTB.  I've added a patch which
+> >    detects this situation and fails the kernel build when it happens.
+> >
+> > 3. Ard's patch "efi/libstub: arm: omit sorting of the UEFI memory map"
+> >    gets rid of the additional sections that (a) change the alignment
+> >    of the compressed data, and (b) add additional unexpected bytes on
+> >    the end of zImage.
 > 
-> After doing a "make multi_v7_defconfig; make zImage", I got the message
-> "arm-linux-gnueabi-ld: error: zImage file size is incorrect" you added
-> in the commit "ARM: verify size of zImage".
+> It's possible that we still need yet another patch to address the gcc bug that
+> Alex Graf found, i.e. https://gcc.gnu.org/bugzilla/show_bug.cgi?id=82445
 > 
-> It is the same with mvebu_v7_defconfig, so I wonder wich with
-> configuration this patch was tested ?
+> Without the latest gcc, we might still get into a situation in which we get
+> an unaligned strd when compiling for armv5te or armv6 with gcc-7.[012].
+> As someone mentioned in the bug report, that problem doesn't seem
+> to happen with gcc-6 or -mtune=xscale, or with gcc-7 -march=armv7-a.
 
-I heard a similar report from Olof when his autobuilder produced 100%
-failure.  I tried one of the same defconfig's that Olof tried here,
-and didn't see the failure.  It passes my build tests here, and it
-also passes kernelci's build tests too.
-
-So, I _think_ it's got something to do with the toolchain versions
-being used, but at the moment I'm just guessing.  I've no real idea,
-because I've no idea what's causing the failure at the moment.
-
-Olof said that he'd send me one of the build trees, but I'm still
-waiting.
-
-What I need is a tarball of the objects from arch/arm/boot/compressed
-to work out what's going on - when grabbing that, it may be a good
-idea to first disable the assert in the linker script, so that the
-resulting "vmlinux" in that directory remains for analysis.  Or...
-someone else needs to work out what's going on and report back.
+There is another solution which we've used in the past - we could detect
+these compiler versions and refuse to build with the broken compilers.
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
