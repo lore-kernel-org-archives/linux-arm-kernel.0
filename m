@@ -1,56 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 30 Oct 2017 13:08:34 +0000
-Subject: [PATCH v3] arm64: prevent regressions in compressed kernel image
- size when upgrading to binutils 2.27
-In-Reply-To: <20171027163341.57550-1-ndesaulniers@google.com>
-References: <CAKv+Gu8wqH5fyievpcFi0P+JxEkA38cROzptN3zdCD0zCPcppg@mail.gmail.com>
- <20171027163341.57550-1-ndesaulniers@google.com>
-Message-ID: <20171030130834.GK4404@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 30 Oct 2017 14:09:49 +0100
+Subject: [GIT PULL 2/4] i.MX device tree updates for 4.15
+In-Reply-To: <1508847645-9191-2-git-send-email-shawnguo@kernel.org>
+References: <1508847645-9191-1-git-send-email-shawnguo@kernel.org>
+ <1508847645-9191-2-git-send-email-shawnguo@kernel.org>
+Message-ID: <CAK8P3a3yb=6gNer8o3yogxOJg43k9KJFQNHhormJP8Rd_f5N+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 27, 2017 at 09:33:41AM -0700, Nick Desaulniers wrote:
-> Upon upgrading to binutils 2.27, we found that our lz4 and gzip
-> compressed kernel images were significantly larger, resulting is 10ms
-> boot time regressions.
-> 
-> As noted by Rahul:
-> "aarch64 binaries uses RELA relocations, where each relocation entry
-> includes an addend value. This is similar to x86_64.  On x86_64, the
-> addend values are also stored at the relocation offset for relative
-> relocations. This is an optimization: in the case where code does not
-> need to be relocated, the loader can simply skip processing relative
-> relocations.  In binutils-2.25, both bfd and gold linkers did this for
-> x86_64, but only the gold linker did this for aarch64.  The kernel build
-> here is using the bfd linker, which stored zeroes at the relocation
-> offsets for relative relocations.  Since a set of zeroes compresses
-> better than a set of non-zero addend values, this behavior was resulting
-> in much better lz4 compression.
-> 
-> The bfd linker in binutils-2.27 is now storing the actual addend values
-> at the relocation offsets. The behavior is now consistent with what it
-> does for x86_64 and what gold linker does for both architectures.  The
-> change happened in this upstream commit:
-> https://sourceware.org/git/?p=binutils-gdb.git;a=commit;h=1f56df9d0d5ad89806c24e71f296576d82344613
-> Since a bunch of zeroes got replaced by non-zero addend values, we see
-> the side effect of lz4 compressed image being a bit bigger.
-> 
-> To get the old behavior from the bfd linker, "--no-apply-dynamic-relocs"
-> flag can be used:
-> $ LDFLAGS="--no-apply-dynamic-relocs" make
-> With this flag, the compressed image size is back to what it was with
-> binutils-2.25.
-> 
-> If the kernel is using ASLR, there aren't additional runtime costs to
-> --no-apply-dynamic-relocs, as the relocations will need to be applied
-> again anyway after the kernel is relocated to a random address.
-> 
-> If the kernel is not using ASLR, then presumably the current default
-> behavior of the linker is better. Since the static linker performed the
-> dynamic relocs, and the kernel is not moved to a different address at
-> load time, it can skip applying the relocations all over again."
+On Tue, Oct 24, 2017 at 2:20 PM, Shawn Guo <shawnguo@kernel.org> wrote:
 
-Do you have any numbers booting an uncompressed kernel Image without ASLR
-to see if skipping the relocs makes a measurable difference there?
+> i.MX device tree updates for 4.15:
+>  - New board support: i.MX51 ZII RDU1, i.MX53 GE Healthcare PPD, i.MX6
+>    TX modules for MB7 from  Ka-Ro Electronics, i.MX6 Wandboard revd1
+>    variants, i.MX6 LWN DISPLAY5 board, Pistachio i.MX6Q board, i.MX6SX
+>    Vining-2000 board.
+>  - Use the 'vpcie-supply' property for PCIe device for boards
+>    imx6qdl-sabresd, imx6q-novena and imx6q-cm-fx6.
+>  - A series from Jagan Teki to update imx6qdl-icore board with audio,
+>    touch and CAN support.
+>  - Switch to nvmem for accessing OCOTP from tempmon for i.MX6SX and add
+>    tempmon support for i.MX6UL.
+>  - A bunch of patches from Lothar Wa?mann updating Ka-Ro i.MX28, i.MX53
+>    and i.MX6 TX modules.
+>  - Fix DTC warnings in i.MX device trees, dropping leading zeros from
+>    unit address, correcting display nodes notation and display port
+>    names, fixing nodes with unit name and no reg property.
 
-Will
+I got some conflicts against the patch from Rob to drop leading zeros,
+but those were all easy to fix up. I noticed that some of your newly
+added files have new leading zeros, so I removed them during the merge
+as well. Please double-check that the new version in branch next/dt is
+fine.
+
+       Arnd
