@@ -1,60 +1,33 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 30 Oct 2017 20:43:40 +0100
-Subject: n950: mmc fails to work, omap_hsmmc 480b4000.mmc: RX DMA channel
- request failed ? was Re: 4.13 (and probably all recent) kernels refuse to
- boot on one Nokia N950, work or another
-In-Reply-To: <65ad0b63-cfae-f7ac-f916-32fd0c7c540a@gmail.com>
-References: <20171025203459.GA22035@amd> <20171025212806.GA21504@atomide.com>
- <20171026091325.GA26929@amd>
- <20171026093115.4bc6ctxjx72ng7ld@earth>
- <20171026095734.GA10141@amd>
- <20171026120130.dicanunwcdmjntnb@earth> <20171027101905.GA4287@amd>
- <65ad0b63-cfae-f7ac-f916-32fd0c7c540a@gmail.com>
-Message-ID: <20171030194340.GA9133@amd>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 30 Oct 2017 21:44:38 +0200
+Subject: [PATCH 0/2] ARM: OMAP3: fix boot regression for N9
+In-Reply-To: <20171030161950.GA7339@atomide.com>
+References: <1509354664-27694-1-git-send-email-t-kristo@ti.com>
+ <20171030161950.GA7339@atomide.com>
+Message-ID: <6baaa6fd-d059-d2f7-fdcc-f42d2160da45@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On 30/10/17 18:19, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [171030 02:13]:
+>> Hi,
+>>
+>> N9 boot is apparently broken with mainline, caused by some recent
+>> changes to TI clock drivers. The reason for failing boot is effectively
+>> missing hwmod data piece for MMC3, so add this in place. The CM
+>> related fix is also needed to properly handle idlest functionality
+>> on OMAP3; currently this is mostly masked but will cause issues in
+>> some places.
+> 
+> Thanks applying both into omap-for-v4.14/fixes. If these don't make
+> it to v4.14, these can always be requested for stable releases as
+> needed as specified in Documentation/process/stable-kernel-rules.rst.
 
-I was able to setup nfsroot, and boot postmarketos (with root
-read/only, but that's good enough for debugging).
+Yeah, really sorry about the delay but was kind of out of my hands this 
+time. Hopefully my email issues have been solved for now and this won't 
+happen again.
 
-Then I was (finally!) able to run dmesg, and that tells me:
+-Tero
 
-[    0.816040] mousedev: PS/2 mouse device common for all mice
-[    0.817657] input: TWL4030 Keypad as
-/devices/platform/68000000.ocp/48070000.i2c/i2c-0/0-0048/48070000.i2c:twl at 48:keypad/input/input0
-[    0.820800] i2c /dev entries driver
-[    0.830261] omap_wdt: OMAP Watchdog Timer Rev 0x31: initial timeout
-60 sec
-[    0.836212] omap_hsmmc 480b4000.mmc: RX DMA channel request failed
-[    0.840026] ledtrig-cpu: registered to indicate activity on CPUs
-[    0.840789] omap-aes 480c5000.aes: OMAP AES hw accel rev: 2.6
-[    0.840942] omap-aes 480c5000.aes: Unable to request in DMA channel
-[    0.841644] omap-aes 480c5000.aes: will run requests pump with
-realtime priority
-
-Kernel 4.13-rc2.
-
-I'm now trying:
-
-+++ b/.config
--CONFIG_MMC_OMAP_HS=y
-+# CONFIG_MMC_OMAP_HS is not set
-
-With that, error is gone, but so is MMC driver, so... not good.
-
-Any ideas?
-
-Best regards,
-									Pavel   
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171030/25d828f2/attachment.sig>
+--
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
