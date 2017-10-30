@@ -1,56 +1,26 @@
-From: wenyou.yang@microchip.com (Wenyou Yang)
-Date: Mon, 30 Oct 2017 08:46:50 +0800
-Subject: [PATCH] media: atmel-isc: Fix clock ID for clk_prepare/unprepare
-Message-ID: <20171030004650.15571-1-wenyou.yang@microchip.com>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Mon, 30 Oct 2017 09:13:22 +0800
+Subject: [PATCH v3] KVM: arm/arm64: fix the incompatible matching for
+ external abort
+In-Reply-To: <861slmaha7.fsf@arm.com>
+References: <1509173159-30579-1-git-send-email-gengdongjiu@huawei.com>
+ <861slmaha7.fsf@arm.com>
+Message-ID: <b3d95d31-acbc-3ab4-f828-bcbb2280a198@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the clock ID to do the runtime pm should be ISC_ISPCK,
-instead of ISC_MCK in clk_prepare(), clk_unprepare() and
-isc_clk_is_enabled().
 
-Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
----
+On 2017/10/29 9:12, Marc Zyngier wrote:
+> I'm sorry, but I can't manage to parse this commit message. How about
+> something like this?
+> 
+> "kvm_vcpu_dabt_isextabt() tries to match a full fault syndrome, but
+>  calls kvm_vcpu_trap_get_fault_type() that only returns the fault class,
+>  thus reducing the scope of the check. This doesn't cause any observable
+>  bug yet as we end-up matching a closely related syndrome for which we
+>  return the same value.
+> 
+>  Using kvm_vcpu_trap_get_fault() instead fixes it for good"
 
- drivers/media/platform/atmel/atmel-isc.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/media/platform/atmel/atmel-isc.c b/drivers/media/platform/atmel/atmel-isc.c
-index 2c40a7886542..9294ff0c7b83 100644
---- a/drivers/media/platform/atmel/atmel-isc.c
-+++ b/drivers/media/platform/atmel/atmel-isc.c
-@@ -598,7 +598,7 @@ static int isc_clk_prepare(struct clk_hw *hw)
- {
- 	struct isc_clk *isc_clk = to_isc_clk(hw);
- 
--	if (isc_clk->id == ISC_MCK)
-+	if (isc_clk->id == ISC_ISPCK)
- 		pm_runtime_get_sync(isc_clk->dev);
- 
- 	return isc_wait_clk_stable(hw);
-@@ -610,7 +610,7 @@ static void isc_clk_unprepare(struct clk_hw *hw)
- 
- 	isc_wait_clk_stable(hw);
- 
--	if (isc_clk->id == ISC_MCK)
-+	if (isc_clk->id == ISC_ISPCK)
- 		pm_runtime_put_sync(isc_clk->dev);
- }
- 
-@@ -657,12 +657,12 @@ static int isc_clk_is_enabled(struct clk_hw *hw)
- 	struct isc_clk *isc_clk = to_isc_clk(hw);
- 	u32 status;
- 
--	if (isc_clk->id == ISC_MCK)
-+	if (isc_clk->id == ISC_ISPCK)
- 		pm_runtime_get_sync(isc_clk->dev);
- 
- 	regmap_read(isc_clk->regmap, ISC_CLKSR, &status);
- 
--	if (isc_clk->id == ISC_MCK)
-+	if (isc_clk->id == ISC_ISPCK)
- 		pm_runtime_put_sync(isc_clk->dev);
- 
- 	return status & ISC_CLK(isc_clk->id) ? 1 : 0;
--- 
-2.13.0
+Marc, thank you very much for your pointing out and good suggestion,
+will update it. Thanks a lot.
