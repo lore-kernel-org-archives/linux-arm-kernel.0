@@ -1,72 +1,92 @@
 From: preid@electromag.com.au (Phil Reid)
-Date: Tue, 31 Oct 2017 15:33:58 +0800
-Subject: [PATCH v4 6/7] i2c: davinci: switch to using gpiod for bus recovery
- gpios
+Date: Tue, 31 Oct 2017 15:33:55 +0800
+Subject: [PATCH v4 3/7] i2c: designware: rename i2c_dw_plat_prepare_clk to
+ i2c_dw_prepare_clk
 In-Reply-To: <1509435239-64848-1-git-send-email-preid@electromag.com.au>
 References: <1509435239-64848-1-git-send-email-preid@electromag.com.au>
-Message-ID: <1509435239-64848-7-git-send-email-preid@electromag.com.au>
+Message-ID: <1509435239-64848-4-git-send-email-preid@electromag.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the driver to use the gpio descriptors for the bus recovery
-information instead of the deprecated integer interface.
+For consistency with the reset of the file rename function and parameter to
+be consistent with the reset of the common file.
 
+Acked-by: Jarkko Nikula <jarkko.nikula@linux.intel.com>
 Signed-off-by: Phil Reid <preid@electromag.com.au>
 ---
- drivers/i2c/busses/i2c-davinci.c | 20 +++++++++++++++-----
- 1 file changed, 15 insertions(+), 5 deletions(-)
+ drivers/i2c/busses/i2c-designware-common.c  | 10 +++++-----
+ drivers/i2c/busses/i2c-designware-core.h    |  2 +-
+ drivers/i2c/busses/i2c-designware-platdrv.c |  6 +++---
+ 3 files changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-davinci.c b/drivers/i2c/busses/i2c-davinci.c
-index 2ead9b9..2afb12a 100644
---- a/drivers/i2c/busses/i2c-davinci.c
-+++ b/drivers/i2c/busses/i2c-davinci.c
-@@ -294,7 +294,7 @@ static int i2c_davinci_init(struct davinci_i2c_dev *dev)
+diff --git a/drivers/i2c/busses/i2c-designware-common.c b/drivers/i2c/busses/i2c-designware-common.c
+index b79f342..3d684c6 100644
+--- a/drivers/i2c/busses/i2c-designware-common.c
++++ b/drivers/i2c/busses/i2c-designware-common.c
+@@ -186,15 +186,15 @@ unsigned long i2c_dw_clk_rate(struct dw_i2c_dev *dev)
+ 	return dev->get_clk_rate_khz(dev);
  }
  
- /*
-- * This routine does i2c bus recovery by using i2c_generic_gpio_recovery
-+ * This routine does i2c bus recovery by using i2c_generic_scl_recovery
-  * which is provided by I2C Bus recovery infrastructure.
-  */
- static void davinci_i2c_prepare_recovery(struct i2c_adapter *adap)
-@@ -316,7 +316,7 @@ static void davinci_i2c_unprepare_recovery(struct i2c_adapter *adap)
+-int i2c_dw_plat_prepare_clk(struct dw_i2c_dev *i_dev, bool prepare)
++int i2c_dw_prepare_clk(struct dw_i2c_dev *dev, bool prepare)
+ {
+-	if (IS_ERR(i_dev->clk))
+-		return PTR_ERR(i_dev->clk);
++	if (IS_ERR(dev->clk))
++		return PTR_ERR(dev->clk);
+ 
+ 	if (prepare)
+-		return clk_prepare_enable(i_dev->clk);
++		return clk_prepare_enable(dev->clk);
+ 
+-	clk_disable_unprepare(i_dev->clk);
++	clk_disable_unprepare(dev->clk);
+ 	return 0;
  }
  
- static struct i2c_bus_recovery_info davinci_i2c_gpio_recovery_info = {
--	.recover_bus = i2c_generic_gpio_recovery,
-+	.recover_bus = i2c_generic_scl_recovery,
- 	.prepare_recovery = davinci_i2c_prepare_recovery,
- 	.unprepare_recovery = davinci_i2c_unprepare_recovery,
- };
-@@ -769,6 +769,7 @@ static int davinci_i2c_probe(struct platform_device *pdev)
- 	struct davinci_i2c_dev *dev;
- 	struct i2c_adapter *adap;
- 	struct resource *mem;
-+	struct i2c_bus_recovery_info *rinfo;
- 	int r, irq;
+diff --git a/drivers/i2c/busses/i2c-designware-core.h b/drivers/i2c/busses/i2c-designware-core.h
+index e80a14c..33c6c8f 100644
+--- a/drivers/i2c/busses/i2c-designware-core.h
++++ b/drivers/i2c/busses/i2c-designware-core.h
+@@ -301,7 +301,7 @@ struct dw_i2c_dev {
+ void __i2c_dw_enable(struct dw_i2c_dev *dev, bool enable);
+ void __i2c_dw_enable_and_wait(struct dw_i2c_dev *dev, bool enable);
+ unsigned long i2c_dw_clk_rate(struct dw_i2c_dev *dev);
+-int i2c_dw_plat_prepare_clk(struct dw_i2c_dev *i_dev, bool prepare);
++int i2c_dw_prepare_clk(struct dw_i2c_dev *dev, bool prepare);
+ int i2c_dw_acquire_lock(struct dw_i2c_dev *dev);
+ void i2c_dw_release_lock(struct dw_i2c_dev *dev);
+ int i2c_dw_wait_bus_not_busy(struct dw_i2c_dev *dev);
+diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
+index a5fd0ee..9c5f649 100644
+--- a/drivers/i2c/busses/i2c-designware-platdrv.c
++++ b/drivers/i2c/busses/i2c-designware-platdrv.c
+@@ -343,7 +343,7 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
+ 		i2c_dw_configure_master(dev);
  
- 	irq = platform_get_irq(pdev, 0);
-@@ -869,9 +870,18 @@ static int davinci_i2c_probe(struct platform_device *pdev)
- 	if (dev->pdata->has_pfunc)
- 		adap->bus_recovery_info = &davinci_i2c_scl_recovery_info;
- 	else if (dev->pdata->scl_pin) {
--		adap->bus_recovery_info = &davinci_i2c_gpio_recovery_info;
--		adap->bus_recovery_info->scl_gpio = dev->pdata->scl_pin;
--		adap->bus_recovery_info->sda_gpio = dev->pdata->sda_pin;
-+		rinfo =  &davinci_i2c_gpio_recovery_info;
-+		adap->bus_recovery_info = rinfo;
-+		r = gpio_request_one(dev->pdata->scl_pin, GPIOF_OPEN_DRAIN |
-+				     GPIOF_OUT_INIT_HIGH, "i2c-scl");
-+		if (r)
-+			goto err_unuse_clocks;
-+		rinfo->scl_gpiod = gpio_to_desc(dev->pdata->scl_pin);
-+
-+		r = gpio_request_one(dev->pdata->sda_pin, GPIOF_IN, "i2c-sda");
-+		if (r)
-+			goto err_unuse_clocks;
-+		rinfo->sda_gpiod = gpio_to_desc(dev->pdata->scl_pin);
+ 	dev->clk = devm_clk_get(&pdev->dev, NULL);
+-	if (!i2c_dw_plat_prepare_clk(dev, true)) {
++	if (!i2c_dw_prepare_clk(dev, true)) {
+ 		dev->get_clk_rate_khz = i2c_dw_get_clk_rate_khz;
+ 
+ 		if (!dev->sda_hold_time && ht)
+@@ -447,7 +447,7 @@ static int dw_i2c_plat_suspend(struct device *dev)
  	}
  
- 	adap->nr = pdev->id;
+ 	i_dev->disable(i_dev);
+-	i2c_dw_plat_prepare_clk(i_dev, false);
++	i2c_dw_prepare_clk(i_dev, false);
+ 
+ 	i_dev->suspended = true;
+ 
+@@ -466,7 +466,7 @@ static int dw_i2c_plat_resume(struct device *dev)
+ 		return 0;
+ 	}
+ 
+-	i2c_dw_plat_prepare_clk(i_dev, true);
++	i2c_dw_prepare_clk(i_dev, true);
+ 	i_dev->init(i_dev);
+ 
+ 	i_dev->suspended = false;
 -- 
 1.8.3.1
