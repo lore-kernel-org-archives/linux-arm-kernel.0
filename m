@@ -1,65 +1,100 @@
-From: matt@mattface.org (Matt Hart)
-Date: Tue, 31 Oct 2017 17:00:15 +0000
-Subject: [GIT PULL 1/2] bcm2835-dt-fixes-2017-10-06
-In-Reply-To: <edb03edb-f2a6-549e-6060-eccfae554d92@gmail.com>
-References: <20171006220504.7776-1-eric@anholt.net>
- <edb03edb-f2a6-549e-6060-eccfae554d92@gmail.com>
-Message-ID: <CAJsfgeU5Zq-2zSfto8WUZ5Xud1Ksedu9XdLG9pWR7YBZGVaHBA@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 31 Oct 2017 13:06:35 -0400 (EDT)
+Subject: [PATCH 3/3] ARM: early_printk: use printascii() rather than
+ printch()
+In-Reply-To: <80bc8c16-321a-43ea-6cbb-257dbeee485b@arm.com>
+References: <20171002020618.23924-1-nicolas.pitre@linaro.org>
+ <20171002020618.23924-4-nicolas.pitre@linaro.org>
+ <PS1PR06MB1162212F37C8BA7EE367FE828A5E0@PS1PR06MB1162.apcprd06.prod.outlook.com>
+ <nycvar.YSQ.7.76.1710311211540.21665@knanqh.ubzr>
+ <80bc8c16-321a-43ea-6cbb-257dbeee485b@arm.com>
+Message-ID: <nycvar.YSQ.7.76.1710311302370.21665@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 October 2017 at 23:14, Florian Fainelli <f.fainelli@gmail.com> wrote:
->
-> On 10/06/2017 03:05 PM, Eric Anholt wrote:
-> > Hi Florian.  Here's a patch that's gone through a couple of revisions
-> > on the list, that seriously fixes up the default serial behavior --
-> > previously, without the right config.txt/cmdline bits, you'd often end
-> > up with a hang with no output before booting completed.  It would be
-> > great to get it into 4.14.
-> >
-> > The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
-> >
-> >   Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
-> >
-> > are available in the git repository at:
-> >
-> >   git://github.com/anholt/linux tags/bcm2835-dt-fixes-2017-10-06
-> >
-> > for you to fetch changes up to f08f58a2bf68900a84e782b8c7ad701c0654173c:
-> >
-> >   ARM: dts: bcm283x: Fix console path on RPi3 (2017-10-06 13:04:56 -0700)
-> >
-> > ----------------------------------------------------------------
-> > This pull request brings in a fix for default serial console setup on
-> > RPi3, so it now comes up with no config.txt/cmdline.txt settings in
-> > the firmware.
-> >
-> > ----------------------------------------------------------------
->
-> Merged, thanks Eric
->
-> --
-> Florian
+On Tue, 31 Oct 2017, Robin Murphy wrote:
 
-Hi all,
+> On 31/10/17 16:22, Nicolas Pitre wrote:
+> > On Tue, 31 Oct 2017, Chris Brandt wrote:
+> > 
+> >> On Sunday, October 01, 2017 1, Nicolas Pitre wrote:
+> >>> With printch() the console messages are sent out one character at a time
+> >>> which is agonizingly slow especially with semihosting as the whole trap
+> >>> intercept, remote byte access, and system resume danse is performed for
+> >>> every single character across a relatively slow remote debug connection.
+> >>> Let's use printascii() to send a whole string at once. This is also going
+> >>> to be more efficient, albeit to a quite lesser extent, with serial ports
+> >>> as well.
+> >>>
+> >>> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> >>> ---
+> >>>  arch/arm/kernel/early_printk.c | 16 ++++++++++------
+> >>>  1 file changed, 10 insertions(+), 6 deletions(-)
+> >>
+> >> Now that this patch has hit -next, I'm noticing an issue with it.
+> >>
+> >> There are no carriage returns, just line feeds, which makes for a very 
+> >> ugly display.
+> > 
+> > Hmmm....
+> > 
+> > If you look at printascii in arch/arm/kernel/debug.S you'll find the 
+> > following code:
+> > 
+> > 1:              waituart r2, r3
+> >                 senduart r1, r3
+> >                 busyuart r2, r3
+> >                 teq     r1, #'\n'
+> >                 moveq   r1, #'\r'
+> >                 beq     1b
+> > 
+> > Why is that not working for you?
+> 
+> By inspection, the removed early_write() code inserted the '\r' before
+> the '\n' in the usual fashion; the printascii() code above ends up doing
+> the reverse, and I can imagine the atypical "\n\r" sequence probably
+> confuses some terminals trying to be clever with line ending detection.
 
-I realise this patch has been in mainline for a more than a week, but
-I've only recently had time to bisect broken rpi-3 boots in kernelci
-and found f08f58a2bf68900a84e782b8c7ad701c0654173c as the cause.
+That's easy to veryfy with this patch:
 
-Kernelci boots the rpi3 using uboot, with console=ttyS0 in the command
-line which now fails:
-https://kernelci.org/boot/id/59f787f059b5147794ef1dcf/
+diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
+index ea9646cc2a..40023a4871 100644
+--- a/arch/arm/kernel/debug.S
++++ b/arch/arm/kernel/debug.S
+@@ -79,18 +79,21 @@ hexbuf:		.space 16
+ 
+ ENTRY(printascii)
+ 		addruart_current r3, r1, r2
+-		b	2f
+-1:		waituart r2, r3
+-		senduart r1, r3
+-		busyuart r2, r3
+-		teq	r1, #'\n'
+-		moveq	r1, #'\r'
+-		beq	1b
+-2:		teq	r0, #0
++1:		teq	r0, #0
+ 		ldrneb	r1, [r0], #1
+ 		teqne	r1, #0
+-		bne	1b
+-		ret	lr
++		reteq	lr
++		teq     r1, #'\n'
++		bne	2f
++		mov	r1, '\r'
++		waituart r2, r3
++		senduart r1, r3
++		busyuart r2, r3
++		mov	r1, '\n'
++2:		waituart r2, r3
++		senduart r1, r3
++		busyuart r2, r3
++		b	1b
+ ENDPROC(printascii)
+ 
+ ENTRY(printch)
 
-Is there an alias I can use for both before and after this patch?
+@Chris: does the above fix your display issue?
 
-Mainline boots fine if I use console=ttyS1 or drop the console arg
-altogether, but as we don't currently support different boot args per
-tree, and we don't have the manpower to track this patch in all the
-trees we test, we will have to switch to only boot testing mainline
-from now on.
 
-It seems to me the patch is doing the right thing, so this is just an
-FYI, though I can imagine a few users getting caught by this.
-
-Cheers
+Nicolas
