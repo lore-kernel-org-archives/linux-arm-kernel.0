@@ -1,50 +1,72 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 31 Oct 2017 07:35:35 +0100
-Subject: [PATCH v4 00/21] SError rework + RAS&IESB for firmware first
- support
-In-Reply-To: <20171019145807.23251-1-james.morse@arm.com>
-References: <20171019145807.23251-1-james.morse@arm.com>
-Message-ID: <20171031063535.GA2166@lvm>
+From: preid@electromag.com.au (Phil Reid)
+Date: Tue, 31 Oct 2017 15:33:58 +0800
+Subject: [PATCH v4 6/7] i2c: davinci: switch to using gpiod for bus recovery
+ gpios
+In-Reply-To: <1509435239-64848-1-git-send-email-preid@electromag.com.au>
+References: <1509435239-64848-1-git-send-email-preid@electromag.com.au>
+Message-ID: <1509435239-64848-7-git-send-email-preid@electromag.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James, Catalin, and Will,
+Change the driver to use the gpio descriptors for the bus recovery
+information instead of the deprecated integer interface.
 
-On Thu, Oct 19, 2017 at 03:57:46PM +0100, James Morse wrote:
-> Hello,
-> 
-> The aim of this series is to enable IESB and add ESB-instructions to let us
-> kick any pending RAS errors into firmware to be handled by firmware-first.
-> 
-> Not all systems will have this firmware, so these RAS errors will become
-> pending SErrors. We should take these as quickly as possible and avoid
-> panic()ing for errors where we could have continued.
-> 
-> This first part of this series reworks the DAIF masking so that SError is
-> unmasked unless we are handling a debug exception.
-> 
-> The last part provides the same minimal handling for SError that interrupt
-> KVM. KVM is currently unable to handle SErrors during world-switch, unless
-> they occur during a magic single-instruction window, it hyp-panics. I suspect
-> this will be easier to fix once the VHE world-switch is further optimised.
-> 
-> KVMs kvm_inject_vabt() needs updating for v8.2 as now we can specify an ESR,
-> and all-zeros has a RAS meaning.
-> 
-> KVM's existing 'impdef SError to the guest' behaviour probably needs revisiting.
-> These are errors where we don't know what they mean, they may not be
-> synchronised by ESB. Today we blame the guest.
-> My half-baked suggestion would be to make a virtual SError pending, but then
-> exit to user-space to give Qemu the change to quit (for virtual machines that
-> don't generate SError), pend an SError with a new Qemu-specific ESR, or blindly
-> continue and take KVMs default all-zeros impdef ESR.
+Signed-off-by: Phil Reid <preid@electromag.com.au>
+---
+ drivers/i2c/busses/i2c-davinci.c | 20 +++++++++++++++-----
+ 1 file changed, 15 insertions(+), 5 deletions(-)
 
-The KVM side of this series is looking pretty good.
-
-What are the merge plans for this?  I am fine if you will take this via
-the arm64 tree with our acks from the KVM side.  Alternatively, I
-suppose you can apply all the arm64 patches and provide us with a stable
-branch for that?
-
-Thanks,
--Christoffer
+diff --git a/drivers/i2c/busses/i2c-davinci.c b/drivers/i2c/busses/i2c-davinci.c
+index 2ead9b9..2afb12a 100644
+--- a/drivers/i2c/busses/i2c-davinci.c
++++ b/drivers/i2c/busses/i2c-davinci.c
+@@ -294,7 +294,7 @@ static int i2c_davinci_init(struct davinci_i2c_dev *dev)
+ }
+ 
+ /*
+- * This routine does i2c bus recovery by using i2c_generic_gpio_recovery
++ * This routine does i2c bus recovery by using i2c_generic_scl_recovery
+  * which is provided by I2C Bus recovery infrastructure.
+  */
+ static void davinci_i2c_prepare_recovery(struct i2c_adapter *adap)
+@@ -316,7 +316,7 @@ static void davinci_i2c_unprepare_recovery(struct i2c_adapter *adap)
+ }
+ 
+ static struct i2c_bus_recovery_info davinci_i2c_gpio_recovery_info = {
+-	.recover_bus = i2c_generic_gpio_recovery,
++	.recover_bus = i2c_generic_scl_recovery,
+ 	.prepare_recovery = davinci_i2c_prepare_recovery,
+ 	.unprepare_recovery = davinci_i2c_unprepare_recovery,
+ };
+@@ -769,6 +769,7 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+ 	struct davinci_i2c_dev *dev;
+ 	struct i2c_adapter *adap;
+ 	struct resource *mem;
++	struct i2c_bus_recovery_info *rinfo;
+ 	int r, irq;
+ 
+ 	irq = platform_get_irq(pdev, 0);
+@@ -869,9 +870,18 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+ 	if (dev->pdata->has_pfunc)
+ 		adap->bus_recovery_info = &davinci_i2c_scl_recovery_info;
+ 	else if (dev->pdata->scl_pin) {
+-		adap->bus_recovery_info = &davinci_i2c_gpio_recovery_info;
+-		adap->bus_recovery_info->scl_gpio = dev->pdata->scl_pin;
+-		adap->bus_recovery_info->sda_gpio = dev->pdata->sda_pin;
++		rinfo =  &davinci_i2c_gpio_recovery_info;
++		adap->bus_recovery_info = rinfo;
++		r = gpio_request_one(dev->pdata->scl_pin, GPIOF_OPEN_DRAIN |
++				     GPIOF_OUT_INIT_HIGH, "i2c-scl");
++		if (r)
++			goto err_unuse_clocks;
++		rinfo->scl_gpiod = gpio_to_desc(dev->pdata->scl_pin);
++
++		r = gpio_request_one(dev->pdata->sda_pin, GPIOF_IN, "i2c-sda");
++		if (r)
++			goto err_unuse_clocks;
++		rinfo->sda_gpiod = gpio_to_desc(dev->pdata->scl_pin);
+ 	}
+ 
+ 	adap->nr = pdev->id;
+-- 
+1.8.3.1
