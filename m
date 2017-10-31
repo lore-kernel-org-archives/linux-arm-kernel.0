@@ -1,279 +1,57 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 31 Oct 2017 16:59:34 +0530
-Subject: [PATCH v1] dmaengine: stm32_mdma: activate pack/unpack feature
-In-Reply-To: <CA+M3ks4EymJ2aR5Fm1G1mTgyiOaGUcQgWMvDp0K4Hvue+M7rbA@mail.gmail.com>
-Message-ID: <20171031112934.GN3187@localhost>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Tue, 31 Oct 2017 11:28:12 +0000
+Subject: [PATCH 3/3] ARM: early_printk: use printascii() rather than
+ printch()
+In-Reply-To: <20171002020618.23924-4-nicolas.pitre@linaro.org>
+References: <20171002020618.23924-1-nicolas.pitre@linaro.org>
+ <20171002020618.23924-4-nicolas.pitre@linaro.org>
+Message-ID: <PS1PR06MB1162212F37C8BA7EE367FE828A5E0@PS1PR06MB1162.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 17, 2017 at 04:26:50PM +0200, Benjamin Gaignard wrote:
-> +Arnd since it should also fix 64 bits division issue
+On Sunday, October 01, 2017 1, Nicolas Pitre wrote:
+> With printch() the console messages are sent out one character at a time
+> which is agonizingly slow especially with semihosting as the whole trap
+> intercept, remote byte access, and system resume danse is performed for
+> every single character across a relatively slow remote debug connection.
+> Let's use printascii() to send a whole string at once. This is also going
+> to be more efficient, albeit to a quite lesser extent, with serial ports
+> as well.
+> 
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> ---
+>  arch/arm/kernel/early_printk.c | 16 ++++++++++------
+>  1 file changed, 10 insertions(+), 6 deletions(-)
 
-Arnd would be back from Prague, so would like to get an ack before I
-apply...
+Now that this patch has hit -next, I'm noticing an issue with it.
 
-> 
-> 2017-10-17 15:43 GMT+02:00 Pierre-Yves MORDRET <pierre-yves.mordret@st.com>:
-> > If source and destination bus width differs pack/unpack MDMA
-> > feature has to be activated for alignment.
-> > This pack/unpack feature implies to have both source/destination address
-> > and buffer length aligned on bus width.
-> >
-> > Fixes: a4ffb13c8946 ("dmaengine: Add STM32 MDMA driver")
-> > Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
-> > ---
-> >  drivers/dma/stm32-mdma.c | 84 ++++++++++++++++++++++++++++--------------------
-> >  1 file changed, 50 insertions(+), 34 deletions(-)
-> >
-> > diff --git a/drivers/dma/stm32-mdma.c b/drivers/dma/stm32-mdma.c
-> > index d3be6bf..daa1602 100644
-> > --- a/drivers/dma/stm32-mdma.c
-> > +++ b/drivers/dma/stm32-mdma.c
-> > @@ -387,14 +387,20 @@ static int stm32_mdma_get_width(struct stm32_mdma_chan *chan,
-> >         }
-> >  }
-> >
-> > -static enum dma_slave_buswidth stm32_mdma_get_max_width(u32 buf_len, u32 tlen)
-> > +static enum dma_slave_buswidth stm32_mdma_get_max_width(dma_addr_t addr,
-> > +                                                       u32 buf_len, u32 tlen)
-> >  {
-> >         enum dma_slave_buswidth max_width = DMA_SLAVE_BUSWIDTH_8_BYTES;
-> >
-> >         for (max_width = DMA_SLAVE_BUSWIDTH_8_BYTES;
-> >              max_width > DMA_SLAVE_BUSWIDTH_1_BYTE;
-> >              max_width >>= 1) {
-> > -               if (((buf_len % max_width) == 0) && (tlen >= max_width))
-> > +               /*
-> > +                * Address and buffer length both have to be aligned on
-> > +                * bus width
-> > +                */
-> > +               if ((((buf_len | addr) & (max_width - 1)) == 0) &&
-> > +                   tlen >= max_width)
-> >                         break;
-> >         }
-> >
-> > @@ -486,7 +492,8 @@ static void stm32_mdma_set_bus(struct stm32_mdma_device *dmadev, u32 *ctbr,
-> >  static int stm32_mdma_set_xfer_param(struct stm32_mdma_chan *chan,
-> >                                      enum dma_transfer_direction direction,
-> >                                      u32 *mdma_ccr, u32 *mdma_ctcr,
-> > -                                    u32 *mdma_ctbr, u32 buf_len)
-> > +                                    u32 *mdma_ctbr, dma_addr_t addr,
-> > +                                    u32 buf_len)
-> >  {
-> >         struct stm32_mdma_device *dmadev = stm32_mdma_get_dev(chan);
-> >         struct stm32_mdma_chan_config *chan_config = &chan->chan_config;
-> > @@ -520,6 +527,9 @@ static int stm32_mdma_set_xfer_param(struct stm32_mdma_chan *chan,
-> >         ctcr &= ~STM32_MDMA_CTCR_LEN2_MSK;
-> >         ctcr |= STM32_MDMA_CTCR_TLEN((tlen - 1));
-> >
-> > +       /* Disable Pack Enable */
-> > +       ctcr &= ~STM32_MDMA_CTCR_PKE;
-> > +
-> >         /* Check burst size constraints */
-> >         if (src_maxburst * src_addr_width > STM32_MDMA_MAX_BURST ||
-> >             dst_maxburst * dst_addr_width > STM32_MDMA_MAX_BURST) {
-> > @@ -551,6 +561,8 @@ static int stm32_mdma_set_xfer_param(struct stm32_mdma_chan *chan,
-> >
-> >         switch (direction) {
-> >         case DMA_MEM_TO_DEV:
-> > +               dst_addr = chan->dma_config.dst_addr;
-> > +
-> >                 /* Set device data size */
-> >                 dst_bus_width = stm32_mdma_get_width(chan, dst_addr_width);
-> >                 if (dst_bus_width < 0)
-> > @@ -567,7 +579,7 @@ static int stm32_mdma_set_xfer_param(struct stm32_mdma_chan *chan,
-> >                 ctcr |= STM32_MDMA_CTCR_DBURST((ilog2(dst_best_burst)));
-> >
-> >                 /* Set memory data size */
-> > -               src_addr_width = stm32_mdma_get_max_width(buf_len, tlen);
-> > +               src_addr_width = stm32_mdma_get_max_width(addr, buf_len, tlen);
-> >                 chan->mem_width = src_addr_width;
-> >                 src_bus_width = stm32_mdma_get_width(chan, src_addr_width);
-> >                 if (src_bus_width < 0)
-> > @@ -587,15 +599,19 @@ static int stm32_mdma_set_xfer_param(struct stm32_mdma_chan *chan,
-> >                 ctcr |= STM32_MDMA_CTCR_SBURST((ilog2(src_best_burst)));
-> >
-> >                 /* Select bus */
-> > -               dst_addr = chan->dma_config.dst_addr;
-> >                 stm32_mdma_set_bus(dmadev, &ctbr, STM32_MDMA_CTBR_DBUS,
-> >                                    dst_addr);
-> >
-> > +               if (dst_bus_width != src_bus_width)
-> > +                       ctcr |= STM32_MDMA_CTCR_PKE;
-> > +
-> >                 /* Set destination address */
-> >                 stm32_mdma_write(dmadev, STM32_MDMA_CDAR(chan->id), dst_addr);
-> >                 break;
-> >
-> >         case DMA_DEV_TO_MEM:
-> > +               src_addr = chan->dma_config.src_addr;
-> > +
-> >                 /* Set device data size */
-> >                 src_bus_width = stm32_mdma_get_width(chan, src_addr_width);
-> >                 if (src_bus_width < 0)
-> > @@ -611,7 +627,7 @@ static int stm32_mdma_set_xfer_param(struct stm32_mdma_chan *chan,
-> >                 ctcr |= STM32_MDMA_CTCR_SBURST((ilog2(src_best_burst)));
-> >
-> >                 /* Set memory data size */
-> > -               dst_addr_width = stm32_mdma_get_max_width(buf_len, tlen);
-> > +               dst_addr_width = stm32_mdma_get_max_width(addr, buf_len, tlen);
-> >                 chan->mem_width = dst_addr_width;
-> >                 dst_bus_width = stm32_mdma_get_width(chan, dst_addr_width);
-> >                 if (dst_bus_width < 0)
-> > @@ -630,10 +646,12 @@ static int stm32_mdma_set_xfer_param(struct stm32_mdma_chan *chan,
-> >                 ctcr |= STM32_MDMA_CTCR_DBURST((ilog2(dst_best_burst)));
-> >
-> >                 /* Select bus */
-> > -               src_addr = chan->dma_config.src_addr;
-> >                 stm32_mdma_set_bus(dmadev, &ctbr, STM32_MDMA_CTBR_SBUS,
-> >                                    src_addr);
-> >
-> > +               if (dst_bus_width != src_bus_width)
-> > +                       ctcr |= STM32_MDMA_CTCR_PKE;
-> > +
-> >                 /* Set source address */
-> >                 stm32_mdma_write(dmadev, STM32_MDMA_CSAR(chan->id), src_addr);
-> >                 break;
-> > @@ -719,23 +737,27 @@ static int stm32_mdma_setup_xfer(struct stm32_mdma_chan *chan,
-> >                         return -EINVAL;
-> >                 }
-> >
-> > -               ret = stm32_mdma_set_xfer_param(chan, direction, &ccr, &ctcr,
-> > -                                               &ctbr, sg_dma_len(sg));
-> > -               if (ret < 0)
-> > -                       return ret;
-> > -
-> >                 if (direction == DMA_MEM_TO_DEV) {
-> >                         src_addr = sg_dma_address(sg);
-> >                         dst_addr = dma_config->dst_addr;
-> > +                       ret = stm32_mdma_set_xfer_param(chan, direction, &ccr,
-> > +                                                       &ctcr, &ctbr, src_addr,
-> > +                                                       sg_dma_len(sg));
-> >                         stm32_mdma_set_bus(dmadev, &ctbr, STM32_MDMA_CTBR_SBUS,
-> >                                            src_addr);
-> >                 } else {
-> >                         src_addr = dma_config->src_addr;
-> >                         dst_addr = sg_dma_address(sg);
-> > +                       ret = stm32_mdma_set_xfer_param(chan, direction, &ccr,
-> > +                                                       &ctcr, &ctbr, dst_addr,
-> > +                                                       sg_dma_len(sg));
-> >                         stm32_mdma_set_bus(dmadev, &ctbr, STM32_MDMA_CTBR_DBUS,
-> >                                            dst_addr);
-> >                 }
-> >
-> > +               if (ret < 0)
-> > +                       return ret;
-> > +
-> >                 stm32_mdma_setup_hwdesc(chan, desc, direction, i, src_addr,
-> >                                         dst_addr, sg_dma_len(sg), ctcr, ctbr,
-> >                                         i == sg_len - 1, i == 0, false);
-> > @@ -830,27 +852,29 @@ stm32_mdma_prep_dma_cyclic(struct dma_chan *c, dma_addr_t buf_addr,
-> >         if (!desc)
-> >                 return NULL;
-> >
-> > -       ret = stm32_mdma_set_xfer_param(chan, direction, &ccr, &ctcr, &ctbr,
-> > -                                       period_len);
-> > -       if (ret < 0)
-> > -               goto xfer_setup_err;
-> > -
-> > -       /* Enable interrupts */
-> > -       ccr &= ~STM32_MDMA_CCR_IRQ_MASK;
-> > -       ccr |= STM32_MDMA_CCR_TEIE | STM32_MDMA_CCR_CTCIE | STM32_MDMA_CCR_BTIE;
-> > -       desc->ccr = ccr;
-> > -
-> >         /* Select bus */
-> >         if (direction == DMA_MEM_TO_DEV) {
-> >                 src_addr = buf_addr;
-> > +               ret = stm32_mdma_set_xfer_param(chan, direction, &ccr, &ctcr,
-> > +                                               &ctbr, src_addr, period_len);
-> >                 stm32_mdma_set_bus(dmadev, &ctbr, STM32_MDMA_CTBR_SBUS,
-> >                                    src_addr);
-> >         } else {
-> >                 dst_addr = buf_addr;
-> > +               ret = stm32_mdma_set_xfer_param(chan, direction, &ccr, &ctcr,
-> > +                                               &ctbr, dst_addr, period_len);
-> >                 stm32_mdma_set_bus(dmadev, &ctbr, STM32_MDMA_CTBR_DBUS,
-> >                                    dst_addr);
-> >         }
-> >
-> > +       if (ret < 0)
-> > +               goto xfer_setup_err;
-> > +
-> > +       /* Enable interrupts */
-> > +       ccr &= ~STM32_MDMA_CCR_IRQ_MASK;
-> > +       ccr |= STM32_MDMA_CCR_TEIE | STM32_MDMA_CCR_CTCIE | STM32_MDMA_CCR_BTIE;
-> > +       desc->ccr = ccr;
-> > +
-> >         /* Configure hwdesc list */
-> >         for (i = 0; i < count; i++) {
-> >                 if (direction == DMA_MEM_TO_DEV) {
-> > @@ -956,9 +980,7 @@ stm32_mdma_prep_dma_memcpy(struct dma_chan *c, dma_addr_t dest, dma_addr_t src,
-> >                 ctcr |= STM32_MDMA_CTCR_TLEN((tlen - 1));
-> >
-> >                 /* Set source best burst size */
-> > -               max_width = stm32_mdma_get_max_width(len, tlen);
-> > -               if (src % max_width)
-> > -                       max_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-> > +               max_width = stm32_mdma_get_max_width(src, len, tlen);
-> >                 src_bus_width = stm32_mdma_get_width(chan, max_width);
-> >
-> >                 max_burst = tlen / max_width;
-> > @@ -971,9 +993,7 @@ stm32_mdma_prep_dma_memcpy(struct dma_chan *c, dma_addr_t dest, dma_addr_t src,
-> >                         STM32_MDMA_CTCR_SINCOS(src_bus_width);
-> >
-> >                 /* Set destination best burst size */
-> > -               max_width = stm32_mdma_get_max_width(len, tlen);
-> > -               if (dest % max_width)
-> > -                       max_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-> > +               max_width = stm32_mdma_get_max_width(dest, len, tlen);
-> >                 dst_bus_width = stm32_mdma_get_width(chan, max_width);
-> >
-> >                 max_burst = tlen / max_width;
-> > @@ -1014,9 +1034,7 @@ stm32_mdma_prep_dma_memcpy(struct dma_chan *c, dma_addr_t dest, dma_addr_t src,
-> >                                            STM32_MDMA_MAX_BLOCK_LEN);
-> >
-> >                         /* Set source best burst size */
-> > -                       max_width = stm32_mdma_get_max_width(len, tlen);
-> > -                       if (src % max_width)
-> > -                               max_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-> > +                       max_width = stm32_mdma_get_max_width(src, len, tlen);
-> >                         src_bus_width = stm32_mdma_get_width(chan, max_width);
-> >
-> >                         max_burst = tlen / max_width;
-> > @@ -1030,9 +1048,7 @@ stm32_mdma_prep_dma_memcpy(struct dma_chan *c, dma_addr_t dest, dma_addr_t src,
-> >                                 STM32_MDMA_CTCR_SINCOS(src_bus_width);
-> >
-> >                         /* Set destination best burst size */
-> > -                       max_width = stm32_mdma_get_max_width(len, tlen);
-> > -                       if (dest % max_width)
-> > -                               max_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-> > +                       max_width = stm32_mdma_get_max_width(dest, len, tlen);
-> >                         dst_bus_width = stm32_mdma_get_width(chan, max_width);
-> >
-> >                         max_burst = tlen / max_width;
-> > --
-> > 2.7.4
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
-> 
-> -- 
-> Benjamin Gaignard
-> 
-> Graphic Study Group
-> 
-> Linaro.org ? Open source software for ARM SoCs
-> 
-> Follow Linaro: Facebook | Twitter | Blog
-> --
-> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+There are no carriage returns, just line feeds, which makes for a very 
+ugly display.
 
--- 
-~Vinod
+
+For example:
+
+Booting Linux...
+[    0.000000] Booting Linux on physical CPU 0x0
+                                                [    0.000000] Linux version 4.14.0-rc5-00014-g5689707d65e6 (chris at ubuntu) (gcc version 5.4.1 20161213 (Linaro GCC 5.4-2017.01)) #735 Mon Oct 30 12:59:37 EST 2017
+                                                                                          [    0.000000] CPU: ARMv7 Processor [413fc090] revision 0 (ARMv7), cr=58c53c7d
+                                                [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
+               [    0.000000] OF: fdt: Machine model: RSKRZA1
+                                                             [    0.000000] debug: ignoring loglevel setting.
+                                                                                                             [    0.000000] bootconsole [earlycon0] enabled
+                                   [    0.000000] Memory policy: Data cache writeback
+                                                                                     [    0.000000] On node 0 totalpages: 8192
+      [    0.000000] free_area_init_node: node 0, pgdat c003dfb4, node_mem_map c1fb8000
+                                                                                       [    0.000000]   Normal zone: 64 pages used for memmap
+                     [    0.000000]   Normal zone: 0 pages reserved
+                                                                   [    0.000000]   Normal zone: 8192 pages, LIFO batch:0
+ [    0.000000] CPU: All CPU(s) started in SVC mode.
+
+
+
+
+Of course as soon as the normal console driver is loaded later it boot, 
+everything looks fine again. But I use early_printk a lot, so I wonder 
+if I could get my carriage returns back.
+
+Chris
