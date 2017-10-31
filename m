@@ -1,43 +1,88 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Tue, 31 Oct 2017 08:46:54 -0400
-Subject: [PATCH v3 0/7] Support PPTT for ARM64
-In-Reply-To: <20171012194856.13844-1-jeremy.linton@arm.com>
-References: <20171012194856.13844-1-jeremy.linton@arm.com>
-Message-ID: <82688148-de6c-8538-dec8-51c94dc4f068@redhat.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 31 Oct 2017 12:47:08 +0000
+Subject: [PATCH] ARM: add a private asm/unaligned.h
+In-Reply-To: <20171030163816.GA27404@n2100.armlinux.org.uk>
+References: <20171020200231.1355569-1-arnd@arndb.de>
+ <87wp3g39es.fsf@free-electrons.com>
+ <20171027152743.GJ20805@n2100.armlinux.org.uk>
+ <87k1zc3fxp.fsf@free-electrons.com>
+ <20171030154855.GO20805@n2100.armlinux.org.uk>
+ <87bmko1v6f.fsf@free-electrons.com>
+ <20171030161207.GS20805@n2100.armlinux.org.uk>
+ <8737601u4d.fsf@free-electrons.com>
+ <20171030163816.GA27404@n2100.armlinux.org.uk>
+Message-ID: <20171031124707.GD9463@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/12/2017 03:48 PM, Jeremy Linton wrote:
-
-> ACPI 6.2 adds the Processor Properties Topology Table (PPTT), which is
-> used to describe the processor and cache topology. Ideally it is
-> used to extend/override information provided by the hardware, but
-> right now ARM64 is entirely dependent on firmware provided tables.
+On Mon, Oct 30, 2017 at 04:38:17PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Oct 30, 2017 at 05:24:34PM +0100, Gregory CLEMENT wrote:
+> > Hi Russell King,
+> >  
+> > Here you will find all the objects included the vmlinux:
+> > 
+> > http://free-electrons.com/~gregory/pub/compressed.tgz
 > 
-> This patch parses the table for the cache topology and CPU topology.
-> For the latter we also add an additional topology_cod_id() macro,
-> and a package_id for arm64. Initially the physical id will match
-> the cluster id, but we update users of the cluster to utilize
-> the new macro. When we enable ACPI/PPTT for arm64 we map the socket
-> to the physical id as the remainder of the kernel expects.
+> Thanks.  Unfortunately, nothing stands out, but I do see a difference
+> between the output of your linker from mine.
+> 
+> Yours:
+> 
+> Idx Name          Size      VMA       LMA       File off  Algn
+>   0 .text         00005ef8  00000000  00000000  00010000  2**5
+>                   CONTENTS, ALLOC, LOAD, READONLY, CODE
+> 
+> Mine:
+> 
+> Idx Name          Size      VMA       LMA       File off  Algn
+>   0 .text         00005f00  00000000  00000000  00010000  2**5
+>                   CONTENTS, ALLOC, LOAD, READONLY, CODE
+> 
+> That has the effect of moving the addresses of the following
+> sections in your vmlinux down by 8 bytes.  However, I don't think
+> that's the cause of this - but it does hint at something being
+> different in binutils in the way sections are processed in the
+> linker.
+> 
+> Please add to your linker script after the assignment of _edata:
+> 
+>   .image_end (NOLOAD) : {
+>     _edata_foo = .;
+>   }
+> 
+> relink the decompressor, and see what value _edata_foo ends up with
+> compared to _edata?  They should be the same, but I suspect using
+> your linker, they will be different.
+> 
+> Also try adding
+>     BYTE(0);
+> 
+> after the _edata_foo assignment as a separate test, and see whether
+> that makes any difference - with that you should end up with the
+> .image_end section in the output image.
 
-Just wanted to thank you for doing this Jeremy. As you know, we're
-tracking these patches and working with multiple vendors to ensure that
-firmware has accurate PPTTs populated to match. We're expecting to pull
-these patches and replace our current RHEL-only kludge asap. RHEL
-currently has to kludge topology based upon magic "known" meanings of
-the MPIDRs on various server platforms. It's (known to be) ugly and is
-one of the reasons that we pushed for what became PPTT.
+Gregory sent me has new url... for _both_ changes, which gives me:
 
-Beyond scheduler efficiency, in general, it's very important that Arm
-systems can correctly report x86 style topology industry conventions -
-especially sockets - since (and I told Arm this years ago, and other
-non-Linux vendors backed me up) it's typical on server platforms to use
-either "memory" or "number of sockets" when making licensing and
-subscription calculations in various tooling. This became a problem
-early on even with X-Gene1 and Seattle showing as 8 socket boxes ;)
+$ arm-linux-nm vmlinux |grep _edata
+00491160 D _edata
+00491160 D _edata_foo
 
-Jon.
+So there's no reason that ASSERT() should be failing!  However, as I
+don't have the intermediate step, I can't say whether the addition
+of the BYTE() affected it in some way - sorry, but I asked for _both_
+to be tested above because I wanted to speed up the process, and
+clearly that's backfired.
+
+Given how close we potentially are to 4.14, I don't think we're going
+to get to the bottom of this to make 4.14.  I'd want to get this
+sorted by Wednesday so linux-next (which is resuming this evening)
+can grab a copy of my tree with it in, and we have another day to
+sort out any remaining issues, but I'm basically out of time to do
+anything further with this as of now.
+
+So, 4.14 will likely be released without any of this being fixed.
 
 -- 
-Computer Architect | Sent from my Fedora powered laptop
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
