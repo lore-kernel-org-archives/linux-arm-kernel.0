@@ -1,36 +1,42 @@
 From: elder@linaro.org (Alex Elder)
-Date: Tue, 31 Oct 2017 07:58:08 -0500
-Subject: [PATCH v2 3/3] arm64: defconfig: remove CONFIG_USB_QCOM_8X16_PHY
-In-Reply-To: <20171031125808.7300-1-elder@linaro.org>
-References: <20171031125808.7300-1-elder@linaro.org>
-Message-ID: <20171031125808.7300-4-elder@linaro.org>
+Date: Tue, 31 Oct 2017 08:11:28 -0500
+Subject: [PATCH v3 0/3] usb: remove some unused code
+Message-ID: <20171031131131.8099-1-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No Qualcomm SoC requires the "phy-qcom-8x16-usb.c" USB phy driver
-support any more.  Remove the code, and remove the config option
-from the arm64 defconfig.
+This series deletes some Qualcomm USB code is no longer needed by
+any Qualcomm hardware.  A separate series deletes the Kconfig
+options that enable building this code from the ARM64 defconfig.
 
-Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
-Signed-off-by: Alex Elder <elder@linaro.org>
-Reviewed-by: Amit Kucheria <amit.kucheria@linaro.org>
-Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-Acked-by: Andy Gross <andy.gross@linaro.org>
----
- arch/arm64/configs/defconfig | 1 -
- 1 file changed, 1 deletion(-)
+With these drivers, host and gadget mode were implemented separately
+for the same hardware, which is inherently racy and broken.  These
+drivers have not really been needed since Stephen Boyd reworked the
+ChipIdea driver to support these platforms.
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 85ca53f59c3e..22ca89e58d9d 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -425,7 +425,6 @@ CONFIG_USB_CHIPIDEA_HOST=y
- CONFIG_USB_ISP1760=y
- CONFIG_USB_HSIC_USB3503=y
- CONFIG_NOP_USB_XCEIV=y
--CONFIG_USB_QCOM_8X16_PHY=y
- CONFIG_USB_ULPI=y
- CONFIG_USB_GADGET=y
- CONFIG_USB_RENESAS_USBHS_UDC=m
+					-Alex
+
+v3: - rebased, and expanded the above description; no functional change
+v2: - delete sections of Kconfig files that control whether the deleted
+      code gets built
+
+
+Alex Elder (3):
+  usb: host: remove ehci-msm.c
+  usb: phy: remove phy-msm-usb.c
+  usb: phy: remove phy-qcom-8x16-usb.c
+
+ drivers/usb/host/Kconfig            |   12 -
+ drivers/usb/host/Makefile           |    1 -
+ drivers/usb/host/ehci-msm.c         |  265 -----
+ drivers/usb/phy/Kconfig             |   29 -
+ drivers/usb/phy/Makefile            |    2 -
+ drivers/usb/phy/phy-msm-usb.c       | 2085 -----------------------------------
+ drivers/usb/phy/phy-qcom-8x16-usb.c |  366 ------
+ 7 files changed, 2760 deletions(-)
+ delete mode 100644 drivers/usb/host/ehci-msm.c
+ delete mode 100644 drivers/usb/phy/phy-msm-usb.c
+ delete mode 100644 drivers/usb/phy/phy-qcom-8x16-usb.c
+
 -- 
 2.11.0
