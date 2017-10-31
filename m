@@ -1,60 +1,61 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 31 Oct 2017 17:23:13 +0000
-Subject: [PATCH v9 3/8] coresight: of: Use of_cpu_node_to_id helper
+Date: Tue, 31 Oct 2017 17:23:17 +0000
+Subject: [PATCH v9 7/8] dt-bindings: Document devicetree binding for ARM DSU
+ PMU
 In-Reply-To: <20171031172318.11823-1-suzuki.poulose@arm.com>
 References: <20171031172318.11823-1-suzuki.poulose@arm.com>
-Message-ID: <20171031172318.11823-4-suzuki.poulose@arm.com>
+Message-ID: <20171031172318.11823-8-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reuse the new generic helper, of_cpu_node_to_id() to map a
-given CPU phandle to a logical CPU number.
+This patch documents the devicetree bindings for ARM DSU PMU.
 
-Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Tested-by: Leo Yan <leo.yan@linaro.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: devicetree at vger.kernel.org
+Cc: frowand.list at gmail.com
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
-Changes since V4:
- - Fix a regression introduced in v4, reported by bugrobot
 Changes since V3:
- - Reflect the renaming of the helper and return value changes
+ - Fixed node name in the example, suggested by Rob
 ---
- drivers/hwtracing/coresight/of_coresight.c | 15 +++------------
- 1 file changed, 3 insertions(+), 12 deletions(-)
+ .../devicetree/bindings/arm/arm-dsu-pmu.txt        | 27 ++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/arm-dsu-pmu.txt
 
-diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
-index a18794128bf8..7c375443ede6 100644
---- a/drivers/hwtracing/coresight/of_coresight.c
-+++ b/drivers/hwtracing/coresight/of_coresight.c
-@@ -104,26 +104,17 @@ static int of_coresight_alloc_memory(struct device *dev,
- int of_coresight_get_cpu(const struct device_node *node)
- {
- 	int cpu;
--	bool found;
--	struct device_node *dn, *np;
-+	struct device_node *dn;
- 
- 	dn = of_parse_phandle(node, "cpu", 0);
--
- 	/* Affinity defaults to CPU0 */
- 	if (!dn)
- 		return 0;
--
--	for_each_possible_cpu(cpu) {
--		np = of_cpu_device_node_get(cpu);
--		found = (dn == np);
--		of_node_put(np);
--		if (found)
--			break;
--	}
-+	cpu = of_cpu_node_to_id(dn);
- 	of_node_put(dn);
- 
- 	/* Affinity to CPU0 if no cpu nodes are found */
--	return found ? cpu : 0;
-+	return (cpu < 0) ? 0 : cpu;
- }
- EXPORT_SYMBOL_GPL(of_coresight_get_cpu);
- 
+diff --git a/Documentation/devicetree/bindings/arm/arm-dsu-pmu.txt b/Documentation/devicetree/bindings/arm/arm-dsu-pmu.txt
+new file mode 100644
+index 000000000000..6efabba530f1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/arm-dsu-pmu.txt
+@@ -0,0 +1,27 @@
++* ARM DynamIQ Shared Unit (DSU) Performance Monitor Unit (PMU)
++
++ARM DyanmIQ Shared Unit (DSU) integrates one or more CPU cores
++with a shared L3 memory system, control logic and external interfaces to
++form a multicore cluster. The PMU enables to gather various statistics on
++the operations of the DSU. The PMU provides independent 32bit counters that
++can count any of the supported events, along with a 64bit cycle counter.
++The PMU is accessed via CPU system registers and has no MMIO component.
++
++** DSU PMU required properties:
++
++- compatible	: should be one of :
++
++		"arm,dsu-pmu"
++
++- interrupts	: Exactly 1 SPI must be listed.
++
++- cpus		: List of phandles for the CPUs connected to this DSU instance.
++
++
++** Example:
++
++dsu-pmu-0 {
++	compatible = "arm,dsu-pmu";
++	interrupts = <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>;
++	cpus = <&cpu_0>, <&cpu_1>;
++};
 -- 
 2.13.6
