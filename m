@@ -1,68 +1,39 @@
-From: cyrille.pitchen@wedev4u.fr (Cyrille Pitchen)
-Date: Tue, 31 Oct 2017 01:42:30 +0100
-Subject: linux-next: manual merge of the spi-nor tree with the imx-mxs tree
-In-Reply-To: <20171030181551.skcvt4mr4br7rtn2@sirena.co.uk>
-References: <20171030181551.skcvt4mr4br7rtn2@sirena.co.uk>
-Message-ID: <d38cf683-c7a8-51b1-896a-ff1fda0f64f9@wedev4u.fr>
+From: wenyou.yang@microchip.com (Wenyou Yang)
+Date: Tue, 31 Oct 2017 09:11:42 +0800
+Subject: [PATCH v4 0/3] media: ov7740: Add a V4L2 sensor-level driver
+Message-ID: <20171031011146.6899-1-wenyou.yang@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Add a Video4Linux2 sensor-level driver for the OmniVision OV7740
+VGA camera image sensor.
 
-+ Marek
+Changes in v4:
+ - Assign 'val' a initial value to avoid warning: 'val' may be
+   used uninitialized.
+ - Rename REG_REG15 to avoid warning: "REG_REG15" redefined.
 
-Mark, thanks for this report.
+Changes in v3:
+ - Explicitly document the "remote-endpoint" property.
+ - Put the MAINTAINERS change to a separate patch.
 
-Shawn, Yuan, if I don't make a mistake, patch "dt-bindings: mtd: add sst25wf040b
-and en25s64 to sip-nor list" was not submitted to the linux-mtd mailing list
-hence was neither reviewed nor acked by any spi-nor maintainer. If so, such a
-patch should then be taken from the spi-nor/next branch of the l2-mtd tree.
+Changes in v2:
+ - Split off the bindings into a separate patch.
+ - Add a new entry to the MAINTAINERS file.
 
-So Shawn, could you please remove this patch from your tree ?
+Wenyou Yang (3):
+  media: i2c: Add the ov7740 image sensor driver
+  media: ov7740: Document device tree bindings
+  MAINTAINERS: Add a new entry of the ov7740 driver
 
-Yuan, could you please submit your patch to the linux-mtd mailing list for
-proper review ?
+ .../devicetree/bindings/media/i2c/ov7740.txt       |   47 +
+ MAINTAINERS                                        |    8 +
+ drivers/media/i2c/Kconfig                          |    8 +
+ drivers/media/i2c/Makefile                         |    1 +
+ drivers/media/i2c/ov7740.c                         | 1220 ++++++++++++++++++++
+ 5 files changed, 1284 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/i2c/ov7740.txt
+ create mode 100644 drivers/media/i2c/ov7740.c
 
-Best regards,
-
-Cyrille
-
-
-Le 30/10/2017 ? 19:15, Mark Brown a ?crit :
-> Hi Cyrille,
-> 
-> Today's linux-next merge of the spi-nor tree got a conflict in:
-> 
->   Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
-> 
-> between commit:
-> 
->   b07815d4eaf65 ("dt-bindings: mtd: add sst25wf040b and en25s64 to sip-nor list")
-> 
-> from the imx-mxs tree and commit:
-> 
->    282e45dc64d1 ("mtd: spi-nor: Add support for mr25h128")
-> 
-> from the spi-nor tree.
-> 
-> I fixed it up (see below) and can carry the fix as necessary. This
-> is now fixed as far as linux-next is concerned, but any non trivial
-> conflicts should be mentioned to your upstream maintainer when your tree
-> is submitted for merging.  You may also want to consider cooperating
-> with the maintainer of the conflicting tree to minimise any particularly
-> complex conflicts.
-> 
-> diff --cc Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
-> index 4cab5d85cf6f,956bb046e599..000000000000
-> --- a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
-> +++ b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
-> @@@ -13,7 -13,7 +13,8 @@@ Required properties
->                    at25df321a
->                    at25df641
->                    at26df081a
->  +                 en25s64
-> +                  mr25h128
->                    mr25h256
->                    mr25h10
->                    mr25h40
-> 
+-- 
+2.13.0
