@@ -1,86 +1,49 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 31 Oct 2017 11:43:42 +0000
-Subject: [PATCH v4 20/21] KVM: arm64: Take any host SError before entering
- the guest
-In-Reply-To: <20171031062315.GY2166@lvm>
-References: <20171019145807.23251-1-james.morse@arm.com>
- <20171019145807.23251-21-james.morse@arm.com> <20171031062315.GY2166@lvm>
-Message-ID: <59F861EE.4010505@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 31 Oct 2017 11:51:56 +0000
+Subject: [PATCH] arm64: support __int128 on gcc 5+
+In-Reply-To: <20171031114319.24436-1-Jason@zx2c4.com>
+References: <CAHmME9pE+G0V-nyKchQyG03YXbPjGykL1xX0M8E544Rh7QrgOQ@mail.gmail.com>
+ <20171031114319.24436-1-Jason@zx2c4.com>
+Message-ID: <20171031115156.GF5584@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
-
-On 31/10/17 06:23, Christoffer Dall wrote:
-> On Thu, Oct 19, 2017 at 03:58:06PM +0100, James Morse wrote:
->> On VHE systems KVM masks SError before switching the VBAR value. Any
->> host RAS error that the CPU knew about before world-switch may become
->> pending as an SError during world-switch, and only be taken once we enter
->> the guest.
->>
->> Until KVM can take RAS SErrors during world switch, add an ESB to
->> force any RAS errors to be synchronised and taken on the host before
->> we enter world switch.
->>
->> RAS errors that become pending during world switch are still taken
->> once we enter the guest.
-
->> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->> index cf5d78ba14b5..5dc6f2877762 100644
->> --- a/arch/arm64/include/asm/kvm_host.h
->> +++ b/arch/arm64/include/asm/kvm_host.h
->> @@ -392,6 +392,7 @@ static inline void __cpu_init_stage2(void)
->>  
->>  static inline void kvm_arm_vhe_guest_enter(void)
->>  {
->> +	esb();
-
-> I don't fully appreciate what the point of this is?
+On Tue, Oct 31, 2017 at 12:43:19PM +0100, Jason A. Donenfeld wrote:
+> Versions of gcc prior to gcc 5 emitted a __multi3 function call when
+> dealing with TI types, resulting in failures when trying to link to
+> libgcc, and more generally, horrible performance. However, since gcc 5,
+> the compiler supports actually emitting fast instructions, which means
+> we can at long last enable this option and receive the speedups.
 > 
-> As I understand it, our fundamental goal here is to try to distinguish
-> between errors happening on the host or in the guest.
+> The gcc commit that added proper Aarch64 support is:
+> https://gcc.gnu.org/git/?p=gcc.git;a=commitdiff;h=d1ae7bb994f49316f6f63e6173f2931e837a351d
+> 
+> This commit appears to be part of the gcc 5 release.
+> 
+> Signed-off-by: Jason A. Donenfeld <Jason@zx2c4.com>
+> ---
+>  arch/arm64/Makefile | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+> index 939b310913cf..1f8a0fec6998 100644
+> --- a/arch/arm64/Makefile
+> +++ b/arch/arm64/Makefile
+> @@ -53,6 +53,8 @@ KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst)
+>  KBUILD_CFLAGS	+= $(call cc-option,-mabi=lp64)
+>  KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
+>  
+> +KBUILD_CFLAGS	+= $(call cc-ifversion, -ge, 0500, -DCONFIG_ARCH_SUPPORTS_INT128)
+> +
+>  ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
+>  KBUILD_CPPFLAGS	+= -mbig-endian
+>  CHECKFLAGS	+= -D__AARCH64EB__
 
-Not just host/guest, but also those we can and can't handle.
+Which code in the kernel actually uses 128-bit types directly? I know we
+have some unfortunate occurences in our headers (including uapi) for the
+vector registers, but I thought we generally used asm or copy routines to
+access those.
 
-KVM can't currently take an SError during world switch, so a RAS error that the
-CPU was hoping to defer may spread from the host into KVM's
-no-SError:world-switch code. If this happens it will (almost certainly) have to
-be re-classified as uncontainable.
+Are you seeing a performance issue without this?
 
-There is also a firmware-first angle here: NOTIFY_SEI can't be delivered if the
-normal world has SError masked, so any error that spreads past this point
-becomes a reboot-by-firmware instead of an OS notification and almost-helpful
-error message.
-
-
-> If that's correct, then why don't we do it at the last possible moment
-> when we still have a scratch register left, in the world switch code
-> itself, and in the case abort the guest entry and report back a "host
-> SError" return code.
-
-We have IESB to run the error-barrier as we enter the guest. This would make any
-host error pending as an SError, and we would exit the guest immediately. But if
-there was an RAS error during world switch, by this point its likely to be
-classified as uncontainable.
-
-This esb() is trying to keep this window of code as small as possible, to just
-errors that occur during world switch.
-
-With your vcpu load/save this window becomes a lot smaller, it may be possible
-to get a VHE-host's arch-code SError handler to take errors from EL2, in which
-case this barrier can disappear.
-(note to self: guest may still own the debug hardware)
-
-
-Thanks,
-
-James
-
-
-> If the answer to that question is, that since we will always have some
-> instruction window before entering the guest and things will never be
-> precise anyway, so we do it here where it's more convenient, then my
-> counter-question would be why we do it at all then?  If we're not
-> precise anyway, then why not simply take our chances and hope that the
-> hardware delivers the SError before we mask them, and if not, tough
-> luck?
+Will
