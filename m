@@ -1,42 +1,35 @@
-From: bp@suse.de (Borislav Petkov)
-Date: Tue, 31 Oct 2017 20:09:47 +0100
-Subject: [RFC/RFT PATCH 2/6] x86/mm/fixmap: Add GHES fixmap entries
-In-Reply-To: <20171031153832.17746-3-james.morse@arm.com>
-References: <20171031153832.17746-1-james.morse@arm.com>
- <20171031153832.17746-3-james.morse@arm.com>
-Message-ID: <20171031190947.gmbr67etuoanhu6n@pd.tnic>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Tue, 31 Oct 2017 21:05:57 +0200
+Subject: [PATCH 2/4] gpiolib: add bitmask for valid GPIO lines
+In-Reply-To: <02208047-38c8-f97b-5c53-6cced7bdecc6@codeaurora.org>
+References: <1509396602-1936-1-git-send-email-timur@codeaurora.org>
+ <1509396602-1936-3-git-send-email-timur@codeaurora.org>
+ <1509441149.10233.80.camel@linux.intel.com>
+ <02208047-38c8-f97b-5c53-6cced7bdecc6@codeaurora.org>
+Message-ID: <1509476757.10233.143.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 31, 2017 at 03:38:28PM +0000, James Morse wrote:
-> GHES is switching to use fixmap for its dynamic mapping of CPER records,
-> to avoid using ioremap_page_range() in IRQ/NMI context.
+On Tue, 2017-10-31 at 13:54 -0500, Timur Tabi wrote:
+> On 10/31/2017 04:12 AM, Andy Shevchenko wrote:
+> > Instead of mangling this function wouldn't be better to introduce a
+> > separate one for line and perhaps a third one which calls them both?
 > 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> ---
->  arch/x86/include/asm/fixmap.h | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/x86/include/asm/fixmap.h b/arch/x86/include/asm/fixmap.h
-> index dcd9fb55e679..be3cc32db7f0 100644
-> --- a/arch/x86/include/asm/fixmap.h
-> +++ b/arch/x86/include/asm/fixmap.h
-> @@ -104,6 +104,10 @@ enum fixed_addresses {
->  	FIX_GDT_REMAP_BEGIN,
->  	FIX_GDT_REMAP_END = FIX_GDT_REMAP_BEGIN + NR_CPUS - 1,
->  
-> +	/* Used for GHES mapping from assorted contexts */
-> +	FIX_APEI_GHES_IRQ,
-> +	FIX_APEI_GHES_NMI,
+> The diff is convoluted, but the end result is clean:
 
-Maybe I'm missing something but shouldn't those two be inside
-CONFIG_ACPI_APEI_GHES ifdeffery?
+> Is this acceptable?
 
-Ditto for the ARM side.
+I also put in the comment the following:
+
+--- 8< --- 8< --- 8< ---
+
+...for my opinion it will drastically increase readability and reduce
+diff as well (better for review).
+
+--- 8< --- 8< --- 8< ---
+
+The decision is up to Linus. I simple shared my opinion.
 
 -- 
-Regards/Gruss,
-    Boris.
-
-SUSE Linux GmbH, GF: Felix Imend?rffer, Jane Smithard, Graham Norton, HRB 21284 (AG N?rnberg)
--- 
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
