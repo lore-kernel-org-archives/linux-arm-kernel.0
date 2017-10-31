@@ -1,65 +1,50 @@
-From: salyzyn@android.com (Mark Salyzyn)
-Date: Tue, 31 Oct 2017 11:32:02 -0700
-Subject: [PATCH v4 07/12] arm: vdso: disable profiling
-Message-ID: <20171031183205.81190-1-salyzyn@android.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Tue, 31 Oct 2017 13:54:56 -0500
+Subject: [PATCH 2/4] gpiolib: add bitmask for valid GPIO lines
+In-Reply-To: <1509441149.10233.80.camel@linux.intel.com>
+References: <1509396602-1936-1-git-send-email-timur@codeaurora.org>
+ <1509396602-1936-3-git-send-email-timur@codeaurora.org>
+ <1509441149.10233.80.camel@linux.intel.com>
+Message-ID: <02208047-38c8-f97b-5c53-6cced7bdecc6@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Take an effort to recode the arm64 vdso code from assembler to C
-previously submitted by Andrew Pinski <apinski@cavium.com>, rework
-it for use in both arm and arm64, overlapping any optimizations
-for each architecture. But instead of landing it in arm64, land the
-result into lib/vdso and unify both implementations to simplify
-future maintenance.
+On 10/31/2017 04:12 AM, Andy Shevchenko wrote:
+> Instead of mangling this function wouldn't be better to introduce a
+> separate one for line and perhaps a third one which calls them both?
 
-Make sure kasan and ubsan profiling, and kcov instrumentation,
-is turned off for VDSO code.
+The diff is convoluted, but the end result is clean:
 
-Signed-off-by: Mark Salyzyn <salyzyn@android.com>
-Cc: James Morse <james.morse@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Andy Lutomirski <luto@amacapital.net>
-Cc: Dmitry Safonov <dsafonov@virtuozzo.com>
-Cc: John Stultz <john.stultz@linaro.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Laura Abbott <labbott@redhat.com>
-Cc: Kees Cook <keescook@chromium.org>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Andy Gross <andy.gross@linaro.org>
-Cc: Kevin Brodsky <kevin.brodsky@arm.com>
-Cc: Andrew Pinski <apinski@cavium.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
+static int gpiochip_irqchip_init_valid_mask(struct gpio_chip *gpiochip)
+{
+	if (gpiochip->irq_need_valid_mask) {
+		gpiochip->irq_valid_mask =
+			kcalloc(BITS_TO_LONGS(gpiochip->ngpio),
+				sizeof(long), GFP_KERNEL);
+		if (!gpiochip->irq_valid_mask)
+			return -ENOMEM;
 
-v2:
-- Added this to the split up of first CL, based on comments in second CL
+		/* Assume by default all GPIOs are valid */
+		bitmap_fill(gpiochip->irq_valid_mask, gpiochip->ngpio);
+	}
 
-v4:
-- update commit message to reflect overall reasoning
+	if (gpiochip->line_need_valid_mask) {
+		gpiochip->line_valid_mask =
+			kcalloc(BITS_TO_LONGS(gpiochip->ngpio),
+				sizeof(long), GFP_KERNEL);
+		if (!gpiochip->line_valid_mask)
+			return -ENOMEM;
 
----
- arch/arm/vdso/Makefile | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+		/* Assume by default all GPIOs are valid */
+		bitmap_fill(gpiochip->line_valid_mask, gpiochip->ngpio);
+	}
 
-diff --git a/arch/arm/vdso/Makefile b/arch/arm/vdso/Makefile
-index 59a8fa7b8a3b..1ce912ab47cc 100644
---- a/arch/arm/vdso/Makefile
-+++ b/arch/arm/vdso/Makefile
-@@ -26,8 +26,11 @@ CFLAGS_REMOVE_vdso.o = -pg
- CFLAGS_REMOVE_vgettimeofday.o = -pg -Os
- CFLAGS_vgettimeofday.o = -O2
- 
--# Disable gcov profiling for VDSO code
-+# Disable gcov, kasan, ubsan and kcov profiling for VDSO code
- GCOV_PROFILE := n
-+KASAN_SANITIZE := n
-+UBSAN_SANITIZE := n
-+KCOV_INSTRUMENT := n
- 
- # Force dependency
- $(obj)/vdso.o : $(obj)/vdso.so
+	return 0;
+}
+
+Is this acceptable?
+
 -- 
-2.15.0.rc2.357.g7e34df9404-goog
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
