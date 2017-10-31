@@ -1,55 +1,34 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 31 Oct 2017 16:56:29 +0000
-Subject: [RFC] Improving udelay/ndelay on platforms where that is possible
-In-Reply-To: <CA+55aFzy9=RtFRuJhFbF+PL_PCrkZsKtAKrq6WJo1z9eW9gLSA@mail.gmail.com>
-References: <d3f42f35-8175-58f6-78b7-3331efe64da2@sigmadesigns.com>
- <CA+55aFzy9=RtFRuJhFbF+PL_PCrkZsKtAKrq6WJo1z9eW9gLSA@mail.gmail.com>
-Message-ID: <20171031165629.GF9463@n2100.armlinux.org.uk>
+From: tpiepho@impinj.com (Trent Piepho)
+Date: Tue, 31 Oct 2017 16:57:42 +0000
+Subject: [PATCH v2 1/4] spi: imx: GPIO based chip selects should not be
+ required
+In-Reply-To: <20171031111919.gocl7wwrhkwnxrya@sirena.co.uk>
+References: <20171027010841.28624-1-tpiepho@impinj.com>
+ <20171027010841.28624-2-tpiepho@impinj.com>
+ <20171031111919.gocl7wwrhkwnxrya@sirena.co.uk>
+Message-ID: <1509469061.5473.16.camel@impinj.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 31, 2017 at 09:44:20AM -0700, Linus Torvalds wrote:
-> On Tue, Oct 31, 2017 at 9:15 AM, Marc Gonzalez
-> <marc_gonzalez@sigmadesigns.com> wrote:
-> >
-> > On arm32, it is possible to set up udelay() to be clock-based.
+On Tue, 2017-10-31 at 11:19 +0000, Mark Brown wrote:
+> On Thu, Oct 26, 2017 at 06:08:38PM -0700, Trent Piepho wrote:
+> > The driver will fail to load if no gpio chip selects are specified,
+> > this patch changes this so that it no longer fails.
+> > 
+> > It's possible to use all native chip selects, in which case there is
+> > no reason to have a gpio chip select array.  This is what happens if
+> > the *optional* device tree property "cs-gpios" is omitted.
 > 
-> I'm not sure why this is discussed as some kind of generic problem.
+> Do the native chip selects actually work usefully on this hardware?
+> There used to be problems with it wanting to do things like bounce the
+> chip select on every word which made it extremely difficult to use with
+> Linux.
 
-Hi Linus,
+Still are annoying, but on the device we have connected to it, it ends
+up working as desired.
 
-Marc is stating something that's incorrect there.  On ARM32, we don't
-have a TSC, and we aren't guaranteed to have a timer usable for delays.
-Where there is a suitable timer, it can be used for delays.
-
-However, where there isn't a timer, we fall back to using the software
-loop, and that's where the problem lies.  For example, some platforms
-have a relatively slow timer (32kHz).
-
-This centres around is the discussion we had previously:
-
-  http://lists.openwall.net/linux-kernel/2011/01/12/372
-
-where errors of 5% are very much in the "don't care" category for
-udelay() - so if udelay() returns early by 5%, we don't care.
-
-Marc, however, does want to care about udelay() etc returning early,
-because he wants his NAND driver to be performant, despite using
-udelay()/ndelay() in critical paths.  So his argument is that udelay()
-and ndelay() should be accurate, and certainly not return early.
-
-Marc's motivation here is to try and force me to "fix" the ARM and
-generic loops_per_jiffy code so that these functions provide accurate
-delays.  I've said no, based on what we discussed back in 2011.
-
-There's the issue too of the timer-based delay code possibly returning
-one timer tick early, which at reasonable timer resolutions is pretty
-small.  I don't want to do that, as it encourages people to use data-
-sheet values in udelay() and ndelay() without any cushioning, and so
-the drivers end up breaking if we fall back to using the software loop
-delays - which we know for a fact will return early.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+I've not thoroughly investigated this hardware to find the details. 
+IIRC, the designware SPI on Altera SoCFPGA had the same issue, but it
+was a flaw in the driver and I was able to fix it.  I've come to expect
+it, as every new SPI master I use doesn't work properly in some
+different way.
