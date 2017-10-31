@@ -1,27 +1,26 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 31 Oct 2017 16:46:00 +0000
-Subject: [RFC] Improving udelay/ndelay on platforms where that is possible
-In-Reply-To: <d3f42f35-8175-58f6-78b7-3331efe64da2@sigmadesigns.com>
-References: <d3f42f35-8175-58f6-78b7-3331efe64da2@sigmadesigns.com>
-Message-ID: <20171031164600.GE9463@n2100.armlinux.org.uk>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Tue, 31 Oct 2017 08:52:58 -0700
+Subject: [RFC/RFT PATCH 0/6] Switch GHES ioremap_page_range() to use fixmap
+In-Reply-To: <20171031153832.17746-1-james.morse@arm.com>
+References: <20171031153832.17746-1-james.morse@arm.com>
+Message-ID: <CA+55aFxUYoiPgS_VaECsOCnieOUNir=tNB2jHznboo+CZFvO2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 31, 2017 at 05:15:34PM +0100, Marc Gonzalez wrote:
-> I am writing to you directly because Russell has bluntly stated (paraphrased)
-> "Send your patches to Linus; it's his kernel, and he has the final say." which
-> is his diplomatic way of telling me to fsck off.
+On Tue, Oct 31, 2017 at 8:38 AM, James Morse <james.morse@arm.com> wrote:
+>  7 files changed, 30 insertions(+), 85 deletions(-)
 
-... after I've already pointed you at archived emails from Linus
-himself giving you all the information you need, and me stating the
-reasons for it being the way it is.
+Lovely.
 
-Why can you not accept what has already been said?  Why do you need
-to continually re-open old discussions only to be told the same thing
-as has already been said?  Why this "if I don't get the answer I want,
-I'm going to keep on trying until I do" attitude?
+I obviously can't test it, but it looks fine. I *would* suggest just
+making the "add fixmap entries" commits with the code that actually
+uses them. There's no real reason to have two commits that just add
+two entries that aren't used yet.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+If it was some meaningful helper function where a split of the commits
+makes each commit easier to read, that would be one thing.  As it is,
+the split just makes it harder to look at the history of the code (ie
+"I wonder where this was introduced - let's use 'git blame'. Oh,
+that's not useful").
+
+                  Linus
