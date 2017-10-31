@@ -1,31 +1,59 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 31 Oct 2017 09:49:53 +0000
-Subject: [PATCH v3 0/12] arm+arm64: vdso unification to lib/vdso/
-In-Reply-To: <20171030214434.ta26ekbg7jyws2lf@salmiak>
-References: <20171027222353.56875-1-salyzyn@android.com>
- <20171030141813.nozm5bgumb5qp2ol@lakrids.cambridge.arm.com>
- <6c9aa942-bfc0-4c54-888a-85fd1d43e40c@android.com>
- <20171030214434.ta26ekbg7jyws2lf@salmiak>
-Message-ID: <20171031094953.GA5584@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 31 Oct 2017 10:52:42 +0100
+Subject: [PATCH v2 7/7] gpio: brcmstb: implement suspend/resume/shutdown
+In-Reply-To: <20171024195451.30535-8-opendmb@gmail.com>
+References: <20171024195451.30535-1-opendmb@gmail.com>
+ <20171024195451.30535-8-opendmb@gmail.com>
+Message-ID: <CACRpkdZiqJcySSEavz9xbdLv=32Dng_Q17hV9mPGu0LzQ+zCbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 30, 2017 at 09:44:35PM +0000, Mark Rutland wrote:
-> On Mon, Oct 30, 2017 at 01:34:13PM -0700, Mark Salyzyn wrote:
-> > On 10/30/2017 07:18 AM, Mark Rutland wrote:
-> > > On Fri, Oct 27, 2017 at 03:23:48PM -0700, Mark Salyzyn wrote:
-> > > > Note I noticed a bug in the old implementation of __kernel_clock_getres;
-> > > > it was checking only the lower 32bits of the pointer; this would work
-> > > > for most cases but could fail in a few.
-> > > Sorry if this is a stupid question, but do you mean from a prior version
-> > > of this series, or the one in the kernel today?
-> > 
-> > apinski at cavium.com noticed this as part of the existing upstream arm64
-> > assembler when he did the original conversion to C.
-> 
-> Just to check, does the below address the issue, or is there something that
-> I've missed?
+On Tue, Oct 24, 2017 at 9:54 PM, Doug Berger <opendmb@gmail.com> wrote:
 
-Looks fine to me. Applied.
+> This commit corrects problems with the previous wake implementation
+> by implementing suspend and resume power management operations and
+> the driver shutdown operation.
+>
+> Wake masks are used to keep track of which GPIO should wake the
+> device.  On suspend the GPIO state is saved and the possible wakeup
+> sources are explicitly unmasked in the hardware. Non-wakeup sources
+> are explicitly masked so IRQCHIP_MASK_ON_SUSPEND is no longer
+> necessary.  The saved state of the GPIO is restored upon resume.
+> It is important not to write to the GPIO status register since this
+> has the effect of clearing bits.  The status register is explicitly
+> removed from the register save and restore to ensure this.
+>
+> The shutdown operation allows the hardware to be put into the same
+> quiesced state as the suspend operation and removes the need for
+> the reboot notifier.
+>
+> Unfortunately, there appears to be some confusion about whether
+> a pending disabled wake interrupt should wake the system. If a wake
+> capable interrupt is disabled using the default "lazy disable"
+> behavior and it is triggered before the suspend_device_irq call
+> the interrupt hardware will be acknowledged by mask_ack_irq and the
+> IRQS_PENDING flag is added to its state. However, the IRQS_PENDING
+> flag of wake interrupts is not checked to prevent the transition to
+> suspend and the hardware has been acked which prevents its wakeup.
+> If the lazy disabled interrupt is triggered after the call to
+> suspend_device_irqs then the wakeup logic will abort the suspend.
+> The irq_disable method is defined by this GPIO driver to prevent
+> lazy disable so that the pending hardware state remains asserted
+> allowing the hardware to wake and providing a consistent behavior.
+>
+> In addition, the IRQ_DISABLE_UNLAZY flag is set for the non-wake
+> parent interrupt as a convenience to prevent the need to add code
+> to the brcmstb_gpio_irq_handler to support "lazy disable" of the
+> non-wake parent interrupt when it is disabled during suspend and
+> resume. Chained interrupt parents are not normally disabled, but
+> these GPIO devices have different parent interrupts for wake and
+> non-wake handling. It is convenient to mask the non-wake parent
+> when suspending to preserve the hardware state for proper wakeup
+> accounting when the driver is resumed.
+>
+> Signed-off-by: Doug Berger <opendmb@gmail.com>
 
-Will
+Patch applied with the tags.
+
+Yours,
+Linus Walleij
