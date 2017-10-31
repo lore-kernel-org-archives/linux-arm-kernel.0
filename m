@@ -1,37 +1,48 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Thu, 30 Nov 2017 21:27:32 -0800
-Subject: [PATCH] arm64: dts: msm8916: Correct ipc references for smsm
-Message-ID: <20171201052732.31996-1-bjorn.andersson@linaro.org>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Wed,  1 Nov 2017 01:24:20 +0530
+Subject: [PATCH 0/3] Add clock driver for Actions S900 SoC
+Message-ID: <1509479663-8985-1-git-send-email-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SMSM is not symmetrical, the incoming bits from WCNSS are available at
-index 6, but the outgoing host id for WCNSS is 3. Further more, upstream
-references the base of APCS (in contrast to downstream), so the register
-offset of 8 must be included.
+This series adds clock driver for Actions Semi OWL series
+S900 SoC with relevant clock bindings and device tree data.
 
-Fixes: 1fb47e0a9ba4 ("arm64: dts: qcom: msm8916: Add smsm and smp2p nodes")
-Cc: stable at vger.kernel.org
-Reported-by: Ramon Fried <rfried@codeaurora.org>
-Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
----
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+This series also addresses the review comments from previous
+submission happened last year.
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index 9fb317853a5c..a8e1e3b4562c 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -1437,8 +1437,8 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
--		qcom,ipc-1 = <&apcs 0 13>;
--		qcom,ipc-6 = <&apcs 0 19>;
-+		qcom,ipc-1 = <&apcs 8 13>;
-+		qcom,ipc-3 = <&apcs 8 19>;
- 
- 		apps_smsm: apps at 0 {
- 			reg = <0>;
+https://patchwork.kernel.org/patch/9254471/
+
+Driver has been validated on Bubblegum-96 board.
+
+Thanks,
+Mani
+
+Manivannan Sadhasivam (3):
+  arm64: dts: actions: add s900 clock controller nodes
+  clk: owl: add clock driver for Actions S900 SoC
+  Documentation: add Actions S900 clock bindings
+
+ .../bindings/clock/actions,s900-clock.txt          |  47 ++
+ MAINTAINERS                                        |   5 +
+ arch/arm64/boot/dts/actions/s900.dtsi              |  19 +
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/owl/Makefile                           |   2 +
+ drivers/clk/owl/clk-factor.c                       | 270 ++++++++++
+ drivers/clk/owl/clk-pll.c                          | 346 ++++++++++++
+ drivers/clk/owl/clk-s900.c                         | 587 +++++++++++++++++++++
+ drivers/clk/owl/clk.c                              | 318 +++++++++++
+ drivers/clk/owl/clk.h                              | 301 +++++++++++
+ include/dt-bindings/clock/actions,s900-clock.h     | 141 +++++
+ 11 files changed, 2037 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/actions,s900-clock.txt
+ create mode 100644 drivers/clk/owl/Makefile
+ create mode 100644 drivers/clk/owl/clk-factor.c
+ create mode 100644 drivers/clk/owl/clk-pll.c
+ create mode 100644 drivers/clk/owl/clk-s900.c
+ create mode 100644 drivers/clk/owl/clk.c
+ create mode 100644 drivers/clk/owl/clk.h
+ create mode 100644 include/dt-bindings/clock/actions,s900-clock.h
+
 -- 
-2.15.0
+2.7.4
