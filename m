@@ -1,25 +1,36 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Tue, 31 Oct 2017 07:36:14 -0500
-Subject: [PATCH 1/4] Revert "gpio: set up initial state from
- .get_direction()"
-In-Reply-To: <CAOMZO5CbPCJe76AMeRHNBUwfEu5jdWUEAqkZuxLBbgOHoLx_MQ@mail.gmail.com>
-References: <1509396602-1936-1-git-send-email-timur@codeaurora.org>
- <1509396602-1936-2-git-send-email-timur@codeaurora.org>
- <1509440926.10233.77.camel@linux.intel.com>
- <a6c8b2ac-29de-4ec7-7b3f-fac1b5b16942@codeaurora.org>
- <CAOMZO5CbPCJe76AMeRHNBUwfEu5jdWUEAqkZuxLBbgOHoLx_MQ@mail.gmail.com>
-Message-ID: <d424fea5-6b28-5cb0-5fda-e71a64bf8528@codeaurora.org>
+From: elder@linaro.org (Alex Elder)
+Date: Tue, 31 Oct 2017 07:58:07 -0500
+Subject: [PATCH v2 2/3] arm64: defconfig: remove CONFIG_USB_MSM_OTG
+In-Reply-To: <20171031125808.7300-1-elder@linaro.org>
+References: <20171031125808.7300-1-elder@linaro.org>
+Message-ID: <20171031125808.7300-3-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/17 7:33 AM, Fabio Estevam wrote:
-> In this case checkpatch should have given you an error due to the
-> missing Signed-off-by tag:-)
+No Qualcomm SoC requires the "phy-msm-usb.c" USB phy driver support
+any more.  Remove the code, and remove the config option from the
+arm64 defconfig.
 
-Indeed!  Something must be broken in my checkpatch invocation.  I did 
-think that it was odd that I didn't get any complaints.  Thanks.
+Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Alex Elder <elder@linaro.org>
+Reviewed-by: Amit Kucheria <amit.kucheria@linaro.org>
+Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Acked-by: Andy Gross <andy.gross@linaro.org>
+---
+ arch/arm64/configs/defconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 4d0b96bb340a..85ca53f59c3e 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -425,7 +425,6 @@ CONFIG_USB_CHIPIDEA_HOST=y
+ CONFIG_USB_ISP1760=y
+ CONFIG_USB_HSIC_USB3503=y
+ CONFIG_NOP_USB_XCEIV=y
+-CONFIG_USB_MSM_OTG=y
+ CONFIG_USB_QCOM_8X16_PHY=y
+ CONFIG_USB_ULPI=y
+ CONFIG_USB_GADGET=y
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.11.0
