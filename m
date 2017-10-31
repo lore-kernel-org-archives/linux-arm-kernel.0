@@ -1,7 +1,7 @@
 From: salyzyn@android.com (Mark Salyzyn)
-Date: Tue, 31 Oct 2017 11:32:13 -0700
-Subject: [PATCH v4 08/12] arm: vdso: Add ARCH_CLOCK_FIXED_MASK
-Message-ID: <20171031183216.81259-1-salyzyn@android.com>
+Date: Tue, 31 Oct 2017 11:32:02 -0700
+Subject: [PATCH v4 07/12] arm: vdso: disable profiling
+Message-ID: <20171031183205.81190-1-salyzyn@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,8 +12,8 @@ for each architecture. But instead of landing it in arm64, land the
 result into lib/vdso and unify both implementations to simplify
 future maintenance.
 
-Add ARCH_CLOCK_FIXED_MASK as an efficiency since arm64 has no
-purpose for cs_mask vdso_data variable.
+Make sure kasan and ubsan profiling, and kcov instrumentation,
+is turned off for VDSO code.
 
 Signed-off-by: Mark Salyzyn <salyzyn@android.com>
 Cc: James Morse <james.morse@arm.com>
@@ -34,82 +34,32 @@ Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: linux-kernel at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 
+v2:
+- Added this to the split up of first CL, based on comments in second CL
+
 v4:
-- New in series, split off from earlier.
+- update commit message to reflect overall reasoning
 
 ---
- arch/arm/vdso/vgettimeofday.c | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ arch/arm/vdso/Makefile | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/vdso/vgettimeofday.c b/arch/arm/vdso/vgettimeofday.c
-index 1152308067e1..bbacf4d0d6a2 100644
---- a/arch/arm/vdso/vgettimeofday.c
-+++ b/arch/arm/vdso/vgettimeofday.c
-@@ -123,7 +123,11 @@ static notrace int do_realtime(const struct vdso_data *vd, struct timespec *ts)
- {
- 	u32 seq, mult, shift;
- 	u64 nsec, cycle_last;
-+#ifdef ARCH_CLOCK_FIXED_MASK
-+	static const u64 mask = ARCH_CLOCK_FIXED_MASK;
-+#else
- 	u64 mask;
-+#endif
- 	vdso_xtime_clock_sec_t sec;
+diff --git a/arch/arm/vdso/Makefile b/arch/arm/vdso/Makefile
+index 59a8fa7b8a3b..1ce912ab47cc 100644
+--- a/arch/arm/vdso/Makefile
++++ b/arch/arm/vdso/Makefile
+@@ -26,8 +26,11 @@ CFLAGS_REMOVE_vdso.o = -pg
+ CFLAGS_REMOVE_vgettimeofday.o = -pg -Os
+ CFLAGS_vgettimeofday.o = -O2
  
- 	do {
-@@ -136,7 +140,9 @@ static notrace int do_realtime(const struct vdso_data *vd, struct timespec *ts)
+-# Disable gcov profiling for VDSO code
++# Disable gcov, kasan, ubsan and kcov profiling for VDSO code
+ GCOV_PROFILE := n
++KASAN_SANITIZE := n
++UBSAN_SANITIZE := n
++KCOV_INSTRUMENT := n
  
- 		mult = vd->cs_mono_mult;
- 		shift = vd->cs_shift;
-+#ifndef ARCH_CLOCK_FIXED_MASK
- 		mask = vd->cs_mask;
-+#endif
- 
- 		sec = vd->xtime_clock_sec;
- 		nsec = vd->xtime_clock_snsec;
-@@ -156,7 +162,11 @@ static notrace int do_monotonic(const struct vdso_data *vd, struct timespec *ts)
- {
- 	u32 seq, mult, shift;
- 	u64 nsec, cycle_last;
-+#ifdef ARCH_CLOCK_FIXED_MASK
-+	static const u64 mask = ARCH_CLOCK_FIXED_MASK;
-+#else
- 	u64 mask;
-+#endif
- 	vdso_wtm_clock_nsec_t wtm_nsec;
- 	__kernel_time_t sec;
- 
-@@ -170,7 +180,9 @@ static notrace int do_monotonic(const struct vdso_data *vd, struct timespec *ts)
- 
- 		mult = vd->cs_mono_mult;
- 		shift = vd->cs_shift;
-+#ifndef ARCH_CLOCK_FIXED_MASK
- 		mask = vd->cs_mask;
-+#endif
- 
- 		sec = vd->xtime_clock_sec;
- 		nsec = vd->xtime_clock_snsec;
-@@ -195,7 +207,11 @@ static notrace int do_monotonic_raw(const struct vdso_data *vd,
- {
- 	u32 seq, mult, shift;
- 	u64 nsec, cycle_last;
-+#ifdef ARCH_CLOCK_FIXED_MASK
-+	static const u64 mask = ARCH_CLOCK_FIXED_MASK;
-+#else
- 	u64 mask;
-+#endif
- 	vdso_raw_time_sec_t sec;
- 
- 	do {
-@@ -208,7 +224,9 @@ static notrace int do_monotonic_raw(const struct vdso_data *vd,
- 
- 		mult = vd->cs_raw_mult;
- 		shift = vd->cs_shift;
-+#ifndef ARCH_CLOCK_FIXED_MASK
- 		mask = vd->cs_mask;
-+#endif
- 
- 		sec = vd->raw_time_sec;
- 		nsec = vd->raw_time_nsec;
+ # Force dependency
+ $(obj)/vdso.o : $(obj)/vdso.so
 -- 
 2.15.0.rc2.357.g7e34df9404-goog
