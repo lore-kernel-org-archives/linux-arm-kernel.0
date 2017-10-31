@@ -1,26 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 31 Oct 2017 10:31:10 +0100
-Subject: [PATCH v2 5/7] gpio: brcmstb: correct the configuration of level
- interrupts
-In-Reply-To: <20171024195451.30535-6-opendmb@gmail.com>
-References: <20171024195451.30535-1-opendmb@gmail.com>
- <20171024195451.30535-6-opendmb@gmail.com>
-Message-ID: <CACRpkdbrEoJBVnS-1YoHsKuw3hBeuXuU_Gd2FKMD5bB2PRCHnw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 31 Oct 2017 09:49:53 +0000
+Subject: [PATCH v3 0/12] arm+arm64: vdso unification to lib/vdso/
+In-Reply-To: <20171030214434.ta26ekbg7jyws2lf@salmiak>
+References: <20171027222353.56875-1-salyzyn@android.com>
+ <20171030141813.nozm5bgumb5qp2ol@lakrids.cambridge.arm.com>
+ <6c9aa942-bfc0-4c54-888a-85fd1d43e40c@android.com>
+ <20171030214434.ta26ekbg7jyws2lf@salmiak>
+Message-ID: <20171031094953.GA5584@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 24, 2017 at 9:54 PM, Doug Berger <opendmb@gmail.com> wrote:
+On Mon, Oct 30, 2017 at 09:44:35PM +0000, Mark Rutland wrote:
+> On Mon, Oct 30, 2017 at 01:34:13PM -0700, Mark Salyzyn wrote:
+> > On 10/30/2017 07:18 AM, Mark Rutland wrote:
+> > > On Fri, Oct 27, 2017 at 03:23:48PM -0700, Mark Salyzyn wrote:
+> > > > Note I noticed a bug in the old implementation of __kernel_clock_getres;
+> > > > it was checking only the lower 32bits of the pointer; this would work
+> > > > for most cases but could fail in a few.
+> > > Sorry if this is a stupid question, but do you mean from a prior version
+> > > of this series, or the one in the kernel today?
+> > 
+> > apinski at cavium.com noticed this as part of the existing upstream arm64
+> > assembler when he did the original conversion to C.
+> 
+> Just to check, does the below address the issue, or is there something that
+> I've missed?
 
-> This commit corrects a bug when configuring the GPIO hardware for
-> IRQ_TYPE_LEVEL_LOW and IRQ_TYPE_LEVEL_HIGH interrupt types. The
-> hardware is now correctly configured to support those types.
->
-> Fixes: 19a7b6940b78 ("gpio: brcmstb: Add interrupt and wakeup source support")
-> Signed-off-by: Doug Berger <opendmb@gmail.com>
-> Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
-> Acked-by: Gregory Fong <gregory.0xf0@gmail.com>
+Looks fine to me. Applied.
 
-Patch applied.
-
-Yours,
-Linus Walleij
+Will
