@@ -1,138 +1,28 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 31 Oct 2017 13:14:03 +0000
-Subject: [PATCH v4 11/21] arm64: cpufeature: Detect CPU RAS Extentions
-In-Reply-To: <20171019145807.23251-12-james.morse@arm.com>
-References: <20171019145807.23251-1-james.morse@arm.com>
- <20171019145807.23251-12-james.morse@arm.com>
-Message-ID: <20171031131403.GJ5584@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 31 Oct 2017 14:16:17 +0100
+Subject: [PATCH] pinctrl: armada-37xx: Add edge both type gpio irq support
+In-Reply-To: <CACRpkdbqjh5U5QoE_B+7GfSyDdHW-NCAvogGq-2n8j6L6nG-Gw@mail.gmail.com>
+References: <20171019131003.9684-1-gregory.clement@free-electrons.com>
+ <CACRpkdbqjh5U5QoE_B+7GfSyDdHW-NCAvogGq-2n8j6L6nG-Gw@mail.gmail.com>
+Message-ID: <20171031131617.GA11647@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 19, 2017 at 03:57:57PM +0100, James Morse wrote:
-> From: Xie XiuQi <xiexiuqi@huawei.com>
+> Patch applied.
 > 
-> ARM's v8.2 Extentions add support for Reliability, Availability and
-> Serviceability (RAS). On CPUs with these extensions system software
-> can use additional barriers to isolate errors and determine if faults
-> are pending.
-> 
-> Add cpufeature detection and a barrier in the context-switch code.
-> There is no need to use alternatives for this as CPUs that don't
-> support this feature will treat the instruction as a nop.
-> 
-> Platform level RAS support may require additional firmware support.
-> 
-> Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
-> [Rebased, added esb and config option, reworded commit message]
-> Signed-off-by: James Morse <james.morse@arm.com>
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> ---
->  arch/arm64/Kconfig               | 16 ++++++++++++++++
->  arch/arm64/include/asm/barrier.h |  1 +
->  arch/arm64/include/asm/cpucaps.h |  3 ++-
->  arch/arm64/include/asm/sysreg.h  |  2 ++
->  arch/arm64/kernel/cpufeature.c   | 13 +++++++++++++
->  arch/arm64/kernel/process.c      |  3 +++
->  6 files changed, 37 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 70dfe4e9ccc5..b68f5e93baac 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -973,6 +973,22 @@ config ARM64_PMEM
->  	  operations if DC CVAP is not supported (following the behaviour of
->  	  DC CVAP itself if the system does not define a point of persistence).
->  
-> +config ARM64_RAS_EXTN
-> +	bool "Enable support for RAS CPU Extensions"
-> +	default y
-> +	help
-> +	  CPUs that support the Reliability, Availability and Serviceability
-> +	  (RAS) Extensions, part of ARMv8.2 are able to track faults and
-> +	  errors, classify them and report them to software.
-> +
-> +	  On CPUs with these extensions system software can use additional
-> +	  barriers to determine if faults are pending and read the
-> +	  classification from a new set of registers.
-> +
-> +	  Selecting this feature will allow the kernel to use these barriers
-> +	  and access the new registers if the system supports the extension.
-> +	  Platform RAS features may additionally depend on firmware support.
-> +
->  endmenu
->  
->  config ARM64_MODULE_CMODEL_LARGE
-> diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
-> index 0fe7e43b7fbc..8b0a0eb67625 100644
-> --- a/arch/arm64/include/asm/barrier.h
-> +++ b/arch/arm64/include/asm/barrier.h
-> @@ -30,6 +30,7 @@
->  #define isb()		asm volatile("isb" : : : "memory")
->  #define dmb(opt)	asm volatile("dmb " #opt : : : "memory")
->  #define dsb(opt)	asm volatile("dsb " #opt : : : "memory")
-> +#define esb()		asm volatile("hint #16"  : : : "memory")
->  
->  #define mb()		dsb(sy)
->  #define rmb()		dsb(ld)
-> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-> index 8da621627d7c..4820d441bfb9 100644
-> --- a/arch/arm64/include/asm/cpucaps.h
-> +++ b/arch/arm64/include/asm/cpucaps.h
-> @@ -40,7 +40,8 @@
->  #define ARM64_WORKAROUND_858921			19
->  #define ARM64_WORKAROUND_CAVIUM_30115		20
->  #define ARM64_HAS_DCPOP				21
-> +#define ARM64_HAS_RAS_EXTN			22
->  
-> -#define ARM64_NCAPS				22
-> +#define ARM64_NCAPS				23
->  
->  #endif /* __ASM_CPUCAPS_H */
-> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> index f707fed5886f..64e2a80fd749 100644
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -332,6 +332,7 @@
->  #define ID_AA64ISAR1_DPB_SHIFT		0
->  
->  /* id_aa64pfr0 */
-> +#define ID_AA64PFR0_RAS_SHIFT		28
->  #define ID_AA64PFR0_GIC_SHIFT		24
->  #define ID_AA64PFR0_ASIMD_SHIFT		20
->  #define ID_AA64PFR0_FP_SHIFT		16
-> @@ -340,6 +341,7 @@
->  #define ID_AA64PFR0_EL1_SHIFT		4
->  #define ID_AA64PFR0_EL0_SHIFT		0
->  
-> +#define ID_AA64PFR0_RAS_V1		0x1
->  #define ID_AA64PFR0_FP_NI		0xf
->  #define ID_AA64PFR0_FP_SUPPORTED	0x0
->  #define ID_AA64PFR0_ASIMD_NI		0xf
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index cd52d365d1f0..0fc017b55cb1 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -125,6 +125,7 @@ static const struct arm64_ftr_bits ftr_id_aa64isar1[] = {
->  };
->  
->  static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
-> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64PFR0_RAS_SHIFT, 4, 0),
+> The discussion here is interesting, it is customary for GPIO drivers
+> to implement double-edge detection emulation by swapping the
+> edge detector around like this.
 
-We probably want FTR_LOWER_SAFE here now, right? (we changed the other
-fields in for-next/core).
+Hi Linus
 
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index 2dc0f8482210..5e5d2f0a1d0a 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -365,6 +365,9 @@ __notrace_funcgraph struct task_struct *__switch_to(struct task_struct *prev,
->  	 */
->  	dsb(ish);
->  
-> +	/* Deliver any pending SError from prev */
-> +	esb();
+I was not aware this was customary.
 
-I'm assuming this is going to be expensive. What if we moved it to switch_mm
-instead. Do we actually need thread granularity for error isolation?
+> It might be possible to collect some generic information about
+> this in the Documentation/gpio/driver.txt document.
 
-Will
+Yes, i think it should be documented somewhere. Even in the use case
+here, detecting an SD card being inserted/removed, you could get some
+bounce on the microswitch, miss an edge, and be in the wrong state.
+
+       Andrew
