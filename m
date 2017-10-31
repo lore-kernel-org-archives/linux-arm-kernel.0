@@ -1,48 +1,30 @@
-From: colin.king@canonical.com (Colin King)
-Date: Tue, 31 Oct 2017 14:37:55 +0000
-Subject: [PATCH] net: thunderx: remove a couple of redundant assignments
-Message-ID: <20171031143755.26021-1-colin.king@canonical.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 31 Oct 2017 15:07:37 +0000
+Subject: [PATCH v2 1/8] mfd: axp20x: Add axp20x-regulator cell for AXP813
+In-Reply-To: <20171031133614.bcj4k3phh4q5qxes@flea>
+References: <20171018083138.14517-1-wens@csie.org>
+ <20171018083138.14517-2-wens@csie.org>
+ <20171031133614.bcj4k3phh4q5qxes@flea>
+Message-ID: <20171031150737.7enqmjooo5nayzvb@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+On Tue, 31 Oct 2017, Maxime Ripard wrote:
+> On Wed, Oct 18, 2017 at 04:31:31PM +0800, Chen-Yu Tsai wrote:
+> > Now that axp20x-regulator supports AXP813, we can add a cell for it
+> > to enable it.
+> > 
+> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> > Tested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+> 
+> Is there any chance this gets merged for 4.15?
 
-The assignment to pointer msg is redundant as it is never read, so
-remove msg.  Also remove the first assignment to qset as this is not
-read before the next re-assignment of a new value to qset in the
-for-loop. Cleans up two clang warnings:
+Can it go in by itself?
 
-drivers/net/ethernet/cavium/thunder/nic_main.c:589:2: warning: Value
-stored to 'msg' is never read
-drivers/net/ethernet/cavium/thunder/nic_main.c:611:2: warning: Value
-stored to 'qset' is never read
-
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- drivers/net/ethernet/cavium/thunder/nic_main.c | 4 ----
- 1 file changed, 4 deletions(-)
-
-diff --git a/drivers/net/ethernet/cavium/thunder/nic_main.c b/drivers/net/ethernet/cavium/thunder/nic_main.c
-index fb770b0182d3..988c06a28e5e 100644
---- a/drivers/net/ethernet/cavium/thunder/nic_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nic_main.c
-@@ -584,9 +584,6 @@ static void nic_config_cpi(struct nicpf *nic, struct cpi_cfg_msg *cfg)
- static void nic_send_rss_size(struct nicpf *nic, int vf)
- {
- 	union nic_mbx mbx = {};
--	u64  *msg;
--
--	msg = (u64 *)&mbx;
- 
- 	mbx.rss_size.msg = NIC_MBOX_MSG_RSS_SIZE;
- 	mbx.rss_size.ind_tbl_size = nic->hw->rss_ind_tbl_size;
-@@ -608,7 +605,6 @@ static void nic_config_rss(struct nicpf *nic, struct rss_cfg_msg *cfg)
- 	rssi_base = nic->rssi_base[cfg->vf_id] + cfg->tbl_offset;
- 
- 	rssi = rssi_base;
--	qset = cfg->vf_id;
- 
- 	for (; rssi < (rssi_base + cfg->tbl_len); rssi++) {
- 		u8 svf = cfg->ind_tbl[idx] >> 3;
 -- 
-2.14.1
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
