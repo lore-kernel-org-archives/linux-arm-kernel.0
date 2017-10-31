@@ -1,61 +1,49 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 31 Oct 2017 17:23:17 +0000
-Subject: [PATCH v9 7/8] dt-bindings: Document devicetree binding for ARM DSU
- PMU
+Date: Tue, 31 Oct 2017 17:23:16 +0000
+Subject: [PATCH v9 6/8] arm_pmu: Use of_cpu_node_to_id helper
 In-Reply-To: <20171031172318.11823-1-suzuki.poulose@arm.com>
 References: <20171031172318.11823-1-suzuki.poulose@arm.com>
-Message-ID: <20171031172318.11823-8-suzuki.poulose@arm.com>
+Message-ID: <20171031172318.11823-7-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch documents the devicetree bindings for ARM DSU PMU.
+Use the new generic helper, of_cpu_node_to_id(), to map a
+a phandle to the logical CPU number while parsing the
+PMU irq affinity.
 
-Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
-Cc: devicetree at vger.kernel.org
-Cc: frowand.list at gmail.com
-Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
-Changes since V3:
- - Fixed node name in the example, suggested by Rob
----
- .../devicetree/bindings/arm/arm-dsu-pmu.txt        | 27 ++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/arm-dsu-pmu.txt
+ drivers/perf/arm_pmu_platform.c | 15 +++------------
+ 1 file changed, 3 insertions(+), 12 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/arm-dsu-pmu.txt b/Documentation/devicetree/bindings/arm/arm-dsu-pmu.txt
-new file mode 100644
-index 000000000000..6efabba530f1
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/arm-dsu-pmu.txt
-@@ -0,0 +1,27 @@
-+* ARM DynamIQ Shared Unit (DSU) Performance Monitor Unit (PMU)
-+
-+ARM DyanmIQ Shared Unit (DSU) integrates one or more CPU cores
-+with a shared L3 memory system, control logic and external interfaces to
-+form a multicore cluster. The PMU enables to gather various statistics on
-+the operations of the DSU. The PMU provides independent 32bit counters that
-+can count any of the supported events, along with a 64bit cycle counter.
-+The PMU is accessed via CPU system registers and has no MMIO component.
-+
-+** DSU PMU required properties:
-+
-+- compatible	: should be one of :
-+
-+		"arm,dsu-pmu"
-+
-+- interrupts	: Exactly 1 SPI must be listed.
-+
-+- cpus		: List of phandles for the CPUs connected to this DSU instance.
-+
-+
-+** Example:
-+
-+dsu-pmu-0 {
-+	compatible = "arm,dsu-pmu";
-+	interrupts = <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>;
-+	cpus = <&cpu_0>, <&cpu_1>;
-+};
+diff --git a/drivers/perf/arm_pmu_platform.c b/drivers/perf/arm_pmu_platform.c
+index 4eafa7a42e52..a96884e37eaf 100644
+--- a/drivers/perf/arm_pmu_platform.c
++++ b/drivers/perf/arm_pmu_platform.c
+@@ -81,19 +81,10 @@ static int pmu_parse_irq_affinity(struct device_node *node, int i)
+ 		return -EINVAL;
+ 	}
+ 
+-	/* Now look up the logical CPU number */
+-	for_each_possible_cpu(cpu) {
+-		struct device_node *cpu_dn;
+-
+-		cpu_dn = of_cpu_device_node_get(cpu);
+-		of_node_put(cpu_dn);
+-
+-		if (dn == cpu_dn)
+-			break;
+-	}
+-
+-	if (cpu >= nr_cpu_ids) {
++	cpu = of_cpu_node_to_id(dn);
++	if (cpu < 0) {
+ 		pr_warn("failed to find logical CPU for %s\n", dn->name);
++		cpu = nr_cpu_ids;
+ 	}
+ 
+ 	of_node_put(dn);
 -- 
 2.13.6
