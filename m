@@ -1,89 +1,34 @@
-From: zhiqiang.hou@nxp.com (Z.q. Hou)
-Date: Tue, 31 Oct 2017 02:39:45 +0000
-Subject: linux-next: manual merge of the spi-nor tree with the imx-mxs tree
-In-Reply-To: <d38cf683-c7a8-51b1-896a-ff1fda0f64f9@wedev4u.fr>
-References: <20171030181551.skcvt4mr4br7rtn2@sirena.co.uk>
- <d38cf683-c7a8-51b1-896a-ff1fda0f64f9@wedev4u.fr>
-Message-ID: <AM5PR0402MB2771BE97FFDCF052411F974B845E0@AM5PR0402MB2771.eurprd04.prod.outlook.com>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Tue, 31 Oct 2017 12:19:39 +0800
+Subject: [GIT PULL] Mediatek: 32-bit DT update for v4.15
+In-Reply-To: <CAK8P3a3NWwoe0mX45WrFONyiHt9eWTTMziEc+rjqSfr5QZv8xQ@mail.gmail.com>
+References: <c7145c00-b2b9-780c-0bfd-15f7d8a08dd6@gmail.com>
+ <CAK8P3a3NWwoe0mX45WrFONyiHt9eWTTMziEc+rjqSfr5QZv8xQ@mail.gmail.com>
+Message-ID: <1509423579.10793.10.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Cyrille,
+Hi Arnd,
 
-> -----Original Message-----
-> From: Cyrille Pitchen [mailto:cyrille.pitchen at wedev4u.fr]
-> Sent: 2017?10?31? 8:43
-> To: Mark Brown <broonie@kernel.org>; Yuan Yao <yao.yuan@nxp.com>; Z.q.
-> Hou <zhiqiang.hou@nxp.com>; Rob Herring <robh@kernel.org>; Shawn Guo
-> <shawnguo@kernel.org>; Philipp Puschmann <pp@emlix.com>
-> Cc: linux-arm-kernel at lists.infradead.org; Linux-Next Mailing List
-> <linux-next@vger.kernel.org>; Linux Kernel Mailing List
-> <linux-kernel@vger.kernel.org>; Marek Vasut <marek.vasut@gmail.com>
-> Subject: Re: linux-next: manual merge of the spi-nor tree with the imx-mxs tree
-> 
-> Hi all,
-> 
-> + Marek
-> 
-> Mark, thanks for this report.
-> 
-> Shawn, Yuan, if I don't make a mistake, patch "dt-bindings: mtd: add
-> sst25wf040b and en25s64 to sip-nor list" was not submitted to the linux-mtd
-> mailing list hence was neither reviewed nor acked by any spi-nor maintainer. If
-> so, such a patch should then be taken from the spi-nor/next branch of the
-> l2-mtd tree.
-> 
-> So Shawn, could you please remove this patch from your tree ?
-> 
-> Yuan, could you please submit your patch to the linux-mtd mailing list for
-> proper review ?
+We have 3 root ports in MT7623, but this is a bug in this chip where the
+HW designers wired the IRQs in a nonstandard way. We've tried to
+statically assign the bus portion of the address part in the parent
+interrupt-map before, but this approach cannot handle the case - if we
+attach the device in random order.
 
-Only this single patch is needed to submit to linux-mtd mailing list, right?
+Thanks.
 
-Thanks,
-Zhiqiang
-
-> Best regards,
+On Mon, 2017-10-30 at 13:42 +0100, Arnd Bergmann wrote:
+> On Mon, Oct 23, 2017 at 12:06 AM, Matthias Brugger
+> <matthias.bgg@gmail.com> wrote:
+> >
+> > ----------------------------------------------------------------
+> > - mt76233 add PCIe node
 > 
-> Cyrille
+> Could you clarify what the subnodes in the PCI node are for? It seems odd
+> to have "interrupt-map" properties in both the pcie controller and its child
+> nodes, and I want to ensure this is following the standard PCIe binding before
+> I pull it.
 > 
+>        Arnd
 > 
-> Le 30/10/2017 ? 19:15, Mark Brown a ?crit :
-> > Hi Cyrille,
-> >
-> > Today's linux-next merge of the spi-nor tree got a conflict in:
-> >
-> >   Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
-> >
-> > between commit:
-> >
-> >   b07815d4eaf65 ("dt-bindings: mtd: add sst25wf040b and en25s64 to
-> > sip-nor list")
-> >
-> > from the imx-mxs tree and commit:
-> >
-> >    282e45dc64d1 ("mtd: spi-nor: Add support for mr25h128")
-> >
-> > from the spi-nor tree.
-> >
-> > I fixed it up (see below) and can carry the fix as necessary. This is
-> > now fixed as far as linux-next is concerned, but any non trivial
-> > conflicts should be mentioned to your upstream maintainer when your
-> > tree is submitted for merging.  You may also want to consider
-> > cooperating with the maintainer of the conflicting tree to minimise
-> > any particularly complex conflicts.
-> >
-> > diff --cc Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
-> > index 4cab5d85cf6f,956bb046e599..000000000000
-> > --- a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
-> > +++ b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
-> > @@@ -13,7 -13,7 +13,8 @@@ Required properties
-> >                    at25df321a
-> >                    at25df641
-> >                    at26df081a
-> >  +                 en25s64
-> > +                  mr25h128
-> >                    mr25h256
-> >                    mr25h10
-> >                    mr25h40
-> >
