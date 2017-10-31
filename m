@@ -1,68 +1,31 @@
-From: andrea.bondavalli74@gmail.com (Andrea Bondavalli)
+From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
 Date: Tue, 31 Oct 2017 12:58:18 +0100
-Subject: [PATCH] ASoC: sun4i-codec: fixed 32bit audio capture support for
- H3/H2+
-Message-ID: <20171031115818.GA9264@andrea-laptop>
+Subject: [PATCH 0/7] omap: dmtimer: Move driver out of plat-omap
+In-Reply-To: <1509445726-21040-1-git-send-email-j-keerthy@ti.com>
+References: <1509445726-21040-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <20171031115818.zfftupfwmz6day6r@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-32bit and 24bit audio capture formats for H3/H2+ are broken because the 
-RX_SAMPLE_BITS and the RX_FIFO_MODE bits of AC_ADC_FIFOC register of the audio 
-codec are not set to operate in 24bit mode but in 16bit mode only.
-The following patch sets the H3 audio codec registers and the DMA bus width
-properly when a 24/32bit capture is requested.
+Hi,
 
-Signed-off-by: Andrea Bondavalli <andrea.bondavalli74@gmail.com>
----
- sound/soc/sunxi/sun4i-codec.c | 29 ++++++++++++++++++++++++-----
- 1 file changed, 24 insertions(+), 5 deletions(-)
+On Tue, Oct 31, 2017 at 03:58:39PM +0530, Keerthy wrote:
+> The series moves dmtimer out of plat-omap to drivers/clocksource.
+> The series also does a bunch of changes to pwm-omap-dmtimer code
+> to adapt to the driver migration and clean up plat specific
+> pdata-quirks and use the dmtimer platform data.
+>  
+> Boot tested on DRA7-EVM and AM437X-GP-EVM.
+> 
+> More testing would be of great help.
 
-diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index baa9007..5da4efe 100644
---- a/sound/soc/sunxi/sun4i-codec.c
-+++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -346,11 +346,6 @@ static int sun4i_codec_prepare_capture(struct snd_pcm_substream *substream,
- 				   0x3 << 8,
- 				   0x1 << 8);
- 
--	/* Fill most significant bits with valid data MSB */
--	regmap_field_update_bits(scodec->reg_adc_fifoc,
--				 BIT(SUN4I_CODEC_ADC_FIFOC_RX_FIFO_MODE),
--				 BIT(SUN4I_CODEC_ADC_FIFOC_RX_FIFO_MODE));
--
- 	return 0;
- }
- 
-@@ -490,6 +485,30 @@ static int sun4i_codec_hw_params_capture(struct sun4i_codec *scodec,
- 					 BIT(SUN4I_CODEC_ADC_FIFOC_MONO_EN),
- 					 0);
- 
-+	/* Set the number of sample bits to either 16 or 24 bits */
-+	if (hw_param_interval(params, SNDRV_PCM_HW_PARAM_SAMPLE_BITS)->min == 32) {
-+		regmap_field_update_bits(scodec->reg_adc_fifoc,
-+				   BIT(SUN4I_CODEC_ADC_FIFOC_RX_SAMPLE_BITS),
-+				   BIT(SUN4I_CODEC_ADC_FIFOC_RX_SAMPLE_BITS));
-+
-+		regmap_field_update_bits(scodec->reg_adc_fifoc,
-+				   BIT(SUN4I_CODEC_ADC_FIFOC_RX_FIFO_MODE),
-+				   0);
-+
-+		scodec->capture_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-+	} else {
-+		regmap_field_update_bits(scodec->reg_adc_fifoc,
-+				   BIT(SUN4I_CODEC_ADC_FIFOC_RX_SAMPLE_BITS),
-+				   0);
-+
-+		/* Fill most significant bits with valid data MSB */
-+		regmap_field_update_bits(scodec->reg_adc_fifoc,
-+				   BIT(SUN4I_CODEC_ADC_FIFOC_RX_FIFO_MODE),
-+				   BIT(SUN4I_CODEC_ADC_FIFOC_RX_FIFO_MODE));
-+
-+		scodec->capture_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
-+	}
-+
- 	return 0;
- }
- 
--- 
-2.7.4
+Please resend with "--find-renames" :)
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171031/bcff06f6/attachment-0001.sig>
