@@ -1,36 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 31 Oct 2017 13:56:16 +0000
-Subject: [PATCH v4 13/21] arm64: cpufeature: Enable IESB on exception
- entry/return for firmware-first
-In-Reply-To: <20171019145807.23251-14-james.morse@arm.com>
-References: <20171019145807.23251-1-james.morse@arm.com>
- <20171019145807.23251-14-james.morse@arm.com>
-Message-ID: <20171031135616.GM5584@arm.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Tue, 31 Oct 2017 14:36:50 +0000
+Subject: [PATCH] I2C-S3C2410: Use common error handling code in
+ s3c24xx_i2c_probe()
+In-Reply-To: <20171025132620.l7scp2eachnarpzt@mwanda>
+References: <32c82282-ee0a-137f-4913-310b194b60f3@users.sourceforge.net>
+ <20171025132620.l7scp2eachnarpzt@mwanda>
+Message-ID: <20171031143650.GA13049@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 19, 2017 at 03:57:59PM +0100, James Morse wrote:
-> ARM v8.2 has a feature to add implicit error synchronization barriers
-> whenever the CPU enters or returns from an exception level. Add code to
-> detect this feature and enable the SCTLR_ELx.IESB bit.
+On Wed, Oct 25, 2017 at 04:26:20PM +0300, Dan Carpenter wrote:
+> > @@ -1180,24 +1179,21 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
+> >  		i2c->irq = ret = platform_get_irq(pdev, 0);
+> >  		if (ret <= 0) {
 > 
-> This feature causes RAS errors that are not yet visible to software to
-> become pending SErrors. We expect to have firmware-first RAS support
-> so synchronised RAS errors will be take immediately to EL3.
-> Any system without firmware-first handling of errors will take the SError
-> either immediatly after exception return, or when we unmask SError after
-> entry.S's work.
+> Not related to this patch, but the comparison here should be < 0.  Or
+> otherwise we should set an error code.  The bug was introduced in commit
+> e0d1ec97853f ("i2c-s3c2410: Change IRQ to be plain integer.").
 > 
-> Platform level RAS support may require additional firmware support.
+> >  			dev_err(&pdev->dev, "cannot find IRQ\n");
+> > -			clk_unprepare(i2c->clk);
+> > -			return ret;
 > 
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: James Morse <james.morse@arm.com>
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> regards,
+> dan carpenter
 
-To be honest, I'd just set this bit unconditionally. I realise the
-architecture would rather we didn't do that for v8 parts where it's RES0,
-but we do this elsewhere (e.g. HD and HA in the TCR) and practically it's
-fine.
+I believe (ret < 0) { } should be the correct case here.
 
-Will
+-- 
+Ben Dooks, ben@fluff.org, http://www.fluff.org/ben/
+
+Large Hadron Colada: A large Pina Colada that makes the universe disappear.
