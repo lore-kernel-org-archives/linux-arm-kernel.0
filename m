@@ -1,30 +1,30 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 31 Oct 2017 23:12:35 +0800
-Subject: [PATCH v2 1/8] mfd: axp20x: Add axp20x-regulator cell for AXP813
-In-Reply-To: <20171031150737.7enqmjooo5nayzvb@dell>
-References: <20171018083138.14517-1-wens@csie.org>
- <20171018083138.14517-2-wens@csie.org>
- <20171031133614.bcj4k3phh4q5qxes@flea> <20171031150737.7enqmjooo5nayzvb@dell>
-Message-ID: <CAGb2v679wywznY-H5-bs3r8nz50yWPMe3hH_2CV48fBr+-iw_w@mail.gmail.com>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Tue, 31 Oct 2017 16:25:22 +0100
+Subject: [PATCH 0/2] Fixes for the Atmel AES crypto module
+Message-ID: <20171031152524.25216-1-romain.izard.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 31, 2017 at 11:07 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Tue, 31 Oct 2017, Maxime Ripard wrote:
->> On Wed, Oct 18, 2017 at 04:31:31PM +0800, Chen-Yu Tsai wrote:
->> > Now that axp20x-regulator supports AXP813, we can add a cell for it
->> > to enable it.
->> >
->> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> > Tested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> > Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
->>
->> Is there any chance this gets merged for 4.15?
->
-> Can it go in by itself?
+After encountering an issue with cts(cbc(aes)) in the Atmel AES module,
+I have used tcrypt and libkcapi's test suite to validate my fix. This led
+me to observe some other issues.
 
-Yes. There are no build time dependencies. And the regulator driver changes
-are already in the regulator tree.
+This series includes the IV issue correction for the Atmel AES crypto
+engine, as well as a secondary issue observed when running
+'insmod tcrypt.ko mode=10' and 'insmod tcrypt.ko mode=152' on a SAMA5D2
+board.
 
-ChenYu
+The libkcapi test suite still reports some problems, for example when the
+input data is too large to fit into an intermediate buffer in unaligned
+cases. And it seems that with the v4.14 updates, new asynchronous tests
+are enabled and report new issues.
+
+Romain Izard (2):
+  crypto: atmel-aes - properly set IV after {en,de}crypt
+  crypto: atmel-aes - Reset the controller before each use
+
+ drivers/crypto/atmel-aes.c | 50 ++++++++++++++++++++++++++++++++++++----------
+ 1 file changed, 40 insertions(+), 10 deletions(-)
+
+-- 
+2.14.1
