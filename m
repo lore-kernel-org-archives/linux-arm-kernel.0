@@ -1,33 +1,48 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 31 Oct 2017 14:36:50 +0000
-Subject: [PATCH] I2C-S3C2410: Use common error handling code in
- s3c24xx_i2c_probe()
-In-Reply-To: <20171025132620.l7scp2eachnarpzt@mwanda>
-References: <32c82282-ee0a-137f-4913-310b194b60f3@users.sourceforge.net>
- <20171025132620.l7scp2eachnarpzt@mwanda>
-Message-ID: <20171031143650.GA13049@trinity.fluff.org>
+From: colin.king@canonical.com (Colin King)
+Date: Tue, 31 Oct 2017 14:37:55 +0000
+Subject: [PATCH] net: thunderx: remove a couple of redundant assignments
+Message-ID: <20171031143755.26021-1-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 25, 2017 at 04:26:20PM +0300, Dan Carpenter wrote:
-> > @@ -1180,24 +1179,21 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
-> >  		i2c->irq = ret = platform_get_irq(pdev, 0);
-> >  		if (ret <= 0) {
-> 
-> Not related to this patch, but the comparison here should be < 0.  Or
-> otherwise we should set an error code.  The bug was introduced in commit
-> e0d1ec97853f ("i2c-s3c2410: Change IRQ to be plain integer.").
-> 
-> >  			dev_err(&pdev->dev, "cannot find IRQ\n");
-> > -			clk_unprepare(i2c->clk);
-> > -			return ret;
-> 
-> regards,
-> dan carpenter
+From: Colin Ian King <colin.king@canonical.com>
 
-I believe (ret < 0) { } should be the correct case here.
+The assignment to pointer msg is redundant as it is never read, so
+remove msg.  Also remove the first assignment to qset as this is not
+read before the next re-assignment of a new value to qset in the
+for-loop. Cleans up two clang warnings:
 
+drivers/net/ethernet/cavium/thunder/nic_main.c:589:2: warning: Value
+stored to 'msg' is never read
+drivers/net/ethernet/cavium/thunder/nic_main.c:611:2: warning: Value
+stored to 'qset' is never read
+
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ drivers/net/ethernet/cavium/thunder/nic_main.c | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/drivers/net/ethernet/cavium/thunder/nic_main.c b/drivers/net/ethernet/cavium/thunder/nic_main.c
+index fb770b0182d3..988c06a28e5e 100644
+--- a/drivers/net/ethernet/cavium/thunder/nic_main.c
++++ b/drivers/net/ethernet/cavium/thunder/nic_main.c
+@@ -584,9 +584,6 @@ static void nic_config_cpi(struct nicpf *nic, struct cpi_cfg_msg *cfg)
+ static void nic_send_rss_size(struct nicpf *nic, int vf)
+ {
+ 	union nic_mbx mbx = {};
+-	u64  *msg;
+-
+-	msg = (u64 *)&mbx;
+ 
+ 	mbx.rss_size.msg = NIC_MBOX_MSG_RSS_SIZE;
+ 	mbx.rss_size.ind_tbl_size = nic->hw->rss_ind_tbl_size;
+@@ -608,7 +605,6 @@ static void nic_config_rss(struct nicpf *nic, struct rss_cfg_msg *cfg)
+ 	rssi_base = nic->rssi_base[cfg->vf_id] + cfg->tbl_offset;
+ 
+ 	rssi = rssi_base;
+-	qset = cfg->vf_id;
+ 
+ 	for (; rssi < (rssi_base + cfg->tbl_len); rssi++) {
+ 		u8 svf = cfg->ind_tbl[idx] >> 3;
 -- 
-Ben Dooks, ben@fluff.org, http://www.fluff.org/ben/
-
-Large Hadron Colada: A large Pina Colada that makes the universe disappear.
+2.14.1
