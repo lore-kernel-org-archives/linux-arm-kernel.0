@@ -1,34 +1,71 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Tue, 31 Oct 2017 12:19:39 +0800
-Subject: [GIT PULL] Mediatek: 32-bit DT update for v4.15
-In-Reply-To: <CAK8P3a3NWwoe0mX45WrFONyiHt9eWTTMziEc+rjqSfr5QZv8xQ@mail.gmail.com>
-References: <c7145c00-b2b9-780c-0bfd-15f7d8a08dd6@gmail.com>
- <CAK8P3a3NWwoe0mX45WrFONyiHt9eWTTMziEc+rjqSfr5QZv8xQ@mail.gmail.com>
-Message-ID: <1509423579.10793.10.camel@mtkswgap22>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 31 Oct 2017 04:26:01 +0000
+Subject: [PATCH v4 17/21] KVM: arm64: Save ESR_EL2 on guest SError
+In-Reply-To: <20171019145807.23251-18-james.morse@arm.com> (James Morse's
+ message of "Thu, 19 Oct 2017 15:58:03 +0100")
+References: <20171019145807.23251-1-james.morse@arm.com>
+ <20171019145807.23251-18-james.morse@arm.com>
+Message-ID: <86po943puu.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Thu, Oct 19 2017 at  4:58:03 pm BST, James Morse <james.morse@arm.com> wrote:
+> When we exit a guest due to an SError the vcpu fault info isn't updated
+> with the ESR. Today this is only done for traps.
+>
+> The v8.2 RAS Extensions define ISS values for SError. Update the vcpu's
+> fault_info with the ESR on SError so that handle_exit() can determine
+> if this was a RAS SError and decode its severity.
+>
+> Signed-off-by: James Morse <james.morse@arm.com>
+> ---
+>  arch/arm64/kvm/hyp/switch.c | 15 ++++++++++++---
+>  1 file changed, 12 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index af37658223a0..cba6d8ac105c 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -230,13 +230,20 @@ static bool __hyp_text __translate_far_to_hpfar(u64 far, u64 *hpfar)
+>  	return true;
+>  }
+>  
+> +static void __hyp_text __populate_fault_info_esr(struct kvm_vcpu *vcpu)
+> +{
+> +	vcpu->arch.fault.esr_el2 = read_sysreg_el2(esr);
+> +}
+> +
+>  static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
+>  {
+> -	u64 esr = read_sysreg_el2(esr);
+> -	u8 ec = ESR_ELx_EC(esr);
+> +	u8 ec;
+> +	u64 esr;
+>  	u64 hpfar, far;
+>  
+> -	vcpu->arch.fault.esr_el2 = esr;
+> +	__populate_fault_info_esr(vcpu);
+> +	esr = vcpu->arch.fault.esr_el2;
+> +	ec = ESR_ELx_EC(esr);
+>  
+>  	if (ec != ESR_ELx_EC_DABT_LOW && ec != ESR_ELx_EC_IABT_LOW)
+>  		return true;
+> @@ -325,6 +332,8 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+>  	 */
+>  	if (exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
+>  		goto again;
+> +	else if (ARM_EXCEPTION_CODE(exit_code) == ARM_EXCEPTION_EL1_SERROR)
+> +		__populate_fault_info_esr(vcpu);
+>  
+>  	if (static_branch_unlikely(&vgic_v2_cpuif_trap) &&
+>  	    exit_code == ARM_EXCEPTION_TRAP) {
 
-We have 3 root ports in MT7623, but this is a bug in this chip where the
-HW designers wired the IRQs in a nonstandard way. We've tried to
-statically assign the bus portion of the address part in the parent
-interrupt-map before, but this approach cannot handle the case - if we
-attach the device in random order.
+With this patch, the only case were we don't save ESR_EL2 is when we
+take an interrupt. I think we should bite the bullet and make it
+slightly more streamlined, always saving ESR_EL2.
 
-Thanks.
+Thanks,
 
-On Mon, 2017-10-30 at 13:42 +0100, Arnd Bergmann wrote:
-> On Mon, Oct 23, 2017 at 12:06 AM, Matthias Brugger
-> <matthias.bgg@gmail.com> wrote:
-> >
-> > ----------------------------------------------------------------
-> > - mt76233 add PCIe node
-> 
-> Could you clarify what the subnodes in the PCI node are for? It seems odd
-> to have "interrupt-map" properties in both the pcie controller and its child
-> nodes, and I want to ensure this is following the standard PCIe binding before
-> I pull it.
-> 
->        Arnd
-> 
+	M.
+-- 
+Jazz is not dead. It just smells funny.
