@@ -1,47 +1,32 @@
-From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
-Date: Tue, 31 Oct 2017 18:21:57 +0100
-Subject: [PATCH] arm: pass endianness info to sparse
-Message-ID: <20171031172157.9744-1-luc.vanoostenryck@gmail.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 31 Oct 2017 17:23:11 +0000
+Subject: [PATCH v9 1/8] perf: Export perf_event_update_userpage
+In-Reply-To: <20171031172318.11823-1-suzuki.poulose@arm.com>
+References: <20171031172318.11823-1-suzuki.poulose@arm.com>
+Message-ID: <20171031172318.11823-2-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM depends on the macros '__ARMEL__' & '__ARMEB__' being defined
-or not to correctly select or define endian-specific macros,
-structures or pieces of code.
+Export perf_event_update_userpage() so that PMU driver using them,
+can be built as modules.
 
-These macros are predefined by the compiler but sparse knows
-nothing about them and thus may pre-process files differently
-from what gcc would.
-
-Fix this by passing '-D__ARMEL__' or '-D__ARMEB__' to sparse,
-depending on the endianness of the kernel, like defined by GCC.
-
-Note: In most case it won't change anything since most ARMs use
-      little-endian (but an allyesconfig would use big-endian!).
-
-To: Russell King <linux@armlinux.org.uk>
-CC: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
+Cc: Peter Zilstra <peterz@infradead.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm/Makefile | 2 ++
- 1 file changed, 2 insertions(+)
+ kernel/events/core.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 817e5cfef..36ae44545 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -44,10 +44,12 @@ endif
+diff --git a/kernel/events/core.c b/kernel/events/core.c
+index 9d93db81fa36..550015829db8 100644
+--- a/kernel/events/core.c
++++ b/kernel/events/core.c
+@@ -4982,6 +4982,7 @@ void perf_event_update_userpage(struct perf_event *event)
+ unlock:
+ 	rcu_read_unlock();
+ }
++EXPORT_SYMBOL_GPL(perf_event_update_userpage);
  
- ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
- KBUILD_CPPFLAGS	+= -mbig-endian
-+CHECKFLAGS	+= -D__ARMEB__
- AS		+= -EB
- LD		+= -EB
- else
- KBUILD_CPPFLAGS	+= -mlittle-endian
-+CHECKFLAGS	+= -D__ARMEL__
- AS		+= -EL
- LD		+= -EL
- endif
+ static int perf_mmap_fault(struct vm_fault *vmf)
+ {
 -- 
-2.14.0
+2.13.6
