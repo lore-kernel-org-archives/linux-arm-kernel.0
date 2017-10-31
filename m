@@ -1,37 +1,24 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 31 Oct 2017 14:36:14 +0100
-Subject: [PATCH v2 1/8] mfd: axp20x: Add axp20x-regulator cell for AXP813
-In-Reply-To: <20171018083138.14517-2-wens@csie.org>
-References: <20171018083138.14517-1-wens@csie.org>
- <20171018083138.14517-2-wens@csie.org>
-Message-ID: <20171031133614.bcj4k3phh4q5qxes@flea>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Tue, 31 Oct 2017 09:46:33 -0400 (EDT)
+Subject: [PATCH v3 1/3] usb: host: remove ehci-msm.c
+In-Reply-To: <20171031131131.8099-2-elder@linaro.org>
+Message-ID: <Pine.LNX.4.44L0.1710310945580.10104-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+On Tue, 31 Oct 2017, Alex Elder wrote:
 
-On Wed, Oct 18, 2017 at 04:31:31PM +0800, Chen-Yu Tsai wrote:
-> Now that axp20x-regulator supports AXP813, we can add a cell for it
-> to enable it.
+> No Qualcomm SoC requires the "ehci-msm.c" code any more.  So remove it.
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> Tested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+> Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
+> Signed-off-by: Alex Elder <elder@linaro.org>
+> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+> Acked-by: Andy Gross <andy.gross@linaro.org>
+> ---
+>  drivers/usb/host/Kconfig    |  12 --
+>  drivers/usb/host/Makefile   |   1 -
+>  drivers/usb/host/ehci-msm.c | 265 --------------------------------------------
+>  3 files changed, 278 deletions(-)
+>  delete mode 100644 drivers/usb/host/ehci-msm.c
 
-Is there any chance this gets merged for 4.15?
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171031/d1143b5c/attachment.sig>
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
