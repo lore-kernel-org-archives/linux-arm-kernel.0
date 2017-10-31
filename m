@@ -1,73 +1,77 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Tue, 31 Oct 2017 15:58:43 +0530
-Subject: [PATCH 4/7] dmtimer: Add timer ops to the platform data structure
+Date: Tue, 31 Oct 2017 15:58:46 +0530
+Subject: [PATCH 7/7] arm: omap: pdata-quirks: Remove unused timer pdata
 In-Reply-To: <1509445726-21040-1-git-send-email-j-keerthy@ti.com>
 References: <1509445726-21040-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1509445726-21040-5-git-send-email-j-keerthy@ti.com>
+Message-ID: <1509445726-21040-8-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add timer ops to the platform data structure
+Remove unused timer pdata.
 
 Signed-off-by: Keerthy <j-keerthy@ti.com>
 ---
- include/linux/platform_data/dmtimer-omap.h | 38 ++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+ arch/arm/mach-omap2/pdata-quirks.c | 32 --------------------------------
+ 1 file changed, 32 deletions(-)
 
-diff --git a/include/linux/platform_data/dmtimer-omap.h b/include/linux/platform_data/dmtimer-omap.h
-index a19b78d..a3e1794 100644
---- a/include/linux/platform_data/dmtimer-omap.h
-+++ b/include/linux/platform_data/dmtimer-omap.h
-@@ -20,12 +20,50 @@
- #ifndef __PLATFORM_DATA_DMTIMER_OMAP_H__
- #define __PLATFORM_DATA_DMTIMER_OMAP_H__
+diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+index ad9df86..e7d7fc7 100644
+--- a/arch/arm/mach-omap2/pdata-quirks.c
++++ b/arch/arm/mach-omap2/pdata-quirks.c
+@@ -24,10 +24,8 @@
+ #include <linux/platform_data/hsmmc-omap.h>
+ #include <linux/platform_data/iommu-omap.h>
+ #include <linux/platform_data/wkup_m3.h>
+-#include <linux/platform_data/pwm_omap_dmtimer.h>
+ #include <linux/platform_data/media/ir-rx51.h>
+ #include <linux/platform_data/asoc-ti-mcbsp.h>
+-#include <clocksource/dmtimer.h>
  
-+struct omap_dm_timer_ops {
-+	struct omap_dm_timer *(*request_by_node)(struct device_node *np);
-+	struct omap_dm_timer *(*request_specific)(int timer_id);
-+	struct omap_dm_timer *(*request)(void);
-+
-+	int	(*free)(struct omap_dm_timer *timer);
-+
-+	void	(*enable)(struct omap_dm_timer *timer);
-+	void	(*disable)(struct omap_dm_timer *timer);
-+
-+	int	(*get_irq)(struct omap_dm_timer *timer);
-+	int	(*set_int_enable)(struct omap_dm_timer *timer,
-+				  unsigned int value);
-+	int	(*set_int_disable)(struct omap_dm_timer *timer, u32 mask);
-+
-+	struct clk *(*get_fclk)(struct omap_dm_timer *timer);
-+
-+	int	(*start)(struct omap_dm_timer *timer);
-+	int	(*stop)(struct omap_dm_timer *timer);
-+	int	(*set_source)(struct omap_dm_timer *timer, int source);
-+
-+	int	(*set_load)(struct omap_dm_timer *timer, int autoreload,
-+			    unsigned int value);
-+	int	(*set_match)(struct omap_dm_timer *timer, int enable,
-+			     unsigned int match);
-+	int	(*set_pwm)(struct omap_dm_timer *timer, int def_on,
-+			   int toggle, int trigger);
-+	int	(*set_prescaler)(struct omap_dm_timer *timer, int prescaler);
-+
-+	unsigned int (*read_counter)(struct omap_dm_timer *timer);
-+	int	(*write_counter)(struct omap_dm_timer *timer,
-+				 unsigned int value);
-+	unsigned int (*read_status)(struct omap_dm_timer *timer);
-+	int	(*write_status)(struct omap_dm_timer *timer,
-+				unsigned int value);
-+};
-+
- struct dmtimer_platform_data {
- 	/* set_timer_src - Only used for OMAP1 devices */
- 	int (*set_timer_src)(struct platform_device *pdev, int source);
- 	u32 timer_capability;
- 	u32 timer_errata;
- 	int (*get_context_loss_count)(struct device *);
-+	struct omap_dm_timer_ops *timer_ops;
+ #include "common.h"
+ #include "common-board-devices.h"
+@@ -477,33 +475,6 @@ void omap_auxdata_legacy_init(struct device *dev)
+ 	dev->platform_data = &twl_gpio_auxdata;
+ }
+ 
+-/* Dual mode timer PWM callbacks platdata */
+-#if IS_ENABLED(CONFIG_OMAP_DM_TIMER)
+-static struct pwm_omap_dmtimer_pdata pwm_dmtimer_pdata = {
+-	.request_by_node = omap_dm_timer_request_by_node,
+-	.request_specific = omap_dm_timer_request_specific,
+-	.request = omap_dm_timer_request,
+-	.set_source = omap_dm_timer_set_source,
+-	.get_irq = omap_dm_timer_get_irq,
+-	.set_int_enable = omap_dm_timer_set_int_enable,
+-	.set_int_disable = omap_dm_timer_set_int_disable,
+-	.free = omap_dm_timer_free,
+-	.enable = omap_dm_timer_enable,
+-	.disable = omap_dm_timer_disable,
+-	.get_fclk = omap_dm_timer_get_fclk,
+-	.start = omap_dm_timer_start,
+-	.stop = omap_dm_timer_stop,
+-	.set_load = omap_dm_timer_set_load,
+-	.set_match = omap_dm_timer_set_match,
+-	.set_pwm = omap_dm_timer_set_pwm,
+-	.set_prescaler = omap_dm_timer_set_prescaler,
+-	.read_counter = omap_dm_timer_read_counter,
+-	.write_counter = omap_dm_timer_write_counter,
+-	.read_status = omap_dm_timer_read_status,
+-	.write_status = omap_dm_timer_write_status,
+-};
+-#endif
+-
+ static struct ir_rx51_platform_data __maybe_unused rx51_ir_data = {
+ 	.set_max_mpu_wakeup_lat = omap_pm_set_max_mpu_wakeup_lat,
  };
- 
- #endif /* __PLATFORM_DATA_DMTIMER_OMAP_H__ */
+@@ -572,9 +543,6 @@ static void __init omap3_mcbsp_init(void) {}
+ 	OF_DEV_AUXDATA("ti,am4372-wkup-m3", 0x44d00000, "44d00000.wkup_m3",
+ 		       &wkup_m3_data),
+ #endif
+-#if IS_ENABLED(CONFIG_OMAP_DM_TIMER)
+-	OF_DEV_AUXDATA("ti,omap-dmtimer-pwm", 0, NULL, &pwm_dmtimer_pdata),
+-#endif
+ #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
+ 	OF_DEV_AUXDATA("ti,omap4-iommu", 0x4a066000, "4a066000.mmu",
+ 		       &omap4_iommu_pdata),
 -- 
 1.9.1
