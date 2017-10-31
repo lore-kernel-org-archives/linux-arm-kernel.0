@@ -1,16 +1,14 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Tue, 31 Oct 2017 20:04:38 +0100
+From: bp@suse.de (Borislav Petkov)
+Date: Tue, 31 Oct 2017 20:09:47 +0100
 Subject: [RFC/RFT PATCH 2/6] x86/mm/fixmap: Add GHES fixmap entries
 In-Reply-To: <20171031153832.17746-3-james.morse@arm.com>
 References: <20171031153832.17746-1-james.morse@arm.com>
  <20171031153832.17746-3-james.morse@arm.com>
-Message-ID: <20171031190438.u6ctvc7lyeedo5dw@gmail.com>
+Message-ID: <20171031190947.gmbr67etuoanhu6n@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-* James Morse <james.morse@arm.com> wrote:
-
+On Tue, Oct 31, 2017 at 03:38:28PM +0000, James Morse wrote:
 > GHES is switching to use fixmap for its dynamic mapping of CPER records,
 > to avoid using ioremap_page_range() in IRQ/NMI context.
 > 
@@ -30,10 +28,15 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > +	/* Used for GHES mapping from assorted contexts */
 > +	FIX_APEI_GHES_IRQ,
 > +	FIX_APEI_GHES_NMI,
-> +
 
-Acked-by: Ingo Molnar <mingo@kernel.org>
+Maybe I'm missing something but shouldn't those two be inside
+CONFIG_ACPI_APEI_GHES ifdeffery?
 
-Thanks,
+Ditto for the ARM side.
 
-	Ingo
+-- 
+Regards/Gruss,
+    Boris.
+
+SUSE Linux GmbH, GF: Felix Imend?rffer, Jane Smithard, Graham Norton, HRB 21284 (AG N?rnberg)
+-- 
