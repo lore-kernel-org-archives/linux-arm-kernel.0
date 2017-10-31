@@ -1,140 +1,73 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 31 Oct 2017 18:20:25 +0000
-Subject: [PATCH 3/3] ARM: early_printk: use printascii() rather than
- printch()
-In-Reply-To: <nycvar.YSQ.7.76.1710311355000.21665@knanqh.ubzr>
-References: <20171002020618.23924-1-nicolas.pitre@linaro.org>
- <20171002020618.23924-4-nicolas.pitre@linaro.org>
- <PS1PR06MB1162212F37C8BA7EE367FE828A5E0@PS1PR06MB1162.apcprd06.prod.outlook.com>
- <nycvar.YSQ.7.76.1710311211540.21665@knanqh.ubzr>
- <80bc8c16-321a-43ea-6cbb-257dbeee485b@arm.com>
- <nycvar.YSQ.7.76.1710311302370.21665@knanqh.ubzr>
- <20171031171629.GI9463@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1710311346190.21665@knanqh.ubzr>
- <20171031175344.GJ9463@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1710311355000.21665@knanqh.ubzr>
-Message-ID: <20171031182024.GK9463@n2100.armlinux.org.uk>
+From: salyzyn@android.com (Mark Salyzyn)
+Date: Tue, 31 Oct 2017 11:30:19 -0700
+Subject: [PATCH v4 00/12] arm+arm64: vdso unification to lib/vdso/
+Message-ID: <20171031183022.80775-1-salyzyn@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 31, 2017 at 02:15:14PM -0400, Nicolas Pitre wrote:
-> On Tue, 31 Oct 2017, Russell King - ARM Linux wrote:
-> > On Tue, Oct 31, 2017 at 01:48:01PM -0400, Nicolas Pitre wrote:
-> > > On Tue, 31 Oct 2017, Russell King - ARM Linux wrote:
-> > > 
-> > > > On Tue, Oct 31, 2017 at 01:06:35PM -0400, Nicolas Pitre wrote:
-> > > > > That's easy to veryfy with this patch:
-> > > > 
-> > > > Unfortunately not that easy, this patch breaks printch.
-> > > 
-> > > Right, missed that.
-> > > 
-> > > New patch below:
-> > > 
-> > > diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
-> > > index ea9646cc2a..0d1cef4b6e 100644
-> > > --- a/arch/arm/kernel/debug.S
-> > > +++ b/arch/arm/kernel/debug.S
-> > > @@ -79,25 +79,28 @@ hexbuf:		.space 16
-> > >  
-> > >  ENTRY(printascii)
-> > >  		addruart_current r3, r1, r2
-> > > -		b	2f
-> > > -1:		waituart r2, r3
-> > > -		senduart r1, r3
-> > > -		busyuart r2, r3
-> > > -		teq	r1, #'\n'
-> > > -		moveq	r1, #'\r'
-> > > -		beq	1b
-> > > -2:		teq	r0, #0
-> > > +1:		teq	r0, #0
-> > >  		ldrneb	r1, [r0], #1
-> > >  		teqne	r1, #0
-> > > -		bne	1b
-> > > -		ret	lr
-> > > +		reteq	lr
-> > > +		teq     r1, #'\n'
-> > > +		bne	2f
-> > > +		mov	r1, '\r'
-> > > +		waituart r2, r3
-> > > +		senduart r1, r3
-> > > +		busyuart r2, r3
-> > > +		mov	r1, '\n'
-> > > +2:		waituart r2, r3
-> > > +		senduart r1, r3
-> > > +		busyuart r2, r3
-> > > +		b	1b
-> > >  ENDPROC(printascii)
-> > >  
-> > >  ENTRY(printch)
-> > >  		addruart_current r3, r1, r2
-> > >  		mov	r1, r0
-> > >  		mov	r0, #0
-> > > -		b	1b
-> > > +		b	2b
-> > >  ENDPROC(printch)
-> > 
-> > Still, not quite!  printch('\n') with the old code would do this
-> > (in terms of executed instructions):
-> > 
-> >  		mov	r1, r0
-> >  		mov	r0, #0
-> > 		b	1b
-> > 1:		waituart r2, r3
-> > 		senduart r1, r3
-> > 		busyuart r2, r3
-> > 		teq	r1, #'\n'
-> > 		moveq	r1, #'\r'
-> > 		beq	1b
-> > 1:		waituart r2, r3
-> > 		senduart r1, r3
-> > 		busyuart r2, r3
-> > 		teq	r1, #'\n'
-> > 		...
-> > 2:		teq	r0, #0
-> > 		ret	lr
-> > 
-> > So a printch('\n') produces "\n\r" on the UART.  If we're fixing
-> > printascii() to emit "\r\n" instead of "\n\r" for a '\n', then
-> > printch() should have the same fix, and should not truncate to
-> > just '\n'.
-> 
-> OK... That's easy to achieve, but is it desirable?
+Take an effort to recode the arm64 vdso code from assembler to C
+previously submitted by Andrew Pinski <apinski@cavium.com>, rework
+it for use in both arm and arm64, overlapping any optimizations
+for each architecture. But instead of landing it in arm64, land the
+result into lib/vdso and unify both implementations to simplify
+future maintenance. This will act as the basis for implementing
+arm64 vdso32 in the future.
 
-Yes - remember, these are supposed to be usable from assembly,
-and we really don't want to have the complexity of:
 
-	mov	r0, #'\r'
-	bl	printch
-	mov	r0, #'\n'
-	bl	printch
+apinski at cavium.com made the following claims in the original patch:
 
-each time we want to begin a new line.
+This allows the compiler to optimize the divide by 1000 and remove
+the other divides.
 
-> IMHO the semantics of a single character should be just that: a single 
-> character.  And if some user relied on printch('\n') inserting the \r 
-> automatically then this would have run into the same display issue we're 
-> attempting to fix here. That might be why early_write() did the extra \r 
-> itself.
+On ThunderX, gettimeofday improves by 32%.  On ThunderX 2,
+gettimeofday improves by 18%.
 
-You're thinking about these functions as C functions that you'd call
-from C code.  That's not their primary purpose or intention, they're
-for debugging assembly.  They just happen to be re-used for the
-early printk crap because people find these a convenient implementation.
+Note I noticed a bug in the old implementation of __kernel_clock_getres;
+it was checking only the lower 32bits of the pointer; this would work
+for most cases but could fail in a few.
 
-> Thing is: that only printch user user is now gone. So I'd fix the 
-> semantic issue by simply removing printch altogether.
 
-No.  You could make the same argument for the printhex*() functions
-too, but removing them means next time we need to stuff in some
-debug that prints hex numbers before the MMU is up, we need to
-reinvent those wheels yet again.
+Signed-off-by: Mark Salyzyn <salyzyn@android.com>
+Cc: James Morse <james.morse@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Andy Lutomirski <luto@amacapital.net>
+Cc: Dmitry Safonov <dsafonov@virtuozzo.com>
+Cc: John Stultz <john.stultz@linaro.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Laura Abbott <labbott@redhat.com>
+Cc: Kees Cook <keescook@chromium.org>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Andy Gross <andy.gross@linaro.org>
+Cc: Kevin Brodsky <kevin.brodsky@arm.com>
+Cc: Andrew Pinski <apinski@cavium.com>
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
 
-The point of this assembly is to provide a set of debugging functions
-that can be used from assembly.  They were never really meant for C
-code to use.
+v2:
+- split first CL into 7 pieces, there were cosmetic adjustments.
+- make sure profiling is turned off.
+- kept quiet_cmd_vdsoas.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+v3:
+- changed are a result of private email review comments
+- rebase
+- move arch/arm/vdso/vgettimeofday.c to lib/vdso/vgettimeofday.c
+- adjust vgettimeofday.c to be a better global candidate, switch to using
+  ARCH_PROVIDES_TIMER and __arch_counter_get() as more generic.
+- do not expose gettimeofday if arch does not support user space timer
+
+v4:
+- update commit messages to reflect reasoning here.
+- switch to arch_vdso_read_counter as common API.
+- split out ARCH_CLOCK_FIXED_MASK.
+- Use GENMASK_ULL macro for ARCH_CLOCK_FIXED_MASK.
+- dropping forced inline patch and side effects.
+- replace all typeof()s with the appropriate types
+  vdso_wtm_clock_nsec_t, vdso_xtime_clock_sec, vdso_raw_time_sec_t,
+  long (tv_nsec) and __kernel_time_t (tv_sec).
+- clock_getres implementation, use clock instead of clock_id to
+  match usage elsewhere and remove an inconsistency.
+- simplify arm64 implementation of arch_vdso_read_counter,
+  use read_sysreg.
