@@ -1,56 +1,47 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 31 Oct 2017 17:16:29 +0000
-Subject: [PATCH 3/3] ARM: early_printk: use printascii() rather than
- printch()
-In-Reply-To: <nycvar.YSQ.7.76.1710311302370.21665@knanqh.ubzr>
-References: <20171002020618.23924-1-nicolas.pitre@linaro.org>
- <20171002020618.23924-4-nicolas.pitre@linaro.org>
- <PS1PR06MB1162212F37C8BA7EE367FE828A5E0@PS1PR06MB1162.apcprd06.prod.outlook.com>
- <nycvar.YSQ.7.76.1710311211540.21665@knanqh.ubzr>
- <80bc8c16-321a-43ea-6cbb-257dbeee485b@arm.com>
- <nycvar.YSQ.7.76.1710311302370.21665@knanqh.ubzr>
-Message-ID: <20171031171629.GI9463@n2100.armlinux.org.uk>
+From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
+Date: Tue, 31 Oct 2017 18:21:57 +0100
+Subject: [PATCH] arm: pass endianness info to sparse
+Message-ID: <20171031172157.9744-1-luc.vanoostenryck@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 31, 2017 at 01:06:35PM -0400, Nicolas Pitre wrote:
-> That's easy to veryfy with this patch:
+ARM depends on the macros '__ARMEL__' & '__ARMEB__' being defined
+or not to correctly select or define endian-specific macros,
+structures or pieces of code.
 
-Unfortunately not that easy, this patch breaks printch.
+These macros are predefined by the compiler but sparse knows
+nothing about them and thus may pre-process files differently
+from what gcc would.
 
-> diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
-> index ea9646cc2a..40023a4871 100644
-> --- a/arch/arm/kernel/debug.S
-> +++ b/arch/arm/kernel/debug.S
-> @@ -79,18 +79,21 @@ hexbuf:		.space 16
->  
+Fix this by passing '-D__ARMEL__' or '-D__ARMEB__' to sparse,
+depending on the endianness of the kernel, like defined by GCC.
 
-The new code is:
+Note: In most case it won't change anything since most ARMs use
+      little-endian (but an allyesconfig would use big-endian!).
 
->  ENTRY(printascii)
->  		addruart_current r3, r1, r2
-> +1:		teq	r0, #0
->  		ldrneb	r1, [r0], #1
->  		teqne	r1, #0
-> +		reteq	lr
-> +		teq     r1, #'\n'
-> +		bne	2f
-> +		mov	r1, '\r'
-> +		waituart r2, r3
-> +		senduart r1, r3
-> +		busyuart r2, r3
-> +		mov	r1, '\n'
-> +2:		waituart r2, r3
-> +		senduart r1, r3
-> +		busyuart r2, r3
-> +		b	1b
->  ENDPROC(printascii)
+To: Russell King <linux@armlinux.org.uk>
+CC: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
+---
+ arch/arm/Makefile | 2 ++
+ 1 file changed, 2 insertions(+)
 
-and printch jumps to the 1: label with r0 = 0 and r1 = character.  Your
-change has the effect that the "reteq" will always be taken when called
-by printch.
-
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 817e5cfef..36ae44545 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -44,10 +44,12 @@ endif
+ 
+ ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
+ KBUILD_CPPFLAGS	+= -mbig-endian
++CHECKFLAGS	+= -D__ARMEB__
+ AS		+= -EB
+ LD		+= -EB
+ else
+ KBUILD_CPPFLAGS	+= -mlittle-endian
++CHECKFLAGS	+= -D__ARMEL__
+ AS		+= -EL
+ LD		+= -EL
+ endif
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.14.0
