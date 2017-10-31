@@ -1,34 +1,68 @@
-From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Tue, 31 Oct 2017 12:57:29 +0100
-Subject: [PATCH] arm64: support __int128 on gcc 5+
-In-Reply-To: <20171031115156.GF5584@arm.com>
-References: <CAHmME9pE+G0V-nyKchQyG03YXbPjGykL1xX0M8E544Rh7QrgOQ@mail.gmail.com>
- <20171031114319.24436-1-Jason@zx2c4.com> <20171031115156.GF5584@arm.com>
-Message-ID: <CAHmME9qZq4rsspQ2BFWMXp1boj8YRuvbyfqKWtdPs=6BO9Bm0g@mail.gmail.com>
+From: andrea.bondavalli74@gmail.com (Andrea Bondavalli)
+Date: Tue, 31 Oct 2017 12:58:18 +0100
+Subject: [PATCH] ASoC: sun4i-codec: fixed 32bit audio capture support for
+ H3/H2+
+Message-ID: <20171031115818.GA9264@andrea-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+32bit and 24bit audio capture formats for H3/H2+ are broken because the 
+RX_SAMPLE_BITS and the RX_FIFO_MODE bits of AC_ADC_FIFOC register of the audio 
+codec are not set to operate in 24bit mode but in 16bit mode only.
+The following patch sets the H3 audio codec registers and the DMA bus width
+properly when a 24/32bit capture is requested.
 
-On Tue, Oct 31, 2017 at 12:51 PM, Will Deacon <will.deacon@arm.com> wrote:
-> Which code in the kernel actually uses 128-bit types directly? I know we
-> have some unfortunate occurences in our headers (including uapi) for the
-> vector registers, but I thought we generally used asm or copy routines to
-> access those.
+Signed-off-by: Andrea Bondavalli <andrea.bondavalli74@gmail.com>
+---
+ sound/soc/sunxi/sun4i-codec.c | 29 ++++++++++++++++++++++++-----
+ 1 file changed, 24 insertions(+), 5 deletions(-)
 
-math64.h provides it, and various things throughout use those
-functions. Notably, the scheduler and kvm use those the __int128
-functions. There's also an elliptic curve implementation that uses it,
-which makes a big difference. And soon I'll be adding an
-implementation of curve25519 that will make heavy use of these
-instructions for significant speedups as well.
-
-Generally, adding this CONFIG_ARCH key is a hint for current and
-future bits of code, so that they can use the faster 128-bit
-implementations when available. Not providing it when it's there and
-available would be silly. This wasn't originally added to the
-architecture, because when the Kconfig symbol was added, gcc didn't
-have sane support for it on aarch64. But now it does, so let's support
-it.
-
-Jason
+diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
+index baa9007..5da4efe 100644
+--- a/sound/soc/sunxi/sun4i-codec.c
++++ b/sound/soc/sunxi/sun4i-codec.c
+@@ -346,11 +346,6 @@ static int sun4i_codec_prepare_capture(struct snd_pcm_substream *substream,
+ 				   0x3 << 8,
+ 				   0x1 << 8);
+ 
+-	/* Fill most significant bits with valid data MSB */
+-	regmap_field_update_bits(scodec->reg_adc_fifoc,
+-				 BIT(SUN4I_CODEC_ADC_FIFOC_RX_FIFO_MODE),
+-				 BIT(SUN4I_CODEC_ADC_FIFOC_RX_FIFO_MODE));
+-
+ 	return 0;
+ }
+ 
+@@ -490,6 +485,30 @@ static int sun4i_codec_hw_params_capture(struct sun4i_codec *scodec,
+ 					 BIT(SUN4I_CODEC_ADC_FIFOC_MONO_EN),
+ 					 0);
+ 
++	/* Set the number of sample bits to either 16 or 24 bits */
++	if (hw_param_interval(params, SNDRV_PCM_HW_PARAM_SAMPLE_BITS)->min == 32) {
++		regmap_field_update_bits(scodec->reg_adc_fifoc,
++				   BIT(SUN4I_CODEC_ADC_FIFOC_RX_SAMPLE_BITS),
++				   BIT(SUN4I_CODEC_ADC_FIFOC_RX_SAMPLE_BITS));
++
++		regmap_field_update_bits(scodec->reg_adc_fifoc,
++				   BIT(SUN4I_CODEC_ADC_FIFOC_RX_FIFO_MODE),
++				   0);
++
++		scodec->capture_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
++	} else {
++		regmap_field_update_bits(scodec->reg_adc_fifoc,
++				   BIT(SUN4I_CODEC_ADC_FIFOC_RX_SAMPLE_BITS),
++				   0);
++
++		/* Fill most significant bits with valid data MSB */
++		regmap_field_update_bits(scodec->reg_adc_fifoc,
++				   BIT(SUN4I_CODEC_ADC_FIFOC_RX_FIFO_MODE),
++				   BIT(SUN4I_CODEC_ADC_FIFOC_RX_FIFO_MODE));
++
++		scodec->capture_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
++	}
++
+ 	return 0;
+ }
+ 
+-- 
+2.7.4
