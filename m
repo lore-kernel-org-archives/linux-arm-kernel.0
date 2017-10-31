@@ -1,92 +1,59 @@
 From: preid@electromag.com.au (Phil Reid)
-Date: Tue, 31 Oct 2017 15:33:55 +0800
-Subject: [PATCH v4 3/7] i2c: designware: rename i2c_dw_plat_prepare_clk to
- i2c_dw_prepare_clk
+Date: Tue, 31 Oct 2017 15:33:57 +0800
+Subject: [PATCH v4 5/7] i2c: imx: switch to using gpiod for bus recovery gpios
 In-Reply-To: <1509435239-64848-1-git-send-email-preid@electromag.com.au>
 References: <1509435239-64848-1-git-send-email-preid@electromag.com.au>
-Message-ID: <1509435239-64848-4-git-send-email-preid@electromag.com.au>
+Message-ID: <1509435239-64848-6-git-send-email-preid@electromag.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For consistency with the reset of the file rename function and parameter to
-be consistent with the reset of the common file.
+Change the driver to use the gpio descriptors for the bus recovery
+information instead of the deprecated integer interface.
 
-Acked-by: Jarkko Nikula <jarkko.nikula@linux.intel.com>
 Signed-off-by: Phil Reid <preid@electromag.com.au>
 ---
- drivers/i2c/busses/i2c-designware-common.c  | 10 +++++-----
- drivers/i2c/busses/i2c-designware-core.h    |  2 +-
- drivers/i2c/busses/i2c-designware-platdrv.c |  6 +++---
- 3 files changed, 9 insertions(+), 9 deletions(-)
+ drivers/i2c/busses/i2c-imx.c | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-designware-common.c b/drivers/i2c/busses/i2c-designware-common.c
-index b79f342..3d684c6 100644
---- a/drivers/i2c/busses/i2c-designware-common.c
-+++ b/drivers/i2c/busses/i2c-designware-common.c
-@@ -186,15 +186,15 @@ unsigned long i2c_dw_clk_rate(struct dw_i2c_dev *dev)
- 	return dev->get_clk_rate_khz(dev);
- }
+diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
+index f96830f..c4cf265 100644
+--- a/drivers/i2c/busses/i2c-imx.c
++++ b/drivers/i2c/busses/i2c-imx.c
+@@ -1006,26 +1006,26 @@ static int i2c_imx_init_recovery_info(struct imx_i2c_struct *i2c_imx,
+ 			PINCTRL_STATE_DEFAULT);
+ 	i2c_imx->pinctrl_pins_gpio = pinctrl_lookup_state(i2c_imx->pinctrl,
+ 			"gpio");
+-	rinfo->sda_gpio = of_get_named_gpio(pdev->dev.of_node, "sda-gpios", 0);
+-	rinfo->scl_gpio = of_get_named_gpio(pdev->dev.of_node, "scl-gpios", 0);
++	rinfo->sda_gpiod = devm_gpiod_get(&pdev->dev, "sda", GPIOD_OUT_HIGH);
++	rinfo->scl_gpiod = devm_gpiod_get(&pdev->dev, "scl", GPIOD_IN);
  
--int i2c_dw_plat_prepare_clk(struct dw_i2c_dev *i_dev, bool prepare)
-+int i2c_dw_prepare_clk(struct dw_i2c_dev *dev, bool prepare)
- {
--	if (IS_ERR(i_dev->clk))
--		return PTR_ERR(i_dev->clk);
-+	if (IS_ERR(dev->clk))
-+		return PTR_ERR(dev->clk);
- 
- 	if (prepare)
--		return clk_prepare_enable(i_dev->clk);
-+		return clk_prepare_enable(dev->clk);
- 
--	clk_disable_unprepare(i_dev->clk);
-+	clk_disable_unprepare(dev->clk);
- 	return 0;
- }
- 
-diff --git a/drivers/i2c/busses/i2c-designware-core.h b/drivers/i2c/busses/i2c-designware-core.h
-index e80a14c..33c6c8f 100644
---- a/drivers/i2c/busses/i2c-designware-core.h
-+++ b/drivers/i2c/busses/i2c-designware-core.h
-@@ -301,7 +301,7 @@ struct dw_i2c_dev {
- void __i2c_dw_enable(struct dw_i2c_dev *dev, bool enable);
- void __i2c_dw_enable_and_wait(struct dw_i2c_dev *dev, bool enable);
- unsigned long i2c_dw_clk_rate(struct dw_i2c_dev *dev);
--int i2c_dw_plat_prepare_clk(struct dw_i2c_dev *i_dev, bool prepare);
-+int i2c_dw_prepare_clk(struct dw_i2c_dev *dev, bool prepare);
- int i2c_dw_acquire_lock(struct dw_i2c_dev *dev);
- void i2c_dw_release_lock(struct dw_i2c_dev *dev);
- int i2c_dw_wait_bus_not_busy(struct dw_i2c_dev *dev);
-diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
-index a5fd0ee..9c5f649 100644
---- a/drivers/i2c/busses/i2c-designware-platdrv.c
-+++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-@@ -343,7 +343,7 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
- 		i2c_dw_configure_master(dev);
- 
- 	dev->clk = devm_clk_get(&pdev->dev, NULL);
--	if (!i2c_dw_plat_prepare_clk(dev, true)) {
-+	if (!i2c_dw_prepare_clk(dev, true)) {
- 		dev->get_clk_rate_khz = i2c_dw_get_clk_rate_khz;
- 
- 		if (!dev->sda_hold_time && ht)
-@@ -447,7 +447,7 @@ static int dw_i2c_plat_suspend(struct device *dev)
- 	}
- 
- 	i_dev->disable(i_dev);
--	i2c_dw_plat_prepare_clk(i_dev, false);
-+	i2c_dw_prepare_clk(i_dev, false);
- 
- 	i_dev->suspended = true;
- 
-@@ -466,7 +466,7 @@ static int dw_i2c_plat_resume(struct device *dev)
+-	if (rinfo->sda_gpio == -EPROBE_DEFER ||
+-	    rinfo->scl_gpio == -EPROBE_DEFER) {
++	if (PTR_ERR(rinfo->sda_gpiod) == -EPROBE_DEFER ||
++	    PTR_ERR(rinfo->scl_gpiod) == -EPROBE_DEFER) {
+ 		return -EPROBE_DEFER;
+-	} else if (!gpio_is_valid(rinfo->sda_gpio) ||
+-		   !gpio_is_valid(rinfo->scl_gpio) ||
++	} else if (IS_ERR(rinfo->sda_gpiod) ||
++		   IS_ERR(rinfo->scl_gpiod) ||
+ 		   IS_ERR(i2c_imx->pinctrl_pins_default) ||
+ 		   IS_ERR(i2c_imx->pinctrl_pins_gpio)) {
+ 		dev_dbg(&pdev->dev, "recovery information incomplete\n");
  		return 0;
  	}
  
--	i2c_dw_plat_prepare_clk(i_dev, true);
-+	i2c_dw_prepare_clk(i_dev, true);
- 	i_dev->init(i_dev);
+-	dev_dbg(&pdev->dev, "using scl-gpio %d and sda-gpio %d for recovery\n",
+-			rinfo->scl_gpio, rinfo->sda_gpio);
++	dev_dbg(&pdev->dev, "using scl%s for recovery\n",
++		rinfo->sda_gpiod ? ",sda" : "");
  
- 	i_dev->suspended = false;
+ 	rinfo->prepare_recovery = i2c_imx_prepare_recovery;
+ 	rinfo->unprepare_recovery = i2c_imx_unprepare_recovery;
+-	rinfo->recover_bus = i2c_generic_gpio_recovery;
++	rinfo->recover_bus = i2c_generic_scl_recovery;
+ 	i2c_imx->adapter.bus_recovery_info = rinfo;
+ 
+ 	return 0;
 -- 
 1.8.3.1
