@@ -1,78 +1,85 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 31 Oct 2017 23:50:39 +0000
-Subject: [PATCH 3/3] ARM: early_printk: use printascii() rather than
- printch()
-In-Reply-To: <nycvar.YSQ.7.76.1710311918100.21665@knanqh.ubzr>
-References: <20171031171629.GI9463@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1710311346190.21665@knanqh.ubzr>
- <20171031175344.GJ9463@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1710311355000.21665@knanqh.ubzr>
- <20171031182024.GK9463@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1710311432120.21665@knanqh.ubzr>
- <SG2PR06MB1165AE45FB289039E55D03028A5E0@SG2PR06MB1165.apcprd06.prod.outlook.com>
- <nycvar.YSQ.7.76.1710311527280.21665@knanqh.ubzr>
- <20171031215018.GL9463@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1710311918100.21665@knanqh.ubzr>
-Message-ID: <20171031235038.GM9463@n2100.armlinux.org.uk>
+From: labbott@redhat.com (Laura Abbott)
+Date: Tue, 31 Oct 2017 16:56:39 -0700
+Subject: [RFC PATCH 0/2] arm64: optional paranoid __{get,put}_user checks
+In-Reply-To: <20171026090942.7041-1-mark.rutland@arm.com>
+References: <20171026090942.7041-1-mark.rutland@arm.com>
+Message-ID: <77c80381-cf68-aa1a-9112-e057c068eeb6@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 31, 2017 at 07:35:56PM -0400, Nicolas Pitre wrote:
-> On Tue, 31 Oct 2017, Russell King - ARM Linux wrote:
+On 10/26/2017 02:09 AM, Mark Rutland wrote:
+> Hi,
 > 
-> > On Tue, Oct 31, 2017 at 03:28:11PM -0400, Nicolas Pitre wrote:
-> > > Good!  Queued as patch #8717.
-> > 
-> > I was going to say that there's another implementation of the
-> > same in arch/arm/boot/compressed/head.S, and if we fix one we
-> > should apply the same fix to the other.
+> In Prague, Kees mentioned that it would be nice to have a mechanism to
+> catch bad __{get,put}_user uses, such as the recent CVE-2017-5123 [1,2]
+> issue with unsafe_put_user() in waitid().
 > 
-> Let's make a separate patch for that one. Something like:
+> These patches allow an optional access_ok() check to be dropped in
+> arm64's __{get,put}_user() primitives. These will then BUG() if a bad
+> user pointer is passed (which should only happen in the absence of an
+> earlier access_ok() check).
 > 
-> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> index 8a756870c2..28a48ad3dd 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -1296,19 +1296,24 @@ phex:		adr	r3, phexbuf
->  
->  @ puts corrupts {r0, r1, r2, r3}
->  puts:		loadsp	r3, r1
-> -1:		ldrb	r2, [r0], #1
-> -		teq	r2, #0
-> +1:		teq	r0, #0
-> +		ldrneb	r2, [r0], #1
-> +		teqne	r2, #0
->  		moveq	pc, lr
-> -2:		writeb	r2, r3
-> +2:		teq	r2, #'\n'
-> +		bne	4f
-> +		mov	r2, #'\r'
-> +		writeb	r2, r3
->  		mov	r1, #0x00020000
->  3:		subs	r1, r1, #1
->  		bne	3b
-> -		teq	r2, #'\n'
-> -		moveq	r2, #'\r'
-> -		beq	2b
-> -		teq	r0, #0
-> -		bne	1b
-> -		mov	pc, lr
-> +		mov	r2, #'\n'
-> +4:		writeb	r2, r3
-> +		mov	r1, #0x00020000
-> +5:		subs	r1, r1, #1
-> +		bne	5b
-> +		b	1b
-> +
->  @ putc corrupts {r0, r1, r2, r3}
->  putc:
->  		mov	r2, r0
+> The first patch rewrites the arm64 access_ok() check in C. This gives
+> the compiler the visibility it needs to elide redundant access_ok()
+> checks, so in the common case:
 > 
-> Please review as this is untested.
+>   get_user()
+>     access_ok()
+>     __get_user()
+>       BUG_ON(!access_ok())
+>       <uaccess asm>
+> 
+> ... the compiler can determine that the second access_ok() must return
+> true, and can elide it along with the BUG_ON(), leaving:
+> 
+>   get_user()
+>     access_ok()
+>       __get_user()
+>         <uaccess asm>
+> 
+> ... and thus this sanity check can have no cost in the common case.
+> 
+> The compiler doesn't always have the visibility to do this (e.g. if the
+> two access_ok() checks are in different compilation units), but it seems
+> to manage to do this most of the time -- In testing with v4.14-rc5
+> defconfig this only increases the total Image size by 4KiB.
+> 
+> I had a go at turning this into a BUILD_BUG_ON(), to see if we could
+> catch this issue at compile time. However, my GCC wasn't able to remove
+> the BUILD_BUG() from some {get,put}_user cases. Maybe we can fix that,
+> or maybe we can have some static analysis catch this at build time.
+> 
+> It's entirely possible that I've made some catastrophic mistake in these
+> patches; I've only build-tested them so far, and I don't currently have
+> access to hardware to test on.
+> 
+> I also haven't yet modified __copy_{to,from}_user and friends along
+> similar lines, so this is incomplete. If there aren't any major
+> objections to this approach, I can fold those in for the next spin.
+> 
+> Thanks,
+> Mark.
+> 
+> [1] https://lwn.net/Articles/736348/
+> [2] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=96ca579a1ecc943b75beba58bebb0356f6cc4b51
+> 
+> 
+> Mark Rutland (2):
+>   arm64: write __range_ok() in C
+>   arm64: allow paranoid __{get,put}user
+> 
+>  arch/arm64/Kconfig               |  9 +++++++++
+>  arch/arm64/include/asm/uaccess.h | 27 +++++++++++++++++++--------
+>  2 files changed, 28 insertions(+), 8 deletions(-)
+> 
 
-Looks good from a quick read through, thanks.
+Turning on the option fails as soon as we hit userspace. On my buildroot
+based environment I get the help text for ld.so (????) and then a message
+about attempting to kill init. I get a crash in init on the Hikey Android
+environment as well. It almost seems like the __range_ok re-write
+is triggering an error but it only seems to happen when the option is
+enabled even when I take out the BUG. I'll see if I can get more useful
+information.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Thanks,
+Laura
