@@ -1,43 +1,28 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 31 Oct 2017 10:36:16 +0000
-Subject: [PATCH v3 05/12] arm: vdso: do calculations outside reader loops
-In-Reply-To: <040cf1cc-28a0-0f4c-1c08-7bc8a9dc75a2@android.com>
-References: <20171027222543.57279-1-salyzyn@android.com>
- <20171030141517.25ex2os47cyvah2z@lakrids.cambridge.arm.com>
- <040cf1cc-28a0-0f4c-1c08-7bc8a9dc75a2@android.com>
-Message-ID: <20171031103615.urjintbmv4i5cw4a@lakrids.cambridge.arm.com>
+Date: Tue, 31 Oct 2017 10:43:32 +0000
+Subject: CONFIG_ARCH_SUPPORTS_INT128 for AArch64
+In-Reply-To: <CAHmME9q3=k2fJMi4Zy6d=ewj-P=sRhB8c_MjSJAMbKkopThi1w@mail.gmail.com>
+References: <CAHmME9q3=k2fJMi4Zy6d=ewj-P=sRhB8c_MjSJAMbKkopThi1w@mail.gmail.com>
+Message-ID: <20171031104332.gqpd6icvrxt2uj4c@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 30, 2017 at 01:27:22PM -0700, Mark Salyzyn wrote:
-> Thanks for the review, am taking all the points into consideration.
+On Tue, Oct 31, 2017 at 11:17:52AM +0100, Jason A. Donenfeld wrote:
+> Hi folks,
 > 
-> On 10/30/2017 07:15 AM, Mark Rutland wrote:
-> > > +
-> > > +	typeof(((struct vdso_data *)vd)->xtime_clock_sec) sec;
-> > Why do we need to do this typeof() magic?
-> > 
-> > Can't we settle on a consistent type across arches, or have a typedef in
-> > a header?
+> Older versions of gcc are horrible for int128_t on aarch64, emitting a
+> __multi3 call, which is slow and defeats the purpose. However, more
+> recent versions of gcc (since 5, IIRC), do the right thing and produce
+> the proper inlined instructions.
 > 
-> Would you accept 'because I do not want to standardize the sizes yet'?
+> Do we have the infrastructure available to test for this, and
+> conditionally set CONFIG_ARCH_SUPPORTS_INT128 if we do?
 
-Well, a typedef would solve that issue. e.g. each arch can have:
+Judging by Documentation/kbuild/makefiles.txt, we could do something
+like the below in the arm64 Makefile:
 
-  typedef u64 vdso_xtime_sec_t;
+cflags-y += $(call cc-ifversion, -ge, 0500, -DCONFIG_ARCH_SUPPORTS_INT128)
 
-... or
-
-  typedef u32 vdso_xtime_sec_t;
-
-... in headers for native/compat, and the above can be:
-
-  vdso_xtime_sec_t sec
-
-... with the same type in the relevant struct.
-
-That way the type can differ per arch. If we want to do something more
-complicated later, we can always rework the code.
+Note that I havent tested this at all.
 
 Thanks,
-Mark.
