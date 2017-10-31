@@ -1,35 +1,96 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Tue, 31 Oct 2017 21:05:57 +0200
-Subject: [PATCH 2/4] gpiolib: add bitmask for valid GPIO lines
-In-Reply-To: <02208047-38c8-f97b-5c53-6cced7bdecc6@codeaurora.org>
-References: <1509396602-1936-1-git-send-email-timur@codeaurora.org>
- <1509396602-1936-3-git-send-email-timur@codeaurora.org>
- <1509441149.10233.80.camel@linux.intel.com>
- <02208047-38c8-f97b-5c53-6cced7bdecc6@codeaurora.org>
-Message-ID: <1509476757.10233.143.camel@linux.intel.com>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Tue, 31 Oct 2017 19:12:32 +0000
+Subject: [PATCH 3/3] ARM: early_printk: use printascii() rather than
+ printch()
+In-Reply-To: <nycvar.YSQ.7.76.1710311432120.21665@knanqh.ubzr>
+References: <20171002020618.23924-1-nicolas.pitre@linaro.org>
+ <20171002020618.23924-4-nicolas.pitre@linaro.org>
+ <PS1PR06MB1162212F37C8BA7EE367FE828A5E0@PS1PR06MB1162.apcprd06.prod.outlook.com>
+ <nycvar.YSQ.7.76.1710311211540.21665@knanqh.ubzr>
+ <80bc8c16-321a-43ea-6cbb-257dbeee485b@arm.com>
+ <nycvar.YSQ.7.76.1710311302370.21665@knanqh.ubzr>
+ <20171031171629.GI9463@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1710311346190.21665@knanqh.ubzr>
+ <20171031175344.GJ9463@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1710311355000.21665@knanqh.ubzr>
+ <20171031182024.GK9463@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1710311432120.21665@knanqh.ubzr>
+Message-ID: <SG2PR06MB1165AE45FB289039E55D03028A5E0@SG2PR06MB1165.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-10-31 at 13:54 -0500, Timur Tabi wrote:
-> On 10/31/2017 04:12 AM, Andy Shevchenko wrote:
-> > Instead of mangling this function wouldn't be better to introduce a
-> > separate one for line and perhaps a third one which calls them both?
+On Tuesday, October 31, 2017, Nicolas Pitre wrote:
+> On Tue, 31 Oct 2017, Russell King - ARM Linux wrote:
+> > On Tue, Oct 31, 2017 at 02:15:14PM -0400, Nicolas Pitre wrote:
+> > > On Tue, 31 Oct 2017, Russell King - ARM Linux wrote:
+> > > > So a printch('\n') produces "\n\r" on the UART.  If we're fixing
+> > > > printascii() to emit "\r\n" instead of "\n\r" for a '\n', then
+> > > > printch() should have the same fix, and should not truncate to
+> > > > just '\n'.
+> > >
+> > > OK... That's easy to achieve, but is it desirable?
+> >
+> > Yes - remember, these are supposed to be usable from assembly,
+> > and we really don't want to have the complexity of:
+> >
+> > 	mov	r0, #'\r'
+> > 	bl	printch
+> > 	mov	r0, #'\n'
+> > 	bl	printch
+> >
+> > each time we want to begin a new line.
 > 
-> The diff is convoluted, but the end result is clean:
+> Fine with me.
+> 
+> diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
+> index ea9646cc2a..01d746efff 100644
+> --- a/arch/arm/kernel/debug.S
+> +++ b/arch/arm/kernel/debug.S
+> @@ -79,25 +79,28 @@ hexbuf:		.space 16
+> 
+>  ENTRY(printascii)
+>  		addruart_current r3, r1, r2
+> -		b	2f
+> -1:		waituart r2, r3
+> -		senduart r1, r3
+> -		busyuart r2, r3
+> -		teq	r1, #'\n'
+> -		moveq	r1, #'\r'
+> -		beq	1b
+> -2:		teq	r0, #0
+> +1:		teq	r0, #0
+>  		ldrneb	r1, [r0], #1
+>  		teqne	r1, #0
+> -		bne	1b
+> -		ret	lr
+> +		reteq	lr
+> +2:		teq     r1, #'\n'
+> +		bne	3f
+> +		mov	r1, '\r'
+> +		waituart r2, r3
+> +		senduart r1, r3
+> +		busyuart r2, r3
+> +		mov	r1, '\n'
+> +3:		waituart r2, r3
+> +		senduart r1, r3
+> +		busyuart r2, r3
+> +		b	1b
+>  ENDPROC(printascii)
+> 
+>  ENTRY(printch)
+>  		addruart_current r3, r1, r2
+>  		mov	r1, r0
+>  		mov	r0, #0
+> -		b	1b
+> +		b	2b
+>  ENDPROC(printch)
+> 
+>  #ifdef CONFIG_MMU
 
-> Is this acceptable?
 
-I also put in the comment the following:
+This patch worked for me.
+I get my carriage returns again.
 
---- 8< --- 8< --- 8< ---
+Thanks.
 
-...for my opinion it will drastically increase readability and reduce
-diff as well (better for review).
-
---- 8< --- 8< --- 8< ---
-
-The decision is up to Linus. I simple shared my opinion.
-
--- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+Chris
