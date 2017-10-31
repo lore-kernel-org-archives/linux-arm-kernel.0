@@ -1,53 +1,71 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 31 Oct 2017 17:23:15 +0000
-Subject: [PATCH v9 5/8] arm64: Use of_cpu_node_to_id helper for CPU topology
- parsing
+Date: Tue, 31 Oct 2017 17:23:14 +0000
+Subject: [PATCH v9 4/8] irqchip: gic-v3: Use of_cpu_node_to_id helper
 In-Reply-To: <20171031172318.11823-1-suzuki.poulose@arm.com>
 References: <20171031172318.11823-1-suzuki.poulose@arm.com>
-Message-ID: <20171031172318.11823-6-suzuki.poulose@arm.com>
+Message-ID: <20171031172318.11823-5-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make use of the new generic helper to convert an of_node of a CPU
-to the logical CPU id in parsing the topology.
+Use the new generic helper of_cpu_node_to_id() instead
+of using our own version to map a device node to logical CPU
+number.
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Leo Yan <leo.yan@linaro.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/kernel/topology.c | 16 ++++++----------
- 1 file changed, 6 insertions(+), 10 deletions(-)
+Changes since V3:
+ - Reflect the change in the helper name and return value.
+---
+ drivers/irqchip/irq-gic-v3.c | 29 ++---------------------------
+ 1 file changed, 2 insertions(+), 27 deletions(-)
 
-diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index 8d48b233e6ce..21868530018e 100644
---- a/arch/arm64/kernel/topology.c
-+++ b/arch/arm64/kernel/topology.c
-@@ -37,18 +37,14 @@ static int __init get_cpu_for_node(struct device_node *node)
- 	if (!cpu_node)
- 		return -1;
- 
--	for_each_possible_cpu(cpu) {
--		if (of_get_cpu_node(cpu, NULL) == cpu_node) {
--			topology_parse_cpu_capacity(cpu_node, cpu);
--			of_node_put(cpu_node);
--			return cpu;
--		}
--	}
--
--	pr_crit("Unable to find CPU node for %pOF\n", cpu_node);
-+	cpu = of_cpu_node_to_id(cpu_node);
-+	if (cpu >= 0)
-+		topology_parse_cpu_capacity(cpu_node, cpu);
-+	else
-+		pr_crit("Unable to find CPU node for %pOF\n", cpu_node);
- 
- 	of_node_put(cpu_node);
--	return -1;
-+	return cpu;
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index b5df99c6f680..04cecab71597 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -1038,31 +1038,6 @@ static int __init gic_validate_dist_version(void __iomem *dist_base)
+ 	return 0;
  }
  
- static int __init parse_core(struct device_node *core, int cluster_id,
+-static int get_cpu_number(struct device_node *dn)
+-{
+-	const __be32 *cell;
+-	u64 hwid;
+-	int cpu;
+-
+-	cell = of_get_property(dn, "reg", NULL);
+-	if (!cell)
+-		return -1;
+-
+-	hwid = of_read_number(cell, of_n_addr_cells(dn));
+-
+-	/*
+-	 * Non affinity bits must be set to 0 in the DT
+-	 */
+-	if (hwid & ~MPIDR_HWID_BITMASK)
+-		return -1;
+-
+-	for_each_possible_cpu(cpu)
+-		if (cpu_logical_map(cpu) == hwid)
+-			return cpu;
+-
+-	return -1;
+-}
+-
+ /* Create all possible partitions at boot time */
+ static void __init gic_populate_ppi_partitions(struct device_node *gic_node)
+ {
+@@ -1113,8 +1088,8 @@ static void __init gic_populate_ppi_partitions(struct device_node *gic_node)
+ 			if (WARN_ON(!cpu_node))
+ 				continue;
+ 
+-			cpu = get_cpu_number(cpu_node);
+-			if (WARN_ON(cpu == -1))
++			cpu = of_cpu_node_to_id(cpu_node);
++			if (WARN_ON(cpu < 0))
+ 				continue;
+ 
+ 			pr_cont("%pOF[%d] ", cpu_node, cpu);
 -- 
 2.13.6
