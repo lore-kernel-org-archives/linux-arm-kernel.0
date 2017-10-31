@@ -1,7 +1,8 @@
 From: salyzyn@android.com (Mark Salyzyn)
-Date: Tue, 31 Oct 2017 11:33:14 -0700
-Subject: [PATCH v4 11/12] lib: vdso: Add support for CLOCK_BOOTTIME
-Message-ID: <20171031183325.81436-1-salyzyn@android.com>
+Date: Tue, 31 Oct 2017 11:33:40 -0700
+Subject: [PATCH v4 12/12] lib: vdso: do not expose gettimeofday,
+ if no arch supported timer
+Message-ID: <20171031183345.81499-1-salyzyn@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,14 +13,9 @@ for each architecture. But instead of landing it in arm64, land the
 result into lib/vdso and unify both implementations to simplify
 future maintenance.
 
-Add a case for CLOCK_BOOTTIME as it is popular for measuring
-relative time on systems expected to suspend() or hibernate().
-
-Android uses CLOCK_BOOTTIME for all relative time measurements
-and timeouts. Switching to vdso reduced CPU utilization and improves
-accuracy. There is also a desire by some partners to switch all
-logging over to CLOCK_BOOTTIME, and thus this operation alone would
-contribute to a near percentile CPU load.
+If ARCH_PROVIDES_TIMER is not defined, do not expose gettimeofday.
+libc will default directly to syscall.  Also ifdef clock_gettime
+switch cases and stubs if not supported and other unused components.
 
 Signed-off-by: Mark Salyzyn <salyzyn@android.com>
 Cc: James Morse <james.morse@arm.com>
@@ -40,159 +36,121 @@ Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: linux-kernel at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 
-v2:
-- rebased and changed from 3/3 to 10/10, fortified commit message.
-
 v3:
-- move arch/arm/vdso/vgettimeofday.c to lib/vdso/vgettimeofday.c.
+- do not expose gettimeofday if arch does not support user space timer.
 
 v4:
-- update commit message to reflect specific, and overall reasoning
-  of patch series.
-- drop forced inline operations.
-- switch typeof() with __kernel_time_t.
+- update commit message to reflect overall reasoning of patch series.
 
 ---
- arch/arm/include/asm/vdso_datapage.h   |  1 +
- arch/arm/kernel/vdso.c                 |  1 +
- arch/arm64/include/asm/vdso_datapage.h |  1 +
- arch/arm64/kernel/vdso.c               |  1 +
- lib/vdso/vgettimeofday.c               | 54 ++++++++++++++++++++++++++++++++++
- 5 files changed, 58 insertions(+)
+ lib/vdso/vgettimeofday.c | 52 +++++++++++++++++++-----------------------------
+ 1 file changed, 20 insertions(+), 32 deletions(-)
 
-diff --git a/arch/arm/include/asm/vdso_datapage.h b/arch/arm/include/asm/vdso_datapage.h
-index 1c6e6a5d5d9d..1adfb2daac3a 100644
---- a/arch/arm/include/asm/vdso_datapage.h
-+++ b/arch/arm/include/asm/vdso_datapage.h
-@@ -64,6 +64,7 @@ struct vdso_data {
- 	u32 tz_minuteswest;	/* timezone info for gettimeofday(2) */
- 	u32 tz_dsttime;
- 
-+	u64 btm_nsec;		/* monotonic to boot time */
- 	/* Raw clocksource multipler */
- 	u32 cs_raw_mult;
- 	/* Raw time */
-diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
-index 287424541f3a..9370ab4b2734 100644
---- a/arch/arm/kernel/vdso.c
-+++ b/arch/arm/kernel/vdso.c
-@@ -347,6 +347,7 @@ void update_vsyscall(struct timekeeper *tk)
- 		/* tkr_mono.shift == tkr_raw.shift */
- 		vdso_data->cs_shift		= tk->tkr_mono.shift;
- 		vdso_data->cs_mask		= tk->tkr_mono.mask;
-+		vdso_data->btm_nsec		= ktime_to_ns(tk->offs_boot);
- 	}
- 
- 	vdso_write_end(vdso_data);
-diff --git a/arch/arm64/include/asm/vdso_datapage.h b/arch/arm64/include/asm/vdso_datapage.h
-index 95f4a7abab80..e4fa5e054708 100644
---- a/arch/arm64/include/asm/vdso_datapage.h
-+++ b/arch/arm64/include/asm/vdso_datapage.h
-@@ -45,6 +45,7 @@ struct vdso_data {
- 	__u64 xtime_coarse_nsec;
- 	__u64 wtm_clock_sec;	/* Wall to monotonic time */
- 	vdso_wtm_clock_nsec_t wtm_clock_nsec;
-+	__u64 btm_nsec;		/* monotonic to boot time */
- 	__u32 tb_seq_count;	/* Timebase sequence counter */
- 	/* cs_* members must be adjacent and in this order (ldp accesses) */
- 	__u32 cs_mono_mult;	/* NTP-adjusted clocksource multiplier */
-diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-index 59f150c25889..0710edd8bedc 100644
---- a/arch/arm64/kernel/vdso.c
-+++ b/arch/arm64/kernel/vdso.c
-@@ -243,6 +243,7 @@ void update_vsyscall(struct timekeeper *tk)
- 		vdso_data->cs_raw_mult		= tk->tkr_raw.mult;
- 		/* tkr_mono.shift == tkr_raw.shift */
- 		vdso_data->cs_shift		= tk->tkr_mono.shift;
-+		vdso_data->btm_nsec		= ktime_to_ns(tk->offs_boot);
- 	}
- 
- 	smp_wmb();
 diff --git a/lib/vdso/vgettimeofday.c b/lib/vdso/vgettimeofday.c
-index 0b585081f4de..4f500aba7e60 100644
+index 4f500aba7e60..896e20e34a23 100644
 --- a/lib/vdso/vgettimeofday.c
 +++ b/lib/vdso/vgettimeofday.c
-@@ -242,6 +242,49 @@ static notrace int do_monotonic_raw(const struct vdso_data *vd,
+@@ -29,7 +29,9 @@
+ #include "compiler.h"
+ #include "datapage.h"
+ 
++#ifdef ARCH_PROVIDES_TIMER
+ DEFINE_FALLBACK(gettimeofday, struct timeval *, tv, struct timezone *, tz)
++#endif
+ DEFINE_FALLBACK(clock_gettime, clockid_t, clock, struct timespec *, ts)
+ DEFINE_FALLBACK(clock_getres, clockid_t, clock, struct timespec *, ts)
+ 
+@@ -285,30 +287,6 @@ static notrace int do_boottime(const struct vdso_data *vd, struct timespec *ts)
  	return 0;
  }
  
-+static notrace int do_boottime(const struct vdso_data *vd, struct timespec *ts)
-+{
-+	u32 seq, mult, shift;
-+	u64 nsec, cycle_last, wtm_nsec;
-+#ifdef ARCH_CLOCK_FIXED_MASK
-+	static const u64 mask = ARCH_CLOCK_FIXED_MASK;
-+#else
-+	u64 mask;
-+#endif
-+	__kernel_time_t sec;
-+
-+	do {
-+		seq = vdso_read_begin(vd);
-+
-+		if (vd->use_syscall)
-+			return -1;
-+
-+		cycle_last = vd->cs_cycle_last;
-+
-+		mult = vd->cs_mono_mult;
-+		shift = vd->cs_shift;
-+#ifndef ARCH_CLOCK_FIXED_MASK
-+		mask = vd->cs_mask;
-+#endif
-+
-+		sec = vd->xtime_clock_sec;
-+		nsec = vd->xtime_clock_snsec;
-+
-+		sec += vd->wtm_clock_sec;
-+		wtm_nsec = vd->wtm_clock_nsec + vd->btm_nsec;
-+
-+	} while (unlikely(vdso_read_retry(vd, seq)));
-+
-+	nsec += get_clock_shifted_nsec(cycle_last, mult, mask);
-+	nsec >>= shift;
-+	nsec += wtm_nsec;
-+
-+	ts->tv_sec = sec + __iter_div_u64_rem(nsec, NSEC_PER_SEC, &nsec);
-+	ts->tv_nsec = nsec;
-+
-+	return 0;
-+}
-+
- #else /* ARCH_PROVIDES_TIMER */
- 
- static notrace int do_realtime(const struct vdso_data *vd, struct timespec *ts)
-@@ -260,6 +303,12 @@ static notrace int do_monotonic_raw(const struct vdso_data *vd,
- 	return -1;
- }
- 
-+static notrace int do_boottime(const struct vdso_data *vd,
-+			       struct timespec *ts)
-+{
-+	return -1;
-+}
-+
+-#else /* ARCH_PROVIDES_TIMER */
+-
+-static notrace int do_realtime(const struct vdso_data *vd, struct timespec *ts)
+-{
+-	return -1;
+-}
+-
+-static notrace int do_monotonic(const struct vdso_data *vd, struct timespec *ts)
+-{
+-	return -1;
+-}
+-
+-static notrace int do_monotonic_raw(const struct vdso_data *vd,
+-				    struct timespec *ts)
+-{
+-	return -1;
+-}
+-
+-static notrace int do_boottime(const struct vdso_data *vd,
+-			       struct timespec *ts)
+-{
+-	return -1;
+-}
+-
  #endif /* ARCH_PROVIDES_TIMER */
  
  notrace int __vdso_clock_gettime(clockid_t clock, struct timespec *ts)
-@@ -285,6 +334,10 @@ notrace int __vdso_clock_gettime(clockid_t clock, struct timespec *ts)
- 		if (do_monotonic_raw(vd, ts))
+@@ -322,6 +300,7 @@ notrace int __vdso_clock_gettime(clockid_t clock, struct timespec *ts)
+ 	case CLOCK_MONOTONIC_COARSE:
+ 		do_monotonic_coarse(vd, ts);
+ 		break;
++#ifdef ARCH_PROVIDES_TIMER
+ 	case CLOCK_REALTIME:
+ 		if (do_realtime(vd, ts))
+ 			goto fallback;
+@@ -338,6 +317,7 @@ notrace int __vdso_clock_gettime(clockid_t clock, struct timespec *ts)
+ 		if (do_boottime(vd, ts))
  			goto fallback;
  		break;
-+	case CLOCK_BOOTTIME:
-+		if (do_boottime(vd, ts))
-+			goto fallback;
-+		break;
++#endif
  	default:
  		goto fallback;
  	}
-@@ -321,6 +374,7 @@ int __vdso_clock_getres(clockid_t clock, struct timespec *res)
+@@ -347,6 +327,7 @@ notrace int __vdso_clock_gettime(clockid_t clock, struct timespec *ts)
+ 	return clock_gettime_fallback(clock, ts);
+ }
+ 
++#ifdef ARCH_PROVIDES_TIMER
+ notrace int __vdso_gettimeofday(struct timeval *tv, struct timezone *tz)
+ {
+ 	const struct vdso_data *vd = __get_datapage();
+@@ -368,21 +349,28 @@ notrace int __vdso_gettimeofday(struct timeval *tv, struct timezone *tz)
+ 
+ 	return 0;
+ }
++#endif
+ 
+ int __vdso_clock_getres(clockid_t clock, struct timespec *res)
+ {
  	long nsec;
  
- 	if (clock == CLOCK_REALTIME ||
-+	    clock == CLOCK_BOOTTIME ||
- 	    clock == CLOCK_MONOTONIC ||
- 	    clock == CLOCK_MONOTONIC_RAW)
- 		nsec = MONOTONIC_RES_NSEC;
+-	if (clock == CLOCK_REALTIME ||
+-	    clock == CLOCK_BOOTTIME ||
+-	    clock == CLOCK_MONOTONIC ||
+-	    clock == CLOCK_MONOTONIC_RAW)
+-		nsec = MONOTONIC_RES_NSEC;
+-	else if (clock == CLOCK_REALTIME_COARSE ||
+-		 clock == CLOCK_MONOTONIC_COARSE)
++	switch (clock) {
++	case CLOCK_REALTIME_COARSE:
++	case CLOCK_MONOTONIC_COARSE:
+ 		nsec = LOW_RES_NSEC;
+-	else
++		break;
++#ifdef ARCH_PROVIDES_TIMER
++	case CLOCK_REALTIME:
++	case CLOCK_MONOTONIC:
++	case CLOCK_MONOTONIC_RAW:
++	case CLOCK_BOOTTIME:
++		nsec = MONOTONIC_RES_NSEC;
++		break;
++#endif
++	default:
+ 		return clock_getres_fallback(clock, res);
++	}
+ 
+ 	if (likely(res != NULL)) {
+ 		res->tv_sec = 0;
 -- 
 2.15.0.rc2.357.g7e34df9404-goog
