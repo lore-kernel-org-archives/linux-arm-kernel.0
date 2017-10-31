@@ -1,30 +1,134 @@
 From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Tue, 31 Oct 2017 16:25:22 +0100
-Subject: [PATCH 0/2] Fixes for the Atmel AES crypto module
-Message-ID: <20171031152524.25216-1-romain.izard.pro@gmail.com>
+Date: Tue, 31 Oct 2017 16:25:23 +0100
+Subject: [PATCH 1/2] crypto: atmel-aes - properly set IV after {en,de}crypt
+In-Reply-To: <20171031152524.25216-1-romain.izard.pro@gmail.com>
+References: <20171031152524.25216-1-romain.izard.pro@gmail.com>
+Message-ID: <20171031152524.25216-2-romain.izard.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After encountering an issue with cts(cbc(aes)) in the Atmel AES module,
-I have used tcrypt and libkcapi's test suite to validate my fix. This led
-me to observe some other issues.
+Certain cipher modes like CTS expect the IV (req->info) of
+ablkcipher_request (or equivalently req->iv of skcipher_request) to
+contain the last ciphertext block when the {en,de}crypt operation is done.
 
-This series includes the IV issue correction for the Atmel AES crypto
-engine, as well as a secondary issue observed when running
-'insmod tcrypt.ko mode=10' and 'insmod tcrypt.ko mode=152' on a SAMA5D2
-board.
+Fix this issue for the Atmel AES hardware engine. The tcrypt test
+case for cts(cbc(aes)) is now correctly passed.
 
-The libkcapi test suite still reports some problems, for example when the
-input data is too large to fit into an intermediate buffer in unaligned
-cases. And it seems that with the v4.14 updates, new asynchronous tests
-are enabled and report new issues.
+In the case of in-place decryption, copy the ciphertext in an
+intermediate buffer before decryption.
 
-Romain Izard (2):
-  crypto: atmel-aes - properly set IV after {en,de}crypt
-  crypto: atmel-aes - Reset the controller before each use
+Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+---
+ drivers/crypto/atmel-aes.c | 40 +++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 37 insertions(+), 3 deletions(-)
 
- drivers/crypto/atmel-aes.c | 50 ++++++++++++++++++++++++++++++++++++----------
- 1 file changed, 40 insertions(+), 10 deletions(-)
-
+diff --git a/drivers/crypto/atmel-aes.c b/drivers/crypto/atmel-aes.c
+index 29e20c37f3a6..53432ab97d7e 100644
+--- a/drivers/crypto/atmel-aes.c
++++ b/drivers/crypto/atmel-aes.c
+@@ -110,6 +110,7 @@ struct atmel_aes_base_ctx {
+ 	int			keylen;
+ 	u32			key[AES_KEYSIZE_256 / sizeof(u32)];
+ 	u16			block_size;
++	bool			is_aead;
+ };
+ 
+ struct atmel_aes_ctx {
+@@ -156,6 +157,7 @@ struct atmel_aes_authenc_ctx {
+ 
+ struct atmel_aes_reqctx {
+ 	unsigned long		mode;
++	u32			lastc[AES_BLOCK_SIZE / sizeof(u32)];
+ };
+ 
+ #ifdef CONFIG_CRYPTO_DEV_ATMEL_AUTHENC
+@@ -497,12 +499,34 @@ static void atmel_aes_authenc_complete(struct atmel_aes_dev *dd, int err);
+ static inline int atmel_aes_complete(struct atmel_aes_dev *dd, int err)
+ {
+ #ifdef CONFIG_CRYPTO_DEV_ATMEL_AUTHENC
+-	atmel_aes_authenc_complete(dd, err);
++	if (dd->ctx->is_aead)
++		atmel_aes_authenc_complete(dd, err);
+ #endif
+ 
+ 	clk_disable(dd->iclk);
+ 	dd->flags &= ~AES_FLAGS_BUSY;
+ 
++	if (!dd->ctx->is_aead) {
++		struct ablkcipher_request *req =
++			ablkcipher_request_cast(dd->areq);
++		struct atmel_aes_reqctx *rctx = ablkcipher_request_ctx(req);
++		struct crypto_ablkcipher *ablkcipher =
++			crypto_ablkcipher_reqtfm(req);
++		int ivsize = crypto_ablkcipher_ivsize(ablkcipher);
++
++		if (rctx->mode & AES_FLAGS_ENCRYPT) {
++			scatterwalk_map_and_copy(req->info, req->dst,
++				req->nbytes - ivsize, ivsize, 0);
++		} else {
++			if (req->src == req->dst) {
++				memcpy(req->info, rctx->lastc, ivsize);
++			} else {
++				scatterwalk_map_and_copy(req->info, req->src,
++					req->nbytes - ivsize, ivsize, 0);
++			}
++		}
++	}
++
+ 	if (dd->is_async)
+ 		dd->areq->complete(dd->areq, err);
+ 
+@@ -1071,11 +1095,11 @@ static int atmel_aes_ctr_start(struct atmel_aes_dev *dd)
+ 
+ static int atmel_aes_crypt(struct ablkcipher_request *req, unsigned long mode)
+ {
+-	struct atmel_aes_base_ctx *ctx;
++	struct crypto_ablkcipher *ablkcipher = crypto_ablkcipher_reqtfm(req);
++	struct atmel_aes_base_ctx *ctx = crypto_ablkcipher_ctx(ablkcipher);
+ 	struct atmel_aes_reqctx *rctx;
+ 	struct atmel_aes_dev *dd;
+ 
+-	ctx = crypto_ablkcipher_ctx(crypto_ablkcipher_reqtfm(req));
+ 	switch (mode & AES_FLAGS_OPMODE_MASK) {
+ 	case AES_FLAGS_CFB8:
+ 		ctx->block_size = CFB8_BLOCK_SIZE;
+@@ -1097,6 +1121,7 @@ static int atmel_aes_crypt(struct ablkcipher_request *req, unsigned long mode)
+ 		ctx->block_size = AES_BLOCK_SIZE;
+ 		break;
+ 	}
++	ctx->is_aead = false;
+ 
+ 	dd = atmel_aes_find_dev(ctx);
+ 	if (!dd)
+@@ -1105,6 +1130,13 @@ static int atmel_aes_crypt(struct ablkcipher_request *req, unsigned long mode)
+ 	rctx = ablkcipher_request_ctx(req);
+ 	rctx->mode = mode;
+ 
++	if (!(mode & AES_FLAGS_ENCRYPT) && (req->src == req->dst)) {
++		int ivsize = crypto_ablkcipher_ivsize(ablkcipher);
++
++		scatterwalk_map_and_copy(rctx->lastc, req->src,
++			(req->nbytes - ivsize), ivsize, 0);
++	}
++
+ 	return atmel_aes_handle_queue(dd, &req->base);
+ }
+ 
+@@ -1739,6 +1771,7 @@ static int atmel_aes_gcm_crypt(struct aead_request *req,
+ 
+ 	ctx = crypto_aead_ctx(crypto_aead_reqtfm(req));
+ 	ctx->block_size = AES_BLOCK_SIZE;
++	ctx->is_aead = true;
+ 
+ 	dd = atmel_aes_find_dev(ctx);
+ 	if (!dd)
+@@ -2223,6 +2256,7 @@ static int atmel_aes_authenc_crypt(struct aead_request *req,
+ 
+ 	rctx->base.mode = mode;
+ 	ctx->block_size = AES_BLOCK_SIZE;
++	ctx->is_aead = true;
+ 
+ 	dd = atmel_aes_find_dev(ctx);
+ 	if (!dd)
 -- 
 2.14.1
