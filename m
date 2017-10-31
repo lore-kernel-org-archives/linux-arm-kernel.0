@@ -1,21 +1,26 @@
-From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Tue, 31 Oct 2017 13:18:41 +0100
-Subject: [PATCH] arm64: support __int128 on gcc 5+
-In-Reply-To: <20171031121701.GI5584@arm.com>
-References: <CAHmME9pE+G0V-nyKchQyG03YXbPjGykL1xX0M8E544Rh7QrgOQ@mail.gmail.com>
- <20171031114319.24436-1-Jason@zx2c4.com> <20171031115156.GF5584@arm.com>
- <CAHmME9qZq4rsspQ2BFWMXp1boj8YRuvbyfqKWtdPs=6BO9Bm0g@mail.gmail.com>
- <20171031121701.GI5584@arm.com>
-Message-ID: <CAHmME9pey+8YcDg9+vkoVGU0qBkc6dqY7RXFYFr=RzcTb7qb+Q@mail.gmail.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Tue, 31 Oct 2017 07:28:12 -0500
+Subject: [PATCH 1/4] Revert "gpio: set up initial state from
+ .get_direction()"
+In-Reply-To: <1509440926.10233.77.camel@linux.intel.com>
+References: <1509396602-1936-1-git-send-email-timur@codeaurora.org>
+ <1509396602-1936-2-git-send-email-timur@codeaurora.org>
+ <1509440926.10233.77.camel@linux.intel.com>
+Message-ID: <a6c8b2ac-29de-4ec7-7b3f-fac1b5b16942@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 31, 2017 at 1:17 PM, Will Deacon <will.deacon@arm.com> wrote:
->
-> Sure, I'll wait for your patch that matches the relevant compiler versions.
+On 10/31/17 4:08 AM, Andy Shevchenko wrote:
+> Can you preserve the style and indentation of the commit?
+> Does checkpatch warn you about style? (It's apparently not a net
+> subsystem)
 
-That's the patch in this thread:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2017-October/539943.html
+I ran checkpatch on it and it didn't complain.
 
-As mentioned in there, gcc does the right thing for 5 and up:
-https://gcc.gnu.org/git/?p=gcc.git;a=commitdiff;h=d1ae7bb994f49316f6f63e6173f2931e837a351d
+Also, I don't think that when reverting a patch, I am also supposed to 
+to fix cosmetic changes of the code that existed before the original patch.
+
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
