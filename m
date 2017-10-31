@@ -1,28 +1,105 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 31 Oct 2017 10:43:32 +0000
-Subject: CONFIG_ARCH_SUPPORTS_INT128 for AArch64
-In-Reply-To: <CAHmME9q3=k2fJMi4Zy6d=ewj-P=sRhB8c_MjSJAMbKkopThi1w@mail.gmail.com>
-References: <CAHmME9q3=k2fJMi4Zy6d=ewj-P=sRhB8c_MjSJAMbKkopThi1w@mail.gmail.com>
-Message-ID: <20171031104332.gqpd6icvrxt2uj4c@lakrids.cambridge.arm.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Tue, 31 Oct 2017 15:58:45 +0530
+Subject: [PATCH 6/7] pwm: pwm-omap-dmtimer: Adapt driver to utilize dmtimer
+ pdata ops
+In-Reply-To: <1509445726-21040-1-git-send-email-j-keerthy@ti.com>
+References: <1509445726-21040-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <1509445726-21040-7-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 31, 2017 at 11:17:52AM +0100, Jason A. Donenfeld wrote:
-> Hi folks,
-> 
-> Older versions of gcc are horrible for int128_t on aarch64, emitting a
-> __multi3 call, which is slow and defeats the purpose. However, more
-> recent versions of gcc (since 5, IIRC), do the right thing and produce
-> the proper inlined instructions.
-> 
-> Do we have the infrastructure available to test for this, and
-> conditionally set CONFIG_ARCH_SUPPORTS_INT128 if we do?
+Adapt driver to utilize dmtimer pdata ops instead of pdata-quirks.
 
-Judging by Documentation/kbuild/makefiles.txt, we could do something
-like the below in the arm64 Makefile:
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+---
+ drivers/pwm/pwm-omap-dmtimer.c | 39 ++++++++++++++++++++++-----------------
+ 1 file changed, 22 insertions(+), 17 deletions(-)
 
-cflags-y += $(call cc-ifversion, -ge, 0500, -DCONFIG_ARCH_SUPPORTS_INT128)
-
-Note that I havent tested this at all.
-
-Thanks,
+diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
+index 5ad42f3..3b27aff 100644
+--- a/drivers/pwm/pwm-omap-dmtimer.c
++++ b/drivers/pwm/pwm-omap-dmtimer.c
+@@ -23,6 +23,7 @@
+ #include <linux/mutex.h>
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
++#include <linux/platform_data/dmtimer-omap.h>
+ #include <linux/platform_data/pwm_omap_dmtimer.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+@@ -37,7 +38,7 @@ struct pwm_omap_dmtimer_chip {
+ 	struct pwm_chip chip;
+ 	struct mutex mutex;
+ 	pwm_omap_dmtimer *dm_timer;
+-	struct pwm_omap_dmtimer_pdata *pdata;
++	struct omap_dm_timer_ops *pdata;
+ 	struct platform_device *dm_timer_pdev;
+ };
+ 
+@@ -242,19 +243,33 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
+ 	struct device_node *timer;
++	struct platform_device *timer_pdev;
+ 	struct pwm_omap_dmtimer_chip *omap;
+-	struct pwm_omap_dmtimer_pdata *pdata;
++	struct dmtimer_platform_data *timer_pdata;
++	struct omap_dm_timer_ops *pdata;
+ 	pwm_omap_dmtimer *dm_timer;
+ 	u32 v;
+ 	int status;
+ 
+-	pdata = dev_get_platdata(&pdev->dev);
+-	if (!pdata) {
+-		dev_err(&pdev->dev, "Missing dmtimer platform data\n");
++	timer = of_parse_phandle(np, "ti,timers", 0);
++	if (!timer)
++		return -ENODEV;
++
++	timer_pdev = of_find_device_by_node(timer);
++	if (!timer_pdev) {
++		dev_err(&pdev->dev, "Unable to find Timer pdev\n");
++		return -ENODEV;
++	}
++
++	timer_pdata = dev_get_platdata(&timer_pdev->dev);
++	if (!timer_pdata) {
++		dev_err(&pdev->dev, "dmtimer pdata structure NULL\n");
+ 		return -EINVAL;
+ 	}
+ 
+-	if (!pdata->request_by_node ||
++	pdata = timer_pdata->timer_ops;
++
++	if (!pdata || !pdata->request_by_node ||
+ 	    !pdata->free ||
+ 	    !pdata->enable ||
+ 	    !pdata->disable ||
+@@ -270,10 +285,6 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 
+-	timer = of_parse_phandle(np, "ti,timers", 0);
+-	if (!timer)
+-		return -ENODEV;
+-
+ 	if (!of_get_property(timer, "ti,timer-pwm", NULL)) {
+ 		dev_err(&pdev->dev, "Missing ti,timer-pwm capability\n");
+ 		return -ENODEV;
+@@ -291,13 +302,7 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+ 
+ 	omap->pdata = pdata;
+ 	omap->dm_timer = dm_timer;
+-
+-	omap->dm_timer_pdev = of_find_device_by_node(timer);
+-	if (!omap->dm_timer_pdev) {
+-		dev_err(&pdev->dev, "Unable to find timer pdev\n");
+-		omap->pdata->free(dm_timer);
+-		return -EINVAL;
+-	}
++	omap->dm_timer_pdev = timer_pdev;
+ 
+ 	/*
+ 	 * Ensure that the timer is stopped before we allow PWM core to call
+-- 
+1.9.1
