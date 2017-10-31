@@ -1,174 +1,88 @@
 From: preid@electromag.com.au (Phil Reid)
-Date: Tue, 31 Oct 2017 15:33:59 +0800
-Subject: [PATCH v4 7/7] i2c: remove legacy integer scl/sda gpio for recovery
+Date: Tue, 31 Oct 2017 15:33:54 +0800
+Subject: [PATCH v4 2/7] i2c: designware: move i2c_dw_plat_prepare_clk to common
 In-Reply-To: <1509435239-64848-1-git-send-email-preid@electromag.com.au>
 References: <1509435239-64848-1-git-send-email-preid@electromag.com.au>
-Message-ID: <1509435239-64848-8-git-send-email-preid@electromag.com.au>
+Message-ID: <1509435239-64848-3-git-send-email-preid@electromag.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove all reference to code related to using integer based ids for
-scl/sda gpio for bus recovery. All in tree drivers are now using the
-gpio descriptors to specific the required gpios.
+Move the i2c_dw_plat_prepare_clk funciton to common file in preparation
+for its use also by the master driver.
 
+Acked-by: Jarkko Nikula <jarkko.nikula@linux.intel.com>
 Signed-off-by: Phil Reid <preid@electromag.com.au>
 ---
- drivers/i2c/i2c-core-base.c | 78 ++-------------------------------------------
- include/linux/i2c.h         |  9 ++----
- 2 files changed, 5 insertions(+), 82 deletions(-)
+ drivers/i2c/busses/i2c-designware-common.c  | 13 +++++++++++++
+ drivers/i2c/busses/i2c-designware-core.h    |  1 +
+ drivers/i2c/busses/i2c-designware-platdrv.c | 12 ------------
+ 3 files changed, 14 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/i2c/i2c-core-base.c b/drivers/i2c/i2c-core-base.c
-index 29c8e6d..d286c30 100644
---- a/drivers/i2c/i2c-core-base.c
-+++ b/drivers/i2c/i2c-core-base.c
-@@ -146,46 +146,6 @@ static int get_sda_gpio_value(struct i2c_adapter *adap)
- 	return gpiod_get_value_cansleep(adap->bus_recovery_info->sda_gpiod);
- }
- 
--static int i2c_get_gpios_for_recovery(struct i2c_adapter *adap)
--{
--	struct i2c_bus_recovery_info *bri = adap->bus_recovery_info;
--	struct device *dev = &adap->dev;
--	int ret = 0;
--
--	ret = gpio_request_one(bri->scl_gpio, GPIOF_OPEN_DRAIN |
--			GPIOF_OUT_INIT_HIGH, "i2c-scl");
--	if (ret) {
--		dev_warn(dev, "Can't get SCL gpio: %d\n", bri->scl_gpio);
--		return ret;
--	}
--	bri->scl_gpiod = gpio_to_desc(bri->scl_gpio);
--
--	if (bri->get_sda) {
--		if (gpio_request_one(bri->sda_gpio, GPIOF_IN, "i2c-sda")) {
--			/* work without SDA polling */
--			dev_warn(dev, "Can't get SDA gpio: %d. Not using SDA polling\n",
--					bri->sda_gpio);
--			bri->get_sda = NULL;
--		}
--		bri->sda_gpiod = gpio_to_desc(bri->sda_gpio);
--	}
--
--	return ret;
--}
--
--static void i2c_put_gpios_for_recovery(struct i2c_adapter *adap)
--{
--	struct i2c_bus_recovery_info *bri = adap->bus_recovery_info;
--
--	if (bri->get_sda) {
--		gpio_free(bri->sda_gpio);
--		bri->sda_gpiod = NULL;
--	}
--
--	gpio_free(bri->scl_gpio);
--	bri->scl_gpiod = NULL;
--}
--
- /*
-  * We are generating clock pulses. ndelay() determines durating of clk pulses.
-  * We will generate clock with rate 100 KHz and so duration of both clock levels
-@@ -194,7 +154,7 @@ static void i2c_put_gpios_for_recovery(struct i2c_adapter *adap)
- #define RECOVERY_NDELAY		5000
- #define RECOVERY_CLK_CNT	9
- 
--static int i2c_generic_recovery(struct i2c_adapter *adap)
-+int i2c_generic_scl_recovery(struct i2c_adapter *adap)
- {
- 	struct i2c_bus_recovery_info *bri = adap->bus_recovery_info;
- 	int i = 0, val = 1, ret = 0;
-@@ -236,28 +196,8 @@ static int i2c_generic_recovery(struct i2c_adapter *adap)
- 
- 	return ret;
- }
--
--int i2c_generic_scl_recovery(struct i2c_adapter *adap)
--{
--	return i2c_generic_recovery(adap);
--}
- EXPORT_SYMBOL_GPL(i2c_generic_scl_recovery);
- 
--int i2c_generic_gpio_recovery(struct i2c_adapter *adap)
--{
--	int ret;
--
--	ret = i2c_get_gpios_for_recovery(adap);
--	if (ret)
--		return ret;
--
--	ret = i2c_generic_recovery(adap);
--	i2c_put_gpios_for_recovery(adap);
--
--	return ret;
--}
--EXPORT_SYMBOL_GPL(i2c_generic_gpio_recovery);
--
- int i2c_recover_bus(struct i2c_adapter *adap)
- {
- 	if (!adap->bus_recovery_info)
-@@ -289,21 +229,7 @@ static void i2c_init_recovery(struct i2c_adapter *adap)
- 		return;
- 	}
- 
--	/* Generic GPIO recovery */
--	if (bri->recover_bus == i2c_generic_gpio_recovery) {
--		if (!gpio_is_valid(bri->scl_gpio)) {
--			err_str = "invalid SCL gpio";
--			goto err;
--		}
--
--		if (gpio_is_valid(bri->sda_gpio))
--			bri->get_sda = get_sda_gpio_value;
--		else
--			bri->get_sda = NULL;
--
--		bri->get_scl = get_scl_gpio_value;
--		bri->set_scl = set_scl_gpio_value;
--	} else if (bri->recover_bus == i2c_generic_scl_recovery) {
-+	if (bri->recover_bus == i2c_generic_scl_recovery) {
- 		/* Generic SCL recovery */
- 		if (!bri->set_scl || !bri->get_scl) {
- 			err_str = "no {get|set}_scl() found";
-diff --git a/include/linux/i2c.h b/include/linux/i2c.h
-index ea31cb3..8597eac 100644
---- a/include/linux/i2c.h
-+++ b/include/linux/i2c.h
-@@ -485,7 +485,7 @@ struct i2c_timings {
- /**
-  * struct i2c_bus_recovery_info - I2C bus recovery information
-  * @recover_bus: Recover routine. Either pass driver's recover_bus() routine, or
-- *	i2c_generic_scl_recovery() or i2c_generic_gpio_recovery().
-+ *	i2c_generic_scl_recovery().
-  * @get_scl: This gets current value of SCL line. Mandatory for generic SCL
-  *      recovery. Used internally for generic GPIO recovery.
-  * @set_scl: This sets/clears SCL line. Mandatory for generic SCL recovery. Used
-@@ -497,8 +497,8 @@ struct i2c_timings {
-  *	configure padmux here for SDA/SCL line or something else they want.
-  * @unprepare_recovery: This will be called after completing recovery. Platform
-  *	may configure padmux here for SDA/SCL line or something else they want.
-- * @scl_gpio: gpio number of the SCL line. Only required for GPIO recovery.
-- * @sda_gpio: gpio number of the SDA line. Only required for GPIO recovery.
-+ * @scl_gpiod: gpiod of the SCL line. Only required for GPIO recovery.
-+ * @sda_gpiod: gpiod of the SDA line. Only required for GPIO recovery.
+diff --git a/drivers/i2c/busses/i2c-designware-common.c b/drivers/i2c/busses/i2c-designware-common.c
+index d1a6937..b79f342 100644
+--- a/drivers/i2c/busses/i2c-designware-common.c
++++ b/drivers/i2c/busses/i2c-designware-common.c
+@@ -21,6 +21,7 @@
+  * ----------------------------------------------------------------------------
+  *
   */
- struct i2c_bus_recovery_info {
- 	int (*recover_bus)(struct i2c_adapter *);
-@@ -511,8 +511,6 @@ struct i2c_bus_recovery_info {
- 	void (*unprepare_recovery)(struct i2c_adapter *);
++#include <linux/clk.h>
+ #include <linux/delay.h>
+ #include <linux/export.h>
+ #include <linux/errno.h>
+@@ -185,6 +186,18 @@ unsigned long i2c_dw_clk_rate(struct dw_i2c_dev *dev)
+ 	return dev->get_clk_rate_khz(dev);
+ }
  
- 	/* gpio recovery */
--	int scl_gpio;
--	int sda_gpio;
- 	struct gpio_desc *scl_gpiod;
- 	struct gpio_desc *sda_gpiod;
- };
-@@ -520,7 +518,6 @@ struct i2c_bus_recovery_info {
- int i2c_recover_bus(struct i2c_adapter *adap);
++int i2c_dw_plat_prepare_clk(struct dw_i2c_dev *i_dev, bool prepare)
++{
++	if (IS_ERR(i_dev->clk))
++		return PTR_ERR(i_dev->clk);
++
++	if (prepare)
++		return clk_prepare_enable(i_dev->clk);
++
++	clk_disable_unprepare(i_dev->clk);
++	return 0;
++}
++
+ int i2c_dw_acquire_lock(struct dw_i2c_dev *dev)
+ {
+ 	int ret;
+diff --git a/drivers/i2c/busses/i2c-designware-core.h b/drivers/i2c/busses/i2c-designware-core.h
+index 21bf619..e80a14c 100644
+--- a/drivers/i2c/busses/i2c-designware-core.h
++++ b/drivers/i2c/busses/i2c-designware-core.h
+@@ -301,6 +301,7 @@ struct dw_i2c_dev {
+ void __i2c_dw_enable(struct dw_i2c_dev *dev, bool enable);
+ void __i2c_dw_enable_and_wait(struct dw_i2c_dev *dev, bool enable);
+ unsigned long i2c_dw_clk_rate(struct dw_i2c_dev *dev);
++int i2c_dw_plat_prepare_clk(struct dw_i2c_dev *i_dev, bool prepare);
+ int i2c_dw_acquire_lock(struct dw_i2c_dev *dev);
+ void i2c_dw_release_lock(struct dw_i2c_dev *dev);
+ int i2c_dw_wait_bus_not_busy(struct dw_i2c_dev *dev);
+diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
+index 58add69..a5fd0ee 100644
+--- a/drivers/i2c/busses/i2c-designware-platdrv.c
++++ b/drivers/i2c/busses/i2c-designware-platdrv.c
+@@ -214,18 +214,6 @@ static void i2c_dw_configure_slave(struct dw_i2c_dev *dev)
+ 	}
+ }
  
- /* Generic recovery routines */
--int i2c_generic_gpio_recovery(struct i2c_adapter *adap);
- int i2c_generic_scl_recovery(struct i2c_adapter *adap);
- 
- /**
+-static int i2c_dw_plat_prepare_clk(struct dw_i2c_dev *i_dev, bool prepare)
+-{
+-	if (IS_ERR(i_dev->clk))
+-		return PTR_ERR(i_dev->clk);
+-
+-	if (prepare)
+-		return clk_prepare_enable(i_dev->clk);
+-
+-	clk_disable_unprepare(i_dev->clk);
+-	return 0;
+-}
+-
+ static void dw_i2c_set_fifo_size(struct dw_i2c_dev *dev, int id)
+ {
+ 	u32 param, tx_fifo_depth, rx_fifo_depth;
 -- 
 1.8.3.1
