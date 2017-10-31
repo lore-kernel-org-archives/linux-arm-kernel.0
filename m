@@ -1,49 +1,74 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Tue, 31 Oct 2017 23:23:15 +0100
-Subject: [PATCH 1/2] ARM: dts: meson8b: add more L2 cache settings
-In-Reply-To: <20171031222316.24548-1-martin.blumenstingl@googlemail.com>
-References: <20171031222316.24548-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20171031222316.24548-2-martin.blumenstingl@googlemail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 31 Oct 2017 19:35:56 -0400 (EDT)
+Subject: [PATCH 3/3] ARM: early_printk: use printascii() rather than
+ printch()
+In-Reply-To: <20171031215018.GL9463@n2100.armlinux.org.uk>
+References: <80bc8c16-321a-43ea-6cbb-257dbeee485b@arm.com>
+ <nycvar.YSQ.7.76.1710311302370.21665@knanqh.ubzr>
+ <20171031171629.GI9463@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1710311346190.21665@knanqh.ubzr>
+ <20171031175344.GJ9463@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1710311355000.21665@knanqh.ubzr>
+ <20171031182024.GK9463@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1710311432120.21665@knanqh.ubzr>
+ <SG2PR06MB1165AE45FB289039E55D03028A5E0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+ <nycvar.YSQ.7.76.1710311527280.21665@knanqh.ubzr>
+ <20171031215018.GL9463@n2100.armlinux.org.uk>
+Message-ID: <nycvar.YSQ.7.76.1710311918100.21665@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Amlogic's vendor kernel prints these PL310 L2 cache controller settings
-during boot:
-  8 ways, 2048 sets, CACHE_ID 0x4100a0c9,  Cache size: 524288 B
-  AUX_CTRL 0x7ec60001, PERFETCH_CTRL 0x75000007, POWER_CTRL  0x00000000
-  TAG_LATENCY 0x00000111, DATA_LATENCY 0x00000222
+On Tue, 31 Oct 2017, Russell King - ARM Linux wrote:
 
-Add the "prefetch-data", "prefetch-instr" and "arm,shared-override"
-properties to get the same L2 cache controller configuration as the
-vendor kernel.
-Four differences still remain:
-- L310_AUX_CTRL_EARLY_BRESP is enabled by the vendor kernel, however
-  this is only supported on Cortex-A9 cores (Meson8b has Cortex-A5 cores
-  though)
-- L310_AUX_CTRL_NS_INT_CTRL is currently not supported by the cache-l2x0
-  driver
-- bit 23 is set by the vendor kernel, but this is defined in cache-l2x0.h
-- L310_AUX_CTRL_FULL_LINE_ZERO is enabled by the vendor kernel which is
-  also only supported on Cortex-A9 cores
+> On Tue, Oct 31, 2017 at 03:28:11PM -0400, Nicolas Pitre wrote:
+> > Good!  Queued as patch #8717.
+> 
+> I was going to say that there's another implementation of the
+> same in arch/arm/boot/compressed/head.S, and if we fix one we
+> should apply the same fix to the other.
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
----
- arch/arm/boot/dts/meson8b.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+Let's make a separate patch for that one. Something like:
 
-diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
-index 554c58e67b01..71466077890e 100644
---- a/arch/arm/boot/dts/meson8b.dtsi
-+++ b/arch/arm/boot/dts/meson8b.dtsi
-@@ -223,6 +223,9 @@
- 	arm,data-latency = <3 3 3>;
- 	arm,tag-latency = <2 2 2>;
- 	arm,filter-ranges = <0x100000 0xc0000000>;
-+	prefetch-data = <1>;
-+	prefetch-instr = <1>;
-+	arm,shared-override;
- };
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index 8a756870c2..28a48ad3dd 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -1296,19 +1296,24 @@ phex:		adr	r3, phexbuf
  
- &pwm_ab {
--- 
-2.15.0
+ @ puts corrupts {r0, r1, r2, r3}
+ puts:		loadsp	r3, r1
+-1:		ldrb	r2, [r0], #1
+-		teq	r2, #0
++1:		teq	r0, #0
++		ldrneb	r2, [r0], #1
++		teqne	r2, #0
+ 		moveq	pc, lr
+-2:		writeb	r2, r3
++2:		teq	r2, #'\n'
++		bne	4f
++		mov	r2, #'\r'
++		writeb	r2, r3
+ 		mov	r1, #0x00020000
+ 3:		subs	r1, r1, #1
+ 		bne	3b
+-		teq	r2, #'\n'
+-		moveq	r2, #'\r'
+-		beq	2b
+-		teq	r0, #0
+-		bne	1b
+-		mov	pc, lr
++		mov	r2, #'\n'
++4:		writeb	r2, r3
++		mov	r1, #0x00020000
++5:		subs	r1, r1, #1
++		bne	5b
++		b	1b
++
+ @ putc corrupts {r0, r1, r2, r3}
+ putc:
+ 		mov	r2, r0
+
+Please review as this is untested.
+
+
+Nicolas
