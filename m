@@ -1,23 +1,30 @@
-From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Tue, 31 Oct 2017 12:17:10 +0100
-Subject: CONFIG_ARCH_SUPPORTS_INT128 for AArch64
-In-Reply-To: <20171031104332.gqpd6icvrxt2uj4c@lakrids.cambridge.arm.com>
-References: <CAHmME9q3=k2fJMi4Zy6d=ewj-P=sRhB8c_MjSJAMbKkopThi1w@mail.gmail.com>
- <20171031104332.gqpd6icvrxt2uj4c@lakrids.cambridge.arm.com>
-Message-ID: <CAHmME9pE+G0V-nyKchQyG03YXbPjGykL1xX0M8E544Rh7QrgOQ@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 31 Oct 2017 11:19:19 +0000
+Subject: [PATCH v2 1/4] spi: imx: GPIO based chip selects should not be
+ required
+In-Reply-To: <20171027010841.28624-2-tpiepho@impinj.com>
+References: <20171027010841.28624-1-tpiepho@impinj.com>
+ <20171027010841.28624-2-tpiepho@impinj.com>
+Message-ID: <20171031111919.gocl7wwrhkwnxrya@sirena.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Thu, Oct 26, 2017 at 06:08:38PM -0700, Trent Piepho wrote:
+> The driver will fail to load if no gpio chip selects are specified,
+> this patch changes this so that it no longer fails.
+> 
+> It's possible to use all native chip selects, in which case there is
+> no reason to have a gpio chip select array.  This is what happens if
+> the *optional* device tree property "cs-gpios" is omitted.
 
-On Tue, Oct 31, 2017 at 11:43 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> Judging by Documentation/kbuild/makefiles.txt, we could do something
-> like the below in the arm64 Makefile:
->
-> cflags-y += $(call cc-ifversion, -ge, 0500, -DCONFIG_ARCH_SUPPORTS_INT128)
-
-Okay, in that case, I'll re-research the gcc commit that made int128
-work properly on aarch64, confirm the release version, and then submit
-a patch doing this.
-
-Jason
+Do the native chip selects actually work usefully on this hardware?
+There used to be problems with it wanting to do things like bounce the
+chip select on every word which made it extremely difficult to use with
+Linux.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171031/7298bf15/attachment.sig>
