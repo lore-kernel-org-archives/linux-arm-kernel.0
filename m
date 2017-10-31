@@ -1,74 +1,56 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 31 Oct 2017 06:56:40 +0100
-Subject: [PATCH v4 18/21] KVM: arm64: Handle RAS SErrors from EL1 on
- guest exit
-In-Reply-To: <20171019145807.23251-19-james.morse@arm.com>
-References: <20171019145807.23251-1-james.morse@arm.com>
- <20171019145807.23251-19-james.morse@arm.com>
-Message-ID: <20171031055640.GW2166@lvm>
+From: SZ.Lin@moxa.com (=?big5?B?U1ogTGluICiqTKRXtLwp?=)
+Date: Tue, 31 Oct 2017 05:58:53 +0000
+Subject: [RESEND] ARM: dts: ls1021a: Add support for QSPI with ls1021a SoC
+Message-ID: <5942081F7727964D830FC876E62CA85601194652AD@MHQMBX01.moxa.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 19, 2017 at 03:58:04PM +0100, James Morse wrote:
-> We expect to have firmware-first handling of RAS SErrors, with errors
-> notified via an APEI method. For systems without firmware-first, add
-> some minimal handling to KVM.
-> 
-> There are two ways KVM can take an SError due to a guest, either may be a
-> RAS error: we exit the guest due to an SError routed to EL2 by HCR_EL2.AMO,
-> or we take an SError from EL2 when we unmask PSTATE.A from __guest_exit.
-> 
-> For SError that interrupt a guest and are routed to EL2 the existing
-> behaviour is to inject an impdef SError into the guest.
-> 
-> Add code to handle RAS SError based on the ESR. For uncontained errors
-> arm64_is_blocking_ras_serror() will panic(), these errors compromise
-> the host too. All other error types are contained: For the 'blocking'
-> errors the vCPU can't make progress, so we inject a virtual SError.
-> We ignore contained errors where we can make progress as if we're lucky,
-> we may not hit them again.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-
-> ---
->  arch/arm64/kvm/handle_exit.c | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-> index 7debb74843a0..345fdbba6c2e 100644
-> --- a/arch/arm64/kvm/handle_exit.c
-> +++ b/arch/arm64/kvm/handle_exit.c
-> @@ -28,12 +28,19 @@
->  #include <asm/kvm_emulate.h>
->  #include <asm/kvm_mmu.h>
->  #include <asm/kvm_psci.h>
-> +#include <asm/traps.h>
->  
->  #define CREATE_TRACE_POINTS
->  #include "trace.h"
->  
->  typedef int (*exit_handle_fn)(struct kvm_vcpu *, struct kvm_run *);
->  
-> +static void kvm_handle_guest_serror(struct kvm_vcpu *vcpu, u32 esr)
-> +{
-> +	if (!arm64_is_ras_serror(esr) || arm64_blocking_ras_serror(NULL, esr))
-> +		kvm_inject_vabt(vcpu);
-> +}
-> +
->  static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  {
->  	int ret;
-> @@ -211,7 +218,7 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  	case ARM_EXCEPTION_IRQ:
->  		return 1;
->  	case ARM_EXCEPTION_EL1_SERROR:
-> -		kvm_inject_vabt(vcpu);
-> +		kvm_handle_guest_serror(vcpu, kvm_vcpu_get_hsr(vcpu));
->  		return 1;
->  	case ARM_EXCEPTION_TRAP:
->  		/*
-> -- 
-> 2.13.3
-> 
+> > Add QSPI node support, and this function is disabled by default This
+> > setting could be overwritten in board-level definitions
+>
+> Adding Shawn Guo.
+>
+This patch is modified based on https://patchwork.ozlabs.org/patch/492099/. The originator of this patch is Haikun Wang.
+> >
+Signed-off-by: Haikun Wang <haikun.wang@freescale.com>
+> > Signed-off-by: SZ Lin <sz.lin@moxa.com>
+>
+> Acked-by: Li Yang <leoyang.li@nxp.com>
+>
+> > ---
+> >  arch/arm/boot/dts/ls1021a.dtsi | 14 ++++++++++++++
+> >  1 file changed, 14 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/ls1021a.dtsi
+> > b/arch/arm/boot/dts/ls1021a.dtsi index 7bb9df2c1460..9da876e47810
+> > 100644
+> > --- a/arch/arm/boot/dts/ls1021a.dtsi
+> > +++ b/arch/arm/boot/dts/ls1021a.dtsi
+> > @@ -154,6 +154,20 @@
+> >                         big-endian;
+> >                 };
+> >
+> > +               qspi: quadspi at 1550000 {
+> > +                       compatible = "fsl,ls1021a-qspi";
+> > +                       #address-cells = <1>;
+> > +                       #size-cells = <0>;
+> > +                       reg = <0x0 0x1550000 0x0 0x10000>,
+> > +                             <0x0 0x40000000 0x0 0x40000000>;
+> > +                       reg-names = "QuadSPI", "QuadSPI-memory";
+> > +                       interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>;
+> > +                       clock-names = "qspi_en", "qspi";
+> > +                       clocks = <&clockgen 4 1>, <&clockgen 4 1>;
+> > +                       big-endian;
+> > +                       status = "disabled";
+> > +               };
+> > +
+> >                 esdhc: esdhc at 1560000 {
+> >                         compatible = "fsl,esdhc";
+> >                         reg = <0x0 0x1560000 0x0 0x10000>;
+> > --
+> > 2.14.1
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe devicetree"
+> > in the body of a message to majordomo at vger.kernel.org More majordomo
+> > info at  http://vger.kernel.org/majordomo-info.html
