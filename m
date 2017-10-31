@@ -1,48 +1,55 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Wed,  1 Nov 2017 01:24:20 +0530
-Subject: [PATCH 0/3] Add clock driver for Actions S900 SoC
-Message-ID: <1509479663-8985-1-git-send-email-manivannan.sadhasivam@linaro.org>
+Date: Wed,  1 Nov 2017 01:24:21 +0530
+Subject: [PATCH 1/3] arm64: dts: actions: add s900 clock controller nodes
+In-Reply-To: <1509479663-8985-1-git-send-email-manivannan.sadhasivam@linaro.org>
+References: <1509479663-8985-1-git-send-email-manivannan.sadhasivam@linaro.org>
+Message-ID: <1509479663-8985-2-git-send-email-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds clock driver for Actions Semi OWL series
-S900 SoC with relevant clock bindings and device tree data.
+This patch adds clock controller nodes for Actions Semi s900 SoC
 
-This series also addresses the review comments from previous
-submission happened last year.
+Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+---
+ arch/arm64/boot/dts/actions/s900.dtsi | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-https://patchwork.kernel.org/patch/9254471/
-
-Driver has been validated on Bubblegum-96 board.
-
-Thanks,
-Mani
-
-Manivannan Sadhasivam (3):
-  arm64: dts: actions: add s900 clock controller nodes
-  clk: owl: add clock driver for Actions S900 SoC
-  Documentation: add Actions S900 clock bindings
-
- .../bindings/clock/actions,s900-clock.txt          |  47 ++
- MAINTAINERS                                        |   5 +
- arch/arm64/boot/dts/actions/s900.dtsi              |  19 +
- drivers/clk/Makefile                               |   1 +
- drivers/clk/owl/Makefile                           |   2 +
- drivers/clk/owl/clk-factor.c                       | 270 ++++++++++
- drivers/clk/owl/clk-pll.c                          | 346 ++++++++++++
- drivers/clk/owl/clk-s900.c                         | 587 +++++++++++++++++++++
- drivers/clk/owl/clk.c                              | 318 +++++++++++
- drivers/clk/owl/clk.h                              | 301 +++++++++++
- include/dt-bindings/clock/actions,s900-clock.h     | 141 +++++
- 11 files changed, 2037 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/actions,s900-clock.txt
- create mode 100644 drivers/clk/owl/Makefile
- create mode 100644 drivers/clk/owl/clk-factor.c
- create mode 100644 drivers/clk/owl/clk-pll.c
- create mode 100644 drivers/clk/owl/clk-s900.c
- create mode 100644 drivers/clk/owl/clk.c
- create mode 100644 drivers/clk/owl/clk.h
- create mode 100644 include/dt-bindings/clock/actions,s900-clock.h
-
+diff --git a/arch/arm64/boot/dts/actions/s900.dtsi b/arch/arm64/boot/dts/actions/s900.dtsi
+index 11406f6..c099ef1 100644
+--- a/arch/arm64/boot/dts/actions/s900.dtsi
++++ b/arch/arm64/boot/dts/actions/s900.dtsi
+@@ -5,6 +5,7 @@
+  */
+ 
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/clock/actions,s900-clock.h>
+ 
+ / {
+ 	compatible = "actions,s900";
+@@ -88,6 +89,24 @@
+ 		#clock-cells = <0>;
+ 	};
+ 
++	losc: losc {
++		compatible = "fixed-clock";
++		clock-frequency = <32768>;
++		#clock-cells = <0>;
++	};
++
++	diff_24M: diff_24M {
++		compatible = "fixed-clock";
++		clock-frequency = <24000000>;
++		#clock-cells = <0>;
++	};
++
++	clock: clock-controller at e0160000 {
++		compatible = "actions,s900-clock";
++		reg = <0 0xe0160000 0 0x1000>;
++		#clock-cells = <1>;
++	};
++
+ 	soc {
+ 		compatible = "simple-bus";
+ 		#address-cells = <2>;
 -- 
 2.7.4
