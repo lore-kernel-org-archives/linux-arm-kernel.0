@@ -1,39 +1,56 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Tue, 31 Oct 2017 12:19:48 +0200
-Subject: [PATCH v4 7/7] i2c: remove legacy integer scl/sda gpio for
- recovery
-In-Reply-To: <1509435239-64848-8-git-send-email-preid@electromag.com.au>
-References: <1509435239-64848-1-git-send-email-preid@electromag.com.au>
- <1509435239-64848-8-git-send-email-preid@electromag.com.au>
-Message-ID: <1509445188.10233.110.camel@linux.intel.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Tue, 31 Oct 2017 15:58:39 +0530
+Subject: [PATCH 0/7] omap: dmtimer: Move driver out of plat-omap
+Message-ID: <1509445726-21040-1-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-10-31 at 15:33 +0800, Phil Reid wrote:
-> Remove all reference to code related to using integer based ids for
-> scl/sda gpio for bus recovery. All in tree drivers are now using the
-> gpio descriptors to specific the required gpios.
+The series moves dmtimer out of plat-omap to drivers/clocksource.
+The series also does a bunch of changes to pwm-omap-dmtimer code
+to adapt to the driver migration and clean up plat specific
+pdata-quirks and use the dmtimer platform data.
+ 
+Boot tested on DRA7-EVM and AM437X-GP-EVM.
 
-> - * @scl_gpio: gpio number of the SCL line. Only required for GPIO
-> recovery.
-> - * @sda_gpio: gpio number of the SDA line. Only required for GPIO
-> recovery.
-> + * @scl_gpiod: gpiod of the SCL line. Only required for GPIO
-> recovery.
-> + * @sda_gpiod: gpiod of the SDA line. Only required for GPIO
-> recovery.
+More testing would be of great help.
 
-Ah, missed comment here.
+Keerthy (7):
+  clocksource: dmtimer: Remove all the exports
+  arm: omap: Move dmtimer.h out of plat-omap
+  arm: OMAP: Move dmtimer driver out of plat-omap to drivers under
+    clocksource
+  dmtimer: Add timer ops to the platform data structure
+  clocksource: dmtimer: Populate the timer ops to the pdata
+  pwm: pwm-omap-dmtimer: Adapt driver to utilize dmtimer pdata ops
+  arm: omap: pdata-quirks: Remove unused timer pdata
 
-0day kbuild bot now warns if we add field w/o kernel doc description.
-
-I would suggest to add the descriptions in the same patch which brings
-new fields and here just remove old ones.
-
->  	/* gpio recovery */
-> -	int scl_gpio;
-> -	int sda_gpio;
+ arch/arm/mach-omap1/pm.c                           |    2 +-
+ arch/arm/mach-omap1/timer.c                        |    2 +-
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c         |    2 +-
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c         |    2 +-
+ arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |    2 +-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |    2 +-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    2 +-
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |    2 +-
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |    2 +-
+ arch/arm/mach-omap2/omap_hwmod_81xx_data.c         |    2 +-
+ arch/arm/mach-omap2/pdata-quirks.c                 |   32 -
+ arch/arm/mach-omap2/timer.c                        |    2 +-
+ arch/arm/plat-omap/Kconfig                         |    6 -
+ arch/arm/plat-omap/Makefile                        |    1 -
+ arch/arm/plat-omap/dmtimer.c                       | 1003 --------------------
+ arch/arm/plat-omap/include/plat/dmtimer.h          |  418 --------
+ drivers/clocksource/Kconfig                        |    6 +
+ drivers/clocksource/Makefile                       |    1 +
+ drivers/clocksource/dmtimer.c                      | 1001 +++++++++++++++++++
+ drivers/pwm/pwm-omap-dmtimer.c                     |   39 +-
+ include/clocksource/dmtimer.h                      |  418 ++++++++
+ include/linux/platform_data/dmtimer-omap.h         |   38 +
+ 22 files changed, 1497 insertions(+), 1488 deletions(-)
+ delete mode 100644 arch/arm/plat-omap/dmtimer.c
+ delete mode 100644 arch/arm/plat-omap/include/plat/dmtimer.h
+ create mode 100644 drivers/clocksource/dmtimer.c
+ create mode 100644 include/clocksource/dmtimer.h
 
 -- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+1.9.1
