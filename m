@@ -1,66 +1,57 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 31 Oct 2017 15:51:02 +0000
-Subject: [PATCH v5 10/30] arm64/sve: Kconfig update and conditional
- compilation support
+Date: Tue, 31 Oct 2017 15:51:04 +0000
+Subject: [PATCH v5 12/30] arm64/sve: Low-level CPU setup
 In-Reply-To: <1509465082-30427-1-git-send-email-Dave.Martin@arm.com>
 References: <1509465082-30427-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1509465082-30427-11-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1509465082-30427-13-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds CONFIG_ARM64_SVE to control building of SVE support
-into the kernel, and adds a stub predicate system_supports_sve() to
-control conditional compilation and runtime SVE support.
+To enable the kernel to use SVE, SVE traps from EL1 to EL2 must be
+disabled.  To take maximum advantage of the hardware, the full
+available vector length also needs to be enabled for EL1 by
+programming ZCR_EL2.LEN.  (The kernel will program ZCR_EL1.LEN as
+required, but this cannot override the limit set by ZCR_EL2.)
 
-system_supports_sve() just returns false for now: it will be
-replaced with a non-trivial implementation in a later patch, once
-SVE support is complete enough to be enabled safely.
+This patch makes the appropriate changes to the EL2 early setup
+code.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/Kconfig                  | 11 +++++++++++
- arch/arm64/include/asm/cpufeature.h |  5 +++++
- 2 files changed, 16 insertions(+)
+Cc: Alex Benn?e <alex.bennee@linaro.org>
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 5cfb79d..1046074 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -976,6 +976,17 @@ config ARM64_PMEM
+---
+
+**Dropped at v3** Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+(Due to significant changes to the logic.)
+---
+ arch/arm64/kernel/head.S | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index cfa90a4..67e86a0 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -524,8 +524,19 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
+ 	mov	x0, #0x33ff
+ 	msr	cptr_el2, x0			// Disable copro. traps to EL2
  
- endmenu
- 
-+config ARM64_SVE
-+	bool "ARM Scalable Vector Extension support"
-+	default y
-+	help
-+	  The Scalable Vector Extension (SVE) is an extension to the AArch64
-+	  execution state which complements and extends the SIMD functionality
-+	  of the base architecture to support much larger vectors and to enable
-+	  additional vectorisation opportunities.
++	/* SVE register access */
++	mrs	x1, id_aa64pfr0_el1
++	ubfx	x1, x1, #ID_AA64PFR0_SVE_SHIFT, #4
++	cbz	x1, 7f
 +
-+	  To enable use of this extension on CPUs that implement it, say Y.
++	bic	x0, x0, #CPTR_EL2_TZ		// Also disable SVE traps
++	msr	cptr_el2, x0			// Disable copro. traps to EL2
++	isb
++	mov	x1, #ZCR_ELx_LEN_MASK		// SVE: Enable full vector
++	msr_s	SYS_ZCR_EL2, x1			// length for EL1.
 +
- config ARM64_MODULE_CMODEL_LARGE
- 	bool
+ 	/* Hypervisor stub */
+-	adr_l	x0, __hyp_stub_vectors
++7:	adr_l	x0, __hyp_stub_vectors
+ 	msr	vbar_el2, x0
  
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 428ee1f..4ea3441 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -262,6 +262,11 @@ static inline bool system_uses_ttbr0_pan(void)
- 		!cpus_have_const_cap(ARM64_HAS_PAN);
- }
- 
-+static inline bool system_supports_sve(void)
-+{
-+	return false;
-+}
-+
- #endif /* __ASSEMBLY__ */
- 
- #endif
+ 	/* spsr */
 -- 
 2.1.4
