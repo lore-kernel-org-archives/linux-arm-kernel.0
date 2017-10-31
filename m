@@ -1,142 +1,165 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 31 Oct 2017 15:38:29 +0000
-Subject: [RFC/RFT PATCH 3/6] ACPI / APEI: Replace ioremap_page_range() with
- fixmap
-In-Reply-To: <20171031153832.17746-1-james.morse@arm.com>
-References: <20171031153832.17746-1-james.morse@arm.com>
-Message-ID: <20171031153832.17746-4-james.morse@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 31 Oct 2017 15:50:52 +0000
+Subject: [PATCH v5 00/30] ARM Scalable Vector Extension (SVE)
+Message-ID: <1509465082-30427-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace ghes_io{re,un}map_pfn_{nmi,irq}()s use of ioremap_page_range()
-with __set_fixmap() as ioremap_page_range() may sleep to allocate a new
-level of page-table, even if its passed an existing final-address to
-use in the mapping.
+This series implements Linux kernel support for the ARM Scalable Vector
+Extension (SVE). [1]  It supersedes the previous v3: see [3] for link
+and full cover letter.
 
-clear_fixmap() does the TLB invalidation in __set_fixmap() for arm64
-and __set_pte_vaddr() for x86. In each case its the same as the
-respective arch_apei_flush_tlb_one().
+This is a minor update to v4, but does contain a couple of important
+fixes.
 
-Reported-by: Fengguang Wu <fengguang.wu@intel.com>
-Suggested-by: Linus Torvalds <torvalds@linux-foundation.org>
-Signed-off-by: James Morse <james.morse@arm.com>
-CC: Tyler Baicar <tbaicar@codeaurora.org>
-CC: Dongjiu Geng <gengdongjiu@huawei.com>
-CC: Xie XiuQi <xiexiuqi@huawei.com>
+As in previous postings, the last two patches (here 29-30) are still
+RFC and not proposed for merging at this time.
 
----
-CC'd people I've seen posting CPER log fragments, could you give this a
-test on your platforms?
+The patches apply on
+git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git
+for-next/core
+d7b1d22d3821 ("arm64: uapi: Remove PSR_Q_BIT")
 
- drivers/acpi/apei/ghes.c | 45 +++++++++++++++------------------------------
- 1 file changed, 15 insertions(+), 30 deletions(-)
+To reduce spam, some people may not been copied on the entire series.
+For those who did not receive the whole series, it can be found in the
+linux-arm-kernel archive. [2]
 
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 3c3a37b8503b..f3269816b997 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -51,6 +51,7 @@
- #include <acpi/actbl1.h>
- #include <acpi/ghes.h>
- #include <acpi/apei.h>
-+#include <asm/fixmap.h>
- #include <asm/tlbflush.h>
- #include <ras/ras_event.h>
- 
-@@ -112,7 +113,7 @@ static DEFINE_MUTEX(ghes_list_mutex);
-  * Because the memory area used to transfer hardware error information
-  * from BIOS to Linux can be determined only in NMI, IRQ or timer
-  * handler, but general ioremap can not be used in atomic context, so
-- * a special version of atomic ioremap is implemented for that.
-+ * the fixmap is used instead.
-  */
- 
- /*
-@@ -126,8 +127,8 @@ static DEFINE_MUTEX(ghes_list_mutex);
- /* virtual memory area for atomic ioremap */
- static struct vm_struct *ghes_ioremap_area;
- /*
-- * These 2 spinlock is used to prevent atomic ioremap virtual memory
-- * area from being mapped simultaneously.
-+ * These 2 spinlocks are used to prevent the fixmap entries from being used
-+ * simultaneously.
-  */
- static DEFINE_RAW_SPINLOCK(ghes_ioremap_lock_nmi);
- static DEFINE_SPINLOCK(ghes_ioremap_lock_irq);
-@@ -159,52 +160,36 @@ static void ghes_ioremap_exit(void)
- 
- static void __iomem *ghes_ioremap_pfn_nmi(u64 pfn)
- {
--	unsigned long vaddr;
- 	phys_addr_t paddr;
- 	pgprot_t prot;
- 
--	vaddr = (unsigned long)GHES_IOREMAP_NMI_PAGE(ghes_ioremap_area->addr);
--
- 	paddr = pfn << PAGE_SHIFT;
- 	prot = arch_apei_get_mem_attribute(paddr);
--	ioremap_page_range(vaddr, vaddr + PAGE_SIZE, paddr, prot);
-+	__set_fixmap(FIX_APEI_GHES_NMI, paddr, prot);
- 
--	return (void __iomem *)vaddr;
-+	return (void __iomem *) fix_to_virt(FIX_APEI_GHES_NMI);
- }
- 
- static void __iomem *ghes_ioremap_pfn_irq(u64 pfn)
- {
--	unsigned long vaddr, paddr;
-+	unsigned long paddr;
- 	pgprot_t prot;
- 
--	vaddr = (unsigned long)GHES_IOREMAP_IRQ_PAGE(ghes_ioremap_area->addr);
--
- 	paddr = pfn << PAGE_SHIFT;
- 	prot = arch_apei_get_mem_attribute(paddr);
-+	__set_fixmap(FIX_APEI_GHES_IRQ, paddr, prot);
- 
--	ioremap_page_range(vaddr, vaddr + PAGE_SIZE, paddr, prot);
--
--	return (void __iomem *)vaddr;
-+	return (void __iomem *) fix_to_virt(FIX_APEI_GHES_IRQ);
- }
- 
--static void ghes_iounmap_nmi(void __iomem *vaddr_ptr)
-+static void ghes_iounmap_nmi(void)
- {
--	unsigned long vaddr = (unsigned long __force)vaddr_ptr;
--	void *base = ghes_ioremap_area->addr;
--
--	BUG_ON(vaddr != (unsigned long)GHES_IOREMAP_NMI_PAGE(base));
--	unmap_kernel_range_noflush(vaddr, PAGE_SIZE);
--	arch_apei_flush_tlb_one(vaddr);
-+	clear_fixmap(FIX_APEI_GHES_NMI);
- }
- 
--static void ghes_iounmap_irq(void __iomem *vaddr_ptr)
-+static void ghes_iounmap_irq(void)
- {
--	unsigned long vaddr = (unsigned long __force)vaddr_ptr;
--	void *base = ghes_ioremap_area->addr;
--
--	BUG_ON(vaddr != (unsigned long)GHES_IOREMAP_IRQ_PAGE(base));
--	unmap_kernel_range_noflush(vaddr, PAGE_SIZE);
--	arch_apei_flush_tlb_one(vaddr);
-+	clear_fixmap(FIX_APEI_GHES_IRQ);
- }
- 
- static int ghes_estatus_pool_init(void)
-@@ -360,10 +345,10 @@ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
- 		paddr += trunk;
- 		buffer += trunk;
- 		if (in_nmi) {
--			ghes_iounmap_nmi(vaddr);
-+			ghes_iounmap_nmi();
- 			raw_spin_unlock(&ghes_ioremap_lock_nmi);
- 		} else {
--			ghes_iounmap_irq(vaddr);
-+			ghes_iounmap_irq();
- 			spin_unlock_irqrestore(&ghes_ioremap_lock_irq, flags);
- 		}
- 	}
+See the individual patches for details of changes.
+
+For reviewer convenience, a git tree is available. [4]
+
+Since there are some changes against already-reviewed patches, I've also
+pushed an unsquashed fixes tree for people to take a look at if it
+helps. [5]
+
+
+Summary:
+
+ * "regset: Add support for dynamically sized regsets" fixed to avoid
+   x86 breakage;
+
+ * one trival arm64 patch added to add asmlinkage annotations, and a
+   corresponding minor change to the Core task context handling patch;
+
+ * one new arm64 fix ("signal: Verify extra data is user-readable in
+   sys_rt_sigreturn") to ensure that access_ok() checks are done for the
+   whole extended signal frame, not just the base frame;
+
+ * one minor fix to the SVE sigreturn code to return consistent
+   intermediate error values (semantic correctness, non-functional
+   change);
+
+ * one minor change to call __copy_from_user() instead of
+   copy_from_user() in a situation where there is already an access_ok()
+   check;
+
+
+[1] ARM Scalable Vector Extension
+https://community.arm.com/groups/processors/blog/2016/08/22/technology-update-the-scalable-vector-extension-sve-for-the-armv8-a-architecture
+
+[2] linux-arm-kernel October 2017 Archives by thread
+http://lists.infradead.org/pipermail/linux-arm-kernel/2017-October/thread.html
+
+[3] [PATCH v4 00/28] ARM Scalable Vector Extension (SVE)
+http://lists.infradead.org/pipermail/linux-arm-kernel/2017-October/539414.html
+
+[4] For review and testing only -- **do not pull**
+    (This branch has review changelogs which should not form part of
+    the final commits.)
+
+    v5 series (this posting)
+
+    http://linux-arm.org/git?p=linux-dm.git;a=shortlog;h=refs/heads/sve/v5
+    git://linux-arm.org/linux-dm.git sve/v5
+
+[5] For review and testing only -- **do not pull**
+    (This branch has review changelogs which should not form part of
+    the final commits.)
+
+    v4 with unsquashed fixes
+
+    http://linux-arm.org/git?p=linux-dm.git;a=shortlog;h=refs/heads/sve/v4%2Bfixes
+    git://linux-arm.org/linux-dm.git sve/v4+fixes
+
+
+Dave Martin (30):
+  regset: Add support for dynamically sized regsets
+  arm64: fpsimd: Correctly annotate exception helpers called from asm
+  arm64: signal: Verify extra data is user-readable in sys_rt_sigreturn
+  arm64: KVM: Hide unsupported AArch64 CPU features from guests
+  arm64: efi: Add missing Kconfig dependency on KERNEL_MODE_NEON
+  arm64: Port deprecated instruction emulation to new sysctl interface
+  arm64: fpsimd: Simplify uses of {set,clear}_ti_thread_flag()
+  arm64/sve: System register and exception syndrome definitions
+  arm64/sve: Low-level SVE architectural state manipulation functions
+  arm64/sve: Kconfig update and conditional compilation support
+  arm64/sve: Signal frame and context structure definition
+  arm64/sve: Low-level CPU setup
+  arm64/sve: Core task context handling
+  arm64/sve: Support vector length resetting for new processes
+  arm64/sve: Signal handling support
+  arm64/sve: Backend logic for setting the vector length
+  arm64: cpufeature: Move sys_caps_initialised declarations
+  arm64/sve: Probe SVE capabilities and usable vector lengths
+  arm64/sve: Preserve SVE registers around kernel-mode NEON use
+  arm64/sve: Preserve SVE registers around EFI runtime service calls
+  arm64/sve: ptrace and ELF coredump support
+  arm64/sve: Add prctl controls for userspace vector length management
+  arm64/sve: Add sysctl to set the default vector length for new
+    processes
+  arm64/sve: KVM: Prevent guests from using SVE
+  arm64/sve: KVM: Treat guest SVE use as undefined instruction execution
+  arm64/sve: KVM: Hide SVE from CPU features exposed to guests
+  arm64/sve: Detect SVE and activate runtime support
+  arm64/sve: Add documentation
+  arm64: signal: Report signal frame size to userspace via auxv
+  arm64/sve: signal: Include SVE when computing AT_MINSIGSTKSZ
+
+ Documentation/arm64/cpu-feature-registers.txt |   6 +-
+ Documentation/arm64/elf_hwcaps.txt            |   4 +
+ Documentation/arm64/sve.txt                   | 508 +++++++++++++++
+ arch/arm/include/asm/kvm_host.h               |   3 +
+ arch/arm64/Kconfig                            |  12 +
+ arch/arm64/include/asm/cpu.h                  |   4 +
+ arch/arm64/include/asm/cpucaps.h              |   3 +-
+ arch/arm64/include/asm/cpufeature.h           |  42 ++
+ arch/arm64/include/asm/elf.h                  |   5 +
+ arch/arm64/include/asm/esr.h                  |   3 +-
+ arch/arm64/include/asm/fpsimd.h               |  71 +-
+ arch/arm64/include/asm/fpsimdmacros.h         | 148 +++++
+ arch/arm64/include/asm/kvm_arm.h              |   5 +-
+ arch/arm64/include/asm/kvm_host.h             |  11 +
+ arch/arm64/include/asm/processor.h            |  10 +
+ arch/arm64/include/asm/sysreg.h               |  24 +
+ arch/arm64/include/asm/thread_info.h          |   5 +
+ arch/arm64/include/asm/traps.h                |   2 +
+ arch/arm64/include/uapi/asm/auxvec.h          |   3 +-
+ arch/arm64/include/uapi/asm/hwcap.h           |   1 +
+ arch/arm64/include/uapi/asm/ptrace.h          | 138 ++++
+ arch/arm64/include/uapi/asm/sigcontext.h      | 120 +++-
+ arch/arm64/kernel/armv8_deprecated.c          |  15 +-
+ arch/arm64/kernel/cpufeature.c                |  99 ++-
+ arch/arm64/kernel/cpuinfo.c                   |   7 +
+ arch/arm64/kernel/entry-fpsimd.S              |  17 +
+ arch/arm64/kernel/entry.S                     |  40 +-
+ arch/arm64/kernel/fpsimd.c                    | 907 +++++++++++++++++++++++++-
+ arch/arm64/kernel/head.S                      |  13 +-
+ arch/arm64/kernel/process.c                   |  24 +
+ arch/arm64/kernel/ptrace.c                    | 280 +++++++-
+ arch/arm64/kernel/signal.c                    | 220 ++++++-
+ arch/arm64/kernel/signal32.c                  |   2 +-
+ arch/arm64/kernel/traps.c                     |   7 +-
+ arch/arm64/kvm/handle_exit.c                  |   8 +
+ arch/arm64/kvm/hyp/switch.c                   |  12 +-
+ arch/arm64/kvm/sys_regs.c                     | 292 +++++++--
+ fs/binfmt_elf.c                               |  10 +-
+ include/linux/regset.h                        |  67 +-
+ include/uapi/linux/elf.h                      |   1 +
+ include/uapi/linux/prctl.h                    |   9 +
+ kernel/sys.c                                  |  12 +
+ virt/kvm/arm/arm.c                            |   3 +
+ 43 files changed, 3023 insertions(+), 150 deletions(-)
+ create mode 100644 Documentation/arm64/sve.txt
+
 -- 
-2.15.0.rc2
+2.1.4
