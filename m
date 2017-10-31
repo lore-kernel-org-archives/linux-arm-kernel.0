@@ -1,26 +1,35 @@
 From: elder@linaro.org (Alex Elder)
-Date: Tue, 31 Oct 2017 07:58:05 -0500
-Subject: [PATCH v2 0/3] arm64: defconfig: remove some Qualcomm USB options
-Message-ID: <20171031125808.7300-1-elder@linaro.org>
+Date: Tue, 31 Oct 2017 07:58:06 -0500
+Subject: [PATCH v2 1/3] arm64: defconfig: remove CONFIG_USB_EHCI_MSM
+In-Reply-To: <20171031125808.7300-1-elder@linaro.org>
+References: <20171031125808.7300-1-elder@linaro.org>
+Message-ID: <20171031125808.7300-2-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series deletes three config options related to USB on Qualcomm
-SoCs from the arm64 "defconfig".  The code enabled by the options is
-no longer needed by any Qualcomm hardware.  The driver code that
-corresponds to these config options is removed in a separate series.
+No Qualcomm SoC requires the "ehci-msm.c" code any more.  So remove
+the code, and remove the config option from the arm64 defconfig.
 
-					-Alex
+Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Alex Elder <elder@linaro.org>
+Reviewed-by: Amit Kucheria <amit.kucheria@linaro.org>
+Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Acked-by: Andy Gross <andy.gross@linaro.org>
+---
+ arch/arm64/configs/defconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-v2:  Added Reviewed-by: Amit Kucheria <amit.kucheria@linaro.org>
-
-Alex Elder (3):
-  arm64: defconfig: remove CONFIG_USB_EHCI_MSM
-  arm64: defconfig: remove CONFIG_USB_MSM_OTG
-  arm64: defconfig: remove CONFIG_USB_QCOM_8X16_PHY
-
- arch/arm64/configs/defconfig | 3 ---
- 1 file changed, 3 deletions(-)
-
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 34480e9af2e7..4d0b96bb340a 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -410,7 +410,6 @@ CONFIG_USB_OTG=y
+ CONFIG_USB_XHCI_HCD=y
+ CONFIG_USB_XHCI_TEGRA=y
+ CONFIG_USB_EHCI_HCD=y
+-CONFIG_USB_EHCI_MSM=y
+ CONFIG_USB_EHCI_EXYNOS=y
+ CONFIG_USB_EHCI_HCD_PLATFORM=y
+ CONFIG_USB_OHCI_HCD=y
 -- 
 2.11.0
