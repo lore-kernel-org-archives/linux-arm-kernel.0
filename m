@@ -1,34 +1,65 @@
-From: tpiepho@impinj.com (Trent Piepho)
-Date: Tue, 31 Oct 2017 16:57:42 +0000
-Subject: [PATCH v2 1/4] spi: imx: GPIO based chip selects should not be
- required
-In-Reply-To: <20171031111919.gocl7wwrhkwnxrya@sirena.co.uk>
-References: <20171027010841.28624-1-tpiepho@impinj.com>
- <20171027010841.28624-2-tpiepho@impinj.com>
- <20171031111919.gocl7wwrhkwnxrya@sirena.co.uk>
-Message-ID: <1509469061.5473.16.camel@impinj.com>
+From: matt@mattface.org (Matt Hart)
+Date: Tue, 31 Oct 2017 17:00:15 +0000
+Subject: [GIT PULL 1/2] bcm2835-dt-fixes-2017-10-06
+In-Reply-To: <edb03edb-f2a6-549e-6060-eccfae554d92@gmail.com>
+References: <20171006220504.7776-1-eric@anholt.net>
+ <edb03edb-f2a6-549e-6060-eccfae554d92@gmail.com>
+Message-ID: <CAJsfgeU5Zq-2zSfto8WUZ5Xud1Ksedu9XdLG9pWR7YBZGVaHBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-10-31 at 11:19 +0000, Mark Brown wrote:
-> On Thu, Oct 26, 2017 at 06:08:38PM -0700, Trent Piepho wrote:
-> > The driver will fail to load if no gpio chip selects are specified,
-> > this patch changes this so that it no longer fails.
-> > 
-> > It's possible to use all native chip selects, in which case there is
-> > no reason to have a gpio chip select array.  This is what happens if
-> > the *optional* device tree property "cs-gpios" is omitted.
-> 
-> Do the native chip selects actually work usefully on this hardware?
-> There used to be problems with it wanting to do things like bounce the
-> chip select on every word which made it extremely difficult to use with
-> Linux.
+On 6 October 2017 at 23:14, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>
+> On 10/06/2017 03:05 PM, Eric Anholt wrote:
+> > Hi Florian.  Here's a patch that's gone through a couple of revisions
+> > on the list, that seriously fixes up the default serial behavior --
+> > previously, without the right config.txt/cmdline bits, you'd often end
+> > up with a hang with no output before booting completed.  It would be
+> > great to get it into 4.14.
+> >
+> > The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+> >
+> >   Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+> >
+> > are available in the git repository at:
+> >
+> >   git://github.com/anholt/linux tags/bcm2835-dt-fixes-2017-10-06
+> >
+> > for you to fetch changes up to f08f58a2bf68900a84e782b8c7ad701c0654173c:
+> >
+> >   ARM: dts: bcm283x: Fix console path on RPi3 (2017-10-06 13:04:56 -0700)
+> >
+> > ----------------------------------------------------------------
+> > This pull request brings in a fix for default serial console setup on
+> > RPi3, so it now comes up with no config.txt/cmdline.txt settings in
+> > the firmware.
+> >
+> > ----------------------------------------------------------------
+>
+> Merged, thanks Eric
+>
+> --
+> Florian
 
-Still are annoying, but on the device we have connected to it, it ends
-up working as desired.
+Hi all,
 
-I've not thoroughly investigated this hardware to find the details. 
-IIRC, the designware SPI on Altera SoCFPGA had the same issue, but it
-was a flaw in the driver and I was able to fix it.  I've come to expect
-it, as every new SPI master I use doesn't work properly in some
-different way.
+I realise this patch has been in mainline for a more than a week, but
+I've only recently had time to bisect broken rpi-3 boots in kernelci
+and found f08f58a2bf68900a84e782b8c7ad701c0654173c as the cause.
+
+Kernelci boots the rpi3 using uboot, with console=ttyS0 in the command
+line which now fails:
+https://kernelci.org/boot/id/59f787f059b5147794ef1dcf/
+
+Is there an alias I can use for both before and after this patch?
+
+Mainline boots fine if I use console=ttyS1 or drop the console arg
+altogether, but as we don't currently support different boot args per
+tree, and we don't have the manpower to track this patch in all the
+trees we test, we will have to switch to only boot testing mainline
+from now on.
+
+It seems to me the patch is doing the right thing, so this is just an
+FYI, though I can imagine a few users getting caught by this.
+
+Cheers
