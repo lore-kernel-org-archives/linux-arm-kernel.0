@@ -1,101 +1,44 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 31 Oct 2017 17:53:44 +0000
-Subject: [PATCH 3/3] ARM: early_printk: use printascii() rather than
- printch()
-In-Reply-To: <nycvar.YSQ.7.76.1710311346190.21665@knanqh.ubzr>
-References: <20171002020618.23924-1-nicolas.pitre@linaro.org>
- <20171002020618.23924-4-nicolas.pitre@linaro.org>
- <PS1PR06MB1162212F37C8BA7EE367FE828A5E0@PS1PR06MB1162.apcprd06.prod.outlook.com>
- <nycvar.YSQ.7.76.1710311211540.21665@knanqh.ubzr>
- <80bc8c16-321a-43ea-6cbb-257dbeee485b@arm.com>
- <nycvar.YSQ.7.76.1710311302370.21665@knanqh.ubzr>
- <20171031171629.GI9463@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1710311346190.21665@knanqh.ubzr>
-Message-ID: <20171031175344.GJ9463@n2100.armlinux.org.uk>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Tue, 31 Oct 2017 10:58:19 -0700
+Subject: [RFC] Improving udelay/ndelay on platforms where that is possible
+In-Reply-To: <CA+55aFwDquBXt_EYT3JFoWkeFsZTym5qUXig-DePXXzm07uABw@mail.gmail.com>
+References: <d3f42f35-8175-58f6-78b7-3331efe64da2@sigmadesigns.com>
+ <CA+55aFzy9=RtFRuJhFbF+PL_PCrkZsKtAKrq6WJo1z9eW9gLSA@mail.gmail.com>
+ <20171031165629.GF9463@n2100.armlinux.org.uk>
+ <CA+55aFwDquBXt_EYT3JFoWkeFsZTym5qUXig-DePXXzm07uABw@mail.gmail.com>
+Message-ID: <CA+55aFyRE0Sm3NFtY7cz8p=ZFK5WQDo-oNUHGW99+EQGr_rigA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 31, 2017 at 01:48:01PM -0400, Nicolas Pitre wrote:
-> On Tue, 31 Oct 2017, Russell King - ARM Linux wrote:
-> 
-> > On Tue, Oct 31, 2017 at 01:06:35PM -0400, Nicolas Pitre wrote:
-> > > That's easy to veryfy with this patch:
-> > 
-> > Unfortunately not that easy, this patch breaks printch.
-> 
-> Right, missed that.
-> 
-> New patch below:
-> 
-> diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
-> index ea9646cc2a..0d1cef4b6e 100644
-> --- a/arch/arm/kernel/debug.S
-> +++ b/arch/arm/kernel/debug.S
-> @@ -79,25 +79,28 @@ hexbuf:		.space 16
->  
->  ENTRY(printascii)
->  		addruart_current r3, r1, r2
-> -		b	2f
-> -1:		waituart r2, r3
-> -		senduart r1, r3
-> -		busyuart r2, r3
-> -		teq	r1, #'\n'
-> -		moveq	r1, #'\r'
-> -		beq	1b
-> -2:		teq	r0, #0
-> +1:		teq	r0, #0
->  		ldrneb	r1, [r0], #1
->  		teqne	r1, #0
-> -		bne	1b
-> -		ret	lr
-> +		reteq	lr
-> +		teq     r1, #'\n'
-> +		bne	2f
-> +		mov	r1, '\r'
-> +		waituart r2, r3
-> +		senduart r1, r3
-> +		busyuart r2, r3
-> +		mov	r1, '\n'
-> +2:		waituart r2, r3
-> +		senduart r1, r3
-> +		busyuart r2, r3
-> +		b	1b
->  ENDPROC(printascii)
->  
->  ENTRY(printch)
->  		addruart_current r3, r1, r2
->  		mov	r1, r0
->  		mov	r0, #0
-> -		b	1b
-> +		b	2b
->  ENDPROC(printch)
+On Tue, Oct 31, 2017 at 10:45 AM, Linus Torvalds
+<torvalds@linux-foundation.org> wrote:
+>
+> So I'm very much open to udelay improvements, and if somebody sends
+> patches for particular platforms to do particularly well on that
+> platform, I think we should merge them. But ...
 
-Still, not quite!  printch('\n') with the old code would do this
-(in terms of executed instructions):
+Side note: this is obviously a negative feedback circle, where because
+we know we can't do all that great in general, few platforms really
+bother to do as well as they perhaps could, since nobody should
+generally care that deeply due to the generic problem..
 
- 		mov	r1, r0
- 		mov	r0, #0
-		b	1b
-1:		waituart r2, r3
-		senduart r1, r3
-		busyuart r2, r3
-		teq	r1, #'\n'
-		moveq	r1, #'\r'
-		beq	1b
-1:		waituart r2, r3
-		senduart r1, r3
-		busyuart r2, r3
-		teq	r1, #'\n'
-		...
-2:		teq	r0, #0
-		ret	lr
+Again, if a driver that has tight timing requirements can just
+generate the timings from its own hardware, that tends to
+JustWorks(tm).
 
-So a printch('\n') produces "\n\r" on the UART.  If we're fixing
-printascii() to emit "\r\n" instead of "\n\r" for a '\n', then
-printch() should have the same fix, and should not truncate to
-just '\n'.
+It was what people used to do traditionally at least on the PC/AT
+platform. None of this "udelay()" crud, you knew that doing a single
+PIO read took one usec, so you'd just delay that way. Then the
+hardware moved from ISA to EISA, and everything sped up, but that was
+ok, because now it needed a shorter delay anyway...
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Doing things like a status register read is often a good way
+(sometimes the _only_ way) to make sure preceding writes have been
+flushed all the way to the device anyway, so it can have those kinds
+of incidental advantages.
+
+Of course, all of this is relevant only for delays on the scale of
+individual device accesses. But that's also when udelay/ndelay() tends
+to have the most problems.
+
+               Linus
