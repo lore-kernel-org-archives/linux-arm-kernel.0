@@ -1,42 +1,32 @@
-From: salyzyn@android.com (Mark Salyzyn)
-Date: Tue, 31 Oct 2017 11:42:39 -0700
-Subject: [PATCH v3 0/3] arm64: Add CONFIG_KUSER_HELPERS
-In-Reply-To: <20170920091555.GA3782@arm.com>
-References: <20170911152635.95367-1-salyzyn@android.com>
- <CAGXu5jK-i_Eqfm1mZ-Kz5dqsKuCt_-MDymkb735VXCV9aOnvwQ@mail.gmail.com>
- <20170920091555.GA3782@arm.com>
-Message-ID: <065fd365-4635-ddc7-b683-59a5cb16be8f@android.com>
+From: tbaicar@codeaurora.org (Tyler Baicar)
+Date: Tue, 31 Oct 2017 14:46:36 -0400
+Subject: [RFC/RFT PATCH 0/6] Switch GHES ioremap_page_range() to use fixmap
+In-Reply-To: <20171031153832.17746-1-james.morse@arm.com>
+References: <20171031153832.17746-1-james.morse@arm.com>
+Message-ID: <6373c223-5b53-f6a0-6867-a2be8bb9f44c@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/20/2017 02:15 AM, Will Deacon wrote:
-> On Tue, Sep 19, 2017 at 03:02:22PM -0700, Kees Cook wrote:
->> On Mon, Sep 11, 2017 at 8:26 AM, Mark Salyzyn <salyzyn@android.com> wrote:
->>> Make it possible to disable the kuser helpers by adding a KUSER_HELPERS
->>> config option (enabled by default). When disabled, all kuser
->>> helpers-related code is removed from the kernel and no mapping is done
->>> at the fixed high address (0xffff0000); any attempt to use a kuser
->>> helper from a 32-bit process will result in a segfault.
->>>
->>> Signed-off-by: Mark Salyzyn <salyzyn@android.com>
->>>
->>> v2:
->>> - vectors_page and compat_vdso_spec as array of 2
->>> - free sigpage if vectors allocation failed
->>> - adjust makefile so one line for each of the assembler source modules
->>> - split off assembler changes to a new previous patch in series to reduce churn
->>> - modify slightly the feature documentation to reduce its reach
->>> - modify slightly the feature documentation to rationalize the yes default.
->>> - There are more ifdefs as a result of the rebase.
->>>
->>> v3:
->>> - rebase (minor conflicts)
->> This looks great to me. I'd love to see kuser helpers gone. :)
->>
->> Catalin, Will, does this need anything else?
-> I haven't had chance to look at the patches yet (buried in other stuff), but
-> I aim to get to it in the next couple of weeks.
+On 10/31/2017 11:38 AM, James Morse wrote:
+> GHES is doing ioremap_page_range() in both NMI and irq context, neither
+> are safe as it may sleep to allocate intermediate levels of page table.
 >
-> Will
+> Replace the NMI/irq GHES_IOREMAP_PAGES to use a fixmap entry each.
+>
+> After this nothing uses ghes_ioremap_area or arch_apei_flush_tlb_one(),
+> rip them out.
+>
+> RFC as I've only build-tested this on x86. For arm64 I've tested it on a
+> software model. Any more testing would be welcome. These patches are based
+> on rc7.
+For the arm64 and APEI patches:
+Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
 
-Ping?
+Verified on arm64. I no longer see the BUGs in the GHES code. Thanks!
+
+Tyler
+
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
