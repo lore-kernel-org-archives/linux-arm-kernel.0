@@ -1,50 +1,39 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Tue, 31 Oct 2017 13:54:56 -0500
-Subject: [PATCH 2/4] gpiolib: add bitmask for valid GPIO lines
-In-Reply-To: <1509441149.10233.80.camel@linux.intel.com>
-References: <1509396602-1936-1-git-send-email-timur@codeaurora.org>
- <1509396602-1936-3-git-send-email-timur@codeaurora.org>
- <1509441149.10233.80.camel@linux.intel.com>
-Message-ID: <02208047-38c8-f97b-5c53-6cced7bdecc6@codeaurora.org>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Tue, 31 Oct 2017 20:04:38 +0100
+Subject: [RFC/RFT PATCH 2/6] x86/mm/fixmap: Add GHES fixmap entries
+In-Reply-To: <20171031153832.17746-3-james.morse@arm.com>
+References: <20171031153832.17746-1-james.morse@arm.com>
+ <20171031153832.17746-3-james.morse@arm.com>
+Message-ID: <20171031190438.u6ctvc7lyeedo5dw@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2017 04:12 AM, Andy Shevchenko wrote:
-> Instead of mangling this function wouldn't be better to introduce a
-> separate one for line and perhaps a third one which calls them both?
 
-The diff is convoluted, but the end result is clean:
+* James Morse <james.morse@arm.com> wrote:
 
-static int gpiochip_irqchip_init_valid_mask(struct gpio_chip *gpiochip)
-{
-	if (gpiochip->irq_need_valid_mask) {
-		gpiochip->irq_valid_mask =
-			kcalloc(BITS_TO_LONGS(gpiochip->ngpio),
-				sizeof(long), GFP_KERNEL);
-		if (!gpiochip->irq_valid_mask)
-			return -ENOMEM;
+> GHES is switching to use fixmap for its dynamic mapping of CPER records,
+> to avoid using ioremap_page_range() in IRQ/NMI context.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
+> ---
+>  arch/x86/include/asm/fixmap.h | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/x86/include/asm/fixmap.h b/arch/x86/include/asm/fixmap.h
+> index dcd9fb55e679..be3cc32db7f0 100644
+> --- a/arch/x86/include/asm/fixmap.h
+> +++ b/arch/x86/include/asm/fixmap.h
+> @@ -104,6 +104,10 @@ enum fixed_addresses {
+>  	FIX_GDT_REMAP_BEGIN,
+>  	FIX_GDT_REMAP_END = FIX_GDT_REMAP_BEGIN + NR_CPUS - 1,
+>  
+> +	/* Used for GHES mapping from assorted contexts */
+> +	FIX_APEI_GHES_IRQ,
+> +	FIX_APEI_GHES_NMI,
+> +
 
-		/* Assume by default all GPIOs are valid */
-		bitmap_fill(gpiochip->irq_valid_mask, gpiochip->ngpio);
-	}
+Acked-by: Ingo Molnar <mingo@kernel.org>
 
-	if (gpiochip->line_need_valid_mask) {
-		gpiochip->line_valid_mask =
-			kcalloc(BITS_TO_LONGS(gpiochip->ngpio),
-				sizeof(long), GFP_KERNEL);
-		if (!gpiochip->line_valid_mask)
-			return -ENOMEM;
+Thanks,
 
-		/* Assume by default all GPIOs are valid */
-		bitmap_fill(gpiochip->line_valid_mask, gpiochip->ngpio);
-	}
-
-	return 0;
-}
-
-Is this acceptable?
-
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+	Ingo
