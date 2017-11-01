@@ -1,135 +1,132 @@
-From: aik@ozlabs.ru (Alexey Kardashevskiy)
-Date: Sun, 1 Oct 2017 12:46:38 +1100
-Subject: [RESEND RFC PATCH 0/7] sun8i H3 HDMI glue driver for DW HDMI
-In-Reply-To: <34246001.lKHNgTVc0h@jernej-laptop>
-References: <20170920200124.20457-1-jernej.skrabec@siol.net>
- <51c50157-6794-852b-f89d-647b9cf06ef2@ozlabs.ru>
- <34246001.lKHNgTVc0h@jernej-laptop>
-Message-ID: <ccaebb62-ad28-4905-5ebf-bcdc1e7ebf54@ozlabs.ru>
+From: christina.jacob.koikara@gmail.com (Christina Jacob)
+Date: Wed,  1 Nov 2017 13:18:03 +0530
+Subject: [PATCH v3 0/1] XDP program for ip forward
+Message-ID: <1509522484-30215-1-git-send-email-christina.jacob.koikara@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/17 04:56, Jernej ?krabec wrote:
-> Hi,
-> 
-> Dne sobota, 30. september 2017 ob 13:58:03 CEST je Alexey Kardashevskiy 
-> napisal(a):
->> On 21/09/17 06:01, Jernej Skrabec wrote:
->>> [added media mailing list due to CEC question]
->>>
->>> This patch series adds a HDMI glue driver for Allwinner H3 SoC. For now,
->>> only video and CEC functionality is supported. Audio needs more tweaks.
->>>
->>> Series is based on the H3 DE2 patch series available on mailing list:
->>> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-August/522697.h
->>> tml (ignore patches marked with [NOT FOR REVIEW NOW] tag)
->>>
->>> Patch 1 adds support for polling plug detection since custom PHY used here
->>> doesn't support HPD interrupt.
->>>
->>> Patch 2 enables overflow workaround for v1.32a. This HDMI controller
->>> exhibits same issues as HDMI controller used in iMX6 SoCs.
->>>
->>> Patch 3 adds CLK_SET_RATE_PARENT to hdmi clock.
->>>
->>> Patch 4 adds dt bindings documentation.
->>>
->>> Patch 5 adds actual H3 HDMI glue driver.
->>>
->>> Patch 6 and 7 add HDMI node to DT and enable it where needed.
->>>
->>> Allwinner used DW HDMI controller in a non standard way:
->>> - register offsets obfuscation layer, which can fortunately be turned off
->>> - register read lock, which has to be disabled by magic number
->>> - custom PHY, which have to be initialized before DW HDMI controller
->>> - non standard clocks
->>> - no HPD interrupt
->>>
->>> Because of that, I have two questions:
->>> - Since HPD have to be polled, is it enough just to enable poll mode? I'm
->>>
->>>   mainly concerned about invalidating CEC address here.
->>>
->>> - PHY has to be initialized before DW HDMI controller to disable offset
->>>
->>>   obfuscation and read lock among other things. This means that all clocks
->>>   have to be enabled in glue driver. This poses a problem, since when
->>>   using component model, dw-hdmi bridge uses drvdata for it's own private
->>>   data and prevents glue layer to pass a pointer to unbind function,
->>>   where clocks should be disabled. I noticed same issue in meson DW HDMI
->>>   glue driver, where clocks are also not disabled when unbind callback is
->>>   called. I noticed that when H3 SoC is shutdown, HDMI output is still
->>>   enabled and lastest image is shown on monitor until it is unplugged
->>>   from power supply. Is there any simple solution to this?
->>>
->>> Chen-Yu,
->>> TL Lim was unable to obtain any answer from Allwinner about HDMI clocks. I
->>> think it is safe to assume that divider in HDMI clock doesn't have any
->>> effect.
->>>
->>> Branch based on linux-next from 1. September with integrated patches is
->>> available here:
->>> https://github.com/jernejsk/linux-1/tree/h3_hdmi_rfc
->>
->> Out of curiosity I tried this one and got:
->>
->>
->>
->> [    0.071711] sun4i-usb-phy 1c19400.phy: Couldn't request ID GPIO
->> [    0.074809] sun8i-h3-pinctrl 1c20800.pinctrl: initialized sunXi PIO
->> driver [    0.076167] sun8i-h3-r-pinctrl 1f02c00.pinctrl: initialized sunXi
->> PIO driver [    0.148009] ------------[ cut here ]------------
->> [    0.148035] WARNING: CPU: 0 PID: 1 at
->> drivers/clk/sunxi-ng/ccu_common.c:41 ccu_nm_set_rate+0x1d0/0x274
->> [    0.148046] CPU: 0 PID: 1 Comm: swapper/0 Not tainted
->> 4.13.0-rc6-next-20170825-aik-aik #24
->> [    0.148051] Hardware name: Allwinner sun8i Family
->> [    0.148082] [<c010de6c>] (unwind_backtrace) from [<c010b260>]
->> (show_stack+0x10/0x14)
->> [    0.148101] [<c010b260>] (show_stack) from [<c077a464>]
->> (dump_stack+0x84/0x98)
->> [    0.148117] [<c077a464>] (dump_stack) from [<c011abe0>]
->> (__warn+0xe0/0xfc) [    0.148132] [<c011abe0>] (__warn) from [<c011acac>]
->> (warn_slowpath_null+0x20/0x28)
->> [    0.148145] [<c011acac>] (warn_slowpath_null) from [<c03d1888>]
->> (ccu_nm_set_rate+0x1d0/0x274)
->> [    0.148161] [<c03d1888>] (ccu_nm_set_rate) from [<c03c78b4>]
->> (clk_change_rate+0x19c/0x250)
->> [    0.148175] [<c03c78b4>] (clk_change_rate) from [<c03c7b7c>]
->> (clk_core_set_rate_nolock+0x68/0xb0)
->> [    0.148187] [<c03c7b7c>] (clk_core_set_rate_nolock) from [<c03c8134>]
->> (clk_set_rate+0x20/0x30)
->> [    0.148202] [<c03c8134>] (clk_set_rate) from [<c03cc560>]
->> (of_clk_set_defaults+0x200/0x364)
->> [    0.148219] [<c03cc560>] (of_clk_set_defaults) from [<c045427c>]
->> (platform_drv_probe+0x18/0xb0)
->> [    0.148233] [<c045427c>] (platform_drv_probe) from [<c0452efc>]
->> (driver_probe_device+0x234/0x2e8)
->> [    0.148246] [<c0452efc>] (driver_probe_device) from [<c0453068>]
->> (__driver_attach+0xb8/0xbc)
->> [    0.148258] [<c0453068>] (__driver_attach) from [<c0451414[    1.336154]
->> Unable to handle kernel NULL pointer dereference at virtual address 00000008
->>
-> 
-> Patch for that is already merged upstream and can be found here:
-> https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/
-> drivers/clk/sunxi-ng?id=62d212bdb022deeb875f92f6e376c799e3f35eca
+The patch below implements port to port forwarding through route table and arp
+table lookup for ipv4 packets using bpf_redirect helper function and lpm_trie
+map.  This has an improved performance over the normal kernel stack ip forward.
 
-Lovely, it works, thanks!
+Implementation details.
+-----------------------
+The program uses one map each for arp table, route table and packet count.
+The number of entries the program can process is limited by the size of the
+map used.
+
+In the xdp_router_ipv4_user.c,
+
+initially, the routing table is read and is stored in an lpm trie map.
+The arp table is read and stored in an array map There are two netlink sockets
+that listens to any change in the route table  and arp table.
+There are two types of changes to the route table.
+        1.New
+
+        The new entries are added to the lpm_trie with proper key and prefix
+        length If there is a another entry in the route table with a different
+        metric(only metric is considered). Then the values are compared and the
+        one with lowest metric is added to the node.
+
+        2.Deletion
+
+        On deletion from the route table, The particular node is removed and the
+        entire route table is again read to check if there is another entry with
+        a different metric.
+
+This implementation depends on  bpf: Implement map_delete_elem for
+BPF_MAP_TYPE_LPM_TRIE which is not yet upstreamed.
+
+There are two types of changes to the route table
+
+        1.New
+
+        The new arp entries are added in the in the array map directly with the
+        ip address as the key and the destination mac address as the value.
+
+        2.Delete
+
+        The entry corresponding to the particular ip is deleted from the
+        arp table map.
+
+Another map is maintained for entries in the route table having 32 bit mask.
+such entries can have a corresponding  arp entry which if  stored together with
+the route entry in an array map and can be accessed in O(1) time. Eliminating
+the trie lookup and arp lookup.
+
+In the xdp_router_ipv4_kern.c,
+
+The array map for the 32 bit mask entries checked to see if there is a key that
+exactly matches with the destination ip. If it has a non zero destination mac
+entry then the xdp data is updated accordingly Otherwise a proper route and
+arp table lookup is done using the lpm_trie and the arp table array map.
+
+        Usage: as ./xdp_router_ipv4 -S <ifindex1...ifindexn> (-S for
+        generic xdp implementation ifindex- the index of the interface to which
+        the xdp program has to be attached.) in 4.14-rc3 kernel.
+
+Changes from v1 to v2
+---------------------
+
+* As suggested by Jesper Dangaard Brouer
+        1. Changed the program name to  list xdp_router_ipv4
+        2. Changed the commandline arguments from ifindex list to interface name
+                Usage : ./xdp_router_ipv4 [-S] <interface name list>
+                -S for generic xdp implementation
+                -interface name list is the list of interfaces to which
+                the xdp program should attach to
+
+* As suggested by Daniel Borkmann
+        1. Using __builin_memcpy to update source and destination mac in the bpf
+          kernel program.
+
+        2. Started using __be32 in the kernel program to be inline with the data
+           type used in user program
+
+        3. Rectified few style issues.
+
+* Corrected the copyright issue pointed out by David Ahern
+
+* Fixed the bug: The already attached interfaces are not detached from the
+  xdp program if the program fails to attach to an interface later in the list.
 
 
->> and a bit later:
->>
->> [    1.995572] Rebooting in 10 seconds..
-> 
-> I'm not sure about that one. Kernel config issue?
+Changes from v2 to v3
+---------------------
+* As pointed out by Jesper Dangaard Brouer
+               1. Changed the program name in the cover letter.
+	       2. Changed variable declararions to follow Reverse-xmas tree
+	          rule.
+	       3. Reduced the nesting in code for readability.
+	       4. Fixed bug: incorrect mac address being set for source and
+	          destination mac.
+	       5. Fixed comment style.
+
+* As suggested by Stephen Hemminger 
+		Changed all the bzeros' to memset.
+
+* As suggested by David Laight
+		removed the signed remainders calculation.
+
+* As suggested by Stephen Hemminger and David Daney 
+		1. Added checks for the ioctl return value.
+		2. Changed data types to be64 to be sure about the size of the
+		   data type.
+		3. Verified byte order. Using the mac address from ioctl in
+		   network byte order. not casting to to long data type
+		   anymore.
+		4. Fixed returning address of local variable.
 
 
+Christina Jacob (1):
+  xdp: Sample xdp program implementing ip forward
 
-Yup, I did not have CMA enabled.
-
-
-
+ samples/bpf/Makefile               |   4 +
+ samples/bpf/xdp_router_ipv4_kern.c | 181 ++++++++++
+ samples/bpf/xdp_router_ipv4_user.c | 657 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 842 insertions(+)
+ create mode 100644 samples/bpf/xdp_router_ipv4_kern.c
+ create mode 100644 samples/bpf/xdp_router_ipv4_user.c
 
 -- 
-Alexey
+2.7.4
