@@ -1,77 +1,45 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 1 Nov 2017 13:05:21 +0100
-Subject: [GIT PULL 1/2] bcm2835-dt-fixes-2017-10-06
-In-Reply-To: <CALeDE9NsjYHpaR6kyHgABGr2eE=EhpJstttK60WwRkAj0u1m7Q@mail.gmail.com>
-References: <20171006220504.7776-1-eric@anholt.net>
- <edb03edb-f2a6-549e-6060-eccfae554d92@gmail.com>
- <CAJsfgeU5Zq-2zSfto8WUZ5Xud1Ksedu9XdLG9pWR7YBZGVaHBA@mail.gmail.com>
- <CALeDE9NsjYHpaR6kyHgABGr2eE=EhpJstttK60WwRkAj0u1m7Q@mail.gmail.com>
-Message-ID: <910a98ca-57f6-baca-73ac-f6c8c1ff04db@i2se.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 1 Nov 2017 12:05:55 +0000
+Subject: [RFC PATCH 0/2] arm64: optional paranoid __{get,put}_user checks
+In-Reply-To: <77c80381-cf68-aa1a-9112-e057c068eeb6@redhat.com>
+References: <20171026090942.7041-1-mark.rutland@arm.com>
+ <77c80381-cf68-aa1a-9112-e057c068eeb6@redhat.com>
+Message-ID: <20171101120555.yvb65g3wgtxskfh3@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matt, hi Peter,
+On Tue, Oct 31, 2017 at 04:56:39PM -0700, Laura Abbott wrote:
+> On 10/26/2017 02:09 AM, Mark Rutland wrote:
+> > In Prague, Kees mentioned that it would be nice to have a mechanism to
+> > catch bad __{get,put}_user uses, such as the recent CVE-2017-5123 [1,2]
+> > issue with unsafe_put_user() in waitid().
+> > 
+> > These patches allow an optional access_ok() check to be dropped in
+> > arm64's __{get,put}_user() primitives. These will then BUG() if a bad
+> > user pointer is passed (which should only happen in the absence of an
+> > earlier access_ok() check).
 
-Am 01.11.2017 um 10:37 schrieb Peter Robinson:
-> On Tue, Oct 31, 2017 at 5:00 PM, Matt Hart <matt@mattface.org> wrote:
->> On 6 October 2017 at 23:14, Florian Fainelli <f.fainelli@gmail.com> wrote:
->>> On 10/06/2017 03:05 PM, Eric Anholt wrote:
->>>> Hi Florian.  Here's a patch that's gone through a couple of revisions
->>>> on the list, that seriously fixes up the default serial behavior --
->>>> previously, without the right config.txt/cmdline bits, you'd often end
->>>> up with a hang with no output before booting completed.  It would be
->>>> great to get it into 4.14.
->>>>
->>>> The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
->>>>
->>>>   Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
->>>>
->>>> are available in the git repository at:
->>>>
->>>>   git://github.com/anholt/linux tags/bcm2835-dt-fixes-2017-10-06
->>>>
->>>> for you to fetch changes up to f08f58a2bf68900a84e782b8c7ad701c0654173c:
->>>>
->>>>   ARM: dts: bcm283x: Fix console path on RPi3 (2017-10-06 13:04:56 -0700)
->>>>
->>>> ----------------------------------------------------------------
->>>> This pull request brings in a fix for default serial console setup on
->>>> RPi3, so it now comes up with no config.txt/cmdline.txt settings in
->>>> the firmware.
->>>>
->>>> ----------------------------------------------------------------
->>> Merged, thanks Eric
->>>
->>> --
->>> Florian
->> Hi all,
->>
->> I realise this patch has been in mainline for a more than a week, but
->> I've only recently had time to bisect broken rpi-3 boots in kernelci
->> and found f08f58a2bf68900a84e782b8c7ad701c0654173c as the cause.
->>
->> Kernelci boots the rpi3 using uboot, with console=ttyS0 in the command
->> line which now fails:
->> https://kernelci.org/boot/id/59f787f059b5147794ef1dcf/
->>
->> Is there an alias I can use for both before and after this patch?
->>
->> Mainline boots fine if I use console=ttyS1 or drop the console arg
->> altogether, but as we don't currently support different boot args per
->> tree, and we don't have the manpower to track this patch in all the
->> trees we test, we will have to switch to only boot testing mainline
->> from now on.
-> Yes, I've seen the same in Fedora with that patch.
->
->
-could you please describe the issue more in detail.
+> Turning on the option fails as soon as we hit userspace. On my buildroot
+> based environment I get the help text for ld.so (????) and then a message
+> about attempting to kill init. 
 
-Does u-boot or Linux hang? Does u-boot select the wrong UART? Is there a
-pinmux conflict?
+Ouch. Thanks for the report, and sorry about this.
 
-Which u-boot version do you use?
+The problem is that I evaluate the ptr argument twice in
+__{get,put}_user(), and this may have side effects.
 
+e.g. when the ELF loader does things like:
 
-Best regards
+  __put_user((elf_addr_t)p, sp++)
 
-Stefan
+... we increment sp twice, and write to the wrong user address, leaving
+sp corrupt.
+
+I have an additional patch [1] to fix this, which is in my
+arm64/access-ok branch [2].
+
+Thanks,
+Mark.
+
+[1] https://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git/commit/?h=arm64/access-ok&id=ebb7ff83eb53b8810395d5cf48712a4ae6d678543
+[2] https://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git/log/?h=arm64/access-ok
