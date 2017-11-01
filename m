@@ -1,94 +1,68 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 1 Nov 2017 16:32:07 +0100
-Subject: Nokia N9: fun with camera
-In-Reply-To: <20171101063655.GA16895@amd>
-References: <20170424224724.5bb52382@vento.lan> <20170426105300.GA857@amd>
- <20170426082608.7dd52fbf@vento.lan> <20171021220026.GA26881@amd>
- <f85cab54-30cf-0774-7376-abced86842af@xs4all.nl>
- <20171023185414.GA2258@amd>
- <40C85971-7DDE-4FB0-AB90-C52CA864C0D4@xs4all.nl>
- <20171023201557.hecu4e6o3ynp5hmv@valkosipuli.retiisi.org.uk>
- <20171031212812.GA11148@amd> <20171101063655.GA16895@amd>
-Message-ID: <20171101153207.GA28559@amd>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 1 Nov 2017 11:32:43 -0400 (EDT)
+Subject: [PATCH 1/2] usb: ehci-platform: use reset array API
+In-Reply-To: <1509356120-21473-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <Pine.LNX.4.44L0.1711011118570.1770-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Mon, 30 Oct 2017, Masahiro Yamada wrote:
 
-> > Sakari, I am actually playing with N9 camera, not N950. That comes
-> > next.
-> > 
-> > And the clock error I mentioned ... seems to be
-> > -EPROBE_DEFER. So... not an issue.
+> Generic drivers like this need to control arbitrary numbers of reset
+> lines.  Instead of hard-coding the maximum number of resets, use the
+> reset array API.  It can manage a bunch of resets behind the scene.
 > 
-> Hmm, and with similar config, I got N950 to work. ... which should
-> give me enough clues to get N9 to work. I guess I forgot to reset the
-> pipeline between the tries, or something.
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+>  drivers/usb/host/ehci-platform.c | 33 +++++++++++----------------------
+>  1 file changed, 11 insertions(+), 22 deletions(-)
 > 
-> For the record, this got me some data on n950:
-> 
->  m.media_ctl( [ '-f', '"OMAP3 ISP CSI2a":0 [fmt:%s/%dx%d]' % (m.fmt, m.cap_x, m.cap_y) ] )
->  m.media_ctl( [ '-l', '"OMAP3 ISP CSI2a":1 -> "OMAP3 ISP CSI2a output":0[1]' ] )
-> 
->  # WORKS!!!!
->  # pavel at n900:~/g/tui/camera$ sudo /my/tui/yavta/yavta
->  # --capture=8 --skip 0 --format SGRBG10 --size 4272x3016 /dev/video1 --file=/tmp/delme#
-> 
-> ...ouch. It only worked twice :-(. Either driver gets confused by my
-> attempts, or it relied on some other initialization code. Strange.
+> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
+> index f1908ea..64fd643 100644
+> --- a/drivers/usb/host/ehci-platform.c
+> +++ b/drivers/usb/host/ehci-platform.c
+> @@ -40,12 +40,11 @@
+>  
+>  #define DRIVER_DESC "EHCI generic platform driver"
+>  #define EHCI_MAX_CLKS 4
+> -#define EHCI_MAX_RSTS 4
+>  #define hcd_to_ehci_priv(h) ((struct ehci_platform_priv *)hcd_to_ehci(h)->priv)
+>  
+>  struct ehci_platform_priv {
+>  	struct clk *clks[EHCI_MAX_CLKS];
+> -	struct reset_control *rsts[EHCI_MAX_RSTS];
+> +	struct reset_control *rsts;
+>  	struct phy **phys;
+>  	int num_phys;
+>  	bool reset_on_resume;
+> @@ -151,7 +150,7 @@ static int ehci_platform_probe(struct platform_device *dev)
+>  	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
+>  	struct ehci_platform_priv *priv;
+>  	struct ehci_hcd *ehci;
+> -	int err, irq, phy_num, clk = 0, rst;
+> +	int err, irq, phy_num, clk = 0;
+>  
+>  	if (usb_disabled())
+>  		return -ENODEV;
+> @@ -239,21 +238,13 @@ static int ehci_platform_probe(struct platform_device *dev)
+>  		}
+>  	}
+>  
+> -	for (rst = 0; rst < EHCI_MAX_RSTS; rst++) {
+> -		priv->rsts[rst] = devm_reset_control_get_shared_by_index(
+> -					&dev->dev, rst);
+> -		if (IS_ERR(priv->rsts[rst])) {
+> -			err = PTR_ERR(priv->rsts[rst]);
+> -			if (err == -EPROBE_DEFER)
+> -				goto err_reset;
+> -			priv->rsts[rst] = NULL;
+> -			break;
+> -		}
+> +	priv->rsts = devm_reset_control_array_get_optional_shared(&dev->dev);
+> +	if (IS_ERR(priv->rsts))
+> +		return PTR_ERR(priv->rsts);
 
-Hmm, so it works "reliably" after boot. But it also locks up machine
-with high probability. If you have N950, it might still be handy...
+You must not return.  Instead you should set err and jump to 
+err_put_clks.
 
-Messages are:
-
-['-r']
-['-f', '"OMAP3 ISP CSI2a":0 [fmt:SGRBG10/4272x3016]']
-Warning: the -f option is deprecated and has been replaced by -V.
-['-l', '"OMAP3 ISP CSI2a":1 -> "OMAP3 ISP CSI2a output":0[1]']
-Testing: is raw
-Testing:  /my/tui/yavta/yavta --capture=8 --skip 0 --format SGRBG10
---size 4272x3016 /dev/video_sensor --file=/tmp/delme#
-Error opening device /dev/video_sensor: Permission denied (13).
-Raw mode is  1
-Raw mode is  1
-Testing: is raw
-Testing:  /my/tui/yavta/yavta --capture=8 --skip 0 --format SGRBG10
---size 4272x3016 /dev/video_sensor --file=/tmp/delme#
-Device /dev/video_sensor opened.
-Device `OMAP3 ISP CSI2a output' on `media' is a video capture (without
-mplanes) device.
-Video format set: SGRBG10 (30314142) 4272x3016 (stride 8544) field
-none buffer size 25768704
-Video format: SGRBG10 (30314142) 4272x3016 (stride 8544) field none
-buffer size 25768704
-1 buffers requested.
-length: 25768704 offset: 0 timestamp type/source: mono/EoF
-Buffer 0/0 mapped at address 0xb54e9000.
-0 (0) [-] none 0 25768704 B 691.756907 691.758403 6.212 fps ts
-mono/EoF
-1 (0) [-] none 1 25768704 B 694.821025 694.821422 0.326 fps ts
-mono/EoF
-2 (0) [E] none 2 25768704 B 698.530833 698.534739 0.270 fps ts
-mono/EoF
-3 (0) [-] none 3 25768704 B 700.788127 700.790996 0.443 fps ts
-mono/EoF
-(and here it locked up :-(. Sometimes it captures more.)
-
-Thanks,
-
-								Pavel
-
-
-
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171101/18dc9d80/attachment.sig>
+Alan Stern
