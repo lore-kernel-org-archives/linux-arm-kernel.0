@@ -1,31 +1,67 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed, 1 Nov 2017 15:17:09 -0700
-Subject: [PATCH] mailbox: add support for doorbell/signal mode controllers
-In-Reply-To: <59a05fcb-ff30-0683-144e-93521a7413f9@arm.com>
-References: <1509553964-4451-1-git-send-email-sudeep.holla@arm.com>
- <CABb+yY1tcm-68E5oG75hstuMd6AOeb=BB6HeKGnQ1zj4Qya6hg@mail.gmail.com>
- <59a05fcb-ff30-0683-144e-93521a7413f9@arm.com>
-Message-ID: <20171101221709.GB28761@minitux>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 1 Nov 2017 15:28:29 -0700
+Subject: [RFC PATCH 0/2] arm64: optional paranoid __{get,put}_user checks
+In-Reply-To: <0f2d5f89-2939-06ec-9b59-b19f828d8968@redhat.com>
+References: <20171026090942.7041-1-mark.rutland@arm.com>
+ <77c80381-cf68-aa1a-9112-e057c068eeb6@redhat.com>
+ <20171101120555.yvb65g3wgtxskfh3@lakrids.cambridge.arm.com>
+ <0f2d5f89-2939-06ec-9b59-b19f828d8968@redhat.com>
+Message-ID: <CAGXu5j+eb+41XRorgAVURKEsixiMYgtcmpKwQzJ3Mct_yw1G6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 01 Nov 11:15 PDT 2017, Sudeep Holla wrote:
-> 
->  80         writel_relaxed(msg->cmd, mb->mbox_base +
-> MAILBOX_A2B_CMD(chans->idx));
->  81         writel_relaxed(msg->rx_size, mb->mbox_base +
-> 
->  82                        MAILBOX_A2B_DAT(chans->idx));
-> 
->  83
+On Wed, Nov 1, 2017 at 2:13 PM, Laura Abbott <labbott@redhat.com> wrote:
+> On 11/01/2017 05:05 AM, Mark Rutland wrote:
+>> On Tue, Oct 31, 2017 at 04:56:39PM -0700, Laura Abbott wrote:
+>>> On 10/26/2017 02:09 AM, Mark Rutland wrote:
+>>>> In Prague, Kees mentioned that it would be nice to have a mechanism to
+>>>> catch bad __{get,put}_user uses, such as the recent CVE-2017-5123 [1,2]
+>>>> issue with unsafe_put_user() in waitid().
+>>>>
+>>>> These patches allow an optional access_ok() check to be dropped in
+>>>> arm64's __{get,put}_user() primitives. These will then BUG() if a bad
+>>>> user pointer is passed (which should only happen in the absence of an
+>>>> earlier access_ok() check).
+>>
+>>> Turning on the option fails as soon as we hit userspace. On my buildroot
+>>> based environment I get the help text for ld.so (????) and then a message
+>>> about attempting to kill init.
+>>
+>> Ouch. Thanks for the report, and sorry about this.
+>>
+>> The problem is that I evaluate the ptr argument twice in
+>> __{get,put}_user(), and this may have side effects.
+>>
+>> e.g. when the ELF loader does things like:
+>>
+>>   __put_user((elf_addr_t)p, sp++)
+>>
+>> ... we increment sp twice, and write to the wrong user address, leaving
+>> sp corrupt.
+>>
+>> I have an additional patch [1] to fix this, which is in my
+>> arm64/access-ok branch [2].
+>>
+>> Thanks,
+>> Mark.
+>>
+>> [1] https://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git/commit/?h=arm64/access-ok&id=ebb7ff83eb53b8810395d5cf48712a4ae6d678543
+>> [2] https://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git/log/?h=arm64/access-ok
+>>
+>
+> Thanks, the updated patch works. I wrote an LKDTM test to verify
+> the expected behavior (__{get,put}_user panic whereas {get,put}_user
+> do not). You're welcome to add Tested-by or I can wait for v2.
 
-This is just terrible, using the void *mssg to pass a struct which is
-interpreted by the controller removes any form of abstraction provided
-by the framework.
+Nice. :) Out of curiosity, can you check if this correctly BUG()s on a
+waitid() call when the fixes are reverted?
 
-In my view the void *mssg should point to the data to be written in the
-mailbox register, and hence might be of different size - but only of
-native type.
+96ca579a1ecc ("waitid(): Avoid unbalanced user_access_end() on
+access_ok() error")
+1c9fec470b81 ("waitid(): Add missing access_ok() checks")
 
-Regards,
-Bjorn
+-Kees
+
+-- 
+Kees Cook
+Pixel Security
