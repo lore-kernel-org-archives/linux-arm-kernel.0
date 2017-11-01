@@ -1,94 +1,62 @@
-From: matt@mattface.org (Matt Hart)
-Date: Wed, 1 Nov 2017 13:06:35 +0000
-Subject: [GIT PULL 1/2] bcm2835-dt-fixes-2017-10-06
-In-Reply-To: <910a98ca-57f6-baca-73ac-f6c8c1ff04db@i2se.com>
-References: <20171006220504.7776-1-eric@anholt.net>
- <edb03edb-f2a6-549e-6060-eccfae554d92@gmail.com>
- <CAJsfgeU5Zq-2zSfto8WUZ5Xud1Ksedu9XdLG9pWR7YBZGVaHBA@mail.gmail.com>
- <CALeDE9NsjYHpaR6kyHgABGr2eE=EhpJstttK60WwRkAj0u1m7Q@mail.gmail.com>
- <910a98ca-57f6-baca-73ac-f6c8c1ff04db@i2se.com>
-Message-ID: <CAJsfgeWgb3tnJvxBq_sOwRo+srq1UMyMcn+2hHx7-UzHPFUCCA@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 1 Nov 2017 13:16:44 +0000
+Subject: [PATCH v5 01/30] regset: Add support for dynamically sized regsets
+In-Reply-To: <20171101114228.jm53aj7jx6j4mxhn@armageddon.cambridge.arm.com>
+References: <1509465082-30427-1-git-send-email-Dave.Martin@arm.com>
+ <1509465082-30427-2-git-send-email-Dave.Martin@arm.com>
+ <20171101114228.jm53aj7jx6j4mxhn@armageddon.cambridge.arm.com>
+Message-ID: <20171101131644.GL19485@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 November 2017 at 12:05, Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> Hi Matt, hi Peter,
->
-> Am 01.11.2017 um 10:37 schrieb Peter Robinson:
->> On Tue, Oct 31, 2017 at 5:00 PM, Matt Hart <matt@mattface.org> wrote:
->>> On 6 October 2017 at 23:14, Florian Fainelli <f.fainelli@gmail.com> wrote:
->>>> On 10/06/2017 03:05 PM, Eric Anholt wrote:
->>>>> Hi Florian.  Here's a patch that's gone through a couple of revisions
->>>>> on the list, that seriously fixes up the default serial behavior --
->>>>> previously, without the right config.txt/cmdline bits, you'd often end
->>>>> up with a hang with no output before booting completed.  It would be
->>>>> great to get it into 4.14.
->>>>>
->>>>> The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
->>>>>
->>>>>   Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
->>>>>
->>>>> are available in the git repository at:
->>>>>
->>>>>   git://github.com/anholt/linux tags/bcm2835-dt-fixes-2017-10-06
->>>>>
->>>>> for you to fetch changes up to f08f58a2bf68900a84e782b8c7ad701c0654173c:
->>>>>
->>>>>   ARM: dts: bcm283x: Fix console path on RPi3 (2017-10-06 13:04:56 -0700)
->>>>>
->>>>> ----------------------------------------------------------------
->>>>> This pull request brings in a fix for default serial console setup on
->>>>> RPi3, so it now comes up with no config.txt/cmdline.txt settings in
->>>>> the firmware.
->>>>>
->>>>> ----------------------------------------------------------------
->>>> Merged, thanks Eric
->>>>
->>>> --
->>>> Florian
->>> Hi all,
->>>
->>> I realise this patch has been in mainline for a more than a week, but
->>> I've only recently had time to bisect broken rpi-3 boots in kernelci
->>> and found f08f58a2bf68900a84e782b8c7ad701c0654173c as the cause.
->>>
->>> Kernelci boots the rpi3 using uboot, with console=ttyS0 in the command
->>> line which now fails:
->>> https://kernelci.org/boot/id/59f787f059b5147794ef1dcf/
->>>
->>> Is there an alias I can use for both before and after this patch?
->>>
->>> Mainline boots fine if I use console=ttyS1 or drop the console arg
->>> altogether, but as we don't currently support different boot args per
->>> tree, and we don't have the manpower to track this patch in all the
->>> trees we test, we will have to switch to only boot testing mainline
->>> from now on.
->> Yes, I've seen the same in Fedora with that patch.
->>
->>
-> could you please describe the issue more in detail.
->
-> Does u-boot or Linux hang? Does u-boot select the wrong UART? Is there a
-> pinmux conflict?
-Linux throws a kernel panic, "Warning: unable to open an initial console."
->
-> Which u-boot version do you use?
-These are the 2 boot reports from KernelCI, there some LAVA debug in
-there but you can see the uboot version and boot commands used.
+On Wed, Nov 01, 2017 at 11:42:29AM +0000, Catalin Marinas wrote:
+> On Tue, Oct 31, 2017 at 03:50:53PM +0000, Dave P Martin wrote:
+> > Currently the regset API doesn't allow for the possibility that
+> > regsets (or at least, the amount of meaningful data in a regset)
+> > may change in size.
+> > 
+> > In particular, this results in useless padding being added to
+> > coredumps if a regset's current size is smaller than its
+> > theoretical maximum size.
+> > 
+> > This patch adds a get_size() function to struct user_regset.
+> > Individual regset implementations can implement this function to
+> > return the current size of the regset data.  A regset_size()
+> > function is added to provide callers with an abstract interface for
+> > determining the size of a regset without needing to know whether
+> > the regset is dynamically sized or not.
+> > 
+> > The only affected user of this interface is the ELF coredump code:
+> > This patch ports ELF coredump to dump regsets with their actual
+> > size in the coredump.  This has no effect except for new regsets
+> > that are dynamically sized and provide a get_size() implementation.
+> > 
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Oleg Nesterov <oleg@redhat.com>
+> > Cc: Alexander Viro <viro@zeniv.linux.org.uk>
+> > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > Cc: Ingo Molnar <mingo@redhat.com>
+> > Cc: "H. Peter Anvin" <hpa@zytor.com>
+> > Cc: Dmitry Safonov <dsafonov@virtuozzo.com>
+> > Cc: H. J. Lu <hjl.tools@gmail.com>
+> > 
+> > ---
+> > 
+> > **Dropped** Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+> > **Dropped** Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> > (due to bug fix applied against v4 of this patch.)
+> 
+> It seems that the Reviewed-by tags are still there ;). Anyway, on the
 
-Working boot
-https://storage.kernelci.org/mainline/master/v4.14-rc5-95-g1c9fec470b81/arm64/defconfig/lab-mhart/boot-bcm2837-rpi-3-b.html
+Oops, looks like that only happened on this patch.  I've removed
+Alex's R-b from my own version in case of repost -- can you also
+do the same?
 
-Failing boot
-https://storage.kernelci.org/mainline/master/v4.14-rc5-125-g9c323bff13f9/arm64/defconfig/lab-mhart/boot-bcm2837-rpi-3-b.html
->
->
-> Best regards
->
-> Stefan
->
+> new patch:
+> 
+> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 
-
-
--- 
-Matt Hart
+Cheers
+---Dave
