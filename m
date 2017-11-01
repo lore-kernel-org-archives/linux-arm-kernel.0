@@ -1,27 +1,34 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 01 Nov 2017 21:30:46 +0900 (KST)
-Subject: [PATCH] net: thunderx: remove a couple of redundant assignments
-In-Reply-To: <20171031143755.26021-1-colin.king@canonical.com>
-References: <20171031143755.26021-1-colin.king@canonical.com>
-Message-ID: <20171101.213046.1800118728866748105.davem@davemloft.net>
+From: vanessa.maegima@nxp.com (Vanessa Maegima)
+Date: Wed, 1 Nov 2017 12:38:44 +0000
+Subject: [PATCH v2] ARM: dts: imx7d-pico: Add Wifi support
+In-Reply-To: <CAP9ODKrp1+-u+OvuXLv_k7rpo-5Y6DpoxHFA+2zXM=XbPA7GBQ@mail.gmail.com>
+References: <1503056221-29183-1-git-send-email-vanessa.maegima@nxp.com>
+ <CAP9ODKrp1+-u+OvuXLv_k7rpo-5Y6DpoxHFA+2zXM=XbPA7GBQ@mail.gmail.com>
+Message-ID: <1509539876.4068.2.camel@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin King <colin.king@canonical.com>
-Date: Tue, 31 Oct 2017 14:37:55 +0000
+Hi Otavio,
 
-> From: Colin Ian King <colin.king@canonical.com>
+On Ter, 2017-10-31 at 16:11 -0200, Otavio Salvador wrote:
+> On Fri, Aug 18, 2017 at 8:37 AM, Vanessa Maegima
+> <vanessa.maegima@nxp.com> wrote:
+> > 
+> > imx7d-pico has an ap6212 wifi chip connected to usdhc2 port.
+> > 
+> > Add support for the usdhc2 port and to the WL_REG_ON regulator
+> > so Wifi can be functional on this board.
+> > 
+> > Signed-off-by: Vanessa Maegima <vanessa.maegima@nxp.com>
+> It seems the name of the dtb is misleading ... this dtb refers mostly
+> to the imx7d-pico-pi board no?
 > 
-> The assignment to pointer msg is redundant as it is never read, so
-> remove msg.  Also remove the first assignment to qset as this is not
-> read before the next re-assignment of a new value to qset in the
-> for-loop. Cleans up two clang warnings:
-> 
-> drivers/net/ethernet/cavium/thunder/nic_main.c:589:2: warning: Value
-> stored to 'msg' is never read
-> drivers/net/ethernet/cavium/thunder/nic_main.c:611:2: warning: Value
-> stored to 'qset' is never read
-> 
-> Signed-off-by: Colin Ian King <colin.king@canonical.com>
 
-Applied.
+Yes, this refers to the imx7d-pico-pi board. At the time I added this
+support, I was not aware of the board variants as I had only the pico-
+pi baseboard. I can work to separate this dts into SoM and baseboard
+dts if you think this would be better, but I can only support pico-pi
+as I do not have access to the other baseboards.
+
+Best,
+Vanessa
