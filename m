@@ -1,115 +1,108 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed,  1 Nov 2017 15:59:41 +0000
-Subject: [PATCH 15/13] firmware: arm_sdei: move the frozen flag under the
- spinlock
-In-Reply-To: <20171017174432.1684-1-james.morse@arm.com>
-References: <20171017174432.1684-1-james.morse@arm.com>
-Message-ID: <20171101155941.19432-1-james.morse@arm.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu,  2 Nov 2017 01:01:58 +0900
+Subject: [PATCH v2 1/2] usb: ehci-platform: use reset array API
+Message-ID: <1509552119-23816-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dpm_suspend() calls the freeze/thaw callbacks for hibernate before
-disable_non_bootcpus() takes down secondaries.
+Generic drivers like this need to control arbitrary number of reset
+lines.  Instead of hard-coding the maximum number of resets, use the
+reset array API.  It can manage a bunch of resets behind the scene.
 
-This leads to a fun race where the freeze/thaw callbacks reset the
-SDEI interface (as we may be restoring a kernel with a different
-layout due to KASLR), then the cpu-hotplug callbacks come in to
-save the current state, which has already been reset.
-
-We solve this with a 'frozen' flag that stops the hotplug callback
-from overwriting the saved values.
-
-This patch moves the flag under the 'events' spinlock we take
-in the hotplug callbacks, to avoid depending on cpu-hotplug's
-mechanics to ensure the callback sees the correct value.
-
-Reported-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: James Morse <james.morse@arm.com>
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
- drivers/firmware/arm_sdei.c | 21 ++++++++++++++++++---
- 1 file changed, 18 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/firmware/arm_sdei.c b/drivers/firmware/arm_sdei.c
-index 14b6d170518c..0ae497975064 100644
---- a/drivers/firmware/arm_sdei.c
-+++ b/drivers/firmware/arm_sdei.c
-@@ -78,7 +78,10 @@ struct sdei_event {
- static LIST_HEAD(sdei_events);
- static DEFINE_SPINLOCK(sdei_events_lock);
+Changes in v2:
+  - Goto err_put_clks when it fails to get reset_control.
+
+ drivers/usb/host/ehci-platform.c | 35 +++++++++++++----------------------
+ 1 file changed, 13 insertions(+), 22 deletions(-)
+
+diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
+index f1908ea..a41acd6 100644
+--- a/drivers/usb/host/ehci-platform.c
++++ b/drivers/usb/host/ehci-platform.c
+@@ -40,12 +40,11 @@
  
--/* When frozen, cpu-hotplug notifiers shouldn't unregister/re-register events */
-+/*
-+ * When frozen, cpu-hotplug notifiers shouldn't unregister/re-register events.
-+ * Protected by sdei_events_lock.
-+ */
- static bool frozen;
+ #define DRIVER_DESC "EHCI generic platform driver"
+ #define EHCI_MAX_CLKS 4
+-#define EHCI_MAX_RSTS 4
+ #define hcd_to_ehci_priv(h) ((struct ehci_platform_priv *)hcd_to_ehci(h)->priv)
  
- /* Private events are registered/enabled via IPI passing one of these */
-@@ -704,13 +707,15 @@ static int sdei_cpuhp_down(unsigned int cpu)
- 	struct sdei_event *event;
- 	struct sdei_crosscall_args arg;
+ struct ehci_platform_priv {
+ 	struct clk *clks[EHCI_MAX_CLKS];
+-	struct reset_control *rsts[EHCI_MAX_RSTS];
++	struct reset_control *rsts;
+ 	struct phy **phys;
+ 	int num_phys;
+ 	bool reset_on_resume;
+@@ -151,7 +150,7 @@ static int ehci_platform_probe(struct platform_device *dev)
+ 	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
+ 	struct ehci_platform_priv *priv;
+ 	struct ehci_hcd *ehci;
+-	int err, irq, phy_num, clk = 0, rst;
++	int err, irq, phy_num, clk = 0;
  
-+
-+	spin_lock(&sdei_events_lock);
- 	if (frozen) {
- 		/* All events unregistered  */
-+		spin_unlock(&sdei_events_lock);
- 		return sdei_mask_local_cpu();
+ 	if (usb_disabled())
+ 		return -ENODEV;
+@@ -239,22 +238,16 @@ static int ehci_platform_probe(struct platform_device *dev)
+ 		}
  	}
  
- 	/* un-register private events */
--	spin_lock(&sdei_events_lock);
- 	list_for_each_entry(event, &sdei_events, list) {
- 		if (event->type == SDEI_EVENT_TYPE_SHARED)
- 			continue;
-@@ -732,13 +737,14 @@ static int sdei_cpuhp_up(unsigned int cpu)
- 	struct sdei_event *event;
- 	struct sdei_crosscall_args arg;
- 
-+	spin_lock(&sdei_events_lock);
- 	if (frozen) {
- 		/* Events will be re-registered when we thaw. */
-+		spin_unlock(&sdei_events_lock);
- 		return sdei_unmask_local_cpu();
+-	for (rst = 0; rst < EHCI_MAX_RSTS; rst++) {
+-		priv->rsts[rst] = devm_reset_control_get_shared_by_index(
+-					&dev->dev, rst);
+-		if (IS_ERR(priv->rsts[rst])) {
+-			err = PTR_ERR(priv->rsts[rst]);
+-			if (err == -EPROBE_DEFER)
+-				goto err_reset;
+-			priv->rsts[rst] = NULL;
+-			break;
+-		}
+-
+-		err = reset_control_deassert(priv->rsts[rst]);
+-		if (err)
+-			goto err_reset;
++	priv->rsts = devm_reset_control_array_get_optional_shared(&dev->dev);
++	if (IS_ERR(priv->rsts)) {
++		err = PTR_ERR(priv->rsts);
++		goto err_put_clks;
  	}
  
- 	/* re-register/enable private events */
--	spin_lock(&sdei_events_lock);
- 	list_for_each_entry(event, &sdei_events, list) {
- 		if (event->type == SDEI_EVENT_TYPE_SHARED)
- 			continue;
-@@ -813,7 +819,10 @@ static int sdei_device_freeze(struct device *dev)
- {
- 	int err;
- 
-+	spin_lock(&sdei_events_lock);
- 	frozen = true;
-+	spin_unlock(&sdei_events_lock);
++	err = reset_control_deassert(priv->rsts);
++	if (err)
++		goto err_put_clks;
 +
- 	err = sdei_event_unregister_all();
- 	if (err)
- 		return err;
-@@ -828,7 +837,11 @@ static int sdei_device_thaw(struct device *dev)
- 	sdei_device_resume(dev);
+ 	if (pdata->big_endian_desc)
+ 		ehci->big_endian_desc = 1;
+ 	if (pdata->big_endian_mmio)
+@@ -310,8 +303,7 @@ static int ehci_platform_probe(struct platform_device *dev)
+ 	if (pdata->power_off)
+ 		pdata->power_off(dev);
+ err_reset:
+-	while (--rst >= 0)
+-		reset_control_assert(priv->rsts[rst]);
++	reset_control_assert(priv->rsts);
+ err_put_clks:
+ 	while (--clk >= 0)
+ 		clk_put(priv->clks[clk]);
+@@ -329,15 +321,14 @@ static int ehci_platform_remove(struct platform_device *dev)
+ 	struct usb_hcd *hcd = platform_get_drvdata(dev);
+ 	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
+ 	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
+-	int clk, rst;
++	int clk;
  
- 	err = sdei_reregister_events();
-+
-+	spin_lock(&sdei_events_lock);
- 	frozen = false;
-+	spin_unlock(&sdei_events_lock);
-+
- 	return err;
- }
+ 	usb_remove_hcd(hcd);
  
-@@ -865,7 +878,9 @@ static int sdei_reboot_notifier(struct notifier_block *nb, unsigned long action,
- 	 * There is now no point trying to unregister private events if we go on
- 	 * to take CPUs offline.
- 	 */
-+	spin_lock(&sdei_events_lock);
- 	frozen = true;
-+	spin_unlock(&sdei_events_lock);
+ 	if (pdata->power_off)
+ 		pdata->power_off(dev);
  
- 	return NOTIFY_OK;
- }
+-	for (rst = 0; rst < EHCI_MAX_RSTS && priv->rsts[rst]; rst++)
+-		reset_control_assert(priv->rsts[rst]);
++	reset_control_assert(priv->rsts);
+ 
+ 	for (clk = 0; clk < EHCI_MAX_CLKS && priv->clks[clk]; clk++)
+ 		clk_put(priv->clks[clk]);
 -- 
-2.15.0.rc2
+2.7.4
