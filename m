@@ -1,29 +1,29 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 1 Nov 2017 09:40:16 +0000
-Subject: [PATCH v4 00/12] arm+arm64: vdso unification to lib/vdso/
-In-Reply-To: <64439dc3-909d-722f-68c3-d8e20e96ed9a@redhat.com>
-References: <20171031183022.80775-1-salyzyn@android.com>
- <64439dc3-909d-722f-68c3-d8e20e96ed9a@redhat.com>
-Message-ID: <20171101094015.GA14665@arm.com>
+From: xieyisheng1@huawei.com (Yisheng Xie)
+Date: Wed, 1 Nov 2017 17:46:19 +0800
+Subject: [PATCH] arm64: suspend: remove useless included file
+Message-ID: <1509529579-3467-1-git-send-email-xieyisheng1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 31, 2017 at 06:04:19PM -0400, Jon Masters wrote:
-> On 10/31/2017 02:30 PM, Mark Salyzyn wrote:
-> > Take an effort to recode the arm64 vdso code from assembler to C
-> > previously submitted by Andrew Pinski <apinski@cavium.com>, rework
-> > it for use in both arm and arm64, overlapping any optimizations
-> > for each architecture. But instead of landing it in arm64, land the
-> > result into lib/vdso and unify both implementations to simplify
-> > future maintenance. This will act as the basis for implementing
-> > arm64 vdso32 in the future.
-> 
-> In the original patch series, our QE folks found a problem that lead to
-> its revertion from our internal trees. I've pinged them to check this
-> latest version and followup if we see the same failures now.
+After commit 9e8e865bbe29 ("arm64: unify idmap removal"), we no need to
+flush tlb in suspend.c, so the included file tlbflush.h can be removed.
 
-Could you elaborate a bit on the problem you found, please? Even if you
-don't see it with this series, it doesn't mean it isn't lurking somewhere
-else (potentially even in mainline!).
+Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
+---
+ arch/arm64/kernel/suspend.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-Will
+diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
+index 1e3be90..5794326 100644
+--- a/arch/arm64/kernel/suspend.c
++++ b/arch/arm64/kernel/suspend.c
+@@ -11,7 +11,6 @@
+ #include <asm/mmu_context.h>
+ #include <asm/smp_plat.h>
+ #include <asm/suspend.h>
+-#include <asm/tlbflush.h>
+ 
+ /*
+  * This is allocated by cpu_suspend_init(), and used to store a pointer to
+-- 
+1.7.12.4
