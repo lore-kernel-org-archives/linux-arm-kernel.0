@@ -1,7 +1,7 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed,  1 Nov 2017 13:22:13 +0100
-Subject: [PATCH] arm: dts: zynq: Use SPDX-License-Identifier
-Message-ID: <f49258251b1df101c68616fd44788a583a10fa84.1509538929.git.michal.simek@xilinx.com>
+Date: Wed,  1 Nov 2017 13:23:34 +0100
+Subject: [PATCH] arm64: dts: zynqmp: Use SPDX-License-Identifier
+Message-ID: <d432b970c977750b5c32595ef2c13f16fe92ff16.1509539009.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,155 +10,58 @@ Follow trend and use the SPDX License description.
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
 
- arch/arm/boot/dts/zynq-7000.dtsi      | 11 ++---------
- arch/arm/boot/dts/zynq-microzed.dts   |  9 +--------
- arch/arm/boot/dts/zynq-parallella.dts |  9 +--------
- arch/arm/boot/dts/zynq-zc702.dts      |  9 +--------
- arch/arm/boot/dts/zynq-zc706.dts      |  9 +--------
- arch/arm/boot/dts/zynq-zed.dts        |  9 +--------
- arch/arm/boot/dts/zynq-zybo.dts       |  9 +--------
- 7 files changed, 8 insertions(+), 57 deletions(-)
+ arch/arm64/boot/dts/xilinx/zynqmp-ep108-clk.dtsi | 5 +----
+ arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts      | 5 +----
+ arch/arm64/boot/dts/xilinx/zynqmp.dtsi           | 5 +----
+ 3 files changed, 3 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-index 0f79fe1ccd9d..2a66da637314 100644
---- a/arch/arm/boot/dts/zynq-7000.dtsi
-+++ b/arch/arm/boot/dts/zynq-7000.dtsi
-@@ -1,14 +1,7 @@
- /*
-- *  Copyright (C) 2011 - 2014 Xilinx
-+ * Copyright (C) 2011 - 2014 Xilinx
+diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-ep108-clk.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp-ep108-clk.dtsi
+index b87b8316f4ac..c85454fc9d7b 100644
+--- a/arch/arm64/boot/dts/xilinx/zynqmp-ep108-clk.dtsi
++++ b/arch/arm64/boot/dts/xilinx/zynqmp-ep108-clk.dtsi
+@@ -5,10 +5,7 @@
   *
-- * This software is licensed under the terms of the GNU General Public
-- * License version 2, as published by the Free Software Foundation, and
-- * may be copied, distributed, and modified under those terms.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-+ * SPDX-License-Identifier:	GPL-2.0
+  * Michal Simek <michal.simek@xilinx.com>
+  *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License as
+- * published by the Free Software Foundation; either version 2 of
+- * the License, or (at your option) any later version.
++ * SPDX-License-Identifier: GPL-2.0+
   */
  
  / {
-diff --git a/arch/arm/boot/dts/zynq-microzed.dts b/arch/arm/boot/dts/zynq-microzed.dts
-index b9376a4904b4..30853ce92f6b 100644
---- a/arch/arm/boot/dts/zynq-microzed.dts
-+++ b/arch/arm/boot/dts/zynq-microzed.dts
-@@ -2,14 +2,7 @@
-  * Copyright (C) 2011 - 2014 Xilinx
-  * Copyright (C) 2016 Jagan Teki <jteki@openedev.com>
+diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+index bf552674a834..49bc65e236ba 100644
+--- a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
++++ b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+@@ -5,10 +5,7 @@
   *
-- * This software is licensed under the terms of the GNU General Public
-- * License version 2, as published by the Free Software Foundation, and
-- * may be copied, distributed, and modified under those terms.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-+ * SPDX-License-Identifier:	GPL-2.0
-  */
- /dts-v1/;
- /include/ "zynq-7000.dtsi"
-diff --git a/arch/arm/boot/dts/zynq-parallella.dts b/arch/arm/boot/dts/zynq-parallella.dts
-index 0144acfa9793..2e12dd996140 100644
---- a/arch/arm/boot/dts/zynq-parallella.dts
-+++ b/arch/arm/boot/dts/zynq-parallella.dts
-@@ -7,14 +7,7 @@
-  *  Copyright (C) 2012 National Instruments Corp.
-  *  Copyright (C) 2013 Xilinx
+  * Michal Simek <michal.simek@xilinx.com>
   *
-- * This software is licensed under the terms of the GNU General Public
-- * License version 2, as published by the Free Software Foundation, and
-- * may be copied, distributed, and modified under those terms.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-+ * SPDX-License-Identifier:	GPL-2.0
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License as
+- * published by the Free Software Foundation; either version 2 of
+- * the License, or (at your option) any later version.
++ * SPDX-License-Identifier: GPL-2.0+
   */
+ 
  /dts-v1/;
- /include/ "zynq-7000.dtsi"
-diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
-index 70a5de76b7db..d96979644e49 100644
---- a/arch/arm/boot/dts/zynq-zc702.dts
-+++ b/arch/arm/boot/dts/zynq-zc702.dts
-@@ -2,14 +2,7 @@
-  *  Copyright (C) 2011 - 2014 Xilinx
-  *  Copyright (C) 2012 National Instruments Corp.
+diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+index 7665fbddff28..f99fc7c477d5 100644
+--- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
++++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+@@ -5,10 +5,7 @@
   *
-- * This software is licensed under the terms of the GNU General Public
-- * License version 2, as published by the Free Software Foundation, and
-- * may be copied, distributed, and modified under those terms.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-+ * SPDX-License-Identifier:	GPL-2.0
-  */
- /dts-v1/;
- #include "zynq-7000.dtsi"
-diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
-index cdc326ec3335..d0f51d0d6c95 100644
---- a/arch/arm/boot/dts/zynq-zc706.dts
-+++ b/arch/arm/boot/dts/zynq-zc706.dts
-@@ -2,14 +2,7 @@
-  *  Copyright (C) 2011 - 2014 Xilinx
-  *  Copyright (C) 2012 National Instruments Corp.
+  * Michal Simek <michal.simek@xilinx.com>
   *
-- * This software is licensed under the terms of the GNU General Public
-- * License version 2, as published by the Free Software Foundation, and
-- * may be copied, distributed, and modified under those terms.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-+ * SPDX-License-Identifier:	GPL-2.0
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License as
+- * published by the Free Software Foundation; either version 2 of
+- * the License, or (at your option) any later version.
++ * SPDX-License-Identifier: GPL-2.0+
   */
- /dts-v1/;
- #include "zynq-7000.dtsi"
-diff --git a/arch/arm/boot/dts/zynq-zed.dts b/arch/arm/boot/dts/zynq-zed.dts
-index 5e44dc12fd60..c2c0dc3d2c67 100644
---- a/arch/arm/boot/dts/zynq-zed.dts
-+++ b/arch/arm/boot/dts/zynq-zed.dts
-@@ -2,14 +2,7 @@
-  *  Copyright (C) 2011 - 2014 Xilinx
-  *  Copyright (C) 2012 National Instruments Corp.
-  *
-- * This software is licensed under the terms of the GNU General Public
-- * License version 2, as published by the Free Software Foundation, and
-- * may be copied, distributed, and modified under those terms.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-+ * SPDX-License-Identifier:	GPL-2.0
-  */
- /dts-v1/;
- #include "zynq-7000.dtsi"
-diff --git a/arch/arm/boot/dts/zynq-zybo.dts b/arch/arm/boot/dts/zynq-zybo.dts
-index e40cafc5ee5b..5c73ca5896ea 100644
---- a/arch/arm/boot/dts/zynq-zybo.dts
-+++ b/arch/arm/boot/dts/zynq-zybo.dts
-@@ -2,14 +2,7 @@
-  *  Copyright (C) 2011 - 2014 Xilinx
-  *  Copyright (C) 2012 National Instruments Corp.
-  *
-- * This software is licensed under the terms of the GNU General Public
-- * License version 2, as published by the Free Software Foundation, and
-- * may be copied, distributed, and modified under those terms.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-+ * SPDX-License-Identifier:	GPL-2.0
-  */
- /dts-v1/;
- #include "zynq-7000.dtsi"
+ 
+ / {
 -- 
 1.9.1
