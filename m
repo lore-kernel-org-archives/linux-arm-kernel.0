@@ -1,76 +1,72 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  1 Nov 2017 11:34:58 +0100
-Subject: [PATCH 7/7] arm64: dts: renesas: r8a7796: Enable IPMMU-DS0, DS1, MP,
- VI0, VC0 and MM
-In-Reply-To: <20171101103458.7582-1-horms+renesas@verge.net.au>
-References: <20171101103458.7582-1-horms+renesas@verge.net.au>
-Message-ID: <20171101103458.7582-8-horms+renesas@verge.net.au>
+Date: Wed,  1 Nov 2017 11:35:01 +0100
+Subject: [PATCH 1/4] arm64: dts: renesas: r8a77970: Add IPMMU device nodes
+In-Reply-To: <20171101103504.7658-1-horms+renesas@verge.net.au>
+References: <20171101103504.7658-1-horms+renesas@verge.net.au>
+Message-ID: <20171101103504.7658-2-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm+renesas@opensource.se>
+Add r8a77970 IPMMU nodes and keep all disabled by default.
 
-Enable the r8a7795 device nodes for IPMMU-DS0, IPMMU-DS1, IPMMU-MP,
-IPMMU-VI0, IPMMU-VC0 and the shared IPMMU-MM device.
+Based on work for the r8a7796 by Magnus Damm
 
-Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
-[simon: enable IPMMU-MP, VI0 and VC0]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 6 ------
- 1 file changed, 6 deletions(-)
+ arch/arm64/boot/dts/renesas/r8a77970.dtsi | 41 +++++++++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index 78160b4a380c..f0800f501116 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -362,7 +362,6 @@
- 			reg = <0 0xfebd0000 0 0x1000>; /* IPMMU-VI0 */
- 			renesas,ipmmu-main = <&ipmmu_mm 9>;
- 			#iommu-cells = <1>;
--			status = "disabled";
+diff --git a/arch/arm64/boot/dts/renesas/r8a77970.dtsi b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
+index 75d09f1724f0..fbae43ff70b2 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77970.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
+@@ -134,6 +134,47 @@
+ 			#power-domain-cells = <1>;
  		};
  
- 		ipmmu_vc0: mmu at fe6b0000 {
-@@ -370,7 +369,6 @@
- 			reg = <0 0xfe6b0000 0 0x1000>; /* IPMMU-VC0 */
- 			renesas,ipmmu-main = <&ipmmu_mm 8>;
- 			#iommu-cells = <1>;
--			status = "disabled";
- 		};
- 
- 		ipmmu_pv0: mmu at fd800000 {
-@@ -418,7 +416,6 @@
- 			reg = <0 0xec670000 0 0x1000>; /* IPMMU-MP */
- 			renesas,ipmmu-main = <&ipmmu_mm 4>;
- 			#iommu-cells = <1>;
--			status = "disabled";
- 		};
- 
- 		ipmmu_ds0: mmu at e6740000 {
-@@ -426,7 +423,6 @@
- 			reg = <0 0xe6740000 0 0x1000>; /* IPMMU-DS0 */
- 			renesas,ipmmu-main = <&ipmmu_mm 0>;
- 			#iommu-cells = <1>;
--			status = "disabled";
- 		};
- 
- 		ipmmu_ds1: mmu at e7740000 {
-@@ -434,7 +430,6 @@
- 			reg = <0 0xe7740000 0 0x1000>; /* IPMMU-DS1 */
- 			renesas,ipmmu-main = <&ipmmu_mm 1>;
- 			#iommu-cells = <1>;
--			status = "disabled";
- 		};
- 
- 		ipmmu_mm: mmu at e67b0000 {
-@@ -443,7 +438,6 @@
- 			interrupts = <GIC_SPI 196 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 197 IRQ_TYPE_LEVEL_HIGH>;
- 			#iommu-cells = <1>;
--			status = "disabled";
- 		};
- 
- 		cpg: clock-controller at e6150000 {
++		ipmmu_vi0: mmu at febd0000 {
++			compatible = "renesas,ipmmu-r8a77970";
++			reg = <0 0xfebd0000 0 0x1000>; /* IPMMU-VI0 */
++			renesas,ipmmu-main = <&ipmmu_mm 9>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_ir: mmu at ff8b0000 {
++			compatible = "renesas,ipmmu-r8a77970";
++			reg = <0 0xff8b0000 0 0x1000>; /* IPMMU-IR */
++			renesas,ipmmu-main = <&ipmmu_mm 3>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_rt: mmu at ffc80000 {
++			compatible = "renesas,ipmmu-r8a77970";
++			reg = <0 0xffc80000 0 0x1000>; /* IPMMU-RT */
++			renesas,ipmmu-main = <&ipmmu_mm 7>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_ds1: mmu at e7740000 {
++			compatible = "renesas,ipmmu-r8a7796";
++			reg = <0 0xe7740000 0 0x1000>; /* IPMMU-DS1 */
++			renesas,ipmmu-main = <&ipmmu_mm 1>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_mm: mmu at e67b0000 {
++			compatible = "renesas,ipmmu-r8a77970";
++			reg = <0 0xe67b0000 0 0x1000>; /* IPMMU-MM */
++			interrupts = <GIC_SPI 196 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 197 IRQ_TYPE_LEVEL_HIGH>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
+ 		intc_ex: interrupt-controller at e61c0000 {
+ 			compatible = "renesas,intc-ex-r8a77970", "renesas,irqc";
+ 			#interrupt-cells = <2>;
 -- 
 2.11.0
