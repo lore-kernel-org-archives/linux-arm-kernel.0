@@ -1,120 +1,59 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 1 Nov 2017 15:57:36 +0000
-Subject: [PATCH] ARM: add a private asm/unaligned.h
-In-Reply-To: <87mv478na9.fsf@free-electrons.com>
-References: <20171020200231.1355569-1-arnd@arndb.de>
- <87wp3g39es.fsf@free-electrons.com>
- <20171027152743.GJ20805@n2100.armlinux.org.uk>
- <87k1zc3fxp.fsf@free-electrons.com>
- <20171030154855.GO20805@n2100.armlinux.org.uk>
- <87bmko1v6f.fsf@free-electrons.com>
- <20171030161207.GS20805@n2100.armlinux.org.uk>
- <8737601u4d.fsf@free-electrons.com>
- <20171030163816.GA27404@n2100.armlinux.org.uk>
- <20171031124707.GD9463@n2100.armlinux.org.uk>
- <CAKv+Gu-te-Q+em36jM-dyouZuov_=xJaVY0Yr-3JCmJn6Zi4sg@mail.gmail.com>
- <87mv478na9.fsf@free-electrons.com>
-Message-ID: <CAKv+Gu9d2TUQHavs-rasKFcNmmwo22dwiGuD2+jBLqawbZAwuA@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 01 Nov 2017 15:59:52 +0000
+Subject: [PATCH v4 11/13] firmware: arm_sdei: add support for CPU private
+ events
+In-Reply-To: <59EF798A.9000609@arm.com>
+References: <20171017174432.1684-1-james.morse@arm.com>
+ <20171017174432.1684-12-james.morse@arm.com> <20171018171959.GJ21820@arm.com>
+ <59EF798A.9000609@arm.com>
+Message-ID: <59F9EF78.8090107@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 October 2017 at 13:22, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> Hi Ard,
->
->  On mar., oct. 31 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->
->> On 31 October 2017 at 12:47, Russell King - ARM Linux
->> <linux@armlinux.org.uk> wrote:
->>> On Mon, Oct 30, 2017 at 04:38:17PM +0000, Russell King - ARM Linux wrote:
->>>> On Mon, Oct 30, 2017 at 05:24:34PM +0100, Gregory CLEMENT wrote:
->>>> > Hi Russell King,
->>>> >
->>>> > Here you will find all the objects included the vmlinux:
->>>> >
->>>> > http://free-electrons.com/~gregory/pub/compressed.tgz
->>>>
->>>> Thanks.  Unfortunately, nothing stands out, but I do see a difference
->>>> between the output of your linker from mine.
->>>>
->>>> Yours:
->>>>
->>>> Idx Name          Size      VMA       LMA       File off  Algn
->>>>   0 .text         00005ef8  00000000  00000000  00010000  2**5
->>>>                   CONTENTS, ALLOC, LOAD, READONLY, CODE
->>>>
->>>> Mine:
->>>>
->>>> Idx Name          Size      VMA       LMA       File off  Algn
->>>>   0 .text         00005f00  00000000  00000000  00010000  2**5
->>>>                   CONTENTS, ALLOC, LOAD, READONLY, CODE
->>>>
->>>> That has the effect of moving the addresses of the following
->>>> sections in your vmlinux down by 8 bytes.  However, I don't think
->>>> that's the cause of this - but it does hint at something being
->>>> different in binutils in the way sections are processed in the
->>>> linker.
->>>>
->>>> Please add to your linker script after the assignment of _edata:
->>>>
->>>>   .image_end (NOLOAD) : {
->>>>     _edata_foo = .;
->>>>   }
->>>>
->>>> relink the decompressor, and see what value _edata_foo ends up with
->>>> compared to _edata?  They should be the same, but I suspect using
->>>> your linker, they will be different.
->>>>
->>>> Also try adding
->>>>     BYTE(0);
->>>>
->>>> after the _edata_foo assignment as a separate test, and see whether
->>>> that makes any difference - with that you should end up with the
->>>> .image_end section in the output image.
->>>
->>> Gregory sent me has new url... for _both_ changes, which gives me:
->
-> If needed I can provide this url.
->
->>>
->>> $ arm-linux-nm vmlinux |grep _edata
->>> 00491160 D _edata
->>> 00491160 D _edata_foo
->>>
->>> So there's no reason that ASSERT() should be failing!  However, as I
->>> don't have the intermediate step, I can't say whether the addition
->>> of the BYTE() affected it in some way - sorry, but I asked for _both_
->>> to be tested above because I wanted to speed up the process, and
->>> clearly that's backfired.
->>>
->>> Given how close we potentially are to 4.14, I don't think we're going
->>> to get to the bottom of this to make 4.14.  I'd want to get this
->>> sorted by Wednesday so linux-next (which is resuming this evening)
->>> can grab a copy of my tree with it in, and we have another day to
->>> sort out any remaining issues, but I'm basically out of time to do
->>> anything further with this as of now.
->>
->>> So, 4.14 will likely be released without any of this being fixed.
->>>
->>
->> IIUC, the current issue is limited to the ASSERT() itself, which is
->> there to prevent future regressions, while the other two patches deal
->> with severe and difficult to diagnose known issues.
->
-> I confirm that whithout the last commit (adding the ASSERT()) in the
-> fixes branch it worked well.
->
->>
->> So why can't we apply those two patches as fixes, and revisit the
->> patch that helps us prevent this from regressing in the future for
->> v4.15?
->
-> I also agree with this.
->
+Hi Will,
 
-Russell,
+On 24/10/17 18:34, James Morse wrote:
+> On 18/10/17 18:19, Will Deacon wrote:
+>> On Tue, Oct 17, 2017 at 06:44:30PM +0100, James Morse wrote:
+>>> Private SDE events are per-cpu, and need to be registered and enabled
+>>> on each CPU.
+>>>
+>>> Hide this detail from the caller by adapting our {,un}register and
+>>> {en,dis}able calls to send an IPI to each CPU if the event is private.
+>>>
+>>> CPU private events are unregistered when the CPU is powered-off, and
+>>> re-registered when the CPU is brought back online. This saves bringing
+>>> secondary cores back online to call private_reset() on shutdown, kexec
+>>> and resume from hibernate.
+> 
+>>> diff --git a/drivers/firmware/arm_sdei.c b/drivers/firmware/arm_sdei.c
+>>> index 28e4c4cbb16d..5598d9ba8b5d 100644
+>>> --- a/drivers/firmware/arm_sdei.c
+>>> +++ b/drivers/firmware/arm_sdei.c
+>>> @@ -610,6 +813,7 @@ static int sdei_device_freeze(struct device *dev)
+>>>  {
+>>>  	int err;
+>>>  
+>>> +	frozen = true;
+>>>  	err = sdei_event_unregister_all();
+> 
+>> Are the release semantics from spin_unlock in sdei_event_unregister_all
+>> sufficient for the ordering guarantees you need?
+> 
+> ... ordering ...
+> 
+> The hotplug notifiers don't touch that lock, so at the first level: no.
+> 
+> It looks like I was relying on the cpu-hotplug code using stop-machine for its
+> work, and the spinlocks changing the pre-empt count for this to work. Which is
+> not something I want to debug if it changes!
+> 
+> I'll post a patch changing this bool to a more sensible atomic type.
 
-Please drop the EFI patch from your tree. I will forward it myself.
+Here I show my ignorance: atomic_t didn't do what I thought. But I do take the
+spinlock inside the hotplug callback, so I'll move the variable in there.
+
 
 Thanks,
-Ard.
+
+James
