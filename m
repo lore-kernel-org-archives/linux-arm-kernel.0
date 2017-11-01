@@ -1,84 +1,108 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 2 Nov 2017 00:49:40 +0900
-Subject: [PATCH 1/2] usb: ehci-platform: use reset array API
-In-Reply-To: <Pine.LNX.4.44L0.1711011118570.1770-100000@iolanthe.rowland.org>
-References: <1509356120-21473-1-git-send-email-yamada.masahiro@socionext.com>
- <Pine.LNX.4.44L0.1711011118570.1770-100000@iolanthe.rowland.org>
-Message-ID: <CAK7LNAQSJhx0cFvoCkwssgCim0G=bA9H_p1HaGDToVGv2Dr-nQ@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 1 Nov 2017 08:53:40 -0700
+Subject: [RFC] Improving udelay/ndelay on platforms where that is possible
+In-Reply-To: <20171101092618.GN9463@n2100.armlinux.org.uk>
+References: <d3f42f35-8175-58f6-78b7-3331efe64da2@sigmadesigns.com>
+ <CA+55aFzy9=RtFRuJhFbF+PL_PCrkZsKtAKrq6WJo1z9eW9gLSA@mail.gmail.com>
+ <20171031165629.GF9463@n2100.armlinux.org.uk>
+ <CA+55aFwDquBXt_EYT3JFoWkeFsZTym5qUXig-DePXXzm07uABw@mail.gmail.com>
+ <CAD=FV=V3n0gjzpL860V6cgf8JVh5pmoL+i0t63Oot19T2afTPw@mail.gmail.com>
+ <20171101092618.GN9463@n2100.armlinux.org.uk>
+Message-ID: <CAD=FV=VKEz9jvJaD2KTitH=2G+wb42RXHyRVKi4-zrypAu9jSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alan,
+Hi,
 
-2017-11-02 0:32 GMT+09:00 Alan Stern <stern@rowland.harvard.edu>:
-> On Mon, 30 Oct 2017, Masahiro Yamada wrote:
+On Wed, Nov 1, 2017 at 2:26 AM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Tue, Oct 31, 2017 at 05:23:19PM -0700, Doug Anderson wrote:
+>> Hi,
+>>
+>> On Tue, Oct 31, 2017 at 10:45 AM, Linus Torvalds
+>> <torvalds@linux-foundation.org> wrote:
+>> > So I'm very much open to udelay improvements, and if somebody sends
+>> > patches for particular platforms to do particularly well on that
+>> > platform, I think we should merge them. But ...
+>>
+>> If I'm reading this all correctly, this sounds like you'd be willing
+>> to merge <https://patchwork.kernel.org/patch/9429841/>.  This makes
+>> udelay() guaranteed not to underrun on arm32 platforms.
 >
->> Generic drivers like this need to control arbitrary numbers of reset
->> lines.  Instead of hard-coding the maximum number of resets, use the
->> reset array API.  It can manage a bunch of resets behind the scene.
->>
->> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->> ---
->>  drivers/usb/host/ehci-platform.c | 33 +++++++++++----------------------
->>  1 file changed, 11 insertions(+), 22 deletions(-)
->>
->> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
->> index f1908ea..64fd643 100644
->> --- a/drivers/usb/host/ehci-platform.c
->> +++ b/drivers/usb/host/ehci-platform.c
->> @@ -40,12 +40,11 @@
->>
->>  #define DRIVER_DESC "EHCI generic platform driver"
->>  #define EHCI_MAX_CLKS 4
->> -#define EHCI_MAX_RSTS 4
->>  #define hcd_to_ehci_priv(h) ((struct ehci_platform_priv *)hcd_to_ehci(h)->priv)
->>
->>  struct ehci_platform_priv {
->>       struct clk *clks[EHCI_MAX_CLKS];
->> -     struct reset_control *rsts[EHCI_MAX_RSTS];
->> +     struct reset_control *rsts;
->>       struct phy **phys;
->>       int num_phys;
->>       bool reset_on_resume;
->> @@ -151,7 +150,7 @@ static int ehci_platform_probe(struct platform_device *dev)
->>       struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
->>       struct ehci_platform_priv *priv;
->>       struct ehci_hcd *ehci;
->> -     int err, irq, phy_num, clk = 0, rst;
->> +     int err, irq, phy_num, clk = 0;
->>
->>       if (usb_disabled())
->>               return -ENODEV;
->> @@ -239,21 +238,13 @@ static int ehci_platform_probe(struct platform_device *dev)
->>               }
->>       }
->>
->> -     for (rst = 0; rst < EHCI_MAX_RSTS; rst++) {
->> -             priv->rsts[rst] = devm_reset_control_get_shared_by_index(
->> -                                     &dev->dev, rst);
->> -             if (IS_ERR(priv->rsts[rst])) {
->> -                     err = PTR_ERR(priv->rsts[rst]);
->> -                     if (err == -EPROBE_DEFER)
->> -                             goto err_reset;
->> -                     priv->rsts[rst] = NULL;
->> -                     break;
->> -             }
->> +     priv->rsts = devm_reset_control_array_get_optional_shared(&dev->dev);
->> +     if (IS_ERR(priv->rsts))
->> +             return PTR_ERR(priv->rsts);
+> That's a mis-representation again.  It stops a timer-based udelay()
+> possibly underrunning by one tick if we are close to the start of
+> a count increment.  However, it does nothing for the loops_per_jiffy
+> udelay(), which can still underrun.
 >
-> You must not return.  Instead you should set err and jump to
-> err_put_clks.
+> My argument against merging that patch is that with it merged, we get
+> (as you say) a udelay() that doesn't underrun _when using a timer_
+> but when we end up using the loops_per_jiffy udelay(), we're back to
+> the old problem.
 >
+> My opinion is that's bad, because it encourages people to write drivers
+> that rely on udelay() having "good" behaviour, which it is not guaranteed
+> to have.  So, they'll specify a delay period of exactly what they want,
+> and their drivers will then fail when running on systems that aren't
+> using a timer-based udelay().
 
-Good catch!
+IMHO the current udelay is broken in an off-by-one way and it's easy
+to fix.  Intentionally leaving a bug in the code seems silly.  This
+seems to by what Linus is saying with his statement that "(a) platform
+code could try to make their udelay/ndelay() be as good as it can be
+on a particular platform".
 
-Will fix.
+So no matter the rest of the discussions, we should land that.  If you
+disagree then I'm happy to re-post that patch straight to Linus later
+this week since it sounds as if he'd take it.
 
-Thank you!
+
+> If we want udelay() to have this behaviour, it needs to _always_ have
+> this behaviour irrespective of the implementation.  So that means
+> the loops_per_jiffy version also needs to be fixed in the same way,
+> which IMHO is impossible.
+
+As Linus indicates, if there is a way to code things up that doesn't
+rely on udelay then that should be preferred.  However, there may be
+cases where this is exceedingly difficult.  If you're writing a driver
+at a high enough level that will work on a lot of underlying platforms
+(AKA it's platform-agnostic) then you can't necessarily rely on timing
+an individual hardware read.  Since you're writing high-level
+platform-agnostic code, presumably implementing a 1 us delay in a
+generic way is equally difficult to making the platform-agnostic
+udelay() reliable.
 
 
+IMHO it would be OK to put in a requirement in a driver saying that it
+will only function properly on hardware that has a udelay() that is
+guaranteed to never return early.  As Linus says: "most core kernel
+developers even have access to platforms that have unstable TSC's any
+more."  Presumably all those old platforms aren't suddenly going to be
+attached to new devices unless those new devices are connected by a
+PCI, ISA, USB, etc. bus.  Drivers for components connected by
+non-external busses seem like they don't need to take into account the
+quirks of really ancient hardware.
 
--- 
-Best Regards
-Masahiro Yamada
+Yes, I know there are still some arm32 chips that aren't that old and
+that don't have a CP15-based timer.  We should make sure we don't
+change existing drivers and frameworks in a way that will break those
+boards.  If that means we need to figure out how to add an API, as
+Linus says, to indicate how accurate udelay is then that might be a
+solution.  Another would be to come up with some clever solution on
+affected boards.  Most arm32 boards I'm aware of have other
+(non-CP15-based) timers.  ...if they don't and these are real boards
+that are actually using a driver relying on udelay() then perhaps they
+could add a new board-specific udelay() implementation that delayed by
+reading a specific hardware register with known timing.
+
+
+Said another way: if we're writing a high level NAND driver and we
+can't find a better way than udelay() to ensure timing requirements,
+then the driver should use udelay() and document the fact that it must
+not underrun (ideally it could even test for it at runtime).  If that
+NAND driver will never be used on platforms with an unreliable
+udelay() then we don't need to worry about it.  If we find a platform
+where we need this NAND driver, we should find a way to implement a
+udelay() that will, at least, never underestimate.
+
+
+-Doug
