@@ -1,25 +1,61 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 1 Nov 2017 16:49:04 -0500
-Subject: [PATCH 1/3] ARM: shmobile: Document Renesas M3-W-based
- Salvator-XS board DT bindings
-In-Reply-To: <1509384599-28953-2-git-send-email-geert+renesas@glider.be>
-References: <1509384599-28953-1-git-send-email-geert+renesas@glider.be>
- <1509384599-28953-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <20171101214904.b5adavvirlmphnqn@rob-hp-laptop>
+Date: Wed, 1 Nov 2017 16:51:57 -0500
+Subject: [PATCH v4 2/3] media: ov7740: Document device tree bindings
+In-Reply-To: <20171031011146.6899-3-wenyou.yang@microchip.com>
+References: <20171031011146.6899-1-wenyou.yang@microchip.com>
+ <20171031011146.6899-3-wenyou.yang@microchip.com>
+Message-ID: <20171101215157.5hemcpuplikvtpqx@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 30, 2017 at 06:29:57PM +0100, Geert Uytterhoeven wrote:
-> The Renesas Salvator-XS (Salvator-X 2nd version) development board can
-> be equipped with either an R-Car H3 ES2.0 or M3-W ES1.x SiP, which are
-> pin-compatible.
+On Tue, Oct 31, 2017 at 09:11:44AM +0800, Wenyou Yang wrote:
+> Add the device tree binding documentation for the ov7740 sensor driver.
 > 
-> Document board part number and compatible values for the version with
-> R-Car M3-W.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
 > ---
->  Documentation/devicetree/bindings/arm/shmobile.txt | 2 ++
->  1 file changed, 2 insertions(+)
+> 
+> Changes in v4: None
+> Changes in v3:
+>  - Explicitly document the "remote-endpoint" property.
+> 
+> Changes in v2: None
+> 
+>  .../devicetree/bindings/media/i2c/ov7740.txt       | 47 ++++++++++++++++++++++
+>  1 file changed, 47 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/i2c/ov7740.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/media/i2c/ov7740.txt b/Documentation/devicetree/bindings/media/i2c/ov7740.txt
+> new file mode 100644
+> index 000000000000..af781c3a5f0e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/i2c/ov7740.txt
+> @@ -0,0 +1,47 @@
+> +* Omnivision OV7740 CMOS image sensor
+> +
+> +The Omnivision OV7740 image sensor supports multiple output image
+> +size, such as VGA, and QVGA, CIF and any size smaller. It also
+> +supports the RAW RGB and YUV output formats.
+> +
+> +The common video interfaces bindings (see video-interfaces.txt) should
+> +be used to specify link to the image data receiver. The OV7740 device
+> +node should contain one 'port' child node with an 'endpoint' subnode.
+> +
+> +Required Properties:
+> +- compatible:	"ovti,ov7740".
+> +- reg:		I2C slave address of the sensor.
+> +- clocks:	Reference to the xvclk input clock.
+> +- clock-names:	"xvclk".
+> +
+> +Optional Properties:
+> +- reset-gpios: Rreference to the GPIO connected to the reset_b pin,
+> +  if any. Active low with pull-ip resistor.
+> +- powerdown-gpios: Reference to the GPIO connected to the pwdn pin,
+> +  if any. Active high with pull-down resistor.
+> +
+> +Endpoint node mandatory properties:
+> +- remote-endpoint: A phandle to the bus receiver's endpoint node.
+
+This is not really necessary. What's required is documenting how many 
+ports and how many endpoints for each port which you have above.
 
 Acked-by: Rob Herring <robh@kernel.org>
