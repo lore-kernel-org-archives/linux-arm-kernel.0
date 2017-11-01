@@ -1,35 +1,81 @@
 From: damien.riegel@savoirfairelinux.com (Damien Riegel)
-Date: Wed,  1 Nov 2017 13:53:31 -0400
-Subject: [PATCH 0/4] arm64: dts: qcom: dts improvements 
-Message-ID: <20171101175335.22123-1-damien.riegel@savoirfairelinux.com>
+Date: Wed,  1 Nov 2017 13:53:33 -0400
+Subject: [PATCH 2/4] arm64: dts: qcom: msm8916-pins: remove assignments to
+ bias-disable
+In-Reply-To: <20171101175335.22123-1-damien.riegel@savoirfairelinux.com>
+References: <20171101175335.22123-1-damien.riegel@savoirfairelinux.com>
+Message-ID: <20171101175335.22123-3-damien.riegel@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The goal of this series was to add missing I2C bindings for BLSP_I2C1,
-BLSP_I2C3, and BLSP_I2C5. But while working on this, I noticed some
-styling issues and decided to tackle them in the same patchset, mostly
-because they touch the same files and the same people will be involved
-for the review. Let me know if you'd rather see them sent separately.
+Drop assignments to bias-disable as the documentation [1] states that
+this property doesn't take a value. Other occurrences of this property
+respect that.
 
-First patch reindents the wcd_codec block in pm8916.dtsi with respect
-to the kernel standards.
+[1] Documentation/devicetree/bindings/pinctrl/qcom,msm8916-pinctrl.txt
 
-Second patch and third patch makes existing I2C more in sync with the
-rest of the bindings by dropping assignments to a property that doesn't
-take a value, and by making their style matches thus of SPI bindings.
+Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
+---
+ arch/arm64/boot/dts/qcom/msm8916-pins.dtsi | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-Last patch add bindings of I2C cores 1, 3, and 5.
-
-Damien Riegel (4):
-  arm64: dts: qcom: pm8916: fix wcd_codec indentation
-  arm64: dts: qcom: msm8916-pins: remove assignments to bias-disable
-  arm64: dts: qcom: msm8916: normalize I2C bindings
-  arm64: dts: qcom: msm8916: add bindings for i2c1, i2c3, i2c5
-
- arch/arm64/boot/dts/qcom/msm8916-pins.dtsi | 84 +++++++++++++++++++++++++++---
- arch/arm64/boot/dts/qcom/msm8916.dtsi      | 57 +++++++++++++++++---
- arch/arm64/boot/dts/qcom/pm8916.dtsi       | 82 ++++++++++++++---------------
- 3 files changed, 169 insertions(+), 54 deletions(-)
-
+diff --git a/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi b/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
+index 4cb0b5834143..c67ad8ed8b60 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
+@@ -278,7 +278,7 @@
+ 		pinconf {
+ 			pins = "gpio6", "gpio7";
+ 			drive-strength = <16>;
+-			bias-disable = <0>;
++			bias-disable;
+ 		};
+ 	};
+ 
+@@ -290,7 +290,7 @@
+ 		pinconf {
+ 			pins = "gpio6", "gpio7";
+ 			drive-strength = <2>;
+-			bias-disable = <0>;
++			bias-disable;
+ 		};
+ 	};
+ 
+@@ -302,7 +302,7 @@
+ 		pinconf {
+ 			pins = "gpio14", "gpio15";
+ 			drive-strength = <16>;
+-			bias-disable = <0>;
++			bias-disable;
+ 		};
+ 	};
+ 
+@@ -314,7 +314,7 @@
+ 		pinconf {
+ 			pins = "gpio14", "gpio15";
+ 			drive-strength = <2>;
+-			bias-disable = <0>;
++			bias-disable;
+ 		};
+ 	};
+ 
+@@ -326,7 +326,7 @@
+ 		pinconf {
+ 			pins = "gpio22", "gpio23";
+ 			drive-strength = <16>;
+-			bias-disable = <0>;
++			bias-disable;
+ 		};
+ 	};
+ 
+@@ -338,7 +338,7 @@
+ 		pinconf {
+ 			pins = "gpio22", "gpio23";
+ 			drive-strength = <2>;
+-			bias-disable = <0>;
++			bias-disable;
+ 		};
+ 	};
+ 
 -- 
 2.15.0
