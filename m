@@ -1,67 +1,27 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed,  1 Nov 2017 13:23:34 +0100
-Subject: [PATCH] arm64: dts: zynqmp: Use SPDX-License-Identifier
-Message-ID: <d432b970c977750b5c32595ef2c13f16fe92ff16.1509539009.git.michal.simek@xilinx.com>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 01 Nov 2017 21:30:46 +0900 (KST)
+Subject: [PATCH] net: thunderx: remove a couple of redundant assignments
+In-Reply-To: <20171031143755.26021-1-colin.king@canonical.com>
+References: <20171031143755.26021-1-colin.king@canonical.com>
+Message-ID: <20171101.213046.1800118728866748105.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Follow trend and use the SPDX License description.
+From: Colin King <colin.king@canonical.com>
+Date: Tue, 31 Oct 2017 14:37:55 +0000
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+> From: Colin Ian King <colin.king@canonical.com>
+> 
+> The assignment to pointer msg is redundant as it is never read, so
+> remove msg.  Also remove the first assignment to qset as this is not
+> read before the next re-assignment of a new value to qset in the
+> for-loop. Cleans up two clang warnings:
+> 
+> drivers/net/ethernet/cavium/thunder/nic_main.c:589:2: warning: Value
+> stored to 'msg' is never read
+> drivers/net/ethernet/cavium/thunder/nic_main.c:611:2: warning: Value
+> stored to 'qset' is never read
+> 
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
 
- arch/arm64/boot/dts/xilinx/zynqmp-ep108-clk.dtsi | 5 +----
- arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts      | 5 +----
- arch/arm64/boot/dts/xilinx/zynqmp.dtsi           | 5 +----
- 3 files changed, 3 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-ep108-clk.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp-ep108-clk.dtsi
-index b87b8316f4ac..c85454fc9d7b 100644
---- a/arch/arm64/boot/dts/xilinx/zynqmp-ep108-clk.dtsi
-+++ b/arch/arm64/boot/dts/xilinx/zynqmp-ep108-clk.dtsi
-@@ -5,10 +5,7 @@
-  *
-  * Michal Simek <michal.simek@xilinx.com>
-  *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License as
-- * published by the Free Software Foundation; either version 2 of
-- * the License, or (at your option) any later version.
-+ * SPDX-License-Identifier: GPL-2.0+
-  */
- 
- / {
-diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
-index bf552674a834..49bc65e236ba 100644
---- a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
-+++ b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
-@@ -5,10 +5,7 @@
-  *
-  * Michal Simek <michal.simek@xilinx.com>
-  *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License as
-- * published by the Free Software Foundation; either version 2 of
-- * the License, or (at your option) any later version.
-+ * SPDX-License-Identifier: GPL-2.0+
-  */
- 
- /dts-v1/;
-diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-index 7665fbddff28..f99fc7c477d5 100644
---- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-+++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-@@ -5,10 +5,7 @@
-  *
-  * Michal Simek <michal.simek@xilinx.com>
-  *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License as
-- * published by the Free Software Foundation; either version 2 of
-- * the License, or (at your option) any later version.
-+ * SPDX-License-Identifier: GPL-2.0+
-  */
- 
- / {
--- 
-1.9.1
+Applied.
