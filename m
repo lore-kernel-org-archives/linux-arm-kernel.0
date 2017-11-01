@@ -1,108 +1,120 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 1 Nov 2017 08:53:40 -0700
-Subject: [RFC] Improving udelay/ndelay on platforms where that is possible
-In-Reply-To: <20171101092618.GN9463@n2100.armlinux.org.uk>
-References: <d3f42f35-8175-58f6-78b7-3331efe64da2@sigmadesigns.com>
- <CA+55aFzy9=RtFRuJhFbF+PL_PCrkZsKtAKrq6WJo1z9eW9gLSA@mail.gmail.com>
- <20171031165629.GF9463@n2100.armlinux.org.uk>
- <CA+55aFwDquBXt_EYT3JFoWkeFsZTym5qUXig-DePXXzm07uABw@mail.gmail.com>
- <CAD=FV=V3n0gjzpL860V6cgf8JVh5pmoL+i0t63Oot19T2afTPw@mail.gmail.com>
- <20171101092618.GN9463@n2100.armlinux.org.uk>
-Message-ID: <CAD=FV=VKEz9jvJaD2KTitH=2G+wb42RXHyRVKi4-zrypAu9jSA@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 1 Nov 2017 15:57:36 +0000
+Subject: [PATCH] ARM: add a private asm/unaligned.h
+In-Reply-To: <87mv478na9.fsf@free-electrons.com>
+References: <20171020200231.1355569-1-arnd@arndb.de>
+ <87wp3g39es.fsf@free-electrons.com>
+ <20171027152743.GJ20805@n2100.armlinux.org.uk>
+ <87k1zc3fxp.fsf@free-electrons.com>
+ <20171030154855.GO20805@n2100.armlinux.org.uk>
+ <87bmko1v6f.fsf@free-electrons.com>
+ <20171030161207.GS20805@n2100.armlinux.org.uk>
+ <8737601u4d.fsf@free-electrons.com>
+ <20171030163816.GA27404@n2100.armlinux.org.uk>
+ <20171031124707.GD9463@n2100.armlinux.org.uk>
+ <CAKv+Gu-te-Q+em36jM-dyouZuov_=xJaVY0Yr-3JCmJn6Zi4sg@mail.gmail.com>
+ <87mv478na9.fsf@free-electrons.com>
+Message-ID: <CAKv+Gu9d2TUQHavs-rasKFcNmmwo22dwiGuD2+jBLqawbZAwuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Nov 1, 2017 at 2:26 AM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Tue, Oct 31, 2017 at 05:23:19PM -0700, Doug Anderson wrote:
->> Hi,
+On 31 October 2017 at 13:22, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> Hi Ard,
+>
+>  On mar., oct. 31 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>
+>> On 31 October 2017 at 12:47, Russell King - ARM Linux
+>> <linux@armlinux.org.uk> wrote:
+>>> On Mon, Oct 30, 2017 at 04:38:17PM +0000, Russell King - ARM Linux wrote:
+>>>> On Mon, Oct 30, 2017 at 05:24:34PM +0100, Gregory CLEMENT wrote:
+>>>> > Hi Russell King,
+>>>> >
+>>>> > Here you will find all the objects included the vmlinux:
+>>>> >
+>>>> > http://free-electrons.com/~gregory/pub/compressed.tgz
+>>>>
+>>>> Thanks.  Unfortunately, nothing stands out, but I do see a difference
+>>>> between the output of your linker from mine.
+>>>>
+>>>> Yours:
+>>>>
+>>>> Idx Name          Size      VMA       LMA       File off  Algn
+>>>>   0 .text         00005ef8  00000000  00000000  00010000  2**5
+>>>>                   CONTENTS, ALLOC, LOAD, READONLY, CODE
+>>>>
+>>>> Mine:
+>>>>
+>>>> Idx Name          Size      VMA       LMA       File off  Algn
+>>>>   0 .text         00005f00  00000000  00000000  00010000  2**5
+>>>>                   CONTENTS, ALLOC, LOAD, READONLY, CODE
+>>>>
+>>>> That has the effect of moving the addresses of the following
+>>>> sections in your vmlinux down by 8 bytes.  However, I don't think
+>>>> that's the cause of this - but it does hint at something being
+>>>> different in binutils in the way sections are processed in the
+>>>> linker.
+>>>>
+>>>> Please add to your linker script after the assignment of _edata:
+>>>>
+>>>>   .image_end (NOLOAD) : {
+>>>>     _edata_foo = .;
+>>>>   }
+>>>>
+>>>> relink the decompressor, and see what value _edata_foo ends up with
+>>>> compared to _edata?  They should be the same, but I suspect using
+>>>> your linker, they will be different.
+>>>>
+>>>> Also try adding
+>>>>     BYTE(0);
+>>>>
+>>>> after the _edata_foo assignment as a separate test, and see whether
+>>>> that makes any difference - with that you should end up with the
+>>>> .image_end section in the output image.
+>>>
+>>> Gregory sent me has new url... for _both_ changes, which gives me:
+>
+> If needed I can provide this url.
+>
+>>>
+>>> $ arm-linux-nm vmlinux |grep _edata
+>>> 00491160 D _edata
+>>> 00491160 D _edata_foo
+>>>
+>>> So there's no reason that ASSERT() should be failing!  However, as I
+>>> don't have the intermediate step, I can't say whether the addition
+>>> of the BYTE() affected it in some way - sorry, but I asked for _both_
+>>> to be tested above because I wanted to speed up the process, and
+>>> clearly that's backfired.
+>>>
+>>> Given how close we potentially are to 4.14, I don't think we're going
+>>> to get to the bottom of this to make 4.14.  I'd want to get this
+>>> sorted by Wednesday so linux-next (which is resuming this evening)
+>>> can grab a copy of my tree with it in, and we have another day to
+>>> sort out any remaining issues, but I'm basically out of time to do
+>>> anything further with this as of now.
 >>
->> On Tue, Oct 31, 2017 at 10:45 AM, Linus Torvalds
->> <torvalds@linux-foundation.org> wrote:
->> > So I'm very much open to udelay improvements, and if somebody sends
->> > patches for particular platforms to do particularly well on that
->> > platform, I think we should merge them. But ...
+>>> So, 4.14 will likely be released without any of this being fixed.
+>>>
 >>
->> If I'm reading this all correctly, this sounds like you'd be willing
->> to merge <https://patchwork.kernel.org/patch/9429841/>.  This makes
->> udelay() guaranteed not to underrun on arm32 platforms.
+>> IIUC, the current issue is limited to the ASSERT() itself, which is
+>> there to prevent future regressions, while the other two patches deal
+>> with severe and difficult to diagnose known issues.
 >
-> That's a mis-representation again.  It stops a timer-based udelay()
-> possibly underrunning by one tick if we are close to the start of
-> a count increment.  However, it does nothing for the loops_per_jiffy
-> udelay(), which can still underrun.
+> I confirm that whithout the last commit (adding the ASSERT()) in the
+> fixes branch it worked well.
 >
-> My argument against merging that patch is that with it merged, we get
-> (as you say) a udelay() that doesn't underrun _when using a timer_
-> but when we end up using the loops_per_jiffy udelay(), we're back to
-> the old problem.
+>>
+>> So why can't we apply those two patches as fixes, and revisit the
+>> patch that helps us prevent this from regressing in the future for
+>> v4.15?
 >
-> My opinion is that's bad, because it encourages people to write drivers
-> that rely on udelay() having "good" behaviour, which it is not guaranteed
-> to have.  So, they'll specify a delay period of exactly what they want,
-> and their drivers will then fail when running on systems that aren't
-> using a timer-based udelay().
+> I also agree with this.
+>
 
-IMHO the current udelay is broken in an off-by-one way and it's easy
-to fix.  Intentionally leaving a bug in the code seems silly.  This
-seems to by what Linus is saying with his statement that "(a) platform
-code could try to make their udelay/ndelay() be as good as it can be
-on a particular platform".
+Russell,
 
-So no matter the rest of the discussions, we should land that.  If you
-disagree then I'm happy to re-post that patch straight to Linus later
-this week since it sounds as if he'd take it.
+Please drop the EFI patch from your tree. I will forward it myself.
 
-
-> If we want udelay() to have this behaviour, it needs to _always_ have
-> this behaviour irrespective of the implementation.  So that means
-> the loops_per_jiffy version also needs to be fixed in the same way,
-> which IMHO is impossible.
-
-As Linus indicates, if there is a way to code things up that doesn't
-rely on udelay then that should be preferred.  However, there may be
-cases where this is exceedingly difficult.  If you're writing a driver
-at a high enough level that will work on a lot of underlying platforms
-(AKA it's platform-agnostic) then you can't necessarily rely on timing
-an individual hardware read.  Since you're writing high-level
-platform-agnostic code, presumably implementing a 1 us delay in a
-generic way is equally difficult to making the platform-agnostic
-udelay() reliable.
-
-
-IMHO it would be OK to put in a requirement in a driver saying that it
-will only function properly on hardware that has a udelay() that is
-guaranteed to never return early.  As Linus says: "most core kernel
-developers even have access to platforms that have unstable TSC's any
-more."  Presumably all those old platforms aren't suddenly going to be
-attached to new devices unless those new devices are connected by a
-PCI, ISA, USB, etc. bus.  Drivers for components connected by
-non-external busses seem like they don't need to take into account the
-quirks of really ancient hardware.
-
-Yes, I know there are still some arm32 chips that aren't that old and
-that don't have a CP15-based timer.  We should make sure we don't
-change existing drivers and frameworks in a way that will break those
-boards.  If that means we need to figure out how to add an API, as
-Linus says, to indicate how accurate udelay is then that might be a
-solution.  Another would be to come up with some clever solution on
-affected boards.  Most arm32 boards I'm aware of have other
-(non-CP15-based) timers.  ...if they don't and these are real boards
-that are actually using a driver relying on udelay() then perhaps they
-could add a new board-specific udelay() implementation that delayed by
-reading a specific hardware register with known timing.
-
-
-Said another way: if we're writing a high level NAND driver and we
-can't find a better way than udelay() to ensure timing requirements,
-then the driver should use udelay() and document the fact that it must
-not underrun (ideally it could even test for it at runtime).  If that
-NAND driver will never be used on platforms with an unreliable
-udelay() then we don't need to worry about it.  If we find a platform
-where we need this NAND driver, we should find a way to implement a
-udelay() that will, at least, never underestimate.
-
-
--Doug
+Thanks,
+Ard.
