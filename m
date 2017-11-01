@@ -1,132 +1,26 @@
-From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
-Date: Wed,  1 Nov 2017 17:05:51 -0400
-Subject: [PATCH v2 14/26] media: xilinx: fix a debug printk
-In-Reply-To: <c4389ab1c02bb08c1a55012fdb859c8b10bdc47e.1509569763.git.mchehab@s-opensource.com>
-References: <c4389ab1c02bb08c1a55012fdb859c8b10bdc47e.1509569763.git.mchehab@s-opensource.com>
-Message-ID: <be86653c5e5641582f65f43780b1fe255e92cdc0.1509569763.git.mchehab@s-opensource.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 1 Nov 2017 16:11:32 -0500
+Subject: [PATCH v2 08/10] dt-bindings: add binding for A64 DE2 CCU SRAM
+In-Reply-To: <20171027150658.18509-9-icenowy@aosc.io>
+References: <20171027150658.18509-1-icenowy@aosc.io>
+ <20171027150658.18509-9-icenowy@aosc.io>
+Message-ID: <20171101211132.jtbhywkudrev4ux3@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Two orthogonal changesets caused a breakage at several printk
-messages inside xilinx. Changeset 859969b38e2e
-("[media] v4l: Switch from V4L2 OF not V4L2 fwnode API")
-made davinci to use struct fwnode_handle instead of
-struct device_node. Changeset 68d9c47b1679
-("media: Convert to using %pOF instead of full_name")
-changed the printk to not use ->full_name, but, instead,
-to rely on %pOF.
+On Fri, Oct 27, 2017 at 11:06:56PM +0800, Icenowy Zheng wrote:
+> A64's Display Engine 2.0 needs a section of SRAM (SRAM C) to be claimed,
+> otherwise the whole DE2 memory zone cannot be accessed (kept to all 0).
+> 
+> Add binding for this, in order to make the DE2 CCU able to claim the
+> SRAM and enable access to the DE2 clock and reset registers.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+> Changes in v2:
+> - Adds description of the situation when the SRAM is not claimed.
+> 
+>  Documentation/devicetree/bindings/clock/sun8i-de2.txt | 5 +++++
+>  1 file changed, 5 insertions(+)
 
-With both patches applied, the Kernel will do the wrong
-thing, as warned by smatch:
-	drivers/media/platform/xilinx/xilinx-vipp.c:108 xvip_graph_build_one() error: '%pOF' expects argument of type 'struct device_node*', argument 4 has type 'void*'
-	drivers/media/platform/xilinx/xilinx-vipp.c:117 xvip_graph_build_one() error: '%pOF' expects argument of type 'struct device_node*', argument 4 has type 'void*'
-	drivers/media/platform/xilinx/xilinx-vipp.c:126 xvip_graph_build_one() error: '%pOF' expects argument of type 'struct device_node*', argument 4 has type 'void*'
-	drivers/media/platform/xilinx/xilinx-vipp.c:138 xvip_graph_build_one() error: '%pOF' expects argument of type 'struct device_node*', argument 3 has type 'void*'
-	drivers/media/platform/xilinx/xilinx-vipp.c:148 xvip_graph_build_one() error: '%pOF' expects argument of type 'struct device_node*', argument 4 has type 'void*'
-	drivers/media/platform/xilinx/xilinx-vipp.c:245 xvip_graph_build_dma() error: '%pOF' expects argument of type 'struct device_node*', argument 3 has type 'void*'
-	drivers/media/platform/xilinx/xilinx-vipp.c:254 xvip_graph_build_dma() error: '%pOF' expects argument of type 'struct device_node*', argument 4 has type 'void*'
-
-So, change the logic to actually print the device name
-that was obtained before the print logic.
-
-Fixes: 68d9c47b1679 ("media: Convert to using %pOF instead of full_name")
-Fixes: 859969b38e2e ("[media] v4l: Switch from V4L2 OF not V4L2 fwnode API")
-Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
----
- drivers/media/platform/xilinx/xilinx-vipp.c | 31 ++++++++++++++++-------------
- 1 file changed, 17 insertions(+), 14 deletions(-)
-
-diff --git a/drivers/media/platform/xilinx/xilinx-vipp.c b/drivers/media/platform/xilinx/xilinx-vipp.c
-index d881cf09876d..dd777c834c43 100644
---- a/drivers/media/platform/xilinx/xilinx-vipp.c
-+++ b/drivers/media/platform/xilinx/xilinx-vipp.c
-@@ -65,6 +65,9 @@ xvip_graph_find_entity(struct xvip_composite_device *xdev,
- 	return NULL;
- }
- 
-+#define LOCAL_NAME(link)	to_of_node(link.local_node)->full_name
-+#define REMOTE_NAME(link)	to_of_node(link.remote_node)->full_name
-+
- static int xvip_graph_build_one(struct xvip_composite_device *xdev,
- 				struct xvip_graph_entity *entity)
- {
-@@ -103,9 +106,9 @@ static int xvip_graph_build_one(struct xvip_composite_device *xdev,
- 		 * the link.
- 		 */
- 		if (link.local_port >= local->num_pads) {
--			dev_err(xdev->dev, "invalid port number %u for %pOF\n",
-+			dev_err(xdev->dev, "invalid port number %u for %s\n",
- 				link.local_port,
--				to_of_node(link.local_node));
-+				LOCAL_NAME(link));
- 			v4l2_fwnode_put_link(&link);
- 			ret = -EINVAL;
- 			break;
-@@ -114,8 +117,8 @@ static int xvip_graph_build_one(struct xvip_composite_device *xdev,
- 		local_pad = &local->pads[link.local_port];
- 
- 		if (local_pad->flags & MEDIA_PAD_FL_SINK) {
--			dev_dbg(xdev->dev, "skipping sink port %pOF:%u\n",
--				to_of_node(link.local_node),
-+			dev_dbg(xdev->dev, "skipping sink port %s:%u\n",
-+				LOCAL_NAME(link),
- 				link.local_port);
- 			v4l2_fwnode_put_link(&link);
- 			continue;
-@@ -123,8 +126,8 @@ static int xvip_graph_build_one(struct xvip_composite_device *xdev,
- 
- 		/* Skip DMA engines, they will be processed separately. */
- 		if (link.remote_node == of_fwnode_handle(xdev->dev->of_node)) {
--			dev_dbg(xdev->dev, "skipping DMA port %pOF:%u\n",
--				to_of_node(link.local_node),
-+			dev_dbg(xdev->dev, "skipping DMA port %s:%u\n",
-+				REMOTE_NAME(link),
- 				link.local_port);
- 			v4l2_fwnode_put_link(&link);
- 			continue;
-@@ -134,8 +137,8 @@ static int xvip_graph_build_one(struct xvip_composite_device *xdev,
- 		ent = xvip_graph_find_entity(xdev,
- 					     to_of_node(link.remote_node));
- 		if (ent == NULL) {
--			dev_err(xdev->dev, "no entity found for %pOF\n",
--				to_of_node(link.remote_node));
-+			dev_err(xdev->dev, "no entity found for %s\n",
-+				REMOTE_NAME(link));
- 			v4l2_fwnode_put_link(&link);
- 			ret = -ENODEV;
- 			break;
-@@ -144,8 +147,8 @@ static int xvip_graph_build_one(struct xvip_composite_device *xdev,
- 		remote = ent->entity;
- 
- 		if (link.remote_port >= remote->num_pads) {
--			dev_err(xdev->dev, "invalid port number %u on %pOF\n",
--				link.remote_port, to_of_node(link.remote_node));
-+			dev_err(xdev->dev, "invalid port number %u on %s\n",
-+				link.remote_port, REMOTE_NAME(link));
- 			v4l2_fwnode_put_link(&link);
- 			ret = -EINVAL;
- 			break;
-@@ -241,17 +244,17 @@ static int xvip_graph_build_dma(struct xvip_composite_device *xdev)
- 		ent = xvip_graph_find_entity(xdev,
- 					     to_of_node(link.remote_node));
- 		if (ent == NULL) {
--			dev_err(xdev->dev, "no entity found for %pOF\n",
--				to_of_node(link.remote_node));
-+			dev_err(xdev->dev, "no entity found for %s\n",
-+				REMOTE_NAME(link));
- 			v4l2_fwnode_put_link(&link);
- 			ret = -ENODEV;
- 			break;
- 		}
- 
- 		if (link.remote_port >= ent->entity->num_pads) {
--			dev_err(xdev->dev, "invalid port number %u on %pOF\n",
-+			dev_err(xdev->dev, "invalid port number %u on %s\n",
- 				link.remote_port,
--				to_of_node(link.remote_node));
-+				REMOTE_NAME(link));
- 			v4l2_fwnode_put_link(&link);
- 			ret = -EINVAL;
- 			break;
--- 
-2.13.6
+Acked-by: Rob Herring <robh@kernel.org>
