@@ -1,39 +1,56 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed, 1 Nov 2017 15:12:17 -0700
-Subject: [PATCH] mailbox: add support for doorbell/signal mode controllers
-In-Reply-To: <CABb+yY1tcm-68E5oG75hstuMd6AOeb=BB6HeKGnQ1zj4Qya6hg@mail.gmail.com>
-References: <1509553964-4451-1-git-send-email-sudeep.holla@arm.com>
- <CABb+yY1tcm-68E5oG75hstuMd6AOeb=BB6HeKGnQ1zj4Qya6hg@mail.gmail.com>
-Message-ID: <20171101221217.GA28761@minitux>
+From: salyzyn@android.com (Mark Salyzyn)
+Date: Wed, 1 Nov 2017 15:14:03 -0700
+Subject: [PATCH v4 10/12] arm64: vdso: replace gettimeofday.S with global
+ vgettimeofday.C
+In-Reply-To: <20171031183306.81375-1-salyzyn@android.com>
+References: <20171031183306.81375-1-salyzyn@android.com>
+Message-ID: <7775cc5e-4a24-1e33-aae5-6181ca018d80@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 01 Nov 11:03 PDT 2017, Jassi Brar wrote:
-> On Wed, Nov 1, 2017 at 10:02 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-[..]
-> >
-> > This is rough idea I have on extending mailbox interface to support
-> > the doorbell requirements.
-> >
-> What doorbell requirements does the api not support?
-> QComm's APCS IPC is what you call a "doorbell" controller and is
-> already supported by the API. It could run SCMI even easier than MHU
-> (your controller).
-> 
+On 10/31/2017 11:32 AM, Mark Salyzyn wrote:
+> . . .
+> diff --git a/arch/arm64/kernel/vdso/Makefile b/arch/arm64/kernel/vdso/Makefile
+> index 62c84f7cb01b..0925f8908dcb 100644
+> --- a/arch/arm64/kernel/vdso/Makefile
+> +++ b/arch/arm64/kernel/vdso/Makefile
+> @@ -5,18 +5,26 @@
+>   # Heavily based on the vDSO Makefiles for other archs.
+>   #
+>   
+> -obj-vdso := gettimeofday.o note.o sigreturn.o
+> +obj-vdso := vgettimeofday.o note.o sigreturn.o
+>   
+>   # Build rules
+>   targets := $(obj-vdso) vdso.so vdso.so.dbg
+>   obj-vdso := $(addprefix $(obj)/, $(obj-vdso))
+>   
+> -ccflags-y := -shared -fno-common -fno-builtin
+> +ccflags-y := -shared -fno-common -fno-builtin -fno-stack-protector
+> +ccflags-y += -DDISABLE_BRANCH_PROFILING
+>   ccflags-y += -nostdlib -Wl,-soname=linux-vdso.so.1 \
+>   		$(call cc-ldoption, -Wl$(comma)--hash-style=sysv)
+>   
+> +# Force -O2 to avoid libgcc dependencies
+> +CFLAGS_REMOVE_vgettimeofday.o = -pg -Os
+> +CFLAGS_vgettimeofday.o = -O2 -mcmodel=tiny
+> +
+This last stanza breaks clang builds. Suggested fix is:
 
-I agree; from a mbox consumer perspective a doorbell should be a mailbox
-channel that when signalled will ring the bell, i.e. the message is not
-significant and should not be provided by the client.
+@@ -18,7 +18,11 @@ ccflags-y += -nostdlib -Wl,-soname=linux-vdso.so.1 \
 
-If the message is significant and is not derived from the mailbox
-channel (e.g. channel id -> bit in register) it is not a mailbox
-doorbell, it's s regular mailbox used as a doorbell.
+ ?# Force -O2 to avoid libgcc dependencies
+ ?CFLAGS_REMOVE_vgettimeofday.o = -pg -Os
++ifeq ($(cc-name),clang)
++CFLAGS_vgettimeofday.o = -O2
++else
+ ?CFLAGS_vgettimeofday.o = -O2 -mcmodel=tiny
++endif
 
+ ?# Disable gcov profiling for VDSO code
+ ?GCOV_PROFILE := n
 
-The potential improvement I see in the Qualcomm case is to wrap the
-mbox_send_message(chan, NULL); mbox_client_txdone(chan, 0); calls in one
-simple "mbox_ring_door_bell(chan)" - but I haven't investigated the
-validity of this as a generic function.
+Holding off respin or followup patch until after we get a response from 
+Jon Masters <jcm@readhat.com> on their QE tests on this patch series.
 
-Regards,
-Bjorn
+-- Mark
