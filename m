@@ -1,47 +1,78 @@
-From: salyzyn@android.com (Mark Salyzyn)
-Date: Wed, 1 Nov 2017 10:49:00 -0700
-Subject: [PATCH] arm64: write_sysreg asm illegal for aarch32
-In-Reply-To: <35cf2062-f27e-16e6-19b1-cae5200d7081@arm.com>
-References: <20171101170014.20931-1-salyzyn@android.com>
- <35cf2062-f27e-16e6-19b1-cae5200d7081@arm.com>
-Message-ID: <24cdf320-35e3-76f2-6e07-8b5548ac67a0@android.com>
+From: gnomes@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Wed, 1 Nov 2017 17:53:25 +0000
+Subject: [RFC] Improving udelay/ndelay on platforms where that is possible
+In-Reply-To: <d3f42f35-8175-58f6-78b7-3331efe64da2@sigmadesigns.com>
+References: <d3f42f35-8175-58f6-78b7-3331efe64da2@sigmadesigns.com>
+Message-ID: <20171101175325.2557ce85@alans-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/2017 10:14 AM, Robin Murphy wrote:
-> On 01/11/17 16:58, Mark Salyzyn wrote:
->> Cross compiling to aarch32 (for vdso32) using clang correctly
->> identifies that (the unused) write_sysreg inline asm directive is
->> illegal in that architectural context:
->>
->> arch/arm64/include/asm/arch_timer.h: error: invalid input constraint 'rZ' in asm
->>          write_sysreg(cntkctl, cntkctl_el1);
->>          ^
->> arch/arm64/include/asm/sysreg.h: note: expanded from macro 'write_sysreg'
->>                       : : "rZ" (__val));
->>                           ^
->>
->> GCC normally checks for correctness everywhere. But uniquely for
->> unused asm, will optimize out and suppress the error report.
-> It sounds more like some paths are wrong in the compat vDSO build if
-> it's pulling in this header in the first place - nothing in this file is
-> relevant to AArch32.
->
-> Robin.
->
-And yet, when you CROSS_COMPILE_ARM32 a vdso32, you have no choice but 
-to utilize the arm64 headers since they contain all the relevant kernel 
-structures and environment.
+On Tue, 31 Oct 2017 17:15:34 +0100
+> Therefore, users are accustomed to having delays be longer (within a reasonable margin).
+> However, very few users would expect delays to be *shorter* than requested.
 
-asm/arch_timer.h (remember we are using arm instructions to access 
-arch64 timers)
+If your udelay can be under by 10% then just bump the number by 10%.
+However at that level most hardware isn't that predictable anyway because
+the fabric between the CPU core and the device isn't some clunky
+serialized link. Writes get delayed, they can bunch together, busses do
+posting and queueing.
 
-linux/time.h (really only for struct timespec())
+Then there is virtualisation 8)
 
-asm/processor.h (eg: cpu_relax())
+> A typical driver writer has some HW spec in front of them, which e.g. states:
+> 
+> * poke register A
+> * wait 1 microsecond for the dust to settle
+> * poke register B
 
-pull in a _lot_ of architectural related cruft that always somehow picks 
-up asm/sysreg.h somewhere in the multitude of includes to fulfill some 
-unused inline's needs.
+Rarely because of posting. It's usually
 
--- Mark
+	write
+	while(read() != READY);
+	write
+
+and even when you've got a legacy device with timeouts its
+
+	write
+	read
+	delay
+	write
+
+and for sub 1ms delays I suspect the read and bus latency actually add a
+randomization sufficient that it's not much of an optimization to worry
+about an accurate ndelay().
+
+> This "off-by-one" error is systematic over the entire range of allowed
+> delay_us input (1 to 2000), so it is easy to fix, by adding 1 to the result.
+
+And that + 1 might be worth adding but really there isn't a lot of
+modern hardware that haas a bus that behaves like software folks imagine
+and everything has percentage errors factored into published numbers.
+
+> 3) Why does all this even matter?
+> 
+> At boot, the NAND framework scans the NAND chips for bad blocks;
+> this operation generates approximately 10^5 calls to ndelay(100);
+> which cause a 100 ms delay, because ndelay is implemented as a
+> call to the nearest udelay (rounded up).
+
+So why aren't you doing that on both NANDs in parallel and asynchronous
+to other parts of boot ? If you start scanning at early boot time do you
+need the bad block list before mounting / - or are you stuck with a
+single threaded CPU and PIO ?
+
+For that matter given the bad blocks don't randomly change why not cache
+them ?
+ 
+> My current NAND chips are tiny (2 x 512 MB) but with larger chips,
+> the number of calls to ndelay would climb to 10^6 and the delay
+> increase to 1 second, with is starting to be a problem.
+> 
+> One solution is to implement ndelay, but ndelay is more prone to
+> under-delays, and thus a prerequisite is fixing under-delays.
+
+For ndelay you probably have to make it platform specific or just use
+udelay if not. We do have a few cases we wanted 400ns delays in the PC
+world (ATA) but not many.
+
+Akab
