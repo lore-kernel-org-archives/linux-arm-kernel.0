@@ -1,54 +1,33 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  1 Nov 2017 11:34:54 +0100
-Subject: [PATCH 3/7] arm64: dts: renesas: r8a7796: Tie Audio-DMAC to IPMMU-MP
+Date: Wed,  1 Nov 2017 11:34:57 +0100
+Subject: [PATCH 6/7] arm64: dts: renesas: r8a7796: Connect Ethernet-AVB to
+ IPMMU-DS0
 In-Reply-To: <20171101103458.7582-1-horms+renesas@verge.net.au>
 References: <20171101103458.7582-1-horms+renesas@verge.net.au>
-Message-ID: <20171101103458.7582-4-horms+renesas@verge.net.au>
+Message-ID: <20171101103458.7582-7-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hook up r8a7796 Audio-DMAC nodes to the IPMMU-MP.
+Add IPMMU-DS0 to the Ethernet-AVB device node.
 
-Based on work for the r8a7795 by Magnus Damm.
+Based on work by Magnus Damm for the r8a7795.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index de044c954638..ce74a7ae47f4 100644
+index c14ce1c47487..78160b4a380c 100644
 --- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -1316,6 +1316,14 @@
- 			resets = <&cpg 502>;
- 			#dma-cells = <1>;
- 			dma-channels = <16>;
-+			iommus = <&ipmmu_mp 0>, <&ipmmu_mp 1>,
-+			       <&ipmmu_mp 2>, <&ipmmu_mp 3>,
-+			       <&ipmmu_mp 4>, <&ipmmu_mp 5>,
-+			       <&ipmmu_mp 6>, <&ipmmu_mp 7>,
-+			       <&ipmmu_mp 8>, <&ipmmu_mp 9>,
-+			       <&ipmmu_mp 10>, <&ipmmu_mp 11>,
-+			       <&ipmmu_mp 12>, <&ipmmu_mp 13>,
-+			       <&ipmmu_mp 14>, <&ipmmu_mp 15>;
- 		};
- 
- 		audma1: dma-controller at ec720000 {
-@@ -1350,6 +1358,14 @@
- 			resets = <&cpg 501>;
- 			#dma-cells = <1>;
- 			dma-channels = <16>;
-+			iommus = <&ipmmu_mp 16>, <&ipmmu_mp 17>,
-+			       <&ipmmu_mp 18>, <&ipmmu_mp 19>,
-+			       <&ipmmu_mp 20>, <&ipmmu_mp 21>,
-+			       <&ipmmu_mp 22>, <&ipmmu_mp 23>,
-+			       <&ipmmu_mp 24>, <&ipmmu_mp 25>,
-+			       <&ipmmu_mp 26>, <&ipmmu_mp 27>,
-+			       <&ipmmu_mp 28>, <&ipmmu_mp 29>,
-+			       <&ipmmu_mp 30>, <&ipmmu_mp 31>;
- 		};
- 
- 		usb_dmac0: dma-controller at e65a0000 {
+@@ -906,6 +906,7 @@
+ 			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
+ 			resets = <&cpg 812>;
+ 			phy-mode = "rgmii-txid";
++			iommus = <&ipmmu_ds0 16>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			status = "disabled";
 -- 
 2.11.0
