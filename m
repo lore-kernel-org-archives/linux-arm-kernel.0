@@ -1,33 +1,15 @@
-From: Zhiqiang.Hou@nxp.com (Zhiqiang Hou)
-Date: Wed, 1 Nov 2017 11:40:15 +0800
-Subject: [PATCH 2/2] Documentation: fsl: dspi: Add a compatible string for
- ls1088a DSPI
-In-Reply-To: <20171101034015.41114-1-Zhiqiang.Hou@nxp.com>
-References: <20171101034015.41114-1-Zhiqiang.Hou@nxp.com>
-Message-ID: <20171101034015.41114-3-Zhiqiang.Hou@nxp.com>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Wed, 1 Nov 2017 12:13:35 +0800
+Subject: [RFC/RFT PATCH 3/6] ACPI / APEI: Replace ioremap_page_range()
+ with fixmap
+In-Reply-To: <20171031153832.17746-4-james.morse@arm.com>
+References: <20171031153832.17746-1-james.morse@arm.com>
+ <20171031153832.17746-4-james.morse@arm.com>
+Message-ID: <3b796e66-1618-0a6e-e57e-99323514b84d@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-
-Add a new compatible string "fsl,ls1088a-dspi".
-
-Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
----
- Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt b/Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt
-index dcc7eaada511..5fc467211cc6 100644
---- a/Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt
-@@ -6,6 +6,7 @@ Required properties:
- 		or
- 		"fsl,ls2080a-dspi" followed by "fsl,ls2085a-dspi"
- 		"fsl,ls1012a-dspi" followed by "fsl,ls1021a-v1.0-dspi"
-+		"fsl,ls1088a-dspi" followed by "fsl,ls2085a-dspi"
- - reg : Offset and length of the register set for the device
- - interrupts : Should contain SPI controller interrupt
- - clocks: from common clock binding: handle to dspi clock.
--- 
-2.14.1
+On 2017/10/31 23:38, James Morse wrote:
+> CC'd people I've seen posting CPER log fragments, could you give this a
+> test on your platforms?
+Thanks for the fixing, not found obviously issue.
