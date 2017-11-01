@@ -1,58 +1,31 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 2 Nov 2017 06:14:21 +0800
-Subject: [patch v10 2/4] drivers: jtag: Add Aspeed SoC 24xx and 25xx
- families JTAG master driver
-In-Reply-To: <1509365528-28803-3-git-send-email-oleksandrs@mellanox.com>
-References: <1509365528-28803-3-git-send-email-oleksandrs@mellanox.com>
-Message-ID: <201711020628.gDB79T0F%fengguang.wu@intel.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Wed, 1 Nov 2017 15:17:09 -0700
+Subject: [PATCH] mailbox: add support for doorbell/signal mode controllers
+In-Reply-To: <59a05fcb-ff30-0683-144e-93521a7413f9@arm.com>
+References: <1509553964-4451-1-git-send-email-sudeep.holla@arm.com>
+ <CABb+yY1tcm-68E5oG75hstuMd6AOeb=BB6HeKGnQ1zj4Qya6hg@mail.gmail.com>
+ <59a05fcb-ff30-0683-144e-93521a7413f9@arm.com>
+Message-ID: <20171101221709.GB28761@minitux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oleksandr,
+On Wed 01 Nov 11:15 PDT 2017, Sudeep Holla wrote:
+> 
+>  80         writel_relaxed(msg->cmd, mb->mbox_base +
+> MAILBOX_A2B_CMD(chans->idx));
+>  81         writel_relaxed(msg->rx_size, mb->mbox_base +
+> 
+>  82                        MAILBOX_A2B_DAT(chans->idx));
+> 
+>  83
 
-I love your patch! Yet something to improve:
+This is just terrible, using the void *mssg to pass a struct which is
+interpreted by the controller removes any form of abstraction provided
+by the framework.
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.14-rc7]
-[cannot apply to next-20171018]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+In my view the void *mssg should point to the data to be written in the
+mailbox register, and hence might be of different size - but only of
+native type.
 
-url:    https://github.com/0day-ci/linux/commits/Oleksandr-Shamray/JTAG-driver-introduction/20171102-045624
-config: blackfin-allyesconfig (attached as .config)
-compiler: bfin-uclinux-gcc (GCC) 6.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=blackfin 
-
-All errors (new ones prefixed by >>):
-
->> drivers//jtag/jtag-aspeed.c:703:10: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
-     .xfer = aspeed_jtag_xfer
-             ^~~~~~~~~~~~~~~~
-   drivers//jtag/jtag-aspeed.c:703:10: note: (near initialization for 'aspeed_jtag_ops.xfer')
-   cc1: some warnings being treated as errors
-
-vim +703 drivers//jtag/jtag-aspeed.c
-
-   697	
-   698	static const struct jtag_ops aspeed_jtag_ops = {
-   699		.freq_get = aspeed_jtag_freq_get,
-   700		.freq_set = aspeed_jtag_freq_set,
-   701		.status_get = aspeed_jtag_status_get,
-   702		.idle = aspeed_jtag_idle,
- > 703		.xfer = aspeed_jtag_xfer
-   704	};
-   705	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 46048 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171102/67c9eb57/attachment-0001.gz>
+Regards,
+Bjorn
