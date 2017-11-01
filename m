@@ -1,106 +1,41 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed,  1 Nov 2017 14:12:35 +0000
-Subject: [PATCH 1/5] arm_pmu: fold platform helpers into platform code
-In-Reply-To: <20171101141239.45340-1-mark.rutland@arm.com>
-References: <20171101141239.45340-1-mark.rutland@arm.com>
-Message-ID: <20171101141239.45340-2-mark.rutland@arm.com>
+Date: Wed,  1 Nov 2017 14:12:34 +0000
+Subject: [PATCH 0/5] arm_pmu: fix lockdep issues with ACPI systems
+Message-ID: <20171101141239.45340-1-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The armpmu_{request,free}_irqs() helpers are only used by
-arm_pmu_platform.c, so let's fold them in and make them static.
+Currently the arm_pmu ACPI code is somewhat dubious. It attempts ot
+allocate memory any manpiulate IRQs in a hotplug callback, which is an
+atomic context.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- drivers/perf/arm_pmu.c          | 21 ---------------------
- drivers/perf/arm_pmu_platform.c | 21 +++++++++++++++++++++
- include/linux/perf/arm_pmu.h    |  2 --
- 3 files changed, 21 insertions(+), 23 deletions(-)
+These patches (based on the arm64 for-next/core branch [1]) attempt to
+address this by moving work out of hotplug callback, requiring a
+reorganisation of the common arm_pmu code.
 
-diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index 7bc5eee96b31..57df8dce8e19 100644
---- a/drivers/perf/arm_pmu.c
-+++ b/drivers/perf/arm_pmu.c
-@@ -548,14 +548,6 @@ void armpmu_free_irq(struct arm_pmu *armpmu, int cpu)
- 	free_irq(irq, per_cpu_ptr(&hw_events->percpu_pmu, cpu));
- }
- 
--void armpmu_free_irqs(struct arm_pmu *armpmu)
--{
--	int cpu;
--
--	for_each_cpu(cpu, &armpmu->supported_cpus)
--		armpmu_free_irq(armpmu, cpu);
--}
--
- int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
- {
- 	int err = 0;
-@@ -612,19 +604,6 @@ int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
- 	return err;
- }
- 
--int armpmu_request_irqs(struct arm_pmu *armpmu)
--{
--	int cpu, err;
--
--	for_each_cpu(cpu, &armpmu->supported_cpus) {
--		err = armpmu_request_irq(armpmu, cpu);
--		if (err)
--			break;
--	}
--
--	return err;
--}
--
- static int armpmu_get_cpu_irq(struct arm_pmu *pmu, int cpu)
- {
- 	struct pmu_hw_events __percpu *hw_events = pmu->hw_events;
-diff --git a/drivers/perf/arm_pmu_platform.c b/drivers/perf/arm_pmu_platform.c
-index bbc64ee6dd96..db863f14c406 100644
---- a/drivers/perf/arm_pmu_platform.c
-+++ b/drivers/perf/arm_pmu_platform.c
-@@ -172,6 +172,27 @@ static int pmu_parse_irqs(struct arm_pmu *pmu)
- 	return 0;
- }
- 
-+static int armpmu_request_irqs(struct arm_pmu *armpmu)
-+{
-+	int cpu, err;
-+
-+	for_each_cpu(cpu, &armpmu->supported_cpus) {
-+		err = armpmu_request_irq(armpmu, cpu);
-+		if (err)
-+			break;
-+	}
-+
-+	return err;
-+}
-+
-+static void armpmu_free_irqs(struct arm_pmu *armpmu)
-+{
-+	int cpu;
-+
-+	for_each_cpu(cpu, &armpmu->supported_cpus)
-+		armpmu_free_irq(armpmu, cpu);
-+}
-+
- int arm_pmu_device_probe(struct platform_device *pdev,
- 			 const struct of_device_id *of_table,
- 			 const struct pmu_probe_info *probe_table)
-diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
-index af0f44effd44..97426407904d 100644
---- a/include/linux/perf/arm_pmu.h
-+++ b/include/linux/perf/arm_pmu.h
-@@ -176,8 +176,6 @@ static inline int arm_pmu_acpi_probe(armpmu_init_fn init_fn) { return 0; }
- struct arm_pmu *armpmu_alloc(void);
- void armpmu_free(struct arm_pmu *pmu);
- int armpmu_register(struct arm_pmu *pmu);
--int armpmu_request_irqs(struct arm_pmu *armpmu);
--void armpmu_free_irqs(struct arm_pmu *armpmu);
- int armpmu_request_irq(struct arm_pmu *armpmu, int cpu);
- void armpmu_free_irq(struct arm_pmu *armpmu, int cpu);
- 
+I've given these a boot-test on a Juno R1 system, both with DT and ACPI.
+In either case the PMU works as expected, and lockdep seems happy.
+
+I've pushed the series out to my arm64/acpi-pmu-lockdep branch [2].
+
+Thanks,
+Mark.
+
+[1] https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=for-next/core
+[2] https://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git/log/?h=arm64/acpi-pmu-lockdep
+
+Mark Rutland (5):
+  arm_pmu: fold platform helpers into platform code
+  arm_pmu: have armpmu_alloc() take GFP flags
+  arm_pmu: acpi: check for mismatched PPIs
+  arm_pmu: note IRQs/PMUs per-cpu
+  arm_pmu: acpi: request IRQs up-front
+
+ drivers/perf/arm_pmu.c          | 107 ++++++++++++++--------------------------
+ drivers/perf/arm_pmu_acpi.c     |  62 ++++++++++++++++-------
+ drivers/perf/arm_pmu_platform.c |  42 +++++++++++++++-
+ include/linux/perf/arm_pmu.h    |  20 +++++---
+ 4 files changed, 137 insertions(+), 94 deletions(-)
+
 -- 
 2.11.0
