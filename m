@@ -1,185 +1,61 @@
-From: damien.riegel@savoirfairelinux.com (Damien Riegel)
-Date: Wed,  1 Nov 2017 13:53:35 -0400
-Subject: [PATCH 4/4] arm64: dts: qcom: msm8916: add bindings for i2c1, i2c3,
- i2c5
-In-Reply-To: <20171101175335.22123-1-damien.riegel@savoirfairelinux.com>
-References: <20171101175335.22123-1-damien.riegel@savoirfairelinux.com>
-Message-ID: <20171101175335.22123-5-damien.riegel@savoirfairelinux.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 1 Nov 2017 17:56:43 +0000
+Subject: [PATCH] arm64: write_sysreg asm illegal for aarch32
+In-Reply-To: <24cdf320-35e3-76f2-6e07-8b5548ac67a0@android.com>
+References: <20171101170014.20931-1-salyzyn@android.com>
+ <35cf2062-f27e-16e6-19b1-cae5200d7081@arm.com>
+ <24cdf320-35e3-76f2-6e07-8b5548ac67a0@android.com>
+Message-ID: <20171101175642.c65f7kngixjndavr@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
----
- arch/arm64/boot/dts/qcom/msm8916-pins.dtsi | 72 ++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/qcom/msm8916.dtsi      | 45 +++++++++++++++++++
- 2 files changed, 117 insertions(+)
+On Wed, Nov 01, 2017 at 10:49:00AM -0700, Mark Salyzyn wrote:
+> On 11/01/2017 10:14 AM, Robin Murphy wrote:
+> > On 01/11/17 16:58, Mark Salyzyn wrote:
+> > > Cross compiling to aarch32 (for vdso32) using clang correctly
+> > > identifies that (the unused) write_sysreg inline asm directive is
+> > > illegal in that architectural context:
+> > > 
+> > > arch/arm64/include/asm/arch_timer.h: error: invalid input constraint 'rZ' in asm
+> > >          write_sysreg(cntkctl, cntkctl_el1);
+> > >          ^
+> > > arch/arm64/include/asm/sysreg.h: note: expanded from macro 'write_sysreg'
+> > >                       : : "rZ" (__val));
+> > >                           ^
+> > > 
+> > > GCC normally checks for correctness everywhere. But uniquely for
+> > > unused asm, will optimize out and suppress the error report.
+> > It sounds more like some paths are wrong in the compat vDSO build if
+> > it's pulling in this header in the first place - nothing in this file is
+> > relevant to AArch32.
+> > 
+> > Robin.
+> > 
+> And yet, when you CROSS_COMPILE_ARM32 a vdso32, you have no choice but to
+> utilize the arm64 headers since they contain all the relevant kernel
+> structures and environment.
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi b/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
-index c67ad8ed8b60..1cec5b30ed6e 100644
---- a/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
-@@ -270,6 +270,30 @@
- 		};
- 	};
- 
-+	i2c1_default: i2c1_default {
-+		pinmux {
-+			function = "blsp_i2c1";
-+			pins = "gpio2", "gpio3";
-+		};
-+		pinconf {
-+			pins = "gpio2", "gpio3";
-+			drive-strength = <16>;
-+			bias-disable;
-+		};
-+	};
-+
-+	i2c1_sleep: i2c1_sleep {
-+		pinmux {
-+			function = "gpio";
-+			pins = "gpio2", "gpio3";
-+		};
-+		pinconf {
-+			pins = "gpio2", "gpio3";
-+			drive-strength = <2>;
-+			bias-disable;
-+		};
-+	};
-+
- 	i2c2_default: i2c2_default {
- 		pinmux {
- 			function = "blsp_i2c2";
-@@ -294,6 +318,30 @@
- 		};
- 	};
- 
-+	i2c3_default: i2c3_default {
-+		pinmux {
-+			function = "blsp_i2c3";
-+			pins = "gpio10", "gpio11";
-+		};
-+		pinconf {
-+			pins = "gpio10", "gpio11";
-+			drive-strength = <16>;
-+			bias-disable;
-+		};
-+	};
-+
-+	i2c3_sleep: i2c3_sleep {
-+		pinmux {
-+			function = "gpio";
-+			pins = "gpio10", "gpio11";
-+		};
-+		pinconf {
-+			pins = "gpio10", "gpio11";
-+			drive-strength = <2>;
-+			bias-disable;
-+		};
-+	};
-+
- 	i2c4_default: i2c4_default {
- 		pinmux {
- 			function = "blsp_i2c4";
-@@ -318,6 +366,30 @@
- 		};
- 	};
- 
-+	i2c5_default: i2c5_default {
-+		pinmux {
-+			function = "blsp_i2c5";
-+			pins = "gpio18", "gpio19";
-+		};
-+		pinconf {
-+			pins = "gpio18", "gpio19";
-+			drive-strength = <16>;
-+			bias-disable;
-+		};
-+	};
-+
-+	i2c5_sleep: i2c5_sleep {
-+		pinmux {
-+			function = "gpio";
-+			pins = "gpio18", "gpio19";
-+		};
-+		pinconf {
-+			pins = "gpio18", "gpio19";
-+			drive-strength = <2>;
-+			bias-disable;
-+		};
-+	};
-+
- 	i2c6_default: i2c6_default {
- 		pinmux {
- 			function = "blsp_i2c6";
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index de25bd6070f5..bdc4cb6f66d4 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -455,6 +455,21 @@
- 			status = "disabled";
- 		};
- 
-+		blsp_i2c1: i2c at 78b5000 {
-+			compatible = "qcom,i2c-qup-v2.2.1";
-+			reg = <0x078b5000 0x600>;
-+			interrupts = <GIC_SPI 95 0>;
-+			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
-+				 <&gcc GCC_BLSP1_QUP1_I2C_APPS_CLK>;
-+			clock-names = "iface", "core";
-+			pinctrl-names = "default", "sleep";
-+			pinctrl-0 = <&i2c1_default>;
-+			pinctrl-1 = <&i2c1_sleep>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
- 		blsp_i2c2: i2c at 78b6000 {
- 			compatible = "qcom,i2c-qup-v2.2.1";
- 			reg = <0x078b6000 0x600>;
-@@ -470,6 +485,21 @@
- 			status = "disabled";
- 		};
- 
-+		blsp_i2c3: i2c at 78b7000 {
-+			compatible = "qcom,i2c-qup-v2.2.1";
-+			reg = <0x078b7000 0x600>;
-+			interrupts = <GIC_SPI 97 0>;
-+			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
-+				 <&gcc GCC_BLSP1_QUP3_I2C_APPS_CLK>;
-+			clock-names = "iface", "core";
-+			pinctrl-names = "default", "sleep";
-+			pinctrl-0 = <&i2c3_default>;
-+			pinctrl-1 = <&i2c3_sleep>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
- 		blsp_i2c4: i2c at 78b8000 {
- 			compatible = "qcom,i2c-qup-v2.2.1";
- 			reg = <0x078b8000 0x600>;
-@@ -485,6 +515,21 @@
- 			status = "disabled";
- 		};
- 
-+		blsp_i2c5: i2c at 78b9000 {
-+			compatible = "qcom,i2c-qup-v2.2.1";
-+			reg = <0x078b9000 0x600>;
-+			interrupts = <GIC_SPI 99 0>;
-+			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
-+				 <&gcc GCC_BLSP1_QUP5_I2C_APPS_CLK>;
-+			clock-names = "iface", "core";
-+			pinctrl-names = "default", "sleep";
-+			pinctrl-0 = <&i2c5_default>;
-+			pinctrl-1 = <&i2c5_sleep>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
- 		blsp_i2c6: i2c at 78ba000 {
- 			compatible = "qcom,i2c-qup-v2.2.1";
- 			reg = <0x078ba000 0x600>;
--- 
-2.15.0
+This itself is the underlying issue.
+
+When building the compat VDSO, we must ensure that we only include
+headers that make sense for 32-bit arm.
+
+If the build system can't do that today, we should rework it so that it
+can. Anything else cannot be a complete fix.
+
+> asm/arch_timer.h (remember we are using arm instructions to access arch64
+> timers)
+> 
+> linux/time.h (really only for struct timespec())
+> 
+> asm/processor.h (eg: cpu_relax())
+> 
+> pull in a _lot_ of architectural related cruft that always somehow picks up
+> asm/sysreg.h somewhere in the multitude of includes to fulfill some unused
+> inline's needs.
+
+... these are just the particular symptoms this problem results in
+today.
+
+Thanks,
+Mark.
