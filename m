@@ -1,29 +1,81 @@
-From: xieyisheng1@huawei.com (Yisheng Xie)
-Date: Wed, 1 Nov 2017 17:46:19 +0800
-Subject: [PATCH] arm64: suspend: remove useless included file
-Message-ID: <1509529579-3467-1-git-send-email-xieyisheng1@huawei.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 1 Nov 2017 09:55:06 +0000
+Subject: [PATCH 02/17] coresight tmc: Hide trace buffer handling for file
+ read
+In-Reply-To: <190b4a4a-6d54-51e5-52d3-2a313fea714d@arm.com>
+References: <20171019171553.24056-1-suzuki.poulose@arm.com>
+ <20171019171553.24056-3-suzuki.poulose@arm.com>
+ <190b4a4a-6d54-51e5-52d3-2a313fea714d@arm.com>
+Message-ID: <e667552a-c763-dac1-cd49-6e973df765a6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After commit 9e8e865bbe29 ("arm64: unify idmap removal"), we no need to
-flush tlb in suspend.c, so the included file tlbflush.h can be removed.
+On 20/10/17 13:34, Julien Thierry wrote:
+> Hi Suzuki,
+> 
+> On 19/10/17 18:15, Suzuki K Poulose wrote:
+>> At the moment we adjust the buffer pointers for reading the trace
+>> data via misc device in the common code for ETF/ETB and ETR. Since
+>> we are going to change how we manage the buffer for ETR, let us
+>> move the buffer manipulation to the respective driver files, hiding
+>> it from the common code. We do so by adding type specific helpers
+>> for finding the length of data and the pointer to the buffer,
+>> for a given length at a file position.
+>>
+>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>> ? drivers/hwtracing/coresight/coresight-tmc-etf.c | 16 ++++++++++++
+>> ? drivers/hwtracing/coresight/coresight-tmc-etr.c | 33 ++++++++++++++++++++++++
+>> ? drivers/hwtracing/coresight/coresight-tmc.c???? | 34 ++++++++++++++-----------
+>> ? drivers/hwtracing/coresight/coresight-tmc.h???? |? 4 +++
+>> ? 4 files changed, 72 insertions(+), 15 deletions(-)
+>>
+>> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+>> index e2513b786242..0b6f1eb746de 100644
+>> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
+>> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+>> @@ -120,6 +120,22 @@ static void tmc_etf_disable_hw(struct tmc_drvdata *drvdata)
+>> ????? CS_LOCK(drvdata->base);
+>> ? }
+>> +/*
+>> + * Return the available trace data in the buffer from @pos, with
+>> + * a maximum limit of @len, updating the @bufpp on where to
+>> + * find it.
+>> + */
+>> +ssize_t tmc_etb_get_sysfs_trace(struct tmc_drvdata *drvdata,
+>> +????????????????? loff_t pos, size_t len, char **bufpp)
+>> +{
+>> +??? /* Adjust the len to available size @pos */
+>> +??? if (pos + len > drvdata->len)
+>> +??????? len = drvdata->len - pos;
+>> +??? if (len > 0)
+> 
+> Do we have some guarantee that "pos <= drvdata->len"? because since len is unsigned this check only covers the case were len is 0.
+> 
+> Maybe it would be better to use a signed variable to store the result of the difference.
+> 
+>> +??????? *bufpp = drvdata->buf + pos;
 
-Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
----
- arch/arm64/kernel/suspend.c | 1 -
- 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
-index 1e3be90..5794326 100644
---- a/arch/arm64/kernel/suspend.c
-+++ b/arch/arm64/kernel/suspend.c
-@@ -11,7 +11,6 @@
- #include <asm/mmu_context.h>
- #include <asm/smp_plat.h>
- #include <asm/suspend.h>
--#include <asm/tlbflush.h>
- 
- /*
-  * This is allocated by cpu_suspend_init(), and used to store a pointer to
--- 
-1.7.12.4
+>> + * Return the available trace data in the buffer @pos, with a maximum
+>> + * limit of @len, also updating the @bufpp on where to find it.
+>> + */
+>> +ssize_t tmc_etr_get_sysfs_trace(struct tmc_drvdata *drvdata,
+>> +??????????????? loff_t pos, size_t len, char **bufpp)
+>> +{
+>> +??? char *bufp = drvdata->buf + pos;
+>> +??? char *bufend = (char *)(drvdata->vaddr + drvdata->size);
+>> +
+>> +??? /* Adjust the len to available size @pos */
+>> +??? if (pos + len > drvdata->len)
+>> +??????? len = drvdata->len - pos;
+>> +
+>> +??? if (len <= 0)
+>> +??????? return len;
+> 
+> Similar issue here.
+
+Thanks for spotting. I will fix it.
+
+Cheers
