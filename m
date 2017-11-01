@@ -1,81 +1,21 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Wed, 1 Nov 2017 05:55:50 +0100
-Subject: [PATCH v4 20/21] KVM: arm64: Take any host SError before
- entering the guest
-In-Reply-To: <59F861EE.4010505@arm.com>
-References: <20171019145807.23251-1-james.morse@arm.com>
- <20171019145807.23251-21-james.morse@arm.com>
- <20171031062315.GY2166@lvm> <59F861EE.4010505@arm.com>
-Message-ID: <20171101045550.GB11166@lvm>
+From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
+Date: Wed, 1 Nov 2017 06:55:38 +0100 (CET)
+Subject: [PATCH 1/4] pinctrl: gemini: Add missing functions
+In-Reply-To: <20171028133719.27528-1-linus.walleij@linaro.org>
+References: <20171028133719.27528-1-linus.walleij@linaro.org>
+Message-ID: <alpine.LNX.2.00.1711010655140.4454@T420s>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 31, 2017 at 11:43:42AM +0000, James Morse wrote:
-> Hi Christoffer,
-> 
-> On 31/10/17 06:23, Christoffer Dall wrote:
-> > On Thu, Oct 19, 2017 at 03:58:06PM +0100, James Morse wrote:
-> >> On VHE systems KVM masks SError before switching the VBAR value. Any
-> >> host RAS error that the CPU knew about before world-switch may become
-> >> pending as an SError during world-switch, and only be taken once we enter
-> >> the guest.
-> >>
-> >> Until KVM can take RAS SErrors during world switch, add an ESB to
-> >> force any RAS errors to be synchronised and taken on the host before
-> >> we enter world switch.
-> >>
-> >> RAS errors that become pending during world switch are still taken
-> >> once we enter the guest.
-> 
-> >> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> >> index cf5d78ba14b5..5dc6f2877762 100644
-> >> --- a/arch/arm64/include/asm/kvm_host.h
-> >> +++ b/arch/arm64/include/asm/kvm_host.h
-> >> @@ -392,6 +392,7 @@ static inline void __cpu_init_stage2(void)
-> >>  
-> >>  static inline void kvm_arm_vhe_guest_enter(void)
-> >>  {
-> >> +	esb();
-> 
-> > I don't fully appreciate what the point of this is?
-> > 
-> > As I understand it, our fundamental goal here is to try to distinguish
-> > between errors happening on the host or in the guest.
-> 
-> Not just host/guest, but also those we can and can't handle.
-> 
-> KVM can't currently take an SError during world switch, so a RAS error that the
-> CPU was hoping to defer may spread from the host into KVM's
-> no-SError:world-switch code. If this happens it will (almost certainly) have to
-> be re-classified as uncontainable.
-> 
-> There is also a firmware-first angle here: NOTIFY_SEI can't be delivered if the
-> normal world has SError masked, so any error that spreads past this point
-> becomes a reboot-by-firmware instead of an OS notification and almost-helpful
-> error message.
-> 
-> 
-> > If that's correct, then why don't we do it at the last possible moment
-> > when we still have a scratch register left, in the world switch code
-> > itself, and in the case abort the guest entry and report back a "host
-> > SError" return code.
-> 
-> We have IESB to run the error-barrier as we enter the guest. This would make any
-> host error pending as an SError, and we would exit the guest immediately. But if
-> there was an RAS error during world switch, by this point its likely to be
-> classified as uncontainable.
-> 
-> This esb() is trying to keep this window of code as small as possible, to just
-> errors that occur during world switch.
-> 
-> With your vcpu load/save this window becomes a lot smaller, it may be possible
-> to get a VHE-host's arch-code SError handler to take errors from EL2, in which
-> case this barrier can disappear.
-> (note to self: guest may still own the debug hardware)
-> 
+Hi Linus
 
-ok, thanks for your detailed explanation.  I didn't consider that the
-classification of a RAS error as containable vs. non-containable
-depended on where we take the exception.
+On Sat, 28 Oct 2017, Linus Walleij wrote:
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Some two functions were missing from the Gemini pin control
+> driver. Noticed when trying to use ethernet. Fix it up by
+> adding them.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+
+Acked-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
