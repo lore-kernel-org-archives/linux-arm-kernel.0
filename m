@@ -1,78 +1,68 @@
-From: gnomes@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Wed, 1 Nov 2017 17:53:25 +0000
-Subject: [RFC] Improving udelay/ndelay on platforms where that is possible
-In-Reply-To: <d3f42f35-8175-58f6-78b7-3331efe64da2@sigmadesigns.com>
-References: <d3f42f35-8175-58f6-78b7-3331efe64da2@sigmadesigns.com>
-Message-ID: <20171101175325.2557ce85@alans-desktop>
+From: damien.riegel@savoirfairelinux.com (Damien Riegel)
+Date: Wed,  1 Nov 2017 13:53:34 -0400
+Subject: [PATCH 3/4] arm64: dts: qcom: msm8916: normalize I2C bindings
+In-Reply-To: <20171101175335.22123-1-damien.riegel@savoirfairelinux.com>
+References: <20171101175335.22123-1-damien.riegel@savoirfairelinux.com>
+Message-ID: <20171101175335.22123-4-damien.riegel@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 31 Oct 2017 17:15:34 +0100
-> Therefore, users are accustomed to having delays be longer (within a reasonable margin).
-> However, very few users would expect delays to be *shorter* than requested.
+The QUP core can be used either for I2C or SPI, so the same IP is mapped
+by a driver or the other. SPI bindings use a leading 0 for the start
+address and a size of 0x600, I2C bindings don't have the leading 0 and
+have a size 0x1000.
 
-If your udelay can be under by 10% then just bump the number by 10%.
-However at that level most hardware isn't that predictable anyway because
-the fabric between the CPU core and the device isn't some clunky
-serialized link. Writes get delayed, they can bunch together, busses do
-posting and queueing.
+To make them more similar, add the leading 0 to I2C bindings and changes
+the size to 0x600, as the driver only accesses registers up to address
+0x408. Also align the second entry of the clocks array.
 
-Then there is virtualisation 8)
+Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
+---
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-> A typical driver writer has some HW spec in front of them, which e.g. states:
-> 
-> * poke register A
-> * wait 1 microsecond for the dust to settle
-> * poke register B
-
-Rarely because of posting. It's usually
-
-	write
-	while(read() != READY);
-	write
-
-and even when you've got a legacy device with timeouts its
-
-	write
-	read
-	delay
-	write
-
-and for sub 1ms delays I suspect the read and bus latency actually add a
-randomization sufficient that it's not much of an optimization to worry
-about an accurate ndelay().
-
-> This "off-by-one" error is systematic over the entire range of allowed
-> delay_us input (1 to 2000), so it is easy to fix, by adding 1 to the result.
-
-And that + 1 might be worth adding but really there isn't a lot of
-modern hardware that haas a bus that behaves like software folks imagine
-and everything has percentage errors factored into published numbers.
-
-> 3) Why does all this even matter?
-> 
-> At boot, the NAND framework scans the NAND chips for bad blocks;
-> this operation generates approximately 10^5 calls to ndelay(100);
-> which cause a 100 ms delay, because ndelay is implemented as a
-> call to the nearest udelay (rounded up).
-
-So why aren't you doing that on both NANDs in parallel and asynchronous
-to other parts of boot ? If you start scanning at early boot time do you
-need the bad block list before mounting / - or are you stuck with a
-single threaded CPU and PIO ?
-
-For that matter given the bad blocks don't randomly change why not cache
-them ?
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index e16ba8334518..de25bd6070f5 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -457,10 +457,10 @@
  
-> My current NAND chips are tiny (2 x 512 MB) but with larger chips,
-> the number of calls to ndelay would climb to 10^6 and the delay
-> increase to 1 second, with is starting to be a problem.
-> 
-> One solution is to implement ndelay, but ndelay is more prone to
-> under-delays, and thus a prerequisite is fixing under-delays.
-
-For ndelay you probably have to make it platform specific or just use
-udelay if not. We do have a few cases we wanted 400ns delays in the PC
-world (ATA) but not many.
-
-Akab
+ 		blsp_i2c2: i2c at 78b6000 {
+ 			compatible = "qcom,i2c-qup-v2.2.1";
+-			reg = <0x78b6000 0x1000>;
++			reg = <0x078b6000 0x600>;
+ 			interrupts = <GIC_SPI 96 0>;
+ 			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
+-				<&gcc GCC_BLSP1_QUP2_I2C_APPS_CLK>;
++				 <&gcc GCC_BLSP1_QUP2_I2C_APPS_CLK>;
+ 			clock-names = "iface", "core";
+ 			pinctrl-names = "default", "sleep";
+ 			pinctrl-0 = <&i2c2_default>;
+@@ -472,10 +472,10 @@
+ 
+ 		blsp_i2c4: i2c at 78b8000 {
+ 			compatible = "qcom,i2c-qup-v2.2.1";
+-			reg = <0x78b8000 0x1000>;
++			reg = <0x078b8000 0x600>;
+ 			interrupts = <GIC_SPI 98 0>;
+ 			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
+-				<&gcc GCC_BLSP1_QUP4_I2C_APPS_CLK>;
++				 <&gcc GCC_BLSP1_QUP4_I2C_APPS_CLK>;
+ 			clock-names = "iface", "core";
+ 			pinctrl-names = "default", "sleep";
+ 			pinctrl-0 = <&i2c4_default>;
+@@ -487,10 +487,10 @@
+ 
+ 		blsp_i2c6: i2c at 78ba000 {
+ 			compatible = "qcom,i2c-qup-v2.2.1";
+-			reg = <0x78ba000 0x1000>;
++			reg = <0x078ba000 0x600>;
+ 			interrupts = <GIC_SPI 100 0>;
+ 			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
+-				<&gcc GCC_BLSP1_QUP6_I2C_APPS_CLK>;
++				 <&gcc GCC_BLSP1_QUP6_I2C_APPS_CLK>;
+ 			clock-names = "iface", "core";
+ 			pinctrl-names = "default", "sleep";
+ 			pinctrl-0 = <&i2c6_default>;
+-- 
+2.15.0
