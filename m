@@ -1,57 +1,27 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 1 Nov 2017 14:16:33 +0000
-Subject: [PATCH v1 1/3] arm64: add a macro for SError synchronization
-In-Reply-To: <d7b8b779-9e00-8e8f-b44e-48e3d7e37058@huawei.com>
-References: <1509563697-6359-1-git-send-email-gengdongjiu@huawei.com>
- <1509563697-6359-2-git-send-email-gengdongjiu@huawei.com>
- <6dc82768-8564-a54e-041b-3b9965fa038b@arm.com>
- <d7b8b779-9e00-8e8f-b44e-48e3d7e37058@huawei.com>
-Message-ID: <20171101141603.4ppgwup4grnmcswe@lakrids.cambridge.arm.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Wed, 1 Nov 2017 07:30:47 -0700
+Subject: [PATCH] ata: fixes kernel crash while tracing
+ ata_eh_link_autopsy event
+In-Reply-To: <CAFd313w9W2hHFPJ47y0jeNb1u7=0deLtwcRF=+HXGBYft-QaLw@mail.gmail.com>
+References: <1508926976-11467-1-git-send-email-rsahu@apm.com>
+ <20171025145450.GA59538@devbig577.frc2.facebook.com>
+ <CAFd313w9W2hHFPJ47y0jeNb1u7=0deLtwcRF=+HXGBYft-QaLw@mail.gmail.com>
+Message-ID: <20171101143031.GL3252168@devbig577.frc2.facebook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 01, 2017 at 08:54:44PM +0800, gengdongjiu wrote:
-> On 2017/11/1 19:24, Robin Murphy wrote:
-> >> +	esb
-> >> +alternative_else_nop_endif
-> >> +1:
-> >> +	.endm
-> > Having a branch in here is pretty horrible, and furthermore using label
-> > number 1 has a pretty high chance of subtly breaking code where this
-> > macro is inserted.
-> > 
-> > Can we not somehow nest or combine the alternative conditions here?
+Hello,
+
+On Tue, Oct 31, 2017 at 08:52:44PM +0530, Rameshwar Sahu wrote:
+> > probably should take both link and dev and use dev iff it's not NULL.
+> >
 > 
-> I found it will report error if combine the alternative conditions here.
-> 
-> For example:
-> 
-> +	.macro	error_synchronize
-> +alternative_if ARM64_HAS_IESB
-> +alternative_if ARM64_HAS_RAS_EXTN
-> +	esb
-> +alternative_else_nop_endif
-> +alternative_else_nop_endif
-> +	.endm
-> 
-> And even using b.eq/cbz instruction in the alternative instruction in arch/arm64/kernel/entry.S,
-> it will report Error.
+> Instead of this would it be better to call trace_ata_eh_link_autopsy() if
+> dev is not NULL from ata error handler ??
 
-Alternatives cannot be nested. You need to define a cap like:
+Oh yeah, that'd work too and be probably better.
 
-  ARM64_HAS_RAS_NOT_IESB
+Thanks.
 
-... which is set when ARM64_HAS_RAS_EXTN && !ARM64_HAS_IESB.
-
-Then you can do:
-
-alternative_if ARM64_HAS_RAS_NOT_IESB
-	esb
-alternative_else_nop_endif
-
-See ARM64_ALT_PAN_NOT_UAO for an example.
-
-That said, as Robin points out we may not even need the alternative.
-
-Thanks,
-Mark.
+-- 
+tejun
