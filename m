@@ -1,52 +1,95 @@
-From: gengdongjiu@huawei.com (Dongjiu Geng)
-Date: Thu, 2 Nov 2017 03:14:56 +0800
-Subject: [PATCH v1 2/3] arm64: add error synchronization barrier in
- kernel_entry/kernel_exit
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 1 Nov 2017 11:21:22 +0000
+Subject: [PATCH v1 0/3] manually add Error Synchronization Barrier at
+ exception handler entry and exit
 In-Reply-To: <1509563697-6359-1-git-send-email-gengdongjiu@huawei.com>
 References: <1509563697-6359-1-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <1509563697-6359-3-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <7f8a9f5f-0474-c1ed-5904-3839b9073d97@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If taking an exception from or return to user space, insert
-a Error Synchronization Barrier(ESB) to isolate the error.
+On 01/11/17 19:14, Dongjiu Geng wrote:
+> Some hardware platform can support RAS Extension, but not support IESB,
+> such as Huawei's platform, so software need to insert Synchronization Barrier
+> operations at exception handler entry.
+> 
+> This series patches are based on  James's series patches "SError rework +
+> RAS&IESB for firmware first support". In Huawei's platform, we do not
+> support IESB, so software needs to insert that.
+> 
+> 
+> Dongjiu Geng (3):
+>   arm64: add a macro for SError synchronization
+>   arm64: add error synchronization barrier in kernel_entry/kernel_exit
+>   KVM: arm64: add ESB in exception handler entry and exit.
+> 
+> James Morse (18):
+>   arm64: explicitly mask all exceptions
+>   arm64: introduce an order for exceptions
+>   arm64: Move the async/fiq helpers to explicitly set process context
+>     flags
+>   arm64: Mask all exceptions during kernel_exit
+>   arm64: entry.S: Remove disable_dbg
+>   arm64: entry.S: convert el1_sync
+>   arm64: entry.S convert el0_sync
+>   arm64: entry.S: convert elX_irq
+>   KVM: arm/arm64: mask/unmask daif around VHE guests
+>   arm64: kernel: Survive corrected RAS errors notified by SError
+>   arm64: cpufeature: Enable IESB on exception entry/return for
+>     firmware-first
+>   arm64: kernel: Prepare for a DISR user
+>   KVM: arm64: Set an impdef ESR for Virtual-SError using VSESR_EL2.
+>   KVM: arm64: Save/Restore guest DISR_EL1
+>   KVM: arm64: Save ESR_EL2 on guest SError
+>   KVM: arm64: Handle RAS SErrors from EL1 on guest exit
+>   KVM: arm64: Handle RAS SErrors from EL2 on guest exit
+>   KVM: arm64: Take any host SError before entering the guest
+> 
+> Xie XiuQi (2):
+>   arm64: entry.S: move SError handling into a C function for future
+>     expansion
+>   arm64: cpufeature: Detect CPU RAS Extentions
+> 
+>  arch/arm64/Kconfig                   | 33 +++++++++++++-
+>  arch/arm64/include/asm/assembler.h   | 59 +++++++++++++++++-------
+>  arch/arm64/include/asm/barrier.h     |  1 +
+>  arch/arm64/include/asm/cpucaps.h     |  4 +-
+>  arch/arm64/include/asm/daifflags.h   | 61 +++++++++++++++++++++++++
+>  arch/arm64/include/asm/esr.h         | 17 +++++++
+>  arch/arm64/include/asm/exception.h   | 14 ++++++
+>  arch/arm64/include/asm/irqflags.h    | 40 ++++++----------
+>  arch/arm64/include/asm/kvm_emulate.h | 10 ++++
+>  arch/arm64/include/asm/kvm_host.h    | 16 +++++++
+>  arch/arm64/include/asm/processor.h   |  2 +
+>  arch/arm64/include/asm/sysreg.h      |  6 +++
+>  arch/arm64/include/asm/traps.h       | 36 +++++++++++++++
+>  arch/arm64/kernel/asm-offsets.c      |  1 +
+>  arch/arm64/kernel/cpufeature.c       | 43 ++++++++++++++++++
+>  arch/arm64/kernel/debug-monitors.c   |  5 +-
+>  arch/arm64/kernel/entry.S            | 88 +++++++++++++++++++++---------------
+>  arch/arm64/kernel/hibernate.c        |  5 +-
+>  arch/arm64/kernel/machine_kexec.c    |  4 +-
+>  arch/arm64/kernel/process.c          |  3 ++
+>  arch/arm64/kernel/setup.c            |  8 ++--
+>  arch/arm64/kernel/signal.c           |  8 +++-
+>  arch/arm64/kernel/smp.c              | 12 ++---
+>  arch/arm64/kernel/suspend.c          |  7 +--
+>  arch/arm64/kernel/traps.c            | 64 +++++++++++++++++++++++++-
+>  arch/arm64/kvm/handle_exit.c         | 19 +++++++-
+>  arch/arm64/kvm/hyp-init.S            |  3 ++
+>  arch/arm64/kvm/hyp/entry.S           | 15 ++++++
+>  arch/arm64/kvm/hyp/hyp-entry.S       |  1 +
+>  arch/arm64/kvm/hyp/switch.c          | 19 ++++++--
+>  arch/arm64/kvm/hyp/sysreg-sr.c       |  6 +++
+>  arch/arm64/kvm/inject_fault.c        | 13 +++++-
+>  arch/arm64/kvm/sys_regs.c            |  1 +
+>  arch/arm64/mm/proc.S                 | 14 ++++--
+>  virt/kvm/arm/arm.c                   |  4 ++
+>  35 files changed, 527 insertions(+), 115 deletions(-)
+>  create mode 100644 arch/arm64/include/asm/daifflags.h
 
-If a user space process is pending a SError, when enter to
-kernel, the SError will be immediately synchronized in the
-handler entry. Otherwise if kernel space is pending a SError,
-before return to user space, the SError will be synchronized
-in the handler exit.
+If you're sending a patch series, please have the cover letter describe
+*those patches*, rather than dozens of other patches that aren't part of
+it. This diffstat and summary is very confusing.
 
-In order to reduce impact on performance, not check the DISR_EL1
-to see whether an SError is consumed by an ESB instruction.
-This is because DISR_EL1 is RAZ/WI in firmware-first RAS
-solution, if happen SError, it will immediately trap to EL3
-firmware.
-
-Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
----
- arch/arm64/kernel/entry.S | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index e147c1d..6dde644 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -138,6 +138,7 @@
- 	stp	x28, x29, [sp, #16 * 14]
- 
- 	.if	\el == 0
-+	error_synchronize
- 	mrs	x21, sp_el0
- 	ldr_this_cpu	tsk, __entry_task, x20	// Ensure MDSCR_EL1.SS is clear,
- 	ldr	x19, [tsk, #TSK_TI_FLAGS]	// since we can unmask debug
-@@ -281,6 +282,7 @@ alternative_if ARM64_WORKAROUND_845719
- 1:
- alternative_else_nop_endif
- #endif
-+	error_synchronize
- 	.endif
- 
- 	msr	elr_el1, x21			// set up the return data
--- 
-1.9.1
+Robin.
