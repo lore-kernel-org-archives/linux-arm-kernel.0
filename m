@@ -1,139 +1,292 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 1 Nov 2017 16:29:56 -0700
-Subject: [RFC PATCH 0/2] arm64: optional paranoid __{get,put}_user checks
-In-Reply-To: <57fa4bef-9540-6fb1-b2a7-5bf8b01c748a@redhat.com>
-References: <20171026090942.7041-1-mark.rutland@arm.com>
- <77c80381-cf68-aa1a-9112-e057c068eeb6@redhat.com>
- <20171101120555.yvb65g3wgtxskfh3@lakrids.cambridge.arm.com>
- <0f2d5f89-2939-06ec-9b59-b19f828d8968@redhat.com>
- <CAGXu5j+eb+41XRorgAVURKEsixiMYgtcmpKwQzJ3Mct_yw1G6Q@mail.gmail.com>
- <57fa4bef-9540-6fb1-b2a7-5bf8b01c748a@redhat.com>
-Message-ID: <CAGXu5jLhU7si5d3=e5ixhh67fY+6ZGJQBnLxQLMFfcZsB8GJvg@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 1 Nov 2017 17:47:17 -0600
+Subject: [PATCH 06/17] coresight: tmc: Make ETR SG table circular
+In-Reply-To: <20171019171553.24056-7-suzuki.poulose@arm.com>
+References: <20171019171553.24056-1-suzuki.poulose@arm.com>
+ <20171019171553.24056-7-suzuki.poulose@arm.com>
+Message-ID: <20171101234717.GA16611@xps15>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 1, 2017 at 4:05 PM, Laura Abbott <labbott@redhat.com> wrote:
-> On 11/01/2017 03:28 PM, Kees Cook wrote:
->> On Wed, Nov 1, 2017 at 2:13 PM, Laura Abbott <labbott@redhat.com> wrote:
->>> On 11/01/2017 05:05 AM, Mark Rutland wrote:
->>>> On Tue, Oct 31, 2017 at 04:56:39PM -0700, Laura Abbott wrote:
->>>>> On 10/26/2017 02:09 AM, Mark Rutland wrote:
->>>>>> In Prague, Kees mentioned that it would be nice to have a mechanism to
->>>>>> catch bad __{get,put}_user uses, such as the recent CVE-2017-5123 [1,2]
->>>>>> issue with unsafe_put_user() in waitid().
->>>>>>
->>>>>> These patches allow an optional access_ok() check to be dropped in
->>>>>> arm64's __{get,put}_user() primitives. These will then BUG() if a bad
->>>>>> user pointer is passed (which should only happen in the absence of an
->>>>>> earlier access_ok() check).
->>>>
->>>>> Turning on the option fails as soon as we hit userspace. On my buildroot
->>>>> based environment I get the help text for ld.so (????) and then a message
->>>>> about attempting to kill init.
->>>>
->>>> Ouch. Thanks for the report, and sorry about this.
->>>>
->>>> The problem is that I evaluate the ptr argument twice in
->>>> __{get,put}_user(), and this may have side effects.
->>>>
->>>> e.g. when the ELF loader does things like:
->>>>
->>>>   __put_user((elf_addr_t)p, sp++)
->>>>
->>>> ... we increment sp twice, and write to the wrong user address, leaving
->>>> sp corrupt.
->>>>
->>>> I have an additional patch [1] to fix this, which is in my
->>>> arm64/access-ok branch [2].
->>>>
->>>> Thanks,
->>>> Mark.
->>>>
->>>> [1] https://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git/commit/?h=arm64/access-ok&id=ebb7ff83eb53b8810395d5cf48712a4ae6d678543
->>>> [2] https://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git/log/?h=arm64/access-ok
->>>>
->>>
->>> Thanks, the updated patch works. I wrote an LKDTM test to verify
->>> the expected behavior (__{get,put}_user panic whereas {get,put}_user
->>> do not). You're welcome to add Tested-by or I can wait for v2.
->>
->> Nice. :) Out of curiosity, can you check if this correctly BUG()s on a
->> waitid() call when the fixes are reverted?
->>
->> 96ca579a1ecc ("waitid(): Avoid unbalanced user_access_end() on
->> access_ok() error")
->> 1c9fec470b81 ("waitid(): Add missing access_ok() checks")
->>
->> -Kees
->>
->
-> Yep, we get a nice bug:
->
-> [   34.783912] ------------[ cut here ]------------
-> [   34.784484] kernel BUG at kernel/exit.c:1614!
+On Thu, Oct 19, 2017 at 06:15:42PM +0100, Suzuki K Poulose wrote:
+> Make the ETR SG table Circular buffer so that we could start
+> at any of the SG pages and use the entire buffer for tracing.
+> This can be achieved by :
+> 
+> 1) Keeping an additional LINK pointer at the very end of the
+> SG table, i.e, after the LAST buffer entry, to point back to
+> the beginning of the first table. This will allow us to use
+> the buffer normally when we start the trace at offset 0 of
+> the buffer, as the LAST buffer entry hints the TMC-ETR and
+> it automatically wraps to the offset 0.
+> 
+> 2) If we want to start at any other ETR SG page aligned offset,
+> we could :
+>  a) Make the preceding page entry as LAST entry.
+>  b) Make the original LAST entry a normal entry.
+>  c) Use the table pointer to the "new" start offset as the
+>     base of the table address.
+> This works as the TMC doesn't mandate that the page table
+> base address should be 4K page aligned.
+> 
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  drivers/hwtracing/coresight/coresight-tmc-etr.c | 159 +++++++++++++++++++++---
+>  1 file changed, 139 insertions(+), 20 deletions(-)
+> 
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> index 4424eb67a54c..c171b244e12a 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> @@ -71,36 +71,41 @@ typedef u32 sgte_t;
+>   * @sg_table:		Generic SG Table holding the data/table pages.
+>   * @hwaddr:		hwaddress used by the TMC, which is the base
+>   *			address of the table.
+> + * @nr_entries:		Total number of pointers in the table.
+> + * @first_entry:	Index to the current "start" of the buffer.
+> + * @last_entry:		Index to the last entry of the buffer.
+>   */
+>  struct etr_sg_table {
+>  	struct tmc_sg_table	*sg_table;
+>  	dma_addr_t		hwaddr;
+> +	u32			nr_entries;
+> +	u32			first_entry;
+> +	u32			last_entry;
+>  };
+>  
+>  /*
+>   * tmc_etr_sg_table_entries: Total number of table entries required to map
+>   * @nr_pages system pages.
+>   *
+> - * We need to map @nr_pages * ETR_SG_PAGES_PER_SYSPAGE data pages.
+> + * We need to map @nr_pages * ETR_SG_PAGES_PER_SYSPAGE data pages and
+> + * an additional Link pointer for making it a Circular buffer.
+>   * Each TMC page can map (ETR_SG_PTRS_PER_PAGE - 1) buffer pointers,
+>   * with the last entry pointing to the page containing the table
+> - * entries. If we spill over to a new page for mapping 1 entry,
+> - * we could as well replace the link entry of the previous page
+> - * with the last entry.
+> + * entries. If we fill the last table in full with the pointers, (i.e,
+> + * nr_sgpages % (ETR_SG_PTRS_PER_PAGE - 1) == 0, we don't have to allocate
+> + * another table and hence skip the Link pointer. Also we could use the
+> + * link entry of the last page to make it circular.
+>   */
+>  static inline unsigned long __attribute_const__
+>  tmc_etr_sg_table_entries(int nr_pages)
+>  {
+>  	unsigned long nr_sgpages = nr_pages * ETR_SG_PAGES_PER_SYSPAGE;
+>  	unsigned long nr_sglinks = nr_sgpages / (ETR_SG_PTRS_PER_PAGE - 1);
+> -	/*
+> -	 * If we spill over to a new page for 1 entry, we could as well
+> -	 * make it the LAST entry in the previous page, skipping the Link
+> -	 * address.
+> -	 */
+> -	if (nr_sglinks && (nr_sgpages % (ETR_SG_PTRS_PER_PAGE - 1) < 2))
+> +
+> +	if (nr_sglinks && !(nr_sgpages % (ETR_SG_PTRS_PER_PAGE - 1)))
+>  		nr_sglinks--;
+> -	return nr_sgpages + nr_sglinks;
+> +	/* Add an entry for the circular link */
+> +	return nr_sgpages + nr_sglinks + 1;
+>  }
+>  
+>  /*
+> @@ -417,14 +422,21 @@ tmc_sg_daddr_to_vaddr(struct tmc_sg_table *sg_table,
+>  /* Dump the given sg_table */
+>  static void tmc_etr_sg_table_dump(struct etr_sg_table *etr_table)
+>  {
+> -	sgte_t *ptr;
+> +	sgte_t *ptr, *start;
+>  	int i = 0;
+>  	dma_addr_t addr;
+>  	struct tmc_sg_table *sg_table = etr_table->sg_table;
+>  
+> -	ptr = (sgte_t *)tmc_sg_daddr_to_vaddr(sg_table,
+> +	start = (sgte_t *)tmc_sg_daddr_to_vaddr(sg_table,
+>  					      etr_table->hwaddr, true);
+> -	while (ptr) {
+> +	if (!start) {
+> +		pr_debug("ERROR: Failed to translate table base: 0x%llx\n",
+> +					 etr_table->hwaddr);
+> +		return;
+> +	}
+> +
+> +	ptr = start;
+> +	do {
+>  		addr = ETR_SG_ADDR(*ptr);
+>  		switch (ETR_SG_ET(*ptr)) {
+>  		case ETR_SG_ET_NORMAL:
+> @@ -436,14 +448,17 @@ static void tmc_etr_sg_table_dump(struct etr_sg_table *etr_table)
+>  				 i, ptr, addr);
+>  			ptr = (sgte_t *)tmc_sg_daddr_to_vaddr(sg_table,
+>  							      addr, true);
+> +			if (!ptr)
+> +				pr_debug("ERROR: Bad Link 0x%llx\n", addr);
+>  			break;
+>  		case ETR_SG_ET_LAST:
+>  			pr_debug("%05d: ### %p\t:[L] 0x%llx ###\n",
+>  				 i, ptr, addr);
+> -			return;
+> +			ptr++;
+> +			break;
+>  		}
+>  		i++;
+> -	}
+> +	} while (ptr && ptr != start);
+>  	pr_debug("******* End of Table *****\n");
+>  }
+>  #endif
+> @@ -458,7 +473,7 @@ static void tmc_etr_sg_table_dump(struct etr_sg_table *etr_table)
+>  static void tmc_etr_sg_table_populate(struct etr_sg_table *etr_table)
+>  {
+>  	dma_addr_t paddr;
+> -	int i, type, nr_entries;
+> +	int i, type;
+>  	int tpidx = 0; /* index to the current system table_page */
+>  	int sgtidx = 0;	/* index to the sg_table within the current syspage */
+>  	int sgtoffset = 0; /* offset to the next entry within the sg_table */
+> @@ -469,16 +484,16 @@ static void tmc_etr_sg_table_populate(struct etr_sg_table *etr_table)
+>  	dma_addr_t *table_daddrs = sg_table->table_pages.daddrs;
+>  	dma_addr_t *data_daddrs = sg_table->data_pages.daddrs;
+>  
+> -	nr_entries = tmc_etr_sg_table_entries(sg_table->data_pages.nr_pages);
+>  	/*
+>  	 * Use the contiguous virtual address of the table to update entries.
+>  	 */
+>  	ptr = sg_table->table_vaddr;
+>  	/*
+> -	 * Fill all the entries, except the last entry to avoid special
+> +	 * Fill all the entries, except the last two entries (i.e, the last
+> +	 * buffer and the circular link back to the base) to avoid special
+>  	 * checks within the loop.
+>  	 */
+> -	for (i = 0; i < nr_entries - 1; i++) {
+> +	for (i = 0; i < etr_table->nr_entries - 2; i++) {
+>  		if (sgtoffset == ETR_SG_PTRS_PER_PAGE - 1) {
+>  			/*
+>  			 * Last entry in a sg_table page is a link address to
+> @@ -519,6 +534,107 @@ static void tmc_etr_sg_table_populate(struct etr_sg_table *etr_table)
+>  	/* Set up the last entry, which is always a data pointer */
+>  	paddr = data_daddrs[dpidx] + spidx * ETR_SG_PAGE_SIZE;
+>  	*ptr++ = ETR_SG_ENTRY(paddr, ETR_SG_ET_LAST);
+> +	/* followed by a circular link, back to the start of the table */
+> +	*ptr++ = ETR_SG_ENTRY(sg_table->table_daddr, ETR_SG_ET_LINK);
+> +}
+> +
+> +/*
+> + * tmc_etr_sg_offset_to_table_index : Translate a given data @offset
+> + * to the index of the page table "entry". Data pointers always have
+> + * a fixed location, with ETR_SG_PTRS_PER_PAGE - 1 entries in an
+> + * ETR_SG_PAGE and 1 link entry per (ETR_SG_PTRS_PER_PAGE -1) entries.
+> + */
+> +static inline u32
+> +tmc_etr_sg_offset_to_table_index(u64 offset)
+> +{
+> +	u64 sgpage_idx = offset >> ETR_SG_PAGE_SHIFT;
+> +
+> +	return sgpage_idx + sgpage_idx / (ETR_SG_PTRS_PER_PAGE - 1);
+> +}
+> +
+> +/*
+> + * tmc_etr_sg_update_type: Update the type of a given entry in the
+> + * table to the requested entry. This is only used for data buffers
+> + * to toggle the "NORMAL" vs "LAST" buffer entries.
+> + */
+> +static inline void tmc_etr_sg_update_type(sgte_t *entry, u32 type)
+> +{
+> +	WARN_ON(ETR_SG_ET(*entry) == ETR_SG_ET_LINK);
+> +	WARN_ON(!ETR_SG_ET(*entry));
+> +	*entry &= ~ETR_SG_ET_MASK;
+> +	*entry |= type;
+> +}
+> +
+> +/*
+> + * tmc_etr_sg_table_index_to_daddr: Return the hardware address to the table
+> + * entry @index. Use this address to let the table begin @index.
+> + */
+> +static inline dma_addr_t
+> +tmc_etr_sg_table_index_to_daddr(struct tmc_sg_table *sg_table, u32 index)
+> +{
+> +	u32 sys_page_idx = index / ETR_SG_PTRS_PER_SYSPAGE;
+> +	u32 sys_page_offset = index % ETR_SG_PTRS_PER_SYSPAGE;
+> +	sgte_t *ptr;
+> +
+> +	ptr = (sgte_t *)sg_table->table_pages.daddrs[sys_page_idx];
+> +	return (dma_addr_t)&ptr[sys_page_offset];
+> +}
+> +
+> +/*
+> + * tmc_etr_sg_table_rotate : Rotate the SG circular buffer, moving
+> + * the "base" to a requested offset. We do so by :
+> + *
+> + * 1) Reset the current LAST buffer.
+> + * 2) Mark the "previous" buffer in the table to the "base" as LAST.
+> + * 3) Update the hwaddr to point to the table pointer for the buffer
+> + *    which starts at "base".
+> + */
+> +static int __maybe_unused
+> +tmc_etr_sg_table_rotate(struct etr_sg_table *etr_table, u64 base_offset)
+> +{
+> +	u32 last_entry, first_entry;
+> +	u64 last_offset;
+> +	struct tmc_sg_table *sg_table = etr_table->sg_table;
+> +	sgte_t *table_ptr = sg_table->table_vaddr;
+> +	ssize_t buf_size = tmc_sg_table_buf_size(sg_table);
+> +
+> +	/* Offset should always be SG PAGE_SIZE aligned */
+> +	if (base_offset & (ETR_SG_PAGE_SIZE - 1)) {
+> +		pr_debug("unaligned base offset %llx\n", base_offset);
+> +		return -EINVAL;
+> +	}
+> +	/* Make sure the offset is within the range */
+> +	if (base_offset < 0 || base_offset > buf_size) {
+> +		base_offset = (base_offset + buf_size) % buf_size;
+> +		pr_debug("Resetting offset to %llx\n", base_offset);
+> +	}
+> +	first_entry = tmc_etr_sg_offset_to_table_index(base_offset);
+> +	if (first_entry == etr_table->first_entry) {
+> +		pr_debug("Head is already at %llx, skipping\n", base_offset);
+> +		return 0;
+> +	}
+> +
+> +	/* Last entry should be the previous one to the new "base" */
+> +	last_offset = ((base_offset - ETR_SG_PAGE_SIZE) + buf_size) % buf_size;
+> +	last_entry = tmc_etr_sg_offset_to_table_index(last_offset);
+> +
+> +	/* Reset the current Last page to Normal and new Last page to NORMAL */
+> +	tmc_etr_sg_update_type(&table_ptr[etr_table->last_entry],
+> +				 ETR_SG_ET_NORMAL);
+> +	tmc_etr_sg_update_type(&table_ptr[last_entry], ETR_SG_ET_LAST);
+> +	etr_table->hwaddr = tmc_etr_sg_table_index_to_daddr(sg_table,
+> +							    first_entry);
+> +	etr_table->first_entry = first_entry;
+> +	etr_table->last_entry = last_entry;
+> +	pr_debug("table rotated to offset %llx-%llx, entries (%d - %d), dba: %llx\n",
+> +			base_offset, last_offset, first_entry, last_entry,
+> +			etr_table->hwaddr);
 
-Awesome! :)
+The above line generates a warning when compiling for ARMv7.
 
-I wonder how hard it might be to make this happen on x86 too (or
-generically). Hmmm
-
--Kees
-
-> [   34.785016] Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
-> [   34.785572] Modules linked in:
-> [   34.786177] CPU: 0 PID: 1324 Comm: a.out Not tainted 4.14.0-rc5-00005-ga3bb7b0f72d3 #69
-> [   34.786657] Hardware name: linux,dummy-virt (DT)
-> [   34.787093] task: ffff80003c4ed400 task.stack: ffff00000ade0000
-> [   34.788196] PC is at SyS_waitid+0x1d4/0x210
-> [   34.788534] LR is at SyS_waitid+0x20/0x210
-> [   34.788839] pc : [<ffff0000080cde1c>] lr : [<ffff0000080cdc68>] pstate: a0000145
-> [   34.789310] sp : ffff00000ade3e00
-> [   34.789578] x29: ffff00000ade3e00 x28: ffff80003c4ed400
-> [   34.790039] x27: ffff0000089e1000 x26: 000000000000005f
-> [   34.790397] x25: 0000000000000124 x24: 0000000000000015
-> [   34.790649] x23: 0000000080000000 x22: 0000ffffb1eb6b24
-> [   34.790897] x21: 00000000ffffffff x20: 000080003600c000
-> [   34.791149] x19: ffff800000000000 x18: 0000000000000007
-> [   34.791397] x17: 0000000000000001 x16: 0000000000000019
-> [   34.791648] x15: 0000000000000033 x14: 000000000000004c
-> [   34.791903] x13: 0000000000000068 x12: ffff000008af69d0
-> [   34.792156] x11: ffff00000ade3c20 x10: 0000000000000000
-> [   34.792451] x9 : 0000000000000000 x8 : 0000000000000000
-> [   34.792706] x7 : 0000000000000000 x6 : ffff000008f42f18
-> [   34.792965] x5 : dead000000000100 x4 : 0000000000000011
-> [   34.793214] x3 : ffff80003c4ed400 x2 : ffff800000000004
-> [   34.793462] x1 : 0001000000000000 x0 : 0000000000000000
-> [   34.793743] Process a.out (pid: 1324, stack limit = 0xffff00000ade0000)
-> [   34.794098] Call trace:
-> [   34.794351] Exception stack(0xffff00000ade3cc0 to 0xffff00000ade3e00)
-> [   34.794722] 3cc0: 0000000000000000 0001000000000000 ffff800000000004 ffff80003c4ed400
-> [   34.795034] 3ce0: 0000000000000011 dead000000000100 ffff000008f42f18 0000000000000000
-> [   34.795297] 3d00: 0000000000000000 0000000000000000 0000000000000000 ffff00000ade3c20
-> [   34.795549] 3d20: ffff000008af69d0 0000000000000068 000000000000004c 0000000000000033
-> [   34.795803] 3d40: 0000000000000019 0000000000000001 0000000000000007 ffff800000000000
-> [   34.796066] 3d60: 000080003600c000 00000000ffffffff 0000ffffb1eb6b24 0000000080000000
-> [   34.796277] 3d80: 0000000000000015 0000000000000124 000000000000005f ffff0000089e1000
-> [   34.796477] 3da0: ffff80003c4ed400 ffff00000ade3e00 ffff0000080cdc68 ffff00000ade3e00
-> [   34.796677] 3dc0: ffff0000080cde1c 00000000a0000145 0000000000000000 ffff80003c4ed400
-> [   34.796884] 3de0: 0001000000000000 dead000000000100 ffff00000ade3e00 ffff0000080cde1c
-> [   34.797153] [<ffff0000080cde1c>] SyS_waitid+0x1d4/0x210
-> [   34.797298] Exception stack(0xffff00000ade3ec0 to 0xffff00000ade4000)
-> [   34.797470] 3ec0: 0000000000000000 0000000000000000 ffff800000000000 0000000000000004
-> [   34.797670] 3ee0: 0000000000000000 0400000055550400 0000ffffb1e0a011 0000000000000cbf
-> [   34.797873] 3f00: 000000000000005f 0000000000000a3b 0000000000000000 16170f120a1a1311
-> [   34.798073] 3f20: 00000000000001a8 0000ffffb1f8ecb8 0000ffffb1e1c0e0 0000000000000002
-> [   34.798272] 3f40: 0000ffffb1eb6af0 0000000000420018 0000000000000000 0000000000400740
-> [   34.798471] 3f60: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
-> [   34.798668] 3f80: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
-> [   34.798870] 3fa0: 0000000000000000 0000fffff7294200 00000000004006fc 0000fffff7294200
-> [   34.799068] 3fc0: 0000ffffb1eb6b24 0000000080000000 0000000000000000 000000000000005f
-> [   34.799265] 3fe0: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
-> [   34.799474] [<ffff0000080837b0>] el0_svc_naked+0x24/0x28
-> [   34.799715] Code: f9400fb4 17ffff9a d503201f f9000fb4 (d4210000)
-> [   34.800121] ---[ end trace a14ca5cd5d8f9b30 ]---
-
-
-
--- 
-Kees Cook
-Pixel Security
+> +	/* Sync the table for device */
+> +	tmc_sg_table_sync_table(sg_table);
+> +#ifdef ETR_SG_DEBUG
+> +	tmc_etr_sg_table_dump(etr_table);
+> +#endif
+> +	return 0;
+>  }
+>  
+>  /*
+> @@ -552,6 +668,9 @@ tmc_init_etr_sg_table(struct device *dev, int node,
+>  	}
+>  
+>  	etr_table->sg_table = sg_table;
+> +	etr_table->nr_entries = nr_entries;
+> +	etr_table->first_entry = 0;
+> +	etr_table->last_entry = nr_entries - 2;
+>  	/* TMC should use table base address for DBA */
+>  	etr_table->hwaddr = sg_table->table_daddr;
+>  	tmc_etr_sg_table_populate(etr_table);
+> -- 
+> 2.13.6
+> 
