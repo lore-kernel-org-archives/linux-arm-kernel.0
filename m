@@ -1,49 +1,43 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 1 Nov 2017 14:33:49 +0000
-Subject: [PATCH v5 15/30] arm64/sve: Signal handling support
-In-Reply-To: <1509465082-30427-16-git-send-email-Dave.Martin@arm.com>
-References: <1509465082-30427-1-git-send-email-Dave.Martin@arm.com>
- <1509465082-30427-16-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20171101143349.emzluowg5k3zmyhn@armageddon.cambridge.arm.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Wed,  1 Nov 2017 14:33:44 +0000
+Subject: [PATCH 2/2] perf: Fix ftrace builtin when kernel doesn't have
+ function_graph
+In-Reply-To: <1509546824-46165-1-git-send-email-julien.thierry@arm.com>
+References: <1509546824-46165-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <1509546824-46165-3-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 31, 2017 at 03:51:07PM +0000, Dave P Martin wrote:
-> This patch implements support for saving and restoring the SVE
-> registers around signals.
-> 
-> A fixed-size header struct sve_context is always included in the
-> signal frame encoding the thread's vector length at the time of
-> signal delivery, optionally followed by a variable-layout structure
-> encoding the SVE registers.
-> 
-> Because of the need to preserve backwards compatibility, the FPSIMD
-> view of the SVE registers is always dumped as a struct
-> fpsimd_context in the usual way, in addition to any sve_context.
-> 
-> The SVE vector registers are dumped in full, including bits 127:0
-> of each register which alias the corresponding FPSIMD vector
-> registers in the hardware.  To avoid any ambiguity about which
-> alias to restore during sigreturn, the kernel always restores bits
-> 127:0 of each SVE vector register from the fpsimd_context in the
-> signal frame (which must be present): userspace needs to take this
-> into account if it wants to modify the SVE vector register contents
-> on return from a signal.
-> 
-> FPSR and FPCR, which are used by both FPSIMD and SVE, are not
-> included in sve_context because they are always present in
-> fpsimd_context anyway.
-> 
-> For signal delivery, a new helper
-> fpsimd_signal_preserve_current_state() is added to update _both_
-> the FPSIMD and SVE views in the task struct, to make it easier to
-> populate this information into the signal frame.  Because of the
-> redundancy between the two views of the state, only one is updated
-> otherwise.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Cc: Alex Benn?e <alex.bennee@linaro.org>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Will Deacon <will.deacon@arm.com>
+When linux is built without support for function graph tracer, the ftrace
+builtin of perf will fail when trying to reset max_graph_depth because the
+file does not exist. This prevents the use of function tracer from perf.
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Do not attempt to write this file when the tracer in use is not
+function_graph.
+
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: linux-kernel at vger.kernel.org
+---
+ tools/perf/builtin-ftrace.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/tools/perf/builtin-ftrace.c b/tools/perf/builtin-ftrace.c
+index 25a42ac..48120f2 100644
+--- a/tools/perf/builtin-ftrace.c
++++ b/tools/perf/builtin-ftrace.c
+@@ -130,7 +130,8 @@ static int reset_tracing_files(struct perf_ftrace *ftrace __maybe_unused)
+ 	if (reset_tracing_cpu() < 0)
+ 		return -1;
+
+-	if (write_tracing_file("max_graph_depth", "0") < 0)
++	if (!strcmp(ftrace->tracer, "function_graph") &&
++	    write_tracing_file("max_graph_depth", "0") < 0)
+ 		return -1;
+
+ 	reset_tracing_filters();
+--
+1.9.1
