@@ -1,61 +1,52 @@
 From: gengdongjiu@huawei.com (Dongjiu Geng)
-Date: Thu, 2 Nov 2017 03:14:57 +0800
-Subject: [PATCH v1 3/3] KVM: arm64: add ESB in exception handler entry and
- exit.
+Date: Thu, 2 Nov 2017 03:14:56 +0800
+Subject: [PATCH v1 2/3] arm64: add error synchronization barrier in
+ kernel_entry/kernel_exit
 In-Reply-To: <1509563697-6359-1-git-send-email-gengdongjiu@huawei.com>
 References: <1509563697-6359-1-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <1509563697-6359-4-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <1509563697-6359-3-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some hardware platform can support RAS Extension instead
-of support IESB, so software need to insert Synchronization
-Barrier operations at exception handler entry and exit.
+If taking an exception from or return to user space, insert
+a Error Synchronization Barrier(ESB) to isolate the error.
 
-In the __guest_exit(), it added a ESB instruction, but can
-not cover the path which is not guest exit. For example, if
-EL1 host call HVC instruction enter to hypervisor, it will
-not call __guest_exit().
+If a user space process is pending a SError, when enter to
+kernel, the SError will be immediately synchronized in the
+handler entry. Otherwise if kernel space is pending a SError,
+before return to user space, the SError will be synchronized
+in the handler exit.
 
-In the kvm_arm_vhe_guest_enter(), it synchronised any host
-RAS errors for VHE mode, but it can not handle the non-VHE
-mode. For example, if EL1 host is pending a SError, the error
-can be propagated to guest without error synchronization
-operation.
-
-Only add the ESB in the important exception handler path to
-reduce the impact on performance.
+In order to reduce impact on performance, not check the DISR_EL1
+to see whether an SError is consumed by an ESB instruction.
+This is because DISR_EL1 is RAZ/WI in firmware-first RAS
+solution, if happen SError, it will immediately trap to EL3
+firmware.
 
 Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
 ---
- arch/arm64/kvm/hyp/entry.S     | 2 ++
- arch/arm64/kvm/hyp/hyp-entry.S | 1 +
- 2 files changed, 3 insertions(+)
+ arch/arm64/kernel/entry.S | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
-index 96caa53..fce6806 100644
---- a/arch/arm64/kvm/hyp/entry.S
-+++ b/arch/arm64/kvm/hyp/entry.S
-@@ -84,6 +84,8 @@ ENTRY(__guest_enter)
- 	// Restore guest reg x18
- 	ldr	x18,      [x18, #CPU_XREG_OFFSET(18)]
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index e147c1d..6dde644 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -138,6 +138,7 @@
+ 	stp	x28, x29, [sp, #16 * 14]
  
-+	// synchronize host pending asynchronous error
+ 	.if	\el == 0
 +	error_synchronize
- 	// Do not touch any register after this!
- 	eret
- ENDPROC(__guest_enter)
-diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-index 5170ce1..ac85029 100644
---- a/arch/arm64/kvm/hyp/hyp-entry.S
-+++ b/arch/arm64/kvm/hyp/hyp-entry.S
-@@ -54,6 +54,7 @@ ENTRY(__vhe_hyp_call)
- ENDPROC(__vhe_hyp_call)
- 
- el1_sync:				// Guest trapped into EL2
+ 	mrs	x21, sp_el0
+ 	ldr_this_cpu	tsk, __entry_task, x20	// Ensure MDSCR_EL1.SS is clear,
+ 	ldr	x19, [tsk, #TSK_TI_FLAGS]	// since we can unmask debug
+@@ -281,6 +282,7 @@ alternative_if ARM64_WORKAROUND_845719
+ 1:
+ alternative_else_nop_endif
+ #endif
 +	error_synchronize
- 	stp	x0, x1, [sp, #-16]!
+ 	.endif
  
- alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
+ 	msr	elr_el1, x21			// set up the return data
 -- 
 1.9.1
