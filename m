@@ -1,104 +1,51 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Wed, 1 Nov 2017 09:18:49 +0000
-Subject: [Patch v10] QE: remove PPCisms for QE
-In-Reply-To: <20171101020133.27966-1-qiang.zhao@nxp.com>
-References: <20171101020133.27966-1-qiang.zhao@nxp.com>
-Message-ID: <b9a491c9-c7f9-3062-8c85-468c1a94ba0d@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 1 Nov 2017 09:26:18 +0000
+Subject: [RFC] Improving udelay/ndelay on platforms where that is possible
+In-Reply-To: <CAD=FV=V3n0gjzpL860V6cgf8JVh5pmoL+i0t63Oot19T2afTPw@mail.gmail.com>
+References: <d3f42f35-8175-58f6-78b7-3331efe64da2@sigmadesigns.com>
+ <CA+55aFzy9=RtFRuJhFbF+PL_PCrkZsKtAKrq6WJo1z9eW9gLSA@mail.gmail.com>
+ <20171031165629.GF9463@n2100.armlinux.org.uk>
+ <CA+55aFwDquBXt_EYT3JFoWkeFsZTym5qUXig-DePXXzm07uABw@mail.gmail.com>
+ <CAD=FV=V3n0gjzpL860V6cgf8JVh5pmoL+i0t63Oot19T2afTPw@mail.gmail.com>
+Message-ID: <20171101092618.GN9463@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Zhao,
-
-I just noticed a small nit.
-
-On 01/11/17 02:01, Zhao Qiang wrote:
-> QE was supported on PowerPC, and dependent on PPC,
-> Now it is supported on other platforms. so remove PPCisms.
+On Tue, Oct 31, 2017 at 05:23:19PM -0700, Doug Anderson wrote:
+> Hi,
 > 
-> Signed-off-by: Zhao Qiang <qiang.zhao@nxp.com>
-> ---
-> Changes for v2:
-> 	- na
-> Changes for v3:
-> 	- add NO_IRQ
-> Changes for v4:
-> 	- modify spin_event_timeout to opencoded timeout loop
-> 	- remove NO_IRQ
-> 	- modify virq_to_hw to opencoed code
-> Changes for v5:
-> 	- modify commit msg
-> 	- modify depends of QUICC_ENGINE
-> 	- add kerneldoc header for qe_issue_cmd
-> Changes for v6:
-> 	- add dependency on FSL_SOC and PPC32 for drivers
-> 	  depending on QUICC_ENGING but not available on ARM
-> Changes for v7:
-> 	- split qeic part to another patch
-> 	- rebase
-> Changes for v8:
-> 	- include <asm/cpm.h> in ucc_uart
-> Changes for v9:
-> 	- fix cast warning
-> Changes for v10:
-> 	- rebase
+> On Tue, Oct 31, 2017 at 10:45 AM, Linus Torvalds
+> <torvalds@linux-foundation.org> wrote:
+> > So I'm very much open to udelay improvements, and if somebody sends
+> > patches for particular platforms to do particularly well on that
+> > platform, I think we should merge them. But ...
 > 
->   drivers/net/ethernet/freescale/Kconfig | 11 ++---
->   drivers/soc/fsl/qe/Kconfig             |  2 +-
->   drivers/soc/fsl/qe/qe.c                | 82 +++++++++++++++++++++-------------
->   drivers/soc/fsl/qe/qe_io.c             | 42 ++++++++---------
->   drivers/soc/fsl/qe/qe_tdm.c            |  8 ++--
->   drivers/soc/fsl/qe/ucc.c               | 10 ++---
->   drivers/soc/fsl/qe/ucc_fast.c          | 74 +++++++++++++++---------------
->   drivers/tty/serial/Kconfig             |  2 +-
->   drivers/tty/serial/ucc_uart.c          |  1 +
->   drivers/usb/gadget/udc/Kconfig         |  2 +-
->   drivers/usb/host/Kconfig               |  2 +-
->   include/soc/fsl/qe/qe.h                |  1 -
->   12 files changed, 126 insertions(+), 111 deletions(-)
-> 
+> If I'm reading this all correctly, this sounds like you'd be willing
+> to merge <https://patchwork.kernel.org/patch/9429841/>.  This makes
+> udelay() guaranteed not to underrun on arm32 platforms.
 
-[...]
+That's a mis-representation again.  It stops a timer-based udelay()
+possibly underrunning by one tick if we are close to the start of
+a count increment.  However, it does nothing for the loops_per_jiffy
+udelay(), which can still underrun.
 
-> diff --git a/drivers/soc/fsl/qe/qe.c b/drivers/soc/fsl/qe/qe.c
-> index 2ef6fc6487c1..1d695870ea9e 100644
-> --- a/drivers/soc/fsl/qe/qe.c
-> +++ b/drivers/soc/fsl/qe/qe.c
+My argument against merging that patch is that with it merged, we get
+(as you say) a udelay() that doesn't underrun _when using a timer_
+but when we end up using the loops_per_jiffy udelay(), we're back to
+the old problem.
 
-[...]
+My opinion is that's bad, because it encourages people to write drivers
+that rely on udelay() having "good" behaviour, which it is not guaranteed
+to have.  So, they'll specify a delay period of exactly what they want,
+and their drivers will then fail when running on systems that aren't
+using a timer-based udelay().
 
-> @@ -132,20 +142,26 @@ int qe_issue_cmd(u32 cmd, u32 device, u8 mcn_protocol, u32 cmd_input)
->   				mcn_shift = QE_CR_MCN_NORMAL_SHIFT;
->   		}
->   
-> -		out_be32(&qe_immr->cp.cecdr, cmd_input);
-> -		out_be32(&qe_immr->cp.cecr,
-> -			 (cmd | QE_CR_FLG | ((u32) device << dev_shift) | (u32)
-> -			  mcn_protocol << mcn_shift));
-> +		iowrite32be(cmd_input, &qe_immr->cp.cecdr);
-> +		iowrite32be((cmd | QE_CR_FLG | ((u32)device << dev_shift) |
-> +			    (u32)mcn_protocol << mcn_shift), &qe_immr->cp.cecr);
->   	}
->   
->   	/* wait for the QE_CR_FLG to clear */
-> -	ret = spin_event_timeout((in_be32(&qe_immr->cp.cecr) & QE_CR_FLG) == 0,
-> -			   100, 0);
-> +	ret = -EIO;
-> +	for (i = 0; i < 100; i++) {
-> +		if ((ioread32be(&qe_immr->cp.cecr) & QE_CR_FLG) == 0) {
-> +			ret = 0;
-> +			break;
-> +		}
-> +		udelay(1);
-> +	}
-> +
->   	/* On timeout (e.g. failure), the expression will be false (ret == 0),
->   	   otherwise it will be true (ret == 1). */
-
-nit:
-The comment here is no longer valid, on timeout ret == -EIO and on 
-success 0. It should probably be removed to avoid confusion.
-
-Cheers,
+If we want udelay() to have this behaviour, it needs to _always_ have
+this behaviour irrespective of the implementation.  So that means
+the loops_per_jiffy version also needs to be fixed in the same way,
+which IMHO is impossible.
 
 -- 
-Julien Thierry
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
