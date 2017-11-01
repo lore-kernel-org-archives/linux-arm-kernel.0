@@ -1,27 +1,32 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Wed, 1 Nov 2017 07:30:47 -0700
-Subject: [PATCH] ata: fixes kernel crash while tracing
- ata_eh_link_autopsy event
-In-Reply-To: <CAFd313w9W2hHFPJ47y0jeNb1u7=0deLtwcRF=+HXGBYft-QaLw@mail.gmail.com>
-References: <1508926976-11467-1-git-send-email-rsahu@apm.com>
- <20171025145450.GA59538@devbig577.frc2.facebook.com>
- <CAFd313w9W2hHFPJ47y0jeNb1u7=0deLtwcRF=+HXGBYft-QaLw@mail.gmail.com>
-Message-ID: <20171101143031.GL3252168@devbig577.frc2.facebook.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Wed,  1 Nov 2017 14:33:42 +0000
+Subject: [PATCH 0/2] Ftrace fixes
+Message-ID: <1509546824-46165-1-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi,
 
-On Tue, Oct 31, 2017 at 08:52:44PM +0530, Rameshwar Sahu wrote:
-> > probably should take both link and dev and use dev iff it's not NULL.
-> >
-> 
-> Instead of this would it be better to call trace_ata_eh_link_autopsy() if
-> dev is not NULL from ata error handler ??
+>From what Steve Rostedt said, we shouldn't rely on ftrace_trace_function
+not being ftrace_stub when using the function graph tracer. As x86 does,
+always check whether function graph tracing is requested in static tracing.
 
-Oh yeah, that'd work too and be probably better.
+While testing that I didn't break things, I discovered that the perf ftrace
+builtin doesn't handle kernels built without function graph tracer
+(regardless of whether tracing is dynamic or not).
 
-Thanks.
+First patch fixes the ftrace issue.
+Second patch fixes the perf front-end.
 
--- 
-tejun
+Cheers,
+
+Julien Thierry (2):
+  arm64: Fix static use of function graph
+  perf: Fix ftrace builtin when kernel doesn't have function_graph
+
+ arch/arm64/kernel/entry-ftrace.S | 12 +++---------
+ tools/perf/builtin-ftrace.c      |  3 ++-
+ 2 files changed, 5 insertions(+), 10 deletions(-)
+
+--
+1.9.1
