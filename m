@@ -1,84 +1,92 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 1 Nov 2017 18:15:39 +0000
-Subject: [PATCH] mailbox: add support for doorbell/signal mode controllers
-In-Reply-To: <CABb+yY1tcm-68E5oG75hstuMd6AOeb=BB6HeKGnQ1zj4Qya6hg@mail.gmail.com>
-References: <1509553964-4451-1-git-send-email-sudeep.holla@arm.com>
- <CABb+yY1tcm-68E5oG75hstuMd6AOeb=BB6HeKGnQ1zj4Qya6hg@mail.gmail.com>
-Message-ID: <59a05fcb-ff30-0683-144e-93521a7413f9@arm.com>
+From: salyzyn@android.com (Mark Salyzyn)
+Date: Wed, 1 Nov 2017 11:16:43 -0700
+Subject: [PATCH] arm64: write_sysreg asm illegal for aarch32
+In-Reply-To: <20171101175642.c65f7kngixjndavr@lakrids.cambridge.arm.com>
+References: <20171101170014.20931-1-salyzyn@android.com>
+ <35cf2062-f27e-16e6-19b1-cae5200d7081@arm.com>
+ <24cdf320-35e3-76f2-6e07-8b5548ac67a0@android.com>
+ <20171101175642.c65f7kngixjndavr@lakrids.cambridge.arm.com>
+Message-ID: <ba7f7072-88e5-92ee-f573-4282b6a082d4@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 01/11/17 18:03, Jassi Brar wrote:
-> On Wed, Nov 1, 2017 at 10:02 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> 
->>
->> Such controllers don't need to transmit any data, they just transmit
->> the signal. In such controllers the data pointer passed to
->> mbox_send_message is passed to client via it's tx_prepare callback.
->> Controller doesn't need any data to be passed from the client.
->>
-> Some controllers need a non-zero value written to a register in order
-> to trigger the signal.
-
-You are right, just right non-zero or whatever controller value to
-trigger the interrupt to remote.
-
-> That register is visible to the remote. While the data/packet is setup
-> during tx_prepare() callback.
-
-Agreed.
-
-> You are overlooking this class of doorbell controllers.
+On 11/01/2017 10:56 AM, Mark Rutland wrote:
+> On Wed, Nov 01, 2017 at 10:49:00AM -0700, Mark Salyzyn wrote:
+>> On 11/01/2017 10:14 AM, Robin Murphy wrote:
+>>> On 01/11/17 16:58, Mark Salyzyn wrote:
+>>>> Cross compiling to aarch32 (for vdso32) using clang correctly
+>>>> identifies that (the unused) write_sysreg inline asm directive is
+>>>> illegal in that architectural context:
+>>>>
+>>>> arch/arm64/include/asm/arch_timer.h: error: invalid input constraint 'rZ' in asm
+>>>>           write_sysreg(cntkctl, cntkctl_el1);
+>>>>           ^
+>>>> arch/arm64/include/asm/sysreg.h: note: expanded from macro 'write_sysreg'
+>>>>                        : : "rZ" (__val));
+>>>>                            ^
+>>>>
+>>>> GCC normally checks for correctness everywhere. But uniquely for
+>>>> unused asm, will optimize out and suppress the error report.
+>>> It sounds more like some paths are wrong in the compat vDSO build if
+>>> it's pulling in this header in the first place - nothing in this file is
+>>> relevant to AArch32.
+>>>
+>>> Robin.
+>>>
+>> And yet, when you CROSS_COMPILE_ARM32 a vdso32, you have no choice but to
+>> utilize the arm64 headers since they contain all the relevant kernel
+>> structures and environment.
+> This itself is the underlying issue.
 >
-
-Not sure what do you mean by that ?
-
+> When building the compat VDSO, we must ensure that we only include
+> headers that make sense for 32-bit arm.
+>
+> If the build system can't do that today, we should rework it so that it
+> can. Anything else cannot be a complete fix.
+>
+>> asm/arch_timer.h (remember we are using arm instructions to access arch64
+>> timers)
 >>
->> This is rough idea I have on extending mailbox interface to support
->> the doorbell requirements.
+>> linux/time.h (really only for struct timespec())
 >>
-> What doorbell requirements does the api not support?
-> QComm's APCS IPC is what you call a "doorbell" controller and is
-> already supported by the API. It could run SCMI even easier than MHU
-> (your controller).
-> 
-
-Again agreed. But see below for reason to create this API.
-
->> The new API send_signal will eliminate the
->> issue Jassi has explained in earlier discussion with respect to generic
->> message format using Rockchip example.
+>> asm/processor.h (eg: cpu_relax())
 >>
-> Sorry I don't see how.
-> Please explain how can send_signal() api be used by, say, rockchip to
-> support SCMI?
-> 
+>> pull in a _lot_ of architectural related cruft that always somehow picks up
+>> asm/sysreg.h somewhere in the multitude of includes to fulfill some unused
+>> inline's needs.
+> ... these are just the particular symptoms this problem results in
+> today.
+>
+> Thanks,
+> Mark.
 
- 80         writel_relaxed(msg->cmd, mb->mbox_base +
-MAILBOX_A2B_CMD(chans->idx));
- 81         writel_relaxed(msg->rx_size, mb->mbox_base +
+Ok, will attack it and see just how bad the scale is...
 
- 82                        MAILBOX_A2B_DAT(chans->idx));
+These ones trouble me ... there was no intent to pick up the wrong pieces.
 
- 83
+In file included from ./include/linux/time.h:4:
+In file included from ./include/linux/cache.h:5:
+In file included from ./arch/arm64/include/asm/cache.h:19:
+In file included from ./arch/arm64/include/asm/cachetype.h:19:
+In file included from ./arch/arm64/include/asm/cputype.h:94:
+./arch/arm64/include/asm/sysreg.h:303:2: error: invalid input constraint 
+'rZ' in asm
 
- will be replaced with
+In file included from ./include/linux/hrtimer.h:18:
+In file included from ./include/linux/rbtree.h:34:
+In file included from ./include/linux/rcupdate.h:47:
+In file included from ./include/linux/ktime.h:25:
+In file included from ./include/linux/jiffies.h:8:
+In file included from ./include/linux/timex.h:65:
+In file included from ./arch/arm64/include/asm/timex.h:19:
+./arch/arm64/include/asm/arch_timer.h:83:4: error: invalid input 
+constraint 'rZ' in asm
 
-writel(whatever_value_to trigger_signal, MAILBOX_A2B_CMD(chans->idx));
+ ??????? write_sysreg(cntkctl, cntkctl_el1);
+ ??????? ^
 
-in its send_signal function.
+./arch/arm64/include/asm/sysreg.h:278:12: note: expanded from macro 
+'write_sysreg'
+ ???????????????????? : : "rZ" (__val));
 
-> I am not convinced we should clone an api just so that a client driver
-> becomes simpler. Esp when it shifts, and not avoid, the additional
-> code (to support the client) onto the provider side.
-> 
-
-It doesn't tie the data format with particular mailbox controller.
-send_data has void *data and the interpretation is controller specific.
-send_signal on the other handle can implemented by the controllers which
-knows how and can trigger the specific signal to the remote.
--- 
-Regards,
-Sudeep
+-- Mark
