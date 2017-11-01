@@ -1,64 +1,204 @@
-From: pbrobinson@gmail.com (Peter Robinson)
-Date: Wed, 1 Nov 2017 09:37:55 +0000
-Subject: [GIT PULL 1/2] bcm2835-dt-fixes-2017-10-06
-In-Reply-To: <CAJsfgeU5Zq-2zSfto8WUZ5Xud1Ksedu9XdLG9pWR7YBZGVaHBA@mail.gmail.com>
-References: <20171006220504.7776-1-eric@anholt.net>
- <edb03edb-f2a6-549e-6060-eccfae554d92@gmail.com>
- <CAJsfgeU5Zq-2zSfto8WUZ5Xud1Ksedu9XdLG9pWR7YBZGVaHBA@mail.gmail.com>
-Message-ID: <CALeDE9NsjYHpaR6kyHgABGr2eE=EhpJstttK60WwRkAj0u1m7Q@mail.gmail.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Wed,  1 Nov 2017 17:38:14 +0800
+Subject: [PATCH] ARM: sun8i: h2+: add support for Banana Pi M2 Zero board
+Message-ID: <20171101093814.19177-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 31, 2017 at 5:00 PM, Matt Hart <matt@mattface.org> wrote:
-> On 6 October 2017 at 23:14, Florian Fainelli <f.fainelli@gmail.com> wrote:
->>
->> On 10/06/2017 03:05 PM, Eric Anholt wrote:
->> > Hi Florian.  Here's a patch that's gone through a couple of revisions
->> > on the list, that seriously fixes up the default serial behavior --
->> > previously, without the right config.txt/cmdline bits, you'd often end
->> > up with a hang with no output before booting completed.  It would be
->> > great to get it into 4.14.
->> >
->> > The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
->> >
->> >   Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
->> >
->> > are available in the git repository at:
->> >
->> >   git://github.com/anholt/linux tags/bcm2835-dt-fixes-2017-10-06
->> >
->> > for you to fetch changes up to f08f58a2bf68900a84e782b8c7ad701c0654173c:
->> >
->> >   ARM: dts: bcm283x: Fix console path on RPi3 (2017-10-06 13:04:56 -0700)
->> >
->> > ----------------------------------------------------------------
->> > This pull request brings in a fix for default serial console setup on
->> > RPi3, so it now comes up with no config.txt/cmdline.txt settings in
->> > the firmware.
->> >
->> > ----------------------------------------------------------------
->>
->> Merged, thanks Eric
->>
->> --
->> Florian
->
-> Hi all,
->
-> I realise this patch has been in mainline for a more than a week, but
-> I've only recently had time to bisect broken rpi-3 boots in kernelci
-> and found f08f58a2bf68900a84e782b8c7ad701c0654173c as the cause.
->
-> Kernelci boots the rpi3 using uboot, with console=ttyS0 in the command
-> line which now fails:
-> https://kernelci.org/boot/id/59f787f059b5147794ef1dcf/
->
-> Is there an alias I can use for both before and after this patch?
->
-> Mainline boots fine if I use console=ttyS1 or drop the console arg
-> altogether, but as we don't currently support different boot args per
-> tree, and we don't have the manpower to track this patch in all the
-> trees we test, we will have to switch to only boot testing mainline
-> from now on.
+Banana Pi M2 Zero board is a H2+-based board by Sinovoip, with a form
+factor and GPIO holes similar to Raspberry Pi Zero.
 
-Yes, I've seen the same in Fedora with that patch.
+It features:
+- Allwinner H2+ SoC
+- Single-chip (16-bit) 512MiB DDR3 DRAM
+- Ampak AP6212 Wi-Fi/Bluetooth module
+- MicroSD slot
+- Two MicroUSB Type-B ports (one can only be used to power the board and
+  the other features OTG functionality)
+- Two keys, a reset and a GPIO-connected key.
+- HDMI Type-C (miniHDMI) connector connected to the HDMI part of H2+.
+- CSI connector to connect the camera sensor provided by Sinovoip.
+
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ arch/arm/boot/dts/Makefile                         |   1 +
+ .../boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts    | 156 +++++++++++++++++++++
+ 2 files changed, 157 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 3a5b79fd8198..803dbdf03916 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -930,6 +930,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+ 	sun8i-a83t-bananapi-m3.dtb \
+ 	sun8i-a83t-cubietruck-plus.dtb \
+ 	sun8i-a83t-tbs-a711.dtb \
++	sun8i-h2-plus-bananapi-m2-zero.dtb \
+ 	sun8i-h2-plus-orangepi-zero.dtb \
+ 	sun8i-h3-bananapi-m2-plus.dtb \
+ 	sun8i-h3-beelink-x2.dtb \
+diff --git a/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts b/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
+new file mode 100644
+index 000000000000..414258da4308
+--- /dev/null
++++ b/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
+@@ -0,0 +1,156 @@
++/*
++ * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.io>
++ *
++ * Based on sun8i-h3-bananapi-m2-plus.dts, which is:
++ *   Copyright (C) 2016 Chen-Yu Tsai <wens@csie.org>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "sun8i-h3.dtsi"
++#include "sunxi-common-regulators.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++
++/ {
++	model = "Banana Pi BPI-M2-Zero";
++	compatible = "sinovoip,bpi-m2-zero", "allwinner,sun8i-h2-plus";
++
++	aliases {
++		serial0 = &uart0;
++		serial1 = &uart1;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++
++		pwr_led {
++			label = "bananapi-m2-zero:red:pwr";
++			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>; /* PL10 */
++			default-state = "on";
++		};
++	};
++
++	gpio_keys {
++		compatible = "gpio-keys";
++		pinctrl-names = "default";
++
++		sw4 {
++			label = "power";
++			linux,code = <BTN_0>;
++			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
++		};
++	};
++
++	wifi_pwrseq: wifi_pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		pinctrl-names = "default";
++		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>; /* PL7 */
++	};
++};
++
++&ehci0 {
++	status = "okay";
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	/*
++	 * In different revisions the board have different card detect
++	 * configuration.
++	 */
++	broken-cd;
++	status = "okay";
++};
++
++&mmc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc1_pins_a>;
++	vmmc-supply = <&reg_vcc3v3>;
++	vqmmc-supply = <&reg_vcc3v3>;
++	mmc-pwrseq = <&wifi_pwrseq>;
++	bus-width = <4>;
++	non-removable;
++	status = "okay";
++
++	brcmf: wifi at 1 {
++		reg = <1>;
++		compatible = "brcm,bcm4329-fmac";
++		interrupt-parent = <&pio>;
++		interrupts = <6 10 IRQ_TYPE_LEVEL_LOW>; /* PG10 / EINT10 */
++		interrupt-names = "host-wake";
++	};
++};
++
++&ohci0 {
++	status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
++	status = "okay";
++};
++
++&usb_otg {
++	dr_mode = "otg";
++	status = "okay";
++};
++
++&usbphy {
++	usb0_id_det-gpios = <&r_pio 0 6 GPIO_ACTIVE_HIGH>; /* PL6 */
++	/* USB OTG VBUS is directly connected to 5V without any regulators */
++	status = "okay";
++};
+-- 
+2.13.6
