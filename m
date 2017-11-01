@@ -1,85 +1,25 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Tue, 31 Oct 2017 16:56:39 -0700
-Subject: [RFC PATCH 0/2] arm64: optional paranoid __{get,put}_user checks
-In-Reply-To: <20171026090942.7041-1-mark.rutland@arm.com>
-References: <20171026090942.7041-1-mark.rutland@arm.com>
-Message-ID: <77c80381-cf68-aa1a-9112-e057c068eeb6@redhat.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 31 Oct 2017 17:23:19 -0700
+Subject: [RFC] Improving udelay/ndelay on platforms where that is possible
+In-Reply-To: <CA+55aFwDquBXt_EYT3JFoWkeFsZTym5qUXig-DePXXzm07uABw@mail.gmail.com>
+References: <d3f42f35-8175-58f6-78b7-3331efe64da2@sigmadesigns.com>
+ <CA+55aFzy9=RtFRuJhFbF+PL_PCrkZsKtAKrq6WJo1z9eW9gLSA@mail.gmail.com>
+ <20171031165629.GF9463@n2100.armlinux.org.uk>
+ <CA+55aFwDquBXt_EYT3JFoWkeFsZTym5qUXig-DePXXzm07uABw@mail.gmail.com>
+Message-ID: <CAD=FV=V3n0gjzpL860V6cgf8JVh5pmoL+i0t63Oot19T2afTPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/26/2017 02:09 AM, Mark Rutland wrote:
-> Hi,
-> 
-> In Prague, Kees mentioned that it would be nice to have a mechanism to
-> catch bad __{get,put}_user uses, such as the recent CVE-2017-5123 [1,2]
-> issue with unsafe_put_user() in waitid().
-> 
-> These patches allow an optional access_ok() check to be dropped in
-> arm64's __{get,put}_user() primitives. These will then BUG() if a bad
-> user pointer is passed (which should only happen in the absence of an
-> earlier access_ok() check).
-> 
-> The first patch rewrites the arm64 access_ok() check in C. This gives
-> the compiler the visibility it needs to elide redundant access_ok()
-> checks, so in the common case:
-> 
->   get_user()
->     access_ok()
->     __get_user()
->       BUG_ON(!access_ok())
->       <uaccess asm>
-> 
-> ... the compiler can determine that the second access_ok() must return
-> true, and can elide it along with the BUG_ON(), leaving:
-> 
->   get_user()
->     access_ok()
->       __get_user()
->         <uaccess asm>
-> 
-> ... and thus this sanity check can have no cost in the common case.
-> 
-> The compiler doesn't always have the visibility to do this (e.g. if the
-> two access_ok() checks are in different compilation units), but it seems
-> to manage to do this most of the time -- In testing with v4.14-rc5
-> defconfig this only increases the total Image size by 4KiB.
-> 
-> I had a go at turning this into a BUILD_BUG_ON(), to see if we could
-> catch this issue at compile time. However, my GCC wasn't able to remove
-> the BUILD_BUG() from some {get,put}_user cases. Maybe we can fix that,
-> or maybe we can have some static analysis catch this at build time.
-> 
-> It's entirely possible that I've made some catastrophic mistake in these
-> patches; I've only build-tested them so far, and I don't currently have
-> access to hardware to test on.
-> 
-> I also haven't yet modified __copy_{to,from}_user and friends along
-> similar lines, so this is incomplete. If there aren't any major
-> objections to this approach, I can fold those in for the next spin.
-> 
-> Thanks,
-> Mark.
-> 
-> [1] https://lwn.net/Articles/736348/
-> [2] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=96ca579a1ecc943b75beba58bebb0356f6cc4b51
-> 
-> 
-> Mark Rutland (2):
->   arm64: write __range_ok() in C
->   arm64: allow paranoid __{get,put}user
-> 
->  arch/arm64/Kconfig               |  9 +++++++++
->  arch/arm64/include/asm/uaccess.h | 27 +++++++++++++++++++--------
->  2 files changed, 28 insertions(+), 8 deletions(-)
-> 
+Hi,
 
-Turning on the option fails as soon as we hit userspace. On my buildroot
-based environment I get the help text for ld.so (????) and then a message
-about attempting to kill init. I get a crash in init on the Hikey Android
-environment as well. It almost seems like the __range_ok re-write
-is triggering an error but it only seems to happen when the option is
-enabled even when I take out the BUG. I'll see if I can get more useful
-information.
+On Tue, Oct 31, 2017 at 10:45 AM, Linus Torvalds
+<torvalds@linux-foundation.org> wrote:
+> So I'm very much open to udelay improvements, and if somebody sends
+> patches for particular platforms to do particularly well on that
+> platform, I think we should merge them. But ...
 
-Thanks,
-Laura
+If I'm reading this all correctly, this sounds like you'd be willing
+to merge <https://patchwork.kernel.org/patch/9429841/>.  This makes
+udelay() guaranteed not to underrun on arm32 platforms.
+
+-Doug
