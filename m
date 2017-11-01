@@ -1,58 +1,78 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  1 Nov 2017 11:34:39 +0100
-Subject: [PATCH v4 02/15] arm64: dts: renesas: r8a7795-es1: Add IPMMU device
- nodes
+Date: Wed,  1 Nov 2017 11:34:40 +0100
+Subject: [PATCH v4 03/15] arm64: dts: renesas: r8a7795: Tie SYS-DMAC to
+ IPMMU-DS0/1
 In-Reply-To: <20171101103452.7491-1-horms+renesas@verge.net.au>
 References: <20171101103452.7491-1-horms+renesas@verge.net.au>
-Message-ID: <20171101103452.7491-3-horms+renesas@verge.net.au>
+Message-ID: <20171101103452.7491-4-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm+renesas@opensource.se>
 
-Add r8a7795 ES1.x IPMMU nodes and keep all disabled by default.
-
-This is a follow-up to a patch that adds IPMMU device nodes that
-are common to r8a7795 ES1.x and ES2.0
+Hook up r8a7795 SYS-DMAC nodes to the IPMMUs. In particular SYS-DMAC0 gets
+tied to IPMMU-DS0, and SYS-DMAC1 and SYS-DMAC2 get tied to IPMMU-DS1.
 
 Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
 v4 [Simon Horman]
-* Broke out of larger patch
+* Broke out of a larger patch
 
 v1 - v3 [Magnus Damm]
 ---
- arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi b/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
-index 02d505f2e0e5..b930c2a0623f 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
-@@ -26,6 +26,22 @@
- 	/delete-node/ mmu at fd960000;
- 	/delete-node/ mmu at fd970000;
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 9750881c90a6..fce66aaf282e 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -580,6 +580,14 @@
+ 			resets = <&cpg 219>;
+ 			#dma-cells = <1>;
+ 			dma-channels = <16>;
++			iommus = <&ipmmu_ds0 0>, <&ipmmu_ds0 1>,
++			       <&ipmmu_ds0 2>, <&ipmmu_ds0 3>,
++			       <&ipmmu_ds0 4>, <&ipmmu_ds0 5>,
++			       <&ipmmu_ds0 6>, <&ipmmu_ds0 7>,
++			       <&ipmmu_ds0 8>, <&ipmmu_ds0 9>,
++			       <&ipmmu_ds0 10>, <&ipmmu_ds0 11>,
++			       <&ipmmu_ds0 12>, <&ipmmu_ds0 13>,
++			       <&ipmmu_ds0 14>, <&ipmmu_ds0 15>;
+ 		};
  
-+	ipmmu_mp1: mmu at ec680000 {
-+		compatible = "renesas,ipmmu-r8a7795";
-+		reg = <0 0xec680000 0 0x1000>; /* IPMMU-MP1 */
-+		renesas,ipmmu-main = <&ipmmu_mm 5>;
-+		#iommu-cells = <1>;
-+		status = "disabled";
-+	};
-+
-+	ipmmu_sy: mmu at e7730000 {
-+		compatible = "renesas,ipmmu-r8a7795";
-+		reg = <0 0xe7730000 0 0x1000>; /* IPMMU-SY */
-+		renesas,ipmmu-main = <&ipmmu_mm 8>;
-+		#iommu-cells = <1>;
-+		status = "disabled";
-+	};
-+
- 	/delete-node/ usb-phy at ee0e0200;
- 	/delete-node/ usb at ee0e0100;
- 	/delete-node/ usb at ee0e0000;
+ 		dmac1: dma-controller at e7300000 {
+@@ -614,6 +622,14 @@
+ 			resets = <&cpg 218>;
+ 			#dma-cells = <1>;
+ 			dma-channels = <16>;
++			iommus = <&ipmmu_ds1 0>, <&ipmmu_ds1 1>,
++			       <&ipmmu_ds1 2>, <&ipmmu_ds1 3>,
++			       <&ipmmu_ds1 4>, <&ipmmu_ds1 5>,
++			       <&ipmmu_ds1 6>, <&ipmmu_ds1 7>,
++			       <&ipmmu_ds1 8>, <&ipmmu_ds1 9>,
++			       <&ipmmu_ds1 10>, <&ipmmu_ds1 11>,
++			       <&ipmmu_ds1 12>, <&ipmmu_ds1 13>,
++			       <&ipmmu_ds1 14>, <&ipmmu_ds1 15>;
+ 		};
+ 
+ 		dmac2: dma-controller at e7310000 {
+@@ -648,6 +664,14 @@
+ 			resets = <&cpg 217>;
+ 			#dma-cells = <1>;
+ 			dma-channels = <16>;
++			iommus = <&ipmmu_ds1 16>, <&ipmmu_ds1 17>,
++			       <&ipmmu_ds1 18>, <&ipmmu_ds1 19>,
++			       <&ipmmu_ds1 20>, <&ipmmu_ds1 21>,
++			       <&ipmmu_ds1 22>, <&ipmmu_ds1 23>,
++			       <&ipmmu_ds1 24>, <&ipmmu_ds1 25>,
++			       <&ipmmu_ds1 26>, <&ipmmu_ds1 27>,
++			       <&ipmmu_ds1 28>, <&ipmmu_ds1 29>,
++			       <&ipmmu_ds1 30>, <&ipmmu_ds1 31>;
+ 		};
+ 
+ 		audma0: dma-controller at ec700000 {
 -- 
 2.11.0
