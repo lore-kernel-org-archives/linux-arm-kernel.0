@@ -1,56 +1,58 @@
-From: salyzyn@android.com (Mark Salyzyn)
-Date: Wed, 1 Nov 2017 15:14:03 -0700
-Subject: [PATCH v4 10/12] arm64: vdso: replace gettimeofday.S with global
- vgettimeofday.C
-In-Reply-To: <20171031183306.81375-1-salyzyn@android.com>
-References: <20171031183306.81375-1-salyzyn@android.com>
-Message-ID: <7775cc5e-4a24-1e33-aae5-6181ca018d80@android.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 2 Nov 2017 06:14:21 +0800
+Subject: [patch v10 2/4] drivers: jtag: Add Aspeed SoC 24xx and 25xx
+ families JTAG master driver
+In-Reply-To: <1509365528-28803-3-git-send-email-oleksandrs@mellanox.com>
+References: <1509365528-28803-3-git-send-email-oleksandrs@mellanox.com>
+Message-ID: <201711020628.gDB79T0F%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2017 11:32 AM, Mark Salyzyn wrote:
-> . . .
-> diff --git a/arch/arm64/kernel/vdso/Makefile b/arch/arm64/kernel/vdso/Makefile
-> index 62c84f7cb01b..0925f8908dcb 100644
-> --- a/arch/arm64/kernel/vdso/Makefile
-> +++ b/arch/arm64/kernel/vdso/Makefile
-> @@ -5,18 +5,26 @@
->   # Heavily based on the vDSO Makefiles for other archs.
->   #
->   
-> -obj-vdso := gettimeofday.o note.o sigreturn.o
-> +obj-vdso := vgettimeofday.o note.o sigreturn.o
->   
->   # Build rules
->   targets := $(obj-vdso) vdso.so vdso.so.dbg
->   obj-vdso := $(addprefix $(obj)/, $(obj-vdso))
->   
-> -ccflags-y := -shared -fno-common -fno-builtin
-> +ccflags-y := -shared -fno-common -fno-builtin -fno-stack-protector
-> +ccflags-y += -DDISABLE_BRANCH_PROFILING
->   ccflags-y += -nostdlib -Wl,-soname=linux-vdso.so.1 \
->   		$(call cc-ldoption, -Wl$(comma)--hash-style=sysv)
->   
-> +# Force -O2 to avoid libgcc dependencies
-> +CFLAGS_REMOVE_vgettimeofday.o = -pg -Os
-> +CFLAGS_vgettimeofday.o = -O2 -mcmodel=tiny
-> +
-This last stanza breaks clang builds. Suggested fix is:
+Hi Oleksandr,
 
-@@ -18,7 +18,11 @@ ccflags-y += -nostdlib -Wl,-soname=linux-vdso.so.1 \
+I love your patch! Yet something to improve:
 
- ?# Force -O2 to avoid libgcc dependencies
- ?CFLAGS_REMOVE_vgettimeofday.o = -pg -Os
-+ifeq ($(cc-name),clang)
-+CFLAGS_vgettimeofday.o = -O2
-+else
- ?CFLAGS_vgettimeofday.o = -O2 -mcmodel=tiny
-+endif
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.14-rc7]
+[cannot apply to next-20171018]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
- ?# Disable gcov profiling for VDSO code
- ?GCOV_PROFILE := n
+url:    https://github.com/0day-ci/linux/commits/Oleksandr-Shamray/JTAG-driver-introduction/20171102-045624
+config: blackfin-allyesconfig (attached as .config)
+compiler: bfin-uclinux-gcc (GCC) 6.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=blackfin 
 
-Holding off respin or followup patch until after we get a response from 
-Jon Masters <jcm@readhat.com> on their QE tests on this patch series.
+All errors (new ones prefixed by >>):
 
--- Mark
+>> drivers//jtag/jtag-aspeed.c:703:10: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+     .xfer = aspeed_jtag_xfer
+             ^~~~~~~~~~~~~~~~
+   drivers//jtag/jtag-aspeed.c:703:10: note: (near initialization for 'aspeed_jtag_ops.xfer')
+   cc1: some warnings being treated as errors
+
+vim +703 drivers//jtag/jtag-aspeed.c
+
+   697	
+   698	static const struct jtag_ops aspeed_jtag_ops = {
+   699		.freq_get = aspeed_jtag_freq_get,
+   700		.freq_set = aspeed_jtag_freq_set,
+   701		.status_get = aspeed_jtag_status_get,
+   702		.idle = aspeed_jtag_idle,
+ > 703		.xfer = aspeed_jtag_xfer
+   704	};
+   705	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 46048 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171102/67c9eb57/attachment-0001.gz>
