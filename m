@@ -1,34 +1,43 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  1 Nov 2017 11:34:49 +0100
-Subject: [PATCH v4 12/15] arm64: dts: renesas: r8a7795: Connect Ethernet-AVB
- to IPMMU-DS0
-In-Reply-To: <20171101103452.7491-1-horms+renesas@verge.net.au>
-References: <20171101103452.7491-1-horms+renesas@verge.net.au>
-Message-ID: <20171101103452.7491-13-horms+renesas@verge.net.au>
+From: gengdongjiu@huawei.com (Dongjiu Geng)
+Date: Thu, 2 Nov 2017 03:14:55 +0800
+Subject: [PATCH v1 1/3] arm64: add a macro for SError synchronization
+In-Reply-To: <1509563697-6359-1-git-send-email-gengdongjiu@huawei.com>
+References: <1509563697-6359-1-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <1509563697-6359-2-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm+renesas@opensource.se>
+ARMv8.2 adds a control bit to each SCTLR_ELx to insert implicit
+Error Synchronization Barrier(IESB) operations at exception handler entry
+and exit. But not all hardware platform which support RAS Extension
+can support IESB. So for this case, software needs to manually insert
+Error Synchronization Barrier(ESB) operations.
 
-Add IPMMU-DS0 to the Ethernet-AVB device node.
+In this macros, if system supports RAS Extensdddon instead of IESB,
+it will insert an ESB instruction.
 
-Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
 ---
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/include/asm/assembler.h | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index ce6188a140b7..856d294c48e3 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -798,6 +798,7 @@
- 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
- 			resets = <&cpg 812>;
- 			phy-mode = "rgmii-txid";
-+			iommus = <&ipmmu_ds0 16>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			status = "disabled";
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index d4c0adf..e6c79c4 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -517,4 +517,13 @@
+ #endif
+ 	.endm
+ 
++	.macro	error_synchronize
++alternative_if ARM64_HAS_IESB
++	b	1f
++alternative_else_nop_endif
++alternative_if ARM64_HAS_RAS_EXTN
++	esb
++alternative_else_nop_endif
++1:
++	.endm
+ #endif	/* __ASM_ASSEMBLER_H */
 -- 
-2.11.0
+1.9.1
