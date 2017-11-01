@@ -1,43 +1,39 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 1 Nov 2017 16:26:59 -0500
-Subject: [PATCH 2/4] pinctrl: Add skew-delay pin config and bindings
-In-Reply-To: <20171028133719.27528-2-linus.walleij@linaro.org>
-References: <20171028133719.27528-1-linus.walleij@linaro.org>
- <20171028133719.27528-2-linus.walleij@linaro.org>
-Message-ID: <20171101212659.be4phj2wha66x63d@rob-hp-laptop>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 2 Nov 2017 05:34:04 +0800
+Subject: [patch v10 1/4] drivers: jtag: Add JTAG core driver
+In-Reply-To: <1509365528-28803-2-git-send-email-oleksandrs@mellanox.com>
+References: <1509365528-28803-2-git-send-email-oleksandrs@mellanox.com>
+Message-ID: <201711020548.ETMSMVaX%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 28, 2017 at 03:37:17PM +0200, Linus Walleij wrote:
-> Some pin controllers (such as the Gemini) can control the
-> expected clock skew and output delay on certain pins with a
-> sub-nanosecond granularity. This is typically done by shunting
-> in a number of double inverters in front of or behind the pin.
-> Make it possible to configure this with a generic binding.
-> 
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt | 4 ++++
->  drivers/pinctrl/pinconf-generic.c                              | 2 ++
->  include/linux/pinctrl/pinconf-generic.h                        | 5 +++++
->  3 files changed, 11 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-> index 4483cc31e531..ad9bbbba36e9 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-> @@ -271,6 +271,10 @@ output-high		- set the pin to output mode with high level
->  sleep-hardware-state	- indicate this is sleep related state which will be programmed
->  			  into the registers for the sleep state.
->  slew-rate		- set the slew rate
-> +skew-delay		- this affects the expected clock skew on input pins
-> +			  and the delay before latching a value to an output
-> +			  pin. Typically indicates how many double-inverters are
-> +			  used to delay the signal.
+Hi Oleksandr,
 
-Units?
+I love your patch! Perhaps something to improve:
 
->  
->  For example:
->  
+[auto build test WARNING on linus/master]
+[also build test WARNING on v4.14-rc7]
+[cannot apply to next-20171018]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Oleksandr-Shamray/JTAG-driver-introduction/20171102-045624
+config: i386-tinyconfig (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
+
+All warnings (new ones prefixed by >>):
+
+>> ./usr/include/linux/jtag.h:74: found __[us]{8,16,32,64} type without #include <linux/types.h>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 6687 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171102/d7267249/attachment-0001.gz>
