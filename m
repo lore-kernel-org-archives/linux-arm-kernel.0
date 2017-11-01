@@ -1,44 +1,77 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 1 Nov 2017 11:43:29 +0000
-Subject: [PATCH v5 03/30] arm64: signal: Verify extra data is
- user-readable in sys_rt_sigreturn
-In-Reply-To: <1509465082-30427-4-git-send-email-Dave.Martin@arm.com>
-References: <1509465082-30427-1-git-send-email-Dave.Martin@arm.com>
- <1509465082-30427-4-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20171101114329.5eaejnxwojvadbex@armageddon.cambridge.arm.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 1 Nov 2017 13:05:21 +0100
+Subject: [GIT PULL 1/2] bcm2835-dt-fixes-2017-10-06
+In-Reply-To: <CALeDE9NsjYHpaR6kyHgABGr2eE=EhpJstttK60WwRkAj0u1m7Q@mail.gmail.com>
+References: <20171006220504.7776-1-eric@anholt.net>
+ <edb03edb-f2a6-549e-6060-eccfae554d92@gmail.com>
+ <CAJsfgeU5Zq-2zSfto8WUZ5Xud1Ksedu9XdLG9pWR7YBZGVaHBA@mail.gmail.com>
+ <CALeDE9NsjYHpaR6kyHgABGr2eE=EhpJstttK60WwRkAj0u1m7Q@mail.gmail.com>
+Message-ID: <910a98ca-57f6-baca-73ac-f6c8c1ff04db@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 31, 2017 at 03:50:55PM +0000, Dave P Martin wrote:
-> Currently sys_rt_sigreturn() verifies that the base sigframe is
-> readable, but no similar check is performed on the extra data to
-> which an extra_context record points.
-> 
-> This matters because the extra data will be read with the
-> unprotected user accessors.  However, this is not a problem at
-> present because the extra data base address is required to be
-> exactly at the end of the base sigframe.  So, there would need to
-> be a non-user-readable kernel address within about 59K
-> (SIGFRAME_MAXSZ - sizeof(struct rt_sigframe)) of some address for
-> which access_ok(VERIFY_READ) returns true, in order for sigreturn
-> to be able to read kernel memory that should be inaccessible to the
-> user task.  This is currently impossible due to the untranslatable
-> address hole between the TTBR0 and TTBR1 address ranges.
-> 
-> Disappearance of the hole between the TTBR0 and TTBR1 mapping
-> ranges would require the VA size for TTBR0 and TTBR1 to grow to at
-> least 55 bits, and either the disabling of tagged pointers for
-> userspace or enabling of tagged pointers for kernel space; none of
-> which is currently envisaged.
-> 
-> Even so, it is wrong to use the unprotected user accessors without
-> an accompanying access_ok() check.
-> 
-> To avoid the potential for future surprises, this patch does an
-> explicit access_ok() check on the extra data space when parsing an
-> extra_context record.
-> 
-> Fixes: 33f082614c34 ("arm64: signal: Allow expansion of the signal frame")
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Hi Matt, hi Peter,
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Am 01.11.2017 um 10:37 schrieb Peter Robinson:
+> On Tue, Oct 31, 2017 at 5:00 PM, Matt Hart <matt@mattface.org> wrote:
+>> On 6 October 2017 at 23:14, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>>> On 10/06/2017 03:05 PM, Eric Anholt wrote:
+>>>> Hi Florian.  Here's a patch that's gone through a couple of revisions
+>>>> on the list, that seriously fixes up the default serial behavior --
+>>>> previously, without the right config.txt/cmdline bits, you'd often end
+>>>> up with a hang with no output before booting completed.  It would be
+>>>> great to get it into 4.14.
+>>>>
+>>>> The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+>>>>
+>>>>   Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+>>>>
+>>>> are available in the git repository at:
+>>>>
+>>>>   git://github.com/anholt/linux tags/bcm2835-dt-fixes-2017-10-06
+>>>>
+>>>> for you to fetch changes up to f08f58a2bf68900a84e782b8c7ad701c0654173c:
+>>>>
+>>>>   ARM: dts: bcm283x: Fix console path on RPi3 (2017-10-06 13:04:56 -0700)
+>>>>
+>>>> ----------------------------------------------------------------
+>>>> This pull request brings in a fix for default serial console setup on
+>>>> RPi3, so it now comes up with no config.txt/cmdline.txt settings in
+>>>> the firmware.
+>>>>
+>>>> ----------------------------------------------------------------
+>>> Merged, thanks Eric
+>>>
+>>> --
+>>> Florian
+>> Hi all,
+>>
+>> I realise this patch has been in mainline for a more than a week, but
+>> I've only recently had time to bisect broken rpi-3 boots in kernelci
+>> and found f08f58a2bf68900a84e782b8c7ad701c0654173c as the cause.
+>>
+>> Kernelci boots the rpi3 using uboot, with console=ttyS0 in the command
+>> line which now fails:
+>> https://kernelci.org/boot/id/59f787f059b5147794ef1dcf/
+>>
+>> Is there an alias I can use for both before and after this patch?
+>>
+>> Mainline boots fine if I use console=ttyS1 or drop the console arg
+>> altogether, but as we don't currently support different boot args per
+>> tree, and we don't have the manpower to track this patch in all the
+>> trees we test, we will have to switch to only boot testing mainline
+>> from now on.
+> Yes, I've seen the same in Fedora with that patch.
+>
+>
+could you please describe the issue more in detail.
+
+Does u-boot or Linux hang? Does u-boot select the wrong UART? Is there a
+pinmux conflict?
+
+Which u-boot version do you use?
+
+
+Best regards
+
+Stefan
