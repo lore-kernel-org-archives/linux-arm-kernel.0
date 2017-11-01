@@ -1,68 +1,35 @@
 From: damien.riegel@savoirfairelinux.com (Damien Riegel)
-Date: Wed,  1 Nov 2017 13:53:34 -0400
-Subject: [PATCH 3/4] arm64: dts: qcom: msm8916: normalize I2C bindings
-In-Reply-To: <20171101175335.22123-1-damien.riegel@savoirfairelinux.com>
-References: <20171101175335.22123-1-damien.riegel@savoirfairelinux.com>
-Message-ID: <20171101175335.22123-4-damien.riegel@savoirfairelinux.com>
+Date: Wed,  1 Nov 2017 13:53:31 -0400
+Subject: [PATCH 0/4] arm64: dts: qcom: dts improvements 
+Message-ID: <20171101175335.22123-1-damien.riegel@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The QUP core can be used either for I2C or SPI, so the same IP is mapped
-by a driver or the other. SPI bindings use a leading 0 for the start
-address and a size of 0x600, I2C bindings don't have the leading 0 and
-have a size 0x1000.
+The goal of this series was to add missing I2C bindings for BLSP_I2C1,
+BLSP_I2C3, and BLSP_I2C5. But while working on this, I noticed some
+styling issues and decided to tackle them in the same patchset, mostly
+because they touch the same files and the same people will be involved
+for the review. Let me know if you'd rather see them sent separately.
 
-To make them more similar, add the leading 0 to I2C bindings and changes
-the size to 0x600, as the driver only accesses registers up to address
-0x408. Also align the second entry of the clocks array.
+First patch reindents the wcd_codec block in pm8916.dtsi with respect
+to the kernel standards.
 
-Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
----
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+Second patch and third patch makes existing I2C more in sync with the
+rest of the bindings by dropping assignments to a property that doesn't
+take a value, and by making their style matches thus of SPI bindings.
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index e16ba8334518..de25bd6070f5 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -457,10 +457,10 @@
- 
- 		blsp_i2c2: i2c at 78b6000 {
- 			compatible = "qcom,i2c-qup-v2.2.1";
--			reg = <0x78b6000 0x1000>;
-+			reg = <0x078b6000 0x600>;
- 			interrupts = <GIC_SPI 96 0>;
- 			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
--				<&gcc GCC_BLSP1_QUP2_I2C_APPS_CLK>;
-+				 <&gcc GCC_BLSP1_QUP2_I2C_APPS_CLK>;
- 			clock-names = "iface", "core";
- 			pinctrl-names = "default", "sleep";
- 			pinctrl-0 = <&i2c2_default>;
-@@ -472,10 +472,10 @@
- 
- 		blsp_i2c4: i2c at 78b8000 {
- 			compatible = "qcom,i2c-qup-v2.2.1";
--			reg = <0x78b8000 0x1000>;
-+			reg = <0x078b8000 0x600>;
- 			interrupts = <GIC_SPI 98 0>;
- 			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
--				<&gcc GCC_BLSP1_QUP4_I2C_APPS_CLK>;
-+				 <&gcc GCC_BLSP1_QUP4_I2C_APPS_CLK>;
- 			clock-names = "iface", "core";
- 			pinctrl-names = "default", "sleep";
- 			pinctrl-0 = <&i2c4_default>;
-@@ -487,10 +487,10 @@
- 
- 		blsp_i2c6: i2c at 78ba000 {
- 			compatible = "qcom,i2c-qup-v2.2.1";
--			reg = <0x78ba000 0x1000>;
-+			reg = <0x078ba000 0x600>;
- 			interrupts = <GIC_SPI 100 0>;
- 			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
--				<&gcc GCC_BLSP1_QUP6_I2C_APPS_CLK>;
-+				 <&gcc GCC_BLSP1_QUP6_I2C_APPS_CLK>;
- 			clock-names = "iface", "core";
- 			pinctrl-names = "default", "sleep";
- 			pinctrl-0 = <&i2c6_default>;
+Last patch add bindings of I2C cores 1, 3, and 5.
+
+Damien Riegel (4):
+  arm64: dts: qcom: pm8916: fix wcd_codec indentation
+  arm64: dts: qcom: msm8916-pins: remove assignments to bias-disable
+  arm64: dts: qcom: msm8916: normalize I2C bindings
+  arm64: dts: qcom: msm8916: add bindings for i2c1, i2c3, i2c5
+
+ arch/arm64/boot/dts/qcom/msm8916-pins.dtsi | 84 +++++++++++++++++++++++++++---
+ arch/arm64/boot/dts/qcom/msm8916.dtsi      | 57 +++++++++++++++++---
+ arch/arm64/boot/dts/qcom/pm8916.dtsi       | 82 ++++++++++++++---------------
+ 3 files changed, 169 insertions(+), 54 deletions(-)
+
 -- 
 2.15.0
