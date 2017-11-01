@@ -1,27 +1,55 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 1 Nov 2017 16:12:58 -0500
-Subject: [PATCH v2 01/10] dt-bindings: fix the binding of Allwinner DE2
- CCU of A83T and H3
-In-Reply-To: <20171027150658.18509-2-icenowy@aosc.io>
-References: <20171027150658.18509-1-icenowy@aosc.io>
- <20171027150658.18509-2-icenowy@aosc.io>
-Message-ID: <20171101211258.m7lk4s2glhxhs7el@rob-hp-laptop>
+From: labbott@redhat.com (Laura Abbott)
+Date: Wed, 1 Nov 2017 14:13:45 -0700
+Subject: [RFC PATCH 0/2] arm64: optional paranoid __{get,put}_user checks
+In-Reply-To: <20171101120555.yvb65g3wgtxskfh3@lakrids.cambridge.arm.com>
+References: <20171026090942.7041-1-mark.rutland@arm.com>
+ <77c80381-cf68-aa1a-9112-e057c068eeb6@redhat.com>
+ <20171101120555.yvb65g3wgtxskfh3@lakrids.cambridge.arm.com>
+Message-ID: <0f2d5f89-2939-06ec-9b59-b19f828d8968@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 27, 2017 at 11:06:49PM +0800, Icenowy Zheng wrote:
-> The DE2 CCU is different on A83T and H3 -- the parent of the clocks on
-> A83T is PLL_DE but on H3 it's the DE module clock. This is not noticed
-> when I develop the DE2 CCU driver.
+On 11/01/2017 05:05 AM, Mark Rutland wrote:
+> On Tue, Oct 31, 2017 at 04:56:39PM -0700, Laura Abbott wrote:
+>> On 10/26/2017 02:09 AM, Mark Rutland wrote:
+>>> In Prague, Kees mentioned that it would be nice to have a mechanism to
+>>> catch bad __{get,put}_user uses, such as the recent CVE-2017-5123 [1,2]
+>>> issue with unsafe_put_user() in waitid().
+>>>
+>>> These patches allow an optional access_ok() check to be dropped in
+>>> arm64's __{get,put}_user() primitives. These will then BUG() if a bad
+>>> user pointer is passed (which should only happen in the absence of an
+>>> earlier access_ok() check).
 > 
-> Fix the binding by using different compatibles for A83T and H3, adding
-> notes for the PLL_DE usage on A83T, and change the binding example's
-> compatible from A83T to H3 (as it specifies the DE module clock).
+>> Turning on the option fails as soon as we hit userspace. On my buildroot
+>> based environment I get the help text for ld.so (????) and then a message
+>> about attempting to kill init. 
 > 
-> Fixes: ed74f8a8a679 ("dt-bindings: add binding for the Allwinner DE2 CCU")
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  Documentation/devicetree/bindings/clock/sun8i-de2.txt | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
+> Ouch. Thanks for the report, and sorry about this.
+> 
+> The problem is that I evaluate the ptr argument twice in
+> __{get,put}_user(), and this may have side effects.
+> 
+> e.g. when the ELF loader does things like:
+> 
+>   __put_user((elf_addr_t)p, sp++)
+> 
+> ... we increment sp twice, and write to the wrong user address, leaving
+> sp corrupt.
+> 
+> I have an additional patch [1] to fix this, which is in my
+> arm64/access-ok branch [2].
+> 
+> Thanks,
+> Mark.
+> 
+> [1] https://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git/commit/?h=arm64/access-ok&id=ebb7ff83eb53b8810395d5cf48712a4ae6d678543
+> [2] https://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git/log/?h=arm64/access-ok
+> 
 
-Acked-by: Rob Herring <robh@kernel.org>
+Thanks, the updated patch works. I wrote an LKDTM test to verify
+the expected behavior (__{get,put}_user panic whereas {get,put}_user
+do not). You're welcome to add Tested-by or I can wait for v2.
+
+Thanks,
+Laura
