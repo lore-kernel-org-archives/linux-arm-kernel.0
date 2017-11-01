@@ -1,56 +1,81 @@
-From: john.weber@technexion.com (John Weber)
-Date: Wed, 1 Nov 2017 17:24:52 +0000
-Subject: [PATCH v2] ARM: dts: imx7d-pico: Add Wifi support
-In-Reply-To: <CAP9ODKpjhob8kqr+xMi6aqnVkd82JwpdJ_3cLJ_K6Ap7nAfApQ@mail.gmail.com>
-References: <1503056221-29183-1-git-send-email-vanessa.maegima@nxp.com>
- <CAP9ODKrp1+-u+OvuXLv_k7rpo-5Y6DpoxHFA+2zXM=XbPA7GBQ@mail.gmail.com>
- <1509539876.4068.2.camel@nxp.com>
- <CAP9ODKpjhob8kqr+xMi6aqnVkd82JwpdJ_3cLJ_K6Ap7nAfApQ@mail.gmail.com>
-Message-ID: <FE0F1D02-95E6-474A-B549-9F113B87835D@technexion.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 01 Nov 2017 17:42:37 +0000
+Subject: [PATCH v4 17/21] KVM: arm64: Save ESR_EL2 on guest SError
+In-Reply-To: <86efpj50nb.fsf@arm.com>
+References: <20171019145807.23251-1-james.morse@arm.com>	<20171019145807.23251-18-james.morse@arm.com>
+ <86po943puu.fsf@arm.com> <86efpj50nb.fsf@arm.com>
+Message-ID: <59FA078D.6030005@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Marc,
 
-On 11/1/17, 7:47 AM, "Otavio Salvador" <otavio.salvador@ossystems.com.br> wrote:
+On 31/10/17 05:47, Marc Zyngier wrote:
+> On Tue, Oct 31 2017 at  4:26:01 am GMT, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On Thu, Oct 19 2017 at  4:58:03 pm BST, James Morse <james.morse@arm.com> wrote:
+>>> When we exit a guest due to an SError the vcpu fault info isn't updated
+>>> with the ESR. Today this is only done for traps.
+>>>
+>>> The v8.2 RAS Extensions define ISS values for SError. Update the vcpu's
+>>> fault_info with the ESR on SError so that handle_exit() can determine
+>>> if this was a RAS SError and decode its severity.
 
-    On Wed, Nov 1, 2017 at 10:38 AM, Vanessa Maegima
-    <vanessa.maegima@nxp.com> wrote:
-    > On Ter, 2017-10-31 at 16:11 -0200, Otavio Salvador wrote:
-    >> On Fri, Aug 18, 2017 at 8:37 AM, Vanessa Maegima
-    >> <vanessa.maegima@nxp.com> wrote:
-    >> >
-    >> > imx7d-pico has an ap6212 wifi chip connected to usdhc2 port.
-    >> >
-    >> > Add support for the usdhc2 port and to the WL_REG_ON regulator
-    >> > so Wifi can be functional on this board.
-    >> >
-    >> > Signed-off-by: Vanessa Maegima <vanessa.maegima@nxp.com>
-    >> It seems the name of the dtb is misleading ... this dtb refers mostly
-    >> to the imx7d-pico-pi board no?
-    >>
-    >
-    > Yes, this refers to the imx7d-pico-pi board. At the time I added this
-    > support, I was not aware of the board variants as I had only the pico-
-    > pi baseboard. I can work to separate this dts into SoM and baseboard
-    > dts if you think this would be better, but I can only support pico-pi
-    > as I do not have access to the other baseboards.
-    
-    Agreed, splitting it makes sense.
-    
-    I think we'd need to:
-    
-    - rename imx7d-pico.dts to imx7d-pico.dtsi
-    - make a new imx7d-pico.dts to keep compatibility (Shawn is it need?)
-    - try to make a imx7d-pico-pi.dts that includes imx7d-pico.dtsi and
-    technexion-pico-pi.dtsi?
-    
-    It allows for adding the imx6ul-pico-pi and also split hobit baseboard as well.
+>>> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+>>> index af37658223a0..cba6d8ac105c 100644
+>>> --- a/arch/arm64/kvm/hyp/switch.c
+>>> +++ b/arch/arm64/kvm/hyp/switch.c
+>>> @@ -230,13 +230,20 @@ static bool __hyp_text __translate_far_to_hpfar(u64 far, u64 *hpfar)
+>>>  	return true;
+>>>  }
+>>>  
+>>> +static void __hyp_text __populate_fault_info_esr(struct kvm_vcpu *vcpu)
+>>> +{
+>>> +	vcpu->arch.fault.esr_el2 = read_sysreg_el2(esr);
+>>> +}
+>>> +
+>>>  static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
+>>>  {
+>>> -	u64 esr = read_sysreg_el2(esr);
+>>> -	u8 ec = ESR_ELx_EC(esr);
+>>> +	u8 ec;
+>>> +	u64 esr;
+>>>  	u64 hpfar, far;
+>>>  
+>>> -	vcpu->arch.fault.esr_el2 = esr;
+>>> +	__populate_fault_info_esr(vcpu);
+>>> +	esr = vcpu->arch.fault.esr_el2;
+>>> +	ec = ESR_ELx_EC(esr);
+>>>  
+>>>  	if (ec != ESR_ELx_EC_DABT_LOW && ec != ESR_ELx_EC_IABT_LOW)
+>>>  		return true;
+>>> @@ -325,6 +332,8 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+>>>  	 */
+>>>  	if (exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
+>>>  		goto again;
+>>> +	else if (ARM_EXCEPTION_CODE(exit_code) == ARM_EXCEPTION_EL1_SERROR)
+>>> +		__populate_fault_info_esr(vcpu);
+>>>  
+>>>  	if (static_branch_unlikely(&vgic_v2_cpuif_trap) &&
+>>>  	    exit_code == ARM_EXCEPTION_TRAP) {
+>>
+>> With this patch, the only case were we don't save ESR_EL2 is when we
+>> take an interrupt. I think we should bite the bullet and make it
+>> slightly more streamlined, always saving ESR_EL2.
 
-This is the way that it has been done in the TechNexion downstream kernel based on NXP?s 4.1.15 kernel:
+We always read it __guest_exit, just in case we take an SError and have to put
+it back.
 
-For reference:
-https://github.com/TechNexion/linux/tree/tn-imx_4.1.15_2.0.0_ga/arch/arm/boot/dts
 
-We have split the baseboards out into .dtsi files with ?baseboard_pico_(pi,nymph,hobbit,dwarf).dtsi?
+> Otherwise, an alternative would be to write something like:
+> 
+> 	if (ARM_EXCEPTION_CODE(exit_code) != ARM_EXCEPTION_IRQ)
+>         	vcpu->arch.fault.esr_el2 = read_sysreg_el2(esr);
+> 
+> which still avoids saving it, and is a lot more readable.
 
-John
+I'll switch to this in the next version.
+
+
+Thanks,
+
+James
