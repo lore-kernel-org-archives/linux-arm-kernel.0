@@ -1,77 +1,164 @@
-From: marcel@holtmann.org (Marcel Holtmann)
-Date: Wed, 1 Nov 2017 13:16:42 +0100
-Subject: [GIT PULL 1/2] bcm2835-dt-fixes-2017-10-06
-In-Reply-To: <CALeDE9Oi+DvoJ6X22ButaQxHNyqBzg=H1-mb69_g-rp4RR_fqw@mail.gmail.com>
-References: <20171006220504.7776-1-eric@anholt.net>
- <edb03edb-f2a6-549e-6060-eccfae554d92@gmail.com>
- <CAJsfgeU5Zq-2zSfto8WUZ5Xud1Ksedu9XdLG9pWR7YBZGVaHBA@mail.gmail.com>
- <CALeDE9NsjYHpaR6kyHgABGr2eE=EhpJstttK60WwRkAj0u1m7Q@mail.gmail.com>
- <910a98ca-57f6-baca-73ac-f6c8c1ff04db@i2se.com>
- <CALeDE9Oi+DvoJ6X22ButaQxHNyqBzg=H1-mb69_g-rp4RR_fqw@mail.gmail.com>
-Message-ID: <F3464528-76E5-4F11-BD58-DEB56410687B@holtmann.org>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed,  1 Nov 2017 13:22:13 +0100
+Subject: [PATCH] arm: dts: zynq: Use SPDX-License-Identifier
+Message-ID: <f49258251b1df101c68616fd44788a583a10fa84.1509538929.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Follow trend and use the SPDX License description.
 
->>>>>> Hi Florian.  Here's a patch that's gone through a couple of revisions
->>>>>> on the list, that seriously fixes up the default serial behavior --
->>>>>> previously, without the right config.txt/cmdline bits, you'd often end
->>>>>> up with a hang with no output before booting completed.  It would be
->>>>>> great to get it into 4.14.
->>>>>> 
->>>>>> The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
->>>>>> 
->>>>>>  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
->>>>>> 
->>>>>> are available in the git repository at:
->>>>>> 
->>>>>>  git://github.com/anholt/linux tags/bcm2835-dt-fixes-2017-10-06
->>>>>> 
->>>>>> for you to fetch changes up to f08f58a2bf68900a84e782b8c7ad701c0654173c:
->>>>>> 
->>>>>>  ARM: dts: bcm283x: Fix console path on RPi3 (2017-10-06 13:04:56 -0700)
->>>>>> 
->>>>>> ----------------------------------------------------------------
->>>>>> This pull request brings in a fix for default serial console setup on
->>>>>> RPi3, so it now comes up with no config.txt/cmdline.txt settings in
->>>>>> the firmware.
->>>>>> 
->>>>>> ----------------------------------------------------------------
->>>>> Merged, thanks Eric
->>>>> 
->>>>> --
->>>>> Florian
->>>> Hi all,
->>>> 
->>>> I realise this patch has been in mainline for a more than a week, but
->>>> I've only recently had time to bisect broken rpi-3 boots in kernelci
->>>> and found f08f58a2bf68900a84e782b8c7ad701c0654173c as the cause.
->>>> 
->>>> Kernelci boots the rpi3 using uboot, with console=ttyS0 in the command
->>>> line which now fails:
->>>> https://kernelci.org/boot/id/59f787f059b5147794ef1dcf/
->>>> 
->>>> Is there an alias I can use for both before and after this patch?
->>>> 
->>>> Mainline boots fine if I use console=ttyS1 or drop the console arg
->>>> altogether, but as we don't currently support different boot args per
->>>> tree, and we don't have the manpower to track this patch in all the
->>>> trees we test, we will have to switch to only boot testing mainline
->>>> from now on.
->>> Yes, I've seen the same in Fedora with that patch.
->>> 
->>> 
->> could you please describe the issue more in detail.
->> 
->> Does u-boot or Linux hang? Does u-boot select the wrong UART? Is there a
->> pinmux conflict?
-> 
-> Basically on the RPi3 you use to get ttyAMA0 and ttyS0 but now the
-> later is ttyS1
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-which UART is which now. It should expose the Bluetooth UART correctly now. And also more importantly usable. The only missing piece with 4.14 would be the DT assigned for serdev. While 4.14 would still require a call to btattach, starting with 4.15 that should no longer be needed.
+ arch/arm/boot/dts/zynq-7000.dtsi      | 11 ++---------
+ arch/arm/boot/dts/zynq-microzed.dts   |  9 +--------
+ arch/arm/boot/dts/zynq-parallella.dts |  9 +--------
+ arch/arm/boot/dts/zynq-zc702.dts      |  9 +--------
+ arch/arm/boot/dts/zynq-zc706.dts      |  9 +--------
+ arch/arm/boot/dts/zynq-zed.dts        |  9 +--------
+ arch/arm/boot/dts/zynq-zybo.dts       |  9 +--------
+ 7 files changed, 8 insertions(+), 57 deletions(-)
 
-Regards
-
-Marcel
+diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+index 0f79fe1ccd9d..2a66da637314 100644
+--- a/arch/arm/boot/dts/zynq-7000.dtsi
++++ b/arch/arm/boot/dts/zynq-7000.dtsi
+@@ -1,14 +1,7 @@
+ /*
+- *  Copyright (C) 2011 - 2014 Xilinx
++ * Copyright (C) 2011 - 2014 Xilinx
+  *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
++ * SPDX-License-Identifier:	GPL-2.0
+  */
+ 
+ / {
+diff --git a/arch/arm/boot/dts/zynq-microzed.dts b/arch/arm/boot/dts/zynq-microzed.dts
+index b9376a4904b4..30853ce92f6b 100644
+--- a/arch/arm/boot/dts/zynq-microzed.dts
++++ b/arch/arm/boot/dts/zynq-microzed.dts
+@@ -2,14 +2,7 @@
+  * Copyright (C) 2011 - 2014 Xilinx
+  * Copyright (C) 2016 Jagan Teki <jteki@openedev.com>
+  *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
++ * SPDX-License-Identifier:	GPL-2.0
+  */
+ /dts-v1/;
+ /include/ "zynq-7000.dtsi"
+diff --git a/arch/arm/boot/dts/zynq-parallella.dts b/arch/arm/boot/dts/zynq-parallella.dts
+index 0144acfa9793..2e12dd996140 100644
+--- a/arch/arm/boot/dts/zynq-parallella.dts
++++ b/arch/arm/boot/dts/zynq-parallella.dts
+@@ -7,14 +7,7 @@
+  *  Copyright (C) 2012 National Instruments Corp.
+  *  Copyright (C) 2013 Xilinx
+  *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
++ * SPDX-License-Identifier:	GPL-2.0
+  */
+ /dts-v1/;
+ /include/ "zynq-7000.dtsi"
+diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
+index 70a5de76b7db..d96979644e49 100644
+--- a/arch/arm/boot/dts/zynq-zc702.dts
++++ b/arch/arm/boot/dts/zynq-zc702.dts
+@@ -2,14 +2,7 @@
+  *  Copyright (C) 2011 - 2014 Xilinx
+  *  Copyright (C) 2012 National Instruments Corp.
+  *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
++ * SPDX-License-Identifier:	GPL-2.0
+  */
+ /dts-v1/;
+ #include "zynq-7000.dtsi"
+diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
+index cdc326ec3335..d0f51d0d6c95 100644
+--- a/arch/arm/boot/dts/zynq-zc706.dts
++++ b/arch/arm/boot/dts/zynq-zc706.dts
+@@ -2,14 +2,7 @@
+  *  Copyright (C) 2011 - 2014 Xilinx
+  *  Copyright (C) 2012 National Instruments Corp.
+  *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
++ * SPDX-License-Identifier:	GPL-2.0
+  */
+ /dts-v1/;
+ #include "zynq-7000.dtsi"
+diff --git a/arch/arm/boot/dts/zynq-zed.dts b/arch/arm/boot/dts/zynq-zed.dts
+index 5e44dc12fd60..c2c0dc3d2c67 100644
+--- a/arch/arm/boot/dts/zynq-zed.dts
++++ b/arch/arm/boot/dts/zynq-zed.dts
+@@ -2,14 +2,7 @@
+  *  Copyright (C) 2011 - 2014 Xilinx
+  *  Copyright (C) 2012 National Instruments Corp.
+  *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
++ * SPDX-License-Identifier:	GPL-2.0
+  */
+ /dts-v1/;
+ #include "zynq-7000.dtsi"
+diff --git a/arch/arm/boot/dts/zynq-zybo.dts b/arch/arm/boot/dts/zynq-zybo.dts
+index e40cafc5ee5b..5c73ca5896ea 100644
+--- a/arch/arm/boot/dts/zynq-zybo.dts
++++ b/arch/arm/boot/dts/zynq-zybo.dts
+@@ -2,14 +2,7 @@
+  *  Copyright (C) 2011 - 2014 Xilinx
+  *  Copyright (C) 2012 National Instruments Corp.
+  *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
++ * SPDX-License-Identifier:	GPL-2.0
+  */
+ /dts-v1/;
+ #include "zynq-7000.dtsi"
+-- 
+1.9.1
