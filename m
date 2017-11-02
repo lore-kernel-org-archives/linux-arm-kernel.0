@@ -1,150 +1,61 @@
 From: preid@electromag.com.au (Phil Reid)
-Date: Thu,  2 Nov 2017 10:40:27 +0800
-Subject: [PATCH v5 4/7] i2c: designware: add i2c gpio recovery option
-In-Reply-To: <1509590430-11968-1-git-send-email-preid@electromag.com.au>
-References: <1509590430-11968-1-git-send-email-preid@electromag.com.au>
-Message-ID: <1509590430-11968-5-git-send-email-preid@electromag.com.au>
+Date: Thu,  2 Nov 2017 10:40:23 +0800
+Subject: [PATCH v5 0/7]  i2c: designware: add i2c gpio recovery option
+Message-ID: <1509590430-11968-1-git-send-email-preid@electromag.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tim Sander <tim@krieglstein.org>
+Changes from V3:
+- fix typ in message s/reset/rest/
+- move *_gpiod field comments to the first commit where the fields
+  are actually added.
+- Add Jarkko/Andy Ack/Reviewed.
 
-This patch contains much input from Phil Reid and has been tested
-on Intel/Altera Cyclone V SOC Hardware with Altera GPIO's for the
-SCL and SDA GPIO's.
+Changes from V3:
+- rebase on i2c/for-next
+- Add patches to convert other drivers using gpio recover to gpiod
+- Remove legacy gpio
+- Address minor issues raised in review and add acks received so far
 
-Acked-by: Jarkko Nikula <jarkko.nikula@linux.intel.com>
-Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Signed-off-by: Tim Sander <tim@krieglstein.org>
-Signed-off-by: Phil Reid <preid@electromag.com.au>
----
- drivers/i2c/busses/i2c-designware-common.c |  6 +++-
- drivers/i2c/busses/i2c-designware-core.h   |  1 +
- drivers/i2c/busses/i2c-designware-master.c | 57 ++++++++++++++++++++++++++++++
- 3 files changed, 63 insertions(+), 1 deletion(-)
+Changes from V2:
+- Rebase on https://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git/
+  i2c/for-next
+  No intentional changes, but needed to move i2c_dw_plat_prepare_clk to common
+  for the master recovery functions to use. which is included as two additional
+  patches.
 
-diff --git a/drivers/i2c/busses/i2c-designware-common.c b/drivers/i2c/busses/i2c-designware-common.c
-index 3d684c6..6b82809 100644
---- a/drivers/i2c/busses/i2c-designware-common.c
-+++ b/drivers/i2c/busses/i2c-designware-common.c
-@@ -230,7 +230,11 @@ int i2c_dw_wait_bus_not_busy(struct dw_i2c_dev *dev)
- 	while (dw_readl(dev, DW_IC_STATUS) & DW_IC_STATUS_ACTIVITY) {
- 		if (timeout <= 0) {
- 			dev_warn(dev->dev, "timeout waiting for bus ready\n");
--			return -ETIMEDOUT;
-+			i2c_recover_bus(&dev->adapter);
-+
-+			if (dw_readl(dev, DW_IC_STATUS) & DW_IC_STATUS_ACTIVITY)
-+				return -ETIMEDOUT;
-+			return 0;
- 		}
- 		timeout--;
- 		usleep_range(1000, 1100);
-diff --git a/drivers/i2c/busses/i2c-designware-core.h b/drivers/i2c/busses/i2c-designware-core.h
-index 33c6c8f..d58a336 100644
---- a/drivers/i2c/busses/i2c-designware-core.h
-+++ b/drivers/i2c/busses/i2c-designware-core.h
-@@ -286,6 +286,7 @@ struct dw_i2c_dev {
- 	void			(*disable_int)(struct dw_i2c_dev *dev);
- 	int			(*init)(struct dw_i2c_dev *dev);
- 	int			mode;
-+	struct i2c_bus_recovery_info rinfo;
- };
- 
- #define ACCESS_SWAP		0x00000001
-diff --git a/drivers/i2c/busses/i2c-designware-master.c b/drivers/i2c/busses/i2c-designware-master.c
-index 418c233..ae69188 100644
---- a/drivers/i2c/busses/i2c-designware-master.c
-+++ b/drivers/i2c/busses/i2c-designware-master.c
-@@ -25,11 +25,13 @@
- #include <linux/err.h>
- #include <linux/errno.h>
- #include <linux/export.h>
-+#include <linux/gpio/consumer.h>
- #include <linux/i2c.h>
- #include <linux/interrupt.h>
- #include <linux/io.h>
- #include <linux/module.h>
- #include <linux/pm_runtime.h>
-+#include <linux/reset.h>
- 
- #include "i2c-designware-core.h"
- 
-@@ -443,6 +445,7 @@ static void i2c_dw_xfer_init(struct dw_i2c_dev *dev)
- 	if (!wait_for_completion_timeout(&dev->cmd_complete, adap->timeout)) {
- 		dev_err(dev->dev, "controller timed out\n");
- 		/* i2c_dw_init implicitly disables the adapter */
-+		i2c_recover_bus(&dev->adapter);
- 		i2c_dw_init_master(dev);
- 		ret = -ETIMEDOUT;
- 		goto done;
-@@ -613,6 +616,56 @@ static irqreturn_t i2c_dw_isr(int this_irq, void *dev_id)
- 	return IRQ_HANDLED;
- }
- 
-+static void i2c_dw_prepare_recovery(struct i2c_adapter *adap)
-+{
-+	struct dw_i2c_dev *dev = i2c_get_adapdata(adap);
-+
-+	i2c_dw_disable(dev);
-+	reset_control_assert(dev->rst);
-+	i2c_dw_prepare_clk(dev, false);
-+}
-+
-+static void i2c_dw_unprepare_recovery(struct i2c_adapter *adap)
-+{
-+	struct dw_i2c_dev *dev = i2c_get_adapdata(adap);
-+
-+	i2c_dw_prepare_clk(dev, true);
-+	reset_control_deassert(dev->rst);
-+	i2c_dw_init_master(dev);
-+}
-+
-+static int i2c_dw_init_recovery_info(struct dw_i2c_dev *dev)
-+{
-+	struct i2c_bus_recovery_info *rinfo = &dev->rinfo;
-+	struct i2c_adapter *adap = &dev->adapter;
-+	struct gpio_desc *gpio;
-+	int r;
-+
-+	gpio = devm_gpiod_get(dev->dev, "scl", GPIOD_OUT_HIGH);
-+	if (IS_ERR(gpio)) {
-+		r = PTR_ERR(gpio);
-+		if (r == -ENOENT)
-+			return 0;
-+		return r;
-+	}
-+	rinfo->scl_gpiod = gpio;
-+
-+	gpio = devm_gpiod_get_optional(dev->dev, "sda", GPIOD_IN);
-+	if (IS_ERR(gpio))
-+		return PTR_ERR(gpio);
-+	rinfo->sda_gpiod = gpio;
-+
-+	rinfo->recover_bus = i2c_generic_scl_recovery;
-+	rinfo->prepare_recovery = i2c_dw_prepare_recovery;
-+	rinfo->unprepare_recovery = i2c_dw_unprepare_recovery;
-+	adap->bus_recovery_info = rinfo;
-+
-+	dev_info(dev->dev, "running with gpio recovery mode! scl%s",
-+		 rinfo->sda_gpiod ? ",sda" : "");
-+
-+	return 0;
-+}
-+
- int i2c_dw_probe(struct dw_i2c_dev *dev)
- {
- 	struct i2c_adapter *adap = &dev->adapter;
-@@ -652,6 +705,10 @@ int i2c_dw_probe(struct dw_i2c_dev *dev)
- 		return ret;
- 	}
- 
-+	ret = i2c_dw_init_recovery_info(dev);
-+	if (ret)
-+		return ret;
-+
- 	/*
- 	 * Increment PM usage count during adapter registration in order to
- 	 * avoid possible spurious runtime suspend when adapter device is
+Changes from V1:
+- In review Andy suggested change the i2c core to use the gpiod
+  I've added a patch that allows the gradual switching of drivers 
+  to using gpiod interface. The old interface is preserved so
+  that changes can be made incrementally.
+- I've update Tim's patch for the designware driver to use the new
+  interface. Tweaked a couple of things to his patch and fixed
+  up things Andy id in last review. 
+  The core changes in p1 don't require the get/set scl/sda functions.
+  Hopefully I've done the right thing with preserving authorship and
+  signoff.
+
+Phil Reid (6):
+  i2c: Switch to using gpiod interface for gpio bus recovery
+  i2c: designware: move i2c_dw_plat_prepare_clk to common
+  i2c: designware: rename i2c_dw_plat_prepare_clk to i2c_dw_prepare_clk
+  i2c: imx: switch to using gpiod for bus recovery gpios
+  i2c: davinci: switch to using gpiod for bus recovery gpios
+  i2c: remove legacy integer scl/sda gpio for recovery
+
+Tim Sander (1):
+  i2c: designware: add i2c gpio recovery option
+
+ drivers/i2c/busses/i2c-davinci.c            | 20 +++++--
+ drivers/i2c/busses/i2c-designware-common.c  | 19 ++++++-
+ drivers/i2c/busses/i2c-designware-core.h    |  2 +
+ drivers/i2c/busses/i2c-designware-master.c  | 57 ++++++++++++++++++++
+ drivers/i2c/busses/i2c-designware-platdrv.c | 18 ++-----
+ drivers/i2c/busses/i2c-imx.c                | 18 +++----
+ drivers/i2c/i2c-core-base.c                 | 83 ++++-------------------------
+ include/linux/i2c.h                         | 11 ++--
+ 8 files changed, 120 insertions(+), 108 deletions(-)
+
 -- 
 1.8.3.1
