@@ -1,117 +1,194 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 2 Nov 2017 08:09:48 +0530
-Subject: [PATCH] mailbox: add support for doorbell/signal mode controllers
-In-Reply-To: <59a05fcb-ff30-0683-144e-93521a7413f9@arm.com>
-References: <1509553964-4451-1-git-send-email-sudeep.holla@arm.com>
- <CABb+yY1tcm-68E5oG75hstuMd6AOeb=BB6HeKGnQ1zj4Qya6hg@mail.gmail.com>
- <59a05fcb-ff30-0683-144e-93521a7413f9@arm.com>
-Message-ID: <CABb+yY16-B9vReRjLopV1RsyB8a=c5X9XaomtTj44520XrDdmA@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 02 Nov 2017 04:43:51 +0200
+Subject: [PATCH v2 14/26] media: xilinx: fix a debug printk
+In-Reply-To: <be86653c5e5641582f65f43780b1fe255e92cdc0.1509569763.git.mchehab@s-opensource.com>
+References: <c4389ab1c02bb08c1a55012fdb859c8b10bdc47e.1509569763.git.mchehab@s-opensource.com>
+ <be86653c5e5641582f65f43780b1fe255e92cdc0.1509569763.git.mchehab@s-opensource.com>
+Message-ID: <2117711.dO2rQLXOup@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 1, 2017 at 11:45 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->
->
-> On 01/11/17 18:03, Jassi Brar wrote:
->> On Wed, Nov 1, 2017 at 10:02 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>
->>>
->>> Such controllers don't need to transmit any data, they just transmit
->>> the signal. In such controllers the data pointer passed to
->>> mbox_send_message is passed to client via it's tx_prepare callback.
->>> Controller doesn't need any data to be passed from the client.
->>>
->> Some controllers need a non-zero value written to a register in order
->> to trigger the signal.
->
-> You are right, just right non-zero or whatever controller value to
-> trigger the interrupt to remote.
->
->> That register is visible to the remote. While the data/packet is setup
->> during tx_prepare() callback.
->
-> Agreed.
->
->> You are overlooking this class of doorbell controllers.
->>
->
-> Not sure what do you mean by that ?
->
-Such doorbell controllers can't use send_signal(chan) because they
-need that non-zero value from client to send over the shared register.
-You are assuming every protocol implements just one command.
+Hi Mauro,
 
->>>
->>> This is rough idea I have on extending mailbox interface to support
->>> the doorbell requirements.
->>>
->> What doorbell requirements does the api not support?
->> QComm's APCS IPC is what you call a "doorbell" controller and is
->> already supported by the API. It could run SCMI even easier than MHU
->> (your controller).
->>
->
-> Again agreed. But see below for reason to create this API.
->
->>> The new API send_signal will eliminate the
->>> issue Jassi has explained in earlier discussion with respect to generic
->>> message format using Rockchip example.
->>>
->> Sorry I don't see how.
->> Please explain how can send_signal() api be used by, say, rockchip to
->> support SCMI?
->>
->
->  80         writel_relaxed(msg->cmd, mb->mbox_base +
-> MAILBOX_A2B_CMD(chans->idx));
->  81         writel_relaxed(msg->rx_size, mb->mbox_base +
->
->  82                        MAILBOX_A2B_DAT(chans->idx));
->
->  83
->
->  will be replaced with
->
-> writel(whatever_value_to trigger_signal, MAILBOX_A2B_CMD(chans->idx));
->
-> in its send_signal function.
->
-1) Where does the  "whatever_value_to_trigger_signal"  come from?
-That has to come from client. You can not dictate the channel
-transfers a fixed u32 value over its lifetime. SCMI may use one
-command code but other protocols use more.
+(CC'ing Rob and Sakari)
 
-2) Using 'rx_size' is not a software choice made in the driver. The
-_hardware_ has two registers shared with remote side - a CMD and a
-DATA register. So the driver (written agnostic to any particular
-client) would naturally expect the command+data from the client to be
-programmed in to CMD and DAT registers.
+Thank you for the patch.
 
+On Wednesday, 1 November 2017 23:05:51 EET Mauro Carvalho Chehab wrote:
+> Two orthogonal changesets caused a breakage at several printk
+> messages inside xilinx. Changeset 859969b38e2e
+> ("[media] v4l: Switch from V4L2 OF not V4L2 fwnode API")
+> made davinci to use struct fwnode_handle instead of
+> struct device_node. Changeset 68d9c47b1679
+> ("media: Convert to using %pOF instead of full_name")
+> changed the printk to not use ->full_name, but, instead,
+> to rely on %pOF.
+> 
+> With both patches applied, the Kernel will do the wrong
+> thing, as warned by smatch:
+> drivers/media/platform/xilinx/xilinx-vipp.c:108 xvip_graph_build_one()
+> error: '%pOF' expects argument of type 'struct device_node*', argument 4
+> has type 'void*'
+> drivers/media/platform/xilinx/xilinx-vipp.c:117 xvip_graph_build_one()
+> error: '%pOF' expects argument of type 'struct device_node*', argument 4 has
+> type 'void*'
+> drivers/media/platform/xilinx/xilinx-vipp.c:126 xvip_graph_build_one()
+> error: '%pOF' expects argument of type 'struct device_node*', argument 4
+> has type 'void*'
+> drivers/media/platform/xilinx/xilinx-vipp.c:138 xvip_graph_build_one()
+> error: '%pOF' expects argument of type 'struct device_node*', argument 3 has
+> type 'void*'
+> drivers/media/platform/xilinx/xilinx-vipp.c:148 xvip_graph_build_one()
+> error: '%pOF' expects argument of type 'struct device_node*', argument 4
+> has type 'void*'
+> drivers/media/platform/xilinx/xilinx-vipp.c:245 xvip_graph_build_dma()
+> error: '%pOF' expects argument of type 'struct device_node*', argument 3 has
+> type 'void*'
+> drivers/media/platform/xilinx/xilinx-vipp.c:254 xvip_graph_build_dma()
+> error: '%pOF' expects argument of type 'struct device_node*', argument 4
+> has type 'void*'
+> 
+> So, change the logic to actually print the device name
+> that was obtained before the print logic.
 
->> I am not convinced we should clone an api just so that a client driver
->> becomes simpler. Esp when it shifts, and not avoid, the additional
->> code (to support the client) onto the provider side.
->>
->
-> It doesn't tie the data format with particular mailbox controller.
-> send_data has void *data and the interpretation is controller specific.
-> send_signal on the other handle can implemented by the controllers which
-> knows how and can trigger the specific signal to the remote.
->
-Yeah that's what I said - you want to make a client simpler by pushing
-the code requirement onto the provider side.
+This doesn't seem like a good idea to me. The main point of commit 
+68d9c47b1679 is to avoid accessing full_name directly to prepare for removal 
+of that field.
 
-For example, you mean we modify the provider rockchip-mailbox.c by implementing
+to_of_node() is defined as
 
-rockchip_send_signal(chan)
+#define to_of_node(__fwnode)                                            \
+        ({                                                              \
+                typeof(__fwnode) __to_of_node_fwnode = (__fwnode);      \
+                                                                        \
+                is_of_node(__to_of_node_fwnode) ?                       \
+                        container_of(__to_of_node_fwnode,               \
+                                     struct device_node, fwnode) :      \
+                        NULL;                                           \
+        })
+
+when CONFIG_OF is set, and as
+
+static inline struct device_node *to_of_node(const struct fwnode_handle 
+*fwnode)
 {
-  struct rockchip_mbox_msg msg;
-
-  msg.cmd = chan->idx;  //only one command supported by the channel !!!
-  msg.rx_size = 0;
-
-  rockchip_send_data(chan, (void*) &msg);
+        return NULL;
 }
 
-whereas I suggest this SCMI specific code should be part of
-transport/mapping shim layer of SCMI.
+otherwise. I wonder why smatch believes the value is a void *, but in any case 
+that should be fixed either in smatch (if it's a smatch bug) or in the 
+definition of the to_of_node() macro.
+
+> Fixes: 68d9c47b1679 ("media: Convert to using %pOF instead of full_name")
+> Fixes: 859969b38e2e ("[media] v4l: Switch from V4L2 OF not V4L2 fwnode API")
+
+When submitting fixes you should CC the author of the original commits. They 
+should have more information about the context, and in this case I believe Rob 
+would have pointed out that adding back references to full_name would break 
+the refactoring he's working on.
+
+> Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
+> ---
+>  drivers/media/platform/xilinx/xilinx-vipp.c | 31 +++++++++++++-------------
+>  1 file changed, 17 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/media/platform/xilinx/xilinx-vipp.c
+> b/drivers/media/platform/xilinx/xilinx-vipp.c index
+> d881cf09876d..dd777c834c43 100644
+> --- a/drivers/media/platform/xilinx/xilinx-vipp.c
+> +++ b/drivers/media/platform/xilinx/xilinx-vipp.c
+> @@ -65,6 +65,9 @@ xvip_graph_find_entity(struct xvip_composite_device *xdev,
+> return NULL;
+>  }
+> 
+> +#define LOCAL_NAME(link)	to_of_node(link.local_node)->full_name
+> +#define REMOTE_NAME(link)	to_of_node(link.remote_node)->full_name
+> +
+>  static int xvip_graph_build_one(struct xvip_composite_device *xdev,
+>  				struct xvip_graph_entity *entity)
+>  {
+> @@ -103,9 +106,9 @@ static int xvip_graph_build_one(struct
+> xvip_composite_device *xdev,
+>  		 * the link.
+>  		 */
+>  		if (link.local_port >= local->num_pads) {
+> -			dev_err(xdev->dev, "invalid port number %u for %pOF\n",
+> +			dev_err(xdev->dev, "invalid port number %u for %s\n",
+>  				link.local_port,
+> -				to_of_node(link.local_node));
+> +				LOCAL_NAME(link));
+>  			v4l2_fwnode_put_link(&link);
+>  			ret = -EINVAL;
+>  			break;
+> @@ -114,8 +117,8 @@ static int xvip_graph_build_one(struct
+> xvip_composite_device *xdev, local_pad = &local->pads[link.local_port];
+> 
+>  		if (local_pad->flags & MEDIA_PAD_FL_SINK) {
+> -			dev_dbg(xdev->dev, "skipping sink port %pOF:%u\n",
+> -				to_of_node(link.local_node),
+> +			dev_dbg(xdev->dev, "skipping sink port %s:%u\n",
+> +				LOCAL_NAME(link),
+>  				link.local_port);
+>  			v4l2_fwnode_put_link(&link);
+>  			continue;
+> @@ -123,8 +126,8 @@ static int xvip_graph_build_one(struct
+> xvip_composite_device *xdev,
+> 
+>  		/* Skip DMA engines, they will be processed separately. */
+>  		if (link.remote_node == of_fwnode_handle(xdev->dev->of_node)) {
+> -			dev_dbg(xdev->dev, "skipping DMA port %pOF:%u\n",
+> -				to_of_node(link.local_node),
+> +			dev_dbg(xdev->dev, "skipping DMA port %s:%u\n",
+> +				REMOTE_NAME(link),
+>  				link.local_port);
+>  			v4l2_fwnode_put_link(&link);
+>  			continue;
+> @@ -134,8 +137,8 @@ static int xvip_graph_build_one(struct
+> xvip_composite_device *xdev, ent = xvip_graph_find_entity(xdev,
+>  					     to_of_node(link.remote_node));
+>  		if (ent == NULL) {
+> -			dev_err(xdev->dev, "no entity found for %pOF\n",
+> -				to_of_node(link.remote_node));
+> +			dev_err(xdev->dev, "no entity found for %s\n",
+> +				REMOTE_NAME(link));
+>  			v4l2_fwnode_put_link(&link);
+>  			ret = -ENODEV;
+>  			break;
+> @@ -144,8 +147,8 @@ static int xvip_graph_build_one(struct
+> xvip_composite_device *xdev, remote = ent->entity;
+> 
+>  		if (link.remote_port >= remote->num_pads) {
+> -			dev_err(xdev->dev, "invalid port number %u on %pOF\n",
+> -				link.remote_port, to_of_node(link.remote_node));
+> +			dev_err(xdev->dev, "invalid port number %u on %s\n",
+> +				link.remote_port, REMOTE_NAME(link));
+>  			v4l2_fwnode_put_link(&link);
+>  			ret = -EINVAL;
+>  			break;
+> @@ -241,17 +244,17 @@ static int xvip_graph_build_dma(struct
+> xvip_composite_device *xdev) ent = xvip_graph_find_entity(xdev,
+>  					     to_of_node(link.remote_node));
+>  		if (ent == NULL) {
+> -			dev_err(xdev->dev, "no entity found for %pOF\n",
+> -				to_of_node(link.remote_node));
+> +			dev_err(xdev->dev, "no entity found for %s\n",
+> +				REMOTE_NAME(link));
+>  			v4l2_fwnode_put_link(&link);
+>  			ret = -ENODEV;
+>  			break;
+>  		}
+> 
+>  		if (link.remote_port >= ent->entity->num_pads) {
+> -			dev_err(xdev->dev, "invalid port number %u on %pOF\n",
+> +			dev_err(xdev->dev, "invalid port number %u on %s\n",
+>  				link.remote_port,
+> -				to_of_node(link.remote_node));
+> +				REMOTE_NAME(link));
+>  			v4l2_fwnode_put_link(&link);
+>  			ret = -EINVAL;
+>  			break;
+
+-- 
+Regards,
+
+Laurent Pinchart
