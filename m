@@ -1,66 +1,53 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 02 Nov 2017 19:39:18 +0200
-Subject: [PATCH] ARM: dts: koelsch: Move cec_clock to root node
-In-Reply-To: <20171102091805.24967-1-horms+renesas@verge.net.au>
-References: <20171102091805.24967-1-horms+renesas@verge.net.au>
-Message-ID: <14112514.nMv28tbzn2@avalon>
+From: Jason@zx2c4.com (Jason A. Donenfeld)
+Date: Thu,  2 Nov 2017 18:43:22 +0100
+Subject: [PATCH v2] arm64: support __int128 on gcc 5+
+In-Reply-To: <20171102134720.GA17333@arm.com>
+References: <20171102134720.GA17333@arm.com>
+Message-ID: <20171102174322.21853-1-Jason@zx2c4.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Versions of gcc prior to gcc 5 emitted a __multi3 function call when
+dealing with TI types, resulting in failures when trying to link to
+libgcc, and more generally, bad performance. However, since gcc 5,
+the compiler supports actually emitting fast instructions, which means
+we can at long last enable this option and receive the speedups.
 
-Thank you for the patch.
+The gcc commit that added proper Aarch64 support is:
+https://gcc.gnu.org/git/?p=gcc.git;a=commitdiff;h=d1ae7bb994f49316f6f63e6173f2931e837a351d
+This commit appears to be part of the gcc 5 release.
 
-On Thursday, 2 November 2017 11:18:05 EET Simon Horman wrote:
-> cec-clock is a fixed clock generator that is not controlled by i2c5 and
-> thus should not be a child of the i2c5 bus node. Rather, it should be
-> a child of the root node of the DT.
-> 
-> Fixes: 02a5ab18d366 ("ARM: dts: koelsch: Add CEC clock for HDMI
-> transmitter") Reported-by: Laurent Pinchart
-> <laurent.pinchart@ideasonboard.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+There are still a few instructions, such as __ashlti3 and __ashrti3,
+that require libgcc, which is fine. So, we also link to libgcc for these
+functions when needed, which is what several other architectures already
+have been doing for a long time.
 
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Jason A. Donenfeld <Jason@zx2c4.com>
+---
+ arch/arm64/Makefile | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-> ---
->  arch/arm/boot/dts/r8a7791-koelsch.dts | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts
-> b/arch/arm/boot/dts/r8a7791-koelsch.dts index e164eda69baf..4126de417922
-> 100644
-> --- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-> +++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-> @@ -278,6 +278,12 @@
->  		};
->  	};
-> 
-> +	cec_clock: cec-clock {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <12000000>;
-> +	};
-> +
->  	hdmi-out {
->  		compatible = "hdmi-connector";
->  		type = "a";
-> @@ -640,12 +646,6 @@
->  		};
->  	};
-> 
-> -	cec_clock: cec-clock {
-> -		compatible = "fixed-clock";
-> -		#clock-cells = <0>;
-> -		clock-frequency = <12000000>;
-> -	};
-> -
->  	hdmi at 39 {
->  		compatible = "adi,adv7511w";
->  		reg = <0x39>;
-
-
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 939b310913cf..70c7c0c1bccb 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -53,6 +53,8 @@ KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst)
+ KBUILD_CFLAGS	+= $(call cc-option,-mabi=lp64)
+ KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
+ 
++KBUILD_CFLAGS	+= $(call cc-ifversion, -ge, 0500, -DCONFIG_ARCH_SUPPORTS_INT128)
++
+ ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
+ KBUILD_CPPFLAGS	+= -mbig-endian
+ CHECKFLAGS	+= -D__AARCH64EB__
+@@ -108,7 +110,7 @@ core-$(CONFIG_NET) += arch/arm64/net/
+ core-$(CONFIG_KVM) += arch/arm64/kvm/
+ core-$(CONFIG_XEN) += arch/arm64/xen/
+ core-$(CONFIG_CRYPTO) += arch/arm64/crypto/
+-libs-y		:= arch/arm64/lib/ $(libs-y)
++libs-y		:= arch/arm64/lib/ $(shell $(CC) $(KBUILD_CFLAGS) -print-libgcc-file-name) $(libs-y)
+ core-$(CONFIG_EFI_STUB) += $(objtree)/drivers/firmware/efi/libstub/lib.a
+ 
+ # Default target when executing plain make
 -- 
-Regards,
-
-Laurent Pinchart
+2.14.2
