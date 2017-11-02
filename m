@@ -1,190 +1,102 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Thu, 02 Nov 2017 09:31:00 +0100
-Subject: [PATCH 2/2] media: s5p-mfc: fix lock confection -
- request_firmware() once and keep state
-In-Reply-To: <fab205fc9ba1bc00e5dda4db6d426fde69116c37.1507325072.git.shuahkh@osg.samsung.com>
-References: <cover.1507325072.git.shuahkh@osg.samsung.com>
- <CGME20171006213016epcas3p20e34abea60ca43f7c3f79a68fc7a38d7@epcas3p2.samsung.com>
- <fab205fc9ba1bc00e5dda4db6d426fde69116c37.1507325072.git.shuahkh@osg.samsung.com>
-Message-ID: <c1704d1b-95e8-e6a2-9086-3079f78daa00@samsung.com>
+From: matt@mattface.org (Matt Hart)
+Date: Thu, 2 Nov 2017 08:33:17 +0000
+Subject: [GIT PULL 1/2] bcm2835-dt-fixes-2017-10-06
+In-Reply-To: <254358848.99422.1509558270051@email.1und1.de>
+References: <20171006220504.7776-1-eric@anholt.net>
+ <edb03edb-f2a6-549e-6060-eccfae554d92@gmail.com>
+ <CAJsfgeU5Zq-2zSfto8WUZ5Xud1Ksedu9XdLG9pWR7YBZGVaHBA@mail.gmail.com>
+ <CALeDE9NsjYHpaR6kyHgABGr2eE=EhpJstttK60WwRkAj0u1m7Q@mail.gmail.com>
+ <910a98ca-57f6-baca-73ac-f6c8c1ff04db@i2se.com>
+ <CAJsfgeWgb3tnJvxBq_sOwRo+srq1UMyMcn+2hHx7-UzHPFUCCA@mail.gmail.com>
+ <254358848.99422.1509558270051@email.1und1.de>
+Message-ID: <CAJsfgeVGhqeXc++zjxXg7csXhHHNVmbbc69RfyhUSVHXc60HCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06.10.2017 23:30, Shuah Khan wrote:
-> Driver calls request_firmware() whenever the device is opened for the
-> first time. As the device gets opened and closed, dev->num_inst == 1
-> is true several times. This is not necessary since the firmware is saved
-> in the fw_buf. s5p_mfc_load_firmware() copies the buffer returned by
-> the request_firmware() to dev->fw_buf.
+On 1 November 2017 at 17:44, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> Hi Matt,
 >
-> fw_buf sticks around until it gets released from s5p_mfc_remove(), hence
-> there is no need to keep requesting firmware and copying it to fw_buf.
+>> Matt Hart <matt@mattface.org> hat am 1. November 2017 um 14:06 geschrieben:
+>>
+>>
+>> On 1 November 2017 at 12:05, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+>> > Hi Matt, hi Peter,
+>> >
+>> > Am 01.11.2017 um 10:37 schrieb Peter Robinson:
+>> >> On Tue, Oct 31, 2017 at 5:00 PM, Matt Hart <matt@mattface.org> wrote:
+>> >>> On 6 October 2017 at 23:14, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>> >>>> On 10/06/2017 03:05 PM, Eric Anholt wrote:
+>> >>>>> Hi Florian.  Here's a patch that's gone through a couple of revisions
+>> >>>>> on the list, that seriously fixes up the default serial behavior --
+>> >>>>> previously, without the right config.txt/cmdline bits, you'd often end
+>> >>>>> up with a hang with no output before booting completed.  It would be
+>> >>>>> great to get it into 4.14.
+>> >>>>>
+>> >>>>> The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+>> >>>>>
+>> >>>>>   Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+>> >>>>>
+>> >>>>> are available in the git repository at:
+>> >>>>>
+>> >>>>>   git://github.com/anholt/linux tags/bcm2835-dt-fixes-2017-10-06
+>> >>>>>
+>> >>>>> for you to fetch changes up to f08f58a2bf68900a84e782b8c7ad701c0654173c:
+>> >>>>>
+>> >>>>>   ARM: dts: bcm283x: Fix console path on RPi3 (2017-10-06 13:04:56 -0700)
+>> >>>>>
+>> >>>>> ----------------------------------------------------------------
+>> >>>>> This pull request brings in a fix for default serial console setup on
+>> >>>>> RPi3, so it now comes up with no config.txt/cmdline.txt settings in
+>> >>>>> the firmware.
+>> >>>>>
+>> >>>>> ----------------------------------------------------------------
+>> >>>> Merged, thanks Eric
+>> >>>>
+>> >>>> --
+>> >>>> Florian
+>> >>> Hi all,
+>> >>>
+>> >>> I realise this patch has been in mainline for a more than a week, but
+>> >>> I've only recently had time to bisect broken rpi-3 boots in kernelci
+>> >>> and found f08f58a2bf68900a84e782b8c7ad701c0654173c as the cause.
+>> >>>
+>> >>> Kernelci boots the rpi3 using uboot, with console=ttyS0 in the command
+>> >>> line which now fails:
+>> >>> https://kernelci.org/boot/id/59f787f059b5147794ef1dcf/
+>> >>>
+>> >>> Is there an alias I can use for both before and after this patch?
+>> >>>
+>> >>> Mainline boots fine if I use console=ttyS1 or drop the console arg
+>> >>> altogether, but as we don't currently support different boot args per
+>> >>> tree, and we don't have the manpower to track this patch in all the
+>> >>> trees we test, we will have to switch to only boot testing mainline
+>> >>> from now on.
+>> >> Yes, I've seen the same in Fedora with that patch.
+>> >>
+>> >>
+>> > could you please describe the issue more in detail.
+>> >
+>> > Does u-boot or Linux hang? Does u-boot select the wrong UART? Is there a
+>> > pinmux conflict?
+>> Linux throws a kernel panic, "Warning: unable to open an initial console."
 >
-> This might have been overlooked when changes are made to free fw_buf from
-> the device release interface s5p_mfc_release().
+> what happens if you specify both?
 >
-> Fix s5p_mfc_load_firmware() to call request_firmware() once and keep state.
-> Change _probe() to load firmware once fw_buf has been allocated.
->
-> s5p_mfc_open() and it continues to call s5p_mfc_load_firmware() and init
-> hardware which is the step where firmware is written to the device.
->
-> This addresses the mfc_mutex contention due to repeated request_firmware()
-> calls from open() in the following circular locking warning:
->
-> [  552.194115] qtdemux0:sink/2710 is trying to acquire lock:
-> [  552.199488]  (&dev->mfc_mutex){+.+.}, at: [<bf145544>] s5p_mfc_mmap+0x28/0xd4 [s5p_mfc]
-> [  552.207459]
->                but task is already holding lock:
-> [  552.213264]  (&mm->mmap_sem){++++}, at: [<c01df2e4>] vm_mmap_pgoff+0x44/0xb8
-> [  552.220284]
->                which lock already depends on the new lock.
->
-> [  552.228429]
->                the existing dependency chain (in reverse order) is:
-> [  552.235881]
->                -> #2 (&mm->mmap_sem){++++}:
-> [  552.241259]        __might_fault+0x80/0xb0
-> [  552.245331]        filldir64+0xc0/0x2f8
-> [  552.249144]        call_filldir+0xb0/0x14c
-> [  552.253214]        ext4_readdir+0x768/0x90c
-> [  552.257374]        iterate_dir+0x74/0x168
-> [  552.261360]        SyS_getdents64+0x7c/0x1a0
-> [  552.265608]        ret_fast_syscall+0x0/0x28
-> [  552.269850]
->                -> #1 (&type->i_mutex_dir_key#2){++++}:
-> [  552.276180]        down_read+0x48/0x90
-> [  552.279904]        lookup_slow+0x74/0x178
-> [  552.283889]        walk_component+0x1a4/0x2e4
-> [  552.288222]        link_path_walk+0x174/0x4a0
-> [  552.292555]        path_openat+0x68/0x944
-> [  552.296541]        do_filp_open+0x60/0xc4
-> [  552.300528]        file_open_name+0xe4/0x114
-> [  552.304772]        filp_open+0x28/0x48
-> [  552.308499]        kernel_read_file_from_path+0x30/0x78
-> [  552.313700]        _request_firmware+0x3ec/0x78c
-> [  552.318291]        request_firmware+0x3c/0x54
-> [  552.322642]        s5p_mfc_load_firmware+0x54/0x150 [s5p_mfc]
-> [  552.328358]        s5p_mfc_open+0x4e4/0x550 [s5p_mfc]
-> [  552.333394]        v4l2_open+0xa0/0x104 [videodev]
-> [  552.338137]        chrdev_open+0xa4/0x18c
-> [  552.342121]        do_dentry_open+0x208/0x310
-> [  552.346454]        path_openat+0x28c/0x944
-> [  552.350526]        do_filp_open+0x60/0xc4
-> [  552.354512]        do_sys_open+0x118/0x1c8
-> [  552.358586]        ret_fast_syscall+0x0/0x28
-> [  552.362830]
->                -> #0 (&dev->mfc_mutex){+.+.}:
->                -> #0 (&dev->mfc_mutex){+.+.}:
-> [  552.368379]        lock_acquire+0x6c/0x88
-> [  552.372364]        __mutex_lock+0x68/0xa34
-> [  552.376437]        mutex_lock_interruptible_nested+0x1c/0x24
-> [  552.382086]        s5p_mfc_mmap+0x28/0xd4 [s5p_mfc]
-> [  552.386939]        v4l2_mmap+0x54/0x88 [videodev]
-> [  552.391601]        mmap_region+0x3a8/0x638
-> [  552.395673]        do_mmap+0x330/0x3a4
-> [  552.399400]        vm_mmap_pgoff+0x90/0xb8
-> [  552.403472]        SyS_mmap_pgoff+0x90/0xc0
-> [  552.407632]        ret_fast_syscall+0x0/0x28
-> [  552.411876]
->                other info that might help us debug this:
->
-> [  552.419848] Chain exists of:
->                  &dev->mfc_mutex --> &type->i_mutex_dir_key#2 --> &mm->mmap_sem
->
-> [  552.431200]  Possible unsafe locking scenario:
->
-> [  552.437092]        CPU0                    CPU1
-> [  552.441598]        ----                    ----
-> [  552.446104]   lock(&mm->mmap_sem);
-> [  552.449484]                                lock(&type->i_mutex_dir_key#2);
-> [  552.456329]                                lock(&mm->mmap_sem);
-> [  552.462222]   lock(&dev->mfc_mutex);
-> [  552.465775]
->                 *** DEADLOCK ***
+> console=ttyS0,115200n8 console=ttyS1,115200n8
 
-I am not 100% but it looks like false positive. Could you describe
-scenario when it deadlocks?
+You can't do that, as per
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/admin-guide/serial-console.rst#n45
 
->
-> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
-> ---
->  drivers/media/platform/s5p-mfc/s5p_mfc.c        | 4 ++++
->  drivers/media/platform/s5p-mfc/s5p_mfc_common.h | 3 +++
->  drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c   | 5 +++++
->  3 files changed, 12 insertions(+)
->
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-> index 1afde50..4c253fb 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-> @@ -1315,6 +1315,10 @@ static int s5p_mfc_probe(struct platform_device *pdev)
->  		goto err_dma;
->  	}
->  
-> +	ret = s5p_mfc_load_firmware(dev);
-> +	if (ret)
-> +		mfc_err("Failed to load FW - try loading from open()\n");
-> +
+I tried it anyway, and new kernel with this patch failed with the same
+error, I suspect it used the first console definition on the command
+line.
 
-What is the point of adding it? It will produce error log in case
-filesystem is not yet mounted, and as I remember it was the reason to
-put fw load to open callback.
+Incidentally, on the old pre-patch kernel, it did boot to a prompt but
+I got double kernel output as it setup 2 consoles both on ttyS0.
+https://pastebin.com/raw/Uf09gUaP
 
-Regards
-Andrzej
+I think Eric is right here, it was just wrong before and we'll have to
+live with the legacy.
 
->  	mutex_init(&dev->mfc_mutex);
->  	init_waitqueue_head(&dev->queue);
->  	dev->hw_lock = 0;
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-> index 4220914..76119a8 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-> @@ -290,6 +290,8 @@ struct s5p_mfc_priv_buf {
->   * @mfc_cmds:		cmd structure holding HW commands function pointers
->   * @mfc_regs:		structure holding MFC registers
->   * @fw_ver:		loaded firmware sub-version
-> + * @fw_get_done		flag set when request_firmware() is complete and
-> + *			copied into fw_buf
->   * risc_on:		flag indicates RISC is on or off
->   *
->   */
-> @@ -336,6 +338,7 @@ struct s5p_mfc_dev {
->  	struct s5p_mfc_hw_cmds *mfc_cmds;
->  	const struct s5p_mfc_regs *mfc_regs;
->  	enum s5p_mfc_fw_ver fw_ver;
-> +	bool fw_get_done;
->  	bool risc_on; /* indicates if RISC is on or off */
->  };
->  
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c b/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
-> index f064a0d1..ca57936 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
-> @@ -55,6 +55,9 @@ int s5p_mfc_load_firmware(struct s5p_mfc_dev *dev)
->  	 * into kernel. */
->  	mfc_debug_enter();
->  
-> +	if (dev->fw_get_done)
-> +		return 0;
-> +
->  	if (!dev->fw_buf.virt) {
->  		mfc_err("MFC firmware is not allocated\n");
->  		return -EINVAL;
-> @@ -82,6 +85,7 @@ int s5p_mfc_load_firmware(struct s5p_mfc_dev *dev)
->  	}
->  	memcpy(dev->fw_buf.virt, fw_blob->data, fw_blob->size);
->  	wmb();
-> +	dev->fw_get_done = true;
->  	release_firmware(fw_blob);
->  	mfc_debug_leave();
->  	return 0;
-> @@ -93,6 +97,7 @@ int s5p_mfc_release_firmware(struct s5p_mfc_dev *dev)
->  	/* Before calling this function one has to make sure
->  	 * that MFC is no longer processing */
->  	s5p_mfc_release_priv_buf(dev, &dev->fw_buf);
-> +	dev->fw_get_done = false;
->  	return 0;
->  }
->  
+-- 
+Matt Hart
