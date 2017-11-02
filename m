@@ -1,40 +1,35 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 2 Nov 2017 19:40:43 +0100
-Subject: [GIT PULL] Mediatek: soc driver updates for v4.15
-In-Reply-To: <CAK8P3a1hCWV6Fp5wyiESbdZUsgSoGZywj55=0v9Az-TPt3GtyQ@mail.gmail.com>
-References: <1ebc2f2d-033e-e8d6-86c8-32a67ebd55b7@gmail.com>
- <CAK8P3a1hCWV6Fp5wyiESbdZUsgSoGZywj55=0v9Az-TPt3GtyQ@mail.gmail.com>
-Message-ID: <514a12ee-b31f-1be0-8e11-2ec0929dd34b@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 2 Nov 2017 18:42:16 +0000
+Subject: [GIT PULL] arm64 fix for 4.14
+Message-ID: <20171102184215.3q7sqasz4wfkvq7v@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Linus,
 
-On 11/02/2017 04:35 PM, Arnd Bergmann wrote:
-> On Mon, Oct 23, 2017 at 12:10 AM, Matthias Brugger
-> <matthias.bgg@gmail.com> wrote:
->>
->> ----------------------------------------------------------------
->> - add 32 bit read/write support to pwrap
->> - add mt7622 support to pwrap
->> - test build all mediatek soc drivers
->> - fix compiler issues
->> - clean up Kconfig description
-> 
-> Pulled into next/soc. I see some bug fixes in here that I would have
-> marked 'Cc: stable at vger.kernel.org'
-> to get them backported into stable kernels. Could you please make sure
-> they are marked appropriately
-> in the future, and maybe (after the merge window) send a message to
-> stable at vger.kernel.org with a list
-> of the commits that you want backported but that are missing the tag? Thanks!
-> 
+Please pull the arm64 fix below. Thanks.
 
-Do you refer to this commits?
-f32fbbadaf44 soc: mediatek: pwrap: fix fatal compiler error
-fb2c1934f305 soc: mediatek: pwrap: fix compiler errors
+The following changes since commit 0b07194bb55ed836c2cc7c22e866b87a14681984:
 
-They are actually fix problems in the very same pull request.
+  Linux 4.14-rc7 (2017-10-29 13:58:38 -0700)
 
-Regards,
-Matthias
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
+
+for you to fetch changes up to 7a7003b1da010d2b0d1dc8bf21c10f5c73b389f1:
+
+  arm64: ensure __dump_instr() checks addr_limit (2017-11-02 18:33:08 +0000)
+
+----------------------------------------------------------------
+Check addr_limit in arm64 __dump_instr()
+
+----------------------------------------------------------------
+Mark Rutland (1):
+      arm64: ensure __dump_instr() checks addr_limit
+
+ arch/arm64/kernel/traps.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+-- 
+Catalin
