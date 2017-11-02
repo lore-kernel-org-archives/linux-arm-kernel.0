@@ -1,29 +1,34 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 2 Nov 2017 08:58:25 +0100
-Subject: [PATCH 1/3] ARM: shmobile: Document Renesas M3-W-based
- Salvator-XS board DT bindings
-In-Reply-To: <20171101214904.b5adavvirlmphnqn@rob-hp-laptop>
-References: <1509384599-28953-1-git-send-email-geert+renesas@glider.be>
- <1509384599-28953-2-git-send-email-geert+renesas@glider.be>
- <20171101214904.b5adavvirlmphnqn@rob-hp-laptop>
-Message-ID: <20171102075825.3hiqwfbxjpqmeayp@verge.net.au>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 2 Nov 2017 09:03:03 +0100
+Subject: [PATCH 1/1] ARM: dts: sunxi: sun8i-h3-nanopi-m1-plus: Add
+ missing regulator
+In-Reply-To: <20171101080357.4241-2-clabbe.montjoie@gmail.com>
+References: <20171101080357.4241-1-clabbe.montjoie@gmail.com>
+ <20171101080357.4241-2-clabbe.montjoie@gmail.com>
+Message-ID: <20171102080303.75ej6sygyzwuqrf3@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 01, 2017 at 04:49:04PM -0500, Rob Herring wrote:
-> On Mon, Oct 30, 2017 at 06:29:57PM +0100, Geert Uytterhoeven wrote:
-> > The Renesas Salvator-XS (Salvator-X 2nd version) development board can
-> > be equipped with either an R-Car H3 ES2.0 or M3-W ES1.x SiP, which are
-> > pin-compatible.
-> > 
-> > Document board part number and compatible values for the version with
-> > R-Car M3-W.
-> > 
-> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > ---
-> >  Documentation/devicetree/bindings/arm/shmobile.txt | 2 ++
-> >  1 file changed, 2 insertions(+)
+On Wed, Nov 01, 2017 at 09:03:57AM +0100, Corentin Labbe wrote:
+> This patch add the missing regulator for sun8i-h3-nanopi-m1-plus.
 > 
-> Acked-by: Rob Herring <robh@kernel.org>
+> Fixes: ("ARM: dts: sunxi: Restore EMAC changes (boards)")
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 
-Thanks, applied.
+Squashed into your previous commit, please at least make a compile
+test next time.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171102/085867ba/attachment.sig>
