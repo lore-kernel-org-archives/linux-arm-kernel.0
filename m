@@ -1,28 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 2 Nov 2017 16:48:14 +0100
-Subject: [GIT PULL 1/2] omap defconfig changes for v4.15 merge window
-In-Reply-To: <pull-1509381562-551838@atomide.com>
-References: <pull-1509381562-551838@atomide.com>
-Message-ID: <CAK8P3a26fgpZ1BympPxC+cJX6nUm+PYfbDPTEh_onvgf0=UTMw@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 Nov 2017 15:48:14 +0000
+Subject: [PATCH 3/3] ARM: early_printk: use printascii() rather than
+ printch()
+In-Reply-To: <SG2PR06MB116563CB4F1B55160392AAC68A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+References: <20171031182024.GK9463@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1710311432120.21665@knanqh.ubzr>
+ <SG2PR06MB1165AE45FB289039E55D03028A5E0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+ <20171102000945.GT9463@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1711012249020.21665@knanqh.ubzr>
+ <SG2PR06MB11655BDEF09BB62D268A29DD8A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+ <20171102112041.GW9463@n2100.armlinux.org.uk>
+ <SG2PR06MB11653D39086B1F58497C9FE08A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+ <nycvar.YSQ.7.76.1711021044380.21665@knanqh.ubzr>
+ <SG2PR06MB116563CB4F1B55160392AAC68A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+Message-ID: <20171102154814.GE9463@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> ----------------------------------------------------------------
-> Few omap2plus_defconfig changes for v4.15 merge window to enable NEON
-> based crypto and droid 4 USB PHY. Also let's run savedefconfig again
-> to save a bit of space and make it easier for people to send patches
-> against omap2plus_defconfig.
+On Thu, Nov 02, 2017 at 03:23:14PM +0000, Chris Brandt wrote:
+> On Thursday, November 02, 2017 1, Nicolas Pitre wrote:
+> > > > So, as far as ARM assembly in the Linux kernel goes, all constants
+> > must
+> > > > be preceded by # whether or not binutils requires it - no exceptions.
+> > > > Please always test assembly changes with a binutils version that is
+> > not
+> > > > gratuitously broken!
+> > >
+> > > Somewhat ironic since Nicolas works for Linaro.
+> > 
+> > I'm not involved with the toolchain people though, other than using
+> > their output.
+> 
+> That was the irony!
+> 
+> As in...
+> Even if you built the code, you would have probably used a Linaro 
+> toolchain and it would have worked like on my system.
+> 
+>   Forget it.  (mailing lists are so dry when it comes to humor)
 
-I'm not too fond of the blind 'rerun savedefconfig' patches. Can you respin that
-branch and separate that one into at least two patches doing:
+It's not mailing lists, it's email.  Email lacks the facial expressions,
+and the voice inflections and tone necessary to convey this extra
+"metadata".  It's a well known problem.  Email is dry and devoid of the
+subtle hints that humans need to effectively communicate.  Communication
+is *not* just about the words on a page.
 
-- one trivial patch to move the config options that have not changed but only
-  appear in a different line
+It's why we have smilies and emojis, as an attempt to fill that void, but
+I bet most of us (me included) don't use them enough.
 
-- one patch that drops the other options and has an explanation for each one
-  why it's not there any more. Split this up further if necessary.
+	http://www.youmeworks.com/no_honking.html
 
-I mainly want to be sure when we do this that we have not accidentally
-dropped an option that got renamed but is actually required for some users.
+The 44% figure in that URL, if correct, is shocking.  It probably means
+that approaching half of all emails on this list are misconstrued by
+the reader(s) of them!
 
-      Arnd
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
