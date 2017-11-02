@@ -1,23 +1,21 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 2 Nov 2017 16:20:05 +0100
-Subject: [GIT PULL 4/7] thermal: tegra: Changes for v4.15-rc1
-In-Reply-To: <20171020115603.9828-4-thierry.reding@gmail.com>
-References: <20171020115603.9828-1-thierry.reding@gmail.com>
- <20171020115603.9828-4-thierry.reding@gmail.com>
-Message-ID: <CAK8P3a0+b7x_QvbNuFGof27qb6CLWoJpqZ7sgQVW-pQULP6bZA@mail.gmail.com>
+From: nicolas.dechesne@linaro.org (Nicolas Dechesne)
+Date: Thu, 2 Nov 2017 16:21:03 +0100
+Subject: [PATCH] arm64: defconfig: enable USB host and IOMMU for msm8916
+In-Reply-To: <20171101195714.26729-1-robh@kernel.org>
+References: <20171101195714.26729-1-robh@kernel.org>
+Message-ID: <CAP71WjzvhSHtLLJo+7brEfxbFr9dUo4OJCLXihT5dy5KkM6qXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 20, 2017 at 1:56 PM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> This pulls in parts of both the tegra-for-4.15-dt-bindings and
-> tegra-for-4.15-firmware tags in order to resolve a build time
-> dependency.
+On Wed, Nov 1, 2017 at 8:57 PM, Rob Herring <robh@kernel.org> wrote:
+> Add config options needed on DB410c and other msm8916 based boards for
+> the IOMMU and USB host. The IOMMU is needed to enable the GPU.
+>
 
-I see that Zhang Rui has provided an Ack for this going through the
-arm-soc tree,
-but is not on Cc. I've added him now for transparency.
+The USB bits below are already taken care in a patch from Alex Elder 2
+weeks ago, see [1]
 
-Pulled into next/drivers, thanks!
+The IOMMU bit has been applied by Arnd already as well, see [2]
 
-        Arnd
+[1] https://patchwork.kernel.org/patch/10008457
+[2] https://patchwork.kernel.org/patch/9999911/
