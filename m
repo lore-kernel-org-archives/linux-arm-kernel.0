@@ -1,36 +1,21 @@
-From: felipe.balbi@linux.intel.com (Felipe Balbi)
-Date: Thu, 02 Nov 2017 17:38:20 +0200
-Subject: [PATCH] usb: mtu3: fix dma_addr_t printk output again
-In-Reply-To: <20171102143027.775184-1-arnd@arndb.de>
-References: <20171102143027.775184-1-arnd@arndb.de>
-Message-ID: <87y3no8zdf.fsf@linux.intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 2 Nov 2017 16:39:04 +0100
+Subject: [GIT PULL] SoCFPGA DTS updates for v4.15, part 2
+In-Reply-To: <1509374569-5811-1-git-send-email-dinguyen@kernel.org>
+References: <1509374569-5811-1-git-send-email-dinguyen@kernel.org>
+Message-ID: <CAK8P3a02AjaD7P0=1stt05-8kNuzfoUM1kZFubYd6EwfE7NYGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi,
-
-Arnd Bergmann <arnd@arndb.de> writes:
-> The support for 36-bit addresses originally came with an incorrect
-> printk format for dma addresses. Felipe changed the format string it
-> while applying, but the result was still incorrect, since we now have
-> to pass a pointer to the address instead of the integer value:
+On Mon, Oct 30, 2017 at 3:42 PM, Dinh Nguyen <dinguyen@kernel.org> wrote:
+> Alan Tull (2):
+>       arm64: dts: stratix10: add gpio header
+>       arm64: dts: stratix10: enable gpio and leds
 >
-> drivers/usb/mtu3/mtu3_qmu.c: In function 'mtu3_prepare_tx_gpd':
-> drivers/usb/mtu3/mtu3_qmu.c:261:25: error: format '%p' expects argument of type 'void *', but argument 7 has type 'dma_addr_t {aka unsigned int}' [-Werror=format=]
-> drivers/usb/mtu3/mtu3_qmu.c: In function 'mtu3_prepare_rx_gpd':
-> drivers/usb/mtu3/mtu3_qmu.c:300:25: error: format '%p' expects argument of type 'void *', but argument 7 has type 'dma_addr_t {aka unsigned int}' [-Werror=format=]
->
-> This fixes the printk argument accordingly.
->
-> Fixes: 1a46dfea0841 ("usb: mtu3: support 36-bit DMA address")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Dinh Nguyen (1):
+>       arm64: dts: stratix10: fix interrupt number for gpio1
 
-oh, so it wants a pointer afterall :-)
+Pulled into next/dt. Should the last one here be marked "Cc:
+stable at vger.kernel.org"?
 
-sorry.
-
-Acked-by: Felipe Balbi <felipe.balbi@linux.intel.com>
-
--- 
-balbi
+       Arnd
