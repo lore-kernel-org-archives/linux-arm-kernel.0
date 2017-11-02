@@ -1,52 +1,40 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 2 Nov 2017 17:12:13 +0100
-Subject: [RFC] Improving udelay/ndelay on platforms where that is possible
-In-Reply-To: <20171101194822.hd76z7zjazlqbsmy@tarshish>
-References: <d3f42f35-8175-58f6-78b7-3331efe64da2@sigmadesigns.com>
- <20171101175325.2557ce85@alans-desktop>
- <4b707ce0-6067-ab36-e167-1acf348d26bf@free.fr>
- <20171101194822.hd76z7zjazlqbsmy@tarshish>
-Message-ID: <20171102171213.6449268c@bbrezillon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu,  2 Nov 2017 16:12:03 +0000
+Subject: [PATCH] arm64: ensure __dump_instr() checks addr_limit
+Message-ID: <20171102161203.4704-1-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 1 Nov 2017 21:48:22 +0200
-Baruch Siach <baruch@tkos.co.il> wrote:
+It's possible for a user to deliberately trigger __dump_instr with a
+chosen kernel address.
 
-> Hi Marc,
-> 
-> On Wed, Nov 01, 2017 at 08:03:20PM +0100, Marc Gonzalez wrote:
-> > On 01/11/2017 18:53, Alan Cox wrote:   
-> > > For that matter given the bad blocks don't randomly change why not cache
-> > > them ?  
-> > 
-> > That's a good question, I'll ask the NAND framework maintainer.
-> > Store them where, by the way? On the NAND chip itself?  
-> 
-> Yes. In the bad block table (bbt). See drivers/mtd/nand/nand_bbt.c.
+Let's avoid problems resulting from this by using get_user() rather than
+__get_user(), ensuring that we don't erroneously access kernel memory.
 
-Yes, you can cache this information in a bad block table stored on the
-flash. But still, the ndelay()/udelay() problem remains: reading the
-out-of-band area of each eraseblock to re-create the bad block table is
-just one use case. This ndelay() is something you can have on all kind
-of read/write operations. As Thomas Gleixner stated, this is not really
-needed on modern NAND controllers which take care of various
-timing constraints internally, but still, we have some controllers
-that are not that smart, and we have to support them.
+Where we use __dump_instr() on kernel text, we already switch to
+KERNEL_DS, so this shouldn't adversely affect those cases.
 
-I'm not concerned about performances here, and if I'm told that we
-should turn all ndelay() calls into usleep_range() ones, then I'm
-perfectly fine with that, but I need a guarantee that when I say "I
-want to wait at least X ns/us", the function does not return before
-that time has expired.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Fixes: 60ffc30d5652810d ("arm64: Exception handling")
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: stable at vger.kernel.org
+---
+ arch/arm64/kernel/traps.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Not sure if that would work, but maybe we could create a wrapper like
-
-void nand_ndelay(unsigned long nanoseconds)
-{
-	ktime_t end = ktime_add_ns(ktime_get(), nanoseconds);
-
-	do {
-		ndelay(nanoseconds);
-	} while (ktime_before(ktime_get(), end));
-}
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 5ea4b85aee0e..8383af15a759 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -118,7 +118,7 @@ static void __dump_instr(const char *lvl, struct pt_regs *regs)
+ 	for (i = -4; i < 1; i++) {
+ 		unsigned int val, bad;
+ 
+-		bad = __get_user(val, &((u32 *)addr)[i]);
++		bad = get_user(val, &((u32 *)addr)[i]);
+ 
+ 		if (!bad)
+ 			p += sprintf(p, i == 0 ? "(%08x) " : "%08x ", val);
+-- 
+2.11.0
