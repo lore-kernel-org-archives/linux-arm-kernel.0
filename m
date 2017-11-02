@@ -1,60 +1,48 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Nov 2017 15:48:14 +0000
-Subject: [PATCH 3/3] ARM: early_printk: use printascii() rather than
- printch()
-In-Reply-To: <SG2PR06MB116563CB4F1B55160392AAC68A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
-References: <20171031182024.GK9463@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1710311432120.21665@knanqh.ubzr>
- <SG2PR06MB1165AE45FB289039E55D03028A5E0@SG2PR06MB1165.apcprd06.prod.outlook.com>
- <20171102000945.GT9463@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1711012249020.21665@knanqh.ubzr>
- <SG2PR06MB11655BDEF09BB62D268A29DD8A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
- <20171102112041.GW9463@n2100.armlinux.org.uk>
- <SG2PR06MB11653D39086B1F58497C9FE08A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
- <nycvar.YSQ.7.76.1711021044380.21665@knanqh.ubzr>
- <SG2PR06MB116563CB4F1B55160392AAC68A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
-Message-ID: <20171102154814.GE9463@n2100.armlinux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 2 Nov 2017 16:49:35 +0100
+Subject: [GIT PULL] Amlogic SoC updates for v4.15
+In-Reply-To: <CAFBinCBpDsn1rrUUy74dpkCsHj_wca3ojmCaUUEiVB41cfvTMQ@mail.gmail.com>
+References: <7hy3ntq50j.fsf@baylibre.com>
+ <CAK8P3a1fLbzp4xzFyTEO1w4vu=X=wwSV74_WBXiuYqTeF1P5ng@mail.gmail.com>
+ <CAFBinCBpDsn1rrUUy74dpkCsHj_wca3ojmCaUUEiVB41cfvTMQ@mail.gmail.com>
+Message-ID: <CAK8P3a3sJ3okbxv3qAcmeWV9erPZD8Zk+uC31G+srYE-C+ru-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 02, 2017 at 03:23:14PM +0000, Chris Brandt wrote:
-> On Thursday, November 02, 2017 1, Nicolas Pitre wrote:
-> > > > So, as far as ARM assembly in the Linux kernel goes, all constants
-> > must
-> > > > be preceded by # whether or not binutils requires it - no exceptions.
-> > > > Please always test assembly changes with a binutils version that is
-> > not
-> > > > gratuitously broken!
-> > >
-> > > Somewhat ironic since Nicolas works for Linaro.
-> > 
-> > I'm not involved with the toolchain people though, other than using
-> > their output.
-> 
-> That was the irony!
-> 
-> As in...
-> Even if you built the code, you would have probably used a Linaro 
-> toolchain and it would have worked like on my system.
-> 
->   Forget it.  (mailing lists are so dry when it comes to humor)
+On Mon, Oct 30, 2017 at 10:52 PM, Martin Blumenstingl
+<martin.blumenstingl@googlemail.com> wrote:
+> Hi Arnd,
+>
+> On Mon, Oct 30, 2017 at 11:26 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Sun, Oct 29, 2017 at 5:43 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+>>
+>>> ----------------------------------------------------------------
+>>> Amlogic SoC updates for v4.15
+>>> - add SMP support to Meson8/8b
+>>
+>> Pulled into next/soc. For my understanding, could you clarify what
+>> this line is needed for on meson?
+>>
+>> +textofs-$(CONFIG_ARCH_MESON) := 0x00208000
+> this was already part of Carlo's version of the SMP patches. I didn't
+> question this change (I simply assumed that it's relevant - I never
+> questioned "why" it was relevant) so far
+> however, that was until Linus L?ssing (CC'ed) investigated a
+> bug-report from Emiliano Ingrassia (also CC'ed). you can find his
+> results here: [0]
+> (tl;dr: kernel refuses to boot without this change when using a
+> slightly modified multi_v7_defconfig)
+>
+> Linus even asked me to split this change out into a separate patch [1]
+> however, by the time I came back home Kevin already sent out the pull request
+>
+> please let me know if
+> - we can keep the patches the way they are right now
+> - or if you want to separate this change into a separate patch
+>
 
-It's not mailing lists, it's email.  Email lacks the facial expressions,
-and the voice inflections and tone necessary to convey this extra
-"metadata".  It's a well known problem.  Email is dry and devoid of the
-subtle hints that humans need to effectively communicate.  Communication
-is *not* just about the words on a page.
+I think it's good enough to keep it this time, especially now that your
+explanation is in the mailing list archives. If you get into a similar
+situation again, splitting up the patch is better though.
 
-It's why we have smilies and emojis, as an attempt to fill that void, but
-I bet most of us (me included) don't use them enough.
-
-	http://www.youmeworks.com/no_honking.html
-
-The 44% figure in that URL, if correct, is shocking.  It probably means
-that approaching half of all emails on this list are misconstrued by
-the reader(s) of them!
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+     Arnd
