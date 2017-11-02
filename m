@@ -1,23 +1,20 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 1 Nov 2017 22:55:52 -0700
-Subject: [PATCH v2] clk: sunxi: fix build warning
-In-Reply-To: <20171024170616.24889-1-clabbe.montjoie@gmail.com>
-References: <20171024170616.24889-1-clabbe.montjoie@gmail.com>
-Message-ID: <20171102055552.GQ30645@codeaurora.org>
+Date: Wed, 1 Nov 2017 23:18:38 -0700
+Subject: [PATCH] clk: uniphier: fix clock data for PXs3
+In-Reply-To: <1507899286-1953-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1507899286-1953-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20171102061837.GR30645@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/24, Corentin Labbe wrote:
-> This patch fix the following build warning:
-> drivers/clk/sunxi/clk-factors.c:279:14: warning: variable 'name' set but not used [-Wunused-but-set-variable]
+On 10/13, Masahiro Yamada wrote:
+> Fix reg offsets of USB clocks.
 > 
-> Fixes: 4cbeaebb8af1 ("clk: sunxi: factors: Add unregister function")
-> 
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> Fixes: 736de651a836 ("clk: uniphier: add PXs3 clock data")
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 > ---
 
-Applied to clk-next
+Applied to clk-fixes
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
