@@ -1,47 +1,106 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  2 Nov 2017 10:21:21 +0100
-Subject: [PATCH] ARM: NOMMU: work around maybe-uninitialized warning
-Message-ID: <20171102092155.737712-1-arnd@arndb.de>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Thu, 2 Nov 2017 10:24:46 +0100
+Subject: [PATCH v3 1/5] dt-bindings: input: Add Atmel PTC subsystem
+ bindings
+In-Reply-To: <20171030230658.csl2sxfrmdcdx3lj@dtor-ws>
+References: <20171020133121.7992-1-ludovic.desroches@microchip.com>
+ <20171020133121.7992-2-ludovic.desroches@microchip.com>
+ <20171030230658.csl2sxfrmdcdx3lj@dtor-ws>
+Message-ID: <20171102092446.ehuilhqtfb7ouses@rfolt0960.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The reworked MPU code produces a new warning in some configurations,
-presumably starting with the code move after the compiler now makes
-different inlining decisions:
+Hi Dmitry,
 
-arch/arm/mm/pmsa-v7.c: In function 'adjust_lowmem_bounds_mpu':
-arch/arm/mm/pmsa-v7.c:310:5: error: 'specified_mem_size' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+On Mon, Oct 30, 2017 at 04:06:58PM -0700, Dmitry Torokhov wrote:
+> Hi Ludovic,
+> 
+> On Fri, Oct 20, 2017 at 03:31:17PM +0200, Ludovic Desroches wrote:
+> > Add description of the Atmel PTC subsystem bindings.
+> > 
+> > Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+> > Acked-by: Rob Herring <robh@kernel.org>
+> > ---
+> >  .../devicetree/bindings/input/atmel,ptc.txt        | 67 ++++++++++++++++++++++
+> >  1 file changed, 67 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/input/atmel,ptc.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/input/atmel,ptc.txt b/Documentation/devicetree/bindings/input/atmel,ptc.txt
+> > new file mode 100644
+> > index 000000000000..a183fd511e04
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/input/atmel,ptc.txt
+> > @@ -0,0 +1,67 @@
+> > +Atmel PTC Subsystem
+> > +
+> > +The Atmel Peripheral Touch Controller subsystem offers built-in hardware
+> > +for capacitive touch measurement on sensors that function as buttons, sliders
+> > +and wheels.
+> > +
+> > +1) PTC Subsystem node
+> > +
+> > +Required properties:
+> > +- compatible: 		Must be "atmel,sama5d2-ptc"
+> > +- reg: 			Address, length of the shared memory and ppp registers location
+> > +			and length.
+> > +- clocks: 		Phandlers to the clocks.
+> > +- clock-names: 		Must be "ptc_clk", "ptc_int_osc", "slow_clk".
+> > +- #address-cells:	Must be one. The cell is the button or scroller id.
+> > +- #size-cells: 		Must be zero.
+> > +
+> > +Example:
+> > +	ptc at fc060000 {
+> > +		compatible = "atmel,sama5d2-ptc";
+> > +		reg = <0x00800000 0x10000
+> > +		       0xfc060000 0xcf>;
+> > +		interrupts = <58 IRQ_TYPE_LEVEL_HIGH 7>;
+> > +		clocks = <&ptc_clk>, <&main>, <&clk32k>;
+> > +		clock-names = "ptc_clk", "ptc_int_osc", "slow_clk";
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +
+> > +		[ child node definitions... ]
+> > +	};
+> > +
+> > +2) Scroller / buttons subnodes
+> > +
+> > +Subnodes describe the kind of sensors the customer want to use. They have to be
+> > +named according to their function: button, slider or wheel.
+> 
+> I wonder do we really need this? Or we can have a generic:
+> 
+> 	slider at 0 {
+> 		reg = <0>;
+> 		linux,type = <EV_ABS>;
+> 		linux,code = <ABS_X>;
+> 	},
+> 	vertical-slider at 1 {
+> 		reg = <1>;
+> 		linux,type = <EV_ABS>;
+> 		linux,code = <ABS_Y>;
+> 	},
+> 	wheel at 2 {
+> 		reg = <2>;
+> 		linux,type = <EV_ABS>;
+> 		linux,code = <ABS_WHEEL>;
+> 	},
+> 	button at 3 {
+> 		reg = <3>;
+> 		linux,type = <EV_KEY>;
+> 		linux,code = <KEY_A>;
+> 	},
+> 	...
+> 
+> I.e. you specify type/code in a generic way.
 
-This appears to be harmless, as we know that there is always at
-least one memblock, and the only way this could get triggered is
-if the for_each_memblock() loop was never entered.
+No problem with this approach, I can retrieve the kind of sensors from
+the linux,type property.
 
-I could not come up with a better workaround than initializing
-the specified_mem_size to zero, but at least that is the value
-that the variable would have in the hypothetical case of no
-memblocks.
+Can I set both ABS_X and ABS_Y? In the future, we may have a "surface"
+object reporting coordinates for these axes. It seems there are no
+generic helpers to parse the 'linux,code' property, so I assume it won't be a
+problem.
 
-Fixes: 877ec119dbbf ("ARM: 8706/1: NOMMU: Move out MPU setup in separate module")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-Vladimir, if this looks good to you, can you forward it to Russell's
-patch tracker, or otherwise suggest a different fix?
----
- arch/arm/mm/pmsa-v7.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Regards
 
-diff --git a/arch/arm/mm/pmsa-v7.c b/arch/arm/mm/pmsa-v7.c
-index 106ae1c435a3..976df60ac426 100644
---- a/arch/arm/mm/pmsa-v7.c
-+++ b/arch/arm/mm/pmsa-v7.c
-@@ -234,7 +234,7 @@ static int __init allocate_region(phys_addr_t base, phys_addr_t size,
- /* MPU initialisation functions */
- void __init adjust_lowmem_bounds_mpu(void)
- {
--	phys_addr_t  specified_mem_size, total_mem_size = 0;
-+	phys_addr_t  specified_mem_size = 0, total_mem_size = 0;
- 	struct memblock_region *reg;
- 	bool first = true;
- 	phys_addr_t mem_start;
--- 
-2.9.0
+Ludovic
