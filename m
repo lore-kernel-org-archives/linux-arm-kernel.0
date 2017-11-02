@@ -1,21 +1,23 @@
-From: nicolas.dechesne@linaro.org (Nicolas Dechesne)
-Date: Thu, 2 Nov 2017 16:21:03 +0100
-Subject: [PATCH] arm64: defconfig: enable USB host and IOMMU for msm8916
-In-Reply-To: <20171101195714.26729-1-robh@kernel.org>
-References: <20171101195714.26729-1-robh@kernel.org>
-Message-ID: <CAP71WjzvhSHtLLJo+7brEfxbFr9dUo4OJCLXihT5dy5KkM6qXA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 2 Nov 2017 16:22:04 +0100
+Subject: [GIT PULL 5/5] Broadcom drivers changes for 4.15 (part 2)
+In-Reply-To: <20171021001636.17662-5-f.fainelli@gmail.com>
+References: <20171021001636.17662-1-f.fainelli@gmail.com>
+ <20171021001636.17662-5-f.fainelli@gmail.com>
+Message-ID: <CAK8P3a3=imY06GGNgyOm6mMj6KhJiOnDOJ8X4GTtmFg-4YSkAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 1, 2017 at 8:57 PM, Rob Herring <robh@kernel.org> wrote:
-> Add config options needed on DB410c and other msm8916 based boards for
-> the IOMMU and USB host. The IOMMU is needed to enable the GPU.
+On Sat, Oct 21, 2017 at 2:16 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> This pull request contains Broadcom ARM/ARM64/MIPS SoCs changes for 4.15
+> (second part), please pull the following:
 >
+> - Markus updates the Broadcom STB DPFE driver to avoid loading the firmware when
+>   unnecessary to accomodate for specific platform restrictions
+>
+> - Florian adds support for the Broadcom Hurricane 2 SoC iProc PLL clock needed
+>   to get the proper CPU clock frequency
 
-The USB bits below are already taken care in a patch from Alex Elder 2
-weeks ago, see [1]
+Pulled into next/drivers, thanks!
 
-The IOMMU bit has been applied by Arnd already as well, see [2]
-
-[1] https://patchwork.kernel.org/patch/10008457
-[2] https://patchwork.kernel.org/patch/9999911/
+       Arnd
