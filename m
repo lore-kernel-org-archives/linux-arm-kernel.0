@@ -1,252 +1,29 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 02 Nov 2017 17:07:30 +0800
-Subject: [linux-sunxi] Re: [PATCH] ARM: sun8i: h2+: add support for Banana
- Pi M2 Zero board
-In-Reply-To: <20171102090248.wnvj7dpphn5uqsut@flea>
-References: <20171101093814.19177-1-icenowy@aosc.io>
- <20171102090248.wnvj7dpphn5uqsut@flea>
-Message-ID: <8327eaeaa12b99f9962a53c9f02ddd6d@aosc.io>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 2 Nov 2017 10:08:58 +0100
+Subject: [PATCH v2] kbuild: clean up *.dtb and *.dtb.S patterns from
+ top-level Makefile
+In-Reply-To: <bb7c1a637afa47e8943ce494798f957c@SOC-EX01V.e01.socionext.com>
+References: <1509591085-23940-1-git-send-email-yamada.masahiro@socionext.com>
+ <CAK8P3a3FoRJeO=TQGMRf6t4-bP8nP6KUEhkCrHP6L8XaF1Ee7g@mail.gmail.com>
+ <bb7c1a637afa47e8943ce494798f957c@SOC-EX01V.e01.socionext.com>
+Message-ID: <CAK8P3a0r=un9H8y2AizW3v5KzkTEGgb70hfBx8C88qphDjJksg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-11-02 17:02?Maxime Ripard ???
-> Hi,
-> 
-> On Wed, Nov 01, 2017 at 05:38:14PM +0800, Icenowy Zheng wrote:
->> Banana Pi M2 Zero board is a H2+-based board by Sinovoip, with a form
->> factor and GPIO holes similar to Raspberry Pi Zero.
->> 
->> It features:
->> - Allwinner H2+ SoC
->> - Single-chip (16-bit) 512MiB DDR3 DRAM
->> - Ampak AP6212 Wi-Fi/Bluetooth module
->> - MicroSD slot
->> - Two MicroUSB Type-B ports (one can only be used to power the board 
->> and
->>   the other features OTG functionality)
->> - Two keys, a reset and a GPIO-connected key.
->> - HDMI Type-C (miniHDMI) connector connected to the HDMI part of H2+.
->> - CSI connector to connect the camera sensor provided by Sinovoip.
->> 
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> ---
->>  arch/arm/boot/dts/Makefile                         |   1 +
->>  .../boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts    | 156 
->> +++++++++++++++++++++
->>  2 files changed, 157 insertions(+)
->>  create mode 100644 
->> arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
->> 
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index 3a5b79fd8198..803dbdf03916 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -930,6 +930,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
->>  	sun8i-a83t-bananapi-m3.dtb \
->>  	sun8i-a83t-cubietruck-plus.dtb \
->>  	sun8i-a83t-tbs-a711.dtb \
->> +	sun8i-h2-plus-bananapi-m2-zero.dtb \
->>  	sun8i-h2-plus-orangepi-zero.dtb \
->>  	sun8i-h3-bananapi-m2-plus.dtb \
->>  	sun8i-h3-beelink-x2.dtb \
->> diff --git a/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts 
->> b/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
->> new file mode 100644
->> index 000000000000..414258da4308
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
->> @@ -0,0 +1,156 @@
->> +/*
->> + * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.io>
->> + *
->> + * Based on sun8i-h3-bananapi-m2-plus.dts, which is:
->> + *   Copyright (C) 2016 Chen-Yu Tsai <wens@csie.org>
->> + *
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
->> + *
->> + *  a) This file is free software; you can redistribute it and/or
->> + *     modify it under the terms of the GNU General Public License as
->> + *     published by the Free Software Foundation; either version 2 of 
->> the
->> + *     License, or (at your option) any later version.
->> + *
->> + *     This file is distributed in the hope that it will be useful,
->> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + *     GNU General Public License for more details.
->> + *
->> + * Or, alternatively,
->> + *
->> + *  b) Permission is hereby granted, free of charge, to any person
->> + *     obtaining a copy of this software and associated documentation
->> + *     files (the "Software"), to deal in the Software without
->> + *     restriction, including without limitation the rights to use,
->> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->> + *     sell copies of the Software, and to permit persons to whom the
->> + *     Software is furnished to do so, subject to the following
->> + *     conditions:
->> + *
->> + *     The above copyright notice and this permission notice shall be
->> + *     included in all copies or substantial portions of the 
->> Software.
->> + *
->> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY 
->> KIND,
->> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE 
->> WARRANTIES
->> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> + *     OTHER DEALINGS IN THE SOFTWARE.
->> + */
->> +
->> +/dts-v1/;
->> +#include "sun8i-h3.dtsi"
->> +#include "sunxi-common-regulators.dtsi"
->> +
->> +#include <dt-bindings/gpio/gpio.h>
->> +#include <dt-bindings/input/input.h>
->> +
->> +/ {
->> +	model = "Banana Pi BPI-M2-Zero";
->> +	compatible = "sinovoip,bpi-m2-zero", "allwinner,sun8i-h2-plus";
->> +
->> +	aliases {
->> +		serial0 = &uart0;
->> +		serial1 = &uart1;
->> +	};
->> +
->> +	chosen {
->> +		stdout-path = "serial0:115200n8";
->> +	};
->> +
->> +	leds {
->> +		compatible = "gpio-leds";
->> +		pinctrl-names = "default";
-> 
-> This property is useless
-> 
->> +
->> +		pwr_led {
->> +			label = "bananapi-m2-zero:red:pwr";
->> +			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>; /* PL10 */
->> +			default-state = "on";
->> +		};
->> +	};
->> +
->> +	gpio_keys {
->> +		compatible = "gpio-keys";
->> +		pinctrl-names = "default";
-> 
-> Same thing here.
-> 
->> +
->> +		sw4 {
-> 
-> That node should be called power.
-> 
->> +			label = "power";
->> +			linux,code = <BTN_0>;
->> +			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
->> +		};
->> +	};
->> +
->> +	wifi_pwrseq: wifi_pwrseq {
->> +		compatible = "mmc-pwrseq-simple";
->> +		pinctrl-names = "default";
-> 
-> That property is useless
-> 
->> +		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>; /* PL7 */
->> +	};
->> +};
->> +
->> +&ehci0 {
->> +	status = "okay";
->> +};
->> +
->> +&mmc0 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&mmc0_pins_a>;
->> +	vmmc-supply = <&reg_vcc3v3>;
->> +	bus-width = <4>;
->> +	/*
->> +	 * In different revisions the board have different card detect
->> +	 * configuration.
->> +	 */
-> 
-> Which ones?
+On Thu, Nov 2, 2017 at 9:48 AM,  <yamada.masahiro@socionext.com> wrote:
 
-In the sample batch (1.2V fixed voltage) the card detect is normal
-(PF6 low as inserted), however in the final batch (1.1V/1.3V
-switchable) it's inverted at PF6 (high as inserted).
+>>       Arnd
+>
+> Yeah, I had also noticed this race problem on parallel building
+> with CONFIG_OF_ALL_DTBS.
+>
+> I was planning to do it
+> when I come up with a clean implementation.
+>
+> One idea is to handle dtb-y and CONFIG_OF_ALL_DTBS
+> natively in scripts/Makefile.build or somewhere
+> as scripts/Makefile.dtbinst already recognizes dtb-y as a special variable.
 
-> 
->> +	broken-cd;
->> +	status = "okay";
->> +};
->> +
->> +&mmc1 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&mmc1_pins_a>;
->> +	vmmc-supply = <&reg_vcc3v3>;
->> +	vqmmc-supply = <&reg_vcc3v3>;
->> +	mmc-pwrseq = <&wifi_pwrseq>;
->> +	bus-width = <4>;
->> +	non-removable;
->> +	status = "okay";
->> +
->> +	brcmf: wifi at 1 {
->> +		reg = <1>;
->> +		compatible = "brcm,bcm4329-fmac";
->> +		interrupt-parent = <&pio>;
->> +		interrupts = <6 10 IRQ_TYPE_LEVEL_LOW>; /* PG10 / EINT10 */
->> +		interrupt-names = "host-wake";
->> +	};
->> +};
->> +
->> +&ohci0 {
->> +	status = "okay";
->> +};
->> +
->> +&uart0 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&uart0_pins_a>;
->> +	status = "okay";
->> +};
->> +
->> +&uart1 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
->> +	status = "okay";
->> +};
->> +
->> +&usb_otg {
->> +	dr_mode = "otg";
->> +	status = "okay";
->> +};
->> +
->> +&usbphy {
->> +	usb0_id_det-gpios = <&r_pio 0 6 GPIO_ACTIVE_HIGH>; /* PL6 */
->> +	/* USB OTG VBUS is directly connected to 5V without any regulators 
->> */
-> 
-> So it cannot operate in OTG, but it's host only?
+Ah, nice, that does sound better, yes.
 
-It can operate in OTG -- you can power the board via the OTG port, as
-the VBUS is not gated from 5V at all, so 5V power at VBUS will power up 
-the
-board. Yes, it's a bit unsafe, but the board designer did it.
-
-> 
-> Maxime
-> 
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+      Arnd
