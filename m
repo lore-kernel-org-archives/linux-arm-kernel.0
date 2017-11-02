@@ -1,62 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 2 Nov 2017 17:05:31 +0100
-Subject: [GIT PULL] Mediatek: 32-bit DT update for v4.15
-In-Reply-To: <e8fdd9a9-ce13-8804-aea0-46becc6f9730@gmail.com>
-References: <c7145c00-b2b9-780c-0bfd-15f7d8a08dd6@gmail.com>
- <CAK8P3a3NWwoe0mX45WrFONyiHt9eWTTMziEc+rjqSfr5QZv8xQ@mail.gmail.com>
- <1509423579.10793.10.camel@mtkswgap22>
- <e8fdd9a9-ce13-8804-aea0-46becc6f9730@gmail.com>
-Message-ID: <CAK8P3a0+9fChSbObS9boR8okHtO8u8_hr2Te+RjfRD0T54QYWQ@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 2 Nov 2017 12:06:15 -0400 (EDT)
+Subject: [PATCH 3/3] ARM: early_printk: use printascii() rather than
+ printch()
+In-Reply-To: <nycvar.YSQ.7.76.1711021132170.21665@knanqh.ubzr>
+References: <20171031171629.GI9463@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1710311346190.21665@knanqh.ubzr>
+ <20171031175344.GJ9463@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1710311355000.21665@knanqh.ubzr>
+ <20171031182024.GK9463@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1710311432120.21665@knanqh.ubzr>
+ <SG2PR06MB1165AE45FB289039E55D03028A5E0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+ <20171102000945.GT9463@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1711012249020.21665@knanqh.ubzr>
+ <SG2PR06MB11655BDEF09BB62D268A29DD8A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+ <20171102112041.GW9463@n2100.armlinux.org.uk>
+ <SG2PR06MB11653D39086B1F58497C9FE08A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+ <nycvar.YSQ.7.76.1711021044380.21665@knanqh.ubzr>
+ <SG2PR06MB116563CB4F1B55160392AAC68A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+ <nycvar.YSQ.7.76.1711021132170.21665@knanqh.ubzr>
+Message-ID: <nycvar.YSQ.7.76.1711021157560.21665@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 2, 2017 at 12:47 PM, Matthias Brugger
-<matthias.bgg@gmail.com> wrote:
-> Hi Arnd,
->
-> On 10/31/2017 05:19 AM, Ryder Lee wrote:
->> Hi Arnd,
->>
->> We have 3 root ports in MT7623, but this is a bug in this chip where the
->> HW designers wired the IRQs in a nonstandard way. We've tried to
->> statically assign the bus portion of the address part in the parent
->> interrupt-map before, but this approach cannot handle the case - if we
->> attach the device in random order.
->>
->
-> Ryder, please don't top post :)
->
->> Thanks.
->>
->> On Mon, 2017-10-30 at 13:42 +0100, Arnd Bergmann wrote:
->>> On Mon, Oct 23, 2017 at 12:06 AM, Matthias Brugger
->>> <matthias.bgg@gmail.com> wrote:
->>>>
->>>> ----------------------------------------------------------------
->>>> - mt76233 add PCIe node
->>>
->>> Could you clarify what the subnodes in the PCI node are for? It seems odd
->>> to have "interrupt-map" properties in both the pcie controller and its child
->>> nodes, and I want to ensure this is following the standard PCIe binding before
->>> I pull it.
->>>
->
-> Arnd, I didn't found the pull request in your next/dt branch.
-> Is there more clarification needed from our side?
+On Thu, 2 Nov 2017, Nicolas Pitre wrote:
 
-I'm still unsure about it., this looks like exactly the thing that the top-level
-interrupt-map is supposed to handle fine.
+> Would be good to figure out what option makes it accept no # and see if 
+> that can be avoided for kernel build.
 
-Can you send a pull request for the series without the pci child nodes for the
-moment while we figure out what the exact problem is? We can take
-whatever fix we come up with during the v4.15 -rc cycle then.
+OK.. I wanted to get to the bottom of this. The gas documentation says:
 
-I would assume that either the parent interrupt-map is wrong, or something
-broke the parser, but that it's not actually something that's wrong in the
-hardware design in a way that we can't already handle in a standard way.
+|9.4.2.1 Instruction Set Syntax
+|..............................
+|
+|Two slightly different syntaxes are supported for ARM and THUMB
+|instructions.  The default, `divided', uses the old style where ARM and
+|THUMB instructions had their own, separate syntaxes.  The new,
+|`unified' syntax, which can be selected via the `.syntax' directive,
+|and has the following main features:
+|
+|   * Immediate operands do not require a `#' prefix.
+|
+|   * The `IT' instruction may appear, and if it does it is validated
+|     against subsequent conditional affixes.  In ARM mode it does not
+|     generate machine code, in THUMB mode it does.
+|
+|   * For ARM instructions the conditional affixes always appear at the
+|     end of the instruction.  For THUMB instructions conditional
+|     affixes can be used, but only inside the scope of an `IT'
+|     instruction.
+|
+|   * All of the instructions new to the V6T2 architecture (and later)
+|     are available.  (Only a few such instructions can be written in the
+|     `divided' syntax).
+|
+|   * The `.N' and `.W' suffixes are recognized and honored.
+|
+|   * All instructions set the flags if and only if they have an `s'
+|     affix.
 
-Ryder, can you be more specific how the interrupts are wired up?
-Is there one IRQ per slot that is connected to all of IntA/IntB/IntC/IntD
-and gets propagated through the bridges like that, or is it something else?
+So this is a mixed bag of features and, unless I'm missing something, 
+there is no way to get some and not the others. And we do need most of 
+those features for Thumb2 kernel build.
 
-     Arnd
+
+Nicolas
