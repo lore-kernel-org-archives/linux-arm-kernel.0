@@ -1,58 +1,30 @@
-From: sakari.ailus@linux.intel.com (Sakari Ailus)
-Date: Thu,  2 Nov 2017 11:57:22 +0200
-Subject: [PATCH 1/1] of: Make return types of to_of_node and of_fwnode_handle
- macros consistent
-In-Reply-To: <2117711.dO2rQLXOup@avalon>
-References: <2117711.dO2rQLXOup@avalon>
-Message-ID: <20171102095722.6893-1-sakari.ailus@linux.intel.com>
+From: rsahu@apm.com (Rameshwar Sahu)
+Date: Thu, 2 Nov 2017 15:27:25 +0530
+Subject: [PATCH] ata: fixes kernel crash while tracing ata_eh_link_autopsy
+ event
+In-Reply-To: <20171101143031.GL3252168@devbig577.frc2.facebook.com>
+References: <1508926976-11467-1-git-send-email-rsahu@apm.com>
+ <20171025145450.GA59538@devbig577.frc2.facebook.com>
+ <CAFd313w9W2hHFPJ47y0jeNb1u7=0deLtwcRF=+HXGBYft-QaLw@mail.gmail.com>
+ <20171101143031.GL3252168@devbig577.frc2.facebook.com>
+Message-ID: <CAFd313w-SKoLR5J4qDDCnDG=OpcRXGL7DqTpy7_tuxzcFyrVdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-to_of_node() macro checks whether the fwnode_handle passed to it is not an
-OF node, and if so, returns NULL in order to be NULL-safe. Otherwise it
-returns the pointer to the OF node which the fwnode_handle contains.
-
-The problem with returning NULL is that its type was void *, which
-sometimes matters. Explicitly return struct device_node * instead.
-
-Make a similar change to of_fwnode_handle() as well.
-
-Fixes: d20dc1493db4 ("of: Support const and non-const use for to_of_node()")
-Fixes: debd3a3b27c7 ("of: Make of_fwnode_handle() safer")
-Signed-off-by: Sakari Ailus <sakari.ailus@linux.intel.com>
----
-Hi Mauro,
-
-Could you check whether this addresses the smatch issue with the xilinx
-driver?
-
-Thanks.
-
- include/linux/of.h | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/include/linux/of.h b/include/linux/of.h
-index b240ed69dc96..0651231c115e 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -161,7 +161,7 @@ static inline bool is_of_node(const struct fwnode_handle *fwnode)
- 		is_of_node(__to_of_node_fwnode) ?			\
- 			container_of(__to_of_node_fwnode,		\
- 				     struct device_node, fwnode) :	\
--			NULL;						\
-+			(struct device_node *)NULL;			\
- 	})
- 
- #define of_fwnode_handle(node)						\
-@@ -169,7 +169,8 @@ static inline bool is_of_node(const struct fwnode_handle *fwnode)
- 		typeof(node) __of_fwnode_handle_node = (node);		\
- 									\
- 		__of_fwnode_handle_node ?				\
--			&__of_fwnode_handle_node->fwnode : NULL;	\
-+			&__of_fwnode_handle_node->fwnode :		\
-+			(struct fwnode_handle *)NULL;			\
- 	})
- 
- static inline bool of_have_populated_dt(void)
--- 
-2.11.0
+On Wed, Nov 1, 2017 at 8:00 PM, Tejun Heo <tj@kernel.org> wrote:
+> Hello,
+>
+> On Tue, Oct 31, 2017 at 08:52:44PM +0530, Rameshwar Sahu wrote:
+>> > probably should take both link and dev and use dev iff it's not NULL.
+>> >
+>>
+>> Instead of this would it be better to call trace_ata_eh_link_autopsy() if
+>> dev is not NULL from ata error handler ??
+>
+> Oh yeah, that'd work too and be probably better.
+I will post another  version with this fix.
+>
+> Thanks.
+>
+> --
+> tejun
