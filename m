@@ -1,21 +1,19 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 2 Nov 2017 16:39:04 +0100
-Subject: [GIT PULL] SoCFPGA DTS updates for v4.15, part 2
-In-Reply-To: <1509374569-5811-1-git-send-email-dinguyen@kernel.org>
-References: <1509374569-5811-1-git-send-email-dinguyen@kernel.org>
-Message-ID: <CAK8P3a02AjaD7P0=1stt05-8kNuzfoUM1kZFubYd6EwfE7NYGg@mail.gmail.com>
+Date: Thu, 2 Nov 2017 16:44:14 +0100
+Subject: [GIT PULL 2/2] omap coccinelle warning fixes for v4.15 merge
+ window
+In-Reply-To: <pull-1509381562-551838@atomide.com-2>
+References: <pull-1509381562-551838@atomide.com>
+ <pull-1509381562-551838@atomide.com-2>
+Message-ID: <CAK8P3a2DUiyxtxqM44hHRgBrzm4XAr4sCjT1+3X4Qkq2vnZrNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 30, 2017 at 3:42 PM, Dinh Nguyen <dinguyen@kernel.org> wrote:
-> Alan Tull (2):
->       arm64: dts: stratix10: add gpio header
->       arm64: dts: stratix10: enable gpio and leds
->
-> Dinh Nguyen (1):
->       arm64: dts: stratix10: fix interrupt number for gpio1
+On Mon, Oct 30, 2017 at 5:41 PM, Tony Lindgren <tony@atomide.com> wrote:
+> ----------------------------------------------------------------
+> Few coccinelle robot clean-up patches for careless human coding
+> issues for v4.15 merge window sent by their human operatorrrrrs.
 
-Pulled into next/dt. Should the last one here be marked "Cc:
-stable at vger.kernel.org"?
+Thanks, pulled into next/soc.
 
-       Arnd
+      Arnd
