@@ -1,24 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 2 Nov 2017 10:15:47 +0100
-Subject: [PATCH v2 0/3] arm64: defconfig: remove some Qualcomm USB options
-In-Reply-To: <20171031125808.7300-1-elder@linaro.org>
-References: <20171031125808.7300-1-elder@linaro.org>
-Message-ID: <CAK8P3a0r8NZdbv8KYyF72oXU_3gxBD2ETzY+BZUf4i5V4Lr=mw@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu,  2 Nov 2017 10:18:05 +0100
+Subject: [PATCH] ARM: dts: koelsch: Move cec_clock to root node
+Message-ID: <20171102091805.24967-1-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 31, 2017 at 1:58 PM, Alex Elder <elder@linaro.org> wrote:
-> This series deletes three config options related to USB on Qualcomm
-> SoCs from the arm64 "defconfig".  The code enabled by the options is
-> no longer needed by any Qualcomm hardware.  The driver code that
-> corresponds to these config options is removed in a separate series.
->
->                                         -Alex
->
-> v2:  Added Reviewed-by: Amit Kucheria <amit.kucheria@linaro.org>
+cec-clock is a fixed clock generator that is not controlled by i2c5 and
+thus should not be a child of the i2c5 bus node. Rather, it should be
+a child of the root node of the DT.
 
-The patches look good. Should we apply them directly to arm-soc, or is
-Andy going to forward them? Normally I'd wait for him to apply them,
-but I see he has already given an Ack, so I don't know what to do here.
+Fixes: 02a5ab18d366 ("ARM: dts: koelsch: Add CEC clock for HDMI transmitter")
+Reported-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-         Arnd
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index e164eda69baf..4126de417922 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -278,6 +278,12 @@
+ 		};
+ 	};
+ 
++	cec_clock: cec-clock {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <12000000>;
++	};
++
+ 	hdmi-out {
+ 		compatible = "hdmi-connector";
+ 		type = "a";
+@@ -640,12 +646,6 @@
+ 		};
+ 	};
+ 
+-	cec_clock: cec-clock {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		clock-frequency = <12000000>;
+-	};
+-
+ 	hdmi at 39 {
+ 		compatible = "adi,adv7511w";
+ 		reg = <0x39>;
+-- 
+2.11.0
