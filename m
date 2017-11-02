@@ -1,31 +1,32 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Thu, 2 Nov 2017 17:28:08 +0000
-Subject: [PATCH 3/3] ARM: early_printk: use printascii() rather than
- printch()
-In-Reply-To: <20171102171018.GH9463@n2100.armlinux.org.uk>
-References: <20171102000945.GT9463@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1711012249020.21665@knanqh.ubzr>
- <SG2PR06MB11655BDEF09BB62D268A29DD8A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
- <20171102112041.GW9463@n2100.armlinux.org.uk>
- <SG2PR06MB11653D39086B1F58497C9FE08A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
- <nycvar.YSQ.7.76.1711021044380.21665@knanqh.ubzr>
- <SG2PR06MB116563CB4F1B55160392AAC68A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
- <nycvar.YSQ.7.76.1711021132170.21665@knanqh.ubzr>
- <nycvar.YSQ.7.76.1711021157560.21665@knanqh.ubzr>
- <SG2PR06MB116509D159F4E79D5A788DCE8A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
- <20171102171018.GH9463@n2100.armlinux.org.uk>
-Message-ID: <SG2PR06MB116573DD79771C3EAA5CD3278A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 2 Nov 2017 17:30:04 +0000
+Subject: [PATCH] arm: ensure dump_instr() checks addr_limit
+In-Reply-To: <20171102164706.GC5061@kroah.com>
+References: <20171102163452.7652-1-mark.rutland@arm.com>
+ <20171102164706.GC5061@kroah.com>
+Message-ID: <20171102173003.t5wugpup26eu2hpx@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, November 02, 2017, Russell King - ARM Linux wrote:
-> This is very bad, and it's going to make it slower to get such
-> patches into the kernel.
+On Thu, Nov 02, 2017 at 05:47:06PM +0100, Greg KH wrote:
+> On Thu, Nov 02, 2017 at 04:34:52PM +0000, Mark Rutland wrote:
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> 
+> Huh?  What's that doing up here?
 
-Well crap! All I wanted was my carriage returns back.
+[...]
 
-This is going to come back and bite me in the ass later when I try to 
-submit some XIP code changes in head.S that I've been meaning to get to.
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Russell King <rmk+kernel@armlinux.org.uk>
+> > Cc: stable at vger.kernel.org
+> 
+> It's right here...
 
+Sorry; I'd generated this commit message from another. I must've
+accidentally passed -s to git commit before copying the text I wanted.
 
-Chris
+I will be more careful in future, and I'll remove the first instance
+if/when submitting this to Russell's patch system.
+
+Thanks,
+Mark.
