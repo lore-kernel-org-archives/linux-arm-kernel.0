@@ -1,159 +1,49 @@
-From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Thu, 2 Nov 2017 14:56:22 +0800
-Subject: [PATCH V3 07/11] clk: sprd: add composite clock support
-In-Reply-To: <20171102065626.21835-1-chunyan.zhang@spreadtrum.com>
-References: <20171102065626.21835-1-chunyan.zhang@spreadtrum.com>
-Message-ID: <20171102065626.21835-8-chunyan.zhang@spreadtrum.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 2 Nov 2017 00:11:25 -0700
+Subject: [PATCH 0/2] Add a regmap to Allwinner R40 CCU to export GMAC
+ register
+In-Reply-To: <14505033-D960-4287-92F2-554E2EDDFC59@aosc.io>
+References: <20171006063333.12345-1-icenowy@aosc.io>
+ <20171009071809.jte47cd2mt4iv6y7@flea.lan>
+ <14505033-D960-4287-92F2-554E2EDDFC59@aosc.io>
+Message-ID: <20171102071125.GL30645@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduced composite driver for Spreadtrum's SoCs. The
-functions of this composite clock simply consist of divider and
-mux clocks.
+On 10/09, Icenowy Zheng wrote:
+> 
+> 
+> ? 2017?10?9? GMT+08:00 ??3:18:09, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
+> >On Fri, Oct 06, 2017 at 06:33:31AM +0000, Icenowy Zheng wrote:
+> >> In the CCU of the Allwinner R40 SoC, there's a GMAC configuration
+> >register,
+> >> which is intended to be accessed by the dwmac-sun8i driver. On SoCs
+> >already
+> >> supported by the driver the register is placed in the syscon rather
+> >than
+> >> the CCU.
+> >> 
+> >> As CCU is a critical part of the SoC, so write to it should be
+> >strictly
+> >> limited. A regmap with restricted write permission is created by the
+> >R40
+> >> CCU driver, and can be get with dev_get_regmap. In order to tie the
+> >regmap
+> >> to the CCU device, the R40 CCU is now a platform driver, so a
+> >platform
+> >> device is created for it (and then tied with the regmap).
+> >> 
+> >> The first patch does the conversion of the driver to a platform
+> >driver,
+> >> and the second patch adds the regmap.
+> >
+> >I'd like to see first what you want to do with it.
+> 
+> Export the GMAC configuration register to dwmac-sun8i.
+> 
 
-Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
----
- drivers/clk/sprd/Makefile    |  1 +
- drivers/clk/sprd/composite.c | 65 ++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/sprd/composite.h | 49 +++++++++++++++++++++++++++++++++
- 3 files changed, 115 insertions(+)
- create mode 100644 drivers/clk/sprd/composite.c
- create mode 100644 drivers/clk/sprd/composite.h
+Is this series going to be reposted?
 
-diff --git a/drivers/clk/sprd/Makefile b/drivers/clk/sprd/Makefile
-index 80e6039..2262e76 100644
---- a/drivers/clk/sprd/Makefile
-+++ b/drivers/clk/sprd/Makefile
-@@ -4,3 +4,4 @@ clk-sprd-y	+= common.o
- clk-sprd-y	+= gate.o
- clk-sprd-y	+= mux.o
- clk-sprd-y	+= div.o
-+clk-sprd-y	+= composite.o
-diff --git a/drivers/clk/sprd/composite.c b/drivers/clk/sprd/composite.c
-new file mode 100644
-index 0000000..30d5b36
---- /dev/null
-+++ b/drivers/clk/sprd/composite.c
-@@ -0,0 +1,65 @@
-+/*
-+ * Spreadtrum composite clock driver
-+ *
-+ * Copyright (C) 2017 Spreadtrum, Inc.
-+ * Author: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
-+ *
-+ * SPDX-License-Identifier: GPL-2.0
-+ */
-+
-+#include <linux/clk-provider.h>
-+
-+#include "composite.h"
-+
-+DEFINE_SPINLOCK(sprd_comp_lock);
-+EXPORT_SYMBOL_GPL(sprd_comp_lock);
-+
-+static long sprd_comp_round_rate(struct clk_hw *hw, unsigned long rate,
-+				unsigned long *parent_rate)
-+{
-+	struct sprd_comp *cc = hw_to_sprd_comp(hw);
-+
-+	return sprd_div_helper_round_rate(&cc->common, &cc->div,
-+					 rate, parent_rate);
-+}
-+
-+static unsigned long sprd_comp_recalc_rate(struct clk_hw *hw,
-+					  unsigned long parent_rate)
-+{
-+	struct sprd_comp *cc = hw_to_sprd_comp(hw);
-+
-+	return sprd_div_helper_recalc_rate(&cc->common, &cc->div, parent_rate);
-+}
-+
-+static int sprd_comp_set_rate(struct clk_hw *hw, unsigned long rate,
-+			     unsigned long parent_rate)
-+{
-+	struct sprd_comp *cc = hw_to_sprd_comp(hw);
-+
-+	return sprd_div_helper_set_rate(&cc->common, &cc->div,
-+				       rate, parent_rate);
-+}
-+
-+static u8 sprd_comp_get_parent(struct clk_hw *hw)
-+{
-+	struct sprd_comp *cc = hw_to_sprd_comp(hw);
-+
-+	return sprd_mux_helper_get_parent(&cc->common, &cc->mux);
-+}
-+
-+static int sprd_comp_set_parent(struct clk_hw *hw, u8 index)
-+{
-+	struct sprd_comp *cc = hw_to_sprd_comp(hw);
-+
-+	return sprd_mux_helper_set_parent(&cc->common, &cc->mux, index);
-+}
-+
-+const struct clk_ops sprd_comp_ops = {
-+	.get_parent	= sprd_comp_get_parent,
-+	.set_parent	= sprd_comp_set_parent,
-+
-+	.round_rate	= sprd_comp_round_rate,
-+	.recalc_rate	= sprd_comp_recalc_rate,
-+	.set_rate	= sprd_comp_set_rate,
-+};
-+EXPORT_SYMBOL_GPL(sprd_comp_ops);
-diff --git a/drivers/clk/sprd/composite.h b/drivers/clk/sprd/composite.h
-new file mode 100644
-index 0000000..551f274
---- /dev/null
-+++ b/drivers/clk/sprd/composite.h
-@@ -0,0 +1,49 @@
-+/*
-+ * Spreadtrum composite clock driver
-+ *
-+ * Copyright (C) 2017 Spreadtrum, Inc.
-+ * Author: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
-+ *
-+ * SPDX-License-Identifier: GPL-2.0
-+ */
-+
-+#ifndef _SPRD_COMPOSITE_H_
-+#define _SPRD_COMPOSITE_H_
-+
-+#include "common.h"
-+#include "mux.h"
-+#include "div.h"
-+
-+struct sprd_comp {
-+	struct sprd_mux_internal	mux;
-+	struct sprd_div_internal	div;
-+	struct sprd_clk_common	common;
-+};
-+
-+#define SPRD_COMP_CLK(_struct, _name, _parent, _reg, _table,		\
-+			_mshift, _mwidth, _dshift, _dwidth, _flags)	\
-+	struct sprd_comp _struct = {					\
-+		.mux	= _SPRD_MUX_CLK(_mshift, _mwidth, _table),	\
-+		.div	= _SPRD_DIV_CLK(_dshift, _dwidth),		\
-+		.common = {						\
-+			.regmap		= NULL,				\
-+			.reg		= _reg,				\
-+			.lock		= &sprd_comp_lock,		\
-+			.hw.init = CLK_HW_INIT_PARENTS(_name,		\
-+						       _parent,		\
-+						       &sprd_comp_ops,	\
-+						       _flags),		\
-+			 }						\
-+	}
-+
-+static inline struct sprd_comp *hw_to_sprd_comp(const struct clk_hw *hw)
-+{
-+	struct sprd_clk_common *common = hw_to_sprd_clk_common(hw);
-+
-+	return container_of(common, struct sprd_comp, common);
-+}
-+
-+extern const struct clk_ops sprd_comp_ops;
-+extern spinlock_t sprd_comp_lock;
-+
-+#endif /* _SPRD_COMPOSITE_H_ */
 -- 
-2.7.4
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
