@@ -1,50 +1,72 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 2 Nov 2017 17:07:50 +0000
-Subject: [PATCH] arm64: ensure __dump_instr() checks addr_limit
-In-Reply-To: <20171102161203.4704-1-mark.rutland@arm.com>
-References: <20171102161203.4704-1-mark.rutland@arm.com>
-Message-ID: <20171102170750.GC595@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 Nov 2017 17:10:19 +0000
+Subject: [PATCH 3/3] ARM: early_printk: use printascii() rather than
+ printch()
+In-Reply-To: <SG2PR06MB116509D159F4E79D5A788DCE8A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+References: <20171102000945.GT9463@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1711012249020.21665@knanqh.ubzr>
+ <SG2PR06MB11655BDEF09BB62D268A29DD8A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+ <20171102112041.GW9463@n2100.armlinux.org.uk>
+ <SG2PR06MB11653D39086B1F58497C9FE08A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+ <nycvar.YSQ.7.76.1711021044380.21665@knanqh.ubzr>
+ <SG2PR06MB116563CB4F1B55160392AAC68A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+ <nycvar.YSQ.7.76.1711021132170.21665@knanqh.ubzr>
+ <nycvar.YSQ.7.76.1711021157560.21665@knanqh.ubzr>
+ <SG2PR06MB116509D159F4E79D5A788DCE8A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+Message-ID: <20171102171018.GH9463@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 02, 2017 at 04:12:03PM +0000, Mark Rutland wrote:
-> It's possible for a user to deliberately trigger __dump_instr with a
-> chosen kernel address.
+On Thu, Nov 02, 2017 at 04:38:11PM +0000, Chris Brandt wrote:
+> On Thursday, November 02, 2017 1, Nicolas Pitre wrote:
+> > OK.. I wanted to get to the bottom of this. The gas documentation says:
+> > 
+> > |9.4.2.1 Instruction Set Syntax
+> > |..............................
+> > |
+> > |Two slightly different syntaxes are supported for ARM and THUMB
+> > |instructions.  The default, `divided', uses the old style where ARM and
+> > |THUMB instructions had their own, separate syntaxes.  The new,
+> > |`unified' syntax, which can be selected via the `.syntax' directive,
+> > |and has the following main features:
+> > |
+> > |   * Immediate operands do not require a `#' prefix.
 > 
-> Let's avoid problems resulting from this by using get_user() rather than
-> __get_user(), ensuring that we don't erroneously access kernel memory.
+> Well there you go!
 > 
-> Where we use __dump_instr() on kernel text, we already switch to
-> KERNEL_DS, so this shouldn't adversely affect those cases.
+> We all have "gratuitously broken binutils"
 > 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Fixes: 60ffc30d5652810d ("arm64: Exception handling")
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: stable at vger.kernel.org
-> ---
->  arch/arm64/kernel/traps.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> ;)
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Yes!
 
-Catalin, can you take this as a fix please?
+What reason could there be to drop the well established norm of
+prefixing constants with "#" in ARM assembly, other than maybe
+political pressure?
 
-Will
+As I've already pointed out, we can see that this causes problems,
+and what it means is that people now must test their changes with
+Thumb2 support disabled in the kernel for there to be any valid
+testing of assembly.  That basically means I can't trust anyone
+elses testing of patches that contain assembly, because I don't
+know what configuration they've tested.
 
-> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> index 5ea4b85aee0e..8383af15a759 100644
-> --- a/arch/arm64/kernel/traps.c
-> +++ b/arch/arm64/kernel/traps.c
-> @@ -118,7 +118,7 @@ static void __dump_instr(const char *lvl, struct pt_regs *regs)
->  	for (i = -4; i < 1; i++) {
->  		unsigned int val, bad;
->  
-> -		bad = __get_user(val, &((u32 *)addr)[i]);
-> +		bad = get_user(val, &((u32 *)addr)[i]);
->  
->  		if (!bad)
->  			p += sprintf(p, i == 0 ? "(%08x) " : "%08x ", val);
-> -- 
-> 2.11.0
-> 
+This is very bad, and it's going to make it slower to get such
+patches into the kernel.
+
+That's an unintended side effect of what was probably thought to be
+a trivial decision by the ARM ISA team, but it unfortunately has
+wider effects than they could have imagined.
+
+There is another solution to this: I augment the patch system with an
+ARM assembly parser that detects this before it gets accepted,
+rejecting patches that omit the # for constants.  However, that is
+incomplete, because we now live in a world where ARM assembly gets
+added to the kernel via many different git trees.
+
+Basically, this change in the ARM syntax should never have been made.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
