@@ -1,74 +1,49 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 2 Nov 2017 15:32:16 +0100
-Subject: [PATCH 2/4] pinctrl: Add skew-delay pin config and bindings
-In-Reply-To: <20171101212659.be4phj2wha66x63d@rob-hp-laptop>
-References: <20171028133719.27528-1-linus.walleij@linaro.org>
- <20171028133719.27528-2-linus.walleij@linaro.org>
- <20171101212659.be4phj2wha66x63d@rob-hp-laptop>
-Message-ID: <CACRpkdZcB9ghYYFSQdTqpuN29DZZeY_AKimQ62-5W7+Mymm1HQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu,  2 Nov 2017 15:30:20 +0100
+Subject: [PATCH] usb: mtu3: fix dma_addr_t printk output again
+Message-ID: <20171102143027.775184-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 1, 2017 at 10:26 PM, Rob Herring <robh@kernel.org> wrote:
-> On Sat, Oct 28, 2017 at 03:37:17PM +0200, Linus Walleij wrote:
->> Some pin controllers (such as the Gemini) can control the
->> expected clock skew and output delay on certain pins with a
->> sub-nanosecond granularity. This is typically done by shunting
->> in a number of double inverters in front of or behind the pin.
->> Make it possible to configure this with a generic binding.
->>
->> Cc: devicetree at vger.kernel.org
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> ---
->>  Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt | 4 ++++
->>  drivers/pinctrl/pinconf-generic.c                              | 2 ++
->>  include/linux/pinctrl/pinconf-generic.h                        | 5 +++++
->>  3 files changed, 11 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
->> index 4483cc31e531..ad9bbbba36e9 100644
->> --- a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
->> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
->> @@ -271,6 +271,10 @@ output-high              - set the pin to output mode with high level
->>  sleep-hardware-state - indicate this is sleep related state which will be programmed
->>                         into the registers for the sleep state.
->>  slew-rate            - set the slew rate
->> +skew-delay           - this affects the expected clock skew on input pins
->> +                       and the delay before latching a value to an output
->> +                       pin. Typically indicates how many double-inverters are
->> +                       used to delay the signal.
->
-> Units?
+The support for 36-bit addresses originally came with an incorrect
+printk format for dma addresses. Felipe changed the format string it
+while applying, but the result was still incorrect, since we now have
+to pass a pointer to the address instead of the integer value:
 
-Number of double-inverters I guess, just as it says.
+drivers/usb/mtu3/mtu3_qmu.c: In function 'mtu3_prepare_tx_gpd':
+drivers/usb/mtu3/mtu3_qmu.c:261:25: error: format '%p' expects argument of type 'void *', but argument 7 has type 'dma_addr_t {aka unsigned int}' [-Werror=format=]
+drivers/usb/mtu3/mtu3_qmu.c: In function 'mtu3_prepare_rx_gpd':
+drivers/usb/mtu3/mtu3_qmu.c:300:25: error: format '%p' expects argument of type 'void *', but argument 7 has type 'dma_addr_t {aka unsigned int}' [-Werror=format=]
 
-skew-delay = <1>; // number of inverter pairs
+This fixes the printk argument accordingly.
 
-Like with other bindings of this type they are custom.
+Fixes: 1a46dfea0841 ("usb: mtu3: support 36-bit DMA address")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/usb/mtu3/mtu3_qmu.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-The Gemini datasheet says "every unit represents about 0.2 ns".
-
-So if you set it to 1, that means (as far as I can guess) this
-is shunted in:
-
-   |\    |\
---+ >o--+ >o---
-   |/    |/
-
-The signal will take ~0.2 ns to propagate through this.
-For 2, there will be four inverters etc.
-
-It is dependent of production technology, and I do not know
-if everyone is using something like double-inverters.
-
-We could try to define a value in picoseconds instead so I
-would need to set this to 200 in that case if you think that is better:
-
-skew-delay = <200>; // picoseconds
-
-I think it would be kludgy since with increasing clock speeds
-maybe picoseconds would be too big even. Nanoseconds is
-apparently already a to coarse unit.
-
-Yours,
-Linus Walleij
+diff --git a/drivers/usb/mtu3/mtu3_qmu.c b/drivers/usb/mtu3/mtu3_qmu.c
+index 42145a3f1422..0b4b412b1d0d 100644
+--- a/drivers/usb/mtu3/mtu3_qmu.c
++++ b/drivers/usb/mtu3/mtu3_qmu.c
+@@ -259,7 +259,7 @@ static int mtu3_prepare_tx_gpd(struct mtu3_ep *mep, struct mtu3_request *mreq)
+ 	enq = advance_enq_gpd(ring);
+ 	enq_dma = gpd_virt_to_dma(ring, enq);
+ 	dev_dbg(mep->mtu->dev, "TX-EP%d queue gpd=%p, enq=%p, qdma=%pad\n",
+-		mep->epnum, gpd, enq, enq_dma);
++		mep->epnum, gpd, enq, &enq_dma);
+ 
+ 	enq->flag &= ~GPD_FLAGS_HWO;
+ 	gpd->next_gpd = cpu_to_le32(lower_32_bits(enq_dma));
+@@ -298,7 +298,7 @@ static int mtu3_prepare_rx_gpd(struct mtu3_ep *mep, struct mtu3_request *mreq)
+ 	enq = advance_enq_gpd(ring);
+ 	enq_dma = gpd_virt_to_dma(ring, enq);
+ 	dev_dbg(mep->mtu->dev, "RX-EP%d queue gpd=%p, enq=%p, qdma=%pad\n",
+-		mep->epnum, gpd, enq, enq_dma);
++		mep->epnum, gpd, enq, &enq_dma);
+ 
+ 	enq->flag &= ~GPD_FLAGS_HWO;
+ 	gpd->next_gpd = cpu_to_le32(lower_32_bits(enq_dma));
+-- 
+2.9.0
