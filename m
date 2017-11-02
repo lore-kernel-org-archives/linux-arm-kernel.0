@@ -1,35 +1,74 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 2 Nov 2017 18:42:16 +0000
-Subject: [GIT PULL] arm64 fix for 4.14
-Message-ID: <20171102184215.3q7sqasz4wfkvq7v@armageddon.cambridge.arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 2 Nov 2017 19:47:34 +0100
+Subject: [GIT PULL] Mediatek: 32-bit DT update for v4.15
+In-Reply-To: <CAK8P3a0+9fChSbObS9boR8okHtO8u8_hr2Te+RjfRD0T54QYWQ@mail.gmail.com>
+References: <c7145c00-b2b9-780c-0bfd-15f7d8a08dd6@gmail.com>
+ <CAK8P3a3NWwoe0mX45WrFONyiHt9eWTTMziEc+rjqSfr5QZv8xQ@mail.gmail.com>
+ <1509423579.10793.10.camel@mtkswgap22>
+ <e8fdd9a9-ce13-8804-aea0-46becc6f9730@gmail.com>
+ <CAK8P3a0+9fChSbObS9boR8okHtO8u8_hr2Te+RjfRD0T54QYWQ@mail.gmail.com>
+Message-ID: <0c3f8521-e0a6-a0d2-45b9-62d7c824818d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
 
-Please pull the arm64 fix below. Thanks.
 
-The following changes since commit 0b07194bb55ed836c2cc7c22e866b87a14681984:
+On 11/02/2017 05:05 PM, Arnd Bergmann wrote:
+> On Thu, Nov 2, 2017 at 12:47 PM, Matthias Brugger
+> <matthias.bgg@gmail.com> wrote:
+>> Hi Arnd,
+>>
+>> On 10/31/2017 05:19 AM, Ryder Lee wrote:
+>>> Hi Arnd,
+>>>
+>>> We have 3 root ports in MT7623, but this is a bug in this chip where the
+>>> HW designers wired the IRQs in a nonstandard way. We've tried to
+>>> statically assign the bus portion of the address part in the parent
+>>> interrupt-map before, but this approach cannot handle the case - if we
+>>> attach the device in random order.
+>>>
+>>
+>> Ryder, please don't top post :)
+>>
+>>> Thanks.
+>>>
+>>> On Mon, 2017-10-30 at 13:42 +0100, Arnd Bergmann wrote:
+>>>> On Mon, Oct 23, 2017 at 12:06 AM, Matthias Brugger
+>>>> <matthias.bgg@gmail.com> wrote:
+>>>>>
+>>>>> ----------------------------------------------------------------
+>>>>> - mt76233 add PCIe node
+>>>>
+>>>> Could you clarify what the subnodes in the PCI node are for? It seems odd
+>>>> to have "interrupt-map" properties in both the pcie controller and its child
+>>>> nodes, and I want to ensure this is following the standard PCIe binding before
+>>>> I pull it.
+>>>>
+>>
+>> Arnd, I didn't found the pull request in your next/dt branch.
+>> Is there more clarification needed from our side?
+> 
+> I'm still unsure about it., this looks like exactly the thing that the top-level
+> interrupt-map is supposed to handle fine.
+> 
+> Can you send a pull request for the series without the pci child nodes for the
+> moment while we figure out what the exact problem is? We can take
+> whatever fix we come up with during the v4.15 -rc cycle then.
 
-  Linux 4.14-rc7 (2017-10-29 13:58:38 -0700)
+Sure. I'll provide a new tag v4.14-next-dts32-2 without the patch.
+I will send a pull request shortly.
 
-are available in the git repository at:
+Regards,
+Matthias
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
-
-for you to fetch changes up to 7a7003b1da010d2b0d1dc8bf21c10f5c73b389f1:
-
-  arm64: ensure __dump_instr() checks addr_limit (2017-11-02 18:33:08 +0000)
-
-----------------------------------------------------------------
-Check addr_limit in arm64 __dump_instr()
-
-----------------------------------------------------------------
-Mark Rutland (1):
-      arm64: ensure __dump_instr() checks addr_limit
-
- arch/arm64/kernel/traps.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
--- 
-Catalin
+> 
+> I would assume that either the parent interrupt-map is wrong, or something
+> broke the parser, but that it's not actually something that's wrong in the
+> hardware design in a way that we can't already handle in a standard way.
+> 
+> Ryder, can you be more specific how the interrupts are wired up?
+> Is there one IRQ per slot that is connected to all of IntA/IntB/IntC/IntD
+> and gets propagated through the bridges like that, or is it something else?
+> 
+>      Arnd
+> 
