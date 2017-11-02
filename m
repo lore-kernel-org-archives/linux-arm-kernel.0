@@ -1,25 +1,91 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 2 Nov 2017 16:32:49 +0000
-Subject: [PATCH v5 00/30] ARM Scalable Vector Extension (SVE)
-In-Reply-To: <1509465082-30427-1-git-send-email-Dave.Martin@arm.com>
-References: <1509465082-30427-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20171102163248.GB595@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu,  2 Nov 2017 16:34:52 +0000
+Subject: [PATCH] arm: ensure dump_instr() checks addr_limit
+Message-ID: <20171102163452.7652-1-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 31, 2017 at 03:50:52PM +0000, Dave Martin wrote:
-> This series implements Linux kernel support for the ARM Scalable Vector
-> Extension (SVE). [1]  It supersedes the previous v3: see [3] for link
-> and full cover letter.
-> 
-> This is a minor update to v4, but does contain a couple of important
-> fixes.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 
-I've pushed a version of this series out to the arm64 devel branch, with
-a view to putting it into next.
+When CONFIG_DEBUG_USER is enabled, it's possible for a user to
+deliberately trigger dump_instr() with a chosen kernel address.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git devel
+Let's avoid problems resulting from this by using get_user() rather than
+__get_user(), ensuring that we don't erroneously access kernel memory.
 
-Please kick the tyres and let me know of any issues ASAP.
+So that we can use the same code to dump user instructions and kernel
+instructions, the common dumping code is factored out to __dump_instr(),
+with the fs manipulated appropriately in dump_instr() around calls to
+this.
 
-Will
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Russell King <rmk+kernel@armlinux.org.uk>
+Cc: stable at vger.kernel.org
+---
+ arch/arm/kernel/traps.c | 28 ++++++++++++++++++----------
+ 1 file changed, 18 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index 948c648fea00..0fcd82f01388 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -154,30 +154,26 @@ static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
+ 	set_fs(fs);
+ }
+ 
+-static void dump_instr(const char *lvl, struct pt_regs *regs)
++static void __dump_instr(const char *lvl, struct pt_regs *regs)
+ {
+ 	unsigned long addr = instruction_pointer(regs);
+ 	const int thumb = thumb_mode(regs);
+ 	const int width = thumb ? 4 : 8;
+-	mm_segment_t fs;
+ 	char str[sizeof("00000000 ") * 5 + 2 + 1], *p = str;
+ 	int i;
+ 
+ 	/*
+-	 * We need to switch to kernel mode so that we can use __get_user
+-	 * to safely read from kernel space.  Note that we now dump the
+-	 * code first, just in case the backtrace kills us.
++	 * Note that we now dump the code first, just in case the backtrace
++	 * kills us.
+ 	 */
+-	fs = get_fs();
+-	set_fs(KERNEL_DS);
+ 
+ 	for (i = -4; i < 1 + !!thumb; i++) {
+ 		unsigned int val, bad;
+ 
+ 		if (thumb)
+-			bad = __get_user(val, &((u16 *)addr)[i]);
++			bad = get_user(val, &((u16 *)addr)[i]);
+ 		else
+-			bad = __get_user(val, &((u32 *)addr)[i]);
++			bad = get_user(val, &((u32 *)addr)[i]);
+ 
+ 		if (!bad)
+ 			p += sprintf(p, i == 0 ? "(%0*x) " : "%0*x ",
+@@ -188,8 +184,20 @@ static void dump_instr(const char *lvl, struct pt_regs *regs)
+ 		}
+ 	}
+ 	printk("%sCode: %s\n", lvl, str);
++}
+ 
+-	set_fs(fs);
++static void dump_instr(const char *lvl, struct pt_regs *regs)
++{
++	mm_segment_t fs;
++
++	if (!user_mode(regs)) {
++		fs = get_fs();
++		set_fs(KERNEL_DS);
++		__dump_instr(lvl, regs);
++		set_fs(fs);
++	} else {
++		__dump_instr(lvl, regs);
++	}
+ }
+ 
+ #ifdef CONFIG_ARM_UNWIND
+-- 
+2.11.0
