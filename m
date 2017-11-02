@@ -1,29 +1,52 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Thu, 2 Nov 2017 11:06:42 -0500
-Subject: [GIT PULL] SoCFPGA DTS updates for v4.15, part 2
-In-Reply-To: <CAK8P3a02AjaD7P0=1stt05-8kNuzfoUM1kZFubYd6EwfE7NYGg@mail.gmail.com>
-References: <1509374569-5811-1-git-send-email-dinguyen@kernel.org>
- <CAK8P3a02AjaD7P0=1stt05-8kNuzfoUM1kZFubYd6EwfE7NYGg@mail.gmail.com>
-Message-ID: <dc25f1c2-6ee2-69b7-367b-99569b7513c2@kernel.org>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 2 Nov 2017 17:12:13 +0100
+Subject: [RFC] Improving udelay/ndelay on platforms where that is possible
+In-Reply-To: <20171101194822.hd76z7zjazlqbsmy@tarshish>
+References: <d3f42f35-8175-58f6-78b7-3331efe64da2@sigmadesigns.com>
+ <20171101175325.2557ce85@alans-desktop>
+ <4b707ce0-6067-ab36-e167-1acf348d26bf@free.fr>
+ <20171101194822.hd76z7zjazlqbsmy@tarshish>
+Message-ID: <20171102171213.6449268c@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Wed, 1 Nov 2017 21:48:22 +0200
+Baruch Siach <baruch@tkos.co.il> wrote:
 
-On 11/02/2017 10:39 AM, Arnd Bergmann wrote:
-> On Mon, Oct 30, 2017 at 3:42 PM, Dinh Nguyen <dinguyen@kernel.org> wrote:
->> Alan Tull (2):
->>       arm64: dts: stratix10: add gpio header
->>       arm64: dts: stratix10: enable gpio and leds
->>
->> Dinh Nguyen (1):
->>       arm64: dts: stratix10: fix interrupt number for gpio1
+> Hi Marc,
 > 
-> Pulled into next/dt. Should the last one here be marked "Cc:
-> stable at vger.kernel.org"?
+> On Wed, Nov 01, 2017 at 08:03:20PM +0100, Marc Gonzalez wrote:
+> > On 01/11/2017 18:53, Alan Cox wrote:   
+> > > For that matter given the bad blocks don't randomly change why not cache
+> > > them ?  
+> > 
+> > That's a good question, I'll ask the NAND framework maintainer.
+> > Store them where, by the way? On the NAND chip itself?  
+> 
+> Yes. In the bad block table (bbt). See drivers/mtd/nand/nand_bbt.c.
 
-I don't think it's necessary. The stratix10 platform is relatively new
-and should only be supported from v4.15 onward.
+Yes, you can cache this information in a bad block table stored on the
+flash. But still, the ndelay()/udelay() problem remains: reading the
+out-of-band area of each eraseblock to re-create the bad block table is
+just one use case. This ndelay() is something you can have on all kind
+of read/write operations. As Thomas Gleixner stated, this is not really
+needed on modern NAND controllers which take care of various
+timing constraints internally, but still, we have some controllers
+that are not that smart, and we have to support them.
 
-Thanks,
-dinh
+I'm not concerned about performances here, and if I'm told that we
+should turn all ndelay() calls into usleep_range() ones, then I'm
+perfectly fine with that, but I need a guarantee that when I say "I
+want to wait at least X ns/us", the function does not return before
+that time has expired.
+
+Not sure if that would work, but maybe we could create a wrapper like
+
+void nand_ndelay(unsigned long nanoseconds)
+{
+	ktime_t end = ktime_add_ns(ktime_get(), nanoseconds);
+
+	do {
+		ndelay(nanoseconds);
+	} while (ktime_before(ktime_get(), end));
+}
