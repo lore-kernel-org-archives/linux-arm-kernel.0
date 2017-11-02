@@ -1,18 +1,39 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 2 Nov 2017 00:28:02 -0700
-Subject: [PATCH RESEND 2/2] clk: imx: imx7d: Remove ARM_M0 clock
-In-Reply-To: <1506940331-16742-3-git-send-email-adriana.reus@nxp.com>
+Date: Thu, 2 Nov 2017 00:27:58 -0700
+Subject: [PATCH RESEND 1/2] clk: imx: imx7d: Fix parent clock for OCRAM_CLK
+In-Reply-To: <1506940331-16742-2-git-send-email-adriana.reus@nxp.com>
 References: <1506940331-16742-1-git-send-email-adriana.reus@nxp.com>
- <1506940331-16742-3-git-send-email-adriana.reus@nxp.com>
-Message-ID: <20171102072802.GS30645@codeaurora.org>
+ <1506940331-16742-2-git-send-email-adriana.reus@nxp.com>
+Message-ID: <20171102072758.GR30645@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 10/02, Adriana Reus wrote:
-> IMX7d does not have an M0 Core and this particular
-> clock doesn't seem connected to anything else.
-> Remove this entry from the CCM driver.
+> The parent of OCRAM_CLK should be axi_main_root_clk
+> and not axi_post_div.
 > 
+> before:
+> 
+>     axi_src                     1       1       332307692       0 0
+>       axi_cg                    1       1       332307692       0 0
+>         axi_pre_div             1       1       332307692       0 0
+>           axi_post_div          1       1       332307692       0 0
+>             ocram_clk           0       0       332307692       0 0
+>             main_axi_root_clk   1       1       332307692       0 0
+> 
+> after:
+> 
+>     axi_src                     1       1       332307692       0 0
+>       axi_cg                    1       1       332307692       0 0
+>         axi_pre_div             1       1       332307692       0 0
+>           axi_post_div          1       1       332307692       0 0
+>             main_axi_root_clk   1       1       332307692       0 0
+>               ocram_clk         0       0       332307692       0 0
+> 
+> Reference Doc: i.MX 7D Reference Manual - Chap 5, p 516
+> (https://www.nxp.com/docs/en/reference-manual/IMX7DRM.pdf)
+> 
+> Fixes: 8f6d8094b215 ("ARM: imx: add imx7d clk tree support")
 > Signed-off-by: Adriana Reus <adriana.reus@nxp.com>
 > ---
 
