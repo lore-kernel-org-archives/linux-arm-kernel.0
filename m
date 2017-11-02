@@ -1,39 +1,55 @@
-From: olivier.moysan@st.com (Olivier Moysan)
-Date: Thu, 2 Nov 2017 11:20:09 +0100
-Subject: [PATCH 1/1] ASoC: stm32: sai: fix warning in stm32_sai_set_config()
-Message-ID: <1509618009-30804-1-git-send-email-olivier.moysan@st.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 02 Nov 2017 10:36:35 +0000
+Subject: [PATCH v3 6/9] KVM: arm/arm64: Limit icache invalidation to
+ prefetch aborts
+In-Reply-To: <20171101101727.ysc65qlxwsqe5sfq@kamzik.brq.redhat.com> (Andrew
+ Jones's message of "Wed, 1 Nov 2017 11:17:27 +0100")
+References: <20171023161122.15291-1-marc.zyngier@arm.com>
+ <20171023161122.15291-7-marc.zyngier@arm.com>
+ <20171101101727.ysc65qlxwsqe5sfq@kamzik.brq.redhat.com>
+Message-ID: <87lgjpufv0.fsf@on-the-bus.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix uninitialized warning introduced by
-"Move static settings to DAI init" commit
-in stm32_sai_set_config() function.
+On Wed, Nov 01 2017 at 11:17:27 am GMT, Andrew Jones <drjones@redhat.com> wrote:
+> On Mon, Oct 23, 2017 at 05:11:19PM +0100, Marc Zyngier wrote:
+>> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+>> index 2174244f6317..0417c8e2a81c 100644
+>> --- a/virt/kvm/arm/mmu.c
+>> +++ b/virt/kvm/arm/mmu.c
+>> @@ -1292,7 +1292,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>  			  unsigned long fault_status)
+>>  {
+>>  	int ret;
+>> -	bool write_fault, writable, hugetlb = false, force_pte = false;
+>> +	bool write_fault, exec_fault, writable, hugetlb = false, force_pte = false;
+>>  	unsigned long mmu_seq;
+>>  	gfn_t gfn = fault_ipa >> PAGE_SHIFT;
+>>  	struct kvm *kvm = vcpu->kvm;
+>> @@ -1304,7 +1304,10 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>  	unsigned long flags = 0;
+>>  
+>>  	write_fault = kvm_is_write_fault(vcpu);
+>> -	if (fault_status == FSC_PERM && !write_fault) {
+>> +	exec_fault = kvm_vcpu_trap_is_iabt(vcpu);
+>> +	VM_BUG_ON(write_fault && exec_fault);
+>
+> This VM_BUG_ON can never fire as long as kvm_is_write_fault() is
+> defined as
+>
+>  {
+>    if (kvm_vcpu_trap_is_iabt(vcpu))
+>        return false;
+>    return kvm_vcpu_dabt_iswrite(vcpu);
+>  }
 
-Signed-off-by: Olivier Moysan <olivier.moysan@st.com>
----
- sound/soc/stm/stm32_sai_sub.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+That's indeed what I expect. But given that the code now relies on this
+property, I chose to make it explicit.
 
-diff --git a/sound/soc/stm/stm32_sai_sub.c b/sound/soc/stm/stm32_sai_sub.c
-index 150ad54..08583b9 100644
---- a/sound/soc/stm/stm32_sai_sub.c
-+++ b/sound/soc/stm/stm32_sai_sub.c
-@@ -482,13 +482,13 @@ static int stm32_sai_set_config(struct snd_soc_dai *cpu_dai,
- 	cr1_mask = SAI_XCR1_DS_MASK;
- 	switch (params_format(params)) {
- 	case SNDRV_PCM_FORMAT_S8:
--		cr1 |= SAI_XCR1_DS_SET(SAI_DATASIZE_8);
-+		cr1 = SAI_XCR1_DS_SET(SAI_DATASIZE_8);
- 		break;
- 	case SNDRV_PCM_FORMAT_S16_LE:
--		cr1 |= SAI_XCR1_DS_SET(SAI_DATASIZE_16);
-+		cr1 = SAI_XCR1_DS_SET(SAI_DATASIZE_16);
- 		break;
- 	case SNDRV_PCM_FORMAT_S32_LE:
--		cr1 |= SAI_XCR1_DS_SET(SAI_DATASIZE_32);
-+		cr1 = SAI_XCR1_DS_SET(SAI_DATASIZE_32);
- 		break;
- 	default:
- 		dev_err(cpu_dai->dev, "Data format not supported");
+Or are you seeing a better way of making this an invariant?
+
+Thanks,
+
+	M.
 -- 
-1.9.1
+Jazz is not dead, it just smell funny.
