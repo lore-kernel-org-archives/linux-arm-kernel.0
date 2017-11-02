@@ -1,73 +1,69 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 02 Nov 2017 19:37:15 +0200
-Subject: [RESEND PATCH 1/1] of: Make return types of to_of_node and
- of_fwnode_handle macros consistent
-In-Reply-To: <20171102095918.7041-1-sakari.ailus@linux.intel.com>
-References: <2117711.dO2rQLXOup@avalon>
- <20171102095918.7041-1-sakari.ailus@linux.intel.com>
-Message-ID: <1668125.RyNuczo2n4@avalon>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Thu, 2 Nov 2017 18:38:45 +0100
+Subject: [PULL 0/8] KVM/ARM Fixes for v4.14
+In-Reply-To: <20171030025603.23550-1-christoffer.dall@linaro.org>
+References: <20171030025603.23550-1-christoffer.dall@linaro.org>
+Message-ID: <f36c74ab-ce35-e3cd-a772-b83407228cfe@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sakari,
+On 30/10/2017 03:55, Christoffer Dall wrote:
+> Hi Paolo and Radim,
+> 
+> Here are the fixes we've been trying to get ready for v4.14 for a while;
+> sorry about sending these so late.
+> 
+> We're fixing:
+> 
+>  - a number of issues with saving/restoring the ITS
+>  - a bug in KVM/ARM when branch profiling is enabled in Hyp mode
+>  - an emulation bug for 32-bit guests when injecting aborts
+>  - a failure to check if a kmalloc succeeds in the ITS emulation
+> 
+> The following changes since commit 8a5776a5f49812d29fe4b2d0a2d71675c3facf3f:
+> 
+>   Linux 4.14-rc4 (2017-10-08 20:53:29 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-fixes-for-v4.14
+> 
+> for you to fetch changes up to c2385eaa6c5a87cdc4e04ed589ae103ca3297c84:
+> 
+>   KVM: arm/arm64: vgic-its: Check GITS_BASER Valid bit before saving tables (2017-10-29 03:25:06 +0100)
+> 
+> 
+> Thanks,
+> -Christoffer
+> 
+> Christoffer Dall (1):
+>       KVM: arm64: its: Fix missing dynamic allocation check in scan_its_table
+> 
+> Dongjiu Geng (1):
+>       arm/arm64: KVM: set right LR register value for 32 bit guest when inject abort
+> 
+> Eric Auger (3):
+>       KVM: arm/arm64: vgic-its: Fix vgic_its_restore_collection_table returned value
+>       KVM: arm/arm64: vgic-its: Check CBASER/BASER validity before enabling the ITS
+>       KVM: arm/arm64: vgic-its: Check GITS_BASER Valid bit before saving tables
+> 
+> Julien Thierry (2):
+>       arm/arm64: kvm: Move initialization completion message
+>       arm/arm64: kvm: Disable branch profiling in HYP code
+> 
+> wanghaibin (1):
+>       KVM: arm/arm64: vgic-its: Fix return value for device table restore
+> 
+>  arch/arm/kvm/emulate.c        |  6 ++--
+>  arch/arm/kvm/hyp/Makefile     |  2 +-
+>  arch/arm64/kvm/hyp/Makefile   |  2 +-
+>  arch/arm64/kvm/inject_fault.c | 16 +++++++++-
+>  virt/kvm/arm/arm.c            | 31 +++++++++---------
+>  virt/kvm/arm/vgic/vgic-its.c  | 73 ++++++++++++++++++++++++++++---------------
+>  6 files changed, 81 insertions(+), 49 deletions(-)
+> 
 
-Thank you for the patch.
 
-On Thursday, 2 November 2017 11:59:18 EET Sakari Ailus wrote:
-> (Fixed Mauro's e-mail.)
-> 
-> to_of_node() macro checks whether the fwnode_handle passed to it is not an
-> OF node, and if so, returns NULL in order to be NULL-safe. Otherwise it
-> returns the pointer to the OF node which the fwnode_handle contains.
-> 
-> The problem with returning NULL is that its type was void *, which
-> sometimes matters. Explicitly return struct device_node * instead.
-> 
-> Make a similar change to of_fwnode_handle() as well.
-> 
-> Fixes: d20dc1493db4 ("of: Support const and non-const use for to_of_node()")
-> Fixes: debd3a3b27c7 ("of: Make of_fwnode_handle() safer")
-> Signed-off-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+Pulled, thanks.
 
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-> ---
-> Hi Mauro,
-> 
-> Could you check whether this addresses the smatch issue with the xilinx
-> driver?
-> 
-> Thanks.
-> 
->  include/linux/of.h | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/include/linux/of.h b/include/linux/of.h
-> index b240ed69dc96..0651231c115e 100644
-> --- a/include/linux/of.h
-> +++ b/include/linux/of.h
-> @@ -161,7 +161,7 @@ static inline bool is_of_node(const struct fwnode_handle
-> *fwnode) is_of_node(__to_of_node_fwnode) ?			\
->  			container_of(__to_of_node_fwnode,		\
->  				     struct device_node, fwnode) :	\
-> -			NULL;						\
-> +			(struct device_node *)NULL;			\
->  	})
-> 
->  #define of_fwnode_handle(node)						\
-> @@ -169,7 +169,8 @@ static inline bool is_of_node(const struct fwnode_handle
-> *fwnode) typeof(node) __of_fwnode_handle_node = (node);		\
->  									\
->  		__of_fwnode_handle_node ?				\
-> -			&__of_fwnode_handle_node->fwnode : NULL;	\
-> +			&__of_fwnode_handle_node->fwnode :		\
-> +			(struct fwnode_handle *)NULL;			\
->  	})
-> 
->  static inline bool of_have_populated_dt(void)
-
-
--- 
-Regards,
-
-Laurent Pinchart
+Paolo
