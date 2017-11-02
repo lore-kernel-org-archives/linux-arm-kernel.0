@@ -1,12 +1,9 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Thu, 2 Nov 2017 11:06:54 +0000
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 Nov 2017 11:09:26 +0000
 Subject: [PATCH 3/3] ARM: early_printk: use printascii() rather than
  printch()
-In-Reply-To: <nycvar.YSQ.7.76.1711012249020.21665@knanqh.ubzr>
-References: <nycvar.YSQ.7.76.1710311211540.21665@knanqh.ubzr>
- <80bc8c16-321a-43ea-6cbb-257dbeee485b@arm.com>
- <nycvar.YSQ.7.76.1710311302370.21665@knanqh.ubzr>
- <20171031171629.GI9463@n2100.armlinux.org.uk>
+In-Reply-To: <nycvar.YSQ.7.76.1711020011400.21665@knanqh.ubzr>
+References: <20171031171629.GI9463@n2100.armlinux.org.uk>
  <nycvar.YSQ.7.76.1710311346190.21665@knanqh.ubzr>
  <20171031175344.GJ9463@n2100.armlinux.org.uk>
  <nycvar.YSQ.7.76.1710311355000.21665@knanqh.ubzr>
@@ -15,102 +12,45 @@ References: <nycvar.YSQ.7.76.1710311211540.21665@knanqh.ubzr>
  <SG2PR06MB1165AE45FB289039E55D03028A5E0@SG2PR06MB1165.apcprd06.prod.outlook.com>
  <20171102000945.GT9463@n2100.armlinux.org.uk>
  <nycvar.YSQ.7.76.1711012249020.21665@knanqh.ubzr>
-Message-ID: <SG2PR06MB11655BDEF09BB62D268A29DD8A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+ <nycvar.YSQ.7.76.1711020011400.21665@knanqh.ubzr>
+Message-ID: <20171102110925.GV9463@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, November 01, 2017 1, Nicolas Pitre wrote:
-> > > This patch worked for me.
-> > > I get my carriage returns again.
-> >
-> > Sorry, but no.  This is crap.
-> >
-> > The kernelci.org test resulting from the tree I pushed out this evening
-> > with both of the patches in is very unhappy:
-> >
-> >      42  arch/arm/kernel/debug.S:98: Error: immediate expression
-> requires a # prefix -- `mov r1,10'
-> >      42  arch/arm/kernel/debug.S:94: Error: immediate expression
-> requires a # prefix -- `mov r1,13'
-> >
-> > I can't believe that anyone actually build-tested this patch as it
-> > stands - maybe, Chris, you just think you did but you ended up
-> > testing something else?  Or maybe your binutils is broken because
-> > it now accepts constants without the preceding '#' ?
+On Thu, Nov 02, 2017 at 12:16:54AM -0400, Nicolas Pitre wrote:
+> On Wed, 1 Nov 2017, Nicolas Pitre wrote:
 > 
-> Well... I don't know what happened with Chris' testing either.
+> > Well... I don't know what happened with Chris' testing either.
+> > 
+> > I *thought* I build tested it, but my .config had 
+> > CONFIG_DEBUG_SEMIHOSTING=y.
+> 
+> Here's the fixed patch. I won't submit it to the patch system before we 
+> understand how the previous one worked for Chris.
 
+As we have seen, there's risk involved with merging apparently tested
+fixes, and it can result in major build breakage.
 
-So, just to show I'm not crazy...
+Today is the last linux-next fetch before the potential opening of the
+merge window on Sunday.  I'd prefer not to merge anything in the next
+four days, but instead let things settle ready for that.
 
+Most of last night's builds for my autobuilder failed due to this
+problem (I didn't have a chance to regenerate that tree after kernelci
+reported the problem), so I'm going to have to wait until tonight's
+builds to see how things are - and that's starting to leave precious
+little available time before the merge window.  I don't run the
+builder during the day as it eats around six hours of time.
 
-# Yes, patch was applied:
-$ grep "mov        r1" arch/arm/kernel/debug.S
-		mov	r1, #8
-		mov	r1, #4
-		mov	r1, #2
-		mov	r1, #0
-		mov	r1, '\r'    <<<<<<<<<<
-		mov	r1, '\n'    <<<<<<<<<<
-		mov	r1, r0
-		mov	r1, r0
+So, in short, my tree is now closed in expectation of 4.14 on Sunday.
 
-# Yes it builds:
-$ touch arch/arm/kernel/debug.S
-$ make -j8 O=.out uImage LOADADDR=0x08008000
-make[1]: Entering directory '/home/renesas/tools/upstream/renesas-drivers/.out'
-  CHK     include/config/kernel.release
-  GEN     ./Makefile
-  CHK     include/generated/uapi/linux/version.h
-  CHK     scripts/mod/devicetable-offsets.h
-  UPD     include/config/kernel.release
-  Using .. as source for kernel
-  CHK     include/generated/utsrelease.h
-  UPD     include/generated/utsrelease.h
-  CHK     include/generated/timeconst.h
-  CHK     include/generated/bounds.h
-  CHK     include/generated/asm-offsets.h
-  CALL    ../scripts/checksyscalls.sh
-  CHK     include/generated/compile.h
-  CC      init/version.o
-  AS      arch/arm/kernel/debug.o       <<<<<<<<<<
+However, if you want me to remove "8705/1: early_printk: use printascii()
+rather than printch()" I can do that, but only if you tell me before
+4pm UTC today.
 
+If we get 4.14-rc8 instead, I'll re-open for a few days for this.
 
-# Have a look@the output:
-$ arm-linux-gnueabihf-objdump -SdCg .out/arch/arm/kernel/debug.o > /tmp/debug.lst
-$ cat /tmp/debug.lst
-
-------------------------------------------------------------
-                mov     r1, '\r'           <<<<<<<<<<
-  70:   f04f 010d       mov.w   r1, #13    <<<<<<<<<<
-                waituart r2, r3
-  74:   8a1a            ldrh    r2, [r3, #16]
-  76:   f012 0f20       tst.w   r2, #32
-  7a:   d0fb            beq.n   74 <printascii+0x2c>
-                senduart r1, r3
-  7c:   7319            strb    r1, [r3, #12]
-  7e:   8a19            ldrh    r1, [r3, #16]
-  80:   f021 0140       bic.w   r1, r1, #64     ; 0x40
-  84:   8219            strh    r1, [r3, #16]
-                busyuart r2, r3
-  86:   8a1a            ldrh    r2, [r3, #16]
-  88:   f012 0f40       tst.w   r2, #64 ; 0x40
-  8c:   d0fb            beq.n   86 <printascii+0x3e>
-                mov     r1, '\n'         <<<<<<<<<<
-  8e:   f04f 010a       mov.w   r1, #10  <<<<<<<<<<
-------------------------------------------------------------
-
-
-So, the compiler realized what you wanted to do even if there wasn't a
-# in front of the constant.
-
-
-$ arm-linux-gnueabihf-gcc --version
-arm-linux-gnueabihf-gcc (Linaro GCC 5.4-2017.01) 5.4.1 20161213
-Copyright (C) 2015 Free Software Foundation, Inc.
-This is free software; see the source for copying conditions.  There is NO
-warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-
-
-
-Chris
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
