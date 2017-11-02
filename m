@@ -1,128 +1,93 @@
-From: brouer@redhat.com (Jesper Dangaard Brouer)
-Date: Thu, 2 Nov 2017 12:21:57 +0100
-Subject: [PATCH v3 1/1] xdp: Sample xdp program implementing ip forward
-In-Reply-To: <1509522484-30215-2-git-send-email-christina.jacob.koikara@gmail.com>
-References: <1509522484-30215-1-git-send-email-christina.jacob.koikara@gmail.com>
- <1509522484-30215-2-git-send-email-christina.jacob.koikara@gmail.com>
-Message-ID: <20171102122157.2dcb2da7@redhat.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 2 Nov 2017 16:56:40 +0530
+Subject: [PATCH] mailbox: add support for doorbell/signal mode controllers
+In-Reply-To: <4268c9d9-dc1e-0bd7-3fac-790c2d42b54b@arm.com>
+References: <1509553964-4451-1-git-send-email-sudeep.holla@arm.com>
+ <CABb+yY1tcm-68E5oG75hstuMd6AOeb=BB6HeKGnQ1zj4Qya6hg@mail.gmail.com>
+ <59a05fcb-ff30-0683-144e-93521a7413f9@arm.com>
+ <CABb+yY16-B9vReRjLopV1RsyB8a=c5X9XaomtTj44520XrDdmA@mail.gmail.com>
+ <4268c9d9-dc1e-0bd7-3fac-790c2d42b54b@arm.com>
+Message-ID: <CABb+yY3Gd3u-_xNPSqJT_+yVHGMs7pgt3Bc4faGvN2KwOsm6_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed,  1 Nov 2017 13:18:04 +0530 Christina Jacob <christina.jacob.koikara@gmail.com> wrote:
+On Thu, Nov 2, 2017 at 4:17 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> On 02/11/17 02:39, Jassi Brar wrote:
 
-> From: Christina Jacob <Christina.Jacob@cavium.com>
-> 
-> Implements port to port forwarding with route table and arp table
-> lookup for ipv4 packets using bpf_redirect helper function and
-> lpm_trie  map.
-> Signed-off-by: Christina Jacob <Christina.Jacob@cavium.com>
-
-There is usually a line between the desc and Signed-off-by.
-
-> ---
->  samples/bpf/Makefile               |   4 +
->  samples/bpf/xdp_router_ipv4_kern.c | 181 ++++++++++
->  samples/bpf/xdp_router_ipv4_user.c | 657 +++++++++++++++++++++++++++++++++++++
->  3 files changed, 842 insertions(+)
-> 
-[...]
-> diff --git a/samples/bpf/xdp_router_ipv4_kern.c b/samples/bpf/xdp_router_ipv4_kern.c
-> new file mode 100644
-> index 0000000..70a5907
-> --- /dev/null
-> +++ b/samples/bpf/xdp_router_ipv4_kern.c
-> @@ -0,0 +1,181 @@
-> +/* Copyright (C) 2017 Cavium, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms of version 2 of the GNU General Public License
-> + * as published by the Free Software Foundation.
-> + */
-[...]
-> +SEC("xdp3")
-> +int xdp_prog3(struct xdp_md *ctx)
-
-You changed the filename from xdp3 to xdp_router_ipv4, but you didn't
-change the name in he code.
-
-> +{
-> +	void *data_end = (void *)(long)ctx->data_end;
-> +	__be64 *dest_mac = NULL, *src_mac = NULL;
-> +	void *data = (void *)(long)ctx->data;
-> +	struct trie_value *prefix_value;
-> +	int rc = XDP_DROP, forward_to;
-> +	struct ethhdr *eth = data;
-> +	union key_4 key4;
-> +	long *value;
-> +	u16 h_proto;
-> +	u32 ipproto;
-> +	u64 nh_off;
-> +
-[..]
-> +	if (h_proto == htons(ETH_P_ARP)) {
-> +		return XDP_PASS;
-> +	} else if (h_proto == htons(ETH_P_IP)) {
-> +		struct direct_map *direct_entry;
-> +		__be32 src_ip = 0, dest_ip = 0;
-> +
-> +		ipproto = parse_ipv4(data, nh_off, data_end, &src_ip, &dest_ip);
-> +		direct_entry = (struct direct_map *)bpf_map_lookup_elem
-> +			(&exact_match, &dest_ip);
-
-I don't think you need this type-casting.
+>>>>>
+>>>>> Such controllers don't need to transmit any data, they just transmit
+>>>>> the signal. In such controllers the data pointer passed to
+>>>>> mbox_send_message is passed to client via it's tx_prepare callback.
+>>>>> Controller doesn't need any data to be passed from the client.
+>>>>>
+>>>> Some controllers need a non-zero value written to a register in order
+>>>> to trigger the signal.
+>>>
+>>> You are right, just right non-zero or whatever controller value to
+>>> trigger the interrupt to remote.
+>>>
+>>>> That register is visible to the remote. While the data/packet is setup
+>>>> during tx_prepare() callback.
+>>>
+>>> Agreed.
+>>>
+>>>> You are overlooking this class of doorbell controllers.
+>>>>
+>>>
+>>> Not sure what do you mean by that ?
+>>>
+>> Such doorbell controllers can't use send_signal(chan) because they
+>> need that non-zero value from client to send over the shared register.
+>> You are assuming every protocol implements just one command.
+>>
+>
+> No that non-zero value is not client specific, it's entirely controller
+> specific.
+>
+??
+For example BCM2835 has such a controller. Have a look at
+bcm2835_send_data() and let me know what is that controller specific
+value.
 
 
-> +		/* Check for exact match, this would give a faster lookup*/
-> +		if (direct_entry && direct_entry->mac && direct_entry->arp.mac) {
-> +			src_mac = &direct_entry->mac;
-> +			dest_mac = &direct_entry->arp.mac;
-> +			forward_to = direct_entry->ifindex;
-> +		} else {
-> +			/* Look up in the trie for lpm*/
-> +			key4.b32[0] = 32;
-> +			key4.b8[4] = dest_ip & 0xff;
-> +			key4.b8[5] = (dest_ip >> 8) & 0xff;
-> +			key4.b8[6] = (dest_ip >> 16) & 0xff;
-> +			key4.b8[7] = (dest_ip >> 24) & 0xff;
-> +			prefix_value = ((struct trie_value *)bpf_map_lookup_elem
-> +					(&lpm_map, &key4));
-> +			if (!prefix_value)
-> +				return XDP_DROP;
-> +			src_mac = &prefix_value->value;
-> +			if (!src_mac)
-> +				return XDP_DROP;
-> +			dest_mac = (__be64 *)bpf_map_lookup_elem(&arp_table, &dest_ip);
-> +			if (!dest_mac) {
-> +				if (!prefix_value->gw)
-> +					return XDP_DROP;
-> +				dest_ip = *(__be32 *)&prefix_value->gw;
-> +				dest_mac = (__be64 *)bpf_map_lookup_elem(&arp_table, &dest_ip);
-> +			}
-> +			forward_to = prefix_value->ifindex;
-> +		}
-> +	} else {
-> +		ipproto = 0;
-> +	}
-> +	if (src_mac && dest_mac) {
-> +		set_src_dst_mac(data, src_mac, dest_mac);
-> +		value = bpf_map_lookup_elem(&rxcnt, &ipproto);
-> +		if (value)
-> +			*value += 1;
-> +		return  bpf_redirect(forward_to, 0);
+>>> Again agreed. But see below for reason to create this API.
+>>>
+>>>>> The new API send_signal will eliminate the
+>>>>> issue Jassi has explained in earlier discussion with respect to generic
+>>>>> message format using Rockchip example.
+>>>>>
+>>>> Sorry I don't see how.
+>>>> Please explain how can send_signal() api be used by, say, rockchip to
+>>>> support SCMI?
+>>>>
+>>>
+>>>  80         writel_relaxed(msg->cmd, mb->mbox_base +
+>>> MAILBOX_A2B_CMD(chans->idx));
+>>>  81         writel_relaxed(msg->rx_size, mb->mbox_base +
+>>>
+>>>  82                        MAILBOX_A2B_DAT(chans->idx));
+>>>
+>>>  83
+>>>
+>>>  will be replaced with
+>>>
+>>> writel(whatever_value_to trigger_signal, MAILBOX_A2B_CMD(chans->idx));
+>>>
+>>> in its send_signal function.
+>>>
+>> 1) Where does the  "whatever_value_to_trigger_signal"  come from?
+>
+> Controller specific.
+>
+>> That has to come from client.
+>
+> No.
+>
+Again, let me know what does the controller expect 'val' to be
 
-Notice that using bpf_redirect() is slow, while using bpf_redirect_map()
-is fast.  Using bpf_redirect_map() requires a little more book keeping,
-but the performance gain is worth it.
+  writel(val, MAILBOX_A2B_CMD(chans->idx))
 
-Raw benchmarks on my system show:
- * bpf_redirect() max at  7Mpps
- * bpf_redirect_map() at 13Mpps
 
-Trying out your program on my systems showed it jumps between 5.6Mpps
-to 7Mpps.  And it seems to be correlated with matching direct_entry.
-
--- 
-Best regards,
-  Jesper Dangaard Brouer
-  MSc.CS, Principal Kernel Engineer at Red Hat
-  LinkedIn: http://www.linkedin.com/in/brouer
+Your entire post is based on your assertion that the controller
+expects a particular non-zero value to trigger a signal, which is
+wrong. So lets first get that straight and not stray from the point.
