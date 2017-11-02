@@ -1,59 +1,71 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Thu, 02 Nov 2017 09:12:43 +0100
-Subject: [PATCH 1/2] media: s5p-mfc: check for firmware allocation
- before requesting firmware
-In-Reply-To: <e7c1ad0167ca363cc783be11871a04957127a3fa.1507325072.git.shuahkh@osg.samsung.com>
-References: <cover.1507325072.git.shuahkh@osg.samsung.com>
- <CGME20171006213015epcas3p2c0d4741e06b2d8c25583fb656b7f5532@epcas3p2.samsung.com>
- <e7c1ad0167ca363cc783be11871a04957127a3fa.1507325072.git.shuahkh@osg.samsung.com>
-Message-ID: <5bbc048a-4b68-de23-373d-eb8a12c5b736@samsung.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Thu, 2 Nov 2017 09:14:05 +0100
+Subject: [PATCH v4 00/21] SError rework + RAS&IESB for firmware first
+ support
+In-Reply-To: <59F9E706.40503@arm.com>
+References: <20171019145807.23251-1-james.morse@arm.com>
+ <20171031063535.GA2166@lvm> <20171031100829.GC5584@arm.com>
+ <59F9E706.40503@arm.com>
+Message-ID: <20171102081405.GA20075@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shuah,
+On Wed, Nov 01, 2017 at 03:23:50PM +0000, James Morse wrote:
+> Hi guys,
+> 
+> On 31/10/17 10:08, Will Deacon wrote:
+> > On Tue, Oct 31, 2017 at 07:35:35AM +0100, Christoffer Dall wrote:
+> >> On Thu, Oct 19, 2017 at 03:57:46PM +0100, James Morse wrote:
+> >>> The aim of this series is to enable IESB and add ESB-instructions to let us
+> >>> kick any pending RAS errors into firmware to be handled by firmware-first.
+> >>>
+> >>> Not all systems will have this firmware, so these RAS errors will become
+> >>> pending SErrors. We should take these as quickly as possible and avoid
+> >>> panic()ing for errors where we could have continued.
+> >>>
+> >>> This first part of this series reworks the DAIF masking so that SError is
+> >>> unmasked unless we are handling a debug exception.
+> >>>
+> >>> The last part provides the same minimal handling for SError that interrupt
+> >>> KVM. KVM is currently unable to handle SErrors during world-switch, unless
+> >>> they occur during a magic single-instruction window, it hyp-panics. I suspect
+> >>> this will be easier to fix once the VHE world-switch is further optimised.
+> >>>
+> >>> KVMs kvm_inject_vabt() needs updating for v8.2 as now we can specify an ESR,
+> >>> and all-zeros has a RAS meaning.
+> >>>
+> >>> KVM's existing 'impdef SError to the guest' behaviour probably needs revisiting.
+> >>> These are errors where we don't know what they mean, they may not be
+> >>> synchronised by ESB. Today we blame the guest.
+> >>> My half-baked suggestion would be to make a virtual SError pending, but then
+> >>> exit to user-space to give Qemu the change to quit (for virtual machines that
+> >>> don't generate SError), pend an SError with a new Qemu-specific ESR, or blindly
+> >>> continue and take KVMs default all-zeros impdef ESR.
+> >>
+> >> The KVM side of this series is looking pretty good.
+> >>
+> >> What are the merge plans for this?  I am fine if you will take this via
+> >> the arm64 tree with our acks from the KVM side.  Alternatively, I
+> >> suppose you can apply all the arm64 patches and provide us with a stable
+> >> branch for that?
+> > 
+> > I'll take a look this afternoon, but we haven't had a linux next release
+> > since the 18th so I'm starting to get nervous about conflicts if I end up
+> > pulling in new trees now.
+> 
+> Will's 'what about mixed RAS support' comment will take me a while to get to
+> fix, and I don't think I can test that before the end of the week.
+> 
+> Unless there is an rc8+linux-next I think this is too late, but I will split off
+> and repost the SError_rework bits as that seems uncontentious...
+> 
+> 
 
-On 06.10.2017 23:30, Shuah Khan wrote:
-> Check if firmware is allocated before requesting firmware instead of
-> requesting firmware only to release it if firmware is not allocated.
->
-> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
-> ---
->  drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c b/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
-> index 69ef9c2..f064a0d1 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
-> @@ -55,6 +55,11 @@ int s5p_mfc_load_firmware(struct s5p_mfc_dev *dev)
->  	 * into kernel. */
->  	mfc_debug_enter();
->  
-> +	if (!dev->fw_buf.virt) {
-> +		mfc_err("MFC firmware is not allocated\n");
-> +		return -EINVAL;
-> +	}
-> +
->  	for (i = MFC_FW_MAX_VERSIONS - 1; i >= 0; i--) {
->  		if (!dev->variant->fw_name[i])
->  			continue;
-> @@ -75,11 +80,6 @@ int s5p_mfc_load_firmware(struct s5p_mfc_dev *dev)
->  		release_firmware(fw_blob);
->  		return -ENOMEM;
->  	}
-> -	if (!dev->fw_buf.virt) {
-> -		mfc_err("MFC firmware is not allocated\n");
-> -		release_firmware(fw_blob);
-> -		return -EINVAL;
-> -	}
+It is indeed cutting it a bit close.  We'll have the same challenge of
+either going via arm64 or using a stable branch we merge into the KVM
+side for the next merge window as well.  I prefer the latter, since
+there's going to be some conflicts with my optimization series which I
+hope to get in for v4.16.
 
-Is there any scenario in which dev->fw_buf.virt is null and
-s5p_mfc_load_firmware is called?
-I suspect this check is not necessary at all.
-
-Regards
-Andrzej
-
->  	memcpy(dev->fw_buf.virt, fw_blob->data, fw_blob->size);
->  	wmb();
->  	release_firmware(fw_blob);
+Thanks,
+-Christoffer
