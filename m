@@ -1,45 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 2 Nov 2017 22:51:44 +0100
-Subject: [GIT PULL] Mediatek: soc driver updates for v4.15
-In-Reply-To: <514a12ee-b31f-1be0-8e11-2ec0929dd34b@gmail.com>
-References: <1ebc2f2d-033e-e8d6-86c8-32a67ebd55b7@gmail.com>
- <CAK8P3a1hCWV6Fp5wyiESbdZUsgSoGZywj55=0v9Az-TPt3GtyQ@mail.gmail.com>
- <514a12ee-b31f-1be0-8e11-2ec0929dd34b@gmail.com>
-Message-ID: <CAK8P3a2Lk3_W0kcR2vfpEtAHVBavbQ-ZJ6DCbMqnYDqmFR7y5w@mail.gmail.com>
+Date: Thu, 2 Nov 2017 22:55:33 +0100
+Subject: [GIT PULL] Mediatek: 32-bit DT update for v4.15
+In-Reply-To: <0c3f8521-e0a6-a0d2-45b9-62d7c824818d@gmail.com>
+References: <c7145c00-b2b9-780c-0bfd-15f7d8a08dd6@gmail.com>
+ <CAK8P3a3NWwoe0mX45WrFONyiHt9eWTTMziEc+rjqSfr5QZv8xQ@mail.gmail.com>
+ <1509423579.10793.10.camel@mtkswgap22>
+ <e8fdd9a9-ce13-8804-aea0-46becc6f9730@gmail.com>
+ <CAK8P3a0+9fChSbObS9boR8okHtO8u8_hr2Te+RjfRD0T54QYWQ@mail.gmail.com>
+ <0c3f8521-e0a6-a0d2-45b9-62d7c824818d@gmail.com>
+Message-ID: <CAK8P3a1Bh3_HtzdXgHX5a88uDOehtQnaqYebrOKO2Y8GWW7vhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 2, 2017 at 7:40 PM, Matthias Brugger <matthias.bgg@gmail.com> wrote:
-> Hi Arnd,
+On Thu, Nov 2, 2017 at 7:47 PM, Matthias Brugger <matthias.bgg@gmail.com> wrote:
 >
-> On 11/02/2017 04:35 PM, Arnd Bergmann wrote:
->> On Mon, Oct 23, 2017 at 12:10 AM, Matthias Brugger
->> <matthias.bgg@gmail.com> wrote:
 >>>
->>> ----------------------------------------------------------------
->>> - add 32 bit read/write support to pwrap
->>> - add mt7622 support to pwrap
->>> - test build all mediatek soc drivers
->>> - fix compiler issues
->>> - clean up Kconfig description
+>>> Arnd, I didn't found the pull request in your next/dt branch.
+>>> Is there more clarification needed from our side?
 >>
->> Pulled into next/soc. I see some bug fixes in here that I would have
->> marked 'Cc: stable at vger.kernel.org'
->> to get them backported into stable kernels. Could you please make sure
->> they are marked appropriately
->> in the future, and maybe (after the merge window) send a message to
->> stable at vger.kernel.org with a list
->> of the commits that you want backported but that are missing the tag? Thanks!
+>> I'm still unsure about it., this looks like exactly the thing that the top-level
+>> interrupt-map is supposed to handle fine.
 >>
+>> Can you send a pull request for the series without the pci child nodes for the
+>> moment while we figure out what the exact problem is? We can take
+>> whatever fix we come up with during the v4.15 -rc cycle then.
 >
-> Do you refer to this commits?
-> f32fbbadaf44 soc: mediatek: pwrap: fix fatal compiler error
-> fb2c1934f305 soc: mediatek: pwrap: fix compiler errors
+> Sure. I'll provide a new tag v4.14-next-dts32-2 without the patch.
+> I will send a pull request shortly.
 
-Yes.
+I was thinking with the patch but without the duplicated interrupt-map
+properties
+(or without the extra child nodes) but dropping the patch works for me too.
 
-> They are actually fix problems in the very same pull request.
+I was hoping that we could figure out whether it's a code bug that prevents
+us from just parsing the parent interrupt-map correctly, or whether there is
+something wrong with that map itself.
 
-Ok, thanks for checking!
-
-     Arnd
+       Arnd
