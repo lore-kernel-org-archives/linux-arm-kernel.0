@@ -1,27 +1,59 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 2 Nov 2017 01:12:08 -0700
-Subject: [PATCH v2 1/4] dt-bindings: clock: mediatek: document clk
- bindings for MediaTek MT7622 SoC
-In-Reply-To: <cac2312d51a2a30e066f79214dc0b71acea7732d.1507174799.git.sean.wang@mediatek.com>
-References: <cover.1507174799.git.sean.wang@mediatek.com>
- <cac2312d51a2a30e066f79214dc0b71acea7732d.1507174799.git.sean.wang@mediatek.com>
-Message-ID: <20171102081207.GH11011@codeaurora.org>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Thu, 02 Nov 2017 09:12:43 +0100
+Subject: [PATCH 1/2] media: s5p-mfc: check for firmware allocation
+ before requesting firmware
+In-Reply-To: <e7c1ad0167ca363cc783be11871a04957127a3fa.1507325072.git.shuahkh@osg.samsung.com>
+References: <cover.1507325072.git.shuahkh@osg.samsung.com>
+ <CGME20171006213015epcas3p2c0d4741e06b2d8c25583fb656b7f5532@epcas3p2.samsung.com>
+ <e7c1ad0167ca363cc783be11871a04957127a3fa.1507325072.git.shuahkh@osg.samsung.com>
+Message-ID: <5bbc048a-4b68-de23-373d-eb8a12c5b736@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/05, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
-> 
-> This patch adds the binding documentation for apmixedsys, ethsys, hifsys,
-> infracfg, pericfg, topckgen and audsys for MT7622.
-> 
-> Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> Acked-by: Rob Herring <robh@kernel.org>
+Hi Shuah,
+
+On 06.10.2017 23:30, Shuah Khan wrote:
+> Check if firmware is allocated before requesting firmware instead of
+> requesting firmware only to release it if firmware is not allocated.
+>
+> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
 > ---
+>  drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c b/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
+> index 69ef9c2..f064a0d1 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
+> @@ -55,6 +55,11 @@ int s5p_mfc_load_firmware(struct s5p_mfc_dev *dev)
+>  	 * into kernel. */
+>  	mfc_debug_enter();
+>  
+> +	if (!dev->fw_buf.virt) {
+> +		mfc_err("MFC firmware is not allocated\n");
+> +		return -EINVAL;
+> +	}
+> +
+>  	for (i = MFC_FW_MAX_VERSIONS - 1; i >= 0; i--) {
+>  		if (!dev->variant->fw_name[i])
+>  			continue;
+> @@ -75,11 +80,6 @@ int s5p_mfc_load_firmware(struct s5p_mfc_dev *dev)
+>  		release_firmware(fw_blob);
+>  		return -ENOMEM;
+>  	}
+> -	if (!dev->fw_buf.virt) {
+> -		mfc_err("MFC firmware is not allocated\n");
+> -		release_firmware(fw_blob);
+> -		return -EINVAL;
+> -	}
 
-Applied to clk-next
+Is there any scenario in which dev->fw_buf.virt is null and
+s5p_mfc_load_firmware is called?
+I suspect this check is not necessary at all.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Regards
+Andrzej
+
+>  	memcpy(dev->fw_buf.virt, fw_blob->data, fw_blob->size);
+>  	wmb();
+>  	release_firmware(fw_blob);
