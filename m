@@ -1,37 +1,35 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 2 Nov 2017 15:13:47 +0100
-Subject: [PATCH v6 03/12] arm64: dts: mt8173: remove "mediatek, mt8135-mmc"
- from mmc nodes
-In-Reply-To: <b24d12e4-251f-6f79-1ed9-5b52f8f39625@gmail.com>
-References: <1508118399-21828-1-git-send-email-chaotian.jing@mediatek.com>
- <1508118399-21828-4-git-send-email-chaotian.jing@mediatek.com>
- <CAPDyKFrRVT8YFXvy3Wuf_jga5oourScOdas34U=YkeLRzHoWMg@mail.gmail.com>
- <b24d12e4-251f-6f79-1ed9-5b52f8f39625@gmail.com>
-Message-ID: <CAPDyKFp5Ez_NXWtSeTt+nsgJtesS3t_tbUpgFco8ZVAPj+PgoA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu,  2 Nov 2017 15:29:13 +0100
+Subject: [PATCH] pinctrl: armada-37xx: remove unused variable
+Message-ID: <20171102142932.774199-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 November 2017 at 12:50, Matthias Brugger <matthias.bgg@gmail.com> wrote:
->
->
-> On 10/25/2017 11:11 PM, Ulf Hansson wrote:
->> On 16 October 2017 at 03:46, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
->>> devicetree bindings has been updated to support multi-platforms,
->>> so that each platform has its owns compatible name.
->>> And, this compatible name may used in driver to distinguish with
->>> other platform.
->>>
->>> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
->>
->> Matthias, do you intend to pick this? Else I can do it with your ack...
->>
->
-> If it's not too late, feel free to take it. Otherwise I will queue it for the
-> next merge window:
->
-> Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
+A cleanup left behind a temporary variable that is now unused:
 
-Thanks, I have queued it up for 4.15 and will add your ack.
+drivers/pinctrl/mvebu/pinctrl-armada-37xx.c: In function 'armada_37xx_irq_startup':
+drivers/pinctrl/mvebu/pinctrl-armada-37xx.c:693:20: error: unused variable 'chip' [-Werror=unused-variable]
 
-Kind regards
-Uffe
+This removes the declarations as well.
+
+Fixes: 3ee9e605caea ("pinctrl: armada-37xx: Stop using struct gpio_chip.irq_base")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/pinctrl/mvebu/pinctrl-armada-37xx.c | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+index 68a4af12fb0a..2149f8d955cf 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
++++ b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+@@ -690,8 +690,6 @@ static void armada_37xx_irq_handler(struct irq_desc *desc)
+ 
+ static unsigned int armada_37xx_irq_startup(struct irq_data *d)
+ {
+-	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
+-
+ 	/*
+ 	 * The mask field is a "precomputed bitmask for accessing the
+ 	 * chip registers" which was introduced for the generic
+-- 
+2.9.0
