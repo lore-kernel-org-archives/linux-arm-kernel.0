@@ -1,50 +1,66 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  2 Nov 2017 10:18:05 +0100
-Subject: [PATCH] ARM: dts: koelsch: Move cec_clock to root node
-Message-ID: <20171102091805.24967-1-horms+renesas@verge.net.au>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Thu, 2 Nov 2017 09:20:14 +0000
+Subject: [PATCH] ARM: dts: iwg20d-q7: Add support for ttySC3
+In-Reply-To: <20171102080412.n3wfabxt2ayswxzp@verge.net.au>
+References: <1507539981-4193-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <CAMuHMdUprE7QuXF_sX47JyrvuZXhXnQFufy4OHeJ5ExwwoogKw@mail.gmail.com>
+ <TY1PR06MB0895612044D5E21BCBFEF46BC0740@TY1PR06MB0895.apcprd06.prod.outlook.com>
+ <20171102080412.n3wfabxt2ayswxzp@verge.net.au>
+Message-ID: <TY1PR06MB0895FCBA06AF6FF82E1CF939C05C0@TY1PR06MB0895.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cec-clock is a fixed clock generator that is not controlled by i2c5 and
-thus should not be a child of the i2c5 bus node. Rather, it should be
-a child of the root node of the DT.
+> Subject: Re: [PATCH] ARM: dts: iwg20d-q7: Add support for ttySC3
+>
+> On Mon, Oct 09, 2017 at 01:45:07PM +0000, Fabrizio Castro wrote:
+> > Hello Geert,
+> >
+> > thank you for your feedback!
+> >
+> > >
+> > > Hi Fabrizio, Chris,
+> > >
+> > > On Mon, Oct 9, 2017 at 11:06 AM, Fabrizio Castro
+> > > <fabrizio.castro@bp.renesas.com> wrote:
+> > > > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> > > > Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
+> > >
+> > > Thanks for your patch!
+> > >
+> > > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > >
+> > > > --- a/arch/arm/boot/dts/iwg20d-q7-common.dtsi
+> > > > +++ b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
+> > > > @@ -11,6 +11,7 @@
+> > > >  / {
+> > > >         aliases {
+> > > >                 serial0 = &scif0;
+> > > > +               serial3 = &scifb1;
+> > >
+> > > Given this port is not labeled "serial3", but called "data uart", you may want
+> > > to add a comment to avoid confusion:
+> >
+> > It's a little bit confusing, isn't it? The lines related to such
+> > interface are named as UART0_x on the carrier board schematic, the
+> > section of the schematic that contains the header is named "data uart
+> > header", and the board documentation names it explicitly as "UART 3 -
+> > /dev/ttySC3 (SCIFB1)".
+> >
+> > I don't think there is anything we can do to make this easier for the
+> > user really, is there? :D If we decide to add a comment to serial 3, I
+> > guess we need to be consistent and add comments for the other serial
+> > interfaces too.  If you still prefer having a comment there I'll send a
+> > v2 and patch(es) for adding comments to the other interfaces, just let me
+> > know.
+>
+> I have applied this patch. If a comment is subsequently decided on
+> then please send a follow-up patch.
 
-Fixes: 02a5ab18d366 ("ARM: dts: koelsch: Add CEC clock for HDMI transmitter")
-Reported-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7791-koelsch.dts | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+Thank you Simon.
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index e164eda69baf..4126de417922 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -278,6 +278,12 @@
- 		};
- 	};
- 
-+	cec_clock: cec-clock {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <12000000>;
-+	};
-+
- 	hdmi-out {
- 		compatible = "hdmi-connector";
- 		type = "a";
-@@ -640,12 +646,6 @@
- 		};
- 	};
- 
--	cec_clock: cec-clock {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		clock-frequency = <12000000>;
--	};
--
- 	hdmi at 39 {
- 		compatible = "adi,adv7511w";
- 		reg = <0x39>;
--- 
-2.11.0
+Cheers,
+Fab
+
+
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
