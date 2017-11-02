@@ -1,55 +1,55 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 03 Nov 2017 07:53:17 +0800
-Subject: [linux-sunxi] Re: [PATCH] ARM: sun8i: h2+: add support for Banana
- Pi M2 Zero board
-In-Reply-To: <20171102155003.vp7uve4ypyn4sb6j@flea>
-References: <20171101093814.19177-1-icenowy@aosc.io>
- <20171102090248.wnvj7dpphn5uqsut@flea>
- <8327eaeaa12b99f9962a53c9f02ddd6d@aosc.io>
- <20171102155003.vp7uve4ypyn4sb6j@flea>
-Message-ID: <b548b74e04b29ec8c3cddb7cc42f2b4e@aosc.io>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Fri, 3 Nov 2017 07:54:18 +0800
+Subject: [PATCH] usb: mtu3: fix dma_addr_t printk output again
+In-Reply-To: <20171102143027.775184-1-arnd@arndb.de>
+References: <20171102143027.775184-1-arnd@arndb.de>
+Message-ID: <1509666858.17567.144.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-11-02 23:50?Maxime Ripard ???
-> On Thu, Nov 02, 2017 at 05:07:30PM +0800, Icenowy Zheng wrote:
->> > > +&mmc0 {
->> > > +	pinctrl-names = "default";
->> > > +	pinctrl-0 = <&mmc0_pins_a>;
->> > > +	vmmc-supply = <&reg_vcc3v3>;
->> > > +	bus-width = <4>;
->> > > +	/*
->> > > +	 * In different revisions the board have different card detect
->> > > +	 * configuration.
->> > > +	 */
->> >
->> > Which ones?
->> 
->> In the sample batch (1.2V fixed voltage) the card detect is normal
->> (PF6 low as inserted), however in the final batch (1.1V/1.3V
->> switchable) it's inverted at PF6 (high as inserted).
+hi,
+On Thu, 2017-11-02 at 15:30 +0100, Arnd Bergmann wrote:
+> The support for 36-bit addresses originally came with an incorrect
+> printk format for dma addresses. Felipe changed the format string it
+> while applying, but the result was still incorrect, since we now have
+> to pass a pointer to the address instead of the integer value:
 > 
-> Then just use the final version's.
+> drivers/usb/mtu3/mtu3_qmu.c: In function 'mtu3_prepare_tx_gpd':
+> drivers/usb/mtu3/mtu3_qmu.c:261:25: error: format '%p' expects argument of type 'void *', but argument 7 has type 'dma_addr_t {aka unsigned int}' [-Werror=format=]
+> drivers/usb/mtu3/mtu3_qmu.c: In function 'mtu3_prepare_rx_gpd':
+> drivers/usb/mtu3/mtu3_qmu.c:300:25: error: format '%p' expects argument of type 'void *', but argument 7 has type 'dma_addr_t {aka unsigned int}' [-Werror=format=]
 > 
->> > > +&usbphy {
->> > > +	usb0_id_det-gpios = <&r_pio 0 6 GPIO_ACTIVE_HIGH>; /* PL6 */
->> > > +	/* USB OTG VBUS is directly connected to 5V without any regulators
->> > > */
->> >
->> > So it cannot operate in OTG, but it's host only?
->> 
->> It can operate in OTG -- you can power the board via the OTG port,
->> as the VBUS is not gated from 5V at all, so 5V power at VBUS will
->> power up the board. Yes, it's a bit unsafe, but the board designer
->> did it.
+> This fixes the printk argument accordingly.
 > 
-> What will provide the 5v in the first place then if a USB device is
-> connected to the micro-USB connector?
+> Fixes: 1a46dfea0841 ("usb: mtu3: support 36-bit DMA address")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/usb/mtu3/mtu3_qmu.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/usb/mtu3/mtu3_qmu.c b/drivers/usb/mtu3/mtu3_qmu.c
+> index 42145a3f1422..0b4b412b1d0d 100644
+> --- a/drivers/usb/mtu3/mtu3_qmu.c
+> +++ b/drivers/usb/mtu3/mtu3_qmu.c
+> @@ -259,7 +259,7 @@ static int mtu3_prepare_tx_gpd(struct mtu3_ep *mep, struct mtu3_request *mreq)
+>  	enq = advance_enq_gpd(ring);
+>  	enq_dma = gpd_virt_to_dma(ring, enq);
+>  	dev_dbg(mep->mtu->dev, "TX-EP%d queue gpd=%p, enq=%p, qdma=%pad\n",
+> -		mep->epnum, gpd, enq, enq_dma);
+> +		mep->epnum, gpd, enq, &enq_dma);
+>  
+>  	enq->flag &= ~GPD_FLAGS_HWO;
+>  	gpd->next_gpd = cpu_to_le32(lower_32_bits(enq_dma));
+> @@ -298,7 +298,7 @@ static int mtu3_prepare_rx_gpd(struct mtu3_ep *mep, struct mtu3_request *mreq)
+>  	enq = advance_enq_gpd(ring);
+>  	enq_dma = gpd_virt_to_dma(ring, enq);
+>  	dev_dbg(mep->mtu->dev, "RX-EP%d queue gpd=%p, enq=%p, qdma=%pad\n",
+> -		mep->epnum, gpd, enq, enq_dma);
+> +		mep->epnum, gpd, enq, &enq_dma);
+>  
+>  	enq->flag &= ~GPD_FLAGS_HWO;
+>  	gpd->next_gpd = cpu_to_le32(lower_32_bits(enq_dma));
 
-There're two micro-USB connectors, one is power-only and another is
-OTG. The Vbus of these two connectors are connected together, so
-the external USB device will be powered just by the power input
-from the power-only USB port.
+Thanks.
 
-> 
-> Maxime
+Acked-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
