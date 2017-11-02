@@ -1,48 +1,24 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 2 Nov 2017 00:11:25 -0700
-Subject: [PATCH 0/2] Add a regmap to Allwinner R40 CCU to export GMAC
- register
-In-Reply-To: <14505033-D960-4287-92F2-554E2EDDFC59@aosc.io>
-References: <20171006063333.12345-1-icenowy@aosc.io>
- <20171009071809.jte47cd2mt4iv6y7@flea.lan>
- <14505033-D960-4287-92F2-554E2EDDFC59@aosc.io>
-Message-ID: <20171102071125.GL30645@codeaurora.org>
+Date: Thu, 2 Nov 2017 00:19:42 -0700
+Subject: [RESEND RFC PATCH 3/7] clk: sunxi: Add CLK_SET_RATE_PARENT flag
+ for H3 HDMI clock
+In-Reply-To: <20170920200124.20457-4-jernej.skrabec@siol.net>
+References: <20170920200124.20457-1-jernej.skrabec@siol.net>
+ <20170920200124.20457-4-jernej.skrabec@siol.net>
+Message-ID: <20171102071942.GN30645@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/09, Icenowy Zheng wrote:
+On 09/20, Jernej Skrabec wrote:
+> When setting the HDMI clock of H3, the PLL_VIDEO clock needs to be set.
 > 
+> Add CLK_SET_RATE_PARENT flag for H3 HDMI clock.
 > 
-> ? 2017?10?9? GMT+08:00 ??3:18:09, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
-> >On Fri, Oct 06, 2017 at 06:33:31AM +0000, Icenowy Zheng wrote:
-> >> In the CCU of the Allwinner R40 SoC, there's a GMAC configuration
-> >register,
-> >> which is intended to be accessed by the dwmac-sun8i driver. On SoCs
-> >already
-> >> supported by the driver the register is placed in the syscon rather
-> >than
-> >> the CCU.
-> >> 
-> >> As CCU is a critical part of the SoC, so write to it should be
-> >strictly
-> >> limited. A regmap with restricted write permission is created by the
-> >R40
-> >> CCU driver, and can be get with dev_get_regmap. In order to tie the
-> >regmap
-> >> to the CCU device, the R40 CCU is now a platform driver, so a
-> >platform
-> >> device is created for it (and then tied with the regmap).
-> >> 
-> >> The first patch does the conversion of the driver to a platform
-> >driver,
-> >> and the second patch adds the regmap.
-> >
-> >I'd like to see first what you want to do with it.
-> 
-> Export the GMAC configuration register to dwmac-sun8i.
-> 
+> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
 
-Is this series going to be reposted?
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
