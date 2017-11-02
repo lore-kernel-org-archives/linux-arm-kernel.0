@@ -1,144 +1,116 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 2 Nov 2017 11:01:37 +0000
-Subject: [PATCH v5 04/30] arm64: KVM: Hide unsupported AArch64 CPU
- features from guests
-In-Reply-To: <20171102081557.GB20075@cbox>
-References: <1509465082-30427-1-git-send-email-Dave.Martin@arm.com>
- <1509465082-30427-5-git-send-email-Dave.Martin@arm.com>
- <20171101044729.GA11166@lvm>
- <20171101102601.GK19485@e103592.cambridge.arm.com>
- <20171102081557.GB20075@cbox>
-Message-ID: <20171102110137.GN19485@e103592.cambridge.arm.com>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Thu, 2 Nov 2017 11:06:54 +0000
+Subject: [PATCH 3/3] ARM: early_printk: use printascii() rather than
+ printch()
+In-Reply-To: <nycvar.YSQ.7.76.1711012249020.21665@knanqh.ubzr>
+References: <nycvar.YSQ.7.76.1710311211540.21665@knanqh.ubzr>
+ <80bc8c16-321a-43ea-6cbb-257dbeee485b@arm.com>
+ <nycvar.YSQ.7.76.1710311302370.21665@knanqh.ubzr>
+ <20171031171629.GI9463@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1710311346190.21665@knanqh.ubzr>
+ <20171031175344.GJ9463@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1710311355000.21665@knanqh.ubzr>
+ <20171031182024.GK9463@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1710311432120.21665@knanqh.ubzr>
+ <SG2PR06MB1165AE45FB289039E55D03028A5E0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+ <20171102000945.GT9463@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1711012249020.21665@knanqh.ubzr>
+Message-ID: <SG2PR06MB11655BDEF09BB62D268A29DD8A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 02, 2017 at 09:15:57AM +0100, Christoffer Dall wrote:
-> On Wed, Nov 01, 2017 at 10:26:03AM +0000, Dave Martin wrote:
-> > On Wed, Nov 01, 2017 at 05:47:29AM +0100, Christoffer Dall wrote:
-> > > On Tue, Oct 31, 2017 at 03:50:56PM +0000, Dave Martin wrote:
-> > > > Currently, a guest kernel sees the true CPU feature registers
-> > > > (ID_*_EL1) when it reads them using MRS instructions.  This means
-> > > > that the guest may observe features that are present in the
-> > > > hardware but the host doesn't understand or doesn't provide support
-> > > > for.  A guest may legimitately try to use such a feature as per the
-> > > > architecture, but use of the feature may trap instead of working
-> > > > normally, triggering undef injection into the guest.
-> > > > 
-> > > > This is not a problem for the host, but the guest may go wrong when
-> > > > running on newer hardware than the host knows about.
-> > > > 
-> > > > This patch hides from guest VMs any AArch64-specific CPU features
-> > > > that the host doesn't support, by exposing to the guest the
-> > > > sanitised versions of the registers computed by the cpufeatures
-> > > > framework, instead of the true hardware registers.  To achieve
-> > > > this, HCR_EL2.TID3 is now set for AArch64 guests, and emulation
-> > > > code is added to KVM to report the sanitised versions of the
-> > > > affected registers in response to MRS and register reads from
-> > > > userspace.
-> > > > 
-> > > > The affected registers are removed from invariant_sys_regs[] (since
-> > > > the invariant_sys_regs handling is no longer quite correct for
-> > > > them) and added to sys_reg_desgs[], with appropriate access(),
-> > > > get_user() and set_user() methods.  No runtime vcpu storage is
-> > > > allocated for the registers: instead, they are read on demand from
-> > > > the cpufeatures framework.  This may need modification in the
-> > > > future if there is a need for userspace to customise the features
-> > > > visible to the guest.
-> > > > 
-> > > > Attempts by userspace to write the registers are handled similarly
-> > > > to the current invariant_sys_regs handling: writes are permitted,
-> > > > but only if they don't attempt to change the value.  This is
-> > > > sufficient to support VM snapshot/restore from userspace.
-> > > > 
-> > > > Because of the additional registers, restoring a VM on an older
-> > > > kernel may not work unless userspace knows how to handle the extra
-> > > > VM registers exposed to the KVM user ABI by this patch.
-> > > > 
-> > > > Under the principle of least damage, this patch makes no attempt to
-> > > > handle any of the other registers currently in
-> > > > invariant_sys_regs[], or to emulate registers for AArch32: however,
-> > > > these could be handled in a similar way in future, as necessary.
-> > > > 
-> > > > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > > > Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> > > > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> > > > Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> > > > ---
-> > > >  arch/arm64/include/asm/sysreg.h |   3 +
-> > > >  arch/arm64/kvm/hyp/switch.c     |   6 +
-> > > >  arch/arm64/kvm/sys_regs.c       | 282 +++++++++++++++++++++++++++++++++-------
-> > > >  3 files changed, 246 insertions(+), 45 deletions(-)
-> > > > 
-> > > > diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> > > > index 4dceb12..609d59af 100644
-> > > > --- a/arch/arm64/include/asm/sysreg.h
-> > > > +++ b/arch/arm64/include/asm/sysreg.h
-> > > > @@ -149,6 +149,9 @@
-> > > >  #define SYS_ID_AA64DFR0_EL1		sys_reg(3, 0, 0, 5, 0)
-> > > >  #define SYS_ID_AA64DFR1_EL1		sys_reg(3, 0, 0, 5, 1)
-> > > >  
-> > > > +#define SYS_ID_AA64AFR0_EL1		sys_reg(3, 0, 0, 5, 4)
-> > > > +#define SYS_ID_AA64AFR1_EL1		sys_reg(3, 0, 0, 5, 5)
-> > > > +
-> > > >  #define SYS_ID_AA64ISAR0_EL1		sys_reg(3, 0, 0, 6, 0)
-> > > >  #define SYS_ID_AA64ISAR1_EL1		sys_reg(3, 0, 0, 6, 1)
-> > > >  
-> > > > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> > > > index 945e79c..35a90b8 100644
-> > > > --- a/arch/arm64/kvm/hyp/switch.c
-> > > > +++ b/arch/arm64/kvm/hyp/switch.c
-> > > > @@ -81,11 +81,17 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
-> > > >  	 * it will cause an exception.
-> > > >  	 */
-> > > >  	val = vcpu->arch.hcr_el2;
-> > > > +
-> > > >  	if (!(val & HCR_RW) && system_supports_fpsimd()) {
-> > > >  		write_sysreg(1 << 30, fpexc32_el2);
-> > > >  		isb();
-> > > >  	}
-> > > > +
-> > > > +	if (val & HCR_RW) /* for AArch64 only: */
-> > > > +		val |= HCR_TID3; /* TID3: trap feature register accesses */
-> > > > +
-> > > 
-> > > I still think we should set this in vcpu_reset_hcr() and do it once
-> > > instead of adding code in every iteration of the critical path.
-> > 
-> > Dang, I somehow missed this in the last round.
-> > 
-> > How about:
-> > 
-> > diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-> > index e5df3fc..c87be0d 100644
-> > --- a/arch/arm64/include/asm/kvm_emulate.h
-> > +++ b/arch/arm64/include/asm/kvm_emulate.h
-> > @@ -49,6 +49,14 @@ static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
-> >  		vcpu->arch.hcr_el2 |= HCR_E2H;
-> >  	if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features))
-> >  		vcpu->arch.hcr_el2 &= ~HCR_RW;
-> > +
-> > +	/*
-> > +	 * TID3: trap feature register accesses that we virtualise.
-> > +	 * For now this is conditional, since no AArch32 feature regs
-> > +	 * are currently virtualised.
-> > +	 */
-> > +	if (vcpu->arch.hcr_el2 & HCR_RW)
-> > +		vcpu->arch.hcr_el2 |= HCR_TID3;
-> >  }
-> >  
-> >  static inline unsigned long vcpu_get_hcr(struct kvm_vcpu *vcpu)
-> > > 
-> > > Otherwise this patch looks good to me.
-> > 
-> > I'll probably post this as a separate follow-up patch, unless there's
-> > some other reason for a full respin.
-> > 
+On Wednesday, November 01, 2017 1, Nicolas Pitre wrote:
+> > > This patch worked for me.
+> > > I get my carriage returns again.
+> >
+> > Sorry, but no.  This is crap.
+> >
+> > The kernelci.org test resulting from the tree I pushed out this evening
+> > with both of the patches in is very unhappy:
+> >
+> >      42  arch/arm/kernel/debug.S:98: Error: immediate expression
+> requires a # prefix -- `mov r1,10'
+> >      42  arch/arm/kernel/debug.S:94: Error: immediate expression
+> requires a # prefix -- `mov r1,13'
+> >
+> > I can't believe that anyone actually build-tested this patch as it
+> > stands - maybe, Chris, you just think you did but you ended up
+> > testing something else?  Or maybe your binutils is broken because
+> > it now accepts constants without the preceding '#' ?
 > 
-> Fine with me, just remember to remove the part of the world-switch that
-> was added in this patch, as that's what we want to savoid.
+> Well... I don't know what happened with Chris' testing either.
 
-To be clear, does this amount to an Ack on the _original_ patch,
-providing I follow up with this optimisation after the merge window?
 
-Cheers
----Dave
+So, just to show I'm not crazy...
+
+
+# Yes, patch was applied:
+$ grep "mov        r1" arch/arm/kernel/debug.S
+		mov	r1, #8
+		mov	r1, #4
+		mov	r1, #2
+		mov	r1, #0
+		mov	r1, '\r'    <<<<<<<<<<
+		mov	r1, '\n'    <<<<<<<<<<
+		mov	r1, r0
+		mov	r1, r0
+
+# Yes it builds:
+$ touch arch/arm/kernel/debug.S
+$ make -j8 O=.out uImage LOADADDR=0x08008000
+make[1]: Entering directory '/home/renesas/tools/upstream/renesas-drivers/.out'
+  CHK     include/config/kernel.release
+  GEN     ./Makefile
+  CHK     include/generated/uapi/linux/version.h
+  CHK     scripts/mod/devicetable-offsets.h
+  UPD     include/config/kernel.release
+  Using .. as source for kernel
+  CHK     include/generated/utsrelease.h
+  UPD     include/generated/utsrelease.h
+  CHK     include/generated/timeconst.h
+  CHK     include/generated/bounds.h
+  CHK     include/generated/asm-offsets.h
+  CALL    ../scripts/checksyscalls.sh
+  CHK     include/generated/compile.h
+  CC      init/version.o
+  AS      arch/arm/kernel/debug.o       <<<<<<<<<<
+
+
+# Have a look@the output:
+$ arm-linux-gnueabihf-objdump -SdCg .out/arch/arm/kernel/debug.o > /tmp/debug.lst
+$ cat /tmp/debug.lst
+
+------------------------------------------------------------
+                mov     r1, '\r'           <<<<<<<<<<
+  70:   f04f 010d       mov.w   r1, #13    <<<<<<<<<<
+                waituart r2, r3
+  74:   8a1a            ldrh    r2, [r3, #16]
+  76:   f012 0f20       tst.w   r2, #32
+  7a:   d0fb            beq.n   74 <printascii+0x2c>
+                senduart r1, r3
+  7c:   7319            strb    r1, [r3, #12]
+  7e:   8a19            ldrh    r1, [r3, #16]
+  80:   f021 0140       bic.w   r1, r1, #64     ; 0x40
+  84:   8219            strh    r1, [r3, #16]
+                busyuart r2, r3
+  86:   8a1a            ldrh    r2, [r3, #16]
+  88:   f012 0f40       tst.w   r2, #64 ; 0x40
+  8c:   d0fb            beq.n   86 <printascii+0x3e>
+                mov     r1, '\n'         <<<<<<<<<<
+  8e:   f04f 010a       mov.w   r1, #10  <<<<<<<<<<
+------------------------------------------------------------
+
+
+So, the compiler realized what you wanted to do even if there wasn't a
+# in front of the constant.
+
+
+$ arm-linux-gnueabihf-gcc --version
+arm-linux-gnueabihf-gcc (Linaro GCC 5.4-2017.01) 5.4.1 20161213
+Copyright (C) 2015 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+
+
+Chris
