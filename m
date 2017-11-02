@@ -1,55 +1,52 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 02 Nov 2017 10:36:35 +0000
-Subject: [PATCH v3 6/9] KVM: arm/arm64: Limit icache invalidation to
- prefetch aborts
-In-Reply-To: <20171101101727.ysc65qlxwsqe5sfq@kamzik.brq.redhat.com> (Andrew
- Jones's message of "Wed, 1 Nov 2017 11:17:27 +0100")
-References: <20171023161122.15291-1-marc.zyngier@arm.com>
- <20171023161122.15291-7-marc.zyngier@arm.com>
- <20171101101727.ysc65qlxwsqe5sfq@kamzik.brq.redhat.com>
-Message-ID: <87lgjpufv0.fsf@on-the-bus.cambridge.arm.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Thu, 2 Nov 2017 18:41:08 +0800
+Subject: [PATCH 0/2] Add support for Hi6220 coresight
+In-Reply-To: <150955133019.90597.6277114786385559431@resonance>
+References: <1504226835-2115-1-git-send-email-leo.yan@linaro.org>
+ <20170901013301.GN21656@codeaurora.org>
+ <20171007121802.GC23080@leoy-linaro> <59E07FDE.40307@hisilicon.com>
+ <150955133019.90597.6277114786385559431@resonance>
+Message-ID: <20171102104108.GC3550@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 01 2017 at 11:17:27 am GMT, Andrew Jones <drjones@redhat.com> wrote:
-> On Mon, Oct 23, 2017 at 05:11:19PM +0100, Marc Zyngier wrote:
->> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
->> index 2174244f6317..0417c8e2a81c 100644
->> --- a/virt/kvm/arm/mmu.c
->> +++ b/virt/kvm/arm/mmu.c
->> @@ -1292,7 +1292,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->>  			  unsigned long fault_status)
->>  {
->>  	int ret;
->> -	bool write_fault, writable, hugetlb = false, force_pte = false;
->> +	bool write_fault, exec_fault, writable, hugetlb = false, force_pte = false;
->>  	unsigned long mmu_seq;
->>  	gfn_t gfn = fault_ipa >> PAGE_SHIFT;
->>  	struct kvm *kvm = vcpu->kvm;
->> @@ -1304,7 +1304,10 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->>  	unsigned long flags = 0;
->>  
->>  	write_fault = kvm_is_write_fault(vcpu);
->> -	if (fault_status == FSC_PERM && !write_fault) {
->> +	exec_fault = kvm_vcpu_trap_is_iabt(vcpu);
->> +	VM_BUG_ON(write_fault && exec_fault);
->
-> This VM_BUG_ON can never fire as long as kvm_is_write_fault() is
-> defined as
->
->  {
->    if (kvm_vcpu_trap_is_iabt(vcpu))
->        return false;
->    return kvm_vcpu_dabt_iswrite(vcpu);
->  }
+On Wed, Nov 01, 2017 at 04:48:50PM +0100, Michael Turquette wrote:
+> Quoting Wei Xu (2017-10-13 10:57:02)
+> > Hi Leo,
+> > 
+> > On 2017/10/7 13:18, Leo Yan wrote:
+> > > Hi Stephen, Wei,
+> > > 
+> > > On Thu, Aug 31, 2017 at 06:33:01PM -0700, Stephen Boyd wrote:
+> > >> On 09/01, Leo Yan wrote:
+> > >>> This patch series adds support for coresight on Hi6220; the first patch
+> > >>> is to fix coresight PLL so can avoid system hang after we enable
+> > >>> coresight, the second patch is to add DT binding according to coresight
+> > >>> topology.
+> > >>>
+> > >>> The patch has been tested on Hikey; By using OpenCSD snapshot mode, it
+> > >>> can successfully decode ETF and ETB trace data.
+> > >>>
+> > >>
+> > >> I can take the first one and second one goes through arm-soc?
+> > > 
+> > > Could you pick these two patches for Hi6220 coresight enabling for
+> > > this merge window? Or need me resend these two patches?
+> > 
+> > Applied patch 2 into hisilicon dt tree with slight fix.
+> > Thanks!
+> 
+> Cool. Patch #1 applied to clk tree.
 
-That's indeed what I expect. But given that the code now relies on this
-property, I chose to make it explicit.
+Thanks, Mike and Wei.
 
-Or are you seeing a better way of making this an invariant?
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead, it just smell funny.
+> Regards,
+> Mike
+> 
+> > 
+> > BR,
+> > Wei
+> > 
+> > > 
+> > > Thanks,
+> > > Leo Yan
