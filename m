@@ -1,32 +1,32 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Thu, 2 Nov 2017 12:35:24 -0700
-Subject: [PATCH 0/2] hwrng: iproc-rng200: Add support for BCM7278
-In-Reply-To: <20171101232006.3943-1-f.fainelli@gmail.com>
-References: <20171101232006.3943-1-f.fainelli@gmail.com>
-Message-ID: <b268ce8a-ac98-47a5-9fa1-555bcb1302dd@broadcom.com>
+From: dave.hansen@linux.intel.com (Dave Hansen)
+Date: Thu, 2 Nov 2017 12:38:05 -0700
+Subject: [PATCH 00/23] KAISER: unmap most of the kernel from userspace
+ page tables
+In-Reply-To: <20171102190106.GC22263@arm.com>
+References: <20171031223146.6B47C861@viggo.jf.intel.com>
+ <20171102190106.GC22263@arm.com>
+Message-ID: <816a3491-3c2c-ec0a-810f-b593c25968f2@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch series looks fine.
+On 11/02/2017 12:01 PM, Will Deacon wrote:
+> On Tue, Oct 31, 2017 at 03:31:46PM -0700, Dave Hansen wrote:
+>> KAISER makes it harder to defeat KASLR, but makes syscalls and
+>> interrupts slower.  These patches are based on work from a team at
+>> Graz University of Technology posted here[1].  The major addition is
+>> support for Intel PCIDs which builds on top of Andy Lutomorski's PCID
+>> work merged for 4.14.  PCIDs make KAISER's overhead very reasonable
+>> for a wide variety of use cases.
+> I just wanted to say that I've got a version of this up and running for
+> arm64. I'm still ironing out a few small details, but I hope to post it
+> after the merge window. We always use ASIDs, and the perf impact looks
+> like it aligns roughly with your findings for a PCID-enabled x86 system.
 
+Welcome to the party!
 
-On 17-11-01 04:20 PM, Florian Fainelli wrote:
-> Hi,
->
-> This patch series adds support for the RNG200 block found on the BCM7278 SoC.
-> This requires us to update the compatible string (and associated binding
-> document) as well as the Kconfig option to make that driver selectable with
-> ARCH_BRCMSTB gating the enabling of such SoCs.
->
-> Thank you
->
-> Florian Fainelli (2):
->    dt-bindings: rng: Document BCM7278 RNG200 compatible
->    hwrng: iproc-rng200: Add support for BCM7278
->
->   Documentation/devicetree/bindings/rng/brcm,iproc-rng200.txt | 4 +++-
->   drivers/char/hw_random/Kconfig                              | 6 +++---
->   drivers/char/hw_random/iproc-rng200.c                       | 1 +
->   3 files changed, 7 insertions(+), 4 deletions(-)
->
-Acked-by: Scott Branden <scott.branden@broadcom.com>
+I don't know if you've found anything different, but there been woefully
+little code that's really cross-architecture.  The kernel task
+stack-mapping stuff _was_, but it's going away.  The per-cpu-user-mapped
+section stuff might be common, I guess.
+
+Is there any other common infrastructure that we can or should be sharing?
