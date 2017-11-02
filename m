@@ -1,49 +1,249 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  2 Nov 2017 15:30:20 +0100
-Subject: [PATCH] usb: mtu3: fix dma_addr_t printk output again
-Message-ID: <20171102143027.775184-1-arnd@arndb.de>
+From: mailinglists@kunz-im-inter.net (Frank Kunz)
+Date: Thu,  2 Nov 2017 15:35:34 +0100
+Subject: [PATCH] ARM: sun7i: Add Cubietech Einstein A20 board device-tree
+Message-ID: <20171102143534.19353-1-mailinglists@kunz-im-inter.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The support for 36-bit addresses originally came with an incorrect
-printk format for dma addresses. Felipe changed the format string it
-while applying, but the result was still incorrect, since we now have
-to pass a pointer to the address instead of the integer value:
+From: Frank Kunz <xxxxxmichl@googlemail.com>
 
-drivers/usb/mtu3/mtu3_qmu.c: In function 'mtu3_prepare_tx_gpd':
-drivers/usb/mtu3/mtu3_qmu.c:261:25: error: format '%p' expects argument of type 'void *', but argument 7 has type 'dma_addr_t {aka unsigned int}' [-Werror=format=]
-drivers/usb/mtu3/mtu3_qmu.c: In function 'mtu3_prepare_rx_gpd':
-drivers/usb/mtu3/mtu3_qmu.c:300:25: error: format '%p' expects argument of type 'void *', but argument 7 has type 'dma_addr_t {aka unsigned int}' [-Werror=format=]
+The Einstein A20 board is a Allwinner A20 based board with a credit card
+form factor.
 
-This fixes the printk argument accordingly.
+Features:
+- Allwinner A20 SoC
+- DDR3 1GB RAM
+- 8GiB eMMC
+- AP6210 wifi/Bluetooth
+- RTC
+- Micro USB-OTG connector
+- UART0 debugging port
+- 200 pins stamp hole package
 
-Fixes: 1a46dfea0841 ("usb: mtu3: support 36-bit DMA address")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Frank Kunz <xxxxxmichl@googlemail.com>
 ---
- drivers/usb/mtu3/mtu3_qmu.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/Makefile               |   1 +
+ arch/arm/boot/dts/sun7i-a20-einstein.dts | 200 +++++++++++++++++++++++++++++++
+ 2 files changed, 201 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-einstein.dts
 
-diff --git a/drivers/usb/mtu3/mtu3_qmu.c b/drivers/usb/mtu3/mtu3_qmu.c
-index 42145a3f1422..0b4b412b1d0d 100644
---- a/drivers/usb/mtu3/mtu3_qmu.c
-+++ b/drivers/usb/mtu3/mtu3_qmu.c
-@@ -259,7 +259,7 @@ static int mtu3_prepare_tx_gpd(struct mtu3_ep *mep, struct mtu3_request *mreq)
- 	enq = advance_enq_gpd(ring);
- 	enq_dma = gpd_virt_to_dma(ring, enq);
- 	dev_dbg(mep->mtu->dev, "TX-EP%d queue gpd=%p, enq=%p, qdma=%pad\n",
--		mep->epnum, gpd, enq, enq_dma);
-+		mep->epnum, gpd, enq, &enq_dma);
- 
- 	enq->flag &= ~GPD_FLAGS_HWO;
- 	gpd->next_gpd = cpu_to_le32(lower_32_bits(enq_dma));
-@@ -298,7 +298,7 @@ static int mtu3_prepare_rx_gpd(struct mtu3_ep *mep, struct mtu3_request *mreq)
- 	enq = advance_enq_gpd(ring);
- 	enq_dma = gpd_virt_to_dma(ring, enq);
- 	dev_dbg(mep->mtu->dev, "RX-EP%d queue gpd=%p, enq=%p, qdma=%pad\n",
--		mep->epnum, gpd, enq, enq_dma);
-+		mep->epnum, gpd, enq, &enq_dma);
- 
- 	enq->flag &= ~GPD_FLAGS_HWO;
- 	gpd->next_gpd = cpu_to_le32(lower_32_bits(enq_dma));
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index faf46abaa4a2..f9158400ea0f 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -878,6 +878,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+ 	sun7i-a20-bananapro.dtb \
+ 	sun7i-a20-cubieboard2.dtb \
+ 	sun7i-a20-cubietruck.dtb \
++	sun7i-a20-einstein.dtb \
+ 	sun7i-a20-hummingbird.dtb \
+ 	sun7i-a20-itead-ibox.dtb \
+ 	sun7i-a20-i12-tvbox.dtb \
+diff --git a/arch/arm/boot/dts/sun7i-a20-einstein.dts b/arch/arm/boot/dts/sun7i-a20-einstein.dts
+new file mode 100644
+index 000000000000..59d46b08f21c
+--- /dev/null
++++ b/arch/arm/boot/dts/sun7i-a20-einstein.dts
+@@ -0,0 +1,200 @@
++/*
++ * Copyright 2017 Frank Kunz
++ *
++ * Frank Kunz <xxxxxmichl@googlemail.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "sun7i-a20.dtsi"
++#include "sunxi-common-regulators.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/interrupt-controller/irq.h>
++
++/ {
++	model = "Cubietech Einstein A20";
++	compatible = "cubietech,einstein-a20", "allwinner,sun7i-a20";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	mmc3_pwrseq: mmc3_pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		pinctrl-names = "default";
++		pinctrl-0 = <&mmc3_pwrseq_pin_ea20>;
++		reset-gpios = <&pio 7 9 GPIO_ACTIVE_LOW>; /* PH9 WIFI-SHDN */
++	};
++};
++
++&cpu0 {
++	cpu-supply = <&reg_dcdc2>;
++};
++
++&ehci0 {
++	status = "okay";
++};
++
++&i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_pins_a>;
++	status = "okay";
++
++	axp209: pmic at 34 {
++		reg = <0x34>;
++		interrupt-parent = <&nmi_intc>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++	};
++};
++
++&mmc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc2_pins_a>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	non-removable;
++	status = "okay";
++};
++
++&mmc3 {
++	#address-cells = <1>;
++	#size-cells = <0>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc3_pins_a>;
++	vmmc-supply = <&reg_vcc3v3>;
++	mmc-pwrseq = <&mmc3_pwrseq>;
++	bus-width = <4>;
++	non-removable;
++	wakeup-source;
++	status = "okay";
++
++	brcmf: wifi at 1 {
++		reg = <1>;
++		compatible = "brcm,bcm4329-fmac";
++		interrupt-parent = <&pio>;
++		interrupts = <7 10 IRQ_TYPE_LEVEL_LOW>;
++		interrupt-names = "host-wake";
++	};
++};
++
++&ohci0 {
++	status = "okay";
++};
++
++&otg_sram {
++	status = "okay";
++};
++
++&pio {
++	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
++		pins = "PH4";
++		function = "gpio_in";
++		bias-pull-up;
++	};
++
++	mmc3_pwrseq_pin_ea20: mmc3_pwrseq_pin at 0 {
++		pins = "PH9";
++		function = "gpio_out";
++	};
++};
++
++#include "axp209.dtsi"
++
++&usb_power_supply {
++	status = "okay";
++};
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1450000>;
++	regulator-name = "vdd-cpu";
++};
++
++&reg_dcdc3 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-int-dll";
++};
++
++&reg_ldo1 {
++	regulator-name = "vdd-rtc";
++};
++
++&reg_ldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "avcc";
++};
++
++&reg_usb1_vbus {
++	status = "okay";
++};
++
++&reg_usb2_vbus {
++	status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&usb_otg {
++	dr_mode = "otg";
++	status = "okay";
++};
++
++&usbphy {
++	pinctrl-names = "default";
++	pinctrl-0 = <&usb0_id_detect_pin>;
++	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
++	usb1_vbus-supply = <&reg_usb1_vbus>;
++	usb2_vbus-supply = <&reg_usb2_vbus>;
++	status = "okay";
++};
 -- 
-2.9.0
+2.14.2
