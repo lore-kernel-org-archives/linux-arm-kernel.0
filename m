@@ -1,84 +1,71 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 2 Nov 2017 00:16:54 -0400 (EDT)
-Subject: [PATCH 3/3] ARM: early_printk: use printascii() rather than
- printch()
-In-Reply-To: <nycvar.YSQ.7.76.1711012249020.21665@knanqh.ubzr>
-References: <nycvar.YSQ.7.76.1710311211540.21665@knanqh.ubzr>
- <80bc8c16-321a-43ea-6cbb-257dbeee485b@arm.com>
- <nycvar.YSQ.7.76.1710311302370.21665@knanqh.ubzr>
- <20171031171629.GI9463@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1710311346190.21665@knanqh.ubzr>
- <20171031175344.GJ9463@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1710311355000.21665@knanqh.ubzr>
- <20171031182024.GK9463@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1710311432120.21665@knanqh.ubzr>
- <SG2PR06MB1165AE45FB289039E55D03028A5E0@SG2PR06MB1165.apcprd06.prod.outlook.com>
- <20171102000945.GT9463@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1711012249020.21665@knanqh.ubzr>
-Message-ID: <nycvar.YSQ.7.76.1711020011400.21665@knanqh.ubzr>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 2 Nov 2017 13:43:07 +0900
+Subject: [PATCH 1/2] arm64: Fix static use of function graph
+In-Reply-To: <1509546824-46165-2-git-send-email-julien.thierry@arm.com>
+References: <1509546824-46165-1-git-send-email-julien.thierry@arm.com>
+ <1509546824-46165-2-git-send-email-julien.thierry@arm.com>
+Message-ID: <20171102044306.GL10563@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 1 Nov 2017, Nicolas Pitre wrote:
-
-> Well... I don't know what happened with Chris' testing either.
+On Wed, Nov 01, 2017 at 02:33:43PM +0000, Julien Thierry wrote:
+> Function graph does not work currently when CONFIG_DYNAMIC_TRACE is not
+> set. This is because ftrace_function_trace is not always set to ftrace_stub
+> when function_graph is in use.
 > 
-> I *thought* I build tested it, but my .config had 
-> CONFIG_DEBUG_SEMIHOSTING=y.
+> Do not skip checking of graph tracer functions when ftrace_function_trace
+> is set.
+> 
+> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-Here's the fixed patch. I won't submit it to the patch system before we 
-understand how the previous one worked for Chris.
+Reviewed-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
------ >8
-Subject: debug printch/printascii: translate '\n' to "\r\n" not "\n\r"
+I think that arm has the same issue, hoping the following patch
+will fix it:
+===
+>From e25bcf50d1acde698285a0c64f72d97f8b17e3fb Mon Sep 17 00:00:00 2001
+From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Date: Thu, 2 Nov 2017 11:35:04 +0900
+Subject: [PATCH] arm: ftrace: function_graph with DYNAMIC_FTRACE
 
-Some terminals apparently have issues with "\n\r" and mess up the 
-display. Let's use the traditional "\r\n" ordering.
+---
+ arch/arm/kernel/entry-ftrace.S | 12 +++++-------
+ 1 file changed, 5 insertions(+), 7 deletions(-)
 
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
-Reported-by: Chris Brandt <Chris.Brandt@renesas.com>
-
-diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
-index ea9646cc2a..01d746efff 100644
---- a/arch/arm/kernel/debug.S
-+++ b/arch/arm/kernel/debug.S
-@@ -79,25 +79,28 @@ hexbuf:		.space 16
+diff --git a/arch/arm/kernel/entry-ftrace.S b/arch/arm/kernel/entry-ftrace.S
+index efcd9f25a14b..ef94c73ad996 100644
+--- a/arch/arm/kernel/entry-ftrace.S
++++ b/arch/arm/kernel/entry-ftrace.S
+@@ -68,8 +68,12 @@
+ 	ldr	r2, [r0]
+ 	adr	r0, .Lftrace_stub
+ 	cmp	r0, r2
+-	bne	1f
++	beq	1f
  
- ENTRY(printascii)
- 		addruart_current r3, r1, r2
--		b	2f
--1:		waituart r2, r3
--		senduart r1, r3
--		busyuart r2, r3
--		teq	r1, #'\n'
--		moveq	r1, #'\r'
--		beq	1b
--2:		teq	r0, #0
-+1:		teq	r0, #0
- 		ldrneb	r1, [r0], #1
- 		teqne	r1, #0
--		bne	1b
--		ret	lr
-+		reteq	lr
-+2:		teq     r1, #'\n'
-+		bne	3f
-+		mov	r1, #'\r'
-+		waituart r2, r3
-+		senduart r1, r3
-+		busyuart r2, r3
-+		mov	r1, #'\n'
-+3:		waituart r2, r3
-+		senduart r1, r3
-+		busyuart r2, r3
-+		b	1b
- ENDPROC(printascii)
++ 	mcount_get_lr	r1			@ lr of instrumented func
++	mcount_adjust_addr	r0, lr		@ instrumented function
++	blx	r2
++1:
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+ 	ldr     r1, =ftrace_graph_return
+ 	ldr     r2, [r1]
+@@ -84,12 +88,6 @@
+ #endif
  
- ENTRY(printch)
- 		addruart_current r3, r1, r2
- 		mov	r1, r0
- 		mov	r0, #0
--		b	1b
-+		b	2b
- ENDPROC(printch)
+ 	mcount_exit
+-
+-1: 	mcount_get_lr	r1			@ lr of instrumented func
+-	mcount_adjust_addr	r0, lr		@ instrumented function
+-	badr	lr, 2f
+-	mov	pc, r2
+-2:	mcount_exit
+ .endm
  
- #ifdef CONFIG_MMU
+ #ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+-- 
+2.14.1
