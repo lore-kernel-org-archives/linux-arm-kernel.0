@@ -1,88 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  2 Nov 2017 12:43:54 +0100
-Subject: [PATCH] exynos: drm: use monotonic timestamps
-Message-ID: <20171102114415.1811842-1-arnd@arndb.de>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 2 Nov 2017 12:47:05 +0100
+Subject: [GIT PULL] Mediatek: 32-bit DT update for v4.15
+In-Reply-To: <1509423579.10793.10.camel@mtkswgap22>
+References: <c7145c00-b2b9-780c-0bfd-15f7d8a08dd6@gmail.com>
+ <CAK8P3a3NWwoe0mX45WrFONyiHt9eWTTMziEc+rjqSfr5QZv8xQ@mail.gmail.com>
+ <1509423579.10793.10.camel@mtkswgap22>
+Message-ID: <e8fdd9a9-ce13-8804-aea0-46becc6f9730@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The exynos DRM driver uses real-time 'struct timeval' values
-for exporting its timestamps to user space. This has multiple
-problems:
+Hi Arnd,
 
-1. signed seconds overflow in y2038
-2. the 'struct timeval' definition is deprecated in the kernel
-3. time may jump or go backwards after a 'settimeofday()' syscall
-4. other DRM timestamps are in CLOCK_MONOTONIC domain, so they
-   can't be compared
-5. exporting microseconds requires a division by 1000, which may
-   be slow on some architectures.
+On 10/31/2017 05:19 AM, Ryder Lee wrote:
+> Hi Arnd,
+> 
+> We have 3 root ports in MT7623, but this is a bug in this chip where the
+> HW designers wired the IRQs in a nonstandard way. We've tried to
+> statically assign the bus portion of the address part in the parent
+> interrupt-map before, but this approach cannot handle the case - if we
+> attach the device in random order.
+> 
 
-Ideally timestamps should just use 64-bit nanoseconds instead, but
-of course we can't change that now. Instead, this tries to address
-the first four points above by using monotonic 'timespec' values.
+Ryder, please don't top post :)
 
-The downside is that there is a small risk of breaking user space
-if that expects the absolute timestamp numbers to relate to the
-result of 'gettimeofday()'. Please review the user space driver
-before applying this patch to ensure this works.
+> Thanks.
+> 
+> On Mon, 2017-10-30 at 13:42 +0100, Arnd Bergmann wrote:
+>> On Mon, Oct 23, 2017 at 12:06 AM, Matthias Brugger
+>> <matthias.bgg@gmail.com> wrote:
+>>>
+>>> ----------------------------------------------------------------
+>>> - mt76233 add PCIe node
+>>
+>> Could you clarify what the subnodes in the PCI node are for? It seems odd
+>> to have "interrupt-map" properties in both the pcie controller and its child
+>> nodes, and I want to ensure this is following the standard PCIe binding before
+>> I pull it.
+>>
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/gpu/drm/exynos/exynos_drm_g2d.c | 6 +++---
- drivers/gpu/drm/exynos/exynos_drm_ipp.c | 8 ++++----
- 2 files changed, 7 insertions(+), 7 deletions(-)
+Arnd, I didn't found the pull request in your next/dt branch.
+Is there more clarification needed from our side?
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_g2d.c b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
-index 2b8bf2dd6387..9effe40f5fa5 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_g2d.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
-@@ -926,7 +926,7 @@ static void g2d_finish_event(struct g2d_data *g2d, u32 cmdlist_no)
- 	struct drm_device *drm_dev = g2d->subdrv.drm_dev;
- 	struct g2d_runqueue_node *runqueue_node = g2d->runqueue_node;
- 	struct drm_exynos_pending_g2d_event *e;
--	struct timeval now;
-+	struct timespec64 now;
- 
- 	if (list_empty(&runqueue_node->event_list))
- 		return;
-@@ -934,9 +934,9 @@ static void g2d_finish_event(struct g2d_data *g2d, u32 cmdlist_no)
- 	e = list_first_entry(&runqueue_node->event_list,
- 			     struct drm_exynos_pending_g2d_event, base.link);
- 
--	do_gettimeofday(&now);
-+	ktime_get_ts64(&now);
- 	e->event.tv_sec = now.tv_sec;
--	e->event.tv_usec = now.tv_usec;
-+	e->event.tv_usec = now.tv_nsec / NSEC_PER_USEC;
- 	e->event.cmdlist_no = cmdlist_no;
- 
- 	drm_send_event(drm_dev, &e->base);
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_ipp.c b/drivers/gpu/drm/exynos/exynos_drm_ipp.c
-index 3edda18cc2d2..3f9d8d79bbde 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_ipp.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_ipp.c
-@@ -1406,7 +1406,7 @@ static int ipp_send_event(struct exynos_drm_ippdrv *ippdrv,
- 	struct drm_exynos_ipp_queue_buf qbuf;
- 	struct drm_exynos_ipp_send_event *e;
- 	struct list_head *head;
--	struct timeval now;
-+	struct timespec64 now;
- 	u32 tbuf_id[EXYNOS_DRM_OPS_MAX] = {0, };
- 	int ret, i;
- 
-@@ -1509,10 +1509,10 @@ static int ipp_send_event(struct exynos_drm_ippdrv *ippdrv,
- 	e = list_first_entry(&c_node->event_list,
- 		struct drm_exynos_ipp_send_event, base.link);
- 
--	do_gettimeofday(&now);
--	DRM_DEBUG_KMS("tv_sec[%ld]tv_usec[%ld]\n", now.tv_sec, now.tv_usec);
-+	ktime_get_ts64(&now);
-+	DRM_DEBUG_KMS("tv_sec[%lld]tv_nsec[%ld]\n", (s64)now.tv_sec, now.tv_nsec);
- 	e->event.tv_sec = now.tv_sec;
--	e->event.tv_usec = now.tv_usec;
-+	e->event.tv_usec = now.tv_nsec / NSEC_PER_USEC;
- 	e->event.prop_id = property->prop_id;
- 
- 	/* set buffer id about source destination */
--- 
-2.9.0
+Regards,
+Matthias
