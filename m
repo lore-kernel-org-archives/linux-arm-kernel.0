@@ -1,32 +1,73 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 2 Nov 2017 17:30:04 +0000
-Subject: [PATCH] arm: ensure dump_instr() checks addr_limit
-In-Reply-To: <20171102164706.GC5061@kroah.com>
-References: <20171102163452.7652-1-mark.rutland@arm.com>
- <20171102164706.GC5061@kroah.com>
-Message-ID: <20171102173003.t5wugpup26eu2hpx@lakrids.cambridge.arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 02 Nov 2017 19:37:15 +0200
+Subject: [RESEND PATCH 1/1] of: Make return types of to_of_node and
+ of_fwnode_handle macros consistent
+In-Reply-To: <20171102095918.7041-1-sakari.ailus@linux.intel.com>
+References: <2117711.dO2rQLXOup@avalon>
+ <20171102095918.7041-1-sakari.ailus@linux.intel.com>
+Message-ID: <1668125.RyNuczo2n4@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 02, 2017 at 05:47:06PM +0100, Greg KH wrote:
-> On Thu, Nov 02, 2017 at 04:34:52PM +0000, Mark Rutland wrote:
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Hi Sakari,
+
+Thank you for the patch.
+
+On Thursday, 2 November 2017 11:59:18 EET Sakari Ailus wrote:
+> (Fixed Mauro's e-mail.)
 > 
-> Huh?  What's that doing up here?
-
-[...]
-
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Russell King <rmk+kernel@armlinux.org.uk>
-> > Cc: stable at vger.kernel.org
+> to_of_node() macro checks whether the fwnode_handle passed to it is not an
+> OF node, and if so, returns NULL in order to be NULL-safe. Otherwise it
+> returns the pointer to the OF node which the fwnode_handle contains.
 > 
-> It's right here...
+> The problem with returning NULL is that its type was void *, which
+> sometimes matters. Explicitly return struct device_node * instead.
+> 
+> Make a similar change to of_fwnode_handle() as well.
+> 
+> Fixes: d20dc1493db4 ("of: Support const and non-const use for to_of_node()")
+> Fixes: debd3a3b27c7 ("of: Make of_fwnode_handle() safer")
+> Signed-off-by: Sakari Ailus <sakari.ailus@linux.intel.com>
 
-Sorry; I'd generated this commit message from another. I must've
-accidentally passed -s to git commit before copying the text I wanted.
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-I will be more careful in future, and I'll remove the first instance
-if/when submitting this to Russell's patch system.
+> ---
+> Hi Mauro,
+> 
+> Could you check whether this addresses the smatch issue with the xilinx
+> driver?
+> 
+> Thanks.
+> 
+>  include/linux/of.h | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/include/linux/of.h b/include/linux/of.h
+> index b240ed69dc96..0651231c115e 100644
+> --- a/include/linux/of.h
+> +++ b/include/linux/of.h
+> @@ -161,7 +161,7 @@ static inline bool is_of_node(const struct fwnode_handle
+> *fwnode) is_of_node(__to_of_node_fwnode) ?			\
+>  			container_of(__to_of_node_fwnode,		\
+>  				     struct device_node, fwnode) :	\
+> -			NULL;						\
+> +			(struct device_node *)NULL;			\
+>  	})
+> 
+>  #define of_fwnode_handle(node)						\
+> @@ -169,7 +169,8 @@ static inline bool is_of_node(const struct fwnode_handle
+> *fwnode) typeof(node) __of_fwnode_handle_node = (node);		\
+>  									\
+>  		__of_fwnode_handle_node ?				\
+> -			&__of_fwnode_handle_node->fwnode : NULL;	\
+> +			&__of_fwnode_handle_node->fwnode :		\
+> +			(struct fwnode_handle *)NULL;			\
+>  	})
+> 
+>  static inline bool of_have_populated_dt(void)
 
-Thanks,
-Mark.
+
+-- 
+Regards,
+
+Laurent Pinchart
