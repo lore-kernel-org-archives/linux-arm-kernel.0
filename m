@@ -1,24 +1,23 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 2 Nov 2017 01:12:05 -0700
-Subject: [PATCH v2 2/4] clk: mediatek: add the option for determining PLL
- source clock
-In-Reply-To: <b90d46284cb527d1412352606912f5e8d18b3e53.1507174799.git.sean.wang@mediatek.com>
+Date: Thu, 2 Nov 2017 01:12:08 -0700
+Subject: [PATCH v2 1/4] dt-bindings: clock: mediatek: document clk
+ bindings for MediaTek MT7622 SoC
+In-Reply-To: <cac2312d51a2a30e066f79214dc0b71acea7732d.1507174799.git.sean.wang@mediatek.com>
 References: <cover.1507174799.git.sean.wang@mediatek.com>
- <b90d46284cb527d1412352606912f5e8d18b3e53.1507174799.git.sean.wang@mediatek.com>
-Message-ID: <20171102081205.GG11011@codeaurora.org>
+ <cac2312d51a2a30e066f79214dc0b71acea7732d.1507174799.git.sean.wang@mediatek.com>
+Message-ID: <20171102081207.GH11011@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 10/05, sean.wang at mediatek.com wrote:
-> From: Chen Zhong <chen.zhong@mediatek.com>
+> From: Sean Wang <sean.wang@mediatek.com>
 > 
-> Since the previous setup always sets the PLL using crystal 26MHz, this
-> doesn't always happen in every MediaTek platform. So the patch added
-> flexibility for assigning extra member for determining the PLL source
-> clock.
+> This patch adds the binding documentation for apmixedsys, ethsys, hifsys,
+> infracfg, pericfg, topckgen and audsys for MT7622.
 > 
 > Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
 > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> Acked-by: Rob Herring <robh@kernel.org>
 > ---
 
 Applied to clk-next
