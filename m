@@ -1,69 +1,47 @@
-From: nleeder@codeaurora.org (Leeder, Neil)
-Date: Thu, 2 Nov 2017 16:38:27 -0400
-Subject: [PATCH 0/2] arm64 SMMUv3 PMU driver with IORT support
-In-Reply-To: <20171031233352.5232hzebwek6avzi@yury-thinkpad>
-References: <1501876754-1064-1-git-send-email-nleeder@codeaurora.org>
- <20171031233352.5232hzebwek6avzi@yury-thinkpad>
-Message-ID: <5db10f59-e2dc-cb03-0950-58e14eac16e5@codeaurora.org>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Thu, 2 Nov 2017 22:06:44 +0100
+Subject: [PATCH] ARM: meson: fix spelling mistake: "Couln't" -> "Couldn't"
+In-Reply-To: <20171102092737.16957-1-colin.king@canonical.com>
+References: <20171102092737.16957-1-colin.king@canonical.com>
+Message-ID: <CAFBinCAHRg8y-=ELPu3_tRnskjgPe6gXAG67tmEt75OeSBn-sw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yury,
+On Thu, Nov 2, 2017 at 10:27 AM, Colin King <colin.king@canonical.com> wrote:
+> From: Colin Ian King <colin.king@canonical.com>
+>
+> Trivial fix to spelling mistake in pr_err error message
+>
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+Acked-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 
-On 10/31/2017 7:33 PM, Yury Norov wrote:
-> Hi Neil,
-> 
-> On Fri, Aug 04, 2017 at 03:59:12PM -0400, Neil Leeder wrote:
->> This adds a driver for the SMMUv3 PMU into the perf framework.
->> It includes an IORT update to support PM Counter Groups.
->>
->> IORT has no mechanism for determining device names so PMUs
->> are named based on their physical address. 
->>
->> Tested on Qualcomm QDF2400. perf_fuzzer ran for 4+ hours
->> with no failures.
->>
->> Neil Leeder (2):
->>   acpi: arm64: add iort support for PMCG
->>   perf: add arm64 smmuv3 pmu driver
->>
->>  drivers/acpi/arm64/iort.c     |  54 +++
->>  drivers/perf/Kconfig          |   9 +
->>  drivers/perf/Makefile         |   1 +
->>  drivers/perf/arm_smmuv3_pmu.c | 823 ++++++++++++++++++++++++++++++++++++++++++
->>  include/acpi/actbl2.h         |   9 +-
->>  5 files changed, 895 insertions(+), 1 deletion(-)
->>  create mode 100644 drivers/perf/arm_smmuv3_pmu.c
-> 
-> I try to run your driver on ThunderX2, but perf list doesn't show new
-> events, and example in description in patch 2 also doesn't work:
-> yury at VAL1-25:~/linux$ tools/perf/perf stat -e smmu_0_ff88840/transaction,filter_enable=1, filter_span=1,filter_stream_id=0x42/ -a pwd
-> event syntax error: '..ter_enable=1,'
->                                   \___ parser error
-> Run 'perf list' for a list of valid events 
-> 
->  Usage: perf stat [<options>] [<command>]
-> 
->     -e, --event <event>   event selector. use 'perf list' to list available events
-> 
-> I run v4.14-rc7 kernel plus this series. The config is attached. I
-> found that platform_match() never return 1 for arm-smmu-pmu and so
-> the driver never probed.
-> 
-> Maybe it's my local configuration issue?
+thank you for catching and fixing this!
 
-Thanks for testing this driver. As some of the review comments pointed out, there are
-some changes needed which will be addressed in a future patchset. Notably the IORT
-needs updating to handle the two base addresses. The current driver assumes the second
-memory area is adjacent to the first, which may not be the case in all implementations.
+> ---
+>  arch/arm/mach-meson/platsmp.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-meson/platsmp.c b/arch/arm/mach-meson/platsmp.c
+> index 2555f9056a33..cad7ee8f0d6b 100644
+> --- a/arch/arm/mach-meson/platsmp.c
+> +++ b/arch/arm/mach-meson/platsmp.c
+> @@ -102,7 +102,7 @@ static void __init meson_smp_prepare_cpus(const char *scu_compatible,
+>
+>         scu_base = of_iomap(node, 0);
+>         if (!scu_base) {
+> -               pr_err("Couln't map SCU registers\n");
+> +               pr_err("Couldn't map SCU registers\n");
+>                 return;
+>         }
+>
+> --
+> 2.14.1
+>
+>
+> _______________________________________________
+> linux-amlogic mailing list
+> linux-amlogic at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-amlogic
 
-In order to make the driver probe correctly, you'll need to update your ACPI tables
-with entries for PMCG, node type 0x5. This ACPI information will include the two base
-addresses. I've heard that the updated spec which will include the second memory
-area will be available soon. At that point I will release another patchset for review.
-
-Neil
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+Regards
+Martin
