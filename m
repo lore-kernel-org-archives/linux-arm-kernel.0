@@ -1,74 +1,88 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 02 Nov 2017 11:05:55 +0000
-Subject: Applied "ASoC: stm32: sai: fix warning in stm32_sai_set_config()" to
- the asoc tree
-In-Reply-To: <1509618009-30804-1-git-send-email-olivier.moysan@st.com>
-Message-ID: <E1eADJr-0002Cr-9J@debutante>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu,  2 Nov 2017 12:43:54 +0100
+Subject: [PATCH] exynos: drm: use monotonic timestamps
+Message-ID: <20171102114415.1811842-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+The exynos DRM driver uses real-time 'struct timeval' values
+for exporting its timestamps to user space. This has multiple
+problems:
 
-   ASoC: stm32: sai: fix warning in stm32_sai_set_config()
+1. signed seconds overflow in y2038
+2. the 'struct timeval' definition is deprecated in the kernel
+3. time may jump or go backwards after a 'settimeofday()' syscall
+4. other DRM timestamps are in CLOCK_MONOTONIC domain, so they
+   can't be compared
+5. exporting microseconds requires a division by 1000, which may
+   be slow on some architectures.
 
-has been applied to the asoc tree at
+Ideally timestamps should just use 64-bit nanoseconds instead, but
+of course we can't change that now. Instead, this tries to address
+the first four points above by using monotonic 'timespec' values.
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+The downside is that there is a small risk of breaking user space
+if that expects the absolute timestamp numbers to relate to the
+result of 'gettimeofday()'. Please review the user space driver
+before applying this patch to ensure this works.
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 7e751e375ae7218f8b49f0b47e855cf9bbbdbcf9 Mon Sep 17 00:00:00 2001
-From: olivier moysan <olivier.moysan@st.com>
-Date: Thu, 2 Nov 2017 11:20:09 +0100
-Subject: [PATCH] ASoC: stm32: sai: fix warning in stm32_sai_set_config()
-
-Fix uninitialized warning introduced by
-"Move static settings to DAI init" commit
-in stm32_sai_set_config() function.
-
-Signed-off-by: Olivier Moysan <olivier.moysan@st.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- sound/soc/stm/stm32_sai_sub.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/gpu/drm/exynos/exynos_drm_g2d.c | 6 +++---
+ drivers/gpu/drm/exynos/exynos_drm_ipp.c | 8 ++++----
+ 2 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/sound/soc/stm/stm32_sai_sub.c b/sound/soc/stm/stm32_sai_sub.c
-index 150ad546d8b9..08583b958430 100644
---- a/sound/soc/stm/stm32_sai_sub.c
-+++ b/sound/soc/stm/stm32_sai_sub.c
-@@ -482,13 +482,13 @@ static int stm32_sai_set_config(struct snd_soc_dai *cpu_dai,
- 	cr1_mask = SAI_XCR1_DS_MASK;
- 	switch (params_format(params)) {
- 	case SNDRV_PCM_FORMAT_S8:
--		cr1 |= SAI_XCR1_DS_SET(SAI_DATASIZE_8);
-+		cr1 = SAI_XCR1_DS_SET(SAI_DATASIZE_8);
- 		break;
- 	case SNDRV_PCM_FORMAT_S16_LE:
--		cr1 |= SAI_XCR1_DS_SET(SAI_DATASIZE_16);
-+		cr1 = SAI_XCR1_DS_SET(SAI_DATASIZE_16);
- 		break;
- 	case SNDRV_PCM_FORMAT_S32_LE:
--		cr1 |= SAI_XCR1_DS_SET(SAI_DATASIZE_32);
-+		cr1 = SAI_XCR1_DS_SET(SAI_DATASIZE_32);
- 		break;
- 	default:
- 		dev_err(cpu_dai->dev, "Data format not supported");
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_g2d.c b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
+index 2b8bf2dd6387..9effe40f5fa5 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_g2d.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
+@@ -926,7 +926,7 @@ static void g2d_finish_event(struct g2d_data *g2d, u32 cmdlist_no)
+ 	struct drm_device *drm_dev = g2d->subdrv.drm_dev;
+ 	struct g2d_runqueue_node *runqueue_node = g2d->runqueue_node;
+ 	struct drm_exynos_pending_g2d_event *e;
+-	struct timeval now;
++	struct timespec64 now;
+ 
+ 	if (list_empty(&runqueue_node->event_list))
+ 		return;
+@@ -934,9 +934,9 @@ static void g2d_finish_event(struct g2d_data *g2d, u32 cmdlist_no)
+ 	e = list_first_entry(&runqueue_node->event_list,
+ 			     struct drm_exynos_pending_g2d_event, base.link);
+ 
+-	do_gettimeofday(&now);
++	ktime_get_ts64(&now);
+ 	e->event.tv_sec = now.tv_sec;
+-	e->event.tv_usec = now.tv_usec;
++	e->event.tv_usec = now.tv_nsec / NSEC_PER_USEC;
+ 	e->event.cmdlist_no = cmdlist_no;
+ 
+ 	drm_send_event(drm_dev, &e->base);
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_ipp.c b/drivers/gpu/drm/exynos/exynos_drm_ipp.c
+index 3edda18cc2d2..3f9d8d79bbde 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_ipp.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_ipp.c
+@@ -1406,7 +1406,7 @@ static int ipp_send_event(struct exynos_drm_ippdrv *ippdrv,
+ 	struct drm_exynos_ipp_queue_buf qbuf;
+ 	struct drm_exynos_ipp_send_event *e;
+ 	struct list_head *head;
+-	struct timeval now;
++	struct timespec64 now;
+ 	u32 tbuf_id[EXYNOS_DRM_OPS_MAX] = {0, };
+ 	int ret, i;
+ 
+@@ -1509,10 +1509,10 @@ static int ipp_send_event(struct exynos_drm_ippdrv *ippdrv,
+ 	e = list_first_entry(&c_node->event_list,
+ 		struct drm_exynos_ipp_send_event, base.link);
+ 
+-	do_gettimeofday(&now);
+-	DRM_DEBUG_KMS("tv_sec[%ld]tv_usec[%ld]\n", now.tv_sec, now.tv_usec);
++	ktime_get_ts64(&now);
++	DRM_DEBUG_KMS("tv_sec[%lld]tv_nsec[%ld]\n", (s64)now.tv_sec, now.tv_nsec);
+ 	e->event.tv_sec = now.tv_sec;
+-	e->event.tv_usec = now.tv_usec;
++	e->event.tv_usec = now.tv_nsec / NSEC_PER_USEC;
+ 	e->event.prop_id = property->prop_id;
+ 
+ 	/* set buffer id about source destination */
 -- 
-2.15.0
+2.9.0
