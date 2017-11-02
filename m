@@ -1,29 +1,24 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 2 Nov 2017 10:08:58 +0100
-Subject: [PATCH v2] kbuild: clean up *.dtb and *.dtb.S patterns from
- top-level Makefile
-In-Reply-To: <bb7c1a637afa47e8943ce494798f957c@SOC-EX01V.e01.socionext.com>
-References: <1509591085-23940-1-git-send-email-yamada.masahiro@socionext.com>
- <CAK8P3a3FoRJeO=TQGMRf6t4-bP8nP6KUEhkCrHP6L8XaF1Ee7g@mail.gmail.com>
- <bb7c1a637afa47e8943ce494798f957c@SOC-EX01V.e01.socionext.com>
-Message-ID: <CAK8P3a0r=un9H8y2AizW3v5KzkTEGgb70hfBx8C88qphDjJksg@mail.gmail.com>
+Date: Thu, 2 Nov 2017 10:15:47 +0100
+Subject: [PATCH v2 0/3] arm64: defconfig: remove some Qualcomm USB options
+In-Reply-To: <20171031125808.7300-1-elder@linaro.org>
+References: <20171031125808.7300-1-elder@linaro.org>
+Message-ID: <CAK8P3a0r8NZdbv8KYyF72oXU_3gxBD2ETzY+BZUf4i5V4Lr=mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 2, 2017 at 9:48 AM,  <yamada.masahiro@socionext.com> wrote:
-
->>       Arnd
+On Tue, Oct 31, 2017 at 1:58 PM, Alex Elder <elder@linaro.org> wrote:
+> This series deletes three config options related to USB on Qualcomm
+> SoCs from the arm64 "defconfig".  The code enabled by the options is
+> no longer needed by any Qualcomm hardware.  The driver code that
+> corresponds to these config options is removed in a separate series.
 >
-> Yeah, I had also noticed this race problem on parallel building
-> with CONFIG_OF_ALL_DTBS.
+>                                         -Alex
 >
-> I was planning to do it
-> when I come up with a clean implementation.
->
-> One idea is to handle dtb-y and CONFIG_OF_ALL_DTBS
-> natively in scripts/Makefile.build or somewhere
-> as scripts/Makefile.dtbinst already recognizes dtb-y as a special variable.
+> v2:  Added Reviewed-by: Amit Kucheria <amit.kucheria@linaro.org>
 
-Ah, nice, that does sound better, yes.
+The patches look good. Should we apply them directly to arm-soc, or is
+Andy going to forward them? Normally I'd wait for him to apply them,
+but I see he has already given an Ack, so I don't know what to do here.
 
-      Arnd
+         Arnd
