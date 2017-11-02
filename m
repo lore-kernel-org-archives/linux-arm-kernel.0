@@ -1,91 +1,46 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  2 Nov 2017 16:34:52 +0000
-Subject: [PATCH] arm: ensure dump_instr() checks addr_limit
-Message-ID: <20171102163452.7652-1-mark.rutland@arm.com>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Thu, 2 Nov 2017 16:38:11 +0000
+Subject: [PATCH 3/3] ARM: early_printk: use printascii() rather than
+ printch()
+In-Reply-To: <nycvar.YSQ.7.76.1711021157560.21665@knanqh.ubzr>
+References: <20171031171629.GI9463@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1710311346190.21665@knanqh.ubzr>
+ <20171031175344.GJ9463@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1710311355000.21665@knanqh.ubzr>
+ <20171031182024.GK9463@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1710311432120.21665@knanqh.ubzr>
+ <SG2PR06MB1165AE45FB289039E55D03028A5E0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+ <20171102000945.GT9463@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1711012249020.21665@knanqh.ubzr>
+ <SG2PR06MB11655BDEF09BB62D268A29DD8A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+ <20171102112041.GW9463@n2100.armlinux.org.uk>
+ <SG2PR06MB11653D39086B1F58497C9FE08A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+ <nycvar.YSQ.7.76.1711021044380.21665@knanqh.ubzr>
+ <SG2PR06MB116563CB4F1B55160392AAC68A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+ <nycvar.YSQ.7.76.1711021132170.21665@knanqh.ubzr>
+ <nycvar.YSQ.7.76.1711021157560.21665@knanqh.ubzr>
+Message-ID: <SG2PR06MB116509D159F4E79D5A788DCE8A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+On Thursday, November 02, 2017 1, Nicolas Pitre wrote:
+> OK.. I wanted to get to the bottom of this. The gas documentation says:
+> 
+> |9.4.2.1 Instruction Set Syntax
+> |..............................
+> |
+> |Two slightly different syntaxes are supported for ARM and THUMB
+> |instructions.  The default, `divided', uses the old style where ARM and
+> |THUMB instructions had their own, separate syntaxes.  The new,
+> |`unified' syntax, which can be selected via the `.syntax' directive,
+> |and has the following main features:
+> |
+> |   * Immediate operands do not require a `#' prefix.
 
-When CONFIG_DEBUG_USER is enabled, it's possible for a user to
-deliberately trigger dump_instr() with a chosen kernel address.
+Well there you go!
 
-Let's avoid problems resulting from this by using get_user() rather than
-__get_user(), ensuring that we don't erroneously access kernel memory.
+We all have "gratuitously broken binutils"
 
-So that we can use the same code to dump user instructions and kernel
-instructions, the common dumping code is factored out to __dump_instr(),
-with the fs manipulated appropriately in dump_instr() around calls to
-this.
+;)
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Russell King <rmk+kernel@armlinux.org.uk>
-Cc: stable at vger.kernel.org
----
- arch/arm/kernel/traps.c | 28 ++++++++++++++++++----------
- 1 file changed, 18 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 948c648fea00..0fcd82f01388 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -154,30 +154,26 @@ static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
- 	set_fs(fs);
- }
- 
--static void dump_instr(const char *lvl, struct pt_regs *regs)
-+static void __dump_instr(const char *lvl, struct pt_regs *regs)
- {
- 	unsigned long addr = instruction_pointer(regs);
- 	const int thumb = thumb_mode(regs);
- 	const int width = thumb ? 4 : 8;
--	mm_segment_t fs;
- 	char str[sizeof("00000000 ") * 5 + 2 + 1], *p = str;
- 	int i;
- 
- 	/*
--	 * We need to switch to kernel mode so that we can use __get_user
--	 * to safely read from kernel space.  Note that we now dump the
--	 * code first, just in case the backtrace kills us.
-+	 * Note that we now dump the code first, just in case the backtrace
-+	 * kills us.
- 	 */
--	fs = get_fs();
--	set_fs(KERNEL_DS);
- 
- 	for (i = -4; i < 1 + !!thumb; i++) {
- 		unsigned int val, bad;
- 
- 		if (thumb)
--			bad = __get_user(val, &((u16 *)addr)[i]);
-+			bad = get_user(val, &((u16 *)addr)[i]);
- 		else
--			bad = __get_user(val, &((u32 *)addr)[i]);
-+			bad = get_user(val, &((u32 *)addr)[i]);
- 
- 		if (!bad)
- 			p += sprintf(p, i == 0 ? "(%0*x) " : "%0*x ",
-@@ -188,8 +184,20 @@ static void dump_instr(const char *lvl, struct pt_regs *regs)
- 		}
- 	}
- 	printk("%sCode: %s\n", lvl, str);
-+}
- 
--	set_fs(fs);
-+static void dump_instr(const char *lvl, struct pt_regs *regs)
-+{
-+	mm_segment_t fs;
-+
-+	if (!user_mode(regs)) {
-+		fs = get_fs();
-+		set_fs(KERNEL_DS);
-+		__dump_instr(lvl, regs);
-+		set_fs(fs);
-+	} else {
-+		__dump_instr(lvl, regs);
-+	}
- }
- 
- #ifdef CONFIG_ARM_UNWIND
--- 
-2.11.0
+Chris
