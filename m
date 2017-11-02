@@ -1,162 +1,123 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 2 Nov 2017 10:47:46 +0000
-Subject: [PATCH] mailbox: add support for doorbell/signal mode controllers
-In-Reply-To: <CABb+yY16-B9vReRjLopV1RsyB8a=c5X9XaomtTj44520XrDdmA@mail.gmail.com>
-References: <1509553964-4451-1-git-send-email-sudeep.holla@arm.com>
- <CABb+yY1tcm-68E5oG75hstuMd6AOeb=BB6HeKGnQ1zj4Qya6hg@mail.gmail.com>
- <59a05fcb-ff30-0683-144e-93521a7413f9@arm.com>
- <CABb+yY16-B9vReRjLopV1RsyB8a=c5X9XaomtTj44520XrDdmA@mail.gmail.com>
-Message-ID: <4268c9d9-dc1e-0bd7-3fac-790c2d42b54b@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 2 Nov 2017 10:48:35 +0000
+Subject: [PATCH v3 6/7] arm64: topology: Enable ACPI/PPTT based CPU
+ topology.
+In-Reply-To: <270ae2f5-0af6-1be4-2914-d1ce8d0a5cd0@redhat.com>
+References: <20171012194856.13844-1-jeremy.linton@arm.com>
+ <20171012194856.13844-7-jeremy.linton@arm.com>
+ <20171019155622.GC18883@red-moon>
+ <b6c3fae3-eb6d-e5f2-6887-de1471978897@arm.com>
+ <20171020092210.GB21060@red-moon>
+ <270ae2f5-0af6-1be4-2914-d1ce8d0a5cd0@redhat.com>
+Message-ID: <20171102104826.GB13580@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 02/11/17 02:39, Jassi Brar wrote:
-> On Wed, Nov 1, 2017 at 11:45 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>
->>
->> On 01/11/17 18:03, Jassi Brar wrote:
->>> On Wed, Nov 1, 2017 at 10:02 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>>
->>>>
->>>> Such controllers don't need to transmit any data, they just transmit
->>>> the signal. In such controllers the data pointer passed to
->>>> mbox_send_message is passed to client via it's tx_prepare callback.
->>>> Controller doesn't need any data to be passed from the client.
->>>>
->>> Some controllers need a non-zero value written to a register in order
->>> to trigger the signal.
->>
->> You are right, just right non-zero or whatever controller value to
->> trigger the interrupt to remote.
->>
->>> That register is visible to the remote. While the data/packet is setup
->>> during tx_prepare() callback.
->>
->> Agreed.
->>
->>> You are overlooking this class of doorbell controllers.
->>>
->>
->> Not sure what do you mean by that ?
->>
-> Such doorbell controllers can't use send_signal(chan) because they
-> need that non-zero value from client to send over the shared register.
-> You are assuming every protocol implements just one command.
->
-
-No that non-zero value is not client specific, it's entirely controller
-specific. Not sure why do you think I am assuming every protocol
-implements just one command.
-
->>>>
->>>> This is rough idea I have on extending mailbox interface to support
->>>> the doorbell requirements.
->>>>
->>> What doorbell requirements does the api not support?
->>> QComm's APCS IPC is what you call a "doorbell" controller and is
->>> already supported by the API. 
-
-After looking at this, you will see that doorbell has not data specific
-to client in the above case.
-
-	unsigned long idx = (unsigned long)chan->con_priv;
-
-	writel(BIT(idx), apcs->reg);
-
-So it's channel specific, same in mailbox-sti
-
->> Again agreed. But see below for reason to create this API.
->>
->>>> The new API send_signal will eliminate the
->>>> issue Jassi has explained in earlier discussion with respect to generic
->>>> message format using Rockchip example.
->>>>
->>> Sorry I don't see how.
->>> Please explain how can send_signal() api be used by, say, rockchip to
->>> support SCMI?
->>>
->>
->>  80         writel_relaxed(msg->cmd, mb->mbox_base +
->> MAILBOX_A2B_CMD(chans->idx));
->>  81         writel_relaxed(msg->rx_size, mb->mbox_base +
->>
->>  82                        MAILBOX_A2B_DAT(chans->idx));
->>
->>  83
->>
->>  will be replaced with
->>
->> writel(whatever_value_to trigger_signal, MAILBOX_A2B_CMD(chans->idx));
->>
->> in its send_signal function.
->>
-> 1) Where does the  "whatever_value_to_trigger_signal"  come from?
-
-Controller specific.
-
-> That has to come from client. 
-
-No.
-
-> You can not dictate the channel transfers a fixed u32 value over its
->lifetime. SCMI may use one command code but other protocols use more.
-
-Yes if it's just a doorbell, see the above 2 cases I have pointed out.
-
+On Wed, Nov 01, 2017 at 02:29:26PM -0600, Al Stone wrote:
+> On 10/20/2017 03:22 AM, Lorenzo Pieralisi wrote:
+> > On Thu, Oct 19, 2017 at 11:54:22AM -0500, Jeremy Linton wrote:
+> > 
+> > [...]
+> > 
+> >>>> +			cpu_topology[cpu].core_id   = topology_id;
+> >>>> +			topology_id = setup_acpi_cpu_topology(cpu, 2);
+> >>>> +			cpu_topology[cpu].cluster_id = topology_id;
+> >>>> +			topology_id = setup_acpi_cpu_topology(cpu, max_topo);
+> >>>
+> >>> If you want a package id (that's just a package tag to group cores), you
+> >>> should not use a large level because you know how setup_acpi_cpu_topology()works, you should add an API that allows you to retrieve the package id
+> >>> (so that you can use th ACPI_PPTT_PHYSICAL_PACKAGE flag consistenly,
+> >>> whatever it represents).
+> >>
+> >> I don't think the spec requires the use of PHYSICAL_PACKAGE... Am I
+> >> misreading it? Which means we need to "pick" a node level to
+> >> represent the physical package if one doesn't exist...
+> > 
+> > The specs define a means to detect if a given PPTT node corresponds to a
+> > package (I am refraining from stating again that to me that's not clean
+> > cut what a package is _architecturally_, I think you know my POV by now)
+> > and that's what you need to use to retrieve a packageid for a given cpu,
+> > if I understand the aim of the physical package flag.
+> > 
+> > Either that or that flag is completely useless.
+> > 
+> > Lorenzo
+> > 
+> > ACPI 6.2 - Table 5-151 (page 248)
+> > Physical package
+> > -----------------
+> > Set to 1 if this node of the processor topology represents the boundary
+> > of a physical package, whether socketed or surface mounted.  Set to 0 if
+> > this instance of the processor topology does not represent the boundary
+> > of a physical package.
+> > 
 > 
-> 2) Using 'rx_size' is not a software choice made in the driver. The
-> _hardware_ has two registers shared with remote side - a CMD and a
-> DATA register. So the driver (written agnostic to any particular
-> client) would naturally expect the command+data from the client to be
-> programmed in to CMD and DAT registers.
+> I've been following the discussion and I'm not sure I understand what the
+> confusion is around having a physical package ID.  Since I'm the one that
+> insisted it be in the spec, I'd be glad to clarify anything.  My apologies
+> for not saying anything sooner but things IRL have been very complicated
+> of late.
 > 
+> What was intended was a simple flag that was meant to tell me if a CPU ID
+> (this could be a CPU, a cluster, a processor container -- I don't really
+> care which) is *also* an actual physical device on a motherboard.  That is
+> the only intent; there was no architectural meaning intended at all -- that
+> is what the PPTT structures are for, in conjunction with any DSDT information
+> uncovered later in the boot process.
+> 
+> However, in the broader server ecosystem, this can be incredibly useful.  There
+> are a significant number of software products sold or supported that base their
+> fees on the number of physical sockets in use.  There have been in the past (and
+> may be in the near future) machines where the cost of the lease on the machine
+> is determined by how many physical sockets (or even CPUs) are in use, even if
+> the machine has many more available.
+> 
+> Some vendors also include FRU (Field Replaceable Unit) location info in their
+> ACPI tables.  So, for example, one or more CPUs or caches might fail in one
+> physical package, which is then reported to a maintenance system of some sort
+> that tells some human which of the physical sockets on what motherboard needs a
+> replacement device, or it's simply noted and shut off until it's time to replace
+> the entire server, or perhaps it's logged and used in an algorithm to predict
+> when the server might fail completely.
+> 
+> So, that's why the flag exists in the spec.  It seems to make sense to me to
+> have a package ID as part of struct cpu_topology -- it might even be really
+> handy for CPU hotplug.  If you don't, it seems to me a whole separate struct
+> would be needed with more cpumasks to show who belongs to what physical package;
+> that might be okay but seems unnecessarily complicated to me.
+> 
+> You can also tell me that I have completely missed the point of the discussion
+> so far :-).  But if you do, you have to tell me what I missed.
+> 
+> Hope this helps clarify...
 
-OK, if this controller needs to be used in doorbell mode for SCMI, we
-can send one fixed cmd and fixed rx_size() or 1 based on inclusive or
-exclusive).
+Hi Al,
 
-> 
->>> I am not convinced we should clone an api just so that a client driver
->>> becomes simpler. Esp when it shifts, and not avoid, the additional
->>> code (to support the client) onto the provider side.
->>>
->>
->> It doesn't tie the data format with particular mailbox controller.
->> send_data has void *data and the interpretation is controller specific.
->> send_signal on the other handle can implemented by the controllers which
->> knows how and can trigger the specific signal to the remote.
->>
-> Yeah that's what I said - you want to make a client simpler by pushing
-> the code requirement onto the provider side.
-> 
+yes it does.
 
-No, I want to support generic case of mailbox doorbell instead of
-creating another unnecessary abstraction layer
-> For example, you mean we modify the provider rockchip-mailbox.c by implementing
-> 
-> rockchip_send_signal(chan)
-> {
->   struct rockchip_mbox_msg msg;
-> 
->   msg.cmd = chan->idx;  //only one command supported by the channel !!!
+I think we agree that package ID has a HW/architectural meaning on x86,
+it has none on PPTT (ie it totally depends on how PPTT is enumerated).
 
-Yes, it's just a doorbell. That actual data is transmitted or shared
-elsewhere. This doorbell is a signal to the remote to examine that,
+That's the first remark. So, if the package flag is used to group CPUs
+and provide the topology package hierarchy to the kernel/userspace fine,
+if it is to be used to provide scheduler/userspace with an ID that can
+identify a HW "component" of sorts it is not fine because the topology
+package ID is a SW construction on ARM systems relying on PPTT
+(and DT - by the way).
 
->   msg.rx_size = 0;
-> 
->   rockchip_send_data(chan, (void*) &msg);
-> }
-> 
-> whereas I suggest this SCMI specific code should be part of
-> transport/mapping shim layer of SCMI.
-> 
+So, to group CPUs and call them a package, fine by me (with a hope
+FW developers won't play too much with that package flag to make
+things work but use it consistenly instead).
 
-Yes that's what I did with abstraction and few think including me that
-it's unnecessary abstraction for such a generic use.
+Having said that, all I asked is that, given that we _know_ (thanks
+to the PPTT flag) the package boundary, let's use it to initialize
+the topology package level and that's where this patch series should
+stop IMHO.
 
--- 
-Regards,
-Sudeep
+For the time being, I see no point in adding another arbitrary topology
+level (ie COD) with no architectural meaning, as I said, this is vague
+enough already and there is legacy (and DT systems) to take into account
+too.
+
+Thanks,
+Lorenzo
