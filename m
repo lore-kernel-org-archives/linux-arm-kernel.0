@@ -1,59 +1,28 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 2 Nov 2017 16:50:03 +0100
-Subject: [linux-sunxi] Re: [PATCH] ARM: sun8i: h2+: add support for
- Banana Pi M2 Zero board
-In-Reply-To: <8327eaeaa12b99f9962a53c9f02ddd6d@aosc.io>
-References: <20171101093814.19177-1-icenowy@aosc.io>
- <20171102090248.wnvj7dpphn5uqsut@flea>
- <8327eaeaa12b99f9962a53c9f02ddd6d@aosc.io>
-Message-ID: <20171102155003.vp7uve4ypyn4sb6j@flea>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Thu, 2 Nov 2017 08:56:53 -0700
+Subject: [GIT PULL 3/3] Keystone SOC update for 4.15
+In-Reply-To: <CAK8P3a2Sc9HKgf2-ggZ-XtWefseGOuf0h8vxaVYovOJY39gSXw@mail.gmail.com>
+References: <1508548966-7350-1-git-send-email-santosh.shilimkar@oracle.com>
+ <1508548966-7350-3-git-send-email-santosh.shilimkar@oracle.com>
+ <CAK8P3a2Sc9HKgf2-ggZ-XtWefseGOuf0h8vxaVYovOJY39gSXw@mail.gmail.com>
+Message-ID: <f6b1b603-c6c8-0504-70ef-ddb05ebfe6f0@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 02, 2017 at 05:07:30PM +0800, Icenowy Zheng wrote:
-> > > +&mmc0 {
-> > > +	pinctrl-names = "default";
-> > > +	pinctrl-0 = <&mmc0_pins_a>;
-> > > +	vmmc-supply = <&reg_vcc3v3>;
-> > > +	bus-width = <4>;
-> > > +	/*
-> > > +	 * In different revisions the board have different card detect
-> > > +	 * configuration.
-> > > +	 */
-> > 
-> > Which ones?
+On 11/2/2017 8:24 AM, Arnd Bergmann wrote:
+> On Sat, Oct 21, 2017 at 3:22 AM, Santosh Shilimkar
+> <santosh.shilimkar@oracle.com> wrote:
+>> Keystone SOC for 4.15
+>>
 > 
-> In the sample batch (1.2V fixed voltage) the card detect is normal
-> (PF6 low as inserted), however in the final batch (1.1V/1.3V
-> switchable) it's inverted at PF6 (high as inserted).
+> I would prefer a real changelog text, even for a simple bugfix, e.g. you could
+> say "Just one simple bugfix" ;-)
+>
+:-) Will do in future
 
-Then just use the final version's.
-
-> > > +&usbphy {
-> > > +	usb0_id_det-gpios = <&r_pio 0 6 GPIO_ACTIVE_HIGH>; /* PL6 */
-> > > +	/* USB OTG VBUS is directly connected to 5V without any regulators
-> > > */
-> > 
-> > So it cannot operate in OTG, but it's host only?
+> Pulled into next/drivers, thanks!
 > 
-> It can operate in OTG -- you can power the board via the OTG port,
-> as the VBUS is not gated from 5V at all, so 5V power at VBUS will
-> power up the board. Yes, it's a bit unsafe, but the board designer
-> did it.
+Thanks !!
 
-What will provide the 5v in the first place then if a USB device is
-connected to the micro-USB connector?
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171102/911f8b0e/attachment-0001.sig>
+Regards,
+Santosh
