@@ -1,224 +1,106 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Thu, 2 Nov 2017 18:11:05 +0000
-Subject: [PATCH V3 05/11] clk: sprd: add mux clock support
-In-Reply-To: <20171102065626.21835-6-chunyan.zhang@spreadtrum.com>
-References: <20171102065626.21835-1-chunyan.zhang@spreadtrum.com>
- <20171102065626.21835-6-chunyan.zhang@spreadtrum.com>
-Message-ID: <532aed43-03bf-ea26-bdc2-d7deb1093f53@arm.com>
+From: sebastien.bourdelin@savoirfairelinux.com (Sebastien Bourdelin)
+Date: Thu,  2 Nov 2017 14:17:12 -0400
+Subject: [PATCH v7 1/2] dt-bindings: bus: Add documentation for the
+ Technologic Systems NBUS
+In-Reply-To: <20171102181713.8076-1-sebastien.bourdelin@savoirfairelinux.com>
+References: <20171102181713.8076-1-sebastien.bourdelin@savoirfairelinux.com>
+Message-ID: <20171102181713.8076-2-sebastien.bourdelin@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add binding documentation for the Technologic Systems NBUS that is used
+to interface with peripherals in the FPGA of the TS-4600 SoM.
 
-On 02/11/17 06:56, Chunyan Zhang wrote:
-> This patch adds clock multiplexor support for Spreadtrum platforms,
-> the mux clocks also can be found in sprd composite clocks, so
-> provides two helpers that can be reused later on.
-> 
-> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
-> ---
->   drivers/clk/sprd/Makefile |  1 +
->   drivers/clk/sprd/mux.c    | 89 +++++++++++++++++++++++++++++++++++++++++++++++
->   drivers/clk/sprd/mux.h    | 65 ++++++++++++++++++++++++++++++++++
->   3 files changed, 155 insertions(+)
->   create mode 100644 drivers/clk/sprd/mux.c
->   create mode 100644 drivers/clk/sprd/mux.h
-> 
-> diff --git a/drivers/clk/sprd/Makefile b/drivers/clk/sprd/Makefile
-> index 8cd5592..cee36b5 100644
-> --- a/drivers/clk/sprd/Makefile
-> +++ b/drivers/clk/sprd/Makefile
-> @@ -2,3 +2,4 @@ obj-$(CONFIG_SPRD_COMMON_CLK)	+= clk-sprd.o
->   
->   clk-sprd-y	+= common.o
->   clk-sprd-y	+= gate.o
-> +clk-sprd-y	+= mux.o
-> diff --git a/drivers/clk/sprd/mux.c b/drivers/clk/sprd/mux.c
-> new file mode 100644
-> index 0000000..5a344e0
-> --- /dev/null
-> +++ b/drivers/clk/sprd/mux.c
-> @@ -0,0 +1,89 @@
-> +/*
-> + * Spreadtrum multiplexer clock driver
-> + *
-> + * Copyright (C) 2017 Spreadtrum, Inc.
-> + * Author: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
-> + *
-> + * SPDX-License-Identifier: GPL-2.0
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/clk-provider.h>
-> +#include <linux/regmap.h>
-> +
-> +#include "mux.h"
-> +
-> +DEFINE_SPINLOCK(sprd_mux_lock);
-> +EXPORT_SYMBOL_GPL(sprd_mux_lock);
-> +
-> +u8 sprd_mux_helper_get_parent(const struct sprd_clk_common *common,
-> +			      const struct sprd_mux_internal *mux)
-> +{
-> +	unsigned int reg;
-> +	u8 parent;
-> +	int num_parents;
-> +	int i;
-> +
-> +	sprd_regmap_read(common->regmap, common->reg, &reg);
-> +	parent = reg >> mux->shift;
-> +	parent &= (1 << mux->width) - 1;
-> +
-> +	if (mux->table) {
-> +		num_parents = clk_hw_get_num_parents(&common->hw);
-> +
-> +		for (i = 0; i < num_parents; i++)
-> +			if (parent == mux->table[i] ||
-> +			    (i < (num_parents - 1) && parent > mux->table[i] &&
-> +			     parent < mux->table[i + 1]))
-> +				return i;
-> +		if (i == num_parents)
-> +			return i - 1;
+Signed-off-by: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+Changes v6 -> v7:
+  - rebase on master
+  - add missing ack from Rob Herring on v4 (no changes done since)
 
-The if branch is not necessary since you only get there when the loop 
-has finished, so the condition is always true. And the loop can be 
-simplified to:
+Changes v5 -> v6:
+  - rebase on master
+  - split the previous patch series into series by subsystem
+  - add ack by Linus Walleij
 
-for (i = 0; i < num_parents - 1; i++)
-	if (parent >= mux->table[i] &&  parent < mux->table[i + 1])
-		return i;
+Changes v4 -> v5:
+  - fix missing signed off
 
-return num_parents;
+Changes v3 -> v4:
+  - rebase on master
+  - fix vendor prefixes for dts properties (suggested by Rob Herring)
+  - v3 was acked by Linus Walleij
 
+Changes v2 -> v3:
+  - rebase on master
+  - fix typo (suggested by Rob Herring)
 
-> +	}
-> +
-> +	return parent;
-> +}
-> +EXPORT_SYMBOL_GPL(sprd_mux_helper_get_parent);
-> +
-> +static u8 sprd_mux_get_parent(struct clk_hw *hw)
-> +{
-> +	struct sprd_mux *cm = hw_to_sprd_mux(hw);
-> +
-> +	return sprd_mux_helper_get_parent(&cm->common, &cm->mux);
-> +}
-> +
-> +int sprd_mux_helper_set_parent(const struct sprd_clk_common *common,
-> +			       const struct sprd_mux_internal *mux,
-> +			       u8 index)
-> +{
-> +	unsigned long flags = 0;
-> +	unsigned int reg;
-> +
-> +	if (mux->table)
-> +		index = mux->table[index];
-> +
-> +	spin_lock_irqsave(common->lock, flags);
-> +
-> +	sprd_regmap_read(common->regmap, common->reg, &reg);
-> +	reg &= ~GENMASK(mux->width + mux->shift - 1, mux->shift);
-> +	sprd_regmap_write(common->regmap, common->reg,
-> +			  reg | (index << mux->shift));
-> +
-> +	spin_unlock_irqrestore(common->lock, flags);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(sprd_mux_helper_set_parent);
-> +
-> +static int sprd_mux_set_parent(struct clk_hw *hw, u8 index)
-> +{
-> +	struct sprd_mux *cm = hw_to_sprd_mux(hw);
-> +
-> +	return sprd_mux_helper_set_parent(&cm->common, &cm->mux, index);
-> +}
-> +
-> +const struct clk_ops sprd_mux_ops = {
-> +	.get_parent = sprd_mux_get_parent,
-> +	.set_parent = sprd_mux_set_parent,
-> +	.determine_rate = __clk_mux_determine_rate,
-> +};
-> +EXPORT_SYMBOL_GPL(sprd_mux_ops);
+Changes v1 -> v2:
+  - rebase on master
+  - remove the simple-bus compatibility as the root node will now
+  populate child nodes (suggested by Rob Herring)
+  - use the ts vendor prefix for gpios (suggested by Rob Herring)
+---
+ Documentation/devicetree/bindings/bus/ts-nbus.txt | 50 +++++++++++++++++++++++
+ 1 file changed, 50 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/bus/ts-nbus.txt
 
-Same as with the other patch, I'd recommend have one set of ops for 
-direct mux and another one for a mux using a table to map the parents. 
-Keeping functions for both modes separate.
-
-Cheers,
-
-> diff --git a/drivers/clk/sprd/mux.h b/drivers/clk/sprd/mux.h
-> new file mode 100644
-> index 0000000..148ca8c
-> --- /dev/null
-> +++ b/drivers/clk/sprd/mux.h
-> @@ -0,0 +1,65 @@
-> +/*
-> + * Spreadtrum multiplexer clock driver
-> + *
-> + * Copyright (C) 2017 Spreadtrum, Inc.
-> + * Author: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
-> + *
-> + * SPDX-License-Identifier: GPL-2.0
-> + */
-> +
-> +#ifndef _SPRD_MUX_H_
-> +#define _SPRD_MUX_H_
-> +
-> +#include "common.h"
-> +
-> +struct sprd_mux_internal {
-> +	u8		shift;
-> +	u8		width;
-> +	const u8	*table;
-> +};
-> +
-> +struct sprd_mux {
-> +	struct sprd_mux_internal mux;
-> +	struct sprd_clk_common	common;
-> +};
-> +
-> +#define _SPRD_MUX_CLK(_shift, _width, _table)		\
-> +	{						\
-> +		.shift	= _shift,			\
-> +		.width	= _width,			\
-> +		.table	= _table,			\
-> +	}
-> +
-> +#define SPRD_MUX_CLK(_struct, _name, _parents, _table,			\
-> +				     _reg, _shift, _width,		\
-> +				     _flags)				\
-> +	struct sprd_mux _struct = {					\
-> +		.mux	= _SPRD_MUX_CLK(_shift, _width, _table),	\
-> +		.common	= {						\
-> +			.regmap		= NULL,				\
-> +			.reg		= _reg,				\
-> +			.lock		= &sprd_mux_lock,		\
-> +			.hw.init = CLK_HW_INIT_PARENTS(_name,		\
-> +						       _parents,	\
-> +						       &sprd_mux_ops,	\
-> +						       _flags),		\
-> +		}							\
-> +	}
-> +
-> +static inline struct sprd_mux *hw_to_sprd_mux(const struct clk_hw *hw)
-> +{
-> +	struct sprd_clk_common *common = hw_to_sprd_clk_common(hw);
-> +
-> +	return container_of(common, struct sprd_mux, common);
-> +}
-> +
-> +extern const struct clk_ops sprd_mux_ops;
-> +extern spinlock_t sprd_mux_lock;
-> +
-> +u8 sprd_mux_helper_get_parent(const struct sprd_clk_common *common,
-> +			      const struct sprd_mux_internal *mux);
-> +int sprd_mux_helper_set_parent(const struct sprd_clk_common *common,
-> +			       const struct sprd_mux_internal *mux,
-> +			       u8 index);
-> +
-> +#endif /* _SPRD_MUX_H_ */
-> 
-
+diff --git a/Documentation/devicetree/bindings/bus/ts-nbus.txt b/Documentation/devicetree/bindings/bus/ts-nbus.txt
+new file mode 100644
+index 000000000000..2a10d065b9fa
+--- /dev/null
++++ b/Documentation/devicetree/bindings/bus/ts-nbus.txt
+@@ -0,0 +1,50 @@
++Technologic Systems NBUS
++
++The NBUS is a bus used to interface with peripherals in the Technologic
++Systems FPGA on the TS-4600 SoM.
++
++Required properties :
++ - compatible		: "technologic,ts-nbus"
++ - #address-cells	: must be 1
++ - #size-cells		: must be 0
++ - pwms			: The PWM bound to the FPGA
++ - ts,data-gpios	: The 8 GPIO pins connected to the data lines on the FPGA
++ - ts,csn-gpios		: The GPIO pin connected to the csn line on the FPGA
++ - ts,txrx-gpios	: The GPIO pin connected to the txrx line on the FPGA
++ - ts,strobe-gpios	: The GPIO pin connected to the stobe line on the FPGA
++ - ts,ale-gpios		: The GPIO pin connected to the ale line on the FPGA
++ - ts,rdy-gpios		: The GPIO pin connected to the rdy line on the FPGA
++
++Child nodes:
++
++The NBUS node can contain zero or more child nodes representing peripherals
++on the bus.
++
++Example:
++
++	nbus {
++		compatible = "technologic,ts-nbus";
++		pinctrl-0 = <&nbus_pins>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		pwms = <&pwm 2 83>;
++		ts,data-gpios   = <&gpio0 0 GPIO_ACTIVE_HIGH
++				   &gpio0 1 GPIO_ACTIVE_HIGH
++				   &gpio0 2 GPIO_ACTIVE_HIGH
++				   &gpio0 3 GPIO_ACTIVE_HIGH
++				   &gpio0 4 GPIO_ACTIVE_HIGH
++				   &gpio0 5 GPIO_ACTIVE_HIGH
++				   &gpio0 6 GPIO_ACTIVE_HIGH
++				   &gpio0 7 GPIO_ACTIVE_HIGH>;
++		ts,csn-gpios    = <&gpio0 16 GPIO_ACTIVE_HIGH>;
++		ts,txrx-gpios   = <&gpio0 24 GPIO_ACTIVE_HIGH>;
++		ts,strobe-gpios = <&gpio0 25 GPIO_ACTIVE_HIGH>;
++		ts,ale-gpios    = <&gpio0 26 GPIO_ACTIVE_HIGH>;
++		ts,rdy-gpios    = <&gpio0 21 GPIO_ACTIVE_HIGH>;
++
++		watchdog at 2a {
++			compatible = "...";
++
++			/* ... */
++		};
++	};
 -- 
-Julien Thierry
+2.15.0
