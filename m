@@ -1,144 +1,61 @@
 From: james.morse@arm.com (James Morse)
-Date: Thu,  2 Nov 2017 12:12:40 +0000
-Subject: [RESEND PATCH v4 7/9] arm64: entry.S convert el0_sync
-In-Reply-To: <20171102121242.8925-1-james.morse@arm.com>
-References: <20171102121242.8925-1-james.morse@arm.com>
-Message-ID: <20171102121242.8925-8-james.morse@arm.com>
+Date: Thu, 02 Nov 2017 12:14:28 +0000
+Subject: [PATCH v4 09/21] KVM: arm/arm64: mask/unmask daif around VHE
+ guests
+In-Reply-To: <20171030074019.GS2166@lvm>
+References: <20171019145807.23251-1-james.morse@arm.com>
+ <20171019145807.23251-10-james.morse@arm.com> <20171030074019.GS2166@lvm>
+Message-ID: <59FB0C24.7080503@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-el0_sync also unmasks exceptions on a case-by-case basis, debug exceptions
-are enabled, unless this was a debug exception. Irqs are unmasked for
-some exception types but not for others.
+Hi Christoffer,
 
-el0_dbg should run with everything masked to prevent us taking a debug
-exception from do_debug_exception. For the other cases we can unmask
-everything. This changes the behaviour of fpsimd_{acc,exc} and el0_inv
-which previously ran with irqs masked.
+On 30/10/17 07:40, Christoffer Dall wrote:
+> On Thu, Oct 19, 2017 at 03:57:55PM +0100, James Morse wrote:
+>> Non-VHE systems take an exception to EL2 in order to world-switch into the
+>> guest. When returning from the guest KVM implicitly restores the DAIF
+>> flags when it returns to the kernel at EL1.
+>>
+>> With VHE none of this exception-level jumping happens, so KVMs
+>> world-switch code is exposed to the host kernel's DAIF values, and KVM
+>> spills the guest-exit DAIF values back into the host kernel.
+>> On entry to a guest we have Debug and SError exceptions unmasked, KVM
+>> has switched VBAR but isn't prepared to handle these. On guest exit
+>> Debug exceptions are left disabled once we return to the host and will
+>> stay this way until we enter user space.
+>>
+>> Add a helper to mask/unmask DAIF around VHE guests. The unmask can only
+>> happen after the hosts VBAR value has been synchronised by the isb in
+>> __vhe_hyp_call (via kvm_call_hyp()). Masking could be as late as
+>> setting KVMs VBAR value, but is kept here for symmetry.
 
-This patch removed the last user of enable_dbg_and_irq, remove it.
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-Signed-off-by: James Morse <james.morse@arm.com>
-Reviewed-by: Julien Thierry <julien.thierry@arm.com>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/include/asm/assembler.h |  9 ---------
- arch/arm64/kernel/entry.S          | 24 ++++++++++--------------
- 2 files changed, 10 insertions(+), 23 deletions(-)
+Thanks!
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index abb5abd61ddb..c2a37e2f733c 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -96,15 +96,6 @@
- 9990:
- 	.endm
- 
--/*
-- * Enable both debug exceptions and interrupts. This is likely to be
-- * faster than two daifclr operations, since writes to this register
-- * are self-synchronising.
-- */
--	.macro	enable_dbg_and_irq
--	msr	daifclr, #(8 | 2)
--	.endm
--
- /*
-  * SMP data memory barrier
-  */
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index bd54115972a4..f7dfe5d2b1fb 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -670,8 +670,7 @@ el0_da:
- 	 * Data abort handling
- 	 */
- 	mrs	x26, far_el1
--	// enable interrupts before calling the main handler
--	enable_dbg_and_irq
-+	enable_daif
- 	ct_user_exit
- 	clear_address_tag x0, x26
- 	mov	x1, x25
-@@ -683,8 +682,7 @@ el0_ia:
- 	 * Instruction abort handling
- 	 */
- 	mrs	x26, far_el1
--	// enable interrupts before calling the main handler
--	enable_dbg_and_irq
-+	enable_daif
- 	ct_user_exit
- 	mov	x0, x26
- 	mov	x1, x25
-@@ -695,7 +693,7 @@ el0_fpsimd_acc:
- 	/*
- 	 * Floating Point or Advanced SIMD access
- 	 */
--	enable_dbg
-+	enable_daif
- 	ct_user_exit
- 	mov	x0, x25
- 	mov	x1, sp
-@@ -705,7 +703,7 @@ el0_fpsimd_exc:
- 	/*
- 	 * Floating Point or Advanced SIMD exception
- 	 */
--	enable_dbg
-+	enable_daif
- 	ct_user_exit
- 	mov	x0, x25
- 	mov	x1, sp
-@@ -716,8 +714,7 @@ el0_sp_pc:
- 	 * Stack or PC alignment exception handling
- 	 */
- 	mrs	x26, far_el1
--	// enable interrupts before calling the main handler
--	enable_dbg_and_irq
-+	enable_daif
- 	ct_user_exit
- 	mov	x0, x26
- 	mov	x1, x25
-@@ -728,8 +725,7 @@ el0_undef:
- 	/*
- 	 * Undefined instruction
- 	 */
--	// enable interrupts before calling the main handler
--	enable_dbg_and_irq
-+	enable_daif
- 	ct_user_exit
- 	mov	x0, sp
- 	bl	do_undefinstr
-@@ -738,7 +734,7 @@ el0_sys:
- 	/*
- 	 * System instructions, for trapped cache maintenance instructions
- 	 */
--	enable_dbg_and_irq
-+	enable_daif
- 	ct_user_exit
- 	mov	x0, x25
- 	mov	x1, sp
-@@ -753,11 +749,11 @@ el0_dbg:
- 	mov	x1, x25
- 	mov	x2, sp
- 	bl	do_debug_exception
--	enable_dbg
-+	enable_daif
- 	ct_user_exit
- 	b	ret_to_user
- el0_inv:
--	enable_dbg
-+	enable_daif
- 	ct_user_exit
- 	mov	x0, sp
- 	mov	x1, #BAD_SYNC
-@@ -836,7 +832,7 @@ el0_svc:
- 	mov	wsc_nr, #__NR_syscalls
- el0_svc_naked:					// compat entry point
- 	stp	x0, xscno, [sp, #S_ORIG_X0]	// save the original x0 and syscall number
--	enable_dbg_and_irq
-+	enable_daif
- 	ct_user_exit 1
- 
- 	ldr	x16, [tsk, #TSK_TI_FLAGS]	// check for syscall hooks
--- 
-2.15.0.rc2
+
+>> ---
+>> Give me a kick if you want this reworked as a fix (which will then
+>> conflict with this series), or a backportable version.
+> 
+> I don't know of any real-world issues where some more graceful handling
+> of SErrors would make sense on older kernels, so I'm fine with just
+> merging this together with this series.
+
+What about debug?
+> On guest exit Debug exceptions are left disabled once we return to the host
+> and will stay this way until we enter user space.
+
+Today VHE:KVM causes the kernel to run with SError unmasked and debug disabled
+until the next return to user-space, whereas previously the kernel expected
+SError to be masked and debug enabled.
+
+
+(Reposting just the SError rework without this patch changes the kernel to
+expect SError to be unmasked, which isn't making this any worse.)
+
+
+Thanks,
+
+James
