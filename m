@@ -1,62 +1,37 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 2 Nov 2017 13:40:22 -0600
-Subject: [PATCH 10/17] coresight: etr: Track if the device is coherent
-In-Reply-To: <20171019171553.24056-11-suzuki.poulose@arm.com>
-References: <20171019171553.24056-1-suzuki.poulose@arm.com>
- <20171019171553.24056-11-suzuki.poulose@arm.com>
-Message-ID: <20171102194022.GC23320@xps15>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu,  2 Nov 2017 12:55:33 -0700
+Subject: [GIT PULL] two omap regression fixes
+Message-ID: <pull-1509652473-291160@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 19, 2017 at 06:15:46PM +0100, Suzuki K Poulose wrote:
-> Track if the ETR is dma-coherent or not. This will be useful
-> in deciding if we should use software buffering for perf.
-> 
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  drivers/hwtracing/coresight/coresight-tmc.c | 5 ++++-
->  drivers/hwtracing/coresight/coresight-tmc.h | 1 +
->  2 files changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-> index 4939333cc6c7..5a8c41130f96 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc.c
-> @@ -347,6 +347,9 @@ static int tmc_etr_setup_caps(struct tmc_drvdata *drvdata,
->  	if (!(devid & TMC_DEVID_NOSCAT))
->  		tmc_etr_set_cap(drvdata, TMC_ETR_SG);
->  
-> +	if (device_get_dma_attr(drvdata->dev) == DEV_DMA_COHERENT)
-> +		tmc_etr_set_cap(drvdata, TMC_ETR_COHERENT);
-> +
->  	/* Check if the AXI address width is available */
->  	if (devid & TMC_DEVID_AXIAW_VALID)
->  		dma_mask = ((devid >> TMC_DEVID_AXIAW_SHIFT) &
-> @@ -397,7 +400,7 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
->  	if (!drvdata)
->  		goto out;
->  
-> -	drvdata->dev = &adev->dev;
-> +	drvdata->dev = dev;
+From: "Tony Lindgren" <tony@atomide.com>
 
-What is that one for?
+The following changes since commit 4afa616ce937f88d9a69a71b8c561551596a81e3:
 
->  	dev_set_drvdata(dev, drvdata);
->  
->  	/* Validity for the resource is already checked by the AMBA core */
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
-> index 50ebc17c4645..69da0b584a6b 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc.h
-> +++ b/drivers/hwtracing/coresight/coresight-tmc.h
-> @@ -131,6 +131,7 @@ enum tmc_mem_intf_width {
->   * so we have to rely on PID of the IP to detect the functionality.
->   */
->  #define TMC_ETR_SAVE_RESTORE		(0x1U << 2)
-> +#define TMC_ETR_COHERENT		(0x1U << 3)
->  
->  /* Coresight SoC-600 TMC-ETR unadvertised capabilities */
->  #define CORESIGHT_SOC_600_ETR_CAPS	\
-> -- 
-> 2.13.6
-> 
+  ARM: dts: am43xx-epos-evm: Remove extra CPSW EMAC entry (2017-09-19 10:59:26 -0700)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.14/fixes-rc7-signed
+
+for you to fetch changes up to 6301d58477bc11116c78c9542871f27ae374278d:
+
+  ARM: OMAP2/3: CM: fix cm_split_idlest functionality (2017-10-30 09:14:55 -0700)
+
+----------------------------------------------------------------
+Two regression fixes for omap3 to fix mmc3 issues noticed on nokia n9.
+
+These have been broken for a few months and we don't have the LCD yet
+functional on n9. So these can wait for the merge window if considered
+too late for the -rc cycle at this point.
+
+----------------------------------------------------------------
+Tero Kristo (2):
+      ARM: OMAP3: hwmod_data: add missing module_offs for MMC3
+      ARM: OMAP2/3: CM: fix cm_split_idlest functionality
+
+ arch/arm/mach-omap2/cm_common.c            | 6 +++++-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | 1 +
+ arch/arm/mach-omap2/prcm-common.h          | 1 +
+ 3 files changed, 7 insertions(+), 1 deletion(-)
