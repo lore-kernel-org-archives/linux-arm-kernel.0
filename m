@@ -1,108 +1,81 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 2 Nov 2017 08:40:16 -0600
-Subject: [PATCH 06/17] coresight: tmc: Make ETR SG table circular
-In-Reply-To: <db0a9a62-e2b5-6895-f7b9-42989d3d56e2@arm.com>
-References: <20171019171553.24056-1-suzuki.poulose@arm.com>
- <20171019171553.24056-7-suzuki.poulose@arm.com> <20171101234717.GA16611@xps15>
- <db0a9a62-e2b5-6895-f7b9-42989d3d56e2@arm.com>
-Message-ID: <CANLsYkwKgCEQ5QXLR2ERqrL5JdCbgS1rwJfWLQD8XGmaH+O9Fw@mail.gmail.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 2 Nov 2017 20:22:14 +0530
+Subject: [PATCH] mailbox: add support for doorbell/signal mode controllers
+In-Reply-To: <0a08fa09-864c-00e0-34f3-9c6f6b8fc036@arm.com>
+References: <1509553964-4451-1-git-send-email-sudeep.holla@arm.com>
+ <CABb+yY1tcm-68E5oG75hstuMd6AOeb=BB6HeKGnQ1zj4Qya6hg@mail.gmail.com>
+ <59a05fcb-ff30-0683-144e-93521a7413f9@arm.com>
+ <CABb+yY16-B9vReRjLopV1RsyB8a=c5X9XaomtTj44520XrDdmA@mail.gmail.com>
+ <4268c9d9-dc1e-0bd7-3fac-790c2d42b54b@arm.com>
+ <CABb+yY3Gd3u-_xNPSqJT_+yVHGMs7pgt3Bc4faGvN2KwOsm6_w@mail.gmail.com>
+ <5af1c28f-50db-9f5a-2c60-71cacab4a3ab@arm.com>
+ <CABb+yY11a3y8A8NGUXED8qzg0aS_ikMK-EvB3yG31kP5pewNNw@mail.gmail.com>
+ <0a08fa09-864c-00e0-34f3-9c6f6b8fc036@arm.com>
+Message-ID: <CABb+yY1XMCVP7pisXYES15HtsLWgaP_av54UPyKZmTTPWBMNaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 November 2017 at 06:00, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
-> On 01/11/17 23:47, Mathieu Poirier wrote:
+On Thu, Nov 2, 2017 at 6:07 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> On 02/11/17 12:21, Jassi Brar wrote:
+>> On Thu, Nov 2, 2017 at 5:19 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>> On 02/11/17 11:26, Jassi Brar wrote:
 >>
->> On Thu, Oct 19, 2017 at 06:15:42PM +0100, Suzuki K Poulose wrote:
+>>>>>> 1) Where does the  "whatever_value_to_trigger_signal"  come from?
+>>>>>
+>>>>> Controller specific.
+>>>>>
+>>>>>> That has to come from client.
+>>>>>
+>>>>> No.
+>>>>>
+>>>> Again, let me know what does the controller expect 'val' to be
+>>>>
+>>>>   writel(val, MAILBOX_A2B_CMD(chans->idx))
+>>>>
 >>>
->>> Make the ETR SG table Circular buffer so that we could start
->>> at any of the SG pages and use the entire buffer for tracing.
->>> This can be achieved by :
+>>> It depends on the controller. Whatever value that can generate a signal
+>>> to remote.
 >>>
->>> 1) Keeping an additional LINK pointer at the very end of the
->>> SG table, i.e, after the LAST buffer entry, to point back to
->>> the beginning of the first table. This will allow us to use
->>> the buffer normally when we start the trace at offset 0 of
->>> the buffer, as the LAST buffer entry hints the TMC-ETR and
->>> it automatically wraps to the offset 0.
->>>
->>> 2) If we want to start at any other ETR SG page aligned offset,
->>> we could :
->>>   a) Make the preceding page entry as LAST entry.
->>>   b) Make the original LAST entry a normal entry.
->>>   c) Use the table pointer to the "new" start offset as the
->>>      base of the table address.
->>> This works as the TMC doesn't mandate that the page table
->>> base address should be 4K page aligned.
->>>
->>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
->>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->>> ---
->
->
->>> +static int __maybe_unused
->>> +tmc_etr_sg_table_rotate(struct etr_sg_table *etr_table, u64 base_offset)
->>> +{
->>> +       u32 last_entry, first_entry;
->>> +       u64 last_offset;
->>> +       struct tmc_sg_table *sg_table = etr_table->sg_table;
->>> +       sgte_t *table_ptr = sg_table->table_vaddr;
->>> +       ssize_t buf_size = tmc_sg_table_buf_size(sg_table);
->>> +
->>> +       /* Offset should always be SG PAGE_SIZE aligned */
->>> +       if (base_offset & (ETR_SG_PAGE_SIZE - 1)) {
->>> +               pr_debug("unaligned base offset %llx\n", base_offset);
->>> +               return -EINVAL;
->>> +       }
->>> +       /* Make sure the offset is within the range */
->>> +       if (base_offset < 0 || base_offset > buf_size) {
->>> +               base_offset = (base_offset + buf_size) % buf_size;
->>> +               pr_debug("Resetting offset to %llx\n", base_offset);
->>> +       }
->>> +       first_entry = tmc_etr_sg_offset_to_table_index(base_offset);
->>> +       if (first_entry == etr_table->first_entry) {
->>> +               pr_debug("Head is already at %llx, skipping\n",
->>> base_offset);
->>> +               return 0;
->>> +       }
->>> +
->>> +       /* Last entry should be the previous one to the new "base" */
->>> +       last_offset = ((base_offset - ETR_SG_PAGE_SIZE) + buf_size) %
->>> buf_size;
->>> +       last_entry = tmc_etr_sg_offset_to_table_index(last_offset);
->>> +
->>> +       /* Reset the current Last page to Normal and new Last page to
->>> NORMAL */
->>> +       tmc_etr_sg_update_type(&table_ptr[etr_table->last_entry],
->>> +                                ETR_SG_ET_NORMAL);
->>> +       tmc_etr_sg_update_type(&table_ptr[last_entry], ETR_SG_ET_LAST);
->>> +       etr_table->hwaddr = tmc_etr_sg_table_index_to_daddr(sg_table,
->>> +                                                           first_entry);
->>> +       etr_table->first_entry = first_entry;
->>> +       etr_table->last_entry = last_entry;
->>> +       pr_debug("table rotated to offset %llx-%llx, entries (%d - %d),
->>> dba: %llx\n",
->>> +                       base_offset, last_offset, first_entry,
->>> last_entry,
->>> +                       etr_table->hwaddr);
+>> As you _know_, the controller expects any non-zero value. Now what
+>> value would you write in there?
 >>
+>
+> I just said its *non-zero value* to give example. What action needs to
+> be done to trigger the doorbell is *entirely* controller specific and
+> typically it's a bit in the register.
+>
+Please read the above full context and see how you wasted 4 posts just
+because you had to refute my any explanation.
+
+>>>
+>>> 1. pcc_send_data (drivers/mailbox/pcc.c)
+>>> 2. sti_mbox_send_data (drivers/mailbox/mailbox-sti.c)
+>>> 3. qcom_apcs_ipc_send_data (drivers/mailbox/qcom-apcs-ipc-mailbox.c)
+>>> 4. tegra_hsp_doorbell_send_data (drivers/mailbox/tegra-hsp.c)
+>>>
+>>> And SCMI fits the above case.
+>>>
+>> These are only 4 out of 14. Can we overlook that your implementation
+>> rules out 70% controllers.
 >>
->> The above line generates a warning when compiling for ARMv7.
 >
+> I am *not* saying we will break other 10 controllers. All I am says
+> there are 4 controllers that can make use of this new feature. 4 is good
+> number IMO to generalize something.
 >
-> Where you running with LPAE off ? That could probably be the case,
-> where hwaddr could be 32bit or 64bit depending on whether LPAE
-> is enabled. I will fix it.
+If all you want to support is these 4 controllers why mess with the api?!
 
-My original setup did not have LPAE configured but even when I do
-configure it I can generate the warnings.
+These 4 controllers don't use the data pointer, just use the existing
+API as such
+  mbox_send_message(chan, NULL);
 
-Compiler:
 
-arm-linux-gnueabi-gcc (Ubuntu/Linaro 5.4.0-6ubuntu1~16.04.4) 5.4.0 20160609
-
-Let me know if you want my .config file.
-
+>> BTW these 4 don't even need any send_signal() api, they would remain
+>> unchanged. What's the new api for?
+>>
 >
-> I have fixed some other warnings with ARMv7 with LPAE.
+> Sure, it's working fine doesn't mean it can't be used at all. That's not
+> a right argument TBH.
 >
-> Suzuki
+API real estate is very precious. No redundancy should be added,
+unless absolutely necessary.
