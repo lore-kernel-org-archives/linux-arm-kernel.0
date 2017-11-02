@@ -1,105 +1,50 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 02 Nov 2017 12:18:20 +0000
-Subject: [PATCH v4 20/21] KVM: arm64: Take any host SError before entering
- the guest
-In-Reply-To: <20171101045550.GB11166@lvm>
-References: <20171019145807.23251-1-james.morse@arm.com>
- <20171019145807.23251-21-james.morse@arm.com> <20171031062315.GY2166@lvm>
- <59F861EE.4010505@arm.com> <20171101045550.GB11166@lvm>
-Message-ID: <59FB0D0C.1010208@arm.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 2 Nov 2017 17:51:56 +0530
+Subject: [PATCH] mailbox: add support for doorbell/signal mode controllers
+In-Reply-To: <5af1c28f-50db-9f5a-2c60-71cacab4a3ab@arm.com>
+References: <1509553964-4451-1-git-send-email-sudeep.holla@arm.com>
+ <CABb+yY1tcm-68E5oG75hstuMd6AOeb=BB6HeKGnQ1zj4Qya6hg@mail.gmail.com>
+ <59a05fcb-ff30-0683-144e-93521a7413f9@arm.com>
+ <CABb+yY16-B9vReRjLopV1RsyB8a=c5X9XaomtTj44520XrDdmA@mail.gmail.com>
+ <4268c9d9-dc1e-0bd7-3fac-790c2d42b54b@arm.com>
+ <CABb+yY3Gd3u-_xNPSqJT_+yVHGMs7pgt3Bc4faGvN2KwOsm6_w@mail.gmail.com>
+ <5af1c28f-50db-9f5a-2c60-71cacab4a3ab@arm.com>
+Message-ID: <CABb+yY11a3y8A8NGUXED8qzg0aS_ikMK-EvB3yG31kP5pewNNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+On Thu, Nov 2, 2017 at 5:19 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> On 02/11/17 11:26, Jassi Brar wrote:
 
-On 01/11/17 04:55, Christoffer Dall wrote:
-> On Tue, Oct 31, 2017 at 11:43:42AM +0000, James Morse wrote:
->> On 31/10/17 06:23, Christoffer Dall wrote:
->>> On Thu, Oct 19, 2017 at 03:58:06PM +0100, James Morse wrote:
->>>> On VHE systems KVM masks SError before switching the VBAR value. Any
->>>> host RAS error that the CPU knew about before world-switch may become
->>>> pending as an SError during world-switch, and only be taken once we enter
->>>> the guest.
->>>>
->>>> Until KVM can take RAS SErrors during world switch, add an ESB to
->>>> force any RAS errors to be synchronised and taken on the host before
->>>> we enter world switch.
->>>>
->>>> RAS errors that become pending during world switch are still taken
->>>> once we enter the guest.
->>
->>>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->>>> index cf5d78ba14b5..5dc6f2877762 100644
->>>> --- a/arch/arm64/include/asm/kvm_host.h
->>>> +++ b/arch/arm64/include/asm/kvm_host.h
->>>> @@ -392,6 +392,7 @@ static inline void __cpu_init_stage2(void)
->>>>  
->>>>  static inline void kvm_arm_vhe_guest_enter(void)
->>>>  {
->>>> +	esb();
->>
->>> I don't fully appreciate what the point of this is?
+>>>> 1) Where does the  "whatever_value_to_trigger_signal"  come from?
 >>>
->>> As I understand it, our fundamental goal here is to try to distinguish
->>> between errors happening on the host or in the guest.
+>>> Controller specific.
+>>>
+>>>> That has to come from client.
+>>>
+>>> No.
+>>>
+>> Again, let me know what does the controller expect 'val' to be
 >>
->> Not just host/guest, but also those we can and can't handle.
+>>   writel(val, MAILBOX_A2B_CMD(chans->idx))
 >>
->> KVM can't currently take an SError during world switch, so a RAS error that the
->> CPU was hoping to defer may spread from the host into KVM's
->> no-SError:world-switch code. If this happens it will (almost certainly) have to
->> be re-classified as uncontainable.
->>
->> There is also a firmware-first angle here: NOTIFY_SEI can't be delivered if the
->> normal world has SError masked, so any error that spreads past this point
->> becomes a reboot-by-firmware instead of an OS notification and almost-helpful
->> error message.
->>
->>
->>> If that's correct, then why don't we do it at the last possible moment
->>> when we still have a scratch register left, in the world switch code
->>> itself, and in the case abort the guest entry and report back a "host
->>> SError" return code.
->>
->> We have IESB to run the error-barrier as we enter the guest. This would make any
->> host error pending as an SError, and we would exit the guest immediately. But if
->> there was an RAS error during world switch, by this point its likely to be
->> classified as uncontainable.
->>
->> This esb() is trying to keep this window of code as small as possible, to just
->> errors that occur during world switch.
->>
->> With your vcpu load/save this window becomes a lot smaller, it may be possible
->> to get a VHE-host's arch-code SError handler to take errors from EL2, in which
->> case this barrier can disappear.
->> (note to self: guest may still own the debug hardware)
->>
-> 
-> ok, thanks for your detailed explanation.  I didn't consider that the
-> classification of a RAS error as containable vs. non-containable
-> depended on where we take the exception.
+>
+> It depends on the controller. Whatever value that can generate a signal
+> to remote.
+>
+As you _know_, the controller expects any non-zero value. Now what
+value would you write in there?
 
-Will makes the point over on patch 11 that until we have different handling for
-these different classifications of error, there isn't much point doing this now.
-(i.e. we treat an error generated here, or when we enter the guest in the same way).
+>
+> 1. pcc_send_data (drivers/mailbox/pcc.c)
+> 2. sti_mbox_send_data (drivers/mailbox/mailbox-sti.c)
+> 3. qcom_apcs_ipc_send_data (drivers/mailbox/qcom-apcs-ipc-mailbox.c)
+> 4. tegra_hsp_doorbell_send_data (drivers/mailbox/tegra-hsp.c)
+>
+> And SCMI fits the above case.
+>
+These are only 4 out of 14. Can we overlook that your implementation
+rules out 70% controllers.
 
-I was trying to keep my eye on what we need for kernel-first support, so we
-don't have to change the code twice, we just expand the error handling to do better.
-
-I'll drop this patch for now, it will come back if/when we get kernel-first
-support for RAS.
-
-
-What about firmware-first? Firmware can always take these errors when the normal
-world is running. Dropping the barrier means its up to the CPU when any error
-gets reported, if firmware has to use NOTIFY_SEI it will have to do a reboot if
-the error occurs during world-switch (as SError is masked). If an error spreads
-over this boundary, that's just tough-luck, the kernel would have panic'd anyway.
-
-
-Sorry for the noise,
-
-
-Thanks,
-
-James
+BTW these 4 don't even need any send_signal() api, they would remain
+unchanged. What's the new api for?
