@@ -1,55 +1,118 @@
 From: james.morse@arm.com (James Morse)
-Date: Thu,  2 Nov 2017 12:12:33 +0000
-Subject: [RESEND PATCH v4 0/9] SError rework (- RAS & IESB for firmware first
- support)
-Message-ID: <20171102121242.8925-1-james.morse@arm.com>
+Date: Thu,  2 Nov 2017 12:12:35 +0000
+Subject: [RESEND PATCH v4 2/9] arm64: introduce an order for exceptions
+In-Reply-To: <20171102121242.8925-1-james.morse@arm.com>
+References: <20171102121242.8925-1-james.morse@arm.com>
+Message-ID: <20171102121242.8925-3-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Currently SError is always masked in the kernel. To support RAS exceptions
+using SError on hardware with the v8.2 RAS Extensions we need to unmask
+SError as much as possible.
 
-This is repost of the SError Rework bits of the bigger series [0].
-None of these patches have changed since v3.
+Let's define an order for masking and unmasking exceptions. 'dai' is
+memorable and effectively what we have today.
 
-Thanks,
+Disabling debug exceptions should cause all other exceptions to be masked.
+Masking SError should mask irq, but not disable debug exceptions.
+Masking irqs has no side effects for other flags. Keeping to this order
+makes it easier for entry.S to know which exceptions should be unmasked.
 
-James
+FIQ is never expected, but we mask it when we mask debug exceptions, and
+unmask it at all other times.
 
+Given masking debug exceptions masks everything, we don't need macros
+to save/restore that bit independently. Remove them and switch the last
+caller over to use the daif calls.
 
-[0] https://www.spinics.net/lists/arm-kernel/msg612870.html
+Signed-off-by: James Morse <james.morse@arm.com>
+Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 
+==
+Changes since v3:
+ * Use save_daif version, swapped verb/daif word-order.
+ * tweak last sentence of commit message.
+---
+ arch/arm64/include/asm/irqflags.h  | 34 +++++++++++++---------------------
+ arch/arm64/kernel/debug-monitors.c |  5 +++--
+ 2 files changed, 16 insertions(+), 23 deletions(-)
 
-James Morse (8):
-  arm64: explicitly mask all exceptions
-  arm64: introduce an order for exceptions
-  arm64: Move the async/fiq helpers to explicitly set process context
-    flags
-  arm64: Mask all exceptions during kernel_exit
-  arm64: entry.S: Remove disable_dbg
-  arm64: entry.S: convert el1_sync
-  arm64: entry.S convert el0_sync
-  arm64: entry.S: convert elX_irq
-
-Xie XiuQi (1):
-  arm64: entry.S: move SError handling into a C function for future
-    expansion
-
- arch/arm64/Kconfig                 |  2 +-
- arch/arm64/include/asm/assembler.h | 46 ++++++++++++--------
- arch/arm64/include/asm/daifflags.h | 72 +++++++++++++++++++++++++++++++
- arch/arm64/include/asm/irqflags.h  | 40 ++++++------------
- arch/arm64/kernel/debug-monitors.c |  5 ++-
- arch/arm64/kernel/entry.S          | 86 ++++++++++++++++++++++----------------
- arch/arm64/kernel/hibernate.c      |  5 ++-
- arch/arm64/kernel/machine_kexec.c  |  4 +-
- arch/arm64/kernel/setup.c          |  8 ++--
- arch/arm64/kernel/signal.c         |  8 +++-
- arch/arm64/kernel/smp.c            | 12 ++----
- arch/arm64/kernel/suspend.c        |  7 ++--
- arch/arm64/kernel/traps.c          | 16 ++++++-
- arch/arm64/mm/proc.S               |  9 ++--
- 14 files changed, 211 insertions(+), 109 deletions(-)
- create mode 100644 arch/arm64/include/asm/daifflags.h
-
+diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
+index 8c581281fa12..9ecdca7011f0 100644
+--- a/arch/arm64/include/asm/irqflags.h
++++ b/arch/arm64/include/asm/irqflags.h
+@@ -20,6 +20,19 @@
+ 
+ #include <asm/ptrace.h>
+ 
++/*
++ * Aarch64 has flags for masking: Debug, Asynchronous (serror), Interrupts and
++ * FIQ exceptions, in the 'daif' register. We mask and unmask them in 'dai'
++ * order:
++ * Masking debug exceptions causes all other exceptions to be masked too/
++ * Masking SError masks irq, but not debug exceptions. Masking irqs has no
++ * side effects for other flags. Keeping to this order makes it easier for
++ * entry.S to know which exceptions should be unmasked.
++ *
++ * FIQ is never expected, but we mask it when we disable debug exceptions, and
++ * unmask it at all other times.
++ */
++
+ /*
+  * CPU interrupt mask handling.
+  */
+@@ -89,26 +102,5 @@ static inline int arch_irqs_disabled_flags(unsigned long flags)
+ {
+ 	return flags & PSR_I_BIT;
+ }
+-
+-/*
+- * save and restore debug state
+- */
+-#define local_dbg_save(flags)						\
+-	do {								\
+-		typecheck(unsigned long, flags);			\
+-		asm volatile(						\
+-		"mrs    %0, daif		// local_dbg_save\n"	\
+-		"msr    daifset, #8"					\
+-		: "=r" (flags) : : "memory");				\
+-	} while (0)
+-
+-#define local_dbg_restore(flags)					\
+-	do {								\
+-		typecheck(unsigned long, flags);			\
+-		asm volatile(						\
+-		"msr    daif, %0		// local_dbg_restore\n"	\
+-		: : "r" (flags) : "memory");				\
+-	} while (0)
+-
+ #endif
+ #endif
+diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+index c7ef99904934..a88b6ccebbb4 100644
+--- a/arch/arm64/kernel/debug-monitors.c
++++ b/arch/arm64/kernel/debug-monitors.c
+@@ -30,6 +30,7 @@
+ 
+ #include <asm/cpufeature.h>
+ #include <asm/cputype.h>
++#include <asm/daifflags.h>
+ #include <asm/debug-monitors.h>
+ #include <asm/system_misc.h>
+ 
+@@ -46,9 +47,9 @@ u8 debug_monitors_arch(void)
+ static void mdscr_write(u32 mdscr)
+ {
+ 	unsigned long flags;
+-	local_dbg_save(flags);
++	flags = local_daif_save();
+ 	write_sysreg(mdscr, mdscr_el1);
+-	local_dbg_restore(flags);
++	local_daif_restore(flags);
+ }
+ NOKPROBE_SYMBOL(mdscr_write);
+ 
 -- 
 2.15.0.rc2
