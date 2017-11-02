@@ -1,9 +1,13 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Nov 2017 15:22:11 +0000
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Thu, 2 Nov 2017 15:23:14 +0000
 Subject: [PATCH 3/3] ARM: early_printk: use printascii() rather than
  printch()
-In-Reply-To: <18e5317b-c3a4-1b6c-5bb1-154e5a0971d2@arm.com>
-References: <20171031182024.GK9463@n2100.armlinux.org.uk>
+In-Reply-To: <nycvar.YSQ.7.76.1711021044380.21665@knanqh.ubzr>
+References: <20171031171629.GI9463@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1710311346190.21665@knanqh.ubzr>
+ <20171031175344.GJ9463@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1710311355000.21665@knanqh.ubzr>
+ <20171031182024.GK9463@n2100.armlinux.org.uk>
  <nycvar.YSQ.7.76.1710311432120.21665@knanqh.ubzr>
  <SG2PR06MB1165AE45FB289039E55D03028A5E0@SG2PR06MB1165.apcprd06.prod.outlook.com>
  <20171102000945.GT9463@n2100.armlinux.org.uk>
@@ -12,21 +16,43 @@ References: <20171031182024.GK9463@n2100.armlinux.org.uk>
  <20171102112041.GW9463@n2100.armlinux.org.uk>
  <SG2PR06MB11653D39086B1F58497C9FE08A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
  <nycvar.YSQ.7.76.1711021044380.21665@knanqh.ubzr>
- <18e5317b-c3a4-1b6c-5bb1-154e5a0971d2@arm.com>
-Message-ID: <20171102152211.GD9463@n2100.armlinux.org.uk>
+Message-ID: <SG2PR06MB116563CB4F1B55160392AAC68A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 02, 2017 at 03:18:11PM +0000, Robin Murphy wrote:
-> Note that for UAL syntax, GAS follows the ARM ARM recommendation and
-> considers the '#' on immediate values optional everywhere. I'm going to
-> hazard a guess that Chris might be building a Thumb-2 kernel or somehow
-> otherwise has ARM_ASM_UNIFIED turned on.
+On Thursday, November 02, 2017 1, Nicolas Pitre wrote:
+> > > So, as far as ARM assembly in the Linux kernel goes, all constants
+> must
+> > > be preceded by # whether or not binutils requires it - no exceptions.
+> > > Please always test assembly changes with a binutils version that is
+> not
+> > > gratuitously broken!
+> >
+> > Somewhat ironic since Nicolas works for Linaro.
+> 
+> I'm not involved with the toolchain people though, other than using
+> their output.
 
-I hope people can see what a silly idea that is from the amount of
-problems this is causing.
+That was the irony!
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+As in...
+Even if you built the code, you would have probably used a Linaro 
+toolchain and it would have worked like on my system.
+
+  Forget it.  (mailing lists are so dry when it comes to humor)
+
+
+> They all fail, including the version that looks like the one you have.
+> 
+> Could you try that little test above on your side?
+
+Yes, I also get a failure:
+
+arm-linux-gnueabihf-as /tmp/t.s -o /tmp/t.o
+/tmp/t.s: Assembler messages:
+/tmp/t.s:2: Error: immediate expression requires a # prefix -- `mov r1,13'
+
+But I think the answer is not that simple. 
+You have no command line options.
+
+Chris
