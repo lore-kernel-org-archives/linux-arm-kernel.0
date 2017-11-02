@@ -1,147 +1,80 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Thu, 2 Nov 2017 20:18:31 +0100
-Subject: [PATCH v5 04/30] arm64: KVM: Hide unsupported AArch64 CPU
- features from guests
-In-Reply-To: <20171102110137.GN19485@e103592.cambridge.arm.com>
-References: <1509465082-30427-1-git-send-email-Dave.Martin@arm.com>
- <1509465082-30427-5-git-send-email-Dave.Martin@arm.com>
- <20171101044729.GA11166@lvm>
- <20171101102601.GK19485@e103592.cambridge.arm.com>
- <20171102081557.GB20075@cbox>
- <20171102110137.GN19485@e103592.cambridge.arm.com>
-Message-ID: <20171102191831.GA14144@cbox>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 2 Nov 2017 12:25:31 -0700
+Subject: [GIT PULL 1/2] omap defconfig changes for v4.15 merge window
+In-Reply-To: <CAK8P3a26fgpZ1BympPxC+cJX6nUm+PYfbDPTEh_onvgf0=UTMw@mail.gmail.com>
+References: <pull-1509381562-551838@atomide.com>
+ <CAK8P3a26fgpZ1BympPxC+cJX6nUm+PYfbDPTEh_onvgf0=UTMw@mail.gmail.com>
+Message-ID: <20171102192531.GA28152@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 02, 2017 at 11:01:37AM +0000, Dave Martin wrote:
-> On Thu, Nov 02, 2017 at 09:15:57AM +0100, Christoffer Dall wrote:
-> > On Wed, Nov 01, 2017 at 10:26:03AM +0000, Dave Martin wrote:
-> > > On Wed, Nov 01, 2017 at 05:47:29AM +0100, Christoffer Dall wrote:
-> > > > On Tue, Oct 31, 2017 at 03:50:56PM +0000, Dave Martin wrote:
-> > > > > Currently, a guest kernel sees the true CPU feature registers
-> > > > > (ID_*_EL1) when it reads them using MRS instructions.  This means
-> > > > > that the guest may observe features that are present in the
-> > > > > hardware but the host doesn't understand or doesn't provide support
-> > > > > for.  A guest may legimitately try to use such a feature as per the
-> > > > > architecture, but use of the feature may trap instead of working
-> > > > > normally, triggering undef injection into the guest.
-> > > > > 
-> > > > > This is not a problem for the host, but the guest may go wrong when
-> > > > > running on newer hardware than the host knows about.
-> > > > > 
-> > > > > This patch hides from guest VMs any AArch64-specific CPU features
-> > > > > that the host doesn't support, by exposing to the guest the
-> > > > > sanitised versions of the registers computed by the cpufeatures
-> > > > > framework, instead of the true hardware registers.  To achieve
-> > > > > this, HCR_EL2.TID3 is now set for AArch64 guests, and emulation
-> > > > > code is added to KVM to report the sanitised versions of the
-> > > > > affected registers in response to MRS and register reads from
-> > > > > userspace.
-> > > > > 
-> > > > > The affected registers are removed from invariant_sys_regs[] (since
-> > > > > the invariant_sys_regs handling is no longer quite correct for
-> > > > > them) and added to sys_reg_desgs[], with appropriate access(),
-> > > > > get_user() and set_user() methods.  No runtime vcpu storage is
-> > > > > allocated for the registers: instead, they are read on demand from
-> > > > > the cpufeatures framework.  This may need modification in the
-> > > > > future if there is a need for userspace to customise the features
-> > > > > visible to the guest.
-> > > > > 
-> > > > > Attempts by userspace to write the registers are handled similarly
-> > > > > to the current invariant_sys_regs handling: writes are permitted,
-> > > > > but only if they don't attempt to change the value.  This is
-> > > > > sufficient to support VM snapshot/restore from userspace.
-> > > > > 
-> > > > > Because of the additional registers, restoring a VM on an older
-> > > > > kernel may not work unless userspace knows how to handle the extra
-> > > > > VM registers exposed to the KVM user ABI by this patch.
-> > > > > 
-> > > > > Under the principle of least damage, this patch makes no attempt to
-> > > > > handle any of the other registers currently in
-> > > > > invariant_sys_regs[], or to emulate registers for AArch32: however,
-> > > > > these could be handled in a similar way in future, as necessary.
-> > > > > 
-> > > > > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > > > > Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> > > > > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> > > > > Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> > > > > ---
-> > > > >  arch/arm64/include/asm/sysreg.h |   3 +
-> > > > >  arch/arm64/kvm/hyp/switch.c     |   6 +
-> > > > >  arch/arm64/kvm/sys_regs.c       | 282 +++++++++++++++++++++++++++++++++-------
-> > > > >  3 files changed, 246 insertions(+), 45 deletions(-)
-> > > > > 
-> > > > > diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> > > > > index 4dceb12..609d59af 100644
-> > > > > --- a/arch/arm64/include/asm/sysreg.h
-> > > > > +++ b/arch/arm64/include/asm/sysreg.h
-> > > > > @@ -149,6 +149,9 @@
-> > > > >  #define SYS_ID_AA64DFR0_EL1		sys_reg(3, 0, 0, 5, 0)
-> > > > >  #define SYS_ID_AA64DFR1_EL1		sys_reg(3, 0, 0, 5, 1)
-> > > > >  
-> > > > > +#define SYS_ID_AA64AFR0_EL1		sys_reg(3, 0, 0, 5, 4)
-> > > > > +#define SYS_ID_AA64AFR1_EL1		sys_reg(3, 0, 0, 5, 5)
-> > > > > +
-> > > > >  #define SYS_ID_AA64ISAR0_EL1		sys_reg(3, 0, 0, 6, 0)
-> > > > >  #define SYS_ID_AA64ISAR1_EL1		sys_reg(3, 0, 0, 6, 1)
-> > > > >  
-> > > > > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> > > > > index 945e79c..35a90b8 100644
-> > > > > --- a/arch/arm64/kvm/hyp/switch.c
-> > > > > +++ b/arch/arm64/kvm/hyp/switch.c
-> > > > > @@ -81,11 +81,17 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
-> > > > >  	 * it will cause an exception.
-> > > > >  	 */
-> > > > >  	val = vcpu->arch.hcr_el2;
-> > > > > +
-> > > > >  	if (!(val & HCR_RW) && system_supports_fpsimd()) {
-> > > > >  		write_sysreg(1 << 30, fpexc32_el2);
-> > > > >  		isb();
-> > > > >  	}
-> > > > > +
-> > > > > +	if (val & HCR_RW) /* for AArch64 only: */
-> > > > > +		val |= HCR_TID3; /* TID3: trap feature register accesses */
-> > > > > +
-> > > > 
-> > > > I still think we should set this in vcpu_reset_hcr() and do it once
-> > > > instead of adding code in every iteration of the critical path.
-> > > 
-> > > Dang, I somehow missed this in the last round.
-> > > 
-> > > How about:
-> > > 
-> > > diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-> > > index e5df3fc..c87be0d 100644
-> > > --- a/arch/arm64/include/asm/kvm_emulate.h
-> > > +++ b/arch/arm64/include/asm/kvm_emulate.h
-> > > @@ -49,6 +49,14 @@ static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
-> > >  		vcpu->arch.hcr_el2 |= HCR_E2H;
-> > >  	if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features))
-> > >  		vcpu->arch.hcr_el2 &= ~HCR_RW;
-> > > +
-> > > +	/*
-> > > +	 * TID3: trap feature register accesses that we virtualise.
-> > > +	 * For now this is conditional, since no AArch32 feature regs
-> > > +	 * are currently virtualised.
-> > > +	 */
-> > > +	if (vcpu->arch.hcr_el2 & HCR_RW)
-> > > +		vcpu->arch.hcr_el2 |= HCR_TID3;
-> > >  }
-> > >  
-> > >  static inline unsigned long vcpu_get_hcr(struct kvm_vcpu *vcpu)
-> > > > 
-> > > > Otherwise this patch looks good to me.
-> > > 
-> > > I'll probably post this as a separate follow-up patch, unless there's
-> > > some other reason for a full respin.
-> > > 
-> > 
-> > Fine with me, just remember to remove the part of the world-switch that
-> > was added in this patch, as that's what we want to savoid.
+* Arnd Bergmann <arnd@arndb.de> [171102 15:49]:
+> > ----------------------------------------------------------------
+> > Few omap2plus_defconfig changes for v4.15 merge window to enable NEON
+> > based crypto and droid 4 USB PHY. Also let's run savedefconfig again
+> > to save a bit of space and make it easier for people to send patches
+> > against omap2plus_defconfig.
 > 
-> To be clear, does this amount to an Ack on the _original_ patch,
-> providing I follow up with this optimisation after the merge window?
+> I'm not too fond of the blind 'rerun savedefconfig' patches. Can you respin that
+> branch and separate that one into at least two patches doing:
 > 
-Yes:
+> - one trivial patch to move the config options that have not changed but only
+>   appear in a different line
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Hmm OK. And we get patches causing issues like this because.. savedefconfig
+was not run for a while and people are having hard time generating patches
+against it :)
+
+> - one patch that drops the other options and has an explanation for each one
+>   why it's not there any more. Split this up further if necessary.
+> 
+> I mainly want to be sure when we do this that we have not accidentally
+> dropped an option that got renamed but is actually required for some users.
+
+Sure I'll do that later on for v4.16 as there's no huge rush to do it right
+now as the merge window is about to open.
+
+Meanwhile, below is an updated pull request with just the savedefconfig
+patch dropped. Naturally this one can wait too if needed.
+
+Regards,
+
+Tony
+
+8< ---------------------
+>From nobody Thu Nov 2 12:18:27 2017
+From: "Tony Lindgren" <tony@atomide.com>
+To: arm at kernel.org
+Cc: linux-arm-kernel at lists.infradead.org, linux-omap at vger.kernel.org
+Subject: [GIT PULL] updated omap defconfig changes for v4.15 merge window
+Date: Thu, 2 Nov 2017 12:18:27 -0700
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: 8bit
+Message-ID: <pull-1509650307-243134@atomide.com>
+
+The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+
+  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.15/defconfig-v2-signed
+
+for you to fetch changes up to 2b1f0fa116595cab831deffc2ba3f0fe9a9840a3:
+
+  ARM: omap2plus_defconfig: Enable droid 4 USB PHY (2017-10-20 10:55:46 -0700)
+
+----------------------------------------------------------------
+Few omap2plus_defconfig changes for v4.15 merge window to enable NEON
+based crypto and droid 4 USB PHY.
+
+----------------------------------------------------------------
+Ard Biesheuvel (1):
+      ARM: omap2plus_defconfig: enable NEON based crypto
+
+Tony Lindgren (1):
+      ARM: omap2plus_defconfig: Enable droid 4 USB PHY
+
+ arch/arm/configs/omap2plus_defconfig | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
