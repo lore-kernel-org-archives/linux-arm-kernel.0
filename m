@@ -1,91 +1,47 @@
-From: sakari.ailus@linux.intel.com (Sakari Ailus)
-Date: Thu, 2 Nov 2017 11:20:15 +0200
-Subject: [PATCH v2 14/26] media: xilinx: fix a debug printk
-In-Reply-To: <2117711.dO2rQLXOup@avalon>
-References: <c4389ab1c02bb08c1a55012fdb859c8b10bdc47e.1509569763.git.mchehab@s-opensource.com>
- <be86653c5e5641582f65f43780b1fe255e92cdc0.1509569763.git.mchehab@s-opensource.com>
- <2117711.dO2rQLXOup@avalon>
-Message-ID: <20171102092015.kppthosrh5qhlpw5@paasikivi.fi.intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu,  2 Nov 2017 10:21:21 +0100
+Subject: [PATCH] ARM: NOMMU: work around maybe-uninitialized warning
+Message-ID: <20171102092155.737712-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent and Mauro,
+The reworked MPU code produces a new warning in some configurations,
+presumably starting with the code move after the compiler now makes
+different inlining decisions:
 
-On Thu, Nov 02, 2017 at 04:43:51AM +0200, Laurent Pinchart wrote:
-> Hi Mauro,
-> 
-> (CC'ing Rob and Sakari)
-> 
-> Thank you for the patch.
-> 
-> On Wednesday, 1 November 2017 23:05:51 EET Mauro Carvalho Chehab wrote:
-> > Two orthogonal changesets caused a breakage at several printk
-> > messages inside xilinx. Changeset 859969b38e2e
-> > ("[media] v4l: Switch from V4L2 OF not V4L2 fwnode API")
-> > made davinci to use struct fwnode_handle instead of
-> > struct device_node. Changeset 68d9c47b1679
-> > ("media: Convert to using %pOF instead of full_name")
-> > changed the printk to not use ->full_name, but, instead,
-> > to rely on %pOF.
-> > 
-> > With both patches applied, the Kernel will do the wrong
-> > thing, as warned by smatch:
-> > drivers/media/platform/xilinx/xilinx-vipp.c:108 xvip_graph_build_one()
-> > error: '%pOF' expects argument of type 'struct device_node*', argument 4
-> > has type 'void*'
-> > drivers/media/platform/xilinx/xilinx-vipp.c:117 xvip_graph_build_one()
-> > error: '%pOF' expects argument of type 'struct device_node*', argument 4 has
-> > type 'void*'
-> > drivers/media/platform/xilinx/xilinx-vipp.c:126 xvip_graph_build_one()
-> > error: '%pOF' expects argument of type 'struct device_node*', argument 4
-> > has type 'void*'
-> > drivers/media/platform/xilinx/xilinx-vipp.c:138 xvip_graph_build_one()
-> > error: '%pOF' expects argument of type 'struct device_node*', argument 3 has
-> > type 'void*'
-> > drivers/media/platform/xilinx/xilinx-vipp.c:148 xvip_graph_build_one()
-> > error: '%pOF' expects argument of type 'struct device_node*', argument 4
-> > has type 'void*'
-> > drivers/media/platform/xilinx/xilinx-vipp.c:245 xvip_graph_build_dma()
-> > error: '%pOF' expects argument of type 'struct device_node*', argument 3 has
-> > type 'void*'
-> > drivers/media/platform/xilinx/xilinx-vipp.c:254 xvip_graph_build_dma()
-> > error: '%pOF' expects argument of type 'struct device_node*', argument 4
-> > has type 'void*'
-> > 
-> > So, change the logic to actually print the device name
-> > that was obtained before the print logic.
-> 
-> This doesn't seem like a good idea to me. The main point of commit 
-> 68d9c47b1679 is to avoid accessing full_name directly to prepare for removal 
-> of that field.
-> 
-> to_of_node() is defined as
-> 
-> #define to_of_node(__fwnode)                                            \
->         ({                                                              \
->                 typeof(__fwnode) __to_of_node_fwnode = (__fwnode);      \
->                                                                         \
->                 is_of_node(__to_of_node_fwnode) ?                       \
->                         container_of(__to_of_node_fwnode,               \
->                                      struct device_node, fwnode) :      \
->                         NULL;                                           \
->         })
-> 
-> when CONFIG_OF is set, and as
-> 
-> static inline struct device_node *to_of_node(const struct fwnode_handle 
-> *fwnode)
-> {
->         return NULL;
-> }
-> 
-> otherwise. I wonder why smatch believes the value is a void *, but in any case 
-> that should be fixed either in smatch (if it's a smatch bug) or in the 
-> definition of the to_of_node() macro.
+arch/arm/mm/pmsa-v7.c: In function 'adjust_lowmem_bounds_mpu':
+arch/arm/mm/pmsa-v7.c:310:5: error: 'specified_mem_size' may be used uninitialized in this function [-Werror=maybe-uninitialized]
 
-Probably because NULL maybe returned by the function. I can write a patch
-for that. I presume the same issue would be present in a lot of places.
+This appears to be harmless, as we know that there is always at
+least one memblock, and the only way this could get triggered is
+if the for_each_memblock() loop was never entered.
 
+I could not come up with a better workaround than initializing
+the specified_mem_size to zero, but at least that is the value
+that the variable would have in the hypothetical case of no
+memblocks.
+
+Fixes: 877ec119dbbf ("ARM: 8706/1: NOMMU: Move out MPU setup in separate module")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+Vladimir, if this looks good to you, can you forward it to Russell's
+patch tracker, or otherwise suggest a different fix?
+---
+ arch/arm/mm/pmsa-v7.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mm/pmsa-v7.c b/arch/arm/mm/pmsa-v7.c
+index 106ae1c435a3..976df60ac426 100644
+--- a/arch/arm/mm/pmsa-v7.c
++++ b/arch/arm/mm/pmsa-v7.c
+@@ -234,7 +234,7 @@ static int __init allocate_region(phys_addr_t base, phys_addr_t size,
+ /* MPU initialisation functions */
+ void __init adjust_lowmem_bounds_mpu(void)
+ {
+-	phys_addr_t  specified_mem_size, total_mem_size = 0;
++	phys_addr_t  specified_mem_size = 0, total_mem_size = 0;
+ 	struct memblock_region *reg;
+ 	bool first = true;
+ 	phys_addr_t mem_start;
 -- 
-Sakari Ailus
-sakari.ailus at linux.intel.com
+2.9.0
