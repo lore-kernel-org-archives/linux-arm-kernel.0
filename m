@@ -1,52 +1,162 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Thu, 2 Nov 2017 18:41:08 +0800
-Subject: [PATCH 0/2] Add support for Hi6220 coresight
-In-Reply-To: <150955133019.90597.6277114786385559431@resonance>
-References: <1504226835-2115-1-git-send-email-leo.yan@linaro.org>
- <20170901013301.GN21656@codeaurora.org>
- <20171007121802.GC23080@leoy-linaro> <59E07FDE.40307@hisilicon.com>
- <150955133019.90597.6277114786385559431@resonance>
-Message-ID: <20171102104108.GC3550@leoy-linaro>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 2 Nov 2017 10:47:46 +0000
+Subject: [PATCH] mailbox: add support for doorbell/signal mode controllers
+In-Reply-To: <CABb+yY16-B9vReRjLopV1RsyB8a=c5X9XaomtTj44520XrDdmA@mail.gmail.com>
+References: <1509553964-4451-1-git-send-email-sudeep.holla@arm.com>
+ <CABb+yY1tcm-68E5oG75hstuMd6AOeb=BB6HeKGnQ1zj4Qya6hg@mail.gmail.com>
+ <59a05fcb-ff30-0683-144e-93521a7413f9@arm.com>
+ <CABb+yY16-B9vReRjLopV1RsyB8a=c5X9XaomtTj44520XrDdmA@mail.gmail.com>
+Message-ID: <4268c9d9-dc1e-0bd7-3fac-790c2d42b54b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 01, 2017 at 04:48:50PM +0100, Michael Turquette wrote:
-> Quoting Wei Xu (2017-10-13 10:57:02)
-> > Hi Leo,
-> > 
-> > On 2017/10/7 13:18, Leo Yan wrote:
-> > > Hi Stephen, Wei,
-> > > 
-> > > On Thu, Aug 31, 2017 at 06:33:01PM -0700, Stephen Boyd wrote:
-> > >> On 09/01, Leo Yan wrote:
-> > >>> This patch series adds support for coresight on Hi6220; the first patch
-> > >>> is to fix coresight PLL so can avoid system hang after we enable
-> > >>> coresight, the second patch is to add DT binding according to coresight
-> > >>> topology.
-> > >>>
-> > >>> The patch has been tested on Hikey; By using OpenCSD snapshot mode, it
-> > >>> can successfully decode ETF and ETB trace data.
-> > >>>
-> > >>
-> > >> I can take the first one and second one goes through arm-soc?
-> > > 
-> > > Could you pick these two patches for Hi6220 coresight enabling for
-> > > this merge window? Or need me resend these two patches?
-> > 
-> > Applied patch 2 into hisilicon dt tree with slight fix.
-> > Thanks!
-> 
-> Cool. Patch #1 applied to clk tree.
 
-Thanks, Mike and Wei.
 
-> Regards,
-> Mike
+On 02/11/17 02:39, Jassi Brar wrote:
+> On Wed, Nov 1, 2017 at 11:45 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>
+>>
+>> On 01/11/17 18:03, Jassi Brar wrote:
+>>> On Wed, Nov 1, 2017 at 10:02 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>>
+>>>>
+>>>> Such controllers don't need to transmit any data, they just transmit
+>>>> the signal. In such controllers the data pointer passed to
+>>>> mbox_send_message is passed to client via it's tx_prepare callback.
+>>>> Controller doesn't need any data to be passed from the client.
+>>>>
+>>> Some controllers need a non-zero value written to a register in order
+>>> to trigger the signal.
+>>
+>> You are right, just right non-zero or whatever controller value to
+>> trigger the interrupt to remote.
+>>
+>>> That register is visible to the remote. While the data/packet is setup
+>>> during tx_prepare() callback.
+>>
+>> Agreed.
+>>
+>>> You are overlooking this class of doorbell controllers.
+>>>
+>>
+>> Not sure what do you mean by that ?
+>>
+> Such doorbell controllers can't use send_signal(chan) because they
+> need that non-zero value from client to send over the shared register.
+> You are assuming every protocol implements just one command.
+>
+
+No that non-zero value is not client specific, it's entirely controller
+specific. Not sure why do you think I am assuming every protocol
+implements just one command.
+
+>>>>
+>>>> This is rough idea I have on extending mailbox interface to support
+>>>> the doorbell requirements.
+>>>>
+>>> What doorbell requirements does the api not support?
+>>> QComm's APCS IPC is what you call a "doorbell" controller and is
+>>> already supported by the API. 
+
+After looking at this, you will see that doorbell has not data specific
+to client in the above case.
+
+	unsigned long idx = (unsigned long)chan->con_priv;
+
+	writel(BIT(idx), apcs->reg);
+
+So it's channel specific, same in mailbox-sti
+
+>> Again agreed. But see below for reason to create this API.
+>>
+>>>> The new API send_signal will eliminate the
+>>>> issue Jassi has explained in earlier discussion with respect to generic
+>>>> message format using Rockchip example.
+>>>>
+>>> Sorry I don't see how.
+>>> Please explain how can send_signal() api be used by, say, rockchip to
+>>> support SCMI?
+>>>
+>>
+>>  80         writel_relaxed(msg->cmd, mb->mbox_base +
+>> MAILBOX_A2B_CMD(chans->idx));
+>>  81         writel_relaxed(msg->rx_size, mb->mbox_base +
+>>
+>>  82                        MAILBOX_A2B_DAT(chans->idx));
+>>
+>>  83
+>>
+>>  will be replaced with
+>>
+>> writel(whatever_value_to trigger_signal, MAILBOX_A2B_CMD(chans->idx));
+>>
+>> in its send_signal function.
+>>
+> 1) Where does the  "whatever_value_to_trigger_signal"  come from?
+
+Controller specific.
+
+> That has to come from client. 
+
+No.
+
+> You can not dictate the channel transfers a fixed u32 value over its
+>lifetime. SCMI may use one command code but other protocols use more.
+
+Yes if it's just a doorbell, see the above 2 cases I have pointed out.
+
 > 
-> > 
-> > BR,
-> > Wei
-> > 
-> > > 
-> > > Thanks,
-> > > Leo Yan
+> 2) Using 'rx_size' is not a software choice made in the driver. The
+> _hardware_ has two registers shared with remote side - a CMD and a
+> DATA register. So the driver (written agnostic to any particular
+> client) would naturally expect the command+data from the client to be
+> programmed in to CMD and DAT registers.
+> 
+
+OK, if this controller needs to be used in doorbell mode for SCMI, we
+can send one fixed cmd and fixed rx_size() or 1 based on inclusive or
+exclusive).
+
+> 
+>>> I am not convinced we should clone an api just so that a client driver
+>>> becomes simpler. Esp when it shifts, and not avoid, the additional
+>>> code (to support the client) onto the provider side.
+>>>
+>>
+>> It doesn't tie the data format with particular mailbox controller.
+>> send_data has void *data and the interpretation is controller specific.
+>> send_signal on the other handle can implemented by the controllers which
+>> knows how and can trigger the specific signal to the remote.
+>>
+> Yeah that's what I said - you want to make a client simpler by pushing
+> the code requirement onto the provider side.
+> 
+
+No, I want to support generic case of mailbox doorbell instead of
+creating another unnecessary abstraction layer
+> For example, you mean we modify the provider rockchip-mailbox.c by implementing
+> 
+> rockchip_send_signal(chan)
+> {
+>   struct rockchip_mbox_msg msg;
+> 
+>   msg.cmd = chan->idx;  //only one command supported by the channel !!!
+
+Yes, it's just a doorbell. That actual data is transmitted or shared
+elsewhere. This doorbell is a signal to the remote to examine that,
+
+>   msg.rx_size = 0;
+> 
+>   rockchip_send_data(chan, (void*) &msg);
+> }
+> 
+> whereas I suggest this SCMI specific code should be part of
+> transport/mapping shim layer of SCMI.
+> 
+
+Yes that's what I did with abstraction and few think including me that
+it's unnecessary abstraction for such a generic use.
+
+-- 
+Regards,
+Sudeep
