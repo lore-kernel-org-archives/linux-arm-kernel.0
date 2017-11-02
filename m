@@ -1,43 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 2 Nov 2017 10:19:33 +0000
-Subject: [RFC/RFT PATCH 0/6] Switch GHES ioremap_page_range() to use fixmap
-In-Reply-To: <20171031153832.17746-1-james.morse@arm.com>
-References: <20171031153832.17746-1-james.morse@arm.com>
-Message-ID: <20171102101933.GC11881@arm.com>
+From: olivier.moysan@st.com (Olivier Moysan)
+Date: Thu, 2 Nov 2017 11:20:09 +0100
+Subject: [PATCH 1/1] ASoC: stm32: sai: fix warning in stm32_sai_set_config()
+Message-ID: <1509618009-30804-1-git-send-email-olivier.moysan@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 31, 2017 at 03:38:26PM +0000, James Morse wrote:
-> GHES is doing ioremap_page_range() in both NMI and irq context, neither
-> are safe as it may sleep to allocate intermediate levels of page table.
-> 
-> Replace the NMI/irq GHES_IOREMAP_PAGES to use a fixmap entry each.
-> 
-> After this nothing uses ghes_ioremap_area or arch_apei_flush_tlb_one(),
-> rip them out.
-> 
-> RFC as I've only build-tested this on x86. For arm64 I've tested it on a
-> software model. Any more testing would be welcome. These patches are based
-> on rc7.
-> 
-> Thanks,
-> 
-> James Morse (6):
->   arm64: fixmap: Add GHES fixmap entries
->   x86/mm/fixmap: Add GHES fixmap entries
->   ACPI / APEI:  Replace ioremap_page_range() with fixmap
->   ACPI / APEI: Remove ghes_ioremap_area
->   arm64: mm: Remove arch_apei_flush_tlb_one()
->   ACPI / APEI: Remove arch_apei_flush_tlb_one()
-> 
->  arch/arm64/include/asm/acpi.h   | 12 ------
->  arch/arm64/include/asm/fixmap.h |  5 +++
->  arch/arm64/mm/mmu.c             |  4 ++
+Fix uninitialized warning introduced by
+"Move static settings to DAI init" commit
+in stm32_sai_set_config() function.
 
-If you need it:
+Signed-off-by: Olivier Moysan <olivier.moysan@st.com>
+---
+ sound/soc/stm/stm32_sai_sub.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-for the arm64 bits.
-
-Will
+diff --git a/sound/soc/stm/stm32_sai_sub.c b/sound/soc/stm/stm32_sai_sub.c
+index 150ad54..08583b9 100644
+--- a/sound/soc/stm/stm32_sai_sub.c
++++ b/sound/soc/stm/stm32_sai_sub.c
+@@ -482,13 +482,13 @@ static int stm32_sai_set_config(struct snd_soc_dai *cpu_dai,
+ 	cr1_mask = SAI_XCR1_DS_MASK;
+ 	switch (params_format(params)) {
+ 	case SNDRV_PCM_FORMAT_S8:
+-		cr1 |= SAI_XCR1_DS_SET(SAI_DATASIZE_8);
++		cr1 = SAI_XCR1_DS_SET(SAI_DATASIZE_8);
+ 		break;
+ 	case SNDRV_PCM_FORMAT_S16_LE:
+-		cr1 |= SAI_XCR1_DS_SET(SAI_DATASIZE_16);
++		cr1 = SAI_XCR1_DS_SET(SAI_DATASIZE_16);
+ 		break;
+ 	case SNDRV_PCM_FORMAT_S32_LE:
+-		cr1 |= SAI_XCR1_DS_SET(SAI_DATASIZE_32);
++		cr1 = SAI_XCR1_DS_SET(SAI_DATASIZE_32);
+ 		break;
+ 	default:
+ 		dev_err(cpu_dai->dev, "Data format not supported");
+-- 
+1.9.1
