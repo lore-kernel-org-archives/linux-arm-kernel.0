@@ -1,9 +1,9 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 1 Nov 2017 23:31:36 -0700
-Subject: [PATCH] clk: spear: make clk_ops const
-In-Reply-To: <1503407690-13541-1-git-send-email-bhumirks@gmail.com>
-References: <1503407690-13541-1-git-send-email-bhumirks@gmail.com>
-Message-ID: <20171102063136.GT30645@codeaurora.org>
+Date: Wed, 1 Nov 2017 23:31:50 -0700
+Subject: [PATCH] clk: imx: make clk_ops const
+In-Reply-To: <1503407909-15469-1-git-send-email-bhumirks@gmail.com>
+References: <1503407909-15469-1-git-send-email-bhumirks@gmail.com>
+Message-ID: <20171102063150.GY30645@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
