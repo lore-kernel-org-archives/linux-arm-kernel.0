@@ -1,69 +1,66 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Thu, 2 Nov 2017 18:38:45 +0100
-Subject: [PULL 0/8] KVM/ARM Fixes for v4.14
-In-Reply-To: <20171030025603.23550-1-christoffer.dall@linaro.org>
-References: <20171030025603.23550-1-christoffer.dall@linaro.org>
-Message-ID: <f36c74ab-ce35-e3cd-a772-b83407228cfe@redhat.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 02 Nov 2017 19:39:18 +0200
+Subject: [PATCH] ARM: dts: koelsch: Move cec_clock to root node
+In-Reply-To: <20171102091805.24967-1-horms+renesas@verge.net.au>
+References: <20171102091805.24967-1-horms+renesas@verge.net.au>
+Message-ID: <14112514.nMv28tbzn2@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/10/2017 03:55, Christoffer Dall wrote:
-> Hi Paolo and Radim,
+Hi Simon,
+
+Thank you for the patch.
+
+On Thursday, 2 November 2017 11:18:05 EET Simon Horman wrote:
+> cec-clock is a fixed clock generator that is not controlled by i2c5 and
+> thus should not be a child of the i2c5 bus node. Rather, it should be
+> a child of the root node of the DT.
 > 
-> Here are the fixes we've been trying to get ready for v4.14 for a while;
-> sorry about sending these so late.
+> Fixes: 02a5ab18d366 ("ARM: dts: koelsch: Add CEC clock for HDMI
+> transmitter") Reported-by: Laurent Pinchart
+> <laurent.pinchart@ideasonboard.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+> ---
+>  arch/arm/boot/dts/r8a7791-koelsch.dts | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
 > 
-> We're fixing:
+> diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts
+> b/arch/arm/boot/dts/r8a7791-koelsch.dts index e164eda69baf..4126de417922
+> 100644
+> --- a/arch/arm/boot/dts/r8a7791-koelsch.dts
+> +++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+> @@ -278,6 +278,12 @@
+>  		};
+>  	};
 > 
->  - a number of issues with saving/restoring the ITS
->  - a bug in KVM/ARM when branch profiling is enabled in Hyp mode
->  - an emulation bug for 32-bit guests when injecting aborts
->  - a failure to check if a kmalloc succeeds in the ITS emulation
+> +	cec_clock: cec-clock {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <12000000>;
+> +	};
+> +
+>  	hdmi-out {
+>  		compatible = "hdmi-connector";
+>  		type = "a";
+> @@ -640,12 +646,6 @@
+>  		};
+>  	};
 > 
-> The following changes since commit 8a5776a5f49812d29fe4b2d0a2d71675c3facf3f:
-> 
->   Linux 4.14-rc4 (2017-10-08 20:53:29 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-fixes-for-v4.14
-> 
-> for you to fetch changes up to c2385eaa6c5a87cdc4e04ed589ae103ca3297c84:
-> 
->   KVM: arm/arm64: vgic-its: Check GITS_BASER Valid bit before saving tables (2017-10-29 03:25:06 +0100)
-> 
-> 
-> Thanks,
-> -Christoffer
-> 
-> Christoffer Dall (1):
->       KVM: arm64: its: Fix missing dynamic allocation check in scan_its_table
-> 
-> Dongjiu Geng (1):
->       arm/arm64: KVM: set right LR register value for 32 bit guest when inject abort
-> 
-> Eric Auger (3):
->       KVM: arm/arm64: vgic-its: Fix vgic_its_restore_collection_table returned value
->       KVM: arm/arm64: vgic-its: Check CBASER/BASER validity before enabling the ITS
->       KVM: arm/arm64: vgic-its: Check GITS_BASER Valid bit before saving tables
-> 
-> Julien Thierry (2):
->       arm/arm64: kvm: Move initialization completion message
->       arm/arm64: kvm: Disable branch profiling in HYP code
-> 
-> wanghaibin (1):
->       KVM: arm/arm64: vgic-its: Fix return value for device table restore
-> 
->  arch/arm/kvm/emulate.c        |  6 ++--
->  arch/arm/kvm/hyp/Makefile     |  2 +-
->  arch/arm64/kvm/hyp/Makefile   |  2 +-
->  arch/arm64/kvm/inject_fault.c | 16 +++++++++-
->  virt/kvm/arm/arm.c            | 31 +++++++++---------
->  virt/kvm/arm/vgic/vgic-its.c  | 73 ++++++++++++++++++++++++++++---------------
->  6 files changed, 81 insertions(+), 49 deletions(-)
-> 
+> -	cec_clock: cec-clock {
+> -		compatible = "fixed-clock";
+> -		#clock-cells = <0>;
+> -		clock-frequency = <12000000>;
+> -	};
+> -
+>  	hdmi at 39 {
+>  		compatible = "adi,adv7511w";
+>  		reg = <0x39>;
 
 
-Pulled, thanks.
+-- 
+Regards,
 
-Paolo
+Laurent Pinchart
