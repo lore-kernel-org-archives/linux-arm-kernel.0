@@ -1,187 +1,167 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 2 Nov 2017 16:57:36 +0100
-Subject: [PATCH] ARM: sun7i: Add Cubietech Einstein A20 board device-tree
-In-Reply-To: <20171102143534.19353-1-mailinglists@kunz-im-inter.net>
-References: <20171102143534.19353-1-mailinglists@kunz-im-inter.net>
-Message-ID: <20171102155736.qab746tkaspfe47n@flea>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Thu, 2 Nov 2017 18:00:42 +0200
+Subject: [PATCH v3 1/3] interconnect: Add generic on-chip interconnect API
+In-Reply-To: <CAHLCerOKEY_My9OKDMV_ns3dTAgBMPkRS2hdS7iYwFoX5rxOPA@mail.gmail.com>
+References: <20170908171830.13813-1-georgi.djakov@linaro.org>
+ <20170908171830.13813-2-georgi.djakov@linaro.org>
+ <CAHLCerOKEY_My9OKDMV_ns3dTAgBMPkRS2hdS7iYwFoX5rxOPA@mail.gmail.com>
+Message-ID: <26225878-8fed-b990-d02f-5253190de77a@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Frank,
+Hi Amit,
 
-Thanks for your patch.
-
-On Thu, Nov 02, 2017 at 03:35:34PM +0100, Frank Kunz wrote:
-> From: Frank Kunz <xxxxxmichl@googlemail.com>
+On 11/02/2017 09:28 AM, Amit Kucheria wrote:
+[..>> +Interconnect node is the software definition of the interconnect
+hardware
+>> +port. Each interconnect provider consists of multiple interconnect nodes,
+>> +which are connected to other SoC components including other interconnect
+>> +providers. The point on the diagram where the CPUs connects to the memory is
+>> +called an interconnect node, which belongs to the Mem NoC interconnect provider.
+>> +
+>> +Interconnect endpoits are the first or the last element of the path. Every
 > 
-> The Einstein A20 board is a Allwinner A20 based board with a credit card
-> form factor.
+> s/endpoits/endpoints
 > 
-> Features:
-> - Allwinner A20 SoC
-> - DDR3 1GB RAM
-> - 8GiB eMMC
-> - AP6210 wifi/Bluetooth
-> - RTC
-> - Micro USB-OTG connector
-> - UART0 debugging port
-> - 200 pins stamp hole package
+
+Ok!
+
+>> +endpoint is a node, but not every node is an endpoint.
+>> +
+>> +Interconnect path is everything between two endpoints including all the nodes
+>> +that have to be traversed to reach from a source to destination node. It may
+>> +include multiple master-slave pairs across several interconnect providers.
+>> +
+>> +Interconnect consumers are the entities which make use of the data paths exposed
+>> +by the providers. The consumers send requests to providers requesting various
+>> +throughput, latency and priority. Usually the consumers are device drivers, that
+>> +send request based on their needs. An example for a consumer is a a video
 > 
-> Signed-off-by: Frank Kunz <xxxxxmichl@googlemail.com>
-> ---
->  arch/arm/boot/dts/Makefile               |   1 +
->  arch/arm/boot/dts/sun7i-a20-einstein.dts | 200 +++++++++++++++++++++++++++++++
->  2 files changed, 201 insertions(+)
->  create mode 100644 arch/arm/boot/dts/sun7i-a20-einstein.dts
+> typo: is a video>
+
+Ok!
+
+[..]
+>> +/**
+>> + * interconnect_set() - set constraints on a path between two endpoints
+>> + * @path: reference to the path returned by interconnect_get()
+>> + * @creq: request from the consumer, containing its requirements
+>> + *
+>> + * This function is used by an interconnect consumer to express its own needs
+>> + * in term of bandwidth and QoS for a previously requested path between two
+>> + * endpoints. The requests are aggregated and each node is updated accordingly.
+>> + *
+>> + * Returns 0 on success, or an approproate error code otherwise.
+>> + */
+>> +int interconnect_set(struct interconnect_path *path,
+>> +                    struct interconnect_creq *creq)
+>> +{
+>> +       struct interconnect_node *next, *prev = NULL;
+>> +       size_t i;
+>> +       int ret = 0;
+>> +
+>> +       for (i = 0; i < path->num_nodes; i++, prev = next) {
+>> +               next = path->reqs[i].node;
+>> +
+>> +               /*
+>> +                * Both endpoints should be valid and master-slave pairs of
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index faf46abaa4a2..f9158400ea0f 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -878,6 +878,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
->  	sun7i-a20-bananapro.dtb \
->  	sun7i-a20-cubieboard2.dtb \
->  	sun7i-a20-cubietruck.dtb \
-> +	sun7i-a20-einstein.dtb \
+> Losing the 'and' improves readability.
+> 
 
-I guess it's not that obvious from what company that board is coming
-from. Could you turn it into cubietech-einstein please?
+Ok!
 
->  	sun7i-a20-hummingbird.dtb \
->  	sun7i-a20-itead-ibox.dtb \
->  	sun7i-a20-i12-tvbox.dtb \
-> diff --git a/arch/arm/boot/dts/sun7i-a20-einstein.dts b/arch/arm/boot/dts/sun7i-a20-einstein.dts
-> new file mode 100644
-> index 000000000000..59d46b08f21c
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sun7i-a20-einstein.dts
-> @@ -0,0 +1,200 @@
-> +/*
-> + * Copyright 2017 Frank Kunz
-> + *
-> + * Frank Kunz <xxxxxmichl@googlemail.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +#include "sun7i-a20.dtsi"
-> +#include "sunxi-common-regulators.dtsi"
-> +
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/interrupt-controller/irq.h>
-> +
-> +/ {
-> +	model = "Cubietech Einstein A20";
-> +	compatible = "cubietech,einstein-a20", "allwinner,sun7i-a20";
-> +
-> +	aliases {
-> +		serial0 = &uart0;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +
-> +	mmc3_pwrseq: mmc3_pwrseq {
-> +		compatible = "mmc-pwrseq-simple";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&mmc3_pwrseq_pin_ea20>;
+>> +                * the same interconnect provider that will be configured.
+>> +                */
+>> +               if (!next || !prev)
+>> +                       continue;
+>> +               if (next->icp != prev->icp)
+>> +                       continue;
+>> +
+>> +               mutex_lock(&next->icp->lock);
+>> +
+>> +               /* update the consumer request for this path */
+>> +               path->reqs[i].avg_bw = creq->avg_bw;
+>> +               path->reqs[i].peak_bw = creq->peak_bw;
+>> +
+>> +               /* aggregate all requests */
+>> +               interconnect_aggregate_icn(next);
+>> +               interconnect_aggregate_icp(next->icp);
+>> +
+>> +               if (next->icp->ops->set) {
+>> +                       /* commit the aggregated constraints */
+>> +                       ret = next->icp->ops->set(prev, next, &next->icp->creq);
+>> +               }
+> 
+> A comment here on how the contraints are propagated along the path
+> would be good. At the moment, this seems to go to each provider along
+> the path, take the provider lock and set the new constraints, then
+> move on to the next provider. Is there any need to make the changes
+> along the entire path "atomic"?
 
-You don't need those GPIO pinctrl nodes, you can remove all of them.
+Yes, the above is correct. There is no such need at least for the
+hardware i am currently playing with. We can add support for that later
+if needed.
 
-> +		reset-gpios = <&pio 7 9 GPIO_ACTIVE_LOW>; /* PH9 WIFI-SHDN */
-> +	};
-> +};
-> +
-> +&cpu0 {
-> +	cpu-supply = <&reg_dcdc2>;
-> +};
-> +
-> +&ehci0 {
-> +	status = "okay";
-> +};
-> +
-> +&i2c0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2c0_pins_a>;
-> +	status = "okay";
-> +
-> +	axp209: pmic at 34 {
-> +		reg = <0x34>;
-> +		interrupt-parent = <&nmi_intc>;
-> +		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-> +	};
-> +};
-> +
-> +&mmc2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc2_pins_a>;
-> +	vmmc-supply = <&reg_vcc3v3>;
+> 
+> I'm trying to understand what happens in the case where a new request
+> comes along while the previous path is still be traversed.
 
-What regulator is this connected to on the PMIC?
+It just gets aggregated and set and this seems to not be an issue as the
+paths are valid. Now I am trying to keep it simple and if anything needs
+serialization we can add some locking later.
 
-> +	bus-width = <4>;
-> +	non-removable;
-> +	status = "okay";
-> +};
-> +
-> +&mmc3 {
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc3_pins_a>;
-> +	vmmc-supply = <&reg_vcc3v3>;
+> 
+>> +               mutex_unlock(&next->icp->lock);
+>> +               if (ret)
+>> +                       goto out;
+>> +       }
+>> +
+>> +out:
+>> +       return ret;
+>> +}
+>> +
+>> +/**
+>> + * interconnect_get() - return a handle for path between two endpoints
+> 
+> This is not used currently by the msm8916 platform driver? Is this
+> expected to be called by leaf device drivers or by higher layer bus
+> drivers? I suspect a mix of the two, but an example would be nice.
 
-Same question here.
+This is called by a consumer driver to express its for example bandwidth
+needs between various endpoints. Will add some examples.
 
-Looks good otherwise, thanks!
-Maxime
+[..]
+>> +/**
+>> + * struct icp - interconnect provider (controller) entity that might
+>> + * provide multiple interconnect controls
+>> + *
+>> + * @icp_list: list of the registered interconnect providers
+>> + * @nodes: internal list of the interconnect provider nodes
+>> + * @ops: pointer to device specific struct icp_ops
+>> + * @dev: the device this interconnect provider belongs to
+>> + * @lock: a lock to protect creq and users
+>> + * @creq: the actual state of constraints for this interconnect provider
+>> + * @users: count of active users
+>> + * @data: pointer to private data
+>> + */
+>> +struct icp {
+>> +       struct list_head        icp_list;
+>> +       struct list_head        nodes;
+>> +       const struct icp_ops    *ops;
+>> +       struct device           *dev;
+>> +       struct mutex            lock;
+>> +       struct interconnect_creq creq;
+>> +       int                     users;
+>> +       void                    *data;
+>> +};
+> 
+> Use interconnect_provider here instead of icp for the sake of
+> consistency. Same for icp_ops. Or replace everything with any of the
+> other suggested alternatives. My suggestion to the name pool is 'xcon'
+> where x == inter.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171102/aca9b288/attachment.sig>
+Yes i am working on better naming, thanks!
+
+BR,
+Georgi
