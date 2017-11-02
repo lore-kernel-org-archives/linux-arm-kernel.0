@@ -1,34 +1,23 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 1 Nov 2017 22:35:46 -0700
-Subject: [GIT PULL] Amlogic clock driver updates for 4.15
-In-Reply-To: <f83efd53-0600-a4b4-3ee2-089e435a8cb4@baylibre.com>
-References: <f83efd53-0600-a4b4-3ee2-089e435a8cb4@baylibre.com>
-Message-ID: <20171102053546.GM30645@codeaurora.org>
+Date: Wed, 1 Nov 2017 22:55:52 -0700
+Subject: [PATCH v2] clk: sunxi: fix build warning
+In-Reply-To: <20171024170616.24889-1-clabbe.montjoie@gmail.com>
+References: <20171024170616.24889-1-clabbe.montjoie@gmail.com>
+Message-ID: <20171102055552.GQ30645@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/20, Neil Armstrong wrote:
-> Hi Mike, Stephen,
+On 10/24, Corentin Labbe wrote:
+> This patch fix the following build warning:
+> drivers/clk/sunxi/clk-factors.c:279:14: warning: variable 'name' set but not used [-Wunused-but-set-variable]
 > 
-> Below is a request to pull the Amlogic clock driver updates for 4.15.
+> Fixes: 4cbeaebb8af1 ("clk: sunxi: factors: Add unregister function")
 > 
-> Thanks,
-> Neil
-> 
-> The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
-> 
->   Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/baylibre/clk-meson.git tags/meson-clk-for-4.15
-> 
-> for you to fetch changes up to 762a1f2098b2fd4f84ccdb62d5747fff1ad7f816:
-> 
->   clk: meson: gxbb: Add VPU and VAPB clocks data (2017-10-20 10:34:49 +0200)
-> 
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> ---
 
-Thanks. Pulled.
+Applied to clk-next
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
