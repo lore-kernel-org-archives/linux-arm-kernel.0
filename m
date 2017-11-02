@@ -1,55 +1,58 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Thu, 2 Nov 2017 13:11:23 +0000
-Subject: [PATCH] ARM: NOMMU: work around maybe-uninitialized warning
-In-Reply-To: <20171102130734.GZ9463@n2100.armlinux.org.uk>
-References: <20171102092155.737712-1-arnd@arndb.de>
- <681a1757-ddbe-c9a7-6945-fa72600cf172@arm.com>
- <20171102130734.GZ9463@n2100.armlinux.org.uk>
-Message-ID: <fa406984-11dc-a6d9-b181-f0287afd746a@arm.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Thu, 2 Nov 2017 14:13:31 +0100
+Subject: [PATCH v3 6/9] KVM: arm/arm64: Limit icache invalidation to
+ prefetch aborts
+In-Reply-To: <87lgjpufv0.fsf@on-the-bus.cambridge.arm.com>
+References: <20171023161122.15291-1-marc.zyngier@arm.com>
+ <20171023161122.15291-7-marc.zyngier@arm.com>
+ <20171101101727.ysc65qlxwsqe5sfq@kamzik.brq.redhat.com>
+ <87lgjpufv0.fsf@on-the-bus.cambridge.arm.com>
+Message-ID: <20171102131331.nr7p7nflenj6qphm@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/17 13:07, Russell King - ARM Linux wrote:
-> On Thu, Nov 02, 2017 at 12:25:47PM +0000, Vladimir Murzin wrote:
->> On 02/11/17 09:21, Arnd Bergmann wrote:
->>> The reworked MPU code produces a new warning in some configurations,
->>> presumably starting with the code move after the compiler now makes
->>> different inlining decisions:
->>>
->>> arch/arm/mm/pmsa-v7.c: In function 'adjust_lowmem_bounds_mpu':
->>> arch/arm/mm/pmsa-v7.c:310:5: error: 'specified_mem_size' may be used uninitialized in this function [-Werror=maybe-uninitialized]
->>>
->>> This appears to be harmless, as we know that there is always at
->>> least one memblock, and the only way this could get triggered is
->>> if the for_each_memblock() loop was never entered.
->>>
->>> I could not come up with a better workaround than initializing
->>> the specified_mem_size to zero, but at least that is the value
->>> that the variable would have in the hypothetical case of no
->>> memblocks.
->>>
->>> Fixes: 877ec119dbbf ("ARM: 8706/1: NOMMU: Move out MPU setup in separate module")
->>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>> ---
->>> Vladimir, if this looks good to you, can you forward it to Russell's
->>> patch tracker, or otherwise suggest a different fix?
->>
->> Accepted as patch 8719/1. Not sure if Russell will pick it up or not... anyway,
->> thanks for the patch!
+On Thu, Nov 02, 2017 at 10:36:35AM +0000, Marc Zyngier wrote:
+> On Wed, Nov 01 2017 at 11:17:27 am GMT, Andrew Jones <drjones@redhat.com> wrote:
+> > On Mon, Oct 23, 2017 at 05:11:19PM +0100, Marc Zyngier wrote:
+> >> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+> >> index 2174244f6317..0417c8e2a81c 100644
+> >> --- a/virt/kvm/arm/mmu.c
+> >> +++ b/virt/kvm/arm/mmu.c
+> >> @@ -1292,7 +1292,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >>  			  unsigned long fault_status)
+> >>  {
+> >>  	int ret;
+> >> -	bool write_fault, writable, hugetlb = false, force_pte = false;
+> >> +	bool write_fault, exec_fault, writable, hugetlb = false, force_pte = false;
+> >>  	unsigned long mmu_seq;
+> >>  	gfn_t gfn = fault_ipa >> PAGE_SHIFT;
+> >>  	struct kvm *kvm = vcpu->kvm;
+> >> @@ -1304,7 +1304,10 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >>  	unsigned long flags = 0;
+> >>  
+> >>  	write_fault = kvm_is_write_fault(vcpu);
+> >> -	if (fault_status == FSC_PERM && !write_fault) {
+> >> +	exec_fault = kvm_vcpu_trap_is_iabt(vcpu);
+> >> +	VM_BUG_ON(write_fault && exec_fault);
+> >
+> > This VM_BUG_ON can never fire as long as kvm_is_write_fault() is
+> > defined as
+> >
+> >  {
+> >    if (kvm_vcpu_trap_is_iabt(vcpu))
+> >        return false;
+> >    return kvm_vcpu_dabt_iswrite(vcpu);
+> >  }
 > 
-> I'd prefer not to at this stage.  Same things that apply that I said
-> in the "ARM: early_printk: use printascii() rather than printch()"
-> thread - I need to ensure that what I have is stable before 4.14 is
-> released, so I'm not accepting anything further unless it is _really_
-> urgent.
-
-Yes, I saw that thread, it is why that "not sure" thing.
-
+> That's indeed what I expect. But given that the code now relies on this
+> property, I chose to make it explicit.
 > 
-> This isn't urgent.
-> 
+> Or are you seeing a better way of making this an invariant?
+>
 
-Should I resubmit after -rc1 or you'll apply it directly from patch tracker?
+No, I wish I did, because then I wouldn't have to apologize for the
+noise :-) The VM_BUG_ON() does indeed improve the code by documenting/
+enforcing the requirement.
 
-Thanks
-Vladimir
+Thanks,
+drew
