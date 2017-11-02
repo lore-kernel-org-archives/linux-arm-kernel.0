@@ -1,51 +1,149 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed,  1 Nov 2017 18:03:56 -0700
-Subject: [PATCH 00/12] bcm63xx-rng conversion to bcm2835-rng
-Message-ID: <20171102010408.27736-1-f.fainelli@gmail.com>
+Date: Wed,  1 Nov 2017 18:03:58 -0700
+Subject: [PATCH 02/12] hwrng: bcm2835-rng: Define a driver private context
+In-Reply-To: <20171102010408.27736-1-f.fainelli@gmail.com>
+References: <20171102010408.27736-1-f.fainelli@gmail.com>
+Message-ID: <20171102010408.27736-3-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Instead of making hwrng::priv host the base register address, define a
+driver private context, make it per platform device instance and pass it
+down the different functions.
 
-As it usually happens when there is a fair amount of HW IP block re-use,
-competing implementations show up. In that case the BCM2835 HWRNG driver and
-the BCM63xx RNG driver have exactly the same register offsets and this is
-indeed the same piece of HW.
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ drivers/char/hw_random/bcm2835-rng.c | 55 ++++++++++++++++++++++--------------
+ 1 file changed, 34 insertions(+), 21 deletions(-)
 
-This patch series first prepares the bcm2835-rng to be more future proof and
-support newer platforms, and the last part brings in what is necessary to
-migrate the bcm63xx-rng over to bcm2835-rng. Finally we delete bcm63xx-rng
-completely.
-
-The reason why BCM2835 RNG was kept over BCM63xx RNG is because the former
-deals correctly with a warm up count and the number of words available in the
-FIFO size.
-
-Thanks!
-
-Florian Fainelli (12):
-  hwrng: bcm2835-rng: Obtain base register via resource
-  hwrng: bcm2835-rng: Define a driver private context
-  hwrng: bcm2835-rng: Move enabling to hwrng::init
-  hwrng: bcm2835-rng: Implementation cleanup callback
-  hwrng: bcm2835-rng: Use device managed helpers
-  hwrng: bcm2835-rng: Rework interrupt masking
-  hwrng: bcm2835-rng: Manage an optional clock
-  hwrng: bcm2835-rng: Abstract I/O accessors
-  hwrng: bcm2835-rng: Add Broadcom MIPS I/O accessors
-  dt-bindings: rng: Incorporate brcm,bcm6368.txt binding
-  hwrng: bcm2835-rng: Enable BCM2835 RNG to work on BCM63xx platforms
-  hwrng: bcm63xx-rng: Remove since bcm2835-rng takes over
-
- .../devicetree/bindings/rng/brcm,bcm2835.txt       |  22 ++-
- .../devicetree/bindings/rng/brcm,bcm6368.txt       |  17 ---
- drivers/char/hw_random/Kconfig                     |  20 +--
- drivers/char/hw_random/Makefile                    |   1 -
- drivers/char/hw_random/bcm2835-rng.c               | 166 ++++++++++++++-------
- drivers/char/hw_random/bcm63xx-rng.c               | 154 -------------------
- 6 files changed, 139 insertions(+), 241 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/rng/brcm,bcm6368.txt
- delete mode 100644 drivers/char/hw_random/bcm63xx-rng.c
-
+diff --git a/drivers/char/hw_random/bcm2835-rng.c b/drivers/char/hw_random/bcm2835-rng.c
+index a818418a7e4c..0d72147ab45b 100644
+--- a/drivers/char/hw_random/bcm2835-rng.c
++++ b/drivers/char/hw_random/bcm2835-rng.c
+@@ -29,6 +29,11 @@
+ 
+ #define RNG_INT_OFF	0x1
+ 
++struct bcm2835_rng_priv {
++	struct hwrng rng;
++	void __iomem *base;
++};
++
+ static void __init nsp_rng_init(void __iomem *base)
+ {
+ 	u32 val;
+@@ -39,34 +44,34 @@ static void __init nsp_rng_init(void __iomem *base)
+ 	writel(val, base + RNG_INT_MASK);
+ }
+ 
++static inline struct bcm2835_rng_priv *to_rng_priv(struct hwrng *rng)
++{
++	return container_of(rng, struct bcm2835_rng_priv, rng);
++}
++
+ static int bcm2835_rng_read(struct hwrng *rng, void *buf, size_t max,
+ 			       bool wait)
+ {
+-	void __iomem *rng_base = (void __iomem *)rng->priv;
++	struct bcm2835_rng_priv *priv = to_rng_priv(rng);
+ 	u32 max_words = max / sizeof(u32);
+ 	u32 num_words, count;
+ 
+-	while ((__raw_readl(rng_base + RNG_STATUS) >> 24) == 0) {
++	while ((__raw_readl(priv->base + RNG_STATUS) >> 24) == 0) {
+ 		if (!wait)
+ 			return 0;
+ 		cpu_relax();
+ 	}
+ 
+-	num_words = readl(rng_base + RNG_STATUS) >> 24;
++	num_words = readl(priv->base + RNG_STATUS) >> 24;
+ 	if (num_words > max_words)
+ 		num_words = max_words;
+ 
+ 	for (count = 0; count < num_words; count++)
+-		((u32 *)buf)[count] = readl(rng_base + RNG_DATA);
++		((u32 *)buf)[count] = readl(priv->base + RNG_DATA);
+ 
+ 	return num_words * sizeof(u32);
+ }
+ 
+-static struct hwrng bcm2835_rng_ops = {
+-	.name	= "bcm2835",
+-	.read	= bcm2835_rng_read,
+-};
+-
+ static const struct of_device_id bcm2835_rng_of_match[] = {
+ 	{ .compatible = "brcm,bcm2835-rng"},
+ 	{ .compatible = "brcm,bcm-nsp-rng", .data = nsp_rng_init},
+@@ -80,19 +85,27 @@ static int bcm2835_rng_probe(struct platform_device *pdev)
+ 	struct device_node *np = dev->of_node;
+ 	void (*rng_setup)(void __iomem *base);
+ 	const struct of_device_id *rng_id;
+-	void __iomem *rng_base;
++	struct bcm2835_rng_priv *priv;
+ 	struct resource *r;
+ 	int err;
+ 
++	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	platform_set_drvdata(pdev, priv);
++
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 
+ 	/* map peripheral */
+-	rng_base = devm_ioremap_resource(dev, r);
+-	if (IS_ERR(rng_base)) {
++	priv->base = devm_ioremap_resource(dev, r);
++	if (IS_ERR(priv->base)) {
+ 		dev_err(dev, "failed to remap rng regs");
+-		return PTR_ERR(rng_base);
++		return PTR_ERR(priv->base);
+ 	}
+-	bcm2835_rng_ops.priv = (unsigned long)rng_base;
++
++	priv->rng.name = "bcm2835-rng";
++	priv->rng.read = bcm2835_rng_read;
+ 
+ 	rng_id = of_match_node(bcm2835_rng_of_match, np);
+ 	if (!rng_id)
+@@ -101,14 +114,14 @@ static int bcm2835_rng_probe(struct platform_device *pdev)
+ 	/* Check for rng init function, execute it */
+ 	rng_setup = rng_id->data;
+ 	if (rng_setup)
+-		rng_setup(rng_base);
++		rng_setup(priv->base);
+ 
+ 	/* set warm-up count & enable */
+-	__raw_writel(RNG_WARMUP_COUNT, rng_base + RNG_STATUS);
+-	__raw_writel(RNG_RBGEN, rng_base + RNG_CTRL);
++	__raw_writel(RNG_WARMUP_COUNT, priv->base + RNG_STATUS);
++	__raw_writel(RNG_RBGEN, priv->base + RNG_CTRL);
+ 
+ 	/* register driver */
+-	err = hwrng_register(&bcm2835_rng_ops);
++	err = hwrng_register(&priv->rng);
+ 	if (err)
+ 		dev_err(dev, "hwrng registration failed\n");
+ 	else
+@@ -119,13 +132,13 @@ static int bcm2835_rng_probe(struct platform_device *pdev)
+ 
+ static int bcm2835_rng_remove(struct platform_device *pdev)
+ {
+-	void __iomem *rng_base = (void __iomem *)bcm2835_rng_ops.priv;
++	struct bcm2835_rng_priv *priv = platform_get_drvdata(pdev);
+ 
+ 	/* disable rng hardware */
+-	__raw_writel(0, rng_base + RNG_CTRL);
++	__raw_writel(0, priv->base + RNG_CTRL);
+ 
+ 	/* unregister driver */
+-	hwrng_unregister(&bcm2835_rng_ops);
++	hwrng_unregister(&priv->rng);
+ 
+ 	return 0;
+ }
 -- 
 2.9.3
