@@ -1,71 +1,86 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 2 Nov 2017 13:43:07 +0900
-Subject: [PATCH 1/2] arm64: Fix static use of function graph
-In-Reply-To: <1509546824-46165-2-git-send-email-julien.thierry@arm.com>
-References: <1509546824-46165-1-git-send-email-julien.thierry@arm.com>
- <1509546824-46165-2-git-send-email-julien.thierry@arm.com>
-Message-ID: <20171102044306.GL10563@linaro.org>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 2 Nov 2017 10:18:51 +0530
+Subject: [PATCH] mailbox: add support for doorbell/signal mode controllers
+In-Reply-To: <20171102032728.GI28761@minitux>
+References: <1509553964-4451-1-git-send-email-sudeep.holla@arm.com>
+ <CABb+yY1tcm-68E5oG75hstuMd6AOeb=BB6HeKGnQ1zj4Qya6hg@mail.gmail.com>
+ <59a05fcb-ff30-0683-144e-93521a7413f9@arm.com>
+ <20171101221709.GB28761@minitux>
+ <CABb+yY0unrs-LpqFyh1ibVO00ztA+=i_1-+MpRCrG5mLsWoiSw@mail.gmail.com>
+ <20171102032728.GI28761@minitux>
+Message-ID: <CABb+yY3aXQHy2Y1DSxnFzho+6mfPQ442cCNag0QEGEuf3XZB6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 01, 2017 at 02:33:43PM +0000, Julien Thierry wrote:
-> Function graph does not work currently when CONFIG_DYNAMIC_TRACE is not
-> set. This is because ftrace_function_trace is not always set to ftrace_stub
-> when function_graph is in use.
-> 
-> Do not skip checking of graph tracer functions when ftrace_function_trace
-> is set.
-> 
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: AKASHI Takahiro <takahiro.akashi@linaro.org>
+On Thu, Nov 2, 2017 at 8:57 AM, Bjorn Andersson
+<bjorn.andersson@linaro.org> wrote:
+> On Wed 01 Nov 20:02 PDT 2017, Jassi Brar wrote:
+>
+>> On Thu, Nov 2, 2017 at 3:47 AM, Bjorn Andersson
+>> <bjorn.andersson@linaro.org> wrote:
+>> > On Wed 01 Nov 11:15 PDT 2017, Sudeep Holla wrote:
+>> >>
+>> >>  80         writel_relaxed(msg->cmd, mb->mbox_base +
+>> >> MAILBOX_A2B_CMD(chans->idx));
+>> >>  81         writel_relaxed(msg->rx_size, mb->mbox_base +
+>> >>
+>> >>  82                        MAILBOX_A2B_DAT(chans->idx));
+>> >>
+>> >>  83
+>> >
+>> > This is just terrible, using the void *mssg to pass a struct which is
+>> > interpreted by the controller removes any form of abstraction provided
+>> > by the framework.
+>> >
+>> > In my view the void *mssg should point to the data to be written in the
+>> > mailbox register, and hence might be of different size - but only of
+>> > native type.
+>> >
+>> Please note the terrible 'rx_size' is not a software option - the
+>> hardware has a DAT register so the driver rightfully allows a client
+>> to write a value in that as well.
+>
+> Okay, so the interface exposed by the mailbox driver is not { cmd,
+> rx_size } but rather __le32 data[2], or perhaps a generic { cmd, data }.
+> That sounds more generic.
+>
+>
+> I think it would be good to replace the totally opaque void * with some
+> sort of structured data type and having the framework ensure that
+> clients and controllers are compatible. That would, by design, allow for
+> reuse between controllers and clients.
+>
+> Perhaps something like:
+>
+> enum mbox_msg_type {
+>         MBOX_MSG_TYPE_NULL,
+>         MBOX_MSG_TYPE_U32,
+>         MBOX_MSG_TYPE_CMD_DATA,
+> };
+>
+> struct mbox_msg {
+>         enum mbox_msg_type type;
+>
+>         union {
+>                 u32 u;
+>                 struct {
+>                         u32 cmd;
+>                         u32 data;
+>                 } cd;
+>         };
+> };
+>
+> And have the controller register for a specific "type", so the framework
+> could validate that the type of data being passed matches the hardware.
+>
+> Have you had any thoughts around this before?
+>
+Yes. Different controllers have different capabilities... some have
+32bits data register, some have 4x32bits deep fifos and some 8x32bits
+deep.... while some traverse descriptor rings. Even with all these
+termed 'standard' options, the clients still have to understand the
+underlying controller and what the remote expects it to behave and do
+very platform specific tasks. So mailbox clients are inherently
+difficult to be reusable on other platforms.
 
-Reviewed-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-
-I think that arm has the same issue, hoping the following patch
-will fix it:
-===
->From e25bcf50d1acde698285a0c64f72d97f8b17e3fb Mon Sep 17 00:00:00 2001
-From: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Date: Thu, 2 Nov 2017 11:35:04 +0900
-Subject: [PATCH] arm: ftrace: function_graph with DYNAMIC_FTRACE
-
----
- arch/arm/kernel/entry-ftrace.S | 12 +++++-------
- 1 file changed, 5 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/kernel/entry-ftrace.S b/arch/arm/kernel/entry-ftrace.S
-index efcd9f25a14b..ef94c73ad996 100644
---- a/arch/arm/kernel/entry-ftrace.S
-+++ b/arch/arm/kernel/entry-ftrace.S
-@@ -68,8 +68,12 @@
- 	ldr	r2, [r0]
- 	adr	r0, .Lftrace_stub
- 	cmp	r0, r2
--	bne	1f
-+	beq	1f
- 
-+ 	mcount_get_lr	r1			@ lr of instrumented func
-+	mcount_adjust_addr	r0, lr		@ instrumented function
-+	blx	r2
-+1:
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
- 	ldr     r1, =ftrace_graph_return
- 	ldr     r2, [r1]
-@@ -84,12 +88,6 @@
- #endif
- 
- 	mcount_exit
--
--1: 	mcount_get_lr	r1			@ lr of instrumented func
--	mcount_adjust_addr	r0, lr		@ instrumented function
--	badr	lr, 2f
--	mov	pc, r2
--2:	mcount_exit
- .endm
- 
- #ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
--- 
-2.14.1
+cheers
