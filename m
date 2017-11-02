@@ -1,19 +1,21 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 2 Nov 2017 01:12:03 -0700
-Subject: [PATCH v2 3/4] clk: mediatek: add clock support for MT7622 SoC
-In-Reply-To: <9d8aa50c0e9f45e7a7fbb3e0682e7d8ed72a0205.1507174799.git.sean.wang@mediatek.com>
+Date: Thu, 2 Nov 2017 01:12:05 -0700
+Subject: [PATCH v2 2/4] clk: mediatek: add the option for determining PLL
+ source clock
+In-Reply-To: <b90d46284cb527d1412352606912f5e8d18b3e53.1507174799.git.sean.wang@mediatek.com>
 References: <cover.1507174799.git.sean.wang@mediatek.com>
- <9d8aa50c0e9f45e7a7fbb3e0682e7d8ed72a0205.1507174799.git.sean.wang@mediatek.com>
-Message-ID: <20171102081203.GF11011@codeaurora.org>
+ <b90d46284cb527d1412352606912f5e8d18b3e53.1507174799.git.sean.wang@mediatek.com>
+Message-ID: <20171102081205.GG11011@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 10/05, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
+> From: Chen Zhong <chen.zhong@mediatek.com>
 > 
-> Add all supported clocks exported from every susbystem found on MT7622 SoC
-> such as topckgen, apmixedsys, infracfg, pericfg , pciessys, ssusbsys,
-> ethsys and audsys.
+> Since the previous setup always sets the PLL using crystal 26MHz, this
+> doesn't always happen in every MediaTek platform. So the patch added
+> flexibility for assigning extra member for determining the PLL source
+> clock.
 > 
 > Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
 > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
