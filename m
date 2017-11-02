@@ -1,33 +1,104 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 2 Nov 2017 07:50:02 -0500
-Subject: [PATCH] dmaengine: dmatest: bug out when dma test times out
-In-Reply-To: <21c3bb47-8ce6-fb53-9087-5f6bd3250bae@codeaurora.org>
-References: <1509565797-5219-1-git-send-email-awallis@codeaurora.org>
- <20171102081758.GD3187@localhost>
- <21c3bb47-8ce6-fb53-9087-5f6bd3250bae@codeaurora.org>
-Message-ID: <36367ec9-61b1-9701-2dec-667b175ed90d@codeaurora.org>
+From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
+Date: Thu, 2 Nov 2017 12:49:32 +0000
+Subject: [RFCv2 PATCH 14/36] iommu/arm-smmu-v3: Add support for
+ Substream IDs
+In-Reply-To: <20171006133203.22803-15-jean-philippe.brucker@arm.com>
+References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
+ <20171006133203.22803-15-jean-philippe.brucker@arm.com>
+Message-ID: <5FC3163CFD30C246ABAA99954A238FA838454887@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/02/2017 07:11 AM, Adam Wallis wrote:
->> This will essentially kill the system. People have been trying to remove
->> usage of BUG(), we should not do that. Complaining violently makes sense..
->>
-> Understood. In my testing, the system is effectively shot if you run the dmatest
-> in a tight enough loop, however, at least using a WARN would alert the user that
-> the kernel might be in an unstable state. I will submit another patch with a
-> WARN, even though, I hope a proper fix can be introduced at some point. I am not
-> familiar enough with this code to propose such a fix at the moment though.
+Hi Jean,
 
-I think Adam's original patch is correct, because as he said, the code 
-as it is today corrupts the kernel.  The BUG() is a stop-cap measure to 
-prevent the user from thinking that the kernel is stable when it isn't.
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org]
+> On Behalf Of Jean-Philippe Brucker
+> Sent: Friday, October 06, 2017 2:32 PM
+> To: linux-arm-kernel at lists.infradead.org; linux-pci at vger.kernel.org; linux-
+> acpi at vger.kernel.org; devicetree at vger.kernel.org; iommu at lists.linux-
+> foundation.org
+> Cc: mark.rutland at arm.com; xieyisheng (A) <xieyisheng1@huawei.com>;
+> Gabriele Paoloni <gabriele.paoloni@huawei.com>; catalin.marinas at arm.com;
+> will.deacon at arm.com; okaya at codeaurora.org; yi.l.liu at intel.com;
+> lorenzo.pieralisi at arm.com; ashok.raj at intel.com; tn at semihalf.com;
+> joro at 8bytes.org; rfranz at cavium.com; lenb at kernel.org;
+> jacob.jun.pan at linux.intel.com; alex.williamson at redhat.com;
+> robh+dt at kernel.org; Leizhen (ThunderTown) <thunder.leizhen@huawei.com>;
+> bhelgaas at google.com; dwmw2 at infradead.org; liubo (CU)
+> <liubo95@huawei.com>; rjw at rjwysocki.net; robdclark at gmail.com;
+> hanjun.guo at linaro.org; sudeep.holla at arm.com; robin.murphy at arm.com;
+> nwatters at codeaurora.org
+> Subject: [RFCv2 PATCH 14/36] iommu/arm-smmu-v3: Add support for
+> Substream IDs
+> 
+> At the moment, the SMMUv3 driver offers only one stage-1 or stage-2
+> address space to each device. SMMUv3 allows to associate multiple address
+> spaces per device. In addition to the Stream ID (SID), that identifies a
+> device, we can now have Substream IDs (SSID) identifying an address space.
+> In PCIe lingo, SID is called Requester ID (RID) and SSID is called Process
+> Address-Space ID (PASID).
 
-So I think that either dmatest gets fixed properly today (which Adam 
-said he cannot do), or you should apply his patch until the code can get 
-fixed.
+We had a go with this series on HiSIlicon D05 platform which doesn't have
+support for ssids/ATS/PRI, to make sure it generally works.
 
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+But observed the below crash on boot,
+
+[   16.009084] WARNING: CPU: 59 PID: 391 at mm/page_alloc.c:3883 __alloc_pages_nodemask+0x19c/0xc48
+[   16.026797] Modules linked in:
+[   16.032944] CPU: 59 PID: 391 Comm: kworker/59:1 Not tainted 4.14.0-rc1-159539-ge42aca3 #236
+[...]
+[   16.068206] Workqueue: events deferred_probe_work_func
+[   16.078557] task: ffff8017d38a0000 task.stack: ffff00000b198000
+[   16.090486] PC is at __alloc_pages_nodemask+0x19c/0xc48
+[   16.101013] LR is at __alloc_pages_nodemask+0xe0/0xc48
+[   16.469220] [<ffff000008186b94>] __alloc_pages_nodemask+0x19c/0xc48
+[   16.481854] [<ffff0000081d65b0>] alloc_pages_current+0x80/0xcc
+[   16.493607] [<ffff000008182be8>] __get_free_pages+0xc/0x38
+[   16.504661] [<ffff0000083c4d58>] swiotlb_alloc_coherent+0x64/0x190
+[   16.517117] [<ffff00000809824c>] __dma_alloc+0x110/0x204
+[   16.527820] [<ffff00000858e850>] dmam_alloc_coherent+0x88/0xf0
+[   16.539575] [<ffff000008568884>] arm_smmu_domain_finalise_s1+0x60/0x248
+[   16.552909] [<ffff00000856c104>] arm_smmu_attach_dev+0x264/0x300
+[   16.565013] [<ffff00000855d40c>] __iommu_attach_device+0x48/0x5c
+[   16.577117] [<ffff00000855e698>] iommu_group_add_device+0x144/0x3a4
+[   16.589746] [<ffff00000855ed18>] iommu_group_get_for_dev+0x70/0xf8
+[   16.602201] [<ffff00000856a314>] arm_smmu_add_device+0x1a4/0x418
+[   16.614308] [<ffff00000849dfcc>] iort_iommu_configure+0xf0/0x16c
+[   16.626416] [<ffff000008468c50>] acpi_dma_configure+0x30/0x70
+[   16.637994] [<ffff00000858f00c>] dma_configure+0xa8/0xd4
+[   16.648695] [<ffff00000857706c>] driver_probe_device+0x1a4/0x2dc
+[   16.673081] [<ffff0000085752c8>] bus_for_each_drv+0x54/0x94
+[   16.684307] [<ffff000008576db0>] __device_attach+0xc4/0x12c
+[   16.695533] [<ffff000008577350>] device_initial_probe+0x10/0x18
+[   16.707462] [<ffff0000085762b4>] bus_probe_device+0x90/0x98
+
+After a bit of debug it looks like on platforms where ssid is not supported,
+s1_cfg.num_contexts is set to zero and it eventually results in this crash 
+in,
+arm_smmu_domain_finalise_s1() -->arm_smmu_alloc_cd_tables()-->
+arm_smmu_alloc_cd_leaf_table() as num_leaf_entries is zero.
+
+With the below fix, it works on D05 now,
+
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 8ad90e2..51f5821 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -2433,7 +2433,10 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain,
+                        domain->min_pasid = 1;
+                        domain->max_pasid = master->num_ssids - 1;
+                        smmu_domain->s1_cfg.num_contexts = master->num_ssids;
++               } else {
++                       smmu_domain->s1_cfg.num_contexts = 1;
+                }
++
+                smmu_domain->s1_cfg.can_stall = master->ste.can_stall;
+                break;
+        case ARM_SMMU_DOMAIN_NESTED:
+
+
+I am not sure this is right place do this. Please take a look.
+
+Thanks,
+Shameer
