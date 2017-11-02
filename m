@@ -1,81 +1,224 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Thu, 2 Nov 2017 23:25:43 +0530
-Subject: [PATCH 1/3] arm64: dts: actions: add s900 clock controller nodes
-In-Reply-To: <20171102000616.ug7s7s6fmnubq7y5@rob-hp-laptop>
-References: <1509479663-8985-1-git-send-email-manivannan.sadhasivam@linaro.org>
- <1509479663-8985-2-git-send-email-manivannan.sadhasivam@linaro.org>
- <20171102000616.ug7s7s6fmnubq7y5@rob-hp-laptop>
-Message-ID: <CAOZjjh=zCEEcKVN9Lop2Mhkcw79GP=XcN=J1f2wevnq8OHv0Uw@mail.gmail.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Thu, 2 Nov 2017 18:11:05 +0000
+Subject: [PATCH V3 05/11] clk: sprd: add mux clock support
+In-Reply-To: <20171102065626.21835-6-chunyan.zhang@spreadtrum.com>
+References: <20171102065626.21835-1-chunyan.zhang@spreadtrum.com>
+ <20171102065626.21835-6-chunyan.zhang@spreadtrum.com>
+Message-ID: <532aed43-03bf-ea26-bdc2-d7deb1093f53@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi,
 
-On 2 November 2017 at 05:36, Rob Herring <robh@kernel.org> wrote:
-> On Wed, Nov 01, 2017 at 01:24:21AM +0530, Manivannan Sadhasivam wrote:
->> This patch adds clock controller nodes for Actions Semi s900 SoC
->>
->> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
->> ---
->>  arch/arm64/boot/dts/actions/s900.dtsi | 19 +++++++++++++++++++
->>  1 file changed, 19 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/actions/s900.dtsi b/arch/arm64/boot/dts/actions/s900.dtsi
->> index 11406f6..c099ef1 100644
->> --- a/arch/arm64/boot/dts/actions/s900.dtsi
->> +++ b/arch/arm64/boot/dts/actions/s900.dtsi
->> @@ -5,6 +5,7 @@
->>   */
->>
->>  #include <dt-bindings/interrupt-controller/arm-gic.h>
->> +#include <dt-bindings/clock/actions,s900-clock.h>
->>
->>  / {
->>       compatible = "actions,s900";
->> @@ -88,6 +89,24 @@
->>               #clock-cells = <0>;
->>       };
->>
->> +     losc: losc {
->> +             compatible = "fixed-clock";
->> +             clock-frequency = <32768>;
->> +             #clock-cells = <0>;
->> +     };
->> +
->> +     diff_24M: diff_24M {
->> +             compatible = "fixed-clock";
->> +             clock-frequency = <24000000>;
->> +             #clock-cells = <0>;
->> +     };
->
-> These 2 are inputs to the clock ctrlr? The clock controller should have
-> a clocks property then.
->
-Actually losc and hosc (already defined) are the sources to the clock
-controller.
-There isn't much documentation about diff_24M clock which seems to be only
-sourcing eDP. Since, the vendor driver defined these 3 clocks (losc,
-hosc, diff_24M)
-as fixed rate clocks I have added them in the device tree as
-"fixed-clock" nodes.
+On 02/11/17 06:56, Chunyan Zhang wrote:
+> This patch adds clock multiplexor support for Spreadtrum platforms,
+> the mux clocks also can be found in sprd composite clocks, so
+> provides two helpers that can be reused later on.
+> 
+> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+> ---
+>   drivers/clk/sprd/Makefile |  1 +
+>   drivers/clk/sprd/mux.c    | 89 +++++++++++++++++++++++++++++++++++++++++++++++
+>   drivers/clk/sprd/mux.h    | 65 ++++++++++++++++++++++++++++++++++
+>   3 files changed, 155 insertions(+)
+>   create mode 100644 drivers/clk/sprd/mux.c
+>   create mode 100644 drivers/clk/sprd/mux.h
+> 
+> diff --git a/drivers/clk/sprd/Makefile b/drivers/clk/sprd/Makefile
+> index 8cd5592..cee36b5 100644
+> --- a/drivers/clk/sprd/Makefile
+> +++ b/drivers/clk/sprd/Makefile
+> @@ -2,3 +2,4 @@ obj-$(CONFIG_SPRD_COMMON_CLK)	+= clk-sprd.o
+>   
+>   clk-sprd-y	+= common.o
+>   clk-sprd-y	+= gate.o
+> +clk-sprd-y	+= mux.o
+> diff --git a/drivers/clk/sprd/mux.c b/drivers/clk/sprd/mux.c
+> new file mode 100644
+> index 0000000..5a344e0
+> --- /dev/null
+> +++ b/drivers/clk/sprd/mux.c
+> @@ -0,0 +1,89 @@
+> +/*
+> + * Spreadtrum multiplexer clock driver
+> + *
+> + * Copyright (C) 2017 Spreadtrum, Inc.
+> + * Author: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+> + *
+> + * SPDX-License-Identifier: GPL-2.0
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/regmap.h>
+> +
+> +#include "mux.h"
+> +
+> +DEFINE_SPINLOCK(sprd_mux_lock);
+> +EXPORT_SYMBOL_GPL(sprd_mux_lock);
+> +
+> +u8 sprd_mux_helper_get_parent(const struct sprd_clk_common *common,
+> +			      const struct sprd_mux_internal *mux)
+> +{
+> +	unsigned int reg;
+> +	u8 parent;
+> +	int num_parents;
+> +	int i;
+> +
+> +	sprd_regmap_read(common->regmap, common->reg, &reg);
+> +	parent = reg >> mux->shift;
+> +	parent &= (1 << mux->width) - 1;
+> +
+> +	if (mux->table) {
+> +		num_parents = clk_hw_get_num_parents(&common->hw);
+> +
+> +		for (i = 0; i < num_parents; i++)
+> +			if (parent == mux->table[i] ||
+> +			    (i < (num_parents - 1) && parent > mux->table[i] &&
+> +			     parent < mux->table[i + 1]))
+> +				return i;
+> +		if (i == num_parents)
+> +			return i - 1;
 
-So, as per your suggestion I will add hosc and losc as clock providers for the
-clock controller like below in next revision:
+The if branch is not necessary since you only get there when the loop 
+has finished, so the condition is always true. And the loop can be 
+simplified to:
 
-clocks = <&hosc>,  <&losc>;
+for (i = 0; i < num_parents - 1; i++)
+	if (parent >= mux->table[i] &&  parent < mux->table[i + 1])
+		return i;
 
-Thanks,
-Mani
->> +
->> +     clock: clock-controller at e0160000 {
->> +             compatible = "actions,s900-clock";
->> +             reg = <0 0xe0160000 0 0x1000>;
->> +             #clock-cells = <1>;
->> +     };
->> +
->>       soc {
->>               compatible = "simple-bus";
->>               #address-cells = <2>;
->> --
->> 2.7.4
->>
+return num_parents;
+
+
+> +	}
+> +
+> +	return parent;
+> +}
+> +EXPORT_SYMBOL_GPL(sprd_mux_helper_get_parent);
+> +
+> +static u8 sprd_mux_get_parent(struct clk_hw *hw)
+> +{
+> +	struct sprd_mux *cm = hw_to_sprd_mux(hw);
+> +
+> +	return sprd_mux_helper_get_parent(&cm->common, &cm->mux);
+> +}
+> +
+> +int sprd_mux_helper_set_parent(const struct sprd_clk_common *common,
+> +			       const struct sprd_mux_internal *mux,
+> +			       u8 index)
+> +{
+> +	unsigned long flags = 0;
+> +	unsigned int reg;
+> +
+> +	if (mux->table)
+> +		index = mux->table[index];
+> +
+> +	spin_lock_irqsave(common->lock, flags);
+> +
+> +	sprd_regmap_read(common->regmap, common->reg, &reg);
+> +	reg &= ~GENMASK(mux->width + mux->shift - 1, mux->shift);
+> +	sprd_regmap_write(common->regmap, common->reg,
+> +			  reg | (index << mux->shift));
+> +
+> +	spin_unlock_irqrestore(common->lock, flags);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(sprd_mux_helper_set_parent);
+> +
+> +static int sprd_mux_set_parent(struct clk_hw *hw, u8 index)
+> +{
+> +	struct sprd_mux *cm = hw_to_sprd_mux(hw);
+> +
+> +	return sprd_mux_helper_set_parent(&cm->common, &cm->mux, index);
+> +}
+> +
+> +const struct clk_ops sprd_mux_ops = {
+> +	.get_parent = sprd_mux_get_parent,
+> +	.set_parent = sprd_mux_set_parent,
+> +	.determine_rate = __clk_mux_determine_rate,
+> +};
+> +EXPORT_SYMBOL_GPL(sprd_mux_ops);
+
+Same as with the other patch, I'd recommend have one set of ops for 
+direct mux and another one for a mux using a table to map the parents. 
+Keeping functions for both modes separate.
+
+Cheers,
+
+> diff --git a/drivers/clk/sprd/mux.h b/drivers/clk/sprd/mux.h
+> new file mode 100644
+> index 0000000..148ca8c
+> --- /dev/null
+> +++ b/drivers/clk/sprd/mux.h
+> @@ -0,0 +1,65 @@
+> +/*
+> + * Spreadtrum multiplexer clock driver
+> + *
+> + * Copyright (C) 2017 Spreadtrum, Inc.
+> + * Author: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+> + *
+> + * SPDX-License-Identifier: GPL-2.0
+> + */
+> +
+> +#ifndef _SPRD_MUX_H_
+> +#define _SPRD_MUX_H_
+> +
+> +#include "common.h"
+> +
+> +struct sprd_mux_internal {
+> +	u8		shift;
+> +	u8		width;
+> +	const u8	*table;
+> +};
+> +
+> +struct sprd_mux {
+> +	struct sprd_mux_internal mux;
+> +	struct sprd_clk_common	common;
+> +};
+> +
+> +#define _SPRD_MUX_CLK(_shift, _width, _table)		\
+> +	{						\
+> +		.shift	= _shift,			\
+> +		.width	= _width,			\
+> +		.table	= _table,			\
+> +	}
+> +
+> +#define SPRD_MUX_CLK(_struct, _name, _parents, _table,			\
+> +				     _reg, _shift, _width,		\
+> +				     _flags)				\
+> +	struct sprd_mux _struct = {					\
+> +		.mux	= _SPRD_MUX_CLK(_shift, _width, _table),	\
+> +		.common	= {						\
+> +			.regmap		= NULL,				\
+> +			.reg		= _reg,				\
+> +			.lock		= &sprd_mux_lock,		\
+> +			.hw.init = CLK_HW_INIT_PARENTS(_name,		\
+> +						       _parents,	\
+> +						       &sprd_mux_ops,	\
+> +						       _flags),		\
+> +		}							\
+> +	}
+> +
+> +static inline struct sprd_mux *hw_to_sprd_mux(const struct clk_hw *hw)
+> +{
+> +	struct sprd_clk_common *common = hw_to_sprd_clk_common(hw);
+> +
+> +	return container_of(common, struct sprd_mux, common);
+> +}
+> +
+> +extern const struct clk_ops sprd_mux_ops;
+> +extern spinlock_t sprd_mux_lock;
+> +
+> +u8 sprd_mux_helper_get_parent(const struct sprd_clk_common *common,
+> +			      const struct sprd_mux_internal *mux);
+> +int sprd_mux_helper_set_parent(const struct sprd_clk_common *common,
+> +			       const struct sprd_mux_internal *mux,
+> +			       u8 index);
+> +
+> +#endif /* _SPRD_MUX_H_ */
+> 
+
+-- 
+Julien Thierry
