@@ -1,9 +1,9 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 2 Nov 2017 20:00:40 +0100 (CET)
+Date: Thu, 2 Nov 2017 20:01:00 +0100 (CET)
 Subject: [PATCH 00/12] bcm63xx-rng conversion to bcm2835-rng
 In-Reply-To: <20171102010408.27736-1-f.fainelli@gmail.com>
 References: <20171102010408.27736-1-f.fainelli@gmail.com>
-Message-ID: <1883956051.127519.1509649240138@email.1und1.de>
+Message-ID: <1329593033.127526.1509649260041@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
