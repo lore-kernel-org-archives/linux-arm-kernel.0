@@ -1,36 +1,37 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Nov 2017 13:47:37 +0000
-Subject: [PATCH] ARM: NOMMU: work around maybe-uninitialized warning
-In-Reply-To: <fa406984-11dc-a6d9-b181-f0287afd746a@arm.com>
-References: <20171102092155.737712-1-arnd@arndb.de>
- <681a1757-ddbe-c9a7-6945-fa72600cf172@arm.com>
- <20171102130734.GZ9463@n2100.armlinux.org.uk>
- <fa406984-11dc-a6d9-b181-f0287afd746a@arm.com>
-Message-ID: <20171102134737.GA9463@n2100.armlinux.org.uk>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 2 Nov 2017 15:13:47 +0100
+Subject: [PATCH v6 03/12] arm64: dts: mt8173: remove "mediatek, mt8135-mmc"
+ from mmc nodes
+In-Reply-To: <b24d12e4-251f-6f79-1ed9-5b52f8f39625@gmail.com>
+References: <1508118399-21828-1-git-send-email-chaotian.jing@mediatek.com>
+ <1508118399-21828-4-git-send-email-chaotian.jing@mediatek.com>
+ <CAPDyKFrRVT8YFXvy3Wuf_jga5oourScOdas34U=YkeLRzHoWMg@mail.gmail.com>
+ <b24d12e4-251f-6f79-1ed9-5b52f8f39625@gmail.com>
+Message-ID: <CAPDyKFp5Ez_NXWtSeTt+nsgJtesS3t_tbUpgFco8ZVAPj+PgoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 02, 2017 at 01:11:23PM +0000, Vladimir Murzin wrote:
-> On 02/11/17 13:07, Russell King - ARM Linux wrote:
-> > I'd prefer not to at this stage.  Same things that apply that I said
-> > in the "ARM: early_printk: use printascii() rather than printch()"
-> > thread - I need to ensure that what I have is stable before 4.14 is
-> > released, so I'm not accepting anything further unless it is _really_
-> > urgent.
-> 
-> Yes, I saw that thread, it is why that "not sure" thing.
-> 
-> > 
-> > This isn't urgent.
-> > 
-> 
-> Should I resubmit after -rc1 or you'll apply it directly from patch tracker?
+On 2 November 2017 at 12:50, Matthias Brugger <matthias.bgg@gmail.com> wrote:
+>
+>
+> On 10/25/2017 11:11 PM, Ulf Hansson wrote:
+>> On 16 October 2017 at 03:46, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+>>> devicetree bindings has been updated to support multi-platforms,
+>>> so that each platform has its owns compatible name.
+>>> And, this compatible name may used in driver to distinguish with
+>>> other platform.
+>>>
+>>> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+>>
+>> Matthias, do you intend to pick this? Else I can do it with your ack...
+>>
+>
+> If it's not too late, feel free to take it. Otherwise I will queue it for the
+> next merge window:
+>
+> Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
 
-If you put it in the patch tracker now, I'll apply it when appropriate.
+Thanks, I have queued it up for 4.15 and will add your ack.
 
-Thanks.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Kind regards
+Uffe
