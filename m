@@ -1,38 +1,236 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Thu, 2 Nov 2017 16:52:37 +0800
-Subject: [PATCH v1 1/3] arm64: add a macro for SError synchronization
-In-Reply-To: <20171101141603.4ppgwup4grnmcswe@lakrids.cambridge.arm.com>
-References: <1509563697-6359-1-git-send-email-gengdongjiu@huawei.com>
- <1509563697-6359-2-git-send-email-gengdongjiu@huawei.com>
- <6dc82768-8564-a54e-041b-3b9965fa038b@arm.com>
- <d7b8b779-9e00-8e8f-b44e-48e3d7e37058@huawei.com>
- <20171101141603.4ppgwup4grnmcswe@lakrids.cambridge.arm.com>
-Message-ID: <399edb73-ec0d-1f73-d244-0d10f0a9e169@huawei.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 2 Nov 2017 10:02:48 +0100
+Subject: [PATCH] ARM: sun8i: h2+: add support for Banana Pi M2 Zero board
+In-Reply-To: <20171101093814.19177-1-icenowy@aosc.io>
+References: <20171101093814.19177-1-icenowy@aosc.io>
+Message-ID: <20171102090248.wnvj7dpphn5uqsut@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-On 2017/11/1 22:16, Mark Rutland wrote:
->> it will report Error.
-> Alternatives cannot be nested. You need to define a cap like:
+On Wed, Nov 01, 2017 at 05:38:14PM +0800, Icenowy Zheng wrote:
+> Banana Pi M2 Zero board is a H2+-based board by Sinovoip, with a form
+> factor and GPIO holes similar to Raspberry Pi Zero.
 > 
->   ARM64_HAS_RAS_NOT_IESB
+> It features:
+> - Allwinner H2+ SoC
+> - Single-chip (16-bit) 512MiB DDR3 DRAM
+> - Ampak AP6212 Wi-Fi/Bluetooth module
+> - MicroSD slot
+> - Two MicroUSB Type-B ports (one can only be used to power the board and
+>   the other features OTG functionality)
+> - Two keys, a reset and a GPIO-connected key.
+> - HDMI Type-C (miniHDMI) connector connected to the HDMI part of H2+.
+> - CSI connector to connect the camera sensor provided by Sinovoip.
 > 
-> ... which is set when ARM64_HAS_RAS_EXTN && !ARM64_HAS_IESB.
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>  arch/arm/boot/dts/Makefile                         |   1 +
+>  .../boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts    | 156 +++++++++++++++++++++
+>  2 files changed, 157 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
 > 
-> Then you can do:
-> 
-> alternative_if ARM64_HAS_RAS_NOT_IESB
-> 	esb
-> alternative_else_nop_endif
-> 
-> See ARM64_ALT_PAN_NOT_UAO for an example.
-> 
-> That said, as Robin points out we may not even need the alternative.
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 3a5b79fd8198..803dbdf03916 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -930,6 +930,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+>  	sun8i-a83t-bananapi-m3.dtb \
+>  	sun8i-a83t-cubietruck-plus.dtb \
+>  	sun8i-a83t-tbs-a711.dtb \
+> +	sun8i-h2-plus-bananapi-m2-zero.dtb \
+>  	sun8i-h2-plus-orangepi-zero.dtb \
+>  	sun8i-h3-bananapi-m2-plus.dtb \
+>  	sun8i-h3-beelink-x2.dtb \
+> diff --git a/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts b/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
+> new file mode 100644
+> index 000000000000..414258da4308
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
+> @@ -0,0 +1,156 @@
+> +/*
+> + * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.io>
+> + *
+> + * Based on sun8i-h3-bananapi-m2-plus.dts, which is:
+> + *   Copyright (C) 2016 Chen-Yu Tsai <wens@csie.org>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +#include "sun8i-h3.dtsi"
+> +#include "sunxi-common-regulators.dtsi"
+> +
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/input/input.h>
+> +
+> +/ {
+> +	model = "Banana Pi BPI-M2-Zero";
+> +	compatible = "sinovoip,bpi-m2-zero", "allwinner,sun8i-h2-plus";
+> +
+> +	aliases {
+> +		serial0 = &uart0;
+> +		serial1 = &uart1;
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +		pinctrl-names = "default";
 
-Ok, got it. thank you very much for your point and opinion
+This property is useless
 
+> +
+> +		pwr_led {
+> +			label = "bananapi-m2-zero:red:pwr";
+> +			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>; /* PL10 */
+> +			default-state = "on";
+> +		};
+> +	};
+> +
+> +	gpio_keys {
+> +		compatible = "gpio-keys";
+> +		pinctrl-names = "default";
 
-> 
-> Thanks,
-> Mark.
+Same thing here.
+
+> +
+> +		sw4 {
+
+That node should be called power.
+
+> +			label = "power";
+> +			linux,code = <BTN_0>;
+> +			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
+> +		};
+> +	};
+> +
+> +	wifi_pwrseq: wifi_pwrseq {
+> +		compatible = "mmc-pwrseq-simple";
+> +		pinctrl-names = "default";
+
+That property is useless
+
+> +		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>; /* PL7 */
+> +	};
+> +};
+> +
+> +&ehci0 {
+> +	status = "okay";
+> +};
+> +
+> +&mmc0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc0_pins_a>;
+> +	vmmc-supply = <&reg_vcc3v3>;
+> +	bus-width = <4>;
+> +	/*
+> +	 * In different revisions the board have different card detect
+> +	 * configuration.
+> +	 */
+
+Which ones?
+
+> +	broken-cd;
+> +	status = "okay";
+> +};
+> +
+> +&mmc1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc1_pins_a>;
+> +	vmmc-supply = <&reg_vcc3v3>;
+> +	vqmmc-supply = <&reg_vcc3v3>;
+> +	mmc-pwrseq = <&wifi_pwrseq>;
+> +	bus-width = <4>;
+> +	non-removable;
+> +	status = "okay";
+> +
+> +	brcmf: wifi at 1 {
+> +		reg = <1>;
+> +		compatible = "brcm,bcm4329-fmac";
+> +		interrupt-parent = <&pio>;
+> +		interrupts = <6 10 IRQ_TYPE_LEVEL_LOW>; /* PG10 / EINT10 */
+> +		interrupt-names = "host-wake";
+> +	};
+> +};
+> +
+> +&ohci0 {
+> +	status = "okay";
+> +};
+> +
+> +&uart0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart0_pins_a>;
+> +	status = "okay";
+> +};
+> +
+> +&uart1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
+> +	status = "okay";
+> +};
+> +
+> +&usb_otg {
+> +	dr_mode = "otg";
+> +	status = "okay";
+> +};
+> +
+> +&usbphy {
+> +	usb0_id_det-gpios = <&r_pio 0 6 GPIO_ACTIVE_HIGH>; /* PL6 */
+> +	/* USB OTG VBUS is directly connected to 5V without any regulators */
+
+So it cannot operate in OTG, but it's host only?
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171102/7218d614/attachment.sig>
