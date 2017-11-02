@@ -1,19 +1,19 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 1 Nov 2017 22:35:34 -0700
-Subject: [GIT PULL] Allwinner clock changes for 4.15
-In-Reply-To: <20171020074324.y5ykvzhst3uq6kbz@flea>
-References: <20171020074324.y5ykvzhst3uq6kbz@flea>
-Message-ID: <20171102053534.GL30645@codeaurora.org>
+Date: Wed, 1 Nov 2017 22:35:46 -0700
+Subject: [GIT PULL] Amlogic clock driver updates for 4.15
+In-Reply-To: <f83efd53-0600-a4b4-3ee2-089e435a8cb4@baylibre.com>
+References: <f83efd53-0600-a4b4-3ee2-089e435a8cb4@baylibre.com>
+Message-ID: <20171102053546.GM30645@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/20, Maxime Ripard wrote:
+On 10/20, Neil Armstrong wrote:
 > Hi Mike, Stephen,
 > 
-> Please pull the following changes for the next merge window.
+> Below is a request to pull the Amlogic clock driver updates for 4.15.
 > 
-> Thanks!
-> Maxime
+> Thanks,
+> Neil
 > 
 > The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 > 
@@ -21,11 +21,11 @@ On 10/20, Maxime Ripard wrote:
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-clk-for-4.15
+>   git://github.com/baylibre/clk-meson.git tags/meson-clk-for-4.15
 > 
-> for you to fetch changes up to 4328a2186e5120cfd34c4f04c6e4b7e74fb8b7b4:
+> for you to fetch changes up to 762a1f2098b2fd4f84ccdb62d5747fff1ad7f816:
 > 
->   clk: sunxi-ng: sun4i: Export video PLLs (2017-10-17 19:32:16 +0200)
+>   clk: meson: gxbb: Add VPU and VAPB clocks data (2017-10-20 10:34:49 +0200)
 > 
 
 Thanks. Pulled.
