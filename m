@@ -1,93 +1,48 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 2 Nov 2017 16:56:40 +0530
-Subject: [PATCH] mailbox: add support for doorbell/signal mode controllers
-In-Reply-To: <4268c9d9-dc1e-0bd7-3fac-790c2d42b54b@arm.com>
-References: <1509553964-4451-1-git-send-email-sudeep.holla@arm.com>
- <CABb+yY1tcm-68E5oG75hstuMd6AOeb=BB6HeKGnQ1zj4Qya6hg@mail.gmail.com>
- <59a05fcb-ff30-0683-144e-93521a7413f9@arm.com>
- <CABb+yY16-B9vReRjLopV1RsyB8a=c5X9XaomtTj44520XrDdmA@mail.gmail.com>
- <4268c9d9-dc1e-0bd7-3fac-790c2d42b54b@arm.com>
-Message-ID: <CABb+yY3Gd3u-_xNPSqJT_+yVHGMs7pgt3Bc4faGvN2KwOsm6_w@mail.gmail.com>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Thu, 2 Nov 2017 11:28:55 +0000
+Subject: [PATCH 3/3] ARM: early_printk: use printascii() rather than
+ printch()
+In-Reply-To: <20171102112041.GW9463@n2100.armlinux.org.uk>
+References: <20171031171629.GI9463@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1710311346190.21665@knanqh.ubzr>
+ <20171031175344.GJ9463@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1710311355000.21665@knanqh.ubzr>
+ <20171031182024.GK9463@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1710311432120.21665@knanqh.ubzr>
+ <SG2PR06MB1165AE45FB289039E55D03028A5E0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+ <20171102000945.GT9463@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1711012249020.21665@knanqh.ubzr>
+ <SG2PR06MB11655BDEF09BB62D268A29DD8A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+ <20171102112041.GW9463@n2100.armlinux.org.uk>
+Message-ID: <SG2PR06MB11653D39086B1F58497C9FE08A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 2, 2017 at 4:17 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> On 02/11/17 02:39, Jassi Brar wrote:
+On Thursday, November 02, 2017, Russell King - ARM Linux wrote:
+> The compiler is only involved for the C pre-processor front-end.  It's
+> not involved in parsing the resulting assembly - as far as gcc is
+> concerned, it could be forth in the post-processed file.
+> 
+> GCC will then pass the post-processed output to binutils 'as' to do the
+> actual assembly, and that's what should complain.
 
->>>>>
->>>>> Such controllers don't need to transmit any data, they just transmit
->>>>> the signal. In such controllers the data pointer passed to
->>>>> mbox_send_message is passed to client via it's tx_prepare callback.
->>>>> Controller doesn't need any data to be passed from the client.
->>>>>
->>>> Some controllers need a non-zero value written to a register in order
->>>> to trigger the signal.
->>>
->>> You are right, just right non-zero or whatever controller value to
->>> trigger the interrupt to remote.
->>>
->>>> That register is visible to the remote. While the data/packet is setup
->>>> during tx_prepare() callback.
->>>
->>> Agreed.
->>>
->>>> You are overlooking this class of doorbell controllers.
->>>>
->>>
->>> Not sure what do you mean by that ?
->>>
->> Such doorbell controllers can't use send_signal(chan) because they
->> need that non-zero value from client to send over the shared register.
->> You are assuming every protocol implements just one command.
->>
->
-> No that non-zero value is not client specific, it's entirely controller
-> specific.
->
-??
-For example BCM2835 has such a controller. Have a look at
-bcm2835_send_data() and let me know what is that controller specific
-value.
+Oops, I meant to show this:
+
+$ arm-linux-gnueabihf-as -version
+GNU assembler (Linaro_Binutils-2017.01) 2.25.2 Linaro 2016_02
+Copyright (C) 2014 Free Software Foundation, Inc.
+This program is free software; you may redistribute it under the terms of
+the GNU General Public License version 3 or later.
+This program has absolutely no warranty.
+This assembler was configured for a target of `arm-linux-gnueabihf'.
 
 
->>> Again agreed. But see below for reason to create this API.
->>>
->>>>> The new API send_signal will eliminate the
->>>>> issue Jassi has explained in earlier discussion with respect to generic
->>>>> message format using Rockchip example.
->>>>>
->>>> Sorry I don't see how.
->>>> Please explain how can send_signal() api be used by, say, rockchip to
->>>> support SCMI?
->>>>
->>>
->>>  80         writel_relaxed(msg->cmd, mb->mbox_base +
->>> MAILBOX_A2B_CMD(chans->idx));
->>>  81         writel_relaxed(msg->rx_size, mb->mbox_base +
->>>
->>>  82                        MAILBOX_A2B_DAT(chans->idx));
->>>
->>>  83
->>>
->>>  will be replaced with
->>>
->>> writel(whatever_value_to trigger_signal, MAILBOX_A2B_CMD(chans->idx));
->>>
->>> in its send_signal function.
->>>
->> 1) Where does the  "whatever_value_to_trigger_signal"  come from?
->
-> Controller specific.
->
->> That has to come from client.
->
-> No.
->
-Again, let me know what does the controller expect 'val' to be
+> So, as far as ARM assembly in the Linux kernel goes, all constants must
+> be preceded by # whether or not binutils requires it - no exceptions.
+> Please always test assembly changes with a binutils version that is not
+> gratuitously broken!
 
-  writel(val, MAILBOX_A2B_CMD(chans->idx))
+Somewhat ironic since Nicolas works for Linaro.
 
 
-Your entire post is based on your assertion that the controller
-expects a particular non-zero value to trigger a signal, which is
-wrong. So lets first get that straight and not stray from the point.
+Chris
