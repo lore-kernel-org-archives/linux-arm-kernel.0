@@ -1,72 +1,54 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Thu, 2 Nov 2017 09:18:46 +0100
-Subject: [PATCH v5] ARM: dts: imx53-tx53: Fix 'ethernet-phy@0' node with
- unit name and no reg property
-In-Reply-To: <CAOMZO5ALw3VKkX_rQCfBVNQ1q5Y8a12R3Dn42NyPAn3Te0e6OQ@mail.gmail.com>
-References: <1509031514-30602-1-git-send-email-marco.franchi@nxp.com>
- <CAOMZO5ALw3VKkX_rQCfBVNQ1q5Y8a12R3Dn42NyPAn3Te0e6OQ@mail.gmail.com>
-Message-ID: <20171102091846.2046173a@karo-electronics.de>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 2 Nov 2017 09:04:12 +0100
+Subject: [PATCH] ARM: dts: iwg20d-q7: Add support for ttySC3
+In-Reply-To: <TY1PR06MB0895612044D5E21BCBFEF46BC0740@TY1PR06MB0895.apcprd06.prod.outlook.com>
+References: <1507539981-4193-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <CAMuHMdUprE7QuXF_sX47JyrvuZXhXnQFufy4OHeJ5ExwwoogKw@mail.gmail.com>
+ <TY1PR06MB0895612044D5E21BCBFEF46BC0740@TY1PR06MB0895.apcprd06.prod.outlook.com>
+Message-ID: <20171102080412.n3wfabxt2ayswxzp@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, 26 Oct 2017 16:10:54 -0200 Fabio Estevam wrote:
-> On Thu, Oct 26, 2017 at 1:25 PM, Marco Franchi <marco.franchi@nxp.com> wrote:
-> > The following build warning is seen with W=1:
-> >
-> > Warning (unit_address_vs_reg): Node /soc/aips at 60000000/ethernet at 63fec000/ethernet-phy at 0 has a unit name, but no reg property
-> >
-> > Fix this warning by adding reg property from such node and, consequently,
-> > includes a mdio node into the fec node, with the 'address-cells' and
-> > 'size-cells' to avoid these other following warnings:
-> >
-> > Warning (reg_format): "reg" property in /soc/aips at 60000000/ethernet at 63fec000/ethernet-phy at 0 has invalid length (4 bytes) (#address-cells == 2, #size-cells == 1)
-> > Warning (avoid_default_addr_size): Relying on default #address-cells value for /soc/aips at 60000000/ethernet at 63fec000/ethernet-phy at 0
-> > Warning (avoid_default_addr_size): Relying on default #size-cells value for /soc/aips at 60000000/ethernet at 63fec000/ethernet-phy at 0
-> >
-> > Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
+On Mon, Oct 09, 2017 at 01:45:07PM +0000, Fabrizio Castro wrote:
+> Hello Geert,
 > 
-> Lothar, could you please test it?
+> thank you for your feedback!
 > 
-> > ---
-> > Change since v4:
-> > -pass the 'address-cells' and 'size-cells' values using a mdio node
-> > -change message log
-> >  arch/arm/boot/dts/imx53-tx53.dtsi | 14 ++++++++++----
-> >  1 file changed, 10 insertions(+), 4 deletions(-)
 > >
-> > diff --git a/arch/arm/boot/dts/imx53-tx53.dtsi b/arch/arm/boot/dts/imx53-tx53.dtsi
-> > index 71b58b6..a22e461 100644
-> > --- a/arch/arm/boot/dts/imx53-tx53.dtsi
-> > +++ b/arch/arm/boot/dts/imx53-tx53.dtsi
-> > @@ -225,10 +225,16 @@
-> >         mac-address = [000000000000]; /* placeholder; will be overwritten by bootloader */
-> >         status = "okay";
+> > Hi Fabrizio, Chris,
 > >
-> > -       phy0: ethernet-phy at 0 {
-> > -               interrupt-parent = <&gpio2>;
-> > -               interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
-> > -               device_type = "ethernet-phy";
-> > +       mdio {
-> > +               #address-cells = <1>;
-> > +               #size-cells = <0>;
-> > +
-> > +               phy0: ethernet-phy at 0 {
-> > +                       reg = <0>;
-> > +                       interrupt-parent = <&gpio2>;
-> > +                       interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
-> > +                       device_type = "ethernet-phy";
-> > +               };
-> >         };
-> >  };
+> > On Mon, Oct 9, 2017 at 11:06 AM, Fabrizio Castro
+> > <fabrizio.castro@bp.renesas.com> wrote:
+> > > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> > > Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
 > >
-> > --
-> > 2.7.4
+> > Thanks for your patch!
 > >
+> > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >
+> > > --- a/arch/arm/boot/dts/iwg20d-q7-common.dtsi
+> > > +++ b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
+> > > @@ -11,6 +11,7 @@
+> > >  / {
+> > >         aliases {
+> > >                 serial0 = &scif0;
+> > > +               serial3 = &scifb1;
+> >
+> > Given this port is not labeled "serial3", but called "data uart", you may want
+> > to add a comment to avoid confusion:
 > 
-Tested-by: <LW@karo-electronics.de>
-Acked-by: <LW@karo-electronics.de>
+> It's a little bit confusing, isn't it? The lines related to such
+> interface are named as UART0_x on the carrier board schematic, the
+> section of the schematic that contains the header is named "data uart
+> header", and the board documentation names it explicitly as "UART 3 -
+> /dev/ttySC3 (SCIFB1)".
+> 
+> I don't think there is anything we can do to make this easier for the
+> user really, is there? :D If we decide to add a comment to serial 3, I
+> guess we need to be consistent and add comments for the other serial
+> interfaces too.  If you still prefer having a comment there I'll send a
+> v2 and patch(es) for adding comments to the other interfaces, just let me
+> know.
 
-
-Lothar Wa?mann
+I have applied this patch. If a comment is subsequently decided on
+then please send a follow-up patch.
