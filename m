@@ -1,71 +1,53 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Thu, 2 Nov 2017 09:14:05 +0100
-Subject: [PATCH v4 00/21] SError rework + RAS&IESB for firmware first
- support
-In-Reply-To: <59F9E706.40503@arm.com>
-References: <20171019145807.23251-1-james.morse@arm.com>
- <20171031063535.GA2166@lvm> <20171031100829.GC5584@arm.com>
- <59F9E706.40503@arm.com>
-Message-ID: <20171102081405.GA20075@cbox>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 2 Nov 2017 13:47:58 +0530
+Subject: [PATCH] dmaengine: dmatest: bug out when dma test times out
+In-Reply-To: <1509565797-5219-1-git-send-email-awallis@codeaurora.org>
+References: <1509565797-5219-1-git-send-email-awallis@codeaurora.org>
+Message-ID: <20171102081758.GD3187@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 01, 2017 at 03:23:50PM +0000, James Morse wrote:
-> Hi guys,
+On Wed, Nov 01, 2017 at 03:49:57PM -0400, Adam Wallis wrote:
+> Commit adfa543e7314 ("dmatest: don't use set_freezable_with_signal()")
+> introduced a bug (that is in fact documented by the patch commit text)
+> that leaves behind a dangling pointer. Since the done_wait structure is
+> allocated on the stack, future invocations to the DMATEST can produce
+> undesirable results (e.g., corrupted spinlocks). Ideally, this would be
+> cleaned up in the the thread handler, but at the very least, the kernel
+> is left in a very precarious scenario that can lead to some long debug
+> sessions when the crash comes later.
 > 
-> On 31/10/17 10:08, Will Deacon wrote:
-> > On Tue, Oct 31, 2017 at 07:35:35AM +0100, Christoffer Dall wrote:
-> >> On Thu, Oct 19, 2017 at 03:57:46PM +0100, James Morse wrote:
-> >>> The aim of this series is to enable IESB and add ESB-instructions to let us
-> >>> kick any pending RAS errors into firmware to be handled by firmware-first.
-> >>>
-> >>> Not all systems will have this firmware, so these RAS errors will become
-> >>> pending SErrors. We should take these as quickly as possible and avoid
-> >>> panic()ing for errors where we could have continued.
-> >>>
-> >>> This first part of this series reworks the DAIF masking so that SError is
-> >>> unmasked unless we are handling a debug exception.
-> >>>
-> >>> The last part provides the same minimal handling for SError that interrupt
-> >>> KVM. KVM is currently unable to handle SErrors during world-switch, unless
-> >>> they occur during a magic single-instruction window, it hyp-panics. I suspect
-> >>> this will be easier to fix once the VHE world-switch is further optimised.
-> >>>
-> >>> KVMs kvm_inject_vabt() needs updating for v8.2 as now we can specify an ESR,
-> >>> and all-zeros has a RAS meaning.
-> >>>
-> >>> KVM's existing 'impdef SError to the guest' behaviour probably needs revisiting.
-> >>> These are errors where we don't know what they mean, they may not be
-> >>> synchronised by ESB. Today we blame the guest.
-> >>> My half-baked suggestion would be to make a virtual SError pending, but then
-> >>> exit to user-space to give Qemu the change to quit (for virtual machines that
-> >>> don't generate SError), pend an SError with a new Qemu-specific ESR, or blindly
-> >>> continue and take KVMs default all-zeros impdef ESR.
-> >>
-> >> The KVM side of this series is looking pretty good.
-> >>
-> >> What are the merge plans for this?  I am fine if you will take this via
-> >> the arm64 tree with our acks from the KVM side.  Alternatively, I
-> >> suppose you can apply all the arm64 patches and provide us with a stable
-> >> branch for that?
-> > 
-> > I'll take a look this afternoon, but we haven't had a linux next release
-> > since the 18th so I'm starting to get nervous about conflicts if I end up
-> > pulling in new trees now.
+> This bug has also been captured at
+> https://bugzilla.kernel.org/show_bug.cgi?id=197605
 > 
-> Will's 'what about mixed RAS support' comment will take me a while to get to
-> fix, and I don't think I can test that before the end of the week.
+> Signed-off-by: Adam Wallis <awallis@codeaurora.org>
+> ---
+>  drivers/dma/dmatest.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Unless there is an rc8+linux-next I think this is too late, but I will split off
-> and repost the SError_rework bits as that seems uncontentious...
-> 
+> diff --git a/drivers/dma/dmatest.c b/drivers/dma/dmatest.c
+> index 34ff532..95c662f 100644
+> --- a/drivers/dma/dmatest.c
+> +++ b/drivers/dma/dmatest.c
+> @@ -706,7 +706,7 @@ static int dmatest_func(void *data)
+>  			result("test timed out", total_tests, src_off, dst_off,
+>  			       len, 0);
+>  			failed_tests++;
+> -			continue;
+> +			BUG();
+
+This will essentially kill the system. People have been trying to remove
+usage of BUG(), we should not do that. Complaining violently makes sense..
+
+
+>  		} else if (status != DMA_COMPLETE) {
+>  			dmaengine_unmap_put(um);
+>  			result(status == DMA_ERROR ?
+> -- 
+> Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+> Qualcomm Technologies, Inc. is a member of the
+> Code Aurora Forum, a Linux Foundation Collaborative Project.
 > 
 
-It is indeed cutting it a bit close.  We'll have the same challenge of
-either going via arm64 or using a stable branch we merge into the KVM
-side for the next merge window as well.  I prefer the latter, since
-there's going to be some conflicts with my optimization series which I
-hope to get in for v4.16.
-
-Thanks,
--Christoffer
+-- 
+~Vinod
