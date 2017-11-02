@@ -1,152 +1,66 @@
 From: james.morse@arm.com (James Morse)
-Date: Thu,  2 Nov 2017 12:12:42 +0000
-Subject: [RESEND PATCH v4 9/9] arm64: entry.S: move SError handling into a C
- function for future expansion
+Date: Thu,  2 Nov 2017 12:12:41 +0000
+Subject: [RESEND PATCH v4 8/9] arm64: entry.S: convert elX_irq
 In-Reply-To: <20171102121242.8925-1-james.morse@arm.com>
 References: <20171102121242.8925-1-james.morse@arm.com>
-Message-ID: <20171102121242.8925-10-james.morse@arm.com>
+Message-ID: <20171102121242.8925-9-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Xie XiuQi <xiexiuqi@huawei.com>
+Following our 'dai' order, irqs should be processed with debug and
+serror exceptions unmasked.
 
-Today SError is taken using the inv_entry macro that ends up in
-bad_mode.
+Add a helper to unmask these two, (and fiq for good measure).
 
-SError can be used by the RAS Extensions to notify either the OS or
-firmware of CPU problems, some of which may have been corrected.
-
-To allow this handling to be added, add a do_serror() C function
-that just panic()s. Add the entry.S boiler plate to save/restore the
-CPU registers and unmask debug exceptions. Future patches may change
-do_serror() to return if the SError Interrupt was notification of a
-corrected error.
-
-Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
-Signed-off-by: Wang Xiongfeng <wangxiongfengi2@huawei.com>
-[Split out of a bigger patch, added compat path, renamed, enabled debug
- exceptions]
 Signed-off-by: James Morse <james.morse@arm.com>
+Reviewed-by: Julien Thierry <julien.thierry@arm.com>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/Kconfig        |  2 +-
- arch/arm64/kernel/entry.S | 36 +++++++++++++++++++++++++++++-------
- arch/arm64/kernel/traps.c | 13 +++++++++++++
- 3 files changed, 43 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 0df64a6a56d4..70dfe4e9ccc5 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -98,7 +98,7 @@ config ARM64
- 	select HAVE_IRQ_TIME_ACCOUNTING
- 	select HAVE_MEMBLOCK
- 	select HAVE_MEMBLOCK_NODE_MAP if NUMA
--	select HAVE_NMI if ACPI_APEI_SEA
-+	select HAVE_NMI
- 	select HAVE_PATA_PLATFORM
- 	select HAVE_PERF_EVENTS
- 	select HAVE_PERF_REGS
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index df085ec003b0..e147c1d00b41 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -375,18 +375,18 @@ ENTRY(vectors)
- 	kernel_ventry	el1_sync			// Synchronous EL1h
- 	kernel_ventry	el1_irq				// IRQ EL1h
- 	kernel_ventry	el1_fiq_invalid			// FIQ EL1h
--	kernel_ventry	el1_error_invalid		// Error EL1h
-+	kernel_ventry	el1_error			// Error EL1h
+==
+Changes since v3:
+* Added comment against enable_da_f
+---
+ arch/arm64/include/asm/assembler.h | 5 +++++
+ arch/arm64/kernel/entry.S          | 4 ++--
+ 2 files changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index c2a37e2f733c..e4ac505b7b3d 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -54,6 +54,11 @@
+ 	msr	daif, \tmp
+ 	.endm
  
- 	kernel_ventry	el0_sync			// Synchronous 64-bit EL0
- 	kernel_ventry	el0_irq				// IRQ 64-bit EL0
- 	kernel_ventry	el0_fiq_invalid			// FIQ 64-bit EL0
--	kernel_ventry	el0_error_invalid		// Error 64-bit EL0
-+	kernel_ventry	el0_error			// Error 64-bit EL0
- 
- #ifdef CONFIG_COMPAT
- 	kernel_ventry	el0_sync_compat			// Synchronous 32-bit EL0
- 	kernel_ventry	el0_irq_compat			// IRQ 32-bit EL0
- 	kernel_ventry	el0_fiq_invalid_compat		// FIQ 32-bit EL0
--	kernel_ventry	el0_error_invalid_compat	// Error 32-bit EL0
-+	kernel_ventry	el0_error_compat		// Error 32-bit EL0
- #else
- 	kernel_ventry	el0_sync_invalid		// Synchronous 32-bit EL0
- 	kernel_ventry	el0_irq_invalid			// IRQ 32-bit EL0
-@@ -455,10 +455,6 @@ ENDPROC(el0_error_invalid)
- el0_fiq_invalid_compat:
- 	inv_entry 0, BAD_FIQ, 32
- ENDPROC(el0_fiq_invalid_compat)
--
--el0_error_invalid_compat:
--	inv_entry 0, BAD_ERROR, 32
--ENDPROC(el0_error_invalid_compat)
- #endif
- 
- el1_sync_invalid:
-@@ -663,6 +659,10 @@ el0_svc_compat:
- el0_irq_compat:
- 	kernel_entry 0, 32
- 	b	el0_irq_naked
-+
-+el0_error_compat:
-+	kernel_entry 0, 32
-+	b	el0_error_naked
- #endif
- 
- el0_da:
-@@ -780,6 +780,28 @@ el0_irq_naked:
- 	b	ret_to_user
- ENDPROC(el0_irq)
- 
-+el1_error:
-+	kernel_entry 1
-+	mrs	x1, esr_el1
-+	enable_dbg
-+	mov	x0, sp
-+	bl	do_serror
-+	kernel_exit 1
-+ENDPROC(el1_error)
-+
-+el0_error:
-+	kernel_entry 0
-+el0_error_naked:
-+	mrs	x1, esr_el1
-+	enable_dbg
-+	mov	x0, sp
-+	bl	do_serror
-+	enable_daif
-+	ct_user_exit
-+	b	ret_to_user
-+ENDPROC(el0_error)
-+
++	/* IRQ is the lowest priority flag, unconditionally unmask the rest. */
++	.macro enable_da_f
++	msr	daifclr, #(8 | 4 | 1)
++	.endm
 +
  /*
-  * This is the fast syscall return path.  We do as little as possible here,
-  * and this includes saving x0 back into the kernel stack.
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 1808be65d22f..773aae69c376 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -709,6 +709,19 @@ asmlinkage void handle_bad_stack(struct pt_regs *regs)
- }
+  * Enable and disable interrupts.
+  */
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index f7dfe5d2b1fb..df085ec003b0 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -557,7 +557,7 @@ ENDPROC(el1_sync)
+ 	.align	6
+ el1_irq:
+ 	kernel_entry 1
+-	enable_dbg
++	enable_da_f
+ #ifdef CONFIG_TRACE_IRQFLAGS
+ 	bl	trace_hardirqs_off
  #endif
- 
-+asmlinkage void do_serror(struct pt_regs *regs, unsigned int esr)
-+{
-+	nmi_enter();
-+
-+	console_verbose();
-+
-+	pr_crit("SError Interrupt on CPU%d, code 0x%08x -- %s\n",
-+		smp_processor_id(), esr, esr_get_class_string(esr));
-+	__show_regs(regs);
-+
-+	panic("Asynchronous SError Interrupt");
-+}
-+
- void __pte_error(const char *file, int line, unsigned long val)
- {
- 	pr_err("%s:%d: bad pte %016lx.\n", file, line, val);
+@@ -766,7 +766,7 @@ ENDPROC(el0_sync)
+ el0_irq:
+ 	kernel_entry 0
+ el0_irq_naked:
+-	enable_dbg
++	enable_da_f
+ #ifdef CONFIG_TRACE_IRQFLAGS
+ 	bl	trace_hardirqs_off
+ #endif
 -- 
 2.15.0.rc2
