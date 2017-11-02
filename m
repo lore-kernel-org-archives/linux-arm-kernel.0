@@ -1,36 +1,53 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 2 Nov 2017 22:03:40 +0530
-Subject: [PATCH] dmaengine: dmatest: bug out when dma test times out
-In-Reply-To: <36367ec9-61b1-9701-2dec-667b175ed90d@codeaurora.org>
-References: <1509565797-5219-1-git-send-email-awallis@codeaurora.org>
- <20171102081758.GD3187@localhost>
- <21c3bb47-8ce6-fb53-9087-5f6bd3250bae@codeaurora.org>
- <36367ec9-61b1-9701-2dec-667b175ed90d@codeaurora.org>
-Message-ID: <20171102163340.GI3187@localhost>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Thu, 2 Nov 2017 16:30:55 +0000
+Subject: [PATCH 3/3] ARM: early_printk: use printascii() rather than
+ printch()
+In-Reply-To: <20171102154814.GE9463@n2100.armlinux.org.uk>
+References: <20171031182024.GK9463@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1710311432120.21665@knanqh.ubzr>
+ <SG2PR06MB1165AE45FB289039E55D03028A5E0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+ <20171102000945.GT9463@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1711012249020.21665@knanqh.ubzr>
+ <SG2PR06MB11655BDEF09BB62D268A29DD8A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+ <20171102112041.GW9463@n2100.armlinux.org.uk>
+ <SG2PR06MB11653D39086B1F58497C9FE08A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+ <nycvar.YSQ.7.76.1711021044380.21665@knanqh.ubzr>
+ <SG2PR06MB116563CB4F1B55160392AAC68A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+ <20171102154814.GE9463@n2100.armlinux.org.uk>
+Message-ID: <SG2PR06MB11658F27BEE84EB8EA286B7B8A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 02, 2017 at 07:50:02AM -0500, Timur Tabi wrote:
-> On 11/02/2017 07:11 AM, Adam Wallis wrote:
-> >>This will essentially kill the system. People have been trying to remove
-> >>usage of BUG(), we should not do that. Complaining violently makes sense..
-> >>
-> >Understood. In my testing, the system is effectively shot if you run the dmatest
-> >in a tight enough loop, however, at least using a WARN would alert the user that
-> >the kernel might be in an unstable state. I will submit another patch with a
-> >WARN, even though, I hope a proper fix can be introduced at some point. I am not
-> >familiar enough with this code to propose such a fix at the moment though.
+On Thursday, November 02, 2017 1, Russell King - ARM Linux wrote:
+> >   Forget it.  (mailing lists are so dry when it comes to humor)
 > 
-> I think Adam's original patch is correct, because as he said, the code as it
-> is today corrupts the kernel.  The BUG() is a stop-cap measure to prevent
-> the user from thinking that the kernel is stable when it isn't.
+> It's not mailing lists, it's email.  Email lacks the facial expressions,
+> and the voice inflections and tone necessary to convey this extra
+> "metadata".  It's a well known problem.  Email is dry and devoid of the
+> subtle hints that humans need to effectively communicate.  Communication
+> is *not* just about the words on a page.
 
-It also helps people to get more information to debug the systems
+Ya I know (insert Frowning Face U+2639 here)
 
-> So I think that either dmatest gets fixed properly today (which Adam said he
-> cannot do), or you should apply his patch until the code can get fixed.
+> It's why we have smilies and emojis, as an attempt to fill that void, but
+> I bet most of us (me included) don't use them enough.
 
-Ofcourse fixing is better.
+I bet people would take their patches being rejected much better if you 
+just sent back a Pile of Poo emoji (U+1F4A9) instead.
 
--- 
-~Vinod
+ (yes, said in a sarcastic voice)
+
+
+> 	http://www.youmeworks.com/no_honking.html
+
+ * Don't use e-mail for emotional or sensitive topics. Pick
+   up the phone or visit in person.
+
+I look forward to seeing you at the next ELC!
+
+   (yes, sarcasm again....)
+
+
+Cheers
+
+Chris
