@@ -1,66 +1,129 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 2 Nov 2017 12:06:15 -0400 (EDT)
-Subject: [PATCH 3/3] ARM: early_printk: use printascii() rather than
- printch()
-In-Reply-To: <nycvar.YSQ.7.76.1711021132170.21665@knanqh.ubzr>
-References: <20171031171629.GI9463@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1710311346190.21665@knanqh.ubzr>
- <20171031175344.GJ9463@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1710311355000.21665@knanqh.ubzr>
- <20171031182024.GK9463@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1710311432120.21665@knanqh.ubzr>
- <SG2PR06MB1165AE45FB289039E55D03028A5E0@SG2PR06MB1165.apcprd06.prod.outlook.com>
- <20171102000945.GT9463@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1711012249020.21665@knanqh.ubzr>
- <SG2PR06MB11655BDEF09BB62D268A29DD8A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
- <20171102112041.GW9463@n2100.armlinux.org.uk>
- <SG2PR06MB11653D39086B1F58497C9FE08A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
- <nycvar.YSQ.7.76.1711021044380.21665@knanqh.ubzr>
- <SG2PR06MB116563CB4F1B55160392AAC68A5C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
- <nycvar.YSQ.7.76.1711021132170.21665@knanqh.ubzr>
-Message-ID: <nycvar.YSQ.7.76.1711021157560.21665@knanqh.ubzr>
+From: jonnyc@amazon.com (Chocron, Jonathan)
+Date: Thu, 2 Nov 2017 16:05:59 +0000
+Subject: [PATCH net-next 4/8] net: ethernet: add the Alpine Ethernet driver
+In-Reply-To: <20170828180932.GG10418@lunn.ch>
+References: <20170203181216.30214-1-antoine.tenart@free-electrons.com>
+ <20170203181216.30214-5-antoine.tenart@free-electrons.com>
+ <20170203205823.GA22572@lunn.ch> <1503841641816.62526@amazon.com>
+ <20170828180932.GG10418@lunn.ch>
+Message-ID: <8023db8c8218450fb6c97049db054989@EX13D13UWA001.ant.amazon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2 Nov 2017, Nicolas Pitre wrote:
+ -----Original Message-----
+> From: Andrew Lunn [mailto:andrew at lunn.ch]
+> Sent: Monday, August 28, 2017 9:10 PM
+> To: Chocron, Jonathan <jonnyc@amazon.com>
+> Cc: Antoine Tenart <antoine.tenart@free-electrons.com>;
+> netdev at vger.kernel.org; davem at davemloft.net; linux-arm-
+> kernel at lists.infradead.org; thomas.petazzoni at free-electrons.com;
+> arnd at arndb.de
+> Subject: Re: [PATCH net-next 4/8] net: ethernet: add the Alpine Ethernet
+> driver
+> 
+> On Sun, Aug 27, 2017 at 01:47:19PM +0000, Chocron, Jonathan wrote:
+> > This is a fixed version of my previous response (using proper indentation
+> and leaving only the specific questions responded to).
+> 
+> Wow, this is old.  3 Feb 2017. I had to go dig into the archive to refresh my
+> memory.
+> 
+> > > > +/* MDIO */
+> > > > +#define AL_ETH_MDIO_C45_DEV_MASK     0x1f0000
+> > > > +#define AL_ETH_MDIO_C45_DEV_SHIFT    16
+> > > > +#define AL_ETH_MDIO_C45_REG_MASK     0xffff
+> > > > +
+> > > > +static int al_mdio_read(struct mii_bus *bp, int mii_id, int reg)
+> > > > +{
+> > > > +     struct al_eth_adapter *adapter = bp->priv;
+> > > > +     u16 value = 0;
+> > > > +     int rc;
+> > > > +     int timeout = MDIO_TIMEOUT_MSEC;
+> > > > +
+> > > > +     while (timeout > 0) {
+> > > > +             if (reg & MII_ADDR_C45) {
+> > > > +                     netdev_dbg(adapter->netdev, "[c45]: dev %x reg %x val
+> %x\n",
+> > > > +                                ((reg & AL_ETH_MDIO_C45_DEV_MASK) >>
+> AL_ETH_MDIO_C45_DEV_SHIFT),
+> > > > +                                (reg & AL_ETH_MDIO_C45_REG_MASK), value);
+> > > > +                     rc = al_eth_mdio_read(&adapter->hw_adapter, adapter-
+> >phy_addr,
+> > > > +                             ((reg & AL_ETH_MDIO_C45_DEV_MASK) >>
+> AL_ETH_MDIO_C45_DEV_SHIFT),
+> > > > +                             (reg & AL_ETH_MDIO_C45_REG_MASK), &value);
+> > > > +             } else {
+> > > > +                     rc = al_eth_mdio_read(&adapter->hw_adapter, adapter-
+> >phy_addr,
+> > > > +                                           MDIO_DEVAD_NONE, reg, &value);
+> > > > +             }
+> > > > +
+> > > > +             if (rc == 0)
+> > > > +                     return value;
+> > > > +
+> > > > +             netdev_dbg(adapter->netdev,
+> > > > +                        "mdio read failed. try again in 10
+> > > > + msec\n");
+> > > > +
+> > > > +             timeout -= 10;
+> > > > +             msleep(10);
+> > > > +     }
+> > >
+> > > This is rather unusual, retrying MDIO operations. Are you working
+> > > around a hardware bug? I suspect this also opens up race conditions,
+> > > in particular with PHY interrupts, which can be clear on read.
+> >
+> > The MDIO bus is shared between the ethernet units. There is a HW lock
+> > used to arbitrate between different interfaces trying to access the
+> > bus, therefore there is a retry loop. The reg isn't accessed before
+> > obtaining the lock, so there shouldn't be any clear on read issues.
+> >
+> > > > +/* al_eth_mdiobus_setup - initialize mdiobus and register to
+> > > > +kernel */ static int al_eth_mdiobus_setup(struct al_eth_adapter
+> > > > +*adapter) {
+> > > > +     struct phy_device *phydev;
+> > > > +     int i;
+> > > > +     int ret = 0;
+> > > > +
+> > > > +     adapter->mdio_bus = mdiobus_alloc();
+> > > > +     if (!adapter->mdio_bus)
+> > > > +             return -ENOMEM;
+> > > > +
+> > > > +     adapter->mdio_bus->name     = "al mdio bus";
+> > > > +     snprintf(adapter->mdio_bus->id, MII_BUS_ID_SIZE, "%x",
+> > > > +              (adapter->pdev->bus->number << 8) | adapter->pdev-
+> >devfn);
+> > > > +     adapter->mdio_bus->priv     = adapter;
+> > > > +     adapter->mdio_bus->parent   = &adapter->pdev->dev;
+> > > > +     adapter->mdio_bus->read     = &al_mdio_read;
+> > > > +     adapter->mdio_bus->write    = &al_mdio_write;
+> > > > +     adapter->mdio_bus->phy_mask = ~BIT(adapter->phy_addr);
+> > >
+> > > Why do this?
+> >
+> > Since the MDIO bus is shared, we want each interface to probe only for the
+> PHY associated with it.
+> 
+> So i think this is the core of the problem. You have one physical MDIO bus,
+> yet you register it twice with the MDIO framework.
+> 
+> How about you only register it once? A lot of the complexity then goes away.
+> The mutex in the mdio core per bus means you don't need your hardware
+> locking. All that code goes away. All the retry code goes away. Life is simple.
+> 
+> 	Andrew
 
-> Would be good to figure out what option makes it accept no # and see if 
-> that can be avoided for kernel build.
+We indeed have one physical MDIO bus, but have multiple masters on it,
+each "behind" a different internal PCIe device. Since the accesses to the bus
+are done "indirectly" through each master, we can't register the bus only once.
+Think of the scenario that we register it in the driver context of PCIe device A,
+and then the driver is unbound from just this device. Device B won't be able
+to access the bus since it was registered with callbacks that use a PCIe BAR of
+device A, which is no longer valid.
 
-OK.. I wanted to get to the bottom of this. The gas documentation says:
+Is it possible to register the mdio_bus struct as a global instance at driver load,
+and someway pass the offset to the specific device's MDIO master, as part of
+each read/write transaction towards the MDIO bus?
+Or perhaps you have another suggestion which takes into account the issues I've described?
 
-|9.4.2.1 Instruction Set Syntax
-|..............................
-|
-|Two slightly different syntaxes are supported for ARM and THUMB
-|instructions.  The default, `divided', uses the old style where ARM and
-|THUMB instructions had their own, separate syntaxes.  The new,
-|`unified' syntax, which can be selected via the `.syntax' directive,
-|and has the following main features:
-|
-|   * Immediate operands do not require a `#' prefix.
-|
-|   * The `IT' instruction may appear, and if it does it is validated
-|     against subsequent conditional affixes.  In ARM mode it does not
-|     generate machine code, in THUMB mode it does.
-|
-|   * For ARM instructions the conditional affixes always appear at the
-|     end of the instruction.  For THUMB instructions conditional
-|     affixes can be used, but only inside the scope of an `IT'
-|     instruction.
-|
-|   * All of the instructions new to the V6T2 architecture (and later)
-|     are available.  (Only a few such instructions can be written in the
-|     `divided' syntax).
-|
-|   * The `.N' and `.W' suffixes are recognized and honored.
-|
-|   * All instructions set the flags if and only if they have an `s'
-|     affix.
-
-So this is a mixed bag of features and, unless I'm missing something, 
-there is no way to get some and not the others. And we do need most of 
-those features for Thumb2 kernel build.
-
-
-Nicolas
+Jonathan
