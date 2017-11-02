@@ -1,20 +1,26 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 1 Nov 2017 23:18:38 -0700
-Subject: [PATCH] clk: uniphier: fix clock data for PXs3
-In-Reply-To: <1507899286-1953-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1507899286-1953-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20171102061837.GR30645@codeaurora.org>
+Date: Wed, 1 Nov 2017 23:22:43 -0700
+Subject: [PATCH 1/2] CLK: SPEAr: make structure field and function
+ argument as const
+In-Reply-To: <1508251114-7042-2-git-send-email-bhumirks@gmail.com>
+References: <1508251114-7042-1-git-send-email-bhumirks@gmail.com>
+ <1508251114-7042-2-git-send-email-bhumirks@gmail.com>
+Message-ID: <20171102062243.GS30645@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/13, Masahiro Yamada wrote:
-> Fix reg offsets of USB clocks.
+On 10/17, Bhumika Goyal wrote:
+> Make the masks field of clk_aux structure const as it do not modify the
+> fields of the aux_clk_masks structure it points to.
 > 
-> Fixes: 736de651a836 ("clk: uniphier: add PXs3 clock data")
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Make the struct aux_clk_masks *aux argument of the function
+> clk_register_aux as const as the argument is only stored in the masks
+> field of a clk_aux structure which is now made const.
+> 
+> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
 > ---
 
-Applied to clk-fixes
+Applied to clk-next
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
